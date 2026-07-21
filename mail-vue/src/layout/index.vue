@@ -78,6 +78,8 @@ onBeforeUnmount(() => {
 .el-aside {
   width: auto;
   transition: all 100ms ease;
+  background: var(--aside-backgound);
+  border-right: var(--aside-right-border);
 }
 
 .layout {

@@ -159,20 +159,19 @@ const formatSize = (bytes) => {
 .title {
   margin: 15px 10px;
   height: 45px;
-  border-radius: 6px;
+  border-radius: 8px;
   display: flex;
   position: relative;
-  font-size: 16px;
-  font-weight: bold;
+  font-size: 18px;
+  font-weight: 800;
   align-items: center;
   justify-content: center;
-  gap: 5px;
-  color: #ffffff;
-  background: linear-gradient(135deg, var(--el-color-primary), var(--el-color-primary-light-3));
+  gap: 8px;
+  color: var(--el-text-color-primary);
+  background: transparent;
   transition: all 0.3s ease;
   max-width: 240px;
   padding: 0 10px;
-  box-shadow: 0 4px 12px rgba(var(--el-color-primary-rgb, 94,106,210), 0.2);
   
   > div {
     overflow: hidden;
@@ -183,7 +182,8 @@ const formatSize = (bytes) => {
 
   :deep(.el-icon) {
     flex-shrink: 0;
-    font-size: 20px;
+    font-size: 24px;
+    color: var(--el-color-primary);
   }
 
   .user-right-icon {
@@ -191,7 +191,7 @@ const formatSize = (bytes) => {
     position: absolute;
     font-size: 12px;
     right: 8px;
-    color: #ffffff;
+    color: var(--regular-text-color);
   }
 }
 
