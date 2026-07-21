@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="100%" height="100%">
+    <defs>
+        <!-- 次世代科技漸層 (數位青綠 -> 經典藍 -> 科技紫) -->
+        <linearGradient id="brandGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#00F5D4" />
+            <stop offset="40%" stop-color="#0072FF" />
+            <stop offset="100%" stop-color="#5B24FF" />
+        </linearGradient>
+
+        <!-- 柔和現代的陰影特效 -->
+        <filter id="softShadow" x="-15%" y="-15%" width="130%" height="130%">
+            <feDropShadow dx="0" dy="12" stdDeviation="15" flood-color="#0072FF" flood-opacity="0.3"/>
+        </filter>
+
+        <!-- ✨ 核心魔法：負空間遮罩 (透過切割來描繪形狀) ✨ -->
+        <mask id="cutout">
+            <!-- 初始保留所有實體背景 -->
+            <rect width="100%" height="100%" fill="white" />
+            
+            <!-- 1. 信封 V 型封口 (配合弧形信封，切口俐落大方) -->
+            <path d="M 15 210 L 200 270 L 385 210" 
+                  fill="none" stroke="black" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" />
+            
+            <!-- 2. 信封對角摺痕 (完美契合底部弧線) -->
+            <line x1="60" y1="320" x2="140" y2="280" stroke="black" stroke-width="10" stroke-linecap="round" />
+            <line x1="340" y1="320" x2="260" y2="280" stroke="black" stroke-width="10" stroke-linecap="round" />
+
+            <!-- 🌟 創新神來之筆：時間印封 (Wax Seal) 🌟 -->
+            <!-- 步驟 A：在 V 型尖端重新填補白底，覆蓋切割線 -->
+            <circle cx="200" cy="270" r="26" fill="white" />
+            
+            <!-- 步驟 B：切割印章外輪廓，產生物理間隙 -->
+            <circle cx="200" cy="270" r="26" fill="none" stroke="black" stroke-width="10" />
+            
+            <!-- 步驟 C：印封內部的 Epoch 極簡時鐘 (10:10) -->
+            <circle cx="200" cy="270" r="4.5" fill="black" />
+            <!-- 時針 (10點方向) -->
+            <line x1="200" y1="270" x2="188" y2="258" stroke="black" stroke-width="7" stroke-linecap="round" />
+            <!-- 分針 (2點方向) -->
+            <line x1="200" y1="270" x2="215" y2="258" stroke="black" stroke-width="7" stroke-linecap="round" />
+        </mask>
+    </defs>
+
+    <!-- 深空背景板 (App Icon 樣式，若需透明背景請移除此行) -->
+    <rect width="400" height="400" rx="90" fill="#0F172A" />
+
+    <!-- 點綴青春科技感的魔法星芒 (避開了高聳的主峰) -->
+    <path d="M 60 110 Q 70 110 70 100 Q 70 110 80 110 Q 70 110 70 120 Q 70 110 60 110 Z" fill="#00F5D4" opacity="0.8" />
+    <path d="M 330 90 Q 335 90 335 85 Q 335 90 340 90 Q 335 90 335 95 Q 335 90 330 90 Z" fill="#FF369B" opacity="0.9" />
+    <circle cx="85" cy="180" r="2.5" fill="#5B24FF" opacity="0.6" />
+    <circle cx="320" cy="180" r="3" fill="#0072FF" opacity="0.7" />
+
+    <!-- 主視覺 Logo：飽滿的三峰雲朵 + 帶有優美弧線底部的信封 -->
+    <g filter="url(#softShadow)">
+        <path d="
+            M 40 220 
+            A 60 60 0 0 1 120 155 
+            A 85 85 0 0 1 280 155 
+            A 60 60 0 0 1 360 220 
+            L 360 260 
+            C 360 325 290 335 200 335 
+            C 110 335 40 325 40 260 
+            Z" 
+            fill="url(#brandGrad)" 
+            mask="url(#cutout)" />
+    </g>
+</svg>
+
