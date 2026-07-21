@@ -5,7 +5,7 @@
         <Icon icon="mdi:email-outline" width="24" height="24" />
         <div>{{settingStore.settings.title}}</div>
       </div>
-      <el-menu :collapse="false" text-color="#fff" active-text-color="#fff" style="margin-top: 10px">
+      <el-menu :collapse="false" style="margin-top: 10px">
         <el-menu-item @click="router.push({name: 'email'})" index="email"
                       :class="route.meta.name === 'email' ? 'choose-item' : ''">
           <Icon icon="hugeicons:mailbox-01" width="20" height="20" />
@@ -168,10 +168,12 @@ const formatSize = (bytes) => {
   justify-content: center;
   gap: 5px;
   color: #ffffff;
-  background: linear-gradient(135deg, #1890ff, #3a80dd);
+  background: linear-gradient(135deg, var(--el-color-primary), var(--el-color-primary-light-3));
   transition: all 0.3s ease;
   max-width: 240px;
   padding: 0 10px;
+  box-shadow: 0 4px 12px rgba(var(--el-color-primary-rgb, 94,106,210), 0.2);
+  
   > div {
     overflow: hidden;
     white-space: nowrap;
@@ -191,32 +193,38 @@ const formatSize = (bytes) => {
     right: 8px;
     color: #ffffff;
   }
-
 }
 
-
 .manage-title {
-  margin-top: 10px;
+  margin-top: 15px;
+  margin-bottom: 5px;
   padding-left: 20px;
-  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--secondary-text-color);
+  letter-spacing: 0.5px;
 }
 
 .el-menu-item {
-  margin: 5px 10px !important;
-  border-radius: 6px;
-  height: 36px;
+  margin: 4px 10px !important;
+  border-radius: 8px;
+  height: 40px;
   padding: 10px !important;
+  color: var(--regular-text-color);
+  transition: all 0.2s ease;
 }
 
 .choose-item {
-  font-weight: bold;
-  background: rgba(255, 255, 255, 0.08) !important;
-  backdrop-filter: blur(4px);
+  font-weight: 600;
+  color: var(--el-color-primary) !important;
+  background: var(--el-color-primary-light-9) !important;
 }
 
 @media (hover: hover) {
-  .el-menu-item:hover {
-    background: rgba(255, 255, 255, 0.08) !important;
+  .el-menu-item:hover:not(.choose-item) {
+    background: var(--base-fill) !important;
+    color: var(--el-text-color-primary);
   }
 }
 
@@ -230,11 +238,11 @@ const formatSize = (bytes) => {
 }
 
 :deep(.el-menu-item) {
-  background: var(--aside-backgound);
+  background: transparent;
 }
 
 :deep(.el-menu) {
-  background: var(--aside-backgound);
+  background: transparent;
 }
 
 .el-menu {
@@ -244,33 +252,30 @@ const formatSize = (bytes) => {
 
 :deep(.el-divider__text) {
   background: var(--aside-backgound);
-  color: #FFFFFF;
-}
-
-.scroll {
-
+  color: var(--regular-text-color);
 }
 
 .quota-container {
   margin: 20px 10px;
   padding: 15px;
-  background: rgba(0, 0, 0, 0.2);
+  background: var(--base-fill);
+  border: 1px solid var(--base-border-color);
   border-radius: 8px;
-  color: #fff;
+  color: var(--el-text-color-primary);
 }
 .quota-title {
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--secondary-text-color);
   margin-bottom: 4px;
 }
 .quota-text {
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--regular-text-color);
   text-align: right;
   margin-top: 2px;
 }
 .db-full-warning {
-  color: #f56c6c;
+  color: var(--el-color-danger, #f56c6c);
   font-size: 12px;
   font-weight: bold;
   text-align: center;
