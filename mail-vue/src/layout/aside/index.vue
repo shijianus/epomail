@@ -218,12 +218,13 @@ const formatSize = (bytes) => {
 .choose-item {
   font-weight: 600;
   color: var(--el-color-primary) !important;
-  background: var(--el-color-primary-light-9) !important;
+  background: var(--el-bg-color) !important;
+  box-shadow: 0 2px 6px rgba(0,0,0, 0.04);
 }
 
 @media (hover: hover) {
   .el-menu-item:hover:not(.choose-item) {
-    background: var(--base-fill) !important;
+    background: rgba(0, 0, 0, 0.04) !important;
     color: var(--el-text-color-primary);
   }
 }

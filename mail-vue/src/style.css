@@ -131,7 +131,7 @@ button, input, select, textarea {
 
     /* Base Layout Colors */
     --el-bg-color: #ffffff;
-    --aside-backgound: #f9f9fb; /* Light grey instead of dark blue */
+    --aside-backgound: #eaf2ff; /* Outlook-style Light Blue */
     --base-fill: #f4f5f8;
     --extra-light-fill: #FAFCFF;
     --light-ill: #F5F7FA;
@@ -181,7 +181,7 @@ button, input, select, textarea {
 
     /* Base Layout Colors */
     --el-bg-color: #0e0f11;
-    --aside-backgound: #151619;
+    --aside-backgound: #0a1326; /* Deep Dark Blue */
     --base-fill: #1a1b1e;
     --extra-light-fill: #191919;
     --light-ill: #262727;
