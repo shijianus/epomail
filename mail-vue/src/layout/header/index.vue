@@ -405,12 +405,13 @@ function formatName(email) {
   align-items: center;
   height: 100%;
   min-width: 0;
+  color: var(--header-text-color);
 }
 
 .breadcrumb-item {
   font-weight: bold;
   font-size: 14px;
-  color: var(--el-text-color-primary);
+  color: var(--header-text-color);
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -433,13 +434,13 @@ function formatName(email) {
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    color: var(--regular-text-color);
+    color: var(--header-text-color);
     transition: all 0.2s ease;
   }
 
   .icon-item:hover {
-    background: var(--base-fill);
-    color: var(--el-color-primary);
+    background: rgba(255, 255, 255, 0.2);
+    color: #ffffff;
   }
 
   .notice {
