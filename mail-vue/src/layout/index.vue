@@ -103,7 +103,7 @@ onBeforeUnmount(() => {
 }
 
 .el-header {
-  background: var(--aside-backgound);
+  background: var(--header-background);
   border-bottom: solid 1px var(--el-border-color);
   padding: 0 0 0 0;
 }

@@ -130,9 +130,10 @@ button, input, select, textarea {
     --el-color-primary-light-9: #E6F2FA;
 
     /* Base Layout Colors */
-    --el-bg-color: #ffffff;          /* Rightmost (Content / 展示頁) - Lightest (White) */
-    --aside-backgound: #DDEEFE;      /* Leftmost/Top (功能頁) - Deepest Light Blue */
-    --base-fill: #EDF5FF;            /* Middle (天藍色) - Medium Light Blue */
+    --el-bg-color: #ffffff;          /* Rightmost/Bottom - Lightest (White) */
+    --header-background: #A6CFFB;    /* Topmost - Deepest Light Blue (Scale is larger than Left-to-Right) */
+    --aside-backgound: #DDEEFE;      /* Leftmost - Deep Light Blue */
+    --base-fill: #EDF5FF;            /* Middle - Medium Light Blue */
     --extra-light-fill: #F4F8FF;
     --light-ill: #F8FAFC;
     
@@ -180,8 +181,9 @@ button, input, select, textarea {
     --el-color-primary-light-9: #0F172A;
 
     /* Base Layout Colors */
-    --el-bg-color: #000000;          /* Rightmost (Content / 展示頁) - Deepest Black */
-    --aside-backgound: #1E293B;      /* Leftmost/Top (功能頁) - Lightest Dark Blue */
+    --el-bg-color: #000000;          /* Rightmost/Bottom - Deepest Black */
+    --header-background: #2A3A54;    /* Topmost - Lightest Dark Blue (Scale is larger than Left-to-Right) */
+    --aside-backgound: #1E293B;      /* Leftmost - Light Dark Blue */
     --base-fill: #0F172A;            /* Middle - Medium Dark Blue */
     --extra-light-fill: #050505;
     --light-ill: #0B1120;
