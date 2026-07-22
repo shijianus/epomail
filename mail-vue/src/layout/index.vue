@@ -93,7 +93,7 @@ onBeforeUnmount(() => {
 
 .main-container {
   min-height: 100%;
-  background: var(--el-bg-color);
+  background: var(--base-fill);
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
 }
@@ -103,7 +103,7 @@ onBeforeUnmount(() => {
 }
 
 .el-header {
-  background: var(--el-bg-color);
+  background: var(--aside-backgound);
   border-bottom: solid 1px var(--el-border-color);
   padding: 0 0 0 0;
 }
