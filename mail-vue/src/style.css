@@ -131,7 +131,8 @@ button, input, select, textarea {
 
     /* Base Layout Colors */
     --el-bg-color: #ffffff;          /* Rightmost/Bottom - Lightest (White) */
-    --header-background: #A6CFFB;    /* Topmost - Deepest Light Blue (Scale is larger than Left-to-Right) */
+    --header-background: #0078D4;    /* Topmost - Solid Deep Blue (Outlook Style) */
+    --header-text-color: #ffffff;    /* Text color for deep background */
     --aside-backgound: #DDEEFE;      /* Leftmost - Deep Light Blue */
     --base-fill: #EDF5FF;            /* Middle - Medium Light Blue */
     --extra-light-fill: #F4F8FF;
@@ -182,7 +183,8 @@ button, input, select, textarea {
 
     /* Base Layout Colors */
     --el-bg-color: #000000;          /* Rightmost/Bottom - Deepest Black */
-    --header-background: #2A3A54;    /* Topmost - Lightest Dark Blue (Scale is larger than Left-to-Right) */
+    --header-background: #334155;    /* Topmost - Lightest Dark Color */
+    --header-text-color: #F9FAFB;    /* Text color for header */
     --aside-backgound: #1E293B;      /* Leftmost - Light Dark Blue */
     --base-fill: #0F172A;            /* Middle - Medium Dark Blue */
     --extra-light-fill: #050505;
