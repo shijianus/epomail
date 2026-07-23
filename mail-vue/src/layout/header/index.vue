@@ -2,6 +2,7 @@
   <div class="header" :class="!hasPerm('email:send') ? 'not-send' : ''">
     <div class="header-left">
       <hanburger @click="changeAside" class="hamburger-btn"></hanburger>
+      <img src="/logo.svg" alt="Logo" class="app-logo" />
       <span class="logo-text">EpoCanvas</span>
       <span class="breadcrumb-item" v-if="route.meta.title">{{ $t(route.meta.title) }}</span>
     </div>
@@ -14,11 +15,6 @@
     </div>
 
     <div class="toolbar header-right">
-      <div v-perm="'email:send'" class="writer-box" @click="openSend">
-        <div class="writer">
-          <Icon icon="material-symbols:edit-outline-sharp" width="22" height="22"/>
-        </div>
-      </div>
       <div v-if="uiStore.dark" class="sun-icon icon-item" @click="openDark($event)">
         <Icon icon="mingcute:sun-fill"/>
       </div>
@@ -71,6 +67,38 @@
                 </div>
               </div>
             </div>
+
+            <!-- Quota UI section -->
+            <div v-if="userStore.user.quota" class="quota-dropdown-section">
+               <div class="quota-title">Storage Quota</div>
+               <el-progress 
+                 :percentage="storagePercent" 
+                 :status="storageStatus" 
+                 :stroke-width="6"
+                 :show-text="false"
+               />
+               <div class="quota-text">
+                  <template v-if="isDbFull && !isAdmin">Full</template>
+                  <template v-else>
+                     {{ formatSize(userStore.user.quota.usedStorageBytes) }} / {{ userStore.user.quota.maxStorageMB }} MB
+                  </template>
+               </div>
+               
+               <div class="quota-title" style="margin-top: 8px;">Email Quota</div>
+               <el-progress 
+                 :percentage="emailPercent" 
+                 :status="emailStatus"
+                 :stroke-width="6"
+                 :show-text="false"
+               />
+               <div class="quota-text">
+                  <template v-if="isDbFull && !isAdmin">Full</template>
+                  <template v-else>
+                     {{ userStore.user.quota.usedEmails }} / {{ userStore.user.quota.maxEmails }}
+                  </template>
+               </div>
+            </div>
+
             <div class="logout">
               <el-button type="primary" :loading="logoutLoading" @click="clickLogout">{{ $t('logOut') }}</el-button>
             </div>
@@ -165,6 +193,38 @@ const sendCount = computed(() => {
   return userStore.user.sendCount + '/' + userStore.user.role.sendCount
 })
 
+const isDbFull = computed(() => userStore.user.quota?.dbFull);
+const isAdmin = computed(() => userStore.user.type === 0);
+
+const storagePercent = computed(() => {
+  if (!userStore.user.quota) return 0;
+  if (isDbFull.value && !isAdmin.value) return 100;
+  return Math.min(100, Math.round((userStore.user.quota.usedStorageBytes / userStore.user.quota.maxStorageBytes) * 100));
+});
+
+const storageStatus = computed(() => {
+  if (isDbFull.value) return 'exception';
+  return storagePercent.value >= 100 ? 'exception' : '';
+});
+
+const emailPercent = computed(() => {
+  if (!userStore.user.quota) return 0;
+  if (isDbFull.value && !isAdmin.value) return 100;
+  return Math.min(100, Math.round((userStore.user.quota.usedEmails / userStore.user.quota.maxEmails) * 100));
+});
+
+const emailStatus = computed(() => {
+  if (isDbFull.value) return 'exception';
+  return emailPercent.value >= 100 ? 'exception' : '';
+});
+
+const formatSize = (bytes) => {
+  if (!bytes) return '0 B';
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+};
+
 function userInfoHide(e) {
     if (userInfoShow.value) {
         userinfoRef.value.handleClose()
@@ -241,9 +301,7 @@ function switchDark(nextIsDark, root) {
   uiStore.dark = nextIsDark
 }
 
-function openSend() {
-  uiStore.writerRef.open()
-}
+
 
 function changeAside() {
   uiStore.asideShow = !uiStore.asideShow
@@ -361,6 +419,34 @@ function formatName(email) {
     justify-content: center;
     border-radius: 10px;
   }
+
+  .quota-dropdown-section {
+    width: 100%;
+    padding: 15px 20px 0;
+    margin-top: 15px;
+    border-top: 1px solid var(--el-border-color-lighter);
+  }
+
+  .quota-title {
+    font-size: 12px;
+    color: var(--secondary-text-color);
+    margin-bottom: 4px;
+    text-align: left;
+  }
+
+  .quota-text {
+    font-size: 12px;
+    color: var(--regular-text-color);
+    text-align: right;
+    margin-top: 2px;
+  }
+}
+
+.app-logo {
+  height: 24px;
+  width: auto;
+  margin-left: 8px;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.1));
 }
 
 
@@ -445,31 +531,6 @@ function formatName(email) {
   justify-content: flex-end;
   align-items: center;
   gap: 5px;
-}
-
-.writer-box {
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-right: 8px;
-
-  .writer {
-    width: 34px;
-    height: 34px;
-    border-radius: 6px;
-    color: #ffffff;
-    background: rgba(255, 255, 255, 0.15);
-    transition: all 0.2s ease;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    &:hover {
-      background: rgba(255, 255, 255, 0.25);
-      transform: translateY(-1px);
-    }
-  }
 }
 
 .breadcrumb-item {

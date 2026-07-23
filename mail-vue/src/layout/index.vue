@@ -53,33 +53,33 @@ onBeforeUnmount(() => {
 
 <style lang="scss" scoped>
 .el-aside-hide {
-  position: fixed;
-  left: 0;
-  height: 100%;
+  transition: all 0.2s ease;
   z-index: 100;
-  transform: translateX(-100%);
-  transition: all 100ms ease;
+  @media (max-width: 1025px) {
+    position: fixed;
+    left: 0;
+    height: 100%;
+    transform: translateX(-100%);
+  }
 }
 
 .aside-show {
-  -webkit-box-shadow: var(--aside-right-border);
-  box-shadow: var(--aside-right-border);
-  transform: translateX(0);
-  transition: all 100ms ease;
+  transition: all 0.2s ease;
   z-index: 101;
   @media (max-width: 1025px) {
     position: fixed;
     top: 0;
     left: 0;
-    z-index: 101;
     height: 100%;
     background: var(--el-bg-color);
+    transform: translateX(0);
+    box-shadow: var(--aside-right-border);
   }
 }
 
 .el-aside {
   width: auto;
-  transition: all 100ms ease;
+  transition: width 0.2s ease;
   background: var(--aside-backgound);
   border-right: var(--aside-right-border);
 }
