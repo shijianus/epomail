@@ -191,7 +191,7 @@ function changeStar() {
 }
 
 const handleBack = () => {
-  router.back()
+  emailStore.contentData.email = null
 }
 
 const handleDelete = () => {
@@ -221,7 +221,7 @@ const handleDelete = () => {
       })
     }
 
-    router.back()
+    emailStore.contentData.email = null
   })
 }
 </script>
