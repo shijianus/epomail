@@ -63,14 +63,16 @@ function updateContent() {
       }
 
       .shadow-content {
-        background: ${uiStore.dark ? 'transparent' : '#FFFFFF'};
+        background: transparent;
         width: fit-content;
         height: fit-content;
         min-width: 100%;
+        ${uiStore.dark ? 'filter: invert(1) hue-rotate(180deg);' : ''}
         ${bodyStyle ? bodyStyle : ''} /* 注入 body 的 style */
       }
 
-      img:not(table img) {
+      img, video {
+        ${uiStore.dark ? 'filter: invert(1) hue-rotate(180deg);' : ''}
         max-width: 100%;
         height: auto !important;
       }
