@@ -49,9 +49,8 @@
           </template>
         </el-menu-item>
         
-        <div class="manage-title" v-perm="['all-email:query','user:query','role:query','setting:query','analysis:query','reg-key:query']">
+        <div class="manage-title" :class="(!uiStore.asideShow && !isMobile) ? 'is-collapsed' : ''" v-perm="['all-email:query','user:query','role:query','setting:query','analysis:query','reg-key:query']">
           <span v-if="uiStore.asideShow || isMobile">{{$t('manage')}}</span>
-          <span v-else>···</span>
         </div>
         
         <el-menu-item @click="router.push({name: 'analysis'})" index="analysis" v-perm="'analysis:query'"
@@ -151,6 +150,14 @@ function openSend() {
   text-transform: uppercase;
   color: var(--secondary-text-color);
   letter-spacing: 0.5px;
+
+  &.is-collapsed {
+    padding: 0;
+    margin-top: 24px;
+    margin-bottom: 12px;
+    height: 1px;
+    width: 100%;
+  }
 }
 
 .el-menu-item {
