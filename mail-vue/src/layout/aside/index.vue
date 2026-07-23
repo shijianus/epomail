@@ -248,6 +248,11 @@ function openSend() {
   .compose-text {
     display: none;
   }
+
+  svg {
+    width: 24px !important;
+    height: 24px !important;
+  }
 }
 
 :deep(.el-menu--collapse) {
@@ -262,6 +267,11 @@ function openSend() {
     
     .menu-name {
       display: none;
+    }
+
+    svg {
+      width: 24px !important;
+      height: 24px !important;
     }
   }
 }
