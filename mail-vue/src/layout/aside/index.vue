@@ -7,7 +7,7 @@
       </div>
       <div v-perm="'email:send'" class="compose-btn-wrapper" @click="openSend">
         <button class="compose-btn" :class="(!uiStore.asideShow && !isMobile) ? 'collapsed' : ''">
-          <Icon icon="material-symbols:edit-outline-sharp" width="22" height="22"/>
+          <Icon icon="material-symbols:edit-outline-sharp" :width="(!uiStore.asideShow && !isMobile) ? 28 : 22" :height="(!uiStore.asideShow && !isMobile) ? 28 : 22"/>
           <span class="compose-text">{{$t('writeEmail') || 'Compose'}}</span>
         </button>
       </div>
@@ -15,35 +15,35 @@
       <el-menu :collapse="!uiStore.asideShow && !isMobile" style="margin-top: 10px">
         <el-menu-item @click="router.push({name: 'email'})" index="email"
                       :class="route.meta.name === 'email' ? 'choose-item' : ''">
-          <Icon icon="hugeicons:mailbox-01" width="20" height="20" />
+          <Icon icon="hugeicons:mailbox-01" :width="(!uiStore.asideShow && !isMobile) ? 28 : 20" :height="(!uiStore.asideShow && !isMobile) ? 28 : 20" />
           <template #title>
             <span class="menu-name" style="margin-left: 21px">{{$t('inbox')}}</span>
           </template>
         </el-menu-item>
         <el-menu-item @click="router.push({name: 'send'})" index="send" v-perm="'email:send'"
                       :class="route.meta.name === 'send' ? 'choose-item' : ''">
-          <Icon icon="cil:send" width="20" height="20" />
+          <Icon icon="cil:send" :width="(!uiStore.asideShow && !isMobile) ? 28 : 20" :height="(!uiStore.asideShow && !isMobile) ? 28 : 20" />
           <template #title>
             <span class="menu-name" style="margin-left: 21px">{{$t('sent')}}</span>
           </template>
         </el-menu-item>
         <el-menu-item @click="router.push({name: 'draft'})" index="draft" v-perm="'email:send'"
                       :class="route.meta.name === 'draft' ? 'choose-item' : ''">
-          <Icon icon="ep:document" width="19" height="19" />
+          <Icon icon="ep:document" :width="(!uiStore.asideShow && !isMobile) ? 27 : 19" :height="(!uiStore.asideShow && !isMobile) ? 27 : 19" />
           <template #title>
             <span class="menu-name" style="margin-left: 22px">{{$t('drafts')}}</span>
           </template>
         </el-menu-item>
         <el-menu-item @click="router.push({name: 'star'})" index="star"
                       :class="route.meta.name === 'star' ? 'choose-item' : ''">
-          <Icon icon="solar:star-line-duotone" width="20" height="20" />
+          <Icon icon="solar:star-line-duotone" :width="(!uiStore.asideShow && !isMobile) ? 28 : 20" :height="(!uiStore.asideShow && !isMobile) ? 28 : 20" />
           <template #title>
             <span class="menu-name" style="margin-left: 21px">{{$t('starred')}}</span>
           </template>
         </el-menu-item>
         <el-menu-item @click="router.push({name: 'setting'})" index="setting"
                       :class="route.meta.name === 'setting' ? 'choose-item' : ''">
-          <Icon icon="fluent:settings-48-regular" width="20" height="20" />
+          <Icon icon="fluent:settings-48-regular" :width="(!uiStore.asideShow && !isMobile) ? 28 : 20" :height="(!uiStore.asideShow && !isMobile) ? 28 : 20" />
           <template #title>
             <span class="menu-name" style="margin-left: 21px">{{$t('settings')}}</span>
           </template>
@@ -56,42 +56,42 @@
         
         <el-menu-item @click="router.push({name: 'analysis'})" index="analysis" v-perm="'analysis:query'"
                       :class="route.meta.name === 'analysis' ? 'choose-item' : ''">
-          <Icon icon="fluent:data-pie-20-regular" width="24" height="24" />
+          <Icon icon="fluent:data-pie-20-regular" :width="(!uiStore.asideShow && !isMobile) ? 32 : 24" :height="(!uiStore.asideShow && !isMobile) ? 32 : 24" />
           <template #title>
             <span class="menu-name" style="margin-left: 18px">{{$t('analytics')}}</span>
           </template>
         </el-menu-item>
         <el-menu-item @click="router.push({name: 'user'})" index="user" v-perm="'user:query'"
                       :class="route.meta.name === 'user' ? 'choose-item' : ''">
-          <Icon icon="si:user-alt-2-line" width="20" height="20" />
+          <Icon icon="si:user-alt-2-line" :width="(!uiStore.asideShow && !isMobile) ? 28 : 20" :height="(!uiStore.asideShow && !isMobile) ? 28 : 20" />
           <template #title>
             <span class="menu-name" style="margin-left: 21px">{{$t('allUsers')}}</span>
           </template>
         </el-menu-item>
         <el-menu-item @click="router.push({name: 'all-email'})" index="all-email" v-perm="'all-email:query'"
                       :class="route.meta.name === 'all-email' ? 'choose-item' : ''">
-          <Icon icon="fluent:mail-list-28-regular" width="22" height="22" />
+          <Icon icon="fluent:mail-list-28-regular" :width="(!uiStore.asideShow && !isMobile) ? 30 : 22" :height="(!uiStore.asideShow && !isMobile) ? 30 : 22" />
           <template #title>
             <span class="menu-name" style="margin-left: 20px">{{$t('allMail')}}</span>
           </template>
         </el-menu-item>
         <el-menu-item @click="router.push({name: 'role'})" index="role" v-perm="'role:query'"
                       :class="route.meta.name === 'role' ? 'choose-item' : ''">
-          <Icon icon="fluent:lock-closed-16-regular" width="22" height="22" />
+          <Icon icon="fluent:lock-closed-16-regular" :width="(!uiStore.asideShow && !isMobile) ? 30 : 22" :height="(!uiStore.asideShow && !isMobile) ? 30 : 22" />
           <template #title>
             <span class="menu-name" style="margin-left: 20px">{{$t('permissions')}}</span>
           </template>
         </el-menu-item>
         <el-menu-item @click="router.push({name: 'reg-key'})" index="reg-key" v-perm="'reg-key:query'"
                       :class="route.meta.name === 'reg-key' ? 'choose-item' : ''">
-          <Icon icon="fluent:fingerprint-20-filled" width="22" height="22" />
+          <Icon icon="fluent:fingerprint-20-filled" :width="(!uiStore.asideShow && !isMobile) ? 30 : 22" :height="(!uiStore.asideShow && !isMobile) ? 30 : 22" />
           <template #title>
             <span class="menu-name" style="margin-left: 20px">{{$t('inviteCode')}}</span>
           </template>
         </el-menu-item>
         <el-menu-item @click="router.push({name: 'sys-setting'})" index="sys-setting" v-perm="'setting:query'"
                       :class="route.meta.name === 'sys-setting' ? 'choose-item' : ''">
-          <Icon icon="eos-icons:system-ok-outlined" width="18" height="18" style="margin-left: 2px" />
+          <Icon icon="eos-icons:system-ok-outlined" :width="(!uiStore.asideShow && !isMobile) ? 26 : 18" :height="(!uiStore.asideShow && !isMobile) ? 26 : 18" style="margin-left: 2px" />
           <template #title>
             <span class="menu-name" style="margin-left: 22px">{{$t('SystemSettings')}}</span>
           </template>
@@ -250,8 +250,8 @@ function openSend() {
   }
 
   svg {
-    width: 24px !important;
-    height: 24px !important;
+    width: 28px !important;
+    height: 28px !important;
   }
 }
 
@@ -270,8 +270,8 @@ function openSend() {
     }
 
     svg {
-      width: 24px !important;
-      height: 24px !important;
+      width: 28px !important;
+      height: 28px !important;
     }
   }
 }
