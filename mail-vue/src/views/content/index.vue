@@ -28,16 +28,19 @@
         </div>
         <div class="content">
           <div class="email-info">
-            <div>
-              <div class="send"><span class="send-source">{{$t('from')}}</span>
-                <div class="send-name">
+            <div style="display: flex; gap: 16px;">
+              <el-avatar :size="44" class="sender-avatar">{{ email.name ? email.name.charAt(0).toUpperCase() : 'U' }}</el-avatar>
+              <div class="info-body">
+                <div class="info-top">
                   <span class="send-name-title">{{ email.name }}</span>
-                  <span><{{ email.sendEmail }}></span>
+                  <span class="date">{{ formatDetailDate(email.createTime) }}</span>
                 </div>
-              </div>
-              <div class="receive"><span class="source">{{$t('recipient')}}</span><span class="receive-email">{{  formateReceive(email.recipient) }}</span></div>
-              <div class="date">
-                <div>{{ formatDetailDate(email.createTime) }}</div>
+                <div class="info-middle">
+                  <span>&lt;{{ email.sendEmail }}&gt;</span>
+                </div>
+                <div class="info-bottom">
+                  <span class="source">{{$t('recipient')}}:</span><span class="receive-email">{{  formateReceive(email.recipient) }}</span>
+                </div>
               </div>
             </div>
             <el-alert v-if="email.status === 3" :closable="false" :title="toMessage(email.message)" class="email-msg" type="error" show-icon />
@@ -71,6 +74,15 @@
                 </div>
               </div>
             </div>
+          </div>
+          
+          <div class="inline-reply" v-if="emailStore.contentData.showReply && hasPerm('email:send')">
+             <el-button round class="reply-btn" @click="openReply">
+                <Icon icon="la:reply" width="18" height="18" /> {{ $t('reply') || 'Reply' }}
+             </el-button>
+             <el-button round class="reply-btn" @click="openForward">
+                <Icon icon="iconoir:arrow-up-right" width="18" height="18" /> {{ $t('forward') || 'Forward' }}
+             </el-button>
           </div>
         </div>
       </div>
@@ -352,58 +364,80 @@ const handleDelete = () => {
       }
     }
 
-    .email-info {
-
-      border-bottom: 1px solid var(--light-border-color);
-      margin-bottom: 20px;
-      padding-bottom: 8px;
-      @media (max-width: 1024px) {
-        margin-bottom: 15px;
-      }
-      .date {
-        color: var(--regular-text-color);
-        margin-bottom: 6px;
-      }
-
-      .email-msg {
-        max-width: 400px;
-        width: fit-content;
-        margin-bottom: 15px;
-      }
-
-      .send {
+      .email-info {
         display: flex;
-        margin-bottom: 6px;
+        flex-direction: column;
+        border-bottom: 1px solid var(--light-border-color);
+        margin-bottom: 20px;
+        padding-bottom: 16px;
+        @media (max-width: 1024px) {
+          margin-bottom: 15px;
+        }
 
-        .send-name {
-          color: var(--regular-text-color);
+        .sender-avatar {
+          background: var(--el-color-primary);
+          color: white;
+          font-weight: bold;
+          font-size: 18px;
+        }
+
+        .info-body {
+          flex: 1;
           display: flex;
-          flex-wrap: wrap;
+          flex-direction: column;
+          gap: 2px;
         }
 
-        .send-name-title {
-          padding-right: 5px;
+        .info-top {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          
+          .send-name-title {
+            font-size: 16px;
+            font-weight: bold;
+            color: var(--el-text-color-primary);
+          }
+          .date {
+            color: var(--regular-text-color);
+            font-size: 13px;
+          }
         }
-      }
-
-      .receive {
-        margin-bottom: 6px;
-        display: flex;
-        .receive-email {
-          max-width: 700px;
-          word-break: break-word;
-        }
-        span:nth-child(2) {
+        
+        .info-middle {
           color: var(--regular-text-color);
+          font-size: 13px;
+        }
+
+        .info-bottom {
+          display: flex;
+          gap: 8px;
+          font-size: 13px;
+          color: var(--secondary-text-color);
+        }
+
+        .email-msg {
+          max-width: 400px;
+          width: fit-content;
+          margin-top: 15px;
         }
       }
 
-      .send-source {
-        white-space: nowrap;
-        font-weight: bold;
-        padding-right: 10px;
+      .inline-reply {
+        display: flex;
+        gap: 12px;
+        margin-top: 30px;
+        margin-bottom: 40px;
+        
+        .reply-btn {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          padding: 8px 20px;
+          font-size: 14px;
+        }
       }
-
+      
       .source {
         white-space: nowrap;
         font-weight: bold;
@@ -411,7 +445,6 @@ const handleDelete = () => {
       }
     }
   }
-}
 
 
 .email-text {

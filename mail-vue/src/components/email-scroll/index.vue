@@ -46,6 +46,7 @@
                  @contextmenu="handleContextmenu($event, item)"
                  :style="item.rightChecked ? 'background: var(--email-hover-background)' : ''"
             >
+              <div class="unread-bar" v-if="item.unread === EmailUnreadEnum.UNREAD && showUnread"></div>
               <el-checkbox :class=" props.type === 'all-email' ? 'all-email-checkbox' : 'checkbox'"
                            v-model="item.checked" @click.stop></el-checkbox>
               <div @click.stop="starChange(item)" class="pc-star" v-if="showStar">
@@ -69,7 +70,6 @@
                   <div v-else></div>
                   <span class="name">
                     <span>
-                      <div class="unread" v-if="isMobile && (item.unread === EmailUnreadEnum.UNREAD && showUnread) "/>
                       <slot name="name" :email="item"> {{ item.name }}</slot>
                     </span>
                     <span>
@@ -81,7 +81,6 @@
                 <div>
                   <div class="email-text">
                     <span class="email-subject" :style="(item.unread === EmailUnreadEnum.UNREAD && showUnread)  ? 'font-weight: bold' : ''">
-                      <div class="unread" v-if="!isMobile && (item.unread === EmailUnreadEnum.UNREAD && showUnread) "/>
                       <span v-if="item.code" class="code-tag" @click.stop="copyCode(item.code)">[{{ t('codeLabel') }}{{ item.code }}]</span>
                       <span class="subject-text">
                         <slot name="subject" :email="item" >
@@ -109,6 +108,14 @@
               </div>
               <div class="email-right" :style="showUserInfo ? 'align-self: start;':''">
                 <span class="email-time" :style="(item.unread === EmailUnreadEnum.UNREAD && showUnread) ? 'font-weight: bold' : ''">{{ item.formatCreateTime }}</span>
+                <div class="quick-actions">
+                  <el-tooltip :content="$t('delete')" placement="top">
+                    <Icon icon="uiw:delete" width="16" height="16" class="quick-icon" @click.stop="rightDelete(item.emailId)" />
+                  </el-tooltip>
+                  <el-tooltip :content="$t('markRead')" placement="top" v-if="item.unread === EmailUnreadEnum.UNREAD && showUnread">
+                    <Icon icon="fluent:mail-read-20-regular" width="18" height="18" class="quick-icon" @click.stop="emailRead(item.emailId)" />
+                  </el-tooltip>
+                </div>
               </div>
             </div>
             <skeletonBlock v-else-if="item.expand === 'loading'"
@@ -915,6 +922,7 @@ function loadData() {
 <style lang="scss" scoped>
 
 .email-container {
+  container-type: inline-size;
   display: grid;
   grid-template-rows: auto 1fr;
   padding: 0;
@@ -991,7 +999,7 @@ function loadData() {
   position: relative;
   transition: background 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
   height: 48px;
-  @media (max-width: 1366px) {
+  @container (max-width: 800px) {
     height: 83px;
   }
 
@@ -1001,7 +1009,7 @@ function loadData() {
   }
   &.all-email {
     height: 65px;
-    @media (max-width: 1366px) {
+    @container (max-width: 800px) {
       height: 132px;
     }
   }
@@ -1012,7 +1020,7 @@ function loadData() {
     margin-top: 5px;
     margin-bottom: 2px;
     color: var(--email-scroll-content-color);
-    @media (max-width: 1366px) {
+    @container (max-width: 800px) {
       flex-direction: column;
     }
 
@@ -1053,7 +1061,7 @@ function loadData() {
     padding-left: 15px;
     padding-right: 20px;
     justify-content: center;
-    @media (min-width: 1367px) {
+    @container (min-width: 801px) {
       justify-content: start;
       height: 100%;
       align-self: start;
@@ -1062,7 +1070,7 @@ function loadData() {
   }
 
   .title-column {
-    @media (max-width: 1366px) {
+    @container (max-width: 800px) {
       grid-template-columns: 1fr !important;
       gap: 4px !important;
     }
@@ -1072,10 +1080,10 @@ function loadData() {
     flex: 1;
     display: grid;
     grid-template-columns: 240px 1fr;
-    @media (max-width: 1366px) {
+    @container (max-width: 800px) {
       padding-right: 15px;
     }
-    @media (max-width: 1366px) {
+    @container (max-width: 800px) {
       grid-template-columns: 1fr;
       gap: 4px;
     }
@@ -1089,7 +1097,7 @@ function loadData() {
         display: flex;
         flex-direction: column;
         align-content: center;
-        @media (max-width: 1366px) {
+        @container (max-width: 800px) {
           flex-direction: row;
           gap: 5px;
         }
@@ -1130,7 +1138,7 @@ function loadData() {
       .phone-time {
         font-weight: normal;
         font-size: 12px;
-        @media (min-width: 1367px) {
+        @container (min-width: 801px) {
           display: none;
         }
       }
@@ -1140,7 +1148,7 @@ function loadData() {
       .text-skeleton-one {
         width: 80%;
         height: 16px;
-        @media (max-width: 1366px) {
+        @container (max-width: 800px) {
           width: 40%;
         }
         @media (max-width: 767px) {
@@ -1151,10 +1159,10 @@ function loadData() {
       .text-skeleton-two {
         width: min(300px, 100%);
         height: 16px;
-        @media (min-width: 1367px) {
+        @container (min-width: 801px) {
           display: none;
         }
-        @media (max-width: 1366px) {
+        @container (max-width: 800px) {
           width: 100%;
         }
       }
@@ -1163,7 +1171,7 @@ function loadData() {
     .email-text {
       display: grid;
       grid-template-columns: auto 1fr;
-      @media (max-width: 1366px) {
+      @container (max-width: 800px) {
         grid-template-columns: 1fr;
       }
 
@@ -1174,7 +1182,7 @@ function loadData() {
         overflow: hidden;
         white-space: nowrap;
         min-width: 0;
-        @media (min-width: 1367px) {
+        @container (min-width: 801px) {
           padding-left: 5px;
         }
       }
@@ -1205,7 +1213,7 @@ function loadData() {
         text-overflow: ellipsis;
         padding-left: 10px;
         color: var(--email-scroll-content-color);
-        @media (max-width: 1366px) {
+        @container (max-width: 800px) {
           padding-left: 0;
           margin-top: 0;
         }
@@ -1221,13 +1229,13 @@ function loadData() {
     display: flex;
     padding-left: 15px;
     align-items: center;
-    @media (max-width: 1366px) {
+    @container (max-width: 800px) {
       display: none;
     }
   }
 
   .email-right-skeleton {
-    @media (max-width: 1366px) {
+    @container (max-width: 800px) {
       display: none;
     }
   }
@@ -1252,7 +1260,7 @@ function loadData() {
   width: 40px;
 }
 
-@media (max-width: 1366px) {
+@container (max-width: 800px) {
   .pc-star {
     display: none;
   }
@@ -1347,15 +1355,39 @@ function loadData() {
   padding-left: 14px;
 }
 
-.unread {
-  height: 6px;
-  width: 6px;
+.unread-bar {
+  height: 24px;
+  width: 4px;
   background: var(--el-color-primary);
-  margin-bottom: 2px;
-  margin-right: 5px;
-  border-radius: 50%;
-  display: inline-block;
-  justify-content: center;
+  border-radius: 4px;
+  position: absolute;
+  left: 2px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.quick-actions {
+  display: none;
+  gap: 12px;
+  align-items: center;
+  padding-right: 15px;
+}
+
+.email-row:hover .email-time {
+  display: none;
+}
+
+.email-row:hover .quick-actions {
+  display: flex;
+}
+
+.quick-icon {
+  color: var(--secondary-text-color);
+  cursor: pointer;
+}
+
+.quick-icon:hover {
+  color: var(--el-color-primary);
 }
 
 ul {
