@@ -32,7 +32,7 @@ function jumpContent(email) {
   emailStore.contentData.delType = 'logic'
   emailStore.contentData.showStar = true
   emailStore.contentData.showReply = true
-  router.push('/message')
+  // router.push('/message')
 }
 
 function cancelStar(email) {

@@ -2,16 +2,25 @@
   <div :class="accountShow && hasPerm('account:query') ? 'main-box-show' : 'main-box-hide'">
     <div :class="accountShow && hasPerm('account:query') ? 'block-show' : 'block-hide'" @click="uiStore.accountShow = false"></div>
     <account  :class="accountShow && hasPerm('account:query') ? 'show' : 'hide'" />
-    <router-view class="main-view" v-slot="{ Component,route }">
-      <keep-alive :include="['email','all-email','send','sys-setting','star','user','role','analysis','reg-key','draft']">
-        <component :is="Component" :key="route.name"/>
-      </keep-alive>
-    </router-view>
+    <div class="split-view-container" :class="{'has-reading-pane': showReadingPane, 'is-mobile': isMobileView}">
+      <div class="list-column" :class="{'hide-on-mobile': showReadingPane && isMobileView}">
+        <router-view class="main-view" v-slot="{ Component,route }">
+          <keep-alive :include="['email','all-email','send','sys-setting','star','user','role','analysis','reg-key','draft']">
+            <component :is="Component" :key="route.name"/>
+          </keep-alive>
+        </router-view>
+      </div>
+      <div class="reading-pane-column" v-if="showReadingPane">
+        <ContentComponent :key="emailStore.contentData.email?.emailId" />
+      </div>
+    </div>
   </div>
 </template>
 <script setup>
 import account from '@/layout/account/index.vue'
+import ContentComponent from '@/views/content/index.vue'
 import {useUiStore} from "@/store/ui.js";
+import {useEmailStore} from "@/store/email.js";
 import {useSettingStore} from "@/store/setting.js";
 import {computed, onBeforeUnmount, onMounted, watch} from "vue";
 import { useRoute } from 'vue-router'
@@ -19,6 +28,7 @@ import { hasPerm } from "@/perm/perm.js"
 
 const settingStore = useSettingStore()
 const uiStore = useUiStore();
+const emailStore = useEmailStore();
 const route = useRoute()
 let  innerWidth =  window.innerWidth
 
@@ -26,6 +36,16 @@ let elNotification = null
 
 const accountShow = computed(() => {
   return uiStore.accountShow && settingStore.settings.manyEmail === 0
+})
+
+const isMobileView = computed(() => window.innerWidth < 768)
+const showReadingPane = computed(() => {
+  const mailRoutes = ['email','all-email','send','star','draft']
+  return mailRoutes.includes(route.meta.name) && !!emailStore.contentData.email
+})
+
+watch(() => route.path, () => {
+  emailStore.contentData.email = null
 })
 
 watch(() => uiStore.changeNotice, () => {
@@ -162,6 +182,37 @@ const handleResize = () => {
 
 .main-view {
   background: var(--el-bg-color);
+  height: 100%;
+}
+
+.split-view-container {
+  display: flex;
+  height: 100%;
+  width: 100%;
+  background: var(--el-bg-color);
+}
+
+.list-column {
+  flex: 1;
+  height: 100%;
+  overflow: hidden;
+  transition: all 0.3s;
+}
+
+.split-view-container.has-reading-pane:not(.is-mobile) .list-column {
+  flex: 0 0 350px;
+  border-right: 1px solid var(--el-border-color);
+}
+
+.reading-pane-column {
+  flex: 1;
+  height: 100%;
+  overflow: hidden;
+  background: var(--el-bg-color);
+}
+
+.hide-on-mobile {
+  display: none !important;
 }
 
 
