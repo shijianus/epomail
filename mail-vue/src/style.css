@@ -261,3 +261,35 @@ html[data-theme-to="light"]::view-transition-old(root) {
     from { clip-path: circle(var(--vt-end-radius, 0px) at var(--vt-x) var(--vt-y)); }
     to   { clip-path: circle(0px at var(--vt-x) var(--vt-y)); }
 }
+
+/* Override tooltip (popper) colors for proper dark/light mode contrast */
+html.dark .el-popper.is-dark, html.dark .el-popper.is-light {
+    background: #141414 !important; /* distinguishing black */
+    color: #ffffff !important;
+    border-color: #333333 !important;
+}
+
+html.dark .el-popper[data-popper-placement^="right"] .el-popper__arrow::before,
+html.dark .el-popper[data-popper-placement^="bottom"] .el-popper__arrow::before,
+html.dark .el-popper[data-popper-placement^="top"] .el-popper__arrow::before,
+html.dark .el-popper[data-popper-placement^="left"] .el-popper__arrow::before,
+html.dark .el-popper .el-popper__arrow::before {
+    background: #141414 !important;
+    border-color: #333333 !important;
+}
+
+html:not(.dark) .el-popper.is-dark, html:not(.dark) .el-popper.is-light {
+    background: #ffffff !important;
+    color: #000000 !important;
+    border-color: #e4e7ed !important;
+    box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1) !important;
+}
+
+html:not(.dark) .el-popper[data-popper-placement^="right"] .el-popper__arrow::before,
+html:not(.dark) .el-popper[data-popper-placement^="bottom"] .el-popper__arrow::before,
+html:not(.dark) .el-popper[data-popper-placement^="top"] .el-popper__arrow::before,
+html:not(.dark) .el-popper[data-popper-placement^="left"] .el-popper__arrow::before,
+html:not(.dark) .el-popper .el-popper__arrow::before {
+    background: #ffffff !important;
+    border-color: #e4e7ed !important;
+}

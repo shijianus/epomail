@@ -1,7 +1,9 @@
 <template>
   <div class="header" :class="!hasPerm('email:send') ? 'not-send' : ''">
     <div class="header-left">
-      <hanburger @click="changeAside" class="hamburger-btn"></hanburger>
+      <el-tooltip :content="$t('toggleSidebar') || 'Toggle Sidebar'" placement="bottom">
+        <hanburger @click="changeAside" class="hamburger-btn"></hanburger>
+      </el-tooltip>
       <img src="/logo.svg" alt="Logo" class="app-logo" />
       <span class="logo-text">EpoCanvas</span>
       <span class="breadcrumb-item" v-if="route.meta.title">{{ $t(route.meta.title) }}</span>
@@ -15,22 +17,28 @@
     </div>
 
     <div class="toolbar header-right">
-      <div v-if="uiStore.dark" class="sun-icon icon-item" @click="openDark($event)">
-        <Icon icon="mingcute:sun-fill"/>
-      </div>
-      <div v-else class="dark-icon icon-item" @click="openDark($event)">
-        <Icon icon="solar:moon-linear"/>
-      </div>
-      <div class="notice icon-item" @click="openNotice">
-        <Icon icon="streamline-plump:announcement-megaphone"/>
-      </div>
-      <el-dropdown ref="userinfoRef" @visible-change="e => userInfoShow = e" :teleported="false" popper-class="detail-dropdown">
-        <div class="avatar" @click="userInfoHide" >
-          <div class="avatar-text">
-            <div>{{ formatName(userStore.user.email) }}</div>
-          </div>
-          <Icon class="setting-icon" icon="mingcute:down-small-fill" width="24" height="24"/>
+      <el-tooltip :content="uiStore.dark ? ($t('lightMode') || 'Light Mode') : ($t('darkMode') || 'Dark Mode')" placement="bottom">
+        <div v-if="uiStore.dark" class="sun-icon icon-item" @click="openDark($event)">
+          <Icon icon="mingcute:sun-fill"/>
         </div>
+        <div v-else class="dark-icon icon-item" @click="openDark($event)">
+          <Icon icon="solar:moon-linear"/>
+        </div>
+      </el-tooltip>
+      <el-tooltip :content="$t('notice') || 'Notice'" placement="bottom">
+        <div class="notice icon-item" @click="openNotice">
+          <Icon icon="streamline-plump:announcement-megaphone"/>
+        </div>
+      </el-tooltip>
+      <el-dropdown ref="userinfoRef" @visible-change="e => userInfoShow = e" :teleported="false" popper-class="detail-dropdown">
+        <el-tooltip :content="$t('account') || 'Account'" placement="bottom">
+          <div class="avatar" @click="userInfoHide" >
+            <div class="avatar-text">
+              <div>{{ formatName(userStore.user.email) }}</div>
+            </div>
+            <Icon class="setting-icon" icon="mingcute:down-small-fill" width="24" height="24"/>
+          </div>
+        </el-tooltip>
         <template #dropdown>
           <div class="user-details">
             <div class="details-avatar">

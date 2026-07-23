@@ -6,6 +6,9 @@
 
 <script setup>
 import { ref, onMounted, watch } from 'vue'
+import {useUiStore} from "@/store/ui.js";
+
+const uiStore = useUiStore();
 
 const props = defineProps({
   html: {
@@ -40,8 +43,9 @@ function updateContent() {
                     'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
         font-size: 14px;
         line-height: 1.5;
-        color: #13181D;
+        color: ${uiStore.dark ? '#ffffff' : '#13181D'};
         word-break: break-word;
+        color-scheme: ${uiStore.dark ? 'dark' : 'light'};
       }
 
       h1, h2, h3, h4 {
@@ -59,7 +63,7 @@ function updateContent() {
       }
 
       .shadow-content {
-        background: #FFFFFF;
+        background: ${uiStore.dark ? '#000000' : '#FFFFFF'};
         width: fit-content;
         height: fit-content;
         min-width: 100%;
@@ -104,6 +108,11 @@ onMounted(() => {
 })
 
 watch(() => props.html, () => {
+  updateContent()
+  autoScale()
+})
+
+watch(() => uiStore.dark, () => {
   updateContent()
   autoScale()
 })
