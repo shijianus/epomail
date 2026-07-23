@@ -1,15 +1,24 @@
 <template>
   <div class="header" :class="!hasPerm('email:send') ? 'not-send' : ''">
-    <div class="header-btn">
-      <hanburger @click="changeAside"></hanburger>
-      <span class="breadcrumb-item">{{ $t(route.meta.title) }}</span>
+    <div class="header-left">
+      <hanburger @click="changeAside" class="hamburger-btn"></hanburger>
+      <span class="logo-text">EpoCanvas</span>
+      <span class="breadcrumb-item" v-if="route.meta.title">{{ $t(route.meta.title) }}</span>
     </div>
-    <div v-perm="'email:send'" class="writer-box" @click="openSend">
-      <div class="writer">
-        <Icon icon="material-symbols:edit-outline-sharp" width="22" height="22"/>
+
+    <div class="header-center">
+      <div class="search-box">
+        <Icon icon="lucide:search" width="18" height="18" class="search-icon"/>
+        <input type="text" :placeholder="$t('search') || 'Search'" class="search-input" />
       </div>
     </div>
-    <div class="toolbar">
+
+    <div class="toolbar header-right">
+      <div v-perm="'email:send'" class="writer-box" @click="openSend">
+        <div class="writer">
+          <Icon icon="material-symbols:edit-outline-sharp" width="22" height="22"/>
+        </div>
+      </div>
       <div v-if="uiStore.dark" class="sun-icon icon-item" @click="openDark($event)">
         <Icon icon="mingcute:sun-fill"/>
       </div>
@@ -251,7 +260,7 @@ function clickLogout() {
 }
 
 function formatName(email) {
-  return email[0]?.toUpperCase() || ''
+  return email?.[0]?.toUpperCase() || ''
 }
 
 </script>
@@ -356,16 +365,86 @@ function formatName(email) {
 
 
 .header {
-  text-align: right;
-  font-size: 12px;
-  display: grid;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   height: 100%;
-  gap: 10px;
-  grid-template-columns: auto auto 1fr;
+  padding: 0 16px;
+  color: var(--header-text-color);
 }
 
-.header.not-send {
-  grid-template-columns: auto 1fr;
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 250px;
+}
+
+.hamburger-btn {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.logo-text {
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  color: var(--header-text-color);
+  margin-right: 16px;
+  white-space: nowrap;
+}
+
+.header-center {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  margin: 0 20px;
+}
+
+.search-box {
+  width: 100%;
+  max-width: 480px;
+  height: 36px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+
+  &:hover, &:focus-within {
+    background: rgba(255, 255, 255, 0.25);
+    border-color: rgba(255, 255, 255, 0.3);
+  }
+
+  .search-icon {
+    color: var(--header-text-color);
+    opacity: 0.8;
+    margin-right: 8px;
+  }
+
+  .search-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--header-text-color);
+    font-size: 14px;
+    
+    &::placeholder {
+      color: rgba(255, 255, 255, 0.6);
+    }
+  }
+}
+
+.header-right {
+  min-width: 250px;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 5px;
 }
 
 .writer-box {
@@ -373,48 +452,32 @@ function formatName(email) {
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-left: 5px;
+  margin-right: 8px;
 
   .writer {
     width: 34px;
     height: 34px;
-    border-radius: 50%;
+    border-radius: 6px;
     color: #ffffff;
-    background: linear-gradient(135deg, var(--el-color-primary), var(--el-color-primary-light-3));
-    box-shadow: 0 4px 12px rgba(94, 106, 210, 0.3);
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    background: rgba(255, 255, 255, 0.15);
+    transition: all 0.2s ease;
     display: flex;
     align-items: center;
     justify-content: center;
 
     &:hover {
-      transform: translateY(-1px) scale(1.05);
-      box-shadow: 0 6px 16px rgba(94, 106, 210, 0.4);
-    }
-
-    .writer-text {
-      margin-left: 15px;
-      font-size: 14px;
-      font-weight: bold;
+      background: rgba(255, 255, 255, 0.25);
+      transform: translateY(-1px);
     }
   }
 }
 
-.header-btn {
-  display: inline-flex;
-  align-items: center;
-  height: 100%;
-  min-width: 0;
-  color: var(--header-text-color);
-}
-
 .breadcrumb-item {
-  font-weight: bold;
+  font-weight: 500;
   font-size: 14px;
-  color: var(--header-text-color);
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  color: rgba(255, 255, 255, 0.8);
+  border-left: 1px solid rgba(255, 255, 255, 0.2);
+  padding-left: 16px;
 }
 
 .toolbar {
