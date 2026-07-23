@@ -269,9 +269,14 @@ function openSend() {
       display: none;
     }
 
+    .el-tooltip__trigger {
+      padding: 0 !important;
+      justify-content: center !important;
+    }
+
     svg {
-      width: 28px !important;
-      height: 28px !important;
+      width: 32px !important;
+      height: 32px !important;
     }
   }
 }
