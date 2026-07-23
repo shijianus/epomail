@@ -1,21 +1,23 @@
 <template>
-  <el-container class="layout">
-    <el-aside
-        class="aside"
-        :class="uiStore.asideShow ? 'aside-show' : 'el-aside-hide'">
-      <Aside />
-    </el-aside>
-    <div
-        :class="(uiStore.asideShow && isMobile)? 'overlay-show':'overlay-hide'"
-        @click="uiStore.asideShow = false"
-    ></div>
-    <el-container class="main-container">
-      <el-main>
-        <el-header>
-            <Header />
-        </el-header>
-        <Main />
-      </el-main>
+  <el-container class="layout" direction="vertical">
+    <el-header>
+        <Header />
+    </el-header>
+    <el-container class="body-container">
+      <el-aside
+          class="aside"
+          :class="uiStore.asideShow ? 'aside-show' : 'el-aside-hide'">
+        <Aside />
+      </el-aside>
+      <div
+          :class="(uiStore.asideShow && isMobile)? 'overlay-show':'overlay-hide'"
+          @click="uiStore.asideShow = false"
+      ></div>
+      <el-container class="main-container">
+        <el-main>
+          <Main />
+        </el-main>
+      </el-container>
     </el-container>
   </el-container>
   <writer ref="writerRef" />
@@ -91,8 +93,14 @@ onBeforeUnmount(() => {
   overflow: hidden;
 }
 
+.body-container {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
 .main-container {
-  min-height: 100%;
+  height: 100%;
   background: var(--base-fill);
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
