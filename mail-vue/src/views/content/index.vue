@@ -1,14 +1,24 @@
 <template>
   <div class="box">
     <div class="header-actions">
-      <Icon class="icon" icon="material-symbols-light:arrow-back-ios-new" width="20" height="20" @click="handleBack"/>
-      <Icon v-perm="'email:delete'" class="icon" icon="uiw:delete" width="16" height="16" @click="handleDelete"/>
-      <span class="star" v-if="emailStore.contentData.showStar">
-        <Icon class="icon" @click="changeStar" v-if="email.isStar" icon="fluent-color:star-16" width="20" height="20"/>
-        <Icon class="icon" @click="changeStar" v-else icon="solar:star-line-duotone" width="18" height="18"/>
-      </span>
-      <Icon class="icon" v-if="emailStore.contentData.showReply" v-perm="'email:send'"  @click="openReply" icon="la:reply" width="21" height="21" />
-      <Icon class="icon" v-if="emailStore.contentData.showReply" v-perm="'email:send'"  @click="openForward" icon="iconoir:arrow-up-right" width="20" height="20" />
+      <el-tooltip :content="$t('back') || 'Back'" placement="bottom">
+        <Icon class="icon" icon="material-symbols-light:arrow-back-ios-new" width="20" height="20" @click="handleBack"/>
+      </el-tooltip>
+      <el-tooltip :content="$t('delete') || 'Delete'" placement="bottom" v-if="hasPerm('email:delete')">
+        <Icon class="icon" icon="uiw:delete" width="16" height="16" @click="handleDelete"/>
+      </el-tooltip>
+      <el-tooltip :content="$t('star') || 'Star'" placement="bottom" v-if="emailStore.contentData.showStar">
+        <span class="star">
+          <Icon class="icon" @click="changeStar" v-if="email.isStar" icon="fluent-color:star-16" width="20" height="20"/>
+          <Icon class="icon" @click="changeStar" v-else icon="solar:star-line-duotone" width="18" height="18"/>
+        </span>
+      </el-tooltip>
+      <el-tooltip :content="$t('reply') || 'Reply'" placement="bottom" v-if="emailStore.contentData.showReply && hasPerm('email:send')">
+        <Icon class="icon" @click="openReply" icon="la:reply" width="21" height="21" />
+      </el-tooltip>
+      <el-tooltip :content="$t('forward') || 'Forward'" placement="bottom" v-if="emailStore.contentData.showReply && hasPerm('email:send')">
+        <Icon class="icon" @click="openForward" icon="iconoir:arrow-up-right" width="20" height="20" />
+      </el-tooltip>
     </div>
     <div></div>
     <el-scrollbar class="scrollbar">
@@ -92,6 +102,7 @@ import {allEmailDelete} from "@/request/all-email.js";
 import {useUiStore} from "@/store/ui.js";
 import {useI18n} from "vue-i18n";
 import {EmailUnreadEnum} from "@/enums/email-enum.js";
+import {hasPerm} from "@/perm/perm.js";
 
 const uiStore = useUiStore();
 const settingStore = useSettingStore();
@@ -402,16 +413,6 @@ const handleDelete = () => {
   }
 }
 
-.shadow-html::after  {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: var(--message-block-color); /* 半透明黑色蒙层 */
-  pointer-events: none; /* 不影响点击 */
-}
 
 .email-text {
   font-family: inherit;
