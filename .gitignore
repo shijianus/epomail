@@ -21,3 +21,6 @@ lerna-debug.log*
 
 .wrangler/
 .venv/
+
+.env
+**/.env
