@@ -101,7 +101,8 @@ router.beforeEach((to, from, next) => {
     const token = localStorage.getItem('token')
 
     if (!token && to.name !== 'login') {
-        return next({name: 'login'})
+        window.location.href = '/login/';
+        return;
     }
 
     if (!token && to.name === 'login') {

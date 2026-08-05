@@ -1,12 +1,6 @@
 <template>
-  <div id="login-box" :style=" background ? 'background: var(--el-bg-color)' : ''" v-loading="oauthLoading" element-loading-text="登录中...">
-    <div id="background-wrap" v-if="!settingStore.settings.background">
-      <div class="x1 cloud"></div>
-      <div class="x2 cloud"></div>
-      <div class="x3 cloud"></div>
-      <div class="x4 cloud"></div>
-      <div class="x5 cloud"></div>
-    </div>
+  <div id="login-box" class="epomail relative size-full min-h-screen overflow-hidden" :style=" background ? 'background: var(--el-bg-color)' : 'background: var(--epo-void)'" v-loading="oauthLoading" element-loading-text="登录中...">
+    <CanvasBackground ref="canvasRef" v-if="!settingStore.settings.background" />
     <div v-else :style="background"></div>
     <div class="form-wrapper">
       <div class="container">
@@ -147,6 +141,8 @@
 </template>
 
 <script setup>
+import CanvasBackground from './CanvasBackground.vue';
+import './login_theme.css';
 import router from "@/router";
 import {computed, nextTick, reactive, ref} from "vue";
 import {login} from "@/request/login.js";
@@ -606,16 +602,21 @@ function submitRegister() {
 }
 
 .container {
-  background: v-bind(loginOpacity);
+  background: linear-gradient(145deg, rgba(20,24,54,0.55), rgba(10,12,30,0.35));
+  backdrop-filter: blur(28px) saturate(140%);
+  -webkit-backdrop-filter: blur(28px) saturate(140%);
+  box-shadow: 0 30px 80px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.18);
+  border-radius: 24px;
+  position: relative;
+  overflow: hidden;
   padding-left: 40px;
   padding-right: 40px;
   display: flex;
   flex-direction: column;
   justify-content: center;
   width: 450px;
-  height: 100%;
-  border-left: 1px solid var(--login-border);
-  box-shadow: var(--el-box-shadow-light);
+  height: auto;
+  min-height: 500px;
   @media (max-width: 1024px) {
     padding: 20px 18px;
     width: 384px;
@@ -755,9 +756,9 @@ function submitRegister() {
 
 
 #login-box {
-  background: linear-gradient(to bottom, #2980b9, #6dd5fa, #fff);
+  background: var(--epo-void);
   font: 100% Arial, sans-serif;
-  height: 100%;
+  height: 100vh;
   margin: 0;
   padding: 0;
   overflow-x: hidden;
@@ -767,6 +768,8 @@ function submitRegister() {
 
 
 #background-wrap {
+  position: absolute;
+  inset: 0;
   height: 100%;
   z-index: 0;
 }
