@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" width="100%" height="100%">
+  <defs>
+    <!-- Harmonious violet -> indigo -> cyan brand gradient -->
+    <linearGradient id="epoBrand" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#a855f7" />
+      <stop offset="50%" stop-color="#6366f1" />
+      <stop offset="100%" stop-color="#67e8f9" />
+    </linearGradient>
+
+    <!-- Glass surface tint for the acrylic node -->
+    <radialGradient id="epoGlass" cx="35%" cy="30%" r="80%">
+      <stop offset="0%" stop-color="rgba(255,255,255,0.35)" />
+      <stop offset="45%" stop-color="rgba(124,58,237,0.35)" />
+      <stop offset="100%" stop-color="rgba(10,16,48,0.55)" />
+    </radialGradient>
+
+    <!-- Neon glow -->
+    <filter id="epoGlow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="1.6" result="b" />
+      <feMerge>
+        <feMergeNode in="b" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- CANVAS: infinite-space data motes -->
+  <circle cx="16" cy="20" r="1.6" fill="#67e8f9" opacity="0.85" />
+  <circle cx="80" cy="18" r="1.3" fill="#a855f7" opacity="0.9" />
+  <circle cx="82" cy="72" r="1.5" fill="#6366f1" opacity="0.8" />
+  <circle cx="14" cy="74" r="1.2" fill="#67e8f9" opacity="0.7" />
+
+  <!-- EPO: orbital / time rings (fluidity) -->
+  <g filter="url(#epoGlow)">
+    <ellipse cx="48" cy="48" rx="34" ry="15" fill="none"
+      stroke="url(#epoBrand)" stroke-width="2" opacity="0.55"
+      transform="rotate(-24 48 48)" />
+    <ellipse cx="48" cy="48" rx="34" ry="15" fill="none"
+      stroke="url(#epoBrand)" stroke-width="2" opacity="0.35"
+      transform="rotate(40 48 48)" />
+  </g>
+
+  <!-- MAIL: the acrylic-glass transmission node (never an envelope) -->
+  <g filter="url(#epoGlow)">
+    <circle cx="48" cy="48" r="20" fill="url(#epoGlass)"
+      stroke="rgba(255,255,255,0.45)" stroke-width="1.5" />
+    <!-- Inner rim -->
+    <circle cx="48" cy="48" r="20" fill="none"
+      stroke="url(#epoBrand)" stroke-width="1.2" opacity="0.7" />
+    <!-- Glass top highlight -->
+    <path d="M 34 40 A 20 20 0 0 1 60 34"
+      fill="none" stroke="rgba(255,255,255,0.6)" stroke-width="1.6"
+      stroke-linecap="round" opacity="0.7" />
+
+    <!-- Core node -->
+    <circle cx="48" cy="48" r="6" fill="url(#epoBrand)" />
+    <circle cx="48" cy="48" r="2.4" fill="#05060f" opacity="0.85" />
+
+    <!-- EPO time hands radiating from the core -->
+    <line x1="48" y1="48" x2="48" y2="37" stroke="#67e8f9"
+      stroke-width="1.8" stroke-linecap="round" />
+    <line x1="48" y1="48" x2="57" y2="52" stroke="#a855f7"
+      stroke-width="1.8" stroke-linecap="round" />
+  </g>
+
+  <!-- Orbiting information packets -->
+  <circle cx="82" cy="48" r="2.4" fill="#67e8f9" filter="url(#epoGlow)" />
+  <circle cx="20" cy="60" r="2" fill="#a855f7" filter="url(#epoGlow)" />
+</svg>
