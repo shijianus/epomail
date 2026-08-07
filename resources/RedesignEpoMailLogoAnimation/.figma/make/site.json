@@ -1,0 +1,10 @@
+{
+  "description": "Experience a sleek, minimalist loading animation featuring a dynamic logo that seamlessly combines time and email concepts for EpoMail users.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}

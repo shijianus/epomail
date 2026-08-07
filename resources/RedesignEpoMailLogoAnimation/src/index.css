@@ -1,0 +1,225 @@
+@import 'tailwindcss';
+
+/* ── EpoMail loading mark ──────────────────────────────────────────────
+   Only transform / opacity / stroke-dashoffset / stop-color are animated,
+   so the whole sequence stays on the compositor at 60fps.               */
+
+.epo-stage {
+  /* keeps the bloom from ever producing a scrollbar */
+  position: relative;
+}
+
+/* entry: the mark lifts into place once */
+.epo-rise {
+  animation: epo-rise 1s cubic-bezier(0.22, 1, 0.36, 1) both;
+  will-change: transform, opacity;
+}
+
+@keyframes epo-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* entry: negative-space creases and dial draw themselves in */
+.epo-draw {
+  stroke-dasharray: 100;
+  animation: epo-draw 1.1s cubic-bezier(0.65, 0, 0.35, 1) both;
+}
+
+.epo-draw-flap {
+  animation-delay: 0.12s;
+}
+.epo-draw-crease-l {
+  animation-delay: 0.5s;
+  animation-duration: 0.7s;
+}
+.epo-draw-crease-r {
+  animation-delay: 0.58s;
+  animation-duration: 0.7s;
+}
+.epo-draw-ring {
+  animation-delay: 0.62s;
+  animation-duration: 0.8s;
+}
+
+@keyframes epo-draw {
+  from {
+    stroke-dashoffset: 100;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* the seal breathes — the loader's heartbeat */
+.epo-seal {
+  transform-box: view-box;
+  transform-origin: 200px 270px;
+  animation: epo-breathe 3.2s ease-in-out 1.1s infinite;
+}
+
+@keyframes epo-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.045);
+  }
+}
+
+/* time actually passes: the only "spinner" is the clock itself */
+.epo-hand {
+  transform-box: view-box;
+  transform-origin: 200px 270px;
+  animation: epo-sweep linear infinite;
+}
+
+.epo-hand-minute {
+  animation-duration: 6s;
+}
+.epo-hand-hour {
+  animation-duration: 72s;
+}
+
+@keyframes epo-sweep {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* neon gradient slowly cycles across the cyan → indigo → violet triad */
+.epo-stop-1 {
+  animation: epo-hue-1 6s ease-in-out infinite;
+}
+.epo-stop-2 {
+  animation: epo-hue-2 6s ease-in-out infinite;
+}
+.epo-stop-3 {
+  animation: epo-hue-3 6s ease-in-out infinite;
+}
+
+@keyframes epo-hue-1 {
+  0%,
+  100% {
+    stop-color: #00f5d4;
+  }
+  50% {
+    stop-color: #3ef0ff;
+  }
+}
+@keyframes epo-hue-2 {
+  0%,
+  100% {
+    stop-color: #0072ff;
+  }
+  50% {
+    stop-color: #4b6bff;
+  }
+}
+@keyframes epo-hue-3 {
+  0%,
+  100% {
+    stop-color: #5b24ff;
+  }
+  50% {
+    stop-color: #a855f7;
+  }
+}
+
+/* ambient bloom pulse */
+.epo-halo {
+  opacity: 0.28;
+  transform-box: view-box;
+  transform-origin: 200px 245px;
+  animation: epo-halo 3.2s ease-in-out 1.1s infinite;
+}
+
+@keyframes epo-halo {
+  0%,
+  100% {
+    opacity: 0.2;
+    transform: scale(0.98);
+  }
+  50% {
+    opacity: 0.42;
+    transform: scale(1.04);
+  }
+}
+
+/* specular glass highlight glides */
+.epo-spec {
+  animation: epo-spec 4.4s ease-in-out 1.1s infinite;
+}
+
+@keyframes epo-spec {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* drifting accent particles */
+.epo-p {
+  transform-box: view-box;
+  animation: epo-orbit 5.6s ease-in-out infinite;
+}
+
+.epo-p1 {
+  animation-delay: 0s;
+}
+.epo-p2 {
+  animation-delay: 0.7s;
+  animation-duration: 6.4s;
+}
+.epo-p3 {
+  animation-delay: 1.4s;
+  animation-duration: 5s;
+}
+.epo-p4 {
+  animation-delay: 2.1s;
+  animation-duration: 6.8s;
+}
+.epo-p5 {
+  animation-delay: 2.8s;
+  animation-duration: 4.6s;
+}
+
+@keyframes epo-orbit {
+  0%,
+  100% {
+    opacity: 0.25;
+    transform: translate(0, 0);
+  }
+  50% {
+    opacity: 0.95;
+    transform: translate(0, -14px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .epo-rise,
+  .epo-draw,
+  .epo-seal,
+  .epo-hand,
+  .epo-halo,
+  .epo-spec,
+  .epo-p,
+  .epo-stop-1,
+  .epo-stop-2,
+  .epo-stop-3 {
+    animation: none;
+  }
+  .epo-draw {
+    stroke-dasharray: none;
+  }
+}
