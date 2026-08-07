@@ -179,8 +179,21 @@ function removeLoading() {
     if (!doc) {
         return;
     }
+    const elapsed = Date.now() - (window.__EPO_LOADING_START__ || 0);
+    const minTime = 1500;
+    
+    function hideAndRemove() {
+        doc.classList.add('loading-hide');
+        setTimeout(() => {
+            doc.remove();
+        }, 400); // 400ms is the CSS transition duration
+    }
 
-    doc.remove()
+    if (elapsed < minTime) {
+        setTimeout(hideAndRemove, minTime - elapsed);
+    } else {
+        hideAndRemove();
+    }
 }
 
 export default router
