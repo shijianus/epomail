@@ -180,7 +180,7 @@ function removeLoading() {
         return;
     }
     const elapsed = Date.now() - (window.__EPO_LOADING_START__ || 0);
-    const minTime = 1500;
+    const minTime = 3000;
     
     function hideAndRemove() {
         doc.classList.add('loading-hide');
