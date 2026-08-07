@@ -101,7 +101,15 @@ router.beforeEach((to, from, next) => {
     const token = localStorage.getItem('token')
 
     if (!token && to.name !== 'login') {
-        window.location.href = '/login/';
+        const elapsed = Date.now() - (window.__EPO_LOADING_START__ || Date.now());
+        const minTime = 3000;
+        if (elapsed < minTime) {
+            setTimeout(() => {
+                window.location.href = '/login/';
+            }, minTime - elapsed);
+        } else {
+            window.location.href = '/login/';
+        }
         return;
     }
 
@@ -179,7 +187,7 @@ function removeLoading() {
     if (!doc) {
         return;
     }
-    const elapsed = Date.now() - (window.__EPO_LOADING_START__ || 0);
+    const elapsed = Date.now() - (window.__EPO_LOADING_START__ || Date.now());
     const minTime = 3000;
     
     function hideAndRemove() {
