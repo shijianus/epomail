@@ -105,10 +105,10 @@ router.beforeEach((to, from, next) => {
         const minTime = 3000;
         if (elapsed < minTime) {
             setTimeout(() => {
-                window.location.href = '/login/';
+                next({ name: 'login' });
             }, minTime - elapsed);
         } else {
-            window.location.href = '/login/';
+            next({ name: 'login' });
         }
         return;
     }
