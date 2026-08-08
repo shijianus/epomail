@@ -4,6 +4,11 @@ import { cameraState } from "./cameraStore";
 type PlanetType = "ice" | "gas" | "dark" | "nebula";
 type FlightPhase = "frontal" | "lateral" | "chase";
 
+function getBellCurve(min: number, max: number): number {
+  const u = (Math.random() + Math.random() + Math.random()) / 3;
+  return min + u * (max - min);
+}
+
 interface Planet {
   id: string;
   type: PlanetType;
@@ -135,6 +140,9 @@ export function PassingPlanets() {
           // Destroy if way behind, bounced too far away, or flew off laterally
           planetsRef.current.splice(i, 1);
           listChanged = true;
+          if (planetsRef.current.length === 0) {
+            nextSpawn = now + getBellCurve(5000, 15000);
+          }
         } else {
           // Update DOM
           const el = elementsRef.current.get(p.id);
@@ -158,8 +166,8 @@ export function PassingPlanets() {
         }
       }
 
-      // Spawn logic
-      if (now > nextSpawn && planetsRef.current.length < 2) {
+      // Spawn logic: strictly one planet at a time!
+      if (now > nextSpawn && planetsRef.current.length === 0) {
         let phase = flightPhaseRef.current;
         
         phasePlanetsSpawned.current++;
@@ -332,11 +340,8 @@ export function PassingPlanets() {
         planetsRef.current.push(p);
         listChanged = true;
         
-        let delay = 10000;
-        if (phase === "frontal") delay = isHit ? 12000 : 9000; // Give room after hit
-        else delay = 8000; // Lateral and chase are slightly faster
-        
-        nextSpawn = now + delay + Math.random() * 3000;
+        // Prevent another spawn until this planet finishes and sets the next timer
+        nextSpawn = Infinity;
       }
 
       if (listChanged) {
