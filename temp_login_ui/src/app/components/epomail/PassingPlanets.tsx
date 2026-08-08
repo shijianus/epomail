@@ -197,26 +197,43 @@ export function PassingPlanets() {
           
           if (isHit) {
             if (hitType === "dead-center" || hitType === "pass-through") {
-              targetX = (Math.random() - 0.5) * radius * 0.3;
-              targetY = (Math.random() - 0.5) * radius * 0.3;
-            } else { // edge
+              // Frontal hit: lands ON the screen, but can be randomly placed
+              const r = Math.random() * (radius * 0.7);
               const angle = Math.random() * Math.PI * 2;
+              targetX = Math.cos(angle) * r;
+              targetY = Math.sin(angle) * r;
+            } else { 
+              // Edge hit: 50% Left/Right, 50% Top/Bottom
+              const isHorizontal = Math.random() < 0.5;
               const edgeDist = radius * 0.9 + Math.random() * (radius * 0.25);
-              targetX = Math.cos(angle) * edgeDist;
-              targetY = Math.sin(angle) * edgeDist;
+              if (isHorizontal) {
+                targetX = (Math.random() < 0.5 ? 1 : -1) * edgeDist;
+                targetY = (Math.random() - 0.5) * radius * 0.8;
+              } else {
+                targetX = (Math.random() - 0.5) * radius * 0.8;
+                targetY = (Math.random() < 0.5 ? 1 : -1) * edgeDist;
+              }
             }
-          } else { // miss
-            const angle = Math.random() * Math.PI * 2;
-            const missDist = radius * 1.3 + 400 + Math.random() * 2500;
-            targetX = Math.cos(angle) * missDist;
-            targetY = Math.sin(angle) * missDist;
+          } else { 
+            // Miss: 50% Left/Right, 50% Top/Bottom
+            const isHorizontal = Math.random() < 0.5;
+            const missDistX = radius * 1.3 + 800 + Math.random() * 2500;
+            const missDistY = radius * 1.3 + 400 + Math.random() * 2500;
+            if (isHorizontal) {
+              targetX = (Math.random() < 0.5 ? 1 : -1) * missDistX;
+              targetY = (Math.random() - 0.5) * missDistY;
+            } else {
+              targetX = (Math.random() - 0.5) * missDistX;
+              targetY = (Math.random() < 0.5 ? 1 : -1) * missDistY;
+            }
           }
           
+          // Spawn completely randomly in the deep background and calculate velocity to hit the target
           const T = spawnZ / vz;
-          vx = (Math.random() - 0.5) * 100;
-          vy = (Math.random() - 0.5) * 100;
-          spawnX = targetX - vx * T;
-          spawnY = targetY - vy * T;
+          spawnX = (Math.random() - 0.5) * 16000; 
+          spawnY = (Math.random() - 0.5) * 10000;
+          vx = (targetX - spawnX) / T;
+          vy = (targetY - spawnY) / T;
 
         } else if (phase === "chase") {
           spawnZ = -1500;
@@ -224,26 +241,41 @@ export function PassingPlanets() {
           
           if (isHit) {
             if (hitType === "dead-center") {
-              targetX = (Math.random() - 0.5) * radius * 0.3;
-              targetY = (Math.random() - 0.5) * radius * 0.3;
-            } else { // edge scrape
+              const r = Math.random() * (radius * 0.7);
               const angle = Math.random() * Math.PI * 2;
+              targetX = Math.cos(angle) * r;
+              targetY = Math.sin(angle) * r;
+            } else { 
+              // Edge scrape from behind
+              const isHorizontal = Math.random() < 0.5;
               const edgeDist = radius * 0.9 + Math.random() * (radius * 0.25);
-              targetX = Math.cos(angle) * edgeDist;
-              targetY = Math.sin(angle) * edgeDist;
+              if (isHorizontal) {
+                targetX = (Math.random() < 0.5 ? 1 : -1) * edgeDist;
+                targetY = (Math.random() - 0.5) * radius * 0.8;
+              } else {
+                targetX = (Math.random() - 0.5) * radius * 0.8;
+                targetY = (Math.random() < 0.5 ? 1 : -1) * edgeDist;
+              }
             }
-          } else { // miss
-            const angle = Math.random() * Math.PI * 2;
-            const missDist = radius * 1.5 + 400 + Math.random() * 2000;
-            targetX = Math.cos(angle) * missDist;
-            targetY = Math.sin(angle) * missDist;
+          } else { 
+            // Miss from behind
+            const isHorizontal = Math.random() < 0.5;
+            const missDistX = radius * 1.3 + 800 + Math.random() * 2000;
+            const missDistY = radius * 1.3 + 400 + Math.random() * 2000;
+            if (isHorizontal) {
+              targetX = (Math.random() < 0.5 ? 1 : -1) * missDistX;
+              targetY = (Math.random() - 0.5) * missDistY;
+            } else {
+              targetX = (Math.random() - 0.5) * missDistX;
+              targetY = (Math.random() < 0.5 ? 1 : -1) * missDistY;
+            }
           }
           
           const T = Math.abs(spawnZ / vz);
-          vx = (Math.random() - 0.5) * 100;
-          vy = (Math.random() - 0.5) * 100;
-          spawnX = targetX - vx * T;
-          spawnY = targetY - vy * T;
+          spawnX = (Math.random() - 0.5) * 4000; 
+          spawnY = (Math.random() - 0.5) * 3000;
+          vx = (targetX - spawnX) / T;
+          vy = (targetY - spawnY) / T;
 
         } else if (phase === "lateral") {
           if (isHit && hitType === "dead-center") {
