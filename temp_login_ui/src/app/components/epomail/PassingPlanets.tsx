@@ -51,31 +51,41 @@ export function PassingPlanets() {
         p.z -= effectiveApproachSpeed * dt;
 
         // Collision logic
-        const radius = p.baseSize;
-        if (p.z < radius && p.z > -radius && !p.hasCollided) {
+        const radius = p.baseSize / 2; // Real physical radius
+        
+        // Z-axis check: Is it crossing the camera plane?
+        if (p.z < radius * 1.5 && p.z > -radius * 1.5 && !p.hasCollided) {
           const distXY = Math.hypot(p.x, p.y);
-          if (distXY < radius * 1.2) {
+          if (distXY < radius * 1.1) {
             p.hasCollided = true;
             
             if (p.destiny === "knock-back") {
-              cameraState.vz = -2.5; // violently knocked backward
-              cameraState.shakeIntensity = 60;
+              cameraState.vz = -4.0; // Violently knocked backward
+              cameraState.shakeIntensity = 80;
+              p.vz = -5000; // Planet bounces away!
             } else if (p.destiny === "pass-through") {
               cameraState.overlayOpacity = 1;
-              if (p.type === 'gas') cameraState.overlayColor = "rgba(168,85,247,0.9)";
-              else if (p.type === 'ice') cameraState.overlayColor = "rgba(103,232,249,0.9)";
+              if (p.type === 'gas') cameraState.overlayColor = "rgba(168,85,247,0.95)";
+              else if (p.type === 'ice') cameraState.overlayColor = "rgba(103,232,249,0.95)";
               else if (p.type === 'dark') cameraState.overlayColor = "rgba(0,0,0,1)";
-              else cameraState.overlayColor = "rgba(244,114,182,0.9)";
+              else cameraState.overlayColor = "rgba(244,114,182,0.95)";
             } else if (p.destiny === "glance") {
+              // Violent lateral pan
               const angle = Math.atan2(p.y, p.x);
-              cameraState.panVelX = -Math.cos(angle) * 3000; // violent lateral pan
-              cameraState.panVelY = -Math.sin(angle) * 3000;
-              cameraState.shakeIntensity = 30;
+              cameraState.panVelX = -Math.cos(angle) * 4000; 
+              cameraState.panVelY = -Math.sin(angle) * 4000;
+              cameraState.shakeIntensity = 50;
+              
+              // Planet bounces off
+              p.vx *= -0.8;
+              p.vy *= -0.8;
+              p.vz = -3000; // Knocked away
             }
           }
         }
 
-        if (p.z < -200 || p.z > 5000) { // destroy if way behind or bounced too far away
+        if (p.z < -1000 || p.z > 35000 || Math.abs(p.x) > 10000 || Math.abs(p.y) > 10000) { 
+          // Destroy if way behind, bounced too far away, or flew off laterally
           planetsRef.current.splice(i, 1);
           listChanged = true;
         } else {
@@ -86,8 +96,11 @@ export function PassingPlanets() {
             const sx = p.x * scale;
             const sy = p.y * scale;
             const size = p.baseSize * scale;
-            // Opacity fades in from far away, but stays solid if we are inside it
-            const opacity = p.z < 100 ? 1 : Math.min(1, (2500 - p.z) / 500);
+            // Opacity fades in from VERY far away, but stays solid if we are inside it
+            // It fades out if Z gets too small (behind camera) or > 25000
+            let opacity = 1;
+            if (p.z > 15000) opacity = Math.max(0, (25000 - p.z) / 10000);
+            if (p.z < 0) opacity = Math.max(0, (500 + p.z) / 500);
 
             el.style.width = `${size}px`;
             el.style.height = `${size}px`;
@@ -106,39 +119,55 @@ export function PassingPlanets() {
         else if (roll < 0.05) destiny = "knock-back";
         else if (roll < 0.20) destiny = "glance";
 
-        const baseSize = Math.random() * 300 + 150;
-        const radius = baseSize;
-        let targetX = 0, targetY = 0;
+        const baseSize = Math.random() * 800 + 400; // Planets are massive
+        const radius = baseSize / 2;
+        
+        let spawnX = 0, spawnY = 0, spawnZ = 0;
+        let vx = 0, vy = 0, vz = 0;
 
-        if (destiny === "pass-through" || destiny === "knock-back") {
-          targetX = (Math.random() - 0.5) * radius * 0.4;
-          targetY = (Math.random() - 0.5) * radius * 0.4;
-        } else if (destiny === "glance") {
-          const angle = Math.random() * Math.PI * 2;
-          targetX = Math.cos(angle) * radius * 0.8;
-          targetY = Math.sin(angle) * radius * 0.8;
+        if (destiny === "glance") {
+          // SIDE-HIT: Spawns exactly at the sides, very close, moving rapidly inward
+          spawnZ = 200 + Math.random() * 300; 
+          const side = Math.floor(Math.random() * 4); // 0=right, 1=left, 2=bottom, 3=top
+          
+          if (side === 0) { spawnX = 3000; spawnY = (Math.random() - 0.5) * 500; vx = -3500 - Math.random() * 1000; vy = 0; }
+          else if (side === 1) { spawnX = -3000; spawnY = (Math.random() - 0.5) * 500; vx = 3500 + Math.random() * 1000; vy = 0; }
+          else if (side === 2) { spawnX = (Math.random() - 0.5) * 500; spawnY = 2000; vx = 0; vy = -3500 - Math.random() * 1000; }
+          else { spawnX = (Math.random() - 0.5) * 500; spawnY = -2000; vx = 0; vy = 3500 + Math.random() * 1000; }
+          
+          vz = (Math.random() - 0.5) * 100; // minimal Z movement
+          
         } else {
-          const angle = Math.random() * Math.PI * 2;
-          const missDist = radius + 400 + Math.random() * 1500;
-          targetX = Math.cos(angle) * missDist;
-          targetY = Math.sin(angle) * missDist;
+          // FRONTAL (Miss, Pass-through, Knock-back)
+          spawnZ = 25000; // True dot in the distance
+          vz = Math.random() * 2000 + 2500; // Extremely fast approach (takes ~6-8s to reach)
+          
+          let targetX = 0, targetY = 0;
+          if (destiny === "pass-through" || destiny === "knock-back") {
+            targetX = (Math.random() - 0.5) * radius * 0.3; // Dead center
+            targetY = (Math.random() - 0.5) * radius * 0.3;
+          } else {
+            // Miss
+            const angle = Math.random() * Math.PI * 2;
+            const missDist = radius + 800 + Math.random() * 2000; // Safely far away from center
+            targetX = Math.cos(angle) * missDist;
+            targetY = Math.sin(angle) * missDist;
+          }
+
+          // Back-calculate spawn X/Y so it hits the target exactly at Z=0
+          const T = spawnZ / vz;
+          vx = (Math.random() - 0.5) * 100; // Small lateral drift
+          vy = (Math.random() - 0.5) * 100;
+          spawnX = targetX - vx * T;
+          spawnY = targetY - vy * T;
         }
-
-        const vz = Math.random() * 250 + 150;
-        const vx = (Math.random() - 0.5) * 80;
-        const vy = (Math.random() - 0.5) * 80;
-
-        // Back-calculate spawn position so it perfectly hits the target at Z=0
-        const T = 2500 / vz;
-        const spawnX = targetX - vx * T;
-        const spawnY = targetY - vy * T;
 
         const p: Planet = {
           id: Math.random().toString(36).substring(2, 9),
           type: types[Math.floor(Math.random() * types.length)],
           x: spawnX,
           y: spawnY,
-          z: 2500,
+          z: spawnZ,
           vx,
           vy,
           vz,
