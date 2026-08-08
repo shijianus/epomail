@@ -1,51 +1,65 @@
-import { useRef, useState, useEffect } from "react";
+import { useRef, useEffect } from "react";
 import { CanvasBackground } from "./components/epomail/CanvasBackground";
 import type { CanvasHandle } from "./components/epomail/CanvasBackground";
 import { LoginCard } from "./components/epomail/LoginCard";
 import { PassingPlanets } from "./components/epomail/PassingPlanets";
+import { cameraState, updateCameraPhysics } from "./components/epomail/cameraStore";
 
 export default function App() {
   const canvasRef = useRef<CanvasHandle | null>(null);
-  const [shakeIntensity, setShakeIntensity] = useState(0);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (shakeIntensity > 0) {
-      const timer = setTimeout(() => setShakeIntensity(0), 800);
-      return () => clearTimeout(timer);
-    }
-  }, [shakeIntensity]);
+    let raf: number;
+    let lastTime = performance.now();
 
-  const onShake = (strength: number) => {
-    setShakeIntensity(strength);
-  };
+    const loop = (now: number) => {
+      const dt = Math.min((now - lastTime) / 1000, 0.1);
+      lastTime = now;
+
+      // Update global camera physics
+      updateCameraPhysics(dt);
+
+      // Apply to container
+      if (containerRef.current) {
+        containerRef.current.style.transform = `translate3d(${cameraState.panX + cameraState.shakeX}px, ${cameraState.panY + cameraState.shakeY}px, 0)`;
+      }
+
+      // Apply overlay
+      if (overlayRef.current) {
+        overlayRef.current.style.opacity = cameraState.overlayOpacity.toString();
+        overlayRef.current.style.background = cameraState.overlayColor;
+        overlayRef.current.style.pointerEvents = cameraState.overlayOpacity > 0 ? "auto" : "none";
+      }
+
+      raf = requestAnimationFrame(loop);
+    };
+
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, []);
 
   return (
     <>
-      {shakeIntensity > 0 && (
-        <style>{`
-          @keyframes screenShake {
-            0% { transform: translate(0, 0) rotate(0deg); }
-            20% { transform: translate(-${shakeIntensity * 8}px, ${shakeIntensity * 4}px) rotate(-${shakeIntensity * 1}deg); }
-            40% { transform: translate(${shakeIntensity * 6}px, -${shakeIntensity * 6}px) rotate(${shakeIntensity * 1}deg); }
-            60% { transform: translate(-${shakeIntensity * 4}px, ${shakeIntensity * 8}px) rotate(0deg); }
-            80% { transform: translate(${shakeIntensity * 4}px, -${shakeIntensity * 4}px) rotate(-${shakeIntensity * 0.5}deg); }
-            100% { transform: translate(0, 0) rotate(0deg); }
-          }
-          .shake-active {
-            animation: screenShake 0.6s cubic-bezier(.36,.07,.19,.97) both;
-          }
-        `}</style>
-      )}
       <div
-        className={`epomail relative size-full min-h-screen overflow-hidden ${shakeIntensity > 0 ? 'shake-active' : ''}`}
+        ref={containerRef}
+        className="epomail relative size-full min-h-screen overflow-hidden will-change-transform"
         style={{ background: "var(--epo-void)" }}
       >
         <CanvasBackground ref={canvasRef} />
-        <PassingPlanets onShake={onShake} />
+        <PassingPlanets />
         <div className="relative h-full min-h-screen">
           <LoginCard canvasRef={canvasRef} />
         </div>
       </div>
+      
+      {/* Pass-through overlay effect */}
+      <div 
+        ref={overlayRef}
+        className="fixed inset-0 z-50 transition-colors duration-0"
+        style={{ opacity: 0, pointerEvents: 'none' }}
+      />
     </>
   );
 }

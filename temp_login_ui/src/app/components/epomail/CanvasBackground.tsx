@@ -1,4 +1,5 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { cameraState } from "./cameraStore";
 
 /**
  * Imperative API exposed to the login form so keystrokes / submit can
@@ -235,15 +236,23 @@ export const CanvasBackground = forwardRef<CanvasHandle>((_props, ref) => {
       const fov = Math.max(width, height);
       for (const s of stars) {
         if (!reduceMotion) {
-          s.z -= s.speed;
+          // Multiply intrinsic star speed by the global camera Z-velocity
+          // If cameraState.vz is negative (knocked back), stars will move away!
+          s.z -= s.speed * cameraState.vz;
+          
           if (s.z <= 0) {
             s.z = 1000;
+            s.x = (Math.random() - 0.5) * 2400;
+            s.y = (Math.random() - 0.5) * 2400;
+          } else if (s.z > 1000) {
+            // If receding due to knockback, wrap them to the front
+            s.z = 1;
             s.x = (Math.random() - 0.5) * 2400;
             s.y = (Math.random() - 0.5) * 2400;
           }
         }
         
-        const scale = fov / s.z;
+        const scale = fov / Math.max(1, s.z);
         const sx = cx + s.x * scale;
         const sy = cy + s.y * scale;
 
@@ -252,9 +261,9 @@ export const CanvasBackground = forwardRef<CanvasHandle>((_props, ref) => {
 
         const size = Math.max(0.2, 1.5 * scale);
         
-        // Streak effect (motion blur)
-        const prevZ = s.z + (reduceMotion ? 0 : s.speed * 1.5);
-        const prevScale = fov / prevZ;
+        // Streak effect (motion blur relative to actual movement)
+        const prevZ = s.z + (reduceMotion ? 0 : s.speed * 1.5 * cameraState.vz);
+        const prevScale = fov / Math.max(1, prevZ);
         const px = cx + s.x * prevScale;
         const py = cy + s.y * prevScale;
 
