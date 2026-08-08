@@ -332,11 +332,11 @@ export function PassingPlanets() {
         planetsRef.current.push(p);
         listChanged = true;
         
-        let delay = 3000;
-        if (phase === "frontal") delay = isHit ? 5000 : 3000; // Give room after hit
-        else delay = 1500; // Lateral and chase are faster
+        let delay = 10000;
+        if (phase === "frontal") delay = isHit ? 12000 : 9000; // Give room after hit
+        else delay = 8000; // Lateral and chase are slightly faster
         
-        nextSpawn = now + delay + Math.random() * 2000;
+        nextSpawn = now + delay + Math.random() * 3000;
       }
 
       if (listChanged) {

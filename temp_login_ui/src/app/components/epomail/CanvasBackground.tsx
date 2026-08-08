@@ -135,14 +135,14 @@ export const CanvasBackground = forwardRef<CanvasHandle>((_props, ref) => {
     let stars: Star[] = [];
 
     const buildStars = () => {
-      const count = Math.round((width * height) / 6000); // denser for warp effect
+      const count = Math.round((width * height) / 1500); // Massive density increase
       stars = Array.from({ length: count }, () => ({
-        x: (Math.random() - 0.5) * 2400,
-        y: (Math.random() - 0.5) * 2400,
+        x: (Math.random() - 0.5) * 3000, // wider field to accommodate panning
+        y: (Math.random() - 0.5) * 3000,
         z: Math.random() * 1000 + 1,
         base: Math.random() * 0.5 + 0.2,
         phase: Math.random() * Math.PI * 2,
-        speed: Math.random() * 2.5 + 0.5,
+        speed: Math.random() * 4.5 + 2.5, // Medium-fast baseline speed
       }));
     };
 
@@ -187,7 +187,11 @@ export const CanvasBackground = forwardRef<CanvasHandle>((_props, ref) => {
     let raf = 0;
     const start = performance.now();
 
+    let lastTime = performance.now();
+
     const render = (now: number) => {
+      const dt = Math.min((now - lastTime) / 1000, 0.1);
+      lastTime = now;
       const t = (now - start) / 1000;
       ctx.clearRect(0, 0, width, height);
 
@@ -236,19 +240,21 @@ export const CanvasBackground = forwardRef<CanvasHandle>((_props, ref) => {
       const fov = Math.max(width, height);
       for (const s of stars) {
         if (!reduceMotion) {
-          // Multiply intrinsic star speed by the global camera Z-velocity
-          // If cameraState.vz is negative (knocked back), stars will move away!
+          // Z-axis movement based on camera knockback
           s.z -= s.speed * cameraState.vz;
+          
+          // X/Y-axis sweeping based on camera lateral pan
+          s.x -= cameraState.panVelX * dt * 0.05;
+          s.y -= cameraState.panVelY * dt * 0.05;
           
           if (s.z <= 0) {
             s.z = 1000;
-            s.x = (Math.random() - 0.5) * 2400;
-            s.y = (Math.random() - 0.5) * 2400;
+            s.x = (Math.random() - 0.5) * 3000;
+            s.y = (Math.random() - 0.5) * 3000;
           } else if (s.z > 1000) {
-            // If receding due to knockback, wrap them to the front
             s.z = 1;
-            s.x = (Math.random() - 0.5) * 2400;
-            s.y = (Math.random() - 0.5) * 2400;
+            s.x = (Math.random() - 0.5) * 3000;
+            s.y = (Math.random() - 0.5) * 3000;
           }
         }
         
@@ -259,13 +265,16 @@ export const CanvasBackground = forwardRef<CanvasHandle>((_props, ref) => {
         // Skip if out of bounds
         if (sx < -50 || sx > width + 50 || sy < -50 || sy > height + 50) continue;
 
-        const size = Math.max(0.2, 1.5 * scale);
+        // Stars are distant points. Keep them small regardless of Z-scale!
+        const size = Math.max(0.5, Math.min(2.0, 0.4 * scale));
         
         // Streak effect (motion blur relative to actual movement)
         const prevZ = s.z + (reduceMotion ? 0 : s.speed * 1.5 * cameraState.vz);
+        const prevX = s.x + (reduceMotion ? 0 : cameraState.panVelX * dt * 0.05 * 1.5);
+        const prevY = s.y + (reduceMotion ? 0 : cameraState.panVelY * dt * 0.05 * 1.5);
         const prevScale = fov / Math.max(1, prevZ);
-        const px = cx + s.x * prevScale;
-        const py = cy + s.y * prevScale;
+        const px = cx + prevX * prevScale;
+        const py = cy + prevY * prevScale;
 
         const tw = reduceMotion
           ? s.base
