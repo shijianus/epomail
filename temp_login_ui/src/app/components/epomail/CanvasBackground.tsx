@@ -376,22 +376,7 @@ export const CanvasBackground = forwardRef<CanvasHandle>((_props, ref) => {
       {/* All autonomous motion (aurora + starscape + dust) is rendered here. */}
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
 
-      {/* Macro-scale astronomical element: distant planet silhouette,
-          recolored to blend with the violet→indigo→cyan harmony. */}
-      <div
-        className="absolute rounded-full"
-        style={{
-          width: "70vw",
-          height: "70vw",
-          right: "-28vw",
-          bottom: "-34vw",
-          background:
-            "radial-gradient(circle at 34% 30%, rgba(99,102,241,0.14) 0%, rgba(124,58,237,0.06) 42%, rgba(5,6,15,0) 70%)",
-          boxShadow:
-            "inset 22px 30px 90px rgba(103,232,249,0.14), inset -40px -50px 120px rgba(5,6,15,0.85)",
-          border: "1px solid rgba(103,232,249,0.08)",
-        }}
-      />
+
       {/* Solar flare — a single grand arc of light. */}
       <div
         className="absolute"
