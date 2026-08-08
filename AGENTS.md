@@ -37,13 +37,19 @@
 | 層級 | 組件 | 描述 |
 |------|------|------|
 | z-0 | `CanvasBackground.vue` | 星點矩陣、極光 blob、漣漪、鼠標交互 |
-| z-2 | `SpaceTrail.vue` | 翹曲飛行星軌 + 流星 + 陨石碎片（**2026-08 新增**） |
+| z-2 | `SpaceTrail.vue` | 翹曲飛行星軌 + 彗星多層光暈 + 旋轉陨石碎片 + 能量環 + 星雲薄霧 + 塵埃粒子（**2026-08 增強**） |
 | z-10 | `.form-wrapper` | 登錄表單面板 |
 
-### SpaceTrail 設計要點
+### SpaceTrail 設計要點（2026-08-07 增強版）
 
-- **區域限制**：僅佔 `bottom-left 52vw × 58vh`，使用 `mask-image` 漸層邊緣融合
-- **內容**：高速翹曲星軌（warp starfield）+ 随機流星 + 浮動陨石碎片
+- **區域限制**：僅佔 `bottom-left 56vw × 62vh`，使用 `mask-image` 漸層邊緣融合
+- **動畫層次（6層）**：
+  1. **星雲薄霧**（Nebula wisps）— 軟色彩浮動雲氣，背景氣氛
+  2. **翹曲星軌**（Warp stars）— 180顆高速星點，速度提升至 2-7.5x，從消失點向外輻射
+  3. **能量環**（Energy rings）— 偶發閃爍圓環，增加脈衝感
+  4. **彗星**（Comets）— 多層光暈（外層漫射 + 核心細條 + 發光頭部），最多4顆
+  5. **旋轉陨石**（Tumbling asteroids）— 12顆不規則多邊形碎片，帶旋轉動畫
+  6. **塵埃粒子**（Dust）— 60個微型快速移動點，填充細節
 - **色彩**：繼承主色 — Purple `rgb(168,85,247)`、Indigo `rgb(99,102,241)`、Cyan `rgb(103,232,249)`
 - **無障礙**：尊重 `prefers-reduced-motion`（若用戶開啟，動畫完全不啟動）
 - **性能**：使用 `ResizeObserver` 響應尺寸，`onUnmounted` 清理 RAF 和 Observer
@@ -55,6 +61,8 @@
 - 不要刪除或替換已有的 `CanvasBackground` 交互效果
 - 新增動畫必須疊加在既有層次之上，不衝突
 - 新增動畫不得遮蔽或影響表單的正常使用
+- **每次對 SpaceTrail 或 CanvasBackground 進行修改前**，必須 `git commit` 當前狀態作為備份，並匯報 commit hash
+- 修改後必須使用 Playwright 截圖驗收（至少 1440px 和 375px 兩個解析度），確認不破壞已有動畫
 
 ---
 
