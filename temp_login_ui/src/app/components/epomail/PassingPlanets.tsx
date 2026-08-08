@@ -56,12 +56,15 @@ export function PassingPlanets() {
         // Only check collisions if it's not a chase or flyby
         if (p.phase !== "chase" && p.phase !== "lateral-flyby" && p.z < radius * 1.5 && p.z > -radius * 1.5 && !p.hasCollided) {
           const distXY = Math.hypot(p.x, p.y);
-          if (distXY < radius * 1.1) {
+          if (distXY < radius * 1.2) {
             p.hasCollided = true;
             
-            const isPassThrough = Math.random() < 0.15; // 15% chance to just clip through the atmosphere
+            const isPassThrough = Math.random() < 0.05; 
+            // Dead center is when the camera is deep inside the planet. 
+            // Edge hit is when the camera only clips the outer 15-20% of the radius.
+            const isDeadCenter = distXY < radius * 0.85;
             
-            if (isPassThrough) {
+            if (isPassThrough && isDeadCenter) {
               cameraState.overlayOpacity = 1;
               if (p.type === 'gas') cameraState.overlayColor = "rgba(168,85,247,0.95)";
               else if (p.type === 'ice') cameraState.overlayColor = "rgba(103,232,249,0.95)";
@@ -70,19 +73,34 @@ export function PassingPlanets() {
             } else {
               // Physical Hit!
               if (p.phase === "frontal") {
-                cameraState.vz = -4.0; // Violently knocked backward
-                cameraState.shakeIntensity = 80;
-                p.vz = -5000; // Planet bounces away!
-                
-                // User-requested probabilities:
-                // 65% keep frontal, 20% to lateral/chase, 15% pure lateral flyby
-                const shiftRoll = Math.random();
-                if (shiftRoll < 0.65) {
-                  flightPhaseRef.current = "frontal";
-                } else if (shiftRoll < 0.85) {
-                  flightPhaseRef.current = Math.random() < 0.5 ? "lateral" : "chase";
+                if (isDeadCenter) {
+                  // DEAD-CENTER FRONT HIT (Knock-back)
+                  cameraState.vz = -4.0;
+                  cameraState.shakeIntensity = 80;
+                  p.vz = -5000;
+                  
+                  // Massive hit -> MUST change trajectory
+                  const shiftRoll = Math.random();
+                  if (shiftRoll < 0.10) flightPhaseRef.current = "frontal"; // Only 10% chance to stay
+                  else if (shiftRoll < 0.60) flightPhaseRef.current = "lateral"; 
+                  else flightPhaseRef.current = "chase"; 
                 } else {
-                  flightPhaseRef.current = "lateral-flyby";
+                  // EDGE HIT (Glance)
+                  const angle = Math.atan2(p.y, p.x);
+                  cameraState.panVelX = -Math.cos(angle) * 2500; // Pushed sideways
+                  cameraState.panVelY = -Math.sin(angle) * 2500;
+                  cameraState.shakeIntensity = 40;
+                  
+                  // Planet deflects off the edge of the screen!
+                  p.vz = -2000; // Bounce away slightly
+                  p.vx += Math.cos(angle) * 3000; 
+                  p.vy += Math.sin(angle) * 3000;
+                  
+                  // Edge hit -> MUST change trajectory
+                  const shiftRoll = Math.random();
+                  if (shiftRoll < 0.15) flightPhaseRef.current = "frontal"; // Only 15% chance to stay
+                  else if (shiftRoll < 0.65) flightPhaseRef.current = "lateral-flyby"; // Shift to cinematic side
+                  else flightPhaseRef.current = "lateral"; // Shift to lateral combat
                 }
                 phasePlanetsSpawned.current = 0;
                 
@@ -100,9 +118,9 @@ export function PassingPlanets() {
                 
                 // Phase Shift after lateral hit
                 const shiftRoll = Math.random();
-                if (shiftRoll < 0.40) flightPhaseRef.current = "lateral";
-                else if (shiftRoll < 0.70) flightPhaseRef.current = "chase";
-                else flightPhaseRef.current = "frontal";
+                if (shiftRoll < 0.30) flightPhaseRef.current = "lateral"; // 30% stay
+                else if (shiftRoll < 0.70) flightPhaseRef.current = "chase"; // 40% shift to chase
+                else flightPhaseRef.current = "frontal"; // 30% return to frontal
                 
                 phasePlanetsSpawned.current = 0;
               }
@@ -194,14 +212,25 @@ export function PassingPlanets() {
           vz = Math.random() * 2000 + 2500; // Fast approach towards camera
           
           let targetX = 0, targetY = 0;
-          // Organic hit detection: 35% chance to bias heavily towards the center for a collision
-          if (Math.random() < 0.35) {
-            targetX = (Math.random() - 0.5) * radius * 0.8; 
-            targetY = (Math.random() - 0.5) * radius * 0.8;
-          } else {
-            // Organic miss
+          
+          // Organic spawn targeting: 10% Dead-Center, 30% Edge Hit, 60% Miss
+          const aimRoll = Math.random();
+          
+          if (aimRoll < 0.10) {
+            // Dead-Center (guarantees distXY < radius * 0.6)
+            targetX = (Math.random() - 0.5) * radius * 0.5; 
+            targetY = (Math.random() - 0.5) * radius * 0.5;
+          } else if (aimRoll < 0.40) {
+            // Edge Hit (guarantees radius * 0.9 < distXY < radius * 1.15)
+            // Visually, the planet will only clip the corner of the screen
             const angle = Math.random() * Math.PI * 2;
-            const missDist = radius + 600 + Math.random() * 2000; 
+            const edgeDist = radius * 0.9 + Math.random() * (radius * 0.25);
+            targetX = Math.cos(angle) * edgeDist;
+            targetY = Math.sin(angle) * edgeDist;
+          } else {
+            // Organic miss (distXY > radius * 1.3)
+            const angle = Math.random() * Math.PI * 2;
+            const missDist = radius * 1.3 + 200 + Math.random() * 2500; 
             targetX = Math.cos(angle) * missDist;
             targetY = Math.sin(angle) * missDist;
           }
