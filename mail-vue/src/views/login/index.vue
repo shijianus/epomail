@@ -2,6 +2,8 @@
   <div id="login-box" class="epomail relative size-full min-h-screen overflow-hidden" :style=" background ? 'background: var(--el-bg-color)' : 'background: var(--epo-void)'" v-loading="oauthLoading" element-loading-text="登录中...">
     <CanvasBackground ref="canvasRef" v-if="!settingStore.settings.background" />
     <div v-else :style="background"></div>
+    <!-- Warp-speed space animation overlay (bottom-left, non-blocking) -->
+    <SpaceTrail v-if="!settingStore.settings.background" />
     <div class="form-wrapper">
       <div class="container">
         <span class="form-title">{{ settingStore.settings.title }}</span>
@@ -142,6 +144,7 @@
 
 <script setup>
 import CanvasBackground from './CanvasBackground.vue';
+import SpaceTrail from './SpaceTrail.vue';
 import './login_theme.css';
 import router from "@/router";
 import {computed, nextTick, reactive, ref} from "vue";
