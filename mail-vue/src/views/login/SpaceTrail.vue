@@ -60,7 +60,7 @@ onMounted(() => {
   function makeWarpStar() {
     const angle  = Math.random() * Math.PI * 2;
     const seed   = Math.random() * 0.05;
-    const speed  = Math.random() * 5.5 + 2.0; // faster than before
+    const speed  = Math.random() * 15.0 + 8.0; // Extremely high speed warp
     const col    = COLORS[Math.floor(Math.random() * COLORS.length)];
     const maxDist = Math.random() * 0.6 + 0.55;
     return { angle, dist: seed, maxDist, speed, col };
@@ -73,13 +73,13 @@ onMounted(() => {
   function makeComet() {
     // Spawn from top/left edges
     const fromTop = Math.random() < 0.5;
-    const x = fromTop ? Math.random() * W * 0.7 : -30;
-    const y = fromTop ? -30 : Math.random() * H * 0.5;
-    const angle = (Math.PI / 4) + (Math.random() - 0.5) * 0.7;
-    const speed = Math.random() * 4.5 + 3.5;
-    const tailLength = Math.random() * 120 + 80;
+    const x = fromTop ? Math.random() * W * 0.7 : -50;
+    const y = fromTop ? -50 : Math.random() * H * 0.5;
+    const angle = (Math.PI / 4) + (Math.random() - 0.5) * 0.4;
+    const speed = Math.random() * 12.0 + 8.0; // High speed comets
+    const tailLength = Math.random() * 250 + 150; // Much longer tails
     const col = COLORS[Math.floor(Math.random() * 3)];
-    const width = Math.random() * 1.4 + 0.8;
+    const width = Math.random() * 2.5 + 1.5; // Thicker comets
     // Extra: comet has a glowing head + multi-segment tail
     return {
       x, y, angle, speed, tailLength, col, width,
@@ -104,10 +104,10 @@ onMounted(() => {
     return {
       x: Math.random() * W,
       y: Math.random() * H,
-      vx: (Math.random() - 0.5) * 0.55,
-      vy: (Math.random() - 0.5) * 0.55,
+      vx: (Math.random() - 0.5) * 2.5,
+      vy: (Math.random() - 0.5) * 2.5,
       rot: Math.random() * Math.PI * 2,
-      rotSpeed: (Math.random() - 0.5) * 0.025, // tumble speed
+      rotSpeed: (Math.random() - 0.5) * 0.15, // fast tumble speed
       alpha: Math.random() * 0.35 + 0.12,
       points,
       r,
@@ -236,24 +236,25 @@ onMounted(() => {
       const x = vx + Math.cos(s.angle) * r;
       const y = vy + Math.sin(s.angle) * r;
 
-      // Much longer streak for warp effect
-      const streakLen = normDist * normDist * 48 + 2;
+      // Much longer streak for extreme warp effect
+      const streakLen = normDist * normDist * 200 + 10;
       const prevX = x - Math.cos(s.angle) * streakLen;
       const prevY = y - Math.sin(s.angle) * streakLen;
 
-      const a = Math.min(normDist * normDist * 1.1, 0.9);
+      const a = Math.min(normDist * normDist * 1.5, 1.0);
       const [cr, cg, cb] = s.col;
 
       const grad = ctx.createLinearGradient(prevX, prevY, x, y);
       grad.addColorStop(0, `rgba(${cr},${cg},${cb},0)`);
-      grad.addColorStop(0.6, `rgba(${cr},${cg},${cb},${a * 0.5})`);
-      grad.addColorStop(1, `rgba(${cr},${cg},${cb},${a})`);
+      grad.addColorStop(0.6, `rgba(${cr},${cg},${cb},${a * 0.4})`);
+      grad.addColorStop(1, `rgba(255,255,255,${a})`); // White hot tip
 
       ctx.beginPath();
       ctx.moveTo(prevX, prevY);
       ctx.lineTo(x, y);
       ctx.strokeStyle = grad;
-      ctx.lineWidth = normDist * 2.2 + 0.4;
+      ctx.lineWidth = normDist * 4.0 + 0.8;
+      ctx.lineCap = "round";
       ctx.stroke();
 
       // Reset star when exits canvas
@@ -386,13 +387,17 @@ onMounted(() => {
       }
       ctx.closePath();
 
+      // High speed motion trail for asteroid
+      ctx.shadowColor = `rgba(180, 200, 255, ${a.alpha})`;
+      ctx.shadowBlur = 10;
       // Rock fill: dim gray-blue
-      ctx.fillStyle = `rgba(130, 150, 200, ${a.alpha * 0.5})`;
+      ctx.fillStyle = `rgba(130, 150, 200, ${a.alpha * 0.7})`;
       ctx.fill();
       // Rock edge: slightly lighter
-      ctx.strokeStyle = `rgba(180, 200, 255, ${a.alpha * 0.8})`;
-      ctx.lineWidth = 0.7;
+      ctx.strokeStyle = `rgba(180, 200, 255, ${a.alpha * 0.9})`;
+      ctx.lineWidth = 1.2;
       ctx.stroke();
+      ctx.shadowBlur = 0; // reset
 
       ctx.restore();
     }
