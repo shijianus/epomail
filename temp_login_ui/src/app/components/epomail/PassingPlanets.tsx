@@ -2,8 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { cameraState } from "./cameraStore";
 
 type PlanetType = "ice" | "gas" | "dark" | "nebula";
-type Destiny = "frontal-miss" | "knock-back" | "pass-through" | "lateral-miss" | "lateral-hit" | "chase-overtake";
-type FlightPhase = "frontal" | "lateral" | "chase";
+type FlightPhase = "frontal" | "lateral" | "lateral-flyby" | "chase";
 
 interface Planet {
   id: string;
@@ -16,7 +15,7 @@ interface Planet {
   vz: number;
   baseSize: number;
   seed: number;
-  destiny: Destiny;
+  phase: FlightPhase;
   hasCollided: boolean;
 }
 
@@ -54,42 +53,59 @@ export function PassingPlanets() {
 
         const radius = p.baseSize / 2; 
         
-        // Only check collisions if it's not a chase overtake (chase overtakes safely pass by)
-        if (p.destiny !== "chase-overtake" && p.z < radius * 1.5 && p.z > -radius * 1.5 && !p.hasCollided) {
+        // Only check collisions if it's not a chase or flyby
+        if (p.phase !== "chase" && p.phase !== "lateral-flyby" && p.z < radius * 1.5 && p.z > -radius * 1.5 && !p.hasCollided) {
           const distXY = Math.hypot(p.x, p.y);
           if (distXY < radius * 1.1) {
             p.hasCollided = true;
             
-            if (p.destiny === "knock-back") {
-              cameraState.vz = -4.0; // Violently knocked backward
-              cameraState.shakeIntensity = 80;
-              p.vz = -5000; // Planet bounces away!
-              
-              // Shift Trajectory to Lateral
-              flightPhaseRef.current = "lateral";
-              phasePlanetsSpawned.current = 0;
-              
-            } else if (p.destiny === "pass-through") {
+            const isPassThrough = Math.random() < 0.15; // 15% chance to just clip through the atmosphere
+            
+            if (isPassThrough) {
               cameraState.overlayOpacity = 1;
               if (p.type === 'gas') cameraState.overlayColor = "rgba(168,85,247,0.95)";
               else if (p.type === 'ice') cameraState.overlayColor = "rgba(103,232,249,0.95)";
               else if (p.type === 'dark') cameraState.overlayColor = "rgba(0,0,0,1)";
               else cameraState.overlayColor = "rgba(244,114,182,0.95)";
-            } else if (p.destiny === "lateral-hit") {
-              // Violent lateral pan
-              const angle = Math.atan2(p.y, p.x);
-              cameraState.panVelX = -Math.cos(angle) * 4000; 
-              cameraState.panVelY = -Math.sin(angle) * 4000;
-              cameraState.shakeIntensity = 50;
-              
-              // Planet bounces off
-              p.vx *= -0.8;
-              p.vy *= -0.8;
-              p.vz = -3000; 
-              
-              // Shift Trajectory to Chase (we matched speed/direction)
-              flightPhaseRef.current = "chase";
-              phasePlanetsSpawned.current = 0;
+            } else {
+              // Physical Hit!
+              if (p.phase === "frontal") {
+                cameraState.vz = -4.0; // Violently knocked backward
+                cameraState.shakeIntensity = 80;
+                p.vz = -5000; // Planet bounces away!
+                
+                // User-requested probabilities:
+                // 65% keep frontal, 20% to lateral/chase, 15% pure lateral flyby
+                const shiftRoll = Math.random();
+                if (shiftRoll < 0.65) {
+                  flightPhaseRef.current = "frontal";
+                } else if (shiftRoll < 0.85) {
+                  flightPhaseRef.current = Math.random() < 0.5 ? "lateral" : "chase";
+                } else {
+                  flightPhaseRef.current = "lateral-flyby";
+                }
+                phasePlanetsSpawned.current = 0;
+                
+              } else if (p.phase === "lateral") {
+                // Violent lateral pan
+                const angle = Math.atan2(p.y, p.x);
+                cameraState.panVelX = -Math.cos(angle) * 4000; 
+                cameraState.panVelY = -Math.sin(angle) * 4000;
+                cameraState.shakeIntensity = 50;
+                
+                // Planet bounces off
+                p.vx *= -0.8;
+                p.vy *= -0.8;
+                p.vz = -3000; 
+                
+                // Phase Shift after lateral hit
+                const shiftRoll = Math.random();
+                if (shiftRoll < 0.40) flightPhaseRef.current = "lateral";
+                else if (shiftRoll < 0.70) flightPhaseRef.current = "chase";
+                else flightPhaseRef.current = "frontal";
+                
+                phasePlanetsSpawned.current = 0;
+              }
             }
           }
         }
@@ -123,26 +139,14 @@ export function PassingPlanets() {
 
       // Spawn logic
       if (now > nextSpawn && planetsRef.current.length < 2) {
-        const phase = flightPhaseRef.current;
+        let phase = flightPhaseRef.current;
         const count = phasePlanetsSpawned.current;
-        let destiny: Destiny = "frontal-miss";
         
-        // Phase-based Destiny Engine
-        if (phase === "frontal") {
-          const roll = Math.random();
-          if (roll < 0.05) destiny = "pass-through";
-          else if (roll < 0.25 && count >= 1) destiny = "knock-back"; // Ensure at least 1 miss before hit
-          else destiny = "frontal-miss";
-        } else if (phase === "lateral") {
-          const roll = Math.random();
-          if (roll < 0.30 && count >= 1) destiny = "lateral-hit";
-          else destiny = "lateral-miss";
-        } else if (phase === "chase") {
-          destiny = "chase-overtake";
-          if (count > 1) { // After 2 chases, revert back to frontal
-            flightPhaseRef.current = "frontal";
-            phasePlanetsSpawned.current = 0;
-          }
+        // Auto-exit pure cinematic phases after a few planets
+        if (phase === "chase" && count > 1) {
+          flightPhaseRef.current = "frontal"; phasePlanetsSpawned.current = 0; phase = "frontal";
+        } else if (phase === "lateral-flyby" && count > 2) {
+          flightPhaseRef.current = "frontal"; phasePlanetsSpawned.current = 0; phase = "frontal";
         }
         
         phasePlanetsSpawned.current++;
@@ -153,33 +157,30 @@ export function PassingPlanets() {
         let spawnX = 0, spawnY = 0, spawnZ = 0;
         let vx = 0, vy = 0, vz = 0;
 
-        if (destiny.startsWith("lateral")) {
-          // LATERAL FIELD: Spawns exactly at the sides, very close, moving rapidly inward
+        if (phase === "lateral" || phase === "lateral-flyby") {
           spawnZ = 200 + Math.random() * 300; 
           const side = Math.floor(Math.random() * 4); 
-          const isHit = destiny === "lateral-hit";
           
           if (side === 0) { spawnX = 3000; spawnY = (Math.random() - 0.5) * 500; vx = -3500 - Math.random() * 1000; vy = 0; }
           else if (side === 1) { spawnX = -3000; spawnY = (Math.random() - 0.5) * 500; vx = 3500 + Math.random() * 1000; vy = 0; }
           else if (side === 2) { spawnX = (Math.random() - 0.5) * 500; spawnY = 2000; vx = 0; vy = -3500 - Math.random() * 1000; }
           else { spawnX = (Math.random() - 0.5) * 500; spawnY = -2000; vx = 0; vy = 3500 + Math.random() * 1000; }
           
-          if (isHit) {
-            // Adjust to perfectly strike the camera (center) on its non-moving axis
+          if (phase === "lateral") {
+            // Aim at camera
             if (side === 0 || side === 1) spawnY = (Math.random() - 0.5) * radius * 0.5;
             else spawnX = (Math.random() - 0.5) * radius * 0.5;
           } else {
-            // Miss: wildly off center on the perpendicular axis
+            // Pure flyby (Miss intentionally)
             if (side === 0 || side === 1) spawnY = (Math.random() < 0.5 ? 1 : -1) * (radius + 500 + Math.random() * 1000);
             else spawnX = (Math.random() < 0.5 ? 1 : -1) * (radius + 500 + Math.random() * 1000);
           }
           
           vz = (Math.random() - 0.5) * 100; // minimal Z movement
           
-        } else if (destiny === "chase-overtake") {
+        } else if (phase === "chase") {
           // CHASE FIELD: Spawns slightly behind camera, moves into the distance
           spawnZ = -1500; 
-          // Negative VZ means p.z += abs(VZ)*dt, so it flies AWAY into positive Z
           vz = -3000 - Math.random() * 1500; 
           
           spawnX = (Math.random() - 0.5) * 1500;
@@ -188,18 +189,19 @@ export function PassingPlanets() {
           vy = (Math.random() - 0.5) * 300;
           
         } else {
-          // FRONTAL FIELD (Miss, Pass-through, Knock-back)
+          // FRONTAL FIELD
           spawnZ = 25000; // True dot in the distance
           vz = Math.random() * 2000 + 2500; // Fast approach towards camera
           
           let targetX = 0, targetY = 0;
-          if (destiny === "pass-through" || destiny === "knock-back") {
-            targetX = (Math.random() - 0.5) * radius * 0.3; // Dead center
-            targetY = (Math.random() - 0.5) * radius * 0.3;
+          // Organic hit detection: 35% chance to bias heavily towards the center for a collision
+          if (Math.random() < 0.35) {
+            targetX = (Math.random() - 0.5) * radius * 0.8; 
+            targetY = (Math.random() - 0.5) * radius * 0.8;
           } else {
-            // Frontal miss
+            // Organic miss
             const angle = Math.random() * Math.PI * 2;
-            const missDist = radius + 800 + Math.random() * 2000; 
+            const missDist = radius + 600 + Math.random() * 2000; 
             targetX = Math.cos(angle) * missDist;
             targetY = Math.sin(angle) * missDist;
           }
@@ -223,19 +225,18 @@ export function PassingPlanets() {
           vz,
           baseSize,
           seed: Math.random(),
-          destiny,
+          phase,
           hasCollided: false,
         };
         
         planetsRef.current.push(p);
         listChanged = true;
         
-        // Dynamic pacing: Frontal takes longer (travels from 25000), lateral/chase is much faster action
         let delay = 3000;
-        if (destiny === "frontal-miss") delay = 3000;
-        else if (destiny === "lateral-miss") delay = 1500;
-        else if (destiny === "chase-overtake") delay = 1000;
-        else delay = 6000; // Give time to breathe after a major collision
+        if (phase === "frontal") delay = Math.random() < 0.3 ? 6000 : 3000; 
+        else if (phase === "lateral-flyby") delay = 1000;
+        else if (phase === "chase") delay = 1000;
+        else delay = 4000; 
         
         nextSpawn = now + delay + Math.random() * 2000;
       }
