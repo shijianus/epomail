@@ -31,7 +31,7 @@ interface Ripple {
 interface Star {
   x: number;
   y: number;
-  r: number;
+  z: number;
   base: number;
   phase: number;
   speed: number;
@@ -134,14 +134,14 @@ export const CanvasBackground = forwardRef<CanvasHandle>((_props, ref) => {
     let stars: Star[] = [];
 
     const buildStars = () => {
-      const count = Math.round((width * height) / 9000);
+      const count = Math.round((width * height) / 6000); // denser for warp effect
       stars = Array.from({ length: count }, () => ({
-        x: Math.random() * width,
-        y: Math.random() * height,
-        r: Math.random() * 1.3 + 0.3,
+        x: (Math.random() - 0.5) * 2400,
+        y: (Math.random() - 0.5) * 2400,
+        z: Math.random() * 1000 + 1,
         base: Math.random() * 0.5 + 0.2,
         phase: Math.random() * Math.PI * 2,
-        speed: Math.random() * 1.4 + 0.4,
+        speed: Math.random() * 2.5 + 0.5,
       }));
     };
 
@@ -175,12 +175,12 @@ export const CanvasBackground = forwardRef<CanvasHandle>((_props, ref) => {
     window.addEventListener("pointermove", onPointerMove);
     window.addEventListener("pointerleave", onPointerLeave);
 
-    // Flowing aurora blobs — the autonomous environmental animation.
+    // Flowing aurora blobs — with continuous directional flow.
     const auroraBlobs = [
-      { color: PURPLE, cx: 0.28, cy: 0.3, rad: 0.55, ax: 0.14, ay: 0.1, sx: 0.11, sy: 0.07, ph: 0 },
-      { color: INDIGO, cx: 0.6, cy: 0.35, rad: 0.5, ax: 0.16, ay: 0.12, sx: 0.09, sy: 0.13, ph: 1.7 },
-      { color: CYAN, cx: 0.72, cy: 0.68, rad: 0.48, ax: 0.13, ay: 0.11, sx: 0.14, sy: 0.08, ph: 3.1 },
-      { color: INDIGO, cx: 0.35, cy: 0.75, rad: 0.44, ax: 0.12, ay: 0.14, sx: 0.1, sy: 0.12, ph: 4.5 },
+      { color: PURPLE, cx: 0.28, cy: 0.3, rad: 0.55, ax: 0.14, ay: 0.1, sx: 0.11, sy: 0.07, ph: 0, fx: 0.015, fy: 0.01 },
+      { color: INDIGO, cx: 0.6, cy: 0.35, rad: 0.5, ax: 0.16, ay: 0.12, sx: 0.09, sy: 0.13, ph: 1.7, fx: 0.02, fy: 0.012 },
+      { color: CYAN, cx: 0.72, cy: 0.68, rad: 0.48, ax: 0.13, ay: 0.11, sx: 0.14, sy: 0.08, ph: 3.1, fx: 0.012, fy: 0.018 },
+      { color: INDIGO, cx: 0.35, cy: 0.75, rad: 0.44, ax: 0.12, ay: 0.14, sx: 0.1, sy: 0.12, ph: 4.5, fx: 0.018, fy: 0.015 },
     ];
 
     let raf = 0;
@@ -202,42 +202,90 @@ export const CanvasBackground = forwardRef<CanvasHandle>((_props, ref) => {
       ctx.globalCompositeOperation = "lighter";
       for (const b of auroraBlobs) {
         const drift = reduceMotion ? 0 : 1;
-        const cx = (b.cx + Math.sin(t * b.sx + b.ph) * b.ax * drift) * width;
-        const cy = (b.cy + Math.cos(t * b.sy + b.ph) * b.ay * drift) * height;
-        const rad =
-          b.rad *
-          Math.max(width, height) *
-          (1 + (reduceMotion ? 0 : Math.sin(t * 0.12 + b.ph) * 0.12));
-        const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, rad);
-        const [r, gr, bl] = b.color;
-        g.addColorStop(0, `rgba(${r},${gr},${bl},0.22)`);
-        g.addColorStop(0.45, `rgba(${r},${gr},${bl},0.08)`);
-        g.addColorStop(1, "rgba(0,0,0,0)");
-        ctx.fillStyle = g;
-        ctx.fillRect(0, 0, width, height);
+        // Directional wrapping flow
+        const baseCx = (b.cx + t * b.fx * drift) % 1.5;
+        const baseCy = (b.cy + t * b.fy * drift) % 1.5;
+
+        const renderBlob = (offsetX: number, offsetY: number) => {
+          const cx = (baseCx + offsetX + Math.sin(t * b.sx + b.ph) * b.ax * drift) * width;
+          const cy = (baseCy + offsetY + Math.cos(t * b.sy + b.ph) * b.ay * drift) * height;
+          const rad =
+            b.rad *
+            Math.max(width, height) *
+            (1 + (reduceMotion ? 0 : Math.sin(t * 0.12 + b.ph) * 0.12));
+          const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, rad);
+          const [r, gr, bl] = b.color;
+          g.addColorStop(0, `rgba(${r},${gr},${bl},0.22)`);
+          g.addColorStop(0.45, `rgba(${r},${gr},${bl},0.08)`);
+          g.addColorStop(1, "rgba(0,0,0,0)");
+          ctx.fillStyle = g;
+          ctx.fillRect(0, 0, width, height);
+        };
+        
+        renderBlob(0, 0);
+        renderBlob(-1.5, 0);
+        renderBlob(0, -1.5);
+        renderBlob(-1.5, -1.5);
       }
       ctx.globalCompositeOperation = "source-over";
 
-      // 3. Twinkling deep-space starscape.
+      // 3. Immersive Deep-Space Warp Starfield
+      const cx = width / 2;
+      const cy = height / 2;
+      const fov = Math.max(width, height);
       for (const s of stars) {
+        if (!reduceMotion) {
+          s.z -= s.speed;
+          if (s.z <= 0) {
+            s.z = 1000;
+            s.x = (Math.random() - 0.5) * 2400;
+            s.y = (Math.random() - 0.5) * 2400;
+          }
+        }
+        
+        const scale = fov / s.z;
+        const sx = cx + s.x * scale;
+        const sy = cy + s.y * scale;
+
+        // Skip if out of bounds
+        if (sx < -50 || sx > width + 50 || sy < -50 || sy > height + 50) continue;
+
+        const size = Math.max(0.2, 1.5 * scale);
+        
+        // Streak effect (motion blur)
+        const prevZ = s.z + (reduceMotion ? 0 : s.speed * 1.5);
+        const prevScale = fov / prevZ;
+        const px = cx + s.x * prevScale;
+        const py = cy + s.y * prevScale;
+
         const tw = reduceMotion
           ? s.base
-          : s.base + Math.sin(t * s.speed + s.phase) * 0.35;
-        const a = Math.max(0, Math.min(1, tw));
-        ctx.fillStyle = `rgba(226,232,255,${a})`;
+          : s.base + Math.sin(t * 1.5 + s.phase) * 0.35;
+        // Fade in from distance, fade out at edges
+        const depthAlpha = Math.min(1, (1000 - s.z) / 250);
+        const a = Math.max(0, Math.min(1, tw)) * depthAlpha;
+
+        ctx.strokeStyle = `rgba(226,232,255,${a})`;
+        ctx.lineWidth = size;
+        ctx.lineCap = "round";
         ctx.beginPath();
-        ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.moveTo(px, py);
+        ctx.lineTo(sx, sy);
+        ctx.stroke();
       }
 
-      // 4. Kinetic dot-grid — Brownian "data dust" + cursor pull + ripples.
+      // 4. Kinetic dot-grid — Brownian "data dust" + Cursor pull + Global Parallax drift.
       const pointer = pointerRef.current;
       const pullRadius = 160;
+      
+      // Global perspective lateral drift
+      const globalDriftX = reduceMotion ? 0 : (t * -15) % spacing;
+      const globalDriftY = reduceMotion ? 0 : (t * -8) % spacing;
 
       for (let i = 0; i < cols; i++) {
         for (let j = 0; j < rows; j++) {
-          const baseX = i * spacing;
-          const baseY = j * spacing;
+          const baseX = i * spacing + globalDriftX;
+          const baseY = j * spacing + globalDriftY;
 
           // Layered chaotic Brownian drift (visible when fully idle).
           const brownian = reduceMotion
@@ -359,12 +407,12 @@ export const CanvasBackground = forwardRef<CanvasHandle>((_props, ref) => {
         }}
       />
 
-      {/* Vignette for depth. */}
+      {/* Vignette for depth & warp tunnel sensation. */}
       <div
         className="absolute inset-0"
         style={{
           background:
-            "radial-gradient(circle at center, transparent 42%, rgba(5,6,15,0.82) 100%)",
+            "radial-gradient(ellipse at center, transparent 38%, rgba(5,6,15,0.85) 100%)",
         }}
       />
     </div>
