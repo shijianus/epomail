@@ -141,7 +141,7 @@ export function PassingPlanets() {
           planetsRef.current.splice(i, 1);
           listChanged = true;
           if (planetsRef.current.length === 0) {
-            nextSpawn = now + getBellCurve(5000, 15000);
+            nextSpawn = now + getBellCurve(3000, 10000);
           }
         } else {
           // Update DOM
