@@ -102,3 +102,12 @@
 ---
 
 *備註：在任何階段（包含目前的 Phase 1 顏色改版及後續動畫強化），皆須將此流程作為最高指導原則。*
+
+---
+
+## 📅 版本記錄 (Version Log)
+
+### SpaceTrail 高速太空动画改版 (2026-08-08)
+*   **安全备份 (Backup)**: `b6bea42` — 修改前的最新稳定状态，保留了原有的 `SpaceTrail` 逻辑。
+*   **动画升级 (Enhancement)**: `e54fe81` — 强化了 Warp Stars、Comets 和 Asteroids 的运动速度与拖尾，增加了强烈的局部移动漫游感。
+*   **说明**: 若要撤销此视觉修改，请执行 `git checkout b6bea42 -- mail-vue/src/views/login/SpaceTrail.vue` 然后新建 commit。
