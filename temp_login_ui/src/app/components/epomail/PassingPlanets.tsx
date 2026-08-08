@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { cameraState } from "./cameraStore";
 
 type PlanetType = "ice" | "gas" | "dark" | "nebula";
-type FlightPhase = "frontal" | "lateral" | "lateral-flyby" | "chase";
+type FlightPhase = "frontal" | "lateral" | "chase";
 
 interface Planet {
   id: string;
@@ -16,6 +16,8 @@ interface Planet {
   baseSize: number;
   seed: number;
   phase: FlightPhase;
+  isHit: boolean;
+  hitType: "dead-center" | "edge" | "pass-through" | "none";
   hasCollided: boolean;
 }
 
@@ -53,78 +55,79 @@ export function PassingPlanets() {
 
         const radius = p.baseSize / 2; 
         
-        // Only check collisions if it's not a chase or flyby
-        if (p.phase !== "chase" && p.phase !== "lateral-flyby" && p.z < radius * 1.5 && p.z > -radius * 1.5 && !p.hasCollided) {
+        // Only check collisions if it's meant to hit and Z is near the camera
+        if (p.isHit && !p.hasCollided && p.z < radius * 1.5 && p.z > -radius * 1.5) {
           const distXY = Math.hypot(p.x, p.y);
+          // Safety check (our spawn math guarantees it, but just in case)
           if (distXY < radius * 1.2) {
             p.hasCollided = true;
             
-            const isPassThrough = Math.random() < 0.05; 
-            // Dead center is when the camera is deep inside the planet. 
-            // Edge hit is when the camera only clips the outer 15-20% of the radius.
-            const isDeadCenter = distXY < radius * 0.85;
-            
-            if (isPassThrough && isDeadCenter) {
+            if (p.hitType === "pass-through") {
               cameraState.overlayOpacity = 1;
               if (p.type === 'gas') cameraState.overlayColor = "rgba(168,85,247,0.95)";
               else if (p.type === 'ice') cameraState.overlayColor = "rgba(103,232,249,0.95)";
               else if (p.type === 'dark') cameraState.overlayColor = "rgba(0,0,0,1)";
               else cameraState.overlayColor = "rgba(244,114,182,0.95)";
-            } else {
-              // Physical Hit!
+            } else if (p.hitType === "dead-center") {
               if (p.phase === "frontal") {
-                if (isDeadCenter) {
-                  // DEAD-CENTER FRONT HIT (Knock-back)
-                  cameraState.vz = -4.0;
-                  cameraState.shakeIntensity = 80;
-                  p.vz = -5000;
-                  
-                  // Massive hit -> MUST change trajectory
-                  const shiftRoll = Math.random();
-                  if (shiftRoll < 0.10) flightPhaseRef.current = "frontal"; // Only 10% chance to stay
-                  else if (shiftRoll < 0.60) flightPhaseRef.current = "lateral"; 
-                  else flightPhaseRef.current = "chase"; 
-                } else {
-                  // EDGE HIT (Glance)
-                  const angle = Math.atan2(p.y, p.x);
-                  cameraState.panVelX = -Math.cos(angle) * 2500; // Pushed sideways
-                  cameraState.panVelY = -Math.sin(angle) * 2500;
-                  cameraState.shakeIntensity = 40;
-                  
-                  // Planet deflects off the edge of the screen!
-                  p.vz = -2000; // Bounce away slightly
-                  p.vx += Math.cos(angle) * 3000; 
-                  p.vy += Math.sin(angle) * 3000;
-                  
-                  // Edge hit -> MUST change trajectory
-                  const shiftRoll = Math.random();
-                  if (shiftRoll < 0.15) flightPhaseRef.current = "frontal"; // Only 15% chance to stay
-                  else if (shiftRoll < 0.65) flightPhaseRef.current = "lateral-flyby"; // Shift to cinematic side
-                  else flightPhaseRef.current = "lateral"; // Shift to lateral combat
-                }
-                phasePlanetsSpawned.current = 0;
-                
-              } else if (p.phase === "lateral") {
-                // Violent lateral pan
-                const angle = Math.atan2(p.y, p.x);
+                cameraState.vz = -4.0; // Knock-back
+                cameraState.shakeIntensity = 80;
+                p.vz = -5000;
+              } else if (p.phase === "chase" || (p.phase === "lateral" && p.vz < -1000)) {
+                // Hit perfectly from behind
+                cameraState.vz = 4.0; // Knocked FORWARD
+                cameraState.shakeIntensity = 60;
+                p.vz = 5000; // Bounce backwards relative to camera
+              }
+            } else if (p.hitType === "edge") {
+              const angle = Math.atan2(p.y, p.x);
+              if (p.phase === "lateral" && Math.abs(p.vz) < 500) {
+                // Pure lateral collision
                 cameraState.panVelX = -Math.cos(angle) * 4000; 
                 cameraState.panVelY = -Math.sin(angle) * 4000;
                 cameraState.shakeIntensity = 50;
-                
-                // Planet bounces off
-                p.vx *= -0.8;
-                p.vy *= -0.8;
-                p.vz = -3000; 
-                
-                // Phase Shift after lateral hit
-                const shiftRoll = Math.random();
-                if (shiftRoll < 0.30) flightPhaseRef.current = "lateral"; // 30% stay
-                else if (shiftRoll < 0.70) flightPhaseRef.current = "chase"; // 40% shift to chase
-                else flightPhaseRef.current = "frontal"; // 30% return to frontal
-                
-                phasePlanetsSpawned.current = 0;
+                p.vx *= -0.8; p.vy *= -0.8; p.vz = -3000; 
+              } else {
+                // Frontal or Chase edge scrape
+                cameraState.panVelX = -Math.cos(angle) * 2500; 
+                cameraState.panVelY = -Math.sin(angle) * 2500;
+                cameraState.shakeIntensity = 40;
+                p.vz = p.phase === "frontal" ? -2000 : 2000; 
+                p.vx += Math.cos(angle) * 3000; 
+                p.vy += Math.sin(angle) * 3000;
               }
             }
+            
+            // EXACT PHASE TRANSITION PROBABILITIES AS REQUESTED
+            const shiftRoll = Math.random();
+            let nextPhase = p.phase;
+            
+            if (p.phase === "frontal") {
+               // 65% stay, 25% lateral, 10% chase
+               if (shiftRoll < 0.65) nextPhase = "frontal";
+               else if (shiftRoll < 0.90) nextPhase = "lateral";
+               else nextPhase = "chase";
+            } else if (p.phase === "lateral") {
+               // 55% stay, 35% frontal, 10% chase
+               if (shiftRoll < 0.55) nextPhase = "lateral";
+               else if (shiftRoll < 0.90) nextPhase = "frontal";
+               else nextPhase = "chase";
+            } else if (p.phase === "chase") {
+               // 60% stay, 39% lateral, 1% frontal
+               if (shiftRoll < 0.60) nextPhase = "chase";
+               else if (shiftRoll < 0.99) nextPhase = "lateral";
+               else {
+                 nextPhase = "frontal";
+                 // Special Camera Spin (15% chance when Chase -> Frontal)
+                 if (Math.random() < 0.15) {
+                    cameraState.panVelX = 15000 * (Math.random() > 0.5 ? 1 : -1);
+                    cameraState.panVelY = 15000 * (Math.random() > 0.5 ? 1 : -1);
+                 }
+               }
+            }
+            
+            flightPhaseRef.current = nextPhase;
+            phasePlanetsSpawned.current = 0;
           }
         }
 
@@ -158,14 +161,6 @@ export function PassingPlanets() {
       // Spawn logic
       if (now > nextSpawn && planetsRef.current.length < 2) {
         let phase = flightPhaseRef.current;
-        const count = phasePlanetsSpawned.current;
-        
-        // Auto-exit pure cinematic phases after a few planets
-        if (phase === "chase" && count > 1) {
-          flightPhaseRef.current = "frontal"; phasePlanetsSpawned.current = 0; phase = "frontal";
-        } else if (phase === "lateral-flyby" && count > 2) {
-          flightPhaseRef.current = "frontal"; phasePlanetsSpawned.current = 0; phase = "frontal";
-        }
         
         phasePlanetsSpawned.current++;
 
@@ -174,73 +169,115 @@ export function PassingPlanets() {
         
         let spawnX = 0, spawnY = 0, spawnZ = 0;
         let vx = 0, vy = 0, vz = 0;
+        let targetX = 0, targetY = 0;
 
-        if (phase === "lateral" || phase === "lateral-flyby") {
-          spawnZ = 200 + Math.random() * 300; 
-          const side = Math.floor(Math.random() * 4); 
-          
-          if (side === 0) { spawnX = 3000; spawnY = (Math.random() - 0.5) * 500; vx = -3500 - Math.random() * 1000; vy = 0; }
-          else if (side === 1) { spawnX = -3000; spawnY = (Math.random() - 0.5) * 500; vx = 3500 + Math.random() * 1000; vy = 0; }
-          else if (side === 2) { spawnX = (Math.random() - 0.5) * 500; spawnY = 2000; vx = 0; vy = -3500 - Math.random() * 1000; }
-          else { spawnX = (Math.random() - 0.5) * 500; spawnY = -2000; vx = 0; vy = 3500 + Math.random() * 1000; }
-          
-          if (phase === "lateral") {
-            // Aim at camera
-            if (side === 0 || side === 1) spawnY = (Math.random() - 0.5) * radius * 0.5;
-            else spawnX = (Math.random() - 0.5) * radius * 0.5;
-          } else {
-            // Pure flyby (Miss intentionally)
-            if (side === 0 || side === 1) spawnY = (Math.random() < 0.5 ? 1 : -1) * (radius + 500 + Math.random() * 1000);
-            else spawnX = (Math.random() < 0.5 ? 1 : -1) * (radius + 500 + Math.random() * 1000);
+        // GLOBAL RULE: 10% hit, 90% miss!
+        const isHit = Math.random() < 0.10;
+        let hitType: Planet["hitType"] = "none";
+
+        if (isHit) {
+          if (phase === "frontal") {
+            const hasDeadCenter = planetsRef.current.some(p => p.hitType === "dead-center" || p.hitType === "pass-through");
+            // 5% dead-center (prevented if one is already active), 95% edge
+            if (!hasDeadCenter && Math.random() < 0.05) {
+              hitType = Math.random() < 0.20 ? "pass-through" : "dead-center"; // 1% pass-through, 4% dead-center
+            } else {
+              hitType = "edge";
+            }
+          } else if (phase === "chase") {
+            hitType = Math.random() < 0.10 ? "dead-center" : "edge"; // 10% back hit, 90% side scrape
+          } else if (phase === "lateral") {
+            hitType = Math.random() < 0.01 ? "dead-center" : "edge"; // 1% back hit, 99% side hit
           }
+        }
+
+        if (phase === "frontal") {
+          spawnZ = 25000;
+          vz = Math.random() * 2000 + 2500;
           
-          vz = (Math.random() - 0.5) * 100; // minimal Z movement
-          
-        } else if (phase === "chase") {
-          // CHASE FIELD: Spawns slightly behind camera, moves into the distance
-          spawnZ = -1500; 
-          vz = -3000 - Math.random() * 1500; 
-          
-          spawnX = (Math.random() - 0.5) * 1500;
-          spawnY = (Math.random() - 0.5) * 1000;
-          vx = (Math.random() - 0.5) * 300;
-          vy = (Math.random() - 0.5) * 300;
-          
-        } else {
-          // FRONTAL FIELD
-          spawnZ = 25000; // True dot in the distance
-          vz = Math.random() * 2000 + 2500; // Fast approach towards camera
-          
-          let targetX = 0, targetY = 0;
-          
-          // Organic spawn targeting: 10% Dead-Center, 30% Edge Hit, 60% Miss
-          const aimRoll = Math.random();
-          
-          if (aimRoll < 0.10) {
-            // Dead-Center (guarantees distXY < radius * 0.6)
-            targetX = (Math.random() - 0.5) * radius * 0.5; 
-            targetY = (Math.random() - 0.5) * radius * 0.5;
-          } else if (aimRoll < 0.40) {
-            // Edge Hit (guarantees radius * 0.9 < distXY < radius * 1.15)
-            // Visually, the planet will only clip the corner of the screen
+          if (isHit) {
+            if (hitType === "dead-center" || hitType === "pass-through") {
+              targetX = (Math.random() - 0.5) * radius * 0.3;
+              targetY = (Math.random() - 0.5) * radius * 0.3;
+            } else { // edge
+              const angle = Math.random() * Math.PI * 2;
+              const edgeDist = radius * 0.9 + Math.random() * (radius * 0.25);
+              targetX = Math.cos(angle) * edgeDist;
+              targetY = Math.sin(angle) * edgeDist;
+            }
+          } else { // miss
             const angle = Math.random() * Math.PI * 2;
-            const edgeDist = radius * 0.9 + Math.random() * (radius * 0.25);
-            targetX = Math.cos(angle) * edgeDist;
-            targetY = Math.sin(angle) * edgeDist;
-          } else {
-            // Organic miss (distXY > radius * 1.3)
-            const angle = Math.random() * Math.PI * 2;
-            const missDist = radius * 1.3 + 200 + Math.random() * 2500; 
+            const missDist = radius * 1.3 + 400 + Math.random() * 2500;
             targetX = Math.cos(angle) * missDist;
             targetY = Math.sin(angle) * missDist;
           }
-
-          // Back-calculate spawn X/Y so it hits the target exactly at Z=0
+          
           const T = spawnZ / vz;
-          vx = (Math.random() - 0.5) * 100; 
+          vx = (Math.random() - 0.5) * 100;
           vy = (Math.random() - 0.5) * 100;
           spawnX = targetX - vx * T;
           spawnY = targetY - vy * T;
+
+        } else if (phase === "chase") {
+          spawnZ = -1500;
+          vz = -3000 - Math.random() * 1500; 
+          
+          if (isHit) {
+            if (hitType === "dead-center") {
+              targetX = (Math.random() - 0.5) * radius * 0.3;
+              targetY = (Math.random() - 0.5) * radius * 0.3;
+            } else { // edge scrape
+              const angle = Math.random() * Math.PI * 2;
+              const edgeDist = radius * 0.9 + Math.random() * (radius * 0.25);
+              targetX = Math.cos(angle) * edgeDist;
+              targetY = Math.sin(angle) * edgeDist;
+            }
+          } else { // miss
+            const angle = Math.random() * Math.PI * 2;
+            const missDist = radius * 1.5 + 400 + Math.random() * 2000;
+            targetX = Math.cos(angle) * missDist;
+            targetY = Math.sin(angle) * missDist;
+          }
+          
+          const T = Math.abs(spawnZ / vz);
+          vx = (Math.random() - 0.5) * 100;
+          vy = (Math.random() - 0.5) * 100;
+          spawnX = targetX - vx * T;
+          spawnY = targetY - vy * T;
+
+        } else if (phase === "lateral") {
+          if (isHit && hitType === "dead-center") {
+            // 1% back hit in lateral phase! Spawns behind us.
+            spawnZ = -1500;
+            vz = -3000 - Math.random() * 1500; 
+            targetX = (Math.random() - 0.5) * radius * 0.3;
+            targetY = (Math.random() - 0.5) * radius * 0.3;
+            const T = Math.abs(spawnZ / vz);
+            vx = (Math.random() - 0.5) * 100;
+            vy = (Math.random() - 0.5) * 100;
+            spawnX = targetX - vx * T;
+            spawnY = targetY - vy * T;
+          } else {
+            // Normal lateral side spawn
+            spawnZ = 200 + Math.random() * 300; 
+            const side = Math.floor(Math.random() * 4); 
+            
+            if (side === 0) { spawnX = 3000; spawnY = (Math.random() - 0.5) * 500; vx = -3500 - Math.random() * 1000; vy = 0; }
+            else if (side === 1) { spawnX = -3000; spawnY = (Math.random() - 0.5) * 500; vx = 3500 + Math.random() * 1000; vy = 0; }
+            else if (side === 2) { spawnX = (Math.random() - 0.5) * 500; spawnY = 2000; vx = 0; vy = -3500 - Math.random() * 1000; }
+            else { spawnX = (Math.random() - 0.5) * 500; spawnY = -2000; vx = 0; vy = 3500 + Math.random() * 1000; }
+            
+            if (isHit) {
+              // Aim at camera
+              if (side === 0 || side === 1) spawnY = (Math.random() - 0.5) * radius * 0.5;
+              else spawnX = (Math.random() - 0.5) * radius * 0.5;
+            } else {
+              // Pure flyby (Miss intentionally)
+              if (side === 0 || side === 1) spawnY = (Math.random() < 0.5 ? 1 : -1) * (radius + 500 + Math.random() * 1000);
+              else spawnX = (Math.random() < 0.5 ? 1 : -1) * (radius + 500 + Math.random() * 1000);
+            }
+            vz = (Math.random() - 0.5) * 100; 
+          }
         }
 
         const p: Planet = {
@@ -255,6 +292,8 @@ export function PassingPlanets() {
           baseSize,
           seed: Math.random(),
           phase,
+          isHit,
+          hitType,
           hasCollided: false,
         };
         
@@ -262,10 +301,8 @@ export function PassingPlanets() {
         listChanged = true;
         
         let delay = 3000;
-        if (phase === "frontal") delay = Math.random() < 0.3 ? 6000 : 3000; 
-        else if (phase === "lateral-flyby") delay = 1000;
-        else if (phase === "chase") delay = 1000;
-        else delay = 4000; 
+        if (phase === "frontal") delay = isHit ? 5000 : 3000; // Give room after hit
+        else delay = 1500; // Lateral and chase are faster
         
         nextSpawn = now + delay + Math.random() * 2000;
       }
