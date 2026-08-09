@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { cameraState } from "./cameraStore";
 
-type PlanetType = "ice" | "gas" | "dark" | "nebula";
 type FlightPhase = "frontal" | "lateral" | "chase";
 
 function getBellCurve(min: number, max: number): number {
@@ -11,7 +10,16 @@ function getBellCurve(min: number, max: number): number {
 
 interface Planet {
   id: string;
-  type: PlanetType;
+  hue: number;
+  saturation: number;
+  lightness: number;
+  surfacePattern: 1 | 2 | 3 | 4;
+  hasRing: boolean;
+  ringHue: number;
+  ringTiltX: number;
+  ringTiltY: number;
+  ringScale: number;
+  ringWidth: number;
   x: number;
   y: number;
   z: number;
@@ -35,13 +43,12 @@ export function PassingPlanets() {
   // State Machine for cinematic trajectory phases
   const flightPhaseRef = useRef<FlightPhase>("frontal");
   const phasePlanetsSpawned = useRef<number>(0);
+  const hueHistoryRef = useRef<number[]>([]);
 
   useEffect(() => {
     let raf: number;
     let lastTime = performance.now();
     let nextSpawn = performance.now() + 1000 + Math.random() * 2000;
-
-    const types: PlanetType[] = ["ice", "gas", "dark", "nebula"];
     const fov = 1000;
 
     const loop = (now: number) => {
@@ -69,10 +76,7 @@ export function PassingPlanets() {
             
             if (p.hitType === "pass-through") {
               cameraState.overlayOpacity = 1;
-              if (p.type === 'gas') cameraState.overlayColor = "rgba(168,85,247,0.95)";
-              else if (p.type === 'ice') cameraState.overlayColor = "rgba(103,232,249,0.95)";
-              else if (p.type === 'dark') cameraState.overlayColor = "rgba(0,0,0,1)";
-              else cameraState.overlayColor = "rgba(244,114,182,0.95)";
+              cameraState.overlayColor = `hsla(${p.hue}, 80%, 60%, 0.95)`;
             } else if (p.hitType === "dead-center") {
               if (p.phase === "frontal") {
                 cameraState.vz = -4.0; // Knock-back
@@ -319,10 +323,33 @@ export function PassingPlanets() {
             vz = (Math.random() - 0.5) * 100; 
           }
         }
+        
+        let hue = Math.random() * 360;
+        let attempts = 0;
+        while (attempts < 10) {
+          const isDistinct = hueHistoryRef.current.every(h => {
+            let diff = Math.abs(h - hue);
+            return diff > 45 && diff < 315;
+          });
+          if (isDistinct) break;
+          hue = Math.random() * 360;
+          attempts++;
+        }
+        hueHistoryRef.current.push(hue);
+        if (hueHistoryRef.current.length > 5) hueHistoryRef.current.shift();
 
         const p: Planet = {
           id: Math.random().toString(36).substring(2, 9),
-          type: types[Math.floor(Math.random() * types.length)],
+          hue,
+          saturation: 50 + Math.random() * 50, // 50-100%
+          lightness: 40 + Math.random() * 30, // 40-70%
+          surfacePattern: (Math.floor(Math.random() * 4) + 1) as 1 | 2 | 3 | 4,
+          hasRing: Math.random() > 0.5, // 50% chance of rings!
+          ringHue: (hue + Math.random() * 120 - 60 + 360) % 360, // Analogous or distinct
+          ringTiltX: 60 + Math.random() * 25, // 60-85 deg tilt
+          ringTiltY: (Math.random() - 0.5) * 60,
+          ringScale: 1.8 + Math.random() * 0.8, // 1.8 - 2.6
+          ringWidth: 4 + Math.random() * 12,
           x: spawnX,
           y: spawnY,
           z: spawnZ,
@@ -362,19 +389,25 @@ export function PassingPlanets() {
         let shadow = "";
         let border = "";
 
-        if (p.type === "gas") {
-          bg = "radial-gradient(circle at 30% 30%, rgba(168,85,247,0.9), rgba(99,102,241,0.7) 45%, rgba(5,6,15,0.98) 85%)";
-          shadow = "inset 20px 20px 80px rgba(103,232,249,0.4), inset -40px -40px 100px rgba(0,0,0,0.9), 0 0 80px rgba(168,85,247,0.2)";
-        } else if (p.type === "ice") {
-          bg = "radial-gradient(circle at 35% 25%, rgba(103,232,249,0.95), rgba(14,165,233,0.8) 50%, rgba(5,6,15,0.98) 85%)";
-          shadow = "inset 15px 15px 60px rgba(255,255,255,0.6), inset -40px -40px 120px rgba(0,0,0,0.95), 0 0 60px rgba(103,232,249,0.3)";
-        } else if (p.type === "dark") {
-          bg = "radial-gradient(circle at 50% 50%, rgba(5,6,15,1) 40%, rgba(0,0,0,1) 85%)";
-          shadow = "inset 0 0 50px rgba(0,0,0,1), 0 0 120px rgba(168,85,247,0.8), 0 0 200px rgba(99,102,241,0.6)";
-          border = "2px solid rgba(168,85,247,0.7)";
+        const primary = `hsla(${p.hue}, ${p.saturation}%, ${p.lightness}%, 0.9)`;
+        const secondary = `hsla(${(p.hue + 40) % 360}, ${p.saturation}%, ${p.lightness - 15}%, 0.7)`;
+        const highlight = `hsla(${p.hue}, 100%, 80%, 0.4)`;
+        const dark = `rgba(5,6,15,0.98)`;
+
+        if (p.surfacePattern === 1) {
+          bg = `radial-gradient(circle at 30% 30%, ${primary}, ${secondary} 45%, ${dark} 85%)`;
+          shadow = `inset 20px 20px 80px ${highlight}, inset -40px -40px 100px rgba(0,0,0,0.9), 0 0 80px hsla(${p.hue}, 100%, 60%, 0.2)`;
+        } else if (p.surfacePattern === 2) {
+          bg = `radial-gradient(circle at 35% 25%, ${primary}, ${secondary} 50%, ${dark} 85%)`;
+          shadow = `inset 15px 15px 60px rgba(255,255,255,0.6), inset -40px -40px 120px rgba(0,0,0,0.95), 0 0 60px hsla(${p.hue}, 100%, 60%, 0.3)`;
+        } else if (p.surfacePattern === 3) {
+          // "Dark anomaly" style (Void with glowing rim)
+          bg = `radial-gradient(circle at 50% 50%, rgba(5,6,15,1) 40%, rgba(0,0,0,1) 85%)`;
+          shadow = `inset 0 0 50px rgba(0,0,0,1), 0 0 120px hsla(${p.hue}, 100%, 50%, 0.8), 0 0 200px hsla(${(p.hue + 60) % 360}, 100%, 50%, 0.6)`;
+          border = `2px solid hsla(${p.hue}, 80%, 60%, 0.7)`;
         } else {
-          bg = "radial-gradient(circle at 40% 40%, rgba(244,114,182,0.8), rgba(124,58,237,0.6) 65%, rgba(5,6,15,0.95) 90%)";
-          shadow = "inset 10px 10px 50px rgba(244,114,182,0.5), inset -30px -30px 80px rgba(0,0,0,0.95), 0 0 50px rgba(244,114,182,0.2)";
+          bg = `radial-gradient(circle at 40% 40%, ${primary}, ${secondary} 65%, ${dark} 90%)`;
+          shadow = `inset 10px 10px 50px ${highlight}, inset -30px -30px 80px rgba(0,0,0,0.95), 0 0 50px hsla(${p.hue}, 100%, 60%, 0.2)`;
         }
 
         return (
@@ -384,35 +417,43 @@ export function PassingPlanets() {
               if (el) elementsRef.current.set(p.id, el);
               else elementsRef.current.delete(p.id);
             }}
-            className="absolute rounded-full left-1/2 top-1/2 will-change-transform"
+            className="absolute rounded-full left-1/2 top-1/2 will-change-transform flex items-center justify-center"
             style={{
               background: bg,
               boxShadow: shadow,
               border: border,
-              opacity: 0, 
+              opacity: 0,
+              transformStyle: 'preserve-3d' 
             }}
           >
-            {p.type === "dark" && (
+            {/* Dynamic CSS Rings */}
+            {p.hasRing && (
               <div
-                className="absolute inset-0 rounded-full"
+                className="absolute rounded-full pointer-events-none"
                 style={{
-                  transform: `rotateX(75deg) rotateY(${p.seed * 45}deg) scale(2.4)`,
-                  border: "2px solid rgba(103,232,249,0.6)",
-                  boxShadow: "0 0 60px rgba(103,232,249,0.9), inset 0 0 30px rgba(103,232,249,0.6)",
+                  width: '100%',
+                  height: '100%',
+                  transform: `rotateX(${p.ringTiltX}deg) rotateY(${p.ringTiltY}deg) scale(${p.ringScale})`,
+                  border: `${p.ringWidth}px solid hsla(${p.ringHue}, 80%, 60%, 0.15)`,
+                  borderTopColor: `hsla(${p.ringHue}, 100%, 70%, 0.8)`,
+                  borderBottomColor: `hsla(${p.ringHue}, 100%, 70%, 0.3)`,
+                  boxShadow: `0 0 40px hsla(${p.ringHue}, 100%, 60%, 0.5), inset 0 0 20px hsla(${p.ringHue}, 100%, 60%, 0.5)`,
                   borderRadius: "50%",
                 }}
               />
             )}
             
-            {p.type === "ice" && p.seed > 0.5 && (
+            {/* Inner Ring (Double Ring Effect for 50% of ringed planets) */}
+            {p.hasRing && p.seed > 0.5 && (
               <div
-                className="absolute inset-0 rounded-full"
+                className="absolute rounded-full pointer-events-none"
                 style={{
-                  transform: `rotateX(80deg) rotateY(${-p.seed * 30}deg) scale(2.2)`,
-                  border: "10px solid rgba(255,255,255,0.15)",
-                  borderTopColor: "rgba(103,232,249,0.7)",
-                  borderBottomColor: "rgba(103,232,249,0.3)",
-                  boxShadow: "0 0 30px rgba(103,232,249,0.5)",
+                  width: '100%',
+                  height: '100%',
+                  transform: `rotateX(${p.ringTiltX}deg) rotateY(${p.ringTiltY}deg) scale(${p.ringScale - 0.2})`,
+                  border: `${p.ringWidth / 2}px solid hsla(${(p.ringHue + 30) % 360}, 80%, 60%, 0.1)`,
+                  borderTopColor: `hsla(${(p.ringHue + 30) % 360}, 100%, 70%, 0.9)`,
+                  boxShadow: `0 0 20px hsla(${(p.ringHue + 30) % 360}, 100%, 60%, 0.6)`,
                   borderRadius: "50%",
                 }}
               />
