@@ -65,10 +65,6 @@ export function PassingPlanets() {
       const dt = Math.min((now - lastTime) / 1000, 0.1);
       lastTime = now;
 
-      if (containerRef.current) {
-        containerRef.current.style.transform = `translate3d(${cameraState.panX + cameraState.shakeX}px, ${cameraState.panY + cameraState.shakeY}px, 0)`;
-      }
-
       let listChanged = false;
 
       for (let i = planetsRef.current.length - 1; i >= 0; i--) {
@@ -88,6 +84,10 @@ export function PassingPlanets() {
           if (distXY < radius * 1.2) {
             p.hasCollided = true;
             
+            // Immediately sync camera physics to ensure shakeX/shakeY are generated THIS EXACT FRAME
+            // This eliminates the 1-frame visual delay (stutter) between the hit and the shake!
+            updateCameraPhysics(0);
+
             if (p.hitType === "pass-through") {
               cameraState.overlayOpacity = 1;
               if (p.type === 'gas') cameraState.overlayColor = "rgba(168,85,247,0.95)";
@@ -96,14 +96,14 @@ export function PassingPlanets() {
               else cameraState.overlayColor = "rgba(244,114,182,0.95)";
             } else if (p.hitType === "dead-center") {
               if (p.phase === "frontal") {
-                cameraState.vz = -4.0; // Knock-back
+                cameraState.vz = -3.0; // Heavy camera knock-back
                 cameraState.shakeIntensity = 180; // Massive collision
-                p.vz = -5000;
+                p.vz = -500; // Slight bounce, mostly rely on camera recoil
               } else if (p.phase === "chase" || (p.phase === "lateral" && p.vz < -1000)) {
                 // Hit perfectly from behind
-                cameraState.vz = 4.0; // Knocked FORWARD
+                cameraState.vz = 3.0; // Knocked FORWARD
                 cameraState.shakeIntensity = 140; // Powerful hit from behind
-                p.vz = 5000; // Bounce backwards relative to camera
+                p.vz = 1500; // Bounce backwards relative to camera but realistically
               }
             } else if (p.hitType === "edge") {
               const angle = Math.atan2(p.y, p.x);
@@ -118,7 +118,7 @@ export function PassingPlanets() {
                 cameraState.panVelX = -Math.cos(angle) * 2500; 
                 cameraState.panVelY = -Math.sin(angle) * 2500;
                 cameraState.shakeIntensity = 90; // Light scrape
-                p.vz = p.phase === "frontal" ? -2000 : 2000; 
+                p.vz = p.phase === "frontal" ? -500 : 500; 
                 p.vx += Math.cos(angle) * 3000; 
                 p.vy += Math.sin(angle) * 3000;
               }
@@ -392,6 +392,12 @@ export function PassingPlanets() {
 
       if (listChanged) {
         setPlanets([...planetsRef.current]);
+      }
+
+      // Apply physics to DOM at the VERY END of the loop so any collisions processed 
+      // in this frame instantly reflect their shake values!
+      if (containerRef.current) {
+        containerRef.current.style.transform = `translate3d(${cameraState.panX + cameraState.shakeX}px, ${cameraState.panY + cameraState.shakeY}px, 0)`;
       }
 
       raf = requestAnimationFrame(loop);
