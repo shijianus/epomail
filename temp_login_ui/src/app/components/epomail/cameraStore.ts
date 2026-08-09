@@ -1,5 +1,7 @@
 export const cameraState = {
-  vz: 1, // 1 = normal forward velocity. < 1 means slowed or knocked backward
+  vz: 1,       // 1 = normal forward velocity. < 1 means slowed or knocked backward
+  vzTarget: 1, // Smooth target for vz — set this on collision; vz springs toward it each frame.
+               // This prevents an instant vz jump from causing a single-frame star-reset storm.
   panX: 0,
   panY: 0,
   panVelX: 0,
@@ -17,8 +19,12 @@ export const cameraState = {
 };
 
 export function updateCameraPhysics(dt: number) {
-  // Z-velocity recovery (spring back to 1)
-  cameraState.vz += (1 - cameraState.vz) * dt * 1.5;
+  // Z-velocity: two-layer spring system.
+  // Layer 1 — vzTarget recovers at the original rate (matches existing knockback duration ~3s).
+  cameraState.vzTarget += (1 - cameraState.vzTarget) * Math.min(dt * 1.5, 1);
+  // Layer 2 — vz rapidly tracks vzTarget (reaches it within ~3 frames at 60fps).
+  // This prevents the single-frame instant jump that caused mass star Z-resets.
+  cameraState.vz += (cameraState.vzTarget - cameraState.vz) * Math.min(dt * 25, 1);
 
   // Pan recovery (spring back to center)
   cameraState.panX += cameraState.panVelX * dt;

@@ -147,6 +147,8 @@ export const CanvasBackground = forwardRef<CanvasHandle>((_props, ref) => {
       }));
     };
 
+    let baseGradient: CanvasGradient | null = null; // Cached per resize — never changes between frames
+
     const resize = () => {
       dpr = Math.min(window.devicePixelRatio || 1, 2);
       width = canvas.clientWidth;
@@ -158,6 +160,11 @@ export const CanvasBackground = forwardRef<CanvasHandle>((_props, ref) => {
       cols = Math.ceil(width / spacing) + 2;
       rows = Math.ceil(height / spacing) + 2;
       buildStars();
+      // Rebuild the cached static base gradient after resize
+      baseGradient = ctx.createLinearGradient(0, 0, width, height);
+      baseGradient.addColorStop(0, "#05060f");
+      baseGradient.addColorStop(0.5, "#080a1f");
+      baseGradient.addColorStop(1, "#05060f");
     };
     resize();
 
@@ -203,12 +210,8 @@ export const CanvasBackground = forwardRef<CanvasHandle>((_props, ref) => {
 
       ctx.clearRect(0, 0, width, height);
 
-      // 1. Deep-space base wash.
-      const base = ctx.createLinearGradient(0, 0, width, height);
-      base.addColorStop(0, "#05060f");
-      base.addColorStop(0.5, "#080a1f");
-      base.addColorStop(1, "#05060f");
-      ctx.fillStyle = base;
+      // 1. Deep-space base wash (uses cached gradient — created once per resize, never recreated).
+      ctx.fillStyle = baseGradient!;
       ctx.fillRect(0, 0, width, height);
 
       // 2. Autonomous flowing aurora (additive glow).
@@ -246,6 +249,10 @@ export const CanvasBackground = forwardRef<CanvasHandle>((_props, ref) => {
       const cx = width / 2;
       const cy = height / 2;
       const fov = Math.max(width, height);
+      // Limit star resets per frame to prevent CPU spike when many stars cross bounds simultaneously.
+      // In practice, the vzTarget spring system prevents large batches, but this is a safety cap.
+      let starResetsThisFrame = 0;
+      const MAX_STAR_RESETS_PER_FRAME = 50;
       for (const s of stars) {
         if (!reduceMotion) {
           // Z-axis movement based on camera knockback
@@ -256,13 +263,23 @@ export const CanvasBackground = forwardRef<CanvasHandle>((_props, ref) => {
           s.y -= cameraState.panVelY * dt * 0.05;
           
           if (s.z <= 0) {
-            s.z = 1000;
-            s.x = (Math.random() - 0.5) * 3500;
-            s.y = (Math.random() - 0.5) * 3500;
+            if (starResetsThisFrame < MAX_STAR_RESETS_PER_FRAME) {
+              s.z = 1000;
+              s.x = (Math.random() - 0.5) * 3500;
+              s.y = (Math.random() - 0.5) * 3500;
+              starResetsThisFrame++;
+            } else {
+              s.z = 1; // defer reset to next frame — prevents mass Math.random() spike
+            }
           } else if (s.z > 1000) {
-            s.z = 1;
-            s.x = (Math.random() - 0.5) * 3500;
-            s.y = (Math.random() - 0.5) * 3500;
+            if (starResetsThisFrame < MAX_STAR_RESETS_PER_FRAME) {
+              s.z = 1;
+              s.x = (Math.random() - 0.5) * 3500;
+              s.y = (Math.random() - 0.5) * 3500;
+              starResetsThisFrame++;
+            } else {
+              s.z = 999; // defer reset to next frame
+            }
           }
         }
         

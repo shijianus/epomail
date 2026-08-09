@@ -97,12 +97,14 @@ export function PassingPlanets() {
             } else if (p.hitType === "dead-center") {
               cameraState.warningOpacity = 1; // Trigger warning UI
               if (p.phase === "frontal") {
-                cameraState.vz = -4.0; // Knock-back
+                // Use vzTarget (not vz directly) — the spring engine smooths the transition
+                // over ~3 frames, preventing the instant vz jump from causing a star-reset storm.
+                cameraState.vzTarget = -4.0; // Knock-back
                 cameraState.shakeIntensity = 80;
                 p.vz = -5000;
               } else if (p.phase === "chase" || (p.phase === "lateral" && p.vz < -1000)) {
                 // Hit perfectly from behind
-                cameraState.vz = 4.0; // Knocked FORWARD
+                cameraState.vzTarget = 4.0; // Knocked FORWARD
                 cameraState.shakeIntensity = 60;
                 p.vz = 5000; // Bounce backwards relative to camera
               }
@@ -392,6 +394,11 @@ export function PassingPlanets() {
       }
 
       if (listChanged) {
+        // Pre-warm style cache BEFORE triggering React re-render.
+        // getPlanetStyles() generates expensive CSS gradient strings; calling it here
+        // in the RAF frame ensures the cache is hot when React's render phase runs,
+        // so the reconciler only reads cached results — zero string-building overhead.
+        planetsRef.current.forEach(p => getPlanetStyles(p));
         setPlanets([...planetsRef.current]);
       }
 

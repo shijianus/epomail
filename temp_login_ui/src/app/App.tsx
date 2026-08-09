@@ -30,9 +30,10 @@ export default function App() {
       }
       
       // Apply warning border
+      // Note: we intentionally use ONLY opacity (not visibility) to avoid triggering Layout Reflow.
+      // pointer-events-none class handles interaction blocking. visibility would cause full layout recalc on collision.
       if (warningRef.current) {
         warningRef.current.style.opacity = cameraState.warningOpacity.toString();
-        warningRef.current.style.visibility = cameraState.warningOpacity > 0 ? "visible" : "hidden";
       }
 
       raf = requestAnimationFrame(loop);
@@ -67,9 +68,9 @@ export default function App() {
         ref={warningRef}
         className="fixed inset-0 z-[60] pointer-events-none overflow-hidden"
         style={{ 
-          opacity: 0, 
-          visibility: 'hidden',
-          willChange: 'opacity, visibility', 
+          opacity: 0,
+          /* visibility intentionally omitted — paint elements upfront, toggle only via opacity (GPU Composite) */
+          willChange: 'opacity', 
           transform: 'translateZ(0)',
           background: 'radial-gradient(ellipse at center, transparent 40%, rgba(220, 38, 38, 0.25) 100%)',
           boxShadow: 'inset 0 0 120px rgba(220, 38, 38, 0.6)'
