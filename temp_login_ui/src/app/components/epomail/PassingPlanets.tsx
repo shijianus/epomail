@@ -357,27 +357,127 @@ export function PassingPlanets() {
     return () => cancelAnimationFrame(raf);
   }, []);
 
+function getPlanetStyles(p: Planet) {
+  let surfaceBg = "";
+  let atmosphereShadow = "";
+  let ring: React.CSSProperties | null = null;
+  let surfaceTransform = "";
+  let outerGlow = "";
+  let outerBorder = "none";
+
+  if (p.type === "gas") {
+    surfaceBg = `
+      linear-gradient(
+        0deg,
+        rgba(0,0,0,0.6) 0%,
+        transparent 15%,
+        rgba(255,255,255,0.15) 25%,
+        rgba(0,0,0,0.3) 32%,
+        transparent 40%,
+        rgba(168,85,247,0.4) 50%,
+        transparent 60%,
+        rgba(255,255,255,0.2) 75%,
+        rgba(0,0,0,0.5) 85%,
+        transparent 100%
+      ),
+      linear-gradient(90deg, #312e81, #4c1d95, #581c87)
+    `;
+    surfaceTransform = `rotate(${(p.seed - 0.5) * 60}deg) scale(1.05)`;
+    atmosphereShadow = "inset 20px 20px 80px rgba(168,85,247,0.6), inset -50px -50px 120px rgba(0,0,0,0.95)";
+    outerGlow = "0 0 80px rgba(168,85,247,0.4)";
+    
+    if (p.seed > 0.3) {
+      ring = {
+        transform: `rotateX(75deg) rotateY(${p.seed * 40 - 20}deg) scale(2.2)`,
+        background: 'radial-gradient(circle at center, transparent 50%, rgba(168,85,247,0.8) 51%, rgba(168,85,247,0.3) 62%, transparent 63%)',
+        WebkitMaskImage: 'linear-gradient(to bottom, transparent 48%, black 52%)',
+        maskImage: 'linear-gradient(to bottom, transparent 48%, black 52%)',
+        borderRadius: "50%"
+      };
+    }
+  } else if (p.type === "ice") {
+    surfaceBg = `
+      repeating-linear-gradient(
+        45deg,
+        transparent,
+        transparent 10px,
+        rgba(255,255,255,0.2) 10px,
+        rgba(255,255,255,0.2) 12px
+      ),
+      repeating-linear-gradient(
+        -45deg,
+        transparent,
+        transparent 15px,
+        rgba(255,255,255,0.15) 15px,
+        rgba(255,255,255,0.15) 17px
+      ),
+      radial-gradient(circle at 35% 25%, #22d3ee, #0284c7 55%, #082f49 95%)
+    `;
+    surfaceTransform = `rotate(${p.seed * 90}deg)`;
+    atmosphereShadow = "inset 15px 15px 60px rgba(255,255,255,0.7), inset -50px -50px 120px rgba(0,0,0,0.95)";
+    outerGlow = "0 0 60px rgba(103,232,249,0.4)";
+    
+    if (p.seed > 0.5) {
+      ring = {
+        transform: `rotateX(78deg) rotateY(${-p.seed * 40}deg) scale(2.4)`,
+        border: "6px solid rgba(255,255,255,0.25)",
+        borderTopColor: "rgba(103,232,249,0.9)",
+        boxShadow: "0 0 30px rgba(103,232,249,0.7)",
+        WebkitMaskImage: 'linear-gradient(to bottom, transparent 48%, black 52%)',
+        maskImage: 'linear-gradient(to bottom, transparent 48%, black 52%)',
+        borderRadius: "50%"
+      };
+    }
+  } else if (p.type === "dark") {
+    surfaceBg = `
+      repeating-conic-gradient(
+        from 0deg,
+        transparent 0deg,
+        transparent 15deg,
+        rgba(168,85,247,0.25) 15deg,
+        rgba(168,85,247,0.25) 16deg
+      ),
+      radial-gradient(circle at 50% 50%, #000 35%, #1e1b4b 85%, #000 100%)
+    `;
+    surfaceTransform = `rotate(${p.seed * 180}deg) scale(1.05)`;
+    atmosphereShadow = "inset 0 0 50px rgba(0,0,0,1)";
+    outerGlow = "0 0 150px rgba(168,85,247,0.9), 0 0 250px rgba(99,102,241,0.7)";
+    outerBorder = "2px solid rgba(168,85,247,0.8)";
+    
+    ring = {
+      transform: `rotateX(70deg) rotateY(${p.seed * 180}deg) scale(2.8)`,
+      border: "3px solid rgba(103,232,249,0.9)",
+      boxShadow: "0 0 80px rgba(103,232,249,1), inset 0 0 40px rgba(103,232,249,0.8)",
+      WebkitMaskImage: 'linear-gradient(to bottom, transparent 48%, black 52%)',
+      maskImage: 'linear-gradient(to bottom, transparent 48%, black 52%)',
+      borderRadius: "50%"
+    };
+  } else {
+    // Nebula / Magma planet
+    surfaceBg = `
+      radial-gradient(circle at 20% 20%, rgba(0,0,0,0.4) 0%, transparent 12%),
+      radial-gradient(circle at 75% 65%, rgba(0,0,0,0.5) 0%, transparent 18%),
+      radial-gradient(circle at 40% 80%, rgba(0,0,0,0.4) 0%, transparent 15%),
+      repeating-radial-gradient(
+        circle at 40% 40%,
+        transparent 0,
+        rgba(255,255,255,0.1) 4%,
+        transparent 8%
+      ),
+      radial-gradient(circle at 35% 35%, #f472b6, #be185d 55%, #4c0519 95%)
+    `;
+    surfaceTransform = `rotate(${p.seed * 360}deg) scale(1.1)`;
+    atmosphereShadow = "inset 20px 20px 60px rgba(244,114,182,0.7), inset -50px -50px 110px rgba(0,0,0,0.95)";
+    outerGlow = "0 0 70px rgba(244,114,182,0.4)";
+  }
+
+  return { surfaceBg, atmosphereShadow, ring, surfaceTransform, outerGlow, outerBorder };
+}
+
   return (
     <div ref={containerRef} className="absolute inset-0 pointer-events-none overflow-hidden" style={{ perspective: '1000px' }}>
       {planets.map((p) => {
-        let bg = "";
-        let shadow = "";
-        let border = "";
-
-        if (p.type === "gas") {
-          bg = "radial-gradient(circle at 30% 30%, rgba(168,85,247,0.9), rgba(99,102,241,0.7) 45%, rgba(5,6,15,0.98) 85%)";
-          shadow = "inset 20px 20px 80px rgba(103,232,249,0.4), inset -40px -40px 100px rgba(0,0,0,0.9), 0 0 80px rgba(168,85,247,0.2)";
-        } else if (p.type === "ice") {
-          bg = "radial-gradient(circle at 35% 25%, rgba(103,232,249,0.95), rgba(14,165,233,0.8) 50%, rgba(5,6,15,0.98) 85%)";
-          shadow = "inset 15px 15px 60px rgba(255,255,255,0.6), inset -40px -40px 120px rgba(0,0,0,0.95), 0 0 60px rgba(103,232,249,0.3)";
-        } else if (p.type === "dark") {
-          bg = "radial-gradient(circle at 50% 50%, rgba(5,6,15,1) 40%, rgba(0,0,0,1) 85%)";
-          shadow = "inset 0 0 50px rgba(0,0,0,1), 0 0 120px rgba(168,85,247,0.8), 0 0 200px rgba(99,102,241,0.6)";
-          border = "2px solid rgba(168,85,247,0.7)";
-        } else {
-          bg = "radial-gradient(circle at 40% 40%, rgba(244,114,182,0.8), rgba(124,58,237,0.6) 65%, rgba(5,6,15,0.95) 90%)";
-          shadow = "inset 10px 10px 50px rgba(244,114,182,0.5), inset -30px -30px 80px rgba(0,0,0,0.95), 0 0 50px rgba(244,114,182,0.2)";
-        }
+        const styles = getPlanetStyles(p);
 
         return (
           <div
@@ -387,36 +487,38 @@ export function PassingPlanets() {
               else elementsRef.current.delete(p.id);
             }}
             className="absolute rounded-full left-1/2 top-1/2 will-change-transform"
-            style={{
-              background: bg,
-              boxShadow: shadow,
-              border: border,
-              opacity: 0, 
-            }}
+            style={{ opacity: 0 }}
           >
-            {p.type === "dark" && (
-              <div
-                className="absolute inset-0 rounded-full"
-                style={{
-                  transform: `rotateX(75deg) rotateY(${p.seed * 45}deg) scale(2.4)`,
-                  border: "2px solid rgba(103,232,249,0.6)",
-                  boxShadow: "0 0 60px rgba(103,232,249,0.9), inset 0 0 30px rgba(103,232,249,0.6)",
-                  borderRadius: "50%",
-                }}
+            {/* Sphere Volume Container */}
+            <div 
+              className="absolute inset-0 rounded-full overflow-hidden"
+              style={{
+                boxShadow: styles.outerGlow,
+                border: styles.outerBorder
+              }}
+            >
+              {/* Texture Layer */}
+              <div 
+                className="absolute inset-0" 
+                style={{ 
+                  background: styles.surfaceBg, 
+                  transform: styles.surfaceTransform,
+                  backgroundSize: '150% 150%',
+                  backgroundPosition: 'center'
+                }} 
               />
-            )}
-            
-            {p.type === "ice" && p.seed > 0.5 && (
+              {/* Atmosphere / 3D Shading Layer */}
+              <div 
+                className="absolute inset-0" 
+                style={{ boxShadow: styles.atmosphereShadow }} 
+              />
+            </div>
+
+            {/* Occlusion-Masked Ring Layer */}
+            {styles.ring && (
               <div
                 className="absolute inset-0 rounded-full"
-                style={{
-                  transform: `rotateX(80deg) rotateY(${-p.seed * 30}deg) scale(2.2)`,
-                  border: "10px solid rgba(255,255,255,0.15)",
-                  borderTopColor: "rgba(103,232,249,0.7)",
-                  borderBottomColor: "rgba(103,232,249,0.3)",
-                  boxShadow: "0 0 30px rgba(103,232,249,0.5)",
-                  borderRadius: "50%",
-                }}
+                style={styles.ring}
               />
             )}
           </div>
