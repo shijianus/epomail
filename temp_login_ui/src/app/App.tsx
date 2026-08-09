@@ -21,11 +21,6 @@ export default function App() {
       // Update global camera physics
       updateCameraPhysics(dt);
 
-      // Apply to container
-      if (containerRef.current) {
-        containerRef.current.style.transform = `translate3d(${cameraState.panX + cameraState.shakeX}px, ${cameraState.panY + cameraState.shakeY}px, 0)`;
-      }
-
       // Apply overlay
       if (overlayRef.current) {
         overlayRef.current.style.opacity = cameraState.overlayOpacity.toString();
@@ -43,8 +38,7 @@ export default function App() {
   return (
     <>
       <div
-        ref={containerRef}
-        className="epomail relative size-full min-h-screen overflow-hidden will-change-transform"
+        className="epomail relative size-full min-h-screen overflow-hidden"
         style={{ background: "var(--epo-void)" }}
       >
         <CanvasBackground ref={canvasRef} />

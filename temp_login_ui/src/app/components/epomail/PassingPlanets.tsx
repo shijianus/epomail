@@ -65,6 +65,10 @@ export function PassingPlanets() {
       const dt = Math.min((now - lastTime) / 1000, 0.1);
       lastTime = now;
 
+      if (containerRef.current) {
+        containerRef.current.style.transform = `translate3d(${cameraState.panX + cameraState.shakeX}px, ${cameraState.panY + cameraState.shakeY}px, 0)`;
+      }
+
       let listChanged = false;
 
       for (let i = planetsRef.current.length - 1; i >= 0; i--) {
@@ -175,8 +179,9 @@ export function PassingPlanets() {
             let opacity = 1;
             if (p.z > 15000) opacity = Math.max(0, (25000 - p.z) / 10000);
             
-            // Fade out aggressively when close to prevent full-screen rendering lag
-            if (p.z < 800) opacity *= Math.max(0, (p.z) / 800); 
+            // Allow planets to remain partially visible during pass-through so the collision effect is seen
+            if (p.z < 800 && p.z > 0) opacity *= Math.max(0.4, (p.z) / 800); 
+            if (p.z <= 0) opacity *= 0.4; // Maintain visibility while behind camera for dramatic effect
 
             // Removed display: none toggle which caused massive layout reflow stutters.
             // Opacity and pointer-events-none handle invisibility efficiently.
@@ -695,7 +700,7 @@ function getPlanetStyles(p: Planet) {
 }
 
   return (
-    <div ref={containerRef} className="absolute inset-0 pointer-events-none overflow-hidden" style={{ perspective: '1000px' }}>
+    <div ref={containerRef} className="absolute inset-0 pointer-events-none overflow-hidden will-change-transform" style={{ perspective: '1000px' }}>
       {planets.map((p) => {
         const styles = getPlanetStyles(p);
 
