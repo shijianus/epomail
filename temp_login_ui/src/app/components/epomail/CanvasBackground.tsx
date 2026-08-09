@@ -143,7 +143,7 @@ export const CanvasBackground = forwardRef<CanvasHandle>((_props, ref) => {
         z: Math.random() * 1000 + 1,
         base: Math.random() * 0.5 + 0.3,
         phase: Math.random() * Math.PI * 2,
-        speed: Math.random() * 20.0 + 15.0, // 3-5x Faster cruising speed
+        speed: Math.random() * 8.0 + 8.0, // Balanced cruising speed
       }));
     };
 
@@ -277,10 +277,10 @@ export const CanvasBackground = forwardRef<CanvasHandle>((_props, ref) => {
         const size = Math.max(0.8, Math.min(2.5, 0.6 * scale));
         
         // Streak effect (motion blur relative to actual movement)
-        // With higher base speed, a multiplier of 0.8 prevents streaks from becoming infinite lines
-        const prevZ = s.z + (reduceMotion ? 0 : s.speed * 0.8 * cameraState.vz);
-        const prevX = s.x + (reduceMotion ? 0 : cameraState.panVelX * dt * 0.05 * 0.8);
-        const prevY = s.y + (reduceMotion ? 0 : cameraState.panVelY * dt * 0.05 * 0.8);
+        // With balanced speed, a multiplier of 1.2 gives nice trails
+        const prevZ = s.z + (reduceMotion ? 0 : s.speed * 1.2 * cameraState.vz);
+        const prevX = s.x + (reduceMotion ? 0 : cameraState.panVelX * dt * 0.05 * 1.2);
+        const prevY = s.y + (reduceMotion ? 0 : cameraState.panVelY * dt * 0.05 * 1.2);
         const prevScale = fov / Math.max(1, prevZ);
         const px = cx + prevX * prevScale;
         const py = cy + prevY * prevScale;
