@@ -9,6 +9,10 @@ export const cameraState = {
   shakeIntensity: 0,
   overlayOpacity: 0,
   overlayColor: "rgba(255,255,255,1)",
+  // Internal state for smooth chaotic shake
+  _targetShakeX: 0,
+  _targetShakeY: 0,
+  _lastShakeUpdate: 0,
 };
 
 export function updateCameraPhysics(dt: number) {
@@ -25,14 +29,20 @@ export function updateCameraPhysics(dt: number) {
 
   // Shake
   if (cameraState.shakeIntensity > 0) {
-    cameraState.shakeIntensity -= dt * 40;
+    cameraState.shakeIntensity -= dt * 80; // Fast decay for sharp impact
     if (cameraState.shakeIntensity < 0) cameraState.shakeIntensity = 0;
     
-    // Use a smooth high-frequency oscillation instead of pure Math.random() 
-    // to prevent the shake from looking like frame-drop/stutter
-    const timeStr = performance.now() / 1000;
-    cameraState.shakeX = Math.sin(timeStr * 50) * cameraState.shakeIntensity;
-    cameraState.shakeY = Math.cos(timeStr * 43) * cameraState.shakeIntensity;
+    // Smooth chaotic shake: Pick a new random target every 30ms for violent but smooth interpolation
+    const now = performance.now();
+    if (now - (cameraState._lastShakeUpdate || 0) > 30) {
+      cameraState._targetShakeX = (Math.random() - 0.5) * 2 * cameraState.shakeIntensity;
+      cameraState._targetShakeY = (Math.random() - 0.5) * 2 * cameraState.shakeIntensity;
+      cameraState._lastShakeUpdate = now;
+    }
+    
+    // Interpolate rapidly towards the target (Smoothness + Violence)
+    cameraState.shakeX += (cameraState._targetShakeX - cameraState.shakeX) * dt * 40;
+    cameraState.shakeY += (cameraState._targetShakeY - cameraState.shakeY) * dt * 40;
   } else {
     cameraState.shakeX = 0;
     cameraState.shakeY = 0;

@@ -52,7 +52,7 @@ export default function App() {
       <div 
         ref={overlayRef}
         className="fixed inset-0 z-50 transition-colors duration-0"
-        style={{ opacity: 0, pointerEvents: 'none' }}
+        style={{ opacity: 0, pointerEvents: 'none', willChange: 'opacity, background-color', transform: 'translateZ(0)' }}
       />
     </>
   );
