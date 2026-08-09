@@ -52,6 +52,7 @@ function pickColor(c?: "purple" | "cyan" | "indigo"): [number, number, number] {
 }
 
 export const CanvasBackground = forwardRef<CanvasHandle>((_props, ref) => {
+  const rootRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const ripplesRef = useRef<Ripple[]>([]);
   const pointerRef = useRef({ x: -9999, y: -9999, active: false });
@@ -193,6 +194,13 @@ export const CanvasBackground = forwardRef<CanvasHandle>((_props, ref) => {
       const dt = Math.min((now - lastTime) / 1000, 0.1);
       lastTime = now;
       const t = (now - start) / 1000;
+      
+      // Apply camera shake to the root DOM element directly
+      if (rootRef.current) {
+        // Expand the background slightly (scale 1.05) to hide black edges when shaking
+        rootRef.current.style.transform = `scale(1.05) translate3d(${cameraState.panX + cameraState.shakeX}px, ${cameraState.panY + cameraState.shakeY}px, 0)`;
+      }
+
       ctx.clearRect(0, 0, width, height);
 
       // 1. Deep-space base wash.
@@ -390,7 +398,7 @@ export const CanvasBackground = forwardRef<CanvasHandle>((_props, ref) => {
   }, []);
 
   return (
-    <div className="pointer-events-none absolute inset-0 overflow-hidden">
+    <div ref={rootRef} className="pointer-events-none absolute inset-0 overflow-hidden will-change-transform">
       {/* All autonomous motion (aurora + starscape + dust) is rendered here. */}
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
 

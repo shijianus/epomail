@@ -75,6 +75,10 @@ export function PassingPlanets() {
       const dt = Math.min((now - lastTime) / 1000, 0.1);
       lastTime = now;
 
+      if (containerRef.current) {
+        containerRef.current.style.transform = `translate3d(${cameraState.panX + cameraState.shakeX}px, ${cameraState.panY + cameraState.shakeY}px, 0)`;
+      }
+
       let listChanged = false;
 
       for (let i = 0; i < planetsRef.current.length; i++) {
@@ -685,7 +689,7 @@ function getPlanetStyles(p: Planet) {
 }
 
   return (
-    <div ref={containerRef} className="absolute inset-0 pointer-events-none overflow-hidden" style={{ perspective: '1000px' }}>
+    <div ref={containerRef} className="absolute inset-0 pointer-events-none overflow-hidden will-change-transform" style={{ perspective: '1000px' }}>
       {planets.map((p) => {
         const styles = getPlanetStyles(p);
 
