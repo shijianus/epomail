@@ -97,12 +97,12 @@ export function PassingPlanets() {
             } else if (p.hitType === "dead-center") {
               if (p.phase === "frontal") {
                 cameraState.vz = -4.0; // Knock-back
-                cameraState.shakeIntensity = 80;
+                cameraState.shakeIntensity = 180; // Massive collision
                 p.vz = -5000;
               } else if (p.phase === "chase" || (p.phase === "lateral" && p.vz < -1000)) {
                 // Hit perfectly from behind
                 cameraState.vz = 4.0; // Knocked FORWARD
-                cameraState.shakeIntensity = 60;
+                cameraState.shakeIntensity = 140; // Powerful hit from behind
                 p.vz = 5000; // Bounce backwards relative to camera
               }
             } else if (p.hitType === "edge") {
@@ -111,13 +111,13 @@ export function PassingPlanets() {
                 // Pure lateral collision
                 cameraState.panVelX = -Math.cos(angle) * 4000; 
                 cameraState.panVelY = -Math.sin(angle) * 4000;
-                cameraState.shakeIntensity = 50;
+                cameraState.shakeIntensity = 120; // Hard scrape
                 p.vx *= -0.8; p.vy *= -0.8; p.vz = -3000; 
               } else {
                 // Frontal or Chase edge scrape
                 cameraState.panVelX = -Math.cos(angle) * 2500; 
                 cameraState.panVelY = -Math.sin(angle) * 2500;
-                cameraState.shakeIntensity = 40;
+                cameraState.shakeIntensity = 90; // Light scrape
                 p.vz = p.phase === "frontal" ? -2000 : 2000; 
                 p.vx += Math.cos(angle) * 3000; 
                 p.vy += Math.sin(angle) * 3000;
@@ -170,12 +170,13 @@ export function PassingPlanets() {
           // Update DOM
           const el = elementsRef.current.get(p.id);
           if (el) {
-            // Cap the scale strictly to prevent GPU tile allocation lag and grid artifacts
-            // Cap scale at 3.5 instead of 5 to prevent massive GPU fill-rate drops (stutter) on 4K screens
-            const scale = Math.max(0.01, Math.min(3.5, fov / Math.max(1, p.z)));
-            const sx = p.x * scale;
-            const sy = p.y * scale;
-            const size = p.baseSize * scale;
+            // Separate position scale from size scale to ensure smooth trajectory divergence 
+            // without causing GPU fill-rate stutter from infinitely growing radial gradients.
+            const posScale = fov / Math.max(1, p.z);
+            const sizeScale = Math.max(0.01, Math.min(4.0, posScale));
+            const sx = p.x * posScale;
+            const sy = p.y * posScale;
+            const size = p.baseSize * sizeScale;
             
             let opacity = 1;
             if (p.z > 15000) opacity = Math.max(0, (25000 - p.z) / 10000);

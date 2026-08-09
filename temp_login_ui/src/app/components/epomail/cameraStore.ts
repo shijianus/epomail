@@ -25,14 +25,12 @@ export function updateCameraPhysics(dt: number) {
 
   // Shake
   if (cameraState.shakeIntensity > 0) {
-    cameraState.shakeIntensity -= dt * 40;
+    cameraState.shakeIntensity -= dt * 100; // Faster decay for sharper impact
     if (cameraState.shakeIntensity < 0) cameraState.shakeIntensity = 0;
     
-    // Use a smooth high-frequency oscillation instead of pure Math.random() 
-    // to prevent the shake from looking like frame-drop/stutter
-    const timeStr = performance.now() / 1000;
-    cameraState.shakeX = Math.sin(timeStr * 50) * cameraState.shakeIntensity;
-    cameraState.shakeY = Math.cos(timeStr * 43) * cameraState.shakeIntensity;
+    // Use chaotic random shake for maximum visceral impact
+    cameraState.shakeX = (Math.random() - 0.5) * 2 * cameraState.shakeIntensity;
+    cameraState.shakeY = (Math.random() - 0.5) * 2 * cameraState.shakeIntensity;
   } else {
     cameraState.shakeX = 0;
     cameraState.shakeY = 0;
