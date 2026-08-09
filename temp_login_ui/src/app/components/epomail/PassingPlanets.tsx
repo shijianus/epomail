@@ -389,41 +389,47 @@ function getPlanetStyles(p: Planet) {
 
   let surfaceBg = "";
   let atmosphereShadow = "";
-  let ring: React.CSSProperties | null = null;
+  let innerShadow = "";
+  let rings: React.CSSProperties[] = [];
   let surfaceTransform = "";
   let outerGlow = "";
   let outerBorder = "none";
   
   const h = p.baseHue;
+  const h2 = (h + 120) % 360;
+  const h3 = (h + 240) % 360;
   
   // Deterministic PRNG
   let seedVal = Math.floor(p.seed * 2147483647);
-  if (seedVal === 0) seedVal = 1; // prevent 0 seed
+  if (seedVal === 0) seedVal = 1; 
   const rand = () => {
     seedVal = (seedVal * 16807) % 2147483647;
     return (seedVal - 1) / 2147483646;
   };
   rand(); rand(); rand(); // Mix initial
 
+  // Strong 3D Volume Shading
+  innerShadow = `inset -25px -25px 50px rgba(0,0,0,0.9), inset 10px 10px 30px rgba(255,255,255,0.3)`;
+
   if (p.type === "gas") {
     let storms = [];
-    const numStorms = Math.floor(rand() * 8) + 4;
+    const numStorms = Math.floor(rand() * 12) + 6;
     for (let i = 0; i < numStorms; i++) {
       const x = rand() * 100;
       const y = rand() * 100;
       const r = rand() * 3 + 1.5;
-      const c = rand() > 0.5 ? h + 20 : h - 20;
-      storms.push(`radial-gradient(ellipse at ${x}% ${y}%, hsla(${c}, 70%, 40%, 0.85) 0%, transparent ${r}%)`);
+      const hueChoice = rand() > 0.6 ? h2 : (rand() > 0.5 ? h + 20 : h - 20);
+      storms.push(`radial-gradient(ellipse at ${x}% ${y}%, hsla(${hueChoice}, 70%, 40%, 0.85) 0%, transparent ${r}%)`);
     }
 
     let currentPct = 0;
     const bandColors = [
       `hsla(${h}, 60%, 35%, 1)`,
-      `hsla(${h + 15}, 50%, 45%, 1)`,
-      `hsla(${h - 10}, 70%, 25%, 1)`,
-      `hsla(${h + 5}, 65%, 40%, 1)`,
-      `hsla(${h - 5}, 70%, 20%, 1)`,
-      `hsla(${h + 10}, 50%, 50%, 1)`
+      `hsla(${h2}, 50%, 45%, 1)`,
+      `hsla(${h3}, 70%, 25%, 1)`,
+      `hsla(${h + 15}, 65%, 40%, 1)`,
+      `hsla(${h2 - 15}, 70%, 20%, 1)`,
+      `hsla(${h3 + 10}, 50%, 50%, 1)`
     ];
     let bandStops = [];
     while (currentPct < 25) { 
@@ -438,15 +444,28 @@ function getPlanetStyles(p: Planet) {
 
     surfaceBg = [...storms, bands].join(', ');
     surfaceTransform = `scale(1.02)`;
-    atmosphereShadow = `radial-gradient(circle at 30% 30%, hsla(${h}, 50%, 90%, 0.3) 0%, transparent 40%), radial-gradient(circle at 70% 70%, transparent 40%, rgba(0,0,0,0.8) 80%, rgba(0,0,0,1) 100%)`;
+    atmosphereShadow = `radial-gradient(circle at 30% 30%, hsla(${h}, 50%, 90%, 0.4) 0%, transparent 40%), radial-gradient(circle at 70% 70%, transparent 40%, rgba(0,0,0,0.85) 80%, rgba(0,0,0,1) 100%)`;
     outerGlow = `0 0 50px hsla(${h}, 80%, 60%, 0.4)`;
     
-    if (rand() > 0.3) {
-      ring = {
-        transform: `rotateX(75deg) rotateY(${rand() * 40 - 20}deg) scale(2.2)`,
-        background: `radial-gradient(circle at center, transparent 48%, hsla(${h}, 70%, 60%, 0.8) 50%, hsla(${h}, 70%, 60%, 0.3) 62%, transparent 63%)`,
-        borderRadius: "50%"
-      };
+    const ringType = rand();
+    if (ringType > 0.3) {
+      if (ringType > 0.8) {
+        // Dual Axis Crossed Rings
+        rings.push({ transform: `rotateX(75deg) rotateY(${rand() * 180}deg) scale(2.2)`, border: `6px solid hsla(${h}, 70%, 60%, 0.8)`, borderRadius: "50%" });
+        rings.push({ transform: `rotateX(-75deg) rotateY(${rand() * 180}deg) scale(2.5)`, border: `12px solid hsla(${h2}, 70%, 50%, 0.6)`, borderRadius: "50%" });
+      } else if (ringType > 0.5) {
+        // Double Concentric Rings
+        const rot = rand() * 40 - 20;
+        rings.push({ transform: `rotateX(75deg) rotateY(${rot}deg) scale(1.8)`, border: `25px solid hsla(${h}, 60%, 50%, 0.9)`, borderRadius: "50%" });
+        rings.push({ transform: `rotateX(75deg) rotateY(${rot}deg) scale(2.5)`, border: `4px solid hsla(${h2}, 80%, 70%, 0.5)`, borderRadius: "50%" });
+      } else {
+        // Thick Accretion Disk
+        rings.push({
+          transform: `rotateX(75deg) rotateY(${rand() * 40 - 20}deg) scale(2.4)`,
+          background: `radial-gradient(circle at center, transparent 38%, hsla(${h}, 70%, 60%, 0.95) 40%, hsla(${h2}, 60%, 50%, 0.8) 50%, hsla(${h3}, 50%, 40%, 0.4) 65%, transparent 68%)`,
+          borderRadius: "50%"
+        });
+      }
     }
   } else if (p.type === "ice") {
     let craters = [];
@@ -456,7 +475,8 @@ function getPlanetStyles(p: Planet) {
       const y = rand() * 100;
       const r = rand() * 2 + 0.5;
       const op = rand() * 0.6 + 0.3;
-      craters.push(`radial-gradient(circle at ${x}% ${y}%, hsla(${h}, 30%, 95%, ${op}) 0%, transparent ${r}%)`);
+      const c = rand() > 0.7 ? h2 : h;
+      craters.push(`radial-gradient(circle at ${x}% ${y}%, hsla(${c}, 40%, 90%, ${op}) 0%, transparent ${r}%)`);
     }
     
     let cracks = [];
@@ -465,23 +485,22 @@ function getPlanetStyles(p: Planet) {
       const angle = rand() * 360;
       const pos = rand() * 100;
       const width = rand() * 0.4 + 0.1;
-      cracks.push(`linear-gradient(${angle}deg, transparent ${pos}%, hsla(${h}, 10%, 100%, 0.9) ${pos + width/2}%, hsla(${h}, 30%, 80%, 0.5) ${pos + width}, transparent ${pos + width*1.5}%)`);
+      cracks.push(`linear-gradient(${angle}deg, transparent ${pos}%, hsla(${h3}, 40%, 100%, 0.9) ${pos + width/2}%, hsla(${h}, 30%, 80%, 0.5) ${pos + width}, transparent ${pos + width*1.5}%)`);
     }
     
-    const baseIce = `radial-gradient(circle at 35% 35%, hsla(${h}, 60%, 75%, 1) 0%, hsla(${h}, 70%, 50%, 1) 40%, hsla(${h}, 80%, 20%, 1) 100%)`;
+    const baseIce = `radial-gradient(circle at 35% 35%, hsla(${h}, 60%, 75%, 1) 0%, hsla(${h2}, 50%, 60%, 1) 40%, hsla(${h3}, 70%, 30%, 1) 100%)`;
     surfaceBg = [...craters, ...cracks, baseIce].join(', ');
     surfaceTransform = `rotate(${rand() * 360}deg)`;
-    atmosphereShadow = `radial-gradient(circle at 35% 35%, hsla(${h}, 50%, 95%, 0.4) 0%, transparent 50%), radial-gradient(circle at 75% 75%, transparent 35%, rgba(0,0,0,0.85) 80%, rgba(0,0,0,1) 100%)`;
+    atmosphereShadow = `radial-gradient(circle at 35% 35%, hsla(${h}, 50%, 95%, 0.5) 0%, transparent 50%), radial-gradient(circle at 75% 75%, transparent 35%, rgba(0,0,0,0.9) 80%, rgba(0,0,0,1) 100%)`;
     outerGlow = `0 0 40px hsla(${h}, 80%, 60%, 0.4)`;
     
     if (rand() > 0.5) {
-      ring = {
+      rings.push({
         transform: `rotateX(78deg) rotateY(${-rand() * 40}deg) scale(2.4)`,
-        border: `6px solid hsla(${h}, 50%, 90%, 0.25)`,
-        borderTopColor: `hsla(${h}, 80%, 70%, 0.9)`,
-        boxShadow: `0 0 30px hsla(${h}, 80%, 60%, 0.7)`,
+        border: `${Math.floor(rand() * 12 + 2)}px solid hsla(${h}, 50%, 90%, 0.7)`,
+        boxShadow: `0 0 30px hsla(${h2}, 80%, 60%, 0.8), inset 0 0 15px hsla(${h3}, 80%, 80%, 0.9)`,
         borderRadius: "50%"
-      };
+      });
     }
   } else if (p.type === "dark") {
     let flares = [];
@@ -491,8 +510,8 @@ function getPlanetStyles(p: Planet) {
       const y = rand() * 60 + 20;
       const op = rand() * 0.6 + 0.4;
       const r = rand() * 10 + 5;
-      const hueOffset = rand() * 60 - 30;
-      flares.push(`radial-gradient(circle at ${x}% ${y}%, hsla(${h + hueOffset}, 100%, 60%, ${op}) 0%, transparent ${r}%)`);
+      const c = rand() > 0.5 ? h2 : h3;
+      flares.push(`radial-gradient(circle at ${x}% ${y}%, hsla(${c}, 100%, 60%, ${op}) 0%, transparent ${r}%)`);
     }
     
     let conicStops = [];
@@ -501,7 +520,8 @@ function getPlanetStyles(p: Planet) {
        const isFlare = rand() > 0.5;
        const step = rand() * 8 + 3;
        if (isFlare) {
-          conicStops.push(`hsla(${h + rand()*40 - 20}, 100%, ${rand()*40 + 50}%, ${rand()*0.6 + 0.4}) ${currentAngle}%`);
+          const c = rand() > 0.5 ? h : h2;
+          conicStops.push(`hsla(${c}, 100%, ${rand()*40 + 50}%, ${rand()*0.6 + 0.4}) ${currentAngle}%`);
        } else {
           conicStops.push(`hsla(${h}, 100%, 50%, 0) ${currentAngle}%`);
        }
@@ -510,20 +530,29 @@ function getPlanetStyles(p: Planet) {
     conicStops.push(`hsla(${h}, 100%, 50%, 0) 100%`);
     
     const accretion = `conic-gradient(from ${rand() * 360}deg at 50% 50%, ${conicStops.join(", ")})`;
-    const baseDark = `radial-gradient(circle at 50% 50%, #000 0%, #000 38%, hsla(${h}, 100%, 70%, 0.9) 40%, hsla(${h+20}, 100%, 50%, 0.8) 42%, transparent 48%), radial-gradient(circle at 50% 50%, #111 0%, #000 100%)`;
+    const baseDark = `radial-gradient(circle at 50% 50%, #000 0%, #000 38%, hsla(${h}, 100%, 70%, 0.9) 40%, hsla(${h2}, 100%, 50%, 0.8) 42%, transparent 48%), radial-gradient(circle at 50% 50%, #111 0%, #000 100%)`;
     
     surfaceBg = [...flares, accretion, baseDark].join(', ');
     surfaceTransform = `rotate(${rand() * 180}deg)`;
-    atmosphereShadow = `radial-gradient(circle at 50% 50%, transparent 60%, rgba(0,0,0,0.9) 95%, rgba(0,0,0,1) 100%)`;
-    outerGlow = `0 0 60px hsla(${h}, 80%, 50%, 0.8), 0 0 100px hsla(${h + 30}, 80%, 40%, 0.5)`;
+    atmosphereShadow = `radial-gradient(circle at 50% 50%, transparent 60%, rgba(0,0,0,0.95) 90%, rgba(0,0,0,1) 100%)`;
+    outerGlow = `0 0 60px hsla(${h}, 80%, 50%, 0.9), 0 0 120px hsla(${h2}, 80%, 40%, 0.6)`;
     outerBorder = `2px solid hsla(${h}, 80%, 50%, 0.8)`;
     
-    ring = {
-      transform: `rotateX(70deg) rotateY(${rand() * 180}deg) scale(2.8)`,
-      border: `3px solid hsla(${h}, 80%, 60%, 0.9)`,
-      boxShadow: `0 0 80px hsla(${h}, 80%, 60%, 1), inset 0 0 40px hsla(${h}, 80%, 60%, 0.8)`,
+    const ringRot = rand() * 180;
+    rings.push({
+      transform: `rotateX(70deg) rotateY(${ringRot}deg) scale(2.8)`,
+      border: `4px solid hsla(${h3}, 80%, 60%, 0.9)`,
+      boxShadow: `0 0 80px hsla(${h}, 80%, 60%, 1), inset 0 0 40px hsla(${h2}, 80%, 60%, 0.8)`,
       borderRadius: "50%"
-    };
+    });
+    if (rand() > 0.5) {
+      rings.push({
+        transform: `rotateX(70deg) rotateY(${ringRot}deg) scale(3.2)`,
+        border: `1px solid hsla(${h}, 90%, 70%, 0.5)`,
+        boxShadow: `0 0 20px hsla(${h}, 90%, 70%, 0.5)`,
+        borderRadius: "50%"
+      });
+    }
   } else {
     let rivers = [];
     const numRivers = Math.floor(rand() * 18) + 8;
@@ -532,7 +561,8 @@ function getPlanetStyles(p: Planet) {
       const pos = rand() * 100;
       const width = rand() * 1.5 + 0.3;
       const bright = rand() > 0.5 ? 70 : 50;
-      rivers.push(`linear-gradient(${angle}deg, transparent ${pos}%, hsla(${h + rand()*40 - 20}, 100%, ${bright}%, 0.9) ${pos + width/2}%, transparent ${pos + width}%)`);
+      const c = rand() > 0.5 ? h2 : h;
+      rivers.push(`linear-gradient(${angle}deg, transparent ${pos}%, hsla(${c}, 100%, ${bright}%, 0.9) ${pos + width/2}%, transparent ${pos + width}%)`);
     }
     
     let hotspots = [];
@@ -541,18 +571,19 @@ function getPlanetStyles(p: Planet) {
       const x = rand() * 100;
       const y = rand() * 100;
       const r = rand() * 5 + 2;
-      hotspots.push(`radial-gradient(circle at ${x}% ${y}%, hsla(${h + rand()*40 - 20}, 100%, 65%, 0.9) 0%, transparent ${r}%)`);
+      const c = rand() > 0.5 ? h3 : h2;
+      hotspots.push(`radial-gradient(circle at ${x}% ${y}%, hsla(${c}, 100%, 65%, 0.9) 0%, transparent ${r}%)`);
     }
     
-    const baseMagma = `radial-gradient(circle at 50% 50%, hsla(${h}, 90%, 20%, 1) 0%, hsla(${h}, 100%, 5%, 1) 100%)`;
+    const baseMagma = `radial-gradient(circle at 50% 50%, hsla(${h}, 90%, 20%, 1) 0%, hsla(${h3}, 100%, 5%, 1) 100%)`;
     
     surfaceBg = [...hotspots, ...rivers, baseMagma].join(', ');
     surfaceTransform = `rotate(${rand() * 360}deg) scale(1.1)`;
-    atmosphereShadow = `radial-gradient(circle at 35% 35%, hsla(${h}, 50%, 80%, 0.2) 0%, transparent 50%), radial-gradient(circle at 70% 70%, transparent 40%, rgba(0,0,0,0.85) 80%, rgba(0,0,0,1) 100%)`;
-    outerGlow = `0 0 50px hsla(${h}, 80%, 60%, 0.4)`;
+    atmosphereShadow = `radial-gradient(circle at 35% 35%, hsla(${h}, 50%, 80%, 0.3) 0%, transparent 50%), radial-gradient(circle at 70% 70%, transparent 40%, rgba(0,0,0,0.9) 80%, rgba(0,0,0,1) 100%)`;
+    outerGlow = `0 0 50px hsla(${h2}, 80%, 60%, 0.5)`;
   }
 
-  const styles = { surfaceBg, atmosphereShadow, ring, surfaceTransform, outerGlow, outerBorder };
+  const styles = { surfaceBg, atmosphereShadow, innerShadow, rings, surfaceTransform, outerGlow, outerBorder };
   (p as any)._cachedStyles = styles;
   return styles;
 }
@@ -576,7 +607,7 @@ function getPlanetStyles(p: Planet) {
             <div 
               className="absolute inset-0 rounded-full overflow-hidden"
               style={{
-                boxShadow: styles.outerGlow,
+                boxShadow: `${styles.outerGlow}, ${styles.innerShadow}`,
                 border: styles.outerBorder,
                 opacity: 'var(--p-opacity, 0)',
                 transform: 'translateZ(0)' // Anchor for 3D intersection
@@ -593,23 +624,24 @@ function getPlanetStyles(p: Planet) {
                   backgroundRepeat: 'no-repeat'
                 }} 
               />
-              {/* Atmosphere / 3D Shading Layer */}
+              {/* Atmosphere / 3D Shading Layer (Fixed to use background instead of boxShadow) */}
               <div 
                 className="absolute inset-0" 
-                style={{ boxShadow: styles.atmosphereShadow }} 
+                style={{ background: styles.atmosphereShadow }} 
               />
             </div>
 
-            {/* Complete 360-Degree Ring Layer (Preserve-3D Occlusion) */}
-            {styles.ring && (
+            {/* Complete 360-Degree Ring Layers (Preserve-3D Occlusion) */}
+            {styles.rings.map((rStyles, i) => (
               <div
+                key={i}
                 className="absolute inset-0 rounded-full"
                 style={{
-                  ...styles.ring,
+                  ...rStyles,
                   opacity: 'var(--p-opacity, 0)'
                 }}
               />
-            )}
+            ))}
           </div>
         );
       })}
