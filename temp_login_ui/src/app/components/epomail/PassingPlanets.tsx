@@ -25,6 +25,9 @@ interface Planet {
   hitType: "dead-center" | "edge" | "pass-through" | "none";
   hasCollided: boolean;
   baseHue: number;
+  spinSpeed: number;
+  axialTilt: number;
+  spinOffset: number;
 }
 
 export function PassingPlanets() {
@@ -184,6 +187,12 @@ export function PassingPlanets() {
             el.style.width = `${size}px`;
             el.style.height = `${size}px`;
             el.style.transform = `translate3d(calc(-50% + ${sx}px), calc(-50% + ${sy}px), 0)`;
+            
+            p.spinOffset = (p.spinOffset || 0) + p.spinSpeed * dt;
+            // Wrap seamlessly at 33.3333% (one full tile of the 300% width texture)
+            p.spinOffset = p.spinOffset % (100 / 3);
+            el.style.setProperty('--spin-offset', `${p.spinOffset}%`);
+            
             el.style.setProperty('--p-opacity', opacity.toString());
             el.style.zIndex = p.z < 500 ? "50" : "1";
           }
@@ -364,6 +373,9 @@ export function PassingPlanets() {
           hitType,
           hasCollided: false,
           baseHue: h,
+          spinSpeed: (Math.random() < 0.5 ? 1 : -1) * (Math.random() * 5 + 3), // 3 to 8% per second
+          axialTilt: (Math.random() - 0.5) * 60, // -30 to 30 degrees
+          spinOffset: 0,
         };
         
         planetsRef.current.push(p);
@@ -389,9 +401,7 @@ function getPlanetStyles(p: Planet) {
 
   let surfaceBg = "";
   let atmosphereShadow = "";
-  let innerShadow = "";
   let rings: React.CSSProperties[] = [];
-  let surfaceTransform = "";
   let outerGlow = "";
   let outerBorder = "none";
   
@@ -407,9 +417,6 @@ function getPlanetStyles(p: Planet) {
     return (seedVal - 1) / 2147483646;
   };
   rand(); rand(); rand(); // Mix initial
-
-  // Strong 3D Volume Shading
-  innerShadow = `inset -25px -25px 50px rgba(0,0,0,0.9), inset 10px 10px 30px rgba(255,255,255,0.3)`;
 
   if (p.type === "gas") {
     let storms = [];
@@ -440,26 +447,27 @@ function getPlanetStyles(p: Planet) {
       bandStops.push(`${color} ${currentPct}%`);
       currentPct += rand() * 0.3; // gap
     }
-    const bands = `repeating-linear-gradient(${(rand() - 0.5) * 60}deg, ${bandStops.join(', ')})`;
+    // Vertical bands so they slide horizontally across the planet perfectly
+    const bands = `repeating-linear-gradient(90deg, ${bandStops.join(', ')})`;
 
     surfaceBg = [...storms, bands].join(', ');
-    surfaceTransform = `scale(1.02)`;
-    atmosphereShadow = `radial-gradient(circle at 30% 30%, hsla(${h}, 50%, 90%, 0.4) 0%, transparent 40%), radial-gradient(circle at 70% 70%, transparent 40%, rgba(0,0,0,0.85) 80%, rgba(0,0,0,1) 100%)`;
+    atmosphereShadow = `
+      radial-gradient(circle at 30% 30%, hsla(${h}, 50%, 100%, 0.4) 0%, transparent 45%), 
+      radial-gradient(circle at 75% 75%, transparent 35%, rgba(0,0,0,0.95) 75%, rgba(0,0,0,1) 100%),
+      radial-gradient(circle at 50% 50%, transparent 60%, rgba(0,0,0,0.7) 100%)
+    `;
     outerGlow = `0 0 50px hsla(${h}, 80%, 60%, 0.4)`;
     
     const ringType = rand();
     if (ringType > 0.3) {
       if (ringType > 0.8) {
-        // Dual Axis Crossed Rings
         rings.push({ transform: `rotateX(75deg) rotateY(${rand() * 180}deg) scale(2.2)`, border: `6px solid hsla(${h}, 70%, 60%, 0.8)`, borderRadius: "50%" });
         rings.push({ transform: `rotateX(-75deg) rotateY(${rand() * 180}deg) scale(2.5)`, border: `12px solid hsla(${h2}, 70%, 50%, 0.6)`, borderRadius: "50%" });
       } else if (ringType > 0.5) {
-        // Double Concentric Rings
         const rot = rand() * 40 - 20;
         rings.push({ transform: `rotateX(75deg) rotateY(${rot}deg) scale(1.8)`, border: `25px solid hsla(${h}, 60%, 50%, 0.9)`, borderRadius: "50%" });
         rings.push({ transform: `rotateX(75deg) rotateY(${rot}deg) scale(2.5)`, border: `4px solid hsla(${h2}, 80%, 70%, 0.5)`, borderRadius: "50%" });
       } else {
-        // Thick Accretion Disk
         rings.push({
           transform: `rotateX(75deg) rotateY(${rand() * 40 - 20}deg) scale(2.4)`,
           background: `radial-gradient(circle at center, transparent 38%, hsla(${h}, 70%, 60%, 0.95) 40%, hsla(${h2}, 60%, 50%, 0.8) 50%, hsla(${h3}, 50%, 40%, 0.4) 65%, transparent 68%)`,
@@ -488,10 +496,14 @@ function getPlanetStyles(p: Planet) {
       cracks.push(`linear-gradient(${angle}deg, transparent ${pos}%, hsla(${h3}, 40%, 100%, 0.9) ${pos + width/2}%, hsla(${h}, 30%, 80%, 0.5) ${pos + width}, transparent ${pos + width*1.5}%)`);
     }
     
-    const baseIce = `radial-gradient(circle at 35% 35%, hsla(${h}, 60%, 75%, 1) 0%, hsla(${h2}, 50%, 60%, 1) 40%, hsla(${h3}, 70%, 30%, 1) 100%)`;
+    // Solid flat base so it repeats seamlessly without a visible seam
+    const baseIce = `hsla(${h}, 60%, 65%, 1)`;
     surfaceBg = [...craters, ...cracks, baseIce].join(', ');
-    surfaceTransform = `rotate(${rand() * 360}deg)`;
-    atmosphereShadow = `radial-gradient(circle at 35% 35%, hsla(${h}, 50%, 95%, 0.5) 0%, transparent 50%), radial-gradient(circle at 75% 75%, transparent 35%, rgba(0,0,0,0.9) 80%, rgba(0,0,0,1) 100%)`;
+    atmosphereShadow = `
+      radial-gradient(circle at 30% 30%, hsla(${h}, 50%, 95%, 0.5) 0%, transparent 45%), 
+      radial-gradient(circle at 75% 75%, transparent 35%, rgba(0,0,0,0.95) 75%, rgba(0,0,0,1) 100%),
+      radial-gradient(circle at 50% 50%, transparent 60%, rgba(0,0,0,0.8) 100%)
+    `;
     outerGlow = `0 0 40px hsla(${h}, 80%, 60%, 0.4)`;
     
     if (rand() > 0.5) {
@@ -530,11 +542,14 @@ function getPlanetStyles(p: Planet) {
     conicStops.push(`hsla(${h}, 100%, 50%, 0) 100%`);
     
     const accretion = `conic-gradient(from ${rand() * 360}deg at 50% 50%, ${conicStops.join(", ")})`;
-    const baseDark = `radial-gradient(circle at 50% 50%, #000 0%, #000 38%, hsla(${h}, 100%, 70%, 0.9) 40%, hsla(${h2}, 100%, 50%, 0.8) 42%, transparent 48%), radial-gradient(circle at 50% 50%, #111 0%, #000 100%)`;
+    const baseDark = `hsla(${h}, 10%, 10%, 1)`;
     
     surfaceBg = [...flares, accretion, baseDark].join(', ');
-    surfaceTransform = `rotate(${rand() * 180}deg)`;
-    atmosphereShadow = `radial-gradient(circle at 50% 50%, transparent 60%, rgba(0,0,0,0.95) 90%, rgba(0,0,0,1) 100%)`;
+    atmosphereShadow = `
+      radial-gradient(circle at 40% 40%, hsla(${h}, 50%, 80%, 0.3) 0%, transparent 40%),
+      radial-gradient(circle at 70% 70%, transparent 40%, rgba(0,0,0,0.95) 75%, rgba(0,0,0,1) 100%),
+      radial-gradient(circle at 50% 50%, transparent 60%, rgba(0,0,0,0.9) 100%)
+    `;
     outerGlow = `0 0 60px hsla(${h}, 80%, 50%, 0.9), 0 0 120px hsla(${h2}, 80%, 40%, 0.6)`;
     outerBorder = `2px solid hsla(${h}, 80%, 50%, 0.8)`;
     
@@ -575,15 +590,18 @@ function getPlanetStyles(p: Planet) {
       hotspots.push(`radial-gradient(circle at ${x}% ${y}%, hsla(${c}, 100%, 65%, 0.9) 0%, transparent ${r}%)`);
     }
     
-    const baseMagma = `radial-gradient(circle at 50% 50%, hsla(${h}, 90%, 20%, 1) 0%, hsla(${h3}, 100%, 5%, 1) 100%)`;
+    const baseMagma = `hsla(${h3}, 100%, 10%, 1)`;
     
     surfaceBg = [...hotspots, ...rivers, baseMagma].join(', ');
-    surfaceTransform = `rotate(${rand() * 360}deg) scale(1.1)`;
-    atmosphereShadow = `radial-gradient(circle at 35% 35%, hsla(${h}, 50%, 80%, 0.3) 0%, transparent 50%), radial-gradient(circle at 70% 70%, transparent 40%, rgba(0,0,0,0.9) 80%, rgba(0,0,0,1) 100%)`;
+    atmosphereShadow = `
+      radial-gradient(circle at 35% 35%, hsla(${h}, 50%, 80%, 0.3) 0%, transparent 40%),
+      radial-gradient(circle at 70% 70%, transparent 40%, rgba(0,0,0,0.95) 75%, rgba(0,0,0,1) 100%),
+      radial-gradient(circle at 50% 50%, transparent 60%, rgba(0,0,0,0.9) 100%)
+    `;
     outerGlow = `0 0 50px hsla(${h2}, 80%, 60%, 0.5)`;
   }
 
-  const styles = { surfaceBg, atmosphereShadow, innerShadow, rings, surfaceTransform, outerGlow, outerBorder };
+  const styles = { surfaceBg, atmosphereShadow, rings, outerGlow, outerBorder };
   (p as any)._cachedStyles = styles;
   return styles;
 }
@@ -607,24 +625,24 @@ function getPlanetStyles(p: Planet) {
             <div 
               className="absolute inset-0 rounded-full overflow-hidden"
               style={{
-                boxShadow: `${styles.outerGlow}, ${styles.innerShadow}`,
+                boxShadow: styles.outerGlow,
                 border: styles.outerBorder,
                 opacity: 'var(--p-opacity, 0)',
                 transform: 'translateZ(0)' // Anchor for 3D intersection
               }}
             >
-              {/* Texture Layer */}
+              {/* Spinning 3D Texture Layer */}
               <div 
-                className="absolute inset-0" 
+                className="absolute" 
                 style={{ 
+                  width: '300%', height: '300%', left: '-100%', top: '-100%',
                   background: styles.surfaceBg, 
-                  transform: styles.surfaceTransform,
-                  backgroundSize: '150% 150%',
-                  backgroundPosition: 'center',
-                  backgroundRepeat: 'no-repeat'
+                  backgroundSize: '33.333333% 33.333333%',
+                  backgroundRepeat: 'repeat',
+                  transform: `rotate(${p.axialTilt}deg) translateX(var(--spin-offset, 0%))`
                 }} 
               />
-              {/* Atmosphere / 3D Shading Layer (Fixed to use background instead of boxShadow) */}
+              {/* Stationary Atmosphere / 3D Shading Layer */}
               <div 
                 className="absolute inset-0" 
                 style={{ background: styles.atmosphereShadow }} 
