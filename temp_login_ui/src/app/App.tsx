@@ -3,7 +3,6 @@ import { CanvasBackground } from "./components/epomail/CanvasBackground";
 import type { CanvasHandle } from "./components/epomail/CanvasBackground";
 import { LoginCard } from "./components/epomail/LoginCard";
 import { PassingPlanets } from "./components/epomail/PassingPlanets";
-import { PassingComets } from "./components/epomail/PassingComets";
 import { cameraState, updateCameraPhysics } from "./components/epomail/cameraStore";
 
 export default function App() {
@@ -44,7 +43,6 @@ export default function App() {
       >
         <CanvasBackground ref={canvasRef} />
         <PassingPlanets />
-        <PassingComets />
         <div className="relative h-full min-h-screen">
           <LoginCard canvasRef={canvasRef} />
         </div>
