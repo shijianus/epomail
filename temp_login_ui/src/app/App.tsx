@@ -42,26 +42,23 @@ export default function App() {
 
   return (
     <>
-      {/* Space Environment - This container shakes on collision */}
       <div
         ref={containerRef}
-        className="fixed inset-0 overflow-hidden will-change-transform"
+        className="epomail relative size-full min-h-screen overflow-hidden will-change-transform"
         style={{ background: "var(--epo-void)" }}
       >
         <CanvasBackground ref={canvasRef} />
         <PassingPlanets />
-      </div>
-      
-      {/* UI Layer - Completely decoupled from camera shake to preserve backdrop-filter performance */}
-      <div className="relative z-10 min-h-screen">
-        <LoginCard canvasRef={canvasRef} />
+        <div className="relative h-full min-h-screen">
+          <LoginCard canvasRef={canvasRef} />
+        </div>
       </div>
       
       {/* Pass-through overlay effect */}
       <div 
         ref={overlayRef}
-        className="fixed inset-0 z-50 transition-colors duration-0 pointer-events-none"
-        style={{ opacity: 0 }}
+        className="fixed inset-0 z-50 transition-colors duration-0"
+        style={{ opacity: 0, pointerEvents: 'none' }}
       />
     </>
   );
