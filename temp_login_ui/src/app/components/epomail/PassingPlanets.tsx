@@ -39,6 +39,7 @@ export function PassingPlanets() {
   // State Machine for cinematic trajectory phases
   const flightPhaseRef = useRef<FlightPhase>("frontal");
   const phasePlanetsSpawned = useRef<number>(0);
+  const globalPlanetsSpawned = useRef<number>(0);
   const hueHistoryRef = useRef<number[]>([]);
 
   function generateDistinctHue(): number {
@@ -165,6 +166,11 @@ export function PassingPlanets() {
             // Planet travel time is ~5-8 seconds. To make the perceived gap 3-10s,
             // we set the actual wait timer to 0-3s.
             nextSpawn = now + getBellCurve(0, 3000);
+            
+            // Trigger comet spawn if it's the 3rd planet interval
+            if (globalPlanetsSpawned.current > 0 && globalPlanetsSpawned.current % 3 === 0) {
+              cameraState.cometTriggerCount++;
+            }
           }
         } else {
           // Update DOM
@@ -207,6 +213,7 @@ export function PassingPlanets() {
         let phase = flightPhaseRef.current;
         
         phasePlanetsSpawned.current++;
+        globalPlanetsSpawned.current++;
 
         const baseSize = Math.random() * 800 + 400; // Planets are massive
         const radius = baseSize / 2;
