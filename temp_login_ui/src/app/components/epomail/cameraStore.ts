@@ -27,8 +27,12 @@ export function updateCameraPhysics(dt: number) {
   if (cameraState.shakeIntensity > 0) {
     cameraState.shakeIntensity -= dt * 40;
     if (cameraState.shakeIntensity < 0) cameraState.shakeIntensity = 0;
-    cameraState.shakeX = (Math.random() - 0.5) * cameraState.shakeIntensity;
-    cameraState.shakeY = (Math.random() - 0.5) * cameraState.shakeIntensity;
+    
+    // Use a smooth high-frequency oscillation instead of pure Math.random() 
+    // to prevent the shake from looking like frame-drop/stutter
+    const timeStr = performance.now() / 1000;
+    cameraState.shakeX = Math.sin(timeStr * 50) * cameraState.shakeIntensity;
+    cameraState.shakeY = Math.cos(timeStr * 43) * cameraState.shakeIntensity;
   } else {
     cameraState.shakeX = 0;
     cameraState.shakeY = 0;

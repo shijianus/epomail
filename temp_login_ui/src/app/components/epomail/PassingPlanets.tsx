@@ -171,7 +171,8 @@ export function PassingPlanets() {
           const el = elementsRef.current.get(p.id);
           if (el) {
             // Cap the scale strictly to prevent GPU tile allocation lag and grid artifacts
-            const scale = Math.max(0.01, Math.min(5, fov / Math.max(1, p.z)));
+            // Cap scale at 3.5 instead of 5 to prevent massive GPU fill-rate drops (stutter) on 4K screens
+            const scale = Math.max(0.01, Math.min(3.5, fov / Math.max(1, p.z)));
             const sx = p.x * scale;
             const sy = p.y * scale;
             const size = p.baseSize * scale;
