@@ -58,7 +58,7 @@ export function PassingPlanets() {
     let lastTime = performance.now();
     let nextSpawn = performance.now() + 1000 + Math.random() * 2000;
 
-    const types: PlanetType[] = ["ice", "gas", "dark", "nebula"];
+    const types: PlanetType[] = ["ice", "gas", "dark", "nebula", "earth", "saturn"];
     const fov = 1000;
 
     const loop = (now: number) => {
@@ -205,6 +205,7 @@ export function PassingPlanets() {
         const baseSize = Math.random() * 800 + 400; // Planets are massive
         const radius = baseSize / 2;
         
+        const type = types[Math.floor(Math.random() * types.length)];
         let spawnX = 0, spawnY = 0, spawnZ = 0;
         let vx = 0, vy = 0, vz = 0;
         let targetX = 0, targetY = 0;
@@ -474,6 +475,87 @@ function getPlanetStyles(p: Planet) {
         });
       }
     }
+  } else if (p.type === "earth") {
+    // Classic Earth-like Terrestrial Blue Planet
+    let clouds = [];
+    const numClouds = Math.floor(rand() * 15) + 10;
+    for (let i = 0; i < numClouds; i++) {
+      const x = rand() * 100;
+      const y = rand() * 100;
+      const rx = rand() * 15 + 8;
+      const ry = rand() * 6 + 2; 
+      clouds.push(`radial-gradient(ellipse ${rx}% ${ry}% at ${x}% ${y}%, rgba(255,255,255,0.85) 0%, rgba(255,255,255,0.4) 40%, transparent 100%)`);
+    }
+
+    let continents = [];
+    const numContinents = Math.floor(rand() * 12) + 6;
+    for (let i = 0; i < numContinents; i++) {
+      const x = rand() * 100;
+      const y = rand() * 100;
+      const rx = rand() * 12 + 6;
+      const ry = rand() * 10 + 4;
+      // Green/Brown organic patches for landmass
+      const isDesert = rand() > 0.7;
+      const color = isDesert ? 'hsla(45, 40%, 50%, 0.9)' : 'hsla(110, 30%, 40%, 0.9)';
+      const colorEdge = isDesert ? 'hsla(30, 40%, 40%, 0.6)' : 'hsla(130, 30%, 30%, 0.6)';
+      continents.push(`radial-gradient(ellipse ${rx}% ${ry}% at ${x}% ${y}%, ${color} 0%, ${colorEdge} 60%, transparent 100%)`);
+    }
+
+    // Deep Ocean Base
+    const baseOcean = `hsla(210, 80%, 25%, 1)`;
+    surfaceBg = [...clouds, ...continents, baseOcean].join(', ');
+
+    atmosphereShadow = `
+      radial-gradient(circle at 30% 30%, hsla(210, 50%, 100%, 0.4) 0%, transparent 45%), 
+      radial-gradient(circle at 75% 75%, transparent 35%, rgba(0,0,0,0.95) 75%, rgba(0,0,0,1) 100%),
+      radial-gradient(circle at 50% 50%, transparent 60%, rgba(0,0,0,0.7) 100%)
+    `;
+    outerGlow = `0 0 50px hsla(210, 80%, 60%, 0.4)`;
+    // Earth usually has no rings, keep empty.
+  } else if (p.type === "saturn") {
+    // Classic Saturn-like Gas Giant
+    let currentPct = 0;
+    const saturnColors = [
+      `hsla(40, 40%, 65%, 1)`,   // Pale yellow
+      `hsla(30, 30%, 55%, 1)`,   // Tan
+      `hsla(20, 35%, 45%, 1)`,   // Brown/Orange
+      `hsla(45, 50%, 75%, 1)`,   // Bright cream
+      `hsla(25, 20%, 40%, 1)`    // Dark tan
+    ];
+    let bandStops = [];
+    while (currentPct < 25) { 
+      let color = saturnColors[Math.floor(rand() * saturnColors.length)];
+      let width = rand() * 1.5 + 0.2; // very tight, smooth bands
+      bandStops.push(`${color} ${currentPct}%`);
+      currentPct += width;
+      bandStops.push(`${color} ${currentPct}%`);
+    }
+    surfaceBg = `repeating-linear-gradient(90deg, ${bandStops.join(', ')})`;
+
+    atmosphereShadow = `
+      radial-gradient(circle at 30% 30%, hsla(40, 50%, 100%, 0.3) 0%, transparent 45%), 
+      radial-gradient(circle at 75% 75%, transparent 35%, rgba(0,0,0,0.95) 75%, rgba(0,0,0,1) 100%),
+      radial-gradient(circle at 50% 50%, transparent 60%, rgba(0,0,0,0.8) 100%)
+    `;
+    outerGlow = `0 0 60px hsla(40, 60%, 50%, 0.3)`;
+    
+    // Iconic massive Saturn rings (A, B rings, Cassini division)
+    const tilt = (rand() > 0.5 ? 1 : -1) * (70 + rand() * 10); // 70 to 80 degrees tilt
+    const ringRot = rand() * 40 - 20;
+    rings.push({
+      transform: `rotateX(${tilt}deg) rotateY(${ringRot}deg) scale(2.6)`,
+      background: `
+        radial-gradient(circle at center, 
+        transparent 38%, 
+        hsla(35, 40%, 55%, 0.95) 40%, 
+        hsla(40, 50%, 65%, 0.85) 46%, 
+        transparent 47.5%, /* Cassini Division */
+        hsla(30, 30%, 50%, 0.8) 49%, 
+        hsla(25, 20%, 40%, 0.4) 62%, 
+        transparent 65%)
+      `,
+      borderRadius: "50%"
+    });
   } else if (p.type === "ice") {
     if (complexity < 0.25) {
       // Pure Minimalist Ice Planet
