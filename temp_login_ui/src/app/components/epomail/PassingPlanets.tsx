@@ -1,14 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { cameraState } from "./cameraStore";
 
+type PlanetType = "ice" | "gas" | "dark" | "nebula";
 type FlightPhase = "frontal" | "lateral" | "chase";
-
-const TEXTURES = [
-  "/login/planets/gas_giant.jpg",
-  "/login/planets/rocky.jpg",
-  "/login/planets/lava.jpg",
-  "/login/planets/ice.jpg"
-];
 
 function getBellCurve(min: number, max: number): number {
   const u = (Math.random() + Math.random() + Math.random()) / 3;
@@ -17,18 +11,7 @@ function getBellCurve(min: number, max: number): number {
 
 interface Planet {
   id: string;
-  textureUrl: string;
-  hueRotate: number;
-  brightness: number;
-  contrast: number;
-  hasRing: boolean;
-  ringHueRotate: number;
-  ringRotationX: number;
-  ringRotationY: number;
-  ringRotationZ: number;
-  rotation: number;
-  flipX: number;
-  flipY: number;
+  type: PlanetType;
   x: number;
   y: number;
   z: number;
@@ -36,6 +19,7 @@ interface Planet {
   vy: number;
   vz: number;
   baseSize: number;
+  seed: number;
   phase: FlightPhase;
   isHit: boolean;
   hitType: "dead-center" | "edge" | "pass-through" | "none";
@@ -51,12 +35,13 @@ export function PassingPlanets() {
   // State Machine for cinematic trajectory phases
   const flightPhaseRef = useRef<FlightPhase>("frontal");
   const phasePlanetsSpawned = useRef<number>(0);
-  const textureHistoryRef = useRef<string[]>([]);
 
   useEffect(() => {
     let raf: number;
     let lastTime = performance.now();
     let nextSpawn = performance.now() + 1000 + Math.random() * 2000;
+
+    const types: PlanetType[] = ["ice", "gas", "dark", "nebula"];
     const fov = 1000;
 
     const loop = (now: number) => {
@@ -84,7 +69,10 @@ export function PassingPlanets() {
             
             if (p.hitType === "pass-through") {
               cameraState.overlayOpacity = 1;
-              cameraState.overlayColor = `hsla(${p.hueRotate}, 80%, 60%, 0.95)`;
+              if (p.type === 'gas') cameraState.overlayColor = "rgba(168,85,247,0.95)";
+              else if (p.type === 'ice') cameraState.overlayColor = "rgba(103,232,249,0.95)";
+              else if (p.type === 'dark') cameraState.overlayColor = "rgba(0,0,0,1)";
+              else cameraState.overlayColor = "rgba(244,114,182,0.95)";
             } else if (p.hitType === "dead-center") {
               if (p.phase === "frontal") {
                 cameraState.vz = -4.0; // Knock-back
@@ -332,28 +320,9 @@ export function PassingPlanets() {
           }
         }
 
-        // Distinct planet logic using textures
-        let availableTextures = TEXTURES.filter(t => !textureHistoryRef.current.includes(t));
-        if (availableTextures.length === 0) availableTextures = TEXTURES; // fallback
-        const textureUrl = availableTextures[Math.floor(Math.random() * availableTextures.length)];
-        
-        textureHistoryRef.current.push(textureUrl);
-        if (textureHistoryRef.current.length > 3) textureHistoryRef.current.shift();
-
         const p: Planet = {
           id: Math.random().toString(36).substring(2, 9),
-          textureUrl,
-          hueRotate: Math.random() * 360,
-          brightness: 0.8 + Math.random() * 0.7,
-          contrast: 1.0 + Math.random() * 0.5,
-          hasRing: Math.random() > 0.6,
-          ringHueRotate: Math.random() * 360,
-          ringRotationX: 60 + Math.random() * 20,
-          ringRotationY: Math.random() * 360,
-          ringRotationZ: Math.random() * 360,
-          rotation: Math.random() * 360,
-          flipX: Math.random() > 0.5 ? 1 : -1,
-          flipY: Math.random() > 0.5 ? 1 : -1,
+          type: types[Math.floor(Math.random() * types.length)],
           x: spawnX,
           y: spawnY,
           z: spawnZ,
@@ -361,6 +330,7 @@ export function PassingPlanets() {
           vy,
           vz,
           baseSize,
+          seed: Math.random(),
           phase,
           isHit,
           hitType,
@@ -388,6 +358,25 @@ export function PassingPlanets() {
   return (
     <div ref={containerRef} className="absolute inset-0 pointer-events-none overflow-hidden" style={{ perspective: '1000px' }}>
       {planets.map((p) => {
+        let bg = "";
+        let shadow = "";
+        let border = "";
+
+        if (p.type === "gas") {
+          bg = "radial-gradient(circle at 30% 30%, rgba(168,85,247,0.9), rgba(99,102,241,0.7) 45%, rgba(5,6,15,0.98) 85%)";
+          shadow = "inset 20px 20px 80px rgba(103,232,249,0.4), inset -40px -40px 100px rgba(0,0,0,0.9), 0 0 80px rgba(168,85,247,0.2)";
+        } else if (p.type === "ice") {
+          bg = "radial-gradient(circle at 35% 25%, rgba(103,232,249,0.95), rgba(14,165,233,0.8) 50%, rgba(5,6,15,0.98) 85%)";
+          shadow = "inset 15px 15px 60px rgba(255,255,255,0.6), inset -40px -40px 120px rgba(0,0,0,0.95), 0 0 60px rgba(103,232,249,0.3)";
+        } else if (p.type === "dark") {
+          bg = "radial-gradient(circle at 50% 50%, rgba(5,6,15,1) 40%, rgba(0,0,0,1) 85%)";
+          shadow = "inset 0 0 50px rgba(0,0,0,1), 0 0 120px rgba(168,85,247,0.8), 0 0 200px rgba(99,102,241,0.6)";
+          border = "2px solid rgba(168,85,247,0.7)";
+        } else {
+          bg = "radial-gradient(circle at 40% 40%, rgba(244,114,182,0.8), rgba(124,58,237,0.6) 65%, rgba(5,6,15,0.95) 90%)";
+          shadow = "inset 10px 10px 50px rgba(244,114,182,0.5), inset -30px -30px 80px rgba(0,0,0,0.95), 0 0 50px rgba(244,114,182,0.2)";
+        }
+
         return (
           <div
             key={p.id}
@@ -395,37 +384,36 @@ export function PassingPlanets() {
               if (el) elementsRef.current.set(p.id, el);
               else elementsRef.current.delete(p.id);
             }}
-            className="absolute left-1/2 top-1/2 will-change-transform flex items-center justify-center"
+            className="absolute rounded-full left-1/2 top-1/2 will-change-transform"
             style={{
+              background: bg,
+              boxShadow: shadow,
+              border: border,
               opacity: 0, 
-              transformStyle: 'preserve-3d'
             }}
           >
-            {/* The Planet Sphere */}
-            <img 
-              src={p.textureUrl} 
-              alt="planet"
-              className="absolute object-cover rounded-full pointer-events-none"
-              style={{
-                width: '100%',
-                height: '100%',
-                mixBlendMode: 'screen',
-                filter: `hue-rotate(${p.hueRotate}deg) brightness(${p.brightness}) contrast(${p.contrast})`,
-                transform: `rotate(${p.rotation}deg) scaleX(${p.flipX}) scaleY(${p.flipY})`
-              }}
-            />
-            {/* The Planetary Rings */}
-            {p.hasRing && (
-              <img 
-                src="/login/planets/rings.jpg" 
-                alt="rings"
-                className="absolute object-contain pointer-events-none"
+            {p.type === "dark" && (
+              <div
+                className="absolute inset-0 rounded-full"
                 style={{
-                  width: '250%',
-                  height: '250%',
-                  mixBlendMode: 'screen',
-                  filter: `hue-rotate(${p.ringHueRotate}deg) brightness(1.2) contrast(1.2)`,
-                  transform: `rotateX(${p.ringRotationX}deg) rotateY(${p.ringRotationY}deg) rotateZ(${p.ringRotationZ}deg)`
+                  transform: `rotateX(75deg) rotateY(${p.seed * 45}deg) scale(2.4)`,
+                  border: "2px solid rgba(103,232,249,0.6)",
+                  boxShadow: "0 0 60px rgba(103,232,249,0.9), inset 0 0 30px rgba(103,232,249,0.6)",
+                  borderRadius: "50%",
+                }}
+              />
+            )}
+            
+            {p.type === "ice" && p.seed > 0.5 && (
+              <div
+                className="absolute inset-0 rounded-full"
+                style={{
+                  transform: `rotateX(80deg) rotateY(${-p.seed * 30}deg) scale(2.2)`,
+                  border: "10px solid rgba(255,255,255,0.15)",
+                  borderTopColor: "rgba(103,232,249,0.7)",
+                  borderBottomColor: "rgba(103,232,249,0.3)",
+                  boxShadow: "0 0 30px rgba(103,232,249,0.5)",
+                  borderRadius: "50%",
                 }}
               />
             )}
