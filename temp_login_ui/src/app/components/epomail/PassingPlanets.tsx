@@ -141,7 +141,9 @@ export function PassingPlanets() {
           planetsRef.current.splice(i, 1);
           listChanged = true;
           if (planetsRef.current.length === 0) {
-            nextSpawn = now + getBellCurve(3000, 10000);
+            // Planet travel time is ~5-8 seconds. To make the perceived gap 3-10s,
+            // we set the actual wait timer to 0-3s.
+            nextSpawn = now + getBellCurve(0, 3000);
           }
         } else {
           // Update DOM
