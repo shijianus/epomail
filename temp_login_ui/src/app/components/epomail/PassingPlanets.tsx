@@ -28,21 +28,11 @@ interface Planet {
   spinSpeed: number;
   axialTilt: number;
   spinOffset: number;
-  isActive: boolean;
 }
 
-const MAX_PLANETS = 3;
-
 export function PassingPlanets() {
-  const [planets, setPlanets] = useState<Planet[]>(() => 
-    Array.from({ length: MAX_PLANETS }, (_, i) => ({
-      id: `pool-planet-${i}`,
-      type: "earth", x: 0, y: 0, z: -99999, vx: 0, vy: 0, vz: 0, baseSize: 0, seed: 0, phase: "frontal",
-      isHit: false, hitType: "none", hasCollided: false, baseHue: 0, spinSpeed: 0, axialTilt: 0, spinOffset: 0,
-      isActive: false
-    } as Planet))
-  );
-  const planetsRef = useRef<Planet[]>(planets);
+  const [planets, setPlanets] = useState<Planet[]>([]);
+  const planetsRef = useRef<Planet[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
   const elementsRef = useRef<Map<string, HTMLDivElement>>(new Map());
   
@@ -75,16 +65,10 @@ export function PassingPlanets() {
       const dt = Math.min((now - lastTime) / 1000, 0.1);
       lastTime = now;
 
-      if (containerRef.current) {
-        containerRef.current.style.transform = `translate3d(${cameraState.panX + cameraState.shakeX}px, ${cameraState.panY + cameraState.shakeY}px, 0)`;
-      }
-
       let listChanged = false;
 
-      for (let i = 0; i < planetsRef.current.length; i++) {
+      for (let i = planetsRef.current.length - 1; i >= 0; i--) {
         const p = planetsRef.current[i];
-        if (!p.isActive) continue;
-
         p.x += p.vx * dt;
         p.y += p.vy * dt;
         
@@ -115,31 +99,53 @@ export function PassingPlanets() {
                 // Hit perfectly from behind
                 cameraState.vz = 4.0; // Knocked FORWARD
                 cameraState.shakeIntensity = 60;
-                p.vz = 6000;
-              } else {
-                cameraState.shakeIntensity = 90;
-                cameraState.panVelX = (p.x > 0 ? -1 : 1) * 2000; // Knocked sideways
-                cameraState.panVelY = (p.y > 0 ? -1 : 1) * 2000;
-                p.vx *= -1;
-                p.vy *= -1;
+                p.vz = 5000; // Bounce backwards relative to camera
               }
             } else if (p.hitType === "edge") {
-              cameraState.shakeIntensity = 45;
-              cameraState.panVelX = (p.x > 0 ? -1 : 1) * 1200;
-              cameraState.panVelY = (p.y > 0 ? -1 : 1) * 1200;
-              p.vx = p.x > 0 ? 3000 : -3000;
-              p.vy = p.y > 0 ? 3000 : -3000;
+              const angle = Math.atan2(p.y, p.x);
+              if (p.phase === "lateral" && Math.abs(p.vz) < 500) {
+                // Pure lateral collision
+                cameraState.panVelX = -Math.cos(angle) * 4000; 
+                cameraState.panVelY = -Math.sin(angle) * 4000;
+                cameraState.shakeIntensity = 50;
+                p.vx *= -0.8; p.vy *= -0.8; p.vz = -3000; 
+              } else {
+                // Frontal or Chase edge scrape
+                cameraState.panVelX = -Math.cos(angle) * 2500; 
+                cameraState.panVelY = -Math.sin(angle) * 2500;
+                cameraState.shakeIntensity = 40;
+                p.vz = p.phase === "frontal" ? -2000 : 2000; 
+                p.vx += Math.cos(angle) * 3000; 
+                p.vy += Math.sin(angle) * 3000;
+              }
             }
             
-            // State Machine Logic
-            let nextPhase = flightPhaseRef.current;
-            if (flightPhaseRef.current === "frontal") {
-               if (p.hitType === "dead-center") nextPhase = "lateral";
-               else if (p.hitType === "edge") nextPhase = Math.random() < 0.3 ? "lateral" : "frontal";
-            } else if (flightPhaseRef.current === "lateral") {
-               if (p.hitType === "edge") nextPhase = "chase"; // Sideways scrap puts us parallel
-            } else if (flightPhaseRef.current === "chase") {
-               if (phasePlanetsSpawned.current > 1) nextPhase = "frontal"; // Recover after 2 chase planets
+            // PROBABILITIES: Lateral + Chase <= 10%
+            const shiftRoll = Math.random();
+            let nextPhase = p.phase;
+            
+            if (p.phase === "frontal") {
+               // 90% stay, 8% lateral, 2% chase
+               if (shiftRoll < 0.90) nextPhase = "frontal";
+               else if (shiftRoll < 0.98) nextPhase = "lateral";
+               else nextPhase = "chase";
+            } else if (p.phase === "lateral") {
+               // 90% stay, 9% frontal, 1% chase
+               if (shiftRoll < 0.90) nextPhase = "lateral";
+               else if (shiftRoll < 0.99) nextPhase = "frontal";
+               else nextPhase = "chase";
+            } else if (p.phase === "chase") {
+               // 90% stay, 9% lateral, 1% frontal
+               if (shiftRoll < 0.90) nextPhase = "chase";
+               else if (shiftRoll < 0.99) nextPhase = "lateral";
+               else {
+                 nextPhase = "frontal";
+                 // Special Camera Spin (15% chance when Chase -> Frontal)
+                 if (Math.random() < 0.15) {
+                    cameraState.panVelX = 15000 * (Math.random() > 0.5 ? 1 : -1);
+                    cameraState.panVelY = 15000 * (Math.random() > 0.5 ? 1 : -1);
+                 }
+               }
             }
             
             flightPhaseRef.current = nextPhase;
@@ -148,10 +154,10 @@ export function PassingPlanets() {
         }
 
         if (p.z < -1000 || p.z > 35000 || Math.abs(p.x) > 10000 || Math.abs(p.y) > 10000) { 
-          // Soft-despawn: deactivate without removing from DOM pool
-          p.isActive = false;
+          // Destroy if way behind, bounced too far away, or flew off laterally
+          planetsRef.current.splice(i, 1);
           listChanged = true;
-          if (!planetsRef.current.some(pl => pl.isActive)) {
+          if (planetsRef.current.length === 0) {
             // Planet travel time is ~5-8 seconds. To make the perceived gap 3-10s,
             // we set the actual wait timer to 0-3s.
             nextSpawn = now + getBellCurve(0, 3000);
@@ -190,8 +196,8 @@ export function PassingPlanets() {
         }
       }
 
-      // Spawn logic: strictly one active planet at a time (from pool)
-      if (now > nextSpawn && !planetsRef.current.some(pl => pl.isActive)) {
+      // Spawn logic: strictly one planet at a time!
+      if (now > nextSpawn && planetsRef.current.length === 0) {
         let phase = flightPhaseRef.current;
         
         phasePlanetsSpawned.current++;
@@ -210,7 +216,7 @@ export function PassingPlanets() {
 
         if (isHit) {
           if (phase === "frontal") {
-            const hasDeadCenter = planetsRef.current.some(pl => pl.isActive && (pl.hitType === "dead-center" || pl.hitType === "pass-through"));
+            const hasDeadCenter = planetsRef.current.some(p => p.hitType === "dead-center" || p.hitType === "pass-through");
             // 5% dead-center (prevented if one is already active), 95% edge
             if (!hasDeadCenter && Math.random() < 0.05) {
               hitType = Math.random() < 0.20 ? "pass-through" : "dead-center"; // 1% pass-through, 4% dead-center
@@ -689,7 +695,7 @@ function getPlanetStyles(p: Planet) {
 }
 
   return (
-    <div ref={containerRef} className="absolute inset-0 pointer-events-none overflow-hidden will-change-transform" style={{ perspective: '1000px' }}>
+    <div ref={containerRef} className="absolute inset-0 pointer-events-none overflow-hidden" style={{ perspective: '1000px' }}>
       {planets.map((p) => {
         const styles = getPlanetStyles(p);
 
@@ -701,10 +707,7 @@ function getPlanetStyles(p: Planet) {
               else elementsRef.current.delete(p.id);
             }}
             className="absolute rounded-full left-1/2 top-1/2 will-change-transform"
-            style={{ 
-              transformStyle: 'preserve-3d',
-              visibility: p.isActive ? 'visible' : 'hidden' 
-            }}
+            style={{ transformStyle: 'preserve-3d' }}
           >
             {/* Sphere Volume Container */}
             <div 

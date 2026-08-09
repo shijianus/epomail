@@ -21,6 +21,11 @@ export default function App() {
       // Update global camera physics
       updateCameraPhysics(dt);
 
+      // Apply to container
+      if (containerRef.current) {
+        containerRef.current.style.transform = `translate3d(${cameraState.panX + cameraState.shakeX}px, ${cameraState.panY + cameraState.shakeY}px, 0)`;
+      }
+
       // Apply overlay
       if (overlayRef.current) {
         overlayRef.current.style.opacity = cameraState.overlayOpacity.toString();
@@ -37,27 +42,23 @@ export default function App() {
 
   return (
     <>
-      {/* Root Background Container - No longer shakes! */}
       <div
-        className="epomail relative size-full min-h-screen overflow-hidden"
+        ref={containerRef}
+        className="epomail relative size-full min-h-screen overflow-hidden will-change-transform"
         style={{ background: "var(--epo-void)" }}
       >
         <CanvasBackground ref={canvasRef} />
         <PassingPlanets />
-        
-        {/* UI Layer - Static, does not shake! */}
-        <div className="relative z-10 flex min-h-screen items-center justify-center pointer-events-none">
-          <div className="pointer-events-auto h-full w-full">
-            <LoginCard canvasRef={canvasRef} />
-          </div>
+        <div className="relative h-full min-h-screen">
+          <LoginCard canvasRef={canvasRef} />
         </div>
       </div>
       
       {/* Pass-through overlay effect */}
       <div 
         ref={overlayRef}
-        className="fixed inset-0 z-50 transition-colors duration-0 pointer-events-none"
-        style={{ opacity: 0 }}
+        className="fixed inset-0 z-50 transition-colors duration-0"
+        style={{ opacity: 0, pointerEvents: 'none' }}
       />
     </>
   );
