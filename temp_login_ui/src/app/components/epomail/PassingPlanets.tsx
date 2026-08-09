@@ -174,23 +174,12 @@ export function PassingPlanets() {
           // Update DOM
           const el = elementsRef.current.get(p.id);
           if (el) {
-            // ─────────────────────────────────────────────────────────────────────────
-            // PERF FIX: scale() in transform instead of changing width/height.
-            //
-            // Previously: el.style.width = baseSize * scale (changed every frame)
-            //   → The child 300%×300% texture CSS size = baseSize * scale * 3
-            //   → At max scale 3.5: 10500px texture, requiring full GPU re-rasterize
-            //   → Bottom/top collisions worst: viewport height < width means MORE
-            //     off-screen texture spills below viewport, GPU allocates extra tiles.
-            //
-            // Now: width/height are set ONCE in JSX to p.baseSize (fixed forever).
-            //   → GPU compositor applies scale() for visual size — zero Layout/Rasterize cost.
-            //   → Texture stays at 3×baseSize regardless of approach distance.
-            //   → Per-frame cost: only a transform matrix update (nanoseconds).
-            // ─────────────────────────────────────────────────────────────────────────
+            // Cap the scale strictly to prevent GPU tile allocation lag and grid artifacts
+            // Cap scale at 3.5 instead of 5 to prevent massive GPU fill-rate drops (stutter) on 4K screens
             const scale = Math.max(0.01, Math.min(3.5, fov / Math.max(1, p.z)));
             const sx = p.x * scale;
             const sy = p.y * scale;
+            const size = p.baseSize * scale;
             
             let opacity = 1;
             if (p.z > 15000) opacity = Math.max(0, (25000 - p.z) / 10000);
@@ -199,9 +188,12 @@ export function PassingPlanets() {
             if (p.z < 800 && p.z > 0) opacity *= Math.max(0.4, (p.z) / 800); 
             if (p.z <= 0) opacity *= 0.4; // Maintain visibility while behind camera for dramatic effect
 
-            // Use scale() in the transform — width/height are FIXED at baseSize in JSX, never touched here.
-            // Mathematical proof: visual center = parent_50% + sx = screen_center + p.x * scale ✓
-            el.style.transform = `translate3d(calc(-50% + ${sx}px), calc(-50% + ${sy}px), 0) scale(${scale})`;
+            // Removed display: none toggle which caused massive layout reflow stutters.
+            // Opacity and pointer-events-none handle invisibility efficiently.
+
+            el.style.width = `${size}px`;
+            el.style.height = `${size}px`;
+            el.style.transform = `translate3d(calc(-50% + ${sx}px), calc(-50% + ${sy}px), 0)`;
             
             p.spinOffset = (p.spinOffset || 0) + p.spinSpeed * dt;
             // Wrap seamlessly at 33.3333% (one full tile of the 300% width texture)
@@ -209,9 +201,7 @@ export function PassingPlanets() {
             el.style.setProperty('--spin-offset', `${p.spinOffset}%`);
             
             el.style.setProperty('--p-opacity', opacity.toString());
-            // Cache zIndex to avoid redundant compositor layer re-sorts on unchanged values
-            const targetZ = p.z < 500 ? "50" : "1";
-            if (el.style.zIndex !== targetZ) el.style.zIndex = targetZ;
+            el.style.zIndex = p.z < 500 ? "50" : "1";
           }
         }
       }
@@ -731,16 +721,8 @@ function getPlanetStyles(p: Planet) {
               if (el) elementsRef.current.set(p.id, el);
               else elementsRef.current.delete(p.id);
             }}
-            className="absolute left-1/2 top-1/2 will-change-transform"
-            style={{
-              transformStyle: 'preserve-3d',
-              // Fixed size set ONCE at render — the RAF loop uses scale() in transform for visual sizing.
-              // This is the key to eliminating pre-collision rasterization bursts:
-              // the 300%×300% texture child stays at 3×baseSize CSS pixels forever,
-              // regardless of how close the planet gets.
-              width: `${p.baseSize}px`,
-              height: `${p.baseSize}px`,
-            }}
+            className="absolute rounded-full left-1/2 top-1/2 will-change-transform"
+            style={{ transformStyle: 'preserve-3d' }}
           >
             {/* Sphere Volume Container */}
             <div 
