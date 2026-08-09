@@ -163,18 +163,23 @@ export function PassingPlanets() {
           // Update DOM
           const el = elementsRef.current.get(p.id);
           if (el) {
-            // Cap the scale to prevent massive divs from crashing the GPU during pass-through
-            const scale = Math.max(0.01, Math.min(12, fov / Math.max(1, p.z)));
+            // Cap the scale strictly to prevent GPU tile allocation lag and grid artifacts
+            const scale = Math.max(0.01, Math.min(5, fov / Math.max(1, p.z)));
             const sx = p.x * scale;
             const sy = p.y * scale;
             const size = p.baseSize * scale;
-            // Opacity fades in from VERY far away, but stays solid if we are inside it
-            // It fades out if Z gets too small (behind camera) or > 25000
+            
             let opacity = 1;
             if (p.z > 15000) opacity = Math.max(0, (25000 - p.z) / 10000);
             
-            // Fade out aggressively when extremely close to prevent full-screen rendering lag
-            if (p.z < 300) opacity *= Math.max(0, (p.z + 100) / 400); 
+            // Fade out aggressively when close to prevent full-screen rendering lag
+            if (p.z < 800) opacity *= Math.max(0, (p.z) / 800); 
+
+            if (opacity < 0.005) {
+              el.style.display = 'none';
+            } else {
+              el.style.display = 'block';
+            }
 
             el.style.width = `${size}px`;
             el.style.height = `${size}px`;
@@ -391,16 +396,17 @@ function getPlanetStyles(p: Planet) {
 
   if (p.type === "gas") {
     surfaceBg = `
-      radial-gradient(ellipse at 50% 10%, hsla(${h}, 50%, 80%, 0.15) 0%, transparent 25%),
-      linear-gradient(
+      radial-gradient(circle at ${30 + p.seed * 40}% ${30 + p.seed * 40}%, hsla(${h}, 70%, 50%, 0.6) 0%, transparent 20%),
+      repeating-linear-gradient(
         ${(p.seed - 0.5) * 30}deg,
-        hsla(${h}, 80%, 35%, 1) 0%,
-        hsla(${h + 10}, 60%, 25%, 1) 15%,
-        hsla(${h - 15}, 70%, 45%, 1) 35%,
-        hsla(${h + 5}, 80%, 30%, 1) 50%,
-        hsla(${h - 10}, 60%, 20%, 1) 70%,
-        hsla(${h}, 75%, 40%, 1) 85%,
-        hsla(${h + 15}, 70%, 25%, 1) 100%
+        hsla(${h}, 60%, 35%, 1) 0%,
+        hsla(${h}, 60%, 35%, 1) 4%,
+        hsla(${h + 15}, 50%, 45%, 1) 4.1%,
+        hsla(${h + 15}, 50%, 45%, 1) 8%,
+        hsla(${h - 10}, 70%, 25%, 1) 8.1%,
+        hsla(${h - 10}, 70%, 25%, 1) 12%,
+        hsla(${h + 5}, 65%, 40%, 1) 12.1%,
+        hsla(${h + 5}, 65%, 40%, 1) 18%
       )
     `;
     surfaceTransform = `scale(1.02)`;
@@ -416,11 +422,11 @@ function getPlanetStyles(p: Planet) {
     }
   } else if (p.type === "ice") {
     surfaceBg = `
-      radial-gradient(circle at 30% 40%, hsla(${h}, 30%, 90%, 0.25) 0%, transparent 12%),
-      radial-gradient(circle at 70% 60%, hsla(${h}, 30%, 80%, 0.2) 0%, transparent 18%),
-      radial-gradient(circle at 40% 70%, hsla(${h}, 40%, 85%, 0.3) 0%, transparent 15%),
-      radial-gradient(circle at 60% 20%, hsla(${h}, 20%, 70%, 0.15) 0%, transparent 10%),
-      radial-gradient(circle at 35% 35%, hsla(${h}, 80%, 65%, 1) 0%, hsla(${h}, 70%, 50%, 1) 40%, hsla(${h}, 80%, 20%, 1) 100%)
+      radial-gradient(circle at 30% 40%, hsla(${h}, 30%, 90%, 0.5) 0%, transparent 20%),
+      radial-gradient(circle at 70% 60%, hsla(${h}, 30%, 80%, 0.4) 0%, transparent 25%),
+      linear-gradient(45deg, transparent 40%, hsla(${h}, 10%, 95%, 0.5) 45%, transparent 50%),
+      linear-gradient(-30deg, transparent 30%, hsla(${h}, 20%, 85%, 0.4) 35%, transparent 40%),
+      radial-gradient(circle at 35% 35%, hsla(${h}, 60%, 75%, 1) 0%, hsla(${h}, 70%, 50%, 1) 40%, hsla(${h}, 80%, 20%, 1) 100%)
     `;
     surfaceTransform = `rotate(${p.seed * 360}deg)`;
     atmosphereShadow = `radial-gradient(circle at 35% 35%, hsla(${h}, 50%, 95%, 0.4) 0%, transparent 50%), radial-gradient(circle at 75% 75%, transparent 35%, rgba(0,0,0,0.85) 80%, rgba(0,0,0,1) 100%)`;
@@ -437,9 +443,8 @@ function getPlanetStyles(p: Planet) {
     }
   } else if (p.type === "dark") {
     surfaceBg = `
-      radial-gradient(circle at ${40 + p.seed * 20}% ${40 + p.seed * 20}%, hsla(${h}, 100%, 85%, 0.9) 0%, transparent 25%),
-      radial-gradient(circle at 50% 50%, hsla(${h}, 100%, 60%, 0.8) 0%, hsla(${h}, 90%, 20%, 0.6) 45%, transparent 65%),
-      radial-gradient(circle at 50% 50%, #111 0%, #000 100%)
+      radial-gradient(circle at 50% 50%, #000 0%, #000 45%, hsla(${h}, 100%, 60%, 0.9) 48%, transparent 55%),
+      conic-gradient(from ${p.seed * 360}deg at 50% 50%, hsla(${h}, 100%, 50%, 0) 0%, hsla(${h}, 100%, 60%, 0.6) 20%, hsla(${h+30}, 100%, 80%, 0.9) 50%, hsla(${h}, 100%, 60%, 0.6) 80%, hsla(${h}, 100%, 50%, 0) 100%)
     `;
     surfaceTransform = `rotate(${p.seed * 180}deg)`;
     atmosphereShadow = `radial-gradient(circle at 50% 50%, transparent 60%, rgba(0,0,0,0.9) 95%, rgba(0,0,0,1) 100%)`;
@@ -455,11 +460,12 @@ function getPlanetStyles(p: Planet) {
   } else {
     // Nebula / Magma planet
     surfaceBg = `
-      radial-gradient(circle at 25% 30%, hsla(${h + 35}, 90%, 65%, 0.7) 0%, transparent 45%),
-      radial-gradient(circle at 75% 65%, hsla(${h - 25}, 90%, 65%, 0.6) 0%, transparent 40%),
-      radial-gradient(circle at 50% 80%, hsla(${h + 15}, 80%, 55%, 0.6) 0%, transparent 35%),
-      radial-gradient(circle at 50% 50%, hsla(${h}, 80%, 40%, 0.8) 0%, transparent 65%),
-      radial-gradient(circle at 40% 40%, hsla(${h}, 80%, 15%, 1) 0%, hsla(${h}, 90%, 5%, 1) 100%)
+      radial-gradient(circle at 25% 30%, hsla(${h + 35}, 90%, 65%, 0.8) 0%, transparent 40%),
+      radial-gradient(circle at 75% 65%, hsla(${h - 25}, 90%, 65%, 0.7) 0%, transparent 45%),
+      radial-gradient(circle at 50% 80%, hsla(${h + 15}, 80%, 55%, 0.7) 0%, transparent 35%),
+      radial-gradient(circle at 20% 70%, hsla(${h}, 100%, 80%, 0.9) 0%, transparent 25%),
+      radial-gradient(circle at 80% 20%, hsla(${h + 40}, 90%, 60%, 0.8) 0%, transparent 35%),
+      radial-gradient(circle at 50% 50%, hsla(${h}, 90%, 20%, 1) 0%, hsla(${h}, 100%, 5%, 1) 100%)
     `;
     surfaceTransform = `rotate(${p.seed * 360}deg) scale(1.1)`;
     atmosphereShadow = `radial-gradient(circle at 35% 35%, hsla(${h}, 50%, 80%, 0.2) 0%, transparent 50%), radial-gradient(circle at 70% 70%, transparent 40%, rgba(0,0,0,0.85) 80%, rgba(0,0,0,1) 100%)`;
@@ -501,7 +507,8 @@ function getPlanetStyles(p: Planet) {
                   background: styles.surfaceBg, 
                   transform: styles.surfaceTransform,
                   backgroundSize: '150% 150%',
-                  backgroundPosition: 'center'
+                  backgroundPosition: 'center',
+                  backgroundRepeat: 'no-repeat'
                 }} 
               />
               {/* Atmosphere / 3D Shading Layer */}
