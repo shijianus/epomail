@@ -135,7 +135,7 @@ export const CanvasBackground = forwardRef<CanvasHandle>((_props, ref) => {
     let stars: Star[] = [];
 
     const buildStars = () => {
-      const count = Math.round((width * height) / 600); // Increase density noticeably
+      const count = Math.round((width * height) / 200); // Extreme density for hyper-drive feel
       stars = Array.from({ length: count }, () => ({
         x: (Math.random() - 0.5) * 3500, // wider field
         y: (Math.random() - 0.5) * 3500,
