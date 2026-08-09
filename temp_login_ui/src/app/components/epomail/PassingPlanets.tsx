@@ -24,6 +24,7 @@ interface Planet {
   isHit: boolean;
   hitType: "dead-center" | "edge" | "pass-through" | "none";
   hasCollided: boolean;
+  baseHue: number;
 }
 
 export function PassingPlanets() {
@@ -35,6 +36,19 @@ export function PassingPlanets() {
   // State Machine for cinematic trajectory phases
   const flightPhaseRef = useRef<FlightPhase>("frontal");
   const phasePlanetsSpawned = useRef<number>(0);
+  const hueHistoryRef = useRef<number[]>([]);
+
+  function generateDistinctHue(): number {
+    let hue = 0;
+    let attempts = 0;
+    while (attempts < 20) {
+      hue = Math.floor(Math.random() * 360);
+      const isTooClose = hueHistoryRef.current.some(h => Math.min(Math.abs(h - hue), 360 - Math.abs(h - hue)) < 45);
+      if (!isTooClose) break;
+      attempts++;
+    }
+    return hue;
+  }
 
   useEffect(() => {
     let raf: number;
@@ -103,23 +117,23 @@ export function PassingPlanets() {
               }
             }
             
-            // EXACT PHASE TRANSITION PROBABILITIES AS REQUESTED
+            // PROBABILITIES: Lateral + Chase <= 10%
             const shiftRoll = Math.random();
             let nextPhase = p.phase;
             
             if (p.phase === "frontal") {
-               // 65% stay, 25% lateral, 10% chase
-               if (shiftRoll < 0.65) nextPhase = "frontal";
-               else if (shiftRoll < 0.90) nextPhase = "lateral";
+               // 90% stay, 8% lateral, 2% chase
+               if (shiftRoll < 0.90) nextPhase = "frontal";
+               else if (shiftRoll < 0.98) nextPhase = "lateral";
                else nextPhase = "chase";
             } else if (p.phase === "lateral") {
-               // 55% stay, 35% frontal, 10% chase
-               if (shiftRoll < 0.55) nextPhase = "lateral";
-               else if (shiftRoll < 0.90) nextPhase = "frontal";
+               // 90% stay, 9% frontal, 1% chase
+               if (shiftRoll < 0.90) nextPhase = "lateral";
+               else if (shiftRoll < 0.99) nextPhase = "frontal";
                else nextPhase = "chase";
             } else if (p.phase === "chase") {
-               // 60% stay, 39% lateral, 1% frontal
-               if (shiftRoll < 0.60) nextPhase = "chase";
+               // 90% stay, 9% lateral, 1% frontal
+               if (shiftRoll < 0.90) nextPhase = "chase";
                else if (shiftRoll < 0.99) nextPhase = "lateral";
                else {
                  nextPhase = "frontal";
@@ -162,7 +176,7 @@ export function PassingPlanets() {
             el.style.width = `${size}px`;
             el.style.height = `${size}px`;
             el.style.transform = `translate3d(calc(-50% + ${sx}px), calc(-50% + ${sy}px), 0)`;
-            el.style.opacity = opacity.toString();
+            el.style.setProperty('--p-opacity', opacity.toString());
             el.style.zIndex = p.z < 500 ? "50" : "1";
           }
         }
@@ -322,6 +336,10 @@ export function PassingPlanets() {
           }
         }
 
+        const h = generateDistinctHue();
+        hueHistoryRef.current.unshift(h);
+        if (hueHistoryRef.current.length > 5) hueHistoryRef.current.pop();
+
         const p: Planet = {
           id: Math.random().toString(36).substring(2, 9),
           type: types[Math.floor(Math.random() * types.length)],
@@ -337,6 +355,7 @@ export function PassingPlanets() {
           isHit,
           hitType,
           hasCollided: false,
+          baseHue: h,
         };
         
         planetsRef.current.push(p);
@@ -364,6 +383,8 @@ function getPlanetStyles(p: Planet) {
   let surfaceTransform = "";
   let outerGlow = "";
   let outerBorder = "none";
+  
+  const h = p.baseHue;
 
   if (p.type === "gas") {
     surfaceBg = `
@@ -371,27 +392,25 @@ function getPlanetStyles(p: Planet) {
         0deg,
         rgba(0,0,0,0.6) 0%,
         transparent 15%,
-        rgba(255,255,255,0.15) 25%,
+        hsla(${h}, 50%, 80%, 0.15) 25%,
         rgba(0,0,0,0.3) 32%,
         transparent 40%,
-        rgba(168,85,247,0.4) 50%,
+        hsla(${h}, 70%, 50%, 0.4) 50%,
         transparent 60%,
-        rgba(255,255,255,0.2) 75%,
+        hsla(${h}, 50%, 80%, 0.2) 75%,
         rgba(0,0,0,0.5) 85%,
         transparent 100%
       ),
-      linear-gradient(90deg, #312e81, #4c1d95, #581c87)
+      linear-gradient(90deg, hsla(${h}, 80%, 20%, 1), hsla(${h}, 80%, 40%, 1), hsla(${h + 20}, 80%, 30%, 1))
     `;
     surfaceTransform = `rotate(${(p.seed - 0.5) * 60}deg) scale(1.05)`;
-    atmosphereShadow = "inset 20px 20px 80px rgba(168,85,247,0.6), inset -50px -50px 120px rgba(0,0,0,0.95)";
-    outerGlow = "0 0 80px rgba(168,85,247,0.4)";
+    atmosphereShadow = `inset 20px 20px 80px hsla(${h}, 80%, 60%, 0.6), inset -50px -50px 120px rgba(0,0,0,0.95)`;
+    outerGlow = `0 0 80px hsla(${h}, 80%, 60%, 0.4)`;
     
     if (p.seed > 0.3) {
       ring = {
         transform: `rotateX(75deg) rotateY(${p.seed * 40 - 20}deg) scale(2.2)`,
-        background: 'radial-gradient(circle at center, transparent 50%, rgba(168,85,247,0.8) 51%, rgba(168,85,247,0.3) 62%, transparent 63%)',
-        WebkitMaskImage: 'linear-gradient(to bottom, transparent 48%, black 52%)',
-        maskImage: 'linear-gradient(to bottom, transparent 48%, black 52%)',
+        background: `radial-gradient(circle at center, transparent 48%, hsla(${h}, 70%, 60%, 0.8) 50%, hsla(${h}, 70%, 60%, 0.3) 62%, transparent 63%)`,
         borderRadius: "50%"
       };
     }
@@ -401,30 +420,28 @@ function getPlanetStyles(p: Planet) {
         45deg,
         transparent,
         transparent 10px,
-        rgba(255,255,255,0.2) 10px,
-        rgba(255,255,255,0.2) 12px
+        hsla(${h}, 50%, 90%, 0.2) 10px,
+        hsla(${h}, 50%, 90%, 0.2) 12px
       ),
       repeating-linear-gradient(
         -45deg,
         transparent,
         transparent 15px,
-        rgba(255,255,255,0.15) 15px,
-        rgba(255,255,255,0.15) 17px
+        hsla(${h}, 50%, 90%, 0.15) 15px,
+        hsla(${h}, 50%, 90%, 0.15) 17px
       ),
-      radial-gradient(circle at 35% 25%, #22d3ee, #0284c7 55%, #082f49 95%)
+      radial-gradient(circle at 35% 25%, hsla(${h}, 80%, 60%, 1), hsla(${h}, 80%, 40%, 1) 55%, hsla(${h}, 80%, 15%, 1) 95%)
     `;
     surfaceTransform = `rotate(${p.seed * 90}deg)`;
-    atmosphereShadow = "inset 15px 15px 60px rgba(255,255,255,0.7), inset -50px -50px 120px rgba(0,0,0,0.95)";
-    outerGlow = "0 0 60px rgba(103,232,249,0.4)";
+    atmosphereShadow = `inset 15px 15px 60px hsla(${h}, 20%, 90%, 0.7), inset -50px -50px 120px rgba(0,0,0,0.95)`;
+    outerGlow = `0 0 60px hsla(${h}, 80%, 60%, 0.4)`;
     
     if (p.seed > 0.5) {
       ring = {
         transform: `rotateX(78deg) rotateY(${-p.seed * 40}deg) scale(2.4)`,
-        border: "6px solid rgba(255,255,255,0.25)",
-        borderTopColor: "rgba(103,232,249,0.9)",
-        boxShadow: "0 0 30px rgba(103,232,249,0.7)",
-        WebkitMaskImage: 'linear-gradient(to bottom, transparent 48%, black 52%)',
-        maskImage: 'linear-gradient(to bottom, transparent 48%, black 52%)',
+        border: `6px solid hsla(${h}, 50%, 90%, 0.25)`,
+        borderTopColor: `hsla(${h}, 80%, 70%, 0.9)`,
+        boxShadow: `0 0 30px hsla(${h}, 80%, 60%, 0.7)`,
         borderRadius: "50%"
       };
     }
@@ -434,22 +451,20 @@ function getPlanetStyles(p: Planet) {
         from 0deg,
         transparent 0deg,
         transparent 15deg,
-        rgba(168,85,247,0.25) 15deg,
-        rgba(168,85,247,0.25) 16deg
+        hsla(${h}, 80%, 50%, 0.25) 15deg,
+        hsla(${h}, 80%, 50%, 0.25) 16deg
       ),
-      radial-gradient(circle at 50% 50%, #000 35%, #1e1b4b 85%, #000 100%)
+      radial-gradient(circle at 50% 50%, #000 35%, hsla(${h}, 80%, 15%, 1) 85%, #000 100%)
     `;
     surfaceTransform = `rotate(${p.seed * 180}deg) scale(1.05)`;
     atmosphereShadow = "inset 0 0 50px rgba(0,0,0,1)";
-    outerGlow = "0 0 150px rgba(168,85,247,0.9), 0 0 250px rgba(99,102,241,0.7)";
-    outerBorder = "2px solid rgba(168,85,247,0.8)";
+    outerGlow = `0 0 150px hsla(${h}, 80%, 50%, 0.9), 0 0 250px hsla(${h + 30}, 80%, 40%, 0.7)`;
+    outerBorder = `2px solid hsla(${h}, 80%, 50%, 0.8)`;
     
     ring = {
       transform: `rotateX(70deg) rotateY(${p.seed * 180}deg) scale(2.8)`,
-      border: "3px solid rgba(103,232,249,0.9)",
-      boxShadow: "0 0 80px rgba(103,232,249,1), inset 0 0 40px rgba(103,232,249,0.8)",
-      WebkitMaskImage: 'linear-gradient(to bottom, transparent 48%, black 52%)',
-      maskImage: 'linear-gradient(to bottom, transparent 48%, black 52%)',
+      border: `3px solid hsla(${h}, 80%, 60%, 0.9)`,
+      boxShadow: `0 0 80px hsla(${h}, 80%, 60%, 1), inset 0 0 40px hsla(${h}, 80%, 60%, 0.8)`,
       borderRadius: "50%"
     };
   } else {
@@ -461,14 +476,14 @@ function getPlanetStyles(p: Planet) {
       repeating-radial-gradient(
         circle at 40% 40%,
         transparent 0,
-        rgba(255,255,255,0.1) 4%,
+        hsla(${h}, 50%, 90%, 0.1) 4%,
         transparent 8%
       ),
-      radial-gradient(circle at 35% 35%, #f472b6, #be185d 55%, #4c0519 95%)
+      radial-gradient(circle at 35% 35%, hsla(${h}, 80%, 60%, 1), hsla(${h - 20}, 80%, 40%, 1) 55%, hsla(${h}, 90%, 10%, 1) 95%)
     `;
     surfaceTransform = `rotate(${p.seed * 360}deg) scale(1.1)`;
-    atmosphereShadow = "inset 20px 20px 60px rgba(244,114,182,0.7), inset -50px -50px 110px rgba(0,0,0,0.95)";
-    outerGlow = "0 0 70px rgba(244,114,182,0.4)";
+    atmosphereShadow = `inset 20px 20px 60px hsla(${h}, 80%, 60%, 0.7), inset -50px -50px 110px rgba(0,0,0,0.95)`;
+    outerGlow = `0 0 70px hsla(${h}, 80%, 60%, 0.4)`;
   }
 
   return { surfaceBg, atmosphereShadow, ring, surfaceTransform, outerGlow, outerBorder };
@@ -487,14 +502,16 @@ function getPlanetStyles(p: Planet) {
               else elementsRef.current.delete(p.id);
             }}
             className="absolute rounded-full left-1/2 top-1/2 will-change-transform"
-            style={{ opacity: 0 }}
+            style={{ transformStyle: 'preserve-3d' }}
           >
             {/* Sphere Volume Container */}
             <div 
               className="absolute inset-0 rounded-full overflow-hidden"
               style={{
                 boxShadow: styles.outerGlow,
-                border: styles.outerBorder
+                border: styles.outerBorder,
+                opacity: 'var(--p-opacity, 0)',
+                transform: 'translateZ(0)' // Anchor for 3D intersection
               }}
             >
               {/* Texture Layer */}
@@ -514,11 +531,14 @@ function getPlanetStyles(p: Planet) {
               />
             </div>
 
-            {/* Occlusion-Masked Ring Layer */}
+            {/* Complete 360-Degree Ring Layer (Preserve-3D Occlusion) */}
             {styles.ring && (
               <div
                 className="absolute inset-0 rounded-full"
-                style={styles.ring}
+                style={{
+                  ...styles.ring,
+                  opacity: 'var(--p-opacity, 0)'
+                }}
               />
             )}
           </div>
