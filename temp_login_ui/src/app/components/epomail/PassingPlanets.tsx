@@ -178,11 +178,8 @@ export function PassingPlanets() {
             // Fade out aggressively when close to prevent full-screen rendering lag
             if (p.z < 800) opacity *= Math.max(0, (p.z) / 800); 
 
-            if (opacity < 0.005) {
-              el.style.display = 'none';
-            } else {
-              el.style.display = 'block';
-            }
+            // Removed display: none toggle which caused massive layout reflow stutters.
+            // Opacity and pointer-events-none handle invisibility efficiently.
 
             el.style.width = `${size}px`;
             el.style.height = `${size}px`;
@@ -373,7 +370,7 @@ export function PassingPlanets() {
           hitType,
           hasCollided: false,
           baseHue: h,
-          spinSpeed: (Math.random() < 0.5 ? 1 : -1) * (Math.random() * 5 + 3), // 3 to 8% per second
+          spinSpeed: (Math.random() < 0.5 ? 1 : -1) * (Math.random() * 15 + 10), // 10 to 25% per second (Highly noticeable)
           axialTilt: (Math.random() - 0.5) * 60, // -30 to 30 degrees
           spinOffset: 0,
         };
@@ -417,6 +414,8 @@ function getPlanetStyles(p: Planet) {
     return (seedVal - 1) / 2147483646;
   };
   rand(); rand(); rand(); // Mix initial
+
+  const complexity = rand();
 
   if (p.type === "gas") {
     let storms = [];
@@ -476,29 +475,29 @@ function getPlanetStyles(p: Planet) {
       }
     }
   } else if (p.type === "ice") {
-    let craters = [];
-    const numCraters = Math.floor(rand() * 25) + 15;
-    for (let i = 0; i < numCraters; i++) {
-      const x = rand() * 100;
-      const y = rand() * 100;
-      const r = rand() * 2 + 0.5;
-      const op = rand() * 0.6 + 0.3;
-      const c = rand() > 0.7 ? h2 : h;
-      craters.push(`radial-gradient(circle at ${x}% ${y}%, hsla(${c}, 40%, 90%, ${op}) 0%, transparent ${r}%)`);
+    if (complexity < 0.25) {
+      // Pure Minimalist Ice Planet
+      surfaceBg = `
+        radial-gradient(ellipse at 30% 60%, hsla(${h2}, 30%, 80%, 0.4) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 20%, hsla(${h3}, 20%, 90%, 0.3) 0%, transparent 60%),
+        hsla(${h}, 50%, 70%, 1)
+      `;
+    } else {
+      // Organic Blobby Ice (No straight cracks)
+      let blobs = [];
+      const numBlobs = Math.floor(rand() * 20) + 15;
+      for (let i = 0; i < numBlobs; i++) {
+        const x = rand() * 100;
+        const y = rand() * 100;
+        const rx = rand() * 15 + 3;
+        const ry = rand() * 6 + 2; 
+        const c = rand() > 0.6 ? h2 : h;
+        blobs.push(`radial-gradient(ellipse ${rx}% ${ry}% at ${x}% ${y}%, hsla(${c}, 40%, 95%, 0.8) 0%, hsla(${h3}, 30%, 80%, 0.3) 60%, transparent 100%)`);
+      }
+      const baseIce = `hsla(${h}, 50%, 65%, 1)`;
+      surfaceBg = [...blobs, baseIce].join(', ');
     }
-    
-    let cracks = [];
-    const numCracks = Math.floor(rand() * 15) + 8;
-    for (let i = 0; i < numCracks; i++) {
-      const angle = rand() * 360;
-      const pos = rand() * 100;
-      const width = rand() * 0.4 + 0.1;
-      cracks.push(`linear-gradient(${angle}deg, transparent ${pos}%, hsla(${h3}, 40%, 100%, 0.9) ${pos + width/2}%, hsla(${h}, 30%, 80%, 0.5) ${pos + width}, transparent ${pos + width*1.5}%)`);
-    }
-    
-    // Solid flat base so it repeats seamlessly without a visible seam
-    const baseIce = `hsla(${h}, 60%, 65%, 1)`;
-    surfaceBg = [...craters, ...cracks, baseIce].join(', ');
+
     atmosphereShadow = `
       radial-gradient(circle at 30% 30%, hsla(${h}, 50%, 95%, 0.5) 0%, transparent 45%), 
       radial-gradient(circle at 75% 75%, transparent 35%, rgba(0,0,0,0.95) 75%, rgba(0,0,0,1) 100%),
@@ -515,36 +514,44 @@ function getPlanetStyles(p: Planet) {
       });
     }
   } else if (p.type === "dark") {
-    let flares = [];
-    const numFlares = Math.floor(rand() * 7) + 4;
-    for (let i = 0; i < numFlares; i++) {
-      const x = rand() * 60 + 20; 
-      const y = rand() * 60 + 20;
-      const op = rand() * 0.6 + 0.4;
-      const r = rand() * 10 + 5;
-      const c = rand() > 0.5 ? h2 : h3;
-      flares.push(`radial-gradient(circle at ${x}% ${y}%, hsla(${c}, 100%, 60%, ${op}) 0%, transparent ${r}%)`);
+    if (complexity < 0.2) {
+      // Pure Void Planet
+      surfaceBg = `
+        radial-gradient(ellipse at 50% 50%, hsla(${h}, 50%, 15%, 0.6) 0%, transparent 60%),
+        hsla(${h3}, 10%, 5%, 1)
+      `;
+    } else {
+      let flares = [];
+      const numFlares = Math.floor(rand() * 8) + 5;
+      for (let i = 0; i < numFlares; i++) {
+        const x = rand() * 100; 
+        const y = rand() * 100;
+        const rx = rand() * 20 + 5;
+        const ry = rand() * 10 + 3;
+        const c = rand() > 0.5 ? h2 : h3;
+        flares.push(`radial-gradient(ellipse ${rx}% ${ry}% at ${x}% ${y}%, hsla(${c}, 100%, 50%, 0.7) 0%, transparent 100%)`);
+      }
+      
+      let conicStops = [];
+      let currentAngle = 0;
+      while(currentAngle < 100) {
+         const isFlare = rand() > 0.5;
+         const step = rand() * 8 + 3;
+         if (isFlare) {
+            const c = rand() > 0.5 ? h : h2;
+            conicStops.push(`hsla(${c}, 100%, ${rand()*40 + 50}%, ${rand()*0.6 + 0.4}) ${currentAngle}%`);
+         } else {
+            conicStops.push(`hsla(${h}, 100%, 50%, 0) ${currentAngle}%`);
+         }
+         currentAngle += step;
+      }
+      conicStops.push(`hsla(${h}, 100%, 50%, 0) 100%`);
+      
+      const accretion = `conic-gradient(from ${rand() * 360}deg at 50% 50%, ${conicStops.join(", ")})`;
+      const baseDark = `hsla(${h}, 10%, 8%, 1)`;
+      surfaceBg = [...flares, accretion, baseDark].join(', ');
     }
-    
-    let conicStops = [];
-    let currentAngle = 0;
-    while(currentAngle < 100) {
-       const isFlare = rand() > 0.5;
-       const step = rand() * 8 + 3;
-       if (isFlare) {
-          const c = rand() > 0.5 ? h : h2;
-          conicStops.push(`hsla(${c}, 100%, ${rand()*40 + 50}%, ${rand()*0.6 + 0.4}) ${currentAngle}%`);
-       } else {
-          conicStops.push(`hsla(${h}, 100%, 50%, 0) ${currentAngle}%`);
-       }
-       currentAngle += step;
-    }
-    conicStops.push(`hsla(${h}, 100%, 50%, 0) 100%`);
-    
-    const accretion = `conic-gradient(from ${rand() * 360}deg at 50% 50%, ${conicStops.join(", ")})`;
-    const baseDark = `hsla(${h}, 10%, 10%, 1)`;
-    
-    surfaceBg = [...flares, accretion, baseDark].join(', ');
+
     atmosphereShadow = `
       radial-gradient(circle at 40% 40%, hsla(${h}, 50%, 80%, 0.3) 0%, transparent 40%),
       radial-gradient(circle at 70% 70%, transparent 40%, rgba(0,0,0,0.95) 75%, rgba(0,0,0,1) 100%),
@@ -569,30 +576,29 @@ function getPlanetStyles(p: Planet) {
       });
     }
   } else {
-    let rivers = [];
-    const numRivers = Math.floor(rand() * 18) + 8;
-    for (let i = 0; i < numRivers; i++) {
-      const angle = rand() * 360;
-      const pos = rand() * 100;
-      const width = rand() * 1.5 + 0.3;
-      const bright = rand() > 0.5 ? 70 : 50;
-      const c = rand() > 0.5 ? h2 : h;
-      rivers.push(`linear-gradient(${angle}deg, transparent ${pos}%, hsla(${c}, 100%, ${bright}%, 0.9) ${pos + width/2}%, transparent ${pos + width}%)`);
+    if (complexity < 0.25) {
+      // Pure Obsidian/Magma Planet
+      surfaceBg = `
+        radial-gradient(ellipse at 40% 60%, hsla(${h}, 100%, 30%, 0.4) 0%, transparent 60%),
+        hsla(${h3}, 100%, 8%, 1)
+      `;
+    } else {
+      // Organic Magma Lakes (No straight rivers)
+      let lakes = [];
+      const numLakes = Math.floor(rand() * 15) + 8;
+      for (let i = 0; i < numLakes; i++) {
+        const x = rand() * 100;
+        const y = rand() * 100;
+        const rx = rand() * 18 + 4;
+        const ry = rand() * 8 + 2;
+        const bright = rand() > 0.5 ? 65 : 45;
+        const c = rand() > 0.5 ? h2 : h;
+        lakes.push(`radial-gradient(ellipse ${rx}% ${ry}% at ${x}% ${y}%, hsla(${c}, 100%, ${bright}%, 0.95) 0%, hsla(${h3}, 100%, 25%, 0.6) 50%, transparent 100%)`);
+      }
+      const baseMagma = `hsla(${h3}, 100%, 10%, 1)`;
+      surfaceBg = [...lakes, baseMagma].join(', ');
     }
     
-    let hotspots = [];
-    const numSpots = Math.floor(rand() * 10) + 5;
-    for (let i = 0; i < numSpots; i++) {
-      const x = rand() * 100;
-      const y = rand() * 100;
-      const r = rand() * 5 + 2;
-      const c = rand() > 0.5 ? h3 : h2;
-      hotspots.push(`radial-gradient(circle at ${x}% ${y}%, hsla(${c}, 100%, 65%, 0.9) 0%, transparent ${r}%)`);
-    }
-    
-    const baseMagma = `hsla(${h3}, 100%, 10%, 1)`;
-    
-    surfaceBg = [...hotspots, ...rivers, baseMagma].join(', ');
     atmosphereShadow = `
       radial-gradient(circle at 35% 35%, hsla(${h}, 50%, 80%, 0.3) 0%, transparent 40%),
       radial-gradient(circle at 70% 70%, transparent 40%, rgba(0,0,0,0.95) 75%, rgba(0,0,0,1) 100%),
