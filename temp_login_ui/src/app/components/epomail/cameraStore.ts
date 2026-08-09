@@ -9,7 +9,6 @@ export const cameraState = {
   shakeIntensity: 0,
   overlayOpacity: 0,
   overlayColor: "rgba(255,255,255,1)",
-  cometTriggerCount: 0,
 };
 
 export function updateCameraPhysics(dt: number) {
