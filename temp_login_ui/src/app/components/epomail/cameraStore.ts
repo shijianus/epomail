@@ -9,6 +9,7 @@ export const cameraState = {
   shakeIntensity: 0,
   overlayOpacity: 0,
   overlayColor: "rgba(255,255,255,1)",
+  warningOpacity: 0,
   // Internal state for smooth chaotic shake
   _targetShakeX: 0,
   _targetShakeY: 0,
@@ -52,5 +53,11 @@ export function updateCameraPhysics(dt: number) {
   if (cameraState.overlayOpacity > 0) {
     cameraState.overlayOpacity -= dt * 0.8;
     if (cameraState.overlayOpacity < 0) cameraState.overlayOpacity = 0;
+  }
+
+  // Warning border fade (lasting ~3 seconds: 1.0 / 3 ≈ 0.33 per second)
+  if (cameraState.warningOpacity > 0) {
+    cameraState.warningOpacity -= dt * 0.33;
+    if (cameraState.warningOpacity < 0) cameraState.warningOpacity = 0;
   }
 }

@@ -95,6 +95,7 @@ export function PassingPlanets() {
               else if (p.type === 'dark') cameraState.overlayColor = "rgba(0,0,0,1)";
               else cameraState.overlayColor = "rgba(244,114,182,0.95)";
             } else if (p.hitType === "dead-center") {
+              cameraState.warningOpacity = 1; // Trigger warning UI
               if (p.phase === "frontal") {
                 cameraState.vz = -4.0; // Knock-back
                 cameraState.shakeIntensity = 80;
@@ -106,6 +107,7 @@ export function PassingPlanets() {
                 p.vz = 5000; // Bounce backwards relative to camera
               }
             } else if (p.hitType === "edge") {
+              cameraState.warningOpacity = 1; // Trigger warning UI
               const angle = Math.atan2(p.y, p.x);
               if (p.phase === "lateral" && Math.abs(p.vz) < 500) {
                 // Pure lateral collision

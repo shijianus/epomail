@@ -9,6 +9,7 @@ export default function App() {
   const canvasRef = useRef<CanvasHandle | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
+  const warningRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let raf: number;
@@ -26,6 +27,11 @@ export default function App() {
         overlayRef.current.style.opacity = cameraState.overlayOpacity.toString();
         overlayRef.current.style.background = cameraState.overlayColor;
         overlayRef.current.style.pointerEvents = cameraState.overlayOpacity > 0 ? "auto" : "none";
+      }
+      
+      // Apply warning border
+      if (warningRef.current) {
+        warningRef.current.style.opacity = cameraState.warningOpacity.toString();
       }
 
       raf = requestAnimationFrame(loop);
@@ -53,6 +59,19 @@ export default function App() {
         ref={overlayRef}
         className="fixed inset-0 z-50 transition-colors duration-0"
         style={{ opacity: 0, pointerEvents: 'none', willChange: 'opacity, background-color', transform: 'translateZ(0)' }}
+      />
+      
+      {/* Red warning border on collision */}
+      <div 
+        ref={warningRef}
+        className="fixed inset-0 z-[60] pointer-events-none"
+        style={{ 
+          boxShadow: 'inset 0 0 150px 20px rgba(220, 38, 38, 0.65)',
+          border: '6px solid rgba(220, 38, 38, 0.85)',
+          opacity: 0, 
+          willChange: 'opacity', 
+          transform: 'translateZ(0)' 
+        }}
       />
     </>
   );
