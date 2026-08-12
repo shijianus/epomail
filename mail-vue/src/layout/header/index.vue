@@ -1,27 +1,42 @@
 <template>
   <div class="topbar" :class="!hasPerm('email:send') ? 'not-send' : ''">
-    <button class="brand-toggle" id="sidebarToggle" @click="changeAside">
-      <img src="/logo.svg" alt="Logo" class="brand-logo" />
-      <span class="brand-name">EpoCanvas</span>
-    </button>
-
-    <div class="topbar-search">
-      <span class="search-icon"><Icon icon="lucide:search" width="16" height="16"/></span>
-      <input type="text" :placeholder="$t('search') || '搜索邮件、联系人、文件…'" />
+    <!-- Left Section: Hamburger + Logo -->
+    <div class="topbar-left">
+      <div class="hamburger-wrapper" @click="changeAside" :title="$t('toggleSidebar') || 'Toggle Sidebar'">
+        <Icon icon="lucide:menu" width="24" height="24" class="hamburger-icon"/>
+      </div>
+      <div class="brand-wrapper" @click="router.push({name: 'email'})" style="cursor:pointer">
+        <img src="/logo.svg" alt="Logo" class="brand-logo" />
+        <span class="brand-name">EpoCanvas</span>
+      </div>
     </div>
 
+    <!-- Middle Section: Search -->
+    <div class="topbar-search">
+      <div class="search-box">
+        <span class="search-icon"><Icon icon="lucide:search" width="20" height="20"/></span>
+        <input type="text" :placeholder="$t('search') || 'Search mail'" />
+      </div>
+    </div>
+
+    <!-- Right Section: Actions & Avatar -->
     <div class="topbar-actions">
       <el-tooltip :content="uiStore.dark ? ($t('lightMode') || 'Light Mode') : ($t('darkMode') || 'Dark Mode')" placement="bottom">
         <button v-if="uiStore.dark" class="icon-btn" @click="openDark($event)">
-          <Icon icon="lucide:sun" width="20" height="20"/>
+          <Icon icon="lucide:sun" width="22" height="22"/>
         </button>
         <button v-else class="icon-btn" @click="openDark($event)">
-          <Icon icon="lucide:moon" width="20" height="20"/>
+          <Icon icon="lucide:moon" width="22" height="22"/>
+        </button>
+      </el-tooltip>
+      <el-tooltip :content="$t('help') || 'Support'" placement="bottom">
+        <button class="icon-btn">
+          <Icon icon="lucide:help-circle" width="22" height="22"/>
         </button>
       </el-tooltip>
       <el-tooltip :content="$t('notice') || 'Notice'" placement="bottom">
         <button class="icon-btn" @click="openNotice">
-          <Icon icon="lucide:bell" width="20" height="20"/>
+          <Icon icon="lucide:bell" width="22" height="22"/>
           <span class="badge"></span>
         </button>
       </el-tooltip>
@@ -50,7 +65,7 @@
               </div>
             </div>
             <div class="am-item"><Icon class="ic ic-sm" icon="lucide:user" /><span>Account Details</span></div>
-            <div class="am-item"><Icon class="ic ic-sm" icon="lucide:settings" /><span>Settings</span></div>
+            <div class="am-item" @click="router.push({name: 'setting'})"><Icon class="ic ic-sm" icon="lucide:settings" /><span>Settings</span></div>
             <div class="am-item logout" @click="clickLogout"><Icon class="ic ic-sm" icon="lucide:log-out" /><span>{{ $t('logOut') }}</span></div>
           </div>
         </template>
@@ -287,123 +302,175 @@ function formatName(email) {
 </style>
 <style lang="scss" scoped>
 .topbar { 
-  height: 56px; 
-  background: var(--bg-surface); 
+  height: 100%; 
+  background: transparent; 
   display: flex; 
   align-items: center; 
-  gap: 16px; 
+  justify-content: space-between;
   padding: 0 16px; 
-  flex-shrink: 0; 
-  z-index: 100; 
 }
-.brand-toggle { 
+
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 238px;
+}
+
+.hamburger-wrapper {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: background .15s;
+}
+
+.hamburger-wrapper:hover {
+  background: var(--bg-hover);
+}
+
+.brand-wrapper { 
   display: flex; 
   align-items: center; 
   gap: 10px; 
-  background: none; 
-  border: none; 
   cursor: pointer; 
-  padding: 0; 
+  transition: opacity .15s;
 }
+.brand-wrapper:active {
+  opacity: 0.7;
+}
+
 .brand-logo { 
-  width: 28px; 
-  height: 28px; 
+  width: 32px; 
+  height: 32px; 
   object-fit: contain;
-  transition: transform .25s var(--ease);
-  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.1));
+  transition: transform .25s var(--ease, cubic-bezier(0.4,0,0.2,1));
 }
-.brand-toggle:hover .brand-logo { transform: rotate(-8deg) scale(1.05); }
-.brand-toggle:active .brand-logo { transform: scale(.92); }
+.brand-wrapper:hover .brand-logo { transform: rotate(-8deg) scale(1.05); }
+
 .brand-name { 
-  font-size: 16px; 
+  font-size: 18px; 
   font-weight: 700; 
   background: linear-gradient(90deg, #8b9cff, #b07ff5); 
   -webkit-background-clip: text; 
   -webkit-text-fill-color: transparent; 
   letter-spacing: .5px; 
 }
+
 .topbar-search { 
   flex: 1; 
-  max-width: 580px; 
-  position: relative; 
-  margin: 0 24px;
+  max-width: 720px; 
+  display: flex;
+  justify-content: flex-start;
+  padding: 0 24px;
 }
-.topbar-search input { 
+
+.search-box {
+  width: 100%;
+  position: relative;
+}
+
+.search-box input { 
   width: 100%; 
-  height: 36px; 
+  height: 48px; 
   background: var(--bg-elevated); 
-  border: 1px solid var(--border-mid); 
-  border-radius: 18px; 
+  border: 1px solid transparent; 
+  border-radius: 24px; 
   color: var(--text-primary); 
-  padding: 0 16px 0 40px; 
-  font-size: 13.5px; 
+  padding: 0 16px 0 52px; 
+  font-size: 15px; 
   outline: none; 
-  transition: border-color .2s, box-shadow .2s; 
+  transition: background .15s, border-color .15s, box-shadow .15s; 
 }
-.topbar-search input::placeholder { color: var(--text-muted); }
-.topbar-search input:focus { border-color: var(--accent-primary); box-shadow: 0 0 0 3px var(--accent-glow); }
-.topbar-search .search-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--text-muted); pointer-events: none; }
-.topbar-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.search-box input::placeholder { color: var(--text-muted); font-size: 14.5px; }
+.search-box input:focus { 
+  background: var(--bg-surface);
+  border-color: var(--border-mid); 
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08); 
+}
+.search-box input:hover:not(:focus) {
+  background: var(--bg-hover);
+}
+
+.search-box .search-icon { 
+  position: absolute; 
+  left: 18px; 
+  top: 50%; 
+  transform: translateY(-50%); 
+  color: var(--text-muted); 
+  pointer-events: none; 
+}
+
+.topbar-actions { 
+  display: flex; 
+  align-items: center; 
+  gap: 6px; 
+  padding-right: 8px;
+}
+
 .icon-btn { 
-  width: 36px; 
-  height: 36px; 
+  width: 40px; 
+  height: 40px; 
   border: none; 
   background: transparent; 
   cursor: pointer; 
   color: var(--text-secondary); 
-  border-radius: 10px; 
+  border-radius: 50%; 
   display: flex; 
   align-items: center; 
   justify-content: center; 
-  transition: background .15s, color .15s, transform .1s; 
+  transition: background .15s, color .15s; 
   position: relative; 
-  overflow: hidden; 
 }
 .icon-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
-.icon-btn:active { transform: scale(.9); }
 .icon-btn .badge { 
   position: absolute; 
-  top: 7px; 
-  right: 7px; 
+  top: 9px; 
+  right: 9px; 
   width: 8px; 
   height: 8px; 
   background: var(--accent-primary); 
   border-radius: 50%; 
   border: 2px solid var(--bg-surface); 
-  animation: pulse 2s var(--ease) infinite; 
 }
-@keyframes pulse { 0%,100%{box-shadow:0 0 0 0 rgba(91,110,245,.5);} 50%{box-shadow:0 0 0 4px rgba(91,110,245,0);} }
-.avatar-wrap { position: relative; display: flex; align-items: center; margin-left: 4px;}
+
+.avatar-wrap { 
+  margin-left: 8px;
+}
 .avatar { 
-  width: 32px; 
-  height: 32px; 
+  width: 36px; 
+  height: 36px; 
   border-radius: 50%; 
   background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary)); 
   display: flex; 
   align-items: center; 
   justify-content: center; 
-  font-size: 13px; 
+  font-size: 14px; 
   font-weight: 700; 
   color: #fff; 
   cursor: pointer; 
-  border: 2px solid var(--border-mid); 
-  transition: border-color .2s, transform .15s; 
+  border: 2px solid transparent; 
+  transition: border-color .15s, transform .15s; 
 }
-.avatar:hover { border-color: var(--accent-primary); transform: scale(1.05); }
+.avatar:hover { border-color: var(--border-mid); transform: scale(1.02); }
 
 /* Account Menu Dropdown */
-.account-menu { width: 264px; background: transparent; }
-.am-header { padding: 16px; display: flex; gap: 12px; align-items: center; background: linear-gradient(135deg, rgba(91,110,245,.2), rgba(124,92,191,.2)); border-bottom: 1px solid var(--border-subtle); }
+.account-menu { width: 280px; background: transparent; }
+.am-header { padding: 16px; display: flex; gap: 12px; align-items: center; background: linear-gradient(135deg, rgba(91,110,245,.1), rgba(124,92,191,.1)); border-bottom: 1px solid var(--border-subtle); }
 .am-avatar { width: 44px; height: 44px; border-radius: 50%; background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary)); display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 700; color: #fff; flex-shrink: 0; }
 .am-name { font-size: 14px; font-weight: 700; color: var(--text-primary); text-align: left; }
-.am-email { font-size: 11px; color: var(--text-muted); text-align: left;}
+.am-email { font-size: 12px; color: var(--text-muted); text-align: left;}
 .am-status { display: flex; align-items: center; gap: 5px; margin-top: 3px; }
-.am-status span { font-size: 10.5px; color: var(--success); }
+.am-status span { font-size: 11px; color: var(--success); }
 .am-storage { padding: 12px 16px; border-bottom: 1px solid var(--border-subtle); }
 .am-storage-label { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-secondary); margin-bottom: 6px; }
 .storage-bar { height: 6px; background: var(--bg-hover); border-radius: 3px; overflow: hidden; }
 .storage-fill { height: 100%; background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary)); border-radius: 3px; transition: width .3s ease; }
-.am-item { padding: 10px 16px; display: flex; align-items: center; gap: 11px; cursor: pointer; color: var(--text-secondary); font-size: 13px; transition: background .15s, color .15s; }
+.am-item { padding: 10px 16px; display: flex; align-items: center; gap: 12px; cursor: pointer; color: var(--text-secondary); font-size: 13.5px; transition: background .15s, color .15s; }
 .am-item:hover { background: var(--bg-hover); color: var(--text-primary); }
 .am-item.logout:hover { color: var(--danger); }
 .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--success); box-shadow: 0 0 6px var(--success); }

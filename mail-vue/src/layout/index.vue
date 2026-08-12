@@ -1,10 +1,11 @@
 <template>
   <el-container class="layout" direction="vertical">
-    <el-header>
-        <Header />
+    <el-header class="custom-header">
+      <Header />
     </el-header>
     <el-container class="body-container">
       <el-aside
+          v-show="!isSettingsMode"
           class="aside"
           :class="uiStore.asideShow ? 'aside-show' : 'el-aside-hide'">
         <Aside />
@@ -19,6 +20,9 @@
         </el-main>
       </el-container>
     </el-container>
+    <el-footer class="custom-footer" height="22px">
+      <StatusBar />
+    </el-footer>
   </el-container>
   <writer ref="writerRef" />
 </template>
@@ -27,13 +31,21 @@
 import Aside from '@/layout/aside/index.vue'
 import Header from '@/layout/header/index.vue'
 import Main from '@/layout/main/index.vue'
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+import StatusBar from '@/layout/status-bar/index.vue'
+import { ref, onMounted, onBeforeUnmount, computed } from 'vue'
 import {useUiStore} from "@/store/ui.js";
+import {useRoute} from "vue-router";
 import writer from '@/layout/write/index.vue'
 
 const uiStore = useUiStore();
+const route = useRoute();
 const writerRef = ref({})
 const isMobile = ref(window.innerWidth < 1025)
+
+const isSettingsMode = computed(() => {
+  return ['setting', 'analysis', 'user', 'all-email', 'role', 'reg-key', 'sys-setting'].includes(route.name)
+})
+
 const handleResize = () => {
   isMobile.value = window.innerWidth < 1025
   uiStore.asideShow = window.innerWidth > 1024;
@@ -52,6 +64,22 @@ onBeforeUnmount(() => {
 </script>
 
 <style lang="scss" scoped>
+.custom-header {
+  height: 64px;
+  padding: 0;
+  border-bottom: 1px solid var(--border-subtle, var(--el-border-color));
+  background: var(--bg-surface, var(--el-bg-color));
+}
+
+.custom-footer {
+  padding: 0;
+  height: 22px;
+  background: var(--bg-surface, var(--el-bg-color));
+  border-top: 1px solid var(--border-subtle, var(--el-border-color));
+  display: flex;
+  align-items: center;
+}
+
 .el-aside-hide {
   transition: all 0.2s ease;
   z-index: 100;
@@ -70,18 +98,18 @@ onBeforeUnmount(() => {
     position: fixed;
     top: 0;
     left: 0;
-    height: 100%;
-    background: var(--el-bg-color);
+    height: calc(100% - 64px - 22px);
+    background: var(--bg-surface, var(--el-bg-color));
     transform: translateX(0);
-    box-shadow: var(--aside-right-border);
+    box-shadow: 2px 0 8px rgba(0,0,0,0.1);
   }
 }
 
-.el-aside {
+.aside {
   width: auto;
   transition: width 0.2s ease;
-  background: var(--aside-backgound);
-  border-right: var(--aside-right-border);
+  background: var(--bg-surface, var(--el-bg-color));
+  border-right: 1px solid var(--border-subtle, var(--el-border-color));
 }
 
 .layout {
@@ -91,6 +119,7 @@ onBeforeUnmount(() => {
   top: 0;
   left: 0;
   overflow: hidden;
+  background: var(--bg-base, #f4f7fc);
 }
 
 .body-container {
@@ -101,28 +130,22 @@ onBeforeUnmount(() => {
 
 .main-container {
   height: 100%;
-  background: var(--base-fill);
+  background: var(--bg-base, #f4f7fc);
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
 }
 
 .el-main {
   padding: 0;
-}
-
-.el-header {
-  padding: 0;
-  height: auto;
-  border-bottom: none;
   background: transparent;
 }
 
 .overlay-show {
   position: fixed;
-  top: 0;
+  top: 64px;
   left: 0;
   width: 100vw;
-  height: 100vh;
+  height: calc(100vh - 64px);
   background: rgba(0, 0, 0, 0.4);
   z-index: 99;
   transition: all 0.3s;

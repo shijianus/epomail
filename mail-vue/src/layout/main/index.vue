@@ -1,11 +1,65 @@
 <template>
-  <div :class="accountShow && hasPerm('account:query') ? 'main-box-show' : 'main-box-hide'">
-    <div :class="accountShow && hasPerm('account:query') ? 'block-show' : 'block-hide'" @click="uiStore.accountShow = false"></div>
-    <account  :class="accountShow && hasPerm('account:query') ? 'show' : 'hide'" />
-    <div class="split-view-container" :class="{'has-reading-pane': showReadingPane, 'is-mobile': isMobileView}">
+  <div class="main-box-hide">
+    
+    <!-- Settings Layout -->
+    <div v-if="isSettingsMode" class="settings-layout">
+      <div class="settings-sidebar">
+        <el-scrollbar>
+          <div class="settings-sidebar-content">
+            <div class="settings-title" @click="router.push({name: 'email'})">
+              <Icon icon="lucide:arrow-left" width="18" height="18" />
+              <span>{{$t('backToMail') || 'Back to Mail'}}</span>
+            </div>
+            
+            <div class="nav-section-title">{{$t('profile')}} / {{$t('general')}}</div>
+            <router-link :to="{name: 'setting'}" class="settings-nav-item" :class="{active: route.name === 'setting'}">
+              <Icon icon="fluent:settings-48-regular" width="20" height="20" /> {{$t('settings')}}
+            </router-link>
+
+            <template v-if="hasPerm(['all-email:query','user:query','role:query','setting:query','analysis:query','reg-key:query'])">
+              <div class="nav-section-title">{{$t('manage')}}</div>
+              
+              <router-link v-if="hasPerm('analysis:query')" :to="{name: 'analysis'}" class="settings-nav-item" :class="{active: route.name === 'analysis'}">
+                <Icon icon="fluent:data-pie-20-regular" width="20" height="20" /> {{$t('analytics')}}
+              </router-link>
+              
+              <router-link v-if="hasPerm('user:query')" :to="{name: 'user'}" class="settings-nav-item" :class="{active: route.name === 'user'}">
+                <Icon icon="si:user-alt-2-line" width="18" height="18" /> {{$t('allUsers')}}
+              </router-link>
+
+              <router-link v-if="hasPerm('all-email:query')" :to="{name: 'all-email'}" class="settings-nav-item" :class="{active: route.name === 'all-email'}">
+                <Icon icon="fluent:mail-list-28-regular" width="20" height="20" /> {{$t('allMail')}}
+              </router-link>
+
+              <router-link v-if="hasPerm('role:query')" :to="{name: 'role'}" class="settings-nav-item" :class="{active: route.name === 'role'}">
+                <Icon icon="fluent:lock-closed-16-regular" width="20" height="20" /> {{$t('permissions')}}
+              </router-link>
+
+              <router-link v-if="hasPerm('reg-key:query')" :to="{name: 'reg-key'}" class="settings-nav-item" :class="{active: route.name === 'reg-key'}">
+                <Icon icon="fluent:fingerprint-20-filled" width="20" height="20" /> {{$t('inviteCode')}}
+              </router-link>
+
+              <router-link v-if="hasPerm('setting:query')" :to="{name: 'sys-setting'}" class="settings-nav-item" :class="{active: route.name === 'sys-setting'}">
+                <Icon icon="eos-icons:system-ok-outlined" width="18" height="18" /> {{$t('SystemSettings')}}
+              </router-link>
+            </template>
+          </div>
+        </el-scrollbar>
+      </div>
+      <div class="settings-content">
+        <router-view class="main-view" v-slot="{ Component,route }">
+          <keep-alive :include="['sys-setting','user','role','analysis','reg-key']">
+            <component :is="Component" :key="route.name"/>
+          </keep-alive>
+        </router-view>
+      </div>
+    </div>
+
+    <!-- Mail Split View Layout -->
+    <div v-else class="split-view-container" :class="{'has-reading-pane': showReadingPane, 'is-mobile': isMobileView}">
       <div class="list-column" :class="{'hide-on-mobile': showReadingPane && isMobileView}">
         <router-view class="main-view" v-slot="{ Component,route }">
-          <keep-alive :include="['email','all-email','send','sys-setting','star','user','role','analysis','reg-key','draft']">
+          <keep-alive :include="['email','send','star','draft']">
             <component :is="Component" :key="route.name"/>
           </keep-alive>
         </router-view>
@@ -14,10 +68,10 @@
         <ContentComponent :key="emailStore.contentData.email?.emailId" />
       </div>
     </div>
+
   </div>
 </template>
 <script setup>
-import account from '@/layout/account/index.vue'
 import ContentComponent from '@/views/content/index.vue'
 import {useUiStore} from "@/store/ui.js";
 import {useEmailStore} from "@/store/email.js";
@@ -25,6 +79,8 @@ import {useSettingStore} from "@/store/setting.js";
 import {computed, onBeforeUnmount, onMounted, watch} from "vue";
 import { useRoute } from 'vue-router'
 import { hasPerm } from "@/perm/perm.js"
+import { Icon } from "@iconify/vue"
+import router from "@/router/index.js"
 
 const settingStore = useSettingStore()
 const uiStore = useUiStore();
@@ -34,11 +90,12 @@ let  innerWidth =  window.innerWidth
 
 let elNotification = null
 
-const accountShow = computed(() => {
-  return uiStore.accountShow && settingStore.settings.manyEmail === 0
+const isMobileView = computed(() => window.innerWidth < 768)
+
+const isSettingsMode = computed(() => {
+  return ['setting', 'analysis', 'user', 'all-email', 'role', 'reg-key', 'sys-setting'].includes(route.name)
 })
 
-const isMobileView = computed(() => window.innerWidth < 768)
 const showReadingPane = computed(() => {
   const mailRoutes = ['email','all-email','send','star','draft']
   return mailRoutes.includes(route.meta.name) && !!emailStore.contentData.email
@@ -122,69 +179,18 @@ const handleResize = () => {
 </script>
 <style lang="scss" scoped>
 
-.block-show {
-  position: fixed;
-  @media (max-width: 767px) {
-    position: absolute;
-    right: 0;
-    border: 0;
-    height: 100%;
-    width: 100%;
-    background: #000000;
-    opacity: 0.6;
-    z-index: 10;
-    transition: all 300ms;
-  }
-}
-
-.block-hide {
-  position: fixed;
-  pointer-events: none;
-  transition: all 300ms;
-}
-
-.show {
-  transition: all 100ms;
-  @media (max-width: 767px) {
-    position: fixed;
-    z-index: 100;
-    width: 260px;
-  }
-}
-
-.hide {
-  transition: all 100ms;
-  position: fixed;
-  transform: translateX(-100%);
-  opacity: 0;
-  @media (max-width: 1024px) {
-    width: 260px;
-    z-index: 100;
-  }
-}
-
-
-.main-box-show {
-  display: grid;
-  grid-template-columns: 260px  1fr;
-  height: calc(100% - 56px);
-  @media (max-width: 767px) {
-    grid-template-columns: 1fr;
-  }
-}
-
 .main-box-hide {
-  display: grid;
-  grid-template-columns: 1fr;
-  height: calc(100% - 56px);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
-
 
 .main-view {
   background: var(--bg-surface);
   height: 100%;
 }
 
+/* --- Split View Layout (Mail) --- */
 .split-view-container {
   display: flex;
   height: 100%;
@@ -215,17 +221,91 @@ const handleResize = () => {
   display: none !important;
 }
 
-
-.navigation {
-  height: 30px;
-  border-bottom: solid 1px var(--border-subtle);
-  display: inline-flex;
-  justify-items: center;
-  align-items: center;
+/* --- Settings Layout --- */
+.settings-layout {
+  display: flex;
+  height: 100%;
   width: 100%;
-  .tag {
-    background: var(--bg-surface);
-    margin-left: 5px;
+  background: var(--bg-base, #f4f7fc);
+}
+
+.settings-sidebar {
+  width: 260px;
+  background: var(--bg-surface, #ffffff);
+  border-right: 1px solid var(--border-subtle, #e5e7eb);
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  
+  @media (max-width: 767px) {
+    display: none; /* In mobile, maybe we handle settings differently, but for now just hide */
+  }
+}
+
+.settings-sidebar-content {
+  padding: 16px 0;
+}
+
+.settings-title {
+  padding: 12px 24px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  margin-bottom: 16px;
+  transition: color 0.2s;
+  
+  &:hover {
+    color: var(--accent-primary);
+  }
+}
+
+.nav-section-title {
+  padding: 16px 24px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+
+.settings-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 24px;
+  color: var(--text-secondary);
+  font-size: 14px;
+  text-decoration: none;
+  transition: background-color 0.2s, color 0.2s;
+  
+  &:hover {
+    background-color: var(--bg-hover);
+    color: var(--text-primary);
+  }
+  
+  &.active {
+    background-color: var(--accent-muted);
+    color: var(--text-accent);
+    font-weight: 600;
+    border-right: 3px solid var(--accent-primary);
+  }
+}
+
+.settings-content {
+  flex: 1;
+  height: 100%;
+  overflow-y: auto;
+  background: var(--bg-surface);
+  
+  @media (min-width: 1024px) {
+    padding: 24px 40px;
+  }
+  @media (max-width: 1023px) {
+    padding: 16px 20px;
   }
 }
 </style>
