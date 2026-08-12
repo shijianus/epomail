@@ -49,8 +49,7 @@
           </div>
         </div>
         
-        <div class="divider"></div>
-        <div class="nav-section" id="labelSection">
+        <div class="nav-section" id="labelSection" style="margin-top: 24px;">
           <div class="nav-section-label"><span>{{ $t('labels') || 'Labels' }}</span></div>
           <div class="nav-item" :title="$t('labelWork') || 'Work'">
             <span class="nav-ic-wrap"><Icon icon="ic:outline-work-outline" width="18" height="18" /></span>
@@ -237,9 +236,8 @@ function openSend() {
 .collapsed .nav-label,
 .collapsed .nav-count,
 .collapsed .nav-section-label { display: none; }
-.collapsed .nav-item { margin: 10px 0; padding: 0; height: auto; justify-content: center; gap: 0; border-radius: 0; background: transparent; }
-.collapsed .nav-ic-wrap { width: 44px; height: 44px; }
+.collapsed .nav-item { margin: 12px 0; padding: 0; height: auto; justify-content: center; gap: 0; border-radius: 0; background: transparent; }
+.collapsed .nav-ic-wrap { width: 36px; height: 36px; }
 .collapsed .nav-item:hover .nav-ic-wrap { background: var(--bg-hover); }
 .collapsed .nav-item.active .nav-ic-wrap { background: var(--accent-muted); }
-.collapsed .divider { margin: 8px auto; width: 36px; }
 </style>
