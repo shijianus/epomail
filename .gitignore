@@ -24,3 +24,8 @@ lerna-debug.log*
 
 .env
 **/.env
+
+mail-worker/.env
+mail-worker/d1_output.json
+mail-worker/kv_setting.json
+mail-worker/test-resend.js
