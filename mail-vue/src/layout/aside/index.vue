@@ -156,7 +156,7 @@ function openSend() {
   justify-content: flex-start;
   padding-left: 16px;
   gap: 16px;
-  transition: transform .15s ease, box-shadow .2s, width .28s ease, margin .28s ease;
+  transition: transform .15s ease, box-shadow .2s;
   box-shadow: 0 3px 14px rgba(91,110,245,.4);
   position: relative;
   overflow: hidden;
@@ -180,9 +180,8 @@ function openSend() {
   height: 56px;
   margin: 0;
   border-radius: 16px;
-  padding: 0;
-  gap: 0;
-  justify-content: center;
+  padding-left: 16px;
+  gap: 16px;
 
   .compose-text {
     display: none;
@@ -226,7 +225,7 @@ function openSend() {
   border-radius: 0 19px 19px 0; 
   color: var(--text-secondary); 
   cursor: pointer; 
-  transition: all .2s; 
+  transition: background .2s, color .2s; 
   font-size: 13px; 
   position: relative; 
   white-space: nowrap; 
@@ -244,9 +243,10 @@ function openSend() {
 .collapsed .nav-label,
 .collapsed .nav-count,
 .collapsed .nav-section-label { display: none; }
-.collapsed .nav-item { margin: 12px 0; padding: 0 0 0 18px; height: auto; justify-content: flex-start; gap: 0; border-radius: 0; background: transparent !important; }
-.collapsed .nav-item:hover { background: transparent !important; }
-.collapsed .nav-ic-wrap { width: 36px; height: 36px; transition: background .2s; }
-.collapsed .nav-item:hover .nav-ic-wrap { background: var(--bg-hover); }
-.collapsed .nav-item.active .nav-ic-wrap { background: var(--accent-muted); }
+.collapsed .nav-item { 
+  margin: 2px 0; 
+  padding: 0 0 0 25px; 
+  border-radius: 0; 
+  clip-path: circle(18px at 36px 19px); 
+}
 </style>
