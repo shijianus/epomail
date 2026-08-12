@@ -34,3 +34,4 @@ mail-worker/test-resend.js
 .agent/
 AGENT.md
 AGENTS.md
+temp_login_ui/
