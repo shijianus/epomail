@@ -23,6 +23,10 @@
             <span class="nav-ic-wrap"><Icon icon="solar:star-line-duotone" width="20" height="20" /></span>
             <span class="nav-label">{{$t('starred')}}</span>
           </div>
+          <div class="nav-item" @click="() => {}" :title="$t('snoozed') || 'Snoozed'">
+            <span class="nav-ic-wrap"><Icon icon="ic:outline-access-time" width="20" height="20" /></span>
+            <span class="nav-label">{{$t('snoozed') || 'Snoozed'}}</span>
+          </div>
           <div class="nav-item" @click="router.push({name: 'send'})" v-perm="'email:send'" :class="route.name === 'send' ? 'active' : ''" :title="$t('sent')">
             <span class="nav-ic-wrap"><Icon icon="cil:send" width="20" height="20" /></span>
             <span class="nav-label">{{$t('sent')}}</span>
@@ -35,26 +39,34 @@
             <span class="nav-ic-wrap"><Icon icon="fluent:mail-list-28-regular" width="22" height="22" /></span>
             <span class="nav-label">{{$t('allMail')}}</span>
           </div>
+          <div class="nav-item" @click="() => {}" :title="$t('spam') || 'Spam'">
+            <span class="nav-ic-wrap"><Icon icon="ic:outline-report-gmailerrorred" width="20" height="20" /></span>
+            <span class="nav-label">{{$t('spam') || 'Spam'}}</span>
+          </div>
+          <div class="nav-item" @click="() => {}" :title="$t('trash') || 'Trash'">
+            <span class="nav-ic-wrap"><Icon icon="ic:outline-delete" width="20" height="20" /></span>
+            <span class="nav-label">{{$t('trash') || 'Trash'}}</span>
+          </div>
         </div>
         
         <div class="divider"></div>
         <div class="nav-section" id="labelSection">
-          <div class="nav-section-label"><span>{{ $t('labels') || '标签' }}</span><span class="label-edit-btn">{{ $t('edit') || '编辑' }}</span></div>
-          <div class="nav-item" :title="$t('labelWork') || '工作'">
+          <div class="nav-section-label"><span>{{ $t('labels') || 'Labels' }}</span></div>
+          <div class="nav-item" :title="$t('labelWork') || 'Work'">
             <span class="nav-ic-wrap"><Icon icon="ic:outline-work-outline" width="18" height="18" /></span>
-            <span class="nav-label">{{ $t('labelWork') || '工作' }}</span>
+            <span class="nav-label">{{ $t('labelWork') || 'Work' }}</span>
           </div>
-          <div class="nav-item" :title="$t('labelPersonal') || '个人'">
+          <div class="nav-item" :title="$t('labelPersonal') || 'Personal'">
             <span class="nav-ic-wrap"><Icon icon="ic:outline-person-outline" width="18" height="18" /></span>
-            <span class="nav-label">{{ $t('labelPersonal') || '个人' }}</span>
+            <span class="nav-label">{{ $t('labelPersonal') || 'Personal' }}</span>
           </div>
-          <div class="nav-item" :title="$t('labelBilling') || '账单'">
+          <div class="nav-item" :title="$t('labelBilling') || 'Billing'">
             <span class="nav-ic-wrap"><Icon icon="ic:outline-receipt" width="18" height="18" /></span>
-            <span class="nav-label">{{ $t('labelBilling') || '账单' }}</span>
+            <span class="nav-label">{{ $t('labelBilling') || 'Billing' }}</span>
           </div>
-          <div class="nav-item" :title="$t('labelNotice') || '通知'">
+          <div class="nav-item" :title="$t('labelNotice') || 'Notice'">
             <span class="nav-ic-wrap"><Icon icon="ic:outline-notifications-none" width="18" height="18" /></span>
-            <span class="nav-label">{{ $t('labelNotice') || '通知' }}</span>
+            <span class="nav-label">{{ $t('labelNotice') || 'Notice' }}</span>
           </div>
         </div>
         
@@ -121,7 +133,7 @@ function openSend() {
 }
 
 .compose-btn-wrapper {
-  padding: 14px 12px 12px;
+  padding: 14px 12px 16px;
   display: flex;
 }
 
@@ -171,10 +183,10 @@ function openSend() {
   }
 }
 
-.nav-section { margin-bottom: 2px; }
+.nav-section { margin-bottom: 4px; }
 .nav-section-label { 
-  padding: 10px 20px 4px; 
-  font-size: 10px; 
+  padding: 10px 20px 8px; 
+  font-size: 10.5px; 
   font-weight: 700; 
   color: var(--text-muted); 
   text-transform: uppercase; 
@@ -201,13 +213,13 @@ function openSend() {
   display: flex; 
   align-items: center; 
   gap: 14px; 
-  height: 36px; 
-  margin: 1px 10px; 
-  padding: 0 12px; 
-  cursor: pointer; 
+  height: 38px; 
+  margin: 2px 14px; 
+  padding: 0 16px; 
+  border-radius: 19px; 
   color: var(--text-secondary); 
-  border-radius: 18px; 
-  transition: background .14s, color .14s, margin .22s var(--ease, cubic-bezier(0.4,0,0.2,1)), padding .22s var(--ease, cubic-bezier(0.4,0,0.2,1)); 
+  cursor: pointer; 
+  transition: all .2s; 
   font-size: 13px; 
   position: relative; 
   white-space: nowrap; 
@@ -225,7 +237,7 @@ function openSend() {
 .collapsed .nav-label,
 .collapsed .nav-count,
 .collapsed .nav-section-label { display: none; }
-.collapsed .nav-item { margin: 3px 0; padding: 0; height: auto; justify-content: center; gap: 0; border-radius: 0; background: transparent; }
+.collapsed .nav-item { margin: 10px 0; padding: 0; height: auto; justify-content: center; gap: 0; border-radius: 0; background: transparent; }
 .collapsed .nav-ic-wrap { width: 44px; height: 44px; }
 .collapsed .nav-item:hover .nav-ic-wrap { background: var(--bg-hover); }
 .collapsed .nav-item.active .nav-ic-wrap { background: var(--accent-muted); }
