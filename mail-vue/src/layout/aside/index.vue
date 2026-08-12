@@ -137,13 +137,14 @@ function openSend() {
 }
 
 .compose-btn-wrapper {
-  padding: 14px 12px 32px 8px;
+  padding: 14px 16px 32px 8px;
   display: flex;
 }
 
 .compose-btn {
   height: 56px;
-  width: 140px;
+  width: 100%;
+  flex-shrink: 0;
   background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
   border: none;
   border-radius: 16px;

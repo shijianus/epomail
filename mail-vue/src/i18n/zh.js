@@ -360,5 +360,6 @@ const zh = {
     labelPersonal: '个人',
     labelBilling: '账单',
     labelNotice: '通知',
+    writeEmail: '写邮件',
 }
 export default zh

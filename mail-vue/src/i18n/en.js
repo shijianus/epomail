@@ -360,6 +360,7 @@ const en = {
     labelPersonal: 'Personal',
     labelBilling: 'Billing',
     labelNotice: 'Notice',
+    writeEmail: 'Compose',
 }
 
 export default en
