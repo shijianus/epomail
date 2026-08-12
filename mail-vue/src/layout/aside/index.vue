@@ -1,104 +1,138 @@
 <template>
-  <el-scrollbar class="scroll">
-    <div>
-      <div class="title" >
-        <Icon icon="mdi:email-outline" width="24" height="24" />
-        <div>{{settingStore.settings.title}}</div>
-      </div>
-      <div v-perm="'email:send'" class="compose-btn-wrapper" @click="openSend">
-        <button class="compose-btn" :class="(!uiStore.asideShow && !isMobile) ? 'collapsed' : ''">
-          <Icon icon="material-symbols:edit-outline-sharp" width="24" height="24"/>
-          <span class="compose-text">{{$t('writeEmail') || 'Compose'}}</span>
-        </button>
-      </div>
-
-      <el-menu :collapse="!uiStore.asideShow && !isMobile" style="margin-top: 10px">
-        <el-menu-item @click="router.push({name: 'email'})" index="email"
-                      :class="route.meta.name === 'email' ? 'choose-item' : ''">
-          <Icon icon="hugeicons:mailbox-01" width="20" height="20" />
-          <template #title>
-            <span class="menu-name" style="margin-left: 21px">{{$t('inbox')}}</span>
-          </template>
-        </el-menu-item>
-        <el-menu-item @click="router.push({name: 'send'})" index="send" v-perm="'email:send'"
-                      :class="route.meta.name === 'send' ? 'choose-item' : ''">
-          <Icon icon="cil:send" width="20" height="20" />
-          <template #title>
-            <span class="menu-name" style="margin-left: 21px">{{$t('sent')}}</span>
-          </template>
-        </el-menu-item>
-        <el-menu-item @click="router.push({name: 'draft'})" index="draft" v-perm="'email:send'"
-                      :class="route.meta.name === 'draft' ? 'choose-item' : ''">
-          <Icon icon="ep:document" width="20" height="20" />
-          <template #title>
-            <span class="menu-name" style="margin-left: 22px">{{$t('drafts')}}</span>
-          </template>
-        </el-menu-item>
-        <el-menu-item @click="router.push({name: 'star'})" index="star"
-                      :class="route.meta.name === 'star' ? 'choose-item' : ''">
-          <Icon icon="solar:star-line-duotone" width="20" height="20" />
-          <template #title>
-            <span class="menu-name" style="margin-left: 21px">{{$t('starred')}}</span>
-          </template>
-        </el-menu-item>
-        <el-menu-item @click="router.push({name: 'setting'})" index="setting"
-                      :class="route.meta.name === 'setting' ? 'choose-item' : ''">
-          <Icon icon="fluent:settings-48-regular" width="20" height="20" />
-          <template #title>
-            <span class="menu-name" style="margin-left: 21px">{{$t('settings')}}</span>
-          </template>
-        </el-menu-item>
-        
-        <div class="manage-title" :class="(!uiStore.asideShow && !isMobile) ? 'is-collapsed' : ''" v-perm="['all-email:query','user:query','role:query','setting:query','analysis:query','reg-key:query']">
-          <span v-if="uiStore.asideShow || isMobile">{{$t('manage')}}</span>
+  <div class="aside-container">
+    <el-scrollbar class="scroll" style="flex: 1">
+      <div>
+        <div class="title" >
+          <Icon icon="mdi:email-outline" width="24" height="24" />
+          <div>{{settingStore.settings.title}}</div>
         </div>
+
+        <!-- Compose / Back Button -->
+        <div v-if="!isSettingsMode" v-perm="'email:send'" class="compose-btn-wrapper" @click="openSend">
+          <button class="compose-btn" :class="(!uiStore.asideShow && !isMobile) ? 'collapsed' : ''">
+            <Icon icon="material-symbols:edit-outline-sharp" width="24" height="24"/>
+            <span class="compose-text">{{$t('writeEmail') || 'Compose'}}</span>
+          </button>
+        </div>
+        <div v-else class="compose-btn-wrapper" @click="router.push({name: 'email'})">
+          <button class="compose-btn settings-back" :class="(!uiStore.asideShow && !isMobile) ? 'collapsed' : ''">
+            <Icon icon="lucide:arrow-left" width="20" height="20"/>
+            <span class="compose-text">{{$t('backToMail') || 'Back to Mail'}}</span>
+          </button>
+        </div>
+
+        <!-- Mail Mode Menu -->
+        <el-menu v-if="!isSettingsMode" :collapse="!uiStore.asideShow && !isMobile" style="margin-top: 10px">
+          <el-menu-item @click="router.push({name: 'email'})" index="email"
+                        :class="route.name === 'email' ? 'choose-item' : ''">
+            <Icon icon="hugeicons:mailbox-01" width="20" height="20" />
+            <template #title>
+              <span class="menu-name" style="margin-left: 21px">{{$t('inbox')}}</span>
+            </template>
+          </el-menu-item>
+          <el-menu-item @click="router.push({name: 'send'})" index="send" v-perm="'email:send'"
+                        :class="route.name === 'send' ? 'choose-item' : ''">
+            <Icon icon="cil:send" width="20" height="20" />
+            <template #title>
+              <span class="menu-name" style="margin-left: 21px">{{$t('sent')}}</span>
+            </template>
+          </el-menu-item>
+          <el-menu-item @click="router.push({name: 'draft'})" index="draft" v-perm="'email:send'"
+                        :class="route.name === 'draft' ? 'choose-item' : ''">
+            <Icon icon="ep:document" width="20" height="20" />
+            <template #title>
+              <span class="menu-name" style="margin-left: 22px">{{$t('drafts')}}</span>
+            </template>
+          </el-menu-item>
+          <el-menu-item @click="router.push({name: 'star'})" index="star"
+                        :class="route.name === 'star' ? 'choose-item' : ''">
+            <Icon icon="solar:star-line-duotone" width="20" height="20" />
+            <template #title>
+              <span class="menu-name" style="margin-left: 21px">{{$t('starred')}}</span>
+            </template>
+          </el-menu-item>
+          
+          <div style="height: 16px;"></div> <!-- Spacer -->
+          
+          <el-menu-item @click="router.push({name: 'setting'})" index="setting"
+                        :class="route.name === 'setting' ? 'choose-item' : ''">
+            <Icon icon="fluent:settings-48-regular" width="20" height="20" />
+            <template #title>
+              <span class="menu-name" style="margin-left: 21px">{{$t('settings')}}</span>
+            </template>
+          </el-menu-item>
+        </el-menu>
+
+        <!-- Settings Mode Menu -->
+        <el-menu v-else :collapse="!uiStore.asideShow && !isMobile" style="margin-top: 10px">
+          
+          <div class="manage-title" :class="(!uiStore.asideShow && !isMobile) ? 'is-collapsed' : ''">
+            <span v-if="uiStore.asideShow || isMobile">{{$t('profile')}} / {{$t('general')}}</span>
+          </div>
+
+          <el-menu-item @click="router.push({name: 'setting'})" index="setting"
+                        :class="route.name === 'setting' ? 'choose-item' : ''">
+            <Icon icon="fluent:settings-48-regular" width="20" height="20" />
+            <template #title>
+              <span class="menu-name" style="margin-left: 21px">{{$t('settings')}}</span>
+            </template>
+          </el-menu-item>
+
+          <div class="manage-title" :class="(!uiStore.asideShow && !isMobile) ? 'is-collapsed' : ''" v-perm="['all-email:query','user:query','role:query','setting:query','analysis:query','reg-key:query']">
+            <span v-if="uiStore.asideShow || isMobile">{{$t('manage')}}</span>
+          </div>
+          
+          <el-menu-item @click="router.push({name: 'analysis'})" index="analysis" v-perm="'analysis:query'"
+                        :class="route.name === 'analysis' ? 'choose-item' : ''">
+            <Icon icon="fluent:data-pie-20-regular" width="22" height="22" />
+            <template #title>
+              <span class="menu-name" style="margin-left: 18px">{{$t('analytics')}}</span>
+            </template>
+          </el-menu-item>
+          <el-menu-item @click="router.push({name: 'user'})" index="user" v-perm="'user:query'"
+                        :class="route.name === 'user' ? 'choose-item' : ''">
+            <Icon icon="si:user-alt-2-line" width="20" height="20" />
+            <template #title>
+              <span class="menu-name" style="margin-left: 21px">{{$t('allUsers')}}</span>
+            </template>
+          </el-menu-item>
+          <el-menu-item @click="router.push({name: 'all-email'})" index="all-email" v-perm="'all-email:query'"
+                        :class="route.name === 'all-email' ? 'choose-item' : ''">
+            <Icon icon="fluent:mail-list-28-regular" width="22" height="22" />
+            <template #title>
+              <span class="menu-name" style="margin-left: 20px">{{$t('allMail')}}</span>
+            </template>
+          </el-menu-item>
+          <el-menu-item @click="router.push({name: 'role'})" index="role" v-perm="'role:query'"
+                        :class="route.name === 'role' ? 'choose-item' : ''">
+            <Icon icon="fluent:lock-closed-16-regular" width="22" height="22" />
+            <template #title>
+              <span class="menu-name" style="margin-left: 20px">{{$t('permissions')}}</span>
+            </template>
+          </el-menu-item>
+          <el-menu-item @click="router.push({name: 'reg-key'})" index="reg-key" v-perm="'reg-key:query'"
+                        :class="route.name === 'reg-key' ? 'choose-item' : ''">
+            <Icon icon="fluent:fingerprint-20-filled" width="22" height="22" />
+            <template #title>
+              <span class="menu-name" style="margin-left: 20px">{{$t('inviteCode')}}</span>
+            </template>
+          </el-menu-item>
+          <el-menu-item @click="router.push({name: 'sys-setting'})" index="sys-setting" v-perm="'setting:query'"
+                        :class="route.name === 'sys-setting' ? 'choose-item' : ''">
+            <Icon icon="eos-icons:system-ok-outlined" width="18" height="18" style="margin-left: 2px" />
+            <template #title>
+              <span class="menu-name" style="margin-left: 22px">{{$t('SystemSettings')}}</span>
+            </template>
+          </el-menu-item>
+        </el-menu>
         
-        <el-menu-item @click="router.push({name: 'analysis'})" index="analysis" v-perm="'analysis:query'"
-                      :class="route.meta.name === 'analysis' ? 'choose-item' : ''">
-          <Icon icon="fluent:data-pie-20-regular" width="22" height="22" />
-          <template #title>
-            <span class="menu-name" style="margin-left: 18px">{{$t('analytics')}}</span>
-          </template>
-        </el-menu-item>
-        <el-menu-item @click="router.push({name: 'user'})" index="user" v-perm="'user:query'"
-                      :class="route.meta.name === 'user' ? 'choose-item' : ''">
-          <Icon icon="si:user-alt-2-line" width="20" height="20" />
-          <template #title>
-            <span class="menu-name" style="margin-left: 21px">{{$t('allUsers')}}</span>
-          </template>
-        </el-menu-item>
-        <el-menu-item @click="router.push({name: 'all-email'})" index="all-email" v-perm="'all-email:query'"
-                      :class="route.meta.name === 'all-email' ? 'choose-item' : ''">
-          <Icon icon="fluent:mail-list-28-regular" width="22" height="22" />
-          <template #title>
-            <span class="menu-name" style="margin-left: 20px">{{$t('allMail')}}</span>
-          </template>
-        </el-menu-item>
-        <el-menu-item @click="router.push({name: 'role'})" index="role" v-perm="'role:query'"
-                      :class="route.meta.name === 'role' ? 'choose-item' : ''">
-          <Icon icon="fluent:lock-closed-16-regular" width="22" height="22" />
-          <template #title>
-            <span class="menu-name" style="margin-left: 20px">{{$t('permissions')}}</span>
-          </template>
-        </el-menu-item>
-        <el-menu-item @click="router.push({name: 'reg-key'})" index="reg-key" v-perm="'reg-key:query'"
-                      :class="route.meta.name === 'reg-key' ? 'choose-item' : ''">
-          <Icon icon="fluent:fingerprint-20-filled" width="22" height="22" />
-          <template #title>
-            <span class="menu-name" style="margin-left: 20px">{{$t('inviteCode')}}</span>
-          </template>
-        </el-menu-item>
-        <el-menu-item @click="router.push({name: 'sys-setting'})" index="sys-setting" v-perm="'setting:query'"
-                      :class="route.meta.name === 'sys-setting' ? 'choose-item' : ''">
-          <Icon icon="eos-icons:system-ok-outlined" width="18" height="18" style="margin-left: 2px" />
-          <template #title>
-            <span class="menu-name" style="margin-left: 22px">{{$t('SystemSettings')}}</span>
-          </template>
-        </el-menu-item>
-      </el-menu>
-      
+      </div>
+    </el-scrollbar>
+    <div class="status-bar" :class="(!uiStore.asideShow && !isMobile) ? 'collapsed' : ''">
+      <div class="status-dot"></div>
+      <div class="status-text" v-if="uiStore.asideShow || isMobile">Connected <span class="status-time">Synced just now</span></div>
     </div>
-  </el-scrollbar>
+  </div>
 </template>
 
 <script setup>
@@ -114,6 +148,10 @@ const settingStore = useSettingStore();
 const userStore = useUserStore();
 const uiStore = useUiStore();
 const route = useRoute();
+
+const isSettingsMode = computed(() => {
+  return ['setting', 'analysis', 'user', 'all-email', 'role', 'reg-key', 'sys-setting'].includes(route.name)
+})
 
 const isMobile = ref(window.innerWidth < 1025)
 const handleResize = () => {
@@ -136,6 +174,46 @@ function openSend() {
 </script>
 
 <style lang="scss" scoped>
+.aside-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.status-bar {
+  margin-top: auto;
+  padding: 16px 20px;
+  border-top: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--bg-surface);
+  
+  &.collapsed {
+    justify-content: center;
+    padding: 16px 0;
+  }
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--success);
+  box-shadow: 0 0 6px var(--success);
+  flex-shrink: 0;
+}
+
+.status-text {
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.status-time {
+  color: var(--text-muted);
+  margin-left: 4px;
+}
 
 .title {
   display: none;
@@ -260,6 +338,22 @@ function openSend() {
 
   .compose-text {
     white-space: nowrap;
+  }
+}
+
+.compose-btn.settings-back {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  box-shadow: none;
+  
+  &:hover {
+    background: var(--bg-active);
+    transform: translateY(-1px);
+    box-shadow: none;
+  }
+  
+  &:active {
+    transform: translateY(0) scale(0.98);
   }
 }
 

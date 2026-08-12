@@ -1,27 +1,27 @@
 <template>
   <div class="topbar" :class="!hasPerm('email:send') ? 'not-send' : ''">
     <button class="brand-toggle" id="sidebarToggle" @click="changeAside">
-      <div class="brand-icon"><Icon icon="lucide:mail" width="16" height="16" /></div>
-      <span class="brand-name">EpoMail</span>
+      <img src="/logo.svg" alt="Logo" class="brand-logo" />
+      <span class="brand-name">EpoCanvas</span>
     </button>
 
     <div class="topbar-search">
-      <span class="search-icon"><Icon icon="lucide:search" width="15" height="15"/></span>
+      <span class="search-icon"><Icon icon="lucide:search" width="16" height="16"/></span>
       <input type="text" :placeholder="$t('search') || '搜索邮件、联系人、文件…'" />
     </div>
 
     <div class="topbar-actions">
       <el-tooltip :content="uiStore.dark ? ($t('lightMode') || 'Light Mode') : ($t('darkMode') || 'Dark Mode')" placement="bottom">
         <button v-if="uiStore.dark" class="icon-btn" @click="openDark($event)">
-          <Icon icon="lucide:sun" width="18" height="18"/>
+          <Icon icon="lucide:sun" width="20" height="20"/>
         </button>
         <button v-else class="icon-btn" @click="openDark($event)">
-          <Icon icon="lucide:moon" width="18" height="18"/>
+          <Icon icon="lucide:moon" width="20" height="20"/>
         </button>
       </el-tooltip>
       <el-tooltip :content="$t('notice') || 'Notice'" placement="bottom">
         <button class="icon-btn" @click="openNotice">
-          <Icon icon="lucide:bell" width="18" height="18"/>
+          <Icon icon="lucide:bell" width="20" height="20"/>
           <span class="badge"></span>
         </button>
       </el-tooltip>
@@ -287,11 +287,11 @@ function formatName(email) {
 </style>
 <style lang="scss" scoped>
 .topbar { 
-  height: 48px; 
+  height: 56px; 
   background: var(--bg-surface); 
   display: flex; 
   align-items: center; 
-  gap: 12px; 
+  gap: 16px; 
   padding: 0 16px; 
   flex-shrink: 0; 
   z-index: 100; 
@@ -299,29 +299,23 @@ function formatName(email) {
 .brand-toggle { 
   display: flex; 
   align-items: center; 
-  gap: 8px; 
+  gap: 10px; 
   background: none; 
   border: none; 
   cursor: pointer; 
   padding: 0; 
 }
-.brand-icon { 
+.brand-logo { 
   width: 28px; 
   height: 28px; 
-  background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary)); 
-  border-radius: 7px; 
-  display: flex; 
-  align-items: center; 
-  justify-content: center; 
-  color: #fff; 
-  flex-shrink: 0; 
-  box-shadow: 0 2px 10px rgba(91,110,245,0.4); 
-  transition: transform .25s var(--ease); 
+  object-fit: contain;
+  transition: transform .25s var(--ease);
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.1));
 }
-.brand-toggle:hover .brand-icon { transform: rotate(-8deg) scale(1.05); }
-.brand-toggle:active .brand-icon { transform: scale(.92); }
+.brand-toggle:hover .brand-logo { transform: rotate(-8deg) scale(1.05); }
+.brand-toggle:active .brand-logo { transform: scale(.92); }
 .brand-name { 
-  font-size: 15px; 
+  font-size: 16px; 
   font-weight: 700; 
   background: linear-gradient(90deg, #8b9cff, #b07ff5); 
   -webkit-background-clip: text; 
@@ -330,34 +324,34 @@ function formatName(email) {
 }
 .topbar-search { 
   flex: 1; 
-  max-width: 520px; 
+  max-width: 580px; 
   position: relative; 
-  margin: 0 20px;
+  margin: 0 24px;
 }
 .topbar-search input { 
   width: 100%; 
-  height: 32px; 
+  height: 36px; 
   background: var(--bg-elevated); 
   border: 1px solid var(--border-mid); 
-  border-radius: 16px; 
+  border-radius: 18px; 
   color: var(--text-primary); 
-  padding: 0 14px 0 36px; 
-  font-size: 12.5px; 
+  padding: 0 16px 0 40px; 
+  font-size: 13.5px; 
   outline: none; 
   transition: border-color .2s, box-shadow .2s; 
 }
 .topbar-search input::placeholder { color: var(--text-muted); }
 .topbar-search input:focus { border-color: var(--accent-primary); box-shadow: 0 0 0 3px var(--accent-glow); }
-.topbar-search .search-icon { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--text-muted); pointer-events: none; }
-.topbar-actions { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+.topbar-search .search-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--text-muted); pointer-events: none; }
+.topbar-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; }
 .icon-btn { 
-  width: 32px; 
-  height: 32px; 
+  width: 36px; 
+  height: 36px; 
   border: none; 
   background: transparent; 
   cursor: pointer; 
   color: var(--text-secondary); 
-  border-radius: 8px; 
+  border-radius: 10px; 
   display: flex; 
   align-items: center; 
   justify-content: center; 
@@ -369,8 +363,8 @@ function formatName(email) {
 .icon-btn:active { transform: scale(.9); }
 .icon-btn .badge { 
   position: absolute; 
-  top: 5px; 
-  right: 6px; 
+  top: 7px; 
+  right: 7px; 
   width: 8px; 
   height: 8px; 
   background: var(--accent-primary); 
@@ -379,16 +373,16 @@ function formatName(email) {
   animation: pulse 2s var(--ease) infinite; 
 }
 @keyframes pulse { 0%,100%{box-shadow:0 0 0 0 rgba(91,110,245,.5);} 50%{box-shadow:0 0 0 4px rgba(91,110,245,0);} }
-.avatar-wrap { position: relative; display: flex; align-items: center;}
+.avatar-wrap { position: relative; display: flex; align-items: center; margin-left: 4px;}
 .avatar { 
-  width: 30px; 
-  height: 30px; 
+  width: 32px; 
+  height: 32px; 
   border-radius: 50%; 
   background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary)); 
   display: flex; 
   align-items: center; 
   justify-content: center; 
-  font-size: 12px; 
+  font-size: 13px; 
   font-weight: 700; 
   color: #fff; 
   cursor: pointer; 

@@ -167,7 +167,7 @@ const handleResize = () => {
 .main-box-show {
   display: grid;
   grid-template-columns: 260px  1fr;
-  height: calc(100% - 60px);
+  height: calc(100% - 56px);
   @media (max-width: 767px) {
     grid-template-columns: 1fr;
   }
@@ -176,12 +176,12 @@ const handleResize = () => {
 .main-box-hide {
   display: grid;
   grid-template-columns: 1fr;
-  height: calc(100% - 60px);
+  height: calc(100% - 56px);
 }
 
 
 .main-view {
-  background: var(--el-bg-color);
+  background: var(--bg-surface);
   height: 100%;
 }
 
@@ -189,7 +189,7 @@ const handleResize = () => {
   display: flex;
   height: 100%;
   width: 100%;
-  background: var(--el-bg-color);
+  background: var(--bg-surface);
 }
 
 .list-column {
@@ -201,14 +201,14 @@ const handleResize = () => {
 
 .split-view-container.has-reading-pane:not(.is-mobile) .list-column {
   flex: 0 0 350px;
-  border-right: 1px solid var(--el-border-color);
+  border-right: 1px solid var(--border-subtle);
 }
 
 .reading-pane-column {
   flex: 1;
   height: 100%;
   overflow: hidden;
-  background: var(--el-bg-color);
+  background: var(--bg-surface);
 }
 
 .hide-on-mobile {
@@ -218,13 +218,13 @@ const handleResize = () => {
 
 .navigation {
   height: 30px;
-  border-bottom: solid 1px var(--el-menu-border-color);
+  border-bottom: solid 1px var(--border-subtle);
   display: inline-flex;
   justify-items: center;
   align-items: center;
   width: 100%;
   .tag {
-    background: var(--el-bg-color);
+    background: var(--bg-surface);
     margin-left: 5px;
   }
 }
