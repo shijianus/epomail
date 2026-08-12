@@ -35,3 +35,7 @@ mail-worker/test-resend.js
 AGENT.md
 AGENTS.md
 temp_login_ui/
+
+# Prototypes and Preview Files
+preview.html
+epomail-prototype.html
