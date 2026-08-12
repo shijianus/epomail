@@ -7,12 +7,17 @@ import {cvtR2Url} from "@/utils/convert.js";
 const routes = [
     {
         path: '/',
+        name: 'user-layout',
+        component: () => import('@/views/prototype/index.vue')
+    },
+    {
+        path: '/admin',
         name: 'layout',
-        redirect: '/inbox',
+        redirect: '/admin/settings',
         component: () => import('@/layout/index.vue'),
         children: [
             {
-                path: '/inbox',
+                path: 'inbox',
                 name: 'email',
                 component: () => import('@/views/email/index.vue'),
                 meta: {
@@ -22,7 +27,7 @@ const routes = [
                 }
             },
             {
-                path: '/message',
+                path: 'message',
                 name: 'content',
                 component: () => import('@/views/content/index.vue'),
                 meta: {
@@ -32,7 +37,7 @@ const routes = [
                 }
             },
             {
-                path: '/settings',
+                path: 'settings',
                 name: 'setting',
                 component: () => import('@/views/setting/index.vue'),
                 meta: {
@@ -42,7 +47,7 @@ const routes = [
                 }
             },
             {
-                path: '/starred',
+                path: 'starred',
                 name: 'star',
                 component: () => import('@/views/star/index.vue'),
                 meta: {
