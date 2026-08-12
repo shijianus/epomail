@@ -143,7 +143,7 @@ function openSend() {
 
 .compose-btn {
   height: 44px;
-  width: 100%;
+  width: 148px;
   background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
   border: none;
   border-radius: 22px;
@@ -153,8 +153,9 @@ function openSend() {
   cursor: pointer;
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 9px;
+  justify-content: flex-start;
+  padding-left: 12px;
+  gap: 12px;
   transition: transform .15s ease, box-shadow .2s, width .28s ease, margin .28s ease;
   box-shadow: 0 3px 14px rgba(91,110,245,.4);
   position: relative;
@@ -181,6 +182,7 @@ function openSend() {
   border-radius: 50%;
   padding: 0;
   gap: 0;
+  justify-content: center;
 
   .compose-text {
     display: none;
