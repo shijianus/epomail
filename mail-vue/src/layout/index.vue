@@ -111,9 +111,10 @@ onBeforeUnmount(() => {
 }
 
 .el-header {
-  background: var(--header-background);
-  border-bottom: solid 1px var(--el-border-color);
-  padding: 0 0 0 0;
+  padding: 0;
+  height: auto;
+  border-bottom: none;
+  background: transparent;
 }
 
 .overlay-show {

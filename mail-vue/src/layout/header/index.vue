@@ -1,115 +1,57 @@
 <template>
-  <div class="header" :class="!hasPerm('email:send') ? 'not-send' : ''">
-    <div class="header-left">
-      <el-tooltip :content="$t('toggleSidebar') || 'Toggle Sidebar'" placement="bottom">
-        <hanburger @click="changeAside" class="hamburger-btn"></hanburger>
-      </el-tooltip>
-      <img src="/logo.svg" alt="Logo" class="app-logo" />
-      <span class="logo-text">EpoCanvas</span>
-      <span class="breadcrumb-item" v-if="route.meta.title">{{ $t(route.meta.title) }}</span>
+  <div class="topbar" :class="!hasPerm('email:send') ? 'not-send' : ''">
+    <button class="brand-toggle" id="sidebarToggle" @click="changeAside">
+      <div class="brand-icon"><Icon icon="lucide:mail" width="16" height="16" /></div>
+      <span class="brand-name">EpoMail</span>
+    </button>
+
+    <div class="topbar-search">
+      <span class="search-icon"><Icon icon="lucide:search" width="15" height="15"/></span>
+      <input type="text" :placeholder="$t('search') || '搜索邮件、联系人、文件…'" />
     </div>
 
-    <div class="header-center">
-      <div class="search-box">
-        <Icon icon="lucide:search" width="18" height="18" class="search-icon"/>
-        <input type="text" :placeholder="$t('search') || 'Search'" class="search-input" />
-      </div>
-    </div>
-
-    <div class="toolbar header-right">
+    <div class="topbar-actions">
       <el-tooltip :content="uiStore.dark ? ($t('lightMode') || 'Light Mode') : ($t('darkMode') || 'Dark Mode')" placement="bottom">
-        <div v-if="uiStore.dark" class="sun-icon icon-item" @click="openDark($event)">
-          <Icon icon="mingcute:sun-fill"/>
-        </div>
-        <div v-else class="dark-icon icon-item" @click="openDark($event)">
-          <Icon icon="solar:moon-linear"/>
-        </div>
+        <button v-if="uiStore.dark" class="icon-btn" @click="openDark($event)">
+          <Icon icon="lucide:sun" width="18" height="18"/>
+        </button>
+        <button v-else class="icon-btn" @click="openDark($event)">
+          <Icon icon="lucide:moon" width="18" height="18"/>
+        </button>
       </el-tooltip>
       <el-tooltip :content="$t('notice') || 'Notice'" placement="bottom">
-        <div class="notice icon-item" @click="openNotice">
-          <Icon icon="streamline-plump:announcement-megaphone"/>
-        </div>
+        <button class="icon-btn" @click="openNotice">
+          <Icon icon="lucide:bell" width="18" height="18"/>
+          <span class="badge"></span>
+        </button>
       </el-tooltip>
       <el-dropdown ref="userinfoRef" @visible-change="e => userInfoShow = e" :teleported="false" popper-class="detail-dropdown">
-        <el-tooltip :content="$t('account') || 'Account'" placement="bottom">
-          <div class="avatar" @click="userInfoHide" >
-            <div class="avatar-text">
-              <div>{{ formatName(userStore.user.email) }}</div>
-            </div>
-            <Icon class="setting-icon" icon="mingcute:down-small-fill" width="24" height="24"/>
-          </div>
-        </el-tooltip>
+        <div class="avatar-wrap">
+          <div class="avatar" @click="userInfoHide">{{ formatName(userStore.user.email) }}</div>
+        </div>
         <template #dropdown>
-          <div class="user-details">
-            <div class="details-avatar">
-              {{ formatName(userStore.user.email) }}
-            </div>
-            <div class="user-name">
-              {{ userStore.user.name }}
-            </div>
-            <div class="detail-email" @click="copyEmail(userStore.user.email)">
-              {{ userStore.user.email }}
-            </div>
-            <div class="detail-user-type">
-              <el-tag>{{ userStore.user.role.name }}</el-tag>
-            </div>
-            <div class="action-info">
-              <div>
-                <span style="margin-right: 10px">{{ $t('sendCount') }}</span>
-                <span style="margin-right: 10px">{{ $t('accountCount') }}</span>
-              </div>
-              <div>
-                <div>
-                  <span v-if="sendCount" style="margin-right: 5px">{{ sendCount }}</span>
-                  <el-tag v-if="!hasPerm('email:send')">{{ sendType }}</el-tag>
-                  <el-tag v-else>{{ sendType }}</el-tag>
-                </div>
-                <div>
-                  <el-tag v-if="settingStore.settings.manyEmail || settingStore.settings.addEmail">
-                    {{ $t('disabled') }}
-                  </el-tag>
-                  <span v-else-if="accountCount && hasPerm('account:add')"
-                        style="margin-right: 5px">{{ $t('totalUserAccount', {msg: accountCount}) }}</span>
-                  <el-tag v-else-if="!accountCount && hasPerm('account:add')">{{ $t('unlimited') }}</el-tag>
-                  <el-tag v-else-if="!hasPerm('account:add')">{{ $t('unauthorized') }}</el-tag>
-                </div>
+          <div class="user-details account-menu open" style="position:relative;top:0;transform:none;opacity:1;box-shadow:none;border:none;">
+            <div class="am-header">
+              <div class="am-avatar">{{ formatName(userStore.user.email) }}</div>
+              <div style="overflow:hidden">
+                <div class="am-name">{{ userStore.user.name }}</div>
+                <div class="am-email" @click="copyEmail(userStore.user.email)" style="cursor:pointer">{{ userStore.user.email }}</div>
+                <div class="am-status"><span class="status-dot"></span><span>{{ userStore.user.role.name }}</span></div>
               </div>
             </div>
-
-            <!-- Quota UI section -->
-            <div v-if="userStore.user.quota" class="quota-dropdown-section">
-               <div class="quota-title">Storage Quota</div>
-               <el-progress 
-                 :percentage="storagePercent" 
-                 :status="storageStatus" 
-                 :stroke-width="6"
-                 :show-text="false"
-               />
-               <div class="quota-text">
-                  <template v-if="isDbFull && !isAdmin">Full</template>
-                  <template v-else>
-                     {{ formatSize(userStore.user.quota.usedStorageBytes) }} / {{ userStore.user.quota.maxStorageMB }} MB
-                  </template>
-               </div>
-               
-               <div class="quota-title" style="margin-top: 8px;">Email Quota</div>
-               <el-progress 
-                 :percentage="emailPercent" 
-                 :status="emailStatus"
-                 :stroke-width="6"
-                 :show-text="false"
-               />
-               <div class="quota-text">
-                  <template v-if="isDbFull && !isAdmin">Full</template>
-                  <template v-else>
-                     {{ userStore.user.quota.usedEmails }} / {{ userStore.user.quota.maxEmails }}
-                  </template>
-               </div>
+            <div v-if="userStore.user.quota" class="am-storage">
+              <div class="am-storage-label">
+                <span>Storage</span>
+                <span v-if="isDbFull && !isAdmin">Full</span>
+                <span v-else>{{ formatSize(userStore.user.quota.usedStorageBytes) }} / {{ userStore.user.quota.maxStorageMB }} MB</span>
+              </div>
+              <div class="storage-bar">
+                <div class="storage-fill" :style="{width: storagePercent + '%', background: storageStatus === 'exception' ? 'var(--danger)' : ''}"></div>
+              </div>
             </div>
-
-            <div class="logout">
-              <el-button type="primary" :loading="logoutLoading" @click="clickLogout">{{ $t('logOut') }}</el-button>
-            </div>
+            <div class="am-item"><Icon class="ic ic-sm" icon="lucide:user" /><span>Account Details</span></div>
+            <div class="am-item"><Icon class="ic ic-sm" icon="lucide:settings" /><span>Settings</span></div>
+            <div class="am-item logout" @click="clickLogout"><Icon class="ic ic-sm" icon="lucide:log-out" /><span>{{ $t('logOut') }}</span></div>
           </div>
         </template>
       </el-dropdown>
@@ -332,296 +274,144 @@ function formatName(email) {
 </script>
 <style>
 .detail-dropdown {
-  color: var(--el-text-color-primary) !important;
+  background: var(--bg-elevated) !important;
+  border: 1px solid var(--border-mid) !important;
+  border-radius: 12px !important;
+  padding: 0 !important;
+  overflow: hidden;
+}
+.detail-dropdown .el-popper__arrow::before {
+  background: var(--bg-elevated) !important;
+  border-color: var(--border-mid) !important;
 }
 </style>
 <style lang="scss" scoped>
-
-:deep(.el-popper.is-pure) {
-  border-radius: 6px;
+.topbar { 
+  height: 48px; 
+  background: var(--bg-surface); 
+  display: flex; 
+  align-items: center; 
+  gap: 12px; 
+  padding: 0 16px; 
+  flex-shrink: 0; 
+  z-index: 100; 
 }
-
-.user-details {
-  width: 250px;
-  font-size: 14px;
-  display: grid;
-  grid-template-columns: 1fr;
-  justify-items: center;
-
-  .user-name {
-    font-weight: bold;
-    margin-top: 10px;
-    padding-left: 20px;
-    padding-right: 20px;
-    width: 250px;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-    text-align: center;
-  }
-
-  .detail-user-type {
-    margin-top: 10px;
-  }
-
-  .action-info {
-    width: 100%;
-    display: grid;
-    grid-template-columns: auto auto;
-    margin-top: 10px;
-
-    > div:first-child {
-      display: grid;
-      align-items: center;
-      gap: 10px;
-    }
-
-    > div:last-child {
-      display: grid;
-      gap: 10px;
-      text-align: center;
-
-      > div {
-        display: flex;
-        align-items: center;
-      }
-    }
-  }
-
-  .detail-email {
-    padding-left: 20px;
-    padding-right: 20px;
-    width: 250px;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-    text-align: center;
-    color: var(--regular-text-color);
-    cursor: pointer;
-  }
-
-  .logout {
-    margin-top: 20px;
-    width: 100%;
-    padding-left: 10px;
-    padding-right: 10px;
-    padding-bottom: 10px;
-
-    .el-button {
-      border-radius: 6px;
-      height: 28px;
-      width: 100%;
-    }
-  }
-
-  .details-avatar {
-    margin-top: 20px;
-    height: 40px;
-    width: 40px;
-    background: var(--el-bg-color);
-    color: var(--el-text-color-primary);
-    border: 1px solid var(--dark-border);
-    font-size: 18px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 10px;
-  }
-
-  .quota-dropdown-section {
-    width: 100%;
-    padding: 15px 20px 0;
-    margin-top: 15px;
-    border-top: 1px solid var(--el-border-color-lighter);
-  }
-
-  .quota-title {
-    font-size: 12px;
-    color: var(--secondary-text-color);
-    margin-bottom: 4px;
-    text-align: left;
-  }
-
-  .quota-text {
-    font-size: 12px;
-    color: var(--regular-text-color);
-    text-align: right;
-    margin-top: 2px;
-  }
+.brand-toggle { 
+  display: flex; 
+  align-items: center; 
+  gap: 8px; 
+  background: none; 
+  border: none; 
+  cursor: pointer; 
+  padding: 0; 
 }
-
-.app-logo {
-  height: 24px;
-  width: auto;
-  margin-left: 8px;
-  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.1));
+.brand-icon { 
+  width: 28px; 
+  height: 28px; 
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary)); 
+  border-radius: 7px; 
+  display: flex; 
+  align-items: center; 
+  justify-content: center; 
+  color: #fff; 
+  flex-shrink: 0; 
+  box-shadow: 0 2px 10px rgba(91,110,245,0.4); 
+  transition: transform .25s var(--ease); 
 }
-
-
-.header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 100%;
-  padding: 0 16px;
-  color: var(--header-text-color);
+.brand-toggle:hover .brand-icon { transform: rotate(-8deg) scale(1.05); }
+.brand-toggle:active .brand-icon { transform: scale(.92); }
+.brand-name { 
+  font-size: 15px; 
+  font-weight: 700; 
+  background: linear-gradient(90deg, #8b9cff, #b07ff5); 
+  -webkit-background-clip: text; 
+  -webkit-text-fill-color: transparent; 
+  letter-spacing: .5px; 
 }
-
-.header-left {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  min-width: 250px;
-}
-
-.hamburger-btn {
-  display: flex;
-  align-items: center;
-  cursor: pointer;
-}
-
-.logo-text {
-  font-size: 18px;
-  font-weight: 600;
-  letter-spacing: 0.5px;
-  color: var(--header-text-color);
-  margin-right: 16px;
-  white-space: nowrap;
-}
-
-.header-center {
-  flex: 1;
-  display: flex;
-  justify-content: center;
+.topbar-search { 
+  flex: 1; 
+  max-width: 520px; 
+  position: relative; 
   margin: 0 20px;
 }
-
-.search-box {
-  width: 100%;
-  max-width: 480px;
-  height: 36px;
-  background: rgba(255, 255, 255, 0.15);
-  border-radius: 4px;
-  display: flex;
-  align-items: center;
-  padding: 0 12px;
-  transition: all 0.2s ease;
-  border: 1px solid transparent;
-
-  &:hover, &:focus-within {
-    background: rgba(255, 255, 255, 0.25);
-    border-color: rgba(255, 255, 255, 0.3);
-  }
-
-  .search-icon {
-    color: var(--header-text-color);
-    opacity: 0.8;
-    margin-right: 8px;
-  }
-
-  .search-input {
-    flex: 1;
-    background: transparent;
-    border: none;
-    outline: none;
-    color: var(--header-text-color);
-    font-size: 14px;
-    
-    &::placeholder {
-      color: rgba(255, 255, 255, 0.6);
-    }
-  }
+.topbar-search input { 
+  width: 100%; 
+  height: 32px; 
+  background: var(--bg-elevated); 
+  border: 1px solid var(--border-mid); 
+  border-radius: 16px; 
+  color: var(--text-primary); 
+  padding: 0 14px 0 36px; 
+  font-size: 12.5px; 
+  outline: none; 
+  transition: border-color .2s, box-shadow .2s; 
 }
-
-.header-right {
-  min-width: 250px;
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  gap: 5px;
+.topbar-search input::placeholder { color: var(--text-muted); }
+.topbar-search input:focus { border-color: var(--accent-primary); box-shadow: 0 0 0 3px var(--accent-glow); }
+.topbar-search .search-icon { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--text-muted); pointer-events: none; }
+.topbar-actions { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+.icon-btn { 
+  width: 32px; 
+  height: 32px; 
+  border: none; 
+  background: transparent; 
+  cursor: pointer; 
+  color: var(--text-secondary); 
+  border-radius: 8px; 
+  display: flex; 
+  align-items: center; 
+  justify-content: center; 
+  transition: background .15s, color .15s, transform .1s; 
+  position: relative; 
+  overflow: hidden; 
 }
-
-.breadcrumb-item {
-  font-weight: 500;
-  font-size: 14px;
-  color: rgba(255, 255, 255, 0.8);
-  border-left: 1px solid rgba(255, 255, 255, 0.2);
-  padding-left: 16px;
+.icon-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+.icon-btn:active { transform: scale(.9); }
+.icon-btn .badge { 
+  position: absolute; 
+  top: 5px; 
+  right: 6px; 
+  width: 8px; 
+  height: 8px; 
+  background: var(--accent-primary); 
+  border-radius: 50%; 
+  border: 2px solid var(--bg-surface); 
+  animation: pulse 2s var(--ease) infinite; 
 }
-
-.toolbar {
-  display: flex;
-  justify-content: end;
-  gap: 15px;
-  @media (max-width: 767px) {
-    gap: 10px;
-  }
-
-  .icon-item {
-    align-self: center;
-    width: 34px;
-    height: 34px;
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    color: var(--header-text-color);
-    transition: all 0.2s ease;
-  }
-
-  .icon-item:hover {
-    background: rgba(255, 255, 255, 0.2);
-    color: #ffffff;
-  }
-
-  .notice {
-    font-size: 22px;
-    margin-right: 4px;
-  }
-
-  .dark-icon {
-    font-size: 20px;
-  }
-
-  .sun-icon {
-    font-size: 24px;
-  }
-
-  .avatar {
-    display: flex;
-    align-items: center;
-    cursor: pointer;
-
-    .avatar-text {
-      background: var(--el-color-primary-light-9);
-      color: var(--el-color-primary);
-      height: 34px;
-      width: 34px;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      border-radius: 50%;
-      border: none;
-      font-weight: bold;
-      transition: transform 0.2s ease;
-    }
-    
-    .avatar-text:hover {
-      transform: scale(1.05);
-    }
-
-    .setting-icon {
-      position: relative;
-      top: 0;
-      margin-right: 10px;
-      bottom: 10px;
-    }
-  }
-
+@keyframes pulse { 0%,100%{box-shadow:0 0 0 0 rgba(91,110,245,.5);} 50%{box-shadow:0 0 0 4px rgba(91,110,245,0);} }
+.avatar-wrap { position: relative; display: flex; align-items: center;}
+.avatar { 
+  width: 30px; 
+  height: 30px; 
+  border-radius: 50%; 
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary)); 
+  display: flex; 
+  align-items: center; 
+  justify-content: center; 
+  font-size: 12px; 
+  font-weight: 700; 
+  color: #fff; 
+  cursor: pointer; 
+  border: 2px solid var(--border-mid); 
+  transition: border-color .2s, transform .15s; 
 }
+.avatar:hover { border-color: var(--accent-primary); transform: scale(1.05); }
 
-.el-tooltip__trigger:first-child:focus-visible {
-  outline: unset;
-}
+/* Account Menu Dropdown */
+.account-menu { width: 264px; background: transparent; }
+.am-header { padding: 16px; display: flex; gap: 12px; align-items: center; background: linear-gradient(135deg, rgba(91,110,245,.2), rgba(124,92,191,.2)); border-bottom: 1px solid var(--border-subtle); }
+.am-avatar { width: 44px; height: 44px; border-radius: 50%; background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary)); display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 700; color: #fff; flex-shrink: 0; }
+.am-name { font-size: 14px; font-weight: 700; color: var(--text-primary); text-align: left; }
+.am-email { font-size: 11px; color: var(--text-muted); text-align: left;}
+.am-status { display: flex; align-items: center; gap: 5px; margin-top: 3px; }
+.am-status span { font-size: 10.5px; color: var(--success); }
+.am-storage { padding: 12px 16px; border-bottom: 1px solid var(--border-subtle); }
+.am-storage-label { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-secondary); margin-bottom: 6px; }
+.storage-bar { height: 6px; background: var(--bg-hover); border-radius: 3px; overflow: hidden; }
+.storage-fill { height: 100%; background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary)); border-radius: 3px; transition: width .3s ease; }
+.am-item { padding: 10px 16px; display: flex; align-items: center; gap: 11px; cursor: pointer; color: var(--text-secondary); font-size: 13px; transition: background .15s, color .15s; }
+.am-item:hover { background: var(--bg-hover); color: var(--text-primary); }
+.am-item.logout:hover { color: var(--danger); }
+.status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--success); box-shadow: 0 0 6px var(--success); }
+.ic { display: flex; }
 </style>

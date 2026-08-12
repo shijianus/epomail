@@ -121,52 +121,57 @@ button, input, select, textarea {
 }
 
 :root {
-    /* Modern Brand Colors (Electric/Purple Blue -> Outlook Blue) */
-    --el-color-primary: #0078D4;
-    --el-color-primary-dark-2: #0F548C;
-    --el-color-primary-light-3: #429CE3;
-    --el-color-primary-light-5: #7EBDF2;
-    --el-color-primary-light-7: #B9DDF8;
-    --el-color-primary-light-9: #E6F2FA;
+    /* Prototype Light Theme Variables */
+    --bg-base: #eef0f8;
+    --bg-surface: #ffffff;
+    --bg-elevated: #f5f6fd;
+    --bg-hover: #e7eaf9;
+    --bg-active: #dde2fb;
+    --bg-card: #ffffff;
+    --accent-primary: #5b6ef5;
+    --accent-secondary: #7c5cbf;
+    --accent-glow: rgba(91,110,245,0.16);
+    --accent-muted: rgba(91,110,245,0.12);
+    --text-primary: #141726;
+    --text-secondary: #3b4266;
+    --text-muted: #828aad;
+    --text-accent: #5546d6;
+    --star-color: #e0a91f;
+    --danger: #e05f5f;
+    --success: #4caf7d;
+    --border-subtle: rgba(91,110,245,0.16);
+    --border-mid: rgba(91,110,245,0.3);
+    --sidebar-w: 230px;
+    --sidebar-collapsed: 72px;
+    --list-w: 340px;
+    --ease: cubic-bezier(0.4,0,0.2,1);
 
-    /* Base Layout Colors */
-    --el-bg-color: #ffffff;          /* Rightmost/Bottom - Lightest (White) */
-    --header-background: #0078D4;    /* Topmost - Solid Deep Blue (Outlook Style) */
-    --header-text-color: #ffffff;    /* Text color for deep background */
-    --aside-backgound: #DDEEFE;      /* Leftmost - Deep Light Blue */
-    --base-fill: #EDF5FF;            /* Middle - Medium Light Blue */
-    --extra-light-fill: #F4F8FF;
-    --light-ill: #F8FAFC;
-    
-    /* Borders - Subtle and clean */
-    --light-border: #E4E7ED;
-    --dark-border: #CDD0D6;
-    --base-border-color: #ebeef5;
-    --light-border-color: #f0f2f5;
-    --header-actions-border: inset 0 -1px 0 0 var(--base-border-color);
-    --aside-right-border: 1px solid var(--base-border-color); /* No shadow, clean line */
-    --login-border: none;
-    
-    /* Text Colors - High Contrast */
-    --el-text-color-primary: #111827;
-    --regular-text-color: #374151;
-    --el-text-color-regular: var(--regular-text-color);
-    --secondary-text-color: #6B7280;
-    --form-desc-color: #6B7280;
-
-    /* Components & States */
-    --choose-account-background: var(--el-color-primary-light-9);
-    --email-scroll-content-color: rgba(17, 24, 39, 0.5);
-    --email-hover-background: #EBF4FF;
-    --login-switch-color: var(--el-color-primary);
-    --scrollbar-track-color: transparent;
-    --scrollbar-thumb: #d3d5db;
-    --loadding-background: rgba(255, 255, 255, 0.8);
-    --message-block-color: rgba(0, 0, 0, 0);
-
-    /* Radiuses for a softer feel */
+    /* Element Plus Overrides */
+    --el-color-primary: var(--accent-primary);
+    --el-bg-color: var(--bg-base);
+    --el-text-color-primary: var(--text-primary);
+    --el-text-color-regular: var(--text-secondary);
+    --el-border-color: var(--border-subtle);
     --el-border-radius-base: 8px;
     --el-border-radius-small: 6px;
+
+    /* Base Layout Mappings */
+    --header-background: var(--bg-surface);
+    --aside-backgound: var(--bg-surface);
+    --base-fill: var(--bg-card);
+    --aside-right-border: 1px solid var(--border-subtle);
+    --header-actions-border: none;
+    --login-border: none;
+    
+    /* Components & States */
+    --choose-account-background: var(--bg-elevated);
+    --email-scroll-content-color: var(--text-secondary);
+    --email-hover-background: var(--bg-hover);
+    --login-switch-color: var(--accent-primary);
+    --scrollbar-track-color: transparent;
+    --scrollbar-thumb: var(--border-mid);
+    --loadding-background: rgba(255, 255, 255, 0.8);
+    --message-block-color: transparent;
 
     /* View Transitions */
     --loading-hide-transition: all 200ms;
@@ -177,45 +182,51 @@ button, input, select, textarea {
 }
 
 .dark {
-    /* Dark Mode Brand Colors */
-    --el-color-primary: #479EF5;
-    --el-color-primary-light-9: #0F172A;
+    /* Prototype Dark Theme Variables */
+    --bg-base: #0d0f1a;
+    --bg-surface: #13162a;
+    --bg-elevated: #1a1e36;
+    --bg-hover: #1e2340;
+    --bg-active: #232850;
+    --bg-card: #181c33;
+    --accent-primary: #5b6ef5;
+    --accent-secondary: #7c5cbf;
+    --accent-glow: rgba(91,110,245,0.18);
+    --accent-muted: rgba(91,110,245,0.14);
+    --text-primary: #eef0fb;
+    --text-secondary: #b6bce4;
+    --text-muted: #767ca8;
+    --text-accent: #9fb0ff;
+    --star-color: #f5c542;
+    --danger: #e05f5f;
+    --success: #4caf7d;
+    --border-subtle: rgba(91,110,245,0.12);
+    --border-mid: rgba(91,110,245,0.22);
+    
+    /* Element Plus Overrides */
+    --el-color-primary: var(--accent-primary);
+    --el-bg-color: var(--bg-base);
+    --el-text-color-primary: var(--text-primary);
+    --el-text-color-regular: var(--text-secondary);
+    --el-border-color: var(--border-subtle);
 
-    /* Base Layout Colors */
-    --el-bg-color: #000000;          /* Rightmost/Bottom - Deepest Black */
-    --header-background: #334155;    /* Topmost - Lightest Dark Color */
-    --header-text-color: #F9FAFB;    /* Text color for header */
-    --aside-backgound: #1E293B;      /* Leftmost - Light Dark Blue */
-    --base-fill: #0F172A;            /* Middle - Medium Dark Blue */
-    --extra-light-fill: #050505;
-    --light-ill: #0B1120;
-
-    /* Borders */
-    --el-border-color: #1F2937 !important;
-    --base-border-color: #1F2937;
-    --light-border-color: #374151;
-    --light-border: #4B5563;
-    --dark-border: #6B7280;
-    --header-actions-border: inset 0 -1px 0 0 var(--base-border-color);
-    --aside-right-border: 1px solid var(--base-border-color); /* No shadow */
+    /* Base Layout Mappings */
+    --header-background: var(--bg-surface);
+    --aside-backgound: var(--bg-surface);
+    --base-fill: var(--bg-card);
+    --aside-right-border: 1px solid var(--border-subtle);
+    --header-actions-border: none;
     --login-border: none;
 
-    /* Text Colors */
-    --el-text-color-primary: #F9FAFB;
-    --regular-text-color: #D1D5DB;
-    --el-text-color-regular: var(--regular-text-color);
-    --secondary-text-color: #9CA3AF;
-    --form-desc-color: #9CA3AF;
-
     /* Components & States */
-    --choose-account-background: #0F172A;
-    --email-scroll-content-color: rgba(255, 255, 255, 0.4);
-    --email-hover-background: #1E3A8A;
-    --login-switch-color: var(--el-color-primary);
+    --choose-account-background: var(--bg-elevated);
+    --email-scroll-content-color: var(--text-secondary);
+    --email-hover-background: var(--bg-hover);
+    --login-switch-color: var(--accent-primary);
     --scrollbar-track-color: transparent;
-    --scrollbar-thumb: #41434a;
-    --loadding-background: rgba(0, 0, 0, 0.3);
-    --message-block-color: rgba(30, 30, 30, 0.2);
+    --scrollbar-thumb: var(--border-mid);
+    --loadding-background: rgba(13, 15, 26, 0.8);
+    --message-block-color: transparent;
 }
 
 .el-input {
