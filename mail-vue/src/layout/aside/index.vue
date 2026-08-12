@@ -49,27 +49,27 @@
           </div>
         </div>
         
-        <div class="nav-section" id="labelSection" style="margin-top: 24px;">
+        <div class="nav-section" id="labelSection" style="margin-top: 32px;">
           <div class="nav-section-label">
-            <span>{{ $t('labels') || 'Labels' }}</span>
-            <div class="label-add-btn">
-              <Icon icon="ic:outline-add" width="18" height="18" />
+            <span class="section-title">{{ $t('labels') || 'Labels' }}</span>
+            <div class="label-add-btn" :title="$t('createNewLabel') || 'Create new label'" @click.stop="uiStore.showAddLabel = true">
+              <Icon icon="ic:outline-add" width="20" height="20" />
             </div>
           </div>
           <div class="nav-item" :title="$t('labelWork') || 'Work'">
-            <span class="nav-ic-wrap"><Icon icon="ic:outline-work-outline" width="20" height="20" /></span>
+            <span class="nav-ic-wrap"><Icon icon="ic:baseline-label" width="20" height="20" /></span>
             <span class="nav-label">{{ $t('labelWork') || 'Work' }}</span>
           </div>
           <div class="nav-item" :title="$t('labelPersonal') || 'Personal'">
-            <span class="nav-ic-wrap"><Icon icon="ic:outline-person-outline" width="20" height="20" /></span>
+            <span class="nav-ic-wrap"><Icon icon="ic:baseline-label" width="20" height="20" /></span>
             <span class="nav-label">{{ $t('labelPersonal') || 'Personal' }}</span>
           </div>
           <div class="nav-item" :title="$t('labelBilling') || 'Billing'">
-            <span class="nav-ic-wrap"><Icon icon="ic:outline-receipt" width="20" height="20" /></span>
+            <span class="nav-ic-wrap"><Icon icon="ic:baseline-label" width="20" height="20" /></span>
             <span class="nav-label">{{ $t('labelBilling') || 'Billing' }}</span>
           </div>
           <div class="nav-item" :title="$t('labelNotice') || 'Notice'">
-            <span class="nav-ic-wrap"><Icon icon="ic:outline-notifications-none" width="20" height="20" /></span>
+            <span class="nav-ic-wrap"><Icon icon="ic:baseline-label" width="20" height="20" /></span>
             <span class="nav-label">{{ $t('labelNotice') || 'Notice' }}</span>
           </div>
         </div>
@@ -243,7 +243,16 @@ function openSend() {
 
 .collapsed .nav-label,
 .collapsed .nav-count,
-.collapsed .nav-section-label { display: none; }
+.collapsed .section-title { display: none; }
+.collapsed .nav-section-label {
+  padding: 0;
+  justify-content: center;
+  height: 48px;
+}
+.collapsed .label-add-btn {
+  width: 40px;
+  height: 40px;
+}
 .collapsed .nav-item { 
   margin: 2px 0; 
   padding: 0 0 0 25px; 
