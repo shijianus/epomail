@@ -29,3 +29,8 @@ mail-worker/.env
 mail-worker/d1_output.json
 mail-worker/kv_setting.json
 mail-worker/test-resend.js
+
+# AI Assistant and Skills
+.agent/
+AGENT.md
+AGENTS.md
