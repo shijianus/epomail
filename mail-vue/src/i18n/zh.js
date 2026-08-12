@@ -27,6 +27,7 @@ const zh = {
     delete: '删除',
     save: '保存',
     profile: '个人信息',
+    general: '常规',
     change: '修改',
     changePwdBtn: '修改密码',
     username: '用户名',

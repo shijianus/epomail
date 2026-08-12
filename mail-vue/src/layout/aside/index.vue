@@ -73,8 +73,8 @@
             <span class="nav-label">{{ $t('labelNotice') || 'Notice' }}</span>
           </div>
           <div class="nav-item" v-for="(label, idx) in uiStore.customLabels" :key="idx" :title="label.name || label">
-            <span class="nav-ic-wrap"><Icon :icon="label.icon || 'ic:baseline-label'" width="20" height="20" /></span>
-            <span class="nav-label">{{ label.name || label }}</span>
+            <span class="nav-ic-wrap"><Icon :icon="label.icon || 'ic:baseline-label'" width="20" height="20" :style="{ color: label.color || 'inherit' }" /></span>
+            <span class="nav-label" :style="{ color: label.color || 'inherit' }">{{ label.name || label }}</span>
           </div>
         </div>
         
@@ -115,7 +115,8 @@ const handleAddLabel = () => {
     if (!uiStore.customLabels) uiStore.customLabels = [];
     uiStore.customLabels.push({
       name: newLabelName.value.trim(),
-      icon: 'ic:baseline-label'
+      icon: 'ic:baseline-label',
+      color: ''
     });
     newLabelName.value = '';
     uiStore.showAddLabel = false;

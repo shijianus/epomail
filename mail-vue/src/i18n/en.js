@@ -27,6 +27,7 @@ const en = {
     delete: 'Delete',
     save: 'Save',
     profile: 'Profile',
+    general: 'General',
     change: 'Change',
     changePwdBtn: 'Change',
     username: 'Username',

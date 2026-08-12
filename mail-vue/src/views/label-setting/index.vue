@@ -6,11 +6,12 @@
       <div class="label-list">
         <div class="label-item" v-for="(label, index) in uiStore.customLabels" :key="index">
           <div class="label-info">
-            <Icon :icon="label.icon || 'ic:baseline-label'" width="20" height="20" />
+            <Icon :icon="label.icon || 'ic:baseline-label'" width="20" height="20" :style="{ color: label.color || 'inherit' }" />
             <span v-if="editIndex !== index">{{ label.name || label }}</span>
             <template v-else>
               <el-input v-model="editForm.name" size="small" :placeholder="$t('labels') || 'Label Name'" style="width: 150px" />
-              <el-input v-model="editForm.icon" size="small" placeholder="Icon (e.g. ic:baseline-label)" style="width: 200px" />
+              <el-input v-model="editForm.icon" size="small" placeholder="Icon (e.g. ic:baseline-label)" style="width: 180px" />
+              <el-color-picker v-model="editForm.color" size="small" />
             </template>
           </div>
           
@@ -46,13 +47,13 @@ import { Icon } from '@iconify/vue'
 const uiStore = useUiStore()
 
 const editIndex = ref(-1)
-const editForm = ref({ name: '', icon: '' })
+const editForm = ref({ name: '', icon: '', color: '' })
 
 // Ensure they are object shapes
 const normalizeLabels = () => {
   if (!uiStore.customLabels) uiStore.customLabels = []
   uiStore.customLabels = uiStore.customLabels.map(l => {
-    if (typeof l === 'string') return { name: l, icon: 'ic:baseline-label' }
+    if (typeof l === 'string') return { name: l, icon: 'ic:baseline-label', color: '' }
     return l
   })
 }
