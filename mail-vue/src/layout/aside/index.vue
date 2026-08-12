@@ -72,9 +72,9 @@
             <span class="nav-ic-wrap"><Icon icon="ic:outline-notifications-none" width="20" height="20" /></span>
             <span class="nav-label">{{ $t('labelNotice') || 'Notice' }}</span>
           </div>
-          <div class="nav-item" v-for="(label, idx) in uiStore.customLabels" :key="idx" :title="label">
-            <span class="nav-ic-wrap"><Icon icon="ic:baseline-label" width="20" height="20" /></span>
-            <span class="nav-label">{{ label }}</span>
+          <div class="nav-item" v-for="(label, idx) in uiStore.customLabels" :key="idx" :title="label.name || label">
+            <span class="nav-ic-wrap"><Icon :icon="label.icon || 'ic:baseline-label'" width="20" height="20" /></span>
+            <span class="nav-label">{{ label.name || label }}</span>
           </div>
         </div>
         
@@ -113,7 +113,10 @@ const newLabelName = ref('');
 const handleAddLabel = () => {
   if (newLabelName.value.trim()) {
     if (!uiStore.customLabels) uiStore.customLabels = [];
-    uiStore.customLabels.push(newLabelName.value.trim());
+    uiStore.customLabels.push({
+      name: newLabelName.value.trim(),
+      icon: 'ic:baseline-label'
+    });
     newLabelName.value = '';
     uiStore.showAddLabel = false;
   }

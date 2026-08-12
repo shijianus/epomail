@@ -11,13 +11,16 @@
               <span>{{$t('backToMail') || 'Back to Mail'}}</span>
             </div>
             
-            <div class="nav-section-title">{{$t('profile')}} / {{$t('general')}}</div>
+            <div class="nav-section-title">{{$t('settings') || 'Settings'}}</div>
             <router-link :to="{name: 'setting'}" class="settings-nav-item" :class="{active: route.name === 'setting'}">
-              <Icon icon="fluent:settings-48-regular" width="20" height="20" /> {{$t('settings')}}
+              <Icon icon="fluent:settings-48-regular" width="20" height="20" /> {{$t('general') || 'General'}}
+            </router-link>
+            <router-link :to="{name: 'label-setting'}" class="settings-nav-item" :class="{active: route.name === 'label-setting'}">
+              <Icon icon="ic:baseline-label" width="20" height="20" /> {{$t('labels') || 'Labels'}}
             </router-link>
 
             <template v-if="hasPerm(['all-email:query','user:query','role:query','setting:query','analysis:query','reg-key:query'])">
-              <div class="nav-section-title">{{$t('manage')}}</div>
+              <div class="nav-section-title" style="margin-top: 24px;">{{$t('manage')}}</div>
               
               <router-link v-if="hasPerm('analysis:query')" :to="{name: 'analysis'}" class="settings-nav-item" :class="{active: route.name === 'analysis'}">
                 <Icon icon="fluent:data-pie-20-regular" width="20" height="20" /> {{$t('analytics')}}
@@ -93,7 +96,7 @@ let elNotification = null
 const isMobileView = computed(() => window.innerWidth < 768)
 
 const isSettingsMode = computed(() => {
-  return ['setting', 'analysis', 'user', 'all-email', 'role', 'reg-key', 'sys-setting'].includes(route.name)
+  return ['setting', 'label-setting', 'analysis', 'user', 'all-email', 'role', 'reg-key', 'sys-setting'].includes(route.name)
 })
 
 const showReadingPane = computed(() => {

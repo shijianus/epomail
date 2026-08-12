@@ -42,15 +42,7 @@
         <el-option label="English" value="en" @pointerdown.prevent.stop="changeLang('en')"/>
       </el-select>
     </div>
-    <div class="labels-setting">
-      <div class="title">{{$t('labels') || 'Labels'}}</div>
-      <div style="color: var(--regular-text-color); margin-top: 10px; margin-bottom: 20px;">
-        {{$t('manageLabels') || 'Manage Labels'}}
-      </div>
-      <div>
-        <el-button type="primary">{{$t('edit') || 'Edit'}}</el-button>
-      </div>
-    </div>
+
     <div class="del-email" v-perm="'my:delete'">
       <div class="title">{{$t('deleteUser')}}</div>
       <div style="color: var(--regular-text-color);">

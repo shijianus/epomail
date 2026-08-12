@@ -42,6 +42,16 @@ const routes = [
                 }
             },
             {
+                path: '/settings/labels',
+                name: 'label-setting',
+                component: () => import('@/views/label-setting/index.vue'),
+                meta: {
+                    title: 'labels',
+                    name: 'label-setting',
+                    menu: true
+                }
+            },
+            {
                 path: '/starred',
                 name: 'star',
                 component: () => import('@/views/star/index.vue'),
