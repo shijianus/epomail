@@ -125,8 +125,7 @@
                            :showStatus="showStatus"
                            :showUserInfo="showUserInfo"
                            :type="type"/>
-            <div class="noLoading" v-else-if="item.expand === 'noMoreData'">
-              <div>{{ $t('noMoreData') }}</div>
+            <div class="noLoading" v-else-if="item.expand === 'noMoreData'" style="height: 10px;">
             </div>
           </template>
         </UseVirtualList>
@@ -145,7 +144,7 @@
                        :showUserInfo="showUserInfo"
                        :type="type"/>
       <div class="empty" v-if="noLoading && emailList.length === 0 && !loading">
-        <el-empty :image-size="isMobile ? 120 : null" :description="$t('noMessagesFound')"/>
+        <el-empty :image-size="isMobile ? 120 : null" :description="$t('noMoreData')"/>
       </div>
     </div>
     <el-dropdown

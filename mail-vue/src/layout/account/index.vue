@@ -66,11 +66,10 @@
           </el-skeleton>
         </template>
 
-        <div class="noLoading" v-if="noLoading && accounts.length > 0">
-          <div>{{ $t('noMoreData') }}</div>
+        <div class="noLoading" v-if="noLoading && accounts.length > 0" style="height: 10px;">
         </div>
-        <div class="empty" v-if="noLoading && accounts.length === 0">
-          <el-empty :description="$t('noMessagesFound')"/>
+        <div class="empty" v-if="noLoading && accounts.length === 0 && !loading">
+          <el-empty :description="$t('noMoreData')"/>
         </div>
       </div>
 

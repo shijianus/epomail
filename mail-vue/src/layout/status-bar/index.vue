@@ -1,7 +1,9 @@
 <template>
   <div class="status-bar">
     <div class="status-dot"></div>
-    <div class="status-text">Connected <span class="status-time">Synced just now</span></div>
+    <div class="status-text">{{ $t('connected') || 'Connected' }} <span class="status-time">{{ $t('syncedJustNow') || 'Synced just now' }}</span></div>
+    <div style="flex: 1"></div>
+    <div class="status-text version-tag">EpoMail v1.0.3 · Cloudflare Workers</div>
   </div>
 </template>
 

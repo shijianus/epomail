@@ -1,11 +1,8 @@
 <template>
   <div class="topbar" :class="!hasPerm('email:send') ? 'not-send' : ''">
-    <!-- Left Section: Hamburger + Logo -->
+    <!-- Left Section: Logo acting as toggle -->
     <div class="topbar-left">
-      <div class="hamburger-wrapper" @click="changeAside" :title="$t('toggleSidebar') || 'Toggle Sidebar'">
-        <Icon icon="lucide:menu" width="24" height="24" class="hamburger-icon"/>
-      </div>
-      <div class="brand-wrapper" @click="router.push({name: 'email'})" style="cursor:pointer">
+      <div class="brand-wrapper" @click="changeAside" style="cursor:pointer" :title="$t('toggleSidebar') || 'Toggle Sidebar'">
         <img src="/logo.svg" alt="Logo" class="brand-logo" />
         <span class="brand-name">EpoCanvas</span>
       </div>
@@ -56,16 +53,16 @@
             </div>
             <div v-if="userStore.user.quota" class="am-storage">
               <div class="am-storage-label">
-                <span>Storage</span>
-                <span v-if="isDbFull && !isAdmin">Full</span>
+                <span>{{ $t('storage') || 'Storage' }}</span>
+                <span v-if="isDbFull && !isAdmin">{{ $t('full') || 'Full' }}</span>
                 <span v-else>{{ formatSize(userStore.user.quota.usedStorageBytes) }} / {{ userStore.user.quota.maxStorageMB }} MB</span>
               </div>
               <div class="storage-bar">
                 <div class="storage-fill" :style="{width: storagePercent + '%', background: storageStatus === 'exception' ? 'var(--danger)' : ''}"></div>
               </div>
             </div>
-            <div class="am-item"><Icon class="ic ic-sm" icon="lucide:user" /><span>Account Details</span></div>
-            <div class="am-item" @click="router.push({name: 'setting'})"><Icon class="ic ic-sm" icon="lucide:settings" /><span>Settings</span></div>
+            <div class="am-item"><Icon class="ic ic-sm" icon="lucide:user" /><span>{{ $t('accountDetails') || 'Account Details' }}</span></div>
+            <div class="am-item" @click="router.push({name: 'setting'})"><Icon class="ic ic-sm" icon="lucide:settings" /><span>{{ $t('settings') || 'Settings' }}</span></div>
             <div class="am-item logout" @click="clickLogout"><Icon class="ic ic-sm" icon="lucide:log-out" /><span>{{ $t('logOut') }}</span></div>
           </div>
         </template>
@@ -336,7 +333,7 @@ function formatName(email) {
 .brand-wrapper { 
   display: flex; 
   align-items: center; 
-  gap: 10px; 
+  gap: 22px; 
   cursor: pointer; 
   transition: opacity .15s;
 }
