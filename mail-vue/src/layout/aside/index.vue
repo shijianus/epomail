@@ -57,25 +57,38 @@
             </div>
           </div>
           <div class="nav-item" :title="$t('labelWork') || 'Work'">
-            <span class="nav-ic-wrap"><Icon icon="ic:baseline-label" width="20" height="20" /></span>
+            <span class="nav-ic-wrap"><Icon icon="ic:outline-work-outline" width="20" height="20" /></span>
             <span class="nav-label">{{ $t('labelWork') || 'Work' }}</span>
           </div>
           <div class="nav-item" :title="$t('labelPersonal') || 'Personal'">
-            <span class="nav-ic-wrap"><Icon icon="ic:baseline-label" width="20" height="20" /></span>
+            <span class="nav-ic-wrap"><Icon icon="ic:outline-person-outline" width="20" height="20" /></span>
             <span class="nav-label">{{ $t('labelPersonal') || 'Personal' }}</span>
           </div>
           <div class="nav-item" :title="$t('labelBilling') || 'Billing'">
-            <span class="nav-ic-wrap"><Icon icon="ic:baseline-label" width="20" height="20" /></span>
+            <span class="nav-ic-wrap"><Icon icon="ic:outline-receipt" width="20" height="20" /></span>
             <span class="nav-label">{{ $t('labelBilling') || 'Billing' }}</span>
           </div>
           <div class="nav-item" :title="$t('labelNotice') || 'Notice'">
-            <span class="nav-ic-wrap"><Icon icon="ic:baseline-label" width="20" height="20" /></span>
+            <span class="nav-ic-wrap"><Icon icon="ic:outline-notifications-none" width="20" height="20" /></span>
             <span class="nav-label">{{ $t('labelNotice') || 'Notice' }}</span>
+          </div>
+          <div class="nav-item" v-for="(label, idx) in uiStore.customLabels" :key="idx" :title="label">
+            <span class="nav-ic-wrap"><Icon icon="ic:baseline-label" width="20" height="20" /></span>
+            <span class="nav-label">{{ label }}</span>
           </div>
         </div>
         
-      </div>
     </div>
+    
+    <el-dialog v-model="uiStore.showAddLabel" :title="$t('createNewLabel') || 'Create new label'" width="400px">
+      <el-input v-model="newLabelName" :placeholder="$t('labels') || 'Label name'" @keyup.enter="handleAddLabel" />
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="uiStore.showAddLabel = false">{{ $t('cancel') || 'Cancel' }}</el-button>
+          <el-button type="primary" @click="handleAddLabel">{{ $t('confirm') || 'Confirm' }}</el-button>
+        </span>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -95,6 +108,16 @@ const route = useRoute();
 
 // Mock unread count for demonstration
 const unreadCount = ref(12);
+
+const newLabelName = ref('');
+const handleAddLabel = () => {
+  if (newLabelName.value.trim()) {
+    if (!uiStore.customLabels) uiStore.customLabels = [];
+    uiStore.customLabels.push(newLabelName.value.trim());
+    newLabelName.value = '';
+    uiStore.showAddLabel = false;
+  }
+};
 
 const isMobile = ref(window.innerWidth < 1025)
 const handleResize = () => {
