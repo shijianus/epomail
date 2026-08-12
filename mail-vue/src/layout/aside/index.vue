@@ -78,8 +78,8 @@
           </div>
         </div>
         
+      </div>
     </div>
-    
     <el-dialog v-model="uiStore.showAddLabel" :title="$t('createNewLabel') || 'Create new label'" width="400px">
       <el-input v-model="newLabelName" :placeholder="$t('labels') || 'Label name'" @keyup.enter="handleAddLabel" />
       <template #footer>
