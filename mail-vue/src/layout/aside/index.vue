@@ -50,21 +50,26 @@
         </div>
         
         <div class="nav-section" id="labelSection" style="margin-top: 24px;">
-          <div class="nav-section-label"><span>{{ $t('labels') || 'Labels' }}</span></div>
+          <div class="nav-section-label">
+            <span>{{ $t('labels') || 'Labels' }}</span>
+            <div class="label-add-btn">
+              <Icon icon="ic:outline-add" width="18" height="18" />
+            </div>
+          </div>
           <div class="nav-item" :title="$t('labelWork') || 'Work'">
-            <span class="nav-ic-wrap"><Icon icon="ic:outline-work-outline" width="18" height="18" /></span>
+            <span class="nav-ic-wrap"><Icon icon="ic:outline-work-outline" width="20" height="20" /></span>
             <span class="nav-label">{{ $t('labelWork') || 'Work' }}</span>
           </div>
           <div class="nav-item" :title="$t('labelPersonal') || 'Personal'">
-            <span class="nav-ic-wrap"><Icon icon="ic:outline-person-outline" width="18" height="18" /></span>
+            <span class="nav-ic-wrap"><Icon icon="ic:outline-person-outline" width="20" height="20" /></span>
             <span class="nav-label">{{ $t('labelPersonal') || 'Personal' }}</span>
           </div>
           <div class="nav-item" :title="$t('labelBilling') || 'Billing'">
-            <span class="nav-ic-wrap"><Icon icon="ic:outline-receipt" width="18" height="18" /></span>
+            <span class="nav-ic-wrap"><Icon icon="ic:outline-receipt" width="20" height="20" /></span>
             <span class="nav-label">{{ $t('labelBilling') || 'Billing' }}</span>
           </div>
           <div class="nav-item" :title="$t('labelNotice') || 'Notice'">
-            <span class="nav-ic-wrap"><Icon icon="ic:outline-notifications-none" width="18" height="18" /></span>
+            <span class="nav-ic-wrap"><Icon icon="ic:outline-notifications-none" width="20" height="20" /></span>
             <span class="nav-label">{{ $t('labelNotice') || 'Notice' }}</span>
           </div>
         </div>
@@ -132,7 +137,7 @@ function openSend() {
 }
 
 .compose-btn-wrapper {
-  padding: 14px 12px 16px;
+  padding: 14px 12px 32px;
   display: flex;
 }
 
@@ -184,28 +189,29 @@ function openSend() {
 
 .nav-section { margin-bottom: 4px; }
 .nav-section-label { 
-  padding: 10px 20px 8px; 
-  font-size: 10.5px; 
-  font-weight: 700; 
-  color: var(--text-muted); 
-  text-transform: uppercase; 
-  letter-spacing: .8px; 
+  padding: 10px 16px 8px 25px; 
+  font-size: 14px; 
+  font-weight: 500; 
+  color: var(--text-primary); 
+  text-transform: none; 
+  letter-spacing: 0; 
   white-space: nowrap; 
   display: flex; 
   align-items: center; 
   justify-content: space-between; 
 }
-.label-edit-btn { 
-  cursor: pointer; 
-  color: var(--text-accent); 
-  font-size: 10px; 
-  font-weight: 600; 
-  text-transform: none; 
-  letter-spacing: 0; 
-  padding: 2px 8px; 
-  border-radius: 8px; 
-  transition: background .15s; 
+.label-add-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: background .2s;
+  color: var(--text-secondary);
 }
+.label-add-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
 .label-edit-btn:hover { background: var(--bg-hover); }
 
 .nav-item { 
@@ -213,8 +219,8 @@ function openSend() {
   align-items: center; 
   gap: 14px; 
   height: 38px; 
-  margin: 2px 14px; 
-  padding: 0 16px; 
+  margin: 2px 12px; 
+  padding: 0 13px; 
   border-radius: 19px; 
   color: var(--text-secondary); 
   cursor: pointer; 
