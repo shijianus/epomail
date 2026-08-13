@@ -10,71 +10,74 @@
       </el-button>
     </div>
 
-    <!-- Default Template Labels -->
-    <div class="section">
-      <h2 class="section-title">{{ $t('defaultTemplates') || 'Default Templates' }}</h2>
-      <div class="modern-list">
-        <div class="list-row system-row" v-for="(label, index) in uiStore.defaultLabels" :key="'def-'+index">
-          <div class="drag-handle disabled" :title="$t('cannotReorderDefault') || 'Default labels cannot be reordered'"></div>
-          <div class="label-pill-cell">
-            <div class="label-pill" :style="{ '--pill-color': label.color }">
-              <Icon :icon="label.icon" width="16" />
-              <span>{{ label.name }}</span>
+    <div class="labels-container" v-if="uiStore.defaultLabels.length > 0 || uiStore.customLabels.length > 0">
+      <!-- Default Template Labels -->
+      <div class="section" v-if="uiStore.defaultLabels.length > 0">
+        <h2 class="section-title">{{ $t('defaultTemplates') || 'Default Templates' }}</h2>
+        <div class="modern-list">
+          <div class="list-row tech-row" v-for="(label, index) in uiStore.defaultLabels" :key="'def-'+index">
+            <div class="label-pill-cell">
+              <div class="label-pill" :style="{ '--pill-color': label.color }">
+                <Icon :icon="label.icon" width="18" />
+                <span>{{ label.name }}</span>
+              </div>
+            </div>
+            <div class="visibility-cell">
+               <el-switch v-model="label.listVis" size="small" :active-text="$t('show') || 'Show'" :inactive-text="$t('hide') || 'Hide'" inline-prompt />
+            </div>
+            <div class="actions-cell">
+              <el-button link class="action-btn edit-btn" @click="startEditDefault(index)" :title="$t('edit') || 'Edit'">
+                <Icon icon="lucide:pencil" width="16" />
+              </el-button>
+              <el-button link class="action-btn delete-btn" @click="confirmDeleteDefault(index)" :title="$t('delete') || 'Delete'">
+                <Icon icon="lucide:trash-2" width="16" />
+              </el-button>
             </div>
           </div>
-          <div class="visibility-cell">
-             <el-switch v-model="label.listVis" size="small" :active-text="$t('show') || 'Show'" :inactive-text="$t('hide') || 'Hide'" inline-prompt />
-          </div>
-          <div class="stats-cell">--</div>
-          <div class="actions-cell">
-            <el-button link class="action-btn edit-btn" @click="startEditDefault(index)" :title="$t('edit') || 'Edit'">
-              <Icon icon="lucide:pencil" width="16" />
-            </el-button>
+        </div>
+      </div>
+
+      <!-- Custom Labels -->
+      <div class="section" style="margin-top: 32px" v-if="uiStore.customLabels.length > 0">
+        <h2 class="section-title">{{ $t('customLabels') || 'Custom Labels' }}</h2>
+        <div class="modern-list">
+          <div class="list-row tech-row" v-for="(label, index) in uiStore.customLabels" :key="index">
+            <div class="drag-handle" :title="$t('dragToReorder') || 'Drag to reorder'" @click="moveUp(index)">
+              <Icon icon="lucide:grip-vertical" width="18" />
+            </div>
+            <div class="label-pill-cell" style="padding-left: 8px;">
+              <div class="label-pill" :style="{ '--pill-color': label.color || 'var(--accent-primary)' }">
+                <Icon :icon="label.icon || 'ic:baseline-label'" width="18" />
+                <span>{{ label.name || label }}</span>
+              </div>
+            </div>
+            <div class="visibility-cell">
+               <el-switch v-model="label.listVis" size="small" :active-text="$t('show') || 'Show'" :inactive-text="$t('hide') || 'Hide'" inline-prompt />
+            </div>
+            <div class="actions-cell">
+              <el-button link class="action-btn edit-btn" @click="startEdit(index)" :title="$t('edit') || 'Edit'">
+                <Icon icon="lucide:pencil" width="16" />
+              </el-button>
+              <el-button link class="action-btn delete-btn" @click="confirmDelete(index)" :title="$t('delete') || 'Delete'">
+                <Icon icon="lucide:trash-2" width="16" />
+              </el-button>
+            </div>
           </div>
         </div>
       </div>
     </div>
-
-    <!-- Custom Labels -->
-    <div class="section" style="margin-top: 32px">
-      <div class="modern-list" v-if="uiStore.customLabels && uiStore.customLabels.length > 0">
-        <div class="list-row custom-row" v-for="(label, index) in uiStore.customLabels" :key="index">
-          <div class="drag-handle" :title="$t('dragToReorder') || 'Drag to reorder'" @click="moveUp(index)">
-            <Icon icon="lucide:grip-vertical" width="18" />
-          </div>
-          <div class="label-pill-cell">
-            <div class="label-pill" :style="{ '--pill-color': label.color || 'var(--accent-primary)' }">
-              <Icon :icon="label.icon || 'ic:baseline-label'" width="16" />
-              <span>{{ label.name || label }}</span>
-            </div>
-          </div>
-          <div class="visibility-cell">
-             <el-switch v-model="label.listVis" size="small" :active-text="$t('show') || 'Show'" :inactive-text="$t('hide') || 'Hide'" inline-prompt />
-          </div>
-          <div class="stats-cell">0 {{$t('emails') || 'emails'}}</div>
-          <div class="actions-cell">
-            <el-button link class="action-btn edit-btn" @click="startEdit(index)" :title="$t('edit') || 'Edit'">
-              <Icon icon="lucide:pencil" width="16" />
-            </el-button>
-            <el-button link class="action-btn delete-btn" @click="confirmDelete(index)" :title="$t('delete') || 'Delete'">
-              <Icon icon="lucide:trash-2" width="16" />
-            </el-button>
-          </div>
-        </div>
-      </div>
-      <div v-else class="empty-state">
-        <Icon icon="lucide:tags" width="48" class="empty-icon" />
-        <h3>{{ $t('noCustomLabels') || 'No Custom Labels' }}</h3>
-        <p>{{ $t('noCustomLabelsDesc') || 'Create your first label to keep your inbox organized.' }}</p>
-      </div>
+    <div v-else class="empty-state">
+      <Icon icon="lucide:tags" width="48" class="empty-icon" />
+      <h3>{{ $t('noLabels') || 'No Labels' }}</h3>
+      <p>{{ $t('noLabelsDesc') || 'Create your first label to keep your inbox organized.' }}</p>
     </div>
 
     <!-- Drawer for Add/Edit -->
     <el-drawer v-model="isEditorOpen" :title="editIndex === -1 ? 'Create New Label' : 'Edit Label'" size="400px" destroy-on-close class="label-drawer">
       <div class="editor-form">
         <div class="form-group">
-          <label>Name</label>
-          <el-input v-model="form.name" size="large" placeholder="Enter label name" :disabled="isEditingDefault" />
+          <label>{{ $t('name') || 'Name' }}</label>
+          <el-input v-model="form.name" size="large" :placeholder="$t('labelNamePlaceholder') || 'Enter label name'" />
         </div>
         <div class="form-group" v-if="!isEditingDefault">
           <label>Parent Label</label>
@@ -113,17 +116,26 @@
         
         <!-- Rules Section -->
         <div class="form-group" style="margin-top: 8px;">
-          <label>{{ $t('rules') || 'Automation Rules' }}</label>
+          <label>{{ $t('classificationRules') || '分类规则 (Classification Rules)' }}</label>
           <p style="font-size: 12px; color: var(--text-muted); margin: 0 0 8px 0; line-height: 1.4;">
-            {{ $t('rulesDesc') || 'Emails from these senders or domains will automatically receive this label.' }}
+            {{ $t('rulesDesc') || 'Emails matching these rules will automatically receive this label.' }}
           </p>
           <div style="display: flex; gap: 8px; margin-bottom: 8px;">
-            <el-input v-model="newRule" size="small" :placeholder="$t('addRulePlaceholder') || 'e.g. @gmail.com or user@test.com'" @keyup.enter="addRule" />
+            <el-select v-model="newRuleType" size="small" style="width: 140px;" :placeholder="$t('ruleType') || 'Rule Type'">
+              <el-option :label="$t('ruleDomain') || '发件人域名/后缀'" value="domain" />
+              <el-option :label="$t('ruleSender') || '指定邮箱地址'" value="sender" />
+            </el-select>
+            <el-input v-model="newRuleValue" size="small" :placeholder="newRuleType === 'domain' ? '@gmail.com' : 'admin@outlook.com'" @keyup.enter="addRule" style="flex: 1;" />
             <el-button size="small" @click="addRule"><Icon icon="lucide:plus" width="14" /></el-button>
           </div>
           <div v-if="form.rules && form.rules.length > 0" class="rules-list" style="display: flex; flex-direction: column; gap: 4px; max-height: 150px; overflow-y: auto; padding-right: 4px;">
-            <div v-for="(rule, rIdx) in form.rules" :key="rIdx" style="display: flex; align-items: center; justify-content: space-between; padding: 4px 8px; background: var(--bg-base); border-radius: 4px; border: 1px solid var(--border-subtle); font-size: 12px; color: var(--text-primary);">
-              <span>{{ rule }}</span>
+            <div v-for="(rule, rIdx) in form.rules" :key="rIdx" style="display: flex; align-items: center; justify-content: space-between; padding: 6px 10px; background: var(--bg-hover); border-radius: 6px; border: 1px solid var(--border-subtle); font-size: 12.5px; color: var(--text-primary);">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="padding: 2px 6px; background: var(--bg-surface); border-radius: 4px; color: var(--text-secondary); font-size: 11px;">
+                  {{ rule.type === 'domain' ? ($t('ruleDomainShort') || '域名') : ($t('ruleSenderShort') || '邮箱') }}
+                </span>
+                <span>{{ rule.value }}</span>
+              </div>
               <el-button link size="small" @click="removeRule(rIdx)" style="color: var(--danger);"><Icon icon="lucide:x" width="14" /></el-button>
             </div>
           </div>
@@ -138,18 +150,18 @@
     </el-drawer>
 
     <!-- Delete Confirmation Modal -->
-    <el-dialog v-model="isDeleteOpen" title="Delete Label" width="450px" custom-class="delete-modal">
+    <el-dialog v-model="isDeleteOpen" :title="$t('deleteLabel') || 'Delete Label'" width="450px" custom-class="delete-modal">
       <div class="delete-warning">
         <Icon icon="lucide:alert-triangle" width="32" class="warning-icon" />
         <div class="warning-text">
-          <h3 style="margin:0; font-size: 16px;">Delete "{{ deleteCandidate?.name }}"?</h3>
-          <p style="margin:8px 0 0; color: var(--text-secondary); font-size: 13px;">Please select how to handle the associated emails.</p>
+          <h3 style="margin:0; font-size: 16px;">{{ $t('deleteConfirmMsg', { name: deleteCandidate?.name }) || `Delete "${deleteCandidate?.name}"?` }}</h3>
+          <p style="margin:8px 0 0; color: var(--text-secondary); font-size: 13px;">{{ $t('deleteLabelDesc') || 'Please select how to handle the associated emails.' }}</p>
         </div>
       </div>
       <el-radio-group v-model="deleteMode" class="delete-radio-group">
         <el-radio :value="'tagOnly'" class="radio-item">
-          <div><strong>Only remove the label tag</strong></div>
-          <div class="radio-desc">Emails will remain in their original folders. The label association will simply be cleared.</div>
+          <div><strong>{{ $t('onlyRemoveTag') || 'Only remove the label tag' }}</strong></div>
+          <div class="radio-desc">{{ $t('onlyRemoveTagDesc') || 'Emails will remain in their original folders. The label association will simply be cleared.' }}</div>
         </el-radio>
       </el-radio-group>
       <template #footer>
@@ -198,13 +210,14 @@ const isEditorOpen = ref(false)
 const editIndex = ref(-1)
 const isEditingDefault = ref(false)
 const form = ref({ name: '', icon: 'ic:baseline-label', color: '#3b82f6', parent: '', sidebarVis: 'show', listVis: true, rules: [] })
-const newRule = ref('')
+const newRuleType = ref('domain')
+const newRuleValue = ref('')
 
 const startAdd = () => {
   editIndex.value = -1
   isEditingDefault.value = false
   form.value = { name: '', icon: 'ic:baseline-label', color: presetColors[5], parent: '', sidebarVis: 'show', listVis: true, rules: [] }
-  newRule.value = ''
+  newRuleValue.value = ''
   isEditorOpen.value = true
 }
 
@@ -213,7 +226,7 @@ const startEdit = (index) => {
   isEditingDefault.value = false
   form.value = { ...uiStore.customLabels[index] }
   if (!form.value.rules) form.value.rules = []
-  newRule.value = ''
+  newRuleValue.value = ''
   isEditorOpen.value = true
 }
 
@@ -222,18 +235,19 @@ const startEditDefault = (index) => {
   isEditingDefault.value = true
   form.value = { ...uiStore.defaultLabels[index] }
   if (!form.value.rules) form.value.rules = []
-  newRule.value = ''
+  newRuleValue.value = ''
   isEditorOpen.value = true
 }
 
 const addRule = () => {
-  const rule = newRule.value.trim().toLowerCase()
-  if (rule) {
+  const ruleVal = newRuleValue.value.trim().toLowerCase()
+  if (ruleVal) {
     if (!form.value.rules) form.value.rules = []
-    if (!form.value.rules.includes(rule)) {
-      form.value.rules.push(rule)
+    const exists = form.value.rules.some(r => r.type === newRuleType.value && r.value === ruleVal)
+    if (!exists) {
+      form.value.rules.push({ type: newRuleType.value, value: ruleVal })
     }
-    newRule.value = ''
+    newRuleValue.value = ''
   }
 }
 
@@ -265,17 +279,31 @@ const isDeleteOpen = ref(false)
 const deleteCandidate = ref(null)
 const deleteIndex = ref(-1)
 const deleteMode = ref('tagOnly')
+const isDeletingDefault = ref(false)
 
 const confirmDelete = (index) => {
   deleteIndex.value = index
   deleteCandidate.value = uiStore.customLabels[index]
   deleteMode.value = 'tagOnly'
+  isDeletingDefault.value = false
+  isDeleteOpen.value = true
+}
+
+const confirmDeleteDefault = (index) => {
+  deleteIndex.value = index
+  deleteCandidate.value = uiStore.defaultLabels[index]
+  deleteMode.value = 'tagOnly'
+  isDeletingDefault.value = true
   isDeleteOpen.value = true
 }
 
 const executeDelete = () => {
   if (deleteIndex.value > -1) {
-    uiStore.customLabels.splice(deleteIndex.value, 1)
+    if (isDeletingDefault.value) {
+      uiStore.defaultLabels.splice(deleteIndex.value, 1)
+    } else {
+      uiStore.customLabels.splice(deleteIndex.value, 1)
+    }
   }
   isDeleteOpen.value = false
   ElMessage.success('Label tag removed successfully')
@@ -348,20 +376,26 @@ const moveUp = (index) => {
   background: var(--bg-surface);
 }
 
-.list-row {
+.tech-row {
   display: flex;
   align-items: center;
-  padding: 12px 0;
+  padding: 16px 12px;
+  border: 1px solid transparent;
   border-bottom: 1px solid var(--border-subtle);
-  transition: background-color 0.2s;
+  transition: all 0.2s ease;
+  border-radius: 8px;
+  margin-bottom: 4px;
 }
 
-.list-row:last-child {
-  border-bottom: none;
+.modern-list:hover .tech-row:not(:hover) {
+  opacity: 0.6;
 }
 
-.list-row.custom-row:hover {
+.tech-row:hover {
   background-color: var(--bg-hover);
+  border-color: var(--border-mid);
+  transform: translateX(4px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
 }
 
 .drag-handle {
@@ -377,7 +411,7 @@ const moveUp = (index) => {
 .drag-handle.disabled {
   cursor: default;
 }
-.list-row:hover .drag-handle:not(.disabled) {
+.tech-row:hover .drag-handle:not(.disabled) {
   opacity: 1;
 }
 
@@ -425,7 +459,7 @@ const moveUp = (index) => {
   transition: opacity 0.2s, color 0.2s;
 }
 
-.list-row:hover .action-btn {
+.tech-row:hover .action-btn {
   color: var(--text-secondary);
 }
 

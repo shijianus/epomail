@@ -14,10 +14,10 @@ export const useUiStore = defineStore('ui', {
         showAddLabel: false,
         customLabels: [],
         defaultLabels: [
-          { name: '社群', icon: 'ic:outline-people-alt', color: '#3b82f6', sidebarVis: 'show', listVis: true },
-          { name: '工作', icon: 'ic:outline-work-outline', color: '#f59e0b', sidebarVis: 'show', listVis: true },
-          { name: '推销', icon: 'ic:outline-local-offer', color: '#ef4444', sidebarVis: 'show', listVis: true },
-          { name: '订阅', icon: 'ic:outline-rss-feed', color: '#10b981', sidebarVis: 'show', listVis: true }
+          { name: '社群', icon: 'ic:outline-people-alt', color: '#3b82f6', listVis: true, rules: [{type: 'domain', value: '@gmail.com'}, {type: 'domain', value: '@outlook.com'}, {type: 'domain', value: '@yahoo.com'}] },
+          { name: '工作', icon: 'ic:outline-work-outline', color: '#f59e0b', listVis: true, rules: [] },
+          { name: '推销', icon: 'ic:outline-local-offer', color: '#ef4444', listVis: true, rules: [] },
+          { name: '订阅', icon: 'ic:outline-rss-feed', color: '#10b981', listVis: true, rules: [] }
         ],
         asideCount: {
             email: 0,
