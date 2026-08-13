@@ -23,7 +23,7 @@
             <span class="nav-ic-wrap"><Icon icon="solar:star-line-duotone" width="20" height="20" /></span>
             <span class="nav-label">{{$t('starred')}}</span>
           </div>
-          <div class="nav-item" @click="() => {}" :title="$t('snoozed') || 'Snoozed'">
+          <div class="nav-item" @click="router.push({name: 'snoozed'})" :class="route.name === 'snoozed' ? 'active' : ''" :title="$t('snoozed') || 'Snoozed'">
             <span class="nav-ic-wrap"><Icon icon="ic:outline-access-time" width="20" height="20" /></span>
             <span class="nav-label">{{$t('snoozed') || 'Snoozed'}}</span>
           </div>
@@ -36,14 +36,14 @@
             <span class="nav-label">{{$t('drafts')}}</span>
           </div>
           <div class="nav-item" @click="router.push({name: 'all-email'})" v-perm="'all-email:query'" :class="route.name === 'all-email' ? 'active' : ''" :title="$t('allMail')">
-            <span class="nav-ic-wrap"><Icon icon="fluent:mail-list-28-regular" width="22" height="22" /></span>
+            <span class="nav-ic-wrap"><Icon icon="mdi:email-multiple-outline" width="22" height="22" /></span>
             <span class="nav-label">{{$t('allMail')}}</span>
           </div>
-          <div class="nav-item" @click="() => {}" :title="$t('spam') || 'Spam'">
+          <div class="nav-item" @click="router.push({name: 'spam'})" :class="route.name === 'spam' ? 'active' : ''" :title="$t('spam') || 'Spam'">
             <span class="nav-ic-wrap"><Icon icon="ic:outline-report-gmailerrorred" width="20" height="20" /></span>
             <span class="nav-label">{{$t('spam') || 'Spam'}}</span>
           </div>
-          <div class="nav-item" @click="() => {}" :title="$t('trash') || 'Trash'">
+          <div class="nav-item" @click="router.push({name: 'trash'})" :class="route.name === 'trash' ? 'active' : ''" :title="$t('trash') || 'Trash'">
             <span class="nav-ic-wrap"><Icon icon="ic:outline-delete" width="20" height="20" /></span>
             <span class="nav-label">{{$t('trash') || 'Trash'}}</span>
           </div>

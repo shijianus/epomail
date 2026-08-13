@@ -109,8 +109,17 @@
               <div class="email-right" :style="showUserInfo ? 'align-self: start;':''">
                 <span class="email-time" :style="(item.unread === EmailUnreadEnum.UNREAD && showUnread) ? 'font-weight: bold' : ''">{{ item.formatCreateTime }}</span>
                 <div class="quick-actions">
-                  <el-tooltip :content="$t('delete')" placement="top">
+                  <el-tooltip :content="$t('snooze') || 'Snooze'" placement="top" v-if="['email'].includes(props.type)">
+                    <Icon icon="ic:outline-access-time" width="18" height="18" class="quick-icon" @click.stop="handleSnooze(item.emailId)" />
+                  </el-tooltip>
+                  <el-tooltip :content="$t('delete')" placement="top" v-if="!['trash'].includes(props.type)">
                     <Icon icon="uiw:delete" width="16" height="16" class="quick-icon" @click.stop="rightDelete(item.emailId)" />
+                  </el-tooltip>
+                  <el-tooltip :content="$t('permanentDelete') || 'Delete forever'" placement="top" v-if="['trash', 'spam'].includes(props.type)">
+                    <Icon icon="uiw:delete" width="16" height="16" class="quick-icon" @click.stop="rightDelete(item.emailId, true)" />
+                  </el-tooltip>
+                  <el-tooltip :content="$t('restore') || 'Restore'" placement="top" v-if="['trash', 'spam', 'snoozed'].includes(props.type)">
+                    <Icon icon="ic:outline-restore" width="18" height="18" class="quick-icon" @click.stop="handleRestore(item.emailId)" />
                   </el-tooltip>
                   <el-tooltip :content="$t('markRead')" placement="top" v-if="item.unread === EmailUnreadEnum.UNREAD && showUnread">
                     <Icon icon="fluent:mail-read-20-regular" width="18" height="18" class="quick-icon" @click.stop="emailRead(item.emailId)" />
@@ -177,6 +186,22 @@
               </div>
             </template>
           </el-dropdown-item>
+          <el-dropdown-item v-if="['email'].includes(props.type)" @click="handleSnooze(rightClickEmail.emailId)" >
+            <template #default>
+              <div class="right-dropdown-item">
+                <Icon icon="ic:outline-access-time" width="20" height="20" />
+                <span>{{t('snooze') || 'Snooze'}}</span>
+              </div>
+            </template>
+          </el-dropdown-item>
+          <el-dropdown-item v-if="['email'].includes(props.type)" @click="handleSpam(rightClickEmail.emailId)" >
+            <template #default>
+              <div class="right-dropdown-item">
+                <Icon icon="ic:outline-report-gmailerrorred" width="20" height="20" />
+                <span>{{t('markSpam') || 'Spam'}}</span>
+              </div>
+            </template>
+          </el-dropdown-item>
           <el-dropdown-item v-if="['email','star'].includes(props.type)" @click="openReply(rightClickEmail)">
             <template #default>
               <div class="right-dropdown-item">
@@ -225,11 +250,27 @@
               </div>
             </template>
           </el-dropdown-item>
-          <el-dropdown-item @click="rightDelete(rightClickEmail.emailId)">
+          <el-dropdown-item v-if="!['trash'].includes(props.type)" @click="rightDelete(rightClickEmail.emailId)">
             <template #default>
               <div class="right-dropdown-item">
                 <Icon icon="uiw:delete" width="16" height="20" style="margin-left: 1px;margin-right: 3px" />
                 <span>{{t('delete')}}</span>
+              </div>
+            </template>
+          </el-dropdown-item>
+          <el-dropdown-item v-if="['trash', 'spam'].includes(props.type)" @click="rightDelete(rightClickEmail.emailId, true)">
+            <template #default>
+              <div class="right-dropdown-item">
+                <Icon icon="uiw:delete" width="16" height="20" style="margin-left: 1px;margin-right: 3px" />
+                <span>{{t('permanentDelete') || 'Delete forever'}}</span>
+              </div>
+            </template>
+          </el-dropdown-item>
+          <el-dropdown-item v-if="['trash', 'spam', 'snoozed'].includes(props.type)" @click="handleRestore(rightClickEmail.emailId)">
+            <template #default>
+              <div class="right-dropdown-item">
+                <Icon icon="ic:outline-restore" width="16" height="20" style="margin-left: 1px;margin-right: 3px" />
+                <span>{{t('restore') || 'Restore'}}</span>
               </div>
             </template>
           </el-dropdown-item>
@@ -252,6 +293,7 @@ import {useI18n} from "vue-i18n";
 import {EmailUnreadEnum} from "@/enums/email-enum.js";
 import { UseVirtualList } from '@vueuse/components'
 import { useScroll } from '@vueuse/core'
+import { emailSpam, emailSnooze, emailRestore, emailDelete as realEmailDelete } from "@/request/email.js";
 
 const props = defineProps({
   getEmailList: Function,
@@ -500,6 +542,37 @@ function openForward(email) {
   uiStore.writerRef.openForward(email)
 }
 
+function handleSnooze(emailId) {
+  // Add 1 day for default snooze
+  const time = new Date(Date.now() + 86400000).toISOString().replace('T', ' ').substring(0, 19);
+  emailSnooze(emailId, time).then(() => {
+    ElMessage.success(t('snoozedSuccess') || 'Email snoozed');
+    deleteEmailFromList([emailId]);
+  });
+}
+
+function handleSpam(emailId) {
+  emailSpam(emailId, true).then(() => {
+    ElMessage.success(t('spamSuccess') || 'Marked as spam');
+    deleteEmailFromList([emailId]);
+  });
+}
+
+function handleRestore(emailId) {
+  emailRestore(emailId).then(() => {
+    ElMessage.success(t('restoreSuccess') || 'Email restored');
+    deleteEmailFromList([emailId]);
+  });
+}
+
+function deleteEmailFromList(ids) {
+  for (let i = emailList.length - 1; i >= 0; i--) {
+    if (ids.includes(emailList[i].emailId)) {
+      emailList.splice(i, 1);
+    }
+  }
+}
+
 function visibleChange(e) {
   dropdownShow.value = e;
   dropdownCloseLock.value = true;
@@ -640,7 +713,7 @@ function localRead(emailIds) {
   })
 }
 
-function rightDelete(emailId) {
+function rightDelete(emailId, physical = false) {
 
   if (props.type === 'all-email') {
     ElMessageBox.confirm(t('delOneEmailConfirm'), {
@@ -648,7 +721,7 @@ function rightDelete(emailId) {
       cancelButtonText: t('cancel'),
       type: 'warning'
     }).then(() => {
-      props.emailDelete([emailId]).then(() => {
+      props.emailDelete([emailId], physical).then(() => {
         ElMessage({
           message: t('delSuccessMsg'),
           type: 'success',
@@ -659,7 +732,7 @@ function rightDelete(emailId) {
     })
     return;
   }
-  props.emailDelete([emailId]).then(() => {
+  props.emailDelete([emailId], physical).then(() => {
     ElMessage({
       message: t('delSuccessMsg'),
       type: 'success',

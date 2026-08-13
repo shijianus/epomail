@@ -1,9 +1,25 @@
 <template>
   <div class="box">
     <div class="container">
-      <div class="title">{{ $t('labels') || 'Labels' }}</div>
+      <div class="title" style="display: flex; justify-content: space-between; align-items: center;">
+        <span>{{ $t('labelSetting') || 'Label Settings' }}</span>
+        <el-button type="primary" size="small" @click="startAdd">
+          <Icon icon="lucide:plus" width="16" /> {{ $t('add') || 'Add' }}
+        </el-button>
+      </div>
       
       <div class="label-list">
+        <div v-if="isAdding" class="label-item">
+          <div class="label-info">
+            <el-input v-model="addForm.name" size="small" :placeholder="$t('labels') || 'Label Name'" style="width: 150px" />
+            <el-input v-model="addForm.icon" size="small" placeholder="Icon (e.g. ic:baseline-label)" style="width: 180px" />
+            <el-color-picker v-model="addForm.color" size="small" />
+          </div>
+          <div class="label-actions">
+            <el-button link type="primary" @click="saveAdd">{{ $t('save') || 'Save' }}</el-button>
+            <el-button link @click="isAdding = false">{{ $t('cancel') || 'Cancel' }}</el-button>
+          </div>
+        </div>
         <div class="label-item" v-for="(label, index) in uiStore.customLabels" :key="index">
           <div class="label-info">
             <Icon :icon="label.icon || 'ic:baseline-label'" width="20" height="20" :style="{ color: label.color || 'inherit' }" />
@@ -46,6 +62,9 @@ import { Icon } from '@iconify/vue'
 
 const uiStore = useUiStore()
 
+const isAdding = ref(false)
+const addForm = ref({ name: '', icon: 'ic:baseline-label', color: '' })
+
 const editIndex = ref(-1)
 const editForm = ref({ name: '', icon: '', color: '' })
 
@@ -58,6 +77,19 @@ const normalizeLabels = () => {
   })
 }
 normalizeLabels()
+
+const startAdd = () => {
+  isAdding.value = true
+  addForm.value = { name: '', icon: 'ic:baseline-label', color: '' }
+}
+
+const saveAdd = () => {
+  if (addForm.value.name.trim()) {
+    if (!uiStore.customLabels) uiStore.customLabels = []
+    uiStore.customLabels.push({ ...addForm.value })
+    isAdding.value = false
+  }
+}
 
 const startEdit = (index) => {
   editIndex.value = index

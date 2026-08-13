@@ -61,6 +61,36 @@ const routes = [
                     menu: true
                 }
             },
+            {
+                path: '/snoozed',
+                name: 'snoozed',
+                component: () => import('@/views/snoozed/index.vue'),
+                meta: {
+                    title: 'snoozed',
+                    name: 'snoozed',
+                    menu: true
+                }
+            },
+            {
+                path: '/spam',
+                name: 'spam',
+                component: () => import('@/views/spam/index.vue'),
+                meta: {
+                    title: 'spam',
+                    name: 'spam',
+                    menu: true
+                }
+            },
+            {
+                path: '/trash',
+                name: 'trash',
+                component: () => import('@/views/trash/index.vue'),
+                meta: {
+                    title: 'trash',
+                    name: 'trash',
+                    menu: true
+                }
+            },
         ]
 
     },

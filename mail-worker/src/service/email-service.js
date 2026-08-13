@@ -27,7 +27,7 @@ const emailService = {
 
 	async list(c, params, userId) {
 
-		let { emailId, type, accountId, size, timeSort, allReceive } = params;
+		let { emailId, type, accountId, size, timeSort, allReceive, folder } = params;
 
 		size = Number(size);
 		emailId = Number(emailId);
@@ -75,9 +75,11 @@ const emailService = {
 					allReceive ? eq(1,1) : eq(email.accountId, accountId),
 					eq(email.userId, userId),
 					timeSort ? gt(email.emailId, emailId) : lt(email.emailId, emailId),
-					eq(email.type, type),
-					eq(email.isDel, isDel.NORMAL),
-					eq(account.isDel, isDel.NORMAL)
+					eq(account.isDel, isDel.NORMAL),
+					folder === 'trash' ? eq(email.isDel, 1) : eq(email.isDel, 0),
+					folder === 'spam' ? eq(email.isSpam, 1) : (folder === 'trash' || folder === 'snoozed' ? eq(1,1) : eq(email.isSpam, 0)),
+					folder === 'snoozed' ? sql`snoozed_time IS NOT NULL` : (folder === 'trash' || folder === 'spam' ? eq(1,1) : sql`(snoozed_time IS NULL OR snoozed_time <= CURRENT_TIMESTAMP)`),
+					(!folder && type !== undefined) ? eq(email.type, type) : eq(1,1)
 				)
 			);
 
@@ -98,9 +100,11 @@ const emailService = {
 				and(
 					allReceive ? eq(1,1) : eq(email.accountId, accountId),
 					eq(email.userId, userId),
-					eq(email.type, type),
-					eq(email.isDel, isDel.NORMAL),
-					eq(account.isDel, isDel.NORMAL)
+					eq(account.isDel, isDel.NORMAL),
+					folder === 'trash' ? eq(email.isDel, 1) : eq(email.isDel, 0),
+					folder === 'spam' ? eq(email.isSpam, 1) : (folder === 'trash' || folder === 'snoozed' ? eq(1,1) : eq(email.isSpam, 0)),
+					folder === 'snoozed' ? sql`snoozed_time IS NOT NULL` : (folder === 'trash' || folder === 'spam' ? eq(1,1) : sql`(snoozed_time IS NULL OR snoozed_time <= CURRENT_TIMESTAMP)`),
+					(!folder && type !== undefined) ? eq(email.type, type) : eq(1,1)
 				)
 		).get();
 
@@ -108,8 +112,10 @@ const emailService = {
 			and(
 				allReceive ? eq(1,1) : eq(email.accountId, accountId),
 				eq(email.userId, userId),
-				eq(email.type, type),
-				eq(email.isDel, isDel.NORMAL)
+				folder === 'trash' ? eq(email.isDel, 1) : eq(email.isDel, 0),
+				folder === 'spam' ? eq(email.isSpam, 1) : (folder === 'trash' || folder === 'snoozed' ? eq(1,1) : eq(email.isSpam, 0)),
+				folder === 'snoozed' ? sql`snoozed_time IS NOT NULL` : (folder === 'trash' || folder === 'spam' ? eq(1,1) : sql`(snoozed_time IS NULL OR snoozed_time <= CURRENT_TIMESTAMP)`),
+				(!folder && type !== undefined) ? eq(email.type, type) : eq(1,1)
 			))
 			.orderBy(desc(email.emailId)).limit(1).get();
 
@@ -135,13 +141,83 @@ const emailService = {
 	},
 
 	async delete(c, params, userId) {
-		const { emailIds } = params;
+		const { emailIds, physical } = params;
 		const emailIdList = emailIds.split(',').map(Number);
-		await orm(c).update(email).set({ isDel: isDel.DELETE }).where(
+		if (physical) {
+			await orm(c).delete(email).where(
+				and(
+					eq(email.userId, userId),
+					inArray(email.emailId, emailIdList)))
+				.run();
+		} else {
+			const quota = await userService.getUserQuota(c, userId);
+			if (quota.maxStorageBytes > 0 && quota.usedStorageBytes / quota.maxStorageBytes > 0.9) {
+				// Immediate physical delete if quota > 90%
+				await orm(c).delete(email).where(
+					and(
+						eq(email.userId, userId),
+						inArray(email.emailId, emailIdList)))
+					.run();
+			} else {
+				await orm(c).update(email).set({ isDel: isDel.DELETE, snoozedTime: null }).where(
+					and(
+						eq(email.userId, userId),
+						inArray(email.emailId, emailIdList)))
+					.run();
+			}
+		}
+	},
+
+	async setSpam(c, params, userId) {
+		const { emailIds, isSpam } = params;
+		const emailIdList = emailIds.split(',').map(Number);
+		await orm(c).update(email).set({ isSpam: isSpam ? 1 : 0, snoozedTime: null }).where(
 			and(
 				eq(email.userId, userId),
 				inArray(email.emailId, emailIdList)))
 			.run();
+	},
+
+	async setSnooze(c, params, userId) {
+		const { emailIds, time } = params;
+		const emailIdList = emailIds.split(',').map(Number);
+		await orm(c).update(email).set({ snoozedTime: time }).where(
+			and(
+				eq(email.userId, userId),
+				inArray(email.emailId, emailIdList)))
+			.run();
+	},
+
+	async restore(c, params, userId) {
+		const { emailIds } = params;
+		const emailIdList = emailIds.split(',').map(Number);
+		await orm(c).update(email).set({ isDel: 0, isSpam: 0, snoozedTime: null }).where(
+			and(
+				eq(email.userId, userId),
+				inArray(email.emailId, emailIdList)))
+			.run();
+	},
+
+	async clearTrashAndSpam(c) {
+		const settings = await settingService.query(c);
+		const spamRetentionDays = settings.spamRetentionDays || 7;
+		
+		// Move Spam to Trash after spamRetentionDays
+		await orm(c).update(email).set({ isDel: 1 }).where(
+			and(
+				eq(email.isSpam, 1),
+				eq(email.isDel, 0),
+				lt(email.createTime, sql`datetime('now', '-' || ${spamRetentionDays} || ' days')`)
+			)
+		).run();
+
+		// Physical Delete Trash after 7 days
+		await orm(c).delete(email).where(
+			and(
+				eq(email.isDel, 1),
+				lt(email.createTime, sql`datetime('now', '-7 days')`)
+			)
+		).run();
 	},
 
 	receive(c, params, cidAttList, r2domain) {

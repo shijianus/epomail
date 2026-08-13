@@ -29,6 +29,7 @@ const dbInit = {
 		await this.v2_8DB(c);
 		await this.v2_9DB(c);
 		await this.v3_0DB(c);
+		await this.v3_1DB(c);
 		await settingService.refresh(c);
 		return c.text('success');
 	},
@@ -54,6 +55,18 @@ const dbInit = {
 			console.warn(`跳过字段：${e.message}`);
 		}
 
+	},
+
+	async v3_1DB(c) {
+		try {
+			await c.env.db.batch([
+				c.env.db.prepare(`ALTER TABLE email ADD COLUMN is_spam INTEGER NOT NULL DEFAULT 0;`),
+				c.env.db.prepare(`ALTER TABLE email ADD COLUMN snoozed_time DATETIME;`),
+				c.env.db.prepare(`ALTER TABLE setting ADD COLUMN spam_retention_days INTEGER NOT NULL DEFAULT 7;`)
+			]);
+		} catch (e) {
+			console.warn(`跳过字段：${e.message}`);
+		}
 	},
 
 	async v2_9DB(c) {

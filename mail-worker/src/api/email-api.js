@@ -32,5 +32,19 @@ app.post('/email/send', async (c) => {
 app.put('/email/read', async (c) => {
 	await emailService.read(c, await c.req.json(), userContext.getUserId(c));
 	return c.json(result.ok());
-})
+});
 
+app.put('/email/spam', async (c) => {
+	await emailService.setSpam(c, await c.req.json(), userContext.getUserId(c));
+	return c.json(result.ok());
+});
+
+app.put('/email/snooze', async (c) => {
+	await emailService.setSnooze(c, await c.req.json(), userContext.getUserId(c));
+	return c.json(result.ok());
+});
+
+app.put('/email/restore', async (c) => {
+	await emailService.restore(c, await c.req.json(), userContext.getUserId(c));
+	return c.json(result.ok());
+});

@@ -12,12 +12,14 @@
             </div>
             
             <div class="nav-section-title">{{$t('settings') || 'Settings'}}</div>
+            <div class="settings-nav-group">
             <router-link :to="{name: 'setting'}" class="settings-nav-item" :class="{active: route.name === 'setting'}">
-              <Icon icon="fluent:settings-48-regular" width="20" height="20" /> {{$t('general') || 'General'}}
+              <Icon icon="fluent:settings-48-regular" width="20" height="20" /> {{$t('generalSetting') || 'General Settings'}}
             </router-link>
             <router-link :to="{name: 'label-setting'}" class="settings-nav-item" :class="{active: route.name === 'label-setting'}">
-              <Icon icon="lucide:tags" width="20" height="20" /> {{$t('labels') || 'Labels'}}
+              <Icon icon="lucide:tags" width="20" height="20" /> {{$t('labelSetting') || 'Label Settings'}}
             </router-link>
+            </div>
 
             <template v-if="hasPerm(['all-email:query','user:query','role:query','setting:query','analysis:query','reg-key:query'])">
               <div class="nav-section-title" style="margin-top: 24px;">{{$t('manage')}}</div>

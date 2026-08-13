@@ -25,7 +25,7 @@ const userService = {
 
 	async setCustomLabels(c, params, userId) {
 		const { customLabels } = params;
-		await c.env.db.update(user).set({ customLabels }).where(eq(user.userId, userId));
+		await orm(c).update(user).set({ customLabels }).where(eq(user.userId, userId));
 		
 		const authInfo = await c.env.kv.get(KvConst.AUTH_INFO + userId, { type: 'json' });
 		if (authInfo && authInfo.user) {
@@ -57,6 +57,7 @@ const userService = {
 		user.permKeys = permKeys;
 		user.role = roleRow;
 		user.type = userRow.type;
+		user.customLabels = userRow.customLabels;
 
 		if (c.env.admin === userRow.email) {
 			user.role = constant.ADMIN_ROLE

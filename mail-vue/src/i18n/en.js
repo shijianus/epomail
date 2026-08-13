@@ -1,5 +1,5 @@
 const en = {
-    inbox: 'Inbox',
+    inbox: 'Main',
     drafts: 'Drafts',
     sent: 'Sent',
     starred: 'Starred',
@@ -28,6 +28,8 @@ const en = {
     save: 'Save',
     profile: 'Profile',
     general: 'General',
+    generalSetting: 'General Settings',
+    labelSetting: 'Label Settings',
     change: 'Change',
     changePwdBtn: 'Change',
     username: 'Username',
