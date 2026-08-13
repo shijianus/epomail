@@ -3,7 +3,7 @@
     <div class="header-area">
       <div class="header-text">
         <h1 class="page-title">{{ $t('labelSetting') || 'Label Management' }}</h1>
-        <p class="page-desc">{{ $t('labelSettingDesc') || 'Manage your system labels and custom email categories' }}</p>
+        <p class="page-desc">{{ $t('labelSettingDesc') || 'Manage your labels and classification rules' }}</p>
       </div>
       <el-button type="primary" size="large" @click="startAdd" class="primary-btn">
         <Icon icon="lucide:plus" width="18" /> {{ $t('newLabel') || 'New Label' }}
@@ -22,6 +22,22 @@
                 <span>{{ label.name }}</span>
               </div>
             </div>
+            
+            <div class="stats-group">
+              <div class="stat-item">
+                <span class="stat-val">{{ label.stats?.total || 0 }}</span>
+                <span class="stat-lbl">{{ $t('statTotal') || 'Total' }}</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-val">{{ label.stats?.current || 0 }}</span>
+                <span class="stat-lbl">{{ $t('statCurrent') || 'Current' }}</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-val">{{ label.stats?.unread || 0 }}</span>
+                <span class="stat-lbl">{{ $t('statUnread') || 'Unread' }}</span>
+              </div>
+            </div>
+
             <div class="visibility-cell">
                <el-switch v-model="label.listVis" size="small" :active-text="$t('show') || 'Show'" :inactive-text="$t('hide') || 'Hide'" inline-prompt />
             </div>
@@ -51,6 +67,22 @@
                 <span>{{ label.name || label }}</span>
               </div>
             </div>
+            
+            <div class="stats-group">
+              <div class="stat-item">
+                <span class="stat-val">{{ label.stats?.total || 0 }}</span>
+                <span class="stat-lbl">{{ $t('statTotal') || 'Total' }}</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-val">{{ label.stats?.current || 0 }}</span>
+                <span class="stat-lbl">{{ $t('statCurrent') || 'Current' }}</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-val">{{ label.stats?.unread || 0 }}</span>
+                <span class="stat-lbl">{{ $t('statUnread') || 'Unread' }}</span>
+              </div>
+            </div>
+
             <div class="visibility-cell">
                <el-switch v-model="label.listVis" size="small" :active-text="$t('show') || 'Show'" :inactive-text="$t('hide') || 'Hide'" inline-prompt />
             </div>
@@ -116,27 +148,43 @@
         
         <!-- Rules Section -->
         <div class="form-group" style="margin-top: 8px;">
-          <label>{{ $t('classificationRules') || '分类规则 (Classification Rules)' }}</label>
+          <label>{{ $t('classificationRules') || 'Rules' }}</label>
           <p style="font-size: 12px; color: var(--text-muted); margin: 0 0 8px 0; line-height: 1.4;">
             {{ $t('rulesDesc') || 'Emails matching these rules will automatically receive this label.' }}
           </p>
-          <div style="display: flex; gap: 8px; margin-bottom: 8px;">
-            <el-select v-model="newRuleType" size="small" style="width: 140px;" :placeholder="$t('ruleType') || 'Rule Type'">
-              <el-option :label="$t('ruleDomain') || '发件人域名/后缀'" value="domain" />
-              <el-option :label="$t('ruleSender') || '指定邮箱地址'" value="sender" />
-            </el-select>
-            <el-input v-model="newRuleValue" size="small" :placeholder="newRuleType === 'domain' ? '@gmail.com' : 'admin@outlook.com'" @keyup.enter="addRule" style="flex: 1;" />
-            <el-button size="small" @click="addRule"><Icon icon="lucide:plus" width="14" /></el-button>
+          
+          <div class="rule-builder">
+            <el-radio-group v-model="newRuleLogic" size="small" style="margin-bottom: 8px; width: 100%;">
+              <el-radio-button value="include" style="flex: 1; text-align: center;">{{ $t('ruleInclude') || 'Include' }}</el-radio-button>
+              <el-radio-button value="exclude" style="flex: 1; text-align: center;">{{ $t('ruleExclude') || 'Except' }}</el-radio-button>
+              <el-radio-button value="all" style="flex: 1; text-align: center;">{{ $t('ruleAll') || 'All' }}</el-radio-button>
+            </el-radio-group>
+            
+            <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+              <el-select v-if="newRuleLogic !== 'all'" v-model="newRuleType" size="small" style="width: 140px;" :placeholder="$t('ruleType') || 'Type'">
+                <el-option :label="$t('ruleDomain') || 'Domain / Suffix'" value="domain" />
+                <el-option :label="$t('ruleSender') || 'Sender Address'" value="sender" />
+              </el-select>
+              <el-select v-else v-model="newRuleTypeAll" size="small" style="width: 140px;" :placeholder="$t('ruleType') || 'Type'">
+                <el-option :label="$t('ruleBlacklist') || 'Blacklist'" value="blacklist" />
+                <el-option :label="$t('ruleWhitelist') || 'Whitelist'" value="whitelist" />
+                <el-option :label="$t('ruleCorporate') || 'Corporate'" value="corporate" />
+              </el-select>
+              
+              <el-input v-model="newRuleValue" size="small" :disabled="newRuleLogic === 'all'" :placeholder="newRuleLogic === 'all' ? ($t('systemControlled') || 'System Managed') : (newRuleType === 'domain' ? '@gmail.com' : 'admin@outlook.com')" @keyup.enter="addRule" style="flex: 1;" />
+              <el-button type="primary" size="small" @click="addRule"><Icon icon="lucide:plus" width="14" /></el-button>
+            </div>
           </div>
+          
           <div v-if="form.rules && form.rules.length > 0" class="rules-list" style="display: flex; flex-direction: column; gap: 4px; max-height: 150px; overflow-y: auto; padding-right: 4px;">
-            <div v-for="(rule, rIdx) in form.rules" :key="rIdx" style="display: flex; align-items: center; justify-content: space-between; padding: 6px 10px; background: var(--bg-hover); border-radius: 6px; border: 1px solid var(--border-subtle); font-size: 12.5px; color: var(--text-primary);">
+            <div v-for="(rule, rIdx) in form.rules" :key="rIdx" class="rule-tag">
               <div style="display: flex; align-items: center; gap: 8px;">
-                <span style="padding: 2px 6px; background: var(--bg-surface); border-radius: 4px; color: var(--text-secondary); font-size: 11px;">
-                  {{ rule.type === 'domain' ? ($t('ruleDomainShort') || '域名') : ($t('ruleSenderShort') || '邮箱') }}
+                <span class="rule-badge" :class="'badge-' + rule.logic">
+                  {{ getRuleLogicText(rule.logic) }} {{ getRuleTypeText(rule.type) }}
                 </span>
-                <span>{{ rule.value }}</span>
+                <span v-if="rule.logic !== 'all'">{{ rule.value }}</span>
               </div>
-              <el-button link size="small" @click="removeRule(rIdx)" style="color: var(--danger);"><Icon icon="lucide:x" width="14" /></el-button>
+              <el-button link size="small" @click="removeRule(rIdx)" class="rule-del"><Icon icon="lucide:x" width="14" /></el-button>
             </div>
           </div>
         </div>
@@ -179,7 +227,9 @@ import { ref } from 'vue'
 import { useUiStore } from '@/store/ui.js'
 import { Icon } from '@iconify/vue'
 import { ElMessage } from 'element-plus'
+import { useI18n } from 'vue-i18n'
 
+const { t } = useI18n()
 const uiStore = useUiStore()
 
 const presetColors = [
@@ -210,13 +260,36 @@ const isEditorOpen = ref(false)
 const editIndex = ref(-1)
 const isEditingDefault = ref(false)
 const form = ref({ name: '', icon: 'ic:baseline-label', color: '#3b82f6', parent: '', sidebarVis: 'show', listVis: true, rules: [] })
+
+const newRuleLogic = ref('include')
 const newRuleType = ref('domain')
+const newRuleTypeAll = ref('blacklist')
 const newRuleValue = ref('')
+
+const getRuleLogicText = (logic) => {
+  if (logic === 'include') return t('ruleInclude') || 'Include'
+  if (logic === 'exclude') return t('ruleExclude') || 'Except'
+  if (logic === 'all') return t('ruleAll') || 'All'
+  return logic
+}
+
+const getRuleTypeText = (type) => {
+  if (type === 'domain') return t('ruleDomainShort') || 'Domain'
+  if (type === 'sender') return t('ruleSenderShort') || 'Sender'
+  if (type === 'blacklist') return t('ruleBlacklist') || 'Blacklist'
+  if (type === 'whitelist') return t('ruleWhitelist') || 'Whitelist'
+  if (type === 'corporate') return t('ruleCorporate') || 'Corporate'
+  return type
+}
 
 const startAdd = () => {
   editIndex.value = -1
   isEditingDefault.value = false
-  form.value = { name: '', icon: 'ic:baseline-label', color: presetColors[5], parent: '', sidebarVis: 'show', listVis: true, rules: [] }
+  form.value = { 
+    name: '', icon: 'ic:baseline-label', color: presetColors[5], parent: '', 
+    sidebarVis: 'show', listVis: true, rules: [], 
+    stats: { total: 0, current: 0, unread: 0 } 
+  }
   newRuleValue.value = ''
   isEditorOpen.value = true
 }
@@ -240,12 +313,14 @@ const startEditDefault = (index) => {
 }
 
 const addRule = () => {
-  const ruleVal = newRuleValue.value.trim().toLowerCase()
-  if (ruleVal) {
+  let ruleType = newRuleLogic.value === 'all' ? newRuleTypeAll.value : newRuleType.value
+  let ruleVal = newRuleLogic.value === 'all' ? '' : newRuleValue.value.trim().toLowerCase()
+  
+  if (newRuleLogic.value === 'all' || ruleVal) {
     if (!form.value.rules) form.value.rules = []
-    const exists = form.value.rules.some(r => r.type === newRuleType.value && r.value === ruleVal)
+    const exists = form.value.rules.some(r => r.logic === newRuleLogic.value && r.type === ruleType && r.value === ruleVal)
     if (!exists) {
-      form.value.rules.push({ type: newRuleType.value, value: ruleVal })
+      form.value.rules.push({ logic: newRuleLogic.value, type: ruleType, value: ruleVal })
     }
     newRuleValue.value = ''
   }
@@ -598,5 +673,90 @@ const moveUp = (index) => {
   color: var(--text-secondary);
   margin-top: 4px;
   line-height: 1.4;
+}
+
+/* Stats Group */
+.stats-group {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  gap: 32px;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.stat-val {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.1;
+}
+
+.stat-lbl {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 4px;
+}
+
+/* Advanced Rules UI */
+.rule-builder :deep(.el-radio-group) {
+  display: flex;
+}
+.rule-builder :deep(.el-radio-button__inner) {
+  width: 100%;
+}
+
+.rule-tag {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  background: var(--bg-hover);
+  border-radius: 6px;
+  border: 1px solid var(--border-subtle);
+  font-size: 12.5px;
+  color: var(--text-primary);
+  transition: all 0.2s;
+}
+
+.rule-tag:hover {
+  border-color: var(--border-mid);
+}
+
+.rule-badge {
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.badge-include {
+  background: color-mix(in srgb, var(--success) 15%, transparent);
+  color: var(--success);
+}
+.badge-exclude {
+  background: color-mix(in srgb, var(--danger) 15%, transparent);
+  color: var(--danger);
+}
+.badge-all {
+  background: color-mix(in srgb, var(--warning) 15%, transparent);
+  color: var(--warning);
+}
+
+.rule-del {
+  color: var(--text-muted);
+  transition: color 0.2s;
+}
+.rule-tag:hover .rule-del {
+  color: var(--danger);
 }
 </style>
