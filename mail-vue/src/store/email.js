@@ -17,6 +17,27 @@ export const useEmailStore = defineStore('email', {
         sendScroll: null,
         searchKeyword: '',
     }),
+    getters: {
+        searchParsed: (state) => {
+            let input = state.searchKeyword.trim();
+            let isGlobal = false;
+            let highlight = true;
+            
+            // Check for global parameter
+            if (input.includes('global:')) {
+                isGlobal = true;
+                input = input.replace(/global:\s*/i, '').trim();
+            }
+            
+            // Check for highlight toggle parameter
+            if (input.includes('hl:off')) {
+                highlight = false;
+                input = input.replace(/hl:off\s*/i, '').trim();
+            }
+            
+            return { keyword: input, isGlobal, highlight };
+        }
+    },
     persist: {
         pick: ['contentData'],
     },

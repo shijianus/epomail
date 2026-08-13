@@ -141,7 +141,7 @@ function cancelStar(email) {
 function getEmailList(emailId, size) {
   const accountId =  accountStore.currentAccountId;
   const allReceive = accountStore.currentAccount.allReceive;
-  return emailList(accountId, allReceive, emailId, params.timeSort, size, undefined, 'all', emailStore.searchKeyword).then(data => {
+  return emailList(accountId, allReceive, emailId, params.timeSort, size, undefined, 'all', emailStore.searchParsed.keyword).then(data => {
     data.latestEmail.reqAccountId = accountId;
     data.latestEmail.allReceive = allReceive;
     return data;

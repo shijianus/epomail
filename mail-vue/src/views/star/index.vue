@@ -41,7 +41,7 @@ function cancelStar(email) {
 }
 
 function getStarList(emailId, size) {
-  return starList(emailId, size, emailStore.searchKeyword);
+  return starList(emailId, size, emailStore.searchParsed.keyword);
 }
 
 onMounted(() => {

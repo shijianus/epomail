@@ -101,6 +101,17 @@ const accountCount = computed(() => {
 })
 
 function handleSearch() {
+  const parsed = emailStore.searchParsed;
+  
+  if (parsed.isGlobal) {
+    if (route.name !== 'user-all-email') {
+      router.push({ name: 'user-all-email' });
+    } else if (emailStore.emailScroll) {
+      emailStore.emailScroll.refreshList();
+    }
+    return;
+  }
+
   const mailRoutes = ['email', 'user-all-email', 'star', 'snoozed', 'spam', 'trash'];
   if (!mailRoutes.includes(route.name)) {
     router.push({ name: 'user-all-email' });

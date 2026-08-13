@@ -74,7 +74,7 @@ watch(() => draftStore.refreshList, async () => {
 function getEmailList() {
   return new Promise((resolve, reject) => {
     db.value.draft.orderBy('createTime').reverse().toArray().then(list => {
-      const keyword = emailStore.searchKeyword;
+      const keyword = emailStore.searchParsed.keyword;
       if (keyword) {
         list = list.filter(item => {
           const lkeyword = keyword.toLowerCase();

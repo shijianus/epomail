@@ -70,7 +70,9 @@
                   <div v-else></div>
                   <span class="name">
                     <span>
-                      <slot name="name" :email="item"> {{ item.name }}</slot>
+                      <slot name="name" :email="item">
+                        <span v-html="highlightMatch(item.name || '')"></span>
+                      </slot>
                     </span>
                     <span>
                       <Icon v-if="item.isStar" icon="fluent-color:star-16" width="18" height="18"/>
@@ -84,11 +86,11 @@
                       <span v-if="item.code" class="code-tag" @click.stop="copyCode(item.code)">[{{ t('codeLabel') }}{{ item.code }}]</span>
                       <span class="subject-text">
                         <slot name="subject" :email="item" >
-                          {{ item.subject || '\u200B' }}
+                          <span v-html="highlightMatch(item.subject || '\u200B')"></span>
                         </slot>
                       </span>
                     </span>
-                    <span class="email-content">{{ item.formatText || '\u200B' }}</span>
+                    <span class="email-content" v-html="highlightMatch(item.formatText || '\u200B')"></span>
                   </div>
                   <div class="user-info" v-if="showUserInfo">
                     <div class="user">
@@ -390,6 +392,29 @@ const triggerRef = ref({
 const queryParam = reactive({
   size: 50
 });
+
+function escapeHtml(text) {
+  if (!text) return '';
+  return text.toString()
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function escapeRegExp(string) {
+  return string.toString().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function highlightMatch(text) {
+  text = escapeHtml(text || '');
+  const parsed = emailStore.searchParsed;
+  if (!parsed.highlight || !parsed.keyword) return text;
+  
+  const regex = new RegExp(`(${escapeRegExp(parsed.keyword)})`, 'gi');
+  return text.replace(regex, '<mark class="search-highlight">$1</mark>');
+}
 
 defineExpose({
   refreshList,
