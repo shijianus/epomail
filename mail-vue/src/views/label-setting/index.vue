@@ -3,7 +3,7 @@
     <div class="header-area">
       <div class="header-text">
         <h1 class="page-title">{{ $t('labelSetting') || 'Label Management' }}</h1>
-        <p class="page-desc">Manage your system labels and custom email categories</p>
+        <p class="page-desc">{{ $t('labelSettingDesc') || 'Manage your system labels and custom email categories' }}</p>
       </div>
       <el-button type="primary" size="large" @click="startAdd" class="primary-btn">
         <Icon icon="lucide:plus" width="18" /> {{ $t('newLabel') || 'New Label' }}
@@ -12,10 +12,10 @@
 
     <!-- Default Template Labels -->
     <div class="section">
-      <h2 class="section-title">默认模板 (Default Templates)</h2>
+      <h2 class="section-title">{{ $t('defaultTemplates') || 'Default Templates' }}</h2>
       <div class="modern-list">
         <div class="list-row system-row" v-for="(label, index) in uiStore.defaultLabels" :key="'def-'+index">
-          <div class="drag-handle disabled" title="Default labels cannot be reordered"></div>
+          <div class="drag-handle disabled" :title="$t('cannotReorderDefault') || 'Default labels cannot be reordered'"></div>
           <div class="label-pill-cell">
             <div class="label-pill" :style="{ '--pill-color': label.color }">
               <Icon :icon="label.icon" width="16" />
@@ -23,18 +23,11 @@
             </div>
           </div>
           <div class="visibility-cell">
-            <el-select v-model="label.sidebarVis" size="small" class="vis-select">
-              <el-option label="Show" value="show" />
-              <el-option label="Hide" value="hide" />
-              <el-option label="Show if unread" value="unread" />
-            </el-select>
-          </div>
-          <div class="visibility-cell">
-             <el-switch v-model="label.listVis" size="small" />
+             <el-switch v-model="label.listVis" size="small" :active-text="$t('show') || 'Show'" :inactive-text="$t('hide') || 'Hide'" inline-prompt />
           </div>
           <div class="stats-cell">--</div>
           <div class="actions-cell">
-            <el-button link class="action-btn edit-btn" @click="startEditDefault(index)" title="Edit Color/Icon">
+            <el-button link class="action-btn edit-btn" @click="startEditDefault(index)" :title="$t('edit') || 'Edit'">
               <Icon icon="lucide:pencil" width="16" />
             </el-button>
           </div>
@@ -46,7 +39,7 @@
     <div class="section" style="margin-top: 32px">
       <div class="modern-list" v-if="uiStore.customLabels && uiStore.customLabels.length > 0">
         <div class="list-row custom-row" v-for="(label, index) in uiStore.customLabels" :key="index">
-          <div class="drag-handle" title="Drag to reorder" @click="moveUp(index)">
+          <div class="drag-handle" :title="$t('dragToReorder') || 'Drag to reorder'" @click="moveUp(index)">
             <Icon icon="lucide:grip-vertical" width="18" />
           </div>
           <div class="label-pill-cell">
@@ -56,21 +49,14 @@
             </div>
           </div>
           <div class="visibility-cell">
-            <el-select v-model="label.sidebarVis" size="small" class="vis-select" placeholder="Show">
-              <el-option label="Show" value="show" />
-              <el-option label="Hide" value="hide" />
-              <el-option label="Show if unread" value="unread" />
-            </el-select>
-          </div>
-          <div class="visibility-cell">
-             <el-switch v-model="label.listVis" size="small" />
+             <el-switch v-model="label.listVis" size="small" :active-text="$t('show') || 'Show'" :inactive-text="$t('hide') || 'Hide'" inline-prompt />
           </div>
           <div class="stats-cell">0 {{$t('emails') || 'emails'}}</div>
           <div class="actions-cell">
-            <el-button link class="action-btn edit-btn" @click="startEdit(index)">
+            <el-button link class="action-btn edit-btn" @click="startEdit(index)" :title="$t('edit') || 'Edit'">
               <Icon icon="lucide:pencil" width="16" />
             </el-button>
-            <el-button link class="action-btn delete-btn" @click="confirmDelete(index)">
+            <el-button link class="action-btn delete-btn" @click="confirmDelete(index)" :title="$t('delete') || 'Delete'">
               <Icon icon="lucide:trash-2" width="16" />
             </el-button>
           </div>
@@ -79,8 +65,7 @@
       <div v-else class="empty-state">
         <Icon icon="lucide:tags" width="48" class="empty-icon" />
         <h3>{{ $t('noCustomLabels') || 'No Custom Labels' }}</h3>
-        <p>Create your first label to keep your inbox organized.</p>
-        <el-button plain @click="startAdd">Create Label</el-button>
+        <p>{{ $t('noCustomLabelsDesc') || 'Create your first label to keep your inbox organized.' }}</p>
       </div>
     </div>
 
@@ -111,7 +96,7 @@
           <el-input v-model="form.icon" size="small" placeholder="Or type custom Iconify icon name (e.g. lucide:star)" />
         </div>
         <div class="form-group">
-          <label>Color</label>
+          <label>{{ $t('color') || 'Color' }}</label>
           <div class="swatches">
             <div class="swatch" 
                  v-for="color in presetColors" :key="color"
@@ -122,6 +107,24 @@
             </div>
             <div class="swatch custom-color-picker">
               <el-color-picker v-model="form.color" size="small" />
+            </div>
+          </div>
+        </div>
+        
+        <!-- Rules Section -->
+        <div class="form-group" style="margin-top: 8px;">
+          <label>{{ $t('rules') || 'Automation Rules' }}</label>
+          <p style="font-size: 12px; color: var(--text-muted); margin: 0 0 8px 0; line-height: 1.4;">
+            {{ $t('rulesDesc') || 'Emails from these senders or domains will automatically receive this label.' }}
+          </p>
+          <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+            <el-input v-model="newRule" size="small" :placeholder="$t('addRulePlaceholder') || 'e.g. @gmail.com or user@test.com'" @keyup.enter="addRule" />
+            <el-button size="small" @click="addRule"><Icon icon="lucide:plus" width="14" /></el-button>
+          </div>
+          <div v-if="form.rules && form.rules.length > 0" class="rules-list" style="display: flex; flex-direction: column; gap: 4px; max-height: 150px; overflow-y: auto; padding-right: 4px;">
+            <div v-for="(rule, rIdx) in form.rules" :key="rIdx" style="display: flex; align-items: center; justify-content: space-between; padding: 4px 8px; background: var(--bg-base); border-radius: 4px; border: 1px solid var(--border-subtle); font-size: 12px; color: var(--text-primary);">
+              <span>{{ rule }}</span>
+              <el-button link size="small" @click="removeRule(rIdx)" style="color: var(--danger);"><Icon icon="lucide:x" width="14" /></el-button>
             </div>
           </div>
         </div>
@@ -194,12 +197,14 @@ normalizeLabels()
 const isEditorOpen = ref(false)
 const editIndex = ref(-1)
 const isEditingDefault = ref(false)
-const form = ref({ name: '', icon: 'ic:baseline-label', color: '#3b82f6', parent: '', sidebarVis: 'show', listVis: true })
+const form = ref({ name: '', icon: 'ic:baseline-label', color: '#3b82f6', parent: '', sidebarVis: 'show', listVis: true, rules: [] })
+const newRule = ref('')
 
 const startAdd = () => {
   editIndex.value = -1
   isEditingDefault.value = false
-  form.value = { name: '', icon: 'ic:baseline-label', color: presetColors[5], parent: '', sidebarVis: 'show', listVis: true }
+  form.value = { name: '', icon: 'ic:baseline-label', color: presetColors[5], parent: '', sidebarVis: 'show', listVis: true, rules: [] }
+  newRule.value = ''
   isEditorOpen.value = true
 }
 
@@ -207,6 +212,8 @@ const startEdit = (index) => {
   editIndex.value = index
   isEditingDefault.value = false
   form.value = { ...uiStore.customLabels[index] }
+  if (!form.value.rules) form.value.rules = []
+  newRule.value = ''
   isEditorOpen.value = true
 }
 
@@ -214,7 +221,26 @@ const startEditDefault = (index) => {
   editIndex.value = index
   isEditingDefault.value = true
   form.value = { ...uiStore.defaultLabels[index] }
+  if (!form.value.rules) form.value.rules = []
+  newRule.value = ''
   isEditorOpen.value = true
+}
+
+const addRule = () => {
+  const rule = newRule.value.trim().toLowerCase()
+  if (rule) {
+    if (!form.value.rules) form.value.rules = []
+    if (!form.value.rules.includes(rule)) {
+      form.value.rules.push(rule)
+    }
+    newRule.value = ''
+  }
+}
+
+const removeRule = (index) => {
+  if (form.value.rules) {
+    form.value.rules.splice(index, 1)
+  }
 }
 
 const saveLabel = () => {
@@ -394,12 +420,17 @@ const moveUp = (index) => {
 }
 
 .action-btn {
-  opacity: 0;
+  opacity: 1;
+  color: var(--text-muted);
   transition: opacity 0.2s, color 0.2s;
 }
 
 .list-row:hover .action-btn {
-  opacity: 1;
+  color: var(--text-secondary);
+}
+
+.action-btn:hover {
+  color: var(--accent-primary) !important;
 }
 
 .action-btn.delete-btn:hover {
