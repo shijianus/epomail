@@ -10,27 +10,34 @@
       </el-button>
     </div>
 
-    <!-- System Labels -->
+    <!-- Default Template Labels -->
     <div class="section">
+      <h2 class="section-title">默认模板 (Default Templates)</h2>
       <div class="modern-list">
-        <div class="list-row system-row">
-          <div class="drag-handle disabled"></div>
+        <div class="list-row system-row" v-for="(label, index) in defaultLabels" :key="'def-'+index">
+          <div class="drag-handle disabled" title="Default labels cannot be reordered"></div>
           <div class="label-pill-cell">
-            <div class="label-pill" style="--pill-color: var(--text-secondary)">
-              <Icon icon="hugeicons:mailbox-01" width="16" />
-              <span>{{ $t('inbox') || 'Inbox' }}</span>
+            <div class="label-pill" :style="{ '--pill-color': label.color }">
+              <Icon :icon="label.icon" width="16" />
+              <span>{{ label.name }}</span>
             </div>
           </div>
           <div class="visibility-cell">
-            <el-select size="small" :model-value="'show'" class="vis-select" disabled>
+            <el-select v-model="label.sidebarVis" size="small" class="vis-select">
               <el-option label="Show" value="show" />
+              <el-option label="Hide" value="hide" />
+              <el-option label="Show if unread" value="unread" />
             </el-select>
           </div>
           <div class="visibility-cell">
-             <el-switch :model-value="true" size="small" disabled />
+             <el-switch v-model="label.listVis" size="small" />
           </div>
           <div class="stats-cell">--</div>
-          <div class="actions-cell"></div>
+          <div class="actions-cell">
+            <el-button link class="action-btn edit-btn" @click="startEditDefault(index)" title="Edit Color/Icon">
+              <Icon icon="lucide:pencil" width="16" />
+            </el-button>
+          </div>
         </div>
       </div>
     </div>
@@ -82,9 +89,9 @@
       <div class="editor-form">
         <div class="form-group">
           <label>Name</label>
-          <el-input v-model="form.name" size="large" placeholder="Enter label name" />
+          <el-input v-model="form.name" size="large" placeholder="Enter label name" :disabled="isEditingDefault" />
         </div>
-        <div class="form-group">
+        <div class="form-group" v-if="!isEditingDefault">
           <label>Parent Label</label>
           <el-select v-model="form.parent" size="large" placeholder="None" clearable style="width: 100%">
              <el-option v-for="(l, i) in uiStore.customLabels" :key="i" :label="l.name" :value="l.name" :disabled="editIndex === i" />
@@ -153,6 +160,14 @@ const presetColors = [
   '#64748b', '#1e293b'
 ]
 
+// Default template labels
+const defaultLabels = ref([
+  { name: '社群', icon: 'ic:outline-people-alt', color: '#3b82f6', sidebarVis: 'show', listVis: true },
+  { name: '工作', icon: 'ic:outline-work-outline', color: '#f59e0b', sidebarVis: 'show', listVis: true },
+  { name: '推销', icon: 'ic:outline-local-offer', color: '#ef4444', sidebarVis: 'show', listVis: true },
+  { name: '订阅', icon: 'ic:outline-rss-feed', color: '#10b981', sidebarVis: 'show', listVis: true },
+])
+
 // Normalization
 const normalizeLabels = () => {
   if (!uiStore.customLabels) uiStore.customLabels = []
@@ -167,17 +182,27 @@ normalizeLabels()
 
 const isEditorOpen = ref(false)
 const editIndex = ref(-1)
+const isEditingDefault = ref(false)
 const form = ref({ name: '', icon: 'ic:baseline-label', color: '#3b82f6', parent: '', sidebarVis: 'show', listVis: true })
 
 const startAdd = () => {
   editIndex.value = -1
+  isEditingDefault.value = false
   form.value = { name: '', icon: 'ic:baseline-label', color: presetColors[5], parent: '', sidebarVis: 'show', listVis: true }
   isEditorOpen.value = true
 }
 
 const startEdit = (index) => {
   editIndex.value = index
+  isEditingDefault.value = false
   form.value = { ...uiStore.customLabels[index] }
+  isEditorOpen.value = true
+}
+
+const startEditDefault = (index) => {
+  editIndex.value = index
+  isEditingDefault.value = true
+  form.value = { ...defaultLabels.value[index] }
   isEditorOpen.value = true
 }
 
@@ -187,10 +212,14 @@ const saveLabel = () => {
     return
   }
   
-  if (editIndex.value > -1) {
-    uiStore.customLabels[editIndex.value] = { ...form.value }
+  if (isEditingDefault.value) {
+    defaultLabels.value[editIndex.value] = { ...form.value }
   } else {
-    uiStore.customLabels.push({ ...form.value })
+    if (editIndex.value > -1) {
+      uiStore.customLabels[editIndex.value] = { ...form.value }
+    } else {
+      uiStore.customLabels.push({ ...form.value })
+    }
   }
   isEditorOpen.value = false
 }
