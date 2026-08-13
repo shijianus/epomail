@@ -13,6 +13,12 @@ export const useUiStore = defineStore('ui', {
         dark: true,
         showAddLabel: false,
         customLabels: [],
+        defaultLabels: [
+          { name: '社群', icon: 'ic:outline-people-alt', color: '#3b82f6', sidebarVis: 'show', listVis: true },
+          { name: '工作', icon: 'ic:outline-work-outline', color: '#f59e0b', sidebarVis: 'show', listVis: true },
+          { name: '推销', icon: 'ic:outline-local-offer', color: '#ef4444', sidebarVis: 'show', listVis: true },
+          { name: '订阅', icon: 'ic:outline-rss-feed', color: '#10b981', sidebarVis: 'show', listVis: true }
+        ],
         asideCount: {
             email: 0,
             send: 0,
@@ -29,6 +35,6 @@ export const useUiStore = defineStore('ui', {
         }
     },
     persist: {
-        pick: ['accountShow','dark', 'customLabels'],
+        pick: ['accountShow','dark', 'customLabels', 'defaultLabels'],
     },
 })

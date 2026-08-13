@@ -14,7 +14,7 @@
     <div class="section">
       <h2 class="section-title">默认模板 (Default Templates)</h2>
       <div class="modern-list">
-        <div class="list-row system-row" v-for="(label, index) in defaultLabels" :key="'def-'+index">
+        <div class="list-row system-row" v-for="(label, index) in uiStore.defaultLabels" :key="'def-'+index">
           <div class="drag-handle disabled" title="Default labels cannot be reordered"></div>
           <div class="label-pill-cell">
             <div class="label-pill" :style="{ '--pill-color': label.color }">
@@ -98,6 +98,19 @@
           </el-select>
         </div>
         <div class="form-group">
+          <label>Icon</label>
+          <div class="swatches" style="margin-bottom: 8px;">
+             <div class="swatch" 
+                  v-for="ico in presetIcons" :key="ico"
+                  :class="{ active: form.icon === ico }"
+                  @click="form.icon = ico"
+                  style="background-color: var(--bg-hover)">
+                  <Icon :icon="ico" width="18" :color="form.icon === ico ? form.color : 'var(--text-secondary)'" />
+             </div>
+          </div>
+          <el-input v-model="form.icon" size="small" placeholder="Or type custom Iconify icon name (e.g. lucide:star)" />
+        </div>
+        <div class="form-group">
           <label>Color</label>
           <div class="swatches">
             <div class="swatch" 
@@ -160,13 +173,11 @@ const presetColors = [
   '#64748b', '#1e293b'
 ]
 
-// Default template labels
-const defaultLabels = ref([
-  { name: '社群', icon: 'ic:outline-people-alt', color: '#3b82f6', sidebarVis: 'show', listVis: true },
-  { name: '工作', icon: 'ic:outline-work-outline', color: '#f59e0b', sidebarVis: 'show', listVis: true },
-  { name: '推销', icon: 'ic:outline-local-offer', color: '#ef4444', sidebarVis: 'show', listVis: true },
-  { name: '订阅', icon: 'ic:outline-rss-feed', color: '#10b981', sidebarVis: 'show', listVis: true },
-])
+const presetIcons = [
+  'ic:baseline-label', 'ic:outline-work-outline', 'ic:outline-people-alt', 
+  'ic:outline-shopping-cart', 'ic:outline-favorite-border', 'ic:outline-bookmark-border',
+  'ic:outline-info', 'ic:outline-lightbulb', 'ic:outline-flag', 'ic:outline-rss-feed'
+]
 
 // Normalization
 const normalizeLabels = () => {
@@ -202,7 +213,7 @@ const startEdit = (index) => {
 const startEditDefault = (index) => {
   editIndex.value = index
   isEditingDefault.value = true
-  form.value = { ...defaultLabels.value[index] }
+  form.value = { ...uiStore.defaultLabels[index] }
   isEditorOpen.value = true
 }
 
@@ -213,7 +224,7 @@ const saveLabel = () => {
   }
   
   if (isEditingDefault.value) {
-    defaultLabels.value[editIndex.value] = { ...form.value }
+    uiStore.defaultLabels[editIndex.value] = { ...form.value }
   } else {
     if (editIndex.value > -1) {
       uiStore.customLabels[editIndex.value] = { ...form.value }
