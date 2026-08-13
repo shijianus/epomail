@@ -12,3 +12,7 @@ export function userDelete() {
     return http.delete('/my/delete')
 }
 
+export function userSetCustomLabels(customLabels) {
+    return http.put('/my/setCustomLabels', { customLabels })
+}
+

@@ -23,6 +23,17 @@ import oauthService from "./oauth-service";
 
 const userService = {
 
+	async setCustomLabels(c, params, userId) {
+		const { customLabels } = params;
+		await c.env.db.update(user).set({ customLabels }).where(eq(user.userId, userId));
+		
+		const authInfo = await c.env.kv.get(KvConst.AUTH_INFO + userId, { type: 'json' });
+		if (authInfo && authInfo.user) {
+			authInfo.user.customLabels = customLabels;
+			await c.env.kv.put(KvConst.AUTH_INFO + userId, JSON.stringify(authInfo), { expirationTtl: constant.TOKEN_EXPIRE });
+		}
+	},
+
 	async loginUserInfo(c, userId) {
 
 		const userRow = await userService.selectById(c, userId);

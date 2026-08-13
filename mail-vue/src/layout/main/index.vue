@@ -16,7 +16,7 @@
               <Icon icon="fluent:settings-48-regular" width="20" height="20" /> {{$t('general') || 'General'}}
             </router-link>
             <router-link :to="{name: 'label-setting'}" class="settings-nav-item" :class="{active: route.name === 'label-setting'}">
-              <Icon icon="ic:baseline-label" width="20" height="20" /> {{$t('labels') || 'Labels'}}
+              <Icon icon="lucide:tags" width="20" height="20" /> {{$t('labels') || 'Labels'}}
             </router-link>
 
             <template v-if="hasPerm(['all-email:query','user:query','role:query','setting:query','analysis:query','reg-key:query'])">
