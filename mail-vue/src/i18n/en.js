@@ -396,6 +396,32 @@ const en = {
     ruleWhitelist: 'Whitelist',
     ruleCorporate: 'Corporate',
     systemControlled: 'System Managed',
+    
+    // New Rule Builder
+    ruleFutureNotice: '*(Rules only apply to future incoming emails)*',
+    ruleOptPeople: 'People',
+    ruleOptSubject: 'Subject',
+    ruleOptKeywords: 'Keywords',
+    ruleOptMessageSize: 'Message size',
+    ruleOptReceived: 'Received',
+    ruleOptAllMessages: 'All messages',
+    condFrom: 'From...',
+    condTo: 'To...',
+    condEmailReceivedForOthers: 'Email received for others...',
+    condSubjectInclude: 'Subject include...',
+    condSubjectOrBodyInclude: 'Subject or body include...',
+    condMessageBodyIncludes: 'Message body includes...',
+    condSenderAddressIncludes: 'Sender address includes...',
+    condRecipientAddressIncludes: 'Recipient address includes...',
+    condMessageHeaderIncludes: 'Message header includes...',
+    condAtLeast: 'At least (bytes)...',
+    condAtMost: 'At most (bytes)...',
+    condBefore: 'Before...',
+    condAfter: 'After...',
+    condApplyToAll: 'Apply to all messages',
+    condInBlacklist: 'Is in Blacklist...',
+    condInWhitelist: 'Is in Whitelist...',
+    condIsCorporate: 'Is Corporate Email...',
 }
 
 export default en

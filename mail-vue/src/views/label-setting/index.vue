@@ -153,38 +153,23 @@
             {{ $t('rulesDesc') || 'Emails matching these rules will automatically receive this label.' }}
           </p>
           
-          <div class="rule-builder">
-            <el-radio-group v-model="newRuleLogic" size="small" style="margin-bottom: 8px; width: 100%;">
-              <el-radio-button value="include" style="flex: 1; text-align: center;">{{ $t('ruleInclude') || 'Include' }}</el-radio-button>
-              <el-radio-button value="exclude" style="flex: 1; text-align: center;">{{ $t('ruleExclude') || 'Except' }}</el-radio-button>
-              <el-radio-button value="all" style="flex: 1; text-align: center;">{{ $t('ruleAll') || 'All' }}</el-radio-button>
-            </el-radio-group>
-            
-            <div style="display: flex; gap: 8px; margin-bottom: 8px;">
-              <el-select v-if="newRuleLogic !== 'all'" v-model="newRuleType" size="small" style="width: 140px;" :placeholder="$t('ruleType') || 'Type'">
-                <el-option :label="$t('ruleDomain') || 'Domain / Suffix'" value="domain" />
-                <el-option :label="$t('ruleSender') || 'Sender Address'" value="sender" />
-              </el-select>
-              <el-select v-else v-model="newRuleTypeAll" size="small" style="width: 140px;" :placeholder="$t('ruleType') || 'Type'">
-                <el-option :label="$t('ruleBlacklist') || 'Blacklist'" value="blacklist" />
-                <el-option :label="$t('ruleWhitelist') || 'Whitelist'" value="whitelist" />
-                <el-option :label="$t('ruleCorporate') || 'Corporate'" value="corporate" />
-              </el-select>
-              
-              <el-input v-model="newRuleValue" size="small" :disabled="newRuleLogic === 'all'" :placeholder="newRuleLogic === 'all' ? ($t('systemControlled') || 'System Managed') : (newRuleType === 'domain' ? '@gmail.com' : 'admin@outlook.com')" @keyup.enter="addRule" style="flex: 1;" />
-              <el-button type="primary" size="small" @click="addRule"><Icon icon="lucide:plus" width="14" /></el-button>
-            </div>
-          </div>
+          <el-button type="primary" plain size="small" @click="openRuleBuilder" style="width: 100%; justify-content: center; margin-bottom: 8px;">
+            <Icon icon="lucide:plus" width="16" style="margin-right: 4px;" /> 添加分类规则 (Add Rule)
+          </el-button>
           
-          <div v-if="form.rules && form.rules.length > 0" class="rules-list" style="display: flex; flex-direction: column; gap: 4px; max-height: 150px; overflow-y: auto; padding-right: 4px;">
-            <div v-for="(rule, rIdx) in form.rules" :key="rIdx" class="rule-tag">
-              <div style="display: flex; align-items: center; gap: 8px;">
-                <span class="rule-badge" :class="'badge-' + rule.logic">
-                  {{ getRuleLogicText(rule.logic) }} {{ getRuleTypeText(rule.type) }}
-                </span>
-                <span v-if="rule.logic !== 'all'">{{ rule.value }}</span>
+          <div v-if="form.rules && form.rules.length > 0" class="rules-list" style="display: flex; flex-direction: column; gap: 6px; max-height: 200px; overflow-y: auto;">
+            <div v-for="(rule, rIdx) in form.rules" :key="rIdx" class="rule-card">
+              <div class="rule-card-content">
+                <div class="rule-cond">
+                  <span class="cond-lbl">If:</span>
+                  <span class="cond-val">{{ getConditionText(rule.condition) }}</span>
+                </div>
+                <div class="rule-exc" v-if="rule.exception">
+                  <span class="exc-lbl">Except if:</span>
+                  <span class="exc-val">{{ getConditionText(rule.exception) }}</span>
+                </div>
               </div>
-              <el-button link size="small" @click="removeRule(rIdx)" class="rule-del"><Icon icon="lucide:x" width="14" /></el-button>
+              <el-button link size="small" @click="removeRule(rIdx)" class="rule-del"><Icon icon="lucide:trash-2" width="14" /></el-button>
             </div>
           </div>
         </div>
@@ -216,6 +201,144 @@
         <div style="display: flex; justify-content: flex-end; gap: 12px;">
           <el-button @click="isDeleteOpen = false">Cancel</el-button>
           <el-button type="danger" @click="executeDelete">Delete</el-button>
+        </div>
+      </template>
+    </el-dialog>
+
+    <!-- Rule Builder Modal -->
+    <el-dialog v-model="isRuleBuilderOpen" :title="$t('classificationRules')" width="600px" destroy-on-close>
+      <div class="rule-builder-modal">
+        <div style="font-size: 13px; color: var(--text-secondary); margin-bottom: 12px; margin-top: -12px;">
+          {{ $t('ruleFutureNotice') }}
+        </div>
+        <!-- Step 1: Condition -->
+        <div class="rb-step">
+          <h4 class="rb-step-title"><span class="step-num">1</span> {{ $t('ruleInclude') }} (Condition)</h4>
+          <div class="rb-form-row">
+            <el-select v-model="rbCondition.type" size="large" style="width: 250px;">
+              <el-option-group :label="$t('ruleOptPeople')">
+                <el-option :label="$t('condFrom')" value="from" />
+                <el-option :label="$t('condTo')" value="to" />
+                <el-option :label="$t('condEmailReceivedForOthers')" value="email_received_for_others" />
+              </el-option-group>
+              <el-option-group :label="$t('ruleOptSubject')">
+                <el-option :label="$t('condSubjectInclude')" value="subject_include" />
+                <el-option :label="$t('condSubjectOrBodyInclude')" value="subject_or_body_include" />
+              </el-option-group>
+              <el-option-group :label="$t('ruleOptKeywords')">
+                <el-option :label="$t('condMessageBodyIncludes')" value="message_body_includes" />
+                <el-option :label="$t('condSenderAddressIncludes')" value="sender_address_includes" />
+                <el-option :label="$t('condRecipientAddressIncludes')" value="recipient_address_includes" />
+                <el-option :label="$t('condMessageHeaderIncludes')" value="message_header_includes" />
+              </el-option-group>
+              <el-option-group :label="$t('ruleOptMessageSize')">
+                <el-option :label="$t('condAtLeast')" value="at_least" />
+                <el-option :label="$t('condAtMost')" value="at_most" />
+              </el-option-group>
+              <el-option-group :label="$t('ruleOptReceived')">
+                <el-option :label="$t('condBefore')" value="before" />
+                <el-option :label="$t('condAfter')" value="after" />
+              </el-option-group>
+              <el-option-group :label="$t('ruleOptAllMessages')">
+                <el-option :label="$t('condApplyToAll')" value="all_messages" />
+                <el-option :label="$t('condInWhitelist')" value="in_whitelist" />
+                <el-option :label="$t('condIsCorporate')" value="is_corporate" />
+              </el-option-group>
+            </el-select>
+            
+            <el-date-picker
+              v-if="['before', 'after'].includes(rbCondition.type)"
+              v-model="rbCondition.value"
+              type="date"
+              size="large"
+              style="flex: 1;"
+              value-format="YYYY-MM-DD"
+            />
+            <el-input-number
+              v-else-if="['at_least', 'at_most'].includes(rbCondition.type)"
+              v-model="rbCondition.value"
+              size="large"
+              style="flex: 1;"
+              :min="0"
+            />
+            <el-input 
+              v-else-if="!['all_messages', 'in_whitelist', 'is_corporate', 'in_blacklist'].includes(rbCondition.type)" 
+              v-model="rbCondition.value" 
+              size="large" 
+              placeholder="Value" 
+              style="flex: 1;" 
+            />
+          </div>
+        </div>
+
+        <el-divider border-style="dashed" />
+
+        <!-- Step 2: Exception (Optional) -->
+        <div class="rb-step">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <h4 class="rb-step-title" style="margin: 0;"><span class="step-num">2</span> {{ $t('ruleExclude') }} (Exception)</h4>
+            <el-switch v-model="rbHasException" size="small" />
+          </div>
+          
+          <div v-if="rbHasException" class="rb-form-row" style="margin-top: 12px;">
+            <el-select v-model="rbException.type" size="large" style="width: 250px;">
+              <el-option-group :label="$t('ruleOptPeople')">
+                <el-option :label="$t('condFrom')" value="from" />
+                <el-option :label="$t('condTo')" value="to" />
+                <el-option :label="$t('condEmailReceivedForOthers')" value="email_received_for_others" />
+              </el-option-group>
+              <el-option-group :label="$t('ruleOptSubject')">
+                <el-option :label="$t('condSubjectInclude')" value="subject_include" />
+                <el-option :label="$t('condSubjectOrBodyInclude')" value="subject_or_body_include" />
+              </el-option-group>
+              <el-option-group :label="$t('ruleOptKeywords')">
+                <el-option :label="$t('condMessageBodyIncludes')" value="message_body_includes" />
+                <el-option :label="$t('condSenderAddressIncludes')" value="sender_address_includes" />
+                <el-option :label="$t('condRecipientAddressIncludes')" value="recipient_address_includes" />
+                <el-option :label="$t('condMessageHeaderIncludes')" value="message_header_includes" />
+              </el-option-group>
+              <el-option-group :label="$t('ruleOptMessageSize')">
+                <el-option :label="$t('condAtLeast')" value="at_least" />
+                <el-option :label="$t('condAtMost')" value="at_most" />
+              </el-option-group>
+              <el-option-group :label="$t('ruleOptReceived')">
+                <el-option :label="$t('condBefore')" value="before" />
+                <el-option :label="$t('condAfter')" value="after" />
+              </el-option-group>
+              <el-option-group :label="$t('systemControlled')">
+                <el-option :label="$t('condInBlacklist')" value="in_blacklist" />
+              </el-option-group>
+            </el-select>
+
+            <el-date-picker
+              v-if="['before', 'after'].includes(rbException.type)"
+              v-model="rbException.value"
+              type="date"
+              size="large"
+              style="flex: 1;"
+              value-format="YYYY-MM-DD"
+            />
+            <el-input-number
+              v-else-if="['at_least', 'at_most'].includes(rbException.type)"
+              v-model="rbException.value"
+              size="large"
+              style="flex: 1;"
+              :min="0"
+            />
+            <el-input 
+              v-else-if="!['all_messages', 'in_whitelist', 'is_corporate', 'in_blacklist'].includes(rbException.type)" 
+              v-model="rbException.value" 
+              size="large" 
+              placeholder="Value" 
+              style="flex: 1;" 
+            />
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <div style="display: flex; justify-content: flex-end; gap: 12px;">
+          <el-button @click="isRuleBuilderOpen = false">{{ $t('cancel') }}</el-button>
+          <el-button type="primary" @click="saveNewRule">{{ $t('add') }}</el-button>
         </div>
       </template>
     </el-dialog>
@@ -256,32 +379,6 @@ const normalizeLabels = () => {
 }
 normalizeLabels()
 
-const isEditorOpen = ref(false)
-const editIndex = ref(-1)
-const isEditingDefault = ref(false)
-const form = ref({ name: '', icon: 'ic:baseline-label', color: '#3b82f6', parent: '', sidebarVis: 'show', listVis: true, rules: [] })
-
-const newRuleLogic = ref('include')
-const newRuleType = ref('domain')
-const newRuleTypeAll = ref('blacklist')
-const newRuleValue = ref('')
-
-const getRuleLogicText = (logic) => {
-  if (logic === 'include') return t('ruleInclude') || 'Include'
-  if (logic === 'exclude') return t('ruleExclude') || 'Except'
-  if (logic === 'all') return t('ruleAll') || 'All'
-  return logic
-}
-
-const getRuleTypeText = (type) => {
-  if (type === 'domain') return t('ruleDomainShort') || 'Domain'
-  if (type === 'sender') return t('ruleSenderShort') || 'Sender'
-  if (type === 'blacklist') return t('ruleBlacklist') || 'Blacklist'
-  if (type === 'whitelist') return t('ruleWhitelist') || 'Whitelist'
-  if (type === 'corporate') return t('ruleCorporate') || 'Corporate'
-  return type
-}
-
 const startAdd = () => {
   editIndex.value = -1
   isEditingDefault.value = false
@@ -290,7 +387,6 @@ const startAdd = () => {
     sidebarVis: 'show', listVis: true, rules: [], 
     stats: { total: 0, current: 0, unread: 0 } 
   }
-  newRuleValue.value = ''
   isEditorOpen.value = true
 }
 
@@ -299,7 +395,6 @@ const startEdit = (index) => {
   isEditingDefault.value = false
   form.value = { ...uiStore.customLabels[index] }
   if (!form.value.rules) form.value.rules = []
-  newRuleValue.value = ''
   isEditorOpen.value = true
 }
 
@@ -308,22 +403,97 @@ const startEditDefault = (index) => {
   isEditingDefault.value = true
   form.value = { ...uiStore.defaultLabels[index] }
   if (!form.value.rules) form.value.rules = []
-  newRuleValue.value = ''
   isEditorOpen.value = true
 }
 
-const addRule = () => {
-  let ruleType = newRuleLogic.value === 'all' ? newRuleTypeAll.value : newRuleType.value
-  let ruleVal = newRuleLogic.value === 'all' ? '' : newRuleValue.value.trim().toLowerCase()
-  
-  if (newRuleLogic.value === 'all' || ruleVal) {
-    if (!form.value.rules) form.value.rules = []
-    const exists = form.value.rules.some(r => r.logic === newRuleLogic.value && r.type === ruleType && r.value === ruleVal)
-    if (!exists) {
-      form.value.rules.push({ logic: newRuleLogic.value, type: ruleType, value: ruleVal })
-    }
-    newRuleValue.value = ''
+const isEditorOpen = ref(false)
+const editIndex = ref(-1)
+const isEditingDefault = ref(false)
+const form = ref({ name: '', icon: 'ic:baseline-label', color: '#3b82f6', parent: '', sidebarVis: 'show', listVis: true, rules: [] })
+
+const isRuleBuilderOpen = ref(false)
+const rbCondition = ref({ type: 'from', value: '' })
+const rbHasException = ref(false)
+const rbException = ref({ type: 'in_blacklist', value: '' })
+
+const openRuleBuilder = () => {
+  rbCondition.value = { type: 'from', value: '' }
+  rbHasException.value = false
+  rbException.value = { type: 'in_blacklist', value: '' }
+  isRuleBuilderOpen.value = true
+}
+
+const saveNewRule = () => {
+  // Validation
+  const requiresValue = (type) => !['all_messages', 'in_whitelist', 'is_corporate', 'in_blacklist'].includes(type)
+  const isValidValue = (val) => {
+    if (val === 0) return true
+    if (!val) return false
+    if (typeof val === 'string') return !!val.trim()
+    return true
   }
+
+  if (requiresValue(rbCondition.value.type) && !isValidValue(rbCondition.value.value)) {
+    ElMessage.warning(t('emptyContentMsg') || 'Please enter condition value')
+    return
+  }
+  
+  if (rbHasException.value && requiresValue(rbException.value.type) && !isValidValue(rbException.value.value)) {
+    ElMessage.warning(t('emptyContentMsg') || 'Please enter exception value')
+    return
+  }
+  
+  const newRule = {
+    condition: { 
+      type: rbCondition.value.type, 
+      value: requiresValue(rbCondition.value.type) 
+        ? (typeof rbCondition.value.value === 'string' ? rbCondition.value.value.trim().toLowerCase() : rbCondition.value.value) 
+        : true
+    }
+  }
+  
+  if (rbHasException.value) {
+    newRule.exception = {
+      type: rbException.value.type,
+      value: requiresValue(rbException.value.type) 
+        ? (typeof rbException.value.value === 'string' ? rbException.value.value.trim().toLowerCase() : rbException.value.value) 
+        : true
+    }
+  }
+  
+  if (!form.value.rules) form.value.rules = []
+  form.value.rules.push(newRule)
+  isRuleBuilderOpen.value = false
+}
+
+const getConditionText = (cond) => {
+  if (!cond) return ''
+  const typeMap = {
+    'from': 'condFrom',
+    'to': 'condTo',
+    'email_received_for_others': 'condEmailReceivedForOthers',
+    'subject_include': 'condSubjectInclude',
+    'subject_or_body_include': 'condSubjectOrBodyInclude',
+    'message_body_includes': 'condMessageBodyIncludes',
+    'sender_address_includes': 'condSenderAddressIncludes',
+    'recipient_address_includes': 'condRecipientAddressIncludes',
+    'message_header_includes': 'condMessageHeaderIncludes',
+    'at_least': 'condAtLeast',
+    'at_most': 'condAtMost',
+    'before': 'condBefore',
+    'after': 'condAfter',
+    'all_messages': 'condApplyToAll',
+    'in_blacklist': 'condInBlacklist',
+    'in_whitelist': 'condInWhitelist',
+    'is_corporate': 'condIsCorporate'
+  }
+  const key = typeMap[cond.type]
+  let typeStr = key ? t(key) : cond.type
+  if (typeStr.endsWith('...')) {
+    typeStr = typeStr.slice(0, -3)
+  }
+  if (cond.value === true) return typeStr
+  return `${typeStr} "${cond.value}"`
 }
 
 const removeRule = (index) => {
@@ -706,57 +876,105 @@ const moveUp = (index) => {
   margin-top: 4px;
 }
 
-/* Advanced Rules UI */
-.rule-builder :deep(.el-radio-group) {
+/* Rule Cards (New UI) */
+.rule-card {
   display: flex;
-}
-.rule-builder :deep(.el-radio-button__inner) {
-  width: 100%;
-}
-
-.rule-tag {
-  display: flex;
-  align-items: center;
   justify-content: space-between;
-  padding: 6px 10px;
-  background: var(--bg-hover);
-  border-radius: 6px;
-  border: 1px solid var(--border-subtle);
-  font-size: 12.5px;
-  color: var(--text-primary);
-  transition: all 0.2s;
+  align-items: flex-start;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-mid);
+  border-radius: 8px;
+  padding: 10px 12px;
+  transition: all 0.2s ease;
 }
-
-.rule-tag:hover {
-  border-color: var(--border-mid);
+.rule-card:hover {
+  border-color: var(--accent-primary);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
 }
-
-.rule-badge {
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-size: 11px;
+.rule-card-content {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  flex: 1;
+}
+.rule-cond {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.rule-exc {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 2px;
+}
+.cond-lbl {
   font-weight: 600;
-  letter-spacing: 0.5px;
-}
-
-.badge-include {
-  background: color-mix(in srgb, var(--success) 15%, transparent);
   color: var(--success);
+  font-size: 12px;
 }
-.badge-exclude {
-  background: color-mix(in srgb, var(--danger) 15%, transparent);
+.cond-val {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+.exc-lbl {
+  font-weight: 600;
   color: var(--danger);
+  font-size: 12px;
 }
-.badge-all {
-  background: color-mix(in srgb, var(--warning) 15%, transparent);
-  color: var(--warning);
+.exc-val {
+  color: var(--text-primary);
+  font-style: italic;
 }
-
 .rule-del {
   color: var(--text-muted);
-  transition: color 0.2s;
+  margin-left: 8px;
+  margin-top: -4px;
 }
-.rule-tag:hover .rule-del {
-  color: var(--danger);
+.rule-del:hover {
+  color: var(--danger) !important;
+}
+
+/* Rule Builder Modal */
+.rule-builder-modal {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.rb-step {
+  display: flex;
+  flex-direction: column;
+}
+.rb-step-title {
+  margin: 0 0 6px 0;
+  font-size: 15px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-primary);
+}
+.step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--accent-primary);
+  color: white;
+  font-size: 12px;
+  font-weight: 700;
+}
+.rb-step-desc {
+  margin: 0 0 12px 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.rb-form-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
 }
 </style>
