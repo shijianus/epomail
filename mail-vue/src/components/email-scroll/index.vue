@@ -411,9 +411,9 @@ function escapeRegExp(string) {
 function highlightMatch(text) {
   text = escapeHtml(text || '');
   const parsed = emailStore.searchParsed;
-  if (!parsed.highlight || !parsed.keyword) return text;
+  if (!parsed.highlight || !parsed.cleanKeyword) return text;
   
-  const regex = new RegExp(`(${escapeRegExp(parsed.keyword)})`, 'gi');
+  const regex = new RegExp(`(${escapeRegExp(parsed.cleanKeyword)})`, 'gi');
   return text.replace(regex, '<mark class="search-highlight">$1</mark>');
 }
 

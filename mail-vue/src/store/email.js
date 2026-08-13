@@ -38,9 +38,18 @@ export const useEmailStore = defineStore('email', {
                 isDraft = true;
             }
             
+            let cleanKeyword = input.replace(/global:/ig, '')
+                .replace(/is:sent/ig, '')
+                .replace(/from:me/ig, '')
+                .replace(/is:draft/ig, '')
+                .replace(/is:spam/ig, '')
+                .replace(/is:trash/ig, '')
+                .replace(/hl:off/ig, '')
+                .trim();
+            
             // We return the raw input as keyword so the backend can parse its own flags 
             // (e.g. global:, is:sent, is:draft, is:spam, etc.)
-            return { keyword: input, isGlobal, highlight, isDraft };
+            return { keyword: input, cleanKeyword, isGlobal, highlight, isDraft };
         }
     },
     persist: {
