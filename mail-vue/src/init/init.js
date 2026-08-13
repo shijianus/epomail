@@ -25,33 +25,50 @@ export async function init() {
 
     let setting = null;
 
-    if (token) {
-        const userPromise = loginUserInfo().catch(e => {
-            console.error(e);
-            return null;
-        });
-
-        const [s, user] = await Promise.all([websiteConfig(), userPromise]);
-        setting = s;
-        settingStore.settings = setting;
-        settingStore.domainList = setting.domainList;
-        document.title = setting.title;
-
-        if (user) {
-            accountStore.currentAccountId = user.account.accountId;
-            accountStore.currentAccount = user.account;
-            userStore.user = user;
-
-            const routers = permsToRouter(user.permKeys);
-            routers.forEach(routerData => {
-                router.addRoute('layout', routerData);
+    try {
+        if (token) {
+            const userPromise = loginUserInfo().catch(e => {
+                console.error(e);
+                return null;
             });
-        }
 
-    } else {
-        setting = await websiteConfig();
-        settingStore.settings = setting;
-        settingStore.domainList = setting.domainList;
-        document.title = setting.title;
+            const settingPromise = websiteConfig().catch(e => {
+                console.error('websiteConfig failed:', e);
+                return null;
+            });
+
+            const [s, user] = await Promise.all([settingPromise, userPromise]);
+            setting = s;
+
+            if (setting) {
+                settingStore.settings = setting;
+                settingStore.domainList = setting.domainList;
+                document.title = setting.title;
+            }
+
+            if (user) {
+                accountStore.currentAccountId = user.account.accountId;
+                accountStore.currentAccount = user.account;
+                userStore.user = user;
+
+                const routers = permsToRouter(user.permKeys);
+                routers.forEach(routerData => {
+                    router.addRoute('layout', routerData);
+                });
+            }
+
+        } else {
+            setting = await websiteConfig().catch(e => {
+                console.error('websiteConfig failed:', e);
+                return null;
+            });
+            if (setting) {
+                settingStore.settings = setting;
+                settingStore.domainList = setting.domainList;
+                document.title = setting.title;
+            }
+        }
+    } catch (e) {
+        console.error('init() unexpected error:', e);
     }
 }

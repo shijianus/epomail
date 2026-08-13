@@ -11,7 +11,11 @@ import perm from "@/perm/perm.js";
 const pinia = createPinia().use(piniaPersistedState)
 import i18n from "@/i18n/index.js";
 const app = createApp(App).use(pinia)
-await init()
+try {
+    await init()
+} catch (e) {
+    console.error('App init failed:', e);
+}
 app.use(router).use(i18n).directive('perm',perm)
 app.config.devtools = true;
 
