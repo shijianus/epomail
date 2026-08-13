@@ -1,13 +1,70 @@
 <template>
   <div class="status-bar">
-    <div class="status-dot"></div>
-    <div class="status-text">{{ $t('connected') || 'Connected' }} <span class="status-time">{{ $t('syncedJustNow') || 'Synced just now' }}</span></div>
+    <div class="status-dot" :class="{'offline': !isOnline}"></div>
+    <div class="status-text">
+      {{ isOnline ? ($t('connected') || 'Connected') : ($t('disconnected') || 'Disconnected') }} 
+      <span class="status-time" v-if="isOnline">{{ syncTimeText }}</span>
+      <span class="status-unread" v-if="isOnline && unreadCount > 0"> ({{ unreadCount }} {{ $t('statUnread') || 'Unread' }})</span>
+    </div>
     <div style="flex: 1"></div>
     <div class="status-text version-tag">EpoMail v1.0.3 · Cloudflare Workers</div>
   </div>
 </template>
 
 <script setup>
+import { computed, ref, onMounted, onUnmounted, watch } from 'vue';
+import { useUiStore } from '@/store/ui.js';
+import { useEmailStore } from '@/store/email.js';
+import { fromNow } from '@/utils/day.js';
+import { useI18n } from 'vue-i18n';
+import { EmailUnreadEnum } from '@/enums/email-enum.js';
+
+const { t } = useI18n();
+const uiStore = useUiStore();
+const emailStore = useEmailStore();
+
+const isOnline = ref(navigator.onLine);
+const handleOnlineStatus = () => {
+  isOnline.value = navigator.onLine;
+};
+
+const syncTimeText = ref(t('syncedJustNow') || 'Synced just now');
+let timer = null;
+
+const updateSyncTimeText = () => {
+  if (uiStore.lastSyncTime) {
+    const diff = Date.now() - uiStore.lastSyncTime;
+    if (diff < 60000) {
+      syncTimeText.value = t('syncedJustNow') || 'Synced just now';
+    } else {
+      syncTimeText.value = fromNow(uiStore.lastSyncTime);
+    }
+  } else {
+    syncTimeText.value = t('syncedJustNow') || 'Synced just now';
+  }
+};
+
+onMounted(() => {
+  window.addEventListener('online', handleOnlineStatus);
+  window.addEventListener('offline', handleOnlineStatus);
+  timer = setInterval(updateSyncTimeText, 1000 * 30);
+  updateSyncTimeText();
+});
+
+onUnmounted(() => {
+  window.removeEventListener('online', handleOnlineStatus);
+  window.removeEventListener('offline', handleOnlineStatus);
+  if (timer) clearInterval(timer);
+});
+
+watch(() => uiStore.lastSyncTime, () => {
+  updateSyncTimeText();
+});
+
+const unreadCount = computed(() => {
+  const list = emailStore.emailScroll?.emailList || [];
+  return list.filter(e => e.unread === EmailUnreadEnum.UNREAD).length;
+});
 </script>
 
 <style lang="scss" scoped>
@@ -28,6 +85,12 @@
   background: var(--success, #4caf7d);
   box-shadow: 0 0 6px var(--success, #4caf7d);
   flex-shrink: 0;
+  transition: all 0.3s ease;
+}
+
+.status-dot.offline {
+  background: var(--danger, #f44336);
+  box-shadow: 0 0 6px var(--danger, #f44336);
 }
 
 .status-text {
@@ -40,5 +103,10 @@
 
 .status-time {
   margin-left: 5px;
+}
+
+.status-unread {
+  font-weight: 500;
+  color: var(--text-primary);
 }
 </style>

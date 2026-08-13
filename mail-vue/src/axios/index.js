@@ -15,12 +15,18 @@ http.interceptors.request.use(config => {
     return config
 })
 
-http.interceptors.response.use((res) => {
+    http.interceptors.response.use((res) => {
 
         return new Promise((resolve, reject) => {
 
             const noMsg = res.config.noMsg;
             const data = res.data
+
+            if (res.config.url?.includes('/email/list') || res.config.url?.includes('/email/latest')) {
+                import('@/store/ui.js').then(({useUiStore}) => {
+                    useUiStore().lastSyncTime = Date.now()
+                }).catch(() => {})
+            }
 
             if (noMsg) {
 

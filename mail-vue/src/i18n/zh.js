@@ -341,6 +341,7 @@ const zh = {
     searchSender: '搜索发件人',
     userEmail: '用户邮箱',
     connected: '已连接',
+    disconnected: '已离线',
     syncedJustNow: '刚刚同步',
     accountDetails: '账户详情',
     lightMode: '浅色模式',

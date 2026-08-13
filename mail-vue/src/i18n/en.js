@@ -341,6 +341,7 @@ const en = {
     searchSender: 'Search by Sender',
     userEmail: 'Email Address',
     connected: 'Connected',
+    disconnected: 'Disconnected',
     syncedJustNow: 'Synced just now',
     accountDetails: 'Account Details',
     lightMode: 'Light Mode',
