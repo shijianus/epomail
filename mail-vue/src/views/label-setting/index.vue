@@ -261,9 +261,10 @@
               style="flex: 1;"
               :min="0"
             />
-            <el-input 
+            <el-autocomplete 
               v-else-if="!['all_messages', 'in_whitelist', 'is_corporate', 'in_blacklist'].includes(rbCondition.type)" 
               v-model="rbCondition.value" 
+              :fetch-suggestions="queryConditionSuggestions"
               size="large" 
               placeholder="Value" 
               style="flex: 1;" 
@@ -325,9 +326,10 @@
               style="flex: 1;"
               :min="0"
             />
-            <el-input 
+            <el-autocomplete 
               v-else-if="!['all_messages', 'in_whitelist', 'is_corporate', 'in_blacklist'].includes(rbException.type)" 
               v-model="rbException.value" 
+              :fetch-suggestions="queryExceptionSuggestions"
               size="large" 
               placeholder="Value" 
               style="flex: 1;" 
@@ -348,12 +350,15 @@
 <script setup>
 import { ref } from 'vue'
 import { useUiStore } from '@/store/ui.js'
+import { useAccountStore } from '@/store/account.js'
+import { emailList } from '@/request/email.js'
 import { Icon } from '@iconify/vue'
 import { ElMessage } from 'element-plus'
 import { useI18n } from 'vue-i18n'
 
 const { t } = useI18n()
 const uiStore = useUiStore()
+const accountStore = useAccountStore()
 
 const presetColors = [
   '#ef4444', '#f97316', '#f59e0b', '#10b981', 
@@ -415,12 +420,61 @@ const isRuleBuilderOpen = ref(false)
 const rbCondition = ref({ type: 'from', value: '' })
 const rbHasException = ref(false)
 const rbException = ref({ type: 'in_blacklist', value: '' })
+const recentEmailsForSuggestions = ref([])
 
-const openRuleBuilder = () => {
+const openRuleBuilder = async () => {
   rbCondition.value = { type: 'from', value: '' }
   rbHasException.value = false
   rbException.value = { type: 'in_blacklist', value: '' }
   isRuleBuilderOpen.value = true
+
+  if (recentEmailsForSuggestions.value.length === 0) {
+    try {
+      const res = await emailList(accountStore.currentAccountId || 0, 1, 0, 0, 50, undefined, 'all')
+      if (res && res.list) {
+        recentEmailsForSuggestions.value = res.list
+      }
+    } catch (e) {
+      console.warn('Failed to fetch recent emails for suggestions', e)
+    }
+  }
+}
+
+const getSuggestions = (queryString, type) => {
+  const query = (queryString || '').toLowerCase()
+  const results = new Set()
+  
+  recentEmailsForSuggestions.value.forEach(email => {
+    if (['from', 'sender_address_includes'].includes(type)) {
+      if (email.fromAddress && email.fromAddress.toLowerCase().includes(query)) {
+        results.add(email.fromAddress)
+        const domain = email.fromAddress.split('@')[1]
+        if (domain && domain.includes(query)) results.add(domain)
+      }
+    } else if (['to', 'recipient_address_includes', 'email_received_for_others'].includes(type)) {
+      if (email.toAddress && email.toAddress.toLowerCase().includes(query)) {
+        results.add(email.toAddress)
+      }
+    } else if (['subject_include', 'subject_or_body_include'].includes(type)) {
+      if (email.subject && email.subject.toLowerCase().includes(query)) {
+        results.add(email.subject)
+      }
+    }
+  })
+  
+  let resultArr = Array.from(results).map(val => ({ value: val }))
+  if (resultArr.length === 0 && query) {
+    resultArr = [{ value: queryString }]
+  }
+  return resultArr
+}
+
+const queryConditionSuggestions = (queryString, cb) => {
+  cb(getSuggestions(queryString, rbCondition.value.type))
+}
+
+const queryExceptionSuggestions = (queryString, cb) => {
+  cb(getSuggestions(queryString, rbException.value.type))
 }
 
 const saveNewRule = () => {
