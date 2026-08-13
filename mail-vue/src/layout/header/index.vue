@@ -11,8 +11,8 @@
     <!-- Middle Section: Search -->
     <div class="topbar-search">
       <div class="search-box">
-        <span class="search-icon"><Icon icon="lucide:search" width="20" height="20"/></span>
-        <input type="text" :placeholder="$t('search') || 'Search mail'" />
+        <span class="search-icon" @click="handleSearch" style="cursor: pointer; z-index: 1"><Icon icon="lucide:search" width="20" height="20"/></span>
+        <input type="text" :placeholder="$t('search') || 'Search mail'" v-model="emailStore.searchKeyword" @keyup.enter="handleSearch" />
       </div>
     </div>
 
@@ -78,6 +78,7 @@ import {logout} from "@/request/login.js";
 import {Icon} from "@iconify/vue";
 import {useUiStore} from "@/store/ui.js";
 import {useUserStore} from "@/store/user.js";
+import {useEmailStore} from "@/store/email.js";
 import {useRoute} from "vue-router";
 import {computed, ref} from "vue";
 import {useSettingStore} from "@/store/setting.js";
@@ -90,6 +91,7 @@ const route = useRoute();
 const settingStore = useSettingStore();
 const userStore = useUserStore();
 const uiStore = useUiStore();
+const emailStore = useEmailStore();
 const logoutLoading = ref(false)
 const userInfoShow = ref(false)
 const userinfoRef = ref({})
@@ -97,6 +99,18 @@ const userinfoRef = ref({})
 const accountCount = computed(() => {
   return userStore.user.role.accountCount
 })
+
+function handleSearch() {
+  const mailRoutes = ['email', 'user-all-email', 'star', 'snoozed', 'spam', 'trash'];
+  if (!mailRoutes.includes(route.name)) {
+    router.push({ name: 'user-all-email' });
+  } else {
+    // If already on a mail page, refresh the list
+    if (emailStore.emailScroll) {
+      emailStore.emailScroll.refreshList();
+    }
+  }
+}
 
 const sendType = computed(() => {
 
@@ -399,7 +413,6 @@ function formatName(email) {
   top: 50%; 
   transform: translateY(-50%); 
   color: var(--text-muted); 
-  pointer-events: none; 
 }
 
 .topbar-actions { 

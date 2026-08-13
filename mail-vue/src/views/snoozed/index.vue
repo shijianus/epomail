@@ -142,7 +142,7 @@ function cancelStar(email) {
 function getEmailList(emailId, size) {
   const accountId =  accountStore.currentAccountId;
   const allReceive = accountStore.currentAccount.allReceive;
-  return emailList(accountId, allReceive, emailId, params.timeSort, size, undefined, 'snoozed').then(data => {
+  return emailList(accountId, allReceive, emailId, params.timeSort, size, undefined, 'snoozed', emailStore.searchKeyword).then(data => {
     data.latestEmail.reqAccountId = accountId;
     data.latestEmail.allReceive = allReceive;
     return data;

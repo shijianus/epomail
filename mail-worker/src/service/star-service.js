@@ -2,7 +2,7 @@ import orm from '../entity/orm';
 import { star } from '../entity/star';
 import emailService from './email-service';
 import BizError from '../error/biz-error';
-import { and, desc, eq, lt, sql, inArray } from 'drizzle-orm';
+import { and, desc, eq, lt, sql, inArray, or } from 'drizzle-orm';
 import email from '../entity/email';
 import { isDel } from '../const/entity-const';
 import attService from "./att-service";
@@ -41,12 +41,30 @@ const starService = {
 	},
 
 	async list(c, params, userId) {
-		let { emailId, size } = params;
+		let { emailId, size, keyword } = params;
 		emailId = Number(emailId);
 		size = Number(size);
 
 		if (!emailId) {
 			emailId = 9999999999;
+		}
+
+		const conditions = [
+			eq(star.userId, userId),
+			eq(email.isDel, isDel.NORMAL),
+			lt(star.emailId, emailId)
+		];
+
+		if (keyword) {
+			conditions.push(
+				or(
+					sql`${email.subject} COLLATE NOCASE LIKE ${'%'+ keyword + '%'}`,
+					sql`${email.name} COLLATE NOCASE LIKE ${'%'+ keyword + '%'}`,
+					sql`${email.sendEmail} COLLATE NOCASE LIKE ${'%'+ keyword + '%'}`,
+					sql`${email.toEmail} COLLATE NOCASE LIKE ${'%'+ keyword + '%'}`,
+					sql`${email.text} COLLATE NOCASE LIKE ${'%'+ keyword + '%'}`
+				)
+			);
 		}
 
 		const list = await orm(c).select({
@@ -55,11 +73,7 @@ const starService = {
 			, ...email
 		}).from(star)
 			.leftJoin(email, eq(email.emailId, star.emailId))
-			.where(
-				and(
-					eq(star.userId, userId),
-					eq(email.isDel, isDel.NORMAL),
-					lt(star.emailId, emailId)))
+			.where(and(...conditions))
 			.orderBy(desc(star.emailId))
 			.limit(size)
 			.all();

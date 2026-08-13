@@ -29,6 +29,7 @@ import {starAdd, starCancel} from "@/request/star.js";
 import {defineOptions, ref, watch, toRaw} from "vue";
 import {useUiStore} from "@/store/ui.js";
 import {userDraftStore} from "@/store/draft.js";
+import {useEmailStore} from "@/store/email.js";
 import db from "@/db/db.js"
 
 defineOptions({
@@ -37,6 +38,7 @@ defineOptions({
 
 const draftStore = userDraftStore();
 const uiStore = useUiStore();
+const emailStore = useEmailStore();
 const scroll = ref({})
 
 watch(() => draftStore.setDraft, async () => {
@@ -72,6 +74,15 @@ watch(() => draftStore.refreshList, async () => {
 function getEmailList() {
   return new Promise((resolve, reject) => {
     db.value.draft.orderBy('createTime').reverse().toArray().then(list => {
+      const keyword = emailStore.searchKeyword;
+      if (keyword) {
+        list = list.filter(item => {
+          const lkeyword = keyword.toLowerCase();
+          return (item.subject && item.subject.toLowerCase().includes(lkeyword)) ||
+                 (item.content && item.content.toLowerCase().includes(lkeyword)) ||
+                 (item.receiveEmail && item.receiveEmail.join(',').toLowerCase().includes(lkeyword));
+        });
+      }
       resolve({list})
     })
   })

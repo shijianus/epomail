@@ -27,7 +27,7 @@ const emailService = {
 
 	async list(c, params, userId) {
 
-		let { emailId, type, accountId, size, timeSort, allReceive, folder } = params;
+		let { emailId, type, accountId, size, timeSort, allReceive, folder, keyword } = params;
 
 		size = Number(size);
 		emailId = Number(emailId);
@@ -70,18 +70,34 @@ const emailService = {
 				account,
 				eq(account.accountId, email.accountId)
 			)
-			.where(
-				and(
-					allReceive ? eq(1,1) : eq(email.accountId, accountId),
-					eq(email.userId, userId),
-					timeSort ? gt(email.emailId, emailId) : lt(email.emailId, emailId),
-					eq(account.isDel, isDel.NORMAL),
-					folder === 'trash' ? eq(email.isDel, 1) : eq(email.isDel, 0),
-					folder === 'spam' ? eq(email.isSpam, 1) : (folder === 'trash' || folder === 'snoozed' || folder === 'all' ? eq(1,1) : eq(email.isSpam, 0)),
-					folder === 'snoozed' ? sql`snoozed_time IS NOT NULL` : (folder === 'trash' || folder === 'spam' ? eq(1,1) : sql`(snoozed_time IS NULL OR snoozed_time <= CURRENT_TIMESTAMP)`),
-					(!folder && type !== undefined) ? eq(email.type, type) : (folder === 'all' ? eq(email.type, 0) : eq(1,1))
+		const commonConditions = [
+			allReceive ? eq(1,1) : eq(email.accountId, accountId),
+			eq(email.userId, userId),
+			eq(account.isDel, isDel.NORMAL),
+			folder === 'trash' ? eq(email.isDel, 1) : eq(email.isDel, 0),
+			folder === 'spam' ? eq(email.isSpam, 1) : (folder === 'trash' || folder === 'snoozed' || folder === 'all' ? eq(1,1) : eq(email.isSpam, 0)),
+			folder === 'snoozed' ? sql`snoozed_time IS NOT NULL` : (folder === 'trash' || folder === 'spam' ? eq(1,1) : sql`(snoozed_time IS NULL OR snoozed_time <= CURRENT_TIMESTAMP)`),
+			(!folder && type !== undefined) ? eq(email.type, type) : (folder === 'all' ? eq(email.type, 0) : eq(1,1))
+		];
+
+		if (keyword) {
+			commonConditions.push(
+				or(
+					sql`${email.subject} COLLATE NOCASE LIKE ${'%'+ keyword + '%'}`,
+					sql`${email.name} COLLATE NOCASE LIKE ${'%'+ keyword + '%'}`,
+					sql`${email.sendEmail} COLLATE NOCASE LIKE ${'%'+ keyword + '%'}`,
+					sql`${email.toEmail} COLLATE NOCASE LIKE ${'%'+ keyword + '%'}`,
+					sql`${email.text} COLLATE NOCASE LIKE ${'%'+ keyword + '%'}`
 				)
 			);
+		}
+
+		query.where(
+			and(
+				...commonConditions,
+				timeSort ? gt(email.emailId, emailId) : lt(email.emailId, emailId)
+			)
+		);
 
 		if (timeSort) {
 			query.orderBy(asc(email.emailId));
@@ -97,16 +113,8 @@ const emailService = {
 				eq(account.accountId, email.accountId)
 			)
 			.where(
-				and(
-					allReceive ? eq(1,1) : eq(email.accountId, accountId),
-					eq(email.userId, userId),
-					eq(account.isDel, isDel.NORMAL),
-					folder === 'trash' ? eq(email.isDel, 1) : eq(email.isDel, 0),
-					folder === 'spam' ? eq(email.isSpam, 1) : (folder === 'trash' || folder === 'snoozed' || folder === 'all' ? eq(1,1) : eq(email.isSpam, 0)),
-					folder === 'snoozed' ? sql`snoozed_time IS NOT NULL` : (folder === 'trash' || folder === 'spam' ? eq(1,1) : sql`(snoozed_time IS NULL OR snoozed_time <= CURRENT_TIMESTAMP)`),
-					(!folder && type !== undefined) ? eq(email.type, type) : (folder === 'all' ? eq(email.type, 0) : eq(1,1))
-				)
-		).get();
+				and(...commonConditions)
+			).get();
 
 		const latestEmailQuery = orm(c).select().from(email).where(
 			and(

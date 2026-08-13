@@ -2,7 +2,7 @@
   <emailScroll type="star" ref="scroll"
                :allow-star="false"
                :cancel-success="cancelStar"
-               :getEmailList="starList"
+               :getEmailList="getStarList"
                :emailDelete="emailDelete"
                :star-add="starAdd"
                :star-cancel="starCancel"
@@ -38,6 +38,10 @@ function jumpContent(email) {
 function cancelStar(email) {
   emailStore.cancelStarEmailId = email.emailId
   scroll.value.deleteEmail([email.emailId])
+}
+
+function getStarList(emailId, size) {
+  return starList(emailId, size, emailStore.searchKeyword);
 }
 
 onMounted(() => {
