@@ -145,10 +145,10 @@ router.beforeEach((to, from, next) => {
         const minTime = 3000;
         if (elapsed < minTime) {
             setTimeout(() => {
-                window.location.href = '/login/';
+                window.location.href = '/login/index.html';
             }, minTime - elapsed);
         } else {
-            window.location.href = '/login/';
+            window.location.href = '/login/index.html';
         }
         return;
     }

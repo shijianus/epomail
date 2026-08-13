@@ -12,7 +12,7 @@ import { onMounted } from 'vue';
 
 onMounted(() => {
   // Always force a hard redirect so Cloudflare serves the React app at /login/
-  window.location.href = '/login/';
+  window.location.href = '/login/index.html';
 });
 </script>
 
