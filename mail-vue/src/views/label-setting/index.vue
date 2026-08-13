@@ -1,110 +1,218 @@
 <template>
-  <div class="box">
-    <div class="container">
-      <div class="title" style="display: flex; justify-content: space-between; align-items: center;">
-        <span>{{ $t('labelSetting') || 'Label Settings' }}</span>
-        <el-button type="primary" size="small" @click="startAdd">
-          <Icon icon="lucide:plus" width="16" /> {{ $t('add') || 'Add' }}
-        </el-button>
+  <div class="page-container">
+    <div class="header-area">
+      <div class="header-text">
+        <h1 class="page-title">{{ $t('labelSetting') || 'Label Management' }}</h1>
+        <p class="page-desc">Manage your system labels and custom email categories</p>
       </div>
-      
-      <div class="label-list">
-        <div v-if="isAdding" class="label-item">
-          <div class="label-info">
-            <el-input v-model="addForm.name" size="small" :placeholder="$t('labels') || 'Label Name'" style="width: 150px" />
-            <el-input v-model="addForm.icon" size="small" placeholder="Icon (e.g. ic:baseline-label)" style="width: 180px" />
-            <el-color-picker v-model="addForm.color" size="small" />
+      <el-button type="primary" size="large" @click="startAdd" class="primary-btn">
+        <Icon icon="lucide:plus" width="18" /> {{ $t('newLabel') || 'New Label' }}
+      </el-button>
+    </div>
+
+    <!-- System Labels -->
+    <div class="section">
+      <div class="modern-list">
+        <div class="list-row system-row">
+          <div class="drag-handle disabled"></div>
+          <div class="label-pill-cell">
+            <div class="label-pill" style="--pill-color: var(--text-secondary)">
+              <Icon icon="hugeicons:mailbox-01" width="16" />
+              <span>{{ $t('inbox') || 'Inbox' }}</span>
+            </div>
           </div>
-          <div class="label-actions">
-            <el-button link type="primary" @click="saveAdd">{{ $t('save') || 'Save' }}</el-button>
-            <el-button link @click="isAdding = false">{{ $t('cancel') || 'Cancel' }}</el-button>
+          <div class="visibility-cell">
+            <el-select size="small" :model-value="'show'" class="vis-select" disabled>
+              <el-option label="Show" value="show" />
+            </el-select>
           </div>
+          <div class="visibility-cell">
+             <el-switch :model-value="true" size="small" disabled />
+          </div>
+          <div class="stats-cell">--</div>
+          <div class="actions-cell"></div>
         </div>
-        <div class="label-item" v-for="(label, index) in uiStore.customLabels" :key="index">
-          <div class="label-info">
-            <Icon :icon="label.icon || 'ic:baseline-label'" width="20" height="20" :style="{ color: label.color || 'inherit' }" />
-            <span v-if="editIndex !== index">{{ label.name || label }}</span>
-            <template v-else>
-              <el-input v-model="editForm.name" size="small" :placeholder="$t('labels') || 'Label Name'" style="width: 150px" />
-              <el-input v-model="editForm.icon" size="small" placeholder="Icon (e.g. ic:baseline-label)" style="width: 180px" />
-              <el-color-picker v-model="editForm.color" size="small" />
-            </template>
-          </div>
-          
-          <div class="label-actions">
-            <template v-if="editIndex !== index">
-              <el-button link type="primary" @click="startEdit(index)">{{ $t('edit') || 'Edit' }}</el-button>
-              <el-button link type="danger" @click="deleteLabel(index)">{{ $t('delete') || 'Delete' }}</el-button>
-              
-              <el-button link :disabled="index === 0" @click="moveUp(index)">
-                <Icon icon="lucide:arrow-up" width="16" />
-              </el-button>
-              <el-button link :disabled="index === uiStore.customLabels.length - 1" @click="moveDown(index)">
-                <Icon icon="lucide:arrow-down" width="16" />
-              </el-button>
-            </template>
-            <template v-else>
-              <el-button link type="primary" @click="saveEdit(index)">{{ $t('save') || 'Save' }}</el-button>
-              <el-button link @click="editIndex = -1">{{ $t('cancel') || 'Cancel' }}</el-button>
-            </template>
-          </div>
-        </div>
-        
-        <el-empty v-if="!uiStore.customLabels || uiStore.customLabels.length === 0" :description="$t('noData') || 'No labels yet'" />
       </div>
     </div>
+
+    <!-- Custom Labels -->
+    <div class="section" style="margin-top: 32px">
+      <div class="modern-list" v-if="uiStore.customLabels && uiStore.customLabels.length > 0">
+        <div class="list-row custom-row" v-for="(label, index) in uiStore.customLabels" :key="index">
+          <div class="drag-handle" title="Drag to reorder" @click="moveUp(index)">
+            <Icon icon="lucide:grip-vertical" width="18" />
+          </div>
+          <div class="label-pill-cell">
+            <div class="label-pill" :style="{ '--pill-color': label.color || 'var(--accent-primary)' }">
+              <Icon :icon="label.icon || 'ic:baseline-label'" width="16" />
+              <span>{{ label.name || label }}</span>
+            </div>
+          </div>
+          <div class="visibility-cell">
+            <el-select v-model="label.sidebarVis" size="small" class="vis-select" placeholder="Show">
+              <el-option label="Show" value="show" />
+              <el-option label="Hide" value="hide" />
+              <el-option label="Show if unread" value="unread" />
+            </el-select>
+          </div>
+          <div class="visibility-cell">
+             <el-switch v-model="label.listVis" size="small" />
+          </div>
+          <div class="stats-cell">0 {{$t('emails') || 'emails'}}</div>
+          <div class="actions-cell">
+            <el-button link class="action-btn edit-btn" @click="startEdit(index)">
+              <Icon icon="lucide:pencil" width="16" />
+            </el-button>
+            <el-button link class="action-btn delete-btn" @click="confirmDelete(index)">
+              <Icon icon="lucide:trash-2" width="16" />
+            </el-button>
+          </div>
+        </div>
+      </div>
+      <div v-else class="empty-state">
+        <Icon icon="lucide:tags" width="48" class="empty-icon" />
+        <h3>{{ $t('noCustomLabels') || 'No Custom Labels' }}</h3>
+        <p>Create your first label to keep your inbox organized.</p>
+        <el-button plain @click="startAdd">Create Label</el-button>
+      </div>
+    </div>
+
+    <!-- Drawer for Add/Edit -->
+    <el-drawer v-model="isEditorOpen" :title="editIndex === -1 ? 'Create New Label' : 'Edit Label'" size="400px" destroy-on-close class="label-drawer">
+      <div class="editor-form">
+        <div class="form-group">
+          <label>Name</label>
+          <el-input v-model="form.name" size="large" placeholder="Enter label name" />
+        </div>
+        <div class="form-group">
+          <label>Parent Label</label>
+          <el-select v-model="form.parent" size="large" placeholder="None" clearable style="width: 100%">
+             <el-option v-for="(l, i) in uiStore.customLabels" :key="i" :label="l.name" :value="l.name" :disabled="editIndex === i" />
+          </el-select>
+        </div>
+        <div class="form-group">
+          <label>Color</label>
+          <div class="swatches">
+            <div class="swatch" 
+                 v-for="color in presetColors" :key="color"
+                 :style="{ backgroundColor: color }"
+                 :class="{ active: form.color === color }"
+                 @click="form.color = color">
+                 <Icon v-if="form.color === color" icon="lucide:check" width="16" color="#fff" />
+            </div>
+            <div class="swatch custom-color-picker">
+              <el-color-picker v-model="form.color" size="small" />
+            </div>
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <div style="display: flex; justify-content: flex-end; gap: 12px;">
+          <el-button @click="isEditorOpen = false">Cancel</el-button>
+          <el-button type="primary" @click="saveLabel">Save Label</el-button>
+        </div>
+      </template>
+    </el-drawer>
+
+    <!-- Delete Confirmation Modal -->
+    <el-dialog v-model="isDeleteOpen" title="Delete Label" width="450px" custom-class="delete-modal">
+      <div class="delete-warning">
+        <Icon icon="lucide:alert-triangle" width="32" class="warning-icon" />
+        <div class="warning-text">
+          <h3 style="margin:0; font-size: 16px;">Delete "{{ deleteCandidate?.name }}"?</h3>
+          <p style="margin:8px 0 0; color: var(--text-secondary); font-size: 13px;">Please select how to handle the associated emails.</p>
+        </div>
+      </div>
+      <el-radio-group v-model="deleteMode" class="delete-radio-group">
+        <el-radio :value="'tagOnly'" class="radio-item">
+          <div><strong>Only remove the label tag</strong></div>
+          <div class="radio-desc">Emails will remain in their original folders. The label association will simply be cleared.</div>
+        </el-radio>
+      </el-radio-group>
+      <template #footer>
+        <div style="display: flex; justify-content: flex-end; gap: 12px;">
+          <el-button @click="isDeleteOpen = false">Cancel</el-button>
+          <el-button type="danger" @click="executeDelete">Delete</el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
+
 <script setup>
 import { ref } from 'vue'
 import { useUiStore } from '@/store/ui.js'
 import { Icon } from '@iconify/vue'
+import { ElMessage } from 'element-plus'
 
 const uiStore = useUiStore()
 
-const isAdding = ref(false)
-const addForm = ref({ name: '', icon: 'ic:baseline-label', color: '' })
+const presetColors = [
+  '#ef4444', '#f97316', '#f59e0b', '#10b981', 
+  '#06b6d4', '#3b82f6', '#8b5cf6', '#d946ef',
+  '#64748b', '#1e293b'
+]
 
-const editIndex = ref(-1)
-const editForm = ref({ name: '', icon: '', color: '' })
-
-// Ensure they are object shapes
+// Normalization
 const normalizeLabels = () => {
   if (!uiStore.customLabels) uiStore.customLabels = []
   uiStore.customLabels = uiStore.customLabels.map(l => {
-    if (typeof l === 'string') return { name: l, icon: 'ic:baseline-label', color: '' }
+    if (typeof l === 'string') return { name: l, icon: 'ic:baseline-label', color: '#3b82f6', sidebarVis: 'show', listVis: true }
+    if (!l.sidebarVis) l.sidebarVis = 'show'
+    if (l.listVis === undefined) l.listVis = true
     return l
   })
 }
 normalizeLabels()
 
-const startAdd = () => {
-  isAdding.value = true
-  addForm.value = { name: '', icon: 'ic:baseline-label', color: '' }
-}
+const isEditorOpen = ref(false)
+const editIndex = ref(-1)
+const form = ref({ name: '', icon: 'ic:baseline-label', color: '#3b82f6', parent: '', sidebarVis: 'show', listVis: true })
 
-const saveAdd = () => {
-  if (addForm.value.name.trim()) {
-    if (!uiStore.customLabels) uiStore.customLabels = []
-    uiStore.customLabels.push({ ...addForm.value })
-    isAdding.value = false
-  }
+const startAdd = () => {
+  editIndex.value = -1
+  form.value = { name: '', icon: 'ic:baseline-label', color: presetColors[5], parent: '', sidebarVis: 'show', listVis: true }
+  isEditorOpen.value = true
 }
 
 const startEdit = (index) => {
   editIndex.value = index
-  editForm.value = { ...uiStore.customLabels[index] }
+  form.value = { ...uiStore.customLabels[index] }
+  isEditorOpen.value = true
 }
 
-const saveEdit = (index) => {
-  if (editForm.value.name.trim()) {
-    uiStore.customLabels[index] = { ...editForm.value }
-    editIndex.value = -1
+const saveLabel = () => {
+  if (!form.value.name.trim()) {
+    ElMessage.warning('Label name is required')
+    return
   }
+  
+  if (editIndex.value > -1) {
+    uiStore.customLabels[editIndex.value] = { ...form.value }
+  } else {
+    uiStore.customLabels.push({ ...form.value })
+  }
+  isEditorOpen.value = false
 }
 
-const deleteLabel = (index) => {
-  uiStore.customLabels.splice(index, 1)
+const isDeleteOpen = ref(false)
+const deleteCandidate = ref(null)
+const deleteIndex = ref(-1)
+const deleteMode = ref('tagOnly')
+
+const confirmDelete = (index) => {
+  deleteIndex.value = index
+  deleteCandidate.value = uiStore.customLabels[index]
+  deleteMode.value = 'tagOnly'
+  isDeleteOpen.value = true
+}
+
+const executeDelete = () => {
+  if (deleteIndex.value > -1) {
+    uiStore.customLabels.splice(deleteIndex.value, 1)
+  }
+  isDeleteOpen.value = false
+  ElMessage.success('Label tag removed successfully')
 }
 
 const moveUp = (index) => {
@@ -114,57 +222,276 @@ const moveUp = (index) => {
     uiStore.customLabels[index - 1] = temp
   }
 }
-
-const moveDown = (index) => {
-  if (index < uiStore.customLabels.length - 1) {
-    const temp = uiStore.customLabels[index]
-    uiStore.customLabels[index] = uiStore.customLabels[index + 1]
-    uiStore.customLabels[index + 1] = temp
-  }
-}
 </script>
+
 <style scoped>
-.box {
-  padding: 24px 0;
+.page-container {
+  padding: 0;
   width: 100%;
+  max-width: 900px;
+  margin: 0 auto;
 }
-.title {
-  font-size: 20px;
-  font-weight: 600;
-  margin-bottom: 24px;
-  color: var(--text-primary);
-}
-.container {
-  max-width: 800px;
-}
-.label-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-.label-item {
+
+.header-area {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 16px;
-  background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: 8px;
-  transition: border-color 0.2s;
+  margin-bottom: 32px;
 }
-.label-item:hover {
-  border-color: var(--border-primary);
-}
-.label-info {
+
+.header-text {
   display: flex;
-  align-items: center;
-  gap: 12px;
-  color: var(--text-primary);
-  font-weight: 500;
+  flex-direction: column;
+  gap: 6px;
 }
-.label-actions {
+
+.page-title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.5px;
+}
+
+.page-desc {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.primary-btn {
+  border-radius: 8px;
+  padding: 0 20px;
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.section-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 12px;
+}
+
+.modern-list {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-surface);
+}
+
+.list-row {
+  display: flex;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border-subtle);
+  transition: background-color 0.2s;
+}
+
+.list-row:last-child {
+  border-bottom: none;
+}
+
+.list-row.custom-row:hover {
+  background-color: var(--bg-hover);
+}
+
+.drag-handle {
+  width: 32px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: var(--text-muted);
+  cursor: grab;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.drag-handle.disabled {
+  cursor: default;
+}
+.list-row:hover .drag-handle:not(.disabled) {
+  opacity: 1;
+}
+
+.label-pill-cell {
+  flex: 1;
+  min-width: 200px;
+}
+
+.label-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  border-radius: 100px;
+  background-color: color-mix(in srgb, var(--pill-color) 12%, transparent);
+  color: var(--pill-color);
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.visibility-cell {
+  width: 140px;
+  display: flex;
+  justify-content: center;
+}
+
+.stats-cell {
+  width: 100px;
+  text-align: right;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.actions-cell {
+  width: 80px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
+  padding-right: 8px;
+}
+
+.action-btn {
+  opacity: 0;
+  transition: opacity 0.2s, color 0.2s;
+}
+
+.list-row:hover .action-btn {
+  opacity: 1;
+}
+
+.action-btn.delete-btn:hover {
+  color: var(--danger);
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 64px 20px;
+  text-align: center;
+  border: 1px dashed var(--border-subtle);
+  border-radius: 12px;
+  background: var(--bg-base);
+}
+
+.empty-icon {
+  color: var(--text-muted);
+  margin-bottom: 16px;
+}
+
+.empty-state h3 {
+  margin: 0 0 8px;
+  font-size: 16px;
+  color: var(--text-primary);
+}
+
+.empty-state p {
+  margin: 0 0 24px;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+/* Form Styles */
+.editor-form {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 0 8px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-group label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.swatch {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.swatch:hover {
+  transform: scale(1.1);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+
+.swatch.active {
+  box-shadow: 0 0 0 2px var(--bg-surface), 0 0 0 4px var(--accent-primary);
+}
+
+.custom-color-picker :deep(.el-color-picker__trigger) {
+  border: none;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 50%;
+  overflow: hidden;
+}
+
+/* Modal Styles */
+.delete-warning {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 24px;
+  padding: 16px;
+  background-color: color-mix(in srgb, var(--danger) 10%, transparent);
+  border-radius: 8px;
+}
+
+.warning-icon {
+  color: var(--danger);
+  flex-shrink: 0;
+}
+
+.delete-radio-group {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+}
+
+.radio-item {
+  display: flex;
+  align-items: flex-start;
+  height: auto;
+  white-space: normal;
+  padding: 12px;
+  border: 1px solid var(--border-mid);
+  border-radius: 8px;
+  margin-right: 0;
+}
+
+.radio-item.is-checked {
+  border-color: var(--accent-primary);
+  background-color: color-mix(in srgb, var(--accent-primary) 5%, transparent);
+}
+
+.radio-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+  line-height: 1.4;
 }
 </style>

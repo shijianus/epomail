@@ -62,6 +62,16 @@ const routes = [
                 }
             },
             {
+                path: '/settings/category',
+                name: 'category-setting',
+                component: () => import('@/views/category-setting/index.vue'),
+                meta: {
+                    title: 'category',
+                    name: 'category-setting',
+                    menu: true
+                }
+            },
+            {
                 path: '/starred',
                 name: 'star',
                 component: () => import('@/views/star/index.vue'),

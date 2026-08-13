@@ -47,6 +47,10 @@
               <router-link v-if="hasPerm('setting:query')" :to="{name: 'sys-setting'}" class="settings-nav-item" :class="{active: route.name === 'sys-setting'}">
                 <Icon icon="eos-icons:system-ok-outlined" width="18" height="18" /> {{$t('SystemSettings')}}
               </router-link>
+
+              <router-link :to="{name: 'category-setting'}" class="settings-nav-item" :class="{active: route.name === 'category-setting'}">
+                <Icon icon="lucide:network" width="18" height="18" /> 分类管理
+              </router-link>
             </template>
           </div>
         </el-scrollbar>
@@ -98,7 +102,7 @@ let elNotification = null
 const isMobileView = computed(() => window.innerWidth < 768)
 
 const isSettingsMode = computed(() => {
-  return ['setting', 'label-setting', 'analysis', 'user', 'all-email', 'role', 'reg-key', 'sys-setting'].includes(route.name)
+  return ['setting', 'label-setting', 'category-setting', 'analysis', 'user', 'all-email', 'role', 'reg-key', 'sys-setting'].includes(route.name)
 })
 
 const showReadingPane = computed(() => {
