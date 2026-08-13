@@ -70,24 +70,56 @@ const emailService = {
 				account,
 				eq(account.accountId, email.accountId)
 			)
+		let isGlobal = false;
+		let isSent = false;
+		let isSpam = false;
+		let isTrash = false;
+
+		if (keyword) {
+			isGlobal = /global:/i.test(keyword);
+			isSent = /is:sent/i.test(keyword) || /from:me/i.test(keyword);
+			isSpam = /is:spam/i.test(keyword);
+			isTrash = /is:trash/i.test(keyword);
+
+			keyword = keyword.replace(/global:/ig, '')
+				.replace(/is:sent/ig, '')
+				.replace(/from:me/ig, '')
+				.replace(/is:draft/ig, '') // drafts are local only, so we just strip it
+				.replace(/is:spam/ig, '')
+				.replace(/is:trash/ig, '')
+				.replace(/hl:off/ig, '')
+				.trim();
+		}
+
 		const commonConditions = [
 			allReceive ? eq(1,1) : eq(email.accountId, accountId),
 			eq(email.userId, userId),
-			eq(account.isDel, isDel.NORMAL),
-			folder === 'trash' ? eq(email.isDel, 1) : eq(email.isDel, 0),
-			folder === 'spam' ? eq(email.isSpam, 1) : (folder === 'trash' || folder === 'snoozed' || folder === 'all' ? eq(1,1) : eq(email.isSpam, 0)),
-			folder === 'snoozed' ? sql`snoozed_time IS NOT NULL` : (folder === 'trash' || folder === 'spam' ? eq(1,1) : sql`(snoozed_time IS NULL OR snoozed_time <= CURRENT_TIMESTAMP)`),
-			(!folder && type !== undefined) ? eq(email.type, type) : (folder === 'all' ? eq(email.type, 0) : eq(1,1))
+			eq(account.isDel, isDel.NORMAL)
 		];
+
+		if (isGlobal) {
+			// global search searches everywhere except maybe we only enforce account/user constraints
+		} else {
+			commonConditions.push(folder === 'trash' ? eq(email.isDel, 1) : (isTrash ? eq(email.isDel, 1) : eq(email.isDel, 0)));
+			commonConditions.push(folder === 'spam' ? eq(email.isSpam, 1) : (isSpam ? eq(email.isSpam, 1) : (folder === 'trash' || folder === 'snoozed' || folder === 'all' ? eq(1,1) : eq(email.isSpam, 0))));
+			commonConditions.push(folder === 'snoozed' ? sql`snoozed_time IS NOT NULL` : (folder === 'trash' || folder === 'spam' ? eq(1,1) : sql`(snoozed_time IS NULL OR snoozed_time <= CURRENT_TIMESTAMP)`));
+			
+			if (isSent) {
+				const currentType = (folder === 'all' ? emailConst.type.RECEIVE : (type !== undefined ? type : emailConst.type.RECEIVE));
+				commonConditions.push(inArray(email.type, [currentType, emailConst.type.SEND]));
+			} else {
+				commonConditions.push((!folder && type !== undefined) ? eq(email.type, type) : (folder === 'all' ? eq(email.type, 0) : eq(1,1)));
+			}
+		}
 
 		if (keyword) {
 			commonConditions.push(
 				or(
-					sql`${email.subject} COLLATE NOCASE LIKE ${'%'+ keyword + '%'}`,
-					sql`${email.name} COLLATE NOCASE LIKE ${'%'+ keyword + '%'}`,
-					sql`${email.sendEmail} COLLATE NOCASE LIKE ${'%'+ keyword + '%'}`,
-					sql`${email.toEmail} COLLATE NOCASE LIKE ${'%'+ keyword + '%'}`,
-					sql`${email.text} COLLATE NOCASE LIKE ${'%'+ keyword + '%'}`
+					like(email.subject, '%'+ keyword + '%'),
+					like(email.name, '%'+ keyword + '%'),
+					like(email.sendEmail, '%'+ keyword + '%'),
+					like(email.toEmail, '%'+ keyword + '%'),
+					like(email.text, '%'+ keyword + '%')
 				)
 			);
 		}

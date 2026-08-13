@@ -23,19 +23,24 @@ export const useEmailStore = defineStore('email', {
             let isGlobal = false;
             let highlight = true;
             
-            // Check for global parameter
-            if (input.includes('global:')) {
+            // Check for global parameter (still parse it for frontend routing)
+            if (/global:/i.test(input)) {
                 isGlobal = true;
-                input = input.replace(/global:\s*/i, '').trim();
             }
             
-            // Check for highlight toggle parameter
-            if (input.includes('hl:off')) {
+            // Check for highlight toggle parameter (still parse it for frontend rendering)
+            if (/hl:off/i.test(input)) {
                 highlight = false;
-                input = input.replace(/hl:off\s*/i, '').trim();
+            }
+
+            let isDraft = false;
+            if (/is:draft/i.test(input)) {
+                isDraft = true;
             }
             
-            return { keyword: input, isGlobal, highlight };
+            // We return the raw input as keyword so the backend can parse its own flags 
+            // (e.g. global:, is:sent, is:draft, is:spam, etc.)
+            return { keyword: input, isGlobal, highlight, isDraft };
         }
     },
     persist: {

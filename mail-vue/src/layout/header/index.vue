@@ -79,6 +79,7 @@ import {Icon} from "@iconify/vue";
 import {useUiStore} from "@/store/ui.js";
 import {useUserStore} from "@/store/user.js";
 import {useEmailStore} from "@/store/email.js";
+import {userDraftStore} from "@/store/draft.js";
 import {useRoute} from "vue-router";
 import {computed, ref} from "vue";
 import {useSettingStore} from "@/store/setting.js";
@@ -103,6 +104,15 @@ const accountCount = computed(() => {
 function handleSearch() {
   const parsed = emailStore.searchParsed;
   
+  if (parsed.isDraft) {
+    if (route.name !== 'draft') {
+      router.push({ name: 'draft' });
+    } else {
+      userDraftStore().refreshList++;
+    }
+    return;
+  }
+
   if (parsed.isGlobal) {
     if (route.name !== 'user-all-email') {
       router.push({ name: 'user-all-email' });
@@ -112,13 +122,15 @@ function handleSearch() {
     return;
   }
 
-  const mailRoutes = ['email', 'user-all-email', 'star', 'snoozed', 'spam', 'trash'];
+  const mailRoutes = ['email', 'user-all-email', 'star', 'snoozed', 'spam', 'trash', 'draft', 'send'];
   if (!mailRoutes.includes(route.name)) {
     router.push({ name: 'user-all-email' });
   } else {
     // If already on a mail page, refresh the list
     if (emailStore.emailScroll) {
       emailStore.emailScroll.refreshList();
+    } else if (route.name === 'draft') {
+      userDraftStore().refreshList++;
     }
   }
 }

@@ -84,6 +84,7 @@
                   <div class="email-text">
                     <span class="email-subject" :style="(item.unread === EmailUnreadEnum.UNREAD && showUnread)  ? 'font-weight: bold' : ''">
                       <span v-if="item.code" class="code-tag" @click.stop="copyCode(item.code)">[{{ t('codeLabel') }}{{ item.code }}]</span>
+                      <el-tag size="small" type="info" class="folder-tag" v-if="emailStore.searchParsed.isGlobal" style="margin-right: 5px; height: 18px; padding: 0 4px; line-height: 16px; display: inline-flex; align-items: center; vertical-align: middle;">{{ getFolderTag(item) }}</el-tag>
                       <span class="subject-text">
                         <slot name="subject" :email="item" >
                           <span v-html="highlightMatch(item.subject || '\u200B')"></span>
@@ -787,6 +788,14 @@ async function copyCode(code) {
       plain: true
     })
   }
+}
+
+function getFolderTag(item) {
+  if (item.isSpam) return t('spam');
+  if (item.isDel) return t('trash');
+  if (item.snoozedTime) return t('snoozed');
+  if (item.type === 1) return t('sent');
+  return t('inbox');
 }
 
 function handleDelete() {
