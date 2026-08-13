@@ -77,8 +77,8 @@ const emailService = {
 					timeSort ? gt(email.emailId, emailId) : lt(email.emailId, emailId),
 					eq(account.isDel, isDel.NORMAL),
 					folder === 'trash' ? eq(email.isDel, 1) : eq(email.isDel, 0),
-					folder === 'spam' ? eq(email.isSpam, 1) : (folder === 'trash' || folder === 'snoozed' ? eq(1,1) : eq(email.isSpam, 0)),
-					folder === 'snoozed' ? sql`snoozed_time IS NOT NULL` : (folder === 'trash' || folder === 'spam' ? eq(1,1) : sql`(snoozed_time IS NULL OR snoozed_time <= CURRENT_TIMESTAMP)`),
+					folder === 'spam' ? eq(email.isSpam, 1) : (folder === 'trash' || folder === 'snoozed' || folder === 'all' ? eq(1,1) : eq(email.isSpam, 0)),
+					folder === 'snoozed' ? sql`snoozed_time IS NOT NULL` : (folder === 'trash' || folder === 'spam' || folder === 'all' ? eq(1,1) : sql`(snoozed_time IS NULL OR snoozed_time <= CURRENT_TIMESTAMP)`),
 					(!folder && type !== undefined) ? eq(email.type, type) : eq(1,1)
 				)
 			);
@@ -102,8 +102,8 @@ const emailService = {
 					eq(email.userId, userId),
 					eq(account.isDel, isDel.NORMAL),
 					folder === 'trash' ? eq(email.isDel, 1) : eq(email.isDel, 0),
-					folder === 'spam' ? eq(email.isSpam, 1) : (folder === 'trash' || folder === 'snoozed' ? eq(1,1) : eq(email.isSpam, 0)),
-					folder === 'snoozed' ? sql`snoozed_time IS NOT NULL` : (folder === 'trash' || folder === 'spam' ? eq(1,1) : sql`(snoozed_time IS NULL OR snoozed_time <= CURRENT_TIMESTAMP)`),
+					folder === 'spam' ? eq(email.isSpam, 1) : (folder === 'trash' || folder === 'snoozed' || folder === 'all' ? eq(1,1) : eq(email.isSpam, 0)),
+					folder === 'snoozed' ? sql`snoozed_time IS NOT NULL` : (folder === 'trash' || folder === 'spam' || folder === 'all' ? eq(1,1) : sql`(snoozed_time IS NULL OR snoozed_time <= CURRENT_TIMESTAMP)`),
 					(!folder && type !== undefined) ? eq(email.type, type) : eq(1,1)
 				)
 		).get();
@@ -113,8 +113,8 @@ const emailService = {
 				allReceive ? eq(1,1) : eq(email.accountId, accountId),
 				eq(email.userId, userId),
 				folder === 'trash' ? eq(email.isDel, 1) : eq(email.isDel, 0),
-				folder === 'spam' ? eq(email.isSpam, 1) : (folder === 'trash' || folder === 'snoozed' ? eq(1,1) : eq(email.isSpam, 0)),
-				folder === 'snoozed' ? sql`snoozed_time IS NOT NULL` : (folder === 'trash' || folder === 'spam' ? eq(1,1) : sql`(snoozed_time IS NULL OR snoozed_time <= CURRENT_TIMESTAMP)`),
+				folder === 'spam' ? eq(email.isSpam, 1) : (folder === 'trash' || folder === 'snoozed' || folder === 'all' ? eq(1,1) : eq(email.isSpam, 0)),
+				folder === 'snoozed' ? sql`snoozed_time IS NOT NULL` : (folder === 'trash' || folder === 'spam' || folder === 'all' ? eq(1,1) : sql`(snoozed_time IS NULL OR snoozed_time <= CURRENT_TIMESTAMP)`),
 				(!folder && type !== undefined) ? eq(email.type, type) : eq(1,1)
 			))
 			.orderBy(desc(email.emailId)).limit(1).get();

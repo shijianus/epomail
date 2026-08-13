@@ -35,7 +35,7 @@
             <span class="nav-ic-wrap"><Icon icon="ep:document" width="20" height="20" /></span>
             <span class="nav-label">{{$t('drafts')}}</span>
           </div>
-          <div class="nav-item" @click="router.push({name: 'all-email'})" v-perm="'all-email:query'" :class="route.name === 'all-email' ? 'active' : ''" :title="$t('allMail')">
+          <div class="nav-item" @click="router.push({name: 'user-all-email'})" :class="route.name === 'user-all-email' ? 'active' : ''" :title="$t('allMail')">
             <span class="nav-ic-wrap"><Icon icon="mdi:email-multiple-outline" width="22" height="22" /></span>
             <span class="nav-label">{{$t('allMail')}}</span>
           </div>

@@ -22,6 +22,16 @@ const routes = [
                 }
             },
             {
+                path: '/all',
+                name: 'user-all-email',
+                component: () => import('@/views/all/index.vue'),
+                meta: {
+                    title: 'allMail',
+                    name: 'user-all-email',
+                    menu: true
+                }
+            },
+            {
                 path: '/message',
                 name: 'content',
                 component: () => import('@/views/content/index.vue'),

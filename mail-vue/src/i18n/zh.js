@@ -3,7 +3,7 @@ const zh = {
     drafts: '草稿箱',
     sent: '已发送',
     starred: '星标邮件',
-    settings: '设定',
+    settings: '设置',
     analytics: '分析页',
     allUsers: '用户列表',
     allMail: '全部邮件',
