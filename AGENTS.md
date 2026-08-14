@@ -255,3 +255,10 @@
 *   **版本控制 (Commit)**: 提交了 Commit (`1608487`)。
 *   **部署上线 (Deploy)**: 在 `mail-worker` 目录执行了 `npx wrangler deploy`，成功发布至 Cloudflare。
     - Current Version ID: `d6665740-fb57-4481-8f4c-9f9debf3f1d4`
+
+### UI/UX 优化: 标签系统内置规则简化及 i18n 修复 (2026-08-14)
+*   **诊断 (Diagnosis)**: 确认到 `editLabel` 键值在多语言文件中缺失导致回退显示异常；确认到 "系统内置" 分类的 UI 显示占用了过多高度且带有冗余的文案。
+*   **编辑 (Edit)**: 在 `mail-vue/src/i18n/zh.js` 与 `en.js` 补充了相应的 key (`editLabel`, `createLabel`, `systemCheck`, `systemCheckTooltip`)。移除了原有的锁形 `lucide:lock` 与段落文本，转而使用更加紧凑且功能明确的 `lucide:settings` 齿轮图标与 `lucide:help-circle` 问号提示工具。
+*   **验证与截图 (Verify & Screenshot)**: 启动 `npm run dev`，使用 Playwright 完成界面截图。
+*   **版本控制 (Commit)**: `3a21a52` — UI(Labels): Optimize system built-in rule display and fix editLabel i18n。
+*   **部署上线 (Deploy)**: 运行 `npm run build` 生成最新产物，并通过 `wrangler deploy` 成功推送到 Cloudflare 线上环境。
