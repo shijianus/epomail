@@ -204,3 +204,27 @@
 *   **动态映射 (Dynamic System Mapping)**: 在 `mail-worker/src/email/rule-engine.js` 针对不同的标签名称执行不同的站长底层配置。如果是“订阅”则执行白名单逻辑；如果是“推销”则执行黑名单逻辑。
 *   **严格验证合规 (Compliance Check)**: Commit `f898087`。
 *   **⚠️ 修复状态遗留问题 (Fix State Sync)**: 发现早前代码 `store/user.js` 中含有硬编码的 `['工作', '推销', '订阅'].includes` 强制删除逻辑，导致即便 `ui.js` 注入了新模板，也在读取云端数据库时被客户端抹杀！已在 Commit `779e324` 中彻底删除了针对“推销”和“订阅”的抹杀逻辑，并加入了缺失注入逻辑 (Inject if missing)。已重新进行 Playwright 本地验证，并成功部署至 CF (Version ID: `4d7dee62`)。
+
+### 彻底修复：标签规则前端不可见 + 后端引擎占位符替换 (2026-08-14)
+*   **安全备份 (Backup)**: `b47d1da` — 修改前最新稳定状态。
+*   **根因分析 (Root Cause)**:
+    1. **Pinia persist 覆盖初始值**：老用户 localStorage 中存储的 `defaultLabels` 没有 `rules` 字段（旧版本保存的格式），Pinia persist 恢复时覆盖了 `ui.js` 初始状态中定义的 rules，导致打开编辑抽屉时 `form.rules` 为空。
+    2. **`user.js` merge 逻辑有漏洞**：DB 中 `订阅`/`推销` 的 rules 也是空时，merge 后仍然是空，没有触发任何注入逻辑（仅 `社群` 有单独兜底，`订阅`/`推销` 完全遗漏）。
+    3. **`rule-engine.js` 是纯占位符**：`订阅` 永远 `return true`（所有邮件都被标订阅），`推销` 永远 `return false`，完全无法实际验证。
+*   **修复 (Fix)**: Commit `0b7e37d`
+    *   **`ui.js` 新增 `ensureDefaultRules()` action**：作为权威规则定义中心，幂等地为 `社群`/`订阅`/`推销` 补全缺失的规则，不覆盖用户自定义规则。
+    *   **`user.js` 重构 merge 逻辑**：清理碎片化的 inject 块，在所有 merge 步骤完成后，统一调用 `uiStore.ensureDefaultRules()` 作为最终兜底。
+    *   **`label-setting/index.vue` 三处增强**：
+        - `onMounted()` 调用 `ensureDefaultRules()`，页面加载即修复旧数据；
+        - `system_setting` 规则渲染为琥珀色锁定徽章 + 可读描述，删除按钮替换为锁图标（不可操作）；
+        - `sender_address_includes` 规则将域名列表渲染为蓝色 domain chips；
+        - 规则数量计数徽章显示在 label 标题旁。
+    *   **`rule-engine.js` 实现真实启发式逻辑**：
+        - `订阅`：检测 noreply/newsletter 发件人前缀、主流 ESP 域名（mailchimp、sendgrid 等）、退订关键词（unsubscribe/退订/取消订阅）
+        - `推销`：检测主题中的促销强信号（折扣百分比/flash sale/限时优惠等，中英文），正文命中 2 个以上营销词才触发（降低误判）
+*   **逻辑单元测试通过 (Logic Tests Passed)**：
+    - `noreply@github.com` → 订阅=true, 推销=false ✓
+    - 含 unsubscribe 正文 → 订阅=true, 推销=false ✓
+    - "50% off! Flash Sale" 主题 → 订阅=false, 推销=true ✓
+    - 普通邮件 → 订阅=false, 推销=false ✓
+*   **部署 (Deploy)**: CF Version ID `a77f7d82-28ac-4557-965b-0da6ca54f118`
