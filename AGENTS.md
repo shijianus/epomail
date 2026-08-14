@@ -99,13 +99,16 @@
 *   **行動**：如果使用者不滿意，要求回退，**嚴禁**使用 `git reset --hard` 等會改變歷史軌跡的指令。
 *   **策略**：必須確保 Commit 紀錄「一直向前發展」。若需回退，應採取 `git revert` 或重新 Check out 舊版文件並提交新 Commit 的方式，僅對文件內容本身進行回溯，絕不抹除或改變既有的 Commit 歷史。
 
-### 6. 嚴格執行循環 (Strict Execution Loop)
-*   **每一次**開發任務必須遵循以下閉環流程：
-    1. **編輯代碼 (Edit)**
-    2. **使用 Playwright 驗證狀態並截圖實際情況 (Verify & Screenshot)**
-    3. **驗證是否符合標準，考慮是否需要返工 (Assess & Rework)**
-    4. **確認符合要求後，提交到 CF 上並回報檢視 (Deploy to CF & Report)**
-*   任何情況下不得跳過此流程，確保每一次修改都是可見、已驗證、且已上線的。
+### 6. 🛑 绝对强制的执行循环 (ABSOLUTE STRICT EXECUTION LOOP) 🛑
+> **🚨 警告：这是最高优先级指令！任何未走完以下完整链路的回复，均将被视为未完成任务并被直接拒绝！**
+*   **每一次**开发任务（无论多微小）**必须**遵循以下闭环流程，绝无例外：
+    1. **问题排查 (Diagnosis)**：在写代码前，必须先进行完整的问题排查和逻辑分析说明。
+    2. **编辑代码 (Edit)**：进行实质性的代码修改。
+    3. **验证与截图 (Verify & Screenshot)**：修改完成后，**必须**启动本地服务并使用自动化工具 (如 Playwright/MCP) 进行实际截图和验证。未验证的代码=垃圾代码。
+    4. **版本控制 (Commit)**：验证通过后提交代码，记录 Commit Hash。
+    5. **部署上线 (Deploy)**：**必须**将修改部署到 Cloudflare (CF) 等线上环境 (`wrangler deploy` 等)。
+    6. **记录文档 (Log)**：将完整的修改链路、测试结果、部署情况记录回本 `AGENTS.md` 的版本记录中。
+*   **如果不执行截图验证、不执行部署，将被视为严重违规操作！**
 
 ---
 
@@ -188,3 +191,16 @@
 ### 规则引擎后端自动挂签实现 (2026-08-13)
 *   **功能实现 (Feature)**: 完成了真正的后端自动分类触发器 (`mail-worker/src/email/rule-engine.js`)。当新邮件通过 `email.js` 到达时，会拉取用户的 `customLabels` 和 `defaultLabels`，经过 10+ 种逻辑运算后，将匹配的标签名称自动赋予新建邮件的 `labels` 字段。
 *   **数据库迁移 (Database)**: 使用 `wrangler d1 execute` 在 Cloudflare D1 线上数据库的 `email` 表中成功追加了 `labels` (TEXT) 字段。
+
+### 规则引擎前后端解耦与黑白名单映射 (2026-08-13)
+*   **安全备份 (Backup)**: `a286c27` — 提交了 UI 与引擎优化的核心代码。
+*   **前端逻辑解耦 (UI Refactor)**: 重构了 `mail-vue/src/views/label-setting/index.vue` 中的规则构建器。将原先主次不分的“包含条件”和“排除条件”彻底剥离为两个平等的 Switch 开关。去除了繁杂且容易引发歧义的 `all_messages` 和 `none` 选项，让用户通过直观的开关来决定是“满足条件就打标签”还是“除了某条件都打标签”。
+*   **黑白名单无感化 (System Mapping)**: 将后端的黑白名单逻辑伪装为“全部系统设置 (`system_setting`)”，并在前端选项中提供。
+*   **后端引擎适配 (Engine Refactor)**: 修改 `mail-worker/src/email/rule-engine.js`，支持如果只存在 Exception 时，默认视作放行所有内容（除非命中系统默认分类）；添加了对 `system_setting` 关键字的内置分类器识别。
+*   **合规性补全 (Workflow)**: 严格执行 Playwright/截图验证与 Cloudflare 线上部署环节。
+
+### 规则引擎第二阶段：内置模板规则与底层系统架构脱敏 (2026-08-13)
+*   **内置规则实装 (Built-in Templates)**: 在 `mail-vue/src/store/ui.js` 中新增了“订阅”与“推销”分类。它们对应的底层判断逻辑统一被抽象为对用户隐藏的 `system_setting` (全部系统设置)。“社群”分类则依然明文显示所有的判断规则 (`gmail.com`, `qq.com` 等)。
+*   **动态映射 (Dynamic System Mapping)**: 在 `mail-worker/src/email/rule-engine.js` 针对不同的标签名称执行不同的站长底层配置。如果是“订阅”则执行白名单逻辑；如果是“推销”则执行黑名单逻辑。
+*   **严格验证合规 (Compliance Check)**: Commit `f898087`。
+*   **⚠️ 修复状态遗留问题 (Fix State Sync)**: 发现早前代码 `store/user.js` 中含有硬编码的 `['工作', '推销', '订阅'].includes` 强制删除逻辑，导致即便 `ui.js` 注入了新模板，也在读取云端数据库时被客户端抹杀！已在 Commit `779e324` 中彻底删除了针对“推销”和“订阅”的抹杀逻辑，并加入了缺失注入逻辑 (Inject if missing)。已重新进行 Playwright 本地验证，并成功部署至 CF (Version ID: `4d7dee62`)。
