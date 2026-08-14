@@ -58,10 +58,17 @@ export const useUserStore = defineStore('user', {
                                 if (!uiStore.defaultLabels.find(t => t.name === '系统设置')) {
                                     uiStore.defaultLabels.push({ name: '系统设置', icon: 'ic:outline-settings', color: '#8b5cf6', listVis: true, stats: { total: 0, current: 0, unread: 0 }, rules: [] });
                                 }
+                                // Ensure '订阅' and '推销' are injected if completely missing (for existing users upgrading)
+                                if (!uiStore.defaultLabels.find(t => t.name === '订阅')) {
+                                    uiStore.defaultLabels.push({ name: '订阅', icon: 'ic:outline-subscriptions', color: '#10b981', listVis: true, stats: { total: 0, current: 0, unread: 0 }, rules: [{ condition: { type: 'system_setting', value: '' } }] });
+                                }
+                                if (!uiStore.defaultLabels.find(t => t.name === '推销')) {
+                                    uiStore.defaultLabels.push({ name: '推销', icon: 'ic:outline-local-offer', color: '#f59e0b', listVis: true, stats: { total: 0, current: 0, unread: 0 }, rules: [{ condition: { type: 'system_setting', value: '' } }] });
+                                }
 
                                 // Remove deprecated labels containing in_blacklist or in_whitelist to comply with system settings requirement
                                 uiStore.defaultLabels = uiStore.defaultLabels.filter(templateLabel => {
-                                    if (['工作', '推销', '订阅'].includes(templateLabel.name)) return false; // Hard remove deprecated categories
+                                    if (['工作'].includes(templateLabel.name)) return false; // Hard remove deprecated '工作' category only
                                     if (!templateLabel.rules) return true;
                                     return !templateLabel.rules.some(r => 
                                         (r.condition && (r.condition.type === 'in_blacklist' || r.condition.type === 'in_whitelist')) ||
