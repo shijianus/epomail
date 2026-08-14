@@ -412,12 +412,20 @@ function escapeRegExp(string) {
 }
 
 function highlightMatch(text) {
-  text = escapeHtml(text || '');
   const parsed = emailStore.searchParsed;
-  if (!parsed.highlight || !parsed.cleanKeyword) return text;
+  if (!parsed.highlight || !parsed.cleanKeyword) return escapeHtml(text || '');
   
-  const regex = new RegExp(`(${escapeRegExp(parsed.cleanKeyword)})`, 'gi');
-  return text.replace(regex, '<mark class="search-highlight">$1</mark>');
+  const keyword = parsed.cleanKeyword;
+  const regex = new RegExp(`(${escapeRegExp(keyword)})`, 'gi');
+  
+  const parts = (text || '').split(regex);
+  return parts.map((part, i) => {
+    if (i % 2 === 1) {
+      return `<mark class="search-highlight">${escapeHtml(part)}</mark>`;
+    } else {
+      return escapeHtml(part);
+    }
+  }).join('');
 }
 
 defineExpose({
@@ -488,18 +496,14 @@ const list = computed(() => {
       let subject = item.subject || '';
       let text = item.formatText || '';
       let name = item.name || '';
-      let from = item.sendEmail || '';
-      let to = item.toEmail || '';
       
       if (!isCaseSensitive) {
         subject = subject.toLowerCase();
         text = text.toLowerCase();
         name = name.toLowerCase();
-        from = from.toLowerCase();
-        to = to.toLowerCase();
       }
       
-      const fields = [subject, text, name, from, to];
+      const fields = [subject, text, name];
       if (isExact) {
         pass = fields.some(c => c === searchStr || c.includes(' ' + searchStr + ' '));
       } else {
