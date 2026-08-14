@@ -231,8 +231,8 @@
       </div>
       <template #footer>
         <div style="display: flex; justify-content: flex-end; gap: 12px;">
-          <el-button @click="isEditorOpen = false">Cancel</el-button>
-          <el-button type="primary" @click="saveLabel">Save Label</el-button>
+          <el-button @click="isEditorOpen = false">{{ $t('cancel') || 'Cancel' }}</el-button>
+          <el-button type="primary" @click="saveLabel">{{ $t('saveLabel') || 'Save Label' }}</el-button>
         </div>
       </template>
     </el-drawer>
@@ -243,19 +243,15 @@
         <Icon icon="lucide:alert-triangle" width="32" class="warning-icon" />
         <div class="warning-text">
           <h3 style="margin:0; font-size: 16px;">{{ $t('deleteConfirmMsg', { name: deleteCandidate?.name }) || `Delete "${deleteCandidate?.name}"?` }}</h3>
-          <p style="margin:8px 0 0; color: var(--text-secondary); font-size: 13px;">{{ $t('deleteLabelDesc') || 'Please select how to handle the associated emails.' }}</p>
+          <p style="margin:8px 0 0; color: var(--text-secondary); font-size: 13px;">
+             <strong>{{ $t('note') || 'Note' }}:</strong> {{ $t('deleteLabelWarning') || 'This will only remove the label tag. Associated emails will not be deleted.' }}
+          </p>
         </div>
       </div>
-      <el-radio-group v-model="deleteMode" class="delete-radio-group">
-        <el-radio :value="'tagOnly'" class="radio-item">
-          <div><strong>{{ $t('onlyRemoveTag') || 'Only remove the label tag' }}</strong></div>
-          <div class="radio-desc">{{ $t('onlyRemoveTagDesc') || 'Emails will remain in their original folders. The label association will simply be cleared.' }}</div>
-        </el-radio>
-      </el-radio-group>
       <template #footer>
         <div style="display: flex; justify-content: flex-end; gap: 12px;">
-          <el-button @click="isDeleteOpen = false">Cancel</el-button>
-          <el-button type="danger" @click="executeDelete">Delete</el-button>
+          <el-button @click="isDeleteOpen = false">{{ $t('cancel') || 'Cancel' }}</el-button>
+          <el-button type="danger" @click="executeDelete">{{ $t('delete') || 'Delete' }}</el-button>
         </div>
       </template>
     </el-dialog>

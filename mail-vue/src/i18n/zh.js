@@ -401,6 +401,11 @@ const zh = {
     createLabel: '新建标签',
     systemCheck: '系统自查',
     systemCheckTooltip: '此规则由系统内置逻辑驱动，无法修改',
+    backToMail: '返回邮件',
+    searchSettings: '搜索设定',
+    note: '注意',
+    deleteLabelWarning: '这只会移除标签标记，相关邮件不会被删除。',
+    saveLabel: '保存标签',
     
     // New Rule Builder
     ruleFutureNotice: '*(规则仅对未来新收到的邮件生效)*',

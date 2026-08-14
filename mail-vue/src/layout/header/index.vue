@@ -189,7 +189,7 @@ function onDropdownVisibleChange(visible) {
 }
 
 const isSettingsMode = computed(() => {
-  return ['setting', 'label-setting', 'category-setting', 'sys-setting'].includes(route.name)
+  return ['setting', 'label-setting', 'category-setting', 'sys-setting', 'analysis', 'user', 'all-email', 'role', 'reg-key'].includes(route.name)
 })
 
 const settingsMap = computed(() => [
@@ -235,6 +235,41 @@ const settingsMap = computed(() => [
       { text: t('newLabel') || 'New Label', id: 'newLabel' },
       { text: t('customLabels') || 'Custom Labels', id: 'customLabels' },
       { text: t('classificationRules') || 'Rules', id: 'rules' }
+    ]
+  },
+  {
+    route: 'analysis',
+    title: t('analytics') || 'Analytics',
+    items: [
+      { text: t('analytics') || 'Data Analytics', id: 'analysis' }
+    ]
+  },
+  {
+    route: 'user',
+    title: t('allUsers') || 'All Users',
+    items: [
+      { text: t('allUsers') || 'User Management', id: 'user' }
+    ]
+  },
+  {
+    route: 'all-email',
+    title: t('allMail') || 'All Mail',
+    items: [
+      { text: t('allMail') || 'All Mail Management', id: 'all-email' }
+    ]
+  },
+  {
+    route: 'role',
+    title: t('permissions') || 'Permissions',
+    items: [
+      { text: t('permissions') || 'Role Permissions', id: 'role' }
+    ]
+  },
+  {
+    route: 'reg-key',
+    title: t('inviteCode') || 'Invite Code',
+    items: [
+      { text: t('inviteCode') || 'Registration Key', id: 'reg-key' }
     ]
   }
 ])
