@@ -12,7 +12,19 @@
     <div class="topbar-search">
       <div class="search-box">
         <span class="search-icon" @click="handleSearch" style="cursor: pointer; z-index: 1"><Icon icon="lucide:search" width="20" height="20"/></span>
-        <input type="text" :placeholder="$t('search') || 'Search mail'" v-model="emailStore.searchKeyword" @keyup.enter="handleSearch" />
+        <input type="text" :placeholder="isSettingsMode ? ($t('searchSettings') || 'Search settings') : ($t('search') || 'Search mail')" v-model="emailStore.searchKeyword" @keyup.enter="handleSearch" @focus="searchFocus = true" @blur="onSearchBlur" />
+        
+        <div v-if="isSettingsMode && emailStore.searchKeyword && searchFocus" class="settings-search-dropdown">
+           <div v-for="group in settingsSearchResults" :key="group.route" class="settings-search-group">
+             <div class="settings-search-title">{{ group.title }}</div>
+             <div class="settings-search-item" v-for="item in group.items" :key="item.text" @mousedown.prevent="goToSetting(group.route, item.id)">
+               <span v-html="highlightSetting(item.text)"></span>
+             </div>
+           </div>
+           <div v-if="settingsSearchResults.length === 0" class="settings-search-empty">
+             {{ $t('noData') || 'No results found' }}
+           </div>
+        </div>
       </div>
     </div>
 
@@ -97,11 +109,125 @@ const logoutLoading = ref(false)
 const userInfoShow = ref(false)
 const userinfoRef = ref({})
 
+const searchFocus = ref(false)
+
+const isSettingsMode = computed(() => {
+  return ['setting', 'label-setting', 'category-setting', 'sys-setting'].includes(route.name)
+})
+
+const settingsMap = computed(() => [
+  {
+    route: 'setting',
+    title: t('generalSetting') || 'General Settings',
+    items: [
+      { text: t('username') || 'Username', id: 'username' },
+      { text: t('emailAccount') || 'Email Account', id: 'emailAccount' },
+      { text: t('password') || 'Password', id: 'password' },
+      { text: t('language') || 'Language', id: 'language' },
+      { text: t('deleteUser') || 'Delete User', id: 'deleteUser' },
+    ]
+  },
+  {
+    route: 'sys-setting',
+    title: t('systemSetting') || 'System Settings',
+    items: [
+      { text: t('autoRefresh') || 'Auto Refresh', id: 'autoRefresh' },
+      { text: t('sendSetting') || 'Send Settings', id: 'sendSetting' }
+    ]
+  },
+  {
+    route: 'category-setting',
+    title: t('categorySetting') || 'Category Settings',
+    items: [
+      { text: t('category') || 'Categories', id: 'category' }
+    ]
+  },
+  {
+    route: 'label-setting',
+    title: t('labelSetting') || 'Label Settings',
+    items: [
+      { text: t('labels') || 'Labels', id: 'labels' },
+      { text: t('createLabel') || 'Create Label', id: 'createLabel' }
+    ]
+  }
+])
+
+const settingsSearchResults = computed(() => {
+  const keyword = emailStore.searchKeyword.trim();
+  if (!keyword) return [];
+  
+  const isGlobal = /^(all:|global:)/i.test(keyword);
+  let cleanKeyword = keyword.replace(/^(all:|global:)/i, '').trim().toLowerCase();
+  if (!cleanKeyword) return [];
+  
+  return settingsMap.value.map(group => {
+    if (!isGlobal && group.route !== route.name) {
+      return null;
+    }
+    const matchedItems = group.items.filter(item => item.text.toLowerCase().includes(cleanKeyword));
+    if (matchedItems.length > 0) {
+      return { ...group, items: matchedItems }
+    }
+    return null;
+  }).filter(Boolean);
+})
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str).replace(/[&<>"']/g, function(match) {
+    switch (match) {
+      case '&': return '&amp;';
+      case '<': return '&lt;';
+      case '>': return '&gt;';
+      case '"': return '&quot;';
+      case "'": return '&#39;';
+      default: return match;
+    }
+  });
+}
+
+function escapeRegExp(string) {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function highlightSetting(text) {
+  const keyword = emailStore.searchKeyword.replace(/^(all:|global:)/i, '').trim();
+  if (!keyword) return escapeHtml(text);
+  
+  const regex = new RegExp(`(${escapeRegExp(keyword)})`, 'gi');
+  const parts = text.split(regex);
+  
+  return parts.map((part, i) => {
+    if (i % 2 === 1) {
+      return `<mark class="search-highlight" style="background-color: yellow; color: black; padding: 0 2px; border-radius: 2px;">${escapeHtml(part)}</mark>`;
+    } else {
+      return escapeHtml(part);
+    }
+  }).join('');
+}
+
+function goToSetting(routeName, itemId) {
+  searchFocus.value = false;
+  if (route.name !== routeName) {
+    router.push({ name: routeName });
+  }
+}
+
+function onSearchBlur() {
+  setTimeout(() => {
+    searchFocus.value = false
+  }, 200)
+}
+
 const accountCount = computed(() => {
   return userStore.user.role.accountCount
 })
 
 function handleSearch() {
+  if (isSettingsMode.value) {
+    return;
+  }
+  
   const parsed = emailStore.searchParsed;
   
   if (parsed.isDraft) {
@@ -508,4 +634,45 @@ function formatName(email) {
 .am-item.logout:hover { color: var(--danger); }
 .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--success); box-shadow: 0 0 6px var(--success); }
 .ic { display: flex; }
+
+.settings-search-dropdown {
+  position: absolute;
+  top: 60px;
+  left: 0;
+  width: 100%;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-mid);
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+  z-index: 1000;
+  max-height: 400px;
+  overflow-y: auto;
+  padding: 8px 0;
+}
+.settings-search-group {
+  margin-bottom: 8px;
+}
+.settings-search-title {
+  padding: 6px 16px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+.settings-search-item {
+  padding: 8px 24px;
+  font-size: 14px;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.settings-search-item:hover {
+  background: var(--bg-hover);
+}
+.settings-search-empty {
+  padding: 16px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 14px;
+}
 </style>
