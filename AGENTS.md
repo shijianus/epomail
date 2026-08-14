@@ -269,3 +269,18 @@
 *   **验证与截图 (Verify & Screenshot)**: 运行 `npm run dev` 并在后台成功执行 Playwright 截图脚本验证了样式替换结果正常。
 *   **版本控制 (Commit)**: `884a13d` — UI(Labels): Redesign Add Custom Rule button for better visual hierarchy。
 *   **部署上线 (Deploy)**: 重新编译并执行 `wrangler deploy` 推送 Cloudflare 更新。
+
+### i18n 多语言修复与设置页逻辑补全 (2026-08-14)
+*   **诊断 (Diagnosis)**: 
+    1. 标签编辑和删除弹窗中的多个按钮（Cancel, Save Label, Delete）未做 i18n 适配。
+    2. 删除标签的弹窗使用了选项模式（`el-radio`），但在仅有“移除标签不删除邮件”这一个选项时，存在误导性；
+    3. 全局头部导航中的 `backToMail` 和 `searchSettings` 缺少翻译；
+    4. 头部组件 `layout/header/index.vue` 中的 `isSettingsMode` 判断条件遗漏了部分设置路由（如 analysis, user, all-email, role, reg-key），导致这些页面的搜索栏错误回退到“搜索邮件”且无法提供对应的设置项搜索。
+*   **编辑 (Edit)**: 
+    1. 为 `label-setting/index.vue` 中的按钮添加了 `$t()` 包装。
+    2. 将删除确认弹窗重构为“不可更改的 Notice（注意）”警告文本，移除了单选框。
+    3. 在 `zh.js` 与 `en.js` 补齐了缺漏的键值（包括 `saveLabel`, `cancel`, `delete`, `backToMail`, `searchSettings`, `note`, `deleteLabelWarning`）。
+    4. 同步修正了 `layout/header/index.vue` 中的 `isSettingsMode` 逻辑使其覆盖全部设置路由，并在 `settingsMap` 中补齐了所有 Manage 类型的路由对象，确保“搜索设定”功能完整运作。
+*   **验证与截图 (Verify & Screenshot)**: 已在本地开发服务器上成功启动并利用 Playwright 工具完成了渲染验证。
+*   **版本控制 (Commit)**: `5ab64c1` — UI/UX: Fix i18n keys for Settings, redesign Delete Label modal, and fix search bugs。
+*   **部署上线 (Deploy)**: 重新执行 `npm run build` 和 `wrangler deploy` 推送至 Cloudflare。

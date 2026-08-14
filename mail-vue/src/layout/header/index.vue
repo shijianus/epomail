@@ -14,7 +14,7 @@
         <span class="search-icon" @click="handleSearch" style="cursor: pointer; z-index: 1"><Icon icon="lucide:search" width="20" height="20"/></span>
         <input type="text" :placeholder="isSettingsMode ? ($t('searchSettings') || 'Search settings') : ($t('search') || 'Search mail')" v-model="emailStore.searchKeyword" @keyup.enter="handleSearch" @focus="searchFocus = true" @blur="onSearchBlur" />
         
-        <div v-if="isSettingsMode && isGlobalSearch && searchFocus" class="settings-search-dropdown">
+        <div v-if="isSettingsMode && emailStore.searchKeyword.trim() && searchFocus" class="settings-search-dropdown">
            <div v-for="group in settingsSearchResults" :key="group.route" class="settings-search-group">
              <div class="settings-search-title">{{ group.title }}</div>
              <div class="settings-search-item" v-for="item in group.items" :key="item.text" @mousedown.prevent="goToSetting(group.route, item.id)">
@@ -299,14 +299,10 @@ const settingsSearchResults = computed(() => {
   const keyword = emailStore.searchKeyword.trim();
   if (!keyword) return [];
   
-  const isGlobal = /^(all:|global:)/i.test(keyword);
   let cleanKeyword = keyword.replace(/^(all:|global:)/i, '').trim().toLowerCase();
   if (!cleanKeyword) return [];
   
   return settingsMap.value.map(group => {
-    if (!isGlobal && group.route !== route.name) {
-      return null;
-    }
     const matchedItems = group.items.filter(item => item.text.toLowerCase().includes(cleanKeyword));
     if (matchedItems.length > 0) {
       return { ...group, items: matchedItems }
