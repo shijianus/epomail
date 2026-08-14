@@ -58,6 +58,15 @@ const userService = {
 		user.role = roleRow;
 		user.type = userRow.type;
 		user.customLabels = userRow.customLabels;
+		if (!user.customLabels || user.customLabels === '[]') {
+			user.customLabels = JSON.stringify({
+				customLabels: [],
+				defaultLabels: [
+					{ name: '社群', rules: [{ condition: { type: 'sender_address_includes', value: 'gmail.com, outlook.com, qq.com, 163.com, yahoo.com, hotmail.com, foxmail.com, sina.com' } }] },
+					{ name: '系统设置', rules: [] }
+				]
+			});
+		}
 
 		if (c.env.admin === userRow.email) {
 			user.role = constant.ADMIN_ROLE
