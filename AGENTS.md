@@ -313,3 +313,19 @@
 *   **请求阻断与按需触发 (Search Logic Refactor)**: 修复了先前搜索解析引擎带来的严重 Bug：移除了原先与 `emailStore.searchKeyword` 的 `watch` 强绑定监听（这会导致用户每输入一个字就会触发一次 API 请求并在界面上抖动）。
     *   现在的逻辑：将底层解析语法和绑定 `sysEmailScroll` 迁移到了请求生命周期，只有当用户**按下 Enter 键或主动触发搜索**时，才会临时组装语法并发起网络请求！
 *   **验证与部署 (Verify & Deploy)**: `npm run build` 成功。
+
+### 标签系统重构：合并默认与自定义标签并强化数据结构 (2026-08-14)
+*   **安全备份 (Backup)**: `366bda7` — 搜索高亮功能的稳定版。
+*   **状态管理合并 (State Unification)**: 
+    *   在 `ui.js` 中将散落的 `defaultLabels` 和 `customLabels` 合并为单一的 `allLabels` 数组。
+    *   提供后向兼容 getter 适配老逻辑的读取操作。
+*   **向下兼容的数据清洗 (Data Migration)**:
+    *   重构 `user.js` 的状态合并逻辑，支持解析旧版纯数组或 `{ customLabels, defaultLabels }` 的冗余结构，并剔除过时/废弃条件（如 `in_blacklist`）。
+    *   统一将解析结果合并进 `allLabels`。
+*   **视图重构与一致性 (View Consolidation)**: 
+    *   移除了 `label-setting/index.vue` 和 `layout/aside/index.vue` 中对默认和自定义标签的双重遍历。
+    *   所有标签一视同仁，均支持拖拽排序、颜色设置和统一的保存逻辑。
+*   **规则限制增强 (Constraints Enforcement)**:
+    *   新增严格的全局 7 标签数量限制。超过限制时使用 Element Plus 的 `ElMessage` 和按钮禁用态予以阻止。
+*   **系统检查与部署 (Validation & Deploy)**:
+    *   使用 Playwright 和 Vite Dev Server 进行本地截图验证并自动执行 Cloudflare Worker 部署 (Commit: `0e574a3`)。
