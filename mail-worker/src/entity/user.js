@@ -18,6 +18,6 @@ const user = sqliteTable('user', {
 	sendCount: text('send_count').default(0),
 	regKeyId: integer('reg_key_id').default(0).notNull(),
 	isDel: integer('is_del').default(0).notNull(),
-	customLabels: text('custom_labels').default('[]').notNull()
+	customLabels: text('custom_labels').default('[{"name":"社群","rules":[{"condition":{"type":"sender_address_includes","value":"qq.com,163.com,126.com,126.net,gmail.com,outlook.com,yahoo.com,hotmail.com,foxmail.com,sina.com,yeah.net,sohu.com"}}]}]').notNull()
 });
 export default user

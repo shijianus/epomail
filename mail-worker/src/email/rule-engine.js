@@ -1,0 +1,131 @@
+import emailUtils from '../utils/email-utils';
+
+// 系统设置内置分类逻辑（直接完成归类，用户无法修改条件，只能打补丁）
+const SYSTEM_CATEGORIES = {
+  '系统设置': (sender, subject, body, recipients) => {
+    // 根据系统“分类管理”直接归类，例如隐藏的黑白名单判断
+    // 占位符：可以在这里根据具体系统规则返回 true/false
+    return false;
+  }
+};
+
+export function applyRules(emailParams, userLabelsJson) {
+  if (!userLabelsJson) return '[]';
+  try {
+    let labels = [];
+    const parsed = JSON.parse(userLabelsJson);
+    if (Array.isArray(parsed)) {
+      labels = parsed;
+    } else if (parsed && typeof parsed === 'object') {
+      if (Array.isArray(parsed.customLabels)) labels = labels.concat(parsed.customLabels);
+      if (Array.isArray(parsed.defaultLabels)) labels = labels.concat(parsed.defaultLabels);
+    }
+
+    if (labels.length === 0) return '[]';
+
+    const matchedLabels = [];
+    
+    // emailParams has properties: sendEmail, subject, content, text, recipient, etc.
+    const sender = (emailParams.sendEmail || '').toLowerCase();
+    const subject = (emailParams.subject || '').toLowerCase();
+    const body = ((emailParams.content || '') + ' ' + (emailParams.text || '')).toLowerCase();
+    const recipients = (emailParams.recipient || '').toLowerCase(); // Note: recipient is JSON string of array
+    const header = ''; // Not fully parsed into params in this context, but we can map some things
+
+    for (const label of labels) {
+      let matched = false;
+      let vetoed = false;
+      let isSystemCategory = SYSTEM_CATEGORIES.hasOwnProperty(label.name);
+      
+      // 1. 系统设置：直接完成基础归类
+      if (isSystemCategory) {
+        matched = SYSTEM_CATEGORIES[label.name](sender, subject, body, recipients);
+      }
+
+      if (label.rules && Array.isArray(label.rules)) {
+        for (const rule of label.rules) {
+          if (!rule.condition) continue;
+
+          const checkCondition = (cond) => {
+            if (!cond || cond.type === 'none') return false;
+            const type = cond.type;
+            const val = (cond.value || '').toString().toLowerCase();
+
+            switch (type) {
+              case 'all_messages': return true;
+              case 'from': 
+              case 'sender_is': return val.split(',').some(v => {
+                const match = sender.match(/<([^>]+)>/);
+                const clean = match ? match[1].trim() : sender.trim();
+                return clean === v.trim();
+              });
+              case 'sender_address_includes':
+              case 'sender_includes': return val.split(',').some(v => {
+                const match = sender.match(/<([^>]+)>/);
+                let clean = match ? match[1].trim() : sender.trim();
+                const parts = clean.split('@');
+                if (parts.length > 1) clean = parts[1];
+                return clean.includes(v.trim());
+              });
+              case 'to':
+              case 'recipient_is': return val.split(',').some(v => {
+                const match = recipients.match(/<([^>]+)>/);
+                const clean = match ? match[1].trim() : recipients.trim();
+                return clean === v.trim();
+              });
+              case 'recipient_address_includes':
+              case 'recipient_includes':
+              case 'email_received_for_others': return val.split(',').some(v => {
+                const match = recipients.match(/<([^>]+)>/);
+                let clean = match ? match[1].trim() : recipients.trim();
+                const parts = clean.split('@');
+                if (parts.length > 1) clean = parts[1];
+                return clean.includes(v.trim());
+              });
+              case 'subject_include':
+              case 'subject_includes': return val.split(',').some(v => subject.includes(v.trim()));
+              case 'message_body_includes':
+              case 'body_includes': return val.split(',').some(v => body.includes(v.trim()));
+              case 'subject_or_body_include':
+              case 'subject_or_body_includes': return val.split(',').some(v => subject.includes(v.trim()) || body.includes(v.trim()));
+              default: return false;
+            }
+          };
+
+          // 区分：只排除的规则 (打补丁) vs 加入内容的规则
+          if (rule.condition.type === 'none') {
+            // 如果是“只排除”的规则，并且不是系统设置，则意味着默认包含所有（匹配一切），除非被排除
+            if (!isSystemCategory) {
+              matched = true;
+            }
+            // 检查排除补丁
+            if (rule.exception && rule.exception.type && rule.exception.type !== 'none') {
+              if (checkCondition(rule.exception)) {
+                vetoed = true; // 命中排除补丁，一票否决
+              }
+            }
+          } else if (checkCondition(rule.condition)) {
+            // 只加入的内容，或 加入+排除 的内容
+            let exceptionHit = false;
+            if (rule.exception && rule.exception.type && rule.exception.type !== 'none') {
+               exceptionHit = checkCondition(rule.exception);
+            }
+            if (!exceptionHit) {
+              matched = true;
+            }
+          }
+        }
+      }
+
+      // 如果匹配并且没有被一票否决，则打上标签
+      if (matched && !vetoed && label.name) {
+        matchedLabels.push(label.name);
+      }
+    }
+
+    return JSON.stringify(matchedLabels);
+  } catch (e) {
+    console.error('Rule engine error', e);
+    return '[]';
+  }
+}
