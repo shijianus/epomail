@@ -1096,6 +1096,19 @@ const emailService = {
 			conditions.push(sql`${email.subject} COLLATE NOCASE LIKE ${'%'+ subject + '%'}`);
 		}
 
+		// keyword = free-text search (no $-prefix), OR across name + subject + sendEmail
+		if (params.keyword) {
+			const kw = '%' + params.keyword + '%';
+			conditions.push(
+				or(
+					sql`${email.name} COLLATE NOCASE LIKE ${kw}`,
+					sql`${email.subject} COLLATE NOCASE LIKE ${kw}`,
+					sql`${email.sendEmail} COLLATE NOCASE LIKE ${kw}`,
+					sql`${email.toEmail} COLLATE NOCASE LIKE ${kw}`,
+				)
+			);
+		}
+
 		conditions.push(ne(email.status, emailConst.status.SAVING));
 
 		const countConditions = [...conditions];

@@ -265,9 +265,8 @@ function parseQuery(query) {
   
   result.keyword = leftover.join(' ').replace(/\u0002/g, '$').replace(/\u0001/g, '\\').trim();
   
-  if (result.keyword && !result.subject && !result.name && !result.userEmail && !result.accountEmail) {
-      result.subject = result.keyword;
-  }
+  // NOTE: plain free-text stays in result.keyword for multi-field OR search in backend.
+  // Only set subject/name/etc when user used an explicit $-prefix directive.
   
   return result;
 }
@@ -305,7 +304,10 @@ function getEmailList(emailId, size) {
   params.subject = parsed.subject;
   params.type = parsed.type;
   
-  return allEmailList({emailId, size, ...params})
+  // keyword drives multi-field OR search; only sent when no explicit field directives
+  const extra = parsed.keyword ? { keyword: parsed.keyword } : {};
+  
+  return allEmailList({emailId, size, ...params, ...extra})
 }
 
 async function latest() {
