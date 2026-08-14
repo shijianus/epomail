@@ -172,15 +172,16 @@
                  :class="['rule-card', isSystemRule(rule) ? 'rule-card--system' : '']">
               <div class="rule-card-content">
 
-                <!-- ① system_setting 规则：显示锁定标记 + 人类可读描述 -->
+                <!-- ① system_setting 规则：显示系统自查及提示 -->
                 <template v-if="isSystemRule(rule)">
-                  <div class="rule-sys-header">
-                    <span class="rule-sys-badge">
-                      <Icon icon="lucide:lock" width="12" style="margin-right:3px;" />系统内置
+                  <div class="rule-cond" style="align-items: center; display: flex; gap: 6px;">
+                    <span class="cond-lbl" style="display: flex; align-items: center; gap: 4px; font-weight: 500;">
+                      <Icon icon="lucide:settings" width="14" /> {{ $t('systemCheck') || '系统自查' }}
                     </span>
-                    <span class="rule-sys-desc">{{ getSystemRuleDesc(form.name) }}</span>
+                    <el-tooltip :content="$t('systemCheckTooltip') || '此规则由系统内置逻辑驱动，无法修改'" placement="top">
+                      <Icon icon="lucide:help-circle" width="14" style="color: var(--text-secondary); cursor: help; outline: none;" />
+                    </el-tooltip>
                   </div>
-                  <p class="rule-sys-note">此规则由系统内置逻辑驱动，无需手动配置。您可在此之上添加额外的自定义规则作为补充。</p>
                 </template>
 
                 <!-- ② sender_address_includes：将域名渲染为 chips -->
@@ -411,6 +412,8 @@
           <el-button type="primary" @click="saveNewRule">{{ $t('add') }}</el-button>
         </div>
       </template>
+    </el-dialog>
+
     <!-- Custom SVG Modal -->
     <el-dialog v-model="isSvgModalOpen" :title="$t('addCustomIcon') || '添加自定义 SVG'" width="450px" destroy-on-close>
       <div style="margin-bottom: 12px; font-size: 13px; color: var(--text-secondary); line-height: 1.5;">
@@ -457,14 +460,6 @@ const parseDomainList = (value) => {
   return value.split(',').map(v => v.trim()).filter(Boolean)
 }
 
-// 根据当前编辑的标签名，返回 system_setting 的人类可读描述
-const getSystemRuleDesc = (labelName) => {
-  const desc = {
-    '订阅': '按系统内置规则识别（检测 noreply 发件人、退订关键词等）',
-    '推销': '按系统内置规则识别（检测促销关键词、营销邮件特征等）',
-  }
-  return desc[labelName] || '按系统内置逻辑自动分类'
-}
 
 const presetColors = [
   '#ef4444', '#f97316', '#f59e0b', '#10b981', 

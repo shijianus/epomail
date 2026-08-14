@@ -397,6 +397,10 @@ const zh = {
     ruleWhitelist: '系统放行',
     ruleCorporate: '企业邮箱',
     systemControlled: '系统托管',
+    editLabel: '编辑标签',
+    createLabel: '新建标签',
+    systemCheck: '系统自查',
+    systemCheckTooltip: '此规则由系统内置逻辑驱动，无法修改',
     
     // New Rule Builder
     ruleFutureNotice: '*(规则仅对未来新收到的邮件生效)*',

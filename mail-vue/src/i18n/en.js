@@ -397,6 +397,10 @@ const en = {
     ruleWhitelist: 'System Allow',
     ruleCorporate: 'Corporate',
     systemControlled: 'System Managed',
+    editLabel: 'Edit Label',
+    createLabel: 'Create Label',
+    systemCheck: 'System Check',
+    systemCheckTooltip: 'This rule is driven by built-in system logic and cannot be modified.',
     
     // New Rule Builder
     ruleFutureNotice: '*(Rules only apply to future incoming emails)*',

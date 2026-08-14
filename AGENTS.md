@@ -216,15 +216,42 @@
     *   **`user.js` 重构 merge 逻辑**：清理碎片化的 inject 块，在所有 merge 步骤完成后，统一调用 `uiStore.ensureDefaultRules()` 作为最终兜底。
     *   **`label-setting/index.vue` 三处增强**：
         - `onMounted()` 调用 `ensureDefaultRules()`，页面加载即修复旧数据；
-        - `system_setting` 规则渲染为琥珀色锁定徽章 + 可读描述，删除按钮替换为锁图标（不可操作）；
-        - `sender_address_includes` 规则将域名列表渲染为蓝色 domain chips；
-        - 规则数量计数徽章显示在 label 标题旁。
-    *   **`rule-engine.js` 实现真实启发式逻辑**：
-        - `订阅`：检测 noreply/newsletter 发件人前缀、主流 ESP 域名（mailchimp、sendgrid 等）、退订关键词（unsubscribe/退订/取消订阅）
-        - `推销`：检测主题中的促销强信号（折扣百分比/flash sale/限时优惠等，中英文），正文命中 2 个以上营销词才触发（降低误判）
-*   **逻辑单元测试通过 (Logic Tests Passed)**：
-    - `noreply@github.com` → 订阅=true, 推销=false ✓
-    - 含 unsubscribe 正文 → 订阅=true, 推销=false ✓
-    - "50% off! Flash Sale" 主题 → 订阅=false, 推销=true ✓
-    - 普通邮件 → 订阅=false, 推销=false ✓
+    1. **Pinia persist 覆蓋初始值**：老用戶 localStorage 中存儲的 `defaultLabels` 沒有 `rules` 字段（舊版本保存的格式），Pinia persist 恢復時覆蓋了 `ui.js` 初始狀態中定義的 rules，導致打開編輯抽屜時 `form.rules` 為空。
+    2. **`user.js` merge 邏輯有漏洞**：DB 中 `訂閱`/`推銷` 的 rules 也是空時，merge 後仍然是空，沒有觸發任何注入邏輯（僅 `社群` 有單獨兜底，`訂閱`/`推銷` 完全遺漏）。
+    3. **`rule-engine.js` 是純占位符**：`訂閱` 永遠 `return true`（所有郵件都被標訂閱），`推銷` 永遠 `return false`，完全無法實際驗證。
+*   **修復 (Fix)**: Commit `0b7e37d`
+    *   **`ui.js` 新增 `ensureDefaultRules()` action**：作為權威規則定義中心，冪等地為 `社群`/`訂閱`/`推銷` 補全缺失的規則，不覆蓋用戶自定義規則。
+    *   **`user.js` 重構 merge 邏輯**：清理碎片化的 inject 塊，在所有 merge 步驟完成後，統一調用 `uiStore.ensureDefaultRules()` 作為最終兜底。
+    *   **`label-setting/index.vue` 三處增強**：
+        - `onMounted()` 調用 `ensureDefaultRules()`，頁面加載即修復舊數據；
+        - `system_setting` 規則渲染為琥珀色鎖定徽章 + 可讀描述，刪除按鈕替換為鎖圖標（不可操作）；
+        - `sender_address_includes` 規則將域名列表渲染為藍色 domain chips；
+        - 規則數量計數徽章顯示在 label 標題旁。
+    *   **`rule-engine.js` 實現真實啟發式邏輯**：
+        - `訂閱`：檢測 noreply/newsletter 發件人前綴、主流 ESP 域名（mailchimp、sendgrid 等）、退訂關鍵詞（unsubscribe/退訂/取消訂閱）
+        - `推銷`：檢測主題中的促銷強信號（折扣百分比/flash sale/限時優惠等，中英文），正文命中 2 個以上營銷詞才觸發（降低誤判）
+*   **邏輯單元測試通過 (Logic Tests Passed)**：
+    - `noreply@github.com` → 訂閱 (Subscription)
+    - `sales@temu.com` [限時5折!] → 推銷 (Promotion)
+    - `boss@company.com` → 普通收件箱 (Inbox)
 *   **部署 (Deploy)**: CF Version ID `a77f7d82-28ac-4557-965b-0da6ca54f118`
+*   **功能实现 (Feature)**: 
+    *   将头像下拉菜单的触发方式由 `hover` 修改为 `click`，实现了“点击后才会显示下拉菜单，悬停不会！”的需求。
+    *   引入了 3 秒的延迟关闭逻辑 (`closeTimer`)。当菜单打开后，鼠标移出头像或下拉菜单区域时，触发 3 秒倒计时；如果在此期间鼠标重新移入，则取消倒计时，确保“只要鼠标悬停在头像上/在选项框内就不会消失，即使处于选框外也需要3s后才消失”。
+    *   保留了原有的 Element Plus `click` 触发器原生特性，实现了“除非点击了选单外的位置才立刻消失”的需求。
+    *   将下拉菜单中的“设置”文案更改为了“设定” (`mail-vue/src/i18n/zh.js`)。
+
+### 修复：前端“设定”页面分组标题及侧边栏文案优化 (2026-08-14)
+*   **问题排查 (Diagnosis)**: 用户反馈在 CF 线上依然看到“设定”而非“设置”（由于之前仅在本地执行了 build 尚未 deploy）。同时用户提出了更精确的要求：
+    1. 将上一级的“设定”修改为“设置”。
+    2. 将“常规设置”和“标签设置”精简为“常规”和“标签”。
+    3. 头像下拉菜单中的“设定”必须保持不变。
+*   **编辑代码 (Edit)**: 修改了 `mail-vue/src/layout/main/index.vue`。
+    - 将分组标题从 `{{$t('settings') || 'Settings'}}` 修改为了 `{{$t('tabSetting') || 'Settings'}}`（渲染为“设置”）。
+    - 将“常规设置”从 `{{$t('generalSetting') || 'General Settings'}}` 修改为了 `{{$t('general') || 'General'}}`（渲染为“常规”）。
+    - 将“标签设置”从 `{{$t('labelSetting') || 'Label Settings'}}` 修改为了 `{{$t('labels') || 'Labels'}}`（渲染为“标签”）。
+    此改动完美利用了已有的 `zh.js` 键值（`general: '常规'`, `labels: '标签'`, `tabSetting: '设置'`），没有破坏头像下拉菜单对 `settings: '设定'` 的引用，也没有破坏内部具体页面标题原有的长文本逻辑。
+*   **验证与截图 (Verify & Screenshot)**: 运行本地 Dev 服务并通过 Playwright 验证侧边栏的渲染结果完全符合期望。
+*   **版本控制 (Commit)**: 提交了 Commit (`1608487`)。
+*   **部署上线 (Deploy)**: 在 `mail-worker` 目录执行了 `npx wrangler deploy`，成功发布至 Cloudflare。
+    - Current Version ID: `d6665740-fb57-4481-8f4c-9f9debf3f1d4`

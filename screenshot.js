@@ -1,22 +1,19 @@
-const { chromium } = require('playwright');
+import { chromium } from 'playwright';
+
 (async () => {
   const browser = await chromium.launch();
-  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  const page = await browser.newPage();
   
-  // Set fake local storage if needed to bypass login, or just screenshot the login page.
-  // Wait, let's just go to the page and see what happens.
-  await page.goto('http://localhost:3002/');
+  // Wait a bit for the dev server to be fully ready
+  await new Promise(r => setTimeout(r, 2000));
   
-  // Wait a bit for initial render
-  await page.waitForTimeout(3000);
+  await page.goto('http://localhost:5173', { waitUntil: 'networkidle' });
   
-  // Actually, wait for the layout to show
-  await page.screenshot({ path: '/home/shijian/projects/epocanvas-mail/screenshot_1440.png' });
+  // Try to navigate to label settings or take a general screenshot
+  // In a real app we might need to login, but we'll try to just take a screenshot
+  // of whatever is there
+  await page.screenshot({ path: 'screenshot.png', fullPage: true });
   
-  // Mobile screenshot
-  await page.setViewportSize({ width: 375, height: 812 });
-  await page.waitForTimeout(1000);
-  await page.screenshot({ path: '/home/shijian/projects/epocanvas-mail/screenshot_375.png' });
-  
+  console.log('Screenshot taken: screenshot.png');
   await browser.close();
 })();
