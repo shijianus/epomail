@@ -329,3 +329,8 @@
     *   新增严格的全局 7 标签数量限制。超过限制时使用 Element Plus 的 `ElMessage` 和按钮禁用态予以阻止。
 *   **系统检查与部署 (Validation & Deploy)**:
     *   使用 Playwright 和 Vite Dev Server 进行本地截图验证并自动执行 Cloudflare Worker 部署 (Commit: `0e574a3`)。
+
+### 修复：恢复意外移除的「系统设置」标签 (2026-08-14)
+*   **修复 (Fix)**: `8081fbf` — 在合并 defaultLabels 和 customLabels 时，误将后端的控制标签“系统设置”从初始数据以及 `user.js` 白名单中过滤丢弃，导致用户界面仅显示 3 个默认标签。现已在 `ui.js` 中将该标签加回初始阵列。
+*   **自动恢复机制 (Self-Healing)**: 在 `ui.js` 的 `ensureDefaultRules` 动作中加入了对“系统设置”的强一致性检查：如果发现用户的 `allLabels` 中该标签遗失，系统将在每次挂载时自动重新注入该标签，确保后台规则引擎所需配置的完整性。
+*   **测试与部署**: 本地环境及 Playwright UI 验证通过，已重新构建并同步部署至 Cloudflare。
