@@ -216,11 +216,15 @@
     *   **`user.js` 重构 merge 逻辑**：清理碎片化的 inject 块，在所有 merge 步骤完成后，统一调用 `uiStore.ensureDefaultRules()` 作为最终兜底。
     *   **`label-setting/index.vue` 三处增强**：
         - `onMounted()` 调用 `ensureDefaultRules()`，页面加载即修复旧数据；
-    1. **Pinia persist 覆蓋初始值**：老用戶 localStorage 中存儲的 `defaultLabels` 沒有 `rules` 字段（舊版本保存的格式），Pinia persist 恢復時覆蓋了 `ui.js` 初始狀態中定義的 rules，導致打開編輯抽屜時 `form.rules` 為空。
-    2. **`user.js` merge 邏輯有漏洞**：DB 中 `訂閱`/`推銷` 的 rules 也是空時，merge 後仍然是空，沒有觸發任何注入邏輯（僅 `社群` 有單獨兜底，`訂閱`/`推銷` 完全遺漏）。
-    3. **`rule-engine.js` 是純占位符**：`訂閱` 永遠 `return true`（所有郵件都被標訂閱），`推銷` 永遠 `return false`，完全無法實際驗證。
-*   **修復 (Fix)**: Commit `0b7e37d`
-    *   **`ui.js` 新增 `ensureDefaultRules()` action**：作為權威規則定義中心，冪等地為 `社群`/`訂閱`/`推銷` 補全缺失的規則，不覆蓋用戶自定義規則。
+
+### 全面优化：全部邮件 (All Mail) 专属多字段高亮搜索及系统设置 i18n 完善 (2026-08-14)
+*   **统一化搜索体验 (Search Bar Harmonization)**: `77b1c28` — 将“全部邮件”专区的搜索功能重新绑定至全局导航栏搜索框，抛弃了旧版的下拉选框形式。现在的搜索行为与普通搜索一致：输入即触发 (400ms debounce)，无需按下 Enter。
+*   **全表无感搜索 (Global Fuzzy Search)**: 当用户在全部邮件内进行纯文本搜索时，后端引擎会自动执行对 `subject`, `name`, `sendEmail`, 和 `toEmail` 的 `OR` 联合查询匹配，实现了真正的全局模糊搜索，且保持了高效率。
+*   **智能高亮 (Yellow Highlighting)**: 重构了 `emailStore` 和 `highlightMatch` 逻辑。实现了原生的文本黄色背景标记 (`<mark style="background-color: yellow;">`)，任何检索出的自由关键字将立刻在结果列表中被显眼地标出。
+*   **全量 i18n 翻译及 $ 语法提示 (Multilingual Syntax + Auto-complete)**:
+    *   统一修复了 `search`, `searchSettings` 在多语言下的对应键值（摒弃了错误的 `research` 等）。
+    *   在英文版中，Tab 提示支持如 `$Sender admin`；中文版中则支持 `$发件人 admin`，搜索提示下拉框的展示文字现在完全按照当前的系统语种 (Display Value) 来渲染。
+    *   大幅增强了 `parseQuery` 解释器：使得通过 i18n 返回的显示文本也能直接被映射到底层对应的字段，再也不会发生中英文语言切换后底层匹配失效的问题。則定義中心，冪等地為 `社群`/`訂閱`/`推銷` 補全缺失的規則，不覆蓋用戶自定義規則。
     *   **`user.js` 重構 merge 邏輯**：清理碎片化的 inject 塊，在所有 merge 步驟完成後，統一調用 `uiStore.ensureDefaultRules()` 作為最終兜底。
     *   **`label-setting/index.vue` 三處增強**：
         - `onMounted()` 調用 `ensureDefaultRules()`，頁面加載即修復舊數據；

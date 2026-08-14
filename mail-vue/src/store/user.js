@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import {loginUserInfo} from "@/request/my.js";
 import { useUiStore } from "@/store/ui.js";
+import { BUILTIN_LABELS } from "@/store/ui.js";
 
 export const useUserStore = defineStore('user', {
     state: () => ({
@@ -16,52 +17,66 @@ export const useUserStore = defineStore('user', {
         refreshUserInfo() {
             loginUserInfo().then(user => {
                 this.user = user
-                
+                const uiStore = useUiStore()
+
                 if (user.customLabels) {
                     try {
-                        const uiStore = useUiStore()
                         const parsed = JSON.parse(user.customLabels)
+
                         if (Array.isArray(parsed)) {
-                            if (parsed.length > 0) uiStore.customLabels = parsed
+                            // 旧格式：纯数组 (只有 customLabels)
+                            // 需要与当前 allLabels 合并：DB 里的数组视为全量
+                            if (parsed.length > 0) {
+                                // 注入内置标签规则再覆盖
+                                uiStore.allLabels = parsed
+                            }
                         } else if (parsed && typeof parsed === 'object') {
-                            if (parsed.customLabels) uiStore.customLabels = parsed.customLabels
-                            if (parsed.defaultLabels) {
-                                const dbDefs = parsed.defaultLabels;
+                            // 旧格式：{ customLabels: [...], defaultLabels: [...] }
+                            // 将两者合并为统一 allLabels
+                            const dbCustom = parsed.customLabels || []
+                            const dbDefs   = parsed.defaultLabels || []
+                            const dbAll    = [...dbDefs, ...dbCustom]
 
-                                // ① 补充 DB 中有但 uiStore 没有的 label
-                                dbDefs.forEach(dbLabel => {
-                                    if (!uiStore.defaultLabels.find(t => t.name === dbLabel.name)) {
-                                        uiStore.defaultLabels.push(dbLabel);
-                                    }
-                                });
+                            if (dbAll.length > 0) {
+                                // ① 把 DB 里有的标签合并进来
+                                const merged = [...uiStore.allLabels]
 
-                                // ② 更新 uiStore 中已有 label 的用户设置（listVis 和用户自定义 rules）
-                                uiStore.defaultLabels.forEach(templateLabel => {
-                                    const dbLabel = dbDefs.find(d => d.name === templateLabel.name);
-                                    if (dbLabel) {
+                                dbAll.forEach(dbLabel => {
+                                    const existing = merged.find(t => t.name === dbLabel.name)
+                                    if (existing) {
                                         // 同步可见性偏好
-                                        templateLabel.listVis = dbLabel.listVis !== undefined ? dbLabel.listVis : templateLabel.listVis;
-                                        // 同步用户自定义 rules（只取 DB 中合法的规则，过滤废弃的类型）
+                                        if (dbLabel.listVis !== undefined) existing.listVis = dbLabel.listVis
+                                        // 同步用户自定义 rules（过滤废弃类型）
                                         if (dbLabel.rules && dbLabel.rules.length > 0) {
                                             const hasDeprecated = dbLabel.rules.every(r =>
                                                 r.condition && ['sender_includes', 'in_blacklist', 'in_whitelist'].includes(r.condition.type)
-                                            );
+                                            )
                                             if (!hasDeprecated) {
-                                                templateLabel.rules = dbLabel.rules;
+                                                existing.rules = dbLabel.rules
                                             }
                                         }
+                                    } else {
+                                        // DB 里有但 store 里没有的标签（用户自定义），追加进来
+                                        merged.push(dbLabel)
                                     }
-                                });
+                                })
 
-                                // ③ 删除废弃的系统标签（工作、含旧版黑白名单条件的）
-                                uiStore.defaultLabels = uiStore.defaultLabels.filter(templateLabel => {
-                                    if (['工作'].includes(templateLabel.name)) return false;
-                                    if (!templateLabel.rules) return true;
-                                    return !templateLabel.rules.some(r =>
+                                // ② 过滤废弃的标签（工作、含旧版黑白名单条件的）
+                                const filtered = merged.filter(label => {
+                                    if (['工作', '系统设置'].includes(label.name)) return false
+                                    if (!label.rules) return true
+                                    return !label.rules.some(r =>
                                         (r.condition && (r.condition.type === 'in_blacklist' || r.condition.type === 'in_whitelist')) ||
                                         (r.exception && (r.exception.type === 'in_blacklist' || r.exception.type === 'in_whitelist'))
-                                    );
-                                });
+                                    )
+                                })
+
+                                uiStore.allLabels = filtered
+                            }
+
+                            // ③ 新格式：allLabels 直接覆盖（最高优先）
+                            if (parsed.allLabels && Array.isArray(parsed.allLabels) && parsed.allLabels.length > 0) {
+                                uiStore.allLabels = parsed.allLabels
                             }
                         }
 
@@ -70,12 +85,11 @@ export const useUserStore = defineStore('user', {
 
                     } catch (e) {
                         console.error("Failed to parse customLabels from user", e)
-                        // 即使解析失败，也要确保规则完整
-                        try { useUiStore().ensureDefaultRules() } catch (_) {}
+                        try { uiStore.ensureDefaultRules() } catch (_) {}
                     }
                 } else {
                     // 用户没有保存过 label 配置，直接用模板规则兜底
-                    try { useUiStore().ensureDefaultRules() } catch (_) {}
+                    try { uiStore.ensureDefaultRules() } catch (_) {}
                 }
             })
         }

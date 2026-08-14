@@ -5,97 +5,53 @@
         <h1 class="page-title">{{ $t('labelSetting') || 'Label Management' }}</h1>
         <p class="page-desc">{{ $t('labelSettingDesc') || 'Manage your labels and classification rules' }}</p>
       </div>
-      <el-button type="primary" size="large" @click="startAdd" class="primary-btn">
-        <Icon icon="lucide:plus" width="18" /> {{ $t('newLabel') || 'New Label' }}
-      </el-button>
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span class="label-count-badge">{{ uiStore.allLabels.length }} / 7</span>
+        <el-button type="primary" size="large" @click="startAdd" class="primary-btn" :disabled="uiStore.allLabels.length >= 7">
+          <Icon icon="lucide:plus" width="18" /> {{ $t('newLabel') || 'New Label' }}
+        </el-button>
+      </div>
     </div>
 
-    <div class="labels-container" v-if="uiStore.defaultLabels.length > 0 || uiStore.customLabels.length > 0">
-      <!-- Default Template Labels -->
-      <div class="section" v-if="uiStore.defaultLabels.length > 0">
-        <h2 class="section-title">{{ $t('defaultTemplates') || 'Default Templates' }}</h2>
-        <div class="modern-list">
-          <div class="list-row tech-row" v-for="(label, index) in uiStore.defaultLabels" :key="'def-'+index">
-            <div class="label-pill-cell">
-              <div class="label-pill" :style="{ '--pill-color': label.color }">
-                <div v-if="label.icon?.startsWith('<svg')" v-html="label.icon" style="width: 18px; height: 18px; display: inline-flex; justify-content: center; align-items: center; fill: currentColor;"></div>
-                <Icon v-else :icon="label.icon" width="18" />
-                <span>{{ label.name }}</span>
-              </div>
-            </div>
-            
-            <div class="stats-group">
-              <div class="stat-item">
-                <span class="stat-val">{{ label.stats?.total || 0 }}</span>
-                <span class="stat-lbl">{{ $t('statTotal') || 'Total' }}</span>
-              </div>
-              <div class="stat-item">
-                <span class="stat-val">{{ label.stats?.current || 0 }}</span>
-                <span class="stat-lbl">{{ $t('statCurrent') || 'Current' }}</span>
-              </div>
-              <div class="stat-item">
-                <span class="stat-val">{{ label.stats?.unread || 0 }}</span>
-                <span class="stat-lbl">{{ $t('statUnread') || 'Unread' }}</span>
-              </div>
-            </div>
-
-            <div class="visibility-cell">
-               <el-switch v-model="label.listVis" size="small" :active-text="$t('show') || 'Show'" :inactive-text="$t('hide') || 'Hide'" inline-prompt />
-            </div>
-            <div class="actions-cell">
-              <el-button link class="action-btn edit-btn" @click="startEditDefault(index)" :title="$t('edit') || 'Edit'">
-                <Icon icon="lucide:pencil" width="16" />
-              </el-button>
-              <el-button link class="action-btn delete-btn" @click="confirmDeleteDefault(index)" :title="$t('delete') || 'Delete'">
-                <Icon icon="lucide:trash-2" width="16" />
-              </el-button>
+    <div class="labels-container" v-if="uiStore.allLabels.length > 0">
+      <div class="modern-list">
+        <div class="list-row tech-row" v-for="(label, index) in uiStore.allLabels" :key="'lbl-'+index">
+          <div class="drag-handle" :title="$t('dragToReorder') || 'Drag to reorder'" @click="moveUp(index)">
+            <Icon icon="lucide:grip-vertical" width="18" />
+          </div>
+          <div class="label-pill-cell" style="padding-left: 8px;">
+            <div class="label-pill" :style="{ '--pill-color': label.color || 'var(--accent-primary)' }">
+              <div v-if="(label.icon || '').startsWith('<svg')" v-html="label.icon" style="width: 18px; height: 18px; display: inline-flex; justify-content: center; align-items: center; fill: currentColor;"></div>
+              <Icon v-else :icon="label.icon || 'ic:baseline-label'" width="18" />
+              <span>{{ label.name || label }}</span>
             </div>
           </div>
-        </div>
-      </div>
 
-      <!-- Custom Labels -->
-      <div class="section" style="margin-top: 32px" v-if="uiStore.customLabels.length > 0">
-        <h2 class="section-title">{{ $t('customLabels') || 'Custom Labels' }}</h2>
-        <div class="modern-list">
-          <div class="list-row tech-row" v-for="(label, index) in uiStore.customLabels" :key="index">
-            <div class="drag-handle" :title="$t('dragToReorder') || 'Drag to reorder'" @click="moveUp(index)">
-              <Icon icon="lucide:grip-vertical" width="18" />
+          <div class="stats-group">
+            <div class="stat-item">
+              <span class="stat-val">{{ label.stats?.total || 0 }}</span>
+              <span class="stat-lbl">{{ $t('statTotal') || 'Total' }}</span>
             </div>
-            <div class="label-pill-cell" style="padding-left: 8px;">
-              <div class="label-pill" :style="{ '--pill-color': label.color || 'var(--accent-primary)' }">
-                <div v-if="(label.icon || '').startsWith('<svg')" v-html="label.icon" style="width: 18px; height: 18px; display: inline-flex; justify-content: center; align-items: center; fill: currentColor;"></div>
-                <Icon v-else :icon="label.icon || 'ic:baseline-label'" width="18" />
-                <span>{{ label.name || label }}</span>
-              </div>
+            <div class="stat-item">
+              <span class="stat-val">{{ label.stats?.current || 0 }}</span>
+              <span class="stat-lbl">{{ $t('statCurrent') || 'Current' }}</span>
             </div>
-            
-            <div class="stats-group">
-              <div class="stat-item">
-                <span class="stat-val">{{ label.stats?.total || 0 }}</span>
-                <span class="stat-lbl">{{ $t('statTotal') || 'Total' }}</span>
-              </div>
-              <div class="stat-item">
-                <span class="stat-val">{{ label.stats?.current || 0 }}</span>
-                <span class="stat-lbl">{{ $t('statCurrent') || 'Current' }}</span>
-              </div>
-              <div class="stat-item">
-                <span class="stat-val">{{ label.stats?.unread || 0 }}</span>
-                <span class="stat-lbl">{{ $t('statUnread') || 'Unread' }}</span>
-              </div>
+            <div class="stat-item">
+              <span class="stat-val">{{ label.stats?.unread || 0 }}</span>
+              <span class="stat-lbl">{{ $t('statUnread') || 'Unread' }}</span>
             </div>
+          </div>
 
-            <div class="visibility-cell">
-               <el-switch v-model="label.listVis" size="small" :active-text="$t('show') || 'Show'" :inactive-text="$t('hide') || 'Hide'" inline-prompt />
-            </div>
-            <div class="actions-cell">
-              <el-button link class="action-btn edit-btn" @click="startEdit(index)" :title="$t('edit') || 'Edit'">
-                <Icon icon="lucide:pencil" width="16" />
-              </el-button>
-              <el-button link class="action-btn delete-btn" @click="confirmDelete(index)" :title="$t('delete') || 'Delete'">
-                <Icon icon="lucide:trash-2" width="16" />
-              </el-button>
-            </div>
+          <div class="visibility-cell">
+             <el-switch v-model="label.listVis" size="small" :active-text="$t('show') || 'Show'" :inactive-text="$t('hide') || 'Hide'" inline-prompt />
+          </div>
+          <div class="actions-cell">
+            <el-button link class="action-btn edit-btn" @click="startEdit(index)" :title="$t('edit') || 'Edit'">
+              <Icon icon="lucide:pencil" width="16" />
+            </el-button>
+            <el-button link class="action-btn delete-btn" @click="confirmDelete(index)" :title="$t('delete') || 'Delete'">
+              <Icon icon="lucide:trash-2" width="16" />
+            </el-button>
           </div>
         </div>
       </div>
@@ -113,10 +69,10 @@
           <label>{{ $t('name') || 'Name' }}</label>
           <el-input v-model="form.name" size="large" :placeholder="$t('labelNamePlaceholder') || 'Enter label name'" />
         </div>
-        <div class="form-group" v-if="!isEditingDefault">
+        <div class="form-group">
           <label>Parent Label</label>
           <el-select v-model="form.parent" size="large" placeholder="None" clearable style="width: 100%">
-             <el-option v-for="(l, i) in uiStore.customLabels" :key="i" :label="l.name" :value="l.name" :disabled="editIndex === i" />
+             <el-option v-for="(l, i) in uiStore.allLabels" :key="i" :label="l.name" :value="l.name" :disabled="editIndex === i" />
           </el-select>
         </div>
         <div class="form-group">
@@ -429,7 +385,7 @@
 </template>
 
 <script setup>
-import { ref, watch, onMounted, computed } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useUiStore } from '@/store/ui.js'
 import { useAccountStore } from '@/store/account.js'
 import { emailSearchSuggestions } from '@/request/email.js'
@@ -444,6 +400,15 @@ const accountStore = useAccountStore()
 // 页面加载时，强制确保所有默认标签的系统规则都正确注入
 onMounted(() => {
   uiStore.ensureDefaultRules()
+  // Normalize any old-format labels
+  uiStore.allLabels = uiStore.allLabels.map(l => {
+    if (typeof l === 'string') return { name: l, icon: 'ic:baseline-label', color: '#3b82f6', listVis: true, rules: [], stats: { total: 0, current: 0, unread: 0 } }
+    if (l.sidebarVis === undefined) l.sidebarVis = 'show'
+    if (l.listVis === undefined) l.listVis = true
+    if (!l.rules) l.rules = []
+    if (!l.stats) l.stats = { total: 0, current: 0, unread: 0 }
+    return l
+  })
 })
 
 // 判断一条规则是否为系统内置规则（不允许删除）
@@ -457,7 +422,6 @@ const parseDomainList = (value) => {
   return value.split(',').map(v => v.trim()).filter(Boolean)
 }
 
-
 const presetColors = [
   '#ef4444', '#f97316', '#f59e0b', '#10b981', 
   '#06b6d4', '#3b82f6', '#8b5cf6', '#d946ef',
@@ -470,49 +434,29 @@ const presetIcons = [
   'ic:outline-info', 'ic:outline-lightbulb', 'ic:outline-flag', 'ic:outline-rss-feed'
 ]
 
-// Normalization
-const normalizeLabels = () => {
-  if (!uiStore.customLabels) uiStore.customLabels = []
-  uiStore.customLabels = uiStore.customLabels.map(l => {
-    if (typeof l === 'string') return { name: l, icon: 'ic:baseline-label', color: '#3b82f6', sidebarVis: 'show', listVis: true }
-    if (!l.sidebarVis) l.sidebarVis = 'show'
-    if (l.listVis === undefined) l.listVis = true
-    return l
-  })
-}
-normalizeLabels()
+const isEditorOpen = ref(false)
+const editIndex = ref(-1)
+const form = ref({ name: '', icon: 'ic:baseline-label', color: '#3b82f6', parent: '', listVis: true, rules: [], stats: { total: 0, current: 0, unread: 0 } })
 
 const startAdd = () => {
+  if (uiStore.allLabels.length >= 7) {
+    ElMessage.warning(t('maxLabelsReached') || '最多只能创建 7 个标签')
+    return
+  }
   editIndex.value = -1
-  isEditingDefault.value = false
   form.value = { 
     name: '', icon: 'ic:baseline-label', color: presetColors[5], parent: '', 
-    sidebarVis: 'show', listVis: true, rules: [], 
-    stats: { total: 0, current: 0, unread: 0 } 
+    listVis: true, rules: [], stats: { total: 0, current: 0, unread: 0 } 
   }
   isEditorOpen.value = true
 }
 
 const startEdit = (index) => {
   editIndex.value = index
-  isEditingDefault.value = false
-  form.value = { ...uiStore.customLabels[index] }
+  form.value = { ...uiStore.allLabels[index] }
   if (!form.value.rules) form.value.rules = []
   isEditorOpen.value = true
 }
-
-const startEditDefault = (index) => {
-  editIndex.value = index
-  isEditingDefault.value = true
-  form.value = { ...uiStore.defaultLabels[index] }
-  if (!form.value.rules) form.value.rules = []
-  isEditorOpen.value = true
-}
-
-const isEditorOpen = ref(false)
-const editIndex = ref(-1)
-const isEditingDefault = ref(false)
-const form = ref({ name: '', icon: 'ic:baseline-label', color: '#3b82f6', parent: '', sidebarVis: 'show', listVis: true, rules: [] })
 
 const isSvgModalOpen = ref(false)
 const customSvgInput = ref('')
@@ -596,7 +540,6 @@ const queryExceptionSuggestions = async (queryString, cb) => {
 }
 
 const saveNewRule = () => {
-  // Validation
   const requiresValue = (type) => !['all_messages', 'none', 'system_setting', 'in_whitelist', 'is_corporate', 'in_blacklist'].includes(type)
   const isValidValue = (val) => {
     if (val === 0) return true
@@ -630,7 +573,6 @@ const saveNewRule = () => {
         : true
     }
   } else {
-    // Legacy support for backend logic
     newRule.condition = { type: 'none', value: true }
   }
   
@@ -687,18 +629,14 @@ const removeRule = (index) => {
 
 const saveLabel = () => {
   if (!form.value.name.trim()) {
-    ElMessage.warning('Label name is required')
+    ElMessage.warning(t('labelNameRequired') || 'Label name is required')
     return
   }
   
-  if (isEditingDefault.value) {
-    uiStore.defaultLabels[editIndex.value] = { ...form.value }
+  if (editIndex.value > -1) {
+    uiStore.allLabels[editIndex.value] = { ...form.value }
   } else {
-    if (editIndex.value > -1) {
-      uiStore.customLabels[editIndex.value] = { ...form.value }
-    } else {
-      uiStore.customLabels.push({ ...form.value })
-    }
+    uiStore.allLabels.push({ ...form.value })
   }
   isEditorOpen.value = false
 }
@@ -706,42 +644,26 @@ const saveLabel = () => {
 const isDeleteOpen = ref(false)
 const deleteCandidate = ref(null)
 const deleteIndex = ref(-1)
-const deleteMode = ref('tagOnly')
-const isDeletingDefault = ref(false)
 
 const confirmDelete = (index) => {
   deleteIndex.value = index
-  deleteCandidate.value = uiStore.customLabels[index]
-  deleteMode.value = 'tagOnly'
-  isDeletingDefault.value = false
-  isDeleteOpen.value = true
-}
-
-const confirmDeleteDefault = (index) => {
-  deleteIndex.value = index
-  deleteCandidate.value = uiStore.defaultLabels[index]
-  deleteMode.value = 'tagOnly'
-  isDeletingDefault.value = true
+  deleteCandidate.value = uiStore.allLabels[index]
   isDeleteOpen.value = true
 }
 
 const executeDelete = () => {
   if (deleteIndex.value > -1) {
-    if (isDeletingDefault.value) {
-      uiStore.defaultLabels.splice(deleteIndex.value, 1)
-    } else {
-      uiStore.customLabels.splice(deleteIndex.value, 1)
-    }
+    uiStore.allLabels.splice(deleteIndex.value, 1)
   }
   isDeleteOpen.value = false
-  ElMessage.success('Label tag removed successfully')
+  ElMessage.success(t('labelDeleted') || 'Label removed successfully')
 }
 
 const moveUp = (index) => {
   if (index > 0) {
-    const temp = uiStore.customLabels[index]
-    uiStore.customLabels[index] = uiStore.customLabels[index - 1]
-    uiStore.customLabels[index - 1] = temp
+    const temp = uiStore.allLabels[index]
+    uiStore.allLabels[index] = uiStore.allLabels[index - 1]
+    uiStore.allLabels[index - 1] = temp
   }
 }
 </script>
@@ -759,6 +681,17 @@ const moveUp = (index) => {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 32px;
+}
+
+.label-count-badge {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: var(--bg-hover);
+  border: 1px solid var(--border-mid);
+  border-radius: 20px;
+  padding: 4px 12px;
+  letter-spacing: 0.5px;
 }
 
 .header-text {

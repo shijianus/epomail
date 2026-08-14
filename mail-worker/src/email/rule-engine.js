@@ -69,8 +69,14 @@ export function applyRules(emailParams, userLabelsJson) {
     if (Array.isArray(parsed)) {
       labels = parsed;
     } else if (parsed && typeof parsed === 'object') {
-      if (Array.isArray(parsed.customLabels)) labels = labels.concat(parsed.customLabels);
-      if (Array.isArray(parsed.defaultLabels)) labels = labels.concat(parsed.defaultLabels);
+      // New unified format
+      if (Array.isArray(parsed.allLabels)) {
+        labels = parsed.allLabels;
+      } else {
+        // Legacy format: merge both arrays
+        if (Array.isArray(parsed.customLabels)) labels = labels.concat(parsed.customLabels);
+        if (Array.isArray(parsed.defaultLabels)) labels = labels.concat(parsed.defaultLabels);
+      }
     }
 
     if (labels.length === 0) return '[]';
