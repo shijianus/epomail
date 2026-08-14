@@ -12,9 +12,9 @@
     <div class="topbar-search">
       <div class="search-box">
         <span class="search-icon" @click="handleSearch" style="cursor: pointer; z-index: 1"><Icon icon="lucide:search" width="20" height="20"/></span>
-        <input type="text" :placeholder="isSettingsMode ? ($t('searchSettings') || 'Search settings') : ($t('search') || 'Search mail')" v-model="emailStore.searchKeyword" @keyup.enter="handleSearch" @focus="searchFocus = true" @blur="onSearchBlur" />
+        <input type="text" :placeholder="(isSettingsMode && route.name !== 'all-email') ? ($t('searchSettings') || 'Search settings') : ($t('search') || 'Search mail')" v-model="emailStore.searchKeyword" @keyup.enter="handleSearch" @focus="searchFocus = true" @blur="onSearchBlur" />
         
-        <div v-if="isSettingsMode && emailStore.searchKeyword.trim() && searchFocus" class="settings-search-dropdown">
+        <div v-if="isSettingsMode && route.name !== 'all-email' && emailStore.searchKeyword.trim() && searchFocus" class="settings-search-dropdown">
            <div v-for="group in settingsSearchResults" :key="group.route" class="settings-search-group">
              <div class="settings-search-title">{{ group.title }}</div>
              <div class="settings-search-item" v-for="item in group.items" :key="item.text" @mousedown.prevent="goToSetting(group.route, item.id)">
@@ -363,9 +363,10 @@ const accountCount = computed(() => {
 })
 
 function handleSearch() {
-  if (isSettingsMode.value) {
+  if (isSettingsMode.value && route.name !== 'all-email') {
     return;
   }
+
   
   const parsed = emailStore.searchParsed;
   
@@ -384,6 +385,10 @@ function handleSearch() {
     } else if (emailStore.emailScroll) {
       emailStore.emailScroll.refreshList();
     }
+    return;
+  }
+
+  if (route.name === 'all-email') {
     return;
   }
 

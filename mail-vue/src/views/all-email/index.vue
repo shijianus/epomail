@@ -19,43 +19,11 @@
 
     >
       <template #first>
-        <el-input
-            v-model="searchValue"
-            :placeholder="$t('searchByContent')"
-            class="search-input"
-        >
-          <template #prefix>
-            <div @click.stop="openSelect">
-              <el-select
-                  ref="mySelect"
-                  v-model="params.searchType"
-                  :placeholder="$t('select')"
-                  class="select"
-              >
-                <el-option key="3" :label="$t('sender')" :value="'name'"/>
-                <el-option key="4" :label="$t('subject')" :value="'subject'"/>
-                <el-option key="1" :label="$t('user')" :value="'user'"/>
-                <el-option key="2" :label="$t('selectEmail')" :value="'account'"/>
-              </el-select>
-              <div class="search-type">
-                <span>{{ selectTitle }}</span>
-                <Icon class="setting-icon" icon="mingcute:down-small-fill" width="20" height="20"/>
-              </div>
-            </div>
-          </template>
-        </el-input>
-        <el-select v-model="params.type" placeholder="Select" class="status-select" @change="typeSelectChange">
-          <el-option key="1" :label="$t('all')" value="all"/>
-          <el-option key="3" :label="$t('received')" value="receive"/>
-          <el-option key="2" :label="$t('sent')" value="send"/>
-          <el-option key="4" :label="$t('selectDeleted')" value="delete"/>
-          <el-option key="4" :label="$t('noRecipientTitle')" value="noone"/>
-        </el-select>
-        <Icon class="icon" icon="iconoir:search" @click="search" width="20" height="20"/>
+        <div style="flex-grow: 1;"></div> <!-- Spacer to push icons to the right if needed, or just let them sit -->
         <Icon class="icon" @click="changeTimeSort" icon="material-symbols-light:timer-arrow-down-outline"
-              v-if="params.timeSort === 0" width="28" height="28"/>
+              v-if="params.timeSort === 0" width="28" height="28" style="margin-left: auto;"/>
         <Icon class="icon" @click="changeTimeSort" icon="material-symbols-light:timer-arrow-up-outline" v-else
-              width="28" height="28"/>
+              width="28" height="28" style="margin-left: auto;"/>
         <Icon class="icon clear" icon="fluent:broom-sparkle-16-regular" width="22" height="22" @click="openBathDelete"/>
       </template>
     </emailScroll>
@@ -228,61 +196,115 @@ function batchDelete() {
 }
 
 function rightSearch(type, value) {
-  params.searchType = type;
-  searchValue.value = value;
-  search();
+  // Translate right click into query string
+  let query = emailStore.searchKeyword + '';
+  const prefix = type === 'user' ? '$user ' : type === 'account' ? '$to ' : '$sender ';
+  query = `${query} ${prefix}${value}`.trim();
+  emailStore.searchKeyword = query;
 }
+
+function parseQuery(query) {
+  let processed = query.replace(/\\\\/g, '\u0001'); 
+  processed = processed.replace(/\\\$/g, '\u0002'); 
+  
+  const parts = processed.split(/(?=\$)/);
+  
+  const fieldsMap = {
+    'user': 'userEmail', '账户': 'userEmail', '帳戶': 'userEmail',
+    'to': 'accountEmail', '收件人': 'accountEmail',
+    'sender': 'name', '发件人': 'name', '發件人': 'name',
+    'subject': 'subject', '主题': 'subject', '主題': 'subject',
+  };
+  const typeMap = {
+    'received': 'receive', '已接收': 'receive',
+    'sent': 'send', '已发送': 'send', '已發送': 'send',
+    'deleted': 'delete', '已删除': 'delete', '已刪除': 'delete',
+    'noone': 'noone', '无收件人': 'noone', '無收件人': 'noone',
+    'all': 'all', '全部': 'all'
+  };
+
+  const result = {
+    userEmail: null,
+    accountEmail: null,
+    name: null,
+    subject: null,
+    type: params.type || 'receive',
+    keyword: ''
+  };
+
+  let leftover = [];
+  
+  for (let p of parts) {
+    if (!p) continue;
+    if (p.startsWith('$')) {
+      const spaceIdx = p.indexOf(' ');
+      let key = '';
+      let value = '';
+      if (spaceIdx === -1) {
+         key = p.slice(1);
+      } else {
+         key = p.slice(1, spaceIdx);
+         value = p.slice(spaceIdx + 1).trim();
+      }
+      
+      key = key.toLowerCase();
+      
+      if (fieldsMap[key]) {
+         result[fieldsMap[key]] = value.replace(/\u0002/g, '$').replace(/\u0001/g, '\\');
+      } else if (typeMap[key]) {
+         result.type = typeMap[key];
+         if (value) leftover.push(value);
+      } else {
+         leftover.push(p);
+      }
+    } else {
+      leftover.push(p);
+    }
+  }
+  
+  result.keyword = leftover.join(' ').replace(/\u0002/g, '$').replace(/\u0001/g, '\\').trim();
+  
+  if (result.keyword && !result.subject && !result.name && !result.userEmail && !result.accountEmail) {
+      result.subject = result.keyword;
+  }
+  
+  return result;
+}
+
+watch(() => emailStore.searchKeyword, (newVal) => {
+  if (route.name !== 'all-email') return;
+  const parsed = parseQuery(newVal || '');
+  params.userEmail = parsed.userEmail;
+  params.accountEmail = parsed.accountEmail;
+  params.name = parsed.name;
+  params.subject = parsed.subject;
+  params.type = parsed.type;
+  if (sysEmailScroll.value && sysEmailScroll.value.refreshList) {
+    sysEmailScroll.value.refreshList();
+  }
+});
 
 function refreshBefore() {
-  searchValue.value = null
-  params.timeSort = 0
-  params.type = 'receive'
-  params.userEmail = null
-  params.accountEmail = null
-  params.name = null
-  params.subject = null
-  params.searchType = 'name'
-}
-
-function search() {
-
-  params.userEmail = null
-  params.accountEmail = null
-  params.name = null
-  params.subject = null
-
-  if (params.searchType === 'user') {
-    params.userEmail = searchValue.value
-  }
-
-  if (params.searchType === 'account') {
-    params.accountEmail = searchValue.value
-  }
-
-  if (params.searchType === 'name') {
-    params.name = searchValue.value
-  }
-
-  if (params.searchType === 'subject') {
-    params.subject = searchValue.value
-  }
-
-  sysEmailScroll.value.refreshList();
+  emailStore.searchKeyword = '';
+  params.timeSort = 0;
+  params.type = 'receive';
+  params.userEmail = null;
+  params.accountEmail = null;
+  params.name = null;
+  params.subject = null;
 }
 
 function changeTimeSort() {
-  params.timeSort = params.timeSort ? 0 : 1
-  search()
-}
-
-function typeSelectChange() {
-  search()
+  params.timeSort = params.timeSort ? 0 : 1;
+  if (sysEmailScroll.value && sysEmailScroll.value.refreshList) {
+    sysEmailScroll.value.refreshList();
+  }
 }
 
 function jumpContent(email) {
-  emailStore.contentData.email = email
-  emailStore.contentData.delType = 'physics'
-  emailStore.contentData.showStar = false
+  emailStore.contentData.email = email;
+  emailStore.contentData.delType = 'physics';
+  emailStore.contentData.showStar = false;
   emailStore.contentData.showReply = false
   // router.push({name: 'content'})
 }
