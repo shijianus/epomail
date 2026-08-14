@@ -11,7 +11,7 @@
               <span>{{$t('backToMail') || 'Back to Mail'}}</span>
             </div>
             
-            <div class="nav-section-title">{{$t('settings') || 'Settings'}}</div>
+            <div class="nav-section-title">{{$t('tabSetting') || 'Settings'}}</div>
             <div class="settings-nav-group">
             <router-link :to="{name: 'setting'}" class="settings-nav-item" :class="{active: route.name === 'setting'}">
               <Icon icon="fluent:settings-48-regular" width="20" height="20" /> {{$t('generalSetting') || 'General Settings'}}
