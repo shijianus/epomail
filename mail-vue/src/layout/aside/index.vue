@@ -58,13 +58,19 @@
           </div>
           <template v-for="(label, idx) in uiStore.defaultLabels" :key="'def-'+idx">
             <div class="nav-item" v-if="label.listVis !== false" :title="label.name">
-              <span class="nav-ic-wrap"><Icon :icon="label.icon || 'ic:baseline-label'" width="20" height="20" :style="{ color: label.color || 'inherit' }" /></span>
+              <span class="nav-ic-wrap">
+                <div v-if="(label.icon || '').startsWith('<svg')" v-html="label.icon" style="width: 20px; height: 20px; display: inline-flex; justify-content: center; align-items: center; fill: currentColor;" :style="{ color: label.color || 'inherit' }"></div>
+                <Icon v-else :icon="label.icon || 'ic:baseline-label'" width="20" height="20" :style="{ color: label.color || 'inherit' }" />
+              </span>
               <span class="nav-label" :style="{ color: label.color || 'inherit' }">{{ label.name }}</span>
             </div>
           </template>
           <template v-for="(label, idx) in uiStore.customLabels" :key="'cust-'+idx">
             <div class="nav-item" v-if="label.listVis !== false" :title="label.name || label">
-              <span class="nav-ic-wrap"><Icon :icon="label.icon || 'ic:baseline-label'" width="20" height="20" :style="{ color: label.color || 'inherit' }" /></span>
+              <span class="nav-ic-wrap">
+                <div v-if="(label.icon || '').startsWith('<svg')" v-html="label.icon" style="width: 20px; height: 20px; display: inline-flex; justify-content: center; align-items: center; fill: currentColor;" :style="{ color: label.color || 'inherit' }"></div>
+                <Icon v-else :icon="label.icon || 'ic:baseline-label'" width="20" height="20" :style="{ color: label.color || 'inherit' }" />
+              </span>
               <span class="nav-label" :style="{ color: label.color || 'inherit' }">{{ label.name || label }}</span>
             </div>
           </template>

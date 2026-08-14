@@ -18,7 +18,8 @@
           <div class="list-row tech-row" v-for="(label, index) in uiStore.defaultLabels" :key="'def-'+index">
             <div class="label-pill-cell">
               <div class="label-pill" :style="{ '--pill-color': label.color }">
-                <Icon :icon="label.icon" width="18" />
+                <div v-if="label.icon?.startsWith('<svg')" v-html="label.icon" style="width: 18px; height: 18px; display: inline-flex; justify-content: center; align-items: center; fill: currentColor;"></div>
+                <Icon v-else :icon="label.icon" width="18" />
                 <span>{{ label.name }}</span>
               </div>
             </div>
@@ -63,7 +64,8 @@
             </div>
             <div class="label-pill-cell" style="padding-left: 8px;">
               <div class="label-pill" :style="{ '--pill-color': label.color || 'var(--accent-primary)' }">
-                <Icon :icon="label.icon || 'ic:baseline-label'" width="18" />
+                <div v-if="(label.icon || '').startsWith('<svg')" v-html="label.icon" style="width: 18px; height: 18px; display: inline-flex; justify-content: center; align-items: center; fill: currentColor;"></div>
+                <Icon v-else :icon="label.icon || 'ic:baseline-label'" width="18" />
                 <span>{{ label.name || label }}</span>
               </div>
             </div>
@@ -105,7 +107,7 @@
     </div>
 
     <!-- Drawer for Add/Edit -->
-    <el-drawer v-model="isEditorOpen" :title="editIndex === -1 ? 'Create New Label' : 'Edit Label'" size="400px" destroy-on-close class="label-drawer">
+    <el-drawer v-model="isEditorOpen" :title="editIndex === -1 ? ($t('createLabel') || '新建标签') : ($t('editLabel') || '编辑标签')" size="400px" destroy-on-close class="label-drawer">
       <div class="editor-form">
         <div class="form-group">
           <label>{{ $t('name') || 'Name' }}</label>
@@ -118,8 +120,8 @@
           </el-select>
         </div>
         <div class="form-group">
-          <label>Icon</label>
-          <div class="swatches" style="margin-bottom: 8px;">
+          <label>{{ $t('icon') || '标签图标' }}</label>
+          <div class="swatches" style="margin-bottom: 8px; flex-wrap: wrap; gap: 8px;">
              <div class="swatch" 
                   v-for="ico in presetIcons" :key="ico"
                   :class="{ active: form.icon === ico }"
@@ -127,8 +129,17 @@
                   style="background-color: var(--bg-hover)">
                   <Icon :icon="ico" width="18" :color="form.icon === ico ? form.color : 'var(--text-secondary)'" />
              </div>
+             <div class="swatch"
+                  v-for="(svgStr, idx) in uiStore.customSvgs" :key="'csvg-'+idx"
+                  :class="{ active: form.icon === svgStr }"
+                  @click="form.icon = svgStr"
+                  style="background-color: var(--bg-hover)">
+                  <div v-html="svgStr" style="width: 18px; height: 18px; display: flex; justify-content: center; align-items: center;" :style="{ color: form.icon === svgStr ? form.color : 'var(--text-secondary)', fill: 'currentColor' }"></div>
+             </div>
+             <div class="swatch" v-if="(uiStore.customSvgs || []).length < 5" @click="isSvgModalOpen = true" style="background-color: var(--bg-hover); border: 1px dashed var(--border-mid); cursor: pointer;" :title="$t('addCustomIcon') || '添加自定义 SVG'">
+                <Icon icon="lucide:plus" width="18" color="var(--text-secondary)" />
+             </div>
           </div>
-          <el-input v-model="form.icon" size="small" placeholder="Or type custom Iconify icon name (e.g. lucide:star)" />
         </div>
         <div class="form-group">
           <label>{{ $t('color') || 'Color' }}</label>
@@ -400,6 +411,19 @@
           <el-button type="primary" @click="saveNewRule">{{ $t('add') }}</el-button>
         </div>
       </template>
+    <!-- Custom SVG Modal -->
+    <el-dialog v-model="isSvgModalOpen" :title="$t('addCustomIcon') || '添加自定义 SVG'" width="450px" destroy-on-close>
+      <div style="margin-bottom: 12px; font-size: 13px; color: var(--text-secondary); line-height: 1.5;">
+        请在下方粘贴您的自定义 SVG 代码。<br/>
+        建议使用 <code style="background: var(--bg-hover); padding: 2px 4px; border-radius: 4px;">viewBox="0 0 24 24"</code> 并将主要路径的颜色设置为 <code style="background: var(--bg-hover); padding: 2px 4px; border-radius: 4px;">fill="currentColor"</code> 以支持颜色切换。
+      </div>
+      <el-input v-model="customSvgInput" type="textarea" :rows="6" placeholder="<svg ...> ... </svg>" style="font-family: monospace;" />
+      <template #footer>
+        <div style="display: flex; justify-content: flex-end; gap: 12px;">
+          <el-button @click="isSvgModalOpen = false">{{ $t('cancel') || '取消' }}</el-button>
+          <el-button type="primary" @click="saveCustomSvg">{{ $t('save') || '保存' }}</el-button>
+        </div>
+      </template>
     </el-dialog>
   </div>
 </template>
@@ -497,6 +521,29 @@ const isEditorOpen = ref(false)
 const editIndex = ref(-1)
 const isEditingDefault = ref(false)
 const form = ref({ name: '', icon: 'ic:baseline-label', color: '#3b82f6', parent: '', sidebarVis: 'show', listVis: true, rules: [] })
+
+const isSvgModalOpen = ref(false)
+const customSvgInput = ref('')
+
+const saveCustomSvg = () => {
+  const val = customSvgInput.value.trim()
+  if (val.toLowerCase().startsWith('<svg')) {
+    if (!uiStore.customSvgs) {
+      uiStore.customSvgs = []
+    }
+    if (uiStore.customSvgs.length < 5) {
+      uiStore.customSvgs.push(val)
+      form.value.icon = val
+      isSvgModalOpen.value = false
+      customSvgInput.value = ''
+      ElMessage.success('自定义图标已添加')
+    } else {
+      ElMessage.warning('最多只能添加 5 个自定义图标')
+    }
+  } else {
+    ElMessage.error('请输入有效的 SVG 代码 (需以 <svg> 开头)')
+  }
+}
 
 const isRuleBuilderOpen = ref(false)
 const rbHasCondition = ref(true)

@@ -13,6 +13,7 @@ export const useUiStore = defineStore('ui', {
         dark: true,
         showAddLabel: false,
         customLabels: [],
+        customSvgs: [],
         defaultLabels: [
           { name: '社群', icon: 'ic:outline-people-alt', color: '#3b82f6', listVis: true, stats: { total: 1250, current: 340, unread: 12 }, rules: [
             { condition: { type: 'sender_address_includes', value: 'gmail.com, outlook.com, qq.com, 163.com, yahoo.com, hotmail.com, foxmail.com, sina.com' } }
@@ -65,6 +66,6 @@ export const useUiStore = defineStore('ui', {
         }
     },
     persist: {
-        pick: ['accountShow','dark', 'customLabels', 'defaultLabels'],
+        pick: ['accountShow','dark', 'customLabels', 'defaultLabels', 'customSvgs'],
     },
 })
