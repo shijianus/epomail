@@ -14,7 +14,7 @@
         <span class="search-icon" @click="handleSearch" style="cursor: pointer; z-index: 1"><Icon icon="lucide:search" width="20" height="20"/></span>
         <input type="text" :placeholder="isSettingsMode ? ($t('searchSettings') || 'Search settings') : ($t('search') || 'Search mail')" v-model="emailStore.searchKeyword" @keyup.enter="handleSearch" @focus="searchFocus = true" @blur="onSearchBlur" />
         
-        <div v-if="isSettingsMode && emailStore.searchKeyword && searchFocus" class="settings-search-dropdown">
+        <div v-if="isSettingsMode && isGlobalSearch && searchFocus" class="settings-search-dropdown">
            <div v-for="group in settingsSearchResults" :key="group.route" class="settings-search-group">
              <div class="settings-search-title">{{ group.title }}</div>
              <div class="settings-search-item" v-for="item in group.items" :key="item.text" @mousedown.prevent="goToSetting(group.route, item.id)">
@@ -92,6 +92,54 @@ import {useUiStore} from "@/store/ui.js";
 import {useUserStore} from "@/store/user.js";
 import {useEmailStore} from "@/store/email.js";
 import {userDraftStore} from "@/store/draft.js";
+
+function highlightTextOnPage(keyword) {
+  if (typeof CSS === 'undefined' || !CSS.highlights) return;
+  CSS.highlights.clear();
+  if (!keyword) return;
+
+  const mainEl = document.querySelector('.main-container');
+  if (!mainEl) return;
+
+  const treeWalker = document.createTreeWalker(mainEl, NodeFilter.SHOW_TEXT);
+  const ranges = [];
+  let node;
+  
+  // Escape regex properly and ignore case
+  const escapeRegExp = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const regex = new RegExp(escapeRegExp(keyword), 'gi');
+
+  while ((node = treeWalker.nextNode())) {
+    const text = node.nodeValue;
+    let match;
+    while ((match = regex.exec(text)) !== null) {
+      const range = new Range();
+      range.setStart(node, match.index);
+      range.setEnd(node, match.index + match[0].length);
+      ranges.push(range);
+    }
+  }
+
+  const highlight = new Highlight(...ranges);
+  CSS.highlights.set('search-highlight', highlight);
+
+  if (ranges.length > 0) {
+    const rect = ranges[0].getBoundingClientRect();
+    if (rect.top < 0 || rect.bottom > window.innerHeight) {
+      try {
+        ranges[0].startContainer.parentElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } catch (e) {
+        // ignore scroll error
+      }
+    }
+  }
+}
+
+function clearHighlightOnPage() {
+  if (typeof CSS !== 'undefined' && CSS.highlights) {
+    CSS.highlights.clear();
+  }
+}
 import {useRoute} from "vue-router";
 import {computed, ref} from "vue";
 import {useSettingStore} from "@/store/setting.js";
@@ -129,28 +177,59 @@ const settingsMap = computed(() => [
   },
   {
     route: 'sys-setting',
-    title: t('systemSetting') || 'System Settings',
+    title: t('sysSetting') || 'System Settings',
     items: [
+      { text: t('websiteSetting') || 'Website Settings', id: 'websiteSetting' },
+      { text: t('loginDomain') || 'Login Domain', id: 'loginDomain' },
+      { text: t('regKey') || 'Registration Key', id: 'regKey' },
+      { text: t('addAccount') || 'Add Account', id: 'addAccount' },
+      { text: t('multipleEmail') || 'Multiple Emails', id: 'multipleEmail' },
+      { text: t('emailPrefix') || 'Email Prefix', id: 'emailPrefix' },
+      { text: t('customization') || 'Customization', id: 'customization' },
+      { text: t('emailSetting') || 'Email Settings', id: 'emailSetting' },
       { text: t('autoRefresh') || 'Auto Refresh', id: 'autoRefresh' },
-      { text: t('sendSetting') || 'Send Settings', id: 'sendSetting' }
+      { text: t('storageSetting') || 'Storage Settings', id: 'storageSetting' }
     ]
   },
   {
     route: 'category-setting',
     title: t('categorySetting') || 'Category Settings',
     items: [
-      { text: t('category') || 'Categories', id: 'category' }
+      { text: t('categorySetting') || 'Categories', id: 'category' }
     ]
   },
   {
     route: 'label-setting',
     title: t('labelSetting') || 'Label Settings',
     items: [
-      { text: t('labels') || 'Labels', id: 'labels' },
-      { text: t('createLabel') || 'Create Label', id: 'createLabel' }
+      { text: t('labelSetting') || 'Label Management', id: 'labels' },
+      { text: t('newLabel') || 'New Label', id: 'newLabel' },
+      { text: t('customLabels') || 'Custom Labels', id: 'customLabels' },
+      { text: t('classificationRules') || 'Rules', id: 'rules' }
     ]
   }
 ])
+
+const isGlobalSearch = computed(() => {
+  const keyword = emailStore.searchKeyword.trim();
+  return /^(all:|global:)/i.test(keyword) && keyword.length > 4;
+})
+
+import { watch } from 'vue';
+
+watch(() => emailStore.searchKeyword, (newVal) => {
+  if (isSettingsMode.value) {
+    const keyword = newVal.trim();
+    const isGlobal = /^(all:|global:)/i.test(keyword);
+    if (!isGlobal && keyword) {
+      highlightTextOnPage(keyword);
+    } else {
+      clearHighlightOnPage();
+    }
+  } else {
+    clearHighlightOnPage();
+  }
+});
 
 const settingsSearchResults = computed(() => {
   const keyword = emailStore.searchKeyword.trim();
@@ -674,5 +753,9 @@ function formatName(email) {
   text-align: center;
   color: var(--text-muted);
   font-size: 14px;
+}
+::highlight(search-highlight) {
+  background-color: var(--el-color-warning-light-5, #fdf6ec);
+  color: var(--el-text-color-primary, #303133);
 }
 </style>
