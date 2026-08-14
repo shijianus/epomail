@@ -75,11 +75,41 @@ const emailService = {
 		let isSpam = false;
 		let isTrash = false;
 
+		let pFrom = null;
+		let pTo = null;
+		let pSubject = null;
+		let pSubjectOrBody = null;
+		let pBody = null;
+		let pSizeAtLeast = null;
+		let pSizeAtMost = null;
+		let pBefore = null;
+		let pAfter = null;
+
 		if (keyword) {
 			isGlobal = /global:/i.test(keyword);
 			isSent = /is:sent/i.test(keyword) || /from:me/i.test(keyword);
 			isSpam = /is:spam/i.test(keyword);
 			isTrash = /is:trash/i.test(keyword);
+
+			const extractParam = (prefix) => {
+				const regex = new RegExp(prefix + ':("([^"]+)"|([^\\s]+))', 'i');
+				const match = keyword.match(regex);
+				if (match) {
+					keyword = keyword.replace(match[0], '');
+					return match[2] || match[3];
+				}
+				return null;
+			};
+
+			pFrom = extractParam('from');
+			pTo = extractParam('to');
+			pSubject = extractParam('subject');
+			pSubjectOrBody = extractParam('subject_or_body');
+			pBody = extractParam('body');
+			pSizeAtLeast = extractParam('larger');
+			pSizeAtMost = extractParam('smaller');
+			pBefore = extractParam('before');
+			pAfter = extractParam('after');
 
 			keyword = keyword.replace(/global:/ig, '')
 				.replace(/is:sent/ig, '')
@@ -112,6 +142,40 @@ const emailService = {
 			} else {
 				commonConditions.push((!folder && type !== undefined) ? eq(email.type, type) : (folder === 'all' ? eq(email.type, 0) : eq(1,1)));
 			}
+		}
+
+		if (pFrom) {
+			commonConditions.push(
+				or(like(email.sendEmail, '%'+ pFrom + '%'), like(email.name, '%'+ pFrom + '%'))
+			);
+		}
+		if (pTo) {
+			commonConditions.push(
+				or(like(email.toEmail, '%'+ pTo + '%'), like(email.toName, '%'+ pTo + '%'))
+			);
+		}
+		if (pSubject) {
+			commonConditions.push(like(email.subject, '%'+ pSubject + '%'));
+		}
+		if (pSubjectOrBody) {
+			commonConditions.push(
+				or(like(email.subject, '%'+ pSubjectOrBody + '%'), like(email.text, '%'+ pSubjectOrBody + '%'))
+			);
+		}
+		if (pBody) {
+			commonConditions.push(like(email.text, '%'+ pBody + '%'));
+		}
+		if (pSizeAtLeast) {
+			commonConditions.push(sql`ifnull(length(text), 0) + ifnull(length(content), 0) >= ${parseInt(pSizeAtLeast)}`);
+		}
+		if (pSizeAtMost) {
+			commonConditions.push(sql`ifnull(length(text), 0) + ifnull(length(content), 0) <= ${parseInt(pSizeAtMost)}`);
+		}
+		if (pBefore) {
+			commonConditions.push(lt(email.createTime, pBefore));
+		}
+		if (pAfter) {
+			commonConditions.push(gt(email.createTime, pAfter));
 		}
 
 		if (keyword) {
