@@ -1251,6 +1251,68 @@ const emailService = {
 	async read(c, params, userId) {
 		const { emailIds } = params;
 		await orm(c).update(email).set({ unread: emailConst.unread.READ }).where(and(eq(email.userId, userId), inArray(email.emailId, emailIds)));
+	},
+
+	async searchSuggestions(c, params, userId) {
+		const { query, type, accountId } = params;
+		if (!query || query.length < 1) return [];
+
+		const searchPattern = `%${query}%`;
+		const conditionList = [eq(email.userId, userId)];
+		if (accountId && accountId > 0) {
+			conditionList.push(eq(email.accountId, Number(accountId)));
+		}
+
+		let fieldToSelect = null;
+		let results = [];
+		const isFrom = ['from', 'sender_address_includes'].includes(type);
+		const isTo = ['to', 'recipient_address_includes', 'email_received_for_others'].includes(type);
+		const isSubject = ['subject_include', 'subject_or_body_include'].includes(type);
+
+		if (isFrom) {
+			conditionList.push(like(email.sendEmail, searchPattern));
+			const list = await orm(c).select({ value: email.sendEmail }).from(email)
+				.where(and(...conditionList))
+				.groupBy(email.sendEmail)
+				.limit(15);
+			
+			const extracted = list.map(item => {
+				const match = (item.value || '').match(/<([^>]+)>/);
+				let emailStr = match ? match[1].trim() : (item.value || '').trim();
+				if (type === 'sender_address_includes') {
+					const parts = emailStr.split('@');
+					if (parts.length > 1) emailStr = parts[1];
+				}
+				return emailStr;
+			});
+			results = [...new Set(extracted)].filter(v => v.toLowerCase().includes(query.toLowerCase()));
+		} else if (isTo) {
+			conditionList.push(like(email.toEmail, searchPattern));
+			const list = await orm(c).select({ value: email.toEmail }).from(email)
+				.where(and(...conditionList))
+				.groupBy(email.toEmail)
+				.limit(15);
+				
+			const extracted = list.map(item => {
+				const match = (item.value || '').match(/<([^>]+)>/);
+				let emailStr = match ? match[1].trim() : (item.value || '').trim();
+				if (type === 'recipient_address_includes') {
+					const parts = emailStr.split('@');
+					if (parts.length > 1) emailStr = parts[1];
+				}
+				return emailStr;
+			});
+			results = [...new Set(extracted)].filter(v => v.toLowerCase().includes(query.toLowerCase()));
+		} else if (isSubject) {
+			conditionList.push(like(email.subject, searchPattern));
+			const list = await orm(c).select({ value: email.subject }).from(email)
+				.where(and(...conditionList))
+				.groupBy(email.subject)
+				.limit(15);
+			results = list.map(item => item.value);
+		}
+
+		return results;
 	}
 };
 

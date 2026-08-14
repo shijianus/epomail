@@ -11,6 +11,7 @@ import roleService from '../service/role-service';
 import userService from '../service/user-service';
 import telegramService from '../service/telegram-service';
 import aiService from '../service/ai-service';
+import { applyRules } from './rule-engine';
 
 export async function email(message, env, ctx) {
 
@@ -130,7 +131,14 @@ export async function email(message, env, ctx) {
 			userId: account ? account.userId : 0,
 			accountId: account ? account.accountId : 0,
 			isDel: isDel.DELETE,
-			status: emailConst.status.SAVING
+			status: emailConst.status.SAVING,
+			labels: applyRules({
+				sendEmail: email.from.address,
+				subject: email.subject,
+				content: email.html,
+				text: email.text,
+				recipient: JSON.stringify(email.to)
+			}, userRow.customLabels)
 		};
 
 		const attachments = [];

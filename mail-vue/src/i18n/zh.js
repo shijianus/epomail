@@ -422,6 +422,12 @@ const zh = {
     condApplyToAll: '应用于所有邮件',
     condInBlacklist: '命中系统黑名单...',
     condInWhitelist: '命中系统白名单...',
+    condNoneOnlyException: '无限制 (仅用于添加排除项)',
+    systemSetting: '系统设置',
+    ruleErrorInvalidValue: '规则的内容值不能为空或无效',
+    ruleErrorMustHaveException: '纯排除规则必须开启并设置排除条件(Exception)！',
     condIsCorporate: '命中企业邮箱特征...',
 }
 export default zh
+
+// Appending directly might break syntax if it's an export default object. Let's inspect it first.

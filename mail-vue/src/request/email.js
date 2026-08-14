@@ -36,3 +36,6 @@ export function emailSend(form,progress) {
         noMsg: true
     })
 }
+export function emailSearchSuggestions(params) {
+    return http.get('/email/searchSuggestions', { params, noMsg: true })
+}

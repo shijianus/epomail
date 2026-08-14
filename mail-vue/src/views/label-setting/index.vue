@@ -215,7 +215,13 @@
         <div class="rb-step">
           <h4 class="rb-step-title"><span class="step-num">1</span> {{ $t('ruleInclude') }} (Condition)</h4>
           <div class="rb-form-row">
-            <el-select v-model="rbCondition.type" size="large" style="width: 250px;">
+            <div v-if="['in_whitelist', 'is_corporate', 'in_blacklist'].includes(rbCondition.type)" class="system-rule-tag" style="width: 250px; display: flex; align-items: center;">
+              <el-tag type="info" size="large" style="width: 100%;">
+                <Icon icon="ic:outline-settings" style="margin-right: 4px;" />
+                {{ $t('systemSetting') }}
+              </el-tag>
+            </div>
+            <el-select v-else v-model="rbCondition.type" size="large" style="width: 250px;">
               <el-option-group :label="$t('ruleOptPeople')">
                 <el-option :label="$t('condFrom')" value="from" />
                 <el-option :label="$t('condTo')" value="to" />
@@ -241,8 +247,7 @@
               </el-option-group>
               <el-option-group :label="$t('ruleOptAllMessages')">
                 <el-option :label="$t('condApplyToAll')" value="all_messages" />
-                <el-option :label="$t('condInWhitelist')" value="in_whitelist" />
-                <el-option :label="$t('condIsCorporate')" value="is_corporate" />
+                <el-option :label="$t('condNoneOnlyException')" value="none" />
               </el-option-group>
             </el-select>
             
@@ -262,7 +267,7 @@
               :min="0"
             />
             <el-autocomplete 
-              v-else-if="!['all_messages', 'in_whitelist', 'is_corporate', 'in_blacklist'].includes(rbCondition.type)" 
+              v-else-if="!['all_messages', 'none', 'in_whitelist', 'is_corporate', 'in_blacklist'].includes(rbCondition.type)" 
               v-model="rbCondition.value" 
               :fetch-suggestions="queryConditionSuggestions"
               size="large" 
@@ -281,8 +286,14 @@
             <el-switch v-model="rbHasException" size="small" />
           </div>
           
-          <div v-if="rbHasException" class="rb-form-row" style="margin-top: 12px;">
-            <el-select v-model="rbException.type" size="large" style="width: 250px;">
+          <div v-if="rbHasException" class="rb-form-row">
+            <div v-if="['in_whitelist', 'is_corporate', 'in_blacklist'].includes(rbException.type)" class="system-rule-tag" style="width: 250px; display: flex; align-items: center;">
+              <el-tag type="info" size="large" style="width: 100%;">
+                <Icon icon="ic:outline-settings" style="margin-right: 4px;" />
+                {{ $t('systemSetting') }}
+              </el-tag>
+            </div>
+            <el-select v-else v-model="rbException.type" size="large" style="width: 250px;">
               <el-option-group :label="$t('ruleOptPeople')">
                 <el-option :label="$t('condFrom')" value="from" />
                 <el-option :label="$t('condTo')" value="to" />
@@ -305,9 +316,6 @@
               <el-option-group :label="$t('ruleOptReceived')">
                 <el-option :label="$t('condBefore')" value="before" />
                 <el-option :label="$t('condAfter')" value="after" />
-              </el-option-group>
-              <el-option-group :label="$t('systemControlled')">
-                <el-option :label="$t('condInBlacklist')" value="in_blacklist" />
               </el-option-group>
             </el-select>
 
@@ -351,7 +359,7 @@
 import { ref } from 'vue'
 import { useUiStore } from '@/store/ui.js'
 import { useAccountStore } from '@/store/account.js'
-import { emailList } from '@/request/email.js'
+import { emailSearchSuggestions } from '@/request/email.js'
 import { Icon } from '@iconify/vue'
 import { ElMessage } from 'element-plus'
 import { useI18n } from 'vue-i18n'
@@ -420,66 +428,61 @@ const isRuleBuilderOpen = ref(false)
 const rbCondition = ref({ type: 'from', value: '' })
 const rbHasException = ref(false)
 const rbException = ref({ type: 'in_blacklist', value: '' })
-const recentEmailsForSuggestions = ref([])
 
 const openRuleBuilder = async () => {
   rbCondition.value = { type: 'from', value: '' }
   rbHasException.value = false
   rbException.value = { type: 'in_blacklist', value: '' }
   isRuleBuilderOpen.value = true
+}
 
-  if (recentEmailsForSuggestions.value.length === 0) {
-    try {
-      const res = await emailList(accountStore.currentAccountId || 0, 1, 0, 0, 50, undefined, 'all')
-      if (res && res.list) {
-        recentEmailsForSuggestions.value = res.list
-      }
-    } catch (e) {
-      console.warn('Failed to fetch recent emails for suggestions', e)
+const getSuggestions = async (queryString, type) => {
+  const parts = (queryString || '').split(',')
+  const lastPart = parts.pop() || ''
+  const query = lastPart.trim().toLowerCase()
+  const prefix = parts.length > 0 ? parts.join(',') + (parts[0] ? ', ' : '') : ''
+
+  if (!query) {
+    return queryString ? [{ value: queryString }] : []
+  }
+
+  try {
+    const res = await emailSearchSuggestions({
+      query: query,
+      type: type,
+      accountId: accountStore.currentAccountId || 0
+    })
+    
+    let resultArr = []
+    if (res && Array.isArray(res)) {
+      resultArr = res.map(val => ({ value: prefix + val }))
+    } else if (res && res.data && Array.isArray(res.data)) {
+      resultArr = res.data.map(val => ({ value: prefix + val }))
     }
+    
+    if (resultArr.length === 0) {
+      resultArr = [{ value: queryString }]
+    }
+    return resultArr
+  } catch (error) {
+    console.error(error)
+    return [{ value: queryString }]
   }
 }
 
-const getSuggestions = (queryString, type) => {
-  const query = (queryString || '').toLowerCase()
-  const results = new Set()
-  
-  recentEmailsForSuggestions.value.forEach(email => {
-    if (['from', 'sender_address_includes'].includes(type)) {
-      if (email.fromAddress && email.fromAddress.toLowerCase().includes(query)) {
-        results.add(email.fromAddress)
-        const domain = email.fromAddress.split('@')[1]
-        if (domain && domain.includes(query)) results.add(domain)
-      }
-    } else if (['to', 'recipient_address_includes', 'email_received_for_others'].includes(type)) {
-      if (email.toAddress && email.toAddress.toLowerCase().includes(query)) {
-        results.add(email.toAddress)
-      }
-    } else if (['subject_include', 'subject_or_body_include'].includes(type)) {
-      if (email.subject && email.subject.toLowerCase().includes(query)) {
-        results.add(email.subject)
-      }
-    }
-  })
-  
-  let resultArr = Array.from(results).map(val => ({ value: val }))
-  if (resultArr.length === 0 && query) {
-    resultArr = [{ value: queryString }]
-  }
-  return resultArr
+const queryConditionSuggestions = async (queryString, cb) => {
+  const results = await getSuggestions(queryString, rbCondition.value.type)
+  cb(results)
 }
 
-const queryConditionSuggestions = (queryString, cb) => {
-  cb(getSuggestions(queryString, rbCondition.value.type))
-}
-
-const queryExceptionSuggestions = (queryString, cb) => {
-  cb(getSuggestions(queryString, rbException.value.type))
+const queryExceptionSuggestions = async (queryString, cb) => {
+  const results = await getSuggestions(queryString, rbException.value.type)
+  cb(results)
 }
 
 const saveNewRule = () => {
   // Validation
-  const requiresValue = (type) => !['all_messages', 'in_whitelist', 'is_corporate', 'in_blacklist'].includes(type)
+  const requiresValue = (type) => !['all_messages', 'none', 'in_whitelist', 'is_corporate', 'in_blacklist'].includes(type)
   const isValidValue = (val) => {
     if (val === 0) return true
     if (!val) return false
@@ -488,7 +491,12 @@ const saveNewRule = () => {
   }
 
   if (requiresValue(rbCondition.value.type) && !isValidValue(rbCondition.value.value)) {
-    ElMessage.warning(t('emptyContentMsg') || 'Please enter condition value')
+    ElMessage.error(t('ruleErrorInvalidValue'))
+    return
+  }
+
+  if (rbCondition.value.type === 'none' && !rbHasException.value) {
+    ElMessage.error(t('ruleErrorMustHaveException'))
     return
   }
   

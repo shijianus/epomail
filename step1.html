@@ -1,0 +1,335 @@
+<!DOCTYPE html><html lang="en" class="dark"><head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#000000" id="theme-color-meta">
+  <meta name="description" content="EpoCanvas Mail 是一个 Serverless 响应式邮箱服务，支持邮件发送，可部署到 Cloudflare 平台，降低服务器成本。EpoCanvas Mail is a serverless responsive email service that supports email sending and can be deployed on Cloudflare to reduce server costs.">
+  <title>EpoCanvas Mail</title>
+  <link rel="icon" href="/logo.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet">
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async="" defer=""></script>
+  <script>
+    const uiStoreStr = localStorage.getItem('ui');
+    const root = document.documentElement;
+    const metaTag = document.getElementById('theme-color-meta');
+    const isMobile = !window.matchMedia("(pointer: fine) and (hover: hover)").matches;
+    let isDark = true;
+    if (uiStoreStr) {
+      const uiStore = JSON.parse(uiStoreStr);
+      isDark = uiStore.dark !== false; // Only light if explicitly false
+    }
+    root.setAttribute('class', isDark ? 'dark' : '');
+    metaTag.setAttribute('content', isDark ? (isMobile ? '#141414' : '#000000') : (isMobile ? '#FFFFFF' : '#F1F1F1'));
+  </script>
+  <script type="module" crossorigin="" src="/assets/index-BnOY8NdO.js"></script>
+  <link rel="stylesheet" crossorigin="" href="/assets/index-BAfEud5c.css">
+<link rel="manifest" href="/manifest.webmanifest"><script id="vite-plugin-pwa:register-sw" src="/registerSW.js" defer=""></script><style>
+  html {
+    background: #FFFFFF;
+  }
+  .dark {
+    background: #141414;
+  }
+  #loading-first {
+    position: fixed;
+    left: 0;
+    top: 0;
+    height: 100%;
+    width: 100%;
+    display: grid;
+    place-items: center;
+    z-index: 500;
+    background: #0B0F19;
+    overflow: hidden;
+    transition: opacity 0.4s ease, visibility 0.4s ease;
+  }
+  .loading-hide {
+    pointer-events: none;
+    opacity: 0;
+    visibility: hidden;
+  }
+
+  /* ── EpoMail loading mark ── */
+  .epo-rise {
+    width: min(46vmin, 300px);
+    animation: epo-rise 1s cubic-bezier(0.22, 1, 0.36, 1) both;
+    will-change: transform, opacity;
+  }
+
+  @keyframes epo-rise {
+    from {
+      opacity: 0;
+      transform: translateY(14px) scale(0.94);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  .epo-draw {
+    stroke-dasharray: 100;
+    animation: epo-draw 1.1s cubic-bezier(0.65, 0, 0.35, 1) both;
+  }
+
+  .epo-draw-flap {
+    animation-delay: 0.12s;
+  }
+  .epo-draw-crease-l {
+    animation-delay: 0.5s;
+    animation-duration: 0.7s;
+  }
+  .epo-draw-crease-r {
+    animation-delay: 0.58s;
+    animation-duration: 0.7s;
+  }
+  .epo-draw-ring {
+    animation-delay: 0.62s;
+    animation-duration: 0.8s;
+  }
+
+  @keyframes epo-draw {
+    from {
+      stroke-dashoffset: 100;
+    }
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+
+  .epo-seal {
+    transform-box: view-box;
+    transform-origin: 200px 270px;
+    animation: epo-breathe 3.2s ease-in-out 1.1s infinite;
+  }
+
+  @keyframes epo-breathe {
+    0%,
+    100% {
+      transform: scale(1);
+    }
+    50% {
+      transform: scale(1.045);
+    }
+  }
+
+  .epo-hand {
+    transform-box: view-box;
+    transform-origin: 200px 270px;
+    animation: epo-sweep linear infinite;
+  }
+
+  .epo-hand-minute {
+    animation-duration: 6s;
+  }
+  .epo-hand-hour {
+    animation-duration: 72s;
+  }
+
+  @keyframes epo-sweep {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  .epo-stop-1 {
+    animation: epo-hue-1 6s ease-in-out infinite;
+  }
+  .epo-stop-2 {
+    animation: epo-hue-2 6s ease-in-out infinite;
+  }
+  .epo-stop-3 {
+    animation: epo-hue-3 6s ease-in-out infinite;
+  }
+
+  @keyframes epo-hue-1 {
+    0%,
+    100% {
+      stop-color: #00f5d4;
+    }
+    50% {
+      stop-color: #3ef0ff;
+    }
+  }
+  @keyframes epo-hue-2 {
+    0%,
+    100% {
+      stop-color: #0072ff;
+    }
+    50% {
+      stop-color: #4b6bff;
+    }
+  }
+  @keyframes epo-hue-3 {
+    0%,
+    100% {
+      stop-color: #5b24ff;
+    }
+    50% {
+      stop-color: #a855f7;
+    }
+  }
+
+  .epo-halo {
+    opacity: 0.28;
+    transform-box: view-box;
+    transform-origin: 200px 245px;
+    animation: epo-halo 3.2s ease-in-out 1.1s infinite;
+  }
+
+  @keyframes epo-halo {
+    0%,
+    100% {
+      opacity: 0.2;
+      transform: scale(0.98);
+    }
+    50% {
+      opacity: 0.42;
+      transform: scale(1.04);
+    }
+  }
+
+  .epo-spec {
+    animation: epo-spec 4.4s ease-in-out 1.1s infinite;
+  }
+
+  @keyframes epo-spec {
+    0%,
+    100% {
+      opacity: 0.55;
+    }
+    50% {
+      opacity: 1;
+    }
+  }
+
+  .epo-p {
+    transform-box: view-box;
+    animation: epo-orbit 5.6s ease-in-out infinite;
+  }
+
+  .epo-p1 {
+    animation-delay: 0s;
+  }
+  .epo-p2 {
+    animation-delay: 0.7s;
+    animation-duration: 6.4s;
+  }
+  .epo-p3 {
+    animation-delay: 1.4s;
+    animation-duration: 5s;
+  }
+  .epo-p4 {
+    animation-delay: 2.1s;
+    animation-duration: 6.8s;
+  }
+  .epo-p5 {
+    animation-delay: 2.8s;
+    animation-duration: 4.6s;
+  }
+
+  @keyframes epo-orbit {
+    0%,
+    100% {
+      opacity: 0.25;
+      transform: translate(0, 0);
+    }
+    50% {
+      opacity: 0.95;
+      transform: translate(0, -14px);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .epo-rise,
+    .epo-draw,
+    .epo-seal,
+    .epo-hand,
+    .epo-halo,
+    .epo-spec,
+    .epo-p,
+    .epo-stop-1,
+    .epo-stop-2,
+    .epo-stop-3 {
+      animation: none;
+    }
+    .epo-draw {
+      stroke-dasharray: none;
+    }
+  }
+</style><link rel="modulepreload" as="script" crossorigin="" href="/assets/index-DKm0_KGj.js"><link rel="modulepreload" as="script" crossorigin="" href="/assets/iconify-CnedwKOS.js"></head>
+
+<body>
+<script>
+  window.__EPO_LOADING_START__ = Date.now();
+</script>
+<div id="loading-first">
+  <div class="epo-rise">
+    <svg viewBox="0 0 400 400" width="100%" height="100%" role="img" aria-label="EpoMail">
+      <defs>
+        <linearGradient id="epoMarkGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop class="epo-stop-1" offset="0%" stop-color="#00F5D4"></stop>
+          <stop class="epo-stop-2" offset="45%" stop-color="#0072FF"></stop>
+          <stop class="epo-stop-3" offset="100%" stop-color="#5B24FF"></stop>
+        </linearGradient>
+
+        <radialGradient id="epoMarkSheen" cx="34%" cy="26%" r="82%">
+          <stop offset="0%" stop-color="rgba(255,255,255,0.42)"></stop>
+          <stop offset="42%" stop-color="rgba(255,255,255,0.08)"></stop>
+          <stop offset="100%" stop-color="rgba(8,12,32,0.42)"></stop>
+        </radialGradient>
+
+        <filter id="epoMarkGlow" x="-40%" y="-40%" width="180%" height="180%">
+          <feGaussianBlur stdDeviation="16"></feGaussianBlur>
+        </filter>
+
+        <filter id="epoMarkLift" x="-25%" y="-25%" width="150%" height="160%">
+          <feDropShadow dx="0" dy="16" stdDeviation="20" flood-color="#0072FF" flood-opacity="0.35"></feDropShadow>
+        </filter>
+
+        <mask id="epoMarkCut">
+          <rect width="400" height="400" fill="#fff"></rect>
+          <path class="epo-draw epo-draw-flap" d="M 15 210 L 200 270 L 385 210" pathLength="100" fill="none" stroke="#000" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"></path>
+          <path class="epo-draw epo-draw-crease-l" d="M 60 322 L 141 281" pathLength="100" fill="none" stroke="#000" stroke-width="11" stroke-linecap="round"></path>
+          <path class="epo-draw epo-draw-crease-r" d="M 340 322 L 259 281" pathLength="100" fill="none" stroke="#000" stroke-width="11" stroke-linecap="round"></path>
+          <g class="epo-seal">
+            <circle cx="200" cy="270" r="27" fill="#fff"></circle>
+            <circle class="epo-draw epo-draw-ring" cx="200" cy="270" r="27" pathLength="100" fill="none" stroke="#000" stroke-width="10"></circle>
+            <g class="epo-hand epo-hand-hour">
+              <path d="M 200 270 L 186 256" fill="none" stroke="#000" stroke-width="7.5" stroke-linecap="round"></path>
+            </g>
+            <g class="epo-hand epo-hand-minute">
+              <path d="M 200 270 L 216 255" fill="none" stroke="#000" stroke-width="6.5" stroke-linecap="round"></path>
+            </g>
+            <circle cx="200" cy="270" r="4.5" fill="#000"></circle>
+          </g>
+        </mask>
+      </defs>
+
+      <path class="epo-halo" d="M 40 220 A 60 60 0 0 1 120 155 A 85 85 0 0 1 280 155 A 60 60 0 0 1 360 220 L 360 260 C 360 325 290 335 200 335 C 110 335 40 325 40 260 Z" fill="url(#epoMarkGrad)" filter="url(#epoMarkGlow)"></path>
+
+      <g filter="url(#epoMarkLift)">
+        <path d="M 40 220 A 60 60 0 0 1 120 155 A 85 85 0 0 1 280 155 A 60 60 0 0 1 360 220 L 360 260 C 360 325 290 335 200 335 C 110 335 40 325 40 260 Z" fill="url(#epoMarkGrad)" mask="url(#epoMarkCut)"></path>
+        <path d="M 40 220 A 60 60 0 0 1 120 155 A 85 85 0 0 1 280 155 A 60 60 0 0 1 360 220 L 360 260 C 360 325 290 335 200 335 C 110 335 40 325 40 260 Z" fill="url(#epoMarkSheen)" mask="url(#epoMarkCut)"></path>
+      </g>
+
+      <g class="epo-spec" fill="none" stroke-linecap="round">
+        <path d="M 143 151 A 85 85 0 0 1 254 149" stroke="rgba(255,255,255,0.55)" stroke-width="6"></path>
+        <path d="M 62 199 A 60 60 0 0 1 99 168" stroke="rgba(255,255,255,0.32)" stroke-width="5"></path>
+      </g>
+
+      <g class="epo-particles">
+        <circle class="epo-p epo-p1" cx="46" cy="118" r="4.5" fill="#00F5D4"></circle>
+        <circle class="epo-p epo-p2" cx="352" cy="104" r="3.6" fill="#A855F7"></circle>
+        <circle class="epo-p epo-p3" cx="374" cy="300" r="4" fill="#0072FF"></circle>
+        <circle class="epo-p epo-p4" cx="28" cy="286" r="3.2" fill="#00F5D4"></circle>
+        <circle class="epo-p epo-p5" cx="200" cy="72" r="3" fill="#FF369B"></circle>
+      </g>
+    </svg>
+  </div>
+</div>
+<div id="app" data-v-app=""><!----></div>
+
+
+</body></html>

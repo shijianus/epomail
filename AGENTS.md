@@ -184,3 +184,7 @@
         - `axios/index.js`：添加 `timeout: 15000`（15 秒超时）
     *   **额外发现**：`epomail.bond` 和 `epomail.cyou` 两个自定义域名 DNS 已指向 NicNames.com 停靠页（`198.18.1.150/151`），不再解析到 Cloudflare。需用户在域名注册商处修复 DNS 配置。`workers.dev` 子域正常工作。
 
+
+### 规则引擎后端自动挂签实现 (2026-08-13)
+*   **功能实现 (Feature)**: 完成了真正的后端自动分类触发器 (`mail-worker/src/email/rule-engine.js`)。当新邮件通过 `email.js` 到达时，会拉取用户的 `customLabels` 和 `defaultLabels`，经过 10+ 种逻辑运算后，将匹配的标签名称自动赋予新建邮件的 `labels` 字段。
+*   **数据库迁移 (Database)**: 使用 `wrangler d1 execute` 在 Cloudflare D1 线上数据库的 `email` 表中成功追加了 `labels` (TEXT) 字段。

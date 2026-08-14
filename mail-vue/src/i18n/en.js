@@ -422,6 +422,10 @@ const en = {
     condApplyToAll: 'Apply to all messages',
     condInBlacklist: 'Is in Blacklist...',
     condInWhitelist: 'Is in Whitelist...',
+    condNoneOnlyException: 'No Restriction (For Exclusions Only)',
+    systemSetting: 'System Setting',
+    ruleErrorInvalidValue: 'Rule value cannot be empty or invalid',
+    ruleErrorMustHaveException: 'Exclusion-only rules must have an exception defined!',
     condIsCorporate: 'Is Corporate Email...',
 }
 

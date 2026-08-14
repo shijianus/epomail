@@ -18,11 +18,19 @@ watch(() => settingStore.lang, () => locale.value = settingStore.lang)
 
 const uiStore = useUiStore()
 let isFirstLoad = true
-watch(() => uiStore.customLabels, (newVal) => {
-  if (isFirstLoad) {
-    isFirstLoad = false;
-    return;
-  }
-  userSetCustomLabels(JSON.stringify(newVal)).catch(e => console.error('Failed to sync labels', e))
-}, { deep: true })
+watch(
+  () => [uiStore.customLabels, uiStore.defaultLabels],
+  ([newCustom, newDefault]) => {
+    if (isFirstLoad) {
+      isFirstLoad = false;
+      return;
+    }
+    const payload = {
+      customLabels: newCustom,
+      defaultLabels: newDefault
+    };
+    userSetCustomLabels(JSON.stringify(payload)).catch(e => console.error('Failed to sync labels', e))
+  },
+  { deep: true }
+)
 </script>

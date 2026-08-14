@@ -48,3 +48,8 @@ app.put('/email/restore', async (c) => {
 	await emailService.restore(c, await c.req.json(), userContext.getUserId(c));
 	return c.json(result.ok());
 });
+
+app.get('/email/searchSuggestions', async (c) => {
+	const data = await emailService.searchSuggestions(c, c.req.query(), userContext.getUserId(c));
+	return c.json(result.ok(data));
+});
