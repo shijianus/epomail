@@ -12,9 +12,18 @@
     <div class="topbar-search">
       <div class="search-box">
         <span class="search-icon" @click="handleSearch" style="cursor: pointer; z-index: 1"><Icon icon="lucide:search" width="20" height="20"/></span>
-        <input type="text" :placeholder="(isSettingsMode && route.name !== 'all-email') ? ($t('searchSettings') || 'Search settings') : ($t('search') || 'Search mail')" v-model="emailStore.searchKeyword" @keyup.enter="handleSearch" @focus="searchFocus = true" @blur="onSearchBlur" />
+        <input type="text" :placeholder="(isSettingsMode && route.name !== 'all-email') ? ($t('searchSettings') || 'Search settings') : ($t('search') || 'Search mail')" v-model="emailStore.searchKeyword" @keyup.enter="handleSearch" @keydown.tab.prevent="handleTabComplete" @focus="searchFocus = true" @blur="onSearchBlur" />
         
-        <div v-if="isSettingsMode && route.name !== 'all-email' && emailStore.searchKeyword.trim() && searchFocus" class="settings-search-dropdown">
+        <!-- Dropdown for all-email syntax suggestions -->
+        <div v-if="route.name === 'all-email' && searchFocus && allEmailSuggestions.length > 0" class="settings-search-dropdown" style="padding: 4px 0;">
+           <div class="settings-search-item" v-for="(item, index) in allEmailSuggestions" :key="item.val" @mousedown.prevent="applySuggestion(item.val)" style="display:flex; justify-content:space-between;">
+             <span><strong style="color:var(--el-color-primary)">$</strong>{{ item.val }}</span>
+             <span style="color:var(--el-text-color-secondary); font-size:12px;">{{ item.desc }}</span>
+           </div>
+        </div>
+
+        <!-- Dropdown for Settings Search -->
+        <div v-else-if="isSettingsMode && route.name !== 'all-email' && emailStore.searchKeyword.trim() && searchFocus" class="settings-search-dropdown">
            <div v-for="group in settingsSearchResults" :key="group.route" class="settings-search-group">
              <div class="settings-search-title">{{ group.title }}</div>
              <div class="settings-search-item" v-for="item in group.items" :key="item.text" @mousedown.prevent="goToSetting(group.route, item.id)">
@@ -185,6 +194,47 @@ function onDropdownVisibleChange(visible) {
     clearCloseTimer();
   } else {
     clearCloseTimer();
+  }
+}
+
+const allEmailSuggestions = computed(() => {
+   if (route.name !== 'all-email' || !searchFocus.value) return [];
+   
+   const input = emailStore.searchKeyword || '';
+   const match = input.match(/(?:^|\s)\$(\S*)$/);
+   if (!match) return [];
+   
+   const term = match[1].toLowerCase();
+   
+   const opts = [
+       { val: t('received') || '已接收', desc: t('statusFilter') || 'Status Filter' },
+       { val: t('all') || '全部', desc: t('statusFilter') || 'Status Filter' },
+       { val: t('sender') || '发件人', desc: t('searchField') || 'Search Field' },
+       { val: t('user') || '账户', desc: t('searchField') || 'Search Field' },
+       { val: t('selectEmail') || '收件人', desc: t('searchField') || 'Search Field' },
+       { val: t('subject') || '主题', desc: t('searchField') || 'Search Field' },
+       { val: t('sent') || '已发送', desc: t('statusFilter') || 'Status Filter' },
+       { val: t('selectDeleted') || '已删除', desc: t('statusFilter') || 'Status Filter' },
+       { val: t('noRecipientTitle') || '无收件人', desc: t('statusFilter') || 'Status Filter' }
+   ];
+   
+   return opts.filter(o => o.val.toLowerCase().startsWith(term) || term === '');
+});
+
+function applySuggestion(val) {
+   const input = emailStore.searchKeyword || '';
+   const match = input.match(/(?:^|\s)\$(\S*)$/);
+   if (match) {
+      emailStore.searchKeyword = input.slice(0, match.index) + (match[0].startsWith(' ') ? ' $' : '$') + val + ' ';
+   }
+}
+
+function handleTabComplete(e) {
+  if (route.name === 'all-email') {
+    const suggestions = allEmailSuggestions.value;
+    if (suggestions.length > 0) {
+      applySuggestion(suggestions[0].val);
+    }
   }
 }
 
@@ -389,6 +439,9 @@ function handleSearch() {
   }
 
   if (route.name === 'all-email') {
+    if (emailStore.emailScroll) {
+      emailStore.emailScroll.refreshList();
+    }
     return;
   }
 

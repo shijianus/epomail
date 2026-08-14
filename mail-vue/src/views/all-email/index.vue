@@ -90,6 +90,7 @@ const showBathDelete = ref(false)
 const clearLoading = ref(false)
 
 onMounted(() => {
+  emailStore.emailScroll = sysEmailScroll.value;
   latest();
 })
 
@@ -271,19 +272,6 @@ function parseQuery(query) {
   return result;
 }
 
-watch(() => emailStore.searchKeyword, (newVal) => {
-  if (route.name !== 'all-email') return;
-  const parsed = parseQuery(newVal || '');
-  params.userEmail = parsed.userEmail;
-  params.accountEmail = parsed.accountEmail;
-  params.name = parsed.name;
-  params.subject = parsed.subject;
-  params.type = parsed.type;
-  if (sysEmailScroll.value && sysEmailScroll.value.refreshList) {
-    sysEmailScroll.value.refreshList();
-  }
-});
-
 function refreshBefore() {
   emailStore.searchKeyword = '';
   params.timeSort = 0;
@@ -309,8 +297,14 @@ function jumpContent(email) {
   // router.push({name: 'content'})
 }
 
-
 function getEmailList(emailId, size) {
+  const parsed = parseQuery(emailStore.searchKeyword || '');
+  params.userEmail = parsed.userEmail;
+  params.accountEmail = parsed.accountEmail;
+  params.name = parsed.name;
+  params.subject = parsed.subject;
+  params.type = parsed.type;
+  
   return allEmailList({emailId, size, ...params})
 }
 
