@@ -63,7 +63,7 @@ export const useUserStore = defineStore('user', {
 
                                 // ② 过滤废弃的标签（工作、含旧版黑白名单条件的）
                                 const filtered = merged.filter(label => {
-                                    if (['工作', '系统设置'].includes(label.name)) return false
+                                    if (['工作'].includes(label.name)) return false
                                     if (!label.rules) return true
                                     return !label.rules.some(r =>
                                         (r.condition && (r.condition.type === 'in_blacklist' || r.condition.type === 'in_whitelist')) ||
