@@ -262,3 +262,10 @@
 *   **验证与截图 (Verify & Screenshot)**: 启动 `npm run dev`，使用 Playwright 完成界面截图。
 *   **版本控制 (Commit)**: `3a21a52` — UI(Labels): Optimize system built-in rule display and fix editLabel i18n。
 *   **部署上线 (Deploy)**: 运行 `npm run build` 生成最新产物，并通过 `wrangler deploy` 成功推送到 Cloudflare 线上环境。
+
+### UI/UX 优化: 标签编辑器内“添加自定义规则”按钮重构 (2026-08-14)
+*   **诊断 (Diagnosis)**: 先前的“添加自定义规则”使用的是默认的 `<el-button>` (又扁又细)，视觉层次感弱且无法很好地暗示“新建区块”的动作语义。
+*   **编辑 (Edit)**: 去除了原来的 `el-button`，改为自定义的 `<button class="add-rule-btn">`。为其引入了现代面板设计常用的 Dashboard New Item 风格：使用了 `1.5px dashed` 虚线边框、半透明的蓝色背景（`color-mix`）、更加饱满的 `12px` padding，并增加了微弱的 hover 位移和透明度渐变动画，使得按键区域更加突出且操作反馈更立体。
+*   **验证与截图 (Verify & Screenshot)**: 运行 `npm run dev` 并在后台成功执行 Playwright 截图脚本验证了样式替换结果正常。
+*   **版本控制 (Commit)**: `884a13d` — UI(Labels): Redesign Add Custom Rule button for better visual hierarchy。
+*   **部署上线 (Deploy)**: 重新编译并执行 `wrangler deploy` 推送 Cloudflare 更新。
