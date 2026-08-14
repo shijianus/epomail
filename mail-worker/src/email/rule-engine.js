@@ -1,20 +1,64 @@
 import emailUtils from '../utils/email-utils';
 
-// 系统设置内置分类逻辑（直接完成归类，用户无法修改条件，只能打补丁）
+// ─── 系统内置分类启发式逻辑 ───────────────────────────────────────────────────
+// 这些规则由站长维护，用户可见其效果（"订阅"/"推销"自动打标），但无法在前端修改条件本身
+// 用户可通过添加"例外规则"(Exception)来对特定邮件打补丁
 const SYSTEM_CATEGORIES = {
-  '订阅': (sender, subject, body, recipients) => {
-    // 白名单模式：在白名单中，或者不在黑名单中的其他安全节点
-    // 占位符：真实环境中从站长配置拉取
-    return true; 
-  },
-  '推销': (sender, subject, body, recipients) => {
-    // 黑名单模式：在黑名单中，或者不在白名单中的可疑节点
-    return false; 
-  },
-  '系统设置': (sender, subject, body, recipients) => {
-    // 根据系统“分类管理”直接归类，例如隐藏的黑白名单判断
+  /**
+   * 订阅 — 识别通讯/邮件列表/服务通知类邮件
+   * 匹配条件（任一即触发）：
+   *   A. 发件人地址包含 noreply/no-reply/newsletter/notifications 等常见无回复前缀
+   *   B. 正文或主题含 "unsubscribe" / "退订" / "取消订阅" / "manage preferences" 等退订信号
+   *   C. 发件人域名包含常见通讯平台（mailchimp, sendgrid, constantcontact 等）
+   */
+  '订阅': (sender, subject, body) => {
+    // A. 无回复/通知类发件人特征
+    const noReplyPattern = /\b(no[_.-]?reply|noreply|newsletter|notifications?|updates?|alerts?|info|news|mailer|postmaster|do[_.-]?not[_.-]?reply)\b/i;
+    // B. 正文/主题退订信号
+    const unsubKeywords = /\b(unsubscribe|退订|取消订阅|opt.?out|manage.*prefer|email.*prefer|mailing.*list|subscription|邮件列表|已订阅|您正在接收|you are receiving|you're receiving)\b/i;
+    // C. 常见 ESP（邮件服务商）域名
+    const espPattern = /\b(mailchimp|sendgrid|constantcontact|campaignmonitor|klaviyo|mailerlite|brevo|sendinblue|hubspot|marketo|pardot|salesforce\.com|amazonses|sendpulse|mailjet|postmark|mailgun)\b/i;
+
+    const senderLocal = sender.split('@')[0] || '';
+    const senderDomain = sender.split('@')[1] || '';
+
+    if (noReplyPattern.test(senderLocal)) return true;
+    if (espPattern.test(senderDomain)) return true;
+    if (unsubKeywords.test(subject)) return true;
+    if (unsubKeywords.test(body)) return true;
     return false;
-  }
+  },
+
+  /**
+   * 推销 — 识别促销/营销/广告类邮件
+   * 匹配条件（任一即触发）：
+   *   A. 主题含促销关键词（折扣、限时、立即购买等）
+   *   B. 正文含高密度促销信号（多个关键词同时出现）
+   */
+  '推销': (sender, subject, body) => {
+    // A. 主题促销强信号（中英文）
+    const subjectStrongPattern = /(\d+%\s*off|\d+折|buy\s*\d+\s*get\s*\d+|flash\s*sale|limited\s*time|exclusive\s*(offer|deal)|今日特卖|限时(优惠|折扣|秒杀)|特价|满减|买[一二三1-9]送[一二三1-9]|免费领取|领取优惠|抢购|特惠|促销活动)/i;
+    // B. 正文营销信号（匹配 3 个及以上关键词）
+    const marketingTerms = [
+      /\bshop\s*(now|online)\b/i, /\bbuy\s*now\b/i, /\border\s*now\b/i,
+      /\bfree\s*shipping\b/i, /\bdiscount\b/i, /\bpromo(tion)?\b/i,
+      /\bsale\b/i, /\bdeal\b/i, /\bcoupon\b/i, /\bvoucher\b/i,
+      /优惠券/, /折扣码/, /立即购买/, /免费配送/, /下单/, /抢先购/,
+    ];
+
+    if (subjectStrongPattern.test(subject)) return true;
+
+    // 正文中同时命中 2 个以上营销信号才触发（降低误判）
+    const bodyHits = marketingTerms.filter(p => p.test(body) || p.test(subject)).length;
+    if (bodyHits >= 2) return true;
+
+    return false;
+  },
+
+  /**
+   * 系统设置 — 后台系统操作通知（保留，通常不自动归类）
+   */
+  '系统设置': () => false,
 };
 
 export function applyRules(emailParams, userLabelsJson) {

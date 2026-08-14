@@ -148,30 +148,72 @@
         
         <!-- Rules Section -->
         <div class="form-group" style="margin-top: 8px;">
-          <label>{{ $t('classificationRules') || 'Rules' }}</label>
+          <label style="display:flex; align-items:center; gap:8px;">
+            {{ $t('classificationRules') || 'Rules' }}
+            <span v-if="form.rules && form.rules.length > 0" class="rules-count-badge">{{ form.rules.length }} 条</span>
+          </label>
           <p style="font-size: 12px; color: var(--text-muted); margin: 0 0 8px 0; line-height: 1.4;">
             {{ $t('rulesDesc') || 'Emails matching these rules will automatically receive this label.' }}
           </p>
           
-          <el-button type="primary" plain size="small" @click="openRuleBuilder" style="width: 100%; justify-content: center; margin-bottom: 8px;">
-            <Icon icon="lucide:plus" width="16" style="margin-right: 4px;" /> 添加分类规则 (Add Rule)
-          </el-button>
-          
-          <div v-if="form.rules && form.rules.length > 0" class="rules-list" style="display: flex; flex-direction: column; gap: 6px; max-height: 200px; overflow-y: auto;">
-            <div v-for="(rule, rIdx) in form.rules" :key="rIdx" class="rule-card">
+          <div v-if="form.rules && form.rules.length > 0" class="rules-list" style="display: flex; flex-direction: column; gap: 6px; max-height: 280px; overflow-y: auto; margin-bottom: 8px;">
+            <div v-for="(rule, rIdx) in form.rules" :key="rIdx"
+                 :class="['rule-card', isSystemRule(rule) ? 'rule-card--system' : '']">
               <div class="rule-card-content">
-                <div class="rule-cond">
-                  <span class="cond-lbl">If:</span>
-                  <span class="cond-val">{{ getConditionText(rule.condition) }}</span>
-                </div>
-                <div class="rule-exc" v-if="rule.exception">
-                  <span class="exc-lbl">Except if:</span>
-                  <span class="exc-val">{{ getConditionText(rule.exception) }}</span>
-                </div>
+
+                <!-- ① system_setting 规则：显示锁定标记 + 人类可读描述 -->
+                <template v-if="isSystemRule(rule)">
+                  <div class="rule-sys-header">
+                    <span class="rule-sys-badge">
+                      <Icon icon="lucide:lock" width="12" style="margin-right:3px;" />系统内置
+                    </span>
+                    <span class="rule-sys-desc">{{ getSystemRuleDesc(form.name) }}</span>
+                  </div>
+                  <p class="rule-sys-note">此规则由系统内置逻辑驱动，无需手动配置。您可在此之上添加额外的自定义规则作为补充。</p>
+                </template>
+
+                <!-- ② sender_address_includes：将域名渲染为 chips -->
+                <template v-else-if="rule.condition?.type === 'sender_address_includes'">
+                  <div class="rule-cond" style="align-items: flex-start; flex-wrap: wrap; gap: 6px;">
+                    <span class="cond-lbl" style="white-space:nowrap; margin-top:2px;">If 发件人域名包含:</span>
+                    <div class="domain-chips">
+                      <span v-for="d in parseDomainList(rule.condition.value)" :key="d" class="domain-chip">{{ d }}</span>
+                    </div>
+                  </div>
+                  <div class="rule-exc" v-if="rule.exception">
+                    <span class="exc-lbl">Except if:</span>
+                    <span class="exc-val">{{ getConditionText(rule.exception) }}</span>
+                  </div>
+                </template>
+
+                <!-- ③ 普通规则 -->
+                <template v-else>
+                  <div class="rule-cond">
+                    <span class="cond-lbl">If:</span>
+                    <span class="cond-val">{{ getConditionText(rule.condition) }}</span>
+                  </div>
+                  <div class="rule-exc" v-if="rule.exception">
+                    <span class="exc-lbl">Except if:</span>
+                    <span class="exc-val">{{ getConditionText(rule.exception) }}</span>
+                  </div>
+                </template>
               </div>
-              <el-button link size="small" @click="removeRule(rIdx)" class="rule-del"><Icon icon="lucide:trash-2" width="14" /></el-button>
+
+              <!-- 删除按钮：系统规则禁止删除 -->
+              <el-tooltip v-if="isSystemRule(rule)" content="系统内置规则，不可删除" placement="top">
+                <span class="rule-del rule-del--locked">
+                  <Icon icon="lucide:lock" width="14" />
+                </span>
+              </el-tooltip>
+              <el-button v-else link size="small" @click="removeRule(rIdx)" class="rule-del">
+                <Icon icon="lucide:trash-2" width="14" />
+              </el-button>
             </div>
           </div>
+
+          <el-button type="primary" plain size="small" @click="openRuleBuilder" style="width: 100%; justify-content: center;">
+            <Icon icon="lucide:plus" width="16" style="margin-right: 4px;" /> 添加自定义规则
+          </el-button>
         </div>
       </div>
       <template #footer>
@@ -363,7 +405,7 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, onMounted, computed } from 'vue'
 import { useUiStore } from '@/store/ui.js'
 import { useAccountStore } from '@/store/account.js'
 import { emailSearchSuggestions } from '@/request/email.js'
@@ -374,6 +416,31 @@ import { useI18n } from 'vue-i18n'
 const { t } = useI18n()
 const uiStore = useUiStore()
 const accountStore = useAccountStore()
+
+// 页面加载时，强制确保所有默认标签的系统规则都正确注入
+onMounted(() => {
+  uiStore.ensureDefaultRules()
+})
+
+// 判断一条规则是否为系统内置规则（不允许删除）
+const isSystemRule = (rule) => {
+  return rule?.condition?.type === 'system_setting'
+}
+
+// 解析逗号分隔的域名值为数组（用于 chips 显示）
+const parseDomainList = (value) => {
+  if (!value || typeof value !== 'string') return []
+  return value.split(',').map(v => v.trim()).filter(Boolean)
+}
+
+// 根据当前编辑的标签名，返回 system_setting 的人类可读描述
+const getSystemRuleDesc = (labelName) => {
+  const desc = {
+    '订阅': '按系统内置规则识别（检测 noreply 发件人、退订关键词等）',
+    '推销': '按系统内置规则识别（检测促销关键词、营销邮件特征等）',
+  }
+  return desc[labelName] || '按系统内置逻辑自动分类'
+}
 
 const presetColors = [
   '#ef4444', '#f97316', '#f59e0b', '#10b981', 
@@ -1053,5 +1120,91 @@ const moveUp = (index) => {
   display: flex;
   gap: 12px;
   align-items: center;
+}
+
+/* ─── Rules count badge ─── */
+.rules-count-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1px 7px;
+  border-radius: 100px;
+  background: color-mix(in srgb, var(--accent-primary) 15%, transparent);
+  color: var(--accent-primary);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+
+/* ─── System rule card variant ─── */
+.rule-card--system {
+  background: color-mix(in srgb, #f59e0b 6%, var(--bg-surface));
+  border-color: color-mix(in srgb, #f59e0b 30%, var(--border-mid));
+}
+.rule-card--system:hover {
+  border-color: color-mix(in srgb, #f59e0b 60%, transparent);
+  box-shadow: 0 2px 8px color-mix(in srgb, #f59e0b 10%, transparent);
+}
+.rule-sys-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.rule-sys-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 100px;
+  background: color-mix(in srgb, #f59e0b 20%, transparent);
+  color: #d97706;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.rule-sys-desc {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+.rule-sys-note {
+  margin: 4px 0 0;
+  font-size: 11.5px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+/* ─── Domain chips ─── */
+.domain-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  flex: 1;
+}
+.domain-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 100px;
+  background: color-mix(in srgb, var(--accent-primary) 10%, transparent);
+  color: var(--accent-primary);
+  font-size: 11.5px;
+  font-weight: 600;
+  font-family: 'JetBrains Mono', monospace, sans-serif;
+  border: 1px solid color-mix(in srgb, var(--accent-primary) 20%, transparent);
+}
+
+/* ─── Locked delete icon ─── */
+.rule-del--locked {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  color: color-mix(in srgb, #f59e0b 50%, var(--text-muted));
+  margin-left: 8px;
+  margin-top: -4px;
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 </style>

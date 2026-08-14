@@ -26,60 +26,56 @@ export const useUserStore = defineStore('user', {
                         } else if (parsed && typeof parsed === 'object') {
                             if (parsed.customLabels) uiStore.customLabels = parsed.customLabels
                             if (parsed.defaultLabels) {
-                                // Smart merge: keep template rules if the DB version has no rules, so new template rules apply to existing blank DB states
                                 const dbDefs = parsed.defaultLabels;
-                                // Add missing labels from DB that are not in uiStore
+
+                                // ① 补充 DB 中有但 uiStore 没有的 label
                                 dbDefs.forEach(dbLabel => {
                                     if (!uiStore.defaultLabels.find(t => t.name === dbLabel.name)) {
                                         uiStore.defaultLabels.push(dbLabel);
                                     }
                                 });
-                                // Update existing
+
+                                // ② 更新 uiStore 中已有 label 的用户设置（listVis 和用户自定义 rules）
                                 uiStore.defaultLabels.forEach(templateLabel => {
                                     const dbLabel = dbDefs.find(d => d.name === templateLabel.name);
                                     if (dbLabel) {
+                                        // 同步可见性偏好
                                         templateLabel.listVis = dbLabel.listVis !== undefined ? dbLabel.listVis : templateLabel.listVis;
+                                        // 同步用户自定义 rules（只取 DB 中合法的规则，过滤废弃的类型）
                                         if (dbLabel.rules && dbLabel.rules.length > 0) {
-                                            // Ensure we don't carry over deprecated whitelist condition blocks if they're naked
-                                            const hasOnlyDeprecated = dbLabel.rules.every(r => r.condition && ['sender_includes'].includes(r.condition.type));
-                                            if (!hasOnlyDeprecated) {
+                                            const hasDeprecated = dbLabel.rules.every(r =>
+                                                r.condition && ['sender_includes', 'in_blacklist', 'in_whitelist'].includes(r.condition.type)
+                                            );
+                                            if (!hasDeprecated) {
                                                 templateLabel.rules = dbLabel.rules;
                                             }
                                         }
                                     }
                                 });
-                                
-                                // Ensure '社群' always has default rules if it is empty
-                                const socialLabel = uiStore.defaultLabels.find(t => t.name === '社群');
-                                if (socialLabel && (!socialLabel.rules || socialLabel.rules.length === 0)) {
-                                    socialLabel.rules = [{ condition: { type: 'sender_address_includes', value: 'gmail.com, outlook.com, qq.com, 163.com, yahoo.com, hotmail.com, foxmail.com, sina.com' } }];
-                                }
-                                // Ensure '系统设置' is injected if completely missing
-                                if (!uiStore.defaultLabels.find(t => t.name === '系统设置')) {
-                                    uiStore.defaultLabels.push({ name: '系统设置', icon: 'ic:outline-settings', color: '#8b5cf6', listVis: true, stats: { total: 0, current: 0, unread: 0 }, rules: [] });
-                                }
-                                // Ensure '订阅' and '推销' are injected if completely missing (for existing users upgrading)
-                                if (!uiStore.defaultLabels.find(t => t.name === '订阅')) {
-                                    uiStore.defaultLabels.push({ name: '订阅', icon: 'ic:outline-subscriptions', color: '#10b981', listVis: true, stats: { total: 0, current: 0, unread: 0 }, rules: [{ condition: { type: 'system_setting', value: '' } }] });
-                                }
-                                if (!uiStore.defaultLabels.find(t => t.name === '推销')) {
-                                    uiStore.defaultLabels.push({ name: '推销', icon: 'ic:outline-local-offer', color: '#f59e0b', listVis: true, stats: { total: 0, current: 0, unread: 0 }, rules: [{ condition: { type: 'system_setting', value: '' } }] });
-                                }
 
-                                // Remove deprecated labels containing in_blacklist or in_whitelist to comply with system settings requirement
+                                // ③ 删除废弃的系统标签（工作、含旧版黑白名单条件的）
                                 uiStore.defaultLabels = uiStore.defaultLabels.filter(templateLabel => {
-                                    if (['工作'].includes(templateLabel.name)) return false; // Hard remove deprecated '工作' category only
+                                    if (['工作'].includes(templateLabel.name)) return false;
                                     if (!templateLabel.rules) return true;
-                                    return !templateLabel.rules.some(r => 
+                                    return !templateLabel.rules.some(r =>
                                         (r.condition && (r.condition.type === 'in_blacklist' || r.condition.type === 'in_whitelist')) ||
                                         (r.exception && (r.exception.type === 'in_blacklist' || r.exception.type === 'in_whitelist'))
                                     );
                                 });
                             }
                         }
+
+                        // ④ 兜底：无论 DB 里数据如何，始终保证系统默认标签的规则完整性
+                        uiStore.ensureDefaultRules()
+
                     } catch (e) {
                         console.error("Failed to parse customLabels from user", e)
+                        // 即使解析失败，也要确保规则完整
+                        try { useUiStore().ensureDefaultRules() } catch (_) {}
                     }
+                } else {
+                    // 用户没有保存过 label 配置，直接用模板规则兜底
+                    try { useUiStore().ensureDefaultRules() } catch (_) {}
                 }
             })
         }

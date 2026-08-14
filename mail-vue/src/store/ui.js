@@ -42,6 +42,26 @@ export const useUiStore = defineStore('ui', {
         previewNotice(data) {
             this.previewData = data
             this.changePreview ++
+        },
+        // 权威规则注入 — 确保默认标签的系统规则始终存在
+        // 此方法幂等：只补全缺失的规则，不覆盖用户已添加的自定义规则
+        ensureDefaultRules() {
+            const CANONICAL = {
+                '社群': [{ condition: { type: 'sender_address_includes', value: 'gmail.com, outlook.com, qq.com, 163.com, yahoo.com, hotmail.com, foxmail.com, sina.com' } }],
+                '订阅': [{ condition: { type: 'system_setting', value: '' } }],
+                '推销': [{ condition: { type: 'system_setting', value: '' } }],
+            }
+            this.defaultLabels.forEach(label => {
+                const canonicals = CANONICAL[label.name]
+                if (!canonicals) return
+                if (!label.rules) label.rules = []
+                canonicals.forEach(cRule => {
+                    const alreadyHas = label.rules.some(r => r.condition?.type === cRule.condition?.type)
+                    if (!alreadyHas) {
+                        label.rules.push({ ...cRule, condition: { ...cRule.condition } })
+                    }
+                })
+            })
         }
     },
     persist: {
