@@ -283,7 +283,7 @@
         <div class="rb-step">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
             <h4 class="rb-step-title" style="margin: 0;"><span class="step-num">2</span> {{ $t('ruleExclude') }} (Exception)</h4>
-            <el-switch v-model="rbHasException" size="small" />
+            <el-switch v-model="rbHasException" size="small" :disabled="rbCondition.type === 'none'" />
           </div>
           
           <div v-if="rbHasException" class="rb-form-row">
@@ -356,7 +356,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { useUiStore } from '@/store/ui.js'
 import { useAccountStore } from '@/store/account.js'
 import { emailSearchSuggestions } from '@/request/email.js'
@@ -428,6 +428,12 @@ const isRuleBuilderOpen = ref(false)
 const rbCondition = ref({ type: 'from', value: '' })
 const rbHasException = ref(false)
 const rbException = ref({ type: 'in_blacklist', value: '' })
+
+watch(() => rbCondition.value.type, (newVal) => {
+  if (newVal === 'none') {
+    rbHasException.value = true;
+  }
+})
 
 const openRuleBuilder = async () => {
   rbCondition.value = { type: 'from', value: '' }
