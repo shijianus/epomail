@@ -7,7 +7,7 @@ import { chromium } from 'playwright';
   // Wait a bit for the dev server to be fully ready
   await new Promise(r => setTimeout(r, 2000));
   
-  await page.goto('http://localhost:5173', { waitUntil: 'networkidle' });
+  await page.goto('http://localhost:3002', { waitUntil: 'networkidle' });
   
   // Try to navigate to label settings or take a general screenshot
   // In a real app we might need to login, but we'll try to just take a screenshot

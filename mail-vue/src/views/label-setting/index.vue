@@ -223,9 +223,10 @@
             </div>
           </div>
 
-          <el-button type="primary" plain size="small" @click="openRuleBuilder" style="width: 100%; justify-content: center;">
-            <Icon icon="lucide:plus" width="16" style="margin-right: 4px;" /> 添加自定义规则
-          </el-button>
+          <button class="add-rule-btn" @click.prevent="openRuleBuilder">
+            <Icon icon="lucide:plus" width="16" />
+            <span>添加自定义规则</span>
+          </button>
         </div>
       </div>
       <template #footer>
@@ -1248,5 +1249,32 @@ const moveUp = (index) => {
   margin-top: -4px;
   cursor: not-allowed;
   opacity: 0.6;
+}
+
+/* ─── Add Rule Button ─── */
+.add-rule-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 12px;
+  background-color: color-mix(in srgb, var(--accent-primary) 5%, transparent);
+  border: 1.5px dashed color-mix(in srgb, var(--accent-primary) 30%, transparent);
+  border-radius: 8px;
+  color: var(--accent-primary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  outline: none;
+}
+.add-rule-btn:hover {
+  background-color: color-mix(in srgb, var(--accent-primary) 10%, transparent);
+  border-color: color-mix(in srgb, var(--accent-primary) 50%, transparent);
+  transform: translateY(-1px);
+}
+.add-rule-btn:active {
+  transform: translateY(0);
 }
 </style>
