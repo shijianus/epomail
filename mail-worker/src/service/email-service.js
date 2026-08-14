@@ -88,6 +88,8 @@ const emailService = {
 				.replace(/is:spam/ig, '')
 				.replace(/is:trash/ig, '')
 				.replace(/hl:off/ig, '')
+				.replace(/exact:true/ig, '')
+				.replace(/case:true/ig, '')
 				.trim();
 		}
 

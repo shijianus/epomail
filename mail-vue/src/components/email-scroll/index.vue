@@ -137,6 +137,9 @@
                            :showStatus="showStatus"
                            :showUserInfo="showUserInfo"
                            :type="type"/>
+            <div class="search-separator" v-else-if="item.expand === 'separator'">
+              <span>{{ item.title }}</span>
+            </div>
             <div class="noLoading" v-else-if="item.expand === 'noMoreData'" style="height: 10px;">
             </div>
           </template>
@@ -464,7 +467,101 @@ const { arrivedState } = useScroll(scrollbarRef, {
 
 
 const list = computed(() => {
-  return [...emailList, ...expandList]
+  const keyword = emailStore.searchKeyword.trim();
+  const parsed = emailStore.searchParsed;
+  
+  if (!keyword) {
+    return [...emailList, ...expandList]
+  }
+
+  const isExact = /exact:true/i.test(keyword);
+  const isCaseSensitive = /case:true/i.test(keyword);
+  
+  let searchStr = parsed.cleanKeyword;
+  if (!isCaseSensitive) {
+    searchStr = searchStr.toLowerCase();
+  }
+
+  const filtered = emailList.filter(item => {
+    let pass = true;
+    if (searchStr) {
+      let subject = item.subject || '';
+      let text = item.formatText || '';
+      let name = item.name || '';
+      let from = item.sendEmail || '';
+      let to = item.toEmail || '';
+      
+      if (!isCaseSensitive) {
+        subject = subject.toLowerCase();
+        text = text.toLowerCase();
+        name = name.toLowerCase();
+        from = from.toLowerCase();
+        to = to.toLowerCase();
+      }
+      
+      const fields = [subject, text, name, from, to];
+      if (isExact) {
+        pass = fields.some(c => c === searchStr || c.includes(' ' + searchStr + ' '));
+      } else {
+        pass = fields.some(c => c.includes(searchStr));
+      }
+    }
+    
+    if (pass) {
+      if (/is:sent/i.test(keyword) || /from:me/i.test(keyword)) {
+        pass = pass && (item.type === 1 || item.type === 'send');
+      }
+      if (/is:spam/i.test(keyword)) {
+        pass = pass && item.isSpam;
+      }
+      if (/is:trash/i.test(keyword)) {
+        pass = pass && item.isDel;
+      }
+    }
+    
+    return pass;
+  });
+
+  const currentPartition = [];
+  const otherPartition = [];
+  
+  filtered.forEach(item => {
+    let isCurrent = false;
+    if (props.type === 'trash') {
+      isCurrent = !!item.isDel;
+    } else if (props.type === 'spam') {
+      isCurrent = !!item.isSpam;
+    } else if (props.type === 'send') {
+      isCurrent = item.type === 1;
+    } else if (props.type === 'snoozed') {
+      isCurrent = !!item.snoozedTime;
+    } else if (props.type === 'star') {
+      isCurrent = !!item.isStar;
+    } else if (props.type === 'all-email') {
+      isCurrent = true;
+    } else {
+      isCurrent = !item.isDel && !item.isSpam && !item.snoozedTime && item.type === 0;
+    }
+    
+    if (isCurrent) {
+      currentPartition.push(item);
+    } else {
+      otherPartition.push(item);
+    }
+  });
+
+  let finalResult = [];
+  if (otherPartition.length > 0) {
+    finalResult = [
+      ...currentPartition,
+      { emailId: 'separator-1', expand: 'separator', title: t('otherFolders') || 'Other Folders' },
+      ...otherPartition
+    ];
+  } else {
+    finalResult = [...currentPartition];
+  }
+
+  return [...finalResult, ...expandList];
 })
 
 const itemHeight = computed(() => {
@@ -1092,6 +1189,20 @@ function loadData() {
     pointer-events: none;
     transition: var(--loading-hide-transition);
     opacity: 0;
+  }
+  
+  .search-separator {
+    padding: 10px 15px;
+    font-weight: 500;
+    color: var(--el-text-color-secondary);
+    background-color: var(--el-fill-color-light);
+    font-size: 13px;
+    margin: 8px 0;
+    border-radius: 4px;
+    text-align: center;
+    position: sticky;
+    top: 0;
+    z-index: 10;
   }
 }
 
