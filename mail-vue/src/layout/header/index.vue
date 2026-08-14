@@ -754,8 +754,10 @@ function formatName(email) {
   color: var(--text-muted);
   font-size: 14px;
 }
+</style>
+<style>
 ::highlight(search-highlight) {
-  background-color: var(--el-color-warning-light-5, #fdf6ec);
-  color: var(--el-text-color-primary, #303133);
+  background-color: yellow;
+  color: black;
 }
 </style>
