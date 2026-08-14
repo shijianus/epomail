@@ -44,8 +44,6 @@ export function applyRules(emailParams, userLabelsJson) {
 
       if (label.rules && Array.isArray(label.rules)) {
         for (const rule of label.rules) {
-          if (!rule.condition) continue;
-
           const checkCondition = (cond) => {
             if (!cond || cond.type === 'none') return false;
             const type = cond.type;
@@ -53,6 +51,7 @@ export function applyRules(emailParams, userLabelsJson) {
 
             switch (type) {
               case 'all_messages': return true;
+              case 'system_setting': return SYSTEM_CATEGORIES['系统设置'](sender, subject, body, recipients);
               case 'from': 
               case 'sender_is': return val.split(',').some(v => {
                 const match = sender.match(/<([^>]+)>/);
@@ -92,25 +91,30 @@ export function applyRules(emailParams, userLabelsJson) {
             }
           };
 
-          // 区分：只排除的规则 (打补丁) vs 加入内容的规则
-          if (rule.condition.type === 'none') {
-            // 如果是“只排除”的规则，并且不是系统设置，则意味着默认包含所有（匹配一切），除非被排除
+          const hasCondition = rule.condition && rule.condition.type && rule.condition.type !== 'none';
+          const hasException = rule.exception && rule.exception.type && rule.exception.type !== 'none';
+
+          // 如果只有排除规则，没有包含规则，表示默认包含所有（匹配一切）
+          let conditionMatched = false;
+          if (!hasCondition) {
             if (!isSystemCategory) {
-              matched = true;
+              conditionMatched = true; // 默认匹配全部
+            } else {
+              conditionMatched = matched; // 如果是系统分类，依赖系统的默认匹配结果
             }
-            // 检查排除补丁
-            if (rule.exception && rule.exception.type && rule.exception.type !== 'none') {
-              if (checkCondition(rule.exception)) {
-                vetoed = true; // 命中排除补丁，一票否决
-              }
-            }
-          } else if (checkCondition(rule.condition)) {
-            // 只加入的内容，或 加入+排除 的内容
+          } else {
+            conditionMatched = checkCondition(rule.condition);
+          }
+
+          if (conditionMatched) {
             let exceptionHit = false;
-            if (rule.exception && rule.exception.type && rule.exception.type !== 'none') {
+            if (hasException) {
                exceptionHit = checkCondition(rule.exception);
             }
-            if (!exceptionHit) {
+            
+            if (exceptionHit) {
+              vetoed = true; // 命中排除补丁，一票否决当前规则，甚至可能否决系统基础分类
+            } else {
               matched = true;
             }
           }

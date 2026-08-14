@@ -211,11 +211,16 @@
         <div style="font-size: 13px; color: var(--text-secondary); margin-bottom: 12px; margin-top: -12px;">
           {{ $t('ruleFutureNotice') }}
         </div>
-        <!-- Step 1: Condition -->
+        
+        <!-- Step 1: Condition (Include) -->
         <div class="rb-step">
-          <h4 class="rb-step-title"><span class="step-num">1</span> {{ $t('ruleInclude') }} (Condition)</h4>
-          <div class="rb-form-row">
-            <div v-if="['in_whitelist', 'is_corporate', 'in_blacklist'].includes(rbCondition.type)" class="system-rule-tag" style="width: 250px; display: flex; align-items: center;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <h4 class="rb-step-title" style="margin: 0;"><span class="step-num">1</span> {{ $t('ruleInclude') }} (Condition)</h4>
+            <el-switch v-model="rbHasCondition" size="small" />
+          </div>
+          
+          <div v-if="rbHasCondition" class="rb-form-row">
+            <div v-if="['in_whitelist', 'is_corporate', 'in_blacklist', 'system_setting'].includes(rbCondition.type)" class="system-rule-tag" style="width: 250px; display: flex; align-items: center;">
               <el-tag type="info" size="large" style="width: 100%;">
                 <Icon icon="ic:outline-settings" style="margin-right: 4px;" />
                 {{ $t('systemSetting') }}
@@ -245,9 +250,8 @@
                 <el-option :label="$t('condBefore')" value="before" />
                 <el-option :label="$t('condAfter')" value="after" />
               </el-option-group>
-              <el-option-group :label="$t('ruleOptAllMessages')">
-                <el-option :label="$t('condApplyToAll')" value="all_messages" />
-                <el-option :label="$t('condNoneOnlyException')" value="none" />
+              <el-option-group :label="$t('systemSetting')">
+                <el-option :label="$t('systemSetting')" value="system_setting" />
               </el-option-group>
             </el-select>
             
@@ -267,7 +271,7 @@
               :min="0"
             />
             <el-autocomplete 
-              v-else-if="!['all_messages', 'none', 'in_whitelist', 'is_corporate', 'in_blacklist'].includes(rbCondition.type)" 
+              v-else-if="!['system_setting', 'in_whitelist', 'is_corporate', 'in_blacklist'].includes(rbCondition.type)" 
               v-model="rbCondition.value" 
               :fetch-suggestions="queryConditionSuggestions"
               size="large" 
@@ -279,15 +283,15 @@
 
         <el-divider border-style="dashed" />
 
-        <!-- Step 2: Exception (Optional) -->
+        <!-- Step 2: Exception (Exclude) -->
         <div class="rb-step">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
             <h4 class="rb-step-title" style="margin: 0;"><span class="step-num">2</span> {{ $t('ruleExclude') }} (Exception)</h4>
-            <el-switch v-model="rbHasException" size="small" :disabled="rbCondition.type === 'none'" />
+            <el-switch v-model="rbHasException" size="small" />
           </div>
           
           <div v-if="rbHasException" class="rb-form-row">
-            <div v-if="['in_whitelist', 'is_corporate', 'in_blacklist'].includes(rbException.type)" class="system-rule-tag" style="width: 250px; display: flex; align-items: center;">
+            <div v-if="['in_whitelist', 'is_corporate', 'in_blacklist', 'system_setting'].includes(rbException.type)" class="system-rule-tag" style="width: 250px; display: flex; align-items: center;">
               <el-tag type="info" size="large" style="width: 100%;">
                 <Icon icon="ic:outline-settings" style="margin-right: 4px;" />
                 {{ $t('systemSetting') }}
@@ -317,6 +321,9 @@
                 <el-option :label="$t('condBefore')" value="before" />
                 <el-option :label="$t('condAfter')" value="after" />
               </el-option-group>
+              <el-option-group :label="$t('systemSetting')">
+                <el-option :label="$t('systemSetting')" value="system_setting" />
+              </el-option-group>
             </el-select>
 
             <el-date-picker
@@ -335,7 +342,7 @@
               :min="0"
             />
             <el-autocomplete 
-              v-else-if="!['all_messages', 'in_whitelist', 'is_corporate', 'in_blacklist'].includes(rbException.type)" 
+              v-else-if="!['system_setting', 'in_whitelist', 'is_corporate', 'in_blacklist'].includes(rbException.type)" 
               v-model="rbException.value" 
               :fetch-suggestions="queryExceptionSuggestions"
               size="large" 
@@ -425,20 +432,16 @@ const isEditingDefault = ref(false)
 const form = ref({ name: '', icon: 'ic:baseline-label', color: '#3b82f6', parent: '', sidebarVis: 'show', listVis: true, rules: [] })
 
 const isRuleBuilderOpen = ref(false)
+const rbHasCondition = ref(true)
 const rbCondition = ref({ type: 'from', value: '' })
 const rbHasException = ref(false)
-const rbException = ref({ type: 'in_blacklist', value: '' })
-
-watch(() => rbCondition.value.type, (newVal) => {
-  if (newVal === 'none') {
-    rbHasException.value = true;
-  }
-})
+const rbException = ref({ type: 'from', value: '' })
 
 const openRuleBuilder = async () => {
+  rbHasCondition.value = true
   rbCondition.value = { type: 'from', value: '' }
   rbHasException.value = false
-  rbException.value = { type: 'in_blacklist', value: '' }
+  rbException.value = { type: 'from', value: '' }
   isRuleBuilderOpen.value = true
 }
 
@@ -488,7 +491,7 @@ const queryExceptionSuggestions = async (queryString, cb) => {
 
 const saveNewRule = () => {
   // Validation
-  const requiresValue = (type) => !['all_messages', 'none', 'in_whitelist', 'is_corporate', 'in_blacklist'].includes(type)
+  const requiresValue = (type) => !['all_messages', 'none', 'system_setting', 'in_whitelist', 'is_corporate', 'in_blacklist'].includes(type)
   const isValidValue = (val) => {
     if (val === 0) return true
     if (!val) return false
@@ -496,13 +499,13 @@ const saveNewRule = () => {
     return true
   }
 
-  if (requiresValue(rbCondition.value.type) && !isValidValue(rbCondition.value.value)) {
-    ElMessage.error(t('ruleErrorInvalidValue'))
+  if (!rbHasCondition.value && !rbHasException.value) {
+    ElMessage.error(t('ruleErrorMustHaveConditionOrException') || 'Please configure at least one condition or exception')
     return
   }
 
-  if (rbCondition.value.type === 'none' && !rbHasException.value) {
-    ElMessage.error(t('ruleErrorMustHaveException'))
+  if (rbHasCondition.value && requiresValue(rbCondition.value.type) && !isValidValue(rbCondition.value.value)) {
+    ElMessage.error(t('ruleErrorInvalidValue') || 'Invalid condition value')
     return
   }
   
@@ -511,13 +514,18 @@ const saveNewRule = () => {
     return
   }
   
-  const newRule = {
-    condition: { 
+  const newRule = {}
+  
+  if (rbHasCondition.value) {
+    newRule.condition = { 
       type: rbCondition.value.type, 
       value: requiresValue(rbCondition.value.type) 
         ? (typeof rbCondition.value.value === 'string' ? rbCondition.value.value.trim().toLowerCase() : rbCondition.value.value) 
         : true
     }
+  } else {
+    // Legacy support for backend logic
+    newRule.condition = { type: 'none', value: true }
   }
   
   if (rbHasException.value) {
@@ -553,7 +561,8 @@ const getConditionText = (cond) => {
     'all_messages': 'condApplyToAll',
     'in_blacklist': 'condInBlacklist',
     'in_whitelist': 'condInWhitelist',
-    'is_corporate': 'condIsCorporate'
+    'is_corporate': 'condIsCorporate',
+    'system_setting': 'systemSetting'
   }
   const key = typeMap[cond.type]
   let typeStr = key ? t(key) : cond.type
