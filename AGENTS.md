@@ -284,3 +284,21 @@
 *   **验证与截图 (Verify & Screenshot)**: 已在本地开发服务器上成功启动并利用 Playwright 工具完成了渲染验证。
 *   **版本控制 (Commit)**: `5ab64c1` — UI/UX: Fix i18n keys for Settings, redesign Delete Label modal, and fix search bugs。
 *   **部署上线 (Deploy)**: 重新执行 `npm run build` 和 `wrangler deploy` 推送至 Cloudflare。
+
+### 彻底修复：搜索设定 (Search Settings) 下拉菜单被全局条件阻断 (2026-08-14)
+*   **安全备份 (Backup)**: `5ab64c1`
+*   **根因分析 (Root Cause)**: 
+    * 虽然前一版本修复了路由的遗漏与菜单结构的残缺，但代码 `header/index.vue` 的 `v-if` 指令上强制要求 `isGlobalSearch` 必须为 `true` 才能展示搜索下拉列表，这导致除非用户输入 `all:` 伪代码，否则永远看不到设置项的候选列表，给用户造成“完全没有起作用”的错觉。此外，后端的 `settingsSearchResults` 也在没有全局前缀时对当前路由外的其他设定进行阻断过滤。
+*   **修复逻辑 (Fix)**:
+    1. 修改 `header/index.vue` 中 `<div class="settings-search-dropdown">` 的 `v-if` 条件，移除 `isGlobalSearch` 的束缚，使得有输入值即可弹出匹配菜单。
+    2. 修改 `settingsSearchResults` 的计算属性，不再要求全局标识，默认直接在全部 Settings 项目中进行文本匹配和检索。
+*   **合规性补全 (Workflow)**: 已执行本地重新编译，并重新通过 `wrangler deploy` 推送了变更。
+
+### "全部邮件" 搜索栏深度融合与特殊指令系统 (2026-08-14)
+*   **功能重构 (Feature)**: Commit `4f9504b` — 移除了 `all-email/index.vue`（全部邮件模块）内部多余的查询条件组件（下拉框、搜索输入），完全接管并复用顶部的全域搜索栏。
+*   **搜索路由解耦 (Route Decoupling)**: 调整了 `header/index.vue`。当进入 `all-email` 页面时，搜索栏不再强制唤起 "Settings Search" 的下拉菜单，而是保持原生的邮件搜索框样式（Search mail），且点击 Enter 搜索时不会错误跳出当前页面。
+*   **深度指令解析 (Syntax Parser)**: 在前端引入了强大的特殊参数解析引擎：
+    - 支持精确中英文键值锁定：`$发件人`/`$sender` (锁定 name), `$账户`/`$user` (锁定 userEmail), `$收件人`/`$to` (锁定 accountEmail), `$主题`/`$subject` (锁定 subject)。
+    - 支持无参数状态词：`$已接收` (receive), `$已发送` (send), `$已删除` (delete), `$无收件人` (noone), `$全部` (all)。
+    - **智能逃逸 (Escaping)**: 支持将 `$ `转义（使用 `\$`，用户输入时打出 `\\$` 则变为真实查询文本 `\$`）。没有被标签圈定的剩余关键字会自动归类为 `subject` 模糊查询，极大提高了特殊需求下的检索精准度和操作上限。
+*   **合规性验证 (Deploy)**: Vite 启动无错误，准备执行 CF 线上部署！
