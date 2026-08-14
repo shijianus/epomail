@@ -49,12 +49,12 @@
           <span class="badge"></span>
         </button>
       </el-tooltip>
-      <el-dropdown ref="userinfoRef" @visible-change="e => userInfoShow = e" :teleported="false" popper-class="detail-dropdown">
-        <div class="avatar-wrap">
-          <div class="avatar" @click="userInfoHide">{{ formatName(userStore.user.email) }}</div>
+      <el-dropdown ref="userinfoRef" trigger="click" @visible-change="onDropdownVisibleChange" :teleported="false" popper-class="detail-dropdown">
+        <div class="avatar-wrap" @mouseenter="clearCloseTimer" @mouseleave="startCloseTimer">
+          <div class="avatar">{{ formatName(userStore.user.email) }}</div>
         </div>
         <template #dropdown>
-          <div class="user-details account-menu open" style="position:relative;top:0;transform:none;opacity:1;box-shadow:none;border:none;">
+          <div class="user-details account-menu open" @mouseenter="clearCloseTimer" @mouseleave="startCloseTimer" style="position:relative;top:0;transform:none;opacity:1;box-shadow:none;border:none;">
             <div class="am-header">
               <div class="am-avatar">{{ formatName(userStore.user.email) }}</div>
               <div style="overflow:hidden">
@@ -158,6 +158,35 @@ const userInfoShow = ref(false)
 const userinfoRef = ref({})
 
 const searchFocus = ref(false)
+
+let closeTimer = null;
+
+function clearCloseTimer() {
+  if (closeTimer) {
+    clearTimeout(closeTimer);
+    closeTimer = null;
+  }
+}
+
+function startCloseTimer() {
+  clearCloseTimer();
+  if (userInfoShow.value) {
+    closeTimer = setTimeout(() => {
+      if (userinfoRef.value) {
+        userinfoRef.value.handleClose();
+      }
+    }, 3000);
+  }
+}
+
+function onDropdownVisibleChange(visible) {
+  userInfoShow.value = visible;
+  if (visible) {
+    clearCloseTimer();
+  } else {
+    clearCloseTimer();
+  }
+}
 
 const isSettingsMode = computed(() => {
   return ['setting', 'label-setting', 'category-setting', 'sys-setting'].includes(route.name)
@@ -428,14 +457,6 @@ const formatSize = (bytes) => {
   if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
   return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
 };
-
-function userInfoHide(e) {
-    if (userInfoShow.value) {
-        userinfoRef.value.handleClose()
-    } else {
-        userinfoRef.value.handleOpen()
-    }
-}
 
 async function copyEmail(email) {
   try {
