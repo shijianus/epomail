@@ -2,9 +2,17 @@ import emailUtils from '../utils/email-utils';
 
 // 系统设置内置分类逻辑（直接完成归类，用户无法修改条件，只能打补丁）
 const SYSTEM_CATEGORIES = {
+  '订阅': (sender, subject, body, recipients) => {
+    // 白名单模式：在白名单中，或者不在黑名单中的其他安全节点
+    // 占位符：真实环境中从站长配置拉取
+    return true; 
+  },
+  '推销': (sender, subject, body, recipients) => {
+    // 黑名单模式：在黑名单中，或者不在白名单中的可疑节点
+    return false; 
+  },
   '系统设置': (sender, subject, body, recipients) => {
     // 根据系统“分类管理”直接归类，例如隐藏的黑白名单判断
-    // 占位符：可以在这里根据具体系统规则返回 true/false
     return false;
   }
 };
@@ -51,7 +59,7 @@ export function applyRules(emailParams, userLabelsJson) {
 
             switch (type) {
               case 'all_messages': return true;
-              case 'system_setting': return SYSTEM_CATEGORIES['系统设置'](sender, subject, body, recipients);
+              case 'system_setting': return SYSTEM_CATEGORIES[label.name] ? SYSTEM_CATEGORIES[label.name](sender, subject, body, recipients) : false;
               case 'from': 
               case 'sender_is': return val.split(',').some(v => {
                 const match = sender.match(/<([^>]+)>/);
