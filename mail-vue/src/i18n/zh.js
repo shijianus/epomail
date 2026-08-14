@@ -436,6 +436,9 @@ const zh = {
     ruleErrorInvalidValue: '规则的内容值不能为空或无效',
     ruleErrorMustHaveException: '纯排除规则必须开启并设置排除条件(Exception)！',
     condIsCorporate: '命中企业邮箱特征...',
+    searchAllMail: '搜索所有邮件...',
+    statusFilter: '状态筛选',
+    searchField: '搜索字段',
 }
 export default zh
 

@@ -211,17 +211,30 @@ function parseQuery(query) {
   const parts = processed.split(/(?=\$)/);
   
   const fieldsMap = {
-    'user': 'userEmail', '账户': 'userEmail', '帳戶': 'userEmail',
-    'to': 'accountEmail', '收件人': 'accountEmail',
-    'sender': 'name', '发件人': 'name', '發件人': 'name',
-    'subject': 'subject', '主题': 'subject', '主題': 'subject',
+    // English tokens (match i18n t('sender') etc.)
+    'sender': 'name',   'Sender': 'name',
+    'user': 'userEmail', 'User': 'userEmail',
+    'to': 'accountEmail', 'To': 'accountEmail', 'Email': 'accountEmail',
+    'subject': 'subject', 'Subject': 'subject',
+    // Chinese tokens
+    '发件人': 'name', '發件人': 'name',
+    '账户': 'userEmail', '帳戶': 'userEmail', '用户': 'userEmail', '用戶': 'userEmail',
+    '收件人': 'accountEmail', '邮箱': 'accountEmail', '郵箱': 'accountEmail',
+    '主题': 'subject', '主題': 'subject',
   };
   const typeMap = {
-    'received': 'receive', '已接收': 'receive',
-    'sent': 'send', '已发送': 'send', '已發送': 'send',
-    'deleted': 'delete', '已删除': 'delete', '已刪除': 'delete',
-    'noone': 'noone', '无收件人': 'noone', '無收件人': 'noone',
-    'all': 'all', '全部': 'all'
+    // English tokens
+    'received': 'receive', 'Received': 'receive',
+    'sent': 'send', 'Sent': 'send',
+    'deleted': 'delete', 'Deleted': 'delete',
+    'norecipient': 'noone', 'No Recipient': 'noone', 'No recipient': 'noone',
+    'all': 'all', 'All': 'all',
+    // Chinese tokens
+    '已接收': 'receive',
+    '已发送': 'send', '已發送': 'send',
+    '已删除': 'delete', '已刪除': 'delete',
+    '无收件人': 'noone', '無收件人': 'noone', '无人收件': 'noone',
+    '全部': 'all',
   };
 
   const result = {

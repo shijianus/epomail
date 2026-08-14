@@ -47,6 +47,27 @@ export const useEmailStore = defineStore('email', {
                 .replace(/hl:off/ig, '')
                 .trim();
             
+            // For all-email $-syntax: strip $token directives, keep plain keyword for highlight
+            let allEmailKeyword = '';
+            if (/\$/.test(cleanKeyword)) {
+                // Extract plain words that are not $-prefixed tokens and their values
+                const parts = cleanKeyword.split(/(?=\$)/);
+                const freeText = [];
+                for (const p of parts) {
+                    if (p.startsWith('$')) {
+                        // $token value — extract value after space as potential highlight text
+                        const spaceIdx = p.indexOf(' ');
+                        if (spaceIdx !== -1) {
+                            freeText.push(p.slice(spaceIdx + 1).trim());
+                        }
+                    } else {
+                        freeText.push(p.trim());
+                    }
+                }
+                allEmailKeyword = freeText.filter(Boolean).join(' ').trim();
+                cleanKeyword = allEmailKeyword || cleanKeyword;
+            }
+            
             // We return the raw input as keyword so the backend can parse its own flags 
             // (e.g. global:, is:sent, is:draft, is:spam, etc.)
             return { keyword: input, cleanKeyword, isGlobal, highlight, isDraft };

@@ -436,6 +436,9 @@ const en = {
     ruleErrorInvalidValue: 'Rule value cannot be empty or invalid',
     ruleErrorMustHaveException: 'Exclusion-only rules must have an exception defined!',
     condIsCorporate: 'Is Corporate Email...',
+    searchAllMail: 'Search all mail...',
+    statusFilter: 'Status Filter',
+    searchField: 'Search Field',
 }
 
 export default en

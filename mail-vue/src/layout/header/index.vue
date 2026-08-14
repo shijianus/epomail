@@ -12,13 +12,13 @@
     <div class="topbar-search">
       <div class="search-box">
         <span class="search-icon" @click="handleSearch" style="cursor: pointer; z-index: 1"><Icon icon="lucide:search" width="20" height="20"/></span>
-        <input type="text" :placeholder="(isSettingsMode && route.name !== 'all-email') ? ($t('searchSettings') || 'Search settings') : ($t('search') || 'Search mail')" v-model="emailStore.searchKeyword" @keyup.enter="handleSearch" @keydown.tab.prevent="handleTabComplete" @focus="searchFocus = true" @blur="onSearchBlur" />
+        <input type="text" :placeholder="isSettingsMode && route.name !== 'all-email' ? ($t('searchSettings') || 'Search settings') : route.name === 'all-email' ? ($t('searchAllMail') || 'Search all mail...') : ($t('searchMail') || 'Search mail')" v-model="emailStore.searchKeyword" @input="handleSearchInput" @keyup.enter="handleSearch" @keydown.tab.prevent="handleTabComplete" @focus="searchFocus = true" @blur="onSearchBlur" />
         
         <!-- Dropdown for all-email syntax suggestions -->
         <div v-if="route.name === 'all-email' && searchFocus && allEmailSuggestions.length > 0" class="settings-search-dropdown" style="padding: 4px 0;">
-           <div class="settings-search-item" v-for="(item, index) in allEmailSuggestions" :key="item.val" @mousedown.prevent="applySuggestion(item.val)" style="display:flex; justify-content:space-between;">
-             <span><strong style="color:var(--el-color-primary)">$</strong>{{ item.val }}</span>
-             <span style="color:var(--el-text-color-secondary); font-size:12px;">{{ item.desc }}</span>
+           <div class="settings-search-item" v-for="(item) in allEmailSuggestions" :key="item.token" @mousedown.prevent="applySuggestion(item)" style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
+             <span><strong style="color:var(--el-color-primary)">$</strong>{{ item.display }}</span>
+             <span style="color:var(--el-text-color-secondary); font-size:11px; white-space:nowrap;">{{ item.desc }}</span>
            </div>
         </div>
 
@@ -197,44 +197,67 @@ function onDropdownVisibleChange(visible) {
   }
 }
 
+// Map suggestion tokens using proper i18n - these must match parseQuery's fieldsMap/typeMap
+const ALL_EMAIL_OPTS = computed(() => [
+  // Status filters — these token values must match parseQuery typeMap keys
+  { token: 'received',        display: t('received'),        desc: t('statusFilter') || 'Status Filter',  group: 'status' },
+  { token: 'all',             display: t('all'),             desc: t('statusFilter') || 'Status Filter',  group: 'status' },
+  { token: 'sent',            display: t('sent'),            desc: t('statusFilter') || 'Status Filter',  group: 'status' },
+  { token: 'deleted',         display: t('selectDeleted'),   desc: t('statusFilter') || 'Status Filter',  group: 'status' },
+  { token: 'norecipient',     display: t('noRecipient'),     desc: t('statusFilter') || 'Status Filter',  group: 'status' },
+  // Field filters — token values match parseQuery fieldsMap keys
+  { token: 'sender',          display: t('sender'),          desc: t('searchField') || 'Search Field',    group: 'field' },
+  { token: 'user',            display: t('user'),            desc: t('searchField') || 'Search Field',    group: 'field' },
+  { token: 'to',              display: t('selectEmail'),     desc: t('searchField') || 'Search Field',    group: 'field' },
+  { token: 'subject',         display: t('subject'),         desc: t('searchField') || 'Search Field',    group: 'field' },
+]);
+
 const allEmailSuggestions = computed(() => {
    if (route.name !== 'all-email' || !searchFocus.value) return [];
-   
    const input = emailStore.searchKeyword || '';
    const match = input.match(/(?:^|\s)\$(\S*)$/);
    if (!match) return [];
-   
    const term = match[1].toLowerCase();
-   
-   const opts = [
-       { val: t('received') || '已接收', desc: t('statusFilter') || 'Status Filter' },
-       { val: t('all') || '全部', desc: t('statusFilter') || 'Status Filter' },
-       { val: t('sender') || '发件人', desc: t('searchField') || 'Search Field' },
-       { val: t('user') || '账户', desc: t('searchField') || 'Search Field' },
-       { val: t('selectEmail') || '收件人', desc: t('searchField') || 'Search Field' },
-       { val: t('subject') || '主题', desc: t('searchField') || 'Search Field' },
-       { val: t('sent') || '已发送', desc: t('statusFilter') || 'Status Filter' },
-       { val: t('selectDeleted') || '已删除', desc: t('statusFilter') || 'Status Filter' },
-       { val: t('noRecipientTitle') || '无收件人', desc: t('statusFilter') || 'Status Filter' }
-   ];
-   
-   return opts.filter(o => o.val.toLowerCase().startsWith(term) || term === '');
+   return ALL_EMAIL_OPTS.value.filter(o =>
+     o.display.toLowerCase().startsWith(term) ||
+     o.token.toLowerCase().startsWith(term) ||
+     term === ''
+   );
 });
 
-function applySuggestion(val) {
+function applySuggestion(opt) {
+   const val = typeof opt === 'string' ? opt : opt.display;
    const input = emailStore.searchKeyword || '';
    const match = input.match(/(?:^|\s)\$(\S*)$/);
    if (match) {
       emailStore.searchKeyword = input.slice(0, match.index) + (match[0].startsWith(' ') ? ' $' : '$') + val + ' ';
    }
+   // Trigger real-time search after applying suggestion
+   triggerAllEmailSearch();
 }
 
-function handleTabComplete(e) {
+function handleTabComplete() {
   if (route.name === 'all-email') {
     const suggestions = allEmailSuggestions.value;
     if (suggestions.length > 0) {
-      applySuggestion(suggestions[0].val);
+      applySuggestion(suggestions[0]);
     }
+  }
+}
+
+// Debounced real-time search for all-email
+let searchDebounceTimer = null;
+function handleSearchInput() {
+  if (route.name !== 'all-email') return;
+  clearTimeout(searchDebounceTimer);
+  searchDebounceTimer = setTimeout(() => {
+    triggerAllEmailSearch();
+  }, 400);
+}
+
+function triggerAllEmailSearch() {
+  if (emailStore.emailScroll && emailStore.emailScroll.refreshList) {
+    emailStore.emailScroll.refreshList();
   }
 }
 

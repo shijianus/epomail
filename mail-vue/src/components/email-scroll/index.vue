@@ -421,7 +421,7 @@ function highlightMatch(text) {
   const parts = (text || '').split(regex);
   return parts.map((part, i) => {
     if (i % 2 === 1) {
-      return `<mark class="search-highlight">${escapeHtml(part)}</mark>`;
+      return `<mark class="search-highlight" style="background-color: yellow; color: black; padding: 0 2px; border-radius: 2px;">${escapeHtml(part)}</mark>`;
     } else {
       return escapeHtml(part);
     }
