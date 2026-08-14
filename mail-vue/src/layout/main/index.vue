@@ -14,10 +14,10 @@
             <div class="nav-section-title">{{$t('tabSetting') || 'Settings'}}</div>
             <div class="settings-nav-group">
             <router-link :to="{name: 'setting'}" class="settings-nav-item" :class="{active: route.name === 'setting'}">
-              <Icon icon="fluent:settings-48-regular" width="20" height="20" /> {{$t('generalSetting') || 'General Settings'}}
+              <Icon icon="fluent:settings-48-regular" width="20" height="20" /> {{$t('general') || 'General'}}
             </router-link>
             <router-link :to="{name: 'label-setting'}" class="settings-nav-item" :class="{active: route.name === 'label-setting'}">
-              <Icon icon="lucide:tags" width="20" height="20" /> {{$t('labelSetting') || 'Label Settings'}}
+              <Icon icon="lucide:tags" width="20" height="20" /> {{$t('labels') || 'Labels'}}
             </router-link>
             </div>
 
