@@ -1,95 +1,94 @@
 <template>
-  <div class="cat-page">
+  <div class="cat-page box">
     <div class="loading-overlay" :class="firstLoading ? 'lo-show' : 'lo-hide'">
       <loading />
     </div>
 
     <el-scrollbar class="cat-scroll" v-if="!firstLoading">
-      <div class="cat-body">
-        <div class="cat-header">
-          <div class="cat-header-left">
-            <h1 class="cat-title">{{ $t('categorySetting') || '分类管理' }}</h1>
-          </div>
-        </div>
-
-        <div class="cat-grid">
-          <!-- ── Panel 1: Mode & List ── -->
-          <div class="cat-card mode-card">
-            <div class="cat-card-header">
-              <Icon icon="lucide:settings-2" width="16" class="card-icon" />
-              <span>基础名单</span>
+        <div class="container">
+          <div class="title">基础名单 
               <el-tooltip :content="($t('catHowItWorks') || '白名单放行，黑名单拦截。') + ' ' + (listMode === 'blacklist' ? ($t('blacklistExplain') || '黑名单内地址直接拉黑。') : ($t('whitelistExplain') || '仅放行白名单内地址。'))" placement="top">
                 <Icon icon="lucide:help-circle" width="14" class="help-icon" />
               </el-tooltip>
-            </div>
-            <div class="cat-card-body">
-              <div class="mode-toggle-group">
-                 <button class="mode-btn" :class="{ active: listMode === 'blacklist' }" @click="setMode('blacklist')" :disabled="saving">
-                    <Icon icon="lucide:shield-off" width="18" class="mode-icon" /> {{ $t('blacklistMode') || '黑名单模式' }}
-                 </button>
-                 <button class="mode-btn" :class="{ active: listMode === 'whitelist' }" @click="setMode('whitelist')" :disabled="saving">
-                    <Icon icon="lucide:shield-check" width="18" class="mode-icon" /> {{ $t('whitelistMode') || '白名单模式' }}
-                 </button>
-              </div>
-
-              <div class="stats-row">
-                 <div class="stats-text">当前模式下生效规则：<strong>{{ listEntries.length }}</strong> 条</div>
-                 <el-button type="primary" @click="openDrawer('list')" :loading="saving">设置规则</el-button>
-              </div>
-              <div class="internal-toggle">
+          </div>
+          
+          <div class="item">
+             <div>工作模式</div>
+             <div>
+                <el-radio-group v-model="listMode" @change="saveListDirectly">
+                  <el-radio label="blacklist">黑名单模式</el-radio>
+                  <el-radio label="whitelist">白名单模式</el-radio>
+                </el-radio-group>
+             </div>
+          </div>
+          <div class="item">
+             <div>名单规则</div>
+             <div>
+                <span>当前生效规则：{{ listEntries.length }} 条</span>
+                <el-button type="primary" size="small" style="margin-left: 15px;" @click="openDrawer('list')" :loading="saving">设置规则</el-button>
+             </div>
+          </div>
+          <div class="item">
+             <div>站内邮件</div>
+             <div class="internal-toggle">
                 <el-switch v-model="blockInternalList" @change="saveListDirectly" />
-                <span class="internal-label">对站内邮件生效 (默认放行)</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- ── Panel 2: Hard Block ── -->
-          <div class="cat-card">
-             <div class="cat-card-header">
-               <Icon icon="lucide:ban" width="16" class="card-icon danger" />
-               <span>硬拦截 (Hard Block)</span>
-               <el-tooltip :content="$t('hardBlockDesc') || '符合条件的邮件直接拒收，不进入垃圾箱。'" placement="top">
-                 <Icon icon="lucide:help-circle" width="14" class="help-icon" />
-               </el-tooltip>
-             </div>
-             <div class="cat-card-body">
-               <div class="stats-row">
-                 <div class="stats-text">生效拦截规则：<strong>{{ hardBlockEntries.length }}</strong> 条</div>
-                 <el-button type="primary" @click="openDrawer('block')" :loading="saving">设置拦截</el-button>
-               </div>
-               <div class="internal-toggle">
-                 <el-switch v-model="blockInternalBlock" @change="saveBlockDirectly" />
-                 <span class="internal-label">对站内邮件生效 (默认放行)</span>
-               </div>
-             </div>
-          </div>
-
-          <!-- ── Panel 3: Content Filter ── -->
-          <div class="cat-card">
-             <div class="cat-card-header">
-               <Icon icon="lucide:file-warning" width="16" class="card-icon warning" />
-               <span>内容过滤 (Content Filter)</span>
-               <el-tooltip :content="$t('contentFilterDesc') || '根据邮件主题或正文关键词进行拦截。'" placement="top">
-                 <Icon icon="lucide:help-circle" width="14" class="help-icon" />
-               </el-tooltip>
-             </div>
-             <div class="cat-card-body">
-               <div class="stats-row">
-                 <div class="stats-text">主题关键词 <strong>{{ blackSubject.length }}</strong> 个，正文 <strong>{{ blackContent.length }}</strong> 个</div>
-                 <el-button type="primary" @click="openDrawer('content')" :loading="saving">设置关键词</el-button>
-               </div>
-               <div class="internal-toggle">
-                 <el-switch v-model="blockInternalSubject" @change="saveContentDirectly" />
-                 <span class="internal-label">主题过滤对站内邮件生效</span>
-               </div>
-               <div class="internal-toggle" style="margin-top: 8px;">
-                 <el-switch v-model="blockInternalContent" @change="saveContentDirectly" />
-                 <span class="internal-label">正文过滤对站内邮件生效</span>
-               </div>
+                <span class="internal-label">连同站内信一起阻挡 (默认放行)</span>
              </div>
           </div>
         </div>
-      </div>
+
+        <div class="container">
+          <div class="title">硬拦截 (Hard Block)
+               <el-tooltip :content="$t('hardBlockDesc') || '符合条件的邮件直接拒收，不进入垃圾箱。'" placement="top">
+                 <Icon icon="lucide:help-circle" width="14" class="help-icon" />
+               </el-tooltip>
+          </div>
+          
+          <div class="item">
+             <div>拦截规则</div>
+             <div>
+                <span>生效拦截规则：{{ hardBlockEntries.length }} 条</span>
+                <el-button type="primary" size="small" style="margin-left: 15px;" @click="openDrawer('block')" :loading="saving">设置拦截</el-button>
+             </div>
+          </div>
+          <div class="item">
+             <div>站内邮件</div>
+             <div class="internal-toggle">
+                <el-switch v-model="blockInternalBlock" @change="saveBlockDirectly" />
+                <span class="internal-label">连同站内信一起阻挡 (默认放行)</span>
+             </div>
+          </div>
+        </div>
+
+        <div class="container">
+          <div class="title">内容过滤 (Content Filter)
+               <el-tooltip :content="$t('contentFilterDesc') || '根据邮件主题或正文关键词进行拦截。'" placement="top">
+                 <Icon icon="lucide:help-circle" width="14" class="help-icon" />
+               </el-tooltip>
+          </div>
+          
+          <div class="item">
+             <div>过滤规则</div>
+             <div>
+                <span>主题关键词 {{ blackSubject.length }} 个，正文 {{ blackContent.length }} 个</span>
+                <el-button type="primary" size="small" style="margin-left: 15px;" @click="openDrawer('content')" :loading="saving">设置关键词</el-button>
+             </div>
+          </div>
+          <div class="item">
+             <div>主题过滤</div>
+             <div class="internal-toggle">
+                <el-switch v-model="blockInternalSubject" @change="saveContentDirectly" />
+                <span class="internal-label">对站内信的主题生效</span>
+             </div>
+          </div>
+          <div class="item">
+             <div>正文过滤</div>
+             <div class="internal-toggle">
+                <el-switch v-model="blockInternalContent" @change="saveContentDirectly" />
+                <span class="internal-label">对站内信的正文生效</span>
+             </div>
+          </div>
+        </div>
     </el-scrollbar>
 
     <!-- ── Drawer ── -->
@@ -404,6 +403,54 @@ async function saveContentDirectly() {
   position: relative;
   background: transparent;
 }
+.box {
+  padding: 40px 40px;
+  @media (max-width: 767px) {
+    padding: 30px 30px;
+  }
+}
+.title {
+  font-size: 18px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 20px;
+  color: var(--text-primary);
+  .help-icon { color: var(--text-secondary); cursor: pointer; }
+}
+
+.container {
+  font-size: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  margin-bottom: 40px;
+  color: var(--text-primary);
+
+  .item {
+    display: grid;
+    grid-template-columns: 80px 1fr;
+    gap: 100px;
+    align-items: center;
+
+    @media (max-width: 767px) {
+      gap: 30px;
+    }
+
+    div:first-child {
+      font-weight: bold;
+      color: var(--text-secondary);
+    }
+  }
+}
+
+.internal-toggle {
+  display: flex; align-items: center; gap: 8px;
+  .internal-label { font-size: 13px; color: var(--text-secondary); }
+}
+
+/* loading */
 .loading-overlay {
   position: absolute;
   inset: 0;
@@ -415,77 +462,7 @@ async function saveContentDirectly() {
 }
 .lo-show { opacity: 1; transition: opacity 200ms; }
 .lo-hide { opacity: 0; pointer-events: none; transition: opacity 200ms; }
-
 .cat-scroll { width: 100%; height: 100%; }
-.cat-body { padding: 30px; max-width: 900px; margin: 0 auto; }
-
-.cat-header {
-  margin-bottom: 24px;
-  .cat-title {
-    font-size: 22px; font-weight: 700; color: var(--text-primary); margin: 0;
-  }
-}
-
-.cat-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.cat-card {
-  background: transparent;
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
-  overflow: hidden;
-}
-.cat-card-header {
-  display: flex; align-items: center; gap: 8px;
-  padding: 14px 18px;
-  background: var(--bg-surface);
-  border-bottom: 1px solid var(--border-color);
-  font-size: 14px; font-weight: 600; color: var(--text-primary);
-  .card-icon { color: var(--el-color-primary); }
-  .card-icon.danger { color: var(--el-color-danger); }
-  .card-icon.warning { color: var(--el-color-warning); }
-  .help-icon { color: var(--text-secondary); cursor: pointer; margin-left: 4px; }
-}
-.cat-card-body { padding: 20px 18px; }
-
-.mode-toggle-group {
-  display: flex; gap: 12px; margin-bottom: 20px;
-}
-.mode-btn {
-  flex: 1;
-  display: flex; align-items: center; justify-content: center; gap: 8px;
-  padding: 12px;
-  background: transparent;
-  border: 1px solid var(--border-color);
-  border-radius: 8px; cursor: pointer;
-  font-size: 13.5px; font-weight: 600; color: var(--text-secondary);
-  transition: all 200ms;
-  &:hover { background: var(--bg-surface); }
-  &.active {
-    border-color: var(--el-color-primary);
-    background: var(--el-color-primary-light-9);
-    color: var(--el-color-primary);
-    .mode-icon { color: var(--el-color-primary); }
-  }
-  .mode-icon { color: var(--text-secondary); }
-}
-
-.stats-row {
-  display: flex; align-items: center; justify-content: space-between;
-  background: var(--bg-surface);
-  padding: 12px 16px; border-radius: 8px;
-  margin-bottom: 16px;
-  .stats-text { font-size: 13.5px; color: var(--text-secondary); strong { color: var(--text-primary); font-size: 15px;} }
-}
-
-.internal-toggle {
-  display: flex; align-items: center; gap: 8px;
-  .internal-label { font-size: 13px; color: var(--text-secondary); }
-}
-
 /* Drawer */
 .drawer-content { padding: 0 4px; }
 .drawer-desc { font-size: 13px; color: var(--text-secondary); margin-top: 0; margin-bottom: 20px; line-height: 1.5; }
