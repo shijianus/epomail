@@ -39,6 +39,11 @@ app.put('/email/spam', async (c) => {
 	return c.json(result.ok());
 });
 
+app.put('/email/reportNotSpam', async (c) => {
+	await emailService.reportNotSpam(c, await c.req.json(), userContext.getUserId(c));
+	return c.json(result.ok());
+});
+
 app.put('/email/snooze', async (c) => {
 	await emailService.setSnooze(c, await c.req.json(), userContext.getUserId(c));
 	return c.json(result.ok());

@@ -46,6 +46,15 @@
             <el-alert v-if="email.status === 3" :closable="false" :title="toMessage(email.message)" class="email-msg" type="error" show-icon />
             <el-alert v-if="email.status === 4" :closable="false" :title="$t('complained')" class="email-msg" type="warning" show-icon />
             <el-alert v-if="email.status === 5" :closable="false" :title="$t('delayed')" class="email-msg" type="warning" show-icon />
+            
+            <div class="spam-alert-banner" v-if="email.isSpam === 1 || (email.labels && email.labels.includes('推销'))">
+              <div class="spam-alert-content">
+                <Icon icon="mdi:alert-outline" width="18" height="18" style="flex-shrink: 0;" />
+                <span>为什么此邮件在垃圾/推销邮件中？它与过去被识别为垃圾/推销邮件的信息特征相似。</span>
+              </div>
+              <el-button size="small" type="primary" plain @click="handleReportNotSpam">这不是垃圾邮件</el-button>
+            </div>
+            
           </div>
           <el-scrollbar class="htm-scrollbar" :class="email.attList.length === 0 ? 'bottom-distance' : ''">
             <ShadowHtml class="shadow-html" :html="formatImage(email.content)" v-if="email.content" />
@@ -100,7 +109,7 @@ import ShadowHtml from '@/components/shadow-html/index.vue'
 import {reactive, ref, watch, onMounted, onUnmounted} from "vue";
 import {useRouter} from 'vue-router'
 import {ElMessage, ElMessageBox} from 'element-plus'
-import {emailDelete, emailRead} from "@/request/email.js";
+import {emailDelete, emailRead, emailReportNotSpam} from "@/request/email.js";
 import {Icon} from "@iconify/vue";
 import {useEmailStore} from "@/store/email.js";
 import {useAccountStore} from "@/store/account.js";
@@ -233,6 +242,28 @@ const handleDelete = () => {
       })
     }
 
+    emailStore.contentData.email = null
+  })
+}
+
+const handleReportNotSpam = () => {
+  emailReportNotSpam(email.emailId).then(() => {
+    ElMessage({
+      message: '已移至收件箱并加入信任名单',
+      type: 'success',
+      plain: true,
+    })
+    email.isSpam = 0;
+    if (email.labels) {
+      try {
+        let labs = JSON.parse(email.labels);
+        if (Array.isArray(labs)) {
+          labs = labs.filter(l => l !== '推销');
+          email.labels = JSON.stringify(labs);
+        }
+      } catch (e) {}
+    }
+    emailStore.deleteIds = [email.emailId]
     emailStore.contentData.email = null
   })
 }
@@ -420,6 +451,32 @@ const handleDelete = () => {
           max-width: 400px;
           width: fit-content;
           margin-top: 15px;
+        }
+
+        .spam-alert-banner {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          background: var(--el-color-warning-light-9);
+          border: 1px solid var(--el-color-warning-light-5);
+          border-radius: 8px;
+          padding: 12px 16px;
+          margin-top: 16px;
+          gap: 16px;
+
+          .spam-alert-content {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--el-color-warning-dark-2);
+            font-size: 13px;
+            line-height: 1.4;
+          }
+
+          @media (max-width: 600px) {
+            flex-direction: column;
+            align-items: flex-start;
+          }
         }
       }
 

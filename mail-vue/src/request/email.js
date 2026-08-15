@@ -20,6 +20,10 @@ export function emailRestore(emailIds) {
     return http.put('/email/restore', {emailIds})
 }
 
+export function emailReportNotSpam(emailIds) {
+    return http.put('/email/reportNotSpam', {emailIds})
+}
+
 export function emailLatest(emailId, accountId, allReceive) {
     return http.get('/email/latest', {params: {emailId, accountId, allReceive}, noMsg: true, timeout: 35 * 1000})
 }

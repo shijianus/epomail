@@ -278,6 +278,99 @@ const emailService = {
 		}
 	},
 
+	async reportNotSpam(c, params, userId) {
+		const { emailIds } = params;
+		const emailIdList = emailIds.split(',').map(Number);
+		
+		// 1. Move email back to inbox
+		const emailRows = await orm(c).update(email).set({ 
+			isSpam: 0, 
+			isDel: 0, 
+			snoozedTime: null 
+		}).where(
+			and(
+				eq(email.userId, userId),
+				inArray(email.emailId, emailIdList)
+			)
+		).returning().all();
+
+		if (emailRows.length === 0) return;
+
+		// 2. Extract unique senders
+		const senders = [];
+		for (const row of emailRows) {
+			if (row.sendEmail) {
+				const match = row.sendEmail.match(/<([^>]+)>/);
+				const cleanSender = match ? match[1].trim() : row.sendEmail.trim();
+				if (!senders.includes(cleanSender)) {
+					senders.push(cleanSender);
+				}
+			}
+		}
+
+		if (senders.length === 0) return;
+
+		// 3. Add senders to user's Whitelist (信任名单)
+		const userRow = await orm(c).select().from(user).where(eq(user.userId, userId)).get();
+		let customLabels = userRow.customLabels;
+		let labelsObj = [];
+		try {
+			labelsObj = JSON.parse(customLabels || '[]');
+			if (!Array.isArray(labelsObj)) {
+			   if (labelsObj && Array.isArray(labelsObj.customLabels)) {
+				   labelsObj = labelsObj.customLabels;
+			   } else {
+				   labelsObj = [];
+			   }
+			}
+		} catch (e) {
+			labelsObj = [];
+		}
+
+		let whitelistLabel = labelsObj.find(l => l.name === '信任名单');
+		if (!whitelistLabel) {
+			whitelistLabel = {
+				id: Date.now().toString(),
+				name: '信任名单',
+				actions: { priority: 1, stopProcessing: true },
+				rules: [{
+					id: Date.now().toString() + 'r',
+					condition: { type: 'sender_is', value: '' },
+					exception: { type: 'none', value: '' }
+				}]
+			};
+			labelsObj.push(whitelistLabel);
+		}
+
+		// Update sender list
+		const cond = whitelistLabel.rules[0].condition;
+		const existingSenders = cond.value ? cond.value.split(',').map(s => s.trim()) : [];
+		
+		let updated = false;
+		for (const s of senders) {
+			if (!existingSenders.includes(s)) {
+				existingSenders.push(s);
+				updated = true;
+			}
+		}
+
+		if (updated) {
+			cond.value = existingSenders.join(',');
+			
+			// ensure priority
+			whitelistLabel.actions = { priority: 1, stopProcessing: true };
+
+			// Save back
+			await orm(c).update(user).set({ customLabels: JSON.stringify(labelsObj) }).where(eq(user.userId, userId)).run();
+			
+			const authInfo = await c.env.kv.get(kvConst.AUTH_INFO + userId, { type: 'json' });
+			if (authInfo && authInfo.user) {
+				authInfo.user.customLabels = JSON.stringify(labelsObj);
+				await c.env.kv.put(kvConst.AUTH_INFO + userId, JSON.stringify(authInfo), { expirationTtl: 60 * 60 * 24 * 7 });
+			}
+		}
+	},
+
 	async setSpam(c, params, userId) {
 		const { emailIds, isSpam } = params;
 		const emailIdList = emailIds.split(',').map(Number);

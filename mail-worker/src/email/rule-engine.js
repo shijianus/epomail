@@ -62,7 +62,7 @@ const SYSTEM_CATEGORIES = {
 };
 
 export function applyRules(emailParams, userLabelsJson, blackFromStr = '') {
-  if (!userLabelsJson) return '[]';
+  if (!userLabelsJson) return { labelsStr: '[]', actions: {} };
 
   // Parse blackFrom mode and list
   let listMode = 'blacklist';
@@ -111,9 +111,22 @@ export function applyRules(emailParams, userLabelsJson, blackFromStr = '') {
       }
     }
 
-    if (labels.length === 0) return '[]';
+    if (labels.length === 0) return { labelsStr: '[]', actions: {} };
+
+    // SORT LABELS FOR WATERFALL (Level 1 > Level 2 > Level 3)
+    labels.sort((a, b) => {
+      // Level 1: Labels explicitly having actions.priority (lower number = higher priority), or hardcoded '信任名单'/'黑名单'
+      const getPriority = (label) => {
+         if (label.actions && typeof label.actions.priority === 'number') return label.actions.priority;
+         if (label.name === '信任名单' || label.name === '黑名单') return 1;
+         if (SYSTEM_CATEGORIES.hasOwnProperty(label.name)) return 3; // Level 3: System templates
+         return 2; // Level 2: Custom user rules
+      };
+      return getPriority(a) - getPriority(b);
+    });
 
     const matchedLabels = [];
+    const finalActions = {};
     
     const sender = (emailParams.sendEmail || '').toLowerCase();
     const senderMatch = sender.match(/<([^>]+)>/);
@@ -130,20 +143,17 @@ export function applyRules(emailParams, userLabelsJson, blackFromStr = '') {
       
       // 1. 系统设置：基于底层配置的启发式归类 (动态映射)
       if (isSystemCategory) {
-        // 如果是"订阅"或"推销"，则混合启发式与黑白名单逻辑
         if (label.name === '订阅' || label.name === '推销') {
           const isOnList = matchesSenderList(cleanSender);
-          // 订阅: 在白名单时，白名单内的邮件被归类；在黑名单时，非黑名单内的邮件被归类
-          // 推销: 在白名单时，非白名单内的邮件被归类；在黑名单时，黑名单内的邮件被归类
           let isSubAllowed = false;
           let isPromoBlocked = false;
           
           if (listMode === 'whitelist') {
-             isSubAllowed = isOnList; // whitelist logic for 订阅
-             isPromoBlocked = !isOnList; // whitelist logic for 推销
+             isSubAllowed = isOnList;
+             isPromoBlocked = !isOnList;
           } else {
-             isSubAllowed = !isOnList; // blacklist logic for 订阅
-             isPromoBlocked = isOnList; // blacklist logic for 推销
+             isSubAllowed = !isOnList;
+             isPromoBlocked = isOnList;
           }
 
           if (label.name === '订阅') {
@@ -216,13 +226,12 @@ export function applyRules(emailParams, userLabelsJson, blackFromStr = '') {
           const hasCondition = rule.condition && rule.condition.type && rule.condition.type !== 'none';
           const hasException = rule.exception && rule.exception.type && rule.exception.type !== 'none';
 
-          // 如果只有排除规则，没有包含规则，表示默认包含所有（匹配一切）
           let conditionMatched = false;
           if (!hasCondition) {
             if (!isSystemCategory) {
-              conditionMatched = true; // 默认匹配全部
+              conditionMatched = true;
             } else {
-              conditionMatched = matched; // 如果是系统分类，依赖系统的默认匹配结果
+              conditionMatched = matched;
             }
           } else {
             conditionMatched = checkCondition(rule.condition);
@@ -235,7 +244,7 @@ export function applyRules(emailParams, userLabelsJson, blackFromStr = '') {
             }
             
             if (exceptionHit) {
-              vetoed = true; // 命中排除补丁，一票否决当前规则，甚至可能否决系统基础分类
+              vetoed = true;
             } else {
               matched = true;
             }
@@ -243,15 +252,24 @@ export function applyRules(emailParams, userLabelsJson, blackFromStr = '') {
         }
       }
 
-      // 如果匹配并且没有被一票否决，则打上标签
       if (matched && !vetoed && label.name) {
-        matchedLabels.push(label.name);
+        if (!label.name.startsWith('__')) {
+            matchedLabels.push(label.name);
+        }
+        
+        if (label.actions) {
+            Object.assign(finalActions, label.actions);
+        }
+        
+        if (label.actions && label.actions.stopProcessing) {
+            break; // Stop evaluating further rules in waterfall
+        }
       }
     }
 
-    return JSON.stringify(matchedLabels);
+    return { labelsStr: JSON.stringify(matchedLabels), actions: finalActions };
   } catch (e) {
     console.error('Rule engine error', e);
-    return '[]';
+    return { labelsStr: '[]', actions: {} };
   }
 }

@@ -113,6 +113,39 @@ export async function email(message, env, ctx) {
 		const toName = email.to.find(item => item.address === message.to)?.name || '';
 		const code = await aiService.extractCode({ env }, email, { aiCode, aiCodeFilter });
 
+		const ruleResult = applyRules({
+			sendEmail: email.from.address,
+			subject: email.subject,
+			content: email.html,
+			text: email.text,
+			recipient: JSON.stringify(email.to)
+		}, userRow.customLabels, blackFrom);
+        
+		let finalLabelsStr = '[]';
+		let ruleActions = {};
+		if (ruleResult) {
+			finalLabelsStr = ruleResult.labelsStr || '[]';
+			ruleActions = ruleResult.actions || {};
+		}
+
+		let isSpamVal = 0;
+		let isDelVal = isDel.NORMAL;
+		let unreadVal = emailConst.unread.UNREAD;
+		
+		if (ruleActions.targetFolder === 'spam') {
+			isSpamVal = 1;
+		} else if (ruleActions.targetFolder === 'trash') {
+			isDelVal = isDel.DELETE;
+		}
+		
+		if (ruleActions.markAsRead) {
+			unreadVal = emailConst.unread.READ;
+		}
+		
+		if (blockFlag) {
+			isDelVal = isDel.DELETE;
+		}
+
 		const params = {
 			toEmail: message.to,
 			toName: toName,
@@ -131,14 +164,10 @@ export async function email(message, env, ctx) {
 			userId: account ? account.userId : 0,
 			accountId: account ? account.accountId : 0,
 			isDel: isDel.DELETE,
+			isSpam: isSpamVal,
+			unread: unreadVal,
 			status: emailConst.status.SAVING,
-			labels: applyRules({
-				sendEmail: email.from.address,
-				subject: email.subject,
-				content: email.html,
-				text: email.text,
-				recipient: JSON.stringify(email.to)
-			}, userRow.customLabels, blackFrom)
+			labels: finalLabelsStr
 		};
 
 		const attachments = [];
@@ -170,7 +199,7 @@ export async function email(message, env, ctx) {
 			console.error(e);
 		}
 
-		emailRow = await emailService.completeReceive({ env }, account ? emailConst.status.RECEIVE : emailConst.status.NOONE, emailRow.emailId, blockFlag ? isDel.DELETE : isDel.NORMAL);
+		emailRow = await emailService.completeReceive({ env }, account ? emailConst.status.RECEIVE : emailConst.status.NOONE, emailRow.emailId, isDelVal);
 
 
 		if (ruleType === settingConst.ruleType.RULE) {
