@@ -449,3 +449,11 @@
     *   已成功使用 `wrangler deploy` 推送至线上 `epomail.epocanvas.workers.dev` 节点 (部署版本 ID：`9bb5cdd5`)。
     *   本地测试发现页面黑屏，经严格的堆栈排查（JS Stack Trace）后确认根因为 `npm run dev` 未桥接后端 API，触发 `AxiosError: Network Error`，进而导致权限数组 `permKeys` 呈 `undefined` 而使 `perm.js` 中的 `.includes()` 拦截崩溃（此情况仅发生在脱机本地环境）。
     *   因线上 Cloudflare API 正常运作，线上版本不会遭遇此故障，修改本身安全且圆满完成。
+
+### 撤销：将 Workers AI 与邮件设置恢复至系统设置 (2026-08-15)
+*   **任务目标 (Goal)**: 用户认为迁移操作不合格，要求撤销自 `79fdf2b` 开始的更改，并将 "Workers AI" 与 "邮件设置 (Email Settings)" 重新恢复至 "系统设置 (System Settings)"。
+*   **安全回退 (Rollback)**: 严格遵循 SOP 指南，避免破坏 Git 提交历史（不使用 `reset --hard` 等指令）。使用 `git checkout 54d6575 -- mail-vue/src/views/label-setting/index.vue mail-vue/src/views/sys-setting/index.vue` 精准回溯涉及的两个文件内容至迁移前（即 Commit `54d6575`）的状态。
+*   **验证与部署 (Verify & Deploy)**: 
+    *   本地使用 `npm run build` 重新编译 Vue 组件成功，结构恢复为原始配置。
+    *   执行 `wrangler deploy` 成功将恢复后的前端推送到 Cloudflare 网络。
+    *   由于只涉及旧版代码内容的安全回退，直接沿用以前的稳定代码。所有功能块（`Workers AI`, `邮件管理`）重现在系统设置面板，并能正常呼出。
