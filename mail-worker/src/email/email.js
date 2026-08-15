@@ -260,14 +260,24 @@ function checkBlock(blackSubjectStr, blackContentStr, blackFromStr, email, env) 
 		regularContentList = blackContentStr ? blackContentStr.split(',').filter(Boolean) : [];
 	}
 
+	function matchesSender(entry, address, domain) {
+		const e = entry.trim().toLowerCase();
+		if (!e) return false;
+		if (e.includes('*')) {
+			const escaped = e.replace(/[.+?^${}()|[\]\\]/g, '\\$&');
+			const regex = new RegExp('^' + escaped.replace(/\\\*/g, '.*') + '$');
+			return regex.test(address) || regex.test(domain);
+		}
+		if (e.includes('@')) {
+			return address === e;
+		}
+		return domain === e || domain.endsWith('.' + e);
+	}
+
 	if (!isInternal || blockInternalBlock) {
 		for (const blockEntry of hardBlockList) {
-			const b = blockEntry.trim().toLowerCase();
-			if (!b) continue;
-			if (b.includes('@')) {
-				if (senderAddress === b) return { block: true, hardBlock: true };
-			} else {
-				if (senderDomain === b || senderDomain.endsWith('.' + b)) return { block: true, hardBlock: true };
+			if (matchesSender(blockEntry, senderAddress, senderDomain)) {
+				return { block: true, hardBlock: true };
 			}
 		}
 
@@ -316,21 +326,12 @@ function checkBlock(blackSubjectStr, blackContentStr, blackFromStr, email, env) 
 			}
 		}
 
-		function matchesSender(entry) {
-			const e = entry.trim().toLowerCase();
-			if (!e) return false;
-			if (e.includes('@')) {
-				return senderAddress === e;
-			}
-			return senderDomain === e || senderDomain.endsWith('.' + e);
-		}
-
 		if (listMode === 'whitelist') {
-			const isOnList = fromList.some(matchesSender);
+			const isOnList = fromList.some(e => matchesSender(e, senderAddress, senderDomain));
 			if (!isOnList) return { block: true, hardBlock: false };
 		} else if (listMode === 'blacklist') {
 			if (fromList.length > 0) {
-				const isOnList = fromList.some(matchesSender);
+				const isOnList = fromList.some(e => matchesSender(e, senderAddress, senderDomain));
 				if (isOnList) return { block: true, hardBlock: false };
 			}
 		}

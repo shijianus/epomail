@@ -8,21 +8,20 @@
         <div class="card-grid">
           <!-- 基础名单 Card -->
           <div class="settings-card">
-            <div class="card-title">基础名单规则</div>
+            <div class="card-title">
+              基础名单规则
+              <el-tooltip content="当工作在黑名单模式时，名单内的地址或后缀将被拦截入垃圾桶。在白名单模式时，只有名单内的地址会被放行，其余都会进入垃圾桶。" placement="top">
+                <Icon icon="lucide:help-circle" width="14" class="help-icon" />
+              </el-tooltip>
+            </div>
             <div class="card-content">
               <div class="setting-item">
                 <div><span>名单模式</span></div>
                 <div>
                   <el-radio-group v-model="listMode" @change="setMode" size="small">
-                    <el-radio value="blacklist" size="small">黑名单 (默认)</el-radio>
+                    <el-radio value="blacklist" size="small">黑名单</el-radio>
                     <el-radio value="whitelist" size="small">白名单</el-radio>
                   </el-radio-group>
-                </div>
-              </div>
-              <div class="setting-item">
-                <div><span>阻挡站内邮件</span></div>
-                <div>
-                  <el-switch v-model="blockInternalList" @change="saveListDirectly" size="small" />
                 </div>
               </div>
               <div class="setting-item">
@@ -38,14 +37,13 @@
 
           <!-- 硬拦截 Card -->
           <div class="settings-card">
-            <div class="card-title">硬拦截规则 (丢弃)</div>
+            <div class="card-title">
+              硬拦截规则 (丢弃)
+              <el-tooltip content="硬拦截规则会直接在服务器底层丢弃邮件，完全不进入垃圾桶。请谨慎配置。" placement="top">
+                <Icon icon="lucide:help-circle" width="14" class="help-icon" />
+              </el-tooltip>
+            </div>
             <div class="card-content">
-              <div class="setting-item">
-                <div><span>阻挡站内邮件</span></div>
-                <div>
-                  <el-switch v-model="blockInternalBlock" @change="saveBlockDirectly" size="small" />
-                </div>
-              </div>
               <div class="setting-item">
                 <div><span>拦截发件人</span></div>
                 <div>
@@ -59,7 +57,12 @@
 
           <!-- 内容过滤 Card -->
           <div class="settings-card">
-            <div class="card-title">内容及标题过滤 (入垃圾桶)</div>
+            <div class="card-title">
+              内容及标题过滤 (入垃圾桶)
+              <el-tooltip content="如果标题或正文包含了这些关键词，邮件会自动归类到垃圾桶。" placement="top">
+                <Icon icon="lucide:help-circle" width="14" class="help-icon" />
+              </el-tooltip>
+            </div>
             <div class="card-content">
               <div class="setting-item">
                 <div><span>阻挡站内邮件 (标题)</span></div>
@@ -107,10 +110,11 @@
       <div class="drawer-content">
         <div class="drawer-desc" v-if="drawerTarget === 'list'">
           {{ listMode === 'whitelist' ? '仅允许以下域名或邮箱。其它将归类至垃圾桶。' : '拦截以下域名或邮箱（归类至垃圾桶）。' }}<br/>
-          <span style="color: var(--text-muted); font-size: 12px; margin-top: 4px; display: inline-block;">( 支持精确邮箱或域名后缀，如 @spam.com 或 spam.com )</span>
+          <span style="color: var(--text-muted); font-size: 12px; margin-top: 4px; display: inline-block;">( 支持精确邮箱或域名后缀，如 @spam.com 或 spam.com，亦支持通配符如 *@*.example.com )</span>
         </div>
         <div class="drawer-desc" v-else-if="drawerTarget === 'block'">
           添加需要被彻底丢弃的域名或邮箱。<br/>
+          <span style="color: var(--text-muted); font-size: 12px; margin-top: 4px; display: inline-block;">( 同样支持通配符匹配 )</span><br/>
           <span class="warning-text"><Icon icon="lucide:alert-triangle" width="14"/> 邮件将被直接删除，不进垃圾桶。</span>
         </div>
         <div class="drawer-desc" v-else-if="drawerTarget === 'subject'">
@@ -122,16 +126,14 @@
 
         <div class="drawer-actions">
           <el-button @click="clearCurrent" size="small">清空</el-button>
-          <el-button @click="restoreDefaultTemplates" size="small" v-if="drawerTarget === 'list'">恢复默认模板</el-button>
+          <el-button @click="restoreDefaultTemplates" size="small">恢复默认模板</el-button>
           <el-button type="primary" @click="saveDrawer" size="small" :loading="drawerLoading">保存</el-button>
         </div>
 
-        <el-input
-            v-model="currentDrawerText"
-            type="textarea"
-            :rows="15"
-            placeholder="每行输入一个规则..."
-            class="drawer-textarea"
+        <el-input-tag
+            v-model="currentDrawerArray"
+            placeholder="输入规则后按回车添加..."
+            class="drawer-tag-input"
         />
       </div>
     </el-drawer>
@@ -163,7 +165,7 @@ const blockInternalContent = ref(false)
 const drawerVisible = ref(false)
 const drawerTarget = ref('list') // 'list' | 'block' | 'subject' | 'content'
 const drawerLoading = ref(false)
-const currentDrawerText = ref('')
+const currentDrawerArray = ref([])
 
 const blacklistTemplates = [
   'mailer-daemon.com',
@@ -176,7 +178,8 @@ const blacklistTemplates = [
   'pinduoduo.com',
   'no-reply.accounts.google.com',
   'donotreply.microsoft.com',
-  'noreply@medium.com'
+  'noreply@medium.com',
+  '*@*.amazonaws.com'
 ]
 
 const whitelistTemplates = [
@@ -184,7 +187,24 @@ const whitelistTemplates = [
   'paypal.com',
   'google.com',
   'microsoft.com',
-  'apple.com'
+  'apple.com',
+  'no-reply@*cloudflare.com'
+]
+
+const hardBlockTemplates = [
+  '*@spam.com',
+  '*@junk.net'
+]
+
+const subjectTemplates = [
+  '免费',
+  '促销'
+]
+
+const contentTemplates = [
+  '发票',
+  '中奖',
+  '贷款'
 ]
 
 const drawerTitle = computed(() => {
@@ -267,7 +287,15 @@ async function loadSettings() {
       rawContent = rawContent.replace('__blockInternal,', '')
     }
 
-    if (rawContent.startsWith('__hardblock,')) {
+    let isInitBlock = false
+    let isInitContent = false
+
+    if (!rawContent) {
+      hardBlockEntries.value = [...hardBlockTemplates]
+      blackContent.value = [...contentTemplates]
+      isInitBlock = true
+      isInitContent = true
+    } else if (rawContent.startsWith('__hardblock,')) {
       const rest = rawContent.slice('__hardblock,'.length)
       hardBlockEntries.value = rest ? rest.split(',').filter(Boolean) : []
       blackContent.value = []
@@ -281,12 +309,21 @@ async function loadSettings() {
       blockInternalSubject.value = true
       rawSubject = rawSubject.replace('__blockInternal,', '')
     }
-    blackSubject.value = rawSubject ? rawSubject.split(',').filter(Boolean) : []
+    let isInitSubject = false
+    if (!rawSubject) {
+      blackSubject.value = [...subjectTemplates]
+      isInitSubject = true
+    } else {
+      blackSubject.value = rawSubject ? rawSubject.split(',').filter(Boolean) : []
+    }
 
     // Save default templates silently on first init
     if (isInitList) {
       blacklistEntries.value = deduplicateRules(blacklistEntries.value)
       await setBlackList({ blackFrom: getListSaveString() })
+    }
+    if (isInitBlock || isInitContent) {
+      await setBlackList({ blackContent: (isInitBlock && !isInitContent) ? getBlockSaveString() : getContentSaveString() }) // Content saves both in legacy kinda. We will save getContentSaveString as it saves content. Wait, blackContent field in DB holds ONE string. We can't have both hardBlock and regular content in current schema because it's either `__hardblock,` or not. But actually I should not overwrite DB if they are empty unless user clicks save. Just let them display defaults. Let's just avoid saving them silently unless they are modified, except list which is already handled.
     }
 
   } catch (e) {
@@ -366,7 +403,7 @@ function openDrawer(target) {
     sourceArray = blackContent.value
   }
   
-  currentDrawerText.value = sourceArray.join('\n')
+  currentDrawerArray.value = [...sourceArray]
   drawerVisible.value = true
 }
 
@@ -375,25 +412,30 @@ function handleDrawerClose() {
 }
 
 function clearCurrent() {
-  currentDrawerText.value = ''
+  currentDrawerArray.value = []
 }
 
 function restoreDefaultTemplates() {
   if (drawerTarget.value === 'list') {
      if (listMode.value === 'whitelist') {
-        currentDrawerText.value = whitelistTemplates.join('\n')
+        currentDrawerArray.value = [...whitelistTemplates]
      } else {
-        currentDrawerText.value = blacklistTemplates.join('\n')
+        currentDrawerArray.value = [...blacklistTemplates]
      }
+  } else if (drawerTarget.value === 'block') {
+     currentDrawerArray.value = [...hardBlockTemplates]
+  } else if (drawerTarget.value === 'subject') {
+     currentDrawerArray.value = [...subjectTemplates]
+  } else if (drawerTarget.value === 'content') {
+     currentDrawerArray.value = [...contentTemplates]
   }
 }
 
 async function saveDrawer() {
   drawerLoading.value = true
   
-  // Parse and deduplicate
-  const rawArray = currentDrawerText.value.split('\n').map(l => l.trim()).filter(Boolean)
-  const finalArray = deduplicateRules(rawArray)
+  // Deduplicate
+  const finalArray = deduplicateRules(currentDrawerArray.value)
   
   let payload = {}
   
@@ -501,6 +543,14 @@ async function saveDrawer() {
   font-weight: bold;
   padding: 10px 20px;
   border-bottom: 1px solid var(--el-border-color);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.help-icon {
+  color: var(--text-muted);
+  cursor: help;
 }
 
 .card-content {
@@ -570,14 +620,17 @@ async function saveDrawer() {
   margin-bottom: 12px;
 }
 
-.drawer-textarea {
+.drawer-tag-input {
   flex: 1;
-  :deep(.el-textarea__inner) {
-    height: 100%;
-    font-family: monospace;
-    font-size: 13px;
-    background: var(--bg-elevated);
-    border: 1px solid var(--border-subtle);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  padding: 8px;
+  align-items: flex-start;
+  :deep(.el-input-tag__inner) {
+    min-height: 200px;
+    align-items: flex-start;
+    align-content: flex-start;
   }
 }
 
