@@ -50,8 +50,12 @@ const emailService = {
 		}
 
 		if (isNaN(allReceive)) {
-			let accountRow = await accountService.selectById(c, accountId);
-			allReceive = accountRow.allReceive;
+			if (!accountId || isNaN(accountId)) {
+				allReceive = 1;
+			} else {
+				let accountRow = await accountService.selectById(c, accountId);
+				allReceive = accountRow ? accountRow.allReceive : 1;
+			}
 		}
 
 		const query = orm(c)

@@ -221,6 +221,15 @@
 *   **统一化搜索体验 (Search Bar Harmonization)**: `77b1c28` — 将“全部邮件”专区的搜索功能重新绑定至全局导航栏搜索框，抛弃了旧版的下拉选框形式。现在的搜索行为与普通搜索一致：输入即触发 (400ms debounce)，无需按下 Enter。
 *   **全表无感搜索 (Global Fuzzy Search)**: 当用户在全部邮件内进行纯文本搜索时，后端引擎会自动执行对 `subject`, `name`, `sendEmail`, 和 `toEmail` 的 `OR` 联合查询匹配，实现了真正的全局模糊搜索，且保持了高效率。
 *   **智能高亮 (Yellow Highlighting)**: 重构了 `emailStore` 和 `highlightMatch` 逻辑。实现了原生的文本黄色背景标记 (`<mark style="background-color: yellow;">`)，任何检索出的自由关键字将立刻在结果列表中被显眼地标出。
+
+### 修复：前端错误吞咽问题与 Inbox 500 崩溃修复 (2026-08-14)
+*   **根因分析 (Root Cause)**:
+    1. **前端错误吞咽 (Error Swallowing)**：`temp_login_ui/src/app/components/epomail/AuthForm.tsx` 中遇到非 200 返回码时，原代码使用 `alert(data.msg || 'Login failed')`。由于后端抛出 `BizError` 返回的对象结构中包含的是 `message` 而非 `msg`，导致任何真实错误（如 `IncorrectPwd`, `notExistUser`，或后端其他崩溃等）都被无情覆盖为一句泛泛的 "Login failed"。这导致用户在密码正确但后端发生其他问题时，收到误导性的登录失败提示。
+    2. **Inbox 接口崩溃 (Backend Crash)**：在用户登录成功并获取 token 后，前端跳转至 `inbox`，并向后端请求 `/api/email/list`。由于请求没有传递 `accountId` 且默认解析结果为 `NaN`，`email-service.js` 内部执行 `accountService.selectById(c, accountId)` 返回 `undefined`，紧接着在执行 `accountRow.allReceive` 时触发了 `Cannot read properties of undefined (reading 'allReceive')` 500 致命错误。
+*   **修复 (Fix)**:
+    *   **前端**：修正了 `alert(data.message || data.msg || 'Login failed')`，确保可以真实显示后端的报错细节。并增加了 fetch catch 块中的 `err.message` 反馈。
+    *   **后端**：在 `mail-worker/src/service/email-service.js` 中增加防御性编程。当 `accountId` 不存在或为 `NaN` 时，直接将 `allReceive` 默认赋予 1，如果 `accountRow` 查不到也赋予 1，彻底避免解构空指针的崩溃。
+*   **验证与合规性 (Verification & Compliance)**: 已部署至 Cloudflare 线上环境。运行 `tests/verify_fix.js` 自动验证通过（Inbox等接口全部返回 200，截取了正确界面的 Screenshot）。已同步遵守 Git 向前推进的规范。
 *   **全量 i18n 翻译及 $ 语法提示 (Multilingual Syntax + Auto-complete)**:
     *   统一修复了 `search`, `searchSettings` 在多语言下的对应键值（摒弃了错误的 `research` 等）。
     *   在英文版中，Tab 提示支持如 `$Sender admin`；中文版中则支持 `$发件人 admin`，搜索提示下拉框的展示文字现在完全按照当前的系统语种 (Display Value) 来渲染。
