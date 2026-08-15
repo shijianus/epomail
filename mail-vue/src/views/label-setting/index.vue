@@ -546,7 +546,7 @@ import { getTextWidth } from "@/utils/text.js";
 import { isDomain, isEmail } from "@/utils/verify-utils.js";
 
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const uiStore = useUiStore()
 const accountStore = useAccountStore()
 
