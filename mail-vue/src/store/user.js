@@ -61,9 +61,9 @@ export const useUserStore = defineStore('user', {
                                     }
                                 })
 
-                                // ② 过滤废弃的标签（工作、含旧版黑白名单条件的）
+                                // ② 过滤废弃的标签（系统设置、含旧版黑白名单条件的）
                                 const filtered = merged.filter(label => {
-                                    if (['工作'].includes(label.name)) return false
+                                    if (['系统设置'].includes(label.name)) return false
                                     if (!label.rules) return true
                                     return !label.rules.some(r =>
                                         (r.condition && (r.condition.type === 'in_blacklist' || r.condition.type === 'in_whitelist')) ||
@@ -80,7 +80,8 @@ export const useUserStore = defineStore('user', {
                             }
                         }
 
-                        // ④ 兜底：无论 DB 里数据如何，始终保证系统默认标签的规则完整性
+                        // ④ 全局清理废弃的“系统设置”标签，然后再兜底规则
+                        uiStore.allLabels = uiStore.allLabels.filter(l => l.name !== '系统设置')
                         uiStore.ensureDefaultRules()
 
                     } catch (e) {

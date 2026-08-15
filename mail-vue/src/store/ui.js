@@ -11,7 +11,7 @@ export const BUILTIN_LABELS = [
   { name: '推销', icon: 'ic:outline-local-offer', color: '#f59e0b', listVis: true, stats: { total: 0, current: 0, unread: 0 }, rules: [
     { condition: { type: 'system_setting', value: '' } }
   ]},
-  { name: '系统设置', icon: 'ic:outline-settings', color: '#8b5cf6', listVis: true, stats: { total: 0, current: 0, unread: 0 }, rules: []}
+  { name: '工作', icon: 'ic:outline-work-outline', color: '#8b5cf6', listVis: true, stats: { total: 0, current: 0, unread: 0 }, rules: []}
 ]
 
 export const MAX_LABELS = 7
@@ -39,7 +39,7 @@ export const useUiStore = defineStore('ui', {
           { name: '推销', icon: 'ic:outline-local-offer', color: '#f59e0b', listVis: true, stats: { total: 0, current: 0, unread: 0 }, rules: [
             { condition: { type: 'system_setting', value: '' } }
           ]},
-          { name: '系统设置', icon: 'ic:outline-settings', color: '#8b5cf6', listVis: true, stats: { total: 0, current: 0, unread: 0 }, rules: []}
+          { name: '工作', icon: 'ic:outline-work-outline', color: '#8b5cf6', listVis: true, stats: { total: 0, current: 0, unread: 0 }, rules: []}
         ],
         customSvgs: [],
         asideCount: {
@@ -68,15 +68,15 @@ export const useUiStore = defineStore('ui', {
                 '社群': [{ condition: { type: 'sender_address_includes', value: 'gmail.com, outlook.com, qq.com, 163.com, yahoo.com, hotmail.com, foxmail.com, sina.com' } }],
                 '订阅': [{ condition: { type: 'system_setting', value: '' } }],
                 '推销': [{ condition: { type: 'system_setting', value: '' } }],
-                '系统设置': []
+                '工作': []
             }
 
-            // 强制恢复被错误删除的系统设置标签
-            if (!this.allLabels.some(l => l.name === '系统设置')) {
-                this.allLabels.push({ name: '系统设置', icon: 'ic:outline-settings', color: '#8b5cf6', listVis: true, stats: { total: 0, current: 0, unread: 0 }, rules: [] })
+            // 强制恢复被错误删除的工作标签
+            if (!this.allLabels.some(l => l.name === '工作')) {
+                this.allLabels.push({ name: '工作', icon: 'ic:outline-work-outline', color: '#8b5cf6', listVis: true, stats: { total: 0, current: 0, unread: 0 }, rules: [] })
             }
 
-            // 保证内置标签存在（如果被删则不重注入——除了系统设置外，其他均允许用户删除）
+            // 保证内置标签存在（如果被删则不重注入——除了工作外，其他均允许用户删除）
             this.allLabels.forEach(label => {
                 const canonicals = CANONICAL[label.name]
                 if (!canonicals) return

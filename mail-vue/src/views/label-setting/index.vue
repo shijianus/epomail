@@ -628,15 +628,26 @@ const removeRule = (index) => {
 }
 
 const saveLabel = () => {
-  if (!form.value.name.trim()) {
+  const name = form.value.name.trim()
+  if (!name) {
     ElMessage.warning(t('labelNameRequired') || 'Label name is required')
     return
   }
   
+  let len = 0;
+  for (let i = 0; i < name.length; i++) {
+    len += name.charCodeAt(i) > 255 ? 2 : 1;
+  }
+  
+  if (len > 18) {
+    ElMessage.warning(t('labelNameTooLong') || '名称不能超过18个拉丁字符（中文占2个字符）')
+    return
+  }
+  
   if (editIndex.value > -1) {
-    uiStore.allLabels[editIndex.value] = { ...form.value }
+    uiStore.allLabels[editIndex.value] = { ...form.value, name }
   } else {
-    uiStore.allLabels.push({ ...form.value })
+    uiStore.allLabels.push({ ...form.value, name })
   }
   isEditorOpen.value = false
 }
