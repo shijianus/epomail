@@ -370,3 +370,12 @@
     *   **强制阻断 (Hard Block)**: 在 `mail-worker/src/email/email.js` 的 `checkBlock` 中新引入了对 `__hardblock,` 前缀的解析与优先级最高的阻断判定，确保命中纯黑名单的邮件会在连接阶段直接返回 `message.setReject()` 并抛弃，彻底防止入库。
     *   **软拦截至垃圾箱 (Soft Block to Spam)**: 对于常规的黑名单规则（即未通过正常白名单/命中黑名单但不属于硬拦截），邮件将正常接收入库，但在保存至 Cloudflare D1 数据库时会被标记为 `isDel: 1`。配合前端 UI，使得这些邮件在默认情况下自动进入“垃圾箱 (Trash/Spam)”而不会污染主收件箱。
 *   **体验验收**: 虽然目前缺乏直观的 UI 数据，但通过本地 `npm run dev` 构建并利用 Playwright 成功捕捉并验收了不同分辨率的动画帧；已将代码执行部署流程。
+
+### 分类管理(黑白名单/内容过滤) UI/UX 极致简化重构 (2026-08-14)
+*   **安全备份 (Backup)**: `c443232` — 重构前包含所有遗留 UI，逻辑庞杂、展现形式臃肿。
+*   **重构行动 (Refactor)**: 对 `mail-vue/src/views/category-setting/index.vue` 进行了全面的界面清理与逻辑分离。
+    *   **极简主义面板 (Minimalist Panel)**：去除了主页面的长篇大论（垃圾话）和长宽不一的杂乱列表区域，改为三个清晰的统计状态卡片（基础名单、硬拦截、内容过滤）。所有说明性文字均通过 `?` 图标与 Tooltip 进行无侵入展示。
+    *   **抽屉式交互 (Drawer Extensions)**：将繁琐的规则增删挪入了统一规范的抽屉（Drawer）面板，采用标签化（`el-input-tag`）批量输入，避免了占用主视角。
+    *   **去重逻辑注入 (Auto Deduplication)**：保存时，自动执行层级包含过滤（例如输入了 `gmail.com` 后，任何 `test@gmail.com` 的具体地址将被自动去重移除），保证底层数据的最简化。
+    *   **基础模板伴随 (Built-in Templates Initializer)**：初始化时自动加载并注入 12 个基本模板（如 `mailer-daemon.com` 等），站长有权通过标签管理形式进行随心修改或删除。
+*   **验证与部署 (Verify & Deploy)**: 已通过本地 Playwright 在 `1440px` 和 `375px` 分辨率下完成截图视觉验收，无视觉溢出或滚动条重叠，且已由 `wrangler` 发布至线上。
