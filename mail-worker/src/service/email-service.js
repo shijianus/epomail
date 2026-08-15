@@ -1198,9 +1198,9 @@ const emailService = {
 		await orm(c).update(email).set({ isDel: isDel.NORMAL }).where(eq(email.userId, userId)).run();
 	},
 
-	async completeReceive(c, status, emailId) {
+	async completeReceive(c, status, emailId, delStatus) {
 		return await orm(c).update(email).set({
-			isDel: isDel.NORMAL,
+			isDel: delStatus !== undefined ? delStatus : isDel.NORMAL,
 			status: status
 		}).where(eq(email.emailId, emailId)).returning().get();
 	},

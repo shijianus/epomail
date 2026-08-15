@@ -58,9 +58,9 @@ export async function email(message, env, ctx) {
 		const email = await PostalMime.parse(content);
 
 
-		const blockFlag = checkBlock(blackSubject, blackContent, blackFrom, email);
+		const { block: blockFlag, hardBlock: hardBlockFlag } = checkBlock(blackSubject, blackContent, blackFrom, email);
 
-		if (blockFlag) {
+		if (hardBlockFlag) {
 			message.setReject('Message rejected');
 			return;
 		}
@@ -138,7 +138,7 @@ export async function email(message, env, ctx) {
 				content: email.html,
 				text: email.text,
 				recipient: JSON.stringify(email.to)
-			}, userRow.customLabels)
+			}, userRow.customLabels, blackFrom)
 		};
 
 		const attachments = [];
@@ -170,7 +170,7 @@ export async function email(message, env, ctx) {
 			console.error(e);
 		}
 
-		emailRow = await emailService.completeReceive({ env }, account ? emailConst.status.RECEIVE : emailConst.status.NOONE, emailRow.emailId);
+		emailRow = await emailService.completeReceive({ env }, account ? emailConst.status.RECEIVE : emailConst.status.NOONE, emailRow.emailId, blockFlag ? isDel.DELETE : isDel.NORMAL);
 
 
 		if (ruleType === settingConst.ruleType.RULE) {
@@ -220,28 +220,92 @@ export async function email(message, env, ctx) {
 
 function checkBlock(blackSubjectStr, blackContentStr, blackFromStr, email) {
 
-	const blackFromList = blackFromStr ? blackFromStr.split(',') : []
-	const blackContentList = blackContentStr ? blackContentStr.split(',') : []
-	const blackSubjectList = blackSubjectStr ? blackSubjectStr.split(',') : []
+	const senderAddress = (email.from?.address || '').toLowerCase();
+	const senderDomain = emailUtils.getDomain(senderAddress) || '';
 
-	for (const blackSubject of blackSubjectList) {
-		if (email.subject?.includes(blackSubject)) {
-			return true
+	// ── 1. Hard-block check (always runs first, always rejects) ──────────────
+	// blackContent may have prefix '__hardblock,' for permanently blocked addresses
+	let hardBlockList = [];
+	let regularContentList = [];
+	if (blackContentStr && blackContentStr.startsWith('__hardblock,')) {
+		const rest = blackContentStr.slice('__hardblock,'.length);
+		hardBlockList = rest ? rest.split(',').filter(Boolean) : [];
+	} else {
+		regularContentList = blackContentStr ? blackContentStr.split(',').filter(Boolean) : [];
+	}
+
+	// Hard-block: reject immediately (setReject is handled at call site by returning true)
+	for (const blockEntry of hardBlockList) {
+		const b = blockEntry.trim().toLowerCase();
+		if (!b) continue;
+		if (b.includes('@')) {
+			// exact email
+			if (senderAddress === b) return { block: true, hardBlock: true };
+		} else {
+			// domain (and subdomains): sender domain ends with .b or equals b
+			if (senderDomain === b || senderDomain.endsWith('.' + b)) return { block: true, hardBlock: true };
 		}
 	}
 
-	for (const blackContent of blackContentList) {
-		if (email.html?.includes(blackContent) || email.text?.includes(blackContent)) {
-			return true
+	// ── 2. Subject keyword check ──────────────────────────────────────────────
+	const blackSubjectList = blackSubjectStr ? blackSubjectStr.split(',').filter(Boolean) : [];
+	for (const kw of blackSubjectList) {
+		const k = kw.trim().toLowerCase();
+		if (k && email.subject?.toLowerCase().includes(k)) return { block: true, hardBlock: false };
+	}
+
+	// ── 3. Body content keyword check ────────────────────────────────────────
+	for (const kw of regularContentList) {
+		const k = kw.trim().toLowerCase();
+		if (!k) continue;
+		if (email.html?.toLowerCase().includes(k) || email.text?.toLowerCase().includes(k)) {
+			return { block: true, hardBlock: false };
 		}
 	}
 
-	for (const blackFrom of blackFromList) {
-		if (email.from.address === blackFrom || emailUtils.getDomain(email.from.address) === blackFrom) {
-			return true
+	// ── 4. Sender address / domain blacklist or whitelist ────────────────────
+	// blackFromStr may have prefix '__mode:blacklist,' or '__mode:whitelist,'
+	let listMode = 'blacklist';
+	let fromList = [];
+
+	if (blackFromStr) {
+		if (blackFromStr.startsWith('__mode:whitelist,')) {
+			listMode = 'whitelist';
+			const rest = blackFromStr.slice('__mode:whitelist,'.length);
+			fromList = rest ? rest.split(',').filter(Boolean) : [];
+		} else if (blackFromStr.startsWith('__mode:blacklist,')) {
+			listMode = 'blacklist';
+			const rest = blackFromStr.slice('__mode:blacklist,'.length);
+			fromList = rest ? rest.split(',').filter(Boolean) : [];
+		} else {
+			// Legacy: plain comma-separated list = blacklist
+			listMode = 'blacklist';
+			fromList = blackFromStr.split(',').filter(Boolean);
 		}
 	}
 
-	return false
+	// Helper: does entry match this sender?
+	function matchesSender(entry) {
+		const e = entry.trim().toLowerCase();
+		if (!e) return false;
+		if (e.includes('@')) {
+			return senderAddress === e;
+		}
+		// Domain: check exact match AND multi-level subdomain match
+		return senderDomain === e || senderDomain.endsWith('.' + e);
+	}
+
+	if (fromList.length > 0) {
+		const isOnList = fromList.some(matchesSender);
+		if (listMode === 'blacklist') {
+			// Blacklist: block if sender is on the list
+			if (isOnList) return { block: true, hardBlock: false };
+		} else {
+			// Whitelist: block if sender is NOT on the list
+			if (!isOnList) return { block: true, hardBlock: false };
+		}
+	}
+
+	return { block: false, hardBlock: false };
 
 }

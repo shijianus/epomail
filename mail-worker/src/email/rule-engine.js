@@ -61,19 +61,48 @@ const SYSTEM_CATEGORIES = {
   '系统设置': () => false,
 };
 
-export function applyRules(emailParams, userLabelsJson) {
+export function applyRules(emailParams, userLabelsJson, blackFromStr = '') {
   if (!userLabelsJson) return '[]';
+
+  // Parse blackFrom mode and list
+  let listMode = 'blacklist';
+  let fromList = [];
+  if (blackFromStr) {
+    if (blackFromStr.startsWith('__mode:whitelist,')) {
+      listMode = 'whitelist';
+      const rest = blackFromStr.slice('__mode:whitelist,'.length);
+      fromList = rest ? rest.split(',').filter(Boolean) : [];
+    } else if (blackFromStr.startsWith('__mode:blacklist,')) {
+      listMode = 'blacklist';
+      const rest = blackFromStr.slice('__mode:blacklist,'.length);
+      fromList = rest ? rest.split(',').filter(Boolean) : [];
+    } else {
+      listMode = 'blacklist';
+      fromList = blackFromStr.split(',').filter(Boolean);
+    }
+  }
+
+  function matchesSenderList(senderAddr) {
+    if (fromList.length === 0) return false;
+    const addr = senderAddr.trim().toLowerCase();
+    const domain = emailUtils.getDomain(addr) || '';
+    return fromList.some(entry => {
+      const e = entry.trim().toLowerCase();
+      if (!e) return false;
+      if (e.includes('@')) return addr === e;
+      return domain === e || domain.endsWith('.' + e);
+    });
+  }
+
   try {
     let labels = [];
     const parsed = JSON.parse(userLabelsJson);
     if (Array.isArray(parsed)) {
       labels = parsed;
     } else if (parsed && typeof parsed === 'object') {
-      // New unified format
       if (Array.isArray(parsed.allLabels)) {
         labels = parsed.allLabels;
       } else {
-        // Legacy format: merge both arrays
         if (Array.isArray(parsed.customLabels)) labels = labels.concat(parsed.customLabels);
         if (Array.isArray(parsed.defaultLabels)) labels = labels.concat(parsed.defaultLabels);
       }
@@ -83,21 +112,45 @@ export function applyRules(emailParams, userLabelsJson) {
 
     const matchedLabels = [];
     
-    // emailParams has properties: sendEmail, subject, content, text, recipient, etc.
     const sender = (emailParams.sendEmail || '').toLowerCase();
+    const senderMatch = sender.match(/<([^>]+)>/);
+    const cleanSender = senderMatch ? senderMatch[1].trim() : sender.trim();
+    
     const subject = (emailParams.subject || '').toLowerCase();
     const body = ((emailParams.content || '') + ' ' + (emailParams.text || '')).toLowerCase();
-    const recipients = (emailParams.recipient || '').toLowerCase(); // Note: recipient is JSON string of array
-    const header = ''; // Not fully parsed into params in this context, but we can map some things
+    const recipients = (emailParams.recipient || '').toLowerCase();
 
     for (const label of labels) {
       let matched = false;
       let vetoed = false;
       let isSystemCategory = SYSTEM_CATEGORIES.hasOwnProperty(label.name);
       
-      // 1. 系统设置：直接完成基础归类
+      // 1. 系统设置：基于底层配置的启发式归类 (动态映射)
       if (isSystemCategory) {
-        matched = SYSTEM_CATEGORIES[label.name](sender, subject, body, recipients);
+        // 如果是"订阅"或"推销"，则混合启发式与黑白名单逻辑
+        if (label.name === '订阅' || label.name === '推销') {
+          const isOnList = matchesSenderList(cleanSender);
+          // 订阅: 在白名单时，白名单内的邮件被归类；在黑名单时，非黑名单内的邮件被归类
+          // 推销: 在白名单时，非白名单内的邮件被归类；在黑名单时，黑名单内的邮件被归类
+          let isSubAllowed = false;
+          let isPromoBlocked = false;
+          
+          if (listMode === 'whitelist') {
+             isSubAllowed = isOnList; // whitelist logic for 订阅
+             isPromoBlocked = !isOnList; // whitelist logic for 推销
+          } else {
+             isSubAllowed = !isOnList; // blacklist logic for 订阅
+             isPromoBlocked = isOnList; // blacklist logic for 推销
+          }
+
+          if (label.name === '订阅') {
+             matched = isSubAllowed && SYSTEM_CATEGORIES[label.name](sender, subject, body, recipients);
+          } else if (label.name === '推销') {
+             matched = isPromoBlocked || SYSTEM_CATEGORIES[label.name](sender, subject, body, recipients);
+          }
+        } else {
+          matched = SYSTEM_CATEGORIES[label.name](sender, subject, body, recipients);
+        }
       }
 
       if (label.rules && Array.isArray(label.rules)) {
@@ -109,7 +162,15 @@ export function applyRules(emailParams, userLabelsJson) {
 
             switch (type) {
               case 'all_messages': return true;
-              case 'system_setting': return SYSTEM_CATEGORIES[label.name] ? SYSTEM_CATEGORIES[label.name](sender, subject, body, recipients) : false;
+              case 'system_setting': 
+                if (label.name === '订阅' || label.name === '推销') {
+                  const isOnList = matchesSenderList(cleanSender);
+                  let isSubAllowed = listMode === 'whitelist' ? isOnList : !isOnList;
+                  let isPromoBlocked = listMode === 'whitelist' ? !isOnList : isOnList;
+                  if (label.name === '订阅') return isSubAllowed && SYSTEM_CATEGORIES[label.name](sender, subject, body, recipients);
+                  if (label.name === '推销') return isPromoBlocked || SYSTEM_CATEGORIES[label.name](sender, subject, body, recipients);
+                }
+                return SYSTEM_CATEGORIES[label.name] ? SYSTEM_CATEGORIES[label.name](sender, subject, body, recipients) : false;
               case 'from': 
               case 'sender_is': return val.split(',').some(v => {
                 const match = sender.match(/<([^>]+)>/);

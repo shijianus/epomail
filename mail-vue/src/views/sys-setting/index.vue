@@ -120,6 +120,10 @@
                   </div>
                 </div>
               </div>
+              <div class="login-bg-note">
+                <Icon icon="lucide:info" width="13" style="flex-shrink:0; margin-top: 1px;" />
+                <span>{{ $t('loginBgNote') }}</span>
+              </div>
             </div>
           </div>
 
@@ -189,15 +193,6 @@
                   <el-button class="opt-button" style="margin-top: 0" @click="openResendForm" size="small"
                              type="primary">
                     <Icon icon="material-symbols:add-rounded" width="16" height="16"/>
-                  </el-button>
-                </div>
-              </div>
-              <div class="setting-item">
-                <div><span>{{ $t('blackList') }}</span></div>
-                <div>
-                  <el-button class="opt-button" style="margin-top: 0" @click="openBlackListForm" size="small"
-                             type="primary">
-                    <Icon icon="fluent:settings-48-regular" width="16" height="16"/>
                   </el-button>
                 </div>
               </div>
@@ -1905,6 +1900,21 @@ function editSetting(settingForm, refreshStatus = true) {
 
 .dialog-input {
   margin-bottom: 15px;
+}
+
+.login-bg-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.4;
+  padding: 8px 10px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  margin-top: 4px;
+  grid-column: 1 / -1;
 }
 
 .force-path-style {
