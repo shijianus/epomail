@@ -71,6 +71,104 @@
       <p>{{ $t('noLabelsDesc') || 'Create your first label to keep your inbox organized.' }}</p>
     </div>
 
+
+    <!-- Migrated from sys-setting -->
+    <div class="settings-grid" style="margin-top: 24px; margin-bottom: 24px;">
+      <div class="card-grid">
+          <!-- Email Sending Settings Card -->
+          <div class="settings-card">
+            <div class="card-title">{{ $t('emailSetting') }}</div>
+            <div class="card-content">
+              <div class="setting-item">
+                <div><span>{{ $t('receiveEmail') }}</span></div>
+                <div>
+                  <el-switch @change="change" :before-change="beforeChange" :active-value="0" :inactive-value="1"
+                             v-model="setting.receive"/>
+                </div>
+              </div>
+              <div class="setting-item">
+                <div>
+                  <span>{{ $t('autoRefresh') }}</span>
+                  <el-tooltip effect="dark" :content="$t('autoRefreshDesc')">
+                    <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+                  </el-tooltip>
+                </div>
+                <div>
+                  <el-select
+                      @change="change"
+                      :style="`width: ${ locale === 'en' ? 100 : 80 }px;`"
+                      v-model="setting.autoRefresh"
+                      placeholder="Select"
+                  >
+                    <el-option
+                        v-for="item in authRefreshOptions"
+                        :key="item.value"
+                        :label="item.label"
+                        :value="item.value"
+                    />
+                  </el-select>
+                </div>
+              </div>
+              <div class="setting-item">
+                <div><span>{{ $t('sendEmail') }}</span></div>
+                <div>
+                  <el-switch @change="change" :before-change="beforeChange" :active-value="0" :inactive-value="1"
+                             v-model="setting.send"/>
+                </div>
+              </div>
+              <div class="setting-item">
+                <div>
+                  <span>{{ $t('noRecipientTitle') }}</span>
+                  <el-tooltip effect="dark" :content="$t('noRecipientDesc')">
+                    <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+                  </el-tooltip>
+                </div>
+                <div>
+                  <el-switch @change="change" :before-change="beforeChange" :active-value="0" :inactive-value="1"
+                             v-model="setting.noRecipient"/>
+                </div>
+              </div>
+              <div class="setting-item">
+                <div><span>{{ setting.hasCfEmail ? $t('cloudflareEmailSending') : $t('resendToken') }}</span></div>
+                <div v-if="setting.hasCfEmail">
+                  <span>{{ $t('enabled') }}</span>
+                </div>
+                <div v-else>
+                  <el-button class="opt-button" style="margin-top: 0" @click="openResendList" size="small"
+                             type="primary">
+                    <Icon icon="ic:round-list" width="18" height="18"/>
+                  </el-button>
+                  <el-button class="opt-button" style="margin-top: 0" @click="openResendForm" size="small"
+                             type="primary">
+                    <Icon icon="material-symbols:add-rounded" width="16" height="16"/>
+                  </el-button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="settings-card">
+            <div class="card-title">Workers AI</div>
+            <div class="card-content">
+              <div class="setting-item">
+                <div><span>{{ $t('codeRecognition') }}</span></div>
+                <div>
+                  <el-switch @change="changeField('aiCode', $event)" :before-change="beforeChange" :active-value="0" :inactive-value="1"
+                             v-model="setting.aiCode"/>
+                </div>
+              </div>
+              <div class="setting-item">
+                <div><span>{{ $t('codeRecognitionRules') }}</span></div>
+                <div class="forward">
+                  <el-button class="opt-button" size="small" type="primary" @click="openAiCodeFilter">
+                    <Icon icon="fluent:settings-48-regular" width="18" height="18"/>
+                  </el-button>
+                </div>
+              </div>
+            </div>
+          </div>
+      </div>
+    </div>
+
     <!-- Drawer for Add/Edit -->
     <el-drawer v-model="isEditorOpen" :title="editIndex === -1 ? ($t('createLabel') || '新建标签') : ($t('editLabel') || '编辑标签')" size="400px" destroy-on-close class="label-drawer">
       <div class="editor-form">
@@ -390,6 +488,45 @@
         </div>
       </template>
     </el-dialog>
+
+      <el-dialog v-model="resendTokenFormShow" :title="$t('resendToken')" width="340" @closed="cleanResendTokenForm">
+        <form>
+          <el-select style="margin-bottom: 15px" v-model="resendTokenForm.domain" placeholder="Select">
+            <el-option
+                v-for="item in settingStore.domainList"
+                :key="item"
+                :label="item"
+                :value="item"
+            />
+          </el-select>
+          <el-input type="text" :placeholder="$t('addResendTokenDesc')" v-model="resendTokenForm.token"/>
+          <el-button type="primary" :loading="settingLoading" @click="saveResendToken">{{ $t('save') }}</el-button>
+        </form>
+      </el-dialog>
+      <el-dialog class="resend-table" v-model="showResendList" :title="$t('resendTokenList')">
+        <el-table :data="resendList">
+          <el-table-column :min-width="emailColumnWidth" property="key" :label="$t('domain')"
+                           :show-overflow-tooltip="true"/>
+          <el-table-column :width="tokenColumnWidth" property="value" label="Token" fixed="right"
+                           :show-overflow-tooltip="true"/>
+        </el-table>
+      </el-dialog>
+      <el-dialog v-model="aiCodeFilterShow" class="forward-dialog" @closed="resetAiCodeFilter">
+        <template #header>
+          <div class="forward-head">
+            <span class="forward-set-title">{{ $t('codeRecognitionRules') }}</span>
+            <el-tooltip effect="dark" :content="$t('codeRecognitionRulesDesc')">
+              <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+            </el-tooltip>
+          </div>
+        </template>
+        <el-form>
+          <el-form-item :label="t('senderRules')" label-position="top">
+            <el-input-tag v-model="aiCodeFilter" @add-tag="aiCodeFilterAddTag"/>
+          </el-form-item>
+        </el-form>
+        <el-button type="primary" style="width: 100%;" :loading="settingLoading" @click="saveAiCodeFilter">{{ $t('save') }}</el-button>
+      </el-dialog>
   </div>
 </template>
 
@@ -402,9 +539,186 @@ import { Icon } from '@iconify/vue'
 import { ElMessage } from 'element-plus'
 import { useI18n } from 'vue-i18n'
 
+import { settingQuery, settingSet } from "@/request/setting.js";
+import { useSettingStore } from "@/store/setting.js";
+import { storeToRefs } from "pinia";
+import { getTextWidth } from "@/utils/text.js";
+import { isDomain, isEmail } from "@/utils/verify-utils.js";
+
+
 const { t } = useI18n()
 const uiStore = useUiStore()
 const accountStore = useAccountStore()
+
+const settingStore = useSettingStore()
+const { settings: setting } = storeToRefs(settingStore)
+const settingReady = ref(false)
+const settingLoading = ref(false)
+
+const resendTokenFormShow = ref(false)
+const showResendList = ref(false)
+const aiCodeFilterShow = ref(false)
+
+const resendTokenForm = reactive({
+  domain: '',
+  token: '',
+})
+const aiCodeFilter = ref([])
+
+const authRefreshOptions = computed(() => [
+  {label: t('disable'), value: 0},
+  {label: '3s', value: 3},
+  {label: '5s', value: 5},
+  {label: '10s', value: 10},
+  {label: '15s', value: 15},
+  {label: '20s', value: 20},
+])
+
+const emailColumnWidth = ref(0)
+const tokenColumnWidth = ref(0)
+
+const resendList = computed(() => {
+  if (!setting.value || !setting.value.resendTokens) return []
+  let list = Object.keys(setting.value.resendTokens).map(key => {
+    return {
+      key: key,
+      value: setting.value.resendTokens[key]
+    };
+  })
+  if (list.length > 0) {
+    const key = list.reduce((a, b) => compareByLengthAndUpperCase(a, b, 'key')).key;
+    emailColumnWidth.value = getTextWidth(key) + 30;
+    const value = list.reduce((a, b) => compareByLengthAndUpperCase(a, b, 'value')).value;
+    tokenColumnWidth.value = getTextWidth(value) + 30;
+  }
+  return list;
+});
+
+const compareByLengthAndUpperCase = (a, b, key) => {
+  const getUpperCaseCount = (str) => (str.match(/[A-Z]/g) || []).length;
+  if (a[key].length === b[key].length) {
+    return getUpperCaseCount(a[key]) > getUpperCaseCount(b[key]) ? a : b;
+  }
+  return a[key].length > b[key].length ? a : b;
+};
+
+function getSettings() {
+  settingReady.value = false
+  settingQuery().then(settingData => {
+    setting.value = settingData
+    settingStore.domainList = settingData.domainList;
+    if (setting.value.domainList && setting.value.domainList.length > 0) {
+      resendTokenForm.domain = setting.value.domainList[0]
+    }
+    resetAiCodeFilter()
+    settingReady.value = true
+  })
+}
+
+function resetAiCodeFilter() {
+  aiCodeFilter.value = setting.value.aiCodeFilter ? setting.value.aiCodeFilter.split(',') : []
+}
+
+function openResendList() {
+  showResendList.value = true
+}
+
+function openResendForm() {
+  resendTokenFormShow.value = true
+}
+
+function openAiCodeFilter() {
+  aiCodeFilterShow.value = true
+}
+
+function cleanResendTokenForm() {
+  resendTokenForm.token = ''
+}
+
+function aiCodeFilterAddTag(val) {
+  const emails = Array.from(new Set(
+      val.split(/[,，]/).map(item => item.trim()).filter(item => item)
+  ));
+  aiCodeFilter.value.splice(aiCodeFilter.value.length - 1, 1)
+  emails.forEach(email => {
+    if ((isEmail(email) || isDomain(email)) && !aiCodeFilter.value.includes(email)) {
+      aiCodeFilter.value.push(email)
+    }
+  })
+}
+
+function saveAiCodeFilter() {
+  editSetting({aiCodeFilter: aiCodeFilter.value + ''})
+}
+
+function saveResendToken() {
+  const settingForm = {
+    resendTokens: {}
+  }
+  const domain = resendTokenForm.domain.startsWith('@') ? resendTokenForm.domain.slice(1) : resendTokenForm.domain
+  settingForm.resendTokens[domain] = resendTokenForm.token
+  editSetting(settingForm)
+}
+
+function change(e) {
+  if (!settingReady.value) return
+  const settingForm = {...setting.value}
+  delete settingForm.siteKey
+  delete settingForm.secretKey
+  delete settingForm.s3AccessKey
+  delete settingForm.s3SecretKey
+  delete settingForm.tgBotToken
+  delete settingForm.resendTokens
+  editSetting(settingForm, false)
+}
+
+function changeField(key, value) {
+  if (!settingReady.value) return
+  setting.value[key] = value
+  editSetting({[key]: value}, false)
+}
+
+let backup = '{}'
+function beforeChange() {
+  if (!settingReady.value || settingLoading.value) return false
+  const settingForm = {...setting.value}
+  delete settingForm.resendTokens
+  delete settingForm.siteKey
+  delete settingForm.secretKey
+  backup = JSON.stringify(settingForm)
+  return true
+}
+
+function editSetting(settingForm, refreshStatus = true) {
+  if (settingLoading.value) return
+  settingLoading.value = true
+
+  settingSet(settingForm).then(() => {
+    settingLoading.value = false
+    ElMessage({
+      message: t('saveSuccessMsg') || 'Save success',
+      type: "success",
+      plain: true
+    })
+    if (setting.value.manyEmail === 1) {
+      accountStore.currentAccountId = uiStore.user?.account?.accountId || 0;
+    }
+    if (refreshStatus) {
+      getSettings()
+    }
+    resendTokenFormShow.value = false
+    aiCodeFilterShow.value = false
+  }).catch((e) => {
+    setting.value = {...setting.value, ...JSON.parse(backup)}
+  }).finally(() => {
+    settingLoading.value = false
+  })
+}
+
+onMounted(() => {
+  getSettings()
+})
+
 
 // 页面加载时，强制确保所有默认标签的系统规则都正确注入
 onMounted(() => {
@@ -1256,4 +1570,89 @@ const onDrop = () => {
 .add-rule-btn:active {
   transform: translateY(0);
 }
+</style>
+
+<style scoped>
+
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+  gap: 20px;
+}
+
+.settings-card {
+  background-color: var(--bg-surface);
+  border-radius: 8px;
+  border: 1px solid var(--border-mid);
+  transition: all 300ms;
+  overflow: hidden;
+}
+
+.card-title {
+  font-size: 15px;
+  font-weight: bold;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.card-content {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.setting-item {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px;
+  font-weight: normal;
+
+  > div:first-child {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  > div:last-child {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    justify-items: flex-end;
+    font-weight: normal;
+  }
+}
+
+.forward {
+  span {
+    display: flex;
+    align-items: center;
+  }
+  .el-button {
+    width: 48px;
+    margin: 0 0 0 10px;
+  }
+}
+
+.opt-button {
+  width: fit-content !important;
+}
+
+:deep(.resend-table.el-dialog) {
+  min-height: 300px;
+  width: 500px !important;
+  @media (max-width: 540px) {
+    width: calc(100% - 40px) !important;
+    margin-right: 20px !important;
+    margin-left: 20px !important;
+  }
+}
+
+:deep(.resend-table .el-dialog__header) {
+  padding-bottom: 5px;
+}
+
+:deep(.el-table__inner-wrapper:before) {
+  background: var(--el-bg-color);
+}
+
 </style>
