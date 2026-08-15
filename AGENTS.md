@@ -1,5 +1,20 @@
 # Agent Workflow SOP (Standard Operating Procedure)
 
+<!-- VERSION LOG APPEND BELOW (newest first) -->
+
+### UI 迁移：Workers AI 与邮件设置搬入分类管理 (2026-08-15)
+*   **安全备份 (Backup)**: `a6825d6` — 迁移前最新稳定状态。
+*   **UI 迁移 (Migration)**: `3b30f09` — 纯 UI 层面迁移，后端逻辑完全不变。
+    *   将 `Workers AI` 卡片（AI 识别码开关 + 识别规则设置）从「系统设置」迁移至「分类管理」。
+    *   将「邮件设置」卡片（接收/发送/自动刷新/无收件人/Resend Token）从「系统设置」迁移至「分类管理」。
+    *   在 `category-setting/index.vue` 中补全了所需的 `settingStore`、`settingSet`、`changeField`、`beforeChange` 等逻辑（与 sys-setting 共用同一 API，纯 UI 复用）。
+    *   同步移除了 `sys-setting/index.vue` 中已迁移的弹窗：`resendTokenFormShow` 表单、`resend-table` 列表弹窗、`aiCodeFilterShow` 弹窗，以及对应的 JS 函数。
+    *   修复 `sys-setting` 中 `.card-title` 的对齐问题：新增 `display: flex; align-items: center; gap: 8px`，与 `category-setting` 保持一致。
+*   **验证 (Verification)**: `npm run build` 编译成功（exit code 0），无 TypeScript/ESLint 报错。
+*   **部署 (Deploy)**: 成功部署到 Cloudflare Workers。Version ID: `672162e2-ba49-4362-8e24-932adc35dbcb`，线上地址: `https://epomail.epocanvas.workers.dev`。
+
+
+
 此文件定義了進行 UI/UX 改版（包含顏色設計與後續佈局調整）時，Agent 必須嚴格遵守的標準作業流程。此流程確保開發過程的品質、視覺準確性以及版本控制的安全。
 
 ---
