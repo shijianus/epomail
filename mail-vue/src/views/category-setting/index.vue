@@ -36,6 +36,10 @@
                  <div class="stats-text">当前模式下生效规则：<strong>{{ listEntries.length }}</strong> 条</div>
                  <el-button type="primary" @click="openDrawer('list')" :loading="saving">设置规则</el-button>
               </div>
+              <div class="internal-toggle">
+                <el-switch v-model="blockInternalList" @change="saveListDirectly" />
+                <span class="internal-label">对站内邮件生效 (默认放行)</span>
+              </div>
             </div>
           </div>
 
@@ -53,6 +57,10 @@
                  <div class="stats-text">生效拦截规则：<strong>{{ hardBlockEntries.length }}</strong> 条</div>
                  <el-button type="primary" @click="openDrawer('block')" :loading="saving">设置拦截</el-button>
                </div>
+               <div class="internal-toggle">
+                 <el-switch v-model="blockInternalBlock" @change="saveBlockDirectly" />
+                 <span class="internal-label">对站内邮件生效 (默认放行)</span>
+               </div>
              </div>
           </div>
 
@@ -69,6 +77,14 @@
                <div class="stats-row">
                  <div class="stats-text">主题关键词 <strong>{{ blackSubject.length }}</strong> 个，正文 <strong>{{ blackContent.length }}</strong> 个</div>
                  <el-button type="primary" @click="openDrawer('content')" :loading="saving">设置关键词</el-button>
+               </div>
+               <div class="internal-toggle">
+                 <el-switch v-model="blockInternalSubject" @change="saveContentDirectly" />
+                 <span class="internal-label">主题过滤对站内邮件生效</span>
+               </div>
+               <div class="internal-toggle" style="margin-top: 8px;">
+                 <el-switch v-model="blockInternalContent" @change="saveContentDirectly" />
+                 <span class="internal-label">正文过滤对站内邮件生效</span>
                </div>
              </div>
           </div>
@@ -89,20 +105,8 @@
           <p class="drawer-desc" v-if="drawerTarget === 'content'">输入关键词并回车添加。</p>
 
           <template v-if="drawerTarget === 'list'">
-             <div class="templates-section">
-                <div class="templates-title">内置推荐模板 <el-tooltip content="点击添加。加粗项为系统预设。"><Icon icon="lucide:help-circle" width="12" /></el-tooltip></div>
-                <div class="templates-list">
-                   <el-tag
-                      v-for="tpl in builtinTemplates"
-                      :key="tpl"
-                      :type="tempEntries.includes(tpl) ? 'info' : ''"
-                      size="small"
-                      class="tpl-tag"
-                      @click="addTemplate(tpl)"
-                   >
-                      {{ tpl }}
-                   </el-tag>
-                </div>
+             <div class="drawer-actions" style="margin-bottom: 12px; display: flex; justify-content: flex-end;">
+               <el-button size="small" @click="restoreDefaultTemplates">恢复默认模板</el-button>
              </div>
              <el-input-tag v-model="tempEntries" placeholder="输入后回车" class="tag-input-area" />
           </template>
@@ -130,7 +134,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
-import { settingQuery, setBlackList, settingSet } from '@/request/setting.js'
+import { settingQuery, setBlackList } from '@/request/setting.js'
 import loading from '@/components/loading/index.vue'
 import { ElMessage } from 'element-plus'
 
@@ -146,6 +150,11 @@ const hardBlockEntries = ref([])
 const blackSubject = ref([])
 const blackContent = ref([])
 
+const blockInternalList = ref(false)
+const blockInternalBlock = ref(false)
+const blockInternalSubject = ref(false)
+const blockInternalContent = ref(false)
+
 // Drawer State
 const drawerVisible = ref(false)
 const drawerTarget = ref('list') // 'list' | 'block' | 'content'
@@ -153,7 +162,7 @@ const tempEntries = ref([])
 const tempSubject = ref([])
 const tempContent = ref([])
 
-const builtinTemplates = [
+const blacklistTemplates = [
   'mailer-daemon.com',
   'newsletters.google.com',
   'facebookmail.com',
@@ -164,8 +173,15 @@ const builtinTemplates = [
   'pinduoduo.com',
   'no-reply.accounts.google.com',
   'donotreply.microsoft.com',
-  'noreply@medium.com',
-  'hello@producthunt.com'
+  'noreply@medium.com'
+]
+
+const whitelistTemplates = [
+  'github.com',
+  'paypal.com',
+  'google.com',
+  'microsoft.com',
+  'apple.com'
 ]
 
 const drawerTitle = computed(() => {
@@ -198,29 +214,41 @@ async function loadSettings() {
   firstLoading.value = true
   try {
     const data = await settingQuery()
-    let raw = data.blackFrom || ''
+    let rawList = data.blackFrom || ''
     
-    // Auto-inject if completely empty (first initialization)
-    let isInit = false
-    if (!raw) {
-      raw = '__mode:blacklist,' + builtinTemplates.join(',')
-      isInit = true
+    // Parse list mode and internal flag
+    if (rawList.includes('__blockInternal,')) {
+      blockInternalList.value = true
+      rawList = rawList.replace('__blockInternal,', '')
     }
 
-    if (raw.startsWith('__mode:whitelist,')) {
+    let isInitList = false
+    if (!rawList) {
+      rawList = '__mode:blacklist,' + blacklistTemplates.join(',')
+      isInitList = true
+    }
+
+    if (rawList.startsWith('__mode:whitelist,')) {
       listMode.value = 'whitelist'
-      const rest = raw.slice('__mode:whitelist,'.length)
+      const rest = rawList.slice('__mode:whitelist,'.length)
       listEntries.value = rest ? rest.split(',').filter(Boolean) : []
-    } else if (raw.startsWith('__mode:blacklist,')) {
+    } else if (rawList.startsWith('__mode:blacklist,')) {
       listMode.value = 'blacklist'
-      const rest = raw.slice('__mode:blacklist,'.length)
+      const rest = rawList.slice('__mode:blacklist,'.length)
       listEntries.value = rest ? rest.split(',').filter(Boolean) : []
     } else {
       listMode.value = 'blacklist'
-      listEntries.value = raw ? raw.split(',').filter(Boolean) : []
+      listEntries.value = rawList ? rawList.split(',').filter(Boolean) : []
     }
 
-    const rawContent = data.blackContent || ''
+    // Parse block content and internal flag
+    let rawContent = data.blackContent || ''
+    if (rawContent.includes('__blockInternal,')) {
+      blockInternalBlock.value = true
+      blockInternalContent.value = true // Sync for legacy compat
+      rawContent = rawContent.replace('__blockInternal,', '')
+    }
+
     if (rawContent.startsWith('__hardblock,')) {
       const rest = rawContent.slice('__hardblock,'.length)
       hardBlockEntries.value = rest ? rest.split(',').filter(Boolean) : []
@@ -230,12 +258,17 @@ async function loadSettings() {
       blackContent.value = rawContent ? rawContent.split(',').filter(Boolean) : []
     }
 
-    blackSubject.value = data.blackSubject ? data.blackSubject.split(',').filter(Boolean) : []
+    let rawSubject = data.blackSubject || ''
+    if (rawSubject.includes('__blockInternal,')) {
+      blockInternalSubject.value = true
+      rawSubject = rawSubject.replace('__blockInternal,', '')
+    }
+    blackSubject.value = rawSubject ? rawSubject.split(',').filter(Boolean) : []
 
     // Save default templates silently on first init
-    if (isInit) {
+    if (isInitList) {
       listEntries.value = deduplicateRules(listEntries.value)
-      await setBlackList({ blackFrom: '__mode:blacklist,' + listEntries.value.join(',') })
+      await setBlackList({ blackFrom: getListSaveString() })
     }
 
   } catch (e) {
@@ -243,6 +276,26 @@ async function loadSettings() {
   } finally {
     firstLoading.value = false
   }
+}
+
+function getListSaveString() {
+  const internalPrefix = blockInternalList.value ? '__blockInternal,' : '';
+  return `__mode:${listMode.value},${internalPrefix}` + listEntries.value.join(',')
+}
+
+function getBlockSaveString() {
+  const internalPrefix = blockInternalBlock.value ? '__blockInternal,' : '';
+  return `__hardblock,${internalPrefix}` + hardBlockEntries.value.join(',')
+}
+
+function getSubjectSaveString() {
+  const internalPrefix = blockInternalSubject.value ? '__blockInternal,' : '';
+  return `${internalPrefix}` + blackSubject.value.join(',')
+}
+
+function getContentSaveString() {
+  const internalPrefix = blockInternalContent.value ? '__blockInternal,' : '';
+  return `${internalPrefix}` + blackContent.value.join(',')
 }
 
 function setMode(mode) {
@@ -269,9 +322,12 @@ function onDrawerClosed() {
   tempContent.value = []
 }
 
-function addTemplate(tpl) {
-  if (!tempEntries.value.includes(tpl)) {
-    tempEntries.value.push(tpl)
+function restoreDefaultTemplates() {
+  const templates = listMode.value === 'whitelist' ? whitelistTemplates : blacklistTemplates;
+  for (const tpl of templates) {
+    if (!tempEntries.value.includes(tpl)) {
+      tempEntries.value.push(tpl)
+    }
   }
 }
 
@@ -279,19 +335,18 @@ async function confirmDrawer() {
   saving.value = true
   try {
     if (drawerTarget.value === 'list') {
-      const deduped = deduplicateRules(tempEntries.value)
-      listEntries.value = deduped
-      await setBlackList({ blackFrom: `__mode:${listMode.value},` + deduped.join(',') })
+      listEntries.value = deduplicateRules(tempEntries.value)
+      await setBlackList({ blackFrom: getListSaveString() })
     } else if (drawerTarget.value === 'block') {
-      const deduped = deduplicateRules(tempEntries.value)
-      hardBlockEntries.value = deduped
-      await setBlackList({ blackContent: '__hardblock,' + deduped.join(',') })
+      hardBlockEntries.value = deduplicateRules(tempEntries.value)
+      await setBlackList({ blackContent: getBlockSaveString() })
     } else if (drawerTarget.value === 'content') {
-      const dSub = Array.from(new Set(tempSubject.value)).filter(Boolean)
-      const dCon = Array.from(new Set(tempContent.value)).filter(Boolean)
-      blackSubject.value = dSub
-      blackContent.value = dCon
-      await setBlackList({ blackSubject: dSub.join(','), blackContent: dCon.join(',') })
+      blackSubject.value = Array.from(new Set(tempSubject.value)).filter(Boolean)
+      blackContent.value = Array.from(new Set(tempContent.value)).filter(Boolean)
+      await setBlackList({ 
+        blackSubject: getSubjectSaveString(), 
+        blackContent: getContentSaveString() 
+      })
     }
     ElMessage.success('保存成功，已自动去除冗余')
     drawerVisible.value = false
@@ -305,10 +360,37 @@ async function confirmDrawer() {
 async function saveListDirectly() {
   saving.value = true
   try {
-    await setBlackList({ blackFrom: `__mode:${listMode.value},` + listEntries.value.join(',') })
-    ElMessage.success('模式已切换')
+    await setBlackList({ blackFrom: getListSaveString() })
+    ElMessage.success('配置已保存')
   } catch (e) {
-    ElMessage.error('切换失败')
+    ElMessage.error('保存失败')
+  } finally {
+    saving.value = false
+  }
+}
+
+async function saveBlockDirectly() {
+  saving.value = true
+  try {
+    await setBlackList({ blackContent: getBlockSaveString() })
+    ElMessage.success('配置已保存')
+  } catch (e) {
+    ElMessage.error('保存失败')
+  } finally {
+    saving.value = false
+  }
+}
+
+async function saveContentDirectly() {
+  saving.value = true
+  try {
+    await setBlackList({ 
+        blackSubject: getSubjectSaveString(), 
+        blackContent: getContentSaveString() 
+    })
+    ElMessage.success('配置已保存')
+  } catch (e) {
+    ElMessage.error('保存失败')
   } finally {
     saving.value = false
   }
@@ -320,7 +402,7 @@ async function saveListDirectly() {
   height: 100%;
   overflow: hidden;
   position: relative;
-  background: var(--bg-main, #f8f9fa); /* fallback */
+  background: transparent;
 }
 .loading-overlay {
   position: absolute;
@@ -329,7 +411,7 @@ async function saveListDirectly() {
   align-items: center;
   justify-content: center;
   z-index: 10;
-  background: var(--bg-main);
+  background: var(--bg-main, transparent);
 }
 .lo-show { opacity: 1; transition: opacity 200ms; }
 .lo-hide { opacity: 0; pointer-events: none; transition: opacity 200ms; }
@@ -351,21 +433,21 @@ async function saveListDirectly() {
 }
 
 .cat-card {
-  background: var(--bg-surface, #fff);
-  border: 1px solid var(--border-subtle, #eaeaea);
+  background: transparent;
+  border: 1px solid var(--border-color);
   border-radius: 12px;
   overflow: hidden;
 }
 .cat-card-header {
   display: flex; align-items: center; gap: 8px;
   padding: 14px 18px;
-  background: var(--bg-elevated, #fafafa);
-  border-bottom: 1px solid var(--border-subtle, #eaeaea);
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-color);
   font-size: 14px; font-weight: 600; color: var(--text-primary);
-  .card-icon { color: var(--accent-primary, #3b82f6); }
-  .card-icon.danger { color: var(--danger, #ef4444); }
-  .card-icon.warning { color: #f59e0b; }
-  .help-icon { color: var(--text-muted); cursor: pointer; margin-left: 4px; }
+  .card-icon { color: var(--el-color-primary); }
+  .card-icon.danger { color: var(--el-color-danger); }
+  .card-icon.warning { color: var(--el-color-warning); }
+  .help-icon { color: var(--text-secondary); cursor: pointer; margin-left: 4px; }
 }
 .cat-card-body { padding: 20px 18px; }
 
@@ -376,35 +458,37 @@ async function saveListDirectly() {
   flex: 1;
   display: flex; align-items: center; justify-content: center; gap: 8px;
   padding: 12px;
-  background: var(--bg-surface, #fff);
-  border: 1.5px solid var(--border-subtle, #eaeaea);
+  background: transparent;
+  border: 1px solid var(--border-color);
   border-radius: 8px; cursor: pointer;
   font-size: 13.5px; font-weight: 600; color: var(--text-secondary);
   transition: all 200ms;
-  &:hover { background: var(--bg-hover, #f3f4f6); }
+  &:hover { background: var(--bg-surface); }
   &.active {
-    border-color: var(--accent-primary, #3b82f6);
-    background: rgba(59, 130, 246, 0.05);
-    color: var(--accent-primary, #3b82f6);
-    .mode-icon { color: var(--accent-primary, #3b82f6); }
+    border-color: var(--el-color-primary);
+    background: var(--el-color-primary-light-9);
+    color: var(--el-color-primary);
+    .mode-icon { color: var(--el-color-primary); }
   }
-  .mode-icon { color: var(--text-muted); }
+  .mode-icon { color: var(--text-secondary); }
 }
 
 .stats-row {
   display: flex; align-items: center; justify-content: space-between;
-  background: var(--bg-elevated, #fafafa);
+  background: var(--bg-surface);
   padding: 12px 16px; border-radius: 8px;
+  margin-bottom: 16px;
   .stats-text { font-size: 13.5px; color: var(--text-secondary); strong { color: var(--text-primary); font-size: 15px;} }
+}
+
+.internal-toggle {
+  display: flex; align-items: center; gap: 8px;
+  .internal-label { font-size: 13px; color: var(--text-secondary); }
 }
 
 /* Drawer */
 .drawer-content { padding: 0 4px; }
 .drawer-desc { font-size: 13px; color: var(--text-secondary); margin-top: 0; margin-bottom: 20px; line-height: 1.5; }
-.templates-section { margin-bottom: 20px; }
-.templates-title { display: flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; color: var(--text-secondary); margin-bottom: 10px; }
-.templates-list { display: flex; flex-wrap: wrap; gap: 8px; }
-.tpl-tag { cursor: pointer; transition: opacity 200ms; &:hover { opacity: 0.8; } }
 .filter-label { display: block; font-size: 12.5px; font-weight: 600; color: var(--text-secondary); margin-bottom: 8px; }
 .tag-input-area { min-height: 100px; align-items: flex-start; }
 </style>

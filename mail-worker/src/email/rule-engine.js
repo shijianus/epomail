@@ -68,6 +68,9 @@ export function applyRules(emailParams, userLabelsJson, blackFromStr = '') {
   let listMode = 'blacklist';
   let fromList = [];
   if (blackFromStr) {
+    if (blackFromStr.includes('__blockInternal,')) {
+      blackFromStr = blackFromStr.replace('__blockInternal,', '');
+    }
     if (blackFromStr.startsWith('__mode:whitelist,')) {
       listMode = 'whitelist';
       const rest = blackFromStr.slice('__mode:whitelist,'.length);
