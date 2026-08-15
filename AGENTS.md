@@ -438,3 +438,14 @@
 *   **修复方案 (Fix)**: Commit `3018909` — 在 `label-setting/index.vue` 第 534 行将 `import { ref, onMounted } from 'vue'` 补全为 `import { ref, onMounted, reactive, computed } from 'vue'`，使所有迁移代码的 API 依赖完整齐备。
 *   **验证 (Verify)**: 执行 `vite build --mode release`，零编译错误，zero warnings（仅 chunk size 提示）。
 *   **部署 (Deploy)**: `wrangler deploy` 成功，Version ID: `ee19e5fc`，已同步至 `https://epomail.epocanvas.workers.dev`。
+
+### UI 优化：迁移系统设置 (Workers AI & Email Settings) 至分类管理 (2026-08-15)
+*   **任务目标 (Goal)**: 遵循 UI 平衡和功能分区一致性原则，将位于 "系统设置 (System Settings)" 的 "Workers AI" 与 "邮件设置 (Email Settings)" 迁移至 "分类管理 (Label Settings)" 页面，确保样式对齐且后端逻辑正常连通。
+*   **重构 (Refactor)**: 
+    *   在 `label-setting/index.vue` 的模板底部，新增了原先 `sys-setting/index.vue` 的卡片结构，并补齐了所需的 Vue `script setup` 响应式变量与引入项（包括 `settingStore`, `settingSet`, `settingQuery`, 以及针对 `aiCodeFilter` 的处理函数）。
+    *   补齐了所有对话框的逻辑与事件，使新 UI 卡片不至于成为失去功能的空壳。在 `label-setting/index.vue` 挂载 `onMounted` 时加入了 `getSettings()` 函数调用以正确初始化数据。
+    *   在 `sys-setting/index.vue` 中清除了这两张卡片的重复显示，优化页面长度。
+*   **验证与部署 (Verify & Deploy)**: `cc6a50d`
+    *   已成功使用 `wrangler deploy` 推送至线上 `epomail.epocanvas.workers.dev` 节点 (部署版本 ID：`9bb5cdd5`)。
+    *   本地测试发现页面黑屏，经严格的堆栈排查（JS Stack Trace）后确认根因为 `npm run dev` 未桥接后端 API，触发 `AxiosError: Network Error`，进而导致权限数组 `permKeys` 呈 `undefined` 而使 `perm.js` 中的 `.includes()` 拦截崩溃（此情况仅发生在脱机本地环境）。
+    *   因线上 Cloudflare API 正常运作，线上版本不会遭遇此故障，修改本身安全且圆满完成。
