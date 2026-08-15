@@ -345,3 +345,8 @@
 *   **后端模板硬编码 (Hardcode Default Template)**: 修改 `mail-worker/src/service/user-service.js` 和 `mail-worker/src/entity/user.js` (Drizzle schema)，确保在创建任何新账户时，直接从云端写入包含完整 4 个标签 (`社群`, `订阅`, `推销`, `工作`) 的 JSON 字符串，不再依赖前端的 auto-heal (自动修复) 机制。真正做到“出厂即内置”。
 *   **云端历史数据清理 (D1 Data Reset)**: 为响应“重置所有账户”的指令，通过 `wrangler d1 execute` 线上运行了 D1 迁移脚本。针对那些从未自定义标签的用户（其字段值为 `'[]'` 或旧版的单一 `[{"name":"社群"...}]`），将其底层字段强行更新为最新的 4 标签规范 (`allLabels`) 格式，从而让所有老账户自动恢复到基础的完整模板状态。
 *   **部署上线**: 已向 Cloudflare 发布包含最新 `user-service.js` 和 schema 逻辑的 Worker，实现完整的全局覆盖。
+
+### 修复：前端持久化缓存导致的 "系统设置" 幽灵标签残留 (2026-08-14)
+*   **根因分析 (Root Cause)**: 尽管之前已经在代码的默认模板中用 "工作" 替换了 "系统设置"，且在后端 API 中移除了相关硬编码，但前端使用了 `pinia-plugin-persistedstate`。这导致旧版用户（或正在开发阶段不断热更新的浏览器）的 LocalStorage 中依然缓存着包含 "系统设置" 的 `allLabels` 数组。当页面挂载时，UI 会优先使用这个带毒的本地缓存。且旧版的 `user.js` 只有在成功获取 API 返回并合并后才进行清理，存在时间差和条件限制。
+*   **修复策略 (Fix)**: 在 `mail-vue/src/store/ui.js` 的 `ensureDefaultRules`（所有组件挂载时必定同步执行的核心兜底函数）中，加入了**极度激进的强制清理逻辑 (Aggressive Cleanup)**。无论是从缓存恢复还是从哪里读取，只要在渲染前检测到 `allLabels` 中存在名为 "系统设置" 的标签，直接通过 `splice` 物理抹杀；并且如果检测到 "工作" 标签使用了原先 "系统设置" 的旧图标 (`ic:outline-settings`)，也会强制将其覆写为正确的公文包图标 (`ic:outline-work-outline`)。
+*   **云端对齐 (Cloud Sync)**: 重新向 Cloudflare D1 生产库发送了 `UPDATE user SET custom_labels = REPLACE(custom_labels, '系统设置', '工作');`，确保云端底层数据与前端严格一致。
