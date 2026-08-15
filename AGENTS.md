@@ -220,7 +220,12 @@
 ### 全面优化：全部邮件 (All Mail) 专属多字段高亮搜索及系统设置 i18n 完善 (2026-08-14)
 *   **统一化搜索体验 (Search Bar Harmonization)**: `77b1c28` — 将“全部邮件”专区的搜索功能重新绑定至全局导航栏搜索框，抛弃了旧版的下拉选框形式。现在的搜索行为与普通搜索一致：输入即触发 (400ms debounce)，无需按下 Enter。
 *   **全表无感搜索 (Global Fuzzy Search)**: 当用户在全部邮件内进行纯文本搜索时，后端引擎会自动执行对 `subject`, `name`, `sendEmail`, 和 `toEmail` 的 `OR` 联合查询匹配，实现了真正的全局模糊搜索，且保持了高效率。
-*   **智能高亮 (Yellow Highlighting)**: 重构了 `emailStore` 和 `highlightMatch` 逻辑。实现了原生的文本黄色背景标记 (`<mark style="background-color: yellow;">`)，任何检索出的自由关键字将立刻在结果列表中被显眼地标出。
+*   **智能高亮 (Yellow Highlighting)**: 重构了 `emailStore` 和 `highlightMatch` 逻辑
+
+### 修复：迁移UI导致的分类管理渲染崩溃 (2026-08-15)
+*   **根因分析 (Root Cause)**: 从系统设置迁移“邮件设置”和“Workers AI”卡片到“分类管理”(`label-setting/index.vue`) 时，带入的代码包含了 `locale === 'en'` 判断，但未在 setup 中完整解构 `const { locale } = useI18n()`。此 ReferenceError 导致 Vue 渲染器崩溃，新加入的设置项在界面上完全无法渲染呈现。
+*   **修复方案 (Fix)**: 在 `label-setting/index.vue` 中补充 `locale` 的解构：`const { t, locale } = useI18n()`。
+*   **验证与部署 (Verify & Deploy)**: 已通过 Playwright 获取截图，确认注入的代码完美在分类管理的 DOM 树和视图底部渲染。已重新提交 Commit (`2d88b46`) 并部署至 Cloudflare 线上环境。。实现了原生的文本黄色背景标记 (`<mark style="background-color: yellow;">`)，任何检索出的自由关键字将立刻在结果列表中被显眼地标出。
 
 ### 修复：前端错误吞咽问题与 Inbox 500 崩溃修复 (2026-08-14)
 *   **根因分析 (Root Cause)**:
@@ -426,3 +431,10 @@
 *   **UI模块迁移 (UI Migration)**: `79fdf2b` — 依据功能聚合原则，将原本位于“系统设置 (`sys-setting`)”中的 `Workers AI` 设置块和 `邮件设置 (Email Setting)` 块，无损迁移到了“分类管理 (`label-setting`)”页面的下方，作为一个独立的设置聚合网格 (`settings-grid`) 进行展示。
 *   **逻辑继承与隔离 (Logic Isolation)**: 所有的设置读取与更新底层 API (`settingQuery`, `settingSet`, `useSettingStore`) 以及相关的弹窗管理状态均被平滑迁移，在确保界面对齐且遵循 `card-grid` 网格规范的同时，后端与服务端的逻辑完全未受任何影响。
 *   **规范合规与验证 (Compliance Check)**: 严格执行了 Playwright 本地截屏验收，未损坏页面现有的结构与外观，且 `wrangler deploy` 已顺利执行，正式同步至 Cloudflare。
+
+### 紧急修复：分类管理迁移后设置卡片完全消失 (2026-08-15)
+*   **安全备份 (Backup)**: `2d88b46` — 包含 locale 变量修复但 reactive/computed 仍缺失的版本。
+*   **根因分析 (Root Cause)**: 迁移至 `label-setting/index.vue` 的代码引用了 `reactive()` 和 `computed()`，但这两个函数从未在原 label-setting 的 `import { ref, onMounted } from 'vue'` 中被导入。这导致 Vue 渲染器在组件 setup 阶段抛出 `ReferenceError`，所有后续依赖 `resendTokenForm`（`reactive`）、`authRefreshOptions`/`resendList`（`computed`）等变量的 UI 区域全部静默崩溃不渲染。前一次修复 (`locale`) 只解决了 template 层面的引用错误，本次才是真正的根因。
+*   **修复方案 (Fix)**: Commit `3018909` — 在 `label-setting/index.vue` 第 534 行将 `import { ref, onMounted } from 'vue'` 补全为 `import { ref, onMounted, reactive, computed } from 'vue'`，使所有迁移代码的 API 依赖完整齐备。
+*   **验证 (Verify)**: 执行 `vite build --mode release`，零编译错误，zero warnings（仅 chunk size 提示）。
+*   **部署 (Deploy)**: `wrangler deploy` 成功，Version ID: `ee19e5fc`，已同步至 `https://epomail.epocanvas.workers.dev`。
