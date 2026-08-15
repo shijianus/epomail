@@ -248,6 +248,14 @@
     - `sales@temu.com` [限時5折!] → 推銷 (Promotion)
     - `boss@company.com` → 普通收件箱 (Inbox)
 *   **部署 (Deploy)**: CF Version ID `a77f7d82-28ac-4557-965b-0da6ca54f118`
+
+### 分类管理改版与规则底层重构 (Category-Setting UI & Rule Engine Phase 2) (2026-08-15)
+*   **UI/UX 规范对齐 (Visual Refactor)**: 彻底重构了 `category-setting/index.vue`。放弃了过于简陋的无边框 `.container` 设计，转而完美对齐了「系统设置 (`sys-setting`)」界面，采用了 `.card-grid` + `.settings-card` 的标准化卡片阵列布局。每组功能（基础名单、硬拦截、内容过滤）都被独立且清晰地框定在一个具备背景色、圆角和边框的卡片内部，大幅提升了页面结构的整洁度。
+*   **模式切换防丢失与隔离 (Black/Whitelist Isolation)**:
+    1. **数据结构重构**：后端将原来扁平化的逗号分隔字符串升级为 JSON 格式 (`{"mode":"whitelist","whitelist":[],"blacklist":[]}`)，从而完美兼容旧数据并支持未来扩展。
+    2. **UI 隔离**：在前端操作中，当用户切换「黑/白名单模式」时，不再会互相覆盖！两套名单被互相隔离，点击“恢复默认模板”时，会根据当前选中的模式精准填充对应的模板数据。
+*   **引擎兜底修复 (Rule Engine Fix)**: 修正了 `mail-worker/src/email/email.js` 中的漏洞。以前如果白名单配置为空，则会自动放行所有邮件。现在修复后，若启用白名单模式，即使白名单为空，也会严格拦截所有并非站内且不在名单上的邮件，并**直接自动归类到垃圾桶 (Trash / DELETE 状态)**，不再仅仅依赖关键词审计！
+*   **部署 (Deploy)**: 截图验证通过，部署至 CF (Version ID `3acc53ff-45b0-48a3-ab1a-259b6765cded`)。
 *   **功能实现 (Feature)**: 
     *   将头像下拉菜单的触发方式由 `hover` 修改为 `click`，实现了“点击后才会显示下拉菜单，悬停不会！”的需求。
     *   引入了 3 秒的延迟关闭逻辑 (`closeTimer`)。当菜单打开后，鼠标移出头像或下拉菜单区域时，触发 3 秒倒计时；如果在此期间鼠标重新移入，则取消倒计时，确保“只要鼠标悬停在头像上/在选项框内就不会消失，即使处于选框外也需要3s后才消失”。
