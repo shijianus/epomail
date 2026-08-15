@@ -6,6 +6,111 @@
     <el-scrollbar class="scroll" v-if="!firstLoading">
       <div class="scroll-body">
         <div class="card-grid">
+
+          <!-- 邮件设置 Card (迁移自系统设置) -->
+          <div class="settings-card">
+            <div class="card-title">
+              {{ $t('emailSetting') }}
+              <el-tooltip content="邮件收发及转发相关的基础设置" placement="top">
+                <Icon icon="lucide:help-circle" width="14" class="help-icon" />
+              </el-tooltip>
+            </div>
+            <div class="card-content">
+              <div class="setting-item">
+                <div><span>{{ $t('receiveEmail') }}</span></div>
+                <div>
+                  <el-switch @change="change" :before-change="beforeChange" :active-value="0" :inactive-value="1"
+                             v-model="setting.receive"/>
+                </div>
+              </div>
+              <div class="setting-item">
+                <div>
+                  <span>{{ $t('autoRefresh') }}</span>
+                  <el-tooltip effect="dark" :content="$t('autoRefreshDesc')">
+                    <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+                  </el-tooltip>
+                </div>
+                <div>
+                  <el-select
+                      @change="change"
+                      :style="`width: ${ locale === 'en' ? 100 : 80 }px;`"
+                      v-model="setting.autoRefresh"
+                      placeholder="Select"
+                  >
+                    <el-option
+                        v-for="item in authRefreshOptions"
+                        :key="item.value"
+                        :label="item.label"
+                        :value="item.value"
+                    />
+                  </el-select>
+                </div>
+              </div>
+              <div class="setting-item">
+                <div><span>{{ $t('sendEmail') }}</span></div>
+                <div>
+                  <el-switch @change="change" :before-change="beforeChange" :active-value="0" :inactive-value="1"
+                             v-model="setting.send"/>
+                </div>
+              </div>
+              <div class="setting-item">
+                <div>
+                  <span>{{ $t('noRecipientTitle') }}</span>
+                  <el-tooltip effect="dark" :content="$t('noRecipientDesc')">
+                    <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+                  </el-tooltip>
+                </div>
+                <div>
+                  <el-switch @change="change" :before-change="beforeChange" :active-value="0" :inactive-value="1"
+                             v-model="setting.noRecipient"/>
+                </div>
+              </div>
+              <div class="setting-item">
+                <div><span>{{ setting.hasCfEmail ? $t('cloudflareEmailSending') : $t('resendToken') }}</span></div>
+                <div v-if="setting.hasCfEmail">
+                  <span>{{ $t('enabled') }}</span>
+                </div>
+                <div v-else>
+                  <el-button class="opt-button" style="margin-top: 0" @click="openResendList" size="small"
+                             type="primary">
+                    <Icon icon="ic:round-list" width="18" height="18"/>
+                  </el-button>
+                  <el-button class="opt-button" style="margin-top: 0" @click="openResendForm" size="small"
+                             type="primary">
+                    <Icon icon="material-symbols:add-rounded" width="16" height="16"/>
+                  </el-button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Workers AI Card (迁移自系统设置) -->
+          <div class="settings-card">
+            <div class="card-title">
+              Workers AI
+              <el-tooltip content="使用 Cloudflare Workers AI 对邮件进行智能识别与过滤" placement="top">
+                <Icon icon="lucide:help-circle" width="14" class="help-icon" />
+              </el-tooltip>
+            </div>
+            <div class="card-content">
+              <div class="setting-item">
+                <div><span>{{ $t('codeRecognition') }}</span></div>
+                <div>
+                  <el-switch @change="changeField('aiCode', $event)" :before-change="beforeChange" :active-value="0" :inactive-value="1"
+                             v-model="setting.aiCode"/>
+                </div>
+              </div>
+              <div class="setting-item">
+                <div><span>{{ $t('codeRecognitionRules') }}</span></div>
+                <div class="forward">
+                  <el-button class="opt-button" size="small" type="primary" @click="openAiCodeFilter">
+                    <Icon icon="fluent:settings-48-regular" width="18" height="18"/>
+                  </el-button>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <!-- 基础名单 Card -->
           <div class="settings-card">
             <div class="card-title">
@@ -186,18 +291,116 @@
         />
       </div>
     </el-drawer>
+
+    <!-- Workers AI: aiCodeFilter Dialog -->
+    <el-dialog v-model="aiCodeFilterShow" class="forward-dialog" @closed="resetAiCodeFilter">
+      <template #header>
+        <div class="forward-head">
+          <span class="forward-set-title">{{ $t('codeRecognitionRules') }}</span>
+          <el-tooltip effect="dark" :content="$t('codeRecognitionRulesDesc')">
+            <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+          </el-tooltip>
+        </div>
+      </template>
+      <el-form>
+        <el-form-item :label="t('senderRules')" label-position="top">
+          <el-input-tag v-model="aiCodeFilter" @add-tag="aiCodeFilterAddTag"/>
+        </el-form-item>
+      </el-form>
+      <el-button type="primary" style="width: 100%;" :loading="settingLoading" @click="saveAiCodeFilter">{{ $t('save') }}</el-button>
+    </el-dialog>
+
+    <!-- Email Settings: resend token form -->
+    <el-dialog v-model="resendTokenFormShow" :title="$t('resendToken')" width="340" @closed="cleanResendTokenForm">
+      <form>
+        <el-select style="margin-bottom: 15px" v-model="resendTokenForm.domain" placeholder="Select">
+          <el-option
+              v-for="item in settingStore.domainList"
+              :key="item"
+              :label="item"
+              :value="item"
+          />
+        </el-select>
+        <el-input type="text" :placeholder="$t('addResendTokenDesc')" v-model="resendTokenForm.token"/>
+        <el-button type="primary" :loading="settingLoading" @click="saveResendToken">{{ $t('save') }}</el-button>
+      </form>
+    </el-dialog>
+
+    <!-- Email Settings: resend token list -->
+    <el-dialog class="resend-table" v-model="showResendList" :title="$t('resendTokenList')">
+      <el-table :data="resendList">
+        <el-table-column :min-width="emailColumnWidth" property="key" :label="$t('domain')"
+                         :show-overflow-tooltip="true"/>
+        <el-table-column :width="tokenColumnWidth" property="value" label="Token" fixed="right"
+                         :show-overflow-tooltip="true"/>
+      </el-table>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { settingQuery, setBlackList } from '@/request/setting.js'
+import { ref, computed, onMounted, reactive, nextTick } from 'vue'
+import { settingQuery, setBlackList, settingSet } from '@/request/setting.js'
+import { useSettingStore } from '@/store/setting.js'
+import { useUiStore } from '@/store/ui.js'
 import Loading from '@/components/loading/index.vue'
 import { Icon } from '@iconify/vue'
 import { ElMessage } from 'element-plus'
+import { storeToRefs } from 'pinia'
+import { isDomain, isEmail } from '@/utils/verify-utils.js'
+import { getTextWidth } from '@/utils/text.js'
+import { useI18n } from 'vue-i18n'
+
+const { t, locale } = useI18n()
 
 const firstLoading = ref(true)
+const settingLoading = ref(false)
+const settingReady = ref(false)
+let backup = '{}'
 
+// ── Setting store (shared with sys-setting) ──────────────────────────
+const settingStore = useSettingStore()
+const uiStore = useUiStore()
+const { settings: setting } = storeToRefs(settingStore)
+
+// ── Email Setting refs ────────────────────────────────────────────────
+const authRefreshOptions = computed(() => [
+  { label: t('disable'), value: 0 },
+  { label: '3s', value: 3 },
+  { label: '5s', value: 5 },
+  { label: '10s', value: 10 },
+  { label: '15s', value: 15 },
+  { label: '20s', value: 20 },
+])
+
+const resendTokenFormShow = ref(false)
+const showResendList = ref(false)
+const emailColumnWidth = ref(0)
+const tokenColumnWidth = ref(0)
+const resendTokenForm = reactive({ domain: '', token: '' })
+
+const resendList = computed(() => {
+  const list = Object.keys(setting.value.resendTokens || {}).map(key => ({ key, value: setting.value.resendTokens[key] }))
+  if (list.length > 0) {
+    const key = list.reduce((a, b) => compareByLengthAndUpperCase(a, b, 'key')).key
+    emailColumnWidth.value = getTextWidth(key) + 30
+    const value = list.reduce((a, b) => compareByLengthAndUpperCase(a, b, 'value')).value
+    tokenColumnWidth.value = getTextWidth(value) + 30
+  }
+  return list
+})
+
+const compareByLengthAndUpperCase = (a, b, key) => {
+  const getUpperCaseCount = (str) => (str.match(/[A-Z]/g) || []).length
+  if (a[key].length === b[key].length) return getUpperCaseCount(a[key]) > getUpperCaseCount(b[key]) ? a : b
+  return a[key].length > b[key].length ? a : b
+}
+
+// ── Workers AI refs ───────────────────────────────────────────────────
+const aiCodeFilterShow = ref(false)
+const aiCodeFilter = ref([])
+
+// ── Category filter state ─────────────────────────────────────────────
 const listMode = ref('blacklist')
 const whitelistEntries = ref([])
 const blacklistEntries = ref([])
@@ -217,7 +420,7 @@ const blockInternalContent = ref(false)
 
 // Drawer State
 const drawerVisible = ref(false)
-const drawerTarget = ref('list') // 'list' | 'block' | 'subject' | 'content'
+const drawerTarget = ref('list')
 const drawerLoading = ref(false)
 const currentDrawerArray = ref([])
 
@@ -263,30 +466,12 @@ const hardBlockTemplates = [
 ]
 
 const subjectTemplates = [
-  '免费',
-  '促销',
-  'casino',
-  'viagra',
-  'lottery',
-  'winner',
-  'urgent'
+  '免费', '促销', 'casino', 'viagra', 'lottery', 'winner', 'urgent'
 ]
 
 const contentTemplates = [
-  '发票',
-  '中奖',
-  '贷款',
-  '赌场',
-  '博彩',
-  '免费领取',
-  '代开',
-  '退款通知',
-  '急聘',
-  'pharmacy',
-  'crypto',
-  'bitcoin',
-  'giveaway',
-  'loan'
+  '发票', '中奖', '贷款', '赌场', '博彩', '免费领取', '代开',
+  '退款通知', '急聘', 'pharmacy', 'crypto', 'bitcoin', 'giveaway', 'loan'
 ]
 
 const drawerTitle = computed(() => {
@@ -302,28 +487,137 @@ onMounted(async () => {
   await loadSettings()
 })
 
+// ── Setting helpers (mirrored from sys-setting, pure UI, same API) ──
+function backupSetting() {
+  const form = { ...setting.value }
+  delete form.resendTokens
+  delete form.siteKey
+  delete form.secretKey
+  backup = JSON.stringify(setting.value)
+}
+
+function beforeChange() {
+  if (!settingReady.value || settingLoading.value) return false
+  backupSetting()
+  return true
+}
+
+function change() {
+  if (!settingReady.value) return
+  const settingForm = { ...setting.value }
+  delete settingForm.siteKey
+  delete settingForm.secretKey
+  delete settingForm.s3AccessKey
+  delete settingForm.s3SecretKey
+  delete settingForm.tgBotToken
+  delete settingForm.resendTokens
+  editSetting(settingForm, false)
+}
+
+function changeField(key, value) {
+  if (!settingReady.value) return
+  setting.value[key] = value
+  editSetting({ [key]: value }, false)
+}
+
+function editSetting(settingForm, refreshStatus = true) {
+  if (settingLoading.value) return
+  settingLoading.value = true
+
+  settingSet(settingForm).then(() => {
+    settingLoading.value = false
+    ElMessage({ message: t('saveSuccessMsg'), type: 'success', plain: true })
+    if (refreshStatus) getSettings()
+    resendTokenFormShow.value = false
+    aiCodeFilterShow.value = false
+  }).catch(() => {
+    setting.value = { ...setting.value, ...JSON.parse(backup) }
+  }).finally(() => {
+    settingLoading.value = false
+  })
+}
+
+function getSettings() {
+  settingReady.value = false
+  settingQuery().then(settingData => {
+    setting.value = settingData
+    settingStore.domainList = settingData.domainList
+    resendTokenForm.domain = setting.value.domainList?.[0] || ''
+    resetAiCodeFilter()
+    nextTick(() => { settingReady.value = true })
+  })
+}
+
+// ── Workers AI functions ──────────────────────────────────────────────
+function openAiCodeFilter() {
+  aiCodeFilterShow.value = true
+}
+
+function resetAiCodeFilter() {
+  aiCodeFilter.value = setting.value.aiCodeFilter ? setting.value.aiCodeFilter.split(',') : []
+}
+
+function aiCodeFilterAddTag(val) {
+  const emails = Array.from(new Set(
+    val.split(/[,，]/).map(item => item.trim()).filter(item => item)
+  ))
+  aiCodeFilter.value.splice(aiCodeFilter.value.length - 1, 1)
+  emails.forEach(email => {
+    if ((isEmail(email) || isDomain(email)) && !aiCodeFilter.value.includes(email)) {
+      aiCodeFilter.value.push(email)
+    }
+  })
+}
+
+function saveAiCodeFilter() {
+  editSetting({ aiCodeFilter: aiCodeFilter.value + '' })
+}
+
+// ── Email Setting functions ───────────────────────────────────────────
+function openResendList() {
+  showResendList.value = true
+}
+
+function openResendForm() {
+  resendTokenFormShow.value = true
+}
+
+function cleanResendTokenForm() {
+  resendTokenForm.token = ''
+}
+
+function saveResendToken() {
+  const settingForm = { resendTokens: {} }
+  const domain = resendTokenForm.domain.slice(1)
+  settingForm.resendTokens[domain] = resendTokenForm.token
+  editSetting(settingForm)
+}
+
 // ── Deduplication Logic ─────────────────────────────────────────────
 function deduplicateRules(rules) {
-  let unique = Array.from(new Set(rules)).filter(Boolean).map(r => r.trim());
-  let domains = unique.filter(r => !r.includes('@') || r.startsWith('@')).map(d => d.replace(/^@/, ''));
-  let finalRules = [];
+  let unique = Array.from(new Set(rules)).filter(Boolean).map(r => r.trim())
+  let domains = unique.filter(r => !r.includes('@') || r.startsWith('@')).map(d => d.replace(/^@/, ''))
+  let finalRules = []
   for (let rule of unique) {
     if (rule.includes('@') && !rule.startsWith('@')) {
-       let domainPart = rule.split('@')[1];
-       if (domains.includes(domainPart)) continue; // redundant, domain already included
+       let domainPart = rule.split('@')[1]
+       if (domains.includes(domainPart)) continue
     }
-    finalRules.push(rule);
+    finalRules.push(rule)
   }
-  return finalRules;
+  return finalRules
 }
 
 async function loadSettings() {
   firstLoading.value = true
   try {
     const data = await settingQuery()
+    setting.value = data
+    settingStore.domainList = data.domainList
+    resendTokenForm.domain = data.domainList?.[0] || ''
+    resetAiCodeFilter()
+
     let rawList = data.blackFrom || ''
-    
-    // Parse list mode and internal flag
     if (rawList.includes('__blockInternal,')) {
       blockInternalList.value = true
       rawList = rawList.replace('__blockInternal,', '')
@@ -348,7 +642,6 @@ async function loadSettings() {
         }
       } catch (e) {}
     } else {
-      // legacy support
       if (rawList.startsWith('__mode:whitelist,')) {
         listMode.value = 'whitelist'
         const rest = rawList.slice('__mode:whitelist,'.length)
@@ -366,11 +659,10 @@ async function loadSettings() {
       }
     }
 
-    // Parse block content and internal flag
     let rawContent = data.blackContent || ''
     if (rawContent.includes('__blockInternal,')) {
       blockInternalBlock.value = true
-      blockInternalContent.value = true // Sync for legacy compat
+      blockInternalContent.value = true
       rawContent = rawContent.replace('__blockInternal,', '')
     }
 
@@ -404,15 +696,15 @@ async function loadSettings() {
       blackSubject.value = rawSubject ? rawSubject.split(',').filter(Boolean) : []
     }
 
-    // Save default templates silently on first init
     if (isInitList) {
       blacklistEntries.value = deduplicateRules(blacklistEntries.value)
       await setBlackList({ blackFrom: getListSaveString() })
     }
     if (isInitBlock || isInitContent) {
-      await setBlackList({ blackContent: (isInitBlock && !isInitContent) ? getBlockSaveString() : getContentSaveString() }) 
+      await setBlackList({ blackContent: (isInitBlock && !isInitContent) ? getBlockSaveString() : getContentSaveString() })
     }
 
+    nextTick(() => { settingReady.value = true })
   } catch (e) {
     console.error('Settings load failed:', e)
   } finally {
@@ -421,32 +713,28 @@ async function loadSettings() {
 }
 
 function getListSaveString() {
-  const internalPrefix = blockInternalList.value ? '__blockInternal,' : '';
+  const internalPrefix = blockInternalList.value ? '__blockInternal,' : ''
   const payload = {
     mode: listMode.value,
     whitelist: whitelistEntries.value,
     blacklist: blacklistEntries.value,
-    flags: {
-      blockEmptyName: blockEmptyName.value,
-      blockNotToMe: blockNotToMe.value,
-      blockExecutable: blockExecutable.value
-    }
+    flags: { blockEmptyName: blockEmptyName.value, blockNotToMe: blockNotToMe.value, blockExecutable: blockExecutable.value }
   }
   return internalPrefix + JSON.stringify(payload)
 }
 
 function getBlockSaveString() {
-  const internalPrefix = blockInternalBlock.value ? '__blockInternal,' : '';
+  const internalPrefix = blockInternalBlock.value ? '__blockInternal,' : ''
   return `__hardblock,${internalPrefix}` + hardBlockEntries.value.join(',')
 }
 
 function getSubjectSaveString() {
-  const internalPrefix = blockInternalSubject.value ? '__blockInternal,' : '';
+  const internalPrefix = blockInternalSubject.value ? '__blockInternal,' : ''
   return `${internalPrefix}` + blackSubject.value.join(',')
 }
 
 function getContentSaveString() {
-  const internalPrefix = blockInternalContent.value ? '__blockInternal,' : '';
+  const internalPrefix = blockInternalContent.value ? '__blockInternal,' : ''
   return `${internalPrefix}` + blackContent.value.join(',')
 }
 
@@ -469,12 +757,6 @@ async function saveFlagsDirectly() {
   } catch (e) {}
 }
 
-async function saveBlockDirectly() {
-  try {
-    await setBlackList({ blackContent: getBlockSaveString() })
-    ElMessage.success('已保存拦截设置')
-  } catch (e) {}
-}
 async function saveSubjectDirectly() {
   try {
     await setBlackList({ blackSubject: getSubjectSaveString() })
@@ -491,18 +773,11 @@ async function saveContentDirectly() {
 // ── Drawer Operations ───────────────────────────────────────────────
 function openDrawer(target) {
   drawerTarget.value = target
-  
   let sourceArray = []
-  if (target === 'list') {
-    sourceArray = listMode.value === 'whitelist' ? whitelistEntries.value : blacklistEntries.value
-  } else if (target === 'block') {
-    sourceArray = hardBlockEntries.value
-  } else if (target === 'subject') {
-    sourceArray = blackSubject.value
-  } else if (target === 'content') {
-    sourceArray = blackContent.value
-  }
-  
+  if (target === 'list') sourceArray = listMode.value === 'whitelist' ? whitelistEntries.value : blacklistEntries.value
+  else if (target === 'block') sourceArray = hardBlockEntries.value
+  else if (target === 'subject') sourceArray = blackSubject.value
+  else if (target === 'content') sourceArray = blackContent.value
   currentDrawerArray.value = [...sourceArray]
   drawerVisible.value = true
 }
@@ -517,11 +792,7 @@ function clearCurrent() {
 
 function restoreDefaultTemplates() {
   if (drawerTarget.value === 'list') {
-     if (listMode.value === 'whitelist') {
-        currentDrawerArray.value = [...whitelistTemplates]
-     } else {
-        currentDrawerArray.value = [...blacklistTemplates]
-     }
+     currentDrawerArray.value = listMode.value === 'whitelist' ? [...whitelistTemplates] : [...blacklistTemplates]
   } else if (drawerTarget.value === 'block') {
      currentDrawerArray.value = [...hardBlockTemplates]
   } else if (drawerTarget.value === 'subject') {
@@ -533,18 +804,12 @@ function restoreDefaultTemplates() {
 
 async function saveDrawer() {
   drawerLoading.value = true
-  
-  // Deduplicate
   const finalArray = deduplicateRules(currentDrawerArray.value)
-  
   let payload = {}
-  
+
   if (drawerTarget.value === 'list') {
-    if (listMode.value === 'whitelist') {
-      whitelistEntries.value = finalArray
-    } else {
-      blacklistEntries.value = finalArray
-    }
+    if (listMode.value === 'whitelist') whitelistEntries.value = finalArray
+    else blacklistEntries.value = finalArray
     payload.blackFrom = getListSaveString()
   } else if (drawerTarget.value === 'block') {
     hardBlockEntries.value = finalArray
@@ -677,6 +942,7 @@ async function saveDrawer() {
     justify-content: flex-end;
     align-items: center;
     font-weight: normal;
+    gap: 8px;
   }
 }
 
@@ -685,6 +951,71 @@ async function saveDrawer() {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+}
+
+.forward {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.warning {
+  margin-left: 2px;
+  color: grey;
+  cursor: pointer;
+}
+
+:deep(.forward-dialog.el-dialog) {
+  width: 500px !important;
+  @media (max-width: 540px) {
+    width: calc(100% - 40px) !important;
+    margin-right: 20px !important;
+    margin-left: 20px !important;
+  }
+}
+
+.forward-dialog {
+  .forward-head {
+    display: flex;
+    align-items: center;
+
+    .forward-set-title {
+      top: 1px;
+      padding-right: 5px;
+      position: relative;
+      font-size: 16px;
+      font-weight: bold;
+    }
+  }
+}
+
+:deep(.resend-table.el-dialog) {
+  min-height: 300px;
+  width: 500px !important;
+  @media (max-width: 540px) {
+    width: calc(100% - 40px) !important;
+    margin-right: 20px !important;
+    margin-left: 20px !important;
+  }
+}
+
+:deep(.el-dialog) {
+  width: 400px !important;
+  @media (max-width: 440px) {
+    width: calc(100% - 40px) !important;
+    margin-right: 20px !important;
+    margin-left: 20px !important;
+  }
+}
+
+:deep(.el-table__inner-wrapper:before) {
+  background: var(--el-bg-color);
+}
+
+form .el-button {
+  margin-top: 10px;
+  width: 100%;
 }
 
 /* Drawer styles */
@@ -701,7 +1032,7 @@ async function saveDrawer() {
   padding: 14px;
   border-radius: 6px;
   border: 1px solid var(--border-subtle);
-  
+
   .desc-title {
     font-weight: bold;
     color: var(--text-primary);
@@ -767,5 +1098,9 @@ async function saveDrawer() {
   margin-top: 2px !important;
   margin-bottom: 2px !important;
   height: 24px;
+}
+
+:deep(.el-select__wrapper) {
+  min-height: 28px;
 }
 </style>

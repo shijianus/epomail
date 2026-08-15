@@ -127,77 +127,6 @@
             </div>
           </div>
 
-          <!-- Email Sending Settings Card -->
-          <div class="settings-card">
-            <div class="card-title">{{ $t('emailSetting') }}</div>
-            <div class="card-content">
-              <div class="setting-item">
-                <div><span>{{ $t('receiveEmail') }}</span></div>
-                <div>
-                  <el-switch @change="change" :before-change="beforeChange" :active-value="0" :inactive-value="1"
-                             v-model="setting.receive"/>
-                </div>
-              </div>
-              <div class="setting-item">
-                <div>
-                  <span>{{ $t('autoRefresh') }}</span>
-                  <el-tooltip effect="dark" :content="$t('autoRefreshDesc')">
-                    <Icon class="warning" icon="fe:warning" width="18" height="18"/>
-                  </el-tooltip>
-                </div>
-                <div>
-                  <el-select
-                      @change="change"
-                      :style="`width: ${ locale === 'en' ? 100 : 80 }px;`"
-                      v-model="setting.autoRefresh"
-                      placeholder="Select"
-                  >
-                    <el-option
-                        v-for="item in authRefreshOptions"
-                        :key="item.value"
-                        :label="item.label"
-                        :value="item.value"
-                    />
-                  </el-select>
-                </div>
-              </div>
-              <div class="setting-item">
-                <div><span>{{ $t('sendEmail') }}</span></div>
-                <div>
-                  <el-switch @change="change" :before-change="beforeChange" :active-value="0" :inactive-value="1"
-                             v-model="setting.send"/>
-                </div>
-              </div>
-              <div class="setting-item">
-                <div>
-                  <span>{{ $t('noRecipientTitle') }}</span>
-                  <el-tooltip effect="dark" :content="$t('noRecipientDesc')">
-                    <Icon class="warning" icon="fe:warning" width="18" height="18"/>
-                  </el-tooltip>
-                </div>
-                <div>
-                  <el-switch @change="change" :before-change="beforeChange" :active-value="0" :inactive-value="1"
-                             v-model="setting.noRecipient"/>
-                </div>
-              </div>
-              <div class="setting-item">
-                <div><span>{{ setting.hasCfEmail ? $t('cloudflareEmailSending') : $t('resendToken') }}</span></div>
-                <div v-if="setting.hasCfEmail">
-                  <span>{{ $t('enabled') }}</span>
-                </div>
-                <div v-else>
-                  <el-button class="opt-button" style="margin-top: 0" @click="openResendList" size="small"
-                             type="primary">
-                    <Icon icon="ic:round-list" width="18" height="18"/>
-                  </el-button>
-                  <el-button class="opt-button" style="margin-top: 0" @click="openResendForm" size="small"
-                             type="primary">
-                    <Icon icon="material-symbols:add-rounded" width="16" height="16"/>
-                  </el-button>
-                </div>
-              </div>
-            </div>
-          </div>
 
           <!-- Object Storage Card -->
           <div class="settings-card">
@@ -359,26 +288,6 @@
             </div>
           </div>
 
-          <div class="settings-card">
-            <div class="card-title">Workers AI</div>
-            <div class="card-content">
-              <div class="setting-item">
-                <div><span>{{ $t('codeRecognition') }}</span></div>
-                <div>
-                  <el-switch @change="changeField('aiCode', $event)" :before-change="beforeChange" :active-value="0" :inactive-value="1"
-                             v-model="setting.aiCode"/>
-                </div>
-              </div>
-              <div class="setting-item">
-                <div><span>{{ $t('codeRecognitionRules') }}</span></div>
-                <div class="forward">
-                  <el-button class="opt-button" size="small" type="primary" @click="openAiCodeFilter">
-                    <Icon icon="fluent:settings-48-regular" width="18" height="18"/>
-                  </el-button>
-                </div>
-              </div>
-            </div>
-          </div>
 
           <div class="settings-card about">
             <div class="card-title">{{ $t('about') }}</div>
@@ -439,20 +348,6 @@
         <form>
           <el-input type="text" :placeholder="$t('websiteTitle')" v-model="editTitle"/>
           <el-button type="primary" :loading="settingLoading" @click="saveTitle">{{ $t('save') }}</el-button>
-        </form>
-      </el-dialog>
-      <el-dialog v-model="resendTokenFormShow" :title="$t('resendToken')" width="340" @closed="cleanResendTokenForm">
-        <form>
-          <el-select style="margin-bottom: 15px" v-model="resendTokenForm.domain" placeholder="Select">
-            <el-option
-                v-for="item in settingStore.domainList"
-                :key="item"
-                :label="item"
-                :value="item"
-            />
-          </el-select>
-          <el-input type="text" :placeholder="$t('addResendTokenDesc')" v-model="resendTokenForm.token"/>
-          <el-button type="primary" :loading="settingLoading" @click="saveResendToken">{{ $t('save') }}</el-button>
         </form>
       </el-dialog>
       <el-dialog v-model="r2DomainShow" :title="$t('addOsDomain')" width="340"
@@ -621,14 +516,7 @@
           </div>
         </template>
       </el-dialog>
-      <el-dialog class="resend-table" v-model="showResendList" :title="$t('resendTokenList')">
-        <el-table :data="resendList">
-          <el-table-column :min-width="emailColumnWidth" property="key" :label="$t('domain')"
-                           :show-overflow-tooltip="true"/>
-          <el-table-column :width="tokenColumnWidth" property="value" label="Token" fixed="right"
-                           :show-overflow-tooltip="true"/>
-        </el-table>
-      </el-dialog>
+
       <el-dialog v-model="regVerifyCountShow" :title="$t('rulesVerifyTitle',{count: regVerifyCount})"
                  @closed="regVerifyCount = setting.regVerifyCount">
         <form>
@@ -778,22 +666,7 @@
         </el-form>
         <el-button type="primary" style="width: 100%;" :loading="settingLoading" @click="saveBlackList">{{ $t('save') }}</el-button>
       </el-dialog>
-      <el-dialog v-model="aiCodeFilterShow" class="forward-dialog" @closed="resetAiCodeFilter">
-        <template #header>
-          <div class="forward-head">
-            <span class="forward-set-title">{{ $t('codeRecognitionRules') }}</span>
-            <el-tooltip effect="dark" :content="$t('codeRecognitionRulesDesc')">
-              <Icon class="warning" icon="fe:warning" width="18" height="18"/>
-            </el-tooltip>
-          </div>
-        </template>
-        <el-form>
-          <el-form-item :label="t('senderRules')" label-position="top">
-            <el-input-tag v-model="aiCodeFilter" @add-tag="aiCodeFilterAddTag"/>
-          </el-form-item>
-        </el-form>
-        <el-button type="primary" style="width: 100%;" :loading="settingLoading" @click="saveAiCodeFilter">{{ $t('save') }}</el-button>
-      </el-dialog>
+
     </el-scrollbar>
   </div>
 </template>
@@ -1595,6 +1468,9 @@ function editSetting(settingForm, refreshStatus = true) {
   font-weight: bold;
   padding: 10px 20px;
   border-bottom: 1px solid var(--el-border-color);
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .card-content {
