@@ -62,8 +62,13 @@ export const useUiStore = defineStore('ui', {
             this.previewData = data
             this.changePreview ++
         },
-        // 确保内置标签的系统规则始终存在（幂等）
         ensureDefaultRules() {
+            // Aggressively clean up deprecated '系统设置' label that might be cached
+            const deprecatedIdx = this.allLabels.findIndex(l => l.name === '系统设置')
+            if (deprecatedIdx !== -1) {
+                this.allLabels.splice(deprecatedIdx, 1)
+            }
+
             const CANONICAL = {
                 '社群': [{ condition: { type: 'sender_address_includes', value: 'gmail.com, outlook.com, qq.com, 163.com, yahoo.com, hotmail.com, foxmail.com, sina.com' } }],
                 '订阅': [{ condition: { type: 'system_setting', value: '' } }],
@@ -74,6 +79,12 @@ export const useUiStore = defineStore('ui', {
             // 强制恢复被错误删除的工作标签
             if (!this.allLabels.some(l => l.name === '工作')) {
                 this.allLabels.push({ name: '工作', icon: 'ic:outline-work-outline', color: '#8b5cf6', listVis: true, stats: { total: 0, current: 0, unread: 0 }, rules: [] })
+            } else {
+                // Ensure the icon is updated if it was previously migrated from 系统设置
+                const workLabel = this.allLabels.find(l => l.name === '工作')
+                if (workLabel.icon === 'ic:outline-settings') {
+                    workLabel.icon = 'ic:outline-work-outline'
+                }
             }
 
             // 保证内置标签存在（如果被删则不重注入——除了工作外，其他均允许用户删除）
