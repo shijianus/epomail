@@ -295,7 +295,13 @@ function checkBlock(blackSubjectStr, blackContentStr, blackFromStr, email, env) 
 		let fromList = [];
 
 		if (blackFromStr) {
-			if (blackFromStr.startsWith('__mode:whitelist,')) {
+			if (blackFromStr.startsWith('{')) {
+				try {
+					const obj = JSON.parse(blackFromStr);
+					listMode = obj.mode || 'blacklist';
+					fromList = listMode === 'whitelist' ? (obj.whitelist || []) : (obj.blacklist || []);
+				} catch(e){}
+			} else if (blackFromStr.startsWith('__mode:whitelist,')) {
 				listMode = 'whitelist';
 				const rest = blackFromStr.slice('__mode:whitelist,'.length);
 				fromList = rest ? rest.split(',').filter(Boolean) : [];
@@ -319,17 +325,14 @@ function checkBlock(blackSubjectStr, blackContentStr, blackFromStr, email, env) 
 			return senderDomain === e || senderDomain.endsWith('.' + e);
 		}
 
-		if (fromList.length > 0) {
+		if (listMode === 'whitelist') {
 			const isOnList = fromList.some(matchesSender);
-			if (listMode === 'blacklist') {
+			if (!isOnList) return { block: true, hardBlock: false };
+		} else if (listMode === 'blacklist') {
+			if (fromList.length > 0) {
+				const isOnList = fromList.some(matchesSender);
 				if (isOnList) return { block: true, hardBlock: false };
-			} else {
-				if (!isOnList) return { block: true, hardBlock: false };
 			}
-		} else if (listMode === 'whitelist') {
-			// If whitelist is empty, technically it should block everything.
-			// The original logic didn't handle empty whitelist explicitly blocking everything 
-			// if length == 0. But let's keep original behavior where fromList > 0 check encapsulates it.
 		}
 	}
 

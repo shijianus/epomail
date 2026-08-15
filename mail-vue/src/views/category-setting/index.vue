@@ -1,150 +1,155 @@
 <template>
-  <div class="cat-page box">
-    <div class="loading-overlay" :class="firstLoading ? 'lo-show' : 'lo-hide'">
+  <div class="settings-container">
+    <div class="loading" :class="firstLoading ? 'loading-show' : 'loading-hide'">
       <loading />
     </div>
+    <el-scrollbar class="scroll" v-if="!firstLoading">
+      <div class="scroll-body">
+        <div class="card-grid">
+          <!-- 基础名单 Card -->
+          <div class="settings-card">
+            <div class="card-title">基础名单规则</div>
+            <div class="card-content">
+              <div class="setting-item">
+                <div><span>名单模式</span></div>
+                <div>
+                  <el-radio-group v-model="listMode" @change="setMode" size="small">
+                    <el-radio value="blacklist" size="small">黑名单 (默认)</el-radio>
+                    <el-radio value="whitelist" size="small">白名单</el-radio>
+                  </el-radio-group>
+                </div>
+              </div>
+              <div class="setting-item">
+                <div><span>阻挡站内邮件</span></div>
+                <div>
+                  <el-switch v-model="blockInternalList" @change="saveListDirectly" size="small" />
+                </div>
+              </div>
+              <div class="setting-item">
+                <div><span>规则明细</span></div>
+                <div>
+                  <el-button class="opt-button" size="small" type="primary" @click="openDrawer('list')">
+                    <Icon icon="lucide:settings-2" width="16" /> 设置 ({{ (listMode === 'whitelist' ? whitelistEntries : blacklistEntries).length }})
+                  </el-button>
+                </div>
+              </div>
+            </div>
+          </div>
 
-    <el-scrollbar class="cat-scroll" v-if="!firstLoading">
-        <div class="container">
-          <div class="title">基础名单 
-              <el-tooltip :content="($t('catHowItWorks') || '白名单放行，黑名单拦截。') + ' ' + (listMode === 'blacklist' ? ($t('blacklistExplain') || '黑名单内地址直接拉黑。') : ($t('whitelistExplain') || '仅放行白名单内地址。'))" placement="top">
-                <Icon icon="lucide:help-circle" width="14" class="help-icon" />
-              </el-tooltip>
+          <!-- 硬拦截 Card -->
+          <div class="settings-card">
+            <div class="card-title">硬拦截规则 (丢弃)</div>
+            <div class="card-content">
+              <div class="setting-item">
+                <div><span>阻挡站内邮件</span></div>
+                <div>
+                  <el-switch v-model="blockInternalBlock" @change="saveBlockDirectly" size="small" />
+                </div>
+              </div>
+              <div class="setting-item">
+                <div><span>拦截发件人</span></div>
+                <div>
+                  <el-button class="opt-button" size="small" type="primary" @click="openDrawer('block')">
+                    <Icon icon="lucide:settings-2" width="16" /> 设置 ({{ hardBlockEntries.length }})
+                  </el-button>
+                </div>
+              </div>
+            </div>
           </div>
-          
-          <div class="item">
-             <div>工作模式</div>
-             <div>
-                <el-radio-group v-model="listMode" @change="saveListDirectly">
-                  <el-radio label="blacklist">黑名单模式</el-radio>
-                  <el-radio label="whitelist">白名单模式</el-radio>
-                </el-radio-group>
-             </div>
-          </div>
-          <div class="item">
-             <div>名单规则</div>
-             <div>
-                <span>当前生效规则：{{ listEntries.length }} 条</span>
-                <el-button type="primary" size="small" style="margin-left: 15px;" @click="openDrawer('list')" :loading="saving">设置规则</el-button>
-             </div>
-          </div>
-          <div class="item">
-             <div>站内邮件</div>
-             <div class="internal-toggle">
-                <el-switch v-model="blockInternalList" @change="saveListDirectly" />
-                <span class="internal-label">连同站内信一起阻挡 (默认放行)</span>
-             </div>
+
+          <!-- 内容过滤 Card -->
+          <div class="settings-card">
+            <div class="card-title">内容及标题过滤 (入垃圾桶)</div>
+            <div class="card-content">
+              <div class="setting-item">
+                <div><span>阻挡站内邮件 (标题)</span></div>
+                <div>
+                  <el-switch v-model="blockInternalSubject" @change="saveSubjectDirectly" size="small" />
+                </div>
+              </div>
+              <div class="setting-item">
+                <div><span>过滤标题</span></div>
+                <div>
+                  <el-button class="opt-button" size="small" type="primary" @click="openDrawer('subject')">
+                    <Icon icon="lucide:settings-2" width="16" /> 设置 ({{ blackSubject.length }})
+                  </el-button>
+                </div>
+              </div>
+              <div class="setting-item">
+                <div><span>阻挡站内邮件 (内容)</span></div>
+                <div>
+                  <el-switch v-model="blockInternalContent" @change="saveContentDirectly" size="small" />
+                </div>
+              </div>
+              <div class="setting-item">
+                <div><span>过滤内容</span></div>
+                <div>
+                  <el-button class="opt-button" size="small" type="primary" @click="openDrawer('content')">
+                    <Icon icon="lucide:settings-2" width="16" /> 设置 ({{ blackContent.length }})
+                  </el-button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-
-        <div class="container">
-          <div class="title">硬拦截 (Hard Block)
-               <el-tooltip :content="$t('hardBlockDesc') || '符合条件的邮件直接拒收，不进入垃圾箱。'" placement="top">
-                 <Icon icon="lucide:help-circle" width="14" class="help-icon" />
-               </el-tooltip>
-          </div>
-          
-          <div class="item">
-             <div>拦截规则</div>
-             <div>
-                <span>生效拦截规则：{{ hardBlockEntries.length }} 条</span>
-                <el-button type="primary" size="small" style="margin-left: 15px;" @click="openDrawer('block')" :loading="saving">设置拦截</el-button>
-             </div>
-          </div>
-          <div class="item">
-             <div>站内邮件</div>
-             <div class="internal-toggle">
-                <el-switch v-model="blockInternalBlock" @change="saveBlockDirectly" />
-                <span class="internal-label">连同站内信一起阻挡 (默认放行)</span>
-             </div>
-          </div>
-        </div>
-
-        <div class="container">
-          <div class="title">内容过滤 (Content Filter)
-               <el-tooltip :content="$t('contentFilterDesc') || '根据邮件主题或正文关键词进行拦截。'" placement="top">
-                 <Icon icon="lucide:help-circle" width="14" class="help-icon" />
-               </el-tooltip>
-          </div>
-          
-          <div class="item">
-             <div>过滤规则</div>
-             <div>
-                <span>主题关键词 {{ blackSubject.length }} 个，正文 {{ blackContent.length }} 个</span>
-                <el-button type="primary" size="small" style="margin-left: 15px;" @click="openDrawer('content')" :loading="saving">设置关键词</el-button>
-             </div>
-          </div>
-          <div class="item">
-             <div>主题过滤</div>
-             <div class="internal-toggle">
-                <el-switch v-model="blockInternalSubject" @change="saveContentDirectly" />
-                <span class="internal-label">对站内信的主题生效</span>
-             </div>
-          </div>
-          <div class="item">
-             <div>正文过滤</div>
-             <div class="internal-toggle">
-                <el-switch v-model="blockInternalContent" @change="saveContentDirectly" />
-                <span class="internal-label">对站内信的正文生效</span>
-             </div>
-          </div>
-        </div>
+      </div>
     </el-scrollbar>
 
-    <!-- ── Drawer ── -->
+    <!-- Unified Drawer for Editing -->
     <el-drawer
-       v-model="drawerVisible"
-       :title="drawerTitle"
-       size="450px"
-       @closed="onDrawerClosed"
+        v-model="drawerVisible"
+        :title="drawerTitle"
+        direction="rtl"
+        size="450px"
+        :before-close="handleDrawerClose"
+        class="unified-drawer"
     >
-       <div class="drawer-content">
-          <p class="drawer-desc" v-if="drawerTarget === 'list'">输入域名或邮箱地址并回车。保存后系统会自动对包含关系的地址进行去重。</p>
-          <p class="drawer-desc" v-if="drawerTarget === 'block'">输入需要彻底拒收的域名或邮箱。</p>
-          <p class="drawer-desc" v-if="drawerTarget === 'content'">输入关键词并回车添加。</p>
+      <div class="drawer-content">
+        <div class="drawer-desc" v-if="drawerTarget === 'list'">
+          {{ listMode === 'whitelist' ? '仅允许以下域名或邮箱。其它将归类至垃圾桶。' : '拦截以下域名或邮箱（归类至垃圾桶）。' }}<br/>
+          <span style="color: var(--text-muted); font-size: 12px; margin-top: 4px; display: inline-block;">( 支持精确邮箱或域名后缀，如 @spam.com 或 spam.com )</span>
+        </div>
+        <div class="drawer-desc" v-else-if="drawerTarget === 'block'">
+          添加需要被彻底丢弃的域名或邮箱。<br/>
+          <span class="warning-text"><Icon icon="lucide:alert-triangle" width="14"/> 邮件将被直接删除，不进垃圾桶。</span>
+        </div>
+        <div class="drawer-desc" v-else-if="drawerTarget === 'subject'">
+          若标题包含以下任一关键词，邮件将进入垃圾桶。
+        </div>
+        <div class="drawer-desc" v-else-if="drawerTarget === 'content'">
+          若邮件正文包含以下任一关键词，邮件将进入垃圾桶。
+        </div>
 
-          <template v-if="drawerTarget === 'list'">
-             <div class="drawer-actions" style="margin-bottom: 12px; display: flex; justify-content: flex-end;">
-               <el-button size="small" @click="restoreDefaultTemplates">恢复默认模板</el-button>
-             </div>
-             <el-input-tag v-model="tempEntries" placeholder="输入后回车" class="tag-input-area" />
-          </template>
-          <template v-else-if="drawerTarget === 'block'">
-             <el-input-tag v-model="tempEntries" placeholder="输入后回车" tag-type="danger" class="tag-input-area" />
-          </template>
-          <template v-else-if="drawerTarget === 'content'">
-             <label class="filter-label">主题关键词</label>
-             <el-input-tag v-model="tempSubject" placeholder="输入后回车" tag-type="warning" class="tag-input-area" />
-             <label class="filter-label" style="margin-top:16px;">正文关键词</label>
-             <el-input-tag v-model="tempContent" placeholder="输入后回车" tag-type="warning" class="tag-input-area" />
-          </template>
-       </div>
-       <template #footer>
-          <div style="flex: auto">
-            <el-button @click="drawerVisible = false">取消</el-button>
-            <el-button type="primary" :loading="saving" @click="confirmDrawer">保存并去重</el-button>
-          </div>
-       </template>
+        <div class="drawer-actions">
+          <el-button @click="clearCurrent" size="small">清空</el-button>
+          <el-button @click="restoreDefaultTemplates" size="small" v-if="drawerTarget === 'list'">恢复默认模板</el-button>
+          <el-button type="primary" @click="saveDrawer" size="small" :loading="drawerLoading">保存</el-button>
+        </div>
+
+        <el-input
+            v-model="currentDrawerText"
+            type="textarea"
+            :rows="15"
+            placeholder="每行输入一个规则..."
+            class="drawer-textarea"
+        />
+      </div>
     </el-drawer>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
-import { Icon } from '@iconify/vue'
-import { useI18n } from 'vue-i18n'
+import { ref, computed, onMounted } from 'vue'
 import { settingQuery, setBlackList } from '@/request/setting.js'
-import loading from '@/components/loading/index.vue'
+import Loading from '@/components/loading/index.vue'
+import { Icon } from '@iconify/vue'
 import { ElMessage } from 'element-plus'
 
-const { t } = useI18n()
-
-// ── State ──────────────────────────────────────────────────────────
 const firstLoading = ref(true)
-const saving = ref(false)
 
 const listMode = ref('blacklist')
-const listEntries = ref([])
+const whitelistEntries = ref([])
+const blacklistEntries = ref([])
 const hardBlockEntries = ref([])
 const blackSubject = ref([])
 const blackContent = ref([])
@@ -156,10 +161,9 @@ const blockInternalContent = ref(false)
 
 // Drawer State
 const drawerVisible = ref(false)
-const drawerTarget = ref('list') // 'list' | 'block' | 'content'
-const tempEntries = ref([])
-const tempSubject = ref([])
-const tempContent = ref([])
+const drawerTarget = ref('list') // 'list' | 'block' | 'subject' | 'content'
+const drawerLoading = ref(false)
+const currentDrawerText = ref('')
 
 const blacklistTemplates = [
   'mailer-daemon.com',
@@ -186,7 +190,9 @@ const whitelistTemplates = [
 const drawerTitle = computed(() => {
   if (drawerTarget.value === 'list') return '设置基础名单规则'
   if (drawerTarget.value === 'block') return '设置硬拦截规则'
-  return '设置内容过滤关键词'
+  if (drawerTarget.value === 'subject') return '设置标题过滤关键词'
+  if (drawerTarget.value === 'content') return '设置内容过滤关键词'
+  return '设置'
 })
 
 // ── Lifecycle ───────────────────────────────────────────────────────
@@ -223,21 +229,34 @@ async function loadSettings() {
 
     let isInitList = false
     if (!rawList) {
-      rawList = '__mode:blacklist,' + blacklistTemplates.join(',')
+      listMode.value = 'blacklist'
+      whitelistEntries.value = [...whitelistTemplates]
+      blacklistEntries.value = [...blacklistTemplates]
       isInitList = true
-    }
-
-    if (rawList.startsWith('__mode:whitelist,')) {
-      listMode.value = 'whitelist'
-      const rest = rawList.slice('__mode:whitelist,'.length)
-      listEntries.value = rest ? rest.split(',').filter(Boolean) : []
-    } else if (rawList.startsWith('__mode:blacklist,')) {
-      listMode.value = 'blacklist'
-      const rest = rawList.slice('__mode:blacklist,'.length)
-      listEntries.value = rest ? rest.split(',').filter(Boolean) : []
+    } else if (rawList.startsWith('{')) {
+      try {
+        const obj = JSON.parse(rawList)
+        listMode.value = obj.mode || 'blacklist'
+        whitelistEntries.value = obj.whitelist || []
+        blacklistEntries.value = obj.blacklist || []
+      } catch (e) {}
     } else {
-      listMode.value = 'blacklist'
-      listEntries.value = rawList ? rawList.split(',').filter(Boolean) : []
+      // legacy support
+      if (rawList.startsWith('__mode:whitelist,')) {
+        listMode.value = 'whitelist'
+        const rest = rawList.slice('__mode:whitelist,'.length)
+        whitelistEntries.value = rest ? rest.split(',').filter(Boolean) : []
+        blacklistEntries.value = [...blacklistTemplates]
+      } else if (rawList.startsWith('__mode:blacklist,')) {
+        listMode.value = 'blacklist'
+        const rest = rawList.slice('__mode:blacklist,'.length)
+        blacklistEntries.value = rest ? rest.split(',').filter(Boolean) : []
+        whitelistEntries.value = [...whitelistTemplates]
+      } else {
+        listMode.value = 'blacklist'
+        blacklistEntries.value = rawList ? rawList.split(',').filter(Boolean) : []
+        whitelistEntries.value = [...whitelistTemplates]
+      }
     }
 
     // Parse block content and internal flag
@@ -266,7 +285,7 @@ async function loadSettings() {
 
     // Save default templates silently on first init
     if (isInitList) {
-      listEntries.value = deduplicateRules(listEntries.value)
+      blacklistEntries.value = deduplicateRules(blacklistEntries.value)
       await setBlackList({ blackFrom: getListSaveString() })
     }
 
@@ -279,7 +298,12 @@ async function loadSettings() {
 
 function getListSaveString() {
   const internalPrefix = blockInternalList.value ? '__blockInternal,' : '';
-  return `__mode:${listMode.value},${internalPrefix}` + listEntries.value.join(',')
+  const payload = {
+    mode: listMode.value,
+    whitelist: whitelistEntries.value,
+    blacklist: blacklistEntries.value
+  }
+  return internalPrefix + JSON.stringify(payload)
 }
 
 function getBlockSaveString() {
@@ -298,174 +322,272 @@ function getContentSaveString() {
 }
 
 function setMode(mode) {
-  if (listMode.value === mode) return
   listMode.value = mode
   saveListDirectly()
 }
 
-// ── Drawer Management ────────────────────────────────────────────────
+async function saveListDirectly() {
+  try {
+    await setBlackList({ blackFrom: getListSaveString() })
+    ElMessage.success('已保存基础名单模式')
+  } catch (e) {}
+}
+async function saveBlockDirectly() {
+  try {
+    await setBlackList({ blackContent: getBlockSaveString() })
+    ElMessage.success('已保存拦截设置')
+  } catch (e) {}
+}
+async function saveSubjectDirectly() {
+  try {
+    await setBlackList({ blackSubject: getSubjectSaveString() })
+    ElMessage.success('已保存标题过滤设置')
+  } catch (e) {}
+}
+async function saveContentDirectly() {
+  try {
+    await setBlackList({ blackContent: getContentSaveString() })
+    ElMessage.success('已保存内容过滤设置')
+  } catch (e) {}
+}
+
+// ── Drawer Operations ───────────────────────────────────────────────
 function openDrawer(target) {
   drawerTarget.value = target
-  if (target === 'list') tempEntries.value = [...listEntries.value]
-  else if (target === 'block') tempEntries.value = [...hardBlockEntries.value]
-  else if (target === 'content') {
-    tempSubject.value = [...blackSubject.value]
-    tempContent.value = [...blackContent.value]
+  
+  let sourceArray = []
+  if (target === 'list') {
+    sourceArray = listMode.value === 'whitelist' ? whitelistEntries.value : blacklistEntries.value
+  } else if (target === 'block') {
+    sourceArray = hardBlockEntries.value
+  } else if (target === 'subject') {
+    sourceArray = blackSubject.value
+  } else if (target === 'content') {
+    sourceArray = blackContent.value
   }
+  
+  currentDrawerText.value = sourceArray.join('\n')
   drawerVisible.value = true
 }
 
-function onDrawerClosed() {
-  tempEntries.value = []
-  tempSubject.value = []
-  tempContent.value = []
+function handleDrawerClose() {
+  drawerVisible.value = false
+}
+
+function clearCurrent() {
+  currentDrawerText.value = ''
 }
 
 function restoreDefaultTemplates() {
-  const templates = listMode.value === 'whitelist' ? whitelistTemplates : blacklistTemplates;
-  for (const tpl of templates) {
-    if (!tempEntries.value.includes(tpl)) {
-      tempEntries.value.push(tpl)
-    }
+  if (drawerTarget.value === 'list') {
+     if (listMode.value === 'whitelist') {
+        currentDrawerText.value = whitelistTemplates.join('\n')
+     } else {
+        currentDrawerText.value = blacklistTemplates.join('\n')
+     }
   }
 }
 
-async function confirmDrawer() {
-  saving.value = true
-  try {
-    if (drawerTarget.value === 'list') {
-      listEntries.value = deduplicateRules(tempEntries.value)
-      await setBlackList({ blackFrom: getListSaveString() })
-    } else if (drawerTarget.value === 'block') {
-      hardBlockEntries.value = deduplicateRules(tempEntries.value)
-      await setBlackList({ blackContent: getBlockSaveString() })
-    } else if (drawerTarget.value === 'content') {
-      blackSubject.value = Array.from(new Set(tempSubject.value)).filter(Boolean)
-      blackContent.value = Array.from(new Set(tempContent.value)).filter(Boolean)
-      await setBlackList({ 
-        blackSubject: getSubjectSaveString(), 
-        blackContent: getContentSaveString() 
-      })
+async function saveDrawer() {
+  drawerLoading.value = true
+  
+  // Parse and deduplicate
+  const rawArray = currentDrawerText.value.split('\n').map(l => l.trim()).filter(Boolean)
+  const finalArray = deduplicateRules(rawArray)
+  
+  let payload = {}
+  
+  if (drawerTarget.value === 'list') {
+    if (listMode.value === 'whitelist') {
+      whitelistEntries.value = finalArray
+    } else {
+      blacklistEntries.value = finalArray
     }
-    ElMessage.success('保存成功，已自动去除冗余')
+    payload.blackFrom = getListSaveString()
+  } else if (drawerTarget.value === 'block') {
+    hardBlockEntries.value = finalArray
+    payload.blackContent = getBlockSaveString()
+  } else if (drawerTarget.value === 'subject') {
+    blackSubject.value = finalArray
+    payload.blackSubject = getSubjectSaveString()
+  } else if (drawerTarget.value === 'content') {
+    blackContent.value = finalArray
+    payload.blackContent = getContentSaveString()
+  }
+
+  try {
+    await setBlackList(payload)
+    ElMessage.success('已保存过滤规则')
     drawerVisible.value = false
   } catch (e) {
     ElMessage.error('保存失败')
   } finally {
-    saving.value = false
-  }
-}
-
-async function saveListDirectly() {
-  saving.value = true
-  try {
-    await setBlackList({ blackFrom: getListSaveString() })
-    ElMessage.success('配置已保存')
-  } catch (e) {
-    ElMessage.error('保存失败')
-  } finally {
-    saving.value = false
-  }
-}
-
-async function saveBlockDirectly() {
-  saving.value = true
-  try {
-    await setBlackList({ blackContent: getBlockSaveString() })
-    ElMessage.success('配置已保存')
-  } catch (e) {
-    ElMessage.error('保存失败')
-  } finally {
-    saving.value = false
-  }
-}
-
-async function saveContentDirectly() {
-  saving.value = true
-  try {
-    await setBlackList({ 
-        blackSubject: getSubjectSaveString(), 
-        blackContent: getContentSaveString() 
-    })
-    ElMessage.success('配置已保存')
-  } catch (e) {
-    ElMessage.error('保存失败')
-  } finally {
-    saving.value = false
+    drawerLoading.value = false
   }
 }
 </script>
 
 <style scoped lang="scss">
-.cat-page {
+.settings-container {
   height: 100%;
   overflow: hidden;
+  background: var(--extra-light-fill) !important;
   position: relative;
-  background: transparent;
-}
-.box {
-  padding: 40px 40px;
-  @media (max-width: 767px) {
-    padding: 30px 30px;
+
+  .loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    z-index: 2;
+    width: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+  }
+
+  .loading-show {
+    transition: all 200ms ease 200ms;
+    opacity: 1;
+  }
+
+  .loading-hide {
+    transition: var(--loading-hide-transition);
+    pointer-events: none;
+    opacity: 0;
   }
 }
-.title {
-  font-size: 18px;
-  font-weight: bold;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 20px;
-  color: var(--text-primary);
-  .help-icon { color: var(--text-secondary); cursor: pointer; }
+
+.scroll {
+  width: 100%;
+  min-height: 100%;
+
+  :deep(.el-scrollbar__view) {
+    height: 100%;
+  }
+
+  .scroll-body {
+    min-height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
 }
 
-.container {
-  font-size: 14px;
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(440px, 1fr));
+  padding: 20px;
+  gap: 20px;
+  @media (max-width: 500px) {
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  }
+  @media (max-width: 1023px) {
+    gap: 15px;
+    padding: 15px;
+  }
+}
+
+.settings-card {
+  background-color: var(--el-bg-color);
+  border-radius: 8px;
+  border: 1px solid var(--el-border-color);
+  transition: all 300ms;
+  overflow: hidden;
+}
+
+.card-title {
+  font-size: 15px;
+  font-weight: bold;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--el-border-color);
+}
+
+.card-content {
+  padding: 20px;
   display: flex;
   flex-direction: column;
-  gap: 20px;
-  margin-bottom: 40px;
-  color: var(--text-primary);
+  gap: 10px;
+}
 
-  .item {
-    display: grid;
-    grid-template-columns: 80px 1fr;
-    gap: 100px;
+.setting-item {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px;
+  font-weight: normal;
+
+  > div:first-child {
+    display: flex;
     align-items: center;
+    gap: 5px;
+  }
 
-    @media (max-width: 767px) {
-      gap: 30px;
-    }
-
-    div:first-child {
-      font-weight: bold;
-      color: var(--text-secondary);
-    }
+  > div:last-child {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    font-weight: normal;
   }
 }
 
-.internal-toggle {
-  display: flex; align-items: center; gap: 8px;
-  .internal-label { font-size: 13px; color: var(--text-secondary); }
+.opt-button {
+  width: fit-content !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
-/* loading */
-.loading-overlay {
-  position: absolute;
-  inset: 0;
+/* Drawer styles */
+.drawer-content {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 10;
-  background: var(--bg-main, transparent);
+  flex-direction: column;
+  height: 100%;
+  padding: 0 20px 20px;
 }
-.lo-show { opacity: 1; transition: opacity 200ms; }
-.lo-hide { opacity: 0; pointer-events: none; transition: opacity 200ms; }
-.cat-scroll { width: 100%; height: 100%; }
-/* Drawer */
-.drawer-content { padding: 0 4px; }
-.drawer-desc { font-size: 13px; color: var(--text-secondary); margin-top: 0; margin-bottom: 20px; line-height: 1.5; }
-.filter-label { display: block; font-size: 12.5px; font-weight: 600; color: var(--text-secondary); margin-bottom: 8px; }
-.tag-input-area { min-height: 100px; align-items: flex-start; }
+
+.drawer-desc {
+  margin-bottom: 16px;
+  color: var(--text-regular);
+  font-size: 14px;
+  line-height: 1.5;
+  background: var(--bg-surface);
+  padding: 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border-subtle);
+  .warning-text {
+    color: var(--el-color-danger);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 6px;
+  }
+}
+
+.drawer-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.drawer-textarea {
+  flex: 1;
+  :deep(.el-textarea__inner) {
+    height: 100%;
+    font-family: monospace;
+    font-size: 13px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-subtle);
+  }
+}
+
+:deep(.el-switch) {
+  height: 28px;
+}
+
+:deep(.el-button--small) {
+  margin-top: 2px !important;
+  margin-bottom: 2px !important;
+  height: 24px;
+}
 </style>
