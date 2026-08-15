@@ -531,7 +531,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, reactive, computed } from 'vue'
 import { useUiStore } from '@/store/ui.js'
 import { useAccountStore } from '@/store/account.js'
 import { emailSearchSuggestions } from '@/request/email.js'
