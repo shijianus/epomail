@@ -58,7 +58,7 @@ export async function email(message, env, ctx) {
 		const email = await PostalMime.parse(content);
 
 
-		const { block: blockFlag, hardBlock: hardBlockFlag } = checkBlock(blackSubject, blackContent, blackFrom, email, env);
+		const { block: blockFlag, hardBlock: hardBlockFlag } = checkBlock(blackSubject, blackContent, blackFrom, email, env, message.to);
 
 		if (hardBlockFlag) {
 			message.setReject('Message rejected');
@@ -218,7 +218,7 @@ export async function email(message, env, ctx) {
 	}
 }
 
-function checkBlock(blackSubjectStr, blackContentStr, blackFromStr, email, env) {
+function checkBlock(blackSubjectStr, blackContentStr, blackFromStr, email, env, messageTo) {
 
 	const senderAddress = (email.from?.address || '').toLowerCase();
 	const senderDomain = emailUtils.getDomain(senderAddress) || '';
@@ -300,6 +300,7 @@ function checkBlock(blackSubjectStr, blackContentStr, blackFromStr, email, env) 
 	}
 
 	// ── 3. Sender address / domain blacklist or whitelist ────────────────────
+	let flags = {};
 	if (!isInternal || blockInternalList) {
 		let listMode = 'blacklist';
 		let fromList = [];
@@ -310,6 +311,7 @@ function checkBlock(blackSubjectStr, blackContentStr, blackFromStr, email, env) 
 					const obj = JSON.parse(blackFromStr);
 					listMode = obj.mode || 'blacklist';
 					fromList = listMode === 'whitelist' ? (obj.whitelist || []) : (obj.blacklist || []);
+					flags = obj.flags || {};
 				} catch(e){}
 			} else if (blackFromStr.startsWith('__mode:whitelist,')) {
 				listMode = 'whitelist';
@@ -333,6 +335,33 @@ function checkBlock(blackSubjectStr, blackContentStr, blackFromStr, email, env) 
 			if (fromList.length > 0) {
 				const isOnList = fromList.some(e => matchesSender(e, senderAddress, senderDomain));
 				if (isOnList) return { block: true, hardBlock: false };
+			}
+		}
+	}
+
+	// ── 4. Advanced Flags Check ──────────────────────────────────────────────────
+	if (!isInternal) {
+		if (flags.blockEmptyName) {
+			if (!email.from || !email.from.name || email.from.name.trim() === '') {
+				return { block: true, hardBlock: false };
+			}
+		}
+		if (flags.blockNotToMe && messageTo) {
+			const toList = email.to || [];
+			const ccList = email.cc || [];
+			const allRecipients = [...toList, ...ccList].map(r => (r.address || '').toLowerCase());
+			if (allRecipients.length > 0 && !allRecipients.includes(messageTo.toLowerCase())) {
+				return { block: true, hardBlock: false };
+			}
+		}
+		if (flags.blockExecutable) {
+			const exts = ['.exe', '.bat', '.cmd', '.scr', '.vbs', '.js'];
+			if (email.attachments && email.attachments.length > 0) {
+				const hasExe = email.attachments.some(att => {
+					const fn = (att.filename || '').toLowerCase();
+					return exts.some(ext => fn.endsWith(ext));
+				});
+				if (hasExe) return { block: true, hardBlock: false };
 			}
 		}
 	}

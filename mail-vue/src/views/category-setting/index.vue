@@ -58,7 +58,7 @@
           <!-- 内容过滤 Card -->
           <div class="settings-card">
             <div class="card-title">
-              内容及标题过滤 (入垃圾桶)
+              内容及标题过滤
               <el-tooltip content="如果标题或正文包含了这些关键词，邮件会自动归类到垃圾桶。" placement="top">
                 <Icon icon="lucide:help-circle" width="14" class="help-icon" />
               </el-tooltip>
@@ -94,6 +94,45 @@
               </div>
             </div>
           </div>
+
+          <!-- 高级过滤选项 Card -->
+          <div class="settings-card">
+            <div class="card-title">
+              高级过滤选项
+              <el-tooltip content="开启以下严格选项以拦截结构异常或可疑的邮件 (拦截入垃圾桶)。" placement="top">
+                <Icon icon="lucide:help-circle" width="14" class="help-icon" />
+              </el-tooltip>
+            </div>
+            <div class="card-content">
+              <div class="setting-item">
+                <div>
+                   <span>空发件人拦截</span>
+                   <el-tooltip content="拦截没有发件人姓名 (Sender Name) 仅有地址的异常邮件。" placement="top"><Icon icon="lucide:info" width="12" style="margin-left: 4px; color: var(--text-muted); cursor: help;"/></el-tooltip>
+                </div>
+                <div>
+                  <el-switch v-model="blockEmptyName" @change="saveFlagsDirectly" size="small" />
+                </div>
+              </div>
+              <div class="setting-item">
+                <div>
+                  <span>严格收件人匹配</span>
+                  <el-tooltip content="拦截收件人(To/Cc)中不包含您当前邮箱地址的邮件 (防止密送群发)。" placement="top"><Icon icon="lucide:info" width="12" style="margin-left: 4px; color: var(--text-muted); cursor: help;"/></el-tooltip>
+                </div>
+                <div>
+                  <el-switch v-model="blockNotToMe" @change="saveFlagsDirectly" size="small" />
+                </div>
+              </div>
+              <div class="setting-item">
+                <div>
+                  <span>可执行附件限制</span>
+                  <el-tooltip content="拦截包含可执行文件 (.exe, .bat, .cmd, .scr, .vbs, .js) 附件的邮件。" placement="top"><Icon icon="lucide:info" width="12" style="margin-left: 4px; color: var(--text-muted); cursor: help;"/></el-tooltip>
+                </div>
+                <div>
+                  <el-switch v-model="blockExecutable" @change="saveFlagsDirectly" size="small" />
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </el-scrollbar>
@@ -109,19 +148,29 @@
     >
       <div class="drawer-content">
         <div class="drawer-desc" v-if="drawerTarget === 'list'">
-          {{ listMode === 'whitelist' ? '仅允许以下域名或邮箱。其它将归类至垃圾桶。' : '拦截以下域名或邮箱（归类至垃圾桶）。' }}<br/>
-          <span style="color: var(--text-muted); font-size: 12px; margin-top: 4px; display: inline-block;">( 支持精确邮箱或域名后缀，如 @spam.com 或 spam.com，亦支持通配符如 *@*.example.com )</span>
+          <div class="desc-title">{{ listMode === 'whitelist' ? '放行名单 (Whitelist)' : '拦截名单 (Blacklist)' }}</div>
+          <div class="desc-body">
+             {{ listMode === 'whitelist' ? '仅允许以下地址发送的邮件，未在名单内的邮件将被归类至垃圾桶。' : '当发件人匹配以下地址时，邮件将被归类至垃圾桶。' }}
+          </div>
+          <div class="desc-rule">
+            <strong>规则简述：</strong>支持精确邮箱 (例 <code>spam@a.com</code>)、域名后缀 (例 <code>a.com</code>) 以及通配符模式 (例 <code>*@*.a.com</code>)。
+          </div>
         </div>
         <div class="drawer-desc" v-else-if="drawerTarget === 'block'">
-          添加需要被彻底丢弃的域名或邮箱。<br/>
-          <span style="color: var(--text-muted); font-size: 12px; margin-top: 4px; display: inline-block;">( 同样支持通配符匹配 )</span><br/>
-          <span class="warning-text"><Icon icon="lucide:alert-triangle" width="14"/> 邮件将被直接删除，不进垃圾桶。</span>
+          <div class="desc-title">彻底丢弃规则</div>
+          <div class="desc-body">当发件人匹配以下地址时，邮件将在到达时被直接销毁。</div>
+          <div class="desc-rule">
+            <strong>规则简述：</strong>支持精确邮箱、域名及通配符模式 (如 <code>*@spam.com</code>)。
+          </div>
+          <span class="warning-text"><Icon icon="lucide:alert-triangle" width="14"/> 警告：匹配的邮件将完全消失，不进垃圾桶。</span>
         </div>
         <div class="drawer-desc" v-else-if="drawerTarget === 'subject'">
-          若标题包含以下任一关键词，邮件将进入垃圾桶。
+          <div class="desc-title">标题关键词过滤</div>
+          <div class="desc-body">如果邮件的标题中包含以下任一关键词，该邮件将被自动归类至垃圾桶。</div>
         </div>
         <div class="drawer-desc" v-else-if="drawerTarget === 'content'">
-          若邮件正文包含以下任一关键词，邮件将进入垃圾桶。
+          <div class="desc-title">正文关键词过滤</div>
+          <div class="desc-body">如果邮件的正文或HTML内容中包含以下任一关键词，该邮件将被自动归类至垃圾桶。</div>
         </div>
 
         <div class="drawer-actions">
@@ -155,6 +204,11 @@ const blacklistEntries = ref([])
 const hardBlockEntries = ref([])
 const blackSubject = ref([])
 const blackContent = ref([])
+
+// Advanced flags
+const blockEmptyName = ref(false)
+const blockNotToMe = ref(false)
+const blockExecutable = ref(false)
 
 const blockInternalList = ref(false)
 const blockInternalBlock = ref(false)
@@ -193,18 +247,46 @@ const whitelistTemplates = [
 
 const hardBlockTemplates = [
   '*@spam.com',
-  '*@junk.net'
+  '*@junk.net',
+  '*@*.top',
+  '*@*.xyz',
+  '*@*.click',
+  '*@*.link',
+  '*@*.date',
+  '*@*.review',
+  '*@*.country',
+  '*@*.kim',
+  '*@*.science',
+  '*@*.work',
+  '*@rx-pharmacy.com',
+  '*@viagra-deals.net'
 ]
 
 const subjectTemplates = [
   '免费',
-  '促销'
+  '促销',
+  'casino',
+  'viagra',
+  'lottery',
+  'winner',
+  'urgent'
 ]
 
 const contentTemplates = [
   '发票',
   '中奖',
-  '贷款'
+  '贷款',
+  '赌场',
+  '博彩',
+  '免费领取',
+  '代开',
+  '退款通知',
+  '急聘',
+  'pharmacy',
+  'crypto',
+  'bitcoin',
+  'giveaway',
+  'loan'
 ]
 
 const drawerTitle = computed(() => {
@@ -259,6 +341,11 @@ async function loadSettings() {
         listMode.value = obj.mode || 'blacklist'
         whitelistEntries.value = obj.whitelist || []
         blacklistEntries.value = obj.blacklist || []
+        if (obj.flags) {
+          blockEmptyName.value = !!obj.flags.blockEmptyName
+          blockNotToMe.value = !!obj.flags.blockNotToMe
+          blockExecutable.value = !!obj.flags.blockExecutable
+        }
       } catch (e) {}
     } else {
       // legacy support
@@ -323,7 +410,7 @@ async function loadSettings() {
       await setBlackList({ blackFrom: getListSaveString() })
     }
     if (isInitBlock || isInitContent) {
-      await setBlackList({ blackContent: (isInitBlock && !isInitContent) ? getBlockSaveString() : getContentSaveString() }) // Content saves both in legacy kinda. We will save getContentSaveString as it saves content. Wait, blackContent field in DB holds ONE string. We can't have both hardBlock and regular content in current schema because it's either `__hardblock,` or not. But actually I should not overwrite DB if they are empty unless user clicks save. Just let them display defaults. Let's just avoid saving them silently unless they are modified, except list which is already handled.
+      await setBlackList({ blackContent: (isInitBlock && !isInitContent) ? getBlockSaveString() : getContentSaveString() }) 
     }
 
   } catch (e) {
@@ -338,7 +425,12 @@ function getListSaveString() {
   const payload = {
     mode: listMode.value,
     whitelist: whitelistEntries.value,
-    blacklist: blacklistEntries.value
+    blacklist: blacklistEntries.value,
+    flags: {
+      blockEmptyName: blockEmptyName.value,
+      blockNotToMe: blockNotToMe.value,
+      blockExecutable: blockExecutable.value
+    }
   }
   return internalPrefix + JSON.stringify(payload)
 }
@@ -369,6 +461,14 @@ async function saveListDirectly() {
     ElMessage.success('已保存基础名单模式')
   } catch (e) {}
 }
+
+async function saveFlagsDirectly() {
+  try {
+    await setBlackList({ blackFrom: getListSaveString() })
+    ElMessage.success('已保存高级过滤选项')
+  } catch (e) {}
+}
+
 async function saveBlockDirectly() {
   try {
     await setBlackList({ blackContent: getBlockSaveString() })
@@ -597,19 +697,44 @@ async function saveDrawer() {
 
 .drawer-desc {
   margin-bottom: 16px;
-  color: var(--text-regular);
-  font-size: 14px;
-  line-height: 1.5;
   background: var(--bg-surface);
-  padding: 12px;
+  padding: 14px;
   border-radius: 6px;
   border: 1px solid var(--border-subtle);
+  
+  .desc-title {
+    font-weight: bold;
+    color: var(--text-primary);
+    margin-bottom: 6px;
+    font-size: 14px;
+  }
+  .desc-body {
+    color: var(--text-regular);
+    font-size: 13px;
+    line-height: 1.5;
+    margin-bottom: 8px;
+  }
+  .desc-rule {
+    color: var(--text-muted);
+    font-size: 12px;
+    padding-top: 8px;
+    border-top: 1px dashed var(--border-subtle);
+    code {
+      background: var(--bg-elevated);
+      padding: 2px 4px;
+      border-radius: 4px;
+      font-family: monospace;
+    }
+  }
+
   .warning-text {
     color: var(--el-color-danger);
     display: flex;
     align-items: center;
     gap: 4px;
-    margin-top: 6px;
+    margin-top: 8px;
+    font-size: 13px;
+    font-weight: bold;
   }
 }
 
