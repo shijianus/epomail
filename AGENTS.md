@@ -421,3 +421,8 @@
     *   移除了原本自编的 `.cat-card` 和 `.cat-grid` 大面板布局，彻底采用与「系统设置」(`setting/index.vue`) **完全一致**的 `.box` > `.container` > `.item` 区域划分流式布局。
     *   所有的配置项（工作模式、名单规则、拦截规则、主题/正文过滤及相应的站内邮件特权开关）现在都以左侧固定宽度文字说明、右侧控件的严谨双栏表单 (`grid-template-columns: 80px 1fr`) 呈现，彻底解决了之前卡片式布局带来的视觉混乱感，使整个设置后台画风高度统一！
 *   **验证与部署 (Verify & Deploy)**: 已执行 Playwright 本地重置截图测试并即将推送到 Cloudflare 生产环境。
+
+### 系统设置与分类管理融合重构 (2026-08-15)
+*   **UI模块迁移 (UI Migration)**: `79fdf2b` — 依据功能聚合原则，将原本位于“系统设置 (`sys-setting`)”中的 `Workers AI` 设置块和 `邮件设置 (Email Setting)` 块，无损迁移到了“分类管理 (`label-setting`)”页面的下方，作为一个独立的设置聚合网格 (`settings-grid`) 进行展示。
+*   **逻辑继承与隔离 (Logic Isolation)**: 所有的设置读取与更新底层 API (`settingQuery`, `settingSet`, `useSettingStore`) 以及相关的弹窗管理状态均被平滑迁移，在确保界面对齐且遵循 `card-grid` 网格规范的同时，后端与服务端的逻辑完全未受任何影响。
+*   **规范合规与验证 (Compliance Check)**: 严格执行了 Playwright 本地截屏验收，未损坏页面现有的结构与外观，且 `wrangler deploy` 已顺利执行，正式同步至 Cloudflare。
