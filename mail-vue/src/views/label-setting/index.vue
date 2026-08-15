@@ -15,8 +15,17 @@
 
     <div class="labels-container" v-if="uiStore.allLabels.length > 0">
       <div class="modern-list">
-        <div class="list-row tech-row" v-for="(label, index) in uiStore.allLabels" :key="'lbl-'+index">
-          <div class="drag-handle" :title="$t('dragToReorder') || 'Drag to reorder'" @click="moveUp(index)">
+        <div class="list-row tech-row" v-for="(label, index) in uiStore.allLabels" :key="label.name"
+             :draggable="dragEnabledIndex === index"
+             @dragstart="onDragStart($event, index)"
+             @dragover.prevent
+             @dragenter.prevent="onDragEnter($event, index)"
+             @dragend="onDragEnd"
+             @drop="onDrop"
+             :class="{ 'is-dragging': dragIndex === index }">
+          <div class="drag-handle" :title="$t('dragToReorder') || 'Drag to reorder'"
+               @mouseenter="dragEnabledIndex = index"
+               @mouseleave="dragEnabledIndex = -1">
             <Icon icon="lucide:grip-vertical" width="18" />
           </div>
           <div class="label-pill-cell" style="padding-left: 8px;">
@@ -670,12 +679,35 @@ const executeDelete = () => {
   ElMessage.success(t('labelDeleted') || 'Label removed successfully')
 }
 
-const moveUp = (index) => {
-  if (index > 0) {
-    const temp = uiStore.allLabels[index]
-    uiStore.allLabels[index] = uiStore.allLabels[index - 1]
-    uiStore.allLabels[index - 1] = temp
+const dragEnabledIndex = ref(-1)
+const dragIndex = ref(null)
+
+const onDragStart = (e, index) => {
+  dragIndex.value = index
+  if (e.dataTransfer) {
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', index) // Required for Firefox
   }
+}
+
+const onDragEnter = (e, index) => {
+  if (dragIndex.value !== null && dragIndex.value !== index) {
+    const labels = uiStore.allLabels
+    const temp = labels[dragIndex.value]
+    labels.splice(dragIndex.value, 1)
+    labels.splice(index, 0, temp)
+    dragIndex.value = index
+  }
+}
+
+const onDragEnd = () => {
+  dragIndex.value = null
+  dragEnabledIndex.value = -1
+}
+
+const onDrop = () => {
+  dragIndex.value = null
+  dragEnabledIndex.value = -1
 }
 </script>
 
@@ -768,6 +800,13 @@ const moveUp = (index) => {
   border-color: var(--border-mid);
   transform: translateX(4px);
   box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+.tech-row.is-dragging {
+  opacity: 0.4;
+  background-color: var(--bg-hover);
+  transform: scale(0.98);
+  box-shadow: none;
 }
 
 .drag-handle {

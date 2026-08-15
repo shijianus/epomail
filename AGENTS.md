@@ -350,3 +350,7 @@
 *   **根因分析 (Root Cause)**: 尽管之前已经在代码的默认模板中用 "工作" 替换了 "系统设置"，且在后端 API 中移除了相关硬编码，但前端使用了 `pinia-plugin-persistedstate`。这导致旧版用户（或正在开发阶段不断热更新的浏览器）的 LocalStorage 中依然缓存着包含 "系统设置" 的 `allLabels` 数组。当页面挂载时，UI 会优先使用这个带毒的本地缓存。且旧版的 `user.js` 只有在成功获取 API 返回并合并后才进行清理，存在时间差和条件限制。
 *   **修复策略 (Fix)**: 在 `mail-vue/src/store/ui.js` 的 `ensureDefaultRules`（所有组件挂载时必定同步执行的核心兜底函数）中，加入了**极度激进的强制清理逻辑 (Aggressive Cleanup)**。无论是从缓存恢复还是从哪里读取，只要在渲染前检测到 `allLabels` 中存在名为 "系统设置" 的标签，直接通过 `splice` 物理抹杀；并且如果检测到 "工作" 标签使用了原先 "系统设置" 的旧图标 (`ic:outline-settings`)，也会强制将其覆写为正确的公文包图标 (`ic:outline-work-outline`)。
 *   **云端对齐 (Cloud Sync)**: 重新向 Cloudflare D1 生产库发送了 `UPDATE user SET custom_labels = REPLACE(custom_labels, '系统设置', '工作');`，确保云端底层数据与前端严格一致。
+
+### 优化：原生 HTML5 拖拽排序替换点击上移 (2026-08-14)
+*   **功能重构 (Feature)**: 重构了 `mail-vue/src/views/label-setting/index.vue` 中标签列表的排序交互。将原本只能通过“点击拖拽柄（把手）将元素上移一格”的 `moveUp` 简陋逻辑，彻底替换为原生的 HTML5 拖拽 API (Drag and Drop)。
+*   **体验升级 (UX)**: 现在，当鼠标悬停在左侧六个点的把手 (`.drag-handle`) 时，整行会动态激活 `draggable="true"` 属性。按住并拖动时，被拖拽的行会有半透明和缩小的视觉反馈 (`.is-dragging`)。并在 `onDragEnter` 生命周期中实时计算位置，实现了类似于 Trello 或 notion 列表一样的实时插入挤位排序效果，极大提升了流畅度与直觉体验。
