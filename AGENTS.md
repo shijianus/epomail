@@ -354,3 +354,10 @@
 ### 优化：原生 HTML5 拖拽排序替换点击上移 (2026-08-14)
 *   **功能重构 (Feature)**: 重构了 `mail-vue/src/views/label-setting/index.vue` 中标签列表的排序交互。将原本只能通过“点击拖拽柄（把手）将元素上移一格”的 `moveUp` 简陋逻辑，彻底替换为原生的 HTML5 拖拽 API (Drag and Drop)。
 *   **体验升级 (UX)**: 现在，当鼠标悬停在左侧六个点的把手 (`.drag-handle`) 时，整行会动态激活 `draggable="true"` 属性。按住并拖动时，被拖拽的行会有半透明和缩小的视觉反馈 (`.is-dragging`)。并在 `onDragEnter` 生命周期中实时计算位置，实现了类似于 Trello 或 notion 列表一样的实时插入挤位排序效果，极大提升了流畅度与直觉体验。
+
+### 后端完善：分类管理黑白名单映射与硬拦截 (2026-08-14)
+*   **逻辑接入 (Backend Integration)**: Commit `d65f18e` — 完成了前期在前端部署的 `/settings/category` (分类管理) 功能与后端真实处理逻辑的深度对接。
+    *   **黑白名单 (Blacklist/Whitelist)**: 在 `mail-worker/src/email/email.js` 与 `rule-engine.js` 中加入了对 `__mode:whitelist,` 和 `__mode:blacklist,` 数据前缀的解析。该黑白名单不仅用于拦截邮件入站，还被映射进了“订阅”与“推销”等标签的自动化归类规则中。
+    *   **强制阻断 (Hard Block)**: 在 `mail-worker/src/email/email.js` 的 `checkBlock` 中新引入了对 `__hardblock,` 前缀的解析与优先级最高的阻断判定，确保命中纯黑名单的邮件会在连接阶段直接返回 `message.setReject()` 并抛弃，彻底防止入库。
+    *   **软拦截至垃圾箱 (Soft Block to Spam)**: 对于常规的黑名单规则（即未通过正常白名单/命中黑名单但不属于硬拦截），邮件将正常接收入库，但在保存至 Cloudflare D1 数据库时会被标记为 `isDel: 1`。配合前端 UI，使得这些邮件在默认情况下自动进入“垃圾箱 (Trash/Spam)”而不会污染主收件箱。
+*   **体验验收**: 虽然目前缺乏直观的 UI 数据，但通过本地 `npm run dev` 构建并利用 Playwright 成功捕捉并验收了不同分辨率的动画帧；已将代码执行部署流程。
