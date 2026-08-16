@@ -68,7 +68,7 @@
     <div v-else class="split-view-container" :class="{'has-reading-pane': showReadingPane, 'is-mobile': isMobileView}">
       <div class="list-column" :class="{'hide-on-mobile': showReadingPane && isMobileView}">
         <router-view class="main-view" v-slot="{ Component,route }">
-          <keep-alive :include="['email','send','star','draft','user-all-email']">
+          <keep-alive :include="['email','send','star','draft','user-all-email','snoozed','spam','trash']">
             <component :is="Component" :key="route.name"/>
           </keep-alive>
         </router-view>
@@ -106,7 +106,7 @@ const isSettingsMode = computed(() => {
 })
 
 const showReadingPane = computed(() => {
-  const mailRoutes = ['email','all-email','send','star','draft','user-all-email']
+  const mailRoutes = ['email','all-email','send','star','draft','user-all-email','snoozed','spam','trash']
   return mailRoutes.includes(route.meta.name) && !!emailStore.contentData.email
 })
 

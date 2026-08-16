@@ -207,9 +207,22 @@ const loginService = {
 			throw new BizError(t('emailAndPwdEmpty'));
 		}
 
+		const failKey = KvConst.LOGIN_FAIL + email;
+		let failCountStr = await c.env.kv.get(failKey);
+		let failCount = failCountStr ? parseInt(failCountStr) : 0;
+
+		if (failCount >= 5) {
+			throw new BizError(t('accountLocked'));
+		}
+
+		const incrementFail = async () => {
+			await c.env.kv.put(failKey, (failCount + 1).toString(), { expirationTtl: 12 * 60 * 60 });
+		};
+
 		const userRow = await userService.selectByEmailIncludeDel(c, email);
 
 		if (!userRow) {
+			await incrementFail();
 			throw new BizError(t('notExistUser'));
 		}
 
@@ -222,7 +235,13 @@ const loginService = {
 		}
 
 		if (!await cryptoUtils.verifyPassword(password, userRow.salt, userRow.password) && !noVerifyPwd) {
+			await incrementFail();
 			throw new BizError(t('IncorrectPwd'));
+		}
+
+		// Clear fail count on success
+		if (failCount > 0) {
+			await c.env.kv.delete(failKey);
 		}
 
 		const uuid = uuidv4();

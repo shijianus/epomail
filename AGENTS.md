@@ -2,7 +2,24 @@
 
 <!-- VERSION LOG APPEND BELOW (newest first) -->
 
-### 修复全站操作卡顿 (偶发性"卡一下") (2026-08-16)
+### 优化登录提示交互与添加防刷机制 (2026-08-16)
+*   **问题排查 (Diagnosis)**: 用户反馈当前登录界面的错误提示使用默认的 `alert()` 弹窗体验较差，并且要求提示信息不要明确区分“密码错误”还是“账户不存在”（统一为“密码或账户错误”）。此外，提出增加 12 小时的账户保护冷却期，以防止密码被暴力破解（输入错误 5 次锁定）。
+*   **编辑代码 (Edit)**: 
+    *   在 `mail-worker/src/i18n/zh.js` 和 `en.js` 中将 `notExistUser` 和 `IncorrectPwd` 映射为同一提示：“密码或账户错误”/“Invalid credentials”，并新增 `accountLocked` 相关提示文案。
+    *   在 `mail-worker/src/const/kv-const.js` 增加 `LOGIN_FAIL` 前缀用于记录失败次数。
+    *   在 `mail-worker/src/service/login-service.js` 实现基于 KV 的防爆破保护：连续失败 5 次即返回 12 小时锁定提示 (`accountLocked`)，成功登录后清零。同时修复了历史遗留的 `getAnalytics` 接口空函数导致的 AST 语法报错。
+    *   在前端 `temp_login_ui/src/app/components/epomail/AuthForm.tsx` 中移除 `alert()`，改为采用顶部居中悬浮的磨砂质感 Toast 弹窗（使用 `framer-motion` 驱动出现/消失动画及 `lucide-react` 图标）展示后台返回的提示语。
+*   **验证与截图 (Verify & Screenshot)**: 编写了 `test-login-ui.mjs` 基于本地 `wrangler dev` 进行了 Playwright 全自动化测试，成功断言了统一的错误拦截 Toast 以及连续输入 5 次后出现的 12h 防护锁 Toast 效果。生成了 `login_error_toast.png` 和 `login_lockout_toast.png` 用于界面查验。
+*   **部署上线 (Deploy)**: 重新通过 `npx wrangler deploy` 成功发布到了 Cloudflare 线上！
+
+### 确保拦截邮件数据真实有效 (2026-08-16)
+*   **问题排查 (Diagnosis)**: 用户反馈指出大屏仪表盘中的“拦截邮件”被硬编码写死为0，并且要求所有相关安全指标都必须反映真实服务器数据。经查，硬拦截 (hardBlock) 会直接丢弃邮件而不落库，因此数据库中缺乏硬拦截的相关记录，导致前端无数据可用。
+*   **编辑代码 (Edit)**: Commit `12a204b`
+    *   在 Cloudflare KV (键值对存储) 中新增全局追踪变量 `HARD_INTERCEPT_TOTAL` (`kvConst.HARD_INTERCEPT_TOTAL`)。
+    *   在 `mail-worker/src/email/email.js` 的邮件接收网关中，当触发 `hardBlockFlag` (硬拦截丢弃) 逻辑时，向 KV 进行自增统计操作。
+    *   在后端接口 `analysis-service.js` 的 `queryEcharts` 中取出全局硬拦截累计总数 `hardInterceptTotal`，将其与大屏其它数据对象一并返回。
+    *   修改前端 `analysis/index.vue`，彻底移除硬编码的 0，并将其双向绑定到 `numberCount.hardInterceptTotal`，同时在计算“系统拦截率”时将其纳入被拦截的总数池，确保指标精准并动态刷新。
+*   **验证与部署 (Verify & Deploy)**: 已提交。等待部署脚本完成。
 *   **问题排查 (Diagnosis)**: 用户反馈实际使用中会出现"突然卡一下"的现象。经全量代码审计，发现 4 处根本原因：
     1. **`window.onresize` 直接赋值覆盖**：`email-scroll/index.vue` 在 `<script setup>` 顶层直接使用 `window.onresize = () => {...}` ，每次组件挂载（切换邮件夹）都会覆盖 `layout/index.vue` 设置的 resize 监听器，导致窗口 resize 响应丢失并引发后续布局抖动。
     2. **`wheel` 事件监听器泄漏**：`email-scroll/index.vue` 在顶层裸调用 `window.addEventListener('wheel', ...)` 且没有对应 `removeEventListener`，导致组件每次挂载都累积一个新的全局监听器。多个页面切换后，每次滚轮动作就会触发 N 次回调，造成"越用越卡"的渐进式卡顿。

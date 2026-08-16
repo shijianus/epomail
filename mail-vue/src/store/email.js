@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import { emailSidebarStats } from '@/request/email.js'
 
 export const useEmailStore = defineStore('email', {
     state: () => ({
@@ -16,7 +17,20 @@ export const useEmailStore = defineStore('email', {
         },
         sendScroll: null,
         searchKeyword: '',
+        sidebarStats: {},
     }),
+    actions: {
+        async refreshSidebarStats() {
+            try {
+                const data = await emailSidebarStats()
+                if (data) {
+                    this.sidebarStats = data
+                }
+            } catch (e) {
+                console.error("Failed to fetch sidebar stats", e)
+            }
+        }
+    },
     getters: {
         searchParsed: (state) => {
             let input = state.searchKeyword.trim();

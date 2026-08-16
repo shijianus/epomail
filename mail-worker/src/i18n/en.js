@@ -1,5 +1,5 @@
 const en = {
-	IncorrectPwd: 'Incorrect password',
+	IncorrectPwd: 'Invalid credentials',
 	addAccountDisabled: 'Add Email Address feature is disabled',
 	regDisabled: 'Sign up is disabled',
 	emptyEmail: 'Email cannot be empty',
@@ -37,7 +37,7 @@ const en = {
 	noRegKeyTotal: 'Invite code usage limit reached',
 	regKeyExpire: 'Invite code has expired',
 	emailAndPwdEmpty: 'Email and password cannot be empty',
-	notExistUser: 'Email does not exist',
+	notExistUser: 'Invalid credentials',
 	isDelUser: 'This email has been deleted',
 	isBanUser: 'This email has been banned',
 	regKeyUseCount: 'Usage count cannot be empty',
@@ -101,7 +101,8 @@ const en = {
 		"设置查看": "View Settings",
 		"设置修改": "Change Settings",
 		"发件重置": "Reset Send Count"
-	}
+	},
+	accountLocked: 'Please try again later'
 };
 
 export default en;

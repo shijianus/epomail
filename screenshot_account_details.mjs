@@ -3,6 +3,7 @@ import { chromium } from 'playwright';
 (async () => {
   console.log('Launching browser...');
   const browser = await chromium.launch({ headless: true });
+  // Set viewport to 1440x900 for a large desktop display
   const context = await browser.newContext({
     viewport: { width: 1440, height: 900 }
   });
@@ -16,7 +17,7 @@ import { chromium } from 'playwright';
   await page.waitForTimeout(1000);
 
   console.log('Capturing screenshot...');
-  const screenshotPath = '/home/shijian/projects/epocanvas-mail/account_details_validation_mockup_v5.png';
+  const screenshotPath = '/home/shijian/projects/epocanvas-mail/account_details_validation_mockup_v7.png';
   await page.screenshot({ path: screenshotPath, fullPage: true });
 
   console.log(`Screenshot saved to ${screenshotPath}`);

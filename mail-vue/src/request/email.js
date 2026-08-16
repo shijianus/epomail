@@ -47,3 +47,7 @@ export function emailSearchSuggestions(params) {
 export function emailAnalytics() {
   return http.get('/email/analytics')
 }
+
+export function emailSidebarStats() {
+    return http.get('/email/sidebarStats', { noMsg: true })
+}

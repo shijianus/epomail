@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Mail, Lock, Eye, EyeOff, ArrowRight, Check, Loader2 } from "lucide-react";
+import { Mail, Lock, Eye, EyeOff, ArrowRight, Check, Loader2, AlertCircle } from "lucide-react";
 import type { CanvasHandle } from "./CanvasBackground";
 
 interface AuthFormProps {
@@ -99,11 +99,20 @@ export function AuthForm({ canvasRef }: AuthFormProps) {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [status, setStatus] = useState<Status>("idle");
+  const [errorMsg, setErrorMsg] = useState("");
+
+  useEffect(() => {
+    if (errorMsg) {
+      const timer = setTimeout(() => setErrorMsg(""), 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [errorMsg]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (status !== "idle") return;
     setStatus("warping");
+    setErrorMsg("");
     canvasRef.current?.warp(); // Interactive Hook 3 — warp trigger
     
     fetch('/api/login', {
@@ -121,17 +130,35 @@ export function AuthForm({ canvasRef }: AuthFormProps) {
         }, 1000);
       } else {
         setStatus("idle");
-        alert(data.message || data.msg || 'Login failed');
+        setErrorMsg(data.message || data.msg || 'Login failed');
       }
     })
     .catch((err) => {
       setStatus("idle");
-      alert('Login error: ' + (err.message || err));
+      setErrorMsg('Login error: ' + (err.message || err));
     });
   };
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-7">
+    <form onSubmit={handleSubmit} className="relative flex flex-col gap-7 pt-4">
+      {/* Top Center Toast Notification */}
+      <AnimatePresence>
+        {errorMsg && (
+          <motion.div
+            initial={{ opacity: 0, y: -20, scale: 0.95 }}
+            animate={{ opacity: 1, y: -30, scale: 1 }}
+            exit={{ opacity: 0, y: -10, scale: 0.95 }}
+            transition={{ type: "spring", stiffness: 300, damping: 20 }}
+            className="absolute -top-6 left-0 right-0 flex justify-center z-50 pointer-events-none"
+          >
+            <div className="flex items-center gap-2 rounded-full bg-red-500/10 border border-red-500/20 px-4 py-1.5 backdrop-blur-md shadow-lg shadow-red-500/10">
+              <AlertCircle size={14} className="text-red-400" />
+              <span className="text-xs font-medium tracking-wide text-red-300/90">{errorMsg}</span>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <FloatingField
         id="epo-email"
         type="email"

@@ -1,5 +1,5 @@
 const zh = {
-	IncorrectPwd: '密码输入错误',
+	IncorrectPwd: '密码或账户错误',
 	addAccountDisabled: '添加邮箱功能已关闭',
 	regDisabled: '注册功能已关闭',
 	emptyEmail: '邮箱不能为空',
@@ -37,7 +37,7 @@ const zh = {
 	noRegKeyTotal: '注册码使用次数已耗尽',
 	regKeyExpire: '注册码已过期',
 	emailAndPwdEmpty: '邮箱和密码不能为空',
-	notExistUser: '输入的邮箱不存在',
+	notExistUser: '密码或账户错误',
 	isDelUser: '该邮箱已被注销',
 	isBanUser: '该邮箱已被禁用',
 	regKeyUseCount: '使用次数不能为空',
@@ -101,7 +101,8 @@ const zh = {
 		"设置查看": "设置查看",
 		"设置修改": "设置修改",
 		'发件重置': '发件重置'
-	}
+	},
+	accountLocked: '请稍后尝试'
 }
 
 export default zh

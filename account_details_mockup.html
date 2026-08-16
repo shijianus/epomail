@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>EpoMail Account Interface</title>
+<title>EpoMail Profile Analytics</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Archivo:wght@300;400;500;600;700&display=swap');
 
@@ -22,341 +22,272 @@
     --border-subtle: rgba(91,110,245,0.12);
     --border-mid: rgba(91,110,245,0.22);
     --success: #4caf7d;
+    --warning: #f5a623;
+    --danger: #e05f5f;
   }
 
-  html, body { 
-    width: 100%; height: 100%; 
-    font-family: 'Archivo', system-ui, -apple-system, sans-serif; 
-    background: var(--bg-base); 
-    color: var(--text-primary); 
-    overflow-y: auto;
-    overflow-x: hidden;
+  html, body {
+    width: 100vw; height: 100vh;
+    overflow: hidden;
+    font-family: 'Archivo', system-ui, -apple-system, sans-serif;
+    background: var(--bg-base);
+    color: var(--text-primary);
+    display: flex;
+    flex-direction: column;
   }
 
-  .ic { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; display: block; flex-shrink: 0; }
+  .ic { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; display: block; flex-shrink:0; }
+  .ic-fill { width: 16px; height: 16px; fill: currentColor; display: block; flex-shrink:0; }
 
   /* Navbar */
   .navbar {
-    position: fixed;
-    top: 0; left: 0; right: 0;
-    height: 60px;
-    padding: 0 40px;
-    display: flex;
-    align-items: center;
-    background: rgba(13, 15, 26, 0.6);
-    backdrop-filter: blur(12px);
-    border-bottom: 1px solid rgba(255,255,255,0.05);
-    z-index: 100;
+    height: 50px; padding: 0 40px; display: flex; align-items: center; position: absolute; top: 0; left: 0; right: 0; z-index: 100;
+  }
+  .back-btn {
+    display: flex; align-items: center; gap: 6px; color: var(--text-primary); cursor: pointer;
+    font-size: 14px; font-weight: 600; background: rgba(0,0,0,0.4); padding: 6px 14px; border-radius: 16px; backdrop-filter: blur(10px);
   }
 
-  .nav-btn {
-    display: flex; align-items: center; gap: 8px;
-    color: var(--text-secondary); font-size: 15px; font-weight: 600; cursor: pointer; text-decoration: none;
-    transition: color 0.2s;
-  }
-  .nav-btn:hover { color: #fff; }
-
-  /* Full Width Cover (Edge to Edge) */
-  .full-width-cover {
-    width: 100vw;
-    height: 340px;
-    background: radial-gradient(circle at top right, var(--accent-secondary) 0%, transparent 60%),
+  /* Full Width Cover */
+  .cover-photo {
+    width: 100%; height: 30vh;
+    background: radial-gradient(ellipse at top right, var(--accent-secondary) 0%, transparent 60%),
                 linear-gradient(to bottom, var(--bg-elevated) 0%, var(--bg-base) 100%);
-    position: relative;
-    border-bottom: 1px solid rgba(255,255,255,0.02);
+    position: relative; flex-shrink: 0;
   }
-
-  .full-width-cover::after {
-    content: '';
-    position: absolute;
-    inset: 0;
+  .cover-photo::after {
+    content: ''; position: absolute; inset: 0;
     background: url('data:image/svg+xml;utf8,<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><path d="M0 100 C 20 0 50 0 100 100 Z" fill="rgba(255,255,255,0.02)"/></svg>') center/cover;
     mix-blend-mode: overlay;
   }
 
-  /* Main Content Area */
-  .interface-container {
-    max-width: 1200px; /* Wide layout, not a squeezed card */
-    margin: 0 auto;
-    padding: 0 40px 100px;
-    position: relative;
-    display: grid;
-    grid-template-columns: 320px 1fr;
-    gap: 60px;
-    align-items: start;
+  /* Desktop Profile Grid Layout */
+  .desktop-layout {
+    max-width: 1300px; width: 100%; margin: -60px auto 0; padding: 0 40px;
+    display: grid; grid-template-columns: 320px 1fr; gap: 40px; position: relative; z-index: 10;
   }
 
-  /* Left Sidebar: Profile Identity */
-  .profile-sidebar {
-    position: relative;
-    margin-top: -100px; /* Pull up over the cover */
-    z-index: 10;
-  }
-
+  /* Left Column: Identity */
+  .profile-identity { display: flex; flex-direction: column; }
   .avatar {
-    width: 180px; height: 180px;
-    border-radius: 24px;
+    width: 130px; height: 130px; border-radius: 24px;
     background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
-    border: 8px solid var(--bg-base);
+    border: 6px solid var(--bg-base); box-shadow: 0 12px 32px rgba(0,0,0,0.5);
+    display: flex; align-items: center; justify-content: center; font-size: 54px; font-weight: 800; color: #fff;
+    margin-bottom: 20px; position: relative;
+  }
+  .verified-badge {
+    position: absolute; bottom: -6px; right: -6px; width: 32px; height: 32px;
+    background: var(--bg-base); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--accent-primary);
+  }
+
+  .name-block { margin-bottom: 16px; }
+  .name { font-size: 28px; font-weight: 800; letter-spacing: -0.5px; margin-bottom: 2px; }
+  .handle { font-size: 14px; color: var(--text-secondary); display: flex; align-items: center; gap: 6px; font-weight: 500; }
+
+  .bio { font-size: 14px; color: var(--text-secondary); line-height: 1.6; margin-bottom: 24px; }
+
+  .btn-message {
+    display: flex; align-items: center; justify-content: center; gap: 8px; background: var(--text-primary); color: var(--bg-base);
+    border: none; padding: 12px; border-radius: 12px; font-size: 14px; font-weight: 700; cursor: pointer; transition: all 0.2s;
+  }
+  .btn-message:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(255,255,255,0.2); background: #fff; }
+
+  /* Right Column: Analytics Bento Grid */
+  .profile-bento {
+    display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: auto auto auto; gap: 16px; margin-top: 60px;
+  }
+  .bento-card {
+    background: rgba(26, 30, 54, 0.6); backdrop-filter: blur(20px);
+    border: 1px solid var(--border-subtle); border-radius: 16px; padding: 20px;
+    display: flex; flex-direction: column; transition: transform 0.2s, background 0.2s;
+  }
+  .bento-card:hover { background: rgba(26, 30, 54, 0.8); border-color: var(--border-mid); }
+  .card-span-2 { grid-column: span 2; }
+  .card-span-3 { grid-column: span 3; }
+
+  /* Meta Bar */
+  .meta-bar { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; }
+  .meta-tag { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; color: var(--text-secondary); }
+  .meta-tag .ic { color: var(--accent-primary); }
+
+  /* Card Headers */
+  .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .card-title { font-size: 13px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 6px; }
+
+  /* --- Pure CSS Storage Ring Chart --- */
+  .storage-ring-wrapper {
+    display: flex; align-items: center; justify-content: center; position: relative; margin: 10px 0;
+  }
+  .storage-ring {
+    width: 120px; height: 120px; border-radius: 50%;
+    background: conic-gradient(var(--accent-primary) 0% 64%, var(--bg-hover) 64% 100%);
     display: flex; align-items: center; justify-content: center;
-    font-size: 64px; font-weight: 800; color: #fff;
-    box-shadow: 0 12px 32px rgba(0,0,0,0.5);
-    margin-bottom: 24px;
+    position: relative;
+    box-shadow: 0 0 20px rgba(91,110,245,0.2);
   }
+  .storage-ring::before {
+    content: ''; width: 96px; height: 96px; border-radius: 50%; background: var(--bg-surface); position: absolute;
+  }
+  .storage-ring-value {
+    position: relative; z-index: 1; font-size: 24px; font-weight: 800; color: var(--text-primary);
+    display: flex; flex-direction: column; align-items: center;
+  }
+  .storage-ring-value span { font-size: 11px; color: var(--text-muted); font-weight: 500; margin-top: 2px; }
 
-  .name {
-    font-size: 32px;
-    font-weight: 800;
-    letter-spacing: -1px;
-    color: var(--text-primary);
-    margin-bottom: 4px;
+  /* --- Pure CSS Activity Bar Chart --- */
+  .css-bar-chart {
+    display: flex; align-items: flex-end; justify-content: space-between; height: 100px; padding: 0 10px; margin-top: auto; border-bottom: 1px solid var(--border-subtle); padding-bottom: 8px;
   }
+  .chart-col { display: flex; flex-direction: column; align-items: center; gap: 8px; width: 24px; }
+  .bar-wrapper { width: 100%; height: 80px; display: flex; align-items: flex-end; justify-content: center; position: relative; }
+  .bar { width: 16px; border-radius: 4px; background: var(--bg-hover); transition: height 0.5s ease, background 0.3s; position: relative; }
+  .bar:hover { background: var(--accent-primary); box-shadow: 0 0 12px rgba(91,110,245,0.4); }
+  .chart-label { font-size: 10px; color: var(--text-muted); }
 
-  .email {
-    font-size: 16px;
-    color: var(--text-secondary);
-    font-weight: 500;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 24px;
-  }
-
-  .email .ic { color: var(--text-muted); }
-
-  .btn-communicate {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    width: 100%;
-    background: var(--accent-primary);
-    color: #fff;
-    border: none;
-    padding: 14px 24px;
-    border-radius: 12px;
-    font-size: 16px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    box-shadow: 0 4px 16px rgba(91,110,245,0.25);
-    margin-bottom: 32px;
-  }
-
-  .btn-communicate:hover {
-    background: var(--accent-secondary);
-    transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(91,110,245,0.4);
-  }
-
-  .side-info-list {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-  }
-
-  .side-info-item {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    color: var(--text-secondary);
-    font-size: 14px;
-    font-weight: 500;
-  }
-  
-  .side-info-item .ic { color: var(--text-muted); }
-
-  /* Right Area: About & Details */
-  .profile-main {
-    padding-top: 40px;
-    display: flex;
-    flex-direction: column;
-    gap: 40px;
-  }
-
-  .section-title {
-    font-size: 20px;
-    font-weight: 700;
-    color: var(--text-primary);
-    margin-bottom: 16px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-  
-  .section-title::before {
-    content: '';
-    display: block;
-    width: 4px;
-    height: 18px;
-    background: var(--accent-primary);
-    border-radius: 2px;
-  }
-
-  .bio-text {
-    font-size: 16px;
-    color: var(--text-secondary);
-    line-height: 1.8;
-    background: rgba(255,255,255,0.02);
-    padding: 24px;
-    border-radius: 16px;
-    border-left: 1px solid rgba(255,255,255,0.05);
-  }
-
-  /* Big display items */
-  .details-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 24px;
-  }
-
-  .detail-box {
-    padding: 24px;
-    background: rgba(255,255,255,0.02);
-    border: 1px solid var(--border-subtle);
-    border-radius: 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-
-  .detail-box-label {
-    font-size: 14px;
-    color: var(--text-muted);
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .detail-box-value {
-    font-size: 18px;
-    color: var(--text-primary);
-    font-weight: 500;
-  }
-  
-  .detail-box.highlight {
-    background: rgba(91,110,245,0.05);
-    border-color: rgba(91,110,245,0.2);
-  }
-  .detail-box.highlight .detail-box-value {
-    color: var(--accent-primary);
-  }
-
-  @media (max-width: 900px) {
-    .interface-container {
-      grid-template-columns: 1fr;
-      gap: 32px;
-      padding-top: 0;
-    }
-    .profile-sidebar {
-      margin-top: -80px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      text-align: center;
-    }
-    .side-info-list {
-      align-items: center;
-    }
-    .btn-communicate {
-      max-width: 320px;
-    }
-    .details-grid {
-      grid-template-columns: 1fr;
-    }
-  }
+  /* Stats Mini Grid */
+  .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-top: auto; }
+  .stat-item { display: flex; flex-direction: column; gap: 4px; background: rgba(255,255,255,0.02); padding: 12px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.02); }
+  .stat-val { font-size: 22px; font-weight: 800; color: var(--text-primary); line-height: 1; display:flex; align-items:baseline; gap:4px; }
+  .stat-val small { font-size: 12px; font-weight: 500; color: var(--text-secondary); }
+  .stat-lbl { font-size: 12px; color: var(--text-muted); }
 
 </style>
 </head>
 <body>
 
 <div class="navbar">
-  <div class="nav-btn">
+  <div class="back-btn">
     <svg class="ic" viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
     返回 (Back)
   </div>
 </div>
 
-<!-- Edge-to-Edge Background Cover -->
-<div class="full-width-cover"></div>
+<div class="cover-photo"></div>
 
-<div class="interface-container">
+<div class="desktop-layout">
   
-  <!-- Left Column: Identity -->
-  <div class="profile-sidebar">
-    <div class="avatar">SJ</div>
-    <div class="name">Shijian</div>
-    <div class="email">
-      <svg class="ic" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
-      shijian@epocanvas.com
+  <!-- Left Side: Identity -->
+  <div class="profile-identity">
+    <div class="avatar">
+      SJ
+      <div class="verified-badge">
+        <svg class="ic-fill" style="width:20px; height:20px;" viewBox="0 0 24 24"><path d="M22.5 12.5c0-.67-.2-1.33-.57-1.89l1.45-2.02c.32-.44.38-1.01.15-1.5-.23-.49-.71-.8-1.25-.8h-2.47c-.43 0-.82-.24-1.02-.63l-1.1-2.22c-.25-.5-.73-.83-1.29-.89-.55-.06-1.1.17-1.46.61l-1.6 1.94c-.4.49-1.02.77-1.66.77s-1.26-.28-1.66-.77l-1.6-1.94c-.36-.44-.91-.67-1.46-.61-.56.06-1.04.39-1.29.89l-1.1 2.22c-.2.39-.59.63-1.02.63H3.74c-.54 0-1.02.31-1.25.8-.23.49-.17 1.06.15 1.5l1.45 2.02c.37.56.57 1.22.57 1.89 0 .67-.2 1.33-.57 1.89l-1.45 2.02c-.32.44-.38 1.01-.15 1.5.23.49.71.8 1.25.8h2.47c.43 0 .82.24 1.02.63l1.1 2.22c.25.5.73.83 1.29.89.55.06 1.1-.17 1.46-.61l1.6-1.94c.4-.49 1.02-.77 1.66-.77s1.26.28 1.66.77l1.6 1.94c.36.44.91.67 1.46.61.56-.06 1.04-.39 1.29-.89l1.1-2.22c.2-.39.59-.63 1.02-.63h2.47c.54 0 1.02-.31 1.25-.8.23-.49.17-1.06-.15-1.5l-1.45-2.02c-.37-.56-.57-1.22-.57-1.89zM10.82 17.5l-4.52-4.52 1.41-1.41 3.11 3.11 7.21-7.21 1.41 1.41-8.62 8.62z"></path></svg>
+      </div>
+    </div>
+    
+    <div class="name-block">
+      <h1 class="name">Shijian</h1>
+      <div class="handle">
+        <svg class="ic" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+        shijian@epocanvas.com
+      </div>
     </div>
 
-    <button class="btn-communicate">
-      <svg class="ic" viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
-      发送邮件 (Send Email)
-    </button>
+    <p class="bio">
+      Core Contributor & System Administrator for EpoMail ecosystem. Passionate about secure communication and high-performance architecture.
+    </p>
 
-    <div class="side-info-list">
-      <div class="side-info-item">
+    <button class="btn-message">
+      <svg class="ic" viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+      发送邮件联系我 (Message)
+    </button>
+  </div>
+
+  <!-- Right Side: Analytics Density Bento Grid -->
+  <div class="profile-bento">
+    
+    <!-- Meta Tag Bar -->
+    <div class="bento-card card-span-3 meta-bar">
+      <div class="meta-tag">
         <svg class="ic" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
         Beijing (GMT+8)
       </div>
-      <div class="side-info-item" style="color:var(--accent-primary);">
+      <div class="meta-tag">
         <svg class="ic" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
-        EpoMail Administrator
+        Administrator
       </div>
-      <div class="side-info-item">
+      <div class="meta-tag">
         <svg class="ic" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
         Joined Aug 2026
       </div>
-    </div>
-  </div>
-
-  <!-- Right Column: Details -->
-  <div class="profile-main">
-    
-    <div>
-      <h2 class="section-title">自我介绍 (About)</h2>
-      <div class="bio-text">
-        欢迎联系我。我通常会在工作日内回复。目前致力于完善 EpoMail 的各项基础设施。如果你有任何问题或者合作意向，随时可以通过邮件发送给我！
+      <div class="meta-tag" style="margin-left: auto;">
+        <span style="display:inline-block; width:8px; height:8px; background:var(--success); border-radius:50%; margin-right:4px; box-shadow: 0 0 8px var(--success);"></span>
+        Active Status
       </div>
     </div>
 
-    <div>
-      <h2 class="section-title">账户状态 (Account Status)</h2>
-      <div class="details-grid">
-        
-        <div class="detail-box">
-          <div class="detail-box-label">
-            <svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-            活跃时段 (Active Hours)
-          </div>
-          <div class="detail-box-value">工作日 09:00 - 18:00</div>
+    <!-- Storage Graphic -->
+    <div class="bento-card">
+      <div class="card-header">
+        <div class="card-title">
+          <svg class="ic" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg>
+          邮箱容量使用 (Storage)
         </div>
+      </div>
+      <div class="storage-ring-wrapper">
+        <div class="storage-ring">
+          <div class="storage-ring-value">
+            64%
+            <span>320 / 500 MB</span>
+          </div>
+        </div>
+      </div>
+    </div>
 
-        <div class="detail-box highlight">
-          <div class="detail-box-label" style="color:var(--accent-primary);">
-            <svg class="ic" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-            安全级别 (Security)
-          </div>
-          <div class="detail-box-value">已启用最高级专属加密</div>
+    <!-- 7-Day Activity Chart -->
+    <div class="bento-card card-span-2">
+      <div class="card-header">
+        <div class="card-title">
+          <svg class="ic" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+          7天活跃处理量 (Activity)
         </div>
+        <div style="font-size:12px; color:var(--text-muted);">近7日数据</div>
+      </div>
+      
+      <div class="css-bar-chart">
+        <div class="chart-col"><div class="bar-wrapper"><div class="bar" style="height: 20%; background:var(--accent-primary);"></div></div><span class="chart-label">M</span></div>
+        <div class="chart-col"><div class="bar-wrapper"><div class="bar" style="height: 45%;"></div></div><span class="chart-label">T</span></div>
+        <div class="chart-col"><div class="bar-wrapper"><div class="bar" style="height: 60%; background:var(--accent-primary);"></div></div><span class="chart-label">W</span></div>
+        <div class="chart-col"><div class="bar-wrapper"><div class="bar" style="height: 30%;"></div></div><span class="chart-label">T</span></div>
+        <div class="chart-col"><div class="bar-wrapper"><div class="bar" style="height: 85%; background:var(--accent-primary);"></div></div><span class="chart-label">F</span></div>
+        <div class="chart-col"><div class="bar-wrapper"><div class="bar" style="height: 15%;"></div></div><span class="chart-label">S</span></div>
+        <div class="chart-col"><div class="bar-wrapper"><div class="bar" style="height: 25%;"></div></div><span class="chart-label">S</span></div>
+      </div>
+    </div>
+
+    <!-- Stats Grid -->
+    <div class="bento-card card-span-3">
+      <div class="card-header" style="margin-bottom:8px;">
+        <div class="card-title">
+          <svg class="ic" viewBox="0 0 24 24"><path d="M12 20v-6M6 20V10M18 20V4"></path></svg>
+          各项使用指标 (Usage Indicators)
+        </div>
+      </div>
+      <div class="stats-grid">
         
-        <div class="detail-box">
-          <div class="detail-box-label">
-            <svg class="ic" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-            邮件回复率 (Response Rate)
-          </div>
-          <div class="detail-box-value">极高 (Highly Responsive)</div>
+        <div class="stat-item">
+          <span class="stat-lbl">累计发送量</span>
+          <span class="stat-val">12,420 <small>封</small></span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-lbl">累计拦截量 (规则)</span>
+          <span class="stat-val" style="color:var(--warning);">1,284 <small>次</small></span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-lbl">自定义过滤规则</span>
+          <span class="stat-val">34 <small>条</small></span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-lbl">关联及别名账户</span>
+          <span class="stat-val">3 <small>个</small></span>
         </div>
 
       </div>
     </div>
 
   </div>
+
 </div>
 
 </body>

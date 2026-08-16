@@ -15,37 +15,70 @@
         <!-- Mail Menu -->
         <div class="nav-section">
           <div class="nav-item" @click="router.push({name: 'email'})" :class="route.name === 'email' ? 'active' : ''" :title="$t('inbox')">
-            <span class="nav-ic-wrap"><Icon icon="hugeicons:mailbox-01" width="20" height="20" /></span>
+            <span class="nav-ic-wrap">
+              <Icon icon="hugeicons:mailbox-01" width="20" height="20" />
+              <div class="sidebar-red-dot" v-if="unreadCount > 0"></div>
+            </span>
             <span class="nav-label">{{$t('inbox')}}</span>
             <span class="nav-count" v-if="unreadCount > 0">{{ unreadCount }}</span>
           </div>
           <div class="nav-item" @click="router.push({name: 'star'})" :class="route.name === 'star' ? 'active' : ''" :title="$t('starred')">
-            <span class="nav-ic-wrap"><Icon icon="solar:star-line-duotone" width="20" height="20" /></span>
+            <span class="nav-ic-wrap">
+              <Icon icon="solar:star-line-duotone" width="20" height="20" />
+              <div class="sidebar-red-dot" v-if="starCount > 0"></div>
+            </span>
             <span class="nav-label">{{$t('starred')}}</span>
+            <span class="nav-count" v-if="starCount > 0">{{ starCount }}</span>
           </div>
           <div class="nav-item" @click="router.push({name: 'snoozed'})" :class="route.name === 'snoozed' ? 'active' : ''" :title="$t('snoozed') || 'Snoozed'">
-            <span class="nav-ic-wrap"><Icon icon="ic:outline-access-time" width="20" height="20" /></span>
+            <span class="nav-ic-wrap">
+              <Icon icon="ic:outline-access-time" width="20" height="20" />
+              <div class="sidebar-red-dot" v-if="urgentSnoozedCount > 0"></div>
+              <div class="sidebar-gray-dot" v-else-if="waitingSnoozedCount > 0"></div>
+            </span>
             <span class="nav-label">{{$t('snoozed') || 'Snoozed'}}</span>
+            <span class="nav-count" v-if="urgentSnoozedCount > 0">{{ urgentSnoozedCount }}</span>
+            <span class="nav-count muted" v-else-if="waitingSnoozedCount > 0">{{ waitingSnoozedCount }}</span>
           </div>
           <div class="nav-item" @click="router.push({name: 'send'})" v-perm="'email:send'" :class="route.name === 'send' ? 'active' : ''" :title="$t('sent')">
-            <span class="nav-ic-wrap"><Icon icon="cil:send" width="20" height="20" /></span>
+            <span class="nav-ic-wrap">
+              <Icon icon="cil:send" width="20" height="20" />
+              <div class="sidebar-red-dot" v-if="sendCount > 0"></div>
+            </span>
             <span class="nav-label">{{$t('sent')}}</span>
+            <span class="nav-count" v-if="sendCount > 0">{{ sendCount }}</span>
           </div>
           <div class="nav-item" @click="router.push({name: 'draft'})" v-perm="'email:send'" :class="route.name === 'draft' ? 'active' : ''" :title="$t('drafts')">
-            <span class="nav-ic-wrap"><Icon icon="ep:document" width="20" height="20" /></span>
+            <span class="nav-ic-wrap">
+              <Icon icon="ep:document" width="20" height="20" />
+              <div class="sidebar-red-dot" v-if="draftCount > 0"></div>
+            </span>
             <span class="nav-label">{{$t('drafts')}}</span>
+            <span class="nav-count" v-if="draftCount > 0">{{ draftCount }}</span>
           </div>
           <div class="nav-item" @click="router.push({name: 'user-all-email'})" :class="route.name === 'user-all-email' ? 'active' : ''" :title="$t('allMail')">
-            <span class="nav-ic-wrap"><Icon icon="mdi:email-multiple-outline" width="22" height="22" /></span>
+            <span class="nav-ic-wrap">
+              <Icon icon="mdi:email-multiple-outline" width="22" height="22" />
+              <div class="sidebar-red-dot" v-if="allMailCount > 0"></div>
+            </span>
             <span class="nav-label">{{$t('allMail')}}</span>
+            <span class="nav-count" v-if="allMailCount > 0">{{ allMailCount }}</span>
           </div>
           <div class="nav-item" @click="router.push({name: 'spam'})" :class="route.name === 'spam' ? 'active' : ''" :title="$t('spam') || 'Spam'">
-            <span class="nav-ic-wrap"><Icon icon="ic:outline-report-gmailerrorred" width="20" height="20" /></span>
+            <span class="nav-ic-wrap">
+              <Icon icon="ic:outline-report-gmailerrorred" width="20" height="20" />
+              <div class="sidebar-red-dot" v-if="spamCount > 0"></div>
+            </span>
             <span class="nav-label">{{$t('spam') || 'Spam'}}</span>
+            <span class="nav-count" v-if="spamCount > 0">{{ spamCount }}</span>
           </div>
           <div class="nav-item" @click="router.push({name: 'trash'})" :class="route.name === 'trash' ? 'active' : ''" :title="$t('trash') || 'Trash'">
-            <span class="nav-ic-wrap"><Icon icon="ic:outline-delete" width="20" height="20" /></span>
+            <span class="nav-ic-wrap">
+              <Icon icon="ic:outline-delete" width="20" height="20" />
+              <div class="sidebar-red-dot" v-if="trashCount > 0"></div>
+            </span>
             <span class="nav-label">{{$t('trash') || 'Trash'}}</span>
+            <span class="nav-count" v-if="trashCount > 0">{{ trashCount }}</span>
           </div>
         </div>
         
@@ -61,8 +94,10 @@
               <span class="nav-ic-wrap">
                 <div v-if="(label.icon || '').startsWith('<svg')" v-html="label.icon" style="width: 20px; height: 20px; display: inline-flex; justify-content: center; align-items: center; fill: currentColor;" :style="{ color: label.color || 'inherit' }"></div>
                 <Icon v-else :icon="label.icon || 'ic:baseline-label'" width="20" height="20" :style="{ color: label.color || 'inherit' }" />
+                <div class="sidebar-red-dot" v-if="label.stats && label.stats.unread > 0"></div>
               </span>
               <span class="nav-label" :style="{ color: label.color || 'inherit' }">{{ label.name || label }}</span>
+              <span class="nav-count" v-if="label.stats && label.stats.unread > 0">{{ label.stats.unread }}</span>
             </div>
           </template>
         </div>
@@ -98,8 +133,17 @@ const uiStore = useUiStore();
 const emailStore = useEmailStore();
 const route = useRoute();
 
-// Mock unread count for demonstration
+// Mock counts for UI demonstration
 const unreadCount = ref(12);
+const starCount = ref(1);
+const sendCount = ref(0);
+const draftCount = ref(2);
+const allMailCount = ref(5);
+const spamCount = ref(17);
+const trashCount = ref(8);
+// 优先级测试：urgent 会显示蓝底标签，并且收缩时覆盖 waiting 显示红点
+const urgentSnoozedCount = ref(1);
+const waitingSnoozedCount = ref(3);
 
 const newLabelName = ref('');
 const handleAddLabel = () => {
@@ -274,7 +318,7 @@ function openSend() {
 .nav-item:hover { background: var(--bg-hover); color: var(--text-primary); }
 .nav-item.active { background: var(--accent-muted); color: var(--text-accent); font-weight: 600; }
 .nav-item.active .nav-ic-wrap { color: var(--accent-primary); }
-.nav-ic-wrap { width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; border-radius: 50%; }
+.nav-ic-wrap { width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; border-radius: 50%; position: relative; }
 .nav-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .nav-count { background: var(--accent-primary); color: #fff; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 10px; min-width: 18px; text-align: center; }
 .nav-count.muted { background: var(--bg-elevated); color: var(--text-muted); }
@@ -297,5 +341,22 @@ function openSend() {
   padding: 0 0 0 25px; 
   border-radius: 0; 
   clip-path: circle(18px at 36px 19px); 
+}
+
+.sidebar-red-dot, .sidebar-gray-dot {
+  position: absolute;
+  top: 0px;
+  right: 0px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: none;
+}
+.sidebar-red-dot { background-color: #ea4335; z-index: 10; }
+.sidebar-gray-dot { background-color: #9aa0a6; }
+
+.collapsed .sidebar-red-dot,
+.collapsed .sidebar-gray-dot {
+  display: block;
 }
 </style>
