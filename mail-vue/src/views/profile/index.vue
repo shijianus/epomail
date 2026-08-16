@@ -6,11 +6,6 @@
     <!-- Ready for User Background Image -->
     <div class="cover-photo"></div>
 
-    <div class="bg-blobs">
-      <div class="blob blob-1"></div>
-      <div class="blob blob-2"></div>
-    </div>
-
     <div class="desktop-layout" v-if="!loading">
       <!-- Left Side: Identity -->
       <div class="profile-identity">
@@ -30,7 +25,7 @@
         </div>
 
         <p class="bio">
-          {{ profileData.userInfo.roleName === 'admin' ? 'EpoMail 系统管理员，负责核心平台的维护与安全。' : 'EpoMail 专属用户，致力于安全、高效的邮件通讯。' }}
+          {{ profileData.userInfo.roleName === 'admin' ? 'EpoMail 系统管理员，负责核心平台的维护与安全。我们在数字世界中连接彼此，保护每一次灵感的传递与思想的交汇。为您带来前所未有的纯净沟通体验。' : 'EpoMail 专属用户，致力于安全、高效的邮件通讯。我们在数字世界中连接彼此，保护每一次灵感的传递与思想的交汇。为您带来前所未有的纯净沟通体验。' }}
         </p>
 
         <!-- Detailed Subtitle Tags -->
@@ -49,7 +44,7 @@
           </div>
         </div>
 
-        <el-button type="primary" size="large" style="width: 100%; border-radius: 12px; height: 48px;" @click="router.push('/inbox')">
+        <el-button type="primary" size="large" style="width: 100%; border-radius: 12px; height: 48px; margin-top: auto;" @click="router.push('/inbox')">
           <Icon icon="lucide:send" class="ic" style="margin-right: 8px;" />
           发送邮件联系我
         </el-button>
@@ -198,7 +193,27 @@ const computedSources = computed(() => {
     let currentOffset = 0
     const colors = ['var(--color-send)', 'var(--color-receive)', 'var(--color-intercept)', 'var(--color-other)']
     
-    profileData.value.sources.top.forEach((item, index) => {
+    // Create a deep copy of top and ensure it's sorted
+    let topSources = JSON.parse(JSON.stringify(profileData.value.sources.top || []))
+    let otherPercent = profileData.value.sources.otherPercent || 0
+    
+    // 1. Remove '其它来源' or 'Other' from top list and add to otherPercent
+    const otherIndex = topSources.findIndex(s => s.domain === '其它来源' || s.domain === 'Other')
+    if (otherIndex !== -1) {
+        otherPercent += topSources[otherIndex].percent
+        topSources.splice(otherIndex, 1)
+    }
+
+    // 2. Limit top sources to exactly 3 items, aggregate the rest to otherPercent
+    if (topSources.length > 3) {
+        const excess = topSources.splice(3)
+        excess.forEach(s => {
+            otherPercent += s.percent
+        })
+    }
+    
+    // Generate final list
+    topSources.forEach((item, index) => {
         list.push({
             domain: item.domain,
             percent: item.percent,
@@ -209,12 +224,12 @@ const computedSources = computed(() => {
         currentOffset += item.percent
     })
     
-    if (profileData.value.sources.otherPercent > 0) {
+    if (otherPercent > 0) {
         list.push({
             domain: '其它来源',
-            percent: profileData.value.sources.otherPercent,
+            percent: parseFloat(otherPercent.toFixed(1)), // Fix precision issues
             color: colors[3],
-            dasharray: `${profileData.value.sources.otherPercent} 100`,
+            dasharray: `${otherPercent} 100`,
             dashoffset: -currentOffset
         })
     }
@@ -299,20 +314,6 @@ const hideTooltip = () => {
   z-index: 1000;
 }
 
-  .bg-blobs {
-    position: absolute; inset: 0; overflow: hidden; z-index: 0; pointer-events: none;
-  }
-  .blob {
-    position: absolute; border-radius: 50%; pointer-events: none;
-  }
-  .blob-1 {
-    width: 700px; height: 700px; background: radial-gradient(circle, rgba(59, 130, 246, 0.15) 0%, transparent 70%);
-    bottom: -200px; right: -100px;
-  }
-  .blob-2 {
-    width: 600px; height: 600px; background: radial-gradient(circle, rgba(124, 92, 191, 0.15) 0%, transparent 70%);
-    bottom: 50px; left: -150px;
-  }
 
 .ic { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; display: block; flex-shrink:0; }
 .ic-fill { width: 16px; height: 16px; fill: currentColor; display: block; flex-shrink:0; }

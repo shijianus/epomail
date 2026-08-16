@@ -1,6 +1,12 @@
 # Agent Workflow SOP (Standard Operating Procedure)
 
 <!-- VERSION LOG APPEND BELOW (newest first) -->
+### 账户详情：支持全剧暗/亮色调热切换功能 (2026-08-16)
+*   **问题排查 (Diagnosis)**: 用户反馈账户详情界面虽然整合了 UI 风格，但是完全无法响应暗色调和亮色调的转换，并且指出了背景颜色的基调和原有的系统变量不一致。经过排查发现 `profile/index.vue` 的底层 CSS 中存在大量的硬编码颜色，如 `background: linear-gradient(135deg, var(--bg-base) 0%, #15182e 100%)` 以及大量的 `rgba(255,255,255,0.x)`。这些强制性的深色和白色颜色导致该页面在切换至明亮模式时依然呈现部分暗黑状态。
+*   **编辑代码 (Edit)**: 
+    *   **深度去硬编码**: 全面重构了 `profile/index.vue` 内部 CSS 代码，将所有 `rgba` 硬编码及特定颜色替换为 EpoCanvas 框架下全局统一的颜色令牌 (Tokens)。包括 `var(--bg-elevated)`，`var(--border-subtle)`，`var(--shadow-color)`，`var(--text-primary)` 和 `var(--text-muted)`。
+    *   **动态封面及发光效果重建**: 利用 CSS `repeating-linear-gradient` 对齐 `var(--bg-hover)` 与 `var(--bg-elevated)` 代替了旧版本写死的 Base64 SVG 的黑色虚线封面图，同时保留了统计图表中对于 `var(--shadow-deep)` 和 `var(--color-intercept/receive/send)` 的发光效果继承。
+*   **部署上线 (Deploy)**: 在本地跑通了 `npm run build` 并使用 `wrangler deploy` 推送 Cloudflare Worker，Version ID: `75f816a5-7724-4f6e-a698-7126c1303e1b` 更新已发布。账户详情现在可以实现极度流畅和完美的 Light / Dark Mode 热切换。
 
 ### 账户详情：上栏统一及消除 GPU 渲染瓶颈 (2026-08-16)
 *   **问题排查 (Diagnosis)**: 用户反馈：1. 账户详情页上栏依然独立且“返回”按钮多余；右上角组件未达到主界面标准（缺失悬浮提示和原生头像下拉框）。2. 界面用着比较卡。经排查发现，界面卡顿源于背景装饰 Blob 的 CSS 滤镜 `filter: blur(120px)` 及 `mix-blend-mode: screen` 在如此大面积 (700x700px) 元素上极度消耗 GPU 渲染性能。
