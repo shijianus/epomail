@@ -45,8 +45,5 @@ export function emailSearchSuggestions(params) {
 }
 
 export function emailAnalytics() {
-  return request({
-    url: '/email/analytics',
-    method: 'get'
-  })
+  return http.get('/email/analytics')
 }

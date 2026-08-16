@@ -396,6 +396,7 @@
 <script setup>
 import { ref, computed, onMounted, reactive, nextTick } from 'vue'
 import { settingQuery, setBlackList, settingSet } from '@/request/setting.js'
+import { emailAnalytics } from '@/request/email.js'
 import { useSettingStore } from '@/store/setting.js'
 import { useUiStore } from '@/store/ui.js'
 import Loading from '@/components/loading/index.vue'
@@ -671,6 +672,15 @@ function deduplicateRules(rules) {
     finalRules.push(rule)
   }
   return finalRules
+}
+
+async function fetchAnalytics() {
+  try {
+    const res = await emailAnalytics()
+    Object.assign(analyticsData, res)
+  } catch (e) {
+    console.error('Fetch analytics failed:', e)
+  }
 }
 
 async function loadSettings() {

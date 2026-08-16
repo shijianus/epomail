@@ -1437,7 +1437,7 @@ const emailService = {
 			const totalRow = await orm(c).select({ count: sql`count(*)` }).from(email).where(eq(email.userId, userId)).get();
 			result.totalProcessed = totalRow ? totalRow.count : 0;
 
-			const allEmails = await orm(c).select({ createdAt: email.createdAt, labels: email.labels, isSpam: email.isSpam })
+			const allEmails = await orm(c).select({ createTime: email.createTime, labels: email.labels, isSpam: email.isSpam })
 				.from(email).where(eq(email.userId, userId)).all();
 				
 			const trendMap = {};
@@ -1452,7 +1452,7 @@ const emailService = {
 			
 			let totalIntercepted = 0;
 			allEmails.forEach(e => {
-				const dateObj = new Date(e.createdAt);
+				const dateObj = new Date(e.createTime);
 				const dateStr = dateObj.toISOString().split('T')[0];
 				
 				let intercepted = false;
