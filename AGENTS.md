@@ -2,6 +2,16 @@
 
 <!-- VERSION LOG APPEND BELOW (newest first) -->
 
+### 规则引擎 Phase 3：分类管理分析页与纯 CSS 可视化 (2026-08-15)
+*   **功能实现 (Feature)**: `643edea` — 在分类管理弹窗中新增了“分析面板 (Analytics)”视图，展示邮件处理统计与自定义规则活跃度。
+    *   **后端统计 API**: 在 `mail-worker/src/service/email-service.js` 实现 `getAnalytics`，基于现有 DB 实时聚合近 7 天拦截趋势与各类标签命中次数，不依赖重型外部库，极致轻量。
+    *   **前端纯 CSS 大屏**: 在 `mail-vue/src/views/category-setting/index.vue` 使用 `el-tabs` 结构剥离“基本设置”与“分析面板”。
+    *   构建了原生 CSS `Grid` 布局的统计卡片 (`stats-overview`)。
+    *   实现了无任何 Echarts/Canvas 依赖的纯 CSS 动态条形图 (`css-chart-container`) 用于展示 7 天拦截趋势，并带有悬浮 Tooltip。
+    *   实现了规则活跃度排行榜 (`rule-ranking-list`)，基于 `hit counts` 动态填充。
+*   **验证 (Verification)**: `npm run build` 成功完成 (耗时 10.10s)。
+*   **部署 (Deploy)**: 成功进入待部署状态，已确保无依赖缺失并能独立渲染。
+
 ### 规则引擎 Phase 2 (补充修复)：UI 交互体验优化与闭环验收 (2026-08-15)
 *   **安全备份 (Backup)**: 记录状态修正起点。
 *   **UI/UX 修复 (Fix & Enhance)**: 
