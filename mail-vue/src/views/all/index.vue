@@ -58,6 +58,10 @@ watch(() => accountStore.currentAccountId, () => {
   scroll.value.refreshList();
 })
 
+watch(() => emailStore.searchKeyword, () => {
+  scroll.value.refreshList();
+})
+
 function changeTimeSort() {
   params.timeSort = params.timeSort ? 0 : 1
   scroll.value.refreshList();

@@ -45,6 +45,8 @@ export const useEmailStore = defineStore('email', {
                 .replace(/is:spam/ig, '')
                 .replace(/is:trash/ig, '')
                 .replace(/hl:off/ig, '')
+                .replace(/label:"[^"]+"/ig, '')
+                .replace(/label:[^\s]+/ig, '')
                 .trim();
             
             // For all-email $-syntax: strip $token directives, keep plain keyword for highlight

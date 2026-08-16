@@ -88,6 +88,7 @@ const emailService = {
 		let pSizeAtMost = null;
 		let pBefore = null;
 		let pAfter = null;
+		let pLabel = null;
 
 		if (keyword) {
 			isGlobal = /global:/i.test(keyword);
@@ -114,6 +115,7 @@ const emailService = {
 			pSizeAtMost = extractParam('smaller');
 			pBefore = extractParam('before');
 			pAfter = extractParam('after');
+			pLabel = extractParam('label');
 
 			keyword = keyword.replace(/global:/ig, '')
 				.replace(/is:sent/ig, '')
@@ -180,6 +182,9 @@ const emailService = {
 		}
 		if (pAfter) {
 			commonConditions.push(gt(email.createTime, pAfter));
+		}
+		if (pLabel) {
+			commonConditions.push(like(email.labels, '%"' + pLabel + '"%'));
 		}
 
 		if (keyword) {

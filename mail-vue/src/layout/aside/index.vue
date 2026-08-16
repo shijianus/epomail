@@ -57,7 +57,7 @@
             </div>
           </div>
           <template v-for="(label, idx) in uiStore.allLabels" :key="'lbl-'+idx">
-            <div class="nav-item" v-if="label.listVis !== false" :title="label.name || label">
+            <div class="nav-item" v-if="label.listVis !== false" :title="label.name || label" @click="handleLabelClick(label)" :class="isLabelActive(label) ? 'active' : ''">
               <span class="nav-ic-wrap">
                 <div v-if="(label.icon || '').startsWith('<svg')" v-html="label.icon" style="width: 20px; height: 20px; display: inline-flex; justify-content: center; align-items: center; fill: currentColor;" :style="{ color: label.color || 'inherit' }"></div>
                 <Icon v-else :icon="label.icon || 'ic:baseline-label'" width="20" height="20" :style="{ color: label.color || 'inherit' }" />
@@ -88,12 +88,14 @@ import {Icon} from "@iconify/vue";
 import {useSettingStore} from "@/store/setting.js";
 import {useUserStore} from "@/store/user.js";
 import {useUiStore} from "@/store/ui.js";
+import {useEmailStore} from "@/store/email.js";
 import { ElMessage } from 'element-plus';
 import { computed, ref, onMounted, onBeforeUnmount } from 'vue';
 
 const settingStore = useSettingStore();
 const userStore = useUserStore();
 const uiStore = useUiStore();
+const emailStore = useEmailStore();
 const route = useRoute();
 
 // Mock unread count for demonstration
@@ -118,6 +120,19 @@ const handleAddLabel = () => {
     newLabelName.value = '';
     uiStore.showAddLabel = false;
   }
+};
+
+const handleLabelClick = (label) => {
+  const labelName = label.name || label;
+  emailStore.searchKeyword = `label:"${labelName}"`;
+  router.push({ name: 'user-all-email' });
+};
+
+const isLabelActive = (label) => {
+  if (route.name !== 'user-all-email') return false;
+  const labelName = label.name || label;
+  const keyword = emailStore.searchKeyword || '';
+  return keyword.includes(`label:"${labelName}"`);
 };
 
 const isMobile = ref(window.innerWidth < 1025)
