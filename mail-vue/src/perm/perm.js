@@ -6,6 +6,11 @@ export default {
         const permKeys = userStore.user.permKeys;
         const value = binding.value;
 
+        if (!permKeys) {
+            el.parentNode && el.parentNode.removeChild(el);
+            return;
+        }
+
         if (permKeys.includes('*')) {
             return;
         }
@@ -22,6 +27,7 @@ export default {
 
 export function hasPerm(permKey) {
     const {permKeys} = useUserStore().user;
+    if (!permKeys) return false;
     return permKeys.includes('*') || permKeys.includes(permKey);
 }
 

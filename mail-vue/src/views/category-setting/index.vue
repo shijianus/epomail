@@ -3,11 +3,9 @@
     <div class="loading" :class="firstLoading ? 'loading-show' : 'loading-hide'">
       <loading />
     </div>
-    <div class="tabs-wrapper" v-if="!firstLoading">
-      <div class="custom-tabs">
-          <el-scrollbar class="scroll">
-            <div class="scroll-body">
-              <div class="card-grid">
+    <el-scrollbar class="scroll" v-if="!firstLoading">
+      <div class="scroll-body">
+        <div class="card-grid">
 
           <!-- 邮件设置 Card (迁移自系统设置) -->
           <div class="settings-card">
@@ -240,11 +238,9 @@
               </div>
             </div>
           </div>
-              </div>
-            </div>
-          </el-scrollbar>
+        </div>
       </div>
-    </div>
+    </el-scrollbar>
 
     <!-- Unified Drawer for Editing -->
     <el-drawer
@@ -345,7 +341,6 @@
 <script setup>
 import { ref, computed, onMounted, reactive, nextTick, watch } from 'vue'
 import { settingQuery, setBlackList, settingSet } from '@/request/setting.js'
-
 import { useSettingStore } from '@/store/setting.js'
 import { useUiStore } from '@/store/ui.js'
 import Loading from '@/components/loading/index.vue'
@@ -359,7 +354,6 @@ import { useI18n } from 'vue-i18n'
 const { t, locale } = useI18n()
 
 const firstLoading = ref(true)
-const activeTab = ref('basic')
 const settingLoading = ref(false)
 const settingReady = ref(false)
 let backup = '{}'
@@ -1113,5 +1107,5 @@ form .el-button {
 }
 
 
-
 </style>
+
