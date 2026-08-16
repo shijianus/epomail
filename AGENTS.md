@@ -2,6 +2,24 @@
 
 <!-- VERSION LOG APPEND BELOW (newest first) -->
 
+### 账户详情：上栏统一及消除 GPU 渲染瓶颈 (2026-08-16)
+*   **问题排查 (Diagnosis)**: 用户反馈：1. 账户详情页上栏依然独立且“返回”按钮多余；右上角组件未达到主界面标准（缺失悬浮提示和原生头像下拉框）。2. 界面用着比较卡。经排查发现，界面卡顿源于背景装饰 Blob 的 CSS 滤镜 `filter: blur(120px)` 及 `mix-blend-mode: screen` 在如此大面积 (700x700px) 元素上极度消耗 GPU 渲染性能。
+*   **编辑代码 (Edit)**: 
+    *   **底层架构升级**: 修改了 `mail-vue/src/layout/header/index.vue`，使其接收 `isProfile` Props。在个人画板模式下，隐藏搜索框并将左侧 Logo 的点击行为从“切换侧边栏”重定向至“返回主页 (`/`)”。为 `.profile-topbar` 增加专属的透明毛玻璃悬浮样式。
+    *   **彻底融合 UI**: 在 `mail-vue/src/views/profile/index.vue` 中删除了临时拼装的 HTML 导航栏，直接引入系统级 `<Header isProfile="true" />` 组件，完美解决了右上角组件标准不一的问题（完全对齐主系统原生形态）。
+    *   **渲染性能爆破 (Performance)**: 移除了 `profile/index.vue` 中重度消耗性能的 `.blob` css `filter: blur(120px)`，将其改写为性能开销极低的原生径向渐变 `radial-gradient(circle, rgba(...), transparent)`，彻底消除了 GPU 每帧复合计算负担，根治了卡顿现象。
+*   **部署上线 (Deploy)**: 重新跑通了 Vite 构建 (`npm run build`) 并使用 `wrangler deploy` 推送 Cloudflare 服务端引擎，当前版本更新已上线！
+
+
+### 修复账户详情页无权访问及整合全局 UI 布局 (2026-08-16)
+*   **问题排查 (Diagnosis)**: 用户反馈在之前的修改中，"账户详情" (Profile) 页依然显示 `user is not defined`（因为后端缺失实体引入，且默认路由重定向阻拦了未登录访问），并且独立画面的 UI 缺乏与整个系统的全局一致性（缺失顶部导航栏与底部的状态连接栏）。
+*   **编辑代码 (Edit)**: 
+    *   **后端鉴权修正**: 在 `mail-worker/src/service/public-service.js` 补齐了 `jwtUtils`、`constant` 的引入，并重构了 `getProfile` 接口：读取 Cloudflare KV 中的 `publicProfile` 设置；如果未公开，则严格校验当前访问者的 JWT token，仅允许查看自身或以管理员身份越权查看，完美兼顾了隐私与公开。
+    *   **前端路由放行**: 在 `mail-vue/src/router/index.js` 全局路由守卫中，增加对 `to.name !== 'profile'` 的白名单放行，彻底解决了未登录访问独立个人主页被强制踢回 `/login` 的安全拦截。
+    *   **UI 布局融合 (Topbar / StatusBar)**: 修改了 `mail-vue/src/views/profile/index.vue`。顶部置入 EpoCanvas Logo，品牌名称，深色模式切换和全局样式对齐的 Avatar（若未登录则显示 Login 按钮）。底部安全挂载 `<StatusBar />` (下栏状态条)，实现了从独立画板到主系统组件规范的视觉闭环。
+    *   **管理后台扩展**: 在 `mail-vue/src/views/sys-setting/index.vue` 的系统设置面板增加了“公开个人主页 (publicProfile)”的动态开关，授权站长随时收拢对外档案展示权限。
+*   **部署上线 (Deploy)**: 重新跑通了 Vite 构建 (`npm run build`) 并使用 `wrangler deploy` 推送 Cloudflare 服务端引擎热更新生效！
+
 ### 账户详情：同步个人主页及动态时区支持 (2026-08-16)
 *   **问题排查 (Diagnosis)**: 用户要求将专门设计的账户详情页面 UI（`account_details_mockup.html`）与实际工程对接，确保用户点击下拉菜单的"账户详情"能渲染一致的页面，并且能展示其实际的后端数据。
 *   **编辑代码 (Edit)**: 

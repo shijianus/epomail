@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>EpoMail Profile Dashboard</title>
+<title>EpoMail 个人主页</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Archivo:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap');
 
@@ -20,6 +20,12 @@
     --text-muted: #767ca8;
     --border-subtle: rgba(91,110,245,0.12);
     
+    /* Stacked Chart Colors */
+    --color-send: #3b82f6;      /* Blue */
+    --color-receive: #10b981;   /* Green */
+    --color-intercept: #ef4444; /* Red */
+    --color-other: #64748b;     /* Slate */
+
     /* Gradient Stats Themes */
     --grad-blue: linear-gradient(135deg, rgba(59,130,246,0.2) 0%, rgba(37,99,235,0.05) 100%);
     --grad-blue-border: rgba(59,130,246,0.3);
@@ -34,9 +40,32 @@
     overflow: hidden;
     font-family: 'Archivo', system-ui, -apple-system, sans-serif;
     background: var(--bg-base);
+  html, body {
+    width: 100vw; height: 100vh;
+    overflow: hidden;
+    font-family: 'Archivo', system-ui, -apple-system, sans-serif;
+    /* Richer base background gradient instead of solid color */
+    background: linear-gradient(135deg, var(--bg-base) 0%, #15182e 100%);
     color: var(--text-primary);
     display: flex;
     flex-direction: column;
+    position: relative;
+  }
+  
+  /* Highly visible creative background blobs for the lower half */
+  .bg-blobs {
+    position: absolute; inset: 0; overflow: hidden; z-index: 0; pointer-events: none;
+  }
+  .blob {
+    position: absolute; filter: blur(120px); border-radius: 50%; mix-blend-mode: screen;
+  }
+  .blob-1 {
+    width: 700px; height: 700px; background: rgba(59, 130, 246, 0.15); /* Strong primary blue */
+    bottom: -200px; right: -100px;
+  }
+  .blob-2 {
+    width: 600px; height: 600px; background: rgba(124, 92, 191, 0.15); /* Strong secondary purple */
+    bottom: 50px; left: -150px;
   }
 
   .ic { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; display: block; flex-shrink:0; }
@@ -51,17 +80,21 @@
     font-size: 14px; font-weight: 600; background: rgba(0,0,0,0.4); padding: 6px 14px; border-radius: 16px; backdrop-filter: blur(10px);
   }
 
-  /* Full Width Cover */
+  /* Full Width Cover (Ready for User Background Image) */
   .cover-photo {
     width: 100%; height: 32vh;
-    background: radial-gradient(ellipse at top right, var(--accent-secondary) 0%, transparent 60%),
-                linear-gradient(to bottom, var(--bg-elevated) 0%, var(--bg-base) 100%);
+    /* Placeholder for user's uploaded background image */
+    background-color: var(--bg-elevated);
+    background-image: url('data:image/svg+xml;utf8,<svg width="100" height="100" xmlns="http://www.w3.org/2000/svg"><rect width="100" height="100" fill="%231a1e36"/><path d="M0 100 L 50 20 L 100 100 Z" fill="rgba(255,255,255,0.02)"/></svg>');
+    background-size: cover;
+    background-position: center;
     position: relative; flex-shrink: 0;
   }
+  
+  /* Gradient fade placed strictly at the lower half to blend into the page seamlessly */
   .cover-photo::after {
     content: ''; position: absolute; inset: 0;
-    background: url('data:image/svg+xml;utf8,<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><path d="M0 100 C 20 0 50 0 100 100 Z" fill="rgba(255,255,255,0.02)"/></svg>') center/cover;
-    mix-blend-mode: overlay;
+    background: linear-gradient(to bottom, transparent 40%, var(--bg-base) 100%);
   }
 
   /* Desktop Profile Grid Layout */
@@ -91,7 +124,7 @@
 
   .bio { font-size: 14px; color: var(--text-secondary); line-height: 1.6; margin-bottom: 24px; }
 
-  /* Fine Subtitle Tags (Left Column) */
+  /* Fine Subtitle Tags */
   .sub-tags-list {
     display: flex; flex-direction: column; gap: 10px; margin-bottom: 32px;
     padding: 16px; background: rgba(255,255,255,0.02); border-radius: 12px; border: 1px solid rgba(255,255,255,0.05);
@@ -133,11 +166,11 @@
   .chart-card {
     background: rgba(26, 30, 54, 0.5); backdrop-filter: blur(20px);
     border: 1px solid var(--border-subtle); border-radius: 16px; padding: 20px;
-    display: flex; flex-direction: column;
+    display: flex; flex-direction: column; position: relative;
   }
   .chart-title { font-size: 14px; font-weight: 600; color: var(--text-muted); margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
 
-  /* Bar Chart with Grid Lines */
+  /* Stacked Bar Chart with Grid Lines */
   .bar-chart-container {
     flex: 1; display: flex; align-items: flex-end; justify-content: space-between; position: relative;
     padding-bottom: 24px; padding-top: 10px;
@@ -146,53 +179,80 @@
     position: absolute; inset: 0 0 24px 0; display: flex; flex-direction: column; justify-content: space-between; z-index: 0; pointer-events: none;
   }
   .gridline { width: 100%; height: 1px; background: rgba(255,255,255,0.05); position: relative; }
-  .gridline::before { content: attr(data-val); position: absolute; left: -25px; top: -8px; font-size: 10px; color: var(--text-muted); font-family: 'Fira Code', monospace; }
+  /* Notice: gridline::before removed as requested (no 100% labels) */
 
-  .bar-col { display: flex; flex-direction: column; align-items: center; gap: 8px; z-index: 1; width: 10%; position: relative; height: 100%; justify-content: flex-end; }
-  .bar { width: 100%; border-radius: 4px 4px 0 0; transition: height 0.5s ease; position: relative; }
-  .bar.blue { background: linear-gradient(to top, rgba(59,130,246,0.2), #3b82f6); box-shadow: 0 0 10px rgba(59,130,246,0.3); }
-  .bar.green { background: linear-gradient(to top, rgba(16,185,129,0.2), #10b981); box-shadow: 0 0 10px rgba(16,185,129,0.3); }
-  
-  .bar:hover::after {
-    content: attr(data-tooltip); position: absolute; top: -30px; left: 50%; transform: translateX(-50%);
-    background: var(--bg-elevated); color: #fff; font-size: 11px; padding: 4px 8px; border-radius: 4px; border: 1px solid var(--border-subtle);
-    white-space: nowrap; font-family: 'Fira Code', monospace;
+  .chart-legends-top {
+    display: flex; gap: 12px; font-size: 11px; font-weight: 600;
   }
+  .legend-pill { display: flex; align-items: center; gap: 4px; color: var(--text-secondary); }
+  .legend-color { width: 8px; height: 8px; border-radius: 2px; }
+
+  .bar-col {
+    display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
+    z-index: 1; width: 12%; position: relative; height: 100%;
+  }
+  .bar-wrapper {
+    width: 100%; border-radius: 4px 4px 0 0;
+    display: flex; flex-direction: column-reverse;
+    overflow: hidden; transition: transform 0.5s ease, box-shadow 0.3s ease;
+    box-shadow: 0 0 10px rgba(255,255,255,0.05);
+  }
+  .bar-wrapper:hover {
+    box-shadow: 0 0 16px rgba(255,255,255,0.2);
+    transform: scaleX(1.1);
+  }
+  
+  .segment { width: 100%; border-top: 1px solid rgba(0,0,0,0.2); transition: filter 0.2s; cursor: pointer; }
+  .segment:first-child { border-top: none; }
+  
+  .seg-intercept { background: linear-gradient(to top, rgba(239,68,68,0.7), var(--color-intercept)); }
+  .seg-receive { background: linear-gradient(to top, rgba(16,185,129,0.7), var(--color-receive)); }
+  .seg-send { background: linear-gradient(to top, rgba(59,130,246,0.7), var(--color-send)); }
+
+  .segment:hover { filter: brightness(1.3); }
+
   .bar-label { font-size: 11px; color: var(--text-muted); position: absolute; bottom: -20px; font-family: 'Fira Code', monospace; }
 
   /* Pie Chart (Sources) */
   .pie-chart-container {
-    flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px;
+    flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px;
   }
   .pie-ring {
-    width: 130px; height: 130px; border-radius: 50%;
-    /* 60% Epocanvas (blue), 25% Web (green), 15% API (orange) */
-    background: conic-gradient(
-      #3b82f6 0% 60%, 
-      #10b981 60% 85%, 
-      #f59e0b 85% 100%
-    );
-    display: flex; align-items: center; justify-content: center;
-    box-shadow: 0 0 20px rgba(0,0,0,0.3); position: relative;
+    width: 130px; height: 130px; position: relative;
   }
-  .pie-ring::before { content: ''; width: 90px; height: 90px; border-radius: 50%; background: rgba(26, 30, 54, 0.9); position: absolute; }
   .pie-total { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; }
-  .pie-total-val { font-size: 20px; font-weight: 800; color: var(--text-primary); font-family: 'Fira Code', monospace; }
-  .pie-total-lbl { font-size: 10px; color: var(--text-muted); text-transform: uppercase; }
+  .pie-total-val { font-size: 18px; font-weight: 800; color: var(--text-primary); font-family: 'Fira Code', monospace; }
+  .pie-total-lbl { font-size: 10px; color: var(--text-muted); }
 
   .pie-legend { display: flex; flex-direction: column; gap: 8px; width: 100%; }
   .legend-item { display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: var(--text-secondary); }
   .legend-dot { display: flex; align-items: center; gap: 6px; }
   .dot { width: 8px; height: 8px; border-radius: 50%; }
 
+  /* Global Floating Tooltip (Echarts style) */
+  #float-tooltip {
+    display: none; position: fixed; z-index: 999999;
+    background: var(--bg-elevated); padding: 8px 12px;
+    border-radius: 6px; border: 1px solid var(--border-subtle);
+    font-family: 'Fira Code', monospace; font-size: 12px;
+    pointer-events: none; box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+    white-space: nowrap; font-weight: 600;
+  }
 </style>
 </head>
 <body>
 
+<div class="bg-blobs">
+  <div class="blob blob-1"></div>
+  <div class="blob blob-2"></div>
+</div>
+
+<div id="float-tooltip"></div>
+
 <div class="navbar">
   <div class="back-btn">
     <svg class="ic" viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
-    返回 (Back)
+    返回
   </div>
 </div>
 
@@ -225,96 +285,167 @@
     <div class="sub-tags-list">
       <div class="sub-tag-item">
         <svg class="ic" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
-        Timezone: Beijing (GMT+8)
+        所在时区：北京 (GMT+8)
       </div>
       <div class="sub-tag-item">
         <svg class="ic" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
-        Identity Group: Administrator
+        所属身份组：管理员
       </div>
       <div class="sub-tag-item">
         <svg class="ic" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
-        Joined: Aug 2026
+        加入时间：2026年8月
       </div>
     </div>
 
     <button class="btn-message">
       <svg class="ic" viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
-      发送邮件联系我 (Message)
+      发送邮件联系我
     </button>
   </div>
 
   <!-- Right Side: Analytics Dashboard -->
   <div class="profile-analysis">
     
-    <div class="section-heading">账户数据与分析页看板 (Account Analytics)</div>
+    <div class="section-heading">账户数据与分析看板</div>
 
-    <!-- Top Gradient Cards (Learning from Analysis Page) -->
+    <!-- Top Gradient Cards -->
     <div class="stats-row">
       <div class="stat-card blue">
-        <div class="stat-title"><svg class="ic" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg> 今日发件 (Sent Today)</div>
+        <div class="stat-title"><svg class="ic" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg> 今日发件</div>
         <div class="stat-val">124</div>
       </div>
-      <div class="stat-card orange">
-        <div class="stat-title"><svg class="ic" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg> 今日拦截 (Blocked)</div>
-        <div class="stat-val">38</div>
-      </div>
       <div class="stat-card green">
-        <div class="stat-title"><svg class="ic" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg> 安全防护指数 (Security)</div>
-        <div class="stat-val">99%</div>
+        <div class="stat-title"><svg class="ic" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg> 今日收件</div>
+        <div class="stat-val">842</div>
+      </div>
+      <div class="stat-card orange">
+        <div class="stat-title"><svg class="ic" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg> 个人拦截率</div>
+        <div class="stat-val">12.5%</div>
       </div>
     </div>
 
     <!-- Charts Row -->
     <div class="charts-grid">
       
-      <!-- 邮件增长 (Email Growth Bar Chart) -->
+      <!-- 邮件增长 (Email Growth 100% STACKED Bar Chart) -->
       <div class="chart-card">
         <div class="chart-title">
-          <span>邮件处理趋势 (Email Growth)</span>
-          <span style="font-size:12px; font-weight:normal;">近7日发送量</span>
+          <span>邮件处理态势分布</span>
+          <div class="chart-legends-top">
+            <div class="legend-pill"><div class="legend-color" style="background:var(--color-send);"></div>发送</div>
+            <div class="legend-pill"><div class="legend-color" style="background:var(--color-receive);"></div>接收</div>
+            <div class="legend-pill"><div class="legend-color" style="background:var(--color-intercept);"></div>拦截</div>
+          </div>
         </div>
         <div class="bar-chart-container">
           <div class="chart-gridlines">
-            <div class="gridline" data-val="100"></div>
-            <div class="gridline" data-val="50"></div>
-            <div class="gridline" data-val="0"></div>
+            <div class="gridline"></div>
+            <div class="gridline"></div>
+            <div class="gridline"></div>
           </div>
           
-          <div class="bar-col"><div class="bar blue" style="height: 30%;" data-tooltip="30"></div><div class="bar-label">8/10</div></div>
-          <div class="bar-col"><div class="bar blue" style="height: 55%;" data-tooltip="55"></div><div class="bar-label">8/11</div></div>
-          <div class="bar-col"><div class="bar blue" style="height: 40%;" data-tooltip="40"></div><div class="bar-label">8/12</div></div>
-          <div class="bar-col"><div class="bar blue" style="height: 80%;" data-tooltip="80"></div><div class="bar-label">8/13</div></div>
-          <div class="bar-col"><div class="bar blue" style="height: 45%;" data-tooltip="45"></div><div class="bar-label">8/14</div></div>
-          <div class="bar-col"><div class="bar blue" style="height: 90%;" data-tooltip="90"></div><div class="bar-label">8/15</div></div>
-          <div class="bar-col"><div class="bar green" style="height: 124px;" data-tooltip="124"></div><div class="bar-label" style="color:var(--text-primary); font-weight:bold;">今日</div></div>
+          <div class="bar-col">
+            <div class="bar-wrapper" style="height: 100%;">
+              <div class="segment seg-send" style="height: 40%;" data-tooltip="发送占比: 40%" data-color="var(--color-send)"></div>
+              <div class="segment seg-receive" style="height: 50%;" data-tooltip="接收占比: 50%" data-color="var(--color-receive)"></div>
+              <div class="segment seg-intercept" style="height: 10%;" data-tooltip="拦截占比: 10%" data-color="var(--color-intercept)"></div>
+            </div>
+            <div class="bar-label">8/10</div>
+          </div>
+          
+          <div class="bar-col">
+            <div class="bar-wrapper" style="height: 100%;">
+              <div class="segment seg-send" style="height: 35%;" data-tooltip="发送占比: 35%" data-color="var(--color-send)"></div>
+              <div class="segment seg-receive" style="height: 55%;" data-tooltip="接收占比: 55%" data-color="var(--color-receive)"></div>
+              <div class="segment seg-intercept" style="height: 10%;" data-tooltip="拦截占比: 10%" data-color="var(--color-intercept)"></div>
+            </div>
+            <div class="bar-label">8/11</div>
+          </div>
+          
+          <div class="bar-col">
+            <div class="bar-wrapper" style="height: 100%;">
+              <div class="segment seg-send" style="height: 25%;" data-tooltip="发送占比: 25%" data-color="var(--color-send)"></div>
+              <div class="segment seg-receive" style="height: 65%;" data-tooltip="接收占比: 65%" data-color="var(--color-receive)"></div>
+              <div class="segment seg-intercept" style="height: 10%;" data-tooltip="拦截占比: 10%" data-color="var(--color-intercept)"></div>
+            </div>
+            <div class="bar-label">8/12</div>
+          </div>
+
+          <div class="bar-col">
+            <div class="bar-wrapper" style="height: 100%;">
+              <div class="segment seg-send" style="height: 20%;" data-tooltip="发送占比: 20%" data-color="var(--color-send)"></div>
+              <div class="segment seg-receive" style="height: 75%;" data-tooltip="接收占比: 75%" data-color="var(--color-receive)"></div>
+              <div class="segment seg-intercept" style="height: 5%;" data-tooltip="拦截占比: 5%" data-color="var(--color-intercept)"></div>
+            </div>
+            <div class="bar-label">8/13</div>
+          </div>
+
+          <div class="bar-col">
+            <div class="bar-wrapper" style="height: 100%;">
+              <div class="segment seg-send" style="height: 30%;" data-tooltip="发送占比: 30%" data-color="var(--color-send)"></div>
+              <div class="segment seg-receive" style="height: 55%;" data-tooltip="接收占比: 55%" data-color="var(--color-receive)"></div>
+              <div class="segment seg-intercept" style="height: 15%;" data-tooltip="拦截占比: 15%" data-color="var(--color-intercept)"></div>
+            </div>
+            <div class="bar-label">8/14</div>
+          </div>
+
+          <div class="bar-col">
+            <div class="bar-wrapper" style="height: 100%;">
+              <div class="segment seg-send" style="height: 35%;" data-tooltip="发送占比: 35%" data-color="var(--color-send)"></div>
+              <div class="segment seg-receive" style="height: 60%;" data-tooltip="接收占比: 60%" data-color="var(--color-receive)"></div>
+              <div class="segment seg-intercept" style="height: 5%;" data-tooltip="拦截占比: 5%" data-color="var(--color-intercept)"></div>
+            </div>
+            <div class="bar-label">8/15</div>
+          </div>
+
+          <div class="bar-col">
+            <div class="bar-wrapper" style="height: 100%; box-shadow: 0 0 16px rgba(16,185,129,0.3);">
+              <div class="segment seg-send" style="height: 20%;" data-tooltip="发送占比: 20%" data-color="var(--color-send)"></div>
+              <div class="segment seg-receive" style="height: 68%;" data-tooltip="接收占比: 68%" data-color="var(--color-receive)"></div>
+              <div class="segment seg-intercept" style="height: 12%;" data-tooltip="拦截占比: 12%" data-color="var(--color-intercept)"></div>
+            </div>
+            <div class="bar-label" style="color:var(--text-primary); font-weight:bold;">今日</div>
+          </div>
+
         </div>
       </div>
 
-      <!-- 邮件来源 (Email Sources Pie Chart) -->
+      <!-- 邮件来源 (Email Sources SVG Pie Chart) -->
       <div class="chart-card">
         <div class="chart-title">
-          <span>邮件来源分布 (Sources)</span>
+          <span>来源分布</span>
         </div>
         <div class="pie-chart-container">
           <div class="pie-ring">
-            <div class="pie-total">
+            <svg viewBox="0 0 32 32" style="width: 130px; height: 130px; border-radius: 50%; transform: rotate(-90deg); filter: drop-shadow(0 0 10px rgba(0,0,0,0.3));">
+              <!-- Circumference of r=15.9155 is ~100. So stroke-dasharray values act as exact percentages -->
+              <circle r="15.9155" cx="16" cy="16" stroke="var(--color-send)" stroke-width="32" stroke-dasharray="45 100" stroke-dashoffset="0" fill="none" data-tooltip="epocanvas.com: 45%" data-color="var(--color-send)" style="transition: opacity 0.2s; cursor: pointer;" onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=1" />
+              <circle r="15.9155" cx="16" cy="16" stroke="var(--color-receive)" stroke-width="32" stroke-dasharray="25 100" stroke-dashoffset="-45" fill="none" data-tooltip="github.com: 25%" data-color="var(--color-receive)" style="transition: opacity 0.2s; cursor: pointer;" onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=1" />
+              <circle r="15.9155" cx="16" cy="16" stroke="var(--color-intercept)" stroke-width="32" stroke-dasharray="15 100" stroke-dashoffset="-70" fill="none" data-tooltip="google.com: 15%" data-color="var(--color-intercept)" style="transition: opacity 0.2s; cursor: pointer;" onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=1" />
+              <circle r="15.9155" cx="16" cy="16" stroke="var(--color-other)" stroke-width="32" stroke-dasharray="15 100" stroke-dashoffset="-85" fill="none" data-tooltip="其它来源: 15%" data-color="var(--color-other)" style="transition: opacity 0.2s; cursor: pointer;" onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=1" />
+            </svg>
+            <div class="pie-total" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 80px; height: 80px; background: rgba(26, 30, 54, 0.9); border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center;">
               <span class="pie-total-val">34k</span>
-              <span class="pie-total-lbl">Total</span>
+              <span class="pie-total-lbl">总量</span>
             </div>
           </div>
           
           <div class="pie-legend">
-            <div class="legend-item">
-              <div class="legend-dot"><div class="dot" style="background:#3b82f6;"></div> EpoMail</div>
-              <span style="font-family: monospace;">60%</span>
+            <div class="legend-item" style="cursor: pointer;" data-tooltip="epocanvas.com: 45%" data-color="var(--color-send)" onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=1">
+              <div class="legend-dot"><div class="dot" style="background:var(--color-send);"></div> epocanvas.com</div>
+              <span style="font-family: monospace;">45%</span>
             </div>
-            <div class="legend-item">
-              <div class="legend-dot"><div class="dot" style="background:#10b981;"></div> Webhook</div>
+            <div class="legend-item" style="cursor: pointer;" data-tooltip="github.com: 25%" data-color="var(--color-receive)" onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=1">
+              <div class="legend-dot"><div class="dot" style="background:var(--color-receive);"></div> github.com</div>
               <span style="font-family: monospace;">25%</span>
             </div>
-            <div class="legend-item">
-              <div class="legend-dot"><div class="dot" style="background:#f59e0b;"></div> API</div>
+            <div class="legend-item" style="cursor: pointer;" data-tooltip="google.com: 15%" data-color="var(--color-intercept)" onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=1">
+              <div class="legend-dot"><div class="dot" style="background:var(--color-intercept);"></div> google.com</div>
               <span style="font-family: monospace;">15%</span>
+            </div>
+            <div class="legend-item" style="margin-top: 4px; padding-top: 4px; border-top: 1px dashed rgba(255,255,255,0.1); cursor: pointer;" data-tooltip="其它来源: 15%" data-color="var(--color-other)" onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=1">
+              <div class="legend-dot"><div class="dot" style="background:var(--color-other);"></div> 其它来源</div>
+              <span style="font-family: monospace; color:var(--text-muted);">15%</span>
             </div>
           </div>
         </div>
@@ -325,6 +456,25 @@
   </div>
 
 </div>
+
+<script>
+  // Echarts-like JS dynamic tooltip controller
+  const tip = document.getElementById('float-tooltip');
+  document.querySelectorAll('[data-tooltip]').forEach(el => {
+    el.addEventListener('mousemove', e => {
+      tip.style.display = 'block';
+      tip.style.left = (e.clientX + 15) + 'px';
+      tip.style.top = (e.clientY + 15) + 'px';
+      tip.innerHTML = el.getAttribute('data-tooltip');
+      const targetColor = el.getAttribute('data-color') || 'var(--border-subtle)';
+      tip.style.borderColor = targetColor;
+      tip.style.color = targetColor;
+    });
+    el.addEventListener('mouseleave', () => {
+      tip.style.display = 'none';
+    });
+  });
+</script>
 
 </body>
 </html>

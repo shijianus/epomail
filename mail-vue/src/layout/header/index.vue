@@ -1,15 +1,15 @@
 <template>
-  <div class="topbar" :class="!hasPerm('email:send') ? 'not-send' : ''">
+  <div class="topbar" :class="[!hasPerm('email:send') ? 'not-send' : '', props.isProfile ? 'profile-topbar' : '']">
     <!-- Left Section: Logo acting as toggle -->
     <div class="topbar-left">
-      <div class="brand-wrapper" @click="changeAside" style="cursor:pointer" :title="$t('toggleSidebar') || 'Toggle Sidebar'">
+      <div class="brand-wrapper" @click="props.isProfile ? router.push('/') : changeAside()" style="cursor:pointer" :title="props.isProfile ? ($t('home') || 'Home') : ($t('toggleSidebar') || 'Toggle Sidebar')">
         <img src="/logo.svg" alt="Logo" class="brand-logo" />
         <span class="brand-name">EpoCanvas</span>
       </div>
     </div>
 
     <!-- Middle Section: Search -->
-    <div class="topbar-search">
+    <div class="topbar-search" v-if="!props.isProfile">
       <div class="search-box">
         <span class="search-icon" @click="handleSearch" style="cursor: pointer; z-index: 1"><Icon icon="lucide:search" width="20" height="20"/></span>
         <input type="text" :placeholder="isSettingsMode && route.name !== 'all-email' ? ($t('searchSettings') || 'Search settings') : route.name === 'all-email' ? ($t('searchAllMail') || 'Search all mail...') : ($t('searchMail') || 'Search mail')" v-model="emailStore.searchKeyword" @input="handleSearchInput" @keyup.enter="handleSearch" @keydown.tab.prevent="handleTabComplete" @focus="searchFocus = true" @blur="onSearchBlur" />
@@ -82,7 +82,7 @@
                 <div class="storage-fill" :style="{width: storagePercent + '%', background: storageStatus === 'exception' ? 'var(--danger)' : ''}"></div>
               </div>
             </div>
-            <div class="am-item"><Icon class="ic ic-sm" icon="lucide:user" /><span>{{ $t('accountDetails') || 'Account Details' }}</span></div>
+            <div class="am-item" @click="openAccountDetails"><Icon class="ic ic-sm" icon="lucide:user" /><span>{{ $t('accountDetails') || 'Account Details' }}</span></div>
             <div class="am-item" @click="router.push({name: 'setting'})"><Icon class="ic ic-sm" icon="lucide:settings" /><span>{{ $t('settings') || 'Settings' }}</span></div>
             <div class="am-item logout" @click="clickLogout"><Icon class="ic ic-sm" icon="lucide:log-out" /><span>{{ $t('logOut') }}</span></div>
           </div>
@@ -93,6 +93,13 @@
 </template>
 
 <script setup>
+import {defineProps} from 'vue';
+const props = defineProps({
+  isProfile: {
+    type: Boolean,
+    default: false
+  }
+});
 import router from "@/router";
 import hanburger from '@/components/hamburger/index.vue'
 import {logout} from "@/request/login.js";
@@ -101,6 +108,16 @@ import {useUiStore} from "@/store/ui.js";
 import {useUserStore} from "@/store/user.js";
 import {useEmailStore} from "@/store/email.js";
 import {userDraftStore} from "@/store/draft.js";
+
+function openAccountDetails() {
+  let username = ''
+  if (userStore.user.email) {
+    username = userStore.user.email.split('@')[0]
+  } else {
+    username = 'me'
+  }
+  router.push(`/${username}`)
+}
 
 function highlightTextOnPage(keyword) {
   if (typeof CSS === 'undefined' || !CSS.highlights) return;
@@ -684,6 +701,18 @@ function formatName(email) {
   align-items: center; 
   justify-content: space-between;
   padding: 0 16px; 
+}
+.profile-topbar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  height: 60px;
+  padding: 0 40px;
+  background: rgba(13,15,26,0.6);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .topbar-left {

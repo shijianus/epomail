@@ -2,13 +2,7 @@
   <div class="profile-page">
     <div id="float-tooltip" ref="floatTooltip"></div>
 
-    <div class="navbar">
-      <div class="back-btn" @click="goBack">
-        <svg class="ic" viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
-        返回
-      </div>
-    </div>
-
+    <Header :isProfile="true" />
     <!-- Ready for User Background Image -->
     <div class="cover-photo"></div>
 
@@ -30,35 +24,35 @@
         <div class="name-block">
           <h1 class="name">{{ profileData.userInfo.account }}</h1>
           <div class="handle">
-            <svg class="ic" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+            <Icon class="ic" icon="lucide:mail" style="margin-right: 6px;" />
             {{ profileData.userInfo.email }}
           </div>
         </div>
 
         <p class="bio">
-          Core Contributor & System Administrator for EpoMail ecosystem. Passionate about secure communication and high-performance architecture.
+          {{ profileData.userInfo.roleName === 'admin' ? 'EpoMail 系统管理员，负责核心平台的维护与安全。' : 'EpoMail 专属用户，致力于安全、高效的邮件通讯。' }}
         </p>
 
         <!-- Detailed Subtitle Tags -->
         <div class="sub-tags-list">
           <div class="sub-tag-item">
-            <svg class="ic" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
-            所在时区：北京 (GMT+8)
+            <Icon class="ic" icon="lucide:globe" />
+            所在时区：{{ timezoneString }}
           </div>
           <div class="sub-tag-item">
-            <svg class="ic" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+            <Icon class="ic" icon="lucide:shield" />
             所属身份组：{{ profileData.userInfo.roleName }}
           </div>
           <div class="sub-tag-item">
-            <svg class="ic" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+            <Icon class="ic" icon="lucide:calendar" />
             加入时间：{{ dayjs(profileData.userInfo.joinTime).format('YYYY年M月') }}
           </div>
         </div>
 
-        <button class="btn-message">
-          <svg class="ic" viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+        <el-button type="primary" size="large" style="width: 100%; border-radius: 12px; height: 48px;" @click="router.push('/inbox')">
+          <Icon icon="lucide:send" class="ic" style="margin-right: 8px;" />
           发送邮件联系我
-        </button>
+        </el-button>
       </div>
 
       <!-- Right Side: Analytics Dashboard -->
@@ -121,7 +115,7 @@
             </div>
             <div class="pie-chart-container">
               <div class="pie-ring">
-                <svg viewBox="0 0 32 32" style="width: 130px; height: 130px; border-radius: 50%; transform: rotate(-90deg); filter: drop-shadow(0 0 10px rgba(0,0,0,0.3));">
+                <svg viewBox="0 0 32 32" style="width: 130px; height: 130px; border-radius: 50%; transform: rotate(-90deg); filter: drop-shadow(0 0 10px var(--shadow-deep));">
                   <circle v-for="(source, index) in computedSources" :key="source.domain" r="15.9155" cx="16" cy="16" :stroke="source.color" stroke-width="32" :stroke-dasharray="source.dasharray" :stroke-dashoffset="source.dashoffset" fill="none" class="pie-circle" @mousemove="showTooltip($event, `${source.domain}: ${source.percent}%`, source.color)" @mouseleave="hideTooltip" />
                 </svg>
                 <div class="pie-total">
@@ -131,7 +125,7 @@
               </div>
               
               <div class="pie-legend">
-                <div class="legend-item" v-for="(source, index) in computedSources" :key="source.domain" :style="source.domain === '其它来源' ? 'margin-top: 4px; padding-top: 4px; border-top: 1px dashed rgba(255,255,255,0.1);' : ''" @mousemove="showTooltip($event, `${source.domain}: ${source.percent}%`, source.color)" @mouseleave="hideTooltip">
+                <div class="legend-item" v-for="(source, index) in computedSources" :key="source.domain" :style="source.domain === '其它来源' ? 'margin-top: 4px; padding-top: 4px; border-top: 1px dashed var(--border-subtle);' : ''" @mousemove="showTooltip($event, `${source.domain}: ${source.percent}%`, source.color)" @mouseleave="hideTooltip">
                   <div class="legend-dot"><div class="dot" :style="{background: source.color}"></div> {{ source.domain }}</div>
                   <span style="font-family: monospace;" :style="source.domain === '其它来源' ? 'color:var(--text-muted);' : ''">{{ source.percent }}%</span>
                 </div>
@@ -144,6 +138,8 @@
       </div>
 
     </div>
+    
+    <StatusBar style="position: absolute; bottom: 0; left: 0; right: 0; z-index: 100; border-top: 1px solid var(--border-subtle);" />
   </div>
 </template>
 
@@ -152,6 +148,14 @@ import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getProfile } from '@/request/public.js'
 import dayjs from 'dayjs'
+import { Icon } from '@iconify/vue'
+import { useUiStore } from '@/store/ui.js'
+import { useUserStore } from '@/store/user.js'
+import StatusBar from '@/layout/status-bar/index.vue'
+import Header from '@/layout/header/index.vue'
+
+const uiStore = useUiStore()
+const userStore = useUserStore()
 
 const route = useRoute()
 const router = useRouter()
@@ -286,7 +290,7 @@ const hideTooltip = () => {
   width: 100vw; height: 100vh;
   overflow: hidden;
   font-family: 'Archivo', system-ui, -apple-system, sans-serif;
-  background: linear-gradient(135deg, var(--bg-base) 0%, #15182e 100%);
+  background: var(--bg-base);
   color: var(--text-primary);
   display: flex;
   flex-direction: column;
@@ -295,39 +299,56 @@ const hideTooltip = () => {
   z-index: 1000;
 }
 
-.bg-blobs {
-  position: absolute; inset: 0; overflow: hidden; z-index: 0; pointer-events: none;
-}
-.blob {
-  position: absolute; filter: blur(120px); border-radius: 50%; mix-blend-mode: screen;
-}
-.blob-1 {
-  width: 700px; height: 700px; background: rgba(59, 130, 246, 0.15);
-  bottom: -200px; right: -100px;
-}
-.blob-2 {
-  width: 600px; height: 600px; background: rgba(124, 92, 191, 0.15);
-  bottom: 50px; left: -150px;
-}
+  .bg-blobs {
+    position: absolute; inset: 0; overflow: hidden; z-index: 0; pointer-events: none;
+  }
+  .blob {
+    position: absolute; border-radius: 50%; pointer-events: none;
+  }
+  .blob-1 {
+    width: 700px; height: 700px; background: radial-gradient(circle, rgba(59, 130, 246, 0.15) 0%, transparent 70%);
+    bottom: -200px; right: -100px;
+  }
+  .blob-2 {
+    width: 600px; height: 600px; background: radial-gradient(circle, rgba(124, 92, 191, 0.15) 0%, transparent 70%);
+    bottom: 50px; left: -150px;
+  }
 
 .ic { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; display: block; flex-shrink:0; }
 .ic-fill { width: 16px; height: 16px; fill: currentColor; display: block; flex-shrink:0; }
 
 .navbar {
-  height: 50px; padding: 0 40px; display: flex; align-items: center; position: absolute; top: 0; left: 0; right: 0; z-index: 100;
+  height: 64px; display: flex; align-items: center; position: absolute; top: 0; left: 0; right: 0; z-index: 100;
 }
 .back-btn {
   display: flex; align-items: center; gap: 6px; color: var(--text-primary); cursor: pointer;
-  font-size: 14px; font-weight: 600; background: rgba(0,0,0,0.4); padding: 6px 14px; border-radius: 16px; backdrop-filter: blur(10px);
+  font-size: 14px; font-weight: 600; background: var(--bg-elevated); padding: 6px 14px; border-radius: 16px; backdrop-filter: blur(10px);
+  transition: all 0.2s; border: 1px solid var(--border-subtle);
 }
-.back-btn:hover { background: rgba(0,0,0,0.6); }
+.back-btn:hover { background: var(--bg-hover); }
+
+.icon-btn { 
+  width: 40px; height: 40px; border: none; background: transparent; cursor: pointer; 
+  color: var(--text-secondary); border-radius: 50%; display: flex; align-items: center; justify-content: center; 
+  transition: background .15s, color .15s; 
+}
+.icon-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+
+.avatar-wrap { margin-left: 8px; }
+.avatar { 
+  width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary)); 
+  display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: #fff; cursor: pointer; 
+  border: 2px solid transparent; transition: transform .15s; 
+}
+.avatar:hover { transform: scale(1.05); }
+
 
 .cover-photo {
   width: 100%; height: 32vh;
   background-color: var(--bg-elevated);
-  background-image: url('data:image/svg+xml;utf8,<svg width="100" height="100" xmlns="http://www.w3.org/2000/svg"><rect width="100" height="100" fill="%231a1e36"/><path d="M0 100 L 50 20 L 100 100 Z" fill="rgba(255,255,255,0.02)"/></svg>');
-  background-size: cover;
-  background-position: center;
+  background-image: repeating-linear-gradient(45deg, var(--bg-hover) 25%, transparent 25%, transparent 75%, var(--bg-hover) 75%, var(--bg-hover)), repeating-linear-gradient(45deg, var(--bg-hover) 25%, var(--bg-elevated) 25%, var(--bg-elevated) 75%, var(--bg-hover) 75%, var(--bg-hover));
+  background-position: 0 0, 20px 20px;
+  background-size: 40px 40px;
   position: relative; flex-shrink: 0; z-index: 1;
 }
 .cover-photo::after {
@@ -359,7 +380,7 @@ const hideTooltip = () => {
 
 .sub-tags-list {
   display: flex; flex-direction: column; gap: 10px; margin-bottom: 32px;
-  padding: 16px; background: rgba(255,255,255,0.02); border-radius: 12px; border: 1px solid rgba(255,255,255,0.05);
+  padding: 16px; background: var(--bg-elevated); border-radius: 12px; border: 1px solid var(--border-subtle);
 }
 .sub-tag-item { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-muted); font-weight: 500; }
 .sub-tag-item .ic { color: var(--accent-primary); }
@@ -368,7 +389,7 @@ const hideTooltip = () => {
   display: flex; align-items: center; justify-content: center; gap: 8px; background: var(--text-primary); color: var(--bg-base);
   border: none; padding: 12px; border-radius: 12px; font-size: 14px; font-weight: 700; cursor: pointer; transition: all 0.2s;
 }
-.btn-message:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(255,255,255,0.2); background: #fff; }
+.btn-message:hover { transform: translateY(-2px); box-shadow: 0 8px 24px var(--shadow-color); background: var(--text-secondary); }
 
 .profile-analysis { display: flex; flex-direction: column; gap: 20px; margin-top: 70px; }
 .section-heading { font-size: 18px; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
@@ -377,17 +398,17 @@ const hideTooltip = () => {
 .stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
 .stat-card {
   padding: 20px; border-radius: 16px; display: flex; flex-direction: column; gap: 8px;
-  backdrop-filter: blur(20px); border-top: 1px solid rgba(255,255,255,0.1);
+  backdrop-filter: blur(20px); border: 1px solid var(--border-subtle); background: var(--bg-elevated);
 }
-.stat-card.blue { background: var(--grad-blue); border-color: var(--grad-blue-border); }
-.stat-card.orange { background: var(--grad-orange); border-color: var(--grad-orange-border); }
-.stat-card.green { background: var(--grad-green); border-color: var(--grad-green-border); }
-.stat-title { font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.7); display: flex; align-items: center; gap: 6px; }
-.stat-val { font-size: 28px; font-weight: 800; color: #fff; letter-spacing: -1px; }
+.stat-card.blue { border-top: 3px solid var(--color-send); }
+.stat-card.orange { border-top: 3px solid var(--color-intercept); }
+.stat-card.green { border-top: 3px solid var(--color-receive); }
+.stat-title { font-size: 13px; font-weight: 600; color: var(--text-muted); display: flex; align-items: center; gap: 6px; }
+.stat-val { font-size: 28px; font-weight: 800; color: var(--text-primary); letter-spacing: -1px; }
 
 .charts-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; flex: 1; min-height: 240px; }
 .chart-card {
-  background: rgba(26, 30, 54, 0.5); backdrop-filter: blur(20px);
+  background: var(--bg-elevated); backdrop-filter: blur(20px);
   border: 1px solid var(--border-subtle); border-radius: 16px; padding: 20px;
   display: flex; flex-direction: column; position: relative;
 }
@@ -400,7 +421,7 @@ const hideTooltip = () => {
 .chart-gridlines {
   position: absolute; inset: 0 0 24px 0; display: flex; flex-direction: column; justify-content: space-between; z-index: 0; pointer-events: none;
 }
-.gridline { width: 100%; height: 1px; background: rgba(255,255,255,0.05); position: relative; }
+.gridline { width: 100%; height: 1px; background: var(--border-subtle); position: relative; }
 .chart-legends-top { display: flex; gap: 12px; font-size: 11px; font-weight: 600; }
 .legend-pill { display: flex; align-items: center; gap: 4px; color: var(--text-secondary); }
 .legend-color { width: 8px; height: 8px; border-radius: 2px; }
@@ -408,22 +429,22 @@ const hideTooltip = () => {
 .bar-col { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; z-index: 1; width: 12%; position: relative; height: 100%; }
 .bar-wrapper {
   width: 100%; border-radius: 4px 4px 0 0; display: flex; flex-direction: column-reverse;
-  overflow: hidden; transition: transform 0.5s ease, box-shadow 0.3s ease; box-shadow: 0 0 10px rgba(255,255,255,0.05);
+  overflow: hidden; transition: transform 0.5s ease, box-shadow 0.3s ease; box-shadow: 0 0 10px var(--shadow-color);
 }
-.bar-wrapper:hover { box-shadow: 0 0 16px rgba(255,255,255,0.2); transform: scaleX(1.1); }
-.segment { width: 100%; border-top: 1px solid rgba(0,0,0,0.2); transition: filter 0.2s; cursor: pointer; }
+.bar-wrapper:hover { box-shadow: 0 0 16px var(--shadow-color); transform: scaleX(1.1); }
+.segment { width: 100%; border-top: 1px solid rgba(0,0,0,0.1); transition: filter 0.2s; cursor: pointer; }
 .segment:first-child { border-top: none; }
 .seg-intercept { background: linear-gradient(to top, rgba(239,68,68,0.7), var(--color-intercept)); }
 .seg-receive { background: linear-gradient(to top, rgba(16,185,129,0.7), var(--color-receive)); }
 .seg-send { background: linear-gradient(to top, rgba(59,130,246,0.7), var(--color-send)); }
-.segment:hover { filter: brightness(1.3); }
+.segment:hover { filter: brightness(1.1); }
 .bar-label { font-size: 11px; color: var(--text-muted); position: absolute; bottom: -20px; font-family: 'Fira Code', monospace; }
 
 .pie-chart-container { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px; }
 .pie-ring { width: 130px; height: 130px; position: relative; }
 .pie-circle { transition: opacity 0.2s; cursor: pointer; }
 .pie-circle:hover { opacity: 0.8; }
-.pie-total { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 80px; height: 80px; background: rgba(26, 30, 54, 0.9); border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.pie-total { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 80px; height: 80px; background: var(--bg-elevated); border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 1px solid var(--border-subtle); }
 .pie-total-val { font-size: 18px; font-weight: 800; color: var(--text-primary); font-family: 'Fira Code', monospace; }
 .pie-total-lbl { font-size: 10px; color: var(--text-muted); }
 

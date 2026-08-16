@@ -16,3 +16,8 @@ app.post('/public/addUser', async (c) => {
 	await publicService.addUser(c, await c.req.json());
 	return c.json(result.ok());
 });
+
+app.get('/public/profile/:username', async (c) => {
+	const data = await publicService.getProfile(c, c.req.param('username'));
+	return c.json(result.ok(data));
+});

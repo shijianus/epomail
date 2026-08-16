@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "motion/react";
 import { Mail, Lock, Eye, EyeOff, ArrowRight, Check, Loader2, AlertCircle } from "lucide-react";
 import type { CanvasHandle } from "./CanvasBackground";
+import { cameraState } from "./cameraStore";
 
 interface AuthFormProps {
   canvasRef: React.RefObject<CanvasHandle | null>;
@@ -105,6 +107,7 @@ export function AuthForm({ canvasRef }: AuthFormProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [status, setStatus] = useState<Status>("idle");
   const [errorMsg, setErrorMsg] = useState("");
+  const [successMsg, setSuccessMsg] = useState("");
 
   useEffect(() => {
     if (errorMsg) {
@@ -112,6 +115,13 @@ export function AuthForm({ canvasRef }: AuthFormProps) {
       return () => clearTimeout(timer);
     }
   }, [errorMsg]);
+
+  useEffect(() => {
+    if (successMsg) {
+      const timer = setTimeout(() => setSuccessMsg(""), 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [successMsg]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -129,40 +139,88 @@ export function AuthForm({ canvasRef }: AuthFormProps) {
       const data = await res.json();
       if (data.code === 200) {
         setStatus("success");
-        localStorage.setItem('token', data.data?.token || data.token);
+        localStorage.setItem('token', data.data.token);
+        cameraState.authSuccessOpacity = 1; // Trigger global green success HUD
+        
+        const isZh = typeof navigator !== 'undefined' && navigator.language.toLowerCase().startsWith('zh');
+        let finalMsg = data.message || data.msg;
+        if (!finalMsg || finalMsg.toLowerCase() === 'success') {
+          finalMsg = isZh ? "成功连结节点" : "Node Link Established";
+        }
+        setSuccessMsg(finalMsg);
+        
+        // Success visual effects
+        canvasRef.current?.burst({
+          strength: 2,
+          color: "#22c55e", // Green burst
+        });
+
         setTimeout(() => {
-          window.location.href = '/';
-        }, 1000);
+          window.location.href = data.data.redirect || "/";
+        }, 1500);
       } else {
         setStatus("idle");
-        setErrorMsg(data.message || data.msg || 'Login failed');
+        
+        const isZh = typeof navigator !== 'undefined' && navigator.language.toLowerCase().startsWith('zh');
+        setErrorMsg(data.message || data.msg || (isZh ? "密码或账户错误" : "Invalid credentials"));
+        
+        cameraState.authErrorOpacity = 1; // Trigger global yellow warning HUD
+        cameraState.shakeIntensity = 20; // Reusing shake from existing knockback logic
+        
+        // Original error visual effects
+        canvasRef.current?.burst({
+          strength: 3,
+          color: "#eab308", // Yellow burst
+        });
       }
     })
     .catch((err) => {
       setStatus("idle");
-      setErrorMsg('Login error: ' + (err.message || err));
+      const isZh = typeof navigator !== 'undefined' && navigator.language.toLowerCase().startsWith('zh');
+      setErrorMsg((isZh ? '连结错误: ' : 'Link error: ') + (err.message || err));
     });
   };
 
   return (
     <form onSubmit={handleSubmit} className="relative flex flex-col gap-7 pt-4">
       {/* Top Right Toast Notification */}
-      <AnimatePresence>
-        {errorMsg && (
-          <motion.div
-            initial={{ opacity: 0, x: 20, scale: 0.95 }}
-            animate={{ opacity: 1, x: 0, scale: 1 }}
-            exit={{ opacity: 0, x: 10, scale: 0.95 }}
-            transition={{ type: "spring", stiffness: 300, damping: 20 }}
-            className="fixed top-6 right-6 flex justify-end z-50 pointer-events-none"
-          >
-            <div className="flex items-center gap-2 rounded-full bg-red-500/10 border border-red-500/20 px-4 py-1.5 backdrop-blur-md shadow-lg shadow-red-500/10">
-              <AlertCircle size={14} className="text-red-400" />
-              <span className="text-xs font-medium tracking-wide text-red-300/90">{errorMsg}</span>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {typeof document !== "undefined" && createPortal(
+        <div className="pointer-events-none fixed inset-0 z-[100] overflow-hidden">
+          <AnimatePresence>
+            {errorMsg && (
+              <motion.div
+                key="error"
+                initial={{ opacity: 0, x: 20, scale: 0.95 }}
+                animate={{ opacity: 1, x: 0, scale: 1 }}
+                exit={{ opacity: 0, x: 10, scale: 0.95 }}
+                transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                className="absolute top-10 right-10 sm:top-12 sm:right-12 flex justify-end"
+              >
+                <div className="flex items-center gap-3 rounded-lg bg-yellow-950/40 border border-yellow-500/40 px-6 py-3 backdrop-blur-md shadow-[0_0_20px_rgba(234,179,8,0.2)]">
+                  <AlertCircle size={18} className="text-yellow-400" />
+                  <span className="text-sm sm:text-base font-medium tracking-wide text-yellow-300/90">{errorMsg}</span>
+                </div>
+              </motion.div>
+            )}
+            {successMsg && (
+              <motion.div
+                key="success"
+                initial={{ opacity: 0, x: 20, scale: 0.95 }}
+                animate={{ opacity: 1, x: 0, scale: 1 }}
+                exit={{ opacity: 0, x: 10, scale: 0.95 }}
+                transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                className="absolute top-10 right-10 sm:top-12 sm:right-12 flex justify-end"
+              >
+                <div className="flex items-center gap-3 rounded-lg bg-green-950/40 border border-green-500/40 px-6 py-3 backdrop-blur-md shadow-[0_0_20px_rgba(34,197,94,0.2)]">
+                  <Check size={18} className="text-green-400" />
+                  <span className="text-sm sm:text-base font-medium tracking-wide text-green-300/90">{successMsg}</span>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>,
+        document.body
+      )}
 
       <FloatingField
         id="epo-email"

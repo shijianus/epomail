@@ -10,11 +10,12 @@ app.get('/email/list', async (c) => {
 });
 
 app.get('/email/analytics', async (c) => {
-app.get('/email/sidebarStats', async (c) => {
-	const data = await emailService.getSidebarStats(c, userContext.getUserId(c));
+	const data = await emailService.getAnalytics(c, userContext.getUserId(c));
 	return c.json(result.ok(data));
 });
-	const data = await emailService.getAnalytics(c, userContext.getUserId(c));
+
+app.get('/email/sidebarStats', async (c) => {
+	const data = await emailService.getSidebarStats(c, userContext.getUserId(c));
 	return c.json(result.ok(data));
 });
 

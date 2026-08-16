@@ -1,7 +1,9 @@
+import jwtUtils from '../utils/jwt-utils';
+import constant from '../const/constant';
 import BizError from '../error/biz-error';
 import orm from '../entity/orm';
 import { v4 as uuidv4 } from 'uuid';
-import { and, asc, desc, eq, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, sql, like } from 'drizzle-orm';
 import saltHashUtils from '../utils/crypto-utils';
 import cryptoUtils from '../utils/crypto-utils';
 import emailUtils from '../utils/email-utils';
@@ -12,8 +14,10 @@ import reqUtils from '../utils/req-utils';
 import dayjs from 'dayjs';
 import { isDel, roleConst } from '../const/entity-const';
 import email from '../entity/email';
+import user from '../entity/user';
 import userService from './user-service';
 import KvConst from '../const/kv-const';
+
 
 const publicService = {
 
@@ -188,6 +192,169 @@ const publicService = {
 		if (!await cryptoUtils.verifyPassword(password, userRow.salt, userRow.password)) {
 			throw new BizError(t('IncorrectPwd'));
 		}
+	},
+
+	async getProfile(c, username) {
+		const settingStr = await c.env.kv.get(KvConst.SETTING);
+		let publicProfileEnabled = 0;
+		if (settingStr) {
+		    try {
+		        const settings = JSON.parse(settingStr);
+		        publicProfileEnabled = settings.publicProfile || 0;
+		    } catch (e) {}
+		}
+		
+		if (publicProfileEnabled === 0) {
+		    // Not public. Verify token.
+		    const jwt = c.req.header(constant.TOKEN_HEADER);
+		    if (!jwt) throw new BizError(t('unauthorized'), 401);
+		    
+		    const result = await jwtUtils.verifyToken(c, jwt);
+        	if (!result) throw new BizError(t('authExpired'), 401);
+        	
+        	const { userId, token } = result;
+        	const authInfo = await c.env.kv.get(KvConst.AUTH_INFO + userId, { type: 'json' });
+        	
+        	if (!authInfo || !authInfo.tokens.includes(token)) {
+        		throw new BizError(t('authExpired'), 401);
+        	}
+        	
+        	const currentUser = authInfo.user;
+        	
+        	// Allow if current user matches username, or is admin
+        	const currentUsername = currentUser.email.split('@')[0];
+        	if (currentUsername !== username && currentUser.email !== c.env.admin) {
+        	    throw new BizError(t('unauthorized'), 403);
+        	}
+		}
+
+		const userRow = await orm(c).select().from(user).where(like(user.email, `${username}@%`)).get();
+		if (!userRow) {
+			throw new BizError(t('notExistUser'));
+		}
+		
+		const roleRow = await roleService.selectById(c, userRow.type);
+		
+		const allEmails = await orm(c).select({ 
+            createTime: email.createTime, 
+            labels: email.labels, 
+            isSpam: email.isSpam,
+            type: email.type,
+            sendEmail: email.sendEmail
+        }).from(email).where(eq(email.userId, userRow.userId)).all();
+        
+        let todaySent = 0;
+        let todayReceived = 0;
+        let totalProcessed = 0;
+        let totalIntercepted = 0;
+        
+        const now = new Date();
+		const todayStr = now.toISOString().split('T')[0];
+        
+        const trendMap = {};
+		for (let i = 6; i >= 0; i--) {
+			const d = new Date(now);
+			d.setDate(d.getDate() - i);
+			const dateStr = d.toISOString().split('T')[0];
+			trendMap[dateStr] = { send: 0, receive: 0, intercept: 0 };
+		}
+		
+		const sourceMap = {};
+		
+		allEmails.forEach(e => {
+            const rawTime = e.createTime ? String(e.createTime).replace(' ', 'T') : '';
+			const dateObj = rawTime ? new Date(rawTime) : new Date();
+			const dateStr = dateObj.toISOString().split('T')[0];
+			
+			let intercepted = false;
+			if (e.isSpam === 1) intercepted = true;
+			if (e.labels) {
+				try {
+					const labs = JSON.parse(e.labels);
+					if (Array.isArray(labs) && (labs.includes('推销') || labs.includes('垃圾'))) {
+                        intercepted = true;
+                    }
+				} catch(err) {}
+			}
+			
+			totalProcessed++;
+			if (intercepted) totalIntercepted++;
+			
+			if (dateStr === todayStr) {
+			    if (e.type === 1) todaySent++;
+			    else if (e.type === 0 && !intercepted) todayReceived++;
+			}
+			
+			if (trendMap[dateStr]) {
+			    if (intercepted) trendMap[dateStr].intercept++;
+			    else if (e.type === 1) trendMap[dateStr].send++;
+			    else trendMap[dateStr].receive++;
+			}
+			
+			if (e.type === 0) { // receive, calculate source
+			    let domain = '其它来源';
+			    if (e.sendEmail) {
+			        const match = e.sendEmail.match(/@([^>]+)>/) || e.sendEmail.match(/@([^\s]+)/);
+			        if (match) {
+			            domain = match[1].trim();
+			        } else if (e.sendEmail.includes('@')) {
+                        domain = e.sendEmail.split('@')[1].trim();
+                    }
+			    }
+			    sourceMap[domain] = (sourceMap[domain] || 0) + 1;
+			}
+		});
+		
+		const trend = Object.keys(trendMap).map(date => {
+		    const data = trendMap[date];
+		    const total = data.send + data.receive + data.intercept || 1;
+		    return {
+		        date,
+		        label: date.substring(5), // MM-DD
+		        sendPercent: Math.round((data.send / total) * 100),
+		        receivePercent: Math.round((data.receive / total) * 100),
+		        interceptPercent: Math.round((data.intercept / total) * 100)
+		    }
+		});
+		
+		const topSources = Object.keys(sourceMap)
+		    .map(domain => ({ domain, count: sourceMap[domain] }))
+		    .sort((a,b) => b.count - a.count);
+		    
+		let totalSources = 0;
+		for (const k in sourceMap) totalSources += sourceMap[k];
+		
+		const pieSources = topSources.slice(0, 3).map(s => {
+		    return {
+		        domain: s.domain,
+		        percent: Math.round((s.count / (totalSources||1)) * 100)
+		    }
+		});
+		
+		let otherPercent = 100;
+		pieSources.forEach(s => otherPercent -= s.percent);
+		if (otherPercent < 0) otherPercent = 0;
+
+        return {
+            userInfo: {
+                account: username,
+                email: userRow.email,
+                roleName: roleRow ? roleRow.name : 'Unknown',
+                joinTime: userRow.createTime,
+                avatarInitials: username.substring(0, 2).toUpperCase()
+            },
+            stats: {
+                todaySent,
+                todayReceived,
+                interceptRate: totalProcessed > 0 ? ((totalIntercepted / totalProcessed) * 100).toFixed(1) + '%' : '0%',
+            },
+            trend,
+            sources: {
+                total: totalSources,
+                top: pieSources,
+                otherPercent
+            }
+        }
 	}
 
 }

@@ -125,6 +125,11 @@ const routes = [
         component: () => import('@/views/test/index.vue')
     },
     {
+        path: '/:username',
+        name: 'profile',
+        component: () => import('@/views/profile/index.vue')
+    },
+    {
         path: '/:pathMatch(.*)*',
         name: '404',
         component: () => import('@/views/404/index.vue')
@@ -160,7 +165,7 @@ router.beforeEach((to, from, next) => {
 
     const token = localStorage.getItem('token')
 
-    if (!token && to.name !== 'login') {
+    if (!token && to.name !== 'login' && to.name !== 'profile') {
         const elapsed = Date.now() - (window.__EPO_LOADING_START__ || Date.now());
         const minTime = 3000;
         if (elapsed < minTime) {

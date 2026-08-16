@@ -43,44 +43,44 @@
           <div class="nav-item" @click="router.push({name: 'send'})" v-perm="'email:send'" :class="route.name === 'send' ? 'active' : ''" :title="$t('sent')">
             <span class="nav-ic-wrap">
               <Icon icon="cil:send" width="20" height="20" />
-              <div class="sidebar-red-dot" v-if="sendCount > 0"></div>
+              <div class="sidebar-gray-dot" v-if="sendCount > 0"></div>
             </span>
             <span class="nav-label">{{$t('sent')}}</span>
-            <span class="nav-count" v-if="sendCount > 0">{{ sendCount }}</span>
+            <span class="nav-count muted" v-if="sendCount > 0">{{ sendCount }}</span>
           </div>
           <div class="nav-item" @click="router.push({name: 'draft'})" v-perm="'email:send'" :class="route.name === 'draft' ? 'active' : ''" :title="$t('drafts')">
             <span class="nav-ic-wrap">
               <Icon icon="ep:document" width="20" height="20" />
-              <div class="sidebar-red-dot" v-if="draftCount > 0"></div>
+              <div class="sidebar-gray-dot" v-if="draftCount > 0"></div>
             </span>
             <span class="nav-label">{{$t('drafts')}}</span>
-            <span class="nav-count" v-if="draftCount > 0">{{ draftCount }}</span>
+            <span class="nav-count muted" v-if="draftCount > 0">{{ draftCount }}</span>
           </div>
           <div class="nav-item" @click="router.push({name: 'user-all-email'})" :class="route.name === 'user-all-email' ? 'active' : ''" :title="$t('allMail')">
             <span class="nav-ic-wrap">
               <Icon icon="mdi:email-multiple-outline" width="22" height="22" />
-              <div class="sidebar-red-dot" v-if="allMailCount > 0"></div>
+              <div class="sidebar-gray-dot" v-if="allMailCount > 0"></div>
             </span>
             <span class="nav-label">{{$t('allMail')}}</span>
-            <span class="nav-count" v-if="allMailCount > 0">{{ allMailCount }}</span>
+            <span class="nav-count muted" v-if="allMailCount > 0">{{ allMailCount }}</span>
           </div>
           <div class="nav-item" @click="router.push({name: 'spam'})" :class="route.name === 'spam' ? 'active' : ''" :title="$t('spam') || 'Spam'">
             <span class="nav-ic-wrap">
               <Icon icon="ic:outline-report-gmailerrorred" width="20" height="20" />
-              <div class="sidebar-red-dot" v-if="spamCount > 0"></div>
+              <div class="sidebar-gray-dot" v-if="spamCount > 0"></div>
               <div class="sidebar-gray-dot" v-else-if="spamReadCount > 0"></div>
             </span>
             <span class="nav-label">{{$t('spam') || 'Spam'}}</span>
-            <span class="nav-count" v-if="spamCount > 0">{{ spamCount }}</span>
+            <span class="nav-count muted" v-if="spamCount > 0">{{ spamCount }}</span>
             <span class="nav-count muted" v-else-if="spamReadCount > 0">{{ spamReadCount }}</span>
           </div>
           <div class="nav-item" @click="router.push({name: 'trash'})" :class="route.name === 'trash' ? 'active' : ''" :title="$t('trash') || 'Trash'">
             <span class="nav-ic-wrap">
               <Icon icon="ic:outline-delete" width="20" height="20" />
-              <div class="sidebar-red-dot" v-if="trashCount > 0"></div>
+              <div class="sidebar-gray-dot" v-if="trashCount > 0"></div>
             </span>
             <span class="nav-label">{{$t('trash') || 'Trash'}}</span>
-            <span class="nav-count" v-if="trashCount > 0">{{ trashCount }}</span>
+            <span class="nav-count muted" v-if="trashCount > 0">{{ trashCount }}</span>
           </div>
         </div>
         
@@ -96,12 +96,21 @@
               <span class="nav-ic-wrap">
                 <div v-if="(label.icon || '').startsWith('<svg')" v-html="label.icon" style="width: 20px; height: 20px; display: inline-flex; justify-content: center; align-items: center; fill: currentColor;" :style="{ color: label.color || 'inherit' }"></div>
                 <Icon v-else :icon="label.icon || 'ic:baseline-label'" width="20" height="20" :style="{ color: label.color || 'inherit' }" />
-                <div class="sidebar-red-dot" v-if="getLabelStats(label.name).unread > 0"></div>
-                <div class="sidebar-gray-dot" v-else-if="getLabelStats(label.name).read > 0 && label.name === '推销'"></div>
+                <template v-if="(label.name || label) === '推销'">
+                  <div class="sidebar-gray-dot" v-if="getLabelStats(label.name).unread > 0 || getLabelStats(label.name).read > 0"></div>
+                </template>
+                <template v-else>
+                  <div class="sidebar-red-dot" v-if="getLabelStats(label.name).unread > 0"></div>
+                </template>
               </span>
               <span class="nav-label" :style="{ color: label.color || 'inherit' }">{{ label.name || label }}</span>
-              <span class="nav-count" v-if="getLabelStats(label.name).unread > 0">{{ getLabelStats(label.name).unread }}</span>
-              <span class="nav-count muted" v-else-if="getLabelStats(label.name).read > 0 && label.name === '推销'">{{ getLabelStats(label.name).read }}</span>
+              <template v-if="(label.name || label) === '推销'">
+                <span class="nav-count muted" v-if="getLabelStats(label.name).unread > 0">{{ getLabelStats(label.name).unread }}</span>
+                <span class="nav-count muted" v-else-if="getLabelStats(label.name).read > 0">{{ getLabelStats(label.name).read }}</span>
+              </template>
+              <template v-else>
+                <span class="nav-count" v-if="getLabelStats(label.name).unread > 0">{{ getLabelStats(label.name).unread }}</span>
+              </template>
             </div>
           </template>
         </div>
