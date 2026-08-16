@@ -43,3 +43,10 @@ export function emailSend(form,progress) {
 export function emailSearchSuggestions(params) {
     return http.get('/email/searchSuggestions', { params, noMsg: true })
 }
+
+export function emailAnalytics() {
+  return request({
+    url: '/email/analytics',
+    method: 'get'
+  })
+}

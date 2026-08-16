@@ -3,9 +3,12 @@
     <div class="loading" :class="firstLoading ? 'loading-show' : 'loading-hide'">
       <loading />
     </div>
-    <el-scrollbar class="scroll" v-if="!firstLoading">
-      <div class="scroll-body">
-        <div class="card-grid">
+    <div class="tabs-wrapper" v-if="!firstLoading">
+      <el-tabs v-model="activeTab" class="custom-tabs">
+        <el-tab-pane label="基本设置" name="basic">
+          <el-scrollbar class="scroll">
+            <div class="scroll-body">
+              <div class="card-grid">
 
           <!-- 邮件设置 Card (迁移自系统设置) -->
           <div class="settings-card">
@@ -238,9 +241,61 @@
               </div>
             </div>
           </div>
-        </div>
-      </div>
-    </el-scrollbar>
+              </div>
+            </div>
+          </el-scrollbar>
+        </el-tab-pane>
+
+        <!-- 分析面板 Tab -->
+        <el-tab-pane label="分析面板" name="analytics">
+          <el-scrollbar class="scroll">
+            <div class="scroll-body analytics-body">
+              <div class="analytics-card-grid">
+                
+                <div class="analytics-card stats-overview">
+                  <div class="stat-item">
+                    <div class="stat-label">累计处理邮件</div>
+                    <div class="stat-value">{{ analyticsData.totalProcessed || 0 }}</div>
+                  </div>
+                  <div class="stat-item">
+                    <div class="stat-label">推销/垃圾拦截总量</div>
+                    <div class="stat-value">{{ analyticsData.totalIntercepted || 0 }}</div>
+                  </div>
+                  <div class="stat-item">
+                    <div class="stat-label">系统拦截率</div>
+                    <div class="stat-value">{{ analyticsData.interceptRate || '0%' }}</div>
+                  </div>
+                </div>
+
+                <div class="analytics-card chart-card">
+                  <div class="card-title">最近 7 天拦截趋势</div>
+                  <div class="css-chart-container">
+                    <div class="css-bar" v-for="item in analyticsData.trend" :key="item.date">
+                      <div class="bar-fill" :style="{ height: item.percent + '%' }"></div>
+                      <div class="bar-label">{{ item.label }}</div>
+                      <div class="bar-tooltip">{{ item.count }} 封</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="analytics-card rules-card">
+                  <div class="card-title">规则拦截活跃度排行</div>
+                  <div class="rule-ranking-list">
+                    <div class="rule-rank-item" v-for="(rule, index) in analyticsData.topRules" :key="rule.name">
+                      <div class="rank-index" :class="'top-' + (index + 1)">{{ index + 1 }}</div>
+                      <div class="rank-name">{{ rule.name }}</div>
+                      <div class="rank-count">{{ rule.count }} 次</div>
+                      <div class="rank-bar-bg"><div class="rank-bar-fill" :style="{ width: rule.percent + '%' }"></div></div>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </el-scrollbar>
+        </el-tab-pane>
+      </el-tabs>
+    </div>
 
     <!-- Unified Drawer for Editing -->
     <el-drawer
@@ -354,6 +409,15 @@ import { useI18n } from 'vue-i18n'
 const { t, locale } = useI18n()
 
 const firstLoading = ref(true)
+const activeTab = ref('basic')
+
+const analyticsData = reactive({
+  totalProcessed: 0,
+  totalIntercepted: 0,
+  interceptRate: '0%',
+  trend: [],
+  topRules: []
+})
 const settingLoading = ref(false)
 const settingReady = ref(false)
 let backup = '{}'
@@ -485,6 +549,7 @@ const drawerTitle = computed(() => {
 // ── Lifecycle ───────────────────────────────────────────────────────
 onMounted(async () => {
   await loadSettings()
+  await fetchAnalytics()
 })
 
 // ── Setting helpers (mirrored from sys-setting, pure UI, same API) ──
@@ -1103,4 +1168,165 @@ form .el-button {
 :deep(.el-select__wrapper) {
   min-height: 28px;
 }
+
+/* Analytics Dashboard CSS */
+.analytics-body {
+  padding: 20px 0;
+}
+
+.analytics-card-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.analytics-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 20px;
+}
+
+.stats-overview {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  text-align: center;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.stat-label {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.stat-value {
+  font-size: 28px;
+  font-weight: bold;
+  color: var(--el-color-primary);
+}
+
+.css-chart-container {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  height: 200px;
+  margin-top: 20px;
+  padding-bottom: 30px;
+  position: relative;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.css-bar {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  margin: 0 10px;
+  height: 100%;
+  position: relative;
+}
+
+.css-bar:hover .bar-tooltip {
+  opacity: 1;
+  transform: translateY(-5px);
+}
+
+.bar-fill {
+  width: 100%;
+  max-width: 40px;
+  background: var(--el-color-primary);
+  border-radius: 4px 4px 0 0;
+  transition: height 0.5s ease;
+  min-height: 2px;
+}
+
+.bar-label {
+  position: absolute;
+  bottom: -25px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.bar-tooltip {
+  position: absolute;
+  top: -30px;
+  background: var(--text-primary);
+  color: var(--bg-surface);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  opacity: 0;
+  transition: all 0.2s;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.rule-ranking-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.rule-rank-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.rank-index {
+  width: 24px;
+  height: 24px;
+  border-radius: 12px;
+  background: var(--bg-elevated);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: bold;
+}
+
+.rank-index.top-1 { background: #ff4d4f; color: white; }
+.rank-index.top-2 { background: #faad14; color: white; }
+.rank-index.top-3 { background: #52c41a; color: white; }
+
+.rank-name {
+  width: 100px;
+  font-size: 13px;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rank-bar-bg {
+  flex: 1;
+  height: 8px;
+  background: var(--bg-elevated);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.rank-bar-fill {
+  height: 100%;
+  background: var(--el-color-primary);
+  border-radius: 4px;
+  transition: width 0.5s ease;
+}
+
+.rank-count {
+  width: 50px;
+  text-align: right;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
 </style>

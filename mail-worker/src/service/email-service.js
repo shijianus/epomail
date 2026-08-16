@@ -1423,6 +1423,99 @@ const emailService = {
 		}
 
 		return results;
+	},
+
+	async getAnalytics(c, userId) {
+		const result = {
+			totalProcessed: 0,
+			totalIntercepted: 0,
+			interceptRate: '0%',
+			trend: [],
+			topRules: []
+		};
+		try {
+			const totalRow = await orm(c).select({ count: sql`count(*)` }).from(email).where(eq(email.userId, userId)).get();
+			result.totalProcessed = totalRow ? totalRow.count : 0;
+
+			const allEmails = await orm(c).select({ createdAt: email.createdAt, labels: email.labels, isSpam: email.isSpam })
+				.from(email).where(eq(email.userId, userId)).all();
+				
+			const trendMap = {};
+			const ruleMap = {};
+			const now = new Date();
+			for (let i = 6; i >= 0; i--) {
+				const d = new Date(now);
+				d.setDate(d.getDate() - i);
+				const dateStr = d.toISOString().split('T')[0];
+				trendMap[dateStr] = 0;
+			}
+			
+			let totalIntercepted = 0;
+			allEmails.forEach(e => {
+				const dateObj = new Date(e.createdAt);
+				const dateStr = dateObj.toISOString().split('T')[0];
+				
+				let intercepted = false;
+				if (e.isSpam === 1) intercepted = true;
+				let labs = [];
+				if (e.labels) {
+					try {
+						labs = JSON.parse(e.labels);
+						if (Array.isArray(labs)) {
+							if (labs.includes('推销') || labs.includes('垃圾')) intercepted = true;
+							labs.forEach(l => {
+								if (l !== '收件箱') {
+									ruleMap[l] = (ruleMap[l] || 0) + 1;
+								}
+							});
+						}
+					} catch(err) {}
+				}
+				
+				if (intercepted) totalIntercepted++;
+				if (intercepted && trendMap[dateStr] !== undefined) {
+					trendMap[dateStr]++;
+				}
+			});
+			
+			result.totalIntercepted = totalIntercepted;
+			if (result.totalProcessed > 0) {
+				result.interceptRate = ((result.totalIntercepted / result.totalProcessed) * 100).toFixed(1) + '%';
+			}
+			
+			let maxTrend = 0;
+			for (const k in trendMap) {
+				if (trendMap[k] > maxTrend) maxTrend = trendMap[k];
+			}
+			
+			for (const date in trendMap) {
+				const count = trendMap[date];
+				const label = date.substring(5);
+				result.trend.push({
+					date,
+					label,
+					count,
+					percent: maxTrend === 0 ? 0 : Math.max(2, (count / maxTrend) * 100)
+				});
+			}
+			
+			let maxRule = 0;
+			for (const k in ruleMap) {
+				if (ruleMap[k] > maxRule) maxRule = ruleMap[k];
+			}
+			
+			result.topRules = Object.keys(ruleMap).map(name => {
+				return {
+					name,
+					count: ruleMap[name],
+					percent: maxRule === 0 ? 0 : (ruleMap[name] / maxRule) * 100
+				};
+			}).sort((a,b) => b.count - a.count).slice(0, 5);
+			
+		} catch (e) {
+			console.error('Analytics error:', e);
+		}
+		return result;
 	}
 };
 
