@@ -489,7 +489,7 @@ const zh = {
     blackContentDesc: '正文关键词（含以下任意词即拦截）',
 
     // Sys-setting login background note
-    loginBgNote: '注：登录背景仅影响内置 Vue 登录界面，不影响已自定义的前端登录 UI（两者独立运行）',
+    loginBgNote: '登录背景仅影响内置 Vue 登录界面，不影响已自定义的前端登录 UI（两者独立运行）',
 }
 export default zh
 

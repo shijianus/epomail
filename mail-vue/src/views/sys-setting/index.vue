@@ -76,7 +76,12 @@
 
           <!-- Personalization Settings Card -->
           <div class="settings-card">
-            <div class="card-title">{{ $t('customization') }}</div>
+            <div class="card-title">
+              {{ $t('customization') }}
+              <el-tooltip :content="$t('loginBgNote')" placement="top">
+                <Icon icon="lucide:help-circle" width="14" class="help-icon" />
+              </el-tooltip>
+            </div>
             <div class="card-content">
               <div class="setting-item">
                 <div class="title-item"><span>{{ $t('websiteTitle') }}</span></div>
@@ -119,10 +124,6 @@
                     </el-button>
                   </div>
                 </div>
-              </div>
-              <div class="login-bg-note">
-                <Icon icon="lucide:info" width="13" style="flex-shrink:0; margin-top: 1px;" />
-                <span>{{ $t('loginBgNote') }}</span>
               </div>
             </div>
           </div>
@@ -1473,6 +1474,11 @@ function editSetting(settingForm, refreshStatus = true) {
   gap: 8px;
 }
 
+.help-icon {
+  color: var(--text-muted);
+  cursor: help;
+}
+
 .card-content {
   padding: 20px;
   display: flex;
@@ -1776,21 +1782,6 @@ function editSetting(settingForm, refreshStatus = true) {
 
 .dialog-input {
   margin-bottom: 15px;
-}
-
-.login-bg-note {
-  display: flex;
-  align-items: flex-start;
-  gap: 6px;
-  font-size: 12px;
-  color: var(--text-muted);
-  line-height: 1.4;
-  padding: 8px 10px;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-subtle);
-  border-radius: 6px;
-  margin-top: 4px;
-  grid-column: 1 / -1;
 }
 
 .force-path-style {

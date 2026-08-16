@@ -489,7 +489,7 @@ const en = {
     blackContentDesc: 'Body keywords (any match triggers filter)',
 
     // Sys-setting login background note
-    loginBgNote: 'Note: The login background only affects the built-in Vue login UI. It does not affect your custom frontend login UI — both operate independently.',
+    loginBgNote: 'The login background only affects the built-in Vue login UI. It does not affect your custom frontend login UI — both operate independently.',
 }
 
 export default en
