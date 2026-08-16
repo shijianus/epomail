@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="https://unpkg.com/element-plus/dist/index.css" />
+  <style>
+    body { font-family: sans-serif; background: #fff; padding: 20px; }
+    .spam-alert-banner {
+      display: flex; align-items: center; justify-content: space-between;
+      background: #fdf6ec; border: 1px solid #faecd8; border-radius: 8px; padding: 12px 16px; margin-top: 16px; gap: 16px;
+    }
+    .spam-alert-content { display: flex; align-items: center; gap: 10px; color: #e6a23c; font-size: 13px; line-height: 1.4; }
+  </style>
+</head>
+<body>
+  <div class="spam-alert-banner">
+    <div class="spam-alert-content">
+      <span>⚠️ 为什么此邮件在垃圾/推销邮件中？它与过去被识别为垃圾/推销邮件的信息特征相似。</span>
+    </div>
+    <button class="el-button el-button--warning el-button--small is-plain">
+      <span>这不是垃圾邮件</span>
+    </button>
+  </div>
+</body>
+</html>

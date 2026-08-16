@@ -52,7 +52,7 @@
                 <Icon icon="mdi:alert-outline" width="18" height="18" style="flex-shrink: 0;" />
                 <span>为什么此邮件在垃圾/推销邮件中？它与过去被识别为垃圾/推销邮件的信息特征相似。</span>
               </div>
-              <el-button size="small" type="primary" plain @click="handleReportNotSpam">这不是垃圾邮件</el-button>
+              <el-button size="small" type="warning" plain :loading="isReporting" @click="handleReportNotSpam">这不是垃圾邮件</el-button>
             </div>
             
           </div>
@@ -246,7 +246,11 @@ const handleDelete = () => {
   })
 }
 
+const isReporting = ref(false)
+
 const handleReportNotSpam = () => {
+  if (isReporting.value) return;
+  isReporting.value = true;
   emailReportNotSpam(email.emailId).then(() => {
     ElMessage({
       message: '已移至收件箱并加入信任名单',
@@ -265,6 +269,15 @@ const handleReportNotSpam = () => {
     }
     emailStore.deleteIds = [email.emailId]
     emailStore.contentData.email = null
+  }).catch((err) => {
+    console.error(err);
+    ElMessage({
+      message: '操作失败，请重试',
+      type: 'error',
+      plain: true,
+    })
+  }).finally(() => {
+    isReporting.value = false;
   })
 }
 </script>

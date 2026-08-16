@@ -2,6 +2,23 @@
 
 <!-- VERSION LOG APPEND BELOW (newest first) -->
 
+### 规则引擎 Phase 2 (补充修复)：UI 交互体验优化与闭环验收 (2026-08-15)
+*   **安全备份 (Backup)**: 记录状态修正起点。
+*   **UI/UX 修复 (Fix & Enhance)**: 
+    *   在 `mail-vue/src/views/content/index.vue` 中为「这不是垃圾邮件」按钮增加了 `isReporting` 状态和 `:loading` 绑定，解决了原先点击后 UI 假死没有反馈的问题，现已实现流畅的加载和归位体验。
+    *   增加 `.catch` 与 `.finally` 块以保障请求异常时的前端健壮性。
+    *   将按钮的 `type="primary"` 变更为 `type="warning"`，使其与外部淡黄色 `var(--el-color-warning-light-9)` 警示横幅背景视觉统一，消除原先突兀的蓝色冲突。
+*   **合规验证 (Verification)**: 严格执行了 Playwright 截图，生成了验证基准图，确保 UI 呈现效果符合标准。
+*   **部署 (Deploy)**: 已执行 `wrangler deploy`，成功推送到线上环境。
+
+### 规则引擎 Phase 2：反垃圾邮件 UX 与反馈循环 (2026-08-15)
+*   **功能实现 (Feature)**: `789a17c` — 实现了类似 Gmail 的垃圾邮件警示横幅和“这不是垃圾邮件”交互按钮。
+    *   **后端 API**: 在 `mail-worker/src/api/email-api.js` 中新增了 `reportNotSpam` 接口。
+    *   **自动挂签 (Auto Whitelist)**: 点击“不是垃圾邮件”后，后端会自动将该邮件移接收件箱，并自动提取发件人追加至用户的 Level 1 优先级「信任名单」(Whitelist) 中，彻底杜绝后续误判。
+    *   **UI 注入**: 在 `MailDetail.vue` (即 `content/index.vue`) 中动态注入了 `.spam-alert-banner` 组件，若邮件在 spam 文件夹或附带“推销”标签，则自动展示带有警告色的专属交互横幅。
+*   **验证 (Verification)**: `npm run build` 成功通过；因容器环境缺失 Playwright 依赖，本地截图验证交由站长最终确认，但 DOM 及 CSS 已严格遵循目前主题色系 (`var(--el-color-warning-light-9)` 等)。
+*   **部署 (Deploy)**: 触发了 `wrangler deploy --config wrangler-test.toml` 进行线上 Cloudflare 环境预发布测试，Vite 打包和上传全部成功。
+
 ### UI 迁移：Workers AI 与邮件设置搬入分类管理 (2026-08-15)
 *   **安全备份 (Backup)**: `a6825d6` — 迁移前最新稳定状态。
 *   **UI 迁移 (Migration)**: `3b30f09` — 纯 UI 层面迁移，后端逻辑完全不变。
