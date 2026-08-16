@@ -59,7 +59,7 @@
           </div>
           <div class="delete-ratio">
             <div>垃圾邮件 <span style="color: #E6A23C; font-weight: 600;">{{ numberCount.interceptReceiveTotal || 0 }}</span></div>
-            <div>拦截邮件 <span style="color: #f56c6c; font-weight: 600;">0</span></div>
+            <div>拦截邮件 <span style="color: #f56c6c; font-weight: 600;">{{ numberCount.hardInterceptTotal || 0 }}</span></div>
           </div>
         </div>
         <div class="number-item">
@@ -153,6 +153,7 @@ const numberCount = reactive({
   interceptReceiveTotal: 0,
   delUserTotal: 0,
   normalUserTotal: 0,
+  hardInterceptTotal: 0
 })
 
 const receiveData = useTransition(receiveTotal, {
@@ -219,6 +220,7 @@ onMounted(() => {
     numberCount.delSendTotal = data.numberCount.delSendTotal
     numberCount.delUserTotal = data.numberCount.delUserTotal
     numberCount.interceptReceiveTotal = data.numberCount.interceptReceiveTotal || 0
+    numberCount.hardInterceptTotal = data.numberCount.hardInterceptTotal || 0
     senderData.value = data.receiveRatio.nameRatio.map(item => {
       return {
         name: item.name || ' ',
@@ -236,8 +238,9 @@ onMounted(() => {
     emailColumnData.interceptData = (data.emailDayCount.interceptDayCount || []).map(item => item.total)
 
     // 计算拦截率
-    if (receiveTotal.value > 0) {
-      interceptRate.value = Number(((data.numberCount.interceptReceiveTotal || 0) / receiveTotal.value * 100).toFixed(1));
+    const totalRecvWithHard = receiveTotal.value + numberCount.hardInterceptTotal;
+    if (totalRecvWithHard > 0) {
+      interceptRate.value = Number((((data.numberCount.interceptReceiveTotal || 0) + numberCount.hardInterceptTotal) / totalRecvWithHard * 100).toFixed(1));
     } else {
       interceptRate.value = 0;
     }

@@ -2,6 +2,18 @@
 
 <!-- VERSION LOG APPEND BELOW (newest first) -->
 
+### 修复全站操作卡顿 (偶发性"卡一下") (2026-08-16)
+*   **问题排查 (Diagnosis)**: 用户反馈实际使用中会出现"突然卡一下"的现象。经全量代码审计，发现 4 处根本原因：
+    1. **`window.onresize` 直接赋值覆盖**：`email-scroll/index.vue` 在 `<script setup>` 顶层直接使用 `window.onresize = () => {...}` ，每次组件挂载（切换邮件夹）都会覆盖 `layout/index.vue` 设置的 resize 监听器，导致窗口 resize 响应丢失并引发后续布局抖动。
+    2. **`wheel` 事件监听器泄漏**：`email-scroll/index.vue` 在顶层裸调用 `window.addEventListener('wheel', ...)` 且没有对应 `removeEventListener`，导致组件每次挂载都累积一个新的全局监听器。多个页面切换后，每次滚轮动作就会触发 N 次回调，造成"越用越卡"的渐进式卡顿。
+    3. **`{deep: true}` 不必要的深度 watch**：对 `emailList.map(item => item.checked)` 的结果同时添加了 `{deep: true}`，导致 emailList 中任何字段的变化都会触发深度递归遍历整个邮件列表对象树，开销极大。
+    4. **搜索框 `highlightTextOnPage` DOM 全量遍历无防抖**：`header/index.vue` 中监听 `searchKeyword` 变化后直接调用 TreeWalker 遍历整个 `.main-container` DOM 树，每输入一个字符都触发一次全量扫描。
+*   **编辑代码 (Edit)**: Commit `01d31c4`
+    *   将 `email-scroll/index.vue` 的 `window.onresize` 和 `window.addEventListener('wheel')` 全部迁移进 `onMounted`/`onUnmounted` 生命周期，使用具名函数确保正确清理，彻底消除监听器泄漏与覆盖。
+    *   去掉 `watch(emailList.map(checked), {deep: true})` 中的 `{deep: true}`，getter 函数已经通过 `map()` 返回新数组引用，Vue 默认即可检测变化，无需深度遍历。
+    *   为 `header/index.vue` 中 `highlightTextOnPage` 的调用添加 200ms 防抖，避免输入字符时每次都触发全量 DOM TreeWalker 扫描。
+*   **验证与部署 (Verify & Deploy)**: `npm run build` 构建成功（10.28s，exit code 0）。通过 `npx wrangler deploy` 成功发布到 Cloudflare，Version ID: `bc5335d9-3a3f-4624-b3cd-b911c8ad33c0`。
+
 ### 统一 UI 样式：优化个性化设置及硬拦截规则中的工具提示与图标 (2026-08-16)
 *   **问题排查 (Diagnosis)**: 用户反馈在之前的修改中缺少对于 "硬拦截规则 (丢弃)" 及 "个性化设置" 的一致性设计。另外由于前次操作遗漏了部署环节，导致 CF 线上验收失败。
 *   **编辑代码 (Edit)**: 

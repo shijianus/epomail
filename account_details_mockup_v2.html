@@ -1,0 +1,354 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Account Details Full Page Mockup</title>
+<style>
+  *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+
+  :root {
+    --bg-base:#0d0f1a; --bg-surface:#13162a; --bg-elevated:#1a1e36;
+    --bg-hover:#1e2340; --bg-active:#232850; --bg-card:#181c33;
+    --accent-primary:#5b6ef5; --accent-secondary:#7c5cbf;
+    --accent-glow:rgba(91,110,245,0.18); --accent-muted:rgba(91,110,245,0.14);
+    --text-primary:#eef0fb; --text-secondary:#b6bce4; --text-muted:#767ca8; --text-accent:#9fb0ff;
+    --star-color:#f5c542; --danger:#e05f5f; --success:#4caf7d; --warning:#f5a623;
+    --border-subtle:rgba(91,110,245,0.12); --border-mid:rgba(91,110,245,0.22);
+    --el-bg-color: var(--bg-surface);
+    --el-border-color: var(--border-mid);
+    --extra-light-fill: var(--bg-base);
+    --ease:cubic-bezier(0.4,0,0.2,1);
+  }
+
+  html, body { 
+    width:100%; height:100%; margin:0; padding:0; overflow:hidden;
+    font-family:'Segoe UI',system-ui,-apple-system,sans-serif; 
+    font-size:13px; background:var(--bg-base); color:var(--text-primary); 
+  }
+
+  .ic { width:18px; height:18px; stroke:currentColor; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; display:block; flex-shrink:0; }
+  
+  /* Layout Skeleton */
+  .app-layout {
+    display: flex; flex-direction: column; height: 100vh;
+  }
+  
+  .topbar {
+    height: 48px; background: var(--bg-surface); border-bottom: 1px solid var(--border-subtle);
+    display: flex; align-items: center; padding: 0 16px; justify-content: space-between; flex-shrink: 0;
+  }
+  
+  .topbar-brand {
+    font-size: 15px; font-weight: 700; background: linear-gradient(90deg,#8b9cff,#b07ff5);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+
+  .main-container {
+    display: flex; flex: 1; overflow: hidden;
+  }
+
+  .sidebar {
+    width: 230px; background: var(--bg-surface); border-right: 1px solid var(--border-subtle);
+    padding: 16px; display: flex; flex-direction: column; gap: 8px;
+  }
+  
+  .nav-item {
+    padding: 10px 16px; border-radius: 8px; color: var(--text-secondary); cursor: pointer;
+    display: flex; align-items: center; gap: 12px; font-weight: 500;
+  }
+  
+  .nav-item.active {
+    background: var(--accent-muted); color: var(--text-accent); font-weight: 600;
+  }
+
+  /* Account Details Main Content Area (Matches category-setting CSS) */
+  .content-area {
+    flex: 1; position: relative; overflow: hidden; background: var(--extra-light-fill);
+  }
+
+  .settings-container {
+    height: 100%; overflow: auto; background: var(--extra-light-fill); position: relative;
+  }
+
+  .scroll-body {
+    min-height: 100%; display: flex; flex-direction: column;
+  }
+
+  .card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(440px, 1fr));
+    padding: 20px;
+    gap: 20px;
+  }
+
+  .settings-card {
+    background-color: var(--el-bg-color);
+    border-radius: 8px;
+    border: 1px solid var(--el-border-color);
+    transition: all 300ms;
+    overflow: hidden;
+  }
+
+  .card-title {
+    font-size: 15px;
+    font-weight: bold;
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--el-border-color);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255,255,255,0.02);
+  }
+
+  .help-icon {
+    color: var(--text-muted);
+    cursor: help;
+  }
+
+  .card-content {
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .setting-item {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 10px;
+    font-weight: normal;
+    padding: 6px 0;
+  }
+
+  .setting-item > div:first-child {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text-secondary);
+  }
+
+  .setting-item > div:last-child {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    font-weight: 600;
+    gap: 8px;
+    color: var(--text-primary);
+  }
+
+  /* Custom UI Elements inside cards */
+  .badge-admin {
+    background: linear-gradient(90deg, #e6b91e, #f59e0b);
+    color: #000; font-size: 11px; padding: 2px 8px; border-radius: 6px; font-weight: 800;
+  }
+
+  .badge-status {
+    background: var(--success); color: #fff; font-size: 11px; padding: 2px 8px; border-radius: 6px;
+  }
+
+  .opt-button {
+    background: var(--accent-primary); border: none; color: #fff; padding: 6px 12px; 
+    border-radius: 6px; font-size: 12px; cursor: pointer; transition: background 0.2s;
+  }
+  .opt-button:hover { background: var(--accent-secondary); }
+
+  .avatar-display {
+    width: 44px; height: 44px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+    display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: bold;
+  }
+
+  /* Storage Progress Bar inside a setting item */
+  .storage-bar-wrapper {
+    width: 100%; display: flex; flex-direction: column; gap: 6px; margin-top: 8px;
+  }
+  
+  .storage-bar-bg {
+    height: 6px; background: var(--bg-hover); border-radius: 3px; overflow: hidden; width: 100%;
+  }
+  
+  .storage-bar-fill {
+    height: 100%; background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+    width: 24%; border-radius: 3px; position: relative;
+  }
+
+  .storage-stats {
+    display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted); font-weight: normal;
+  }
+
+</style>
+</head>
+<body class="dark">
+
+<div class="app-layout">
+  
+  <!-- Fake Topbar -->
+  <div class="topbar">
+    <div class="topbar-brand">EpoCanvas Mail</div>
+    <div style="display:flex; gap: 12px; align-items:center;">
+      <div style="width:30px; height:30px; border-radius:50%; background:var(--accent-primary); display:flex; align-items:center; justify-content:center;">S</div>
+    </div>
+  </div>
+
+  <div class="main-container">
+    
+    <!-- Fake Sidebar -->
+    <div class="sidebar">
+      <div class="nav-item">
+        <svg class="ic" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+        Inbox
+      </div>
+      <div class="nav-item">
+        <svg class="ic" viewBox="0 0 24 24"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+        Drafts
+      </div>
+      <div style="height: 1px; background: var(--border-subtle); margin: 8px 0;"></div>
+      <div class="nav-item">
+        <svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+        General Settings
+      </div>
+      <div class="nav-item active">
+        <svg class="ic" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+        Account Details
+      </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="content-area">
+      <div class="settings-container">
+        <div class="scroll-body">
+          <div style="padding: 24px 20px 0; font-size: 20px; font-weight: bold;">Account Details</div>
+          <div class="card-grid">
+
+            <!-- Card 1: 个人信息 -->
+            <div class="settings-card">
+              <div class="card-title">
+                个人信息 (Profile)
+                <svg class="ic help-icon" viewBox="0 0 24 24" width="14" height="14"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+              </div>
+              <div class="card-content">
+                <div class="setting-item" style="border-bottom: 1px solid var(--border-subtle); padding-bottom: 12px; margin-bottom: 4px;">
+                  <div><span>头像</span></div>
+                  <div><div class="avatar-display">S</div></div>
+                </div>
+                <div class="setting-item">
+                  <div><span>姓名</span></div>
+                  <div>Shijian User</div>
+                </div>
+                <div class="setting-item">
+                  <div><span>邮箱账号</span></div>
+                  <div>shijian@epocanvas.com</div>
+                </div>
+                <div class="setting-item">
+                  <div><span>用户角色</span></div>
+                  <div><span class="badge-admin">Admin</span></div>
+                </div>
+                <div class="setting-item">
+                  <div><span>账号状态</span></div>
+                  <div><span class="badge-status">Active</span></div>
+                </div>
+                <div class="setting-item">
+                  <div><span>注册时间</span></div>
+                  <div>2026-08-15 10:24</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Card 2: 存储与容量 -->
+            <div class="settings-card">
+              <div class="card-title">
+                存储与容量 (Storage Quota)
+              </div>
+              <div class="card-content">
+                <div class="setting-item">
+                  <div style="flex-direction: column; align-items: flex-start; width: 100%;">
+                    <div style="width: 100%; display: flex; justify-content: space-between;">
+                      <span style="color:var(--text-primary); font-weight: 600;">收件箱容量占用</span>
+                      <span style="color:var(--text-secondary); font-weight: 600;">120 MB / 500 MB</span>
+                    </div>
+                    <div class="storage-bar-wrapper">
+                      <div class="storage-bar-bg">
+                        <div class="storage-bar-fill"></div>
+                      </div>
+                      <div class="storage-stats">
+                        <span style="color:var(--success);">状态正常</span>
+                        <span>24% Used</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div style="height: 1px; background: var(--border-subtle); margin: 8px 0;"></div>
+                
+                <div class="setting-item">
+                  <div><span>超出容量处理策略</span></div>
+                  <div>
+                    <span style="color:var(--danger); font-size:12px; background: rgba(224,95,95,0.1); padding:2px 6px; border-radius:4px;">拒收新邮件</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Card 3: 使用统计 -->
+            <div class="settings-card">
+              <div class="card-title">
+                使用统计 (Usage Statistics)
+              </div>
+              <div class="card-content">
+                <div class="setting-item">
+                  <div>
+                    <svg class="ic" viewBox="0 0 24 24" style="color:var(--accent-primary);"><path d="M22 13V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v12c0 1.1.9 2 2 2h8"></path><polyline points="22,7 12,14 2,7"></polyline><path d="M19 16v6"></path><path d="M16 19h6"></path></svg>
+                    <span>累计接收邮件</span>
+                  </div>
+                  <div>1,429 封</div>
+                </div>
+                <div class="setting-item">
+                  <div>
+                    <svg class="ic" viewBox="0 0 24 24" style="color:var(--success);"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                    <span>累计发送邮件</span>
+                  </div>
+                  <div>342 封</div>
+                </div>
+                <div class="setting-item">
+                  <div>
+                    <svg class="ic" viewBox="0 0 24 24" style="color:var(--warning);"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg>
+                    <span>关联邮箱账号</span>
+                  </div>
+                  <div>3 个</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Card 4: 安全设置 -->
+            <div class="settings-card">
+              <div class="card-title">
+                安全设置 (Security)
+              </div>
+              <div class="card-content">
+                <div class="setting-item">
+                  <div><span>登录密码</span></div>
+                  <div>
+                    <button class="opt-button">修改密码</button>
+                  </div>
+                </div>
+                <div class="setting-item">
+                  <div><span>当前会话</span></div>
+                  <div style="flex-direction: column; align-items: flex-end; gap:4px;">
+                    <span style="color:var(--success); font-size:12px;">在线 (This Device)</span>
+                    <span style="font-size:11px; color:var(--text-muted); font-weight:normal;">IP: 192.168.1.100</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>

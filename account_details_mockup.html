@@ -1,0 +1,363 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EpoMail Account Interface</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Archivo:wght@300;400;500;600;700&display=swap');
+
+  *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+
+  :root {
+    --bg-base: #0d0f1a; 
+    --bg-surface: #13162a; 
+    --bg-elevated: #1a1e36;
+    --bg-hover: #1e2340; 
+    --accent-primary: #5b6ef5; 
+    --accent-secondary: #7c5cbf;
+    --text-primary: #eef0fb; 
+    --text-secondary: #b6bce4; 
+    --text-muted: #767ca8;
+    --border-subtle: rgba(91,110,245,0.12);
+    --border-mid: rgba(91,110,245,0.22);
+    --success: #4caf7d;
+  }
+
+  html, body { 
+    width: 100%; height: 100%; 
+    font-family: 'Archivo', system-ui, -apple-system, sans-serif; 
+    background: var(--bg-base); 
+    color: var(--text-primary); 
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  .ic { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; display: block; flex-shrink: 0; }
+
+  /* Navbar */
+  .navbar {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 60px;
+    padding: 0 40px;
+    display: flex;
+    align-items: center;
+    background: rgba(13, 15, 26, 0.6);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    z-index: 100;
+  }
+
+  .nav-btn {
+    display: flex; align-items: center; gap: 8px;
+    color: var(--text-secondary); font-size: 15px; font-weight: 600; cursor: pointer; text-decoration: none;
+    transition: color 0.2s;
+  }
+  .nav-btn:hover { color: #fff; }
+
+  /* Full Width Cover (Edge to Edge) */
+  .full-width-cover {
+    width: 100vw;
+    height: 340px;
+    background: radial-gradient(circle at top right, var(--accent-secondary) 0%, transparent 60%),
+                linear-gradient(to bottom, var(--bg-elevated) 0%, var(--bg-base) 100%);
+    position: relative;
+    border-bottom: 1px solid rgba(255,255,255,0.02);
+  }
+
+  .full-width-cover::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: url('data:image/svg+xml;utf8,<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><path d="M0 100 C 20 0 50 0 100 100 Z" fill="rgba(255,255,255,0.02)"/></svg>') center/cover;
+    mix-blend-mode: overlay;
+  }
+
+  /* Main Content Area */
+  .interface-container {
+    max-width: 1200px; /* Wide layout, not a squeezed card */
+    margin: 0 auto;
+    padding: 0 40px 100px;
+    position: relative;
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: 60px;
+    align-items: start;
+  }
+
+  /* Left Sidebar: Profile Identity */
+  .profile-sidebar {
+    position: relative;
+    margin-top: -100px; /* Pull up over the cover */
+    z-index: 10;
+  }
+
+  .avatar {
+    width: 180px; height: 180px;
+    border-radius: 24px;
+    background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+    border: 8px solid var(--bg-base);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 64px; font-weight: 800; color: #fff;
+    box-shadow: 0 12px 32px rgba(0,0,0,0.5);
+    margin-bottom: 24px;
+  }
+
+  .name {
+    font-size: 32px;
+    font-weight: 800;
+    letter-spacing: -1px;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+  }
+
+  .email {
+    font-size: 16px;
+    color: var(--text-secondary);
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 24px;
+  }
+
+  .email .ic { color: var(--text-muted); }
+
+  .btn-communicate {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    background: var(--accent-primary);
+    color: #fff;
+    border: none;
+    padding: 14px 24px;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 16px rgba(91,110,245,0.25);
+    margin-bottom: 32px;
+  }
+
+  .btn-communicate:hover {
+    background: var(--accent-secondary);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(91,110,245,0.4);
+  }
+
+  .side-info-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .side-info-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: var(--text-secondary);
+    font-size: 14px;
+    font-weight: 500;
+  }
+  
+  .side-info-item .ic { color: var(--text-muted); }
+
+  /* Right Area: About & Details */
+  .profile-main {
+    padding-top: 40px;
+    display: flex;
+    flex-direction: column;
+    gap: 40px;
+  }
+
+  .section-title {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  
+  .section-title::before {
+    content: '';
+    display: block;
+    width: 4px;
+    height: 18px;
+    background: var(--accent-primary);
+    border-radius: 2px;
+  }
+
+  .bio-text {
+    font-size: 16px;
+    color: var(--text-secondary);
+    line-height: 1.8;
+    background: rgba(255,255,255,0.02);
+    padding: 24px;
+    border-radius: 16px;
+    border-left: 1px solid rgba(255,255,255,0.05);
+  }
+
+  /* Big display items */
+  .details-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 24px;
+  }
+
+  .detail-box {
+    padding: 24px;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid var(--border-subtle);
+    border-radius: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .detail-box-label {
+    font-size: 14px;
+    color: var(--text-muted);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .detail-box-value {
+    font-size: 18px;
+    color: var(--text-primary);
+    font-weight: 500;
+  }
+  
+  .detail-box.highlight {
+    background: rgba(91,110,245,0.05);
+    border-color: rgba(91,110,245,0.2);
+  }
+  .detail-box.highlight .detail-box-value {
+    color: var(--accent-primary);
+  }
+
+  @media (max-width: 900px) {
+    .interface-container {
+      grid-template-columns: 1fr;
+      gap: 32px;
+      padding-top: 0;
+    }
+    .profile-sidebar {
+      margin-top: -80px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+    }
+    .side-info-list {
+      align-items: center;
+    }
+    .btn-communicate {
+      max-width: 320px;
+    }
+    .details-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+</style>
+</head>
+<body>
+
+<div class="navbar">
+  <div class="nav-btn">
+    <svg class="ic" viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+    返回 (Back)
+  </div>
+</div>
+
+<!-- Edge-to-Edge Background Cover -->
+<div class="full-width-cover"></div>
+
+<div class="interface-container">
+  
+  <!-- Left Column: Identity -->
+  <div class="profile-sidebar">
+    <div class="avatar">SJ</div>
+    <div class="name">Shijian</div>
+    <div class="email">
+      <svg class="ic" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+      shijian@epocanvas.com
+    </div>
+
+    <button class="btn-communicate">
+      <svg class="ic" viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+      发送邮件 (Send Email)
+    </button>
+
+    <div class="side-info-list">
+      <div class="side-info-item">
+        <svg class="ic" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+        Beijing (GMT+8)
+      </div>
+      <div class="side-info-item" style="color:var(--accent-primary);">
+        <svg class="ic" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+        EpoMail Administrator
+      </div>
+      <div class="side-info-item">
+        <svg class="ic" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+        Joined Aug 2026
+      </div>
+    </div>
+  </div>
+
+  <!-- Right Column: Details -->
+  <div class="profile-main">
+    
+    <div>
+      <h2 class="section-title">自我介绍 (About)</h2>
+      <div class="bio-text">
+        欢迎联系我。我通常会在工作日内回复。目前致力于完善 EpoMail 的各项基础设施。如果你有任何问题或者合作意向，随时可以通过邮件发送给我！
+      </div>
+    </div>
+
+    <div>
+      <h2 class="section-title">账户状态 (Account Status)</h2>
+      <div class="details-grid">
+        
+        <div class="detail-box">
+          <div class="detail-box-label">
+            <svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+            活跃时段 (Active Hours)
+          </div>
+          <div class="detail-box-value">工作日 09:00 - 18:00</div>
+        </div>
+
+        <div class="detail-box highlight">
+          <div class="detail-box-label" style="color:var(--accent-primary);">
+            <svg class="ic" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+            安全级别 (Security)
+          </div>
+          <div class="detail-box-value">已启用最高级专属加密</div>
+        </div>
+        
+        <div class="detail-box">
+          <div class="detail-box-label">
+            <svg class="ic" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+            邮件回复率 (Response Rate)
+          </div>
+          <div class="detail-box-value">极高 (Highly Responsive)</div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+</div>
+
+</body>
+</html>

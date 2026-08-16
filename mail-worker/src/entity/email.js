@@ -27,6 +27,7 @@ export const email = sqliteTable('email', {
 	isDel: integer('is_del').default(0).notNull(),
 	isSpam: integer('is_spam').default(0).notNull(),
 	snoozedTime: text('snoozed_time'),
+	snoozedEndTime: text('snoozed_end_time'),
 	labels: text('labels').default('[]').notNull()
 });
 export default email

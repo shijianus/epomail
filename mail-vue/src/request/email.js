@@ -12,8 +12,8 @@ export function emailSpam(emailIds, isSpam) {
     return http.put('/email/spam', {emailIds, isSpam})
 }
 
-export function emailSnooze(emailIds, time) {
-    return http.put('/email/snooze', {emailIds, time})
+export function emailSnooze(emailIds, time, endTime) {
+    return http.put('/email/snooze', {emailIds, time, endTime})
 }
 
 export function emailRestore(emailIds) {

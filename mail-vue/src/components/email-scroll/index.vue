@@ -97,6 +97,17 @@
                         <Icon icon="mdi:shield-alert" width="12" style="margin-right: 2px;" /> 拦截
                       </el-tag>
 
+                      <el-tag
+                        size="small"
+                        :type="getSnoozeStatus(item)?.type"
+                        effect="dark"
+                        v-if="props.type === 'snoozed' && getSnoozeStatus(item)"
+                        style="margin-right: 6px; font-weight: 700; border-radius: 4px;"
+                      >
+                        <Icon icon="ic:outline-access-time" width="12" style="margin-right: 2px;" />
+                        {{ getSnoozeStatus(item)?.text }}
+                      </el-tag>
+
                       <el-tag size="small" type="info" class="folder-tag" v-if="emailStore.searchParsed.isGlobal" style="margin-right: 5px; height: 18px; padding: 0 4px; line-height: 16px; display: inline-flex; align-items: center; vertical-align: middle;">{{ getFolderTag(item) }}</el-tag>
                       <span class="subject-text">
                         <slot name="subject" :email="item" >
@@ -296,6 +307,46 @@
         </el-dropdown-menu>
       </template>
     </el-dropdown>
+
+    <!-- Snooze Dialog -->
+    <el-dialog
+      v-model="snoozeDialogVisible"
+      :title="t('snooze') || 'Snooze'"
+      width="400px"
+      class="snooze-dialog"
+      :append-to-body="true"
+    >
+      <el-form label-position="top">
+        <el-form-item :label="t('snoozeStartTime') || 'Start Time'">
+          <el-date-picker
+            v-model="snoozeForm.time"
+            type="datetime"
+            :placeholder="t('selectTime') || 'Select Time'"
+            style="width: 100%"
+            value-format="YYYY-MM-DD HH:mm:ss"
+            :disabled-date="disabledSnoozeDate"
+          />
+        </el-form-item>
+        <el-form-item :label="t('snoozeEndTime') || 'End Time'">
+          <el-date-picker
+            v-model="snoozeForm.endTime"
+            type="datetime"
+            :placeholder="t('selectTime') || 'Select Time'"
+            style="width: 100%"
+            value-format="YYYY-MM-DD HH:mm:ss"
+            :disabled-date="disabledSnoozeDate"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="snoozeDialogVisible = false">{{ t('cancel') || 'Cancel' }}</el-button>
+          <el-button type="primary" @click="confirmSnooze" :loading="snoozeLoading">
+            {{ t('confirm') || 'Confirm' }}
+          </el-button>
+        </span>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -688,12 +739,68 @@ function openForward(email) {
   uiStore.writerRef.openForward(email)
 }
 
+const snoozeDialogVisible = ref(false);
+const snoozeLoading = ref(false);
+const snoozeForm = reactive({
+  emailId: null,
+  time: '',
+  endTime: ''
+});
+
+function disabledSnoozeDate(time) {
+  const sixMonthsLater = new Date();
+  sixMonthsLater.setMonth(sixMonthsLater.getMonth() + 6);
+  return time.getTime() < Date.now() - 8.64e7 || time.getTime() > sixMonthsLater.getTime();
+}
+
+function getSnoozeStatus(item) {
+  if (!item.snoozedTime) return null;
+  const d = new Date();
+  const pad = (n) => n.toString().padStart(2, '0');
+  const now = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  
+  if (item.snoozedEndTime && item.snoozedEndTime <= now) {
+    return { text: t('snoozeExpired'), type: 'danger' };
+  } else if (item.snoozedTime <= now) {
+    return { text: t('snoozeTodo'), type: 'warning' };
+  } else {
+    return { text: t('snoozeWaiting'), type: 'info' };
+  }
+}
+
 function handleSnooze(emailId) {
-  // Add 1 day for default snooze
-  const time = new Date(Date.now() + 86400000).toISOString().replace('T', ' ').substring(0, 19);
-  emailSnooze(emailId, time).then(() => {
+  snoozeForm.emailId = emailId;
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setHours(9, 0, 0, 0);
+  const end = new Date(tomorrow);
+  end.setHours(10, 0, 0, 0);
+  
+  const pad = (n) => n.toString().padStart(2, '0');
+  const formatTime = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  
+  snoozeForm.time = formatTime(tomorrow);
+  snoozeForm.endTime = formatTime(end);
+  snoozeDialogVisible.value = true;
+}
+
+function confirmSnooze() {
+  if (!snoozeForm.time || !snoozeForm.endTime) {
+    ElMessage.error(t('selectTime') || 'Please select time');
+    return;
+  }
+  if (new Date(snoozeForm.endTime).getTime() < new Date(snoozeForm.time).getTime()) {
+    ElMessage.error(t('endTimeBeforeStartTime') || 'End time cannot be earlier than start time');
+    return;
+  }
+
+  snoozeLoading.value = true;
+  emailSnooze(snoozeForm.emailId, snoozeForm.time, snoozeForm.endTime).then(() => {
     ElMessage.success(t('snoozedSuccess') || 'Email snoozed');
-    deleteEmailFromList([emailId]);
+    deleteEmailFromList([snoozeForm.emailId]);
+    snoozeDialogVisible.value = false;
+  }).finally(() => {
+    snoozeLoading.value = false;
   });
 }
 
@@ -1650,4 +1757,8 @@ ul {
   margin: 0;
 }
 
+.snooze-dialog {
+  margin-top: 10vh !important;
+  border-radius: 12px;
+}
 </style>

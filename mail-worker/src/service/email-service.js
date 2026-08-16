@@ -140,7 +140,7 @@ const emailService = {
 		} else {
 			commonConditions.push(folder === 'trash' ? eq(email.isDel, 1) : (isTrash ? eq(email.isDel, 1) : eq(email.isDel, 0)));
 			commonConditions.push(folder === 'spam' ? eq(email.isSpam, 1) : (isSpam ? eq(email.isSpam, 1) : (folder === 'trash' || folder === 'snoozed' || folder === 'all' ? eq(1,1) : eq(email.isSpam, 0))));
-			commonConditions.push(folder === 'snoozed' ? sql`snoozed_time IS NOT NULL` : (folder === 'trash' || folder === 'spam' ? eq(1,1) : sql`(snoozed_time IS NULL OR snoozed_time <= CURRENT_TIMESTAMP)`));
+			commonConditions.push(folder === 'snoozed' ? sql`snoozed_time IS NOT NULL` : (folder === 'trash' || folder === 'spam' ? eq(1,1) : sql`snoozed_time IS NULL`));
 			
 			if (isSent) {
 				const currentType = (folder === 'all' ? emailConst.type.RECEIVE : (type !== undefined ? type : emailConst.type.RECEIVE));
@@ -229,7 +229,7 @@ const emailService = {
 				eq(email.userId, userId),
 				folder === 'trash' ? eq(email.isDel, 1) : eq(email.isDel, 0),
 				folder === 'spam' ? eq(email.isSpam, 1) : (folder === 'trash' || folder === 'snoozed' || folder === 'all' ? eq(1,1) : eq(email.isSpam, 0)),
-				folder === 'snoozed' ? sql`snoozed_time IS NOT NULL` : (folder === 'trash' || folder === 'spam' ? eq(1,1) : sql`(snoozed_time IS NULL OR snoozed_time <= CURRENT_TIMESTAMP)`),
+				folder === 'snoozed' ? sql`snoozed_time IS NOT NULL` : (folder === 'trash' || folder === 'spam' ? eq(1,1) : sql`snoozed_time IS NULL`),
 				(!folder && type !== undefined) ? eq(email.type, type) : (folder === 'all' ? eq(email.type, 0) : eq(1,1))
 			))
 			.orderBy(desc(email.emailId)).limit(1).get();
@@ -387,9 +387,9 @@ const emailService = {
 	},
 
 	async setSnooze(c, params, userId) {
-		const { emailIds, time } = params;
-		const emailIdList = emailIds.split(',').map(Number);
-		await orm(c).update(email).set({ snoozedTime: time }).where(
+		const { emailIds, time, endTime } = params;
+		const emailIdList = Array.isArray(emailIds) ? emailIds.map(Number) : String(emailIds).split(',').map(Number);
+		await orm(c).update(email).set({ snoozedTime: time, snoozedEndTime: endTime }).where(
 			and(
 				eq(email.userId, userId),
 				inArray(email.emailId, emailIdList)))
@@ -398,8 +398,8 @@ const emailService = {
 
 	async restore(c, params, userId) {
 		const { emailIds } = params;
-		const emailIdList = emailIds.split(',').map(Number);
-		await orm(c).update(email).set({ isDel: 0, isSpam: 0, snoozedTime: null }).where(
+		const emailIdList = Array.isArray(emailIds) ? emailIds.map(Number) : String(emailIds).split(',').map(Number);
+		await orm(c).update(email).set({ isDel: 0, isSpam: 0, snoozedTime: null, snoozedEndTime: null }).where(
 			and(
 				eq(email.userId, userId),
 				inArray(email.emailId, emailIdList)))

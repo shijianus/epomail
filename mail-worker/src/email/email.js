@@ -12,6 +12,7 @@ import userService from '../service/user-service';
 import telegramService from '../service/telegram-service';
 import aiService from '../service/ai-service';
 import { applyRules } from './rule-engine';
+import kvConst from '../const/kv-const';
 
 export async function email(message, env, ctx) {
 
@@ -61,6 +62,12 @@ export async function email(message, env, ctx) {
 		const { block: blockFlag, hardBlock: hardBlockFlag } = checkBlock(blackSubject, blackContent, blackFrom, email, env, message.to);
 
 		if (hardBlockFlag) {
+			try {
+				const count = await env.kv.get(kvConst.HARD_INTERCEPT_TOTAL) || 0;
+				await env.kv.put(kvConst.HARD_INTERCEPT_TOTAL, Number(count) + 1);
+			} catch(e) {
+				console.error('Failed to update hard intercept total', e);
+			}
 			message.setReject('Message rejected');
 			return;
 		}

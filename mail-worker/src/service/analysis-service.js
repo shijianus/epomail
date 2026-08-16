@@ -63,7 +63,8 @@ const analysisService = {
 			receiveDayCountRaw,
 			sendDayCountRaw,
 			interceptDayCountRaw,
-			daySendTotalRaw
+			daySendTotalRaw,
+			hardInterceptTotalRaw
 		] = await Promise.all([
 			analysisDao.numberCount(c),
 
@@ -82,6 +83,7 @@ const analysisService = {
 			analysisDao.interceptDayCount(c, diffHours),
 
 			c.env.kv.get(kvConst.SEND_DAY_COUNT + dayjs().format('YYYY-MM-DD')),
+			c.env.kv.get(kvConst.HARD_INTERCEPT_TOTAL),
 		]);
 
 
@@ -91,9 +93,13 @@ const analysisService = {
 		const interceptDayCount = this.filterEmptyDay(interceptDayCountRaw, timeZone);
 
 		const daySendTotal = daySendTotalRaw || 0;
+		const hardInterceptTotal = Number(hardInterceptTotalRaw || 0);
 
 		return {
-			numberCount,
+			numberCount: {
+				...numberCount,
+				hardInterceptTotal
+			},
 			userDayCount,
 			receiveRatio: {
 				nameRatio

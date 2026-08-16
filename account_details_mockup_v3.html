@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Account Details Full Screen</title>
+<style>
+  *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+
+  :root {
+    --bg-base:#0d0f1a; --bg-surface:#13162a; --bg-elevated:#1a1e36;
+    --bg-hover:#1e2340; --bg-active:#232850; 
+    --accent-primary:#5b6ef5; --accent-secondary:#7c5cbf;
+    --text-primary:#eef0fb; --text-secondary:#b6bce4; --text-muted:#767ca8;
+    --border-subtle:rgba(91,110,245,0.12);
+    --ease:cubic-bezier(0.4,0,0.2,1);
+    --success: #4caf7d; --danger: #e05f5f; --warning: #f5a623;
+  }
+
+  html, body { 
+    width:100%; height:100%; overflow-y:auto; overflow-x:hidden;
+    font-family:'Segoe UI',system-ui,-apple-system,sans-serif; 
+    background:var(--bg-base); color:var(--text-primary); 
+  }
+
+  /* Full Screen Container */
+  .full-screen-wrapper {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-base);
+  }
+
+  /* Top Navigation / Back */
+  .nav-header {
+    height: 60px;
+    padding: 0 32px;
+    display: flex;
+    align-items: center;
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 10;
+    background: transparent;
+    transition: background 0.3s;
+  }
+  .nav-header.scrolled {
+    background: rgba(13, 15, 26, 0.85);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .back-btn {
+    display: flex; align-items: center; gap: 8px;
+    color: var(--text-primary); cursor: pointer;
+    font-size: 15px; font-weight: 600; text-decoration: none;
+    transition: color 0.2s;
+  }
+  .back-btn:hover { color: var(--accent-primary); }
+
+  /* Hero Section (Cover + Avatar) */
+  .hero-section {
+    position: relative;
+    padding-top: 100px;
+    padding-bottom: 40px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  /* Cover Background */
+  .hero-cover {
+    position: absolute;
+    top: 0; left: 0; right: 0; height: 260px;
+    background: radial-gradient(ellipse at top, rgba(91,110,245,0.2) 0%, transparent 70%),
+                linear-gradient(135deg, rgba(20,22,40,1) 0%, rgba(13,15,26,1) 100%);
+    z-index: 0;
+    border-bottom: 1px solid rgba(255,255,255,0.02);
+  }
+
+  .hero-content {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .avatar {
+    width: 120px; height: 120px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+    border: 6px solid var(--bg-base);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 48px; font-weight: 800; color: #fff;
+    box-shadow: 0 16px 32px rgba(0,0,0,0.5);
+    margin-bottom: 24px;
+  }
+
+  .user-name { font-size: 36px; font-weight: 800; letter-spacing: -0.5px; margin-bottom: 8px; }
+  .user-email { font-size: 16px; color: var(--text-secondary); margin-bottom: 20px; font-weight: 500; }
+  
+  .user-tags { display: flex; gap: 12px; }
+  .tag { 
+    padding: 6px 16px; border-radius: 20px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;
+    background: rgba(255,255,255,0.05); color: var(--text-primary); border: 1px solid rgba(255,255,255,0.1);
+  }
+  .tag.role { background: linear-gradient(90deg, #e6b91e, #f59e0b); color: #000; border: none; box-shadow: 0 4px 12px rgba(245,158,11,0.3); }
+
+  /* Content Section */
+  .content-section {
+    max-width: 900px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 60px 32px 100px;
+    display: flex;
+    flex-direction: column;
+    gap: 60px;
+  }
+
+  .info-group {
+    display: flex;
+    flex-direction: column;
+    gap: 32px;
+  }
+
+  .group-title {
+    font-size: 20px; font-weight: 700; color: var(--text-primary);
+    border-bottom: 1px solid var(--border-subtle);
+    padding-bottom: 16px;
+  }
+
+  .info-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    padding-bottom: 24px;
+    border-bottom: 1px dashed rgba(255,255,255,0.05);
+  }
+  .info-row:last-child { border-bottom: none; padding-bottom: 0; }
+
+  .info-label {
+    flex: 1;
+    font-size: 15px; color: var(--text-secondary); font-weight: 500;
+  }
+  
+  .info-value {
+    flex: 2;
+    display: flex; flex-direction: column; gap: 8px;
+    font-size: 15px; color: var(--text-primary); font-weight: 600;
+  }
+  
+  .value-subtext {
+    font-size: 13px; color: var(--text-muted); font-weight: 400; line-height: 1.5;
+  }
+
+  /* Wide Storage Bar */
+  .storage-container { width: 100%; margin-top: 12px; }
+  .storage-bar-bg { width: 100%; height: 10px; background: rgba(0,0,0,0.3); border-radius: 5px; overflow: hidden; box-shadow: inset 0 2px 4px rgba(0,0,0,0.5); }
+  .storage-bar-fill { width: 24%; height: 100%; background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary)); border-radius: 5px; }
+  .storage-labels { display: flex; justify-content: space-between; margin-top: 12px; font-size: 13px; color: var(--text-muted); font-weight: 500; }
+  .storage-labels strong { color: var(--text-primary); font-size: 15px; }
+
+  /* Action Buttons */
+  .action-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    padding: 10px 24px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
+    color: var(--text-primary); font-size: 14px; font-weight: 600; border-radius: 8px;
+    cursor: pointer; transition: all 0.2s; width: fit-content;
+  }
+  .action-btn:hover {
+    background: var(--bg-hover); border-color: var(--text-secondary);
+  }
+  
+  .action-btn.primary {
+    background: var(--accent-primary); border: none; color: #fff;
+  }
+  .action-btn.primary:hover {
+    background: var(--accent-secondary); box-shadow: 0 4px 12px rgba(91,110,245,0.4); transform: translateY(-1px);
+  }
+
+  .ic { width:20px; height:20px; stroke:currentColor; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+</style>
+</head>
+<body>
+
+<div class="full-screen-wrapper">
+  
+  <!-- Top Navigation -->
+  <div class="nav-header">
+    <div class="back-btn">
+      <svg class="ic" viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+      返回邮件 (Back to Mail)
+    </div>
+  </div>
+
+  <!-- Hero Section -->
+  <div class="hero-section">
+    <div class="hero-cover"></div>
+    <div class="hero-content">
+      <div class="avatar">S</div>
+      <div class="user-name">Shijian User</div>
+      <div class="user-email">shijian@epocanvas.com</div>
+      <div class="user-tags">
+        <div class="tag role">Administrator</div>
+        <div class="tag" style="color:var(--success); border-color:rgba(76,175,125,0.3);">Active</div>
+        <div class="tag">Joined Aug 2026</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Detailed Content -->
+  <div class="content-section">
+    
+    <!-- Group: Storage -->
+    <div class="info-group">
+      <div class="group-title">存储与配额 (Storage & Quota)</div>
+      
+      <div class="info-row">
+        <div class="info-label">邮箱存储空间</div>
+        <div class="info-value">
+          <div class="storage-container">
+            <div class="storage-bar-bg">
+              <div class="storage-bar-fill"></div>
+            </div>
+            <div class="storage-labels">
+              <span>已使用 <strong>120 MB</strong> (24%)</span>
+              <span>总容量 <strong>500 MB</strong></span>
+            </div>
+          </div>
+          <div class="value-subtext" style="margin-top:8px;">
+            <span style="color:var(--success);">状态健康</span>。若超出配额，您将无法接收新的邮件。
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Group: Statistics -->
+    <div class="info-group">
+      <div class="group-title">账户活动 (Account Activity)</div>
+      
+      <div class="info-row">
+        <div class="info-label">收发件统计</div>
+        <div class="info-value" style="flex-direction:row; gap:40px;">
+          <div>
+            <div style="font-size:28px; font-weight:800; color:var(--text-primary); margin-bottom:4px;">1,429</div>
+            <div class="value-subtext">累计接收</div>
+          </div>
+          <div>
+            <div style="font-size:28px; font-weight:800; color:var(--text-primary); margin-bottom:4px;">342</div>
+            <div class="value-subtext">累计发送</div>
+          </div>
+          <div>
+            <div style="font-size:28px; font-weight:800; color:var(--text-primary); margin-bottom:4px;">3</div>
+            <div class="value-subtext">关联账号</div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="info-row">
+        <div class="info-label">近期登录</div>
+        <div class="info-value">
+          <div>2026-08-16 00:45</div>
+          <div class="value-subtext">IP: 192.168.1.100 (Current Session)</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Group: Security -->
+    <div class="info-group">
+      <div class="group-title">安全与认证 (Security)</div>
+      
+      <div class="info-row">
+        <div class="info-label">账户密码</div>
+        <div class="info-value">
+          <div>已设置密码</div>
+          <div class="value-subtext">为了保护您的账户安全，建议定期修改密码。</div>
+          <div style="margin-top: 16px;">
+            <button class="action-btn">修改密码</button>
+          </div>
+        </div>
+      </div>
+      
+      <div class="info-row">
+        <div class="info-label">会话管理</div>
+        <div class="info-value">
+          <div>退出当前设备</div>
+          <div style="margin-top: 16px;">
+            <button class="action-btn" style="color:var(--danger); border-color:rgba(224,95,95,0.2);">注销登录</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+  // Add simple scroll effect to nav header
+  window.addEventListener('scroll', () => {
+    const header = document.querySelector('.nav-header');
+    if (window.scrollY > 10) {
+      header.classList.add('scrolled');
+    } else {
+      header.classList.remove('scrolled');
+    }
+  });
+</script>
+</body>
+</html>
