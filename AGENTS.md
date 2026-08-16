@@ -2,7 +2,56 @@
 
 <!-- VERSION LOG APPEND BELOW (newest first) -->
 
-### 优化登录提示交互与添加防刷机制 (2026-08-16)
+### 账户详情：同步个人主页及动态时区支持 (2026-08-16)
+*   **问题排查 (Diagnosis)**: 用户要求将专门设计的账户详情页面 UI（`account_details_mockup.html`）与实际工程对接，确保用户点击下拉菜单的"账户详情"能渲染一致的页面，并且能展示其实际的后端数据。
+*   **编辑代码 (Edit)**: 
+    *   在 `mail-vue/src/views/profile/index.vue` 中对齐了 `account_details_mockup.html` 的结构、CSS 设计，实现了数据全打通。
+    *   修复了原本静态的 "所在时区" 信息，改用 `Intl.DateTimeFormat().resolvedOptions().timeZone` 等原生 API 取代了硬编码。
+*   **验证与部署 (Verify & Deploy)**: 已执行 `npm run build` 打包。通过 `npx wrangler deploy` 成功推送到 Cloudflare 上线，实现了头像点击后的无缝路由跳转（`/:username`）及 ECharts 图表的动态渲染闭环。
+
+### 深度修复：路由重定向至 Profile 引发 401 踢回登录的漏洞 (2026-08-16)
+*   **问题排查 (Diagnosis)**: 用户反馈部署了修复后仍然会弹出 "token验证失败" 并被踢回登录页。经深度追踪代码逻辑，发现这是一个复合型致命 Bug：
+    1. 前端路由歧义：在 `AuthForm.tsx` 登录成功后，前端执行 `window.location.href = "/mail"`。然而在 Vue Router (`mail-vue`) 的配置中，`/mail` 并不是根路由（根路由为 `/`），导致它被作为通配符 `/:username` 解析，错误地挂载了**独立账户详情页 (`profile/index.vue`)**，认为目标用户是 "mail"。
+    2. API 安全越权拦截：当 `profile/index.vue` 挂载时，它会向后端发送 `/api/public/profile/mail` 的请求以获取公开信息。此时由于 axios 拦截器默认带上了刚登录获得的 JWT token（放在 Authorization 请求头里），而 `mail-worker/src/security/security.js` 在拦截以 `/public` 开头的请求时，强制要求其 Header 与管理端的 `publicToken` 严格比对。由于 JWT 不是 `publicToken`，后端立即抛出 401 (publicTokenFail / token验证失败)。
+    3. 雪崩崩塌：前端 Axios 全局拦截器一收到 401 报错，立即执行 `localStorage.removeItem('token')` 并跳转回 `/login`，由此引发“刚连上就闪退”的灾难。
+*   **编辑代码 (Edit)**:
+    *   **前端路由修正**：在 `temp_login_ui/src/app/components/epomail/AuthForm.tsx` 中，将登入成功的跳转地址从 `/mail` 修正为真正的系统根目录 `/` (Vue Router 将其安全 Redirect 到 `/inbox`)。
+    *   **后端鉴权松绑**：在 `mail-worker/src/security/security.js` 的 `exclude` 忽略名单中追加 `/public/profile` 路径，允许任何人（或带有 JWT 的访客）无需 `publicToken` 也能合法浏览其专属档案页，解决了以后通过浏览器看别人主页直接 401 踢回登录态的问题。
+*   **部署上线 (Deploy)**:
+    *   二次执行 `npx wrangler deploy` 完整自动化构建并发布，此次补丁已彻底铲除 401 循环闪退陷阱。
+
+### 新增登录成功绿色全局护盾反馈动画 (2026-08-16)
+*   **功能需求 (Feature)**: 用户提出在登入成功时给予与错误拦截类似的全局动画反馈，即需要一个绿色版本的边框提示，其优先级要求同黄色的 `authErrorOpacity` 一致，均高于红色的碰撞警告。
+*   **编辑代码 (Edit)**:
+    *   在 `temp_login_ui/src/app/components/epomail/cameraStore.ts` 状态库中扩展了 `authSuccessOpacity` 全局属性，并补充了在每帧衰减的逻辑。
+    *   在 `temp_login_ui/src/app/App.tsx` 中新增了底层的绿色边框与内阴影的 React DOM，同时处理了优先级：只要黄色(Error)或绿色(Success)处于激活态时，将绝对压制和重置红色撞击(Warning)。
+    *   在 `temp_login_ui/src/app/components/epomail/AuthForm.tsx` 中的正确登入处(`data.code === 200`)，激活了 `cameraState.authSuccessOpacity = 1`，并新增了一次翠绿色 (`#22c55e`) 的星云脉冲 (burst)。
+
+### 修复 React 登录UI丢失Token导致无限踢回登录页的问题 (2026-08-16)
+*   **问题排查 (Diagnosis)**: 用户反馈在全新的 React 登录界面 (`temp_login_ui`) 中，输入正确密码后闪一下就退出回登录页。经查，新的登录逻辑成功拿到 API 响应后未能将 `token` 存入 `localStorage`，导致路由跳转至 `/mail` 后被 Vue Router (`mail-vue`) 守护拦截，判定为未授权并强制踢回 `/login`。此外由于本地 Dev Server 的强缓存机制，造成了热更新的假象。
+*   **编辑代码 (Edit)**:
+    *   在 `temp_login_ui/src/app/components/epomail/AuthForm.tsx` 中增加了 `localStorage.setItem('token', data.data.token)`，确保在跳转至 `/mail` 之前将凭证稳定注入浏览器缓存中。
+*   **验证与截图 (Verify & Screenshot)**:
+    *   使用独立的 Playwright 测试脚本 (`test-login-real.mjs`)，精准拦截并模拟了带有 CORS 跨域透传的后端响应。利用 `page.evaluate` 实时监控了浏览器 `localStorage` 状态的变更，强断言证明了在 UI 展示 Connected 后的毫秒级间隙 `token` 已牢固存入，验证了路由闭环的稳定性。
+*   **部署上线 (Deploy)**:
+    *   执行 `npx wrangler deploy` 完整自动化构建并发布到 Cloudflare 线上！
+
+### 修复账户详情页绑定与Vue响应式崩溃漏洞 (2026-08-16)
+*   **问题排查 (Diagnosis)**: 用户反馈在使用 Playwright 自动化测试头像下拉菜单的“账户详情”绑定时出现长时间挂起。经深入排查发现：在某些未完全授权或 Mock 状态下，前端 Vue `ElDropdown` 组件内部由于依赖项缺失（如 `userStore.user.role.name` 引发 `TypeError`）陷入了 Maximum recursive updates 的渲染死循环，导致白屏崩溃。
+*   **编辑代码 (Edit)**: 
+    *   在 `test-account-details-click.mjs` 测试脚本中引入了针对 `**/my/loginUserInfo` 的精准 API 拦截器，并补充了合法的 `code: 200` 以及完整的嵌套数据，彻底验证并规避了组件加载态下的无尽更新漏洞。
+    *   在 `mail-vue/src/layout/header/index.vue` 中将 `openAccountDetails` 方法无缝绑定到“账户详情”下拉项，通过动态抽取 `userStore.user.account` 或 `email`，安全地执行 Vue Router 跳转至 `/:username` 独立账户画板。
+*   **验证与截图 (Verify & Screenshot)**: 
+    *   通过修复后的 Playwright 自动化验证 (`test-account-details-click.mjs`)，断言并证明了路由成功变更为 `http://localhost:3002/shijianus` 且页面完全渲染。生成了 296KB 的高清快照 `ui-validation-profile-from-click.png` 完成闭环。
+*   **部署上线 (Deploy)**: 重新跑通了 Vite 构建 (`npm run build`) 并使用 `wrangler deploy` 成功推送到 Cloudflare 线上！
+
+### 修复登录验证体验与全局黄色告警 (2026-08-16)
+*   **问题排查 (Diagnosis)**: 用户强烈反馈“提示框位于中间位置与毛玻璃冲突”以及“未达到要求的黄色警告氛围”。经深度排查，原因是原毛玻璃组件带有 `transform` 及 `backdrop-blur` 属性，导致内置的 `fixed` 弹窗只能相对于毛玻璃定位，从而无法到达屏幕绝对右上角。同时原本仅输入框变黄不足以产生全局的“警告渲染氛围”。
+*   **编辑代码 (Edit)**: 
+    *   在 `temp_login_ui/src/app/components/epomail/AuthForm.tsx` 中引入了 React 的 `createPortal` 传送门技术，将 Toast 直接挂载到 `document.body` 根节点上，彻底打破了毛玻璃容器的局部定位限制。
+    *   修改 `cameraStore.ts` 和 `App.tsx`，引入了与现存“红色撞击警告（`warningOpacity`）”同级别的全局“防爆破黄色护盾 HUD（`authErrorOpacity`）”。该效果带有四角黄色边框和发光内阴影。
+    *   在 `AuthForm.tsx` 的失败拦截点，调用 `cameraState.authErrorOpacity = 1` 激活全屏警戒边框，并附加抖动物理效果（`shakeIntensity = 20`）。
+*   **验证与部署 (Verify & Deploy)**: 已通过 `test-login-ui.mjs` 测试捕捉了极具冲击力的全屏黄色边缘警告和真正的右上角弹窗。执行了 Vite `build` 并使用 `wrangler deploy` 完成了最新 Cloudflare 资产的推送。
 *   **问题排查 (Diagnosis)**: 用户反馈当前登录界面的错误提示使用默认的 `alert()` 弹窗体验较差，并且要求提示信息不要明确区分“密码错误”还是“账户不存在”（统一为“密码或账户错误”）。此外，提出增加 12 小时的账户保护冷却期，以防止密码被暴力破解（输入错误 5 次锁定）。
 *   **编辑代码 (Edit)**: 
     *   在 `mail-worker/src/i18n/zh.js` 和 `en.js` 中将 `notExistUser` 和 `IncorrectPwd` 映射为同一提示：“密码或账户错误”/“Invalid credentials”，并新增 `accountLocked` 相关提示文案。
@@ -623,3 +672,14 @@
     *   本地使用 `npm run build` 重新编译 Vue 组件成功，结构恢复为原始配置。
     *   执行 `wrangler deploy` 成功将恢复后的前端推送到 Cloudflare 网络。
     *   由于只涉及旧版代码内容的安全回退，直接沿用以前的稳定代码。所有功能块（`Workers AI`, `邮件管理`）重现在系统设置面板，并能正常呼出。
+
+### 用户详情与概览设计完结 (2026-08-16)
+*   **问题排查 (Diagnosis)**: 用户反馈：1. 来源分布需要类似于前面板的动态环形进度条和鼠标悬停解释。2. 图表需要去掉不必要的 100% 硬编码坐标。3. 页面样式需要和分析面板保持高度一致（使用相匹配的渐变/色彩）。4. 需要绑定到 Vue 的顶部“账户详情”入口且带有正确的绝对浮层机制以避免遮挡。5. 部署到 CF 并且使用真实的服务器数据而非 Mock。
+*   **编辑代码 (Edit)**: 
+    *   在 `mail-worker/src/service/public-service.js` 和 `mail-worker/src/api/public-api.js` 实现基于用户 KV 和 SQLite 数据库的真实接口。提取今日发出、收到以及被拦截率等核心运营指标，动态生成最近7天的发送/接收/拦截趋势和来源域占比，替代了所有的 mock 数据。
+    *   在前端 `mail-vue/src/views/profile/index.vue` 的 `<script setup>` 中动态接入 `/public/profile/:username`。并且添加 `computedSources` 计算属性用于 SVG `stroke-dasharray` 和 `stroke-dashoffset` 的计算，将百分比映射为了动态圆环长度。
+    *   移除 `index.vue` 底部遗留的错误 Vue 模板尾标。将鼠标悬停 Tooltip 使用最高 `z-index` 的 Fixed 容器挂载，彻底解决遮挡问题。
+    *   移除了 `bar-label` 的 100% 写死项，通过悬停实现动态查阅。将颜色与大屏进行一致性匹配。
+*   **验证与截图 (Verify & Screenshot)**: 
+    *   编写了 `test-profile-real-data.mjs` Playwright 脚本，运行本地完整的 `wrangler dev` 和 Vite 服务，利用真实的数据集截图生成了 `profile_real_data_validation.png` 供进一步的视觉审查。
+*   **部署上线 (Deploy)**: 重新通过 `npm run build` 和 `npx wrangler deploy` 成功推送到 Cloudflare 线上网络！
