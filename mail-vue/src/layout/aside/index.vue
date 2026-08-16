@@ -68,9 +68,11 @@
             <span class="nav-ic-wrap">
               <Icon icon="ic:outline-report-gmailerrorred" width="20" height="20" />
               <div class="sidebar-red-dot" v-if="spamCount > 0"></div>
+              <div class="sidebar-gray-dot" v-else-if="spamReadCount > 0"></div>
             </span>
             <span class="nav-label">{{$t('spam') || 'Spam'}}</span>
             <span class="nav-count" v-if="spamCount > 0">{{ spamCount }}</span>
+            <span class="nav-count muted" v-else-if="spamReadCount > 0">{{ spamReadCount }}</span>
           </div>
           <div class="nav-item" @click="router.push({name: 'trash'})" :class="route.name === 'trash' ? 'active' : ''" :title="$t('trash') || 'Trash'">
             <span class="nav-ic-wrap">
@@ -94,10 +96,12 @@
               <span class="nav-ic-wrap">
                 <div v-if="(label.icon || '').startsWith('<svg')" v-html="label.icon" style="width: 20px; height: 20px; display: inline-flex; justify-content: center; align-items: center; fill: currentColor;" :style="{ color: label.color || 'inherit' }"></div>
                 <Icon v-else :icon="label.icon || 'ic:baseline-label'" width="20" height="20" :style="{ color: label.color || 'inherit' }" />
-                <div class="sidebar-red-dot" v-if="label.stats && label.stats.unread > 0"></div>
+                <div class="sidebar-red-dot" v-if="getLabelStats(label.name).unread > 0"></div>
+                <div class="sidebar-gray-dot" v-else-if="getLabelStats(label.name).read > 0 && label.name === '推销'"></div>
               </span>
               <span class="nav-label" :style="{ color: label.color || 'inherit' }">{{ label.name || label }}</span>
-              <span class="nav-count" v-if="label.stats && label.stats.unread > 0">{{ label.stats.unread }}</span>
+              <span class="nav-count" v-if="getLabelStats(label.name).unread > 0">{{ getLabelStats(label.name).unread }}</span>
+              <span class="nav-count muted" v-else-if="getLabelStats(label.name).read > 0 && label.name === '推销'">{{ getLabelStats(label.name).read }}</span>
             </div>
           </template>
         </div>
@@ -133,17 +137,22 @@ const uiStore = useUiStore();
 const emailStore = useEmailStore();
 const route = useRoute();
 
-// Mock counts for UI demonstration
-const unreadCount = ref(12);
-const starCount = ref(1);
-const sendCount = ref(0);
-const draftCount = ref(2);
-const allMailCount = ref(5);
-const spamCount = ref(17);
-const trashCount = ref(8);
-// 优先级测试：urgent 会显示蓝底标签，并且收缩时覆盖 waiting 显示红点
-const urgentSnoozedCount = ref(1);
-const waitingSnoozedCount = ref(3);
+// Use global sidebar stats from emailStore
+const unreadCount = computed(() => emailStore.sidebarStats?.inboxUnread || 0);
+const starCount = computed(() => 0); // star logic not easily aggregated in D1 currently
+const draftCount = computed(() => emailStore.sidebarStats?.draftUnread || 0);
+const sendCount = computed(() => emailStore.sidebarStats?.sentUnread || 0);
+const spamCount = computed(() => emailStore.sidebarStats?.spamUnread || 0);
+const spamReadCount = computed(() => emailStore.sidebarStats?.spamRead || 0);
+const trashCount = computed(() => emailStore.sidebarStats?.trashUnread || 0);
+const allMailCount = computed(() => emailStore.sidebarStats?.allUnread || 0);
+const urgentSnoozedCount = computed(() => emailStore.sidebarStats?.snoozedUrgent || 0);
+const waitingSnoozedCount = computed(() => emailStore.sidebarStats?.snoozedWaiting || 0);
+
+// Initialize fetch
+onMounted(() => {
+  emailStore.refreshSidebarStats();
+});
 
 const newLabelName = ref('');
 const handleAddLabel = () => {
@@ -183,6 +192,10 @@ const isMobile = ref(window.innerWidth < 1025)
 const handleResize = () => {
   isMobile.value = window.innerWidth < 1025
 }
+
+const getLabelStats = (name) => {
+  return emailStore.sidebarStats?.labelStats?.[name] || { unread: 0, read: 0 };
+};
 
 onMounted(() => {
   window.addEventListener('resize', handleResize)

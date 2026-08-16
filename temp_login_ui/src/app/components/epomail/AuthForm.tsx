@@ -18,6 +18,7 @@ function FloatingField({
   onChange,
   onKeyFeedback,
   trailing,
+  hasError,
 }: {
   id: string;
   type: string;
@@ -27,6 +28,7 @@ function FloatingField({
   onChange: (v: string) => void;
   onKeyFeedback?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
   trailing?: React.ReactNode;
+  hasError?: boolean;
 }) {
   const [focused, setFocused] = useState(false);
   const active = focused || value.length > 0;
@@ -34,21 +36,21 @@ function FloatingField({
   return (
     <div className="relative">
       <div
-        className="pointer-events-none absolute left-0 top-1/2 -translate-y-1/2"
-        style={{ color: active ? "var(--epo-cyan-glow)" : "var(--epo-muted)" }}
+        className="pointer-events-none absolute left-0 top-1/2 -translate-y-1/2 transition-colors duration-300"
+        style={{ color: hasError ? "#eab308" : active ? "var(--epo-cyan-glow)" : "var(--epo-muted)" }}
       >
         {icon}
       </div>
 
       <label
         htmlFor={id}
-        className="epomail-display pointer-events-none absolute left-8 transition-all duration-200"
+        className="epomail-display pointer-events-none absolute left-8 transition-all duration-300"
         style={{
           top: active ? "-2px" : "50%",
           transform: active ? "translateY(0)" : "translateY(-50%)",
           fontSize: active ? "11px" : "15px",
           letterSpacing: "0.04em",
-          color: active ? "var(--epo-cyan-glow)" : "var(--epo-muted)",
+          color: hasError ? "#eab308" : active ? "var(--epo-cyan-glow)" : "var(--epo-muted)",
         }}
       >
         {label}
@@ -63,8 +65,8 @@ function FloatingField({
         onBlur={() => setFocused(false)}
         onKeyDown={onKeyFeedback}
         autoComplete={type === "password" ? "current-password" : "email"}
-        className="w-full bg-transparent pl-8 pr-8 pt-5 pb-2 text-[15px] outline-none"
-        style={{ color: "var(--epo-ink)" }}
+        className="w-full bg-transparent pl-8 pr-8 pt-5 pb-2 text-[15px] outline-none transition-colors duration-300"
+        style={{ color: hasError ? "#fef08a" : "var(--epo-ink)" }}
       />
 
       {trailing && (
@@ -75,17 +77,20 @@ function FloatingField({
 
       {/* Base underline */}
       <div
-        className="absolute bottom-0 left-0 h-px w-full"
-        style={{ background: "rgba(139,147,196,0.25)" }}
+        className="absolute bottom-0 left-0 h-px w-full transition-colors duration-300"
+        style={{ background: hasError ? "rgba(234,179,8,0.3)" : "rgba(139,147,196,0.25)" }}
       />
       {/* Glowing underline */}
       <div
         className="absolute bottom-0 left-0 h-[2px] transition-all duration-300"
         style={{
-          width: focused ? "100%" : "0%",
-          background:
-            "linear-gradient(90deg, var(--epo-purple-glow), var(--epo-cyan-glow))",
-          boxShadow: focused
+          width: hasError || focused ? "100%" : "0%",
+          background: hasError
+            ? "linear-gradient(90deg, #eab308, #facc15)"
+            : "linear-gradient(90deg, var(--epo-purple-glow), var(--epo-cyan-glow))",
+          boxShadow: hasError
+            ? "0 0 15px rgba(234,179,8,0.6)"
+            : focused
             ? "0 0 12px rgba(103,232,249,0.7)"
             : "none",
         }}
@@ -141,15 +146,15 @@ export function AuthForm({ canvasRef }: AuthFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="relative flex flex-col gap-7 pt-4">
-      {/* Top Center Toast Notification */}
+      {/* Top Right Toast Notification */}
       <AnimatePresence>
         {errorMsg && (
           <motion.div
-            initial={{ opacity: 0, y: -20, scale: 0.95 }}
-            animate={{ opacity: 1, y: -30, scale: 1 }}
-            exit={{ opacity: 0, y: -10, scale: 0.95 }}
+            initial={{ opacity: 0, x: 20, scale: 0.95 }}
+            animate={{ opacity: 1, x: 0, scale: 1 }}
+            exit={{ opacity: 0, x: 10, scale: 0.95 }}
             transition={{ type: "spring", stiffness: 300, damping: 20 }}
-            className="absolute -top-6 left-0 right-0 flex justify-center z-50 pointer-events-none"
+            className="fixed top-6 right-6 flex justify-end z-50 pointer-events-none"
           >
             <div className="flex items-center gap-2 rounded-full bg-red-500/10 border border-red-500/20 px-4 py-1.5 backdrop-blur-md shadow-lg shadow-red-500/10">
               <AlertCircle size={14} className="text-red-400" />
@@ -166,6 +171,7 @@ export function AuthForm({ canvasRef }: AuthFormProps) {
         icon={<Mail size={16} strokeWidth={1.8} />}
         value={email}
         onChange={setEmail}
+        hasError={!!errorMsg}
         onKeyFeedback={(e) => {
           const rect = e.currentTarget.getBoundingClientRect();
           canvasRef.current?.burst({
@@ -182,6 +188,7 @@ export function AuthForm({ canvasRef }: AuthFormProps) {
         icon={<Lock size={16} strokeWidth={1.8} />}
         value={password}
         onChange={setPassword}
+        hasError={!!errorMsg}
         // Interactive Hook 2 — every keystroke triggers a nova burst.
         onKeyFeedback={(e) => {
           const rect = e.currentTarget.getBoundingClientRect();

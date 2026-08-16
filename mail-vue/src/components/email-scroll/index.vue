@@ -1242,6 +1242,7 @@ function refresh() {
 }
 
 function refreshList() {
+  emailStore.refreshSidebarStats();
   checkAll.value = false;
   isIndeterminate.value = false;
   getEmailList(true);

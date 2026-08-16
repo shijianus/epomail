@@ -3,9 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>EpoMail Profile Analytics</title>
+<title>EpoMail Profile Dashboard</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Archivo:wght@300;400;500;600;700&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Archivo:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap');
 
   *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
 
@@ -13,17 +13,20 @@
     --bg-base: #0d0f1a; 
     --bg-surface: #13162a; 
     --bg-elevated: #1a1e36;
-    --bg-hover: #1e2340; 
     --accent-primary: #5b6ef5; 
     --accent-secondary: #7c5cbf;
     --text-primary: #eef0fb; 
     --text-secondary: #b6bce4; 
     --text-muted: #767ca8;
     --border-subtle: rgba(91,110,245,0.12);
-    --border-mid: rgba(91,110,245,0.22);
-    --success: #4caf7d;
-    --warning: #f5a623;
-    --danger: #e05f5f;
+    
+    /* Gradient Stats Themes */
+    --grad-blue: linear-gradient(135deg, rgba(59,130,246,0.2) 0%, rgba(37,99,235,0.05) 100%);
+    --grad-blue-border: rgba(59,130,246,0.3);
+    --grad-orange: linear-gradient(135deg, rgba(245,158,11,0.2) 0%, rgba(217,119,6,0.05) 100%);
+    --grad-orange-border: rgba(245,158,11,0.3);
+    --grad-green: linear-gradient(135deg, rgba(16,185,129,0.2) 0%, rgba(5,150,105,0.05) 100%);
+    --grad-green-border: rgba(16,185,129,0.3);
   }
 
   html, body {
@@ -50,7 +53,7 @@
 
   /* Full Width Cover */
   .cover-photo {
-    width: 100%; height: 30vh;
+    width: 100%; height: 32vh;
     background: radial-gradient(ellipse at top right, var(--accent-secondary) 0%, transparent 60%),
                 linear-gradient(to bottom, var(--bg-elevated) 0%, var(--bg-base) 100%);
     position: relative; flex-shrink: 0;
@@ -63,21 +66,22 @@
 
   /* Desktop Profile Grid Layout */
   .desktop-layout {
-    max-width: 1300px; width: 100%; margin: -60px auto 0; padding: 0 40px;
-    display: grid; grid-template-columns: 320px 1fr; gap: 40px; position: relative; z-index: 10;
+    max-width: 1300px; width: 100%; margin: -70px auto 0; padding: 0 40px;
+    display: grid; grid-template-columns: 300px 1fr; gap: 50px; position: relative; z-index: 10;
   }
 
-  /* Left Column: Identity */
+  /* --- LEFT COLUMN: IDENTITY --- */
   .profile-identity { display: flex; flex-direction: column; }
+  
   .avatar {
-    width: 130px; height: 130px; border-radius: 24px;
+    width: 140px; height: 140px; border-radius: 24px;
     background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
     border: 6px solid var(--bg-base); box-shadow: 0 12px 32px rgba(0,0,0,0.5);
     display: flex; align-items: center; justify-content: center; font-size: 54px; font-weight: 800; color: #fff;
     margin-bottom: 20px; position: relative;
   }
   .verified-badge {
-    position: absolute; bottom: -6px; right: -6px; width: 32px; height: 32px;
+    position: absolute; bottom: -6px; right: -6px; width: 36px; height: 36px;
     background: var(--bg-base); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--accent-primary);
   }
 
@@ -87,70 +91,99 @@
 
   .bio { font-size: 14px; color: var(--text-secondary); line-height: 1.6; margin-bottom: 24px; }
 
+  /* Fine Subtitle Tags (Left Column) */
+  .sub-tags-list {
+    display: flex; flex-direction: column; gap: 10px; margin-bottom: 32px;
+    padding: 16px; background: rgba(255,255,255,0.02); border-radius: 12px; border: 1px solid rgba(255,255,255,0.05);
+  }
+  .sub-tag-item { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-muted); font-weight: 500; }
+  .sub-tag-item .ic { color: var(--accent-primary); }
+
   .btn-message {
     display: flex; align-items: center; justify-content: center; gap: 8px; background: var(--text-primary); color: var(--bg-base);
     border: none; padding: 12px; border-radius: 12px; font-size: 14px; font-weight: 700; cursor: pointer; transition: all 0.2s;
   }
   .btn-message:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(255,255,255,0.2); background: #fff; }
 
-  /* Right Column: Analytics Bento Grid */
-  .profile-bento {
-    display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: auto auto auto; gap: 16px; margin-top: 60px;
+  /* --- RIGHT COLUMN: ANALYSIS DASHBOARD --- */
+  .profile-analysis {
+    display: flex; flex-direction: column; gap: 20px; margin-top: 70px;
   }
-  .bento-card {
-    background: rgba(26, 30, 54, 0.6); backdrop-filter: blur(20px);
+  
+  .section-heading { font-size: 18px; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .section-heading::before { content: ''; width: 4px; height: 16px; background: var(--accent-primary); border-radius: 2px; }
+
+  /* Gradient Stats Row */
+  .stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  
+  .stat-card {
+    padding: 20px; border-radius: 16px; display: flex; flex-direction: column; gap: 8px;
+    backdrop-filter: blur(20px); border-top: 1px solid rgba(255,255,255,0.1);
+  }
+  .stat-card.blue { background: var(--grad-blue); border-color: var(--grad-blue-border); }
+  .stat-card.orange { background: var(--grad-orange); border-color: var(--grad-orange-border); }
+  .stat-card.green { background: var(--grad-green); border-color: var(--grad-green-border); }
+
+  .stat-title { font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.7); display: flex; align-items: center; gap: 6px; }
+  .stat-val { font-size: 28px; font-weight: 800; color: #fff; letter-spacing: -1px; }
+
+  /* Analysis Grid (Charts) */
+  .charts-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; flex: 1; min-height: 240px; }
+
+  .chart-card {
+    background: rgba(26, 30, 54, 0.5); backdrop-filter: blur(20px);
     border: 1px solid var(--border-subtle); border-radius: 16px; padding: 20px;
-    display: flex; flex-direction: column; transition: transform 0.2s, background 0.2s;
+    display: flex; flex-direction: column;
   }
-  .bento-card:hover { background: rgba(26, 30, 54, 0.8); border-color: var(--border-mid); }
-  .card-span-2 { grid-column: span 2; }
-  .card-span-3 { grid-column: span 3; }
+  .chart-title { font-size: 14px; font-weight: 600; color: var(--text-muted); margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
 
-  /* Meta Bar */
-  .meta-bar { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; }
-  .meta-tag { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; color: var(--text-secondary); }
-  .meta-tag .ic { color: var(--accent-primary); }
-
-  /* Card Headers */
-  .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
-  .card-title { font-size: 13px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 6px; }
-
-  /* --- Pure CSS Storage Ring Chart --- */
-  .storage-ring-wrapper {
-    display: flex; align-items: center; justify-content: center; position: relative; margin: 10px 0;
+  /* Bar Chart with Grid Lines */
+  .bar-chart-container {
+    flex: 1; display: flex; align-items: flex-end; justify-content: space-between; position: relative;
+    padding-bottom: 24px; padding-top: 10px;
   }
-  .storage-ring {
-    width: 120px; height: 120px; border-radius: 50%;
-    background: conic-gradient(var(--accent-primary) 0% 64%, var(--bg-hover) 64% 100%);
+  .chart-gridlines {
+    position: absolute; inset: 0 0 24px 0; display: flex; flex-direction: column; justify-content: space-between; z-index: 0; pointer-events: none;
+  }
+  .gridline { width: 100%; height: 1px; background: rgba(255,255,255,0.05); position: relative; }
+  .gridline::before { content: attr(data-val); position: absolute; left: -25px; top: -8px; font-size: 10px; color: var(--text-muted); font-family: 'Fira Code', monospace; }
+
+  .bar-col { display: flex; flex-direction: column; align-items: center; gap: 8px; z-index: 1; width: 10%; position: relative; height: 100%; justify-content: flex-end; }
+  .bar { width: 100%; border-radius: 4px 4px 0 0; transition: height 0.5s ease; position: relative; }
+  .bar.blue { background: linear-gradient(to top, rgba(59,130,246,0.2), #3b82f6); box-shadow: 0 0 10px rgba(59,130,246,0.3); }
+  .bar.green { background: linear-gradient(to top, rgba(16,185,129,0.2), #10b981); box-shadow: 0 0 10px rgba(16,185,129,0.3); }
+  
+  .bar:hover::after {
+    content: attr(data-tooltip); position: absolute; top: -30px; left: 50%; transform: translateX(-50%);
+    background: var(--bg-elevated); color: #fff; font-size: 11px; padding: 4px 8px; border-radius: 4px; border: 1px solid var(--border-subtle);
+    white-space: nowrap; font-family: 'Fira Code', monospace;
+  }
+  .bar-label { font-size: 11px; color: var(--text-muted); position: absolute; bottom: -20px; font-family: 'Fira Code', monospace; }
+
+  /* Pie Chart (Sources) */
+  .pie-chart-container {
+    flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px;
+  }
+  .pie-ring {
+    width: 130px; height: 130px; border-radius: 50%;
+    /* 60% Epocanvas (blue), 25% Web (green), 15% API (orange) */
+    background: conic-gradient(
+      #3b82f6 0% 60%, 
+      #10b981 60% 85%, 
+      #f59e0b 85% 100%
+    );
     display: flex; align-items: center; justify-content: center;
-    position: relative;
-    box-shadow: 0 0 20px rgba(91,110,245,0.2);
+    box-shadow: 0 0 20px rgba(0,0,0,0.3); position: relative;
   }
-  .storage-ring::before {
-    content: ''; width: 96px; height: 96px; border-radius: 50%; background: var(--bg-surface); position: absolute;
-  }
-  .storage-ring-value {
-    position: relative; z-index: 1; font-size: 24px; font-weight: 800; color: var(--text-primary);
-    display: flex; flex-direction: column; align-items: center;
-  }
-  .storage-ring-value span { font-size: 11px; color: var(--text-muted); font-weight: 500; margin-top: 2px; }
+  .pie-ring::before { content: ''; width: 90px; height: 90px; border-radius: 50%; background: rgba(26, 30, 54, 0.9); position: absolute; }
+  .pie-total { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; }
+  .pie-total-val { font-size: 20px; font-weight: 800; color: var(--text-primary); font-family: 'Fira Code', monospace; }
+  .pie-total-lbl { font-size: 10px; color: var(--text-muted); text-transform: uppercase; }
 
-  /* --- Pure CSS Activity Bar Chart --- */
-  .css-bar-chart {
-    display: flex; align-items: flex-end; justify-content: space-between; height: 100px; padding: 0 10px; margin-top: auto; border-bottom: 1px solid var(--border-subtle); padding-bottom: 8px;
-  }
-  .chart-col { display: flex; flex-direction: column; align-items: center; gap: 8px; width: 24px; }
-  .bar-wrapper { width: 100%; height: 80px; display: flex; align-items: flex-end; justify-content: center; position: relative; }
-  .bar { width: 16px; border-radius: 4px; background: var(--bg-hover); transition: height 0.5s ease, background 0.3s; position: relative; }
-  .bar:hover { background: var(--accent-primary); box-shadow: 0 0 12px rgba(91,110,245,0.4); }
-  .chart-label { font-size: 10px; color: var(--text-muted); }
-
-  /* Stats Mini Grid */
-  .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-top: auto; }
-  .stat-item { display: flex; flex-direction: column; gap: 4px; background: rgba(255,255,255,0.02); padding: 12px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.02); }
-  .stat-val { font-size: 22px; font-weight: 800; color: var(--text-primary); line-height: 1; display:flex; align-items:baseline; gap:4px; }
-  .stat-val small { font-size: 12px; font-weight: 500; color: var(--text-secondary); }
-  .stat-lbl { font-size: 12px; color: var(--text-muted); }
+  .pie-legend { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+  .legend-item { display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: var(--text-secondary); }
+  .legend-dot { display: flex; align-items: center; gap: 6px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; }
 
 </style>
 </head>
@@ -172,7 +205,7 @@
     <div class="avatar">
       SJ
       <div class="verified-badge">
-        <svg class="ic-fill" style="width:20px; height:20px;" viewBox="0 0 24 24"><path d="M22.5 12.5c0-.67-.2-1.33-.57-1.89l1.45-2.02c.32-.44.38-1.01.15-1.5-.23-.49-.71-.8-1.25-.8h-2.47c-.43 0-.82-.24-1.02-.63l-1.1-2.22c-.25-.5-.73-.83-1.29-.89-.55-.06-1.1.17-1.46.61l-1.6 1.94c-.4.49-1.02.77-1.66.77s-1.26-.28-1.66-.77l-1.6-1.94c-.36-.44-.91-.67-1.46-.61-.56.06-1.04.39-1.29.89l-1.1 2.22c-.2.39-.59.63-1.02.63H3.74c-.54 0-1.02.31-1.25.8-.23.49-.17 1.06.15 1.5l1.45 2.02c.37.56.57 1.22.57 1.89 0 .67-.2 1.33-.57 1.89l-1.45 2.02c-.32.44-.38 1.01-.15 1.5.23.49.71.8 1.25.8h2.47c.43 0 .82.24 1.02.63l1.1 2.22c.25.5.73.83 1.29.89.55.06 1.1-.17 1.46-.61l1.6-1.94c.4-.49 1.02-.77 1.66-.77s1.26.28 1.66.77l1.6 1.94c.36.44.91.67 1.46.61.56-.06 1.04-.39 1.29-.89l1.1-2.22c.2-.39.59-.63 1.02-.63h2.47c.54 0 1.02-.31 1.25-.8.23-.49.17-1.06-.15-1.5l-1.45-2.02c-.37-.56-.57-1.22-.57-1.89zM10.82 17.5l-4.52-4.52 1.41-1.41 3.11 3.11 7.21-7.21 1.41 1.41-8.62 8.62z"></path></svg>
+        <svg class="ic-fill" style="width:20px; height:20px;" viewBox="0 0 24 24"><path d="M22.5 12.5c0-.67-.2-1.33-.57-1.89l1.45-2.02c.32-.44.38-1.01.15-1.5-.23-.49-.71-.8-1.25-.8h-2.47c-.43 0-.82-.24-1.02-.63l-1.1-2.22c-.25-.5-.73-.83-1.29-.89-.55-.06-1.1.17-1.46.61l-1.6 1.94c-.4.49-1.02.77-1.66.77s-1.26-.28-1.66-.77l-1.6-1.94c-.36-.44-.91-.67-1.46-.61-.56.06-1.04.39-1.29.89l-1.1 2.22c-.2.39-.59.63-1.02-.63H3.74c-.54 0-1.02.31-1.25.8-.23.49-.17 1.06.15 1.5l1.45 2.02c.37.56.57 1.22.57 1.89 0 .67-.2 1.33-.57 1.89l-1.45 2.02c-.32.44-.38 1.01-.15 1.5.23.49.71.8 1.25.8h2.47c.43 0 .82.24 1.02.63l1.1 2.22c.25.5.73.83 1.29.89.55.06 1.1-.17 1.46-.61l1.6-1.94c.4-.49 1.02-.77 1.66-.77s1.26.28 1.66.77l1.6 1.94c.36.44.91.67 1.46.61.56-.06 1.04-.39 1.29-.89l1.1-2.22c.2-.39.59-.63 1.02-.63h2.47c.54 0 1.02-.31 1.25-.8.23-.49.17-1.06-.15-1.5l-1.45-2.02c-.37-.56-.57-1.22-.57-1.89zM10.82 17.5l-4.52-4.52 1.41-1.41 3.11 3.11 7.21-7.21 1.41 1.41-8.62 8.62z"></path></svg>
       </div>
     </div>
     
@@ -188,102 +221,105 @@
       Core Contributor & System Administrator for EpoMail ecosystem. Passionate about secure communication and high-performance architecture.
     </p>
 
+    <!-- Detailed Subtitle Tags -->
+    <div class="sub-tags-list">
+      <div class="sub-tag-item">
+        <svg class="ic" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+        Timezone: Beijing (GMT+8)
+      </div>
+      <div class="sub-tag-item">
+        <svg class="ic" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+        Identity Group: Administrator
+      </div>
+      <div class="sub-tag-item">
+        <svg class="ic" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+        Joined: Aug 2026
+      </div>
+    </div>
+
     <button class="btn-message">
       <svg class="ic" viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
       发送邮件联系我 (Message)
     </button>
   </div>
 
-  <!-- Right Side: Analytics Density Bento Grid -->
-  <div class="profile-bento">
+  <!-- Right Side: Analytics Dashboard -->
+  <div class="profile-analysis">
     
-    <!-- Meta Tag Bar -->
-    <div class="bento-card card-span-3 meta-bar">
-      <div class="meta-tag">
-        <svg class="ic" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
-        Beijing (GMT+8)
+    <div class="section-heading">账户数据与分析页看板 (Account Analytics)</div>
+
+    <!-- Top Gradient Cards (Learning from Analysis Page) -->
+    <div class="stats-row">
+      <div class="stat-card blue">
+        <div class="stat-title"><svg class="ic" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg> 今日发件 (Sent Today)</div>
+        <div class="stat-val">124</div>
       </div>
-      <div class="meta-tag">
-        <svg class="ic" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
-        Administrator
+      <div class="stat-card orange">
+        <div class="stat-title"><svg class="ic" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg> 今日拦截 (Blocked)</div>
+        <div class="stat-val">38</div>
       </div>
-      <div class="meta-tag">
-        <svg class="ic" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
-        Joined Aug 2026
-      </div>
-      <div class="meta-tag" style="margin-left: auto;">
-        <span style="display:inline-block; width:8px; height:8px; background:var(--success); border-radius:50%; margin-right:4px; box-shadow: 0 0 8px var(--success);"></span>
-        Active Status
+      <div class="stat-card green">
+        <div class="stat-title"><svg class="ic" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg> 安全防护指数 (Security)</div>
+        <div class="stat-val">99%</div>
       </div>
     </div>
 
-    <!-- Storage Graphic -->
-    <div class="bento-card">
-      <div class="card-header">
-        <div class="card-title">
-          <svg class="ic" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg>
-          邮箱容量使用 (Storage)
+    <!-- Charts Row -->
+    <div class="charts-grid">
+      
+      <!-- 邮件增长 (Email Growth Bar Chart) -->
+      <div class="chart-card">
+        <div class="chart-title">
+          <span>邮件处理趋势 (Email Growth)</span>
+          <span style="font-size:12px; font-weight:normal;">近7日发送量</span>
+        </div>
+        <div class="bar-chart-container">
+          <div class="chart-gridlines">
+            <div class="gridline" data-val="100"></div>
+            <div class="gridline" data-val="50"></div>
+            <div class="gridline" data-val="0"></div>
+          </div>
+          
+          <div class="bar-col"><div class="bar blue" style="height: 30%;" data-tooltip="30"></div><div class="bar-label">8/10</div></div>
+          <div class="bar-col"><div class="bar blue" style="height: 55%;" data-tooltip="55"></div><div class="bar-label">8/11</div></div>
+          <div class="bar-col"><div class="bar blue" style="height: 40%;" data-tooltip="40"></div><div class="bar-label">8/12</div></div>
+          <div class="bar-col"><div class="bar blue" style="height: 80%;" data-tooltip="80"></div><div class="bar-label">8/13</div></div>
+          <div class="bar-col"><div class="bar blue" style="height: 45%;" data-tooltip="45"></div><div class="bar-label">8/14</div></div>
+          <div class="bar-col"><div class="bar blue" style="height: 90%;" data-tooltip="90"></div><div class="bar-label">8/15</div></div>
+          <div class="bar-col"><div class="bar green" style="height: 124px;" data-tooltip="124"></div><div class="bar-label" style="color:var(--text-primary); font-weight:bold;">今日</div></div>
         </div>
       </div>
-      <div class="storage-ring-wrapper">
-        <div class="storage-ring">
-          <div class="storage-ring-value">
-            64%
-            <span>320 / 500 MB</span>
+
+      <!-- 邮件来源 (Email Sources Pie Chart) -->
+      <div class="chart-card">
+        <div class="chart-title">
+          <span>邮件来源分布 (Sources)</span>
+        </div>
+        <div class="pie-chart-container">
+          <div class="pie-ring">
+            <div class="pie-total">
+              <span class="pie-total-val">34k</span>
+              <span class="pie-total-lbl">Total</span>
+            </div>
+          </div>
+          
+          <div class="pie-legend">
+            <div class="legend-item">
+              <div class="legend-dot"><div class="dot" style="background:#3b82f6;"></div> EpoMail</div>
+              <span style="font-family: monospace;">60%</span>
+            </div>
+            <div class="legend-item">
+              <div class="legend-dot"><div class="dot" style="background:#10b981;"></div> Webhook</div>
+              <span style="font-family: monospace;">25%</span>
+            </div>
+            <div class="legend-item">
+              <div class="legend-dot"><div class="dot" style="background:#f59e0b;"></div> API</div>
+              <span style="font-family: monospace;">15%</span>
+            </div>
           </div>
         </div>
       </div>
-    </div>
 
-    <!-- 7-Day Activity Chart -->
-    <div class="bento-card card-span-2">
-      <div class="card-header">
-        <div class="card-title">
-          <svg class="ic" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
-          7天活跃处理量 (Activity)
-        </div>
-        <div style="font-size:12px; color:var(--text-muted);">近7日数据</div>
-      </div>
-      
-      <div class="css-bar-chart">
-        <div class="chart-col"><div class="bar-wrapper"><div class="bar" style="height: 20%; background:var(--accent-primary);"></div></div><span class="chart-label">M</span></div>
-        <div class="chart-col"><div class="bar-wrapper"><div class="bar" style="height: 45%;"></div></div><span class="chart-label">T</span></div>
-        <div class="chart-col"><div class="bar-wrapper"><div class="bar" style="height: 60%; background:var(--accent-primary);"></div></div><span class="chart-label">W</span></div>
-        <div class="chart-col"><div class="bar-wrapper"><div class="bar" style="height: 30%;"></div></div><span class="chart-label">T</span></div>
-        <div class="chart-col"><div class="bar-wrapper"><div class="bar" style="height: 85%; background:var(--accent-primary);"></div></div><span class="chart-label">F</span></div>
-        <div class="chart-col"><div class="bar-wrapper"><div class="bar" style="height: 15%;"></div></div><span class="chart-label">S</span></div>
-        <div class="chart-col"><div class="bar-wrapper"><div class="bar" style="height: 25%;"></div></div><span class="chart-label">S</span></div>
-      </div>
-    </div>
-
-    <!-- Stats Grid -->
-    <div class="bento-card card-span-3">
-      <div class="card-header" style="margin-bottom:8px;">
-        <div class="card-title">
-          <svg class="ic" viewBox="0 0 24 24"><path d="M12 20v-6M6 20V10M18 20V4"></path></svg>
-          各项使用指标 (Usage Indicators)
-        </div>
-      </div>
-      <div class="stats-grid">
-        
-        <div class="stat-item">
-          <span class="stat-lbl">累计发送量</span>
-          <span class="stat-val">12,420 <small>封</small></span>
-        </div>
-        <div class="stat-item">
-          <span class="stat-lbl">累计拦截量 (规则)</span>
-          <span class="stat-val" style="color:var(--warning);">1,284 <small>次</small></span>
-        </div>
-        <div class="stat-item">
-          <span class="stat-lbl">自定义过滤规则</span>
-          <span class="stat-val">34 <small>条</small></span>
-        </div>
-        <div class="stat-item">
-          <span class="stat-lbl">关联及别名账户</span>
-          <span class="stat-val">3 <small>个</small></span>
-        </div>
-
-      </div>
     </div>
 
   </div>

@@ -13,7 +13,8 @@ import { chromium } from 'playwright';
     await page.waitForTimeout(2000);
     
     console.log('Filling in incorrect login details...');
-    await page.locator('#epo-email').fill('notexist@epomail.bond');
+    const randomEmail = `test_${Math.floor(Math.random() * 10000)}@epomail.bond`;
+    await page.locator('#epo-email').fill(randomEmail);
     await page.locator('#epo-password').fill('WrongPassword123!');
     
     console.log('Submitting login form...');
@@ -36,9 +37,10 @@ import { chromium } from 'playwright';
     
     // Now trigger lockout (5 attempts total)
     console.log('Triggering lockout...');
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < 5; i++) {
+        await page.waitForTimeout(1000); // wait for state to reset
         await page.getByRole('button', { name: /Initiate Login/i }).click();
-        await page.waitForTimeout(1000);
+        await page.waitForTimeout(1500); // wait for fetch
     }
     
     await page.waitForSelector('text=请稍后尝试', { timeout: 5000 }).catch(() => {});
