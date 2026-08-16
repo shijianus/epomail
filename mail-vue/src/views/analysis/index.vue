@@ -237,7 +237,7 @@ onMounted(() => {
 
     // 计算拦截率
     if (receiveTotal.value > 0) {
-      interceptRate.value = ((data.numberCount.interceptReceiveTotal || 0) / receiveTotal.value * 100).toFixed(1);
+      interceptRate.value = Number(((data.numberCount.interceptReceiveTotal || 0) / receiveTotal.value * 100).toFixed(1));
     } else {
       interceptRate.value = 0;
     }
