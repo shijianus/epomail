@@ -5,7 +5,13 @@
     </div>
     <div class="tabs-wrapper" v-if="!firstLoading">
       <el-tabs v-model="activeTab" class="custom-tabs">
-        <el-tab-pane label="基本设置" name="basic">
+        <el-tab-pane name="basic">
+          <template #label>
+            <div style="display: flex; align-items: center; gap: 4px;">
+              <Icon icon="mdi:cog-outline" width="16" />
+              <span>基本设置</span>
+            </div>
+          </template>
           <el-scrollbar class="scroll">
             <div class="scroll-body">
               <div class="card-grid">
@@ -247,7 +253,13 @@
         </el-tab-pane>
 
         <!-- 分析面板 Tab -->
-        <el-tab-pane label="分析面板" name="analytics">
+        <el-tab-pane name="analytics">
+          <template #label>
+            <div style="display: flex; align-items: center; gap: 4px; font-weight: 600;">
+              <Icon icon="mdi:shield-alert-outline" width="16" />
+              <span>拦截/防护概览</span>
+            </div>
+          </template>
           <el-scrollbar class="scroll">
             <div class="scroll-body analytics-body">
 
@@ -530,7 +542,7 @@ import { useI18n } from 'vue-i18n'
 const { t, locale } = useI18n()
 
 const firstLoading = ref(true)
-const activeTab = ref('basic')
+const activeTab = ref('analytics') // 默认展示拦截分析面板
 
 const analyticsData = reactive({
   totalProcessed: 0,

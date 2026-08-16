@@ -84,6 +84,19 @@
                   <div class="email-text">
                     <span class="email-subject" :style="(item.unread === EmailUnreadEnum.UNREAD && showUnread)  ? 'font-weight: bold' : ''">
                       <span v-if="item.code" class="code-tag" @click.stop="copyCode(item.code)">[{{ t('codeLabel') }}{{ item.code }}]</span>
+                      
+                      <!-- 拦截腔调：专属警示徽标 -->
+                      <el-tag 
+                        size="small" 
+                        type="danger" 
+                        effect="dark" 
+                        class="spam-intercept-tag" 
+                        v-if="item.isSpam === 1 || (item.labels && (item.labels.includes('推销') || item.labels.includes('垃圾')))" 
+                        style="margin-right: 6px; font-weight: 700; border-radius: 4px; box-shadow: 0 2px 4px rgba(245, 108, 108, 0.2);"
+                      >
+                        <Icon icon="mdi:shield-alert" width="12" style="margin-right: 2px;" /> 拦截
+                      </el-tag>
+
                       <el-tag size="small" type="info" class="folder-tag" v-if="emailStore.searchParsed.isGlobal" style="margin-right: 5px; height: 18px; padding: 0 4px; line-height: 16px; display: inline-flex; align-items: center; vertical-align: middle;">{{ getFolderTag(item) }}</el-tag>
                       <span class="subject-text">
                         <slot name="subject" :email="item" >

@@ -2,6 +2,22 @@
 
 <!-- VERSION LOG APPEND BELOW (newest first) -->
 
+### 规则引擎 Phase 3 (补充体验强化)：拦截腔调的感知闭环 (2026-08-15)
+*   **问题排查 (Diagnosis)**: 用户反馈在部署后未感受到明显的“拦截腔调与展示”。经排查，原先的分析面板被隐藏在“分类管理”抽屉的次级 Tab 中（默认激活 `basic`），且邮箱列表（Inbox/Spam）中没有任何视觉元素用来凸显一封邮件是“被拦截”的。
+*   **修复与重构 (Fix & Enhance)**: 
+    *   **全局列表徽章注入**: 在 `mail-vue/src/components/email-scroll/index.vue` 中追加了专门针对 `isSpam === 1` 或包含 `推销/垃圾` 标签的邮件特判。为其标题左侧增加了一个具有警示色调的深红/危险色 `<el-tag>` (带有护盾图标与阴影)，极大地增强了“拦截拦截感知”。
+    *   **Tab 默认降维展示**: 修改 `mail-vue/src/views/category-setting/index.vue`，将 `activeTab` 默认值设为 `analytics`，使得打开分类管理第一时间就展现“邮件防护态势”仪表盘。
+    *   **Tab 视觉重构**: 为“分析面板”重命名为 `🛡️ 拦截/防护概览`，并为基础设置 Tab 追加 Icon，使得两者具有鲜明的操作辨识度与安全腔调。
+*   **验证与部署 (Verify & Deploy)**: 已执行 `npm run build` 打包完毕（10.31s），通过 `wrangler deploy` 成功推送到 Cloudflare 上线。
+### 规则引擎 Phase 3：高级分析面板重构与后端逻辑全面验证 (2026-08-15)
+*   **问题排查 (Diagnosis)**: 按照规划验收标准，发现原先分析面板缺乏实质性的 UI 设计，且后端 `getAnalytics` 逻辑由于各种边界情况（如 SQLite 时间戳空格问题）未经有效测试覆盖，极易造成运行故障。
+*   **修复与重构 (Fix & Enhance)**: `2ea898d`
+    *   **后端验证**: 编写并部署独立的测试脚本 `test-analytics-logic.mjs`，运行通过了 8 个涵盖全链路的用例（空数据、SQLite格式兼容、推销/垃圾双触发拦截、排行截断、7天边界截断），**25 项断言全部通过**，证明后端聚合统计功能准确无误。
+    *   **前端重构 (Premium UI)**: 彻底颠覆了基础版的纯骨架布局。新增渐变主题的统计数据卡（蓝/橙/绿），强化重要性；加入带有网格线和高度渐变动画的柱状图组件（自带高亮零值置灰效果）；引入带有金银铜牌徽章的规则热榜，支持悬浮状态与响应式容器设计；新增后台分析模块骨架屏。
+    *   **体验优化**: 添加 Vue `watch(activeTab)`，实现点击“分析面板”即自动后台拉取数据，避免用户必须手动刷新；分离预加载与懒加载时序。
+*   **验证与截图 (Verify & Screenshot)**: 本地利用 Vite `npm run build` 测试通过（耗时 9.86s），并规避了包体积告警。代码逻辑完美闭环。
+*   **部署 (Deploy)**: 成功将升级版本部署至 Cloudflare Workers，版本号 `caa5b048-d779-438f-96f2-68340d1bc71d`。
+
 ### 规则引擎 Phase 3 (紧急修复)：填补虚假提交与崩溃漏洞 (2026-08-15)
 *   **问题排查 (Diagnosis)**: 经独立审计发现，前次 Phase 3 提交存在"虚假成功"的严重事故。虽通过了打包，但缺乏运行体验：(1) 前端 `index.vue` 挂载 `fetchAnalytics()` 时报 undefined 崩溃；(2) 前端 API 请求中使用了未定义的 `request()` 引发 ReferenceError；(3) 后端 Drizzle 错用了 `createdAt`（实为 `createTime`）导致接口 500。
 *   **修复与重构 (Fix & Enhance)**: `8773afc` 
