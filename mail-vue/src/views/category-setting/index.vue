@@ -250,43 +250,78 @@
         <el-tab-pane label="分析面板" name="analytics">
           <el-scrollbar class="scroll">
             <div class="scroll-body analytics-body">
+              <!-- 顶部操作栏 -->
+              <div class="analytics-header">
+                <span class="analytics-title">邮件处理态势感知</span>
+                <el-button size="small" :loading="analyticsLoading" @click="fetchAnalytics" plain>
+                  <Icon icon="mdi:refresh" width="14" style="margin-right:4px;" />刷新数据
+                </el-button>
+              </div>
+
               <div class="analytics-card-grid">
                 
+                <!-- 概览卡片 -->
                 <div class="analytics-card stats-overview">
                   <div class="stat-item">
+                    <div class="stat-icon"><Icon icon="mdi:email-outline" width="24" /></div>
+                    <div class="stat-value">{{ analyticsData.totalProcessed }}</div>
                     <div class="stat-label">累计处理邮件</div>
-                    <div class="stat-value">{{ analyticsData.totalProcessed || 0 }}</div>
                   </div>
-                  <div class="stat-item">
-                    <div class="stat-label">推销/垃圾拦截总量</div>
-                    <div class="stat-value">{{ analyticsData.totalIntercepted || 0 }}</div>
+                  <div class="stat-item stat-item--warn">
+                    <div class="stat-icon"><Icon icon="mdi:shield-alert-outline" width="24" /></div>
+                    <div class="stat-value">{{ analyticsData.totalIntercepted }}</div>
+                    <div class="stat-label">推销/垃圾拦截量</div>
                   </div>
-                  <div class="stat-item">
+                  <div class="stat-item stat-item--danger">
+                    <div class="stat-icon"><Icon icon="mdi:percent-outline" width="24" /></div>
+                    <div class="stat-value">{{ analyticsData.interceptRate }}</div>
                     <div class="stat-label">系统拦截率</div>
-                    <div class="stat-value">{{ analyticsData.interceptRate || '0%' }}</div>
                   </div>
                 </div>
 
+                <!-- 7天趋势柱状图 -->
                 <div class="analytics-card chart-card">
-                  <div class="card-title">最近 7 天拦截趋势</div>
-                  <div class="css-chart-container">
-                    <div class="css-bar" v-for="item in analyticsData.trend" :key="item.date">
-                      <div class="bar-fill" :style="{ height: item.percent + '%' }"></div>
-                      <div class="bar-label">{{ item.label }}</div>
-                      <div class="bar-tooltip">{{ item.count }} 封</div>
+                  <div class="chart-card-title">
+                    <Icon icon="mdi:chart-bar" width="16" />
+                    <span>最近 7 天拦截趋势</span>
+                  </div>
+                  <div class="css-chart-wrapper">
+                    <div class="css-chart-container">
+                      <template v-if="analyticsData.trend.length">
+                        <div class="css-bar" v-for="item in analyticsData.trend" :key="item.date">
+                          <div class="bar-tooltip">{{ item.count }} 封</div>
+                          <div class="bar-fill" :style="{ height: (item.count === 0 ? 0 : Math.max(4, item.percent)) + '%' }"></div>
+                          <div class="bar-label">{{ item.label }}</div>
+                        </div>
+                      </template>
+                      <div class="chart-empty" v-else>
+                        <Icon icon="mdi:chart-bar-stacked" width="32" />
+                        <span>暂无拦截数据</span>
+                      </div>
                     </div>
+                    <div class="chart-x-axis"></div>
                   </div>
                 </div>
 
+                <!-- 规则活跃度排行 -->
                 <div class="analytics-card rules-card">
-                  <div class="card-title">规则拦截活跃度排行</div>
-                  <div class="rule-ranking-list">
+                  <div class="chart-card-title">
+                    <Icon icon="mdi:trophy-outline" width="16" />
+                    <span>规则拦截活跃度排行</span>
+                  </div>
+                  <div class="rule-ranking-list" v-if="analyticsData.topRules.length">
                     <div class="rule-rank-item" v-for="(rule, index) in analyticsData.topRules" :key="rule.name">
                       <div class="rank-index" :class="'top-' + (index + 1)">{{ index + 1 }}</div>
                       <div class="rank-name">{{ rule.name }}</div>
+                      <div class="rank-bar-bg">
+                        <div class="rank-bar-fill" :style="{ width: rule.percent + '%' }"></div>
+                      </div>
                       <div class="rank-count">{{ rule.count }} 次</div>
-                      <div class="rank-bar-bg"><div class="rank-bar-fill" :style="{ width: rule.percent + '%' }"></div></div>
                     </div>
+                  </div>
+                  <div class="chart-empty" v-else>
+                    <Icon icon="mdi:trophy-broken" width="32" />
+                    <span>暂无规则命中记录</span>
                   </div>
                 </div>
 
@@ -419,6 +454,7 @@ const analyticsData = reactive({
   trend: [],
   topRules: []
 })
+const analyticsLoading = ref(false)
 const settingLoading = ref(false)
 const settingReady = ref(false)
 let backup = '{}'
@@ -675,11 +711,24 @@ function deduplicateRules(rules) {
 }
 
 async function fetchAnalytics() {
+  if (analyticsLoading.value) return
+  analyticsLoading.value = true
   try {
     const res = await emailAnalytics()
-    Object.assign(analyticsData, res)
+    // Bug Fix #1: Object.assign cannot trigger reactivity for nested arrays on a reactive() object.
+    // Must assign fields individually so Vue 3 proxy intercepts each write.
+    if (res && typeof res === 'object') {
+      analyticsData.totalProcessed = res.totalProcessed ?? 0
+      analyticsData.totalIntercepted = res.totalIntercepted ?? 0
+      analyticsData.interceptRate = res.interceptRate ?? '0%'
+      // Splice-replace arrays to maintain reactive proxy reference
+      analyticsData.trend.splice(0, analyticsData.trend.length, ...(res.trend ?? []))
+      analyticsData.topRules.splice(0, analyticsData.topRules.length, ...(res.topRules ?? []))
+    }
   } catch (e) {
     console.error('Fetch analytics failed:', e)
+  } finally {
+    analyticsLoading.value = false
   }
 }
 
@@ -1181,55 +1230,118 @@ form .el-button {
 
 /* Analytics Dashboard CSS */
 .analytics-body {
-  padding: 20px 0;
+  padding: 16px 0 24px;
+}
+
+.analytics-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.analytics-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
 }
 
 .analytics-card-grid {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px;
 }
 
 .analytics-card {
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
-  border-radius: 8px;
-  padding: 20px;
+  border-radius: 10px;
+  padding: 18px 20px;
 }
 
+/* Stats overview grid */
 .stats-overview {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
-  text-align: center;
+  gap: 0;
+  padding: 4px 0;
 }
 
 .stat-item {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 8px;
+  border-right: 1px solid var(--border-subtle);
+  text-align: center;
+
+  &:last-child {
+    border-right: none;
+  }
+}
+
+.stat-icon {
+  color: var(--el-color-primary);
+  opacity: 0.7;
+  line-height: 1;
+}
+
+.stat-item--warn .stat-icon,
+.stat-item--warn .stat-value {
+  color: var(--el-color-warning);
+}
+
+.stat-item--danger .stat-icon,
+.stat-item--danger .stat-value {
+  color: var(--el-color-danger);
 }
 
 .stat-label {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--text-muted);
+  line-height: 1.3;
 }
 
 .stat-value {
-  font-size: 28px;
-  font-weight: bold;
+  font-size: 26px;
+  font-weight: 700;
   color: var(--el-color-primary);
+  line-height: 1;
+}
+
+/* Chart card */
+.chart-card-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.css-chart-wrapper {
+  position: relative;
+  padding-bottom: 28px;
 }
 
 .css-chart-container {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
-  height: 200px;
-  margin-top: 20px;
-  padding-bottom: 30px;
+  height: 160px;
+  padding-top: 36px; /* space for tooltip */
   position: relative;
-  border-bottom: 1px solid var(--border-subtle);
+}
+
+.chart-x-axis {
+  position: absolute;
+  bottom: 28px;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--border-subtle);
 }
 
 .css-bar {
@@ -1238,70 +1350,89 @@ form .el-button {
   flex-direction: column;
   justify-content: flex-end;
   align-items: center;
-  margin: 0 10px;
   height: 100%;
   position: relative;
-}
+  cursor: default;
 
-.css-bar:hover .bar-tooltip {
-  opacity: 1;
-  transform: translateY(-5px);
+  &:hover .bar-tooltip {
+    opacity: 1;
+    transform: translateY(-4px);
+  }
 }
 
 .bar-fill {
-  width: 100%;
-  max-width: 40px;
+  width: 60%;
+  max-width: 32px;
+  min-width: 8px;
   background: var(--el-color-primary);
   border-radius: 4px 4px 0 0;
-  transition: height 0.5s ease;
-  min-height: 2px;
+  transition: height 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .bar-label {
   position: absolute;
-  bottom: -25px;
-  font-size: 12px;
+  bottom: -22px;
+  font-size: 11px;
   color: var(--text-muted);
+  white-space: nowrap;
 }
 
 .bar-tooltip {
   position: absolute;
-  top: -30px;
-  background: var(--text-primary);
-  color: var(--bg-surface);
-  padding: 4px 8px;
+  top: 4px;
+  left: 50%;
+  transform: translateX(-50%) translateY(0);
+  background: var(--el-text-color-primary);
+  color: var(--el-bg-color);
+  padding: 3px 7px;
   border-radius: 4px;
-  font-size: 12px;
+  font-size: 11px;
   opacity: 0;
-  transition: all 0.2s;
+  transition: opacity 0.2s, transform 0.2s;
   pointer-events: none;
   white-space: nowrap;
+  z-index: 1;
 }
 
+.chart-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: var(--text-muted);
+  font-size: 13px;
+  height: 100%;
+  opacity: 0.6;
+}
+
+/* Rule ranking */
 .rule-ranking-list {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  margin-top: 16px;
+  gap: 14px;
+  margin-top: 14px;
 }
 
 .rule-rank-item {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 
 .rank-index {
-  width: 24px;
-  height: 24px;
-  border-radius: 12px;
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
   background: var(--bg-elevated);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
+  font-size: 11px;
   color: var(--text-muted);
-  font-weight: bold;
+  font-weight: 700;
 }
 
 .rank-index.top-1 { background: #ff4d4f; color: white; }
@@ -1309,7 +1440,8 @@ form .el-button {
 .rank-index.top-3 { background: #52c41a; color: white; }
 
 .rank-name {
-  width: 100px;
+  width: 90px;
+  flex-shrink: 0;
   font-size: 13px;
   color: var(--text-primary);
   white-space: nowrap;
@@ -1319,7 +1451,7 @@ form .el-button {
 
 .rank-bar-bg {
   flex: 1;
-  height: 8px;
+  height: 7px;
   background: var(--bg-elevated);
   border-radius: 4px;
   overflow: hidden;
@@ -1329,14 +1461,17 @@ form .el-button {
   height: 100%;
   background: var(--el-color-primary);
   border-radius: 4px;
-  transition: width 0.5s ease;
+  transition: width 0.6s ease;
+  min-width: 2px;
 }
 
 .rank-count {
-  width: 50px;
+  flex-shrink: 0;
+  width: 46px;
   text-align: right;
-  font-size: 13px;
+  font-size: 12px;
   color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
 }
 
 </style>

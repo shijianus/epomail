@@ -1434,8 +1434,9 @@ const emailService = {
 			topRules: []
 		};
 		try {
-			const totalRow = await orm(c).select({ count: sql`count(*)` }).from(email).where(eq(email.userId, userId)).get();
-			result.totalProcessed = totalRow ? totalRow.count : 0;
+			// Bug Fix #3: Use reliable count via .all() to avoid ambiguous column name
+			const countRows = await orm(c).select({ cnt: sql`count(*) as cnt` }).from(email).where(eq(email.userId, userId)).all();
+			result.totalProcessed = countRows && countRows[0] ? (countRows[0].cnt || 0) : 0;
 
 			const allEmails = await orm(c).select({ createTime: email.createTime, labels: email.labels, isSpam: email.isSpam })
 				.from(email).where(eq(email.userId, userId)).all();
@@ -1452,7 +1453,10 @@ const emailService = {
 			
 			let totalIntercepted = 0;
 			allEmails.forEach(e => {
-				const dateObj = new Date(e.createTime);
+				// Bug Fix #2: SQLite CURRENT_TIMESTAMP is "YYYY-MM-DD HH:MM:SS" (no T).
+				// new Date("2026-08-15 10:00:00") is Invalid Date in V8. Replace space with T.
+				const rawTime = e.createTime ? String(e.createTime).replace(' ', 'T') : '';
+				const dateObj = rawTime ? new Date(rawTime) : new Date();
 				const dateStr = dateObj.toISOString().split('T')[0];
 				
 				let intercepted = false;
