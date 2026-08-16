@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>Analysis Page Mockup (分析大屏验收预览)</title>
+    <!-- 引入 ECharts -->
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #f4f7fc;
+            --card-bg: #ffffff;
+            --text-primary: #303133;
+            --text-regular: #606266;
+            --text-secondary: #909399;
+            --border-color: #ebeef5;
+            --color-success: #67c23a;
+            --color-danger: #f56c6c;
+            --color-primary: #409eff;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-color: var(--bg-color);
+            margin: 0;
+            padding: 24px;
+        }
+
+        .header-title {
+            margin-bottom: 24px;
+            color: var(--text-primary);
+            font-size: 22px;
+            font-weight: 600;
+        }
+
+        .dashboard {
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        /* 顶部数据卡片 */
+        .number-cards {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.05);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .card-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 20px;
+        }
+
+        .card-title {
+            color: var(--text-secondary);
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+
+        .card-value {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .card-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 8px;
+            background: #f0f2f5;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            color: var(--color-primary);
+        }
+
+        .card-bottom {
+            display: flex;
+            gap: 16px;
+            font-size: 13px;
+            color: var(--text-regular);
+            border-top: 1px solid var(--border-color);
+            padding-top: 12px;
+        }
+
+        .val-active { color: var(--color-success); font-weight: 600; }
+        .val-del { color: var(--text-secondary); font-weight: 600; }
+        .val-intercept { color: var(--color-danger); font-weight: 600; }
+
+        /* 图表区域 */
+        .charts-row {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 20px;
+        }
+
+        .chart-card {
+            background: var(--card-bg);
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.05);
+        }
+
+        .chart-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: var(--text-primary);
+        }
+
+        .chart-container {
+            width: 100%;
+            height: 350px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="dashboard">
+    <div class="header-title">📊 分析页 (Analysis) - 概念原型验收版</div>
+
+    <!-- 1. 顶部四大核心指标卡片 -->
+    <div class="number-cards">
+        
+        <!-- 卡片一：收件数量 (增加拦截分类) -->
+        <div class="card">
+            <div class="card-top">
+                <div>
+                    <div class="card-title">收件数量 (Total Received)</div>
+                    <div class="card-value">124,592</div>
+                </div>
+                <div class="card-icon">📥</div>
+            </div>
+            <div class="card-bottom">
+                <div>正常 <span class="val-normal">248,102</span></div>
+                <div>删除 <span class="val-del">12,400</span></div>
+            </div>
+        </div>
+
+        <!-- 卡片二：发件数量 -->
+        <div class="card">
+            <div class="card-top">
+                <div>
+                    <div class="card-title">发件数量 (Total Sent)</div>
+                    <div class="card-value">8,340</div>
+                </div>
+                <div class="card-icon">📤</div>
+            </div>
+            <div class="card-bottom">
+                <div>正常 <span class="val-active">8,200</span></div>
+                <div>删除 <span class="val-del">140</span></div>
+            </div>
+        </div>
+
+        <!-- 卡片三：(原)邮箱数量 -> (新) 系统拦截率 -->
+        <div class="card">
+            <div class="card-top">
+                <div>
+                    <!-- ✨ 优化：替换毫无意义的邮箱数量，采用体现系统价值的拦截率 -->
+                    <div class="card-title">系统拦截率 (Intercept Rate)</div>
+                    <div class="card-value" style="color: var(--color-danger)">14.4%</div>
+                </div>
+                <div class="card-icon" style="color: var(--color-primary); background: #ebf5ff;">🛡️</div>
+            </div>
+            <div class="card-bottom">
+                <div>垃圾邮件 <span style="color: #E6A23C; font-weight: 600;">18,020</span></div>
+                <div>拦截邮件 <span class="val-intercept" style="color: #F56C6C; font-weight: 600;">0</span></div>
+            </div>
+        </div>
+
+        <!-- 卡片四：用户数量 -->
+        <div class="card">
+            <div class="card-top">
+                <div>
+                    <div class="card-title">用户数量 (Total Users)</div>
+                    <div class="card-value">2,150</div>
+                </div>
+                <div class="card-icon">👥</div>
+            </div>
+            <div class="card-bottom">
+                <div>正常 <span class="val-active">2,100</span></div>
+                <div>封禁 <span class="val-del">50</span></div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- 2. 图表区域 -->
+    <div class="charts-row">
+        
+        <!-- 左侧：邮件来源 (饼图使用阴影区分拦截来源) -->
+        <div class="chart-card">
+            <div class="chart-title">邮件来源 (Email Source)</div>
+            <div id="pieChart" class="chart-container"></div>
+        </div>
+
+        <!-- 右侧：邮件增长 (柱状图加入拦截柱状) -->
+        <div class="chart-card">
+            <div class="chart-title">邮件增长 (Email Growth)</div>
+            <div id="barChart" class="chart-container"></div>
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+    // ==========================================
+    // 1. 邮件来源 (饼图) 渲染逻辑
+    // ==========================================
+    var pieChart = echarts.init(document.getElementById('pieChart'));
+    var pieOption = {
+        tooltip: {
+            trigger: 'item',
+            formatter: '{b}: {c} ({d}%)'
+        },
+        legend: {
+            type: 'scroll',
+            orient: 'vertical',
+            left: '10',  // 严格遵循基准画风：图例在左侧
+            top: '20'
+        },
+        series: [
+            {
+                name: '来源',
+                type: 'pie',
+                radius: ['40%', '65%'],
+                center: ['72%', '45%'], // 将图表主体偏向右侧为左侧图例留出空间
+                avoidLabelOverlap: false,
+                itemStyle: {
+                    borderRadius: 4,
+                    borderColor: '#fff',
+                    borderWidth: 2
+                },
+                label: { show: false },
+                data: [
+                    // ✨ 正常来源：使用普通填充
+                    { value: 1048, name: 'Google Workspace', itemStyle: { color: '#409eff' } },
+                    { value: 735, name: 'Microsoft 365', itemStyle: { color: '#67c23a' } },
+                    { value: 580, name: 'Amazon SES', itemStyle: { color: '#e6a23c' } },
+                    // ✨ 拦截来源：使用阴影+斜纹 (Decal) 视觉区分
+                    { 
+                        value: 484, 
+                        name: '促销推广 (被拦截)', 
+                        itemStyle: { 
+                            color: '#f56c6c',
+                            // 阴影效果
+                            shadowBlur: 10,
+                            shadowColor: 'rgba(245, 108, 108, 0.5)',
+                            // 斜线纹理替代实心填充
+                            decal: {
+                                symbol: 'rect',
+                                color: 'rgba(255, 255, 255, 0.4)',
+                                dashArrayX: [1, 0],
+                                dashArrayY: [2, 5],
+                                rotation: Math.PI / 4
+                            }
+                        } 
+                    },
+                    { 
+                        value: 300, 
+                        name: '可疑发件人 (被拦截)', 
+                        itemStyle: { 
+                            color: '#909399',
+                            shadowBlur: 10,
+                            shadowColor: 'rgba(144, 147, 153, 0.5)',
+                            decal: {
+                                symbol: 'rect',
+                                color: 'rgba(255, 255, 255, 0.4)',
+                                dashArrayX: [1, 0],
+                                dashArrayY: [2, 5],
+                                rotation: Math.PI / 4
+                            }
+                        } 
+                    }
+                ]
+            }
+        ]
+    };
+    pieChart.setOption(pieOption);
+
+
+    // ==========================================
+    // 2. 邮件增长 (堆叠柱状图) 渲染逻辑
+    // ==========================================
+    var barChart = echarts.init(document.getElementById('barChart'));
+    var dates = ['08-09', '08-10', '08-11', '08-12', '08-13', '08-14', '08-15'];
+    
+    var barOption = {
+        tooltip: {
+            trigger: 'axis',
+            axisPointer: { type: 'shadow' }
+        },
+        legend: {
+            data: ['收件', '发件', '拦截'],
+            top: '0'
+        },
+        grid: {
+            left: '18',
+            right: '18',
+            bottom: '15',
+            top: '50',
+            containLabel: true
+        },
+        xAxis: {
+            type: 'category',
+            data: dates,
+            axisTick: { show: false },
+            axisLine: {
+                show: true,
+                lineStyle: { color: '#ccc', width: 1 }
+            }
+        },
+        yAxis: {
+            type: 'value',
+            splitLine: {
+                show: true,
+                lineStyle: { type: 'solid', color: '#eee' }
+            }
+        },
+        series: [
+            {
+                name: '收件',
+                type: 'bar',
+                stack: 'total', // 严格遵循基准画风：柱状图堆叠
+                itemStyle: { color: '#409eff' },
+                data: [320, 332, 301, 334, 390, 330, 320]
+            },
+            {
+                name: '发件',
+                type: 'bar',
+                stack: 'total', // 堆叠
+                itemStyle: { color: '#67c23a' },
+                data: [120, 132, 101, 134, 90, 230, 210]
+            },
+            // ✨ 新增拦截数据堆叠柱状体
+            {
+                name: '拦截',
+                type: 'bar',
+                stack: 'total', // 堆叠在收发件上
+                itemStyle: { 
+                    color: '#f56c6c'
+                },
+                data: [50, 80, 45, 120, 40, 60, 110]
+            }
+        ]
+    };
+    barChart.setOption(barOption);
+
+    // 响应式自适应
+    window.addEventListener('resize', function() {
+        pieChart.resize();
+        barChart.resize();
+    });
+</script>
+</body>
+</html>

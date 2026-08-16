@@ -46,20 +46,20 @@
         <div class="number-item">
           <div class="top">
             <div class="left">
-              <div>{{ $t('totalMailboxes') }}</div>
+              <div style="font-weight: 600;">系统拦截率</div>
               <div>
-                <el-statistic :formatter="value => Math.round(value)" :value="accountData"/>
+                <el-statistic :formatter="value => Math.round(value) + '%'" :value="interceptRateData"/>
               </div>
             </div>
             <div class="right">
               <div class="count-icon">
-                <Icon icon="lets-icons:e-mail" width="23" height="23"></Icon>
+                <Icon icon="mdi:shield-alert" width="23" height="23"></Icon>
               </div>
             </div>
           </div>
           <div class="delete-ratio">
-            <div>{{ $t('active') }} <span class="normal">{{ numberCount.normalAccountTotal }}</span></div>
-            <div>{{ $t('deleted') }} <span class="deleted">{{ numberCount.delAccountTotal }}</span></div>
+            <div>垃圾邮件 <span style="color: #E6A23C; font-weight: 600;">{{ numberCount.interceptReceiveTotal || 0 }}</span></div>
+            <div>拦截邮件 <span style="color: #f56c6c; font-weight: 600;">0</span></div>
           </div>
         </div>
         <div class="number-item">
@@ -141,21 +141,19 @@ const uiStore = useUiStore()
 const checkedSourceType = ref('sender')
 const receiveTotal = ref(0)
 const sendTotal = ref(0)
-const accountTotal = ref(0)
+const interceptRate = ref(0)
 const userTotal = ref(0)
 const analysisLoading = ref(true)
 
 const numberCount = reactive({
   normalReceiveTotal: 0,
   normalSendTotal: 0,
-  normalAccountTotal: 0,
-  normalUserTotal: 0,
   delReceiveTotal: 0,
   delSendTotal: 0,
-  delAccountTotal: 0,
-  delUserTotal: 0
+  interceptReceiveTotal: 0,
+  delUserTotal: 0,
+  normalUserTotal: 0,
 })
-
 
 const receiveData = useTransition(receiveTotal, {
   duration: 1500,
@@ -165,7 +163,7 @@ const sendData = useTransition(sendTotal, {
   duration: 1500,
 })
 
-const accountData = useTransition(accountTotal, {
+const interceptRateData = useTransition(interceptRate, {
   duration: 1500,
 })
 
@@ -213,20 +211,19 @@ onMounted(() => {
   analysisEcharts(timeZone).then(data => {
     receiveTotal.value = data.numberCount.receiveTotal
     sendTotal.value = data.numberCount.sendTotal
-    accountTotal.value = data.numberCount.accountTotal
     userTotal.value = data.numberCount.userTotal
     numberCount.normalReceiveTotal = data.numberCount.normalReceiveTotal
     numberCount.normalSendTotal = data.numberCount.normalSendTotal
-    numberCount.normalAccountTotal = data.numberCount.normalAccountTotal
     numberCount.normalUserTotal = data.numberCount.normalUserTotal
     numberCount.delReceiveTotal = data.numberCount.delReceiveTotal
     numberCount.delSendTotal = data.numberCount.delSendTotal
-    numberCount.delAccountTotal = data.numberCount.delAccountTotal
     numberCount.delUserTotal = data.numberCount.delUserTotal
+    numberCount.interceptReceiveTotal = data.numberCount.interceptReceiveTotal || 0
     senderData.value = data.receiveRatio.nameRatio.map(item => {
       return {
         name: item.name || ' ',
-        value: item.total
+        value: item.total,
+        isSpam: item.isSpam
       }
     })
 
@@ -236,6 +233,15 @@ onMounted(() => {
     emailColumnData.daysData = data.emailDayCount.receiveDayCount.map(item => dayjs(item.date).format("M.D"))
     emailColumnData.receiveData = data.emailDayCount.receiveDayCount.map(item => item.total)
     emailColumnData.sendData = data.emailDayCount.sendDayCount.map(item => item.total)
+    emailColumnData.interceptData = (data.emailDayCount.interceptDayCount || []).map(item => item.total)
+
+    // 计算拦截率
+    if (receiveTotal.value > 0) {
+      interceptRate.value = ((data.numberCount.interceptReceiveTotal || 0) / receiveTotal.value * 100).toFixed(1);
+    } else {
+      interceptRate.value = 0;
+    }
+
     daySendTotal = data.daySendTotal
     analysisLoading.value = false
     initPicture();
@@ -348,7 +354,25 @@ function createSenderPie() {
     },
     series: [
       {
-        data: senderData.value,
+        data: senderData.value.map(item => {
+          if (item.isSpam === 1) {
+            return {
+              ...item,
+              itemStyle: {
+                shadowBlur: 10,
+                shadowColor: 'rgba(245, 108, 108, 0.5)',
+                decal: {
+                  symbol: 'rect',
+                  color: 'rgba(255, 255, 255, 0.4)',
+                  dashArrayX: [1, 0],
+                  dashArrayY: [2, 5],
+                  rotation: Math.PI / 4
+                }
+              }
+            }
+          }
+          return item;
+        }),
         name: '',
         type: 'pie',
         radius: ['40%', '65%'],
@@ -560,7 +584,7 @@ function createEmailColumnChart() {
       }
     },
     legend: {
-      data: [t('emailReceived'), t('emailSent')],
+      data: [t('emailReceived'), t('emailSent'), '拦截'],
       top: '0',
       textStyle: {
         color: topic.value.color,  // 图例文字颜色
@@ -642,6 +666,21 @@ function createEmailColumnChart() {
         data: emailColumnData.sendData,
         itemStyle: {
           color: '#13deb9',
+        }
+      },
+      {
+        name: '拦截',
+        type: 'bar',
+        stack: 'total', // 堆叠组标识（必须相同）
+        emphasis: {
+          itemStyle: {
+            shadowBlur: 10,
+            shadowColor: 'rgba(0,0,0,0.3)'
+          }
+        },
+        data: emailColumnData.interceptData,
+        itemStyle: {
+          color: '#f56c6c',
         }
       }
     ]

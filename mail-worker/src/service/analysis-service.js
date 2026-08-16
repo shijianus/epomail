@@ -62,15 +62,16 @@ const analysisService = {
 			userDayCountRaw,
 			receiveDayCountRaw,
 			sendDayCountRaw,
+			interceptDayCountRaw,
 			daySendTotalRaw
 		] = await Promise.all([
 			analysisDao.numberCount(c),
 
 			orm(c)
-				.select({ name: email.name, total: count() })
+				.select({ name: email.name, total: count(), isSpam: email.isSpam })
 				.from(email)
 				.where(and(eq(email.type, emailConst.type.RECEIVE), isNotNull(email.name),ne(email.name,'noreply'), ne(email.name,'')))
-				.groupBy(email.name)
+				.groupBy(email.name, email.isSpam)
 				.orderBy(desc(count()))
 				.limit(6),
 
@@ -78,6 +79,7 @@ const analysisService = {
 			analysisDao.userDayCount(c, diffHours),
 			analysisDao.receiveDayCount(c, diffHours),
 			analysisDao.sendDayCount(c, diffHours),
+			analysisDao.interceptDayCount(c, diffHours),
 
 			c.env.kv.get(kvConst.SEND_DAY_COUNT + dayjs().format('YYYY-MM-DD')),
 		]);
@@ -86,6 +88,7 @@ const analysisService = {
 		const userDayCount = this.filterEmptyDay(userDayCountRaw, timeZone);
 		const receiveDayCount = this.filterEmptyDay(receiveDayCountRaw, timeZone);
 		const sendDayCount = this.filterEmptyDay(sendDayCountRaw, timeZone);
+		const interceptDayCount = this.filterEmptyDay(interceptDayCountRaw, timeZone);
 
 		const daySendTotal = daySendTotalRaw || 0;
 
@@ -97,7 +100,8 @@ const analysisService = {
 			},
 			emailDayCount: {
 				receiveDayCount,
-				sendDayCount
+				sendDayCount,
+				interceptDayCount
 			},
 			daySendTotal: Number(daySendTotal)
 		};
