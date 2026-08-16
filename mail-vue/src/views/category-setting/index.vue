@@ -250,78 +250,163 @@
         <el-tab-pane label="分析面板" name="analytics">
           <el-scrollbar class="scroll">
             <div class="scroll-body analytics-body">
+
               <!-- 顶部操作栏 -->
               <div class="analytics-header">
-                <span class="analytics-title">邮件处理态势感知</span>
-                <el-button size="small" :loading="analyticsLoading" @click="fetchAnalytics" plain>
+                <div class="analytics-header-left">
+                  <div class="analytics-icon-badge">
+                    <Icon icon="mdi:shield-check-outline" width="18" />
+                  </div>
+                  <div>
+                    <div class="analytics-title">邮件防护态势</div>
+                    <div class="analytics-subtitle">实时聚合 · 规则引擎分析报告</div>
+                  </div>
+                </div>
+                <el-button size="small" :loading="analyticsLoading" @click="fetchAnalytics" plain class="refresh-btn">
                   <Icon icon="mdi:refresh" width="14" style="margin-right:4px;" />刷新数据
                 </el-button>
               </div>
 
-              <div class="analytics-card-grid">
-                
-                <!-- 概览卡片 -->
-                <div class="analytics-card stats-overview">
-                  <div class="stat-item">
-                    <div class="stat-icon"><Icon icon="mdi:email-outline" width="24" /></div>
-                    <div class="stat-value">{{ analyticsData.totalProcessed }}</div>
-                    <div class="stat-label">累计处理邮件</div>
+              <!-- 加载状态骨架屏 -->
+              <div class="analytics-skeleton" v-if="analyticsLoading && !analyticsData.totalProcessed">
+                <div class="skeleton-row">
+                  <div class="skeleton-card sk-stat" v-for="n in 3" :key="n">
+                    <div class="sk-icon"></div>
+                    <div class="sk-val"></div>
+                    <div class="sk-label"></div>
                   </div>
-                  <div class="stat-item stat-item--warn">
-                    <div class="stat-icon"><Icon icon="mdi:shield-alert-outline" width="24" /></div>
-                    <div class="stat-value">{{ analyticsData.totalIntercepted }}</div>
-                    <div class="stat-label">推销/垃圾拦截量</div>
+                </div>
+                <div class="skeleton-card sk-chart"></div>
+                <div class="skeleton-card sk-rules"></div>
+              </div>
+
+              <div class="analytics-content" v-else>
+
+                <!-- 统计卡片行 -->
+                <div class="stat-cards-row">
+                  <!-- 总处理量 -->
+                  <div class="stat-card stat-card--blue">
+                    <div class="stat-card-bg-icon">
+                      <Icon icon="mdi:email-multiple-outline" width="52" />
+                    </div>
+                    <div class="stat-card-body">
+                      <div class="stat-card-icon blue-icon">
+                        <Icon icon="mdi:email-outline" width="20" />
+                      </div>
+                      <div class="stat-card-value">{{ analyticsData.totalProcessed.toLocaleString() }}</div>
+                      <div class="stat-card-label">累计处理邮件</div>
+                    </div>
                   </div>
-                  <div class="stat-item stat-item--danger">
-                    <div class="stat-icon"><Icon icon="mdi:percent-outline" width="24" /></div>
-                    <div class="stat-value">{{ analyticsData.interceptRate }}</div>
-                    <div class="stat-label">系统拦截率</div>
+
+                  <!-- 拦截量 -->
+                  <div class="stat-card stat-card--amber">
+                    <div class="stat-card-bg-icon">
+                      <Icon icon="mdi:shield-alert-outline" width="52" />
+                    </div>
+                    <div class="stat-card-body">
+                      <div class="stat-card-icon amber-icon">
+                        <Icon icon="mdi:shield-alert-outline" width="20" />
+                      </div>
+                      <div class="stat-card-value amber-val">{{ analyticsData.totalIntercepted.toLocaleString() }}</div>
+                      <div class="stat-card-label">推销/垃圾拦截量</div>
+                    </div>
+                  </div>
+
+                  <!-- 拦截率 -->
+                  <div class="stat-card stat-card--green">
+                    <div class="stat-card-bg-icon">
+                      <Icon icon="mdi:security" width="52" />
+                    </div>
+                    <div class="stat-card-body">
+                      <div class="stat-card-icon green-icon">
+                        <Icon icon="mdi:percent-outline" width="20" />
+                      </div>
+                      <div class="stat-card-value green-val">{{ analyticsData.interceptRate }}</div>
+                      <div class="stat-card-label">系统拦截率</div>
+                    </div>
                   </div>
                 </div>
 
                 <!-- 7天趋势柱状图 -->
-                <div class="analytics-card chart-card">
-                  <div class="chart-card-title">
-                    <Icon icon="mdi:chart-bar" width="16" />
-                    <span>最近 7 天拦截趋势</span>
+                <div class="analytics-panel chart-panel">
+                  <div class="panel-header">
+                    <div class="panel-title">
+                      <Icon icon="mdi:chart-bar" width="15" class="panel-title-icon" />
+                      <span>最近 7 天拦截趋势</span>
+                    </div>
+                    <div class="panel-badge" v-if="analyticsData.trend.length">
+                      近7天共 <strong>{{ analyticsData.trend.reduce((s,t) => s + t.count, 0) }}</strong> 封
+                    </div>
                   </div>
-                  <div class="css-chart-wrapper">
-                    <div class="css-chart-container">
-                      <template v-if="analyticsData.trend.length">
+                  <div class="css-chart-wrapper" v-if="analyticsData.trend.length">
+                    <div class="chart-y-labels">
+                      <span v-for="n in [100,75,50,25,0]" :key="n">{{ n === 0 ? '0' : '' }}</span>
+                    </div>
+                    <div class="chart-body">
+                      <div class="chart-grid-lines">
+                        <div class="grid-line" v-for="n in 4" :key="n"></div>
+                      </div>
+                      <div class="css-chart-container">
                         <div class="css-bar" v-for="item in analyticsData.trend" :key="item.date">
-                          <div class="bar-tooltip">{{ item.count }} 封</div>
-                          <div class="bar-fill" :style="{ height: (item.count === 0 ? 0 : Math.max(4, item.percent)) + '%' }"></div>
+                          <div class="bar-tooltip">
+                            <span class="tooltip-count">{{ item.count }}</span>
+                            <span class="tooltip-unit"> 封</span>
+                          </div>
+                          <div class="bar-track">
+                            <div
+                              class="bar-fill"
+                              :class="{ 'bar-fill--zero': item.count === 0, 'bar-fill--active': item.count > 0 }"
+                              :style="{ height: (item.count === 0 ? 2 : Math.max(4, item.percent)) + '%' }"
+                            ></div>
+                          </div>
                           <div class="bar-label">{{ item.label }}</div>
                         </div>
-                      </template>
-                      <div class="chart-empty" v-else>
-                        <Icon icon="mdi:chart-bar-stacked" width="32" />
-                        <span>暂无拦截数据</span>
                       </div>
+                      <div class="chart-x-axis"></div>
                     </div>
-                    <div class="chart-x-axis"></div>
+                  </div>
+                  <div class="chart-empty" v-else>
+                    <Icon icon="mdi:chart-bar-stacked" width="36" />
+                    <span>暂无拦截数据</span>
                   </div>
                 </div>
 
                 <!-- 规则活跃度排行 -->
-                <div class="analytics-card rules-card">
-                  <div class="chart-card-title">
-                    <Icon icon="mdi:trophy-outline" width="16" />
-                    <span>规则拦截活跃度排行</span>
+                <div class="analytics-panel rules-panel">
+                  <div class="panel-header">
+                    <div class="panel-title">
+                      <Icon icon="mdi:trophy-outline" width="15" class="panel-title-icon" />
+                      <span>规则拦截活跃度排行</span>
+                    </div>
+                    <div class="panel-badge" v-if="analyticsData.topRules.length">TOP {{ analyticsData.topRules.length }}</div>
                   </div>
                   <div class="rule-ranking-list" v-if="analyticsData.topRules.length">
                     <div class="rule-rank-item" v-for="(rule, index) in analyticsData.topRules" :key="rule.name">
-                      <div class="rank-index" :class="'top-' + (index + 1)">{{ index + 1 }}</div>
-                      <div class="rank-name">{{ rule.name }}</div>
-                      <div class="rank-bar-bg">
-                        <div class="rank-bar-fill" :style="{ width: rule.percent + '%' }"></div>
+                      <div class="rank-medal" :class="'medal-' + (index + 1)">
+                        <Icon v-if="index === 0" icon="mdi:trophy" width="14" />
+                        <Icon v-else-if="index === 1" icon="mdi:medal" width="13" />
+                        <Icon v-else-if="index === 2" icon="mdi:medal-outline" width="13" />
+                        <span v-else class="rank-num">{{ index + 1 }}</span>
                       </div>
-                      <div class="rank-count">{{ rule.count }} 次</div>
+                      <div class="rank-info">
+                        <div class="rank-name-row">
+                          <span class="rank-name" :title="rule.name">{{ rule.name }}</span>
+                          <span class="rank-count-inline">{{ rule.count }} 次</span>
+                        </div>
+                        <div class="rank-bar-bg">
+                          <div
+                            class="rank-bar-fill"
+                            :class="'rank-fill-' + (index + 1)"
+                            :style="{ width: Math.max(2, rule.percent) + '%' }"
+                          ></div>
+                        </div>
+                      </div>
                     </div>
                   </div>
                   <div class="chart-empty" v-else>
-                    <Icon icon="mdi:trophy-broken" width="32" />
+                    <Icon icon="mdi:inbox-outline" width="36" />
                     <span>暂无规则命中记录</span>
+                    <span class="chart-empty-sub">规则引擎运行后将在此展示活跃度数据</span>
                   </div>
                 </div>
 
@@ -429,7 +514,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, reactive, nextTick } from 'vue'
+import { ref, computed, onMounted, reactive, nextTick, watch } from 'vue'
 import { settingQuery, setBlackList, settingSet } from '@/request/setting.js'
 import { emailAnalytics } from '@/request/email.js'
 import { useSettingStore } from '@/store/setting.js'
@@ -586,7 +671,15 @@ const drawerTitle = computed(() => {
 // ── Lifecycle ───────────────────────────────────────────────────────
 onMounted(async () => {
   await loadSettings()
-  await fetchAnalytics()
+  // 首次打开时预加载分析数据（后台静默加载）
+  fetchAnalytics()
+})
+
+// 切换到分析面板时自动刷新数据（懒加载）
+watch(activeTab, (tab) => {
+  if (tab === 'analytics') {
+    fetchAnalytics()
+  }
 })
 
 // ── Setting helpers (mirrored from sys-setting, pure UI, same API) ──
@@ -1228,120 +1321,327 @@ form .el-button {
   min-height: 28px;
 }
 
-/* Analytics Dashboard CSS */
+
+/* ═══════════════ Analytics Dashboard CSS (Premium Redesign) ═══════════════ */
+
 .analytics-body {
-  padding: 16px 0 24px;
+  padding: 0;
+  min-height: 100%;
 }
 
+/* Header */
 .analytics-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 20px;
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--el-bg-color);
+  position: sticky;
+  top: 0;
+  z-index: 3;
+}
+
+.analytics-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.analytics-icon-badge {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--el-color-primary-light-3), var(--el-color-primary));
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
 .analytics-title {
-  font-size: 15px;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 700;
   color: var(--text-primary);
+  line-height: 1.2;
 }
 
-.analytics-card-grid {
+.analytics-subtitle {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 1px;
+}
+
+.refresh-btn {
+  flex-shrink: 0;
+}
+
+/* Content wrapper */
+.analytics-content {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
+  padding: 16px 16px 24px;
 }
 
-.analytics-card {
-  background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: 10px;
-  padding: 18px 20px;
+/* ─── Skeleton Loading ──────────────────────────────────────────────────────── */
+.analytics-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px 16px 24px;
 }
 
-/* Stats overview grid */
-.stats-overview {
+.skeleton-row {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 0;
-  padding: 4px 0;
+  gap: 12px;
 }
 
-.stat-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  padding: 12px 8px;
-  border-right: 1px solid var(--border-subtle);
-  text-align: center;
+.skeleton-card {
+  border-radius: 10px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  overflow: hidden;
+  position: relative;
 
-  &:last-child {
-    border-right: none;
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent 30%, var(--bg-elevated) 50%, transparent 70%);
+    background-size: 200% 100%;
+    animation: skeleton-shimmer 1.6s infinite;
   }
 }
 
-.stat-icon {
+.sk-stat {
+  height: 110px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 16px;
+
+  .sk-icon { width: 32px; height: 32px; border-radius: 50%; background: var(--bg-elevated); }
+  .sk-val  { width: 56px; height: 22px; border-radius: 4px; background: var(--bg-elevated); }
+  .sk-label{ width: 70px; height: 12px; border-radius: 3px; background: var(--bg-elevated); }
+}
+
+.sk-chart { height: 200px; }
+.sk-rules { height: 160px; }
+
+@keyframes skeleton-shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+
+/* ─── Stat Cards Row ────────────────────────────────────────────────────────── */
+.stat-cards-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+
+  @media (max-width: 520px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.stat-card {
+  border-radius: 12px;
+  border: 1px solid transparent;
+  padding: 16px 16px 14px;
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.08);
+  }
+}
+
+.stat-card--blue {
+  background: linear-gradient(135deg, var(--el-color-primary-light-9), var(--el-color-primary-light-8));
+  border-color: var(--el-color-primary-light-7);
+}
+
+.stat-card--amber {
+  background: linear-gradient(135deg, var(--el-color-warning-light-9), var(--el-color-warning-light-8));
+  border-color: var(--el-color-warning-light-7);
+}
+
+.stat-card--green {
+  background: linear-gradient(135deg, var(--el-color-success-light-9), var(--el-color-success-light-8));
+  border-color: var(--el-color-success-light-7);
+}
+
+.stat-card-bg-icon {
+  position: absolute;
+  right: -8px;
+  bottom: -8px;
+  opacity: 0.08;
   color: var(--el-color-primary);
-  opacity: 0.7;
+  pointer-events: none;
+}
+
+.stat-card--amber .stat-card-bg-icon { color: var(--el-color-warning); }
+.stat-card--green .stat-card-bg-icon { color: var(--el-color-success); }
+
+.stat-card-body {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.stat-card-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 2px;
+}
+
+.blue-icon  { background: var(--el-color-primary-light-7); color: var(--el-color-primary); }
+.amber-icon { background: var(--el-color-warning-light-7); color: var(--el-color-warning); }
+.green-icon { background: var(--el-color-success-light-7); color: var(--el-color-success); }
+
+.stat-card-value {
+  font-size: 28px;
+  font-weight: 800;
   line-height: 1;
+  color: var(--el-color-primary);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.5px;
 }
 
-.stat-item--warn .stat-icon,
-.stat-item--warn .stat-value {
-  color: var(--el-color-warning);
-}
+.amber-val { color: var(--el-color-warning); }
+.green-val  { color: var(--el-color-success); }
 
-.stat-item--danger .stat-icon,
-.stat-item--danger .stat-value {
-  color: var(--el-color-danger);
-}
-
-.stat-label {
+.stat-card-label {
   font-size: 12px;
   color: var(--text-muted);
+  font-weight: 500;
   line-height: 1.3;
 }
 
-.stat-value {
-  font-size: 26px;
-  font-weight: 700;
-  color: var(--el-color-primary);
-  line-height: 1;
+/* ─── Analytics Panels (Chart + Rules) ─────────────────────────────────────── */
+.analytics-panel {
+  background: var(--el-bg-color);
+  border: 1px solid var(--el-border-color);
+  border-radius: 12px;
+  overflow: hidden;
 }
 
-/* Chart card */
-.chart-card-title {
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--el-border-color);
+  background: var(--bg-surface);
+}
+
+.panel-title {
   display: flex;
   align-items: center;
   gap: 6px;
   font-size: 13px;
   font-weight: 600;
   color: var(--text-primary);
-  margin-bottom: 4px;
 }
 
-.css-chart-wrapper {
+.panel-title-icon {
+  color: var(--el-color-primary);
+  opacity: 0.8;
+}
+
+.panel-badge {
+  font-size: 11px;
+  color: var(--text-muted);
+  background: var(--bg-elevated);
+  border-radius: 20px;
+  padding: 2px 10px;
+  border: 1px solid var(--border-subtle);
+
+  strong {
+    color: var(--el-color-primary);
+    font-weight: 700;
+  }
+}
+
+/* ─── Bar Chart ─────────────────────────────────────────────────────────────── */
+.chart-panel {
+  .css-chart-wrapper {
+    display: flex;
+    padding: 14px 16px 30px;
+    gap: 8px;
+  }
+}
+
+.chart-y-labels {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  width: 20px;
+  flex-shrink: 0;
+
+  span {
+    font-size: 10px;
+    color: var(--text-muted);
+    line-height: 1;
+    text-align: right;
+  }
+}
+
+.chart-body {
+  flex: 1;
   position: relative;
-  padding-bottom: 28px;
+}
+
+.chart-grid-lines {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 26px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.grid-line {
+  width: 100%;
+  height: 1px;
+  background: var(--el-border-color-lighter);
 }
 
 .css-chart-container {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
-  height: 160px;
-  padding-top: 36px; /* space for tooltip */
+  height: 150px;
+  padding-bottom: 26px;
   position: relative;
+  z-index: 1;
+  gap: 4px;
 }
 
 .chart-x-axis {
   position: absolute;
-  bottom: 28px;
+  bottom: 26px;
   left: 0;
   right: 0;
   height: 1px;
-  background: var(--border-subtle);
+  background: var(--el-border-color);
 }
 
 .css-bar {
@@ -1356,122 +1656,193 @@ form .el-button {
 
   &:hover .bar-tooltip {
     opacity: 1;
-    transform: translateY(-4px);
+    transform: translateX(-50%) translateY(-4px);
+  }
+
+  &:hover .bar-fill {
+    filter: brightness(1.1);
   }
 }
 
-.bar-fill {
-  width: 60%;
-  max-width: 32px;
+.bar-track {
+  width: 70%;
+  max-width: 34px;
   min-width: 8px;
-  background: var(--el-color-primary);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
   border-radius: 4px 4px 0 0;
-  transition: height 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.bar-fill {
+  width: 100%;
+  border-radius: 4px 4px 0 0;
+  transition: height 0.7s cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  &.bar-fill--active {
+    background: linear-gradient(to top, var(--el-color-primary), var(--el-color-primary-light-3));
+  }
+
+  &.bar-fill--zero {
+    background: var(--el-border-color);
+    border-radius: 2px;
+  }
 }
 
 .bar-label {
   position: absolute;
-  bottom: -22px;
-  font-size: 11px;
+  bottom: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 10px;
   color: var(--text-muted);
   white-space: nowrap;
 }
 
 .bar-tooltip {
   position: absolute;
-  top: 4px;
+  top: 0;
   left: 50%;
   transform: translateX(-50%) translateY(0);
   background: var(--el-text-color-primary);
   color: var(--el-bg-color);
-  padding: 3px 7px;
-  border-radius: 4px;
+  padding: 3px 8px;
+  border-radius: 6px;
   font-size: 11px;
   opacity: 0;
   transition: opacity 0.2s, transform 0.2s;
   pointer-events: none;
   white-space: nowrap;
-  z-index: 1;
+  z-index: 2;
+  font-weight: 600;
 }
 
+.tooltip-count {
+  font-size: 12px;
+  font-weight: 700;
+}
+.tooltip-unit {
+  font-size: 10px;
+  opacity: 0.8;
+}
+
+/* ─── Chart Empty State ─────────────────────────────────────────────────────── */
 .chart-empty {
-  flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  gap: 8px;
   color: var(--text-muted);
   font-size: 13px;
-  height: 100%;
-  opacity: 0.6;
+  padding: 36px 20px;
+  opacity: 0.7;
+
+  .chart-empty-sub {
+    font-size: 11px;
+    opacity: 0.7;
+    text-align: center;
+    max-width: 200px;
+    line-height: 1.4;
+  }
 }
 
-/* Rule ranking */
-.rule-ranking-list {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  margin-top: 14px;
+/* ─── Rule Ranking List ─────────────────────────────────────────────────────── */
+.rules-panel {
+  .rule-ranking-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    padding: 8px 0;
+  }
 }
 
 .rule-rank-item {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
+  padding: 10px 16px;
+  transition: background 0.15s;
+
+  &:hover {
+    background: var(--bg-surface);
+  }
 }
 
-.rank-index {
+.rank-medal {
   flex-shrink: 0;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: var(--bg-elevated);
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 11px;
-  color: var(--text-muted);
+  font-weight: 700;
+
+  &.medal-1 { background: linear-gradient(135deg, #fff3cd, #ffc107); color: #7a5300; }
+  &.medal-2 { background: linear-gradient(135deg, #e2e8f0, #94a3b8); color: #334155; }
+  &.medal-3 { background: linear-gradient(135deg, #fde2cc, #f97316); color: #7c2d12; }
+  &.medal-4, &.medal-5 {
+    background: var(--bg-elevated);
+    color: var(--text-muted);
+    font-size: 12px;
+  }
+}
+
+.rank-num {
+  font-size: 12px;
   font-weight: 700;
 }
 
-.rank-index.top-1 { background: #ff4d4f; color: white; }
-.rank-index.top-2 { background: #faad14; color: white; }
-.rank-index.top-3 { background: #52c41a; color: white; }
+.rank-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.rank-name-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 5px;
+}
 
 .rank-name {
-  width: 90px;
-  flex-shrink: 0;
   font-size: 13px;
   color: var(--text-primary);
+  font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  max-width: 65%;
+}
+
+.rank-count-inline {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
 }
 
 .rank-bar-bg {
-  flex: 1;
-  height: 7px;
+  height: 5px;
   background: var(--bg-elevated);
-  border-radius: 4px;
+  border-radius: 3px;
   overflow: hidden;
 }
 
 .rank-bar-fill {
   height: 100%;
-  background: var(--el-color-primary);
-  border-radius: 4px;
-  transition: width 0.6s ease;
+  border-radius: 3px;
+  transition: width 0.7s ease;
   min-width: 2px;
-}
 
-.rank-count {
-  flex-shrink: 0;
-  width: 46px;
-  text-align: right;
-  font-size: 12px;
-  color: var(--text-muted);
-  font-variant-numeric: tabular-nums;
+  &.rank-fill-1 { background: linear-gradient(to right, #ffc107, #ff9800); }
+  &.rank-fill-2 { background: linear-gradient(to right, #90a4ae, #607d8b); }
+  &.rank-fill-3 { background: linear-gradient(to right, #f97316, #ef4444); }
+  &.rank-fill-4 { background: var(--el-color-primary-light-5); }
+  &.rank-fill-5 { background: var(--el-color-primary-light-7); }
 }
 
 </style>
