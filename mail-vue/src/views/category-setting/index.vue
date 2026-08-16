@@ -144,7 +144,7 @@
           <div class="settings-card">
             <div class="card-title">
               硬拦截规则
-              <el-tooltip content="(丢弃) 硬拦截规则会直接在服务器底层丢弃邮件，完全不进入垃圾桶。请谨慎配置。" placement="top">
+              <el-tooltip content="硬拦截规则会直接在服务器底层丢弃邮件，完全不进入垃圾桶。请谨慎配置。" placement="top">
                 <Icon icon="lucide:help-circle" width="14" class="help-icon" />
               </el-tooltip>
             </div>

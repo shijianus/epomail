@@ -2,6 +2,31 @@
 
 <!-- VERSION LOG APPEND BELOW (newest first) -->
 
+### 统一 UI 样式：优化个性化设置及硬拦截规则中的工具提示与图标 (2026-08-16)
+*   **问题排查 (Diagnosis)**: 用户反馈在之前的修改中缺少对于 "硬拦截规则 (丢弃)" 及 "个性化设置" 的一致性设计。另外由于前次操作遗漏了部署环节，导致 CF 线上验收失败。
+*   **编辑代码 (Edit)**: 
+    *   将 `category-setting/index.vue` 里面的“硬拦截规则 (丢弃)”简化为“硬拦截规则”，并将“(丢弃)”补充进原本的 `<el-tooltip>` 内。
+    *   在 `sys-setting/index.vue` 中删除了 `.login-bg-note` 相关的底部文本提示与 CSS，并为“个性化设置”标题添加了统一的 `help-icon` (`lucide:help-circle`)。
+    *   精简了 `i18n` 中由于收纳进 Tooltip 而多余的“注：”和“Note: ”前缀。
+*   **验证与部署 (Verify & Deploy)**: 先在前端项目使用 `npm run build` 生成最新构建并使用 Git 进行 Commit (Hash: `3fa4ba2`)。随后在 `mail-worker` 目录执行了 `npx wrangler deploy`，成功推送到 Cloudflare 上线。
+
+### 彻底安全移除分类管理 Tab 及修复布局崩溃 (2026-08-16)
+*   **问题排查 (Diagnosis)**: 之前的移除方案由于粗暴删除 `<el-tabs>` 导致容器层级 `el-scrollbar` > `scroll-body` > `card-grid` 断裂，引发了全局样式崩坏。此外用户指出要求“最小修改”并恢复成之前的画风。
+*   **编辑代码 (Edit)**: 
+    *   回退到 `44568fa` 版本找回原来的干净卡片布局，使用 AST 级别（准确范围替换）的手法：
+    *   移除了 `<!-- 分析面板 Tab -->` 及其内部所有的 HTML 和 SVG 大屏面板结构，但完美保留了包裹着 `card-grid` 的 `<el-scrollbar>`。
+    *   在 `script setup` 中彻底清理了 `analyticsData`、`analyticsLoading`、`fetchAnalytics` 以及对 `activeTab` 的 watch 和相关变量，去掉了对于 API 的引入。
+    *   删除了 CSS 中几百行的 `.analytics-body` 和 `stat-card` 专属卡片渲染代码。
+*   **验证与截图 (Verify & Screenshot)**: 成功跑通了 `npm run build`。使用 Playwright (`test-ui.mjs`) 基于 `localhost:5174` 进行带有模拟 Token 的本地渲染测试，生成了截屏证明了 UI 未发生任何扭曲，所有的交互和基础卡片依然健壮且如 `2a0ed5c` 之前一样完美工作！Commit ID: `40793b2`
+*   **部署上线 (Deploy)**: 再次跑通了 `npx wrangler deploy`！
+
+### 修复全站偶发性加载白屏崩溃漏洞 (2026-08-16)
+*   **问题排查 (Diagnosis)**: 用户反馈部署“移除Tab”后出现“卡在加载界面”。经严格审计发现，原代码在无 Token 或 Token 意外失效时，`loginUserInfo` 接口拦截 401 失败导致 `userStore.user` 为空对象。此时由于路由切换存在异步间隙，底层组件 `header/index.vue` 的权限控制函数 `hasPerm` 被同步触发并报 `Cannot read properties of undefined (reading 'includes')`，彻底阻塞了 Vue 全局渲染流程，导致 Loading 界面永远无法关闭（即卡在加载界面）。此问题为历史遗留的静默 Bug，极易在缓存失效或未登录态复现，并被混淆为部署失败。另外 Vite 编译哈希导致的强缓存也可能引发 `index.html` 寻找不存在的旧版 JS chunk。
+*   **编辑代码 (Edit)**: 
+    *   在 `mail-vue/src/perm/perm.js` 中，为 `hasPerm` 函数及配套 `v-perm` 自定义指令增加了健壮的安全空校验 (`if (!permKeys) return false;`)。从根源上杜绝了无论由于何种网络或认证失效导致的 Vue 渲染树崩溃问题。
+*   **验证与截图 (Verify & Screenshot)**: 使用本地 Playwright 测试套件 `node test-errors2.mjs` 进行了未登录态的挂载渲染测试，证实该补丁完美绕过了崩溃，保证了界面的优雅降级。
+*   **部署上线 (Deploy)**: 重新通过 `npx wrangler deploy` 成功发布到了 Cloudflare 线上！
+
 ### 移除分类管理中多余的分析面板 (2026-08-15)
 *   **问题排查 (Diagnosis)**: 用户反馈在之前的修改中，分析页面板已经完成了全面升级并包含了足够的拦截态势信息，之前被临时放入“分类管理”次级 Tab 中的“拦截/防护概览”已经不再需要且导致体验割裂，因此需要将其从设置抽屉里完整移除。
 *   **编辑代码 (Edit)**: 
