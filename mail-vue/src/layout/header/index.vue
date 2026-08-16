@@ -354,12 +354,16 @@ const isGlobalSearch = computed(() => {
 
 import { watch } from 'vue';
 
+let highlightDebounceTimer = null;
 watch(() => emailStore.searchKeyword, (newVal) => {
+  clearTimeout(highlightDebounceTimer);
   if (isSettingsMode.value) {
     const keyword = newVal.trim();
     const isGlobal = /^(all:|global:)/i.test(keyword);
     if (!isGlobal && keyword) {
-      highlightTextOnPage(keyword);
+      highlightDebounceTimer = setTimeout(() => {
+        highlightTextOnPage(keyword);
+      }, 200);
     } else {
       clearHighlightOnPage();
     }

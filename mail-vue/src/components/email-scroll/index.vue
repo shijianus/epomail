@@ -460,23 +460,34 @@ onActivated(() => {
   })
 })
 
+const handleResize = () => {
+  isMobile.value = innerWidth < 1367
+}
+
+const handleWheel = () => {
+  if (dropdownShow.value) {
+    dropdownRef.value.handleClose();
+  }
+}
+
 onMounted(() => {
   timer = setInterval(() => {
     emailList.forEach(email => {
       email.formatCreateTime = fromNow(email.createTime);
     })
   }, 1000 * 60);
+
+  window.addEventListener('resize', handleResize)
+  window.addEventListener('wheel', handleWheel)
 })
 
 onUnmounted(() => {
   clearInterval(timer)
+  window.removeEventListener('resize', handleResize)
+  window.removeEventListener('wheel', handleWheel)
 })
 
 getEmailList()
-
-window.onresize = () => {
-  isMobile.value = innerWidth < 1367
-}
 
 function onScroll(e) {
   scrollTop = e.target.scrollTop;
@@ -641,8 +652,7 @@ watch(
       if (emailList.length > 0) {
         updateCheckStatus();
       }
-    },
-    {deep: true}
+    }
 );
 
 
@@ -668,11 +678,7 @@ watch(() => emailStore.addStarEmailId, () => {
   })
 })
 
-window.addEventListener('wheel', (event) => {
-  if (dropdownShow.value) {
-    dropdownRef.value.handleClose();
-  }
-})
+
 
 function openReply(email) {
   uiStore.writerRef.openReply(email)
