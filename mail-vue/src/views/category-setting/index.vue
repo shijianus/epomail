@@ -4,14 +4,7 @@
       <loading />
     </div>
     <div class="tabs-wrapper" v-if="!firstLoading">
-      <el-tabs v-model="activeTab" class="custom-tabs">
-        <el-tab-pane name="basic">
-          <template #label>
-            <div style="display: flex; align-items: center; gap: 4px;">
-              <Icon icon="mdi:cog-outline" width="16" />
-              <span>基本设置</span>
-            </div>
-          </template>
+      <div class="custom-tabs">
           <el-scrollbar class="scroll">
             <div class="scroll-body">
               <div class="card-grid">
@@ -250,8 +243,7 @@
               </div>
             </div>
           </el-scrollbar>
-        </el-tab-pane>
-      </el-tabs>
+      </div>
     </div>
 
     <!-- Unified Drawer for Editing -->
