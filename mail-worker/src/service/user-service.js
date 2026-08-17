@@ -34,6 +34,58 @@ const userService = {
 		}
 	},
 
+	async updateProfile(c, params, userId) {
+        let profile = {};
+        try {
+            const profileStr = await c.env.kv.get('USER_PROFILE_' + userId);
+            if (profileStr) {
+                profile = JSON.parse(profileStr);
+            }
+        } catch (e) {}
+        
+        Object.assign(profile, params);
+        await c.env.kv.put('USER_PROFILE_' + userId, JSON.stringify(profile));
+        
+        const authInfo = await c.env.kv.get(KvConst.AUTH_INFO + userId, { type: 'json' });
+		if (authInfo && authInfo.user) {
+            Object.assign(authInfo.user, params);
+			await c.env.kv.put(KvConst.AUTH_INFO + userId, JSON.stringify(authInfo), { expirationTtl: constant.TOKEN_EXPIRE });
+		}
+	},
+	
+	async uploadImage(c, userId) {
+        const formData = await c.req.formData();
+        const file = formData.get('file');
+        
+        if (!file) throw new BizError('No file');
+        
+        const newFormData = new FormData();
+        newFormData.append('file', file);
+        
+        const res = await fetch('https://drawing.shijian.qzz.io/upload', {
+            method: 'POST',
+            body: newFormData
+        });
+        
+        if (!res.ok) {
+            // fallback if drawing.shijian.qzz.io is unavailable, just return a dummy or throw
+            throw new BizError('Failed to upload image to host');
+        }
+        
+        const data = await res.json();
+        // Adjust depending on the actual response format of the image host
+        let url = data.url;
+        if (!url && data.data) {
+            if (data.data.url) url = data.data.url;
+            else if (data.data.links && data.data.links.url) url = data.data.links.url;
+        }
+        if (!url) {
+            // fallback
+            url = data[0]?.src || '';
+        }
+        return url;
+	},
+
 	async loginUserInfo(c, userId) {
 
 		const userRow = await userService.selectById(c, userId);
@@ -81,6 +133,23 @@ const userService = {
 		}
 
 		user.quota = await userService.getUserQuota(c, userId);
+		
+		// Load profile data
+        let profile = {};
+        try {
+            const profileStr = await c.env.kv.get('USER_PROFILE_' + userId);
+            if (profileStr) {
+                profile = JSON.parse(profileStr);
+            }
+        } catch (e) {}
+        
+        user.nickname = profile.nickname || '';
+        user.bio = profile.bio || '';
+        user.avatarUrl = profile.avatarUrl || '';
+        user.backgroundUrl = profile.backgroundUrl || '';
+        user.showStats = profile.showStats ?? true;
+        user.showTrend = profile.showTrend ?? true;
+        user.showSources = profile.showSources ?? true;
 
 		return user;
 	},

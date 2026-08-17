@@ -16,3 +16,15 @@ export function userSetCustomLabels(customLabels) {
     return http.put('/my/setCustomLabels', { customLabels })
 }
 
+export function updateProfile(data) {
+    return http.put('/my/updateProfile', data)
+}
+
+export function uploadImage(formData) {
+    return http.post('/my/uploadImage', formData, {
+        headers: {
+            'Content-Type': 'multipart/form-data'
+        }
+    })
+}
+

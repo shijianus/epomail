@@ -307,13 +307,16 @@ const publicService = {
 		
 		const trend = Object.keys(trendMap).map(date => {
 		    const data = trendMap[date];
-		    const total = data.send + data.receive + data.intercept || 1;
+		    const total = data.receive + data.intercept || 1;
+		    const receivePercent = Math.round((data.receive / total) * 100);
+		    const interceptPercent = total > 1 || (data.receive > 0 || data.intercept > 0) ? 100 - receivePercent : 0;
+		    
 		    return {
 		        date,
 		        label: date.substring(5), // MM-DD
-		        sendPercent: Math.round((data.send / total) * 100),
-		        receivePercent: Math.round((data.receive / total) * 100),
-		        interceptPercent: Math.round((data.intercept / total) * 100)
+		        sendPercent: 0, // No longer used in UI
+		        receivePercent,
+		        interceptPercent
 		    }
 		});
 		
@@ -334,6 +337,14 @@ const publicService = {
 		let otherPercent = 100;
 		pieSources.forEach(s => otherPercent -= s.percent);
 		if (otherPercent < 0) otherPercent = 0;
+		
+		let profile = {};
+        try {
+            const profileStr = await c.env.kv.get('USER_PROFILE_' + userRow.userId);
+            if (profileStr) {
+                profile = JSON.parse(profileStr);
+            }
+        } catch (e) {}
 
         return {
             userInfo: {
@@ -341,7 +352,14 @@ const publicService = {
                 email: userRow.email,
                 roleName: roleRow ? roleRow.name : 'Unknown',
                 joinTime: userRow.createTime,
-                avatarInitials: username.substring(0, 2).toUpperCase()
+                avatarInitials: username.substring(0, 2).toUpperCase(),
+                nickname: profile.nickname || '',
+                bio: profile.bio || '',
+                avatarUrl: profile.avatarUrl || '',
+                backgroundUrl: profile.backgroundUrl || '',
+                showStats: profile.showStats ?? true,
+                showTrend: profile.showTrend ?? true,
+                showSources: profile.showSources ?? true
             },
             stats: {
                 todaySent,

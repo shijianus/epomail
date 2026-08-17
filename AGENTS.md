@@ -1,6 +1,91 @@
 # Agent Workflow SOP (Standard Operating Procedure)
 
 <!-- VERSION LOG APPEND BELOW (newest first) -->
+### 优化：个人档案设置界面的版块化重构与 Markdown 简介弹窗 (2026-08-16)
+*   **功能需求 (Feature)**: 用户提出原有的“个人档案”设置项排列过于紧凑，需要类似“常规”面板一样的分区域结构。另外，“个人简介”的输入与展示因为采用单行文本框过小，要求改用弹窗模式承载大量文本，并允许简单的 Markdown（加粗、斜体等）安全渲染，禁止渲染可能导致布局结构崩塌的区块级别排版（如表格、引用、列表）。
+*   **编辑代码 (Edit)**:
+    *   **安全的 Markdown 引擎**: 新增 `mail-vue/src/utils/md-parser.js` 提供了 `parseInlineMarkdown` 方法。通过纯正则引擎仅过滤渲染 `**加粗**`, `*斜体*`, `~~删除线~~`, `==高亮==`, 以及换行 `\n`。并严格替换了 `<, >` 防止 XSS 与意外的大型标签，实现了极度安全的富文本注入。
+    *   **UI 级全面重构 (HTML & CSS)**: 在 `mail-vue/src/views/profile-setting/index.vue` 中将整个页面切分为了 `基本信息 (Basic Information)`、`个性装扮 (Visual & Media)` 和 `数据隐私 (Data Privacy)` 三个独立的 `.container` 版块，每个版块享有独立的间距。
+    *   **弹窗交互重写**: 为 `Bio(个人简介)` 重构了修改逻辑，点击“修改”后会弹出原生的 `el-dialog`，内部提供带有字数统计 (`show-word-limit` 150字) 与高度自适应的 `el-input type="textarea"`，完全解决了大段文字的编辑痛点。
+    *   **双端渲染**: 在 `mail-vue/src/views/profile/index.vue` (账户详情大屏) 的简介展示区同步引入了 `parseInlineMarkdown` 引擎并挂载到 `v-html`，确保设置的富文本能在前端对外展示时产生完美对齐的视觉效果。
+*   **验证与部署 (Deploy)**: 
+    *   执行了 UI 自动化测试脚本 (`test-profile-settings.mjs`) 验证表单、布局切片及 Markdown 解析渲染无误。
+    *   Vite 顺利编译，并通过 `npx wrangler deploy` 已推送至 Cloudflare 生产环境 (Version: 44ad9c1e-e261-48db-bed6-86f2aba6285b)。
+
+### 优化：个人档案设置界面的多语言(i18n)支持与UI原生对齐 (2026-08-16)
+*   **问题排查 (Diagnosis)**: 用户反馈：1. 之前的 `个人档案 (Personal Setting)` UI 完全不符合要求，存在硬编码中文问题 (未接轨 i18n)。 2. 存在不属于系统“常规”设置页画风的多余边框与阴影，未能做到与原组件高度一致。 3. 修改、保存等交互逻辑未完全参考原有的“常规”实现方式。
+*   **编辑代码 (Edit)**:
+    *   **i18n 多语言注入**: 在 `mail-vue/src/i18n/zh.js` 及 `en.js` 中完整增补了 `personalSetting, nickname, bio, avatar, background, showStats, showTrend, showSources` 等国际化键值对。
+    *   **UI 级全面重构 (HTML & CSS)**: 在 `mail-vue/src/views/profile-setting/index.vue` 中，全盘删除了自定义添加的 `div.container` 外框 `border` 与 `box-shadow`。并且对于 CSS Layout (`grid-template-columns`)、修改与保存交互动画 (`edit-name-input` / `.edit-name` 蓝色字链接) 等代码进行了彻底的原生架构 1:1 像素级复刻。使之看起来跟“常规”界面不仅是同一个模子刻出来的，还在组件渲染性能上完全拉齐。
+    *   **Vue 表单双向绑定同步**: 将 `uploadAvatar` 和 `uploadBackground` 的 Element Plus 原生 `el-upload` 做了样式隐身化处理，使其以最纯粹的一行字(Button)的极简姿态融入 UI。
+*   **验证与部署 (Deploy)**: 
+    *   执行了 UI 自动化测试脚本 (`test-profile-settings.mjs`) 验证表单及样式无误。
+    *   Vite 顺利编译，并通过 `npx wrangler deploy` 已推送至 Cloudflare 生产环境 (Version: b5983b9b-f78c-43b6-bd92-d01cd98c41c8)。
+
+### 修复：个人档案与常规设置切分 (2026-08-16)
+*   **问题排查 (Diagnosis)**: 用户反馈：之前将“个人(Personal)”配置项放置在“常规(General)”设置页面内的逻辑是错误的。用户期望“个人”设置作为一个独立的界面/分区，不应对原有的“常规”设置造成任何干扰。
+*   **编辑代码 (Edit)**:
+    *   **还原常规配置**: 使用 `git checkout` 将 `mail-vue/src/views/setting/index.vue` 进行了 100% 还原，撤销了所有嵌入该组件内部的“昵称、简介、头像、统计开关”相关代码。
+    *   **创建独立模块**: 在 `mail-vue/src/views/profile-setting/index.vue` 下新建了专属的路由组件，完美继承了原本的所有档案编辑、图床代理上传和隐私开关的 UI 及功能逻辑。
+    *   **挂载路由及菜单**: 修改 `mail-vue/src/router/index.js`，注入 `/settings/profile` 路由。在 `mail-vue/src/layout/main/index.vue` 的设置侧边栏中，新增了独立的 “个人 (lucide:user)” 菜单项（并列于“常规”、“标签”等之上）。
+    *   **补齐核心状态**: 在 `mail-vue/src/layout/main/index.vue` 和 `layout/index.vue` 的 `isSettingsMode` 中增加了 `profile-setting` 白名单，确保其能平滑触发原生设置布局。
+*   **部署上线 (Deploy)**: Vite 已编译成功 (`npm run build`) 并通过 `wrangler deploy` 部署至 Cloudflare Workers 上线。新增了自动化测试用例验证页面渲染无误。
+
+### 新增：个人档案自定义功能前后端完整打通 (2026-08-16)
+*   **功能需求 (Feature)**: 用户提出在系统设置中增加“个人”分区，允许设置个人昵称、不超过150字符的个人简介、支持上传更换头像与背景（不超过25MB），同时增加图表展示开关（收发态势、来源分布），但强制要求保留时区、加入时间等。图片资源上传要求后端进行统一收口转发至私有图床 (`https://drawing.shijian.qzz.io/`)，实现与 `账户详情` 动态大屏的全链路互通响应。
+*   **编辑代码 (Edit)**: 
+    *   **设置页面 (UI)**: 在 `mail-vue/src/views/setting/index.vue` 新增“个人”设置模块。实装了图片上传校验限制，以及支持表单验证的富交互 UI 组件。
+    *   **请求与路由 (API)**: 在 `mail-worker/src/api/my-api.js` 中开放 `/my/updateProfile` 与 `/my/uploadImage`。并使用 FormData 提取和无缝代理请求到目标图床。
+    *   **无感存储与架构 (Backend)**: 在 `mail-worker/src/service/user-service.js` 和 `public-service.js` 中规避了修改 DB Schema 引发的数据重构风险，利用了 Cloudflare KV 安全地存取 `USER_PROFILE_${userId}` 结构体，同步更新 `AUTH_INFO`（当前登录缓存），并将扩展字段注入到了 `getProfile` 响应给前端画板。
+    *   **画板重绘 (Frontend)**: 在 `mail-vue/src/views/profile/index.vue` 中实装动态 UI：没有昵称显示用户名，有昵称则渲染 `**昵称**(用户名)`；绑定行内 `background-image` 重写 CSS 全屏大图；通过 `v-if` 对原先的顶部图表（`showStats`）、柱状图（`showTrend`）和饼图（`showSources`）进行了安全包裹及细颗粒度控制。
+*   **验证与部署 (Verify & Deploy)**: 
+    *   通过编写 `test-profile-custom.mjs`，在 Playwright 全自动沙盒中利用 Route Fulfill (MocK) 重定向响应，精准捕获了具备自定义昵称、全屏壁纸与图表开关的独立视图，生成了验证截屏（`profile_with_nickname_bg_validation.png`）。
+    *   已重新执行 `npm run build` 打包并使用 `wrangler deploy` 推送 Cloudflare，前端 UI 和云端 KV 中间件服务均部署上线。
+
+### 优化：账户详情页态势分布百分比重新计算 (2026-08-16)
+*   **问题排查 (Diagnosis)**: 用户反馈：1. 邮件处理态势分布中不需要“发件”的图标。2. “发送邮件”的占比不应该被计算到态势分布的总量中，导致现在如果去掉了发送邮件的色块，接收和拦截的百分比加起来不足100%。3. “所在时区”是否准确？4. 来源与态势分布的存储是否耗费数据库？（且纠正了之前关于上栏大卡片的误解，将上方“今日发件”及“今日收件”的卡片恢复默认展示）。
+*   **编辑代码 (Edit)**: 
+    *   **UI 恢复与精简**: 恢复了 `mail-vue/src/views/profile/index.vue` 顶部的“今日发件/收件”大卡片原生展示。同时在 “邮件处理态势分布”的 ECharts 图表和图例中，彻底移除了 `.seg-send`（发送邮件）的蓝色占比条与顶部的 Legend 标记。
+    *   **后端态势百分比重构**: 修改了 `public-service.js` 的 `getProfile` 接口：在计算 `trend` 每天的接收与拦截占比时，将总基数 `total` 从 `send + receive + intercept` 改为纯粹的 `receive + intercept`，并使用 `100 - receivePercent` 兜底，确保无论怎么分配，接收与拦截的视觉色块永远完美填满 100%。
+    *   **后端技术架构确认 (知识解惑)**: 经审计 `public-service.js` 的 `getProfile` 接口：图表数据**并未**在数据库中创建专用的独立表。它通过对主 `email` 表的 `userId` 发起全表扫描，将该用户的所有邮件聚合在 Cloudflare Worker 的内存中动态映射（Map）成 `trend` 与 `sources` 并返回。
+*   **部署上线 (Deploy)**: 重新进行了 Vite Build，正在通过 `wrangler deploy` 覆盖 Cloudflare Edge，实现全网缓存刷新与百分比修正。
+
+### 账户详情：恢复态势分布与来源分布图表色彩丢失问题 (2026-08-16)
+*   **问题排查 (Diagnosis)**: 用户反馈在使用之前的方案后，账户详情页大屏中的“邮件处理态势分布”以及“来源分布”的图表颜色丢失或显示不正常。经排查发现，在上一轮去硬编码清除 `:root` 时，误删了草稿原型中专门为图表分配的业务颜色 Token（如 `--color-send`, `--color-receive`, `--color-intercept`, `--color-other`），导致 SVG `<circle>` 标签与 CSS `linear-gradient` 无法解析色彩变量。
+*   **编辑代码 (Edit)**: 
+    *   在 `mail-vue/src/views/profile/index.vue` 中，将丢失的业务色彩变量作为局部作用域属性重新安全地注入到了 `.settings-container` 下。
+    *   `--color-send: #3b82f6;` (蓝色, 发送)
+    *   `--color-receive: #10b981;` (绿色, 接收)
+    *   `--color-intercept: #ef4444;` (红色, 拦截)
+    *   `--color-other: #8b5cf6;` (紫色, 其它)
+    *   此修改完美独立于全局背景色变量，既保证了数据图表的鲜明色彩，又不影响深浅模式的热切换框架。
+*   **部署上线 (Deploy)**: Vite 已编译成功并通过 `wrangler deploy` 部署至 Cloudflare Workers 上线。
+
+### 彻底修复：账户详情页居中崩溃与 Header 定制化回归 (2026-08-16)
+*   **问题排查 (Diagnosis)**: 用户强烈反馈页面内容根本没有居中，并且之前要求的“返回主页功能”和“隐藏 Search 栏”逻辑也因为完全回退 Header 组件而消失。经排查发现之前的改动造成了 3 个致命的结构断裂：
+    1. 将 `profile` 强行塞入 `layout` 的 `isSettingsMode` 导致画板被主系统的**设置侧边栏 (Settings Sidebar)** 挤压到了右边，破坏了全屏居中的视觉观感。
+    2. 移除原有的 `.cover-photo` 后，由于 `.desktop-layout` 依然保留 `margin: -70px auto 0`，导致内容错位并向上插入了 Header。
+    3. `profile/index.vue` 直接挂载未限制高度的 `<Header />` 导致 Flexbox 高度坍塌，组件被拉伸到了 `100vh` 撑爆了全屏。
+*   **编辑代码 (Edit)**: 
+    *   **路由纠偏**: 将 `/:username` 重新放回 `router/index.js` 的**根路由层级**，让其作为一个绝对纯净的独立画布级页面加载，彻底脱离了 `layout` 侧边栏的排版干扰。
+    *   **精准兼容性扩展 Header**: 重新为 `layout/header/index.vue` 增加了 `isProfile` 的 Prop 接收能力，实现了用户要求的 **Logo 点击返回主页** 和 **隐形化搜索栏**，但**绝对保留了原生 `.topbar` 的 CSS 样式**，杜绝了此前被用户诟病的“乱改全局界面风格”的错误。
+    *   **容器高度与居中修复**: 在 `profile/index.vue` 中，用 `<div style="height: 64px; flex-shrink: 0;">` 强行约束了 Header 的原生占位，重置了 `el-scrollbar` 的安全滚动高度；并**重新挂载了 `.cover-photo` (32vh 高度)**，使得 `-70px` 的负边距能完美地将用户卡片在 `settings-container` 框架下**在正中心居中**展现！
+*   **部署上线 (Deploy)**: 重新跑通了 Vite 构建 (`npm run build`) 并使用 `wrangler deploy` 推送 Cloudflare 服务端引擎热更新生效！
+
+### 彻底重构：严格对齐全局模板与移除组件越权修改 (2026-08-16)
+*   **问题排查 (Diagnosis)**: 用户强烈反馈之前的解决方案不仅保留了旧的独立背景代码，还越权修改了公共的 `<Header>` 组件（破坏了“禁止修改其他界面”的原则）。并且原本写死在组件底部的 `:root` 样式依然阻断了全局背景变量，未能真正实现与“其他界面一样的背景模板”。
+*   **编辑代码 (Edit)**: 
+    *   **回退越权修改**: 彻底撤销了 `mail-vue/src/layout/header/index.vue` 中的 `isProfile` 传参逻辑及专属样式，恢复其原生通用形态。
+    *   **路由级模板接入**: 修改了 `mail-vue/src/router/index.js`，将 `/:username` 的个人主页挂载为根路由 `layout` 的子节点；同时在 `layout/index.vue` 中将 `profile` 纳入 `isSettingsMode` 白名单。使账户详情页天生继承系统原生的毛玻璃 Header、左侧边栏（按需隐藏）及底栏。
+    *   **重构容器与彻底去硬编码**: 在 `profile/index.vue` 中，删除了独立导入的 `<Header>` 与 `<StatusBar>`。将原本绝对定位的 `100vw/100vh` 容器与 `:root` 硬编码颜色全部剔除。完全替换为与 `sys-setting` 等页面一致的 `<div class="settings-container"> <el-scrollbar> ...` 标准原生排版结构，实现了真正的“复制粘贴系统原生背景模板”，完美支持所有暗/亮色切换。
+*   **部署上线 (Deploy)**: 成功执行 `npm run build`。使用 `npx wrangler deploy` 已推送 Cloudflare Workers 并即时生效。Version ID: `987e2ad2-e36d-4c8c-b4c6-c5e276b82971`。
+### 账户详情：背景对齐、饼图修复与版面弹性优化 (2026-08-16)
+*   **问题排查 (Diagnosis)**: 用户反馈：1. 背景未能与主应用完全融合（旧的 blobs 干扰了主题全局色背景）。2. 来源分布图饼图中出现了 2 个"其它来源"的数据重复现象。3. 左侧边栏在分辨率不同时，底部的“发送邮件联系我”无法与右侧图表容器形成完美的水平对齐。
+*   **编辑代码 (Edit)**: 
+    *   **彻底融合背景层**: 删除了 `profile/index.vue` 中仅为“发光”而残留的 HTML `.bg-blobs` 及关联样式，使 `profile-page` 完美使用全局变量 `var(--bg-base)`。
+    *   **深度防重叠防越界**: 修改了 `computedSources` 函数逻辑。在处理 API 返回的 `top` 数组时，如果存在 '其它来源' / 'Other'，会优先剥离并安全合并至 `otherPercent` 池。然后强制执行 `splice(3)` 截断操作，确保展示圆环的独立来源最多只有 3 项，彻底根除了前端数据堆叠渲染异常。
+    *   **扩充 Bio 及弹性布局**: 按推荐将用户的个人简介文案延长，使画面更充实；随后通过给 `.btn-message` 容器追加 `margin-top: auto` 激活 Flexbox 下沉机制，成功实现了左侧底部按钮与右侧数据大屏在任意宽高度下的完美水平对齐。
+*   **部署上线 (Deploy)**: Vite 已编译成功并通过 `wrangler deploy` 部署至 Cloudflare Workers，Version ID: `344c78db-d7ff-441f-9575-01ed100f3da9`。
 ### 账户详情：支持全剧暗/亮色调热切换功能 (2026-08-16)
 *   **问题排查 (Diagnosis)**: 用户反馈账户详情界面虽然整合了 UI 风格，但是完全无法响应暗色调和亮色调的转换，并且指出了背景颜色的基调和原有的系统变量不一致。经过排查发现 `profile/index.vue` 的底层 CSS 中存在大量的硬编码颜色，如 `background: linear-gradient(135deg, var(--bg-base) 0%, #15182e 100%)` 以及大量的 `rgba(255,255,255,0.x)`。这些强制性的深色和白色颜色导致该页面在切换至明亮模式时依然呈现部分暗黑状态。
 *   **编辑代码 (Edit)**: 

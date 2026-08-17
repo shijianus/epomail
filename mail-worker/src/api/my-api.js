@@ -13,6 +13,16 @@ app.put('/my/resetPassword', async (c) => {
 	return c.json(result.ok());
 });
 
+app.put('/my/updateProfile', async (c) => {
+	await userService.updateProfile(c, await c.req.json(), userContext.getUserId(c));
+	return c.json(result.ok());
+});
+
+app.post('/my/uploadImage', async (c) => {
+    const res = await userService.uploadImage(c, userContext.getUserId(c));
+    return c.json(result.ok(res));
+});
+
 app.put('/my/setCustomLabels', async (c) => {
 	await userService.setCustomLabels(c, await c.req.json(), userContext.getUserId(c));
 	return c.json(result.ok());

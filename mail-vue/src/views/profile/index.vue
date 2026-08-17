@@ -1,32 +1,40 @@
 <template>
-  <div class="profile-page">
+  <div class="settings-container">
     <div id="float-tooltip" ref="floatTooltip"></div>
-
-    <Header :isProfile="true" />
-    <!-- Ready for User Background Image -->
-    <div class="cover-photo"></div>
-
-    <div class="desktop-layout" v-if="!loading">
-      <!-- Left Side: Identity -->
+    <div style="height: 64px; flex-shrink: 0; width: 100%; position: relative; z-index: 101; background: var(--bg-base); border-bottom: 1px solid var(--border-subtle);">
+      <Header :isProfile="true" />
+    </div>
+    
+    <div class="loading" :class="loading ? 'loading-show' : 'loading-hide'">
+      <loading/>
+    </div>
+    
+    <el-scrollbar class="scroll" v-if="!loading" style="height: calc(100% - 64px - 28px);">
+      <div class="scroll-body">
+        <div class="cover-photo" :style="profileData.userInfo.backgroundUrl ? 'background-image: url(' + profileData.userInfo.backgroundUrl + '); background-size: cover; background-position: center;' : ''"></div>
+        <div class="desktop-layout">
+          <!-- Left Side: Identity -->
       <div class="profile-identity">
-        <div class="avatar">
-          {{ profileData.userInfo.avatarInitials }}
+        <div class="avatar" :style="profileData.userInfo.avatarUrl ? 'background-image: url(' + profileData.userInfo.avatarUrl + '); background-size: cover; background-position: center;' : ''">
+          <span v-if="!profileData.userInfo.avatarUrl">{{ profileData.userInfo.avatarInitials }}</span>
           <div class="verified-badge">
             <svg class="ic-fill" style="width:20px; height:20px;" viewBox="0 0 24 24"><path d="M22.5 12.5c0-.67-.2-1.33-.57-1.89l1.45-2.02c.32-.44.38-1.01.15-1.5-.23-.49-.71-.8-1.25-.8h-2.47c-.43 0-.82-.24-1.02-.63l-1.1-2.22c-.25-.5-.73-.83-1.29-.89-.55-.06-1.1.17-1.46.61l-1.6 1.94c-.4.49-1.02.77-1.66.77s-1.26-.28-1.66-.77l-1.6-1.94c-.36-.44-.91-.67-1.46-.61-.56.06-1.04.39-1.29.89l-1.1 2.22c-.2-.39-.59.63-1.02-.63H3.74c-.54 0-1.02.31-1.25.8-.23.49-.17 1.06-.15-1.5l1.45 2.02c.37.56.57 1.22.57 1.89 0 .67-.2 1.33-.57 1.89l-1.45 2.02c-.32.44-.38 1.01-.15 1.5.23.49.71.8 1.25.8h2.47c.43 0 .82.24 1.02.63l1.1 2.22c.25.5.73.83 1.29.89.55.06 1.1-.17 1.46-.61l1.6-1.94c.4-.49 1.02-.77 1.66-.77s1.26.28 1.66.77l1.6 1.94c.36.44.91.67 1.46.61.56-.06 1.04-.39 1.29-.89l1.1-2.22c.2-.39.59-.63 1.02-.63h2.47c.54 0 1.02-.31 1.25-.8.23-.49.17-1.06-.15-1.5l-1.45-2.02c-.37-.56-.57-1.22-.57-1.89zM10.82 17.5l-4.52-4.52 1.41-1.41 3.11 3.11 7.21-7.21 1.41 1.41-8.62 8.62z"></path></svg>
           </div>
         </div>
         
         <div class="name-block">
-          <h1 class="name">{{ profileData.userInfo.account }}</h1>
+          <h1 class="name">
+            <span v-if="profileData.userInfo.nickname"><strong>{{ profileData.userInfo.nickname }}</strong>({{ profileData.userInfo.account }})</span>
+            <span v-else>{{ profileData.userInfo.account }}</span>
+          </h1>
           <div class="handle">
             <Icon class="ic" icon="lucide:mail" style="margin-right: 6px;" />
             {{ profileData.userInfo.email }}
           </div>
         </div>
 
-        <p class="bio">
-          {{ profileData.userInfo.roleName === 'admin' ? 'EpoMail 系统管理员，负责核心平台的维护与安全。我们在数字世界中连接彼此，保护每一次灵感的传递与思想的交汇。为您带来前所未有的纯净沟通体验。' : 'EpoMail 专属用户，致力于安全、高效的邮件通讯。我们在数字世界中连接彼此，保护每一次灵感的传递与思想的交汇。为您带来前所未有的纯净沟通体验。' }}
-        </p>
+        <p class="bio" v-html="parseInlineMarkdown(profileData.userInfo.bio || (profileData.userInfo.roleName === 'admin' ? 'EpoMail 系统管理员，负责核心平台的维护与安全。我们在数字世界中连接彼此，保护每一次灵感的传递与思想的交汇。为您带来前所未有的纯净沟通体验。' : 'EpoMail 专属用户，致力于安全、高效的邮件通讯。我们在数字世界中连接彼此，保护每一次灵感的传递与思想的交汇。为您带来前所未有的纯净沟通体验。'))"></p>
+
 
         <!-- Detailed Subtitle Tags -->
         <div class="sub-tags-list">
@@ -51,12 +59,12 @@
       </div>
 
       <!-- Right Side: Analytics Dashboard -->
-      <div class="profile-analysis">
+      <div class="profile-analysis" v-if="profileData.userInfo.showStats || profileData.userInfo.showTrend || profileData.userInfo.showSources">
         
         <div class="section-heading">账户数据与分析看板</div>
 
         <!-- Top Gradient Cards -->
-        <div class="stats-row">
+        <div class="stats-row" v-if="profileData.userInfo.showStats">
           <div class="stat-card blue">
             <div class="stat-title"><svg class="ic" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg> 今日发件</div>
             <div class="stat-val">{{ profileData.stats.todaySent }}</div>
@@ -72,14 +80,13 @@
         </div>
 
         <!-- Charts Row -->
-        <div class="charts-grid">
+        <div class="charts-grid" v-if="profileData.userInfo.showTrend || profileData.userInfo.showSources" :style="!profileData.userInfo.showTrend || !profileData.userInfo.showSources ? 'grid-template-columns: 1fr;' : ''">
           
           <!-- 邮件增长 (Email Growth 100% STACKED Bar Chart) -->
-          <div class="chart-card">
+          <div class="chart-card" v-if="profileData.userInfo.showTrend">
             <div class="chart-title">
               <span>邮件处理态势分布</span>
               <div class="chart-legends-top">
-                <div class="legend-pill"><div class="legend-color" style="background:var(--color-send);"></div>发送</div>
                 <div class="legend-pill"><div class="legend-color" style="background:var(--color-receive);"></div>接收</div>
                 <div class="legend-pill"><div class="legend-color" style="background:var(--color-intercept);"></div>拦截</div>
               </div>
@@ -93,7 +100,6 @@
               
               <div class="bar-col" v-for="(item, i) in profileData.trend" :key="item.date">
                 <div class="bar-wrapper" style="height: 100%;" :style="i === profileData.trend.length - 1 ? 'box-shadow: 0 0 16px rgba(16,185,129,0.3);' : ''">
-                  <div class="segment seg-send" :style="{height: item.sendPercent + '%'}" @mousemove="showTooltip($event, `发送占比: ${item.sendPercent}%`, 'var(--color-send)')" @mouseleave="hideTooltip"></div>
                   <div class="segment seg-receive" :style="{height: item.receivePercent + '%'}" @mousemove="showTooltip($event, `接收占比: ${item.receivePercent}%`, 'var(--color-receive)')" @mouseleave="hideTooltip"></div>
                   <div class="segment seg-intercept" :style="{height: item.interceptPercent + '%'}" @mousemove="showTooltip($event, `拦截占比: ${item.interceptPercent}%`, 'var(--color-intercept)')" @mouseleave="hideTooltip"></div>
                 </div>
@@ -104,7 +110,7 @@
           </div>
 
           <!-- 邮件来源 (Email Sources SVG Pie Chart) -->
-          <div class="chart-card">
+          <div class="chart-card" v-if="profileData.userInfo.showSources">
             <div class="chart-title">
               <span>来源分布</span>
             </div>
@@ -132,8 +138,9 @@
 
       </div>
 
-    </div>
-    
+        </div>
+      </div>
+    </el-scrollbar>
     <StatusBar style="position: absolute; bottom: 0; left: 0; right: 0; z-index: 100; border-top: 1px solid var(--border-subtle);" />
   </div>
 </template>
@@ -148,6 +155,7 @@ import { useUiStore } from '@/store/ui.js'
 import { useUserStore } from '@/store/user.js'
 import StatusBar from '@/layout/status-bar/index.vue'
 import Header from '@/layout/header/index.vue'
+import { parseInlineMarkdown } from "@/utils/md-parser.js"
 
 const uiStore = useUiStore()
 const userStore = useUserStore()
@@ -276,44 +284,60 @@ const hideTooltip = () => {
 
 </script>
 
-<style scoped>
+<style scoped lang="scss">
 @import url('https://fonts.googleapis.com/css2?family=Archivo:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap');
 
-.profile-page {
-  --bg-base: #0d0f1a; 
-  --bg-surface: #13162a; 
-  --bg-elevated: #1a1e36;
-  --accent-primary: #5b6ef5; 
-  --accent-secondary: #7c5cbf;
-  --text-primary: #eef0fb; 
-  --text-secondary: #b6bce4; 
-  --text-muted: #767ca8;
-  --border-subtle: rgba(91,110,245,0.12);
-  
+.settings-container {
   --color-send: #3b82f6;
   --color-receive: #10b981;
   --color-intercept: #ef4444;
-  --color-other: #64748b;
-
-  --grad-blue: linear-gradient(135deg, rgba(59,130,246,0.2) 0%, rgba(37,99,235,0.05) 100%);
-  --grad-blue-border: rgba(59,130,246,0.3);
-  --grad-orange: linear-gradient(135deg, rgba(245,158,11,0.2) 0%, rgba(217,119,6,0.05) 100%);
-  --grad-orange-border: rgba(245,158,11,0.3);
-  --grad-green: linear-gradient(135deg, rgba(16,185,129,0.2) 0%, rgba(5,150,105,0.05) 100%);
-  --grad-green-border: rgba(16,185,129,0.3);
-
-  width: 100vw; height: 100vh;
+  --color-other: #8b5cf6;
+  
+  height: 100%;
   overflow: hidden;
+  background: var(--extra-light-fill) !important;
+  position: relative;
   font-family: 'Archivo', system-ui, -apple-system, sans-serif;
-  background: var(--bg-base);
-  color: var(--text-primary);
-  display: flex;
-  flex-direction: column;
-  position: absolute;
-  top: 0; left: 0; right: 0; bottom: 0;
-  z-index: 1000;
+
+  .loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    z-index: 2;
+    width: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+  }
+
+  .loading-show {
+    transition: all 200ms ease 200ms;
+    opacity: 1;
+  }
+
+  .loading-hide {
+    transition: var(--loading-hide-transition);
+    pointer-events: none;
+    opacity: 0;
+  }
 }
 
+.scroll {
+  width: 100%;
+  min-height: 100%;
+
+  :deep(.el-scrollbar__view) {
+    height: 100%;
+  }
+
+  .scroll-body {
+    min-height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+  }
+}
 
 .ic { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; display: block; flex-shrink:0; }
 .ic-fill { width: 16px; height: 16px; fill: currentColor; display: block; flex-shrink:0; }

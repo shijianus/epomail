@@ -1,5 +1,5 @@
 <template>
-  <div class="topbar" :class="[!hasPerm('email:send') ? 'not-send' : '', props.isProfile ? 'profile-topbar' : '']">
+  <div class="topbar" :class="!hasPerm('email:send') ? 'not-send' : ''">
     <!-- Left Section: Logo acting as toggle -->
     <div class="topbar-left">
       <div class="brand-wrapper" @click="props.isProfile ? router.push('/') : changeAside()" style="cursor:pointer" :title="props.isProfile ? ($t('home') || 'Home') : ($t('toggleSidebar') || 'Toggle Sidebar')">
@@ -13,6 +13,7 @@
       <div class="search-box">
         <span class="search-icon" @click="handleSearch" style="cursor: pointer; z-index: 1"><Icon icon="lucide:search" width="20" height="20"/></span>
         <input type="text" :placeholder="isSettingsMode && route.name !== 'all-email' ? ($t('searchSettings') || 'Search settings') : route.name === 'all-email' ? ($t('searchAllMail') || 'Search all mail...') : ($t('searchMail') || 'Search mail')" v-model="emailStore.searchKeyword" @input="handleSearchInput" @keyup.enter="handleSearch" @keydown.tab.prevent="handleTabComplete" @focus="searchFocus = true" @blur="onSearchBlur" />
+        <span class="clear-icon" v-show="emailStore.searchKeyword" @click="clearSearch"><Icon icon="lucide:x" width="16" height="16"/></span>
         
         <!-- Dropdown for all-email syntax suggestions -->
         <div v-if="route.name === 'all-email' && searchFocus && allEmailSuggestions.length > 0" class="settings-search-dropdown" style="padding: 4px 0;">
@@ -702,19 +703,6 @@ function formatName(email) {
   justify-content: space-between;
   padding: 0 16px; 
 }
-.profile-topbar {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 100;
-  height: 60px;
-  padding: 0 40px;
-  background: rgba(13,15,26,0.6);
-  backdrop-filter: blur(10px);
-  border-bottom: 1px solid var(--border-subtle);
-}
-
 .topbar-left {
   display: flex;
   align-items: center;

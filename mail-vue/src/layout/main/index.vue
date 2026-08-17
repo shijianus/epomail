@@ -13,6 +13,9 @@
             
             <div class="nav-section-title">{{$t('tabSetting') || 'Settings'}}</div>
             <div class="settings-nav-group">
+            <router-link :to="{name: 'profile-setting'}" class="settings-nav-item" :class="{active: route.name === 'profile-setting'}">
+              <Icon icon="lucide:user" width="20" height="20" /> 个人
+            </router-link>
             <router-link :to="{name: 'setting'}" class="settings-nav-item" :class="{active: route.name === 'setting'}">
               <Icon icon="fluent:settings-48-regular" width="20" height="20" /> {{$t('general') || 'General'}}
             </router-link>
@@ -102,7 +105,7 @@ let elNotification = null
 const isMobileView = computed(() => window.innerWidth < 768)
 
 const isSettingsMode = computed(() => {
-  return ['setting', 'label-setting', 'category-setting', 'analysis', 'user', 'all-email', 'role', 'reg-key', 'sys-setting'].includes(route.name)
+  return ['setting', 'label-setting', 'profile-setting', 'category-setting', 'analysis', 'user', 'all-email', 'role', 'reg-key', 'sys-setting'].includes(route.name)
 })
 
 const showReadingPane = computed(() => {

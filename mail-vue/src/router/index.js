@@ -52,6 +52,16 @@ const routes = [
                 }
             },
             {
+                path: '/settings/profile',
+                name: 'profile-setting',
+                component: () => import('@/views/profile-setting/index.vue'),
+                meta: {
+                    title: 'profile',
+                    name: 'profile-setting',
+                    menu: true
+                }
+            },
+            {
                 path: '/settings/labels',
                 name: 'label-setting',
                 component: () => import('@/views/label-setting/index.vue'),
@@ -110,7 +120,7 @@ const routes = [
                     name: 'trash',
                     menu: true
                 }
-            },
+            }
         ]
 
     },
