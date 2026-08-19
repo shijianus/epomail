@@ -4,6 +4,40 @@
     <!-- Section 1: Basic Information -->
     <div class="container">
       <div class="title">{{$t('basicInfo')}}</div>
+
+      <div class="item media-item">
+        <div>{{$t('avatar')}}</div>
+        <div class="image-preview-group">
+          <el-image
+              class="avatar-preview"
+              :src="userStore.user.avatarUrl"
+              :preview-src-list="userStore.user.avatarUrl ? [userStore.user.avatarUrl] : []"
+              show-progress
+              fit="cover"
+          >
+            <template #error>
+              <div class="error-image avatar-placeholder">
+                <Icon icon="lucide:user" width="32" height="32"/>
+              </div>
+            </template>
+          </el-image>
+          <div class="background-btn">
+            <el-upload
+              :show-file-list="false"
+              :http-request="uploadAvatar"
+              accept="image/*"
+            >
+              <el-button class="opt-button" size="small" type="primary">
+                <Icon icon="lucide:upload" width="16" height="16" />
+              </el-button>
+            </el-upload>
+            <el-button v-if="userStore.user.avatarUrl" class="opt-button" size="small" type="primary" @click="delAvatar">
+              <Icon icon="material-symbols:delete-outline-rounded" width="16" height="16"/>
+            </el-button>
+          </div>
+        </div>
+      </div>
+
       <div class="item">
         <div>{{$t('nickname')}}</div>
         <div>
@@ -24,13 +58,13 @@
 
       <div class="item bio-item">
         <div>{{$t('bio')}}</div>
-        <div>
-          <span class="user-name">
-            <span class="bio-display" v-html="parseInlineMarkdown(userStore.user.bio) || $t('unknown')"></span>
-            <span class="edit-name" style="align-self: flex-start;" @click="showSetBio">
-             {{$t('change')}}
-            </span>
-          </span>
+        <div class="bio-preview-group">
+          <div class="bio-preview-box">
+            <div class="bio-display" v-html="parseInlineMarkdown(userStore.user.bio) || $t('unknown')"></div>
+          </div>
+          <el-button class="opt-button" size="small" type="primary" @click="showSetBio">
+            <Icon icon="lsicon:edit-outline" width="16" height="16" />
+          </el-button>
         </div>
       </div>
     </div>
@@ -38,33 +72,36 @@
     <!-- Section 2: Visual & Media -->
     <div class="container">
       <div class="title">{{$t('visualMedia')}}</div>
-      <div class="item">
-        <div>{{$t('avatar')}}</div>
-        <div style="display: flex; align-items: center; gap: 15px;">
-          <el-upload
-            :show-file-list="false"
-            :http-request="uploadAvatar"
-            accept="image/*"
-            style="display: inline-block;"
-          >
-            <el-button type="primary">{{$t('change')}}</el-button>
-          </el-upload>
-          <span v-if="userStore.user.avatarUrl" style="color: var(--text-muted); font-size: 13px;">已上传</span>
-        </div>
-      </div>
-
-      <div class="item">
+      <div class="item media-item">
         <div>{{$t('background')}}</div>
-        <div style="display: flex; align-items: center; gap: 15px;">
-          <el-upload
-            :show-file-list="false"
-            :http-request="uploadBackground"
-            accept="image/*"
-            style="display: inline-block;"
+        <div class="image-preview-group">
+          <el-image
+              class="background-preview"
+              :src="userStore.user.backgroundUrl"
+              :preview-src-list="userStore.user.backgroundUrl ? [userStore.user.backgroundUrl] : []"
+              show-progress
+              fit="cover"
           >
-            <el-button type="primary">{{$t('change')}}</el-button>
-          </el-upload>
-          <span v-if="userStore.user.backgroundUrl" style="color: var(--text-muted); font-size: 13px;">已上传</span>
+            <template #error>
+              <div class="error-image">
+                <Icon icon="lucide:image" width="32" height="32"/>
+              </div>
+            </template>
+          </el-image>
+          <div class="background-btn">
+            <el-upload
+              :show-file-list="false"
+              :http-request="uploadBackground"
+              accept="image/*"
+            >
+              <el-button class="opt-button" size="small" type="primary">
+                <Icon icon="lucide:upload" width="16" height="16" />
+              </el-button>
+            </el-upload>
+            <el-button v-if="userStore.user.backgroundUrl" class="opt-button" size="small" type="primary" @click="delBackground">
+              <Icon icon="material-symbols:delete-outline-rounded" width="16" height="16"/>
+            </el-button>
+          </div>
         </div>
       </div>
     </div>
@@ -72,23 +109,17 @@
     <!-- Section 3: Data Privacy -->
     <div class="container">
       <div class="title">{{$t('dataPrivacy')}}</div>
-      <div class="item">
-        <div>{{$t('showStats')}}</div>
-        <div>
+      <div class="privacy-group">
+        <div class="privacy-item">
+          <span>{{$t('showStats')}}</span>
           <el-switch :model-value="userStore.user.showStats ?? true" @change="val => savePrivacy('showStats', val)" />
         </div>
-      </div>
-
-      <div class="item">
-        <div>{{$t('showTrend')}}</div>
-        <div>
+        <div class="privacy-item">
+          <span>{{$t('showTrend')}}</span>
           <el-switch :model-value="userStore.user.showTrend ?? true" @change="val => savePrivacy('showTrend', val)" />
         </div>
-      </div>
-
-      <div class="item">
-        <div>{{$t('showSources')}}</div>
-        <div>
+        <div class="privacy-item">
+          <span>{{$t('showSources')}}</span>
           <el-switch :model-value="userStore.user.showSources ?? true" @change="val => savePrivacy('showSources', val)" />
         </div>
       </div>
@@ -117,6 +148,7 @@ import {useUserStore} from "@/store/user.js";
 import {useI18n} from "vue-i18n";
 import { ElMessage } from 'element-plus'
 import { parseInlineMarkdown } from "@/utils/md-parser.js";
+import { Icon } from "@iconify/vue";
 
 const { t } = useI18n()
 const userStore = useUserStore();
@@ -209,11 +241,29 @@ function uploadBackground(options) {
   })
 }
 
-function savePrivacy(field, value) {
-  updateProfile({ [field]: value }).then(() => {
-    userStore.user[field] = value
+function delAvatar() {
+  updateProfile({ avatarUrl: '' }).then(() => {
+    userStore.user.avatarUrl = ''
     ElMessage({ message: t('saveSuccessMsg') || 'Save success', type: 'success', plain: true })
-  }).catch(() => {})
+  })
+}
+
+function delBackground() {
+  updateProfile({ backgroundUrl: '' }).then(() => {
+    userStore.user.backgroundUrl = ''
+    ElMessage({ message: t('saveSuccessMsg') || 'Save success', type: 'success', plain: true })
+  })
+}
+
+function savePrivacy(field, value) {
+  const originalValue = userStore.user[field] ?? true
+  userStore.user[field] = value
+  updateProfile({ [field]: value }).then(() => {
+    ElMessage({ message: t('saveSuccessMsg') || 'Save success', type: 'success', plain: true })
+  }).catch(() => {
+    userStore.user[field] = originalValue
+    ElMessage({ message: t('saveFailMsg') || 'Save failed', type: 'error', plain: true })
+  })
 }
 </script>
 <style scoped lang="scss">
@@ -252,18 +302,6 @@ function savePrivacy(field, value) {
         }
       }
 
-      &.bio-item {
-        align-items: flex-start;
-      }
-
-      .bio-display {
-        overflow-wrap: break-word;
-        word-wrap: break-word;
-        word-break: break-all;
-        max-width: 100%;
-        line-height: 1.5;
-      }
-
       .edit-name-input {
         position: absolute;
         bottom: -6px;
@@ -289,6 +327,92 @@ function savePrivacy(field, value) {
       div:last-child {
         overflow: hidden;
         /* Removed white-space: nowrap from here so bio-display can wrap */
+      }
+    }
+  }
+
+  .privacy-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 32px;
+    align-items: center;
+
+    .privacy-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: bold;
+    }
+  }
+
+  .bio-preview-group {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    width: min(400px, calc(100vw - 222px));
+    
+    .bio-preview-box {
+      flex: 1;
+      padding: 12px;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-subtle, var(--light-border, #e4e4e7));
+      border-radius: 8px;
+      min-height: 80px;
+      max-height: 157px;
+      overflow-y: auto;
+      
+      .bio-display {
+        overflow-wrap: break-word;
+        word-wrap: break-word;
+        word-break: break-word;
+        white-space: pre-wrap;
+        line-height: 1.6;
+      }
+    }
+  }
+
+  .item.media-item {
+    align-items: flex-start;
+  }
+  
+  .image-preview-group {
+    display: flex;
+    align-items: flex-end;
+    gap: 15px;
+
+    .avatar-preview {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      border: 1px solid var(--border-subtle, var(--light-border, #e4e4e7));
+      overflow: hidden;
+    }
+
+    .background-preview {
+      width: 240px;
+      height: 135px;
+      border-radius: 8px;
+      border: 1px solid var(--border-subtle, var(--light-border, #e4e4e7));
+      overflow: hidden;
+    }
+
+    .error-image {
+      background: var(--bg-hover, var(--light-ill, #f4f4f5));
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-muted, #a1a1aa);
+    }
+
+    .background-btn {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      
+      .opt-button {
+        margin: 0;
+        padding: 8px;
       }
     }
   }

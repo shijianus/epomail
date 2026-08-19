@@ -43,6 +43,10 @@ const routes = [
             },
             {
                 path: '/settings',
+                redirect: '/settings/profile'
+            },
+            {
+                path: '/settings/general',
                 name: 'setting',
                 component: () => import('@/views/setting/index.vue'),
                 meta: {

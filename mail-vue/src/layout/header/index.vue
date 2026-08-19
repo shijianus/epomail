@@ -84,7 +84,7 @@
               </div>
             </div>
             <div class="am-item" @click="openAccountDetails"><Icon class="ic ic-sm" icon="lucide:user" /><span>{{ $t('accountDetails') || 'Account Details' }}</span></div>
-            <div class="am-item" @click="router.push({name: 'setting'})"><Icon class="ic ic-sm" icon="lucide:settings" /><span>{{ $t('settings') || 'Settings' }}</span></div>
+            <div class="am-item" @click="router.push({name: 'profile-setting'})"><Icon class="ic ic-sm" icon="lucide:settings" /><span>{{ $t('settings') || 'Settings' }}</span></div>
             <div class="am-item logout" @click="clickLogout"><Icon class="ic ic-sm" icon="lucide:log-out" /><span>{{ $t('logOut') }}</span></div>
           </div>
         </template>

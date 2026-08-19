@@ -119,7 +119,8 @@ defineExpose({
   open,
   openReply,
   openForward,
-  openDraft
+  openDraft,
+  openWithRecipient
 })
 
 const {t} = useI18n()
@@ -518,6 +519,12 @@ function open() {
   }
   show.value = true;
   editor.value.focus()
+}
+
+function openWithRecipient(email) {
+  resetForm();
+  form.receiveEmail.push(email);
+  open();
 }
 
 function openDraft(draft) {

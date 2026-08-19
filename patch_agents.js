@@ -1,22 +1,20 @@
 const fs = require('fs');
-const content = fs.readFileSync('AGENTS.md', 'utf8');
-
-const newLog = `### 修复 React 登录UI丢失Token导致无限踢回登录页的问题 (2026-08-16)
-*   **问题排查 (Diagnosis)**: 用户反馈在全新的 React 登录界面 (\`temp_login_ui\`) 中，输入正确密码后闪一下就退出回登录页。经查，新的登录逻辑成功拿到 API 响应后未能将 \`token\` 存入 \`localStorage\`，导致路由跳转至 \`/mail\` 后被 Vue Router (\`mail-vue\`) 守护拦截，判定为未授权并强制踢回 \`/login\`。此外由于本地 Dev Server 的强缓存机制，造成了热更新的假象。
-*   **编辑代码 (Edit)**:
-    *   在 \`temp_login_ui/src/app/components/epomail/AuthForm.tsx\` 中增加了 \`localStorage.setItem('token', data.data.token)\`，确保在跳转至 \`/mail\` 之前将凭证稳定注入浏览器缓存中。
-*   **验证与截图 (Verify & Screenshot)**:
-    *   使用独立的 Playwright 测试脚本 (\`test-login-real.mjs\`)，精准拦截并模拟了带有 CORS 跨域透传的后端响应。利用 \`page.evaluate\` 实时监控了浏览器 \`localStorage\` 状态的变更，强断言证明了在 UI 展示 Connected 后的毫秒级间隙 \`token\` 已牢固存入，验证了路由闭环的稳定性。
-*   **部署上线 (Deploy)**:
-    *   执行 \`npx wrangler deploy\` 完整自动化构建并发布到 Cloudflare 线上！
-
+const content = fs.readFileSync('AGENTS.md', 'utf-8');
+const newLog = `
+### 新增：个人主页点击“发送邮件联系我”自动回退并打开Compose (2026-08-18)
+*   **问题排查 (Diagnosis)**: 用户反馈在个人档案画板中直接打开邮件编辑器不符合业务逻辑，期望的流转应当是：先退回主系统的收件箱 \`/inbox\`，然后在主系统页面下唤起 Compose 并自动填充好目标邮箱。
+*   **编辑代码 (Edit)**: 
+    *   **指令重构**: 修改 \`mail-vue/src/views/profile/index.vue\`。当点击按钮时，直接利用 Vue Router 进行跳转并附带路由参数：\`router.push({ path: '/inbox', query: { composeTo: targetEmail } })\`。
+    *   **主框架接管**: 在主架构页面 \`mail-vue/src/layout/index.vue\` 的 \`onMounted\` 及 \`watch(route)\` 中新增了 \`checkComposeQuery\`。嗅探到目标指令后，会通过 \`setTimeout(400)\` 在页面转场完成后平滑调用系统级底座 \`writerRef.value.openWithRecipient()\`，同时无感擦除 URL 上的 \`composeTo\` 参数。
+*   **部署上线 (Deploy)**: Vite 已编译成功并执行 \`npm run deploy\` 部署至 Cloudflare Workers，最新版已生效。
 `;
 
-const target = '<!-- VERSION LOG APPEND BELOW (newest first) -->\n\n';
-if (content.includes(target)) {
-  const updated = content.replace(target, target + newLog);
-  fs.writeFileSync('AGENTS.md', updated);
-  console.log('AGENTS.md updated');
+const lines = content.split('\n');
+const insertIndex = lines.findIndex(line => line.includes('<!-- VERSION LOG APPEND BELOW (newest first) -->'));
+if (insertIndex !== -1) {
+    lines.splice(insertIndex + 1, 0, newLog);
+    fs.writeFileSync('AGENTS.md', lines.join('\n'));
+    console.log('AGENTS.md updated successfully.');
 } else {
-  console.log('Target not found');
+    console.log('Could not find insert point.');
 }

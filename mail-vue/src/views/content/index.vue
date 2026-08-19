@@ -142,7 +142,9 @@ watch(() => accountStore.currentAccountId, () => {
 onMounted(() => {
   if (emailStore.contentData.showUnread && email.unread === EmailUnreadEnum.UNREAD) {
     email.unread = EmailUnreadEnum.READ;
-    emailRead([email.emailId]);
+    emailRead([email.emailId]).then(() => {
+      emailStore.refreshSidebarStats();
+    });
   }
 })
 
@@ -229,6 +231,7 @@ const handleDelete = () => {
           plain: true,
         })
         emailStore.deleteIds = [email.emailId]
+        emailStore.refreshSidebarStats();
       })
     } else  {
 
@@ -239,6 +242,7 @@ const handleDelete = () => {
           plain: true,
         })
         emailStore.deleteIds = [email.emailId]
+        emailStore.refreshSidebarStats();
       })
     }
 
@@ -269,6 +273,7 @@ const handleReportNotSpam = () => {
     }
     emailStore.deleteIds = [email.emailId]
     emailStore.contentData.email = null
+    emailStore.refreshSidebarStats();
   }).catch((err) => {
     console.error(err);
     ElMessage({

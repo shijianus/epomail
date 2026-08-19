@@ -798,6 +798,7 @@ function confirmSnooze() {
   emailSnooze(snoozeForm.emailId, snoozeForm.time, snoozeForm.endTime).then(() => {
     ElMessage.success(t('snoozedSuccess') || 'Email snoozed');
     deleteEmailFromList([snoozeForm.emailId]);
+    emailStore.refreshSidebarStats();
     snoozeDialogVisible.value = false;
   }).finally(() => {
     snoozeLoading.value = false;
@@ -808,6 +809,7 @@ function handleSpam(emailId) {
   emailSpam(emailId, true).then(() => {
     ElMessage.success(t('spamSuccess') || 'Marked as spam');
     deleteEmailFromList([emailId]);
+    emailStore.refreshSidebarStats();
   });
 }
 
@@ -815,6 +817,7 @@ function handleRestore(emailId) {
   emailRestore(emailId).then(() => {
     ElMessage.success(t('restoreSuccess') || 'Email restored');
     deleteEmailFromList([emailId]);
+    emailStore.refreshSidebarStats();
   });
 }
 
@@ -947,12 +950,16 @@ function changeAccountShow() {
 
 const handleRead = () => {
   const emailIds = getSelectedMailsIds();
-  props.emailRead(emailIds);
+  props.emailRead(emailIds).then(() => {
+    emailStore.refreshSidebarStats();
+  });
   localRead(emailIds);
 }
 
 function emailRead(emailId) {
-  props.emailRead([emailId])
+  props.emailRead([emailId]).then(() => {
+    emailStore.refreshSidebarStats();
+  });
   localRead([emailId]);
 }
 
@@ -981,6 +988,7 @@ function rightDelete(emailId, physical = false) {
           plain: true
         })
         emailStore.deleteIds = [emailId];
+        emailStore.refreshSidebarStats();
       })
     })
     return;
@@ -992,6 +1000,7 @@ function rightDelete(emailId, physical = false) {
       plain: true
     })
     emailStore.deleteIds = [emailId];
+    emailStore.refreshSidebarStats();
   })
 }
 
@@ -1046,6 +1055,7 @@ function handleDelete() {
         plain: true
       })
       emailStore.deleteIds = emailIds;
+      emailStore.refreshSidebarStats();
     })
   })
 }

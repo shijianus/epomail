@@ -32,13 +32,14 @@ import Aside from '@/layout/aside/index.vue'
 import Header from '@/layout/header/index.vue'
 import Main from '@/layout/main/index.vue'
 import StatusBar from '@/layout/status-bar/index.vue'
-import { ref, onMounted, onBeforeUnmount, computed } from 'vue'
+import { ref, onMounted, onBeforeUnmount, computed, watch, nextTick } from 'vue'
 import {useUiStore} from "@/store/ui.js";
-import {useRoute} from "vue-router";
+import {useRoute, useRouter} from "vue-router";
 import writer from '@/layout/write/index.vue'
 
 const uiStore = useUiStore();
 const route = useRoute();
+const router = useRouter();
 const writerRef = ref({})
 const isMobile = ref(window.innerWidth < 1025)
 
@@ -51,12 +52,37 @@ const handleResize = () => {
   uiStore.asideShow = window.innerWidth > 1024;
 }
 
+const checkComposeQuery = () => {
+  if (route.query.composeTo) {
+    const targetEmail = route.query.composeTo;
+    // Delay slightly to ensure layout is fully rendered and avoid animation stutter
+    setTimeout(() => {
+      if (writerRef.value && writerRef.value.openWithRecipient) {
+        writerRef.value.openWithRecipient(targetEmail);
+        
+        // Remove query param without triggering reload
+        const newQuery = { ...route.query };
+        delete newQuery.composeTo;
+        router.replace({ query: newQuery });
+      }
+    }, 400);
+  }
+}
+
 onMounted(() => {
   uiStore.writerRef = writerRef
 
   window.addEventListener('resize', handleResize)
   handleResize()
+  
+  checkComposeQuery()
 })
+
+watch(() => route.query.composeTo, (newVal) => {
+  if (newVal) {
+    checkComposeQuery();
+  }
+});
 
 onBeforeUnmount(() => {
   window.removeEventListener('resize', handleResize)

@@ -9,6 +9,8 @@ import path from 'path';
         deviceScaleFactor: 2
     });
     const page = await context.newPage();
+    page.on('console', msg => console.log('BROWSER CONSOLE:', msg.text()));
+    page.on('pageerror', err => console.log('BROWSER ERROR:', err));
 
     // Set mock token just in case
     await context.addInitScript(() => {
@@ -19,7 +21,7 @@ import path from 'path';
     await page.goto('http://localhost:3002/shijianus', { waitUntil: 'networkidle' });
 
     console.log('Waiting for elements to load...');
-    await page.waitForTimeout(2000); // Wait for animations and data fetching
+    await page.waitForTimeout(5000); // Wait for animations and data fetching
 
     const screenshotPath = path.resolve('profile_real_data_validation.png');
     await page.screenshot({ path: screenshotPath, fullPage: true });
