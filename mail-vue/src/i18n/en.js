@@ -561,12 +561,24 @@ const en = {
     allMailMode: 'All Mail Mode',
     allMailModeDesc: 'Enable to allow admin to view all mail; disable for privacy mode.',
     allMailModeStatus: 'All Mail Mode',
-    allMailModeStatusDesc: 'Public Mode: All emails are publicly visible without privacy protection.',
+    allMailModeStatusDesc: 'All Mail Mode: The system receives and displays all incoming and outgoing emails normally.',
     privacyMailModeStatus: 'Privacy Mail Mode',
-    privacyMailModeStatusDesc: 'Privacy Mode: Emails are privately isolated and visible only to you.',
+    privacyMailModeStatusDesc: 'Privacy Mail Mode: Security filtering is active; only spam and blocked emails are displayed.',
     switchedToAllMailMode: 'Switched to [All Mail Mode]',
     switchedToPrivacyMailMode: 'Switched to [Privacy Mail Mode]',
-    spamAdminPartition: 'Spam Mail'
+    spamAdminPartition: 'Spam Mail',
+
+    // Turnstile & Rule Settings Tooltips
+    turnstileCardTooltip: 'Configure Cloudflare Turnstile CAPTCHA to defend against bots and spam registration.',
+    signUpVerificationTooltip: 'Sign-up verification policy: [Enable] enforces CAPTCHA; [Disable] turns off verification; [Rule] triggers when a single IP reaches daily threshold (click gear to configure).',
+    addEmailVerificationTooltip: 'Add-email verification policy: [Enable] enforces CAPTCHA; [Disable] turns off verification; [Rule] triggers when a single IP reaches daily threshold (click gear to configure).',
+    turnstileKeyTooltip: 'Site Key and Secret Key obtained from Cloudflare Dashboard Turnstile section.',
+    emailPrefixDesc: 'Configure email prefix rules including minimum length and prohibited prefix keywords with auto-deduplication.',
+    emailPrefixMinLength: 'Minimum Length',
+    emailPrefixProhibited: 'Prohibited Keywords',
+    mustNotContainDesc: 'Type keyword and press Enter (duplicates auto-removed)',
+    timesPerDay: 'times/day',
+    ipThresholdDesc: 'CAPTCHA will trigger automatically after a single IP exceeds this daily threshold:'
 }
 
 export default en

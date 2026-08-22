@@ -556,12 +556,24 @@ const zh = {
     allMailMode: '全部邮件模式',
     allMailModeDesc: '开启后管理员可查阅全站收发邮件；关闭则进入隐私模式，仅展示垃圾拦截邮件。',
     allMailModeStatus: '全部邮件模式',
-    allMailModeStatusDesc: '公开模式：所有收发邮件均公开可见，未启用隐私保护。',
+    allMailModeStatusDesc: '全部邮件模式：系统正常接收并展示所有收发的往来邮件。',
     privacyMailModeStatus: '隐私邮件模式',
-    privacyMailModeStatusDesc: '隐私模式：个人邮件独立私密隔离，仅本人可见。',
+    privacyMailModeStatusDesc: '隐私邮件模式：系统开启安全过滤，仅展示垃圾与拦截邮件。',
     switchedToAllMailMode: '已开启【全部邮件模式】',
     switchedToPrivacyMailMode: '已切换至【隐私邮件模式】',
-    spamAdminPartition: '垃圾邮件'
+    spamAdminPartition: '垃圾邮件',
+
+    // Turnstile & Rule Settings Tooltips
+    turnstileCardTooltip: '配置 Cloudflare Turnstile 智能人机验证，有效抵御高频机器脚本与恶意注册。',
+    signUpVerificationTooltip: '注册人机验证策略：【启用】每次注册均强制验证；【关闭】不进行验证；【规则】单个 IP 每天注册达到设定阈值后自动触发验证（点击左侧齿轮设置频次阈值）。',
+    addEmailVerificationTooltip: '添加邮箱人机验证策略：【启用】每次添加均强制验证；【关闭】不进行验证；【规则】单个 IP 每天添加邮箱达到设定阈值后自动触发验证（点击左侧齿轮设置频次阈值）。',
+    turnstileKeyTooltip: '在 Cloudflare 控制台 Turnstile 页面创建小组件获取的 Site Key 与 Secret Key。',
+    emailPrefixDesc: '配置邮箱前缀规则，可限定最小字符位数，并添加禁止包含的前缀词进行自动去重拦截。',
+    emailPrefixMinLength: '前缀最小位数',
+    emailPrefixProhibited: '禁止包含关键词',
+    mustNotContainDesc: '输入禁止前缀词后按回车添加（自动排重过滤）',
+    timesPerDay: '次/天',
+    ipThresholdDesc: '单个 IP 每日操作次数达到此阈值后，将自动要求进行人机验证：'
 }
 export default zh
 

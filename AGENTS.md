@@ -2,6 +2,27 @@
 
 <!-- VERSION LOG APPEND BELOW (newest first) -->
 
+### 优化：底栏全部邮件模式Tooltip温和用户化、Turnstile人机验证规则释义与邮箱前缀规则UI规范化 (2026-08-22)
+*   **功能需求与业务逻辑对齐 (Feature & Alignment)**: 
+    1. **底栏全部邮件模式指示器 Tooltip 温和用户视角重塑**:
+       - 剔除“公开可见”等引起隐私恐慌的过分夸张词汇，重构为温和、自然且真实的系统运作状态说明。
+       - **中文**: `全部邮件模式：系统正常接收并展示所有收发的往来邮件。`
+       - **英文**: `All Mail Mode: The system receives and displays all incoming and outgoing emails normally.`
+    2. **Turnstile 人机验证面板与规则专属 Tooltip**:
+       - 为卡片标题补充防护说明（防脚本与恶意注册）。
+       - 为“注册验证”与“添加验证”补充策略 Tooltip，清晰解释【启用】（每次均验证）、【关闭】（不验证）、【规则】（单 IP 每天达到设定阈值后自动触发验证，点击齿轮修改阈值）。
+       - 为 Site Key 与 Secret Key 补充配置来源说明。
+    3. **邮箱前缀与验证阈值弹窗统一为规则标准 UI（含自动排重）**:
+       - “邮箱前缀”弹窗全面重构为标准 `.forward-dialog` 规则弹窗体系，支持前缀最小位数限制与禁止前缀词配置。
+       - 注入禁止关键词自动排重（Deduplication）机制，支持逗号/空格分词与去重入库。
+       - “注册验证·规则”与“添加验证·规则”弹窗统一为标准规则弹窗，附带清晰的每日 IP 阈值说明与 `次/天` 规范单位。
+*   **编辑代码 (Edit)**: 
+    *   **系统设置组件与样式**: 修改 [`mail-vue/src/views/sys-setting/index.vue`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/views/sys-setting/index.vue)。
+    *   **国际化语言包**: 修改 [`mail-vue/src/i18n/zh.js`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/i18n/zh.js) 与 [`mail-vue/src/i18n/en.js`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/i18n/en.js)。
+*   **全链路自动化验证与部署 (Verify & Deploy)**: 
+    *   编写并执行 Playwright 自动化套件（`test-all-requirements.mjs`），成功验证底栏温和说明浮层、Turnstile 各项 Tooltip、邮箱前缀规则弹窗与排重机制、人机验证规则阈值弹窗。
+    *   执行 `npx wrangler deploy` 完成全网构建并发布上线（Version ID: `d5fbc874-4ac0-4e1d-8edb-04c3999d2336`）。
+
 ### 优化：底栏全部邮件模式红色指示器Tooltip用户视角化与极简化 (2026-08-22)
 *   **功能需求与业务逻辑对齐 (Feature & Alignment)**: 
     1. **去管理员化与用户视角重构**:

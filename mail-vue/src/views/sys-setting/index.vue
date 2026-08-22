@@ -75,8 +75,11 @@
               </div>
 
               <div class="setting-item">
-                <div>
+                <div class="title-item">
                   <span>{{ $t('emailPrefix') }}</span>
+                  <el-tooltip effect="dark" :content="$t('emailPrefixDesc')">
+                    <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+                  </el-tooltip>
                 </div>
                 <div class="forward">
                   <el-button class="opt-button" size="small" type="primary" @click="openEmailPrefix">
@@ -276,11 +279,21 @@
 
           <!-- Turnstile Verification Card -->
           <div class="settings-card">
-            <div class="card-title">{{ $t('turnstileSetting') }}</div>
+            <div class="card-title">
+              {{ $t('turnstileSetting') }}
+              <el-tooltip effect="dark" :content="$t('turnstileCardTooltip')">
+                <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+              </el-tooltip>
+            </div>
             <div class="card-content">
               <div class="setting-item">
-                <div><span>{{ $t('signUpVerification') }}</span></div>
-                <div>
+                <div class="title-item">
+                  <span>{{ $t('signUpVerification') }}</span>
+                  <el-tooltip effect="dark" :content="$t('signUpVerificationTooltip')">
+                    <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+                  </el-tooltip>
+                </div>
+                <div class="forward">
                   <el-button class="opt-button" size="small" type="primary" @click="openRegVerifyCount">
                     <Icon icon="fluent:settings-48-regular" width="18" height="18"/>
                   </el-button>
@@ -298,8 +311,13 @@
                 </div>
               </div>
               <div class="setting-item">
-                <div><span>{{ $t('addEmailVerification') }}</span></div>
-                <div>
+                <div class="title-item">
+                  <span>{{ $t('addEmailVerification') }}</span>
+                  <el-tooltip effect="dark" :content="$t('addEmailVerificationTooltip')">
+                    <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+                  </el-tooltip>
+                </div>
+                <div class="forward">
                   <el-button class="opt-button" size="small" type="primary" @click="openAddVerifyCount">
                     <Icon icon="fluent:settings-48-regular" width="18" height="18"/>
                   </el-button>
@@ -317,7 +335,12 @@
                 </div>
               </div>
               <div class="setting-item">
-                <div><span>Site Key</span></div>
+                <div class="title-item">
+                  <span>Site Key</span>
+                  <el-tooltip effect="dark" :content="$t('turnstileKeyTooltip')">
+                    <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+                  </el-tooltip>
+                </div>
                 <div class="bot-verify">
                   <span>{{ setting.siteKey }}</span>
                   <el-button class="opt-button" size="small" type="primary" @click="turnstileShow = true">
@@ -326,7 +349,12 @@
                 </div>
               </div>
               <div class="setting-item">
-                <div><span>Secret Key</span></div>
+                <div class="title-item">
+                  <span>Secret Key</span>
+                  <el-tooltip effect="dark" :content="$t('turnstileKeyTooltip')">
+                    <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+                  </el-tooltip>
+                </div>
                 <div class="bot-verify">
                   <span> {{ setting.secretKey }} </span>
                   <el-button class="opt-button" size="small" type="primary" @click="turnstileShow = true">
@@ -810,20 +838,54 @@
         </template>
       </el-dialog>
 
-      <el-dialog v-model="regVerifyCountShow" :title="$t('rulesVerifyTitle',{count: regVerifyCount})"
-                 @closed="regVerifyCount = setting.regVerifyCount">
-        <form>
-          <el-input-number type="text" v-model="regVerifyCount" :min="1">
+      <el-dialog v-model="regVerifyCountShow" class="forward-dialog" @closed="regVerifyCount = setting.regVerifyCount">
+        <template #header>
+          <div class="forward-head">
+            <span class="forward-set-title">{{ $t('signUpVerification') }} · {{ $t('rulesVerify') }}</span>
+            <el-tooltip effect="dark" :content="$t('signUpVerificationTooltip')">
+              <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+            </el-tooltip>
+          </div>
+        </template>
+        <div class="forward-set-body">
+          <div class="rule-threshold-tip">{{ $t('ipThresholdDesc') }}</div>
+          <el-input-number v-model="regVerifyCount" :min="1" :max="9999" style="width: 100%;">
+            <template #suffix>
+              <span>{{ $t('timesPerDay') }}</span>
+            </template>
           </el-input-number>
-          <el-button type="primary" :loading="settingLoading" @click="saveRegVerifyCount">{{ $t('save') }}</el-button>
-        </form>
+        </div>
+        <template #footer>
+          <div class="dialog-footer">
+            <el-button @click="regVerifyCountShow = false">{{ $t('cancel') }}</el-button>
+            <el-button type="primary" :loading="settingLoading" @click="saveRegVerifyCount">{{ $t('save') }}</el-button>
+          </div>
+        </template>
       </el-dialog>
-      <el-dialog v-model="addVerifyCountShow" :title="$t('rulesVerifyTitle',{count: addVerifyCount})"
-                 @closed="addVerifyCount = setting.addVerifyCount">
-        <form>
-          <el-input-number type="text" v-model="addVerifyCount" :min="1"/>
-          <el-button type="primary" :loading="settingLoading" @click="saveAddVerifyCount">{{ $t('save') }}</el-button>
-        </form>
+
+      <el-dialog v-model="addVerifyCountShow" class="forward-dialog" @closed="addVerifyCount = setting.addVerifyCount">
+        <template #header>
+          <div class="forward-head">
+            <span class="forward-set-title">{{ $t('addEmailVerification') }} · {{ $t('rulesVerify') }}</span>
+            <el-tooltip effect="dark" :content="$t('addEmailVerificationTooltip')">
+              <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+            </el-tooltip>
+          </div>
+        </template>
+        <div class="forward-set-body">
+          <div class="rule-threshold-tip">{{ $t('ipThresholdDesc') }}</div>
+          <el-input-number v-model="addVerifyCount" :min="1" :max="9999" style="width: 100%;">
+            <template #suffix>
+              <span>{{ $t('timesPerDay') }}</span>
+            </template>
+          </el-input-number>
+        </div>
+        <template #footer>
+          <div class="dialog-footer">
+            <el-button @click="addVerifyCountShow = false">{{ $t('cancel') }}</el-button>
+            <el-button type="primary" :loading="settingLoading" @click="saveAddVerifyCount">{{ $t('save') }}</el-button>
+          </div>
+        </template>
       </el-dialog>
       <el-dialog top="5vh" v-model="noticePopupShow" :title="$t('noticePopup')" class="notice-popup"
                  @closed="resetNoticeForm">
@@ -922,20 +984,40 @@
           </div>
         </form>
       </el-dialog>
-      <el-dialog v-model="emailPrefixShow" :title="t('emailPrefix')"  @closed="resetEmailPrefix"  >
-        <div class="email-prefix">
-          <div>{{ t('atLeast') }}</div>
-          <el-input-number v-model="minEmailPrefix" :min="1" :max="20" style="width: 150px" >
-            <template #suffix>
-              <span>{{ t('character') }}</span>
-            </template>
-          </el-input-number>
+      <el-dialog v-model="emailPrefixShow" class="forward-dialog" @closed="resetEmailPrefix">
+        <template #header>
+          <div class="forward-head">
+            <span class="forward-set-title">{{ $t('emailPrefix') }}</span>
+            <el-tooltip effect="dark" :content="$t('emailPrefixDesc')">
+              <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+            </el-tooltip>
+          </div>
+        </template>
+        <div class="forward-set-body">
+          <div class="prefix-rule-item">
+            <div class="rule-field-label">{{ $t('emailPrefixMinLength') }}</div>
+            <el-input-number v-model="minEmailPrefix" :min="1" :max="30" style="width: 100%;">
+              <template #suffix>
+                <span>{{ $t('character') }}</span>
+              </template>
+            </el-input-number>
+          </div>
+          <div class="prefix-rule-item" style="margin-top: 14px;">
+            <div class="rule-field-label">{{ $t('emailPrefixProhibited') }}</div>
+            <el-input-tag 
+              tag-type="danger" 
+              :placeholder="$t('mustNotContainDesc')" 
+              v-model="emailPrefixFilter" 
+              @add-tag="emailPrefixAddTag"
+            />
+          </div>
         </div>
-        <div class="prefix-filter">
-          <div style="margin-bottom: 10px;">{{ t('mustNotContain') }}</div>
-          <el-input-tag style="margin-bottom: 10px;" v-model="emailPrefixFilter"  />
-        </div>
-        <el-button type="primary" style="width: 100%;" :loading="settingLoading" @click="saveEmailPrefix">{{ $t('save') }}</el-button>
+        <template #footer>
+          <div class="dialog-footer">
+            <el-button @click="emailPrefixShow = false">{{ $t('cancel') }}</el-button>
+            <el-button type="primary" :loading="settingLoading" @click="saveEmailPrefix">{{ $t('save') }}</el-button>
+          </div>
+        </template>
       </el-dialog>
       <el-dialog v-model="blackFormShow" class="forward-dialog" @closed="resetBlackList">
         <template #header>
@@ -1426,8 +1508,35 @@ function doOpacityChange() {
 }
 
 function resetEmailPrefix() {
-  minEmailPrefix.value = setting.value.minEmailPrefix
-  emailPrefixFilter.value = setting.value.emailPrefixFilter
+  minEmailPrefix.value = setting.value.minEmailPrefix || 1
+  if (Array.isArray(setting.value.emailPrefixFilter)) {
+    emailPrefixFilter.value = Array.from(new Set(setting.value.emailPrefixFilter.map(s => (typeof s === 'string' ? s.trim() : s)))).filter(Boolean)
+  } else if (typeof setting.value.emailPrefixFilter === 'string' && setting.value.emailPrefixFilter.trim()) {
+    emailPrefixFilter.value = Array.from(new Set(setting.value.emailPrefixFilter.split(/[,，]/).map(s => s.trim()))).filter(Boolean)
+  } else {
+    emailPrefixFilter.value = []
+  }
+}
+
+function emailPrefixAddTag(val) {
+  if (!val) return
+  const rawList = Array.isArray(val) ? val : [val]
+  const newItems = []
+  rawList.forEach(item => {
+    if (typeof item === 'string') {
+      item.split(/[,，\s]/).map(s => s.trim()).filter(Boolean).forEach(s => newItems.push(s))
+    }
+  })
+
+  // Remove the duplicate tag pushed at the end by el-input-tag
+  emailPrefixFilter.value.splice(emailPrefixFilter.value.length - 1, 1)
+
+  newItems.forEach(tag => {
+    const exists = emailPrefixFilter.value.some(p => p.toLowerCase() === tag.toLowerCase())
+    if (!exists) {
+      emailPrefixFilter.value.push(tag)
+    }
+  })
 }
 
 function resetBlackList() {
@@ -1441,9 +1550,13 @@ function resetAiCodeFilter() {
 }
 
 function saveEmailPrefix() {
+  const cleanList = Array.from(new Set(
+    (emailPrefixFilter.value || []).map(p => (typeof p === 'string' ? p.trim() : '')).filter(Boolean)
+  ))
+  emailPrefixFilter.value = cleanList
   const form = {}
   form.minEmailPrefix = minEmailPrefix.value
-  form.emailPrefixFilter = emailPrefixFilter.value
+  form.emailPrefixFilter = cleanList
   editSetting(form, true)
 }
 
@@ -2174,8 +2287,22 @@ function editSetting(settingForm, refreshStatus = true) {
       padding-right: 5px;
       position: relative;
       font-size: 16px;
-      font-weight: bold;;
+      font-weight: bold;
     }
+  }
+
+  .rule-threshold-tip {
+    font-size: 13px;
+    color: var(--el-text-color-secondary);
+    line-height: 1.5;
+    margin-bottom: 12px;
+  }
+
+  .rule-field-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--el-text-color-primary);
+    margin-bottom: 6px;
   }
 }
 
