@@ -2,6 +2,21 @@
 
 <!-- VERSION LOG APPEND BELOW (newest first) -->
 
+### 优化与固化：底栏提示文案用户精准定稿与规则体系统一升级为右侧抽屉 Drawer UI (2026-08-22)
+*   **功能需求与业务逻辑对齐 (Feature & Alignment)**: 
+    1. **底栏邮件模式指示器 Tooltip 依据用户指令精准定稿**:
+       - **全部邮件模式（红色药丸）**: `你的来往邮件不受基础隐私保护，请注意保护个人隐私，不要将重要邮件发送到本邮箱`
+       - **隐私邮件模式（绿色药丸）**: `你的来往邮件受到基础的隐私保护，但是垃圾箱的邮件将被严格检查，请注意垃圾箱的隐私邮件`
+    2. **规则配置全面统一为 `unified-drawer` (`el-drawer`) 体系**:
+       - “邮箱前缀规则”弹窗全面重构为右侧滑出抽屉（`class="unified-drawer el-drawer rtl open"`），包含规范的 `.drawer-desc` 规则简述、最小位数限定、禁止词自动排重标签输入、清空与保存。
+       - “注册验证·规则”与“添加验证·规则”频次阈值弹窗同步重构为标准右侧抽屉（`unified-drawer`），清晰说明单 IP 每日触发阈值。
+*   **编辑代码 (Edit)**: 
+    *   **系统设置与抽屉组件**: 修改 [`mail-vue/src/views/sys-setting/index.vue`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/views/sys-setting/index.vue)。
+    *   **国际化语言包**: 修改 [`mail-vue/src/i18n/zh.js`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/i18n/zh.js) 与 [`mail-vue/src/i18n/en.js`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/i18n/en.js)。
+*   **全链路自动化验证与部署 (Verify & Deploy)**: 
+    *   编写并执行端到端 Playwright 自动化套件（`test-drawer-and-tooltips.mjs` 与 `test-allmail-exact.mjs`），截屏验证红色/绿色底栏指示器精确提示浮层，以及邮箱前缀、注册验证、添加验证三项全部使用标准的 `unified-drawer` 右侧抽屉。
+    *   执行 `npx wrangler deploy` 完成全网构建并发布上线（Version ID: `aab36bfd-f3bb-4fcb-a37a-1027a2f66c79`）。
+
 ### 优化：底栏全部邮件模式Tooltip温和用户化、Turnstile人机验证规则释义与邮箱前缀规则UI规范化 (2026-08-22)
 *   **功能需求与业务逻辑对齐 (Feature & Alignment)**: 
     1. **底栏全部邮件模式指示器 Tooltip 温和用户视角重塑**:

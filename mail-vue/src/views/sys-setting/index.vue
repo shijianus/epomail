@@ -838,55 +838,81 @@
         </template>
       </el-dialog>
 
-      <el-dialog v-model="regVerifyCountShow" class="forward-dialog" @closed="regVerifyCount = setting.regVerifyCount">
-        <template #header>
-          <div class="forward-head">
-            <span class="forward-set-title">{{ $t('signUpVerification') }} · {{ $t('rulesVerify') }}</span>
-            <el-tooltip effect="dark" :content="$t('signUpVerificationTooltip')">
-              <Icon class="warning" icon="fe:warning" width="18" height="18"/>
-            </el-tooltip>
+      <!-- 注册验证规则 Unified Drawer -->
+      <el-drawer
+          v-model="regVerifyCountShow"
+          :title="`${$t('signUpVerification')} · ${$t('rulesVerify')}`"
+          direction="rtl"
+          size="450px"
+          @closed="regVerifyCount = setting.regVerifyCount"
+          class="unified-drawer"
+      >
+        <div class="drawer-content">
+          <div class="drawer-desc">
+            <div class="desc-title">{{ $t('signUpVerification') }}频次阈值规则</div>
+            <div class="desc-body">
+              当单一客户端 IP 每日尝试注册账号的次数达到设定阈值后，系统将自动要求进行 Cloudflare Turnstile 人机验证，以防范脚本批量扫号与恶意注册。
+            </div>
+            <div class="desc-rule">
+              <strong>规则说明：</strong>在面板下拉菜单中选择【规则】时此阈值生效。选择【启用】为每次注册均强制人机验证，选择【关闭】为不验证。
+            </div>
           </div>
-        </template>
-        <div class="forward-set-body">
-          <div class="rule-threshold-tip">{{ $t('ipThresholdDesc') }}</div>
-          <el-input-number v-model="regVerifyCount" :min="1" :max="9999" style="width: 100%;">
-            <template #suffix>
-              <span>{{ $t('timesPerDay') }}</span>
-            </template>
-          </el-input-number>
-        </div>
-        <template #footer>
-          <div class="dialog-footer">
-            <el-button @click="regVerifyCountShow = false">{{ $t('cancel') }}</el-button>
-            <el-button type="primary" :loading="settingLoading" @click="saveRegVerifyCount">{{ $t('save') }}</el-button>
-          </div>
-        </template>
-      </el-dialog>
 
-      <el-dialog v-model="addVerifyCountShow" class="forward-dialog" @closed="addVerifyCount = setting.addVerifyCount">
-        <template #header>
-          <div class="forward-head">
-            <span class="forward-set-title">{{ $t('addEmailVerification') }} · {{ $t('rulesVerify') }}</span>
-            <el-tooltip effect="dark" :content="$t('addEmailVerificationTooltip')">
-              <Icon class="warning" icon="fe:warning" width="18" height="18"/>
-            </el-tooltip>
+          <div style="margin-bottom: 16px;">
+            <div style="font-size: 13px; font-weight: 600; margin-bottom: 8px; color: var(--el-text-color-primary);">
+              单 IP 每日注册触发阈值
+            </div>
+            <el-input-number v-model="regVerifyCount" :min="1" :max="9999" style="width: 100%;">
+              <template #suffix>
+                <span>{{ $t('timesPerDay') }}</span>
+              </template>
+            </el-input-number>
           </div>
-        </template>
-        <div class="forward-set-body">
-          <div class="rule-threshold-tip">{{ $t('ipThresholdDesc') }}</div>
-          <el-input-number v-model="addVerifyCount" :min="1" :max="9999" style="width: 100%;">
-            <template #suffix>
-              <span>{{ $t('timesPerDay') }}</span>
-            </template>
-          </el-input-number>
+
+          <div class="drawer-actions">
+            <el-button @click="regVerifyCountShow = false" size="small">{{ $t('cancel') }}</el-button>
+            <el-button type="primary" @click="saveRegVerifyCount" size="small" :loading="settingLoading">{{ $t('save') }}</el-button>
+          </div>
         </div>
-        <template #footer>
-          <div class="dialog-footer">
-            <el-button @click="addVerifyCountShow = false">{{ $t('cancel') }}</el-button>
-            <el-button type="primary" :loading="settingLoading" @click="saveAddVerifyCount">{{ $t('save') }}</el-button>
+      </el-drawer>
+
+      <!-- 添加验证规则 Unified Drawer -->
+      <el-drawer
+          v-model="addVerifyCountShow"
+          :title="`${$t('addEmailVerification')} · ${$t('rulesVerify')}`"
+          direction="rtl"
+          size="450px"
+          @closed="addVerifyCount = setting.addVerifyCount"
+          class="unified-drawer"
+      >
+        <div class="drawer-content">
+          <div class="drawer-desc">
+            <div class="desc-title">{{ $t('addEmailVerification') }}频次阈值规则</div>
+            <div class="desc-body">
+              当单一客户端 IP 每日添加邮箱别名/子邮箱的次数达到设定阈值后，系统将自动要求进行 Cloudflare Turnstile 人机验证，以防范自动化高频批量生成邮箱。
+            </div>
+            <div class="desc-rule">
+              <strong>规则说明：</strong>在面板下拉菜单中选择【规则】时此阈值生效。选择【启用】为每次添加均强制验证，选择【关闭】为不验证。
+            </div>
           </div>
-        </template>
-      </el-dialog>
+
+          <div style="margin-bottom: 16px;">
+            <div style="font-size: 13px; font-weight: 600; margin-bottom: 8px; color: var(--el-text-color-primary);">
+              单 IP 每日添加邮箱触发阈值
+            </div>
+            <el-input-number v-model="addVerifyCount" :min="1" :max="9999" style="width: 100%;">
+              <template #suffix>
+                <span>{{ $t('timesPerDay') }}</span>
+              </template>
+            </el-input-number>
+          </div>
+
+          <div class="drawer-actions">
+            <el-button @click="addVerifyCountShow = false" size="small">{{ $t('cancel') }}</el-button>
+            <el-button type="primary" @click="saveAddVerifyCount" size="small" :loading="settingLoading">{{ $t('save') }}</el-button>
+          </div>
+        </div>
+      </el-drawer>
       <el-dialog top="5vh" v-model="noticePopupShow" :title="$t('noticePopup')" class="notice-popup"
                  @closed="resetNoticeForm">
         <form>
@@ -984,41 +1010,54 @@
           </div>
         </form>
       </el-dialog>
-      <el-dialog v-model="emailPrefixShow" class="forward-dialog" @closed="resetEmailPrefix">
-        <template #header>
-          <div class="forward-head">
-            <span class="forward-set-title">{{ $t('emailPrefix') }}</span>
-            <el-tooltip effect="dark" :content="$t('emailPrefixDesc')">
-              <Icon class="warning" icon="fe:warning" width="18" height="18"/>
-            </el-tooltip>
+      <!-- 邮箱前缀规则 Unified Drawer -->
+      <el-drawer
+          v-model="emailPrefixShow"
+          :title="$t('emailPrefix')"
+          direction="rtl"
+          size="450px"
+          @closed="resetEmailPrefix"
+          class="unified-drawer"
+      >
+        <div class="drawer-content">
+          <div class="drawer-desc">
+            <div class="desc-title">{{ $t('emailPrefix') }}规则设置</div>
+            <div class="desc-body">
+              限制用户注册或添加邮箱时的前缀最小字符位数，并过滤禁止使用的敏感或保留关键词。
+            </div>
+            <div class="desc-rule">
+              <strong>规则简述：</strong>支持限定字符最小长度；在下方输入禁止前缀词并按回车添加（支持逗号或空格批量粘贴），系统将自动去重排重。
+            </div>
           </div>
-        </template>
-        <div class="forward-set-body">
-          <div class="prefix-rule-item">
-            <div class="rule-field-label">{{ $t('emailPrefixMinLength') }}</div>
+
+          <div style="margin-bottom: 16px;">
+            <div style="font-size: 13px; font-weight: 600; margin-bottom: 8px; color: var(--el-text-color-primary);">
+              {{ $t('emailPrefixMinLength') }}
+            </div>
             <el-input-number v-model="minEmailPrefix" :min="1" :max="30" style="width: 100%;">
               <template #suffix>
                 <span>{{ $t('character') }}</span>
               </template>
             </el-input-number>
           </div>
-          <div class="prefix-rule-item" style="margin-top: 14px;">
-            <div class="rule-field-label">{{ $t('emailPrefixProhibited') }}</div>
-            <el-input-tag 
-              tag-type="danger" 
-              :placeholder="$t('mustNotContainDesc')" 
-              v-model="emailPrefixFilter" 
+
+          <div style="font-size: 13px; font-weight: 600; margin-bottom: 8px; color: var(--el-text-color-primary); display: flex; justify-content: space-between; align-items: center;">
+            <span>{{ $t('emailPrefixProhibited') }} ({{ (emailPrefixFilter || []).length }})</span>
+            <div class="drawer-actions" style="margin-bottom: 0;">
+              <el-button @click="emailPrefixFilter = []" size="small">{{ $t('clear') }}</el-button>
+              <el-button type="primary" @click="saveEmailPrefix" size="small" :loading="settingLoading">{{ $t('save') }}</el-button>
+            </div>
+          </div>
+
+          <el-input-tag
+              tag-type="danger"
+              v-model="emailPrefixFilter"
+              :placeholder="$t('mustNotContainDesc')"
+              class="drawer-tag-input"
               @add-tag="emailPrefixAddTag"
-            />
-          </div>
+          />
         </div>
-        <template #footer>
-          <div class="dialog-footer">
-            <el-button @click="emailPrefixShow = false">{{ $t('cancel') }}</el-button>
-            <el-button type="primary" :loading="settingLoading" @click="saveEmailPrefix">{{ $t('save') }}</el-button>
-          </div>
-        </template>
-      </el-dialog>
+      </el-drawer>
       <el-dialog v-model="blackFormShow" class="forward-dialog" @closed="resetBlackList">
         <template #header>
           <div class="forward-head">
@@ -2303,6 +2342,81 @@ function editSetting(settingForm, refreshStatus = true) {
     font-weight: 500;
     color: var(--el-text-color-primary);
     margin-bottom: 6px;
+  }
+}
+
+/* Unified Drawer styles */
+:deep(.unified-drawer.el-drawer) {
+  .el-drawer__header {
+    margin-bottom: 0;
+    padding: 16px 20px;
+    font-weight: 600;
+    font-size: 16px;
+    border-bottom: 1px solid var(--el-border-color-lighter);
+  }
+  .el-drawer__body {
+    padding: 0;
+  }
+}
+
+.drawer-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 20px;
+}
+
+.drawer-desc {
+  margin-bottom: 16px;
+  background: var(--bg-surface, rgba(255, 255, 255, 0.03));
+  padding: 14px;
+  border-radius: 6px;
+  border: 1px solid var(--border-subtle, var(--el-border-color-lighter));
+
+  .desc-title {
+    font-weight: bold;
+    color: var(--text-primary, var(--el-text-color-primary));
+    margin-bottom: 6px;
+    font-size: 14px;
+  }
+  .desc-body {
+    color: var(--text-regular, var(--el-text-color-regular));
+    font-size: 13px;
+    line-height: 1.5;
+    margin-bottom: 8px;
+  }
+  .desc-rule {
+    color: var(--text-muted, var(--el-text-color-secondary));
+    font-size: 12px;
+    padding-top: 8px;
+    border-top: 1px dashed var(--border-subtle, var(--el-border-color-lighter));
+    code {
+      background: var(--bg-elevated, rgba(255, 255, 255, 0.06));
+      padding: 2px 4px;
+      border-radius: 4px;
+      font-family: monospace;
+    }
+  }
+}
+
+.drawer-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.drawer-tag-input {
+  flex: 1;
+  background: var(--bg-elevated, rgba(255, 255, 255, 0.02));
+  border: 1px solid var(--border-subtle, var(--el-border-color-lighter));
+  border-radius: 4px;
+  padding: 8px;
+  align-items: flex-start;
+  :deep(.el-input-tag__inner) {
+    min-height: 180px;
+    align-items: flex-start;
+    align-content: flex-start;
   }
 }
 
