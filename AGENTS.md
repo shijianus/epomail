@@ -2,6 +2,20 @@
 
 <!-- VERSION LOG APPEND BELOW (newest first) -->
 
+### 缺陷修复：登录提交异常抛错拦截与全链路无缝跳转加固 (2026-08-22)
+*   **功能需求与业务逻辑对齐 (Feature & Alignment)**: 
+    1. **排查登录崩溃/无法登录根因**:
+       - 深度调试发现，在登录提交后处理逻辑中调用了未在 `CanvasBackground` 导出的 `canvasRef.current?.pulseGlow()`，触发 `TypeError` 运行时异常并被外层 `catch` 捕获。
+       - 该异常中断了状态转换并弹出“连结错误”，导致登录成功后被重置为 `idle` 状态且无法正常跳转主界面。
+    2. **加固登录态存储与跳转逻辑**:
+       - 在 `AuthForm.tsx` 中移除未定义方法调用，升级为标准的 `canvasRef.current?.pulse()` 与粒子爆发效果。
+       - 确保 JWT `token` 在 API 响应 `code: 200` 时即时完成 `localStorage.setItem('token', token)` 同步落地，并以 800ms 平滑渐变过渡至 `/inbox`。
+*   **编辑代码 (Edit)**: 
+    *   **登录前端组件**: 修改 [`temp_login_ui/src/app/components/epomail/AuthForm.tsx`](file:///home/shijian/projects/epocanvas-mail/temp_login_ui/src/app/components/epomail/AuthForm.tsx)。
+*   **全链路自动化验证与部署 (Verify & Deploy)**: 
+    *   通过 Playwright 端到端全真模拟用户输入凭据并点击 `Initiate Login`，验证从登录提交、绿色成功气泡提示、3秒开屏动画加载到 `/inbox` 邮箱主界面完全渲染的全流程。
+    *   执行 `wrangler deploy` 完成全量构建并全网发布上线（Version ID: `5bca0d4a-fd7f-44c6-87b8-0440d2ec49c7`）。
+
 ### 优化与加固：底栏纯指标展示器定位、设置项单字段精准响应与全局Tooltip精简规范 (2026-08-22)
 *   **功能需求与业务逻辑对齐 (Feature & Alignment)**: 
     1. **底栏状态条回归纯显示器 (Status Bar Pure Indicator)**:

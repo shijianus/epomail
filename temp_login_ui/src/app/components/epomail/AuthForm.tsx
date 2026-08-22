@@ -147,13 +147,24 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
     .then(async (res) => {
       const data = await res.json();
       if (data.code === 200) {
-        setStatus("connected");
-        setSuccessMsg(i18n.loginSuccess || (isZh ? "成功连结节点" : "Node Link Established"));
-        canvasRef.current?.pulseGlow();
+        const token = data.data?.token || data.token;
+        if (token) {
+          localStorage.setItem('token', token);
+        }
+        setStatus("success");
+        cameraState.authSuccessOpacity = 1;
+        let finalMsg = i18n.loginSuccess || data.message || data.msg;
+        if (!finalMsg || finalMsg.toLowerCase() === 'success') {
+          finalMsg = isZh ? "成功连结节点" : "Node Link Established";
+        }
+        setSuccessMsg(finalMsg);
+        canvasRef.current?.pulse({ strength: 2 });
+        canvasRef.current?.burst({
+          strength: 2,
+        });
         setTimeout(() => {
-          localStorage.setItem('token', data.data?.token || data.token);
           window.location.href = '/inbox';
-        }, 1200);
+        }, 800);
       } else {
         setStatus("idle");
         setErrorMsg(i18n.invalidCredentials || data.message || (isZh ? "填写的坐标不存在" : "Specified coordinates do not exist"));
