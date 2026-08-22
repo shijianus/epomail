@@ -91,13 +91,36 @@
           <div class="settings-card">
             <div class="card-title">
               {{ $t('customization') }}
-              <el-tooltip :content="$t('loginBgNote')" placement="top">
-                <Icon icon="lucide:help-circle" width="14" class="help-icon" />
-              </el-tooltip>
             </div>
             <div class="card-content">
+              <!-- UI Type Switcher Tab -->
+              <div class="custom-ui-tabs">
+                <div 
+                  class="ui-tab-item" 
+                  :class="{ active: activeUiTab === 'dynamic' }"
+                  @click="activeUiTab = 'dynamic'"
+                >
+                  <Icon icon="fluent:sparkle-20-filled" width="16" height="16" />
+                  <span>{{ $t('dynamicUi') }}</span>
+                </div>
+                <div 
+                  class="ui-tab-item" 
+                  :class="{ active: activeUiTab === 'static' }"
+                  @click="activeUiTab = 'static'"
+                >
+                  <Icon icon="fluent:image-20-filled" width="16" height="16" />
+                  <span>{{ $t('staticUi') }}</span>
+                </div>
+              </div>
+
+              <!-- Website Title (Common to both) -->
               <div class="setting-item">
-                <div class="title-item"><span>{{ $t('websiteTitle') }}</span></div>
+                <div class="title-item">
+                  <span>{{ $t('websiteTitle') }}</span>
+                  <el-tooltip effect="dark" :content="$t('websiteTitleTooltip')">
+                    <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+                  </el-tooltip>
+                </div>
                 <div class="email-title">
                   <span>{{ setting.title }}</span>
                   <el-button class="opt-button" size="small" type="primary" @click="editTitleShow = true">
@@ -105,52 +128,70 @@
                   </el-button>
                 </div>
               </div>
-              <div class="setting-item">
-                <div>
-                  <span>{{ $t('authCustomization') }}</span>
-                  <el-tooltip effect="dark" :content="$t('authI18nNoticeAuto')">
-                    <Icon class="warning" icon="fe:warning" width="18" height="18"/>
-                  </el-tooltip>
-                </div>
-                <div class="forward">
-                  <el-button class="opt-button" size="small" type="primary" @click="editAuthI18nShow = true">
-                    <Icon icon="fluent:text-grammar-settings-20-regular" width="16" height="16"/>
-                  </el-button>
-                </div>
-              </div>
-              <div class="setting-item">
-                <div class="title-item"><span>{{ $t('loginBoxOpacity') }}</span></div>
-                <div>
-                  <el-input-number size="small" v-model="loginOpacity" @change="opacityChange" :precision="2"
-                                   :step="0.01" :max="1" :min="0"/>
-                </div>
-              </div>
-              <div class="setting-item personalized">
-                <div><span>{{ $t('loginBackground') }}</span></div>
-                <div>
-                  <el-image
-                      class="background"
-                      :src="cvtR2Url(setting.background)"
-                      :preview-src-list="[cvtR2Url(setting.background)]"
-                      show-progress
-                      fit="cover"
-                  >
-                    <template #error>
-                      <div class="error-image">
-                        <Icon icon="ph:image" width="24" height="24"/>
-                      </div>
-                    </template>
-                  </el-image>
-                  <div class="background-btn">
-                    <el-button class="opt-button" size="small" type="primary" @click="openSetBackground">
-                      <Icon icon="lsicon:edit-outline" width="16" height="16"/>
-                    </el-button>
-                    <el-button class="opt-button" size="small" type="primary" @click="delBackground">
-                      <Icon icon="material-symbols:delete-outline-rounded" width="16" height="16"/>
+
+              <!-- Dynamic UI Section -->
+              <template v-if="activeUiTab === 'dynamic'">
+                <div class="setting-item">
+                  <div>
+                    <span>{{ $t('authCustomization') }}</span>
+                    <el-tooltip effect="dark" :content="$t('authI18nNoticeAuto')">
+                      <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+                    </el-tooltip>
+                  </div>
+                  <div class="forward">
+                    <el-button class="opt-button" size="small" type="primary" @click="editAuthI18nShow = true">
+                      <Icon icon="fluent:text-grammar-settings-20-regular" width="16" height="16"/>
                     </el-button>
                   </div>
                 </div>
-              </div>
+              </template>
+
+              <!-- Static UI Section -->
+              <template v-else>
+                <div class="setting-item">
+                  <div class="title-item">
+                    <span>{{ $t('loginBoxOpacity') }}</span>
+                    <el-tooltip effect="dark" :content="$t('loginBoxOpacityTooltip')">
+                      <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+                    </el-tooltip>
+                  </div>
+                  <div>
+                    <el-input-number size="small" v-model="loginOpacity" @change="opacityChange" :precision="2"
+                                     :step="0.01" :max="1" :min="0"/>
+                  </div>
+                </div>
+                <div class="setting-item personalized">
+                  <div>
+                    <span>{{ $t('loginBackground') }}</span>
+                    <el-tooltip effect="dark" :content="$t('loginBackgroundTooltip')">
+                      <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+                    </el-tooltip>
+                  </div>
+                  <div>
+                    <el-image
+                        class="background"
+                        :src="cvtR2Url(setting.background)"
+                        :preview-src-list="[cvtR2Url(setting.background)]"
+                        show-progress
+                        fit="cover"
+                    >
+                      <template #error>
+                        <div class="error-image">
+                          <Icon icon="ph:image" width="24" height="24"/>
+                        </div>
+                      </template>
+                    </el-image>
+                    <div class="background-btn">
+                      <el-button class="opt-button" size="small" type="primary" @click="openSetBackground">
+                        <Icon icon="lsicon:edit-outline" width="16" height="16"/>
+                      </el-button>
+                      <el-button class="opt-button" size="small" type="primary" @click="delBackground">
+                        <Icon icon="material-symbols:delete-outline-rounded" width="16" height="16"/>
+                      </el-button>
+                    </div>
+                  </div>
+                </div>
+              </template>
             </div>
           </div>
 
@@ -987,6 +1028,7 @@ const showResendList = ref(false)
 const settingStore = useSettingStore();
 const uiStore = useUiStore();
 const {settings: setting} = storeToRefs(settingStore);
+const activeUiTab = ref('dynamic')
 const editTitle = ref('')
 const settingLoading = ref(false)
 const clearS3Loading = ref(false)
@@ -1917,6 +1959,43 @@ function editSetting(settingForm, refreshStatus = true) {
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+.custom-ui-tabs {
+  display: flex;
+  background: var(--el-fill-color-darker, rgba(0, 0, 0, 0.2));
+  padding: 4px;
+  border-radius: 8px;
+  gap: 4px;
+  margin-bottom: 6px;
+  border: 1px solid var(--el-border-color-lighter);
+
+  .ui-tab-item {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    color: var(--el-text-color-secondary);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    user-select: none;
+
+    &:hover {
+      color: var(--el-text-color-primary);
+    }
+
+    &.active {
+      background: var(--el-color-primary);
+      color: #ffffff;
+      font-weight: 600;
+      box-shadow: 0 2px 8px rgba(var(--el-color-primary-rgb), 0.35);
+    }
+  }
 }
 
 .setting-item {

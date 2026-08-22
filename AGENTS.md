@@ -2,6 +2,25 @@
 
 <!-- VERSION LOG APPEND BELOW (newest first) -->
 
+### 优化与重构：个性化设置动态/静态UI模式分流切换与精准差异化Tooltip (2026-08-22)
+*   **功能需求与业务逻辑对齐 (Feature & Alignment)**: 
+    1. **个性化设置板块“动态UI / 静态UI”分流切换**:
+       - 在“个性化设置”卡片顶部新增分段式切换器（`动态 UI` 与 `静态 UI`），使站长能清晰根据目标界面类型配置对应样式。
+       - **动态 UI 模式**：聚焦于内置 Canvas 星空粒子架构，展示“网站标题”与“弹窗提示”。
+       - **静态 UI 模式**：聚焦于传统静态登录页面，展示“网站标题”、“登录透明”与“登录背景”。
+    2. **移除卡片标题无差别“?”，改为功能点专属差异化 Tooltip**:
+       - 移除“个性化设置”卡片标题旁易引起混淆的通用问号。
+       - **弹窗提示**：`配置默认动态界面的状态反馈与弹窗文案，使用静态界面时无效。`
+       - **登录透明**：`调整传统静态界面的登录卡片透明度，使用动态界面时无效。`
+       - **登录背景**：`设置传统静态界面的登录背景壁纸，使用动态界面时无效。`
+       - **网站标题**：`自定义全站网站标题，同时应用于动态与静态界面。`
+*   **编辑代码 (Edit)**: 
+    *   **设置页面 UI 与样式**: 修改 [`mail-vue/src/views/sys-setting/index.vue`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/views/sys-setting/index.vue)。
+    *   **国际化语言包**: 修改 [`mail-vue/src/i18n/zh.js`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/i18n/zh.js) 与 [`mail-vue/src/i18n/en.js`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/i18n/en.js)。
+*   **全链路自动化验证与部署 (Verify & Deploy)**: 
+    *   编写并执行 Playwright 端到端自动化测试，验证动态/静态 UI 分段切换、卡片无通用问号、各功能项专属 Tooltip 精确悬停展现。
+    *   执行 `npx wrangler deploy` 完成构建部署全网发布上线（Version ID: `786cdb8a-bf5c-4bf8-9936-1ce689a66d79`）。
+
 ### 缺陷修复：登录提交异常抛错拦截与全链路无缝跳转加固 (2026-08-22)
 *   **功能需求与业务逻辑对齐 (Feature & Alignment)**: 
     1. **排查登录崩溃/无法登录根因**:
