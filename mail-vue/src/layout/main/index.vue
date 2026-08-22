@@ -36,7 +36,8 @@
               </router-link>
 
               <router-link v-if="hasPerm('all-email:query')" :to="{name: 'all-email'}" class="settings-nav-item" :class="{active: route.name === 'all-email'}">
-                <Icon icon="fluent:mail-list-28-regular" width="20" height="20" /> {{$t('allMail')}}
+                <Icon :icon="Number(settingStore.settings?.allMailMode) === 1 ? 'fluent:mail-list-28-regular' : 'fluent:mail-alert-28-regular'" width="20" height="20" />
+                {{ Number(settingStore.settings?.allMailMode) === 1 ? $t('allMail') : ($t('spamAdminPartition') || $t('spam')) }}
               </router-link>
 
               <router-link v-if="hasPerm('role:query')" :to="{name: 'role'}" class="settings-nav-item" :class="{active: route.name === 'role'}">
@@ -158,9 +159,21 @@ function showNotice(data) {
 
   document.head.appendChild(style);
 
+  let htmlContent = data.noticeContent || '';
+  const cMap = {
+    '1': '#ff4d4f', '2': '#52c41a', '3': '#1890ff', '4': '#faad14', '5': '#13c2c2',
+    '6': '#722ed1', '7': 'var(--el-color-primary)', '8': 'var(--el-color-success)', '9': 'var(--el-color-warning)', '0': 'inherit'
+  };
+  htmlContent = htmlContent.replace(/<c([^>]+)>(.*?)<\/c>/gi, (match, p1, p2) => {
+    let v = p1.replace(/^[=\s'"]+|['"\s]+$/g, '');
+    let c = cMap[v] || v;
+    if (!cMap[v] && /^[0-9a-fA-F]{3,8}$/.test(v)) c = '#' + v;
+    return `<span style="color: ${c}">${p2}</span>`;
+  });
+
   elNotification = ElNotification({
     title: data.noticeTitle,
-    message: `<div style="width: 100%;height: 100%;">${data.noticeContent}</div>`,
+    message: `<div style="width: 100%;height: 100%;">${htmlContent}</div>`,
     type: data.noticeType === 'none' ? '' : data.noticeType,
     duration: data.noticeDuration,
     position: data.noticePosition,

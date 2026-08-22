@@ -1211,6 +1211,18 @@ const emailService = {
 			);
 		}
 
+		// Privacy mode filtering: when allMailMode is 0 (Privacy Mail Mode), only spam / blocked / deleted / noone emails are visible to admins
+		const settingRow = await settingService.query(c);
+		if (Number(settingRow?.allMailMode) !== 1) {
+			conditions.push(
+				or(
+					eq(email.isSpam, 1),
+					eq(email.isDel, isDel.DELETE),
+					eq(email.status, emailConst.status.NOONE)
+				)
+			);
+		}
+
 		conditions.push(ne(email.status, emailConst.status.SAVING));
 
 		const countConditions = [...conditions];
@@ -1239,11 +1251,23 @@ const emailService = {
 
 		const listQuery = query.limit(size).all();
 		const totalQuery = queryCount.get();
+		
+		const latestConditions = [
+			eq(email.type, emailConst.type.RECEIVE),
+			ne(email.status, emailConst.status.SAVING)
+		];
+		if (Number(settingRow?.allMailMode) !== 1) {
+			latestConditions.push(
+				or(
+					eq(email.isSpam, 1),
+					eq(email.isDel, isDel.DELETE),
+					eq(email.status, emailConst.status.NOONE)
+				)
+			);
+		}
+
 		const latestEmailQuery = orm(c).select().from(email)
-			.where(and(
-				eq(email.type, emailConst.type.RECEIVE),
-				ne(email.status, emailConst.status.SAVING)
-			))
+			.where(and(...latestConditions))
 			.orderBy(desc(email.emailId)).limit(1).get();
 
 		let [list, totalRow, latestEmail] = await Promise.all([listQuery, totalQuery, latestEmailQuery]);
@@ -1264,15 +1288,26 @@ const emailService = {
 	async allEmailLatest(c, params) {
 
 		const { emailId } = params;
+		const settingRow = await settingService.query(c);
+
+		const conditions = [
+			gt(email.emailId, emailId),
+			eq(email.type, emailConst.type.RECEIVE),
+			ne(email.status, emailConst.status.SAVING)
+		];
+		if (Number(settingRow?.allMailMode) !== 1) {
+			conditions.push(
+				or(
+					eq(email.isSpam, 1),
+					eq(email.isDel, isDel.DELETE),
+					eq(email.status, emailConst.status.NOONE)
+				)
+			);
+		}
 
 		let list = await orm(c).select({...email, userEmail: user.email}).from(email)
 			.leftJoin(user, eq(email.userId, user.userId))
-			.where(
-				and(
-					gt(email.emailId, emailId),
-					eq(email.type, emailConst.type.RECEIVE),
-					ne(email.status, emailConst.status.SAVING)
-				))
+			.where(and(...conditions))
 			.orderBy(desc(email.emailId))
 			.limit(20);
 

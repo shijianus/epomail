@@ -116,9 +116,11 @@
                   <div class="bar-label" :style="i === profileData.trend.length - 1 ? 'color:var(--text-primary); font-weight:bold;' : ''">{{ i === profileData.trend.length - 1 ? '今日' : item.label }}</div>
                 </div>
               </template>
-              <div v-else style="position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 2; gap: 8px;">
-                <Icon icon="lucide:bar-chart-2" style="font-size: 48px; color: var(--border-subtle); opacity: 0.5;" />
-                <span style="font-size: 13px; font-weight: 600; color: var(--text-muted); letter-spacing: 1px;">**</span>
+              <div v-else style="position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 2;">
+                <div style="display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 16px 24px; background: var(--bg-base); border: 1px dashed var(--border-subtle); border-radius: 12px; transform: translateY(-15px);">
+                  <Icon icon="lucide:eye-off" style="font-size: 36px; color: var(--text-muted); opacity: 0.8;" />
+                  <span style="font-size: 13px; font-weight: 600; color: var(--text-muted); letter-spacing: 1px;">隐私保护已开启，态势数据不可见</span>
+                </div>
               </div>
             </div>
           </div>
@@ -149,8 +151,8 @@
                 </div>
               </div>
               <div class="pie-legend" v-else style="display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; min-height: 80px; gap: 8px;">
-                <Icon icon="lucide:pie-chart" style="font-size: 32px; color: var(--border-subtle); opacity: 0.5;" />
-                <span style="font-size: 13px; font-weight: 600; color: var(--text-muted); letter-spacing: 1px;">**</span>
+                <Icon icon="lucide:eye-off" style="font-size: 32px; color: var(--border-subtle); opacity: 0.5;" />
+                <span style="font-size: 13px; font-weight: 600; color: var(--text-muted); letter-spacing: 1px;">来源数据不可见</span>
               </div>
             </div>
           </div>

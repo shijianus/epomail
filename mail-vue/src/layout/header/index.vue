@@ -53,13 +53,13 @@
           <Icon icon="lucide:help-circle" width="22" height="22"/>
         </button>
       </el-tooltip>
-      <el-tooltip :content="$t('notice') || 'Notice'" placement="bottom">
+      <el-tooltip v-if="settingStore.settings?.notice === 0" :content="$t('notice') || 'Notice'" placement="bottom">
         <button class="icon-btn" @click="openNotice">
           <Icon icon="lucide:bell" width="22" height="22"/>
           <span class="badge"></span>
         </button>
       </el-tooltip>
-      <el-dropdown ref="userinfoRef" trigger="click" @visible-change="onDropdownVisibleChange" :teleported="false" popper-class="detail-dropdown">
+      <el-dropdown v-if="userStore.user && userStore.user.email" ref="userinfoRef" trigger="click" @visible-change="onDropdownVisibleChange" :teleported="false" popper-class="detail-dropdown">
         <div class="avatar-wrap" @mouseenter="clearCloseTimer" @mouseleave="startCloseTimer">
           <div class="avatar">{{ formatName(userStore.user.email) }}</div>
         </div>
@@ -70,7 +70,7 @@
               <div style="overflow:hidden">
                 <div class="am-name">{{ userStore.user.name }}</div>
                 <div class="am-email" @click="copyEmail(userStore.user.email)" style="cursor:pointer">{{ userStore.user.email }}</div>
-                <div class="am-status"><span class="status-dot"></span><span>{{ userStore.user.role.name }}</span></div>
+                <div class="am-status"><span class="status-dot"></span><span>{{ userStore.user.role?.name || '' }}</span></div>
               </div>
             </div>
             <div v-if="userStore.user.quota" class="am-storage">
@@ -89,6 +89,9 @@
           </div>
         </template>
       </el-dropdown>
+      <div v-else-if="props.isProfile" class="guest-login-btn" style="display:flex;align-items:center;">
+        <el-button type="primary" size="small" @click="router.push('/login')" style="border-radius:8px;">{{ $t('login') || '登录' }}</el-button>
+      </div>
     </div>
   </div>
 </template>
@@ -303,7 +306,7 @@ const settingsMap = computed(() => [
       { text: t('loginDomain') || 'Login Domain', id: 'loginDomain' },
       { text: t('regKey') || 'Registration Key', id: 'regKey' },
       { text: t('addAccount') || 'Add Account', id: 'addAccount' },
-      { text: t('multipleEmail') || 'Multiple Emails', id: 'multipleEmail' },
+
       { text: t('emailPrefix') || 'Email Prefix', id: 'emailPrefix' },
       { text: t('customization') || 'Customization', id: 'customization' },
       { text: t('emailSetting') || 'Email Settings', id: 'emailSetting' },

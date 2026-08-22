@@ -52,10 +52,70 @@
         </div>
       </div>
     </el-dialog>
+
+    <!-- Email Detail Drawer/Dialog for Admin Reading -->
+    <el-drawer v-model="showDetailDrawer" :size="'65%'" :title="currentEmail?.subject || $t('noSubject')" direction="rtl" destroy-on-close class="email-detail-drawer">
+      <template #header>
+        <div class="drawer-header-title">
+          <Icon icon="fluent:mail-read-24-regular" width="20" height="20" class="header-mail-icon" />
+          <span class="header-subject">{{ currentEmail?.subject || $t('noSubject') }}</span>
+        </div>
+      </template>
+      <div v-if="currentEmail" class="detail-container">
+        <div class="detail-info-card">
+          <div class="sender-row">
+            <el-avatar :size="40" class="sender-avatar">{{ currentEmail.name ? currentEmail.name.charAt(0).toUpperCase() : 'U' }}</el-avatar>
+            <div class="sender-meta">
+              <div class="name-date">
+                <span class="sender-name">{{ currentEmail.name || $t('noSender') }}</span>
+                <span class="sender-email">&lt;{{ currentEmail.sendEmail }}&gt;</span>
+                <span class="email-date">{{ formatDetailDate(currentEmail.createTime) }}</span>
+              </div>
+              <div class="recipient-line">
+                <span class="label">{{ $t('recipient') }}:</span>
+                <span class="val">{{ formatRecipient(currentEmail.recipient) }}</span>
+                <span class="user-bind" v-if="currentEmail.userEmail">({{ $t('userAccount') }}: {{ currentEmail.userEmail }})</span>
+              </div>
+            </div>
+          </div>
+          <div class="tags-row" v-if="currentEmail.isSpam === 1 || currentEmail.isDel === 1 || currentEmail.status === 2">
+            <el-tag size="small" type="danger" v-if="currentEmail.isSpam === 1">{{ $t('spam') }}</el-tag>
+            <el-tag size="small" type="warning" v-if="currentEmail.isDel === 1">{{ $t('trash') }}</el-tag>
+            <el-tag size="small" type="info" v-if="currentEmail.status === 2">NOONE</el-tag>
+          </div>
+        </div>
+
+        <el-scrollbar class="detail-body-scrollbar">
+          <div class="email-body-content">
+            <ShadowHtml class="shadow-html" :html="formatImage(currentEmail.content)" v-if="currentEmail.content" />
+            <pre v-else class="email-text">{{ currentEmail.text || $t('noContent') }}</pre>
+          </div>
+        </el-scrollbar>
+
+        <div class="detail-attachments" v-if="currentEmail.attList && currentEmail.attList.length > 0">
+          <div class="att-header">
+            <span>{{ $t('attachments') }} ({{ currentEmail.attList.length }})</span>
+          </div>
+          <div class="att-list">
+            <div class="att-item" v-for="att in currentEmail.attList" :key="att.attId">
+              <div class="att-icon">
+                <Icon v-bind="getIconByName(att.filename)" />
+              </div>
+              <div class="att-name" :title="att.filename">{{ att.filename }}</div>
+              <div class="att-size">{{ formatBytes(att.size) }}</div>
+              <a :href="cvtR2Url(att.key)" download class="att-download" target="_blank">
+                <Icon icon="system-uicons:push-down" width="20" height="20"/>
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </el-drawer>
   </div>
 </template>
 
 <script setup>
+import ShadowHtml from "@/components/shadow-html/index.vue";
 import {starAdd, starCancel} from "@/request/star.js";
 import emailScroll from "@/components/email-scroll/index.vue"
 import {computed, defineOptions, reactive, ref, watch, onMounted} from "vue";
@@ -69,10 +129,13 @@ import {
 import {Icon} from "@iconify/vue";
 import router from "@/router/index.js";
 import {useI18n} from 'vue-i18n';
-import {toUtc} from "@/utils/day.js";
+import {toUtc, formatDetailDate} from "@/utils/day.js";
 import {sleep} from "@/utils/time-utils.js";
 import {useSettingStore} from "@/store/setting.js";
-import { useRoute } from 'vue-router'
+import { useRoute } from 'vue-router';
+import {getIconByName} from "@/utils/icon-utils.js";
+import {formatBytes} from "@/utils/file-utils.js";
+import {cvtR2Url, toOssDomain} from "@/utils/convert.js";
 
 defineOptions({
   name: 'all-email'
@@ -89,10 +152,29 @@ const mySelect = ref()
 const showBathDelete = ref(false)
 const clearLoading = ref(false)
 
+const showDetailDrawer = ref(false)
+const currentEmail = ref(null)
+
 onMounted(() => {
   emailStore.emailScroll = sysEmailScroll.value;
   latest();
 })
+
+const formatImage = (content) => {
+  content = content || '';
+  const domain = settingStore.settings?.r2Domain;
+  return content.replace(/{{domain}}/g, toOssDomain(domain) + '/');
+};
+
+const formatRecipient = (recipient) => {
+  if (!recipient) return '';
+  try {
+    const list = JSON.parse(recipient);
+    return list.map(item => item.address || item.name || '').join(', ');
+  } catch (e) {
+    return recipient;
+  }
+};
 
 const openSelect = () => {
   mySelect.value.toggleMenu()
@@ -154,6 +236,12 @@ watch(() => params, () => {
   localStorage.setItem('all-email-params', JSON.stringify(params))
 }, {
   deep: true
+})
+
+watch(() => settingStore.settings?.allMailMode, () => {
+  if (sysEmailScroll.value && sysEmailScroll.value.refreshList) {
+    sysEmailScroll.value.refreshList();
+  }
 })
 
 function openBathDelete() {
@@ -302,11 +390,12 @@ function changeTimeSort() {
 }
 
 function jumpContent(email) {
+  currentEmail.value = email;
+  showDetailDrawer.value = true;
   emailStore.contentData.email = email;
   emailStore.contentData.delType = 'physics';
   emailStore.contentData.showStar = false;
-  emailStore.contentData.showReply = false
-  // router.push({name: 'content'})
+  emailStore.contentData.showReply = false;
 }
 
 function getEmailList(emailId, size) {
@@ -536,6 +625,199 @@ async function latest() {
     position: absolute;
     top: 43px;
     left: 282px;
+  }
+}
+
+/* Detail Drawer Styles */
+:deep(.email-detail-drawer) {
+  .el-drawer__header {
+    margin-bottom: 0;
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--border-subtle, #ebeef5);
+  }
+  .el-drawer__body {
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    height: calc(100% - 60px);
+    overflow: hidden;
+  }
+}
+
+.drawer-header-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow: hidden;
+
+  .header-mail-icon {
+    color: var(--accent-primary, #409eff);
+    flex-shrink: 0;
+  }
+
+  .header-subject {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+.detail-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg-surface, #ffffff);
+}
+
+.detail-info-card {
+  padding: 18px 24px;
+  border-bottom: 1px solid var(--border-subtle, #f0f2f5);
+  background: var(--bg-surface);
+
+  .sender-row {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+  }
+
+  .sender-avatar {
+    background: var(--accent-primary, #409eff);
+    color: #fff;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+
+  .sender-meta {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .name-date {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+
+    .sender-name {
+      font-weight: 600;
+      font-size: 14px;
+      color: var(--text-primary);
+    }
+    .sender-email {
+      font-size: 12.5px;
+      color: var(--text-secondary);
+    }
+    .email-date {
+      margin-left: auto;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+  }
+
+  .recipient-line {
+    font-size: 12.5px;
+    color: var(--text-secondary);
+    .label {
+      font-weight: 500;
+      margin-right: 4px;
+    }
+    .val {
+      color: var(--text-primary);
+    }
+    .user-bind {
+      margin-left: 8px;
+      color: var(--accent-primary);
+      font-size: 12px;
+    }
+  }
+
+  .tags-row {
+    margin-top: 10px;
+    display: flex;
+    gap: 6px;
+  }
+}
+
+.detail-body-scrollbar {
+  flex: 1;
+  padding: 20px 24px;
+  overflow-y: auto;
+
+  .email-body-content {
+    min-height: 150px;
+  }
+
+  .email-text {
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-family: inherit;
+    color: var(--text-primary);
+    line-height: 1.6;
+    margin: 0;
+  }
+}
+
+.detail-attachments {
+  border-top: 1px solid var(--border-subtle, #f0f2f5);
+  padding: 14px 24px;
+  background: var(--bg-surface);
+
+  .att-header {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+  }
+
+  .att-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .att-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    border-radius: 6px;
+    background: var(--bg-subtle, #f8f9fa);
+    border: 1px solid var(--border-subtle, #e9ecef);
+    font-size: 12px;
+
+    .att-icon {
+      display: flex;
+      align-items: center;
+    }
+
+    .att-name {
+      max-width: 140px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: var(--text-primary);
+    }
+
+    .att-size {
+      color: var(--text-muted);
+      font-size: 11px;
+    }
+
+    .att-download {
+      color: var(--accent-primary);
+      display: flex;
+      align-items: center;
+      transition: opacity 0.2s;
+      &:hover {
+        opacity: 0.8;
+      }
+    }
   }
 }
 </style>

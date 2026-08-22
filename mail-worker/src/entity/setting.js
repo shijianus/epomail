@@ -52,6 +52,11 @@ export const setting = sqliteTable('setting', {
 	blackFrom: text('black_from').default('').notNull(),
 	aiCode: integer('ai_code').default(1).notNull(),
 	aiCodeFilter: text('ai_code_filter').default('').notNull(),
-	spamRetentionDays: integer('spam_retention_days').default(7).notNull()
+	spamRetentionDays: integer('spam_retention_days').default(7).notNull(),
+	noLandingNodes: text('no_landing_nodes').default('').notNull(),
+	noNewNodes: text('no_new_nodes').default('').notNull(),
+	authI18n: text('auth_i18n').default('{}').notNull(),
+	publicProfile: integer('public_profile').default(0).notNull(),
+	allMailMode: integer('all_mail_mode').default(0).notNull()
 });
 export default setting

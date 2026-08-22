@@ -15,6 +15,13 @@ const settingService = {
 	async refresh(c) {
 		const settingRow = await orm(c).select().from(setting).get();
 		settingRow.resendTokens = JSON.parse(settingRow.resendTokens);
+		if (typeof settingRow.authI18n === 'string') {
+			try {
+				settingRow.authI18n = JSON.parse(settingRow.authI18n);
+			} catch (e) {
+				settingRow.authI18n = {};
+			}
+		}
 		c.set('setting', settingRow);
 		await c.env.kv.put(KvConst.SETTING, JSON.stringify(settingRow));
 	},
@@ -132,15 +139,53 @@ const settingService = {
 		});
 
 		if (Array.isArray(params.emailPrefixFilter)) {
-			params.emailPrefixFilter = params.emailPrefixFilter + '';
+			params.emailPrefixFilter = params.emailPrefixFilter.join(',');
 		}
 
 		if (Array.isArray(params.aiCodeFilter)) {
-			params.aiCodeFilter = params.aiCodeFilter + '';
+			params.aiCodeFilter = params.aiCodeFilter.join(',');
+		}
+
+		if (params.authI18n && typeof params.authI18n === 'object') {
+			params.authI18n = JSON.stringify(params.authI18n);
+		}
+
+		if (params.allMailMode !== undefined) {
+			params.allMailMode = Number(params.allMailMode) === 1 ? 1 : 0;
+		}
+
+		if (params.publicProfile !== undefined) {
+			params.publicProfile = Number(params.publicProfile) === 1 ? 1 : 0;
 		}
 
 		params.resendTokens = JSON.stringify(resendTokens);
-		await orm(c).update(setting).set({ ...params }).returning().get();
+
+		// Whitelist only valid DB columns in setting table
+		const validColumns = [
+			'register', 'receive', 'title', 'manyEmail', 'addEmail', 'autoRefresh',
+			'addEmailVerify', 'registerVerify', 'regVerifyCount', 'addVerifyCount', 'send',
+			'r2Domain', 'secretKey', 'siteKey', 'regKey', 'background',
+			'tgBotToken', 'tgChatId', 'tgBotStatus', 'forwardEmail', 'forwardStatus',
+			'ruleEmail', 'ruleType', 'loginOpacity', 'resendTokens', 'noticeTitle',
+			'noticeContent', 'noticeType', 'noticeDuration', 'noticePosition', 'noticeOffset',
+			'noticeWidth', 'notice', 'noRecipient', 'loginDomain', 'bucket',
+			'region', 'endpoint', 's3AccessKey', 's3SecretKey', 'forcePathStyle',
+			'customDomain', 'tgMsgFrom', 'tgMsgTo', 'tgMsgText', 'minEmailPrefix',
+			'emailPrefixFilter', 'blackSubject', 'blackContent', 'blackFrom', 'aiCode',
+			'aiCodeFilter', 'spamRetentionDays', 'noLandingNodes', 'noNewNodes',
+			'authI18n', 'publicProfile', 'allMailMode'
+		];
+
+		const updateData = {};
+		for (const key of validColumns) {
+			if (params[key] !== undefined) {
+				updateData[key] = params[key];
+			}
+		}
+
+		if (Object.keys(updateData).length > 0) {
+			await orm(c).update(setting).set(updateData).run();
+		}
 		await this.refresh(c);
 	},
 
@@ -232,7 +277,12 @@ const settingService = {
 			linuxdoCallbackUrl: settingRow.linuxdoCallbackUrl,
 			linuxdoSwitch: settingRow.linuxdoSwitch,
 			minEmailPrefix: settingRow.minEmailPrefix,
-			projectLink: settingRow.projectLink
+			projectLink: settingRow.projectLink,
+			noLandingNodes: settingRow.noLandingNodes,
+			noNewNodes: settingRow.noNewNodes,
+			authI18n: settingRow.authI18n || {},
+			publicProfile: settingRow.publicProfile ?? 0,
+			allMailMode: settingRow.allMailMode ?? 0
 		};
 	},
 

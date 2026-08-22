@@ -304,3 +304,14 @@ html:not(.dark) .el-popper .el-popper__arrow::before {
     background: #ffffff !important;
     border-color: #e4e7ed !important;
 }
+
+/* Tooltip bounds & typography constraints - prevent overflowing containers */
+.el-popper.el-tooltip__popper,
+.el-popper.is-dark,
+.el-popper.is-light {
+    max-width: 280px !important;
+    line-height: 1.45 !important;
+    font-size: 12px !important;
+    word-break: break-word !important;
+    white-space: normal !important;
+}

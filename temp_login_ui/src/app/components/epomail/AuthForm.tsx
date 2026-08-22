@@ -7,6 +7,8 @@ import { cameraState } from "./cameraStore";
 
 interface AuthFormProps {
   canvasRef: React.RefObject<CanvasHandle | null>;
+  onSwitch: () => void;
+  sysConfig?: any;
 }
 
 type Status = "idle" | "warping" | "success";
@@ -101,7 +103,7 @@ function FloatingField({
   );
 }
 
-export function AuthForm({ canvasRef }: AuthFormProps) {
+export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -109,19 +111,26 @@ export function AuthForm({ canvasRef }: AuthFormProps) {
   const [errorMsg, setErrorMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
 
+  const isZh = typeof navigator !== 'undefined' && navigator.language.toLowerCase().startsWith('zh');
+  const userLang = isZh ? 'zh' : 'en';
+  const rawI18n = sysConfig?.authI18n || {};
+  const i18n = (rawI18n.zh || rawI18n.en) ? (rawI18n[userLang] || {}) : rawI18n;
+
   useEffect(() => {
     if (errorMsg) {
-      const timer = setTimeout(() => setErrorMsg(""), 4000);
+      const duration = Number(i18n.alertDuration) || 4000;
+      const timer = setTimeout(() => setErrorMsg(""), duration);
       return () => clearTimeout(timer);
     }
-  }, [errorMsg]);
+  }, [errorMsg, i18n.alertDuration]);
 
   useEffect(() => {
     if (successMsg) {
-      const timer = setTimeout(() => setSuccessMsg(""), 4000);
+      const duration = Number(i18n.alertDuration) || 4000;
+      const timer = setTimeout(() => setSuccessMsg(""), duration);
       return () => clearTimeout(timer);
     }
-  }, [successMsg]);
+  }, [successMsg, i18n.alertDuration]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -138,31 +147,16 @@ export function AuthForm({ canvasRef }: AuthFormProps) {
     .then(async (res) => {
       const data = await res.json();
       if (data.code === 200) {
-        setStatus("success");
-        localStorage.setItem('token', data.data.token);
-        cameraState.authSuccessOpacity = 1; // Trigger global green success HUD
-        
-        const isZh = typeof navigator !== 'undefined' && navigator.language.toLowerCase().startsWith('zh');
-        let finalMsg = data.message || data.msg;
-        if (!finalMsg || finalMsg.toLowerCase() === 'success') {
-          finalMsg = isZh ? "成功连结节点" : "Node Link Established";
-        }
-        setSuccessMsg(finalMsg);
-        
-        // Success visual effects
-        canvasRef.current?.burst({
-          strength: 2,
-          color: "#22c55e", // Green burst
-        });
-
+        setStatus("connected");
+        setSuccessMsg(i18n.loginSuccess || (isZh ? "成功连结节点" : "Node Link Established"));
+        canvasRef.current?.pulseGlow();
         setTimeout(() => {
-          window.location.href = data.data.redirect || "/";
-        }, 1500);
+          localStorage.setItem('token', data.data?.token || data.token);
+          window.location.href = '/inbox';
+        }, 1200);
       } else {
         setStatus("idle");
-        
-        const isZh = typeof navigator !== 'undefined' && navigator.language.toLowerCase().startsWith('zh');
-        setErrorMsg(data.message || data.msg || (isZh ? "密码或账户错误" : "Invalid credentials"));
+        setErrorMsg(i18n.invalidCredentials || data.message || (isZh ? "填写的坐标不存在" : "Specified coordinates do not exist"));
         
         cameraState.authErrorOpacity = 1; // Trigger global yellow warning HUD
         cameraState.shakeIntensity = 20; // Reusing shake from existing knockback logic
@@ -176,25 +170,44 @@ export function AuthForm({ canvasRef }: AuthFormProps) {
     })
     .catch((err) => {
       setStatus("idle");
-      const isZh = typeof navigator !== 'undefined' && navigator.language.toLowerCase().startsWith('zh');
       setErrorMsg((isZh ? '连结错误: ' : 'Link error: ') + (err.message || err));
     });
   };
 
+  const getPositionStyle = () => {
+    const p = i18n.alertPosition || 'top-right';
+    const offset = Number(i18n.alertOffset) || 40;
+    const style: React.CSSProperties = { position: 'absolute' };
+    if (p === 'top-left') {
+      style.top = `${offset}px`;
+      style.left = `${offset}px`;
+    } else if (p === 'bottom-left') {
+      style.bottom = `${offset}px`;
+      style.left = `${offset}px`;
+    } else if (p === 'bottom-right') {
+      style.bottom = `${offset}px`;
+      style.right = `${offset}px`;
+    } else {
+      style.top = `${offset}px`;
+      style.right = `${offset}px`;
+    }
+    return style;
+  };
+
   return (
     <form onSubmit={handleSubmit} className="relative flex flex-col gap-7 pt-4">
-      {/* Top Right Toast Notification */}
+      {/* Toast Notification Container */}
       {typeof document !== "undefined" && createPortal(
         <div className="pointer-events-none fixed inset-0 z-[100] overflow-hidden">
           <AnimatePresence>
             {errorMsg && (
               <motion.div
                 key="error"
-                initial={{ opacity: 0, x: 20, scale: 0.95 }}
-                animate={{ opacity: 1, x: 0, scale: 1 }}
-                exit={{ opacity: 0, x: 10, scale: 0.95 }}
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
                 transition={{ type: "spring", stiffness: 300, damping: 20 }}
-                className="absolute top-10 right-10 sm:top-12 sm:right-12 flex justify-end"
+                style={getPositionStyle()}
               >
                 <div className="flex items-center gap-3 rounded-lg bg-yellow-950/40 border border-yellow-500/40 px-6 py-3 backdrop-blur-md shadow-[0_0_20px_rgba(234,179,8,0.2)]">
                   <AlertCircle size={18} className="text-yellow-400" />
@@ -205,11 +218,11 @@ export function AuthForm({ canvasRef }: AuthFormProps) {
             {successMsg && (
               <motion.div
                 key="success"
-                initial={{ opacity: 0, x: 20, scale: 0.95 }}
-                animate={{ opacity: 1, x: 0, scale: 1 }}
-                exit={{ opacity: 0, x: 10, scale: 0.95 }}
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
                 transition={{ type: "spring", stiffness: 300, damping: 20 }}
-                className="absolute top-10 right-10 sm:top-12 sm:right-12 flex justify-end"
+                style={getPositionStyle()}
               >
                 <div className="flex items-center gap-3 rounded-lg bg-green-950/40 border border-green-500/40 px-6 py-3 backdrop-blur-md shadow-[0_0_20px_rgba(34,197,94,0.2)]">
                   <Check size={18} className="text-green-400" />
@@ -225,7 +238,7 @@ export function AuthForm({ canvasRef }: AuthFormProps) {
       <FloatingField
         id="epo-email"
         type="email"
-        label="EMAIL"
+        label={i18n.emailLabel || "EMAIL"}
         icon={<Mail size={16} strokeWidth={1.8} />}
         value={email}
         onChange={setEmail}
@@ -242,7 +255,7 @@ export function AuthForm({ canvasRef }: AuthFormProps) {
       <FloatingField
         id="epo-password"
         type={showPassword ? "text" : "password"}
-        label="PASSWORD"
+        label={i18n.passwordLabel || "PASSWORD"}
         icon={<Lock size={16} strokeWidth={1.8} />}
         value={password}
         onChange={setPassword}
@@ -275,14 +288,14 @@ export function AuthForm({ canvasRef }: AuthFormProps) {
           style={{ color: "var(--epo-muted)" }}
         >
           <input type="checkbox" className="accent-[var(--epo-purple-glow)]" />
-          Stay in orbit
+          {i18n.stayInOrbit || "Stay in orbit"}
         </label>
         <a
           href="#"
           className="text-[13px] transition-colors hover:text-[var(--epo-cyan-glow)]"
           style={{ color: "var(--epo-muted)" }}
         >
-          Forgot password?
+          {i18n.forgotPassword || "Forgot password?"}
         </a>
       </div>
 
@@ -317,17 +330,17 @@ export function AuthForm({ canvasRef }: AuthFormProps) {
         <span className="relative flex items-center gap-2">
           {status === "idle" && (
             <>
-              Initiate Login <ArrowRight size={17} />
+              {i18n.initiateLogin || "Initiate Login"} <ArrowRight size={17} />
             </>
           )}
           {status === "warping" && (
             <>
-              <Loader2 size={17} className="animate-spin" /> Warping…
+              <Loader2 size={17} className="animate-spin" /> {i18n.warping || "Warping…"}
             </>
           )}
           {status === "success" && (
             <>
-              <Check size={17} /> Connected
+              <Check size={17} /> {i18n.connected || "Connected"}
             </>
           )}
         </span>
@@ -340,7 +353,7 @@ export function AuthForm({ canvasRef }: AuthFormProps) {
           style={{ background: "rgba(139,147,196,0.2)" }}
         />
         <span className="text-[12px]" style={{ color: "var(--epo-muted)" }}>
-          or continue with
+          {i18n.orContinueWith || "or continue with"}
         </span>
         <div
           className="h-px flex-1"
@@ -367,13 +380,14 @@ export function AuthForm({ canvasRef }: AuthFormProps) {
       </div>
 
       <p className="text-center text-[13px]" style={{ color: "var(--epo-muted)" }}>
-        New to the canvas?{" "}
+        {i18n.newToCanvas || "New to the canvas?"}{" "}
         <a
           href="#"
+          onClick={(e) => { e.preventDefault(); onSwitch(); }}
           className="transition-colors hover:text-[var(--epo-cyan-glow)]"
           style={{ color: "var(--epo-purple-glow)" }}
         >
-          Create a node
+          {i18n.exploreNode || (isZh ? "探索节点" : "Explore Node")}
         </a>
       </p>
     </form>

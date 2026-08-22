@@ -31,8 +31,47 @@ const dbInit = {
 		await this.v3_0DB(c);
 		await this.v3_1DB(c);
 		await this.v3_2DB(c);
+		await this.v3_3DB(c);
+		await this.v3_4DB(c);
+		await this.v3_5DB(c);
+		await this.v3_6DB(c);
 		await settingService.refresh(c);
 		return c.text('success');
+	},
+
+	async v3_6DB(c) {
+		try {
+			await c.env.db.prepare(`ALTER TABLE setting ADD COLUMN all_mail_mode INTEGER NOT NULL DEFAULT 0;`).run();
+		} catch (e) {
+			console.warn(`跳过字段：${e.message}`);
+		}
+	},
+
+	async v3_5DB(c) {
+		try {
+			await c.env.db.prepare(`ALTER TABLE setting ADD COLUMN public_profile INTEGER NOT NULL DEFAULT 0;`).run();
+		} catch (e) {
+			console.warn(`跳过字段：${e.message}`);
+		}
+	},
+
+	async v3_4DB(c) {
+		try {
+			await c.env.db.prepare(`ALTER TABLE setting ADD COLUMN auth_i18n TEXT NOT NULL DEFAULT '{}';`).run();
+		} catch (e) {
+			console.warn(`跳过字段：${e.message}`);
+		}
+	},
+
+	async v3_3DB(c) {
+		try {
+			await c.env.db.batch([
+				c.env.db.prepare(`ALTER TABLE setting ADD COLUMN no_landing_nodes TEXT NOT NULL DEFAULT '';`),
+				c.env.db.prepare(`ALTER TABLE setting ADD COLUMN no_new_nodes TEXT NOT NULL DEFAULT '';`)
+			]);
+		} catch (e) {
+			console.warn(`跳过字段：${e.message}`);
+		}
 	},
 
 	async v3_2DB(c) {
@@ -206,10 +245,8 @@ const dbInit = {
 	},
 
 	async v1_6DB(c) {
-
-		const noticeContent = '本项目仅供学习交流，禁止用于违法业务\n' +
-			'<br>\n' +
-			'请遵守当地法规，作者不承担任何法律责任'
+		const noticeContent = '欢迎使用 <c7>EpoCanvas Mail</c> 智能协作平台。<br>\n' +
+			'请在严格遵守当地法律法规及平台规范的前提下，开展业务通信流转。'
 
 		const ADD_COLUMN_SQL_LIST = [
 			`ALTER TABLE setting ADD COLUMN reg_verify_count INTEGER NOT NULL DEFAULT 1;`,
@@ -243,7 +280,15 @@ const dbInit = {
 		});
 
 		await Promise.all(promises);
-		await c.env.db.prepare(`UPDATE setting SET notice_content = ? WHERE notice_content = '';`).bind(noticeContent).run();
+		
+		const oldNoticeContent1 = '本项目仅供学习交流，禁止用于违法业务\n<br>\n请遵守当地法规，作者不承担任何法律责任';
+		const oldNoticeContent2 = '欢迎使用 EpoCanvas Mail 智能协作通信平台。<br><br>\n' +
+			'作为新一代的现代化数字工作站，我们致力于为您提供极简、高效、且高隐私安全标准的企业级通讯体验。<br>\n' +
+			'请在严格遵守当地法律法规及平台规范的前提下，开展您的业务通信流转。';
+		const oldNoticeContent3 = '欢迎使用 <c=var(--el-color-primary)>EpoCanvas Mail</c> 智能协作平台。<br>\n' +
+			'请在严格遵守当地法律法规及平台规范的前提下，开展业务通信流转。';
+		await c.env.db.prepare(`UPDATE setting SET notice_content = ? WHERE notice_content = '' OR notice_content = ? OR notice_content = ? OR notice_content = ?;`).bind(noticeContent, oldNoticeContent1, oldNoticeContent2, oldNoticeContent3).run();
+		
 		try {
 			await c.env.db.batch([
 				c.env.db.prepare(`DROP INDEX IF EXISTS idx_account_email`),

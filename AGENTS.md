@@ -2,6 +2,241 @@
 
 <!-- VERSION LOG APPEND BELOW (newest first) -->
 
+### 优化与加固：底栏纯指标展示器定位、设置项单字段精准响应与全局Tooltip精简规范 (2026-08-22)
+*   **功能需求与业务逻辑对齐 (Feature & Alignment)**: 
+    1. **底栏状态条回归纯显示器 (Status Bar Pure Indicator)**:
+       - 彻底移除底部状态栏 `.mode-tag` 的直接点击交互逻辑、翻转图标 (`fluent:arrow-swap-16-filled`) 与可点击手型，将其严格作为系统当前邮件模式的**纯指标/状态显示器**。
+       - 悬停展示官方简明的模式说明，不含冗余长文。
+    2. **系统设置开关点不动根治与单字段提交 (Sys-Setting Switch Unblock)**:
+       - 根除开关在 `beforeChange()` 中因全局加载状态误锁导致的点击卡死问题，确保开关操作流畅响应。
+       - 针对“全部邮件模式”等开关全面改造为 `@change="(val) => changeField('allMailMode', val)"` 单字段轻量提交，避免全量 50+ 配置字段冲突。
+       - 在 `getSettings()` 中对 `allMailMode`、`publicProfile`、`register` 等关键开关字段做强类型整型（0/1）归一化，杜绝状态不匹配。
+    3. **Tooltip 解释文案全局精简与 CSS 物理边界约束**:
+       - 对系统内所有 Tooltip（`allMailModeDesc`、`allMailModeStatusDesc`、`privacyMailModeStatusDesc`、`publicProfileDesc`、`authI18nNoticeAuto`、`ossDomainDesc`、`loginBgNote` 等）进行地毯式排查与极简化重写，语言官方、简明扼要，直指功能本质。
+       - 在全局 `style.css` 中为 `.el-popper.el-tooltip__popper` 注入 `max-width: 280px !important; word-break: break-word !important; line-height: 1.45 !important;`，从 CSS 层面严格限制浮层气泡宽度，杜绝跨越卡片板块或视口溢出的问题。
+*   **编辑代码 (Edit)**: 
+    *   **前端状态与设置面板**: 修改 [`mail-vue/src/views/sys-setting/index.vue`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/views/sys-setting/index.vue)、[`mail-vue/src/layout/status-bar/index.vue`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/layout/status-bar/index.vue)。
+    *   **样式与全局 Poppers**: 修改 [`mail-vue/src/style.css`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/style.css)。
+    *   **国际化语言包**: 修改 [`mail-vue/src/i18n/zh.js`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/i18n/zh.js) 与 [`mail-vue/src/i18n/en.js`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/i18n/en.js)。
+*   **全链路自动化验证与部署 (Verify & Deploy)**: 
+    *   通过 Playwright 端到端自动化套件测试全链路：系统设置“全部邮件模式”开关点击切换（0->1->0）、Toast 实时通知、底栏状态指示器实时两态响应、Tooltip 悬停展示与紧凑边界。
+    *   执行 `npx wrangler deploy` 完成前后端联合构建并全网发布上线（Version ID: `0c975fda-73eb-44c2-afe6-311ef9ba669a`）。
+
+### 优化与加固：邮件模式切换全链路闭环、D1字段白名单过滤、底部状态栏一键切换与实时响应 (2026-08-21)
+*   **功能需求与业务逻辑对齐 (Feature & Alignment)**: 
+    1. **排查并根治配置保存失败问题**：
+       - 排查发现前端向 `/setting/set` 提交更新时携带了运行时动态属性（如 `hasR2`、`hasCfEmail`、`domainList`、`regVerifyOpen` 等），导致 Drizzle ORM / SQLite 执行 `UPDATE` 时由于找不到对应列而报错，引发前端配置被回滚且无法切换模式。
+       - 在后端 `setting-service.js` 的 `set` 方法中引入严格的 **数据库列白名单过滤 (Columns Whitelist)** 与类型安全转换（确保 `allMailMode`、`publicProfile` 强制转换整型 0/1 并执行 `.run()` 安全更新）。
+    2. **响应式状态实时同步 (Real-time Reactive Store Sync)**：
+       - 在前端 `sys-setting/index.vue` 中的 `change()`、`changeField()`、`getSettings()` 及 `editSetting()` 中，全面注入对 `settingStore.settings` 的即时同步与响应式状态合并，确保切换瞬间全局生效。
+       - 在 `all-email/index.vue` 中增设对 `settingStore.settings.allMailMode` 的响应式 `watch`，一旦管理员切换模式，邮件列表自动无感重新拉取（全部邮件 vs 垃圾拦截邮件）。
+    3. **底部状态栏一键交互切换 (One-Click Status Bar Toggle)**：
+       - 在 `status-bar/index.vue` 中为管理员开放底部模式药丸直接点击切换能力（带动态翻转图标 `fluent:arrow-swap-16-filled` 与悬停变色效果）。
+       - 管理员只需在底栏轻点药丸，即可直接调用 `settingSet({ allMailMode })` 实现瞬间两态无缝切换，并弹出全局 Toast 提示（“已开启【全部邮件模式】” / “已切换至【隐私邮件模式】”）。
+*   **编辑代码 (Edit)**: 
+    *   **后端服务**: 修改 [`mail-worker/src/service/setting-service.js`](file:///home/shijian/projects/epocanvas-mail/mail-worker/src/service/setting-service.js)。
+    *   **前端组件与状态**: 修改 [`mail-vue/src/views/sys-setting/index.vue`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/views/sys-setting/index.vue)、[`mail-vue/src/layout/status-bar/index.vue`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/layout/status-bar/index.vue)、[`mail-vue/src/views/all-email/index.vue`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/views/all-email/index.vue)。
+    *   **国际化语言包**: 修改 [`mail-vue/src/i18n/zh.js`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/i18n/zh.js) 与 [`mail-vue/src/i18n/en.js`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/i18n/en.js)。
+*   **全链路自动化验证与部署 (Verify & Deploy)**: 
+    *   编写 Playwright 端到端交互切换测试（`test-toggle-flow.mjs`），成功截取并验证了三种场景：
+        1. 初始隐私模式：`screenshot_test_toggle_1_privacy.png`
+        2. 底栏一键点击切换为全部邮件模式（红色药丸 + 顶部警告 Toast）：`screenshot_test_toggle_2_all_mail.png`
+        3. 再次点击秒切回隐私邮件模式（绿色药丸 + 成功 Toast）：`screenshot_test_toggle_3_privacy_again.png`
+    *   执行 `npx wrangler deploy` 完成联合构建与全网发布（Version ID: `c3ae63e5-0759-4184-b9b2-28a27caa5712`）。
+*   **功能需求与业务逻辑对齐 (Feature & Alignment)**: 
+    1. **系统设置双模式开关 (Sys-Setting Mode Switch)**：在系统设置“网站设置”卡片中新增“全部邮件模式”开关及附注 Tooltip，明确告知开启后管理员可查阅全站用户所有收发邮件（隐私敏感）。
+    2. **底部状态栏防篡改指示 (Status Bar Tamper-Proof Tag)**：
+       - **开启“全部邮件模式”时**：在底部状态栏右侧版本号前展示**红色**字体及图标的“全部邮件模式”状态药丸，悬浮显示隐私预警。
+       - **关闭“全部邮件模式”（即隐私邮件模式）时**：右下角自动切换为**绿色**字体及图标的“隐私邮件模式”状态药丸，并加注防篡改完整说明（*“受系统安全与隐私机制保护，管理员仅可查看被判定为垃圾/拦截的邮件，无法读取用户的私密往来邮件”*）。
+    3. **管理分区与数据规则联动 (Partition & Privacy Query)**：
+       - 在“隐私邮件模式”下，侧边栏“全部邮件”名称与图标自动联动切换为“垃圾邮件” (`fluent:mail-alert-28-regular`)。
+       - 后端 `email-service.js` 的 `allList` 与 `allEmailLatest` 严格注入数据过滤：隐私模式下管理员仅能查阅命中黑名单、垃圾邮件判定、删除垃圾或无匹配账户 (`isSpam = 1` / `isDel = 1` / `status = 2`) 的邮件。
+    4. **邮件详情阅读器修复与重构 (Email Reader Drawer)**：
+       - 彻底修复管理员在“全部邮件/垃圾邮件”列表中点击邮件无法查看内容的缺陷。在 `all-email/index.vue` 内集成 `el-drawer` 抽屉式深度邮件阅读器，支持发件人/收件人/关联账户元信息、HTML/文本安全渲染（`ShadowHtml`）及附件列表一键下载。
+*   **编辑代码 (Edit)**: 
+    *   **数据库实体与迁移**: 修改 [`mail-worker/src/entity/setting.js`](file:///home/shijian/projects/epocanvas-mail/mail-worker/src/entity/setting.js) 与 [`mail-worker/src/init/init.js`](file:///home/shijian/projects/epocanvas-mail/mail-worker/src/init/init.js)（新增 `v3_6DB`）。
+    *   **后端查询与数据过滤**: 修改 [`mail-worker/src/service/setting-service.js`](file:///home/shijian/projects/epocanvas-mail/mail-worker/src/service/setting-service.js) 与 [`mail-worker/src/service/email-service.js`](file:///home/shijian/projects/epocanvas-mail/mail-worker/src/service/email-service.js)。
+    *   **国际化语言包**: 修改 [`mail-vue/src/i18n/zh.js`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/i18n/zh.js) 与 [`mail-vue/src/i18n/en.js`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/i18n/en.js)。
+    *   **前端布局与组件**: 修改 [`mail-vue/src/views/sys-setting/index.vue`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/views/sys-setting/index.vue)、[`mail-vue/src/layout/status-bar/index.vue`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/layout/status-bar/index.vue)、[`mail-vue/src/layout/main/index.vue`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/layout/main/index.vue) 与 [`mail-vue/src/views/all-email/index.vue`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/views/all-email/index.vue)。
+*   **全链路自动化验证与部署 (Verify & Deploy)**: 
+    *   通过 Playwright 端到端全链路视觉验证与场景测试，成功生成并校验了隐私模式状态栏绿色药丸、防篡改浮层解释、红色全部邮件预警药丸、系统设置开关与邮件阅读抽屉。
+    *   执行 `npx wrangler deploy` 完成联合构建与生产部署（Version ID: `f849f3b3-8b27-43b4-b702-aa8e43f885a4`），生产端调用 `/api/init` 成功执行 `v3_6DB` 数据结构平滑升级。
+
+### 优化与加固：系统设置“公开个人主页”提示说明、业务链路加固、Playwright多态验证与全网部署 (2026-08-21)
+*   **功能需求与业务逻辑对齐 (Feature & Alignment)**: 
+    1. **提示说明 Tooltip**：为系统设置“网站设置”卡片下的“公开个人主页”项增加解释提示图标（`fe:warning` 图标 + Tooltip 浮层），清晰说明该项功能为*“控制站内的用户信息是否允许未登录的用户（站外）查看”*。
+    2. **国际化支持 (i18n)**：将“公开个人主页”及其解释文案、顶栏登录按键文案规范纳入中英文国际化语言包（`publicProfile`、`publicProfileDesc`、`login`）。
+    3. **业务链路底层加固**：
+       - 在 D1 数据库与 Drizzle ORM 中为 `setting` 实体补充 `public_profile` 字段持久化映射与 `v3_5DB` 数据平滑升级。
+       - 修复顶栏 `Header.vue` 在未登录用户（访客模式）访问主页时由于缺少 `userStore.user.email` 触发 `ElDropdown` 无限递归循环的边界缺陷，并为访客状态提供优雅的“登录”入口。
+*   **编辑代码 (Edit)**: 
+    *   **国际化语言包**: 修改 [`mail-vue/src/i18n/zh.js`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/i18n/zh.js) 与 [`mail-vue/src/i18n/en.js`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/i18n/en.js)。
+    *   **系统设置 UI 与框架**: 修改 [`mail-vue/src/views/sys-setting/index.vue`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/views/sys-setting/index.vue) 与 [`mail-vue/src/layout/header/index.vue`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/layout/header/index.vue)。
+    *   **后端存储与迁移**: 修改 [`mail-worker/src/entity/setting.js`](file:///home/shijian/projects/epocanvas-mail/mail-worker/src/entity/setting.js)、[`mail-worker/src/init/init.js`](file:///home/shijian/projects/epocanvas-mail/mail-worker/src/init/init.js)（新增 `v3_5DB`）、[`mail-worker/src/service/setting-service.js`](file:///home/shijian/projects/epocanvas-mail/mail-worker/src/service/setting-service.js)。
+*   **全链路自动化验证与部署 (Verify & Deploy)**: 
+    *   编写并执行 [`test-public-profile.mjs`](file:///home/shijian/projects/epocanvas-mail/test-public-profile.mjs)，通过 Playwright 在 4 种典型场景下进行了端到端自动化测试与视觉检查：
+        1. **后台设置浮层说明**：`screenshot_public_profile_tooltip.png`
+        2. **未登录访客公开查看允许状态**：`screenshot_public_profile_guest_allowed.png`
+        3. **未登录访客公开查看禁止状态（401拦截）**：`screenshot_public_profile_guest_blocked.png`
+        4. **已登录账户专属查看状态**：`screenshot_public_profile_logged_in.png`
+    *   执行 `npx wrangler deploy`，成功完成联合构建与 Cloudflare Workers 全网部署（Version ID: `dc176bba-24e3-4410-8a27-204a81758e75`）。
+    *   调用 `/init/123456` 成功触发生产端数据库无缝完成 `v3_5DB` 迁移。
+
+
+
+### 优化：语境说明外置至个性化设置项并补充自定义前端UI失效提醒 (2026-08-21)
+*   **功能需求 (Feature)**: 
+    1. **语境说明外置**：将语言专属语境说明 Tooltip 从弹窗内部标题旁移至系统设置主界面“个性化设置”卡片下的“弹窗提示”项旁，弹窗内保持纯净标题。
+    2. **补充前端有效范围说明**：在悬停 Tooltip 文案中补充关键提示（*“仅对内置的登录/注册界面有效，若自定义前端UI则将失效。”*），防止站长接入第三方/外置前端时产生歧义。
+*   **编辑代码 (Edit)**: 
+    *   **国际化语言包**: 修改 `mail-vue/src/i18n/zh.js` 与 `en.js`，更新 `authI18nNoticeAuto` 文案，补充有效范围说明。
+    *   **系统设置 UI**: 修改 `mail-vue/src/views/sys-setting/index.vue`，在“个性化设置”卡片中为“弹窗提示”添加 `el-tooltip`，并简化弹窗自身 Header 为默认原生标题。
+*   **验证与部署 (Verify & Deploy)**: 
+    *   执行 `node test-simplified-alerts.mjs`，在 Playwright 中全流程验证了个性化设置卡片“弹窗提示”图标悬停触发新文案 Tooltip 以及弹窗的正常展示，生成 2 张验证截图。
+    *   执行 `npx wrangler deploy`，成功完成联合编译与 Cloudflare Workers 全网部署（Version ID: `c5d77144-b749-468d-8c45-30c73221d55d`）。
+
+
+### 优化：状态场景对象通俗化、按钮右对齐与名称精简为“弹窗提示” (2026-08-21)
+*   **功能需求 (Feature)**: 
+    1. **状态场景对象人话通俗化**：将“状态场景对象”的选择标签从科幻文案还原为直观的业务描述（如“账户或密码错误”、“两次密码不一致”、“未开放注册”、“注册被拒绝”），方便站长快速定位修改对象；实际展示文案及占位符则继续保持科幻坐标入戏体系（如“填写的坐标不存在”、“请确认前后坐标一致”等）。
+    2. **设置主列表按键右对齐**：修复“个性化设置”卡片中“弹窗提示”由于网格布局导致的按钮未右对齐问题，统一采用 `.forward` Flex 右对齐容器，与“网站标题”、“登录框透明度”、“登录背景”等项的右侧按键对齐。
+    3. **名称极简化**：在后台所有面板与弹窗中统一将“弹窗提示内容”简化命名为“弹窗提示” (`Toast Alerts`)。
+*   **编辑代码 (Edit)**: 
+    *   **国际化语言包**: 修改 `mail-vue/src/i18n/zh.js` 与 `en.js`，更新 `authCustomization` 名称并重置场景对象药丸标签为直观人话。
+    *   **系统设置 UI**: 修改 `mail-vue/src/views/sys-setting/index.vue`，重构 `setting-item` 的右侧容器为 `.forward`，并配置全局 `.forward` 的 `justify-content: flex-end` 样式。
+*   **验证与部署 (Verify & Deploy)**: 
+    *   执行 `node test-simplified-alerts.mjs`，在 Playwright 中全流程验证了主设置页面按钮对齐及通俗化场景药丸点击切换联动科幻文案，生成 4 张场景验证截图。
+    *   执行 `npx wrangler deploy`，成功完成前端构建与 Cloudflare Workers 全网部署（Version ID: `f7acfe71-d4c2-4d10-8324-ae272fc577f4`）。
+
+
+### 优化：弹窗提示语境悬停提示、科幻坐标文案入戏与宽屏参数排版 (2026-08-21)
+*   **功能需求 (Feature)**: 
+    1. **语境悬停提示**：移除顶部常显横幅，改为标题旁的信息图标悬停 Tooltip 呈现精确描述（*“系统已根据当前控制台语言载入专属语境，修改内容完全隔离且仅对当前语言生效。”*）。
+    2. **科幻沉浸式坐标文案**：将“密码或账户错误”升级为“填写的坐标不存在”；将“两次输入的密码不一致”升级为“请确认前后坐标一致”。
+    3. **纯净单语言文案与占位符**：彻底移除所有跨语言混合括号（如 `(...)`），中文语境纯中文，英文语境纯英文；输入框标题极简化为“提示文案”。
+    4. **宽屏参数防阻挡排版**：参考“网站公告/登录弹窗”的三列 Grid 自适应排版，将“提示位置”、“位置偏移”与“持续时间”拉宽至完全舒展，数字与单位不再被遮挡。
+*   **编辑代码 (Edit)**: 
+    *   **设置后台与国际化**: 修改 `mail-vue/src/views/sys-setting/index.vue`、`mail-vue/src/i18n/zh.js` 与 `en.js`，重构 Dialog Header 悬停 Tooltip、Grid 参数行、纯净占位符与“提示文案”精简标签。
+    *   **登录注册前端**: 修改 `temp_login_ui/src/app/components/epomail/AuthForm.tsx` 与 `RegisterForm.tsx`，将默认回退文案同步升级为坐标科幻体系。
+*   **验证与部署 (Verify & Deploy)**: 
+    *   执行 `node test-simplified-alerts.mjs`，在 Playwright 中全流程验证了悬停 Tooltip 触发、三色氛围 HUD 及宽屏参数展示，生成 4 张高清场景截图。
+    *   执行 `npx wrangler deploy`，成功完成联合编译与 Cloudflare Workers 全网部署（Version ID: `3f43f939-1725-41c7-b144-72c299c6aa0b`）。
+
+
+### 重构：弹窗提示内容分级层次定制、自动语境/深浅绑定与底部一键同步 (2026-08-21)
+*   **功能需求 (Feature)**: 
+    1. **语言与深浅色调自动匹配**：移除手动语言和主题选择，直接根据当前系统语言和暗/亮模式自动生效，互不干扰且无缝衔接。
+    2. **两级分层选择逻辑**：先选择“① 颜色标识 (绿/黄/红)”，再选择“② 状态场景对象”，最后在下方针对当前对象进行文案、位置与时长修改，层次清晰直观。
+    3. **实时氛围舞台联动**：沙盒实时根据颜色标识与对象文案渲染对应微光/托架/警报 HUD 氛围与气泡位置。
+    4. **底部一键覆盖同步**：将“同步至另一语言”按钮移至弹窗底部 Footer，并增加说明 Tooltip。开放自由文本输入，不限制语种字符。
+*   **编辑代码 (Edit)**: 
+    *   **设置页面 UI**: 修改 `mail-vue/src/views/sys-setting/index.vue`，重构 `auth-prompt-dialog` 为分级状态栏、自动语言提示、底部 Footer 左右分割排版与氛围舞台。
+    *   **国际化语言包**: 修改 `mail-vue/src/i18n/zh.js` 与 `en.js`，增补分级场景状态键名与一键同步 Tooltip。
+*   **验证与部署 (Verify & Deploy)**: 
+    *   执行 `node test-simplified-alerts.mjs`，在 Playwright 中全流程验证了自动语言语境、分级状态场景切换及三色实时氛围 HUD，生成 3 张验证截图。
+    *   执行 `npm run deploy`，成功完成前后端构建与 Cloudflare Workers 全网部署（Version ID: `74f5a7bd-11db-4457-bf4d-44e87df85b00`）。
+
+
+### 优化：极简化“弹窗提示内容”三色氛围HUD与多语言互相同步 (2026-08-21)
+*   **功能需求 (Feature)**: 
+    *   **名称与定位极简化**：将复杂的“登录与注册界面文案定制”重构并精简为“弹窗提示内容”，专注管理绿、黄、红三种核心状态的反馈与氛围 HUD。
+    *   **三大颜色氛围分组**：
+        1. **绿色提示 (Green)**：正常登录成功、正常注册成功提示文案。
+        2. **黄色预警 (Yellow)**：密码凭据错误、两次密码不一致、未开放注册预警 HUD 提示。
+        3. **红色警报 (Red)**：强行注册拒绝 / 严禁入网警报 HUD 与 WARNING 标语提示。
+    *   **借鉴“网站公告”的大横弹窗与位置控制**：提供提示位置 (`top-right`, `top-left`, `bottom-right`, `bottom-left`)、位置偏移量 (`offset px`) 和持续时间 (`duration ms`) 细粒度控制。
+    *   **大屏纯净氛围展示框**：纯黑/纯白深浅背景沙盒，支持实时渲染绿光气泡、黄标四角 HUD 托架、红标撞击警示带与 WARNING 横幅。
+    *   **多语言智能互相同步**：支持中英文独立配置与一键“同步到【English】/ Sync to [中文]”。
+*   **编辑代码 (Edit)**: 
+    *   **系统设置后台**: 修改 `mail-vue/src/views/sys-setting/index.vue`、`i18n/zh.js`、`i18n/en.js`，重构 `auth-prompt-dialog` 宽屏弹窗排版，新增位置与时长控制行、三分类 Tab 切换与纯色氛围预览舞台。
+    *   **登录注册前端**: 修改 `temp_login_ui/src/app/components/epomail/AuthForm.tsx` 与 `RegisterForm.tsx`，接入 `alertPosition`、`alertOffset`、`alertDuration` 动态生效与自动计时清理。
+*   **验证与部署 (Verify & Deploy)**: 
+    *   执行 `node test-simplified-alerts.mjs`，在 Playwright 中全流程测试了进入系统设置、唤起“弹窗提示内容”宽屏弹窗、绿/黄/红三色氛围切换与中英语言切换，成功生成 4 张场景验证截图。
+    *   执行 `npm run deploy`，成功完成联合编译与 Cloudflare Workers 全量部署（Version ID: `63d53dc8-118a-406d-9bf5-48b14a88327c`）。
+
+
+### 重构：登录注册文案定制隔离化预览系统与独立语境(i18n)分治 (2026-08-21)
+*   **功能需求 (Feature)**: 
+    *   **UI 隔离与位置预览**：弹窗重构为“上部文本输入 + 下部纯色背景独立示例结构预览”，彻底解决站长盲改、无位置感知的痛点。
+    *   **多语言语境隔离 (Per-Language Partition)**：文案定制明确绑定当前操作语言（中文/EN），在中文下的改动仅影响中文语境，切换至英文可独立编辑英文语境；同时提供“从其他语言一键同步”操作。
+    *   **多态与主题切换**：支持深色/浅色纯净背景预览切换，以及成功气泡 (Green)、黄标预警 (Yellow HUD)、红标撞击 (Red HUD) 的多态预览切换。
+*   **编辑代码 (Edit)**: 
+    *   **站长后台 UI**: 在 `mail-vue/src/views/sys-setting/index.vue`、`i18n/zh.js`、`i18n/en.js` 中重构 `editAuthI18nShow` 弹窗与样式，注入语言切换栏、提示横幅、隔离预览沙盒与多语言表单状态管理。
+    *   **登录注册前端**: 在 `temp_login_ui` 的 `App.tsx`、`LoginCard.tsx`、`RegisterCard.tsx`、`AuthForm.tsx`、`RegisterForm.tsx` 中接入语境嗅探解析，精准根据客户端语言（`zh` / `en`）分流读取对应字典并优雅回退。
+*   **验证与部署 (Verify & Deploy)**: 
+    *   执行 `node test-customizer-visual.mjs`，在 Playwright 中全流程测试了管理员后台进入系统设置、唤起弹窗、四大分区切换与深浅/多态 HUD 预览效果，成功生成 6 张场景验证截图。
+    *   执行 `npm run deploy`，成功完成前端联合编译与 Cloudflare Workers 全网部署（Version ID: `7f194b23-b8e5-4ad0-b1e9-60890a155e4a`）。
+
+
+
+### 完善：登录与注册全界面多语言(i18n)及所有文案站长深度定制系统 (2026-08-21)
+*   **功能需求 (Feature)**: 
+    *   不仅限于注册拒绝文案，将登录页与注册页的所有 UI 元素（包括副标题、输入框标签、记住登录、忘记密码、按钮文案、过渡提示、三方登录分割线、底部引导、成功/失败/密码不一致提示等）全部开放给站长后台自定义。
+    *   提供结构化分 Tab 弹窗配置（标题副标、登录面板、注册面板、提示与警报），任意字段留空时自动平滑回退至科幻默认文案。
+*   **编辑代码 (Edit)**: 
+    *   **数据库与后端**: 修改 `mail-worker/src/init/init.js`（新增 `v3_4DB`）、`entity/setting.js` 与 `service/setting-service.js`，引入 `auth_i18n` JSON 结构持久化并挂载至 `websiteConfig` API。
+    *   **站长管理后台**: 在 `mail-vue/src/views/sys-setting/index.vue` 个性化设置中重构弹窗，接入四分类 `el-tabs` 表单及动态重置保存逻辑。
+    *   **登录注册前端**: 在 `temp_login_ui/src/app/App.tsx`、`LoginCard.tsx`、`RegisterCard.tsx`、`AuthForm.tsx`、`RegisterForm.tsx` 中全面接入 `authI18n` 映射字典，实现全字段动态热替换与多语言兼容。
+*   **验证与部署 (Verify & Deploy)**: 
+    *   执行 `node test-full-i18n-visual.mjs` 进行了全量文案自定义视觉回归测试，截取并验证了自定义登录面板、自定义注册面板、自定义黄色预警及自定义红标撞击警报共 5 张场景截图。
+    *   执行 `npm run deploy` 并在生产端触发 `/api/init` 平滑完成 `v3_4DB` 升级。
+
+
+
+### 新增：独立科幻注册面板、多级预警HUD防呆与自定义i18n拒绝文案 (2026-08-21)
+*   **功能需求 (Feature)**: 
+    1. 登录页与注册页在保持外层星空背景的前提下实现两套独立面板切换，URL 响应式同步 (`/login/?view=register`)。
+    2. “探索节点”在系统关闭注册时触发 8 秒黄色预警 HUD 及悬浮提示（“当前没有可着陆的节点”）。
+    3. 注册面板去掉第三方登录保持等高排版，增加密码确认与邀请码；强行提交触发最高级别红标撞击警报（“当前没有可以探索的新节点，请联系舰长改变航道”）。
+    4. 系统设置后台允许站长弹窗自定义 i18n 提示语。
+*   **编辑代码 (Edit)**: 
+    *   **前端交互与 HUD 重构**: 修改 `temp_login_ui/src/app/App.tsx`、`LoginCard.tsx`、`RegisterCard.tsx`、`RegisterForm.tsx`，加入 `handlePopState`、密码二次确认、HUD 优先级抢占处理。
+    *   **系统后台管理**: 修改 `mail-vue/src/views/sys-setting/index.vue`，在“个性化设置”中添加注册拒绝提示文案设置弹窗。
+    *   **后端存储与接口**: 修改 `mail-worker/src/init/init.js` (新增 `v3_3DB`)、`entity/setting.js`、`service/setting-service.js`，支持 `noLandingNodes` 和 `noNewNodes` 的持久化及透传。
+*   **验证与部署 (Verify & Deploy)**: 
+    *   执行 `node test-login-register-visual.mjs` 进行了全自动 Playwright 视觉回归测试，截取并校验了登录、注册、黄色预警、红色警报及站长自定义文案等 6 张场景截图。
+    *   执行 `npm run deploy` 并调用 `/api/init` 触发生产数据库平滑升级，全量部署至 Cloudflare Workers。
+
+
+
+### 优化：COC风格极简富文本颜色标签及输入框占位提示 (2026-08-20)
+*   **功能需求 (Feature)**: 用户反馈初版颜色控制语法 (`<c=var(...)>`) 过长难记，要求参考《部落冲突》(COC) 的格式，以最精简的索引式标签 (如 `<c1>`, `<c7>`) 来实现颜色控制。同时需要将新的语法规则注入到设置界面的空白输入框(Placeholder)中以作引导。
+*   **编辑代码 (Edit)**: 
+    *   **底层引擎升级**: 修改了 `mail-vue/src/layout/main/index.vue` 的公告渲染逻辑。重新设计了基于短索引映射的正则引擎：将 `<c1>` 到 `<c9>` 分别映射至内置基础色彩与主题色（如 `<c1>` 为红，`<c7>` 为系统主色）。同时兼容直接书写十六进制(如 `<cff0000>`) 的容错补全机制。
+    *   **缺省提示(Placeholder)更新**: 修改了国际化语言包 `mail-vue/src/i18n/zh.js` 和 `en.js` 中的 `noticeContentDesc`，将新版的标签玩法直接写在了占位符中，方便用户参考。
+    *   **初始文案全量清洗**: 修改了 `mail-worker/src/init/init.js`，将预设宣告语句精简为带 `<c7>` 魔法标签的新形态。并在升级 SQL 中加入了对过渡版文案的 `UPDATE` 扫描逻辑。
+*   **部署上线 (Deploy)**: 成功执行 Vite 构建与 Wrangler 上传，再次手动触发了 `/api/init` 数据清洗接口。
+
+
+
+### 优化：公告提示文案缩减与自定义富文本标签 (2026-08-19)
+*   **功能需求 (Feature)**: 用户反馈原本生成的公告文案字数过多且使用了 `<br><br>`，同时要求在原本支持原生 HTML 的基础上，提供对 `<c=color>文字</c>` 等自定义富文本语法标签的解析，以便用户更便捷地控制颜色。
+*   **编辑代码 (Edit)**: 
+    *   **文案精简与预置标签**: 修改了 `mail-worker/src/init/init.js` 中的默认预设语句，缩减为精炼的两行，并移除了多余的空行。同时在预设语句中示范性地使用了 `<c=var(--el-color-primary)>EpoCanvas Mail</c>` 语法。
+    *   **平滑替换逻辑加固**: 在 `init.js` 的数据迁移脚本中，追加了对“上一版冗长文案”的匹配扫描，保证平滑降级替换。
+    *   **富文本解析引擎**: 在 `mail-vue/src/layout/main/index.vue` 的公告渲染模块中，注入了一套正则解析逻辑：`htmlContent.replace(/<c=(['"]?)(.*?)\1>(.*?)<\/c>/gi, '<span style="color: $2">$3</span>')`，从而实现了针对自定义标签的动态拦截和转换。
+*   **部署上线 (Deploy)**: 重新执行了 `npm run deploy` 以及线上数据引擎 `/api/init` 触发接口。目前全新的短版文案以及解析引擎已完全生效。
+
+
+
+### 完善：公告提示文案 i18n 与右上角图标联动隐藏 (2026-08-19)
+*   **功能需求 (Feature)**: 需要将公告(notice)的解释文本进行多语言 (i18n) 支持。同时优化网站公告的开关逻辑：如果系统设置中关闭了“登录弹窗/系统公告”，那么主界面右上角的公告 Icon 图标也必须自动隐藏，并确保剩余图标能自然右对齐。
+*   **编辑代码 (Edit)**: 
+    *   **i18n 多语言注入**: 在 `mail-vue/src/i18n/zh.js` 与 `en.js` 中新增了 `noticePopupDesc`，并在 `sys-setting/index.vue` 中以提示框(Tooltip)的形态注入。
+    *   **图标联动隐藏**: 修改了主系统顶栏 `mail-vue/src/layout/header/index.vue`，给通知小铃铛图标增加了 `v-if="settingStore.settings?.notice === 0"` 绑定。依托于原生的 Flexbox 布局，小铃铛在隐藏后右侧的操作按钮将自动向右对齐。
+*   **部署上线 (Deploy)**: 重新执行了 Vite 构建，通过 `npm run deploy` 将前后端修改完全推送至 Cloudflare Workers，确保全链路验证生效。
+
+
+
+### 优化：重构并品牌化系统设置页“网站公告” (2026-08-19)
+*   **问题排查 (Diagnosis)**: 用户反馈系统设置中的“网站公告”初始文案（“本项目仅供学习交流...”）不够正式，要求从代码层面将其彻底重构，明确 EpoCanvas Mail 专案的品牌定位并与原本的免责声明完全区分。
+*   **编辑代码 (Edit)**: 
+    *   **重构默认文案**: 修改了 `mail-worker/src/init/init.js`，为 EpoCanvas Mail 定制了全新的初始化提示语：“欢迎使用 EpoCanvas Mail 智能协作通信平台...”，从而传达了极简、高效与高隐私安全标准的企业级通讯理念。
+    *   **平滑数据迁移**: 在 `v1_6DB` 数据库迁移流程中新增了 `UPDATE` 逻辑。系统不仅会注入全新文案，还会主动扫描现存数据库，若发现残留的旧版“本项目仅供学习交流...”文案，则无感地将其全量替换为新版品牌语，保障存量用户与新用户拥有一致的体验。
+*   **部署上线 (Deploy)**: 执行了 `npm run deploy`，自动完成了 `mail-vue` 及 `temp_login_ui` 的 Vite 联合编译，并将服务端代码与静态资源打包推至 Cloudflare Workers 生效。
+
+
+
 ### 新增：个人主页点击“发送邮件联系我”自动回退并打开Compose (2026-08-18)
 *   **问题排查 (Diagnosis)**: 用户反馈在个人档案画板中直接打开邮件编辑器不符合业务逻辑，期望的流转应当是：先退回主系统的收件箱 `/inbox`，然后在主系统页面下唤起 Compose 并自动填充好目标邮箱。
 *   **编辑代码 (Edit)**: 

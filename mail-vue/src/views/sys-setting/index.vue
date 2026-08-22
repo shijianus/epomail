@@ -13,23 +13,38 @@
               <div class="setting-item">
                 <div><span>{{ $t('websiteReg') }}</span></div>
                 <div>
-                  <el-switch @change="change" :before-change="beforeChange" :active-value="0" :inactive-value="1"
+                  <el-switch @change="(val) => changeField('register', val)" :before-change="beforeChange" :active-value="0" :inactive-value="1"
                              v-model="setting.register"/>
                 </div>
               </div>
               <div class="setting-item">
                 <div>
-                  <span>公开个人主页</span>
+                  <span>{{ $t('publicProfile') }}</span>
+                  <el-tooltip effect="dark" :content="$t('publicProfileDesc')">
+                    <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+                  </el-tooltip>
                 </div>
                 <div>
-                  <el-switch @change="change" :before-change="beforeChange" :active-value="1" :inactive-value="0"
+                  <el-switch @change="(val) => changeField('publicProfile', val)" :before-change="beforeChange" :active-value="1" :inactive-value="0"
                              v-model="setting.publicProfile"/>
+                </div>
+              </div>
+              <div class="setting-item">
+                <div>
+                  <span>{{ $t('allMailMode') }}</span>
+                  <el-tooltip effect="dark" :content="$t('allMailModeDesc')">
+                    <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+                  </el-tooltip>
+                </div>
+                <div>
+                  <el-switch @change="(val) => changeField('allMailMode', val)" :before-change="beforeChange" :active-value="1" :inactive-value="0"
+                             v-model="setting.allMailMode"/>
                 </div>
               </div>
               <div class="setting-item">
                 <div><span>{{ $t('loginDomain') }}</span></div>
                 <div>
-                  <el-switch @change="change" :before-change="beforeChange" :active-value="1" :inactive-value="0"
+                  <el-switch @change="(val) => changeField('loginDomain', val)" :before-change="beforeChange" :active-value="1" :inactive-value="0"
                              v-model="setting.loginDomain"/>
                 </div>
               </div>
@@ -37,7 +52,7 @@
                 <div><span>{{ $t('regKey') }}</span></div>
                 <div>
                   <el-select
-                      @change="change"
+                      @change="(val) => changeField('regKey', val)"
                       :style="`width: ${ locale === 'en' ?  100 : 80 }px;`"
                       v-model="setting.regKey"
                       placeholder="Select"
@@ -54,22 +69,11 @@
               <div class="setting-item">
                 <div><span>{{ $t('addAccount') }}</span></div>
                 <div>
-                  <el-switch @change="change" :before-change="beforeChange" :active-value="0" :inactive-value="1"
+                  <el-switch @change="(val) => changeField('addEmail', val)" :before-change="beforeChange" :active-value="0" :inactive-value="1"
                              v-model="setting.addEmail"/>
                 </div>
               </div>
-              <div class="setting-item">
-                <div>
-                  <span>{{ $t('multipleEmail') }}</span>
-                  <el-tooltip effect="dark" :content="$t('multipleEmailDesc')">
-                    <Icon class="warning" icon="fe:warning" width="18" height="18"/>
-                  </el-tooltip>
-                </div>
-                <div>
-                  <el-switch @change="change" :before-change="beforeChange" :active-value="0" :inactive-value="1"
-                             v-model="setting.manyEmail"/>
-                </div>
-              </div>
+
               <div class="setting-item">
                 <div>
                   <span>{{ $t('emailPrefix') }}</span>
@@ -98,6 +102,19 @@
                   <span>{{ setting.title }}</span>
                   <el-button class="opt-button" size="small" type="primary" @click="editTitleShow = true">
                     <Icon icon="lsicon:edit-outline" width="16" height="16"/>
+                  </el-button>
+                </div>
+              </div>
+              <div class="setting-item">
+                <div>
+                  <span>{{ $t('authCustomization') }}</span>
+                  <el-tooltip effect="dark" :content="$t('authI18nNoticeAuto')">
+                    <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+                  </el-tooltip>
+                </div>
+                <div class="forward">
+                  <el-button class="opt-button" size="small" type="primary" @click="editAuthI18nShow = true">
+                    <Icon icon="fluent:text-grammar-settings-20-regular" width="16" height="16"/>
                   </el-button>
                 </div>
               </div>
@@ -279,7 +296,12 @@
             <div class="card-title">{{ $t('noticeTitle') }}</div>
             <div class="card-content">
               <div class="setting-item">
-                <div><span>{{ $t('noticePopup') }}</span></div>
+                <div>
+                  <span>{{ $t('noticePopup') }}</span>
+                  <el-tooltip effect="dark" :content="$t('noticePopupDesc')">
+                    <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+                  </el-tooltip>
+                </div>
                 <div class="forward">
                   <span>{{ setting.notice === 0 ? $t('enabled') : $t('disabled') }}</span>
                   <el-button class="opt-button" size="small" type="primary" @click="openNoticePopupSetting">
@@ -359,6 +381,222 @@
           <el-input type="text" :placeholder="$t('websiteTitle')" v-model="editTitle"/>
           <el-button type="primary" :loading="settingLoading" @click="saveTitle">{{ $t('save') }}</el-button>
         </form>
+      </el-dialog>
+
+      <el-dialog 
+        v-model="editAuthI18nShow" 
+        :title="$t('authCustomization')" 
+        width="860px" 
+        top="5vh"
+        class="auth-prompt-dialog"
+        @open="resetAuthI18nForm"
+      >
+        <div class="auth-prompt-container">
+          <!-- Color Identifier & Scenario Object Step Hierarchy -->
+          <div class="step-selection-section">
+            <!-- Step 1: Color Identifier -->
+            <div class="selection-row">
+              <div class="selection-label">
+                <span class="step-num">1</span>
+                <span>{{ $t('colorCategory') }}</span>
+              </div>
+              <div class="color-badge-group">
+                <div 
+                  class="color-badge-item green" 
+                  :class="{ active: alertColorTab === 'green' }"
+                  @click="onSelectColor('green')"
+                >
+                  <span class="dot green"></span>
+                  <span>{{ $t('greenColorName') }}</span>
+                </div>
+                <div 
+                  class="color-badge-item yellow" 
+                  :class="{ active: alertColorTab === 'yellow' }"
+                  @click="onSelectColor('yellow')"
+                >
+                  <span class="dot yellow"></span>
+                  <span>{{ $t('yellowColorName') }}</span>
+                </div>
+                <div 
+                  class="color-badge-item red" 
+                  :class="{ active: alertColorTab === 'red' }"
+                  @click="onSelectColor('red')"
+                >
+                  <span class="dot red"></span>
+                  <span>{{ $t('redColorName') }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Step 2: Target Scenario Object -->
+            <div class="selection-row mt-2">
+              <div class="selection-label">
+                <span class="step-num">2</span>
+                <span>{{ $t('targetScenario') }}</span>
+              </div>
+              <div class="scenario-pill-group">
+                <template v-if="alertColorTab === 'green'">
+                  <div 
+                    class="scenario-pill" 
+                    :class="{ active: selectedScenario === 'loginSuccess' }"
+                    @click="selectedScenario = 'loginSuccess'"
+                  >
+                    {{ $t('loginSuccess') }}
+                  </div>
+                  <div 
+                    class="scenario-pill" 
+                    :class="{ active: selectedScenario === 'registerSuccess' }"
+                    @click="selectedScenario = 'registerSuccess'"
+                  >
+                    {{ $t('registerSuccess') }}
+                  </div>
+                </template>
+
+                <template v-if="alertColorTab === 'yellow'">
+                  <div 
+                    class="scenario-pill" 
+                    :class="{ active: selectedScenario === 'invalidCredentials' }"
+                    @click="selectedScenario = 'invalidCredentials'"
+                  >
+                    {{ $t('invalidCredentials') }}
+                  </div>
+                  <div 
+                    class="scenario-pill" 
+                    :class="{ active: selectedScenario === 'passwordMismatch' }"
+                    @click="selectedScenario = 'passwordMismatch'"
+                  >
+                    {{ $t('passwordMismatch') }}
+                  </div>
+                  <div 
+                    class="scenario-pill" 
+                    :class="{ active: selectedScenario === 'noLandingNodes' }"
+                    @click="selectedScenario = 'noLandingNodes'"
+                  >
+                    {{ $t('noLandingNodes') }}
+                  </div>
+                </template>
+
+                <template v-if="alertColorTab === 'red'">
+                  <div 
+                    class="scenario-pill" 
+                    :class="{ active: selectedScenario === 'noNewNodes' }"
+                    @click="selectedScenario = 'noNewNodes'"
+                  >
+                    {{ $t('noNewNodes') }}
+                  </div>
+                </template>
+              </div>
+            </div>
+          </div>
+
+          <!-- Position & Duration Parameter Row -->
+          <div class="prompt-param-row">
+            <el-select v-model="authI18nForm[currentEditingLang].alertPosition">
+              <template #prefix>
+                <span style="margin-right: 8px">{{ $t('alertPosition') }}</span>
+              </template>
+              <el-option key="top-right" :label="t('topRight')" value="top-right"/>
+              <el-option key="top-left" :label="t('topLeft')" value="top-left"/>
+              <el-option key="bottom-right" :label="t('bottomRight')" value="bottom-right"/>
+              <el-option key="bottom-left" :label="t('bottomLeft')" value="bottom-left"/>
+            </el-select>
+
+            <el-input-number v-model="authI18nForm[currentEditingLang].alertOffset" :min="10" :max="200">
+              <template #prefix>
+                {{ $t('alertOffset') }}
+              </template>
+              <template #suffix>
+                px
+              </template>
+            </el-input-number>
+
+            <el-input-number v-model="authI18nForm[currentEditingLang].alertDuration" :min="1000" :max="20000" :step="500">
+              <template #prefix>
+                {{ $t('alertDuration') }}
+              </template>
+              <template #suffix>
+                ms
+              </template>
+            </el-input-number>
+          </div>
+
+          <!-- Prompt Text Input -->
+          <div class="prompt-input-row">
+            <div class="field-label-wrap">
+              <span class="field-label-text">{{ $t('promptContent') }}</span>
+            </div>
+            <el-input 
+              v-model="authI18nForm[currentEditingLang][selectedScenario]" 
+              :placeholder="getScenarioPlaceholder()"
+              clearable
+            />
+          </div>
+
+          <!-- Large Atmosphere & Toast Preview Stage (Auto Dark/Light matching uiStore.dark) -->
+          <div class="prompt-preview-container">
+            <div class="preview-toolbar">
+              <div class="preview-title">
+                <Icon icon="solar:eye-bold-duotone" width="16" />
+                <span>{{ $t('previewEffect') }}</span>
+              </div>
+            </div>
+
+            <!-- Atmosphere Stage Box -->
+            <div class="prompt-atmosphere-stage" :class="uiStore.dark ? 'dark' : 'light'">
+              <!-- Green Mode Preview -->
+              <div v-if="alertColorTab === 'green'" class="atmosphere-canvas green-mode">
+                <div class="preview-toast-item toast-green" :style="getPreviewToastStyle()">
+                  <Icon icon="lucide:check" width="18" />
+                  <span>{{ getPreviewToastText() }}</span>
+                </div>
+              </div>
+
+              <!-- Yellow Mode Preview -->
+              <div v-if="alertColorTab === 'yellow'" class="atmosphere-canvas yellow-mode">
+                <div class="hud-corner-bracket top-left"></div>
+                <div class="hud-corner-bracket top-right"></div>
+                <div class="hud-corner-bracket bottom-left"></div>
+                <div class="hud-corner-bracket bottom-right"></div>
+                <div class="preview-toast-item toast-yellow" :style="getPreviewToastStyle()">
+                  <Icon icon="lucide:alert-circle" width="18" />
+                  <span>{{ getPreviewToastText() }}</span>
+                </div>
+              </div>
+
+              <!-- Red Mode Preview -->
+              <div v-if="alertColorTab === 'red'" class="atmosphere-canvas red-mode">
+                <div class="hazard-stripe-bar top"></div>
+                <div class="hazard-stripe-bar bottom"></div>
+                <div class="hud-corner-bracket red top-left"></div>
+                <div class="hud-corner-bracket red top-right"></div>
+                <div class="hud-corner-bracket red bottom-left"></div>
+                <div class="hud-corner-bracket red bottom-right"></div>
+                <div class="center-warning-banner">W A R N I N G</div>
+                <div class="preview-toast-item toast-red" :style="getPreviewToastStyle()">
+                  <Icon icon="lucide:alert-triangle" width="18" />
+                  <span>{{ getPreviewToastText() }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <template #footer>
+          <div class="dialog-footer-split">
+            <div class="footer-left">
+              <el-tooltip :content="$t('syncToOtherLangTooltip')" placement="top">
+                <el-button size="small" type="primary" plain @click="syncCurrentLangToOther">
+                  <Icon icon="fluent:arrow-sync-20-regular" width="14" class="mr-1" />
+                  {{ $t('syncToOtherLang') }}
+                </el-button>
+              </el-tooltip>
+            </div>
+            <div class="footer-right">
+              <el-button @click="editAuthI18nShow = false">{{ $t('cancel') }}</el-button>
+              <el-button type="primary" :loading="settingLoading" @click="saveAuthI18n">{{ $t('save') }}</el-button>
+            </div>
+          </div>
+        </template>
       </el-dialog>
       <el-dialog v-model="r2DomainShow" :title="$t('addOsDomain')" width="340"
                  @closed="r2DomainInput = setting.r2Domain">
@@ -714,6 +952,27 @@ const localUpShow = ref(false)
 const accountStore = useAccountStore();
 const userStore = useUserStore();
 const editTitleShow = ref(false)
+const editAuthI18nShow = ref(false)
+const alertColorTab = ref('green')
+const selectedScenario = ref('loginSuccess')
+const currentEditingLang = ref('zh')
+
+const createDefaultAuthLangObj = () => ({
+  loginSuccess: '',
+  registerSuccess: '',
+  invalidCredentials: '',
+  passwordMismatch: '',
+  noLandingNodes: '',
+  noNewNodes: '',
+  alertPosition: 'top-right',
+  alertOffset: 40,
+  alertDuration: 4000
+})
+
+const authI18nForm = reactive({
+  zh: createDefaultAuthLangObj(),
+  en: createDefaultAuthLangObj()
+})
 const resendTokenFormShow = ref(false)
 const blackFormShow = ref(false)
 const aiCodeFilterShow = ref(false)
@@ -820,17 +1079,24 @@ getUpdate()
 function getSettings() {
   settingReady.value = false
   settingQuery().then(settingData => {
+    settingData.allMailMode = Number(settingData.allMailMode) === 1 ? 1 : 0
+    settingData.publicProfile = Number(settingData.publicProfile) === 1 ? 1 : 0
+    settingData.register = Number(settingData.register) === 0 ? 0 : 1
+    settingData.loginDomain = Number(settingData.loginDomain) === 1 ? 1 : 0
+    settingData.addEmail = Number(settingData.addEmail) === 0 ? 0 : 1
     setting.value = settingData
-    settingStore.domainList = settingData.domainList;
-    resendTokenForm.domain = setting.value.domainList[0]
-    loginOpacity.value = setting.value.loginOpacity
-    minEmailPrefix.value = setting.value.minEmailPrefix
+    settingStore.domainList = settingData.domainList || []
+    settingStore.settings = { ...settingStore.settings, ...settingData }
+    resendTokenForm.domain = setting.value.domainList?.[0] || ''
+    loginOpacity.value = setting.value.loginOpacity || 0.88
+    minEmailPrefix.value = setting.value.minEmailPrefix || 0
     firstLoading.value = false
     backgroundUrl.value = setting.value.background?.startsWith('http') ? setting.value.background : ''
-    editTitle.value = setting.value.title
-    r2DomainInput.value = setting.value.r2Domain
-    addVerifyCount.value = setting.value.addVerifyCount
-    regVerifyCount.value = setting.value.regVerifyCount
+    editTitle.value = setting.value.title || ''
+    resetAuthI18nForm()
+    r2DomainInput.value = setting.value.r2Domain || ''
+    addVerifyCount.value = setting.value.addVerifyCount || 1
+    regVerifyCount.value = setting.value.regVerifyCount || 1
     resetNoticeForm()
     resetAddS3Form()
     resetEmailPrefix()
@@ -839,6 +1105,10 @@ function getSettings() {
     nextTick(() => {
       settingReady.value = true
     })
+  }).catch(e => {
+    console.error('getSettings error:', e)
+    firstLoading.value = false
+    settingReady.value = true
   })
 }
 
@@ -1307,13 +1577,14 @@ function cleanResendTokenForm() {
 }
 
 function beforeChange() {
-  if (!settingReady.value || settingLoading.value) return false
+  if (!settingReady.value) return false
   backupSetting()
   return true
 }
 
 function change(e) {
   if (!settingReady.value) return
+  settingStore.settings = { ...settingStore.settings, ...setting.value }
   const settingForm = {...setting.value}
   delete settingForm.siteKey
   delete settingForm.secretKey
@@ -1327,11 +1598,159 @@ function change(e) {
 function changeField(key, value) {
   if (!settingReady.value) return
   setting.value[key] = value
+  settingStore.settings = { ...settingStore.settings, [key]: value }
   editSetting({[key]: value}, false)
 }
 
 function saveTitle() {
   editSetting({title: editTitle.value})
+}
+
+function onSelectColor(color) {
+  alertColorTab.value = color
+  if (color === 'green') {
+    selectedScenario.value = 'loginSuccess'
+  } else if (color === 'yellow') {
+    selectedScenario.value = 'invalidCredentials'
+  } else if (color === 'red') {
+    selectedScenario.value = 'noNewNodes'
+  }
+}
+
+function getScenarioLabel() {
+  const map = {
+    loginSuccess: t('loginSuccessText'),
+    registerSuccess: t('registerSuccessText'),
+    invalidCredentials: t('invalidCredText'),
+    passwordMismatch: t('passwordMismatchText'),
+    noLandingNodes: t('noLandingNodesText'),
+    noNewNodes: t('noNewNodesText')
+  }
+  return map[selectedScenario.value] || ''
+}
+
+function getScenarioPlaceholder() {
+  const lang = currentEditingLang.value || 'zh'
+  const placeholders = {
+    zh: {
+      loginSuccess: '成功连结节点',
+      registerSuccess: '节点创建成功',
+      invalidCredentials: '填写的坐标不存在',
+      passwordMismatch: '请确认前后坐标一致',
+      noLandingNodes: '当前没有可着陆的节点',
+      noNewNodes: '当前没有可以探索的新节点，请联系舰长改变航道'
+    },
+    en: {
+      loginSuccess: 'Node Link Established',
+      registerSuccess: 'Node Successfully Created',
+      invalidCredentials: 'Specified coordinates do not exist',
+      passwordMismatch: 'Please ensure coordinates match',
+      noLandingNodes: 'No landing nodes available',
+      noNewNodes: 'No new nodes to explore, please contact the captain'
+    }
+  }
+  return placeholders[lang]?.[selectedScenario.value] || ''
+}
+
+function getPreviewToastText() {
+  const lang = currentEditingLang.value || 'zh'
+  const val = authI18nForm[lang]?.[selectedScenario.value]
+  if (val && val.trim()) return val
+  return getScenarioPlaceholder()
+}
+
+function syncCurrentLangToOther() {
+  const fromLang = currentEditingLang.value || 'zh'
+  const toLang = fromLang === 'zh' ? 'en' : 'zh'
+
+  ElMessageBox.confirm(
+    t('syncToOtherLangConfirm'),
+    t('warning'),
+    {
+      confirmButtonText: t('confirm'),
+      cancelButtonText: t('cancel'),
+      type: 'warning'
+    }
+  ).then(() => {
+    Object.keys(authI18nForm[fromLang]).forEach(key => {
+      authI18nForm[toLang][key] = authI18nForm[fromLang][key]
+    })
+    ElMessage.success(t('syncSuccess'))
+  }).catch(() => {})
+}
+
+function getPreviewToastStyle() {
+  const current = authI18nForm[currentEditingLang.value] || {}
+  const pos = current.alertPosition || 'top-right'
+  const offset = Number(current.alertOffset) || 40
+  const style = {}
+  if (pos === 'top-left') {
+    style.top = `${offset}px`
+    style.left = `${offset}px`
+  } else if (pos === 'bottom-left') {
+    style.bottom = `${offset}px`
+    style.left = `${offset}px`
+  } else if (pos === 'bottom-right') {
+    style.bottom = `${offset}px`
+    style.right = `${offset}px`
+  } else {
+    style.top = `${offset}px`
+    style.right = `${offset}px`
+  }
+  return style
+}
+
+function resetAuthI18nForm() {
+  currentEditingLang.value = (settingStore.lang || locale.value || 'zh').startsWith('en') ? 'en' : 'zh'
+  alertColorTab.value = 'green'
+  selectedScenario.value = 'loginSuccess'
+  const rawI18n = (setting.value && setting.value.authI18n) || {}
+  
+  // Support both legacy flat format and new { zh: {}, en: {} } format
+  const isLanguagePartitioned = Boolean(rawI18n && (rawI18n.zh || rawI18n.en))
+  
+  ['zh', 'en'].forEach(lang => {
+    if (!authI18nForm[lang]) {
+      authI18nForm[lang] = createDefaultAuthLangObj()
+    }
+    const langSource = isLanguagePartitioned ? (rawI18n[lang] || {}) : (lang === 'zh' ? rawI18n : {})
+    Object.keys(authI18nForm[lang]).forEach(key => {
+      if (langSource && langSource[key] !== undefined && langSource[key] !== null) {
+        authI18nForm[lang][key] = langSource[key]
+      }
+    })
+  })
+
+  // Backward compatibility with legacy noLandingNodes / noNewNodes
+  if (setting.value && !authI18nForm.zh.noLandingNodes && setting.value.noLandingNodes) {
+    authI18nForm.zh.noLandingNodes = setting.value.noLandingNodes
+  }
+  if (setting.value && !authI18nForm.zh.noNewNodes && setting.value.noNewNodes) {
+    authI18nForm.zh.noNewNodes = setting.value.noNewNodes
+  }
+}
+
+function saveAuthI18n() {
+  editSetting({
+    authI18n: {
+      zh: { ...authI18nForm.zh },
+      en: { ...authI18nForm.en }
+    },
+    noLandingNodes: authI18nForm.zh.noLandingNodes || '',
+    noNewNodes: authI18nForm.zh.noNewNodes || ''
+  })
+}
+
+function syncToOtherLang() {
+  const fromLang = currentEditingLang.value
+  const toLang = fromLang === 'zh' ? 'en' : 'zh'
+  if (authI18nForm[fromLang] && authI18nForm[toLang]) {
+    Object.keys(authI18nForm[fromLang]).forEach(key => {
+      authI18nForm[toLang][key] = authI18nForm[fromLang][key]
+    })
+  }
+  saveAuthI18n()
+  ElMessage.success(t('syncSuccess') || '同步成功')
 }
 
 function jump(href) {
@@ -1347,6 +1766,7 @@ function editSetting(settingForm, refreshStatus = true) {
 
   settingSet(settingForm).then(() => {
     settingLoading.value = false
+    settingStore.settings = { ...settingStore.settings, ...setting.value, ...settingForm }
     ElMessage({
       message: t('saveSuccessMsg'),
       type: "success",
@@ -1359,6 +1779,7 @@ function editSetting(settingForm, refreshStatus = true) {
       getSettings()
     }
     editTitleShow.value = false
+    editAuthI18nShow.value = false
     r2DomainShow.value = false
     resendTokenFormShow.value = false
     turnstileShow.value = false
@@ -1372,8 +1793,11 @@ function editSetting(settingForm, refreshStatus = true) {
     emailPrefixShow.value = false
     aiCodeFilterShow.value = false
   }).catch((e) => {
+    console.error('editSetting error:', e)
     loginOpacity.value = setting.value.loginOpacity
-    setting.value = {...setting.value, ...JSON.parse(backup)}
+    setting.value = {...setting.value, ...JSON.parse(backup || '{}')}
+    settingStore.settings = { ...settingStore.settings, ...setting.value }
+    ElMessage.error(t('operationFailed') || '保存失败')
   }).finally(() => {
     settingLoading.value = false
     clearS3Loading.value = false
@@ -1605,10 +2029,10 @@ function editSetting(settingForm, refreshStatus = true) {
   }
 }
 
-:deep(.notice-popup.el-dialog) {
+:deep(.notice-popup.el-dialog), :deep(.auth-prompt-dialog.el-dialog) {
   min-height: 300px;
-  width: 820px !important;
-  @media (max-width: 860px) {
+  width: 860px !important;
+  @media (max-width: 900px) {
     width: calc(100% - 40px) !important;
     margin-right: 20px !important;
     margin-left: 20px !important;
@@ -1719,6 +2143,10 @@ function editSetting(settingForm, refreshStatus = true) {
 }
 
 .forward {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+
   span {
     display: flex;
     align-items: center;
@@ -1877,6 +2305,406 @@ form .el-button {
 
 :deep(.el-select__wrapper) {
   min-height: 28px;
+}
+
+/* Prompt Popup Messages Dialog Styling & Large Atmosphere Preview Stage */
+.auth-prompt-dialog {
+  :deep(.el-dialog__body) {
+    padding: 16px 20px;
+    max-height: 80vh;
+    overflow-y: auto;
+  }
+}
+
+.auth-prompt-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.prompt-notice-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: rgba(var(--el-color-primary-rgb), 0.08);
+  border-left: 3px solid var(--el-color-primary);
+  border-radius: 4px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+
+  .notice-icon {
+    color: var(--el-color-primary);
+    flex-shrink: 0;
+  }
+}
+
+.step-selection-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 14px;
+  background: var(--el-fill-color-light);
+  border-radius: 8px;
+  border: 1px solid var(--el-border-color-lighter);
+
+  .selection-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+
+    .selection-label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--el-text-color-primary);
+      min-width: 100px;
+
+      .step-num {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: var(--el-color-primary);
+        color: #fff;
+        font-size: 11px;
+        font-weight: 700;
+      }
+    }
+  }
+
+  .color-badge-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+
+    .color-badge-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      border: 1px solid var(--el-border-color);
+      background: var(--el-bg-color);
+      transition: all 0.2s ease;
+
+      .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+
+        &.green {
+          background: #22c55e;
+          box-shadow: 0 0 6px rgba(34, 197, 94, 0.6);
+        }
+
+        &.yellow {
+          background: #eab308;
+          box-shadow: 0 0 6px rgba(234, 179, 8, 0.6);
+        }
+
+        &.red {
+          background: #ef4444;
+          box-shadow: 0 0 6px rgba(239, 68, 68, 0.6);
+        }
+      }
+
+      &:hover {
+        border-color: var(--el-color-primary);
+      }
+
+      &.active {
+        &.green {
+          border-color: #22c55e;
+          background: rgba(34, 197, 94, 0.1);
+          color: #22c55e;
+        }
+
+        &.yellow {
+          border-color: #eab308;
+          background: rgba(234, 179, 8, 0.1);
+          color: #eab308;
+        }
+
+        &.red {
+          border-color: #ef4444;
+          background: rgba(239, 68, 68, 0.1);
+          color: #ef4444;
+        }
+      }
+    }
+  }
+
+  .scenario-pill-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+
+    .scenario-pill {
+      display: inline-flex;
+      align-items: center;
+      padding: 5px 12px;
+      border-radius: 16px;
+      font-size: 12px;
+      cursor: pointer;
+      border: 1px solid var(--el-border-color);
+      background: var(--el-bg-color);
+      color: var(--el-text-color-regular);
+      transition: all 0.2s ease;
+
+      &:hover {
+        color: var(--el-color-primary);
+        border-color: var(--el-color-primary);
+      }
+
+      &.active {
+        background: var(--el-color-primary);
+        border-color: var(--el-color-primary);
+        color: #ffffff;
+        font-weight: 500;
+      }
+    }
+  }
+}
+
+.dialog-header-with-tip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+
+  .dialog-header-info-icon {
+    color: var(--el-text-color-secondary);
+    cursor: pointer;
+    transition: color 0.2s ease;
+
+    &:hover {
+      color: var(--el-color-primary);
+    }
+  }
+}
+
+.prompt-param-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 14px;
+  padding: 10px 14px;
+  background: var(--el-fill-color-lighter);
+  border-radius: 8px;
+  border: 1px solid var(--el-border-color-extra-light);
+
+  > * {
+    width: 100% !important;
+  }
+
+  @media (max-width: 680px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.prompt-input-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+
+  .field-label-wrap {
+    display: flex;
+    align-items: center;
+
+    .field-label-text {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--el-text-color-primary);
+    }
+  }
+}
+
+.dialog-footer-split {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+/* Large Atmosphere & Toast Preview Stage */
+.prompt-preview-container {
+  background: var(--el-fill-color-lighter);
+  border: 1px solid var(--el-border-color);
+  border-radius: 10px;
+  padding: 12px 16px 16px;
+
+  .preview-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+
+    .preview-title {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--el-text-color-primary);
+    }
+  }
+
+  .prompt-atmosphere-stage {
+    min-height: 240px;
+    height: 240px;
+    border-radius: 8px;
+    position: relative;
+    overflow: hidden;
+    transition: background 0.3s ease;
+
+    &.dark {
+      background: #050713;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    &.light {
+      background: #f8fafc;
+      border: 1px solid #cbd5e1;
+    }
+  }
+
+  .atmosphere-canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+
+    &.green-mode {
+      background: radial-gradient(circle at 80% 20%, rgba(34, 197, 94, 0.12), transparent 60%);
+    }
+
+    &.yellow-mode {
+      background: radial-gradient(circle at 80% 20%, rgba(234, 179, 8, 0.12), transparent 60%);
+    }
+
+    &.red-mode {
+      background: radial-gradient(circle at 80% 20%, rgba(239, 68, 68, 0.15), transparent 60%);
+    }
+  }
+
+  /* Toast Box */
+  .preview-toast-item {
+    position: absolute;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 18px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    backdrop-filter: blur(8px);
+    z-index: 10;
+    max-width: 80%;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+    &.toast-green {
+      background: rgba(6, 78, 59, 0.7);
+      border: 1px solid rgba(34, 197, 94, 0.6);
+      color: #86efac;
+      box-shadow: 0 0 20px rgba(34, 197, 94, 0.25);
+    }
+
+    &.toast-yellow {
+      background: rgba(113, 63, 18, 0.7);
+      border: 1px solid rgba(234, 179, 8, 0.6);
+      color: #fef08a;
+      box-shadow: 0 0 20px rgba(234, 179, 8, 0.25);
+    }
+
+    &.toast-red {
+      background: rgba(127, 29, 29, 0.8);
+      border: 1px solid rgba(239, 68, 68, 0.7);
+      color: #fecaca;
+      box-shadow: 0 0 20px rgba(239, 68, 68, 0.3);
+    }
+  }
+
+  /* HUD Atmosphere Elements */
+  .hud-corner-bracket {
+    position: absolute;
+    width: 28px;
+    height: 28px;
+    border-color: #eab308;
+    border-style: solid;
+    opacity: 0.85;
+
+    &.red {
+      border-color: #ef4444;
+    }
+
+    &.top-left {
+      top: 10px;
+      left: 10px;
+      border-width: 2px 0 0 2px;
+    }
+
+    &.top-right {
+      top: 10px;
+      right: 10px;
+      border-width: 2px 2px 0 0;
+    }
+
+    &.bottom-left {
+      bottom: 10px;
+      left: 10px;
+      border-width: 0 0 2px 2px;
+    }
+
+    &.bottom-right {
+      bottom: 10px;
+      right: 10px;
+      border-width: 0 2px 2px 0;
+    }
+  }
+
+  .hazard-stripe-bar {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 8px;
+    background: repeating-linear-gradient(-45deg, #ef4444, #ef4444 8px, #7f1d1d 8px, #7f1d1d 16px);
+    opacity: 0.9;
+
+    &.top {
+      top: 0;
+    }
+
+    &.bottom {
+      bottom: 0;
+    }
+  }
+
+  .center-warning-banner {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: 0.35em;
+    color: #ef4444;
+    background: rgba(127, 29, 29, 0.4);
+    padding: 6px 28px;
+    border-top: 1px solid #ef4444;
+    border-bottom: 1px solid #ef4444;
+    opacity: 0.85;
+    pointer-events: none;
+    white-space: nowrap;
+  }
 }
 
 </style>
