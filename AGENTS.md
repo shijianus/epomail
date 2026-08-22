@@ -2,6 +2,23 @@
 
 <!-- VERSION LOG APPEND BELOW (newest first) -->
 
+### 优化与固化：个性化设置卡片尺寸锁死防跳动与静态UI生效规则常驻提示 (2026-08-22)
+*   **功能需求与业务逻辑对齐 (Feature & Alignment)**: 
+    1. **个性化设置卡片固定大小（防缩放跳动）**:
+       - 针对在“动态 UI”与“静态 UI”Tab 间切换时卡片高度跳动的问题，对 `.customization-card` 及其内部 `.customization-content` 注入刚性布局控制 (`min-height: 420px; display: flex; flex-direction: column; justify-content: space-between;`)。
+       - 与左侧“网站设置”等卡片尺寸保持严格像素级对齐，两态切换高度差为 0px，彻底消除布局抖动与卡片变小变形问题。
+    2. **动态 UI 体系特征与默认生效态指示**:
+       - 在动态 UI 界面下方增设“内置 Canvas 粒子星空系统”运行态特征指示块，展示 3D 视差感应、节点光晕与多态弹窗定制等特性，并明确标注“运行中 (默认生效)”。
+    3. **静态 UI 模式常驻生效规则提示**:
+       - 在静态 UI 界面下方增设醒目的生效规则警示条（`fe:warning` 图标 + 警告色块）：`未配置背景图片时不会应用静态UI，系统默认使用动态UI；只有在配置了背景图片时才会自动启用。`
+       - 同步强化“登录背景”的 Tooltip 说明，确保站长清晰理解双 UI 激活机制。
+*   **编辑代码 (Edit)**: 
+    *   **设置页面 UI 与样式**: 修改 [`mail-vue/src/views/sys-setting/index.vue`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/views/sys-setting/index.vue)。
+    *   **国际化语言包**: 修改 [`mail-vue/src/i18n/zh.js`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/i18n/zh.js) 与 [`mail-vue/src/i18n/en.js`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/i18n/en.js)。
+*   **全链路自动化验证与部署 (Verify & Deploy)**: 
+    *   编写 Playwright 尺寸测量与稳定性测试，实测 Dynamic 状态（420px）与 Static 状态（420px）高度差为 0px，左侧网站设置卡片（420px）完美等高对齐。
+    *   执行 `npx wrangler deploy` 完成全网构建并发布上线（Version ID: `2ce348ab-dad4-4906-9b59-af858a7a9e02`）。
+
 ### 优化与重构：个性化设置动态/静态UI模式分流切换与精准差异化Tooltip (2026-08-22)
 *   **功能需求与业务逻辑对齐 (Feature & Alignment)**: 
     1. **个性化设置板块“动态UI / 静态UI”分流切换**:

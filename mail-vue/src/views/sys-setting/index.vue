@@ -88,110 +88,134 @@
           </div>
 
           <!-- Personalization Settings Card -->
-          <div class="settings-card">
+          <div class="settings-card customization-card">
             <div class="card-title">
               {{ $t('customization') }}
             </div>
-            <div class="card-content">
-              <!-- UI Type Switcher Tab -->
-              <div class="custom-ui-tabs">
-                <div 
-                  class="ui-tab-item" 
-                  :class="{ active: activeUiTab === 'dynamic' }"
-                  @click="activeUiTab = 'dynamic'"
-                >
-                  <Icon icon="fluent:sparkle-20-filled" width="16" height="16" />
-                  <span>{{ $t('dynamicUi') }}</span>
+            <div class="card-content customization-content">
+              <div>
+                <!-- UI Type Switcher Tab -->
+                <div class="custom-ui-tabs">
+                  <div 
+                    class="ui-tab-item" 
+                    :class="{ active: activeUiTab === 'dynamic' }"
+                    @click="activeUiTab = 'dynamic'"
+                  >
+                    <Icon icon="fluent:sparkle-20-filled" width="16" height="16" />
+                    <span>{{ $t('dynamicUi') }}</span>
+                  </div>
+                  <div 
+                    class="ui-tab-item" 
+                    :class="{ active: activeUiTab === 'static' }"
+                    @click="activeUiTab = 'static'"
+                  >
+                    <Icon icon="fluent:image-20-filled" width="16" height="16" />
+                    <span>{{ $t('staticUi') }}</span>
+                  </div>
                 </div>
-                <div 
-                  class="ui-tab-item" 
-                  :class="{ active: activeUiTab === 'static' }"
-                  @click="activeUiTab = 'static'"
-                >
-                  <Icon icon="fluent:image-20-filled" width="16" height="16" />
-                  <span>{{ $t('staticUi') }}</span>
-                </div>
-              </div>
 
-              <!-- Website Title (Common to both) -->
-              <div class="setting-item">
-                <div class="title-item">
-                  <span>{{ $t('websiteTitle') }}</span>
-                  <el-tooltip effect="dark" :content="$t('websiteTitleTooltip')">
-                    <Icon class="warning" icon="fe:warning" width="18" height="18"/>
-                  </el-tooltip>
-                </div>
-                <div class="email-title">
-                  <span>{{ setting.title }}</span>
-                  <el-button class="opt-button" size="small" type="primary" @click="editTitleShow = true">
-                    <Icon icon="lsicon:edit-outline" width="16" height="16"/>
-                  </el-button>
-                </div>
-              </div>
-
-              <!-- Dynamic UI Section -->
-              <template v-if="activeUiTab === 'dynamic'">
+                <!-- Website Title (Common to both) -->
                 <div class="setting-item">
-                  <div>
-                    <span>{{ $t('authCustomization') }}</span>
-                    <el-tooltip effect="dark" :content="$t('authI18nNoticeAuto')">
+                  <div class="title-item">
+                    <span>{{ $t('websiteTitle') }}</span>
+                    <el-tooltip effect="dark" :content="$t('websiteTitleTooltip')">
                       <Icon class="warning" icon="fe:warning" width="18" height="18"/>
                     </el-tooltip>
                   </div>
-                  <div class="forward">
-                    <el-button class="opt-button" size="small" type="primary" @click="editAuthI18nShow = true">
-                      <Icon icon="fluent:text-grammar-settings-20-regular" width="16" height="16"/>
+                  <div class="email-title">
+                    <span>{{ setting.title }}</span>
+                    <el-button class="opt-button" size="small" type="primary" @click="editTitleShow = true">
+                      <Icon icon="lsicon:edit-outline" width="16" height="16"/>
                     </el-button>
                   </div>
                 </div>
-              </template>
 
-              <!-- Static UI Section -->
-              <template v-else>
-                <div class="setting-item">
-                  <div class="title-item">
-                    <span>{{ $t('loginBoxOpacity') }}</span>
-                    <el-tooltip effect="dark" :content="$t('loginBoxOpacityTooltip')">
-                      <Icon class="warning" icon="fe:warning" width="18" height="18"/>
-                    </el-tooltip>
-                  </div>
-                  <div>
-                    <el-input-number size="small" v-model="loginOpacity" @change="opacityChange" :precision="2"
-                                     :step="0.01" :max="1" :min="0"/>
-                  </div>
-                </div>
-                <div class="setting-item personalized">
-                  <div>
-                    <span>{{ $t('loginBackground') }}</span>
-                    <el-tooltip effect="dark" :content="$t('loginBackgroundTooltip')">
-                      <Icon class="warning" icon="fe:warning" width="18" height="18"/>
-                    </el-tooltip>
-                  </div>
-                  <div>
-                    <el-image
-                        class="background"
-                        :src="cvtR2Url(setting.background)"
-                        :preview-src-list="[cvtR2Url(setting.background)]"
-                        show-progress
-                        fit="cover"
-                    >
-                      <template #error>
-                        <div class="error-image">
-                          <Icon icon="ph:image" width="24" height="24"/>
-                        </div>
-                      </template>
-                    </el-image>
-                    <div class="background-btn">
-                      <el-button class="opt-button" size="small" type="primary" @click="openSetBackground">
-                        <Icon icon="lsicon:edit-outline" width="16" height="16"/>
-                      </el-button>
-                      <el-button class="opt-button" size="small" type="primary" @click="delBackground">
-                        <Icon icon="material-symbols:delete-outline-rounded" width="16" height="16"/>
+                <!-- Dynamic UI Section -->
+                <template v-if="activeUiTab === 'dynamic'">
+                  <div class="setting-item">
+                    <div>
+                      <span>{{ $t('authCustomization') }}</span>
+                      <el-tooltip effect="dark" :content="$t('authI18nNoticeAuto')">
+                        <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+                      </el-tooltip>
+                    </div>
+                    <div class="forward">
+                      <el-button class="opt-button" size="small" type="primary" @click="editAuthI18nShow = true">
+                        <Icon icon="fluent:text-grammar-settings-20-regular" width="16" height="16"/>
                       </el-button>
                     </div>
                   </div>
+                </template>
+
+                <!-- Static UI Section -->
+                <template v-else>
+                  <div class="setting-item">
+                    <div class="title-item">
+                      <span>{{ $t('loginBoxOpacity') }}</span>
+                      <el-tooltip effect="dark" :content="$t('loginBoxOpacityTooltip')">
+                        <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+                      </el-tooltip>
+                    </div>
+                    <div>
+                      <el-input-number size="small" v-model="loginOpacity" @change="opacityChange" :precision="2"
+                                       :step="0.01" :max="1" :min="0"/>
+                    </div>
+                  </div>
+                  <div class="setting-item personalized">
+                    <div>
+                      <span>{{ $t('loginBackground') }}</span>
+                      <el-tooltip effect="dark" :content="$t('loginBackgroundTooltip')">
+                        <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+                      </el-tooltip>
+                    </div>
+                    <div>
+                      <el-image
+                          class="background"
+                          :src="cvtR2Url(setting.background)"
+                          :preview-src-list="[cvtR2Url(setting.background)]"
+                          show-progress
+                          fit="cover"
+                      >
+                        <template #error>
+                          <div class="error-image">
+                            <Icon icon="ph:image" width="24" height="24"/>
+                          </div>
+                        </template>
+                      </el-image>
+                      <div class="background-btn">
+                        <el-button class="opt-button" size="small" type="primary" @click="openSetBackground">
+                          <Icon icon="lsicon:edit-outline" width="16" height="16"/>
+                        </el-button>
+                        <el-button class="opt-button" size="small" type="primary" @click="delBackground">
+                          <Icon icon="material-symbols:delete-outline-rounded" width="16" height="16"/>
+                        </el-button>
+                      </div>
+                    </div>
+                  </div>
+                </template>
+              </div>
+
+              <!-- Bottom Feature / Notice Block based on active tab -->
+              <div v-if="activeUiTab === 'dynamic'" class="dynamic-ui-feature-box">
+                <div class="feature-head">
+                  <div class="feature-badge">
+                    <Icon icon="fluent:sparkle-16-filled" width="14" height="14" />
+                    <span>{{ $t('dynamicUiBadge') }}</span>
+                  </div>
+                  <div class="feature-status">
+                    <span class="status-dot"></span>
+                    <span>{{ $t('dynamicUiStatus') }}</span>
+                  </div>
                 </div>
-              </template>
+                <div class="feature-desc">
+                  {{ $t('dynamicUiFeatureDesc') }}
+                </div>
+              </div>
+
+              <div v-else class="static-ui-notice-box">
+                <Icon icon="fe:warning" width="16" height="16" class="notice-icon" />
+                <span>{{ $t('staticUiNotice') }}</span>
+              </div>
             </div>
           </div>
 
@@ -1954,11 +1978,85 @@ function editSetting(settingForm, refreshStatus = true) {
   cursor: help;
 }
 
-.card-content {
-  padding: 20px;
+.customization-card {
+  min-height: 420px;
   display: flex;
   flex-direction: column;
+
+  .customization-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+}
+
+.dynamic-ui-feature-box {
+  margin-top: 14px;
+  padding: 14px 16px;
+  border-radius: 8px;
+  background: rgba(var(--el-color-primary-rgb), 0.06);
+  border: 1px solid rgba(var(--el-color-primary-rgb), 0.18);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+
+  .feature-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    .feature-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--el-color-primary);
+    }
+
+    .feature-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11px;
+      color: #22c55e;
+      font-weight: 500;
+
+      .status-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #22c55e;
+        box-shadow: 0 0 6px rgba(34, 197, 94, 0.8);
+      }
+    }
+  }
+
+  .feature-desc {
+    font-size: 12px;
+    line-height: 1.55;
+    color: var(--el-text-color-secondary);
+  }
+}
+
+.static-ui-notice-box {
+  margin-top: 12px;
+  padding: 10px 14px;
+  border-radius: 6px;
+  background: rgba(234, 179, 8, 0.08);
+  border-left: 3px solid #eab308;
+  display: flex;
+  align-items: center;
   gap: 10px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--el-text-color-secondary);
+
+  .notice-icon {
+    color: #eab308;
+    flex-shrink: 0;
+  }
 }
 
 .custom-ui-tabs {
