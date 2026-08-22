@@ -2,6 +2,17 @@
 
 <!-- VERSION LOG APPEND BELOW (newest first) -->
 
+### 缺陷修复：消除用户详情与账户菜单（Account Menu）底部的横向滑块/滚动条 (2026-08-22)
+*   **功能需求与业务逻辑对齐 (Feature & Alignment)**: 
+    1. **排查并消除 Account Menu 底部滑块**:
+       - 排查发现在顶栏右上角点击头像弹出 `.user-details.account-menu.open` 下拉菜单时，由于 Element Plus 的 `el-dropdown` 内部默认使用 `el-scrollbar` 且存在亚像素宽度浮动，导致在菜单最底部（`退出` 选项下方）生成了横向滚动条滑块（`.el-scrollbar__bar.is-horizontal` / `.el-scrollbar__thumb`）。
+       - 在 `.detail-dropdown` 中彻底隐藏滚动条（`display: none !important;`）并设置 `overflow: hidden !important; overflow-x: hidden !important;`，确保菜单视觉纯净无多余滑块。
+*   **编辑代码 (Edit)**: 
+    *   **顶栏组件与下拉菜单样式**: 修改 [`mail-vue/src/layout/header/index.vue`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/layout/header/index.vue)。
+*   **全链路自动化验证与部署 (Verify & Deploy)**: 
+    *   通过 Playwright 端到端自动化脚本（`test-inspect-user-details.mjs`）全真模拟点击用户头像打开账户下拉菜单，截屏校验菜单底部完全干净平整，确认已彻底无横向滑块残留（`visibleBars: 0`）。
+    *   执行 `npx wrangler deploy` 完成全网构建并发布上线（Version ID: `7f6a0557-191f-44ba-b2d1-f893d16f669e`）。
+
 ### 优化与固化：底栏提示文案用户精准定稿与规则体系统一升级为右侧抽屉 Drawer UI (2026-08-22)
 *   **功能需求与业务逻辑对齐 (Feature & Alignment)**: 
     1. **底栏邮件模式指示器 Tooltip 依据用户指令精准定稿**:

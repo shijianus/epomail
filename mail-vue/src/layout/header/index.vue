@@ -690,7 +690,19 @@ function formatName(email) {
   border: 1px solid var(--border-mid) !important;
   border-radius: 12px !important;
   padding: 0 !important;
-  overflow: hidden;
+  overflow: hidden !important;
+}
+.detail-dropdown .el-dropdown__list {
+  padding: 0 !important;
+}
+.detail-dropdown .el-scrollbar {
+  overflow: hidden !important;
+}
+.detail-dropdown .el-scrollbar__wrap {
+  overflow-x: hidden !important;
+}
+.detail-dropdown .el-scrollbar__bar {
+  display: none !important;
 }
 .detail-dropdown .el-popper__arrow::before {
   background: var(--bg-elevated) !important;
@@ -854,7 +866,7 @@ function formatName(email) {
 .avatar:hover { border-color: var(--border-mid); transform: scale(1.02); }
 
 /* Account Menu Dropdown */
-.account-menu { width: 280px; background: transparent; }
+.account-menu { width: 280px; background: transparent; overflow: hidden; }
 .am-header { padding: 16px; display: flex; gap: 12px; align-items: center; background: linear-gradient(135deg, rgba(91,110,245,.1), rgba(124,92,191,.1)); border-bottom: 1px solid var(--border-subtle); }
 .am-avatar { width: 44px; height: 44px; border-radius: 50%; background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary)); display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 700; color: #fff; flex-shrink: 0; }
 .am-name { font-size: 14px; font-weight: 700; color: var(--text-primary); text-align: left; }
