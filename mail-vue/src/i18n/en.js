@@ -561,9 +561,9 @@ const en = {
     allMailMode: 'All Mail Mode',
     allMailModeDesc: 'Enable to allow admin to view all mail; disable for privacy mode.',
     allMailModeStatus: 'All Mail Mode',
-    allMailModeStatusDesc: 'All Mail Mode: Admin can view all system mail logs.',
+    allMailModeStatusDesc: 'Public Mode: All emails are publicly visible without privacy protection.',
     privacyMailModeStatus: 'Privacy Mail Mode',
-    privacyMailModeStatusDesc: 'Privacy Mode: Only spam and blocked mail visible.',
+    privacyMailModeStatusDesc: 'Privacy Mode: Emails are privately isolated and visible only to you.',
     switchedToAllMailMode: 'Switched to [All Mail Mode]',
     switchedToPrivacyMailMode: 'Switched to [Privacy Mail Mode]',
     spamAdminPartition: 'Spam Mail'

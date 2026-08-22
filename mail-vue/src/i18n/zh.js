@@ -556,9 +556,9 @@ const zh = {
     allMailMode: '全部邮件模式',
     allMailModeDesc: '开启后管理员可查阅全站收发邮件；关闭则进入隐私模式，仅展示垃圾拦截邮件。',
     allMailModeStatus: '全部邮件模式',
-    allMailModeStatusDesc: '全站邮件穿透模式：管理员可查阅全站收发邮件记录。',
+    allMailModeStatusDesc: '公开模式：所有收发邮件均公开可见，未启用隐私保护。',
     privacyMailModeStatus: '隐私邮件模式',
-    privacyMailModeStatusDesc: '隐私防护模式：仅展示垃圾与拦截邮件，保障私密通信安全。',
+    privacyMailModeStatusDesc: '隐私模式：个人邮件独立私密隔离，仅本人可见。',
     switchedToAllMailMode: '已开启【全部邮件模式】',
     switchedToPrivacyMailMode: '已切换至【隐私邮件模式】',
     spamAdminPartition: '垃圾邮件'

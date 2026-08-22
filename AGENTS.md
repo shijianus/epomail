@@ -2,6 +2,19 @@
 
 <!-- VERSION LOG APPEND BELOW (newest first) -->
 
+### 优化：底栏全部邮件模式红色指示器Tooltip用户视角化与极简化 (2026-08-22)
+*   **功能需求与业务逻辑对齐 (Feature & Alignment)**: 
+    1. **去管理员化与用户视角重构**:
+       - 彻底剔除底部状态栏红色药丸指示器（`.mode-tag.mode-red`）悬停 Tooltip 中提及“管理员可查阅”等内部管理视角词汇。
+       - 全面重构为普通终端用户视角：告知用户当前系统邮件的可见性与隐私状态，官方、纯粹且直观。
+       - **中文**: `公开模式：所有收发邮件均公开可见，未启用隐私保护。`
+       - **英文**: `Public Mode: All emails are publicly visible without privacy protection.`
+*   **编辑代码 (Edit)**: 
+    *   **国际化语言包**: 修改 [`mail-vue/src/i18n/zh.js`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/i18n/zh.js) 与 [`mail-vue/src/i18n/en.js`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/i18n/en.js)。
+*   **全链路自动化验证与部署 (Verify & Deploy)**: 
+    *   编写 Playwright 自动化脚本悬停测试底栏红色药丸指示器，成功截屏校验浮层呈现极简用户视角文案。
+    *   执行 `npx wrangler deploy` 完成全网构建并发布上线（Version ID: `ce2a1330-d593-4f18-85a7-16c58ab28c06`）。
+
 ### 优化与固化：个性化设置卡片固定大小（防缩放变形）与静态UI未配图不应用明确提示 (2026-08-22)
 *   **功能需求与业务逻辑对齐 (Feature & Alignment)**: 
     1. **个性化设置卡片尺寸固定（防缩放变形）**:
