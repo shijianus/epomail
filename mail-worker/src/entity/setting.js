@@ -57,6 +57,12 @@ export const setting = sqliteTable('setting', {
 	noNewNodes: text('no_new_nodes').default('').notNull(),
 	authI18n: text('auth_i18n').default('{}').notNull(),
 	publicProfile: integer('public_profile').default(0).notNull(),
-	allMailMode: integer('all_mail_mode').default(0).notNull()
+	allMailMode: integer('all_mail_mode').default(0).notNull(),
+	welcomeSubject: text('welcome_subject').default('').notNull(),
+	welcomeContent: text('welcome_content').default('').notNull(),
+	welcomeText: text('welcome_text').default('').notNull(),
+	welcomeExpireDays: integer('welcome_expire_days').default(7).notNull(),
+	welcomeAutoSend: integer('welcome_auto_send').default(1).notNull(),
+	welcomeLastBroadcast: text('welcome_last_broadcast').default('').notNull()
 });
 export default setting

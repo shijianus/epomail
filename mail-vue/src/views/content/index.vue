@@ -29,10 +29,18 @@
         <div class="content">
           <div class="email-info">
             <div style="display: flex; gap: 16px;">
-              <el-avatar :size="44" class="sender-avatar">{{ email.name ? email.name.charAt(0).toUpperCase() : 'U' }}</el-avatar>
+              <el-avatar :size="44" class="sender-avatar" :class="{ 'official-avatar': email.sendEmail === 'admin@epocanvas.com' || email.isOfficial }">
+                <Icon icon="ri:verified-badge-fill" width="24" height="24" v-if="email.sendEmail === 'admin@epocanvas.com' || email.isOfficial" />
+                <template v-else>{{ email.name ? email.name.charAt(0).toUpperCase() : 'U' }}</template>
+              </el-avatar>
               <div class="info-body">
                 <div class="info-top">
-                  <span class="send-name-title">{{ email.name }}</span>
+                  <div style="display: flex; align-items: center; gap: 6px;">
+                    <span class="send-name-title">{{ email.name }}</span>
+                    <span v-if="email.sendEmail === 'admin@epocanvas.com' || email.isOfficial" class="official-verified-badge" :title="$t('officialVerified') || '官方认证'">
+                      <Icon icon="ri:verified-badge-fill" width="18" height="18" style="color: #0284c7; vertical-align: middle;" />
+                    </span>
+                  </div>
                   <span class="date">{{ formatDetailDate(email.createTime) }}</span>
                 </div>
                 <div class="info-middle">
@@ -43,6 +51,27 @@
                 </div>
               </div>
             </div>
+
+            <!-- Official System Mail Banner -->
+            <div class="official-system-banner" v-if="email.sendEmail === 'admin@epocanvas.com' || email.isOfficial">
+              <div class="banner-left">
+                <Icon icon="ri:verified-badge-fill" width="20" height="20" style="color: #0284c7; flex-shrink: 0;" />
+                <div class="banner-text">
+                  <div class="banner-heading">
+                    <span>{{ $t('officialBannerTitle') || 'Epocanvas Mail 官方系统邮件' }}</span>
+                    <el-tag size="small" type="primary" effect="dark" class="official-mini-tag">{{ $t('officialTag') || '官方' }}</el-tag>
+                  </div>
+                  <div class="banner-subtitle">{{ $t('officialBannerDesc') || '此邮件为官方系统引导，已自动标记为重要与代办。' }}</div>
+                </div>
+              </div>
+              <div class="banner-right" v-if="email.expireDays">
+                <el-tag size="small" type="info" effect="plain" class="expire-pill">
+                  <Icon icon="ic:outline-access-time" width="13" height="13" style="margin-right: 3px;" />
+                  {{ $t('officialExpireNotice', { days: email.expireDays }) }}
+                </el-tag>
+              </div>
+            </div>
+
             <el-alert v-if="email.status === 3" :closable="false" :title="toMessage(email.message)" class="email-msg" type="error" show-icon />
             <el-alert v-if="email.status === 4" :closable="false" :title="$t('complained')" class="email-msg" type="warning" show-icon />
             <el-alert v-if="email.status === 5" :closable="false" :title="$t('delayed')" class="email-msg" type="warning" show-icon />
@@ -469,6 +498,65 @@ const handleReportNotSpam = () => {
           max-width: 400px;
           width: fit-content;
           margin-top: 15px;
+        }
+
+        .official-avatar {
+          background: linear-gradient(135deg, #0284c7, #2563eb) !important;
+          color: #ffffff !important;
+        }
+
+        .official-system-banner {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          background: linear-gradient(135deg, rgba(2, 132, 199, 0.08), rgba(37, 99, 235, 0.08));
+          border: 1px solid rgba(2, 132, 199, 0.25);
+          border-radius: 10px;
+          padding: 12px 16px;
+          margin-top: 14px;
+          gap: 16px;
+
+          .banner-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+
+            .banner-text {
+              .banner-heading {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                font-size: 14px;
+                font-weight: 700;
+                color: var(--el-text-color-primary);
+
+                .official-mini-tag {
+                  background: linear-gradient(135deg, #0284c7, #2563eb);
+                  border: none;
+                  font-weight: 600;
+                  border-radius: 4px;
+                }
+              }
+
+              .banner-subtitle {
+                font-size: 12px;
+                color: var(--el-text-color-secondary);
+                margin-top: 2px;
+              }
+            }
+          }
+
+          .banner-right {
+            .expire-pill {
+              font-size: 12px;
+              border-radius: 6px;
+            }
+          }
+
+          @media (max-width: 600px) {
+            flex-direction: column;
+            align-items: flex-start;
+          }
         }
 
         .spam-alert-banner {

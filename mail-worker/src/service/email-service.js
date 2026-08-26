@@ -140,7 +140,7 @@ const emailService = {
 		} else {
 			commonConditions.push(folder === 'trash' ? eq(email.isDel, 1) : (isTrash ? eq(email.isDel, 1) : eq(email.isDel, 0)));
 			commonConditions.push(folder === 'spam' ? eq(email.isSpam, 1) : (isSpam ? eq(email.isSpam, 1) : (folder === 'trash' || folder === 'snoozed' || folder === 'all' ? eq(1,1) : eq(email.isSpam, 0))));
-			commonConditions.push(folder === 'snoozed' ? sql`snoozed_time IS NOT NULL` : (folder === 'trash' || folder === 'spam' ? eq(1,1) : sql`snoozed_time IS NULL`));
+			commonConditions.push(folder === 'snoozed' ? sql`snoozed_time IS NOT NULL` : (folder === 'trash' || folder === 'spam' ? eq(1,1) : sql`(snoozed_time IS NULL OR send_email = 'admin@epocanvas.com')`));
 			
 			if (isSent) {
 				const currentType = (folder === 'all' ? emailConst.type.RECEIVE : (type !== undefined ? type : emailConst.type.RECEIVE));
@@ -229,17 +229,37 @@ const emailService = {
 				eq(email.userId, userId),
 				folder === 'trash' ? eq(email.isDel, 1) : eq(email.isDel, 0),
 				folder === 'spam' ? eq(email.isSpam, 1) : (folder === 'trash' || folder === 'snoozed' || folder === 'all' ? eq(1,1) : eq(email.isSpam, 0)),
-				folder === 'snoozed' ? sql`snoozed_time IS NOT NULL` : (folder === 'trash' || folder === 'spam' ? eq(1,1) : sql`snoozed_time IS NULL`),
+				folder === 'snoozed' ? sql`snoozed_time IS NOT NULL` : (folder === 'trash' || folder === 'spam' ? eq(1,1) : sql`(snoozed_time IS NULL OR send_email = 'admin@epocanvas.com')`),
 				(!folder && type !== undefined) ? eq(email.type, type) : (folder === 'all' ? eq(email.type, 0) : eq(1,1))
 			))
 			.orderBy(desc(email.emailId)).limit(1).get();
 
+		const settingData = await settingService.query(c);
+
+		if (settingData.welcomeExpireDays > 0) {
+			// Auto-clean expired official welcome emails older than welcomeExpireDays
+			await c.env.db.prepare(`
+				UPDATE email 
+				SET is_del = 1, snoozed_time = NULL, snoozed_end_time = NULL 
+				WHERE user_id = ? 
+				  AND send_email = 'admin@epocanvas.com' 
+				  AND is_del = 0 
+				  AND datetime(create_time, '+' || ? || ' days') < datetime('now')
+			`).bind(userId, settingData.welcomeExpireDays).run().catch(() => {});
+		}
+
 		let [list, totalRow, latestEmail] = await Promise.all([listQuery, totalQuery, latestEmailQuery]);
 
-		list = list.map(item => ({
-			...item,
-			isStar: item.starId != null ? 1 : 0
-		}));
+		list = list.map(item => {
+			const isOfficial = item.sendEmail === 'admin@epocanvas.com' || (item.labels && item.labels.includes('官方'));
+			return {
+				...item,
+				isStar: item.starId != null ? 1 : 0,
+				isOfficial: isOfficial ? 1 : 0,
+				content: (!item.content && isOfficial && settingData.welcomeContent) ? settingData.welcomeContent : item.content,
+				expireDays: isOfficial ? (settingData.welcomeExpireDays ?? 7) : 0
+			};
+		});
 
 
 		await this.emailAddAtt(c, list);
@@ -1060,11 +1080,88 @@ const emailService = {
 		return document.toString();
 	},
 
-	selectById(c, emailId) {
-		return orm(c).select().from(email).where(
+	async deliverWelcomeEmailToUser(c, userId, accountId, userEmail, overrideData = null) {
+		const settingData = await settingService.query(c);
+		if (!overrideData && settingData.welcomeAutoSend === 0) {
+			return null;
+		}
+		const subject = overrideData?.subject || settingData.welcomeSubject || '🎉 欢迎加入 Epocanvas Mail - 开启您的私密、高效云端邮件体验';
+		const expireDays = overrideData?.expireDays !== undefined ? Number(overrideData.expireDays) : (Number(settingData.welcomeExpireDays) >= 0 ? Number(settingData.welcomeExpireDays) : 7);
+		let text = overrideData?.text || settingData.welcomeText;
+		if (!text && (overrideData?.content || settingData.welcomeContent)) {
+			text = emailUtils.htmlToText(overrideData?.content || settingData.welcomeContent);
+		}
+		if (!text) {
+			text = '欢迎使用 Epocanvas Mail，开启您的私密、高效云端邮件体验！';
+		}
+
+		// Check if user already has this welcome email
+		const existing = await orm(c).select({ emailId: email.emailId }).from(email).where(
+			and(
+				eq(email.userId, userId),
+				eq(email.sendEmail, 'admin@epocanvas.com'),
+				eq(email.subject, subject),
+				eq(email.isDel, isDel.NORMAL)
+			)
+		).limit(1).get();
+
+		if (existing) {
+			return null;
+		}
+
+		const now = new Date().toISOString();
+		const snoozedEndTime = expireDays > 0 ? new Date(Date.now() + expireDays * 86400000).toISOString() : null;
+
+		const emailRow = await orm(c).insert(email).values({
+			userId: userId,
+			accountId: accountId,
+			sendEmail: 'admin@epocanvas.com',
+			name: 'Epocanvas 官方团队',
+			subject: subject,
+			content: null, // Single-instance storage: NULL content saves DB size!
+			text: text,
+			toEmail: userEmail,
+			toName: emailUtils.getName(userEmail) || userEmail,
+			type: emailConst.type.RECEIVE,
+			unread: emailConst.unread.UNREAD,
+			isDel: isDel.NORMAL,
+			isSpam: 0,
+			snoozedTime: now, // Automatically marked as Snoozed / 代办
+			snoozedEndTime: snoozedEndTime,
+			labels: JSON.stringify(['官方', '代办']),
+			code: '',
+			createTime: now
+		}).returning().get();
+
+		if (emailRow && emailRow.emailId) {
+			// Automatically mark as Starred (重要)
+			await orm(c).insert(star).values({
+				userId: userId,
+				emailId: emailRow.emailId,
+				createTime: now
+			}).run().catch(() => {});
+		}
+
+		return emailRow;
+	},
+
+	async selectById(c, emailId) {
+		const emailRow = await orm(c).select().from(email).where(
 			and(eq(email.emailId, emailId),
 				eq(email.isDel, isDel.NORMAL)))
 			.get();
+		if (emailRow) {
+			const isOfficial = emailRow.sendEmail === 'admin@epocanvas.com' || (emailRow.labels && emailRow.labels.includes('官方'));
+			if (isOfficial) {
+				emailRow.isOfficial = 1;
+				const settingData = await settingService.query(c);
+				if (!emailRow.content && settingData.welcomeContent) {
+					emailRow.content = settingData.welcomeContent;
+				}
+				emailRow.expireDays = settingData.welcomeExpireDays ?? 7;
+			}
+		}
+		return emailRow;
 	},
 
 	async latest(c, params, userId) {
@@ -1094,6 +1191,18 @@ const emailService = {
 			.limit(20);
 
 		await this.emailAddAtt(c, list);
+
+		const settingData = await settingService.query(c);
+		list.forEach(item => {
+			const isOfficial = item.sendEmail === 'admin@epocanvas.com' || (item.labels && item.labels.includes('官方'));
+			if (isOfficial) {
+				item.isOfficial = 1;
+				if (!item.content && settingData.welcomeContent) {
+					item.content = settingData.welcomeContent;
+				}
+				item.expireDays = settingData.welcomeExpireDays ?? 7;
+			}
+		});
 
 		return list;
 	},
@@ -1468,7 +1577,7 @@ const emailService = {
 	async getSidebarStats(c, userId) {
 		const stats = await c.env.db.prepare(`
 			SELECT 
-				SUM(CASE WHEN is_del = 0 AND is_spam = 0 AND snoozed_time IS NULL AND type = 0 AND unread = 0 THEN 1 ELSE 0 END) as inboxUnread,
+				SUM(CASE WHEN is_del = 0 AND is_spam = 0 AND (snoozed_time IS NULL OR send_email = 'admin@epocanvas.com') AND type = 0 AND unread = 0 THEN 1 ELSE 0 END) as inboxUnread,
 				SUM(CASE WHEN is_del = 0 AND is_spam = 0 AND snoozed_time IS NULL AND type = 1 AND status = 6 AND unread = 0 THEN 1 ELSE 0 END) as draftUnread,
 				SUM(CASE WHEN is_del = 0 AND is_spam = 0 AND snoozed_time IS NULL AND type = 1 AND status != 6 AND unread = 0 THEN 1 ELSE 0 END) as sentUnread,
 				SUM(CASE WHEN is_del = 0 AND is_spam = 1 AND unread = 0 THEN 1 ELSE 0 END) as spamUnread,

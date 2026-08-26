@@ -30,7 +30,7 @@ export const useUiStore = defineStore('ui', {
         showAddLabel: false,
         // 统一标签列表，最多 MAX_LABELS 个
         allLabels: [
-          { name: '社群', icon: 'ic:outline-people-alt', color: '#3b82f6', listVis: true, stats: { total: 100, current: 0, unread: 5 }, rules: [
+          { name: '社群', icon: 'ic:outline-people-alt', color: '#3b82f6', listVis: true, stats: { total: 0, current: 0, unread: 0 }, rules: [
             { condition: { type: 'sender_address_includes', value: 'gmail.com, outlook.com, qq.com, 163.com, yahoo.com, hotmail.com, foxmail.com, sina.com' } }
           ]},
           { name: '订阅', icon: 'ic:outline-subscriptions', color: '#10b981', listVis: true, stats: { total: 0, current: 0, unread: 0 }, rules: [
@@ -68,6 +68,20 @@ export const useUiStore = defineStore('ui', {
             if (deprecatedIdx !== -1) {
                 this.allLabels.splice(deprecatedIdx, 1)
             }
+
+            // ── Stats 净化：清除 localStorage 持久化的幽灵统计数据 ──────────────
+            // stats（total/current/unread）是动态指标，需由后端实时接口填充，
+            // 不应通过 persist 固化到本地。历史版本曾将测试数据 (total:100, unread:5)
+            // 错误地写入初始状态，此处强制将所有标签的 stats 归零以消除幽灵邮件显示。
+            this.allLabels.forEach(label => {
+                if (label.stats) {
+                    label.stats.total = 0
+                    label.stats.current = 0
+                    label.stats.unread = 0
+                } else {
+                    label.stats = { total: 0, current: 0, unread: 0 }
+                }
+            })
 
             const CANONICAL = {
                 '社群': [{ condition: { type: 'sender_address_includes', value: 'gmail.com, outlook.com, qq.com, 163.com, yahoo.com, hotmail.com, foxmail.com, sina.com' } }],

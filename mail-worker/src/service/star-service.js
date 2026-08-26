@@ -6,7 +6,9 @@ import { and, desc, eq, lt, sql, inArray, or } from 'drizzle-orm';
 import email from '../entity/email';
 import { isDel } from '../const/entity-const';
 import attService from "./att-service";
-import { t } from '../i18n/i18n'
+import settingService from './setting-service';
+import { t } from '../i18n/i18n';
+
 const starService = {
 
 	async add(c, params, userId) {
@@ -82,9 +84,18 @@ const starService = {
 
 		const attsList = await attService.selectByEmailIds(c, emailIds);
 
+		const settingData = await settingService.query(c);
 		list.forEach(emailRow => {
 			const atts = attsList.filter(attsRow => attsRow.emailId === emailRow.emailId);
 			emailRow.attList = atts;
+			const isOfficial = emailRow.sendEmail === 'admin@epocanvas.com' || (emailRow.labels && emailRow.labels.includes('官方'));
+			if (isOfficial) {
+				emailRow.isOfficial = 1;
+				if (!emailRow.content && settingData.welcomeContent) {
+					emailRow.content = settingData.welcomeContent;
+				}
+				emailRow.expireDays = settingData.welcomeExpireDays ?? 7;
+			}
 		});
 
 		return { list };

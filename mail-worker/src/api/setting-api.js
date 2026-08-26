@@ -31,5 +31,10 @@ app.delete('/setting/deleteBackground', async (c) => {
 app.put('/setting/setBlacklist', async (c) => {
 	const setting = await settingService.setBlacklist(c, await c.req.json());
 	return c.json(result.ok(setting));
-})
+});
+
+app.post('/setting/sendWelcomeEmail', async (c) => {
+	const res = await settingService.sendWelcomeEmailToAll(c, await c.req.json());
+	return c.json(result.ok(res));
+});
 

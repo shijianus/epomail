@@ -134,6 +134,16 @@ const loginService = {
 
 		await userService.updateUserInfo(c, userId, true);
 
+		try {
+			const emailService = (await import('./email-service')).default;
+			const acc = await accountService.selectByEmail(c, email);
+			if (acc) {
+				await emailService.deliverWelcomeEmailToUser(c, userId, acc.accountId, email);
+			}
+		} catch (err) {
+			console.error('Failed to deliver welcome email on register:', err);
+		}
+
 		if (regKey !== settingConst.regKey.CLOSE && type) {
 			await regKeyService.reduceCount(c, code, 1);
 		}

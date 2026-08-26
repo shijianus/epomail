@@ -35,8 +35,24 @@ const dbInit = {
 		await this.v3_4DB(c);
 		await this.v3_5DB(c);
 		await this.v3_6DB(c);
+		await this.v3_7DB(c);
 		await settingService.refresh(c);
 		return c.text('success');
+	},
+
+	async v3_7DB(c) {
+		try {
+			await c.env.db.batch([
+				c.env.db.prepare(`ALTER TABLE setting ADD COLUMN welcome_subject TEXT NOT NULL DEFAULT '';`),
+				c.env.db.prepare(`ALTER TABLE setting ADD COLUMN welcome_content TEXT NOT NULL DEFAULT '';`),
+				c.env.db.prepare(`ALTER TABLE setting ADD COLUMN welcome_text TEXT NOT NULL DEFAULT '';`),
+				c.env.db.prepare(`ALTER TABLE setting ADD COLUMN welcome_expire_days INTEGER NOT NULL DEFAULT 7;`),
+				c.env.db.prepare(`ALTER TABLE setting ADD COLUMN welcome_auto_send INTEGER NOT NULL DEFAULT 1;`),
+				c.env.db.prepare(`ALTER TABLE setting ADD COLUMN welcome_last_broadcast TEXT NOT NULL DEFAULT '';`)
+			]);
+		} catch (e) {
+			console.warn(`跳过字段：${e.message}`);
+		}
 	},
 
 	async v3_6DB(c) {

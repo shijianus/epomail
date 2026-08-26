@@ -173,7 +173,9 @@ const settingService = {
 			'customDomain', 'tgMsgFrom', 'tgMsgTo', 'tgMsgText', 'minEmailPrefix',
 			'emailPrefixFilter', 'blackSubject', 'blackContent', 'blackFrom', 'aiCode',
 			'aiCodeFilter', 'spamRetentionDays', 'noLandingNodes', 'noNewNodes',
-			'authI18n', 'publicProfile', 'allMailMode'
+			'authI18n', 'publicProfile', 'allMailMode',
+			'welcomeSubject', 'welcomeContent', 'welcomeText', 'welcomeExpireDays',
+			'welcomeAutoSend', 'welcomeLastBroadcast'
 		];
 
 		const updateData = {};
@@ -242,6 +244,60 @@ const settingService = {
 		return this.get(c);
 	},
 
+	async sendWelcomeEmailToAll(c, params) {
+		let { welcomeSubject, welcomeContent, welcomeText, welcomeExpireDays, welcomeAutoSend } = params || {};
+		if (!welcomeSubject || !welcomeSubject.trim()) {
+			welcomeSubject = '🎉 欢迎加入 Epocanvas Mail - 开启您的私密、高效云端邮件体验';
+		}
+		welcomeExpireDays = Number(welcomeExpireDays) >= 0 ? Number(welcomeExpireDays) : 7;
+		welcomeAutoSend = welcomeAutoSend === 0 ? 0 : 1;
+		const nowIso = new Date().toISOString();
+
+		if (!welcomeText && welcomeContent) {
+			const emailUtils = (await import('../utils/email-utils')).default;
+			welcomeText = emailUtils.htmlToText(welcomeContent);
+		}
+
+		await this.set(c, {
+			welcomeSubject,
+			welcomeContent: welcomeContent || '',
+			welcomeText: welcomeText || '',
+			welcomeExpireDays,
+			welcomeAutoSend,
+			welcomeLastBroadcast: nowIso
+		});
+
+		const user = (await import('../entity/user')).default;
+		const account = (await import('../entity/account')).default;
+		const emailService = (await import('./email-service')).default;
+		const { eq, and } = await import('drizzle-orm');
+
+		const users = await orm(c).select({
+			userId: user.userId,
+			email: user.email,
+		}).from(user).where(eq(user.status, 0)).all();
+
+		let deliverCount = 0;
+		for (const u of users) {
+			const acc = await orm(c).select({
+				accountId: account.accountId,
+				name: account.name
+			}).from(account).where(and(eq(account.userId, u.userId), eq(account.isDel, 0))).limit(1).get();
+
+			if (acc) {
+				const res = await emailService.deliverWelcomeEmailToUser(c, u.userId, acc.accountId, u.email, {
+					subject: welcomeSubject,
+					expireDays: welcomeExpireDays,
+					content: welcomeContent,
+					text: welcomeText
+				});
+				if (res) deliverCount++;
+			}
+		}
+
+		return { success: true, deliverCount, totalUsers: users.length };
+	},
+
 	async websiteConfig(c) {
 
 		const settingRow = await this.get(c, true);
@@ -282,7 +338,11 @@ const settingService = {
 			noNewNodes: settingRow.noNewNodes,
 			authI18n: settingRow.authI18n || {},
 			publicProfile: settingRow.publicProfile ?? 0,
-			allMailMode: settingRow.allMailMode ?? 0
+			allMailMode: settingRow.allMailMode ?? 0,
+			welcomeSubject: settingRow.welcomeSubject || '',
+			welcomeExpireDays: settingRow.welcomeExpireDays ?? 7,
+			welcomeAutoSend: settingRow.welcomeAutoSend ?? 1,
+			welcomeLastBroadcast: settingRow.welcomeLastBroadcast || ''
 		};
 	},
 

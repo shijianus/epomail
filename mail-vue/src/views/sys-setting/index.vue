@@ -390,6 +390,20 @@
                   </el-button>
                 </div>
               </div>
+              <div class="setting-item">
+                <div class="title-item">
+                  <span>{{ $t('welcomeEmail') }}</span>
+                  <el-tooltip effect="dark" :content="$t('welcomeEmailTooltip')">
+                    <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+                  </el-tooltip>
+                </div>
+                <div class="forward">
+                  <span>{{ setting.welcomeAutoSend === 1 ? $t('enabled') : $t('disabled') }}</span>
+                  <el-button class="opt-button" size="small" type="primary" :title="$t('welcomeEmailTitle')" @click="openWelcomeEmailSetting">
+                    <Icon icon="hugeicons:quill-write-01" width="18" height="18"/>
+                  </el-button>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -986,6 +1000,314 @@
           </div>
         </template>
       </el-dialog>
+
+      <!-- Welcome Email Compose & Broadcast Dialog (Refactored System Architecture) -->
+      <el-dialog
+        top="3vh"
+        width="980px"
+        v-model="welcomeEmailShow"
+        class="welcome-write-dialog"
+        :close-on-click-modal="false"
+        :show-close="false"
+        @closed="closeWelcomeDialog"
+      >
+        <template #header>
+          <div class="write-dialog-top">
+            <!-- Left Group: Title & Official Sender Identity -->
+            <div class="top-left">
+              <div class="quill-badge">
+                <Icon icon="hugeicons:quill-write-01" width="18" height="18" />
+              </div>
+              <span class="dialog-main-title">{{ $t('welcomeEmailTitle') }}</span>
+              <div class="sender-identity-chip">
+                <Icon icon="ri:verified-badge-fill" width="15" height="15" class="verified-icon" />
+                <span class="sender-name">Epocanvas 官方团队</span>
+                <span class="sender-email">&lt;admin@epocanvas.com&gt;</span>
+              </div>
+            </div>
+
+            <!-- Middle Elastic Spacer -->
+            <div class="top-spacer"></div>
+
+            <!-- Right Group: Mode Switcher + Action Icon Buttons + Close -->
+            <div class="top-right">
+              <!-- Mode switcher capsule (Icon + Label) -->
+              <div class="view-switch-capsule">
+                <el-tooltip :content="$t('editMode')" effect="dark" placement="bottom">
+                  <div
+                    class="capsule-btn"
+                    :class="{ active: !isWelcomePreview }"
+                    @click="switchWelcomeView(false)"
+                  >
+                    <Icon icon="hugeicons:quill-write-01" width="15" height="15" />
+                    <span>{{ $t('editMode') }}</span>
+                  </div>
+                </el-tooltip>
+                <el-tooltip :content="$t('previewMode')" effect="dark" placement="bottom">
+                  <div
+                    class="capsule-btn"
+                    :class="{ active: isWelcomePreview }"
+                    @click="switchWelcomeView(true)"
+                  >
+                    <Icon icon="fluent:eye-24-regular" width="15" height="15" />
+                    <span>{{ $t('previewMode') }}</span>
+                  </div>
+                </el-tooltip>
+              </div>
+
+              <!-- Quick action icon buttons (18-20px icons, 8px gap, 4px hover block) -->
+              <div class="header-action-group">
+                <template v-if="!isWelcomePreview">
+                  <el-tooltip :content="welcomeEditorFormat === 'rich' ? $t('markdownSourceMode') : $t('richTextMode')" effect="dark" placement="bottom">
+                    <div class="tool-icon-btn" @click="toggleEditorFormat">
+                      <Icon :icon="welcomeEditorFormat === 'rich' ? 'fluent:code-24-regular' : 'fluent:text-grammar-settings-20-regular'" width="18" height="18" />
+                    </div>
+                  </el-tooltip>
+                  <el-tooltip :content="$t('clearFormat')" effect="dark" placement="bottom">
+                    <div class="tool-icon-btn" @click="clearWelcomeContent">
+                      <Icon icon="icon-park-outline:clear-format" width="18" height="18" />
+                    </div>
+                  </el-tooltip>
+                  <el-tooltip :content="$t('welcomeResetTemplate')" effect="dark" placement="bottom">
+                    <div class="tool-icon-btn" @click="resetToDefaultWelcomeTemplate">
+                      <Icon icon="fluent:arrow-reset-24-regular" width="18" height="18" />
+                    </div>
+                  </el-tooltip>
+                </template>
+
+                <template v-else>
+                  <el-tooltip :content="previewDark ? $t('previewLightMode') : $t('previewDarkMode')" effect="dark" placement="bottom">
+                    <div class="tool-icon-btn theme-toggle" @click="previewDark = !previewDark">
+                      <Icon :icon="previewDark ? 'fluent:weather-sunny-24-regular' : 'fluent:weather-moon-24-regular'" width="18" height="18" />
+                    </div>
+                  </el-tooltip>
+                  <el-tooltip :content="$t('welcomeResetTemplate')" effect="dark" placement="bottom">
+                    <div class="tool-icon-btn" @click="resetToDefaultWelcomeTemplate">
+                      <Icon icon="fluent:arrow-reset-24-regular" width="18" height="18" />
+                    </div>
+                  </el-tooltip>
+                </template>
+
+                <div class="close-icon-btn" @click="welcomeEmailShow = false">
+                  <Icon icon="material-symbols-light:close-rounded" width="20" height="20" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </template>
+
+        <div class="welcome-write-body">
+          <!-- VIEW 1: 直接写邮件界面 -->
+          <div v-show="!isWelcomePreview" class="write-flow-view">
+            <!-- 2. Dual-Card Group: Audience Target vs Email Attributes -->
+            <div class="meta-cards-row">
+              <!-- Group 1: 发送对象 -->
+              <div class="meta-group-card">
+                <div class="group-header">
+                  <Icon icon="solar:users-group-rounded-bold" width="15" height="15" />
+                  <span>{{ $t('audienceTarget') }}</span>
+                </div>
+                <div class="group-content">
+                  <div class="audience-chip">
+                    <Icon icon="solar:user-check-rounded-bold" width="14" height="14" />
+                    <span>{{ $t('welcomeAllUsers') }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Group 2: 邮件属性 -->
+              <div class="meta-group-card">
+                <div class="group-header">
+                  <Icon icon="fluent:tag-20-filled" width="15" height="15" />
+                  <span>{{ $t('mailAttributes') }}</span>
+                </div>
+                <div class="group-content attributes-row">
+                  <div class="attr-chip official">
+                    <Icon icon="ri:verified-badge-fill" width="13" height="13" />
+                    <span>{{ $t('officialVerified') }}</span>
+                  </div>
+                  <div class="attr-chip star">
+                    <Icon icon="fluent-color:star-16" width="13" height="13" />
+                    <span>⭐ 重要</span>
+                  </div>
+                  <div class="attr-chip todo">
+                    <Icon icon="ic:outline-access-time" width="13" height="13" />
+                    <span>⏰ 代办</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Subject Input Line -->
+            <div class="compose-subject-bar">
+              <el-input
+                v-model="welcomeEmailForm.welcomeSubject"
+                size="default"
+                :placeholder="$t('welcomeSubject')"
+                class="write-subject-input"
+              >
+                <template #prefix>
+                  <Icon icon="fluent:text-bullet-list-square-sparkle-24-regular" width="18" height="18" style="color: #64748b;" />
+                </template>
+              </el-input>
+            </div>
+
+            <!-- Spacious Editor Area -->
+            <div class="compose-editor-area">
+              <template v-if="welcomeEditorFormat === 'rich'">
+                <tinyEditor
+                  editor-id="welcome-sys-editor"
+                  :def-value="welcomeEmailForm.welcomeContent"
+                  ref="welcomeEditorRef"
+                  @change="onWelcomeContentChange"
+                  class="custom-tiny-editor"
+                />
+              </template>
+              <template v-else>
+                <div class="source-editor-wrapper">
+                  <el-input
+                    type="textarea"
+                    v-model="welcomeEmailForm.welcomeContent"
+                    :rows="18"
+                    placeholder="<!-- HTML / Markdown 正文源码 -->"
+                    class="source-textarea"
+                  />
+                </div>
+              </template>
+            </div>
+
+            <!-- 6. Dedicated Auxiliary Configuration Card -->
+            <div class="auxiliary-config-card">
+              <div class="config-card-header">
+                <Icon icon="fluent:bot-24-regular" width="16" height="16" />
+                <span>{{ $t('systemAutomationRules') }}</span>
+              </div>
+              <div class="config-card-body">
+                <div class="config-item">
+                  <span class="config-label">{{ $t('welcomeExpireDays') }}:</span>
+                  <el-select v-model="welcomeEmailForm.welcomeExpireDays" size="small" style="width: 180px;">
+                    <el-option :value="7" :label="$t('welcomeExpire7Days')" />
+                    <el-option :value="14" :label="$t('welcomeExpire14Days')" />
+                    <el-option :value="30" :label="$t('welcomeExpire30Days')" />
+                    <el-option :value="90" :label="$t('welcomeExpire90Days')" />
+                    <el-option :value="0" :label="$t('welcomeExpireNever')" />
+                  </el-select>
+                </div>
+
+                <div class="config-item">
+                  <span class="config-label">{{ $t('welcomeAutoSend') }}:</span>
+                  <el-switch v-model="welcomeEmailForm.welcomeAutoSend" :active-value="1" :inactive-value="0" size="small" />
+                  <el-tooltip effect="dark" :content="$t('welcomeAutoSendDesc')" placement="top">
+                    <Icon class="warning" icon="fe:warning" width="16" height="16" style="margin-left: 4px; cursor: pointer;"/>
+                  </el-tooltip>
+                </div>
+
+                <div class="config-item storage-tag-item">
+                  <div class="storage-pill">
+                    <Icon icon="fluent:database-link-20-regular" width="14" height="14" />
+                    <span>单实例集中存储（仅占用 1 份正文空间）</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- VIEW 2: 预览新建实际情况的模式 (根据用户明/暗色调) -->
+          <div v-if="isWelcomePreview" class="preview-flow-view" :class="{ 'dark-theme-preview': previewDark, 'light-theme-preview': !previewDark }">
+            <div class="real-inbox-mock">
+              <!-- Mock Email Detail Header -->
+              <div class="mock-email-head">
+                <div class="mock-head-main">
+                  <el-avatar :size="44" class="mock-avatar-official">
+                    <Icon icon="ri:verified-badge-fill" width="24" height="24" />
+                  </el-avatar>
+                  <div class="mock-meta-col">
+                    <div class="mock-meta-line-1">
+                      <span class="mock-sender-name">Epocanvas 官方团队</span>
+                      <Icon icon="ri:verified-badge-fill" width="16" height="16" style="color: #0284c7;" />
+                      <el-tag size="small" type="primary" effect="dark" class="mock-pill-official">{{ $t('officialTag') }}</el-tag>
+                      <el-tag size="small" type="warning" effect="dark" class="mock-pill-star">⭐ 重要</el-tag>
+                      <el-tag size="small" type="info" effect="dark" class="mock-pill-todo">⏰ 代办</el-tag>
+                    </div>
+                    <div class="mock-meta-line-2">
+                      <span class="mock-sender-email">&lt;admin@epocanvas.com&gt;</span>
+                      <span class="mock-to-email">至: 尊敬的用户 &lt;user@epocanvas.com&gt;</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="mock-head-date">
+                  <span>{{ formatDetailDate(new Date().toISOString()) }}</span>
+                </div>
+              </div>
+
+              <!-- Mock Official Banner -->
+              <div class="mock-official-banner">
+                <div class="banner-left">
+                  <Icon icon="ri:verified-badge-fill" width="20" height="20" style="color: #0284c7; flex-shrink: 0;" />
+                  <div class="banner-text">
+                    <div class="banner-heading">
+                      <span>{{ $t('officialBannerTitle') }}</span>
+                      <el-tag size="small" type="primary" effect="dark" class="official-mini-tag">{{ $t('officialTag') }}</el-tag>
+                    </div>
+                    <div class="banner-subtitle">{{ $t('officialBannerDesc') }}</div>
+                  </div>
+                </div>
+                <div class="banner-right" v-if="welcomeEmailForm.welcomeExpireDays > 0">
+                  <el-tag size="small" type="info" effect="plain" class="expire-pill">
+                    <Icon icon="ic:outline-access-time" width="13" height="13" style="margin-right: 3px;" />
+                    {{ $t('officialExpireNotice', { days: welcomeEmailForm.welcomeExpireDays }) }}
+                  </el-tag>
+                </div>
+              </div>
+
+              <!-- Sandboxed Email Render with ample padding -->
+              <div class="mock-email-content-box">
+                <el-scrollbar style="max-height: 420px; padding: 14px 18px;">
+                  <ShadowHtml :html="welcomeEmailForm.welcomeContent" />
+                </el-scrollbar>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <template #footer>
+          <!-- 5. Redesigned Actions with Strong Visual Hierarchy & Separation -->
+          <div class="welcome-write-footer">
+            <div class="footer-left">
+              <span class="broadcast-hint" v-if="setting.welcomeLastBroadcast">
+                {{ $t('welcomeRecentBroadcast') }}: {{ formatDetailDate(setting.welcomeLastBroadcast) }}
+              </span>
+            </div>
+            <div class="footer-right">
+              <!-- Secondary Button: 保存模板配置 (Outline / Ghost / Low Saturation) -->
+              <el-tooltip :content="$t('welcomeSaveConfig')" effect="dark" placement="top">
+                <el-button
+                  :loading="savingWelcome"
+                  @click="saveWelcomeTemplate"
+                  class="btn-save-secondary"
+                >
+                  <Icon icon="fluent:save-24-regular" width="16" height="16" style="margin-right: 6px;" />
+                  {{ $t('welcomeSaveConfig') }}
+                </el-button>
+              </el-tooltip>
+
+              <!-- Primary High-Risk Button: 发送全员欢迎邮件 (Strong Emphasis / Danger Confirmation) -->
+              <el-tooltip :content="$t('welcomeBroadcastBtn')" effect="dark" placement="top">
+                <el-button
+                  type="primary"
+                  :loading="sendingWelcome"
+                  @click="confirmBroadcastWelcome"
+                  class="btn-broadcast-primary"
+                >
+                  <Icon icon="fluent:send-24-filled" width="17" height="17" style="margin-right: 6px;" />
+                  {{ $t('welcomeBroadcastBtn') }}
+                </el-button>
+              </el-tooltip>
+            </div>
+          </div>
+        </template>
+      </el-dialog>
+
       <el-dialog v-model="addS3Show" :title="t('s3Configuration')" width="340" @closed="resetAddS3Form">
         <form>
           <el-input class="dialog-input" type="text" placeholder="Bucket" v-model="s3.bucket"/>
@@ -1087,7 +1409,7 @@
 
 <script setup>
 import {computed, defineOptions, nextTick, reactive, ref} from "vue";
-import {deleteBackground, setBackground, setBlackList, settingQuery, settingSet} from "@/request/setting.js";
+import {deleteBackground, setBackground, setBlackList, settingQuery, settingSet, sendWelcomeEmail} from "@/request/setting.js";
 import {useSettingStore} from "@/store/setting.js";
 import {useUiStore} from "@/store/ui.js";
 import {useUserStore} from "@/store/user.js";
@@ -1098,9 +1420,13 @@ import {storeToRefs} from "pinia";
 import {debounce} from 'lodash-es'
 import {isDomain, isEmail} from "@/utils/verify-utils.js";
 import loading from "@/components/loading/index.vue";
+import tinyEditor from "@/components/tiny-editor/index.vue";
+import ShadowHtml from "@/components/shadow-html/index.vue";
 import {getTextWidth} from "@/utils/text.js";
-import {fileToBase64} from "@/utils/file-utils.js"
+import {fileToBase64} from "@/utils/file-utils.js";
+import {formatDetailDate} from "@/utils/day.js";
 import {useI18n} from 'vue-i18n';
+import {ElMessageBox, ElMessage} from "element-plus";
 import axios from "axios";
 
 defineOptions({
@@ -1197,6 +1523,72 @@ const noticeForm = reactive({
   noticeOffset: 0,
   notice: 0,
   noticeWidth: 0
+})
+
+const DEFAULT_WELCOME_SUBJECT = '🎉 欢迎加入 Epocanvas Mail - 开启您的私密、高效云端邮件体验'
+const DEFAULT_WELCOME_CONTENT = `<div style="max-width: 640px; margin: 0 auto; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1e293b; line-height: 1.6; background: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05);">
+  <div style="background: linear-gradient(135deg, #0284c7 0%, #2563eb 50%, #4f46e5 100%); padding: 36px 32px 30px; text-align: left; position: relative;">
+    <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(255, 255, 255, 0.18); padding: 4px 12px; border-radius: 20px; color: #ffffff; font-size: 13px; font-weight: 600; margin-bottom: 16px; backdrop-filter: blur(8px);">
+      <span>✨ 官方系统引导</span>
+    </div>
+    <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 700; letter-spacing: -0.02em;">欢迎加入 Epocanvas Mail</h1>
+    <p style="margin: 8px 0 0; color: rgba(255, 255, 255, 0.9); font-size: 14px;">您的私密、纯净且极速的全球云端邮件工作中心已就绪。</p>
+  </div>
+  <div style="padding: 32px 32px 24px;">
+    <p style="font-size: 15px; color: #334155; margin-top: 0;">尊敬的用户，您好：</p>
+    <p style="font-size: 14px; color: #475569; line-height: 1.7;">很高兴与您相遇！Epocanvas Mail 致力于为您提供安全自主、零广告干扰且具备极致生产力的全新邮件交互体验。为了帮助您快速上手，我们为您准备了以下核心特性与快速指引：</p>
+    <div style="margin: 24px 0; display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+      <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px;">
+        <div style="font-size: 20px; margin-bottom: 6px;">🔒</div>
+        <div style="font-weight: 600; font-size: 14px; color: #0f172a; margin-bottom: 4px;">端到端隐私保护</div>
+        <div style="font-size: 12px; color: #64748b; line-height: 1.5;">全方位的防跟踪与垃圾邮件拦截，守护每一封往来信件的安全。</div>
+      </div>
+      <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px;">
+        <div style="font-size: 20px; margin-bottom: 6px;">⚡</div>
+        <div style="font-weight: 600; font-size: 14px; color: #0f172a; margin-bottom: 4px;">稍后处理与代办流</div>
+        <div style="font-size: 12px; color: #64748b; line-height: 1.5;">支持随时推迟邮件至代办，让收件箱重归清爽，聚焦核心要务。</div>
+      </div>
+      <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px;">
+        <div style="font-size: 20px; margin-bottom: 6px;">⭐</div>
+        <div style="font-weight: 600; font-size: 14px; color: #0f172a; margin-bottom: 4px;">星标重要与极速检索</div>
+        <div style="font-size: 12px; color: #64748b; line-height: 1.5;">一键归档高优先级信件，毫秒级关键字与语法检索，触手可及。</div>
+      </div>
+      <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px;">
+        <div style="font-size: 20px; margin-bottom: 6px;">🌐</div>
+        <div style="font-weight: 600; font-size: 14px; color: #0f172a; margin-bottom: 4px;">多域别名无缝流转</div>
+        <div style="font-size: 12px; color: #64748b; line-height: 1.5;">自由收发多域名前缀，随时切换发送身份，打造多重工作场景。</div>
+      </div>
+    </div>
+    <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 12px; padding: 18px; margin: 20px 0;">
+      <div style="font-weight: 600; font-size: 14px; color: #1e40af; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+        <span>🚀 3 步开启高效邮件之旅</span>
+      </div>
+      <div style="font-size: 13px; color: #1e3a8a; line-height: 1.8;">
+        <div><strong>1. 体验代办分类：</strong> 本邮件已自动放入您的【稍后处理 / 代办】与【星标 / 重要】中，体验快捷归档。</div>
+        <div><strong>2. 探索个性化外观：</strong> 前往「系统设置」体验星空动态 UI、登录背景自定义与多语言自由切换。</div>
+        <div><strong>3. 开启首封信件：</strong> 点击顶栏「写邮件」，即刻体验极速富文本撰写与全球极速投递。</div>
+      </div>
+    </div>
+    <div style="margin-top: 24px; padding-top: 16px; border-top: 1px dashed #cbd5e1; font-size: 12px; color: #94a3b8; line-height: 1.6;">
+      <div>📌 <strong>温馨提示：</strong> 此邮件由系统官方自动发送（admin@epocanvas.com）。站长设定了自动清理周期，到期后将自动从您的邮箱中安全移除，无需手动清理。</div>
+      <div style="margin-top: 8px;">Epocanvas Mail 官方团队 · 敬上</div>
+    </div>
+  </div>
+</div>`
+
+const welcomeEmailShow = ref(false)
+const isWelcomePreview = ref(false)
+const welcomeEditorRef = ref(null)
+const welcomeEditorFormat = ref('rich') // 'rich' | 'source'
+const previewDark = ref(true)
+const sendingWelcome = ref(false)
+const savingWelcome = ref(false)
+const welcomeEmailForm = reactive({
+  welcomeSubject: '',
+  welcomeContent: '',
+  welcomeText: '',
+  welcomeExpireDays: 7,
+  welcomeAutoSend: 1
 })
 
 const regKeyOptions = computed(() => [
@@ -1411,6 +1803,158 @@ function saveNoticePopup() {
 
 function previewNoticePopup() {
   uiStore.previewNotice({...noticeForm})
+}
+
+function openWelcomeEmailSetting() {
+  welcomeEmailForm.welcomeSubject = setting.value.welcomeSubject || DEFAULT_WELCOME_SUBJECT
+  welcomeEmailForm.welcomeContent = setting.value.welcomeContent || DEFAULT_WELCOME_CONTENT
+  welcomeEmailForm.welcomeText = setting.value.welcomeText || ''
+  welcomeEmailForm.welcomeExpireDays = setting.value.welcomeExpireDays !== undefined ? Number(setting.value.welcomeExpireDays) : 7
+  welcomeEmailForm.welcomeAutoSend = setting.value.welcomeAutoSend !== undefined ? Number(setting.value.welcomeAutoSend) : 1
+  isWelcomePreview.value = false
+  welcomeEditorFormat.value = 'rich'
+  previewDark.value = uiStore.dark
+  welcomeEmailShow.value = true
+}
+
+function resetToDefaultWelcomeTemplate() {
+  welcomeEmailForm.welcomeSubject = DEFAULT_WELCOME_SUBJECT
+  welcomeEmailForm.welcomeContent = DEFAULT_WELCOME_CONTENT
+  if (welcomeEditorRef.value) {
+    welcomeEditorRef.value.clearEditor()
+    nextTick(() => {
+      if (welcomeEditorRef.value) {
+        welcomeEmailForm.welcomeContent = DEFAULT_WELCOME_CONTENT
+      }
+    })
+  }
+  ElMessage.success(t('welcomeResetTemplate') || '已恢复官方默认模板')
+}
+
+function toggleEditorFormat() {
+  if (welcomeEditorFormat.value === 'rich') {
+    if (welcomeEditorRef.value) {
+      const current = welcomeEditorRef.value.getContent()
+      if (current !== undefined && current !== '') {
+        welcomeEmailForm.welcomeContent = current
+      }
+    }
+    welcomeEditorFormat.value = 'source'
+  } else {
+    welcomeEditorFormat.value = 'rich'
+    nextTick(() => {
+      if (welcomeEditorRef.value) {
+        welcomeEditorRef.value.setContent(welcomeEmailForm.welcomeContent)
+      }
+    })
+  }
+}
+
+function clearWelcomeContent() {
+  welcomeEmailForm.welcomeContent = ''
+  if (welcomeEditorRef.value) {
+    welcomeEditorRef.value.clearEditor()
+  }
+}
+
+function switchWelcomeView(preview) {
+  if (preview) {
+    if (welcomeEditorFormat.value === 'rich' && welcomeEditorRef.value) {
+      const current = welcomeEditorRef.value.getContent()
+      if (current !== undefined) {
+        welcomeEmailForm.welcomeContent = current
+      }
+    }
+    previewDark.value = uiStore.dark
+  } else {
+    nextTick(() => {
+      if (welcomeEditorFormat.value === 'rich' && welcomeEditorRef.value) {
+        welcomeEditorRef.value.setContent(welcomeEmailForm.welcomeContent)
+      }
+    })
+  }
+  isWelcomePreview.value = preview
+}
+
+function onWelcomeContentChange(content) {
+  welcomeEmailForm.welcomeContent = content
+}
+
+function closeWelcomeDialog() {
+  isWelcomePreview.value = false
+  welcomeEditorFormat.value = 'rich'
+}
+
+function saveWelcomeTemplate() {
+  if (savingWelcome.value) return
+  if (!isWelcomePreview.value && welcomeEditorFormat.value === 'rich' && welcomeEditorRef.value) {
+    const current = welcomeEditorRef.value.getContent()
+    if (current !== undefined) {
+      welcomeEmailForm.welcomeContent = current
+    }
+  }
+
+  savingWelcome.value = true
+  const payload = {
+    welcomeSubject: welcomeEmailForm.welcomeSubject || DEFAULT_WELCOME_SUBJECT,
+    welcomeContent: welcomeEmailForm.welcomeContent,
+    welcomeExpireDays: Number(welcomeEmailForm.welcomeExpireDays),
+    welcomeAutoSend: Number(welcomeEmailForm.welcomeAutoSend)
+  }
+
+  settingSet(payload).then(() => {
+    setting.value = { ...setting.value, ...payload }
+    settingStore.settings = { ...settingStore.settings, ...payload }
+    ElMessage.success(t('welcomeSaveSuccess') || '欢迎邮件模板配置已保存')
+    welcomeEmailShow.value = false
+  }).catch(e => {
+    console.error('saveWelcomeTemplate error:', e)
+    ElMessage.error(t('operationFailed') || '保存失败')
+  }).finally(() => {
+    savingWelcome.value = false
+  })
+}
+
+function confirmBroadcastWelcome() {
+  if (sendingWelcome.value) return
+  if (!isWelcomePreview.value && welcomeEditorFormat.value === 'rich' && welcomeEditorRef.value) {
+    const current = welcomeEditorRef.value.getContent()
+    if (current !== undefined) {
+      welcomeEmailForm.welcomeContent = current
+    }
+  }
+
+  ElMessageBox.confirm(
+    t('broadcastConfirmHighRiskMsg') || t('welcomeBroadcastConfirmMsg'),
+    t('broadcastConfirmHighRiskTitle') || t('welcomeBroadcastConfirmTitle'),
+    {
+      confirmButtonText: t('broadcastConfirmBtnText') || t('welcomeBroadcastBtn'),
+      cancelButtonText: t('cancel'),
+      type: 'warning',
+      customClass: 'welcome-confirm-box high-risk-modal',
+      confirmButtonClass: 'el-button--primary btn-danger-confirm'
+    }
+  ).then(() => {
+    sendingWelcome.value = true
+    const payload = {
+      welcomeSubject: welcomeEmailForm.welcomeSubject || DEFAULT_WELCOME_SUBJECT,
+      welcomeContent: welcomeEmailForm.welcomeContent,
+      welcomeExpireDays: Number(welcomeEmailForm.welcomeExpireDays),
+      welcomeAutoSend: Number(welcomeEmailForm.welcomeAutoSend)
+    }
+
+    sendWelcomeEmail(payload).then(res => {
+      const count = res.deliverCount ?? res.totalUsers ?? 0
+      ElMessage.success(t('welcomeBroadcastSuccess', { count }) || `已成功向全员 ${count} 位用户投递官方欢迎邮件！`)
+      getSettings()
+      welcomeEmailShow.value = false
+    }).catch(e => {
+      console.error('sendWelcomeEmail error:', e)
+      ElMessage.error(t('operationFailed') || '投递失败')
+    }).finally(() => {
+      sendingWelcome.value = false
+    })
+  }).catch(() => {})
 }
 
 function openThirdEmailSetting() {
@@ -2283,10 +2827,11 @@ function editSetting(settingForm, refreshStatus = true) {
   }
 }
 
-:deep(.notice-popup.el-dialog), :deep(.auth-prompt-dialog.el-dialog) {
+:deep(.notice-popup.el-dialog), :deep(.auth-prompt-dialog.el-dialog), :deep(.welcome-write-dialog.el-dialog) {
   min-height: 300px;
-  width: 860px !important;
-  @media (max-width: 900px) {
+  width: 980px !important;
+  max-width: min(980px, calc(100vw - 40px)) !important;
+  @media (max-width: 1040px) {
     width: calc(100% - 40px) !important;
     margin-right: 20px !important;
     margin-left: 20px !important;
@@ -3047,6 +3592,767 @@ form .el-button {
     opacity: 0.85;
     pointer-events: none;
     white-space: nowrap;
+  }
+}
+
+/* Welcome Write Dialog (Refactored System Architecture) */
+:deep(.welcome-write-dialog) {
+  width: 980px !important;
+  max-width: min(980px, calc(100vw - 40px)) !important;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.45);
+  background: var(--el-bg-color);
+
+  .el-dialog__header {
+    margin-right: 0;
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--el-border-color-lighter);
+    background: var(--el-bg-color);
+  }
+
+  .el-dialog__body {
+    padding: 20px 24px 16px;
+    background: var(--el-bg-color);
+  }
+
+  .el-dialog__footer {
+    padding: 16px 24px 18px;
+    border-top: 1px solid var(--el-border-color-lighter);
+    background: var(--el-bg-color);
+  }
+}
+
+.write-dialog-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 38px;
+
+  .top-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    flex-shrink: 0;
+
+    .quill-badge {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      background: var(--el-color-primary-light-9);
+      color: var(--el-color-primary);
+      flex-shrink: 0;
+    }
+
+    .dialog-main-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--el-text-color-primary);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .sender-identity-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      background: var(--el-fill-color-light);
+      border: 1px solid var(--el-border-color-lighter);
+      border-radius: 6px;
+      font-size: 12px;
+      white-space: nowrap;
+
+      .verified-icon {
+        color: #0284c7;
+        flex-shrink: 0;
+      }
+
+      .sender-name {
+        font-weight: 600;
+        color: var(--el-text-color-primary);
+      }
+
+      .sender-email {
+        color: var(--el-text-color-secondary);
+      }
+
+      @media (max-width: 860px) {
+        .sender-email {
+          display: none;
+        }
+      }
+    }
+  }
+
+  .top-spacer {
+    flex: 1 1 auto;
+    min-width: 8px;
+  }
+
+  .top-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+
+    .view-switch-capsule {
+      display: flex;
+      align-items: center;
+      background: var(--el-fill-color);
+      border-radius: 8px;
+      padding: 3px;
+      gap: 3px;
+
+      .capsule-btn {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        padding: 4px 12px;
+        border-radius: 6px;
+        font-size: 12px;
+        font-weight: 500;
+        cursor: pointer;
+        color: var(--el-text-color-secondary);
+        transition: all 0.2s ease;
+
+        &:hover {
+          color: var(--el-text-color-primary);
+        }
+
+        &.active {
+          background: var(--el-bg-color);
+          color: var(--el-color-primary);
+          font-weight: 600;
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+      }
+    }
+
+    .header-action-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+
+      .tool-icon-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        border-radius: 4px;
+        background: var(--el-fill-color);
+        color: var(--el-text-color-regular);
+        cursor: pointer;
+        transition: all 0.2s ease;
+
+        &:hover {
+          background: var(--el-fill-color-darker);
+          color: var(--el-color-primary);
+        }
+
+        &.theme-toggle {
+          color: #eab308;
+        }
+      }
+
+      .close-icon-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        border-radius: 4px;
+        color: var(--el-text-color-secondary);
+        cursor: pointer;
+        transition: all 0.2s ease;
+
+        &:hover {
+          background: var(--el-fill-color);
+          color: var(--el-text-color-primary);
+        }
+      }
+    }
+  }
+}
+
+.welcome-write-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.write-flow-view {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+
+  /* Dual-Card Group: Audience vs Attributes */
+  .meta-cards-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+
+    .meta-group-card {
+      background: var(--el-fill-color-light);
+      border: 1px solid var(--el-border-color-lighter);
+      border-radius: 10px;
+      padding: 10px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+
+      .group-header {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--el-text-color-secondary);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+
+      .group-content {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+
+        .audience-chip {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          background: var(--el-bg-color);
+          padding: 6px 12px;
+          border-radius: 9999px;
+          border: 1px solid var(--el-border-color-lighter);
+          font-size: 13px;
+          font-weight: 500;
+          color: var(--el-text-color-primary);
+          box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+        }
+
+        .attr-chip {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          padding: 6px 12px;
+          border-radius: 9999px;
+          font-size: 13px;
+          font-weight: 600;
+
+          &.official {
+            background: rgba(2, 132, 199, 0.12);
+            color: #0284c7;
+            border: 1px solid rgba(2, 132, 199, 0.3);
+          }
+
+          &.star {
+            background: rgba(234, 179, 8, 0.12);
+            color: #d97706;
+            border: 1px solid rgba(234, 179, 8, 0.3);
+          }
+
+          &.todo {
+            background: rgba(99, 102, 241, 0.12);
+            color: #6366f1;
+            border: 1px solid rgba(99, 102, 241, 0.3);
+          }
+        }
+      }
+    }
+  }
+
+  .compose-subject-bar {
+    .write-subject-input :deep(.el-input__wrapper) {
+      border-radius: 8px;
+      font-weight: 600;
+      padding: 6px 14px;
+      font-size: 14px;
+    }
+  }
+
+  .compose-editor-area {
+    min-height: 380px;
+    border: 1px solid var(--el-border-color-lighter);
+    border-radius: 8px;
+    overflow: hidden;
+
+    .custom-tiny-editor {
+      height: 380px;
+    }
+
+    .source-editor-wrapper {
+      height: 380px;
+
+      .source-textarea :deep(.el-textarea__inner) {
+        height: 380px !important;
+        font-family: 'JetBrains Mono', Consolas, Monaco, monospace;
+        font-size: 13px;
+        line-height: 1.6;
+        border-radius: 0;
+        border: none;
+      }
+    }
+  }
+
+  /* Dedicated Auxiliary Configuration Card */
+  .auxiliary-config-card {
+    background: var(--el-fill-color-light);
+    border: 1px solid var(--el-border-color-lighter);
+    border-radius: 10px;
+    padding: 10px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+
+    .config-card-header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--el-text-color-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .config-card-body {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      flex-wrap: wrap;
+
+      .config-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        color: var(--el-text-color-regular);
+
+        .config-label {
+          font-weight: 600;
+          white-space: nowrap;
+        }
+      }
+
+      .storage-tag-item {
+        margin-left: auto;
+
+        .storage-pill {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          font-size: 12px;
+          font-weight: 500;
+          color: var(--el-text-color-secondary);
+          background: var(--el-bg-color);
+          padding: 4px 10px;
+          border-radius: 6px;
+          border: 1px solid var(--el-border-color-lighter);
+        }
+      }
+    }
+  }
+}
+
+.preview-flow-view {
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--el-border-color-lighter);
+  min-height: 520px;
+  transition: all 0.3s ease;
+
+  &.light-theme-preview {
+    background: #f8fafc;
+    color: #1e293b;
+
+    .real-inbox-mock {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+    }
+
+    .mock-email-head {
+      border-bottom: 1px solid #f1f5f9;
+
+      .mock-sender-name {
+        color: #0f172a;
+      }
+
+      .mock-sender-email, .mock-to-email, .mock-head-date {
+        color: #64748b;
+      }
+    }
+
+    .mock-official-banner {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      box-shadow: 0 2px 8px rgba(2, 132, 199, 0.08);
+
+      .banner-heading span {
+        color: #1e40af;
+      }
+
+      .banner-subtitle {
+        color: #2563eb;
+      }
+    }
+  }
+
+  &.dark-theme-preview {
+    background: #09090b;
+    color: #f4f4f5;
+
+    .real-inbox-mock {
+      background: #18181b;
+      border: 1px solid #27272a;
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.45);
+    }
+
+    .mock-email-head {
+      border-bottom: 1px solid #27272a;
+
+      .mock-sender-name {
+        color: #fafafa;
+      }
+
+      .mock-sender-email, .mock-to-email, .mock-head-date {
+        color: #a1a1aa;
+      }
+    }
+
+    .mock-official-banner {
+      background: rgba(30, 58, 138, 0.28);
+      border: 1px solid rgba(59, 130, 246, 0.4);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+
+      .banner-heading span {
+        color: #93c5fd;
+      }
+
+      .banner-subtitle {
+        color: #bfdbfe;
+      }
+    }
+  }
+
+  .real-inbox-mock {
+    margin: 16px 20px;
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  .mock-email-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 22px;
+
+    .mock-head-main {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+
+      .mock-avatar-official {
+        background: linear-gradient(135deg, #0284c7, #2563eb);
+        color: #ffffff;
+        flex-shrink: 0;
+      }
+
+      .mock-meta-col {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+
+        .mock-meta-line-1 {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          font-weight: 700;
+          font-size: 14px;
+        }
+
+        .mock-meta-line-2 {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          font-size: 12px;
+        }
+      }
+    }
+
+    .mock-head-date {
+      font-size: 12px;
+    }
+  }
+
+  .mock-official-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 18px;
+    margin: 16px 22px;
+    border-radius: 10px;
+
+    .banner-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+
+      .banner-heading {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-weight: 700;
+        font-size: 13px;
+      }
+
+      .banner-subtitle {
+        font-size: 12px;
+        margin-top: 1px;
+      }
+    }
+  }
+
+  .mock-email-content-box {
+    padding: 0 22px 22px;
+  }
+}
+
+.welcome-write-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+
+  .footer-left {
+    .broadcast-hint {
+      font-size: 12px;
+      color: var(--el-text-color-secondary);
+    }
+  }
+
+  .footer-right {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+
+    .btn-save-secondary {
+      height: 38px;
+      padding: 8px 18px;
+      border-radius: 8px;
+      font-weight: 500;
+      font-size: 13px;
+      background: var(--el-fill-color-blank);
+      border: 1px solid var(--el-border-color);
+      color: var(--el-text-color-regular);
+      transition: all 0.2s ease;
+
+      &:hover {
+        border-color: var(--el-color-primary);
+        color: var(--el-color-primary);
+        background: var(--el-fill-color-light);
+      }
+    }
+
+    .btn-broadcast-primary {
+      height: 38px;
+      padding: 8px 24px;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 14px;
+      background: linear-gradient(135deg, #0284c7 0%, #2563eb 100%) !important;
+      border: none !important;
+      color: #ffffff !important;
+      box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+
+      &:hover {
+        box-shadow: 0 6px 20px rgba(37, 99, 235, 0.5);
+        transform: translateY(-1px);
+        opacity: 0.95;
+      }
+
+      &:active {
+        transform: translateY(0);
+      }
+    }
+  }
+}
+
+/* TinyMCE Dark & Light Theme Harmonization Tokens */
+:deep(.tox.tox-tinymce) {
+  border: 1px solid var(--el-border-color-lighter) !important;
+  border-radius: 8px !important;
+  overflow: hidden;
+  background: var(--el-bg-color) !important;
+
+  .tox-editor-container {
+    background: var(--el-bg-color) !important;
+  }
+
+  .tox-toolbar-overlord {
+    background: var(--el-bg-color-overlay) !important;
+  }
+
+  .tox-toolbar, .tox-toolbar__primary {
+    background: var(--el-bg-color-overlay) !important;
+    border-bottom: 1px solid var(--el-border-color-lighter) !important;
+    padding: 6px 8px !important;
+    gap: 4px !important;
+    display: flex !important;
+    align-items: center !important;
+  }
+
+  .tox-toolbar__group {
+    display: flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+    padding: 0 4px !important;
+    margin: 0 !important;
+    border: none !important;
+  }
+
+  .tox-tbtn {
+    height: 30px !important;
+    min-width: 30px !important;
+    margin: 0 !important;
+    padding: 4px !important;
+    border-radius: 4px !important;
+    color: var(--el-text-color-regular) !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    cursor: pointer !important;
+    transition: background 0.2s ease, color 0.2s ease !important;
+
+    &:hover {
+      background: var(--el-fill-color) !important;
+      color: var(--el-color-primary) !important;
+    }
+
+    &.tox-tbtn--enabled, &[aria-pressed="true"] {
+      background: var(--el-color-primary-light-9) !important;
+      color: var(--el-color-primary) !important;
+      font-weight: 600 !important;
+    }
+
+    &.tox-tbtn--disabled, &[aria-disabled="true"] {
+      opacity: 0.4 !important;
+      cursor: not-allowed !important;
+      background: transparent !important;
+    }
+
+    svg {
+      width: 18px !important;
+      height: 18px !important;
+      fill: currentColor !important;
+    }
+  }
+
+  .tox-tbtn--select {
+    height: 30px !important;
+    line-height: 30px !important;
+    border-radius: 4px !important;
+    padding: 0 8px !important;
+    margin: 0 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    color: var(--el-text-color-regular) !important;
+    background: transparent !important;
+
+    &:hover {
+      background: var(--el-fill-color) !important;
+      color: var(--el-color-primary) !important;
+    }
+
+    .tox-tbtn__select-label {
+      font-size: 12px !important;
+      font-weight: 500 !important;
+      color: inherit !important;
+    }
+
+    .tox-tbtn__select-chevron svg {
+      width: 12px !important;
+      height: 12px !important;
+      fill: currentColor !important;
+    }
+  }
+
+  .tox-split-button {
+    height: 30px !important;
+    margin: 0 !important;
+    border-radius: 4px !important;
+    overflow: hidden !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    transition: background 0.2s ease !important;
+
+    &:hover {
+      background: var(--el-fill-color) !important;
+    }
+
+    .tox-tbtn {
+      height: 30px !important;
+      width: 26px !important;
+      border-radius: 4px 0 0 4px !important;
+      padding: 4px !important;
+    }
+
+    .tox-split-button__chevron {
+      height: 30px !important;
+      width: 14px !important;
+      border-radius: 0 4px 4px 0 !important;
+      padding: 0 !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+
+      svg {
+        width: 10px !important;
+        height: 10px !important;
+        fill: currentColor !important;
+      }
+
+      &:hover {
+        background: var(--el-fill-color-darker) !important;
+      }
+    }
+  }
+
+  .tox-separator {
+    height: 18px !important;
+    width: 1px !important;
+    margin: 0 6px !important;
+    background: var(--el-border-color-lighter) !important;
+    border: none !important;
+  }
+
+  .tox-edit-area {
+    border-top: 1px solid var(--el-border-color-lighter) !important;
+  }
+
+  .tox-edit-area__iframe {
+    background: var(--el-bg-color) !important;
+  }
+}
+
+/* High-risk confirmation dialog */
+:deep(.high-risk-modal) {
+  .btn-danger-confirm {
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%) !important;
+    border: none !important;
+    color: #ffffff !important;
+    font-weight: 700 !important;
+    box-shadow: 0 4px 14px rgba(239, 68, 68, 0.4) !important;
   }
 }
 

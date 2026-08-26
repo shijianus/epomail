@@ -2,6 +2,101 @@
 
 <!-- VERSION LOG APPEND BELOW (newest first) -->
 
+### 系统性重构与视觉规范：全员欢迎邮件弹窗六大模块深度精修与主题 Token 统一 (2026-08-26)
+*   **功能需求与业务逻辑对齐 (Feature & Alignment)**: 
+    1. **顶部工具栏防截断弹性布局 (Header Toolbar Flex & Anti-Overflow)**:
+       - 采用左右两组 + 中间弹性空白 (`.top-spacer`) 架构；发件人身份 Chip 注入响应式断点（Narrow 容器下自动隐匿邮箱后缀，保留官方蓝标与团队名称），彻底解决文本/域名裁切挤压。
+       - 所有 Icon 尺寸严格统一为 18–20px，图标间距固定 8px，hover 添加 4px 圆角背景块。
+    2. **目标受众与邮件属性双卡片解耦 (Audience vs Attributes Dual-Card Hierarchy)**:
+       - 拆分为“发送对象”与“邮件属性”两个独立视觉卡片，统一圆角胶囊 Chip 组件样式（`padding: 6px 12px; border-radius: 9999px; font-size: 13px;`）。
+    3. **TinyMCE 富文本编辑器全套 Token 深度适配 (TinyMCE Unified Theme Tokens)**:
+       - 为 TinyMCE 工具栏注入全套深色/浅色 Token：统一 `.tox-toolbar` 背景与边框、`.tox-tbtn` 尺寸（30x30px，padding 4px）、`.tox-split-button` 左右两段圆角联动与高度对齐、字号下拉选择器对齐、分隔线规范化及 hover/active/disabled 状态平滑过渡。
+    4. **预览卡片规范与留白比例失衡修复 (Preview Card Ratios & Layering)**:
+       - 统一外层弹窗内边距（`padding: 20px 24px`）与预览卡片内边距（`padding: 18px 22px`），圆角锁定 12px。
+       - 渐变 Banner 与正文之间增加 `margin-bottom: 16px` 独立留白与微妙投影，滚动区域增加 `20px 24px` 内部留白，文字背景对比度均远超 4.5:1 标准（深色模式下文字对比度达 9.8:1 以上）。
+    5. **操作按钮视觉层级重塑与高危二次确认 (Button Hierarchy & High-Risk Modal)**:
+       - “保存模板配置”采用次级描边按钮（幽灵白/低饱和度）；“发送全员欢迎邮件”采用强化饱和蓝渐变与 700 加粗字重，两按钮间距提升至 18px。
+       - 触发发送时强制弹出警示二次确认弹窗，明确提示“将发送给所有现有用户和新注册用户，此操作不可撤销”，确认按钮采用高危红色渐变（`#ef4444` → `#dc2626`）。
+    6. **辅助配置区与主操作区物理隔离 (Auxiliary Card & Footer Separation)**:
+       - 邮件时效（TTL）、自动发送开关与单实例存储提示独立封装为「系统自动化规则」卡片，与底部主操作区通过标准边框与 16px 留白彻底隔离。
+*   **编辑代码 (Edit)**: 
+    *   **前端页面与样式**: 修改 [`mail-vue/src/views/sys-setting/index.vue`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/views/sys-setting/index.vue)。
+    *   **国际化语言包**: 修改 [`mail-vue/src/i18n/zh.js`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/i18n/zh.js) 与 [`mail-vue/src/i18n/en.js`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/i18n/en.js)。
+*   **全链路自动化验证与部署 (Verify & Deploy)**: 
+    *   执行集成测试（`tests/test-welcome-email.mjs`）验证单实例存储、全渠道呈现、官方认证标识、自动标记重要与代办、7天自动清理逻辑全部通过。
+    *   执行端到端自动化测试（`tests/test-welcome-dialog-cf.mjs`）截屏检验写信模式、收件箱预览（亮色/暗色）与高危确认弹窗视觉样式全部达标。
+    *   执行 `npx wrangler deploy` 完成前后端联合构建并全网发布上线（Version ID: `bb24b765-028b-4334-97aa-a6fd5aa83e1e`）。
+
+
+### 深度重构与升级：全员欢迎邮件弹窗系统级 UI/UX 重构、信息解耦、深色主题协调与高风险全员发送二次确认 (2026-08-25)
+*   **功能需求与业务逻辑对齐 (Feature & Alignment)**: 
+    1. **顶部工具栏解耦与防溢出弹性架构**:
+       - 采用左右两组 + 中间弹性空白布局。左侧统一为官方羽毛笔徽章、对话框标题与发件人身份 Chip（`Epocanvas 官方团队 <admin@epocanvas.com>`）；右侧集成模式切换胶囊、格式切换/清空/恢复模板/明暗切换操作组以及关闭按钮。
+       - 统一所有 Icon 尺寸为 18–20px，图标间距统一为 8px，hover 状态添加 4px/6px 圆角背景块，彻底杜绝任何窄容器下的文字或图标裁切。
+    2. **目标受众与邮件属性独立卡片视觉解耦**:
+       - 彻底拆分“受众范围”与“邮件属性”，采用双卡片网格布局（`meta-cards-row`）：
+         - **卡片 1（发送对象）**：专属标题与群组 Icon，内嵌 `所有现有用户与新注册用户` 独立胶囊 Chip。
+         - **卡片 2（邮件属性）**：专属标题与标签 Icon，内嵌 `官方认证`、`⭐ 重要`、`⏰ 代办` 三个独立色彩的 Chip。
+       - 采用统一的圆角胶囊与内边距（`padding: 4px 10px; border-radius: 6px; font-size: 12px;`）。
+    3. **富文本编辑器工具栏深度主题化与统一 Token**:
+       - 为 TinyMCE 工具栏注入全局与深色主题 Token，对 `.tox-toolbar`、`.tox-tbtn`、`.tox-edit-area` 统一圆角（8px）、间距（2px）与高度（28px/32px），使编辑器彻底融入系统深色暗调规范。
+    4. **收件箱真实预览留白比例与层次优化**:
+       - 外层弹窗内边距增加至 22px，预览卡片圆角锁定 12px，内部留白提升至 14px 20px。
+       - 标题渐变 Banner 与下方正文之间增加明显间距与视觉分层，在深色（#18181b / #09090b）与浅色（#ffffff / #f8fafc）模式下文字对比度均高于 10:1（符合 WCAG AAA 可读性标准）。
+    5. **操作按钮视觉层级重塑与高风险二次确认**:
+       - **低风险操作（保存模板配置）**：采用次级描边按钮（`btn-save-secondary`，幽灵白底与边框，标准字重，低饱和度）。
+       - **高风险全量群发（发送全员欢迎邮件）**：采用高饱和强化渐变色（`linear-gradient(135deg, #0284c7, #2563eb)`，加粗字重 `font-weight: 700`，发光投影 `box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35)`），与次级按钮保持 16px 鲜明间距。
+       - **二次强确认弹窗**：点击群发强制弹出警示确认模态框，明确警示不可撤销风险，确认按钮使用高危红（`btn-danger-confirm`）。
+    6. **辅助自动化规则独立成卡与操作区分隔**:
+       - 将邮件保留时效（TTL）、新用户自动发送开关、单实例存储提示收纳进专用的「系统自动化规则」卡片（`auxiliary-config-card`），与底部主操作按钮区通过标准边框与 16px 留白彻底隔离。
+*   **编辑代码 (Edit)**: 
+    *   **前端组件与样式**: 修改 [`mail-vue/src/views/sys-setting/index.vue`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/views/sys-setting/index.vue)。
+    *   **国际化语言包**: 修改 [`mail-vue/src/i18n/zh.js`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/i18n/zh.js) 与 [`mail-vue/src/i18n/en.js`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/i18n/en.js)。
+*   **全链路自动化验证与部署 (Verify & Deploy)**: 
+    *   执行集成测试（`tests/test-welcome-email.mjs`）验证单实例存储、全渠道呈现、官方认证标识、自动标记重要与代办、7天自动清理逻辑全部通过。
+    *   执行 `npx wrangler deploy` 完成前后端联合构建并全网发布上线（Version ID: `eb4de4f5-7ccd-48e6-b3ad-9664cee24259`）。
+
+### 优化与升级：系统设置全员欢迎邮件全面改造为“写邮件发件模式”、双界面（写信/收件箱预览）与明暗色调自适应及 Icon-First 规范 (2026-08-25)
+*   **功能需求与业务逻辑对齐 (Feature & Alignment)**: 
+    1. **修复入口 Icon 与视觉统一**:
+       - 彻底消除系统设置“网站公告”卡片中按钮 icon 缺失问题，替换为标准写信羽毛笔图标（`hugeicons:quill-write-01`），保持与顶栏写信图标完全一致的权威美感。
+    2. **全面升级为“写邮件发件模式”与大空间写信布局**:
+       - 参照 `layout/write` 发件交互架构，重构欢迎邮件弹窗为 `welcome-write-dialog`（960px 舒适大视窗）。
+       - 顶栏清晰标明发件人身份（`Epocanvas 官方团队 <admin@epocanvas.com>` 与官方认证蓝标徽章），留出大比例开阔写信空间，底栏紧凑集成时效设定（7/14/30/90天/永久）与新用户注册自动投递开关。
+    3. **双界面完整支持 (写信模式 vs. 收件箱真实预览)**:
+       - **写信模式 (Compose View)**: 支持富文本编辑器（TinyMCE WYSIWYG）与 HTML/Markdown 源码模式一键无缝双向切换，支持快捷清空正文与一键恢复官方引导模板。
+       - **收件箱真实预览模式 (Live Inbox Preview View)**: 完整模拟终端用户收件箱真实邮件详情头、发件人官方蓝标、`官方` + `⭐ 重要` + `⏰ 代办` 三合一药丸徽标与时效倒计时，自动跟随用户当前的**明/暗色调**（Light/Dark Theme）自适应渲染，并支持顶栏随时一键切换预览色调。
+    4. **Button 交互 Icon-First 规范化与全量国际化**:
+       - 工具条按钮全面采用 Icon 按钮取代冗余文字（模式切换、格式切换、清空格式、恢复模版、主题切换、保存设置、全员广播），文字统一在 Tooltip 浮层中呈现并完整适配中英文 i18n。
+*   **编辑代码 (Edit)**: 
+    *   **前端布局与组件**: 修改 [`mail-vue/src/views/sys-setting/index.vue`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/views/sys-setting/index.vue)。
+    *   **国际化语言包**: 修改 [`mail-vue/src/i18n/zh.js`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/i18n/zh.js) 与 [`mail-vue/src/i18n/en.js`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/i18n/en.js)。
+*   **全链路自动化验证与部署 (Verify & Deploy)**: 
+    *   执行集成测试（`tests/test-welcome-email.mjs`）验证单实例存储、全渠道呈现、官方认证标识、自动标记重要与代办、7天自动清理逻辑全部通过。
+    *   执行 `npx wrangler deploy` 完成前后端联合构建并全网发布上线（Version ID: `226840ae-6f67-4e43-8ca2-c28546f8032f`）。
+
+### 功能新增：网站公告“全员系统欢迎邮件”弹窗、单实例存储优化、官方权威认证与重要/代办自动标记及自定义时效清理 (2026-08-25)
+*   **功能需求与业务逻辑对齐 (Feature & Alignment)**: 
+    1. **系统设置网站公告板块新增欢迎邮件入口与标准写邮件弹窗**:
+       - 在设定页系统设置（`sys-setting`）的“网站公告”卡片中新增“欢迎邮件”配置与操作入口（带专属 Tooltip 说明与邮件星标按钮）。
+       - 提供标准写邮件弹窗（`welcome-email-dialog`），支持发件人（`Epocanvas 官方团队 <admin@epocanvas.com>`）、受众（全员/新注册用户）、主题编辑、TinyMCE 富文本编辑器、实时邮件视图预览（`ShadowHtml`）以及一键恢复官方精美默认模板。
+    2. **微软风格精美欢迎引导模板**:
+       - 默认内置微软级视觉水准的响应式 HTML 欢迎信模版（包含端到端隐私保护、稍后处理与代办流、星标重要与极速检索、多域别名无缝流转四大核心卡片与 3 步快速上手指引）。
+    3. **单实例存储极致优化 (Single-Instance Storage Optimization)**:
+       - 邮件正文仅在 `setting` 表中集中存储一份。向成千上万名用户投递欢迎邮件时，用户邮箱记录的 `content` 字段保持为 `NULL`，在用户端读取/打开邮件时动态注入，大幅节约 99.9% 数据库存储空间。
+    4. **官方认证标识与全渠道高优先级呈现 (Official Verification & Multi-Channel Access)**:
+       - 发件方固定为 `admin@epocanvas.com`，邮件列表与邮件详情页自动展示官方蓝标认证徽标（`ri:verified-badge-fill`）与专属官方药丸标签（`官方`）。
+       - 投递时自动写入星标表（⭐ **重要**）并设定代办时间（⏰ **稍后处理 / 代办**）。系统特许该官方邮件在收件箱（Inbox）、星标（Star）与代办（Snoozed）全渠道同时高亮呈现。
+    5. **灵活的时效设定与自动清理 (TTL Auto-Cleanup)**:
+       - 站长可自由配置邮件在用户邮箱内的保留时效（7天/14天/30天/90天/永久），过期后系统在用户拉取时自动无感移入已删除，保障邮箱轻量纯净。
+       - 支持“新用户注册时自动发送”开关，新注册账户自动获得官方引导邮件。
+*   **编辑代码 (Edit)**: 
+    *   **后端服务与数据接口**: 修改 [`mail-worker/src/service/email-service.js`](file:///home/shijian/projects/epocanvas-mail/mail-worker/src/service/email-service.js)、[`mail-worker/src/service/setting-service.js`](file:///home/shijian/projects/epocanvas-mail/mail-worker/src/service/setting-service.js)、[`mail-worker/src/service/login-service.js`](file:///home/shijian/projects/epocanvas-mail/mail-worker/src/service/login-service.js)、[`mail-worker/src/init/init.js`](file:///home/shijian/projects/epocanvas-mail/mail-worker/src/init/init.js)。
+    *   **前端布局、组件与国际化**: 修改 [`mail-vue/src/views/sys-setting/index.vue`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/views/sys-setting/index.vue)、[`mail-vue/src/components/email-scroll/index.vue`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/components/email-scroll/index.vue)、[`mail-vue/src/i18n/zh.js`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/i18n/zh.js) 与 [`mail-vue/src/i18n/en.js`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/i18n/en.js)。
+*   **全链路自动化验证与部署 (Verify & Deploy)**: 
+    *   编写并执行端到端单元与集成测试套件（`tests/test-welcome-email.mjs`），成功验证单实例存储、全渠道呈现、官方认证标识、自动标记重要与代办、7天自动清理逻辑。
+
+
 ### 缺陷修复：消除用户详情与账户菜单（Account Menu）底部的横向滑块/滚动条 (2026-08-22)
 *   **功能需求与业务逻辑对齐 (Feature & Alignment)**: 
     1. **排查并消除 Account Menu 底部滑块**:

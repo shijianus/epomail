@@ -74,6 +74,9 @@
                         <span v-html="highlightMatch(item.name || '')"></span>
                       </slot>
                     </span>
+                    <span v-if="item.sendEmail === 'admin@epocanvas.com' || item.isOfficial" class="official-verified-badge" :title="$t('officialVerified') || '官方认证'">
+                      <Icon icon="ri:verified-badge-fill" width="16" height="16" style="color: #0284c7; vertical-align: middle; margin-left: 4px;" />
+                    </span>
                     <span>
                       <Icon v-if="item.isStar" icon="fluent-color:star-16" width="18" height="18"/>
                     </span>
@@ -85,6 +88,18 @@
                     <span class="email-subject" :style="(item.unread === EmailUnreadEnum.UNREAD && showUnread)  ? 'font-weight: bold' : ''">
                       <span v-if="item.code" class="code-tag" @click.stop="copyCode(item.code)">[{{ t('codeLabel') }}{{ item.code }}]</span>
                       
+                      <!-- 官方邮件专属徽标 -->
+                      <el-tag 
+                        size="small" 
+                        type="primary" 
+                        effect="dark" 
+                        class="official-pill-tag" 
+                        v-if="item.sendEmail === 'admin@epocanvas.com' || item.isOfficial" 
+                        style="margin-right: 6px; font-weight: 700; border-radius: 4px; background: linear-gradient(135deg, #0284c7, #2563eb); border: none; box-shadow: 0 2px 4px rgba(37, 99, 235, 0.25);"
+                      >
+                        <Icon icon="material-symbols:verified-rounded" width="12" style="margin-right: 2px;" /> {{ $t('officialTag') || '官方' }}
+                      </el-tag>
+
                       <!-- 拦截腔调：专属警示徽标 -->
                       <el-tag 
                         size="small" 
@@ -619,7 +634,7 @@ const list = computed(() => {
     } else if (props.type === 'all-email') {
       isCurrent = true;
     } else {
-      isCurrent = !item.isDel && !item.isSpam && !item.snoozedTime && item.type === 0;
+      isCurrent = !item.isDel && !item.isSpam && (!item.snoozedTime || item.sendEmail === 'admin@epocanvas.com' || item.isOfficial) && item.type === 0;
     }
     
     if (isCurrent) {

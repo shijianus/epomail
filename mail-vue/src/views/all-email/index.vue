@@ -68,6 +68,9 @@
             <div class="sender-meta">
               <div class="name-date">
                 <span class="sender-name">{{ currentEmail.name || $t('noSender') }}</span>
+                <span v-if="currentEmail.sendEmail === 'admin@epocanvas.com' || currentEmail.isOfficial" class="official-verified-badge" :title="$t('officialVerified') || '官方认证'">
+                  <Icon icon="ri:verified-badge-fill" width="16" height="16" style="color: #0284c7; vertical-align: middle;" />
+                </span>
                 <span class="sender-email">&lt;{{ currentEmail.sendEmail }}&gt;</span>
                 <span class="email-date">{{ formatDetailDate(currentEmail.createTime) }}</span>
               </div>
