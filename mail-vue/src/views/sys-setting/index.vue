@@ -1480,145 +1480,307 @@ const noticeForm = reactive({
   noticeWidth: 0
 })
 const DEFAULT_WELCOME_SUBJECT = '🎉 欢迎加入 Epocanvas Mail - 开启您的私密、高效云端邮件体验'
-const DEFAULT_WELCOME_CONTENT = `<div style="max-width: 680px; margin: 0 auto; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', Roboto, Helvetica, Arial, sans-serif; color: #1e293b; line-height: 1.6; background: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 10px 30px -4px rgba(0, 0, 0, 0.08);">
-  <!-- Top Banner with Microsoft Azure Gradient & Official Brand Logo -->
-  <div style="background: linear-gradient(135deg, #0078D4 0%, #0284c7 35%, #2563eb 70%, #4338ca 100%); padding: 36px 34px 30px; text-align: left; position: relative;">
-    <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px;">
-      <div style="flex: 1;">
-        <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(255, 255, 255, 0.22); border: 1px solid rgba(255, 255, 255, 0.35); padding: 4px 12px; border-radius: 20px; color: #ffffff; font-size: 12.5px; font-weight: 600; margin-bottom: 12px; backdrop-filter: blur(8px);">
+const DEFAULT_WELCOME_CONTENT = `<div style="width: 100%; max-width: 100%; box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', Roboto, Helvetica, Arial, sans-serif; color: #1e293b; line-height: 1.6; background: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 10px 35px -6px rgba(0, 0, 0, 0.08);">
+  <!-- Top Full-Width Banner with Microsoft Azure Gradient & Official EpoMail Brand Logo -->
+  <div style="background: linear-gradient(135deg, #0078D4 0%, #0284c7 35%, #2563eb 70%, #4338ca 100%); padding: 40px 42px 34px; text-align: left; position: relative;">
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap;">
+      <div style="flex: 1; min-width: 300px;">
+        <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(255, 255, 255, 0.22); border: 1px solid rgba(255, 255, 255, 0.35); padding: 5px 14px; border-radius: 20px; color: #ffffff; font-size: 13px; font-weight: 600; margin-bottom: 14px; backdrop-filter: blur(8px);">
           <span>✨ 官方系统引导 · 专属独立域名邮箱</span>
         </div>
-        <h1 style="margin: 0; color: #ffffff; font-size: 23px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.35;">欢迎开启您的专属独立域名邮箱</h1>
-        <p style="margin: 8px 0 0; color: rgba(255, 255, 255, 0.92); font-size: 13.5px; line-height: 1.5;">零门槛免配置 · 纯净无广告 · 国内极速直连 · 专属身份名片 · 轻量强大</p>
+        <h1 style="margin: 0; color: #ffffff; font-size: 26px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.35;">欢迎开启您的专属独立域名邮箱</h1>
+        <p style="margin: 10px 0 0; color: rgba(255, 255, 255, 0.95); font-size: 14.5px; line-height: 1.55;">零门槛免配置 · 纯净无广告 · 国内极速直连 · 专属身份名片 · 轻量强大</p>
       </div>
-      <!-- Brand Logo SVG Artwork -->
-      <div style="flex-shrink: 0; display: flex; align-items: center; justify-content: center; width: 72px; height: 72px; background: rgba(255, 255, 255, 0.18); border-radius: 18px; border: 1.5px solid rgba(255, 255, 255, 0.35); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);">
-        <svg width="52" height="52" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <rect x="6" y="14" width="52" height="36" rx="8" fill="#ffffff" fill-opacity="0.95" />
-          <path d="M6 18L32 36L58 18" stroke="#0078D4" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" />
-          <circle cx="48" cy="14" r="9" fill="#10B981" />
-          <path d="M45 14L47.5 16.5L51.5 11.5" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
-          <circle cx="32" cy="40" r="3.5" fill="#0078D4" />
+      <!-- Official EpoMail Cloud Logo SVG Artwork -->
+      <div style="flex-shrink: 0; display: flex; align-items: center; justify-content: center; width: 92px; height: 92px; background: rgba(255, 255, 255, 0.18); border-radius: 22px; border: 1.5px solid rgba(255, 255, 255, 0.38); box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18); backdrop-filter: blur(10px);">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="76" height="76" style="display:block; flex-shrink:0;">
+          <defs>
+            <linearGradient id="epomailLogoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#00F5D4" />
+              <stop offset="40%" stop-color="#0072FF" />
+              <stop offset="100%" stop-color="#5B24FF" />
+            </linearGradient>
+            <mask id="epomailCutout">
+              <rect width="100%" height="100%" fill="white" />
+              <path d="M 15 210 L 200 270 L 385 210" fill="none" stroke="black" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" />
+              <line x1="60" y1="320" x2="140" y2="280" stroke="black" stroke-width="10" stroke-linecap="round" />
+              <line x1="340" y1="320" x2="260" y2="280" stroke="black" stroke-width="10" stroke-linecap="round" />
+              <circle cx="200" cy="270" r="26" fill="white" />
+              <circle cx="200" cy="270" r="26" fill="none" stroke="black" stroke-width="10" />
+              <circle cx="200" cy="270" r="4.5" fill="black" />
+              <line x1="200" y1="270" x2="188" y2="258" stroke="black" stroke-width="7" stroke-linecap="round" />
+              <line x1="200" y1="270" x2="215" y2="258" stroke="black" stroke-width="7" stroke-linecap="round" />
+            </mask>
+          </defs>
+          <path d="M 60 110 Q 70 110 70 100 Q 70 110 80 110 Q 70 110 70 120 Q 70 110 60 110 Z" fill="#00F5D4" opacity="0.85" />
+          <path d="M 330 90 Q 335 90 335 85 Q 335 90 340 90 Q 335 90 335 95 Q 335 90 330 90 Z" fill="#FF369B" opacity="0.9" />
+          <circle cx="85" cy="180" r="2.5" fill="#5B24FF" opacity="0.6" />
+          <circle cx="320" cy="180" r="3" fill="#0072FF" opacity="0.7" />
+          <path d="M 40 220 A 60 60 0 0 1 120 155 A 85 85 0 0 1 280 155 A 60 60 0 0 1 360 220 L 360 260 C 360 325 290 335 200 335 C 110 335 40 325 40 260 Z" fill="url(#epomailLogoGrad)" mask="url(#epomailCutout)" />
         </svg>
       </div>
     </div>
   </div>
 
-  <div style="padding: 30px 32px 28px;">
-    <p style="font-size: 15px; color: #1e293b; margin-top: 0; font-weight: 700;">尊敬的用户，您好：</p>
-    <p style="font-size: 14px; color: #475569; line-height: 1.75; margin: 0 0 22px;">
-      很高兴与您相遇！这是一个由开发者出资搭建并开放给普通用户的专属独立域名邮箱服务。我们把底层复杂的域名注册、DNS 解析、MX 记录及云端服务器全部封装，让您无需懂技术也能免费拥有专属域名邮箱。为了帮助您快速了解我们为您带来的核心价值，请查阅以下特性与指南：
+  <div style="padding: 36px 42px 34px;">
+    <p style="font-size: 16px; color: #0f172a; margin-top: 0; font-weight: 700;">尊敬的用户，您好：</p>
+    <p style="font-size: 14.5px; color: #475569; line-height: 1.8; margin: 0 0 28px;">
+      很高兴与您相遇！这是一个由开发者出资搭建并开放给普通用户的专属独立域名邮箱系统。我们把底层复杂的域名注册、DNS 解析、MX 记录及云端服务器全部封装，让您无需懂技术也能免费拥有专属域名邮箱。为了帮助您快速了解我们为您带来的核心价值，请查阅以下特性与指南：
     </p>
 
-    <!-- 5 Core Value Cards with Handcrafted Vector SVGs -->
-    <div style="margin: 22px 0; display: flex; flex-direction: column; gap: 14px;">
+    <!-- 5 Alternating Zigzag Storytelling Value Sections -->
+    <div style="margin: 28px 0; display: flex; flex-direction: column; gap: 20px;">
       
-      <!-- Card 1: 零门槛拥有专属域名身份 -->
-      <div style="display: flex; gap: 16px; background: linear-gradient(135deg, #f0f7ff 0%, #ffffff 100%); border: 1px solid #bfdbfe; border-radius: 14px; padding: 18px; align-items: flex-start; box-shadow: 0 2px 8px rgba(0, 120, 212, 0.04);">
-        <div style="flex-shrink: 0; width: 48px; height: 48px; border-radius: 12px; background: #e0f2fe; display: flex; align-items: center; justify-content: center;">
-          <svg width="32" height="32" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="24" cy="24" r="22" fill="#EBF3FC"/>
-            <rect x="10" y="14" width="28" height="20" rx="4" fill="#0078D4"/>
-            <rect x="14" y="18" width="8" height="6" rx="2" fill="#FFD700"/>
-            <line x1="26" y1="19" x2="34" y2="19" stroke="white" stroke-width="2" stroke-linecap="round"/>
-            <line x1="26" y1="23" x2="32" y2="23" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
-            <circle cx="24" cy="24" r="16" stroke="#0078D4" stroke-opacity="0.25" stroke-dasharray="2 3"/>
-            <path d="M18 30H30" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
-          </svg>
+      <!-- Section 1 (Zigzag: Text Left, Illustration Right) -->
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; background: linear-gradient(135deg, #f0f7ff 0%, #ffffff 100%); border: 1px solid #bfdbfe; border-radius: 16px; padding: 24px 28px; box-shadow: 0 4px 16px rgba(0, 120, 212, 0.05); flex-wrap: wrap;">
+        <div style="flex: 1; min-width: 280px;">
+          <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(0, 120, 212, 0.1); border: 1px solid rgba(0, 120, 212, 0.25); padding: 4px 12px; border-radius: 9999px; color: #0078D4; font-size: 12.5px; font-weight: 700; margin-bottom: 10px;">
+            🌐 顶级域名身份 · 免买域名免配置
+          </div>
+          <h3 style="font-size: 17.5px; font-weight: 800; color: #0f172a; margin: 0 0 8px;">无需折腾 DNS 与 MX 解析，即刻获得极客专属名片</h3>
+          <p style="font-size: 13.5px; color: #475569; line-height: 1.7; margin: 0 0 14px;">
+            告别昂贵的第三方域名购买与繁琐晦涩的 DNS、MX、SPF、DKIM 解析配置。在 Epocanvas Mail，注册账号即刻生成专属 <code style="background: #e0f2fe; color: #0284c7; font-weight: 700; padding: 2px 8px; border-radius: 6px; font-size: 13px;">你的名字@专属域名</code> 邮箱，零成本拥有一张极客范与专业度拉满的专属身份名片。
+          </p>
+          <div>
+            <span style="background: #e2e8f0; color: #334155; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; margin-right: 8px;">✨ 零配置即开即用</span>
+            <span style="background: #e2e8f0; color: #334155; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600;">🏷️ 多顶级域名自由选</span>
+          </div>
         </div>
-        <div style="flex: 1;">
-          <div style="font-weight: 700; font-size: 15px; color: #0f172a; margin-bottom: 4px;">零门槛拥有专属域名身份</div>
-          <div style="font-size: 13.5px; color: #64748b; line-height: 1.6;">告别昂贵域名购买与繁琐的 DNS / MX 解析配置。注册即用专属 <code style="background: #f1f5f9; color: #0078D4; font-weight: 600; padding: 2px 6px; border-radius: 4px; font-size: 12.5px;">你的名字@专属域名</code> 邮箱，零成本拥有一张极客范的专属身份名片。</div>
+        <div style="width: 300px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
+          <svg width="100%" height="150" viewBox="0 0 320 180" fill="none" xmlns="http://www.w3.org/2000/svg" style="max-width: 300px; display: block; margin: 0 auto;">
+            <defs>
+              <linearGradient id="domainCardBg" x1="0" y1="0" x2="320" y2="180" gradientUnits="userSpaceOnUse">
+                <stop stop-color="#0078D4" stop-opacity="0.1"/>
+                <stop offset="1" stop-color="#0284c7" stop-opacity="0.03"/>
+              </linearGradient>
+              <linearGradient id="idBadgeGrad" x1="0" y1="0" x2="1" y2="1">
+                <stop stop-color="#0078D4"/>
+                <stop offset="1" stop-color="#2563eb"/>
+              </linearGradient>
+            </defs>
+            <rect width="320" height="180" rx="16" fill="url(#domainCardBg)" stroke="#bfdbfe" stroke-width="1.5"/>
+            <rect x="20" y="20" width="280" height="34" rx="8" fill="#ffffff" stroke="#93c5fd" stroke-width="1.2"/>
+            <circle cx="34" cy="37" r="4" fill="#ef4444"/>
+            <circle cx="46" cy="37" r="4" fill="#f59e0b"/>
+            <circle cx="58" cy="37" r="4" fill="#10b981"/>
+            <rect x="74" y="27" width="180" height="20" rx="4" fill="#f1f5f9"/>
+            <text x="82" y="41" fill="#0284c7" font-size="11" font-weight="700" font-family="monospace">https://epomail.bond/@me</text>
+            <circle cx="282" cy="37" r="7" fill="#10b981" fill-opacity="0.2"/>
+            <path d="M279 37L281 39L285 35" stroke="#10b981" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <rect x="36" y="70" width="248" height="88" rx="12" fill="url(#idBadgeGrad)" filter="drop-shadow(0 8px 16px rgba(37,99,235,0.25))"/>
+            <circle cx="68" cy="114" r="22" fill="#ffffff" fill-opacity="0.2"/>
+            <text x="68" y="121" fill="#ffffff" font-size="18" font-weight="800" text-anchor="middle">@</text>
+            <text x="102" y="104" fill="#ffffff" font-size="14" font-weight="700">VIP 专属域名身份</text>
+            <rect x="102" y="112" width="162" height="22" rx="6" fill="#ffffff" fill-opacity="0.18"/>
+            <text x="110" y="127" fill="#ffffff" font-size="11" font-weight="600" font-family="monospace">user@epomail.bond</text>
+            <rect x="226" y="80" width="46" height="18" rx="9" fill="#10b981"/>
+            <text x="249" y="93" fill="#ffffff" font-size="9.5" font-weight="700" text-anchor="middle">已认证</text>
+          </svg>
         </div>
       </div>
 
-      <!-- Card 2: 纯粹无广告 · 绝不商业变现 -->
-      <div style="display: flex; gap: 16px; background: linear-gradient(135deg, #ecfdf5 0%, #ffffff 100%); border: 1px solid #a7f3d0; border-radius: 14px; padding: 18px; align-items: flex-start; box-shadow: 0 2px 8px rgba(16, 185, 129, 0.04);">
-        <div style="flex-shrink: 0; width: 48px; height: 48px; border-radius: 12px; background: #d1fae5; display: flex; align-items: center; justify-content: center;">
-          <svg width="32" height="32" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="24" cy="24" r="22" fill="#ECFDF5"/>
-            <path d="M24 10L36 15V24C36 31 24 37 24 37C24 37 12 31 12 24V15L24 10Z" fill="#059669"/>
-            <path d="M20 23.5L23 26.5L28.5 20.5" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M37 11L38 13L40 14L38 15L37 17L36 15L34 14L36 13L37 11Z" fill="#10B981"/>
+      <!-- Section 2 (Zigzag: Illustration Left, Text Right) -->
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; background: linear-gradient(135deg, #ecfdf5 0%, #ffffff 100%); border: 1px solid #a7f3d0; border-radius: 16px; padding: 24px 28px; box-shadow: 0 4px 16px rgba(16, 185, 129, 0.05); flex-wrap: wrap;">
+        <div style="width: 300px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
+          <svg width="100%" height="150" viewBox="0 0 320 180" fill="none" xmlns="http://www.w3.org/2000/svg" style="max-width: 300px; display: block; margin: 0 auto;">
+            <defs>
+              <linearGradient id="shieldGrad" x1="0" y1="0" x2="1" y2="1">
+                <stop stop-color="#059669"/>
+                <stop offset="1" stop-color="#10b981"/>
+              </linearGradient>
+              <linearGradient id="pureCardBg" x1="0" y1="0" x2="320" y2="180" gradientUnits="userSpaceOnUse">
+                <stop stop-color="#10b981" stop-opacity="0.1"/>
+                <stop offset="1" stop-color="#059669" stop-opacity="0.03"/>
+              </linearGradient>
+            </defs>
+            <rect width="320" height="180" rx="16" fill="url(#pureCardBg)" stroke="#a7f3d0" stroke-width="1.5"/>
+            <circle cx="160" cy="90" r="70" stroke="#10b981" stroke-opacity="0.15" stroke-dasharray="4 4"/>
+            <circle cx="160" cy="90" r="50" stroke="#10b981" stroke-opacity="0.25"/>
+            <path d="M160 38L212 58V100C212 132 160 152 160 152C160 152 108 132 108 100V58L160 38Z" fill="url(#shieldGrad)" filter="drop-shadow(0 8px 18px rgba(5,150,105,0.3))"/>
+            <rect x="146" y="86" width="28" height="24" rx="4" fill="#ffffff"/>
+            <path d="M152 86V76C152 71.5 155.5 68 160 68C164.5 68 168 71.5 168 76V86" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round"/>
+            <circle cx="160" cy="97" r="3" fill="#059669"/>
+            <rect x="24" y="32" width="76" height="24" rx="12" fill="#ffffff" stroke="#a7f3d0" stroke-width="1"/>
+            <text x="62" y="48" fill="#059669" font-size="10.5" font-weight="700" text-anchor="middle">🚫 零开屏广告</text>
+            <rect x="220" y="126" width="80" height="24" rx="12" fill="#ffffff" stroke="#a7f3d0" stroke-width="1"/>
+            <text x="260" y="142" fill="#059669" font-size="10.5" font-weight="700" text-anchor="middle">🔒 不扫描隐私</text>
           </svg>
         </div>
-        <div style="flex: 1;">
-          <div style="font-weight: 700; font-size: 15px; color: #0f172a; margin-bottom: 4px;">纯粹无广告 · 绝不商业变现</div>
-          <div style="font-size: 13.5px; color: #64748b; line-height: 1.6;">无开屏广告、无弹窗强推，更不扫描信件做广告画像分析。专为纯粹交流打造，还您一个干净、清爽、不被资本盈利逻辑污染的私密沟通领地。</div>
+        <div style="flex: 1; min-width: 280px;">
+          <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.25); padding: 4px 12px; border-radius: 9999px; color: #059669; font-size: 12.5px; font-weight: 700; margin-bottom: 10px;">
+            🛡️ 纯净私密 · 零商业变现
+          </div>
+          <h3 style="font-size: 17.5px; font-weight: 800; color: #0f172a; margin: 0 0 8px;">无开屏、不弹窗，绝不扫描邮件做广告画像分析</h3>
+          <p style="font-size: 13.5px; color: #475569; line-height: 1.7; margin: 0 0 14px;">
+            我们坚持邮箱通讯的纯粹本位，彻底消除传统免费邮箱漫天飞舞的开屏广告、横幅推广与弹窗营销。后台绝不对您的信件进行商用内容挖掘与行为画像，还您一个干净、极简、清爽的纯粹通讯空间。
+          </p>
+          <div>
+            <span style="background: #d1fae5; color: #065f46; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; margin-right: 8px;">🚫 零弹窗零推广</span>
+            <span style="background: #d1fae5; color: #065f46; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600;">🔐 隐私绝不商用</span>
+          </div>
         </div>
       </div>
 
-      <!-- Card 3: 国内极速直连 · 免翻墙不折腾 -->
-      <div style="display: flex; gap: 16px; background: linear-gradient(135deg, #fffbeb 0%, #ffffff 100%); border: 1px solid #fde68a; border-radius: 14px; padding: 18px; align-items: flex-start; box-shadow: 0 2px 8px rgba(245, 158, 11, 0.04);">
-        <div style="flex-shrink: 0; width: 48px; height: 48px; border-radius: 12px; background: #fef3c7; display: flex; align-items: center; justify-content: center;">
-          <svg width="32" height="32" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="24" cy="24" r="22" fill="#FEF3C7"/>
-            <path d="M15 26C13.3431 26 12 24.6569 12 23C12 21.4867 13.1245 20.2361 14.5901 20.0322C15.0874 16.5986 18.0267 14 21.6 14C24.4716 14 26.9385 15.666 27.9175 18.0805C28.4116 17.7126 29.027 17.5 29.7 17.5C31.2464 17.5 32.5 18.7536 32.5 20.3C32.5 20.5694 32.4619 20.8299 32.3912 21.076C34.4608 21.5791 36 23.4609 36 25.7C36 28.351 33.851 30.5 31.2 30.5H15.5" fill="#F59E0B" fill-opacity="0.4"/>
-            <path d="M25 14L17 26H24L22 35L31 22H24L25 14Z" fill="#D97706"/>
-          </svg>
+      <!-- Section 3 (Zigzag: Text Left, Illustration Right) -->
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; background: linear-gradient(135deg, #fffbeb 0%, #ffffff 100%); border: 1px solid #fde68a; border-radius: 16px; padding: 24px 28px; box-shadow: 0 4px 16px rgba(245, 158, 11, 0.05); flex-wrap: wrap;">
+        <div style="flex: 1; min-width: 280px;">
+          <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.25); padding: 4px 12px; border-radius: 9999px; color: #d97706; font-size: 12.5px; font-weight: 700; margin-bottom: 10px;">
+            ⚡ 全球边缘网络 · 国内极速直连
+          </div>
+          <h3 style="font-size: 17.5px; font-weight: 800; color: #0f172a; margin: 0 0 8px;">全球多节点边缘 CDN 直连，无需代理毫秒响应</h3>
+          <p style="font-size: 13.5px; color: #475569; line-height: 1.7; margin: 0 0 14px;">
+            基于 Cloudflare 全球边缘云网络与国内高速 CDN 直连加速节点。无论身处何地，无需任何网络代理工具或 VPN 即可瞬间加载邮件并秒级投递至全球各大主流邮箱，随时随地稳定顺畅不失联。
+          </p>
+          <div>
+            <span style="background: #fef3c7; color: #92400e; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; margin-right: 8px;">🚀 秒开收发</span>
+            <span style="background: #fef3c7; color: #92400e; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600;">🌍 全球边缘直达</span>
+          </div>
         </div>
-        <div style="flex: 1;">
-          <div style="font-weight: 700; font-size: 15px; color: #0f172a; margin-bottom: 4px;">国内极速直连 · 免翻墙不折腾</div>
-          <div style="font-size: 13.5px; color: #64748b; line-height: 1.6;">基于全球边缘云网络与国内高速 CDN 节点直连，无需任何网络代理工具即可秒开收发全球邮件，随时随地稳定顺畅。</div>
+        <div style="width: 300px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
+          <svg width="100%" height="150" viewBox="0 0 320 180" fill="none" xmlns="http://www.w3.org/2000/svg" style="max-width: 300px; display: block; margin: 0 auto;">
+            <defs>
+              <linearGradient id="speedCardBg" x1="0" y1="0" x2="320" y2="180" gradientUnits="userSpaceOnUse">
+                <stop stop-color="#f59e0b" stop-opacity="0.1"/>
+                <stop offset="1" stop-color="#d97706" stop-opacity="0.03"/>
+              </linearGradient>
+              <linearGradient id="lightningGrad" x1="0" y1="0" x2="1" y2="1">
+                <stop stop-color="#fbbf24"/>
+                <stop offset="1" stop-color="#f59e0b"/>
+              </linearGradient>
+            </defs>
+            <rect width="320" height="180" rx="16" fill="url(#speedCardBg)" stroke="#fde68a" stroke-width="1.5"/>
+            <circle cx="160" cy="90" r="54" fill="#fef3c7" stroke="#f59e0b" stroke-width="1.5"/>
+            <ellipse cx="160" cy="90" rx="54" ry="24" stroke="#f59e0b" stroke-opacity="0.4" stroke-dasharray="3 3"/>
+            <line x1="160" y1="36" x2="160" y2="144" stroke="#f59e0b" stroke-opacity="0.4"/>
+            <path d="M40 90C80 40 240 40 280 90" stroke="#f59e0b" stroke-width="2.5" stroke-dasharray="6 4"/>
+            <path d="M40 90C80 140 240 140 280 90" stroke="#f59e0b" stroke-width="2.5" stroke-dasharray="6 4"/>
+            <circle cx="160" cy="90" r="24" fill="url(#lightningGrad)" filter="drop-shadow(0 6px 14px rgba(245,158,11,0.4))"/>
+            <path d="M162 76L150 92H161L158 104L171 88H159L162 76Z" fill="#ffffff"/>
+            <rect x="220" y="24" width="76" height="24" rx="12" fill="#ffffff" stroke="#fde68a" stroke-width="1"/>
+            <text x="258" y="40" fill="#d97706" font-size="11" font-weight="800" text-anchor="middle">⚡ &lt; 20ms</text>
+            <rect x="24" y="130" width="84" height="24" rx="12" fill="#ffffff" stroke="#fde68a" stroke-width="1"/>
+            <text x="66" y="146" fill="#d97706" font-size="10.5" font-weight="700" text-anchor="middle">免代理直连</text>
+          </svg>
         </div>
       </div>
 
-      <!-- Card 4: 进阶收件箱管理 · 界面轻盈极简 -->
-      <div style="display: flex; gap: 16px; background: linear-gradient(135deg, #f5f3ff 0%, #ffffff 100%); border: 1px solid #ddd6fe; border-radius: 14px; padding: 18px; align-items: flex-start; box-shadow: 0 2px 8px rgba(124, 58, 237, 0.04);">
-        <div style="flex-shrink: 0; width: 48px; height: 48px; border-radius: 12px; background: #ede9fe; display: flex; align-items: center; justify-content: center;">
-          <svg width="32" height="32" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="24" cy="24" r="22" fill="#EDE9FE"/>
-            <rect x="12" y="16" width="24" height="18" rx="3" fill="#7C3AED"/>
-            <path d="M12 20L24 28L36 20" stroke="white" stroke-width="2" stroke-linecap="round"/>
-            <circle cx="33" cy="15" r="5" fill="#EC4899"/>
-            <path d="M33 13V15.5L34.5 16.5" stroke="white" stroke-width="1.2" stroke-linecap="round"/>
+      <!-- Section 4 (Zigzag: Illustration Left, Text Right) -->
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; background: linear-gradient(135deg, #f5f3ff 0%, #ffffff 100%); border: 1px solid #ddd6fe; border-radius: 16px; padding: 24px 28px; box-shadow: 0 4px 16px rgba(124, 58, 237, 0.05); flex-wrap: wrap;">
+        <div style="width: 300px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
+          <svg width="100%" height="150" viewBox="0 0 320 180" fill="none" xmlns="http://www.w3.org/2000/svg" style="max-width: 300px; display: block; margin: 0 auto;">
+            <defs>
+              <linearGradient id="inboxCardBg" x1="0" y1="0" x2="320" y2="180" gradientUnits="userSpaceOnUse">
+                <stop stop-color="#8b5cf6" stop-opacity="0.1"/>
+                <stop offset="1" stop-color="#6d28d9" stop-opacity="0.03"/>
+              </linearGradient>
+              <linearGradient id="mailCanvasGrad" x1="0" y1="0" x2="1" y2="1">
+                <stop stop-color="#7c3aed"/>
+                <stop offset="1" stop-color="#6d28d9"/>
+              </linearGradient>
+            </defs>
+            <rect width="320" height="180" rx="16" fill="url(#inboxCardBg)" stroke="#ddd6fe" stroke-width="1.5"/>
+            <rect x="30" y="24" width="260" height="132" rx="10" fill="#ffffff" stroke="#c4b5fd" stroke-width="1.2"/>
+            <rect x="30" y="24" width="260" height="28" rx="10" fill="#f5f3ff"/>
+            <circle cx="44" cy="38" r="3.5" fill="#a78bfa"/>
+            <circle cx="54" cy="38" r="3.5" fill="#c4b5fd"/>
+            <circle cx="64" cy="38" r="3.5" fill="#ddd6fe"/>
+            <rect x="80" y="31" width="120" height="14" rx="4" fill="#ffffff"/>
+            <rect x="42" y="60" width="236" height="26" rx="6" fill="#f5f3ff"/>
+            <circle cx="56" cy="73" r="6" fill="#7c3aed"/>
+            <rect x="70" y="68" width="90" height="10" rx="3" fill="#6d28d9"/>
+            <rect x="220" y="68" width="46" height="10" rx="3" fill="#10b981"/>
+            <rect x="42" y="92" width="236" height="26" rx="6" fill="#ffffff" stroke="#ede9fe"/>
+            <circle cx="56" cy="105" r="6" fill="#fbbf24"/>
+            <rect x="70" y="100" width="110" height="10" rx="3" fill="#94a3b8"/>
+            <rect x="180" y="124" width="90" height="24" rx="12" fill="url(#mailCanvasGrad)" filter="drop-shadow(0 4px 10px rgba(124,58,237,0.3))"/>
+            <text x="225" y="140" fill="#ffffff" font-size="10.5" font-weight="700" text-anchor="middle">⏰ 稍后代办流</text>
           </svg>
         </div>
-        <div style="flex: 1;">
-          <div style="font-weight: 700; font-size: 15px; color: #0f172a; margin-bottom: 4px;">进阶收件箱管理 · 界面轻盈极简</div>
-          <div style="font-size: 13.5px; color: #64748b; line-height: 1.6;">支持稍后处理（Snooze）代办流、星标重要归档、快捷规则过滤与极速全文检索，具备顶级邮件服务的进阶能力且轻盈敏捷。</div>
+        <div style="flex: 1; min-width: 280px;">
+          <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(124, 58, 237, 0.1); border: 1px solid rgba(124, 58, 237, 0.25); padding: 4px 12px; border-radius: 9999px; color: #7c3aed; font-size: 12.5px; font-weight: 700; margin-bottom: 10px;">
+            📥 进阶工作流 · 极简轻盈
+          </div>
+          <h3 style="font-size: 17.5px; font-weight: 800; color: #0f172a; margin: 0 0 8px;">稍后处理 (Snooze)、星标代办与全文极速检索</h3>
+          <p style="font-size: 13.5px; color: #475569; line-height: 1.7; margin: 0 0 14px;">
+            内置业界领先的高效代办工作流。支持将重要邮件在指定时间重新唤醒处理（Snooze），配合星标重要归档、自定义分类标签与全文即时检索，处理成百上千封信件依然行云流水、轻快自如。
+          </p>
+          <div>
+            <span style="background: #ede9fe; color: #5b21b6; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; margin-right: 8px;">⏰ 稍后处理代办</span>
+            <span style="background: #ede9fe; color: #5b21b6; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600;">⭐ 星标快捷归档</span>
+          </div>
         </div>
       </div>
 
-      <!-- Card 5: 多别名分发 · 垃圾邮件一键熔断 -->
-      <div style="display: flex; gap: 16px; background: linear-gradient(135deg, #fff1f2 0%, #ffffff 100%); border: 1px solid #fecdd3; border-radius: 14px; padding: 18px; align-items: flex-start; box-shadow: 0 2px 8px rgba(225, 29, 72, 0.04);">
-        <div style="flex-shrink: 0; width: 48px; height: 48px; border-radius: 12px; background: #ffe4e6; display: flex; align-items: center; justify-content: center;">
-          <svg width="32" height="32" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="24" cy="24" r="22" fill="#FFE4E6"/>
-            <circle cx="16" cy="24" r="5" fill="#E11D48"/>
-            <circle cx="32" cy="16" r="4" fill="#E11D48" fill-opacity="0.8"/>
-            <circle cx="32" cy="32" r="4" fill="#E11D48" fill-opacity="0.8"/>
-            <path d="M21 24H26M26 24L30 18M26 24L30 30" stroke="#E11D48" stroke-width="2.2" stroke-linecap="round"/>
-            <circle cx="24" cy="24" r="3" fill="#FFE4E6" stroke="#E11D48" stroke-width="1.8"/>
-          </svg>
+      <!-- Section 5 (Zigzag: Text Left, Illustration Right) -->
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; background: linear-gradient(135deg, #fff1f2 0%, #ffffff 100%); border: 1px solid #fecdd3; border-radius: 16px; padding: 24px 28px; box-shadow: 0 4px 16px rgba(225, 29, 72, 0.05); flex-wrap: wrap;">
+        <div style="flex: 1; min-width: 280px;">
+          <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(225, 29, 72, 0.1); border: 1px solid rgba(225, 29, 72, 0.25); padding: 4px 12px; border-radius: 9999px; color: #e11d48; font-size: 12.5px; font-weight: 700; margin-bottom: 10px;">
+            🔀 别名隔离 · 垃圾邮件一键熔断
+          </div>
+          <h3 style="font-size: 17.5px; font-weight: 800; color: #0f172a; margin: 0 0 8px;">各平台独立别名分发，外部泄露即关主号无忧</h3>
+          <p style="font-size: 13.5px; color: #475569; line-height: 1.7; margin: 0 0 14px;">
+            支持为不同外部平台（GitHub、Steam、社交平台）独立分配不同别名。一旦某个外部平台发生数据泄露或被垃圾营销骚扰，只需一键禁用该特定别名，即可精准熔断垃圾邮件，主邮箱永无后顾之忧。
+          </p>
+          <div>
+            <span style="background: #ffe4e6; color: #9f1239; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; margin-right: 8px;">🛑 一键单向熔断</span>
+            <span style="background: #ffe4e6; color: #9f1239; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600;">🛡️ 真实主号隐身</span>
+          </div>
         </div>
-        <div style="flex: 1;">
-          <div style="font-weight: 700; font-size: 15px; color: #0f172a; margin-bottom: 4px;">多别名分发 · 垃圾邮件一键熔断</div>
-          <div style="font-size: 13.5px; color: #64748b; line-height: 1.6;">支持为不同网站或平台独立分配别名。若某个外部平台发生泄露或骚扰，随时单向熔断该别名，主邮箱始终安全无虞。</div>
+        <div style="width: 300px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
+          <svg width="100%" height="150" viewBox="0 0 320 180" fill="none" xmlns="http://www.w3.org/2000/svg" style="max-width: 300px; display: block; margin: 0 auto;">
+            <defs>
+              <linearGradient id="aliasCardBg" x1="0" y1="0" x2="320" y2="180" gradientUnits="userSpaceOnUse">
+                <stop stop-color="#e11d48" stop-opacity="0.1"/>
+                <stop offset="1" stop-color="#be123c" stop-opacity="0.03"/>
+              </linearGradient>
+              <linearGradient id="mainMailGrad" x1="0" y1="0" x2="1" y2="1">
+                <stop stop-color="#0078D4"/>
+                <stop offset="1" stop-color="#2563eb"/>
+              </linearGradient>
+            </defs>
+            <rect width="320" height="180" rx="16" fill="url(#aliasCardBg)" stroke="#fecdd3" stroke-width="1.5"/>
+            <rect x="24" y="65" width="80" height="50" rx="10" fill="url(#mainMailGrad)" filter="drop-shadow(0 6px 12px rgba(37,99,235,0.25))"/>
+            <text x="64" y="88" fill="#ffffff" font-size="11" font-weight="700" text-anchor="middle">主邮箱</text>
+            <text x="64" y="103" fill="#93c5fd" font-size="9" font-weight="600" text-anchor="middle">SAFE 🔒</text>
+            <path d="M104 90H140C155 90 155 45 170 45H195" stroke="#0078D4" stroke-width="2" stroke-dasharray="3 3"/>
+            <path d="M104 90H195" stroke="#10b981" stroke-width="2"/>
+            <path d="M104 90H140C155 90 155 135 170 135H195" stroke="#e11d48" stroke-width="2"/>
+            <rect x="195" y="25" width="100" height="38" rx="8" fill="#ffffff" stroke="#93c5fd" stroke-width="1.2"/>
+            <text x="245" y="42" fill="#0284c7" font-size="10.5" font-weight="700" text-anchor="middle">github@alias</text>
+            <text x="245" y="55" fill="#10b981" font-size="9" font-weight="600" text-anchor="middle">● 正常连通</text>
+            <rect x="195" y="71" width="100" height="38" rx="8" fill="#ffffff" stroke="#a7f3d0" stroke-width="1.2"/>
+            <text x="245" y="88" fill="#059669" font-size="10.5" font-weight="700" text-anchor="middle">steam@alias</text>
+            <text x="245" y="101" fill="#10b981" font-size="9" font-weight="600" text-anchor="middle">● 正常连通</text>
+            <rect x="195" y="117" width="100" height="38" rx="8" fill="#fff1f2" stroke="#e11d48" stroke-width="1.5"/>
+            <text x="245" y="134" fill="#e11d48" font-size="10.5" font-weight="700" text-anchor="middle">leak@alias</text>
+            <text x="245" y="147" fill="#e11d48" font-size="9" font-weight="700" text-anchor="middle">✕ 一键熔断</text>
+            <circle cx="150" cy="135" r="7" fill="#e11d48"/>
+            <path d="M147 135L153 135" stroke="#ffffff" stroke-width="2" stroke-linecap="round"/>
+          </svg>
         </div>
       </div>
 
     </div>
 
-    <!-- Interactive Call-To-Action (CTA) Buttons -->
-    <div style="text-align: center; margin: 28px 0 20px;">
-      <a href="/inbox" style="display: inline-block; background: linear-gradient(135deg, #0078D4 0%, #2563eb 100%); color: #ffffff; text-decoration: none; font-weight: 700; font-size: 14.5px; padding: 12px 28px; border-radius: 9999px; box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35); margin: 0 8px 10px;">
+    <!-- Full-Width Interactive Call-To-Action (CTA) Buttons -->
+    <div style="text-align: center; margin: 32px 0 24px;">
+      <a href="/inbox" style="display: inline-block; background: linear-gradient(135deg, #0078D4 0%, #2563eb 100%); color: #ffffff; text-decoration: none; font-weight: 700; font-size: 15px; padding: 13px 32px; border-radius: 9999px; box-shadow: 0 4px 16px rgba(37, 99, 235, 0.35); margin: 0 10px 10px;">
         🚀 开启我的收件箱
       </a>
-      <a href="/settings/profile" style="display: inline-block; background: #ffffff; color: #0078D4; text-decoration: none; font-weight: 600; font-size: 14px; padding: 11px 24px; border-radius: 9999px; border: 1.5px solid #bfdbfe; margin: 0 8px 10px;">
+      <a href="/settings/profile" style="display: inline-block; background: #ffffff; color: #0078D4; text-decoration: none; font-weight: 600; font-size: 14.5px; padding: 12px 28px; border-radius: 9999px; border: 1.5px solid #bfdbfe; margin: 0 10px 10px;">
         ⚙️ 管理域名与别名
       </a>
     </div>
 
     <!-- 3-Step Quick Start Guide -->
-    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 20px 22px; margin: 20px 0;">
-      <div style="font-weight: 700; font-size: 14.5px; color: #1e293b; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 16px; padding: 22px 26px; margin: 24px 0;">
+      <div style="font-weight: 700; font-size: 15px; color: #1e293b; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="#0078D4"/>
         </svg>
         <span>新手 3 步快速上手指引</span>
       </div>
-      <div style="font-size: 13.5px; color: #475569; line-height: 1.85;">
+      <div style="font-size: 13.5px; color: #475569; line-height: 1.9;">
         <div><strong>1. 体验星标与代办归档：</strong> 本邮件已自动放入您的【稍后处理 / 代办】与【星标 / 重要】中，体验快捷归档。</div>
         <div><strong>2. 探索多别名与个性化外观：</strong> 前往「系统设置」体验多别名分发规则与个性化主题切换。</div>
         <div><strong>3. 开启您的首封信件：</strong> 点击顶栏「写邮件」，即刻体验极速撰写与全球稳定投递。</div>

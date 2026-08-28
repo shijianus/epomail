@@ -1,6 +1,32 @@
 # Agent Workflow SOP (Standard Operating Procedure)
 
-### 体验与架构全面升级：全员系统欢迎邮件大弹窗模式、全屏顶底栏保护视窗、Icon 严格居中、右对齐纯图标工具组与微软 Fluent 矢量插画 (2026-08-28)
+### 视觉演进与全宽重构：全员欢迎信全宽展开模式、官方 EpoMail 矢量 Logo、左右间隔交错图文场景与去死板边框 (2026-08-28)
+*   **功能需求与业务逻辑对齐 (Feature & Alignment)**: 
+    1. **信件全宽展开视界 (Full-Width Responsive Canvas)**:
+       - 彻底剔除邮件正文 `max-width: 680px` 局促宽度限制，重构为自适应全宽视界（`width: 100%; max-width: 100%; box-sizing: border-box;`），在各种大屏与收件箱阅读视窗中自适应展开，告别“半屏局促感”。
+    2. **真实官方 EpoMail 矢量 Logo 植入**:
+       - 彻底废除临时简易图标，完整内嵌官方 EpoMail 三峰云朵 + 弧形信封 + 蜡封时钟（10:10）+ 渐变魔法星芒的官方矢量 SVG 资产（`#00F5D4 -> #0072FF -> #5B24FF`），搭配毛玻璃质感徽章卡片，呈现官方权威感。
+    3. **左右间隔交错排版 (Zigzag Alternating Storytelling Layout)**:
+       - 彻底告别“圆框+小 icon”的死板方框罗列模式，重构为左右交错排版的开放式叙事模块（Zigzag Layout）：
+         - **第 1 节（顶级域名身份）**：左侧文字阐述与徽章芯片 + 右侧高精域名地址栏与 VIP 身份卡片微场景。
+         - **第 2 节（纯粹无广告 · 零商业变现）**：左侧绿色隐私安全雷达脉冲护盾微场景 + 右侧文字阐述与隐私零商用标签。
+         - **第 3 节（全球边缘网络 · 国内极速直连）**：左侧文字阐述与秒开芯片 + 右侧全球 CDN 节点与光纤光束高速微场景。
+         - **第 4 节（进阶工作流 · 极简轻盈）**：左侧现代收件箱工作台视窗与稍后处理时钟微场景 + 右侧文字阐述与代办流标签。
+         - **第 5 节（多别名分发 · 垃圾邮件一键熔断）**：左侧文字阐述与隔离熔断标签 + 右侧多分支别名拓扑树与防熔断断路开关微场景。
+    4. **全宽 CTA 按钮与 3 步新手快速上手指南**:
+       - 全宽大圆角行动呼吁按钮（`🚀 开启我的收件箱` 与 `⚙️ 管理域名与别名`）以及 3 步新手快速上手指南，层次丰富通透。
+*   **编辑代码 (Edit)**: 
+    *   **前端页面与模板**: 修改 [`mail-vue/src/views/sys-setting/index.vue`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/views/sys-setting/index.vue)。
+    *   **自动化测试套件**: 更新 [`tests/test-welcome-fullscreen-cf.mjs`](file:///home/shijian/projects/epocanvas-mail/tests/test-welcome-fullscreen-cf.mjs)。
+*   **全链路自动化验证与部署 (Verify & Deploy)**: 
+    *   执行 Playwright 端到端全链路自动化测试（`tests/test-welcome-fullscreen-cf.mjs`），在 Cloudflare 生产环境 100% 通过：
+        1. 默认大弹窗模式（1140px x 837px）校验通过。
+        2. 全屏模式保护视窗（保留全局顶栏与底栏）校验通过。
+        3. 纯 Icon 按钮组与像素级居中校验通过。
+        4. 官方 EpoMail 矢量 Logo 与全宽渐变 Banner 校验通过。
+        5. 5 组左右交错（Zigzag）图文微场景与无死板边框排版校验通过。
+        6. 真实收件箱实时接收并完成顶部、中部与底部全景 Shadow DOM 渲染校验通过。
+    *   成功发布上线到 Cloudflare Workers（Version ID: `13417d7a-5496-4f96-bdcd-317a6b3fd89c`）。
 *   **功能需求与业务逻辑对齐 (Feature & Alignment)**: 
     1. **大弹窗模式与全屏不遮挡顶底栏 (Large Modal Canvas & Safe Fullscreen Bounds)**:
        - 弹窗默认采用高级大弹窗架构（`width: min(1140px, calc(100vw - 48px))`，居中圆角 `16px`，顶部保留 `3.5vh` 边距，带高斯模糊阴影），彻底告别直接全屏失真感，重塑标准弹窗层级体验。
