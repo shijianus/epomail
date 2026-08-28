@@ -1,31 +1,102 @@
 # Agent Workflow SOP (Standard Operating Procedure)
 
-<!-- VERSION LOG APPEND BELOW (newest first) -->
-
-### 系统性重构与视觉规范：全员欢迎邮件弹窗六大模块深度精修与主题 Token 统一 (2026-08-26)
+### 体验与架构全面升级：全员系统欢迎邮件大弹窗模式、全屏顶底栏保护视窗、Icon 严格居中、右对齐纯图标工具组与微软 Fluent 矢量插画 (2026-08-28)
 *   **功能需求与业务逻辑对齐 (Feature & Alignment)**: 
-    1. **顶部工具栏防截断弹性布局 (Header Toolbar Flex & Anti-Overflow)**:
-       - 采用左右两组 + 中间弹性空白 (`.top-spacer`) 架构；发件人身份 Chip 注入响应式断点（Narrow 容器下自动隐匿邮箱后缀，保留官方蓝标与团队名称），彻底解决文本/域名裁切挤压。
-       - 所有 Icon 尺寸严格统一为 18–20px，图标间距固定 8px，hover 添加 4px 圆角背景块。
-    2. **目标受众与邮件属性双卡片解耦 (Audience vs Attributes Dual-Card Hierarchy)**:
-       - 拆分为“发送对象”与“邮件属性”两个独立视觉卡片，统一圆角胶囊 Chip 组件样式（`padding: 6px 12px; border-radius: 9999px; font-size: 13px;`）。
-    3. **TinyMCE 富文本编辑器全套 Token 深度适配 (TinyMCE Unified Theme Tokens)**:
-       - 为 TinyMCE 工具栏注入全套深色/浅色 Token：统一 `.tox-toolbar` 背景与边框、`.tox-tbtn` 尺寸（30x30px，padding 4px）、`.tox-split-button` 左右两段圆角联动与高度对齐、字号下拉选择器对齐、分隔线规范化及 hover/active/disabled 状态平滑过渡。
-    4. **预览卡片规范与留白比例失衡修复 (Preview Card Ratios & Layering)**:
-       - 统一外层弹窗内边距（`padding: 20px 24px`）与预览卡片内边距（`padding: 18px 22px`），圆角锁定 12px。
-       - 渐变 Banner 与正文之间增加 `margin-bottom: 16px` 独立留白与微妙投影，滚动区域增加 `20px 24px` 内部留白，文字背景对比度均远超 4.5:1 标准（深色模式下文字对比度达 9.8:1 以上）。
-    5. **操作按钮视觉层级重塑与高危二次确认 (Button Hierarchy & High-Risk Modal)**:
-       - “保存模板配置”采用次级描边按钮（幽灵白/低饱和度）；“发送全员欢迎邮件”采用强化饱和蓝渐变与 700 加粗字重，两按钮间距提升至 18px。
-       - 触发发送时强制弹出警示二次确认弹窗，明确提示“将发送给所有现有用户和新注册用户，此操作不可撤销”，确认按钮采用高危红色渐变（`#ef4444` → `#dc2626`）。
-    6. **辅助配置区与主操作区物理隔离 (Auxiliary Card & Footer Separation)**:
-       - 邮件时效（TTL）、自动发送开关与单实例存储提示独立封装为「系统自动化规则」卡片，与底部主操作区通过标准边框与 16px 留白彻底隔离。
+    1. **大弹窗模式与全屏不遮挡顶底栏 (Large Modal Canvas & Safe Fullscreen Bounds)**:
+       - 弹窗默认采用高级大弹窗架构（`width: min(1140px, calc(100vw - 48px))`，居中圆角 `16px`，顶部保留 `3.5vh` 边距，带高斯模糊阴影），彻底告别直接全屏失真感，重塑标准弹窗层级体验。
+       - 支持右上角与编辑器工具栏一键全屏切换（`.is-fullscreen`）；全屏模式下严格限定 `top: 50px`、`bottom: 22px`，高度锁定 `calc(100vh - 72px)`，**绝对不遮挡全局导航顶栏（Header）与全局状态底栏（StatusBar）**。
+    2. **Button 与 Icon 严格几何居中 (Pixel-Perfect Icon Centering)**:
+       - 彻底解决所有 Button 与 Icon 偏向右下角问题。全面采用 `display: inline-flex !important; align-items: center !important; justify-content: center !important; line-height: 1 !important;`，SVG 统一 `margin: 0 auto; vertical-align: middle;`，在浅色与深色主题下均实现像素级几何居中。
+    3. **特殊功能纯 Icon 极简工具栏与右对齐 (Right-Aligned Icon-First Actions)**:
+       - 编辑器顶栏重构为左右分离布局：左侧为常规排版快捷工具（源码模式下为 H1、H2、加粗、斜体、引用、代码块、无序列表、链接、分割线；富文本模式下为 TinyMCE 撤销/重做/格式工具）；右侧右对齐集中排列特殊工具：
+         1. 富文本模式切换（`ri:font-size-2`）
+         2. 源码/Markdown 模式切换（`ri:code-s-slash-line`）
+         3. 清除正文内容（`ri:delete-bin-line`）
+         4. 恢复官方默认模板（`ri:restart-line`）
+         5. 全屏模式切换（`ri:fullscreen-line` / `ri:fullscreen-exit-line`）
+       - 全部采用纯 Icon 按钮，悬停在 Tooltip 浮层中显示多语言解释，并剔除所有冗余的“支持 HTML 标签与 Markdown 语法智能排版”文字说明。
+    4. **TinyMCE 功能完善与自定义 SVG 矢量保护**:
+       - 补充 `undo`（撤回）与 `redo`（重做）功能。
+       - 配置 TinyMCE `extended_valid_elements`、`custom_elements` 与 `valid_children`，完美支持并保护复杂的 inline SVG 矢量图形、路径与渐变，杜绝富文本解析时丢失矢量图形。
+    5. **微软 Fluent 5 大核心价值矢量插画与真实 CTA 按钮**:
+       - 默认模板彻底重塑：内嵌高质量品牌 Logo SVG、微软蓝渐变 Banner、5 大定制多色彩矢量插画价值卡片（域名身份、纯粹无广告、国内直连、进阶收件箱、多别名熔断）、2 个真实行动 CTA 按钮（`🚀 开启我的收件箱`、`⚙️ 管理域名与别名`）以及 3 步新手快速上手指南。
+*   **编辑代码 (Edit)**: 
+    *   **前端组件与样式**: 修改 [`mail-vue/src/views/sys-setting/index.vue`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/views/sys-setting/index.vue)、[`mail-vue/src/components/tiny-editor/index.vue`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/components/tiny-editor/index.vue)、[`mail-vue/src/components/shadow-html/index.vue`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/components/shadow-html/index.vue)。
+    *   **国际化语言包**: 修改 [`mail-vue/src/i18n/zh.js`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/i18n/zh.js) 与 [`mail-vue/src/i18n/en.js`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/i18n/en.js)。
+    *   **自动化测试套件**: 更新 [`tests/test-welcome-fullscreen-cf.mjs`](file:///home/shijian/projects/epocanvas-mail/tests/test-welcome-fullscreen-cf.mjs)。
+*   **全链路自动化验证与部署 (Verify & Deploy)**: 
+    *   执行 Playwright 端到端全链路自动化测试（`tests/test-welcome-fullscreen-cf.mjs`），在 Cloudflare 生产环境 100% 通过：
+        1. 默认大弹窗模式（1140px x 837px，top 32px）验证通过。
+        2. 全屏模式视窗保护（top: 50px，不遮挡顶栏；bottom: 22px，不遮挡底栏）及平滑退出验证通过。
+        3. Icon 在 Button 中严格几何居中验证通过。
+        4. 右对齐纯 Icon 按钮组与 Tooltip 浮层校验通过。
+        5. 源码模式下 Markdown 辅助工具与 TinyMCE 撤回/重做功能验证通过。
+        6. 微软 Fluent 默认模板重置与保存验证通过。
+        7. 高危全量群发二次确认模态框警示验证通过。
+        8. 真实收件箱收到欢迎邮件、官方蓝标认证徽章、重要与代办标签校验通过。
+        9. 阅读窗格 Shadow DOM 渲染 5 大核心价值矢量插画与 CTA 按钮全景验证通过。
+    *   成功发布上线到 Cloudflare Workers（Version ID: `3afdad0f-a784-4325-9b35-ffc47213dfa4`）。
+
+### 架构革新与视觉重塑：全员系统欢迎邮件全屏模式、微软风格矢量插画排版、智能格式扫描与快照隔离 (2026-08-28)
+*   **功能需求与业务逻辑对齐 (Feature & Alignment)**: 
+    1. **全员欢迎邮件全屏模式 (Fullscreen Composer Experience)**:
+       - 彻底摆脱弹窗局促感，采用 `fullscreen` 全屏视窗（`.welcome-fullscreen-dialog`），沉浸式利用全部视界（1440x900 / 100vw x 100vh）。
+       - 顶栏精简为羽毛笔徽章 + 页面主标题 + 极简关闭按钮，剔除冗余的 `admin@epocanvas.com` 发件人字符串，界面纯净优雅。
+       - 废除“模拟收件箱预览”，站长保存/发送后可在自己真实收件箱中直接查看真实渲染效果。
+    2. **去冗余与极简信息架构**:
+       - 移除冗余不可编辑的“邮件属性”卡片与 Chips。
+       - “发送对象”简化为单行水平条（`.welcome-recipients-row`），规整大方。
+       - 编辑器控制按钮（富文本 / Markdown 源码切换、格式说明、清空正文、恢复默认模板）从外层下沉并内嵌至编辑器顶栏（`.editor-toolbar-header`），操作更符合直觉。
+    3. **微软 Fluent 风格排版与 5 大核心价值矢量插画模板**:
+       - 针对“小白”终端用户，设计全新微软级排版（680px 居中卡片，微软蓝渐变 Banner `#0078D4`），内嵌专属定制 SVG 矢量插画，直观传递 5 大核心价值：
+         1. **零门槛拥有专属域名身份**（免买域名、免配 DNS/MX，注册即用极客名片）
+         2. **纯粹无广告 · 绝不商业变现**（无开屏、不弹窗、不扫描邮件隐私）
+         3. **国内极速直连 · 免翻墙不折腾**（基于全球边缘 CDN 节点直连秒开）
+         4. **进阶收件箱管理 · 界面轻盈极简**（标签/语法/规则/代办一应俱全且轻快）
+         5. **多别名分发 · 垃圾邮件一键熔断**（各平台独立别名，泄露即关主号无忧）
+       - 搭配 3 步新手快速指引与官方署名。
+    4. **智能格式扫描与多格式支持 (Smart Markdown / HTML Compiler)**:
+       - 实现 `compileMarkdownToHtml`，无论站长输入 Markdown 语法还是 HTML，系统自动识别并编译为排版优美的现代化语义 HTML 邮件。
+       - 模式切换（源码 vs 富文本）或点击保存/群发时实时自动扫描与转换。
+    5. **快照存储与历史版本隔离 (Snapshot Storage Immutability)**:
+       - 欢迎邮件在投递时直接将正文快照写入 `email.content`，后续站长修改欢迎邮件模板仅对新用户与新群发生效，彻底杜绝历史已接收邮件被篡改。
+*   **编辑代码 (Edit)**: 
+    *   **前端页面与样式**: 修改 [`mail-vue/src/views/sys-setting/index.vue`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/views/sys-setting/index.vue)、[`mail-vue/src/components/tiny-editor/index.vue`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/components/tiny-editor/index.vue)。
+    *   **国际化语言包**: 修改 [`mail-vue/src/i18n/zh.js`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/i18n/zh.js) 与 [`mail-vue/src/i18n/en.js`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/i18n/en.js)。
+    *   **后端服务与投递支持**: 修改 [`mail-worker/src/service/email-service.js`](file:///home/shijian/projects/epocanvas-mail/mail-worker/src/service/email-service.js)、[`mail-worker/src/service/setting-service.js`](file:///home/shijian/projects/epocanvas-mail/mail-worker/src/service/setting-service.js)。
+    *   **全链路自动化测试套件**: 编写 [`tests/test-welcome-fullscreen-cf.mjs`](file:///home/shijian/projects/epocanvas-mail/tests/test-welcome-fullscreen-cf.mjs)。
+*   **全链路自动化验证与部署 (Verify & Deploy)**: 
+    *   执行集成测试（`tests/test-welcome-email.mjs`）业务逻辑与快照隔离 100% 通过。
+    *   执行 Playwright 端到端全链路自动化测试（`tests/test-welcome-fullscreen-cf.mjs`），在 Cloudflare 生产环境 100% 通过：
+        1. 登录验证与 Token 注入通过。
+        2. 全屏工作台（1440x900）与顶栏去冗余（移除发件人字符串）通过。
+        3. 单行发送对象条（无邮件属性卡片）通过。
+        4. 编辑器顶栏内嵌工具条（模式切换/格式说明/清空/重置模板）通过。
+        5. 富文本与 Markdown 源码双向切换与智能编译器通过。
+        6. 高危二次确认模态框警示通过。
+        7. 真实收件箱真实邮件接收、官方认证蓝标徽章、重要与代办标签通过。
+        8. 真实邮件正文 Shadow DOM 渲染与 5 大核心价值矢量插画校验通过。
+    *   成功发布上线到 Cloudflare Workers（Version ID: `2292ee47-3b54-4463-98ce-4b4b69d91a9a`）。
+*   **功能需求与业务逻辑对齐 (Feature & Alignment)**: 
+    1. **弹窗占用面积大幅扩容 (1160px Large Desktop Canvas)**:
+       - 弹窗宽度提升至 `1160px`（`max-width: min(1160px, calc(100vw - 32px))`），顶部间距优化为 `top="2.5vh"`，全面最大化利用桌面屏幕视野。
+       - 编辑区高度扩展至 `480px`（富文本与源码模式等高），预览视图扩展至 `580px`，展现更多邮件正文细节，彻底摆脱局促拥挤感。
+    2. **顶部工具栏与操作按钮合理化 (Decoupled Toolbar & Pinned Footer)**:
+       - 顶部工具栏：左右两端 + 中间弹性空白（`.top-spacer`），操作按钮（模式切换、格式切换、清空格式、重置模板、明暗切换、关闭）保持 `36x36px` 黄金点击区域与合理间隙，杜绝挤压。
+       - 底部操作栏（Footer）：采用 Flex 吸底架构，左侧展示全量国际化投递历史（`⏰ 最近全员投递: ...` / `尚未全员发送`）胶囊 Pill；右侧“保存配置”（42px 高度次级描边）与“全员群发”（42px 高度高饱和蓝渐变 + 700 加粗 + 发光投影）保持 20px 舒适间距，视觉层级分明且操作手感极为舒适。
+    3. **格式输入规范与双向同步 (Formatting Inputs & WYSIWYG)**:
+       - 主题输入框升级为 44px 高度，配备专属徽标前缀。
+       - 支持 TinyMCE 富文本所见即所得与 Markdown/HTML 源码（JetBrains Mono 等宽字体）双向无缝实时切换与同步。
+    4. **双卡片信息排版与系统规则卡片**:
+       - “发送对象”与“邮件属性”双卡片并排对齐，圆角胶囊 Chip 视觉统一度达到 100%。
+       - “系统自动化规则”卡片规整水平单行铺展（TTL 选项 + 自动发送开关 + 单实例存储 Pill）。
 *   **编辑代码 (Edit)**: 
     *   **前端页面与样式**: 修改 [`mail-vue/src/views/sys-setting/index.vue`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/views/sys-setting/index.vue)。
     *   **国际化语言包**: 修改 [`mail-vue/src/i18n/zh.js`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/i18n/zh.js) 与 [`mail-vue/src/i18n/en.js`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/i18n/en.js)。
 *   **全链路自动化验证与部署 (Verify & Deploy)**: 
-    *   执行集成测试（`tests/test-welcome-email.mjs`）验证单实例存储、全渠道呈现、官方认证标识、自动标记重要与代办、7天自动清理逻辑全部通过。
-    *   执行端到端自动化测试（`tests/test-welcome-dialog-cf.mjs`）截屏检验写信模式、收件箱预览（亮色/暗色）与高危确认弹窗视觉样式全部达标。
-    *   执行 `npx wrangler deploy` 完成前后端联合构建并全网发布上线（Version ID: `bb24b765-028b-4334-97aa-a6fd5aa83e1e`）。
+    *   执行集成测试（`tests/test-welcome-email.mjs`）业务逻辑 100% 通过。
+    *   执行端到端自动化测试（`tests/test-welcome-dialog-cf.mjs`）截屏验证写信模式、收件箱预览与高危确认弹窗。
+    *   执行 `npx wrangler deploy` 完成全链路构建并部署上线到 Cloudflare Workers（Version ID: `fd7fb51e-6107-49a1-9500-30a6efecffe8`）。
 
 
 ### 深度重构与升级：全员欢迎邮件弹窗系统级 UI/UX 重构、信息解耦、深色主题协调与高风险全员发送二次确认 (2026-08-25)

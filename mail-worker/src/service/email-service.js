@@ -1095,18 +1095,20 @@ const emailService = {
 			text = '欢迎使用 Epocanvas Mail，开启您的私密、高效云端邮件体验！';
 		}
 
-		// Check if user already has this welcome email
-		const existing = await orm(c).select({ emailId: email.emailId }).from(email).where(
-			and(
-				eq(email.userId, userId),
-				eq(email.sendEmail, 'admin@epocanvas.com'),
-				eq(email.subject, subject),
-				eq(email.isDel, isDel.NORMAL)
-			)
-		).limit(1).get();
+		// Check if user already has this welcome email (only check on auto-send on registration)
+		if (!overrideData?.isBroadcast) {
+			const existing = await orm(c).select({ emailId: email.emailId }).from(email).where(
+				and(
+					eq(email.userId, userId),
+					eq(email.sendEmail, 'admin@epocanvas.com'),
+					eq(email.subject, subject),
+					eq(email.isDel, isDel.NORMAL)
+				)
+			).limit(1).get();
 
-		if (existing) {
-			return null;
+			if (existing) {
+				return null;
+			}
 		}
 
 		const now = new Date().toISOString();
@@ -1118,11 +1120,18 @@ const emailService = {
 			sendEmail: 'admin@epocanvas.com',
 			name: 'Epocanvas 官方团队',
 			subject: subject,
-			content: null, // Single-instance storage: NULL content saves DB size!
+			content: (overrideData?.content || settingData.welcomeContent || ''), // Immutable snapshot of welcome email content
 			text: text,
 			toEmail: userEmail,
 			toName: emailUtils.getName(userEmail) || userEmail,
+			recipient: JSON.stringify([{ address: userEmail, name: emailUtils.getName(userEmail) || '' }]),
+			cc: '[]',
+			bcc: '[]',
+			inReplyTo: '',
+			relation: '',
+			messageId: '',
 			type: emailConst.type.RECEIVE,
+			status: 0,
 			unread: emailConst.unread.UNREAD,
 			isDel: isDel.NORMAL,
 			isSpam: 0,

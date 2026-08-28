@@ -15,7 +15,9 @@ import {useSettingStore} from '@/store/setting.js'
 defineExpose({
   clearEditor,
   focus,
-  getContent
+  getContent,
+  setContent,
+  execCommand
 })
 
 const props = defineProps({
@@ -100,11 +102,15 @@ function initEditor() {
          --scrollbar-track-color: ${uiStore.dark ? '#141414' : '#FFFFFF'};
          --scrollbar-thumb-color: ${uiStore.dark ? '#8D9095' : '#A8ABB2'};
     }`,
-    plugins: 'link image advlist lists  emoticons fullscreen  table preview code',
-    toolbar: 'bold emoticons forecolor backcolor italic fontsize | alignleft aligncenter alignright alignjustify | outdent indent |  bullist numlist | link image  | table code preview fullscreen',
+    plugins: 'link image advlist lists emoticons fullscreen table preview code',
+    toolbar: 'undo redo | blocks fontsize | bold italic underline strikethrough forecolor backcolor | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | blockquote hr link image table emoticons | removeformat code',
     toolbar_mode: 'scrolling',
     font_size_formats: '8px 10px 12px 14px 16px 18px 24px 36px',
     emoticons_search: false,
+    schema: 'html5',
+    extended_valid_elements: 'svg[*],defs[*],linearGradient[*],radialGradient[*],stop[*],path[*],rect[*],circle[*],g[*],line[*],polygon[*],polyline[*],text[*],tspan[*],use[*],symbol[*],marker[*],pattern[*],clipPath[*],mask[*],filter[*],feGaussianBlur[*],feColorMatrix[*],feBlend[*],feMerge[*],feMergeNode[*],+div[*],+span[*],+p[*],+a[*],+style[*]',
+    custom_elements: 'svg,defs,linearGradient,radialGradient,stop,path,rect,circle,g,line,polygon,polyline,text,tspan,use,symbol,marker,pattern,clipPath,mask,filter,feGaussianBlur,feColorMatrix,feBlend,feMerge,feMergeNode',
+    valid_children: '+body[style],+div[svg|defs|linearGradient|path|rect|circle|g|line|polygon|polyline|text|tspan|use|symbol|style],+p[svg|span|a|code|strong|em],+span[svg|span|a|code|strong|em],+a[div|span|svg|img|p]',
     language: language.value,
     language_load: true,
     menubar: false,
@@ -164,7 +170,19 @@ function focus() {
 }
 
 function getContent() {
-  return editor.value.getContent()
+  return editor.value ? editor.value.getContent() : ''
+}
+
+function setContent(content) {
+  if (editor.value) {
+    editor.value.setContent(content || '');
+  }
+}
+
+function execCommand(cmd, value = null) {
+  if (editor.value) {
+    editor.value.execCommand(cmd, false, value);
+  }
 }
 
 

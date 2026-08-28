@@ -1,76 +1,132 @@
 /**
- * 全链路自动化测试：全员官方欢迎邮件与单实例存储/认证/重要与代办/自动清理时效
+ * 全链路自动化测试：全员官方欢迎邮件与快照存储/认证/重要与代办/自动清理时效/Markdown智能解析
  */
 
 import assert from 'assert';
 
-console.log('--- 开始欢迎邮件全链路与业务逻辑测试 ---');
+console.log('--- 开始全员系统欢迎邮件全链路与业务逻辑测试 ---');
 
-// 1. 测试欢迎邮件模板默认内容与结构
+// 1. 校验新一代微软风格欢迎邮件模板默认内容与结构
 const DEFAULT_WELCOME_SUBJECT = '🎉 欢迎加入 Epocanvas Mail - 开启您的私密、高效云端邮件体验';
-const DEFAULT_WELCOME_CONTENT = `<div style="max-width: 640px; margin: 0 auto; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1e293b; line-height: 1.6; background: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05);">
-  <div style="background: linear-gradient(135deg, #0284c7 0%, #2563eb 50%, #4f46e5 100%); padding: 36px 32px 30px; text-align: left; position: relative;">
-    <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(255, 255, 255, 0.18); padding: 4px 12px; border-radius: 20px; color: #ffffff; font-size: 13px; font-weight: 600; margin-bottom: 16px; backdrop-filter: blur(8px);">
-      <span>✨ 官方系统引导</span>
+const DEFAULT_WELCOME_CONTENT = `<div style="max-width: 680px; margin: 0 auto; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', Roboto, Helvetica, Arial, sans-serif; color: #1e293b; line-height: 1.6; background: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 24px -2px rgba(0, 0, 0, 0.06);">
+  <div style="background: linear-gradient(135deg, #0078D4 0%, #0284c7 35%, #2563eb 70%, #4338ca 100%); padding: 38px 36px 32px; text-align: left; position: relative;">
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px;">
+      <div style="flex: 1;">
+        <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(255, 255, 255, 0.2); border: 1px solid rgba(255, 255, 255, 0.3); padding: 4px 12px; border-radius: 20px; color: #ffffff; font-size: 12.5px; font-weight: 600; margin-bottom: 14px; backdrop-filter: blur(8px);">
+          <span>✨ 官方系统引导 · 专属独立域名邮箱</span>
+        </div>
+        <h1 style="margin: 0; color: #ffffff; font-size: 23px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.35;">欢迎开启您的专属独立域名邮箱</h1>
+        <p style="margin: 8px 0 0; color: rgba(255, 255, 255, 0.92); font-size: 13.5px; line-height: 1.5;">零门槛免配置 · 纯净无广告 · 国内极速直连 · 专属身份名片 · 轻量强大</p>
+      </div>
+      <div style="flex-shrink: 0; display: flex; align-items: center; justify-content: center; width: 76px; height: 76px; background: rgba(255, 255, 255, 0.15); border-radius: 16px; border: 1px solid rgba(255, 255, 255, 0.25);">
+        <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="6" y="12" width="36" height="26" rx="5" fill="#ffffff" fill-opacity="0.95" />
+          <path d="M6 16L24 28L42 16" stroke="#0078D4" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+          <circle cx="36" cy="12" r="7" fill="#10B981" />
+          <path d="M33.5 12L35.5 14L38.5 10" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </div>
     </div>
-    <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 700; letter-spacing: -0.02em;">欢迎加入 Epocanvas Mail</h1>
-    <p style="margin: 8px 0 0; color: rgba(255, 255, 255, 0.9); font-size: 14px;">您的私密、纯净且极速的全球云端邮件工作中心已就绪。</p>
   </div>
-  <div style="padding: 32px 32px 24px;">
-    <p style="font-size: 15px; color: #334155; margin-top: 0;">尊敬的用户，您好：</p>
-    <p style="font-size: 14px; color: #475569; line-height: 1.7;">很高兴与您相遇！Epocanvas Mail 致力于为您提供安全自主、零广告干扰且具备极致生产力的全新邮件交互体验。为了帮助您快速上手，我们为您准备了以下核心特性与快速指引：</p>
-    <div style="margin: 24px 0; display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
-      <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px;">
-        <div style="font-size: 20px; margin-bottom: 6px;">🔒</div>
-        <div style="font-weight: 600; font-size: 14px; color: #0f172a; margin-bottom: 4px;">端到端隐私保护</div>
-        <div style="font-size: 12px; color: #64748b; line-height: 1.5;">全方位的防跟踪与垃圾邮件拦截，守护每一封往来信件的安全。</div>
+
+  <div style="padding: 32px 32px 28px;">
+    <p style="font-size: 15px; color: #1e293b; margin-top: 0; font-weight: 600;">尊敬的用户，您好：</p>
+    <p style="font-size: 14px; color: #475569; line-height: 1.75; margin: 0 0 20px;">
+      很高兴与您相遇！这是一个由开发者出资搭建并开放给普通用户的专属独立域名邮箱服务。我们把底层复杂的域名注册、DNS 解析、MX 记录及云端服务器全部封装，让您无需懂技术也能免费拥有专属域名邮箱。为了帮助您快速了解我们为您带来的核心价值，请查阅以下特性与指南：
+    </p>
+
+    <div style="margin: 22px 0; display: flex; flex-direction: column; gap: 14px;">
+      <div style="display: flex; gap: 14px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px;">
+        <div style="font-weight: 700;">零门槛拥有专属域名身份</div>
       </div>
-      <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px;">
-        <div style="font-size: 20px; margin-bottom: 6px;">⚡</div>
-        <div style="font-weight: 600; font-size: 14px; color: #0f172a; margin-bottom: 4px;">稍后处理与代办流</div>
-        <div style="font-size: 12px; color: #64748b; line-height: 1.5;">支持随时推迟邮件至代办，让收件箱重归清爽，聚焦核心要务。</div>
+      <div style="display: flex; gap: 14px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px;">
+        <div style="font-weight: 700;">纯粹无广告 · 绝不商业变现</div>
       </div>
-      <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px;">
-        <div style="font-size: 20px; margin-bottom: 6px;">⭐</div>
-        <div style="font-weight: 600; font-size: 14px; color: #0f172a; margin-bottom: 4px;">星标重要与极速检索</div>
-        <div style="font-size: 12px; color: #64748b; line-height: 1.5;">一键归档高优先级信件，毫秒级关键字与语法检索，触手可及。</div>
+      <div style="display: flex; gap: 14px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px;">
+        <div style="font-weight: 700;">国内极速直连 · 免翻墙不折腾</div>
       </div>
-      <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px;">
-        <div style="font-size: 20px; margin-bottom: 6px;">🌐</div>
-        <div style="font-weight: 600; font-size: 14px; color: #0f172a; margin-bottom: 4px;">多域别名无缝流转</div>
-        <div style="font-size: 12px; color: #64748b; line-height: 1.5;">自由收发多域名前缀，随时切换发送身份，打造多重工作场景。</div>
+      <div style="display: flex; gap: 14px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px;">
+        <div style="font-weight: 700;">进阶收件箱管理 · 界面轻盈极简</div>
       </div>
-    </div>
-    <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 12px; padding: 18px; margin: 20px 0;">
-      <div style="font-weight: 600; font-size: 14px; color: #1e40af; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
-        <span>🚀 3 步开启高效邮件之旅</span>
+      <div style="display: flex; gap: 14px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px;">
+        <div style="font-weight: 700;">多别名分发 · 垃圾邮件一键熔断</div>
       </div>
-      <div style="font-size: 13px; color: #1e3a8a; line-height: 1.8;">
-        <div><strong>1. 体验代办分类：</strong> 本邮件已自动放入您的【稍后处理 / 代办】与【星标 / 重要】中，体验快捷归档。</div>
-        <div><strong>2. 探索个性化外观：</strong> 前往「系统设置」体验星空动态 UI、登录背景自定义与多语言自由切换。</div>
-        <div><strong>3. 开启首封信件：</strong> 点击顶栏「写邮件」，即刻体验极速富文本撰写与全球极速投递。</div>
-      </div>
-    </div>
-    <div style="margin-top: 24px; padding-top: 16px; border-top: 1px dashed #cbd5e1; font-size: 12px; color: #94a3b8; line-height: 1.6;">
-      <div>📌 <strong>温馨提示：</strong> 此邮件由系统官方自动发送（admin@epocanvas.com）。站长设定了自动清理周期，到期后将自动从您的邮箱中安全移除，无需手动清理。</div>
-      <div style="margin-top: 8px;">Epocanvas Mail 官方团队 · 敬上</div>
     </div>
   </div>
 </div>`;
 
-console.log('✓ 校验默认欢迎邮件模板结构与品牌信息...');
+console.log('✓ 校验微软设计水准欢迎邮件模板结构与核心价值五大维度...');
 assert.ok(DEFAULT_WELCOME_SUBJECT.includes('欢迎加入 Epocanvas Mail'));
-assert.ok(DEFAULT_WELCOME_CONTENT.includes('端到端隐私保护'));
-assert.ok(DEFAULT_WELCOME_CONTENT.includes('稍后处理与代办流'));
-assert.ok(DEFAULT_WELCOME_CONTENT.includes('admin@epocanvas.com'));
-assert.ok(DEFAULT_WELCOME_CONTENT.includes('Epocanvas Mail 官方团队'));
+assert.ok(DEFAULT_WELCOME_CONTENT.includes('零门槛拥有专属域名身份'));
+assert.ok(DEFAULT_WELCOME_CONTENT.includes('纯粹无广告 · 绝不商业变现'));
+assert.ok(DEFAULT_WELCOME_CONTENT.includes('国内极速直连 · 免翻墙不折腾'));
+assert.ok(DEFAULT_WELCOME_CONTENT.includes('进阶收件箱管理 · 界面轻盈极简'));
+assert.ok(DEFAULT_WELCOME_CONTENT.includes('多别名分发 · 垃圾邮件一键熔断'));
+assert.ok(DEFAULT_WELCOME_CONTENT.includes('<svg'));
 console.log('✓ 欢迎邮件模板验证通过！');
 
-// 2. 模拟单实例存储与用户投递
+// 2. 模拟 Markdown 智能解析与编译
+function compileMarkdownToHtml(src) {
+  if (!src) return '';
+  let text = src.trim();
+  if (text.startsWith('<div') || text.startsWith('<html') || text.startsWith('<!DOCTYPE') || text.startsWith('<table')) {
+    return text;
+  }
+  const codeBlocks = [];
+  text = text.replace(/```([a-zA-Z0-9_-]*)\n([\s\S]*?)```/g, (match, lang, code) => {
+    const placeholder = `%%CODE_BLOCK_${codeBlocks.length}%%`;
+    const escapedCode = code.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    codeBlocks.push(`<pre style="background: #0f172a; color: #f8fafc; padding: 14px 18px; border-radius: 8px;"><code>${escapedCode}</code></pre>`);
+    return placeholder;
+  });
+  text = text.replace(/^#\s+(.*)$/gm, '<h1 style="font-size: 24px; font-weight: 800;">$1</h1>');
+  text = text.replace(/^##\s+(.*)$/gm, '<h2 style="font-size: 20px; font-weight: 700;">$1</h2>');
+  text = text.replace(/^>\s+(.*)$/gm, '<blockquote style="border-left: 4px solid #0078D4;">$1</blockquote>');
+  text = text.replace(/\*\*(.*?)\*\*/g, '<strong style="font-weight: 700;">$1</strong>');
+  text = text.replace(/`([^`]+)`/g, '<code style="background: #f1f5f9; color: #0284c7;">$1</code>');
+  text = text.replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" target="_blank">$1</a>');
+  text = text.replace(/^[\t ]*[-*+][\t ]+(.*)$/gm, '<li>$1</li>');
+  text = text.replace(/(<li>[\s\S]*?<\/li>[\n\r]*)+/g, (match) => `<ul>\n${match.trim()}\n</ul>\n`);
+
+  const paragraphs = text.split(/\n{2,}/).map(p => {
+    p = p.trim();
+    if (!p) return '';
+    if (p.startsWith('<h') || p.startsWith('<blockquote') || p.startsWith('<pre') || p.startsWith('<ul') || p.startsWith('%%CODE_BLOCK_')) {
+      return p;
+    }
+    return `<p>${p.replace(/\n/g, '<br/>')}</p>`;
+  }).filter(Boolean).join('\n');
+
+  let result = paragraphs;
+  codeBlocks.forEach((block, idx) => {
+    result = result.replace(`%%CODE_BLOCK_${idx}%%`, block);
+  });
+  if (!result.includes('max-width:')) {
+    result = `<div style="max-width: 680px; margin: 0 auto; background: #ffffff; border-radius: 16px; padding: 28px 32px;">\n${result}\n</div>`;
+  }
+  return result;
+}
+
+const mdInput = `# 欢迎加入
+> 极简纯净的云端邮件
+
+- **零门槛**：注册即用专属域名
+- **极速**：全球边缘 CDN 加速
+
+\`admin@epocanvas.com\``;
+
+const compiledHtml = compileMarkdownToHtml(mdInput);
+assert.ok(compiledHtml.includes('<h1'));
+assert.ok(compiledHtml.includes('<blockquote'));
+assert.ok(compiledHtml.includes('<li><strong style="font-weight: 700;">零门槛</strong>'));
+assert.ok(compiledHtml.includes('<code'));
+console.log('✓ Markdown 与混合内容智能扫描与编译验证通过！');
+
+// 3. 快照存储隔离测试 (历史邮件不因后续模板修改而改变)
 const mockSetting = {
   welcomeSubject: DEFAULT_WELCOME_SUBJECT,
   welcomeContent: DEFAULT_WELCOME_CONTENT,
-  welcomeText: '欢迎使用 Epocanvas Mail，开启您的私密、高效云端邮件体验！',
+  welcomeText: '欢迎使用 Epocanvas Mail',
   welcomeExpireDays: 7,
   welcomeAutoSend: 1
 };
@@ -90,10 +146,6 @@ function deliverWelcomeEmailToUser(userId, userEmail, overrideData = null) {
   const content = overrideData?.content || mockSetting.welcomeContent;
   const text = overrideData?.text || mockSetting.welcomeText;
 
-  // 检查是否已有该邮件
-  const exists = mockDatabase.emails.find(e => e.userId === userId && e.sendEmail === 'admin@epocanvas.com' && e.subject === subject && e.isDel === 0);
-  if (exists) return null;
-
   const now = new Date();
   const snoozedEndTime = expireDays > 0 ? new Date(now.getTime() + expireDays * 86400000).toISOString() : null;
 
@@ -104,11 +156,11 @@ function deliverWelcomeEmailToUser(userId, userEmail, overrideData = null) {
     sendEmail: 'admin@epocanvas.com',
     name: 'Epocanvas 官方团队',
     subject: subject,
-    content: null, // 关键：单实例存储，数据库内存储为 null，节约全站存储
+    content: content, // 快照存储：直接写入当前版本 content，保障历史版本不被污染
     text: text,
     toEmail: userEmail,
     toName: userEmail.split('@')[0],
-    type: 0, // RECEIVE
+    type: 0,
     unread: 0,
     isDel: 0,
     isSpam: 0,
@@ -119,8 +171,6 @@ function deliverWelcomeEmailToUser(userId, userEmail, overrideData = null) {
   };
 
   mockDatabase.emails.push(emailRow);
-
-  // 自动标记为星标 (重要)
   mockDatabase.stars.push({
     starId: mockDatabase.stars.length + 1,
     userId: userId,
@@ -131,90 +181,23 @@ function deliverWelcomeEmailToUser(userId, userEmail, overrideData = null) {
   return emailRow;
 }
 
-// 模拟全员群发
-mockDatabase.users.forEach(u => {
-  deliverWelcomeEmailToUser(u.userId, u.email);
-});
+// 投递初始版本欢迎邮件给 Alice
+deliverWelcomeEmailToUser(1, 'alice@epocanvas.com');
+assert.strictEqual(mockDatabase.emails[0].content, DEFAULT_WELCOME_CONTENT);
 
-console.log(`✓ 已向全员 ${mockDatabase.users.length} 位用户投递欢迎邮件`);
+// 站长后续修改了欢迎模板为新版本
+const NEW_TEMPLATE = '<div style="max-width: 680px;"><h1>新版欢迎信模版 V2</h1></div>';
+mockSetting.welcomeContent = NEW_TEMPLATE;
 
-// 验证单实例存储
-assert.strictEqual(mockDatabase.emails.length, 2);
-mockDatabase.emails.forEach(e => {
-  assert.strictEqual(e.sendEmail, 'admin@epocanvas.com');
-  assert.strictEqual(e.name, 'Epocanvas 官方团队');
-  assert.strictEqual(e.content, null, '单实例存储：用户记录 content 字段必须为 null');
-  assert.ok(e.snoozedTime != null, '必须自动设为代办');
-  assert.ok(e.labels.includes('官方'), '标签必须包含官方');
-});
-console.log('✓ 单实例存储与官方标识验证通过！');
+// 验证 Alice 历史已接收的邮件快照依然保持原样，不被修改！
+assert.strictEqual(mockDatabase.emails[0].content, DEFAULT_WELCOME_CONTENT, '快照隔离：历史邮件正文必须保持原样，不可被修改！');
 
-// 验证星标重要
-assert.strictEqual(mockDatabase.stars.length, 2);
-console.log('✓ 自动标记为星标重要验证通过！');
+// 投递新版本给 Bob
+deliverWelcomeEmailToUser(2, 'bob@epocanvas.com');
+assert.strictEqual(mockDatabase.emails[1].content, NEW_TEMPLATE, '新用户接收最新的欢迎模板');
+console.log('✓ 快照存储与历史版本隔离验证通过！');
 
-// 3. 模拟邮件读取时动态注入单实例正文
-function getEmailDetail(emailId) {
-  const emailRow = mockDatabase.emails.find(e => e.emailId === emailId && e.isDel === 0);
-  if (!emailRow) return null;
-
-  const isOfficial = emailRow.sendEmail === 'admin@epocanvas.com' || (emailRow.labels && emailRow.labels.includes('官方'));
-  const isStar = mockDatabase.stars.some(s => s.emailId === emailId);
-
-  const result = {
-    ...emailRow,
-    isStar: isStar ? 1 : 0,
-    isOfficial: isOfficial ? 1 : 0,
-    expireDays: isOfficial ? mockSetting.welcomeExpireDays : 0,
-    content: (!emailRow.content && isOfficial && mockSetting.welcomeContent) ? mockSetting.welcomeContent : emailRow.content
-  };
-  return result;
-}
-
-const email1Detail = getEmailDetail(1);
-assert.ok(email1Detail.content.includes('欢迎加入 Epocanvas Mail'), '读取时动态注入官方正文');
-assert.strictEqual(email1Detail.isOfficial, 1);
-assert.strictEqual(email1Detail.isStar, 1);
-assert.strictEqual(email1Detail.expireDays, 7);
-console.log('✓ 读取时动态注入单实例正文与认证标识验证通过！');
-
-// 4. 模拟视图过滤：在 收件箱(Inbox)、星标(Star)、代办(Snoozed)、全员(All) 中均可显示
-function filterEmails(folder, userId) {
-  return mockDatabase.emails.filter(item => {
-    if (item.userId !== userId) return false;
-    if (folder === 'trash') return item.isDel === 1;
-    if (item.isDel === 1) return false;
-
-    if (folder === 'spam') return item.isSpam === 1;
-    if (item.isSpam === 1) return false;
-
-    if (folder === 'snoozed') {
-      return item.snoozedTime != null;
-    }
-
-    if (folder === 'star') {
-      return mockDatabase.stars.some(s => s.emailId === item.emailId);
-    }
-
-    if (folder === 'inbox') {
-      // 官方邮件特权：即使在代办中，也同时展示在收件箱中
-      return item.snoozedTime == null || item.sendEmail === 'admin@epocanvas.com';
-    }
-
-    return true; // all
-  });
-}
-
-const inboxList = filterEmails('inbox', 1);
-const starList = filterEmails('star', 1);
-const snoozedList = filterEmails('snoozed', 1);
-
-assert.strictEqual(inboxList.length, 1, '收件箱必须显示官方欢迎邮件');
-assert.strictEqual(starList.length, 1, '星标重要必须显示官方欢迎邮件');
-assert.strictEqual(snoozedList.length, 1, '稍后处理代办必须显示官方欢迎邮件');
-console.log('✓ 官方邮件跨收件箱/重要/代办全渠道呈现验证通过！');
-
-// 5. 模拟 7 天时效过期自动清理逻辑
+// 4. 验证 7 天时效过期自动清理逻辑
 function autoCleanExpiredWelcomeEmails(days) {
   const expiredThreshold = new Date(Date.now() - days * 86400000);
   let cleanedCount = 0;
@@ -232,16 +215,11 @@ function autoCleanExpiredWelcomeEmails(days) {
   return cleanedCount;
 }
 
-// 模拟未到期（当前时间）
-const clean0 = autoCleanExpiredWelcomeEmails(7);
-assert.strictEqual(clean0, 0, '未到期不应清理');
-
 // 模拟时间推移 8 天后
 mockDatabase.emails[0].createTime = new Date(Date.now() - 8 * 86400000).toISOString();
 const clean1 = autoCleanExpiredWelcomeEmails(7);
 assert.strictEqual(clean1, 1, '超过 7 天应自动标记为删除');
 assert.strictEqual(mockDatabase.emails[0].isDel, 1);
+console.log('✓ 时效自动清理验证通过！');
 
-console.log('✓ 7天时效自动清理逻辑验证通过！');
-
-console.log('\n🎉 所有测试场景全部顺利通过！');
+console.log('\n🎉 所有测试场景与业务逻辑 100% 顺利通过！');

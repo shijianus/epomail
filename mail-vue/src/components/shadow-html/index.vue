@@ -71,10 +71,9 @@ function updateContent() {
         ${bodyStyle ? bodyStyle : ''} /* 注入 body 的 style */
       }
 
-      img, video {
+      img, video, svg {
         ${uiStore.dark ? 'filter: invert(1) hue-rotate(180deg);' : ''}
         max-width: 100%;
-        height: auto !important;
       }
 
     </style>

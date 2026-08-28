@@ -1001,285 +1001,240 @@
         </template>
       </el-dialog>
 
-      <!-- Welcome Email Compose & Broadcast Dialog (Refactored System Architecture) -->
+      <!-- Welcome Email Compose & Broadcast Fullscreen Dialog -->
       <el-dialog
-        top="3vh"
-        width="980px"
         v-model="welcomeEmailShow"
-        class="welcome-write-dialog"
+        :class="['welcome-dialog-canvas', { 'is-fullscreen': isWelcomeFullscreen }]"
         :close-on-click-modal="false"
         :show-close="false"
         @closed="closeWelcomeDialog"
+        width="1140px"
+        top="4vh"
       >
         <template #header>
           <div class="write-dialog-top">
-            <!-- Left Group: Title & Official Sender Identity -->
+            <!-- Left Group: Title -->
             <div class="top-left">
               <div class="quill-badge">
-                <Icon icon="hugeicons:quill-write-01" width="18" height="18" />
+                <Icon icon="hugeicons:quill-write-01" width="20" height="20" />
               </div>
               <span class="dialog-main-title">{{ $t('welcomeEmailTitle') }}</span>
-              <div class="sender-identity-chip">
-                <Icon icon="ri:verified-badge-fill" width="15" height="15" class="verified-icon" />
-                <span class="sender-name">Epocanvas 官方团队</span>
-                <span class="sender-email">&lt;admin@epocanvas.com&gt;</span>
-              </div>
             </div>
 
             <!-- Middle Elastic Spacer -->
             <div class="top-spacer"></div>
 
-            <!-- Right Group: Mode Switcher + Action Icon Buttons + Close -->
+            <!-- Right Group: Fullscreen Toggle & Close -->
             <div class="top-right">
-              <!-- Mode switcher capsule (Icon + Label) -->
-              <div class="view-switch-capsule">
-                <el-tooltip :content="$t('editMode')" effect="dark" placement="bottom">
-                  <div
-                    class="capsule-btn"
-                    :class="{ active: !isWelcomePreview }"
-                    @click="switchWelcomeView(false)"
-                  >
-                    <Icon icon="hugeicons:quill-write-01" width="15" height="15" />
-                    <span>{{ $t('editMode') }}</span>
-                  </div>
-                </el-tooltip>
-                <el-tooltip :content="$t('previewMode')" effect="dark" placement="bottom">
-                  <div
-                    class="capsule-btn"
-                    :class="{ active: isWelcomePreview }"
-                    @click="switchWelcomeView(true)"
-                  >
-                    <Icon icon="fluent:eye-24-regular" width="15" height="15" />
-                    <span>{{ $t('previewMode') }}</span>
-                  </div>
-                </el-tooltip>
-              </div>
-
-              <!-- Quick action icon buttons (18-20px icons, 8px gap, 4px hover block) -->
-              <div class="header-action-group">
-                <template v-if="!isWelcomePreview">
-                  <el-tooltip :content="welcomeEditorFormat === 'rich' ? $t('markdownSourceMode') : $t('richTextMode')" effect="dark" placement="bottom">
-                    <div class="tool-icon-btn" @click="toggleEditorFormat">
-                      <Icon :icon="welcomeEditorFormat === 'rich' ? 'fluent:code-24-regular' : 'fluent:text-grammar-settings-20-regular'" width="18" height="18" />
-                    </div>
-                  </el-tooltip>
-                  <el-tooltip :content="$t('clearFormat')" effect="dark" placement="bottom">
-                    <div class="tool-icon-btn" @click="clearWelcomeContent">
-                      <Icon icon="icon-park-outline:clear-format" width="18" height="18" />
-                    </div>
-                  </el-tooltip>
-                  <el-tooltip :content="$t('welcomeResetTemplate')" effect="dark" placement="bottom">
-                    <div class="tool-icon-btn" @click="resetToDefaultWelcomeTemplate">
-                      <Icon icon="fluent:arrow-reset-24-regular" width="18" height="18" />
-                    </div>
-                  </el-tooltip>
-                </template>
-
-                <template v-else>
-                  <el-tooltip :content="previewDark ? $t('previewLightMode') : $t('previewDarkMode')" effect="dark" placement="bottom">
-                    <div class="tool-icon-btn theme-toggle" @click="previewDark = !previewDark">
-                      <Icon :icon="previewDark ? 'fluent:weather-sunny-24-regular' : 'fluent:weather-moon-24-regular'" width="18" height="18" />
-                    </div>
-                  </el-tooltip>
-                  <el-tooltip :content="$t('welcomeResetTemplate')" effect="dark" placement="bottom">
-                    <div class="tool-icon-btn" @click="resetToDefaultWelcomeTemplate">
-                      <Icon icon="fluent:arrow-reset-24-regular" width="18" height="18" />
-                    </div>
-                  </el-tooltip>
-                </template>
-
-                <div class="close-icon-btn" @click="welcomeEmailShow = false">
-                  <Icon icon="material-symbols-light:close-rounded" width="20" height="20" />
+              <el-tooltip :content="isWelcomeFullscreen ? $t('exitFullscreen') : $t('toggleFullscreen')" effect="dark" placement="bottom">
+                <div class="tool-icon-btn top-action-btn" @click="toggleFullscreen">
+                  <Icon :icon="isWelcomeFullscreen ? 'fluent:full-screen-minimize-24-regular' : 'fluent:full-screen-maximize-24-regular'" width="20" height="20" />
                 </div>
+              </el-tooltip>
+              <div class="tool-icon-btn close-icon-btn" :title="$t('close')" @click="welcomeEmailShow = false">
+                <Icon icon="material-symbols-light:close-rounded" width="22" height="22" />
               </div>
             </div>
           </div>
         </template>
 
-        <div class="welcome-write-body">
-          <!-- VIEW 1: 直接写邮件界面 -->
-          <div v-show="!isWelcomePreview" class="write-flow-view">
-            <!-- 2. Dual-Card Group: Audience Target vs Email Attributes -->
-            <div class="meta-cards-row">
-              <!-- Group 1: 发送对象 -->
-              <div class="meta-group-card">
-                <div class="group-header">
-                  <Icon icon="solar:users-group-rounded-bold" width="15" height="15" />
-                  <span>{{ $t('audienceTarget') }}</span>
-                </div>
-                <div class="group-content">
-                  <div class="audience-chip">
-                    <Icon icon="solar:user-check-rounded-bold" width="14" height="14" />
-                    <span>{{ $t('welcomeAllUsers') }}</span>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Group 2: 邮件属性 -->
-              <div class="meta-group-card">
-                <div class="group-header">
-                  <Icon icon="fluent:tag-20-filled" width="15" height="15" />
-                  <span>{{ $t('mailAttributes') }}</span>
-                </div>
-                <div class="group-content attributes-row">
-                  <div class="attr-chip official">
-                    <Icon icon="ri:verified-badge-fill" width="13" height="13" />
-                    <span>{{ $t('officialVerified') }}</span>
-                  </div>
-                  <div class="attr-chip star">
-                    <Icon icon="fluent-color:star-16" width="13" height="13" />
-                    <span>⭐ 重要</span>
-                  </div>
-                  <div class="attr-chip todo">
-                    <Icon icon="ic:outline-access-time" width="13" height="13" />
-                    <span>⏰ 代办</span>
-                  </div>
-                </div>
-              </div>
+        <div class="welcome-dialog-body">
+          <!-- 1. Single-Line Recipients Row -->
+          <div class="welcome-recipients-row">
+            <div class="recipients-label">
+              <Icon icon="solar:users-group-rounded-bold" width="16" height="16" class="recipients-icon" />
+              <span>{{ $t('welcomeRecipient') }}:</span>
             </div>
+            <div class="recipients-content">
+              <span class="audience-pill">{{ $t('welcomeAllUsers') }}</span>
+              <span class="recipients-subtext">（系统官方自动欢迎通道）</span>
+            </div>
+          </div>
 
-            <!-- Subject Input Line -->
-            <div class="compose-subject-bar">
-              <el-input
-                v-model="welcomeEmailForm.welcomeSubject"
-                size="default"
-                :placeholder="$t('welcomeSubject')"
-                class="write-subject-input"
-              >
-                <template #prefix>
-                  <Icon icon="fluent:text-bullet-list-square-sparkle-24-regular" width="18" height="18" style="color: #64748b;" />
+          <!-- 2. Email Subject Bar -->
+          <div class="welcome-subject-bar">
+            <el-input
+              v-model="welcomeEmailForm.welcomeSubject"
+              size="large"
+              :placeholder="$t('welcomeSubject')"
+              class="write-subject-input"
+            >
+              <template #prefix>
+                <Icon icon="fluent:text-bullet-list-square-sparkle-24-regular" width="18" height="18" class="subject-icon" />
+              </template>
+            </el-input>
+          </div>
+
+          <!-- 3. Workspace Editor Card -->
+          <div class="welcome-editor-card">
+            <!-- Editor Toolbar attached to top of editing area -->
+            <div class="editor-toolbar-header">
+              <!-- Left Group: Formatting / Helper Tools -->
+              <div class="editor-left-tools">
+                <template v-if="welcomeEditorFormat === 'source'">
+                  <el-tooltip content="H1 一级标题" effect="dark" placement="top">
+                    <div class="tool-icon-btn" @click="insertMarkdownSyntax('# ', '')">
+                      <Icon icon="lucide:heading-1" width="16" height="16" />
+                    </div>
+                  </el-tooltip>
+                  <el-tooltip content="H2 二级标题" effect="dark" placement="top">
+                    <div class="tool-icon-btn" @click="insertMarkdownSyntax('## ', '')">
+                      <Icon icon="lucide:heading-2" width="16" height="16" />
+                    </div>
+                  </el-tooltip>
+                  <el-tooltip content="加粗" effect="dark" placement="top">
+                    <div class="tool-icon-btn" @click="insertMarkdownSyntax('**', '**')">
+                      <Icon icon="lucide:bold" width="16" height="16" />
+                    </div>
+                  </el-tooltip>
+                  <el-tooltip content="斜体" effect="dark" placement="top">
+                    <div class="tool-icon-btn" @click="insertMarkdownSyntax('*', '*')">
+                      <Icon icon="lucide:italic" width="16" height="16" />
+                    </div>
+                  </el-tooltip>
+                  <el-tooltip content="引用块" effect="dark" placement="top">
+                    <div class="tool-icon-btn" @click="insertMarkdownSyntax('> ', '')">
+                      <Icon icon="lucide:quote" width="15" height="15" />
+                    </div>
+                  </el-tooltip>
+                  <el-tooltip content="代码块" effect="dark" placement="top">
+                    <div class="tool-icon-btn" @click="insertMarkdownSyntax('```html\n', '\n```')">
+                      <Icon icon="lucide:code-2" width="16" height="16" />
+                    </div>
+                  </el-tooltip>
+                  <el-tooltip content="列表" effect="dark" placement="top">
+                    <div class="tool-icon-btn" @click="insertMarkdownSyntax('- ', '')">
+                      <Icon icon="lucide:list" width="16" height="16" />
+                    </div>
+                  </el-tooltip>
+                  <el-tooltip content="链接" effect="dark" placement="top">
+                    <div class="tool-icon-btn" @click="insertMarkdownSyntax('[链接文字](', ')')">
+                      <Icon icon="lucide:link" width="15" height="15" />
+                    </div>
+                  </el-tooltip>
+                  <el-tooltip content="分割线" effect="dark" placement="top">
+                    <div class="tool-icon-btn" @click="insertMarkdownSyntax('\n---\n', '')">
+                      <Icon icon="lucide:minus" width="16" height="16" />
+                    </div>
+                  </el-tooltip>
                 </template>
-              </el-input>
+              </div>
+
+              <!-- Middle Elastic Spacer -->
+              <div class="toolbar-spacer"></div>
+
+              <!-- Right Group: Special Actions (All Pure Icons with Tooltip!) -->
+              <div class="editor-right-tools">
+                <!-- Rich text mode icon button -->
+                <el-tooltip :content="$t('richTextMode')" effect="dark" placement="top">
+                  <div
+                    class="tool-icon-btn"
+                    :class="{ active: welcomeEditorFormat === 'rich' }"
+                    @click="setEditorFormat('rich')"
+                  >
+                    <Icon icon="fluent:text-grammar-settings-20-regular" width="17" height="17" />
+                  </div>
+                </el-tooltip>
+
+                <!-- Source / Markdown mode icon button -->
+                <el-tooltip :content="$t('markdownSourceMode')" effect="dark" placement="top">
+                  <div
+                    class="tool-icon-btn"
+                    :class="{ active: welcomeEditorFormat === 'source' }"
+                    @click="setEditorFormat('source')"
+                  >
+                    <Icon icon="fluent:code-24-regular" width="17" height="17" />
+                  </div>
+                </el-tooltip>
+
+                <div class="tool-divider"></div>
+
+                <!-- Clear content icon button -->
+                <el-tooltip :content="$t('clearContent')" effect="dark" placement="top">
+                  <div class="tool-icon-btn danger-hover" @click="clearWelcomeContent">
+                    <Icon icon="solar:trash-bin-trash-bold" width="17" height="17" />
+                  </div>
+                </el-tooltip>
+
+                <!-- Reset template icon button -->
+                <el-tooltip :content="$t('welcomeResetTemplate')" effect="dark" placement="top">
+                  <div class="tool-icon-btn" @click="resetToDefaultWelcomeTemplate">
+                    <Icon icon="fluent:arrow-reset-24-regular" width="17" height="17" />
+                  </div>
+                </el-tooltip>
+
+                <div class="tool-divider"></div>
+
+                <!-- Fullscreen toggle icon button in editor toolbar -->
+                <el-tooltip :content="isWelcomeFullscreen ? $t('exitFullscreen') : $t('toggleFullscreen')" effect="dark" placement="top">
+                  <div class="tool-icon-btn" @click="toggleFullscreen">
+                    <Icon :icon="isWelcomeFullscreen ? 'fluent:full-screen-minimize-24-regular' : 'fluent:full-screen-maximize-24-regular'" width="17" height="17" />
+                  </div>
+                </el-tooltip>
+              </div>
             </div>
 
-            <!-- Spacious Editor Area -->
-            <div class="compose-editor-area">
+            <!-- Editor Mount Workspace -->
+            <div class="editor-mount-area">
               <template v-if="welcomeEditorFormat === 'rich'">
                 <tinyEditor
                   editor-id="welcome-sys-editor"
                   :def-value="welcomeEmailForm.welcomeContent"
                   ref="welcomeEditorRef"
                   @change="onWelcomeContentChange"
-                  class="custom-tiny-editor"
+                  class="dialog-tiny-editor"
                 />
               </template>
               <template v-else>
-                <div class="source-editor-wrapper">
+                <div class="source-editor-fullscreen">
                   <el-input
                     type="textarea"
                     v-model="welcomeEmailForm.welcomeContent"
-                    :rows="18"
-                    placeholder="<!-- HTML / Markdown 正文源码 -->"
-                    class="source-textarea"
+                    placeholder="<!-- HTML / Markdown 正文内容 -->"
+                    class="source-textarea-fullscreen"
                   />
                 </div>
               </template>
-            </div>
-
-            <!-- 6. Dedicated Auxiliary Configuration Card -->
-            <div class="auxiliary-config-card">
-              <div class="config-card-header">
-                <Icon icon="fluent:bot-24-regular" width="16" height="16" />
-                <span>{{ $t('systemAutomationRules') }}</span>
-              </div>
-              <div class="config-card-body">
-                <div class="config-item">
-                  <span class="config-label">{{ $t('welcomeExpireDays') }}:</span>
-                  <el-select v-model="welcomeEmailForm.welcomeExpireDays" size="small" style="width: 180px;">
-                    <el-option :value="7" :label="$t('welcomeExpire7Days')" />
-                    <el-option :value="14" :label="$t('welcomeExpire14Days')" />
-                    <el-option :value="30" :label="$t('welcomeExpire30Days')" />
-                    <el-option :value="90" :label="$t('welcomeExpire90Days')" />
-                    <el-option :value="0" :label="$t('welcomeExpireNever')" />
-                  </el-select>
-                </div>
-
-                <div class="config-item">
-                  <span class="config-label">{{ $t('welcomeAutoSend') }}:</span>
-                  <el-switch v-model="welcomeEmailForm.welcomeAutoSend" :active-value="1" :inactive-value="0" size="small" />
-                  <el-tooltip effect="dark" :content="$t('welcomeAutoSendDesc')" placement="top">
-                    <Icon class="warning" icon="fe:warning" width="16" height="16" style="margin-left: 4px; cursor: pointer;"/>
-                  </el-tooltip>
-                </div>
-
-                <div class="config-item storage-tag-item">
-                  <div class="storage-pill">
-                    <Icon icon="fluent:database-link-20-regular" width="14" height="14" />
-                    <span>单实例集中存储（仅占用 1 份正文空间）</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- VIEW 2: 预览新建实际情况的模式 (根据用户明/暗色调) -->
-          <div v-if="isWelcomePreview" class="preview-flow-view" :class="{ 'dark-theme-preview': previewDark, 'light-theme-preview': !previewDark }">
-            <div class="real-inbox-mock">
-              <!-- Mock Email Detail Header -->
-              <div class="mock-email-head">
-                <div class="mock-head-main">
-                  <el-avatar :size="44" class="mock-avatar-official">
-                    <Icon icon="ri:verified-badge-fill" width="24" height="24" />
-                  </el-avatar>
-                  <div class="mock-meta-col">
-                    <div class="mock-meta-line-1">
-                      <span class="mock-sender-name">Epocanvas 官方团队</span>
-                      <Icon icon="ri:verified-badge-fill" width="16" height="16" style="color: #0284c7;" />
-                      <el-tag size="small" type="primary" effect="dark" class="mock-pill-official">{{ $t('officialTag') }}</el-tag>
-                      <el-tag size="small" type="warning" effect="dark" class="mock-pill-star">⭐ 重要</el-tag>
-                      <el-tag size="small" type="info" effect="dark" class="mock-pill-todo">⏰ 代办</el-tag>
-                    </div>
-                    <div class="mock-meta-line-2">
-                      <span class="mock-sender-email">&lt;admin@epocanvas.com&gt;</span>
-                      <span class="mock-to-email">至: 尊敬的用户 &lt;user@epocanvas.com&gt;</span>
-                    </div>
-                  </div>
-                </div>
-                <div class="mock-head-date">
-                  <span>{{ formatDetailDate(new Date().toISOString()) }}</span>
-                </div>
-              </div>
-
-              <!-- Mock Official Banner -->
-              <div class="mock-official-banner">
-                <div class="banner-left">
-                  <Icon icon="ri:verified-badge-fill" width="20" height="20" style="color: #0284c7; flex-shrink: 0;" />
-                  <div class="banner-text">
-                    <div class="banner-heading">
-                      <span>{{ $t('officialBannerTitle') }}</span>
-                      <el-tag size="small" type="primary" effect="dark" class="official-mini-tag">{{ $t('officialTag') }}</el-tag>
-                    </div>
-                    <div class="banner-subtitle">{{ $t('officialBannerDesc') }}</div>
-                  </div>
-                </div>
-                <div class="banner-right" v-if="welcomeEmailForm.welcomeExpireDays > 0">
-                  <el-tag size="small" type="info" effect="plain" class="expire-pill">
-                    <Icon icon="ic:outline-access-time" width="13" height="13" style="margin-right: 3px;" />
-                    {{ $t('officialExpireNotice', { days: welcomeEmailForm.welcomeExpireDays }) }}
-                  </el-tag>
-                </div>
-              </div>
-
-              <!-- Sandboxed Email Render with ample padding -->
-              <div class="mock-email-content-box">
-                <el-scrollbar style="max-height: 420px; padding: 14px 18px;">
-                  <ShadowHtml :html="welcomeEmailForm.welcomeContent" />
-                </el-scrollbar>
-              </div>
             </div>
           </div>
         </div>
 
         <template #footer>
-          <!-- 5. Redesigned Actions with Strong Visual Hierarchy & Separation -->
-          <div class="welcome-write-footer">
-            <div class="footer-left">
-              <span class="broadcast-hint" v-if="setting.welcomeLastBroadcast">
-                {{ $t('welcomeRecentBroadcast') }}: {{ formatDetailDate(setting.welcomeLastBroadcast) }}
-              </span>
+          <!-- Bottom Pinned Action & Rules Bar -->
+          <div class="welcome-fullscreen-footer">
+            <div class="footer-left-rules">
+              <!-- Retention TTL -->
+              <div class="rule-item">
+                <span class="rule-label">{{ $t('welcomeExpireDays') }}:</span>
+                <el-select v-model="welcomeEmailForm.welcomeExpireDays" size="small" style="width: 180px;">
+                  <el-option :value="7" :label="$t('welcomeExpire7Days')" />
+                  <el-option :value="14" :label="$t('welcomeExpire14Days')" />
+                  <el-option :value="30" :label="$t('welcomeExpire30Days')" />
+                  <el-option :value="90" :label="$t('welcomeExpire90Days')" />
+                  <el-option :value="0" :label="$t('welcomeExpireNever')" />
+                </el-select>
+              </div>
+
+              <!-- Auto-Send Switch -->
+              <div class="rule-item">
+                <span class="rule-label">{{ $t('welcomeAutoSend') }}:</span>
+                <el-switch v-model="welcomeEmailForm.welcomeAutoSend" :active-value="1" :inactive-value="0" size="small" />
+                <el-tooltip effect="dark" :content="$t('welcomeAutoSendDesc')" placement="top">
+                  <Icon class="warning" icon="fe:warning" width="16" height="16" style="margin-left: 4px; cursor: pointer;"/>
+                </el-tooltip>
+              </div>
+
+              <!-- Last Broadcast Hint -->
+              <div class="rule-item last-broadcast-item" v-if="setting.welcomeLastBroadcast">
+                <div class="broadcast-hint-pill">
+                  <Icon icon="fluent:history-24-regular" width="14" height="14" />
+                  <span>{{ $t('welcomeRecentBroadcast') }}: {{ formatDetailDate(setting.welcomeLastBroadcast) }}</span>
+                </div>
+              </div>
             </div>
-            <div class="footer-right">
-              <!-- Secondary Button: 保存模板配置 (Outline / Ghost / Low Saturation) -->
+
+            <div class="footer-right-actions">
+              <!-- Secondary Button: 保存模板配置 -->
               <el-tooltip :content="$t('welcomeSaveConfig')" effect="dark" placement="top">
                 <el-button
                   :loading="savingWelcome"
@@ -1291,7 +1246,7 @@
                 </el-button>
               </el-tooltip>
 
-              <!-- Primary High-Risk Button: 发送全员欢迎邮件 (Strong Emphasis / Danger Confirmation) -->
+              <!-- Primary Action Button: 发送全员欢迎邮件 -->
               <el-tooltip :content="$t('welcomeBroadcastBtn')" effect="dark" placement="top">
                 <el-button
                   type="primary"
@@ -1524,63 +1479,163 @@ const noticeForm = reactive({
   notice: 0,
   noticeWidth: 0
 })
-
 const DEFAULT_WELCOME_SUBJECT = '🎉 欢迎加入 Epocanvas Mail - 开启您的私密、高效云端邮件体验'
-const DEFAULT_WELCOME_CONTENT = `<div style="max-width: 640px; margin: 0 auto; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1e293b; line-height: 1.6; background: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05);">
-  <div style="background: linear-gradient(135deg, #0284c7 0%, #2563eb 50%, #4f46e5 100%); padding: 36px 32px 30px; text-align: left; position: relative;">
-    <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(255, 255, 255, 0.18); padding: 4px 12px; border-radius: 20px; color: #ffffff; font-size: 13px; font-weight: 600; margin-bottom: 16px; backdrop-filter: blur(8px);">
-      <span>✨ 官方系统引导</span>
+const DEFAULT_WELCOME_CONTENT = `<div style="max-width: 680px; margin: 0 auto; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', Roboto, Helvetica, Arial, sans-serif; color: #1e293b; line-height: 1.6; background: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 10px 30px -4px rgba(0, 0, 0, 0.08);">
+  <!-- Top Banner with Microsoft Azure Gradient & Official Brand Logo -->
+  <div style="background: linear-gradient(135deg, #0078D4 0%, #0284c7 35%, #2563eb 70%, #4338ca 100%); padding: 36px 34px 30px; text-align: left; position: relative;">
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px;">
+      <div style="flex: 1;">
+        <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(255, 255, 255, 0.22); border: 1px solid rgba(255, 255, 255, 0.35); padding: 4px 12px; border-radius: 20px; color: #ffffff; font-size: 12.5px; font-weight: 600; margin-bottom: 12px; backdrop-filter: blur(8px);">
+          <span>✨ 官方系统引导 · 专属独立域名邮箱</span>
+        </div>
+        <h1 style="margin: 0; color: #ffffff; font-size: 23px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.35;">欢迎开启您的专属独立域名邮箱</h1>
+        <p style="margin: 8px 0 0; color: rgba(255, 255, 255, 0.92); font-size: 13.5px; line-height: 1.5;">零门槛免配置 · 纯净无广告 · 国内极速直连 · 专属身份名片 · 轻量强大</p>
+      </div>
+      <!-- Brand Logo SVG Artwork -->
+      <div style="flex-shrink: 0; display: flex; align-items: center; justify-content: center; width: 72px; height: 72px; background: rgba(255, 255, 255, 0.18); border-radius: 18px; border: 1.5px solid rgba(255, 255, 255, 0.35); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);">
+        <svg width="52" height="52" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="6" y="14" width="52" height="36" rx="8" fill="#ffffff" fill-opacity="0.95" />
+          <path d="M6 18L32 36L58 18" stroke="#0078D4" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" />
+          <circle cx="48" cy="14" r="9" fill="#10B981" />
+          <path d="M45 14L47.5 16.5L51.5 11.5" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+          <circle cx="32" cy="40" r="3.5" fill="#0078D4" />
+        </svg>
+      </div>
     </div>
-    <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 700; letter-spacing: -0.02em;">欢迎加入 Epocanvas Mail</h1>
-    <p style="margin: 8px 0 0; color: rgba(255, 255, 255, 0.9); font-size: 14px;">您的私密、纯净且极速的全球云端邮件工作中心已就绪。</p>
   </div>
-  <div style="padding: 32px 32px 24px;">
-    <p style="font-size: 15px; color: #334155; margin-top: 0;">尊敬的用户，您好：</p>
-    <p style="font-size: 14px; color: #475569; line-height: 1.7;">很高兴与您相遇！Epocanvas Mail 致力于为您提供安全自主、零广告干扰且具备极致生产力的全新邮件交互体验。为了帮助您快速上手，我们为您准备了以下核心特性与快速指引：</p>
-    <div style="margin: 24px 0; display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
-      <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px;">
-        <div style="font-size: 20px; margin-bottom: 6px;">🔒</div>
-        <div style="font-weight: 600; font-size: 14px; color: #0f172a; margin-bottom: 4px;">端到端隐私保护</div>
-        <div style="font-size: 12px; color: #64748b; line-height: 1.5;">全方位的防跟踪与垃圾邮件拦截，守护每一封往来信件的安全。</div>
+
+  <div style="padding: 30px 32px 28px;">
+    <p style="font-size: 15px; color: #1e293b; margin-top: 0; font-weight: 700;">尊敬的用户，您好：</p>
+    <p style="font-size: 14px; color: #475569; line-height: 1.75; margin: 0 0 22px;">
+      很高兴与您相遇！这是一个由开发者出资搭建并开放给普通用户的专属独立域名邮箱服务。我们把底层复杂的域名注册、DNS 解析、MX 记录及云端服务器全部封装，让您无需懂技术也能免费拥有专属域名邮箱。为了帮助您快速了解我们为您带来的核心价值，请查阅以下特性与指南：
+    </p>
+
+    <!-- 5 Core Value Cards with Handcrafted Vector SVGs -->
+    <div style="margin: 22px 0; display: flex; flex-direction: column; gap: 14px;">
+      
+      <!-- Card 1: 零门槛拥有专属域名身份 -->
+      <div style="display: flex; gap: 16px; background: linear-gradient(135deg, #f0f7ff 0%, #ffffff 100%); border: 1px solid #bfdbfe; border-radius: 14px; padding: 18px; align-items: flex-start; box-shadow: 0 2px 8px rgba(0, 120, 212, 0.04);">
+        <div style="flex-shrink: 0; width: 48px; height: 48px; border-radius: 12px; background: #e0f2fe; display: flex; align-items: center; justify-content: center;">
+          <svg width="32" height="32" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="24" cy="24" r="22" fill="#EBF3FC"/>
+            <rect x="10" y="14" width="28" height="20" rx="4" fill="#0078D4"/>
+            <rect x="14" y="18" width="8" height="6" rx="2" fill="#FFD700"/>
+            <line x1="26" y1="19" x2="34" y2="19" stroke="white" stroke-width="2" stroke-linecap="round"/>
+            <line x1="26" y1="23" x2="32" y2="23" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+            <circle cx="24" cy="24" r="16" stroke="#0078D4" stroke-opacity="0.25" stroke-dasharray="2 3"/>
+            <path d="M18 30H30" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div style="flex: 1;">
+          <div style="font-weight: 700; font-size: 15px; color: #0f172a; margin-bottom: 4px;">零门槛拥有专属域名身份</div>
+          <div style="font-size: 13.5px; color: #64748b; line-height: 1.6;">告别昂贵域名购买与繁琐的 DNS / MX 解析配置。注册即用专属 <code style="background: #f1f5f9; color: #0078D4; font-weight: 600; padding: 2px 6px; border-radius: 4px; font-size: 12.5px;">你的名字@专属域名</code> 邮箱，零成本拥有一张极客范的专属身份名片。</div>
+        </div>
       </div>
-      <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px;">
-        <div style="font-size: 20px; margin-bottom: 6px;">⚡</div>
-        <div style="font-weight: 600; font-size: 14px; color: #0f172a; margin-bottom: 4px;">稍后处理与代办流</div>
-        <div style="font-size: 12px; color: #64748b; line-height: 1.5;">支持随时推迟邮件至代办，让收件箱重归清爽，聚焦核心要务。</div>
+
+      <!-- Card 2: 纯粹无广告 · 绝不商业变现 -->
+      <div style="display: flex; gap: 16px; background: linear-gradient(135deg, #ecfdf5 0%, #ffffff 100%); border: 1px solid #a7f3d0; border-radius: 14px; padding: 18px; align-items: flex-start; box-shadow: 0 2px 8px rgba(16, 185, 129, 0.04);">
+        <div style="flex-shrink: 0; width: 48px; height: 48px; border-radius: 12px; background: #d1fae5; display: flex; align-items: center; justify-content: center;">
+          <svg width="32" height="32" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="24" cy="24" r="22" fill="#ECFDF5"/>
+            <path d="M24 10L36 15V24C36 31 24 37 24 37C24 37 12 31 12 24V15L24 10Z" fill="#059669"/>
+            <path d="M20 23.5L23 26.5L28.5 20.5" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M37 11L38 13L40 14L38 15L37 17L36 15L34 14L36 13L37 11Z" fill="#10B981"/>
+          </svg>
+        </div>
+        <div style="flex: 1;">
+          <div style="font-weight: 700; font-size: 15px; color: #0f172a; margin-bottom: 4px;">纯粹无广告 · 绝不商业变现</div>
+          <div style="font-size: 13.5px; color: #64748b; line-height: 1.6;">无开屏广告、无弹窗强推，更不扫描信件做广告画像分析。专为纯粹交流打造，还您一个干净、清爽、不被资本盈利逻辑污染的私密沟通领地。</div>
+        </div>
       </div>
-      <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px;">
-        <div style="font-size: 20px; margin-bottom: 6px;">⭐</div>
-        <div style="font-weight: 600; font-size: 14px; color: #0f172a; margin-bottom: 4px;">星标重要与极速检索</div>
-        <div style="font-size: 12px; color: #64748b; line-height: 1.5;">一键归档高优先级信件，毫秒级关键字与语法检索，触手可及。</div>
+
+      <!-- Card 3: 国内极速直连 · 免翻墙不折腾 -->
+      <div style="display: flex; gap: 16px; background: linear-gradient(135deg, #fffbeb 0%, #ffffff 100%); border: 1px solid #fde68a; border-radius: 14px; padding: 18px; align-items: flex-start; box-shadow: 0 2px 8px rgba(245, 158, 11, 0.04);">
+        <div style="flex-shrink: 0; width: 48px; height: 48px; border-radius: 12px; background: #fef3c7; display: flex; align-items: center; justify-content: center;">
+          <svg width="32" height="32" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="24" cy="24" r="22" fill="#FEF3C7"/>
+            <path d="M15 26C13.3431 26 12 24.6569 12 23C12 21.4867 13.1245 20.2361 14.5901 20.0322C15.0874 16.5986 18.0267 14 21.6 14C24.4716 14 26.9385 15.666 27.9175 18.0805C28.4116 17.7126 29.027 17.5 29.7 17.5C31.2464 17.5 32.5 18.7536 32.5 20.3C32.5 20.5694 32.4619 20.8299 32.3912 21.076C34.4608 21.5791 36 23.4609 36 25.7C36 28.351 33.851 30.5 31.2 30.5H15.5" fill="#F59E0B" fill-opacity="0.4"/>
+            <path d="M25 14L17 26H24L22 35L31 22H24L25 14Z" fill="#D97706"/>
+          </svg>
+        </div>
+        <div style="flex: 1;">
+          <div style="font-weight: 700; font-size: 15px; color: #0f172a; margin-bottom: 4px;">国内极速直连 · 免翻墙不折腾</div>
+          <div style="font-size: 13.5px; color: #64748b; line-height: 1.6;">基于全球边缘云网络与国内高速 CDN 节点直连，无需任何网络代理工具即可秒开收发全球邮件，随时随地稳定顺畅。</div>
+        </div>
       </div>
-      <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px;">
-        <div style="font-size: 20px; margin-bottom: 6px;">🌐</div>
-        <div style="font-weight: 600; font-size: 14px; color: #0f172a; margin-bottom: 4px;">多域别名无缝流转</div>
-        <div style="font-size: 12px; color: #64748b; line-height: 1.5;">自由收发多域名前缀，随时切换发送身份，打造多重工作场景。</div>
+
+      <!-- Card 4: 进阶收件箱管理 · 界面轻盈极简 -->
+      <div style="display: flex; gap: 16px; background: linear-gradient(135deg, #f5f3ff 0%, #ffffff 100%); border: 1px solid #ddd6fe; border-radius: 14px; padding: 18px; align-items: flex-start; box-shadow: 0 2px 8px rgba(124, 58, 237, 0.04);">
+        <div style="flex-shrink: 0; width: 48px; height: 48px; border-radius: 12px; background: #ede9fe; display: flex; align-items: center; justify-content: center;">
+          <svg width="32" height="32" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="24" cy="24" r="22" fill="#EDE9FE"/>
+            <rect x="12" y="16" width="24" height="18" rx="3" fill="#7C3AED"/>
+            <path d="M12 20L24 28L36 20" stroke="white" stroke-width="2" stroke-linecap="round"/>
+            <circle cx="33" cy="15" r="5" fill="#EC4899"/>
+            <path d="M33 13V15.5L34.5 16.5" stroke="white" stroke-width="1.2" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div style="flex: 1;">
+          <div style="font-weight: 700; font-size: 15px; color: #0f172a; margin-bottom: 4px;">进阶收件箱管理 · 界面轻盈极简</div>
+          <div style="font-size: 13.5px; color: #64748b; line-height: 1.6;">支持稍后处理（Snooze）代办流、星标重要归档、快捷规则过滤与极速全文检索，具备顶级邮件服务的进阶能力且轻盈敏捷。</div>
+        </div>
+      </div>
+
+      <!-- Card 5: 多别名分发 · 垃圾邮件一键熔断 -->
+      <div style="display: flex; gap: 16px; background: linear-gradient(135deg, #fff1f2 0%, #ffffff 100%); border: 1px solid #fecdd3; border-radius: 14px; padding: 18px; align-items: flex-start; box-shadow: 0 2px 8px rgba(225, 29, 72, 0.04);">
+        <div style="flex-shrink: 0; width: 48px; height: 48px; border-radius: 12px; background: #ffe4e6; display: flex; align-items: center; justify-content: center;">
+          <svg width="32" height="32" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="24" cy="24" r="22" fill="#FFE4E6"/>
+            <circle cx="16" cy="24" r="5" fill="#E11D48"/>
+            <circle cx="32" cy="16" r="4" fill="#E11D48" fill-opacity="0.8"/>
+            <circle cx="32" cy="32" r="4" fill="#E11D48" fill-opacity="0.8"/>
+            <path d="M21 24H26M26 24L30 18M26 24L30 30" stroke="#E11D48" stroke-width="2.2" stroke-linecap="round"/>
+            <circle cx="24" cy="24" r="3" fill="#FFE4E6" stroke="#E11D48" stroke-width="1.8"/>
+          </svg>
+        </div>
+        <div style="flex: 1;">
+          <div style="font-weight: 700; font-size: 15px; color: #0f172a; margin-bottom: 4px;">多别名分发 · 垃圾邮件一键熔断</div>
+          <div style="font-size: 13.5px; color: #64748b; line-height: 1.6;">支持为不同网站或平台独立分配别名。若某个外部平台发生泄露或骚扰，随时单向熔断该别名，主邮箱始终安全无虞。</div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Interactive Call-To-Action (CTA) Buttons -->
+    <div style="text-align: center; margin: 28px 0 20px;">
+      <a href="/inbox" style="display: inline-block; background: linear-gradient(135deg, #0078D4 0%, #2563eb 100%); color: #ffffff; text-decoration: none; font-weight: 700; font-size: 14.5px; padding: 12px 28px; border-radius: 9999px; box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35); margin: 0 8px 10px;">
+        🚀 开启我的收件箱
+      </a>
+      <a href="/settings/profile" style="display: inline-block; background: #ffffff; color: #0078D4; text-decoration: none; font-weight: 600; font-size: 14px; padding: 11px 24px; border-radius: 9999px; border: 1.5px solid #bfdbfe; margin: 0 8px 10px;">
+        ⚙️ 管理域名与别名
+      </a>
+    </div>
+
+    <!-- 3-Step Quick Start Guide -->
+    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 20px 22px; margin: 20px 0;">
+      <div style="font-weight: 700; font-size: 14.5px; color: #1e293b; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="#0078D4"/>
+        </svg>
+        <span>新手 3 步快速上手指引</span>
+      </div>
+      <div style="font-size: 13.5px; color: #475569; line-height: 1.85;">
+        <div><strong>1. 体验星标与代办归档：</strong> 本邮件已自动放入您的【稍后处理 / 代办】与【星标 / 重要】中，体验快捷归档。</div>
+        <div><strong>2. 探索多别名与个性化外观：</strong> 前往「系统设置」体验多别名分发规则与个性化主题切换。</div>
+        <div><strong>3. 开启您的首封信件：</strong> 点击顶栏「写邮件」，即刻体验极速撰写与全球稳定投递。</div>
       </div>
     </div>
-    <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 12px; padding: 18px; margin: 20px 0;">
-      <div style="font-weight: 600; font-size: 14px; color: #1e40af; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
-        <span>🚀 3 步开启高效邮件之旅</span>
-      </div>
-      <div style="font-size: 13px; color: #1e3a8a; line-height: 1.8;">
-        <div><strong>1. 体验代办分类：</strong> 本邮件已自动放入您的【稍后处理 / 代办】与【星标 / 重要】中，体验快捷归档。</div>
-        <div><strong>2. 探索个性化外观：</strong> 前往「系统设置」体验星空动态 UI、登录背景自定义与多语言自由切换。</div>
-        <div><strong>3. 开启首封信件：</strong> 点击顶栏「写邮件」，即刻体验极速富文本撰写与全球极速投递。</div>
-      </div>
-    </div>
-    <div style="margin-top: 24px; padding-top: 16px; border-top: 1px dashed #cbd5e1; font-size: 12px; color: #94a3b8; line-height: 1.6;">
-      <div>📌 <strong>温馨提示：</strong> 此邮件由系统官方自动发送（admin@epocanvas.com）。站长设定了自动清理周期，到期后将自动从您的邮箱中安全移除，无需手动清理。</div>
-      <div style="margin-top: 8px;">Epocanvas Mail 官方团队 · 敬上</div>
+
+    <div style="margin-top: 24px; padding-top: 16px; border-top: 1px dashed #cbd5e1; font-size: 12.5px; color: #94a3b8; line-height: 1.65;">
+      <div>📌 <strong>系统说明：</strong> 此邮件由系统官方自动发送。站长配置了自动清理周期，到期后将自动从您的邮箱中安全移除，无需手动清理。</div>
+      <div style="margin-top: 10px; font-weight: 600; color: #64748b;">Epocanvas Mail 官方团队 · 敬上</div>
     </div>
   </div>
 </div>`
 
 const welcomeEmailShow = ref(false)
-const isWelcomePreview = ref(false)
+const isWelcomeFullscreen = ref(false)
 const welcomeEditorRef = ref(null)
 const welcomeEditorFormat = ref('rich') // 'rich' | 'source'
-const previewDark = ref(true)
 const sendingWelcome = ref(false)
 const savingWelcome = ref(false)
 const welcomeEmailForm = reactive({
@@ -1590,6 +1645,79 @@ const welcomeEmailForm = reactive({
   welcomeExpireDays: 7,
   welcomeAutoSend: 1
 })
+
+function compileMarkdownToHtml(src) {
+  if (!src) return ''
+  let text = src.trim()
+
+  // If already HTML container or document, retain as-is
+  if (text.startsWith('<div') || text.startsWith('<html') || text.startsWith('<!DOCTYPE') || text.startsWith('<table') || text.startsWith('<section')) {
+    return text
+  }
+
+  // Extract and preserve code blocks
+  const codeBlocks = []
+  text = text.replace(/```([a-zA-Z0-9_-]*)\n([\s\S]*?)```/g, (match, lang, code) => {
+    const placeholder = `%%CODE_BLOCK_${codeBlocks.length}%%`
+    const escapedCode = code.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    codeBlocks.push(`<pre style="background: #0f172a; color: #f8fafc; padding: 14px 18px; border-radius: 8px; font-family: 'JetBrains Mono', Consolas, Monaco, monospace; font-size: 13px; overflow-x: auto; margin: 14px 0; line-height: 1.5;"><code>${escapedCode}</code></pre>`)
+    return placeholder
+  })
+
+  // Headers
+  text = text.replace(/^######\s+(.*)$/gm, '<h6 style="font-size: 13px; font-weight: 700; color: #334155; margin: 12px 0 6px;">$1</h6>')
+  text = text.replace(/^#####\s+(.*)$/gm, '<h5 style="font-size: 14px; font-weight: 700; color: #334155; margin: 14px 0 6px;">$1</h5>')
+  text = text.replace(/^####\s+(.*)$/gm, '<h4 style="font-size: 15px; font-weight: 700; color: #1e293b; margin: 16px 0 8px;">$1</h4>')
+  text = text.replace(/^###\s+(.*)$/gm, '<h3 style="font-size: 17px; font-weight: 700; color: #1e293b; margin: 18px 0 8px;">$1</h3>')
+  text = text.replace(/^##\s+(.*)$/gm, '<h2 style="font-size: 20px; font-weight: 700; color: #0f172a; margin: 22px 0 10px; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px;">$1</h2>')
+  text = text.replace(/^#\s+(.*)$/gm, '<h1 style="font-size: 24px; font-weight: 800; color: #0f172a; margin: 24px 0 12px; letter-spacing: -0.02em;">$1</h1>')
+
+  // Blockquotes
+  text = text.replace(/^>\s+(.*)$/gm, '<blockquote style="border-left: 4px solid #0078D4; background: #f0f9ff; margin: 12px 0; padding: 10px 16px; color: #0369a1; border-radius: 0 8px 8px 0; font-size: 13.5px; line-height: 1.6;">$1</blockquote>')
+
+  // Horizontal rules
+  text = text.replace(/^---$/gm, '<hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />')
+  text = text.replace(/^\*\*\*$/gm, '<hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />')
+
+  // Bold and Italic
+  text = text.replace(/\*\*\*(.*?)\*\*\*/g, '<strong><em>$1</em></strong>')
+  text = text.replace(/\*\*(.*?)\*\*/g, '<strong style="font-weight: 700; color: #0f172a;">$1</strong>')
+  text = text.replace(/__(.*?)__/g, '<strong style="font-weight: 700; color: #0f172a;">$1</strong>')
+  text = text.replace(/\*(.*?)\*/g, '<em>$1</em>')
+  text = text.replace(/_(.*?)_/g, '<em>$1</em>')
+
+  // Inline code
+  text = text.replace(/`([^`]+)`/g, '<code style="background: #f1f5f9; color: #0284c7; padding: 2px 6px; border-radius: 4px; font-size: 12.5px; font-family: monospace;">$1</code>')
+
+  // Links
+  text = text.replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" target="_blank" style="color: #0078D4; text-decoration: underline; font-weight: 500;">$1</a>')
+
+  // Unordered list items
+  text = text.replace(/^[\t ]*[-*+][\t ]+(.*)$/gm, '<li>$1</li>')
+  text = text.replace(/(<li>[\s\S]*?<\/li>[\n\r]*)+/g, (match) => `<ul style="margin: 12px 0 12px 24px; padding: 0; color: #334155; font-size: 14px; line-height: 1.65;">\n${match.trim()}\n</ul>\n`)
+
+  // Paragraphs
+  const paragraphs = text.split(/\n{2,}/).map(p => {
+    p = p.trim()
+    if (!p) return ''
+    if (p.startsWith('<h') || p.startsWith('<blockquote') || p.startsWith('<pre') || p.startsWith('<ul') || p.startsWith('<ol') || p.startsWith('<hr') || p.startsWith('<div') || p.startsWith('%%CODE_BLOCK_')) {
+      return p
+    }
+    return `<p style="margin: 10px 0; font-size: 14px; line-height: 1.7; color: #334155;">${p.replace(/\n/g, '<br/>')}</p>`
+  }).filter(Boolean).join('\n')
+
+  let result = paragraphs
+  codeBlocks.forEach((block, idx) => {
+    result = result.replace(`%%CODE_BLOCK_${idx}%%`, block)
+  })
+
+  // Wrap in a Microsoft Fluent styled card container if not already wrapped
+  if (!result.includes('max-width:')) {
+    result = `<div style="max-width: 680px; margin: 0 auto; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', Roboto, Helvetica, Arial, sans-serif; color: #1e293b; line-height: 1.6; background: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0; padding: 28px 32px; box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05);">\n${result}\n</div>`
+  }
+
+  return result
+}
 
 const regKeyOptions = computed(() => [
   {label: t('enable'), value: 0},
@@ -1811,69 +1939,79 @@ function openWelcomeEmailSetting() {
   welcomeEmailForm.welcomeText = setting.value.welcomeText || ''
   welcomeEmailForm.welcomeExpireDays = setting.value.welcomeExpireDays !== undefined ? Number(setting.value.welcomeExpireDays) : 7
   welcomeEmailForm.welcomeAutoSend = setting.value.welcomeAutoSend !== undefined ? Number(setting.value.welcomeAutoSend) : 1
-  isWelcomePreview.value = false
   welcomeEditorFormat.value = 'rich'
-  previewDark.value = uiStore.dark
+  isWelcomeFullscreen.value = false
   welcomeEmailShow.value = true
+}
+
+function toggleFullscreen() {
+  isWelcomeFullscreen.value = !isWelcomeFullscreen.value
+}
+
+function insertMarkdownSyntax(prefix, suffix = '') {
+  const textarea = document.querySelector('.source-textarea-fullscreen textarea')
+  if (!textarea) return
+  const start = textarea.selectionStart || 0
+  const end = textarea.selectionEnd || 0
+  const text = welcomeEmailForm.welcomeContent || ''
+  const selected = text.substring(start, end)
+  const replacement = `${prefix}${selected || '内容'}${suffix}`
+  welcomeEmailForm.welcomeContent = text.substring(0, start) + replacement + text.substring(end)
+  nextTick(() => {
+    textarea.focus()
+    textarea.setSelectionRange(start + prefix.length, start + prefix.length + (selected.length || 2))
+  })
 }
 
 function resetToDefaultWelcomeTemplate() {
   welcomeEmailForm.welcomeSubject = DEFAULT_WELCOME_SUBJECT
   welcomeEmailForm.welcomeContent = DEFAULT_WELCOME_CONTENT
-  if (welcomeEditorRef.value) {
+  if (welcomeEditorFormat.value === 'rich' && welcomeEditorRef.value) {
     welcomeEditorRef.value.clearEditor()
     nextTick(() => {
       if (welcomeEditorRef.value) {
-        welcomeEmailForm.welcomeContent = DEFAULT_WELCOME_CONTENT
+        welcomeEditorRef.value.setContent(DEFAULT_WELCOME_CONTENT)
       }
     })
   }
   ElMessage.success(t('welcomeResetTemplate') || '已恢复官方默认模板')
 }
 
-function toggleEditorFormat() {
-  if (welcomeEditorFormat.value === 'rich') {
-    if (welcomeEditorRef.value) {
-      const current = welcomeEditorRef.value.getContent()
-      if (current !== undefined && current !== '') {
-        welcomeEmailForm.welcomeContent = current
-      }
-    }
-    welcomeEditorFormat.value = 'source'
-  } else {
+function setEditorFormat(format) {
+  if (welcomeEditorFormat.value === format) return
+  if (format === 'rich') {
+    // Switching from source/markdown to rich text
+    let content = welcomeEmailForm.welcomeContent || ''
+    content = compileMarkdownToHtml(content)
+    welcomeEmailForm.welcomeContent = content
     welcomeEditorFormat.value = 'rich'
     nextTick(() => {
-      if (welcomeEditorRef.value) {
-        welcomeEditorRef.value.setContent(welcomeEmailForm.welcomeContent)
+      if (welcomeEditorRef.value && welcomeEditorRef.value.setContent) {
+        welcomeEditorRef.value.setContent(content)
       }
     })
+  } else {
+    // Switching from rich text to source
+    if (welcomeEditorRef.value && welcomeEditorRef.value.getContent) {
+      try {
+        const current = welcomeEditorRef.value.getContent()
+        if (current && current.trim()) {
+          welcomeEmailForm.welcomeContent = current
+        }
+      } catch (e) {}
+    }
+    if (!welcomeEmailForm.welcomeContent || !welcomeEmailForm.welcomeContent.trim()) {
+      welcomeEmailForm.welcomeContent = DEFAULT_WELCOME_CONTENT
+    }
+    welcomeEditorFormat.value = 'source'
   }
 }
 
 function clearWelcomeContent() {
   welcomeEmailForm.welcomeContent = ''
-  if (welcomeEditorRef.value) {
+  if (welcomeEditorFormat.value === 'rich' && welcomeEditorRef.value) {
     welcomeEditorRef.value.clearEditor()
   }
-}
-
-function switchWelcomeView(preview) {
-  if (preview) {
-    if (welcomeEditorFormat.value === 'rich' && welcomeEditorRef.value) {
-      const current = welcomeEditorRef.value.getContent()
-      if (current !== undefined) {
-        welcomeEmailForm.welcomeContent = current
-      }
-    }
-    previewDark.value = uiStore.dark
-  } else {
-    nextTick(() => {
-      if (welcomeEditorFormat.value === 'rich' && welcomeEditorRef.value) {
-        welcomeEditorRef.value.setContent(welcomeEmailForm.welcomeContent)
-      }
-    })
-  }
-  isWelcomePreview.value = preview
 }
 
 function onWelcomeContentChange(content) {
@@ -1881,23 +2019,26 @@ function onWelcomeContentChange(content) {
 }
 
 function closeWelcomeDialog() {
-  isWelcomePreview.value = false
   welcomeEditorFormat.value = 'rich'
+  isWelcomeFullscreen.value = false
 }
 
 function saveWelcomeTemplate() {
   if (savingWelcome.value) return
-  if (!isWelcomePreview.value && welcomeEditorFormat.value === 'rich' && welcomeEditorRef.value) {
+  let finalContent = welcomeEmailForm.welcomeContent || ''
+  if (welcomeEditorFormat.value === 'rich' && welcomeEditorRef.value) {
     const current = welcomeEditorRef.value.getContent()
     if (current !== undefined) {
-      welcomeEmailForm.welcomeContent = current
+      finalContent = current
     }
   }
+  finalContent = compileMarkdownToHtml(finalContent)
+  welcomeEmailForm.welcomeContent = finalContent
 
   savingWelcome.value = true
   const payload = {
     welcomeSubject: welcomeEmailForm.welcomeSubject || DEFAULT_WELCOME_SUBJECT,
-    welcomeContent: welcomeEmailForm.welcomeContent,
+    welcomeContent: finalContent,
     welcomeExpireDays: Number(welcomeEmailForm.welcomeExpireDays),
     welcomeAutoSend: Number(welcomeEmailForm.welcomeAutoSend)
   }
@@ -1917,12 +2058,15 @@ function saveWelcomeTemplate() {
 
 function confirmBroadcastWelcome() {
   if (sendingWelcome.value) return
-  if (!isWelcomePreview.value && welcomeEditorFormat.value === 'rich' && welcomeEditorRef.value) {
+  let finalContent = welcomeEmailForm.welcomeContent || ''
+  if (welcomeEditorFormat.value === 'rich' && welcomeEditorRef.value) {
     const current = welcomeEditorRef.value.getContent()
     if (current !== undefined) {
-      welcomeEmailForm.welcomeContent = current
+      finalContent = current
     }
   }
+  finalContent = compileMarkdownToHtml(finalContent)
+  welcomeEmailForm.welcomeContent = finalContent
 
   ElMessageBox.confirm(
     t('broadcastConfirmHighRiskMsg') || t('welcomeBroadcastConfirmMsg'),
@@ -1938,7 +2082,7 @@ function confirmBroadcastWelcome() {
     sendingWelcome.value = true
     const payload = {
       welcomeSubject: welcomeEmailForm.welcomeSubject || DEFAULT_WELCOME_SUBJECT,
-      welcomeContent: welcomeEmailForm.welcomeContent,
+      welcomeContent: finalContent,
       welcomeExpireDays: Number(welcomeEmailForm.welcomeExpireDays),
       welcomeAutoSend: Number(welcomeEmailForm.welcomeAutoSend)
     }
@@ -2827,14 +2971,14 @@ function editSetting(settingForm, refreshStatus = true) {
   }
 }
 
-:deep(.notice-popup.el-dialog), :deep(.auth-prompt-dialog.el-dialog), :deep(.welcome-write-dialog.el-dialog) {
+:deep(.notice-popup.el-dialog), :deep(.auth-prompt-dialog.el-dialog) {
   min-height: 300px;
-  width: 980px !important;
-  max-width: min(980px, calc(100vw - 40px)) !important;
-  @media (max-width: 1040px) {
-    width: calc(100% - 40px) !important;
-    margin-right: 20px !important;
-    margin-left: 20px !important;
+  width: 1160px !important;
+  max-width: min(1160px, calc(100vw - 32px)) !important;
+  @media (max-width: 1200px) {
+    width: calc(100% - 32px) !important;
+    margin-right: 16px !important;
+    margin-left: 16px !important;
   }
 }
 
@@ -3048,6 +3192,27 @@ function editSetting(settingForm, refreshStatus = true) {
 
 .opt-button {
   width: fit-content !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 5px 12px !important;
+  line-height: 1 !important;
+  box-sizing: border-box !important;
+
+  :deep(span) {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    line-height: 1 !important;
+    gap: 4px !important;
+  }
+
+  :deep(svg), svg {
+    display: block !important;
+    margin: 0 auto !important;
+    flex-shrink: 0 !important;
+    vertical-align: middle !important;
+  }
 }
 
 .email-prefix {
@@ -3595,32 +3760,72 @@ form .el-button {
   }
 }
 
-/* Welcome Write Dialog (Refactored System Architecture) */
-:deep(.welcome-write-dialog) {
-  width: 980px !important;
-  max-width: min(980px, calc(100vw - 40px)) !important;
-  border-radius: 14px;
-  overflow: hidden;
-  box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.45);
+/* Welcome Email Dialog Architecture (Spacious Modal Canvas + Fullscreen Mode) */
+:deep(.welcome-dialog-canvas) {
+  width: min(1140px, calc(100vw - 48px)) !important;
+  max-width: min(1140px, calc(100vw - 48px)) !important;
+  margin: 3.5vh auto !important;
+  max-height: calc(100vh - 7vh) !important;
+  border-radius: 16px !important;
   background: var(--el-bg-color);
+  box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.4), 0 0 0 1px var(--el-border-color-lighter) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  z-index: 2000;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+  &.is-fullscreen {
+    position: fixed !important;
+    top: 50px !important; /* Retain global top header */
+    bottom: 22px !important; /* Retain global bottom statusbar */
+    left: 12px !important;
+    right: 12px !important;
+    width: calc(100vw - 24px) !important;
+    max-width: calc(100vw - 24px) !important;
+    height: calc(100vh - 72px) !important;
+    max-height: calc(100vh - 72px) !important;
+    margin: 0 !important;
+    border-radius: 12px !important;
+
+    .el-dialog__body {
+      height: calc(100vh - 190px) !important;
+      max-height: calc(100vh - 190px) !important;
+    }
+  }
 
   .el-dialog__header {
     margin-right: 0;
-    padding: 16px 24px;
+    padding: 14px 24px;
     border-bottom: 1px solid var(--el-border-color-lighter);
     background: var(--el-bg-color);
+    flex-shrink: 0;
   }
 
   .el-dialog__body {
-    padding: 20px 24px 16px;
+    padding: 16px 24px;
     background: var(--el-bg-color);
+    overflow-y: auto;
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    height: calc(100vh - 200px);
+    max-height: calc(100vh - 200px);
   }
 
   .el-dialog__footer {
-    padding: 16px 24px 18px;
+    padding: 12px 24px;
     border-top: 1px solid var(--el-border-color-lighter);
     background: var(--el-bg-color);
+    flex-shrink: 0;
   }
+}
+
+:deep(.el-overlay:has(.welcome-dialog-canvas.is-fullscreen)) {
+  top: 50px !important;
+  bottom: 22px !important;
+  height: calc(100vh - 72px) !important;
 }
 
 .write-dialog-top {
@@ -3633,525 +3838,304 @@ form .el-button {
   .top-left {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 12px;
     min-width: 0;
     flex-shrink: 0;
 
     .quill-badge {
-      display: flex;
+      display: inline-flex;
       align-items: center;
       justify-content: center;
-      width: 32px;
-      height: 32px;
-      border-radius: 8px;
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
       background: var(--el-color-primary-light-9);
       color: var(--el-color-primary);
       flex-shrink: 0;
+      line-height: 1;
+
+      :deep(svg), svg {
+        display: block;
+        margin: 0 auto;
+        flex-shrink: 0;
+      }
     }
 
     .dialog-main-title {
-      font-size: 15px;
+      font-size: 16.5px;
       font-weight: 700;
       color: var(--el-text-color-primary);
       white-space: nowrap;
       flex-shrink: 0;
     }
-
-    .sender-identity-chip {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 4px 10px;
-      background: var(--el-fill-color-light);
-      border: 1px solid var(--el-border-color-lighter);
-      border-radius: 6px;
-      font-size: 12px;
-      white-space: nowrap;
-
-      .verified-icon {
-        color: #0284c7;
-        flex-shrink: 0;
-      }
-
-      .sender-name {
-        font-weight: 600;
-        color: var(--el-text-color-primary);
-      }
-
-      .sender-email {
-        color: var(--el-text-color-secondary);
-      }
-
-      @media (max-width: 860px) {
-        .sender-email {
-          display: none;
-        }
-      }
-    }
   }
 
   .top-spacer {
     flex: 1 1 auto;
-    min-width: 8px;
+    min-width: 12px;
   }
 
   .top-right {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
     flex-shrink: 0;
-
-    .view-switch-capsule {
-      display: flex;
-      align-items: center;
-      background: var(--el-fill-color);
-      border-radius: 8px;
-      padding: 3px;
-      gap: 3px;
-
-      .capsule-btn {
-        display: flex;
-        align-items: center;
-        gap: 5px;
-        padding: 4px 12px;
-        border-radius: 6px;
-        font-size: 12px;
-        font-weight: 500;
-        cursor: pointer;
-        color: var(--el-text-color-secondary);
-        transition: all 0.2s ease;
-
-        &:hover {
-          color: var(--el-text-color-primary);
-        }
-
-        &.active {
-          background: var(--el-bg-color);
-          color: var(--el-color-primary);
-          font-weight: 600;
-          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-        }
-      }
-    }
-
-    .header-action-group {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-
-      .tool-icon-btn {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 32px;
-        height: 32px;
-        border-radius: 4px;
-        background: var(--el-fill-color);
-        color: var(--el-text-color-regular);
-        cursor: pointer;
-        transition: all 0.2s ease;
-
-        &:hover {
-          background: var(--el-fill-color-darker);
-          color: var(--el-color-primary);
-        }
-
-        &.theme-toggle {
-          color: #eab308;
-        }
-      }
-
-      .close-icon-btn {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 32px;
-        height: 32px;
-        border-radius: 4px;
-        color: var(--el-text-color-secondary);
-        cursor: pointer;
-        transition: all 0.2s ease;
-
-        &:hover {
-          background: var(--el-fill-color);
-          color: var(--el-text-color-primary);
-        }
-      }
-    }
   }
 }
 
-.welcome-write-body {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+/* Strictly centered Tool Icon Buttons */
+.tool-icon-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 32px !important;
+  height: 32px !important;
+  border-radius: 8px !important;
+  border: 1px solid transparent !important;
+  background: transparent !important;
+  color: var(--el-text-color-regular) !important;
+  cursor: pointer !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  line-height: 1 !important;
+  box-sizing: border-box !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+
+  :deep(svg), svg {
+    display: block !important;
+    margin: 0 auto !important;
+    flex-shrink: 0 !important;
+    vertical-align: middle !important;
+  }
+
+  &:hover {
+    background: var(--el-fill-color) !important;
+    color: var(--el-color-primary) !important;
+  }
+
+  &.active {
+    background: rgba(0, 120, 212, 0.12) !important;
+    color: #0078D4 !important;
+    border-color: rgba(0, 120, 212, 0.3) !important;
+    font-weight: 600 !important;
+  }
+
+  &.danger-hover:hover {
+    background: rgba(239, 68, 68, 0.1) !important;
+    color: #ef4444 !important;
+  }
 }
 
-.write-flow-view {
+.tool-divider {
+  width: 1px;
+  height: 18px;
+  background: var(--el-border-color-lighter);
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+
+.welcome-dialog-body {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
+  flex: 1 1 auto;
+  min-height: 0;
 
-  /* Dual-Card Group: Audience vs Attributes */
-  .meta-cards-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 14px;
-
-    .meta-group-card {
-      background: var(--el-fill-color-light);
-      border: 1px solid var(--el-border-color-lighter);
-      border-radius: 10px;
-      padding: 10px 14px;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-
-      .group-header {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        font-size: 12px;
-        font-weight: 700;
-        color: var(--el-text-color-secondary);
-        text-transform: uppercase;
-        letter-spacing: 0.04em;
-      }
-
-      .group-content {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        flex-wrap: wrap;
-
-        .audience-chip {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          background: var(--el-bg-color);
-          padding: 6px 12px;
-          border-radius: 9999px;
-          border: 1px solid var(--el-border-color-lighter);
-          font-size: 13px;
-          font-weight: 500;
-          color: var(--el-text-color-primary);
-          box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
-        }
-
-        .attr-chip {
-          display: inline-flex;
-          align-items: center;
-          gap: 5px;
-          padding: 6px 12px;
-          border-radius: 9999px;
-          font-size: 13px;
-          font-weight: 600;
-
-          &.official {
-            background: rgba(2, 132, 199, 0.12);
-            color: #0284c7;
-            border: 1px solid rgba(2, 132, 199, 0.3);
-          }
-
-          &.star {
-            background: rgba(234, 179, 8, 0.12);
-            color: #d97706;
-            border: 1px solid rgba(234, 179, 8, 0.3);
-          }
-
-          &.todo {
-            background: rgba(99, 102, 241, 0.12);
-            color: #6366f1;
-            border: 1px solid rgba(99, 102, 241, 0.3);
-          }
-        }
-      }
-    }
-  }
-
-  .compose-subject-bar {
-    .write-subject-input :deep(.el-input__wrapper) {
-      border-radius: 8px;
-      font-weight: 600;
-      padding: 6px 14px;
-      font-size: 14px;
-    }
-  }
-
-  .compose-editor-area {
-    min-height: 380px;
-    border: 1px solid var(--el-border-color-lighter);
-    border-radius: 8px;
-    overflow: hidden;
-
-    .custom-tiny-editor {
-      height: 380px;
-    }
-
-    .source-editor-wrapper {
-      height: 380px;
-
-      .source-textarea :deep(.el-textarea__inner) {
-        height: 380px !important;
-        font-family: 'JetBrains Mono', Consolas, Monaco, monospace;
-        font-size: 13px;
-        line-height: 1.6;
-        border-radius: 0;
-        border: none;
-      }
-    }
-  }
-
-  /* Dedicated Auxiliary Configuration Card */
-  .auxiliary-config-card {
+  .welcome-recipients-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 16px;
     background: var(--el-fill-color-light);
     border: 1px solid var(--el-border-color-lighter);
     border-radius: 10px;
-    padding: 10px 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
+    flex-shrink: 0;
 
-    .config-card-header {
+    .recipients-label {
       display: flex;
       align-items: center;
       gap: 6px;
-      font-size: 12px;
       font-weight: 700;
-      color: var(--el-text-color-secondary);
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-    }
+      font-size: 13.5px;
+      color: var(--el-text-color-regular);
 
-    .config-card-body {
-      display: flex;
-      align-items: center;
-      gap: 20px;
-      flex-wrap: wrap;
-
-      .config-item {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        font-size: 13px;
-        color: var(--el-text-color-regular);
-
-        .config-label {
-          font-weight: 600;
-          white-space: nowrap;
-        }
-      }
-
-      .storage-tag-item {
-        margin-left: auto;
-
-        .storage-pill {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          font-size: 12px;
-          font-weight: 500;
-          color: var(--el-text-color-secondary);
-          background: var(--el-bg-color);
-          padding: 4px 10px;
-          border-radius: 6px;
-          border: 1px solid var(--el-border-color-lighter);
-        }
-      }
-    }
-  }
-}
-
-.preview-flow-view {
-  border-radius: 12px;
-  overflow: hidden;
-  border: 1px solid var(--el-border-color-lighter);
-  min-height: 520px;
-  transition: all 0.3s ease;
-
-  &.light-theme-preview {
-    background: #f8fafc;
-    color: #1e293b;
-
-    .real-inbox-mock {
-      background: #ffffff;
-      border: 1px solid #e2e8f0;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
-    }
-
-    .mock-email-head {
-      border-bottom: 1px solid #f1f5f9;
-
-      .mock-sender-name {
-        color: #0f172a;
-      }
-
-      .mock-sender-email, .mock-to-email, .mock-head-date {
-        color: #64748b;
+      .recipients-icon {
+        color: var(--el-color-primary);
+        display: block;
       }
     }
 
-    .mock-official-banner {
-      background: #eff6ff;
-      border: 1px solid #bfdbfe;
-      box-shadow: 0 2px 8px rgba(2, 132, 199, 0.08);
-
-      .banner-heading span {
-        color: #1e40af;
-      }
-
-      .banner-subtitle {
-        color: #2563eb;
-      }
-    }
-  }
-
-  &.dark-theme-preview {
-    background: #09090b;
-    color: #f4f4f5;
-
-    .real-inbox-mock {
-      background: #18181b;
-      border: 1px solid #27272a;
-      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.45);
-    }
-
-    .mock-email-head {
-      border-bottom: 1px solid #27272a;
-
-      .mock-sender-name {
-        color: #fafafa;
-      }
-
-      .mock-sender-email, .mock-to-email, .mock-head-date {
-        color: #a1a1aa;
-      }
-    }
-
-    .mock-official-banner {
-      background: rgba(30, 58, 138, 0.28);
-      border: 1px solid rgba(59, 130, 246, 0.4);
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-
-      .banner-heading span {
-        color: #93c5fd;
-      }
-
-      .banner-subtitle {
-        color: #bfdbfe;
-      }
-    }
-  }
-
-  .real-inbox-mock {
-    margin: 16px 20px;
-    border-radius: 12px;
-    overflow: hidden;
-  }
-
-  .mock-email-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 18px 22px;
-
-    .mock-head-main {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-
-      .mock-avatar-official {
-        background: linear-gradient(135deg, #0284c7, #2563eb);
-        color: #ffffff;
-        flex-shrink: 0;
-      }
-
-      .mock-meta-col {
-        display: flex;
-        flex-direction: column;
-        gap: 3px;
-
-        .mock-meta-line-1 {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          font-weight: 700;
-          font-size: 14px;
-        }
-
-        .mock-meta-line-2 {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          font-size: 12px;
-        }
-      }
-    }
-
-    .mock-head-date {
-      font-size: 12px;
-    }
-  }
-
-  .mock-official-banner {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 14px 18px;
-    margin: 16px 22px;
-    border-radius: 10px;
-
-    .banner-left {
+    .recipients-content {
       display: flex;
       align-items: center;
       gap: 8px;
 
-      .banner-heading {
-        display: flex;
+      .audience-pill {
+        display: inline-flex;
         align-items: center;
-        gap: 6px;
-        font-weight: 700;
+        background: var(--el-bg-color);
+        padding: 4px 14px;
+        border-radius: 9999px;
+        border: 1px solid var(--el-border-color-lighter);
         font-size: 13px;
+        font-weight: 600;
+        color: var(--el-text-color-primary);
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
       }
 
-      .banner-subtitle {
-        font-size: 12px;
-        margin-top: 1px;
+      .recipients-subtext {
+        font-size: 12.5px;
+        color: var(--el-text-color-secondary);
       }
     }
   }
 
-  .mock-email-content-box {
-    padding: 0 22px 22px;
+  .welcome-subject-bar {
+    flex-shrink: 0;
+
+    .write-subject-input :deep(.el-input__wrapper) {
+      border-radius: 10px;
+      font-weight: 600;
+      padding: 8px 16px;
+      font-size: 15px;
+      height: 44px;
+    }
+  }
+
+  .welcome-editor-card {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--el-border-color-lighter);
+    border-radius: 12px;
+    overflow: hidden;
+    min-height: 380px;
+    background: var(--el-bg-color);
+
+    .editor-toolbar-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 12px;
+      background: var(--el-fill-color-light);
+      border-bottom: 1px solid var(--el-border-color-lighter);
+      flex-shrink: 0;
+
+      .editor-left-tools {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        flex-wrap: wrap;
+      }
+
+      .toolbar-spacer {
+        flex: 1 1 auto;
+        min-width: 12px;
+      }
+
+      .editor-right-tools {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        flex-shrink: 0;
+      }
+    }
+
+    .editor-mount-area {
+      flex: 1 1 auto;
+      display: flex;
+      flex-direction: column;
+      min-height: 340px;
+      height: 100%;
+
+      .dialog-tiny-editor {
+        flex: 1 1 auto;
+        height: 100% !important;
+        min-height: 340px;
+      }
+
+      .source-editor-fullscreen {
+        flex: 1 1 auto;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+
+        .source-textarea-fullscreen {
+          flex: 1 1 auto;
+          height: 100%;
+          display: flex;
+
+          :deep(.el-textarea__inner) {
+            height: 100% !important;
+            min-height: 340px;
+            font-family: 'JetBrains Mono', Consolas, Monaco, monospace;
+            font-size: 13.5px;
+            line-height: 1.65;
+            border: none;
+            border-radius: 0;
+            padding: 16px 20px;
+            background: var(--el-bg-color);
+            color: var(--el-text-color-primary);
+          }
+        }
+      }
+    }
   }
 }
 
-.welcome-write-footer {
+.welcome-fullscreen-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
   width: 100%;
+  gap: 16px;
 
-  .footer-left {
-    .broadcast-hint {
-      font-size: 12px;
+  .footer-left-rules {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    flex-wrap: wrap;
+
+    .rule-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13.5px;
+      color: var(--el-text-color-regular);
+
+      .rule-label {
+        font-weight: 600;
+        white-space: nowrap;
+      }
+    }
+
+    .broadcast-hint-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 14px;
+      border-radius: 9999px;
+      background: var(--el-fill-color-light);
+      border: 1px solid var(--el-border-color-lighter);
+      font-size: 12.5px;
       color: var(--el-text-color-secondary);
     }
   }
 
-  .footer-right {
+  .footer-right-actions {
     display: flex;
     align-items: center;
-    gap: 18px;
+    gap: 16px;
+    flex-shrink: 0;
 
     .btn-save-secondary {
-      height: 38px;
-      padding: 8px 18px;
-      border-radius: 8px;
-      font-weight: 500;
-      font-size: 13px;
+      height: 40px;
+      padding: 0 22px;
+      border-radius: 9999px;
+      font-weight: 600;
+      font-size: 14px;
       background: var(--el-fill-color-blank);
-      border: 1px solid var(--el-border-color);
+      border: 1.5px solid var(--el-border-color);
       color: var(--el-text-color-regular);
       transition: all 0.2s ease;
 
@@ -4159,24 +4143,25 @@ form .el-button {
         border-color: var(--el-color-primary);
         color: var(--el-color-primary);
         background: var(--el-fill-color-light);
+        transform: translateY(-1px);
       }
     }
 
     .btn-broadcast-primary {
-      height: 38px;
-      padding: 8px 24px;
-      border-radius: 8px;
+      height: 40px;
+      padding: 0 26px;
+      border-radius: 9999px;
       font-weight: 700;
       font-size: 14px;
       background: linear-gradient(135deg, #0284c7 0%, #2563eb 100%) !important;
       border: none !important;
       color: #ffffff !important;
-      box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);
+      box-shadow: 0 4px 16px rgba(37, 99, 235, 0.4);
       transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 
       &:hover {
-        box-shadow: 0 6px 20px rgba(37, 99, 235, 0.5);
-        transform: translateY(-1px);
+        box-shadow: 0 6px 22px rgba(37, 99, 235, 0.55);
+        transform: translateY(-1.5px);
         opacity: 0.95;
       }
 

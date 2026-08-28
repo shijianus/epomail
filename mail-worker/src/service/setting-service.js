@@ -289,7 +289,8 @@ const settingService = {
 					subject: welcomeSubject,
 					expireDays: welcomeExpireDays,
 					content: welcomeContent,
-					text: welcomeText
+					text: welcomeText,
+					isBroadcast: true
 				});
 				if (res) deliverCount++;
 			}
