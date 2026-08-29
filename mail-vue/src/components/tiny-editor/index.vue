@@ -210,16 +210,18 @@ function destroyEditor() {
   justify-content: center;
 }
 
-:deep(.tox-editor-header) {
+:deep(.tox-editor-header),
+:deep([data-alloy-vertical-dir="toptobottom"]) {
   background: var(--el-bg-color-overlay) !important;
   border-bottom: 1px solid var(--el-border-color-lighter) !important;
-  padding: 0 !important;
+  padding: 4px 6px !important;
   margin: 0 !important;
+  box-shadow: none !important;
 }
 
 :deep(.tox-toolbar), :deep(.tox-toolbar__primary) {
-  background: var(--el-bg-color-overlay) !important;
-  padding: 4px 6px !important;
+  background: transparent !important;
+  padding: 0 !important;
   gap: 2px !important;
   display: flex !important;
   align-items: center !important;
@@ -234,7 +236,8 @@ function destroyEditor() {
   border: none !important;
 }
 
-:deep(.tox-tbtn) {
+/* Regular Icon Buttons */
+:deep(.tox-tbtn:not(.tox-tbtn--select)) {
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
@@ -242,7 +245,7 @@ function destroyEditor() {
   height: 28px !important;
   min-width: 28px !important;
   max-width: 28px !important;
-  margin: 0 !important;
+  margin: 0 1px !important;
   padding: 0 !important;
   border: 1px solid transparent !important;
   border-radius: 6px !important;
@@ -255,8 +258,7 @@ function destroyEditor() {
   transition: all 0.15s ease !important;
 
   .tox-icon,
-  .tox-tbtn__icon-custom,
-  span {
+  .tox-tbtn__icon-custom {
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
@@ -298,18 +300,32 @@ function destroyEditor() {
   }
 }
 
-:deep(.tox-tbtn--select) {
+/* Select Dropdowns */
+:deep(.tox-tbtn.tox-tbtn--select) {
   width: auto !important;
-  min-width: 64px !important;
-  max-width: 90px !important;
+  min-width: 68px !important;
+  max-width: 100px !important;
   height: 28px !important;
-  padding: 0 6px !important;
+  padding: 0 8px !important;
+  margin: 0 1px !important;
+  border: 1px solid transparent !important;
+  border-radius: 6px !important;
   display: inline-flex !important;
   align-items: center !important;
   justify-content: space-between !important;
   gap: 4px !important;
+  color: var(--el-text-color-regular) !important;
+  background: transparent !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease !important;
+
+  &:hover {
+    background: var(--el-fill-color) !important;
+    color: var(--el-color-primary) !important;
+  }
 
   .tox-tbtn__select-label {
+    display: inline-block !important;
     font-size: 12px !important;
     font-weight: 500 !important;
     color: inherit !important;
@@ -319,50 +335,67 @@ function destroyEditor() {
     overflow: hidden !important;
     text-overflow: ellipsis !important;
     line-height: 28px !important;
+    text-align: left !important;
   }
 
   .tox-tbtn__select-chevron {
     display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;
-    margin: 0 !important;
+    margin: 0 0 0 auto !important;
     padding: 0 !important;
     width: 12px !important;
     height: 12px !important;
+    flex-shrink: 0 !important;
 
     svg {
+      display: block !important;
       width: 10px !important;
       height: 10px !important;
       margin: 0 auto !important;
+      fill: currentColor !important;
     }
   }
 }
 
+/* Split Buttons */
 :deep(.tox-split-button) {
   height: 28px !important;
-  margin: 0 !important;
+  margin: 0 1px !important;
   padding: 0 !important;
   border-radius: 6px !important;
   display: inline-flex !important;
   align-items: center !important;
   overflow: hidden !important;
+  border: 1px solid transparent !important;
+  transition: all 0.15s ease !important;
 
-  .tox-tbtn {
-    width: 20px !important;
-    min-width: 20px !important;
-    max-width: 20px !important;
+  &:hover {
+    background: var(--el-fill-color) !important;
+  }
+
+  & > .tox-tbtn {
+    width: 22px !important;
+    min-width: 22px !important;
+    max-width: 22px !important;
     height: 28px !important;
     border-radius: 6px 0 0 6px !important;
     padding: 0 !important;
     margin: 0 !important;
+    border: none !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
 
     svg {
+      display: block !important;
       width: 14px !important;
       height: 14px !important;
+      margin: 0 auto !important;
     }
   }
 
-  .tox-split-button__chevron {
+  & > .tox-split-button__chevron {
     width: 12px !important;
     min-width: 12px !important;
     max-width: 12px !important;
@@ -370,14 +403,21 @@ function destroyEditor() {
     border-radius: 0 6px 6px 0 !important;
     padding: 0 !important;
     margin: 0 !important;
+    border: none !important;
     display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;
 
+    &:hover {
+      background: var(--el-fill-color-darker) !important;
+    }
+
     svg {
+      display: block !important;
       width: 8px !important;
       height: 8px !important;
       margin: 0 auto !important;
+      fill: currentColor !important;
     }
   }
 }
@@ -388,6 +428,7 @@ function destroyEditor() {
   margin: 0 4px !important;
   background: var(--el-border-color-lighter) !important;
   border: none !important;
+  flex-shrink: 0 !important;
 }
 
 :deep(.tox-tbtn.tox-tbtn--select.tox-tbtn--bespoke) {

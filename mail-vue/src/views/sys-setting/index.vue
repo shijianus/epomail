@@ -1072,51 +1072,125 @@
               <!-- Left Group: Formatting / Helper Tools -->
               <div class="editor-left-tools">
                 <template v-if="welcomeEditorFormat === 'source'">
-                  <el-tooltip content="H1 一级标题" effect="dark" placement="top">
-                    <div class="tool-icon-btn text-icon-btn" @click="insertMarkdownSyntax('# ', '')">
-                      <span class="btn-text-badge">H1</span>
-                    </div>
-                  </el-tooltip>
-                  <el-tooltip content="H2 二级标题" effect="dark" placement="top">
-                    <div class="tool-icon-btn text-icon-btn" @click="insertMarkdownSyntax('## ', '')">
-                      <span class="btn-text-badge">H2</span>
-                    </div>
-                  </el-tooltip>
-                  <el-tooltip content="加粗 (Bold)" effect="dark" placement="top">
-                    <div class="tool-icon-btn" @click="insertMarkdownSyntax('**', '**')">
-                      <Icon icon="ri:bold" width="16" height="16" />
-                    </div>
-                  </el-tooltip>
-                  <el-tooltip content="斜体 (Italic)" effect="dark" placement="top">
-                    <div class="tool-icon-btn" @click="insertMarkdownSyntax('*', '*')">
-                      <Icon icon="ri:italic" width="16" height="16" />
-                    </div>
-                  </el-tooltip>
-                  <el-tooltip content="引用块 (Quote)" effect="dark" placement="top">
-                    <div class="tool-icon-btn" @click="insertMarkdownSyntax('> ', '')">
-                      <Icon icon="ri:double-quotes-l" width="16" height="16" />
-                    </div>
-                  </el-tooltip>
-                  <el-tooltip content="代码块 (Code Block)" effect="dark" placement="top">
-                    <div class="tool-icon-btn" @click="insertMarkdownSyntax('```html\n', '\n```')">
-                      <Icon icon="ri:code-box-line" width="16" height="16" />
-                    </div>
-                  </el-tooltip>
-                  <el-tooltip content="无序列表 (List)" effect="dark" placement="top">
-                    <div class="tool-icon-btn" @click="insertMarkdownSyntax('- ', '')">
-                      <Icon icon="ri:list-unordered" width="16" height="16" />
-                    </div>
-                  </el-tooltip>
-                  <el-tooltip content="插入链接 (Link)" effect="dark" placement="top">
-                    <div class="tool-icon-btn" @click="insertMarkdownSyntax('[链接文字](', ')')">
-                      <Icon icon="ri:link" width="16" height="16" />
-                    </div>
-                  </el-tooltip>
-                  <el-tooltip content="分割线 (Divider)" effect="dark" placement="top">
-                    <div class="tool-icon-btn" @click="insertMarkdownSyntax('\n---\n', '')">
-                      <Icon icon="ri:separator" width="16" height="16" />
-                    </div>
-                  </el-tooltip>
+                  <!-- Group 1: Headings -->
+                  <div class="tool-subgroup">
+                    <el-tooltip content="H1 一级标题" effect="dark" placement="top">
+                      <div class="tool-icon-btn text-icon-btn" @click="insertMarkdownSyntax('# ', '\n', '一级标题')">
+                        <span class="btn-text-badge">H1</span>
+                      </div>
+                    </el-tooltip>
+                    <el-tooltip content="H2 二级标题" effect="dark" placement="top">
+                      <div class="tool-icon-btn text-icon-btn" @click="insertMarkdownSyntax('## ', '\n', '二级标题')">
+                        <span class="btn-text-badge">H2</span>
+                      </div>
+                    </el-tooltip>
+                    <el-tooltip content="H3 三级标题" effect="dark" placement="top">
+                      <div class="tool-icon-btn text-icon-btn" @click="insertMarkdownSyntax('### ', '\n', '三级标题')">
+                        <span class="btn-text-badge">H3</span>
+                      </div>
+                    </el-tooltip>
+                  </div>
+
+                  <div class="tool-divider"></div>
+
+                  <!-- Group 2: Inline Styles -->
+                  <div class="tool-subgroup">
+                    <el-tooltip content="加粗 (Bold)" effect="dark" placement="top">
+                      <div class="tool-icon-btn" @click="insertMarkdownSyntax('**', '**', '加粗文本')">
+                        <Icon icon="ri:bold" width="15" height="15" />
+                      </div>
+                    </el-tooltip>
+                    <el-tooltip content="斜体 (Italic)" effect="dark" placement="top">
+                      <div class="tool-icon-btn" @click="insertMarkdownSyntax('*', '*', '斜体文本')">
+                        <Icon icon="ri:italic" width="15" height="15" />
+                      </div>
+                    </el-tooltip>
+                    <el-tooltip content="删除线 (Strikethrough)" effect="dark" placement="top">
+                      <div class="tool-icon-btn" @click="insertMarkdownSyntax('~~', '~~', '删除文本')">
+                        <Icon icon="ri:strikethrough" width="15" height="15" />
+                      </div>
+                    </el-tooltip>
+                    <el-tooltip content="下划线 (Underline)" effect="dark" placement="top">
+                      <div class="tool-icon-btn" @click="insertMarkdownSyntax('<u>', '</u>', '下划线文本')">
+                        <Icon icon="ri:underline" width="15" height="15" />
+                      </div>
+                    </el-tooltip>
+                  </div>
+
+                  <div class="tool-divider"></div>
+
+                  <!-- Group 3: Quotes & Code -->
+                  <div class="tool-subgroup">
+                    <el-tooltip content="引用块 (Quote)" effect="dark" placement="top">
+                      <div class="tool-icon-btn" @click="insertMarkdownSyntax('> ', '\n', '引用文字')">
+                        <Icon icon="ri:double-quotes-l" width="15" height="15" />
+                      </div>
+                    </el-tooltip>
+                    <el-tooltip content="行内代码 (Inline Code)" effect="dark" placement="top">
+                      <div class="tool-icon-btn" @click="insertMarkdownSyntax('`', '`', 'code')">
+                        <Icon icon="ri:code-line" width="15" height="15" />
+                      </div>
+                    </el-tooltip>
+                    <el-tooltip content="代码块 (Code Block)" effect="dark" placement="top">
+                      <div class="tool-icon-btn" @click="insertMarkdownSyntax('```html\n', '\n```\n', '<div>代码块内容</div>')">
+                        <Icon icon="ri:code-box-line" width="15" height="15" />
+                      </div>
+                    </el-tooltip>
+                  </div>
+
+                  <div class="tool-divider"></div>
+
+                  <!-- Group 4: Lists -->
+                  <div class="tool-subgroup">
+                    <el-tooltip content="无序列表 (Bullet List)" effect="dark" placement="top">
+                      <div class="tool-icon-btn" @click="insertMarkdownSyntax('- ', '\n', '列表项')">
+                        <Icon icon="ri:list-unordered" width="15" height="15" />
+                      </div>
+                    </el-tooltip>
+                    <el-tooltip content="有序列表 (Numbered List)" effect="dark" placement="top">
+                      <div class="tool-icon-btn" @click="insertMarkdownSyntax('1. ', '\n', '列表项')">
+                        <Icon icon="ri:list-ordered" width="15" height="15" />
+                      </div>
+                    </el-tooltip>
+                    <el-tooltip content="任务清单 (Task List)" effect="dark" placement="top">
+                      <div class="tool-icon-btn" @click="insertMarkdownSyntax('- [ ] ', '\n', '待办事项')">
+                        <Icon icon="ri:checkbox-line" width="15" height="15" />
+                      </div>
+                    </el-tooltip>
+                  </div>
+
+                  <div class="tool-divider"></div>
+
+                  <!-- Group 5: Inserts (Link, Image, Table, Divider) -->
+                  <div class="tool-subgroup">
+                    <el-tooltip content="插入链接 (Link)" effect="dark" placement="top">
+                      <div class="tool-icon-btn" @click="insertMarkdownSyntax('[链接文字](', ')', 'https://example.com')">
+                        <Icon icon="ri:link" width="15" height="15" />
+                      </div>
+                    </el-tooltip>
+                    <el-tooltip content="插入图片 (Image)" effect="dark" placement="top">
+                      <div class="tool-icon-btn" @click="insertMarkdownSyntax('![图片描述](', ')', 'https://example.com/image.png')">
+                        <Icon icon="ri:image-line" width="15" height="15" />
+                      </div>
+                    </el-tooltip>
+                    <el-tooltip content="插入表格 (Table)" effect="dark" placement="top">
+                      <div class="tool-icon-btn" @click="insertMarkdownSyntax('\n| 标题 1 | 标题 2 |\n| :--- | :--- |\n| 内容 1 | 内容 2 |\n', '', '')">
+                        <Icon icon="ri:table-line" width="15" height="15" />
+                      </div>
+                    </el-tooltip>
+                    <el-tooltip content="分割线 (Divider)" effect="dark" placement="top">
+                      <div class="tool-icon-btn" @click="insertMarkdownSyntax('\n---\n', '', '')">
+                        <Icon icon="ri:separator" width="15" height="15" />
+                      </div>
+                    </el-tooltip>
+                  </div>
+                </template>
+
+                <template v-else>
+                  <div class="rich-mode-indicator">
+                    <Icon icon="fluent:text-edit-style-20-regular" width="15" height="15" />
+                    <span>{{ $t('richTextMode') || '富文本可视化编辑' }}</span>
+                  </div>
                 </template>
               </div>
 
@@ -2104,18 +2178,21 @@ function toggleFullscreen() {
   isWelcomeFullscreen.value = !isWelcomeFullscreen.value
 }
 
-function insertMarkdownSyntax(prefix, suffix = '') {
+function insertMarkdownSyntax(prefix, suffix = '', defaultText = '内容') {
   const textarea = document.querySelector('.source-textarea-fullscreen textarea')
   if (!textarea) return
   const start = textarea.selectionStart || 0
   const end = textarea.selectionEnd || 0
   const text = welcomeEmailForm.welcomeContent || ''
   const selected = text.substring(start, end)
-  const replacement = `${prefix}${selected || '内容'}${suffix}`
+  const innerText = selected || defaultText
+  const replacement = `${prefix}${innerText}${suffix}`
   welcomeEmailForm.welcomeContent = text.substring(0, start) + replacement + text.substring(end)
   nextTick(() => {
     textarea.focus()
-    textarea.setSelectionRange(start + prefix.length, start + prefix.length + (selected.length || 2))
+    const selectStart = start + prefix.length
+    const selectEnd = selectStart + innerText.length
+    textarea.setSelectionRange(selectStart, selectEnd)
   })
 }
 
@@ -4239,8 +4316,33 @@ form .el-button {
       .editor-left-tools {
         display: flex;
         align-items: center;
-        gap: 4px;
+        gap: 3px;
         flex-wrap: wrap;
+
+        .tool-subgroup {
+          display: inline-flex;
+          align-items: center;
+          gap: 2px;
+        }
+
+        .rich-mode-indicator {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 4px 10px;
+          border-radius: 6px;
+          background: var(--el-color-primary-light-9, rgba(0, 120, 212, 0.12));
+          color: var(--el-color-primary, #0078D4);
+          font-size: 12.5px;
+          font-weight: 600;
+
+          svg {
+            display: block;
+            width: 15px;
+            height: 15px;
+            margin: 0 auto;
+          }
+        }
       }
 
       .toolbar-spacer {
@@ -4345,11 +4447,11 @@ form .el-button {
 
     .btn-save-secondary {
       height: 40px;
-      padding: 0 22px;
+      padding: 0 20px;
       border-radius: 9999px;
       font-weight: 600;
-      font-size: 14px;
-      background: var(--el-fill-color-blank);
+      font-size: 13.5px;
+      background: transparent;
       border: 1.5px solid var(--el-border-color);
       color: var(--el-text-color-regular);
       transition: all 0.2s ease;
@@ -4389,8 +4491,8 @@ form .el-button {
 
 /* TinyMCE Dark & Light Theme Harmonization Tokens */
 :deep(.tox.tox-tinymce) {
-  border: 1px solid var(--el-border-color-lighter) !important;
-  border-radius: 8px !important;
+  border: none !important;
+  border-radius: 0 !important;
   overflow: hidden;
   background: var(--el-bg-color) !important;
 
@@ -4398,15 +4500,24 @@ form .el-button {
     background: var(--el-bg-color) !important;
   }
 
-  .tox-toolbar-overlord {
+  .tox-editor-header,
+  [data-alloy-vertical-dir="toptobottom"] {
     background: var(--el-bg-color-overlay) !important;
+    border-bottom: 1px solid var(--el-border-color-lighter) !important;
+    padding: 4px 6px !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+  }
+
+  .tox-toolbar-overlord {
+    background: transparent !important;
   }
 
   .tox-toolbar, .tox-toolbar__primary {
-    background: var(--el-bg-color-overlay) !important;
-    border-bottom: 1px solid var(--el-border-color-lighter) !important;
-    padding: 6px 8px !important;
-    gap: 4px !important;
+    background: transparent !important;
+    border-bottom: none !important;
+    padding: 0 !important;
+    gap: 2px !important;
     display: flex !important;
     align-items: center !important;
   }
@@ -4420,7 +4531,8 @@ form .el-button {
     border: none !important;
   }
 
-  .tox-tbtn {
+  /* Regular Icon Buttons */
+  .tox-tbtn:not(.tox-tbtn--select) {
     display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;
@@ -4428,7 +4540,7 @@ form .el-button {
     height: 28px !important;
     min-width: 28px !important;
     max-width: 28px !important;
-    margin: 0 !important;
+    margin: 0 1px !important;
     padding: 0 !important;
     border: 1px solid transparent !important;
     border-radius: 6px !important;
@@ -4441,8 +4553,7 @@ form .el-button {
     transition: all 0.15s ease !important;
 
     .tox-icon,
-    .tox-tbtn__icon-custom,
-    span {
+    .tox-tbtn__icon-custom {
       display: flex !important;
       align-items: center !important;
       justify-content: center !important;
@@ -4484,18 +4595,32 @@ form .el-button {
     }
   }
 
-  .tox-tbtn--select {
+  /* Select Dropdowns (Blocks, Font Size, Tables) */
+  .tox-tbtn.tox-tbtn--select {
     width: auto !important;
-    min-width: 64px !important;
-    max-width: 90px !important;
+    min-width: 68px !important;
+    max-width: 100px !important;
     height: 28px !important;
-    padding: 0 6px !important;
+    padding: 0 8px !important;
+    margin: 0 1px !important;
+    border: 1px solid transparent !important;
+    border-radius: 6px !important;
     display: inline-flex !important;
     align-items: center !important;
     justify-content: space-between !important;
     gap: 4px !important;
+    color: var(--el-text-color-regular) !important;
+    background: transparent !important;
+    cursor: pointer !important;
+    transition: all 0.15s ease !important;
+
+    &:hover {
+      background: var(--el-fill-color) !important;
+      color: var(--el-color-primary) !important;
+    }
 
     .tox-tbtn__select-label {
+      display: inline-block !important;
       font-size: 12px !important;
       font-weight: 500 !important;
       color: inherit !important;
@@ -4505,50 +4630,67 @@ form .el-button {
       overflow: hidden !important;
       text-overflow: ellipsis !important;
       line-height: 28px !important;
+      text-align: left !important;
     }
 
     .tox-tbtn__select-chevron {
       display: inline-flex !important;
       align-items: center !important;
       justify-content: center !important;
-      margin: 0 !important;
+      margin: 0 0 0 auto !important;
       padding: 0 !important;
       width: 12px !important;
       height: 12px !important;
+      flex-shrink: 0 !important;
 
       svg {
+        display: block !important;
         width: 10px !important;
         height: 10px !important;
         margin: 0 auto !important;
+        fill: currentColor !important;
       }
     }
   }
 
+  /* Split Buttons */
   .tox-split-button {
     height: 28px !important;
-    margin: 0 !important;
+    margin: 0 1px !important;
     padding: 0 !important;
     border-radius: 6px !important;
     display: inline-flex !important;
     align-items: center !important;
     overflow: hidden !important;
+    border: 1px solid transparent !important;
+    transition: all 0.15s ease !important;
 
-    .tox-tbtn {
-      width: 20px !important;
-      min-width: 20px !important;
-      max-width: 20px !important;
+    &:hover {
+      background: var(--el-fill-color) !important;
+    }
+
+    & > .tox-tbtn {
+      width: 22px !important;
+      min-width: 22px !important;
+      max-width: 22px !important;
       height: 28px !important;
       border-radius: 6px 0 0 6px !important;
       padding: 0 !important;
       margin: 0 !important;
+      border: none !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
 
       svg {
+        display: block !important;
         width: 14px !important;
         height: 14px !important;
+        margin: 0 auto !important;
       }
     }
 
-    .tox-split-button__chevron {
+    & > .tox-split-button__chevron {
       width: 12px !important;
       min-width: 12px !important;
       max-width: 12px !important;
@@ -4556,14 +4698,21 @@ form .el-button {
       border-radius: 0 6px 6px 0 !important;
       padding: 0 !important;
       margin: 0 !important;
+      border: none !important;
       display: inline-flex !important;
       align-items: center !important;
       justify-content: center !important;
 
+      &:hover {
+        background: var(--el-fill-color-darker) !important;
+      }
+
       svg {
+        display: block !important;
         width: 8px !important;
         height: 8px !important;
         margin: 0 auto !important;
+        fill: currentColor !important;
       }
     }
   }
@@ -4574,6 +4723,7 @@ form .el-button {
     margin: 0 4px !important;
     background: var(--el-border-color-lighter) !important;
     border: none !important;
+    flex-shrink: 0 !important;
   }
 
   .tox-edit-area {

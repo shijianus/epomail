@@ -1,6 +1,29 @@
 # Agent Workflow SOP (Standard Operating Procedure)
 
-### 质感精修与文案亲和力重塑：TinyMCE 工具栏全量 Icon 比例与几何居中重构 (28px/15px)、纯 Icon 胶囊模式开关与亲和自然现代文风 (2026-08-28)
+### 深度重构与交互体系完善：TinyMCE Alloy UI 体系重构 (精确区分下拉/分体/普通按钮)、全量 17 项专业 Markdown 工具套件与视觉零偏差交付 (2026-08-29)
+*   **功能需求与业务逻辑对齐 (Feature & Alignment)**: 
+    1. **TinyMCE `[data-alloy-vertical-dir="toptobottom"]` 全面重构**:
+       - 彻底解决普通按钮、下拉选择框（`.tox-tbtn--select`）与分体颜色按钮（`.tox-split-button`）样式混淆问题：
+         - **普通按钮（`.tox-tbtn:not(.tox-tbtn--select)`）**：尺寸严格锁定 `28px x 28px`，SVG 图标规范为 `15px x 15px`，居中偏差实测精确为 `0.00px`（撤销、重做、粗体、斜体、下划线、删除线、四向对齐、缩进、引用、分割线、链接、图片、Emojis、源码等）。
+         - **下拉选择框（`.tox-tbtn--select`）**：彻底解耦文字标签（`段落`、`13px`、`表格`）与下拉箭头（Chevron），保留合理的 `68px-100px` 自适应宽度与左对齐文字，Chevron 靠右绝对垂直居中，彻底消除文字与 Chevron 互相重叠挤压的缺陷。
+         - **分体按钮（`.tox-split-button`）**：文字颜色与背景高亮等 split button 采用 `22px + 12px` 分区设计，主操作与 Chevron 独立居中，颜色指示条与图标清晰可见。
+    2. **全量 17 项专业 Markdown 编辑工具套件 (Complete Markdown Suite)**:
+       - 在源码 / Markdown 模式下，重塑并扩充为 5 大逻辑分组共 17 项专业 Markdown 编辑按钮（带细分割线隔离）：
+         - **标题组**：`H1`（一级标题）、`H2`（二级标题）、`H3`（三级标题）。
+         - **行内样式组**：`加粗 Bold`、`斜体 Italic`、`删除线 Strikethrough`、`下划线 Underline`。
+         - **结构块与代码组**：`引用 Quote`、`行内代码 Inline Code`、`代码块 Code Block`。
+         - **列表组**：`无序列表 Bullet List`、`有序列表 Numbered List`、`任务清单 Task List`。
+         - **插入与表格组**：`插入链接 Link`、`插入图片 Image`、`插入表格 Table`、`水平分割线 Divider`。
+       - 升级 `insertMarkdownSyntax` 智能选区包裹算法，支持文本选中智能包裹与无选区默认模板插入。
+    3. **富文本模式指示徽章 (Rich Text Mode Indicator)**:
+       - 富文本模式下顶部工具栏左侧展示精致的 `<div class="rich-mode-indicator">` 徽章，提供明确的操作上下文，告别空白栏。
+*   **编辑代码 (Edit)**: 
+    *   **全局样式与组件**: 修改 [`mail-vue/src/style.css`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/style.css)、[`mail-vue/src/components/tiny-editor/index.vue`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/components/tiny-editor/index.vue)、[`mail-vue/src/views/sys-setting/index.vue`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/views/sys-setting/index.vue)。
+    *   **自动化测试套件**: 更新 [`tests/test-welcome-fullscreen-cf.mjs`](file:///home/shijian/projects/epocanvas-mail/tests/test-welcome-fullscreen-cf.mjs)、[`tests/diagnose-toolbar.mjs`](file:///home/shijian/projects/epocanvas-mail/tests/diagnose-toolbar.mjs)。
+*   **全链路自动化验证与部署 (Verify & Deploy)**: 
+    *   执行自动化诊断脚本（`tests/diagnose-toolbar.mjs`）抓取 34 个 TinyMCE 按钮/分体按钮/下拉框的 Bounding Box，居中偏差全量实测均为 `0.00px`。
+    *   执行 Playwright 端到端全链路自动化测试（`tests/test-welcome-fullscreen-cf.mjs`），在 Cloudflare 生产环境 100% 通过。
+    *   成功发布上线到 Cloudflare Workers（Version ID: `7dcf4b76-2aa3-432b-889f-623613f68418`）。
 *   **功能需求与业务逻辑对齐 (Feature & Alignment)**: 
     1. **自然亲和、拉近距离的现代开发者文风 (Approachable & Conversational Copywriting)**:
        - 彻底剔除冷冰冰、官僚式的陈旧词汇（如“尊敬的 {{user_name}}”、“出资搭建”等），全面重塑为充满温度、真诚且专业的现代极客产品叙事：
