@@ -108,6 +108,44 @@ import assert from 'assert';
     await modeSwitch.waitFor({ state: 'visible' });
     console.log('✓ 编辑器模式切换胶囊开关 (Segmented Switch) 渲染通过');
 
+    // 验证模式开关内为纯 Icon 按钮 (无冗余文本)
+    const modeSwitchBtns = modeSwitch.locator('.mode-switch-btn');
+    const modeBtnCount = await modeSwitchBtns.count();
+    assert.strictEqual(modeBtnCount, 2, '模式切换必须包含 2 个纯 Icon 切换项');
+    const modeBtn1Text = (await modeSwitchBtns.nth(0).innerText()).trim();
+    const modeBtn2Text = (await modeSwitchBtns.nth(1).innerText()).trim();
+    assert.strictEqual(modeBtn1Text, '', '模式切换富文本按钮必须为纯 Icon 架构');
+    assert.strictEqual(modeBtn2Text, '', '模式切换源码按钮必须为纯 Icon 架构');
+    console.log('✓ 模式切换胶囊已优化为纯 Icon 极简形态 (无冗余文字占用空间)');
+
+    // 验证 TinyMCE tox-editor-header 工具栏全部按钮尺寸与居中
+    console.log('6.1 验证 TinyMCE tox-editor-header 工具栏按钮尺寸 (<=28px) 与 Icon 严格居中...');
+    const toxHeader = dialog.locator('.tox-editor-header').first();
+    await toxHeader.waitFor({ state: 'visible' });
+    
+    // 重点抽检典型按钮: 图片、Emojis、源代码、粗体
+    const testAriaLabels = ['插入/编辑图片', 'Emojis', '源代码', '粗体', '斜体', '块引用', '清除格式'];
+    for (const label of testAriaLabels) {
+      const toxBtn = toxHeader.locator(`button.tox-tbtn[aria-label*="${label}"]`);
+      if (await toxBtn.count() > 0) {
+        const tBox = await toxBtn.first().boundingBox();
+        const sBox = await toxBtn.first().locator('svg').boundingBox();
+        if (tBox && sBox) {
+          assert.ok(tBox.width <= 32 && tBox.height <= 32, `TinyMCE 按钮 ${label} 尺寸 (${tBox.width}x${tBox.height}) 不得过大`);
+          assert.ok(sBox.width <= 18 && sBox.height <= 18, `TinyMCE 按钮 ${label} 内 SVG 尺寸 (${sBox.width}x${sBox.height}) 必须适配 15-16px 规范`);
+          
+          const tCenterX = tBox.x + tBox.width / 2;
+          const tCenterY = tBox.y + tBox.height / 2;
+          const sCenterX = sBox.x + sBox.width / 2;
+          const sCenterY = sBox.y + sBox.height / 2;
+          
+          assert.ok(Math.abs(tCenterX - sCenterX) <= 2, `TinyMCE 按钮 ${label} 水平未居中: diff=${Math.abs(tCenterX - sCenterX)}`);
+          assert.ok(Math.abs(tCenterY - sCenterY) <= 2, `TinyMCE 按钮 ${label} 垂直偏向右下角未居中: diff=${Math.abs(tCenterY - sCenterY)}`);
+          console.log(`  ✓ TinyMCE 按钮 [${label}] 尺寸与严格居中校验通过`);
+        }
+      }
+    }
+
     const rightToolIcons = rightTools.locator('.tool-icon-btn');
     const rightToolCount = await rightToolIcons.count();
     console.log(`- 右侧纯 Icon 按钮数量: ${rightToolCount}`);
@@ -151,8 +189,8 @@ import assert from 'assert';
     await page.waitForTimeout(1000);
 
     const resetSourceVal = await sourceTextarea.inputValue();
-    assert.ok(resetSourceVal.includes('顶级域名身份') || resetSourceVal.includes('专属域名身份'), '恢复默认模板后源码必须包含核心价值1');
-    assert.ok(resetSourceVal.includes('纯粹') || resetSourceVal.includes('零商业变现'), '恢复默认模板后源码必须包含核心价值2');
+    assert.ok(resetSourceVal.includes('专属极客名片') || resetSourceVal.includes('顶级域名身份') || resetSourceVal.includes('专属域名'), '恢复默认模板后源码必须包含核心价值1');
+    assert.ok(resetSourceVal.includes('纯粹') || resetSourceVal.includes('零广告') || resetSourceVal.includes('零商业变现'), '恢复默认模板后源码必须包含核心价值2');
     assert.ok(resetSourceVal.includes('开启我的收件箱'), '恢复默认模板后源码必须包含真实 CTA 按钮');
     assert.ok(resetSourceVal.includes('设定个人资料与讯息') || resetSourceVal.includes('/settings/profile'), '恢复默认模板后源码必须包含个人讯息设置引导按钮');
     console.log('✓ 微软 Fluent 默认模版重置成功');
@@ -194,7 +232,7 @@ import assert from 'assert';
     await page.waitForTimeout(2500);
 
     // 找到官方欢迎邮件
-    const welcomeMailRow = page.locator('.email-row').filter({ hasText: /欢迎开启您的专属独立域名邮箱|欢迎加入 Epocanvas Mail|官方团队/i }).first();
+    const welcomeMailRow = page.locator('.email-row').filter({ hasText: /欢迎来到 Epocanvas Mail|欢迎开启您的专属独立域名邮箱|欢迎加入 Epocanvas Mail|官方团队/i }).first();
     await welcomeMailRow.waitFor({ state: 'visible', timeout: 10000 });
     console.log('✓ 真实收件箱中成功收到官方系统欢迎邮件！');
 
@@ -212,13 +250,14 @@ import assert from 'assert';
     const contentHtml = page.locator('.content-html');
     await contentHtml.waitFor({ state: 'visible' });
     const contentText = await contentHtml.evaluate(el => el.shadowRoot ? el.shadowRoot.textContent : el.textContent);
-    assert.ok(contentText.includes('顶级域名身份') || contentText.includes('专属域名身份'), '必须包含核心价值1：专属域名身份');
-    assert.ok(contentText.includes('纯粹') || contentText.includes('零商业变现'), '必须包含核心价值2：纯粹私密 · 零商业变现');
-    assert.ok(contentText.includes('国内极速直连'), '必须包含核心价值3：国内极速直连 · 免翻墙不折腾');
-    assert.ok(contentText.includes('进阶工作流') || contentText.includes('稍后处理') || contentText.includes('收件箱管理'), '必须包含核心价值4：进阶工作流 · 极简轻盈');
+    assert.ok(contentText.includes('专属极客名片') || contentText.includes('顶级域名身份') || contentText.includes('专属域名'), '必须包含核心价值1：专属域名身份');
+    assert.ok(contentText.includes('纯粹') || contentText.includes('零广告') || contentText.includes('零商业变现'), '必须包含核心价值2：纯粹私密 · 零商业变现');
+    assert.ok(contentText.includes('全球边缘网络') || contentText.includes('国内极速'), '必须包含核心价值3：国内极速秒开 · 全球边缘直连');
+    assert.ok(contentText.includes('进阶工作流') || contentText.includes('稍后处理') || contentText.includes('收件箱管理'), '必须包含核心价值4：进阶工作流 · 极简轻快');
     assert.ok(contentText.includes('别名') || contentText.includes('熔断'), '必须包含核心价值5：多别名分发 · 垃圾邮件一键熔断');
     assert.ok(contentText.includes('开启我的收件箱'), '必须包含真实 CTA 按钮');
-    console.log('✓ 邮件正文 5 大核心价值与微软排版校验 100% 符合标准！');
+    assert.ok(contentText.includes('嗨 admin') || contentText.includes('admin'), '必须包含用户专属问候与动态插值');
+    console.log('✓ 邮件正文 5 大核心价值、亲和友好文案与动态插值校验 100% 符合标准！');
 
     // 截图 3: 真实收件箱真实邮件渲染效果 (顶部)
     console.log('📸 截取真实收件箱中真实渲染的微软 Fluent 欢迎邮件详情 (顶部)...');

@@ -120,6 +120,194 @@ button, input, select, textarea {
     max-height: 220px !important;
 }
 
+/* TinyMCE Toolbar Button & Icon Strict Centering & Proportions */
+.tox.tox-tinymce {
+    .tox-editor-header {
+        background: var(--el-bg-color-overlay) !important;
+        border-bottom: 1px solid var(--el-border-color-lighter) !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        box-shadow: none !important;
+    }
+
+    .tox-toolbar-overlord {
+        background: var(--el-bg-color-overlay) !important;
+    }
+
+    .tox-toolbar, .tox-toolbar__primary {
+        background: var(--el-bg-color-overlay) !important;
+        padding: 4px 6px !important;
+        gap: 2px !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+
+    .tox-toolbar__group {
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 2px !important;
+        padding: 0 2px !important;
+        margin: 0 !important;
+        border: none !important;
+    }
+
+    .tox-tbtn {
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        width: 28px !important;
+        height: 28px !important;
+        min-width: 28px !important;
+        max-width: 28px !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        border: 1px solid transparent !important;
+        border-radius: 6px !important;
+        background: transparent !important;
+        color: var(--el-text-color-regular) !important;
+        box-sizing: border-box !important;
+        line-height: 1 !important;
+        cursor: pointer !important;
+        overflow: hidden !important;
+        transition: all 0.15s ease !important;
+
+        .tox-icon,
+        .tox-tbtn__icon-custom,
+        span {
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            width: 100% !important;
+            height: 100% !important;
+            margin: 0 auto !important;
+            padding: 0 !important;
+            line-height: 1 !important;
+        }
+
+        svg {
+            display: block !important;
+            width: 15px !important;
+            height: 15px !important;
+            max-width: 15px !important;
+            max-height: 15px !important;
+            margin: 0 auto !important;
+            padding: 0 !important;
+            flex-shrink: 0 !important;
+            vertical-align: middle !important;
+            fill: currentColor !important;
+        }
+
+        &:hover {
+            background: var(--el-fill-color) !important;
+            color: var(--el-color-primary) !important;
+        }
+
+        &.tox-tbtn--enabled, &[aria-pressed="true"] {
+            background: var(--el-color-primary-light-9, rgba(91, 110, 245, 0.12)) !important;
+            color: var(--el-color-primary) !important;
+            font-weight: 600 !important;
+        }
+
+        &.tox-tbtn--disabled, &[aria-disabled="true"] {
+            opacity: 0.35 !important;
+            cursor: not-allowed !important;
+            background: transparent !important;
+        }
+    }
+
+    .tox-tbtn--select {
+        width: auto !important;
+        min-width: 64px !important;
+        max-width: 90px !important;
+        height: 28px !important;
+        padding: 0 6px !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        gap: 4px !important;
+
+        .tox-tbtn__select-label {
+            font-size: 12px !important;
+            font-weight: 500 !important;
+            color: inherit !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            line-height: 28px !important;
+        }
+
+        .tox-tbtn__select-chevron {
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            width: 12px !important;
+            height: 12px !important;
+
+            svg {
+                width: 10px !important;
+                height: 10px !important;
+                margin: 0 auto !important;
+            }
+        }
+    }
+
+    .tox-split-button {
+        height: 28px !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        border-radius: 6px !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        overflow: hidden !important;
+
+        .tox-tbtn {
+            width: 20px !important;
+            min-width: 20px !important;
+            max-width: 20px !important;
+            height: 28px !important;
+            border-radius: 6px 0 0 6px !important;
+            padding: 0 !important;
+            margin: 0 !important;
+
+            svg {
+                width: 14px !important;
+                height: 14px !important;
+            }
+        }
+
+        .tox-split-button__chevron {
+            width: 12px !important;
+            min-width: 12px !important;
+            max-width: 12px !important;
+            height: 28px !important;
+            border-radius: 0 6px 6px 0 !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+
+            svg {
+                width: 8px !important;
+                height: 8px !important;
+                margin: 0 auto !important;
+            }
+        }
+    }
+
+    .tox-separator {
+        height: 16px !important;
+        width: 1px !important;
+        margin: 0 4px !important;
+        background: var(--el-border-color-lighter) !important;
+        border: none !important;
+    }
+}
+
 :root {
     /* Prototype Light Theme Variables */
     --bg-base: #eef0f8;

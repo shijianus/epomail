@@ -1125,28 +1125,30 @@
 
               <!-- Right Group: Mode Segmented Switch + Special Actions (Pure Icons with Tooltip) -->
               <div class="editor-right-tools">
-                <!-- Unified Mode Toggle Switch (Segmented Control) -->
+                <!-- Unified Mode Toggle Switch (Segmented Control - Pure Icon with Tooltips) -->
                 <div class="editor-mode-switch">
-                  <button
-                    type="button"
-                    class="mode-switch-btn"
-                    :class="{ 'is-active': welcomeEditorFormat === 'rich' }"
-                    @click="setEditorFormat('rich')"
-                    :title="$t('richTextMode') || '富文本模式'"
-                  >
-                    <Icon icon="fluent:text-edit-style-20-regular" width="15" height="15" />
-                    <span>{{ $t('richTextMode') || '富文本' }}</span>
-                  </button>
-                  <button
-                    type="button"
-                    class="mode-switch-btn"
-                    :class="{ 'is-active': welcomeEditorFormat === 'source' }"
-                    @click="setEditorFormat('source')"
-                    :title="$t('markdownSourceMode') || '源码 / Markdown 模式'"
-                  >
-                    <Icon icon="fluent:code-20-regular" width="15" height="15" />
-                    <span>{{ $t('markdownSourceMode') || '源码' }}</span>
-                  </button>
+                  <el-tooltip :content="$t('richTextMode') || '富文本模式'" effect="dark" placement="top">
+                    <button
+                      type="button"
+                      class="mode-switch-btn"
+                      :class="{ 'is-active': welcomeEditorFormat === 'rich' }"
+                      @click="setEditorFormat('rich')"
+                      aria-label="富文本模式"
+                    >
+                      <Icon icon="fluent:text-edit-style-20-regular" width="16" height="16" />
+                    </button>
+                  </el-tooltip>
+                  <el-tooltip :content="$t('markdownSourceMode') || '源码 / Markdown 模式'" effect="dark" placement="top">
+                    <button
+                      type="button"
+                      class="mode-switch-btn"
+                      :class="{ 'is-active': welcomeEditorFormat === 'source' }"
+                      @click="setEditorFormat('source')"
+                      aria-label="源码 / Markdown 模式"
+                    >
+                      <Icon icon="fluent:code-20-regular" width="16" height="16" />
+                    </button>
+                  </el-tooltip>
                 </div>
 
                 <div class="tool-divider"></div>
@@ -1481,17 +1483,17 @@ const noticeForm = reactive({
   notice: 0,
   noticeWidth: 0
 })
-const DEFAULT_WELCOME_SUBJECT = '🎉 欢迎加入 Epocanvas Mail - 开启您的私密、高效云端邮件体验'
+const DEFAULT_WELCOME_SUBJECT = '🎉 欢迎来到 Epocanvas Mail · 开启你的专属独立域名邮箱体验'
 const DEFAULT_WELCOME_CONTENT = `<div style="width: 100%; max-width: 100%; box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', Roboto, Helvetica, Arial, sans-serif; color: #1e293b; line-height: 1.6; background: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 10px 35px -6px rgba(0, 0, 0, 0.08);">
   <!-- Top Full-Width Banner with Microsoft Azure Gradient & Official EpoMail Brand Logo -->
   <div style="background: linear-gradient(135deg, #0078D4 0%, #0284c7 35%, #2563eb 70%, #4338ca 100%); padding: 40px 42px 34px; text-align: left; position: relative;">
     <div style="display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap;">
       <div style="flex: 1; min-width: 300px;">
         <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(255, 255, 255, 0.22); border: 1px solid rgba(255, 255, 255, 0.35); padding: 5px 14px; border-radius: 20px; color: #ffffff; font-size: 13px; font-weight: 600; margin-bottom: 14px; backdrop-filter: blur(8px);">
-          <span>✨ 官方系统引导 · 专属独立域名邮箱</span>
+          <span>✨ 你的专属独立域名邮箱已就绪</span>
         </div>
-        <h1 style="margin: 0; color: #ffffff; font-size: 26px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.35;">欢迎开启您的专属独立域名邮箱</h1>
-        <p style="margin: 10px 0 0; color: rgba(255, 255, 255, 0.95); font-size: 14.5px; line-height: 1.55;">零门槛免配置 · 纯净无广告 · 国内极速直连 · 专属身份名片 · 轻量强大</p>
+        <h1 style="margin: 0; color: #ffffff; font-size: 26px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.35;">嗨 {{user_name}}，很高兴认识你！</h1>
+        <p style="margin: 10px 0 0; color: rgba(255, 255, 255, 0.95); font-size: 14.5px; line-height: 1.55;">零门槛免配置 · 纯净无广告 · 国内极速秒开 · 专属极客身份</p>
       </div>
       <!-- Official EpoMail Cloud Logo SVG Artwork -->
       <div style="flex-shrink: 0; display: flex; align-items: center; justify-content: center; width: 92px; height: 92px; background: rgba(255, 255, 255, 0.18); border-radius: 22px; border: 1.5px solid rgba(255, 255, 255, 0.38); box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18); backdrop-filter: blur(10px);">
@@ -1525,9 +1527,9 @@ const DEFAULT_WELCOME_CONTENT = `<div style="width: 100%; max-width: 100%; box-s
   </div>
 
   <div style="padding: 36px 42px 34px;">
-    <p style="font-size: 16px; color: #0f172a; margin-top: 0; font-weight: 700;">尊敬的 {{user_name}}，您好：</p>
+    <p style="font-size: 16px; color: #0f172a; margin-top: 0; font-weight: 700;">嗨 {{user_name}}，欢迎加入 Epocanvas Mail！</p>
     <p style="font-size: 14.5px; color: #475569; line-height: 1.8; margin: 0 0 28px;">
-      很高兴与您相遇！这是一个由开发者出资搭建并开放给普通用户的专属独立域名邮箱系统。我们把底层复杂的域名注册、DNS 解析、MX 记录及云端服务器全部封装，让您无需懂技术也能免费拥有专属域名邮箱。您的账号（{{user_email}}）已就绪，为了帮助您快速了解我们为您带来的核心价值，请查阅以下特性与指南：
+      很高兴能在这里与你相遇。这是一个由开发者精心搭建并免费开放给大家使用的专属独立域名邮箱。我们把底层复杂的域名购买、DNS 解析、MX/SPF 记录和云端服务器全部打包搞定——你不需要懂任何繁琐的技术，注册好就能直接拥有一张专属的高颜值域名名片。你的专属邮箱（{{user_email}}）已经准备好了！快来看看我们为你准备的贴心功能与上手指南吧：
     </p>
 
     <!-- 5 Alternating Zigzag Storytelling Value Sections -->
@@ -1537,15 +1539,15 @@ const DEFAULT_WELCOME_CONTENT = `<div style="width: 100%; max-width: 100%; box-s
       <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; background: linear-gradient(135deg, #f0f7ff 0%, #ffffff 100%); border: 1px solid #bfdbfe; border-radius: 16px; padding: 24px 28px; box-shadow: 0 4px 16px rgba(0, 120, 212, 0.05); flex-wrap: wrap;">
         <div style="flex: 1; min-width: 280px;">
           <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(0, 120, 212, 0.1); border: 1px solid rgba(0, 120, 212, 0.25); padding: 4px 12px; border-radius: 9999px; color: #0078D4; font-size: 12.5px; font-weight: 700; margin-bottom: 10px;">
-            🌐 顶级域名身份 · 免买域名免配置
+            🌐 专属极客名片 · 免买域名免配置
           </div>
-          <h3 style="font-size: 17.5px; font-weight: 800; color: #0f172a; margin: 0 0 8px;">无需折腾 DNS 与 MX 解析，即刻获得极客专属名片</h3>
+          <h3 style="font-size: 17.5px; font-weight: 800; color: #0f172a; margin: 0 0 8px;">无需折腾 DNS 与 MX 解析，即刻拥有专属身份</h3>
           <p style="font-size: 13.5px; color: #475569; line-height: 1.7; margin: 0 0 14px;">
-            告别昂贵的第三方域名购买与繁琐晦涩的 DNS、MX、SPF、DKIM 解析配置。在 Epocanvas Mail，注册账号即刻生成专属 <code style="background: #e0f2fe; color: #0284c7; font-weight: 700; padding: 2px 8px; border-radius: 6px; font-size: 13px;">你的名字@专属域名</code> 邮箱，零成本拥有一张极客范与专业度拉满的专属身份名片。
+            告别繁琐复杂的域名购买与解析配置。在 Epocanvas Mail，直接拥有 <code style="background: #e0f2fe; color: #0284c7; font-weight: 700; padding: 2px 8px; border-radius: 6px; font-size: 13px;">{{user_name}}@专属域名</code> 这样酷炫的邮箱地址，求职简历、技术交流或日常通讯，专业范与极客感瞬间拉满。
           </p>
           <div>
-            <span style="background: #e2e8f0; color: #334155; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; margin-right: 8px;">✨ 零配置即开即用</span>
-            <span style="background: #e2e8f0; color: #334155; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600;">🏷️ 多顶级域名自由选</span>
+            <span style="background: #e2e8f0; color: #334155; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; margin-right: 8px;">✨ 零门槛即开即用</span>
+            <span style="background: #e2e8f0; color: #334155; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600;">🏷️ 多顶级域名随心选</span>
           </div>
         </div>
         <div style="width: 300px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
@@ -1605,15 +1607,15 @@ const DEFAULT_WELCOME_CONTENT = `<div style="width: 100%; max-width: 100%; box-s
         </div>
         <div style="flex: 1; min-width: 280px;">
           <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.25); padding: 4px 12px; border-radius: 9999px; color: #059669; font-size: 12.5px; font-weight: 700; margin-bottom: 10px;">
-            🛡️ 纯净私密 · 零商业变现
+            🛡️ 纯粹私密 · 零广告零商业变现
           </div>
-          <h3 style="font-size: 17.5px; font-weight: 800; color: #0f172a; margin: 0 0 8px;">无开屏、不弹窗，绝不扫描邮件做广告画像分析</h3>
+          <h3 style="font-size: 17.5px; font-weight: 800; color: #0f172a; margin: 0 0 8px;">无开屏、不弹窗，绝不窥探你的邮件隐私</h3>
           <p style="font-size: 13.5px; color: #475569; line-height: 1.7; margin: 0 0 14px;">
-            我们坚持邮箱通讯的纯粹本位，彻底消除传统免费邮箱漫天飞舞的开屏广告、横幅推广与弹窗营销。后台绝不对您的信件进行商用内容挖掘与行为画像，还您一个干净、极简、清爽的纯粹通讯空间。
+            我们坚守邮箱通讯最纯粹的本质。没有令人烦躁的开屏广告、横幅推广和垃圾营销弹窗；后台绝不对你的信件做商业挖掘或行为画像分析，给你一个干净、清爽、安心的专属通讯空间。
           </p>
           <div>
-            <span style="background: #d1fae5; color: #065f46; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; margin-right: 8px;">🚫 零弹窗零推广</span>
-            <span style="background: #d1fae5; color: #065f46; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600;">🔐 隐私绝不商用</span>
+            <span style="background: #d1fae5; color: #065f46; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; margin-right: 8px;">🚫 纯净零弹窗</span>
+            <span style="background: #d1fae5; color: #065f46; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600;">🔒 隐私绝不商用</span>
           </div>
         </div>
       </div>
@@ -1622,14 +1624,14 @@ const DEFAULT_WELCOME_CONTENT = `<div style="width: 100%; max-width: 100%; box-s
       <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; background: linear-gradient(135deg, #fffbeb 0%, #ffffff 100%); border: 1px solid #fde68a; border-radius: 16px; padding: 24px 28px; box-shadow: 0 4px 16px rgba(245, 158, 11, 0.05); flex-wrap: wrap;">
         <div style="flex: 1; min-width: 280px;">
           <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.25); padding: 4px 12px; border-radius: 9999px; color: #d97706; font-size: 12.5px; font-weight: 700; margin-bottom: 10px;">
-            ⚡ 全球边缘网络 · 国内极速直连
+            ⚡ 全球边缘网络 · 国内极速秒开
           </div>
-          <h3 style="font-size: 17.5px; font-weight: 800; color: #0f172a; margin: 0 0 8px;">全球多节点边缘 CDN 直连，无需代理毫秒响应</h3>
+          <h3 style="font-size: 17.5px; font-weight: 800; color: #0f172a; margin: 0 0 8px;">Cloudflare 全球边缘 CDN 直连，无需代理毫秒响应</h3>
           <p style="font-size: 13.5px; color: #475569; line-height: 1.7; margin: 0 0 14px;">
-            基于 Cloudflare 全球边缘云网络与国内高速 CDN 直连加速节点。无论身处何地，无需任何网络代理工具或 VPN 即可瞬间加载邮件并秒级投递至全球各大主流邮箱，随时随地稳定顺畅不失联。
+            基于全球 300+ 边缘节点与国内高速 CDN 加速。无论你在哪里，无需开启任何代理工具，邮件毫秒级秒开加载、全球各大邮箱秒级送达，随时随地稳定顺畅不失联。
           </p>
           <div>
-            <span style="background: #fef3c7; color: #92400e; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; margin-right: 8px;">🚀 秒开收发</span>
+            <span style="background: #fef3c7; color: #92400e; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; margin-right: 8px;">🚀 毫秒级秒开</span>
             <span style="background: #fef3c7; color: #92400e; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600;">🌍 全球边缘直达</span>
           </div>
         </div>
@@ -1690,11 +1692,11 @@ const DEFAULT_WELCOME_CONTENT = `<div style="width: 100%; max-width: 100%; box-s
         </div>
         <div style="flex: 1; min-width: 280px;">
           <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(124, 58, 237, 0.1); border: 1px solid rgba(124, 58, 237, 0.25); padding: 4px 12px; border-radius: 9999px; color: #7c3aed; font-size: 12.5px; font-weight: 700; margin-bottom: 10px;">
-            📥 进阶工作流 · 极简轻盈
+            📥 进阶工作流 · 极简轻快
           </div>
-          <h3 style="font-size: 17.5px; font-weight: 800; color: #0f172a; margin: 0 0 8px;">稍后处理 (Snooze)、星标代办与全文极速检索</h3>
+          <h3 style="font-size: 17.5px; font-weight: 800; color: #0f172a; margin: 0 0 8px;">稍后处理 (Snooze)、星标代办与全文即时检索</h3>
           <p style="font-size: 13.5px; color: #475569; line-height: 1.7; margin: 0 0 14px;">
-            内置业界领先的高效代办工作流。支持将重要邮件在指定时间重新唤醒处理（Snooze），配合星标重要归档、自定义分类标签与全文即时检索，处理成百上千封信件依然行云流水、轻快自如。
+            内置现代高效的工作流体验。重要的信件可以一键设为稍后提醒（Snooze），配合星标代办归档、自定义分类标签与全文即时检索，即使面对成百上千封邮件也能游刃有余、井井有条。
           </p>
           <div>
             <span style="background: #ede9fe; color: #5b21b6; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; margin-right: 8px;">⏰ 稍后处理代办</span>
@@ -1709,12 +1711,12 @@ const DEFAULT_WELCOME_CONTENT = `<div style="width: 100%; max-width: 100%; box-s
           <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(225, 29, 72, 0.1); border: 1px solid rgba(225, 29, 72, 0.25); padding: 4px 12px; border-radius: 9999px; color: #e11d48; font-size: 12.5px; font-weight: 700; margin-bottom: 10px;">
             🔀 别名隔离 · 垃圾邮件一键熔断
           </div>
-          <h3 style="font-size: 17.5px; font-weight: 800; color: #0f172a; margin: 0 0 8px;">各平台独立别名分发，外部泄露即关主号无忧</h3>
+          <h3 style="font-size: 17.5px; font-weight: 800; color: #0f172a; margin: 0 0 8px;">各平台独立别名分发，外部泄露一键切断</h3>
           <p style="font-size: 13.5px; color: #475569; line-height: 1.7; margin: 0 0 14px;">
-            支持为不同外部平台（GitHub、Steam、社交平台）独立分配不同别名。一旦某个外部平台发生数据泄露或被垃圾营销骚扰，只需一键禁用该特定别名，即可精准熔断垃圾邮件，主邮箱永无后顾之忧。
+            支持为 GitHub、Steam 或各类网站独立分配专属别名。一旦某个外部平台遭遇数据泄露或被垃圾营销骚扰，只需一键禁用该别名即可物理熔断，你的真实主邮箱永远安全隐身。
           </p>
           <div>
-            <span style="background: #ffe4e6; color: #9f1239; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; margin-right: 8px;">🛑 一键单向熔断</span>
+            <span style="background: #ffe4e6; color: #9f1239; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; margin-right: 8px;">🛑 一键物理熔断</span>
             <span style="background: #ffe4e6; color: #9f1239; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600;">🛡️ 真实主号隐身</span>
           </div>
         </div>
@@ -1773,15 +1775,15 @@ const DEFAULT_WELCOME_CONTENT = `<div style="width: 100%; max-width: 100%; box-s
         <span>新手 3 步快速上手指引</span>
       </div>
       <div style="font-size: 13.5px; color: #475569; line-height: 1.9;">
-        <div><strong>1. 体验星标与代办归档：</strong> 本邮件已自动放入您的【稍后处理 / 代办】与【星标 / 重要】中，体验快捷归档。</div>
-        <div><strong>2. 设定个人资料与个性化外观：</strong> 前往「个人设置」完善头像与个人简介，并体验个性化主题切换。</div>
-        <div><strong>3. 开启您的首封信件：</strong> 点击顶栏「写邮件」，即刻体验极速撰写与全球稳定投递。</div>
+        <div><strong>1. 体验星标与代办归档：</strong> 这封信已经自动放入你的【稍后代办】与【星标 / 重要】中，点击感受快捷归档。</div>
+        <div><strong>2. 设定个人资料与外观：</strong> 前往「个人设置」上传属于你的专属头像、昵称，并切换喜欢的个性化主题。</div>
+        <div><strong>3. 写下你的第一封信：</strong> 点击左上角「写邮件」，即刻体验流畅轻快的撰写与全球极速投递。</div>
       </div>
     </div>
 
     <div style="margin-top: 24px; padding-top: 16px; border-top: 1px dashed #cbd5e1; font-size: 12.5px; color: #94a3b8; line-height: 1.65;">
-      <div>📌 <strong>系统说明：</strong> 此邮件由系统官方自动发送。站长配置了自动清理周期，到期后将自动从您的邮箱中安全移除，无需手动清理。</div>
-      <div style="margin-top: 10px; font-weight: 600; color: #64748b;">Epocanvas Mail 官方团队 · 敬上</div>
+      <div>📌 <strong>贴心提示：</strong> 这是一封官方系统引导信件。站长设置了自动清理周期，到期后会自动安全清理，无需手动删除。</div>
+      <div style="margin-top: 10px; font-weight: 600; color: #64748b;">Epocanvas Mail 开发者团队 · 陪你开启高效每一天</div>
     </div>
   </div>
 </div>`
@@ -4109,24 +4111,22 @@ form .el-button {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 5px;
+    width: 28px;
     height: 26px;
-    padding: 0 10px;
+    padding: 0;
+    margin: 0;
     border: none;
     background: transparent;
     border-radius: 6px;
-    font-size: 12px;
-    font-weight: 500;
     color: var(--el-text-color-secondary, #64748b);
     cursor: pointer;
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    white-space: nowrap;
 
     .iconify, svg {
       display: block;
-      width: 14px;
-      height: 14px;
-      margin: 0;
+      width: 16px;
+      height: 16px;
+      margin: 0 auto;
     }
 
     &:hover {
@@ -4136,7 +4136,6 @@ form .el-button {
     &.is-active {
       background: var(--el-bg-color, #ffffff);
       color: #0078D4;
-      font-weight: 700;
       box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
     }
   }
@@ -4413,26 +4412,59 @@ form .el-button {
   }
 
   .tox-toolbar__group {
-    display: flex !important;
+    display: inline-flex !important;
     align-items: center !important;
-    gap: 4px !important;
-    padding: 0 4px !important;
+    gap: 2px !important;
+    padding: 0 2px !important;
     margin: 0 !important;
     border: none !important;
   }
 
   .tox-tbtn {
-    height: 30px !important;
-    min-width: 30px !important;
-    margin: 0 !important;
-    padding: 4px !important;
-    border-radius: 4px !important;
-    color: var(--el-text-color-regular) !important;
     display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;
+    width: 28px !important;
+    height: 28px !important;
+    min-width: 28px !important;
+    max-width: 28px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 1px solid transparent !important;
+    border-radius: 6px !important;
+    background: transparent !important;
+    color: var(--el-text-color-regular) !important;
+    box-sizing: border-box !important;
+    line-height: 1 !important;
     cursor: pointer !important;
-    transition: background 0.2s ease, color 0.2s ease !important;
+    overflow: hidden !important;
+    transition: all 0.15s ease !important;
+
+    .tox-icon,
+    .tox-tbtn__icon-custom,
+    span {
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      width: 100% !important;
+      height: 100% !important;
+      margin: 0 auto !important;
+      padding: 0 !important;
+      line-height: 1 !important;
+    }
+
+    svg {
+      display: block !important;
+      width: 15px !important;
+      height: 15px !important;
+      max-width: 15px !important;
+      max-height: 15px !important;
+      margin: 0 auto !important;
+      padding: 0 !important;
+      flex-shrink: 0 !important;
+      vertical-align: middle !important;
+      fill: currentColor !important;
+    }
 
     &:hover {
       background: var(--el-fill-color) !important;
@@ -4440,99 +4472,106 @@ form .el-button {
     }
 
     &.tox-tbtn--enabled, &[aria-pressed="true"] {
-      background: var(--el-color-primary-light-9) !important;
+      background: var(--el-color-primary-light-9, rgba(91, 110, 245, 0.12)) !important;
       color: var(--el-color-primary) !important;
       font-weight: 600 !important;
     }
 
     &.tox-tbtn--disabled, &[aria-disabled="true"] {
-      opacity: 0.4 !important;
+      opacity: 0.35 !important;
       cursor: not-allowed !important;
       background: transparent !important;
-    }
-
-    svg {
-      width: 18px !important;
-      height: 18px !important;
-      fill: currentColor !important;
     }
   }
 
   .tox-tbtn--select {
-    height: 30px !important;
-    line-height: 30px !important;
-    border-radius: 4px !important;
-    padding: 0 8px !important;
-    margin: 0 !important;
+    width: auto !important;
+    min-width: 64px !important;
+    max-width: 90px !important;
+    height: 28px !important;
+    padding: 0 6px !important;
     display: inline-flex !important;
     align-items: center !important;
     justify-content: space-between !important;
-    color: var(--el-text-color-regular) !important;
-    background: transparent !important;
-
-    &:hover {
-      background: var(--el-fill-color) !important;
-      color: var(--el-color-primary) !important;
-    }
+    gap: 4px !important;
 
     .tox-tbtn__select-label {
       font-size: 12px !important;
       font-weight: 500 !important;
       color: inherit !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      white-space: nowrap !important;
+      overflow: hidden !important;
+      text-overflow: ellipsis !important;
+      line-height: 28px !important;
     }
 
-    .tox-tbtn__select-chevron svg {
+    .tox-tbtn__select-chevron {
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      margin: 0 !important;
+      padding: 0 !important;
       width: 12px !important;
       height: 12px !important;
-      fill: currentColor !important;
+
+      svg {
+        width: 10px !important;
+        height: 10px !important;
+        margin: 0 auto !important;
+      }
     }
   }
 
   .tox-split-button {
-    height: 30px !important;
+    height: 28px !important;
     margin: 0 !important;
-    border-radius: 4px !important;
-    overflow: hidden !important;
+    padding: 0 !important;
+    border-radius: 6px !important;
     display: inline-flex !important;
     align-items: center !important;
-    transition: background 0.2s ease !important;
-
-    &:hover {
-      background: var(--el-fill-color) !important;
-    }
+    overflow: hidden !important;
 
     .tox-tbtn {
-      height: 30px !important;
-      width: 26px !important;
-      border-radius: 4px 0 0 4px !important;
-      padding: 4px !important;
+      width: 20px !important;
+      min-width: 20px !important;
+      max-width: 20px !important;
+      height: 28px !important;
+      border-radius: 6px 0 0 6px !important;
+      padding: 0 !important;
+      margin: 0 !important;
+
+      svg {
+        width: 14px !important;
+        height: 14px !important;
+      }
     }
 
     .tox-split-button__chevron {
-      height: 30px !important;
-      width: 14px !important;
-      border-radius: 0 4px 4px 0 !important;
+      width: 12px !important;
+      min-width: 12px !important;
+      max-width: 12px !important;
+      height: 28px !important;
+      border-radius: 0 6px 6px 0 !important;
       padding: 0 !important;
+      margin: 0 !important;
       display: inline-flex !important;
       align-items: center !important;
       justify-content: center !important;
 
       svg {
-        width: 10px !important;
-        height: 10px !important;
-        fill: currentColor !important;
-      }
-
-      &:hover {
-        background: var(--el-fill-color-darker) !important;
+        width: 8px !important;
+        height: 8px !important;
+        margin: 0 auto !important;
       }
     }
   }
 
   .tox-separator {
-    height: 18px !important;
+    height: 16px !important;
     width: 1px !important;
-    margin: 0 6px !important;
+    margin: 0 4px !important;
     background: var(--el-border-color-lighter) !important;
     border: none !important;
   }

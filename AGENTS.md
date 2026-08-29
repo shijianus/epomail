@@ -1,6 +1,33 @@
 # Agent Workflow SOP (Standard Operating Procedure)
 
-### 交互与工程级质感升级：动态参数插值 ({{user_name}} / {{user_email}})、胶囊模式切换开关、Markdown 辅助工具居中精修与精密 SaaS 场景插画 (2026-08-28)
+### 质感精修与文案亲和力重塑：TinyMCE 工具栏全量 Icon 比例与几何居中重构 (28px/15px)、纯 Icon 胶囊模式开关与亲和自然现代文风 (2026-08-28)
+*   **功能需求与业务逻辑对齐 (Feature & Alignment)**: 
+    1. **自然亲和、拉近距离的现代开发者文风 (Approachable & Conversational Copywriting)**:
+       - 彻底剔除冷冰冰、官僚式的陈旧词汇（如“尊敬的 {{user_name}}”、“出资搭建”等），全面重塑为充满温度、真诚且专业的现代极客产品叙事：
+         - 问候语升级为：`嗨 {{user_name}}，很高兴认识你！` 以及 `嗨 {{user_name}}，欢迎加入 Epocanvas Mail！`。
+         - 5 大价值卡片文案重塑：`🌐 专属极客名片 · 免买域名免配置`、`🛡️ 纯粹私密 · 零广告零商业变现`、`⚡ 全球边缘网络 · 国内极速秒开`、`📥 进阶工作流 · 极简轻快`、`🔀 别名隔离 · 垃圾邮件一键熔断`。
+         - 官方署名升级为温暖的开发者团队寄语：`Epocanvas Mail 开发者团队 · 陪你开启高效每一天`。
+    2. **纯 Icon 胶囊模式切换开关 (Pure Icon Segmented Pill Switch)**:
+       - 胶囊滑动开关（`.editor-mode-switch`）彻底移除冗余的中文字符，重构为极致紧凑的纯 Icon 极简胶囊按钮组（`[ 🔤 | </> ]`）。
+       - 采用 `<el-tooltip>` 提供悬停中文交互说明（`富文本模式` / `源码 / Markdown 模式`），释放工具栏横向空间。
+    3. **TinyMCE `.tox-editor-header` 工具栏全局 Icon 比例重构与严格几何居中 (Pixel-Perfect TinyMCE Icons)**:
+       - 彻底解决 TinyMCE 富文本编辑器中所有工具栏按钮（特别是插入图片、Emojis、源码、粗体、斜体、清除格式等）“图标过大偏向右下角”的顽疾。
+       - 全局注入高精度 CSS 规则（`.tox-editor-header`、`.tox-tbtn`、`.tox-icon`、`.tox-tbtn svg`）：
+         - 按钮尺寸规范为 `28px x 28px`（圆角 `6px`），清除所有不对称内边距与外边距。
+         - 内部图标尺寸严格约束为 `15px x 15px`（黄金视觉比例）。
+         - 内部容器全面锁定 `display: flex !important; align-items: center !important; justify-content: center !important; margin: 0 auto !important;`，在浅色与深色主题下均达到绝对几何居中。
+*   **编辑代码 (Edit)**: 
+    *   **全局样式与组件**: 修改 [`mail-vue/src/style.css`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/style.css)、[`mail-vue/src/components/tiny-editor/index.vue`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/components/tiny-editor/index.vue)、[`mail-vue/src/views/sys-setting/index.vue`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/views/sys-setting/index.vue)。
+    *   **自动化测试套件**: 更新 [`tests/test-welcome-fullscreen-cf.mjs`](file:///home/shijian/projects/epocanvas-mail/tests/test-welcome-fullscreen-cf.mjs)。
+*   **全链路自动化验证与部署 (Verify & Deploy)**: 
+    *   执行 Playwright 端到端全链路自动化测试（`tests/test-welcome-fullscreen-cf.mjs`），在 Cloudflare 生产环境 100% 通过：
+        1. 默认大弹窗模式（1140px x 837px）校验通过。
+        2. 全屏模式保护视窗（保留全局顶栏与底栏）校验通过。
+        3. 胶囊模式切换开关纯 Icon 架构（无文字占用）校验通过。
+        4. TinyMCE `.tox-editor-header` 抽检按钮（插入图片、Emojis、源代码、粗体、斜体、清除格式）尺寸（28px）与几何居中（偏差 <= 2px）全景自动化校验 100% 通过。
+        5. 源码模式下 Markdown 辅助工具完备性与居中校验通过。
+        6. 真实收件箱收到亲和文风欢迎信、官方认证蓝标与动态插值（`嗨 admin`、`admin@epomail.bond`）全链路校验通过。
+    *   成功发布上线到 Cloudflare Workers（Version ID: `cfc1c929-0cbc-4aa1-8ec7-21015f3f0480`）。
 *   **功能需求与业务逻辑对齐 (Feature & Alignment)**: 
     1. **动态参数占位符与全自动插值 (Dynamic Template Placeholder Interpolation)**:
        - 默认欢迎信模板升级为动态参数占位符体系：`尊敬的 {{user_name}}，您好：`，支持 `{{user_name}}`（用户名/昵称）、`{{user_email}}`（用户专属完整邮箱）、`{{user_id}}`（用户数字 ID）、`{{domain}}`（当前顶级域名）、`{{current_date}}` / `{{date}}`（当前投递日期）。
