@@ -1,6 +1,36 @@
 # Agent Workflow SOP (Standard Operating Procedure)
 
-### 视觉演进与全宽重构：全员欢迎信全宽展开模式、官方 EpoMail 矢量 Logo、左右间隔交错图文场景与去死板边框 (2026-08-28)
+### 交互与工程级质感升级：动态参数插值 ({{user_name}} / {{user_email}})、胶囊模式切换开关、Markdown 辅助工具居中精修与精密 SaaS 场景插画 (2026-08-28)
+*   **功能需求与业务逻辑对齐 (Feature & Alignment)**: 
+    1. **动态参数占位符与全自动插值 (Dynamic Template Placeholder Interpolation)**:
+       - 默认欢迎信模板升级为动态参数占位符体系：`尊敬的 {{user_name}}，您好：`，支持 `{{user_name}}`（用户名/昵称）、`{{user_email}}`（用户专属完整邮箱）、`{{user_id}}`（用户数字 ID）、`{{domain}}`（当前顶级域名）、`{{current_date}}` / `{{date}}`（当前投递日期）。
+       - 后端投递服务（[`email-service.js`](file:///home/shijian/projects/epocanvas-mail/mail-worker/src/service/email-service.js)）在全员群发与新用户注册自动投递时自动解析目标用户信息并完成精准插值渲染，写入只读邮件快照。
+    2. **胶囊模式切换开关 (Segmented Mode Toggle Switch)**:
+       - 废除松散割裂的双按钮设计，升级为精致的单体胶囊切换开关（`.editor-mode-switch`：`[ 富文本 | 源码 (MD) ]`），选中项高亮卡片浮层，状态一目了然且点击切换流畅。
+    3. **Markdown 编辑辅助工具像素级居中与防裁切**:
+       - 源码模式下 Markdown 格式工具（H1、H2、加粗、斜体、引用、代码块、列表、链接、分割线）全面采用独立徽章（`.btn-text-badge`）与严格居中 Flex 规则，杜绝任何“漏一半”或偏下偏右失真。
+    4. **设定个人资料与讯息引导 (Profile CTA Navigation)**:
+       - 调整欢迎信行动呼吁按钮 2 为 `👤 设定个人资料与讯息`，直接引导至系统个人信息设置主页（`https://mail.epocanvas.com/settings/profile`），辅助小白用户快速完善头像、昵称与个人简介。
+    5. **去 AI 塑料感：微软 Fluent / Linear 工程级矢量微场景**:
+       - 彻底剔除浮夸波浪与杂乱色块，重构为 5 大高精 SaaS 界面与系统拓扑微场景：
+         - **场景 1（专属域名名片）**：真实浏览器地址栏 + `@` 极客名片卡 + SPF/DKIM/DMARC 100% 绿色认证芯片。
+         - **场景 2（隐私与数据安全监控台）**：0 追踪/0 广告指标卡 + TLS 1.3/AES 传输标准 + 绝不出售信件安全承诺条。
+         - **场景 3（全球边缘 CDN 网络直连）**：国内直连用户节点 -> Cloudflare 300+ Edge CDN 节点 -> 全球主流邮箱秒级送达拓扑图 + `< 20ms` 低延迟徽标。
+         - **场景 4（智能收件箱代办流）**：清晰邮件卡片堆叠（`⏰ 明天 09:00` 稍后处理 + `⭐ 重要星标`） + 毫秒级全文即时检索窗。
+         - **场景 5（多别名分发与单向熔断器）**：主邮箱安全隐身节点 -> 独立分支管道（GitHub 连通、Steam 连通、垃圾营销一键物理熔断）拓扑结构。
+*   **编辑代码 (Edit)**: 
+    *   **前端页面与样式**: 修改 [`mail-vue/src/views/sys-setting/index.vue`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/views/sys-setting/index.vue)。
+    *   **后端投递服务**: 修改 [`mail-worker/src/service/email-service.js`](file:///home/shijian/projects/epocanvas-mail/mail-worker/src/service/email-service.js)。
+    *   **自动化测试套件**: 更新 [`tests/test-welcome-fullscreen-cf.mjs`](file:///home/shijian/projects/epocanvas-mail/tests/test-welcome-fullscreen-cf.mjs)。
+*   **全链路自动化验证与部署 (Verify & Deploy)**: 
+    *   执行 Playwright 端到端全链路自动化测试（`tests/test-welcome-fullscreen-cf.mjs`），在 Cloudflare 生产环境 100% 通过：
+        1. 默认大弹窗模式（1140px x 837px）与顶栏去冗余校验通过。
+        2. 全屏模式视窗保护（top: 50px，不遮挡顶栏；bottom: 22px，不遮挡底栏）校验通过。
+        3. 胶囊模式切换开关（Segmented Switch）与纯 Icon 按钮组像素级居中校验通过。
+        4. 源码模式下 Markdown 辅助工具（H1、H2、加粗、斜体等）完备性与居中渲染校验通过。
+        5. 动态参数插值（真实收件箱中 `{{user_name}}` 成功渲染为 `admin`，`{{user_email}}` 渲染为 `admin@epomail.bond`）校验通过。
+        6. 真实收件箱 Shadow DOM 渲染 5 大工程级微场景插画与个人资料 CTA 按钮全景校验通过。
+    *   成功发布上线到 Cloudflare Workers（Version ID: `b1febe37-3580-4f14-8ca0-2fde29abfd77`）。
 *   **功能需求与业务逻辑对齐 (Feature & Alignment)**: 
     1. **信件全宽展开视界 (Full-Width Responsive Canvas)**:
        - 彻底剔除邮件正文 `max-width: 680px` 局促宽度限制，重构为自适应全宽视界（`width: 100%; max-width: 100%; box-sizing: border-box;`），在各种大屏与收件箱阅读视窗中自适应展开，告别“半屏局促感”。

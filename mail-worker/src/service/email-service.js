@@ -1085,15 +1085,45 @@ const emailService = {
 		if (!overrideData && settingData.welcomeAutoSend === 0) {
 			return null;
 		}
-		const subject = overrideData?.subject || settingData.welcomeSubject || '🎉 欢迎加入 Epocanvas Mail - 开启您的私密、高效云端邮件体验';
+		let subject = overrideData?.subject || settingData.welcomeSubject || '🎉 欢迎加入 Epocanvas Mail - 开启您的私密、高效云端邮件体验';
 		const expireDays = overrideData?.expireDays !== undefined ? Number(overrideData.expireDays) : (Number(settingData.welcomeExpireDays) >= 0 ? Number(settingData.welcomeExpireDays) : 7);
 		let text = overrideData?.text || settingData.welcomeText;
-		if (!text && (overrideData?.content || settingData.welcomeContent)) {
-			text = emailUtils.htmlToText(overrideData?.content || settingData.welcomeContent);
+		let rawContent = overrideData?.content || settingData.welcomeContent || '';
+		if (!text && rawContent) {
+			text = emailUtils.htmlToText(rawContent);
 		}
 		if (!text) {
 			text = '欢迎使用 Epocanvas Mail，开启您的私密、高效云端邮件体验！';
 		}
+
+		// Interpolate dynamic template placeholders ({{user_name}}, {{user_id}}, {{user_email}}, {{domain}}, {{current_date}})
+		let userName = emailUtils.getName(userEmail) || (userEmail ? userEmail.split('@')[0] : '用户');
+		try {
+			const userEntity = (await import('../entity/user')).default;
+			const userRow = await orm(c).select({ nickname: userEntity.nickname, email: userEntity.email }).from(userEntity).where(eq(userEntity.userId, userId)).get();
+			if (userRow && userRow.nickname) {
+				userName = userRow.nickname;
+			}
+		} catch (e) {}
+
+		const domain = userEmail ? (userEmail.split('@')[1] || 'epomail.bond') : 'epomail.bond';
+		const dateStr = new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' });
+
+		const interpolate = (str) => {
+			if (!str || typeof str !== 'string') return str;
+			return str
+				.replace(/\{\{\s*user_name\s*\}\}/gi, userName)
+				.replace(/\{\{\s*username\s*\}\}/gi, userName)
+				.replace(/\{\{\s*user_id\s*\}\}/gi, String(userId))
+				.replace(/\{\{\s*user_email\s*\}\}/gi, userEmail || '')
+				.replace(/\{\{\s*domain\s*\}\}/gi, domain)
+				.replace(/\{\{\s*current_date\s*\}\}/gi, dateStr)
+				.replace(/\{\{\s*date\s*\}\}/gi, dateStr);
+		};
+
+		subject = interpolate(subject);
+		const contentSnapshot = interpolate(rawContent);
+		text = interpolate(text);
 
 		// Check if user already has this welcome email (only check on auto-send on registration)
 		if (!overrideData?.isBroadcast) {
@@ -1120,11 +1150,11 @@ const emailService = {
 			sendEmail: 'admin@epocanvas.com',
 			name: 'Epocanvas 官方团队',
 			subject: subject,
-			content: (overrideData?.content || settingData.welcomeContent || ''), // Immutable snapshot of welcome email content
+			content: contentSnapshot, // Immutable snapshot with interpolated user variables
 			text: text,
 			toEmail: userEmail,
-			toName: emailUtils.getName(userEmail) || userEmail,
-			recipient: JSON.stringify([{ address: userEmail, name: emailUtils.getName(userEmail) || '' }]),
+			toName: userName,
+			recipient: JSON.stringify([{ address: userEmail, name: userName }]),
 			cc: '[]',
 			bcc: '[]',
 			inReplyTo: '',
@@ -1166,6 +1196,19 @@ const emailService = {
 				const settingData = await settingService.query(c);
 				if (!emailRow.content && settingData.welcomeContent) {
 					emailRow.content = settingData.welcomeContent;
+				}
+				if (emailRow.content && emailRow.content.includes('{{')) {
+					const userName = emailRow.toName || (emailRow.toEmail ? emailRow.toEmail.split('@')[0] : '用户');
+					const domain = emailRow.toEmail ? (emailRow.toEmail.split('@')[1] || 'epomail.bond') : 'epomail.bond';
+					const dateStr = new Date(emailRow.createTime || Date.now()).toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' });
+					emailRow.content = emailRow.content
+						.replace(/\{\{\s*user_name\s*\}\}/gi, userName)
+						.replace(/\{\{\s*username\s*\}\}/gi, userName)
+						.replace(/\{\{\s*user_id\s*\}\}/gi, String(emailRow.userId || ''))
+						.replace(/\{\{\s*user_email\s*\}\}/gi, emailRow.toEmail || '')
+						.replace(/\{\{\s*domain\s*\}\}/gi, domain)
+						.replace(/\{\{\s*current_date\s*\}\}/gi, dateStr)
+						.replace(/\{\{\s*date\s*\}\}/gi, dateStr);
 				}
 				emailRow.expireDays = settingData.welcomeExpireDays ?? 7;
 			}

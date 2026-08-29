@@ -104,10 +104,14 @@ import assert from 'assert';
     console.log('6. 验证编辑器顶栏右对齐纯 Icon 工具栏 (无冗余文字标签)...');
     const rightTools = page.locator('.editor-right-tools');
     await rightTools.waitFor({ state: 'visible' });
+    const modeSwitch = rightTools.locator('.editor-mode-switch');
+    await modeSwitch.waitFor({ state: 'visible' });
+    console.log('✓ 编辑器模式切换胶囊开关 (Segmented Switch) 渲染通过');
+
     const rightToolIcons = rightTools.locator('.tool-icon-btn');
     const rightToolCount = await rightToolIcons.count();
     console.log(`- 右侧纯 Icon 按钮数量: ${rightToolCount}`);
-    assert.ok(rightToolCount >= 4, '右侧必须包含富文本、源码、清空、恢复模板、全屏等纯 Icon 按钮');
+    assert.ok(rightToolCount >= 3, '右侧必须包含清空、恢复模板、全屏等纯 Icon 按钮');
 
     // 校验按钮几何居中
     const sampleBtn = rightToolIcons.first();
@@ -122,10 +126,10 @@ import assert from 'assert';
     console.log('📸 截取大弹窗富文本编辑视图...');
     await page.screenshot({ path: '/home/shijian/projects/epocanvas-mail/tests/cf_dialog_rich_editor.png' });
 
-    // Step 5: 切换到源码 (Markdown) 模式
-    console.log('7. 切换到源码 (Markdown) 模式并验证 Markdown 辅助工具与编辑器...');
-    const sourceIconBtn = rightTools.locator('.tool-icon-btn').nth(1);
-    await sourceIconBtn.click();
+    // Step 5: 通过模式开关切换到源码 (Markdown) 模式
+    console.log('7. 通过模式开关切换到源码 (Markdown) 模式并验证 Markdown 辅助工具与编辑器...');
+    const sourceSwitchBtn = modeSwitch.locator('.mode-switch-btn').nth(1);
+    await sourceSwitchBtn.click();
     await page.waitForTimeout(1000);
 
     const sourceTextarea = page.locator('.source-textarea-fullscreen textarea');
@@ -142,7 +146,7 @@ import assert from 'assert';
 
     // Step 6: 恢复官方微软 Fluent 默认模版
     console.log('8. 恢复官方微软 Fluent 默认模版 (含精美矢量插画与品牌 Logo)...');
-    const resetIconBtn = rightTools.locator('.tool-icon-btn').nth(3);
+    const resetIconBtn = rightTools.locator('.tool-icon-btn').nth(1); // Index 1 is reset template
     await resetIconBtn.click();
     await page.waitForTimeout(1000);
 
@@ -150,10 +154,11 @@ import assert from 'assert';
     assert.ok(resetSourceVal.includes('顶级域名身份') || resetSourceVal.includes('专属域名身份'), '恢复默认模板后源码必须包含核心价值1');
     assert.ok(resetSourceVal.includes('纯粹') || resetSourceVal.includes('零商业变现'), '恢复默认模板后源码必须包含核心价值2');
     assert.ok(resetSourceVal.includes('开启我的收件箱'), '恢复默认模板后源码必须包含真实 CTA 按钮');
+    assert.ok(resetSourceVal.includes('设定个人资料与讯息') || resetSourceVal.includes('/settings/profile'), '恢复默认模板后源码必须包含个人讯息设置引导按钮');
     console.log('✓ 微软 Fluent 默认模版重置成功');
 
-    const richIconBtn = rightTools.locator('.tool-icon-btn').first();
-    await richIconBtn.click();
+    const richSwitchBtn = modeSwitch.locator('.mode-switch-btn').first();
+    await richSwitchBtn.click();
     await page.waitForTimeout(1500);
 
     // Step 7: 保存配置

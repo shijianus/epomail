@@ -1073,48 +1073,48 @@
               <div class="editor-left-tools">
                 <template v-if="welcomeEditorFormat === 'source'">
                   <el-tooltip content="H1 一级标题" effect="dark" placement="top">
-                    <div class="tool-icon-btn" @click="insertMarkdownSyntax('# ', '')">
-                      <Icon icon="lucide:heading-1" width="16" height="16" />
+                    <div class="tool-icon-btn text-icon-btn" @click="insertMarkdownSyntax('# ', '')">
+                      <span class="btn-text-badge">H1</span>
                     </div>
                   </el-tooltip>
                   <el-tooltip content="H2 二级标题" effect="dark" placement="top">
-                    <div class="tool-icon-btn" @click="insertMarkdownSyntax('## ', '')">
-                      <Icon icon="lucide:heading-2" width="16" height="16" />
+                    <div class="tool-icon-btn text-icon-btn" @click="insertMarkdownSyntax('## ', '')">
+                      <span class="btn-text-badge">H2</span>
                     </div>
                   </el-tooltip>
-                  <el-tooltip content="加粗" effect="dark" placement="top">
+                  <el-tooltip content="加粗 (Bold)" effect="dark" placement="top">
                     <div class="tool-icon-btn" @click="insertMarkdownSyntax('**', '**')">
-                      <Icon icon="lucide:bold" width="16" height="16" />
+                      <Icon icon="ri:bold" width="16" height="16" />
                     </div>
                   </el-tooltip>
-                  <el-tooltip content="斜体" effect="dark" placement="top">
+                  <el-tooltip content="斜体 (Italic)" effect="dark" placement="top">
                     <div class="tool-icon-btn" @click="insertMarkdownSyntax('*', '*')">
-                      <Icon icon="lucide:italic" width="16" height="16" />
+                      <Icon icon="ri:italic" width="16" height="16" />
                     </div>
                   </el-tooltip>
-                  <el-tooltip content="引用块" effect="dark" placement="top">
+                  <el-tooltip content="引用块 (Quote)" effect="dark" placement="top">
                     <div class="tool-icon-btn" @click="insertMarkdownSyntax('> ', '')">
-                      <Icon icon="lucide:quote" width="15" height="15" />
+                      <Icon icon="ri:double-quotes-l" width="16" height="16" />
                     </div>
                   </el-tooltip>
-                  <el-tooltip content="代码块" effect="dark" placement="top">
+                  <el-tooltip content="代码块 (Code Block)" effect="dark" placement="top">
                     <div class="tool-icon-btn" @click="insertMarkdownSyntax('```html\n', '\n```')">
-                      <Icon icon="lucide:code-2" width="16" height="16" />
+                      <Icon icon="ri:code-box-line" width="16" height="16" />
                     </div>
                   </el-tooltip>
-                  <el-tooltip content="列表" effect="dark" placement="top">
+                  <el-tooltip content="无序列表 (List)" effect="dark" placement="top">
                     <div class="tool-icon-btn" @click="insertMarkdownSyntax('- ', '')">
-                      <Icon icon="lucide:list" width="16" height="16" />
+                      <Icon icon="ri:list-unordered" width="16" height="16" />
                     </div>
                   </el-tooltip>
-                  <el-tooltip content="链接" effect="dark" placement="top">
+                  <el-tooltip content="插入链接 (Link)" effect="dark" placement="top">
                     <div class="tool-icon-btn" @click="insertMarkdownSyntax('[链接文字](', ')')">
-                      <Icon icon="lucide:link" width="15" height="15" />
+                      <Icon icon="ri:link" width="16" height="16" />
                     </div>
                   </el-tooltip>
-                  <el-tooltip content="分割线" effect="dark" placement="top">
+                  <el-tooltip content="分割线 (Divider)" effect="dark" placement="top">
                     <div class="tool-icon-btn" @click="insertMarkdownSyntax('\n---\n', '')">
-                      <Icon icon="lucide:minus" width="16" height="16" />
+                      <Icon icon="ri:separator" width="16" height="16" />
                     </div>
                   </el-tooltip>
                 </template>
@@ -1123,29 +1123,31 @@
               <!-- Middle Elastic Spacer -->
               <div class="toolbar-spacer"></div>
 
-              <!-- Right Group: Special Actions (All Pure Icons with Tooltip!) -->
+              <!-- Right Group: Mode Segmented Switch + Special Actions (Pure Icons with Tooltip) -->
               <div class="editor-right-tools">
-                <!-- Rich text mode icon button -->
-                <el-tooltip :content="$t('richTextMode')" effect="dark" placement="top">
-                  <div
-                    class="tool-icon-btn"
-                    :class="{ active: welcomeEditorFormat === 'rich' }"
+                <!-- Unified Mode Toggle Switch (Segmented Control) -->
+                <div class="editor-mode-switch">
+                  <button
+                    type="button"
+                    class="mode-switch-btn"
+                    :class="{ 'is-active': welcomeEditorFormat === 'rich' }"
                     @click="setEditorFormat('rich')"
+                    :title="$t('richTextMode') || '富文本模式'"
                   >
-                    <Icon icon="fluent:text-grammar-settings-20-regular" width="17" height="17" />
-                  </div>
-                </el-tooltip>
-
-                <!-- Source / Markdown mode icon button -->
-                <el-tooltip :content="$t('markdownSourceMode')" effect="dark" placement="top">
-                  <div
-                    class="tool-icon-btn"
-                    :class="{ active: welcomeEditorFormat === 'source' }"
+                    <Icon icon="fluent:text-edit-style-20-regular" width="15" height="15" />
+                    <span>{{ $t('richTextMode') || '富文本' }}</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="mode-switch-btn"
+                    :class="{ 'is-active': welcomeEditorFormat === 'source' }"
                     @click="setEditorFormat('source')"
+                    :title="$t('markdownSourceMode') || '源码 / Markdown 模式'"
                   >
-                    <Icon icon="fluent:code-24-regular" width="17" height="17" />
-                  </div>
-                </el-tooltip>
+                    <Icon icon="fluent:code-20-regular" width="15" height="15" />
+                    <span>{{ $t('markdownSourceMode') || '源码' }}</span>
+                  </button>
+                </div>
 
                 <div class="tool-divider"></div>
 
@@ -1523,9 +1525,9 @@ const DEFAULT_WELCOME_CONTENT = `<div style="width: 100%; max-width: 100%; box-s
   </div>
 
   <div style="padding: 36px 42px 34px;">
-    <p style="font-size: 16px; color: #0f172a; margin-top: 0; font-weight: 700;">尊敬的用户，您好：</p>
+    <p style="font-size: 16px; color: #0f172a; margin-top: 0; font-weight: 700;">尊敬的 {{user_name}}，您好：</p>
     <p style="font-size: 14.5px; color: #475569; line-height: 1.8; margin: 0 0 28px;">
-      很高兴与您相遇！这是一个由开发者出资搭建并开放给普通用户的专属独立域名邮箱系统。我们把底层复杂的域名注册、DNS 解析、MX 记录及云端服务器全部封装，让您无需懂技术也能免费拥有专属域名邮箱。为了帮助您快速了解我们为您带来的核心价值，请查阅以下特性与指南：
+      很高兴与您相遇！这是一个由开发者出资搭建并开放给普通用户的专属独立域名邮箱系统。我们把底层复杂的域名注册、DNS 解析、MX 记录及云端服务器全部封装，让您无需懂技术也能免费拥有专属域名邮箱。您的账号（{{user_email}}）已就绪，为了帮助您快速了解我们为您带来的核心价值，请查阅以下特性与指南：
     </p>
 
     <!-- 5 Alternating Zigzag Storytelling Value Sections -->
@@ -1548,33 +1550,30 @@ const DEFAULT_WELCOME_CONTENT = `<div style="width: 100%; max-width: 100%; box-s
         </div>
         <div style="width: 300px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
           <svg width="100%" height="150" viewBox="0 0 320 180" fill="none" xmlns="http://www.w3.org/2000/svg" style="max-width: 300px; display: block; margin: 0 auto;">
-            <defs>
-              <linearGradient id="domainCardBg" x1="0" y1="0" x2="320" y2="180" gradientUnits="userSpaceOnUse">
-                <stop stop-color="#0078D4" stop-opacity="0.1"/>
-                <stop offset="1" stop-color="#0284c7" stop-opacity="0.03"/>
-              </linearGradient>
-              <linearGradient id="idBadgeGrad" x1="0" y1="0" x2="1" y2="1">
-                <stop stop-color="#0078D4"/>
-                <stop offset="1" stop-color="#2563eb"/>
-              </linearGradient>
-            </defs>
-            <rect width="320" height="180" rx="16" fill="url(#domainCardBg)" stroke="#bfdbfe" stroke-width="1.5"/>
-            <rect x="20" y="20" width="280" height="34" rx="8" fill="#ffffff" stroke="#93c5fd" stroke-width="1.2"/>
-            <circle cx="34" cy="37" r="4" fill="#ef4444"/>
-            <circle cx="46" cy="37" r="4" fill="#f59e0b"/>
-            <circle cx="58" cy="37" r="4" fill="#10b981"/>
-            <rect x="74" y="27" width="180" height="20" rx="4" fill="#f1f5f9"/>
-            <text x="82" y="41" fill="#0284c7" font-size="11" font-weight="700" font-family="monospace">https://epomail.bond/@me</text>
-            <circle cx="282" cy="37" r="7" fill="#10b981" fill-opacity="0.2"/>
-            <path d="M279 37L281 39L285 35" stroke="#10b981" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-            <rect x="36" y="70" width="248" height="88" rx="12" fill="url(#idBadgeGrad)" filter="drop-shadow(0 8px 16px rgba(37,99,235,0.25))"/>
-            <circle cx="68" cy="114" r="22" fill="#ffffff" fill-opacity="0.2"/>
-            <text x="68" y="121" fill="#ffffff" font-size="18" font-weight="800" text-anchor="middle">@</text>
-            <text x="102" y="104" fill="#ffffff" font-size="14" font-weight="700">VIP 专属域名身份</text>
-            <rect x="102" y="112" width="162" height="22" rx="6" fill="#ffffff" fill-opacity="0.18"/>
-            <text x="110" y="127" fill="#ffffff" font-size="11" font-weight="600" font-family="monospace">user@epomail.bond</text>
-            <rect x="226" y="80" width="46" height="18" rx="9" fill="#10b981"/>
-            <text x="249" y="93" fill="#ffffff" font-size="9.5" font-weight="700" text-anchor="middle">已认证</text>
+            <rect width="320" height="180" rx="12" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1.5"/>
+            <rect x="0" y="0" width="320" height="36" rx="12" fill="#FFFFFF"/>
+            <rect x="0" y="24" width="320" height="12" fill="#FFFFFF"/>
+            <line x1="0" y1="36" x2="320" y2="36" stroke="#E2E8F0" stroke-width="1"/>
+            <circle cx="16" cy="18" r="4" fill="#EF4444"/>
+            <circle cx="28" cy="18" r="4" fill="#F59E0B"/>
+            <circle cx="40" cy="18" r="4" fill="#10B981"/>
+            <rect x="56" y="8" width="248" height="20" rx="6" fill="#F1F5F9"/>
+            <circle cx="68" cy="18" r="3" fill="#10B981"/>
+            <text x="78" y="22" fill="#0284C7" font-size="10" font-weight="600" font-family="monospace">https://epomail.bond/@me</text>
+            <rect x="20" y="52" width="280" height="110" rx="10" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="1.2" filter="drop-shadow(0 4px 12px rgba(0,0,0,0.04))"/>
+            <circle cx="50" cy="86" r="18" fill="#0078D4"/>
+            <text x="50" y="92" fill="#FFFFFF" font-size="13" font-weight="800" text-anchor="middle">@</text>
+            <text x="80" y="80" fill="#0F172A" font-size="13" font-weight="700">专属极客域名名片</text>
+            <text x="80" y="96" fill="#64748B" font-size="11" font-weight="500" font-family="monospace">user@epomail.bond</text>
+            <rect x="220" y="70" width="64" height="20" rx="10" fill="#ECFDF5" stroke="#A7F3D0" stroke-width="1"/>
+            <text x="252" y="84" fill="#059669" font-size="10" font-weight="700" text-anchor="middle">● DNS 激活</text>
+            <line x1="32" y1="120" x2="288" y2="120" stroke="#F1F5F9" stroke-width="1"/>
+            <rect x="32" y="130" width="76" height="18" rx="4" fill="#EFF6FF"/>
+            <text x="70" y="143" fill="#0078D4" font-size="9.5" font-weight="600" text-anchor="middle">SPF 权威验证</text>
+            <rect x="116" y="130" width="80" height="18" rx="4" fill="#EFF6FF"/>
+            <text x="156" y="143" fill="#0078D4" font-size="9.5" font-weight="600" text-anchor="middle">DKIM 密钥签发</text>
+            <rect x="204" y="130" width="76" height="18" rx="4" fill="#EFF6FF"/>
+            <text x="242" y="143" fill="#0078D4" font-size="9.5" font-weight="600" text-anchor="middle">DMARC 100%</text>
           </svg>
         </div>
       </div>
@@ -1583,27 +1582,25 @@ const DEFAULT_WELCOME_CONTENT = `<div style="width: 100%; max-width: 100%; box-s
       <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; background: linear-gradient(135deg, #ecfdf5 0%, #ffffff 100%); border: 1px solid #a7f3d0; border-radius: 16px; padding: 24px 28px; box-shadow: 0 4px 16px rgba(16, 185, 129, 0.05); flex-wrap: wrap;">
         <div style="width: 300px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
           <svg width="100%" height="150" viewBox="0 0 320 180" fill="none" xmlns="http://www.w3.org/2000/svg" style="max-width: 300px; display: block; margin: 0 auto;">
-            <defs>
-              <linearGradient id="shieldGrad" x1="0" y1="0" x2="1" y2="1">
-                <stop stop-color="#059669"/>
-                <stop offset="1" stop-color="#10b981"/>
-              </linearGradient>
-              <linearGradient id="pureCardBg" x1="0" y1="0" x2="320" y2="180" gradientUnits="userSpaceOnUse">
-                <stop stop-color="#10b981" stop-opacity="0.1"/>
-                <stop offset="1" stop-color="#059669" stop-opacity="0.03"/>
-              </linearGradient>
-            </defs>
-            <rect width="320" height="180" rx="16" fill="url(#pureCardBg)" stroke="#a7f3d0" stroke-width="1.5"/>
-            <circle cx="160" cy="90" r="70" stroke="#10b981" stroke-opacity="0.15" stroke-dasharray="4 4"/>
-            <circle cx="160" cy="90" r="50" stroke="#10b981" stroke-opacity="0.25"/>
-            <path d="M160 38L212 58V100C212 132 160 152 160 152C160 152 108 132 108 100V58L160 38Z" fill="url(#shieldGrad)" filter="drop-shadow(0 8px 18px rgba(5,150,105,0.3))"/>
-            <rect x="146" y="86" width="28" height="24" rx="4" fill="#ffffff"/>
-            <path d="M152 86V76C152 71.5 155.5 68 160 68C164.5 68 168 71.5 168 76V86" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round"/>
-            <circle cx="160" cy="97" r="3" fill="#059669"/>
-            <rect x="24" y="32" width="76" height="24" rx="12" fill="#ffffff" stroke="#a7f3d0" stroke-width="1"/>
-            <text x="62" y="48" fill="#059669" font-size="10.5" font-weight="700" text-anchor="middle">🚫 零开屏广告</text>
-            <rect x="220" y="126" width="80" height="24" rx="12" fill="#ffffff" stroke="#a7f3d0" stroke-width="1"/>
-            <text x="260" y="142" fill="#059669" font-size="10.5" font-weight="700" text-anchor="middle">🔒 不扫描隐私</text>
+            <rect width="320" height="180" rx="12" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1.5"/>
+            <rect x="0" y="0" width="320" height="36" rx="12" fill="#FFFFFF"/>
+            <rect x="0" y="24" width="320" height="12" fill="#FFFFFF"/>
+            <line x1="0" y1="36" x2="320" y2="36" stroke="#E2E8F0" stroke-width="1"/>
+            <circle cx="16" cy="18" r="4" fill="#10B981"/>
+            <text x="28" y="22" fill="#0F172A" font-size="11" font-weight="700">隐私与数据安全监控台</text>
+            <rect x="236" y="8" width="68" height="20" rx="10" fill="#ECFDF5" stroke="#A7F3D0" stroke-width="1"/>
+            <text x="270" y="22" fill="#059669" font-size="10" font-weight="700" text-anchor="middle">100% 私密</text>
+            <rect x="18" y="50" width="136" height="52" rx="8" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.2"/>
+            <text x="30" y="70" fill="#64748B" font-size="10" font-weight="600">商业广告扫描</text>
+            <text x="30" y="90" fill="#059669" font-size="14" font-weight="800">0 追踪 / 0 广告</text>
+            <rect x="166" y="50" width="136" height="52" rx="8" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.2"/>
+            <text x="178" y="70" fill="#64748B" font-size="10" font-weight="600">传输加密标准</text>
+            <text x="178" y="90" fill="#0078D4" font-size="14" font-weight="800">TLS 1.3 / AES</text>
+            <rect x="18" y="112" width="284" height="50" rx="8" fill="#ECFDF5" stroke="#A7F3D0" stroke-width="1.2"/>
+            <circle cx="38" cy="137" r="10" fill="#059669"/>
+            <path d="M34 137L37 140L42 134" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <text x="56" y="134" fill="#065F46" font-size="11.5" font-weight="700">绝不向第三方出售用户数据与信件画像</text>
+            <text x="56" y="149" fill="#047857" font-size="10" font-weight="500">零开屏 · 零弹窗 · 纯粹邮箱通讯本位</text>
           </svg>
         </div>
         <div style="flex: 1; min-width: 280px;">
@@ -1638,28 +1635,27 @@ const DEFAULT_WELCOME_CONTENT = `<div style="width: 100%; max-width: 100%; box-s
         </div>
         <div style="width: 300px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
           <svg width="100%" height="150" viewBox="0 0 320 180" fill="none" xmlns="http://www.w3.org/2000/svg" style="max-width: 300px; display: block; margin: 0 auto;">
-            <defs>
-              <linearGradient id="speedCardBg" x1="0" y1="0" x2="320" y2="180" gradientUnits="userSpaceOnUse">
-                <stop stop-color="#f59e0b" stop-opacity="0.1"/>
-                <stop offset="1" stop-color="#d97706" stop-opacity="0.03"/>
-              </linearGradient>
-              <linearGradient id="lightningGrad" x1="0" y1="0" x2="1" y2="1">
-                <stop stop-color="#fbbf24"/>
-                <stop offset="1" stop-color="#f59e0b"/>
-              </linearGradient>
-            </defs>
-            <rect width="320" height="180" rx="16" fill="url(#speedCardBg)" stroke="#fde68a" stroke-width="1.5"/>
-            <circle cx="160" cy="90" r="54" fill="#fef3c7" stroke="#f59e0b" stroke-width="1.5"/>
-            <ellipse cx="160" cy="90" rx="54" ry="24" stroke="#f59e0b" stroke-opacity="0.4" stroke-dasharray="3 3"/>
-            <line x1="160" y1="36" x2="160" y2="144" stroke="#f59e0b" stroke-opacity="0.4"/>
-            <path d="M40 90C80 40 240 40 280 90" stroke="#f59e0b" stroke-width="2.5" stroke-dasharray="6 4"/>
-            <path d="M40 90C80 140 240 140 280 90" stroke="#f59e0b" stroke-width="2.5" stroke-dasharray="6 4"/>
-            <circle cx="160" cy="90" r="24" fill="url(#lightningGrad)" filter="drop-shadow(0 6px 14px rgba(245,158,11,0.4))"/>
-            <path d="M162 76L150 92H161L158 104L171 88H159L162 76Z" fill="#ffffff"/>
-            <rect x="220" y="24" width="76" height="24" rx="12" fill="#ffffff" stroke="#fde68a" stroke-width="1"/>
-            <text x="258" y="40" fill="#d97706" font-size="11" font-weight="800" text-anchor="middle">⚡ &lt; 20ms</text>
-            <rect x="24" y="130" width="84" height="24" rx="12" fill="#ffffff" stroke="#fde68a" stroke-width="1"/>
-            <text x="66" y="146" fill="#d97706" font-size="10.5" font-weight="700" text-anchor="middle">免代理直连</text>
+            <rect width="320" height="180" rx="12" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1.5"/>
+            <rect x="0" y="0" width="320" height="36" rx="12" fill="#FFFFFF"/>
+            <rect x="0" y="24" width="320" height="12" fill="#FFFFFF"/>
+            <line x1="0" y1="36" x2="320" y2="36" stroke="#E2E8F0" stroke-width="1"/>
+            <circle cx="16" cy="18" r="4" fill="#F59E0B"/>
+            <text x="28" y="22" fill="#0F172A" font-size="11" font-weight="700">全球边缘 CDN 网络直连</text>
+            <rect x="236" y="8" width="68" height="20" rx="10" fill="#FEF3C7" stroke="#FDE68A" stroke-width="1"/>
+            <text x="270" y="22" fill="#D97706" font-size="10" font-weight="700" text-anchor="middle">⚡ &lt; 20ms</text>
+            <rect x="18" y="50" width="284" height="112" rx="8" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.2"/>
+            <line x1="60" y1="106" x2="160" y2="106" stroke="#0078D4" stroke-width="2" stroke-dasharray="4 3"/>
+            <line x1="160" y1="106" x2="260" y2="106" stroke="#10B981" stroke-width="2"/>
+            <circle cx="60" cy="106" r="16" fill="#EFF6FF" stroke="#0078D4" stroke-width="1.5"/>
+            <text x="60" y="110" fill="#0078D4" font-size="11" font-weight="800" text-anchor="middle">用户</text>
+            <text x="60" y="138" fill="#64748B" font-size="9.5" font-weight="600" text-anchor="middle">国内直连</text>
+            <circle cx="160" cy="106" r="20" fill="#FEF3C7" stroke="#F59E0B" stroke-width="1.8"/>
+            <text x="160" y="109" fill="#D97706" font-size="10" font-weight="800" text-anchor="middle">EDGE</text>
+            <text x="160" y="120" fill="#B45309" font-size="8" font-weight="700" text-anchor="middle">CDN</text>
+            <text x="160" y="144" fill="#D97706" font-size="9.5" font-weight="700" text-anchor="middle">300+ 节点</text>
+            <circle cx="260" cy="106" r="16" fill="#ECFDF5" stroke="#10B981" stroke-width="1.5"/>
+            <text x="260" y="110" fill="#059669" font-size="11" font-weight="800" text-anchor="middle">全球</text>
+            <text x="260" y="138" fill="#64748B" font-size="9.5" font-weight="600" text-anchor="middle">秒级送达</text>
           </svg>
         </div>
       </div>
@@ -1668,32 +1664,28 @@ const DEFAULT_WELCOME_CONTENT = `<div style="width: 100%; max-width: 100%; box-s
       <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; background: linear-gradient(135deg, #f5f3ff 0%, #ffffff 100%); border: 1px solid #ddd6fe; border-radius: 16px; padding: 24px 28px; box-shadow: 0 4px 16px rgba(124, 58, 237, 0.05); flex-wrap: wrap;">
         <div style="width: 300px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
           <svg width="100%" height="150" viewBox="0 0 320 180" fill="none" xmlns="http://www.w3.org/2000/svg" style="max-width: 300px; display: block; margin: 0 auto;">
-            <defs>
-              <linearGradient id="inboxCardBg" x1="0" y1="0" x2="320" y2="180" gradientUnits="userSpaceOnUse">
-                <stop stop-color="#8b5cf6" stop-opacity="0.1"/>
-                <stop offset="1" stop-color="#6d28d9" stop-opacity="0.03"/>
-              </linearGradient>
-              <linearGradient id="mailCanvasGrad" x1="0" y1="0" x2="1" y2="1">
-                <stop stop-color="#7c3aed"/>
-                <stop offset="1" stop-color="#6d28d9"/>
-              </linearGradient>
-            </defs>
-            <rect width="320" height="180" rx="16" fill="url(#inboxCardBg)" stroke="#ddd6fe" stroke-width="1.5"/>
-            <rect x="30" y="24" width="260" height="132" rx="10" fill="#ffffff" stroke="#c4b5fd" stroke-width="1.2"/>
-            <rect x="30" y="24" width="260" height="28" rx="10" fill="#f5f3ff"/>
-            <circle cx="44" cy="38" r="3.5" fill="#a78bfa"/>
-            <circle cx="54" cy="38" r="3.5" fill="#c4b5fd"/>
-            <circle cx="64" cy="38" r="3.5" fill="#ddd6fe"/>
-            <rect x="80" y="31" width="120" height="14" rx="4" fill="#ffffff"/>
-            <rect x="42" y="60" width="236" height="26" rx="6" fill="#f5f3ff"/>
-            <circle cx="56" cy="73" r="6" fill="#7c3aed"/>
-            <rect x="70" y="68" width="90" height="10" rx="3" fill="#6d28d9"/>
-            <rect x="220" y="68" width="46" height="10" rx="3" fill="#10b981"/>
-            <rect x="42" y="92" width="236" height="26" rx="6" fill="#ffffff" stroke="#ede9fe"/>
-            <circle cx="56" cy="105" r="6" fill="#fbbf24"/>
-            <rect x="70" y="100" width="110" height="10" rx="3" fill="#94a3b8"/>
-            <rect x="180" y="124" width="90" height="24" rx="12" fill="url(#mailCanvasGrad)" filter="drop-shadow(0 4px 10px rgba(124,58,237,0.3))"/>
-            <text x="225" y="140" fill="#ffffff" font-size="10.5" font-weight="700" text-anchor="middle">⏰ 稍后代办流</text>
+            <rect width="320" height="180" rx="12" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1.5"/>
+            <rect x="0" y="0" width="320" height="36" rx="12" fill="#FFFFFF"/>
+            <rect x="0" y="24" width="320" height="12" fill="#FFFFFF"/>
+            <line x1="0" y1="36" x2="320" y2="36" stroke="#E2E8F0" stroke-width="1"/>
+            <circle cx="16" cy="18" r="4" fill="#7C3AED"/>
+            <text x="28" y="22" fill="#0F172A" font-size="11" font-weight="700">智能收件箱代办流</text>
+            <rect x="226" y="8" width="78" height="20" rx="10" fill="#EDE9FE" stroke="#DDD6FE" stroke-width="1"/>
+            <text x="265" y="22" fill="#6D28D9" font-size="10" font-weight="700" text-anchor="middle">⏰ 稍后代办</text>
+            <rect x="18" y="48" width="284" height="34" rx="6" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.2"/>
+            <circle cx="34" cy="65" r="5" fill="#7C3AED"/>
+            <text x="48" y="69" fill="#0F172A" font-size="11" font-weight="700">项目周报与架构评审</text>
+            <rect x="220" y="55" width="72" height="20" rx="4" fill="#F5F3FF"/>
+            <text x="256" y="69" fill="#7C3AED" font-size="9.5" font-weight="700" text-anchor="middle">⏰ 明天 09:00</text>
+            <rect x="18" y="88" width="284" height="34" rx="6" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.2"/>
+            <circle cx="34" cy="105" r="5" fill="#F59E0B"/>
+            <text x="48" y="109" fill="#0F172A" font-size="11" font-weight="700">GitHub 安全警报通知</text>
+            <rect x="220" y="95" width="72" height="20" rx="4" fill="#FEF3C7"/>
+            <text x="256" y="109" fill="#D97706" font-size="9.5" font-weight="700" text-anchor="middle">⭐ 重要星标</text>
+            <rect x="18" y="128" width="284" height="36" rx="6" fill="#F1F5F9" stroke="#CBD5E1" stroke-width="1"/>
+            <text x="32" y="151" fill="#64748B" font-size="11" font-family="monospace">🔍 毫秒级全文即时检索...</text>
+            <rect x="238" y="134" width="54" height="24" rx="4" fill="#0078D4"/>
+            <text x="265" y="150" fill="#FFFFFF" font-size="10" font-weight="700" text-anchor="middle">回车检索</text>
           </svg>
         </div>
         <div style="flex: 1; min-width: 280px;">
@@ -1728,34 +1720,34 @@ const DEFAULT_WELCOME_CONTENT = `<div style="width: 100%; max-width: 100%; box-s
         </div>
         <div style="width: 300px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
           <svg width="100%" height="150" viewBox="0 0 320 180" fill="none" xmlns="http://www.w3.org/2000/svg" style="max-width: 300px; display: block; margin: 0 auto;">
-            <defs>
-              <linearGradient id="aliasCardBg" x1="0" y1="0" x2="320" y2="180" gradientUnits="userSpaceOnUse">
-                <stop stop-color="#e11d48" stop-opacity="0.1"/>
-                <stop offset="1" stop-color="#be123c" stop-opacity="0.03"/>
-              </linearGradient>
-              <linearGradient id="mainMailGrad" x1="0" y1="0" x2="1" y2="1">
-                <stop stop-color="#0078D4"/>
-                <stop offset="1" stop-color="#2563eb"/>
-              </linearGradient>
-            </defs>
-            <rect width="320" height="180" rx="16" fill="url(#aliasCardBg)" stroke="#fecdd3" stroke-width="1.5"/>
-            <rect x="24" y="65" width="80" height="50" rx="10" fill="url(#mainMailGrad)" filter="drop-shadow(0 6px 12px rgba(37,99,235,0.25))"/>
-            <text x="64" y="88" fill="#ffffff" font-size="11" font-weight="700" text-anchor="middle">主邮箱</text>
-            <text x="64" y="103" fill="#93c5fd" font-size="9" font-weight="600" text-anchor="middle">SAFE 🔒</text>
-            <path d="M104 90H140C155 90 155 45 170 45H195" stroke="#0078D4" stroke-width="2" stroke-dasharray="3 3"/>
-            <path d="M104 90H195" stroke="#10b981" stroke-width="2"/>
-            <path d="M104 90H140C155 90 155 135 170 135H195" stroke="#e11d48" stroke-width="2"/>
-            <rect x="195" y="25" width="100" height="38" rx="8" fill="#ffffff" stroke="#93c5fd" stroke-width="1.2"/>
-            <text x="245" y="42" fill="#0284c7" font-size="10.5" font-weight="700" text-anchor="middle">github@alias</text>
-            <text x="245" y="55" fill="#10b981" font-size="9" font-weight="600" text-anchor="middle">● 正常连通</text>
-            <rect x="195" y="71" width="100" height="38" rx="8" fill="#ffffff" stroke="#a7f3d0" stroke-width="1.2"/>
-            <text x="245" y="88" fill="#059669" font-size="10.5" font-weight="700" text-anchor="middle">steam@alias</text>
-            <text x="245" y="101" fill="#10b981" font-size="9" font-weight="600" text-anchor="middle">● 正常连通</text>
-            <rect x="195" y="117" width="100" height="38" rx="8" fill="#fff1f2" stroke="#e11d48" stroke-width="1.5"/>
-            <text x="245" y="134" fill="#e11d48" font-size="10.5" font-weight="700" text-anchor="middle">leak@alias</text>
-            <text x="245" y="147" fill="#e11d48" font-size="9" font-weight="700" text-anchor="middle">✕ 一键熔断</text>
-            <circle cx="150" cy="135" r="7" fill="#e11d48"/>
-            <path d="M147 135L153 135" stroke="#ffffff" stroke-width="2" stroke-linecap="round"/>
+            <rect width="320" height="180" rx="12" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1.5"/>
+            <rect x="0" y="0" width="320" height="36" rx="12" fill="#FFFFFF"/>
+            <rect x="0" y="24" width="320" height="12" fill="#FFFFFF"/>
+            <line x1="0" y1="36" x2="320" y2="36" stroke="#E2E8F0" stroke-width="1"/>
+            <circle cx="16" cy="18" r="4" fill="#E11D48"/>
+            <text x="28" y="22" fill="#0F172A" font-size="11" font-weight="700">多别名分发与单向熔断器</text>
+            <rect x="236" y="8" width="68" height="20" rx="10" fill="#FFE4E6" stroke="#FECDD3" stroke-width="1"/>
+            <text x="270" y="22" fill="#E11D48" font-size="10" font-weight="700" text-anchor="middle">🛡️ 保护主号</text>
+            <rect x="18" y="52" width="76" height="110" rx="8" fill="#0078D4" filter="drop-shadow(0 4px 10px rgba(0,120,212,0.25))"/>
+            <circle cx="56" cy="85" r="14" fill="#FFFFFF" fill-opacity="0.2"/>
+            <text x="56" y="90" fill="#FFFFFF" font-size="14" font-weight="800" text-anchor="middle">主</text>
+            <text x="56" y="118" fill="#FFFFFF" font-size="11" font-weight="700" text-anchor="middle">主邮箱</text>
+            <text x="56" y="134" fill="#BFDBFE" font-size="9" font-weight="600" text-anchor="middle">🔒 安全隐身</text>
+            <path d="M94 72H130C140 72 140 64 150 64H170" stroke="#10B981" stroke-width="1.8"/>
+            <path d="M94 107H170" stroke="#10B981" stroke-width="1.8"/>
+            <path d="M94 142H130C140 142 140 150 150 150H170" stroke="#E11D48" stroke-width="1.8" stroke-dasharray="3 3"/>
+            <rect x="170" y="48" width="132" height="32" rx="6" fill="#FFFFFF" stroke="#A7F3D0" stroke-width="1.2"/>
+            <text x="180" y="68" fill="#0F172A" font-size="10" font-weight="600">github@alias</text>
+            <rect x="254" y="54" width="42" height="20" rx="4" fill="#ECFDF5"/>
+            <text x="275" y="68" fill="#059669" font-size="9" font-weight="700" text-anchor="middle">● 通畅</text>
+            <rect x="170" y="91" width="132" height="32" rx="6" fill="#FFFFFF" stroke="#A7F3D0" stroke-width="1.2"/>
+            <text x="180" y="111" fill="#0F172A" font-size="10" font-weight="600">steam@alias</text>
+            <rect x="254" y="97" width="42" height="20" rx="4" fill="#ECFDF5"/>
+            <text x="275" y="111" fill="#059669" font-size="9" font-weight="700" text-anchor="middle">● 通畅</text>
+            <rect x="170" y="134" width="132" height="32" rx="6" fill="#FFF1F2" stroke="#FECDD3" stroke-width="1.2"/>
+            <text x="180" y="154" fill="#9F1239" font-size="10" font-weight="600">spam@alias</text>
+            <rect x="254" y="140" width="42" height="20" rx="4" fill="#FFE4E6"/>
+            <text x="275" y="154" fill="#E11D48" font-size="9" font-weight="700" text-anchor="middle">✕ 已熔断</text>
           </svg>
         </div>
       </div>
@@ -1768,7 +1760,7 @@ const DEFAULT_WELCOME_CONTENT = `<div style="width: 100%; max-width: 100%; box-s
         🚀 开启我的收件箱
       </a>
       <a href="/settings/profile" style="display: inline-block; background: #ffffff; color: #0078D4; text-decoration: none; font-weight: 600; font-size: 14.5px; padding: 12px 28px; border-radius: 9999px; border: 1.5px solid #bfdbfe; margin: 0 10px 10px;">
-        ⚙️ 管理域名与别名
+        👤 设定个人资料与讯息
       </a>
     </div>
 
@@ -1782,7 +1774,7 @@ const DEFAULT_WELCOME_CONTENT = `<div style="width: 100%; max-width: 100%; box-s
       </div>
       <div style="font-size: 13.5px; color: #475569; line-height: 1.9;">
         <div><strong>1. 体验星标与代办归档：</strong> 本邮件已自动放入您的【稍后处理 / 代办】与【星标 / 重要】中，体验快捷归档。</div>
-        <div><strong>2. 探索多别名与个性化外观：</strong> 前往「系统设置」体验多别名分发规则与个性化主题切换。</div>
+        <div><strong>2. 设定个人资料与个性化外观：</strong> 前往「个人设置」完善头像与个人简介，并体验个性化主题切换。</div>
         <div><strong>3. 开启您的首封信件：</strong> 点击顶栏「写邮件」，即刻体验极速撰写与全球稳定投递。</div>
       </div>
     </div>
@@ -4061,13 +4053,28 @@ form .el-button {
   margin: 0 !important;
   line-height: 1 !important;
   box-sizing: border-box !important;
+  overflow: hidden !important;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
 
-  :deep(svg), svg {
+  .btn-text-badge {
+    font-size: 13px !important;
+    font-weight: 800 !important;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+    line-height: 1 !important;
+    letter-spacing: -0.5px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    margin: 0 auto !important;
+  }
+
+  :deep(svg), :deep(.iconify), svg {
     display: block !important;
     margin: 0 auto !important;
     flex-shrink: 0 !important;
     vertical-align: middle !important;
+    width: 17px !important;
+    height: 17px !important;
   }
 
   &:hover {
@@ -4085,6 +4092,53 @@ form .el-button {
   &.danger-hover:hover {
     background: rgba(239, 68, 68, 0.1) !important;
     color: #ef4444 !important;
+  }
+}
+
+/* Unified Editor Mode Switch (Segmented Toggle Control) */
+.editor-mode-switch {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px;
+  background: var(--el-fill-color-darker, #e2e8f0);
+  border: 1px solid var(--el-border-color-lighter, #cbd5e1);
+  border-radius: 8px;
+  gap: 2px;
+
+  .mode-switch-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    height: 26px;
+    padding: 0 10px;
+    border: none;
+    background: transparent;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--el-text-color-secondary, #64748b);
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    white-space: nowrap;
+
+    .iconify, svg {
+      display: block;
+      width: 14px;
+      height: 14px;
+      margin: 0;
+    }
+
+    &:hover {
+      color: var(--el-text-color-primary, #0f172a);
+    }
+
+    &.is-active {
+      background: var(--el-bg-color, #ffffff);
+      color: #0078D4;
+      font-weight: 700;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+    }
   }
 }
 
