@@ -4628,17 +4628,29 @@ form .el-button {
     }
 
     &[data-mce-name="table"] {
-      width: 38px !important;
-      min-width: 38px !important;
-      max-width: 38px !important;
-      padding: 0 4px !important;
+      width: 28px !important;
+      min-width: 28px !important;
+      max-width: 28px !important;
+      padding: 0 !important;
+      margin: 0 1px !important;
+      justify-content: center !important;
 
-      .tox-icon {
+      .tox-tbtn__select-chevron {
+        display: none !important;
+        width: 0 !important;
+        height: 0 !important;
+        visibility: hidden !important;
+      }
+
+      .tox-icon,
+      .tox-tbtn__icon-wrap {
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
-        width: 20px !important;
+        width: 28px !important;
         height: 28px !important;
+        margin: 0 auto !important;
+        padding: 0 !important;
 
         svg {
           display: block !important;
@@ -4679,6 +4691,11 @@ form .el-button {
         display: block !important;
         width: 10px !important;
         height: 10px !important;
+        min-width: 10px !important;
+        min-height: 10px !important;
+        max-width: 10px !important;
+        max-height: 10px !important;
+        transform: none !important;
         margin: 0 auto !important;
         fill: currentColor !important;
       }
@@ -4696,12 +4713,14 @@ form .el-button {
     overflow: hidden !important;
     border: 1px solid transparent !important;
     transition: all 0.15s ease !important;
+    box-sizing: border-box !important;
 
     &:hover {
       background: var(--el-fill-color) !important;
     }
 
-    & > .tox-tbtn {
+    & > .tox-tbtn,
+    & > [role="presentation"]:not(.tox-split-button__chevron) {
       width: 22px !important;
       min-width: 22px !important;
       max-width: 22px !important;
@@ -4713,19 +4732,27 @@ form .el-button {
       display: inline-flex !important;
       align-items: center !important;
       justify-content: center !important;
+      overflow: hidden !important;
 
-      .tox-icon {
+      .tox-icon,
+      .tox-tbtn__icon-wrap {
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
         width: 22px !important;
         height: 28px !important;
+        margin: 0 auto !important;
+        padding: 0 !important;
       }
 
       svg {
         display: block !important;
         width: 24px !important;
         height: 24px !important;
+        min-width: 24px !important;
+        min-height: 24px !important;
+        max-width: 24px !important;
+        max-height: 24px !important;
         transform: scale(0.5833) !important;
         transform-origin: 12px 12px !important;
         margin: 0 auto !important;
@@ -4733,10 +4760,11 @@ form .el-button {
       }
     }
 
-    & > .tox-split-button__chevron {
-      width: 12px !important;
-      min-width: 12px !important;
-      max-width: 12px !important;
+    & > .tox-split-button__chevron,
+    & > [role="presentation"].tox-split-button__chevron {
+      width: 14px !important;
+      min-width: 14px !important;
+      max-width: 14px !important;
       height: 28px !important;
       border-radius: 0 6px 6px 0 !important;
       padding: 0 !important;
@@ -4752,8 +4780,13 @@ form .el-button {
 
       svg {
         display: block !important;
-        width: 8px !important;
-        height: 8px !important;
+        width: 10px !important;
+        height: 10px !important;
+        min-width: 10px !important;
+        min-height: 10px !important;
+        max-width: 10px !important;
+        max-height: 10px !important;
+        transform: none !important;
         margin: 0 auto !important;
         fill: currentColor !important;
       }

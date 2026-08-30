@@ -1,5 +1,20 @@
 # Agent Workflow SOP (Standard Operating Procedure)
 
+### 彻底消除 TinyMCE 分体按钮 Chevron 偏角与表格按钮几何偏差：全量 28px 标准按钮统一体系与 100% 像素级对齐交付 (2026-08-29)
+*   **问题根因与核心修复 (Root Cause & Solution)**:
+    1. **分体按钮 `role="presentation"`（Chevron 下拉箭头）偏左上角根因与修复**:
+       - TinyMCE 的 `.tox-split-button__chevron` 同时具有 `.tox-tbtn` 类名，原全局规则强制给其注入了 `width: 24px; height: 24px;` 视口，导致原本 `10px x 10px` 坐标系的 Chevron 图标被顶在 24x24 视口的左上角。
+       - **修复**：精准隔离 `.tox-split-button__chevron`（`width: 14px; height: 28px;`），将其内部 SVG 尺寸严格锁定为 `10px x 10px`（`transform: none !important;`），实现中轴线与左侧主操作图标（`width: 22px`）的 100% 垂直居中对齐（`y = 14.00px`）。
+    2. **表格按钮（`[data-mce-name="table"]`）不对齐与其他按钮不协调根因与修复**:
+       - 原表格按钮作为 `tox-tbtn--select` 附带了下拉箭头，导致宽度被撑大为 `38px`，且表格网格图标被挤压在左侧，与左右相邻的图片、表情、链接、分割线等 `28px` 按钮完全脱节。
+       - **修复**：表格按钮全面升级为标准 `28px x 28px` 图标按钮，彻底隐藏冗余的内部 chevron（点击直接弹出网格选择器），图标尺寸与居中（`15px x 15px`，`diffX = 0.00px, diffY = 0.00px`）与周围所有工具按钮完全一致，实现整行工具栏从左至右 100% 几何水平中线对齐。
+*   **编辑代码 (Edit)**: 
+    *   **全局样式与组件**: 修改 [`mail-vue/src/style.css`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/style.css)、[`mail-vue/src/components/tiny-editor/index.vue`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/components/tiny-editor/index.vue)、[`mail-vue/src/views/sys-setting/index.vue`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/views/sys-setting/index.vue)。
+*   **全链路自动化验证与部署 (Verify & Deploy)**: 
+    *   成功构建并发布上线到 Cloudflare Workers（Version ID: `cb6aeea2-fd44-4b6b-8da3-73d35424f782`）。
+    *   在 Cloudflare 生产环境执行 Playwright 全链路自动化端到端测试（`tests/test-welcome-fullscreen-cf.mjs`）与视觉诊断抓取，表格按钮及所有分体按钮全部 100% 验证通过。
+
+
 ### 彻底解决 TinyMCE Alloy UI 矢量裁切顽疾：CSS Transform 比例缩放、删除线及全量 SVG 像素级居中与无裁切交付 (2026-08-29)
 *   **问题根因与核心修复 (Root Cause & Solution)**:
     1. **SVG 无 `viewBox` 导致的矢量视口裁切机理**:
