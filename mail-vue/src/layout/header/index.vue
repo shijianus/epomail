@@ -283,13 +283,26 @@ function triggerAllEmailSearch() {
 }
 
 const isSettingsMode = computed(() => {
-  return ['setting', 'label-setting', 'category-setting', 'sys-setting', 'analysis', 'user', 'all-email', 'role', 'reg-key'].includes(route.name)
+  return ['setting', 'label-setting', 'profile-setting', 'category-setting', 'sys-setting', 'analysis', 'user', 'all-email', 'role', 'reg-key'].includes(route.name)
 })
 
 const settingsMap = computed(() => [
   {
-    route: 'setting',
+    route: 'profile-setting',
     title: t('generalSetting') || 'General Settings',
+    items: [
+      { text: t('basicInfo') || 'Basic Information', id: 'basicInfo' },
+      { text: t('nickname') || 'Nickname', id: 'nickname' },
+      { text: t('bio') || 'Bio', id: 'bio' },
+      { text: t('avatar') || 'Avatar', id: 'avatar' },
+      { text: t('visualMedia') || 'Visual & Media', id: 'visualMedia' },
+      { text: t('background') || 'Background', id: 'background' },
+      { text: t('dataPrivacy') || 'Data Privacy', id: 'dataPrivacy' }
+    ]
+  },
+  {
+    route: 'setting',
+    title: t('securitySetting') || 'Security Settings',
     items: [
       { text: t('username') || 'Username', id: 'username' },
       { text: t('emailAccount') || 'Email Account', id: 'emailAccount' },

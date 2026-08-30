@@ -47,20 +47,22 @@ const routes = [
             },
             {
                 path: '/settings/general',
+                alias: '/settings/security',
                 name: 'setting',
                 component: () => import('@/views/setting/index.vue'),
                 meta: {
-                    title: 'settings',
+                    title: 'security',
                     name: 'setting',
                     menu: true
                 }
             },
             {
                 path: '/settings/profile',
+                alias: '/settings/general-settings',
                 name: 'profile-setting',
                 component: () => import('@/views/profile-setting/index.vue'),
                 meta: {
-                    title: 'profile',
+                    title: 'general',
                     name: 'profile-setting',
                     menu: true
                 }

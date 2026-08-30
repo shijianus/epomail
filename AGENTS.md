@@ -1,5 +1,22 @@
 # Agent Workflow SOP (Standard Operating Procedure)
 
+### 设定页导航体系与多语言国际化重塑：原「个人」升级为「常规」，「常规」升级为「安全」，全量中英文 i18n 完备交付 (2026-08-30)
+*   **功能需求与业务逻辑对齐 (Feature & Alignment)**:
+    1. **设定页导航选项卡结构重塑**:
+       - 原「个人」（`profile-setting`）升级为「常规」（`$t('general')` / General），内含用户基本信息（头像、昵称、个人简介）、个性装扮（个人背景）以及数据隐私偏好设置。
+       - 原「常规」（`setting`）升级为「安全」（`$t('security')` / Security），图标更新为盾牌认证图标（`fluent:shield-checkmark-20-regular`），内含用户名管理、邮箱凭证、修改密码、系统语言切换与账户注销等核心账户安全功能；页面主标题统一为「安全设置」（`$t('securitySetting')` / Security Settings）。
+       - 「标签」（`label-setting`）保留为邮件标签与自动化规则管理，与管理区（分类管理、数据分析、用户列表、全量邮件、角色权限、注册密钥、系统设置）共同构成清晰的系统设定体系。
+    2. **全链路 i18n 国际化完备处理 (Complete Internationalization)**:
+       - 中文语言包（`zh.js`）与英文语言包（`en.js`）同步补充 `security`（安全/Security）、`securitySetting`（安全设置/Security Settings）、`bioPlaceholder`、`imageSizeLimitMsg` 等多语言键。
+       - 路由元数据（`router/index.js`）及全局顶栏设定快速检索映射（`settingsMap` / `isSettingsMode`）全面接入并对齐多语言与路由别名。
+*   **编辑代码 (Edit)**: 
+    *   **国际化语言包**: 修改 [`mail-vue/src/i18n/zh.js`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/i18n/zh.js)、[`mail-vue/src/i18n/en.js`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/i18n/en.js)。
+    *   **布局与视图组件**: 修改 [`mail-vue/src/layout/main/index.vue`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/layout/main/index.vue)、[`mail-vue/src/layout/header/index.vue`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/layout/header/index.vue)、[`mail-vue/src/views/setting/index.vue`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/views/setting/index.vue)、[`mail-vue/src/views/profile-setting/index.vue`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/views/profile-setting/index.vue)、[`mail-vue/src/router/index.js`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/router/index.js)。
+*   **全链路自动化验证与部署 (Verify & Deploy)**: 
+    *   成功构建并发布上线到 Cloudflare Workers（Version ID: `384a7eef-a281-4c63-8076-1140b0b232c9`）。
+    *   在 Cloudflare 生产环境执行 Playwright 端到端全链路自动化测试（`tests/test-settings-tabs.mjs`），在中英文切换下 100% 验证通过。
+
+
 ### 彻底消除 TinyMCE 分体按钮 Chevron 偏角与表格按钮几何偏差：全量 28px 标准按钮统一体系与 100% 像素级对齐交付 (2026-08-29)
 *   **问题根因与核心修复 (Root Cause & Solution)**:
     1. **分体按钮 `role="presentation"`（Chevron 下拉箭头）偏左上角根因与修复**:

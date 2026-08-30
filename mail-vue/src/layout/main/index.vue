@@ -14,10 +14,10 @@
             <div class="nav-section-title">{{$t('tabSetting') || 'Settings'}}</div>
             <div class="settings-nav-group">
             <router-link :to="{name: 'profile-setting'}" class="settings-nav-item" :class="{active: route.name === 'profile-setting'}">
-              <Icon icon="lucide:user" width="20" height="20" /> 个人
+              <Icon icon="fluent:settings-48-regular" width="20" height="20" /> {{$t('general') || 'General'}}
             </router-link>
             <router-link :to="{name: 'setting'}" class="settings-nav-item" :class="{active: route.name === 'setting'}">
-              <Icon icon="fluent:settings-48-regular" width="20" height="20" /> {{$t('general') || 'General'}}
+              <Icon icon="fluent:shield-checkmark-20-regular" width="20" height="20" /> {{$t('security') || 'Security'}}
             </router-link>
             <router-link :to="{name: 'label-setting'}" class="settings-nav-item" :class="{active: route.name === 'label-setting'}">
               <Icon icon="lucide:tags" width="20" height="20" /> {{$t('labels') || 'Labels'}}
@@ -53,7 +53,7 @@
               </router-link>
 
               <router-link :to="{name: 'category-setting'}" class="settings-nav-item" :class="{active: route.name === 'category-setting'}">
-                <Icon icon="lucide:network" width="18" height="18" /> 分类管理
+                <Icon icon="lucide:network" width="18" height="18" /> {{$t('categorySetting') || 'Category Settings'}}
               </router-link>
             </template>
           </div>

@@ -1,7 +1,7 @@
 <template>
   <div class="box">
     <div class="container">
-      <div class="title">{{$t('generalSetting') || 'General Settings'}}</div>
+      <div class="title">{{$t('securitySetting') || 'Security Settings'}}</div>
       <div class="item">
         <div>{{$t('username')}}</div>
         <div>

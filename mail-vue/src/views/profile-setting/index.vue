@@ -133,7 +133,7 @@
           :maxlength="150" 
           show-word-limit
           v-model="accountBio" 
-          placeholder="Type your bio here... (Markdown supported for **bold**, *italic*)"
+          :placeholder="$t('bioPlaceholder') || 'Type your bio here... (Markdown supported for **bold**, *italic*)'"
         />
         <el-button type="primary" :loading="bioLoading" @click="saveBio" style="align-self: flex-end; margin-top: 15px;">{{$t('save')}}</el-button>
       </div>
@@ -202,7 +202,7 @@ function saveBio() {
 function uploadAvatar(options) {
   const file = options.file
   if (file.size > 25 * 1024 * 1024) {
-    ElMessage.error('图片不能超过25MB')
+    ElMessage.error(t('imageSizeLimitMsg') || '图片不能超过25MB')
     options.onError(new Error('size limit'))
     return
   }
@@ -223,7 +223,7 @@ function uploadAvatar(options) {
 function uploadBackground(options) {
   const file = options.file
   if (file.size > 25 * 1024 * 1024) {
-    ElMessage.error('图片不能超过25MB')
+    ElMessage.error(t('imageSizeLimitMsg') || '图片不能超过25MB')
     options.onError(new Error('size limit'))
     return
   }
