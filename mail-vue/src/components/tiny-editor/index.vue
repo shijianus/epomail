@@ -258,12 +258,13 @@ function destroyEditor() {
   transition: all 0.15s ease !important;
 
   .tox-icon,
+  .tox-tbtn__icon-wrap,
   .tox-tbtn__icon-custom {
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
-    width: 100% !important;
-    height: 100% !important;
+    width: 28px !important;
+    height: 28px !important;
     margin: 0 auto !important;
     padding: 0 !important;
     line-height: 1 !important;
@@ -271,13 +272,17 @@ function destroyEditor() {
 
   svg {
     display: block !important;
-    width: 15px !important;
-    height: 15px !important;
-    max-width: 15px !important;
-    max-height: 15px !important;
+    width: 24px !important;
+    height: 24px !important;
+    min-width: 24px !important;
+    min-height: 24px !important;
+    max-width: 24px !important;
+    max-height: 24px !important;
     margin: 0 auto !important;
     padding: 0 !important;
     flex-shrink: 0 !important;
+    transform: scale(0.625) !important;
+    transform-origin: 12px 12px !important;
     vertical-align: middle !important;
     fill: currentColor !important;
   }
@@ -302,18 +307,15 @@ function destroyEditor() {
 
 /* Select Dropdowns */
 :deep(.tox-tbtn.tox-tbtn--select) {
-  width: auto !important;
-  min-width: 68px !important;
-  max-width: 100px !important;
   height: 28px !important;
-  padding: 0 8px !important;
+  padding: 0 6px !important;
   margin: 0 1px !important;
   border: 1px solid transparent !important;
   border-radius: 6px !important;
   display: inline-flex !important;
   align-items: center !important;
   justify-content: space-between !important;
-  gap: 4px !important;
+  gap: 2px !important;
   color: var(--el-text-color-regular) !important;
   background: transparent !important;
   cursor: pointer !important;
@@ -322,6 +324,36 @@ function destroyEditor() {
   &:hover {
     background: var(--el-fill-color) !important;
     color: var(--el-color-primary) !important;
+  }
+
+  &.tox-tbtn--bespoke {
+    width: 80px !important;
+    min-width: 80px !important;
+    max-width: 100px !important;
+  }
+
+  &[data-mce-name="table"] {
+    width: 38px !important;
+    min-width: 38px !important;
+    max-width: 38px !important;
+    padding: 0 4px !important;
+
+    .tox-icon {
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      width: 20px !important;
+      height: 28px !important;
+
+      svg {
+        display: block !important;
+        width: 24px !important;
+        height: 24px !important;
+        transform: scale(0.625) !important;
+        transform-origin: 12px 12px !important;
+        fill: currentColor !important;
+      }
+    }
   }
 
   .tox-tbtn__select-label {
@@ -344,8 +376,8 @@ function destroyEditor() {
     justify-content: center !important;
     margin: 0 0 0 auto !important;
     padding: 0 !important;
-    width: 12px !important;
-    height: 12px !important;
+    width: 10px !important;
+    height: 10px !important;
     flex-shrink: 0 !important;
 
     svg {
@@ -387,11 +419,22 @@ function destroyEditor() {
     align-items: center !important;
     justify-content: center !important;
 
+    .tox-icon {
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      width: 22px !important;
+      height: 28px !important;
+    }
+
     svg {
       display: block !important;
-      width: 14px !important;
-      height: 14px !important;
+      width: 24px !important;
+      height: 24px !important;
+      transform: scale(0.5833) !important;
+      transform-origin: 12px 12px !important;
       margin: 0 auto !important;
+      fill: currentColor !important;
     }
   }
 

@@ -1,5 +1,22 @@
 # Agent Workflow SOP (Standard Operating Procedure)
 
+### 彻底解决 TinyMCE Alloy UI 矢量裁切顽疾：CSS Transform 比例缩放、删除线及全量 SVG 像素级居中与无裁切交付 (2026-08-29)
+*   **问题根因与核心修复 (Root Cause & Solution)**:
+    1. **SVG 无 `viewBox` 导致的矢量视口裁切机理**:
+       - TinyMCE 官方内置图标为 24x24 坐标系构建，且 `<svg>` 标签未显式声明 `viewBox="0 0 24 24"`。
+       - 直接在 CSS 中声明 `width: 15px; height: 15px;` 会强行将 SVG 视口截断为 15x15，坐标大于 15 的右侧与下侧路径（如 `aria-label="删除线"` 中横贯 4-20 的横线右半段及 S 底弧）被直接裁剪，导致“图标过大且偏右下侧被切掉一半”。
+    2. **精准无损矢量缩放与严格几何居中 (Precision Transform Scaling)**:
+       - 在 `[data-alloy-vertical-dir="toptobottom"]` 及 `.tox-editor-header` 下全面重构 SVG 缩放体系：
+         - SVG 尺寸锁定为原生 `24px x 24px`，注入 `transform: scale(0.625) !important; transform-origin: 12px 12px !important;`（将 24px 等比高质量无损缩放至 15px），彻底根除任何矢量裁切。
+         - 普通按钮（`.tox-tbtn:not(.tox-tbtn--select)`）内部容器锁定 `width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;`，实测 diffX/diffY 精确为 `0.00px`。
+         - 表格（`[data-mce-name="table"]`）优化为 `38px` 图标选择器，分体按钮（`.tox-split-button`）主操作区注入 `transform: scale(0.5833)`（14px 居中），Chevron 图标绝对居中。
+*   **编辑代码 (Edit)**: 
+    *   **全局样式与组件**: 修改 [`mail-vue/src/style.css`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/style.css)、[`mail-vue/src/components/tiny-editor/index.vue`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/components/tiny-editor/index.vue)、[`mail-vue/src/views/sys-setting/index.vue`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/views/sys-setting/index.vue)。
+*   **全链路自动化验证与部署 (Verify & Deploy)**: 
+    *   成功构建并发布上线到 Cloudflare Workers（Version ID: `ffaf1db6-165f-4f0a-877a-a74470d94460`）。
+    *   在 Cloudflare 生产环境执行 Playwright 全链路自动化端到端测试（`tests/test-welcome-fullscreen-cf.mjs`）与视觉诊断抓取（`tests/cf_prod_strike_dark.png`、`tests/cf_prod_header_dark.png`、`tests/cf_prod_strike_light.png` 等），100% 通过验证。
+
+
 ### 深度重构与交互体系完善：TinyMCE Alloy UI 体系重构 (精确区分下拉/分体/普通按钮)、全量 17 项专业 Markdown 工具套件与视觉零偏差交付 (2026-08-29)
 *   **功能需求与业务逻辑对齐 (Feature & Alignment)**: 
     1. **TinyMCE `[data-alloy-vertical-dir="toptobottom"]` 全面重构**:
