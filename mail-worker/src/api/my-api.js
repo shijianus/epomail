@@ -34,6 +34,11 @@ app.delete('/my/delete', async (c) => {
 	return c.json(result.ok());
 });
 
+app.get('/my/totp/status', async (c) => {
+	const data = await totpService.getStatus(c, userContext.getUserId(c));
+	return c.json(result.ok(data));
+});
+
 app.get('/my/totp/setup', async (c) => {
 	const userObj = userContext.getUser(c);
 	const data = await totpService.getSetupInfo(c, userContext.getUserId(c), userObj.email);

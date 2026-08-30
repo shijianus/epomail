@@ -1,16 +1,16 @@
-import BizError from '../error/biz-error';
-import orm from '../entity/orm';
-import user from '../entity/user';
+import BizError from '../error/biz-error.js';
+import orm from '../entity/orm.js';
+import user from '../entity/user.js';
 import { eq } from 'drizzle-orm';
-import totpUtils from '../utils/totp-utils';
-import cryptoUtils from '../utils/crypto-utils';
-import KvConst from '../const/kv-const';
-import constant from '../const/constant';
-import userContext from '../security/user-context';
-import userService from './user-service';
-import emailService from './email-service';
-import settingService from './setting-service';
-import { t } from '../i18n/i18n';
+import totpUtils from '../utils/totp-utils.js';
+import cryptoUtils from '../utils/crypto-utils.js';
+import KvConst from '../const/kv-const.js';
+import constant from '../const/constant.js';
+import userContext from '../security/user-context.js';
+import userService from './user-service.js';
+import emailService from './email-service.js';
+import settingService from './setting-service.js';
+import { t } from '../i18n/i18n.js';
 import { Resend } from 'resend';
 
 const totpService = {
@@ -70,7 +70,7 @@ const totpService = {
 		}).where(eq(user.userId, userId)).run();
 
 		// Session revocation: except current session, invalidate all other sessions
-		const currentToken = userContext.getToken(c);
+		const currentToken = await userContext.getToken(c);
 		const authInfo = await c.env.kv.get(KvConst.AUTH_INFO + userId, { type: 'json' });
 		if (authInfo) {
 			authInfo.tokens = currentToken ? [currentToken] : [];
@@ -112,6 +112,44 @@ const totpService = {
 
 		return {
 			backupCodes: rawCodes
+		};
+	},
+
+	/**
+	 * Query TOTP 2FA status and remaining backup codes count for current user
+	 */
+	async getStatus(c, userId) {
+		const userRow = await userService.selectById(c, userId);
+		if (!userRow) {
+			throw new BizError(t('notExistUser'));
+		}
+
+		if (userRow.totpEnabled !== 1) {
+			return {
+				enabled: false,
+				backupCodesRemaining: 0,
+				createdAt: null
+			};
+		}
+
+		let remainingCount = 0;
+		if (userRow.totpBackupCodes) {
+			try {
+				const list = typeof userRow.totpBackupCodes === 'string'
+					? JSON.parse(userRow.totpBackupCodes)
+					: userRow.totpBackupCodes;
+				if (Array.isArray(list)) {
+					remainingCount = list.filter(item => item.used === 0).length;
+				}
+			} catch (e) {
+				remainingCount = 0;
+			}
+		}
+
+		return {
+			enabled: true,
+			backupCodesRemaining: remainingCount,
+			createdAt: userRow.totpCreatedAt || null
 		};
 	},
 
@@ -169,7 +207,7 @@ const totpService = {
 		}).where(eq(user.userId, userId)).run();
 
 		// Session revocation: except current session, invalidate all other sessions
-		const currentToken = userContext.getToken(c);
+		const currentToken = await userContext.getToken(c);
 		const authInfo = await c.env.kv.get(KvConst.AUTH_INFO + userId, { type: 'json' });
 		if (authInfo) {
 			authInfo.tokens = currentToken ? [currentToken] : [];

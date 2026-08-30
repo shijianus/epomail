@@ -169,24 +169,29 @@ const totpUtils = {
 	},
 
 	/**
-	 * Derive 256-bit AES-GCM CryptoKey from environment secret (totp_enc_key or jwt_secret)
+	 * Derive 256-bit AES-GCM CryptoKey from environment secret (totp_enc_key)
 	 */
 	async getEncryptionKey(env) {
-		const rawKey = env?.totp_enc_key || env?.jwt_secret || 'default-epomail-totp-fallback-key-32b';
+		const rawKey = env?.totp_enc_key;
+		if (!rawKey || typeof rawKey !== 'string' || !rawKey.trim()) {
+			throw new Error('totp_enc_key is not configured, please run: wrangler secret put totp_enc_key');
+		}
+
+		const cleanKey = rawKey.trim();
 		let keyBytes;
 
 		try {
 			// If totp_enc_key is base64 encoded 32 bytes
-			const decoded = base64ToUint8(rawKey);
+			const decoded = base64ToUint8(cleanKey);
 			if (decoded.length === 32) {
 				keyBytes = decoded;
 			} else {
 				// Hash to 32 bytes if length is not exactly 32
-				const hash = await crypto.subtle.digest('SHA-256', encoder.encode(rawKey));
+				const hash = await crypto.subtle.digest('SHA-256', encoder.encode(cleanKey));
 				keyBytes = new Uint8Array(hash);
 			}
 		} catch (e) {
-			const hash = await crypto.subtle.digest('SHA-256', encoder.encode(rawKey));
+			const hash = await crypto.subtle.digest('SHA-256', encoder.encode(cleanKey));
 			keyBytes = new Uint8Array(hash);
 		}
 

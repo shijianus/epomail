@@ -130,15 +130,21 @@ const saltHashUtils = {
 	},
 
 	/**
-	 * Generate cryptographically secure random password
+	 * Generate cryptographically secure random password using rejection sampling
 	 */
 	genRandomPwd(length = 8) {
 		const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-		const randomBytes = new Uint8Array(length);
-		crypto.getRandomValues(randomBytes);
+		const maxValid = Math.floor(256 / chars.length) * chars.length; // 248
 		let result = '';
-		for (let i = 0; i < length; i++) {
-			result += chars.charAt(randomBytes[i] % chars.length);
+		while (result.length < length) {
+			const batchSize = Math.max(16, (length - result.length) * 2);
+			const randomBytes = new Uint8Array(batchSize);
+			crypto.getRandomValues(randomBytes);
+			for (let i = 0; i < randomBytes.length && result.length < length; i++) {
+				if (randomBytes[i] < maxValid) {
+					result += chars.charAt(randomBytes[i] % chars.length);
+				}
+			}
 		}
 		return result;
 	}

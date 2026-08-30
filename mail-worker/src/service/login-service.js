@@ -1,27 +1,27 @@
-import BizError from '../error/biz-error';
-import userService from './user-service';
-import emailUtils from '../utils/email-utils';
-import { isDel, settingConst, userConst } from '../const/entity-const';
-import JwtUtils from '../utils/jwt-utils';
+import BizError from '../error/biz-error.js';
+import userService from './user-service.js';
+import emailUtils from '../utils/email-utils.js';
+import { isDel, settingConst, userConst } from '../const/entity-const.js';
+import JwtUtils from '../utils/jwt-utils.js';
 import { v4 as uuidv4 } from 'uuid';
-import KvConst from '../const/kv-const';
-import constant from '../const/constant';
-import userContext from '../security/user-context';
-import verifyUtils from '../utils/verify-utils';
-import accountService from './account-service';
-import settingService from './setting-service';
-import saltHashUtils from '../utils/crypto-utils';
-import cryptoUtils from '../utils/crypto-utils';
-import turnstileService from './turnstile-service';
-import roleService from './role-service';
-import regKeyService from './reg-key-service';
+import KvConst from '../const/kv-const.js';
+import constant from '../const/constant.js';
+import userContext from '../security/user-context.js';
+import verifyUtils from '../utils/verify-utils.js';
+import accountService from './account-service.js';
+import settingService from './setting-service.js';
+import saltHashUtils from '../utils/crypto-utils.js';
+import cryptoUtils from '../utils/crypto-utils.js';
+import turnstileService from './turnstile-service.js';
+import roleService from './role-service.js';
+import regKeyService from './reg-key-service.js';
 import dayjs from 'dayjs';
-import { toUtc } from '../utils/date-uitil';
+import { toUtc } from '../utils/date-uitil.js';
 import { t } from '../i18n/i18n.js';
-import verifyRecordService from './verify-record-service';
-import totpUtils from '../utils/totp-utils';
-import orm from '../entity/orm';
-import user from '../entity/user';
+import verifyRecordService from './verify-record-service.js';
+import totpUtils from '../utils/totp-utils.js';
+import orm from '../entity/orm.js';
+import user from '../entity/user.js';
 import { eq } from 'drizzle-orm';
 
 const loginService = {
@@ -345,8 +345,28 @@ const loginService = {
 			throw new BizError(t('totpSessionExpired'));
 		}
 
+		const targetEmail = pendingData.email;
+		const failKey = targetEmail ? KvConst.LOGIN_FAIL + targetEmail : null;
+		let failCount = 0;
+		if (failKey) {
+			const failCountStr = await c.env.kv.get(failKey);
+			failCount = failCountStr ? parseInt(failCountStr) : 0;
+			if (failCount >= 5) {
+				throw new BizError(t('accountLocked'));
+			}
+		}
+
+		const incrementAccountFail = async () => {
+			if (failKey) {
+				const currentFailStr = await c.env.kv.get(failKey);
+				const currentFail = currentFailStr ? parseInt(currentFailStr) : 0;
+				await c.env.kv.put(failKey, (currentFail + 1).toString(), { expirationTtl: 12 * 60 * 60 });
+			}
+		};
+
 		if (pendingData.attempts >= 5) {
 			await c.env.kv.delete(pendingKey);
+			await incrementAccountFail();
 			throw new BizError(t('totpTooManyAttempts'));
 		}
 
@@ -365,6 +385,7 @@ const loginService = {
 			// Verify backup recovery code
 			const backupResult = await totpUtils.verifyAndConsumeBackupCode(code, userRow.totpBackupCodes);
 			if (!backupResult.isValid) {
+				await incrementAccountFail();
 				throw new BizError(t('backupCodeInvalid'));
 			}
 			await orm(c).update(user).set({
@@ -379,6 +400,7 @@ const loginService = {
 			const totpCheck = await totpUtils.verifyTOTP(plainSecret, code, 1);
 
 			if (!totpCheck.isValid) {
+				await incrementAccountFail();
 				throw new BizError(t('totpCodeInvalid'));
 			}
 
@@ -386,6 +408,7 @@ const loginService = {
 			const replayKey = KvConst.TOTP_REPLAY + userRow.userId + ':' + totpCheck.timeStep;
 			const alreadyUsed = await c.env.kv.get(replayKey);
 			if (alreadyUsed) {
+				await incrementAccountFail();
 				throw new BizError(t('totpCodeReplay'));
 			}
 			await c.env.kv.put(replayKey, '1', { expirationTtl: 60 });
@@ -395,8 +418,9 @@ const loginService = {
 		await c.env.kv.delete(pendingKey);
 
 		// Clear login fail rate limit
-		const failKey = KvConst.LOGIN_FAIL + userRow.email;
-		await c.env.kv.delete(failKey);
+		if (failKey) {
+			await c.env.kv.delete(failKey);
+		}
 
 		// Lazy migration of legacy password if needed
 		if (pendingData.needsPasswordUpgrade) {
@@ -428,7 +452,7 @@ const loginService = {
 	},
 
 	async logout(c, userId) {
-		const token = userContext.getToken(c);
+		const token = await userContext.getToken(c);
 		const authInfo = await c.env.kv.get(KvConst.AUTH_INFO + userId, { type: 'json' });
 		if (authInfo && authInfo.tokens) {
 			const index = authInfo.tokens.findIndex(item => item === token);

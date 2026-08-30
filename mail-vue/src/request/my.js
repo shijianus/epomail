@@ -28,3 +28,24 @@ export function uploadImage(formData) {
     })
 }
 
+export function getTotpStatus() {
+    return http.get('/my/totp/status');
+}
+
+export function getTotpSetup() {
+    return http.get('/my/totp/setup');
+}
+
+export function enableTotp(code) {
+    return http.post('/my/totp/enable', { code });
+}
+
+export function disableTotp(password, code) {
+    return http.post('/my/totp/disable', { password, code });
+}
+
+export function regenerateBackupCodes(password) {
+    return http.post('/my/totp/backup-codes', { password });
+}
+
+

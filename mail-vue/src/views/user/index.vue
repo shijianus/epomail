@@ -90,6 +90,7 @@
                   <el-dropdown-menu>
                     <el-dropdown-item @click="openSetPwd(props.row)" >{{ $t('chgPwd') }}</el-dropdown-item>
                     <el-dropdown-item @click="openSetType(props.row)" >{{ $t('perm') }}</el-dropdown-item>
+                    <el-dropdown-item @click="resetTotp(props.row)" >{{ $t('resetTotp') }}</el-dropdown-item>
                     <template v-if="props.row.type !== 0">
                       <el-dropdown-item v-if="props.row.isDel !== 1" @click="setStatus(props.row)">
                         {{ setStatusName(props.row) }}
@@ -350,6 +351,14 @@
               </div>
             </template>
           </el-dropdown-item>
+          <el-dropdown-item @click="resetTotp(rightClickUser)">
+            <template #default>
+              <div class="right-dropdown-item">
+                <Icon icon="fluent:shield-dismiss-20-regular" width="20" height="20" />
+                <span>{{ t('resetTotp') }}</span>
+              </div>
+            </template>
+          </el-dropdown-item>
           <el-dropdown-item v-if="rightClickUser.type !== 0" @click="delOneUser(rightClickUser)" >
             <template #default>
               <div class="right-dropdown-item" >
@@ -376,7 +385,8 @@ import {
   userRestSendCount,
   userRestore,
   userDeleteAccount,
-  userAllAccount
+  userAllAccount,
+  userResetTotp
 } from '@/request/user.js'
 import {roleSelectUse} from "@/request/role.js";
 import {Icon} from "@iconify/vue";
@@ -805,6 +815,26 @@ function resetSendCount(user) {
         plain: true
       })
       user.sendCount = 0
+    })
+  });
+}
+
+function resetTotp(user) {
+  ElMessageBox.confirm(
+    t('resetTotpConfirm', { msg: user.email }),
+    t('resetTotpTitle'),
+    {
+      confirmButtonText: t('confirm'),
+      cancelButtonText: t('cancel'),
+      type: 'warning'
+    }
+  ).then(() => {
+    userResetTotp(user.userId).then(() => {
+      ElMessage({
+        message: t('resetTotpSuccess'),
+        type: 'success',
+        plain: true
+      })
     })
   });
 }

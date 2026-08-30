@@ -307,6 +307,7 @@ const settingsMap = computed(() => [
       { text: t('username') || 'Username', id: 'username' },
       { text: t('emailAccount') || 'Email Account', id: 'emailAccount' },
       { text: t('password') || 'Password', id: 'password' },
+      { text: t('totpTitle') || 'Two-Factor Authentication (2FA)', id: 'totp' },
       { text: t('language') || 'Language', id: 'language' },
       { text: t('deleteUser') || 'Delete User', id: 'deleteUser' },
     ]

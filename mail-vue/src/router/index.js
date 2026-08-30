@@ -46,8 +46,8 @@ const routes = [
                 redirect: '/settings/profile'
             },
             {
-                path: '/settings/general',
-                alias: '/settings/security',
+                path: '/settings/security',
+                alias: '/settings/general',
                 name: 'setting',
                 component: () => import('@/views/setting/index.vue'),
                 meta: {
