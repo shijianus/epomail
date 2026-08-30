@@ -5,7 +5,10 @@ const KvConst = {
 	ANALYSIS_ECHARTS: 'analysis_echarts:',
 	PUBLIC_KEY: "public_key:",
 	HARD_INTERCEPT_TOTAL: "hard_intercept_total",
-	LOGIN_FAIL: "login_fail:"
+	LOGIN_FAIL: "login_fail:",
+	TOTP_PENDING: "totp_pending:",
+	TOTP_SETUP: "totp_setup:",
+	TOTP_REPLAY: "totp_replay:"
 }
 
 export default KvConst;

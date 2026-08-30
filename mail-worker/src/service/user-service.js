@@ -151,6 +151,23 @@ const userService = {
         user.showTrend = profile.showTrend ?? true;
         user.showSources = profile.showSources ?? true;
 
+		let remainingBackupCodes = 0;
+		if (userRow.totpEnabled === 1 && userRow.totpBackupCodes) {
+			try {
+				const codes = JSON.parse(userRow.totpBackupCodes);
+				if (Array.isArray(codes)) {
+					remainingBackupCodes = codes.filter(item => item.used === 0).length;
+				}
+			} catch (e) {}
+		}
+
+		user.totp = {
+			enabled: userRow.totpEnabled === 1,
+			createdAt: userRow.totpCreatedAt || '',
+			remainingBackupCodes
+		};
+		user.totpEnabled = userRow.totpEnabled === 1;
+
 		return user;
 	},
 

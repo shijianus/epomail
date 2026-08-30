@@ -19,6 +19,10 @@ import dayjs from 'dayjs';
 import { toUtc } from '../utils/date-uitil';
 import { t } from '../i18n/i18n.js';
 import verifyRecordService from './verify-record-service';
+import totpUtils from '../utils/totp-utils';
+import orm from '../entity/orm';
+import user from '../entity/user';
+import { eq } from 'drizzle-orm';
 
 const loginService = {
 
@@ -209,6 +213,15 @@ const loginService = {
 		return { type: regKeyRow.roleId, regKeyId: regKeyRow.regKeyId };
 	},
 
+	async lazyMigratePassword(c, userId, plainPassword) {
+		try {
+			const { salt, hash } = await cryptoUtils.hashPassword(plainPassword);
+			await orm(c).update(user).set({ password: hash, salt }).where(eq(user.userId, userId)).run();
+		} catch (err) {
+			console.error('Lazy password migration failed:', err);
+		}
+	},
+
 	async login(c, params, noVerifyPwd = false) {
 
 		const { email, password } = params;
@@ -236,17 +249,45 @@ const loginService = {
 			throw new BizError(t('notExistUser'));
 		}
 
-		if(userRow.isDel === isDel.DELETE) {
+		if (userRow.isDel === isDel.DELETE) {
 			throw new BizError(t('isDelUser'));
 		}
 
-		if(userRow.status === userConst.status.BAN) {
+		if (userRow.status === userConst.status.BAN) {
 			throw new BizError(t('isBanUser'));
 		}
 
-		if (!await cryptoUtils.verifyPassword(password, userRow.salt, userRow.password) && !noVerifyPwd) {
-			await incrementFail();
-			throw new BizError(t('IncorrectPwd'));
+		let isLegacy = false;
+		if (!noVerifyPwd) {
+			const checkResult = await cryptoUtils.verifyPasswordWithUpgrade(password, userRow.salt, userRow.password);
+			if (!checkResult.isValid) {
+				await incrementFail();
+				throw new BizError(t('IncorrectPwd'));
+			}
+			isLegacy = checkResult.isLegacy;
+		}
+
+		// Check if TOTP 2FA is enabled
+		if (userRow.totpEnabled === 1) {
+			const tempToken = 'totp_tmp_' + uuidv4().replace(/-/g, '');
+			await c.env.kv.put(
+				KvConst.TOTP_PENDING + tempToken,
+				JSON.stringify({
+					userId: userRow.userId,
+					email: userRow.email,
+					attempts: 0,
+					needsPasswordUpgrade: isLegacy ? password : null,
+					createdAt: Date.now()
+				}),
+				{ expirationTtl: 300 } // 5 minutes TTL
+			);
+
+			return {
+				mfaRequired: true,
+				tempToken,
+				authType: 'totp',
+				email: userRow.email
+			};
 		}
 
 		// Clear fail count on success
@@ -254,8 +295,13 @@ const loginService = {
 			await c.env.kv.delete(failKey);
 		}
 
+		// If legacy single-round SHA-256 hash was detected, upgrade to PBKDF2 lazily
+		if (isLegacy && password) {
+			await this.lazyMigratePassword(c, userRow.userId, password);
+		}
+
 		const uuid = uuidv4();
-		const jwt = await JwtUtils.generateToken(c,{ userId: userRow.userId, token: uuid });
+		const jwt = await JwtUtils.generateToken(c, { userId: userRow.userId, token: uuid });
 
 		let authInfo = await c.env.kv.get(KvConst.AUTH_INFO + userRow.userId, { type: 'json' });
 
@@ -285,12 +331,112 @@ const loginService = {
 		return jwt;
 	},
 
+	async verifyTotpLogin(c, params) {
+		const { tempToken, code, isBackupCode = false } = params;
+
+		if (!tempToken || !code) {
+			throw new BizError(t('totpCodeEmpty'));
+		}
+
+		const pendingKey = KvConst.TOTP_PENDING + tempToken;
+		const pendingData = await c.env.kv.get(pendingKey, { type: 'json' });
+
+		if (!pendingData || !pendingData.userId) {
+			throw new BizError(t('totpSessionExpired'));
+		}
+
+		if (pendingData.attempts >= 5) {
+			await c.env.kv.delete(pendingKey);
+			throw new BizError(t('totpTooManyAttempts'));
+		}
+
+		pendingData.attempts += 1;
+		await c.env.kv.put(pendingKey, JSON.stringify(pendingData), { expirationTtl: 300 });
+
+		const userRow = await userService.selectById(c, pendingData.userId);
+		if (!userRow || userRow.isDel === isDel.DELETE) {
+			throw new BizError(t('isDelUser'));
+		}
+		if (userRow.status === userConst.status.BAN) {
+			throw new BizError(t('isBanUser'));
+		}
+
+		if (isBackupCode) {
+			// Verify backup recovery code
+			const backupResult = await totpUtils.verifyAndConsumeBackupCode(code, userRow.totpBackupCodes);
+			if (!backupResult.isValid) {
+				throw new BizError(t('backupCodeInvalid'));
+			}
+			await orm(c).update(user).set({
+				totpBackupCodes: backupResult.updatedCodesJson
+			}).where(eq(user.userId, userRow.userId)).run();
+		} else {
+			// Verify 6-digit TOTP code
+			if (!userRow.totpSecret) {
+				throw new BizError(t('totpNotEnabled'));
+			}
+			const plainSecret = await totpUtils.decryptSecret(userRow.totpSecret, c.env);
+			const totpCheck = await totpUtils.verifyTOTP(plainSecret, code, 1);
+
+			if (!totpCheck.isValid) {
+				throw new BizError(t('totpCodeInvalid'));
+			}
+
+			// Anti-replay: prevent OTP reuse in the same 60-second time window
+			const replayKey = KvConst.TOTP_REPLAY + userRow.userId + ':' + totpCheck.timeStep;
+			const alreadyUsed = await c.env.kv.get(replayKey);
+			if (alreadyUsed) {
+				throw new BizError(t('totpCodeReplay'));
+			}
+			await c.env.kv.put(replayKey, '1', { expirationTtl: 60 });
+		}
+
+		// Verification passed: consume temporary token
+		await c.env.kv.delete(pendingKey);
+
+		// Clear login fail rate limit
+		const failKey = KvConst.LOGIN_FAIL + userRow.email;
+		await c.env.kv.delete(failKey);
+
+		// Lazy migration of legacy password if needed
+		if (pendingData.needsPasswordUpgrade) {
+			await this.lazyMigratePassword(c, userRow.userId, pendingData.needsPasswordUpgrade);
+		}
+
+		// Generate formal session JWT
+		const uuid = uuidv4();
+		const jwt = await JwtUtils.generateToken(c, { userId: userRow.userId, token: uuid });
+
+		let authInfo = await c.env.kv.get(KvConst.AUTH_INFO + userRow.userId, { type: 'json' });
+
+		if (authInfo && (authInfo.user.email === userRow.email)) {
+			if (authInfo.tokens.length > 10) {
+				authInfo.tokens.shift();
+			}
+			authInfo.tokens.push(uuid);
+		} else {
+			authInfo = {
+				tokens: [uuid],
+				user: userRow,
+				refreshTime: dayjs().toISOString()
+			};
+		}
+
+		await userService.updateUserInfo(c, userRow.userId);
+		await c.env.kv.put(KvConst.AUTH_INFO + userRow.userId, JSON.stringify(authInfo), { expirationTtl: constant.TOKEN_EXPIRE });
+		return jwt;
+	},
+
 	async logout(c, userId) {
-		const token =userContext.getToken(c);
+		const token = userContext.getToken(c);
 		const authInfo = await c.env.kv.get(KvConst.AUTH_INFO + userId, { type: 'json' });
-		const index = authInfo.tokens.findIndex(item => item === token);
-		authInfo.tokens.splice(index, 1);
-		await c.env.kv.put(KvConst.AUTH_INFO + userId, JSON.stringify(authInfo));
+		if (authInfo && authInfo.tokens) {
+			const index = authInfo.tokens.findIndex(item => item === token);
+			if (index > -1) {
+				authInfo.tokens.splice(index, 1);
+				await c.env.kv.put(KvConst.AUTH_INFO + userId, JSON.stringify(authInfo));
+			}
+		}
 	}
 
 };

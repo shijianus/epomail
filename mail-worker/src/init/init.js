@@ -36,8 +36,30 @@ const dbInit = {
 		await this.v3_5DB(c);
 		await this.v3_6DB(c);
 		await this.v3_7DB(c);
+		await this.v3_8DB(c);
 		await settingService.refresh(c);
 		return c.text('success');
+	},
+
+	async v3_8DB(c) {
+		const columns = [
+			{ name: 'totp_enabled', sql: `ALTER TABLE user ADD COLUMN totp_enabled INTEGER NOT NULL DEFAULT 0;` },
+			{ name: 'totp_secret', sql: `ALTER TABLE user ADD COLUMN totp_secret TEXT NOT NULL DEFAULT '';` },
+			{ name: 'totp_key_version', sql: `ALTER TABLE user ADD COLUMN totp_key_version INTEGER NOT NULL DEFAULT 1;` },
+			{ name: 'totp_backup_codes', sql: `ALTER TABLE user ADD COLUMN totp_backup_codes TEXT NOT NULL DEFAULT '[]';` },
+			{ name: 'totp_created_at', sql: `ALTER TABLE user ADD COLUMN totp_created_at TEXT NOT NULL DEFAULT '';` }
+		];
+
+		for (const col of columns) {
+			try {
+				const colInfo = await c.env.db.prepare(`SELECT * FROM pragma_table_info('user') WHERE name = ? limit 1`).bind(col.name).first();
+				if (!colInfo) {
+					await c.env.db.prepare(col.sql).run();
+				}
+			} catch (e) {
+				console.warn(`跳过字段 ${col.name}：${e.message}`);
+			}
+		}
 	},
 
 	async v3_7DB(c) {

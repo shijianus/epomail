@@ -1,8 +1,15 @@
 import app from '../hono/hono';
 import userService from '../service/user-service';
+import totpService from '../service/totp-service';
 import result from '../model/result';
 import userContext from '../security/user-context';
 import accountService from '../service/account-service';
+
+app.post('/user/resetTotp', async (c) => {
+	const { userId } = await c.req.json();
+	await totpService.adminResetTotp(c, userContext.getUserId(c), userId);
+	return c.json(result.ok());
+});
 
 app.delete('/user/delete', async (c) => {
 	await userService.physicsDelete(c, c.req.query());

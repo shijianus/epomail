@@ -4,7 +4,15 @@ import result from '../model/result';
 import userContext from '../security/user-context';
 
 app.post('/login', async (c) => {
-	const token = await loginService.login(c, await c.req.json());
+	const loginRes = await loginService.login(c, await c.req.json());
+	if (typeof loginRes === 'object' && loginRes.mfaRequired) {
+		return c.json(result.ok(loginRes));
+	}
+	return c.json(result.ok({ token: loginRes }));
+});
+
+app.post('/login/totp', async (c) => {
+	const token = await loginService.verifyTotpLogin(c, await c.req.json());
 	return c.json(result.ok({ token: token }));
 });
 

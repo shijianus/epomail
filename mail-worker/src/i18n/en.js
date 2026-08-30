@@ -102,7 +102,17 @@ const en = {
 		"设置修改": "Change Settings",
 		"发件重置": "Reset Send Count"
 	},
-	accountLocked: 'Please try again later'
+	accountLocked: 'Please try again later',
+	totpCodeEmpty: 'Verification code cannot be empty',
+	totpCodeInvalid: 'Invalid or expired verification code',
+	totpSetupExpired: 'Setup session expired, please scan the QR code again',
+	totpNotEnabled: 'Two-factor authentication is not enabled for this account',
+	totpDisableParamsEmpty: 'Please enter current password and verification code',
+	totpSessionExpired: '2FA session expired. Please sign in again',
+	totpTooManyAttempts: 'Too many failed verification attempts. Please sign in again',
+	backupCodeInvalid: 'Invalid or already used backup code',
+	totpCodeReplay: 'This verification code was already used. Please wait for the next code',
+	emptyPwdMsg: 'Password cannot be empty'
 };
 
 export default en;

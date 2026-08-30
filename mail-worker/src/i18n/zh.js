@@ -102,7 +102,17 @@ const zh = {
 		"设置修改": "设置修改",
 		'发件重置': '发件重置'
 	},
-	accountLocked: '请稍后尝试'
+	accountLocked: '请稍后尝试',
+	totpCodeEmpty: '验证码不能为空',
+	totpCodeInvalid: '验证码错误或已失效，请重试',
+	totpSetupExpired: '绑定会话已超时，请重新扫描二维码',
+	totpNotEnabled: '该账户未开启两步验证',
+	totpDisableParamsEmpty: '请输入当前密码与验证码',
+	totpSessionExpired: '两步验证会话已过期，请重新登录',
+	totpTooManyAttempts: '验证错误次数过多，会话已锁定，请重新登录',
+	backupCodeInvalid: '备用恢复代码错误或已使用',
+	totpCodeReplay: '该验证码刚刚已使用过，请等待下一有效码',
+	emptyPwdMsg: '密码不能为空'
 }
 
-export default zh
+export default zh;
