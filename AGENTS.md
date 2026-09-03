@@ -26,6 +26,7 @@
        - 支持第三方 App 发起单点登录时展示双方品牌连通示意图、申请方名称与域名、当前登录账号（支持快捷切换）与请求的 Scope 列表（`openid`, `profile`, `email`）。
        - 未登录用户支持内嵌式极简直登后接续授权；授权完成后支持 Popup 模式 (`window.opener.postMessage`) 与标准 HTTP 302 重定向。
 *   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **Git Commit Hash**: `9fd02b75dcaa31e1c12c2424b3b9c52b19eab203` (Short Hash: `9fd02b7`)。
     - 生产部署上线 Cloudflare Workers Version ID: `755cb46b-0039-41fb-a0f5-61d28a53a99c`。
     - 全量自动化测试套件 100% 顺利通过：
       - `node tests/test-admin-oauth-apps-and-authorize.mjs` (应用注册、Secret 生成、应用卡片、集成代码生成器、/oauth/authorize 独立授权确认、Authorization Code 捕获、Token 兑换、UserInfo 获取与 Discovery 发现全链路 100% 通过);
