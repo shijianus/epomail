@@ -23,7 +23,7 @@
        - **批量注册与账号创建解耦**: `publicService.batchRegister` 拆分为 `userDb` 用户批量入库并获取 `user_id`，再向 `mailDb` 批量插入 `account`。
        - **DDL 幂等初始化升级 (`init.js`)**: 智能路由用户域表 DDL 到 `getUserDb`、邮件域表 DDL 到 `getMailDb`，在单库与双库模式下均能幂等执行。
 *   **部署上线与自动化测试 (Verification & Deployment)**:
-    - **Git Commit Hash**: `PENDING_COMMIT`
+    - **Git Commit Hash**: `2cc2801ccec3d9ee07d5b1688f2af652d7dc25a2` (Short Hash: `2cc2801`)。
     - 生产部署上线 Cloudflare Workers Version ID: `92fabf8f-0693-48a1-82ed-3c911cfe536a`。
     - 自动化测试套件 100% 顺利通过：
       - `node --loader ./tests/esm-loader.mjs tests/test-dual-and-single-db-e2e.mjs` (单库退化、双库物理分流、跨库聚合、生产 DDL 升级、用户/邮件/分析/OAuth/数据导出全链路通过);
