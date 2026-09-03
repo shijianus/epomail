@@ -32,7 +32,10 @@ export async function email(message, env, ctx) {
 			blackContent,
 			blackFrom,
 			aiCode,
-			aiCodeFilter
+			aiCodeFilter,
+			allMailMode,
+			userTgForward,
+			userEmailForward
 		} = await settingService.query({ env });
 
 		if (receive === settingConst.receive.CLOSE) {
@@ -209,7 +212,10 @@ export async function email(message, env, ctx) {
 		emailRow = await emailService.completeReceive({ env }, account ? emailConst.status.RECEIVE : emailConst.status.NOONE, emailRow.emailId, isDelVal);
 
 
-		if (ruleType === settingConst.ruleType.RULE) {
+		const sysMailMode = Number(allMailMode ?? 0);
+
+		// 系统转发规则过滤 (只在非加密模式下生效，加密模式下转发规则直接失效/被删除，不起任何作用)
+		if (sysMailMode !== 2 && ruleType === settingConst.ruleType.RULE) {
 
 			const emails = ruleEmail.split(',');
 
@@ -219,26 +225,122 @@ export async function email(message, env, ctx) {
 
 		}
 
-		//转发到TG
-		if (tgBotStatus === settingConst.tgBotStatus.OPEN && tgChatId) {
-			await telegramService.sendEmailToBot({ env }, emailRow)
+		// 转发到系统管理员TG (System TG Bot for Admin)
+		if (sysMailMode !== 2 && tgBotStatus === settingConst.tgBotStatus.OPEN && tgChatId) {
+			if (sysMailMode === 1) {
+				// 全部邮件模式：转发的是全部邮件
+				await telegramService.sendEmailToBot({ env }, emailRow);
+			} else if (sysMailMode === 0) {
+				// 隐私邮件模式：仅转发垃圾/可疑邮件
+				if (emailRow.isSpam === 1 || isSpamVal === 1) {
+					await telegramService.sendEmailToBot({ env }, emailRow);
+				}
+			}
 		}
 
-		//转发到其他邮箱
-		if (forwardStatus === settingConst.forwardStatus.OPEN && forwardEmail) {
-
-			const emails = forwardEmail.split(',');
-
-			await Promise.all(emails.map(async email => {
-
-				try {
-					await message.forward(email);
-				} catch (e) {
-					console.error(`转发邮箱 ${email} 失败：`, e);
+		// 转发到其他邮箱 (系统管理员全局转发 - 严格按模式控制)
+		if (sysMailMode !== 2 && forwardStatus === settingConst.forwardStatus.OPEN && forwardEmail) {
+			const sysMailMode = Number(allMailMode ?? 0);
+			let allowSystemForward = false;
+			if (sysMailMode === 1) {
+				// 全部邮件模式：转发全站邮件
+				allowSystemForward = true;
+			} else if (sysMailMode === 0) {
+				// 隐私邮件模式：仅转发垃圾/可疑邮件或无主邮件，严禁转发普通用户私有邮件
+				if (emailRow.isSpam === 1 || isSpamVal === 1 || emailRow.status === emailConst.status.NOONE) {
+					allowSystemForward = true;
 				}
+			} else if (sysMailMode === 2) {
+				// 加密邮件模式：全局第三方转发完全关闭 (系统邮箱仅作为受信任号池)
+				allowSystemForward = false;
+			}
 
-			}));
+			if (allowSystemForward) {
+				const emails = forwardEmail.split(',').map(e => e.trim()).filter(Boolean);
+				await Promise.all(emails.map(async email => {
+					try {
+						await message.forward(email);
+					} catch (e) {
+						console.error(`系统转发邮箱 ${email} 失败：`, e);
+					}
+				}));
+			}
+		}
 
+		// 个人 Telegram 机器人与个人邮件规则转发 (Personal TG Bot & Forwarding)
+		if (emailRow.userId && emailRow.userId > 0) {
+			try {
+				const userProfileStr = await env.kv.get('USER_PROFILE_' + emailRow.userId);
+				if (userProfileStr) {
+					const userProfile = JSON.parse(userProfileStr);
+
+					// 1. 个人 Telegram 机器人推送 (推送归属于该用户的个人邮件通知)
+					const allowUserTg = Number(userTgForward ?? 1) === 1;
+					const ptg = userProfile.personalTelegram;
+					if (allowUserTg && ptg && ptg.enabled && ptg.botToken && ptg.chatId) {
+						await telegramService.sendPersonalEmailToBot({ env }, emailRow, ptg);
+					}
+
+					// 2. 个人规则转发与自动抄送 (加密邮件模式下全面禁用外部转发以防泄密)
+					const allowUserFw = Number(userEmailForward ?? 1) === 1;
+					const pfw = userProfile.personalForwarding;
+					const sysMailMode = Number(allMailMode ?? 0);
+					if (allowUserFw && sysMailMode !== 2 && pfw && pfw.enabled && pfw.targets) {
+						let shouldForward = false;
+						const fwMode = pfw.mode || 'all';
+
+						// 隐私模式与全部邮件模式下，基于规则判断该邮件是否属于用户配置的转发范围
+						if (fwMode === 'all') {
+							shouldForward = true;
+						} else if (fwMode === 'alias') {
+							const prefixes = (pfw.aliasPrefixes || '')
+								.split(',')
+								.map(p => p.trim().toLowerCase())
+								.filter(Boolean);
+							const toLocal = (message.to || '').split('@')[0].toLowerCase();
+							if (prefixes.length === 0 || prefixes.some(p => toLocal.startsWith(p) || toLocal === p)) {
+								shouldForward = true;
+							}
+						} else if (fwMode === 'rules') {
+							shouldForward = true;
+						}
+
+						if (shouldForward) {
+							const targets = pfw.targets.split(',').map(t => t.trim()).filter(Boolean);
+
+							for (const target of targets) {
+								let cfForwardSuccess = false;
+								try {
+									// 尝试 Cloudflare 原生无损转发（若已在 CF Email Routing 中验证）
+									await message.forward(target);
+									cfForwardSuccess = true;
+								} catch (cfErr) {
+									cfForwardSuccess = false;
+								}
+
+								// 若未在 CF 验证，则通过系统邮件发送能力执行自动抄送转发（占用个人发送配额）
+								if (!cfForwardSuccess) {
+									try {
+										const forwardSubject = pfw.addPrefix ? `[Fwd] ${emailRow.subject || ''}` : (emailRow.subject || '');
+										await emailService.send({ env }, {
+											toEmail: target,
+											subject: forwardSubject,
+											content: emailRow.content || emailRow.text || '',
+											text: emailRow.text || '',
+											accountId: emailRow.accountId,
+											sendEmail: message.to
+										}, emailRow.userId);
+									} catch (sendErr) {
+										console.error(`Personal CC Forwarding to ${target} failed:`, sendErr.message);
+									}
+								}
+							}
+						}
+					}
+				}
+			} catch (ptgErr) {
+				console.error('Personal TG / Forwarding processing error:', ptgErr);
+			}
 		}
 
 	} catch (e) {

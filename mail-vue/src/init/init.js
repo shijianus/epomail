@@ -1,6 +1,7 @@
 import {useUserStore} from "@/store/user.js";
 import {useSettingStore} from "@/store/setting.js";
 import {useAccountStore} from "@/store/account.js";
+import {useUiStore} from "@/store/ui.js";
 import {loginUserInfo} from "@/request/my.js";
 import {permsToRouter} from "@/perm/perm.js";
 import router from "@/router";
@@ -13,6 +14,9 @@ export async function init() {
     const settingStore = useSettingStore();
     const userStore = useUserStore();
     const accountStore = useAccountStore();
+    const uiStore = useUiStore();
+
+    uiStore.initTheme();
 
     const token = localStorage.getItem('token');
     if (!settingStore.lang) {
@@ -26,13 +30,15 @@ export async function init() {
     let setting = null;
 
     try {
+        const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(null), 3000));
+
         if (token) {
-            const userPromise = loginUserInfo().catch(e => {
-                console.error(e);
+            const userPromise = Promise.race([loginUserInfo(), timeoutPromise]).catch(e => {
+                console.error('loginUserInfo error:', e);
                 return null;
             });
 
-            const settingPromise = websiteConfig().catch(e => {
+            const settingPromise = Promise.race([websiteConfig(), timeoutPromise]).catch(e => {
                 console.error('websiteConfig failed:', e);
                 return null;
             });
@@ -58,7 +64,7 @@ export async function init() {
             }
 
         } else {
-            setting = await websiteConfig().catch(e => {
+            setting = await Promise.race([websiteConfig(), timeoutPromise]).catch(e => {
                 console.error('websiteConfig failed:', e);
                 return null;
             });

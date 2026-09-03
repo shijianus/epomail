@@ -61,4 +61,9 @@ app.delete('/user/deleteAccount', async (c) => {
 	return c.json(result.ok());
 });
 
+app.post('/user/purgeEmails', async (c) => {
+	const data = await userService.purgeUserEmails(c, await c.req.json());
+	return c.json(result.ok(data));
+});
+
 

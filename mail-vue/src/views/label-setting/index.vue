@@ -713,9 +713,9 @@ const onDrop = () => {
 
 <style scoped>
 .page-container {
-  padding: 0;
+  padding: 30px 40px;
   width: 100%;
-  max-width: 900px;
+  max-width: 960px;
   margin: 0 auto;
 }
 
@@ -723,7 +723,11 @@ const onDrop = () => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 32px;
+  margin-bottom: 24px;
+  padding: 20px 24px;
+  border-radius: 14px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
 }
 
 .label-count-badge {
@@ -778,6 +782,9 @@ const onDrop = () => {
   display: flex;
   flex-direction: column;
   background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  padding: 12px;
 }
 
 .tech-row {

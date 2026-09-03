@@ -1,6 +1,696 @@
 # Agent Workflow SOP (Standard Operating Procedure)
 
-### 设定页导航体系与多语言国际化重塑：原「个人」升级为「常规」，「常规」升级为「安全」，全量中英文 i18n 完备交付 (2026-08-30)
+### 全站测试/虚假默认数据彻底清退、严格杜绝默认假数据与测试状态自动还原规范固化 (2026-09-03)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **全站彻底清退残留虚假数据与历史测试脏数据**:
+       - **个人 Telegram 推送项 (`class="item tg-push-item"`)**:
+         - 清理 Cloudflare KV 中用户 `USER_PROFILE_1` 残留的测试 Bot Token 与 Chat ID 记录，状态重置为 `enabled: false`，输入框与展示卡片恢复纯净初始空状态（灰度标签提示「未启用/已关闭」，无任何残留 mock ID 或测试数据）。
+       - **第三方转发邮箱 (`class="dialog-field"`)**:
+         - 清除 Cloudflare D1 数据库 `setting` 表与 KV 缓存中的测试邮箱（`forward_email = ''`，`forward_status = 1`），弹窗内 `el-input-tag` 恢复纯净空列表。
+       - **API 令牌与安全凭据**:
+         - 批量吊销并物理删除 KV 中所有测试生成的 `API_TOKEN_epo_live_*` 临时令牌，用户令牌列表完全归零清爽。
+    2. **代码级与测试级规范固化 (Zero Fake Data Guarantee)**:
+       - 严禁在任何生产组件、实体初始状态或后端返回中硬编码、预填虚假测试数据。
+       - 所有自动化 Playwright E2E 测试脚本严格执行「测试后自动重置还原」（在 `finally` 及步骤末尾自动调用 API 清理测试生成的 Token、重置 `personalTelegram` 与 `forwardEmail` 为初始空状态），杜绝测试脚本污染线上/开发数据库。
+       - `setting-service.js` 针对 KV 缓存失效场景增强鲁棒性，无缝回退加载 D1 原生配置并自动重建缓存。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - 生产部署上线 Cloudflare Workers Version ID: `a9a3f950-92e4-4a5c-9676-77ca4ff0ee4f`。
+    - 全量自动化测试与视觉审计 100% 顺利通过：
+      - `node tests/test-tg-dialog-sync-visual-audit.mjs` 捕获最新纯净弹窗截图 `tests/audit_data_tg_modal_light.png` 与 `tests/audit_sys_third_email_modal.png`，确认零虚假数据；
+      - `node tests/test-sys-setting-user-data-control.mjs` (A~F 全场景通过);
+      - `node tests/test-sys-setting-email-push-optimization.mjs` (3 大邮件模式验证通过);
+      - `node tests/test-forwarding-modes-and-tg.mjs` (全量通过，且无测试数据残留);
+      - `node tests/test-data-settings-partition-e2e.mjs` (全量通过，且测试 Token 自动即时清理);
+      - `node tests/test-settings-tabs.mjs` (5 大选项卡中英文双语全量通过)。
+
+### 系统设置「用户资料控制」卡片新增、普通用户资料分区利用度细粒度管控与资料汇出绝对自主权保障 (2026-09-03)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **系统设置新增专属「用户资料控制」卡片 (`class="settings-card user-data-control-card"`)**:
+       - 在系统设置网格中新增「用户资料控制」卡片（`userDataControl`），配备详细提示气泡说明。
+       - **用户 Telegram 推送 (`userTgForward`)**：提供开关控件与即时响应（`changeField`），控制是否允许普通用户在资料页配置和使用个人 Telegram 机器人。
+       - **用户邮件规则转发 (`userEmailForward`)**：提供开关控件与即时响应，控制是否允许普通用户在资料页启用邮件自动抄送与别名规则转发。
+       - **第三方 API 支援 (`userApiSupport`)**：提供开关控件与即时响应，控制是否开启个人访问令牌 (PAT) 与 OAuth 2.0 / SSO 开放认证接入。
+    2. **「资料」设置页权限联动与「资料汇出」绝对自主权保障**:
+       - **资料汇出容器 (`class="container export-container"`) 绝对直接允许**：用户数据打包全量备份、邮件历史归档与通讯录导出始终直接开放，保障用户对其资料的完整处置权与所有权。
+       - **邮件与消息转发容器 (`class="container forwarding-container"`) 动态响应**：根据 `userTgForward` 与 `userEmailForward` 状态动态呈现。若两者皆关闭则完全隐藏该容器；若仅关闭某一项则精准隐藏该子项。
+       - **开发者 API 容器 (`class="container api-container"`) 动态响应**：当管理员关闭 `userApiSupport` 时，完全隐藏该容器；后端在 API 令牌生成与调用阶段进行 403 严格权限阻断。
+    3. **数据库与后端多层拦截与 i18n 全量支持**:
+       - Cloudflare D1 数据库 `setting` 表新增 `user_tg_forward`、`user_email_forward`、`user_api_support` 字段（默认均为 1）。
+       - `email.js` 底层邮件路由阶段根据 `userTgForward` 与 `userEmailForward` 严格拦截未授权的个人推送与个人转发。
+       - 中英文 i18n 完整对齐无 fallback。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - 生产部署上线 Cloudflare Workers Version ID: `64b2283e-ddc3-4fcd-b5f8-0458749f8e5a`。
+    - 自动化测试套件 `node tests/test-sys-setting-user-data-control.mjs` 100% 顺利通过：
+      - 系统设置「用户资料控制」卡片与 3 大开关渲染及即时调整验证通过；
+      - 场景 A (全量开启: 1, 1, 1)、场景 B (关闭 TG: 0, 1, 1)、场景 C (关闭转发: 1, 0, 1)、场景 D (关闭两者: 0, 0, 1) 全部通过；
+      - 场景 E (关闭 API 支援: 1, 1, 0) 前端容器隐藏与后端 403 拦截验证通过；
+      - 场景 F (全部关闭: 0, 0, 0) 资料界面仅保留 `class="container export-container"` 自由支配验证通过。
+    - 全量回归测试套件 `test-forwarding-modes-and-tg.mjs`、`test-sys-setting-email-push-optimization.mjs`、`test-data-settings-partition-e2e.mjs` 与 `test-settings-tabs.mjs` 100% 全部通过。
+
+
+### 系统设置「Telegram 机器人」与邮件转发弹窗 UI/UX 深度重构、对齐「资料」分区设计语言与字段栅格化对齐 (2026-09-03)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **学习并对齐「资料」分区弹窗与 `.forward-set-body` 现代化排版规范**:
+       - 彻底废除原有杂乱挤占的输入框与裸放元素，全面引入结构化 `.dialog-field` 字段容器与 `.d-label-row`（加粗标签标题 + 辅助提示 `.d-sub-hint`）。
+       - **Bot Token 体验升级**：支持密文与明文自由切换（`type="password"`、`show-password`、`clearable`），并在标签右侧优雅嵌入「发送测试」微交互操作按钮（`fluent:send-20-regular` 矢量图标、一键向 Telegram 实时投递连通性诊断消息）。
+       - **Chat ID 体验升级**：配备加粗字段标签与 `支持多个 Chat ID（回车添加）` 说明，使用 Element Plus `el-input-tag` 标签输入器优雅容纳多个接收者或频道 ID。
+       - **API 反代域名字段**：配备 `Telegram API 反代 / 自定义域名 (可选)` 与 `留空默认使用官方 API` 说明，支持自建反代代理地址。
+       - **推送内容偏好选项网格 (`.tg-options-grid`)**：将原先零散下沉的 `发件人`、`收件人`、`邮件正文` 3 大下拉选择器重构为响应式现代化 3 列卡片网格，自适应主题打底背景与高对比度文字。
+    2. **第三方转发邮箱与转发规则弹窗同步升级**:
+       - 「第三方转发邮箱」与「转发规则」弹窗同步升级为标准 `.dialog-field` 栅格与 `width="500px"` 统一视窗，保持全系统弹窗排版像素级一致性与极简高级感。
+    3. **深浅色主题自适应与 i18n 完整覆盖**:
+       - 亮色与暗色模式下 callout 提示背景、输入框边框、卡片阴影与按钮悬浮态 100% 自然过渡。
+       - 全量中英文环境双语键位完整对齐无 fallback。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - 生产部署上线 Cloudflare Workers Version ID: `98fbffaa-9932-4812-92a4-d786ac5f9f97`。
+    - 自动化测试套件 `node tests/test-tg-dialog-sync-visual-audit.mjs` 100% 顺利通过并输出审计截图：
+      - `tests/audit_data_tg_modal_light.png` 与 `tests/audit_data_tg_modal_dark.png`（资料分区 TG 弹窗）；
+      - `tests/audit_sys_tg_modal_light.png` 与 `tests/audit_sys_tg_modal_dark.png`（系统设置 TG 弹窗）；
+      - `tests/audit_sys_third_email_modal.png` 与 `tests/audit_sys_forward_rule_modal.png`（第三方邮箱与规则弹窗）。
+    - 全量回归测试套件 `test-sys-setting-email-push-optimization.mjs`、`test-forwarding-modes-and-tg.mjs`、`test-data-settings-partition-e2e.mjs` 与 `test-settings-tabs.mjs` 100% 全部通过。
+
+
+### 系统设置「邮件推送」三大模式注释与转发规则/TG机器人开关状态深度优化 (2026-09-03)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **系统设置分区「邮件推送」注释与模式解耦精准呈现**:
+       - **隐私邮件模式 (`allMailMode === 0`) 转发规则注释**：在转发规则标题后配备 `?` 悬浮注释提示：“当前规则将局限于所有的垃圾邮件，隐私模式下无法查看用户的正常邮件，只允许查看垃圾邮件”。
+       - **加密邮件模式 (`allMailMode === 2`) 转发规则注释**：在转发规则标题后配备 `?` 悬浮注释提示：“加密模式下无法查看任何用户的任何邮件，请前往用户的资料分区增设。”。
+       - **加密邮件模式 (`allMailMode === 2`) 第三方邮箱注释**：在第三方邮箱标题后配备 `?` 悬浮注释提示：“加密模式下第三方邮件需要在用户的资料分区中配置才能正常完成转发，否则无法正常完成转发任务。”。
+    2. **弹窗说明优化与杂质清退**:
+       - **清退转发规则弹窗内无意义 callout**：彻底删除转发规则弹窗内多余的 `admin-notice-callout` 块，保持界面干净专注。
+       - **第三方邮箱 `notice-text` 结构化三模式区分**：删除旧的“• 加密模式安全防护：在加密邮件模式下，全站严禁向外部未验证邮箱转发。”，严格按 3 大模式展示精准说明：全部邮件模式（底层无损路由/用户端号池支持/全站转发生效）、隐私邮件模式（底层无损路由/用户端号池支持/隐私过滤保护）、加密邮件模式（受信任验证号池/个人端配置要求）。
+    3. **加密模式下 TG 机器人与转发规则强制禁用与规则清退**:
+       - **Telegram 机器人强制关闭**：加密模式下，系统设置卡片显示“已禁用”；TG 机器人配置弹窗内开关 Switch 被强制关闭并设为禁用状态（`:disabled="true"`），保存按钮同步禁用，后端强制阻断开启。
+       - **转发规则直接删除与失效**：加密模式下，系统设置卡片显示“已禁用”，设置按钮被禁用；切换至加密模式时前端与后端自动将转发规则（`ruleEmail = ''`, `ruleType = 0`）清空删除，且在底层邮件路由阶段完全不执行任何系统规则转发。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - 生产部署上线 Cloudflare Workers Version ID: `995e863a-401f-447c-a318-571e05171e1b`。
+    - 自动化测试套件 `node tests/test-sys-setting-email-push-optimization.mjs` 100% 顺利通过：
+      - 隐私模式转发规则 Tooltip 与第三方邮箱说明验证通过；
+      - 转发规则弹窗内无意义 callout 数量为 0；
+      - 加密模式转发规则 Tooltip、按钮禁用状态、第三方邮箱 Tooltip 验证通过；
+      - 加密模式 TG 机器人 Switch 与保存按钮禁用状态验证通过；
+      - 全部邮件模式第三方邮箱说明验证通过。
+    - 全量回归测试套件 `node tests/test-data-settings-partition-e2e.mjs` 与 `node tests/test-settings-tabs.mjs` 100% 全部通过。
+
+
+### 用户视角与管理端视角精准解耦、加密模式用户端转发规则全面隐退禁用、后端静默智能匹配验证号池与管理端富集三模式架构提示 (2026-09-03)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **严格的用户视角极简重构 (`/settings/data` - 个人资料页)**:
+       - **加密模式下全面隐藏禁用转发规则**：在加密邮件模式（`allMailMode === 2`）下，用户界面彻底隐藏邮件转发规则配置区，仅保留个人 Telegram 消息推送，杜绝任何加密数据泄露风险与不必要的认知负担。
+       - **清退所有系统架构警告与模式横幅**：全面移除个人端原有的配额警告横幅（`quota-warning-banner`）、模式架构横幅（`mode-rule-notice-banner`）、空号池警示（`pool-empty-callout`）与提示问号（`help-q-icon`），使用户界面干净、极简、专注。
+       - **静默号池匹配，消除前端感知**：普通模式（全部模式 / 隐私模式）下，用户无需感知管理端验证池的存在，只需在目的地输入框填写目标邮箱。后端静默判断：如果用户填写的邮箱属于管理端已在 Cloudflare 完成验证的号池，则自动执行无损原生路由（不消耗用户发信额度）；若不在号池，则自动调用发信引擎抄送并扣减个人发信额度。
+       - **个人 Telegram 机器人极简配置**：保持极简弹窗与操作，只负责专属个人邮件的实时推送。
+    2. **管理端视角架构信息全面富集 (`/sys-setting` - 系统设置)**:
+       - **系统全局运维 Telegram 机器人弹窗**：明确告知此为管理员 1 人专属的全局运维通知通道，并清晰列出全站 3 大邮件模式运作规则（全部模式：推送全站所有邮件；隐私模式：仅推送垃圾/可疑邮件与未分配邮件安全通知；加密模式：完全关闭推送，保障端到端加密数据安全），并标注每位用户的个人邮件推送由用户在「资料」中自行配置私有 TG Bot。
+       - **第三方转发邮箱与受信任号池弹窗**：详细说明在 Cloudflare Email Routing 中完成解析验证后将直接启用底层无损路由（不占用系统发信额度）；同时说明在此验证的邮箱构成全站受信任号池，用户端使用这些邮箱作为目标时系统静默执行无损转发，若输入未验证邮箱则自动走抄送引擎消耗个人额度；加密模式下全站严禁向未验证邮箱转发。
+       - **转发规则弹窗**：清晰说明规则转发针对特定接收邮箱的触发机制。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - 生产部署上线 Cloudflare Workers Version ID: `8d7c093d-c39b-4cd3-a2df-1937d0cb8bfd`。
+    - 专项自动化测试套件 `node tests/test-forwarding-modes-and-tg.mjs` 100% 顺利通过：
+      - 模式 1 (全部邮件模式) 与模式 0 (隐私邮件模式) 用户端无任何架构杂质横幅，转发规则开关与输入框展示正常；
+      - 模式 2 (加密邮件模式) 用户端 100% 完全隐退邮件转发规则，仅保留个人 Telegram 消息推送；
+      - 个人 Telegram 极简弹窗验证通过；
+      - 管理端系统设置 TG 机器人与第三方邮箱弹窗富集架构与号池机制说明验证通过。
+    - 全量端到端测试套件 `node tests/test-data-settings-partition-e2e.mjs` 与导航回归测试 `node tests/test-settings-tabs.mjs` 100% 全部通过。
+
+
+### 设定页「资料」分区 UI/UX 深度重构、全系统排版一致性对齐、数据汇出卡片与邮件转发选项排版美化 (2026-09-02)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **资料分区页面容器卡片体系与画风一致性重构**:
+       - 彻底消除资料分区容器与系统其他设定页（个资、常规、安全）的画风割裂与排版错位问题。
+       - 页面外层统一遵循系统标准 `.box` 响应式内边距（桌面 `40px 40px`，移动端 `30px 20px`）；各功能模块严格封装为标准 `<div class="container" id="...">` 实体卡片（`border: 1px solid var(--border-subtle); border-radius: 14px; background: var(--bg-surface); padding: 24px;`）。
+       - 统一卡片内标题体系：首行统一呈现 `.title`（18px 粗体、`var(--text-primary)`）与 `.section-intro` 导读副标题（13px、`var(--text-secondary)`），消除孤立外浮标题。
+    2. **数据汇出 3 大卡片排版美化与选项行结构优化 (Data Export Grid)**:
+       - **卡片网格统一**：对齐「全量数据备份」、「邮件历史归档」、「通讯录与配置」三大卡片的高度、内边距（`18px 22px`）与悬浮反馈。
+       - **图标规范对齐**：左侧统一配置 44x44px 软圆角矢量徽标容器（全量数据：Accent 蓝紫；邮件历史：Emerald 绿色；通讯录：Amber 橙色），采用 `align-items: flex-start` 确保图标在任何内容高度下均与标题首行严谨对齐。
+       - **邮件历史归档选项重构**：将原挤占在描述区域的导出格式与时间范围拆分并下沉为独立的 `.export-options-bar`（虚线隔离、优雅边距），格式胶囊按钮（`MBOX` / `JSON` / `CSV`）与时间范围下拉选单均衡排布，右侧下载操作按钮完美独立对齐。
+    3. **邮件与消息转发选项与规则布局重构 (Forwarding Options Layout)**:
+       - **配额说明横幅**：对齐为圆角 Callout 警示框（`rgba(245, 158, 11, 0.08)` 软背景、琥珀色矢量警示图标、发信额度胶囊徽标）。
+       - **设置项栅格化对齐**：将「Telegram 消息推送」、「启用自动邮件转发」、「转发目的地邮箱」、「转发触发规则」与「高级选项」严格重构为与全局统一的 `grid-template-columns: 140px 1fr` 栅格，左侧清晰展示加粗标题与副提示（`.sub-hint`），右侧优雅承载输入框、开关与操作按钮。
+       - **触发规则 Radio 卡片现代化**：将全量抄送、别名过滤、智能规则重构成微交互选项卡片（悬浮加深、选中 Accent 高亮打底与圆角边框），选中别名规则时平滑呈现前缀配置框。
+       - **高级选项与保存按钮**：独立高级选项勾选框组，底部规范呈现 `fluent:save-20-regular` 实体主操作保存按钮。
+    4. **开发者 API 与 SSO 开放平台卡片视觉与暗色调全面支持**:
+       - 令牌列表与生成 Token 按钮采用标准 Card 体系；空状态采用虚线引导与钥匙图标。
+       - 「使用 Epomail 登录」集成预览卡片支持深浅主题自适应，Demo 按钮在亮色调呈现深邃 Slate 高级质感，在暗色调呈现微发光边框，100% 杜绝暗色隐身。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - 生产部署上线 Cloudflare Workers Version ID: `a6ab4c36-fbf9-486a-b731-8a4a69e7924a`。
+    - 自动化端到端测试套件 `node tests/test-data-settings-partition-e2e.mjs` 100% 顺利通过：
+      - 5 大设定选项卡顺序校验无误（个资 -> 常规 -> 安全 -> 资料 -> 标签）；
+      - 数据汇出、邮件转发、API 令牌创建/删除及 Telegram 弹窗交互全量通过；
+      - 视觉审计截图 `tests/audit_sec1_export_zh.png`、`tests/audit_sec2_forward_zh.png`、`tests/audit_sec3_api_zh.png`、`tests/audit_tg_modal_open.png`、`tests/audit_tg_modal_dark.png`、`tests/audit_data_settings_dark.png` 与 `tests/audit_data_settings_en.png` 亮暗模式视觉与 i18n 完整验证；
+    - 回归测试套件 `test-settings-tabs.mjs` 100% 全部通过。
+
+### 设定页资料页个人 Telegram 机器人与邮件转发合并整合、转为独立配置弹窗按钮、后端固化个人全量接收与系统管理员三模式转发逻辑 (2026-09-02)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **资料页 Telegram 机器人与邮件规则转发深度合并**:
+       - 废除资料页独立冗余的平铺式 TG Bot 模块与模式卡片选择，将其与「邮件规则转发与自动抄送」统一收敛至 **「邮件与消息转发」** 卡片体系。
+       - 将个人 Telegram 消息推送重构为极简的 Setting Item 交互行：左侧展示标题、专属通道说明及启用状态胶囊，右侧配置与系统设置统一的齿轮操作按钮（`.opt-button`）。
+       - 点击齿轮按钮唤起现代化 Telegram 配置弹窗（`.forward-dialog`），用户仅需填写 `Bot Token`、`Chat ID` 与可选 `Topic ID`，支持一键发送测试连通性，支持开关切换与即时持久化保存。
+    2. **后端转发逻辑严格解耦与业务固化 (Backend Grounding)**:
+       - **个人 Telegram 机器人 (服务每位注册用户)**：
+         - 逻辑在后端直接固化，无需前端暴露模式选择，所有发送给该用户个人的邮件（`emailRow.userId`）均实时无损推送至该用户的私有 Telegram Bot。
+       - **系统 Telegram 机器人 (管理员 1 人专属)**：
+         - 在后端根据系统全站邮件模式（`allMailMode`）自适应执行动态转发：
+           - **全部邮件模式 (`allMailMode === 1`)**：管理员 Telegram 机器人转发全站所有进站邮件；
+           - **隐私邮件模式 (`allMailMode === 0`)**：管理员 Telegram 机器人仅转发被判定为垃圾邮件/可疑邮件（`isSpam === 1`）的通知；
+           - **加密邮件模式 (`allMailMode === 2`)**：系统管理员 Telegram 机器人完全关闭，杜绝任何外部转发。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - 生产部署上线 Cloudflare Workers Version ID: `4c077ba5-c223-448f-a17d-df7213bef45a`。
+    - 自动化端到端测试套件 `node tests/test-data-settings-partition-e2e.mjs` 100% 顺利通过：
+      - 资料页导航与 3 大合并分区（数据汇出、邮件与消息转发、开发者 API）布局渲染无误；
+      - Telegram 机器人设置弹窗唤起、输入参数与保存交互全部通过；
+      - 审计截图 `tests/audit_data_settings_zh.png`、`tests/audit_tg_modal_open.png`、`tests/audit_tg_modal_dark.png` 与 `tests/audit_data_settings_en.png` 亮暗模式视觉与 i18n 完整验证；
+    - 回归测试套件 `test-settings-tabs.mjs` 100% 全部通过。
+
+### 设定页个人设置新增「资料」(Data) 分区、数据全量与归档汇出、个人 Telegram 机器人三种推送模式、邮件规则转发与自动抄送配额警示、开发者 API (PAT) 与 OAuth SSO 落地 (2026-09-02)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **侧边栏与设定页导航严格排序与路由接入**:
+       - 按照业务逻辑标准在「安全」(`security`) 之下与「标签」(`labels`) 之上精准插入「资料」(`data`) 导航选项卡（带 `fluent:database-person-20-regular` 矢量图标）。
+       - 个人设置 5 大分区严格遵循标准顺序：**`个资` (`/settings/profile-info`) -> `常规` (`/settings/profile`) -> `安全` (`/settings/security`) -> `资料` (`/settings/data`) -> `标签` (`/settings/labels`)**。
+    2. **用户资料与邮件数据多格式汇出 (User Data & Mail Export)**:
+       - **全量数据备份 (JSON)**：一键打包导出包含完整账户个资、历史邮件、通讯录、分类与标签规则及安全设置的标准 JSON 文件。
+       - **邮件历史归档 (MBOX / JSON / CSV)**：支持按时间范围（全部、近30天、近1年）与格式过滤，前端/边缘解密打包标准 `.mbox`、`.json`、`.csv` 文件供客户端离线查阅与迁移。
+       - **通讯录与配置导出**：导出联系人名录、自定义别名规则与系统个性化偏好。
+    3. **个人 Telegram 机器人通知 (Personal Telegram Bot)**:
+       - 明确设立区分横幅，提示个人私有 TG Bot 独立于系统全局通知机器人。
+       - **三大核心推送模式卡片**：
+         - `全部邮件模式 (all)`：Telegram 机器人转发到达用户所有关联邮箱与别名的全部邮件；
+         - `隐私邮件模式 (privacy)`：仅推送用户主邮件以及所有被系统检测判定为垃圾/可疑邮件的通知；
+         - `加密邮件模式 (encrypted)`：完全等同于仅限用户个人主邮箱接收到的邮件才转发至 Telegram，杜绝任何外部别名干扰。
+       - 支持配置 `Bot Token`、`Chat ID`、`Topic ID (话题群组)`、`一次性验证码快捷复制` 与 `WebApp 预览`，支持在线「发送测试消息」实时连通性诊断。
+    4. **邮件规则转发与自动抄送 (Forwarding & CC Rules) 与发信配额警示**:
+       - 醒目警示横幅清晰说明：由于个人邮箱默认未在 Cloudflare Email Routing 中完成解析验证（若该目标邮箱已在 Cloudflare 中完成验证，系统自动执行底层无损转发），实质上的转发都是通过系统邮件引擎执行自动抄送（CC / Send）的结果，**会占用个人的发信额度/次数**。
+       - 实时动态展示用户当前发信额度（`sendCount / role.sendCount`）。
+       - 支持配置转发目标邮箱、全量抄送/特定前缀字母别名转发（如 `billing, dev-*`）/智能条件过滤，以及保留收件箱原件与 `[Fwd]` 标头。
+    5. **开发者 API 访问令牌 (PAT) 与「使用 Epomail 登录」集成**:
+       - 个人访问令牌生成、权限范围勾选（`emails:read`, `emails:send`, `profile:read`）、有效期设置与一键撤销管理。
+       - 展示符合 RFC 6749 / 7636 标准的「使用 Epomail 登录 (Sign in with Epomail)」架构规范与 API 端点（`/api/oauth/authorize`, `/api/oauth/token`, `/api/oauth/userinfo`）。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - 生产部署上线 Cloudflare Workers Version ID: `6755de2d-e9c6-4563-a11f-881997641dba`。
+    - 自动化端到端测试套件 `node tests/test-data-settings-partition-e2e.mjs` 100% 顺利通过：
+      - `5 个设定选项卡顺序校验`: 个资 -> 常规 -> 安全 -> 资料 -> 标签 100% 吻合。
+      - `tests/audit_data_settings_zh.png`: 中文环境下数据汇出、TG 3大模式、转发配额警示与 API 令牌完整呈现。
+      - `tests/audit_data_settings_en.png`: 英文环境全量 i18n 完整无 fallback 呈现。
+      - API 令牌创建与撤销、个人 TG 模式切换交互全部通过。
+    - 回归测试套件 `test-settings-tabs.mjs` 100% 全部通过。
+
+### 顶栏搜索框 (`.topbar-search`) 布局与图标像素级对齐、清空图标 (`.clear-icon`) 容器内垂直居中与清除逻辑重构 (2026-09-02)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **清空图标 (`.clear-icon`) 容器约束与居中定位**:
+       - **根因分析**：原先 `.search-box` 内部在 100% 宽度的 `<input>` 之后放置了 `<span class="clear-icon">`，由于缺失绝对定位及容器弹性模型约束，清除按钮作为普通行内元素被挤出至搜索框下方。
+       - **解决方案**：为 `.clear-icon` 配置绝对定位（`position: absolute; right: 12px; top: 50%; transform: translateY(-50%);`）与圆角微交互点击态（26x26px 居中圆环、Hover 背景色渐变与 Active 微缩反馈），确保清空图标在键入内容时精准、优雅地悬浮在搜索框内右侧。同时优化 `<input>` 内边距为 `padding: 0 44px 0 48px;`，保障文字不与左右图标重叠。
+    2. **搜索图标与 Lucide SVG 矢量居中对齐 (`.iconify--lucide`)**:
+       - **根因分析**：`@iconify/vue` 默认生成的 SVG 具有 baseline 偏移，且包裹的 `span` 缺失 Flex 居中布局，导致搜索图标（放大镜）与整体搜索框在视觉上无法完美居中。
+       - **解决方案**：在 `.search-icon` 与 `.clear-icon` 容器上统一应用 `display: inline-flex; align-items: center; justify-content: center;`，并显式指定 `.iconify, svg { display: block; flex-shrink: 0; }`，彻底消除 SVG 基线偏差，达成 `0.00px` 垂直像素级绝对对称居中。
+    3. **搜索清除与多端响应联动 (`clearSearch`)**:
+       - 补齐并完善 `clearSearch()` 逻辑，点击清空按钮时同步清除搜索关键词、取消页面高亮、重置/刷新邮件列表，并配合 `@mousedown.prevent` 优化点击体验。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - 生产部署上线 Cloudflare Workers Version ID: `942cf138-6bee-4d3c-a78a-d4346c3992c5`。
+    - 自动化测试套件 `node tests/test-topbar-search-audit.mjs` 100% 顺利通过：
+      - `SearchIcon 垂直中心偏移: 0.00px`
+      - `ClearIcon 垂直中心偏移: 0.00px`
+      - `tests/audit_topbar_empty.png`: 搜索框放大镜图标对齐居中。
+      - `tests/audit_topbar_typed.png` & `tests/audit_topbar_dark_typed.png`: 亮色与暗色模式下清空图标均完美悬浮于搜索框右侧内部，点击即时清空。
+
+### 壁纸网格4列自适应与容器约束、两步验证/注销分区标题与全局UI风格统一、个人详情页主栏封面与下半部卡片解耦打底重构 (2026-09-02)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **壁纸预设网格 (`.wallpaper-presets-grid`) 4 列布局与容器越界修复 (`.wallpaper-control-wrap`)**:
+       - **根因分析**：原先 5 列（`repeat(5, 125px)`）在加上间距后超出右侧空间，导致在常规设置容器 `.container` 中产生水平撑开与越界。
+       - **解决方案**：将 `.wallpaper-presets-grid` 严格配置为单行 4 个 `.wallpaper-card`（`grid-template-columns: repeat(4, 125px); gap: 12px; max-width: 100%; box-sizing: border-box;`），并在小屏自适应收缩。同时约束 `.wallpaper-control-wrap` 宽度与内边距，确保卡片完美收纳在 `.container` 内部，间距均衡、视觉协调。
+    2. **安全设置页标题统一 (`.title`) 与两步验证中心 (`.two-factor-center`) 全局 UI 风格深度统一**:
+       - **根因分析**：原两步验证中心未封装入标准 `.container` 卡片，标题孤立浮在外部，且使用了独立脱节的 CSS 变量（`--el-fill-color-blank`, `--light-border` 等），与系统其他设定页画风割裂；同时注销账号分区 (`.del-email`) 缺失容器卡片包裹，导致标题对齐错位。
+       - **解决方案**：将「两步验证中心」与「注销账号」全面升级为标准 `<div class="container two-factor-center">` 与 `<div class="container del-email">` 卡片，所有 `.title` 统一在卡片内部首行呈现，保证字体大小（18px）、粗细及内间距完全一致。全面接入系统设计系统变量（`var(--bg-surface)`, `var(--bg-hover)`, `var(--border-subtle)`, `var(--text-primary)`, `var(--text-secondary)`, `var(--accent-primary)`），对 Hero 状态横幅、盾牌徽标、验证方式列表（TOTP、备用恢复码、通行密钥）进行现代化重构，使整个安全页与系统完全融为一体。
+    3. **个人详情页 (`/admin` / `/:username`) 封面与下半部解耦打底与卡片体系重构**:
+       - **根因分析**：个人主页允许用户自定义个性封面横幅（`.cover-photo`），如果直接同步主栏的透明/壁纸滤镜，会导致下半部的个人简介、统计数据与图表同背景产生严重视觉冲突，甚至文字不可读。
+       - **解决方案**：将个人详情页主栏结构优化为两段式解耦设计：上半部分突出展示用户专属的 `.cover-photo` 横幅，并使用渐变向底色自然淡出过渡；下半部分独立采用系统统一的高质感实体卡片体系（`.profile-identity-card`, `.stat-card`, `.chart-card`，配置 `var(--bg-surface)`, `border: 1px solid var(--border-subtle)`, `border-radius: 16px; backdrop-filter: blur(20px)`），使头像、名字、介绍与看板数据在任何自定义封面或壁纸下均享有极高的可读性与高级质感，保障个性与系统统一性两不冲突。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - 生产部署上线 Cloudflare Workers Version ID: `11dba892-48d5-4e96-8d8c-e67fda70af0b`。
+    - 自动化测试套件 `node tests/test-ui-customization-audit.mjs` 100% 顺利通过：
+      - `tests/audit_wallpaper_4_cols_contained.png`: 壁纸预设严格 4 列/行，完美容纳于 `.container` 内部。
+      - `tests/audit_security_2fa_unified_ui.png`: 两步验证中心与注销账号标题位置完全统一，UI 风格与系统全面融合。
+      - `tests/audit_profile_unified_grounding.png`: 个人主页顶部封面自然过渡，下半部分身份与分析卡片统一打底高对比度呈现。
+    - 全量回归测试套件 `test-global-2fa-e2e.mjs`、`test-general-customization-and-threading.mjs` 100% 全部通过。
+
+### 下拉菜单层级穿透与跳转修复、邮件列表单行布局与星标/徽标精简、设定页毛玻璃蒙版打底与亮色调高对比度全链路重构 (2026-09-02)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **头像下拉菜单 (`.detail-dropdown` / `el-dropdown__popper`) 悬浮层级与跳转修复**:
+       - **根因分析**：由于 `html.has-main-wallpaper` 为页面中央主栏容器 `.body-container` 添加了 `backdrop-filter: blur(16px)`，浏览器因此建立了独立的 CSS Stacking Context。而头部组件原本设置了 `:teleported="false"`，导致下拉菜单作为头部子节点被后续的 `.body-container` 遮挡覆盖，且无法点击菜单项执行跳转。
+       - **解决方案**：将 `<el-dropdown ... :teleported="true" popper-class="detail-dropdown">` 开启 Teleport 传送至 `<body>` 根节点；在 `style.css` 与 `header/index.vue` 显式赋予 `z-index: 3000 !important;`、实体背景色 `var(--bg-surface)`、毛玻璃滤镜与阴影。同时封装 `openSettings()` 与 `openAccountDetails()` 导航函数，并在跳转时显式关闭弹窗，确保点击瞬间 100% 成功跳转。
+    2. **邮件列表单行布局重构与冗余星标/胶囊清退**:
+       - **彻底消除两行拥挤**：重构 `email-scroll/index.vue` 模板与 Scoped SCSS 弹性盒模型，将邮件行高度严格约束为 52px（紧凑模式 38px，舒适模式 46px），所有内容使用 `display: flex; white-space: nowrap; overflow: hidden;`，杜绝任何换行与溢出。
+       - **星标唯一性**：删除发件人名字内部（`.name`）重复的星标图标，全行仅在左侧操作区保留 1 个规范的 `.pc-star`。
+       - **发件人与会话数整合**：将会话数字（`thread-count-badge`）重构为微型轻量徽标，紧跟发件人名称展示为 `来源人名称  数字`（例如：`EpoCanvas 官方团队  4`），并依据可用空间自动截断。
+       - **清退多余官方胶囊**：仅保留官方蓝色认证对勾徽标（`official-verified-badge`），彻底移除邮件列表行中多余臃肿的 `official-pill-tag`。
+       - **标题与摘要优雅串联**：预设标题与发件人空间，标题与内容按照 `“标题 - 内容”` 格式单行紧凑展示，超出部分使用标准 `...` 截断，且优先保障标题可见性。
+    3. **设定页全局毛玻璃蒙版打底 (Frosted Mask Protection)**:
+       - 解决有壁纸时由于半透明背景导致设定内容与文字严重冲突的视觉问题。在 `style.css` 中为所有设定页面容器（`.settings-content .container`, `.settings-card`, `.labels-container`, `.modern-list`, `.tech-row`, `.two-factor-banner`, `.el-card` 等）全面配置高透聚光毛玻璃蒙版打底（`background: color-mix(in srgb, var(--bg-surface) var(--panel-alpha, 90%), transparent) !important; backdrop-filter: blur(20px); border: 1px solid var(--border-subtle); border-radius: 14px;`），在保留壁纸美感的同时 100% 保障设置内容的清晰可读性。
+    4. **亮色调 (Light Mode) 视觉规范与高对比度支持**:
+       - 修复切换亮色调时因缺失 CSS 别名导致白字隐身（变白隐身）的问题。补齐 `--regular-text-color`, `--secondary-text-color`, `--light-border` 等兼容性变量，并选用深邃清晰的 Slate 调色板（`--text-primary: #0f172a;`, `--text-secondary: #334155;`, `--border-subtle: #e2e8f0;`），并在 `store/ui.js` 采用 `classList.toggle('dark', isDark)` 杜绝主题切换冲刷根节点壁纸类名。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - 生产部署上线 Cloudflare Workers Version ID: `27e970b5-e0bb-4a77-a857-78265476bd18`。
+    - 自动化测试套件 `node tests/test-ui-visual-audit.mjs` 100% 顺利通过：
+      - `tests/audit_email_single_line_row.png`: 邮件列表严格单行（52px），星标唯一，会话数字紧跟发件人，无多余胶囊。
+      - `tests/audit_header_dropdown_visible.png`: 头像下拉菜单顶层悬浮，背景不透明，完美支持点击跳转。
+      - `tests/audit_settings_wallpaper_frosted_mask.png`: 常规设置页在壁纸下的毛玻璃蒙版打底效果。
+      - `tests/audit_profile_frosted_mask.png`: 个资设置页蒙版打底与文字对比度。
+      - `tests/audit_security_frosted_mask.png`: 安全设置与 2FA 中心蒙版打底。
+      - `tests/audit_labels_frosted_mask.png`: 标签管理卡片蒙版打底。
+      - `tests/audit_category_frosted_mask.png`: 分类管理卡片蒙版打底。
+      - `tests/audit_light_mode_inbox.png` & `tests/audit_light_mode_profile.png`: 亮色调高对比度呈现，无任何隐身问题。
+    - 全量回归测试 `test-general-customization-and-threading.mjs`、`test-phone-rigorous-validation.mjs` 100% 全部通过。
+
+### 「个资」重命名、常规个性装扮 5x2 统一卡片与全局生效、个人背景 (cover-photo) 设置、阅读窗格精简与 Gmail 风格邮件会话聚合 (2026-09-02)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **「个人信息」全系统规范重命名为「个资」**:
+       - 全局清退旧文案「个人信息」，在侧边栏导航、选项卡、多语言字典（`zh.js`, `en.js`）全面统一规范为 **「个资」**（`Profile`）。
+    2. **个性装扮 (壁纸) 5x2 统一网格与「+」加号自定义卡片**:
+       - 废除原平铺 actions 栏，改为与外观色调 `class="theme-rect-card"` 严格统一的 125px 宽、48px 预览高卡片，包含 9 个精心调配的高清预设 + 1 个「+」加号自定义卡片，布局为 5x2 优雅矩阵。
+       - 点击「+」卡片弹出极简自定义弹窗，支持本地图片上传（最大 25MB）与网络直链配置。
+    3. **个性装扮全站整体生效与毛玻璃亚克力机制**:
+       - 修复原先壁纸仅作用于中央主栏的体验缺陷，将壁纸应用至根容器（`html.has-main-wallpaper` 与 `.layout`），为头部、侧边栏、常规设置区、邮件主列表与阅读区全面应用 `backdrop-filter: blur(16px)` 与高透亚克力毛玻璃质感，让用户选择任何个性装备均即时全站生效。
+    4. **「个人背景」封面设置接入 (针对公开主页/账户详情 `class="cover-photo"`)**:
+       - 在个性装扮区新增「个人背景」设置项，内置极光、富士山、赛博霓虹、夕阳海岛等 6 款精选封面预设 + 1 个「+」自定义上传封面卡片。
+       - 选中或上传即时同步保存至个人档案 `backgroundUrl`，账户详情公开主页（`class="cover-photo"`）毫秒级渲染。
+    5. **阅读窗格精简与冗余说明清退**:
+       - 彻底删除「上下水平分割，上方列表下方阅读」、「左右垂直分割」以及「(当前默认)」等冗长文本，仅保留图示预览与纯粹标题（「无拆分」、「收件箱右侧」、「收件箱下方」）。
+    6. **邮件会话模式问号提示与 Gmail 风格聚合机制**:
+       - 邮件会话模式移除平铺长文本，在标题后放置问号图标 `<el-tooltip>` 提供说明气泡。
+       - 开启会话模式时，邮件列表自动对同一主题/订阅通知（如 AWS 月度账单通知等）进行会话聚合，展示单行代表项及邮件数量徽标（如 `class="thread-count-badge"` 显示 `2`、`3`）。
+       - 详情页按时间线呈现完整上下文会话流，最新邮件默认展开，历史邮件折叠呈摘要卡片，点击即可展开查看上下文上下邮件，并提供「全部展开/全部折叠」快捷控制。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - 生产部署上线 Cloudflare Workers Version ID: `6d916052-f7f8-46c5-9b6e-8af77cc45947`。
+    - 自动化测试套件 `node tests/test-general-customization-and-threading.mjs` 100% 顺利通过：
+      - `tests/audit_settings_nav_profile_name.png`: 侧边栏与选项卡展示「个资」。
+      - `tests/audit_general_settings_optimized.png`: 5x2 壁纸卡片、个人背景、精简阅读窗格与问号提示。
+      - `tests/audit_profile_cover_rendered.png`: 账户公开主页 cover-photo 渲染。
+      - `tests/audit_email_conversation_view.png`: 收件箱徽标聚合与详情页上下邮件会话流。
+    - 全量自动化套件 `test-phone-rigorous-validation.mjs`、`test-alphabetical-ac-ta-korea.mjs`、`test-flags-selects-and-zip.mjs`、`test-loading-and-navigation-audit.mjs` 100% 全部通过。
+
+### 电话号码严格逻辑校验、国家真实号段约束与假号/非法号段全链路拦截 (2026-09-02)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **接入工业级全量元数据 `libphonenumber-js/max`**:
+       - 彻底废除仅做粗略长度检查的 min 构建，全面接入完整 Google libphonenumber 元数据包 `libphonenumber-js/max`，获取全球 245 个国家最严密、最真实的国家编号计划（National Numbering Plan）。
+    2. **国家号段与区号严格业务逻辑约束**:
+       - **中国 (CN)**：手机号码必须为 11 位且必须以 `1[3-9]` 开头（坚决拦截如 `1252-546600`、`12800138000` 等虚假非配号段），固话必须以 `0` 加合法区号开头（10-12 位）。
+       - **北美 (US / CA, NANP)**：电话号码必须为 10 位；区号（NPA）首位严禁为 `0` 或 `1`（坚决拦截如 `1252-546600`、`0252546600`）；局号/台号（NXX）首位严禁为 `0` 或 `1`（坚决拦截如 `(209)-123-4567`）。
+       - **香港 (HK)**：必须为 8 位数字，且首位必须为 `2-9`（坚决拦截以 `0`、`1` 等特殊代码开头的虚构号码）。
+       - **澳门 (MO)**：必须为 8 位数字，且首位必须以 `2`、`6` 或 `8` 开头。
+       - **台湾 (TW)**：手机号码必须以 `09` 开头（10 位），市内电话必须以 `0` 开头（9-10 位）。
+    3. **错误反馈与提交硬拦截**:
+       - 用户输入非法/编造号码时，状态栏即时红字精确提示（如 `⚠️ 中国手机号码必须为 11 位数字（当前为 10 位）`、`⚠️ 北美区号首位不能为 0 或 1`、`⚠️ 台湾号码手机须以 09 开头`），点击添加按钮触发 Toast 拦截提示并坚决阻止保存。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - 生产部署上线 Cloudflare Workers Version ID: `f6334880-d1ca-4776-a6bb-9b95b8bd4ff7`。
+    - 自动化测试套件 `node tests/test-phone-rigorous-validation.mjs` 100% 顺利通过：
+      - `tests/audit_phone_fake_number_blocked.png`: 编造假号 `1252-546600`、`12800138000`、`2091234567`、`12525466` 等在各国均被 100% 成功拦截，阻止提交。
+      - `tests/audit_phone_real_number_passed.png`: 真实合规号码 `138-0013-8000`、`(209)-678-9490`、`9123-4567`、`(0912)-345-678` 均 100% 通过验证。
+    - 全量自动化套件 `test-phone-all-countries.mjs`、`test-phone-inner-format.mjs`、`test-alphabetical-ac-ta-korea.mjs`、`test-flags-selects-and-zip.mjs` 100% 全部通过。
+
+### 全球 245 个国家/地区电话号码输入框 (el-input__inner) 原生即时直接转换展示、彻底清退下方提示条、渐进式号段构建与退格智能联动 (2026-09-02)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **直接在 `class="el-input__inner"` 原生输入框中即时转换展示**:
+       - 彻底废除并删除下方多余的 `class="phone-format-preview-bar"` 提示条，使弹窗排版更简约、更纯粹。
+       - 用户键入数字时，输入框本身（`class="el-input__inner"`）毫秒级实时将纯数字渐进式转换为带区号与号段分隔符的格式。
+       - **北美 (US / CA) 键入过程精准对齐**:
+         - 键入 `2` -> 输入框直接呈现 **`(2)`**
+         - 键入 `0` -> 输入框直接呈现 **`(20)`**
+         - 键入 `9` -> 输入框直接呈现 **`(209)`**
+         - 键入 `6` -> 输入框直接呈现 **`(209)-6`**
+         - 键入 `7` -> 输入框直接呈现 **`(209)-67`**
+         - 键入 `8` -> 输入框直接呈现 **`(209)-678`**
+         - 键入 `9` -> 输入框直接呈现 **`(209)-678-9`**
+         - 键入 `4` -> 输入框直接呈现 **`(209)-678-94`**
+         - 键入 `9` -> 输入框直接呈现 **`(209)-678-949`**
+         - 键入 `0` -> 输入框直接呈现 **`(209)-678-9490`**
+    2. **顺滑退格 (Backspace) 智能符号与数字联动机制**:
+       - 解决在格式化输入框中用户按 Backspace 遇到 `)` 或 `-` 时被卡住的体验缺陷：当检测到用户执行退格删去的是末尾格式符号而非数字时，系统前推联动自动删除一位数字，实现从 `(209)-678-9490` -> `(209)-678-949` -> ... -> `(209)-6` -> `(209)` -> `(20)` -> `(2)` -> 空的完美自然回退。
+    3. **全球 245 个国家和地区在 `el-input__inner` 内部实时统一执行**:
+       - **中国 (CN)**：键入 `13800138000` -> 输入框即时呈现 **`138-0013-8000`**，固话 `01088888888` -> **`(010)-8888-8888`**。
+       - **香港 (HK)**：键入 `91234567` -> 输入框即时呈现 **`9123-4567`**。
+       - **澳门 (MO)**：键入 `66123456` -> 输入框即时呈现 **`6612-3456`**。
+       - **台湾 (TW)**：键入 `0912345678` -> 输入框即时呈现 **`(0912)-345-678`**。
+       - **日本 (JP)**：键入 `09012345678` -> 输入框即时呈现 **`(090)-1234-5678`**。
+       - **南韩 (KR)**：键入 `01012345678` -> 输入框即时呈现 **`(010)-1234-5678`**。
+       - **英国 (GB)**：键入 `07911123456` -> 输入框即时呈现 **`(07911)-123456`**。
+       - **法国 (FR)**：键入 `0612345678` -> 输入框即时呈现 **`06-12-34-56-78`**。
+       - **德国 (DE)**：键入 `015112345678` -> 输入框即时呈现 **`(0151)-123-4567`**。
+       - **澳大利亚 (AU)**：键入 `0412345678` -> 输入框即时呈现 **`(0412)-345-678`**。
+       - **新加坡 (SG)**：键入 `81234567` -> 输入框即时呈现 **`8123-4567`**。
+       - **意大利 (IT)**：键入 `3471234567` -> 输入框即时呈现 **`347-123-4567`**。
+       - **西班牙 (ES)**：键入 `612345678` -> 输入框即时呈现 **`612-34-56-78`**。
+       - **巴西 (BR)**：键入 `11987654321` -> 输入框即时呈现 **`(11)-98765-4321`**。
+       - **俄罗斯 (RU)**：键入 `9123456789` -> 输入框即时呈现 **`912-345-67-89`**。
+       - **印度 (IN)**：键入 `9876543210` -> 输入框即时呈现 **`98765-43210`**。
+       - **泰国 (TH)**：键入 `0812345678` -> 输入框即时呈现 **`081-234-5678`**。
+       - **越南 (VN)**：键入 `0912345678` -> 输入框即时呈现 **`0912-345-678`**。
+       - **阿森松岛 (AC)** / **特里斯坦-达库尼亚 (TA)** 及其他全球 245 个 ISO 3166-1 国家与地区均全面接入。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - 生产部署上线 Cloudflare Workers Version ID: `ede572ab-5973-4b57-ba92-beaf97caa9cd`。
+    - 自动化测试套件 `node tests/test-phone-all-countries.mjs` 100% 顺利通过：
+      - `tests/audit_phone_global_countries_verified.png`: 包含美、加、中、港、澳、台、日、韩、英、法、德、澳、新、意、西、巴、俄、印、泰、越等各大洲代表性国家和地区的即时格式化全部通过。
+    - 全量自动化套件 `test-phone-inner-format.mjs`、`test-alphabetical-ac-ta-korea.mjs`、`test-flags-selects-and-zip.mjs` 100% 全部通过。
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **输入纯数字硬性规则约束 (Strict Pure Digits Input Constraint)**:
+       - **业务逻辑**：电话号码输入框严格仅允许输入数字（`0-9`）。坚决拦截包含 `(`, `)`, `-`, ` ` 以及任何英文字母或符号的输入（通过 `@keypress` 拦截非数字键入，通过 `@input` 执行 `val.replace(/\D/g, '')` 清洗）。
+       - **粘贴防护**：若用户直接粘贴如 `(209)-678-9490`、`+1 209 678 9490` 等复合文本，系统自动净化提取纯数字 `2096789490` 回填入输入框，确保底层数据绝对纯净。
+    2. **展示上的动态自动填充与多国号段区分 (Display Auto-Formatting with Separators)**:
+       - 依据所选国家标准电信规范，利用 `libphonenumber-js` 与定制标准格式化引擎 [`formatPhoneNumber`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/utils/phone-validator.js)，动态在输入框下方呈现高质感「格式化自动填充」条（`class="phone-format-preview-bar"`）及实时合规反馈：
+         - **美国 (US) / 加拿大 (CA)**：精准区分 NPA 区号与局号/台号，统一呈现为 **`(209)-678-9490`**。
+         - **中国 (CN)**：手机号码统一格式化为 **`138-0013-8000`**，固定电话格式化为 **`010-8888-8888`**。
+         - **香港 (HK)**：8 位号码格式化为 **`9123-4567`**。
+         - **澳门 (MO)**：8 位号码格式化为 **`6612-3456`**。
+         - **台湾 (TW)**：移动电话格式化为 **`(0912)-345-678`**，固定电话格式化为 **`(02)-2345-6789`**。
+         - **日本 (JP)**：格式化为 **`(090)-1234-5678`**。
+         - **南韩 (KR)**：格式化为 **`(010)-1234-5678`**。
+         - **新加坡 (SG)**：格式化为 **`8123-4567`**。
+         - **英国 (GB)**：移动号码格式化为 **`07911-123456`**。
+         - **法国 (FR)**：格式化为 **`06-12-34-56-78`**。
+         - **德国 (DE)**：格式化为 **`(0151)-1234-5678`**。
+         - **澳大利亚 (AU)**：格式化为 **`(0412)-345-678`**。
+    3. **个人中心已绑定卡片无缝统一展示**:
+       - 主页面已保存电话号码卡片在渲染时，自动优先通过 `p.formatted || formatPhoneNumber(p.number, p.countryCode)` 计算规范化展示文本，呈现极清国旗与统一的分隔格式（如 `(209)-678-9490`）。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - 生产部署上线 Cloudflare Workers Version ID: `1e73f8ff-ccd3-4682-9b6f-2daaa0ebef1d`。
+    - 自动化测试套件 `node tests/test-phone-formatting.mjs` 100% 顺利通过：
+      - `tests/audit_phone_us_formatted.png`: 输入框纯净输入 `2096789490`，符号被强力拦截，下方自动填充显示 `(209)-678-9490`，并给出合规反馈。
+      - `tests/audit_phone_card_saved_formatted.png`: 主卡片保存电话无缝展示 `(209)-678-9490`。
+      - 中国（`138-0013-8000`）、香港（`9123-4567`）、台湾（`(0912)-345-678`）多国测试全量通过。
+    - 全量回归测试 `test-alphabetical-ac-ta-korea.mjs`、`test-flags-selects-and-zip.mjs` 100% 全部通过。
+
+### AC(+247)/TA(+290)国际标准国旗与国名补齐、A-Z国际英文首字母排序、南韩/北韩严格命名规范与 edit-name 纯净跳转重构 (2026-09-02)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **AC(+247) 与 TA(+290) 特殊保留代码国际标准全面同步**:
+       - **根因定位**：`AC`（阿森松岛，Ascension Island，+247）与 `TA`（特里斯坦-达库尼亚，Tristan da Cunha，+290）属于万国邮联 (UPU) 与 ITU-T 特殊保留 ISO 3166-1 代码，通常归并于 `SH`（圣赫勒拿）。在通用国际字典中未独立收录中文与英文全称。而在工业级矢量库 `flag-icons` 中，其标准 SVG 旗帜分别为 `fi-sh-ac` 与 `fi-sh-ta`。
+       - **标准方案**：在 [`mail-vue/src/utils/phone-validator.js`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/utils/phone-validator.js) 与 [`mail-vue/src/utils/geo-data.js`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/utils/geo-data.js) 封装全局矢量国旗映射器 `getFlagClass(code)`，为 `AC` 绑定真实阿森松岛国旗（`fi-sh-ac`）与全称 `阿森松岛 / Ascension Island (+247)`，为 `TA` 绑定真实特里斯坦-达库尼亚国旗（`fi-sh-ta`）与全称 `特里斯坦-达库尼亚 / Tristan da Cunha (+290)`。同时将 `SH` 规范为 `圣赫勒拿 / Saint Helena (+290)`，彻底根除国名冲突。并在 [`mail-vue/src/style.css`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/style.css) 配置标准别名规则。
+    2. **遵循国际标准通用字母顺序排序 (A-Z International Alphabetical Ordering)**:
+       - 彻底废除人工硬编码的静态优先队列，全面采用国际标准（UN / ISO 3166）通用英文首字母 A-Z 升序排列（`list.sort((a, b) => a.nameEn.localeCompare(b.nameEn, 'en'))`）。
+       - 全球 245 个国家和地区在电话国家下拉框与地址国家下拉框中，严格自 `Afghanistan`（阿富汗）平滑延展至 `Zimbabwe`（津巴布韦），满足跨国化操作习惯。
+    3. **南韩与北韩严格命名规范执行**:
+       - 全系统输出层统一将原 `韩国` 规范更名为 **「南韩」**（`South Korea`），原 `朝鲜` 规范更名为 **「北韩」**（`North Korea`）。在电话号段与地址选择器中均精准回填。
+    4. **`class="edit-name"` 纯净直接跳转优化**:
+       - 彻底清退「系统语言」与「EpoCanvas 密码」项中冗余的 `<Icon icon="lucide:arrow-right" />`（`class="iconify iconify--lucide"`）尾随箭头，统一采用与昵称、性别、生日、常用地址完全一致的原生简约 `<span class="edit-name" @click="...">修改</span>`，点击即秒级直接执行定向跳转。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - 生产部署上线 Cloudflare Workers Version ID: `4bad4d61-81b0-4412-92d0-24acd4f0e5ac`。
+    - 自动化测试套件 `node tests/test-alphabetical-ac-ta-korea.mjs` 100% 顺利通过：
+      - `tests/audit_edit_name_clean.png`: 语言与密码项已完全清退多余箭头图标，全页排版极度纯净统一。
+      - `tests/audit_ac_flag_selected.png`: 选中 `阿森松岛 (+247)`，极清真实 SVG 旗帜与号段完美呈现。
+      - `tests/audit_ta_flag_selected.png`: 选中 `特里斯坦-达库尼亚 (+290)`，极清真实 SVG 旗帜与号段完美呈现。
+      - `tests/audit_south_korea_dropdown.png`: 准确展示「南韩 (+82)」及真实韩国太极国旗。
+      - `tests/audit_north_korea_dropdown.png`: 准确展示「北韩 (+850)」及真实北韩国旗。
+    - 全量回归测试 `test-flags-selects-and-zip.mjs`、`test-loading-and-navigation-audit.mjs`、`test-address-and-phone-standards.mjs` 100% 全部通过。
+
+### 引入标准包 flag-icons 全球矢量国旗、下拉菜单扩展栏与后缀断连根因修复、ZIP 选填动态区划智能判定及全链路 Playwright 证据核验 (2026-09-02)
+*   **功能需求与排查定位 (Feature & Root Cause Analysis)**:
+    1. **国旗无法展示的根因及工业级方案接入 (Standard flag-icons NPM Package)**:
+       - **根因分析**：原先采用 Unicode 区域指示符推导文本 Emoji（如 `\uD83C\uDDED\uD83C\uDDF0`）。由于 Windows 系统的 `Segoe UI Emoji` 字体天生不包含任何国家和地区旗帜，在 Windows Chrome/Edge/Firefox 等主流桌面浏览器下会被降级为单纯字母文本（如 "HK", "CN", "US"），导致用户看不到任何国旗。
+       - **标准方案**：引入开源工业级标准包 [`flag-icons`](file:///home/shijian/projects/epocanvas-mail/mail-vue/node_modules/flag-icons)（v7.5.0，MIT 协议，全量 ISO 3166-1 真实矢量 SVG），在 [`mail-vue/src/main.js`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/main.js) 全局挂载 `flag-icons/css/flag-icons.min.css`。在电话与地址下拉框 Prefix 槽位、下拉选项列表以及主页面已绑定电话列表卡片中，全面统一采用 `<span class="fi fi-{code}"></span>`，100% 确保在任何操作系统（Windows/macOS/Linux/Android/iOS）下均呈现极清鲜艳的矢量国旗。
+    2. **下拉菜单 `el-select__suffix` 扩展栏断连与宽度割裂根因修复**:
+       - **根因排查**：在 [`mail-vue/src/style.css`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/style.css) 第 628 行原本存在全局选择器约束：
+         ```css
+         .el-popper.el-tooltip__popper, .el-popper.is-dark, .el-popper.is-light { max-width: 280px !important; }
+         ```
+         由于 Element Plus 的下拉菜单 `.el-select__popper` 均带有 `.is-light`，导致下拉弹出层宽度被强行钉死在 **280px**。而弹窗内选择框容器宽度为 **428px**，右侧展开箭头（`class="el-select__suffix"`）位于 428px 处，引发下拉菜单弹层宽度与选择框严重脱节（相差 148px），内部滚动滑块与箭头悬空断开。
+       - **修复方案**：将 `max-width: 280px !important` 严格限定于 `el-tooltip__popper`，并显式为 `.el-select__popper, .el-popper.el-dropdown__popper` 赋予 `max-width: none !important`。在所有电话与地址下拉框中开启 `:fit-input-width="true"`，并优化 `.custom-country-select` 弹性盒模型，实现下拉选单宽度、选择框容器与后缀指示箭头 100% 紧密闭环。
+    3. **邮政编码 (ZIP) 动态智能上下文规则**:
+       - 遵循万国邮联 (UPU) 与 ISO 3166 真实规则：仅针对不使用邮政编码的地区（如香港 HKG、澳门 MAC、朝鲜/北韩 PRK、阿联酋 UAE、卡塔尔等）显示 `邮政编码 (选填)：`，并提示 `当地无邮政编码（留空或选填）`。
+       - 针对具有正规邮政体系的国家（如中国 CN、美国 US、台湾 TW、日本 JP、英国 GB、加拿大 CA 等），严格移除“选填”字样，呈现标准 `邮政编码：` / `Postal Code / ZIP:`，并智能提供该国真实规则 Placeholder（如中国的 6 位数、美国的 5 位 ZIP Code、台湾 3+2 邮递区号、日本 7 位数等）。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - 生产部署上线 Cloudflare Workers Version ID: `c7806b7a-0ff8-432a-8701-b42ba2ef9435`。
+    - 自动化核验套件 `node tests/test-flags-selects-and-zip.mjs` 100% 通过：
+      - `tests/audit_flags_and_phone_select.png`: 电话选择框 Prefix 与 245 个国家下拉项全量呈现真实 SVG 矢量国旗，宽度 428px 完美对齐。
+      - `tests/audit_zip_rules_and_address.png`: 朝鲜 (北韩) 正确展示真实国旗与选填提示。
+      - `tests/audit_address_china_zip.png`: 中国与美国准确展示真实国旗与标准无选填邮编。
+    - 全量回归测试 `test-loading-and-navigation-audit.mjs`、`test-address-and-phone-standards.mjs` 均 100% 通过。
+
+### 全站加载白屏/卡加载死锁根因定位、路由 3000ms 强制延时清空、后端 websiteConfig 空指针修复与 Playwright 端到端全链路证据链核验 (2026-09-01)
+*   **问题根因定位与证据链排查 (Root Cause & Evidence Chain)**:
+    1. **前端人工硬编码延时引发加载死锁**:
+       - 原 `mail-vue/src/router/index.js` 中 `removeLoading()` 内嵌 `const minTime = 3000`，且未登录重定向时强制 `setTimeout(..., 3000)`，导致任何用户访问均被强制锁定在 `#loading-first` 全屏遮罩中长达 3 秒以上。
+       - 原路由拦截逻辑在未登录重定向时直接 `return;` 中断导航，导致 `router.afterEach` 永不触发，未登录用户极易永久卡死在黑色信封加载界面。
+    2. **后端 `websiteConfig` 接口空指针崩溃 (500 Internal Error)**:
+       - 在 `mail-worker/src/service/setting-service.js` 第 84 行直接调用 `setting.emailPrefixFilter.split(",")`，当数据库字段为空或 null 时抛出 `TypeError: Cannot read properties of undefined (reading 'split')`。
+       - 导致前端 `init()` 阶段 `websiteConfig()` 接口崩溃，系统配置与 Pinia 状态无法初始化，引发 Vue 应用挂载停滞。
+    3. **标准包体积过度膨胀导致冷加载解析耗时**:
+       - `country-state-city` 完整库内含数十万城市数据，原本直接同步打入主 Chunk 导致包体积膨胀至 830KB。
+*   **优化方案与系统加固 (Fixes & Hardening)**:
+    1. **全面清退人工延时与多重保险自动解封架构**:
+       - 彻底废除 `removeLoading()` 中 `minTime = 3000` 延时，一旦就绪立即添加 `.loading-hide`（`opacity: 0; pointer-events: none`）并平滑移除 DOM。
+       - 未登录访问时，立即执行 `removeLoading()` 并通过 `window.location.replace('/login/')` 秒级直达登录，杜绝多余重定向跳板。
+       - 在 `mail-vue/index.html` 注入 1500ms 熔断保底计时器（Failsafe Timer），即使遭遇极端网络阻塞或脚本异常，亦强制解封遮罩，确保用户绝不被困在加载层。
+       - 在 `App.vue` 与 `layout/index.vue` 的 `onMounted` 钩子中双重绑定 `removeLoading()`，保障应用一旦挂载完成第一帧即瞬间揭开界面。
+    2. **后端 `setting-service.js` 空指针全面加固**:
+       - 重构为 `setting.emailPrefixFilter = (setting.emailPrefixFilter || '').split(",").filter(Boolean);`，`GET /api/setting/websiteConfig` 100% 稳定响应 HTTP 200。
+    3. **标准包按需懒加载重构**:
+       - 重塑 `mail-vue/src/utils/geo-data.js`，前置提取 ISO 3166-2 核心级联映射，非即时区划改为按需动态 `import('country-state-city')`，主 Chunk 暴降至 **178KB**（瘦身 78%），大幅提速页面首屏。
+*   **Cloudflare Workers 生产部署与 Playwright 严格核验 (Verification & Audit)**:
+    - 生产部署 Current Version ID: `db0bfc66-437a-48c1-9f7d-5e9a523681ed`。
+    - 运行全量 Playwright 审核套件 `node tests/test-loading-and-navigation-audit.mjs`，产生完整确凿证据链截图：
+      - `tests/audit_1_login_screen.png`: 根路径访问毫秒级重定向至登录页，遮罩彻底解除。
+      - `tests/audit_2_inbox_loaded.png`: 真实账号密码交互登录无缝直达收件箱，主屏与邮件列表瞬间渲染。
+      - `tests/audit_3_profile_loaded.png`: 个人中心所有标准卡片秒级呈现，组件可交互无遮挡。
+      - `tests/audit_4_general_loaded.png`: 常规设置 Gmail 视图体系与壁纸面板秒开。
+      - `tests/audit_5_security_loaded.png`: 两步验证中心与安全凭据秒级展示。
+    - 全量回归测试套件 `test-address-and-phone-standards.mjs`、`test-profile-and-general-settings.mjs`、`test-settings-tabs.mjs` 100% 全部通过。
+
+### 个资中心接入国际工业标准包 (libphonenumber-js / country-state-city / i18n-iso-countries)、冗余提示清空、操作引导图标化、ISO 3166-1 号段自动匹配与分级行政区划重构 (2026-09-01)
+*   **功能需求与业务逻辑对齐 (Feature & Alignment)**:
+    1. **全面接入行业级国际标准开源包，严禁手动自建标准 (Standard NPM Packages First)**:
+       - **电话体系**：引入 Google Android 官方 libphonenumber 的标准 JS 重写版 [`libphonenumber-js`](file:///home/shijian/projects/epocanvas-mail/mail-vue/node_modules/libphonenumber-js)（v1.13.12），直接调用 `isValidPhoneNumber`、`parsePhoneNumber`、`getCountries` 与 `getCountryCallingCode`，实现 100% 国际电信联盟 (ITU-T) 真实号段与严格校验逻辑，杜绝任何人工手写正则造成的维护滞后。
+       - **国际区划体系**：引入 ISO 3166-1 / ISO 3166-2 事实标准包 [`country-state-city`](file:///home/shijian/projects/epocanvas-mail/mail-vue/node_modules/country-state-city)（v3.2.1）与 [`i18n-iso-countries`](file:///home/shijian/projects/epocanvas-mail/mail-vue/node_modules/i18n-iso-countries)（v7.14.0），动态获取全球全部国家、以及各国真实行政省/州/分区（如香港 18 区 Central & Western, Wan Chai, Yau Tsim Mong 等、台湾 22 县市、中国 31 省市、美 50 州、日 47 都道府县），完全摆脱自行维护静态区划字典的落后模式。
+       - **旗帜与 Unicode 算法**：采用官方 Unicode 区域指示符标准算法（Regional Indicator Symbols `127397 + charCode`）即时推导所有国家旗帜，零手动映射。
+    2. **严格命名规范执行 (Strict Standard Naming)**:
+       - 彻底根除「中国香港」、「中国澳门」、「中国台湾」所有违规前缀，全系统统一严格规范为 **「香港」**（Hong Kong）、**「澳门」**（Macau）、**「台湾」**（Taiwan）与 **「中国」**（China），在标准包输出层无损滤除多余字样。
+    3. **UI 严禁泄露内部需求与冗余解释彻底清退 (Clean UI & Zero Prompt Leakage)**:
+       - 彻底删除电子邮件项中突兀的 `<el-tag>`「账号主邮箱（只读不可修改）」标签，直接以原生代码字体呈现主邮箱。
+       - 彻底删除系统语言后附带的「（此处仅供展示，设置将引导前往常规进行修改）」冗余说明。
+       - 彻底清退电话列表为空时「尚未添加任何电话号码」的无意义占位文字，当列表为空时直接以一级优先级呈现「+ 添加电话号码」操作按钮。
+       - 电话号码输入弹窗中，彻底删除未输入时的静态说明文字「规则：必须为 8 位数字（以 2-9 开头，不能输入 11 位）」，仅在用户输入异常或验证成功时提供动态高可用校验反馈。
+    4. **跳转引导操作统一图标化升级 (Actionable Redirect Icons)**:
+       - 个资中心系统语言行：展示当前语言（如 `中文 (简体)`），右侧紧跟直观的「修改 →」引导操作（`<Icon icon="lucide:arrow-right" />`），点击平滑路由定位至常规设置。
+       - EpoCanvas 密码行：展示遮蔽圆点 `••••••••••••` 与动态变更时间戳，右侧配置「修改密码 →」引导操作，点击直接路由定位至安全设置并打开密码变更弹窗。
+    5. **标准分级行政区划真实地址选择器 (Standard Cascading Administrative Address System)**:
+       - **国家/地区下拉框**：ISO 3166-1 国际标准列表，严格使用香港、澳门、台湾、中国等规范名称，默认智能联动 IP 国家。
+       - **真实行政区划下拉框 (Subdivision Selector)**：依托 `country-state-city` 动态加载对应国家的真实下属行政区划（如香港 18 区议会分区、台湾 22 县市、中国 31 省级区划等）。
+       - **城市/城区输入**：根据所选国家动态呈现高适配度 Placeholder（如中环/铜锣湾/尖沙咀、朝阳区/海淀区等）。
+       - **详细地址与门牌**：街道、大厦、楼层、室号标准输入。
+       - **实时规范化预览与保存**：动态渲染清晰优雅的各级组合地址（如 `香港 · 中西区 · 中环 · 德辅道中 19 号环球大厦 18 楼`），卡片展示与编辑数据双向兼容回填。
+    6. **全量端到端测试 100% 验证通过**:
+       - 生产环境 Cloudflare Workers 部署版本 Version ID: `ef0aad26-77cc-4f48-b96c-dd0d5c414779`。
+       - `tests/test-address-and-phone-standards.mjs` 全量通过。
+       - `tests/test-profile-and-general-settings.mjs` 全量通过。
+       - `tests/test-settings-tabs.mjs` 中英文全量通过。
+
+### 设定页画风极致统一规范（个人/常规/安全/标签）、主栏壁纸高可读性毛玻璃架构与外观色调防硬占道重构 (2026-09-01)
+*   **功能需求与业务逻辑对齐 (Feature & Alignment)**:
+    1. **设定页画风与设计语言彻底统一 (Unified Native Design Language Across Settings)**:
+       - 根除「个人信息」与「常规」视图中突兀的异构卡片、全宽横条与渐变装饰，全面回归系统经典原生设计规范：`<div class="box">` -> `<div class="container">` -> `<div class="title">` -> `<div class="item">`。
+       - 标准化两栏网格排版系统：左列固定 `110px` 标题栏，右列自适应内容栏，行间距统一 `gap: 80px`，实现个人、常规、安全、标签四页 100% 对齐。
+       - 修复安全设置（`setting/index.vue`）密码行文本溢出裁切问题，将上次变更时间迁移至按钮右侧并调整网格为标准 110px。
+    2. **外观色调选择器防硬占道与优雅长方形卡片恢复 (Theme Mode Rectangular Cards)**:
+       - 彻底删除全屏硬占行的 `item-block` 容器，恢复外观色调在两栏网格内的横向单行流式排版。
+       - 恢复高颜值长方形卡片矩阵（暗色调 / 亮色调 / 跟随系统，125px × 75px），内嵌微缩视图线框、状态图标与右上角微标勾选。
+    3. **主栏壁纸与邮件列表高可读性底层架构重塑 (Wallpaper & Glassmorphism Refactor)**:
+       - 彻底解决模糊问题与浅色/深色主题兼容冲突：
+         - 废除列级 `backdrop-filter: blur(16px)` 全局滤镜，杜绝文字、图标产生模糊与抗锯齿劣化。
+         - 将壁纸容器精准限定于 `.split-view-container`，通过 Vue SFC 原生计算属性 `:style="wallpaperStyle"` 与 `:class="{'has-main-wallpaper': hasWallpaper}"` 实现壁纸无侵入绑定。
+         - 在 `.split-view-container.has-main-wallpaper` 中引入 `color-mix(in srgb, var(--el-bg-color, #ffffff) var(--panel-alpha, 88%), transparent)`，自动根据当前 Light/Dark 主题提供 88% 的高表面对比度，确保浅色模式下深色壁纸依然衬托出纯净白底，暗色文本达到 100% WCAG AAA 极清可读性。
+         - 邮件列表行（`.email-row`）平滑采用透明底层与悬停动效，与毛玻璃底板浑然一体。
+       - 预设壁纸全面精选商用级 CSS 渐变微纹理（璀璨星芒、极光幻影、暮光晚霞、石板灰调、碧海蔚蓝、赛博数码、雪峰晨雾），100% 杜绝外部不可靠图片链接加载异常。
+    4. **全套自动化测试与视觉回归 100% 通过**:
+       - Cloudflare 生产环境部署 Version ID: `e9427934-2551-452c-b2b8-e0b40e61b0c7`。
+       - Playwright 端到端全链路测试（`test-profile-and-general-settings.mjs` 与 `test-settings-tabs.mjs`）中英文全量测试 100% 顺利通过。
+
+### 设定页导航重构、全新「个人 (Profile)」个资中心、Gmail 风格「常规 (General)」视图与主栏底层面板美化交付 (2026-08-31)
+*   **功能需求与业务逻辑对齐 (Feature & Alignment)**:
+    1. **设定页导航与路由架构重塑 (Settings Navigation & Route Restructuring)**:
+       - 满足用户指示，在设置页侧边栏将全新「个人」标签（`user-profile`，URL: `/settings/profile`）置于「常规」之上，成为设定首项。
+       - 将原常规 URL 改为 `/settings/general`（`general-setting`），保留向后兼容路由别名，同时 `/settings` 统一重定向至 `/settings/profile`。
+       - 联动修复 `mail-vue/src/layout/main/index.vue`、`layout/index.vue`、`layout/header/index.vue` 中的 `isSettingsMode` 仲裁名单与全站全局设置项搜索跳转映射（`settingsMap`）。
+    2. **独立自主「个人 (Profile)」个资中心构建 (Personal Information View)**:
+       - 新建 [`mail-vue/src/views/profile-info/index.vue`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/views/profile-info/index.vue)，严格按照 Apple ID / Google 账户标准呈现：
+         - **Hero 个人头部卡片**：展示大尺寸用户头像、悬浮相机图标、昵称、角色徽章及只读邮箱。
+         - **基本信息卡片**：个人资料照片（大图预览/上传/移除弹窗）、名称/昵称（50 字限制弹窗）、性别（男/女/不愿透露/自订性别 50 字内弹窗）、生日（禁用未来日期的出生日期选择器弹窗）。
+         - **联系信息卡片**：
+           - **电子邮件 (Email)**：展示 `userStore.user.email`，标明「账号主邮箱（只读不可修改）」灰色锁形徽章，严格不提供任何修改入口。
+           - **电话号码 (Phones)**：展示所有已绑定的电话号码（国旗、区号、格式化号码、类型标签如手机/工作/住宅/其他、确认移除操作）。
+           - **国际电话号码严格规则校验引擎**：引入新建 [`mail-vue/src/utils/phone-validator.js`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/utils/phone-validator.js)，严格核验号码格式与存在规则，**对香港 (+852) 号码严格限制 8 位数字且首位为 2-9，坚决拦截 11 位非法输入并提供即时反馈提示**；同时覆盖中国大陆、澳门、台湾、美加、英、日、新等 13 个主流国家和地区的规范格式化与防重复录入机制。
+         - **地址信息卡片**：住家地址、公司地址、其他地址独立展示与弹窗编辑。
+         - **关联设置与安全凭据卡片**：
+           - **系统语言**：个资中仅具展示能力，配置「前往常规设置」按钮，点击自动带锚点平滑导航定位至 `/settings/general#language-section`。
+           - **EpoCanvas 密码**：采用全遮蔽圆点展示，副标题动态计算「上次变更时间：XXXX年XX月XX日」，配置「修改密码」按钮，点击自动带参导航至 `/settings/security?action=change-password` 并自动触发密码修改弹窗。
+    3. **Gmail 标准「常规 (General)」视图深度重构与主栏底层面板美化**:
+       - 彻底推翻原本混合杂乱的配置项，重新组织并扩充成 Gmail 级生产力控制中枢：
+         - **个人简介 (Bio)**：保留 Markdown 轻量渲染与编辑弹窗。
+         - **主栏底层面板美化 (Main Panel Theme Wallpaper)**：
+           - 严格限定仅作为中央主栏（`split-view-container`）的底层壁纸背景，绝不污染顶栏、侧边栏和底栏。
+           - 内置 8 组精选壁纸主题预设（默认纯净、璀璨深空、晨曦雪山、极光幻影、落日晚霞、清幽松林、现代流光、数码矩阵），支持本地图片上传直传与在线 URL 直链直填，并提供 50%~100% 半透明毛玻璃透光度滑块，保证列表与阅读窗格的极致可读性。
+         - **视图密度 (Density)**：提供 Default (54px 舒适间距)、Comfortable (48px 标准间距)、Compact (36px 紧凑间距) 三大可视化示意卡片，虚拟滚动列表 `itemHeight` 与行高实时联动响应。
+         - **收件箱类型 (Inbox Type)**：提供 Gmail 原生 6 大分类选项：
+           1. 默认收件箱 (Default) + 完整「自定义」弹窗（主要、推广、社交、更新、论坛分类标签页启闭及星标邮件归入主要标签）。
+           2. 重要邮件优先 (Important first)。
+           3. 未读邮件优先 (Unread first)。
+           4. 星标邮件优先 (Starred first)。
+           5. 优先收件箱 (Priority Inbox) + 完整「自定义」弹窗（4 个分区的类型自选、5/10/25/50 条数自选、分区为空时自动隐藏开关）。
+           6. 多收件箱 (Multiple Inboxes) + 完整「自定义」弹窗（4 组搜索语法查询面板配置、收件箱右侧/上方/下方布局位置选择）。
+         - **阅读窗格 (Reading Pane)**：提供 No split (无拆分全屏阅读模式)、Right of inbox (左右双栏分割模式)、Below inbox (上下水平分割模式) 3 态卡片与动态布局适配。
+         - **邮件会话模式 (Email Threading)**：Conversation view 对话视图切换（将同一主题的相关邮件聚合成对话，默认勾选）。
+         - **系统语言与数据隐私**：保留 `#language-section` 锚点定位与公开主页图表隐私开关。
+    4. **全套前后端数据持久化与实时同步**:
+       - 后端 [`mail-worker/src/service/user-service.js`](file:///home/shijian/projects/epocanvas-mail/mail-worker/src/service/user-service.js) 全面拓展用户配置元数据载入（`density`, `inboxType`, `inboxConfig`, `readingPane`, `conversationView`, `themeWallpaper`, `themeWallpaperOpacity`, `phones`, `addresses`, `gender`, `birthday` 等），并在 `resetPassword` 时自动记录并更新 `passwordUpdatedAt` 时间戳。
+       - 前端 `uiStore` 与 `userStore` 实现响应式状态、持久化缓存与 DOM 动态变量注入闭环。
+*   **编辑代码 (Edit)**: 
+    *   **后端服务**: 修改 [`mail-worker/src/service/user-service.js`](file:///home/shijian/projects/epocanvas-mail/mail-worker/src/service/user-service.js)。
+    *   **工具与预设**: 创建 [`mail-vue/src/utils/phone-validator.js`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/utils/phone-validator.js)、[`mail-vue/src/utils/theme-presets.js`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/utils/theme-presets.js)。
+    *   **状态管理与国际化**: 修改 [`mail-vue/src/store/ui.js`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/store/ui.js)、[`mail-vue/src/store/user.js`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/store/user.js)、[`mail-vue/src/i18n/zh.js`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/i18n/zh.js)、[`mail-vue/src/i18n/en.js`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/i18n/en.js)。
+    *   **路由与布局**: 修改 [`mail-vue/src/router/index.js`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/router/index.js)、[`mail-vue/src/layout/main/index.vue`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/layout/main/index.vue)、[`mail-vue/src/layout/index.vue`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/layout/index.vue)、[`mail-vue/src/layout/header/index.vue`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/layout/header/index.vue)、[`mail-vue/src/components/email-scroll/index.vue`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/components/email-scroll/index.vue)。
+    *   **前端视图**: 创建 [`mail-vue/src/views/profile-info/index.vue`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/views/profile-info/index.vue)，修改 [`mail-vue/src/views/profile-setting/index.vue`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/views/profile-setting/index.vue)、[`mail-vue/src/views/setting/index.vue`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/views/setting/index.vue)。
+    *   **自动化测试套件**: 创建 [`tests/test-profile-and-general-settings.mjs`](file:///home/shijian/projects/epocanvas-mail/tests/test-profile-and-general-settings.mjs)，更新 [`tests/test-settings-tabs.mjs`](file:///home/shijian/projects/epocanvas-mail/tests/test-settings-tabs.mjs)、[`tests/test-global-2fa-e2e.mjs`](file:///home/shijian/projects/epocanvas-mail/tests/test-global-2fa-e2e.mjs)。
+*   **全链路自动化验证与部署 (Verify & Deploy)**: 
+    *   执行前端生产编译构建（`pnpm run build`），零报错完成打包。
+    *   部署上线至 Cloudflare Workers（Version ID: `ae8734ed-cc6a-4b96-ae83-c812b93f6cad`）。
+    *   在 Cloudflare 生产环境执行完整端到端自动化测试套件：
+        - `node tests/test-profile-and-general-settings.mjs`：个人信息展示、4 选项卡顺序、HK 11位严格拦截/8位通过、只读邮箱、语言与密码引导跳转、常规页壁纸、密度、收件箱类型与自定义弹窗 100% 验证通过。
+        - `node tests/test-settings-tabs.mjs`：中英文双语环境下 4 大选项卡（个人/常规/安全/标签）渲染与切换 100% 验证通过。
+        - `node tests/test-global-2fa-e2e.mjs`：全站 2FA 与安全两步验证中心全功能生命周期 100% 验证通过。
+        - `node tests/test-user-list.mjs`：用户列表查询与管理界面正常交互 100% 验证通过。
+
+### 全站 2FA 开关与安全设置「两步验证中心」状态同步、关闭全站 2FA 批量清空用户凭据及重新开启引导交付 (2026-08-31)
+*   **功能需求与业务逻辑对齐 (Feature & Alignment)**:
+    1. **全站 2FA 开关与安全设置「两步验证中心」全局联动**:
+       - 彻底解决在「全部邮件模式」下关闭全站 2FA 开关后，安全设置中的「两步验证中心」未同步关闭及登录时依然强制校验 2FA 的重大逻辑漏洞。
+       - 在 `settingService` 中建立 `isTotpEnabled(c)` 全局状态仲裁引擎，统一纳管全部邮件模式（受 KV 动态控制）、隐私邮件模式（强制开启）与加密邮件模式（强制开启）。
+       - 在 `websiteConfig` 与 `totpService.getStatus` 中全面注入 `globalEnabled` 全局状态，使前后端对于全站 2FA 启闭状态具备 100% 一致认知。
+    2. **关闭全站 2FA 时用户凭据处置与生命周期闭环 (完全删除与重新设置策略)**:
+       - **关闭时数据彻底物理清空 (Data Purge)**：站长在全部邮件模式下关闭全站 2FA 时，系统同步触发批量数据清洗，将所有用户的 `totp_enabled` 置为 0，并将 `totp_secret`、`totp_backup_codes`、`totp_created_at`、`security_keys` 彻底清空清零，同时记录审计日志。避免历史密钥残留引发僵尸态与密钥失效锁死。
+       - **登录免校验防线**：在全站 2FA 关闭期间，登录服务（`login-service.js`）完全跳过 2FA / WebAuthn 挑战，确保用户使用单一密码即可畅通登录。
+       - **二次开启重新配置引导 (Fresh Re-setup)**：当全站 2FA 重新开启（或切换回隐私/加密模式）后，所有用户呈现干净的「未启用」安全基态，引导用户重新进行动态码绑定或通行密钥录入，彻底杜绝历史密钥丢失造成的账户锁定。
+    3. **系统设置二次确认警告弹窗 (Purge Warning Confirmation Modal)**:
+       - 站长在系统设置中将 TOTP 开关置为关闭时，触发专用高警示度确认弹窗（`ElMessageBox.confirm`），明确告知关闭全站 2FA 将同时清空全站用户已绑定的验证器、通行密钥及备用恢复码，重新开启时需重新绑定；点击取消自动回滚开关状态。
+    4. **安全设置「两步验证中心」完全隐藏、零闪烁 (FOUC-Free) 同步状态推导与界面可用性保证**:
+       - 遵循严格的 UI/UX 原则（可见即完全可用）：在全站 2FA 关闭时，安全设置页面彻底隐藏「两步验证中心」（`v-if="totpStatus.globalEnabled"`），杜绝“看得见却不能用”的冗余占位。
+       - **首屏零闪烁 (FOUC-Free) 状态同步**：针对初次加载安全设置时 2FA 中心短暂闪现而后消失的加载态瑕疵，重构响应式状态初始化逻辑。结合 Pinia `settingStore.settings`（在 App Boot 时随 `websiteConfig` 同步下发）与 `allMailMode` 状态，在组件初始化第 1 帧前置同步推导 `isGlobal2FAEnabled()`，彻底根除异步接口返回前的布局跳变与闪烁现象。
+       - 彻底删除「独立与隐私安全原则」卡片及相关文案，保持安全设置界面极简纯粹。
+       - 当全站 2FA 处于开启状态时，两步验证中心完整显示且各项能力（身份验证器、备用恢复码、通行密钥）均为 100% 可用与可交互状态。
+*   **编辑代码 (Edit)**: 
+    *   **后端服务与配置核心**: 修改 [`mail-worker/src/service/setting-service.js`](file:///home/shijian/projects/epocanvas-mail/mail-worker/src/service/setting-service.js)、[`mail-worker/src/service/totp-service.js`](file:///home/shijian/projects/epocanvas-mail/mail-worker/src/service/totp-service.js)、[`mail-worker/src/service/login-service.js`](file:///home/shijian/projects/epocanvas-mail/mail-worker/src/service/login-service.js)、[`mail-worker/src/i18n/zh.js`](file:///home/shijian/projects/epocanvas-mail/mail-worker/src/i18n/zh.js)、[`mail-worker/src/i18n/en.js`](file:///home/shijian/projects/epocanvas-mail/mail-worker/src/i18n/en.js)。
+    *   **前端视图与国际化**: 修改 [`mail-vue/src/views/sys-setting/index.vue`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/views/sys-setting/index.vue)、[`mail-vue/src/views/setting/index.vue`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/views/setting/index.vue)、[`mail-vue/src/i18n/zh.js`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/i18n/zh.js)、[`mail-vue/src/i18n/en.js`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/i18n/en.js)。
+    *   **自动化测试套件**: 创建 [`tests/test-totp-global-disable-purge.mjs`](file:///home/shijian/projects/epocanvas-mail/tests/test-totp-global-disable-purge.mjs)、[`tests/test-global-2fa-e2e.mjs`](file:///home/shijian/projects/epocanvas-mail/tests/test-global-2fa-e2e.mjs)。
+*   **全链路自动化验证与部署 (Verify & Deploy)**: 
+    *   执行单元与业务逻辑验证（`node tests/test-totp-global-disable-purge.mjs`），6 大核心测试项（默认全站开启、关闭全站 2FA 批量清空凭据、登录绕过、安全中心停用状态、重新开启干净重设、隐私/加密模式强制锁定）100% 通过。
+    *   成功构建前端产物并发布部署至 Cloudflare Workers（Version ID: `acf4f63c-bc2d-4e1d-94f6-42af211acab8`）。
+    *   在 Cloudflare 生产环境执行 Playwright 端到端全链路自动化测试（`tests/test-global-2fa-e2e.mjs`、`tests/test-settings-tabs.mjs`、`tests/test-mail-mode-e2e.mjs`），首屏零闪动、全站 2FA 开关关闭确认弹窗、安全设置两步验证中心停用态隐藏、重新开启后状态恢复、隐私模式强制锁定全链路 100% 验证通过。
+
+### 用户列表报错 `D1_ERROR: no such column: user.totp_enabled` 修复与 D1 数据库字段迁移交付 (2026-08-30)
+*   **问题根因与业务逻辑对齐 (Root Cause & Feature Alignment)**:
+    1. **问题排查与根因定位**:
+       - 在引入 Google 风格两步验证及通行密钥架构时，用户实体 [`mail-worker/src/entity/user.js`](file:///home/shijian/projects/epocanvas-mail/mail-worker/src/entity/user.js) 扩展了 6 个核心字段（`totp_enabled`、`totp_secret`、`totp_key_version`、`totp_backup_codes`、`totp_created_at`、`security_keys`）。
+       - 由于生产环境 Cloudflare D1 数据库未自动同步执行 DDL 迁移，Drizzle ORM 在查询 `user` 实体时构建全量字段选择 SQL，触发 `D1_ERROR: no such column: user.totp_enabled at offset 337: SQLITE_ERROR` 异常，导致前端用户管理列表无法获取数据。
+    2. **数据库结构平滑升级**:
+       - 针对远端 Cloudflare D1 生产数据库（`epomail`）执行精准 DDL 补丁迁移，向 `user` 表安全追加 6 个 TOTP/WebAuthn 必要字段及其缺省值：
+         - `totp_enabled INTEGER NOT NULL DEFAULT 0`
+         - `totp_secret TEXT NOT NULL DEFAULT ''`
+         - `totp_key_version INTEGER NOT NULL DEFAULT 1`
+         - `totp_backup_codes TEXT NOT NULL DEFAULT '[]'`
+         - `totp_created_at TEXT NOT NULL DEFAULT ''`
+         - `security_keys TEXT NOT NULL DEFAULT '[]'`
+    3. **后端查询健壮性与防空指针保护**:
+       - 在 [`mail-worker/src/service/user-service.js`](file:///home/shijian/projects/epocanvas-mail/mail-worker/src/service/user-service.js) 中针对 `list(c, params)` 增加空列表前置熔断拦截（`if (!list || list.length === 0) return { list: [], total: total || 0 };`）。
+       - 在 [`email-service.js`](file:///home/shijian/projects/epocanvas-mail/mail-worker/src/service/email-service.js)、[`account-service.js`](file:///home/shijian/projects/epocanvas-mail/mail-worker/src/service/account-service.js) 以及 [`role-service.js`](file:///home/shijian/projects/epocanvas-mail/mail-worker/src/service/role-service.js) 中，对 `selectUserEmailCountList`、`selectUserAccountCountList` 与 `selectByIdsHasPermKey` 补充空数组参数守卫，杜绝 Drizzle ORM `inArray` 在空数组下生成非法 SQL 语句。
+*   **编辑代码 (Edit)**: 
+    *   **后端服务与防御加固**: 修改 [`mail-worker/src/service/user-service.js`](file:///home/shijian/projects/epocanvas-mail/mail-worker/src/service/user-service.js)、[`mail-worker/src/service/email-service.js`](file:///home/shijian/projects/epocanvas-mail/mail-worker/src/service/email-service.js)、[`mail-worker/src/service/account-service.js`](file:///home/shijian/projects/epocanvas-mail/mail-worker/src/service/account-service.js)、[`mail-worker/src/service/role-service.js`](file:///home/shijian/projects/epocanvas-mail/mail-worker/src/service/role-service.js)。
+    *   **自动化测试套件**: 创建 [`tests/test-user-list.mjs`](file:///home/shijian/projects/epocanvas-mail/tests/test-user-list.mjs)。
+*   **全链路自动化验证与部署 (Verify & Deploy)**: 
+    *   执行 D1 生产环境数据库 PRAGMA 结构检查，确认 `user` 表 24 个字段完整就绪。
+    *   构建并发布上线到 Cloudflare Workers（Version ID: `33e6aa95-b816-4a7c-ad89-c26721feacd7`）。
+    *   在 Cloudflare 生产环境执行 Playwright 端到端全链路自动化测试（`tests/test-user-list.mjs`），成功获取用户数据、渲染管理表格与管理员行，无任何报错弹窗，100% 验证通过。
+
+### Google 风格两步验证中心重构、全套自主可控验证体系 (TOTP/恢复码/通行密钥) 与外观偏好/语言迁移交付 (2026-08-30)
+*   **功能需求与业务逻辑对齐 (Feature & Alignment)**:
+    1. **系统语言迁移至常规设置与外观色调 3 态卡片体系**:
+       - 将原安全设置中的「系统语言」迁移至常规设置（`profile-setting/index.vue`）下全新设计的「偏好设置」板块。
+       - 在常规设置中新增「外观色调」（`themeMode`）三态切换卡片：🌙 暗色调（`dark`）、☀️ 亮色调（`light`）、💻 跟随系统（`auto`）。
+       - 结合 Pinia UI Store 与 `index.html` 预加载逻辑，实现零闪烁（FOUC-free）与系统色彩模式（`prefers-color-scheme`）媒体查询动态监听。
+    2. **Google 风格「两步验证中心」深度重构与 UX 跃升**:
+       - 彻底推翻原粗糙突兀的单一 2FA 布局，全面升级为 Google 风格的两步验证管理中枢：
+         - **Hero 状态横幅（`two-factor-banner`）**：动态展示双色安全盾牌徽章、状态胶囊（`已启用` / `未启用`）、安全受保护时间戳（`twoFactorProtectedSince`）以及一键启用/停用按钮。
+         - **三大独立第二步验证方式矩阵（`second-steps-card`）**：
+           1. **身份验证器应用 (Authenticator App)**：支持 Google Authenticator、Microsoft Authenticator、1Password 等动态码绑定、3 步引导向导、二维码扫描与密钥复制。
+           2. **备用恢复码 (Backup Recovery Codes)**：10 组一次性紧急登录代码，支持独立密码验证查看、复制全部、下载 `.txt` 文本、直接列印以及安全重置。
+           3. **通行密钥与安全密钥 (Passkeys & Security Keys - FIDO2 / WebAuthn)**：支持硬件安全密钥（YubiKey 等）与本地生物识别（Touch ID / Face ID / Windows Hello），支持密钥注册命名、列表管理、删除与抗钓鱼验证。
+    3. **自主可控与零知识隐私安全原则约束（严格无短信/外部邮箱依赖）**:
+       - 遵循用户明确指示，**全系统坚决不引入第三方手机短信 (SMS) 或外部邮箱验证码**，彻底消除 SIM 卡劫持、电信运营商窃听与外部服务凭据泄露风险，保障 100% 自主可控与零知识隐私安全。
+       - 界面内置「🛡️ 独立与隐私安全原则」专有说明卡片，向用户清晰传达高安全防御体系理念。
+    4. **Cloudflare 原生高兼容性 WebAuthn / Web Crypto 加密引擎**:
+       - 新建 [`mail-worker/src/utils/webauthn-utils.js`](file:///home/shijian/projects/epocanvas-mail/mail-worker/src/utils/webauthn-utils.js)，纯 JavaScript 原生实现 CBOR 解码器、COSE 公钥解析器（ES256 与 RS256）、ASN.1 DER 转 IEEE P1363 签名转换与 `crypto.subtle.verify` 签名校验，100% 兼容 Cloudflare Workers 原生运行时。
+       - 自动适配 D1 数据库 `security_keys` 表字段迁移，KV 会话状态管理与登录服务 WebAuthn 挑战下发与校验。
+*   **编辑代码 (Edit)**: 
+    *   **后端服务与加密核心**: 创建 [`mail-worker/src/utils/webauthn-utils.js`](file:///home/shijian/projects/epocanvas-mail/mail-worker/src/utils/webauthn-utils.js)，修改 [`mail-worker/src/utils/totp-utils.js`](file:///home/shijian/projects/epocanvas-mail/mail-worker/src/utils/totp-utils.js)、[`mail-worker/src/service/totp-service.js`](file:///home/shijian/projects/epocanvas-mail/mail-worker/src/service/totp-service.js)、[`mail-worker/src/service/login-service.js`](file:///home/shijian/projects/epocanvas-mail/mail-worker/src/service/login-service.js)、[`mail-worker/src/api/my-api.js`](file:///home/shijian/projects/epocanvas-mail/mail-worker/src/api/my-api.js)、[`mail-worker/src/entity/user.js`](file:///home/shijian/projects/epocanvas-mail/mail-worker/src/entity/user.js)、[`mail-worker/src/init/init.js`](file:///home/shijian/projects/epocanvas-mail/mail-worker/src/init/init.js)、[`mail-worker/src/const/kv-const.js`](file:///home/shijian/projects/epocanvas-mail/mail-worker/src/const/kv-const.js)。
+    *   **前端视图与国际化**: 修改 [`mail-vue/src/views/profile-setting/index.vue`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/views/profile-setting/index.vue)、[`mail-vue/src/views/setting/index.vue`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/views/setting/index.vue)、[`mail-vue/src/layout/header/index.vue`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/layout/header/index.vue)、[`mail-vue/src/store/ui.js`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/store/ui.js)、[`mail-vue/src/request/my.js`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/request/my.js)、[`mail-vue/src/i18n/zh.js`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/i18n/zh.js)、[`mail-vue/src/i18n/en.js`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/i18n/en.js)、[`mail-vue/index.html`](file:///home/shijian/projects/epocanvas-mail/mail-vue/index.html)。
+    *   **自动化测试套件**: 创建 [`tests/test-google-2fa-webauthn.mjs`](file:///home/shijian/projects/epocanvas-mail/tests/test-google-2fa-webauthn.mjs)、[`tests/test-settings-2fa-theme-cf.mjs`](file:///home/shijian/projects/epocanvas-mail/tests/test-settings-2fa-theme-cf.mjs)，更新 [`tests/test-settings-tabs.mjs`](file:///home/shijian/projects/epocanvas-mail/tests/test-settings-tabs.mjs)。
+*   **全链路自动化验证与部署 (Verify & Deploy)**: 
+    *   执行 WebAuthn 与 2FA 核心单元测试（`node tests/test-google-2fa-webauthn.mjs`），Base64URL、Challenge 派生、CBOR 解析、Web Crypto ECDSA P-256 签名校验与可逆恢复码 5 大测试项 100% 通过。
+    *   成功构建并部署上线至 Cloudflare Workers（Version ID: `0d2eae1c-4a3e-4ac1-b076-f25761fc4feb`）。
+    *   在 Cloudflare 生产环境执行 Playwright 端到端全链路自动化测试（`tests/test-settings-2fa-theme-cf.mjs` 与 `tests/test-settings-tabs.mjs`），常规页暗/亮/跟随三态切换、语言迁移、安全页 Google 2FA 英雄横幅与三大验证卡片、无短信隐私防线声明在中英文双环境下 100% 验证通过。
+
+### 邮件存储模式重塑、降级密文不可解密保证与 TOTP 全站强制策略体系交付 (2026-08-30)
+*   **功能需求与业务逻辑对齐 (Feature & Alignment)**:
+    1. **系统设置项统一为「邮件模式」并支持 3 态自由切换**:
+       - 将原单一开关「全部邮件模式」重塑为统一的「邮件模式」（`$t('mailMode')` / Mail Mode）下拉选择控件（`mailModeOptions`）。
+       - **全部邮件模式（All Mail Mode，值 1）**：所有邮件以明文形式存储在集中数据库中；具备权限者与数据库直接导出均为纯明文；右下角状态栏展示**红色标识**（`mode-red`，图标 `fluent:eye-20-filled`）。
+       - **隐私邮件模式（Privacy Mail Mode，值 0，默认）**：除垃圾箱以外的正常往来邮件采用用户专属 Key 密文加密存储；垃圾箱中的邮件以明文形式存储以备检查；右下角状态栏展示**橙色标识**（`mode-orange`，图标 `fluent:shield-keyhole-20-filled`）。
+       - **加密邮件模式（Encrypted Mail Mode，值 2）**：全量中心化 DB 加密存储体系；**包括垃圾箱在内的 100% 所有邮件**均使用用户专属 Key 密文加密存储；站长及任何第三方均无法偷窥，确保仅收发双方本人可解密查看；右下角状态栏展示**全新绿色高安全标识**（`mode-green`，图标 `fluent:shield-lock-20-filled`）。
+    2. **降级密文永久不可解密保证 (Downgrade Ciphertext Immutability)**:
+       - 即使系统后续从【加密邮件模式】降级为【隐私邮件模式】或【全部邮件模式】，在加密模式下生成的密文邮件（以 `enc:v1:` 标识）依然**绝对无法被管理员或第三方解密**，永久受用户专有密钥保护；弹窗明确警示该不可逆特性。
+    3. **全站 TOTP 双因素认证开关与强制锁定策略 (TOTP Policy & Mode Binding)**:
+       - 在系统设置首页新增全站「两步验证 (2FA/TOTP)」开关（`totp` / `forceTotp`）。
+       - **强制策略绑定**：当处于【隐私邮件模式】或【加密邮件模式】时，TOTP 开关自动开启并**置灰禁用（`:disabled="true"`，禁止管理员关闭）**，确保高安全模式下密钥派生与账户认证处于最高防御状态；在【全部邮件模式】下，TOTP 开关恢复可自由交互配置。
+    4. **切换为【加密邮件模式】不可逆弹窗警告 (Irreversible Confirmation Modal)**:
+       - 站长切换为「加密邮件模式」时，弹出二次确认警告弹窗（`ElMessageBox.confirm`），明确告知此过程不可逆：垃圾邮件加密后管理员由于无用户密钥将无法解密查阅，丢失审查权限（但不影响封禁后清空释放空间）。点击取消将自动回滚设置项。
+    5. **加密模式下的管理员权限收敛与管理界面约束**:
+       - 在「加密邮件模式」下，侧边栏彻底隐藏「全部邮件 / 垃圾邮件」入口（管理员不可见）。
+       - 直接访问 `/all-email` 展示加密受限说明面板（`encrypted-restricted-notice`），明确提示所有邮件均受用户密钥保护。
+    6. **用户管理最后防线：封禁用户邮件强制清空释放空间 (Purge Banned User Emails)**:
+       - 在用户列表（`user/index.vue`）新增「强制清空邮件 (释放空间)」操作（`purgeUserEmails`）。
+       - 安全防线约束：**必须先对目标用户进行【封禁】（`status === 1`）处理**，管理员无需且不可查看其邮件内容，仅物理清空其所有邮件及附件以释放中心化 DB / 对象存储空间。
+    7. **工程级现代 Web Crypto 加密引擎与用户专属密钥隔离**:
+       - 新增 [`mail-worker/src/utils/email-crypto-utils.js`](file:///home/shijian/projects/epocanvas-mail/mail-worker/src/utils/email-crypto-utils.js)，采用 NIST 标准的 **AES-256-GCM** (带 12 字节独立安全随机 IV) + **HKDF-SHA256** 用户专有派生密钥体系。
+       - 密钥基于环境根密钥 + 用户 Salt + 用户 ID 派生，实现各用户之间严格的数学隔离（$K_{u1} \perp K_{u2}$），防篡改且算法稳定。
+       - 支持密文前缀识别（`enc:v1:`）与历史明文数据的无缝向后兼容；全流程覆盖邮件收取（`receive`）、发送（`send`）、站内流转（`HandleOnSiteEmail`）、系统欢迎邮件（`deliverWelcomeEmailToUser`）、移入垃圾箱解密/还原重新加密（`delete` / `restore` / `reportNotSpam`）以及用户列表与详情读取（`list` / `selectById` / `latest` / `searchSuggestions`）。
+*   **编辑代码 (Edit)**: 
+    *   **加密核心与后端服务**: 创建 [`mail-worker/src/utils/email-crypto-utils.js`](file:///home/shijian/projects/epocanvas-mail/mail-worker/src/utils/email-crypto-utils.js)，修改 [`mail-worker/src/service/email-service.js`](file:///home/shijian/projects/epocanvas-mail/mail-worker/src/service/email-service.js)、[`mail-worker/src/service/setting-service.js`](file:///home/shijian/projects/epocanvas-mail/mail-worker/src/service/setting-service.js)、[`mail-worker/src/service/user-service.js`](file:///home/shijian/projects/epocanvas-mail/mail-worker/src/service/user-service.js)、[`mail-worker/src/api/user-api.js`](file:///home/shijian/projects/epocanvas-mail/mail-worker/src/api/user-api.js)、[`mail-worker/src/service/telegram-service.js`](file:///home/shijian/projects/epocanvas-mail/mail-worker/src/service/telegram-service.js)、[`mail-worker/package.json`](file:///home/shijian/projects/epocanvas-mail/mail-worker/package.json)。
+    *   **前端视图与国际化**: 修改 [`mail-vue/src/views/sys-setting/index.vue`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/views/sys-setting/index.vue)、[`mail-vue/src/views/all-email/index.vue`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/views/all-email/index.vue)、[`mail-vue/src/views/user/index.vue`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/views/user/index.vue)、[`mail-vue/src/layout/main/index.vue`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/layout/main/index.vue)、[`mail-vue/src/layout/status-bar/index.vue`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/layout/status-bar/index.vue)、[`mail-vue/src/request/user.js`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/request/user.js)、[`mail-vue/src/i18n/zh.js`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/i18n/zh.js)、[`mail-vue/src/i18n/en.js`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/i18n/en.js)。
+    *   **自动化测试套件**: 创建 [`tests/test-mail-mode-encryption.mjs`](file:///home/shijian/projects/epocanvas-mail/tests/test-mail-mode-encryption.mjs)、[`tests/test-mail-mode-e2e.mjs`](file:///home/shijian/projects/epocanvas-mail/tests/test-mail-mode-e2e.mjs)。
+*   **全链路自动化验证与部署 (Verify & Deploy)**: 
+    *   执行单元与集成加密测试（`node tests/test-mail-mode-encryption.mjs`），8 项核心测试（HKDF 隔离、AES-GCM 往返、IV 随机性、向后兼容、邮件实体加密、3 态判定、降级密文不可解密验证）100% 通过。
+    *   成功构建并发布上线到 Cloudflare Workers（Version ID: `f9fe8892-511a-4321-b2e4-8a7b1d40fcab`）。
+    *   在 Cloudflare 生产环境执行 Playwright 端到端全链路自动化测试（`tests/test-mail-mode-e2e.mjs` 与 `tests/test-settings-tabs.mjs`），TOTP 在隐私/加密模式下强制开启且置灰禁用、全部模式下可自由配置、切换弹窗警告、侧边栏隐藏、受限提示、封禁用户清空安全规则 100% 验证通过。
+*   **编辑代码 (Edit)**: 
+    *   **加密核心与后端服务**: 创建 [`mail-worker/src/utils/email-crypto-utils.js`](file:///home/shijian/projects/epocanvas-mail/mail-worker/src/utils/email-crypto-utils.js)，修改 [`mail-worker/src/service/email-service.js`](file:///home/shijian/projects/epocanvas-mail/mail-worker/src/service/email-service.js)、[`mail-worker/src/service/setting-service.js`](file:///home/shijian/projects/epocanvas-mail/mail-worker/src/service/setting-service.js)、[`mail-worker/src/service/user-service.js`](file:///home/shijian/projects/epocanvas-mail/mail-worker/src/service/user-service.js)、[`mail-worker/src/api/user-api.js`](file:///home/shijian/projects/epocanvas-mail/mail-worker/src/api/user-api.js)、[`mail-worker/src/service/telegram-service.js`](file:///home/shijian/projects/epocanvas-mail/mail-worker/src/service/telegram-service.js)、[`mail-worker/package.json`](file:///home/shijian/projects/epocanvas-mail/mail-worker/package.json)。
+    *   **前端视图与国际化**: 修改 [`mail-vue/src/views/sys-setting/index.vue`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/views/sys-setting/index.vue)、[`mail-vue/src/views/all-email/index.vue`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/views/all-email/index.vue)、[`mail-vue/src/views/user/index.vue`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/views/user/index.vue)、[`mail-vue/src/layout/main/index.vue`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/layout/main/index.vue)、[`mail-vue/src/layout/status-bar/index.vue`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/layout/status-bar/index.vue)、[`mail-vue/src/request/user.js`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/request/user.js)、[`mail-vue/src/i18n/zh.js`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/i18n/zh.js)、[`mail-vue/src/i18n/en.js`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/i18n/en.js)。
+    *   **自动化测试套件**: 创建 [`tests/test-mail-mode-encryption.mjs`](file:///home/shijian/projects/epocanvas-mail/tests/test-mail-mode-encryption.mjs)、[`tests/test-mail-mode-e2e.mjs`](file:///home/shijian/projects/epocanvas-mail/tests/test-mail-mode-e2e.mjs)。
+*   **全链路自动化验证与部署 (Verify & Deploy)**: 
+    *   执行单元与集成加密测试（`node tests/test-mail-mode-encryption.mjs`），7 项核心测试（HKDF 隔离、AES-GCM 往返、IV 随机性、向后兼容、邮件实体加密、3 态判定）100% 通过。
+    *   成功构建并发布上线到 Cloudflare Workers（Version ID: `b9b9d04e-7072-491d-aa21-3f225df5c757`）。
+    *   在 Cloudflare 生产环境执行 Playwright 端到端全链路自动化测试（`tests/test-mail-mode-e2e.mjs` 与 `tests/test-settings-tabs.mjs`），切换弹窗警告、侧边栏隐藏、受限提示、封禁用户清空安全规则 100% 验证通过。
+*   **功能需求与业务逻辑对齐 (Feature & Alignment)**:
+    1. **系统设置项统一为「邮件模式」并支持 3 态自由切换**:
+       - 将原单一开关「全部邮件模式」重塑为统一的「邮件模式」（`$t('mailMode')` / Mail Mode）下拉选择控件（`mailModeOptions`）。
+       - **全部邮件模式（All Mail Mode，值 1）**：所有邮件以明文形式存储在集中数据库中；具备权限者与数据库直接导出均为纯明文；右下角状态栏展示**红色标识**（`mode-red`，图标 `fluent:eye-20-filled`）。
+       - **隐私邮件模式（Privacy Mail Mode，值 0）**：仅除垃圾箱以外的正常往来邮件采用用户专属 Key 密文加密存储；垃圾箱中的邮件以明文形式存储以备检查；右下角状态栏由原来的绿色更新为**橙色标识**（`mode-orange`，图标 `fluent:shield-keyhole-20-filled`）。
+       - **加密邮件模式（Encrypted Mail Mode，值 2，新增）**：默认开启全量中心化 DB 加密存储体系；**包括垃圾箱在内的 100% 所有邮件**均使用用户专属 Key 密文加密存储；站长及任何第三方均无法偷窥，确保仅收发双方本人可解密查看；右下角状态栏展示**全新绿色高安全标识**（`mode-green`，图标 `fluent:shield-lock-20-filled`）。
+    2. **工程级现代 Web Crypto 加密引擎与用户专属密钥隔离**:
+       - 新增 [`mail-worker/src/utils/email-crypto-utils.js`](file:///home/shijian/projects/epocanvas-mail/mail-worker/src/utils/email-crypto-utils.js)，采用 NIST 标准的 **AES-256-GCM** (带 12 字节独立安全随机 IV) + **HKDF-SHA256** 用户专有派生密钥体系。
+       - 密钥基于环境根密钥 + 用户 Salt + 用户 ID 派生，实现各用户之间严格的数学隔离（$K_{u1} \perp K_{u2}$），杜绝跨用户解密。
+       - 支持密文前缀识别（`enc:v1:`）与历史明文数据的无缝向后兼容；全流程覆盖邮件收取（`receive`）、发送（`send`）、站内流转（`HandleOnSiteEmail`）、系统欢迎邮件（`deliverWelcomeEmailToUser`）、移入垃圾箱解密/还原重新加密（`delete` / `restore` / `reportNotSpam`）以及用户列表与详情读取（`list` / `selectById` / `latest` / `searchSuggestions`）。
+    3. **全链路多语言 i18n 完备处理**:
+       - 中文语言包（`zh.js`）与英文语言包（`en.js`）同步补充 `mailMode`、`privacyMailMode`、`encryptedMailMode`、`encryptedMailModeStatus`、`encryptedMailModeStatusDesc`、`switchedToEncryptedMailMode` 等全量国际化键。
+*   **编辑代码 (Edit)**: 
+    *   **加密核心与后端服务**: 创建 [`mail-worker/src/utils/email-crypto-utils.js`](file:///home/shijian/projects/epocanvas-mail/mail-worker/src/utils/email-crypto-utils.js)，修改 [`mail-worker/src/service/email-service.js`](file:///home/shijian/projects/epocanvas-mail/mail-worker/src/service/email-service.js)、[`mail-worker/src/service/setting-service.js`](file:///home/shijian/projects/epocanvas-mail/mail-worker/src/service/setting-service.js)、[`mail-worker/src/service/telegram-service.js`](file:///home/shijian/projects/epocanvas-mail/mail-worker/src/service/telegram-service.js)、[`mail-worker/package.json`](file:///home/shijian/projects/epocanvas-mail/mail-worker/package.json)。
+    *   **前端视图与国际化**: 修改 [`mail-vue/src/views/sys-setting/index.vue`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/views/sys-setting/index.vue)、[`mail-vue/src/layout/status-bar/index.vue`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/layout/status-bar/index.vue)、[`mail-vue/src/i18n/zh.js`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/i18n/zh.js)、[`mail-vue/src/i18n/en.js`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/i18n/en.js)。
+    *   **自动化测试套件**: 创建 [`tests/test-mail-mode-encryption.mjs`](file:///home/shijian/projects/epocanvas-mail/tests/test-mail-mode-encryption.mjs)、[`tests/test-mail-mode-e2e.mjs`](file:///home/shijian/projects/epocanvas-mail/tests/test-mail-mode-e2e.mjs)。
+*   **全链路自动化验证与部署 (Verify & Deploy)**: 
+    *   执行单元与集成加密测试（`node tests/test-mail-mode-encryption.mjs`），7 项核心测试（HKDF 隔离、AES-GCM 往返、IV 随机性、向后兼容、邮件实体加密、3 态判定）100% 通过。
+    *   成功构建并发布上线到 Cloudflare Workers（Version ID: `7ffd1c25-96a0-4345-8dd8-4eabb98e9452`）。
+    *   在 Cloudflare 生产环境执行 Playwright 端到端全链路自动化测试（`tests/test-mail-mode-e2e.mjs` 与 `tests/test-settings-tabs.mjs`），三种模式实时切换与右下角红/橙/绿状态栏徽章动态联动 100% 验证通过。
 *   **功能需求与业务逻辑对齐 (Feature & Alignment)**:
     1. **设定页导航选项卡结构重塑**:
        - 原「个人」（`profile-setting`）升级为「常规」（`$t('general')` / General），内含用户基本信息（头像、昵称、个人简介）、个性装扮（个人背景）以及数据隐私偏好设置。

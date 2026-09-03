@@ -46,8 +46,29 @@ const routes = [
                 redirect: '/settings/profile'
             },
             {
+                path: '/settings/profile',
+                alias: ['/settings/personal', '/settings/profile-info'],
+                name: 'user-profile',
+                component: () => import('@/views/profile-info/index.vue'),
+                meta: {
+                    title: 'profile',
+                    name: 'user-profile',
+                    menu: true
+                }
+            },
+            {
+                path: '/settings/general',
+                alias: ['/settings/general-settings', '/settings/profile-setting'],
+                name: 'general-setting',
+                component: () => import('@/views/profile-setting/index.vue'),
+                meta: {
+                    title: 'general',
+                    name: 'general-setting',
+                    menu: true
+                }
+            },
+            {
                 path: '/settings/security',
-                alias: '/settings/general',
                 name: 'setting',
                 component: () => import('@/views/setting/index.vue'),
                 meta: {
@@ -57,13 +78,13 @@ const routes = [
                 }
             },
             {
-                path: '/settings/profile',
-                alias: '/settings/general-settings',
-                name: 'profile-setting',
-                component: () => import('@/views/profile-setting/index.vue'),
+                path: '/settings/data',
+                alias: ['/settings/user-data', '/settings/export', '/settings/data-setting'],
+                name: 'data-setting',
+                component: () => import('@/views/data-setting/index.vue'),
                 meta: {
-                    title: 'general',
-                    name: 'profile-setting',
+                    title: 'data',
+                    name: 'data-setting',
                     menu: true
                 }
             },
@@ -182,15 +203,8 @@ router.beforeEach((to, from, next) => {
     const token = localStorage.getItem('token')
 
     if (!token && to.name !== 'login' && to.name !== 'profile') {
-        const elapsed = Date.now() - (window.__EPO_LOADING_START__ || Date.now());
-        const minTime = 3000;
-        if (elapsed < minTime) {
-            setTimeout(() => {
-                window.location.href = '/login/index.html';
-            }, minTime - elapsed);
-        } else {
-            window.location.href = '/login/index.html';
-        }
+        removeLoading();
+        window.location.replace('/login/');
         return;
     }
 
@@ -268,21 +282,12 @@ function removeLoading() {
     if (!doc) {
         return;
     }
-    const elapsed = Date.now() - (window.__EPO_LOADING_START__ || Date.now());
-    const minTime = 3000;
-    
-    function hideAndRemove() {
-        doc.classList.add('loading-hide');
-        setTimeout(() => {
-            doc.remove();
-        }, 400); // 400ms is the CSS transition duration
-    }
-
-    if (elapsed < minTime) {
-        setTimeout(hideAndRemove, minTime - elapsed);
-    } else {
-        hideAndRemove();
-    }
+    doc.classList.add('loading-hide');
+    setTimeout(() => {
+        if (doc && doc.parentNode) {
+            doc.parentNode.removeChild(doc);
+        }
+    }, 400); // 400ms is the CSS transition duration
 }
 
 export default router

@@ -47,7 +47,8 @@ const dbInit = {
 			{ name: 'totp_secret', sql: `ALTER TABLE user ADD COLUMN totp_secret TEXT NOT NULL DEFAULT '';` },
 			{ name: 'totp_key_version', sql: `ALTER TABLE user ADD COLUMN totp_key_version INTEGER NOT NULL DEFAULT 1;` },
 			{ name: 'totp_backup_codes', sql: `ALTER TABLE user ADD COLUMN totp_backup_codes TEXT NOT NULL DEFAULT '[]';` },
-			{ name: 'totp_created_at', sql: `ALTER TABLE user ADD COLUMN totp_created_at TEXT NOT NULL DEFAULT '';` }
+			{ name: 'totp_created_at', sql: `ALTER TABLE user ADD COLUMN totp_created_at TEXT NOT NULL DEFAULT '';` },
+			{ name: 'security_keys', sql: `ALTER TABLE user ADD COLUMN security_keys TEXT NOT NULL DEFAULT '[]';` }
 		];
 
 		for (const col of columns) {

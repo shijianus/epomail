@@ -44,7 +44,7 @@ const writerRef = ref({})
 const isMobile = ref(window.innerWidth < 1025)
 
 const isSettingsMode = computed(() => {
-  return ['setting', 'label-setting', 'profile-setting', 'category-setting', 'analysis', 'user', 'all-email', 'role', 'reg-key', 'sys-setting'].includes(route.name)
+  return ['user-profile', 'profile', 'general-setting', 'profile-setting', 'setting', 'data-setting', 'label-setting', 'category-setting', 'analysis', 'user', 'all-email', 'role', 'reg-key', 'sys-setting'].includes(route.name)
 })
 
 const handleResize = () => {
@@ -76,6 +76,15 @@ onMounted(() => {
   handleResize()
   
   checkComposeQuery()
+
+  // Ensure loading overlay is immediately dismissed as soon as layout mounts
+  const doc = document.getElementById('loading-first');
+  if (doc) {
+    doc.classList.add('loading-hide');
+    setTimeout(() => {
+      if (doc && doc.parentNode) doc.parentNode.removeChild(doc);
+    }, 400);
+  }
 })
 
 watch(() => route.query.composeTo, (newVal) => {

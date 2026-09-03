@@ -1,5 +1,5 @@
 <template>
-  <div class="settings-container">
+  <div class="settings-container profile-container">
     <!-- Dynamic Aurora Background -->
     <div class="aurora-bg">
       <div class="aurora-1"></div>
@@ -8,7 +8,7 @@
     </div>
     
     <div id="float-tooltip" ref="floatTooltip"></div>
-    <div style="height: 64px; flex-shrink: 0; width: 100%; position: relative; z-index: 101; background: var(--bg-base); border-bottom: 1px solid var(--border-subtle);">
+    <div style="height: 64px; flex-shrink: 0; width: 100%; position: relative; z-index: 101; background: var(--bg-surface); border-bottom: 1px solid var(--border-subtle); backdrop-filter: blur(16px);">
       <Header :isProfile="true" />
     </div>
     
@@ -17,58 +17,58 @@
     </div>
     
     <el-scrollbar class="scroll" v-if="!loading" style="height: calc(100% - 64px - 28px);">
-      <div class="scroll-body">
+      <div class="scroll-body profile-scroll-body">
         <div class="cover-photo" :style="profileData.userInfo.backgroundUrl ? 'background-image: url(' + profileData.userInfo.backgroundUrl + '); background-size: cover; background-position: center;' : ''"></div>
         <div class="desktop-layout">
-          <!-- Left Side: Identity -->
-      <div class="profile-identity">
-        <div class="avatar" :style="profileData.userInfo.avatarUrl ? 'background-image: url(' + profileData.userInfo.avatarUrl + '); background-size: cover; background-position: center;' : ''">
-          <span v-if="!profileData.userInfo.avatarUrl">{{ profileData.userInfo.avatarInitials }}</span>
-          <div class="verified-badge">
-            <svg class="ic-fill" style="width:20px; height:20px;" viewBox="0 0 24 24"><path d="M22.5 12.5c0-.67-.2-1.33-.57-1.89l1.45-2.02c.32-.44.38-1.01.15-1.5-.23-.49-.71-.8-1.25-.8h-2.47c-.43 0-.82-.24-1.02-.63l-1.1-2.22c-.25-.5-.73-.83-1.29-.89-.55-.06-1.1.17-1.46.61l-1.6 1.94c-.4.49-1.02.77-1.66.77s-1.26-.28-1.66-.77l-1.6-1.94c-.36-.44-.91-.67-1.46-.61-.56.06-1.04.39-1.29.89l-1.1 2.22c-.2-.39-.59.63-1.02-.63H3.74c-.54 0-1.02.31-1.25.8-.23.49-.17 1.06-.15-1.5l1.45 2.02c.37.56.57 1.22.57 1.89 0 .67-.2 1.33-.57 1.89l-1.45 2.02c-.32.44-.38 1.01-.15 1.5.23.49.71.8 1.25.8h2.47c.43 0 .82.24 1.02.63l1.1 2.22c.25.5.73.83 1.29.89.55.06 1.1-.17 1.46-.61l1.6-1.94c.4-.49 1.02-.77 1.66-.77s1.26.28 1.66.77l1.6 1.94c.36.44.91.67 1.46.61.56-.06 1.04-.39 1.29-.89l1.1-2.22c.2-.39.59-.63 1.02-.63h2.47c.54 0 1.02-.31 1.25-.8.23-.49.17-1.06-.15-1.5l-1.45-2.02c-.37-.56-.57-1.22-.57-1.89zM10.82 17.5l-4.52-4.52 1.41-1.41 3.11 3.11 7.21-7.21 1.41 1.41-8.62 8.62z"></path></svg>
-          </div>
-        </div>
-        
-        <div class="name-block">
-          <h1 class="name">
-            <span v-if="profileData.userInfo.nickname"><strong>{{ profileData.userInfo.nickname }}</strong>({{ profileData.userInfo.account }})</span>
-            <span v-else>{{ profileData.userInfo.account }}</span>
-          </h1>
-          <div class="handle">
-            <Icon class="ic" icon="lucide:mail" style="margin-right: 6px;" />
-            {{ profileData.userInfo.email }}
-          </div>
-        </div>
-
-        <p class="bio" v-html="parseInlineMarkdown(profileData.userInfo.bio || (profileData.userInfo.roleName === 'admin' ? 'EpoMail 系统管理员，负责核心平台的维护与安全。我们在数字世界中连接彼此，保护每一次灵感的传递与思想的交汇。为您带来前所未有的纯净沟通体验。' : 'EpoMail 专属用户，致力于安全、高效的邮件通讯。我们在数字世界中连接彼此，保护每一次灵感的传递与思想的交汇。为您带来前所未有的纯净沟通体验。'))"></p>
-
-        <!-- Bottom Section: Fixed to bottom -->
-        <div class="bottom-section" style="margin-top: auto;">
-          <!-- Detailed Subtitle Tags -->
-          <div class="sub-tags-list" style="margin-bottom: 16px;">
-            <div class="sub-tag-item">
-              <Icon class="ic" icon="lucide:globe" />
-              所在时区：{{ timezoneString }}
+          <!-- Left Side: Identity Card -->
+          <div class="profile-identity-card">
+            <div class="avatar" :style="profileData.userInfo.avatarUrl ? 'background-image: url(' + profileData.userInfo.avatarUrl + '); background-size: cover; background-position: center;' : ''">
+              <span v-if="!profileData.userInfo.avatarUrl">{{ profileData.userInfo.avatarInitials }}</span>
+              <div class="verified-badge">
+                <svg class="ic-fill" style="width:20px; height:20px;" viewBox="0 0 24 24"><path d="M22.5 12.5c0-.67-.2-1.33-.57-1.89l1.45-2.02c.32-.44.38-1.01.15-1.5-.23-.49-.71-.8-1.25-.8h-2.47c-.43 0-.82-.24-1.02-.63l-1.1-2.22c-.25-.5-.73-.83-1.29-.89-.55-.06-1.1.17-1.46.61l-1.6 1.94c-.4.49-1.02.77-1.66.77s-1.26-.28-1.66-.77l-1.6-1.94c-.36-.44-.91-.67-1.46-.61-.56.06-1.04.39-1.29.89l-1.1 2.22c-.2-.39-.59.63-1.02-.63H3.74c-.54 0-1.02.31-1.25.8-.23.49-.17 1.06-.15-1.5l1.45 2.02c.37.56.57 1.22.57 1.89 0 .67-.2 1.33-.57 1.89l-1.45 2.02c-.32.44-.38 1.01-.15 1.5.23.49.71.8 1.25.8h2.47c.43 0 .82.24 1.02.63l1.1 2.22c.25.5.73.83 1.29.89.55.06 1.1-.17 1.46-.61l1.6-1.94c.4-.49 1.02-.77 1.66-.77s1.26.28 1.66.77l1.6 1.94c.36.44.91.67 1.46.61.56-.06 1.04-.39 1.29-.89l1.1-2.22c.2-.39.59-.63 1.02-.63h2.47c.54 0 1.02-.31 1.25-.8.23-.49.17-1.06-.15-1.5l-1.45-2.02c-.37-.56-.57-1.22-.57-1.89zM10.82 17.5l-4.52-4.52 1.41-1.41 3.11 3.11 7.21-7.21 1.41 1.41-8.62 8.62z"></path></svg>
+              </div>
             </div>
-            <div class="sub-tag-item">
-              <Icon class="ic" icon="lucide:shield" />
-              所属身份组：{{ profileData.userInfo.roleName }}
+            
+            <div class="name-block">
+              <h1 class="name">
+                <span v-if="profileData.userInfo.nickname"><strong>{{ profileData.userInfo.nickname }}</strong>({{ profileData.userInfo.account }})</span>
+                <span v-else>{{ profileData.userInfo.account }}</span>
+              </h1>
+              <div class="handle">
+                <Icon class="ic" icon="lucide:mail" style="margin-right: 6px;" />
+                {{ profileData.userInfo.email }}
+              </div>
             </div>
-            <div class="sub-tag-item">
-              <Icon class="ic" icon="lucide:calendar" />
-              加入时间：{{ dayjs(profileData.userInfo.joinTime).format('YYYY年M月') }}
+
+            <p class="bio" v-html="parseInlineMarkdown(profileData.userInfo.bio || (profileData.userInfo.roleName === 'admin' ? 'EpoMail 系统管理员，负责核心平台的维护与安全。我们在数字世界中连接彼此，保护每一次灵感的传递与思想的交汇。为您带来前所未有的纯净沟通体验。' : 'EpoMail 专属用户，致力于安全、高效的邮件通讯。我们在数字世界中连接彼此，保护每一次灵感的传递与思想的交汇。为您带来前所未有的纯净沟通体验。'))"></p>
+
+            <!-- Bottom Section: Fixed to bottom -->
+            <div class="bottom-section">
+              <!-- Detailed Subtitle Tags -->
+              <div class="sub-tags-list">
+                <div class="sub-tag-item">
+                  <Icon class="ic" icon="lucide:globe" />
+                  所在时区：{{ timezoneString }}
+                </div>
+                <div class="sub-tag-item">
+                  <Icon class="ic" icon="lucide:shield" />
+                  所属身份组：{{ profileData.userInfo.roleName }}
+                </div>
+                <div class="sub-tag-item">
+                  <Icon class="ic" icon="lucide:calendar" />
+                  加入时间：{{ dayjs(profileData.userInfo.joinTime).format('YYYY年M月') }}
+                </div>
+              </div>
+
+              <el-button type="primary" size="large" style="width: 100%; border-radius: 12px; height: 46px; font-weight: 600;" @click="handleContact">
+                <Icon icon="lucide:send" class="ic" style="margin-right: 8px;" />
+                发送邮件联系我
+              </el-button>
             </div>
           </div>
 
-          <el-button type="primary" size="large" style="width: 100%; border-radius: 12px; height: 48px;" @click="handleContact">
-            <Icon icon="lucide:send" class="ic" style="margin-right: 8px;" />
-            发送邮件联系我
-          </el-button>
-        </div>
-      </div>
-
-      <!-- Right Side: Analytics Dashboard -->
-      <div class="profile-analysis">
+          <!-- Right Side: Analytics Dashboard -->
+          <div class="profile-analysis">
         
         <div class="section-heading">账户数据与分析看板</div>
 
@@ -356,6 +356,14 @@ const hideTooltip = () => {
   }
 }
 
+.settings-container.profile-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg-base);
+}
+
 .scroll {
   width: 100%;
   min-height: 100%;
@@ -364,56 +372,54 @@ const hideTooltip = () => {
     height: 100%;
   }
 
-  .scroll-body {
+  .scroll-body.profile-scroll-body {
     min-height: 100%;
     display: flex;
     flex-direction: column;
     justify-content: flex-start;
+    background: transparent;
+    padding-bottom: 40px;
   }
 }
 
 .ic { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; display: block; flex-shrink:0; }
 .ic-fill { width: 16px; height: 16px; fill: currentColor; display: block; flex-shrink:0; }
 
-.navbar {
-  height: 64px; display: flex; align-items: center; position: absolute; top: 0; left: 0; right: 0; z-index: 100;
-}
-.back-btn {
-  display: flex; align-items: center; gap: 6px; color: var(--text-primary); cursor: pointer;
-  font-size: 14px; font-weight: 600; background: var(--bg-elevated); padding: 6px 14px; border-radius: 16px; backdrop-filter: blur(10px);
-  transition: all 0.2s; border: 1px solid var(--border-subtle);
-}
-.back-btn:hover { background: var(--bg-hover); }
-
-.icon-btn { 
-  width: 40px; height: 40px; border: none; background: transparent; cursor: pointer; 
-  color: var(--text-secondary); border-radius: 50%; display: flex; align-items: center; justify-content: center; 
-  transition: background .15s, color .15s; 
-}
-.icon-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
-
-.avatar-wrap { margin-left: 8px; }
-.avatar { 
-  width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary)); 
-  display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: #fff; cursor: pointer; 
-  border: 2px solid transparent; transition: transform .15s; 
-}
-.avatar:hover { transform: scale(1.05); }
-
-
 .cover-photo {
-  width: 100%; height: 25vh;
-  background-color: transparent;
-  position: relative; flex-shrink: 0; z-index: 1;
-}
-.cover-photo::after {
-  content: ''; position: absolute; inset: 0;
-  background: linear-gradient(to bottom, transparent 20%, var(--bg-base) 100%);
+  width: 100%;
+  height: 240px;
+  background-color: var(--bg-surface);
+  background-image: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #047857 100%);
+  background-size: cover;
+  background-position: center;
+  position: relative;
+  flex-shrink: 0;
+  z-index: 1;
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to bottom, rgba(0, 0, 0, 0.04) 0%, transparent 40%, var(--bg-base) 100%);
+  }
 }
 
 .desktop-layout {
-  max-width: 1100px; width: 100%; margin: -60px auto 0; padding: 0 40px;
-  display: grid; grid-template-columns: 280px 1fr; gap: 30px; position: relative; z-index: 10;
+  max-width: 1120px;
+  width: 100%;
+  margin: -70px auto 0;
+  padding: 0 32px;
+  display: grid;
+  grid-template-columns: 310px 1fr;
+  gap: 28px;
+  position: relative;
+  z-index: 10;
+
+  @media (max-width: 900px) {
+    grid-template-columns: 1fr;
+    margin-top: -50px;
+    padding: 0 20px;
+  }
 }
 
 /* Aurora Dynamic Background */
@@ -427,17 +433,17 @@ const hideTooltip = () => {
 .aurora-1 {
   width: 70vw; height: 70vw; left: -10vw; top: -20vw;
   background: radial-gradient(circle, var(--accent-primary) 0%, transparent 65%);
-  opacity: 0.12; animation-delay: 0s;
+  opacity: 0.1; animation-delay: 0s;
 }
 .aurora-2 {
   width: 80vw; height: 80vw; right: -20vw; top: -10vw;
   background: radial-gradient(circle, var(--color-receive) 0%, transparent 65%);
-  opacity: 0.1; animation-delay: -5s;
+  opacity: 0.08; animation-delay: -5s;
 }
 .aurora-3 {
   width: 60vw; height: 60vw; left: 20vw; bottom: -20vw;
   background: radial-gradient(circle, var(--color-other) 0%, transparent 65%);
-  opacity: 0.12; animation-delay: -10s;
+  opacity: 0.1; animation-delay: -10s;
 }
 
 @keyframes aurora-float {
@@ -446,118 +452,237 @@ const hideTooltip = () => {
   100% { transform: translate(-3%, 4%) scale(0.95); }
 }
 
-.profile-identity { display: flex; flex-direction: column; }
-.avatar {
-  width: 120px; height: 120px; border-radius: 24px;
-  background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
-  border: 4px solid var(--bg-base); box-shadow: 0 12px 32px rgba(0,0,0,0.5);
-  display: flex; align-items: center; justify-content: center; font-size: 48px; font-weight: 800; color: #fff;
-  margin-bottom: 20px; position: relative;
-}
-.verified-badge {
-  position: absolute; bottom: -6px; right: -6px; width: 32px; height: 32px;
-  background: var(--bg-base); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--accent-primary);
-}
-.name-block { margin-bottom: 16px; }
-.name { font-size: 26px; font-weight: 800; letter-spacing: -0.5px; margin-bottom: 2px; }
-.handle { font-size: 14px; color: var(--text-secondary); display: flex; align-items: center; gap: 6px; font-weight: 500; }
-.bio { 
-  font-size: 14px; 
-  color: var(--text-secondary); 
-  line-height: 1.6; 
-  margin-bottom: 24px; 
-  height: 112px; 
-  overflow: hidden; 
-  text-overflow: ellipsis; 
-  display: -webkit-box; 
-  -webkit-line-clamp: 5; 
-  -webkit-box-orient: vertical; 
-  word-break: break-word; 
-  white-space: pre-wrap;
+/* Left Profile Identity Card */
+.profile-identity-card {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  height: fit-content;
+
+  .avatar {
+    width: 96px;
+    height: 96px;
+    border-radius: 20px;
+    background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+    border: 3px solid var(--bg-surface);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 38px;
+    font-weight: 800;
+    color: #ffffff;
+    margin-top: -48px;
+    margin-bottom: 16px;
+    position: relative;
+  }
+
+  .verified-badge {
+    position: absolute;
+    bottom: -4px;
+    right: -4px;
+    width: 26px;
+    height: 26px;
+    background: var(--bg-surface);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--accent-primary);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  }
+
+  .name-block {
+    margin-bottom: 12px;
+    .name {
+      font-size: 20px;
+      font-weight: 800;
+      letter-spacing: -0.3px;
+      color: var(--text-primary);
+      margin-bottom: 4px;
+    }
+    .handle {
+      font-size: 13px;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 500;
+    }
+  }
+
+  .bio {
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.6;
+    margin-bottom: 20px;
+    overflow-wrap: break-word;
+    word-break: break-word;
+  }
+
+  .bottom-section {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    margin-top: auto;
+  }
+
+  .sub-tags-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px 14px;
+    background: var(--bg-hover);
+    border-radius: 12px;
+    border: 1px solid var(--border-subtle);
+  }
+
+  .sub-tag-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-weight: 500;
+    .ic {
+      color: var(--accent-primary);
+    }
+  }
 }
 
-.sub-tags-list {
-  display: flex; flex-direction: column; gap: 10px;
-  padding: 16px; background: var(--bg-elevated); border-radius: 12px; border: 1px solid var(--border-subtle);
+/* Right Analytics Dashboard */
+.profile-analysis {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+
+  .section-heading {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 2px;
+    &::before {
+      content: '';
+      width: 4px;
+      height: 16px;
+      background: var(--accent-primary);
+      border-radius: 2px;
+    }
+  }
+
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+
+    @media (max-width: 600px) {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .stat-card {
+    padding: 18px 20px;
+    border-radius: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    border: 1px solid var(--border-subtle);
+    background: var(--bg-surface);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+  }
+
+  .stat-card.blue { border-top: 3px solid var(--color-send); }
+  .stat-card.orange { border-top: 3px solid var(--color-intercept); }
+  .stat-card.green { border-top: 3px solid var(--color-receive); }
+  .stat-title { font-size: 13px; font-weight: 600; color: var(--text-muted); display: flex; align-items: center; gap: 6px; }
+  .stat-val { font-size: 26px; font-weight: 800; color: var(--text-primary); letter-spacing: -0.5px; }
+
+  .charts-grid {
+    display: grid;
+    grid-template-columns: 1.8fr 1.2fr;
+    gap: 16px;
+    flex: 1;
+    min-height: 240px;
+
+    @media (max-width: 768px) {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .chart-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    display: flex;
+    flex-direction: column;
+    position: relative;
+  }
+
+  .chart-title { font-size: 14px; font-weight: 600; color: var(--text-muted); margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
+
+  .bar-chart-container {
+    flex: 1; display: flex; align-items: flex-end; justify-content: space-between; position: relative;
+    padding-bottom: 24px; padding-top: 10px;
+  }
+  .chart-gridlines {
+    position: absolute; inset: 0 0 24px 0; display: flex; flex-direction: column; justify-content: space-between; z-index: 0; pointer-events: none;
+  }
+  .gridline { width: 100%; height: 1px; background: var(--border-subtle); position: relative; }
+  .chart-legends-top { display: flex; gap: 12px; font-size: 11px; font-weight: 600; }
+  .legend-pill { display: flex; align-items: center; gap: 4px; color: var(--text-secondary); }
+  .legend-color { width: 8px; height: 8px; border-radius: 2px; }
+
+  .bar-col { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; z-index: 1; width: 12%; position: relative; height: 100%; }
+  .bar-wrapper {
+    width: 100%; border-radius: 4px 4px 0 0; display: flex; flex-direction: column-reverse;
+    overflow: hidden; transition: transform 0.5s ease, box-shadow 0.3s ease; box-shadow: 0 0 10px var(--shadow-color);
+  }
+  .bar-wrapper:hover { box-shadow: 0 0 16px var(--shadow-color); transform: scaleX(1.1); }
+  .segment { width: 100%; border-top: 1px solid rgba(0,0,0,0.1); transition: filter 0.2s; cursor: pointer; }
+  .segment:first-child { border-top: none; }
+  .seg-intercept { background: linear-gradient(to top, rgba(239,68,68,0.7), var(--color-intercept)); }
+  .seg-receive { background: linear-gradient(to top, rgba(16,185,129,0.7), var(--color-receive)); }
+  .seg-send { background: linear-gradient(to top, rgba(59,130,246,0.7), var(--color-send)); }
+  .segment:hover { filter: brightness(1.1); }
+  .bar-label { font-size: 11px; color: var(--text-muted); position: absolute; bottom: -20px; font-family: 'Fira Code', monospace; }
+
+  .pie-chart-container { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px; }
+  .pie-ring { width: 110px; height: 110px; position: relative; }
+  .pie-circle { transition: opacity 0.2s; cursor: pointer; }
+  .pie-circle:hover { opacity: 0.8; }
+  .pie-total { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 80px; height: 80px; background: var(--bg-hover); border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 1px solid var(--border-subtle); }
+  .pie-total-val { font-size: 18px; font-weight: 800; color: var(--text-primary); font-family: 'Fira Code', monospace; }
+  .pie-total-lbl { font-size: 10px; color: var(--text-muted); }
+
+  .pie-legend { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+  .legend-item { display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: var(--text-secondary); cursor: pointer; transition: opacity 0.2s; }
+  .legend-item:hover { opacity: 0.8; }
+  .legend-dot { display: flex; align-items: center; gap: 6px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; }
 }
-.sub-tag-item { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-muted); font-weight: 500; }
-.sub-tag-item .ic { color: var(--accent-primary); }
-
-.btn-message {
-  display: flex; align-items: center; justify-content: center; gap: 8px; background: var(--text-primary); color: var(--bg-base);
-  border: none; padding: 12px; border-radius: 12px; font-size: 14px; font-weight: 700; cursor: pointer; transition: all 0.2s;
-}
-.btn-message:hover { transform: translateY(-2px); box-shadow: 0 8px 24px var(--shadow-color); background: var(--text-secondary); }
-
-.profile-analysis { display: flex; flex-direction: column; gap: 16px; margin-top: 40px; }
-.section-heading { font-size: 18px; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
-.section-heading::before { content: ''; width: 4px; height: 16px; background: var(--accent-primary); border-radius: 2px; }
-
-.stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-.stat-card {
-  padding: 16px; border-radius: 16px; display: flex; flex-direction: column; gap: 8px;
-  backdrop-filter: blur(20px); border: 1px solid var(--border-subtle); background: var(--bg-elevated);
-}
-.stat-card.blue { border-top: 3px solid var(--color-send); }
-.stat-card.orange { border-top: 3px solid var(--color-intercept); }
-.stat-card.green { border-top: 3px solid var(--color-receive); }
-.stat-title { font-size: 13px; font-weight: 600; color: var(--text-muted); display: flex; align-items: center; gap: 6px; }
-.stat-val { font-size: 28px; font-weight: 800; color: var(--text-primary); letter-spacing: -1px; }
-
-.charts-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; flex: 1; min-height: 200px; }
-.chart-card {
-  background: var(--bg-elevated); backdrop-filter: blur(20px);
-  border: 1px solid var(--border-subtle); border-radius: 16px; padding: 16px;
-  display: flex; flex-direction: column; position: relative;
-}
-.chart-title { font-size: 14px; font-weight: 600; color: var(--text-muted); margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
-
-.bar-chart-container {
-  flex: 1; display: flex; align-items: flex-end; justify-content: space-between; position: relative;
-  padding-bottom: 24px; padding-top: 10px;
-}
-.chart-gridlines {
-  position: absolute; inset: 0 0 24px 0; display: flex; flex-direction: column; justify-content: space-between; z-index: 0; pointer-events: none;
-}
-.gridline { width: 100%; height: 1px; background: var(--border-subtle); position: relative; }
-.chart-legends-top { display: flex; gap: 12px; font-size: 11px; font-weight: 600; }
-.legend-pill { display: flex; align-items: center; gap: 4px; color: var(--text-secondary); }
-.legend-color { width: 8px; height: 8px; border-radius: 2px; }
-
-.bar-col { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; z-index: 1; width: 12%; position: relative; height: 100%; }
-.bar-wrapper {
-  width: 100%; border-radius: 4px 4px 0 0; display: flex; flex-direction: column-reverse;
-  overflow: hidden; transition: transform 0.5s ease, box-shadow 0.3s ease; box-shadow: 0 0 10px var(--shadow-color);
-}
-.bar-wrapper:hover { box-shadow: 0 0 16px var(--shadow-color); transform: scaleX(1.1); }
-.segment { width: 100%; border-top: 1px solid rgba(0,0,0,0.1); transition: filter 0.2s; cursor: pointer; }
-.segment:first-child { border-top: none; }
-.seg-intercept { background: linear-gradient(to top, rgba(239,68,68,0.7), var(--color-intercept)); }
-.seg-receive { background: linear-gradient(to top, rgba(16,185,129,0.7), var(--color-receive)); }
-.seg-send { background: linear-gradient(to top, rgba(59,130,246,0.7), var(--color-send)); }
-.segment:hover { filter: brightness(1.1); }
-.bar-label { font-size: 11px; color: var(--text-muted); position: absolute; bottom: -20px; font-family: 'Fira Code', monospace; }
-
-.pie-chart-container { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px; }
-.pie-ring { width: 110px; height: 110px; position: relative; }
-.pie-circle { transition: opacity 0.2s; cursor: pointer; }
-.pie-circle:hover { opacity: 0.8; }
-.pie-total { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 80px; height: 80px; background: var(--bg-elevated); border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 1px solid var(--border-subtle); }
-.pie-total-val { font-size: 18px; font-weight: 800; color: var(--text-primary); font-family: 'Fira Code', monospace; }
-.pie-total-lbl { font-size: 10px; color: var(--text-muted); }
-
-.pie-legend { display: flex; flex-direction: column; gap: 8px; width: 100%; }
-.legend-item { display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: var(--text-secondary); cursor: pointer; transition: opacity 0.2s; }
-.legend-item:hover { opacity: 0.8; }
-.legend-dot { display: flex; align-items: center; gap: 6px; }
-.dot { width: 8px; height: 8px; border-radius: 50%; }
 
 #float-tooltip {
   display: none; position: fixed; z-index: 999999;
-  background: var(--bg-elevated); padding: 8px 12px;
+  background: var(--bg-surface); padding: 8px 12px;
   border-radius: 6px; border: 1px solid var(--border-subtle);
   font-family: 'Fira Code', monospace; font-size: 12px;
-  pointer-events: none; box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+  pointer-events: none; box-shadow: 0 8px 24px rgba(0,0,0,0.4);
   white-space: nowrap; font-weight: 600;
+  color: var(--text-primary);
 }
 </style>

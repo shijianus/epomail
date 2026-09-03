@@ -7,10 +7,10 @@
       <span class="status-unread" v-if="isOnline && unreadCount > 0"> ({{ unreadCount }} {{ $t('statUnread') || 'Unread' }})</span>
     </div>
     <div style="flex: 1"></div>
-    <el-tooltip effect="dark" :content="isAllMailMode ? $t('allMailModeStatusDesc') : $t('privacyMailModeStatusDesc')" placement="top">
-      <div class="mode-tag" :class="isAllMailMode ? 'mode-red' : 'mode-green'">
-        <Icon :icon="isAllMailMode ? 'fluent:eye-20-filled' : 'fluent:shield-checkmark-20-filled'" width="13" height="13" />
-        <span>{{ isAllMailMode ? $t('allMailModeStatus') : $t('privacyMailModeStatus') }}</span>
+    <el-tooltip effect="dark" :content="currentMailModeConfig.desc" placement="top">
+      <div class="mode-tag" :class="currentMailModeConfig.tagClass">
+        <Icon :icon="currentMailModeConfig.icon" width="13" height="13" />
+        <span>{{ currentMailModeConfig.title }}</span>
       </div>
     </el-tooltip>
     <div class="status-text version-tag">EpoMail v1.0.3 · Cloudflare Workers</div>
@@ -32,8 +32,31 @@ const uiStore = useUiStore();
 const emailStore = useEmailStore();
 const settingStore = useSettingStore();
 
-const isAllMailMode = computed(() => {
-  return Number(settingStore.settings?.allMailMode) === 1;
+const currentMailModeConfig = computed(() => {
+  const mode = Number(settingStore.settings?.allMailMode);
+  if (mode === 1) {
+    return {
+      tagClass: 'mode-red',
+      icon: 'fluent:eye-20-filled',
+      title: t('allMailModeStatus') || '全部邮件模式',
+      desc: t('allMailModeStatusDesc') || '你的来往邮件不受基础隐私保护，请注意保护个人隐私，不要将重要邮件发送到本邮箱'
+    };
+  } else if (mode === 2) {
+    return {
+      tagClass: 'mode-green',
+      icon: 'fluent:shield-lock-20-filled',
+      title: t('encryptedMailModeStatus') || '加密邮件模式',
+      desc: t('encryptedMailModeStatusDesc') || '全站邮件采用高强度中心化加密存储，仅收发双方可查看，任何第三方及管理员均无法查阅'
+    };
+  } else {
+    // Mode 0: 隐私邮件模式 (Orange indicator)
+    return {
+      tagClass: 'mode-orange',
+      icon: 'fluent:shield-keyhole-20-filled',
+      title: t('privacyMailModeStatus') || '隐私邮件模式',
+      desc: t('privacyMailModeStatusDesc') || '你的来往邮件受到基础的隐私保护，但是垃圾箱的邮件将被严格检查，请注意垃圾箱的隐私邮件'
+    };
+  }
 });
 
 const isOnline = ref(navigator.onLine);
@@ -139,6 +162,12 @@ const unreadCount = computed(() => {
     color: #ff4d4f;
     background: rgba(255, 77, 79, 0.1);
     border: 1px solid rgba(255, 77, 79, 0.25);
+  }
+
+  &.mode-orange {
+    color: #fa8c16;
+    background: rgba(250, 140, 22, 0.1);
+    border: 1px solid rgba(250, 140, 22, 0.25);
   }
 
   &.mode-green {

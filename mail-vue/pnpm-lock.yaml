@@ -23,6 +23,9 @@ importers:
       compressorjs:
         specifier: ^1.2.1
         version: 1.2.1
+      country-state-city:
+        specifier: ^3.2.1
+        version: 3.2.1
       date-time-format-timezone:
         specifier: ^1.0.22
         version: 1.0.22
@@ -38,6 +41,15 @@ importers:
       element-plus:
         specifier: ^2.13.1
         version: 2.13.1(vue@3.5.20)
+      flag-icons:
+        specifier: ^7.5.0
+        version: 7.5.0
+      i18n-iso-countries:
+        specifier: ^7.14.0
+        version: 7.14.0
+      libphonenumber-js:
+        specifier: ^1.13.12
+        version: 1.13.12
       lodash-es:
         specifier: ^4.17.21
         version: 4.17.21
@@ -1746,6 +1758,9 @@ packages:
   core-js-compat@3.45.1:
     resolution: {integrity: sha512-tqTt5T4PzsMIZ430XGviK4vzYSoeNJ6CXODi6c/voxOT6IZqBht5/EKaSNnYiEjjRYxjVz7DQIsOsY0XNi8PIA==}
 
+  country-state-city@3.2.1:
+    resolution: {integrity: sha512-kxbanqMc6izjhc/EHkGPCTabSPZ2G6eG4/97akAYHJUN4stzzFEvQPZoF8oXDQ+10gM/O/yUmISCR1ZVxyb6EA==}
+
   crypto-random-string@2.0.0:
     resolution: {integrity: sha512-v1plID3y9r/lPhviJ1wrXpLeyUIGAZ2SHNYTEapm7/8A9nLPoyvVp3RK/EPFqn5kEznyWgYZNsRtYYIWbuG8KA==}
     engines: {node: '>=8'}
@@ -1823,6 +1838,9 @@ packages:
 
   dexie@4.2.0:
     resolution: {integrity: sha512-OSeyyWOUetDy9oFWeddJgi83OnRA3hSFh3RrbltmPgqHszE9f24eUCVLI4mPg0ifsWk0lQTdnS+jyGNrPMvhDA==}
+
+  diacritics@1.3.0:
+    resolution: {integrity: sha512-wlwEkqcsaxvPJML+rDh/2iS824jbREk6DUMUKkEaSlxdYHeS43cClJtsWglvw2RfeXGm6ohKDqsXteJ5sP5enA==}
 
   dijkstrajs@1.0.3:
     resolution: {integrity: sha512-qiSlmBq9+BCdCA/L46dw8Uy93mloxsPSbwnm5yrKn2vMPiy8KyAskTF6zuV/j5BMsmOGZDPs7KjU+mjb670kfA==}
@@ -1948,6 +1966,9 @@ packages:
     resolution: {integrity: sha512-PpOwAdQ/YlXQ2vj8a3h8IipDuYRi3wceVQQGYWxNINccq40Anw7BlsEXCMbt1Zt+OLA6Fq9suIpIWD0OsnISlw==}
     engines: {node: '>=8'}
 
+  flag-icons@7.5.0:
+    resolution: {integrity: sha512-kd+MNXviFIg5hijH766tt+3x76ele1AXlo4zDdCxIvqWZhKt4T83bOtxUOOMlTx/EcFdUMH5yvQgYlFh1EqqFg==}
+
   follow-redirects@1.15.11:
     resolution: {integrity: sha512-deG2P0JfjrTxl50XGCDyfI97ZGVCxIpfKYmfyrQ54n5FO/0gfIES8C/Psl6kWVDolizcaaxZJnTS0QSMxvnsBQ==}
     engines: {node: '>=4.0'}
@@ -2054,6 +2075,10 @@ packages:
 
   hookable@5.5.3:
     resolution: {integrity: sha512-Yc+BQe8SvoXH1643Qez1zqLRmbA5rCL+sSmk6TVos0LWVfNIB7PGncdlId77WzLGSIB5KaWgTaNTs2lNVEI6VQ==}
+
+  i18n-iso-countries@7.14.0:
+    resolution: {integrity: sha512-nXHJZYtNrfsi1UQbyRqm3Gou431elgLjKl//CYlnBGt5aTWdRPH1PiS2T/p/n8Q8LnqYqzQJik3Q7mkwvLokeg==}
+    engines: {node: '>= 12'}
 
   iconv-lite@0.6.3:
     resolution: {integrity: sha512-4fCk79wshMdzMp2rH06qWrJE4iolqLhCUH+OiuIgU++RB0+94NlDL81atO7GX55uUKueo0txHNtvEyI6D7WdMw==}
@@ -2269,6 +2294,9 @@ packages:
   leven@3.1.0:
     resolution: {integrity: sha512-qsda+H8jTaUaN/x5vzW2rzc+8Rw4TAQ/4KjB46IwK5VH+IlVeeeje/EoZRpiXvIqjFgK84QffqPztGI3VBLG1A==}
     engines: {node: '>=6'}
+
+  libphonenumber-js@1.13.12:
+    resolution: {integrity: sha512-uLVeV1c9OTk6qkdqnj+mpMD+ZdnZ0szVyWu58HwMmpwkHA1gCEkyjd3veZQXDnuw9KEwSRjcc9B1pS9XKIN1fA==}
 
   local-pkg@1.1.2:
     resolution: {integrity: sha512-arhlxbFRmoQHl33a0Zkle/YWlmNwoyt6QNZEIJcqNbdrsix5Lvc4HyyI3EnwxTYlZYc32EbYrQ8SzEZ7dqgg9A==}
@@ -4680,6 +4708,8 @@ snapshots:
     dependencies:
       browserslist: 4.25.4
 
+  country-state-city@3.2.1: {}
+
   crypto-random-string@2.0.0: {}
 
   csstype@3.1.3: {}
@@ -4742,6 +4772,8 @@ snapshots:
   detect-libc@2.1.2: {}
 
   dexie@4.2.0: {}
+
+  diacritics@1.3.0: {}
 
   dijkstrajs@1.0.3: {}
 
@@ -4968,6 +5000,8 @@ snapshots:
       locate-path: 5.0.0
       path-exists: 4.0.0
 
+  flag-icons@7.5.0: {}
+
   follow-redirects@1.15.11: {}
 
   for-each@0.3.5:
@@ -5080,6 +5114,10 @@ snapshots:
       function-bind: 1.1.2
 
   hookable@5.5.3: {}
+
+  i18n-iso-countries@7.14.0:
+    dependencies:
+      diacritics: 1.3.0
 
   iconv-lite@0.6.3:
     dependencies:
@@ -5280,6 +5318,8 @@ snapshots:
       source-map: 0.6.1
 
   leven@3.1.0: {}
+
+  libphonenumber-js@1.13.12: {}
 
   local-pkg@1.1.2:
     dependencies:

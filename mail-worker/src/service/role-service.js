@@ -137,6 +137,9 @@ const roleService = {
 	},
 
 	selectByIdsHasPermKey(c, types, permKey) {
+		if (!types || types.length === 0) {
+			return [];
+		}
 		return orm(c).select({ roleId: role.roleId, sendType: role.sendType, sendCount: role.sendCount }).from(perm)
 			.leftJoin(rolePerm, eq(perm.permId, rolePerm.permId))
 			.leftJoin(role, eq(role.roleId, rolePerm.roleId))

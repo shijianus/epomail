@@ -11,9 +11,13 @@
     <!-- Middle Section: Search -->
     <div class="topbar-search" v-if="!props.isProfile">
       <div class="search-box">
-        <span class="search-icon" @click="handleSearch" style="cursor: pointer; z-index: 1"><Icon icon="lucide:search" width="20" height="20"/></span>
+        <span class="search-icon" @click="handleSearch" :title="$t('search') || 'Search'">
+          <Icon icon="lucide:search" width="18" height="18"/>
+        </span>
         <input type="text" :placeholder="isSettingsMode && route.name !== 'all-email' ? ($t('searchSettings') || 'Search settings') : route.name === 'all-email' ? ($t('searchAllMail') || 'Search all mail...') : ($t('searchMail') || 'Search mail')" v-model="emailStore.searchKeyword" @input="handleSearchInput" @keyup.enter="handleSearch" @keydown.tab.prevent="handleTabComplete" @focus="searchFocus = true" @blur="onSearchBlur" />
-        <span class="clear-icon" v-show="emailStore.searchKeyword" @click="clearSearch"><Icon icon="lucide:x" width="16" height="16"/></span>
+        <span class="clear-icon" v-show="emailStore.searchKeyword" @mousedown.prevent @click.stop="clearSearch" :title="$t('clear') || 'Clear'">
+          <Icon icon="lucide:x" width="15" height="15"/>
+        </span>
         
         <!-- Dropdown for all-email syntax suggestions -->
         <div v-if="route.name === 'all-email' && searchFocus && allEmailSuggestions.length > 0" class="settings-search-dropdown" style="padding: 4px 0;">
@@ -41,10 +45,10 @@
     <!-- Right Section: Actions & Avatar -->
     <div class="topbar-actions">
       <el-tooltip :content="uiStore.dark ? ($t('lightMode') || 'Light Mode') : ($t('darkMode') || 'Dark Mode')" placement="bottom">
-        <button v-if="uiStore.dark" class="icon-btn" @click="openDark($event)">
+        <button v-if="uiStore.dark" class="icon-btn theme-toggle-btn" @click="openDark($event)">
           <Icon icon="lucide:sun" width="22" height="22"/>
         </button>
-        <button v-else class="icon-btn" @click="openDark($event)">
+        <button v-else class="icon-btn theme-toggle-btn" @click="openDark($event)">
           <Icon icon="lucide:moon" width="22" height="22"/>
         </button>
       </el-tooltip>
@@ -59,7 +63,7 @@
           <span class="badge"></span>
         </button>
       </el-tooltip>
-      <el-dropdown v-if="userStore.user && userStore.user.email" ref="userinfoRef" trigger="click" @visible-change="onDropdownVisibleChange" :teleported="false" popper-class="detail-dropdown">
+      <el-dropdown v-if="userStore.user && userStore.user.email" ref="userinfoRef" trigger="click" @visible-change="onDropdownVisibleChange" :teleported="true" popper-class="detail-dropdown">
         <div class="avatar-wrap" @mouseenter="clearCloseTimer" @mouseleave="startCloseTimer">
           <div class="avatar">{{ formatName(userStore.user.email) }}</div>
         </div>
@@ -84,7 +88,7 @@
               </div>
             </div>
             <div class="am-item" @click="openAccountDetails"><Icon class="ic ic-sm" icon="lucide:user" /><span>{{ $t('accountDetails') || 'Account Details' }}</span></div>
-            <div class="am-item" @click="router.push({name: 'profile-setting'})"><Icon class="ic ic-sm" icon="lucide:settings" /><span>{{ $t('settings') || 'Settings' }}</span></div>
+            <div class="am-item" @click="openSettings"><Icon class="ic ic-sm" icon="lucide:settings" /><span>{{ $t('settings') || 'Settings' }}</span></div>
             <div class="am-item logout" @click="clickLogout"><Icon class="ic ic-sm" icon="lucide:log-out" /><span>{{ $t('logOut') }}</span></div>
           </div>
         </template>
@@ -114,13 +118,23 @@ import {useEmailStore} from "@/store/email.js";
 import {userDraftStore} from "@/store/draft.js";
 
 function openAccountDetails() {
+  if (userinfoRef.value && userinfoRef.value.handleClose) {
+    userinfoRef.value.handleClose()
+  }
   let username = ''
-  if (userStore.user.email) {
+  if (userStore.user?.email) {
     username = userStore.user.email.split('@')[0]
   } else {
     username = 'me'
   }
   router.push(`/${username}`)
+}
+
+function openSettings() {
+  if (userinfoRef.value && userinfoRef.value.handleClose) {
+    userinfoRef.value.handleClose()
+  }
+  router.push('/settings/profile')
 }
 
 function highlightTextOnPage(keyword) {
@@ -283,20 +297,35 @@ function triggerAllEmailSearch() {
 }
 
 const isSettingsMode = computed(() => {
-  return ['setting', 'label-setting', 'profile-setting', 'category-setting', 'sys-setting', 'analysis', 'user', 'all-email', 'role', 'reg-key'].includes(route.name)
+  return ['user-profile', 'profile', 'general-setting', 'profile-setting', 'setting', 'data-setting', 'label-setting', 'category-setting', 'sys-setting', 'analysis', 'user', 'all-email', 'role', 'reg-key'].includes(route.name)
 })
 
 const settingsMap = computed(() => [
   {
-    route: 'profile-setting',
+    route: 'user-profile',
+    title: t('profile') || 'Personal Info',
+    items: [
+      { text: t('avatar') || 'Avatar', id: 'avatar' },
+      { text: t('nickname') || 'Nickname', id: 'nickname' },
+      { text: t('gender') || 'Gender', id: 'gender' },
+      { text: t('birthday') || 'Birthday', id: 'birthday' },
+      { text: t('emailAccount') || 'Email', id: 'email' },
+      { text: t('phones') || 'Phones', id: 'phones' },
+      { text: t('addresses') || 'Addresses', id: 'addresses' }
+    ]
+  },
+  {
+    route: 'general-setting',
     title: t('generalSetting') || 'General Settings',
     items: [
-      { text: t('basicInfo') || 'Basic Information', id: 'basicInfo' },
-      { text: t('nickname') || 'Nickname', id: 'nickname' },
       { text: t('bio') || 'Bio', id: 'bio' },
-      { text: t('avatar') || 'Avatar', id: 'avatar' },
-      { text: t('visualMedia') || 'Visual & Media', id: 'visualMedia' },
-      { text: t('background') || 'Background', id: 'background' },
+      { text: t('visualMedia') || 'Theme & Wallpaper', id: 'wallpaper' },
+      { text: t('themeMode') || 'Theme Mode', id: 'theme' },
+      { text: t('density') || 'Density', id: 'density' },
+      { text: t('inboxType') || 'Inbox Type', id: 'inboxType' },
+      { text: t('readingPane') || 'Reading Pane', id: 'readingPane' },
+      { text: t('emailThreading') || 'Email Threading', id: 'threading' },
+      { text: t('systemLanguage') || 'System Language', id: 'language' },
       { text: t('dataPrivacy') || 'Data Privacy', id: 'dataPrivacy' }
     ]
   },
@@ -307,9 +336,19 @@ const settingsMap = computed(() => [
       { text: t('username') || 'Username', id: 'username' },
       { text: t('emailAccount') || 'Email Account', id: 'emailAccount' },
       { text: t('password') || 'Password', id: 'password' },
-      { text: t('totpTitle') || 'Two-Factor Authentication (2FA)', id: 'totp' },
-      { text: t('language') || 'Language', id: 'language' },
+      { text: t('twoFactorCenter') || '2-Step Verification (2FA)', id: 'totp' },
+      { text: t('passkeysAndSecurityKeys') || 'Passkeys & Security Keys', id: 'passkeys' },
+      { text: t('backupCodesTitle') || 'Backup Codes', id: 'backupCodes' },
       { text: t('deleteUser') || 'Delete User', id: 'deleteUser' },
+    ]
+  },
+  {
+    route: 'data-setting',
+    title: t('data') || 'Data Management',
+    items: [
+      { text: t('dataExportTitle') || 'Export Data', id: 'dataExport' },
+      { text: t('forwardingAndPushTitle') || t('forwardingRulesTitle') || 'Forwarding & Push', id: 'forwarding' },
+      { text: t('apiDeveloperTitle') || 'API & Developer Access', id: 'apiAccess' }
     ]
   },
   {
@@ -468,6 +507,18 @@ function onSearchBlur() {
   setTimeout(() => {
     searchFocus.value = false
   }, 200)
+}
+
+function clearSearch() {
+  emailStore.searchKeyword = '';
+  clearHighlightOnPage();
+  if (['email', 'user-all-email', 'star', 'snoozed', 'spam', 'trash', 'draft', 'send', 'all-email'].includes(route.name)) {
+    if (emailStore.emailScroll && emailStore.emailScroll.refreshList) {
+      emailStore.emailScroll.refreshList();
+    } else if (route.name === 'draft') {
+      userDraftStore().refreshList++;
+    }
+  }
 }
 
 const accountCount = computed(() => {
@@ -637,44 +688,42 @@ function openNotice() {
 }
 
 function openDark(e) {
-
   const nextIsDark = !uiStore.dark
   const root = document.documentElement
+
+  const x = (e && typeof e.clientX === 'number') ? e.clientX : window.innerWidth / 2;
+  const y = (e && typeof e.clientY === 'number') ? e.clientY : 30;
+
+  const maxX = Math.max(x, window.innerWidth - x)
+  const maxY = Math.max(y, window.innerHeight - y)
+  const endRadius = Math.hypot(maxX, maxY)
 
   if (!document.startViewTransition) {
     switchDark(nextIsDark, root);
     return
   }
 
-  const x = e.clientX
-  const y = e.clientY
+  try {
+    // 标记切换目标，供 CSS 选择器使用
+    root.setAttribute('data-theme-to', nextIsDark ? 'dark' : 'light')
+    root.style.setProperty('--vt-x', `${x}px`)
+    root.style.setProperty('--vt-y', `${y}px`)
+    root.style.setProperty('--vt-end-radius', `${endRadius + 10}px`)
 
-  const maxX = Math.max(x, window.innerWidth - x)
-  const maxY = Math.max(y, window.innerHeight - y)
-  const endRadius = Math.hypot(maxX, maxY)
+    const transition = document.startViewTransition(() => {
+      switchDark(nextIsDark, root);
+    })
 
-  // 标记切换目标，供 CSS 选择器使用
-  root.setAttribute('data-theme-to', nextIsDark ? 'dark' : 'light')
-  root.style.setProperty('--vt-x', `${x}px`)
-  root.style.setProperty('--vt-y', `${y}px`)
-  root.style.setProperty('--vt-end-radius', `${endRadius + 10}px`)
-
-  const transition = document.startViewTransition(() => {
+    transition.finished.finally(() => {
+      root.removeAttribute('data-theme-to')
+    })
+  } catch (err) {
     switchDark(nextIsDark, root);
-  })
-
-  transition.finished.finally(() => {
-    // 清理标记
-    root.removeAttribute('data-theme-to')
-  })
+  }
 }
 
 function switchDark(nextIsDark, root) {
-  root.setAttribute('class', nextIsDark ? 'dark' : '')
-  const metaTag = document.getElementById('theme-color-meta');
-  const isMobile =  !window.matchMedia("(pointer: fine) and (hover: hover)").matches;
-  metaTag.setAttribute('content', nextIsDark ? (isMobile ? '#141414' : '#000000') : (isMobile ? '#FFFFFF' : '#F1F1F1'));
-  uiStore.dark = nextIsDark
+  uiStore.setThemeMode(nextIsDark ? 'dark' : 'light')
 }
 
 
@@ -700,11 +749,15 @@ function formatName(email) {
 </script>
 <style>
 .detail-dropdown {
-  background: var(--bg-elevated) !important;
+  background: var(--bg-surface) !important;
   border: 1px solid var(--border-mid) !important;
-  border-radius: 12px !important;
+  border-radius: 14px !important;
   padding: 0 !important;
   overflow: hidden !important;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.28) !important;
+  z-index: 3000 !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
 }
 .detail-dropdown .el-dropdown__list {
   padding: 0 !important;
@@ -719,7 +772,7 @@ function formatName(email) {
   display: none !important;
 }
 .detail-dropdown .el-popper__arrow::before {
-  background: var(--bg-elevated) !important;
+  background: var(--bg-surface) !important;
   border-color: var(--border-mid) !important;
 }
 </style>
@@ -788,12 +841,16 @@ function formatName(email) {
   max-width: 720px; 
   display: flex;
   justify-content: flex-start;
+  align-items: center;
   padding: 0 24px;
+  min-width: 0;
 }
 
 .search-box {
   width: 100%;
   position: relative;
+  display: flex;
+  align-items: center;
 }
 
 .search-box input { 
@@ -803,10 +860,11 @@ function formatName(email) {
   border: 1px solid transparent; 
   border-radius: 24px; 
   color: var(--text-primary); 
-  padding: 0 16px 0 52px; 
+  padding: 0 44px 0 48px; 
   font-size: 15px; 
   outline: none; 
   transition: background .15s, border-color .15s, box-shadow .15s; 
+  box-sizing: border-box;
 }
 .search-box input::placeholder { color: var(--text-muted); font-size: 14.5px; }
 .search-box input:focus { 
@@ -820,10 +878,68 @@ function formatName(email) {
 
 .search-box .search-icon { 
   position: absolute; 
-  left: 18px; 
+  left: 16px; 
   top: 50%; 
   transform: translateY(-50%); 
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
   color: var(--text-muted); 
+  cursor: pointer;
+  z-index: 2;
+  transition: color .15s ease, transform .15s ease;
+  user-select: none;
+
+  &:hover {
+    color: var(--text-primary);
+  }
+
+  &:active {
+    transform: translateY(-50%) scale(0.92);
+  }
+
+  .iconify, svg {
+    display: block;
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+  }
+}
+
+.search-box .clear-icon {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  color: var(--text-muted);
+  cursor: pointer;
+  z-index: 2;
+  transition: background .15s ease, color .15s ease, transform .15s ease;
+  user-select: none;
+
+  &:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+  }
+
+  &:active {
+    transform: translateY(-50%) scale(0.9);
+  }
+
+  .iconify, svg {
+    display: block;
+    width: 15px;
+    height: 15px;
+    flex-shrink: 0;
+  }
 }
 
 .topbar-actions { 
@@ -880,7 +996,7 @@ function formatName(email) {
 .avatar:hover { border-color: var(--border-mid); transform: scale(1.02); }
 
 /* Account Menu Dropdown */
-.account-menu { width: 280px; background: transparent; overflow: hidden; }
+.account-menu { width: 280px; background: var(--bg-surface); overflow: hidden; }
 .am-header { padding: 16px; display: flex; gap: 12px; align-items: center; background: linear-gradient(135deg, rgba(91,110,245,.1), rgba(124,92,191,.1)); border-bottom: 1px solid var(--border-subtle); }
 .am-avatar { width: 44px; height: 44px; border-radius: 50%; background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary)); display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 700; color: #fff; flex-shrink: 0; }
 .am-name { font-size: 14px; font-weight: 700; color: var(--text-primary); text-align: left; }

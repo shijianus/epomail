@@ -48,4 +48,53 @@ export function regenerateBackupCodes(password) {
     return http.post('/my/totp/backup-codes', { password });
 }
 
+export function viewBackupCodes(password) {
+    return http.post('/my/totp/view-backup-codes', { password });
+}
+
+export function getPasskeySetup() {
+    return http.get('/my/passkey/setup');
+}
+
+export function registerPasskey(data) {
+    return http.post('/my/passkey/register', data);
+}
+
+export function getPasskeyList() {
+    return http.get('/my/passkey/list');
+}
+
+export function deletePasskey(passkeyId) {
+    return http.delete(`/my/passkey/${passkeyId}`);
+}
+
+export function renamePasskey(passkeyId, name) {
+    return http.put(`/my/passkey/${passkeyId}`, { name });
+}
+
+export function getGeo() {
+    return http.get('/my/geo');
+}
+
+export function exportUserData(params) {
+    return http.get('/my/exportData', { params });
+}
+
+export function testTelegramBot(data) {
+    return http.post('/my/testTelegram', data);
+}
+
+export function getApiTokens() {
+    return http.get('/my/apiTokens');
+}
+
+export function createApiToken(data) {
+    return http.post('/my/apiTokens', data);
+}
+
+export function deleteApiToken(tokenId) {
+    return http.delete(`/my/apiTokens/${tokenId}`);
+}
+
+
 

@@ -23,106 +23,150 @@
     <div></div>
     <el-scrollbar class="scrollbar">
       <div class="container">
-        <div class="email-title">
-          {{ email.subject }}
-        </div>
-        <div class="content">
-          <div class="email-info">
-            <div style="display: flex; gap: 16px;">
-              <el-avatar :size="44" class="sender-avatar" :class="{ 'official-avatar': email.sendEmail === 'admin@epocanvas.com' || email.isOfficial }">
-                <Icon icon="ri:verified-badge-fill" width="24" height="24" v-if="email.sendEmail === 'admin@epocanvas.com' || email.isOfficial" />
-                <template v-else>{{ email.name ? email.name.charAt(0).toUpperCase() : 'U' }}</template>
-              </el-avatar>
-              <div class="info-body">
-                <div class="info-top">
-                  <div style="display: flex; align-items: center; gap: 6px;">
-                    <span class="send-name-title">{{ email.name }}</span>
-                    <span v-if="email.sendEmail === 'admin@epocanvas.com' || email.isOfficial" class="official-verified-badge" :title="$t('officialVerified') || '官方认证'">
-                      <Icon icon="ri:verified-badge-fill" width="18" height="18" style="color: #0284c7; vertical-align: middle;" />
-                    </span>
-                  </div>
-                  <span class="date">{{ formatDetailDate(email.createTime) }}</span>
-                </div>
-                <div class="info-middle">
-                  <span>&lt;{{ email.sendEmail }}&gt;</span>
-                </div>
-                <div class="info-bottom">
-                  <span class="source">{{$t('recipient')}}:</span><span class="receive-email">{{  formateReceive(email.recipient) }}</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- Official System Mail Banner -->
-            <div class="official-system-banner" v-if="email.sendEmail === 'admin@epocanvas.com' || email.isOfficial">
-              <div class="banner-left">
-                <Icon icon="ri:verified-badge-fill" width="20" height="20" style="color: #0284c7; flex-shrink: 0;" />
-                <div class="banner-text">
-                  <div class="banner-heading">
-                    <span>{{ $t('officialBannerTitle') || 'Epocanvas Mail 官方系统邮件' }}</span>
-                    <el-tag size="small" type="primary" effect="dark" class="official-mini-tag">{{ $t('officialTag') || '官方' }}</el-tag>
-                  </div>
-                  <div class="banner-subtitle">{{ $t('officialBannerDesc') || '此邮件为官方系统引导，已自动标记为重要与代办。' }}</div>
-                </div>
-              </div>
-              <div class="banner-right" v-if="email.expireDays">
-                <el-tag size="small" type="info" effect="plain" class="expire-pill">
-                  <Icon icon="ic:outline-access-time" width="13" height="13" style="margin-right: 3px;" />
-                  {{ $t('officialExpireNotice', { days: email.expireDays }) }}
-                </el-tag>
-              </div>
-            </div>
-
-            <el-alert v-if="email.status === 3" :closable="false" :title="toMessage(email.message)" class="email-msg" type="error" show-icon />
-            <el-alert v-if="email.status === 4" :closable="false" :title="$t('complained')" class="email-msg" type="warning" show-icon />
-            <el-alert v-if="email.status === 5" :closable="false" :title="$t('delayed')" class="email-msg" type="warning" show-icon />
-            
-            <div class="spam-alert-banner" v-if="email.isSpam === 1 || (email.labels && email.labels.includes('推销'))">
-              <div class="spam-alert-content">
-                <Icon icon="mdi:alert-outline" width="18" height="18" style="flex-shrink: 0;" />
-                <span>为什么此邮件在垃圾/推销邮件中？它与过去被识别为垃圾/推销邮件的信息特征相似。</span>
-              </div>
-              <el-button size="small" type="warning" plain :loading="isReporting" @click="handleReportNotSpam">这不是垃圾邮件</el-button>
-            </div>
-            
-          </div>
-          <el-scrollbar class="htm-scrollbar" :class="email.attList.length === 0 ? 'bottom-distance' : ''">
-            <ShadowHtml class="shadow-html" :html="formatImage(email.content)" v-if="email.content" />
-            <pre v-else class="email-text" >{{email.text}}</pre>
-          </el-scrollbar>
-          <div class="att" v-if="email.attList.length > 0">
-            <div class="att-title">
-              <span>{{$t('attachments')}}</span>
-              <span>{{$t('attCount',{total: email.attList.length})}}</span>
-            </div>
-            <div class="att-box">
-
-              <div class="att-item" v-for="att in email.attList" :key="att.attId">
-                <div class="att-icon" @click="showImage(att.key)">
-                  <Icon v-bind="getIconByName(att.filename)" />
-                </div>
-                <div class="att-name" @click="showImage(att.key)">
-                  {{ att.filename }}
-                </div>
-                <div class="att-size">{{ formatBytes(att.size) }}</div>
-                <div class="opt-icon att-icon">
-                  <Icon v-if="isImage(att.filename)" icon="hugeicons:view" width="22" height="22" @click="showImage(att.key)"/>
-                  <a :href="cvtR2Url(att.key)" download>
-                    <Icon icon="system-uicons:push-down" width="22" height="22"/>
-                  </a>
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          <div class="inline-reply" v-if="emailStore.contentData.showReply && hasPerm('email:send')">
-             <el-button round class="reply-btn" @click="openReply">
-                <Icon icon="la:reply" width="18" height="18" /> {{ $t('reply') || 'Reply' }}
-             </el-button>
-             <el-button round class="reply-btn" @click="openForward">
-                <Icon icon="iconoir:arrow-up-right" width="18" height="18" /> {{ $t('forward') || 'Forward' }}
-             </el-button>
+        <div class="email-title-row">
+          <div class="email-title">{{ email.subject }}</div>
+          <div class="thread-header-bar" v-if="threadMessages.length > 1">
+            <el-tag size="small" type="primary" effect="plain" class="thread-info-tag">
+              <Icon icon="fluent:chat-multiple-16-regular" width="14" style="margin-right: 4px;" />
+              会话聚合 (共 {{ threadMessages.length }} 封邮件)
+            </el-tag>
+            <el-button link size="small" type="primary" @click="toggleExpandAll">
+              {{ isAllExpanded ? '全部折叠' : '全部展开' }}
+            </el-button>
           </div>
         </div>
+
+        <!-- Thread Messages List -->
+        <div class="thread-messages-flow">
+          <div 
+            v-for="(msg, index) in threadMessages" 
+            :key="msg.emailId"
+            class="thread-msg-item"
+            :class="{ 'is-collapsed': !isMsgExpanded(msg.emailId, index), 'is-last': index === threadMessages.length - 1 }"
+          >
+            <!-- Collapsed Card Header -->
+            <div 
+              class="thread-collapsed-header" 
+              v-if="!isMsgExpanded(msg.emailId, index)"
+              @click="toggleMsg(msg.emailId, index)"
+            >
+              <div class="ch-left">
+                <el-avatar :size="28" class="sender-avatar mini" :class="{ 'official-avatar': msg.sendEmail === 'admin@epocanvas.com' || msg.isOfficial }">
+                  <Icon icon="ri:verified-badge-fill" width="16" height="16" v-if="msg.sendEmail === 'admin@epocanvas.com' || msg.isOfficial" />
+                  <template v-else>{{ msg.name ? msg.name.charAt(0).toUpperCase() : 'U' }}</template>
+                </el-avatar>
+                <span class="ch-name">{{ msg.name }}</span>
+                <span class="ch-snippet">{{ msg.formatText || msg.text || '（无纯文本预览）' }}</span>
+              </div>
+              <div class="ch-right">
+                <span class="ch-date">{{ formatDetailDate(msg.createTime) }}</span>
+                <Icon icon="lucide:chevron-down" width="16" height="16" class="ch-arrow" />
+              </div>
+            </div>
+
+            <!-- Expanded Full Message Content -->
+            <div class="content thread-expanded-body" v-else>
+              <div class="email-info" @click="threadMessages.length > 1 ? toggleMsg(msg.emailId, index) : null" :style="threadMessages.length > 1 ? 'cursor: pointer;' : ''">
+                <div style="display: flex; gap: 16px;">
+                  <el-avatar :size="44" class="sender-avatar" :class="{ 'official-avatar': msg.sendEmail === 'admin@epocanvas.com' || msg.isOfficial }">
+                    <Icon icon="ri:verified-badge-fill" width="24" height="24" v-if="msg.sendEmail === 'admin@epocanvas.com' || msg.isOfficial" />
+                    <template v-else>{{ msg.name ? msg.name.charAt(0).toUpperCase() : 'U' }}</template>
+                  </el-avatar>
+                  <div class="info-body">
+                    <div class="info-top">
+                      <div style="display: flex; align-items: center; gap: 6px;">
+                        <span class="send-name-title">{{ msg.name }}</span>
+                        <span v-if="msg.sendEmail === 'admin@epocanvas.com' || msg.isOfficial" class="official-verified-badge" :title="$t('officialVerified') || '官方认证'">
+                          <Icon icon="ri:verified-badge-fill" width="18" height="18" style="color: #0284c7; vertical-align: middle;" />
+                        </span>
+                      </div>
+                      <div style="display: flex; align-items: center; gap: 10px;">
+                        <span class="date">{{ formatDetailDate(msg.createTime) }}</span>
+                        <Icon icon="lucide:chevron-up" width="16" height="16" class="ch-arrow" v-if="threadMessages.length > 1" />
+                      </div>
+                    </div>
+                    <div class="info-middle">
+                      <span>&lt;{{ msg.sendEmail }}&gt;</span>
+                    </div>
+                    <div class="info-bottom">
+                      <span class="source">{{$t('recipient')}}:</span><span class="receive-email">{{ formateReceive(msg.recipient) }}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Official System Mail Banner -->
+                <div class="official-system-banner" v-if="msg.sendEmail === 'admin@epocanvas.com' || msg.isOfficial" @click.stop>
+                  <div class="banner-left">
+                    <Icon icon="ri:verified-badge-fill" width="20" height="20" style="color: #0284c7; flex-shrink: 0;" />
+                    <div class="banner-text">
+                      <div class="banner-heading">
+                        <span>{{ $t('officialBannerTitle') || 'Epocanvas Mail 官方系统邮件' }}</span>
+                        <el-tag size="small" type="primary" effect="dark" class="official-mini-tag">{{ $t('officialTag') || '官方' }}</el-tag>
+                      </div>
+                      <div class="banner-subtitle">{{ $t('officialBannerDesc') || '此邮件为官方系统引导，已自动标记为重要与代办。' }}</div>
+                    </div>
+                  </div>
+                  <div class="banner-right" v-if="msg.expireDays">
+                    <el-tag size="small" type="info" effect="plain" class="expire-pill">
+                      <Icon icon="ic:outline-access-time" width="13" height="13" style="margin-right: 3px;" />
+                      {{ $t('officialExpireNotice', { days: msg.expireDays }) }}
+                    </el-tag>
+                  </div>
+                </div>
+
+                <el-alert v-if="msg.status === 3" :closable="false" :title="toMessage(msg.message)" class="email-msg" type="error" show-icon @click.stop />
+                <el-alert v-if="msg.status === 4" :closable="false" :title="$t('complained')" class="email-msg" type="warning" show-icon @click.stop />
+                <el-alert v-if="msg.status === 5" :closable="false" :title="$t('delayed')" class="email-msg" type="warning" show-icon @click.stop />
+                
+                <div class="spam-alert-banner" v-if="msg.isSpam === 1 || (msg.labels && msg.labels.includes('推销'))" @click.stop>
+                  <div class="spam-alert-content">
+                    <Icon icon="mdi:alert-outline" width="18" height="18" style="flex-shrink: 0;" />
+                    <span>为什么此邮件在垃圾/推销邮件中？它与过去被识别为垃圾/推销邮件的信息特征相似。</span>
+                  </div>
+                  <el-button size="small" type="warning" plain :loading="isReporting" @click="handleReportNotSpam(msg.emailId)">这不是垃圾邮件</el-button>
+                </div>
+                
+              </div>
+              <el-scrollbar class="htm-scrollbar" :class="(!msg.attList || msg.attList.length === 0) ? 'bottom-distance' : ''">
+                <ShadowHtml class="shadow-html" :html="formatImage(msg.content)" v-if="msg.content" />
+                <pre v-else class="email-text" >{{msg.text}}</pre>
+              </el-scrollbar>
+              <div class="att" v-if="msg.attList && msg.attList.length > 0">
+                <div class="att-title">
+                  <span>{{$t('attachments')}}</span>
+                  <span>{{$t('attCount',{total: msg.attList.length})}}</span>
+                </div>
+                <div class="att-box">
+                  <div class="att-item" v-for="att in msg.attList" :key="att.attId">
+                    <div class="att-icon" @click="showImage(att.key)">
+                      <Icon v-bind="getIconByName(att.filename)" />
+                    </div>
+                    <div class="att-name" @click="showImage(att.key)">
+                      {{ att.filename }}
+                    </div>
+                    <div class="att-size">{{ formatBytes(att.size) }}</div>
+                    <div class="opt-icon att-icon">
+                      <Icon v-if="isImage(att.filename)" icon="hugeicons:view" width="22" height="22" @click="showImage(att.key)"/>
+                      <a :href="cvtR2Url(att.key)" download>
+                        <Icon icon="system-uicons:push-down" width="22" height="22"/>
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div class="inline-reply" v-if="emailStore.contentData.showReply && hasPerm('email:send')">
+                 <el-button round class="reply-btn" @click="openReplyMsg(msg)">
+                    <Icon icon="la:reply" width="18" height="18" /> {{ $t('reply') || 'Reply' }}
+                 </el-button>
+                 <el-button round class="reply-btn" @click="openForwardMsg(msg)">
+                    <Icon icon="iconoir:arrow-up-right" width="18" height="18" /> {{ $t('forward') || 'Forward' }}
+                 </el-button>
+              </div>
+            </div>
+          </div>
+        </div>
+
       </div>
     </el-scrollbar>
     <el-image-viewer
@@ -135,7 +179,7 @@
 </template>
 <script setup>
 import ShadowHtml from '@/components/shadow-html/index.vue'
-import {reactive, ref, watch, onMounted, onUnmounted} from "vue";
+import {reactive, ref, computed, watch, onMounted, onUnmounted} from "vue";
 import {useRouter} from 'vue-router'
 import {ElMessage, ElMessageBox} from 'element-plus'
 import {emailDelete, emailRead, emailReportNotSpam} from "@/request/email.js";
@@ -164,6 +208,48 @@ const showPreview = ref(false)
 const srcList = reactive([])
 
 const { t } = useI18n()
+
+// Conversation Thread Messages
+const threadMessages = computed(() => {
+  if (email && email.threadEmails && email.threadEmails.length > 1) {
+    return [...email.threadEmails].sort((a, b) => new Date(a.createTime || 0) - new Date(b.createTime || 0) || a.emailId - b.emailId)
+  }
+  return email ? [email] : []
+})
+
+const expandedMap = reactive({})
+
+function isMsgExpanded(emailId, index) {
+  if (expandedMap[emailId] !== undefined) {
+    return expandedMap[emailId]
+  }
+  // Default: latest message expanded, older messages collapsed
+  return index === threadMessages.value.length - 1
+}
+
+function toggleMsg(emailId, index) {
+  expandedMap[emailId] = !isMsgExpanded(emailId, index)
+}
+
+const isAllExpanded = computed(() => {
+  return threadMessages.value.every((m, idx) => isMsgExpanded(m.emailId, idx))
+})
+
+function toggleExpandAll() {
+  const target = !isAllExpanded.value
+  threadMessages.value.forEach(m => {
+    expandedMap[m.emailId] = target
+  })
+}
+
+function openReplyMsg(msg) {
+  uiStore.writerRef.openReply(msg || email)
+}
+
+function openForwardMsg(msg) {
+  uiStore.writerRef.openForward(msg || email)
+}
+
 watch(() => accountStore.currentAccountId, () => {
   handleBack()
 })
@@ -212,8 +298,12 @@ function isImage(filename) {
 }
 
 function formateReceive(recipient) {
-  recipient = JSON.parse(recipient)
-  return recipient.map(item => item.address).join(', ')
+  try {
+    recipient = JSON.parse(recipient)
+    return recipient.map(item => item.address).join(', ')
+  } catch (e) {
+    return recipient || ''
+  }
 }
 
 function changeStar() {
@@ -281,26 +371,29 @@ const handleDelete = () => {
 
 const isReporting = ref(false)
 
-const handleReportNotSpam = () => {
+const handleReportNotSpam = (emailId) => {
+  const targetId = emailId || email.emailId
   if (isReporting.value) return;
   isReporting.value = true;
-  emailReportNotSpam(email.emailId).then(() => {
+  emailReportNotSpam(targetId).then(() => {
     ElMessage({
       message: '已移至收件箱并加入信任名单',
       type: 'success',
       plain: true,
     })
-    email.isSpam = 0;
-    if (email.labels) {
-      try {
-        let labs = JSON.parse(email.labels);
-        if (Array.isArray(labs)) {
-          labs = labs.filter(l => l !== '推销');
-          email.labels = JSON.stringify(labs);
-        }
-      } catch (e) {}
+    if (email.emailId === targetId) {
+      email.isSpam = 0;
+      if (email.labels) {
+        try {
+          let labs = JSON.parse(email.labels);
+          if (Array.isArray(labs)) {
+            labs = labs.filter(l => l !== '推销');
+            email.labels = JSON.stringify(labs);
+          }
+        } catch (e) {}
+      }
     }
-    emailStore.deleteIds = [email.emailId]
+    emailStore.deleteIds = [targetId]
     emailStore.contentData.email = null
     emailStore.refreshSidebarStats();
   }).catch((err) => {
@@ -339,7 +432,6 @@ const handleReportNotSpam = () => {
   }
 }
 
-
 .scrollbar {
   height: calc(100% - 38px);
   width: 100%;
@@ -355,10 +447,118 @@ const handleReportNotSpam = () => {
     padding-right: 15px;
   }
 
-  .email-title {
-    font-size: 20px;
-    font-weight: bold;
-    margin-bottom: 10px;
+  .email-title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 12px;
+
+    .email-title {
+      font-size: 20px;
+      font-weight: bold;
+      margin-bottom: 0;
+      color: var(--text-primary);
+    }
+
+    .thread-header-bar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+
+      .thread-info-tag {
+        font-weight: 600;
+        border-radius: 6px;
+      }
+    }
+  }
+
+  .thread-messages-flow {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 10px;
+
+    .thread-msg-item {
+      border: 1px solid var(--border-subtle, #e2e8f0);
+      border-radius: 8px;
+      background: var(--bg-surface, #ffffff);
+      overflow: hidden;
+      transition: all 0.2s ease;
+
+      &.is-collapsed {
+        &:hover {
+          background: var(--bg-hover, #f8fafc);
+        }
+      }
+
+      &.is-last {
+        border-color: var(--border-subtle, #e2e8f0);
+      }
+    }
+
+    .thread-collapsed-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      cursor: pointer;
+      gap: 16px;
+
+      .ch-left {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        overflow: hidden;
+        flex: 1;
+
+        .mini {
+          font-size: 13px;
+          flex-shrink: 0;
+        }
+
+        .ch-name {
+          font-size: 13.5px;
+          font-weight: 600;
+          color: var(--text-primary);
+          white-space: nowrap;
+          flex-shrink: 0;
+        }
+
+        .ch-snippet {
+          font-size: 13px;
+          color: var(--text-muted);
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+      }
+
+      .ch-right {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-shrink: 0;
+
+        .ch-date {
+          font-size: 12px;
+          color: var(--text-muted);
+        }
+
+        .ch-arrow {
+          color: var(--text-muted);
+        }
+      }
+    }
+
+    .thread-expanded-body {
+      padding: 16px;
+      
+      .email-info {
+        border-bottom: 1px solid var(--border-subtle, #e2e8f0);
+      }
+    }
   }
 
   .htm-scrollbar {

@@ -13,11 +13,17 @@
             
             <div class="nav-section-title">{{$t('tabSetting') || 'Settings'}}</div>
             <div class="settings-nav-group">
-            <router-link :to="{name: 'profile-setting'}" class="settings-nav-item" :class="{active: route.name === 'profile-setting'}">
-              <Icon icon="fluent:settings-48-regular" width="20" height="20" /> {{$t('general') || 'General'}}
+            <router-link :to="{name: 'user-profile'}" class="settings-nav-item" :class="{active: route.name === 'user-profile' || route.name === 'profile'}">
+              <Icon icon="fluent:person-20-regular" width="20" height="20" /> {{$t('profile') || '个资'}}
+            </router-link>
+            <router-link :to="{name: 'general-setting'}" class="settings-nav-item" :class="{active: route.name === 'general-setting' || route.name === 'profile-setting'}">
+              <Icon icon="fluent:settings-48-regular" width="20" height="20" /> {{$t('general') || '常规'}}
             </router-link>
             <router-link :to="{name: 'setting'}" class="settings-nav-item" :class="{active: route.name === 'setting'}">
               <Icon icon="fluent:shield-checkmark-20-regular" width="20" height="20" /> {{$t('security') || 'Security'}}
+            </router-link>
+            <router-link :to="{name: 'data-setting'}" class="settings-nav-item" :class="{active: route.name === 'data-setting'}">
+              <Icon icon="fluent:database-person-20-regular" width="20" height="20" /> {{$t('data') || '资料'}}
             </router-link>
             <router-link :to="{name: 'label-setting'}" class="settings-nav-item" :class="{active: route.name === 'label-setting'}">
               <Icon icon="lucide:tags" width="20" height="20" /> {{$t('labels') || 'Labels'}}
@@ -35,7 +41,7 @@
                 <Icon icon="si:user-alt-2-line" width="18" height="18" /> {{$t('allUsers')}}
               </router-link>
 
-              <router-link v-if="hasPerm('all-email:query')" :to="{name: 'all-email'}" class="settings-nav-item" :class="{active: route.name === 'all-email'}">
+              <router-link v-if="hasPerm('all-email:query') && Number(settingStore.settings?.allMailMode) !== 2" :to="{name: 'all-email'}" class="settings-nav-item" :class="{active: route.name === 'all-email'}">
                 <Icon :icon="Number(settingStore.settings?.allMailMode) === 1 ? 'fluent:mail-list-28-regular' : 'fluent:mail-alert-28-regular'" width="20" height="20" />
                 {{ Number(settingStore.settings?.allMailMode) === 1 ? $t('allMail') : ($t('spamAdminPartition') || $t('spam')) }}
               </router-link>
@@ -69,8 +75,16 @@
     </div>
 
     <!-- Mail Split View Layout -->
-    <div v-else class="split-view-container" :class="{'has-reading-pane': showReadingPane, 'is-mobile': isMobileView}">
-      <div class="list-column" :class="{'hide-on-mobile': showReadingPane && isMobileView}">
+    <div 
+      v-else 
+      class="split-view-container" 
+      :class="[
+        'reading-pane-' + (uiStore.readingPane || 'right'),
+        {'has-reading-pane': showReadingPane, 'is-mobile': isMobileView, 'has-main-wallpaper': hasWallpaper}
+      ]"
+      :style="wallpaperStyle"
+    >
+      <div class="list-column" :class="{'hide-on-mobile': showReadingPane && isMobileView, 'hide-on-no-split': showReadingPane && uiStore.readingPane === 'no_split'}">
         <router-view class="main-view" v-slot="{ Component,route }">
           <keep-alive :include="['email','send','star','draft','user-all-email','snoozed','spam','trash']">
             <component :is="Component" :key="route.name"/>
@@ -78,6 +92,12 @@
         </router-view>
       </div>
       <div class="reading-pane-column" v-if="showReadingPane">
+        <div v-if="uiStore.readingPane === 'no_split'" class="no-split-back-bar">
+          <el-button link size="small" @click="emailStore.contentData.email = null" class="back-to-list-btn">
+            <Icon icon="lucide:arrow-left" width="16" height="16" style="margin-right: 6px;" />
+            <span>{{ $t('backToMail') || '返回邮件列表' }}</span>
+          </el-button>
+        </div>
         <ContentComponent :key="emailStore.contentData.email?.emailId" />
       </div>
     </div>
@@ -94,6 +114,7 @@ import { useRoute } from 'vue-router'
 import { hasPerm } from "@/perm/perm.js"
 import { Icon } from "@iconify/vue"
 import router from "@/router/index.js"
+import { getWallpaperCssById } from '@/utils/theme-presets.js'
 
 const settingStore = useSettingStore()
 const uiStore = useUiStore();
@@ -106,12 +127,28 @@ let elNotification = null
 const isMobileView = computed(() => window.innerWidth < 768)
 
 const isSettingsMode = computed(() => {
-  return ['setting', 'label-setting', 'profile-setting', 'category-setting', 'analysis', 'user', 'all-email', 'role', 'reg-key', 'sys-setting'].includes(route.name)
+  return ['user-profile', 'profile', 'general-setting', 'profile-setting', 'setting', 'data-setting', 'label-setting', 'category-setting', 'analysis', 'user', 'all-email', 'role', 'reg-key', 'sys-setting'].includes(route.name)
 })
 
 const showReadingPane = computed(() => {
   const mailRoutes = ['email','all-email','send','star','draft','user-all-email','snoozed','spam','trash']
   return mailRoutes.includes(route.meta.name) && !!emailStore.contentData.email
+})
+
+const hasWallpaper = computed(() => {
+  return !!(uiStore.themeWallpaper && uiStore.themeWallpaper !== 'none')
+})
+
+const wallpaperStyle = computed(() => {
+  if (!hasWallpaper.value) return {}
+  const bg = getWallpaperCssById(uiStore.themeWallpaper)
+  if (!bg) return {}
+  return {
+    backgroundImage: bg,
+    backgroundSize: 'cover',
+    backgroundPosition: 'center',
+    '--panel-alpha': `${uiStore.themeWallpaperOpacity || 88}%`
+  }
 })
 
 watch(() => route.path, () => {
@@ -221,6 +258,59 @@ const handleResize = () => {
   height: 100%;
   width: 100%;
   background: var(--bg-surface);
+  position: relative;
+  background-image: var(--main-wallpaper-url, none);
+  background-size: cover;
+  background-position: center;
+
+  &.reading-pane-below {
+    flex-direction: column;
+
+    &.has-reading-pane:not(.is-mobile) .list-column {
+      flex: 0 0 45%;
+      border-right: none;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .reading-pane-column {
+      flex: 1;
+      height: 55%;
+    }
+  }
+
+  &.reading-pane-no_split {
+    .hide-on-no-split {
+      display: none !important;
+    }
+    .reading-pane-column {
+      flex: 1;
+      width: 100%;
+    }
+  }
+}
+
+.split-view-container.has-main-wallpaper {
+  .list-column {
+    background: color-mix(in srgb, var(--el-bg-color, #ffffff) var(--panel-alpha, 88%), transparent) !important;
+  }
+
+  .reading-pane-column {
+    background: color-mix(in srgb, var(--el-bg-color, #ffffff) var(--panel-alpha, 94%), transparent) !important;
+  }
+}
+
+.no-split-back-bar {
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  display: flex;
+  align-items: center;
+
+  .back-to-list-btn {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--accent-primary);
+  }
 }
 
 .list-column {
@@ -230,7 +320,7 @@ const handleResize = () => {
   transition: all 0.3s;
 }
 
-.split-view-container.has-reading-pane:not(.is-mobile) .list-column {
+.split-view-container.has-reading-pane:not(.is-mobile):not(.reading-pane-below) .list-column {
   flex: 0 0 350px;
   border-right: 1px solid var(--border-subtle);
 }

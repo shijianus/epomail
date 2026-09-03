@@ -1,5 +1,5 @@
 import KvConst from '../const/kv-const';
-import setting from '../entity/setting';
+import settingEntity from '../entity/setting';
 import orm from '../entity/orm';
 import {verifyRecordType} from '../const/entity-const';
 import fileUtils from '../utils/file-utils';
@@ -13,7 +13,7 @@ import userContext from '../security/user-context';
 const settingService = {
 
 	async refresh(c) {
-		const settingRow = await orm(c).select().from(setting).get();
+		const settingRow = await orm(c).select().from(settingEntity).get();
 		settingRow.resendTokens = JSON.parse(settingRow.resendTokens);
 		if (typeof settingRow.authI18n === 'string') {
 			try {
@@ -32,11 +32,18 @@ const settingService = {
 			return c.get('setting')
 		}
 
-		const setting = await c.env.kv.get(KvConst.SETTING, { type: 'json' });
+		let settingVal = await c.env.kv.get(KvConst.SETTING, { type: 'json' });
 
-		if (!setting) {
-			throw new BizError('数据库未初始化 Database not initialized.');
+		if (!settingVal) {
+			const settingRow = await orm(c).select().from(settingEntity).get();
+			if (!settingRow) {
+				throw new BizError('数据库未初始化 Database not initialized.');
+			}
+			await this.refresh(c);
+			settingVal = await c.env.kv.get(KvConst.SETTING, { type: 'json' });
 		}
+
+		const setting = settingVal;
 
 		let domainList = c.env.domain;
 
@@ -81,7 +88,30 @@ const settingService = {
 		setting.linuxdoCallbackUrl = c.env.linuxdo_callback_url;
 		setting.linuxdoSwitch = linuxdoSwitch;
 
-		setting.emailPrefixFilter = setting.emailPrefixFilter.split(",").filter(Boolean);
+		setting.emailPrefixFilter = (setting.emailPrefixFilter || '').split(",").filter(Boolean);
+
+		let isTotp = true;
+		const mode = Number(setting.allMailMode);
+		if (mode === 0 || mode === 2) {
+			isTotp = true;
+		} else {
+			try {
+				const totpStatus = await c.env.kv.get('setting_totp_status');
+				isTotp = totpStatus !== '0';
+			} catch (e) {}
+		}
+
+		if (mode === 0 || mode === 2) {
+			setting.totp = 1;
+			setting.forceTotp = 1;
+		} else {
+			setting.totp = isTotp ? 1 : 0;
+			setting.forceTotp = 0;
+		}
+
+		setting.userTgForward = setting.userTgForward !== undefined ? Number(setting.userTgForward) : 1;
+		setting.userEmailForward = setting.userEmailForward !== undefined ? Number(setting.userEmailForward) : 1;
+		setting.userApiSupport = setting.userApiSupport !== undefined ? Number(setting.userApiSupport) : 1;
 
 		c.set?.('setting', setting);
 		return setting;
@@ -128,7 +158,31 @@ const settingService = {
 
 		settingRow.storageType = await r2Service.storageType(c);
 
+		const isTotp = await this.isTotpEnabled(c, settingRow);
+
+		// In Mode 0 (Privacy) and Mode 2 (Encrypted), TOTP is mandatory (1) and cannot be disabled
+		if (Number(settingRow.allMailMode) === 0 || Number(settingRow.allMailMode) === 2) {
+			settingRow.totp = 1;
+			settingRow.forceTotp = 1;
+		} else {
+			settingRow.totp = isTotp ? 1 : 0;
+			settingRow.forceTotp = 0;
+		}
+
 		return settingRow;
+	},
+
+	async isTotpEnabled(c, preloadedSetting = null) {
+		const settingRow = preloadedSetting || (await this.query(c));
+		const mode = Number(settingRow.allMailMode);
+		if (mode === 0 || mode === 2) {
+			return true;
+		}
+		let totpStatus = null;
+		try {
+			totpStatus = await c.env.kv.get('setting_totp_status');
+		} catch (e) {}
+		return totpStatus !== '0';
 	},
 
 	async set(c, params) {
@@ -151,11 +205,70 @@ const settingService = {
 		}
 
 		if (params.allMailMode !== undefined) {
-			params.allMailMode = Number(params.allMailMode) === 1 ? 1 : 0;
+			const m = Number(params.allMailMode);
+			params.allMailMode = [0, 1, 2].includes(m) ? m : 0;
+			if (params.allMailMode === 2) {
+				params.tgBotStatus = 1;
+				params.ruleEmail = '';
+				params.ruleType = 0;
+			}
+		} else {
+			const currentMode = Number(settingData.allMailMode);
+			if (currentMode === 2) {
+				if (params.tgBotStatus !== undefined) {
+					params.tgBotStatus = 1;
+				}
+				if (params.ruleType !== undefined) {
+					params.ruleType = 0;
+				}
+				if (params.ruleEmail !== undefined) {
+					params.ruleEmail = '';
+				}
+			}
+		}
+
+		if (params.totp !== undefined) {
+			const totpVal = Number(params.totp) === 0 ? '0' : '1';
+			try {
+				await c.env.kv.put('setting_totp_status', totpVal);
+			} catch (e) {}
+
+			// When global 2FA is explicitly disabled in All Mail Mode, completely purge all users' 2FA data
+			// so that when 2FA is re-enabled later, all users are cleanly required to re-configure
+			if (totpVal === '0') {
+				try {
+					const user = (await import('../entity/user')).default;
+					await orm(c).update(user).set({
+						totpEnabled: 0,
+						totpSecret: '',
+						totpBackupCodes: '[]',
+						totpCreatedAt: '',
+						securityKeys: '[]'
+					}).run();
+					console.log(JSON.stringify({
+						auditEvent: 'GLOBAL_TOTP_DISABLED_ALL_USERS_PURGED',
+						timestamp: new Date().toISOString()
+					}));
+				} catch (err) {
+					console.error('Failed to purge user 2FA records upon global TOTP disable:', err);
+				}
+			}
 		}
 
 		if (params.publicProfile !== undefined) {
 			params.publicProfile = Number(params.publicProfile) === 1 ? 1 : 0;
+		}
+
+		if (params.userTgForward !== undefined) {
+			params.userTgForward = Number(params.userTgForward) === 1 ? 1 : 0;
+		}
+
+		if (params.userEmailForward !== undefined) {
+			params.userEmailForward = Number(params.userEmailForward) === 1 ? 1 : 0;
+		}
+
+		if (params.userApiSupport !== undefined) {
+			params.userApiSupport = Number(params.userApiSupport) === 1 ? 1 : 0;
 		}
 
 		params.resendTokens = JSON.stringify(resendTokens);
@@ -175,7 +288,8 @@ const settingService = {
 			'aiCodeFilter', 'spamRetentionDays', 'noLandingNodes', 'noNewNodes',
 			'authI18n', 'publicProfile', 'allMailMode',
 			'welcomeSubject', 'welcomeContent', 'welcomeText', 'welcomeExpireDays',
-			'welcomeAutoSend', 'welcomeLastBroadcast'
+			'welcomeAutoSend', 'welcomeLastBroadcast',
+			'userTgForward', 'userEmailForward', 'userApiSupport'
 		];
 
 		const updateData = {};
@@ -186,7 +300,7 @@ const settingService = {
 		}
 
 		if (Object.keys(updateData).length > 0) {
-			await orm(c).update(setting).set(updateData).run();
+			await orm(c).update(settingEntity).set(updateData).run();
 		}
 		await this.refresh(c);
 	},
@@ -197,14 +311,14 @@ const settingService = {
 		if (!background) return
 
 		if (background.startsWith('http')) {
-			await orm(c).update(setting).set({ background: '' }).run();
+			await orm(c).update(settingEntity).set({ background: '' }).run();
 			await this.refresh(c)
 			return;
 		}
 
 		if (background) {
 			await r2Service.delete(c,background)
-			await orm(c).update(setting).set({ background: '' }).run();
+			await orm(c).update(settingEntity).set({ background: '' }).run();
 			await this.refresh(c)
 		}
 	},
@@ -231,7 +345,7 @@ const settingService = {
 
 		}
 
-		await orm(c).update(setting).set({ background }).run();
+		await orm(c).update(settingEntity).set({ background }).run();
 		await this.refresh(c);
 		return background;
 	},
@@ -239,7 +353,7 @@ const settingService = {
 
 	async setBlacklist(c, params) {
 		const { blackSubject, blackContent, blackFrom  } = params
-		await orm(c).update(setting).set({ blackSubject, blackContent, blackFrom }).run();
+		await orm(c).update(settingEntity).set({ blackSubject, blackContent, blackFrom }).run();
 		await this.refresh(c);
 		return this.get(c);
 	},
@@ -340,10 +454,17 @@ const settingService = {
 			authI18n: settingRow.authI18n || {},
 			publicProfile: settingRow.publicProfile ?? 0,
 			allMailMode: settingRow.allMailMode ?? 0,
+			totp: settingRow.totp ?? 1,
+			forceTotp: settingRow.forceTotp ?? 0,
+			forwardEmail: settingRow.forwardEmail || '',
+			forwardStatus: settingRow.forwardStatus ?? 1,
 			welcomeSubject: settingRow.welcomeSubject || '',
 			welcomeExpireDays: settingRow.welcomeExpireDays ?? 7,
 			welcomeAutoSend: settingRow.welcomeAutoSend ?? 1,
-			welcomeLastBroadcast: settingRow.welcomeLastBroadcast || ''
+			welcomeLastBroadcast: settingRow.welcomeLastBroadcast || '',
+			userTgForward: settingRow.userTgForward ?? 1,
+			userEmailForward: settingRow.userEmailForward ?? 1,
+			userApiSupport: settingRow.userApiSupport ?? 1
 		};
 	},
 

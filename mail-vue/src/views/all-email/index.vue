@@ -1,32 +1,39 @@
 <template>
   <div class="email-list-box">
-    <emailScroll ref="sysEmailScroll"
-                 :get-emailList="getEmailList"
-                 :email-delete="allEmailDelete"
-                 :star-add="starAdd"
-                 :star-cancel="starCancel"
-                 :show-star="false"
-                 show-user-info
-                 show-status
-                 actionLeft="4px"
-                 :show-account-icon="false"
-                 :time-sort="params.timeSort"
-                 :item-height="65"
-                 @jump="jumpContent"
-                 @refresh-before="refreshBefore"
-                 @right-search="rightSearch"
-                 :type="'all-email'"
+    <div v-if="Number(settingStore.settings?.allMailMode) === 2" class="encrypted-restricted-notice">
+      <Icon icon="fluent:shield-lock-24-filled" width="56" height="56" class="notice-icon" />
+      <div class="notice-title">{{ $t('encryptedMailModeStatus') }}</div>
+      <div class="notice-desc">{{ $t('encryptedMailModeAdminRestricted') }}</div>
+    </div>
+    <template v-else>
+      <emailScroll ref="sysEmailScroll"
+                   :get-emailList="getEmailList"
+                   :email-delete="allEmailDelete"
+                   :star-add="starAdd"
+                   :star-cancel="starCancel"
+                   :show-star="false"
+                   show-user-info
+                   show-status
+                   actionLeft="4px"
+                   :show-account-icon="false"
+                   :time-sort="params.timeSort"
+                   :item-height="65"
+                   @jump="jumpContent"
+                   @refresh-before="refreshBefore"
+                   @right-search="rightSearch"
+                   :type="'all-email'"
 
-    >
-      <template #first>
-        <div style="flex-grow: 1;"></div> <!-- Spacer to push icons to the right if needed, or just let them sit -->
-        <Icon class="icon" @click="changeTimeSort" icon="material-symbols-light:timer-arrow-down-outline"
-              v-if="params.timeSort === 0" width="28" height="28" style="margin-left: auto;"/>
-        <Icon class="icon" @click="changeTimeSort" icon="material-symbols-light:timer-arrow-up-outline" v-else
-              width="28" height="28" style="margin-left: auto;"/>
-        <Icon class="icon clear" icon="fluent:broom-sparkle-16-regular" width="22" height="22" @click="openBathDelete"/>
-      </template>
-    </emailScroll>
+      >
+        <template #first>
+          <div style="flex-grow: 1;"></div> <!-- Spacer to push icons to the right if needed, or just let them sit -->
+          <Icon class="icon" @click="changeTimeSort" icon="material-symbols-light:timer-arrow-down-outline"
+                v-if="params.timeSort === 0" width="28" height="28" style="margin-left: auto;"/>
+          <Icon class="icon" @click="changeTimeSort" icon="material-symbols-light:timer-arrow-up-outline" v-else
+                width="28" height="28" style="margin-left: auto;"/>
+          <Icon class="icon clear" icon="fluent:broom-sparkle-16-regular" width="22" height="22" @click="openBathDelete"/>
+        </template>
+      </emailScroll>
+    </template>
     <el-dialog v-model="showBathDelete" :title="$t('clearEmail')" width="335"
                @closed="closedClear">
       <div class="clear-email">
@@ -821,6 +828,36 @@ async function latest() {
         opacity: 0.8;
       }
     }
+  }
+}
+
+.encrypted-restricted-notice {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 380px;
+  padding: 40px 24px;
+  text-align: center;
+
+  .notice-icon {
+    color: #52c41a;
+    margin-bottom: 16px;
+  }
+
+  .notice-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+  }
+
+  .notice-desc {
+    font-size: 13.5px;
+    color: var(--text-muted);
+    max-width: 480px;
+    line-height: 1.6;
   }
 }
 </style>

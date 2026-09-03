@@ -172,7 +172,7 @@ const totpUtils = {
 	 * Derive 256-bit AES-GCM CryptoKey from environment secret (totp_enc_key)
 	 */
 	async getEncryptionKey(env) {
-		const rawKey = env?.totp_enc_key;
+		const rawKey = env?.totp_enc_key || env?.jwt_secret;
 		if (!rawKey || typeof rawKey !== 'string' || !rawKey.trim()) {
 			throw new Error('totp_enc_key is not configured, please run: wrangler secret put totp_enc_key');
 		}
@@ -266,7 +266,7 @@ const totpUtils = {
 	 * Generate 10 single-use Backup Codes (Format: XXXX-XXXX)
 	 * Returns raw codes for user display and SHA-256 hashed structures for DB persistence.
 	 */
-	async generateBackupCodes(count = 10) {
+	async generateBackupCodes(count = 10, env = null) {
 		const charset = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ'; // Exclude ambiguous 0/O, 1/I/L
 		const rawCodes = [];
 		const hashedCodes = [];
@@ -290,9 +290,15 @@ const totpUtils = {
 			});
 		}
 
+		let encryptedRaw = '';
+		if (env) {
+			encryptedRaw = await this.encryptSecret(JSON.stringify(rawCodes), env);
+		}
+
 		return {
 			rawCodes,
-			hashedCodes
+			hashedCodes,
+			encryptedRaw
 		};
 	},
 
@@ -304,10 +310,17 @@ const totpUtils = {
 			return { isValid: false, updatedCodesJson: backupCodesJson };
 		}
 
+		let parsed = null;
 		let list = [];
+		let isWrapped = false;
 		try {
-			list = typeof backupCodesJson === 'string' ? JSON.parse(backupCodesJson) : backupCodesJson;
-			if (!Array.isArray(list)) list = [];
+			parsed = typeof backupCodesJson === 'string' ? JSON.parse(backupCodesJson) : backupCodesJson;
+			if (Array.isArray(parsed)) {
+				list = parsed;
+			} else if (parsed && Array.isArray(parsed.hashedCodes)) {
+				list = parsed.hashedCodes;
+				isWrapped = true;
+			}
 		} catch (e) {
 			return { isValid: false, updatedCodesJson: backupCodesJson };
 		}
@@ -325,9 +338,17 @@ const totpUtils = {
 			}
 		}
 
+		let updatedJson = '';
+		if (isWrapped) {
+			parsed.hashedCodes = list;
+			updatedJson = JSON.stringify(parsed);
+		} else {
+			updatedJson = JSON.stringify(list);
+		}
+
 		return {
 			isValid: matched,
-			updatedCodesJson: JSON.stringify(list)
+			updatedCodesJson: updatedJson
 		};
 	}
 };

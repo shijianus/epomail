@@ -112,7 +112,8 @@ const en = {
 	totpTooManyAttempts: 'Too many failed verification attempts. Please sign in again',
 	backupCodeInvalid: 'Invalid or already used backup code',
 	totpCodeReplay: 'This verification code was already used. Please wait for the next code',
-	emptyPwdMsg: 'Password cannot be empty'
+	emptyPwdMsg: 'Password cannot be empty',
+	globalTotpDisabled: 'Two-factor authentication is globally disabled by administrator.'
 };
 
 export default en;

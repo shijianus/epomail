@@ -22,6 +22,7 @@ import domainUtils from '../utils/domain-uitls';
 import account from "../entity/account";
 import { att } from '../entity/att';
 import telegramService from './telegram-service';
+import emailCryptoUtils from '../utils/email-crypto-utils';
 
 const emailService = {
 
@@ -250,6 +251,14 @@ const emailService = {
 
 		let [list, totalRow, latestEmail] = await Promise.all([listQuery, totalQuery, latestEmailQuery]);
 
+		if (userId) {
+			const cryptoKey = await emailCryptoUtils.getUserEmailCryptoKey(c.env, userId);
+			list = await emailCryptoUtils.decryptEmailList(list, cryptoKey);
+			if (latestEmail && latestEmail.emailId) {
+				latestEmail = await emailCryptoUtils.decryptEmailRecord(latestEmail, cryptoKey);
+			}
+		}
+
 		list = list.map(item => {
 			const isOfficial = item.sendEmail === 'admin@epocanvas.com' || (item.labels && item.labels.includes('官方'));
 			return {
@@ -260,7 +269,6 @@ const emailService = {
 				expireDays: isOfficial ? (settingData.welcomeExpireDays ?? 7) : 0
 			};
 		});
-
 
 		await this.emailAddAtt(c, list);
 
@@ -294,11 +302,33 @@ const emailService = {
 						inArray(email.emailId, emailIdList)))
 					.run();
 			} else {
-				await orm(c).update(email).set({ isDel: isDel.DELETE, snoozedTime: null }).where(
-					and(
-						eq(email.userId, userId),
-						inArray(email.emailId, emailIdList)))
-					.run();
+				const settingRow = await settingService.query(c);
+				const mode = Number(settingRow?.allMailMode);
+
+				// In Mode 0 (Privacy Mail Mode): Trash emails must be stored in plaintext.
+				if (mode === 0 && userId) {
+					const targetEmails = await orm(c).select().from(email).where(
+						and(eq(email.userId, userId), inArray(email.emailId, emailIdList))
+					).all();
+					const cryptoKey = await emailCryptoUtils.getUserEmailCryptoKey(c.env, userId);
+					for (const row of targetEmails) {
+						const decrypted = await emailCryptoUtils.decryptEmailRecord(row, cryptoKey);
+						await orm(c).update(email).set({
+							isDel: isDel.DELETE,
+							snoozedTime: null,
+							subject: decrypted.subject,
+							content: decrypted.content,
+							text: decrypted.text,
+							code: decrypted.code
+						}).where(eq(email.emailId, row.emailId)).run();
+					}
+				} else {
+					await orm(c).update(email).set({ isDel: isDel.DELETE, snoozedTime: null }).where(
+						and(
+							eq(email.userId, userId),
+							inArray(email.emailId, emailIdList)))
+						.run();
+				}
 			}
 		}
 	},
@@ -394,6 +424,22 @@ const emailService = {
 				await c.env.kv.put(kvConst.AUTH_INFO + userId, JSON.stringify(authInfo), { expirationTtl: 60 * 60 * 24 * 7 });
 			}
 		}
+
+		// In Mode 0 (Privacy Mail Mode): Restored emails are back in Inbox, so encrypt them
+		const settingRow = await settingService.query(c);
+		const mode = Number(settingRow?.allMailMode);
+		if (mode === 0 && userId) {
+			const cryptoKey = await emailCryptoUtils.getUserEmailCryptoKey(c.env, userId);
+			for (const row of emailRows) {
+				const encrypted = await emailCryptoUtils.encryptEmailRecord(row, cryptoKey);
+				await orm(c).update(email).set({
+					subject: encrypted.subject,
+					content: encrypted.content,
+					text: encrypted.text,
+					code: encrypted.code
+				}).where(eq(email.emailId, row.emailId)).run();
+			}
+		}
 	},
 
 	async setSpam(c, params, userId) {
@@ -419,11 +465,34 @@ const emailService = {
 	async restore(c, params, userId) {
 		const { emailIds } = params;
 		const emailIdList = Array.isArray(emailIds) ? emailIds.map(Number) : String(emailIds).split(',').map(Number);
-		await orm(c).update(email).set({ isDel: 0, isSpam: 0, snoozedTime: null, snoozedEndTime: null }).where(
-			and(
-				eq(email.userId, userId),
-				inArray(email.emailId, emailIdList)))
-			.run();
+		const settingRow = await settingService.query(c);
+		const mode = Number(settingRow?.allMailMode);
+
+		if (mode === 0 && userId) {
+			const targetEmails = await orm(c).select().from(email).where(
+				and(eq(email.userId, userId), inArray(email.emailId, emailIdList))
+			).all();
+			const cryptoKey = await emailCryptoUtils.getUserEmailCryptoKey(c.env, userId);
+			for (const row of targetEmails) {
+				const encrypted = await emailCryptoUtils.encryptEmailRecord(row, cryptoKey);
+				await orm(c).update(email).set({
+					isDel: 0,
+					isSpam: 0,
+					snoozedTime: null,
+					snoozedEndTime: null,
+					subject: encrypted.subject,
+					content: encrypted.content,
+					text: encrypted.text,
+					code: encrypted.code
+				}).where(eq(email.emailId, row.emailId)).run();
+			}
+		} else {
+			await orm(c).update(email).set({ isDel: 0, isSpam: 0, snoozedTime: null, snoozedEndTime: null }).where(
+				and(
+					eq(email.userId, userId),
+					inArray(email.emailId, emailIdList)))
+				.run();
+		}
 	},
 
 	async clearTrashAndSpam(c) {
@@ -448,9 +517,15 @@ const emailService = {
 		).run();
 	},
 
-	receive(c, params, cidAttList, r2domain) {
-		params.content = this.imgReplace(params.content, cidAttList, r2domain)
-		return orm(c).insert(email).values({ ...params }).returning().get();
+	async receive(c, params, cidAttList, r2domain) {
+		params.content = this.imgReplace(params.content, cidAttList, r2domain);
+		const settingRow = await settingService.query(c);
+		let dbParams = { ...params };
+		if (params.userId && emailCryptoUtils.shouldEncryptEmail(settingRow?.allMailMode, params)) {
+			const cryptoKey = await emailCryptoUtils.getUserEmailCryptoKey(c.env, params.userId);
+			dbParams = await emailCryptoUtils.encryptEmailRecord(dbParams, cryptoKey);
+		}
+		return orm(c).insert(email).values(dbParams).returning().get();
 	},
 
 	//邮件发送
@@ -658,8 +733,15 @@ const emailService = {
 			await userService.incrUserSendCount(c, receiveEmail.length, userId);
 		}
 
+		const settingRow = await settingService.query(c);
+		let dbEmailData = { ...emailData };
+		if (userId && emailCryptoUtils.shouldEncryptEmail(settingRow?.allMailMode, emailData)) {
+			const cryptoKey = await emailCryptoUtils.getUserEmailCryptoKey(c.env, userId);
+			dbEmailData = await emailCryptoUtils.encryptEmailRecord(dbEmailData, cryptoKey);
+		}
+
 		//保存到数据库并返回结果
-		const emailResult = await orm(c).insert(email).values(emailData).returning().get();
+		const emailResult = await orm(c).insert(email).values(dbEmailData).returning().get();
 
 		//保存内嵌附件
 		if (imageDataList.length > 0) {
@@ -696,7 +778,7 @@ const emailService = {
 			await c.env.kv.put(kvConst.SEND_DAY_COUNT + dateStr, JSON.stringify(daySendTotal), { expirationTtl: 60 * 60 * 24 });
 		}
 
-		return [ emailResult ];
+		return [ { ...emailResult, subject, content: html, text } ];
 	},
 
 	async sendByCloudflareEmail(c, params) {
@@ -1002,12 +1084,17 @@ const emailService = {
 
 		}
 
+		const settingRow = await settingService.query(c);
 		//保存邮件
 		const receiveEmailList = emailDataList.filter(emailRow => emailRow.status === emailConst.status.RECEIVE || emailRow.status === emailConst.status.NOONE);
 
 		for (const emailData of receiveEmailList) {
-
-			const emailRow = await orm(c).insert(email).values(emailData).returning().get();
+			let dbEmailData = { ...emailData };
+			if (emailData.userId && emailCryptoUtils.shouldEncryptEmail(settingRow?.allMailMode, emailData)) {
+				const recipientKey = await emailCryptoUtils.getUserEmailCryptoKey(c.env, emailData.userId);
+				dbEmailData = await emailCryptoUtils.encryptEmailRecord(dbEmailData, recipientKey);
+			}
+			const emailRow = await orm(c).insert(email).values(dbEmailData).returning().get();
 
 			//设置附件保存
 			for (const attRow of attList) {
@@ -1144,7 +1231,7 @@ const emailService = {
 		const now = new Date().toISOString();
 		const snoozedEndTime = expireDays > 0 ? new Date(Date.now() + expireDays * 86400000).toISOString() : null;
 
-		const emailRow = await orm(c).insert(email).values({
+		let welcomeData = {
 			userId: userId,
 			accountId: accountId,
 			sendEmail: 'admin@epocanvas.com',
@@ -1170,7 +1257,14 @@ const emailService = {
 			labels: JSON.stringify(['官方', '代办']),
 			code: '',
 			createTime: now
-		}).returning().get();
+		};
+
+		if (userId && emailCryptoUtils.shouldEncryptEmail(settingData?.allMailMode, welcomeData)) {
+			const cryptoKey = await emailCryptoUtils.getUserEmailCryptoKey(c.env, userId);
+			welcomeData = await emailCryptoUtils.encryptEmailRecord(welcomeData, cryptoKey);
+		}
+
+		const emailRow = await orm(c).insert(email).values(welcomeData).returning().get();
 
 		if (emailRow && emailRow.emailId) {
 			// Automatically mark as Starred (重要)
@@ -1185,11 +1279,15 @@ const emailService = {
 	},
 
 	async selectById(c, emailId) {
-		const emailRow = await orm(c).select().from(email).where(
+		let emailRow = await orm(c).select().from(email).where(
 			and(eq(email.emailId, emailId),
 				eq(email.isDel, isDel.NORMAL)))
 			.get();
 		if (emailRow) {
+			if (emailRow.userId) {
+				const cryptoKey = await emailCryptoUtils.getUserEmailCryptoKey(c.env, emailRow.userId);
+				emailRow = await emailCryptoUtils.decryptEmailRecord(emailRow, cryptoKey);
+			}
 			const isOfficial = emailRow.sendEmail === 'admin@epocanvas.com' || (emailRow.labels && emailRow.labels.includes('官方'));
 			if (isOfficial) {
 				emailRow.isOfficial = 1;
@@ -1244,6 +1342,11 @@ const emailService = {
 
 		await this.emailAddAtt(c, list);
 
+		if (userId) {
+			const cryptoKey = await emailCryptoUtils.getUserEmailCryptoKey(c.env, userId);
+			list = await emailCryptoUtils.decryptEmailList(list, cryptoKey);
+		}
+
 		const settingData = await settingService.query(c);
 		list.forEach(item => {
 			const isOfficial = item.sendEmail === 'admin@epocanvas.com' || (item.labels && item.labels.includes('官方'));
@@ -1281,6 +1384,9 @@ const emailService = {
 	},
 
 	async selectUserEmailCountList(c, userIds, type, del = isDel.NORMAL) {
+		if (!userIds || userIds.length === 0) {
+			return [];
+		}
 		const result = await orm(c)
 			.select({
 				userId: email.userId,
@@ -1372,15 +1478,23 @@ const emailService = {
 			);
 		}
 
-		// Privacy mode filtering: when allMailMode is 0 (Privacy Mail Mode), only spam / blocked / deleted / noone emails are visible to admins
+		// Privacy mode filtering:
+		// Mode 1 (allMailMode === 1): Admin sees all emails (plaintext)
+		// Mode 0 (allMailMode === 0): Admin only sees spam / deleted / noone emails (plaintext in mode 0)
+		// Mode 2 (allMailMode === 2): Admin only sees noone emails (all user emails encrypted)
 		const settingRow = await settingService.query(c);
-		if (Number(settingRow?.allMailMode) !== 1) {
+		const mode = Number(settingRow?.allMailMode);
+		if (mode === 0) {
 			conditions.push(
 				or(
 					eq(email.isSpam, 1),
 					eq(email.isDel, isDel.DELETE),
 					eq(email.status, emailConst.status.NOONE)
 				)
+			);
+		} else if (mode === 2) {
+			conditions.push(
+				eq(email.status, emailConst.status.NOONE)
 			);
 		}
 
@@ -1417,13 +1531,17 @@ const emailService = {
 			eq(email.type, emailConst.type.RECEIVE),
 			ne(email.status, emailConst.status.SAVING)
 		];
-		if (Number(settingRow?.allMailMode) !== 1) {
+		if (mode === 0) {
 			latestConditions.push(
 				or(
 					eq(email.isSpam, 1),
 					eq(email.isDel, isDel.DELETE),
 					eq(email.status, emailConst.status.NOONE)
 				)
+			);
+		} else if (mode === 2) {
+			latestConditions.push(
+				eq(email.status, emailConst.status.NOONE)
 			);
 		}
 
@@ -1450,19 +1568,24 @@ const emailService = {
 
 		const { emailId } = params;
 		const settingRow = await settingService.query(c);
+		const mode = Number(settingRow?.allMailMode);
 
 		const conditions = [
 			gt(email.emailId, emailId),
 			eq(email.type, emailConst.type.RECEIVE),
 			ne(email.status, emailConst.status.SAVING)
 		];
-		if (Number(settingRow?.allMailMode) !== 1) {
+		if (mode === 0) {
 			conditions.push(
 				or(
 					eq(email.isSpam, 1),
 					eq(email.isDel, isDel.DELETE),
 					eq(email.status, emailConst.status.NOONE)
 				)
+			);
+		} else if (mode === 2) {
+			conditions.push(
+				eq(email.status, emailConst.status.NOONE)
 			);
 		}
 
@@ -1615,12 +1738,19 @@ const emailService = {
 			});
 			results = [...new Set(extracted)].filter(v => v.toLowerCase().includes(query.toLowerCase()));
 		} else if (isSubject) {
-			conditionList.push(like(email.subject, searchPattern));
 			const list = await orm(c).select({ value: email.subject }).from(email)
 				.where(and(...conditionList))
 				.groupBy(email.subject)
-				.limit(15);
-			results = list.map(item => item.value);
+				.limit(25);
+			if (userId) {
+				const cryptoKey = await emailCryptoUtils.getUserEmailCryptoKey(c.env, userId);
+				const decryptedSubjects = await Promise.all(list.map(async item => {
+					return await emailCryptoUtils.decryptText(item.value, cryptoKey);
+				}));
+				results = [...new Set(decryptedSubjects.filter(v => v && v.toLowerCase().includes(query.toLowerCase())))].slice(0, 15);
+			} else {
+				results = list.map(item => item.value);
+			}
 		}
 
 		return results;

@@ -20,6 +20,7 @@ import { toUtc } from '../utils/date-uitil.js';
 import { t } from '../i18n/i18n.js';
 import verifyRecordService from './verify-record-service.js';
 import totpUtils from '../utils/totp-utils.js';
+import webauthnUtils from '../utils/webauthn-utils.js';
 import orm from '../entity/orm.js';
 import user from '../entity/user.js';
 import { eq } from 'drizzle-orm';
@@ -267,15 +268,29 @@ const loginService = {
 			isLegacy = checkResult.isLegacy;
 		}
 
-		// Check if TOTP 2FA is enabled
-		if (userRow.totpEnabled === 1) {
+		// Check if TOTP 2FA or Security Key is enabled
+		const isGlobalTotpEnabled = await settingService.isTotpEnabled(c);
+		let securityKeysList = [];
+		if (isGlobalTotpEnabled && userRow.securityKeys) {
+			try {
+				securityKeysList = typeof userRow.securityKeys === 'string' ? JSON.parse(userRow.securityKeys) : userRow.securityKeys;
+				if (!Array.isArray(securityKeysList)) securityKeysList = [];
+			} catch (e) {
+				securityKeysList = [];
+			}
+		}
+
+		if (isGlobalTotpEnabled && (userRow.totpEnabled === 1 || securityKeysList.length > 0)) {
 			const tempToken = 'totp_tmp_' + uuidv4().replace(/-/g, '');
+			const passkeyChallenge = webauthnUtils.generateChallenge();
+
 			await c.env.kv.put(
 				KvConst.TOTP_PENDING + tempToken,
 				JSON.stringify({
 					userId: userRow.userId,
 					email: userRow.email,
 					attempts: 0,
+					passkeyChallenge,
 					needsPasswordUpgrade: isLegacy ? password : null,
 					createdAt: Date.now()
 				}),
@@ -286,7 +301,11 @@ const loginService = {
 				mfaRequired: true,
 				tempToken,
 				authType: 'totp',
-				email: userRow.email
+				email: userRow.email,
+				hasTotp: !!userRow.totpSecret,
+				hasPasskeys: securityKeysList.length > 0,
+				passkeys: securityKeysList.map(k => ({ id: k.credentialId, type: 'public-key' })),
+				passkeyChallenge
 			};
 		}
 
@@ -332,9 +351,13 @@ const loginService = {
 	},
 
 	async verifyTotpLogin(c, params) {
-		const { tempToken, code, isBackupCode = false } = params;
+		const { tempToken, code, isBackupCode = false, isPasskey = false, credentialId, clientDataJSON, authenticatorData, signature } = params;
 
-		if (!tempToken || !code) {
+		if (!tempToken) {
+			throw new BizError(t('totpCodeEmpty'));
+		}
+
+		if (!isPasskey && !code) {
 			throw new BizError(t('totpCodeEmpty'));
 		}
 
@@ -381,7 +404,47 @@ const loginService = {
 			throw new BizError(t('isBanUser'));
 		}
 
-		if (isBackupCode) {
+		if (isPasskey) {
+			// Verify WebAuthn / Passkey signature
+			if (!credentialId || !clientDataJSON || !authenticatorData || !signature) {
+				throw new BizError('Missing passkey authentication credentials');
+			}
+
+			const clientData = webauthnUtils.parseClientData(clientDataJSON);
+			if (clientData.challenge !== pendingData.passkeyChallenge) {
+				await incrementAccountFail();
+				throw new BizError('Passkey challenge mismatch or expired');
+			}
+
+			let keys = [];
+			if (userRow.securityKeys) {
+				try {
+					keys = typeof userRow.securityKeys === 'string' ? JSON.parse(userRow.securityKeys) : userRow.securityKeys;
+					if (!Array.isArray(keys)) keys = [];
+				} catch (e) {
+					keys = [];
+				}
+			}
+
+			const targetKey = keys.find(k => k.credentialId === credentialId);
+			if (!targetKey) {
+				await incrementAccountFail();
+				throw new BizError('Unrecognized security key');
+			}
+
+			const isValidSig = await webauthnUtils.verifyAuthenticationSignature({
+				clientDataJSONBase64: clientDataJSON,
+				authenticatorDataBase64: authenticatorData,
+				signatureBase64: signature,
+				publicKeyJwk: targetKey.publicKeyJwk,
+				publicKeyRaw: targetKey.publicKeyRaw
+			});
+
+			if (!isValidSig) {
+				await incrementAccountFail();
+				throw new BizError('Security key authentication signature invalid');
+			}
+		} else if (isBackupCode) {
 			// Verify backup recovery code
 			const backupResult = await totpUtils.verifyAndConsumeBackupCode(code, userRow.totpBackupCodes);
 			if (!backupResult.isValid) {

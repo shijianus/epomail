@@ -898,9 +898,9 @@ async function saveDrawer() {
 }
 
 .settings-card {
-  background-color: var(--el-bg-color);
-  border-radius: 8px;
-  border: 1px solid var(--el-border-color);
+  background-color: var(--bg-surface);
+  border-radius: 14px;
+  border: 1px solid var(--border-subtle);
   transition: all 300ms;
   overflow: hidden;
 }

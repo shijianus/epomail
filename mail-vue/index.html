@@ -18,8 +18,18 @@
     const isMobile = !window.matchMedia("(pointer: fine) and (hover: hover)").matches;
     let isDark = true;
     if (uiStoreStr) {
-      const uiStore = JSON.parse(uiStoreStr);
-      isDark = uiStore.dark !== false; // Only light if explicitly false
+      try {
+        const uiStore = JSON.parse(uiStoreStr);
+        if (uiStore.themeMode === 'light') {
+          isDark = false;
+        } else if (uiStore.themeMode === 'dark') {
+          isDark = true;
+        } else if (uiStore.themeMode === 'auto' || uiStore.themeMode === 'system') {
+          isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        } else {
+          isDark = uiStore.dark !== false;
+        }
+      } catch (e) {}
     }
     root.setAttribute('class', isDark ? 'dark' : '');
     metaTag.setAttribute('content', isDark ? (isMobile ? '#141414' : '#000000') : (isMobile ? '#FFFFFF' : '#F1F1F1'));
@@ -263,6 +273,14 @@
 <body>
 <script>
   window.__EPO_LOADING_START__ = Date.now();
+  // Failsafe auto-dismiss: ensure loading screen is ALWAYS dismissed after at most 1500ms
+  setTimeout(function() {
+    var el = document.getElementById('loading-first');
+    if (el && !el.classList.contains('loading-hide')) {
+      el.classList.add('loading-hide');
+      setTimeout(function() { if (el && el.parentNode) el.parentNode.removeChild(el); }, 400);
+    }
+  }, 1500);
 </script>
 <div id="loading-first">
   <div class="epo-rise">

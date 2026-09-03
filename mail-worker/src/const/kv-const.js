@@ -8,7 +8,9 @@ const KvConst = {
 	LOGIN_FAIL: "login_fail:",
 	TOTP_PENDING: "totp_pending:",
 	TOTP_SETUP: "totp_setup:",
-	TOTP_REPLAY: "totp_replay:"
+	TOTP_REPLAY: "totp_replay:",
+	WEBAUTHN_SETUP: "webauthn_setup:",
+	WEBAUTHN_PENDING: "webauthn_pending:"
 }
 
 export default KvConst;

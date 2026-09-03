@@ -1,104 +1,254 @@
 <template>
   <div class="box">
-    <!-- Account Information -->
+    <!-- Section 1: Account Security Information -->
     <div class="container">
-      <div class="title">{{$t('securitySetting') || 'Security Settings'}}</div>
+      <div class="title">{{ $t('securitySetting') || '安全设置' }}</div>
       <div class="item">
-        <div>{{$t('username')}}</div>
+        <div>{{ $t('username') }}</div>
         <div>
           <span v-if="setNameShow" class="edit-name-input">
             <el-input v-model="accountName"></el-input>
             <span class="edit-name" @click="setName">
-             {{$t('save')}}
+             {{ $t('save') }}
             </span>
           </span>
           <span v-else class="user-name">
             <span>{{ userStore.user.name }}</span>
             <span class="edit-name" @click="showSetName">
-             {{$t('change')}}
+             {{ $t('change') }}
             </span>
           </span>
         </div>
       </div>
       <div class="item">
-        <div>{{$t('emailAccount')}}</div>
+        <div>{{ $t('emailAccount') }}</div>
         <div>{{ userStore.user.email }}</div>
       </div>
       <div class="item">
-        <div>{{$t('password')}}</div>
-        <div>
-          <el-button type="primary" @click="pwdShow = true">{{$t('changePwdBtn')}}</el-button>
+        <div>{{ $t('password') }}</div>
+        <div style="display: flex; align-items: center; gap: 16px;">
+          <el-button type="primary" @click="pwdShow = true">{{ $t('changePwdBtn') }}</el-button>
+          <span v-if="passwordChangedText" style="font-size: 12px; color: var(--text-muted);">{{ passwordChangedText }}</span>
         </div>
       </div>
     </div>
 
-    <!-- 2FA Section -->
-    <div class="totp-section">
-      <div class="title">{{ $t('totpTitle') }}</div>
-      <div class="totp-card">
-        <div class="totp-info">
-          <div class="totp-status-row">
-            <span class="totp-label">{{ $t('totpStatus') }}:</span>
-            <el-tag :type="totpStatus.enabled ? 'success' : 'info'" effect="light" round>
-              {{ totpStatus.enabled ? $t('totpEnabled') : $t('totpDisabled') }}
-            </el-tag>
-            <el-tag v-if="totpStatus.enabled" type="warning" effect="plain" round class="backup-remain-tag">
-              {{ $t('totpBackupRemaining', { count: totpStatus.backupCodesRemaining }) }}
-            </el-tag>
+    <!-- Section 2: Google-Style 2-Step Verification Center -->
+    <div class="container two-factor-center" v-if="totpStatus.globalEnabled">
+      <div class="title">{{ $t('twoFactorCenter') || '两步验证中心' }}</div>
+
+      <!-- Hero Status Banner -->
+      <div class="two-factor-banner" :class="{ 'is-enabled': totpStatus.enabled }">
+        <div class="banner-left">
+          <div class="shield-badge" :class="{ 'active-shield': totpStatus.enabled }">
+            <Icon v-if="totpStatus.enabled" icon="fluent:shield-checkmark-20-filled" width="28" height="28" />
+            <Icon v-else icon="fluent:shield-20-regular" width="28" height="28" />
           </div>
-          <div class="totp-desc">
-            {{ totpStatus.enabled ? $t('totpEnabledDesc') : $t('totpDisabledDesc') }}
+          <div class="banner-texts">
+            <div class="banner-status-row">
+              <span class="banner-title">{{ $t('totpTitle') || '两步验证 (2FA)' }}</span>
+              <el-tag
+                :type="totpStatus.enabled ? 'success' : 'info'"
+                effect="dark"
+                round
+                class="status-pill"
+              >
+                {{ totpStatus.enabled ? ($t('totpEnabled') || '已启用') : ($t('totpDisabled') || '未启用') }}
+              </el-tag>
+            </div>
+            <div class="banner-desc">
+              <span v-if="totpStatus.enabled">
+                {{ totpStatus.createdAt ? $t('twoFactorProtectedSince', { date: formatDate(totpStatus.createdAt) }) : $t('totpEnabledDesc') }}
+              </span>
+              <span v-else>
+                {{ $t('twoFactorBannerDisabledDesc') || '为您的账号添加一层额外安全防线。启用后，登录需要密码和第二步验证。' }}
+              </span>
+            </div>
           </div>
         </div>
-        <div class="totp-actions">
-          <template v-if="!totpStatus.enabled">
-            <el-button type="primary" :loading="totpLoading" @click="startTotpSetup">
-              {{ $t('totpEnableBtn') }}
-            </el-button>
-          </template>
-          <template v-else>
-            <el-button type="default" :loading="totpLoading" @click="openRegenBackupModal">
-              {{ $t('totpRegenBackupBtn') }}
-            </el-button>
-            <el-button type="danger" plain :loading="totpLoading" @click="openDisableTotpModal">
-              {{ $t('totpDisableBtn') }}
-            </el-button>
-          </template>
+        <div class="banner-right">
+          <el-button
+            v-if="totpStatus.enabled"
+            type="danger"
+            plain
+            :loading="totpLoading"
+            @click="openDisableTotpModal"
+            class="action-pill-btn"
+          >
+            <Icon icon="fluent:power-20-regular" width="16" height="16" style="margin-right: 6px;" />
+            {{ $t('turnOff2FA') || '停用两步验证' }}
+          </el-button>
+          <el-button
+            v-else
+            type="primary"
+            :loading="totpLoading"
+            @click="startTotpSetup"
+            class="action-pill-btn primary-glow"
+          >
+            <Icon icon="fluent:shield-keyhole-20-filled" width="16" height="16" style="margin-right: 6px;" />
+            {{ $t('turnOn2FA') || '设置两步验证' }}
+          </el-button>
+        </div>
+      </div>
+
+      <!-- Second-Step Verification Methods -->
+      <div class="second-steps-card">
+        <div class="card-header">
+          <div class="sub-title">{{ $t('secondStepMethods') || '可用的第二步验证方式' }}</div>
+          <div class="sub-desc">{{ $t('secondStepMethodsDesc') || '通过以下安全验证方式确认是您本人在登录：' }}</div>
+        </div>
+
+        <div class="methods-list">
+          <!-- Method 1: Authenticator App (TOTP) -->
+          <div class="method-item">
+            <div class="method-icon-box app-icon-box">
+              <Icon icon="fluent:phone-key-24-regular" width="22" height="22" />
+            </div>
+            <div class="method-content">
+              <div class="method-headline">
+                <span class="method-name">{{ $t('authenticatorApp') || '身份验证器应用' }}</span>
+                <el-tag :type="totpStatus.totpConfigured ? 'success' : 'info'" size="small" effect="plain" round>
+                  {{ totpStatus.totpConfigured ? ($t('configured') || '已配置') : ($t('notConfigured') || '未配置') }}
+                </el-tag>
+              </div>
+              <div class="method-subtext">
+                {{ $t('authenticatorAppDesc') || '使用 Google Authenticator、Microsoft Authenticator 或 1Password 等应用获取动态验证码。' }}
+              </div>
+            </div>
+            <div class="method-action">
+              <el-button
+                size="default"
+                :type="totpStatus.totpConfigured ? 'default' : 'primary'"
+                :plain="!totpStatus.totpConfigured"
+                :loading="totpLoading"
+                @click="startTotpSetup"
+              >
+                {{ totpStatus.totpConfigured ? ($t('reconfigure') || '重新配置') : ($t('turnOn2FA') || '立即设置') }}
+              </el-button>
+            </div>
+          </div>
+
+          <!-- Method 2: Backup Recovery Codes -->
+          <div class="method-item">
+            <div class="method-icon-box backup-icon-box">
+              <Icon icon="fluent:password-24-regular" width="22" height="22" />
+            </div>
+            <div class="method-content">
+              <div class="method-headline">
+                <span class="method-name">{{ $t('backupCodesTitle') || '备用恢复码' }}</span>
+                <el-tag v-if="totpStatus.enabled" type="warning" size="small" effect="plain" round>
+                  {{ $t('backupCodesRemainingCount', { count: totpStatus.backupCodesRemaining }) }}
+                </el-tag>
+                <el-tag v-else type="info" size="small" effect="plain" round>
+                  {{ $t('notConfigured') || '未配置' }}
+                </el-tag>
+              </div>
+              <div class="method-subtext">
+                {{ $t('backupCodesDesc') || '10 组一次性安全代码，在您无法使用验证器或安全密钥时用于紧急登录。' }}
+              </div>
+            </div>
+            <div class="method-action dual-actions">
+              <template v-if="totpStatus.enabled">
+                <el-button
+                  size="default"
+                  @click="openViewBackupCodesModal"
+                >
+                  {{ $t('viewBackupCodesBtn') || '查看代码' }}
+                </el-button>
+                <el-button
+                  size="default"
+                  @click="openRegenBackupModal"
+                >
+                  {{ $t('totpRegenBackupBtn') || '生成新代码' }}
+                </el-button>
+              </template>
+              <el-button v-else size="default" disabled>
+                {{ $t('viewBackupCodesBtn') || '查看代码' }}
+              </el-button>
+            </div>
+          </div>
+
+          <!-- Method 3: Passkeys & Security Keys (WebAuthn / FIDO2) -->
+          <div class="method-item passkey-section-item">
+            <div class="method-main-row">
+              <div class="method-icon-box passkey-icon-box">
+                <Icon icon="fluent:shield-keyhole-24-regular" width="22" height="22" />
+              </div>
+              <div class="method-content">
+                <div class="method-headline">
+                  <span class="method-name">{{ $t('passkeysAndSecurityKeys') || '通行密钥与安全密钥' }}</span>
+                  <el-tag :type="passkeyList.length > 0 ? 'success' : 'info'" size="small" effect="plain" round>
+                    {{ passkeyList.length > 0 ? `${passkeyList.length} 个密钥` : ($t('notConfigured') || '未配置') }}
+                  </el-tag>
+                </div>
+                <div class="method-subtext">
+                  {{ $t('passkeysDesc') || '使用硬件安全密钥 (如 YubiKey) 或设备生物识别 (Touch ID / Face ID / Windows Hello) 作为抗钓鱼的两步验证。' }}
+                </div>
+              </div>
+              <div class="method-action">
+                <el-button
+                  type="primary"
+                  size="default"
+                  plain
+                  @click="openAddPasskeyModal"
+                >
+                  <Icon icon="fluent:add-12-filled" width="14" height="14" style="margin-right: 4px;" />
+                  {{ $t('addSecurityKeyBtn') || '添加安全密钥' }}
+                </el-button>
+              </div>
+            </div>
+
+            <!-- Registered Passkeys Sub-list -->
+            <div v-if="passkeyList.length > 0" class="passkeys-sublist">
+              <div
+                v-for="key in passkeyList"
+                :key="key.id"
+                class="passkey-row"
+              >
+                <div class="passkey-info">
+                  <Icon icon="fluent:usb-plug-20-regular" width="18" height="18" class="key-icon" />
+                  <div class="passkey-details">
+                    <span class="passkey-name">{{ key.name }}</span>
+                    <span class="passkey-date">{{ $t('tabRegisteredAt') || '添加于' }}: {{ formatDate(key.createdAt) }}</span>
+                  </div>
+                </div>
+                <div class="passkey-actions">
+                  <el-button
+                    type="danger"
+                    text
+                    size="small"
+                    @click="confirmDeletePasskey(key)"
+                  >
+                    <Icon icon="lucide:trash-2" width="16" height="16" />
+                  </el-button>
+                </div>
+              </div>
+            </div>
+            <div v-else class="empty-passkeys-hint">
+              <span>{{ $t('noSecurityKeys') || '尚未添加任何安全密钥' }}</span>
+            </div>
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- Language Selection -->
-    <div class="language">
-      <div class="title">{{$t('language')}}</div>
-      <el-select
-          :model-value="langSelect"
-          class="language-select"
-          placeholder="Select"
-          @change="changeLang"
-      >
-        <el-option label="中文" value="zh" @pointerdown.prevent.stop="changeLang('zh')"/>
-        <el-option label="English" value="en" @pointerdown.prevent.stop="changeLang('en')"/>
-      </el-select>
-    </div>
-
-    <!-- Account Deletion -->
-    <div class="del-email" v-perm="'my:delete'">
-      <div class="title">{{$t('deleteUser')}}</div>
-      <div style="color: var(--regular-text-color);">
-        {{$t('delAccountMsg')}}
+    <!-- Section 3: Account Deletion -->
+    <div class="container del-email" v-perm="'my:delete'">
+      <div class="title">{{ $t('deleteUser') || '注销账号' }}</div>
+      <div class="del-msg">
+        {{ $t('delAccountMsg') }}
       </div>
-      <div>
-        <el-button type="primary" @click="deleteConfirm">{{$t('deleteUserBtn')}}</el-button>
+      <div class="del-action">
+        <el-button type="danger" plain @click="deleteConfirm">{{ $t('deleteUserBtn') || '注销账号' }}</el-button>
       </div>
     </div>
 
     <!-- Change Password Dialog -->
-    <el-dialog v-model="pwdShow" :title="$t('changePassword')" width="340">
+    <el-dialog v-model="pwdShow" :title="$t('changePassword')" width="340px">
       <div class="update-pwd">
         <el-input type="password" :placeholder="$t('newPassword')" v-model="form.password" autocomplete="off"/>
         <el-input type="password" :placeholder="$t('confirmPassword')" v-model="form.newPwd" autocomplete="off"/>
-        <el-button type="primary" :loading="setPwdLoading" @click="submitPwd">{{$t('save')}}</el-button>
+        <el-button type="primary" :loading="setPwdLoading" @click="submitPwd">{{ $t('save') }}</el-button>
       </div>
     </el-dialog>
 
@@ -157,7 +307,7 @@
             />
           </div>
           <div class="dialog-footer-actions dual-actions">
-            <el-button @click="setupStep = 1">{{ $t('backBtn') || $t('back') || '返回' }}</el-button>
+            <el-button @click="setupStep = 1">{{ $t('backBtn') || '返回' }}</el-button>
             <el-button type="primary" :loading="enableLoading" @click="submitEnableTotp">
               {{ $t('totpVerifyAndEnable') }}
             </el-button>
@@ -197,38 +347,64 @@
       </div>
     </el-dialog>
 
-    <!-- Disable 2FA Modal -->
+    <!-- View Backup Codes Modal -->
     <el-dialog
-      v-model="disableDialogVisible"
-      :title="$t('totpDisableTitle')"
-      width="400px"
+      v-model="viewBackupDialogVisible"
+      :title="$t('viewBackupCodesBtn') || '查看备用恢复码'"
+      width="460px"
       destroy-on-close
     >
-      <div class="disable-modal-content">
-        <div class="disable-desc" style="color: var(--regular-text-color); margin-bottom: 15px; font-size: 13px;">
-          {{ $t('totpDisableDesc') }}
+      <div v-if="viewBackupCodesList.length === 0 && !viewBackupVerified" class="password-verify-box">
+        <div class="dialog-sub-desc">
+          {{ $t('verifyPasswordToViewDesc') || '出于安全考虑，查看备用恢复码需要验证您的登录密码：' }}
         </div>
-        <div class="form-group" style="display: flex; flex-direction: column; gap: 14px;">
-          <el-input
-            type="password"
-            :placeholder="$t('totpPasswordPlaceholder')"
-            v-model="disableForm.password"
-            autocomplete="off"
-          />
-          <el-input
-            :placeholder="$t('totpCodeOrBackupPlaceholder')"
-            v-model="disableForm.code"
-            autocomplete="off"
-            @keyup.enter="submitDisableTotp"
+        <el-input
+          type="password"
+          :placeholder="$t('totpPasswordPlaceholder')"
+          v-model="viewBackupPassword"
+          autocomplete="off"
+          @keyup.enter="submitViewBackupCodes"
+        />
+      </div>
+      <div v-else class="codes-display-box">
+        <div v-if="viewBackupCodesList.length > 0">
+          <div class="backup-codes-grid">
+            <div
+              v-for="(code, idx) in viewBackupCodesList"
+              :key="idx"
+              class="backup-code-item"
+            >
+              {{ code }}
+            </div>
+          </div>
+          <div class="backup-actions-toolbar">
+            <el-button size="small" @click="copyViewBackupCodes">{{ $t('totpCopyAll') }}</el-button>
+            <el-button size="small" @click="downloadViewBackupCodesTxt">{{ $t('totpDownloadTxt') }}</el-button>
+            <el-button size="small" @click="printViewBackupCodes">{{ $t('totpPrint') }}</el-button>
+          </div>
+        </div>
+        <div v-else class="no-codes-hint">
+          <el-alert
+            :title="$t('backupCodesDesc')"
+            type="info"
+            :closable="false"
+            show-icon
           />
         </div>
       </div>
       <template #footer>
         <div class="dialog-footer">
-          <el-button @click="disableDialogVisible = false">{{ $t('cancel') || '取消' }}</el-button>
-          <el-button type="danger" :loading="disableLoading" @click="submitDisableTotp">
-            {{ $t('totpConfirmDisable') }}
-          </el-button>
+          <template v-if="!viewBackupVerified">
+            <el-button @click="viewBackupDialogVisible = false">{{ $t('cancel') || '取消' }}</el-button>
+            <el-button type="primary" :loading="viewBackupLoading" @click="submitViewBackupCodes">
+              {{ $t('confirm') || '确认验证' }}
+            </el-button>
+          </template>
+          <template v-else>
+            <el-button type="primary" class="w-full" @click="viewBackupDialogVisible = false">
+              {{ $t('totpDone') || '完成' }}
+            </el-button>
+          </template>
         </div>
       </template>
     </el-dialog>
@@ -241,7 +417,7 @@
       destroy-on-close
     >
       <div v-if="regenResultCodes.length === 0" class="regen-modal-content">
-        <div style="color: var(--regular-text-color); margin-bottom: 15px; font-size: 13px;">
+        <div class="dialog-sub-desc">
           {{ $t('totpRegenDesc') }}
         </div>
         <el-input
@@ -286,9 +462,76 @@
           </template>
           <template v-else>
             <el-button type="primary" class="w-full" @click="regenDialogVisible = false">
-              {{ $t('totpDone') }}
+              {{ $t('totpDone') || '完成' }}
             </el-button>
           </template>
+        </div>
+      </template>
+    </el-dialog>
+
+    <!-- Add Passkey / Security Key Modal -->
+    <el-dialog
+      v-model="addPasskeyDialogVisible"
+      :title="$t('addSecurityKeyBtn') || '添加安全密钥'"
+      width="440px"
+      destroy-on-close
+    >
+      <div class="add-passkey-content">
+        <div class="dialog-sub-desc">
+          {{ $t('passkeysDesc') }}
+        </div>
+        <div class="key-name-field">
+          <span class="field-label">{{ $t('securityKeyName') || '密钥名称' }}</span>
+          <el-input
+            v-model="newPasskeyName"
+            :placeholder="$t('securityKeyNamePlaceholder') || '例如：MacBook Touch ID、YubiKey 5C'"
+            maxlength="40"
+            @keyup.enter="handleCreatePasskey"
+          />
+        </div>
+      </div>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="addPasskeyDialogVisible = false">{{ $t('cancel') || '取消' }}</el-button>
+          <el-button type="primary" :loading="passkeyLoading" @click="handleCreatePasskey">
+            {{ $t('continue') || '开始注册验证' }}
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
+
+    <!-- Disable 2FA Modal -->
+    <el-dialog
+      v-model="disableDialogVisible"
+      :title="$t('totpDisableTitle')"
+      width="400px"
+      destroy-on-close
+    >
+      <div class="disable-modal-content">
+        <div class="dialog-sub-desc">
+          {{ $t('totpDisableDesc') }}
+        </div>
+        <div class="form-group" style="display: flex; flex-direction: column; gap: 14px;">
+          <el-input
+            type="password"
+            :placeholder="$t('totpPasswordPlaceholder')"
+            v-model="disableForm.password"
+            autocomplete="off"
+          />
+          <el-input
+            :placeholder="$t('totpCodeOrBackupPlaceholder')"
+            v-model="disableForm.code"
+            autocomplete="off"
+            @keyup.enter="submitDisableTotp"
+          />
+        </div>
+      </div>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="disableDialogVisible = false">{{ $t('cancel') || '取消' }}</el-button>
+          <el-button type="danger" :loading="disableLoading" @click="submitDisableTotp">
+            {{ $t('totpConfirmDisable') }}
+          </el-button>
         </div>
       </template>
     </el-dialog>
@@ -296,7 +539,8 @@
 </template>
 
 <script setup>
-import { reactive, ref, onMounted, defineOptions } from 'vue'
+import { reactive, ref, computed, onMounted, defineOptions } from 'vue'
+import { useRoute } from 'vue-router'
 import {
   resetPassword,
   userDelete,
@@ -304,24 +548,48 @@ import {
   getTotpSetup,
   enableTotp,
   disableTotp,
-  regenerateBackupCodes
+  regenerateBackupCodes,
+  viewBackupCodes,
+  getPasskeySetup,
+  registerPasskey,
+  getPasskeyList,
+  deletePasskey
 } from "@/request/my.js";
 import { useUserStore } from "@/store/user.js";
+import { useSettingStore } from "@/store/setting.js";
 import router from "@/router/index.js";
 import { accountSetName } from "@/request/account.js";
 import { useAccountStore } from "@/store/account.js";
 import { useI18n } from "vue-i18n";
-import { useSettingStore } from "@/store/setting.js";
+import { ElMessage, ElMessageBox } from 'element-plus';
+import { Icon } from "@iconify/vue";
 import QRCode from 'qrcode';
 
 const { t } = useI18n()
+const route = useRoute()
 const accountStore = useAccountStore()
-const settingStore = useSettingStore()
 const userStore = useUserStore();
+const settingStore = useSettingStore();
 const setPwdLoading = ref(false)
 const setNameShow = ref(false)
 const accountName = ref(null)
-const langSelect = ref(settingStore.lang)
+
+const passwordChangedText = computed(() => {
+  const ts = userStore.user.passwordUpdatedAt || userStore.user.createTime
+  if (!ts) return ''
+  try {
+    const d = new Date(ts)
+    if (isNaN(d.getTime())) return `上次变更时间：${ts}`
+    const year = d.getFullYear()
+    const month = d.getMonth() + 1
+    const day = d.getDate()
+    return settingStore.lang === 'en'
+      ? `Last changed: ${year}-${month < 10 ? '0' + month : month}-${day < 10 ? '0' + day : day}`
+      : `上次变更时间：${year}年${month}月${day}日`
+  } catch (e) {
+    return `上次变更时间：${ts}`
+  }
+})
 
 defineOptions({
   name: 'setting'
@@ -330,12 +598,29 @@ defineOptions({
 // ==========================================
 // 2FA Reactive State & Methods
 // ==========================================
+function isGlobal2FAEnabled() {
+  const settings = settingStore.settings;
+  if (!settings) return false;
+  const mode = Number(settings.allMailMode);
+  if (mode === 0 || mode === 2) return true;
+  if (mode === 1) return Number(settings.totp) !== 0;
+  return false;
+}
+
 const totpLoading = ref(false)
 const totpStatus = reactive({
+  globalEnabled: isGlobal2FAEnabled(),
   enabled: false,
+  totpConfigured: false,
   backupCodesRemaining: 0,
+  securityKeysCount: 0,
   createdAt: null
 })
+
+const passkeyList = ref([])
+const addPasskeyDialogVisible = ref(false)
+const newPasskeyName = ref('')
+const passkeyLoading = ref(false)
 
 const setupDialogVisible = ref(false)
 const setupStep = ref(1)
@@ -349,6 +634,12 @@ const setupCode = ref('')
 const enableLoading = ref(false)
 const backupCodesList = ref([])
 
+const viewBackupDialogVisible = ref(false)
+const viewBackupPassword = ref('')
+const viewBackupLoading = ref(false)
+const viewBackupVerified = ref(false)
+const viewBackupCodesList = ref([])
+
 const disableDialogVisible = ref(false)
 const disableLoading = ref(false)
 const disableForm = reactive({
@@ -361,12 +652,25 @@ const regenLoading = ref(false)
 const regenPassword = ref('')
 const regenResultCodes = ref([])
 
+function formatDate(isoStr) {
+  if (!isoStr) return '';
+  try {
+    const d = new Date(isoStr);
+    return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  } catch (e) {
+    return isoStr;
+  }
+}
+
 const fetchTotpStatus = async () => {
   try {
     const res = await getTotpStatus();
     if (res) {
+      totpStatus.globalEnabled = res.globalEnabled ?? isGlobal2FAEnabled();
       totpStatus.enabled = !!res.enabled;
+      totpStatus.totpConfigured = res.totpConfigured ?? (res.enabled && (res.backupCodesRemaining > 0 || res.createdAt));
       totpStatus.backupCodesRemaining = res.backupCodesRemaining || 0;
+      totpStatus.securityKeysCount = res.securityKeysCount || 0;
       totpStatus.createdAt = res.createdAt || null;
     }
   } catch (err) {
@@ -374,8 +678,21 @@ const fetchTotpStatus = async () => {
   }
 }
 
+const fetchPasskeys = async () => {
+  try {
+    const res = await getPasskeyList();
+    passkeyList.value = Array.isArray(res) ? res : [];
+  } catch (err) {
+    console.error('Failed to load passkeys:', err);
+  }
+}
+
 onMounted(() => {
+  if (route.query && route.query.action === 'change-password') {
+    pwdShow.value = true;
+  }
   fetchTotpStatus();
+  fetchPasskeys();
 })
 
 const startTotpSetup = async () => {
@@ -418,7 +735,7 @@ const copySecret = () => {
   if (setupData.secret) {
     navigator.clipboard.writeText(setupData.secret).then(() => {
       ElMessage({
-        message: t('totpKeyCopySuccess'),
+        message: t('totpKeyCopySuccess') || 'Secret key copied',
         type: 'success',
         plain: true
       });
@@ -465,7 +782,7 @@ const copyAllBackupCodes = () => {
 }
 
 const downloadBackupCodesTxt = () => {
-  const text = `EpoMail 2FA Recovery Backup Codes\nGenerated at: ${new Date().toISOString()}\n\n` +
+  const text = `EpoCanvas Mail 2FA Recovery Backup Codes\nGenerated at: ${new Date().toISOString()}\n\n` +
     backupCodesList.value.map((c, i) => `${i + 1}. ${c}`).join('\n') +
     '\n\n* Each code can be used only once.';
   const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
@@ -483,7 +800,7 @@ const printBackupCodes = () => {
   printWindow.document.write(`
     <html>
       <head>
-        <title>EpoMail 2FA Backup Codes</title>
+        <title>EpoCanvas Mail 2FA Backup Codes</title>
         <style>
           body { font-family: monospace; padding: 40px; }
           h2 { color: #333; }
@@ -491,7 +808,7 @@ const printBackupCodes = () => {
         </style>
       </head>
       <body>
-        <h2>🛡️ EpoMail 2FA Recovery Backup Codes</h2>
+        <h2>🛡️ EpoCanvas Mail 2FA Recovery Backup Codes</h2>
         <p>Keep these codes safe. Each code can be used only once.</p>
         <hr/>
         <ol>
@@ -510,7 +827,244 @@ const finishSetup = () => {
   fetchTotpStatus();
 }
 
+// ==========================================
+// View Backup Codes
+// ==========================================
+const openViewBackupCodesModal = () => {
+  viewBackupPassword.value = '';
+  viewBackupCodesList.value = [];
+  viewBackupVerified.value = false;
+  viewBackupDialogVisible.value = true;
+}
+
+const submitViewBackupCodes = async () => {
+  if (!viewBackupPassword.value) {
+    ElMessage({
+      message: t('emptyPwdMsg') || 'Please enter password',
+      type: 'error',
+      plain: true
+    });
+    return;
+  }
+
+  viewBackupLoading.value = true;
+  try {
+    const res = await viewBackupCodes(viewBackupPassword.value);
+    viewBackupVerified.value = true;
+    if (res && Array.isArray(res.backupCodes) && res.backupCodes.length > 0) {
+      viewBackupCodesList.value = res.backupCodes;
+    } else {
+      viewBackupCodesList.value = [];
+    }
+  } catch (err) {
+    ElMessage({
+      message: err.message || 'Verification failed',
+      type: 'error',
+      plain: true
+    });
+  } finally {
+    viewBackupLoading.value = false;
+  }
+}
+
+const copyViewBackupCodes = () => {
+  const text = viewBackupCodesList.value.join('\n');
+  navigator.clipboard.writeText(text).then(() => {
+    ElMessage({
+      message: t('totpCopySuccess'),
+      type: 'success',
+      plain: true
+    });
+  });
+}
+
+const downloadViewBackupCodesTxt = () => {
+  const text = `EpoCanvas Mail 2FA Recovery Backup Codes\nExported at: ${new Date().toISOString()}\n\n` +
+    viewBackupCodesList.value.map((c, i) => `${i + 1}. ${c}`).join('\n') +
+    '\n\n* Each code can be used only once.';
+  const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `epomail-backup-codes-${Date.now()}.txt`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+const printViewBackupCodes = () => {
+  const printWindow = window.open('', '_blank');
+  if (!printWindow) return;
+  printWindow.document.write(`
+    <html>
+      <head>
+        <title>EpoCanvas Mail 2FA Backup Codes</title>
+        <style>
+          body { font-family: monospace; padding: 40px; }
+          h2 { color: #333; }
+          .code-item { font-size: 16px; padding: 6px 0; }
+        </style>
+      </head>
+      <body>
+        <h2>🛡️ EpoCanvas Mail 2FA Recovery Backup Codes</h2>
+        <p>Keep these codes safe. Each code can be used only once.</p>
+        <hr/>
+        <ol>
+          ${viewBackupCodesList.value.map(c => `<li class="code-item"><strong>${c}</strong></li>`).join('')}
+        </ol>
+      </body>
+    </html>
+  `);
+  printWindow.document.close();
+  printWindow.focus();
+  printWindow.print();
+}
+
+// ==========================================
+// Passkeys & Security Keys (WebAuthn)
+// ==========================================
+function bufferToBase64Url(buffer) {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (let i = 0; i < bytes.byteLength; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary)
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+}
+
+function base64UrlToBuffer(base64url) {
+  let base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
+  while (base64.length % 4 !== 0) {
+    base64 += '=';
+  }
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+}
+
+const openAddPasskeyModal = () => {
+  newPasskeyName.value = '';
+  addPasskeyDialogVisible.value = true;
+}
+
+const handleCreatePasskey = async () => {
+  if (!window.PublicKeyCredential) {
+    ElMessage({
+      message: t('passkeyUnsupported') || 'WebAuthn is not supported in this browser',
+      type: 'warning',
+      plain: true
+    });
+    return;
+  }
+
+  passkeyLoading.value = true;
+  try {
+    const setupData = await getPasskeySetup();
+    if (!setupData || !setupData.challenge) {
+      throw new Error('Failed to obtain challenge');
+    }
+
+    const challengeBytes = base64UrlToBuffer(setupData.challenge);
+    const userIdBytes = new TextEncoder().encode(setupData.user.id);
+
+    const credential = await navigator.credentials.create({
+      publicKey: {
+        challenge: challengeBytes,
+        rp: setupData.rp,
+        user: {
+          id: userIdBytes,
+          name: setupData.user.name,
+          displayName: setupData.user.displayName
+        },
+        pubKeyCredParams: setupData.pubKeyCredParams || [
+          { type: 'public-key', alg: -7 },
+          { type: 'public-key', alg: -257 }
+        ],
+        authenticatorSelection: setupData.authenticatorSelection || {
+          userVerification: 'preferred',
+          residentKey: 'preferred'
+        },
+        timeout: setupData.timeout || 60000,
+        attestation: 'none'
+      }
+    });
+
+    if (!credential) {
+      throw new Error('Passkey creation cancelled');
+    }
+
+    const clientDataJSON = bufferToBase64Url(credential.response.clientDataJSON);
+    const attestationObject = bufferToBase64Url(credential.response.attestationObject);
+    const credentialId = bufferToBase64Url(credential.rawId);
+    const transports = credential.response.getTransports ? credential.response.getTransports() : [];
+
+    await registerPasskey({
+      name: newPasskeyName.value || 'Security Key',
+      credentialId,
+      clientDataJSON,
+      attestationObject,
+      transports
+    });
+
+    ElMessage({
+      message: t('passkeyRegisterSuccess') || 'Security key added successfully!',
+      type: 'success',
+      plain: true
+    });
+
+    addPasskeyDialogVisible.value = false;
+    await fetchTotpStatus();
+    await fetchPasskeys();
+  } catch (err) {
+    if (err.name !== 'NotAllowedError') {
+      ElMessage({
+        message: err.message || 'Failed to register security key',
+        type: 'error',
+        plain: true
+      });
+    }
+  } finally {
+    passkeyLoading.value = false;
+  }
+}
+
+const confirmDeletePasskey = (key) => {
+  ElMessageBox.confirm(
+    t('deleteSecurityKeyConfirm', { name: key.name }) || `Are you sure you want to remove security key "${key.name}"?`,
+    t('deleteSecurityKey') || '删除密钥',
+    {
+      confirmButtonText: t('confirm') || '确认',
+      cancelButtonText: t('cancel') || '取消',
+      type: 'warning'
+    }
+  ).then(async () => {
+    try {
+      await deletePasskey(key.id);
+      ElMessage({
+        message: t('passkeyDeleteSuccess') || 'Security key removed',
+        type: 'success',
+        plain: true
+      });
+      await fetchTotpStatus();
+      await fetchPasskeys();
+    } catch (err) {
+      ElMessage({
+        message: err.message || 'Failed to delete security key',
+        type: 'error',
+        plain: true
+      });
+    }
+  });
+}
+
+// ==========================================
 // Disable TOTP
+// ==========================================
 const openDisableTotpModal = () => {
   disableForm.password = '';
   disableForm.code = '';
@@ -537,6 +1091,7 @@ const submitDisableTotp = async () => {
     });
     disableDialogVisible.value = false;
     await fetchTotpStatus();
+    await fetchPasskeys();
   } catch (err) {
     ElMessage({
       message: err.message || 'Failed to disable 2FA',
@@ -548,7 +1103,9 @@ const submitDisableTotp = async () => {
   }
 }
 
+// ==========================================
 // Regenerate Backup Codes
+// ==========================================
 const openRegenBackupModal = () => {
   regenPassword.value = '';
   regenResultCodes.value = [];
@@ -593,7 +1150,7 @@ const copyRegenBackupCodes = () => {
 }
 
 const downloadRegenBackupCodesTxt = () => {
-  const text = `EpoMail 2FA Recovery Backup Codes (Regenerated)\nGenerated at: ${new Date().toISOString()}\n\n` +
+  const text = `EpoCanvas Mail 2FA Recovery Backup Codes (Regenerated)\nGenerated at: ${new Date().toISOString()}\n\n` +
     regenResultCodes.value.map((c, i) => `${i + 1}. ${c}`).join('\n') +
     '\n\n* Old backup codes are now void. Each new code can be used only once.';
   const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
@@ -611,7 +1168,7 @@ const printRegenBackupCodes = () => {
   printWindow.document.write(`
     <html>
       <head>
-        <title>EpoMail 2FA Backup Codes</title>
+        <title>EpoCanvas Mail 2FA Backup Codes</title>
         <style>
           body { font-family: monospace; padding: 40px; }
           h2 { color: #333; }
@@ -619,7 +1176,7 @@ const printRegenBackupCodes = () => {
         </style>
       </head>
       <body>
-        <h2>🛡️ EpoMail 2FA Recovery Backup Codes (Regenerated)</h2>
+        <h2>🛡️ EpoCanvas Mail 2FA Recovery Backup Codes (Regenerated)</h2>
         <p>Old backup codes have been invalidated. Keep these codes safe.</p>
         <hr/>
         <ol>
@@ -670,17 +1227,6 @@ function setName() {
   }).catch(() => {
     userStore.user.name = name
   })
-}
-
-function changeLang(lang) {
-  let setting = {}
-  try {
-    setting = JSON.parse(localStorage.getItem('setting') || '{}')
-  } catch (e) {
-    setting = {}
-  }
-  localStorage.setItem('setting', JSON.stringify({...setting, lang}))
-  window.location.reload()
 }
 
 const pwdShow = ref(false)
@@ -769,18 +1315,24 @@ function submitPwd() {
   .title {
     font-size: 18px;
     font-weight: bold;
+    color: var(--text-primary);
   }
 
   .container {
     font-size: 14px;
-    display: grid;
+    display: flex;
+    flex-direction: column;
     gap: 20px;
-    margin-bottom: 40px;
+    margin-bottom: 30px;
+    padding: 24px;
+    border-radius: 14px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
 
     .item {
       display: grid;
-      grid-template-columns: 50px 1fr;
-      gap: 140px;
+      grid-template-columns: 110px 1fr;
+      gap: 80px;
       position: relative;
       align-items: center;
 
@@ -803,9 +1355,10 @@ function submitPwd() {
       }
 
       .edit-name {
-        color: #4dabff;
+        color: var(--accent-primary);
         padding-left: 10px;
         cursor: pointer;
+        font-weight: 500;
       }
 
       @media (max-width: 767px) {
@@ -814,97 +1367,373 @@ function submitPwd() {
 
       div:first-child {
         font-weight: bold;
+        color: var(--text-primary);
       }
 
       div:last-child {
         overflow: hidden;
         white-space: nowrap;
         text-overflow: ellipsis;
+        color: var(--text-secondary);
       }
     }
   }
 
-  /* 2FA Section Styles */
-  .totp-section {
-    display: flex;
-    flex-direction: column;
+  /* Two-Factor Center unified card */
+  .two-factor-center {
     gap: 16px;
-    margin-bottom: 40px;
 
-    .totp-card {
+    /* Hero Banner */
+    .two-factor-banner {
       padding: 20px 24px;
       border-radius: 12px;
-      border: 1px solid var(--el-border-color-light);
-      background-color: var(--el-fill-color-blank);
+      border: 1px solid var(--border-subtle);
+      background: var(--bg-hover);
       display: flex;
       justify-content: space-between;
       align-items: center;
-      gap: 24px;
-      flex-wrap: wrap;
+      gap: 20px;
+      transition: all 0.25s ease;
 
       @media (max-width: 767px) {
         flex-direction: column;
         align-items: flex-start;
+        padding: 16px;
         gap: 16px;
       }
 
-      .totp-info {
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-
-        .totp-status-row {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-
-          .totp-label {
-            font-size: 14px;
-            font-weight: bold;
-          }
-
-          .backup-remain-tag {
-            font-size: 12px;
-          }
-        }
-
-        .totp-desc {
-          font-size: 13px;
-          color: var(--regular-text-color);
-          max-width: 540px;
-          line-height: 1.5;
-        }
+      &.is-enabled {
+        border-color: rgba(16, 185, 129, 0.3);
+        background: rgba(16, 185, 129, 0.05);
       }
 
-      .totp-actions {
+      .banner-left {
         display: flex;
         align-items: center;
-        gap: 12px;
-        flex-wrap: wrap;
+        gap: 16px;
+
+        .shield-badge {
+          width: 46px;
+          height: 46px;
+          border-radius: 12px;
+          background: var(--bg-surface);
+          border: 1px solid var(--border-subtle);
+          color: var(--text-muted);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+          transition: all 0.25s ease;
+
+          &.active-shield {
+            background: rgba(16, 185, 129, 0.12);
+            border-color: rgba(16, 185, 129, 0.25);
+            color: #10b981;
+          }
+        }
+
+        .banner-texts {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+
+          .banner-status-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+
+            .banner-title {
+              font-size: 15px;
+              font-weight: 700;
+              color: var(--text-primary);
+            }
+
+            .status-pill {
+              font-weight: 600;
+              font-size: 11px;
+            }
+          }
+
+          .banner-desc {
+            font-size: 13px;
+            color: var(--text-secondary);
+            line-height: 1.5;
+            max-width: 580px;
+          }
+        }
+      }
+
+      .banner-right {
+        flex-shrink: 0;
+
+        @media (max-width: 767px) {
+          width: 100%;
+          .action-pill-btn {
+            width: 100%;
+          }
+        }
+
+        .action-pill-btn {
+          border-radius: 8px;
+          padding: 8px 18px;
+          font-weight: 600;
+        }
+
+        .primary-glow {
+          box-shadow: 0 2px 10px rgba(59, 130, 246, 0.2);
+        }
+      }
+    }
+
+    /* Second-steps card */
+    .second-steps-card {
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      background: var(--bg-surface);
+      overflow: hidden;
+
+      .card-header {
+        padding: 16px 20px;
+        border-bottom: 1px solid var(--border-subtle);
+        background: var(--bg-hover);
+
+        .sub-title {
+          font-size: 14px;
+          font-weight: 700;
+          color: var(--text-primary);
+          margin-bottom: 2px;
+        }
+
+        .sub-desc {
+          font-size: 12px;
+          color: var(--text-secondary);
+        }
+      }
+
+      .methods-list {
+        display: flex;
+        flex-direction: column;
+
+        .method-item {
+          padding: 18px 20px;
+          border-bottom: 1px solid var(--border-subtle);
+          display: flex;
+          align-items: center;
+          gap: 18px;
+          transition: background 0.15s ease;
+
+          &:last-child {
+            border-bottom: none;
+          }
+
+          &:hover {
+            background: var(--bg-hover);
+          }
+
+          @media (max-width: 767px) {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 14px;
+          }
+
+          .method-icon-box {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+
+            &.app-icon-box {
+              background: rgba(59, 130, 246, 0.1);
+              color: #3b82f6;
+            }
+
+            &.backup-icon-box {
+              background: rgba(245, 158, 11, 0.1);
+              color: #f59e0b;
+            }
+
+            &.passkey-icon-box {
+              background: rgba(139, 92, 246, 0.1);
+              color: #8b5cf6;
+            }
+          }
+
+          .method-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+
+            .method-headline {
+              display: flex;
+              align-items: center;
+              gap: 8px;
+
+              .method-name {
+                font-size: 14px;
+                font-weight: 600;
+                color: var(--text-primary);
+              }
+            }
+
+            .method-subtext {
+              font-size: 12px;
+              color: var(--text-secondary);
+              line-height: 1.45;
+            }
+          }
+
+          .method-action {
+            flex-shrink: 0;
+
+            &.dual-actions {
+              display: flex;
+              gap: 10px;
+            }
+
+            @media (max-width: 767px) {
+              width: 100%;
+              display: flex;
+              .el-button {
+                flex: 1;
+              }
+            }
+          }
+
+          /* Passkey Special Layout */
+          &.passkey-section-item {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 14px;
+
+            .method-main-row {
+              display: flex;
+              align-items: center;
+              gap: 18px;
+
+              @media (max-width: 767px) {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 14px;
+              }
+            }
+
+            .passkeys-sublist {
+              margin-left: 58px;
+              display: flex;
+              flex-direction: column;
+              gap: 6px;
+              background: var(--bg-hover);
+              padding: 10px 14px;
+              border-radius: 8px;
+              border: 1px solid var(--border-subtle);
+
+              @media (max-width: 767px) {
+                margin-left: 0;
+                width: 100%;
+              }
+
+              .passkey-row {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 4px 0;
+                border-bottom: 1px solid var(--border-subtle);
+
+                &:last-child {
+                  border-bottom: none;
+                }
+
+                .passkey-info {
+                  display: flex;
+                  align-items: center;
+                  gap: 10px;
+
+                  .key-icon {
+                    color: #8b5cf6;
+                  }
+
+                  .passkey-details {
+                    display: flex;
+                    flex-direction: column;
+
+                    .passkey-name {
+                      font-size: 13px;
+                      font-weight: 600;
+                      color: var(--text-primary);
+                    }
+
+                    .passkey-date {
+                      font-size: 11px;
+                      color: var(--text-muted);
+                    }
+                  }
+                }
+              }
+            }
+
+            .empty-passkeys-hint {
+              margin-left: 58px;
+              font-size: 12px;
+              color: var(--text-muted);
+              font-style: italic;
+
+              @media (max-width: 767px) {
+                margin-left: 0;
+              }
+            }
+          }
+        }
       }
     }
   }
 
-  .language {
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-    margin-bottom: 40px;
-
-    .language-select {
-      width: 100px;
-    }
-  }
-
+  /* Account Deletion Section */
   .del-email {
-    font-size: 14px;
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
+    gap: 14px;
+
+    .del-msg {
+      font-size: 13px;
+      color: var(--text-secondary);
+      line-height: 1.6;
+      max-width: 680px;
+    }
+
+    .del-action {
+      margin-top: 4px;
+    }
   }
 }
 
-/* 2FA Setup Dialog Elements */
+/* Modals & Dialog Elements */
+.dialog-sub-desc {
+  font-size: 13px;
+  color: var(--regular-text-color, #71717a);
+  line-height: 1.5;
+  margin-bottom: 16px;
+}
+
+.add-passkey-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+
+  .key-name-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+
+    .field-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--el-text-color-primary);
+    }
+  }
+}
+
 .setup-steps-wrapper {
   .step-content {
     display: flex;
@@ -990,51 +1819,6 @@ function submitPwd() {
         }
       }
     }
-
-    .backup-codes-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-      width: 100%;
-      background: var(--el-fill-color-light);
-      padding: 14px;
-      border-radius: 8px;
-
-      .backup-code-item {
-        font-family: monospace;
-        font-size: 15px;
-        font-weight: bold;
-        letter-spacing: 1px;
-        padding: 8px 12px;
-        background: var(--el-fill-color-blank);
-        border: 1px solid var(--el-border-color-lighter);
-        border-radius: 6px;
-        text-align: center;
-        color: var(--el-text-color-primary);
-      }
-    }
-
-    .backup-actions-toolbar {
-      display: flex;
-      justify-content: center;
-      gap: 12px;
-      width: 100%;
-      margin: 4px 0;
-    }
-
-    .dialog-footer-actions {
-      width: 100%;
-      margin-top: 10px;
-
-      &.dual-actions {
-        display: flex;
-        justify-content: space-between;
-        gap: 12px;
-        .el-button {
-          flex: 1;
-        }
-      }
-    }
   }
 }
 
@@ -1067,6 +1851,20 @@ function submitPwd() {
   gap: 12px;
   width: 100%;
   margin: 12px 0;
+}
+
+.dialog-footer-actions {
+  width: 100%;
+  margin-top: 10px;
+
+  &.dual-actions {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    .el-button {
+      flex: 1;
+    }
+  }
 }
 
 .w-full {

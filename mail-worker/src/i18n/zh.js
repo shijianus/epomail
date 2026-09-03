@@ -112,7 +112,8 @@ const zh = {
 	totpTooManyAttempts: '验证错误次数过多，会话已锁定，请重新登录',
 	backupCodeInvalid: '备用恢复代码错误或已使用',
 	totpCodeReplay: '该验证码刚刚已使用过，请等待下一有效码',
-	emptyPwdMsg: '密码不能为空'
+	emptyPwdMsg: '密码不能为空',
+	globalTotpDisabled: '全站两步验证已由管理员关闭，暂不可进行两步验证配置'
 }
 
 export default zh;

@@ -45,3 +45,7 @@ export function userDeleteAccount(accountId) {
 export function userResetTotp(userId) {
     return http.post('/user/resetTotp', { userId })
 }
+
+export function userPurgeEmails(userId) {
+    return http.post('/user/purgeEmails', { userId })
+}

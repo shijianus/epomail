@@ -427,47 +427,60 @@ button, input, select, textarea {
     }
 }
 
-    .tox-separator {
-        height: 16px !important;
-        width: 1px !important;
-        margin: 0 4px !important;
-        background: var(--el-border-color-lighter) !important;
-        border: none !important;
-    }
-}
-
 :root {
-    /* Prototype Light Theme Variables */
-    --bg-base: #eef0f8;
+    /* High-Contrast Light Theme Variables */
+    --bg-base: #f1f3f9;
     --bg-surface: #ffffff;
-    --bg-elevated: #f5f6fd;
-    --bg-hover: #e7eaf9;
-    --bg-active: #dde2fb;
+    --bg-elevated: #f8fafc;
+    --bg-hover: #f1f5f9;
+    --bg-active: #e2e8f0;
     --bg-card: #ffffff;
-    --accent-primary: #5b6ef5;
-    --accent-secondary: #7c5cbf;
-    --accent-glow: rgba(91,110,245,0.16);
-    --accent-muted: rgba(91,110,245,0.12);
-    --text-primary: #141726;
-    --text-secondary: #3b4266;
-    --text-muted: #828aad;
-    --text-accent: #5546d6;
-    --star-color: #e0a91f;
-    --danger: #e05f5f;
-    --success: #4caf7d;
-    --border-subtle: rgba(91,110,245,0.16);
-    --border-mid: rgba(91,110,245,0.3);
+    --accent-primary: #4f46e5;
+    --accent-secondary: #7c3aed;
+    --accent-glow: rgba(79, 70, 229, 0.16);
+    --accent-muted: rgba(79, 70, 229, 0.1);
+    --text-primary: #0f172a;
+    --text-secondary: #334155;
+    --text-muted: #64748b;
+    --text-accent: #4338ca;
+    --star-color: #f59e0b;
+    --danger: #ef4444;
+    --success: #10b981;
+    --border-subtle: #e2e8f0;
+    --border-mid: #cbd5e1;
     --sidebar-w: 230px;
     --sidebar-collapsed: 72px;
     --list-w: 340px;
     --ease: cubic-bezier(0.4,0,0.2,1);
 
+    /* Compatibility aliases */
+    --regular-text-color: var(--text-secondary);
+    --secondary-text-color: var(--text-secondary);
+    --primary-text-color: var(--text-primary);
+    --main-text-color: var(--text-primary);
+    --light-border: var(--border-subtle);
+    --light-border-color: var(--border-subtle);
+    --light-ill: var(--bg-hover);
+    --hover-color: var(--bg-hover);
+    --card-bg: var(--bg-card);
+    --panel-bg: var(--bg-surface);
+
     /* Element Plus Overrides */
     --el-color-primary: var(--accent-primary);
     --el-bg-color: var(--bg-base);
+    --el-bg-color-overlay: var(--bg-surface);
+    --el-bg-color-page: var(--bg-base);
     --el-text-color-primary: var(--text-primary);
     --el-text-color-regular: var(--text-secondary);
+    --el-text-color-secondary: var(--text-muted);
+    --el-text-color-placeholder: #94a3b8;
     --el-border-color: var(--border-subtle);
+    --el-border-color-light: #e2e8f0;
+    --el-border-color-lighter: #f1f5f9;
+    --el-fill-color: #f1f5f9;
+    --el-fill-color-light: #f8fafc;
+    --el-fill-color-blank: #ffffff;
+    --el-card-bg-color: #ffffff;
     --el-border-radius-base: 8px;
     --el-border-radius-small: 6px;
 
@@ -486,7 +499,7 @@ button, input, select, textarea {
     --login-switch-color: var(--accent-primary);
     --scrollbar-track-color: transparent;
     --scrollbar-thumb: var(--border-mid);
-    --loadding-background: rgba(255, 255, 255, 0.8);
+    --loadding-background: rgba(255, 255, 255, 0.88);
     --message-block-color: transparent;
 
     /* View Transitions */
@@ -498,33 +511,55 @@ button, input, select, textarea {
 }
 
 .dark {
-    /* Prototype Dark Theme Variables */
-    --bg-base: #0d0f1a;
-    --bg-surface: #13162a;
-    --bg-elevated: #1a1e36;
-    --bg-hover: #1e2340;
-    --bg-active: #232850;
-    --bg-card: #181c33;
-    --accent-primary: #5b6ef5;
-    --accent-secondary: #7c5cbf;
-    --accent-glow: rgba(91,110,245,0.18);
-    --accent-muted: rgba(91,110,245,0.14);
-    --text-primary: #eef0fb;
-    --text-secondary: #b6bce4;
-    --text-muted: #767ca8;
-    --text-accent: #9fb0ff;
-    --star-color: #f5c542;
-    --danger: #e05f5f;
-    --success: #4caf7d;
-    --border-subtle: rgba(91,110,245,0.12);
-    --border-mid: rgba(91,110,245,0.22);
+    /* Dark Theme Variables */
+    --bg-base: #0b0f19;
+    --bg-surface: #111827;
+    --bg-elevated: #1e293b;
+    --bg-hover: #1f293d;
+    --bg-active: #28354d;
+    --bg-card: #151e32;
+    --accent-primary: #6366f1;
+    --accent-secondary: #8b5cf6;
+    --accent-glow: rgba(99, 102, 241, 0.2);
+    --accent-muted: rgba(99, 102, 241, 0.15);
+    --text-primary: #f8fafc;
+    --text-secondary: #cbd5e1;
+    --text-muted: #94a3b8;
+    --text-accent: #a5b4fc;
+    --star-color: #fbbf24;
+    --danger: #ef4444;
+    --success: #10b981;
+    --border-subtle: rgba(99, 102, 241, 0.15);
+    --border-mid: rgba(99, 102, 241, 0.28);
+
+    /* Compatibility aliases */
+    --regular-text-color: var(--text-secondary);
+    --secondary-text-color: var(--text-secondary);
+    --primary-text-color: var(--text-primary);
+    --main-text-color: var(--text-primary);
+    --light-border: var(--border-subtle);
+    --light-border-color: var(--border-subtle);
+    --light-ill: var(--bg-hover);
+    --hover-color: var(--bg-hover);
+    --card-bg: var(--bg-card);
+    --panel-bg: var(--bg-surface);
     
     /* Element Plus Overrides */
     --el-color-primary: var(--accent-primary);
     --el-bg-color: var(--bg-base);
+    --el-bg-color-overlay: var(--bg-surface);
+    --el-bg-color-page: var(--bg-base);
     --el-text-color-primary: var(--text-primary);
     --el-text-color-regular: var(--text-secondary);
+    --el-text-color-secondary: var(--text-muted);
+    --el-text-color-placeholder: #64748b;
     --el-border-color: var(--border-subtle);
+    --el-border-color-light: rgba(99, 102, 241, 0.15);
+    --el-border-color-lighter: rgba(99, 102, 241, 0.08);
+    --el-fill-color: #1e293b;
+    --el-fill-color-light: #182234;
+    --el-fill-color-blank: var(--bg-surface);
+    --el-card-bg-color: var(--bg-card);
 
     /* Base Layout Mappings */
     --header-background: var(--bg-surface);
@@ -541,7 +576,7 @@ button, input, select, textarea {
     --login-switch-color: var(--accent-primary);
     --scrollbar-track-color: transparent;
     --scrollbar-thumb: var(--border-mid);
-    --loadding-background: rgba(13, 15, 26, 0.8);
+    --loadding-background: rgba(11, 15, 25, 0.88);
     --message-block-color: transparent;
 }
 
@@ -589,47 +624,77 @@ html[data-theme-to="light"]::view-transition-old(root) {
     to   { clip-path: circle(0px at var(--vt-x) var(--vt-y)); }
 }
 
-/* Override tooltip (popper) colors for proper dark/light mode contrast */
-html.dark .el-popper.is-dark, html.dark .el-popper.is-light {
-    background: #141414 !important; /* distinguishing black */
-    color: #ffffff !important;
-    border-color: #333333 !important;
+/* Override tooltip and dropdown popper colors for proper contrast & high z-index */
+html.dark .el-popper.is-dark,
+html.dark .el-popper.is-light,
+html.dark .el-popper {
+    background: #151e32 !important;
+    color: #f8fafc !important;
+    border: 1px solid rgba(99, 102, 241, 0.28) !important;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5) !important;
 }
 
-html.dark .el-popper[data-popper-placement^="right"] .el-popper__arrow::before,
-html.dark .el-popper[data-popper-placement^="bottom"] .el-popper__arrow::before,
-html.dark .el-popper[data-popper-placement^="top"] .el-popper__arrow::before,
-html.dark .el-popper[data-popper-placement^="left"] .el-popper__arrow::before,
 html.dark .el-popper .el-popper__arrow::before {
-    background: #141414 !important;
-    border-color: #333333 !important;
+    background: #151e32 !important;
+    border-color: rgba(99, 102, 241, 0.28) !important;
 }
 
-html:not(.dark) .el-popper.is-dark, html:not(.dark) .el-popper.is-light {
+html:not(.dark) .el-popper.is-dark,
+html:not(.dark) .el-popper.is-light,
+html:not(.dark) .el-popper {
     background: #ffffff !important;
-    color: #000000 !important;
-    border-color: #e4e7ed !important;
-    box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1) !important;
+    color: #0f172a !important;
+    border: 1px solid #e2e8f0 !important;
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.04) !important;
 }
 
-html:not(.dark) .el-popper[data-popper-placement^="right"] .el-popper__arrow::before,
-html:not(.dark) .el-popper[data-popper-placement^="bottom"] .el-popper__arrow::before,
-html:not(.dark) .el-popper[data-popper-placement^="top"] .el-popper__arrow::before,
-html:not(.dark) .el-popper[data-popper-placement^="left"] .el-popper__arrow::before,
 html:not(.dark) .el-popper .el-popper__arrow::before {
     background: #ffffff !important;
-    border-color: #e4e7ed !important;
+    border-color: #e2e8f0 !important;
 }
 
-/* Tooltip bounds & typography constraints - prevent overflowing containers */
-.el-popper.el-tooltip__popper,
-.el-popper.is-dark,
-.el-popper.is-light {
+/* Tooltip bounds & typography constraints */
+.el-popper.el-tooltip__popper {
     max-width: 280px !important;
     line-height: 1.45 !important;
     font-size: 12px !important;
     word-break: break-word !important;
     white-space: normal !important;
+}
+
+/* Ensure select, dropdown and picker poppers stretch to their triggers and are never artificially constrained */
+.el-popper.el-select__popper,
+.el-popper.el-dropdown__popper,
+.el-popper.el-picker__popper,
+.el-popper.detail-dropdown {
+    max-width: none !important;
+    z-index: 3000 !important;
+}
+
+.el-dropdown-menu {
+    background: var(--bg-surface) !important;
+    border-radius: 10px !important;
+    border: 1px solid var(--border-subtle) !important;
+    padding: 6px !important;
+}
+
+.el-dropdown-menu__item {
+    color: var(--text-secondary) !important;
+    border-radius: 6px !important;
+    font-size: 13.5px !important;
+}
+
+.el-dropdown-menu__item:hover {
+    background-color: var(--bg-hover) !important;
+    color: var(--text-primary) !important;
+}
+
+/* Flag icon aliases for Ascension Island (AC -> SH-AC) and Tristan da Cunha (TA -> SH-TA) */
+.fi.fi-ac {
+    background-image: url('flag-icons/flags/4x3/sh-ac.svg');
+}
+.fi.fi-ta {
+    background-image: url('flag-icons/flags/4x3/sh-ta.svg');
 }
 
 /* Element Plus Message Box Global Theme & High-Risk Modal Harmonization */
@@ -699,3 +764,127 @@ html:not(.dark) .el-popper .el-popper__arrow::before {
     transform: translateY(-1px);
     opacity: 0.95;
 }
+
+/* Dialog Global Theme */
+.el-dialog {
+    background: var(--bg-surface) !important;
+    border: 1px solid var(--border-subtle) !important;
+    border-radius: 14px !important;
+    box-shadow: 0 20px 48px rgba(0, 0, 0, 0.3) !important;
+}
+.el-dialog__header {
+    margin-right: 0 !important;
+    border-bottom: 1px solid var(--border-subtle);
+    padding-bottom: 14px !important;
+}
+.el-dialog__title {
+    color: var(--text-primary) !important;
+    font-weight: 700 !important;
+}
+.el-dialog__body {
+    color: var(--text-secondary) !important;
+}
+
+/* --- Global Theme & Wallpaper Full-Layout Acrylic Integration --- */
+html.has-main-wallpaper,
+body.has-main-wallpaper {
+    background-image: var(--main-wallpaper-url, none) !important;
+    background-size: cover !important;
+    background-position: center !important;
+    background-attachment: fixed !important;
+    background-repeat: no-repeat !important;
+}
+
+html.has-main-wallpaper .layout {
+    background-image: var(--main-wallpaper-url, none) !important;
+    background-size: cover !important;
+    background-position: center !important;
+    background-attachment: fixed !important;
+    background-repeat: no-repeat !important;
+}
+
+html.has-main-wallpaper .main-container {
+    background: transparent !important;
+}
+
+html.has-main-wallpaper .body-container {
+    background: transparent !important;
+}
+
+html.has-main-wallpaper .custom-header {
+    background: color-mix(in srgb, var(--bg-surface) var(--panel-alpha, 88%), transparent) !important;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-bottom: 1px solid var(--border-subtle) !important;
+    position: relative;
+    z-index: 1000;
+}
+
+html.has-main-wallpaper .aside,
+html.has-main-wallpaper .aside-show {
+    background: color-mix(in srgb, var(--bg-surface) var(--panel-alpha, 88%), transparent) !important;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-right: 1px solid var(--border-subtle) !important;
+}
+
+html.has-main-wallpaper .custom-footer {
+    background: color-mix(in srgb, var(--bg-surface) var(--panel-alpha, 88%), transparent) !important;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-top: 1px solid var(--border-subtle) !important;
+}
+
+html.has-main-wallpaper .settings-layout {
+    background: transparent !important;
+}
+
+html.has-main-wallpaper .settings-sidebar {
+    background: color-mix(in srgb, var(--bg-surface) var(--panel-alpha, 88%), transparent) !important;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-right: 1px solid var(--border-subtle) !important;
+}
+
+html.has-main-wallpaper .settings-content {
+    background: transparent !important;
+}
+
+html.has-main-wallpaper .settings-content .main-view,
+html.has-main-wallpaper .main-view {
+    background: transparent !important;
+}
+
+/* Comprehensive Settings Frosted Acrylic Mask Protection */
+html.has-main-wallpaper .settings-content .container,
+html.has-main-wallpaper .settings-content .settings-card,
+html.has-main-wallpaper .settings-content .labels-container,
+html.has-main-wallpaper .settings-content .modern-list,
+html.has-main-wallpaper .settings-content .tech-row,
+html.has-main-wallpaper .settings-content .el-card,
+html.has-main-wallpaper .settings-content .table-wrap,
+html.has-main-wallpaper .settings-content .table-container {
+    background: color-mix(in srgb, var(--bg-surface) var(--panel-alpha, 90%), transparent) !important;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid var(--border-subtle) !important;
+    border-radius: 14px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+}
+
+html.has-main-wallpaper .split-view-container {
+    background: transparent !important;
+}
+
+html.has-main-wallpaper .split-view-container .list-column {
+    background: color-mix(in srgb, var(--bg-surface) var(--panel-alpha, 88%), transparent) !important;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+}
+
+html.has-main-wallpaper .split-view-container .reading-pane-column {
+    background: color-mix(in srgb, var(--bg-surface) var(--panel-alpha, 92%), transparent) !important;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+}
+

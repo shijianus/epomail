@@ -20,6 +20,7 @@ import { t } from '../i18n/i18n'
 import reqUtils from '../utils/req-utils';
 import {oauth} from "../entity/oauth";
 import oauthService from "./oauth-service";
+import emailCryptoUtils from '../utils/email-crypto-utils';
 
 const userService = {
 
@@ -151,6 +152,39 @@ const userService = {
         user.showTrend = profile.showTrend ?? true;
         user.showSources = profile.showSources ?? true;
 
+        user.gender = profile.gender || 'prefer_not_to_say';
+        user.genderCustom = profile.genderCustom || '';
+        user.birthday = profile.birthday || '';
+        user.phones = Array.isArray(profile.phones) ? profile.phones : [];
+        user.addresses = profile.addresses || { home: '', work: '', other: '' };
+        user.passwordUpdatedAt = profile.passwordUpdatedAt || userRow.createTime || '';
+        user.density = profile.density || 'default';
+        user.inboxType = profile.inboxType || 'default';
+        user.inboxConfig = profile.inboxConfig || {};
+        user.readingPane = profile.readingPane || 'right';
+        user.conversationView = profile.conversationView ?? true;
+        user.themeWallpaper = profile.themeWallpaper || '';
+        user.themeWallpaperOpacity = profile.themeWallpaperOpacity ?? 85;
+        user.personalTelegram = profile.personalTelegram || {
+            enabled: false,
+            botToken: '',
+            chatId: '',
+            topicId: '',
+            mode: 'privacy',
+            notifyCodeOnly: true,
+            includePreview: true
+        };
+        user.personalForwarding = profile.personalForwarding || {
+            enabled: false,
+            targets: '',
+            mode: 'all',
+            aliasPrefixes: '',
+            keepCopy: true,
+            addPrefix: true
+        };
+        user.apiTokens = Array.isArray(profile.apiTokens) ? profile.apiTokens : [];
+        user.clientCountry = c.req.header('cf-ipcountry') || c.req.raw?.cf?.country || '';
+
 		let remainingBackupCodes = 0;
 		if (userRow.totpEnabled === 1 && userRow.totpBackupCodes) {
 			try {
@@ -227,6 +261,23 @@ const userService = {
 		}
 		const { salt, hash } = await cryptoUtils.hashPassword(password);
 		await orm(c).update(user).set({ password: hash, salt: salt }).where(eq(user.userId, userId)).run();
+
+		try {
+			let profile = {};
+			const profileStr = await c.env.kv.get('USER_PROFILE_' + userId);
+			if (profileStr) {
+				profile = JSON.parse(profileStr);
+			}
+			profile.passwordUpdatedAt = new Date().toISOString();
+			await c.env.kv.put('USER_PROFILE_' + userId, JSON.stringify(profile));
+			const authInfo = await c.env.kv.get(KvConst.AUTH_INFO + userId, { type: 'json' });
+			if (authInfo && authInfo.user) {
+				authInfo.user.passwordUpdatedAt = profile.passwordUpdatedAt;
+				await c.env.kv.put(KvConst.AUTH_INFO + userId, JSON.stringify(authInfo), { expirationTtl: constant.TOKEN_EXPIRE });
+			}
+		} catch (e) {
+			console.error('Failed to update password timestamp', e);
+		}
 	},
 
 	selectByEmail(c, email) {
@@ -340,6 +391,11 @@ const userService = {
 			.select({ total: count() })
 			.from(user)
 			.where(and(...conditions)).get();
+
+		if (!list || list.length === 0) {
+			return { list: [], total: total || 0 };
+		}
+
 		const userIds = list.map(user => user.userId);
 
 		const types = [...new Set(list.map(user => user.type))];
@@ -552,6 +608,174 @@ const userService = {
 			.where(eq(user.regKeyId, regKeyId))
 			.orderBy(desc(user.userId))
 			.all();
+	},
+
+	async purgeUserEmails(c, params) {
+		const { userId } = params;
+		const uid = Number(userId);
+		if (!uid) {
+			throw new BizError(t('userNotExist'));
+		}
+
+		const userRow = await this.selectById(c, uid);
+		if (!userRow) {
+			throw new BizError(t('userNotExist'));
+		}
+
+		if (userRow.type === 0 || userRow.email === c.env.admin) {
+			throw new BizError('Cannot purge administrator emails', 403);
+		}
+
+		// Security rule: User MUST be banned (status === 1) before admin can force purge emails
+		if (userRow.status !== 1) {
+			throw new BizError(t('purgeRequireBannedMsg') || '必须先对该用户进行【封禁】处理，才能强制清空其邮件释放空间', 400);
+		}
+
+		const quota = await this.getUserQuota(c, uid);
+
+		const starService = (await import('./star-service')).default;
+		try {
+			await starService.removeByUserIds(c, [uid]);
+		} catch (e) {}
+
+		await emailService.physicsDeleteUserIds(c, [uid]);
+
+		return {
+			userId: uid,
+			releasedStorageBytes: quota.usedStorageBytes,
+			releasedEmails: quota.usedEmails
+		};
+	},
+
+	async exportUserData(c, userId, options = {}) {
+		const userRow = await userService.selectById(c, userId);
+		if (!userRow) throw new BizError('User not found');
+
+		const [account, roleRow, userEmails] = await Promise.all([
+			accountService.selectByEmailIncludeDel(c, userRow.email),
+			roleService.selectById(c, userRow.type),
+			orm(c).select().from(email).where(and(eq(email.userId, userId), eq(email.isDel, 0))).all()
+		]);
+
+		let profile = {};
+		try {
+			const profileStr = await c.env.kv.get('USER_PROFILE_' + userId);
+			if (profileStr) profile = JSON.parse(profileStr);
+		} catch (e) {}
+
+		let decryptedEmails = userEmails;
+		try {
+			const cryptoKey = await emailCryptoUtils.getUserEmailCryptoKey(c.env, userId);
+			decryptedEmails = await Promise.all(userEmails.map(em => emailCryptoUtils.decryptEmailRecord(em, cryptoKey)));
+		} catch (err) {
+			console.error('Decryption during export:', err);
+		}
+
+		return {
+			exportTime: new Date().toISOString(),
+			version: '1.0.0',
+			user: {
+				userId: userRow.userId,
+				email: userRow.email,
+				name: account?.name || '',
+				createTime: userRow.createTime,
+				role: roleRow?.name || '',
+				profile: {
+					nickname: profile.nickname || '',
+					bio: profile.bio || '',
+					avatarUrl: profile.avatarUrl || '',
+					backgroundUrl: profile.backgroundUrl || '',
+					gender: profile.gender || '',
+					birthday: profile.birthday || '',
+					phones: profile.phones || [],
+					addresses: profile.addresses || {}
+				}
+			},
+			emails: decryptedEmails.map(em => ({
+				emailId: em.emailId,
+				messageId: em.messageId,
+				toEmail: em.toEmail,
+				sendEmail: em.sendEmail,
+				name: em.name,
+				subject: em.subject,
+				createTime: em.createTime,
+				content: em.content,
+				text: em.text,
+				isSpam: em.isSpam,
+				unread: em.unread,
+				labels: em.labels
+			})),
+			customLabels: userRow.customLabels ? JSON.parse(userRow.customLabels) : null,
+			totalEmails: decryptedEmails.length
+		};
+	},
+
+	async getApiTokens(c, userId) {
+		let profile = {};
+		try {
+			const profileStr = await c.env.kv.get('USER_PROFILE_' + userId);
+			if (profileStr) profile = JSON.parse(profileStr);
+		} catch (e) {}
+		return Array.isArray(profile.apiTokens) ? profile.apiTokens : [];
+	},
+
+	async createApiToken(c, userId, params) {
+		const settingService = (await import('./setting-service')).default;
+		const settingData = await settingService.query(c);
+		if (Number(settingData.userApiSupport ?? 1) === 0) {
+			throw new BizError('第三方 API 与开发者访问功能已被管理员停用 / Third-party API support is disabled', 403);
+		}
+
+		const { name, expiresInDays, scopes } = params;
+		if (!name) throw new BizError('Token name is required');
+
+		let profile = {};
+		try {
+			const profileStr = await c.env.kv.get('USER_PROFILE_' + userId);
+			if (profileStr) profile = JSON.parse(profileStr);
+		} catch (e) {}
+
+		if (!Array.isArray(profile.apiTokens)) profile.apiTokens = [];
+
+		const randomHex = Array.from(crypto.getRandomValues(new Uint8Array(24)))
+			.map(b => b.toString(16).padStart(2, '0'))
+			.join('');
+		const tokenStr = `epo_live_${randomHex}`;
+		const tokenObj = {
+			id: 'tok_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+			name,
+			token: tokenStr,
+			scopes: scopes || ['emails:read', 'emails:send', 'profile:read'],
+			createdAt: new Date().toISOString(),
+			expiresAt: expiresInDays ? new Date(Date.now() + expiresInDays * 86400000).toISOString() : null,
+			lastUsedAt: null
+		};
+
+		profile.apiTokens.unshift(tokenObj);
+		await c.env.kv.put('USER_PROFILE_' + userId, JSON.stringify(profile));
+
+		try {
+			await c.env.kv.put(`API_TOKEN_${tokenStr}`, JSON.stringify({ userId, scopes: tokenObj.scopes, expiresAt: tokenObj.expiresAt }));
+		} catch (e) {}
+
+		return tokenObj;
+	},
+
+	async deleteApiToken(c, userId, tokenId) {
+		let profile = {};
+		try {
+			const profileStr = await c.env.kv.get('USER_PROFILE_' + userId);
+			if (profileStr) profile = JSON.parse(profileStr);
+		} catch (e) {}
+
+		if (Array.isArray(profile.apiTokens)) {
+			const target = profile.apiTokens.find(t => t.id === tokenId);
+			if (target && target.token) {
+				try { await c.env.kv.delete(`API_TOKEN_${target.token}`); } catch (e) {}
+			}
+			profile.apiTokens = profile.apiTokens.filter(t => t.id !== tokenId);
+			await c.env.kv.put('USER_PROFILE_' + userId, JSON.stringify(profile));
+		}
 	}
 };
 

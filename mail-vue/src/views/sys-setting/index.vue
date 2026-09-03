@@ -31,14 +31,42 @@
               </div>
               <div class="setting-item">
                 <div>
-                  <span>{{ $t('allMailMode') }}</span>
-                  <el-tooltip effect="dark" :content="$t('allMailModeDesc')">
+                  <span>{{ $t('mailMode') }}</span>
+                  <el-tooltip effect="dark" :content="$t('mailModeDesc')">
                     <Icon class="warning" icon="fe:warning" width="18" height="18"/>
                   </el-tooltip>
                 </div>
                 <div>
-                  <el-switch @change="(val) => changeField('allMailMode', val)" :before-change="beforeChange" :active-value="1" :inactive-value="0"
-                             v-model="setting.allMailMode"/>
+                  <el-select
+                      @change="(val) => changeMailMode(val)"
+                      :style="`width: ${ locale === 'en' ? 180 : 150 }px;`"
+                      v-model="setting.allMailMode"
+                      placeholder="Select"
+                  >
+                    <el-option
+                        v-for="item in mailModeOptions"
+                        :key="item.value"
+                        :label="item.label"
+                        :value="item.value"
+                    />
+                  </el-select>
+                </div>
+              </div>
+              <div class="setting-item">
+                <div>
+                  <span>{{ $t('totpSetting') }}</span>
+                  <el-tooltip effect="dark" :content="isTotpLocked ? $t('totpLockedDesc') : $t('totpSettingDesc')">
+                    <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+                  </el-tooltip>
+                </div>
+                <div>
+                  <el-switch
+                      @change="(val) => changeTotpSwitch(val)"
+                      :disabled="isTotpLocked"
+                      :active-value="1"
+                      :inactive-value="0"
+                      v-model="setting.totp"
+                  />
                 </div>
               </div>
               <div class="setting-item">
@@ -247,17 +275,27 @@
           <div class="settings-card">
             <div class="card-title">{{ $t('emailPush') }}</div>
             <div class="card-content">
-              <div class="setting-item">
-                <div><span>{{ $t('tgBot') }}</span></div>
+              <div class="setting-item" :class="{ 'item-disabled': Number(setting.allMailMode) === 2 }">
+                <div class="title-item">
+                  <span>{{ $t('tgBot') }}</span>
+                  <el-tooltip effect="dark" :content="$t('tgBotDesc')">
+                    <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+                  </el-tooltip>
+                </div>
                 <div class="forward">
-                  <span>{{ setting.tgBotStatus === 0 ? $t('enabled') : $t('disabled') }}</span>
+                  <span>{{ Number(setting.allMailMode) === 2 ? $t('disabled') : (setting.tgBotStatus === 0 ? $t('enabled') : $t('disabled')) }}</span>
                   <el-button class="opt-button" size="small" type="primary" @click="openTgSetting">
                     <Icon icon="fluent:settings-48-regular" width="18" height="18"/>
                   </el-button>
                 </div>
               </div>
               <div class="setting-item">
-                <div><span>{{ $t('otherEmail') }}</span></div>
+                <div class="title-item">
+                  <span>{{ $t('otherEmail') }}</span>
+                  <el-tooltip effect="dark" :content="thirdEmailTooltip">
+                    <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+                  </el-tooltip>
+                </div>
                 <div class="forward">
                   <span>{{ setting.forwardStatus === 0 ? $t('enabled') : $t('disabled') }}</span>
                   <el-button class="opt-button" size="small" type="primary" @click="openThirdEmailSetting">
@@ -265,13 +303,78 @@
                   </el-button>
                 </div>
               </div>
-              <div class="setting-item">
-                <div><span>{{ $t('forwardingRules') }}</span></div>
+              <div class="setting-item" :class="{ 'item-disabled': Number(setting.allMailMode) === 2 }">
+                <div class="title-item">
+                  <span>{{ $t('forwardingRules') }}</span>
+                  <el-tooltip effect="dark" :content="forwardRulesTooltip">
+                    <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+                  </el-tooltip>
+                </div>
                 <div class="forward">
-                  <span>{{ setting.ruleType === 0 ? $t('forwardAll') : $t('rules') }}</span>
-                  <el-button class="opt-button" size="small" type="primary" @click="openForwardRules">
+                  <span>{{ Number(setting.allMailMode) === 2 ? $t('disabled') : (setting.ruleType === 0 ? $t('forwardAll') : $t('rules')) }}</span>
+                  <el-button class="opt-button" size="small" type="primary" :disabled="Number(setting.allMailMode) === 2" @click="openForwardRules">
                     <Icon icon="fluent:settings-48-regular" width="18" height="18"/>
                   </el-button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- User Data & Capabilities Control Card (用户资料控制) -->
+          <div class="settings-card user-data-control-card">
+            <div class="card-title">
+              {{ $t('userDataControl') }}
+              <el-tooltip effect="dark" :content="$t('userDataControlTooltip')">
+                <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+              </el-tooltip>
+            </div>
+            <div class="card-content">
+              <div class="setting-item">
+                <div class="title-item">
+                  <span>{{ $t('userTgPushSetting') }}</span>
+                  <el-tooltip effect="dark" :content="$t('userTgPushSettingTooltip')">
+                    <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+                  </el-tooltip>
+                </div>
+                <div>
+                  <el-switch 
+                    @change="(val) => changeField('userTgForward', val)" 
+                    :active-value="1" 
+                    :inactive-value="0"
+                    v-model="setting.userTgForward"
+                  />
+                </div>
+              </div>
+              <div class="setting-item">
+                <div class="title-item">
+                  <span>{{ $t('userEmailForwardSetting') }}</span>
+                  <el-tooltip effect="dark" :content="$t('userEmailForwardSettingTooltip')">
+                    <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+                  </el-tooltip>
+                </div>
+                <div>
+                  <el-switch 
+                    @change="(val) => changeField('userEmailForward', val)" 
+                    :active-value="1" 
+                    :inactive-value="0"
+                    v-model="setting.userEmailForward"
+                  />
+                </div>
+              </div>
+              <div class="setting-item">
+                <div class="title-item">
+                  <span>{{ $t('userApiSupportSetting') }}</span>
+                  <el-tooltip effect="dark" :content="$t('userApiSupportSettingTooltip')">
+                    <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+                  </el-tooltip>
+                </div>
+                <div>
+                  <el-switch 
+                    @change="(val) => changeField('userApiSupport', val)" 
+                    :active-value="1" 
+                    :inactive-value="0"
+                    v-model="setting.userApiSupport"
+                  />
                 </div>
               </div>
             </div>
@@ -738,7 +841,9 @@
       </el-dialog>
       <el-dialog
           v-model="tgSettingShow"
-          class="forward-dialog"
+          class="forward-dialog sys-tg-dialog"
+          width="500px"
+          destroy-on-close
       >
         <template #header>
           <div class="forward-head">
@@ -749,49 +854,118 @@
           </div>
         </template>
         <div class="forward-set-body">
-          <el-input :placeholder="setting.tgBotToken || $t('tgBotToken')" v-model="tgBotToken"></el-input>
-          <el-input-tag tag-type="warning" :placeholder="$t('toBotTokenDesc')" v-model="tgChatId"
-                        @add-tag="addChatTag"></el-input-tag>
-          <el-input tag-type="warning" :placeholder="$t('customDomainDesc')" v-model="customDomain" ></el-input>
-          <div class="tg-msg-label">
-            <span>{{t('from')}}</span>
-            <el-select  v-model="tgMsgFrom" >
-              <el-option
-                  v-for="item in tgMsgFromOption"
-                  :key="item.value"
-                  :label="item.label"
-                  :value="item.value"
-              />
-            </el-select>
+          <div class="admin-notice-callout">
+            <Icon icon="fluent:bot-20-filled" width="20" height="20" class="notice-icon" />
+            <div class="notice-body">
+              <div class="notice-title">系统全局 Telegram 机器人 (管理员专属)</div>
+              <div class="notice-text">
+                由系统管理员配置，用于全站运维与监控告警。全站 3 大邮件模式运作规则：<br/>
+                • <b>全部邮件模式</b>：推送全站所有进站邮件到管理员 TG；<br/>
+                • <b>隐私邮件模式</b>：仅推送垃圾/可疑邮件与未分配邮件的安全通知；<br/>
+                • <b>加密邮件模式</b>：完全关闭推送，保障端到端加密数据安全。<br/>
+                <i>提示：普通注册用户的个人邮件推送，由用户在个人「资料」设置中自行配置私有 TG Bot。</i>
+              </div>
+            </div>
           </div>
-          <div class="tg-msg-label">
-            <span>{{t('recipient')}}</span>
-            <el-select  v-model="tgMsgTo" >
-              <el-option
-                  v-for="item in tgMsgToOption"
-                  :key="item.value"
-                  :label="item.label"
-                  :value="item.value"
-              />
-            </el-select>
+
+          <div class="dialog-field">
+            <div class="d-label-row">
+              <span class="d-label">{{ $t('tgBotToken') || 'Bot Token' }} <span style="color: var(--el-color-danger)">*</span></span>
+              <el-button 
+                v-if="Number(setting.allMailMode) !== 2"
+                size="small" 
+                class="opt-button test-tg-btn" 
+                type="default"
+                :loading="testingTg" 
+                :disabled="(!tgBotToken && !setting.tgBotToken) || !tgChatId?.length"
+                @click="handleTestAdminTelegram"
+                :title="$t('tgTestSend') || '发送测试消息'"
+              >
+                <Icon icon="fluent:send-20-regular" width="14" height="14" style="margin-right: 3px;" />
+                <span>{{ $t('tgTestSend') || '发送测试' }}</span>
+              </el-button>
+            </div>
+            <el-input 
+              v-model="tgBotToken" 
+              type="password" 
+              show-password 
+              :disabled="Number(setting.allMailMode) === 2" 
+              :placeholder="setting.tgBotToken || $t('tgBotTokenPlaceholder') || '例如：123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ'" 
+              clearable 
+            />
           </div>
-          <div class="tg-msg-label">
-            <span>{{t('emailText')}}</span>
-            <el-select  v-model="tgMsgText" >
-              <el-option
-                  v-for="item in tgMsgTextOption"
-                  :key="item.value"
-                  :label="item.label"
-                  :value="item.value"
-              />
-            </el-select>
+
+          <div class="dialog-field">
+            <div class="d-label-row">
+              <span class="d-label">{{ $t('tgChatId') || 'Chat ID' }} <span style="color: var(--el-color-danger)">*</span></span>
+              <span class="d-sub-hint">支持多个 Chat ID（回车添加）</span>
+            </div>
+            <el-input-tag 
+              v-model="tgChatId" 
+              :disabled="Number(setting.allMailMode) === 2" 
+              tag-type="primary" 
+              :placeholder="$t('toBotTokenDesc') || '例如：123456789 或 目标频道 ID'" 
+              @add-tag="addChatTag"
+            />
+          </div>
+
+          <div class="dialog-field">
+            <div class="d-label-row">
+              <span class="d-label">{{ $t('customDomain') || 'API 反代 / 自定义域名 (可选)' }}</span>
+              <span class="d-sub-hint">留空默认使用官方 API</span>
+            </div>
+            <el-input 
+              v-model="customDomain" 
+              :disabled="Number(setting.allMailMode) === 2" 
+              placeholder="例如：https://tg-proxy.yourdomain.com" 
+              clearable 
+            />
+          </div>
+
+          <div class="dialog-field" style="margin-top: 2px;">
+            <span class="d-label">推送内容与字段偏好</span>
+            <div class="tg-options-grid">
+              <div class="tg-opt-item">
+                <span class="opt-label">{{ t('from') }} (发件人)</span>
+                <el-select :disabled="Number(setting.allMailMode) === 2" v-model="tgMsgFrom" size="default">
+                  <el-option
+                    v-for="item in tgMsgFromOption"
+                    :key="item.value"
+                    :label="item.label"
+                    :value="item.value"
+                  />
+                </el-select>
+              </div>
+              <div class="tg-opt-item">
+                <span class="opt-label">{{ t('recipient') }} (收件人)</span>
+                <el-select :disabled="Number(setting.allMailMode) === 2" v-model="tgMsgTo" size="default">
+                  <el-option
+                    v-for="item in tgMsgToOption"
+                    :key="item.value"
+                    :label="item.label"
+                    :value="item.value"
+                  />
+                </el-select>
+              </div>
+              <div class="tg-opt-item">
+                <span class="opt-label">{{ t('emailText') }} (邮件正文)</span>
+                <el-select :disabled="Number(setting.allMailMode) === 2" v-model="tgMsgText" size="default">
+                  <el-option
+                    v-for="item in tgMsgTextOption"
+                    :key="item.value"
+                    :label="item.label"
+                    :value="item.value"
+                  />
+                </el-select>
+              </div>
+            </div>
           </div>
         </div>
         <template #footer>
           <div class="dialog-footer">
-            <el-switch v-model="tgBotStatus" :active-value="0" :inactive-value="1" :active-text="$t('enable')"
+            <el-switch :disabled="Number(setting.allMailMode) === 2" v-model="tgBotStatus" :active-value="0" :inactive-value="1" :active-text="$t('enable')"
                        :inactive-text="$t('disable')"/>
-            <el-button :loading="settingLoading" type="primary" @click="tgBotSave">
+            <el-button :disabled="Number(setting.allMailMode) === 2" :loading="settingLoading" type="primary" @click="tgBotSave">
               {{ $t('save') }}
             </el-button>
           </div>
@@ -799,19 +973,49 @@
       </el-dialog>
       <el-dialog
           v-model="thirdEmailShow"
-          class="forward-dialog"
+          class="forward-dialog sys-third-email-dialog"
+          width="500px"
+          destroy-on-close
       >
         <template #header>
           <div class="forward-head">
             <span class="forward-set-title">{{ $t('otherEmail') }}</span>
-            <el-tooltip effect="dark" :content="$t('otherEmailDesc')">
+            <el-tooltip effect="dark" :content="thirdEmailTooltip">
               <Icon class="warning" icon="fe:warning" width="18" height="18"/>
             </el-tooltip>
           </div>
         </template>
         <div class="forward-set-body">
-          <el-input-tag tag-type="warning" :placeholder="$t('otherEmailInputDesc')" v-model="forwardEmail"
-                        @add-tag="emailAddTag"></el-input-tag>
+          <div class="admin-notice-callout">
+            <Icon icon="fluent:mail-forward-20-filled" width="20" height="20" class="notice-icon" />
+            <div class="notice-body">
+              <div class="notice-title">第三方转发邮箱与受信任号池</div>
+              <div class="notice-text">
+                <template v-if="Number(setting.allMailMode) === 1">
+                  • <b>底层无损路由</b>：在此添加的第三方邮箱若在 Cloudflare Email Routing 中完成解析验证，系统将直接通过底层路由无损转发，不占用系统发信额度；若未在 Cloudflare 验证，则通过发信引擎自动抄送。<br/>
+                  • <b>用户端号池支持</b>：在此验证的邮箱构成全站受信任号池。用户在个人端配置这些邮箱作为转发目的地时，系统将在底层静默使用无损转发（不消耗用户发信额度）；若用户输入未验证邮箱，则自动通过抄送引擎并消耗其个人发信额度。<br/>
+                  • <b>全站转发生效</b>：当前处于全部邮件模式，全站所有进站邮件均会向启用的第三方邮箱执行转发。
+                </template>
+                <template v-else-if="Number(setting.allMailMode) === 0">
+                  • <b>底层无损路由</b>：在此添加的第三方邮箱若在 Cloudflare Email Routing 中完成解析验证，系统将直接通过底层路由无损转发，不占用系统发信额度；若未在 Cloudflare 验证，则通过发信引擎自动抄送。<br/>
+                  • <b>用户端号池支持</b>：在此验证的邮箱构成全站受信任号池。用户在个人端配置这些邮箱作为转发目的地时，系统将在底层静默使用无损转发（不消耗用户发信额度）；若用户输入未验证邮箱，则自动通过抄送引擎并消耗其个人发信额度。<br/>
+                  • <b>隐私过滤保护</b>：当前处于隐私邮件模式，仅对垃圾/可疑邮件与无主邮件执行转发，普通用户的正常邮件不予转发。
+                </template>
+                <template v-else-if="Number(setting.allMailMode) === 2">
+                  • <b>受信任验证号池</b>：在此添加并验证的第三方邮箱作为全站受信任号池。<br/>
+                  • <b>个人端配置要求</b>：在加密邮件模式下，系统全局转发已被关闭。第三方邮件必须由用户在个人的「资料」分区中单独配置才能正常完成转发任务，否则无法完成转发。
+                </template>
+              </div>
+            </div>
+          </div>
+          <div class="dialog-field">
+            <div class="d-label-row">
+              <span class="d-label">{{ $t('otherEmail') || '第三方邮箱列表' }}</span>
+              <span class="d-sub-hint">支持多个邮箱（输入后回车添加）</span>
+            </div>
+            <el-input-tag tag-type="primary" :placeholder="$t('otherEmailInputDesc')" v-model="forwardEmail"
+                          @add-tag="emailAddTag"></el-input-tag>
+          </div>
         </div>
         <template #footer>
           <div class="dialog-footer">
@@ -826,26 +1030,34 @@
       <el-dialog
           v-model="forwardRulesShow"
           class="forward-dialog"
+          width="500px"
+          destroy-on-close
       >
         <template #header>
           <div class="forward-head">
             <span class="forward-set-title">{{ $t('forwardingRules') }}</span>
-            <el-tooltip effect="dark" :content="$t('forwardingRulesDesc')">
+            <el-tooltip effect="dark" :content="forwardRulesTooltip">
               <Icon class="warning" icon="fe:warning" width="18" height="18"/>
             </el-tooltip>
           </div>
         </template>
         <div class="forward-set-body">
-          <el-input-tag :placeholder="$t('ruleEmailsInputDesc')" tag-type="success" v-model="ruleEmail"
-                        @add-tag="ruleEmailAddTag"/>
+          <div class="dialog-field">
+            <div class="d-label-row">
+              <span class="d-label">{{ $t('ruleEmails') || '转发规则目标邮箱' }}</span>
+              <span class="d-sub-hint">输入邮箱后回车添加</span>
+            </div>
+            <el-input-tag :disabled="Number(setting.allMailMode) === 2" :placeholder="$t('ruleEmailsInputDesc')" tag-type="primary" v-model="ruleEmail"
+                          @add-tag="ruleEmailAddTag"/>
+          </div>
         </div>
         <template #footer>
           <div class="dialog-footer">
-            <el-radio-group v-model="ruleType">
+            <el-radio-group v-model="ruleType" :disabled="Number(setting.allMailMode) === 2">
               <el-radio :value="0">{{ $t('forwardAll') }}</el-radio>
               <el-radio :value="1">{{ $t('rules') }}</el-radio>
             </el-radio-group>
-            <el-button :loading="settingLoading" type="primary" @click="ruleEmailSave">
+            <el-button :disabled="Number(setting.allMailMode) === 2" :loading="settingLoading" type="primary" @click="ruleEmailSave">
               {{ $t('save') }}
             </el-button>
           </div>
@@ -1443,6 +1655,7 @@
 <script setup>
 import {computed, defineOptions, nextTick, reactive, ref} from "vue";
 import {deleteBackground, setBackground, setBlackList, settingQuery, settingSet, sendWelcomeEmail} from "@/request/setting.js";
+import { testTelegramBot } from "@/request/my.js";
 import {useSettingStore} from "@/store/setting.js";
 import {useUiStore} from "@/store/ui.js";
 import {useUserStore} from "@/store/user.js";
@@ -1990,17 +2203,120 @@ const tgMsgToOption = [{label: t('show'), value: 'show'}, {label: t('hide'), val
 const tgMsgTextOption = [{label: t('show'), value: 'show'}, {label: t('hide'), value: 'hide'}]
 const tgMsgLabelWidth = computed(() => locale.value === 'en' ? '120px' : '100px');
 
+const mailModeOptions = computed(() => [
+  { value: 1, label: t('allMailMode') },
+  { value: 0, label: t('privacyMailMode') },
+  { value: 2, label: t('encryptedMailMode') }
+]);
+
+const forwardRulesTooltip = computed(() => {
+  const mode = Number(setting.value?.allMailMode);
+  if (mode === 0) {
+    return t('forwardRulesPrivacyTooltip');
+  }
+  if (mode === 2) {
+    return t('forwardRulesEncryptedTooltip');
+  }
+  return t('forwardingRulesDesc');
+});
+
+const thirdEmailTooltip = computed(() => {
+  const mode = Number(setting.value?.allMailMode);
+  if (mode === 2) {
+    return t('thirdEmailEncryptedTooltip');
+  }
+  return t('otherEmailDesc');
+});
+
+const previousMailMode = ref(0);
+
+const isTotpLocked = computed(() => {
+  const mode = Number(setting.value?.allMailMode);
+  return mode === 0 || mode === 2;
+});
+
+function changeMailMode(val) {
+  const m = Number(val);
+  if (m === 2) {
+    ElMessageBox.confirm(
+      t('encryptedMailModeWarningMsg'),
+      t('encryptedMailModeWarningTitle'),
+      {
+        confirmButtonText: t('confirm') || '确定开启',
+        cancelButtonText: t('cancel') || '取消',
+        type: 'warning',
+        dangerouslyUseHTMLString: true,
+        customClass: 'encrypted-mode-confirm-dialog'
+      }
+    ).then(() => {
+      previousMailMode.value = 2;
+      setting.value.allMailMode = 2;
+      setting.value.totp = 1;
+      setting.value.tgBotStatus = 1;
+      setting.value.ruleType = 0;
+      setting.value.ruleEmail = '';
+      settingStore.settings = { ...settingStore.settings, allMailMode: 2, totp: 1, tgBotStatus: 1, ruleType: 0, ruleEmail: '' };
+      editSetting({ allMailMode: 2, totp: 1, tgBotStatus: 1, ruleType: 0, ruleEmail: '' }, false);
+    }).catch(() => {
+      setting.value.allMailMode = previousMailMode.value;
+    });
+  } else {
+    previousMailMode.value = m;
+    if (m === 0) {
+      setting.value.totp = 1;
+    }
+    changeField('allMailMode', m);
+  }
+}
+
+function changeTotpSwitch(val) {
+  const v = Number(val);
+  if (v === 0) {
+    ElMessageBox.confirm(
+      t('disableTotpConfirmMsg'),
+      t('disableTotpConfirmTitle'),
+      {
+        confirmButtonText: t('confirm') || '确定关闭',
+        cancelButtonText: t('cancel') || '取消',
+        type: 'warning',
+        dangerouslyUseHTMLString: true,
+        customClass: 'disable-totp-confirm-dialog'
+      }
+    ).then(() => {
+      setting.value.totp = 0;
+      changeField('totp', 0);
+    }).catch(() => {
+      setting.value.totp = 1;
+    });
+  } else {
+    setting.value.totp = 1;
+    changeField('totp', 1);
+  }
+}
+
 getSettings()
 getUpdate()
 
 function getSettings() {
   settingReady.value = false
   settingQuery().then(settingData => {
-    settingData.allMailMode = Number(settingData.allMailMode) === 1 ? 1 : 0
+    settingData.allMailMode = [0, 1, 2].includes(Number(settingData.allMailMode)) ? Number(settingData.allMailMode) : 0
+    previousMailMode.value = settingData.allMailMode;
+    if (settingData.allMailMode === 0 || settingData.allMailMode === 2) {
+      settingData.totp = 1;
+    } else {
+      settingData.totp = Number(settingData.totp) === 1 ? 1 : 0;
+    }
+    if (settingData.allMailMode === 2) {
+      settingData.tgBotStatus = 1;
+    }
     settingData.publicProfile = Number(settingData.publicProfile) === 1 ? 1 : 0
     settingData.register = Number(settingData.register) === 0 ? 0 : 1
     settingData.loginDomain = Number(settingData.loginDomain) === 1 ? 1 : 0
     settingData.addEmail = Number(settingData.addEmail) === 0 ? 0 : 1
+    settingData.userTgForward = settingData.userTgForward !== undefined ? Number(settingData.userTgForward) : 1
+    settingData.userEmailForward = settingData.userEmailForward !== undefined ? Number(settingData.userEmailForward) : 1
+    settingData.userApiSupport = settingData.userApiSupport !== undefined ? Number(settingData.userApiSupport) : 1
     setting.value = settingData
     settingStore.domainList = settingData.domainList || []
     settingStore.settings = { ...settingStore.settings, ...settingData }
@@ -2119,12 +2435,16 @@ function closedSetBackground() {
 }
 
 function openTgSetting() {
-  tgBotStatus.value = setting.value.tgBotStatus
-  tgBotToken.value = ''
+  if (Number(setting.value?.allMailMode) === 2) {
+    tgBotStatus.value = 1
+  } else {
+    tgBotStatus.value = setting.value.tgBotStatus
+  }
+  tgBotToken.value = setting.value.tgBotToken || ''
   customDomain.value = setting.value.customDomain
-  tgMsgFrom.value = setting.value.tgMsgFrom
-  tgMsgText.value = setting.value.tgMsgText
-  tgMsgTo.value = setting.value.tgMsgTo
+  tgMsgFrom.value = setting.value.tgMsgFrom || 'show'
+  tgMsgText.value = setting.value.tgMsgText || 'show'
+  tgMsgTo.value = setting.value.tgMsgTo || 'show'
   tgChatId.value = []
   if (setting.value.tgChatId) {
     const list = setting.value.tgChatId.split(',')
@@ -2349,6 +2669,10 @@ function openEmailPrefix() {
 }
 
 function openForwardRules() {
+  if (Number(setting.value?.allMailMode) === 2) {
+    ElMessage.warning(t('forwardRulesEncryptedTooltip') || '加密模式下无法查看任何用户的任何邮件，请前往用户的资料分区增设。')
+    return
+  }
   ruleType.value = setting.value.ruleType
   ruleEmail.value = []
   if (setting.value.ruleEmail) {
@@ -2430,7 +2754,39 @@ function saveS3() {
   editSetting(form)
 }
 
+const testingTg = ref(false);
+
+async function handleTestAdminTelegram() {
+  if (Number(setting.value?.allMailMode) === 2) {
+    ElMessage.warning(t('encryptedModeTgDisabledTip') || '加密邮件模式下 Telegram 机器人已被强制关闭');
+    return;
+  }
+  const token = tgBotToken.value || setting.value.tgBotToken;
+  const chatId = tgChatId.value?.[0];
+  if (!token || !chatId) {
+    ElMessage.warning(t('tgFillRequiredFields') || '请先填写 Bot Token 与至少一个 Chat ID');
+    return;
+  }
+  testingTg.value = true;
+  try {
+    await testTelegramBot({
+      botToken: token,
+      chatId: String(chatId).trim(),
+    });
+    ElMessage.success(t('tgTestSuccess') || '测试消息已成功发送至 Telegram！请前往客户端查收。');
+  } catch (err) {
+    console.error('Test telegram failed:', err);
+    ElMessage.error(err.message || '发送测试消息失败，请检查 Token 与 Chat ID 是否正确');
+  } finally {
+    testingTg.value = false;
+  }
+}
+
 function tgBotSave() {
+  if (Number(setting.value?.allMailMode) === 2) {
+    ElMessage.warning(t('encryptedModeTgDisabledTip') || '加密邮件模式下 Telegram 机器人已被强制关闭')
+    return
+  }
   const form = {
     customDomain: customDomain.value,
     tgBotStatus: tgBotStatus.value,
@@ -2453,6 +2809,10 @@ function forwardEmailSave() {
 
 
 function ruleEmailSave() {
+  if (Number(setting.value?.allMailMode) === 2) {
+    ElMessage.warning(t('forwardRulesEncryptedTooltip') || '加密模式下无法查看任何用户的任何邮件，请前往用户的资料分区增设。')
+    return
+  }
   const form = {
     ruleEmail: ruleEmail.value + '',
     ruleType: ruleType.value
@@ -3242,13 +3602,19 @@ function editSetting(settingForm, refreshStatus = true) {
   .forward-head {
     display: flex;
     align-items: center;
+    gap: 8px;
 
     .forward-set-title {
-      top: 1px;
-      padding-right: 5px;
-      position: relative;
       font-size: 16px;
-      font-weight: bold;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .warning {
+      color: var(--el-color-warning);
+      cursor: help;
+      display: inline-flex;
+      align-items: center;
     }
   }
 
@@ -3264,6 +3630,44 @@ function editSetting(settingForm, refreshStatus = true) {
     font-weight: 500;
     color: var(--el-text-color-primary);
     margin-bottom: 6px;
+  }
+
+  .admin-notice-callout {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px 14px;
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--accent-primary) 8%, var(--bg-surface));
+    border: 1px solid color-mix(in srgb, var(--accent-primary) 22%, transparent);
+    margin-bottom: 4px;
+
+    .notice-icon {
+      color: var(--accent-primary);
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    .notice-body {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+
+      .notice-title {
+        font-size: 13.5px;
+        font-weight: 700;
+        color: var(--text-primary);
+      }
+
+      .notice-text {
+        font-size: 12px;
+        color: var(--text-secondary);
+        line-height: 1.55;
+        b {
+          color: var(--text-primary);
+        }
+      }
+    }
   }
 }
 
@@ -3387,22 +3791,80 @@ function editSetting(settingForm, refreshStatus = true) {
 .forward-set-body {
   display: flex;
   flex-direction: column;
+  gap: 14px;
+  padding: 6px 0;
 
-  .el-switch {
-    align-self: end;
-  }
-
-  > *:nth-child(-n+2) {
-    margin-bottom: 15px;
-  }
-
-  .tg-msg-label {
-    margin-top: 10px;
+  .dialog-field {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    .el-select {
-      width: v-bind(tgMsgLabelWidth);
+    flex-direction: column;
+    gap: 6px;
+
+    .d-label-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .d-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .d-sub-hint {
+      font-size: 11.5px;
+      color: var(--text-secondary);
+    }
+
+    .test-tg-btn {
+      padding: 4px 10px !important;
+      font-size: 12px !important;
+      height: 26px !important;
+      border-radius: 6px !important;
+      border: 1px solid var(--border-subtle) !important;
+      background: var(--bg-surface) !important;
+      color: var(--text-primary) !important;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      transition: all 0.2s ease;
+
+      &:hover:not(:disabled) {
+        border-color: var(--accent-primary) !important;
+        color: var(--accent-primary) !important;
+        background: color-mix(in srgb, var(--accent-primary) 8%, var(--bg-surface)) !important;
+      }
+    }
+  }
+
+  .tg-options-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    padding: 12px;
+    background: color-mix(in srgb, var(--accent-primary) 3%, var(--bg-surface));
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+
+    @media (max-width: 500px) {
+      grid-template-columns: 1fr;
+      gap: 8px;
+    }
+
+    .tg-opt-item {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+
+      .opt-label {
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--text-secondary);
+      }
+
+      .el-select {
+        width: 100%;
+      }
     }
   }
 }

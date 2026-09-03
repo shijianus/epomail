@@ -96,6 +96,9 @@
                         {{ setStatusName(props.row) }}
                       </el-dropdown-item>
                       <el-dropdown-item v-else @click="restore(props.row)">{{ $t('restore') }}</el-dropdown-item>
+                      <el-dropdown-item @click="handlePurgeUserEmails(props.row)" style="color: #ff4d4f;">
+                        {{ $t('purgeUserEmails') }}
+                      </el-dropdown-item>
                     </template>
                     <el-dropdown-item @click="openAccountList(props.row.userId)" >{{ $t('account') }}</el-dropdown-item>
                     <el-dropdown-item @click="openDetails(props.row)" >{{ $t('details') }}</el-dropdown-item>
@@ -359,6 +362,14 @@
               </div>
             </template>
           </el-dropdown-item>
+          <el-dropdown-item v-if="rightClickUser.type !== 0" @click="handlePurgeUserEmails(rightClickUser)" >
+            <template #default>
+              <div class="right-dropdown-item" style="color: #ff4d4f;">
+                <Icon icon="fluent:broom-sparkle-16-regular" width="18" height="18" style="margin-left: 1px;margin-right: 1px" />
+                <span>{{ t('purgeUserEmails') }}</span>
+              </div>
+            </template>
+          </el-dropdown-item>
           <el-dropdown-item v-if="rightClickUser.type !== 0" @click="delOneUser(rightClickUser)" >
             <template #default>
               <div class="right-dropdown-item" >
@@ -386,7 +397,8 @@ import {
   userRestore,
   userDeleteAccount,
   userAllAccount,
-  userResetTotp
+  userResetTotp,
+  userPurgeEmails
 } from '@/request/user.js'
 import {roleSelectUse} from "@/request/role.js";
 import {Icon} from "@iconify/vue";
@@ -836,6 +848,37 @@ function resetTotp(user) {
         plain: true
       })
     })
+  });
+}
+
+function handlePurgeUserEmails(userRow) {
+  if (userRow.status !== 1) {
+    ElMessage({
+      message: t('purgeRequireBannedMsg') || '必须先对该用户进行【封禁】处理，才能强制清空其邮件释放存储空间',
+      type: 'warning',
+      plain: true
+    });
+    return;
+  }
+
+  ElMessageBox.confirm(
+    t('purgeUserEmailsConfirmMsg'),
+    t('purgeUserEmailsConfirmTitle'),
+    {
+      confirmButtonText: t('confirm'),
+      cancelButtonText: t('cancel'),
+      type: 'warning'
+    }
+  ).then(() => {
+    userPurgeEmails(userRow.userId).then(() => {
+      ElMessage({
+        message: t('purgeEmailsSuccess') || '已成功清空该封禁用户的邮件，存储空间已释放',
+        type: 'success',
+        plain: true
+      });
+      userRow.receiveEmailCount = 0;
+      userRow.sendEmailCount = 0;
+    });
   });
 }
 

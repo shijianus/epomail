@@ -182,6 +182,9 @@ const accountService = {
 	},
 
 	async selectUserAccountCountList(c, userIds, del = isDel.NORMAL) {
+		if (!userIds || userIds.length === 0) {
+			return [];
+		}
 		const result = await orm(c)
 			.select({
 				userId: account.userId,

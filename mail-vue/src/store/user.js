@@ -19,6 +19,21 @@ export const useUserStore = defineStore('user', {
                 this.user = user
                 const uiStore = useUiStore()
 
+                if (user.density) uiStore.density = user.density;
+                if (user.inboxType) uiStore.inboxType = user.inboxType;
+                if (user.inboxConfig && Object.keys(user.inboxConfig).length > 0) {
+                    uiStore.inboxConfig = { ...uiStore.inboxConfig, ...user.inboxConfig };
+                }
+                if (user.readingPane) uiStore.readingPane = user.readingPane;
+                if (user.conversationView !== undefined) uiStore.conversationView = !!user.conversationView;
+                if (user.themeWallpaper !== undefined) {
+                    uiStore.themeWallpaper = user.themeWallpaper;
+                    if (user.themeWallpaperOpacity !== undefined) {
+                        uiStore.themeWallpaperOpacity = user.themeWallpaperOpacity;
+                    }
+                    uiStore.applyMainWallpaper();
+                }
+
                 if (user.customLabels) {
                     try {
                         const parsed = JSON.parse(user.customLabels)

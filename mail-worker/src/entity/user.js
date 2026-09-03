@@ -23,6 +23,7 @@ const user = sqliteTable('user', {
 	totpSecret: text('totp_secret').default('').notNull(),
 	totpKeyVersion: integer('totp_key_version').default(1).notNull(),
 	totpBackupCodes: text('totp_backup_codes').default('[]').notNull(),
-	totpCreatedAt: text('totp_created_at').default('').notNull()
+	totpCreatedAt: text('totp_created_at').default('').notNull(),
+	securityKeys: text('security_keys').default('[]').notNull()
 });
 export default user

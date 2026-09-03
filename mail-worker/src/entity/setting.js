@@ -63,6 +63,10 @@ export const setting = sqliteTable('setting', {
 	welcomeText: text('welcome_text').default('').notNull(),
 	welcomeExpireDays: integer('welcome_expire_days').default(7).notNull(),
 	welcomeAutoSend: integer('welcome_auto_send').default(1).notNull(),
-	welcomeLastBroadcast: text('welcome_last_broadcast').default('').notNull()
+	welcomeLastBroadcast: text('welcome_last_broadcast').default('').notNull(),
+	userTgForward: integer('user_tg_forward').default(1).notNull(),
+	userEmailForward: integer('user_email_forward').default(1).notNull(),
+	userApiSupport: integer('user_api_support').default(1).notNull()
 });
 export default setting
+

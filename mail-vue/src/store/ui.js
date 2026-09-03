@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import { getWallpaperCssById } from '@/utils/theme-presets.js'
 
 // 系统内置标签模板（用于兜底注入）
 export const BUILTIN_LABELS = [
@@ -27,6 +28,7 @@ export const useUiStore = defineStore('ui', {
         previewData: {},
         key: 0,
         dark: true,
+        themeMode: 'auto',
         showAddLabel: false,
         // 统一标签列表，最多 MAX_LABELS 个
         allLabels: [
@@ -47,7 +49,39 @@ export const useUiStore = defineStore('ui', {
             send: 0,
             sysEmail: 0
         },
-        lastSyncTime: Date.now()
+        lastSyncTime: Date.now(),
+        // Gmail-style core view preferences
+        density: 'default', // 'default' | 'comfortable' | 'compact'
+        inboxType: 'default', // 'default' | 'important' | 'unread' | 'starred' | 'priority' | 'multiple'
+        inboxConfig: {
+            default: {
+                categories: { primary: true, promotions: true, social: true, updates: true, forums: false },
+                includeStarredInPrimary: true
+            },
+            priority: {
+                sections: [
+                    { type: 'important_unread', maxItems: 10 },
+                    { type: 'starred', maxItems: 10 },
+                    { type: 'none', maxItems: 10 },
+                    { type: 'everything', maxItems: 25 }
+                ],
+                hideEmpty: true
+            },
+            multiple: {
+                panels: [
+                    { query: 'is:starred', title: '星标邮件' },
+                    { query: 'is:unread', title: '未读邮件' },
+                    { query: 'has:attachment', title: '含附件' },
+                    { query: 'label:work', title: '工作' }
+                ],
+                maxItems: 10,
+                position: 'right'
+            }
+        },
+        readingPane: 'right', // 'right' | 'below' | 'no_split'
+        conversationView: true,
+        themeWallpaper: '', // preset id or image url
+        themeWallpaperOpacity: 85
     }),
     getters: {
         // 向后兼容：其他地方读取 customLabels / defaultLabels 时转发到 allLabels
@@ -117,9 +151,113 @@ export const useUiStore = defineStore('ui', {
         // 获取全量标签（供 rule-engine 等使用）
         getAllLabelNames() {
             return this.allLabels.map(l => l.name)
+        },
+        setThemeMode(mode) {
+            this.themeMode = mode;
+            let targetDark = true;
+            if (mode === 'light') {
+                targetDark = false;
+            } else if (mode === 'dark') {
+                targetDark = true;
+            } else {
+                targetDark = typeof window !== 'undefined' && window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)').matches : true;
+            }
+            this.dark = targetDark;
+            this.applyTheme(targetDark);
+        },
+        applyTheme(isDark) {
+            if (typeof document === 'undefined') return;
+            const root = document.documentElement;
+            root.classList.toggle('dark', !!isDark);
+            const metaTag = document.getElementById('theme-color-meta');
+            const isMobile = typeof window !== 'undefined' && !window.matchMedia("(pointer: fine) and (hover: hover)").matches;
+            if (metaTag) {
+                metaTag.setAttribute('content', isDark ? (isMobile ? '#141414' : '#000000') : (isMobile ? '#FFFFFF' : '#F1F1F1'));
+            }
+        },
+        setDensity(density) {
+            this.density = density;
+        },
+        setInboxType(type) {
+            this.inboxType = type;
+        },
+        setInboxConfig(type, cfg) {
+            if (!this.inboxConfig) this.inboxConfig = {};
+            this.inboxConfig[type] = { ...this.inboxConfig[type], ...cfg };
+        },
+        setReadingPane(pane) {
+            this.readingPane = pane;
+        },
+        setConversationView(val) {
+            this.conversationView = !!val;
+        },
+        setThemeWallpaper(wallpaper) {
+            this.themeWallpaper = wallpaper;
+            this.applyMainWallpaper();
+        },
+        setThemeWallpaperOpacity(opacity) {
+            this.themeWallpaperOpacity = Number(opacity) || 85;
+            this.applyMainWallpaper();
+        },
+        applyMainWallpaper() {
+            if (typeof document === 'undefined') return;
+            const root = document.documentElement;
+            let bgCss = '';
+            if (this.themeWallpaper && this.themeWallpaper !== 'none') {
+                bgCss = getWallpaperCssById(this.themeWallpaper);
+            }
+            if (bgCss) {
+                root.style.setProperty('--main-wallpaper-url', bgCss);
+                root.style.setProperty('--main-wallpaper-alpha', `${this.themeWallpaperOpacity || 85}%`);
+                root.style.setProperty('--panel-alpha', `${this.themeWallpaperOpacity || 85}%`);
+                root.classList.add('has-main-wallpaper');
+                if (document.body) document.body.classList.add('has-main-wallpaper');
+            } else {
+                root.style.setProperty('--main-wallpaper-url', 'none');
+                root.style.setProperty('--main-wallpaper-alpha', '100%');
+                root.style.setProperty('--panel-alpha', '100%');
+                root.classList.remove('has-main-wallpaper');
+                if (document.body) document.body.classList.remove('has-main-wallpaper');
+            }
+        },
+        initTheme() {
+            if (typeof window === 'undefined') return;
+            if (!this.themeMode) {
+                this.themeMode = this.dark ? 'dark' : 'light';
+            }
+            if (this.themeMode === 'auto' || this.themeMode === 'system') {
+                this.dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            }
+            this.applyTheme(this.dark);
+            this.applyMainWallpaper();
+
+            if (window.matchMedia) {
+                const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+                if (mediaQuery.addEventListener) {
+                    mediaQuery.addEventListener('change', (e) => {
+                        if (this.themeMode === 'auto' || this.themeMode === 'system') {
+                            this.dark = e.matches;
+                            this.applyTheme(this.dark);
+                        }
+                    });
+                }
+            }
         }
     },
     persist: {
-        pick: ['accountShow', 'dark', 'allLabels', 'customSvgs'],
+        pick: [
+            'accountShow',
+            'dark',
+            'themeMode',
+            'allLabels',
+            'customSvgs',
+            'density',
+            'inboxType',
+            'inboxConfig',
+            'readingPane',
+            'conversationView',
+            'themeWallpaper',
+            'themeWallpaperOpacity'
+        ],
     },
 })
