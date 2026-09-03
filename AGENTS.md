@@ -12,6 +12,19 @@
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
 
+### 全系统「从零开始重写验证整体逻辑」端到端深度审计与生产环境全量发布 (2026-09-03)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **全链路从零到一闭环验证 (Zero-to-One E2E Audit)**:
+       - **Phase 1: 账号认证与会话状态**: 验证生产环境管理员登录与 JWT 令牌签发。
+       - **Phase 2: 客户端资料分区解耦**: 验证 `/settings/data` 5 大选项卡顺序，严格断言零残留 `api-container`，专注于数据汇出与邮件转发。
+       - **Phase 3: 管理员应用平台全生命周期**: 验证 `/settings/oauth-apps` 注册应用、GitHub 风格 Client Secret 一次性安全弹窗、Client ID 生成与 Playground 多框架代码生成器 (NextAuth.js / Node / Python / cURL / OIDC)。
+       - **Phase 4: 独立 OIDC 授权确认页**: 验证 `/oauth/authorize` 应用信息、账号感知、Scopes 请求与 Authorization Code 签发与 302 重定向。
+       - **Phase 5: 后端 OIDC 协议端点兑换**: 验证 `POST /api/oauth/token` 令牌置换、`GET /api/oauth/userinfo` 用户资料与 `GET /.well-known/openid-configuration` Discovery 元数据发现。
+       - **Phase 6: 零假数据自动还原**: 自动化删除测试生成的 OAuth 应用，保持全系统数据库与 KV 零脏数据残留。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - 生产部署上线 Cloudflare Workers Version ID: `89ec6d9c-6b31-4e30-b20a-bb49c3498200`。
+    - 全链路自动化测试套件 `node tests/test-total-zero-to-one-verification.mjs` 100% 顺利通过（Phase 1 ~ Phase 6 全量通过）。
+
 ### 管理员专属 OAuth 开放平台 / 应用管理独立分区上线与个人「资料」分区解耦清退 (2026-09-03)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **权限架构与产品定位精准归位 (Admin Platform vs Client Decoupling)**:
