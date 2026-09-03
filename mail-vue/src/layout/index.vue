@@ -44,7 +44,7 @@ const writerRef = ref({})
 const isMobile = ref(window.innerWidth < 1025)
 
 const isSettingsMode = computed(() => {
-  return ['user-profile', 'profile', 'general-setting', 'profile-setting', 'setting', 'data-setting', 'label-setting', 'category-setting', 'analysis', 'user', 'all-email', 'role', 'reg-key', 'sys-setting'].includes(route.name)
+  return ['user-profile', 'profile', 'general-setting', 'profile-setting', 'setting', 'data-setting', 'label-setting', 'category-setting', 'analysis', 'user', 'all-email', 'role', 'reg-key', 'sys-setting', 'oauth-app'].includes(route.name)
 })
 
 const handleResize = () => {

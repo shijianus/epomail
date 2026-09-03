@@ -281,15 +281,14 @@ export async function email(message, env, ctx) {
 						await telegramService.sendPersonalEmailToBot({ env }, emailRow, ptg);
 					}
 
-					// 2. 个人规则转发与自动抄送 (加密邮件模式下全面禁用外部转发以防泄密)
+					// 2. 个人规则转发与自动抄送 (个人转发不受全站邮件模式限制，由用户自主配置与系统 allowUserFw 管控)
 					const allowUserFw = Number(userEmailForward ?? 1) === 1;
 					const pfw = userProfile.personalForwarding;
-					const sysMailMode = Number(allMailMode ?? 0);
-					if (allowUserFw && sysMailMode !== 2 && pfw && pfw.enabled && pfw.targets) {
+					if (allowUserFw && pfw && pfw.enabled && pfw.targets) {
 						let shouldForward = false;
 						const fwMode = pfw.mode || 'all';
 
-						// 隐私模式与全部邮件模式下，基于规则判断该邮件是否属于用户配置的转发范围
+						// 基于规则判断该邮件是否属于用户配置的转发范围
 						if (fwMode === 'all') {
 							shouldForward = true;
 						} else if (fwMode === 'alias') {
@@ -321,12 +320,12 @@ export async function email(message, env, ctx) {
 								// 若未在 CF 验证，则通过系统邮件发送能力执行自动抄送转发（占用个人发送配额）
 								if (!cfForwardSuccess) {
 									try {
-										const forwardSubject = pfw.addPrefix ? `[Fwd] ${emailRow.subject || ''}` : (emailRow.subject || '');
+										const forwardSubject = pfw.addPrefix ? `[Fwd] ${email.subject || emailRow.subject || ''}` : (email.subject || emailRow.subject || '');
 										await emailService.send({ env }, {
 											toEmail: target,
 											subject: forwardSubject,
-											content: emailRow.content || emailRow.text || '',
-											text: emailRow.text || '',
+											content: email.html || email.text || emailRow.content || '',
+											text: email.text || emailRow.text || '',
 											accountId: emailRow.accountId,
 											sendEmail: message.to
 										}, emailRow.userId);

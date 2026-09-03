@@ -37,8 +37,43 @@ const dbInit = {
 		await this.v3_6DB(c);
 		await this.v3_7DB(c);
 		await this.v3_8DB(c);
+		await this.v3_9DB(c);
 		await settingService.refresh(c);
 		return c.text('success');
+	},
+
+	async v3_9DB(c) {
+		try {
+			await c.env.db.prepare(`
+				CREATE TABLE IF NOT EXISTS oauth_app (
+					id INTEGER PRIMARY KEY AUTOINCREMENT,
+					client_id TEXT NOT NULL UNIQUE,
+					client_secret TEXT NOT NULL,
+					name TEXT NOT NULL,
+					homepage_url TEXT NOT NULL DEFAULT '',
+					description TEXT NOT NULL DEFAULT '',
+					redirect_uris TEXT NOT NULL DEFAULT '[]',
+					logo_url TEXT NOT NULL DEFAULT '',
+					scopes TEXT NOT NULL DEFAULT 'openid profile email',
+					status INTEGER NOT NULL DEFAULT 1,
+					created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+					updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+				);
+			`).run();
+
+			await c.env.db.prepare(`
+				CREATE TABLE IF NOT EXISTS oauth_grant (
+					id INTEGER PRIMARY KEY AUTOINCREMENT,
+					user_id INTEGER NOT NULL,
+					client_id TEXT NOT NULL,
+					scopes TEXT NOT NULL DEFAULT 'openid profile email',
+					created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+					updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+				);
+			`).run();
+		} catch (e) {
+			console.warn(`初始化 oauth_app 表跳过：${e.message}`);
+		}
 	},
 
 	async v3_8DB(c) {

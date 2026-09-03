@@ -44,13 +44,12 @@ import assert from "assert";
       localStorage.setItem("locale", "zh");
     }, token);
 
-    await page.goto(BASE + "/settings/data", { waitUntil: "domcontentloaded" });
-    await page.waitForTimeout(2000);
+    await page.goto(BASE + "/settings/data", { waitUntil: "networkidle" });
+    await page.waitForSelector(".forward-toggle-row", { timeout: 10000 });
 
     console.log("Current URL:", page.url());
     console.log("Forward toggle row count:", await page.locator(".forward-toggle-row").count());
     console.log("Forward container count:", await page.locator(".forwarding-container").count());
-    console.log("Forwarding container text:", await page.locator(".forwarding-container").innerText().catch(e => "N/A"));
 
     // 验证用户端没有架构警告横幅
     assert.strictEqual(await page.locator(".quota-warning-banner").count(), 0, "用户端不应展示配额警告横幅");
@@ -63,25 +62,26 @@ import assert from "assert";
     // 3. 测试模式 0: 隐私邮件模式 (allMailMode = 0)
     console.log("3. 测试模式 0: 隐私邮件模式 (allMailMode = 0)...");
     await setAllMailMode(0);
-    await page.goto(BASE + "/settings/data", { waitUntil: "domcontentloaded" });
-    await page.waitForTimeout(1500);
+    await page.goto(BASE + "/settings/data", { waitUntil: "networkidle" });
+    await page.waitForSelector(".forward-toggle-row", { timeout: 10000 });
 
     assert.strictEqual(await page.locator(".quota-warning-banner").count(), 0, "用户端不应展示配额警告横幅");
     assert.strictEqual(await page.locator(".mode-rule-notice-banner").count(), 0, "用户端不应展示模式架构横幅");
     assert.ok(await page.locator(".forward-toggle-row").count() > 0, "模式 0 下应展示转发开关");
     await page.screenshot({ path: "/home/shijian/projects/epocanvas-mail/tests/audit_user_data_clean_mode0.png" });
 
-    // 4. 测试模式 2: 加密邮件模式 (allMailMode = 2) - 转发规则对用户完全禁用并隐藏
+    // 4. 测试模式 2: 加密邮件模式 (allMailMode = 2) - 用户端正常支持第三方邮件转发与个人 TG 推送
     console.log("4. 测试模式 2: 加密邮件模式 (allMailMode = 2)...");
     await setAllMailMode(2);
     await page.goto(BASE + "/inbox", { waitUntil: "domcontentloaded" });
     await page.goto(BASE + "/settings/data", { waitUntil: "networkidle" });
-    await page.waitForTimeout(2000);
+    await page.waitForSelector(".forward-toggle-row", { timeout: 10000 });
 
     console.log("Mode 2 current forwarding-rule-section count:", await page.locator(".forwarding-rule-section").count());
 
-    // 验证加密模式下，用户端完全不展示邮件转发规则
-    assert.strictEqual(await page.locator(".forwarding-rule-section").count(), 0, "加密模式下应全面隐藏并禁止邮件转发规则");
+    // 验证加密模式下，用户端正常展示邮件转发规则与个人 TG 推送
+    assert.ok(await page.locator(".forward-toggle-row").count() > 0, "加密模式下用户端应展示邮件转发开关");
+    assert.ok(await page.locator(".forwarding-rule-section").count() > 0, "加密模式下应保留用户端邮件转发配置");
     assert.ok(await page.locator(".tg-push-item").count() > 0, "加密模式下仍保留个人 Telegram 消息推送");
     await page.screenshot({ path: "/home/shijian/projects/epocanvas-mail/tests/audit_user_data_encrypted_mode2.png" });
 

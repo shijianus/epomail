@@ -1,5 +1,85 @@
 # Agent Workflow SOP (Standard Operating Procedure)
 
+## 📌 核心准则与提交规范 (Core Rules & Mandatory Commit Standards)
+1. **每次开发/重构/修复必须执行完整 Git Commit**:
+   - 严禁在工作完成或回合结束时不执行 Commit。
+   - 所有任务在通过本地构建、自动化端到端测试与生产部署验证后，必须立即执行 `git add` 与 `git commit`。
+2. **规范化 Commit Message 与 Hash 追溯**:
+   - 提交信息必须结构清晰，说明本次变更的核心背景、架构设计、安全与功能改动。
+   - 每次提交后必须将 Commit Hash 完整写入 `AGENTS.md` 对应上线记录中。
+3. **向用户明确汇报 Commit Hash**:
+   - 在向用户输出回复时，必须置顶/显式打印出本次提交的完整 Commit Hash 与短 Hash，确保版本可追溯、审计记录完整。
+4. **零假数据与测试自动还原准则**:
+   - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
+
+### 管理员专属 OAuth 开放平台 / 应用管理独立分区上线与个人「资料」分区解耦清退 (2026-09-03)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **权限架构与产品定位精准归位 (Admin Platform vs Client Decoupling)**:
+       - **个人「资料」分区彻底清退**: 响应管理员架构要求，从普通用户「资料」设置页 (`/settings/data`) 中彻底移除 `class="container api-container"` 开发者 API 与第三方应用接入卡片，确保普通用户个人界面专注于个人数据汇出与邮件转发。
+       - **管理员专属「应用管理」独立分区建立 (`/settings/oauth-apps`)**: 在设置中心的管理员管理分区（与「系统设置」、「分类设置」同级）新增专属「应用管理」独立分区，由 `setting:query` 与 `setting:set` 权限严格守护。
+    2. **对标 GitHub Developer Settings 的全套现代化体验**:
+       - **OIDC Core 1.0 / RFC 6749 标准端点一览**: 顶部集成 Discovery 元数据 (`/.well-known/openid-configuration`)、授权端点 (`/oauth/authorize`)、令牌置换 (`/api/oauth/token`) 与用户资料 (`/api/oauth/userinfo`) 快捷复制条。
+       - **应用注册与管理 (App Lifecycle Management)**: 支持注册新应用、输入应用名称、主页 URL、描述、多回调 URL (Redirect URIs) 及 Logo；卡片化展示 Client ID、密文 Secret、回调地址与状态切换 Switch。
+       - **GitHub 风格 Client Secret 一次性安全弹窗**: 专属密钥生成/重置时弹出安全警告横幅与明文 Secret 复制视窗，并要求用户确认妥善保管。
+       - **快速集成 Playground 代码生成器**: 内置 NextAuth.js (Auth.js)、Node.js Express、Python FastAPI (Authlib)、cURL 及通用 OIDC 面板配置的一键复制配置模板。
+    3. **标准 OIDC 独立授权确认页 (`/oauth/authorize`)**:
+       - 支持第三方 App 发起单点登录时展示双方品牌连通示意图、申请方名称与域名、当前登录账号（支持快捷切换）与请求的 Scope 列表（`openid`, `profile`, `email`）。
+       - 未登录用户支持内嵌式极简直登后接续授权；授权完成后支持 Popup 模式 (`window.opener.postMessage`) 与标准 HTTP 302 重定向。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - 生产部署上线 Cloudflare Workers Version ID: `755cb46b-0039-41fb-a0f5-61d28a53a99c`。
+    - 全量自动化测试套件 100% 顺利通过：
+      - `node tests/test-admin-oauth-apps-and-authorize.mjs` (应用注册、Secret 生成、应用卡片、集成代码生成器、/oauth/authorize 独立授权确认、Authorization Code 捕获、Token 兑换、UserInfo 获取与 Discovery 发现全链路 100% 通过);
+      - `node tests/test-data-settings-partition-e2e.mjs` (个人资料分区中英文全量通过);
+      - `node tests/test-settings-tabs.mjs` (5 大设定选项卡全量通过);
+      - `node tests/test-sys-setting-user-data-control.mjs` (A~F 全场景通过);
+      - `node tests/test-forwarding-modes-and-tg.mjs` (全量通过)。
+
+### 加密邮件模式个人「资料」分区第三方邮件转发权限与逻辑修复 (2026-09-03)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **权限与架构逻辑精准解耦 (Admin vs User Decoupling)**:
+       - 纠正此前在加密邮件模式（`allMailMode === 2`）下错误隐藏/禁用普通用户个人第三方邮件转发的逻辑。
+       - **管理员限制与普通用户自主权界限**：全站加密模式下限制的仅为管理员在「系统设置」中配置全局第三方邮箱获取全站转发权限；普通注册用户对其个人名下邮件拥有绝对处置权，在个人「资料」分区（`/settings/data`）配置第三方邮箱将自己的邮件自动抄送/规则转发完全符合逻辑，不受加密模式影响。
+    2. **前后端全链路无缝支持**:
+       - **前端 (`mail-vue/src/views/data-setting/index.vue`)**：解绑 `currentMailMode !== 2` 阻断，当管理员允许用户转发（`allowUserEmailForward` 开启）时，加密模式下「邮件与消息转发」容器及内部的「启用自动转发」、「转发目的地邮箱」、「转发触发规则」、「高级选项」完整向用户呈现。
+       - **后端路由与发送 (`mail-worker/src/email/email.js`)**：移除 `sysMailMode !== 2` 拦截，用户个人配置的规则转发在全模式下正常运行；抄送发信时采用入站邮件原文，确保转发内容完整无误。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - 生产部署上线 Cloudflare Workers Version ID: `3518630d-9fc0-44ce-bb3f-2bafb12c6bff`。
+    - 全量自动化测试套件 100% 顺利通过：
+      - `node tests/test-forwarding-modes-and-tg.mjs` (模式 1、模式 0 及模式 2 加密模式下用户端转发与 TG 验证通过);
+      - `node tests/test-sys-setting-user-data-control.mjs` (A~F 全场景通过);
+      - `node tests/test-sys-setting-email-push-optimization.mjs` (全量通过);
+      - `node tests/test-data-settings-partition-e2e.mjs` (全量通过);
+      - `node tests/test-settings-tabs.mjs` (全量通过);
+      - `node tests/test-tg-dialog-sync-visual-audit.mjs` (全量通过)。
+
+### 设定页「资料」分区邮件与消息转发 (`class="container forwarding-container"`) UI/UX 深度重构与画风一致性修复 (2026-09-03)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **转发触发规则选项大小不一与排布错乱彻底修复 (Uniform Selection Card Group)**:
+       - 彻底解决由于 `el-radio` 默认 `inline-flex` 引起的「全部邮件直接抄送转发」、「特定前缀/字母别名转发」、「智能规则过滤转发」三个选项宽度随文本长度参差不齐（宽度 320px vs 480px vs 450px）的严重失调问题。
+       - 全面重构为现代卡片式单选容器（`.forward-type-group` 统一 `width: 100%; max-width: 580px;`），每一项均为标准 `.rule-type-card`（`box-sizing: border-box; width: 100%;`）。
+       - 自定义圆形单选微指示器（`.custom-radio-indicator`），首行严格垂直对齐，选中态呈现高雅 Accent 主题色圆环与软背景（`color-mix(in srgb, var(--accent-primary) 6%, var(--bg-surface))`）。
+       - **别名前缀输入子区域内嵌优化**：将原本孤立断层掉落在最下方的别名前缀输入框优雅内嵌至「特定前缀/字母别名转发」卡片内部（`.alias-inline-subbox`），带矢量标签图标、虚线隔离框与 `clearable` 输入器，交互层级一目了然。
+    2. **「邮件与消息转发」容器排版与全系统设计语言严格对齐**:
+       - 补齐卡片导读副标题（`.section-intro`：“配置个人 Telegram 消息推送通道与进站邮件的自动规则转发，实现跨终端即时触达。”），消除与 Section 1（数据汇出）及 Section 3（开发者 API）的排版断层。
+       - 将字段标签宽度统一升级为 `grid-template-columns: 180px 1fr; gap: 32px;`，彻底解决 7~14 个中文字符副提示在 140px 下被极度挤压断行的丑陋折行问题。
+       - 输入框左侧优雅内嵌 `fluent:mail-forward-20-regular` 矢量转发图标，统一宽度 `max-width: 580px`。
+       - 保存按钮（`.save-forward-btn`）对齐至表单内容列下方（`margin-left: calc(180px + 32px)`），杜绝在 1440px 宽屏下孤立漂浮在最右下角的问题。
+    3. **深浅色主题自适应与 i18n 完整覆盖**:
+       - 亮色与暗色模式下卡片边框、背景 tint、阴影与输入框 100% 完美自适应。
+       - 中英文 i18n 键值（`forwardingSectionDesc`, `forwardingDestinationDesc`, `forwardingTypeSubhint`, `advancedOptions`, `advancedOptionsDesc`）完整补充。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - 生产部署上线 Cloudflare Workers Version ID: `b33443e3-3fa0-4144-a9e3-38a886b945f7`。
+    - 全量自动化端到端测试与多场景视觉审计 100% 顺利通过：
+      - `tests/audit_data_forwarding_fixed_all_light.png` & `tests/audit_data_forwarding_fixed_all_dark.png`；
+      - `tests/audit_data_forwarding_fixed_alias_light.png` & `tests/audit_data_forwarding_fixed_alias_dark.png`；
+      - `tests/audit_data_forwarding_fixed_rules_light.png` & `tests/audit_data_forwarding_fixed_rules_dark.png`；
+      - `node tests/test-data-settings-partition-e2e.mjs` (全量通过);
+      - `node tests/test-sys-setting-user-data-control.mjs` (A~F 全场景通过);
+      - `node tests/test-forwarding-modes-and-tg.mjs` (全量通过);
+      - `node tests/test-sys-setting-email-push-optimization.mjs` (全量通过);
+      - `node tests/test-settings-tabs.mjs` (5 大选项卡中英文双语全量通过);
+      - `node tests/test-tg-dialog-sync-visual-audit.mjs` (全量通过)。
+
 ### 全站测试/虚假默认数据彻底清退、严格杜绝默认假数据与测试状态自动还原规范固化 (2026-09-03)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **全站彻底清退残留虚假数据与历史测试脏数据**:

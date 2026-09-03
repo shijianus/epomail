@@ -85,16 +85,28 @@ const routers = {
             menu: true
         }
     }],
-    'setting:query': [{
-        path: '/system-setting',
-        name: 'sys-setting',
-        component: () => import('@/views/sys-setting/index.vue'),
-        meta: {
-            title: 'SystemSettings',
+    'setting:query': [
+        {
+            path: '/system-setting',
             name: 'sys-setting',
-            menu: true
+            component: () => import('@/views/sys-setting/index.vue'),
+            meta: {
+                title: 'SystemSettings',
+                name: 'sys-setting',
+                menu: true
+            }
+        },
+        {
+            path: '/settings/oauth-apps',
+            name: 'oauth-app',
+            component: () => import('@/views/oauth-app/index.vue'),
+            meta: {
+                title: 'oauthApps',
+                name: 'oauth-app',
+                menu: true
+            }
         }
-    }],
+    ],
     'reg-key:query': [{
         path: '/invite-code',
         name: 'reg-key',

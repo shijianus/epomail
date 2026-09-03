@@ -109,6 +109,17 @@ const routes = [
                 }
             },
             {
+                path: '/settings/oauth-apps',
+                alias: ['/settings/oauth-app', '/oauth-apps', '/oauth-app'],
+                name: 'oauth-app',
+                component: () => import('@/views/oauth-app/index.vue'),
+                meta: {
+                    title: 'oauthApps',
+                    name: 'oauth-app',
+                    menu: true
+                }
+            },
+            {
                 path: '/starred',
                 name: 'star',
                 component: () => import('@/views/star/index.vue'),
@@ -157,6 +168,11 @@ const routes = [
         component: () => import('@/views/login/index.vue')
     },
     {
+        path: '/oauth/authorize',
+        name: 'oauth-authorize',
+        component: () => import('@/views/oauth/authorize.vue')
+    },
+    {
         path: '/test',
         name: 'test',
         component: () => import('@/views/test/index.vue')
@@ -202,7 +218,7 @@ router.beforeEach((to, from, next) => {
 
     const token = localStorage.getItem('token')
 
-    if (!token && to.name !== 'login' && to.name !== 'profile') {
+    if (!token && !['login', 'profile', 'oauth-authorize'].includes(to.name)) {
         removeLoading();
         window.location.replace('/login/');
         return;

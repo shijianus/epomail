@@ -19,7 +19,9 @@ const exclude = [
 	'/public/profile',
 	'/telegram',
 	'/test',
-	'/oauth'
+	'/oauth',
+	'/api/oauth',
+	'/.well-known'
 ];
 
 const requirePerms = [
@@ -45,6 +47,12 @@ const requirePerms = [
 	'/setting/set',
 	'/setting/query',
 	'/setting/setBlacklist',
+	'/admin/oauthApp/list',
+	'/admin/oauthApp/add',
+	'/admin/oauthApp/update',
+	'/admin/oauthApp/resetSecret',
+	'/admin/oauthApp/status',
+	'/admin/oauthApp/delete',
 	'/user/delete',
 	'/user/setPwd',
 	'/user/setStatus',
@@ -83,8 +91,8 @@ const premKey = {
 	'user:delete': ['/user/delete','/user/deleteAccount'],
 	'all-email:query': ['/allEmail/list','/allEmail/latest'],
 	'all-email:delete': ['/allEmail/delete','/allEmail/batchDelete'],
-	'setting:query': ['/setting/query'],
-	'setting:set': ['/setting/set', '/setting/setBackground','/setting/deleteBackground','/setting/setBlacklist'],
+	'setting:query': ['/setting/query', '/admin/oauthApp/list'],
+	'setting:set': ['/setting/set', '/setting/setBackground','/setting/deleteBackground','/setting/setBlacklist', '/admin/oauthApp/add', '/admin/oauthApp/update', '/admin/oauthApp/resetSecret', '/admin/oauthApp/status', '/admin/oauthApp/delete'],
 	'analysis:query': ['/analysis/echarts'],
 	'reg-key:add': ['/regKey/add'],
 	'reg-key:query': ['/regKey/list','/regKey/history'],

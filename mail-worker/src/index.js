@@ -17,6 +17,16 @@ export default {
 			return app.fetch(req, env, ctx);
 		}
 
+		if (
+			url.pathname.startsWith('/.well-known/') ||
+			url.pathname === '/oauth/token' ||
+			url.pathname === '/oauth/userinfo' ||
+			url.pathname === '/oauth/authorize/info' ||
+			(url.pathname === '/oauth/authorize' && req.method === 'POST')
+		) {
+			return app.fetch(req, env, ctx);
+		}
+
 		 if (['/static/','/attachments/'].some(p => url.pathname.startsWith(p))) {
 			 return await kvObjService.toObjResp( { env }, url.pathname.substring(1));
 		 }

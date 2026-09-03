@@ -106,8 +106,11 @@
     </div>
 
     <!-- Section 2: 邮件与消息转发 (Personal TG Push & Email Forwarding) -->
-    <div class="container forwarding-container" id="forwarding" v-if="allowUserTg || (currentMailMode !== 2 && allowUserEmailForward)">
+    <div class="container forwarding-container" id="forwarding" v-if="allowUserTg || allowUserEmailForward">
       <div class="title">{{ $t('forwardingAndPushTitle') || '邮件与消息转发' }}</div>
+      <div class="section-intro">
+        {{ $t('forwardingSectionDesc') || '配置个人 Telegram 消息推送通道与进站邮件的自动规则转发，实现跨终端即时触达。' }}
+      </div>
       
       <!-- 1. Telegram 消息推送 (以 Button 设置弹窗形式集成) -->
       <div class="item tg-push-item" v-if="allowUserTg">
@@ -121,7 +124,7 @@
           </div>
         </div>
         <div class="tg-item-actions">
-          <el-tag :type="tgForm.enabled ? 'success' : 'info'" size="small" effect="plain" round>
+          <el-tag :type="tgForm.enabled ? 'success' : 'info'" size="small" effect="plain" round class="status-tag">
             {{ tgForm.enabled ? ($t('enabled') || '已启用') : ($t('disabled') || '未启用') }}
           </el-tag>
           <el-button class="opt-button" size="small" type="primary" @click="openTgSettingDialog" :title="$t('settings') || '配置'">
@@ -130,16 +133,16 @@
         </div>
       </div>
 
-      <!-- 2. 邮件规则转发与自动抄送 (仅在非加密模式且管理员允许时提供，加密模式下全面禁用并隐藏) -->
-      <template v-if="currentMailMode !== 2 && allowUserEmailForward">
+      <!-- 2. 邮件规则转发与自动抄送 (在管理员允许用户邮件转发时提供) -->
+      <template v-if="allowUserEmailForward">
         <div class="forwarding-rule-section">
           <!-- 启用自动转发开关 -->
           <div class="item forward-toggle-row">
-            <div>
+            <div class="toggle-info">
               <div class="fw-title">{{ $t('forwardingEnable') || '启用自动邮件转发' }}</div>
               <div class="sub-hint">{{ $t('forwardingRulesDesc') || '规则转发只会转发设置邮箱所接收的邮件' }}</div>
             </div>
-            <div>
+            <div class="toggle-action">
               <el-switch v-model="forwardForm.enabled" @change="saveForwardSettings(false)" />
             </div>
           </div>
@@ -147,181 +150,132 @@
           <div class="forwarding-fields" :class="{ 'fields-disabled': !forwardForm.enabled }">
             <!-- 目的地邮箱 -->
             <div class="item forward-field-item">
-              <div>
+              <div class="field-label-col">
                 <div class="fw-label">{{ $t('forwardingDestination') || '转发目的地邮箱' }}</div>
-                <div class="sub-hint">接收转发邮件的目标地址</div>
+                <div class="sub-hint">{{ $t('forwardingDestinationDesc') || '接收转发邮件的目标地址' }}</div>
               </div>
               <div class="forward-input-wrap">
                 <el-input 
                   v-model="forwardForm.targets" 
                   :placeholder="$t('forwardingDestinationPlaceholder') || '输入目标邮箱地址，多个邮箱用英文逗号分隔，如 yourname@gmail.com'" 
                   clearable 
-                />
+                >
+                  <template #prefix>
+                    <Icon icon="fluent:mail-forward-20-regular" width="16" height="16" class="input-prefix-icon" />
+                  </template>
+                </el-input>
               </div>
             </div>
 
             <!-- 触发规则类型 -->
             <div class="item forward-rule-item align-start">
-              <div style="padding-top: 4px;">
+              <div class="field-label-col">
                 <div class="fw-label">{{ $t('forwardingType') || '转发触发规则' }}</div>
-                <div class="sub-hint">选择在何种条件下触发转发</div>
+                <div class="sub-hint">{{ $t('forwardingTypeSubhint') || '选择在何种条件下触发转发' }}</div>
               </div>
               <div class="forward-type-wrapper">
-                <el-radio-group v-model="forwardForm.mode" class="forward-type-group">
-                  <el-radio label="all">
-                    <span class="r-title">{{ $t('forwardingTypeAll') || '全部邮件直接抄送转发' }}</span>
-                    <span class="r-desc">{{ $t('forwardingTypeAllDesc') || '所有进入当前邮箱的邮件无条件抄送转发至目的地' }}</span>
-                  </el-radio>
-                  <el-radio label="alias">
-                    <span class="r-title">{{ $t('forwardingTypeAlias') || '特定前缀/字母别名转发' }}</span>
-                    <span class="r-desc">{{ $t('forwardingTypeAliasDesc') || '仅当收件邮箱匹配指定别名前缀时触发转发（如 billing、dev-*）' }}</span>
-                  </el-radio>
-                  <el-radio label="rules">
-                    <span class="r-title">{{ $t('forwardingTypeRules') || '智能规则过滤转发' }}</span>
-                    <span class="r-desc">{{ $t('forwardingTypeRulesDesc') || '仅当满足特定条件（如重要邮件或含特定关键词）时触发转发' }}</span>
-                  </el-radio>
-                </el-radio-group>
+                <div class="forward-type-group">
+                  <!-- 1. 全部邮件 -->
+                  <div 
+                    class="rule-type-card" 
+                    :class="{ active: forwardForm.mode === 'all' }"
+                    @click="forwardForm.mode = 'all'"
+                  >
+                    <div class="rule-card-main">
+                      <div class="custom-radio-indicator" :class="{ checked: forwardForm.mode === 'all' }">
+                        <div class="radio-inner-dot" v-if="forwardForm.mode === 'all'"></div>
+                      </div>
+                      <div class="rule-card-text">
+                        <div class="r-title">{{ $t('forwardingTypeAll') || '全部邮件直接抄送转发' }}</div>
+                        <div class="r-desc">{{ $t('forwardingTypeAllDesc') || '所有进入当前邮箱的邮件无条件抄送转发至目的地' }}</div>
+                      </div>
+                    </div>
+                  </div>
 
-                <!-- 别名前缀输入 -->
-                <div v-if="forwardForm.mode === 'alias'" class="alias-prefixes-box">
-                  <span class="field-lbl">{{ $t('forwardingAliasPrefix') || '匹配的前缀/别名' }}:</span>
-                  <el-input 
-                    v-model="forwardForm.aliasPrefixes" 
-                    size="small" 
-                    :placeholder="$t('forwardingAliasPrefixPlaceholder') || '多个前缀用逗号隔开，如 billing, dev, notice'" 
-                    style="flex: 1;"
-                  />
+                  <!-- 2. 别名前缀 -->
+                  <div 
+                    class="rule-type-card" 
+                    :class="{ active: forwardForm.mode === 'alias' }"
+                    @click="forwardForm.mode = 'alias'"
+                  >
+                    <div class="rule-card-main">
+                      <div class="custom-radio-indicator" :class="{ checked: forwardForm.mode === 'alias' }">
+                        <div class="radio-inner-dot" v-if="forwardForm.mode === 'alias'"></div>
+                      </div>
+                      <div class="rule-card-text">
+                        <div class="r-title">{{ $t('forwardingTypeAlias') || '特定前缀/字母别名转发' }}</div>
+                        <div class="r-desc">{{ $t('forwardingTypeAliasDesc') || '仅当收件邮箱匹配指定别名前缀时触发转发（如 billing、dev-*）' }}</div>
+                      </div>
+                    </div>
+
+                    <!-- 别名前缀输入子区域 (内嵌在别名卡片内) -->
+                    <div v-if="forwardForm.mode === 'alias'" class="alias-inline-subbox" @click.stop>
+                      <div class="alias-sub-label">
+                        <Icon icon="fluent:tag-multiple-16-regular" width="14" height="14" />
+                        <span>{{ $t('forwardingAliasPrefix') || '匹配的前缀/别名' }}:</span>
+                      </div>
+                      <el-input 
+                        v-model="forwardForm.aliasPrefixes" 
+                        size="small" 
+                        :placeholder="$t('forwardingAliasPrefixPlaceholder') || '多个前缀用逗号隔开，如 billing, dev, notice'" 
+                        clearable
+                        style="width: 100%;"
+                      />
+                    </div>
+                  </div>
+
+                  <!-- 3. 智能规则 -->
+                  <div 
+                    class="rule-type-card" 
+                    :class="{ active: forwardForm.mode === 'rules' }"
+                    @click="forwardForm.mode = 'rules'"
+                  >
+                    <div class="rule-card-main">
+                      <div class="custom-radio-indicator" :class="{ checked: forwardForm.mode === 'rules' }">
+                        <div class="radio-inner-dot" v-if="forwardForm.mode === 'rules'"></div>
+                      </div>
+                      <div class="rule-card-text">
+                        <div class="r-title">{{ $t('forwardingTypeRules') || '智能规则过滤转发' }}</div>
+                        <div class="r-desc">{{ $t('forwardingTypeRulesDesc') || '仅当满足特定条件（如重要邮件或含特定关键词）时触发转发' }}</div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
 
             <!-- 高级选项 -->
             <div class="item forward-options-item align-start no-border">
-              <div>
-                <div class="fw-label">高级选项</div>
-                <div class="sub-hint">保留原件与转发主题标头</div>
+              <div class="field-label-col">
+                <div class="fw-label">{{ $t('advancedOptions') || '高级选项' }}</div>
+                <div class="sub-hint">{{ $t('advancedOptionsDesc') || '保留原件与转发主题标头' }}</div>
               </div>
               <div class="feature-checkboxes">
                 <el-checkbox v-model="forwardForm.keepCopy">
-                  {{ $t('forwardingKeepCopy') || '在收件箱中保留邮件原件' }}
+                  <span class="chk-label">{{ $t('forwardingKeepCopy') || '在收件箱中保留邮件原件' }}</span>
                 </el-checkbox>
                 <el-checkbox v-model="forwardForm.addPrefix">
-                  {{ $t('forwardingSubjectPrefix') || '在转发邮件主题添加 [Fwd] 标头' }}
+                  <span class="chk-label">{{ $t('forwardingSubjectPrefix') || '在转发邮件主题添加 [Fwd] 标头' }}</span>
                 </el-checkbox>
               </div>
             </div>
 
             <div class="form-actions-row">
-              <el-button 
-                type="primary" 
-                :loading="savingForward" 
-                @click="saveForwardSettings(true)"
-                class="save-forward-btn"
-              >
-                <Icon icon="fluent:save-20-regular" width="16" height="16" style="margin-right: 4px;" />
-                {{ $t('save') || '保存转发规则' }}
-              </el-button>
+              <div class="actions-wrapper">
+                <el-button 
+                  type="primary" 
+                  :loading="savingForward" 
+                  @click="saveForwardSettings(true)"
+                  class="save-forward-btn"
+                >
+                  <Icon icon="fluent:save-20-regular" width="16" height="16" style="margin-right: 6px;" />
+                  {{ $t('save') || '保存转发规则' }}
+                </el-button>
+              </div>
             </div>
           </div>
         </div>
       </template>
-    </div>
-
-    <!-- Section 3: 开发者 API 与第三方应用接入 (API & App Authorization) -->
-    <div class="container api-container" id="apiAccess" v-if="allowUserApiSupport">
-      <div class="title">{{ $t('apiDeveloperTitle') || '开发者 API 与第三方应用接入' }}</div>
-      <div class="section-intro">
-        {{ $t('apiDeveloperDesc') || '管理个人访问令牌 (API Key)，并授权外部应用安全接入 Epomail 生态。' }}
-      </div>
-
-      <!-- 1. 个人访问令牌 (Personal Access Tokens) -->
-      <div class="pat-header-row">
-        <div class="sub-header-title">
-          <Icon icon="fluent:key-20-filled" width="18" height="18" class="key-icon" />
-          <span>{{ $t('apiTokenManagement') || '个人访问令牌 (Personal Access Tokens)' }}</span>
-        </div>
-        <el-button type="primary" size="small" @click="openCreateTokenModal">
-          <Icon icon="fluent:add-12-filled" width="14" height="14" style="margin-right: 4px;" />
-          {{ $t('createApiToken') || '生成新 API Token' }}
-        </el-button>
-      </div>
-
-      <!-- Token 列表 -->
-      <div class="tokens-list-wrapper">
-        <div v-if="apiTokensList.length > 0" class="tokens-grid">
-          <div v-for="tok in apiTokensList" :key="tok.id" class="token-card">
-            <div class="token-info">
-              <div class="tok-name-row">
-                <span class="tok-name">{{ tok.name }}</span>
-                <el-tag size="small" type="success" effect="plain" round>Active</el-tag>
-              </div>
-              <div class="tok-val-row">
-                <span class="tok-masked font-mono">{{ maskToken(tok.token) }}</span>
-                <el-button link type="primary" size="small" @click="copyToken(tok.token)" :title="$t('copy') || '复制'">
-                  <Icon icon="lucide:copy" width="14" height="14" />
-                </el-button>
-              </div>
-              <div class="tok-meta-row">
-                <span>{{ formatDate(tok.createdAt) }}</span>
-                <span v-if="tok.expiresAt"> · {{ formatExpireDate(tok.expiresAt) }}</span>
-                <span> · Scopes: {{ (tok.scopes || []).join(', ') }}</span>
-              </div>
-            </div>
-            <div class="token-actions">
-              <el-button type="danger" text size="small" @click="handleDeleteToken(tok.id)">
-                <Icon icon="lucide:trash-2" width="16" height="16" />
-              </el-button>
-            </div>
-          </div>
-        </div>
-        <div v-else class="empty-tokens-box">
-          <Icon icon="fluent:key-reset-24-regular" width="28" height="28" class="empty-key-icon" />
-          <span>尚未生成任何个人访问令牌。您可以生成令牌以使用自动化脚本或第三方邮件客户端。</span>
-        </div>
-      </div>
-
-      <!-- 2. 「使用 Epomail 登录」开放平台预览与规范 (OAuth 2.0 / OIDC Architecture Preview) -->
-      <div class="sso-preview-card">
-        <div class="sso-header">
-          <div class="sso-title-group">
-            <div class="epomail-logo-badge">
-              <img src="/logo.svg" alt="Logo" width="24" height="24" />
-            </div>
-            <div>
-              <div class="sso-title">{{ $t('epomailLoginPreview') || '「使用 Epomail 登录」 (Sign in with Epomail)' }}</div>
-              <div class="sso-sub">{{ $t('epomailLoginPreviewDesc') || '基于 OAuth 2.0 / OpenID Connect (OIDC) 行业标准协议，支持任何网站与客户端原生调用 Epomail 进行单点身份验证 (SSO) 与邮件 API 互联。' }}</div>
-            </div>
-          </div>
-          <el-tag type="info" size="small" effect="dark" round>RFC 6749 / 7636 Ready</el-tag>
-        </div>
-
-        <div class="sso-endpoints-grid">
-          <div class="endpoint-item">
-            <span class="ep-method get">GET</span>
-            <span class="ep-url font-mono">/api/oauth/authorize</span>
-            <span class="ep-desc">用户授权与身份确认端点 (PKCE 支持)</span>
-          </div>
-          <div class="endpoint-item">
-            <span class="ep-method post">POST</span>
-            <span class="ep-url font-mono">/api/oauth/token</span>
-            <span class="ep-desc">Access Token & Refresh Token 签发与置换</span>
-          </div>
-          <div class="endpoint-item">
-            <span class="ep-method get">GET</span>
-            <span class="ep-url font-mono">/api/oauth/userinfo</span>
-            <span class="ep-desc">标准 OpenID Connect 用户资料与主邮箱提取</span>
-          </div>
-        </div>
-
-        <div class="sso-demo-bar">
-          <span class="demo-label">集成演示按钮：</span>
-          <button class="epomail-sso-btn" @click="demoSsoClick">
-            <img src="/logo.svg" width="16" height="16" />
-            <span>Sign in with Epomail</span>
-          </button>
-        </div>
-      </div>
-
     </div>
 
     <!-- DIALOG: 个人 Telegram 机器人配置 (Personal TG Bot Modal) -->
@@ -347,10 +301,10 @@
           <span class="d-label">{{ $t('tgBotToken') || 'Bot Token' }} <span style="color: var(--el-color-danger)">*</span></span>
           <el-input 
             v-model="tgForm.botToken" 
-            type="password" 
-            show-password 
-            :placeholder="$t('tgBotTokenPlaceholder') || '例如：123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ'" 
-            clearable 
+            placeholder="123456789:ABCdefGHIjklMNOpqrsTUVwxyz" 
+            type="password"
+            show-password
+            clearable
           />
         </div>
 
@@ -358,105 +312,53 @@
           <span class="d-label">{{ $t('tgChatId') || 'Chat ID' }} <span style="color: var(--el-color-danger)">*</span></span>
           <el-input 
             v-model="tgForm.chatId" 
-            :placeholder="$t('tgChatIdPlaceholder') || '例如：123456789 或 目标频道 ID'" 
-            clearable 
+            placeholder="例如：987654321 或 -100123456789" 
+            clearable
           />
         </div>
 
         <div class="dialog-field">
-          <span class="d-label">{{ $t('tgTopicId') || '话题/Topic ID (可选)' }}</span>
+          <span class="d-label">{{ $t('tgTopicId') || 'Topic / Thread ID (可选)' }}</span>
           <el-input 
             v-model="tgForm.topicId" 
-            :placeholder="$t('tgTopicIdPlaceholder') || '若在群组话题内接收，请输入数字 Topic ID'" 
-            clearable 
+            placeholder="群组话题 ID，如不需要请留空" 
+            clearable
           />
         </div>
 
-        <div class="dialog-field" style="margin-top: 4px;">
-          <span class="d-label">推送附加功能</span>
-          <div class="feature-checkboxes">
-            <el-checkbox v-model="tgForm.notifyCodeOnly">
-              {{ $t('tgNotifyCodeOnly') || '提取并附加一次性验证码快捷复制' }}
-            </el-checkbox>
-            <el-checkbox v-model="tgForm.includePreview">
-              {{ $t('tgIncludePreview') || '包含邮件摘要与 WebApp 查看按钮' }}
-            </el-checkbox>
-          </div>
+        <div class="dialog-field">
+          <span class="d-label">{{ $t('tgPushMode') || '推送类型偏好' }}</span>
+          <el-radio-group v-model="tgForm.mode" style="margin-top: 4px;">
+            <el-radio label="all">{{ $t('tgModeAll') || '所有进站邮件' }}</el-radio>
+            <el-radio label="important">{{ $t('tgModeImportant') || '仅重要/验证码邮件' }}</el-radio>
+          </el-radio-group>
         </div>
       </div>
 
       <template #footer>
-        <div class="dialog-footer" style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
           <el-button 
-            type="default" 
-            size="default" 
+            type="info" 
+            plain 
             :loading="testingTg" 
-            :disabled="!tgForm.botToken || !tgForm.chatId"
             @click="handleTestTelegram"
+            style="border-radius: 8px;"
           >
             <Icon icon="fluent:send-20-regular" width="16" height="16" style="margin-right: 4px;" />
-            {{ $t('tgTestSend') || '发送测试' }}
+            {{ $t('sendTestMsg') || '发送测试消息' }}
           </el-button>
           
-          <div style="display: flex; align-items: center; gap: 12px;">
-            <el-switch 
-              v-model="tgForm.enabled" 
-              :active-text="$t('enable')" 
-              :inactive-text="$t('disable')" 
-            />
+          <div style="display: flex; gap: 10px;">
+            <el-button @click="tgSettingDialogShow = false">{{ $t('cancel') || '取消' }}</el-button>
             <el-button 
               type="primary" 
               :loading="savingTg" 
               @click="saveTgSettingsFromModal"
+              style="border-radius: 8px;"
             >
               {{ $t('save') || '保存配置' }}
             </el-button>
           </div>
-        </div>
-      </template>
-    </el-dialog>
-
-    <!-- DIALOG: 创建新 API Token -->
-    <el-dialog
-      v-model="createTokenModalShow"
-      :title="$t('createApiToken') || '生成新 API Token'"
-      width="440px"
-      destroy-on-close
-    >
-      <div style="display: flex; flex-direction: column; gap: 14px; padding: 6px 0;">
-        <div class="dialog-field">
-          <span class="d-label">{{ $t('tokenName') || '令牌名称' }} *</span>
-          <el-input 
-            v-model="newTokenForm.name" 
-            :placeholder="$t('tokenNamePlaceholder') || '例如：GitHub Actions, Mac Mail Client'" 
-            maxlength="40"
-          />
-        </div>
-
-        <div class="dialog-field">
-          <span class="d-label">{{ $t('tokenExpires') || '有效期' }}</span>
-          <el-select v-model="newTokenForm.expiresInDays" style="width: 100%;">
-            <el-option :label="$t('tokenExpires30') || '30 天'" :value="30" />
-            <el-option :label="$t('tokenExpires90') || '90 天'" :value="90" />
-            <el-option :label="$t('tokenExpiresNever') || '永久有效'" :value="0" />
-          </el-select>
-        </div>
-
-        <div class="dialog-field">
-          <span class="d-label">{{ $t('tokenScopes') || '权限范围 (Scopes)' }}</span>
-          <el-checkbox-group v-model="newTokenForm.scopes" style="display: flex; flex-direction: column; gap: 6px; margin-top: 4px;">
-            <el-checkbox label="emails:read">{{ $t('scopeRead') || '读取邮件 (emails:read)' }}</el-checkbox>
-            <el-checkbox label="emails:send">{{ $t('scopeSend') || '发送邮件 (emails:send)' }}</el-checkbox>
-            <el-checkbox label="profile:read">{{ $t('scopeProfile') || '读取个资 (profile:read)' }}</el-checkbox>
-          </el-checkbox-group>
-        </div>
-      </div>
-      <template #footer>
-        <div style="display: flex; justify-content: flex-end; gap: 10px;">
-          <el-button @click="createTokenModalShow = false">{{ $t('cancel') || '取消' }}</el-button>
-          <el-button type="primary" :loading="creatingToken" @click="submitCreateToken">
-            {{ $t('save') || '生成令牌' }}
-          </el-button>
         </div>
       </template>
     </el-dialog>
@@ -474,10 +376,7 @@ import { useSettingStore } from '@/store/setting.js'
 import {
   exportUserData,
   testTelegramBot,
-  updateProfile,
-  getApiTokens,
-  createApiToken,
-  deleteApiToken
+  updateProfile
 } from '@/request/my.js'
 import { websiteConfig } from '@/request/setting.js'
 
@@ -523,16 +422,6 @@ const forwardForm = reactive({
 
 const currentMailMode = ref(0)
 
-// 4. API Tokens States
-const apiTokensList = ref([])
-const createTokenModalShow = ref(false)
-const creatingToken = ref(false)
-const newTokenForm = reactive({
-  name: '',
-  expiresInDays: 30,
-  scopes: ['emails:read', 'emails:send', 'profile:read']
-})
-
 const sendQuotaText = computed(() => {
   const user = userStore.user
   if (!user || !user.role) return '计算中...'
@@ -556,13 +445,6 @@ const allowUserEmailForward = computed(() => {
   return true
 })
 
-const allowUserApiSupport = computed(() => {
-  if (settingStore.settings?.userApiSupport !== undefined) {
-    return Number(settingStore.settings.userApiSupport) === 1
-  }
-  return true
-})
-
 onMounted(async () => {
   try {
     const config = await websiteConfig()
@@ -577,9 +459,6 @@ onMounted(async () => {
     console.error('Failed to load website config:', e)
   }
   initDataFromUserStore()
-  if (allowUserApiSupport.value) {
-    fetchTokens()
-  }
 })
 
 function initDataFromUserStore() {
@@ -824,130 +703,6 @@ function triggerFileDownload(content, filename, mimeType) {
   document.body.removeChild(a)
   URL.revokeObjectURL(url)
 }
-
-// ----------------------------------------------------
-// API Tokens Handlers
-// ----------------------------------------------------
-async function fetchTokens() {
-  try {
-    const res = await getApiTokens()
-    apiTokensList.value = Array.isArray(res) ? res : []
-  } catch (e) {
-    console.error('Failed to fetch api tokens:', e)
-  }
-}
-
-function openCreateTokenModal() {
-  newTokenForm.name = ''
-  newTokenForm.expiresInDays = 30
-  newTokenForm.scopes = ['emails:read', 'emails:send', 'profile:read']
-  createTokenModalShow.value = true
-}
-
-async function submitCreateToken() {
-  if (!newTokenForm.name.trim()) {
-    ElMessage({
-      message: '请输入令牌名称',
-      type: 'warning',
-      plain: true
-    })
-    return
-  }
-
-  creatingToken.value = true
-  try {
-    const res = await createApiToken({
-      name: newTokenForm.name.trim(),
-      expiresInDays: newTokenForm.expiresInDays,
-      scopes: newTokenForm.scopes
-    })
-    createTokenModalShow.value = false
-    await fetchTokens()
-
-    if (res && res.token) {
-      ElMessageBox.alert(
-        `<div style="word-break:break-all; font-family:monospace; background:var(--bg-elevated); padding:12px; border-radius:8px; user-select:all; border:1px solid var(--border-subtle); color:var(--accent-primary); font-weight:600;">${res.token}</div><p style="margin-top:10px; font-size:12px; color:var(--text-secondary);">请立即复制并妥善保管此 Token。出于安全原因，该完整密钥将不再二次完整显示。</p>`,
-        'API Token 创建成功',
-        {
-          dangerouslyUseHTMLString: true,
-          confirmButtonText: '已复制并保存'
-        }
-      )
-    }
-  } catch (err) {
-    ElMessage({
-      message: err.message || '创建 Token 失败',
-      type: 'error',
-      plain: true
-    })
-  } finally {
-    creatingToken.value = false
-  }
-}
-
-async function handleDeleteToken(tokenId) {
-  try {
-    await ElMessageBox.confirm('确定要撤销并删除该 API 访问令牌吗？', '撤销确认', {
-      type: 'warning',
-      confirmButtonText: '确认撤销',
-      cancelButtonText: '取消'
-    })
-    await deleteApiToken(tokenId)
-    await fetchTokens()
-    ElMessage({
-      message: '令牌已成功撤销',
-      type: 'success',
-      plain: true
-    })
-  } catch (e) {
-    // cancelled
-  }
-}
-
-function copyToken(tok) {
-  if (!tok) return
-  navigator.clipboard.writeText(tok).then(() => {
-    ElMessage({
-      message: t('copyTokenSuccess') || 'Token 已复制到剪贴板',
-      type: 'success',
-      plain: true
-    })
-  })
-}
-
-function maskToken(tok) {
-  if (!tok) return ''
-  if (tok.length <= 16) return tok
-  return tok.slice(0, 12) + '••••••••' + tok.slice(-4)
-}
-
-function formatDate(isoStr) {
-  if (!isoStr) return ''
-  try {
-    const d = new Date(isoStr)
-    return `创建于 ${d.toLocaleDateString()}`
-  } catch (e) {
-    return isoStr
-  }
-}
-
-function formatExpireDate(isoStr) {
-  if (!isoStr) return ''
-  try {
-    const d = new Date(isoStr)
-    return `过期时间: ${d.toLocaleDateString()}`
-  } catch (e) {
-    return ''
-  }
-}
-
-function demoSsoClick() {
-  ElMessage({
-    message: '「使用 Epomail 登录」集成已就绪，已向开发者控制台开放 Client 配置。',
-    type: 'info',
-    plain: true
-  })
-}
 </script>
 
 <style lang="scss" scoped>
@@ -1150,65 +905,6 @@ function demoSsoClick() {
 }
 
 /* 2. Merged Forwarding Section */
-.quota-warning-banner {
-  display: flex;
-  align-items: flex-start;
-  gap: 14px;
-  padding: 16px 20px;
-  background: rgba(245, 158, 11, 0.08);
-  border: 1px solid rgba(245, 158, 11, 0.25);
-  border-radius: 12px;
-
-  .warning-icon {
-    color: #f59e0b;
-    margin-top: 2px;
-    flex-shrink: 0;
-  }
-
-  .warning-content {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-  }
-
-  .warning-title {
-    font-size: 14px;
-    font-weight: 700;
-    color: var(--text-primary);
-  }
-
-  .warning-desc {
-    font-size: 12.5px;
-    color: var(--text-secondary);
-    line-height: 1.55;
-  }
-
-  .quota-pill-status {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    background: var(--bg-surface);
-    border: 1px solid rgba(245, 158, 11, 0.3);
-    padding: 3px 12px;
-    border-radius: 20px;
-    font-size: 12px;
-    width: fit-content;
-    margin-top: 4px;
-
-    .quota-lbl {
-      color: var(--text-secondary);
-      font-weight: 500;
-    }
-    .quota-val {
-      font-weight: 700;
-      color: #f59e0b;
-      font-family: monospace;
-    }
-  }
-}
-
-/* Telegram Push Item */
 .tg-push-item {
   display: flex !important;
   align-items: center !important;
@@ -1298,98 +994,22 @@ function demoSsoClick() {
 .forwarding-fields {
   display: flex;
   flex-direction: column;
-  transition: opacity 0.2s ease;
+  transition: all 0.25s ease;
 
-  .mode-rule-notice-banner {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    padding: 12px 16px;
-    border-radius: 10px;
-    margin: 12px 0 6px 0;
-    border: 1px solid var(--border-subtle);
-    background: var(--bg-hover);
-    transition: all 0.2s ease;
-
-    &.mode-1 {
-      background: color-mix(in srgb, var(--accent-primary) 6%, var(--bg-surface));
-      border-color: color-mix(in srgb, var(--accent-primary) 22%, transparent);
-    }
-
-    &.mode-0 {
-      background: rgba(16, 185, 129, 0.06);
-      border-color: rgba(16, 185, 129, 0.22);
-    }
-
-    &.mode-2 {
-      background: rgba(245, 158, 11, 0.06);
-      border-color: rgba(245, 158, 11, 0.25);
-    }
-
-    .mode-badge-row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .mode-notice-text {
-      font-size: 12.5px;
-      color: var(--text-secondary);
-      line-height: 1.55;
-
-      .encrypted-notice-wrap {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        flex-wrap: wrap;
-      }
-    }
-  }
-
-  .fw-label-row {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-
-  .help-q-icon {
-    color: var(--text-secondary);
-    cursor: help;
-    flex-shrink: 0;
-    transition: color 0.2s;
-
-    &:hover {
-      color: var(--accent-primary);
-    }
-  }
-
-  .pool-empty-callout {
-    display: flex;
-    align-items: flex-start;
-    gap: 8px;
-    padding: 10px 14px;
-    background: rgba(245, 158, 11, 0.08);
-    border: 1px dashed rgba(245, 158, 11, 0.3);
-    border-radius: 8px;
-    font-size: 12.5px;
-    color: var(--text-secondary);
-    line-height: 1.45;
-
-    .empty-icon {
-      color: #f59e0b;
-      flex-shrink: 0;
-      margin-top: 2px;
-    }
+  &.fields-disabled {
+    opacity: 0.45;
+    pointer-events: none;
+    filter: grayscale(0.2);
   }
 
   .forward-field-item,
   .forward-rule-item,
   .forward-options-item {
     display: grid;
-    grid-template-columns: 140px 1fr;
-    gap: 40px;
+    grid-template-columns: 180px 1fr;
+    gap: 32px;
     position: relative;
-    padding: 16px 0;
+    padding: 18px 0;
     border-bottom: 1px solid var(--border-subtle);
 
     @media (max-width: 767px) {
@@ -1405,6 +1025,10 @@ function demoSsoClick() {
       border-bottom: none;
     }
 
+    .field-label-col {
+      padding-top: 2px;
+    }
+
     .fw-label {
       font-weight: bold;
       color: var(--text-primary);
@@ -1415,22 +1039,24 @@ function demoSsoClick() {
       font-size: 12px;
       color: var(--text-secondary);
       margin-top: 3px;
-      line-height: 1.4;
+      line-height: 1.45;
     }
   }
 }
 
 .forward-input-wrap {
   width: 100%;
-  max-width: 540px;
+  max-width: 580px;
+
+  .input-prefix-icon {
+    color: var(--text-secondary);
+    margin-left: 2px;
+  }
 }
 
 .forward-type-wrapper {
-  flex: 1;
-  max-width: 560px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+  width: 100%;
+  max-width: 580px;
 }
 
 .forward-type-group {
@@ -1438,351 +1064,154 @@ function demoSsoClick() {
   flex-direction: column;
   gap: 10px;
   width: 100%;
+}
 
-  :deep(.el-radio) {
-    height: auto;
-    padding: 12px 16px;
-    border-radius: 10px;
-    border: 1px solid var(--border-subtle);
-    background: var(--bg-surface);
-    margin-right: 0;
+.rule-type-card {
+  width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  user-select: none;
+
+  &:hover {
+    border-color: var(--border-mid);
+    background: var(--bg-hover);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  }
+
+  &.active {
+    border-color: var(--accent-primary);
+    background: color-mix(in srgb, var(--accent-primary) 6%, var(--bg-surface));
+    box-shadow: 0 0 0 1px var(--accent-primary);
+
+    .custom-radio-indicator {
+      border-color: var(--accent-primary);
+      background: var(--accent-primary);
+    }
+  }
+
+  .rule-card-main {
+    display: flex;
     align-items: flex-start;
+    gap: 12px;
+    width: 100%;
+  }
+
+  .custom-radio-indicator {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 1.5px solid var(--border-mid);
+    background: var(--bg-surface);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-top: 2px;
     transition: all 0.2s ease;
 
-    &:hover {
-      border-color: var(--accent-primary);
-      background: var(--bg-hover);
+    .radio-inner-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #ffffff;
     }
+  }
 
-    &.is-checked {
-      border-color: var(--accent-primary);
-      background: color-mix(in srgb, var(--accent-muted) 12%, var(--bg-surface));
-    }
-
-    .el-radio__input {
-      margin-top: 2px;
-    }
-
-    .el-radio__label {
-      display: flex;
-      flex-direction: column;
-      gap: 3px;
-      white-space: normal;
-      padding-left: 10px;
-    }
+  .rule-card-text {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
 
     .r-title {
       font-size: 13.5px;
       font-weight: 600;
       color: var(--text-primary);
+      line-height: 1.4;
     }
 
     .r-desc {
       font-size: 12px;
       color: var(--text-secondary);
-      line-height: 1.45;
+      line-height: 1.5;
     }
   }
-}
 
-.alias-prefixes-box {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: 4px;
-  padding: 8px 12px;
-  background: var(--bg-hover);
-  border: 1px solid var(--border-subtle);
-  border-radius: 8px;
-  font-size: 12.5px;
-  color: var(--text-secondary);
+  .alias-inline-subbox {
+    margin-top: 12px;
+    padding: 10px 14px;
+    background: color-mix(in srgb, var(--bg-base) 60%, var(--bg-surface));
+    border: 1px dashed color-mix(in srgb, var(--accent-primary) 30%, var(--border-subtle));
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
 
-  .field-lbl {
-    font-weight: 500;
-    white-space: nowrap;
+    .alias-sub-label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
   }
-}
-
-.fields-disabled {
-  opacity: 0.55;
-  pointer-events: none;
 }
 
 .feature-checkboxes {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 
   :deep(.el-checkbox) {
     margin-right: 0;
-    color: var(--text-primary);
-    font-size: 13px;
+    height: auto;
+    display: inline-flex;
+    align-items: center;
+
+    .el-checkbox__label {
+      font-size: 13px;
+      color: var(--text-primary);
+      line-height: 1.4;
+    }
   }
 }
 
 .form-actions-row {
   display: flex;
-  justify-content: flex-end;
-  gap: 12px;
   padding-top: 18px;
-  margin-top: 4px;
+  margin-top: 6px;
+
+  .actions-wrapper {
+    width: 100%;
+    max-width: 580px;
+    margin-left: calc(180px + 32px);
+    display: flex;
+    justify-content: flex-start;
+
+    @media (max-width: 767px) {
+      margin-left: 0;
+      justify-content: flex-end;
+    }
+  }
 
   .save-forward-btn {
     display: inline-flex;
     align-items: center;
+    gap: 6px;
     border-radius: 8px;
-    padding: 8px 18px;
+    padding: 8px 20px;
     font-weight: 500;
-  }
-}
-
-/* 3. API Section */
-.pat-header-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 14px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--border-subtle);
-
-  .sub-header-title {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 14px;
-    font-weight: bold;
-    color: var(--text-primary);
-
-    .key-icon {
-      color: var(--accent-primary);
-    }
-  }
-}
-
-.tokens-list-wrapper {
-  margin-bottom: 24px;
-}
-
-.tokens-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.token-card {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14px 18px;
-  border-radius: 10px;
-  background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
-  transition: all 0.2s ease;
-
-  &:hover {
-    border-color: var(--border-mid);
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
-  }
-
-  .token-info {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-
-    .tok-name-row {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-
-      .tok-name {
-        font-weight: 600;
-        font-size: 14px;
-        color: var(--text-primary);
-      }
-    }
-
-    .tok-val-row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 13px;
-      color: var(--accent-primary);
-    }
-
-    .tok-meta-row {
-      font-size: 11.5px;
-      color: var(--text-muted);
-      margin-top: 2px;
-    }
-  }
-
-  .token-actions {
-    flex-shrink: 0;
-  }
-}
-
-.empty-tokens-box {
-  padding: 32px 20px;
-  border-radius: 10px;
-  background: var(--bg-surface);
-  border: 1px dashed var(--border-subtle);
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  color: var(--text-muted);
-
-  .empty-key-icon {
-    opacity: 0.6;
-    color: var(--text-muted);
-  }
-}
-
-/* SSO Preview Card */
-.sso-preview-card {
-  padding: 20px 22px;
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--accent-muted) 8%, var(--bg-surface));
-  border: 1px solid color-mix(in srgb, var(--accent-primary) 22%, transparent);
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-
-  .sso-header {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 12px;
-
-    @media (max-width: 767px) {
-      flex-direction: column;
-      gap: 10px;
-    }
-
-    .sso-title-group {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-
-      .epomail-logo-badge {
-        width: 40px;
-        height: 40px;
-        border-radius: 10px;
-        background: #ffffff;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-        flex-shrink: 0;
-      }
-
-      .sso-title {
-        font-size: 15px;
-        font-weight: 700;
-        color: var(--text-primary);
-      }
-
-      .sso-sub {
-        font-size: 12.5px;
-        color: var(--text-secondary);
-        margin-top: 2px;
-        line-height: 1.45;
-      }
-    }
-  }
-}
-
-.sso-endpoints-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-
-  .endpoint-item {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 9px 14px;
-    background: var(--bg-surface);
-    border-radius: 8px;
-    border: 1px solid var(--border-subtle);
-    font-size: 12.5px;
-
-    @media (max-width: 767px) {
-      flex-wrap: wrap;
-      gap: 8px;
-    }
-
-    .ep-method {
-      font-weight: 700;
-      font-family: monospace;
-      font-size: 11px;
-      padding: 2px 8px;
-      border-radius: 4px;
-      flex-shrink: 0;
-
-      &.get {
-        background: rgba(16, 185, 129, 0.15);
-        color: #10b981;
-      }
-      &.post {
-        background: rgba(59, 130, 246, 0.15);
-        color: #3b82f6;
-      }
-    }
-
-    .ep-url {
-      font-weight: 600;
-      color: var(--text-primary);
-      flex-shrink: 0;
-    }
-
-    .ep-desc {
-      color: var(--text-secondary);
-      margin-left: auto;
-      font-size: 12px;
-
-      @media (max-width: 767px) {
-        margin-left: 0;
-        width: 100%;
-      }
-    }
-  }
-}
-
-.sso-demo-bar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding-top: 6px;
-
-  .demo-label {
-    font-size: 13px;
-    font-weight: 500;
-    color: var(--text-secondary);
-  }
-
-  .epomail-sso-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 18px;
-    background: var(--text-primary);
-    color: var(--bg-surface);
-    font-size: 13px;
-    font-weight: 600;
-    border-radius: 8px;
-    cursor: pointer;
-    border: 1px solid var(--border-subtle);
-    transition: all 0.2s ease;
-    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.12);
-
-    &:hover {
-      opacity: 0.92;
-      transform: translateY(-1px);
-      box-shadow: 0 5px 14px rgba(0, 0, 0, 0.18);
-    }
+    font-size: 13.5px;
   }
 }
 

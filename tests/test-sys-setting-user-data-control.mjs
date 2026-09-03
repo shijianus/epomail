@@ -35,12 +35,14 @@ import assert from "assert";
       assert(data.code === 200, "更新系统设置失败: " + JSON.stringify(data));
     }
 
-    await page.goto(BASE + "/settings/data", { waitUntil: "domcontentloaded" });
+    await page.goto(BASE + "/inbox", { waitUntil: "domcontentloaded" });
     await page.evaluate((t) => {
       localStorage.setItem("token", t);
       localStorage.setItem("setting", JSON.stringify({ lang: "zh" }));
       localStorage.setItem("locale", "zh");
     }, token);
+    await page.goto(BASE + "/inbox", { waitUntil: "domcontentloaded" });
+    await page.waitForTimeout(1500);
 
     // ==========================================
     // 2. 验证管理员「系统设置」中新增的用户资料控制卡片
@@ -53,11 +55,9 @@ import assert from "assert";
       userApiSupport: 1 
     });
 
-    await page.goto(BASE + "/settings/data", { waitUntil: "networkidle" });
+    await page.goto(BASE + "/system-setting", { waitUntil: "domcontentloaded" });
+    await page.waitForSelector(".settings-card", { timeout: 10000 });
     await page.waitForTimeout(1000);
-    const sysNavTab = page.locator(".settings-nav-item").filter({ hasText: "系统设置" }).first();
-    await sysNavTab.click();
-    await page.waitForTimeout(1500);
 
     const dataControlCard = page.locator(".settings-card.user-data-control-card, .settings-card").filter({ hasText: "用户资料控制" });
     assert.ok(await dataControlCard.count() > 0, "系统设置中必须存在「用户资料控制」卡片");
@@ -85,7 +85,6 @@ import assert from "assert";
     assert.ok(await page.locator(".container.forwarding-container").count() > 0, "邮件与消息转发容器 forwarding-container 应存在");
     assert.ok(await page.locator(".item.tg-push-item").count() > 0, "TG 推送项应存在");
     assert.ok(await page.locator(".forwarding-rule-section").count() > 0, "邮件规则转发区域应存在");
-    assert.ok(await page.locator(".container.api-container").count() > 0, "开发者 API 容器 api-container 应存在");
     console.log("✓ 场景 A (全量开启) 校验通过");
     await page.screenshot({ path: "tests/audit_data_page_all_enabled.png" });
 
@@ -101,7 +100,6 @@ import assert from "assert";
     assert.ok(await page.locator(".container.forwarding-container").count() > 0, "forwarding-container 仍应存在 (因为邮件转发开启)");
     assert.strictEqual(await page.locator(".item.tg-push-item").count(), 0, "TG 推送项应隐藏");
     assert.ok(await page.locator(".forwarding-rule-section").count() > 0, "邮件规则转发应保留");
-    assert.ok(await page.locator(".container.api-container").count() > 0, "api-container 仍应存在");
     console.log("✓ 场景 B (关闭 TG 推送) 校验通过");
 
     // ==========================================
@@ -116,7 +114,6 @@ import assert from "assert";
     assert.ok(await page.locator(".container.forwarding-container").count() > 0, "forwarding-container 仍应存在 (因为 TG 开启)");
     assert.ok(await page.locator(".item.tg-push-item").count() > 0, "TG 推送项应保留");
     assert.strictEqual(await page.locator(".forwarding-rule-section").count(), 0, "邮件规则转发区域应隐藏");
-    assert.ok(await page.locator(".container.api-container").count() > 0, "api-container 仍应存在");
     console.log("✓ 场景 C (关闭邮件转发) 校验通过");
 
     // ==========================================
@@ -129,7 +126,6 @@ import assert from "assert";
 
     assert.ok(await page.locator(".container.export-container").count() > 0, "export-container 必须直接允许");
     assert.strictEqual(await page.locator(".container.forwarding-container").count(), 0, "forwarding-container 应完全隐藏");
-    assert.ok(await page.locator(".container.api-container").count() > 0, "api-container 仍应存在");
     console.log("✓ 场景 D (关闭整个转发容器) 校验通过");
 
     // ==========================================
@@ -142,7 +138,6 @@ import assert from "assert";
 
     assert.ok(await page.locator(".container.export-container").count() > 0, "export-container 必须直接允许");
     assert.ok(await page.locator(".container.forwarding-container").count() > 0, "forwarding-container 应存在");
-    assert.strictEqual(await page.locator(".container.api-container").count(), 0, "api-container 应完全隐藏");
 
     // 尝试后端调用创建 Token，验证被 403 阻断
     const createTokRes = await page.request.post(BASE + "/api/my/apiTokens", {
@@ -171,7 +166,6 @@ import assert from "assert";
     console.log("唯一存在的 container 类名:", onlyContainerClass);
     assert.ok(onlyContainerClass.includes("export-container"), "唯一的 container 必须是 export-container");
     assert.strictEqual(await page.locator(".container.forwarding-container").count(), 0, "forwarding-container 应已隐藏");
-    assert.strictEqual(await page.locator(".container.api-container").count(), 0, "api-container 应已隐藏");
 
     await page.screenshot({ path: "tests/audit_data_page_only_export_allowed.png" });
     console.log("✓ 场景 F (仅 export-container 自由支配) 校验 100% 通过！");

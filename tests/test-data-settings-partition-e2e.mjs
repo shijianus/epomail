@@ -92,11 +92,6 @@ import assert from "assert";
     assert.ok(fullText.includes("Telegram 消息推送") || fullText.includes("Telegram 机器人"), "应包含「Telegram 消息推送」项");
     assert.ok(fullText.includes("全部邮件直接抄送转发") || fullText.includes("抄送转发") || fullText.includes("启用自动邮件转发"), "应包含转发选项");
 
-    // Section 3: 开发者 API 与第三方应用接入
-    assert.ok(fullText.includes("开发者 API 与第三方应用接入"), "应包含开发者 API 标题");
-    assert.ok(fullText.includes("个人访问令牌"), "应包含个人访问令牌管理");
-    assert.ok(fullText.includes("使用 Epomail 登录") || fullText.includes("Sign in with Epomail"), "应包含 Epomail 登录平台预览");
-
     // 开启自动转发，展示转发详细选项
     const fwSwitch = page.locator(".forward-toggle-row .el-switch");
     if (!(await fwSwitch.evaluate(el => el.classList.contains('is-checked')))) {
@@ -126,60 +121,13 @@ import assert from "assert";
     const tokenInput = page.locator(".forward-dialog input[type='password']");
     await tokenInput.fill("123456789:AAFakeTokenTestForEpoMailAuditing");
 
-    const chatIdInput = page.locator(".forward-dialog input[placeholder*='目标频道'], .forward-dialog input[placeholder*='channel_id'], .forward-dialog input[placeholder*='123456789']").first();
+    const chatIdInput = page.locator(".forward-dialog input[placeholder*='987654321']").first();
     await chatIdInput.fill("987654321");
 
-    const tgSwitchInModal = page.locator(".forward-dialog .dialog-footer .el-switch");
-    if (!(await tgSwitchInModal.evaluate(el => el.classList.contains('is-checked')))) {
-      await tgSwitchInModal.click();
-      await page.waitForTimeout(300);
-    }
-
-    const saveTgBtn = page.locator(".forward-dialog .dialog-footer .el-button--primary");
+    const saveTgBtn = page.locator(".forward-dialog .el-dialog__footer .el-button--primary, .forward-dialog .el-button--primary").last();
     await saveTgBtn.click();
     await page.waitForTimeout(1000);
     console.log("✓ 个人 Telegram 设置成功在弹窗中提交保存");
-
-    // 7. 测试 API Token 弹窗
-    console.log("6. 测试「生成新 API Token」弹窗与交互...");
-    const createTokenBtn = page.locator(".pat-header-row .el-button--primary");
-    await createTokenBtn.click();
-    await page.waitForSelector(".el-dialog", { timeout: 5000 });
-
-    const tokenNameInput = page.locator(".el-dialog input").first();
-    await tokenNameInput.fill("E2E Test Automated Token");
-
-    const confirmCreateBtn = page.locator(".el-dialog .el-button--primary");
-    await confirmCreateBtn.click();
-    await page.waitForTimeout(1500);
-
-    // 验证弹出的 Token 提醒框
-    const tokenAlertBox = page.locator(".el-message-box");
-    if (await tokenAlertBox.isVisible()) {
-      console.log("✓ API Token 创建成功弹窗显示正常");
-      const confirmTokenBtn = tokenAlertBox.locator(".el-button--primary");
-      await confirmTokenBtn.click();
-      await page.waitForTimeout(500);
-    }
-
-    // 验证列表中出现了新生成的 Token 并立即清理删除，严禁残留虚假数据
-    const tokensCount = await page.locator(".token-card").count();
-    console.log(`当前拥有 ${tokensCount} 个 API Token`);
-    assert.ok(tokensCount >= 1, "API Token 列表中应展示新创建的令牌");
-
-    // 清理删除刚刚测试创建的 API Token
-    const deleteTokenBtns = page.locator(".token-card .el-button--danger");
-    const delCount = await deleteTokenBtns.count();
-    for (let i = 0; i < delCount; i++) {
-      await deleteTokenBtns.first().click();
-      await page.waitForTimeout(400);
-      const confirmDelBtn = page.locator(".el-message-box .el-button--primary");
-      if (await confirmDelBtn.isVisible()) {
-        await confirmDelBtn.click();
-        await page.waitForTimeout(600);
-      }
-    }
-    console.log("✓ 测试生成的 API Token 已全部清理完毕");
 
     // 清理重置个人 Telegram 设置为空和禁用，严禁残留测试虚假数据
     await page.request.put(BASE + "/api/my/updateProfile", {
@@ -231,7 +179,6 @@ import assert from "assert";
     assert.ok(enFullText.includes("User Data & Mail Export"), "英文应包含 User Data & Mail Export");
     assert.ok(enFullText.includes("Email & Message Forwarding") || enFullText.includes("Email Forwarding"), "英文应包含 Email & Message Forwarding");
     assert.ok(enFullText.includes("Telegram Message Push") || enFullText.includes("Telegram Bot") || enFullText.includes("Telegram"), "英文应包含 Telegram 消息推送");
-    assert.ok(enFullText.includes("Developer API & App Authorization") || enFullText.includes("Developer API"), "英文应包含 Developer API");
 
     await page.screenshot({ path: "/home/shijian/projects/epocanvas-mail/tests/audit_data_settings_en.png", fullPage: true });
     console.log("✓ 英文「Data」设置页完整审计截图已保存: tests/audit_data_settings_en.png");

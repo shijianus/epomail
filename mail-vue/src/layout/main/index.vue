@@ -58,6 +58,10 @@
                 <Icon icon="eos-icons:system-ok-outlined" width="18" height="18" /> {{$t('SystemSettings')}}
               </router-link>
 
+              <router-link v-if="hasPerm('setting:query')" :to="{name: 'oauth-app'}" class="settings-nav-item" :class="{active: route.name === 'oauth-app'}">
+                <Icon icon="fluent:apps-24-regular" width="18" height="18" /> {{$t('oauthApps') || '应用管理'}}
+              </router-link>
+
               <router-link :to="{name: 'category-setting'}" class="settings-nav-item" :class="{active: route.name === 'category-setting'}">
                 <Icon icon="lucide:network" width="18" height="18" /> {{$t('categorySetting') || 'Category Settings'}}
               </router-link>
@@ -67,7 +71,7 @@
       </div>
       <div class="settings-content">
         <router-view class="main-view" v-slot="{ Component,route }">
-          <keep-alive :include="['sys-setting','user','role','analysis','reg-key']">
+          <keep-alive :include="['sys-setting','user','role','analysis','reg-key','oauth-app']">
             <component :is="Component" :key="route.name"/>
           </keep-alive>
         </router-view>
@@ -127,7 +131,7 @@ let elNotification = null
 const isMobileView = computed(() => window.innerWidth < 768)
 
 const isSettingsMode = computed(() => {
-  return ['user-profile', 'profile', 'general-setting', 'profile-setting', 'setting', 'data-setting', 'label-setting', 'category-setting', 'analysis', 'user', 'all-email', 'role', 'reg-key', 'sys-setting'].includes(route.name)
+  return ['user-profile', 'profile', 'general-setting', 'profile-setting', 'setting', 'data-setting', 'label-setting', 'category-setting', 'analysis', 'user', 'all-email', 'role', 'reg-key', 'sys-setting', 'oauth-app'].includes(route.name)
 })
 
 const showReadingPane = computed(() => {
