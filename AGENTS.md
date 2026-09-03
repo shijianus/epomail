@@ -22,6 +22,7 @@
        - **Phase 5: 后端 OIDC 协议端点兑换**: 验证 `POST /api/oauth/token` 令牌置换、`GET /api/oauth/userinfo` 用户资料与 `GET /.well-known/openid-configuration` Discovery 元数据发现。
        - **Phase 6: 零假数据自动还原**: 自动化删除测试生成的 OAuth 应用，保持全系统数据库与 KV 零脏数据残留。
 *   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **Git Commit Hash**: `5d8d73e536c535632b5eef85e9754ae40d913730` (Short Hash: `5d8d73e`)。
     - 生产部署上线 Cloudflare Workers Version ID: `89ec6d9c-6b31-4e30-b20a-bb49c3498200`。
     - 全链路自动化测试套件 `node tests/test-total-zero-to-one-verification.mjs` 100% 顺利通过（Phase 1 ~ Phase 6 全量通过）。
 
