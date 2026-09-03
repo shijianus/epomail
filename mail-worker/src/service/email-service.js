@@ -1,4 +1,4 @@
-import orm from '../entity/orm';
+import { mailOrm as orm, userOrm } from '../entity/orm';
 import email from '../entity/email';
 import { attConst, emailConst, isDel, settingConst } from '../const/entity-const';
 import { and, desc, eq, gt, inArray, lt, count, asc, sql, ne, or, like, lte, gte } from 'drizzle-orm';
@@ -366,7 +366,7 @@ const emailService = {
 		if (senders.length === 0) return;
 
 		// 3. Add senders to user's Whitelist (信任名单)
-		const userRow = await orm(c).select().from(user).where(eq(user.userId, userId)).get();
+		const userRow = await userOrm(c).select().from(user).where(eq(user.userId, userId)).get();
 		let customLabels = userRow.customLabels;
 		let labelsObj = [];
 		try {
@@ -1508,14 +1508,12 @@ const emailService = {
 			conditions.unshift(lt(email.emailId, emailId));
 		}
 
-		const query = orm(c).select({ ...email, userEmail: user.email })
+		const query = orm(c).select()
 			.from(email)
-			.leftJoin(user, eq(email.userId, user.userId))
 			.where(and(...conditions));
 
 		const queryCount = orm(c).select({ total: count() })
 			.from(email)
-			.leftJoin(user, eq(email.userId, user.userId))
 			.where(and(...countConditions));
 
 		if (timeSort) {
@@ -1550,6 +1548,25 @@ const emailService = {
 			.orderBy(desc(email.emailId)).limit(1).get();
 
 		let [list, totalRow, latestEmail] = await Promise.all([listQuery, totalQuery, latestEmailQuery]);
+
+		const userIds = [...new Set(list.map(item => item.userId).filter(Boolean))];
+		if (userIds.length > 0) {
+			try {
+				const userList = await userOrm(c).select({ userId: user.userId, email: user.email }).from(user).where(inArray(user.userId, userIds)).all();
+				const userMap = new Map(userList.map(u => [u.userId, u.email]));
+				list.forEach(item => {
+					item.userEmail = userMap.get(item.userId) || '';
+				});
+			} catch (e) {
+				list.forEach(item => {
+					item.userEmail = '';
+				});
+			}
+		} else {
+			list.forEach(item => {
+				item.userEmail = '';
+			});
+		}
 
 		await this.emailAddAtt(c, list);
 
@@ -1589,11 +1606,29 @@ const emailService = {
 			);
 		}
 
-		let list = await orm(c).select({...email, userEmail: user.email}).from(email)
-			.leftJoin(user, eq(email.userId, user.userId))
+		let list = await orm(c).select().from(email)
 			.where(and(...conditions))
 			.orderBy(desc(email.emailId))
 			.limit(20);
+
+		const userIds = [...new Set(list.map(item => item.userId).filter(Boolean))];
+		if (userIds.length > 0) {
+			try {
+				const userList = await userOrm(c).select({ userId: user.userId, email: user.email }).from(user).where(inArray(user.userId, userIds)).all();
+				const userMap = new Map(userList.map(u => [u.userId, u.email]));
+				list.forEach(item => {
+					item.userEmail = userMap.get(item.userId) || '';
+				});
+			} catch (e) {
+				list.forEach(item => {
+					item.userEmail = '';
+				});
+			}
+		} else {
+			list.forEach(item => {
+				item.userEmail = '';
+			});
+		}
 
 		await this.emailAddAtt(c, list);
 

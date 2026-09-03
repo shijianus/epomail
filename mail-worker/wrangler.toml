@@ -6,10 +6,29 @@ keep_vars = true
 [observability]
 enabled = true
 
+# --------------------------------------------------------------------------------------
+# 数据库存储绑定 (D1 Databases Configuration)
+# --------------------------------------------------------------------------------------
+# 【模式 1: 单数据库模式 (默认 / 推荐标准部署)】
+# 所有用户数据与邮件数据集中存放在同一个 D1 数据库中，开箱即用：
 [[d1_databases]]
 binding = "db"
 database_name = "epomail"
 database_id = "542cbca1-fce5-41c5-93f2-c1d04fa919e8"
+
+# 【模式 2: 双数据库物理分离模式 (可选 / 面向海量邮件与核心用户隔离部署)】
+# 若需将邮件流转数据与用户身份/2FA/OAuth应用凭据物理隔离，可解除下方注释并配置对应 D1 ID（系统将自动启用双库路由）：
+# 1) USER_DB: 存放用户账号、密码哈希、2FA密钥、Passkeys、RBAC权限、系统设置与OAuth开放平台数据
+# [[d1_databases]]
+# binding = "USER_DB"
+# database_name = "epomail_user"
+# database_id = "your-user-d1-database-id"
+#
+# 2) MAIL_DB: 存放邮件列表、正文详情、收发号池、星标收藏与附件元数据
+# [[d1_databases]]
+# binding = "MAIL_DB"
+# database_name = "epomail_mail"
+# database_id = "your-mail-d1-database-id"
 
 [[kv_namespaces]]
 binding = "kv"

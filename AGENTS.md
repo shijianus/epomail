@@ -12,6 +12,23 @@
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
 
+### 后端数据库多库物理分离架构上线与默认单 DB 100% 向下兼容增强 (2026-09-03)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **单库默认开箱即用 + 双库物理分离渐进式解耦 (Single-DB Default & Dual-DB Isolation)**:
+       - **默认单库保持不变**: 默认环境仅配置 `binding = "db"`，系统通过 `getUserDb(c)` 与 `getMailDb(c)` 统一退化回单一 D1 数据库，实现对既有部署的 100% 向下兼容与零破坏性升级。
+       - **双库物理隔离支持**: 站长可按需在 `wrangler.toml` 或 Cloudflare 环境变量中绑定 `USER_DB`（存放用户账号、密码哈希、2FA密钥、Passkeys、RBAC权限、系统配置与OAuth开放平台数据）与 `MAIL_DB`（存放邮件列表、正文详情、收发号池、星标收藏与附件元数据），系统自动开启双库路由分流。
+    2. **跨库 SQL 关联彻底解耦与内存拼装 (In-Memory Batch Hydration & Clean DDL)**:
+       - **全站邮件与用户查询解耦**: 彻底消除 `email` 跨库 SQL `LEFT JOIN user`，重构为高效的内存批量水合（`allEmail` / `allEmailLatest` 查询邮件列表后批量拉取对应 `userIds` 的用户信息在内存中组装）。
+       - **分析中心跨库聚合**: `analysisDao.numberCount` 重构为向 `getMailDb` 与 `getUserDb` 并行发起查询并聚合，消除跨库 `CROSS JOIN`。
+       - **批量注册与账号创建解耦**: `publicService.batchRegister` 拆分为 `userDb` 用户批量入库并获取 `user_id`，再向 `mailDb` 批量插入 `account`。
+       - **DDL 幂等初始化升级 (`init.js`)**: 智能路由用户域表 DDL 到 `getUserDb`、邮件域表 DDL 到 `getMailDb`，在单库与双库模式下均能幂等执行。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **Git Commit Hash**: `PENDING_COMMIT`
+    - 生产部署上线 Cloudflare Workers Version ID: `92fabf8f-0693-48a1-82ed-3c911cfe536a`。
+    - 自动化测试套件 100% 顺利通过：
+      - `node --loader ./tests/esm-loader.mjs tests/test-dual-and-single-db-e2e.mjs` (单库退化、双库物理分流、跨库聚合、生产 DDL 升级、用户/邮件/分析/OAuth/数据导出全链路通过);
+      - `node tests/test-total-zero-to-one-verification.mjs` (全系统 Phase 1 ~ Phase 6 全量通过)。
+
 ### 全系统「从零开始重写验证整体逻辑」端到端深度审计与生产环境全量发布 (2026-09-03)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **全链路从零到一闭环验证 (Zero-to-One E2E Audit)**:

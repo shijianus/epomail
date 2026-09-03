@@ -1,6 +1,6 @@
 import BizError from '../error/biz-error';
 import accountService from './account-service';
-import orm from '../entity/orm';
+import { userOrm as orm, mailOrm } from '../entity/orm';
 import user from '../entity/user';
 import { and, asc, count, desc, eq, inArray, sql } from 'drizzle-orm';
 import { emailConst, isDel, roleConst, userConst } from '../const/entity-const';
@@ -654,7 +654,7 @@ const userService = {
 		const [account, roleRow, userEmails] = await Promise.all([
 			accountService.selectByEmailIncludeDel(c, userRow.email),
 			roleService.selectById(c, userRow.type),
-			orm(c).select().from(email).where(and(eq(email.userId, userId), eq(email.isDel, 0))).all()
+			mailOrm(c).select().from(email).where(and(eq(email.userId, userId), eq(email.isDel, 0))).all()
 		]);
 
 		let profile = {};

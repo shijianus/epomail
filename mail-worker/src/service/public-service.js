@@ -1,7 +1,8 @@
 import jwtUtils from '../utils/jwt-utils';
 import constant from '../const/constant';
 import BizError from '../error/biz-error';
-import orm from '../entity/orm';
+import { userOrm, mailOrm } from '../entity/orm';
+import { getUserDb, getMailDb } from '../utils/db-accessor';
 import { v4 as uuidv4 } from 'uuid';
 import { and, asc, desc, eq, sql, like } from 'drizzle-orm';
 import saltHashUtils from '../utils/crypto-utils';
@@ -25,7 +26,7 @@ const publicService = {
 
 		let { toEmail, content, subject, sendName, sendEmail, timeSort, num, size, type , isDel } = params
 
-		const query = orm(c).select({
+		const query = mailOrm(c).select({
 				emailId: email.emailId,
 				sendEmail: email.sendEmail,
 				sendName: email.name,
@@ -128,8 +129,10 @@ const publicService = {
 		const roleList = await roleService.roleSelectUse(c);
 		const defRole = roleList.find(roleRow => roleRow.isDefault === roleConst.isDefault.OPEN);
 
-		const userList = [];
+		const userDb = getUserDb(c);
+		const mailDb = getMailDb(c);
 
+		const userStatements = [];
 		for (const emailRow of list) {
 			let { email, hash, salt, roleName } = emailRow;
 			let type = defRole.roleId;
@@ -140,25 +143,42 @@ const publicService = {
 			}
 
 			const userSql = `INSERT INTO user (email, password, salt, type, os, browser, active_ip, create_ip, device, active_time, create_time)
-			VALUES ('${email}', '${hash}', '${salt}', '${type}', '${os}', '${browser}', '${activeIp}', '${activeIp}', '${device}', '${activeTime}', '${activeTime}')`
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
-			const accountSql = `INSERT INTO account (email, name, user_id)
-			VALUES ('${email}', '${emailUtils.getName(email)}', 0);`;
-
-			userList.push(c.env.db.prepare(userSql));
-			userList.push(c.env.db.prepare(accountSql));
-
+			userStatements.push(userDb.prepare(userSql).bind(email, hash, salt, type, os, browser, activeIp, activeIp, device, activeTime, activeTime));
 		}
 
-		userList.push(c.env.db.prepare(`UPDATE account SET user_id = (SELECT user_id FROM user WHERE user.email = account.email) WHERE user_id = 0;`))
-
 		try {
-			await c.env.db.batch(userList);
+			if (userStatements.length > 0) {
+				await userDb.batch(userStatements);
+			}
 		} catch (e) {
-			if(e.message.includes('SQLITE_CONSTRAINT')) {
-				throw new BizError(t('emailExistDatabase'))
+			if (e.message.includes('SQLITE_CONSTRAINT')) {
+				throw new BizError(t('emailExistDatabase'));
 			} else {
-				throw e
+				throw e;
+			}
+		}
+
+		// Retrieve inserted users to obtain their user_id
+		const emails = list.map(item => item.email);
+		const placeholders = emails.map(() => '?').join(',');
+		const { results: userRows } = await userDb.prepare(`SELECT user_id, email FROM user WHERE email IN (${placeholders})`).bind(...emails).all();
+		const userMap = new Map((userRows || []).map(u => [u.email, u.user_id]));
+
+		// Batch insert accounts into mailDb with correct user_id directly
+		const accountStatements = [];
+		for (const emailRow of list) {
+			const uId = userMap.get(emailRow.email) || 0;
+			const accountSql = `INSERT INTO account (email, name, user_id) VALUES (?, ?, ?)`;
+			accountStatements.push(mailDb.prepare(accountSql).bind(emailRow.email, emailUtils.getName(emailRow.email), uId));
+		}
+
+		if (accountStatements.length > 0) {
+			try {
+				await mailDb.batch(accountStatements);
+			} catch (e) {
+				console.warn('Batch account insert warning:', e.message);
 			}
 		}
 
@@ -228,14 +248,14 @@ const publicService = {
         	}
 		}
 
-		const userRow = await orm(c).select().from(user).where(like(user.email, `${username}@%`)).get();
+		const userRow = await userOrm(c).select().from(user).where(like(user.email, `${username}@%`)).get();
 		if (!userRow) {
 			throw new BizError(t('notExistUser'));
 		}
 		
 		const roleRow = await roleService.selectById(c, userRow.type);
 		
-		const allEmails = await orm(c).select({ 
+		const allEmails = await mailOrm(c).select({ 
             createTime: email.createTime, 
             labels: email.labels, 
             isSpam: email.isSpam,

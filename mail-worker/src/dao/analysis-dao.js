@@ -1,8 +1,12 @@
 import { emailConst } from '../const/entity-const';
+import { getUserDb, getMailDb } from '../utils/db-accessor';
 
 const analysisDao = {
 	async numberCount(c) {
-		const { results } = await c.env.db.prepare(`
+		const mailDb = getMailDb(c);
+		const userDb = getUserDb(c);
+
+		const mailQueryPromise = mailDb.prepare(`
             SELECT
 				COALESCE(e.receiveTotal, 0) AS receiveTotal,
 				COALESCE(e.sendTotal, 0) AS sendTotal,
@@ -11,9 +15,6 @@ const analysisDao = {
 				COALESCE(e.normalReceiveTotal, 0) AS normalReceiveTotal,
 				COALESCE(e.interceptReceiveTotal, 0) AS interceptReceiveTotal,
 				COALESCE(e.normalSendTotal, 0) AS normalSendTotal,
-				COALESCE(u.userTotal, 0) AS userTotal,
-				COALESCE(u.normalUserTotal, 0) AS normalUserTotal,
-				COALESCE(u.delUserTotal, 0) AS delUserTotal,
 				COALESCE(a.accountTotal, 0) AS accountTotal,
 				COALESCE(a.normalAccountTotal, 0) AS normalAccountTotal,
 				COALESCE(a.delAccountTotal, 0) AS delAccountTotal
@@ -32,14 +33,6 @@ const analysisDao = {
                 ) e
             CROSS JOIN (
                 SELECT
-                    COUNT(*) AS userTotal,
-                    SUM(CASE WHEN is_del = 1 THEN 1 ELSE 0 END) AS delUserTotal,
-                    SUM(CASE WHEN is_del = 0 THEN 1 ELSE 0 END) AS normalUserTotal
-                FROM
-                    user
-            ) u
-            CROSS JOIN (
-                SELECT
                     COUNT(*) AS accountTotal,
                     SUM(CASE WHEN is_del = 1 THEN 1 ELSE 0 END) AS delAccountTotal,
                     SUM(CASE WHEN is_del = 0 THEN 1 ELSE 0 END) AS normalAccountTotal
@@ -47,11 +40,29 @@ const analysisDao = {
                     account
             ) a
         `).all();
-		return results[0];
+
+		const userQueryPromise = userDb.prepare(`
+            SELECT
+                COUNT(*) AS userTotal,
+                SUM(CASE WHEN is_del = 1 THEN 1 ELSE 0 END) AS delUserTotal,
+                SUM(CASE WHEN is_del = 0 THEN 1 ELSE 0 END) AS normalUserTotal
+            FROM
+                user
+        `).all();
+
+		const [mailRes, userRes] = await Promise.all([mailQueryPromise, userQueryPromise]);
+		const mailData = mailRes?.results?.[0] || {};
+		const userData = userRes?.results?.[0] || {};
+
+		return {
+			...mailData,
+			...userData
+		};
 	},
 
 	async userDayCount(c, diffHours) {
-		const { results } = await c.env.db.prepare(`
+		const userDb = getUserDb(c);
+		const { results } = await userDb.prepare(`
             SELECT
                 DATE(create_time,'+${diffHours} hours') AS date,
                 COUNT(*) AS total
@@ -68,7 +79,8 @@ const analysisDao = {
 	},
 
 	async receiveDayCount(c, diffHours) {
-		const { results } = await c.env.db.prepare(`
+		const mailDb = getMailDb(c);
+		const { results } = await mailDb.prepare(`
             SELECT
                 DATE(create_time,'+${diffHours} hours') AS date,
                 COUNT(*) AS total
@@ -86,7 +98,8 @@ const analysisDao = {
 	},
 
 	async sendDayCount(c, diffHours) {
-		const { results } = await c.env.db.prepare(`
+		const mailDb = getMailDb(c);
+		const { results } = await mailDb.prepare(`
             SELECT
                 DATE(create_time,'+${diffHours} hours') AS date,
                 COUNT(*) AS total
@@ -104,7 +117,8 @@ const analysisDao = {
 	},
 
 	async interceptDayCount(c, diffHours) {
-		const { results } = await c.env.db.prepare(`
+		const mailDb = getMailDb(c);
+		const { results } = await mailDb.prepare(`
             SELECT
                 DATE(create_time,'+${diffHours} hours') AS date,
                 COUNT(*) AS total

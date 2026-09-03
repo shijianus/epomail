@@ -1,4 +1,4 @@
-import orm from '../entity/orm';
+import { mailOrm as orm } from '../entity/orm';
 import { att } from '../entity/att';
 import { and, eq, isNull, inArray, desc } from 'drizzle-orm';
 import r2Service from './r2-service';

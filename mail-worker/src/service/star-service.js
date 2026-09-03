@@ -1,4 +1,4 @@
-import orm from '../entity/orm';
+import { mailOrm as orm } from '../entity/orm';
 import { star } from '../entity/star';
 import emailService from './email-service';
 import BizError from '../error/biz-error';

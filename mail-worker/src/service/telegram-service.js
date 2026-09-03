@@ -1,4 +1,4 @@
-import orm from '../entity/orm';
+import { mailOrm as orm } from '../entity/orm';
 import email from '../entity/email';
 import settingService from './setting-service';
 import dayjs from 'dayjs';

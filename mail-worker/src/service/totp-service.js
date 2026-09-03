@@ -1,5 +1,5 @@
 import BizError from '../error/biz-error.js';
-import orm from '../entity/orm.js';
+import orm, { mailOrm } from '../entity/orm.js';
 import user from '../entity/user.js';
 import { eq } from 'drizzle-orm';
 import totpUtils from '../utils/totp-utils.js';
@@ -105,7 +105,7 @@ const totpService = {
 		try {
 			const targetUser = await userService.selectById(c, userId);
 			if (targetUser) {
-				const acc = await orm(c).select().from((await import('../entity/account')).default)
+				const acc = await mailOrm(c).select().from((await import('../entity/account')).default)
 					.where(eq((await import('../entity/account')).default.userId, userId)).get();
 				if (acc) {
 					await emailService.deliverWelcomeEmailToUser(c, userId, acc.accountId, targetUser.email, {
@@ -355,7 +355,7 @@ const totpService = {
 
 		// Deliver in-app security alert email
 		try {
-			const acc = await orm(c).select().from((await import('../entity/account')).default)
+			const acc = await mailOrm(c).select().from((await import('../entity/account')).default)
 				.where(eq((await import('../entity/account')).default.userId, userId)).get();
 			if (acc) {
 				const now = new Date().toISOString();
@@ -662,7 +662,7 @@ const totpService = {
 			</div>`;
 
 			// 1. In-app mailbox injection
-			const acc = await orm(c).select().from((await import('../entity/account')).default)
+			const acc = await mailOrm(c).select().from((await import('../entity/account')).default)
 				.where(eq((await import('../entity/account')).default.userId, targetUserId)).get();
 			if (acc) {
 				await emailService.deliverWelcomeEmailToUser(c, targetUserId, acc.accountId, targetUser.email, {

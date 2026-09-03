@@ -1,5 +1,5 @@
 import analysisDao from '../dao/analysis-dao';
-import orm from '../entity/orm';
+import { mailOrm } from '../entity/orm';
 import email from '../entity/email';
 import { desc, count, eq, and, ne, isNotNull } from 'drizzle-orm';
 import { emailConst } from '../const/entity-const';
@@ -68,7 +68,7 @@ const analysisService = {
 		] = await Promise.all([
 			analysisDao.numberCount(c),
 
-			orm(c)
+			mailOrm(c)
 				.select({ name: email.name, total: count(), isSpam: email.isSpam })
 				.from(email)
 				.where(and(eq(email.type, emailConst.type.RECEIVE), isNotNull(email.name),ne(email.name,'noreply'), ne(email.name,'')))

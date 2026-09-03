@@ -3,7 +3,7 @@ import verifyUtils from '../utils/verify-utils';
 import emailUtils from '../utils/email-utils';
 import userService from './user-service';
 import emailService from './email-service';
-import orm from '../entity/orm';
+import { mailOrm as orm } from '../entity/orm';
 import account from '../entity/account';
 import { and, asc, eq, gt, inArray, count, sql, ne, or, lt, desc } from 'drizzle-orm';
 import {accountConst, isDel, settingConst} from '../const/entity-const';
