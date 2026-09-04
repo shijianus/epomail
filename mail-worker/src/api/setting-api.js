@@ -2,6 +2,7 @@ import app from '../hono/hono';
 import result from '../model/result';
 import settingService from '../service/setting-service';
 import s3Service from '../service/s3-service';
+import dbService from '../service/db-service';
 import userContext from "../security/user-context";
 
 app.put('/setting/set', async (c) => {
@@ -44,4 +45,16 @@ app.post('/setting/s3/test', async (c) => {
 	const testResult = await s3Service.testConnection(body);
 	return c.json(result.ok(testResult));
 });
+
+app.get('/setting/db/status', async (c) => {
+	const status = await dbService.getDbStatus(c);
+	return c.json(result.ok(status));
+});
+
+app.post('/setting/db/test', async (c) => {
+	const body = await c.req.json().catch(() => ({}));
+	const testResult = await dbService.testConnection(c, body);
+	return c.json(result.ok(testResult));
+});
+
 

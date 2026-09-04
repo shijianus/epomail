@@ -113,7 +113,9 @@ const zh = {
 	backupCodeInvalid: '备用恢复代码错误或已使用',
 	totpCodeReplay: '该验证码刚刚已使用过，请等待下一有效码',
 	emptyPwdMsg: '密码不能为空',
-	globalTotpDisabled: '全站两步验证已由管理员关闭，暂不可进行两步验证配置'
+	globalTotpDisabled: '全站两步验证已由管理员关闭，暂不可进行两步验证配置',
+	dbTestSuccess: '数据库连通性诊断成功',
+	dbTestFail: '数据库连通性诊断失败'
 }
 
 export default zh;

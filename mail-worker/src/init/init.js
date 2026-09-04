@@ -39,8 +39,34 @@ const dbInit = {
 		await this.v3_8DB(c);
 		await this.v3_9DB(c);
 		await this.v3_10DB(c);
+		await this.v3_11DB(c);
 		await settingService.refresh(c);
 		return c.text('success');
+	},
+
+	async v3_11DB(c) {
+		const userDb = getUserDb(c);
+		
+		// Setting 表第三方数据库配置字段
+		const settingColumns = [
+			{ name: 'external_db_enabled', sql: `ALTER TABLE setting ADD COLUMN external_db_enabled INTEGER NOT NULL DEFAULT 0;` },
+			{ name: 'external_db_provider', sql: `ALTER TABLE setting ADD COLUMN external_db_provider TEXT NOT NULL DEFAULT 'turso';` },
+			{ name: 'external_db_endpoint', sql: `ALTER TABLE setting ADD COLUMN external_db_endpoint TEXT NOT NULL DEFAULT '';` },
+			{ name: 'external_db_token', sql: `ALTER TABLE setting ADD COLUMN external_db_token TEXT NOT NULL DEFAULT '';` },
+			{ name: 'external_db_name', sql: `ALTER TABLE setting ADD COLUMN external_db_name TEXT NOT NULL DEFAULT '';` },
+			{ name: 'external_db_target', sql: `ALTER TABLE setting ADD COLUMN external_db_target TEXT NOT NULL DEFAULT 'mail';` }
+		];
+
+		for (const col of settingColumns) {
+			try {
+				const colInfo = await userDb.prepare(`SELECT * FROM pragma_table_info('setting') WHERE name = ? limit 1`).bind(col.name).first();
+				if (!colInfo) {
+					await userDb.prepare(col.sql).run();
+				}
+			} catch (e) {
+				console.warn(`跳过 setting 字段 ${col.name}：${e.message}`);
+			}
+		}
 	},
 
 	async v3_10DB(c) {

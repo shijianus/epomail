@@ -66,29 +66,28 @@ function uriEncode(str, encodeSlash = true) {
 	return result;
 }
 
+export function detectProvider(endpoint = '') {
+	const ep = (endpoint || '').toLowerCase();
+	if (ep.includes('backblazeb2.com') || ep.includes('backblaze.com')) {
+		return 'Backblaze B2';
+	}
+	if (ep.includes('r2.cloudflarestorage.com')) {
+		return 'Cloudflare R2';
+	}
+	if (ep.includes('amazonaws.com')) {
+		return 'AWS S3';
+	}
+	if (ep.includes('wasabisys.com')) {
+		return 'Wasabi';
+	}
+	if (ep.includes('minio') || ep.includes('localhost') || ep.includes('127.0.0.1')) {
+		return 'MinIO';
+	}
+	return 'S3 Compatible';
+}
+
 export const s3Signer = {
-	/**
-	 * Detect storage provider type from endpoint or configuration
-	 */
-	detectProvider(endpoint = '') {
-		const ep = (endpoint || '').toLowerCase();
-		if (ep.includes('backblazeb2.com') || ep.includes('backblaze.com')) {
-			return 'Backblaze B2';
-		}
-		if (ep.includes('r2.cloudflarestorage.com')) {
-			return 'Cloudflare R2';
-		}
-		if (ep.includes('amazonaws.com')) {
-			return 'AWS S3';
-		}
-		if (ep.includes('wasabisys.com')) {
-			return 'Wasabi';
-		}
-		if (ep.includes('minio') || ep.includes('localhost') || ep.includes('127.0.0.1')) {
-			return 'MinIO';
-		}
-		return 'S3 Compatible';
-	},
+	detectProvider,
 
 	/**
 	 * Normalize S3 Endpoint URL

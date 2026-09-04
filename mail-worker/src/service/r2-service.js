@@ -2,6 +2,7 @@ import s3Service from './s3-service';
 import settingService from './setting-service';
 import kvObjService from './kv-obj-service';
 import { getUserDb } from '../utils/db-accessor';
+import { detectProvider } from '../utils/s3-signer';
 
 const r2Service = {
 
@@ -77,7 +78,12 @@ const r2Service = {
 
 	async storageType(c, userId = null) {
 		const resolved = await this.resolveStorage(c, userId);
-		return resolved.type;
+		if (resolved.type === 'S3' || resolved.type === 'USER_S3') {
+			const provider = detectProvider(resolved.config?.endpoint);
+			return `${provider} (S3)`;
+		}
+		if (resolved.type === 'R2') return 'Cloudflare R2';
+		return 'Cloudflare KV / D1';
 	},
 
 	async putObj(c, key, content, metadata = {}, userId = null) {

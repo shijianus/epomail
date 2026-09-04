@@ -31,3 +31,11 @@ export function sendWelcomeEmail(params) {
 export function testS3Setting(params) {
     return http.post('/setting/s3/test', params)
 }
+
+export function getDbStatus() {
+    return http.get('/setting/db/status')
+}
+
+export function testDbSetting(params) {
+    return http.post('/setting/db/test', params)
+}

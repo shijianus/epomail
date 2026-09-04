@@ -115,6 +115,11 @@ const settingService = {
 		setting.userByoStorage = setting.userByoStorage !== undefined ? Number(setting.userByoStorage) : 1;
 		setting.defaultStorageQuotaMb = setting.defaultStorageQuotaMb !== undefined ? Number(setting.defaultStorageQuotaMb) : 500;
 		setting.storageProvider = setting.storageProvider || 'auto';
+		setting.externalDbEnabled = setting.externalDbEnabled !== undefined ? Number(setting.externalDbEnabled) : 0;
+		setting.externalDbProvider = setting.externalDbProvider || 'turso';
+		setting.externalDbEndpoint = setting.externalDbEndpoint || '';
+		setting.externalDbName = setting.externalDbName || '';
+		setting.externalDbTarget = setting.externalDbTarget || 'mail';
 
 		c.set?.('setting', setting);
 		return setting;
@@ -144,6 +149,7 @@ const settingService = {
 
 		settingRow.s3AccessKey = settingRow.s3AccessKey ? `${settingRow.s3AccessKey.slice(0, 12)}******` : null;
 		settingRow.s3SecretKey = settingRow.s3SecretKey ? `${settingRow.s3SecretKey.slice(0, 12)}******` : null;
+		settingRow.externalDbToken = settingRow.externalDbToken ? `${settingRow.externalDbToken.slice(0, 8)}******` : null;
 		settingRow.tgBotToken = settingRow.tgBotToken ? `${settingRow.tgBotToken.slice(0, 20)}******` : null;
 		settingRow.hasR2 = !!c.env.r2
 		settingRow.hasCfEmail = !!c.env.email
@@ -278,6 +284,22 @@ const settingService = {
 			params.userApiSupport = Number(params.userApiSupport) === 1 ? 1 : 0;
 		}
 
+		if (params.userByoStorage !== undefined) {
+			params.userByoStorage = Number(params.userByoStorage) === 1 ? 1 : 0;
+		}
+
+		if (params.defaultStorageQuotaMb !== undefined) {
+			params.defaultStorageQuotaMb = Number(params.defaultStorageQuotaMb) >= 0 ? Number(params.defaultStorageQuotaMb) : 500;
+		}
+
+		if (params.externalDbEnabled !== undefined) {
+			params.externalDbEnabled = (Number(params.externalDbEnabled) === 1 || params.externalDbEnabled === true) ? 1 : 0;
+		}
+
+		if (params.externalDbToken && params.externalDbToken.includes('******')) {
+			delete params.externalDbToken;
+		}
+
 		params.resendTokens = JSON.stringify(resendTokens);
 
 		// Whitelist only valid DB columns in setting table
@@ -296,7 +318,10 @@ const settingService = {
 			'authI18n', 'publicProfile', 'allMailMode',
 			'welcomeSubject', 'welcomeContent', 'welcomeText', 'welcomeExpireDays',
 			'welcomeAutoSend', 'welcomeLastBroadcast',
-			'userTgForward', 'userEmailForward', 'userApiSupport'
+			'userTgForward', 'userEmailForward', 'userApiSupport',
+			'userByoStorage', 'defaultStorageQuotaMb', 'storageProvider',
+			'externalDbEnabled', 'externalDbProvider', 'externalDbEndpoint',
+			'externalDbToken', 'externalDbName', 'externalDbTarget'
 		];
 
 		const updateData = {};

@@ -280,9 +280,9 @@
 
     <!-- Section 3: 存储空间与个人云存储 (Storage Quota & BYO Cloud Storage) -->
     <div class="container storage-container" id="userStorage">
-      <div class="title">{{ $t('userStorageTitle') || '存储空间与个人云存储' }}</div>
+      <div class="title">{{ $t('userStorageTitle') }}</div>
       <div class="section-intro">
-        {{ $t('userStorageDesc') || '查看个人邮箱附件存储空间配额与使用详情，或接入您自己的 Backblaze B2 / AWS S3 对象存储桶以拓展存储容量并掌控数据。' }}
+        {{ $t('userStorageDesc') }}
       </div>
 
       <div class="storage-cards-grid">
@@ -294,13 +294,13 @@
                 <Icon icon="fluent:server-24-filled" width="22" height="22" />
               </div>
               <div>
-                <div class="st-title">{{ $t('storageUsageTitle') || '附件存储用量' }}</div>
-                <div class="st-subtitle">{{ storageUsage.fileCount || 0 }} 个附件文件已存储</div>
+                <div class="st-title">{{ $t('storageUsageTitle') }}</div>
+                <div class="st-subtitle">{{ storageUsage.fileCount || 0 }} {{ $t('storageFilesCount') }}</div>
               </div>
             </div>
             <div class="header-tag">
               <el-tag :type="storageUsage.byoStorageEnabled ? 'success' : 'info'" effect="plain" round class="status-pill">
-                {{ storageUsage.byoStorageEnabled ? '个人专属存储 (' + (storageUsage.byoStorageConfig?.provider || 'S3') + ')' : '系统默认存储' }}
+                {{ storageUsage.byoStorageEnabled ? $t('personalDedicatedStorage') + ' (' + (storageUsage.byoStorageConfig?.provider || 'S3') + ')' : $t('systemDefaultStorage') }}
               </el-tag>
             </div>
           </div>
@@ -308,9 +308,9 @@
           <div class="meter-body">
             <div class="meter-numbers">
               <span class="used-val">{{ storageUsage.usedMb || '0.00' }} MB</span>
-              <span class="total-val">/ {{ storageUsage.quotaMb === 0 ? '不限容量' : storageUsage.quotaMb + ' MB' }}</span>
+              <span class="total-val">/ {{ storageUsage.quotaMb === 0 ? $t('unlimitedQuota') : storageUsage.quotaMb + ' MB' }}</span>
               <span class="pct-badge" :class="{ 'warning': storageUsage.usedPercentage > 80, 'danger': storageUsage.usedPercentage >= 100 }">
-                {{ storageUsage.quotaMb === 0 ? '无限制' : storageUsage.usedPercentage + '%' }}
+                {{ storageUsage.quotaMb === 0 ? $t('unlimitedBadge') : storageUsage.usedPercentage + '%' }}
               </span>
             </div>
             <div class="progress-track" v-if="storageUsage.quotaMb > 0">
@@ -322,7 +322,7 @@
             </div>
             <div class="meter-footnote">
               <Icon icon="fluent:info-16-regular" width="14" height="14" />
-              <span>{{ storageUsage.byoStorageEnabled ? '您已启用个人对象存储桶，附件将直接保存在您的专属 Bucket 中，不占用公共配额。' : '当前存储由系统池提供，可按需配置个人 Backblaze B2 获得超大独立空间。' }}</span>
+              <span>{{ storageUsage.byoStorageEnabled ? $t('quotaByoNotice') : $t('quotaUsedNotice') }}</span>
             </div>
           </div>
         </div>
@@ -335,8 +335,8 @@
                 <Icon icon="simple-icons:backblaze" width="20" height="20" />
               </div>
               <div>
-                <div class="st-title">{{ $t('byoStorageTitle') || '个人对象存储 (Backblaze B2 / S3)' }}</div>
-                <div class="st-subtitle">{{ storageUsage.byoStorageEnabled ? '已成功绑定个人存储桶' : '接入专属 S3/B2 存储桶代管附件' }}</div>
+                <div class="st-title">{{ $t('byoStorageTitle') }}</div>
+                <div class="st-subtitle">{{ storageUsage.byoStorageEnabled ? $t('byoStorageBound') : $t('byoStorageUnbound') }}</div>
               </div>
             </div>
             <div class="header-action">
@@ -347,7 +347,7 @@
                 class="config-byo-btn"
               >
                 <Icon :icon="storageUsage.byoStorageEnabled ? 'fluent:edit-16-filled' : 'fluent:add-circle-16-filled'" width="15" height="15" />
-                <span>{{ storageUsage.byoStorageEnabled ? '修改配置 / 诊断' : '接入存储桶' }}</span>
+                <span>{{ storageUsage.byoStorageEnabled ? $t('byoStorageEditBtn') : $t('byoStorageConfigBtn') }}</span>
               </el-button>
             </div>
           </div>
@@ -355,15 +355,15 @@
           <div class="byo-status-body" v-if="storageUsage.byoStorageEnabled">
             <div class="byo-info-grid">
               <div class="info-row">
-                <span class="i-label">提供商:</span>
+                <span class="i-label">{{ $t('byoStorageProvider') }}:</span>
                 <span class="i-val bold">{{ storageUsage.byoStorageConfig?.provider || 'Backblaze B2' }}</span>
               </div>
               <div class="info-row">
-                <span class="i-label">Bucket:</span>
+                <span class="i-label">{{ $t('storageBucket') }}:</span>
                 <span class="i-val code">{{ storageUsage.byoStorageConfig?.bucket }}</span>
               </div>
               <div class="info-row">
-                <span class="i-label">Endpoint:</span>
+                <span class="i-label">{{ $t('storageEndpoint') }}:</span>
                 <span class="i-val code">{{ storageUsage.byoStorageConfig?.endpoint }}</span>
               </div>
               <div class="info-row">
@@ -379,7 +379,7 @@
                 @click="testCurrentByoConnection"
               >
                 <Icon icon="fluent:play-circle-16-regular" width="14" height="14" />
-                <span>连通性诊断</span>
+                <span>{{ $t('byoStorageTestBtn') }}</span>
               </el-button>
               <el-button 
                 size="small" 
@@ -389,14 +389,14 @@
                 @click="handleDisconnectByoStorage"
               >
                 <Icon icon="fluent:link-dismiss-16-regular" width="14" height="14" />
-                <span>解除绑定</span>
+                <span>{{ $t('byoStorageDisconnectBtn') }}</span>
               </el-button>
             </div>
           </div>
 
           <div class="byo-empty-body" v-else>
             <div class="empty-desc">
-              推荐使用 <strong>Backblaze B2</strong>（提供 10GB 免费空间，与 Cloudflare 享 0 元出站流量费）。配置完成后，您的所有收发附件将直接保存在您个人的云端存储桶中。
+              {{ $t('byoStoragePromo') }}
             </div>
           </div>
         </div>
@@ -491,7 +491,7 @@
     <!-- DIALOG: 个人对象存储 (Backblaze B2 / S3) 接入配置弹窗 -->
     <el-dialog 
       v-model="byoModalShow" 
-      :title="$t('byoStorageConfigModalTitle') || '接入个人对象存储 (Backblaze B2 / S3)'" 
+      :title="$t('byoModalTitle')" 
       width="540px" 
       @closed="resetByoModalForm"
       class="storage-config-dialog"
@@ -499,8 +499,8 @@
       <div class="s3-modal-body">
         <div class="dialog-field">
           <div class="d-label-row">
-            <span class="d-field-title">存储服务提供商预设</span>
-            <span class="d-sub-hint">点击快速填入预设模版</span>
+            <span class="d-field-title">{{ $t('providerPreset') }}</span>
+            <span class="d-sub-hint">{{ $t('providerPresetHint') }}</span>
           </div>
           <div class="provider-preset-pills">
             <div 
@@ -509,7 +509,7 @@
               @click="selectUserByoProvider('backblaze')"
             >
               <Icon icon="simple-icons:backblaze" width="16" height="16" class="p-icon b2" />
-              <span>Backblaze B2</span>
+              <span>{{ $t('b2Preset') }}</span>
             </div>
             <div 
               class="provider-pill" 
@@ -517,7 +517,7 @@
               @click="selectUserByoProvider('aws')"
             >
               <Icon icon="simple-icons:amazons3" width="16" height="16" class="p-icon aws" />
-              <span>AWS S3</span>
+              <span>{{ $t('awsPreset') }}</span>
             </div>
             <div 
               class="provider-pill" 
@@ -525,7 +525,7 @@
               @click="selectUserByoProvider('r2')"
             >
               <Icon icon="simple-icons:cloudflare" width="16" height="16" class="p-icon r2" />
-              <span>Cloudflare R2</span>
+              <span>{{ $t('r2Preset') }}</span>
             </div>
             <div 
               class="provider-pill" 
@@ -533,7 +533,7 @@
               @click="selectUserByoProvider('custom')"
             >
               <Icon icon="fluent:server-multiple-20-filled" width="16" height="16" class="p-icon custom" />
-              <span>MinIO / 兼容S3</span>
+              <span>{{ $t('customPreset') }}</span>
             </div>
           </div>
         </div>
@@ -541,7 +541,7 @@
         <div class="b2-guidance-box" v-if="byoForm.provider === 'backblaze'">
           <div class="g-header">
             <Icon icon="fluent:sparkle-20-filled" width="16" height="16" class="g-icon" />
-            <span class="g-title">Backblaze B2 接入提示</span>
+            <span class="g-title">{{ $t('b2GuidanceTitle') }}</span>
           </div>
           <div class="g-content">
             • 节点示例：<code>s3.us-west-004.backblazeb2.com</code><br/>
@@ -551,20 +551,20 @@
 
         <div class="dialog-field">
           <div class="d-label-row">
-            <span class="d-field-title">存储桶名称 (Bucket) *</span>
-            <span class="d-sub-hint">您在云平台创建的存储桶名</span>
+            <span class="d-field-title">{{ $t('bucketName') }} *</span>
+            <span class="d-sub-hint">{{ $t('bucketNameHint') }}</span>
           </div>
-          <el-input v-model="byoForm.bucket" placeholder="例如: my-mail-storage" clearable />
+          <el-input v-model="byoForm.bucket" :placeholder="$t('bucketPlaceholder')" clearable />
         </div>
 
         <div class="dialog-field">
           <div class="d-label-row">
-            <span class="d-field-title">服务节点 (Endpoint) *</span>
-            <span class="d-sub-hint">S3 API 接入点 URL</span>
+            <span class="d-field-title">{{ $t('endpoint') }} *</span>
+            <span class="d-sub-hint">{{ $t('endpointHint') }}</span>
           </div>
           <el-input 
             v-model="byoForm.endpoint" 
-            :placeholder="byoForm.provider === 'backblaze' ? '例如: s3.us-west-004.backblazeb2.com' : '例如: s3.amazonaws.com'" 
+            :placeholder="byoForm.provider === 'backblaze' ? $t('endpointPlaceholderB2') : $t('endpointPlaceholderAws')" 
             clearable 
           />
         </div>
@@ -572,56 +572,56 @@
         <div class="dialog-row-2col">
           <div class="dialog-field">
             <div class="d-label-row">
-              <span class="d-field-title">存储区域 (Region)</span>
-              <span class="d-sub-hint">默认 auto</span>
+              <span class="d-field-title">{{ $t('region') }}</span>
+              <span class="d-sub-hint">{{ $t('regionHint') }}</span>
             </div>
-            <el-input v-model="byoForm.region" placeholder="例如: us-west-004 / auto" clearable />
+            <el-input v-model="byoForm.region" placeholder="us-west-004 / auto" clearable />
           </div>
 
           <div class="dialog-field">
             <div class="d-label-row">
-              <span class="d-field-title">ForcePathStyle</span>
-              <span class="d-sub-hint">路径风格还是主机风格</span>
+              <span class="d-field-title">{{ $t('forcePathStyle') }}</span>
+              <span class="d-sub-hint">{{ $t('forcePathStyleDesc') }}</span>
             </div>
             <div class="fps-switch-wrapper">
               <el-switch :active-value="1" :inactive-value="0" v-model="byoForm.forcePathStyle" />
-              <span class="fps-label">{{ byoForm.forcePathStyle === 1 ? '路径风格' : '主机风格' }}</span>
+              <span class="fps-label">{{ byoForm.forcePathStyle === 1 ? $t('fpsPathStyle') : $t('fpsVirtualHost') }}</span>
             </div>
           </div>
         </div>
 
         <div class="dialog-field">
           <div class="d-label-row">
-            <span class="d-field-title">{{ byoForm.provider === 'backblaze' ? 'Key ID (Access Key) *' : 'Access Key ID *' }}</span>
-            <span class="d-sub-hint">{{ storageUsage.byoStorageConfig?.s3AccessKey ? '已配置: ' + storageUsage.byoStorageConfig.s3AccessKey : '用于访问签权' }}</span>
+            <span class="d-field-title">{{ byoForm.provider === 'backblaze' ? 'Key ID (Access Key) *' : $t('s3AccessKeyId') + ' *' }}</span>
+            <span class="d-sub-hint">{{ storageUsage.byoStorageConfig?.s3AccessKey ? $t('configured') + ': ' + storageUsage.byoStorageConfig.s3AccessKey : $t('s3AccessKeyHint') }}</span>
           </div>
           <el-input 
             v-model="byoForm.s3AccessKey" 
-            :placeholder="storageUsage.byoStorageConfig?.s3AccessKey || '输入 Key ID / Access Key'" 
+            :placeholder="storageUsage.byoStorageConfig?.s3AccessKey || $t('s3AccessKeyHint')" 
             clearable 
           />
         </div>
 
         <div class="dialog-field">
           <div class="d-label-row">
-            <span class="d-field-title">{{ byoForm.provider === 'backblaze' ? 'Application Key (Secret Key) *' : 'Secret Access Key *' }}</span>
-            <span class="d-sub-hint">{{ storageUsage.byoStorageConfig?.s3SecretKey ? '已加密配置' : '仅更新时输入' }}</span>
+            <span class="d-field-title">{{ byoForm.provider === 'backblaze' ? 'Application Key (Secret Key) *' : $t('s3SecretKey') + ' *' }}</span>
+            <span class="d-sub-hint">{{ storageUsage.byoStorageConfig?.s3SecretKey ? $t('encrypted') : $t('s3SecretKeyHint') }}</span>
           </div>
           <el-input 
             v-model="byoForm.s3SecretKey" 
             type="password" 
             show-password 
-            :placeholder="storageUsage.byoStorageConfig?.s3SecretKey ? '••••••••••••••••' : '输入 Application Key / Secret Key'" 
+            :placeholder="storageUsage.byoStorageConfig?.s3SecretKey ? '••••••••••••••••' : $t('s3SecretKeyHint')" 
             clearable 
           />
         </div>
 
         <div class="dialog-field">
           <div class="d-label-row">
-            <span class="d-field-title">自定义 CDN 域名 (可选)</span>
-            <span class="d-sub-hint">加速或配合 Cloudflare 免流</span>
+            <span class="d-field-title">{{ $t('customCdnDomain') }}</span>
+            <span class="d-sub-hint">{{ $t('customCdnDomainHint') }}</span>
           </div>
-          <el-input v-model="byoForm.customDomain" placeholder="例如: https://cdn.yourdomain.com" clearable />
+          <el-input v-model="byoForm.customDomain" :placeholder="$t('customCdnPlaceholder')" clearable />
         </div>
 
         <div class="test-action-bar">
@@ -632,7 +632,7 @@
             class="test-conn-btn"
           >
             <Icon icon="fluent:play-circle-20-filled" width="16" height="16" />
-            <span>测试存储连通性与权限</span>
+            <span>{{ testingUserByo ? $t('testingConnection') : $t('testConnectionBtn') }}</span>
           </el-button>
         </div>
 
@@ -642,7 +642,7 @@
           </div>
           <div class="fb-content">
             <div class="fb-title">
-              <span>{{ userByoTestResult.ok ? '连通性诊断通过' : '连接诊断失败' }}</span>
+              <span>{{ userByoTestResult.ok ? $t('storageTestSuccess') : $t('storageTestFail') }}</span>
               <el-tag v-if="userByoTestResult.ok" size="small" type="success" effect="plain" class="latency-pill">
                 ⚡ {{ userByoTestResult.latencyMs }}ms
               </el-tag>
@@ -657,8 +657,8 @@
 
       <template #footer>
         <div class="dialog-footer-actions">
-          <el-button @click="byoModalShow = false">{{ t('cancel') || '取消' }}</el-button>
-          <el-button type="primary" :loading="savingUserByo" @click="handleSaveUserByoStorage">{{ t('save') || '保存并绑定' }}</el-button>
+          <el-button @click="byoModalShow = false">{{ $t('cancel') }}</el-button>
+          <el-button type="primary" :loading="savingUserByo" @click="handleSaveUserByoStorage">{{ $t('byoSaveBtn') }}</el-button>
         </div>
       </template>
     </el-dialog>

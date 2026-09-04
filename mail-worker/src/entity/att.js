@@ -19,3 +19,5 @@ export const  att = sqliteTable('attachments', {
 	createTime: text('create_time').default(sql`CURRENT_TIMESTAMP`).notNull(),
 });
 
+export default att;
+

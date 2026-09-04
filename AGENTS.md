@@ -12,6 +12,33 @@
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
 
+### 系统设置「存储与核心数据库 (Storage & Database Hub)」管理中心全量上线与第三方 DB 接入体系重构 (2026-09-04)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **管理员系统设置「对象存储与核心数据库」无缝合并与层次化重构 (`class="settings-card storage-db-card"`)**:
+       - 响应架构要求，将系统设置中的「对象存储」卡片重构升级为**「存储与核心数据库 (Storage & Database Hub)」**统一管理卡片。
+       - 分区清晰规划为两大部分：
+         - **对象存储 (Object Storage)**：展示存储桶名称、接入节点、0元流量 CDN 域名、存储引擎状态（Backblaze B2 / AWS S3 / Cloudflare R2 / KV）；
+         - **核心与第三方数据库 (Database Hub)**：清晰展示用户域数据库 (`USER_DB`) 与邮件域数据库 (`MAIL_DB`) 运行时分流状态、架构模式（单库模式 / 双库模式 / 第三方云数据库托管）。
+       - 底部操作栏集成三大直观功能：`「S3 / Backblaze B2 配置」`、`「第三方数据库配置」`与`「全链路诊断」`快速联调。
+    2. **核心与第三方数据库管理弹窗 (`class="storage-config-dialog db-config-dialog"`) 与多提供商预设**:
+       - 内置主流边缘与云数据库模版切换（**Turso / LibSQL**、**Cloudflare 原生 D1**、**Cloudflare D1 REST API**、**自定义 HTTP SQL 引擎**）。
+       - 提供接入指引横幅（针对 Turso 全球分布式 SQLite 边缘节点与 D1 单/双库分流最佳实践）。
+       - 支持配置接入点 URL、Auth Token 鉴权（密码框安全输入与脱敏呈现）、数据库名称命名空间、指定分流范围（邮件域 / 全库 / 用户域）。
+       - **数据库全链路实时探针 (`POST /api/setting/db/test`)**: 实时向主库、分库或第三方数据库发起 SQL `SELECT 1` 探针诊断，计算毫秒级网络延迟，并在前端可视化展示模式徽章、耗时药丸与在线表统计（用户数、邮件数、邮箱号数、附件数）。
+       - **全系统状态诊断聚合 (`GET /api/setting/db/status`)**: 实时提取各 DB 绑定状态与运行模式，供前端动态呈现。
+    3. **中英文 i18n 完整清洗与重构 (100% Comprehensive i18n Coverage)**:
+       - 彻底消除此前所有混乱、残缺与错误的 i18n 键值，新增并校准了 40+ 条中英文对照文本（`storageAndDbHubTitle`、`databaseArchTitle`、`dbUserDomain`、`dbMailDomain`、`dbConfigTitle`、`dbProviderPreset`、`tursoPreset`、`d1Preset`、`d1HttpPreset`、`customDbPreset`、`dbEndpointPlaceholderTurso`、`dbTestSuccess`、`dbTestFail` 等）。
+    4. **DDL 幂等升级与安全凭据脱敏保护**:
+       - `init.js` 增加 `v3_11DB` 数据库表平滑升级逻辑，通过 `pragma_table_info` 幂等增加 `external_db_enabled`, `external_db_provider`, `external_db_endpoint`, `external_db_token`, `external_db_name`, `external_db_target` 字段。
+       - `setting-service.js` 实现 Token 掩码化（`12345678******`），在更新时智能识别未修改的脱敏字符串，保护真实密钥不被覆盖。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **Git Commit Hash**: `c37d78734b952bdc5617e023b40fbd8bc956f7d6` (Short Hash: `c37d787`).
+    - 生产部署上线 Cloudflare Workers Version ID: `279ce39d-5634-4e66-8bbf-c75ab283a895`。
+    - 自动化测试套件 100% 顺利通过：
+      - `node --loader ./tests/esm-loader.mjs tests/test-storage-and-db-hub-e2e.mjs` (dbService 状态提取、实时连通性探针、Playwright UI 渲染与弹窗诊断交互 100% 通过);
+      - `node --loader ./tests/esm-loader.mjs tests/test-s3-b2-storage-and-quota-e2e.mjs` (S3/B2 存储与配额体系回归 100% 通过);
+      - `node --loader ./tests/esm-loader.mjs tests/test-dual-and-single-db-e2e.mjs` (单库向下兼容与双库物理隔离架构回归 100% 通过)。
+
 ### Backblaze B2 / S3 多云第三方对象存储接入、用户 BYO Storage 与附件配额体系全量上线 (2026-09-04)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **三方对象存储物理卸载与多级回退架构 (Multi-Tier Storage Architecture)**:

@@ -113,7 +113,9 @@ const en = {
 	backupCodeInvalid: 'Invalid or already used backup code',
 	totpCodeReplay: 'This verification code was already used. Please wait for the next code',
 	emptyPwdMsg: 'Password cannot be empty',
-	globalTotpDisabled: 'Two-factor authentication is globally disabled by administrator.'
+	globalTotpDisabled: 'Two-factor authentication is globally disabled by administrator.',
+	dbTestSuccess: 'Database connectivity diagnostics successful',
+	dbTestFail: 'Database connectivity diagnostics failed'
 };
 
 export default en;

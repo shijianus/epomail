@@ -69,7 +69,13 @@ export const setting = sqliteTable('setting', {
 	userApiSupport: integer('user_api_support').default(1).notNull(),
 	userByoStorage: integer('user_byo_storage').default(1).notNull(),
 	defaultStorageQuotaMb: integer('default_storage_quota_mb').default(500).notNull(),
-	storageProvider: text('storage_provider').default('auto').notNull()
+	storageProvider: text('storage_provider').default('auto').notNull(),
+	externalDbEnabled: integer('external_db_enabled').default(0).notNull(),
+	externalDbProvider: text('external_db_provider').default('turso').notNull(),
+	externalDbEndpoint: text('external_db_endpoint').default('').notNull(),
+	externalDbToken: text('external_db_token').default('').notNull(),
+	externalDbName: text('external_db_name').default('').notNull(),
+	externalDbTarget: text('external_db_target').default('mail').notNull()
 });
 export default setting
 
