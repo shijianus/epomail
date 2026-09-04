@@ -29,7 +29,7 @@
        - 当用户使用管理员提供的公共数据库/存储时，单附件体积超过 `attachmentMaxSizeMb` 抛出 `BizError` 拦截；
        - 当用户启用个人专属 BYO S3 存储或外部数据库时，自动豁免跳过该限制，返回 `{ allowed: true, isByo: true }`，彻底实现业务逻辑闭环。
 *   **部署上线与自动化测试 (Verification & Deployment)**:
-    - **Git Commit Hash**: `dbe0acafe9c954d35709bdc175d026f436212ebc` (Short Hash: `dbe0aca`).
+    - **Git Commit Hash**: `2247ea3fa9fd067498c56d4997611ab926aa84a3` (Short Hash: `2247ea3`).
     - 生产部署上线 Cloudflare Workers Version ID: `6cf0efa6-bfac-42aa-9ecd-a599399dbc1f`。
     - 自动化测试套件 100% 顺利通过：
       - `node --loader ./tests/esm-loader.mjs tests/test-storage-and-db-hub-e2e.mjs` (单附件拦截单元测试、BYO免限制测试、卡片无opt-button、单附件输入框显式展示、920px/880px弹窗宽屏无滚动条验证 100% 通过);
