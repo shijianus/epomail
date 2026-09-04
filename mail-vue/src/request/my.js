@@ -96,5 +96,21 @@ export function deleteApiToken(tokenId) {
     return http.delete(`/my/apiTokens/${tokenId}`);
 }
 
+export function getUserStorage() {
+    return http.get('/my/storage');
+}
+
+export function updateUserStorage(data) {
+    return http.put('/my/storage', data);
+}
+
+export function testUserStorage(data) {
+    return http.post('/my/storage/test', data);
+}
+
+export function clearUserStorage() {
+    return http.delete('/my/storage');
+}
+
 
 

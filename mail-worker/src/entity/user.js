@@ -24,6 +24,9 @@ const user = sqliteTable('user', {
 	totpKeyVersion: integer('totp_key_version').default(1).notNull(),
 	totpBackupCodes: text('totp_backup_codes').default('[]').notNull(),
 	totpCreatedAt: text('totp_created_at').default('').notNull(),
-	securityKeys: text('security_keys').default('[]').notNull()
+	securityKeys: text('security_keys').default('[]').notNull(),
+	storageQuotaMb: integer('storage_quota_mb').default(0).notNull(),
+	byoStorageEnabled: integer('byo_storage_enabled').default(0).notNull(),
+	byoStorageConfig: text('byo_storage_config').default('{}').notNull()
 });
 export default user

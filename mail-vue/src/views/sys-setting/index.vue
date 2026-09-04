@@ -377,6 +377,41 @@
                   />
                 </div>
               </div>
+              <div class="setting-item">
+                <div class="title-item">
+                  <span>{{ $t('userByoStorageSetting') || '用户第三方存储接入' }}</span>
+                  <el-tooltip effect="dark" :content="$t('userByoStorageSettingTooltip') || '允许用户在资料页接入个人的 Backblaze B2 或 AWS S3 对象存储桶托管个人附件'">
+                    <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+                  </el-tooltip>
+                </div>
+                <div>
+                  <el-switch 
+                    @change="(val) => changeField('userByoStorage', val)" 
+                    :active-value="1" 
+                    :inactive-value="0"
+                    v-model="setting.userByoStorage"
+                  />
+                </div>
+              </div>
+              <div class="setting-item">
+                <div class="title-item">
+                  <span>{{ $t('defaultStorageQuotaSetting') || '默认存储配额 (MB)' }}</span>
+                  <el-tooltip effect="dark" :content="$t('defaultStorageQuotaSettingTooltip') || '新用户的初始存储配额限制，设置为 0 表示不限制容量'">
+                    <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+                  </el-tooltip>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <el-input-number 
+                    size="small" 
+                    :min="0" 
+                    :max="102400" 
+                    :step="100" 
+                    v-model="setting.defaultStorageQuotaMb" 
+                    @change="(val) => changeField('defaultStorageQuotaMb', val)"
+                    style="width: 110px;"
+                  />
+                </div>
+              </div>
             </div>
           </div>
 
@@ -1553,29 +1588,208 @@
         </template>
       </el-dialog>
 
-      <el-dialog v-model="addS3Show" :title="t('s3Configuration')" width="340" @closed="resetAddS3Form">
-        <form>
-          <el-input class="dialog-input" type="text" placeholder="Bucket" v-model="s3.bucket"/>
-          <el-input class="dialog-input" type="text" placeholder="Endpoint" v-model="s3.endpoint"/>
-          <el-input class="dialog-input" type="text" placeholder="Region" v-model="s3.region"/>
-          <el-input class="dialog-input" type="text" :placeholder="setting.s3AccessKey || 'Access Key'"
-                    v-model="s3.s3AccessKey"/>
-          <el-input style="margin-bottom: 10px" type="text" :placeholder="setting.s3SecretKey || 'Secret Key'" v-model="s3.s3SecretKey"/>
-          <div class="force-path-style">
-            <div class="force-path-style-left">
-              <span>ForcePathStyle</span>
-              <el-tooltip effect="dark" :content="$t('forcePathStyleDesc')">
-                <Icon class="warning" icon="fe:warning" width="18" height="18"/>
-              </el-tooltip>
+      <!-- S3 / Backblaze B2 Object Storage Modal -->
+      <el-dialog 
+        v-model="addS3Show" 
+        :title="$t('s3Configuration') || '对象存储配置 (S3 / Backblaze B2)'" 
+        width="540px" 
+        @closed="resetAddS3Form"
+        class="storage-config-dialog"
+      >
+        <div class="s3-modal-body">
+          <!-- Provider Presets -->
+          <div class="dialog-field">
+            <div class="d-label-row">
+              <span class="d-field-title">存储服务提供商预设</span>
+              <span class="d-sub-hint">点击快速填入服务配置模版</span>
             </div>
-            <el-switch :before-change="beforeChange" :active-value="0" :inactive-value="1"
-                       v-model="s3.forcePathStyle"/>
+            <div class="provider-preset-pills">
+              <div 
+                class="provider-pill" 
+                :class="{ active: s3.provider === 'backblaze' }" 
+                @click="selectS3Provider('backblaze')"
+              >
+                <Icon icon="simple-icons:backblaze" width="16" height="16" class="p-icon b2" />
+                <span>Backblaze B2</span>
+              </div>
+              <div 
+                class="provider-pill" 
+                :class="{ active: s3.provider === 'aws' }" 
+                @click="selectS3Provider('aws')"
+              >
+                <Icon icon="simple-icons:amazons3" width="16" height="16" class="p-icon aws" />
+                <span>AWS S3</span>
+              </div>
+              <div 
+                class="provider-pill" 
+                :class="{ active: s3.provider === 'r2' }" 
+                @click="selectS3Provider('r2')"
+              >
+                <Icon icon="simple-icons:cloudflare" width="16" height="16" class="p-icon r2" />
+                <span>Cloudflare R2</span>
+              </div>
+              <div 
+                class="provider-pill" 
+                :class="{ active: s3.provider === 'custom' }" 
+                @click="selectS3Provider('custom')"
+              >
+                <Icon icon="fluent:server-multiple-20-filled" width="16" height="16" class="p-icon custom" />
+                <span>MinIO / 兼容S3</span>
+              </div>
+            </div>
           </div>
-          <div class="s3-button">
+
+          <!-- Backblaze B2 / Bandwidth Alliance Guidance Box -->
+          <div class="b2-guidance-box" v-if="s3.provider === 'backblaze'">
+            <div class="g-header">
+              <Icon icon="fluent:sparkle-20-filled" width="16" height="16" class="g-icon" />
+              <span class="g-title">Backblaze B2 最佳实践 (0 元出站流量)</span>
+            </div>
+            <div class="g-content">
+              • 免费提供 10GB 对象存储容量。<br/>
+              • 节点格式示例：<code>s3.us-west-004.backblazeb2.com</code><br/>
+              • 配合 Cloudflare CDN 接入享有 <strong>Bandwidth Alliance 0 元出站流量 (Zero Egress Fee)</strong>！
+            </div>
+          </div>
+
+          <!-- Bucket Field -->
+          <div class="dialog-field">
+            <div class="d-label-row">
+              <span class="d-field-title">存储桶名称 (Bucket) *</span>
+              <span class="d-sub-hint">存储桶唯一英文标识</span>
+            </div>
+            <el-input 
+              v-model="s3.bucket" 
+              placeholder="例如: epomail-attachments" 
+              clearable 
+            />
+          </div>
+
+          <!-- Endpoint Field -->
+          <div class="dialog-field">
+            <div class="d-label-row">
+              <span class="d-field-title">服务节点 (Endpoint) *</span>
+              <span class="d-sub-hint">S3 API 服务接入点 URL</span>
+            </div>
+            <el-input 
+              v-model="s3.endpoint" 
+              :placeholder="s3.provider === 'backblaze' ? '例如: s3.us-west-004.backblazeb2.com' : '例如: s3.amazonaws.com'" 
+              clearable 
+            />
+          </div>
+
+          <!-- Region & ForcePathStyle Row -->
+          <div class="dialog-row-2col">
+            <div class="dialog-field">
+              <div class="d-label-row">
+                <span class="d-field-title">存储区域 (Region)</span>
+                <span class="d-sub-hint">默认 auto</span>
+              </div>
+              <el-input 
+                v-model="s3.region" 
+                placeholder="例如: us-west-004 / auto" 
+                clearable 
+              />
+            </div>
+
+            <div class="dialog-field">
+              <div class="d-label-row">
+                <span class="d-field-title">ForcePathStyle</span>
+                <el-tooltip effect="dark" :content="$t('forcePathStyleDesc') || '路径风格 URL (/bucket/key) 还是虚拟主机风格 (bucket.s3.endpoint)'">
+                  <Icon class="warning" icon="fe:warning" width="16" height="16"/>
+                </el-tooltip>
+              </div>
+              <div class="fps-switch-wrapper">
+                <el-switch 
+                  :active-value="1" 
+                  :inactive-value="0" 
+                  v-model="s3.forcePathStyle"
+                />
+                <span class="fps-label">{{ s3.forcePathStyle === 1 ? '路径风格 (Path Style)' : '主机风格 (Virtual Host)' }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Credentials Fields -->
+          <div class="dialog-field">
+            <div class="d-label-row">
+              <span class="d-field-title">{{ s3.provider === 'backblaze' ? 'Key ID (Access Key) *' : 'Access Key ID *' }}</span>
+              <span class="d-sub-hint">{{ setting.s3AccessKey ? '已配置: ' + setting.s3AccessKey : '用于 API 签权访问' }}</span>
+            </div>
+            <el-input 
+              v-model="s3.s3AccessKey" 
+              type="text"
+              :placeholder="setting.s3AccessKey || '输入 Key ID / Access Key'" 
+              clearable 
+            />
+          </div>
+
+          <div class="dialog-field">
+            <div class="d-label-row">
+              <span class="d-field-title">{{ s3.provider === 'backblaze' ? 'Application Key (Secret Key) *' : 'Secret Access Key *' }}</span>
+              <span class="d-sub-hint">{{ setting.s3SecretKey ? '已加密配置' : '仅在更新时输入' }}</span>
+            </div>
+            <el-input 
+              v-model="s3.s3SecretKey" 
+              type="password" 
+              show-password
+              :placeholder="setting.s3SecretKey ? '••••••••••••••••' : '输入 Application Key / Secret Key'" 
+              clearable 
+            />
+          </div>
+
+          <!-- Custom CDN Domain (Bandwidth Alliance) -->
+          <div class="dialog-field">
+            <div class="d-label-row">
+              <span class="d-field-title">自定义 CDN / 带宽联盟域名 (可选)</span>
+              <span class="d-sub-hint">配置 Cloudflare CNAME 实现直连免流下载</span>
+            </div>
+            <el-input 
+              v-model="s3.customDomain" 
+              placeholder="例如: https://cdn.yourdomain.com" 
+              clearable 
+            />
+          </div>
+
+          <!-- Test Connection & Diagnostic Result Banner -->
+          <div class="test-action-bar">
+            <el-button 
+              type="default" 
+              :loading="testingS3" 
+              @click="handleTestS3Connection"
+              class="test-conn-btn"
+            >
+              <Icon icon="fluent:play-circle-20-filled" width="16" height="16" />
+              <span>{{ $t('testStorageConnection') || '测试存储连通性与权限' }}</span>
+            </el-button>
+          </div>
+
+          <!-- Result Alert Box -->
+          <div v-if="s3TestResult" class="test-feedback-box" :class="{ success: s3TestResult.ok, error: !s3TestResult.ok }">
+            <div class="fb-icon">
+              <Icon :icon="s3TestResult.ok ? 'fluent:checkmark-circle-20-filled' : 'fluent:dismiss-circle-20-filled'" width="20" height="20" />
+            </div>
+            <div class="fb-content">
+              <div class="fb-title">
+                <span>{{ s3TestResult.ok ? '连通性诊断通过' : '连接诊断失败' }}</span>
+                <el-tag v-if="s3TestResult.ok" size="small" type="success" effect="plain" class="latency-pill">
+                  ⚡ {{ s3TestResult.latencyMs }}ms
+                </el-tag>
+                <el-tag v-if="s3TestResult.provider" size="small" type="info" effect="plain" class="provider-pill-tag">
+                  {{ s3TestResult.provider }}
+                </el-tag>
+              </div>
+              <div class="fb-msg">{{ s3TestResult.message || s3TestResult.error }}</div>
+            </div>
+          </div>
+        </div>
+
+        <template #footer>
+          <div class="dialog-footer-actions">
             <el-button :loading="clearS3Loading" @click="clearS3">{{ t('clear') }}</el-button>
             <el-button type="primary" :loading="settingLoading && !clearS3Loading" @click="saveS3">{{ t('save') }}</el-button>
           </div>
-        </form>
+        </template>
       </el-dialog>
       <!-- 邮箱前缀规则 Unified Drawer -->
       <el-drawer
@@ -1674,6 +1888,7 @@ import {formatDetailDate} from "@/utils/day.js";
 import {useI18n} from 'vue-i18n';
 import {ElMessageBox, ElMessage} from "element-plus";
 import axios from "axios";
+import { testS3Setting } from "@/request/setting.js";
 
 defineOptions({
   name: 'sys-setting'
@@ -1757,8 +1972,12 @@ const s3 = reactive({
   region: '',
   s3AccessKey: '',
   s3SecretKey: '',
-  forcePathStyle: 1
+  forcePathStyle: 1,
+  customDomain: '',
+  provider: 'backblaze'
 })
+const testingS3 = ref(false)
+const s3TestResult = ref(null)
 
 const noticeForm = reactive({
   noticeTitle: '',
@@ -2361,12 +2580,48 @@ function openRegVerifyCount() {
 }
 
 function resetAddS3Form() {
-  s3.bucket = setting.value.bucket
-  s3.endpoint = setting.value.endpoint
-  s3.region = setting.value.region
+  s3.bucket = setting.value.bucket || ''
+  s3.endpoint = setting.value.endpoint || ''
+  s3.region = setting.value.region || ''
   s3.s3AccessKey = ''
   s3.s3SecretKey = ''
-  s3.forcePathStyle = setting.value.forcePathStyle
+  s3.forcePathStyle = setting.value.forcePathStyle ?? 1
+  s3.customDomain = setting.value.customDomain || ''
+  s3TestResult.value = null
+  testingS3.value = false
+
+  const ep = (s3.endpoint || '').toLowerCase()
+  if (ep.includes('backblazeb2') || ep.includes('backblaze')) {
+    s3.provider = 'backblaze'
+  } else if (ep.includes('amazonaws.com')) {
+    s3.provider = 'aws'
+  } else if (ep.includes('r2.cloudflarestorage.com')) {
+    s3.provider = 'r2'
+  } else {
+    s3.provider = 'backblaze'
+  }
+}
+
+function selectS3Provider(type) {
+  s3.provider = type
+  if (type === 'backblaze') {
+    if (!s3.endpoint || s3.endpoint.includes('amazonaws') || s3.endpoint.includes('r2')) {
+      s3.endpoint = 's3.us-west-004.backblazeb2.com'
+    }
+    if (!s3.region || s3.region === 'us-east-1') s3.region = 'us-west-004'
+    s3.forcePathStyle = 1
+  } else if (type === 'aws') {
+    if (!s3.endpoint || s3.endpoint.includes('backblaze') || s3.endpoint.includes('r2')) {
+      s3.endpoint = 's3.amazonaws.com'
+    }
+    if (!s3.region || s3.region === 'us-west-004') s3.region = 'us-east-1'
+    s3.forcePathStyle = 0
+  } else if (type === 'r2') {
+    if (!s3.region) s3.region = 'auto'
+    s3.forcePathStyle = 1
+  } else if (type === 'custom') {
+    s3.forcePathStyle = 1
+  }
 }
 
 const resendList = computed(() => {
@@ -2726,32 +2981,68 @@ function addChatTag(val) {
 }
 
 function clearS3() {
-
   const form = {
     bucket: '',
     endpoint: '',
     region: '',
     s3AccessKey: '',
     s3SecretKey: '',
-    forcePathStyle: 1
+    forcePathStyle: 1,
+    customDomain: ''
   }
   clearS3Loading.value = true
+  s3TestResult.value = null
   editSetting(form)
 }
 
 function saveS3() {
-
   const form = {
     bucket: s3.bucket,
     endpoint: s3.endpoint,
     region: s3.region,
-    forcePathStyle: s3.forcePathStyle
+    forcePathStyle: s3.forcePathStyle,
+    customDomain: s3.customDomain
   }
 
   if (s3.s3AccessKey) form.s3AccessKey = s3.s3AccessKey
   if (s3.s3SecretKey) form.s3SecretKey = s3.s3SecretKey
 
   editSetting(form)
+}
+
+async function handleTestS3Connection() {
+  const form = {
+    bucket: s3.bucket,
+    endpoint: s3.endpoint,
+    region: s3.region || 'auto',
+    s3AccessKey: s3.s3AccessKey || setting.value.s3AccessKey,
+    s3SecretKey: s3.s3SecretKey || setting.value.s3SecretKey,
+    forcePathStyle: s3.forcePathStyle,
+    customDomain: s3.customDomain
+  }
+
+  if (!form.bucket || !form.endpoint || !form.s3AccessKey || !form.s3SecretKey) {
+    ElMessage.warning(t('s3FillRequiredFields') || '请先填写 Bucket、Endpoint、Access Key 和 Secret Key')
+    return
+  }
+
+  testingS3.value = true
+  s3TestResult.value = null
+  try {
+    const res = await testS3Setting(form)
+    if (res.data) {
+      s3TestResult.value = res.data
+      if (res.data.ok) {
+        ElMessage.success(res.data.message || '连接测试成功！')
+      } else {
+        ElMessage.error(res.data.message || '连接测试失败')
+      }
+    }
+  } catch (err) {
+    ElMessage.error(err.message || '测试连接异常')
+  } finally {
+    testingS3.value = false
+  }
 }
 
 const testingTg = ref(false);
@@ -5281,6 +5572,163 @@ form .el-button {
     color: #ffffff !important;
     font-weight: 700 !important;
     box-shadow: 0 4px 14px rgba(239, 68, 68, 0.4) !important;
+  }
+}
+
+/* Storage Configuration Dialog */
+.storage-config-dialog {
+  .s3-modal-body {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .provider-preset-pills {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    margin-top: 6px;
+
+    .provider-pill {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border-subtle, #e2e8f0);
+      background: var(--bg-surface, #ffffff);
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-primary, #1e293b);
+      transition: all 0.2s ease;
+
+      &:hover {
+        border-color: var(--accent-primary, #3b82f6);
+        background: var(--bg-hover, #f8fafc);
+      }
+
+      &.active {
+        border-color: var(--accent-primary, #3b82f6);
+        background: color-mix(in srgb, var(--accent-primary, #3b82f6) 8%, var(--bg-surface, #ffffff));
+        color: var(--accent-primary, #3b82f6);
+        font-weight: 600;
+      }
+
+      .p-icon {
+        flex-shrink: 0;
+        &.b2 { color: #e11d48; }
+        &.aws { color: #f59e0b; }
+        &.r2 { color: #f97316; }
+        &.custom { color: #8b5cf6; }
+      }
+    }
+  }
+
+  .b2-guidance-box {
+    padding: 10px 14px;
+    border-radius: 8px;
+    background: color-mix(in srgb, #e11d48 7%, var(--bg-surface, #ffffff));
+    border: 1px solid color-mix(in srgb, #e11d48 20%, transparent);
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--text-primary, #334155);
+
+    .g-header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 4px;
+      font-weight: 600;
+      color: #e11d48;
+    }
+
+    code {
+      background: rgba(0, 0, 0, 0.06);
+      padding: 1px 4px;
+      border-radius: 4px;
+      font-size: 11.5px;
+      font-family: monospace;
+    }
+  }
+
+  .dialog-row-2col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .fps-switch-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 36px;
+
+    .fps-label {
+      font-size: 12px;
+      color: var(--text-secondary, #64748b);
+    }
+  }
+
+  .test-action-bar {
+    margin-top: 4px;
+
+    .test-conn-btn {
+      width: 100%;
+      height: 38px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      font-weight: 500;
+      border-radius: 8px;
+    }
+  }
+
+  .test-feedback-box {
+    display: flex;
+    gap: 12px;
+    padding: 12px 14px;
+    border-radius: 8px;
+    margin-top: 4px;
+    font-size: 13px;
+    animation: fadeIn 0.2s ease;
+
+    &.success {
+      background: color-mix(in srgb, #10b981 10%, var(--bg-surface, #ffffff));
+      border: 1px solid color-mix(in srgb, #10b981 25%, transparent);
+      color: #065f46;
+
+      .fb-icon { color: #10b981; }
+    }
+
+    &.error {
+      background: color-mix(in srgb, #ef4444 10%, var(--bg-surface, #ffffff));
+      border: 1px solid color-mix(in srgb, #ef4444 25%, transparent);
+      color: #991b1b;
+
+      .fb-icon { color: #ef4444; }
+    }
+
+    .fb-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 600;
+      margin-bottom: 3px;
+    }
+
+    .fb-msg {
+      font-size: 12px;
+      line-height: 1.5;
+      opacity: 0.9;
+    }
+  }
+
+  .dialog-footer-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
   }
 }
 

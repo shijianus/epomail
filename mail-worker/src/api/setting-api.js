@@ -1,6 +1,7 @@
 import app from '../hono/hono';
 import result from '../model/result';
 import settingService from '../service/setting-service';
+import s3Service from '../service/s3-service';
 import userContext from "../security/user-context";
 
 app.put('/setting/set', async (c) => {
@@ -36,5 +37,11 @@ app.put('/setting/setBlacklist', async (c) => {
 app.post('/setting/sendWelcomeEmail', async (c) => {
 	const res = await settingService.sendWelcomeEmailToAll(c, await c.req.json());
 	return c.json(result.ok(res));
+});
+
+app.post('/setting/s3/test', async (c) => {
+	const body = await c.req.json();
+	const testResult = await s3Service.testConnection(body);
+	return c.json(result.ok(testResult));
 });
 

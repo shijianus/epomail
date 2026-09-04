@@ -12,6 +12,36 @@
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
 
+### Backblaze B2 / S3 多云第三方对象存储接入、用户 BYO Storage 与附件配额体系全量上线 (2026-09-04)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **三方对象存储物理卸载与多级回退架构 (Multi-Tier Storage Architecture)**:
+       - **轻量元数据与大体积附件解耦**: 邮件索引、收发状态、全文搜索等结构化元数据严格保存在 Cloudflare D1 关系型数据库中；大体积邮件附件与二进制文件物理卸载到 Backblaze B2 / AWS S3 / Cloudflare R2 / MinIO 等低成本对象存储。
+       - **多级渐进式存储解析与回退 (Multi-Tier Fallback)**:
+         - **Level 1 (用户 BYO 独享存储)**: 若当前用户在资料页配置并开启了个人专属 Bucket，附件优先存取至用户自己的存储池；
+         - **Level 2 (系统 S3 / Backblaze B2)**: 若管理员在「系统设置」中配置了全站 S3 存储，系统自动将全局入站附件流转至该存储桶；
+         - **Level 3 (Cloudflare R2)**: 自动回退至 Worker 绑定的原生 R2 存储；
+         - **Level 4 (Cloudflare KV / D1)**: 无上述对象存储时平滑退化为原有 KV Base64 存储，保障系统 100% 开箱即用与向下兼容。
+    2. **纯 WebCrypto AWS SigV4 预签名器与 Bandwidth Alliance 0 元流量 CDN 直连**:
+       - **原生 Edge 签名器 (`s3-signer.js`)**: 采用 WebCrypto API (`crypto.subtle`) 纯原生实现 AWS Signature Version 4 预签名与规范请求构造，杜绝厚重的 Node.js AWS SDK 依赖，完美契合 Cloudflare Workers 毫秒级冷启动。
+       - **Bandwidth Alliance 0 元出站流量加速**: 支持配置自定义 CDN 域名（如 Cloudflare CNAME 代理 Backblaze B2 桶），自动生成直连 CDN 签名下载 URL，彻底绕过 Worker 流量消耗，达成 $0 流量出站与全球极速下载。
+    3. **附件用量统计与存储配额管控体系 (Storage Quota System)**:
+       - **细粒度用量聚合 (`storageQuotaService`)**: 实时统计各用户名下附件总字节数 (`usedBytes`)、MB 转换与文件总数，支持根据管理员配置的默认存储配额 (`defaultStorageQuotaMb`) 或用户专属配额 (`storageQuotaMb`) 进行余量拦截与告警。
+       - **全生命周期清理联动**: 邮件/附件删除时自动联动对象存储批量清理与配额即时释放。
+    4. **管理员 S3 配置中心与连通性即时诊断 (Admin Storage Hub)**:
+       - 在系统设置中全新升级「对象存储 (S3 / Backblaze B2)」弹窗，内置 Backblaze B2、AWS S3、Cloudflare R2、自建 MinIO 四大预设模板、B2 接入操作指引、自定义 CDN 域名配置。
+       - **一键连通性探针 (`POST /api/setting/s3/test`)**: 实时向指定存储桶执行 PUT/GET/DELETE 诊断测试，测量真实网络延迟并在前端呈现延迟徽章与排查建议。
+       - 系统设置「用户资料控制」卡片新增「允许用户接入第三方存储 (BYO Storage)」开关与「默认存储配额 (MB)」配置项。
+    5. **个人「资料」分区存储空间仪表盘与 BYO Storage 独立卡片 (`/settings/data`)**:
+       - **存储空间与配额仪表 (`class="quota-meter-card"`)**: 现代圆角进度条、已用 MB / 总配额 MB、百分比药丸指示器、附件文件计数与当前生效的存储引擎徽章。
+       - **用户专属 BYO Storage 卡片 (`class="byo-storage-card"`)**: 当管理员开启开关后，普通用户可在个人资料页自由挂载个人 Backblaze B2 / S3 存储桶，配备一键测试连通性、安全凭据脱敏与即时断开解除托管功能。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **Git Commit Hash**: `fd2e59b84411fb2335cd8cd2e4e6db0077323bed` (Short Hash: `fd2e59b`)。
+    - 生产部署上线 Cloudflare Workers Version ID: `62ec1fce-8430-4f2b-9e5b-4dbae97af7de`。
+    - 自动化测试套件 100% 顺利通过：
+      - `node --loader ./tests/esm-loader.mjs tests/test-s3-b2-storage-and-quota-e2e.mjs` (SigV4 预签名、Provider 自动识别、0 元流量 CDN 路由、管理端/用户端存储连通性诊断、存储配额 API 与资料分区 Playwright 视觉渲染全量通过);
+      - `node --loader ./tests/esm-loader.mjs tests/test-dual-and-single-db-e2e.mjs` (单库退化与双库物理分离 100% 回归通过);
+      - `node tests/test-total-zero-to-one-verification.mjs` (全系统 Phase 1 ~ Phase 6 全量通过)。
+
 ### 后端数据库多库物理分离架构上线与默认单 DB 100% 向下兼容增强 (2026-09-03)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **单库默认开箱即用 + 双库物理分离渐进式解耦 (Single-DB Default & Dual-DB Isolation)**:

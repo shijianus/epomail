@@ -112,9 +112,16 @@ const settingService = {
 		setting.userTgForward = setting.userTgForward !== undefined ? Number(setting.userTgForward) : 1;
 		setting.userEmailForward = setting.userEmailForward !== undefined ? Number(setting.userEmailForward) : 1;
 		setting.userApiSupport = setting.userApiSupport !== undefined ? Number(setting.userApiSupport) : 1;
+		setting.userByoStorage = setting.userByoStorage !== undefined ? Number(setting.userByoStorage) : 1;
+		setting.defaultStorageQuotaMb = setting.defaultStorageQuotaMb !== undefined ? Number(setting.defaultStorageQuotaMb) : 500;
+		setting.storageProvider = setting.storageProvider || 'auto';
 
 		c.set?.('setting', setting);
 		return setting;
+	},
+
+	async getStorageType(c) {
+		return await r2Service.storageType(c);
 	},
 
 	async get(c, showSiteKey = false) {

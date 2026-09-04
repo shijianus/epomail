@@ -38,8 +38,49 @@ const dbInit = {
 		await this.v3_7DB(c);
 		await this.v3_8DB(c);
 		await this.v3_9DB(c);
+		await this.v3_10DB(c);
 		await settingService.refresh(c);
 		return c.text('success');
+	},
+
+	async v3_10DB(c) {
+		const userDb = getUserDb(c);
+		
+		// 1. Setting 表存储扩展字段
+		const settingColumns = [
+			{ name: 'user_byo_storage', sql: `ALTER TABLE setting ADD COLUMN user_byo_storage INTEGER NOT NULL DEFAULT 1;` },
+			{ name: 'default_storage_quota_mb', sql: `ALTER TABLE setting ADD COLUMN default_storage_quota_mb INTEGER NOT NULL DEFAULT 500;` },
+			{ name: 'storage_provider', sql: `ALTER TABLE setting ADD COLUMN storage_provider TEXT NOT NULL DEFAULT 'auto';` }
+		];
+
+		for (const col of settingColumns) {
+			try {
+				const colInfo = await userDb.prepare(`SELECT * FROM pragma_table_info('setting') WHERE name = ? limit 1`).bind(col.name).first();
+				if (!colInfo) {
+					await userDb.prepare(col.sql).run();
+				}
+			} catch (e) {
+				console.warn(`跳过 setting 字段 ${col.name}：${e.message}`);
+			}
+		}
+
+		// 2. User 表用户专属存储与配额字段
+		const userColumns = [
+			{ name: 'storage_quota_mb', sql: `ALTER TABLE user ADD COLUMN storage_quota_mb INTEGER NOT NULL DEFAULT 0;` },
+			{ name: 'byo_storage_enabled', sql: `ALTER TABLE user ADD COLUMN byo_storage_enabled INTEGER NOT NULL DEFAULT 0;` },
+			{ name: 'byo_storage_config', sql: `ALTER TABLE user ADD COLUMN byo_storage_config TEXT NOT NULL DEFAULT '{}';` }
+		];
+
+		for (const col of userColumns) {
+			try {
+				const colInfo = await userDb.prepare(`SELECT * FROM pragma_table_info('user') WHERE name = ? limit 1`).bind(col.name).first();
+				if (!colInfo) {
+					await userDb.prepare(col.sql).run();
+				}
+			} catch (e) {
+				console.warn(`跳过 user 字段 ${col.name}：${e.message}`);
+			}
+		}
 	},
 
 	async v3_9DB(c) {

@@ -27,3 +27,7 @@ export function setBlackList(params) {
 export function sendWelcomeEmail(params) {
     return http.post('/setting/sendWelcomeEmail', params)
 }
+
+export function testS3Setting(params) {
+    return http.post('/setting/s3/test', params)
+}

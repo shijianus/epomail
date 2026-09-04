@@ -278,6 +278,131 @@
       </template>
     </div>
 
+    <!-- Section 3: 存储空间与个人云存储 (Storage Quota & BYO Cloud Storage) -->
+    <div class="container storage-container" id="userStorage">
+      <div class="title">{{ $t('userStorageTitle') || '存储空间与个人云存储' }}</div>
+      <div class="section-intro">
+        {{ $t('userStorageDesc') || '查看个人邮箱附件存储空间配额与使用详情，或接入您自己的 Backblaze B2 / AWS S3 对象存储桶以拓展存储容量并掌控数据。' }}
+      </div>
+
+      <div class="storage-cards-grid">
+        <!-- 1. 存储容量用量仪表卡片 -->
+        <div class="storage-card quota-meter-card">
+          <div class="storage-card-header">
+            <div class="header-icon-title">
+              <div class="st-icon-box quota-icon">
+                <Icon icon="fluent:server-24-filled" width="22" height="22" />
+              </div>
+              <div>
+                <div class="st-title">{{ $t('storageUsageTitle') || '附件存储用量' }}</div>
+                <div class="st-subtitle">{{ storageUsage.fileCount || 0 }} 个附件文件已存储</div>
+              </div>
+            </div>
+            <div class="header-tag">
+              <el-tag :type="storageUsage.byoStorageEnabled ? 'success' : 'info'" effect="plain" round class="status-pill">
+                {{ storageUsage.byoStorageEnabled ? '个人专属存储 (' + (storageUsage.byoStorageConfig?.provider || 'S3') + ')' : '系统默认存储' }}
+              </el-tag>
+            </div>
+          </div>
+
+          <div class="meter-body">
+            <div class="meter-numbers">
+              <span class="used-val">{{ storageUsage.usedMb || '0.00' }} MB</span>
+              <span class="total-val">/ {{ storageUsage.quotaMb === 0 ? '不限容量' : storageUsage.quotaMb + ' MB' }}</span>
+              <span class="pct-badge" :class="{ 'warning': storageUsage.usedPercentage > 80, 'danger': storageUsage.usedPercentage >= 100 }">
+                {{ storageUsage.quotaMb === 0 ? '无限制' : storageUsage.usedPercentage + '%' }}
+              </span>
+            </div>
+            <div class="progress-track" v-if="storageUsage.quotaMb > 0">
+              <div 
+                class="progress-bar-fill" 
+                :style="{ width: Math.min(100, storageUsage.usedPercentage) + '%' }"
+                :class="{ 'warning': storageUsage.usedPercentage > 80, 'danger': storageUsage.usedPercentage >= 100 }"
+              ></div>
+            </div>
+            <div class="meter-footnote">
+              <Icon icon="fluent:info-16-regular" width="14" height="14" />
+              <span>{{ storageUsage.byoStorageEnabled ? '您已启用个人对象存储桶，附件将直接保存在您的专属 Bucket 中，不占用公共配额。' : '当前存储由系统池提供，可按需配置个人 Backblaze B2 获得超大独立空间。' }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. 个人第三方对象存储 (BYO Storage) 接入卡片 (当管理员允许时) -->
+        <div class="storage-card byo-storage-card" v-if="storageUsage.allowUserByo">
+          <div class="storage-card-header">
+            <div class="header-icon-title">
+              <div class="st-icon-box b2-icon">
+                <Icon icon="simple-icons:backblaze" width="20" height="20" />
+              </div>
+              <div>
+                <div class="st-title">{{ $t('byoStorageTitle') || '个人对象存储 (Backblaze B2 / S3)' }}</div>
+                <div class="st-subtitle">{{ storageUsage.byoStorageEnabled ? '已成功绑定个人存储桶' : '接入专属 S3/B2 存储桶代管附件' }}</div>
+              </div>
+            </div>
+            <div class="header-action">
+              <el-button 
+                type="primary" 
+                size="small" 
+                @click="openByoStorageModal"
+                class="config-byo-btn"
+              >
+                <Icon :icon="storageUsage.byoStorageEnabled ? 'fluent:edit-16-filled' : 'fluent:add-circle-16-filled'" width="15" height="15" />
+                <span>{{ storageUsage.byoStorageEnabled ? '修改配置 / 诊断' : '接入存储桶' }}</span>
+              </el-button>
+            </div>
+          </div>
+
+          <div class="byo-status-body" v-if="storageUsage.byoStorageEnabled">
+            <div class="byo-info-grid">
+              <div class="info-row">
+                <span class="i-label">提供商:</span>
+                <span class="i-val bold">{{ storageUsage.byoStorageConfig?.provider || 'Backblaze B2' }}</span>
+              </div>
+              <div class="info-row">
+                <span class="i-label">Bucket:</span>
+                <span class="i-val code">{{ storageUsage.byoStorageConfig?.bucket }}</span>
+              </div>
+              <div class="info-row">
+                <span class="i-label">Endpoint:</span>
+                <span class="i-val code">{{ storageUsage.byoStorageConfig?.endpoint }}</span>
+              </div>
+              <div class="info-row">
+                <span class="i-label">Key ID:</span>
+                <span class="i-val code">{{ storageUsage.byoStorageConfig?.s3AccessKey }}</span>
+              </div>
+            </div>
+            <div class="byo-footer-actions">
+              <el-button 
+                size="small" 
+                type="default" 
+                :loading="testingUserByo" 
+                @click="testCurrentByoConnection"
+              >
+                <Icon icon="fluent:play-circle-16-regular" width="14" height="14" />
+                <span>连通性诊断</span>
+              </el-button>
+              <el-button 
+                size="small" 
+                type="danger" 
+                plain
+                :loading="disconnectingByo" 
+                @click="handleDisconnectByoStorage"
+              >
+                <Icon icon="fluent:link-dismiss-16-regular" width="14" height="14" />
+                <span>解除绑定</span>
+              </el-button>
+            </div>
+          </div>
+
+          <div class="byo-empty-body" v-else>
+            <div class="empty-desc">
+              推荐使用 <strong>Backblaze B2</strong>（提供 10GB 免费空间，与 Cloudflare 享 0 元出站流量费）。配置完成后，您的所有收发附件将直接保存在您个人的云端存储桶中。
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- DIALOG: 个人 Telegram 机器人配置 (Personal TG Bot Modal) -->
     <el-dialog
       v-model="tgSettingDialogShow"
@@ -363,6 +488,181 @@
       </template>
     </el-dialog>
 
+    <!-- DIALOG: 个人对象存储 (Backblaze B2 / S3) 接入配置弹窗 -->
+    <el-dialog 
+      v-model="byoModalShow" 
+      :title="$t('byoStorageConfigModalTitle') || '接入个人对象存储 (Backblaze B2 / S3)'" 
+      width="540px" 
+      @closed="resetByoModalForm"
+      class="storage-config-dialog"
+    >
+      <div class="s3-modal-body">
+        <div class="dialog-field">
+          <div class="d-label-row">
+            <span class="d-field-title">存储服务提供商预设</span>
+            <span class="d-sub-hint">点击快速填入预设模版</span>
+          </div>
+          <div class="provider-preset-pills">
+            <div 
+              class="provider-pill" 
+              :class="{ active: byoForm.provider === 'backblaze' }" 
+              @click="selectUserByoProvider('backblaze')"
+            >
+              <Icon icon="simple-icons:backblaze" width="16" height="16" class="p-icon b2" />
+              <span>Backblaze B2</span>
+            </div>
+            <div 
+              class="provider-pill" 
+              :class="{ active: byoForm.provider === 'aws' }" 
+              @click="selectUserByoProvider('aws')"
+            >
+              <Icon icon="simple-icons:amazons3" width="16" height="16" class="p-icon aws" />
+              <span>AWS S3</span>
+            </div>
+            <div 
+              class="provider-pill" 
+              :class="{ active: byoForm.provider === 'r2' }" 
+              @click="selectUserByoProvider('r2')"
+            >
+              <Icon icon="simple-icons:cloudflare" width="16" height="16" class="p-icon r2" />
+              <span>Cloudflare R2</span>
+            </div>
+            <div 
+              class="provider-pill" 
+              :class="{ active: byoForm.provider === 'custom' }" 
+              @click="selectUserByoProvider('custom')"
+            >
+              <Icon icon="fluent:server-multiple-20-filled" width="16" height="16" class="p-icon custom" />
+              <span>MinIO / 兼容S3</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="b2-guidance-box" v-if="byoForm.provider === 'backblaze'">
+          <div class="g-header">
+            <Icon icon="fluent:sparkle-20-filled" width="16" height="16" class="g-icon" />
+            <span class="g-title">Backblaze B2 接入提示</span>
+          </div>
+          <div class="g-content">
+            • 节点示例：<code>s3.us-west-004.backblazeb2.com</code><br/>
+            • 请在 Backblaze 控制台创建一个存储桶并生成具有 Read & Write 权限的 Application Key。
+          </div>
+        </div>
+
+        <div class="dialog-field">
+          <div class="d-label-row">
+            <span class="d-field-title">存储桶名称 (Bucket) *</span>
+            <span class="d-sub-hint">您在云平台创建的存储桶名</span>
+          </div>
+          <el-input v-model="byoForm.bucket" placeholder="例如: my-mail-storage" clearable />
+        </div>
+
+        <div class="dialog-field">
+          <div class="d-label-row">
+            <span class="d-field-title">服务节点 (Endpoint) *</span>
+            <span class="d-sub-hint">S3 API 接入点 URL</span>
+          </div>
+          <el-input 
+            v-model="byoForm.endpoint" 
+            :placeholder="byoForm.provider === 'backblaze' ? '例如: s3.us-west-004.backblazeb2.com' : '例如: s3.amazonaws.com'" 
+            clearable 
+          />
+        </div>
+
+        <div class="dialog-row-2col">
+          <div class="dialog-field">
+            <div class="d-label-row">
+              <span class="d-field-title">存储区域 (Region)</span>
+              <span class="d-sub-hint">默认 auto</span>
+            </div>
+            <el-input v-model="byoForm.region" placeholder="例如: us-west-004 / auto" clearable />
+          </div>
+
+          <div class="dialog-field">
+            <div class="d-label-row">
+              <span class="d-field-title">ForcePathStyle</span>
+              <span class="d-sub-hint">路径风格还是主机风格</span>
+            </div>
+            <div class="fps-switch-wrapper">
+              <el-switch :active-value="1" :inactive-value="0" v-model="byoForm.forcePathStyle" />
+              <span class="fps-label">{{ byoForm.forcePathStyle === 1 ? '路径风格' : '主机风格' }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="dialog-field">
+          <div class="d-label-row">
+            <span class="d-field-title">{{ byoForm.provider === 'backblaze' ? 'Key ID (Access Key) *' : 'Access Key ID *' }}</span>
+            <span class="d-sub-hint">{{ storageUsage.byoStorageConfig?.s3AccessKey ? '已配置: ' + storageUsage.byoStorageConfig.s3AccessKey : '用于访问签权' }}</span>
+          </div>
+          <el-input 
+            v-model="byoForm.s3AccessKey" 
+            :placeholder="storageUsage.byoStorageConfig?.s3AccessKey || '输入 Key ID / Access Key'" 
+            clearable 
+          />
+        </div>
+
+        <div class="dialog-field">
+          <div class="d-label-row">
+            <span class="d-field-title">{{ byoForm.provider === 'backblaze' ? 'Application Key (Secret Key) *' : 'Secret Access Key *' }}</span>
+            <span class="d-sub-hint">{{ storageUsage.byoStorageConfig?.s3SecretKey ? '已加密配置' : '仅更新时输入' }}</span>
+          </div>
+          <el-input 
+            v-model="byoForm.s3SecretKey" 
+            type="password" 
+            show-password 
+            :placeholder="storageUsage.byoStorageConfig?.s3SecretKey ? '••••••••••••••••' : '输入 Application Key / Secret Key'" 
+            clearable 
+          />
+        </div>
+
+        <div class="dialog-field">
+          <div class="d-label-row">
+            <span class="d-field-title">自定义 CDN 域名 (可选)</span>
+            <span class="d-sub-hint">加速或配合 Cloudflare 免流</span>
+          </div>
+          <el-input v-model="byoForm.customDomain" placeholder="例如: https://cdn.yourdomain.com" clearable />
+        </div>
+
+        <div class="test-action-bar">
+          <el-button 
+            type="default" 
+            :loading="testingUserByo" 
+            @click="handleTestUserByoConnection"
+            class="test-conn-btn"
+          >
+            <Icon icon="fluent:play-circle-20-filled" width="16" height="16" />
+            <span>测试存储连通性与权限</span>
+          </el-button>
+        </div>
+
+        <div v-if="userByoTestResult" class="test-feedback-box" :class="{ success: userByoTestResult.ok, error: !userByoTestResult.ok }">
+          <div class="fb-icon">
+            <Icon :icon="userByoTestResult.ok ? 'fluent:checkmark-circle-20-filled' : 'fluent:dismiss-circle-20-filled'" width="20" height="20" />
+          </div>
+          <div class="fb-content">
+            <div class="fb-title">
+              <span>{{ userByoTestResult.ok ? '连通性诊断通过' : '连接诊断失败' }}</span>
+              <el-tag v-if="userByoTestResult.ok" size="small" type="success" effect="plain" class="latency-pill">
+                ⚡ {{ userByoTestResult.latencyMs }}ms
+              </el-tag>
+              <el-tag v-if="userByoTestResult.provider" size="small" type="info" effect="plain" class="provider-pill-tag">
+                {{ userByoTestResult.provider }}
+              </el-tag>
+            </div>
+            <div class="fb-msg">{{ userByoTestResult.message || userByoTestResult.error }}</div>
+          </div>
+        </div>
+      </div>
+
+      <template #footer>
+        <div class="dialog-footer-actions">
+          <el-button @click="byoModalShow = false">{{ t('cancel') || '取消' }}</el-button>
+          <el-button type="primary" :loading="savingUserByo" @click="handleSaveUserByoStorage">{{ t('save') || '保存并绑定' }}</el-button>
+        </div>
+      </template>
+    </el-dialog>
+
   </div>
 </template>
 
@@ -376,7 +676,11 @@ import { useSettingStore } from '@/store/setting.js'
 import {
   exportUserData,
   testTelegramBot,
-  updateProfile
+  updateProfile,
+  getUserStorage,
+  updateUserStorage,
+  testUserStorage,
+  clearUserStorage
 } from '@/request/my.js'
 import { websiteConfig } from '@/request/setting.js'
 
@@ -420,6 +724,174 @@ const forwardForm = reactive({
   addPrefix: true
 })
 
+// 4. User Storage & BYO Storage States
+const storageUsage = reactive({
+  usedBytes: 0,
+  usedMb: '0.00',
+  quotaMb: 500,
+  quotaBytes: 0,
+  usedPercentage: 0,
+  fileCount: 0,
+  allowUserByo: true,
+  byoStorageEnabled: 0,
+  byoStorageConfig: null,
+  storageType: 'KV'
+})
+
+const byoModalShow = ref(false)
+const testingUserByo = ref(false)
+const savingUserByo = ref(false)
+const disconnectingByo = ref(false)
+const userByoTestResult = ref(null)
+
+const byoForm = reactive({
+  provider: 'backblaze',
+  bucket: '',
+  endpoint: '',
+  region: '',
+  s3AccessKey: '',
+  s3SecretKey: '',
+  forcePathStyle: 1,
+  customDomain: ''
+})
+
+async function fetchUserStorage() {
+  try {
+    const res = await getUserStorage()
+    if (res && res.data) {
+      Object.assign(storageUsage, res.data)
+    }
+  } catch (err) {
+    console.warn('Failed to load user storage:', err)
+  }
+}
+
+function selectUserByoProvider(type) {
+  byoForm.provider = type
+  if (type === 'backblaze') {
+    if (!byoForm.endpoint || byoForm.endpoint.includes('amazonaws') || byoForm.endpoint.includes('r2')) {
+      byoForm.endpoint = 's3.us-west-004.backblazeb2.com'
+    }
+    if (!byoForm.region || byoForm.region === 'us-east-1') byoForm.region = 'us-west-004'
+    byoForm.forcePathStyle = 1
+  } else if (type === 'aws') {
+    if (!byoForm.endpoint || byoForm.endpoint.includes('backblaze') || byoForm.endpoint.includes('r2')) {
+      byoForm.endpoint = 's3.amazonaws.com'
+    }
+    if (!byoForm.region || byoForm.region === 'us-west-004') byoForm.region = 'us-east-1'
+    byoForm.forcePathStyle = 0
+  } else if (type === 'r2') {
+    if (!byoForm.region) byoForm.region = 'auto'
+    byoForm.forcePathStyle = 1
+  } else if (type === 'custom') {
+    byoForm.forcePathStyle = 1
+  }
+}
+
+function openByoStorageModal() {
+  resetByoModalForm()
+  if (storageUsage.byoStorageConfig) {
+    byoForm.bucket = storageUsage.byoStorageConfig.bucket || ''
+    byoForm.endpoint = storageUsage.byoStorageConfig.endpoint || ''
+    byoForm.region = storageUsage.byoStorageConfig.region || ''
+    byoForm.forcePathStyle = storageUsage.byoStorageConfig.forcePathStyle ?? 1
+    byoForm.customDomain = storageUsage.byoStorageConfig.customDomain || ''
+    byoForm.provider = storageUsage.byoStorageConfig.provider === 'AWS S3' ? 'aws' : (storageUsage.byoStorageConfig.provider === 'Cloudflare R2' ? 'r2' : 'backblaze')
+  }
+  byoModalShow.value = true
+}
+
+function resetByoModalForm() {
+  byoForm.provider = 'backblaze'
+  byoForm.bucket = ''
+  byoForm.endpoint = 's3.us-west-004.backblazeb2.com'
+  byoForm.region = 'us-west-004'
+  byoForm.s3AccessKey = ''
+  byoForm.s3SecretKey = ''
+  byoForm.forcePathStyle = 1
+  byoForm.customDomain = ''
+  userByoTestResult.value = null
+  testingUserByo.value = false
+}
+
+async function handleTestUserByoConnection() {
+  if (!byoForm.bucket || !byoForm.endpoint || !byoForm.s3AccessKey || !byoForm.s3SecretKey) {
+    ElMessage.warning('请填写完整的存储桶信息 (Bucket, Endpoint, Key ID, Secret Key)')
+    return
+  }
+
+  testingUserByo.value = true
+  userByoTestResult.value = null
+  try {
+    const res = await testUserStorage(byoForm)
+    if (res.data) {
+      userByoTestResult.value = res.data
+      if (res.data.ok) {
+        ElMessage.success(res.data.message || '存储桶连接测试成功！')
+      } else {
+        ElMessage.error(res.data.message || '连接测试未通过')
+      }
+    }
+  } catch (err) {
+    ElMessage.error(err.message || '测试连接异常')
+  } finally {
+    testingUserByo.value = false
+  }
+}
+
+async function handleSaveUserByoStorage() {
+  if (!byoForm.bucket || !byoForm.endpoint || !byoForm.s3AccessKey || !byoForm.s3SecretKey) {
+    ElMessage.warning('请填写完整的存储桶信息 (Bucket, Endpoint, Key ID, Secret Key)')
+    return
+  }
+
+  savingUserByo.value = true
+  try {
+    const res = await updateUserStorage(byoForm)
+    ElMessage.success(res.message || '个人对象存储绑定成功！')
+    byoModalShow.value = false
+    await fetchUserStorage()
+  } catch (err) {
+    ElMessage.error(err.message || '绑定存储桶失败')
+  } finally {
+    savingUserByo.value = false
+  }
+}
+
+async function testCurrentByoConnection() {
+  testingUserByo.value = true
+  try {
+    const res = await testUserStorage({})
+    if (res.data?.ok) {
+      ElMessage.success(res.data.message || '个人存储桶连通性正常！')
+    } else {
+      ElMessage.error(res.data?.message || '个人存储桶诊断未通过')
+    }
+  } catch (err) {
+    ElMessage.error(err.message || '诊断失败')
+  } finally {
+    testingUserByo.value = false
+  }
+}
+
+async function handleDisconnectByoStorage() {
+  try {
+    await ElMessageBox.confirm('确定要解除绑定的个人对象存储桶吗？解除后系统将恢复使用默认系统存储。', '确认解除绑定', {
+      type: 'warning',
+      confirmButtonText: '确认解除',
+      cancelButtonText: '取消'
+    })
+    disconnectingByo.value = true
+    await clearUserStorage()
+    ElMessage.success('已解除个人存储桶绑定，恢复默认系统存储。')
+    await fetchUserStorage()
+  } catch (e) {
+    // cancelled
+  } finally {
+    disconnectingByo.value = false
+  }
+}
+
 const currentMailMode = ref(0)
 
 const sendQuotaText = computed(() => {
@@ -459,6 +931,7 @@ onMounted(async () => {
     console.error('Failed to load website config:', e)
   }
   initDataFromUserStore()
+  await fetchUserStorage()
 })
 
 function initDataFromUserStore() {
@@ -1265,5 +1738,209 @@ function triggerFileDownload(content, filename, mimeType) {
   font-size: 12.5px;
   color: var(--text-secondary);
   line-height: 1.45;
+}
+
+/* Storage Container & Cards Grid */
+.storage-container {
+  margin-top: 24px;
+
+  .storage-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+    gap: 16px;
+    margin-top: 16px;
+  }
+
+  .storage-card {
+    border-radius: 12px;
+    border: 1px solid var(--border-subtle, #e2e8f0);
+    background: var(--bg-surface, #ffffff);
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+
+    &:hover {
+      border-color: var(--border-mid, #cbd5e1);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+    }
+  }
+
+  .storage-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+
+    .header-icon-title {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+
+      .st-icon-box {
+        width: 42px;
+        height: 42px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+
+        &.quota-icon {
+          background: color-mix(in srgb, #3b82f6 12%, var(--bg-surface, #ffffff));
+          color: #3b82f6;
+        }
+
+        &.b2-icon {
+          background: color-mix(in srgb, #e11d48 12%, var(--bg-surface, #ffffff));
+          color: #e11d48;
+        }
+      }
+
+      .st-title {
+        font-size: 15px;
+        font-weight: 600;
+        color: var(--text-primary, #1e293b);
+        line-height: 1.3;
+      }
+
+      .st-subtitle {
+        font-size: 12px;
+        color: var(--text-secondary, #64748b);
+        margin-top: 2px;
+      }
+    }
+  }
+
+  .meter-body {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+
+    .meter-numbers {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+
+      .used-val {
+        font-size: 22px;
+        font-weight: 700;
+        color: var(--text-primary, #1e293b);
+        letter-spacing: -0.5px;
+      }
+
+      .total-val {
+        font-size: 13.5px;
+        color: var(--text-secondary, #64748b);
+      }
+
+      .pct-badge {
+        margin-left: auto;
+        font-size: 12px;
+        font-weight: 600;
+        padding: 2px 8px;
+        border-radius: 6px;
+        background: color-mix(in srgb, #3b82f6 10%, var(--bg-surface, #ffffff));
+        color: #3b82f6;
+
+        &.warning {
+          background: color-mix(in srgb, #f59e0b 12%, var(--bg-surface, #ffffff));
+          color: #d97706;
+        }
+
+        &.danger {
+          background: color-mix(in srgb, #ef4444 12%, var(--bg-surface, #ffffff));
+          color: #dc2626;
+        }
+      }
+    }
+
+    .progress-track {
+      width: 100%;
+      height: 8px;
+      border-radius: 4px;
+      background: var(--border-subtle, #e2e8f0);
+      overflow: hidden;
+
+      .progress-bar-fill {
+        height: 100%;
+        border-radius: 4px;
+        background: linear-gradient(90deg, #3b82f6 0%, #60a5fa 100%);
+        transition: width 0.4s ease;
+
+        &.warning {
+          background: linear-gradient(90deg, #f59e0b 0%, #fbbf24 100%);
+        }
+
+        &.danger {
+          background: linear-gradient(90deg, #ef4444 0%, #f87171 100%);
+        }
+      }
+    }
+
+    .meter-footnote {
+      display: flex;
+      align-items: flex-start;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--text-secondary, #64748b);
+      line-height: 1.45;
+      margin-top: 2px;
+    }
+  }
+
+  .byo-status-body {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+
+    .byo-info-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px 12px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      background: color-mix(in srgb, var(--accent-primary, #3b82f6) 4%, var(--bg-surface, #ffffff));
+      border: 1px solid var(--border-subtle, #e2e8f0);
+
+      .info-row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        overflow: hidden;
+
+        .i-label {
+          color: var(--text-secondary, #64748b);
+          flex-shrink: 0;
+        }
+
+        .i-val {
+          color: var(--text-primary, #1e293b);
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+
+          &.bold { font-weight: 600; }
+          &.code { font-family: monospace; font-size: 11.5px; }
+        }
+      }
+    }
+
+    .byo-footer-actions {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+  }
+
+  .byo-empty-body {
+    .empty-desc {
+      font-size: 12.5px;
+      color: var(--text-secondary, #64748b);
+      line-height: 1.55;
+    }
+  }
 }
 </style>

@@ -776,6 +776,82 @@ const userService = {
 			profile.apiTokens = profile.apiTokens.filter(t => t.id !== tokenId);
 			await c.env.kv.put('USER_PROFILE_' + userId, JSON.stringify(profile));
 		}
+	},
+
+	async getUserStorage(c, userId) {
+		const storageQuotaService = (await import('./storage-quota-service')).default;
+		return await storageQuotaService.getUserStorageUsage(c, userId);
+	},
+
+	async testUserStorage(c, userId, params) {
+		const settingService = (await import('./setting-service')).default;
+		const settingData = await settingService.query(c);
+		if (Number(settingData.userByoStorage ?? 1) === 0) {
+			throw new BizError('第三方云存储接入功能已被管理员停用 / BYO Storage is disabled', 403);
+		}
+
+		const s3Service = (await import('./s3-service')).default;
+		return await s3Service.testConnection(params);
+	},
+
+	async updateUserStorage(c, userId, params) {
+		const settingService = (await import('./setting-service')).default;
+		const settingData = await settingService.query(c);
+		if (Number(settingData.userByoStorage ?? 1) === 0) {
+			throw new BizError('第三方云存储接入功能已被管理员停用 / BYO Storage is disabled', 403);
+		}
+
+		const { bucket, endpoint, region, s3AccessKey, s3SecretKey, forcePathStyle, customDomain } = params;
+		if (!bucket || !endpoint || !s3AccessKey || !s3SecretKey) {
+			throw new BizError('请填写完整的存储桶信息 (Bucket, Endpoint, Key ID, Secret Key)');
+		}
+
+		const s3Service = (await import('./s3-service')).default;
+		// Test connection before saving
+		const testRes = await s3Service.testConnection({
+			bucket, endpoint, region, s3AccessKey, s3SecretKey, forcePathStyle, customDomain
+		});
+
+		if (!testRes.ok) {
+			throw new BizError(testRes.message || '存储桶连接测试未通过，请检查凭据与权限');
+		}
+
+		const cleanConfig = {
+			bucket: bucket.trim(),
+			endpoint: endpoint.trim(),
+			region: (region || 'auto').trim(),
+			s3AccessKey: s3AccessKey.trim(),
+			s3SecretKey: s3SecretKey.trim(),
+			forcePathStyle: forcePathStyle === 1 || forcePathStyle === true,
+			customDomain: (customDomain || '').trim()
+		};
+
+		const userDb = (await import('../utils/db-accessor')).getUserDb(c);
+		await userDb.prepare(`
+			UPDATE user 
+			SET byo_storage_enabled = 1, byo_storage_config = ? 
+			WHERE user_id = ?
+		`).bind(JSON.stringify(cleanConfig), userId).run();
+
+		return {
+			ok: true,
+			message: '第三方存储配置已成功绑定！',
+			provider: testRes.provider
+		};
+	},
+
+	async clearUserStorage(c, userId) {
+		const userDb = (await import('../utils/db-accessor')).getUserDb(c);
+		await userDb.prepare(`
+			UPDATE user 
+			SET byo_storage_enabled = 0, byo_storage_config = '{}' 
+			WHERE user_id = ?
+		`).bind(userId).run();
+
+		return {
+			ok: true,
+			message: '已解除第三方存储绑定，已恢复使用系统默认存储。'
+		};
 	}
 };
 

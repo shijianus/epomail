@@ -126,4 +126,24 @@ app.delete('/my/apiTokens/:id', async (c) => {
 	return c.json(result.ok());
 });
 
+app.get('/my/storage', async (c) => {
+	const data = await userService.getUserStorage(c, userContext.getUserId(c));
+	return c.json(result.ok(data));
+});
+
+app.post('/my/storage/test', async (c) => {
+	const data = await userService.testUserStorage(c, userContext.getUserId(c), await c.req.json());
+	return c.json(result.ok(data));
+});
+
+app.put('/my/storage', async (c) => {
+	const data = await userService.updateUserStorage(c, userContext.getUserId(c), await c.req.json());
+	return c.json(result.ok(data));
+});
+
+app.delete('/my/storage', async (c) => {
+	const data = await userService.clearUserStorage(c, userContext.getUserId(c));
+	return c.json(result.ok(data));
+});
+
 

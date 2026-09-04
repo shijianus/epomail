@@ -66,7 +66,10 @@ export const setting = sqliteTable('setting', {
 	welcomeLastBroadcast: text('welcome_last_broadcast').default('').notNull(),
 	userTgForward: integer('user_tg_forward').default(1).notNull(),
 	userEmailForward: integer('user_email_forward').default(1).notNull(),
-	userApiSupport: integer('user_api_support').default(1).notNull()
+	userApiSupport: integer('user_api_support').default(1).notNull(),
+	userByoStorage: integer('user_byo_storage').default(1).notNull(),
+	defaultStorageQuotaMb: integer('default_storage_quota_mb').default(500).notNull(),
+	storageProvider: text('storage_provider').default('auto').notNull()
 });
 export default setting
 

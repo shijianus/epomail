@@ -10,25 +10,36 @@ import { v4 as uuidv4 } from 'uuid';
 import domainUtils from '../utils/domain-uitls';
 import settingService from "./setting-service";
 
+import storageQuotaService from './storage-quota-service';
+import { getMailDb } from '../utils/db-accessor';
+
 const attService = {
 
 	async addAtt(c, attachments) {
+		if (!attachments || attachments.length === 0) return;
+
+		const userId = attachments[0]?.userId;
+		if (userId) {
+			const totalIncomingBytes = attachments.reduce((sum, item) => sum + Number(item.size || item.content?.length || 0), 0);
+			const quotaCheck = await storageQuotaService.checkQuotaAvailable(c, userId, totalIncomingBytes);
+			if (!quotaCheck.allowed) {
+				console.warn(`User ${userId} storage quota exceeded: ${quotaCheck.reason}`);
+			}
+		}
 
 		for (let attachment of attachments) {
-
 			let metadate = {
 				contentType: attachment.mimeType,
-			}
+			};
 
 			if (!attachment.contentId) {
-				metadate.contentDisposition = `attachment;filename=${attachment.filename}`
+				metadate.contentDisposition = `attachment;filename=${attachment.filename}`;
 			} else {
-				metadate.contentDisposition = `inline;filename=${attachment.filename}`
-				metadate.cacheControl = `max-age=259200`
+				metadate.contentDisposition = `inline;filename=${attachment.filename}`;
+				metadate.cacheControl = `max-age=259200`;
 			}
 
-			await r2Service.putObj(c, attachment.key, attachment.content, metadate);
-
+			await r2Service.putObj(c, attachment.key, attachment.content, metadate, attachment.userId || userId);
 		}
 
 		await orm(c).insert(att).values(attachments).run();
@@ -168,7 +179,7 @@ const attService = {
 			await r2Service.putObj(c, att.key, att.buff, {
 				contentType: att.type,
 				contentDisposition: `attachment;filename=${att.filename}`
-			});
+			}, userId);
 		}
 
 	},
@@ -187,7 +198,7 @@ const attService = {
 				contentType: attData.mimeType,
 				cacheControl: `max-age=259200`,
 				contentDisposition: `inline;filename=${attData.filename}`
-			});
+			}, userId);
 			delete attData.buff;
 		}
 
@@ -214,13 +225,14 @@ const attService = {
 
 	async removeAttByField(c, fieldName, fieldValues) {
 
+		const mailDb = getMailDb(c);
 		const sqlList = [];
 
 		fieldValues.forEach(value => {
 
 			sqlList.push(
 
-				c.env.db.prepare(
+				mailDb.prepare(
 					`SELECT a.key, a.att_id
 						FROM attachments a
 							   JOIN (SELECT key
@@ -232,11 +244,11 @@ const attService = {
 					).bind(value)
 			)
 
-			sqlList.push(c.env.db.prepare(`DELETE FROM attachments WHERE ${fieldName} = ?`).bind(value))
+			sqlList.push(mailDb.prepare(`DELETE FROM attachments WHERE ${fieldName} = ?`).bind(value))
 
 		});
 
-		const attListResult = await c.env.db.batch(sqlList);
+		const attListResult = await mailDb.batch(sqlList);
 
 		const delKeyList = attListResult.flatMap(r => r.results ? r.results.map(row => row.key) : []);
 
