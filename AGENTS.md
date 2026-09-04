@@ -35,7 +35,7 @@
        - **存储空间与配额仪表 (`class="quota-meter-card"`)**: 现代圆角进度条、已用 MB / 总配额 MB、百分比药丸指示器、附件文件计数与当前生效的存储引擎徽章。
        - **用户专属 BYO Storage 卡片 (`class="byo-storage-card"`)**: 当管理员开启开关后，普通用户可在个人资料页自由挂载个人 Backblaze B2 / S3 存储桶，配备一键测试连通性、安全凭据脱敏与即时断开解除托管功能。
 *   **部署上线与自动化测试 (Verification & Deployment)**:
-    - **Git Commit Hash**: `fd2e59b84411fb2335cd8cd2e4e6db0077323bed` (Short Hash: `fd2e59b`)。
+    - **Git Commit Hash**: `b1a6a0ebe02a5bb196bf5da601a182f022ab1664` (Short Hash: `b1a6a0e`)。
     - 生产部署上线 Cloudflare Workers Version ID: `62ec1fce-8430-4f2b-9e5b-4dbae97af7de`。
     - 自动化测试套件 100% 顺利通过：
       - `node --loader ./tests/esm-loader.mjs tests/test-s3-b2-storage-and-quota-e2e.mjs` (SigV4 预签名、Provider 自动识别、0 元流量 CDN 路由、管理端/用户端存储连通性诊断、存储配额 API 与资料分区 Playwright 视觉渲染全量通过);
