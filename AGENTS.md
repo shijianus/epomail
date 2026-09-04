@@ -31,7 +31,7 @@
        - 所有弹窗增加 `align-center` 属性并设置 `overflow: visible !important`、`margin: auto !important`，紧凑双列网格布局将弹窗主体高度收敛在 ~340px，弹窗内部及外层遮罩 **100% 杜绝任何滑块/垂直滚动条**；
        - 经 Playwright 端到端截图与无头渲染审计，居中光学对称，视觉极其清爽。
 *   **部署上线与自动化测试 (Verification & Deployment)**:
-    - **Git Commit Hash**: `8efb8ac6570c910a3000cecf7e3c8ae9e4438df6` (Short Hash: `8efb8ac`).
+    - **Git Commit Hash**: `e5d1a39bbf2b497d260c7b9d4bce1edcc0c0c918` (Short Hash: `e5d1a39`).
     - 生产部署上线 Cloudflare Workers Version ID: `02335050-5843-4f2e-8175-9c6833261ef6`。
     - 自动化测试套件 100% 顺利通过：
       - `node --loader ./tests/esm-loader.mjs tests/test-storage-and-db-hub-e2e.mjs` (彻底移除 storage-card-actions 验证、行内按钮融入验证、input-number 严格右对齐验证、880px S3 弹窗纯色无滑块 Playwright 截图验证 100% 通过);
