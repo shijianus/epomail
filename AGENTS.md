@@ -11,6 +11,38 @@
    - 在向用户输出回复时，必须置顶/显式打印出本次提交的完整 Commit Hash 与短 Hash，确保版本可追溯、审计记录完整。
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
+### 存储与数据库中心卡片全量优化、真实 KV 深度扫描体检与附件存储流转规则体系上线 (2026-09-04)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **存储与数据库卡片 (`class="card-content"`) 信息清晰化与"未设置"彻底消除**:
+       - 彻底解决此前卡片条目中大量含糊粗糙的“未设置”硬编码问题。
+       - 引入现代语义化降级与状态指示标签：
+         - 存储桶回退展示：`Cloudflare 原生存储 (KV / R2 自动回退)`；
+         - 接入节点回退展示：`Cloudflare 原生边缘直连 (Edge Native)`；
+         - 0元 CDN 域名回退展示：`Worker 边缘流式代理输出 (Worker Stream Proxy)`；
+         - 安全鉴权展示：`WebCrypto 原生 AWS SigV4 预签名鉴权`。
+    2. **真实 KV 深度扫描与存储体检引擎 (`storageScanService.js`)**:
+       - 拒绝硬编码假数据，通过真实的 `c.env.kv.list()` 对全量 KV 键进行深度体检，精确分类统计（附件缓存键、系统配置键、身份鉴权与OAuth令牌键、临时缓存键）；
+       - 深度盘点 D1 数据库 `attachments` 表真实记录总数、占用空间 (MB)、唯一 SHA-256 去重键及文件类型分布（图片、PDF 文档、多媒体音视频、其他归档格式）；
+       - 实时探针探测对象存储（Backblaze B2 / S3 / R2）存活连通性并综合评定系统健康指数（0~100%），毫秒级统计扫描延迟；
+       - 提供安全清理能力 (`POST /api/setting/storage/cleanup`)，安全清除过期无用临时缓存键。
+    3. **附件存储流转规则 (`attachmentPolicy` / `class="section-badge-row db-sec-row"`) 升级**:
+       - 支持三大流转策略：
+         - **Backblaze B2 / S3 对象存储优先（推荐）**: 附件直接物理卸载至低成本海量存储桶，数据库仅保留轻量元数据；
+         - **智能阈值分流模式**: 小文件（<=2MB）就近缓存于 Cloudflare 边缘原生存储，大附件（>2MB）自动路由至对象存储；
+         - **边缘原生存储优先**: 优先落入 Cloudflare R2 / KV，对象存储作为跨云灾备存储池。
+       - 支持设定全站单文件大小上限 (`attachmentMaxSizeMb`) 与级联物理清理开关 (`attachmentCascadeDelete`)。
+       - DDL 幂等升级 `v3_12DB`，平滑增加 `attachment_policy`, `attachment_max_size_mb`, `attachment_cascade_delete` 字段。
+    4. **双 DB 模式与第三方 DB 管理附件目标配置方案支持**:
+       - 支持将纯文本邮件分流至 `MAIL_DB`，用户身份/2FA/OAuth 分流至 `USER_DB`；
+       - 第三方数据库配置弹窗（`dbConfigShow`）分流目标支持 `all` (全库托管)、`mail` (纯文本邮件域托管)、`attachment` (附件与多媒体元数据托管) 与 `user` (用户身份域托管)；
+       - 提供完整的 Backblaze B2 接入配置方案与 CDN 加速指南。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **Git Commit Hash**: `642493aaa738834521999c2768ad615527e82b51` (Short Hash: `642493a`).
+    - 生产部署上线 Cloudflare Workers Version ID: `8af3eb11-b789-4a43-adc7-225f17d5892b`。
+    - 自动化测试套件 100% 顺利通过：
+      - `node --loader ./tests/esm-loader.mjs tests/test-storage-and-db-hub-e2e.mjs` (真实 KV 扫描、存储深度体检、附件存储规则弹窗交互与全链路诊断 100% 通过);
+      - `node --loader ./tests/esm-loader.mjs tests/test-s3-b2-storage-and-quota-e2e.mjs` (Backblaze B2 / S3 接入、SigV4 预签名、CDN 0元流量加速与配额体系 100% 通过);
+      - `node --loader ./tests/esm-loader.mjs tests/test-dual-and-single-db-e2e.mjs` (单库向下兼容与双库物理隔离架构回归 100% 通过)。
 
 ### 系统设置「存储与核心数据库 (Storage & Database Hub)」管理中心全量上线与第三方 DB 接入体系重构 (2026-09-04)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
