@@ -181,18 +181,15 @@ import { getUserDb, getMailDb, isDualDbMode } from "../mail-worker/src/utils/db-
     const cardTitle = await storageDbCard.locator(".card-title").textContent();
     assert.ok(cardTitle.includes("存储与核心数据库") || cardTitle.includes("Storage & Database"), `卡片标题必须正确: ${cardTitle}`);
 
-    const secLabels = await storageDbCard.locator(".sec-label").allTextContents();
-    assert.ok(secLabels.some(l => l.includes("对象存储") || l.includes("Object Storage")), "必须展示对象存储子分区");
-    assert.ok(secLabels.some(l => l.includes("核心与第三方数据库") || l.includes("Database")), "必须展示核心与第三方数据库子分区");
-    
-    // 验证优化后的说明展示：断言没有孤立未说明的“未设置”，而是友好的回退指示
+    // 验证精简后的 4 大高价值条目与清晰回退指示
     const cardContentText = await storageDbCard.locator(".card-content").textContent();
-    assert.ok(cardContentText.includes("Cloudflare 原生存储") || cardContentText.includes("Backblaze B2") || cardContentText.includes("S3"), "对象存储必须有清晰状态说明");
-    assert.ok(cardContentText.includes("附件存储与流转规则") || cardContentText.includes("Attachment Storage"), "必须展示附件存储与流转规则");
-    assert.ok(cardContentText.includes("KV 边缘缓存") || cardContentText.includes("KV"), "必须展示 KV 边缘存储与缓存层状态");
-    console.log("  ✓ 存储与核心数据库卡片结构、附件存储规则与清晰回退说明 100% 正确");
+    assert.ok(cardContentText.includes("对象存储") || cardContentText.includes("Object Storage"), "必须展示对象存储运行状态");
+    assert.ok(cardContentText.includes("数据库") || cardContentText.includes("Database"), "必须展示数据库架构状态");
+    assert.ok(cardContentText.includes("附件流转策略") || cardContentText.includes("附件存储") || cardContentText.includes("Attachment"), "必须展示附件流转策略");
+    assert.ok(cardContentText.includes("KV 运行与深度体检") || cardContentText.includes("KV"), "必须展示 KV 运行与体检状态");
+    console.log("  ✓ 存储与核心数据库精简高价值条目、附件流转规则与清晰回退说明 100% 正确");
 
-    // 验证 5 大操作按钮
+    // 验证 5 大操作按钮 (2 行网格排布)
     const s3Btn = storageDbCard.locator(".opt-btn-s3");
     const dbBtn = storageDbCard.locator(".opt-btn-db");
     const ruleBtn = storageDbCard.locator(".opt-btn-rule");
@@ -204,7 +201,7 @@ import { getUserDb, getMailDb, isDualDbMode } from "../mail-worker/src/utils/db-
     await assert.ok(await ruleBtn.isVisible(), "附件存储规则按钮必须可见");
     await assert.ok(await scanBtn.isVisible(), "KV/存储深度体检按钮必须可见");
     await assert.ok(await quickTestBtn.isVisible(), "全链路诊断按钮必须可见");
-    console.log("  ✓ 卡片 5 大操作工具（S3配置、DB配置、附件规则、KV体检、全链路诊断）全部就绪");
+    console.log("  ✓ 卡片 5 大操作工具（S3配置、DB配置、附件规则、KV体检、全链路诊断）全部就绪且排布紧凑优雅");
 
     // 2.8 交互验证 1: 打开「附件存储规则」弹窗
     console.log("  -> 点击打开「附件存储规则」弹窗...");

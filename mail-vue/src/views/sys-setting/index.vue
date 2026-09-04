@@ -232,7 +232,6 @@
 
 
           <!-- Storage & Core Database Hub Card (存储与核心数据库管理) -->
-          <!-- Storage & Core Database Hub Card (存储与核心数据库管理) -->
           <div class="settings-card storage-db-card">
             <div class="card-title">
               {{ $t('storageAndDb') }}
@@ -241,182 +240,106 @@
               </el-tooltip>
             </div>
             <div class="card-content">
-              <!-- Sub-header: 对象存储 (Object Storage) -->
-              <div class="section-badge-row">
-                <div class="sec-left">
-                  <Icon icon="fluent:cloud-arrow-up-20-regular" width="15" height="15" class="sec-icon" />
-                  <span class="sec-label">{{ $t('objectStorageTitle') }}</span>
-                </div>
-                <el-tag 
-                  :type="setting.bucket ? 'success' : (setting.storageType && setting.storageType.includes('R2') ? 'primary' : 'info')" 
-                  round 
-                  effect="plain" 
-                  class="engine-status-tag"
-                >
-                  <Icon :icon="setting.bucket ? 'fluent:checkmark-circle-16-filled' : 'fluent:info-16-regular'" width="13" height="13" style="margin-right: 4px;" />
-                  {{ setting.storageType || (setting.bucket ? 'Backblaze B2 / S3' : 'Cloudflare R2 / KV') }}
-                </el-tag>
-              </div>
-
-              <!-- Configured Bucket -->
+              <!-- Item 1: 对象存储运行状态 (Object Storage Engine) -->
               <div class="setting-item">
                 <div class="title-item">
-                  <span>{{ $t('storageBucket') }}</span>
+                  <span>{{ $t('objectStorageTitle') }}</span>
+                  <el-tooltip effect="dark" :content="$t('ossDesc')">
+                    <Icon class="warning" icon="fe:warning" width="16" height="16"/>
+                  </el-tooltip>
                 </div>
-                <div class="r2domain">
+                <div class="storage-hub-val">
                   <template v-if="setting.bucket">
-                    <span class="val-text success-highlight">
-                      <Icon icon="fluent:database-checkmark-20-filled" width="14" height="14" style="margin-right: 4px; vertical-align: -2px; color: var(--el-color-success);" />
-                      {{ setting.bucket }}
-                    </span>
-                    <el-tag size="small" type="success" effect="light" style="margin-left: 6px; font-size: 11px;">
-                      {{ getStorageProviderName(setting.endpoint) }}
+                    <el-tag size="small" type="success" effect="light" class="hub-tag">
+                      <Icon icon="fluent:database-checkmark-20-filled" width="13" height="13" style="margin-right: 4px; vertical-align: -1px;" />
+                      Backblaze B2 / S3 ({{ setting.bucket }})
+                    </el-tag>
+                    <el-tag v-if="setting.customDomain" size="small" type="primary" effect="plain" class="hub-sub-tag">0元出站加速</el-tag>
+                  </template>
+                  <template v-else>
+                    <el-tag size="small" type="info" effect="plain" class="hub-tag">
+                      <Icon icon="fluent:shield-task-20-regular" width="13" height="13" style="margin-right: 4px; vertical-align: -1px;" />
+                      {{ setting.hasR2 ? $t('fallbackToNative') : $t('fallbackToKv') }}
+                    </el-tag>
+                  </template>
+                </div>
+              </div>
+
+              <!-- Item 2: 数据库架构与分流状态 (Database Architecture) -->
+              <div class="setting-item">
+                <div class="title-item">
+                  <span>{{ $t('databaseArchTitle') }}</span>
+                  <el-tooltip effect="dark" :content="setting.externalDbEnabled === 1 ? $t('dbModeExternalDesc') : (dbStatusInfo?.isDual ? $t('dbModeDualDesc') : $t('dbSingleDescTooltip'))">
+                    <Icon class="warning" icon="fe:warning" width="16" height="16"/>
+                  </el-tooltip>
+                </div>
+                <div class="storage-hub-val">
+                  <template v-if="setting.externalDbEnabled === 1">
+                    <el-tag size="small" type="warning" effect="light" class="hub-tag">
+                      <Icon icon="fluent:plug-connected-16-filled" width="13" height="13" style="margin-right: 4px; vertical-align: -1px;" />
+                      {{ $t('dbModeExternal') }} ({{ setting.externalDbName || setting.externalDbProvider || 'Turso' }})
+                    </el-tag>
+                  </template>
+                  <template v-else-if="dbStatusInfo?.isDual">
+                    <el-tag size="small" type="success" effect="light" class="hub-tag">
+                      <Icon icon="fluent:split-horizontal-16-filled" width="13" height="13" style="margin-right: 4px; vertical-align: -1px;" />
+                      {{ $t('dbModeDual') }}
                     </el-tag>
                   </template>
                   <template v-else>
-                    <span class="val-text fallback-text">
-                      <Icon icon="fluent:shield-task-20-regular" width="14" height="14" style="margin-right: 4px; vertical-align: -2px;" />
-                      {{ setting.hasR2 ? $t('fallbackToNative') : $t('fallbackToKv') }}
-                    </span>
+                    <el-tag size="small" type="primary" effect="plain" class="hub-tag">
+                      <Icon icon="fluent:database-16-filled" width="13" height="13" style="margin-right: 4px; vertical-align: -1px;" />
+                      {{ $t('dbModeSingle') }}
+                    </el-tag>
                   </template>
                 </div>
               </div>
 
-              <!-- Configured Endpoint -->
-              <div class="setting-item">
-                <div class="title-item">
-                  <span>{{ $t('storageEndpoint') }}</span>
-                </div>
-                <div class="r2domain">
-                  <span class="val-text code-text" :class="{ 'fallback-code': !setting.endpoint }">
-                    {{ setting.endpoint || $t('nativeEdgeDirect') }}
-                  </span>
-                </div>
-              </div>
-
-              <!-- CDN Zero Egress Domain -->
-              <div class="setting-item">
-                <div class="title-item">
-                  <span>{{ $t('storageCdnDomain') }}</span>
-                  <el-tooltip effect="dark" :content="$t('customCdnDomainHint')">
-                    <Icon class="warning" icon="fe:warning" width="18" height="18"/>
-                  </el-tooltip>
-                </div>
-                <div class="r2domain">
-                  <template v-if="setting.customDomain">
-                    <span class="val-text code-text direct-link">
-                      <Icon icon="fluent:link-20-filled" width="13" height="13" style="margin-right: 3px; vertical-align: -1px; color: var(--el-color-primary);" />
-                      {{ setting.customDomain }}
-                    </span>
-                    <el-tag size="small" type="primary" effect="plain" style="margin-left: 6px; font-size: 11px;">0元出站加速</el-tag>
-                  </template>
-                  <template v-else>
-                    <span class="val-text fallback-text">
-                      {{ $t('workerStreamProxy') }}
-                    </span>
-                  </template>
-                </div>
-              </div>
-
-              <!-- S3 WebCrypto Auth Key -->
-              <div class="setting-item">
-                <div class="title-item">
-                  <span>{{ $t('s3AccessKeyId') }}</span>
-                </div>
-                <div class="r2domain">
-                  <span class="val-text" :class="setting.s3AccessKey ? 'code-text' : 'fallback-text'">
-                    {{ setting.s3AccessKey ? setting.s3AccessKey + ' (' + $t('sigv4Configured') + ')' : $t('nativeSecurityAuth') }}
-                  </span>
-                </div>
-              </div>
-
-              <!-- Sub-header: 核心与第三方数据库 (Core & Third-party Database) -->
-              <div class="section-badge-row db-sec-row">
-                <div class="sec-left">
-                  <Icon icon="fluent:database-link-20-regular" width="15" height="15" class="sec-icon db" />
-                  <span class="sec-label">{{ $t('databaseArchTitle') }}</span>
-                </div>
-                <el-tag 
-                  :type="setting.externalDbEnabled === 1 ? 'warning' : (dbStatusInfo?.isDual ? 'success' : 'primary')" 
-                  round 
-                  effect="plain" 
-                  class="engine-status-tag"
-                >
-                  <Icon :icon="setting.externalDbEnabled === 1 ? 'fluent:plug-connected-16-filled' : (dbStatusInfo?.isDual ? 'fluent:split-horizontal-16-filled' : 'fluent:database-16-filled')" width="13" height="13" style="margin-right: 4px;" />
-                  {{ setting.externalDbEnabled === 1 ? $t('dbModeExternal') : (dbStatusInfo?.isDual ? $t('dbModeDual') : $t('dbModeSingle')) }}
-                </el-tag>
-              </div>
-
-              <!-- User DB Domain -->
-              <div class="setting-item">
-                <div class="title-item">
-                  <span>{{ $t('dbUserDomain') }}</span>
-                  <el-tooltip effect="dark" :content="$t('dbUserDomainDetail')">
-                    <Icon class="warning" icon="fe:warning" width="18" height="18"/>
-                  </el-tooltip>
-                </div>
-                <div class="r2domain">
-                  <span class="val-text code-text domain-active">
-                    <Icon icon="fluent:person-key-20-regular" width="14" height="14" style="margin-right: 4px; vertical-align: -2px; color: var(--el-color-primary);" />
-                    {{ dbStatusInfo?.userDb?.name || 'USER_DB (D1)' }}
-                  </span>
-                </div>
-              </div>
-
-              <!-- Mail DB Domain -->
-              <div class="setting-item">
-                <div class="title-item">
-                  <span>{{ $t('dbMailDomain') }}</span>
-                  <el-tooltip effect="dark" :content="$t('dbMailDomainDetail')">
-                    <Icon class="warning" icon="fe:warning" width="18" height="18"/>
-                  </el-tooltip>
-                </div>
-                <div class="r2domain">
-                  <span class="val-text code-text domain-active">
-                    <Icon icon="fluent:mail-multiple-20-regular" width="14" height="14" style="margin-right: 4px; vertical-align: -2px; color: #10b981;" />
-                    {{ setting.externalDbEnabled === 1 ? (setting.externalDbName || setting.externalDbProvider) : (dbStatusInfo?.mailDb?.name || 'MAIL_DB (D1)') }}
-                  </span>
-                </div>
-              </div>
-
-              <!-- Attachment Storage Rules Item (附件存储与流转规则) -->
+              <!-- Item 3: 附件存储流转策略 (Attachment Storage Policy) -->
               <div class="setting-item">
                 <div class="title-item">
                   <span>{{ $t('attachmentStorageRule') }}</span>
                   <el-tooltip effect="dark" :content="$t('attachmentStorageRuleDesc')">
-                    <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+                    <Icon class="warning" icon="fe:warning" width="16" height="16"/>
                   </el-tooltip>
                 </div>
                 <div class="forward">
-                  <el-tag size="small" :type="setting.attachmentPolicy === 1 ? 'warning' : (setting.attachmentPolicy === 2 ? 'info' : 'success')" effect="plain">
-                    {{ setting.attachmentPolicy === 1 ? $t('policySmartTier') : (setting.attachmentPolicy === 2 ? $t('policyEdgeFirst') : $t('policyB2First')) }}
-                  </el-tag>
+                  <template v-if="setting.bucket">
+                    <el-tag size="small" :type="setting.attachmentPolicy === 1 ? 'warning' : (setting.attachmentPolicy === 2 ? 'info' : 'success')" effect="light" class="hub-tag">
+                      {{ setting.attachmentPolicy === 1 ? $t('policySmartTier') : (setting.attachmentPolicy === 2 ? $t('policyEdgeFirst') : $t('policyB2First')) }}
+                    </el-tag>
+                  </template>
+                  <template v-else>
+                    <el-tag size="small" type="info" effect="plain" class="hub-tag">
+                      {{ $t('attachmentPolicyNativeFallback') }}
+                    </el-tag>
+                  </template>
                   <el-button class="opt-button" size="small" type="primary" @click="openAttachmentRuleDialog" :title="$t('attachmentRuleBtn')">
-                    <Icon icon="fluent:rules-20-filled" width="16" height="16"/>
+                    <Icon icon="fluent:options-20-regular" width="16" height="16"/>
                   </el-button>
                 </div>
               </div>
 
-              <!-- KV Storage & Cache Layer -->
+              <!-- Item 4: KV 边缘存储与深度体检 (KV Layer & Health Inspection) -->
               <div class="setting-item">
                 <div class="title-item">
                   <span>{{ $t('kvLayerActive') }}</span>
                   <el-tooltip effect="dark" :content="$t('storageScanDesc')">
-                    <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+                    <Icon class="warning" icon="fe:warning" width="16" height="16"/>
                   </el-tooltip>
                 </div>
                 <div class="forward">
                   <span class="val-text fallback-text">
-                    <Icon icon="fluent:flash-checkmark-20-filled" width="14" height="14" style="margin-right: 3px; vertical-align: -2px; color: #eab308;" />
+                    <Icon icon="fluent:flash-checkmark-20-filled" width="14" height="14" style="margin-right: 4px; vertical-align: -2px; color: #eab308;" />
                     {{ $t('kvLayerStatusActive') }}
                   </span>
                   <el-button class="opt-button" size="small" type="primary" @click="openStorageScanDialog" :title="$t('storageScanBtn')">
-                    <Icon icon="fluent:scan-text-20-filled" width="16" height="16"/>
+                    <Icon icon="fluent:scan-camera-16-regular" width="16" height="16"/>
                   </el-button>
                 </div>
               </div>
 
-              <!-- Action Toolbar at bottom of Card -->
+              <!-- Action Toolbar at bottom of Card (2 Rows Compact Layout) -->
               <div class="storage-card-actions">
                 <el-button class="opt-btn-main opt-btn-s3" size="small" type="primary" @click="openAddS3">
                   <Icon icon="fluent:server-multiple-20-regular" width="14" height="14" style="margin-right: 4px;" />
@@ -426,18 +349,20 @@
                   <Icon icon="fluent:database-arrow-right-20-regular" width="14" height="14" style="margin-right: 4px;" />
                   {{ $t('dbConfiguration') }}
                 </el-button>
-                <el-button class="opt-btn-rule" size="small" type="default" @click="openAttachmentRuleDialog">
-                  <Icon icon="fluent:rules-20-regular" width="14" height="14" style="margin-right: 4px;" />
-                  {{ $t('attachmentRuleBtn') }}
-                </el-button>
-                <el-button class="opt-btn-scan" size="small" type="default" :loading="scanningStorage" @click="openStorageScanDialog">
-                  <Icon icon="fluent:scan-camera-16-regular" width="14" height="14" style="margin-right: 4px;" />
-                  {{ $t('storageScanBtn') }}
-                </el-button>
-                <el-button class="opt-btn-test" size="small" type="default" :loading="testingStorageQuick" @click="handleQuickTestStorageAndDb" :title="$t('storageAndDbQuickTest')">
-                  <Icon icon="fluent:play-circle-16-regular" width="14" height="14" style="margin-right: 2px;" />
-                  {{ $t('storageAndDbQuickTest') }}
-                </el-button>
+                <div class="opt-tools-row">
+                  <el-button class="opt-btn-rule" size="small" type="default" @click="openAttachmentRuleDialog">
+                    <Icon icon="fluent:rules-20-regular" width="13" height="13" style="margin-right: 3px;" />
+                    {{ $t('attachmentRuleBtn') }}
+                  </el-button>
+                  <el-button class="opt-btn-scan" size="small" type="default" :loading="scanningStorage" @click="openStorageScanDialog">
+                    <Icon icon="fluent:scan-camera-16-regular" width="13" height="13" style="margin-right: 3px;" />
+                    {{ $t('storageScanBtn') }}
+                  </el-button>
+                  <el-button class="opt-btn-test" size="small" type="default" :loading="testingStorageQuick" @click="handleQuickTestStorageAndDb" :title="$t('storageAndDbQuickTest')">
+                    <Icon icon="fluent:play-circle-16-regular" width="13" height="13" style="margin-right: 3px;" />
+                    {{ $t('storageAndDbQuickTest') }}
+                  </el-button>
+                </div>
               </div>
             </div>
           </div>
@@ -2055,6 +1980,17 @@
             </div>
           </div>
 
+          <!-- Notice when external DB is disabled -->
+          <div class="b2-guidance-box" style="margin-top: 10px; margin-bottom: 10px;" v-if="dbForm.provider !== 'd1' && dbForm.enabled !== 1">
+            <div class="g-header">
+              <Icon icon="fluent:info-20-filled" width="16" height="16" class="g-icon" />
+              <span class="g-title">{{ $t('dbExternalDisabled') }}</span>
+            </div>
+            <div class="g-content">
+              {{ $t('dbDisabledNotice') }}
+            </div>
+          </div>
+
           <!-- External DB Endpoint & Auth Fields -->
           <template v-if="dbForm.provider !== 'd1' && dbForm.enabled === 1">
             <div class="dialog-field">
@@ -2166,6 +2102,17 @@
         class="storage-config-dialog attachment-rule-dialog"
       >
         <div class="s3-modal-body">
+          <!-- Notice when external S3 is not configured -->
+          <div class="b2-guidance-box" style="margin-bottom: 12px;" v-if="!setting.bucket">
+            <div class="g-header">
+              <Icon icon="fluent:info-20-filled" width="16" height="16" class="g-icon" />
+              <span class="g-title">{{ $t('attachmentRuleNoS3Title') }}</span>
+            </div>
+            <div class="g-content">
+              {{ $t('attachmentRuleNoS3Desc') }}
+            </div>
+          </div>
+
           <div class="dialog-field">
             <div class="d-label-row">
               <span class="d-field-title">{{ $t('attachmentPolicyLabel') }}</span>
@@ -6698,37 +6645,67 @@ form .el-button {
     letter-spacing: 0.2px;
   }
 
-  .storage-card-actions {
+  .storage-hub-val {
     display: flex;
-    flex-wrap: wrap;
     align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+    flex-wrap: wrap;
+
+    .hub-tag {
+      display: inline-flex;
+      align-items: center;
+      font-size: 11.5px;
+      font-weight: 500;
+      border-radius: 6px;
+      max-width: 240px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .hub-sub-tag {
+      font-size: 10.5px;
+      padding: 0 4px;
+      height: 20px;
+      line-height: 18px;
+    }
+  }
+
+  .storage-card-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
     gap: 8px;
-    margin-top: 14px;
-    padding-top: 12px;
+    margin-top: 12px;
+    padding-top: 10px;
     border-top: 1px dashed var(--el-border-color-lighter);
 
     .opt-btn-main {
-      flex: 1 1 calc(50% - 4px);
-      font-weight: 600;
-      font-size: 12px;
-      height: 32px;
-      padding: 0 6px;
-    }
-
-    .opt-btn-rule, .opt-btn-scan {
-      flex: 1 1 calc(50% - 4px);
-      height: 32px;
-      font-size: 12px;
-      font-weight: 500;
-      padding: 0 6px;
-    }
-
-    .opt-btn-test {
-      width: 100%;
-      height: 32px;
+      height: 30px;
       font-size: 12px;
       font-weight: 600;
-      margin-top: 2px;
+      padding: 0 8px;
+      border-radius: 6px;
+      margin: 0;
+    }
+
+    .opt-tools-row {
+      grid-column: span 2;
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 6px;
+
+      .el-button {
+        height: 28px;
+        font-size: 11.5px;
+        font-weight: 500;
+        padding: 0 4px;
+        margin: 0;
+        border-radius: 6px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
     }
   }
 }
