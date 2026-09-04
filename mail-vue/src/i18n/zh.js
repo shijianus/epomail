@@ -1172,6 +1172,21 @@ const zh = {
     d1TotalAttachments: '附件记录总数',
     d1TotalSize: '附件总容量 (MB)',
     d1DistinctKeys: '去重文件数 (SHA-256)',
+    // Storage Scan & Domains Beginner-Friendly Guidance (小白通俗化指南与多域解读)
+    beginnerArchGuideTitle: '小白通俗解读：什么是 3 大核心 DB 域？',
+    beginnerArchGuideDesc: '为了保障超高安全与海量信件极速收发，Epomail 采用现代化多域解耦架构：',
+    userDbSimpleExplain: '👤 用户域 (身份保险箱)：专门安全存放登录账号、哈希密码、2FA 密钥与安全凭据，与邮件正文隔离，保障最高安全。',
+    mailDbSimpleExplain: '✉️ 信件域 (邮件收发库)：专门存放邮件往来列表、纯文本正文与邮箱号，支持 D1 单/双库或外接第三方数据库 (Turso 等)。',
+    attachmentDbSimpleExplain: '📎 附件域 (文件存储柜)：专门存放图片、PDF 与多媒体大文件，直接流转至 Backblaze B2 / S3 节省开销并享 0 元免流下载。',
+    dbDomainExplainTip: '通俗理解',
+    userDomainTipText: '核心身份安全数据，支持 D1 物理独立存储与 KV 极速验证缓存。',
+    mailDomainTipText: '收发的纯文本邮件与号池，支持单库/双库分流或外接 Turso 数据库。',
+    attachmentDomainTipText: '邮件大附件直接保存在云端对象存储桶中，零占用 D1 数据库容量。',
+    dbThirdPartyTutorialBtn: '第三方数据库接入教程与双库配置指南',
+    dbTutorialModalTitle: '第三方数据库 (Turso / LibSQL) 接入与双 DB 配置指南',
+
+    kvStorageSimpleExplain: '💡 什么是 KV 边缘缓存？部署在离您最近的高速临时缓存，专门用来毫秒级加速登录、验证与系统配置。',
+    d1StorageSimpleExplain: '💡 什么是 D1 与对象存储？用于长期持久保存邮件正文与大附件的云端存储柜。',
     d1MimeDistribution: '文件类型分布',
     d1Images: '图片类文件',
     d1Pdfs: 'PDF / 文档类',
@@ -1181,6 +1196,7 @@ const zh = {
     cleanupStorageBtn: '安全清理临时缓存',
     cleanupStorageConfirm: '确定要清理已过期的临时缓存与验证记录吗？系统将安全释放 KV 边缘存储。',
     cleanupStorageDone: '临时缓存安全清理完成',
+    cleanupSafeTip: '💡 安全保障：一键清理仅移除已过期的无用临时验证记录，绝不会删除任何用户的邮件、账号或附件！',
 
 
     // Data Setting & Storage (用户资料页存储)

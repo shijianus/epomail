@@ -1188,6 +1188,23 @@ const en = {
     cleanupStorageBtn: 'Safely Clean Temp Cache',
     cleanupStorageConfirm: 'Are you sure you want to clean expired temporary verify keys? This will safely free KV storage.',
     cleanupStorageDone: 'Temporary cache safely cleaned',
+    cleanupSafeTip: '💡 Safety Guarantee: Cleaning only deletes expired verification temp tokens, never removes any user emails, accounts, or attachments!',
+
+    // Storage Scan & Domains Beginner-Friendly Guidance
+    beginnerArchGuideTitle: 'Beginner Architecture Guide: What are the 3 Core DB Domains?',
+    beginnerArchGuideDesc: 'To provide high security and ultra-fast email processing, Epomail decouples data into 3 distinct core domains:',
+    userDbSimpleExplain: '👤 User DB (Identity Vault): Securely stores accounts, passwords, 2FA keys, and credentials isolated from emails for highest security.',
+    mailDbSimpleExplain: '✉️ Mail DB (Email Hub): Stores email lists, text contents, and account pools. Supports single/dual D1 or external databases (Turso, etc.).',
+    attachmentDbSimpleExplain: '📎 Attachment DB (File Storage): Stores images, PDFs, and large media directly offloaded to Backblaze B2 / S3 with zero-egress CDN speedup.',
+    dbDomainExplainTip: 'Simple Explanation',
+    userDomainTipText: 'Core user credentials with physical D1 isolation & KV speedup.',
+    mailDomainTipText: 'Email contents with dual-db routing or Turso cloud scaling.',
+    attachmentDomainTipText: 'Files stored in object storage with zero D1 capacity usage.',
+    dbThirdPartyTutorialBtn: 'Third-Party DB Tutorial & Dual-DB Setup Guide',
+    dbTutorialModalTitle: 'Third-Party DB (Turso / LibSQL) & Dual-DB Setup Guide',
+
+    kvStorageSimpleExplain: '💡 What is KV Edge Cache? Ultra-fast temporary cache deployed close to users for millisecond-level login & config lookup.',
+    d1StorageSimpleExplain: '💡 What is D1 & Object Storage? Cloud database and storage buckets used for persistent emails and big attachments.',
 
 
     // Data Setting & Storage (用户资料页存储)

@@ -12,6 +12,31 @@
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
 
+### 小白通俗化存储与数据库架构透视弹窗升级、第三方 DB 交互式教程与单双库物理分流上线 (2026-09-04)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **弹窗小白通俗化全面重构 (`db-domains-dialog` / `storage-scan-dialog`)**:
+       - 彻底解决技术术语生涩晦涩问题，引入直观生活化比喻与场景化白话解释：
+         - **用户域数据库 (User DB)** 标注为「🔐 用户身份与安全保险箱」，通俗解释为“专门存放账号、密码、2FA 双重认证与登录通行证，与信件物理隔离”；
+         - **信件域数据库 (Mail DB)** 标注为「📬 邮件内容与号池收发库」，通俗解释为“专门存放邮件列表、纯文本内容与收发邮箱号”；
+         - **附件域存储 (Attachment DB)** 标注为「🗄️ 多媒体大文件存储柜」，通俗解释为“存放图片、PDF、音视频大附件，支持外接 Backblaze B2 享 0 元出站流量”；
+         - **KV 边缘缓存** 标注为「⚡ 毫秒级高速缓存（临时加速）」，**D1 数据库** 标注为「💾 关系型持久数据库（长期存放）」。
+       - 体检弹窗新增绿色盾牌「安全保障承诺：深度扫描与清理仅针对临时无用会话，绝不影响或删除您的任何正式邮件与账号数据」。
+    2. **内置全链路「数据库接入与配置指南」交互式教程弹窗 (`class="db-tutorial-dialog"`)**:
+       - 在架构透视弹窗与系统设置中加入直观的教程引导入口，提供 3 大极简实操方案：
+         - **🌟 方案 A: 接入 Turso (LibSQL) 3 分钟极速指南 (推荐 - 网页即可配置)**：详细拆解注册 Turso、创建数据库、获取 libsql:// 端点与 Auth Token、在 Epomail 网页设置中一键填入并诊断的完整流程；
+         - **⚡ 方案 B: Cloudflare 原生双 D1 数据库物理隔离 (`USER_DB` + `MAIL_DB`)**：提供 `wrangler d1 create epomail-user` 与 `wrangler d1 create epomail-mail` 命令模板与 `wrangler.toml` 绑定范式；
+         - **🛡️ 方案 C: 附件外接 Backblaze B2 对象存储 (0元 CDN 免流)**：讲解创建 B2 桶、Application Key 授权与 Cloudflare CDN 0 元出站流量加速配合方案。
+    3. **单双库无缝退化与 100% 稳健兼容**:
+       - 系统默认仅需 1 个 D1 数据库 (`db`) 即可完美开箱即用，通过 `getUserDb(c)` 与 `getMailDb(c)` 自动统一退化；
+       - 当站长配置双库时系统自动分流，跨库数据通过内存水合（`allEmail` Hydration）与并行聚合，兼具超高安全隔离性与卓越性能。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **Git Commit Hash**: `9cb725717ec111e4bd184423f32944e355de8934` (Short Hash: `9cb7257`).
+    - 生产部署上线 Cloudflare Workers Version ID: `c3a4999c-8c3e-4fe0-b92d-392edaabfee2`。
+    - 自动化测试套件 100% 顺利通过：
+      - `node --loader ./tests/esm-loader.mjs tests/test-storage-and-db-hub-e2e.mjs` (小白通俗化弹窗、3 大核心域透视、单行操作栏、附件规则与真实 KV 深度体检 100% 通过);
+      - `node --loader ./tests/esm-loader.mjs tests/test-dual-and-single-db-e2e.mjs` (单库向下兼容与双库物理隔离架构 100% 通过);
+      - `node --loader ./tests/esm-loader.mjs tests/test-s3-b2-storage-and-quota-e2e.mjs` (Backblaze B2 / S3 接入、SigV4 预签名、配额体系 100% 通过)。
+
 ### 3大核心域 DB 架构透视弹窗上线与存储操作栏单行极简重构 (2026-09-04)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **3 大核心域 DB 架构透视弹窗 (`class="db-domains-dialog"`)**:
