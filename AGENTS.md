@@ -33,7 +33,7 @@
        - 后端 `dbService.getDbStatus` 全量返回 structured `domains`；
        - `zh.js` 与 `en.js` 完备覆盖多域透视相关中英文对照。
 *   **部署上线与自动化测试 (Verification & Deployment)**:
-    - **Git Commit Hash**: PENDING_COMMIT_HASH.
+    - **Git Commit Hash**: `558e02ff773e9be06ae7e5597bac7f5cdf491ce1` (Short Hash: `558e02f`).
     - 生产部署上线 Cloudflare Workers Version ID: `b4a7c587-0af8-4118-b036-8731311cb2b9`。
     - 自动化测试套件 100% 顺利通过：
       - `node --loader ./tests/esm-loader.mjs tests/test-storage-and-db-hub-e2e.mjs` (3 大核心域透视弹窗、单行操作栏 3 按钮、附件规则与真实 KV 深度体检 100% 通过);
