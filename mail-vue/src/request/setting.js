@@ -39,3 +39,11 @@ export function getDbStatus() {
 export function testDbSetting(params) {
     return http.post('/setting/db/test', params)
 }
+
+export function scanStorage() {
+    return http.post('/setting/storage/scan')
+}
+
+export function cleanupStorage() {
+    return http.post('/setting/storage/cleanup')
+}

@@ -232,6 +232,7 @@
 
 
           <!-- Storage & Core Database Hub Card (存储与核心数据库管理) -->
+          <!-- Storage & Core Database Hub Card (存储与核心数据库管理) -->
           <div class="settings-card storage-db-card">
             <div class="card-title">
               {{ $t('storageAndDb') }}
@@ -263,9 +264,21 @@
                   <span>{{ $t('storageBucket') }}</span>
                 </div>
                 <div class="r2domain">
-                  <span class="val-text" :class="{ 'empty-text': !setting.bucket }">
-                    {{ setting.bucket || $t('notSet') }}
-                  </span>
+                  <template v-if="setting.bucket">
+                    <span class="val-text success-highlight">
+                      <Icon icon="fluent:database-checkmark-20-filled" width="14" height="14" style="margin-right: 4px; vertical-align: -2px; color: var(--el-color-success);" />
+                      {{ setting.bucket }}
+                    </span>
+                    <el-tag size="small" type="success" effect="light" style="margin-left: 6px; font-size: 11px;">
+                      {{ getStorageProviderName(setting.endpoint) }}
+                    </el-tag>
+                  </template>
+                  <template v-else>
+                    <span class="val-text fallback-text">
+                      <Icon icon="fluent:shield-task-20-regular" width="14" height="14" style="margin-right: 4px; vertical-align: -2px;" />
+                      {{ setting.hasR2 ? $t('fallbackToNative') : $t('fallbackToKv') }}
+                    </span>
+                  </template>
                 </div>
               </div>
 
@@ -275,8 +288,8 @@
                   <span>{{ $t('storageEndpoint') }}</span>
                 </div>
                 <div class="r2domain">
-                  <span class="val-text code-text" :class="{ 'empty-text': !setting.endpoint }">
-                    {{ setting.endpoint || 'Cloudflare Native' }}
+                  <span class="val-text code-text" :class="{ 'fallback-code': !setting.endpoint }">
+                    {{ setting.endpoint || $t('nativeEdgeDirect') }}
                   </span>
                 </div>
               </div>
@@ -290,8 +303,29 @@
                   </el-tooltip>
                 </div>
                 <div class="r2domain">
-                  <span class="val-text code-text" :class="{ 'empty-text': !setting.customDomain }">
-                    {{ setting.customDomain || $t('notSet') }}
+                  <template v-if="setting.customDomain">
+                    <span class="val-text code-text direct-link">
+                      <Icon icon="fluent:link-20-filled" width="13" height="13" style="margin-right: 3px; vertical-align: -1px; color: var(--el-color-primary);" />
+                      {{ setting.customDomain }}
+                    </span>
+                    <el-tag size="small" type="primary" effect="plain" style="margin-left: 6px; font-size: 11px;">0元出站加速</el-tag>
+                  </template>
+                  <template v-else>
+                    <span class="val-text fallback-text">
+                      {{ $t('workerStreamProxy') }}
+                    </span>
+                  </template>
+                </div>
+              </div>
+
+              <!-- S3 WebCrypto Auth Key -->
+              <div class="setting-item">
+                <div class="title-item">
+                  <span>{{ $t('s3AccessKeyId') }}</span>
+                </div>
+                <div class="r2domain">
+                  <span class="val-text" :class="setting.s3AccessKey ? 'code-text' : 'fallback-text'">
+                    {{ setting.s3AccessKey ? setting.s3AccessKey + ' (' + $t('sigv4Configured') + ')' : $t('nativeSecurityAuth') }}
                   </span>
                 </div>
               </div>
@@ -317,9 +351,13 @@
               <div class="setting-item">
                 <div class="title-item">
                   <span>{{ $t('dbUserDomain') }}</span>
+                  <el-tooltip effect="dark" :content="$t('dbUserDomainDetail')">
+                    <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+                  </el-tooltip>
                 </div>
                 <div class="r2domain">
-                  <span class="val-text code-text">
+                  <span class="val-text code-text domain-active">
+                    <Icon icon="fluent:person-key-20-regular" width="14" height="14" style="margin-right: 4px; vertical-align: -2px; color: var(--el-color-primary);" />
                     {{ dbStatusInfo?.userDb?.name || 'USER_DB (D1)' }}
                   </span>
                 </div>
@@ -329,23 +367,72 @@
               <div class="setting-item">
                 <div class="title-item">
                   <span>{{ $t('dbMailDomain') }}</span>
+                  <el-tooltip effect="dark" :content="$t('dbMailDomainDetail')">
+                    <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+                  </el-tooltip>
                 </div>
                 <div class="r2domain">
-                  <span class="val-text code-text">
+                  <span class="val-text code-text domain-active">
+                    <Icon icon="fluent:mail-multiple-20-regular" width="14" height="14" style="margin-right: 4px; vertical-align: -2px; color: #10b981;" />
                     {{ setting.externalDbEnabled === 1 ? (setting.externalDbName || setting.externalDbProvider) : (dbStatusInfo?.mailDb?.name || 'MAIL_DB (D1)') }}
                   </span>
                 </div>
               </div>
 
+              <!-- Attachment Storage Rules Item (附件存储与流转规则) -->
+              <div class="setting-item">
+                <div class="title-item">
+                  <span>{{ $t('attachmentStorageRule') }}</span>
+                  <el-tooltip effect="dark" :content="$t('attachmentStorageRuleDesc')">
+                    <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+                  </el-tooltip>
+                </div>
+                <div class="forward">
+                  <el-tag size="small" :type="setting.attachmentPolicy === 1 ? 'warning' : (setting.attachmentPolicy === 2 ? 'info' : 'success')" effect="plain">
+                    {{ setting.attachmentPolicy === 1 ? $t('policySmartTier') : (setting.attachmentPolicy === 2 ? $t('policyEdgeFirst') : $t('policyB2First')) }}
+                  </el-tag>
+                  <el-button class="opt-button" size="small" type="primary" @click="openAttachmentRuleDialog" :title="$t('attachmentRuleBtn')">
+                    <Icon icon="fluent:rules-20-filled" width="16" height="16"/>
+                  </el-button>
+                </div>
+              </div>
+
+              <!-- KV Storage & Cache Layer -->
+              <div class="setting-item">
+                <div class="title-item">
+                  <span>{{ $t('kvLayerActive') }}</span>
+                  <el-tooltip effect="dark" :content="$t('storageScanDesc')">
+                    <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+                  </el-tooltip>
+                </div>
+                <div class="forward">
+                  <span class="val-text fallback-text">
+                    <Icon icon="fluent:flash-checkmark-20-filled" width="14" height="14" style="margin-right: 3px; vertical-align: -2px; color: #eab308;" />
+                    {{ $t('kvLayerStatusActive') }}
+                  </span>
+                  <el-button class="opt-button" size="small" type="primary" @click="openStorageScanDialog" :title="$t('storageScanBtn')">
+                    <Icon icon="fluent:scan-text-20-filled" width="16" height="16"/>
+                  </el-button>
+                </div>
+              </div>
+
               <!-- Action Toolbar at bottom of Card -->
               <div class="storage-card-actions">
-                <el-button class="opt-btn-main" size="small" type="primary" @click="openAddS3">
+                <el-button class="opt-btn-main opt-btn-s3" size="small" type="primary" @click="openAddS3">
                   <Icon icon="fluent:server-multiple-20-regular" width="14" height="14" style="margin-right: 4px;" />
                   {{ $t('s3Configuration') }}
                 </el-button>
-                <el-button class="opt-btn-main" size="small" type="primary" @click="openDbConfig">
+                <el-button class="opt-btn-main opt-btn-db" size="small" type="primary" @click="openDbConfig">
                   <Icon icon="fluent:database-arrow-right-20-regular" width="14" height="14" style="margin-right: 4px;" />
                   {{ $t('dbConfiguration') }}
+                </el-button>
+                <el-button class="opt-btn-rule" size="small" type="default" @click="openAttachmentRuleDialog">
+                  <Icon icon="fluent:rules-20-regular" width="14" height="14" style="margin-right: 4px;" />
+                  {{ $t('attachmentRuleBtn') }}
+                </el-button>
+                <el-button class="opt-btn-scan" size="small" type="default" :loading="scanningStorage" @click="openStorageScanDialog">
+                  <Icon icon="fluent:scan-camera-16-regular" width="14" height="14" style="margin-right: 4px;" />
+                  {{ $t('storageScanBtn') }}
                 </el-button>
                 <el-button class="opt-btn-test" size="small" type="default" :loading="testingStorageQuick" @click="handleQuickTestStorageAndDb" :title="$t('storageAndDbQuickTest')">
                   <Icon icon="fluent:play-circle-16-regular" width="14" height="14" style="margin-right: 2px;" />
@@ -2016,6 +2103,7 @@
                 <span class="d-field-title">{{ $t('dbTargetScope') }}</span>
               </div>
               <el-radio-group v-model="dbForm.target" class="db-target-group">
+                <el-radio-button value="attachment">{{ $t('dbTargetAttachment') }}</el-radio-button>
                 <el-radio-button value="mail">{{ $t('dbTargetMail') }}</el-radio-button>
                 <el-radio-button value="all">{{ $t('dbTargetAll') }}</el-radio-button>
                 <el-radio-button value="user">{{ $t('dbTargetUser') }}</el-radio-button>
@@ -2069,6 +2157,223 @@
           </div>
         </template>
       </el-dialog>
+
+      <!-- Attachment Storage Rule Modal (附件存储与流转规则配置) -->
+      <el-dialog 
+        v-model="attachmentRuleShow" 
+        :title="$t('attachmentRuleTitle')" 
+        width="580px" 
+        class="storage-config-dialog attachment-rule-dialog"
+      >
+        <div class="s3-modal-body">
+          <div class="dialog-field">
+            <div class="d-label-row">
+              <span class="d-field-title">{{ $t('attachmentPolicyLabel') }}</span>
+              <span class="d-sub-hint">{{ $t('attachmentStorageRuleDesc') }}</span>
+            </div>
+            
+            <div class="policy-card-group">
+              <!-- Policy 0: B2 / S3 First -->
+              <div 
+                class="policy-card" 
+                :class="{ active: attachmentRuleForm.policy === 0 }"
+                @click="attachmentRuleForm.policy = 0"
+              >
+                <div class="p-radio-circle"></div>
+                <div class="p-card-body">
+                  <div class="p-title">
+                    <Icon icon="simple-icons:backblaze" width="16" height="16" class="p-brand-icon b2" />
+                    <span>{{ $t('policyB2First') }}</span>
+                  </div>
+                  <div class="p-desc">{{ $t('policyB2FirstDesc') }}</div>
+                </div>
+              </div>
+
+              <!-- Policy 1: Smart Tiering -->
+              <div 
+                class="policy-card" 
+                :class="{ active: attachmentRuleForm.policy === 1 }"
+                @click="attachmentRuleForm.policy = 1"
+              >
+                <div class="p-radio-circle"></div>
+                <div class="p-card-body">
+                  <div class="p-title">
+                    <Icon icon="fluent:split-horizontal-20-filled" width="16" height="16" class="p-brand-icon smart" />
+                    <span>{{ $t('policySmartTier') }}</span>
+                  </div>
+                  <div class="p-desc">{{ $t('policySmartTierDesc') }}</div>
+                </div>
+              </div>
+
+              <!-- Policy 2: Edge Native First -->
+              <div 
+                class="policy-card" 
+                :class="{ active: attachmentRuleForm.policy === 2 }"
+                @click="attachmentRuleForm.policy = 2"
+              >
+                <div class="p-radio-circle"></div>
+                <div class="p-card-body">
+                  <div class="p-title">
+                    <Icon icon="simple-icons:cloudflare" width="16" height="16" class="p-brand-icon r2" />
+                    <span>{{ $t('policyEdgeFirst') }}</span>
+                  </div>
+                  <div class="p-desc">{{ $t('policyEdgeFirstDesc') }}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Max Attachment Size -->
+          <div class="dialog-field">
+            <div class="d-label-row">
+              <span class="d-field-title">{{ $t('maxAttachmentSize') }}</span>
+              <span class="d-sub-hint">{{ $t('maxAttachmentSizeHint') }}</span>
+            </div>
+            <el-input-number 
+              v-model="attachmentRuleForm.maxSizeMb" 
+              :min="1" 
+              :max="500" 
+              :step="5"
+              style="width: 100%;"
+            >
+              <template #suffix>
+                <span>MB</span>
+              </template>
+            </el-input-number>
+          </div>
+
+          <!-- Cascade Delete -->
+          <div class="dialog-field">
+            <div class="d-label-row">
+              <span class="d-field-title">{{ $t('cascadeDeleteAttachment') }}</span>
+              <span class="d-sub-hint">{{ $t('cascadeDeleteAttachmentHint') }}</span>
+            </div>
+            <div class="fps-switch-wrapper" style="margin-top: 6px;">
+              <el-switch 
+                :active-value="1" 
+                :inactive-value="0" 
+                v-model="attachmentRuleForm.cascadeDelete"
+              />
+              <span class="fps-label" :class="{ active: attachmentRuleForm.cascadeDelete === 1 }">
+                {{ attachmentRuleForm.cascadeDelete === 1 ? $t('enabled') : $t('disabled') }}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <template #footer>
+          <div class="dialog-footer-actions">
+            <el-button @click="attachmentRuleShow = false">{{ $t('cancel') }}</el-button>
+            <el-button type="primary" :loading="settingLoading" @click="saveAttachmentRule">{{ $t('saveAttachmentRule') }}</el-button>
+          </div>
+        </template>
+      </el-dialog>
+
+      <!-- Storage & KV Deep Scan Modal (KV与存储深度扫描体检) -->
+      <el-dialog 
+        v-model="storageScanShow" 
+        :title="$t('storageScanTitle')" 
+        width="650px" 
+        class="storage-config-dialog storage-scan-dialog"
+      >
+        <div class="s3-modal-body scan-body">
+          <div v-if="scanningStorage" class="scan-loading-state">
+            <el-icon class="is-loading" :size="32" style="color: var(--el-color-primary);"><Icon icon="fluent:spinner-ios-20-filled" /></el-icon>
+            <div class="scan-loading-text">{{ $t('storageScanRunning') }}</div>
+          </div>
+
+          <template v-else-if="storageScanResult">
+            <!-- Top Health Summary Banner -->
+            <div class="scan-summary-banner" :class="{ warn: storageScanResult.healthScore < 80 }">
+              <div class="sum-left">
+                <Icon :icon="storageScanResult.healthScore >= 80 ? 'fluent:checkmark-circle-24-filled' : 'fluent:warning-24-filled'" width="28" height="28" class="sum-icon" />
+                <div class="sum-texts">
+                  <div class="sum-title">
+                    {{ $t('storageHealthScore') }}: <strong>{{ storageScanResult.healthScore }}%</strong>
+                    <el-tag size="small" :type="storageScanResult.healthScore >= 80 ? 'success' : 'warning'" effect="light" style="margin-left: 8px;">
+                      {{ storageScanResult.healthScore >= 80 ? $t('storageHealthHealthy') : $t('storageHealthWarn') }}
+                    </el-tag>
+                  </div>
+                  <div class="sum-desc">{{ storageScanResult.message }}</div>
+                </div>
+              </div>
+              <div class="sum-right">
+                <el-tag size="small" type="info" effect="plain">⚡ {{ storageScanResult.scanDurationMs }}ms</el-tag>
+              </div>
+            </div>
+
+            <!-- KV Metrics Section -->
+            <div class="scan-metric-card">
+              <div class="card-head">
+                <Icon icon="fluent:flash-checkmark-20-filled" width="16" height="16" class="head-icon kv" />
+                <span>{{ $t('kvStorageStats') }}</span>
+                <el-tag size="small" type="warning" effect="plain" class="head-tag">Cloudflare KV</el-tag>
+              </div>
+              <div class="metrics-grid">
+                <div class="metric-item">
+                  <span class="m-val">{{ storageScanResult.kv?.totalKeys || 0 }}</span>
+                  <span class="m-lbl">{{ $t('kvTotalKeys') }}</span>
+                </div>
+                <div class="metric-item">
+                  <span class="m-val">{{ storageScanResult.kv?.attachmentKeys || 0 }}</span>
+                  <span class="m-lbl">{{ $t('kvAttachmentKeys') }}</span>
+                </div>
+                <div class="metric-item">
+                  <span class="m-val">{{ storageScanResult.kv?.configKeys || 0 }}</span>
+                  <span class="m-lbl">{{ $t('kvConfigKeys') }}</span>
+                </div>
+                <div class="metric-item">
+                  <span class="m-val">{{ storageScanResult.kv?.authKeys || 0 }}</span>
+                  <span class="m-lbl">{{ $t('kvAuthKeys') }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- D1 Attachment Records Section -->
+            <div class="scan-metric-card">
+              <div class="card-head">
+                <Icon icon="fluent:database-20-filled" width="16" height="16" class="head-icon d1" />
+                <span>{{ $t('d1AttachmentStats') }}</span>
+                <el-tag size="small" type="primary" effect="plain" class="head-tag">{{ storageScanResult.db?.mailDbName || 'D1' }}</el-tag>
+              </div>
+              <div class="metrics-grid">
+                <div class="metric-item">
+                  <span class="m-val">{{ storageScanResult.d1?.totalAttachments || 0 }}</span>
+                  <span class="m-lbl">{{ $t('d1TotalAttachments') }}</span>
+                </div>
+                <div class="metric-item">
+                  <span class="m-val">{{ storageScanResult.d1?.totalMb || 0 }} MB</span>
+                  <span class="m-lbl">{{ $t('d1TotalSize') }}</span>
+                </div>
+                <div class="metric-item">
+                  <span class="m-val">{{ storageScanResult.d1?.distinctKeys || 0 }}</span>
+                  <span class="m-lbl">{{ $t('d1DistinctKeys') }}</span>
+                </div>
+                <div class="metric-item">
+                  <span class="m-val">{{ storageScanResult.storage?.activeEngine || 'KV' }}</span>
+                  <span class="m-lbl">{{ $t('storageEngine') }}</span>
+                </div>
+              </div>
+
+              <!-- MIME Breakdown -->
+              <div class="mime-breakdown-row">
+                <span class="mime-pill"><Icon icon="solar:gallery-wide-linear" width="13" height="13"/> {{ $t('d1Images') }}: {{ storageScanResult.d1?.imageCount || 0 }}</span>
+                <span class="mime-pill"><Icon icon="fluent:document-pdf-20-regular" width="13" height="13"/> {{ $t('d1Pdfs') }}: {{ storageScanResult.d1?.pdfCount || 0 }}</span>
+                <span class="mime-pill"><Icon icon="fluent:video-clip-20-regular" width="13" height="13"/> {{ $t('d1Media') }}: {{ storageScanResult.d1?.mediaCount || 0 }}</span>
+                <span class="mime-pill"><Icon icon="fluent:folder-zip-20-regular" width="13" height="13"/> {{ $t('d1Other') }}: {{ storageScanResult.d1?.otherCount || 0 }}</span>
+              </div>
+            </div>
+          </template>
+        </div>
+
+        <template #footer>
+          <div class="dialog-footer-actions">
+            <el-button :loading="cleaningStorage" @click="handleCleanupStorage">{{ $t('cleanupStorageBtn') }}</el-button>
+            <el-button type="primary" :loading="scanningStorage" @click="handleRunStorageScan">{{ $t('rescanStorageBtn') }}</el-button>
+          </div>
+        </template>
+      </el-dialog>
+
       <!-- 邮箱前缀规则 Unified Drawer -->
       <el-drawer
           v-model="emailPrefixShow"
@@ -2146,7 +2451,7 @@
 
 <script setup>
 import {computed, defineOptions, nextTick, reactive, ref} from "vue";
-import {deleteBackground, setBackground, setBlackList, settingQuery, settingSet, sendWelcomeEmail, testS3Setting, getDbStatus, testDbSetting} from "@/request/setting.js";
+import {deleteBackground, setBackground, setBlackList, settingQuery, settingSet, sendWelcomeEmail, testS3Setting, getDbStatus, testDbSetting, scanStorage, cleanupStorage} from "@/request/setting.js";
 import { testTelegramBot } from "@/request/my.js";
 import {useSettingStore} from "@/store/setting.js";
 import {useUiStore} from "@/store/ui.js";
@@ -2191,8 +2496,22 @@ const testingDb = ref(false)
 const dbTestResult = ref(null)
 const clearDbLoading = ref(false)
 const testingStorageQuick = ref(false)
+
+const attachmentRuleShow = ref(false)
+const attachmentRuleForm = reactive({
+  policy: 0,
+  maxSizeMb: 25,
+  cascadeDelete: 1
+})
+
+const storageScanShow = ref(false)
+const scanningStorage = ref(false)
+const storageScanResult = ref(null)
+const cleaningStorage = ref(false)
+
 const backgroundImage = ref('')
 const localUpShow = ref(false)
+
 const accountStore = useAccountStore();
 const userStore = useUserStore();
 const editTitleShow = ref(false)
@@ -3533,7 +3852,77 @@ async function handleQuickTestStorageAndDb() {
   }
 }
 
+function getStorageProviderName(endpoint) {
+  if (!endpoint) return 'Backblaze B2'
+  const ep = endpoint.toLowerCase()
+  if (ep.includes('backblazeb2.com') || ep.includes('b2')) return 'Backblaze B2'
+  if (ep.includes('amazonaws.com') || ep.includes('aws')) return 'AWS S3'
+  if (ep.includes('r2.cloudflarestorage.com') || ep.includes('r2')) return 'Cloudflare R2'
+  if (ep.includes('minio') || ep.includes('9000')) return 'MinIO'
+  return 'S3 Compatible'
+}
+
+function openAttachmentRuleDialog() {
+  attachmentRuleForm.policy = setting.value.attachmentPolicy !== undefined ? Number(setting.value.attachmentPolicy) : 0
+  attachmentRuleForm.maxSizeMb = setting.value.attachmentMaxSizeMb !== undefined ? Number(setting.value.attachmentMaxSizeMb) : 25
+  attachmentRuleForm.cascadeDelete = setting.value.attachmentCascadeDelete !== undefined ? Number(setting.value.attachmentCascadeDelete) : 1
+  attachmentRuleShow.value = true
+}
+
+async function saveAttachmentRule() {
+  await editSetting({
+    attachmentPolicy: attachmentRuleForm.policy,
+    attachmentMaxSizeMb: attachmentRuleForm.maxSizeMb,
+    attachmentCascadeDelete: attachmentRuleForm.cascadeDelete
+  })
+  attachmentRuleShow.value = false
+  ElMessage.success(t('saveAttachmentRule') + ' ' + (t('successful') || '成功'))
+}
+
+async function openStorageScanDialog() {
+  storageScanShow.value = true
+  await handleRunStorageScan()
+}
+
+async function handleRunStorageScan() {
+  scanningStorage.value = true
+  try {
+    const res = await scanStorage()
+    const data = res?.data !== undefined ? res.data : res
+    if (data) {
+      storageScanResult.value = data
+      ElMessage.success(t('storageScanSuccess'))
+    }
+  } catch (e) {
+    ElMessage.error(e.message || '扫描失败')
+  } finally {
+    scanningStorage.value = false
+  }
+}
+
+async function handleCleanupStorage() {
+  try {
+    await ElMessageBox.confirm(t('cleanupStorageConfirm'), t('confirm'), {
+      confirmButtonText: t('confirm'),
+      cancelButtonText: t('cancel'),
+      type: 'warning'
+    })
+    cleaningStorage.value = true
+    const res = await cleanupStorage()
+    const data = res?.data !== undefined ? res.data : res
+    ElMessage.success(data?.message || t('cleanupStorageDone'))
+    await handleRunStorageScan()
+  } catch (e) {
+    if (e !== 'cancel') {
+      ElMessage.error(e.message || '清理失败')
+    }
+  } finally {
+    cleaningStorage.value = false
+  }
+}
+
 const testingTg = ref(false);
+
 
 async function handleTestAdminTelegram() {
   if (Number(setting.value?.allMailMode) === 2) {
@@ -6283,8 +6672,35 @@ form .el-button {
     }
   }
 
+  .fallback-text {
+    color: var(--el-text-color-secondary);
+    font-size: 12px;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .success-highlight {
+    color: var(--el-color-success);
+    font-weight: 600;
+  }
+
+  .fallback-code {
+    color: var(--el-text-color-placeholder);
+  }
+
+  .direct-link {
+    color: var(--el-color-primary);
+    font-weight: 500;
+  }
+
+  .domain-active {
+    font-weight: 600;
+    letter-spacing: 0.2px;
+  }
+
   .storage-card-actions {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 8px;
     margin-top: 14px;
@@ -6292,18 +6708,27 @@ form .el-button {
     border-top: 1px dashed var(--el-border-color-lighter);
 
     .opt-btn-main {
-      flex: 1;
+      flex: 1 1 calc(50% - 4px);
       font-weight: 600;
       font-size: 12px;
       height: 32px;
       padding: 0 6px;
     }
 
-    .opt-btn-test {
-      flex-shrink: 0;
+    .opt-btn-rule, .opt-btn-scan {
+      flex: 1 1 calc(50% - 4px);
       height: 32px;
       font-size: 12px;
-      padding: 0 8px;
+      font-weight: 500;
+      padding: 0 6px;
+    }
+
+    .opt-btn-test {
+      width: 100%;
+      height: 32px;
+      font-size: 12px;
+      font-weight: 600;
+      margin-top: 2px;
     }
   }
 }
@@ -6353,6 +6778,219 @@ form .el-button {
     }
   }
 }
+
+.attachment-rule-dialog {
+  .policy-card-group {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+
+    .policy-card {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 12px 14px;
+      border: 1px solid var(--el-border-color, #e2e8f0);
+      border-radius: 10px;
+      background: var(--bg-surface, #ffffff);
+      cursor: pointer;
+      transition: all 0.2s ease;
+
+      &:hover {
+        border-color: var(--accent-primary, #3b82f6);
+        background: color-mix(in srgb, var(--accent-primary, #3b82f6) 3%, transparent);
+      }
+
+      &.active {
+        border-color: var(--accent-primary, #3b82f6);
+        background: color-mix(in srgb, var(--accent-primary, #3b82f6) 6%, transparent);
+
+        .p-radio-circle {
+          border-color: var(--accent-primary, #3b82f6);
+          background-color: var(--accent-primary, #3b82f6);
+          box-shadow: inset 0 0 0 3px #ffffff;
+        }
+      }
+
+      .p-radio-circle {
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        border: 2px solid var(--el-border-color-darker, #cbd5e1);
+        margin-top: 3px;
+        flex-shrink: 0;
+        transition: all 0.2s ease;
+      }
+
+      .p-card-body {
+        flex: 1;
+
+        .p-title {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          font-size: 13.5px;
+          font-weight: 600;
+          color: var(--el-text-color-primary);
+          margin-bottom: 3px;
+
+          .p-brand-icon {
+            &.b2 { color: #e11d48; }
+            &.smart { color: #f59e0b; }
+            &.r2 { color: #f97316; }
+          }
+        }
+
+        .p-desc {
+          font-size: 12px;
+          line-height: 1.45;
+          color: var(--el-text-color-secondary);
+        }
+      }
+    }
+  }
+}
+
+.storage-scan-dialog {
+  .scan-body {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .scan-loading-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 36px 0;
+    gap: 12px;
+
+    .scan-loading-text {
+      font-size: 13.5px;
+      color: var(--el-text-color-secondary);
+      font-weight: 500;
+    }
+  }
+
+  .scan-summary-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: color-mix(in srgb, var(--el-color-success) 10%, var(--bg-surface));
+    border: 1px solid color-mix(in srgb, var(--el-color-success) 30%, transparent);
+    padding: 12px 16px;
+    border-radius: 10px;
+
+    &.warn {
+      background: color-mix(in srgb, var(--el-color-warning) 10%, var(--bg-surface));
+      border-color: color-mix(in srgb, var(--el-color-warning) 30%, transparent);
+    }
+
+    .sum-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+
+      .sum-icon {
+        color: var(--el-color-success);
+      }
+      &.warn .sum-icon {
+        color: var(--el-color-warning);
+      }
+
+      .sum-title {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--el-text-color-primary);
+      }
+
+      .sum-desc {
+        font-size: 12px;
+        color: var(--el-text-color-secondary);
+        margin-top: 2px;
+      }
+    }
+  }
+
+  .scan-metric-card {
+    border: 1px solid var(--el-border-color, #e2e8f0);
+    border-radius: 10px;
+    padding: 12px 14px;
+    background: var(--bg-surface, #ffffff);
+
+    .card-head {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--el-text-color-primary);
+      margin-bottom: 10px;
+
+      .head-icon {
+        &.kv { color: #f59e0b; }
+        &.d1 { color: #3b82f6; }
+      }
+
+      .head-tag {
+        margin-left: auto;
+        font-size: 11px;
+      }
+    }
+
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+
+      .metric-item {
+        background: color-mix(in srgb, var(--el-fill-color-light) 60%, transparent);
+        padding: 8px 10px;
+        border-radius: 8px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+
+        .m-val {
+          font-size: 15px;
+          font-weight: 700;
+          color: var(--el-text-color-primary);
+          font-family: ui-monospace, SFMono-Regular, monospace;
+        }
+
+        .m-lbl {
+          font-size: 11px;
+          color: var(--el-text-color-secondary);
+          margin-top: 2px;
+        }
+      }
+    }
+
+    .mime-breakdown-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+      padding-top: 8px;
+      border-top: 1px dashed var(--el-border-color-lighter);
+
+      .mime-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 11.5px;
+        color: var(--el-text-color-secondary);
+        background: rgba(0, 0, 0, 0.03);
+        padding: 3px 8px;
+        border-radius: 6px;
+      }
+    }
+  }
+}
+
 
 </style>
 

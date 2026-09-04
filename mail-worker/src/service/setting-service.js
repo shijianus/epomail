@@ -120,6 +120,9 @@ const settingService = {
 		setting.externalDbEndpoint = setting.externalDbEndpoint || '';
 		setting.externalDbName = setting.externalDbName || '';
 		setting.externalDbTarget = setting.externalDbTarget || 'mail';
+		setting.attachmentPolicy = setting.attachmentPolicy !== undefined ? Number(setting.attachmentPolicy) : 0;
+		setting.attachmentMaxSizeMb = setting.attachmentMaxSizeMb !== undefined ? Number(setting.attachmentMaxSizeMb) : 25;
+		setting.attachmentCascadeDelete = setting.attachmentCascadeDelete !== undefined ? Number(setting.attachmentCascadeDelete) : 1;
 
 		c.set?.('setting', setting);
 		return setting;
@@ -321,7 +324,8 @@ const settingService = {
 			'userTgForward', 'userEmailForward', 'userApiSupport',
 			'userByoStorage', 'defaultStorageQuotaMb', 'storageProvider',
 			'externalDbEnabled', 'externalDbProvider', 'externalDbEndpoint',
-			'externalDbToken', 'externalDbName', 'externalDbTarget'
+			'externalDbToken', 'externalDbName', 'externalDbTarget',
+			'attachmentPolicy', 'attachmentMaxSizeMb', 'attachmentCascadeDelete'
 		];
 
 		const updateData = {};

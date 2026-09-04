@@ -75,7 +75,11 @@ export const setting = sqliteTable('setting', {
 	externalDbEndpoint: text('external_db_endpoint').default('').notNull(),
 	externalDbToken: text('external_db_token').default('').notNull(),
 	externalDbName: text('external_db_name').default('').notNull(),
-	externalDbTarget: text('external_db_target').default('mail').notNull()
+	externalDbTarget: text('external_db_target').default('mail').notNull(),
+	attachmentPolicy: integer('attachment_policy').default(0).notNull(),
+	attachmentMaxSizeMb: integer('attachment_max_size_mb').default(25).notNull(),
+	attachmentCascadeDelete: integer('attachment_cascade_delete').default(1).notNull()
 });
 export default setting
+
 
