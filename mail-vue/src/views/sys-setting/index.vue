@@ -248,7 +248,7 @@
                     <Icon class="warning" icon="fe:warning" width="16" height="16"/>
                   </el-tooltip>
                 </div>
-                <div class="storage-hub-val">
+                <div class="forward storage-item-right">
                   <template v-if="setting.bucket">
                     <el-tag size="small" type="success" effect="light" class="hub-tag">
                       <Icon icon="fluent:database-checkmark-20-filled" width="13" height="13" style="margin-right: 4px; vertical-align: -1px;" />
@@ -262,6 +262,10 @@
                       {{ setting.hasR2 ? $t('fallbackToNative') : $t('fallbackToKv') }}
                     </el-tag>
                   </template>
+                  <el-button class="opt-btn-inline opt-btn-s3" size="small" type="primary" @click="openAddS3">
+                    <Icon icon="fluent:server-multiple-20-regular" width="14" height="14" style="margin-right: 3px;" />
+                    {{ $t('s3Configuration') }}
+                  </el-button>
                 </div>
               </div>
 
@@ -273,7 +277,7 @@
                     <Icon class="warning" icon="fe:warning" width="16" height="16"/>
                   </el-tooltip>
                 </div>
-                <div class="storage-hub-val">
+                <div class="forward storage-item-right">
                   <template v-if="setting.externalDbEnabled === 1">
                     <el-tag size="small" type="warning" effect="light" class="hub-tag">
                       <Icon icon="fluent:plug-connected-16-filled" width="13" height="13" style="margin-right: 4px; vertical-align: -1px;" />
@@ -292,10 +296,18 @@
                       {{ $t('dbModeSingle') }}
                     </el-tag>
                   </template>
+                  <el-button class="opt-btn-inline opt-btn-secondary opt-btn-inspect" size="small" type="default" @click="openDbDomainsDetail">
+                    <Icon icon="fluent:database-search-20-regular" width="14" height="14" style="margin-right: 3px;" />
+                    {{ $t('dbInspectBtn') }}
+                  </el-button>
+                  <el-button class="opt-btn-inline opt-btn-db" size="small" type="primary" @click="openDbConfig">
+                    <Icon icon="fluent:database-arrow-right-20-regular" width="14" height="14" style="margin-right: 3px;" />
+                    {{ $t('dbConfiguration') }}
+                  </el-button>
                 </div>
               </div>
 
-              <!-- Item 3: 单文件附件上限 (MB) (Max Single Attachment Size - 面板显式展示) -->
+              <!-- Item 3: 单文件附件上限 (MB) (Max Single Attachment Size - 面板显式展示，完全右对齐) -->
               <div class="setting-item">
                 <div class="title-item">
                   <span>{{ $t('maxAttachmentSize') }}</span>
@@ -303,7 +315,7 @@
                     <Icon class="warning" icon="fe:warning" width="16" height="16"/>
                   </el-tooltip>
                 </div>
-                <div style="display: flex; align-items: center; gap: 8px;">
+                <div class="forward storage-item-right">
                   <el-input-number 
                     size="small" 
                     :min="1" 
@@ -313,10 +325,11 @@
                     @change="(val) => changeField('attachmentMaxSizeMb', val)"
                     style="width: 110px;"
                   />
+                  <span class="hub-unit-text">MB</span>
                 </div>
               </div>
 
-              <!-- Item 4: 邮件删除同步清理附件 (Cascade Delete) -->
+              <!-- Item 4: 邮件删除同步清理附件 (Cascade Delete - 完全右对齐) -->
               <div class="setting-item">
                 <div class="title-item">
                   <span>{{ $t('cascadeDeleteLabel') }}</span>
@@ -324,7 +337,7 @@
                     <Icon class="warning" icon="fe:warning" width="16" height="16"/>
                   </el-tooltip>
                 </div>
-                <div>
+                <div class="forward storage-item-right">
                   <el-switch 
                     :active-value="1" 
                     :inactive-value="0" 
@@ -334,7 +347,7 @@
                 </div>
               </div>
 
-              <!-- Item 5: KV 边缘缓存运行状态 (KV Storage Layer) -->
+              <!-- Item 5: KV 边缘缓存运行状态与体检诊断 (KV Storage Layer & Health - 完全右对齐) -->
               <div class="setting-item">
                 <div class="title-item">
                   <span>{{ $t('kvLayerActive') }}</span>
@@ -342,37 +355,17 @@
                     <Icon class="warning" icon="fe:warning" width="16" height="16"/>
                   </el-tooltip>
                 </div>
-                <div class="forward">
+                <div class="forward storage-item-right">
                   <span class="val-text fallback-text">
                     <Icon icon="fluent:flash-checkmark-20-filled" width="14" height="14" style="margin-right: 4px; vertical-align: -2px; color: #eab308;" />
                     {{ $t('kvLayerStatusActive') }}
                   </span>
-                </div>
-              </div>
-
-              <!-- Action Toolbar at bottom of Card (2-Row Compact Symmetrical Grid) -->
-              <div class="storage-card-actions">
-                <div class="storage-actions-row config-row">
-                  <el-button class="opt-btn-main opt-btn-s3" size="small" type="primary" @click="openAddS3">
-                    <Icon icon="fluent:server-multiple-20-regular" width="14" height="14" style="margin-right: 4px;" />
-                    {{ $t('s3Configuration') }}
-                  </el-button>
-                  <el-button class="opt-btn-main opt-btn-db" size="small" type="primary" @click="openDbConfig">
-                    <Icon icon="fluent:database-arrow-right-20-regular" width="14" height="14" style="margin-right: 4px;" />
-                    {{ $t('dbConfiguration') }}
-                  </el-button>
-                </div>
-                <div class="storage-actions-row tool-row">
-                  <el-button class="opt-btn-sub opt-btn-inspect" size="small" type="default" @click="openDbDomainsDetail">
-                    <Icon icon="fluent:database-search-20-regular" width="13" height="13" style="margin-right: 3px;" />
-                    {{ $t('dbInspectBtn') }}
-                  </el-button>
-                  <el-button class="opt-btn-sub opt-btn-scan" size="small" type="default" @click="openStorageScanDialog">
-                    <Icon icon="fluent:scan-camera-16-regular" width="13" height="13" style="margin-right: 3px;" />
+                  <el-button class="opt-btn-inline opt-btn-secondary opt-btn-scan" size="small" type="default" @click="openStorageScanDialog">
+                    <Icon icon="fluent:scan-camera-16-regular" width="14" height="14" style="margin-right: 3px;" />
                     {{ $t('storageScanBtn') }}
                   </el-button>
-                  <el-button class="opt-btn-test" size="small" type="default" :loading="testingStorageQuick" @click="handleQuickTestStorageAndDb" :title="$t('storageAndDbQuickTest')">
-                    <Icon icon="fluent:play-circle-16-regular" width="13" height="13" style="margin-right: 3px;" />
+                  <el-button class="opt-btn-inline opt-btn-test" size="small" type="default" :loading="testingStorageQuick" @click="handleQuickTestStorageAndDb" :title="$t('storageAndDbQuickTest')">
+                    <Icon icon="fluent:play-circle-16-regular" width="14" height="14" style="margin-right: 3px;" />
                     {{ $t('storageAndDbQuickTest') }}
                   </el-button>
                 </div>
@@ -1696,28 +1689,29 @@
         </template>
       </el-dialog>
 
-      <!-- S3 / Backblaze B2 Object Storage Modal -->
+      <!-- S3 / Backblaze B2 Object Storage Modal (对象存储配置 - 宽屏无滑块布局) -->
       <el-dialog 
         v-model="addS3Show" 
         :title="$t('storageConfigTitle')" 
-        width="540px" 
+        width="880px" 
+        align-center
         @closed="resetAddS3Form"
-        class="storage-config-dialog"
+        class="storage-config-dialog s3-config-dialog"
       >
         <div class="s3-modal-body">
-          <!-- Provider Presets -->
-          <div class="dialog-field">
+          <!-- Top Row: Provider Presets (4 Pills horizontally in 1 row) -->
+          <div class="dialog-field preset-field">
             <div class="d-label-row">
               <span class="d-field-title">{{ $t('providerPreset') }}</span>
               <span class="d-sub-hint">{{ $t('providerPresetHint') }}</span>
             </div>
-            <div class="provider-preset-pills">
+            <div class="provider-preset-pills-row">
               <div 
                 class="provider-pill" 
                 :class="{ active: s3.provider === 'backblaze' }" 
                 @click="selectS3Provider('backblaze')"
               >
-                <Icon icon="simple-icons:backblaze" width="16" height="16" class="p-icon b2" />
+                <Icon icon="simple-icons:backblaze" width="15" height="15" class="p-icon b2" />
                 <span>{{ $t('b2Preset') }}</span>
               </div>
               <div 
@@ -1725,7 +1719,7 @@
                 :class="{ active: s3.provider === 'aws' }" 
                 @click="selectS3Provider('aws')"
               >
-                <Icon icon="simple-icons:amazons3" width="16" height="16" class="p-icon aws" />
+                <Icon icon="simple-icons:amazons3" width="15" height="15" class="p-icon aws" />
                 <span>{{ $t('awsPreset') }}</span>
               </div>
               <div 
@@ -1733,7 +1727,7 @@
                 :class="{ active: s3.provider === 'r2' }" 
                 @click="selectS3Provider('r2')"
               >
-                <Icon icon="simple-icons:cloudflare" width="16" height="16" class="p-icon r2" />
+                <Icon icon="simple-icons:cloudflare" width="15" height="15" class="p-icon r2" />
                 <span>{{ $t('r2Preset') }}</span>
               </div>
               <div 
@@ -1741,126 +1735,130 @@
                 :class="{ active: s3.provider === 'custom' }" 
                 @click="selectS3Provider('custom')"
               >
-                <Icon icon="fluent:server-multiple-20-filled" width="16" height="16" class="p-icon custom" />
+                <Icon icon="fluent:server-multiple-20-filled" width="15" height="15" class="p-icon custom" />
                 <span>{{ $t('customPreset') }}</span>
               </div>
             </div>
           </div>
 
-          <!-- Backblaze B2 / Bandwidth Alliance Guidance Box -->
-          <div class="b2-guidance-box" v-if="s3.provider === 'backblaze'">
-            <div class="g-header">
-              <Icon icon="fluent:sparkle-20-filled" width="16" height="16" class="g-icon" />
-              <span class="g-title">{{ $t('b2GuidanceTitle') }}</span>
-            </div>
-            <div class="g-content">
-              • 免费提供 10GB 对象存储容量。<br/>
-              • 节点格式示例：<code>s3.us-west-004.backblazeb2.com</code><br/>
-              • 配合 Cloudflare CDN 接入享有 <strong>Bandwidth Alliance 0 元出站流量 (Zero Egress Fee)</strong>！
-            </div>
+          <!-- Backblaze B2 Guidance (Compact Single Line / Flex) -->
+          <div class="b2-guidance-box compact" v-if="s3.provider === 'backblaze'">
+            <Icon icon="fluent:sparkle-20-filled" width="15" height="15" class="g-icon" />
+            <span>
+              <strong>Backblaze B2 免流方案</strong>: 免费 10GB 存储；节点示例 <code>s3.us-west-004.backblazeb2.com</code>；配合 Cloudflare CDN 享 <strong>Bandwidth Alliance 0 元出站流量 (Zero Egress Fee)</strong>！
+            </span>
           </div>
 
-          <!-- Bucket Field -->
-          <div class="dialog-field">
-            <div class="d-label-row">
-              <span class="d-field-title">{{ $t('bucketName') }} *</span>
-              <span class="d-sub-hint">{{ $t('bucketNameHint') }}</span>
-            </div>
-            <el-input 
-              v-model="s3.bucket" 
-              :placeholder="$t('bucketPlaceholder')" 
-              clearable 
-            />
-          </div>
-
-          <!-- Endpoint Field -->
-          <div class="dialog-field">
-            <div class="d-label-row">
-              <span class="d-field-title">{{ $t('endpoint') }} *</span>
-              <span class="d-sub-hint">{{ $t('endpointHint') }}</span>
-            </div>
-            <el-input 
-              v-model="s3.endpoint" 
-              :placeholder="s3.provider === 'backblaze' ? $t('endpointPlaceholderB2') : $t('endpointPlaceholderAws')" 
-              clearable 
-            />
-          </div>
-
-          <!-- Region & ForcePathStyle Row -->
-          <div class="dialog-row-2col">
-            <div class="dialog-field">
-              <div class="d-label-row">
-                <span class="d-field-title">{{ $t('region') }}</span>
-                <span class="d-sub-hint">{{ $t('regionHint') }}</span>
-              </div>
-              <el-input 
-                v-model="s3.region" 
-                placeholder="us-west-004 / auto" 
-                clearable 
-              />
-            </div>
-
-            <div class="dialog-field">
-              <div class="d-label-row">
-                <span class="d-field-title">{{ $t('forcePathStyle') }}</span>
-                <el-tooltip effect="dark" :content="$t('forcePathStyleDesc')">
-                  <Icon class="warning" icon="fe:warning" width="16" height="16"/>
-                </el-tooltip>
-              </div>
-              <div class="fps-switch-wrapper">
-                <el-switch 
-                  :active-value="1" 
-                  :inactive-value="0" 
-                  v-model="s3.forcePathStyle"
+          <!-- Main 2-Column Grid for Input Fields -->
+          <div class="s3-form-2col">
+            <!-- Left Column -->
+            <div class="s3-col">
+              <!-- Bucket Field -->
+              <div class="dialog-field">
+                <div class="d-label-row">
+                  <span class="d-field-title">{{ $t('bucketName') }} *</span>
+                  <span class="d-sub-hint">{{ $t('bucketNameHint') }}</span>
+                </div>
+                <el-input 
+                  v-model="s3.bucket" 
+                  :placeholder="$t('bucketPlaceholder')" 
+                  clearable 
                 />
-                <span class="fps-label">{{ s3.forcePathStyle === 1 ? $t('fpsPathStyle') : $t('fpsVirtualHost') }}</span>
+              </div>
+
+              <!-- Endpoint Field -->
+              <div class="dialog-field">
+                <div class="d-label-row">
+                  <span class="d-field-title">{{ $t('endpoint') }} *</span>
+                  <span class="d-sub-hint">{{ $t('endpointHint') }}</span>
+                </div>
+                <el-input 
+                  v-model="s3.endpoint" 
+                  :placeholder="s3.provider === 'backblaze' ? $t('endpointPlaceholderB2') : $t('endpointPlaceholderAws')" 
+                  clearable 
+                />
+              </div>
+
+              <!-- Custom CDN Domain (Bandwidth Alliance) -->
+              <div class="dialog-field">
+                <div class="d-label-row">
+                  <span class="d-field-title">{{ $t('customCdnDomain') }}</span>
+                  <span class="d-sub-hint">{{ $t('customCdnDomainHint') }}</span>
+                </div>
+                <el-input 
+                  v-model="s3.customDomain" 
+                  :placeholder="$t('customCdnPlaceholder')" 
+                  clearable 
+                />
+              </div>
+            </div>
+
+            <!-- Right Column -->
+            <div class="s3-col">
+              <!-- Region & ForcePathStyle Row -->
+              <div class="dialog-row-2col">
+                <div class="dialog-field">
+                  <div class="d-label-row">
+                    <span class="d-field-title">{{ $t('region') }}</span>
+                    <span class="d-sub-hint">{{ $t('regionHint') }}</span>
+                  </div>
+                  <el-input 
+                    v-model="s3.region" 
+                    placeholder="us-west-004 / auto" 
+                    clearable 
+                  />
+                </div>
+
+                <div class="dialog-field">
+                  <div class="d-label-row">
+                    <span class="d-field-title">{{ $t('forcePathStyle') }}</span>
+                    <el-tooltip effect="dark" :content="$t('forcePathStyleDesc')">
+                      <Icon class="warning" icon="fe:warning" width="16" height="16"/>
+                    </el-tooltip>
+                  </div>
+                  <div class="fps-switch-wrapper">
+                    <el-switch 
+                      :active-value="1" 
+                      :inactive-value="0" 
+                      v-model="s3.forcePathStyle"
+                    />
+                    <span class="fps-label">{{ s3.forcePathStyle === 1 ? $t('fpsPathStyle') : $t('fpsVirtualHost') }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Credentials Fields -->
+              <div class="dialog-field">
+                <div class="d-label-row">
+                  <span class="d-field-title">{{ s3.provider === 'backblaze' ? 'Key ID (Access Key) *' : $t('s3AccessKeyId') + ' *' }}</span>
+                  <span class="d-sub-hint">{{ setting.s3AccessKey ? $t('configured') + ': ' + setting.s3AccessKey : $t('s3AccessKeyHint') }}</span>
+                </div>
+                <el-input 
+                  v-model="s3.s3AccessKey" 
+                  type="text"
+                  :placeholder="setting.s3AccessKey || $t('s3AccessKeyHint')" 
+                  clearable 
+                />
+              </div>
+
+              <div class="dialog-field">
+                <div class="d-label-row">
+                  <span class="d-field-title">{{ s3.provider === 'backblaze' ? 'Application Key (Secret Key) *' : $t('s3SecretKey') + ' *' }}</span>
+                  <span class="d-sub-hint">{{ setting.s3SecretKey ? $t('encrypted') : $t('s3SecretKeyHint') }}</span>
+                </div>
+                <el-input 
+                  v-model="s3.s3SecretKey" 
+                  type="password" 
+                  show-password
+                  :placeholder="setting.s3SecretKey ? '••••••••••••••••' : $t('s3SecretKeyHint')" 
+                  clearable 
+                />
               </div>
             </div>
           </div>
 
-          <!-- Credentials Fields -->
-          <div class="dialog-field">
-            <div class="d-label-row">
-              <span class="d-field-title">{{ s3.provider === 'backblaze' ? 'Key ID (Access Key) *' : $t('s3AccessKeyId') + ' *' }}</span>
-              <span class="d-sub-hint">{{ setting.s3AccessKey ? $t('configured') + ': ' + setting.s3AccessKey : $t('s3AccessKeyHint') }}</span>
-            </div>
-            <el-input 
-              v-model="s3.s3AccessKey" 
-              type="text"
-              :placeholder="setting.s3AccessKey || $t('s3AccessKeyHint')" 
-              clearable 
-            />
-          </div>
-
-          <div class="dialog-field">
-            <div class="d-label-row">
-              <span class="d-field-title">{{ s3.provider === 'backblaze' ? 'Application Key (Secret Key) *' : $t('s3SecretKey') + ' *' }}</span>
-              <span class="d-sub-hint">{{ setting.s3SecretKey ? $t('encrypted') : $t('s3SecretKeyHint') }}</span>
-            </div>
-            <el-input 
-              v-model="s3.s3SecretKey" 
-              type="password" 
-              show-password
-              :placeholder="setting.s3SecretKey ? '••••••••••••••••' : $t('s3SecretKeyHint')" 
-              clearable 
-            />
-          </div>
-
-          <!-- Custom CDN Domain (Bandwidth Alliance) -->
-          <div class="dialog-field">
-            <div class="d-label-row">
-              <span class="d-field-title">{{ $t('customCdnDomain') }}</span>
-              <span class="d-sub-hint">{{ $t('customCdnDomainHint') }}</span>
-            </div>
-            <el-input 
-              v-model="s3.customDomain" 
-              :placeholder="$t('customCdnPlaceholder')" 
-              clearable 
-            />
-          </div>
-
-          <!-- Test Connection & Diagnostic Result Banner -->
-          <div class="test-action-bar">
+          <!-- Bottom: Test Connection & Diagnostic Result (Single row flex) -->
+          <div class="test-feedback-row">
             <el-button 
               type="default" 
               :loading="testingS3" 
@@ -1870,24 +1868,18 @@
               <Icon icon="fluent:play-circle-20-filled" width="16" height="16" />
               <span>{{ testingS3 ? $t('testingConnection') : $t('testConnectionBtn') }}</span>
             </el-button>
-          </div>
 
-          <!-- Result Alert Box -->
-          <div v-if="s3TestResult" class="test-feedback-box" :class="{ success: s3TestResult.ok, error: !s3TestResult.ok }">
-            <div class="fb-icon">
-              <Icon :icon="s3TestResult.ok ? 'fluent:checkmark-circle-20-filled' : 'fluent:dismiss-circle-20-filled'" width="20" height="20" />
-            </div>
-            <div class="fb-content">
-              <div class="fb-title">
-                <span>{{ s3TestResult.ok ? $t('storageTestSuccess') : $t('storageTestFail') }}</span>
-                <el-tag v-if="s3TestResult.ok" size="small" type="success" effect="plain" class="latency-pill">
-                  ⚡ {{ s3TestResult.latencyMs }}ms
-                </el-tag>
-                <el-tag v-if="s3TestResult.provider" size="small" type="info" effect="plain" class="provider-pill-tag">
-                  {{ s3TestResult.provider }}
-                </el-tag>
-              </div>
-              <div class="fb-msg">{{ s3TestResult.message || s3TestResult.error }}</div>
+            <!-- Result Alert Box inline -->
+            <div v-if="s3TestResult" class="test-feedback-box-inline" :class="{ success: s3TestResult.ok, error: !s3TestResult.ok }">
+              <Icon :icon="s3TestResult.ok ? 'fluent:checkmark-circle-20-filled' : 'fluent:dismiss-circle-20-filled'" width="16" height="16" class="fb-icon" />
+              <span class="fb-title">{{ s3TestResult.ok ? $t('storageTestSuccess') : $t('storageTestFail') }}</span>
+              <el-tag v-if="s3TestResult.ok" size="small" type="success" effect="plain" class="latency-pill">
+                ⚡ {{ s3TestResult.latencyMs }}ms
+              </el-tag>
+              <el-tag v-if="s3TestResult.provider" size="small" type="info" effect="plain" class="latency-pill">
+                {{ s3TestResult.provider }}
+              </el-tag>
+              <span class="fb-msg">{{ s3TestResult.message || s3TestResult.error }}</span>
             </div>
           </div>
         </div>
@@ -1900,28 +1892,29 @@
         </template>
       </el-dialog>
 
-      <!-- Core & Third-Party Database Management Modal (核心与第三方数据库管理) -->
+      <!-- Core & Third-Party Database Management Modal (核心与第三方数据库管理 - 宽屏无滑块布局) -->
       <el-dialog 
         v-model="dbConfigShow" 
         :title="$t('dbConfigTitle')" 
-        width="560px" 
+        width="880px" 
+        align-center
         @closed="resetDbConfigForm"
         class="storage-config-dialog db-config-dialog"
       >
         <div class="s3-modal-body">
           <!-- Database Provider Presets -->
-          <div class="dialog-field">
+          <div class="dialog-field preset-field">
             <div class="d-label-row">
               <span class="d-field-title">{{ $t('dbProviderPreset') }}</span>
               <span class="d-sub-hint">{{ $t('dbProviderPresetHint') }}</span>
             </div>
-            <div class="provider-preset-pills">
+            <div class="provider-preset-pills-row">
               <div 
                 class="provider-pill" 
                 :class="{ active: dbForm.provider === 'turso' }" 
                 @click="selectDbProvider('turso')"
               >
-                <Icon icon="simple-icons:turso" width="16" height="16" class="p-icon b2" />
+                <Icon icon="simple-icons:turso" width="15" height="15" class="p-icon b2" />
                 <span>{{ $t('tursoPreset') }}</span>
               </div>
               <div 
@@ -1929,7 +1922,7 @@
                 :class="{ active: dbForm.provider === 'd1' }" 
                 @click="selectDbProvider('d1')"
               >
-                <Icon icon="simple-icons:cloudflare" width="16" height="16" class="p-icon r2" />
+                <Icon icon="simple-icons:cloudflare" width="15" height="15" class="p-icon r2" />
                 <span>{{ $t('d1Preset') }}</span>
               </div>
               <div 
@@ -1937,7 +1930,7 @@
                 :class="{ active: dbForm.provider === 'd1_http' }" 
                 @click="selectDbProvider('d1_http')"
               >
-                <Icon icon="fluent:globe-arrow-forward-20-filled" width="16" height="16" class="p-icon aws" />
+                <Icon icon="fluent:globe-arrow-forward-20-filled" width="15" height="15" class="p-icon aws" />
                 <span>{{ $t('d1HttpPreset') }}</span>
               </div>
               <div 
@@ -1945,123 +1938,116 @@
                 :class="{ active: dbForm.provider === 'custom' }" 
                 @click="selectDbProvider('custom')"
               >
-                <Icon icon="fluent:server-multiple-20-filled" width="16" height="16" class="p-icon custom" />
+                <Icon icon="fluent:server-multiple-20-filled" width="15" height="15" class="p-icon custom" />
                 <span>{{ $t('customDbPreset') }}</span>
               </div>
             </div>
           </div>
 
-          <!-- Provider Guidance Box -->
-          <div class="b2-guidance-box" v-if="dbForm.provider === 'turso'">
-            <div class="g-header">
-              <Icon icon="fluent:sparkle-20-filled" width="16" height="16" class="g-icon" />
-              <span class="g-title">{{ $t('tursoGuidanceTitle') }}</span>
-            </div>
-            <div class="g-content">
-              • 适用于将大体积邮件与附件数据卸载至全球分布式 SQLite。<br/>
-              • 接入点格式示例：<code>https://[db-name]-[org].turso.io</code><br/>
-              • 支持通过 <strong>Auth Token</strong> 鉴权直连，大幅扩展海量邮件存储能力。
-            </div>
+          <!-- Provider Guidance Box (Compact) -->
+          <div class="b2-guidance-box compact" v-if="dbForm.provider === 'turso'">
+            <Icon icon="fluent:sparkle-20-filled" width="15" height="15" class="g-icon" />
+            <span>
+              <strong>Turso (LibSQL) 指南</strong>: 适用于将海量邮件与附件数据卸载至全球分布式 SQLite；接入点示例 <code>https://[db-name]-[org].turso.io</code>；支持 Auth Token 鉴权直连。
+            </span>
           </div>
 
-          <div class="b2-guidance-box" v-else-if="dbForm.provider === 'd1'">
-            <div class="g-header">
-              <Icon icon="fluent:info-20-filled" width="16" height="16" class="g-icon" />
-              <span class="g-title">{{ $t('d1GuidanceTitle') }}</span>
-            </div>
-            <div class="g-content">
-              • <strong>默认单库模式</strong>：全部数据表保存在单一 D1 数据库中（100% 开箱即用）。<br/>
-              • <strong>双库物理分流</strong>：在 <code>wrangler.toml</code> 中绑定 <code>USER_DB</code> 与 <code>MAIL_DB</code> 即可物理隔离用户中心与邮件数据。
-            </div>
-          </div>
-
-          <!-- Enable External DB Switch -->
-          <div class="dialog-field" v-if="dbForm.provider !== 'd1'">
-            <div class="d-label-row">
-              <span class="d-field-title">{{ $t('enableExternalDb') }}</span>
-              <span class="d-sub-hint">{{ $t('enableExternalDbHint') }}</span>
-            </div>
-            <div class="fps-switch-wrapper" style="margin-top: 6px;">
-              <el-switch 
-                :active-value="1" 
-                :inactive-value="0" 
-                v-model="dbForm.enabled"
-              />
-              <span class="fps-label" :class="{ active: dbForm.enabled === 1 }">
-                {{ dbForm.enabled === 1 ? $t('enabled') : $t('disabled') }}
-              </span>
-            </div>
+          <div class="b2-guidance-box compact" v-else-if="dbForm.provider === 'd1'">
+            <Icon icon="fluent:info-20-filled" width="15" height="15" class="g-icon" />
+            <span>
+              <strong>Cloudflare 原生 D1 指南</strong>: 默认单库模式全部数据保存在单一 D1 数据库中；可在 <code>wrangler.toml</code> 绑定 <code>USER_DB</code> 与 <code>MAIL_DB</code> 启用双库物理隔离。
+            </span>
           </div>
 
           <!-- Notice when external DB is disabled -->
-          <div class="b2-guidance-box" style="margin-top: 10px; margin-bottom: 10px;" v-if="dbForm.provider !== 'd1' && dbForm.enabled !== 1">
-            <div class="g-header">
-              <Icon icon="fluent:info-20-filled" width="16" height="16" class="g-icon" />
-              <span class="g-title">{{ $t('dbExternalDisabled') }}</span>
+          <div class="b2-guidance-box compact" v-if="dbForm.provider !== 'd1' && dbForm.enabled !== 1">
+            <Icon icon="fluent:info-20-filled" width="15" height="15" class="g-icon" />
+            <span>{{ $t('dbDisabledNotice') }}</span>
+          </div>
+
+          <!-- 2-Column Form for External DB -->
+          <div class="s3-form-2col" v-if="dbForm.provider !== 'd1'">
+            <!-- Left Column -->
+            <div class="s3-col">
+              <!-- Enable Switch -->
+              <div class="dialog-field">
+                <div class="d-label-row">
+                  <span class="d-field-title">{{ $t('enableExternalDb') }}</span>
+                  <span class="d-sub-hint">{{ $t('enableExternalDbHint') }}</span>
+                </div>
+                <div class="fps-switch-wrapper" style="margin-top: 4px;">
+                  <el-switch 
+                    :active-value="1" 
+                    :inactive-value="0" 
+                    v-model="dbForm.enabled"
+                  />
+                  <span class="fps-label" :class="{ active: dbForm.enabled === 1 }">
+                    {{ dbForm.enabled === 1 ? $t('enabled') : $t('disabled') }}
+                  </span>
+                </div>
+              </div>
+
+              <!-- Endpoint Field -->
+              <div class="dialog-field" v-if="dbForm.enabled === 1">
+                <div class="d-label-row">
+                  <span class="d-field-title">{{ $t('dbEndpoint') }} *</span>
+                  <span class="d-sub-hint">{{ $t('dbEndpointHint') }}</span>
+                </div>
+                <el-input 
+                  v-model="dbForm.endpoint" 
+                  :placeholder="dbForm.provider === 'turso' ? $t('dbEndpointPlaceholderTurso') : $t('dbEndpointPlaceholderD1Http')" 
+                  clearable 
+                />
+              </div>
+
+              <!-- Target Routing Scope -->
+              <div class="dialog-field" v-if="dbForm.enabled === 1">
+                <div class="d-label-row">
+                  <span class="d-field-title">{{ $t('dbTargetScope') }}</span>
+                </div>
+                <el-radio-group v-model="dbForm.target" class="db-target-group">
+                  <el-radio-button value="attachment">{{ $t('dbTargetAttachment') }}</el-radio-button>
+                  <el-radio-button value="mail">{{ $t('dbTargetMail') }}</el-radio-button>
+                  <el-radio-button value="all">{{ $t('dbTargetAll') }}</el-radio-button>
+                  <el-radio-button value="user">{{ $t('dbTargetUser') }}</el-radio-button>
+                </el-radio-group>
+              </div>
             </div>
-            <div class="g-content">
-              {{ $t('dbDisabledNotice') }}
+
+            <!-- Right Column -->
+            <div class="s3-col" v-if="dbForm.enabled === 1">
+              <!-- Auth Token -->
+              <div class="dialog-field">
+                <div class="d-label-row">
+                  <span class="d-field-title">{{ $t('dbAuthToken') }} *</span>
+                  <span class="d-sub-hint">{{ setting.externalDbToken ? $t('configured') + ': ' + setting.externalDbToken : $t('dbAuthTokenHint') }}</span>
+                </div>
+                <el-input 
+                  v-model="dbForm.token" 
+                  type="password" 
+                  show-password
+                  :placeholder="setting.externalDbToken ? '••••••••••••••••' : $t('dbAuthTokenHint')" 
+                  clearable 
+                />
+              </div>
+
+              <!-- Database Name / Namespace -->
+              <div class="dialog-field">
+                <div class="d-label-row">
+                  <span class="d-field-title">{{ $t('dbName') }}</span>
+                  <span class="d-sub-hint">{{ $t('dbNameHint') }}</span>
+                </div>
+                <el-input 
+                  v-model="dbForm.name" 
+                  placeholder="例如: epomail_mail_db" 
+                  clearable 
+                />
+              </div>
             </div>
           </div>
 
-          <!-- External DB Endpoint & Auth Fields -->
-          <template v-if="dbForm.provider !== 'd1' && dbForm.enabled === 1">
-            <div class="dialog-field">
-              <div class="d-label-row">
-                <span class="d-field-title">{{ $t('dbEndpoint') }} *</span>
-                <span class="d-sub-hint">{{ $t('dbEndpointHint') }}</span>
-              </div>
-              <el-input 
-                v-model="dbForm.endpoint" 
-                :placeholder="dbForm.provider === 'turso' ? $t('dbEndpointPlaceholderTurso') : $t('dbEndpointPlaceholderD1Http')" 
-                clearable 
-              />
-            </div>
-
-            <!-- Auth Token -->
-            <div class="dialog-field">
-              <div class="d-label-row">
-                <span class="d-field-title">{{ $t('dbAuthToken') }} *</span>
-                <span class="d-sub-hint">{{ setting.externalDbToken ? $t('configured') + ': ' + setting.externalDbToken : $t('dbAuthTokenHint') }}</span>
-              </div>
-              <el-input 
-                v-model="dbForm.token" 
-                type="password" 
-                show-password
-                :placeholder="setting.externalDbToken ? '••••••••••••••••' : $t('dbAuthTokenHint')" 
-                clearable 
-              />
-            </div>
-
-            <!-- Database Name / Namespace -->
-            <div class="dialog-field">
-              <div class="d-label-row">
-                <span class="d-field-title">{{ $t('dbName') }}</span>
-                <span class="d-sub-hint">{{ $t('dbNameHint') }}</span>
-              </div>
-              <el-input 
-                v-model="dbForm.name" 
-                placeholder="例如: epomail_mail_db" 
-                clearable 
-              />
-            </div>
-
-            <!-- Target Routing Scope -->
-            <div class="dialog-field">
-              <div class="d-label-row">
-                <span class="d-field-title">{{ $t('dbTargetScope') }}</span>
-              </div>
-              <el-radio-group v-model="dbForm.target" class="db-target-group">
-                <el-radio-button value="attachment">{{ $t('dbTargetAttachment') }}</el-radio-button>
-                <el-radio-button value="mail">{{ $t('dbTargetMail') }}</el-radio-button>
-                <el-radio-button value="all">{{ $t('dbTargetAll') }}</el-radio-button>
-                <el-radio-button value="user">{{ $t('dbTargetUser') }}</el-radio-button>
-              </el-radio-group>
-            </div>
-          </template>
-
-          <!-- Test Connection & Diagnostic Action -->
-          <div class="test-action-bar">
+          <!-- Bottom: Test Connection & Diagnostic Action -->
+          <div class="test-feedback-row">
             <el-button 
               type="default" 
               :loading="testingDb" 
@@ -2071,30 +2057,18 @@
               <Icon icon="fluent:play-circle-20-filled" width="16" height="16" />
               <span>{{ testingDb ? $t('testingDbConnection') : $t('testDbConnectionBtn') }}</span>
             </el-button>
-          </div>
 
-          <!-- Result Alert Box -->
-          <div v-if="dbTestResult" class="test-feedback-box" :class="{ success: dbTestResult.ok, error: !dbTestResult.ok }">
-            <div class="fb-icon">
-              <Icon :icon="dbTestResult.ok ? 'fluent:checkmark-circle-20-filled' : 'fluent:dismiss-circle-20-filled'" width="20" height="20" />
-            </div>
-            <div class="fb-content">
-              <div class="fb-title">
-                <span>{{ dbTestResult.ok ? $t('dbTestSuccess') : $t('dbTestFail') }}</span>
-                <el-tag v-if="dbTestResult.ok" size="small" type="success" effect="plain" class="latency-pill">
-                  ⚡ {{ dbTestResult.latencyMs }}ms
-                </el-tag>
-                <el-tag size="small" type="info" effect="plain" class="provider-pill-tag">
-                  {{ dbTestResult.mode === 'dual' ? $t('dbModeDual') : (dbTestResult.mode === 'external' ? $t('dbModeExternal') : $t('dbModeSingle')) }}
-                </el-tag>
-              </div>
-              <div class="fb-msg">{{ dbTestResult.message }}</div>
-              <div v-if="dbTestResult.stats" class="fb-stats-row">
-                <span class="stat-pill"><Icon icon="solar:users-group-rounded-linear" width="13" height="13"/> {{ dbTestResult.stats.userCount }} {{ $t('dbStatsUsers') }}</span>
-                <span class="stat-pill"><Icon icon="fluent:mail-20-regular" width="13" height="13"/> {{ dbTestResult.stats.emailCount }} {{ $t('dbStatsEmails') }}</span>
-                <span class="stat-pill"><Icon icon="fluent:person-mail-20-regular" width="13" height="13"/> {{ dbTestResult.stats.accountCount }} {{ $t('dbStatsAccounts') }}</span>
-                <span class="stat-pill"><Icon icon="fluent:attach-20-regular" width="13" height="13"/> {{ dbTestResult.stats.attCount }} {{ $t('dbStatsAtts') }}</span>
-              </div>
+            <!-- Result Alert Box inline -->
+            <div v-if="dbTestResult" class="test-feedback-box-inline" :class="{ success: dbTestResult.ok, error: !dbTestResult.ok }">
+              <Icon :icon="dbTestResult.ok ? 'fluent:checkmark-circle-20-filled' : 'fluent:dismiss-circle-20-filled'" width="16" height="16" class="fb-icon" />
+              <span class="fb-title">{{ dbTestResult.ok ? $t('dbTestSuccess') : $t('dbTestFail') }}</span>
+              <el-tag v-if="dbTestResult.ok" size="small" type="success" effect="plain" class="latency-pill">
+                ⚡ {{ dbTestResult.latencyMs }}ms
+              </el-tag>
+              <el-tag size="small" type="info" effect="plain" class="latency-pill">
+                {{ dbTestResult.mode === 'dual' ? $t('dbModeDual') : (dbTestResult.mode === 'external' ? $t('dbModeExternal') : $t('dbModeSingle')) }}
+              </el-tag>
+              <span class="fb-msg">{{ dbTestResult.message }}</span>
             </div>
           </div>
         </div>
@@ -2112,6 +2086,7 @@
         v-model="attachmentRuleShow" 
         :title="$t('attachmentRuleTitle')" 
         width="580px" 
+        align-center
         class="storage-config-dialog attachment-rule-dialog"
       >
         <div class="s3-modal-body">
@@ -2234,6 +2209,7 @@
         v-model="storageScanShow" 
         :title="$t('storageScanTitle')" 
         width="880px" 
+        align-center
         class="storage-config-dialog storage-scan-dialog"
       >
         <div class="s3-modal-body scan-body">
@@ -2381,6 +2357,7 @@
         v-model="dbDomainsDetailShow"
         :title="$t('dbDomainsModalTitle')"
         width="920px"
+        align-center
         class="storage-config-dialog db-domains-dialog"
       >
         <div class="s3-modal-body domains-modal-body">
@@ -4899,7 +4876,7 @@ function editSetting(settingForm, refreshStatus = true) {
 }
 
 
-:deep(.el-dialog) {
+:deep(.el-dialog:not(.storage-config-dialog):not(.db-domains-dialog):not(.storage-scan-dialog):not(.s3-config-dialog):not(.db-config-dialog):not(.attachment-rule-dialog)) {
   width: 400px !important;
   @media (max-width: 440px) {
     width: calc(100% - 40px) !important;
@@ -4909,30 +4886,63 @@ function editSetting(settingForm, refreshStatus = true) {
 }
 
 :deep(.storage-config-dialog.el-dialog),
+:deep(.s3-config-dialog.el-dialog),
+:deep(.db-config-dialog.el-dialog),
 :deep(.attachment-rule-dialog.el-dialog),
-:deep(.db-config-dialog.el-dialog) {
-  width: min(620px, calc(100vw - 32px)) !important;
-  max-width: min(620px, calc(100vw - 32px)) !important;
-}
-
 :deep(.storage-config-dialog.storage-scan-dialog.el-dialog),
 :deep(.storage-scan-dialog.el-dialog) {
   width: min(880px, calc(100vw - 32px)) !important;
   max-width: min(880px, calc(100vw - 32px)) !important;
+  background: var(--el-bg-color, #ffffff) !important;
+  background-color: var(--el-bg-color, #ffffff) !important;
+  border: 1px solid var(--el-border-color-lighter, #e2e8f0) !important;
+  border-radius: 14px !important;
+  box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.35) !important;
 }
 
 :deep(.storage-config-dialog.db-domains-dialog.el-dialog),
 :deep(.db-domains-dialog.el-dialog) {
   width: min(920px, calc(100vw - 32px)) !important;
   max-width: min(920px, calc(100vw - 32px)) !important;
+  background: var(--el-bg-color, #ffffff) !important;
+  background-color: var(--el-bg-color, #ffffff) !important;
+  border: 1px solid var(--el-border-color-lighter, #e2e8f0) !important;
+  border-radius: 14px !important;
+  box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.35) !important;
 }
 
+:deep(.storage-config-dialog .el-dialog__header),
+:deep(.s3-config-dialog .el-dialog__header),
+:deep(.db-config-dialog .el-dialog__header),
+:deep(.db-domains-dialog .el-dialog__header),
+:deep(.storage-scan-dialog .el-dialog__header) {
+  background: var(--el-bg-color, #ffffff) !important;
+  border-bottom: 1px solid var(--el-border-color-lighter, #e2e8f0) !important;
+  padding: 14px 20px !important;
+  margin-right: 0 !important;
+}
+
+:deep(.storage-config-dialog .el-dialog__body),
+:deep(.s3-config-dialog .el-dialog__body),
+:deep(.db-config-dialog .el-dialog__body),
 :deep(.db-domains-dialog .el-dialog__body),
 :deep(.storage-scan-dialog .el-dialog__body),
 :deep(.attachment-rule-dialog .el-dialog__body) {
+  background: var(--el-bg-color, #ffffff) !important;
+  padding: 16px 20px !important;
   overflow-y: visible !important;
   max-height: none !important;
   height: auto !important;
+}
+
+:deep(.storage-config-dialog .el-dialog__footer),
+:deep(.s3-config-dialog .el-dialog__footer),
+:deep(.db-config-dialog .el-dialog__footer),
+:deep(.db-domains-dialog .el-dialog__footer),
+:deep(.storage-scan-dialog .el-dialog__footer) {
+  background: var(--el-bg-color, #ffffff) !important;
+  border-top: 1px solid var(--el-border-color-lighter, #e2e8f0) !important;
+  padding: 12px 20px !important;
 }
 
 :deep(.resend-table.el-dialog) {
@@ -6665,30 +6675,31 @@ form .el-button {
   }
 }
 
-/* Storage Configuration Dialog */
+/* Storage Configuration Dialog (Wide 880px 2-Column Responsive Layout) */
 .storage-config-dialog {
   .s3-modal-body {
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 12px;
   }
 
-  .provider-preset-pills {
+  .provider-preset-pills-row {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(4, 1fr);
     gap: 8px;
-    margin-top: 6px;
+    margin-top: 4px;
 
     .provider-pill {
       display: flex;
       align-items: center;
-      gap: 8px;
-      padding: 9px 12px;
+      justify-content: center;
+      gap: 6px;
+      padding: 7px 10px;
       border-radius: 8px;
       border: 1px solid var(--border-subtle, #e2e8f0);
       background: var(--bg-surface, #ffffff);
       cursor: pointer;
-      font-size: 13px;
+      font-size: 12.5px;
       font-weight: 500;
       color: var(--text-primary, #1e293b);
       transition: all 0.2s ease;
@@ -6716,21 +6727,23 @@ form .el-button {
   }
 
   .b2-guidance-box {
-    padding: 10px 14px;
+    padding: 8px 12px;
     border-radius: 8px;
     background: color-mix(in srgb, #e11d48 7%, var(--bg-surface, #ffffff));
     border: 1px solid color-mix(in srgb, #e11d48 20%, transparent);
     font-size: 12px;
-    line-height: 1.6;
+    line-height: 1.5;
     color: var(--text-primary, #334155);
 
-    .g-header {
+    &.compact {
       display: flex;
       align-items: center;
-      gap: 6px;
-      margin-bottom: 4px;
-      font-weight: 600;
+      gap: 8px;
+    }
+
+    .g-icon {
       color: #e11d48;
+      flex-shrink: 0;
     }
 
     code {
@@ -6742,17 +6755,30 @@ form .el-button {
     }
   }
 
+  .s3-form-2col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-top: 2px;
+
+    .s3-col {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+  }
+
   .dialog-row-2col {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 12px;
+    gap: 10px;
   }
 
   .fps-switch-wrapper {
     display: flex;
     align-items: center;
     gap: 8px;
-    height: 36px;
+    height: 32px;
 
     .fps-label {
       font-size: 12px;
@@ -6760,58 +6786,67 @@ form .el-button {
     }
   }
 
-  .test-action-bar {
+  .test-feedback-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
     margin-top: 4px;
+    padding-top: 8px;
+    border-top: 1px dashed var(--el-border-color-lighter);
 
     .test-conn-btn {
-      width: 100%;
-      height: 38px;
-      display: flex;
+      flex-shrink: 0;
+      height: 32px;
+      border-radius: 6px;
+      padding: 0 12px;
+      display: inline-flex;
       align-items: center;
-      justify-content: center;
       gap: 6px;
-      font-weight: 500;
-      border-radius: 8px;
-    }
-  }
-
-  .test-feedback-box {
-    display: flex;
-    gap: 12px;
-    padding: 12px 14px;
-    border-radius: 8px;
-    margin-top: 4px;
-    font-size: 13px;
-    animation: fadeIn 0.2s ease;
-
-    &.success {
-      background: color-mix(in srgb, #10b981 10%, var(--bg-surface, #ffffff));
-      border: 1px solid color-mix(in srgb, #10b981 25%, transparent);
-      color: #065f46;
-
-      .fb-icon { color: #10b981; }
+      font-size: 12px;
     }
 
-    &.error {
-      background: color-mix(in srgb, #ef4444 10%, var(--bg-surface, #ffffff));
-      border: 1px solid color-mix(in srgb, #ef4444 25%, transparent);
-      color: #991b1b;
-
-      .fb-icon { color: #ef4444; }
-    }
-
-    .fb-title {
+    .test-feedback-box-inline {
+      flex: 1;
       display: flex;
       align-items: center;
       gap: 8px;
-      font-weight: 600;
-      margin-bottom: 3px;
-    }
-
-    .fb-msg {
+      padding: 4px 10px;
+      border-radius: 6px;
       font-size: 12px;
-      line-height: 1.5;
-      opacity: 0.9;
+      min-height: 32px;
+
+      &.success {
+        background: color-mix(in srgb, #10b981 10%, var(--bg-surface, #ffffff));
+        border: 1px solid color-mix(in srgb, #10b981 25%, transparent);
+        color: #065f46;
+        .fb-icon { color: #10b981; flex-shrink: 0; }
+      }
+
+      &.error {
+        background: color-mix(in srgb, #ef4444 10%, var(--bg-surface, #ffffff));
+        border: 1px solid color-mix(in srgb, #ef4444 25%, transparent);
+        color: #991b1b;
+        .fb-icon { color: #ef4444; flex-shrink: 0; }
+      }
+
+      .fb-title {
+        font-weight: 600;
+        white-space: nowrap;
+      }
+
+      .latency-pill {
+        flex-shrink: 0;
+        height: 20px;
+        padding: 0 4px;
+        font-size: 11px;
+      }
+
+      .fb-msg {
+        font-size: 11.5px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
     }
   }
 
@@ -6823,45 +6858,84 @@ form .el-button {
 }
 
 .storage-db-card {
-  .section-badge-row {
+  .setting-item {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 6px 0;
-    margin-bottom: 4px;
-    border-bottom: 1px solid var(--el-border-color-extra-light, rgba(0, 0, 0, 0.05));
+    padding: 7px 0;
+    gap: 12px;
+    border-bottom: 1px solid var(--el-border-color-extra-light, rgba(0, 0, 0, 0.04));
 
-    &.db-sec-row {
-      margin-top: 10px;
-      padding-top: 10px;
+    &:last-child {
+      border-bottom: none;
     }
 
-    .sec-left {
+    > .title-item {
+      flex-shrink: 0;
       display: flex;
       align-items: center;
-      gap: 6px;
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--el-text-color-primary);
+      gap: 5px;
+    }
+  }
 
-      .sec-icon {
-        color: var(--accent-primary, #3b82f6);
-        &.db {
-          color: #8b5cf6;
-        }
-      }
+  .storage-item-right {
+    display: flex !important;
+    justify-content: flex-end !important;
+    align-items: center !important;
+    gap: 8px !important;
+    flex-wrap: wrap !important;
+    margin-left: auto !important;
 
-      .sec-label {
-        font-size: 13px;
+    .hub-unit-text {
+      font-size: 12px;
+      color: var(--el-text-color-secondary);
+      font-weight: 500;
+      user-select: none;
+    }
+
+    .el-button.opt-btn-inline {
+      width: auto !important;
+      height: 28px !important;
+      padding: 0 10px !important;
+      margin: 0 !important;
+      font-size: 12px !important;
+      border-radius: 6px !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      gap: 4px !important;
+      font-weight: 500 !important;
+      box-shadow: none !important;
+    }
+
+    .el-button.opt-btn-secondary {
+      background: var(--el-fill-color-light) !important;
+      border-color: var(--el-border-color) !important;
+      color: var(--el-text-color-primary) !important;
+
+      &:hover {
+        background: var(--el-fill-color) !important;
+        border-color: var(--el-color-primary) !important;
+        color: var(--el-color-primary) !important;
       }
     }
 
-    .engine-status-tag {
-      font-weight: 600;
-      font-size: 11.5px;
+    .hub-tag {
       display: inline-flex;
       align-items: center;
-      padding: 3px 8px;
+      font-size: 11.5px;
+      font-weight: 500;
+      border-radius: 6px;
+      max-width: 220px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .hub-sub-tag {
+      font-size: 10.5px;
+      padding: 0 4px;
+      height: 20px;
+      line-height: 18px;
     }
   }
 
@@ -6890,93 +6964,6 @@ form .el-button {
     font-size: 12px;
     display: inline-flex;
     align-items: center;
-  }
-
-  .success-highlight {
-    color: var(--el-color-success);
-    font-weight: 600;
-  }
-
-  .fallback-code {
-    color: var(--el-text-color-placeholder);
-  }
-
-  .direct-link {
-    color: var(--el-color-primary);
-    font-weight: 500;
-  }
-
-  .domain-active {
-    font-weight: 600;
-    letter-spacing: 0.2px;
-  }
-
-  .storage-hub-val {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 6px;
-    flex-wrap: wrap;
-
-    .hub-tag {
-      display: inline-flex;
-      align-items: center;
-      font-size: 11.5px;
-      font-weight: 500;
-      border-radius: 6px;
-      max-width: 240px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .hub-sub-tag {
-      font-size: 10.5px;
-      padding: 0 4px;
-      height: 20px;
-      line-height: 18px;
-    }
-  }
-
-  .storage-card-actions {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    margin-top: 12px;
-    padding-top: 10px;
-    border-top: 1px dashed var(--el-border-color-lighter);
-
-    .storage-actions-row {
-      display: grid;
-      gap: 8px;
-
-      &.config-row {
-        grid-template-columns: 1fr 1fr;
-      }
-
-      &.tool-row {
-        grid-template-columns: repeat(3, 1fr);
-      }
-    }
-
-    .el-button {
-      height: 32px;
-      font-size: 12px;
-      font-weight: 500;
-      padding: 0 6px;
-      border-radius: 6px;
-      margin: 0;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-
-      &.opt-btn-main {
-        font-weight: 600;
-      }
-    }
   }
 }
 
@@ -7291,5 +7278,72 @@ form .el-button {
 
 <style>
 .el-popper.is-dark {
+}
+
+/* Epomail Storage & Database Hub Dialogs Unscoped Overrides */
+.el-dialog.storage-config-dialog,
+.el-dialog.s3-config-dialog,
+.el-dialog.db-config-dialog,
+.el-dialog.attachment-rule-dialog,
+.el-dialog.storage-scan-dialog {
+  width: min(880px, calc(100vw - 32px)) !important;
+  max-width: min(880px, calc(100vw - 32px)) !important;
+  background-color: #ffffff !important;
+  background: #ffffff !important;
+  border-radius: 14px !important;
+  box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.35) !important;
+  opacity: 1 !important;
+  overflow: visible !important;
+  margin: auto !important;
+}
+
+html.dark .el-dialog.storage-config-dialog,
+html.dark .el-dialog.s3-config-dialog,
+html.dark .el-dialog.db-config-dialog,
+html.dark .el-dialog.attachment-rule-dialog,
+html.dark .el-dialog.storage-scan-dialog {
+  background-color: #111827 !important;
+  background: #111827 !important;
+}
+
+.el-dialog.storage-config-dialog.db-domains-dialog,
+.el-dialog.db-domains-dialog {
+  width: min(920px, calc(100vw - 32px)) !important;
+  max-width: min(920px, calc(100vw - 32px)) !important;
+  background-color: #ffffff !important;
+  background: #ffffff !important;
+  opacity: 1 !important;
+  overflow: visible !important;
+  margin: auto !important;
+}
+
+html.dark .el-dialog.storage-config-dialog.db-domains-dialog,
+html.dark .el-dialog.db-domains-dialog {
+  background-color: #111827 !important;
+  background: #111827 !important;
+}
+
+.storage-config-dialog .el-dialog__body,
+.s3-config-dialog .el-dialog__body,
+.db-config-dialog .el-dialog__body,
+.db-domains-dialog .el-dialog__body,
+.storage-scan-dialog .el-dialog__body,
+.attachment-rule-dialog .el-dialog__body {
+  background-color: #ffffff !important;
+  background: #ffffff !important;
+  overflow-y: visible !important;
+  overflow-x: hidden !important;
+  max-height: none !important;
+  height: auto !important;
+}
+
+html.dark .storage-config-dialog .el-dialog__body,
+html.dark .s3-config-dialog .el-dialog__body,
+html.dark .db-config-dialog .el-dialog__body,
+html.dark .db-domains-dialog .el-dialog__body,
+html.dark .storage-scan-dialog .el-dialog__body,
+html.dark .attachment-rule-dialog .el-dialog__body {
+  background-color: #111827 !important;
+  background: #111827 !important;
 }
 </style>

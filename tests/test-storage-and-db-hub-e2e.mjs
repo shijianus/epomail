@@ -213,26 +213,98 @@ import { getUserDb, getMailDb, isDualDbMode } from "../mail-worker/src/utils/db-
     assert.strictEqual(optButtons, 0, "卡片行内绝不允许存在画风突兀的 opt-button 蓝色方块按钮！");
     console.log("  ✓ 卡片行内突兀的 opt-button 按钮已 100% 彻底清除");
 
-    // 验证单文件附件上限输入控件显式展示且可操作
+    // 验证 storage-card-actions 独立操作栏已彻底剔除
+    const cardActionsCount = await storageDbCard.locator(".storage-card-actions").count();
+    assert.strictEqual(cardActionsCount, 0, "storage-card-actions 独立操作栏必须彻底移除，所有操作融入行内右对齐！");
+    console.log("  ✓ 确认 storage-card-actions 独立操作栏已彻底剔除，完全融入行内");
+
+    // 验证单文件附件上限输入控件显式展示且必须完全右对齐
     const sizeInput = storageDbCard.locator(".el-input-number");
     await assert.ok(await sizeInput.isVisible(), "卡片面板必须显式展示单文件附件上限输入控件");
-    console.log("  ✓ 单文件附件上限输入控件已在面板显式呈现");
+    const inputContainer = storageDbCard.locator(".el-input-number").locator("xpath=..");
+    const isRightAligned = await inputContainer.evaluate((el) => {
+      const style = window.getComputedStyle(el);
+      return style.justifyContent === 'flex-end';
+    });
+    assert.ok(isRightAligned, "单文件附件上限控件必须通过 justify-content: flex-end 完全右对齐，禁止紧随 title-item 左对齐！");
+    console.log("  ✓ 单文件附件上限输入控件已在面板右对齐显式呈现 (完全右对齐验证通过)");
 
-    // 验证 5 大核心操作按钮 (2行紧凑对称排布)
+    // 验证行内操作按钮全部融入各行并就绪
     const s3Btn = storageDbCard.locator(".opt-btn-s3");
     const dbBtn = storageDbCard.locator(".opt-btn-db");
     const inspectBtn = storageDbCard.locator(".opt-btn-inspect");
     const scanBtn = storageDbCard.locator(".opt-btn-scan");
     const quickTestBtn = storageDbCard.locator(".opt-btn-test");
 
-    await assert.ok(await s3Btn.isVisible(), "对象存储配置按钮必须可见");
-    await assert.ok(await dbBtn.isVisible(), "第三方数据库配置按钮必须可见");
-    await assert.ok(await inspectBtn.isVisible(), "架构透视按钮必须可见");
-    await assert.ok(await scanBtn.isVisible(), "存储体检按钮必须可见");
-    await assert.ok(await quickTestBtn.isVisible(), "全链路诊断按钮必须可见");
-    console.log("  ✓ 卡片底部 5 大核心操作工具全部就绪且 2 行紧凑对称排布");
+    await assert.ok(await s3Btn.isVisible(), "行内对象存储配置按钮必须可见");
+    await assert.ok(await dbBtn.isVisible(), "行内第三方数据库配置按钮必须可见");
+    await assert.ok(await inspectBtn.isVisible(), "行内架构透视按钮必须可见");
+    await assert.ok(await scanBtn.isVisible(), "行内存储体检按钮必须可见");
+    await assert.ok(await quickTestBtn.isVisible(), "行内全链路诊断按钮必须可见");
+    console.log("  ✓ 所有配置与诊断按钮全部融入各条目右侧并就绪");
 
-    // 2.8 交互验证 1: 点击底部 opt-btn-inspect 打开「3大核心域 DB 架构透视」弹窗 (宽屏无滚动设计)
+    // 2.8 交互验证 1: 点击 opt-btn-s3 打开「对象存储配置 (S3 / Backblaze B2)」弹窗 (宽屏无滚动设计)
+    console.log("  -> 点击打开「对象存储配置 (S3 / Backblaze B2)」弹窗...");
+    await s3Btn.click();
+    const s3Dialog = page.locator(".s3-config-dialog");
+    await s3Dialog.waitFor({ state: "visible", timeout: 5000 });
+    await page.waitForTimeout(600); // 确保淡入动效完全结束
+
+    const s3Box = await s3Dialog.boundingBox();
+    assert.ok(s3Box.width >= 840, `对象存储配置弹窗宽度必须扩展至 >= 840px (当前: ${s3Box.width}px)，禁止被 400px 锁死！`);
+
+    // 验证 S3 弹窗内容 100% 无垂直滑块/滚动条，且外层遮罩亦无滑块
+    const s3ScrollInfo = await s3Dialog.evaluate((el) => {
+      const body = el.querySelector(".el-dialog__body") || el;
+      const overlayDialog = el.closest(".el-overlay-dialog") || el.parentElement;
+      return {
+        bodyHasScroll: body.scrollHeight > body.clientHeight + 5,
+        overlayHasScroll: overlayDialog ? overlayDialog.scrollHeight > overlayDialog.clientHeight + 5 : false,
+        computedBg: window.getComputedStyle(el).backgroundColor,
+        bodyBg: window.getComputedStyle(body).backgroundColor,
+        opacity: window.getComputedStyle(el).opacity
+      };
+    });
+    assert.strictEqual(s3ScrollInfo.bodyHasScroll, false, "对象存储配置弹窗内部禁止出现垂直滑块滑动！");
+    assert.strictEqual(s3ScrollInfo.overlayHasScroll, false, "对象存储配置外层遮罩禁止出现垂直滑块滑动！");
+    console.log(`  ✓ 对象存储配置弹窗宽度扩展至 ${s3Box.width}px，纯色实心背景生效 (bg: ${s3ScrollInfo.computedBg})，且 100% 无垂直滚动条滑块`);
+    await page.screenshot({ path: "tests/audit_s3_config_dialog_no_scrollbar.png" });
+
+    // 关闭 S3 弹窗
+    const closeS3Btn = s3Dialog.locator(".el-dialog__headerbtn");
+    if (await closeS3Btn.isVisible()) {
+      await closeS3Btn.click();
+    } else {
+      await page.keyboard.press("Escape");
+    }
+    await page.waitForTimeout(400);
+
+    // 2.9 交互验证 2: 点击 opt-btn-db 打开「第三方数据库管理」弹窗 (宽屏无滚动设计)
+    console.log("  -> 点击打开「第三方数据库管理」弹窗...");
+    await dbBtn.click();
+    const dbConfigDialog = page.locator(".db-config-dialog");
+    await dbConfigDialog.waitFor({ state: "visible", timeout: 5000 });
+
+    const dbConfigBox = await dbConfigDialog.boundingBox();
+    assert.ok(dbConfigBox.width >= 840, `数据库配置弹窗宽度必须扩展至 >= 840px (当前: ${dbConfigBox.width}px)！`);
+
+    const dbConfigHasScrollbar = await dbConfigDialog.evaluate((el) => {
+      const body = el.querySelector(".el-dialog__body") || el;
+      return body.scrollHeight > body.clientHeight + 5;
+    });
+    assert.strictEqual(dbConfigHasScrollbar, false, "第三方数据库配置弹窗禁止出现垂直滑块滑动！");
+    console.log(`  ✓ 第三方数据库配置弹窗宽度扩展至 ${dbConfigBox.width}px，且 100% 无垂直滚动条滑块`);
+
+    // 关闭 DB 配置弹窗
+    const closeDbConfigBtn = dbConfigDialog.locator(".el-dialog__headerbtn");
+    if (await closeDbConfigBtn.isVisible()) {
+      await closeDbConfigBtn.click();
+    } else {
+      await page.keyboard.press("Escape");
+    }
+    await page.waitForTimeout(400);
+
+    // 2.10 交互验证 3: 点击底部 opt-btn-inspect 打开「3大核心域 DB 架构透视」弹窗 (宽屏无滚动设计)
     console.log("  -> 点击打开「3大核心域 DB 架构透视」弹窗...");
     await inspectBtn.click();
     const dbDomainsDialog = page.locator(".db-domains-dialog");

@@ -785,6 +785,127 @@ html:not(.dark) .el-popper .el-popper__arrow::before {
     color: var(--text-secondary) !important;
 }
 
+/* Storage & Database Hub Dialogs Global Strict Styling (100% Solid Background & No Scrollbars) */
+.el-dialog.storage-config-dialog,
+.el-dialog.s3-config-dialog,
+.el-dialog.db-config-dialog,
+.el-dialog.attachment-rule-dialog,
+.el-dialog.storage-scan-dialog {
+    width: min(880px, calc(100vw - 32px)) !important;
+    max-width: min(880px, calc(100vw - 32px)) !important;
+    background-color: #ffffff !important;
+    background: #ffffff !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 14px !important;
+    box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.35) !important;
+    opacity: 1 !important;
+    overflow: visible !important;
+    margin: auto !important;
+}
+
+html.dark .el-dialog.storage-config-dialog,
+html.dark .el-dialog.s3-config-dialog,
+html.dark .el-dialog.db-config-dialog,
+html.dark .el-dialog.attachment-rule-dialog,
+html.dark .el-dialog.storage-scan-dialog {
+    background-color: #111827 !important;
+    background: #111827 !important;
+    border-color: #374151 !important;
+}
+
+.el-dialog.storage-config-dialog.db-domains-dialog,
+.el-dialog.db-domains-dialog {
+    width: min(920px, calc(100vw - 32px)) !important;
+    max-width: min(920px, calc(100vw - 32px)) !important;
+    background-color: #ffffff !important;
+    background: #ffffff !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 14px !important;
+    box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.35) !important;
+    opacity: 1 !important;
+    overflow: visible !important;
+    margin: auto !important;
+}
+
+html.dark .el-dialog.storage-config-dialog.db-domains-dialog,
+html.dark .el-dialog.db-domains-dialog {
+    background-color: #111827 !important;
+    background: #111827 !important;
+    border-color: #374151 !important;
+}
+
+.storage-config-dialog .el-dialog__header,
+.s3-config-dialog .el-dialog__header,
+.db-config-dialog .el-dialog__header,
+.db-domains-dialog .el-dialog__header,
+.storage-scan-dialog .el-dialog__header {
+    background-color: #ffffff !important;
+    background: #ffffff !important;
+    border-bottom: 1px solid #e2e8f0 !important;
+    padding: 14px 20px !important;
+    margin-right: 0 !important;
+    border-top-left-radius: 14px !important;
+    border-top-right-radius: 14px !important;
+}
+
+html.dark .storage-config-dialog .el-dialog__header,
+html.dark .s3-config-dialog .el-dialog__header,
+html.dark .db-config-dialog .el-dialog__header,
+html.dark .db-domains-dialog .el-dialog__header,
+html.dark .storage-scan-dialog .el-dialog__header {
+    background-color: #111827 !important;
+    background: #111827 !important;
+    border-bottom-color: #374151 !important;
+}
+
+.storage-config-dialog .el-dialog__body,
+.s3-config-dialog .el-dialog__body,
+.db-config-dialog .el-dialog__body,
+.db-domains-dialog .el-dialog__body,
+.storage-scan-dialog .el-dialog__body,
+.attachment-rule-dialog .el-dialog__body {
+    background-color: #ffffff !important;
+    background: #ffffff !important;
+    padding: 16px 20px !important;
+    overflow-y: visible !important;
+    overflow-x: hidden !important;
+    max-height: none !important;
+    height: auto !important;
+}
+
+html.dark .storage-config-dialog .el-dialog__body,
+html.dark .s3-config-dialog .el-dialog__body,
+html.dark .db-config-dialog .el-dialog__body,
+html.dark .db-domains-dialog .el-dialog__body,
+html.dark .storage-scan-dialog .el-dialog__body,
+html.dark .attachment-rule-dialog .el-dialog__body {
+    background-color: #111827 !important;
+    background: #111827 !important;
+}
+
+.storage-config-dialog .el-dialog__footer,
+.s3-config-dialog .el-dialog__footer,
+.db-config-dialog .el-dialog__footer,
+.db-domains-dialog .el-dialog__footer,
+.storage-scan-dialog .el-dialog__footer {
+    background-color: #ffffff !important;
+    background: #ffffff !important;
+    border-top: 1px solid #e2e8f0 !important;
+    padding: 12px 20px !important;
+    border-bottom-left-radius: 14px !important;
+    border-bottom-right-radius: 14px !important;
+}
+
+html.dark .storage-config-dialog .el-dialog__footer,
+html.dark .s3-config-dialog .el-dialog__footer,
+html.dark .db-config-dialog .el-dialog__footer,
+html.dark .db-domains-dialog .el-dialog__footer,
+html.dark .storage-scan-dialog .el-dialog__footer {
+    background-color: #111827 !important;
+    background: #111827 !important;
+    border-top-color: #374151 !important;
+}
+
 /* --- Global Theme & Wallpaper Full-Layout Acrylic Integration --- */
 html.has-main-wallpaper,
 body.has-main-wallpaper {

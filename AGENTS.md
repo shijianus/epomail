@@ -12,6 +12,32 @@
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
 
+### 彻底剔除storage-card-actions独立操作栏、操作与调试内容100%行内右对齐、S3弹窗纯白实心与全站弹窗居中无滑块上线 (2026-09-04)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **彻底移除卡片独立操作栏 (`class="storage-card-actions"`)**:
+       - 彻底删除卡片底部突兀的独立大按钮工具栏（`class="storage-card-actions"`）；
+       - 将 5 大核心操作与诊断工具 100% 融入各条目行内右对齐容器：
+         - **对象存储 (Object Storage)**：接入状态徽章 + `[ S3 / Backblaze B2 配置 ]` 按钮 (`.opt-btn-s3`)；
+         - **数据库架构 (Database Arch)**：分流模式徽章 + `[ 架构透视 ]` 按钮 (`.opt-btn-inspect`) + `[ 第三方 DB 配置 ]` 按钮 (`.opt-btn-db`)；
+         - **单文件附件上限 (MB)**：`el-input-number` 步进调节与单位完全右对齐；
+         - **级联删除附件实体**：`el-switch` 开关完全右对齐；
+         - **KV 边缘缓存与体检**：激活状态指示 + `[ 存储体检 ]` 按钮 (`.opt-btn-scan`) + `[ 全链路诊断 ]` 按钮 (`.opt-btn-test`)。
+    2. **所有调试/交互控件 100% 右对齐，杜绝紧跟标题左对齐**:
+       - 在 `.storage-item-right` 容器中设置 `display: flex !important; justify-content: flex-end !important; margin-left: auto !important;`；
+       - 包括 `class="el-input__wrapper"`、`el-input-number`、`el-switch` 等全部强制右对齐对齐线，前后画风 100% 统一。
+    3. **S3 弹窗纯白实心背景彻底杜绝透光与全站弹窗居中无滑块 (`align-center` & Solid Opaque Dialogs)**:
+       - 根治 Element Plus 弹窗由于 Teleport 到 body 导致的 scoped CSS 失效与底图透光重叠错乱问题；
+       - 在全局 `style.css` 及组件顶层非 scoped `<style>` 中为 `.storage-config-dialog`、`.s3-config-dialog`、`.db-config-dialog`、`.attachment-rule-dialog`、`.storage-scan-dialog` 声明强制纯白实心背景（暗黑模式 `#111827`）、`opacity: 1 !important` 与深邃阴影；
+       - 所有弹窗增加 `align-center` 属性并设置 `overflow: visible !important`、`margin: auto !important`，紧凑双列网格布局将弹窗主体高度收敛在 ~340px，弹窗内部及外层遮罩 **100% 杜绝任何滑块/垂直滚动条**；
+       - 经 Playwright 端到端截图与无头渲染审计，居中光学对称，视觉极其清爽。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **Git Commit Hash**: `8efb8ac6570c910a3000cecf7e3c8ae9e4438df6` (Short Hash: `8efb8ac`).
+    - 生产部署上线 Cloudflare Workers Version ID: `02335050-5843-4f2e-8175-9c6833261ef6`。
+    - 自动化测试套件 100% 顺利通过：
+      - `node --loader ./tests/esm-loader.mjs tests/test-storage-and-db-hub-e2e.mjs` (彻底移除 storage-card-actions 验证、行内按钮融入验证、input-number 严格右对齐验证、880px S3 弹窗纯色无滑块 Playwright 截图验证 100% 通过);
+      - `node --loader ./tests/esm-loader.mjs tests/test-dual-and-single-db-e2e.mjs` (单库向下兼容与双库物理隔离架构回归 100% 通过);
+      - `node --loader ./tests/esm-loader.mjs tests/test-s3-b2-storage-and-quota-e2e.mjs` (Backblaze B2 / S3 接入、SigV4 预签名、配额体系 100% 通过)。
+
 ### 存储与数据库中心面板UI深度重构、彻底剔除opt-button、单附件上限显式展示及BYO免受限与弹窗彻底杜绝滑块上线 (2026-09-04)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **存储与数据库卡片 UI 深度重构与彻底剔除画风冲突的 `.opt-button`**:
