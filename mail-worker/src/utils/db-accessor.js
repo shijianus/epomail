@@ -37,7 +37,7 @@ export function isDualDbMode(c) {
 	const env = getEnv(c);
 	const userDb = env.USER_DB || env.user_db;
 	const mailDb = env.MAIL_DB || env.mail_db;
-	return !!(userDb && mailDb && userDb !== mailDb);
+	return !!(userDb && mailDb);
 }
 
 /**

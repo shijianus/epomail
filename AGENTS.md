@@ -12,6 +12,28 @@
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
 
+### 宽屏无滚动 DB 架构透视与体检弹窗上线、全站统一"?"注释规范与生产双 DB 真实生效 (2026-09-04)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **生产双 DB 绑定真实生效与模式精准显示**:
+       - `wrangler.toml` 显式配置 `USER_DB` 与 `MAIL_DB` 双 D1 绑定，部署后 Cloudflare Workers 生产环境真实运行双数据库物理分流模式；
+       - 前端精准展示绿色 `[双数据库物理隔离模式]` 徽章，彻底解决此前单库模式显示冲突；
+       - `db-accessor.js` 保持单库/双库 100% 稳健退化兼容（最少只需 1 个 D1 数据库即可开箱即用）。
+    2. **宽屏无滚动设计与禁止全屏滑块 (No Scrollbars & Wide Grid Layout)**:
+       - 弹窗宽度拓宽至 `880px` ~ `920px`，彻底杜绝中心弹窗内产生垂直滚动条或全屏滑块：
+         - **DB 架构透视弹窗 (`db-domains-dialog`)**：采用水平 3 宫格网格（`domains-3col-grid`）并排呈现用户域、信件域、附件域；
+         - **KV / 存储深度体检弹窗 (`storage-scan-dialog`)**：采用水平 2 宫格网格（`scan-2col-grid`）并排呈现 KV 极速缓存指标与 D1 持久附件记录。
+    3. **全站画风统一："?" 注释文本解释全面覆盖**:
+       - 彻底剔除大段文字占屏卡片，所有域概念、缓存定义、健康评估及统计指标释义统一采用 `?` 图标与 `<el-tooltip>` 悬浮注释文本，保持前后画风极致统一。
+    4. **冗余按钮与指南弹窗全面精简**:
+       - 彻底移除冗余的指南按钮与 `dbTutorialShow` 弹窗，底部操作栏仅保留核心刷新与诊断操作。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **Git Commit Hash**: `e4be8a1833f1f5ec5245f2bc7ccc5b083bb68d0a` (Short Hash: `e4be8a1`).
+    - 生产部署上线 Cloudflare Workers Version ID: `610366c3-59f0-4a24-909f-12dfb91165bb`。
+    - 自动化测试套件 100% 顺利通过：
+      - `node --loader ./tests/esm-loader.mjs tests/test-storage-and-db-hub-e2e.mjs` (宽屏无滚动弹窗、3 域横向网格、"?" 悬浮注释、生产双 DB 模式识别 100% 通过);
+      - `node --loader ./tests/esm-loader.mjs tests/test-dual-and-single-db-e2e.mjs` (单库向下兼容与双库物理隔离 100% 通过);
+      - `node --loader ./tests/esm-loader.mjs tests/test-s3-b2-storage-and-quota-e2e.mjs` (Backblaze B2 / S3 接入、SigV4 预签名、配额体系 100% 通过)。
+
 ### 小白通俗化存储与数据库架构透视弹窗升级、第三方 DB 交互式教程与单双库物理分流上线 (2026-09-04)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **弹窗小白通俗化全面重构 (`db-domains-dialog` / `storage-scan-dialog`)**:

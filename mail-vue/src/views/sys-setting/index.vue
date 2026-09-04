@@ -2211,11 +2211,11 @@
         </template>
       </el-dialog>
 
-      <!-- Storage & KV Deep Scan Modal (KV与存储深度扫描体检) -->
+      <!-- Storage & KV Deep Scan Modal (KV与存储深度扫描体检 - 宽屏无滚动设计) -->
       <el-dialog 
         v-model="storageScanShow" 
         :title="$t('storageScanTitle')" 
-        width="660px" 
+        width="880px" 
         class="storage-config-dialog storage-scan-dialog"
       >
         <div class="s3-modal-body scan-body">
@@ -2225,113 +2225,127 @@
           </div>
 
           <template v-else-if="storageScanResult">
-            <!-- Top Health Summary Banner -->
+            <!-- Top Health Summary Banner (Compact Row) -->
             <div class="scan-summary-banner" :class="{ warn: storageScanResult.healthScore < 80 }">
               <div class="sum-left">
-                <Icon :icon="storageScanResult.healthScore >= 80 ? 'fluent:checkmark-circle-24-filled' : 'fluent:warning-24-filled'" width="32" height="32" class="sum-icon" />
-                <div class="sum-texts">
-                  <div class="sum-title">
-                    {{ $t('storageHealthScore') }}: <strong>{{ storageScanResult.healthScore }}%</strong>
-                    <el-tag size="small" :type="storageScanResult.healthScore >= 80 ? 'success' : 'warning'" effect="light" style="margin-left: 8px;">
-                      {{ storageScanResult.healthScore >= 80 ? $t('storageHealthHealthy') : $t('storageHealthWarn') }}
-                    </el-tag>
-                  </div>
-                  <div class="sum-desc">{{ storageScanResult.message }}</div>
+                <Icon :icon="storageScanResult.healthScore >= 80 ? 'fluent:checkmark-circle-24-filled' : 'fluent:warning-24-filled'" width="26" height="26" class="sum-icon" />
+                <div class="sum-title">
+                  {{ $t('storageHealthScore') }}: <strong>{{ storageScanResult.healthScore }}%</strong>
+                  <el-tag size="small" :type="storageScanResult.healthScore >= 80 ? 'success' : 'warning'" effect="light" style="margin-left: 8px;">
+                    {{ storageScanResult.healthScore >= 80 ? $t('storageHealthHealthy') : $t('storageHealthWarn') }}
+                  </el-tag>
+                  <el-tooltip effect="dark" :content="storageScanResult.message">
+                    <Icon class="warning" icon="fe:warning" width="16" height="16" style="margin-left: 6px; vertical-align: -2px; cursor: pointer; color: var(--el-text-color-secondary);"/>
+                  </el-tooltip>
                 </div>
               </div>
               <div class="sum-right">
-                <el-tag size="small" type="info" effect="plain">⚡ {{ storageScanResult.scanDurationMs }}ms</el-tag>
+                <span class="safe-tag-pill">
+                  <Icon icon="fluent:shield-checkmark-20-filled" width="14" height="14" style="color: #10b981; margin-right: 4px;" />
+                  无损体检保护
+                  <el-tooltip effect="dark" :content="$t('cleanupSafeTip')">
+                    <Icon class="warning" icon="fe:warning" width="14" height="14" style="margin-left: 4px; vertical-align: -2px;"/>
+                  </el-tooltip>
+                </span>
+                <el-tag size="small" type="info" effect="plain" style="margin-left: 8px;">⚡ {{ storageScanResult.scanDurationMs }}ms</el-tag>
               </div>
             </div>
 
-            <!-- KV Metrics Section with Beginner Concept Explanation -->
-            <div class="scan-metric-card">
-              <div class="card-head">
-                <div class="head-left">
-                  <Icon icon="fluent:flash-checkmark-20-filled" width="16" height="16" class="head-icon kv" />
-                  <span class="head-main-title">{{ $t('kvStorageStats') }}</span>
+            <!-- 2-Column Side-by-Side Metrics Grid -->
+            <div class="scan-2col-grid">
+              <!-- Left Column: KV 边缘高速缓存 -->
+              <div class="scan-metric-card">
+                <div class="card-head">
+                  <div class="head-left">
+                    <Icon icon="fluent:flash-checkmark-20-filled" width="16" height="16" class="head-icon kv" />
+                    <span class="head-main-title">{{ $t('kvStorageStats') }}</span>
+                    <el-tooltip effect="dark" :content="$t('kvStorageSimpleExplain')">
+                      <Icon class="warning" icon="fe:warning" width="15" height="15" style="margin-left: 4px; vertical-align: -2px;"/>
+                    </el-tooltip>
+                  </div>
+                  <el-tag size="small" type="warning" effect="plain" class="head-tag">Cloudflare KV</el-tag>
                 </div>
-                <el-tag size="small" type="warning" effect="plain" class="head-tag">Cloudflare KV 边缘极速缓存</el-tag>
-              </div>
-              
-              <!-- Beginner friendly explainer -->
-              <div class="concept-explain-box">
-                <Icon icon="fluent:lightbulb-20-regular" width="15" height="15" class="exp-icon" />
-                <span>{{ $t('kvStorageSimpleExplain') }}</span>
-              </div>
 
-              <div class="metrics-grid">
-                <div class="metric-item">
-                  <span class="m-val">{{ storageScanResult.kv?.authKeys || 0 }}</span>
-                  <span class="m-lbl">{{ $t('kvAuthKeys') }}</span>
-                  <span class="m-subhint">{{ $t('kvAuthKeysDesc') }}</span>
-                </div>
-                <div class="metric-item">
-                  <span class="m-val">{{ storageScanResult.kv?.configKeys || 0 }}</span>
-                  <span class="m-lbl">{{ $t('kvConfigKeys') }}</span>
-                  <span class="m-subhint">{{ $t('kvConfigKeysDesc') }}</span>
-                </div>
-                <div class="metric-item">
-                  <span class="m-val">{{ storageScanResult.kv?.attachmentKeys || 0 }}</span>
-                  <span class="m-lbl">{{ $t('kvAttachmentKeys') }}</span>
-                  <span class="m-subhint">{{ $t('kvAttachmentKeysDesc') }}</span>
-                </div>
-                <div class="metric-item">
-                  <span class="m-val">{{ storageScanResult.kv?.totalKeys || 0 }}</span>
-                  <span class="m-lbl">{{ $t('kvTotalKeys') }}</span>
-                  <span class="m-subhint">{{ $t('kvTotalKeysDesc') }}</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- D1 Attachment Records Section with Beginner Concept Explanation -->
-            <div class="scan-metric-card">
-              <div class="card-head">
-                <div class="head-left">
-                  <Icon icon="fluent:database-20-filled" width="16" height="16" class="head-icon d1" />
-                  <span class="head-main-title">{{ $t('d1AttachmentStats') }}</span>
-                </div>
-                <el-tag size="small" type="primary" effect="plain" class="head-tag">{{ storageScanResult.db?.mailDbName || 'D1 关系型数据库' }}</el-tag>
-              </div>
-
-              <!-- Beginner friendly explainer -->
-              <div class="concept-explain-box d1-box">
-                <Icon icon="fluent:lightbulb-20-regular" width="15" height="15" class="exp-icon" />
-                <span>{{ $t('d1StorageSimpleExplain') }}</span>
-              </div>
-
-              <div class="metrics-grid">
-                <div class="metric-item">
-                  <span class="m-val">{{ storageScanResult.d1?.totalAttachments || 0 }}</span>
-                  <span class="m-lbl">{{ $t('d1TotalAttachments') }}</span>
-                </div>
-                <div class="metric-item">
-                  <span class="m-val">{{ storageScanResult.d1?.totalMb || 0 }} MB</span>
-                  <span class="m-lbl">{{ $t('d1TotalSize') }}</span>
-                </div>
-                <div class="metric-item">
-                  <span class="m-val">{{ storageScanResult.d1?.distinctKeys || 0 }}</span>
-                  <span class="m-lbl">{{ $t('d1DistinctKeys') }}</span>
-                </div>
-                <div class="metric-item">
-                  <span class="m-val">{{ storageScanResult.storage?.activeEngine || 'KV' }}</span>
-                  <span class="m-lbl">{{ $t('storageEngine') }}</span>
+                <div class="metrics-grid">
+                  <div class="metric-item">
+                    <span class="m-val">{{ storageScanResult.kv?.authKeys || 0 }}</span>
+                    <span class="m-lbl">
+                      {{ $t('kvAuthKeys') }}
+                      <el-tooltip effect="dark" :content="$t('kvAuthKeysDesc')">
+                        <Icon class="warning" icon="fe:warning" width="13" height="13" style="margin-left: 2px; vertical-align: -1px;"/>
+                      </el-tooltip>
+                    </span>
+                  </div>
+                  <div class="metric-item">
+                    <span class="m-val">{{ storageScanResult.kv?.configKeys || 0 }}</span>
+                    <span class="m-lbl">
+                      {{ $t('kvConfigKeys') }}
+                      <el-tooltip effect="dark" :content="$t('kvConfigKeysDesc')">
+                        <Icon class="warning" icon="fe:warning" width="13" height="13" style="margin-left: 2px; vertical-align: -1px;"/>
+                      </el-tooltip>
+                    </span>
+                  </div>
+                  <div class="metric-item">
+                    <span class="m-val">{{ storageScanResult.kv?.attachmentKeys || 0 }}</span>
+                    <span class="m-lbl">
+                      {{ $t('kvAttachmentKeys') }}
+                      <el-tooltip effect="dark" :content="$t('kvAttachmentKeysDesc')">
+                        <Icon class="warning" icon="fe:warning" width="13" height="13" style="margin-left: 2px; vertical-align: -1px;"/>
+                      </el-tooltip>
+                    </span>
+                  </div>
+                  <div class="metric-item">
+                    <span class="m-val">{{ storageScanResult.kv?.totalKeys || 0 }}</span>
+                    <span class="m-lbl">
+                      {{ $t('kvTotalKeys') }}
+                      <el-tooltip effect="dark" :content="$t('kvTotalKeysDesc')">
+                        <Icon class="warning" icon="fe:warning" width="13" height="13" style="margin-left: 2px; vertical-align: -1px;"/>
+                      </el-tooltip>
+                    </span>
+                  </div>
                 </div>
               </div>
 
-              <!-- MIME Breakdown -->
-              <div class="mime-breakdown-row">
-                <span class="mime-pill"><Icon icon="solar:gallery-wide-linear" width="13" height="13"/> {{ $t('d1Images') }}: {{ storageScanResult.d1?.imageCount || 0 }}</span>
-                <span class="mime-pill"><Icon icon="fluent:document-pdf-20-regular" width="13" height="13"/> {{ $t('d1Pdfs') }}: {{ storageScanResult.d1?.pdfCount || 0 }}</span>
-                <span class="mime-pill"><Icon icon="fluent:video-clip-20-regular" width="13" height="13"/> {{ $t('d1Media') }}: {{ storageScanResult.d1?.mediaCount || 0 }}</span>
-                <span class="mime-pill"><Icon icon="fluent:folder-zip-20-regular" width="13" height="13"/> {{ $t('d1Other') }}: {{ storageScanResult.d1?.otherCount || 0 }}</span>
-              </div>
-            </div>
+              <!-- Right Column: D1 关系型存储与附件 -->
+              <div class="scan-metric-card">
+                <div class="card-head">
+                  <div class="head-left">
+                    <Icon icon="fluent:database-20-filled" width="16" height="16" class="head-icon d1" />
+                    <span class="head-main-title">{{ $t('d1AttachmentStats') }}</span>
+                    <el-tooltip effect="dark" :content="$t('d1StorageSimpleExplain')">
+                      <Icon class="warning" icon="fe:warning" width="15" height="15" style="margin-left: 4px; vertical-align: -2px;"/>
+                    </el-tooltip>
+                  </div>
+                  <el-tag size="small" type="primary" effect="plain" class="head-tag">{{ storageScanResult.db?.mailDbName || 'D1' }}</el-tag>
+                </div>
 
-            <!-- Safety Guarantee Tip -->
-            <div class="scan-safety-note">
-              <Icon icon="fluent:shield-checkmark-20-filled" width="16" height="16" class="safe-icon" />
-              <span>{{ $t('cleanupSafeTip') }}</span>
+                <div class="metrics-grid">
+                  <div class="metric-item">
+                    <span class="m-val">{{ storageScanResult.d1?.totalAttachments || 0 }}</span>
+                    <span class="m-lbl">{{ $t('d1TotalAttachments') }}</span>
+                  </div>
+                  <div class="metric-item">
+                    <span class="m-val">{{ storageScanResult.d1?.totalMb || 0 }} MB</span>
+                    <span class="m-lbl">{{ $t('d1TotalSize') }}</span>
+                  </div>
+                  <div class="metric-item">
+                    <span class="m-val">{{ storageScanResult.d1?.distinctKeys || 0 }}</span>
+                    <span class="m-lbl">{{ $t('d1DistinctKeys') }}</span>
+                  </div>
+                  <div class="metric-item">
+                    <span class="m-val">{{ storageScanResult.storage?.activeEngine || 'KV' }}</span>
+                    <span class="m-lbl">{{ $t('storageEngine') }}</span>
+                  </div>
+                </div>
+
+                <!-- MIME Breakdown -->
+                <div class="mime-breakdown-row">
+                  <span class="mime-pill"><Icon icon="solar:gallery-wide-linear" width="12" height="12"/> {{ $t('d1Images') }}: {{ storageScanResult.d1?.imageCount || 0 }}</span>
+                  <span class="mime-pill"><Icon icon="fluent:document-pdf-20-regular" width="12" height="12"/> {{ $t('d1Pdfs') }}: {{ storageScanResult.d1?.pdfCount || 0 }}</span>
+                  <span class="mime-pill"><Icon icon="fluent:video-clip-20-regular" width="12" height="12"/> {{ $t('d1Media') }}: {{ storageScanResult.d1?.mediaCount || 0 }}</span>
+                  <span class="mime-pill"><Icon icon="fluent:folder-zip-20-regular" width="12" height="12"/> {{ $t('d1Other') }}: {{ storageScanResult.d1?.otherCount || 0 }}</span>
+                </div>
+              </div>
             </div>
           </template>
         </div>
@@ -2344,336 +2358,159 @@
         </template>
       </el-dialog>
 
-      <!-- DB Domains 3-Domain Architecture Modal (3大核心域 DB 透视弹窗) -->
+      <!-- DB Domains 3-Domain Architecture Modal (3大核心域 DB 透视弹窗 - 宽屏3列无滚动) -->
       <el-dialog
         v-model="dbDomainsDetailShow"
         :title="$t('dbDomainsModalTitle')"
-        width="680px"
+        width="920px"
         class="storage-config-dialog db-domains-dialog"
       >
         <div class="s3-modal-body domains-modal-body">
-          <!-- Beginner Architecture Explanation Card -->
-          <div class="beginner-arch-guide-card">
-            <div class="g-head">
-              <div class="g-head-left">
-                <Icon icon="fluent:brain-circuit-20-filled" width="18" height="18" class="g-icon" />
-                <span class="g-title">{{ $t('beginnerArchGuideTitle') }}</span>
-              </div>
-              <el-button class="tutorial-link-btn" size="small" type="primary" link @click="dbTutorialShow = true">
-                <Icon icon="fluent:book-question-mark-20-filled" width="14" height="14" style="margin-right: 3px;" />
-                {{ $t('dbThirdPartyTutorialBtn') }}
-              </el-button>
-            </div>
-            <div class="g-body">
-              <div class="g-explain-item user">
-                <span class="g-badge user">👤 用户域</span>
-                <span class="g-text">{{ $t('userDbSimpleExplain') }}</span>
-              </div>
-              <div class="g-explain-item mail">
-                <span class="g-badge mail">✉️ 信件域</span>
-                <span class="g-text">{{ $t('mailDbSimpleExplain') }}</span>
-              </div>
-              <div class="g-explain-item attachment">
-                <span class="g-badge attachment">📎 附件域</span>
-                <span class="g-text">{{ $t('attachmentDbSimpleExplain') }}</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Architecture Summary Status Banner -->
+          <!-- Architecture Summary Status Banner (Single Compact Row) -->
           <div class="domains-summary-banner">
             <div class="b-left">
-              <Icon icon="fluent:database-link-20-filled" width="20" height="20" class="b-icon" />
+              <Icon icon="fluent:database-link-20-filled" width="18" height="18" class="b-icon" />
               <span>
                 当前运行架构: 
                 <strong>
                   {{ setting.externalDbEnabled === 1 ? ($t('dbModeExternal') + ' (' + (setting.externalDbName || setting.externalDbProvider || 'Turso') + ')') : (dbStatusInfo?.isDual ? $t('dbModeDual') : $t('dbModeSingle')) }}
                 </strong>
               </span>
+              <el-tooltip effect="dark" :content="setting.externalDbEnabled === 1 ? $t('dbModeExternalDesc') : (dbStatusInfo?.isDual ? $t('dbModeDualDesc') : $t('dbSingleDescTooltip'))">
+                <Icon class="warning" icon="fe:warning" width="16" height="16" style="margin-left: 4px; vertical-align: -2px; cursor: pointer; color: var(--el-text-color-secondary);"/>
+              </el-tooltip>
             </div>
             <div class="b-right">
               <el-tag size="small" :type="setting.externalDbEnabled === 1 ? 'warning' : (dbStatusInfo?.isDual ? 'success' : 'primary')" effect="light">
-                {{ setting.externalDbEnabled === 1 ? '第三方托管分流' : (dbStatusInfo?.isDual ? '双库物理隔离' : '单库集中共享 (最少1个DB)') }}
+                {{ setting.externalDbEnabled === 1 ? '第三方托管分流' : (dbStatusInfo?.isDual ? '双库物理隔离' : '单库集中共享 (默认开箱即用)') }}
               </el-tag>
             </div>
           </div>
 
-          <!-- 3 Domain Cards -->
-          <!-- 1. User DB Domain (用户域) -->
-          <div class="domain-card domain-user-card">
-            <div class="d-card-head">
-              <div class="d-title-group">
-                <div class="d-head-icon-circle user">
-                  <Icon icon="fluent:person-key-20-filled" width="16" height="16" />
+          <!-- 3 Domain Horizontal Grid -->
+          <div class="domains-3col-grid">
+            <!-- 1. User DB Domain (用户域) -->
+            <div class="domain-card domain-user-card">
+              <div class="d-card-head">
+                <div class="d-title-group">
+                  <div class="d-head-icon-circle user">
+                    <Icon icon="fluent:person-key-20-filled" width="16" height="16" />
+                  </div>
+                  <div class="d-title-texts">
+                    <span class="d-main-title">
+                      {{ $t('domainUserDbTitle') }}
+                      <el-tooltip effect="dark" :content="$t('userDbSimpleExplain')">
+                        <Icon class="warning" icon="fe:warning" width="14" height="14" style="margin-left: 3px; vertical-align: -2px;"/>
+                      </el-tooltip>
+                    </span>
+                  </div>
                 </div>
-                <div class="d-title-texts">
-                  <span class="d-main-title">{{ $t('domainUserDbTitle') }}</span>
-                  <span class="d-sub-title">用户账号 · 密码哈希 · 2FA安全密钥 · RBAC权限</span>
-                </div>
+                <el-tag size="small" type="primary" effect="plain">
+                  {{ dbStatusInfo?.domains?.user?.engine || 'D1 / KV' }}
+                </el-tag>
               </div>
-              <el-tag size="small" type="primary" effect="plain">
-                {{ dbStatusInfo?.domains?.user?.engine || 'Cloudflare D1 / KV' }}
-              </el-tag>
-            </div>
-            <div class="d-card-grid">
-              <span class="g-lbl">{{ $t('dbNameLabel') }}:</span>
-              <span class="g-val mono">{{ dbStatusInfo?.domains?.user?.name || (dbStatusInfo?.isDual ? 'USER_DB (Dedicated D1)' : 'db (Primary D1 / KV 缓存)') }}</span>
-              
-              <span class="g-lbl">{{ $t('dbResourceLabel') }}:</span>
-              <span class="g-val mono">{{ dbStatusInfo?.domains?.user?.resource || (dbStatusInfo?.isDual ? 'USER_DB' : 'env.db') }}</span>
+              <div class="d-card-grid">
+                <span class="g-lbl">{{ $t('dbResourceLabel') }}:</span>
+                <span class="g-val mono">{{ dbStatusInfo?.domains?.user?.resource || (dbStatusInfo?.isDual ? 'USER_DB' : 'env.db') }}</span>
 
-              <span class="g-lbl">{{ $t('dbScopeLabel') }}:</span>
-              <span class="g-val">{{ $t('dbUserDomainDetail') || dbStatusInfo?.domains?.user?.scope || '用户账号、哈希口令、2FA密钥、Passkeys、RBAC权限及OAuth开放平台' }}</span>
+                <span class="g-lbl">{{ $t('dbScopeLabel') }}:</span>
+                <span class="g-val">
+                  用户账号 · 2FA · OAuth
+                  <el-tooltip effect="dark" :content="$t('dbUserDomainDetail') || dbStatusInfo?.domains?.user?.scope || '用户账号、哈希口令、2FA密钥、Passkeys、RBAC权限及OAuth开放平台'">
+                    <Icon class="warning" icon="fe:warning" width="13" height="13" style="margin-left: 2px; vertical-align: -1px;"/>
+                  </el-tooltip>
+                </span>
 
-              <span class="g-lbl">当前统计:</span>
-              <span class="g-val stats">{{ dbStatusInfo?.stats?.userCount ?? dbStatusInfo?.domains?.user?.count ?? 0 }} {{ $t('dbStatsUsers') }}</span>
-            </div>
-            <div class="d-simple-note user">
-              <Icon icon="fluent:info-16-regular" width="13" height="13" />
-              <span><strong>通俗解读：</strong>{{ $t('userDomainTipText') }}</span>
-            </div>
-          </div>
-
-          <!-- 2. Mail DB Domain (信件域) -->
-          <div class="domain-card domain-mail-card">
-            <div class="d-card-head">
-              <div class="d-title-group">
-                <div class="d-head-icon-circle mail">
-                  <Icon icon="fluent:mail-multiple-20-filled" width="16" height="16" />
-                </div>
-                <div class="d-title-texts">
-                  <span class="d-main-title">{{ $t('domainMailDbTitle') }}</span>
-                  <span class="d-sub-title">纯文本邮件正文 · 往来列表 · 收发邮箱号池</span>
-                </div>
+                <span class="g-lbl">当前统计:</span>
+                <span class="g-val stats">{{ dbStatusInfo?.stats?.userCount ?? dbStatusInfo?.domains?.user?.count ?? 0 }} {{ $t('dbStatsUsers') }}</span>
               </div>
-              <el-tag size="small" :type="setting.externalDbEnabled === 1 ? 'warning' : 'primary'" effect="plain">
-                {{ dbStatusInfo?.domains?.mail?.engine || (setting.externalDbEnabled === 1 ? (setting.externalDbProvider || 'Turso (第三方托管)') : 'Cloudflare D1') }}
-              </el-tag>
             </div>
-            <div class="d-card-grid">
-              <span class="g-lbl">{{ $t('dbNameLabel') }}:</span>
-              <span class="g-val mono">{{ dbStatusInfo?.domains?.mail?.name || (setting.externalDbEnabled === 1 ? (setting.externalDbName || setting.externalDbProvider) : (dbStatusInfo?.isDual ? 'MAIL_DB (Dedicated D1)' : 'db (Primary D1)')) }}</span>
-              
-              <span class="g-lbl">{{ $t('dbResourceLabel') }}:</span>
-              <span class="g-val mono">{{ dbStatusInfo?.domains?.mail?.resource || (setting.externalDbEnabled === 1 ? setting.externalDbEndpoint : (dbStatusInfo?.isDual ? 'MAIL_DB' : 'env.db')) }}</span>
 
-              <span class="g-lbl">{{ $t('dbScopeLabel') }}:</span>
-              <span class="g-val">{{ dbStatusInfo?.domains?.mail?.scope || '邮件列表、纯文本邮件正文、收发邮箱号池、联系人' }}</span>
-
-              <span class="g-lbl">当前统计:</span>
-              <span class="g-val stats">{{ dbStatusInfo?.stats?.emailCount ?? dbStatusInfo?.domains?.mail?.count ?? 0 }} {{ $t('dbStatsEmails') }} · {{ dbStatusInfo?.stats?.accountCount ?? dbStatusInfo?.domains?.mail?.accountCount ?? 0 }} {{ $t('dbStatsAccounts') }}</span>
-            </div>
-            <div class="d-simple-note mail">
-              <Icon icon="fluent:info-16-regular" width="13" height="13" />
-              <span><strong>通俗解读：</strong>{{ $t('mailDomainTipText') }}</span>
-            </div>
-          </div>
-
-          <!-- 3. Attachment DB Domain (附件域) -->
-          <div class="domain-card domain-attachment-card">
-            <div class="d-card-head">
-              <div class="d-title-group">
-                <div class="d-head-icon-circle attachment">
-                  <Icon icon="fluent:folder-arrow-up-20-filled" width="16" height="16" />
+            <!-- 2. Mail DB Domain (信件域) -->
+            <div class="domain-card domain-mail-card">
+              <div class="d-card-head">
+                <div class="d-title-group">
+                  <div class="d-head-icon-circle mail">
+                    <Icon icon="fluent:mail-multiple-20-filled" width="16" height="16" />
+                  </div>
+                  <div class="d-title-texts">
+                    <span class="d-main-title">
+                      {{ $t('domainMailDbTitle') }}
+                      <el-tooltip effect="dark" :content="$t('mailDbSimpleExplain')">
+                        <Icon class="warning" icon="fe:warning" width="14" height="14" style="margin-left: 3px; vertical-align: -2px;"/>
+                      </el-tooltip>
+                    </span>
+                  </div>
                 </div>
-                <div class="d-title-texts">
-                  <span class="d-main-title">{{ $t('domainAttachmentDbTitle') }}</span>
-                  <span class="d-sub-title">大体积二进制附件 · 图片/PDF/媒体 · 0元 CDN 直链</span>
-                </div>
+                <el-tag size="small" :type="setting.externalDbEnabled === 1 ? 'warning' : 'primary'" effect="plain">
+                  {{ dbStatusInfo?.domains?.mail?.engine || (setting.externalDbEnabled === 1 ? (setting.externalDbProvider || 'Turso') : 'Cloudflare D1') }}
+                </el-tag>
               </div>
-              <el-tag size="small" :type="setting.bucket ? 'success' : (setting.hasR2 ? 'primary' : 'info')" effect="plain">
-                {{ dbStatusInfo?.domains?.attachment?.engine || (setting.bucket ? 'Backblaze B2 / AWS S3' : (setting.hasR2 ? 'Cloudflare R2' : 'Cloudflare D1 + KV')) }}
-              </el-tag>
-            </div>
-            <div class="d-card-grid">
-              <span class="g-lbl">{{ $t('dbNameLabel') }}:</span>
-              <span class="g-val mono">{{ dbStatusInfo?.domains?.attachment?.name || (setting.bucket ? (setting.bucket + ' (Backblaze B2)') : (setting.hasR2 ? 'Cloudflare R2 Native' : 'attachments (D1 表) + KV')) }}</span>
-              
-              <span class="g-lbl">{{ $t('dbResourceLabel') }}:</span>
-              <span class="g-val mono">{{ dbStatusInfo?.domains?.attachment?.resource || (setting.bucket ? (setting.endpoint || 'S3 Endpoint') : (setting.hasR2 ? 'env.r2' : 'attachments (D1) + KV')) }}</span>
+              <div class="d-card-grid">
+                <span class="g-lbl">{{ $t('dbResourceLabel') }}:</span>
+                <span class="g-val mono">{{ dbStatusInfo?.domains?.mail?.resource || (setting.externalDbEnabled === 1 ? setting.externalDbEndpoint : (dbStatusInfo?.isDual ? 'MAIL_DB' : 'env.db')) }}</span>
 
-              <span class="g-lbl">{{ $t('dbScopeLabel') }}:</span>
-              <span class="g-val">{{ dbStatusInfo?.domains?.attachment?.scope || '邮件大附件二进制实体、SHA-256 去重哈希、0元 CDN 直链下载' }}</span>
+                <span class="g-lbl">{{ $t('dbScopeLabel') }}:</span>
+                <span class="g-val">
+                  邮件列表 · 正文 · 号池
+                  <el-tooltip effect="dark" :content="dbStatusInfo?.domains?.mail?.scope || '邮件列表、纯文本邮件正文、收发邮箱号池、联系人'">
+                    <Icon class="warning" icon="fe:warning" width="13" height="13" style="margin-left: 2px; vertical-align: -1px;"/>
+                  </el-tooltip>
+                </span>
 
-              <span class="g-lbl">当前统计:</span>
-              <span class="g-val stats">
-                {{ dbStatusInfo?.stats?.attCount ?? dbStatusInfo?.domains?.attachment?.count ?? 0 }} {{ $t('dbStatsAtts') }}
-                <el-tag v-if="setting.customDomain" size="small" type="primary" effect="light" style="margin-left: 6px;">0元出站 CDN 加速</el-tag>
-              </span>
+                <span class="g-lbl">当前统计:</span>
+                <span class="g-val stats">{{ dbStatusInfo?.stats?.emailCount ?? dbStatusInfo?.domains?.mail?.count ?? 0 }} {{ $t('dbStatsEmails') }} · {{ dbStatusInfo?.stats?.accountCount ?? dbStatusInfo?.domains?.mail?.accountCount ?? 0 }} {{ $t('dbStatsAccounts') }}</span>
+              </div>
             </div>
-            <div class="d-simple-note attachment">
-              <Icon icon="fluent:info-16-regular" width="13" height="13" />
-              <span><strong>通俗解读：</strong>{{ $t('attachmentDomainTipText') }}</span>
+
+            <!-- 3. Attachment DB Domain (附件域) -->
+            <div class="domain-card domain-attachment-card">
+              <div class="d-card-head">
+                <div class="d-title-group">
+                  <div class="d-head-icon-circle attachment">
+                    <Icon icon="fluent:folder-arrow-up-20-filled" width="16" height="16" />
+                  </div>
+                  <div class="d-title-texts">
+                    <span class="d-main-title">
+                      {{ $t('domainAttachmentDbTitle') }}
+                      <el-tooltip effect="dark" :content="$t('attachmentDbSimpleExplain')">
+                        <Icon class="warning" icon="fe:warning" width="14" height="14" style="margin-left: 3px; vertical-align: -2px;"/>
+                      </el-tooltip>
+                    </span>
+                  </div>
+                </div>
+                <el-tag size="small" :type="setting.bucket ? 'success' : (setting.hasR2 ? 'primary' : 'info')" effect="plain">
+                  {{ dbStatusInfo?.domains?.attachment?.engine || (setting.bucket ? 'Backblaze B2' : (setting.hasR2 ? 'R2' : 'D1 + KV')) }}
+                </el-tag>
+              </div>
+              <div class="d-card-grid">
+                <span class="g-lbl">{{ $t('dbResourceLabel') }}:</span>
+                <span class="g-val mono">{{ dbStatusInfo?.domains?.attachment?.resource || (setting.bucket ? (setting.endpoint || 'S3 Endpoint') : (setting.hasR2 ? 'env.r2' : 'attachments (D1) + KV')) }}</span>
+
+                <span class="g-lbl">{{ $t('dbScopeLabel') }}:</span>
+                <span class="g-val">
+                  大体积多媒体 · CDN免流
+                  <el-tooltip effect="dark" :content="dbStatusInfo?.domains?.attachment?.scope || '邮件大附件二进制实体、SHA-256 去重哈希、0元 CDN 直链下载'">
+                    <Icon class="warning" icon="fe:warning" width="13" height="13" style="margin-left: 2px; vertical-align: -1px;"/>
+                  </el-tooltip>
+                </span>
+
+                <span class="g-lbl">当前统计:</span>
+                <span class="g-val stats">
+                  {{ dbStatusInfo?.stats?.attCount ?? dbStatusInfo?.domains?.attachment?.count ?? 0 }} {{ $t('dbStatsAtts') }}
+                  <el-tag v-if="setting.customDomain" size="small" type="primary" effect="light" style="margin-left: 4px;">0元CDN</el-tag>
+                </span>
+              </div>
             </div>
           </div>
         </div>
 
         <template #footer>
           <div class="dialog-footer-actions">
-            <el-button @click="dbTutorialShow = true">
-              <Icon icon="fluent:book-question-mark-20-regular" width="14" height="14" style="margin-right: 4px;" />
-              {{ $t('dbThirdPartyTutorialBtn') }}
-            </el-button>
-            <el-button @click="dbDomainsDetailShow = false">{{ $t('close') || '关闭' }}</el-button>
             <el-button type="primary" :loading="scanningDbDomains" @click="handleRefreshDbDomains">
               <Icon icon="fluent:arrow-sync-20-regular" width="14" height="14" style="margin-right: 4px;" />
               {{ $t('dbRefreshDomains') || '刷新透视' }}
             </el-button>
-          </div>
-        </template>
-      </el-dialog>
-
-      <!-- DB Tutorial & Setup Guidance Modal (第三方数据库与双 DB 配置指南全景弹窗) -->
-      <el-dialog
-        v-model="dbTutorialShow"
-        :title="$t('dbTutorialModalTitle')"
-        width="760px"
-        class="storage-config-dialog db-tutorial-dialog"
-      >
-        <div class="s3-modal-body tutorial-modal-body">
-          <!-- Top Guidance Intro -->
-          <div class="tutorial-intro-box">
-            <div class="i-left">
-              <Icon icon="fluent:sparkle-24-filled" width="24" height="24" class="i-icon" />
-              <div class="i-texts">
-                <div class="i-title">Epomail 多数据库接入与双 DB 分流架构指南</div>
-                <div class="i-desc">默认情况下 Epomail 使用 <strong>1 个 Cloudflare D1</strong> 即可开箱即用运行所有功能（最少需要 1 个 DB）。当您希望将「用户安全身份」与「海量纯文本邮件」分离，或接入第三方分布式数据库时，可选择以下方案：</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Mode Selection Segmented Tabs -->
-          <div class="tutorial-tab-nav">
-            <div 
-              class="tab-nav-item" 
-              :class="{ active: tutorialActiveTab === 'turso' }" 
-              @click="tutorialActiveTab = 'turso'"
-            >
-              <Icon icon="simple-icons:turso" width="15" height="15" class="tab-icon" />
-              <span>方案 A: 接入 Turso 数据库 (推荐 - 3分钟网页配置)</span>
-            </div>
-            <div 
-              class="tab-nav-item" 
-              :class="{ active: tutorialActiveTab === 'dual_d1' }" 
-              @click="tutorialActiveTab = 'dual_d1'"
-            >
-              <Icon icon="simple-icons:cloudflare" width="15" height="15" class="tab-icon" />
-              <span>方案 B: Cloudflare 原生双 D1 物理隔离</span>
-            </div>
-            <div 
-              class="tab-nav-item" 
-              :class="{ active: tutorialActiveTab === 'b2_storage' }" 
-              @click="tutorialActiveTab = 'b2_storage'"
-            >
-              <Icon icon="simple-icons:backblaze" width="15" height="15" class="tab-icon" />
-              <span>方案 C: 附件外接 Backblaze B2</span>
-            </div>
-          </div>
-
-          <!-- Tab Content 1: Turso (LibSQL) Guide -->
-          <div v-if="tutorialActiveTab === 'turso'" class="tutorial-content-panel">
-            <div class="panel-section-title">
-              <span class="step-num">1</span>
-              <span>在 Turso 官网免费创建数据库</span>
-            </div>
-            <div class="step-text">
-              前往 <a href="https://turso.tech" target="_blank" class="ext-link">turso.tech</a> 注册账号，在控制台点击 <strong>Create Database</strong>，输入数据库名称（例如 <code>epomail-mail</code>），选择离您最近的区域即可。
-            </div>
-
-            <div class="panel-section-title">
-              <span class="step-num">2</span>
-              <span>获取接入点 URL 与 Auth Token</span>
-            </div>
-            <div class="step-text">
-              在 Turso 控制台中复制 <strong>Database URL</strong>（格式为 <code>https://epomail-mail-[org].turso.io</code>），并在 Settings 或通过命令行运行 <code>turso db tokens create epomail-mail</code> 创建专属访问令牌。
-            </div>
-
-            <div class="panel-section-title">
-              <span class="step-num">3</span>
-              <span>在 Epomail 管理后台填入并测试</span>
-            </div>
-            <div class="step-text">
-              打开系统设置卡片下方的 <strong>[ 第三方数据库配置 ]</strong> 弹窗：
-              <ul>
-                <li>提供商预设选择 <strong>Turso / LibSQL</strong>；</li>
-                <li>开启 <strong>「启用第三方数据库托管」</strong> 开关；</li>
-                <li>粘贴您的 <strong>接入点 URL</strong> 与 <strong>Auth Token</strong>；</li>
-                <li>托管范围推荐选择 <strong>「纯文本邮件 (Mail DB)」</strong>；</li>
-                <li>点击 <strong>「测试连通性与 SQL 探针」</strong>，测试通过后点击保存即可实时生效！</li>
-              </ul>
-            </div>
-          </div>
-
-          <!-- Tab Content 2: Cloudflare Native Dual D1 Guide -->
-          <div v-else-if="tutorialActiveTab === 'dual_d1'" class="tutorial-content-panel">
-            <div class="panel-section-title">
-              <span class="step-num">1</span>
-              <span>通过 Cloudflare 控制台或终端创建第 2 个 D1 数据库</span>
-            </div>
-            <div class="step-text">
-              在 Cloudflare 仪表盘「Workers & Pages」->「D1」中点击 <strong>Create database</strong> 创建名为 <code>epomail_mail</code> 的数据库，或在项目终端中执行：
-              <pre class="code-box"><code>npx wrangler d1 create epomail_mail</code></pre>
-            </div>
-
-            <div class="panel-section-title">
-              <span class="step-num">2</span>
-              <span>修改 mail-worker/wrangler.toml 绑定双库</span>
-            </div>
-            <div class="step-text">
-              将 <code>wrangler.toml</code> 中的 D1 绑定配置为 <code>USER_DB</code> 与 <code>MAIL_DB</code>（解除注释）：
-              <pre class="code-box"><code># 1) 用户域数据库 (存放账号、哈希密码、2FA、OAuth)
-[[d1_databases]]
-binding = "USER_DB"
-database_name = "epomail"
-database_id = "542cbca1-fce5-41c5-93f2-c1d04fa919e8"
-
-# 2) 信件域数据库 (存放邮件列表、正文详情、收发号池)
-[[d1_databases]]
-binding = "MAIL_DB"
-database_name = "epomail_mail"
-database_id = "您新创建的_d1_database_id"</code></pre>
-            </div>
-
-            <div class="panel-section-title">
-              <span class="step-num">3</span>
-              <span>重新部署并执行一键数据表升级</span>
-            </div>
-            <div class="step-text">
-              在 <code>mail-worker</code> 目录下运行 <code>npx wrangler deploy</code>，部署成功后访问 <code>https://您的域名/api/init/123456</code> 即可自动在双库中分发初始化表结构！
-            </div>
-          </div>
-
-          <!-- Tab Content 3: Backblaze B2 Storage Guide -->
-          <div v-else class="tutorial-content-panel">
-            <div class="panel-section-title">
-              <span class="step-num">1</span>
-              <span>在 Backblaze B2 创建专属 Bucket</span>
-            </div>
-            <div class="step-text">
-              访问 <a href="https://secure.backblaze.com/b2_buckets.htm" target="_blank" class="ext-link">Backblaze B2 控制台</a>，创建公开或私有 Bucket（如 <code>epomail-attachments</code>），并在 App Keys 页面创建一组 Application Key。
-            </div>
-
-            <div class="panel-section-title">
-              <span class="step-num">2</span>
-              <span>在 Epomail 填入 S3 鉴权凭据</span>
-            </div>
-            <div class="step-text">
-              在系统设置中点击 <strong>[ S3 / Backblaze B2 配置 ]</strong>，填入存储桶名称、Endpoint（如 <code>s3.us-west-004.backblazeb2.com</code>）、keyID 与 applicationKey。
-            </div>
-
-            <div class="panel-section-title">
-              <span class="step-num">3</span>
-              <span>配置 0 元出站 CDN 域名 (可选)</span>
-            </div>
-            <div class="step-text">
-              将您自己的子域名（如 <code>cdn.yourdomain.com</code>）通过 Cloudflare CNAME 代理指向 Backblaze B2 桶，享受 Cloudflare Bandwidth Alliance <strong>$0 流量直出</strong>！
-            </div>
-          </div>
-        </div>
-
-        <template #footer>
-          <div class="dialog-footer-actions">
-            <el-button type="primary" @click="dbTutorialShow = false">{{ $t('close') || '关闭指南' }}</el-button>
           </div>
         </template>
       </el-dialog>
@@ -7086,13 +6923,14 @@ form .el-button {
     display: flex;
     flex-direction: column;
     gap: 12px;
+    padding: 2px 0;
   }
 
   .domains-summary-banner {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 10px 14px;
+    padding: 8px 14px;
     background: var(--el-fill-color-light, #f8fafc);
     border: 1px solid var(--el-border-color-lighter, #e2e8f0);
     border-radius: 8px;
@@ -7111,45 +6949,53 @@ form .el-button {
     }
   }
 
+  .domains-3col-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+
   .domain-card {
     border: 1px solid var(--el-border-color-light, #e2e8f0);
-    border-radius: 8px;
+    border-radius: 10px;
     padding: 12px 14px;
     background: var(--el-bg-color, #ffffff);
     transition: all 0.2s ease;
+    display: flex;
+    flex-direction: column;
 
     &:hover {
       border-color: var(--el-color-primary-light-5, #93c5fd);
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
     }
 
     &.domain-user-card {
-      border-left: 3px solid #8b5cf6;
+      border-top: 3px solid #8b5cf6;
     }
     &.domain-mail-card {
-      border-left: 3px solid #3b82f6;
+      border-top: 3px solid #3b82f6;
     }
     &.domain-attachment-card {
-      border-left: 3px solid #10b981;
+      border-top: 3px solid #10b981;
     }
 
     .d-card-head {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 8px;
+      margin-bottom: 10px;
       padding-bottom: 6px;
       border-bottom: 1px dashed var(--el-border-color-lighter, #f1f5f9);
 
       .d-title-group {
         display: flex;
         align-items: center;
-        gap: 8px;
+        gap: 6px;
 
         .d-head-icon-circle {
-          width: 28px;
-          height: 28px;
-          border-radius: 8px;
+          width: 26px;
+          height: 26px;
+          border-radius: 6px;
           display: flex;
           align-items: center;
           justify-content: center;
@@ -7169,18 +7015,12 @@ form .el-button {
         }
 
         .d-title-texts {
-          display: flex;
-          flex-direction: column;
-
           .d-main-title {
-            font-size: 13.5px;
+            font-size: 13px;
             font-weight: 600;
             color: var(--el-text-color-primary);
-          }
-
-          .d-sub-title {
-            font-size: 11px;
-            color: var(--el-text-color-placeholder);
+            display: inline-flex;
+            align-items: center;
           }
         }
       }
@@ -7188,9 +7028,10 @@ form .el-button {
 
     .d-card-grid {
       display: grid;
-      grid-template-columns: 120px 1fr;
-      gap: 6px 12px;
+      grid-template-columns: 70px 1fr;
+      gap: 6px 8px;
       font-size: 12px;
+      flex: 1;
 
       .g-lbl {
         color: var(--el-text-color-secondary, #64748b);
@@ -7200,6 +7041,8 @@ form .el-button {
         color: var(--el-text-color-primary, #1e293b);
         font-weight: 500;
         word-break: break-all;
+        display: inline-flex;
+        align-items: center;
 
         &.mono {
           font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
@@ -7212,220 +7055,6 @@ form .el-button {
         }
       }
     }
-
-    .d-simple-note {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 11.5px;
-      margin-top: 8px;
-      padding: 4px 8px;
-      border-radius: 6px;
-
-      &.user {
-        background: rgba(139, 92, 246, 0.06);
-        color: #7c3aed;
-      }
-      &.mail {
-        background: rgba(59, 130, 246, 0.06);
-        color: #2563eb;
-      }
-      &.attachment {
-        background: rgba(16, 185, 129, 0.06);
-        color: #059669;
-      }
-    }
-  }
-
-  .beginner-arch-guide-card {
-    background: color-mix(in srgb, var(--accent-primary, #3b82f6) 5%, var(--bg-surface));
-    border: 1px solid color-mix(in srgb, var(--accent-primary, #3b82f6) 20%, transparent);
-    border-radius: 10px;
-    padding: 12px 14px;
-
-    .g-head {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 8px;
-
-      .g-head-left {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        font-size: 13px;
-        font-weight: 600;
-        color: var(--el-text-color-primary);
-
-        .g-icon {
-          color: var(--accent-primary, #3b82f6);
-        }
-      }
-
-      .tutorial-link-btn {
-        font-size: 11.5px;
-        font-weight: 600;
-        padding: 0;
-      }
-    }
-
-    .g-body {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-
-      .g-explain-item {
-        display: flex;
-        align-items: flex-start;
-        gap: 8px;
-        font-size: 12px;
-        line-height: 1.45;
-
-        .g-badge {
-          flex-shrink: 0;
-          font-size: 11px;
-          font-weight: 600;
-          padding: 1px 6px;
-          border-radius: 4px;
-
-          &.user {
-            background: rgba(139, 92, 246, 0.15);
-            color: #7c3aed;
-          }
-          &.mail {
-            background: rgba(59, 130, 246, 0.15);
-            color: #2563eb;
-          }
-          &.attachment {
-            background: rgba(16, 185, 129, 0.15);
-            color: #059669;
-          }
-        }
-
-        .g-text {
-          color: var(--el-text-color-regular);
-        }
-      }
-    }
-  }
-}
-
-.db-config-dialog {
-  .db-target-group {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    width: 100%;
-
-    :deep(.el-radio-button) {
-      width: 100%;
-      .el-radio-button__inner {
-        width: 100%;
-        text-align: left;
-        border-radius: 8px !important;
-        border: 1px solid var(--el-border-color, #e2e8f0);
-        padding: 8px 14px;
-        font-size: 12.5px;
-      }
-      &.is-active .el-radio-button__inner {
-        background-color: var(--accent-primary, #3b82f6);
-        border-color: var(--accent-primary, #3b82f6);
-        box-shadow: none;
-      }
-    }
-  }
-
-  .fb-stats-row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-top: 8px;
-    padding-top: 8px;
-    border-top: 1px dashed color-mix(in srgb, currentColor 20%, transparent);
-
-    .stat-pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      font-size: 11.5px;
-      font-weight: 500;
-      background: rgba(0, 0, 0, 0.05);
-      padding: 2px 8px;
-      border-radius: 6px;
-    }
-  }
-}
-
-.attachment-rule-dialog {
-  .policy-card-group {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    width: 100%;
-
-    .policy-card {
-      display: flex;
-      align-items: flex-start;
-      gap: 12px;
-      padding: 12px 14px;
-      border: 1px solid var(--el-border-color, #e2e8f0);
-      border-radius: 10px;
-      background: var(--bg-surface, #ffffff);
-      cursor: pointer;
-      transition: all 0.2s ease;
-
-      &:hover {
-        border-color: var(--accent-primary, #3b82f6);
-        background: color-mix(in srgb, var(--accent-primary, #3b82f6) 3%, transparent);
-      }
-
-      &.active {
-        border-color: var(--accent-primary, #3b82f6);
-        background: color-mix(in srgb, var(--accent-primary, #3b82f6) 6%, transparent);
-
-        .p-radio-circle {
-          border-color: var(--accent-primary, #3b82f6);
-          background-color: var(--accent-primary, #3b82f6);
-          box-shadow: inset 0 0 0 3px #ffffff;
-        }
-      }
-
-      .p-radio-circle {
-        width: 16px;
-        height: 16px;
-        border-radius: 50%;
-        border: 2px solid var(--el-border-color-darker, #cbd5e1);
-        margin-top: 3px;
-        flex-shrink: 0;
-        transition: all 0.2s ease;
-      }
-
-      .p-card-body {
-        flex: 1;
-
-        .p-title {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          font-size: 13.5px;
-          font-weight: 600;
-          color: var(--el-text-color-primary);
-          margin-bottom: 3px;
-
-          .p-brand-icon {
-            &.b2 { color: #e11d48; }
-            &.smart { color: #f59e0b; }
-            &.r2 { color: #f97316; }
-          }
-        }
-
-        .p-desc {
-          font-size: 12px;
-          line-height: 1.45;
-          color: var(--el-text-color-secondary);
-        }
-      }
-    }
   }
 }
 
@@ -7433,7 +7062,8 @@ form .el-button {
   .scan-body {
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    gap: 12px;
+    padding: 2px 0;
   }
 
   .scan-loading-state {
@@ -7457,8 +7087,8 @@ form .el-button {
     justify-content: space-between;
     background: color-mix(in srgb, var(--el-color-success) 10%, var(--bg-surface));
     border: 1px solid color-mix(in srgb, var(--el-color-success) 30%, transparent);
-    padding: 12px 16px;
-    border-radius: 10px;
+    padding: 8px 14px;
+    border-radius: 8px;
 
     &.warn {
       background: color-mix(in srgb, var(--el-color-warning) 10%, var(--bg-surface));
@@ -7468,7 +7098,7 @@ form .el-button {
     .sum-left {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 10px;
 
       .sum-icon {
         color: var(--el-color-success);
@@ -7478,17 +7108,35 @@ form .el-button {
       }
 
       .sum-title {
-        font-size: 14px;
+        font-size: 13.5px;
         font-weight: 600;
         color: var(--el-text-color-primary);
-      }
-
-      .sum-desc {
-        font-size: 12px;
-        color: var(--el-text-color-secondary);
-        margin-top: 2px;
+        display: inline-flex;
+        align-items: center;
       }
     }
+
+    .sum-right {
+      display: flex;
+      align-items: center;
+
+      .safe-tag-pill {
+        display: inline-flex;
+        align-items: center;
+        font-size: 11.5px;
+        font-weight: 500;
+        color: var(--el-color-success-dark-2, #15803d);
+        background: rgba(16, 185, 129, 0.1);
+        padding: 2px 8px;
+        border-radius: 6px;
+      }
+    }
+  }
+
+  .scan-2col-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
   }
 
   .scan-metric-card {
@@ -7522,35 +7170,9 @@ form .el-button {
       }
     }
 
-    .concept-explain-box {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      background: rgba(245, 158, 11, 0.08);
-      border: 1px dashed rgba(245, 158, 11, 0.3);
-      padding: 6px 10px;
-      border-radius: 6px;
-      font-size: 11.5px;
-      color: var(--el-text-color-regular);
-      margin-bottom: 10px;
-
-      .exp-icon {
-        color: #f59e0b;
-        flex-shrink: 0;
-      }
-
-      &.d1-box {
-        background: rgba(59, 130, 246, 0.08);
-        border-color: rgba(59, 130, 246, 0.3);
-        .exp-icon {
-          color: #3b82f6;
-        }
-      }
-    }
-
     .metrics-grid {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
+      grid-template-columns: repeat(2, 1fr);
       gap: 8px;
 
       .metric-item {
@@ -7574,13 +7196,8 @@ form .el-button {
           font-weight: 600;
           color: var(--el-text-color-primary);
           margin-top: 2px;
-        }
-
-        .m-subhint {
-          font-size: 10px;
-          color: var(--el-text-color-placeholder);
-          margin-top: 2px;
-          line-height: 1.2;
+          display: inline-flex;
+          align-items: center;
         }
       }
     }
@@ -7588,178 +7205,20 @@ form .el-button {
     .mime-breakdown-row {
       display: flex;
       flex-wrap: wrap;
-      gap: 8px;
-      margin-top: 10px;
-      padding-top: 8px;
+      gap: 6px;
+      margin-top: 8px;
+      padding-top: 6px;
       border-top: 1px dashed var(--el-border-color-lighter);
 
       .mime-pill {
         display: inline-flex;
         align-items: center;
-        gap: 4px;
-        font-size: 11.5px;
+        gap: 3px;
+        font-size: 11px;
         color: var(--el-text-color-secondary);
         background: rgba(0, 0, 0, 0.03);
-        padding: 3px 8px;
-        border-radius: 6px;
-      }
-    }
-  }
-
-  .scan-safety-note {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    background: color-mix(in srgb, var(--el-color-success) 8%, var(--bg-surface));
-    border: 1px solid color-mix(in srgb, var(--el-color-success) 20%, transparent);
-    padding: 8px 12px;
-    border-radius: 8px;
-    font-size: 12px;
-    color: var(--el-color-success-dark-2, #15803d);
-
-    .safe-icon {
-      color: var(--el-color-success);
-      flex-shrink: 0;
-    }
-  }
-}
-
-.db-tutorial-dialog {
-  .tutorial-modal-body {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-  }
-
-  .tutorial-intro-box {
-    background: color-mix(in srgb, var(--accent-primary, #3b82f6) 8%, var(--bg-surface));
-    border: 1px solid color-mix(in srgb, var(--accent-primary, #3b82f6) 20%, transparent);
-    padding: 12px 16px;
-    border-radius: 10px;
-
-    .i-left {
-      display: flex;
-      align-items: flex-start;
-      gap: 10px;
-
-      .i-icon {
-        color: var(--accent-primary, #3b82f6);
-        margin-top: 2px;
-        flex-shrink: 0;
-      }
-
-      .i-texts {
-        .i-title {
-          font-size: 14px;
-          font-weight: 600;
-          color: var(--el-text-color-primary);
-        }
-        .i-desc {
-          font-size: 12px;
-          color: var(--el-text-color-secondary);
-          margin-top: 4px;
-          line-height: 1.5;
-        }
-      }
-    }
-  }
-
-  .tutorial-tab-nav {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 6px;
-    background: var(--el-fill-color-light, #f1f5f9);
-    padding: 4px;
-    border-radius: 8px;
-
-    .tab-nav-item {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-      padding: 8px 10px;
-      font-size: 12px;
-      font-weight: 600;
-      color: var(--el-text-color-secondary);
-      border-radius: 6px;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      text-align: center;
-
-      &:hover {
-        color: var(--el-text-color-primary);
-      }
-
-      &.active {
-        background: var(--bg-surface, #ffffff);
-        color: var(--accent-primary, #3b82f6);
-        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
-      }
-    }
-  }
-
-  .tutorial-content-panel {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    background: var(--bg-surface, #ffffff);
-    border: 1px solid var(--el-border-color, #e2e8f0);
-    border-radius: 10px;
-    padding: 16px;
-
-    .panel-section-title {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 13.5px;
-      font-weight: 600;
-      color: var(--el-text-color-primary);
-      margin-top: 4px;
-
-      .step-num {
-        width: 20px;
-        height: 20px;
-        background: var(--accent-primary, #3b82f6);
-        color: #ffffff;
-        border-radius: 50%;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 11px;
-        font-weight: 700;
-      }
-    }
-
-    .step-text {
-      font-size: 12.5px;
-      color: var(--el-text-color-regular);
-      line-height: 1.6;
-      padding-left: 28px;
-
-      ul {
-        margin: 6px 0 0 0;
-        padding-left: 18px;
-        li {
-          margin-bottom: 4px;
-        }
-      }
-
-      .ext-link {
-        color: var(--accent-primary, #3b82f6);
-        font-weight: 600;
-        text-decoration: underline;
-      }
-
-      .code-box {
-        background: #0f172a;
-        color: #e2e8f0;
-        padding: 10px 14px;
-        border-radius: 8px;
-        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
-        font-size: 11.5px;
-        margin-top: 6px;
-        overflow-x: auto;
-        white-space: pre-wrap;
+        padding: 2px 6px;
+        border-radius: 4px;
       }
     }
   }

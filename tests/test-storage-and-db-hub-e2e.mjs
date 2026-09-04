@@ -213,7 +213,12 @@ import { getUserDb, getMailDb, isDualDbMode } from "../mail-worker/src/utils/db-
     console.log("  ✓ 3 大核心域 DB 架构透视弹窗（用户域/信件域/附件域）解析与信息渲染 100% 完整");
 
     // 关闭 DB 透视弹窗
-    await dbDomainsDialog.getByRole("button", { name: /关闭|Close/ }).click();
+    const closeBtn = dbDomainsDialog.locator(".el-dialog__headerbtn");
+    if (await closeBtn.isVisible()) {
+      await closeBtn.click();
+    } else {
+      await page.keyboard.press("Escape");
+    }
     await page.waitForTimeout(400);
 
     // 2.9 交互验证 2: 点击行内 opt-button 打开「附件存储规则」弹窗
