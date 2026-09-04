@@ -27,7 +27,7 @@
     4. **冗余按钮与指南弹窗全面精简**:
        - 彻底移除冗余的指南按钮与 `dbTutorialShow` 弹窗，底部操作栏仅保留核心刷新与诊断操作。
 *   **部署上线与自动化测试 (Verification & Deployment)**:
-    - **Git Commit Hash**: `e4be8a1833f1f5ec5245f2bc7ccc5b083bb68d0a` (Short Hash: `e4be8a1`).
+    - **Git Commit Hash**: `5f328d8156bcf6c04fbf89d9708954cbc06a996d` (Short Hash: `5f328d8`).
     - 生产部署上线 Cloudflare Workers Version ID: `610366c3-59f0-4a24-909f-12dfb91165bb`。
     - 自动化测试套件 100% 顺利通过：
       - `node --loader ./tests/esm-loader.mjs tests/test-storage-and-db-hub-e2e.mjs` (宽屏无滚动弹窗、3 域横向网格、"?" 悬浮注释、生产双 DB 模式识别 100% 通过);
