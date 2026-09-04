@@ -12,6 +12,34 @@
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
 
+### 3大核心域 DB 架构透视弹窗上线与存储操作栏单行极简重构 (2026-09-04)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **3 大核心域 DB 架构透视弹窗 (`class="db-domains-dialog"`)**:
+       - 数据库架构与分流状态条目右侧新增架构透视 `opt-button` (`class="el-button el-button--primary el-button--small opt-button"`)；
+       - 点击唤起专业多域透视弹窗，将 Epomail 存储与数据库架构清晰划分为 3 大核心域：
+         - **用户域数据库 (User DB) `[D1 / KV]`**：展示资源绑定名称、引擎类型、用户总数与数据承载范围（账号、哈希口令、2FA 密钥、Passkeys、RBAC 权限及 OAuth 开放平台）；
+         - **信件域数据库 (Mail DB) `[D1 / External]`**：展示资源绑定接入点、引擎类型（Cloudflare D1 / Turso 第三方托管）、邮件与邮箱号统计及数据范围（邮件列表、纯文本邮件正文、收发邮箱号池）；
+         - **附件域存储 (Attachment DB) `[外接 / D1]`**：展示外部存储桶/原生存储名称、接入端点、附件总数与 0 元出站 CDN 加速状态；
+       - 顶部配备动态架构模式横幅（单库集中共享 / 双库物理隔离 / 第三方托管分流），底部支持一键刷新透视。
+    2. **操作按钮功能冲突彻底解决与行内工具一体化**:
+       - 消除行内 `opt-button` 与底部操作栏 `opt-btn-scan` 的功能重叠；
+       - 全面统一设计规范：每一行核心状态（数据库架构、附件流转策略、KV 深度体检）均由其专属的行内 `opt-button` 负责触发对应弹窗。
+    3. **操作工具栏压缩重构为极简单行网格 (`grid-template-columns: repeat(3, 1fr)`)**:
+       - 移除底部多余的重复按钮，将 `class="storage-card-actions"` 压缩为清爽对称的单行 3 宫格布局：
+         - `[ S3 / Backblaze B2 配置 ]`
+         - `[ 第三方数据库配置 ]`
+         - `[ 全链路诊断 ]`
+    4. **中英文多语言与后端数据精准打通**:
+       - 后端 `dbService.getDbStatus` 全量返回 structured `domains`；
+       - `zh.js` 与 `en.js` 完备覆盖多域透视相关中英文对照。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **Git Commit Hash**: PENDING_COMMIT_HASH.
+    - 生产部署上线 Cloudflare Workers Version ID: `b4a7c587-0af8-4118-b036-8731311cb2b9`。
+    - 自动化测试套件 100% 顺利通过：
+      - `node --loader ./tests/esm-loader.mjs tests/test-storage-and-db-hub-e2e.mjs` (3 大核心域透视弹窗、单行操作栏 3 按钮、附件规则与真实 KV 深度体检 100% 通过);
+      - `node --loader ./tests/esm-loader.mjs tests/test-s3-b2-storage-and-quota-e2e.mjs` (Backblaze B2 / S3 接入、SigV4 预签名、配额体系 100% 通过);
+      - `node --loader ./tests/esm-loader.mjs tests/test-dual-and-single-db-e2e.mjs` (单库向下兼容与双库物理隔离架构回归 100% 通过)。
+
 ### 存储与数据库中心卡片精简优化、2行紧凑操作网格与单双库前置逻辑强化上线 (2026-09-04)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **卡片视觉与信息大幅精简 (`class="settings-card storage-db-card"`)**:

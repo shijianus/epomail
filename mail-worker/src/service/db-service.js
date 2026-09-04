@@ -56,6 +56,53 @@ const dbService = {
 			stats.attCount = Array.isArray(attCountRes) ? attCountRes.length : 0;
 		} catch (e) {}
 
+		// Attachment domain evaluation
+		const hasS3Bucket = !!(setting.bucket && setting.bucket.trim());
+		const hasR2 = !!c.env?.r2;
+		const attachmentTargetIsExternal = externalEnabled && (setting.externalDbTarget === 'attachment' || setting.externalDbTarget === 'all');
+
+		const attachmentDbName = hasS3Bucket 
+			? `${setting.bucket} (Backblaze B2 / S3)`
+			: (hasR2 ? 'Cloudflare R2 Native' : 'Cloudflare D1 / KV (原生存储)');
+
+		const attachmentDbType = hasS3Bucket 
+			? 's3_b2' 
+			: (hasR2 ? 'r2' : (attachmentTargetIsExternal ? setting.externalDbProvider : 'd1_kv'));
+
+		const domains = {
+			user: {
+				id: 'user_db',
+				name: userDbBound ? 'USER_DB (Dedicated D1)' : 'db (Primary D1 / KV 缓存)',
+				resource: userDbBound ? 'USER_DB' : 'env.db',
+				engine: 'Cloudflare D1 / KV',
+				type: 'd1',
+				scope: '用户账号、密码哈希、2FA密钥、Passkeys、RBAC权限及OAuth应用',
+				count: stats.userCount,
+				status: 'healthy'
+			},
+			mail: {
+				id: 'mail_db',
+				name: externalEnabled ? `${setting.externalDbName || setting.externalDbProvider} (External DB)` : (mailDbBound ? 'MAIL_DB (Dedicated D1)' : 'db (Primary D1)'),
+				resource: externalEnabled ? (setting.externalDbEndpoint || 'External HTTP') : (mailDbBound ? 'MAIL_DB' : 'env.db'),
+				engine: externalEnabled ? `${setting.externalDbProvider} (第三方托管)` : 'Cloudflare D1',
+				type: externalEnabled ? setting.externalDbProvider : 'd1',
+				scope: '邮件列表、纯文本邮件正文、收发邮箱号池、联系人',
+				count: stats.emailCount,
+				accountCount: stats.accountCount,
+				status: 'healthy'
+			},
+			attachment: {
+				id: 'attachment_db',
+				name: attachmentDbName,
+				resource: hasS3Bucket ? (setting.endpoint || 'S3 API Endpoint') : (hasR2 ? 'env.r2' : 'attachments (D1) + KV'),
+				engine: hasS3Bucket ? 'Backblaze B2 / AWS S3' : (hasR2 ? 'Cloudflare R2' : 'Cloudflare D1 + KV'),
+				type: attachmentDbType,
+				scope: '邮件大附件二进制实体、SHA-256 去重哈希、0元 CDN 直链下载',
+				count: stats.attCount,
+				status: hasS3Bucket ? 'connected' : 'native'
+			}
+		};
+
 		return {
 			mode,
 			isDual: dual,
@@ -82,6 +129,7 @@ const dbService = {
 				target: setting.externalDbTarget || 'mail',
 				configured: !!setting.externalDbEndpoint
 			},
+			domains,
 			stats
 		};
 	},

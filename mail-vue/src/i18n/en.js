@@ -1115,6 +1115,16 @@ const en = {
     dbConnectedBadge: 'Connected',
     dbLatencyBadge: 'Latency',
     dbFillRequiredFields: 'Please fill in Database Endpoint URL and Auth Token first',
+    dbDomainsModalTitle: 'Database Domains Architecture & Status (3 Core Domains)',
+    domainUserDbTitle: 'User Domain Database (User DB)',
+    domainMailDbTitle: 'Mail Domain Database (Mail DB)',
+    domainAttachmentDbTitle: 'Attachment Domain Storage (Attachment DB)',
+    dbNameLabel: 'DB / Bucket Name',
+    dbResourceLabel: 'Resource / Endpoint',
+    dbScopeLabel: 'Data Scope',
+    viewDbStatusDetails: 'Scan & Inspect 3-Domain DB Architecture',
+    dbRefreshDomains: 'Refresh Architecture',
+    dbRefreshSuccess: 'Database domains & status refreshed successfully',
 
     // Attachment Storage Rules & Storage Hub Enhancements
     attachmentStorageRule: 'Attachment Flow Policy',

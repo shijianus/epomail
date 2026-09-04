@@ -189,22 +189,36 @@ import { getUserDb, getMailDb, isDualDbMode } from "../mail-worker/src/utils/db-
     assert.ok(cardContentText.includes("KV 运行与深度体检") || cardContentText.includes("KV"), "必须展示 KV 运行与体检状态");
     console.log("  ✓ 存储与核心数据库精简高价值条目、附件流转规则与清晰回退说明 100% 正确");
 
-    // 验证 5 大操作按钮 (2 行网格排布)
+    // 验证 3 大操作按钮 (单行网格紧凑排布)
     const s3Btn = storageDbCard.locator(".opt-btn-s3");
     const dbBtn = storageDbCard.locator(".opt-btn-db");
-    const ruleBtn = storageDbCard.locator(".opt-btn-rule");
-    const scanBtn = storageDbCard.locator(".opt-btn-scan");
     const quickTestBtn = storageDbCard.locator(".opt-btn-test");
 
     await assert.ok(await s3Btn.isVisible(), "对象存储配置按钮必须可见");
     await assert.ok(await dbBtn.isVisible(), "第三方数据库配置按钮必须可见");
-    await assert.ok(await ruleBtn.isVisible(), "附件存储规则按钮必须可见");
-    await assert.ok(await scanBtn.isVisible(), "KV/存储深度体检按钮必须可见");
     await assert.ok(await quickTestBtn.isVisible(), "全链路诊断按钮必须可见");
-    console.log("  ✓ 卡片 5 大操作工具（S3配置、DB配置、附件规则、KV体检、全链路诊断）全部就绪且排布紧凑优雅");
+    console.log("  ✓ 卡片底部 3 大核心操作工具（S3配置、DB配置、全链路诊断）全部就绪且单行紧凑排布");
 
-    // 2.8 交互验证 1: 打开「附件存储规则」弹窗
+    // 2.8 交互验证 1: 点击行内 opt-button 打开「3大核心域 DB 架构透视」弹窗
+    console.log("  -> 点击打开「3大核心域 DB 架构透视」弹窗...");
+    const dbInspectBtn = storageDbCard.locator(".setting-item").nth(1).locator(".opt-button");
+    await dbInspectBtn.click();
+    const dbDomainsDialog = page.locator(".db-domains-dialog");
+    await dbDomainsDialog.waitFor({ state: "visible", timeout: 5000 });
+
+    const dialogContent = await dbDomainsDialog.textContent();
+    assert.ok(dialogContent.includes("用户域") || dialogContent.includes("User DB"), "透视弹窗必须包含用户域 DB");
+    assert.ok(dialogContent.includes("信件域") || dialogContent.includes("Mail DB"), "透视弹窗必须包含信件域 DB");
+    assert.ok(dialogContent.includes("附件域") || dialogContent.includes("Attachment DB"), "透视弹窗必须包含附件域 DB");
+    console.log("  ✓ 3 大核心域 DB 架构透视弹窗（用户域/信件域/附件域）解析与信息渲染 100% 完整");
+
+    // 关闭 DB 透视弹窗
+    await dbDomainsDialog.getByRole("button", { name: /关闭|Close/ }).click();
+    await page.waitForTimeout(400);
+
+    // 2.9 交互验证 2: 点击行内 opt-button 打开「附件存储规则」弹窗
     console.log("  -> 点击打开「附件存储规则」弹窗...");
+    const ruleBtn = storageDbCard.locator(".setting-item").nth(2).locator(".opt-button");
     await ruleBtn.click();
     const ruleDialog = page.locator(".attachment-rule-dialog");
     await ruleDialog.waitFor({ state: "visible", timeout: 5000 });
@@ -219,8 +233,9 @@ import { getUserDb, getMailDb, isDualDbMode } from "../mail-worker/src/utils/db-
     await page.waitForTimeout(600);
     console.log("  ✓ 附件存储规则弹窗交互与保存成功");
 
-    // 2.9 交互验证 2: 打开「KV / 存储深度体检」弹窗
+    // 2.10 交互验证 3: 点击行内 opt-button 打开「KV / 存储深度体检」弹窗
     console.log("  -> 点击打开「KV / 存储深度体检」弹窗...");
+    const scanBtn = storageDbCard.locator(".setting-item").nth(3).locator(".opt-button");
     await scanBtn.click();
     const scanDialog = page.locator(".storage-scan-dialog");
     await scanDialog.waitFor({ state: "visible", timeout: 5000 });

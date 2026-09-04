@@ -1108,6 +1108,16 @@ const zh = {
     dbConnectedBadge: '已连接',
     dbLatencyBadge: '响应延迟',
     dbFillRequiredFields: '请先填写数据库接入点 URL 与认证令牌',
+    dbDomainsModalTitle: '数据库多域架构透视 (3大核心域 DB)',
+    domainUserDbTitle: '用户域数据库 (User DB)',
+    domainMailDbTitle: '信件域数据库 (Mail DB)',
+    domainAttachmentDbTitle: '附件域存储 (Attachment DB)',
+    dbNameLabel: '数据库 / 存储桶',
+    dbResourceLabel: '资源绑定 / 接入点',
+    dbScopeLabel: '承载数据范围',
+    viewDbStatusDetails: '扫描并透视 3 大域 DB 架构',
+    dbRefreshDomains: '刷新透视',
+    dbRefreshSuccess: '数据库架构与状态刷新成功',
 
     // Attachment Storage Rules & Storage Hub Enhancements (附件存储规则与说明增强)
     attachmentStorageRule: '附件流转策略',

@@ -273,25 +273,30 @@
                     <Icon class="warning" icon="fe:warning" width="16" height="16"/>
                   </el-tooltip>
                 </div>
-                <div class="storage-hub-val">
-                  <template v-if="setting.externalDbEnabled === 1">
-                    <el-tag size="small" type="warning" effect="light" class="hub-tag">
-                      <Icon icon="fluent:plug-connected-16-filled" width="13" height="13" style="margin-right: 4px; vertical-align: -1px;" />
-                      {{ $t('dbModeExternal') }} ({{ setting.externalDbName || setting.externalDbProvider || 'Turso' }})
-                    </el-tag>
-                  </template>
-                  <template v-else-if="dbStatusInfo?.isDual">
-                    <el-tag size="small" type="success" effect="light" class="hub-tag">
-                      <Icon icon="fluent:split-horizontal-16-filled" width="13" height="13" style="margin-right: 4px; vertical-align: -1px;" />
-                      {{ $t('dbModeDual') }}
-                    </el-tag>
-                  </template>
-                  <template v-else>
-                    <el-tag size="small" type="primary" effect="plain" class="hub-tag">
-                      <Icon icon="fluent:database-16-filled" width="13" height="13" style="margin-right: 4px; vertical-align: -1px;" />
-                      {{ $t('dbModeSingle') }}
-                    </el-tag>
-                  </template>
+                <div class="forward">
+                  <div class="storage-hub-val">
+                    <template v-if="setting.externalDbEnabled === 1">
+                      <el-tag size="small" type="warning" effect="light" class="hub-tag">
+                        <Icon icon="fluent:plug-connected-16-filled" width="13" height="13" style="margin-right: 4px; vertical-align: -1px;" />
+                        {{ $t('dbModeExternal') }} ({{ setting.externalDbName || setting.externalDbProvider || 'Turso' }})
+                      </el-tag>
+                    </template>
+                    <template v-else-if="dbStatusInfo?.isDual">
+                      <el-tag size="small" type="success" effect="light" class="hub-tag">
+                        <Icon icon="fluent:split-horizontal-16-filled" width="13" height="13" style="margin-right: 4px; vertical-align: -1px;" />
+                        {{ $t('dbModeDual') }}
+                      </el-tag>
+                    </template>
+                    <template v-else>
+                      <el-tag size="small" type="primary" effect="plain" class="hub-tag">
+                        <Icon icon="fluent:database-16-filled" width="13" height="13" style="margin-right: 4px; vertical-align: -1px;" />
+                        {{ $t('dbModeSingle') }}
+                      </el-tag>
+                    </template>
+                  </div>
+                  <el-button class="opt-button" size="small" type="primary" @click="openDbDomainsDetail" :title="$t('viewDbStatusDetails')">
+                    <Icon icon="fluent:database-search-20-regular" width="16" height="16"/>
+                  </el-button>
                 </div>
               </div>
 
@@ -339,7 +344,7 @@
                 </div>
               </div>
 
-              <!-- Action Toolbar at bottom of Card (2 Rows Compact Layout) -->
+              <!-- Action Toolbar at bottom of Card (Single Row 3-Grid Compact Layout) -->
               <div class="storage-card-actions">
                 <el-button class="opt-btn-main opt-btn-s3" size="small" type="primary" @click="openAddS3">
                   <Icon icon="fluent:server-multiple-20-regular" width="14" height="14" style="margin-right: 4px;" />
@@ -349,20 +354,10 @@
                   <Icon icon="fluent:database-arrow-right-20-regular" width="14" height="14" style="margin-right: 4px;" />
                   {{ $t('dbConfiguration') }}
                 </el-button>
-                <div class="opt-tools-row">
-                  <el-button class="opt-btn-rule" size="small" type="default" @click="openAttachmentRuleDialog">
-                    <Icon icon="fluent:rules-20-regular" width="13" height="13" style="margin-right: 3px;" />
-                    {{ $t('attachmentRuleBtn') }}
-                  </el-button>
-                  <el-button class="opt-btn-scan" size="small" type="default" :loading="scanningStorage" @click="openStorageScanDialog">
-                    <Icon icon="fluent:scan-camera-16-regular" width="13" height="13" style="margin-right: 3px;" />
-                    {{ $t('storageScanBtn') }}
-                  </el-button>
-                  <el-button class="opt-btn-test" size="small" type="default" :loading="testingStorageQuick" @click="handleQuickTestStorageAndDb" :title="$t('storageAndDbQuickTest')">
-                    <Icon icon="fluent:play-circle-16-regular" width="13" height="13" style="margin-right: 3px;" />
-                    {{ $t('storageAndDbQuickTest') }}
-                  </el-button>
-                </div>
+                <el-button class="opt-btn-test" size="small" type="default" :loading="testingStorageQuick" @click="handleQuickTestStorageAndDb" :title="$t('storageAndDbQuickTest')">
+                  <Icon icon="fluent:play-circle-16-regular" width="13" height="13" style="margin-right: 3px;" />
+                  {{ $t('storageAndDbQuickTest') }}
+                </el-button>
               </div>
             </div>
           </div>
@@ -2321,6 +2316,126 @@
         </template>
       </el-dialog>
 
+      <!-- DB Domains 3-Domain Architecture Modal (3大核心域 DB 透视弹窗) -->
+      <el-dialog
+        v-model="dbDomainsDetailShow"
+        :title="$t('dbDomainsModalTitle')"
+        width="660px"
+        class="storage-config-dialog db-domains-dialog"
+      >
+        <div class="s3-modal-body domains-modal-body">
+          <!-- Architecture Summary Banner -->
+          <div class="domains-summary-banner">
+            <div class="b-left">
+              <Icon icon="fluent:database-link-20-filled" width="20" height="20" class="b-icon" />
+              <span>
+                当前架构: 
+                <strong>
+                  {{ setting.externalDbEnabled === 1 ? ($t('dbModeExternal') + ' (' + (setting.externalDbName || setting.externalDbProvider || 'Turso') + ')') : (dbStatusInfo?.isDual ? $t('dbModeDual') : $t('dbModeSingle')) }}
+                </strong>
+              </span>
+            </div>
+            <div class="b-right">
+              <el-tag size="small" :type="setting.externalDbEnabled === 1 ? 'warning' : (dbStatusInfo?.isDual ? 'success' : 'primary')" effect="light">
+                {{ setting.externalDbEnabled === 1 ? '第三方托管分流' : (dbStatusInfo?.isDual ? '双库物理隔离' : '单库集中共享') }}
+              </el-tag>
+            </div>
+          </div>
+
+          <!-- 3 Domain Cards -->
+          <!-- 1. User DB Domain (用户域) -->
+          <div class="domain-card">
+            <div class="d-card-head">
+              <div class="d-title-group">
+                <Icon icon="fluent:person-key-20-filled" width="17" height="17" class="d-head-icon user" />
+                <span>{{ $t('domainUserDbTitle') }}</span>
+              </div>
+              <el-tag size="small" type="primary" effect="plain">
+                {{ dbStatusInfo?.domains?.user?.engine || 'Cloudflare D1 / KV' }}
+              </el-tag>
+            </div>
+            <div class="d-card-grid">
+              <span class="g-lbl">{{ $t('dbNameLabel') }}:</span>
+              <span class="g-val mono">{{ dbStatusInfo?.domains?.user?.name || (dbStatusInfo?.isDual ? 'USER_DB (Dedicated D1)' : 'db (Primary D1 / KV 缓存)') }}</span>
+              
+              <span class="g-lbl">{{ $t('dbResourceLabel') }}:</span>
+              <span class="g-val mono">{{ dbStatusInfo?.domains?.user?.resource || (dbStatusInfo?.isDual ? 'USER_DB' : 'env.db') }}</span>
+
+              <span class="g-lbl">{{ $t('dbScopeLabel') }}:</span>
+              <span class="g-val">{{ $t('dbUserDomainDetail') || dbStatusInfo?.domains?.user?.scope || '用户账号、哈希口令、2FA密钥、Passkeys、RBAC权限及OAuth开放平台' }}</span>
+
+              <span class="g-lbl">统计概览:</span>
+              <span class="g-val stats">{{ dbStatusInfo?.stats?.userCount ?? dbStatusInfo?.domains?.user?.count ?? 0 }} {{ $t('dbStatsUsers') }}</span>
+            </div>
+          </div>
+
+          <!-- 2. Mail DB Domain (信件域) -->
+          <div class="domain-card">
+            <div class="d-card-head">
+              <div class="d-title-group">
+                <Icon icon="fluent:mail-multiple-20-filled" width="17" height="17" class="d-head-icon mail" />
+                <span>{{ $t('domainMailDbTitle') }}</span>
+              </div>
+              <el-tag size="small" :type="setting.externalDbEnabled === 1 ? 'warning' : 'primary'" effect="plain">
+                {{ dbStatusInfo?.domains?.mail?.engine || (setting.externalDbEnabled === 1 ? (setting.externalDbProvider || 'Turso (第三方托管)') : 'Cloudflare D1') }}
+              </el-tag>
+            </div>
+            <div class="d-card-grid">
+              <span class="g-lbl">{{ $t('dbNameLabel') }}:</span>
+              <span class="g-val mono">{{ dbStatusInfo?.domains?.mail?.name || (setting.externalDbEnabled === 1 ? (setting.externalDbName || setting.externalDbProvider) : (dbStatusInfo?.isDual ? 'MAIL_DB (Dedicated D1)' : 'db (Primary D1)')) }}</span>
+              
+              <span class="g-lbl">{{ $t('dbResourceLabel') }}:</span>
+              <span class="g-val mono">{{ dbStatusInfo?.domains?.mail?.resource || (setting.externalDbEnabled === 1 ? setting.externalDbEndpoint : (dbStatusInfo?.isDual ? 'MAIL_DB' : 'env.db')) }}</span>
+
+              <span class="g-lbl">{{ $t('dbScopeLabel') }}:</span>
+              <span class="g-val">{{ dbStatusInfo?.domains?.mail?.scope || '邮件列表、纯文本邮件正文、收发邮箱号池、联系人' }}</span>
+
+              <span class="g-lbl">统计概览:</span>
+              <span class="g-val stats">{{ dbStatusInfo?.stats?.emailCount ?? dbStatusInfo?.domains?.mail?.count ?? 0 }} {{ $t('dbStatsEmails') }} · {{ dbStatusInfo?.stats?.accountCount ?? dbStatusInfo?.domains?.mail?.accountCount ?? 0 }} {{ $t('dbStatsAccounts') }}</span>
+            </div>
+          </div>
+
+          <!-- 3. Attachment DB Domain (附件域) -->
+          <div class="domain-card">
+            <div class="d-card-head">
+              <div class="d-title-group">
+                <Icon icon="fluent:folder-arrow-up-20-filled" width="17" height="17" class="d-head-icon attachment" />
+                <span>{{ $t('domainAttachmentDbTitle') }}</span>
+              </div>
+              <el-tag size="small" :type="setting.bucket ? 'success' : (setting.hasR2 ? 'primary' : 'info')" effect="plain">
+                {{ dbStatusInfo?.domains?.attachment?.engine || (setting.bucket ? 'Backblaze B2 / AWS S3' : (setting.hasR2 ? 'Cloudflare R2' : 'Cloudflare D1 + KV')) }}
+              </el-tag>
+            </div>
+            <div class="d-card-grid">
+              <span class="g-lbl">{{ $t('dbNameLabel') }}:</span>
+              <span class="g-val mono">{{ dbStatusInfo?.domains?.attachment?.name || (setting.bucket ? (setting.bucket + ' (Backblaze B2)') : (setting.hasR2 ? 'Cloudflare R2 Native' : 'attachments (D1 表) + KV')) }}</span>
+              
+              <span class="g-lbl">{{ $t('dbResourceLabel') }}:</span>
+              <span class="g-val mono">{{ dbStatusInfo?.domains?.attachment?.resource || (setting.bucket ? (setting.endpoint || 'S3 Endpoint') : (setting.hasR2 ? 'env.r2' : 'attachments (D1) + KV')) }}</span>
+
+              <span class="g-lbl">{{ $t('dbScopeLabel') }}:</span>
+              <span class="g-val">{{ dbStatusInfo?.domains?.attachment?.scope || '邮件大附件二进制实体、SHA-256 去重哈希、0元 CDN 直链下载' }}</span>
+
+              <span class="g-lbl">统计概览:</span>
+              <span class="g-val stats">
+                {{ dbStatusInfo?.stats?.attCount ?? dbStatusInfo?.domains?.attachment?.count ?? 0 }} {{ $t('dbStatsAtts') }}
+                <el-tag v-if="setting.customDomain" size="small" type="primary" effect="light" style="margin-left: 6px;">0元出站 CDN 加速</el-tag>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <template #footer>
+          <div class="dialog-footer-actions">
+            <el-button @click="dbDomainsDetailShow = false">{{ $t('close') || '关闭' }}</el-button>
+            <el-button type="primary" :loading="scanningDbDomains" @click="handleRefreshDbDomains">
+              <Icon icon="fluent:arrow-sync-20-regular" width="14" height="14" style="margin-right: 4px;" />
+              {{ $t('dbRefreshDomains') || '刷新透视' }}
+            </el-button>
+          </div>
+        </template>
+      </el-dialog>
+
       <!-- 邮箱前缀规则 Unified Drawer -->
       <el-drawer
           v-model="emailPrefixShow"
@@ -2443,6 +2558,8 @@ const testingDb = ref(false)
 const dbTestResult = ref(null)
 const clearDbLoading = ref(false)
 const testingStorageQuick = ref(false)
+const dbDomainsDetailShow = ref(false)
+const scanningDbDomains = ref(false)
 
 const attachmentRuleShow = ref(false)
 const attachmentRuleForm = reactive({
@@ -3824,6 +3941,27 @@ async function saveAttachmentRule() {
   })
   attachmentRuleShow.value = false
   ElMessage.success(t('saveAttachmentRule') + ' ' + (t('successful') || '成功'))
+}
+
+async function openDbDomainsDetail() {
+  dbDomainsDetailShow.value = true
+  await handleRefreshDbDomains()
+}
+
+async function handleRefreshDbDomains() {
+  scanningDbDomains.value = true
+  try {
+    const res = await getDbStatus()
+    const data = res?.data !== undefined ? res.data : res
+    if (data) {
+      dbStatusInfo.value = data
+      ElMessage.success(t('dbRefreshSuccess') || '数据库架构与状态刷新成功')
+    }
+  } catch (e) {
+    ElMessage.error(e.message || '刷新数据库状态失败')
+  } finally {
+    scanningDbDomains.value = false
+  }
 }
 
 async function openStorageScanDialog() {
@@ -6674,37 +6812,119 @@ form .el-button {
 
   .storage-card-actions {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
     margin-top: 12px;
     padding-top: 10px;
     border-top: 1px dashed var(--el-border-color-lighter);
 
-    .opt-btn-main {
+    .el-button {
       height: 30px;
-      font-size: 12px;
+      font-size: 11.5px;
       font-weight: 600;
-      padding: 0 8px;
+      padding: 0 4px;
       border-radius: 6px;
       margin: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+  }
+}
+
+.db-domains-dialog {
+  .domains-modal-body {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .domains-summary-banner {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 14px;
+    background: var(--el-fill-color-light, #f8fafc);
+    border: 1px solid var(--el-border-color-lighter, #e2e8f0);
+    border-radius: 8px;
+
+    .b-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--el-text-color-primary);
+
+      .b-icon {
+        color: var(--el-color-primary);
+      }
+    }
+  }
+
+  .domain-card {
+    border: 1px solid var(--el-border-color-light, #e2e8f0);
+    border-radius: 8px;
+    padding: 12px 14px;
+    background: var(--el-bg-color, #ffffff);
+    transition: all 0.2s ease;
+
+    &:hover {
+      border-color: var(--el-color-primary-light-5, #93c5fd);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
     }
 
-    .opt-tools-row {
-      grid-column: span 2;
-      display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
-      gap: 6px;
+    .d-card-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      padding-bottom: 6px;
+      border-bottom: 1px dashed var(--el-border-color-lighter, #f1f5f9);
 
-      .el-button {
-        height: 28px;
-        font-size: 11.5px;
+      .d-title-group {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--el-text-color-primary);
+
+        .d-head-icon {
+          &.user { color: #8b5cf6; }
+          &.mail { color: #3b82f6; }
+          &.attachment { color: #10b981; }
+        }
+      }
+    }
+
+    .d-card-grid {
+      display: grid;
+      grid-template-columns: 120px 1fr;
+      gap: 6px 12px;
+      font-size: 12px;
+
+      .g-lbl {
+        color: var(--el-text-color-secondary, #64748b);
+      }
+
+      .g-val {
+        color: var(--el-text-color-primary, #1e293b);
         font-weight: 500;
-        padding: 0 4px;
-        margin: 0;
-        border-radius: 6px;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
+        word-break: break-all;
+
+        &.mono {
+          font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+          font-size: 11.5px;
+        }
+
+        &.stats {
+          color: var(--el-color-primary, #3b82f6);
+          font-weight: 600;
+        }
       }
     }
   }
