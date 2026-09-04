@@ -30,7 +30,7 @@
        - 系统默认仅需 1 个 D1 数据库 (`db`) 即可完美开箱即用，通过 `getUserDb(c)` 与 `getMailDb(c)` 自动统一退化；
        - 当站长配置双库时系统自动分流，跨库数据通过内存水合（`allEmail` Hydration）与并行聚合，兼具超高安全隔离性与卓越性能。
 *   **部署上线与自动化测试 (Verification & Deployment)**:
-    - **Git Commit Hash**: `9cb725717ec111e4bd184423f32944e355de8934` (Short Hash: `9cb7257`).
+    - **Git Commit Hash**: `325bb66038e9d459cb9aed298654358c0ac372e7` (Short Hash: `325bb66`).
     - 生产部署上线 Cloudflare Workers Version ID: `c3a4999c-8c3e-4fe0-b92d-392edaabfee2`。
     - 自动化测试套件 100% 顺利通过：
       - `node --loader ./tests/esm-loader.mjs tests/test-storage-and-db-hub-e2e.mjs` (小白通俗化弹窗、3 大核心域透视、单行操作栏、附件规则与真实 KV 深度体检 100% 通过);
