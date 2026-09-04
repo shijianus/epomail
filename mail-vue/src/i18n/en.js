@@ -1140,12 +1140,15 @@ const en = {
     policySmartTierDesc: 'Small inline images stay on fast Cloudflare edge, big binaries offload to B2/S3.',
     policyEdgeFirst: 'Edge Native First (Cloudflare R2 / KV)',
     policyEdgeFirstDesc: 'Use Worker-bound Cloudflare R2 or KV first, seamless fallback when external storage is absent.',
-    maxAttachmentSize: 'Max Attachment Size (MB)',
-    maxAttachmentSizeHint: 'Maximum single attachment size allowed for sending/receiving (Default 25MB)',
+    maxAttachmentSize: 'Max Single Attachment Size (MB)',
+    maxAttachmentSizeHint: 'Max single file size for attachments. ⚠️ Notice: Applies only to users using the admin-provided public storage/database. Users with their own BYO Storage or external database are completely unrestricted.',
     cascadeDeleteAttachment: 'Cascade Delete Attachments on Mail Removal',
-    cascadeDeleteAttachmentHint: 'Automatically delete cloud object storage and KV binaries when emails are deleted by users or admins',
+    cascadeDeleteAttachmentHint: 'Automatically clean up cloud object storage and KV binary files when emails are deleted to reclaim space immediately.',
     saveAttachmentRule: 'Save Attachment Rules',
     attachmentRuleBtn: 'Attachment Storage Rules',
+    dbInspectBtn: 'Architecture Perspective',
+    cascadeDeleteLabel: 'Cascade Delete Attachments',
+    cascadeDeleteTooltip: 'Automatically purge physical files in storage when emails are deleted.',
 
     // Storage Detailed Status (Replaces "Not Set")
     fallbackToNative: 'Cloudflare Native Storage (KV / R2 Auto-Fallback)',

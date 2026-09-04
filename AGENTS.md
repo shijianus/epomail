@@ -12,6 +12,30 @@
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
 
+### 存储与数据库中心面板UI深度重构、彻底剔除opt-button、单附件上限显式展示及BYO免受限与弹窗彻底杜绝滑块上线 (2026-09-04)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **存储与数据库卡片 UI 深度重构与彻底剔除画风冲突的 `.opt-button`**:
+       - 彻底移除每行右侧突兀突出的深蓝色小方块按钮（`class="opt-button"`），全站前后画风实现 100% 极致统一；
+       - **单文件附件上限 (MB) 显式呈现**：直接在面板设置条目中提供 `el-input-number`（步进调整即调即存），无需再通过繁琐弹窗设置；
+       - **明确说明约束范围**：Tooltip 明确公示该限制仅针对使用管理员提供的公共存储/数据库生效；若用户在个人资料页接入了自建/第三方存储 (BYO Storage) 或外部数据库，上传文件将直接流转至用户个人存储，完全不受此上限限制；
+       - **级联删除附件实体**：在面板中以 `el-switch` 标准开关形式直观呈现与配置；
+       - **底部工具栏 2 行紧凑排布**：第一行配置类（`[ S3 / Backblaze B2 配置 ]`、`[ 第三方数据库配置 ]`），第二行工具诊断类（`[ 架构透视 ]`、`[ 存储体检 ]`、`[ 全链路诊断 ]`），对称整洁。
+    2. **弹窗彻底杜绝滑块滑动与全局 400px 压缩问题根治 (No Scrollbars & Wide Responsive Grid)**:
+       - 彻底解决全局 `:deep(.el-dialog)` 将弹窗锁死为 400px 导致的排版严重挤压错乱与垂直滚动条（滑块）问题；
+       - 显式提高特异性规则：`db-domains-dialog` 稳固展开至 `920px`，`storage-scan-dialog` 稳固展开至 `880px`；
+       - 去除大段冗余说教文字，精简核心数据与指标展示，设置 `.el-dialog__body { overflow-y: visible !important; height: auto !important; }`，弹窗内容自然完全展现，**100% 无垂直滚动条、无滑块滑动**。
+    3. **后端底层拦截与业务闭环完整落地 (checkAttachmentSizeLimit)**:
+       - `storageQuotaService` 新增 `checkAttachmentSizeLimit(c, userId, fileSizeBytes)` 方法；
+       - 当用户使用管理员提供的公共数据库/存储时，单附件体积超过 `attachmentMaxSizeMb` 抛出 `BizError` 拦截；
+       - 当用户启用个人专属 BYO S3 存储或外部数据库时，自动豁免跳过该限制，返回 `{ allowed: true, isByo: true }`，彻底实现业务逻辑闭环。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **Git Commit Hash**: `dbe0acafe9c954d35709bdc175d026f436212ebc` (Short Hash: `dbe0aca`).
+    - 生产部署上线 Cloudflare Workers Version ID: `6cf0efa6-bfac-42aa-9ecd-a599399dbc1f`。
+    - 自动化测试套件 100% 顺利通过：
+      - `node --loader ./tests/esm-loader.mjs tests/test-storage-and-db-hub-e2e.mjs` (单附件拦截单元测试、BYO免限制测试、卡片无opt-button、单附件输入框显式展示、920px/880px弹窗宽屏无滚动条验证 100% 通过);
+      - `node --loader ./tests/esm-loader.mjs tests/test-dual-and-single-db-e2e.mjs` (单双库物理隔离与单库退化兼容回归 100% 通过);
+      - `node --loader ./tests/esm-loader.mjs tests/test-s3-b2-storage-and-quota-e2e.mjs` (Backblaze B2 / S3 接入、SigV4 预签名、配额体系 100% 通过)。
+
 ### 宽屏无滚动 DB 架构透视与体检弹窗上线、全站统一"?"注释规范与生产双 DB 真实生效 (2026-09-04)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **生产双 DB 绑定真实生效与模式精准显示**:

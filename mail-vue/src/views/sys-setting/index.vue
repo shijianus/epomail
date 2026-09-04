@@ -273,59 +273,68 @@
                     <Icon class="warning" icon="fe:warning" width="16" height="16"/>
                   </el-tooltip>
                 </div>
-                <div class="forward">
-                  <div class="storage-hub-val">
-                    <template v-if="setting.externalDbEnabled === 1">
-                      <el-tag size="small" type="warning" effect="light" class="hub-tag">
-                        <Icon icon="fluent:plug-connected-16-filled" width="13" height="13" style="margin-right: 4px; vertical-align: -1px;" />
-                        {{ $t('dbModeExternal') }} ({{ setting.externalDbName || setting.externalDbProvider || 'Turso' }})
-                      </el-tag>
-                    </template>
-                    <template v-else-if="dbStatusInfo?.isDual">
-                      <el-tag size="small" type="success" effect="light" class="hub-tag">
-                        <Icon icon="fluent:split-horizontal-16-filled" width="13" height="13" style="margin-right: 4px; vertical-align: -1px;" />
-                        {{ $t('dbModeDual') }}
-                      </el-tag>
-                    </template>
-                    <template v-else>
-                      <el-tag size="small" type="primary" effect="plain" class="hub-tag">
-                        <Icon icon="fluent:database-16-filled" width="13" height="13" style="margin-right: 4px; vertical-align: -1px;" />
-                        {{ $t('dbModeSingle') }}
-                      </el-tag>
-                    </template>
-                  </div>
-                  <el-button class="opt-button" size="small" type="primary" @click="openDbDomainsDetail" :title="$t('viewDbStatusDetails')">
-                    <Icon icon="fluent:database-search-20-regular" width="16" height="16"/>
-                  </el-button>
-                </div>
-              </div>
-
-              <!-- Item 3: 附件存储流转策略 (Attachment Storage Policy) -->
-              <div class="setting-item">
-                <div class="title-item">
-                  <span>{{ $t('attachmentStorageRule') }}</span>
-                  <el-tooltip effect="dark" :content="$t('attachmentStorageRuleDesc')">
-                    <Icon class="warning" icon="fe:warning" width="16" height="16"/>
-                  </el-tooltip>
-                </div>
-                <div class="forward">
-                  <template v-if="setting.bucket">
-                    <el-tag size="small" :type="setting.attachmentPolicy === 1 ? 'warning' : (setting.attachmentPolicy === 2 ? 'info' : 'success')" effect="light" class="hub-tag">
-                      {{ setting.attachmentPolicy === 1 ? $t('policySmartTier') : (setting.attachmentPolicy === 2 ? $t('policyEdgeFirst') : $t('policyB2First')) }}
+                <div class="storage-hub-val">
+                  <template v-if="setting.externalDbEnabled === 1">
+                    <el-tag size="small" type="warning" effect="light" class="hub-tag">
+                      <Icon icon="fluent:plug-connected-16-filled" width="13" height="13" style="margin-right: 4px; vertical-align: -1px;" />
+                      {{ $t('dbModeExternal') }} ({{ setting.externalDbName || setting.externalDbProvider || 'Turso' }})
+                    </el-tag>
+                  </template>
+                  <template v-else-if="dbStatusInfo?.isDual">
+                    <el-tag size="small" type="success" effect="light" class="hub-tag">
+                      <Icon icon="fluent:split-horizontal-16-filled" width="13" height="13" style="margin-right: 4px; vertical-align: -1px;" />
+                      {{ $t('dbModeDual') }}
                     </el-tag>
                   </template>
                   <template v-else>
-                    <el-tag size="small" type="info" effect="plain" class="hub-tag">
-                      {{ $t('attachmentPolicyNativeFallback') }}
+                    <el-tag size="small" type="primary" effect="plain" class="hub-tag">
+                      <Icon icon="fluent:database-16-filled" width="13" height="13" style="margin-right: 4px; vertical-align: -1px;" />
+                      {{ $t('dbModeSingle') }}
                     </el-tag>
                   </template>
-                  <el-button class="opt-button" size="small" type="primary" @click="openAttachmentRuleDialog" :title="$t('attachmentRuleBtn')">
-                    <Icon icon="fluent:options-20-regular" width="16" height="16"/>
-                  </el-button>
                 </div>
               </div>
 
-              <!-- Item 4: KV 边缘存储与深度体检 (KV Layer & Health Inspection) -->
+              <!-- Item 3: 单文件附件上限 (MB) (Max Single Attachment Size - 面板显式展示) -->
+              <div class="setting-item">
+                <div class="title-item">
+                  <span>{{ $t('maxAttachmentSize') }}</span>
+                  <el-tooltip effect="dark" :content="$t('maxAttachmentSizeHint')">
+                    <Icon class="warning" icon="fe:warning" width="16" height="16"/>
+                  </el-tooltip>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <el-input-number 
+                    size="small" 
+                    :min="1" 
+                    :max="500" 
+                    :step="5" 
+                    v-model="setting.attachmentMaxSizeMb" 
+                    @change="(val) => changeField('attachmentMaxSizeMb', val)"
+                    style="width: 110px;"
+                  />
+                </div>
+              </div>
+
+              <!-- Item 4: 邮件删除同步清理附件 (Cascade Delete) -->
+              <div class="setting-item">
+                <div class="title-item">
+                  <span>{{ $t('cascadeDeleteLabel') }}</span>
+                  <el-tooltip effect="dark" :content="$t('cascadeDeleteAttachmentHint')">
+                    <Icon class="warning" icon="fe:warning" width="16" height="16"/>
+                  </el-tooltip>
+                </div>
+                <div>
+                  <el-switch 
+                    :active-value="1" 
+                    :inactive-value="0" 
+                    v-model="setting.attachmentCascadeDelete" 
+                    @change="(val) => changeField('attachmentCascadeDelete', val)"
+                  />
+                </div>
+              </div>
+
+              <!-- Item 5: KV 边缘缓存运行状态 (KV Storage Layer) -->
               <div class="setting-item">
                 <div class="title-item">
                   <span>{{ $t('kvLayerActive') }}</span>
@@ -338,26 +347,35 @@
                     <Icon icon="fluent:flash-checkmark-20-filled" width="14" height="14" style="margin-right: 4px; vertical-align: -2px; color: #eab308;" />
                     {{ $t('kvLayerStatusActive') }}
                   </span>
-                  <el-button class="opt-button" size="small" type="primary" @click="openStorageScanDialog" :title="$t('storageScanBtn')">
-                    <Icon icon="fluent:scan-camera-16-regular" width="16" height="16"/>
-                  </el-button>
                 </div>
               </div>
 
-              <!-- Action Toolbar at bottom of Card (Single Row 3-Grid Compact Layout) -->
+              <!-- Action Toolbar at bottom of Card (2-Row Compact Symmetrical Grid) -->
               <div class="storage-card-actions">
-                <el-button class="opt-btn-main opt-btn-s3" size="small" type="primary" @click="openAddS3">
-                  <Icon icon="fluent:server-multiple-20-regular" width="14" height="14" style="margin-right: 4px;" />
-                  {{ $t('s3Configuration') }}
-                </el-button>
-                <el-button class="opt-btn-main opt-btn-db" size="small" type="primary" @click="openDbConfig">
-                  <Icon icon="fluent:database-arrow-right-20-regular" width="14" height="14" style="margin-right: 4px;" />
-                  {{ $t('dbConfiguration') }}
-                </el-button>
-                <el-button class="opt-btn-test" size="small" type="default" :loading="testingStorageQuick" @click="handleQuickTestStorageAndDb" :title="$t('storageAndDbQuickTest')">
-                  <Icon icon="fluent:play-circle-16-regular" width="13" height="13" style="margin-right: 3px;" />
-                  {{ $t('storageAndDbQuickTest') }}
-                </el-button>
+                <div class="storage-actions-row config-row">
+                  <el-button class="opt-btn-main opt-btn-s3" size="small" type="primary" @click="openAddS3">
+                    <Icon icon="fluent:server-multiple-20-regular" width="14" height="14" style="margin-right: 4px;" />
+                    {{ $t('s3Configuration') }}
+                  </el-button>
+                  <el-button class="opt-btn-main opt-btn-db" size="small" type="primary" @click="openDbConfig">
+                    <Icon icon="fluent:database-arrow-right-20-regular" width="14" height="14" style="margin-right: 4px;" />
+                    {{ $t('dbConfiguration') }}
+                  </el-button>
+                </div>
+                <div class="storage-actions-row tool-row">
+                  <el-button class="opt-btn-sub opt-btn-inspect" size="small" type="default" @click="openDbDomainsDetail">
+                    <Icon icon="fluent:database-search-20-regular" width="13" height="13" style="margin-right: 3px;" />
+                    {{ $t('dbInspectBtn') }}
+                  </el-button>
+                  <el-button class="opt-btn-sub opt-btn-scan" size="small" type="default" @click="openStorageScanDialog">
+                    <Icon icon="fluent:scan-camera-16-regular" width="13" height="13" style="margin-right: 3px;" />
+                    {{ $t('storageScanBtn') }}
+                  </el-button>
+                  <el-button class="opt-btn-test" size="small" type="default" :loading="testingStorageQuick" @click="handleQuickTestStorageAndDb" :title="$t('storageAndDbQuickTest')">
+                    <Icon icon="fluent:play-circle-16-regular" width="13" height="13" style="margin-right: 3px;" />
+                    {{ $t('storageAndDbQuickTest') }}
+                  </el-button>
+                </div>
               </div>
             </div>
           </div>
@@ -4890,6 +4908,33 @@ function editSetting(settingForm, refreshStatus = true) {
   }
 }
 
+:deep(.storage-config-dialog.el-dialog),
+:deep(.attachment-rule-dialog.el-dialog),
+:deep(.db-config-dialog.el-dialog) {
+  width: min(620px, calc(100vw - 32px)) !important;
+  max-width: min(620px, calc(100vw - 32px)) !important;
+}
+
+:deep(.storage-config-dialog.storage-scan-dialog.el-dialog),
+:deep(.storage-scan-dialog.el-dialog) {
+  width: min(880px, calc(100vw - 32px)) !important;
+  max-width: min(880px, calc(100vw - 32px)) !important;
+}
+
+:deep(.storage-config-dialog.db-domains-dialog.el-dialog),
+:deep(.db-domains-dialog.el-dialog) {
+  width: min(920px, calc(100vw - 32px)) !important;
+  max-width: min(920px, calc(100vw - 32px)) !important;
+}
+
+:deep(.db-domains-dialog .el-dialog__body),
+:deep(.storage-scan-dialog .el-dialog__body),
+:deep(.attachment-rule-dialog .el-dialog__body) {
+  overflow-y: visible !important;
+  max-height: none !important;
+  height: auto !important;
+}
+
 :deep(.resend-table.el-dialog) {
   min-height: 300px;
   width: 500px !important;
@@ -6894,18 +6939,31 @@ form .el-button {
   }
 
   .storage-card-actions {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
     margin-top: 12px;
     padding-top: 10px;
     border-top: 1px dashed var(--el-border-color-lighter);
 
+    .storage-actions-row {
+      display: grid;
+      gap: 8px;
+
+      &.config-row {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      &.tool-row {
+        grid-template-columns: repeat(3, 1fr);
+      }
+    }
+
     .el-button {
-      height: 30px;
-      font-size: 11.5px;
-      font-weight: 600;
-      padding: 0 4px;
+      height: 32px;
+      font-size: 12px;
+      font-weight: 500;
+      padding: 0 6px;
       border-radius: 6px;
       margin: 0;
       white-space: nowrap;
@@ -6914,6 +6972,10 @@ form .el-button {
       display: inline-flex;
       align-items: center;
       justify-content: center;
+
+      &.opt-btn-main {
+        font-weight: 600;
+      }
     }
   }
 }

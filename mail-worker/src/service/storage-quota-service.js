@@ -152,6 +152,55 @@ const storageQuotaService = {
 			allowed: true,
 			usage
 		};
+	},
+
+	/**
+	 * Check whether a single attachment file size exceeds the system attachment limit.
+	 * Rule: Applies ONLY to users using the administrator-provided public storage/database.
+	 * If the user has connected and enabled their own third-party storage (BYO S3) or external DB,
+	 * they are completely unrestricted.
+	 */
+	async checkAttachmentSizeLimit(c, userId, fileSizeBytes = 0) {
+		if (userId) {
+			const usage = await this.getUserStorageUsage(c, userId);
+			if (usage.byoStorageEnabled === 1) {
+				// User uses their own BYO S3 storage: completely unrestricted
+				return {
+					allowed: true,
+					isByo: true,
+					maxSizeMb: 0
+				};
+			}
+		}
+
+		// User is using administrator-provided public DB/storage: apply system limit
+		const setting = await settingService.query(c);
+		const maxSizeMb = Number(setting.attachmentMaxSizeMb !== undefined ? setting.attachmentMaxSizeMb : 25);
+		if (maxSizeMb <= 0) {
+			return {
+				allowed: true,
+				isByo: false,
+				maxSizeMb: 0
+			};
+		}
+
+		const maxSizeBytes = maxSizeMb * 1024 * 1024;
+		if (fileSizeBytes > maxSizeBytes) {
+			const currentSizeMb = (fileSizeBytes / (1024 * 1024)).toFixed(2);
+			return {
+				allowed: false,
+				isByo: false,
+				maxSizeMb,
+				currentSizeMb,
+				reason: `单个附件大小 (${currentSizeMb}MB) 超过系统设定的上限 (${maxSizeMb}MB)。此限制仅在使用管理员提供的默认存储时生效，若接入个人第三方存储或外部数据库则不受限制。`
+			};
+		}
+
+		return {
+			allowed: true,
+			isByo: false,
+			maxSizeMb
+		};
 	}
 };
 

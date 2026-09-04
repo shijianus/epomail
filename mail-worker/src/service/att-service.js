@@ -9,6 +9,7 @@ import { parseHTML } from 'linkedom';
 import { v4 as uuidv4 } from 'uuid';
 import domainUtils from '../utils/domain-uitls';
 import settingService from "./setting-service";
+import BizError from '../error/biz-error';
 
 import storageQuotaService from './storage-quota-service';
 import { getMailDb } from '../utils/db-accessor';
@@ -28,6 +29,14 @@ const attService = {
 		}
 
 		for (let attachment of attachments) {
+			const attSize = Number(attachment.size || attachment.content?.length || 0);
+			if (userId && attSize > 0) {
+				const sizeCheck = await storageQuotaService.checkAttachmentSizeLimit(c, userId, attSize);
+				if (!sizeCheck.allowed) {
+					console.warn(`Attachment ${attachment.filename} skipped: ${sizeCheck.reason}`);
+					continue;
+				}
+			}
 			let metadate = {
 				contentType: attachment.mimeType,
 			};
@@ -163,6 +172,13 @@ const attService = {
 
 		for (let att of attList) {
 			att.buff = fileUtils.base64ToUint8Array(att.content);
+
+			// 校验单个附件大小限制 (仅在用户使用管理员公共DB/存储时限制，BYO存储用户不限)
+			const sizeCheck = await storageQuotaService.checkAttachmentSizeLimit(c, userId, att.buff.length);
+			if (!sizeCheck.allowed) {
+				throw new BizError(sizeCheck.reason);
+			}
+
 			att.key = constant.ATTACHMENT_PREFIX + await fileUtils.getBuffHash(att.buff) + fileUtils.getExtFileName(att.filename);
 			const attData = { userId, accountId, emailId };
 			attData.key = att.key;

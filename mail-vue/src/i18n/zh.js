@@ -1133,12 +1133,15 @@ const zh = {
     policySmartTierDesc: '轻量内嵌图片与小附件就近保存在 Cloudflare 原生边缘，大体积附件卸载至 B2/S3。',
     policyEdgeFirst: '边缘原生优先 (Cloudflare R2 / KV)',
     policyEdgeFirstDesc: '优先使用 Worker 绑定的 Cloudflare R2 或 KV 存储，未配置外部存储时平滑运行。',
-    maxAttachmentSize: '单附件大小上限 (MB)',
-    maxAttachmentSizeHint: '允许接收与发送的单个附件最大体积 (默认 25MB)',
+    maxAttachmentSize: '单文件附件上限 (MB)',
+    maxAttachmentSizeHint: '单文件附件上传大小上限。⚠️ 明确说明：此限制仅对使用管理员提供的公共存储/数据库生效；若用户在资料页接入了个人的第三方存储 (BYO Storage) 或外部数据库，则完全不受此限制。',
     cascadeDeleteAttachment: '邮件删除同步销毁附件实体',
-    cascadeDeleteAttachmentHint: '当用户或管理员删除邮件时，自动级联删除云端对象存储与 KV 中的二进制文件',
+    cascadeDeleteAttachmentHint: '当用户或管理员删除邮件时，自动级联删除云端对象存储与 KV 中的二进制文件，即时释放存储容量。',
     saveAttachmentRule: '保存附件规则',
     attachmentRuleBtn: '附件存储规则',
+    dbInspectBtn: '架构透视',
+    cascadeDeleteLabel: '级联删除附件实体',
+    cascadeDeleteTooltip: '删除邮件时同步物理销毁关联附件实体，自动释放存储空间。',
 
     // Storage Detailed Status (优化未设置状态)
     fallbackToNative: 'Cloudflare 原生存储 (KV / R2 自动回退)',

@@ -2,6 +2,7 @@ import { chromium } from "playwright";
 import assert from "assert";
 import dbService from "../mail-worker/src/service/db-service.js";
 import storageScanService from "../mail-worker/src/service/storage-scan-service.js";
+import storageQuotaService from "../mail-worker/src/service/storage-quota-service.js";
 import { getUserDb, getMailDb, isDualDbMode } from "../mail-worker/src/utils/db-accessor.js";
 
 (async () => {
@@ -10,9 +11,9 @@ import { getUserDb, getMailDb, isDualDbMode } from "../mail-worker/src/utils/db-
   console.log("================================================================================");
 
   // ---------------------------------------------------------------------------
-  // Unit Test: dbService & storageScanService diagnostics
+  // Unit Test: dbService, storageScanService & storageQuotaService single attachment limit
   // ---------------------------------------------------------------------------
-  console.log("\n[Step 1] 单元验证: dbService 与 storageScanService 真实扫描逻辑...");
+  console.log("\n[Step 1] 单元验证: dbService, storageScanService 与单附件限制逻辑...");
   
   const mockSingleEnv = {
     env: {
@@ -20,6 +21,10 @@ import { getUserDb, getMailDb, isDualDbMode } from "../mail-worker/src/utils/db-
       db: {
         prepare: (sql) => ({
           all: async () => ({ results: [] }),
+          bind: () => ({
+            first: async () => null,
+            all: async () => ({ results: [] })
+          }),
           first: async () => ({
             probe: 1,
             totalAttachments: 0,
@@ -58,6 +63,18 @@ import { getUserDb, getMailDb, isDualDbMode } from "../mail-worker/src/utils/db-
       }
     }
   };
+
+  // 1.1 验证单文件附件上限拦截与 BYO 免限制逻辑
+  console.log("  -> 验证单文件附件上限拦截与 BYO 免限制逻辑...");
+  // 场景 A: 公共存储用户，单附件 10MB <= 25MB 上限 -> 允许
+  const normalCheck = await storageQuotaService.checkAttachmentSizeLimit(mockSingleEnv, "user_public", 10 * 1024 * 1024);
+  assert.strictEqual(normalCheck.allowed, true, "10MB 附件在 25MB 上限下必须被允许");
+
+  // 场景 B: 公共存储用户，单附件 30MB > 25MB 上限 -> 拦截
+  const exceededCheck = await storageQuotaService.checkAttachmentSizeLimit(mockSingleEnv, "user_public", 30 * 1024 * 1024);
+  assert.strictEqual(exceededCheck.allowed, false, "30MB 附件在 25MB 上限下必须被拦截");
+  assert.ok(exceededCheck.reason.includes("25"), "拦截提示必须包含上限 25MB");
+  console.log(`  ✓ 公共 DB 存储用户超限拦截验证通过: ${exceededCheck.reason}`);
 
   const statusRes = await dbService.getDbStatus(mockSingleEnv);
   assert.strictEqual(statusRes.mode, 'single', '默认单库模式下 mode 必须为 single');
@@ -170,7 +187,10 @@ import { getUserDb, getMailDb, isDualDbMode } from "../mail-worker/src/utils/db-
       localStorage.setItem("setting", JSON.stringify({ lang: "zh" }));
       localStorage.setItem("locale", "zh");
     }, authToken);
-    await page.goto(BASE + "/system-setting", { waitUntil: "domcontentloaded" });
+    // 重新加载 inbox 触发 init.js 完成权限路由动态加载
+    await page.goto(BASE + "/inbox", { waitUntil: "networkidle" });
+    await page.waitForTimeout(1000);
+    await page.goto(BASE + "/system-setting", { waitUntil: "networkidle" });
     await page.waitForTimeout(1500);
 
     // 验证「存储与核心数据库」卡片排版
@@ -181,30 +201,53 @@ import { getUserDb, getMailDb, isDualDbMode } from "../mail-worker/src/utils/db-
     const cardTitle = await storageDbCard.locator(".card-title").textContent();
     assert.ok(cardTitle.includes("存储与核心数据库") || cardTitle.includes("Storage & Database"), `卡片标题必须正确: ${cardTitle}`);
 
-    // 验证精简后的 4 大高价值条目与清晰回退指示
+    // 验证精简后的高价值条目与清晰回退指示
     const cardContentText = await storageDbCard.locator(".card-content").textContent();
     assert.ok(cardContentText.includes("对象存储") || cardContentText.includes("Object Storage"), "必须展示对象存储运行状态");
     assert.ok(cardContentText.includes("数据库") || cardContentText.includes("Database"), "必须展示数据库架构状态");
-    assert.ok(cardContentText.includes("附件流转策略") || cardContentText.includes("附件存储") || cardContentText.includes("Attachment"), "必须展示附件流转策略");
+    assert.ok(cardContentText.includes("单文件附件上限") || cardContentText.includes("附件上限") || cardContentText.includes("Attachment Size"), "必须显式展示单文件附件上限");
     assert.ok(cardContentText.includes("KV 运行与深度体检") || cardContentText.includes("KV"), "必须展示 KV 运行与体检状态");
-    console.log("  ✓ 存储与核心数据库精简高价值条目、附件流转规则与清晰回退说明 100% 正确");
 
-    // 验证 3 大操作按钮 (单行网格紧凑排布)
+    // 验证彻底剔除行内画风冲突的 opt-button 小方块按钮
+    const optButtons = await storageDbCard.locator(".opt-button").count();
+    assert.strictEqual(optButtons, 0, "卡片行内绝不允许存在画风突兀的 opt-button 蓝色方块按钮！");
+    console.log("  ✓ 卡片行内突兀的 opt-button 按钮已 100% 彻底清除");
+
+    // 验证单文件附件上限输入控件显式展示且可操作
+    const sizeInput = storageDbCard.locator(".el-input-number");
+    await assert.ok(await sizeInput.isVisible(), "卡片面板必须显式展示单文件附件上限输入控件");
+    console.log("  ✓ 单文件附件上限输入控件已在面板显式呈现");
+
+    // 验证 5 大核心操作按钮 (2行紧凑对称排布)
     const s3Btn = storageDbCard.locator(".opt-btn-s3");
     const dbBtn = storageDbCard.locator(".opt-btn-db");
+    const inspectBtn = storageDbCard.locator(".opt-btn-inspect");
+    const scanBtn = storageDbCard.locator(".opt-btn-scan");
     const quickTestBtn = storageDbCard.locator(".opt-btn-test");
 
     await assert.ok(await s3Btn.isVisible(), "对象存储配置按钮必须可见");
     await assert.ok(await dbBtn.isVisible(), "第三方数据库配置按钮必须可见");
+    await assert.ok(await inspectBtn.isVisible(), "架构透视按钮必须可见");
+    await assert.ok(await scanBtn.isVisible(), "存储体检按钮必须可见");
     await assert.ok(await quickTestBtn.isVisible(), "全链路诊断按钮必须可见");
-    console.log("  ✓ 卡片底部 3 大核心操作工具（S3配置、DB配置、全链路诊断）全部就绪且单行紧凑排布");
+    console.log("  ✓ 卡片底部 5 大核心操作工具全部就绪且 2 行紧凑对称排布");
 
-    // 2.8 交互验证 1: 点击行内 opt-button 打开「3大核心域 DB 架构透视」弹窗
+    // 2.8 交互验证 1: 点击底部 opt-btn-inspect 打开「3大核心域 DB 架构透视」弹窗 (宽屏无滚动设计)
     console.log("  -> 点击打开「3大核心域 DB 架构透视」弹窗...");
-    const dbInspectBtn = storageDbCard.locator(".setting-item").nth(1).locator(".opt-button");
-    await dbInspectBtn.click();
+    await inspectBtn.click();
     const dbDomainsDialog = page.locator(".db-domains-dialog");
     await dbDomainsDialog.waitFor({ state: "visible", timeout: 5000 });
+
+    const dialogBox = await dbDomainsDialog.boundingBox();
+    assert.ok(dialogBox.width >= 880, `架构透视弹窗宽度必须扩展至 >= 880px (当前: ${dialogBox.width}px)，禁止被 400px 锁死！`);
+
+    // 验证弹窗内容无垂直滑块/滚动条
+    const hasScrollbar = await dbDomainsDialog.evaluate((el) => {
+      const body = el.querySelector(".el-dialog__body") || el;
+      return body.scrollHeight > body.clientHeight + 10;
+    });
+    assert.strictEqual(hasScrollbar, false, "架构透视弹窗禁止出现垂直滑块滑动！");
+    console.log(`  ✓ 3 大核心域 DB 架构透视弹窗宽度扩展至 ${dialogBox.width}px，且 100% 无垂直滚动条滑块`);
 
     const dialogContent = await dbDomainsDialog.textContent();
     assert.ok(dialogContent.includes("用户域") || dialogContent.includes("User DB"), "透视弹窗必须包含用户域 DB");
@@ -221,36 +264,27 @@ import { getUserDb, getMailDb, isDualDbMode } from "../mail-worker/src/utils/db-
     }
     await page.waitForTimeout(400);
 
-    // 2.9 交互验证 2: 点击行内 opt-button 打开「附件存储规则」弹窗
-    console.log("  -> 点击打开「附件存储规则」弹窗...");
-    const ruleBtn = storageDbCard.locator(".setting-item").nth(2).locator(".opt-button");
-    await ruleBtn.click();
-    const ruleDialog = page.locator(".attachment-rule-dialog");
-    await ruleDialog.waitFor({ state: "visible", timeout: 5000 });
-
-    const policyCards = await ruleDialog.locator(".policy-card").allTextContents();
-    assert.ok(policyCards.some(p => p.includes("Backblaze B2")), "必须包含 Backblaze B2 优先选项");
-    assert.ok(policyCards.some(p => p.includes("智能阈值分流")), "必须包含智能分流选项");
-    console.log("  ✓ 附件存储流转策略卡片选项渲染完整");
-
-    // 点击保存附件规则
-    await ruleDialog.getByRole("button", { name: /保存附件规则|保存/ }).click();
-    await page.waitForTimeout(600);
-    console.log("  ✓ 附件存储规则弹窗交互与保存成功");
-
-    // 2.10 交互验证 3: 点击行内 opt-button 打开「KV / 存储深度体检」弹窗
+    // 2.9 交互验证 2: 点击底部 opt-btn-scan 打开「KV / 存储深度体检」弹窗 (宽屏无滚动设计)
     console.log("  -> 点击打开「KV / 存储深度体检」弹窗...");
-    const scanBtn = storageDbCard.locator(".setting-item").nth(3).locator(".opt-button");
     await scanBtn.click();
     const scanDialog = page.locator(".storage-scan-dialog");
     await scanDialog.waitFor({ state: "visible", timeout: 5000 });
+
+    const scanBox = await scanDialog.boundingBox();
+    assert.ok(scanBox.width >= 840, `存储体检弹窗宽度必须扩展至 >= 840px (当前: ${scanBox.width}px)，禁止被 400px 锁死！`);
 
     // 等待扫描结果渲染
     const summaryBanner = scanDialog.locator(".scan-summary-banner");
     await summaryBanner.waitFor({ state: "visible", timeout: 10000 });
     const bannerText = await summaryBanner.textContent();
     assert.ok(bannerText.includes("健康指数") || bannerText.includes("Health"), `健康摘要横幅必须正常渲染: ${bannerText}`);
-    console.log("  ✓ KV与存储深度扫描诊断弹窗结果实时呈现: " + bannerText.trim().replace(/\s+/g, ' '));
+
+    const scanHasScrollbar = await scanDialog.evaluate((el) => {
+      const body = el.querySelector(".el-dialog__body") || el;
+      return body.scrollHeight > body.clientHeight + 10;
+    });
+    assert.strictEqual(scanHasScrollbar, false, "存储深度体检弹窗禁止出现垂直滑块滑动！");
+    console.log(`  ✓ KV 与存储深度体检弹窗宽度扩展至 ${scanBox.width}px，且 100% 无垂直滚动条滑块`);
 
     // 截图存档
     await page.screenshot({ path: "tests/audit_storage_db_hub_full_enhanced.png" });
