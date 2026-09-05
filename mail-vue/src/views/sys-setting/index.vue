@@ -4913,7 +4913,7 @@ function editSetting(settingForm, refreshStatus = true) {
 }
 
 
-:deep(.el-dialog:not(.storage-config-dialog):not(.db-domains-dialog):not(.storage-scan-dialog):not(.s3-config-dialog):not(.db-config-dialog):not(.attachment-rule-dialog)) {
+:deep(.el-dialog:not(.storage-config-dialog):not(.db-domains-dialog):not(.storage-scan-dialog):not(.s3-config-dialog):not(.db-config-dialog):not(.attachment-rule-dialog):not(.welcome-dialog-canvas):not(.notice-popup):not(.auth-prompt-dialog):not(.resend-table)) {
   width: 400px !important;
   @media (max-width: 440px) {
     width: calc(100% - 40px) !important;
@@ -5883,14 +5883,17 @@ form .el-button {
   }
 }
 
-/* Welcome Email Dialog Architecture (Spacious Modal Canvas + Fullscreen Mode) */
+/* Welcome Email Dialog Architecture (Spacious Modal Canvas + Fullscreen Mode - Standalone Class) */
+:deep(.el-dialog.welcome-dialog-canvas),
+:deep(.welcome-dialog-canvas.el-dialog),
 :deep(.welcome-dialog-canvas) {
   width: min(1140px, calc(100vw - 48px)) !important;
   max-width: min(1140px, calc(100vw - 48px)) !important;
   margin: 3.5vh auto !important;
   max-height: calc(100vh - 7vh) !important;
   border-radius: 16px !important;
-  background: var(--el-bg-color);
+  background: var(--el-bg-color) !important;
+  background-color: var(--el-bg-color) !important;
   box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.4), 0 0 0 1px var(--el-border-color-lighter) !important;
   display: flex !important;
   flex-direction: column !important;
@@ -5918,30 +5921,33 @@ form .el-button {
   }
 
   .el-dialog__header {
-    margin-right: 0;
-    padding: 14px 24px;
-    border-bottom: 1px solid var(--el-border-color-lighter);
-    background: var(--el-bg-color);
-    flex-shrink: 0;
+    margin-right: 0 !important;
+    padding: 14px 24px !important;
+    border-bottom: 1px solid var(--el-border-color-lighter) !important;
+    background: var(--el-bg-color) !important;
+    background-color: var(--el-bg-color) !important;
+    flex-shrink: 0 !important;
   }
 
   .el-dialog__body {
-    padding: 16px 24px;
-    background: var(--el-bg-color);
-    overflow-y: auto;
-    flex: 1 1 auto;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    height: calc(100vh - 200px);
-    max-height: calc(100vh - 200px);
+    padding: 16px 24px !important;
+    background: var(--el-bg-color) !important;
+    background-color: var(--el-bg-color) !important;
+    overflow-y: auto !important;
+    flex: 1 1 auto !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 12px !important;
+    height: calc(100vh - 200px) !important;
+    max-height: calc(100vh - 200px) !important;
   }
 
   .el-dialog__footer {
-    padding: 12px 24px;
-    border-top: 1px solid var(--el-border-color-lighter);
-    background: var(--el-bg-color);
-    flex-shrink: 0;
+    padding: 12px 24px !important;
+    border-top: 1px solid var(--el-border-color-lighter) !important;
+    background: var(--el-bg-color) !important;
+    background-color: var(--el-bg-color) !important;
+    flex-shrink: 0 !important;
   }
 }
 
@@ -7381,5 +7387,90 @@ html.dark .storage-scan-dialog .el-dialog__body,
 html.dark .attachment-rule-dialog .el-dialog__body {
   background-color: #111827 !important;
   background: #111827 !important;
+}
+
+/* Epomail Welcome Email Modal Canvas Standalone Class Overrides */
+.el-dialog.welcome-dialog-canvas,
+.welcome-dialog-canvas.el-dialog {
+  width: min(1140px, calc(100vw - 48px)) !important;
+  max-width: min(1140px, calc(100vw - 48px)) !important;
+  margin: 3.5vh auto !important;
+  max-height: calc(100vh - 7vh) !important;
+  border-radius: 16px !important;
+  background-color: #ffffff !important;
+  background: #ffffff !important;
+  box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.4), 0 0 0 1px #e2e8f0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  opacity: 1 !important;
+}
+
+html.dark .el-dialog.welcome-dialog-canvas,
+html.dark .welcome-dialog-canvas.el-dialog {
+  background-color: #111827 !important;
+  background: #111827 !important;
+  border-color: #374151 !important;
+}
+
+.el-dialog.welcome-dialog-canvas.is-fullscreen,
+.welcome-dialog-canvas.el-dialog.is-fullscreen {
+  position: fixed !important;
+  top: 50px !important;
+  bottom: 22px !important;
+  left: 12px !important;
+  right: 12px !important;
+  width: calc(100vw - 24px) !important;
+  max-width: calc(100vw - 24px) !important;
+  height: calc(100vh - 72px) !important;
+  max-height: calc(100vh - 72px) !important;
+  margin: 0 !important;
+  border-radius: 12px !important;
+}
+
+.welcome-dialog-canvas .el-dialog__header {
+  margin-right: 0 !important;
+  padding: 14px 24px !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+  background: #ffffff !important;
+  flex-shrink: 0 !important;
+}
+
+html.dark .welcome-dialog-canvas .el-dialog__header {
+  background: #111827 !important;
+  border-bottom-color: #374151 !important;
+}
+
+.welcome-dialog-canvas .el-dialog__body {
+  padding: 16px 24px !important;
+  background: #ffffff !important;
+  overflow-y: auto !important;
+  flex: 1 1 auto !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 12px !important;
+  height: calc(100vh - 200px) !important;
+  max-height: calc(100vh - 200px) !important;
+}
+
+html.dark .welcome-dialog-canvas .el-dialog__body {
+  background: #111827 !important;
+}
+
+.welcome-dialog-canvas.is-fullscreen .el-dialog__body {
+  height: calc(100vh - 190px) !important;
+  max-height: calc(100vh - 190px) !important;
+}
+
+.welcome-dialog-canvas .el-dialog__footer {
+  padding: 12px 24px !important;
+  border-top: 1px solid #e2e8f0 !important;
+  background: #ffffff !important;
+  flex-shrink: 0 !important;
+}
+
+html.dark .welcome-dialog-canvas .el-dialog__footer {
+  background: #111827 !important;
+  border-top-color: #374151 !important;
 }
 </style>
