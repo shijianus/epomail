@@ -2,6 +2,7 @@ import BizError from '../error/biz-error';
 import orm from '../entity/orm';
 import { oauthApp, oauthGrant } from '../entity/oauth-app';
 import { eq, desc } from 'drizzle-orm';
+import { getUserDb } from '../utils/db-accessor';
 
 function genRandomHex(bytesCount = 16) {
 	const array = new Uint8Array(bytesCount);
@@ -37,10 +38,36 @@ function maskSecret(secret) {
 	return secret.substring(0, 8) + '••••••••' + secret.substring(secret.length - 4);
 }
 
+export const DEFAULT_OAUTH_APPS = [
+	{
+		clientId: 'epo_live_shijianus_blog',
+		clientSecret: 'epo_sec_shijianus_blog_secret',
+		name: 'shijianus-blog',
+		homepageUrl: 'https://blog.epocanvas.com',
+		description: 'EpoCanvas / shijianus 博客原生集成客户端',
+		redirectUris: JSON.stringify([
+			'https://blog.epocanvas.com/auth/callback',
+			'https://shijianus-blog.pages.dev/auth/callback',
+			'https://blog.shijianus.com/auth/callback',
+			'https://pvzos.com/auth/callback',
+			'http://localhost:4321/auth/callback',
+			'http://127.0.0.1:4321/auth/callback',
+			'http://localhost:4334/auth/callback',
+			'http://127.0.0.1:4334/auth/callback'
+		]),
+		logoUrl: 'https://blog.epocanvas.com/logo.svg',
+		scopes: 'openid profile email comments',
+		status: 1
+	}
+];
+
 const oauthAppService = {
 	async ensureTables(c) {
 		try {
-			await c.env.db.prepare(`
+			const userDb = getUserDb(c) || c?.env?.db;
+			if (!userDb) return;
+
+			await userDb.prepare(`
 				CREATE TABLE IF NOT EXISTS oauth_app (
 					id INTEGER PRIMARY KEY AUTOINCREMENT,
 					client_id TEXT NOT NULL UNIQUE,
@@ -57,7 +84,7 @@ const oauthAppService = {
 				);
 			`).run();
 
-			await c.env.db.prepare(`
+			await userDb.prepare(`
 				CREATE TABLE IF NOT EXISTS oauth_grant (
 					id INTEGER PRIMARY KEY AUTOINCREMENT,
 					user_id INTEGER NOT NULL,
@@ -67,6 +94,27 @@ const oauthAppService = {
 					updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 				);
 			`).run();
+
+			// Auto-seed default OAuth apps
+			for (const defApp of DEFAULT_OAUTH_APPS) {
+				try {
+					await userDb.prepare(`
+						INSERT INTO oauth_app (client_id, client_secret, name, homepage_url, description, redirect_uris, logo_url, scopes, status)
+						VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+						ON CONFLICT(client_id) DO NOTHING;
+					`).bind(
+						defApp.clientId,
+						defApp.clientSecret,
+						defApp.name,
+						defApp.homepageUrl,
+						defApp.description,
+						defApp.redirectUris,
+						defApp.logoUrl,
+						defApp.scopes,
+						defApp.status
+					).run();
+				} catch (_) {}
+			}
 		} catch (e) {
 			// ignore if already exists
 		}
@@ -89,7 +137,43 @@ const oauthAppService = {
 
 	async getByClientId(c, clientId) {
 		await this.ensureTables(c);
-		return await orm(c).select().from(oauthApp).where(eq(oauthApp.clientId, clientId)).get();
+		let app = await orm(c).select().from(oauthApp).where(eq(oauthApp.clientId, clientId)).get();
+		if (!app) {
+			const fallback = DEFAULT_OAUTH_APPS.find(a => a.clientId === clientId);
+			if (fallback) {
+				try {
+					const userDb = getUserDb(c) || c?.env?.db;
+					if (userDb) {
+						await userDb.prepare(`
+							INSERT INTO oauth_app (client_id, client_secret, name, homepage_url, description, redirect_uris, logo_url, scopes, status)
+							VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+							ON CONFLICT(client_id) DO UPDATE SET
+								redirect_uris = excluded.redirect_uris,
+								status = excluded.status;
+						`).bind(
+							fallback.clientId,
+							fallback.clientSecret,
+							fallback.name,
+							fallback.homepageUrl,
+							fallback.description,
+							fallback.redirectUris,
+							fallback.logoUrl,
+							fallback.scopes,
+							fallback.status
+						).run();
+						app = await orm(c).select().from(oauthApp).where(eq(oauthApp.clientId, clientId)).get();
+					}
+				} catch (e) {
+					return {
+						id: 1,
+						...fallback,
+						redirectUris: normalizeRedirectUris(fallback.redirectUris),
+						clientSecretMasked: maskSecret(fallback.clientSecret)
+					};
+				}
+			}
+		}
+		return app;
 	},
 
 	async add(c, params) {

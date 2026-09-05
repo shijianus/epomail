@@ -162,6 +162,32 @@ const dbInit = {
 					updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 				);
 			`).run();
+
+			// Auto-seed default OAuth client for shijianus-blog
+			await userDb.prepare(`
+				INSERT INTO oauth_app (client_id, client_secret, name, homepage_url, description, redirect_uris, logo_url, scopes, status)
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+				ON CONFLICT(client_id) DO NOTHING;
+			`).bind(
+				'epo_live_shijianus_blog',
+				'epo_sec_shijianus_blog_secret',
+				'shijianus-blog',
+				'https://blog.epocanvas.com',
+				'EpoCanvas / shijianus 博客原生集成客户端',
+				JSON.stringify([
+					'https://blog.epocanvas.com/auth/callback',
+					'https://shijianus-blog.pages.dev/auth/callback',
+					'https://blog.shijianus.com/auth/callback',
+					'https://pvzos.com/auth/callback',
+					'http://localhost:4321/auth/callback',
+					'http://127.0.0.1:4321/auth/callback',
+					'http://localhost:4334/auth/callback',
+					'http://127.0.0.1:4334/auth/callback'
+				]),
+				'https://blog.epocanvas.com/logo.svg',
+				'openid profile email comments',
+				1
+			).run();
 		} catch (e) {
 			console.warn(`初始化 oauth_app 表跳过：${e.message}`);
 		}
