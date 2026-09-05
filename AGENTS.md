@@ -26,7 +26,7 @@
        - **收敛所有判断逻辑**: 将主面板 `el-tag`（`class="el-tag el-tag--success el-tag--small el-tag--light hub-tag"`）及架构透视弹窗内的模式识别、Tooltip 解释、资源名称全面收敛至 `isDualDb`；
        - **顶层并发静默自动同步**: 在页面组件初始化时立即触发 `loadDbStatus()` 并行请求详细指标，无需任何人工点击干预，彻底实现所看即当前实际情况。
 *   **部署上线与自动化测试 (Verification & Deployment)**:
-    - **Git Commit Hash**: `4e1e4fc3bd75839954e8f46cd39e473959b1096d` (Short Hash: `4e1e4fc`).
+    - **Git Commit Hash**: `1faf3fe834b702d7226cbf876fb733835704d14e` (Short Hash: `1faf3fe`).
     - 生产部署上线 Cloudflare Workers Version ID: `fc64c093-5d74-49c5-8627-2fce5c9b205a`。
     - 自动化测试套件 100% 顺利通过：
       - `node --loader ./tests/esm-loader.mjs tests/test-storage-and-db-hub-e2e.mjs` (生产双 DB 环境首屏自动同步验证、无需人工核验即呈现 `class="el-tag el-tag--success el-tag--small el-tag--light hub-tag"` 验证、无括号截断验证、全链路 100% 通过);
