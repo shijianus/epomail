@@ -649,7 +649,7 @@ const emailService = {
 		//如果是回复邮件
 		if (sendType === 'reply') {
 
-			emailRow = await this.selectById(c, emailId);
+			emailRow = await this.selectById(c, emailId, userId);
 
 			if (!emailRow) {
 				throw new BizError(t('notExistEmailReply'));
@@ -1278,10 +1278,16 @@ const emailService = {
 		return emailRow;
 	},
 
-	async selectById(c, emailId) {
+	async selectById(c, emailId, expectedUserId = null) {
+		const conditions = [
+			eq(email.emailId, emailId),
+			eq(email.isDel, isDel.NORMAL)
+		];
+		if (expectedUserId !== null && expectedUserId !== undefined) {
+			conditions.push(eq(email.userId, expectedUserId));
+		}
 		let emailRow = await orm(c).select().from(email).where(
-			and(eq(email.emailId, emailId),
-				eq(email.isDel, isDel.NORMAL)))
+			and(...conditions))
 			.get();
 		if (emailRow) {
 			if (emailRow.userId) {
@@ -1481,9 +1487,12 @@ const emailService = {
 		// Privacy mode filtering:
 		// Mode 1 (allMailMode === 1): Admin sees all emails (plaintext)
 		// Mode 0 (allMailMode === 0): Admin only sees spam / deleted / noone emails (plaintext in mode 0)
-		// Mode 2 (allMailMode === 2): Admin only sees noone emails (all user emails encrypted)
+		// Mode 2 (allMailMode === 2): Admin strictly forbidden from listing/viewing any user emails
 		const settingRow = await settingService.query(c);
 		const mode = Number(settingRow?.allMailMode);
+		if (mode === 2) {
+			return { list: [], total: 0, latestEmail: { emailId: 0, accountId: 0, userId: 0 } };
+		}
 		if (mode === 0) {
 			conditions.push(
 				or(
@@ -1491,10 +1500,6 @@ const emailService = {
 					eq(email.isDel, isDel.DELETE),
 					eq(email.status, emailConst.status.NOONE)
 				)
-			);
-		} else if (mode === 2) {
-			conditions.push(
-				eq(email.status, emailConst.status.NOONE)
 			);
 		}
 
@@ -1586,6 +1591,9 @@ const emailService = {
 		const { emailId } = params;
 		const settingRow = await settingService.query(c);
 		const mode = Number(settingRow?.allMailMode);
+		if (mode === 2) {
+			return [];
+		}
 
 		const conditions = [
 			gt(email.emailId, emailId),
@@ -1599,10 +1607,6 @@ const emailService = {
 					eq(email.isDel, isDel.DELETE),
 					eq(email.status, emailConst.status.NOONE)
 				)
-			);
-		} else if (mode === 2) {
-			conditions.push(
-				eq(email.status, emailConst.status.NOONE)
 			);
 		}
 

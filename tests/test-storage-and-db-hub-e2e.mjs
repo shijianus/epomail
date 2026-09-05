@@ -3,6 +3,8 @@ import assert from "assert";
 import dbService from "../mail-worker/src/service/db-service.js";
 import storageScanService from "../mail-worker/src/service/storage-scan-service.js";
 import storageQuotaService from "../mail-worker/src/service/storage-quota-service.js";
+import emailCryptoUtils from "../mail-worker/src/utils/email-crypto-utils.js";
+import emailService from "../mail-worker/src/service/email-service.js";
 import { getUserDb, getMailDb, isDualDbMode } from "../mail-worker/src/utils/db-accessor.js";
 
 (async () => {
@@ -94,6 +96,42 @@ import { getUserDb, getMailDb, isDualDbMode } from "../mail-worker/src/utils/db-
   assert.strictEqual(scanRes.kv.authKeys, 1, '认证 Keys 分类统计必须正确');
   assert.strictEqual(scanRes.healthScore, 100, '健康指数计算必须正常');
   console.log(`  ✓ 真实 KV 与存储深度扫描引擎验证通过 (扫描耗时: ${scanRes.scanDurationMs}ms)`);
+
+  // 1.2 验证不可篡改的三大安全加密防护等级与管理员权限阻断逻辑
+  console.log("  -> 验证不可篡改的三大安全加密防护等级 (Level 1 / Level 2 / Level 3)...");
+  const lvl1 = emailCryptoUtils.getProtectionLevel(1);
+  assert.strictEqual(lvl1.level, 1, "Level 1 必须为明文基础级");
+  assert.strictEqual(lvl1.code, 'ALL', "Level 1 对应 ALL 模式");
+  
+  const lvl2 = emailCryptoUtils.getProtectionLevel(0);
+  assert.strictEqual(lvl2.level, 2, "Level 2 必须为增强隐私级 (默认推荐)");
+  assert.strictEqual(lvl2.code, 'PRIVACY', "Level 2 对应 PRIVACY 模式");
+
+  const lvl3 = emailCryptoUtils.getProtectionLevel(2);
+  assert.strictEqual(lvl3.level, 3, "Level 3 必须为最高绝密级 (端到端加密)");
+  assert.strictEqual(lvl3.code, 'ENCRYPTED', "Level 3 对应 ENCRYPTED 模式");
+  console.log("  ✓ 三大安全加密防护等级权威定义固化并通过验证");
+
+  // 1.3 验证 Mode 2 (全量端到端加密) 下管理员接口防越权拦截逻辑
+  console.log("  -> 验证 Mode 2 下管理员 allList / allEmailLatest 防越权彻底拦截...");
+  const mockMode2Env = {
+    get: (k) => k === 'setting' ? { allMailMode: 2 } : null,
+    env: {
+      domain: '["epomail.bond"]',
+      db: mockSingleEnv.env.db,
+      kv: {
+        get: async (k) => {
+          if (k === 'setting') return { allMailMode: 2 };
+          return null;
+        }
+      }
+    }
+  };
+  const blockedList = await emailService.allList(mockMode2Env, {});
+  assert.strictEqual(blockedList.list.length, 0, "Mode 2 下管理员查询全站邮件列表必须直接返回空，彻底阻断越权！");
+  const blockedLatest = await emailService.allEmailLatest(mockMode2Env, { emailId: 0 });
+  assert.strictEqual(blockedLatest.length, 0, "Mode 2 下管理员查询最新邮件增量必须直接返回空！");
+  console.log("  ✓ Mode 2 端到端加密模式管理员全量越权阻断验证通过");
 
   // ---------------------------------------------------------------------------
   // E2E Test: 生产环境 API 与 Web 前端 UI 验证
@@ -242,6 +280,34 @@ import { getUserDb, getMailDb, isDualDbMode } from "../mail-worker/src/utils/db-
     await assert.ok(await scanBtn.isVisible(), "行内存储体检按钮必须可见");
     await assert.ok(await quickTestBtn.isVisible(), "行内全链路诊断按钮必须可见");
     console.log("  ✓ 所有配置与诊断按钮全部融入各条目右侧并就绪");
+
+    // 验证 inspectBtn 与 dbBtn 处于同一行（垂直坐标 y 差值 < 5px）
+    const inspectBox = await inspectBtn.boundingBox();
+    const dbBox = await dbBtn.boundingBox();
+    assert.ok(inspectBox && dbBox, "架构透视与DB配置按钮必须具备有效坐标");
+    const yDiff = Math.abs(inspectBox.y - dbBox.y);
+    assert.ok(yDiff < 5, `架构透视与DB配置两个按钮必须在同一行 (当前 y 差值: ${yDiff}px)！`);
+    console.log(`  ✓ 验证 inspectBtn 与 dbBtn 在同一行紧凑对齐，y 轴差值仅 ${yDiff.toFixed(1)}px`);
+
+    // 验证 hub-tag 展示不全问题已解决：不再带有括号解释，彻底防止截断
+    const dbItemTag = storageDbCard.locator(".setting-item").nth(1).locator(".hub-tag");
+    const dbTagText = await dbItemTag.textContent();
+    assert.ok(!dbTagText.includes("("), `数据库模式标签不应包含括号解释: ${dbTagText}`);
+    console.log(`  ✓ 数据库模式标签已精炼且无括号截断: [${dbTagText.trim()}]`);
+
+    // 验证历史残留的 val-text fallback-text 已被彻底剔除，统一为 el-tag
+    const fallbackCount = await storageDbCard.locator(".fallback-text").count();
+    assert.strictEqual(fallbackCount, 0, "不允许存在历史残留的 fallback-text 纯文本样式");
+    const kvTag = storageDbCard.locator(".kv-tag");
+    assert.ok(await kvTag.isVisible(), "KV 边缘加速层必须以统一的 el-tag 展示");
+    console.log("  ✓ fallback-text 已彻底剔除，KV 边缘加速层采用统一 el-tag 呈现");
+
+    // 验证邮件模式安全等级不可篡改徽章渲染
+    const modeBadge = page.locator(".current-mode-badge");
+    assert.ok(await modeBadge.isVisible(), "邮件模式不可篡改安全等级徽章必须可见");
+    const modeBadgeText = await modeBadge.textContent();
+    assert.ok(modeBadgeText.includes("Level"), `安全等级徽章文案必须包含 Level: ${modeBadgeText}`);
+    console.log(`  ✓ 邮件模式不可篡改安全等级徽章正常呈现: [${modeBadgeText.trim()}]`);
 
     // 2.8 交互验证 1: 点击 opt-btn-s3 打开「对象存储配置 (S3 / Backblaze B2)」弹窗 (宽屏无滚动设计)
     console.log("  -> 点击打开「对象存储配置 (S3 / Backblaze B2)」弹窗...");

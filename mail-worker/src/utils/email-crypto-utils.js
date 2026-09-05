@@ -189,6 +189,53 @@ const emailCryptoUtils = {
 		                      Number(emailRecord.isSpam) === 1 || 
 		                      emailRecord.status === 2; // emailConst.status.NOONE = 2
 		return !isTrashOrSpam;
+	},
+
+	/**
+	 * Canonical definition of protection levels for Epocanvas Mail:
+	 * Level 1: Standard Plaintext (全部邮件模式) - No encryption, full audit
+	 * Level 2: Selective E2EE & Spam Isolation (隐私邮件模式 - 推荐) - User keys encrypt normal mail, trash isolated
+	 * Level 3: Maximum Zero-Knowledge E2EE (端到端加密模式) - 100% encrypted, admin barred from all user data
+	 */
+	PROTECTION_LEVELS: {
+		0: {
+			code: 'PRIVACY',
+			level: 2,
+			titleZh: 'Level 2: 增强隐私级 (Selective E2EE & Spam Isolation)',
+			titleEn: 'Level 2: Enhanced Privacy (Selective E2EE & Spam Isolation)',
+			badgeZh: 'Level 2: 增强隐私',
+			badgeEn: 'Level 2: Privacy',
+			algorithm: 'AES-256-GCM + HKDF-SHA256',
+			adminPrivilegeZh: '受限：仅可审查垃圾箱、系统截断无主件，严禁查阅正常往来邮件',
+			tamperProofZh: '强制开启 2FA，普通邮件自动加密存储，收发双方密钥隔离'
+		},
+		1: {
+			code: 'ALL',
+			level: 1,
+			titleZh: 'Level 1: 明文基础级 (Standard Plaintext)',
+			titleEn: 'Level 1: Standard Plaintext (Full Audit)',
+			badgeZh: 'Level 1: 明文基础',
+			badgeEn: 'Level 1: Plaintext',
+			algorithm: 'Plaintext (无加密)',
+			adminPrivilegeZh: '开放：管理员拥有全站往来邮件完全审查权限',
+			tamperProofZh: '支持自由开关 2FA 与多渠道消息推送'
+		},
+		2: {
+			code: 'ENCRYPTED',
+			level: 3,
+			titleZh: 'Level 3: 最高绝密级 (Maximum Zero-Knowledge E2EE)',
+			titleEn: 'Level 3: Maximum Zero-Knowledge E2EE',
+			badgeZh: 'Level 3: 最高绝密',
+			badgeEn: 'Level 3: E2EE Max',
+			algorithm: 'AES-256-GCM + HKDF-SHA256 (全量100%覆盖)',
+			adminPrivilegeZh: '绝对禁止：管理员无权查看任何邮件列表或正文，全接口阻断',
+			tamperProofZh: '强制开启 2FA，强制封锁外部推送/转发通道，杜绝密文外泄'
+		}
+	},
+
+	getProtectionLevel(mode) {
+		const m = Number(mode);
+		return this.PROTECTION_LEVELS[m] || this.PROTECTION_LEVELS[0];
 	}
 };
 

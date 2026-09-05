@@ -242,9 +242,15 @@ const settingService = {
 				}
 			}
 		}
+		const targetMode = params.allMailMode !== undefined ? Number(params.allMailMode) : Number(settingData.allMailMode);
 
 		if (params.totp !== undefined) {
-			const totpVal = Number(params.totp) === 0 ? '0' : '1';
+			let totpVal = Number(params.totp) === 0 ? '0' : '1';
+			// 防篡改守护：处于隐私模式 (0) 或 加密模式 (2) 时强制开启 2FA，禁止关闭
+			if (targetMode === 0 || targetMode === 2) {
+				totpVal = '1';
+				params.totp = 1;
+			}
 			try {
 				await c.env.kv.put('setting_totp_status', totpVal);
 			} catch (e) {}

@@ -36,10 +36,16 @@
                     <Icon class="warning" icon="fe:warning" width="18" height="18"/>
                   </el-tooltip>
                 </div>
-                <div>
+                <div class="forward storage-item-right" style="gap: 8px;">
+                  <el-tooltip effect="dark" :content="currentMailModeSecurityBadge.tooltip">
+                    <el-tag size="small" :type="currentMailModeSecurityBadge.tagType" effect="light" class="hub-tag current-mode-badge" style="cursor: pointer;">
+                      <Icon :icon="currentMailModeSecurityBadge.icon" width="13" height="13" style="margin-right: 4px; vertical-align: -1px;" />
+                      {{ currentMailModeSecurityBadge.levelText }}
+                    </el-tag>
+                  </el-tooltip>
                   <el-select
                       @change="(val) => changeMailMode(val)"
-                      :style="`width: ${ locale === 'en' ? 180 : 150 }px;`"
+                      :style="`width: ${ locale === 'en' ? 220 : 190 }px;`"
                       v-model="setting.allMailMode"
                       placeholder="Select"
                   >
@@ -252,7 +258,7 @@
                   <template v-if="setting.bucket">
                     <el-tag size="small" type="success" effect="light" class="hub-tag">
                       <Icon icon="fluent:database-checkmark-20-filled" width="13" height="13" style="margin-right: 4px; vertical-align: -1px;" />
-                      Backblaze B2 / S3 ({{ setting.bucket }})
+                      Backblaze B2 / S3
                     </el-tag>
                     <el-tag v-if="setting.customDomain" size="small" type="primary" effect="plain" class="hub-sub-tag">0元出站加速</el-tag>
                   </template>
@@ -262,10 +268,11 @@
                       {{ setting.hasR2 ? $t('fallbackToNative') : $t('fallbackToKv') }}
                     </el-tag>
                   </template>
-                  <el-button class="opt-btn-inline opt-btn-s3" size="small" type="primary" @click="openAddS3">
-                    <Icon icon="fluent:server-multiple-20-regular" width="14" height="14" style="margin-right: 3px;" />
-                    {{ $t('s3Configuration') }}
-                  </el-button>
+                  <el-tooltip effect="dark" :content="$t('s3Configuration')">
+                    <el-button class="opt-btn-inline opt-btn-s3" size="small" type="primary" @click="openAddS3">
+                      <Icon icon="fluent:server-multiple-20-regular" width="15" height="15" />
+                    </el-button>
+                  </el-tooltip>
                 </div>
               </div>
 
@@ -281,7 +288,7 @@
                   <template v-if="setting.externalDbEnabled === 1">
                     <el-tag size="small" type="warning" effect="light" class="hub-tag">
                       <Icon icon="fluent:plug-connected-16-filled" width="13" height="13" style="margin-right: 4px; vertical-align: -1px;" />
-                      {{ $t('dbModeExternal') }} ({{ setting.externalDbName || setting.externalDbProvider || 'Turso' }})
+                      {{ $t('dbModeExternal') }}
                     </el-tag>
                   </template>
                   <template v-else-if="dbStatusInfo?.isDual">
@@ -296,14 +303,16 @@
                       {{ $t('dbModeSingle') }}
                     </el-tag>
                   </template>
-                  <el-button class="opt-btn-inline opt-btn-secondary opt-btn-inspect" size="small" type="default" @click="openDbDomainsDetail">
-                    <Icon icon="fluent:database-search-20-regular" width="14" height="14" style="margin-right: 3px;" />
-                    {{ $t('dbInspectBtn') }}
-                  </el-button>
-                  <el-button class="opt-btn-inline opt-btn-db" size="small" type="primary" @click="openDbConfig">
-                    <Icon icon="fluent:database-arrow-right-20-regular" width="14" height="14" style="margin-right: 3px;" />
-                    {{ $t('dbConfiguration') }}
-                  </el-button>
+                  <el-tooltip effect="dark" :content="$t('dbInspectBtn')">
+                    <el-button class="opt-btn-inline opt-btn-secondary opt-btn-inspect" size="small" type="default" @click="openDbDomainsDetail">
+                      <Icon icon="fluent:database-search-20-regular" width="15" height="15" />
+                    </el-button>
+                  </el-tooltip>
+                  <el-tooltip effect="dark" :content="$t('dbConfiguration')">
+                    <el-button class="opt-btn-inline opt-btn-db" size="small" type="primary" @click="openDbConfig">
+                      <Icon icon="fluent:database-arrow-right-20-regular" width="15" height="15" />
+                    </el-button>
+                  </el-tooltip>
                 </div>
               </div>
 
@@ -356,18 +365,20 @@
                   </el-tooltip>
                 </div>
                 <div class="forward storage-item-right">
-                  <span class="val-text fallback-text">
-                    <Icon icon="fluent:flash-checkmark-20-filled" width="14" height="14" style="margin-right: 4px; vertical-align: -2px; color: #eab308;" />
+                  <el-tag size="small" type="success" effect="plain" class="hub-tag kv-tag">
+                    <Icon icon="fluent:flash-checkmark-20-filled" width="13" height="13" style="margin-right: 4px; vertical-align: -1px; color: #eab308;" />
                     {{ $t('kvLayerStatusActive') }}
-                  </span>
-                  <el-button class="opt-btn-inline opt-btn-secondary opt-btn-scan" size="small" type="default" @click="openStorageScanDialog">
-                    <Icon icon="fluent:scan-camera-16-regular" width="14" height="14" style="margin-right: 3px;" />
-                    {{ $t('storageScanBtn') }}
-                  </el-button>
-                  <el-button class="opt-btn-inline opt-btn-test" size="small" type="default" :loading="testingStorageQuick" @click="handleQuickTestStorageAndDb" :title="$t('storageAndDbQuickTest')">
-                    <Icon icon="fluent:play-circle-16-regular" width="14" height="14" style="margin-right: 3px;" />
-                    {{ $t('storageAndDbQuickTest') }}
-                  </el-button>
+                  </el-tag>
+                  <el-tooltip effect="dark" :content="$t('storageScanBtn')">
+                    <el-button class="opt-btn-inline opt-btn-secondary opt-btn-scan" size="small" type="default" @click="openStorageScanDialog">
+                      <Icon icon="fluent:scan-camera-16-regular" width="15" height="15" />
+                    </el-button>
+                  </el-tooltip>
+                  <el-tooltip effect="dark" :content="$t('storageAndDbQuickTest')">
+                    <el-button class="opt-btn-inline opt-btn-secondary opt-btn-test" size="small" type="default" :loading="testingStorageQuick" @click="handleQuickTestStorageAndDb">
+                      <Icon icon="fluent:play-circle-16-regular" width="15" height="15" />
+                    </el-button>
+                  </el-tooltip>
                 </div>
               </div>
             </div>
@@ -3175,10 +3186,36 @@ const tgMsgTextOption = [{label: t('show'), value: 'show'}, {label: t('hide'), v
 const tgMsgLabelWidth = computed(() => locale.value === 'en' ? '120px' : '100px');
 
 const mailModeOptions = computed(() => [
-  { value: 1, label: t('allMailMode') },
-  { value: 0, label: t('privacyMailMode') },
-  { value: 2, label: t('encryptedMailMode') }
+  { value: 1, label: `${t('allMailMode')} (Level 1)` },
+  { value: 0, label: `${t('privacyMailMode')} (Level 2 [推荐])` },
+  { value: 2, label: `${t('encryptedMailMode')} (Level 3 [E2EE])` }
 ]);
+
+const currentMailModeSecurityBadge = computed(() => {
+  const m = Number(setting.value?.allMailMode);
+  if (m === 2) {
+    return {
+      levelText: 'Level 3: 最高绝密',
+      tagType: 'success',
+      icon: 'fluent:shield-lock-16-filled',
+      tooltip: '最高绝密级 (Maximum Zero-Knowledge E2EE)：全量100%往来信件采用 AES-256-GCM + HKDF-SHA256 加密，仅收发双方私钥可解密；管理员全接口阻断，严禁查阅任何邮件正文及元数据；强制开启 2FA；强制禁用外部推送与转发。'
+    };
+  }
+  if (m === 1) {
+    return {
+      levelText: 'Level 1: 明文基础',
+      tagType: 'info',
+      icon: 'fluent:lock-open-16-regular',
+      tooltip: '明文基础级 (Standard Plaintext)：邮件纯明文流转存储；管理员具备全站邮件审查权限；支持自由配置 2FA 与多渠道推送。'
+    };
+  }
+  return {
+    levelText: 'Level 2: 增强隐私',
+    tagType: 'primary',
+    icon: 'fluent:shield-checkmark-16-filled',
+    tooltip: '增强隐私级 (Selective E2EE & Spam Isolation [推荐])：正常往来邮件强制密文存储，管理员在全站邮件中严禁查阅任何正常邮件；仅允许审查垃圾邮件及系统截断无主件；强制开启 2FA，防篡改保护。'
+  };
+});
 
 const forwardRulesTooltip = computed(() => {
   const mode = Number(setting.value?.allMailMode);
@@ -6894,16 +6931,16 @@ form .el-button {
     }
 
     .el-button.opt-btn-inline {
-      width: auto !important;
+      width: 28px !important;
+      min-width: 28px !important;
       height: 28px !important;
-      padding: 0 10px !important;
+      padding: 0 !important;
       margin: 0 !important;
-      font-size: 12px !important;
+      font-size: 14px !important;
       border-radius: 6px !important;
       display: inline-flex !important;
       align-items: center !important;
-      gap: 4px !important;
-      font-weight: 500 !important;
+      justify-content: center !important;
       box-shadow: none !important;
     }
 
@@ -6925,10 +6962,9 @@ form .el-button {
       font-size: 11.5px;
       font-weight: 500;
       border-radius: 6px;
-      max-width: 220px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+      max-width: none !important;
+      overflow: visible !important;
+      white-space: nowrap !important;
     }
 
     .hub-sub-tag {
