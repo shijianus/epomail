@@ -376,7 +376,7 @@ const publicService = {
                 nickname: profile.nickname || '',
                 bio: profile.bio || '',
                 avatarUrl: profile.avatarUrl || '',
-                backgroundUrl: profile.backgroundUrl || '',
+                backgroundUrl: profile.backgroundUrl || profile.background || '',
                 showStats: profile.showStats ?? true,
                 showTrend: profile.showTrend ?? true,
                 showSources: profile.showSources ?? true

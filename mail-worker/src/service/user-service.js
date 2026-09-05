@@ -44,6 +44,8 @@ const userService = {
             }
         } catch (e) {}
         
+        if (params.background && !params.backgroundUrl) params.backgroundUrl = params.background;
+        if (params.backgroundUrl && !params.background) params.background = params.backgroundUrl;
         Object.assign(profile, params);
         await c.env.kv.put('USER_PROFILE_' + userId, JSON.stringify(profile));
         
@@ -147,7 +149,7 @@ const userService = {
         user.nickname = profile.nickname || '';
         user.bio = profile.bio || '';
         user.avatarUrl = profile.avatarUrl || '';
-        user.backgroundUrl = profile.backgroundUrl || '';
+        user.backgroundUrl = profile.backgroundUrl || profile.background || '';
         user.showStats = profile.showStats ?? true;
         user.showTrend = profile.showTrend ?? true;
         user.showSources = profile.showSources ?? true;
@@ -684,7 +686,7 @@ const userService = {
 					nickname: profile.nickname || '',
 					bio: profile.bio || '',
 					avatarUrl: profile.avatarUrl || '',
-					backgroundUrl: profile.backgroundUrl || '',
+					backgroundUrl: profile.backgroundUrl || profile.background || '',
 					gender: profile.gender || '',
 					birthday: profile.birthday || '',
 					phones: profile.phones || [],

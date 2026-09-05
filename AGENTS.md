@@ -12,6 +12,33 @@
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
 
+### 个人背景修改全链路同步至用户详情页cover-photo、渐变与图片智能渲染与响应式监听上线 (2026-09-05)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **排查并锁定个人背景未同步至用户详情页封面根因 (Root Cause Analysis)**:
+       - **CSS 语法无效 (Invalid CSS Inlining)**: `views/profile/index.vue` 历史代码中硬编码拼接为 `:style="profileData.userInfo.backgroundUrl ? 'background-image: url(' + profileData.userInfo.backgroundUrl + ');...' : ''"`。由于系统内置推荐预设封面（如 `COVER_PRESETS` 赛博朋克、日落、极光等）为纯 CSS 渐变语法（如 `linear-gradient(135deg, #4c1d95 0%, #831843 50%, #c2410c 100%)`），直接拼接在 `url(...)` 内产出了诸如 `background-image: url(linear-gradient(...))` 的严重语法错误，浏览器样式解析器直接拒绝抛弃该属性，进而退化展示回组件样式表中写死的默认祖母绿渐变，造成“修改背景在个人详情页毫无反应”的现象；
+       - **字段命名与映射脱节 (Field Inconsistency)**: 后端历史代码中在某些链路中使用 `background`，而在某些链路中使用 `backgroundUrl`，导致更新与公开查询时字段读取存在脱节风险；
+       - **响应式监听与 Store 同步滞后 (Reactivity Gap)**: 在用户详情页中，`username` 为静态 `ref`，未响应路由参数变化，且当前已登录用户在设置页更新自身个人背景后，详情页未对 Pinia `userStore.user.backgroundUrl` 进行动态侦听，导致从常规设置页修改背景后再切回用户详情页时，未能即时更新封面。
+    2. **核心架构与功能重构 (Architecture & Functional Changes)**:
+       - **响应式计算属性 `coverPhotoStyle` 与智能语法解析**:
+         在 `views/profile/index.vue` 中构建计算属性 `coverPhotoStyle`，自动判断当前访问是否为本人公开资料 (`isOwnProfile`)，优先从响应式 Store 中提取实时背景：
+         - 当值为 `linear-gradient` / `radial-gradient` 渐变函数时，作为合法 CSS 背景直接赋值 `backgroundImage: trimmed`；
+         - 当值为图片链接（相对路径、HTTP(S) 或 R2 存储 Key）时，使用 `cvtR2Url` 进行合法 `url('${url}')` 封装；
+         - 搭配 `backgroundSize: 'cover'` 与 `backgroundPosition: 'center'` 确保自适应完美展示。
+       - **Vue 3 双向响应侦听 (`watch`) 与实时水合**:
+         - 添加 `watch(() => route.params.username, ...)` 确保多用户详情无刷新即时拉取；
+         - 添加 `watch(() => userStore.user?.backgroundUrl, ...)` 并在 `fetchProfile` 中无缝水合，确保用户在常规设置页切换任意预设封面或上传自定义图片时，详情页封面微秒级即时同步生效。
+       - **后端 Service 双字段对齐加固**:
+         - 在 `userService.updateProfile` 中注入字段双向同步逻辑：`if (params.background && !params.backgroundUrl) params.backgroundUrl = params.background; if (params.backgroundUrl && !params.background) params.background = params.backgroundUrl;`；
+         - 在 `publicService.getProfile` 与 `userService.loginUserInfo` 中全面采用 `profile.backgroundUrl || profile.background || ''` 兜底对齐，彻底杜绝数据源脱节。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **Git Commit Hash**: `c6e3793e8a384e9acab435177548108bbdc372f8` (Short Hash: `c6e3793`).
+    - 生产部署上线 Cloudflare Workers Version ID: `6da39db9-43e1-43c1-9b88-ea8d8e25ec30`。
+    - 自动化测试套件 100% 顺利通过：
+      - `node tests/test-profile-cover-sync.mjs` (赛博朋克预设渐变同步验证、日落渐变同步验证、外部图片 URL 规范封装验证、常规设置页 UI 点击即时生效验证、初始背景无残留自动清理还原全链路 100% 通过);
+      - `node tests/test-profile-scrollbar-isolation.mjs` (用户详情主栏物理隔离与全局主题壁纸防穿透回归 100% 通过);
+      - `node --loader ./tests/esm-loader.mjs tests/test-storage-and-db-hub-e2e.mjs` (存储与核心数据库管理中心回归 100% 通过);
+      - `node --loader ./tests/esm-loader.mjs tests/test-dual-and-single-db-e2e.mjs` (单库向下兼容与双库物理隔离架构回归 100% 通过)。
+
 ### 用户详情主栏独立隔离、el-scrollbar__view专属样式与全局主题壁纸物理防穿透上线 (2026-09-05)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **排查并锁定用户详情界面受全局壁纸污染根因 (Root Cause Analysis)**:

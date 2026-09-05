@@ -171,7 +171,9 @@ const oauthProviderService = {
 			throw new BizError('invalid_client: client_id 不匹配', 400);
 		}
 
-		if (redirectUri && redirectUri !== authData.redirectUri) {
+		const cleanRedirectUri = (redirectUri || '').replace(/\/+$/, '');
+		const cleanAuthRedirectUri = (authData.redirectUri || '').replace(/\/+$/, '');
+		if (cleanRedirectUri && cleanRedirectUri !== cleanAuthRedirectUri) {
 			throw new BizError('invalid_grant: redirect_uri 与授权时不一致', 400);
 		}
 

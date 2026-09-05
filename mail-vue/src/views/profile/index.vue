@@ -18,7 +18,7 @@
     
     <el-scrollbar ref="scrollbarRef" class="scroll profile-scrollbar" view-class="profile-scrollbar-view" v-if="!loading" style="height: calc(100% - 64px - 28px);">
       <div class="scroll-body profile-scroll-body">
-        <div class="cover-photo" :style="profileData.userInfo.backgroundUrl ? 'background-image: url(' + profileData.userInfo.backgroundUrl + '); background-size: cover; background-position: center;' : ''"></div>
+        <div class="cover-photo" :style="coverPhotoStyle"></div>
         <div class="desktop-layout">
           <!-- Left Side: Identity Card -->
           <div class="profile-identity-card">
@@ -169,7 +169,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getProfile } from '@/request/public.js'
 import dayjs from 'dayjs'
@@ -179,6 +179,7 @@ import { useUserStore } from '@/store/user.js'
 import StatusBar from '@/layout/status-bar/index.vue'
 import Header from '@/layout/header/index.vue'
 import { parseInlineMarkdown } from "@/utils/md-parser.js"
+import { cvtR2Url } from "@/utils/convert.js"
 
 const uiStore = useUiStore()
 const userStore = useUserStore()
@@ -186,7 +187,7 @@ const userStore = useUserStore()
 const route = useRoute()
 const router = useRouter()
 
-const username = ref(route.params.username || 'User')
+const username = computed(() => (route.params.username || 'admin').trim())
 const floatTooltip = ref(null)
 
 const timezoneString = computed(() => {
@@ -269,11 +270,76 @@ const computedSources = computed(() => {
 
 const loading = ref(true)
 
+const isOwnProfile = computed(() => {
+  const current = userStore.user
+  if (!current) return false
+  const target = username.value?.toLowerCase()
+  if (!target) return false
+
+  const emailPrefix = current.email ? current.email.split('@')[0].toLowerCase() : ''
+  const accountName = typeof current.account === 'string' 
+    ? current.account.toLowerCase() 
+    : (current.account?.name?.toLowerCase() || '')
+  const nameVal = current.name ? current.name.toLowerCase() : ''
+
+  if (target === emailPrefix || target === accountName || target === nameVal) {
+    return true
+  }
+  if (target === 'admin' && (current.type === 0 || current.email === 'admin@epomail.bond')) {
+    return true
+  }
+  return false
+})
+
+const coverPhotoStyle = computed(() => {
+  let bg = ''
+  if (isOwnProfile.value && userStore.user?.backgroundUrl !== undefined && userStore.user?.backgroundUrl !== '') {
+    bg = userStore.user.backgroundUrl
+  } else if (profileData.value?.userInfo?.backgroundUrl) {
+    bg = profileData.value.userInfo.backgroundUrl
+  }
+
+  if (!bg) return {}
+
+  const trimmed = bg.trim()
+  if (trimmed.startsWith('linear-gradient') || trimmed.startsWith('radial-gradient')) {
+    return {
+      backgroundImage: trimmed,
+      backgroundSize: 'cover',
+      backgroundPosition: 'center'
+    }
+  } else {
+    const url = (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('/'))
+      ? trimmed
+      : cvtR2Url(trimmed)
+    return {
+      backgroundImage: `url('${url}')`,
+      backgroundSize: 'cover',
+      backgroundPosition: 'center'
+    }
+  }
+})
+
+watch(() => route.params.username, (newVal) => {
+  if (newVal) {
+    fetchProfile()
+  }
+})
+
+watch(() => userStore.user?.backgroundUrl, (newBg) => {
+  if (isOwnProfile.value && profileData.value?.userInfo) {
+    profileData.value.userInfo.backgroundUrl = newBg || ''
+  }
+})
+
 const fetchProfile = () => {
     loading.value = true
     getProfile(username.value).then(res => {
         if (res) {
             profileData.value = res
+            if (isOwnProfile.value && userStore.user?.backgroundUrl !== undefined && userStore.user?.backgroundUrl !== '') {
+                profileData.value.userInfo.backgroundUrl = userStore.user.backgroundUrl
+            }
         }
     }).catch(err => {
         console.error('Failed to load profile', err)
