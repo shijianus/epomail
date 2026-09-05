@@ -12,6 +12,29 @@
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
 
+### 用户详情主栏独立隔离、el-scrollbar__view专属样式与全局主题壁纸物理防穿透上线 (2026-09-05)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **排查并锁定用户详情界面受全局壁纸污染根因 (Root Cause Analysis)**:
+       - **未定义变量透明穿透**: `views/profile/index.vue` 的 `.settings-container` 历史声明中使用了未定义的 `background: var(--extra-light-fill) !important;`，在浏览器中解析为空值导致底色退化为完全透明 (`rgba(0, 0, 0, 0)`)；
+       - **全局壁纸穿透污染**: 当用户在全局常规设置中开启个性装扮壁纸时，`html.has-main-wallpaper` 和 `body.has-main-wallpaper` 将壁纸图片固定挂载于 `body` 根节点；由于用户详情界面自身及主栏底层透明，导致全局大红大紫或各类壁纸直接穿透并严重污染用户公开主页，与用户个人的 Banner 背景图、极光动态光晕及卡片产生视觉严重割裂；
+       - **主栏未物理独立**: 该页面的滚动主栏为 Element Plus 默认的 `<el-scrollbar class="scroll">`，未声明专属视图类，无法与其它支持壁纸透光的系统主栏进行特例化物理隔离。
+    2. **独立提取主栏 `class="el-scrollbar__view"` (Isolated Profile Main Column)**:
+       - 在 `views/profile/index.vue` 中对 `<el-scrollbar>` 升级注入专属配置：
+         `<el-scrollbar ref="scrollbarRef" class="scroll profile-scrollbar" view-class="profile-scrollbar-view" ...>`；
+       - 确保主栏生成的实际 DOM 结构具备明确且独立的类名：`class="el-scrollbar__view profile-scrollbar-view"`，实现物理级别的架构解耦。
+    3. **固化特例隔离与全局主题壁纸物理防穿透 (Wallpaper Immunity & Grounding)**:
+       - **专属实心底色接地**: 根治未定义变量，将 `.profile-container` 强制绑定为实心 `background: var(--bg-base) !important; background-image: none !important;`（浅色 `#f1f3f9`，深色 `#0d1117`），确保其动态极光光晕 (`.aurora-bg`) 在纯净底色上自然渲染；
+       - **主栏独立层叠上下文**: 为 `.profile-container .el-scrollbar__view` 和 `.profile-scrollbar-view` 配置 `isolation: isolate; background-image: none !important;`，彻底阻断任何全局壁纸渗透；
+       - **全局 `style.css` 固化特例声明**: 在全局样式表 `html.has-main-wallpaper` 作用域下，明确豁免并保护 `.profile-container`、`.profile-scrollbar` 与 `.profile-scrollbar-view`，保证收件箱拆分视图 (`.split-view-container`)、常规设定 (`.settings-content`) 依然享受全局透光磨砂，唯独用户详情页面保持纯净独立；
+       - **核心卡片实心加固**: 确保 `.profile-identity-card`、`.stat-card`、`.chart-card` 维持高对比实心 `var(--bg-surface)`，杜绝半透明失真。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **Git Commit Hash**: 待提交后更新。
+    - 生产部署上线 Cloudflare Workers Version ID: `bef95549-94d0-4270-b5dc-1b8670585ffe`。
+    - 自动化测试套件 100% 顺利通过：
+      - `node tests/test-profile-scrollbar-isolation.mjs` (用户详情 /admin 界面、el-scrollbar__view 专属 profile-scrollbar-view 提取、全局主题壁纸物理隔离与防穿透、暗黑/明亮双模式实心底色核验、其他主栏不受影响验证 100% 通过);
+      - `node --loader ./tests/esm-loader.mjs tests/test-storage-and-db-hub-e2e.mjs` (存储与核心数据库管理中心回归 100% 通过);
+      - `node --loader ./tests/esm-loader.mjs tests/test-dual-and-single-db-e2e.mjs` (单库向下兼容与双库物理隔离架构回归 100% 通过)。
+
 ### 数据库模式 hub-tag 自动同步当前实际情况与所看即所得零刷新上线 (2026-09-05)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **排查并锁定默认展示单 DB 的根本原因 (Root Cause Analysis)**:

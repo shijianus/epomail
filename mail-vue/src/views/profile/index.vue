@@ -16,7 +16,7 @@
       <loading/>
     </div>
     
-    <el-scrollbar class="scroll" v-if="!loading" style="height: calc(100% - 64px - 28px);">
+    <el-scrollbar ref="scrollbarRef" class="scroll profile-scrollbar" view-class="profile-scrollbar-view" v-if="!loading" style="height: calc(100% - 64px - 28px);">
       <div class="scroll-body profile-scroll-body">
         <div class="cover-photo" :style="profileData.userInfo.backgroundUrl ? 'background-image: url(' + profileData.userInfo.backgroundUrl + '); background-size: cover; background-position: center;' : ''"></div>
         <div class="desktop-layout">
@@ -328,7 +328,9 @@ const hideTooltip = () => {
   
   height: 100%;
   overflow: hidden;
-  background: var(--extra-light-fill) !important;
+  background-color: var(--bg-base) !important;
+  background: var(--bg-base) !important;
+  background-image: none !important;
   position: relative;
   font-family: 'Archivo', system-ui, -apple-system, sans-serif;
 
@@ -361,15 +363,29 @@ const hideTooltip = () => {
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background: var(--bg-base);
+  background-color: var(--bg-base) !important;
+  background: var(--bg-base) !important;
+  background-image: none !important;
 }
 
+/* --- Dedicated Profile Main Column (.el-scrollbar__view) Isolation --- */
+.scroll.profile-scrollbar,
 .scroll {
   width: 100%;
   min-height: 100%;
+  background-color: transparent !important;
+  background-image: none !important;
 
-  :deep(.el-scrollbar__view) {
-    height: 100%;
+  :deep(.el-scrollbar__view),
+  :deep(.profile-scrollbar-view) {
+    min-height: 100%;
+    height: auto;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    z-index: 1;
+    background-image: none !important;
+    isolation: isolate;
   }
 
   .scroll-body.profile-scroll-body {
@@ -379,6 +395,8 @@ const hideTooltip = () => {
     justify-content: flex-start;
     background: transparent;
     padding-bottom: 40px;
+    position: relative;
+    z-index: 1;
   }
 }
 

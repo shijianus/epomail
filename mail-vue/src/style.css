@@ -1096,3 +1096,46 @@ html.has-main-wallpaper .split-view-container .reading-pane-column {
     -webkit-backdrop-filter: blur(20px);
 }
 
+/* --- Special Exception: User Details Profile Isolated Main Column (.el-scrollbar__view) --- */
+/* Strictly isolated from other homepage/main columns, 100% immune to global theme wallpaper */
+.profile-container .el-scrollbar__view,
+.profile-scrollbar-view {
+    min-height: 100%;
+    height: auto;
+    position: relative;
+    background-image: none !important;
+    isolation: isolate;
+}
+
+html.has-main-wallpaper .profile-container,
+body.has-main-wallpaper .profile-container {
+    background-color: var(--bg-base) !important;
+    background: var(--bg-base) !important;
+    background-image: none !important;
+}
+
+html.has-main-wallpaper .profile-container .el-scrollbar,
+html.has-main-wallpaper .profile-scrollbar {
+    background-color: transparent !important;
+    background-image: none !important;
+}
+
+html.has-main-wallpaper .profile-container .el-scrollbar__view,
+html.has-main-wallpaper .profile-scrollbar-view {
+    background-image: none !important;
+    isolation: isolate;
+}
+
+html.has-main-wallpaper .profile-container .profile-identity-card {
+    background: var(--bg-surface) !important;
+}
+
+html.has-main-wallpaper .profile-container .stat-card {
+    background: var(--bg-surface) !important;
+}
+
+html.has-main-wallpaper .profile-container .chart-card {
+    background: var(--bg-surface) !important;
+}
+
+
