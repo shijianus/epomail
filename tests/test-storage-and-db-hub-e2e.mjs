@@ -289,11 +289,14 @@ import { getUserDb, getMailDb, isDualDbMode } from "../mail-worker/src/utils/db-
     assert.ok(yDiff < 5, `架构透视与DB配置两个按钮必须在同一行 (当前 y 差值: ${yDiff}px)！`);
     console.log(`  ✓ 验证 inspectBtn 与 dbBtn 在同一行紧凑对齐，y 轴差值仅 ${yDiff.toFixed(1)}px`);
 
-    // 验证 hub-tag 展示不全问题已解决：不再带有括号解释，彻底防止截断
+    // 验证 hub-tag 自动同步当前实际情况（生产双DB物理隔离环境），无需人为点击核验即所看即实际情况
     const dbItemTag = storageDbCard.locator(".setting-item").nth(1).locator(".hub-tag");
     const dbTagText = await dbItemTag.textContent();
     assert.ok(!dbTagText.includes("("), `数据库模式标签不应包含括号解释: ${dbTagText}`);
-    console.log(`  ✓ 数据库模式标签已精炼且无括号截断: [${dbTagText.trim()}]`);
+    const dbTagClasses = await dbItemTag.getAttribute("class");
+    assert.ok(dbTagClasses.includes("el-tag--success"), `在双DB环境下 hub-tag 必须自动呈现 success 状态，当前 class: ${dbTagClasses}`);
+    assert.ok(dbTagText.includes("双数据库物理隔离模式") || dbTagText.includes("Dual"), `在双DB环境下必须自动同步实际情况为双数据库物理隔离模式，当前文本: [${dbTagText.trim()}]`);
+    console.log(`  ✓ 数据库模式标签已自动同步当前实际情况且无截断: [${dbTagText.trim()}] (class: ${dbTagClasses})`);
 
     // 验证历史残留的 val-text fallback-text 已被彻底剔除，统一为 el-tag
     const fallbackCount = await storageDbCard.locator(".fallback-text").count();

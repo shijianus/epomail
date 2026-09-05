@@ -9,6 +9,7 @@ import BizError from '../error/biz-error';
 import {t} from '../i18n/i18n'
 import verifyRecordService from './verify-record-service';
 import userContext from '../security/user-context';
+import { isDualDbMode, getDbModeInfo } from '../utils/db-accessor';
 
 const settingService = {
 
@@ -124,6 +125,13 @@ const settingService = {
 		setting.attachmentMaxSizeMb = setting.attachmentMaxSizeMb !== undefined ? Number(setting.attachmentMaxSizeMb) : 25;
 		setting.attachmentCascadeDelete = setting.attachmentCascadeDelete !== undefined ? Number(setting.attachmentCascadeDelete) : 1;
 
+		const dbModeInfo = getDbModeInfo(c);
+		setting.isDual = dbModeInfo.isDual;
+		setting.hasUserDb = dbModeInfo.hasUserDb;
+		setting.hasMailDb = dbModeInfo.hasMailDb;
+		setting.hasDefaultDb = dbModeInfo.hasDefaultDb;
+		setting.dbMode = dbModeInfo.isDual ? 'dual' : (Number(setting.externalDbEnabled) === 1 ? 'external' : 'single');
+
 		c.set?.('setting', setting);
 		return setting;
 	},
@@ -156,6 +164,13 @@ const settingService = {
 		settingRow.tgBotToken = settingRow.tgBotToken ? `${settingRow.tgBotToken.slice(0, 20)}******` : null;
 		settingRow.hasR2 = !!c.env.r2
 		settingRow.hasCfEmail = !!c.env.email
+
+		const dbModeInfo = getDbModeInfo(c);
+		settingRow.isDual = dbModeInfo.isDual;
+		settingRow.hasUserDb = dbModeInfo.hasUserDb;
+		settingRow.hasMailDb = dbModeInfo.hasMailDb;
+		settingRow.hasDefaultDb = dbModeInfo.hasDefaultDb;
+		settingRow.dbMode = dbModeInfo.isDual ? 'dual' : (Number(settingRow.externalDbEnabled) === 1 ? 'external' : 'single');
 
 		let regVerifyOpen = false
 		let addVerifyOpen = false

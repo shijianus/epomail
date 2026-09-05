@@ -12,6 +12,28 @@
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
 
+### 数据库模式 hub-tag 自动同步当前实际情况与所看即所得零刷新上线 (2026-09-05)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **排查并锁定默认展示单 DB 的根本原因 (Root Cause Analysis)**:
+       - **后端配置源缺失**: 先前 `/api/setting/query` 返回的系统全局配置中，仅带上了 `hasR2` 与 `hasCfEmail`，未注入当前 Worker 环境真实物理绑定的 `isDual`、`hasUserDb`、`hasMailDb` 与 `dbMode`；
+       - **前端状态依赖滞后**: 前端 `sys-setting/index.vue` 的 `hub-tag` 标签直接依赖 `dbStatusInfo?.isDual`，而 `dbStatusInfo` 初始化为 `ref(null)`，且先前其探针仅在用户手动点击“架构透视”弹窗触发刷新或异步全表统计返回后才被赋值；
+       - **视觉假象**: 导致在生产双 DB 环境下，管理员打开页面首屏时由于 `dbStatusInfo` 仍为空，直接落入 fallback 分支渲染出 `[单数据库集中模式]`，必须人为打开弹窗核验后才变为绿色 `[双数据库物理隔离模式]`，造成所见状态与实际情况严重脱节。
+    2. **服务端 Single Source of Truth 注入**:
+       - 在 `mail-worker/src/service/setting-service.js` 的 `query(c)` 与 `get(c)` 链路中引入 `getDbModeInfo(c)`；
+       - 将真实的 `isDual`、`hasUserDb`、`hasMailDb`、`hasDefaultDb` 与 `dbMode` 挂载至 `settingRow` 并统一返回，确保前端获取全局配置的首个请求即携带当前运行时的真实物理架构状态。
+    3. **前端响应式 `isDualDb` 计算属性与自动静默同步 (Zero Refresh & WYSIWYG)**:
+       - **声明响应式计算属性 `isDualDb`**: `computed(() => (dbStatusInfo.value && typeof dbStatusInfo.value.isDual === 'boolean') ? dbStatusInfo.value.isDual : Boolean(setting.value?.isDual))`，在配置就绪的微秒级瞬间即时响应，零闪烁、零延迟；
+       - **收敛所有判断逻辑**: 将主面板 `el-tag`（`class="el-tag el-tag--success el-tag--small el-tag--light hub-tag"`）及架构透视弹窗内的模式识别、Tooltip 解释、资源名称全面收敛至 `isDualDb`；
+       - **顶层并发静默自动同步**: 在页面组件初始化时立即触发 `loadDbStatus()` 并行请求详细指标，无需任何人工点击干预，彻底实现所看即当前实际情况。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **Git Commit Hash**: `4e1e4fc3bd75839954e8f46cd39e473959b1096d` (Short Hash: `4e1e4fc`).
+    - 生产部署上线 Cloudflare Workers Version ID: `fc64c093-5d74-49c5-8627-2fce5c9b205a`。
+    - 自动化测试套件 100% 顺利通过：
+      - `node --loader ./tests/esm-loader.mjs tests/test-storage-and-db-hub-e2e.mjs` (生产双 DB 环境首屏自动同步验证、无需人工核验即呈现 `class="el-tag el-tag--success el-tag--small el-tag--light hub-tag"` 验证、无括号截断验证、全链路 100% 通过);
+      - `node --loader ./tests/esm-loader.mjs tests/test-dual-and-single-db-e2e.mjs` (单库向下兼容与双库物理隔离架构回归 100% 通过);
+      - `node tests/test-welcome-fullscreen-cf.mjs` (全员系统欢迎邮件大弹窗、全屏模式保留顶底栏、TinyMCE 与真实收件箱全链路 100% 通过);
+      - `node --loader ./tests/esm-loader.mjs tests/test-s3-b2-storage-and-quota-e2e.mjs` (Backblaze B2 / S3 接入、SigV4 预签名、配额体系 100% 通过)。
+
 ### 根治全员系统欢迎邮件大弹窗崩溃、排除伪类高优先级污染与welcome-dialog-canvas独自成类上线 (2026-09-05)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **排查并锁定欢迎邮件大弹窗崩溃根本原因 (Root Cause Analysis)**:

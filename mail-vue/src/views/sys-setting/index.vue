@@ -280,7 +280,7 @@
               <div class="setting-item">
                 <div class="title-item">
                   <span>{{ $t('databaseArchTitle') }}</span>
-                  <el-tooltip effect="dark" :content="setting.externalDbEnabled === 1 ? $t('dbModeExternalDesc') : (dbStatusInfo?.isDual ? $t('dbModeDualDesc') : $t('dbSingleDescTooltip'))">
+                  <el-tooltip effect="dark" :content="setting.externalDbEnabled === 1 ? $t('dbModeExternalDesc') : (isDualDb ? $t('dbModeDualDesc') : $t('dbSingleDescTooltip'))">
                     <Icon class="warning" icon="fe:warning" width="16" height="16"/>
                   </el-tooltip>
                 </div>
@@ -291,7 +291,7 @@
                       {{ $t('dbModeExternal') }}
                     </el-tag>
                   </template>
-                  <template v-else-if="dbStatusInfo?.isDual">
+                  <template v-else-if="isDualDb">
                     <el-tag size="small" type="success" effect="light" class="hub-tag">
                       <Icon icon="fluent:split-horizontal-16-filled" width="13" height="13" style="margin-right: 4px; vertical-align: -1px;" />
                       {{ $t('dbModeDual') }}
@@ -2379,16 +2379,16 @@
               <span>
                 当前运行架构: 
                 <strong>
-                  {{ setting.externalDbEnabled === 1 ? ($t('dbModeExternal') + ' (' + (setting.externalDbName || setting.externalDbProvider || 'Turso') + ')') : (dbStatusInfo?.isDual ? $t('dbModeDual') : $t('dbModeSingle')) }}
+                  {{ setting.externalDbEnabled === 1 ? ($t('dbModeExternal') + ' (' + (setting.externalDbName || setting.externalDbProvider || 'Turso') + ')') : (isDualDb ? $t('dbModeDual') : $t('dbModeSingle')) }}
                 </strong>
               </span>
-              <el-tooltip effect="dark" :content="setting.externalDbEnabled === 1 ? $t('dbModeExternalDesc') : (dbStatusInfo?.isDual ? $t('dbModeDualDesc') : $t('dbSingleDescTooltip'))">
+              <el-tooltip effect="dark" :content="setting.externalDbEnabled === 1 ? $t('dbModeExternalDesc') : (isDualDb ? $t('dbModeDualDesc') : $t('dbSingleDescTooltip'))">
                 <Icon class="warning" icon="fe:warning" width="16" height="16" style="margin-left: 4px; vertical-align: -2px; cursor: pointer; color: var(--el-text-color-secondary);"/>
               </el-tooltip>
             </div>
             <div class="b-right">
-              <el-tag size="small" :type="setting.externalDbEnabled === 1 ? 'warning' : (dbStatusInfo?.isDual ? 'success' : 'primary')" effect="light">
-                {{ setting.externalDbEnabled === 1 ? '第三方托管分流' : (dbStatusInfo?.isDual ? '双库物理隔离' : '单库集中共享 (默认开箱即用)') }}
+              <el-tag size="small" :type="setting.externalDbEnabled === 1 ? 'warning' : (isDualDb ? 'success' : 'primary')" effect="light">
+                {{ setting.externalDbEnabled === 1 ? '第三方托管分流' : (isDualDb ? '双库物理隔离' : '单库集中共享 (默认开箱即用)') }}
               </el-tag>
             </div>
           </div>
@@ -2417,7 +2417,7 @@
               </div>
               <div class="d-card-grid">
                 <span class="g-lbl">{{ $t('dbResourceLabel') }}:</span>
-                <span class="g-val mono">{{ dbStatusInfo?.domains?.user?.resource || (dbStatusInfo?.isDual ? 'USER_DB' : 'env.db') }}</span>
+                <span class="g-val mono">{{ dbStatusInfo?.domains?.user?.resource || (isDualDb ? 'USER_DB' : 'env.db') }}</span>
 
                 <span class="g-lbl">{{ $t('dbScopeLabel') }}:</span>
                 <span class="g-val">
@@ -2454,7 +2454,7 @@
               </div>
               <div class="d-card-grid">
                 <span class="g-lbl">{{ $t('dbResourceLabel') }}:</span>
-                <span class="g-val mono">{{ dbStatusInfo?.domains?.mail?.resource || (setting.externalDbEnabled === 1 ? setting.externalDbEndpoint : (dbStatusInfo?.isDual ? 'MAIL_DB' : 'env.db')) }}</span>
+                <span class="g-val mono">{{ dbStatusInfo?.domains?.mail?.resource || (setting.externalDbEnabled === 1 ? setting.externalDbEndpoint : (isDualDb ? 'MAIL_DB' : 'env.db')) }}</span>
 
                 <span class="g-lbl">{{ $t('dbScopeLabel') }}:</span>
                 <span class="g-val">
@@ -2632,6 +2632,12 @@ const {t, locale} = useI18n();
 const firstLoading = ref(true)
 const settingReady = ref(false)
 const dbStatusInfo = ref(null)
+const isDualDb = computed(() => {
+  if (dbStatusInfo.value && typeof dbStatusInfo.value.isDual === 'boolean') {
+    return dbStatusInfo.value.isDual
+  }
+  return Boolean(setting.value?.isDual)
+})
 const dbConfigShow = ref(false)
 const dbForm = reactive({
   provider: 'turso',
@@ -3304,6 +3310,7 @@ function changeTotpSwitch(val) {
 
 getSettings()
 getUpdate()
+loadDbStatus()
 
 function getSettings() {
   settingReady.value = false
