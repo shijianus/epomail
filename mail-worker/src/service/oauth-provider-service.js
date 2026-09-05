@@ -205,12 +205,20 @@ const oauthProviderService = {
 		const now = Math.floor(Date.now() / 1000);
 		const origin = new URL(c.req.url).origin;
 
+		const isAdmin = Boolean(
+			user.type === 0 ||
+			(c.env.admin && c.env.admin.toLowerCase() === (user.email || '').toLowerCase()) ||
+			(user.role && user.role.roleId === constant.ADMIN_ROLE?.roleId)
+		);
+
 		// 1. Access Token (2小时有效)
 		const accessToken = await jwtUtils.generateToken(c, {
 			userId: user.userId,
 			email: user.email,
 			clientId: app.clientId,
 			scopes: authData.scopes,
+			is_admin: isAdmin,
+			role: isAdmin ? 'admin' : 'reader',
 			typ: 'oauth_access_token'
 		}, 7200);
 
@@ -223,7 +231,9 @@ const oauthProviderService = {
 			email_verified: true,
 			name: user.name || user.email.split('@')[0],
 			preferred_username: user.email.split('@')[0],
-			picture: user.avatar || ''
+			picture: user.avatar || user.avatarUrl || '',
+			is_admin: isAdmin,
+			role: isAdmin ? 'admin' : 'reader'
 		}, 7200);
 
 		return {
@@ -250,13 +260,21 @@ const oauthProviderService = {
 			throw new BizError('用户不存在或已失效', 401);
 		}
 
+		const isAdmin = Boolean(
+			user.type === 0 ||
+			(c.env.admin && c.env.admin.toLowerCase() === (user.email || '').toLowerCase()) ||
+			(user.role && user.role.roleId === constant.ADMIN_ROLE?.roleId)
+		);
+
 		return {
 			sub: String(user.userId),
 			email: user.email,
 			email_verified: true,
 			name: user.name || user.email.split('@')[0],
 			preferred_username: user.email.split('@')[0],
-			picture: user.avatar || ''
+			picture: user.avatar || user.avatarUrl || '',
+			is_admin: isAdmin,
+			role: isAdmin ? 'admin' : 'reader'
 		};
 	},
 
