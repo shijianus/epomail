@@ -28,7 +28,7 @@
        - **全局 `style.css` 固化特例声明**: 在全局样式表 `html.has-main-wallpaper` 作用域下，明确豁免并保护 `.profile-container`、`.profile-scrollbar` 与 `.profile-scrollbar-view`，保证收件箱拆分视图 (`.split-view-container`)、常规设定 (`.settings-content`) 依然享受全局透光磨砂，唯独用户详情页面保持纯净独立；
        - **核心卡片实心加固**: 确保 `.profile-identity-card`、`.stat-card`、`.chart-card` 维持高对比实心 `var(--bg-surface)`，杜绝半透明失真。
 *   **部署上线与自动化测试 (Verification & Deployment)**:
-    - **Git Commit Hash**: 待提交后更新。
+    - **Git Commit Hash**: `afb06510220168d22a5efa9a5717efa28cba6bff` (Short Hash: `afb0651`).
     - 生产部署上线 Cloudflare Workers Version ID: `bef95549-94d0-4270-b5dc-1b8670585ffe`。
     - 自动化测试套件 100% 顺利通过：
       - `node tests/test-profile-scrollbar-isolation.mjs` (用户详情 /admin 界面、el-scrollbar__view 专属 profile-scrollbar-view 提取、全局主题壁纸物理隔离与防穿透、暗黑/明亮双模式实心底色核验、其他主栏不受影响验证 100% 通过);
