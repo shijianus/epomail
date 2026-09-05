@@ -12,6 +12,38 @@
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
 
+### 行内操作按钮极简化为紧凑Icon、hub-tag精简无截断、剔除fallback-text与固化不可篡改三级加密防护上线 (2026-09-04)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **行内操作按钮极简化与同一行紧凑排布**:
+       - 将 `.opt-btn-inspect`（default/secondary）与 `.opt-btn-db`（primary）重构为 28x28px 紧凑纯 Icon 按钮，悬停 Tooltip 进行语义解释，完好保留原有颜色区隔；
+       - 经 Playwright 自动化审计，两按钮并排处于同一水平基准线（垂直 y 轴差值仅 0.0px），彻底消除此前因宽度过长导致的换行折行；
+       - 同理将 `.opt-btn-s3`、`.opt-btn-scan`、`.opt-btn-test` 等全部转换为纯 Icon 按钮 + Tooltip 悬浮解释，页面视觉极致统一清爽。
+    2. **`hub-tag` 标签补齐、精简与防截断修复**:
+       - 彻底剔除数据库模式标签（`.hub-tag`）后方冗余生硬的括号说明（如 `(共享主 D1)`、`(USER_DB / MAIL_DB)`、`(External DB)`）；
+       - 统一精炼为纯粹模式名称：`单数据库集中模式`、`双数据库物理隔离模式`、`外接第三方数据库`；
+       - 在 CSS 中声明 `max-width: none !important; overflow: visible !important; white-space: nowrap !important;`，彻底根治标签因空间压缩产生的 `...` 截断显示问题。
+    3. **彻底剔除历史遗留 `class="val-text fallback-text"` 并阐明架构价值**:
+       - 原先由于历史回退逻辑直接渲染了纯文本 `.fallback-text`，造成与其它行 Tag 徽章画风严重割裂；
+       - 彻底剔除该样式类，全面重构为标准统一标签 `<el-tag size="small" type="success" effect="plain" class="hub-tag kv-tag">`；
+       - 明确 Tooltip 释义：KV 边缘加速层负责全局毫秒级配置查询、会话鉴权令牌与附件极速缓存，保障高并发下的超低延迟与零数据库负载。
+    4. **防越权审计与固化三大不可篡改安全防护等级**:
+       - **固化三大安全防护等级 (`emailCryptoUtils.PROTECTION_LEVELS`)**:
+         - **Level 1: 明文基础级 (Standard Plaintext)**：适用于内部测试或轻量合规审计，管理员开放全站审查权限；
+         - **Level 2: 增强隐私级 (Selective E2EE & Spam Isolation - 推荐)**：用户个人密钥隔离加密，普通邮件密文存储，仅垃圾箱/无主件受限审查，强制锁定 2FA；
+         - **Level 3: 最高绝密级 (Maximum Zero-Knowledge E2EE)**：全量 100% 端到端加密，管理员全接口阻断，强制阻断外部消息推送与转发通道。
+       - **前端不可篡改安全等级徽章**: 在「系统设置 - 邮件模式」显式呈现 `currentMailModeSecurityBadge` 盾牌标签与悬浮安全策略。
+       - **后端防越权全面收口与拦截**:
+         - `emailService.selectById`: 发送回复邮件等链路强制校验 `expectedUserId`，彻底杜绝跨租户伪造 `emailId` 水平越权读取；
+         - `emailService.allList` & `allEmailLatest`: 在 Mode 2 (全量加密模式) 下直接返回空数组 `{ list: [], total: 0 }`，后端物理层彻底阻断管理员对用户邮件的遍历与探测；
+         - `settingService.set`: 在 Mode 0 (隐私) 或 Mode 2 (加密) 下强制锁定 `params.totp = 1`，防篡改锁死 2FA，杜绝绕过防护。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **Git Commit Hash**: `71d64db51127054d39bb3ef38d1100e2a25d4839` (Short Hash: `71d64db`).
+    - 生产部署上线 Cloudflare Workers Version ID: `d49a669e-2586-4a0a-83c9-5c93ae4db746`。
+    - 自动化测试套件 100% 顺利通过：
+      - `node --loader ./tests/esm-loader.mjs tests/test-storage-and-db-hub-e2e.mjs` (纯 Icon 按钮同一行对齐验证、hub-tag 无括号防截断验证、fallback-text 彻底剔除验证、不可篡改 Level 1/2/3 安全等级徽章验证、Mode 2 管理员防越权阻断验证、880px/920px 纯色无滑块弹窗 Playwright 截图验证 100% 通过);
+      - `node --loader ./tests/esm-loader.mjs tests/test-dual-and-single-db-e2e.mjs` (单库向下兼容与双库物理隔离架构回归 100% 通过);
+      - `node --loader ./tests/esm-loader.mjs tests/test-s3-b2-storage-and-quota-e2e.mjs` (Backblaze B2 / S3 接入、SigV4 预签名、配额体系 100% 通过)。
+
 ### 彻底剔除storage-card-actions独立操作栏、操作与调试内容100%行内右对齐、S3弹窗纯白实心与全站弹窗居中无滑块上线 (2026-09-04)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **彻底移除卡片独立操作栏 (`class="storage-card-actions"`)**:
