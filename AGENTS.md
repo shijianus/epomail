@@ -31,7 +31,7 @@
          - 在 `userService.updateProfile` 中注入字段双向同步逻辑：`if (params.background && !params.backgroundUrl) params.backgroundUrl = params.background; if (params.backgroundUrl && !params.background) params.background = params.backgroundUrl;`；
          - 在 `publicService.getProfile` 与 `userService.loginUserInfo` 中全面采用 `profile.backgroundUrl || profile.background || ''` 兜底对齐，彻底杜绝数据源脱节。
 *   **部署上线与自动化测试 (Verification & Deployment)**:
-    - **Git Commit Hash**: `c6e3793e8a384e9acab435177548108bbdc372f8` (Short Hash: `c6e3793`).
+    - **Git Commit Hash**: `a7cc24d081e7d8065d6c97a22fc61829e1f5d688` (Short Hash: `a7cc24d`).
     - 生产部署上线 Cloudflare Workers Version ID: `6da39db9-43e1-43c1-9b88-ea8d8e25ec30`。
     - 自动化测试套件 100% 顺利通过：
       - `node tests/test-profile-cover-sync.mjs` (赛博朋克预设渐变同步验证、日落渐变同步验证、外部图片 URL 规范封装验证、常规设置页 UI 点击即时生效验证、初始背景无残留自动清理还原全链路 100% 通过);
