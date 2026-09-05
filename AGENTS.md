@@ -12,6 +12,28 @@
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
 
+### 根治全员系统欢迎邮件大弹窗崩溃、排除伪类高优先级污染与welcome-dialog-canvas独自成类上线 (2026-09-05)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **排查并锁定欢迎邮件大弹窗崩溃根本原因 (Root Cause Analysis)**:
+       - 在先前重构存储中心弹窗时，为了防止通用弹窗样式影响存储弹窗，在 `sys-setting/index.vue` 中将默认弹窗宽度规则修改为 `:deep(.el-dialog:not(.storage-config-dialog):not(.db-domains-dialog)...) { width: 400px !important; }`；
+       - 根据 CSS Selectors Level 4 规范，链式 `:not(...)` 伪类的特异度为所有参数类名特异度之和，导致该 400px 规则的特异度暴增至 `(0, 7, 0)`；
+       - 欢迎邮件大弹窗由于未被列入 `:not()` 排除链，其原先特异度仅为 `(0, 1, 0)` 的 `:deep(.welcome-dialog-canvas)` 规则在 `!important` 级联比较中被彻底压制；
+       - 最终导致原本应展开为 1140px 的全员系统欢迎邮件富文本画布被强行压缩在 400px 极窄竖条中，引发 Alloy 工具栏折行重叠、操作按钮溢出被截断、全屏模式失效的界面全面崩溃。
+    2. **通用 400px 规则排除隔离与止血修复**:
+       - 在 `:deep(.el-dialog:not(...))` 中显式追加 `:not(.welcome-dialog-canvas):not(.notice-popup):not(.auth-prompt-dialog):not(.resend-table)`，彻底阻断 400px 限制对大画布级与桌面级弹窗的样式污染。
+    3. **确保欢迎邮件画布独自成类 (Standalone & Isolated Dialog Canvas Architecture)**:
+       - **组件 Scoped 样式复合加固**: 提升选择器为 `:deep(.el-dialog.welcome-dialog-canvas), :deep(.welcome-dialog-canvas.el-dialog), :deep(.welcome-dialog-canvas)`，具备绝对优先级；
+       - **Unscoped 顶级隔离定义**: 在组件底部非 scoped `<style>` 中为 `.el-dialog.welcome-dialog-canvas` 声明完整的桌面画布尺寸 (`width: min(1140px, calc(100vw - 48px)) !important;`)、全屏响应 (`.is-fullscreen`)、自适应高度、Header/Body/Footer 及暗黑模式适配；
+       - **全局 `style.css` 固化沉淀**: 在全局样式表中同步沉淀独立类声明，保障即使在 Element Plus 弹窗挂载 Teleport 到 body 根节点时依然享有最纯粹、无污染的实心高保真独立层叠样式。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **Git Commit Hash**: `2fd6d9f72cf37745babae5dc0f48b21091ec27b6` (Short Hash: `2fd6d9f`).
+    - 生产部署上线 Cloudflare Workers Version ID: `c99a152e-f538-4c82-bb8d-b66f71141cc2`。
+    - 自动化测试套件 100% 顺利通过：
+      - `node tests/test-welcome-fullscreen-cf.mjs` (1140px 居中大弹窗尺寸校验、全屏顶底栏安全保留视窗校验、纯 Icon 模式切换开关校验、TinyMCE 工具栏尺寸与 Icon 严格居中校验、Markdown 17 种辅助工具与模板重置校验、高危群发二次确认模态框校验、真实收件箱 Shadow DOM 5 大核心价值与 CTA 按钮全链路 100% 通过);
+      - `node --loader ./tests/esm-loader.mjs tests/test-storage-and-db-hub-e2e.mjs` (存储与核心数据库管理中心、纯 Icon 按钮、880px/920px 弹窗无滑块、不可篡改三级加密 100% 通过);
+      - `node --loader ./tests/esm-loader.mjs tests/test-dual-and-single-db-e2e.mjs` (单库向下兼容与双库物理隔离架构回归 100% 通过);
+      - `node --loader ./tests/esm-loader.mjs tests/test-s3-b2-storage-and-quota-e2e.mjs` (Backblaze B2 / S3 接入、SigV4 预签名、配额体系 100% 通过)。
+
 ### 行内操作按钮极简化为紧凑Icon、hub-tag精简无截断、剔除fallback-text与固化不可篡改三级加密防护上线 (2026-09-04)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **行内操作按钮极简化与同一行紧凑排布**:
