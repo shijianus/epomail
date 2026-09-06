@@ -11,6 +11,37 @@
    - 在向用户输出回复时，必须置顶/显式打印出本次提交的完整 Commit Hash 与短 Hash，确保版本可追溯、审计记录完整。
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
+### Gmail风格收件UI升级、to me下拉详情卡片、多维操作快捷栏与AI模型密钥集成及智能全文翻译上线 (2026-09-06)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **遵循最小修复原则学习 Gmail 经典收件交互架构**:
+       - 在严格维持整体页面框架、侧边栏及现有主题系统稳定的前提下，聚焦优化 `.content` 邮件详情视图；
+       - 彻底重塑 `.info-bottom` 布局：个人邮箱场景（如收件箱、星标、稍后提醒等）自适应渲染为「至 我 ▾」；在多用户复合聚合场景（如全部邮件 `/all` 或全局垃圾邮件 `/spam`）保留「收件人：某个邮箱 ▾」；
+       - 点击下拉角标弹出 Gmail 风格信息卡片（`.gmail-details-card`），精确展示发件人（名称+完整地址）、回复地址（如有）、收件人、标准化日期时间、主题、发送方域名（Mailed-by）及 TLS 256 位标准安全加密徽章。
+    2. **Gmail 风格操作栏体系与业务逻辑闭环**:
+       - **个人垃圾邮件隔离 (Report as spam)**：点击将邮件移入垃圾桶，后端智能联动 `user.customLabels` 规则引擎，自动将该发件人加入该用户的个人专属黑名单规则（配置 `targetFolder: 'spam', priority: 1, stopProcessing: true`），此后该发件人来信自动入垃圾桶，仅对该用户个人生效，绝不影响管理员全局垃圾邮件与其他用户；
+       - **安全删除 (Delete)**：一键移至垃圾桶（`isDel = 1`），仅当用户在垃圾桶彻底清空时执行物理销毁；
+       - **标记已读/未读 (Mark as read / unread)**：重构 `/api/email/read` 支持双向 `unread` 状态切换；
+       - **稍后提醒 (Snooze)**：提供快捷时间预设选项（今日稍后 18:00、明天 09:00、本周末、下周一）以及自定义日期时间选择器；
+       - **标签管理 (Label as)**：交互式标签弹窗勾选，无缝同步 `uiStore.allLabels`；
+       - **更多选项 (More)**：集成「过滤此类邮件」一键提取发件人与主题创建过滤规则、「忽略 (Mute)」会话静音与原生打印功能。
+    3. **Gmail 原生工具栏风格 AI 邮件翻译 (Translate Message)**:
+       - 在邮件顶栏与单个邮件头部均增设快捷翻译入口；
+       - 点击展开 Gmail 经典悬浮翻译栏（`.gmail-translate-bar`），包含 8 种主要语言目标选择下拉框（中文、英文、日文、韩文、法文、德文、西班牙文、俄文）；
+       - 提供「立即翻译 / 重新翻译」与「查看原文 / 查看翻译」瞬时切换功能；翻译内容呈现于高质感卡片并附带「AI 智能提取并翻译」徽章。
+    4. **管理面板 AI 模型与 API 密钥集成 (AI API Key Integration)**:
+       - 在 `/settings/category`（收发与过滤设置）的 Workers AI 模块中增设「AI 模型与 API 密钥集成」配置入口；
+       - 弹出独立管理弹窗（`.ai-config-dialog`），允许管理员配置 OpenAI 兼容协议的 API Key（密码输入框支持显隐切换）、Base URL 与 Model Name；
+       - **智能降级与高可用容灾**：当管理员未配置 API Key 时，自动免密调用 Cloudflare Workers AI（`@cf/meta/llama-3.1-8b-instruct`），并具备公共翻译引擎保底机制；
+       - 提供「测试 AI 连通性」接口（`/api/setting/ai/test`）与诊断按钮，即时检测模型服务连通性。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **Cloudflare Workers 部署 Version ID**: `b26f286f-638f-435f-a3b4-c234c242ce06`。
+    - **epocanvas-mail Git Commit**: `deceaaa5b3e7589c63c2240df97b020bab5c2c14` (Short Hash: `deceaaa`)。
+    - 自动化测试套件 100% 顺利通过：
+      - `node tests/test-gmail-ui-and-ai-features.mjs` (Admin 登录获取 Token、测试邮件检索、收件箱右侧面板展开、顶栏 17 大 Gmail 操作按钮完好性审计、.info-bottom「至 我」触发器与详情卡片字段/TLS徽章核验、翻译工具条与语言下拉框核验、后端 /api/email/translate AI 翻译与降级容灾核验、个人垃圾邮件上报与黑名单规则联动核验、已读/未读状态双向流转核验、管理面板 AI 集成 UI 与 /api/setting/ai/test 连通性测试 100% 全部通过);
+      - `node tests/test-oauth-apps-ui-optimization.mjs` (protocol-tag 彻底剔除验证、guide-btn 文档教程提示与博客跳转验证、app-card 回调地址去除核验、卡片高度 <= 210px 压缩审计、底栏三大操作按钮核验、明亮/暗黑双模式截图生成与无白斑验证 100% 全部通过);
+      - `node tests/test-invite-code-ui-optimization.mjs` (Admin 登录、4大操作药丸与原有图标完好性审计、el-scrollbar虚拟与原生滑块彻底删除Zero-Scrollbar审计、empty-baseplate质感与行动按钮审计、清空搜索交互闭环、卡片原有功能/复制/菜单审计、暗黑模式双部分画风完全同步无白斑审计、测试注册码自动重置清理 100% 全部通过);
+      - `node tests/test-identity-sync-and-scrollbar-wrap.mjs` (Admin 登录获取 Token、身份组站长同步、/admin 资料页验证、/invite-code 整体模板底板、暗黑模式模板底板与流畅度 100% 全部通过)。
+
 ### 注册密钥原有图标与卡片功能完整保留、empty-baseplate质感升级与Zero-Scrollbar画风统一上线 (2026-09-06)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **原有图标体系完整保留与功能稳定性保障**:
