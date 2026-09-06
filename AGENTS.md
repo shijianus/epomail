@@ -39,7 +39,7 @@
        - 全面重构 `.role-card`、预设模板芯片、颜色选择器、权限树容器与分级阶梯表格的深色模式变量适配，彻底根治深色模式下的刺眼纯白底色。
 *   **部署上线与自动化测试 (Verification & Deployment)**:
     - **Cloudflare Workers 部署 Version ID**: `cffacbf5-6204-4362-bb1d-b8851c888579`。
-    - **epocanvas-mail Git Commit**: `PENDING_COMMIT_HASH` (Short Hash: `PENDING_SHORT_HASH`).
+    - **epocanvas-mail Git Commit**: `2c5b8ad35422a60744075e6f9689852ce158fdd8` (Short Hash: `2c5b8ad`).
     - 自动化测试套件 100% 顺利通过：
       - `node tests/test-role-ui-beautify-and-tag-limits.mjs` (配额单行与无限制验证、附件权限标签无截断验证、纯净身份徽章验证、860px 双列零滑块弹窗审计、/invite-code 药丸底板、头像下拉博客等级、个人设置页联动板块、/:username 博客联动卡片 100% 通过);
       - `node tests/test-role-hierarchy-and-blog-grading.mjs` (6 大管理组属性核验、博客等级接口连通、Web UI 表格渲染、880px 架构与分级一览弹窗、预设新建角色模板套用与截图验证 100% 通过);
