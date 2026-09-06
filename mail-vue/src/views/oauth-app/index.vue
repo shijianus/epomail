@@ -3,18 +3,15 @@
     <!-- 1. Header & Overview Card -->
     <div class="container header-container">
       <div class="header-top-row">
-        <div class="title-with-badge">
-          <div class="main-title">{{ $t('oauthAppsTitle') || 'OAuth 开放平台与应用管理' }}</div>
-          <el-tag size="small" type="primary" effect="plain" round class="protocol-tag">
-            <Icon icon="fluent:shield-checkmark-16-regular" width="14" height="14" style="margin-right: 4px;" />
-            OIDC Core 1.0 / RFC 6749 Ready
-          </el-tag>
-        </div>
+        <div class="main-title">{{ $t('oauthAppsTitle') || 'OAuth 开放平台与应用管理' }}</div>
         <div class="header-actions">
-          <el-button @click="quickGuideDialogShow = true" class="guide-btn">
-            <Icon icon="fluent:code-20-regular" width="16" height="16" style="margin-right: 6px;" />
-            {{ $t('oauthQuickGuide') || '快速集成指南' }}
-          </el-button>
+          <el-tooltip :content="$t('oauthBlogGuideTooltip') || '前往官方博客阅读 OAuth 2.0 / OIDC 第三方接入完整开发教程与最佳实践'" placement="bottom">
+            <el-button @click="openBlogTutorial" class="guide-btn">
+              <Icon icon="fluent:book-open-20-regular" width="16" height="16" style="margin-right: 6px;" />
+              <span>{{ $t('oauthBlogGuide') || '开发接入教程' }}</span>
+              <Icon icon="fluent:open-16-regular" width="12" height="12" style="margin-left: 4px; opacity: 0.7;" />
+            </el-button>
+          </el-tooltip>
           <el-button type="primary" @click="openCreateDialog" class="create-app-btn">
             <Icon icon="fluent:add-circle-20-regular" width="16" height="16" style="margin-right: 6px;" />
             {{ $t('registerNewApp') || '注册新应用' }}
@@ -31,25 +28,25 @@
           <span class="ep-badge get">GET</span>
           <span class="ep-path font-mono">/.well-known/openid-configuration</span>
           <span class="ep-hint">Discovery 元数据</span>
-          <Icon icon="lucide:copy" width="13" height="13" class="copy-ic" />
+          <Icon icon="fluent:copy-16-regular" width="13" height="13" class="copy-ic" />
         </div>
         <div class="endpoint-chip" @click="copyEndpoint('/oauth/authorize')">
           <span class="ep-badge get">GET</span>
           <span class="ep-path font-mono">/oauth/authorize</span>
           <span class="ep-hint">用户授权端点</span>
-          <Icon icon="lucide:copy" width="13" height="13" class="copy-ic" />
+          <Icon icon="fluent:copy-16-regular" width="13" height="13" class="copy-ic" />
         </div>
         <div class="endpoint-chip" @click="copyEndpoint('/api/oauth/token')">
           <span class="ep-badge post">POST</span>
           <span class="ep-path font-mono">/api/oauth/token</span>
           <span class="ep-hint">令牌置换端点</span>
-          <Icon icon="lucide:copy" width="13" height="13" class="copy-ic" />
+          <Icon icon="fluent:copy-16-regular" width="13" height="13" class="copy-ic" />
         </div>
         <div class="endpoint-chip" @click="copyEndpoint('/api/oauth/userinfo')">
           <span class="ep-badge get">GET</span>
           <span class="ep-path font-mono">/api/oauth/userinfo</span>
           <span class="ep-hint">用户资料端点</span>
-          <Icon icon="lucide:copy" width="13" height="13" class="copy-ic" />
+          <Icon icon="fluent:copy-16-regular" width="13" height="13" class="copy-ic" />
         </div>
       </div>
     </div>
@@ -62,7 +59,7 @@
           <span class="count-bubble">{{ appsList.length }}</span>
         </div>
         <el-button link type="primary" size="small" @click="fetchApps" :loading="loading">
-          <Icon icon="lucide:refresh-cw" width="14" height="14" style="margin-right: 4px;" />
+          <Icon icon="fluent:arrow-clockwise-16-regular" width="14" height="14" style="margin-right: 4px;" />
           {{ $t('refresh') || '刷新列表' }}
         </el-button>
       </div>
@@ -74,10 +71,16 @@
         </div>
         <div class="empty-title">{{ $t('noAppsCreated') || '尚未创建任何 OAuth 应用' }}</div>
         <div class="empty-desc">{{ $t('noAppsCreatedDesc') || '点击上方「注册新应用」按钮，为您的第三方网站、移动端 App 或开源面板开启 Epomail 快捷登录。' }}</div>
-        <el-button type="primary" @click="openCreateDialog" style="margin-top: 14px;">
-          <Icon icon="fluent:add-16-filled" width="15" height="15" style="margin-right: 4px;" />
-          {{ $t('registerNewApp') || '立即注册应用' }}
-        </el-button>
+        <div class="empty-actions">
+          <el-button type="primary" @click="openCreateDialog">
+            <Icon icon="fluent:add-16-filled" width="15" height="15" style="margin-right: 4px;" />
+            {{ $t('registerNewApp') || '立即注册应用' }}
+          </el-button>
+          <el-button @click="openBlogTutorial">
+            <Icon icon="fluent:book-open-16-regular" width="15" height="15" style="margin-right: 4px;" />
+            {{ $t('oauthBlogGuide') || '开发接入教程' }}
+          </el-button>
+        </div>
       </div>
 
       <!-- Apps Grid -->
@@ -94,7 +97,7 @@
                 <div class="app-name-row">
                   <span class="app-name" :title="app.name">{{ app.name }}</span>
                   <a v-if="app.homepageUrl" :href="app.homepageUrl" target="_blank" class="app-link" :title="app.homepageUrl">
-                    <Icon icon="lucide:external-link" width="13" height="13" />
+                    <Icon icon="fluent:open-16-regular" width="12" height="12" />
                   </a>
                 </div>
                 <div class="app-created-time">
@@ -107,6 +110,7 @@
                 v-model="app.status"
                 :active-value="1"
                 :inactive-value="0"
+                size="small"
                 @change="(val) => handleStatusChange(app, val)"
                 :title="app.status === 1 ? ($t('appStatusActive') || '运行中') : ($t('appStatusDisabled') || '已停用')"
               />
@@ -114,7 +118,7 @@
           </div>
 
           <!-- Card Description -->
-          <div class="app-desc-text">
+          <div class="app-desc-text" :title="app.description || '暂无应用详细描述信息'">
             {{ app.description || '暂无应用详细描述信息' }}
           </div>
 
@@ -123,9 +127,9 @@
             <div class="cred-row">
               <span class="cred-label">Client ID</span>
               <div class="cred-val font-mono">
-                <span>{{ app.clientId }}</span>
-                <el-button link type="primary" size="small" @click="copyText(app.clientId, 'Client ID')" :title="$t('copy') || '复制'">
-                  <Icon icon="lucide:copy" width="13" height="13" />
+                <span class="cred-mono-text" :title="app.clientId">{{ app.clientId }}</span>
+                <el-button link type="primary" size="small" class="cred-action-btn" @click="copyText(app.clientId, 'Client ID')" :title="$t('copy') || '复制'">
+                  <Icon icon="fluent:copy-16-regular" width="13" height="13" />
                 </el-button>
               </div>
             </div>
@@ -133,24 +137,9 @@
               <span class="cred-label">Client Secret</span>
               <div class="cred-val font-mono">
                 <span class="masked-secret">{{ app.clientSecretMasked || '••••••••••••••••' }}</span>
-                <el-button link type="primary" size="small" @click="handleResetSecret(app)" :title="$t('resetSecret') || '重新生成密钥'">
+                <el-button link type="primary" size="small" class="cred-action-btn" @click="handleResetSecret(app)" :title="$t('resetSecret') || '重新生成密钥'">
                   <Icon icon="fluent:arrow-sync-16-regular" width="13" height="13" />
                 </el-button>
-              </div>
-            </div>
-          </div>
-
-          <!-- Allowed Callbacks Preview -->
-          <div class="app-uris-box">
-            <div class="uris-label-row">
-              <span class="uris-label">
-                <Icon icon="lucide:link-2" width="13" height="13" style="margin-right: 4px;" />
-                授权回调地址 ({{ (app.redirectUris || []).length }})
-              </span>
-            </div>
-            <div class="uris-tags-list">
-              <div v-for="(uri, uIdx) in (app.redirectUris || [])" :key="uIdx" class="uri-tag font-mono" :title="uri">
-                {{ uri }}
               </div>
             </div>
           </div>
@@ -158,16 +147,16 @@
           <!-- Card Footer Actions -->
           <div class="app-card-footer">
             <el-button size="small" @click="openQuickGuideWithApp(app)" class="action-btn">
-              <Icon icon="fluent:code-16-regular" width="14" height="14" style="margin-right: 4px;" />
+              <Icon icon="fluent:code-16-regular" width="13" height="13" style="margin-right: 4px;" />
               {{ $t('integrationGuide') || '集成代码' }}
             </el-button>
             <div class="footer-right-actions">
               <el-button size="small" @click="openEditDialog(app)" class="action-btn">
-                <Icon icon="lucide:edit-3" width="13" height="13" style="margin-right: 4px;" />
+                <Icon icon="fluent:edit-16-regular" width="13" height="13" style="margin-right: 3px;" />
                 {{ $t('edit') || '编辑' }}
               </el-button>
               <el-button size="small" type="danger" plain @click="handleDeleteApp(app)" class="action-btn danger">
-                <Icon icon="lucide:trash-2" width="13" height="13" style="margin-right: 4px;" />
+                <Icon icon="fluent:delete-16-regular" width="13" height="13" style="margin-right: 3px;" />
                 {{ $t('delete') || '删除' }}
               </el-button>
             </div>
@@ -287,7 +276,7 @@
             <div class="rev-input-box">
               <span class="font-mono rev-value">{{ currentSecretData.clientId }}</span>
               <el-button link type="primary" @click="copyText(currentSecretData.clientId, 'Client ID')">
-                <Icon icon="lucide:copy" width="15" height="15" />
+                <Icon icon="fluent:copy-16-regular" width="15" height="15" />
               </el-button>
             </div>
           </div>
@@ -297,7 +286,7 @@
             <div class="rev-input-box highlight-secret">
               <span class="font-mono rev-value secret-text">{{ currentSecretData.clientSecretPlain }}</span>
               <el-button link type="primary" @click="copyText(currentSecretData.clientSecretPlain, 'Client Secret')">
-                <Icon icon="lucide:copy" width="15" height="15" />
+                <Icon icon="fluent:copy-16-regular" width="15" height="15" />
               </el-button>
             </div>
           </div>
@@ -340,7 +329,7 @@
               <div class="code-header">
                 <span>pages/api/auth/[...nextauth].ts 或 auth.ts</span>
                 <el-button link type="primary" size="small" @click="copyCode(nextAuthSnippet)">
-                  <Icon icon="lucide:copy" width="13" height="13" style="margin-right: 4px;" />
+                  <Icon icon="fluent:copy-16-regular" width="13" height="13" style="margin-right: 4px;" />
                   复制配置
                 </el-button>
               </div>
@@ -354,7 +343,7 @@
               <div class="code-header">
                 <span>OAuth 2.0 授权码兑换与 UserInfo 提取</span>
                 <el-button link type="primary" size="small" @click="copyCode(nodeJsSnippet)">
-                  <Icon icon="lucide:copy" width="13" height="13" style="margin-right: 4px;" />
+                  <Icon icon="fluent:copy-16-regular" width="13" height="13" style="margin-right: 4px;" />
                   复制代码
                 </el-button>
               </div>
@@ -368,7 +357,7 @@
               <div class="code-header">
                 <span>FastAPI + Authlib 标准 OIDC Client</span>
                 <el-button link type="primary" size="small" @click="copyCode(pythonSnippet)">
-                  <Icon icon="lucide:copy" width="13" height="13" style="margin-right: 4px;" />
+                  <Icon icon="fluent:copy-16-regular" width="13" height="13" style="margin-right: 4px;" />
                   复制配置
                 </el-button>
               </div>
@@ -382,7 +371,7 @@
               <div class="code-header">
                 <span>标准 3 步 HTTP 置换流程</span>
                 <el-button link type="primary" size="small" @click="copyCode(curlSnippet)">
-                  <Icon icon="lucide:copy" width="13" height="13" style="margin-right: 4px;" />
+                  <Icon icon="fluent:copy-16-regular" width="13" height="13" style="margin-right: 4px;" />
                   复制命令
                 </el-button>
               </div>
@@ -650,6 +639,10 @@ function openCreateDialog() {
   appDialogShow.value = true
 }
 
+function openBlogTutorial() {
+  window.open('https://blog.epocanvas.com', '_blank')
+}
+
 function openEditDialog(app) {
   editingAppId.value = app.id
   appForm.name = app.name || ''
@@ -869,25 +862,11 @@ function formatDate(isoStr) {
     gap: 16px;
     flex-wrap: wrap;
 
-    .title-with-badge {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      flex-wrap: wrap;
-
-      .main-title {
-        font-size: 20px;
-        font-weight: 700;
-        color: var(--text-primary);
-        letter-spacing: -0.2px;
-      }
-
-      .protocol-tag {
-        display: inline-flex;
-        align-items: center;
-        font-weight: 600;
-        font-size: 11px;
-      }
+    .main-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--text-primary);
+      letter-spacing: -0.2px;
     }
 
     .header-actions {
@@ -902,6 +881,19 @@ function formatDate(isoStr) {
 
       .guide-btn {
         border-radius: 8px;
+        font-weight: 500;
+        background: var(--bg-elevated);
+        border: 1px solid var(--border-subtle);
+        color: var(--text-primary);
+        display: inline-flex;
+        align-items: center;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+
+        &:hover {
+          border-color: var(--accent-primary);
+          color: var(--accent-primary);
+          background: color-mix(in srgb, var(--accent-primary) 6%, var(--bg-surface));
+        }
       }
     }
   }
@@ -1015,7 +1007,7 @@ function formatDate(isoStr) {
 }
 
 .empty-apps-box {
-  padding: 48px 24px;
+  padding: 44px 24px;
   border-radius: 12px;
   background: var(--bg-surface);
   border: 1px dashed var(--border-subtle);
@@ -1025,19 +1017,19 @@ function formatDate(isoStr) {
   text-align: center;
 
   .empty-icon-wrap {
-    width: 64px;
-    height: 64px;
-    border-radius: 16px;
+    width: 56px;
+    height: 56px;
+    border-radius: 14px;
     background: color-mix(in srgb, var(--accent-primary) 10%, transparent);
     color: var(--accent-primary);
     display: flex;
     align-items: center;
     justify-content: center;
-    margin-bottom: 14px;
+    margin-bottom: 12px;
   }
 
   .empty-title {
-    font-size: 16px;
+    font-size: 15.5px;
     font-weight: 700;
     color: var(--text-primary);
     margin-bottom: 6px;
@@ -1048,13 +1040,22 @@ function formatDate(isoStr) {
     color: var(--text-secondary);
     max-width: 480px;
     line-height: 1.5;
+    margin-bottom: 14px;
+  }
+
+  .empty-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: center;
   }
 }
 
 .apps-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
-  gap: 18px;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 14px;
 
   @media (max-width: 767px) {
     grid-template-columns: 1fr;
@@ -1064,42 +1065,42 @@ function formatDate(isoStr) {
 .app-card {
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  padding: 18px 20px;
+  gap: 10px;
+  padding: 14px 16px;
   border-radius: 12px;
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
-  transition: all 0.2s ease;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.03);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 
   &:hover {
-    border-color: var(--border-mid);
-    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.06);
+    border-color: var(--accent-primary);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
     transform: translateY(-1px);
   }
 
   .app-card-header {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     justify-content: space-between;
-    gap: 12px;
+    gap: 10px;
 
     .app-brand {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 10px;
       min-width: 0;
 
       .app-logo-avatar {
-        width: 42px;
-        height: 42px;
-        border-radius: 10px;
+        width: 36px;
+        height: 36px;
+        border-radius: 8px;
         display: flex;
         align-items: center;
         justify-content: center;
         flex-shrink: 0;
         overflow: hidden;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
 
         img {
           width: 100%;
@@ -1110,24 +1111,24 @@ function formatDate(isoStr) {
         .app-avatar-char {
           color: #ffffff;
           font-weight: 700;
-          font-size: 18px;
+          font-size: 16px;
         }
       }
 
       .app-meta {
         display: flex;
         flex-direction: column;
-        gap: 2px;
+        gap: 1px;
         min-width: 0;
 
         .app-name-row {
           display: flex;
           align-items: center;
-          gap: 6px;
+          gap: 5px;
 
           .app-name {
-            font-size: 15px;
-            font-weight: 700;
+            font-size: 14.5px;
+            font-weight: 600;
             color: var(--text-primary);
             white-space: nowrap;
             overflow: hidden;
@@ -1147,31 +1148,35 @@ function formatDate(isoStr) {
         }
 
         .app-created-time {
-          font-size: 11.5px;
+          font-size: 11px;
           color: var(--text-muted);
         }
       }
     }
+
+    .app-status-switch {
+      flex-shrink: 0;
+    }
   }
 
   .app-desc-text {
-    font-size: 13px;
+    font-size: 12px;
     color: var(--text-secondary);
-    line-height: 1.45;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
+    line-height: 1.4;
+    white-space: nowrap;
     overflow: hidden;
-    min-height: 38px;
+    text-overflow: ellipsis;
+    min-height: auto;
+    margin: 0;
   }
 
   .app-credentials-box {
     display: flex;
     flex-direction: column;
-    gap: 6px;
-    padding: 10px 12px;
+    gap: 4px;
+    padding: 7px 10px;
     border-radius: 8px;
-    background: color-mix(in srgb, var(--accent-muted) 5%, var(--bg-surface));
+    background: var(--bg-elevated);
     border: 1px solid var(--border-subtle);
 
     .cred-row {
@@ -1179,59 +1184,44 @@ function formatDate(isoStr) {
       align-items: center;
       justify-content: space-between;
       gap: 8px;
-      font-size: 12px;
+      font-size: 11.5px;
 
       .cred-label {
         font-weight: 600;
         color: var(--text-muted);
-        font-size: 11.5px;
+        font-size: 11px;
+        white-space: nowrap;
+        flex-shrink: 0;
       }
 
       .cred-val {
         display: flex;
         align-items: center;
-        gap: 6px;
+        justify-content: flex-end;
+        gap: 4px;
         font-weight: 600;
         color: var(--text-primary);
+        min-width: 0;
+        flex: 1;
+
+        .cred-mono-text {
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          text-align: right;
+        }
 
         .masked-secret {
           color: var(--text-muted);
           letter-spacing: 1px;
         }
-      }
-    }
-  }
 
-  .app-uris-box {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-
-    .uris-label-row {
-      .uris-label {
-        font-size: 11.5px;
-        font-weight: 600;
-        color: var(--text-muted);
-        display: flex;
-        align-items: center;
-      }
-    }
-
-    .uris-tags-list {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-
-      .uri-tag {
-        font-size: 11.5px;
-        color: var(--text-secondary);
-        background: var(--bg-elevated);
-        padding: 4px 8px;
-        border-radius: 6px;
-        border: 1px solid var(--border-subtle);
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
+        .cred-action-btn {
+          padding: 2px 4px;
+          height: auto;
+          line-height: 1;
+          flex-shrink: 0;
+        }
       }
     }
   }
@@ -1241,16 +1231,26 @@ function formatDate(isoStr) {
     align-items: center;
     justify-content: space-between;
     gap: 8px;
-    padding-top: 10px;
+    padding-top: 8px;
     border-top: 1px dashed var(--border-subtle);
     margin-top: auto;
 
     .action-btn {
       border-radius: 6px;
-      font-size: 12px;
+      font-size: 11.5px;
+      height: 26px;
+      padding: 0 8px;
+      display: inline-flex;
+      align-items: center;
 
       &.danger {
         color: var(--el-color-danger);
+
+        &:hover {
+          color: #ffffff;
+          background: var(--el-color-danger);
+          border-color: var(--el-color-danger);
+        }
       }
     }
 
