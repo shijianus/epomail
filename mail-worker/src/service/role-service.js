@@ -31,9 +31,10 @@ const roleService = {
 				}
 			}
 
-			// Fast check: if all 6 standard roles already exist and have tags, exit immediately
+			// Fast check: if all 6 standard roles already exist, have tags, and visitor is default, exit immediately
 			const check = await userDb.prepare(`SELECT count(*) as cnt FROM role WHERE role_code IN ('visitor', 'user_base', 'user_lv0', 'user_lv1', 'moderator', 'master') AND tag_text IS NOT NULL AND tag_text != '' AND tag_text != 'tag_text'`).first();
-			if (check && Number(check.cnt) >= 6) {
+			const visitorCheck = await userDb.prepare(`SELECT is_default FROM role WHERE role_code = 'visitor' LIMIT 1`).first();
+			if (check && Number(check.cnt) >= 6 && visitorCheck && Number(visitorCheck.is_default) === 1) {
 				return;
 			}
 		} catch (e) {
@@ -47,7 +48,7 @@ const roleService = {
 					name: '参观者',
 					key: 'visitor',
 					sort: 1,
-					isDefault: 0,
+					isDefault: 1,
 					sendType: 'ban',
 					sendCount: 0,
 					accountCount: 0,
@@ -56,14 +57,14 @@ const roleService = {
 					tagText: '开源体验',
 					tagColor: '#6366f1',
 					description: '开源体验与巡检用户，全功能UI交互沙箱，无持久化写入权限，配额0MB',
-					permKeys: ['setting:query', 'role:query', 'analysis:query', 'user:query']
+					permKeys: ['setting:query', 'role:query', 'analysis:query', 'user:query', 'reg-key:query']
 				},
 				{
 					roleCode: 'user_base',
 					name: '普通用户',
 					key: 'user_base',
 					sort: 2,
-					isDefault: 1,
+					isDefault: 0,
 					sendType: 'day',
 					sendCount: 5,
 					accountCount: 1,
@@ -167,12 +168,12 @@ const roleService = {
 				} else {
 					await userDb.prepare(`
 						UPDATE role 
-						SET role_code = ?, storage_quota_mb = ?, allow_attachment = ?, description = ?, send_type = ?, send_count = ?,
+						SET role_code = ?, storage_quota_mb = ?, allow_attachment = ?, description = ?, send_type = ?, send_count = ?, is_default = ?,
 						    tag_text = CASE WHEN tag_text = '' OR tag_text = 'tag_text' OR tag_text IS NULL THEN ? ELSE tag_text END,
 						    tag_color = CASE WHEN tag_color = '' OR tag_color = 'tag_color' OR tag_color IS NULL THEN ? ELSE tag_color END
 						WHERE role_id = ?
 					`).bind(
-						defRole.roleCode, defRole.storageQuotaMb, defRole.allowAttachment, defRole.description, defRole.sendType, defRole.sendCount,
+						defRole.roleCode, defRole.storageQuotaMb, defRole.allowAttachment, defRole.description, defRole.sendType, defRole.sendCount, defRole.isDefault,
 						defRole.tagText, defRole.tagColor,
 						existing.role_id
 					).run();

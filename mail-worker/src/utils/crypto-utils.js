@@ -1,6 +1,6 @@
 const encoder = new TextEncoder();
 
-const PBKDF2_ITERATIONS = 210000;
+const PBKDF2_ITERATIONS = 100000;
 const PBKDF2_KEY_LEN = 256; // bits (32 bytes)
 
 function uint8ToBase64(bytes) {
@@ -96,7 +96,7 @@ const saltHashUtils = {
 		// Check if storedHash uses PBKDF2 format
 		if (storedHash.startsWith('pbkdf2:')) {
 			const parts = storedHash.split(':');
-			const iterations = parseInt(parts[1], 10) || PBKDF2_ITERATIONS;
+			const iterations = Math.min(parseInt(parts[1], 10) || PBKDF2_ITERATIONS, 100000);
 			const expectedBase64 = parts[2];
 
 			const keyMaterial = await crypto.subtle.importKey(

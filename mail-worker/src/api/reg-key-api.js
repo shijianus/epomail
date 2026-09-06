@@ -9,8 +9,8 @@ app.post('/regKey/add', async (c) => {
 })
 
 app.get('/regKey/list', async (c) => {
-	const list = await regKeyService.list(c, c.req.query());
-	 return c.json(result.ok(list));
+	const list = await regKeyService.list(c, c.req.query(), userContext.getUserId(c));
+	return c.json(result.ok(list));
 })
 
 app.delete('/regKey/delete', async (c) => {
@@ -24,6 +24,6 @@ app.delete('/regKey/clearNotUse', async (c) => {
 })
 
 app.get('/regKey/history', async (c) => {
-	const list = await regKeyService.history(c, c.req.query());
+	const list = await regKeyService.history(c, c.req.query(), userContext.getUserId(c));
 	return c.json(result.ok(list));
 })

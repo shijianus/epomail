@@ -76,30 +76,6 @@
 
           <!-- Right Side: Analytics Dashboard -->
           <div class="profile-analysis">
-        
-        <!-- Blog Tier Linkage Card -->
-        <div class="blog-linkage-card" v-if="isOwnProfile">
-          <div class="linkage-header">
-            <div class="linkage-title">
-              <Icon icon="lucide:book-open" class="title-ic" width="18" height="18" />
-              <span>blog.epomail.com 书友分级特权联动</span>
-            </div>
-            <el-button type="primary" size="small" round :loading="syncingBlog" @click="syncBlogLevelHandler">
-              <Icon icon="lucide:refresh-cw" width="13" height="13" style="margin-right: 4px;" />
-              一键同步博客等级
-            </el-button>
-          </div>
-          <div class="linkage-content">
-            <div class="tier-pill-group">
-              <span class="curr-tier-badge">{{ blogLevelText }}</span>
-              <span class="curr-quota-badge">{{ blogQuotaText }}</span>
-            </div>
-            <div class="linkage-hint">
-              博客书友在 <strong>blog.epomail.com</strong> 的注册、阅读与优质讨论将自动转化为 EpoMail 存储配额与附件特权。
-            </div>
-          </div>
-        </div>
-
         <div class="section-heading">账户数据与分析看板</div>
 
         <!-- Top Gradient Cards -->
@@ -210,7 +186,6 @@ import StatusBar from '@/layout/status-bar/index.vue'
 import Header from '@/layout/header/index.vue'
 import { parseInlineMarkdown } from "@/utils/md-parser.js"
 import { cvtR2Url } from "@/utils/convert.js"
-import { userSyncBlogLevel } from "@/request/user.js"
 import { ElMessage } from "element-plus"
 
 const uiStore = useUiStore()
@@ -380,41 +355,6 @@ const fetchProfile = () => {
     })
 }
 
-const syncingBlog = ref(false)
-
-const blogLevelText = computed(() => {
-  const b = userStore.user?.blogLevel
-  if (b?.levelName) return `博客等级：${b.levelName}`
-  const roleCode = userStore.user?.role?.roleCode || ''
-  if (roleCode === 'user_lv1') return '博客等级：LV.1 活跃学者'
-  if (roleCode === 'user_lv0') return '博客等级：LV.0 认证书友'
-  if (roleCode === 'master') return '博客等级：站长学者'
-  return '博客等级：未认证读者'
-})
-
-const blogQuotaText = computed(() => {
-  const role = userStore.user?.role
-  if (!role) return '基础配额'
-  if (role.roleCode === 'master') return '空间无限制 · 发件无限制'
-  return `${role.storageQuotaMb || 5}MB 存储 · 每日 ${role.sendCount || 5} 封 · ${role.allowAttachment ? '支持附件' : '纯文本'}`
-})
-
-const syncBlogLevelHandler = () => {
-  syncingBlog.value = true
-  userSyncBlogLevel().then(res => {
-    ElMessage({
-      message: res?.message || '博客书友等级同步成功！',
-      type: res?.synced ? 'success' : 'info',
-      plain: true
-    })
-    fetchProfile()
-    userStore.initUser?.()
-  }).catch(err => {
-    ElMessage.error(err?.message || '同步博客等级失败')
-  }).finally(() => {
-    syncingBlog.value = false
-  })
-}
 
 onMounted(() => {
     fetchProfile()
@@ -714,71 +654,7 @@ const hideTooltip = () => {
   flex-direction: column;
   gap: 16px;
 
-  .blog-linkage-card {
-    background: var(--bg-surface);
-    border: 1px solid var(--border-subtle);
-    border-radius: 14px;
-    padding: 14px 18px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
 
-    .linkage-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 10px;
-
-      .linkage-title {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        font-size: 14px;
-        font-weight: 700;
-        color: var(--text-primary);
-
-        .title-ic {
-          color: #6366f1;
-        }
-      }
-    }
-
-    .linkage-content {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-
-      .tier-pill-group {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        flex-wrap: wrap;
-
-        .curr-tier-badge {
-          font-size: 12px;
-          font-weight: 600;
-          background: rgba(99, 102, 241, 0.12);
-          color: #6366f1;
-          padding: 3px 10px;
-          border-radius: 6px;
-          border: 1px solid rgba(99, 102, 241, 0.25);
-        }
-
-        .curr-quota-badge {
-          font-size: 12px;
-          color: var(--text-secondary);
-          background: var(--bg-surface-variant);
-          padding: 3px 10px;
-          border-radius: 6px;
-          border: 1px solid var(--border-subtle);
-        }
-      }
-
-      .linkage-hint {
-        font-size: 12px;
-        color: var(--text-muted);
-        line-height: 1.5;
-      }
-    }
-  }
 
   .section-heading {
     font-size: 17px;

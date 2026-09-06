@@ -154,48 +154,7 @@
       </div>
     </div>
 
-    <!-- Section: 博客书友等级与特权联动 -->
-    <div class="container">
-      <div class="title" style="display: flex; justify-content: space-between; align-items: center;">
-        <span>博客书友分级联动 (shijianus-blog)</span>
-        <el-button type="primary" size="small" :loading="syncingBlog" @click="handleSyncBlog" style="font-weight: 500;">
-          <Icon icon="lucide:refresh-cw" width="13" height="13" style="margin-right: 4px;" />
-          一键同步博客等级
-        </el-button>
-      </div>
 
-      <!-- 当前书友称号 -->
-      <div class="item">
-        <div>博客等级称号</div>
-        <div>
-          <span class="user-name">
-            <el-tag size="small" type="primary" effect="plain" style="font-weight: 600;">
-              {{ blogTierName }}
-            </el-tag>
-          </span>
-        </div>
-      </div>
-
-      <!-- 享受的特权配额 -->
-      <div class="item">
-        <div>尊享邮局权益</div>
-        <div>
-          <span class="user-name">
-            <span style="font-size: 13px; color: var(--text-secondary);">
-              {{ blogPrivilegeSummary }}
-            </span>
-          </span>
-        </div>
-      </div>
-
-      <!-- 博客进阶说明 -->
-      <div class="item" style="align-items: flex-start;">
-        <div>等级晋升机制</div>
-        <div style="font-size: 12.5px; color: var(--text-muted); line-height: 1.6; max-width: 520px;">
-          在 <strong>blog.epomail.com</strong> 注册并阅读互动，即可直升 LV.0 认证书友（10MB 配额）；累计发表 3 条评论或阅读满 100 分钟升至 LV.1，解锁邮件附件发送特权。
-        </div>
-      </div>
-    </div>
 
     <!-- Section 4: 关联设置与安全凭据 -->
     <div class="container">
@@ -537,7 +496,6 @@ import { Icon } from '@iconify/vue'
 import { useUserStore } from '@/store/user.js'
 import { useSettingStore } from '@/store/setting.js'
 import { updateProfile, uploadImage, getGeo } from '@/request/my.js'
-import { userSyncBlogLevel } from '@/request/user.js'
 import { COUNTRY_OPTIONS, validatePhoneNumber, getDefaultCountryCode, formatPhoneNumber, formatPhoneInput, getMaxPhoneDigits } from '@/utils/phone-validator.js'
 import { ISO_COUNTRIES, getSubdivisionsByCountry, formatStructuredAddress, hasPostalCode, getPostalCodeLabel, getPostalCodePlaceholder, getFlagClass } from '@/utils/geo-data.js'
 
@@ -551,45 +509,6 @@ const userStore = useUserStore()
 const settingStore = useSettingStore()
 
 const langSelect = computed(() => settingStore.lang || 'zh')
-
-const syncingBlog = ref(false)
-
-const blogTierName = computed(() => {
-  const b = userStore.user?.blogLevel
-  if (b?.levelName) return b.levelName
-  const roleCode = userStore.user?.role?.roleCode || ''
-  if (roleCode === 'user_lv1') return 'LV.1 活跃学者'
-  if (roleCode === 'user_lv0') return 'LV.0 认证书友'
-  if (roleCode === 'master') return '站长统领'
-  return '未认证书友'
-})
-
-const blogPrivilegeSummary = computed(() => {
-  const role = userStore.user?.role
-  if (!role) return '基础配额'
-  if (role.roleCode === 'master') return '最高管理主权 · 空间与发件无限制'
-  return `${role.storageQuotaMb || 5} MB 空间配额 · 每日上限 ${role.sendCount || 5} 封 · ${role.allowAttachment ? '支持发送附件' : '仅限纯文本'}`
-})
-
-async function handleSyncBlog() {
-  if (syncingBlog.value) return
-  syncingBlog.value = true
-  try {
-    const res = await userSyncBlogLevel()
-    if (res?.message) {
-      ElMessage({
-        message: res.message,
-        type: res.synced ? 'success' : 'info',
-        plain: true
-      })
-    }
-    await userStore.fetchUserInfo?.()
-  } catch (e) {
-    ElMessage.error(e?.message || '同步博客等级失败')
-  } finally {
-    syncingBlog.value = false
-  }
-}
 
 // Modals State
 const avatarDialogShow = ref(false)

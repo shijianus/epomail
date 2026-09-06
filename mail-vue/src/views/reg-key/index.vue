@@ -24,17 +24,24 @@
         <Icon class="icon" icon="fluent:broom-sparkle-16-regular" width="18" height="18"/>
       </div>
     </div>
+    <div v-if="isVisitor" class="visitor-notice-bar">
+      <Icon class="notice-icon" icon="solar:shield-warning-bold" width="16" height="16" />
+      <span>参观者演示模式：注册密钥与使用记录已启用安全脱敏保护，仅供体验管理界面与交互流程，不可复制生产密钥。</span>
+    </div>
 
     <el-scrollbar class="scrollbar">
       <div  class="loading" :class="regKeyLoading ? 'loading-show' : 'loading-hide'" :style="regKeyFirst ? 'background: transparent' : ''">
         <loading/>
       </div>
       <div class="code-box">
-        <div class="code-item" v-for="item in regKeyData">
+        <div class="code-item" v-for="item in regKeyData" :key="item.regKeyId || item.code">
           <div class="code-info">
             <div class="info-left">
-              <div class="info-left-item">
-                <span class="code" @click="copyCode(item.code)">{{ item.code }}</span>
+              <div class="info-left-item code-row">
+                <span class="code" :class="{ 'code-masked': isVisitor || item.isMasked }" @click="copyCode(item)">{{ item.code }}</span>
+                <el-tag v-if="isVisitor || item.isMasked" size="small" type="warning" effect="plain" class="masked-tag">
+                  脱敏保护
+                </el-tag>
               </div>
               <div class="info-left-item">
                 <div>{{ $t('remainingUses') }}：</div>
@@ -56,7 +63,7 @@
                 <Icon icon="fluent:settings-24-filled" width="21" height="21" color="#909399"/>
                 <template #dropdown>
                   <el-dropdown-menu>
-                    <el-dropdown-item @click="copyCode(item.code)">{{ $t('copy') }}</el-dropdown-item>
+                    <el-dropdown-item @click="copyCode(item)">{{ $t('copy') }}</el-dropdown-item>
                     <el-dropdown-item @click="openHistory(item)">{{ $t('history') }}</el-dropdown-item>
                     <el-dropdown-item @click="deleteRegKey(item)">{{ $t('delete') }}</el-dropdown-item>
                   </el-dropdown-menu>
@@ -67,7 +74,9 @@
         </div>
       </div>
       <div class="empty" v-if="regKeyData.length === 0">
-        <el-empty v-if="!regKeyFirst" :image-size="isMobile ? 120 : null" :description="$t('noCodeFound')"/>
+        <div class="empty-baseplate" v-if="!regKeyFirst">
+          <el-empty :image-size="isMobile ? 120 : null" :description="$t('noCodeFound')"/>
+        </div>
       </div>
     </el-scrollbar>
     <el-dialog v-model="showAdd" :title="$t('addRegKey')">
@@ -106,10 +115,11 @@
 </template>
 
 <script setup>
-import {defineOptions, nextTick, reactive, ref, watch} from "vue"
+import {computed, defineOptions, nextTick, reactive, ref, watch} from "vue"
 import {Icon} from "@iconify/vue";
 import loading from "@/components/loading/index.vue";
 import {useSettingStore} from "@/store/setting.js";
+import {useUserStore} from "@/store/user.js";
 import {roleSelectUse} from "@/request/role.js";
 import {useRoleStore} from "@/store/role.js";
 import {regKeyAdd, regKeyList, regKeyClearNotUse, regKeyDelete, regKeyHistory} from "@/request/reg-key.js";
@@ -122,6 +132,14 @@ defineOptions({
   name: 'reg-key'
 })
 
+const userStore = useUserStore();
+if (!userStore.user?.userId) {
+  userStore.refreshUserInfo();
+}
+const isVisitor = computed(() => {
+  const r = userStore.user?.role;
+  return r?.roleCode === 'visitor' || r?.name === '参观者' || r?.key === 'visitor' || regKeyData.some(item => item.isMasked);
+});
 const roleStore = useRoleStore();
 const settingStore = useSettingStore();
 const params = reactive({
@@ -268,7 +286,17 @@ function getList(showLoading = false) {
   })
 }
 
-async function copyCode(code) {
+async function copyCode(itemOrCode) {
+  const code = typeof itemOrCode === 'object' ? itemOrCode?.code : itemOrCode;
+  const isItemMasked = typeof itemOrCode === 'object' ? itemOrCode?.isMasked : false;
+  if (isVisitor.value || isItemMasked || (typeof code === 'string' && code.includes('•'))) {
+    ElMessage({
+      message: '参观者演示模式：注册密钥已启用脱敏保护，禁止复制！',
+      type: 'warning',
+      plain: true,
+    });
+    return;
+  }
   try {
     await navigator.clipboard.writeText(code);
     ElMessage({
@@ -443,6 +471,29 @@ function openAdd() {
               text-overflow: ellipsis;
               cursor: pointer;
             }
+
+            &.code-row {
+              align-items: center;
+              gap: 8px;
+
+              .code-masked {
+                letter-spacing: 2px;
+                color: var(--text-secondary, #94a3b8);
+                cursor: not-allowed !important;
+                user-select: none;
+              }
+
+              .masked-tag {
+                font-size: 11px;
+                height: 20px;
+                line-height: 18px;
+                padding: 0 6px;
+                border-radius: 4px;
+                background: rgba(245, 158, 11, 0.1);
+                border-color: rgba(245, 158, 11, 0.25);
+                color: #d97706;
+              }
+            }
           }
 
           .info-left-item:first-child {
@@ -461,11 +512,55 @@ function openAdd() {
   }
 }
 
+.visitor-notice-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 18px;
+  background: rgba(245, 158, 11, 0.08);
+  border-bottom: 1px solid rgba(245, 158, 11, 0.2);
+  color: #b45309;
+  font-size: 13px;
+  line-height: 1.5;
+  font-weight: 500;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+
+  .notice-icon {
+    flex-shrink: 0;
+    color: #f59e0b;
+  }
+}
+
 .empty {
   display: flex;
   justify-content: center;
   align-items: center;
-  height: 100%;
+  min-height: 360px;
+  padding: 40px 20px;
+
+  .empty-baseplate {
+    background: var(--bg-surface, #ffffff);
+    padding: 36px 48px;
+    border-radius: 16px;
+    border: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.08));
+    box-shadow: 0 4px 20px -4px rgba(0, 0, 0, 0.06);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+
+    :deep(.el-empty) {
+      padding: 0;
+
+      .el-empty__description p {
+        color: var(--text-secondary, #64748b);
+        font-weight: 500;
+        font-size: 14px;
+      }
+    }
+  }
 }
 
 :deep(.history-list.el-dialog) {
@@ -626,6 +721,32 @@ function openAdd() {
       border-color: rgba(99, 102, 241, 0.5) !important;
       color: #818cf8 !important;
     }
+  }
+
+  .reg-key .visitor-notice-bar {
+    background: rgba(245, 158, 11, 0.15) !important;
+    border-bottom-color: rgba(245, 158, 11, 0.3) !important;
+    color: #fbbf24 !important;
+
+    .notice-icon {
+      color: #fbbf24 !important;
+    }
+  }
+
+  .reg-key .empty .empty-baseplate {
+    background: var(--bg-surface, #1e293b) !important;
+    border-color: var(--border-subtle, rgba(255, 255, 255, 0.1)) !important;
+    box-shadow: 0 4px 20px -4px rgba(0, 0, 0, 0.4) !important;
+
+    :deep(.el-empty__description p) {
+      color: #94a3b8 !important;
+    }
+  }
+
+  .reg-key .code-box .code-item .code-row .masked-tag {
+    background: rgba(245, 158, 11, 0.18) !important;
+    border-color: rgba(245, 158, 11, 0.4) !important;
+    color: #fbbf24 !important;
   }
 }
 

@@ -47,12 +47,12 @@
           <template #default="props">
             <div class="role-name-cell">
               <span class="role-title">{{ props.row.name }}</span>
-              <span v-if="props.row.isDefault"><el-tag size="small" effect="dark" class="role-tag def-tag">{{ $t('default') }}</el-tag></span>
               <span v-if="getRoleBadge(props.row)" class="custom-badge-wrapper">
                 <span class="custom-role-badge" :style="getRoleBadgeStyle(props.row)">
                   {{ getRoleBadge(props.row).text }}
                 </span>
               </span>
+              <span v-if="props.row.isDefault"><el-tag size="small" effect="dark" class="role-tag def-tag">{{ $t('default') }}</el-tag></span>
             </div>
           </template>
         </el-table-column>
@@ -136,8 +136,7 @@
       </el-table>
     </el-scrollbar>
 
-    <!-- Role Add / Edit Dialog (Zero-Scrollbar 2-Column Split) -->
-    <el-dialog top="6vh" class="dialog role-form-dialog" v-model="roleFormShow" @closed="resetForm" :width="'min(860px, 95vw)'" align-center>
+    <el-dialog class="dialog role-form-dialog" v-model="roleFormShow" @closed="resetForm" :width="'min(860px, 95vw)'" align-center>
       <template #header>
         <div class="dialog-title-bar">
           <span style="font-size: 16.5px; font-weight: 600;">{{ dialogType.title }}</span>
@@ -267,6 +266,7 @@
             <el-tree
                 :expand-on-click-node="false"
                 :check-on-click-node="false"
+                accordion
                 ref="tree"
                 :data="treeList"
                 show-checkbox
@@ -1177,8 +1177,8 @@ window.onresize = () => {
 
 /* Preset Template Buttons */
 .preset-templates {
-  background: var(--bg-surface-variant, #f8fafc);
-  border: 1px dashed var(--border-subtle, #cbd5e1);
+  background: var(--bg-elevated, #f8fafc);
+  border: 1px dashed var(--border-mid, #cbd5e1);
   padding: 10px 12px;
   border-radius: 8px;
   margin-bottom: 6px;
@@ -1218,7 +1218,7 @@ window.onresize = () => {
     display: flex;
     align-items: center;
     gap: 6px;
-    background: var(--bg-surface-variant, #f8fafc);
+    background: var(--bg-elevated, #f8fafc);
     border: 1px solid var(--border-subtle, #e2e8f0);
     border-radius: 8px;
     padding: 0 8px;
@@ -1240,7 +1240,7 @@ window.onresize = () => {
   margin-bottom: 10px;
 
   .pair-item {
-    background: var(--bg-surface-variant, #f8fafc);
+    background: var(--bg-elevated, #f8fafc);
     border: 1px solid var(--border-subtle, #e2e8f0);
     border-radius: 8px;
     padding: 8px 12px;
@@ -1266,9 +1266,9 @@ window.onresize = () => {
   }
 }
 
-/* 2-Column Dialog Layout (Zero Scrollbar) */
+/* 2-Column Dialog Layout (Zero Scrollbar & Centered) */
 :deep(.el-dialog:not(.role-hierarchy-dialog):not(.role-form-dialog)) {
-  margin-bottom: 20px !important;
+  margin: auto !important;
   width: 520px !important;
   border-radius: 14px;
   @media (max-width: 540px) {
@@ -1281,7 +1281,7 @@ window.onresize = () => {
   width: min(860px, 95vw) !important;
   border-radius: 16px;
   overflow: visible !important;
-  margin-bottom: 20px !important;
+  margin: auto !important;
 
   .el-dialog__body {
     padding: 16px 22px 22px;
@@ -1330,10 +1330,29 @@ window.onresize = () => {
   .perm-tree-wrap {
     border: 1px solid var(--border-subtle, #e2e8f0);
     border-radius: 10px;
-    padding: 10px 12px;
-    background: var(--bg-surface-variant, #f8fafc);
+    padding: 8px 10px;
+    background: var(--bg-elevated, #f8fafc);
     max-height: 330px;
     overflow-y: auto;
+
+    :deep(.el-tree) {
+      background: transparent !important;
+      color: var(--text-primary);
+    }
+
+    :deep(.el-tree-node__content) {
+      border-radius: 6px;
+      margin: 1px 0;
+      color: var(--text-primary);
+
+      &:hover {
+        background: var(--bg-hover, #f1f5f9) !important;
+      }
+    }
+
+    :deep(.el-tree-node:focus > .el-tree-node__content) {
+      background: var(--bg-hover, #f1f5f9) !important;
+    }
   }
 
   .visitor-dialog-notice {
@@ -1578,8 +1597,26 @@ window.onresize = () => {
   .form-grid-pair .pair-item,
   .modal-col-right .perm-tree-wrap,
   .tag-picker-row .color-picker-box {
-    background: rgba(255, 255, 255, 0.04) !important;
-    border-color: var(--border-subtle, #334155) !important;
+    background: var(--bg-elevated, #1e293b) !important;
+    border-color: var(--border-subtle, rgba(99, 102, 241, 0.18)) !important;
+  }
+
+  .modal-col-right .perm-tree-wrap {
+    :deep(.el-tree) {
+      background: transparent !important;
+      color: var(--text-primary, #f8fafc) !important;
+    }
+
+    :deep(.el-tree-node__content) {
+      color: var(--text-primary, #f8fafc) !important;
+      &:hover {
+        background: var(--bg-hover, #1f293d) !important;
+      }
+    }
+
+    :deep(.el-tree-node:focus > .el-tree-node__content) {
+      background: var(--bg-hover, #1f293d) !important;
+    }
   }
 
   .role-card {

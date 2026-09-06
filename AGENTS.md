@@ -12,6 +12,33 @@
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
 
+### 角色默认赋予参观者、默认徽章后置、弹窗绝对垂直居中与互斥拉伸、注册码脱敏保护与空状态背板上线 (2026-09-06)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **隐式化博客联动与冗余显式 UI 剔除**:
+       - 彻底剔除用户公开详情页的 `.blog-linkage-card`；
+       - 彻底剔除个人设置页（`/settings/profile`）中的显式「博客书友分级联动」Section；
+       - 彻底剔除顶栏头像下拉菜单中的 `.am-storage` 显式存储栏、`.am-blog-tier` 显式书友等级项以及菜单项内的旧版 `ic iconify--lucide` 图标，实现博客身份隐式映射与特权自适应，还原本体系统的极简纯净。
+    2. **角色管理弹窗水平垂直绝对居中、权限树互斥拉伸 (Accordion) 与暗色无白斑**:
+       - 移除角色表单弹窗 (`.role-form-dialog`) 上写死的 `top="6vh"` 限制，启用 Element Plus 原生 `align-center` 与 `margin: auto !important`，经 Playwright 自动化视口（1440x900）精确审计：`实际 Y = 159.875px === 预期 Y = 159.875px`，实现微米级完美绝对居中；
+       - 为权限树 (`el-tree`) 注入 `accordion` 互斥拉伸机制，同级分支展开时前一个展开节点自动平滑收起，彻底避免权限树超长撑大；
+       - 全面重构 `.perm-tree-wrap`、`.preset-templates`、`.pair-item`、`.color-picker-box` 的背景与边框变量，使用 `var(--bg-elevated)` 并为深色模式配置独立暗色规则，杜绝亮色白斑。
+    3. **默认标识 (`def-tag`) 顺序后置与系统默认角色确立为「参观者 (Visitor)」**:
+       - 将角色表格中的默认徽章（`.role-tag.def-tag`）调整至自定义身份标签（`.custom-role-badge`）之后，视觉层次更符合主副阅读流；
+       - 将系统全局默认分组正式确立为「参观者 (visitor)」：在 D1 数据库、后端 `roleService.ensureStandardRoles` 以及初始化脚本中固化 `visitor` 的 `is_default = 1`（普通用户为 0），确保所有新注册用户默认以参观者沙箱身份安全体验。
+    4. **注册密钥空状态卡片背板渲染与参观者全链路脱敏安全防护**:
+       - 为注册密钥列表（`/invite-code`）的 `.empty` 区域设计专属实心磨砂背板容器（`.empty-baseplate`），配置 `var(--bg-surface)`、16px 圆角、细腻微投影与高对比边框，完美适配明亮/暗黑双模式，杜绝图标与提示文字失真看不见；
+       - **后端安全脱敏**: 在 `regKeyService.list` 与 `/api/regKey/list` 中对参观者（Visitor）请求实施只读脱敏，所有密钥明文替换为 `••••••••••••••••` 且挂载 `isMasked: true`；在 `regKeyService.history` 中对参观者屏蔽所有用户使用记录并直接返回 `[]`；
+       - **前端界面交互防护**: 参观者进入页面顶部显式渲染 `.visitor-notice-bar` 演示脱敏警示条，卡片附带 `.masked-tag`「脱敏保护」徽章，并在点击密钥或下拉复制时彻底拦截剪贴板写入并弹出 Warning 提示（`参观者演示模式：注册密钥已启用脱敏保护，禁止复制！`）；
+       - **PBKDF2 算法与 Cloudflare Workers Web Crypto 兼容优化**: 将 `crypto-utils.js` 中的 PBKDF2 迭代轮数安全调整为 100,000，完美适配 Cloudflare Workers 单次派生最大迭代限制，避免运行期 `iteration counts above 100000 are not supported` 异常。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **Cloudflare Workers 部署 Version ID**: `c3da6be8-8e60-4beb-ac27-38e00949acfb`。
+    - **epocanvas-mail Git Commit**: `d611ac9380acd742855d1ad94547df9e99b16d26` (Short Hash: `d611ac9`)。
+    - 自动化测试套件 100% 顺利通过：
+      - `node tests/test-visitor-defaults-and-masking.mjs` (默认角色确认为参观者、def-tag 后置审计、弹窗精确垂直居中审计、el-tree 互斥拉伸展开测试、博客显式 UI 彻底剔除验证、.empty 磨砂背板实心与边框核验、参观者后端数据脱敏与使用历史阻断、前端脱敏警示条与点击复制拦截闭环、零假数据自动清理 100% 全部通过);
+      - `node tests/test-profile-cover-sync.mjs` (个人背景封面全链路同步回归 100% 通过);
+      - `node --loader ./tests/esm-loader.mjs tests/test-role-permissions-backend-logic.mjs` (配额分级计算、协管者防越权三大拦截、参观者发信禁止与纯文本附件阻断、博客等级进阶算法 100% 通过);
+      - `node --loader ./tests/esm-loader.mjs tests/test-storage-and-db-hub-e2e.mjs` (存储与核心数据库管理中心回归 100% 通过)。
+
 ### 角色UI视觉精细化美化、配额单行智能单位转换、纯净角色尊荣标识、新建/编辑角色860px双列绝对无滑块与博客联动全场景贯通上线 (2026-09-06)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **配额徽章 (`quota-badge`) 严格单行与智能单位转换**:

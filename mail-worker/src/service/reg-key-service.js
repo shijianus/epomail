@@ -5,6 +5,7 @@ import roleService from './role-service';
 import BizError from '../error/biz-error';
 import { formatDetailDate, toUtc } from '../utils/date-uitil';
 import userService from './user-service';
+import userContext from '../security/user-context';
 import { t } from '../i18n/i18n.js';
 
 const regKeyService = {
@@ -52,11 +53,30 @@ const regKeyService = {
 		await orm(c).delete(regKey).where(or(eq(regKey.count, 0),sql`datetime(${regKey.expireTime}, '+8 hours') < datetime(${now})`)).run();
 	},
 
+	async isCallerVisitor(c, callerUserId) {
+		if (callerUserId) {
+			const caller = await userService.selectById(c, callerUserId);
+			if (caller) {
+				const callerRole = await roleService.selectById(c, caller.type);
+				if (callerRole?.roleCode === 'visitor' || callerRole?.name === '参观者' || callerRole?.key === 'visitor') {
+					return true;
+				}
+			}
+		}
+		try {
+			const u = userContext.getUser(c);
+			if (u?.role?.roleCode === 'visitor' || u?.role?.name === '参观者' || u?.role?.key === 'visitor') {
+				return true;
+			}
+		} catch (e) {}
+		return false;
+	},
+
 	selectByCode(c, code) {
 		return orm(c).select().from(regKey).where(eq(regKey.code, code)).get();
 	},
 
-	async list(c, params) {
+	async list(c, params, callerUserId) {
 
 		const {code} = params
 		let query = orm(c).select().from(regKey)
@@ -67,6 +87,7 @@ const regKeyService = {
 
 		const regKeyList = await query.orderBy(desc(regKey.regKeyId)).all();
 		const roleList = await roleService.roleSelectUse(c);
+		const isVisitor = await this.isCallerVisitor(c, callerUserId);
 
 		const today = toUtc().tz('Asia/Shanghai').startOf('day')
 
@@ -79,6 +100,11 @@ const regKeyService = {
 
 			if (expireTime.isBefore(today)) {
 				regKeyRow.expireTime = null
+			}
+
+			if (isVisitor) {
+				regKeyRow.code = '••••••••••••••••';
+				regKeyRow.isMasked = true;
 			}
 		})
 
@@ -93,7 +119,11 @@ const regKeyService = {
 		}).where(eq(regKey.code, code)).run();
 	},
 
-	async history(c, params) {
+	async history(c, params, callerUserId) {
+		const isVisitor = await this.isCallerVisitor(c, callerUserId);
+		if (isVisitor) {
+			return [];
+		}
 		const { regKeyId } = params;
 		return userService.listByRegKeyId(c, regKeyId);
 	}
