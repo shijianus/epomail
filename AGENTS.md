@@ -11,6 +11,31 @@
    - 在向用户输出回复时，必须置顶/显式打印出本次提交的完整 Commit Hash 与短 Hash，确保版本可追溯、审计记录完整。
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
+### OAuth应用管理卡片极小化、隐去回调地址、解除按钮冲突与引导至博客开发教程上线 (2026-09-06)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **OAuth 应用卡片极小化与空间紧缩 (app-card Compact Layout)**:
+       - 彻底从 `.app-card` 隐去冗长的授权回调地址列表（`.app-uris-box`），避免多个 Redirect URI 撑大卡片纵向高度；
+       - 卡片主体高度自原先约 380px 大幅压缩至 209px（压缩超 45%），整体网格调整为 `grid-template-columns: repeat(auto-fill, minmax(320px, 1fr))` 与 14px 紧凑间隙，使人眼可在一屏内一览无余查看所有已接入应用；
+       - 应用 Logo 尺寸精简为 36x36px，描述信息单行自适应省略（悬停 Title 提示），凭据框（Client ID / Client Secret）采用极简单行键值对与一键复制/重置交互，底栏操作按钮高度压缩至 26px。
+    2. **解除按钮冲突与理顺操作层级**:
+       - 根除顶栏 `guide-btn` 与卡片底栏 `.action-btn`（集成代码）的语义与功能冲突；
+       - 彻底移除无实际业务意义的协议徽章 `protocol-tag`（`OIDC Core 1.0 / RFC 6749 Ready`）；
+       - 将顶栏 `guide-btn` 重新定位为官方「开发接入教程」引导入口，配置 `fluent:book-open-20-regular` 与外链图标，悬停呈现详尽 Tooltip，点击平滑在新标签页打开官方博客教程（`https://blog.epocanvas.com`）；
+       - 卡片底栏保留面向该应用的专属「集成代码」生成器（`.action-btn`），保证 Playground 代码快速生成与 E2E 测试兼容无缝。
+    3. **图标体系彻底统一与 Lucide 零残留**:
+       - 全面清理 `oauth-app/index.vue` 中残留的 `lucide:` 系列图标（包括 `lucide:copy`、`lucide:external-link`、`lucide:edit-3`、`lucide:trash-2`、`lucide:refresh-cw` 等）；
+       - 统一升级替换为高清矢量 `fluent:` 体系（`fluent:copy-16-regular`、`fluent:open-16-regular`、`fluent:edit-16-regular`、`fluent:delete-16-regular`、`fluent:arrow-clockwise-16-regular` 等）。
+    4. **深色/浅色双模式与空状态微交互优化**:
+       - 全面重构 `.app-card`、`.app-credentials-box`、`.endpoint-chip` 与 `.empty-apps-box` 的 CSS 变量系统，适配 `var(--bg-surface)`、`var(--bg-elevated)` 与 `var(--border-subtle)`；
+       - 深色模式下无任何刺眼白斑，提供柔和阴影与悬停微平移（`-1px translateY`）高质感反馈；
+       - 空状态增加一键直达博客开发教程次级按钮，提升新接入开发者的指引体验。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **Cloudflare Workers 部署 Version ID**: `dd2d3d23-86f1-4512-b578-e4e18e1e954c`。
+    - **epocanvas-mail Git Commit**: `3bed5bb31b8559d4885d1391b0aa8e4e7cada492` (Short Hash: `3bed5bb`)。
+    - 自动化测试套件 100% 顺利通过：
+      - `node tests/test-oauth-apps-ui-optimization.mjs` (protocol-tag 彻底剔除验证、guide-btn 文档教程提示与博客跳转验证、app-card 回调地址去除核验、卡片高度 <= 210px 压缩审计、底栏三大操作按钮核验、明亮/暗黑双模式截图生成与无白斑验证 100% 全部通过);
+      - `node tests/test-admin-oauth-apps-and-authorize.mjs` (OAuth 应用全生命周期创建、Secret GitHub 风格弹窗、Playground 代码生成器验证、标准 OIDC /oauth/authorize 授权确认页、Code 捕获与 Token 置换、UserInfo 与 Discovery 端点验证、零假数据自动清理 100% 全部通过);
+      - `node tests/test-identity-sync-and-scrollbar-wrap.mjs` (Admin 登录获取 Token、身份组站长同步、/admin 资料页验证、/invite-code 整体模板底板、暗黑模式模板底板与流畅度 100% 全部通过)。
 
 ### 彻底清理lucide残留、真实身份组同步、el-scrollbar__wrap全局模板底板与界面流畅度优化上线 (2026-09-06)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
