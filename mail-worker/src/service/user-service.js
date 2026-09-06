@@ -204,6 +204,17 @@ const userService = {
 		};
 		user.totpEnabled = userRow.totpEnabled === 1;
 
+		// Fast blog level metadata
+		const roleCode = roleRow?.roleCode || '';
+		const isLv1 = roleCode === 'user_lv1';
+		const isLv0 = roleCode === 'user_lv0';
+		user.blogLevel = {
+			level: isLv1 ? 1 : (isLv0 ? 0 : 0),
+			levelName: isLv1 ? '活跃学者' : (isLv0 ? '认证书友' : (roleCode === 'master' ? '站长统领' : '普通读者')),
+			badge: isLv1 ? 'LV.1 活跃学者' : (isLv0 ? 'LV.0 认证书友' : '未认证'),
+			hasBlogAccount: isLv0 || isLv1
+		};
+
 		return user;
 	},
 
@@ -549,12 +560,23 @@ const userService = {
 		const userRow = await this.selectById(c, userId);
 		if (!userRow) throw new BizError(t('notExistUser'));
 
+		const defaultTiers = [
+			{ level: 0, name: '认证书友', quotaMb: 10, sendCount: 8, requirement: '在 blog.epomail.com 注册并激活账号', allowAttachment: 0 },
+			{ level: 1, name: '活跃学者', quotaMb: 25, sendCount: 10, requirement: '注册满 10 天且发表 3 条评论，或累计阅读时长达到 100 分钟', allowAttachment: 1 },
+			{ level: 2, name: '资深贡献者', quotaMb: 50, sendCount: 20, requirement: '注册满 90 天且获赞 30 次，或发表 20 条优质讨论', allowAttachment: 1 },
+			{ level: 3, name: '终身学者', quotaMb: 100, sendCount: 50, requirement: '注册满 180 天且获赞 100 次，享有至尊特权', allowAttachment: 1 }
+		];
+
 		let blogLevelInfo = null;
 		try {
 			const blogUrl = (c.env.BLOG_BASE_URL || 'https://blog.epocanvas.com').replace(/\/+$/, '');
+			const controller = new AbortController();
+			const timeoutId = setTimeout(() => controller.abort(), 2500);
 			const resp = await fetch(`${blogUrl}/api/auth/user-level?email=${encodeURIComponent(userRow.email)}`, {
-				headers: { 'Accept': 'application/json' }
+				headers: { 'Accept': 'application/json' },
+				signal: controller.signal
 			});
+			clearTimeout(timeoutId);
 			if (resp.ok) {
 				blogLevelInfo = await resp.json();
 			}
@@ -569,12 +591,17 @@ const userService = {
 				level: 0,
 				levelName: '未认证读者',
 				badge: '未认证',
-				message: '未关联 blog.epomail.com 账号。在博客注册相同邮箱账号即可直升 LV.0 并提升配额！'
+				stats: { daysRegistered: 0, commentsCount: 0, readingMinutes: 0, upvotesCount: 0 },
+				message: '未关联 blog.epomail.com 账号。在博客注册相同邮箱账号即可直升 LV.0 并提升配额！',
+				tiers: defaultTiers,
+				allTiers: defaultTiers
 			};
 		}
 
 		return {
 			hasBlogAccount: true,
+			tiers: defaultTiers,
+			allTiers: defaultTiers,
 			...blogLevelInfo
 		};
 	},

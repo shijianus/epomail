@@ -1,18 +1,28 @@
 <template>
   <div class="reg-key">
     <div class="header-actions">
-      <Icon class="icon" icon="ion:add-outline" width="23" height="23" @click="openAdd"/>
+      <div class="action-btn-pill" @click="openAdd" :title="$t('add')">
+        <Icon class="icon" icon="ion:add-outline" width="20" height="20"/>
+      </div>
       <div class="search">
         <el-input
             v-model="params.code"
             class="search-input"
             :placeholder="$t('searchRegKeyDesc')"
+            @keyup.enter="search"
+            clearable
         >
         </el-input>
       </div>
-      <Icon class="icon" icon="iconoir:search" @click="search" width="20" height="20"/>
-      <Icon class="icon" icon="ion:reload" width="18" height="18" @click="refresh"/>
-      <Icon class="icon" icon="fluent:broom-sparkle-16-regular" width="22" height="22" @click="clearNotUse"/>
+      <div class="action-btn-pill" @click="search" :title="$t('search')">
+        <Icon class="icon" icon="iconoir:search" width="18" height="18"/>
+      </div>
+      <div class="action-btn-pill" @click="refresh" :title="$t('refresh')">
+        <Icon class="icon" icon="ion:reload" width="16" height="16"/>
+      </div>
+      <div class="action-btn-pill" @click="clearNotUse" :title="$t('clearUnused') || '清理无用注册码'">
+        <Icon class="icon" icon="fluent:broom-sparkle-16-regular" width="18" height="18"/>
+      </div>
     </div>
 
     <el-scrollbar class="scrollbar">
@@ -532,15 +542,47 @@ function openAdd() {
 }
 
 .header-actions {
-  padding: 9px 15px;
+  padding: 10px 18px;
   display: flex;
-  gap: 18px;
+  gap: 12px;
   flex-wrap: wrap;
   align-items: center;
-  box-shadow: inset 0 -1px 0 0 rgba(100, 121, 143, 0.12);
-  font-size: 18px;
+  background: var(--bg-surface, rgba(255, 255, 255, 0.9));
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.06));
+  border-radius: 10px 10px 0 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+  font-size: 16px;
   @media (max-width: 767px) {
-    gap: 15px;
+    gap: 10px;
+    padding: 8px 12px;
+  }
+
+  .action-btn-pill {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: var(--bg-surface-variant, rgba(0, 0, 0, 0.04));
+    border: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.08));
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    color: var(--text-primary, #4b5563);
+
+    &:hover {
+      background: var(--primary-color-light, rgba(99, 102, 241, 0.12));
+      border-color: rgba(99, 102, 241, 0.35);
+      color: #6366f1;
+      transform: translateY(-1px);
+      box-shadow: 0 2px 6px rgba(99, 102, 241, 0.18);
+    }
+
+    &:active {
+      transform: translateY(0);
+    }
   }
 
   .search-input {
@@ -548,12 +590,14 @@ function openAdd() {
   }
 
   .search {
-    :deep(.el-input-group) {
-      height: 28px;
+    :deep(.el-input__wrapper) {
+      border-radius: 8px;
     }
-
+    :deep(.el-input-group) {
+      height: 32px;
+    }
     :deep(.el-input__inner) {
-      height: 28px;
+      height: 32px;
     }
   }
 
@@ -564,6 +608,25 @@ function openAdd() {
 
 :deep(.el-table__inner-wrapper:before) {
   background: var(--el-bg-color);
+}
+
+:global(html.dark) {
+  .reg-key .header-actions {
+    background: var(--bg-surface, #1e293b) !important;
+    border-bottom-color: var(--border-subtle, #334155) !important;
+  }
+
+  .reg-key .action-btn-pill {
+    background: rgba(255, 255, 255, 0.06) !important;
+    border-color: rgba(255, 255, 255, 0.12) !important;
+    color: #e2e8f0 !important;
+
+    &:hover {
+      background: rgba(99, 102, 241, 0.25) !important;
+      border-color: rgba(99, 102, 241, 0.5) !important;
+      color: #818cf8 !important;
+    }
+  }
 }
 
 </style>

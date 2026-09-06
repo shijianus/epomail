@@ -1,12 +1,19 @@
 <template>
   <div class="perm-box">
     <div class="header-actions">
-      <el-tooltip :content="$t('addRoleTitle')" placement="bottom">
-        <Icon class="icon icon-btn" icon="ion:add-outline" width="22" height="22" @click="openAddRole"/>
-      </el-tooltip>
-      <el-tooltip :content="$t('refresh')" placement="bottom">
-        <Icon class="icon icon-btn" icon="ion:reload" width="18" height="18" @click="refresh"/>
-      </el-tooltip>
+      <div class="action-btn-group">
+        <el-tooltip :content="$t('addRoleTitle')" placement="bottom">
+          <div class="action-btn-pill" @click="openAddRole">
+            <Icon class="icon-btn" icon="ion:add-outline" width="20" height="20"/>
+          </div>
+        </el-tooltip>
+        <el-tooltip :content="$t('refresh')" placement="bottom">
+          <div class="action-btn-pill" @click="refresh">
+            <Icon class="icon-btn" icon="ion:reload" width="17" height="17"/>
+          </div>
+        </el-tooltip>
+      </div>
+
       <el-button size="small" type="primary" plain class="hierarchy-btn" @click="hierarchyVisible = true">
         <Icon icon="lucide:shield-check" width="16" height="16" style="margin-right: 4px;" />
         架构与分级一览
@@ -41,23 +48,22 @@
             <div class="role-name-cell">
               <span class="role-title">{{ props.row.name }}</span>
               <span v-if="props.row.isDefault"><el-tag size="small" effect="dark" class="role-tag def-tag">{{ $t('default') }}</el-tag></span>
-              <span v-if="props.row.roleCode === 'visitor'"><el-tag size="small" type="info" effect="plain" class="role-tag">参观者 · 沙箱</el-tag></span>
-              <span v-else-if="props.row.roleCode === 'user_base'"><el-tag size="small" type="primary" effect="plain" class="role-tag">普通用户 · 纯文本</el-tag></span>
-              <span v-else-if="props.row.roleCode === 'user_lv0'"><el-tag size="small" type="warning" effect="plain" class="role-tag">博客认证 · LV.0</el-tag></span>
-              <span v-else-if="props.row.roleCode === 'user_lv1'"><el-tag size="small" type="success" effect="plain" class="role-tag">活跃书友 · LV.1 (含附件)</el-tag></span>
-              <span v-else-if="props.row.roleCode === 'moderator'"><el-tag size="small" effect="plain" class="role-tag mod-tag">协管者 · 模块管理</el-tag></span>
-              <span v-else-if="props.row.roleCode === 'master'"><el-tag size="small" type="danger" effect="plain" class="role-tag master-tag">站长 · 最高权限</el-tag></span>
+              <span v-if="getRoleBadge(props.row)" class="custom-badge-wrapper">
+                <span class="custom-role-badge" :style="getRoleBadgeStyle(props.row)">
+                  {{ getRoleBadge(props.row).text }}
+                </span>
+              </span>
             </div>
           </template>
         </el-table-column>
 
-        <el-table-column label="存储配额" width="130">
+        <el-table-column label="存储配额" width="140">
           <template #default="props">
             <div class="quota-badge">
               <Icon icon="lucide:hard-drive" width="14" height="14" class="col-ic" />
-              <span v-if="props.row.storageQuotaMb === 0" class="quota-zero">0 MB (外接DB)</span>
-              <span v-else-if="props.row.roleCode === 'master'" class="quota-master">1024 MB (无限制)</span>
-              <span v-else class="quota-val">{{ props.row.storageQuotaMb }} MB</span>
+              <span v-if="props.row.roleCode === 'master'" class="quota-master">无限制</span>
+              <span v-else-if="props.row.storageQuotaMb === 0" class="quota-zero">0 MB</span>
+              <span v-else class="quota-val">{{ formatQuotaDisplay(props.row.storageQuotaMb, props.row.roleCode) }}</span>
             </div>
           </template>
         </el-table-column>
@@ -75,15 +81,15 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="附件权限" width="135">
+        <el-table-column label="附件权限" width="140">
           <template #default="props">
             <el-tag v-if="props.row.allowAttachment === 1" size="small" type="success" effect="light" class="att-tag">
-              <Icon icon="lucide:paperclip" width="12" height="12" style="margin-right: 3px;" />
-              支持发送附件
+              <Icon icon="lucide:paperclip" width="12" height="12" style="margin-right: 4px;" />
+              开放附件
             </el-tag>
             <el-tag v-else size="small" type="info" effect="plain" class="att-tag">
-              <Icon icon="lucide:file-text" width="12" height="12" style="margin-right: 3px;" />
-              仅纯文本(无附件)
+              <Icon icon="lucide:file-text" width="12" height="12" style="margin-right: 4px;" />
+              仅纯文本
             </el-tag>
           </template>
         </el-table-column>
@@ -130,11 +136,11 @@
       </el-table>
     </el-scrollbar>
 
-    <!-- Role Add / Edit Dialog -->
-    <el-dialog top="5vh" class="dialog role-form-dialog" v-model="roleFormShow" @closed="resetForm">
+    <!-- Role Add / Edit Dialog (Zero-Scrollbar 2-Column Split) -->
+    <el-dialog top="6vh" class="dialog role-form-dialog" v-model="roleFormShow" @closed="resetForm" :width="'min(860px, 95vw)'" align-center>
       <template #header>
         <div class="dialog-title-bar">
-          <span style="font-size: 17px; font-weight: 600;">{{ dialogType.title }}</span>
+          <span style="font-size: 16.5px; font-weight: 600;">{{ dialogType.title }}</span>
           <el-popover width="340" :title="t('featDesc')" placement="bottom">
             <template #reference>
               <Icon class="warning" icon="fe:warning" width="18" height="18"/>
@@ -147,139 +153,161 @@
         </div>
       </template>
 
-      <div class="dialog-box">
-        <!-- Preset Templates Selector -->
-        <div class="preset-templates">
-          <div class="preset-label">
-            <Icon icon="lucide:sparkles" width="14" height="14" style="color: #6366f1; margin-right: 4px;" />
-            快捷套用系统分组模板：
-          </div>
-          <div class="preset-chips">
-            <el-button size="small" round @click="applyTemplate('visitor')">参观者</el-button>
-            <el-button size="small" round @click="applyTemplate('user_base')">普通用户</el-button>
-            <el-button size="small" round @click="applyTemplate('user_lv0')">普通用户 LV.0</el-button>
-            <el-button size="small" round @click="applyTemplate('user_lv1')">普通用户 LV.1</el-button>
-            <el-button size="small" round @click="applyTemplate('moderator')">协管者</el-button>
-            <el-button size="small" round @click="applyTemplate('master')">站长</el-button>
-          </div>
-        </div>
-
-        <div class="form-row">
-          <el-input class="dialog-input" v-model="form.name" type="text" :maxlength="16" :placeholder="$t('roleName')" autocomplete="off"/>
-          <el-input class="dialog-input" v-model="form.roleCode" type="text" :maxlength="20" placeholder="分组标识代码 (如 user_lv0)" autocomplete="off"/>
-        </div>
-
-        <el-input class="dialog-input" v-model="form.description" :maxlength="60" type="text" :placeholder="$t('description')" autocomplete="off"/>
-
-        <!-- Quota & Attachment Grid -->
-        <div class="form-grid-pair">
-          <div class="pair-item">
-            <div class="pair-label">默认存储配额 (MB)</div>
-            <el-input-number 
-              v-model="form.storageQuotaMb" 
-              :min="0" 
-              :max="102400" 
-              controls-position="right" 
-              style="width: 100%;" 
-            />
-            <div class="pair-tip">设为 0 表示不分配空间(参观者需外接DB)</div>
+      <div class="dialog-box role-edit-grid">
+        <!-- Left Column: Attributes & Templates -->
+        <div class="modal-col-left">
+          <!-- Preset Templates Selector -->
+          <div class="preset-templates">
+            <div class="preset-label">
+              <Icon icon="lucide:sparkles" width="13" height="13" style="color: #6366f1; margin-right: 4px;" />
+              快捷套用系统分组模板：
+            </div>
+            <div class="preset-chips">
+              <el-button size="small" round @click="applyTemplate('visitor')">参观者</el-button>
+              <el-button size="small" round @click="applyTemplate('user_base')">普通用户</el-button>
+              <el-button size="small" round @click="applyTemplate('user_lv0')">普通用户 LV.0</el-button>
+              <el-button size="small" round @click="applyTemplate('user_lv1')">普通用户 LV.1</el-button>
+              <el-button size="small" round @click="applyTemplate('moderator')">协管者</el-button>
+              <el-button size="small" round @click="applyTemplate('master')">站长</el-button>
+            </div>
           </div>
 
-          <div class="pair-item">
-            <div class="pair-label">允许发送邮件附件</div>
-            <div class="switch-box">
-              <el-switch 
-                v-model="form.allowAttachment" 
-                :active-value="1" 
-                :inactive-value="0" 
-                active-text="开放附件" 
-                inactive-text="仅纯文本"
+          <div class="form-row">
+            <el-input class="dialog-input" v-model="form.name" type="text" :maxlength="16" :placeholder="$t('roleName')" autocomplete="off"/>
+            <el-input class="dialog-input" v-model="form.roleCode" type="text" :maxlength="20" placeholder="分组代码 (如 user_lv0)" autocomplete="off"/>
+          </div>
+
+          <!-- Tag Text & Tag Color Customizer -->
+          <div class="form-row tag-picker-row">
+            <el-input class="dialog-input" v-model="form.tagText" type="text" :maxlength="10" placeholder="自订标签 (如 活跃学者)" autocomplete="off">
+              <template #prefix>
+                <Icon icon="lucide:tag" width="14" height="14" style="color: var(--text-muted);" />
+              </template>
+            </el-input>
+            <div class="color-picker-box">
+              <el-color-picker v-model="form.tagColor" size="default" :predefine="['#6366f1','#10b981','#06b6d4','#f59e0b','#ef4444','#8b5cf6','#64748b']" />
+              <span class="color-label" :style="{ color: form.tagColor || 'var(--text-secondary)' }">色彩</span>
+            </div>
+          </div>
+
+          <el-input class="dialog-input" v-model="form.description" :maxlength="60" type="text" :placeholder="$t('description')" autocomplete="off"/>
+
+          <!-- Quota & Attachment Grid -->
+          <div class="form-grid-pair">
+            <div class="pair-item">
+              <div class="pair-label">默认存储配额 (MB)</div>
+              <el-input-number 
+                v-model="form.storageQuotaMb" 
+                :min="0" 
+                :max="102400" 
+                controls-position="right" 
+                style="width: 100%;" 
               />
+              <div class="pair-tip">0MB为无存储(参观者需外接DB)</div>
             </div>
-            <div class="pair-tip">LV.1 及以上书友与管理员开放附件</div>
+
+            <div class="pair-item">
+              <div class="pair-label">允许发送邮件附件</div>
+              <div class="switch-box">
+                <el-switch 
+                  v-model="form.allowAttachment" 
+                  :active-value="1" 
+                  :inactive-value="0" 
+                  active-text="开放附件" 
+                  inactive-text="仅纯文本"
+                />
+              </div>
+              <div class="pair-tip">LV.1及以上书友开放附件</div>
+            </div>
+          </div>
+
+          <!-- Ban Email & Avail Domain -->
+          <div class="form-row">
+            <el-input-tag class="dialog-input" tag-type="warning" v-model="form.banEmail"
+                          @add-tag="banEmailAddTag" type="text" :placeholder="$t('emailInterception')" autocomplete="off"/>
+            <el-select
+                class="dialog-input"
+                v-model="form.availDomain"
+                multiple
+                filterable
+                allow-create
+                default-first-option
+                :reserve-keyword="false"
+                tag-type="success"
+                :placeholder="$t('availableDomains')"
+                @change="availDomainChange"
+            >
+              <el-option
+                  v-for="item in domainOptions"
+                  :key="item.value"
+                  :label="item.label"
+                  :value="item.value"
+              />
+            </el-select>
+          </div>
+
+          <div class="dialog-input" style="margin-bottom: 0;">
+            <el-input-number :placeholder="$t('order')" :min="0" :max="9999" v-model.number="form.sort"
+                             controls-position="right" autocomplete="off" style="width: 100%;" />
           </div>
         </div>
 
-        <!-- Ban Email & Avail Domain -->
-        <el-input-tag class="dialog-input" tag-type="warning" v-model="form.banEmail"
-                      @add-tag="banEmailAddTag" type="text" :placeholder="$t('emailInterception')" autocomplete="off"/>
+        <!-- Right Column: Permission Tree & Save Button -->
+        <div class="modal-col-right">
+          <!-- Permission Tree Header -->
+          <div class="perm-tree-header">
+            <span class="perm-title">权限分配细则</span>
+            <el-radio-group v-model="expand" size="small" @change="expandChange" class="perm-expand">
+              <el-radio-button :label="$t('expand')" :value="true"/>
+              <el-radio-button :label="$t('collapse')" :value="false"/>
+            </el-radio-group>
+          </div>
 
-        <el-select
-            class="dialog-input"
-            v-model="form.availDomain"
-            multiple
-            filterable
-            allow-create
-            default-first-option
-            :reserve-keyword="false"
-            tag-type="success"
-            :placeholder="$t('availableDomains')"
-            @change="availDomainChange"
-        >
-          <el-option
-              v-for="item in domainOptions"
-              :key="item.value"
-              :label="item.label"
-              :value="item.value"
-          />
-        </el-select>
+          <div class="perm-tree-wrap">
+            <el-tree
+                :expand-on-click-node="false"
+                :check-on-click-node="false"
+                ref="tree"
+                :data="treeList"
+                show-checkbox
+                node-key="permId"
+                :default-expand-all="expand"
+                :props="{ label: 'name' }"
+            >
+              <template #default="{ node, data }">
+                <div class="tree-node-content">
+                  <span>{{ node.label }}</span>
+                  <span class="send-num" v-if="data.permKey === 'email:send'" @click.stop>
+                    <el-input-number v-if="form.sendType === 'day' || form.sendType === 'count'" v-model="form.sendCount" controls-position="right" :min="0" :max="99999" size="small"
+                                     :placeholder="$t('total')">
+                    </el-input-number>
+                    <el-select v-model="form.sendType" placeholder="Select" size="small"
+                               :style="`width: ${ locale === 'zh' ? 70 : 90 }px; margin-left: 5px;`">
+                      <el-option :label="$t('total')" value="count"/>
+                      <el-option :label="$t('daily')" value="day"/>
+                      <el-option :label="$t('internal')" value="internal"/>
+                      <el-option :label="$t('btnBan')" value="ban"/>
+                    </el-select>
+                  </span>
+                  <span class="send-num" v-if="data.permKey === 'account:add'" @click.stop>
+                    <el-input-number v-model="form.accountCount" controls-position="right" :min="0" :max="99999"
+                                     size="small" :placeholder="$t('total')">
+                    </el-input-number>
+                  </span>
+                </div>
+              </template>
+            </el-tree>
+          </div>
 
-        <div class="dialog-input">
-          <el-input-number :placeholder="$t('order')" :min="0" :max="9999" v-model.number="form.sort"
-                           controls-position="right" autocomplete="off"/>
+          <div v-if="isVisitor" class="visitor-dialog-notice">
+            <Icon icon="solar:info-circle-bold" width="15" height="15" />
+            <span>您当前处于参观者沙箱模式，点击保存将在当前界面模拟生效，不持久化至数据库。</span>
+          </div>
+
+          <el-button class="btn" type="primary" :loading="permLoading" @click="roleFormClick">
+            {{ isVisitor ? '体验保存 (沙箱模拟)' : $t('save') }}
+          </el-button>
         </div>
-
-        <!-- Permission Tree Header -->
-        <div class="perm-tree-header">
-          <span class="perm-title">权限分配细则</span>
-          <el-radio-group v-model="expand" size="small" @change="expandChange" class="perm-expand">
-            <el-radio-button :label="$t('expand')" :value="true"/>
-            <el-radio-button :label="$t('collapse')" :value="false"/>
-          </el-radio-group>
-        </div>
-
-        <el-tree
-            :expand-on-click-node="false"
-            :check-on-click-node="false"
-            ref="tree"
-            :data="treeList"
-            show-checkbox
-            node-key="permId"
-            :default-expand-all="expand"
-            :props="{ label: 'name' }"
-        >
-          <template #default="{ node, data }">
-            <div class="tree-node-content">
-              <span>{{ node.label }}</span>
-              <span class="send-num" v-if="data.permKey === 'email:send'" @click.stop>
-                <el-input-number v-if="form.sendType === 'day' || form.sendType === 'count'" v-model="form.sendCount" controls-position="right" :min="0" :max="99999" size="small"
-                                 :placeholder="$t('total')">
-                </el-input-number>
-                <el-select v-model="form.sendType" placeholder="Select" size="small"
-                           :style="`width: ${ locale === 'zh' ? 70 : 90 }px; margin-left: 5px;`">
-                  <el-option :label="$t('total')" value="count"/>
-                  <el-option :label="$t('daily')" value="day"/>
-                  <el-option :label="$t('internal')" value="internal"/>
-                  <el-option :label="$t('btnBan')" value="ban"/>
-                </el-select>
-              </span>
-              <span class="send-num" v-if="data.permKey === 'account:add'" @click.stop>
-                <el-input-number v-model="form.accountCount" controls-position="right" :min="0" :max="99999"
-                                 size="small" :placeholder="$t('total')">
-                </el-input-number>
-              </span>
-            </div>
-          </template>
-        </el-tree>
-
-        <div v-if="isVisitor" class="visitor-dialog-notice">
-          <Icon icon="solar:info-circle-bold" width="15" height="15" />
-          <span>您当前处于参观者沙箱模式，点击保存将在当前界面模拟生效，不持久化至数据库。</span>
-        </div>
-
-        <el-button class="btn" type="primary" :loading="permLoading" @click="roleFormClick">
-          {{ isVisitor ? '体验保存 (沙箱模拟)' : $t('save') }}
-        </el-button>
       </div>
     </el-dialog>
 
@@ -501,6 +529,8 @@ const dialogType = reactive({
 const form = reactive({
   name: null,
   roleCode: 'custom',
+  tagText: '',
+  tagColor: '#6366f1',
   description: null,
   storageQuotaMb: 5,
   allowAttachment: 0,
@@ -512,6 +542,41 @@ const form = reactive({
   isDefault: 0,
   availDomain: []
 });
+
+function formatQuotaDisplay(mb, roleCode) {
+  if (roleCode === 'master') return '无限制';
+  if (!mb || mb === 0) return '0 MB';
+  if (mb >= 1024) {
+    const gb = mb / 1024;
+    return (Number.isInteger(gb) ? gb : Number(gb.toFixed(1))) + ' GB';
+  }
+  return mb + ' MB';
+}
+
+function getRoleBadge(row) {
+  if (row.tagText && row.tagText !== 'tag_text') {
+    return { text: row.tagText, color: row.tagColor && row.tagColor !== 'tag_color' ? row.tagColor : '#6366f1' };
+  }
+  const defaults = {
+    visitor: { text: '开源体验', color: '#6366f1' },
+    user_base: { text: '基础成员', color: '#64748b' },
+    user_lv0: { text: '认证书友', color: '#10b981' },
+    user_lv1: { text: '活跃学者', color: '#06b6d4' },
+    moderator: { text: '协同管理', color: '#f59e0b' },
+    master: { text: '最高统领', color: '#ef4444' }
+  };
+  return defaults[row.roleCode] || (row.name ? { text: '自定义组', color: '#8b5cf6' } : null);
+}
+
+function getRoleBadgeStyle(row) {
+  const badge = getRoleBadge(row);
+  if (!badge) return {};
+  return {
+    color: badge.color,
+    borderColor: badge.color + '44',
+    backgroundColor: badge.color + '18'
+  };
+}
 
 let domainOptions = [];
 const expand = ref(false);
@@ -583,6 +648,8 @@ function applyTemplate(type) {
     case 'visitor':
       form.name = '参观者';
       form.roleCode = 'visitor';
+      form.tagText = '开源体验';
+      form.tagColor = '#6366f1';
       form.description = '开源体验与巡检用户，全功能UI交互沙箱，无持久化写入权限，配额0MB';
       form.storageQuotaMb = 0;
       form.allowAttachment = 0;
@@ -595,6 +662,8 @@ function applyTemplate(type) {
     case 'user_base':
       form.name = '普通用户';
       form.roleCode = 'user_base';
+      form.tagText = '基础成员';
+      form.tagColor = '#64748b';
       form.description = '默认注册用户，具备基础使用权限，纯文本收发(无附件)，每日5封上限';
       form.storageQuotaMb = 5;
       form.allowAttachment = 0;
@@ -607,6 +676,8 @@ function applyTemplate(type) {
     case 'user_lv0':
       form.name = '普通用户 LV.0';
       form.roleCode = 'user_lv0';
+      form.tagText = '认证书友';
+      form.tagColor = '#10b981';
       form.description = '已注册/绑定 blog.epomail.com 博客用户，配额提升至10MB，每日8封发信权';
       form.storageQuotaMb = 10;
       form.allowAttachment = 0;
@@ -619,6 +690,8 @@ function applyTemplate(type) {
     case 'user_lv1':
       form.name = '普通用户 LV.1';
       form.roleCode = 'user_lv1';
+      form.tagText = '活跃学者';
+      form.tagColor = '#06b6d4';
       form.description = '参与博客讨论与活跃互动的进阶用户，配额25MB，每日10封，开放附件发送权限';
       form.storageQuotaMb = 25;
       form.allowAttachment = 1;
@@ -631,6 +704,8 @@ function applyTemplate(type) {
     case 'moderator':
       form.name = '协管者/管理员';
       form.roleCode = 'moderator';
+      form.tagText = '协同管理';
+      form.tagColor = '#f59e0b';
       form.description = '非站长管理员，具备细分管控权限，无权修改自身权限与站长权限';
       form.storageQuotaMb = 500;
       form.allowAttachment = 1;
@@ -647,6 +722,8 @@ function applyTemplate(type) {
     case 'master':
       form.name = '站长';
       form.roleCode = 'master';
+      form.tagText = '最高统领';
+      form.tagColor = '#ef4444';
       form.description = '全站最高权力拥有者，全功能不受限';
       form.storageQuotaMb = 1024;
       form.allowAttachment = 1;
@@ -750,6 +827,8 @@ function setRole() {
 function resetForm() {
   form.name = null;
   form.roleCode = 'custom';
+  form.tagText = '';
+  form.tagColor = '#6366f1';
   form.description = null;
   form.storageQuotaMb = 5;
   form.allowAttachment = 0;
@@ -772,6 +851,8 @@ function openRoleSet(role) {
   form.sort = role.sort;
   form.name = role.name;
   form.roleCode = role.roleCode || role.key || 'custom';
+  form.tagText = role.tagText || '';
+  form.tagColor = role.tagColor || '#6366f1';
   form.description = role.description;
   form.storageQuotaMb = role.storageQuotaMb !== undefined ? Number(role.storageQuotaMb) : 5;
   form.allowAttachment = role.allowAttachment !== undefined ? Number(role.allowAttachment) : 0;
@@ -878,25 +959,52 @@ window.onresize = () => {
   padding: 10px 18px;
   display: flex;
   align-items: center;
-  gap: 16px;
-  box-shadow: var(--header-actions-border);
+  gap: 12px;
+  background: var(--bg-surface, rgba(255, 255, 255, 0.9));
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.06));
+  border-radius: 10px 10px 0 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
   font-size: 16px;
   flex-wrap: wrap;
 
-  .icon-btn {
+  .action-btn-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .action-btn-pill {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: var(--bg-surface-variant, rgba(0, 0, 0, 0.04));
+    border: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.08));
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     cursor: pointer;
-    color: var(--text-color, #4b5563);
-    transition: color 0.15s ease, transform 0.15s ease;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    color: var(--text-primary, #4b5563);
+
     &:hover {
+      background: var(--primary-color-light, rgba(99, 102, 241, 0.12));
+      border-color: rgba(99, 102, 241, 0.35);
       color: #6366f1;
-      transform: scale(1.08);
+      transform: translateY(-1px);
+      box-shadow: 0 2px 6px rgba(99, 102, 241, 0.18);
+    }
+
+    &:active {
+      transform: translateY(0);
     }
   }
 
   .hierarchy-btn {
     font-weight: 500;
     border-radius: 8px;
-    height: 30px;
+    height: 32px;
   }
 }
 
@@ -949,40 +1057,77 @@ window.onresize = () => {
     background: #6366f1;
     border-color: #6366f1;
   }
-
-  .mod-tag {
-    background: rgba(139, 92, 246, 0.1);
-    color: #7c3aed;
-    border-color: rgba(139, 92, 246, 0.3);
-  }
-
-  .master-tag {
-    background: rgba(245, 158, 11, 0.1);
-    color: #d97706;
-    border-color: rgba(245, 158, 11, 0.3);
-    font-weight: 600;
-  }
 }
 
-.quota-badge, .send-badge {
+.custom-badge-wrapper {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+}
+
+.custom-role-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 8px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  white-space: nowrap;
+  line-height: 18px;
+}
+
+.quota-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   font-size: 12px;
+  line-height: 20px;
+  height: 22px;
+  white-space: nowrap !important;
+  word-break: keep-all !important;
   color: var(--text-secondary, #4b5563);
 
   .col-ic {
     color: var(--text-muted, #9ca3af);
+    flex-shrink: 0;
   }
 
   .quota-zero {
     color: #9ca3af;
-    font-style: italic;
+    font-weight: 500;
   }
 
   .quota-master {
-    color: #d97706;
+    color: #ef4444;
+    font-weight: 700;
+    background: rgba(239, 68, 68, 0.1);
+    padding: 0 7px;
+    height: 20px;
+    line-height: 18px;
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    border-radius: 4px;
+    border: 1px solid rgba(239, 68, 68, 0.25);
+  }
+
+  .quota-val {
     font-weight: 600;
+    color: var(--text-primary, #1f2937);
+  }
+}
+
+.send-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  white-space: nowrap !important;
+  color: var(--text-secondary, #4b5563);
+
+  .col-ic {
+    color: var(--text-muted, #9ca3af);
+    flex-shrink: 0;
   }
 
   .text-banned {
@@ -994,6 +1139,10 @@ window.onresize = () => {
 .att-tag {
   display: inline-flex;
   align-items: center;
+  white-space: nowrap !important;
+  padding: 0 8px;
+  font-size: 11.5px;
+  border-radius: 6px;
 }
 
 .description {
@@ -1032,7 +1181,7 @@ window.onresize = () => {
   border: 1px dashed var(--border-subtle, #cbd5e1);
   padding: 10px 12px;
   border-radius: 8px;
-  margin-bottom: 14px;
+  margin-bottom: 6px;
 
   .preset-label {
     font-size: 12px;
@@ -1053,10 +1202,34 @@ window.onresize = () => {
 .form-row {
   display: flex;
   gap: 12px;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 
   .dialog-input {
     margin-bottom: 0 !important;
+  }
+}
+
+.tag-picker-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  .color-picker-box {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--bg-surface-variant, #f8fafc);
+    border: 1px solid var(--border-subtle, #e2e8f0);
+    border-radius: 8px;
+    padding: 0 8px;
+    height: 38px;
+    flex-shrink: 0;
+
+    .color-label {
+      font-size: 11.5px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
   }
 }
 
@@ -1064,13 +1237,13 @@ window.onresize = () => {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
-  margin-bottom: 14px;
+  margin-bottom: 10px;
 
   .pair-item {
     background: var(--bg-surface-variant, #f8fafc);
     border: 1px solid var(--border-subtle, #e2e8f0);
     border-radius: 8px;
-    padding: 10px 12px;
+    padding: 8px 12px;
   }
 
   .pair-label {
@@ -1093,17 +1266,95 @@ window.onresize = () => {
   }
 }
 
-.perm-tree-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: 10px;
-  margin-bottom: 8px;
+/* 2-Column Dialog Layout (Zero Scrollbar) */
+:deep(.el-dialog:not(.role-hierarchy-dialog):not(.role-form-dialog)) {
+  margin-bottom: 20px !important;
+  width: 520px !important;
+  border-radius: 14px;
+  @media (max-width: 540px) {
+    width: calc(100% - 32px) !important;
+    margin: 16px !important;
+  }
+}
 
-  .perm-title {
-    font-size: 13px;
+:deep(.el-dialog.role-form-dialog) {
+  width: min(860px, 95vw) !important;
+  border-radius: 16px;
+  overflow: visible !important;
+  margin-bottom: 20px !important;
+
+  .el-dialog__body {
+    padding: 16px 22px 22px;
+    overflow: visible !important;
+  }
+}
+
+.role-edit-grid {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+  gap: 20px;
+  align-items: start;
+
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.modal-col-left {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+
+  .dialog-input {
+    margin-bottom: 0 !important;
+  }
+}
+
+.modal-col-right {
+  display: flex;
+  flex-direction: column;
+
+  .perm-tree-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+
+    .perm-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-secondary, #475569);
+    }
+  }
+
+  .perm-tree-wrap {
+    border: 1px solid var(--border-subtle, #e2e8f0);
+    border-radius: 10px;
+    padding: 10px 12px;
+    background: var(--bg-surface-variant, #f8fafc);
+    max-height: 330px;
+    overflow-y: auto;
+  }
+
+  .visitor-dialog-notice {
+    background: rgba(245, 158, 11, 0.1);
+    border: 1px solid rgba(245, 158, 11, 0.25);
+    color: #b45309;
+    font-size: 12px;
+    padding: 8px 10px;
+    border-radius: 6px;
+    margin-top: 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .btn {
+    width: 100%;
+    margin-top: 12px;
+    height: 40px;
     font-weight: 600;
-    color: var(--text-secondary, #475569);
+    border-radius: 8px;
   }
 }
 
@@ -1117,38 +1368,6 @@ window.onresize = () => {
   margin-left: 10px;
   .el-input-number {
     width: 95px;
-  }
-}
-
-.visitor-dialog-notice {
-  background: rgba(245, 158, 11, 0.1);
-  border: 1px solid rgba(245, 158, 11, 0.25);
-  color: #b45309;
-  font-size: 12px;
-  padding: 8px 10px;
-  border-radius: 6px;
-  margin-top: 12px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.btn {
-  width: 100%;
-  margin-top: 15px;
-  height: 38px;
-  font-weight: 600;
-  border-radius: 8px;
-}
-
-/* Dialog Global Overrides */
-:deep(.el-dialog:not(.role-hierarchy-dialog)) {
-  margin-bottom: 20px !important;
-  width: 520px !important;
-  border-radius: 14px;
-  @media (max-width: 540px) {
-    width: calc(100% - 32px) !important;
-    margin: 16px !important;
   }
 }
 
@@ -1208,7 +1427,7 @@ window.onresize = () => {
 }
 
 .role-card {
-  background: var(--bg-surface-variant, #ffffff);
+  background: var(--bg-surface, #ffffff);
   border: 1px solid var(--border-subtle, #e2e8f0);
   border-radius: 10px;
   padding: 12px 14px;
@@ -1274,7 +1493,7 @@ window.onresize = () => {
 }
 
 .blog-grading-section {
-  background: var(--bg-surface-variant, #f8fafc);
+  background: var(--bg-surface, #f8fafc);
   border: 1px solid var(--border-subtle, #e2e8f0);
   border-radius: 12px;
   padding: 14px 16px;
@@ -1335,4 +1554,64 @@ window.onresize = () => {
 .text-purple { color: #8b5cf6; }
 .text-gold { color: #d97706; }
 .text-muted { color: #94a3b8; }
+
+/* Dark mode theme adaptations */
+:global(html.dark) {
+  .header-actions {
+    background: var(--bg-surface, #1e293b) !important;
+    border-bottom-color: var(--border-subtle, #334155) !important;
+  }
+
+  .action-btn-pill {
+    background: rgba(255, 255, 255, 0.06) !important;
+    border-color: rgba(255, 255, 255, 0.12) !important;
+    color: #e2e8f0 !important;
+
+    &:hover {
+      background: rgba(99, 102, 241, 0.25) !important;
+      border-color: rgba(99, 102, 241, 0.5) !important;
+      color: #818cf8 !important;
+    }
+  }
+
+  .preset-templates,
+  .form-grid-pair .pair-item,
+  .modal-col-right .perm-tree-wrap,
+  .tag-picker-row .color-picker-box {
+    background: rgba(255, 255, 255, 0.04) !important;
+    border-color: var(--border-subtle, #334155) !important;
+  }
+
+  .role-card {
+    background: var(--bg-surface, #1e293b) !important;
+    border-color: var(--border-subtle, #334155) !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25) !important;
+  }
+
+  .bg-cyan { background: rgba(14, 165, 233, 0.18) !important; color: #38bdf8 !important; }
+  .bg-blue { background: rgba(59, 130, 246, 0.18) !important; color: #60a5fa !important; }
+  .bg-amber { background: rgba(245, 158, 11, 0.18) !important; color: #fbbf24 !important; }
+  .bg-emerald { background: rgba(16, 185, 129, 0.18) !important; color: #34d399 !important; }
+  .bg-purple { background: rgba(139, 92, 246, 0.18) !important; color: #c084fc !important; }
+  .bg-gold { background: rgba(234, 179, 8, 0.18) !important; color: #fde047 !important; }
+
+  .blog-grading-section {
+    background: var(--bg-surface, #1e293b) !important;
+    border-color: var(--border-subtle, #334155) !important;
+
+    .grading-table th {
+      background: rgba(255, 255, 255, 0.05) !important;
+      color: #94a3b8 !important;
+    }
+
+    .grading-table td {
+      color: #e2e8f0 !important;
+      border-bottom-color: rgba(255, 255, 255, 0.08) !important;
+    }
+  }
+
+  .quota-val {
+    color: #e2e8f0 !important;
+  }
+}
 </style>

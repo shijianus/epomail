@@ -87,6 +87,16 @@
                 <div class="storage-fill" :style="{width: storagePercent + '%', background: storageStatus === 'exception' ? 'var(--danger)' : ''}"></div>
               </div>
             </div>
+            <div class="am-blog-tier" @click="handleSyncBlogInDropdown">
+              <div class="am-tier-left">
+                <Icon icon="lucide:book-open" width="13" height="13" class="tier-ic" />
+                <span class="tier-label">博客书友：</span>
+                <span class="tier-name">{{ blogTierName }}</span>
+              </div>
+              <span class="tier-sync-action" :title="'点击同步博客等级'">
+                <Icon icon="lucide:refresh-cw" :class="{ 'is-spinning': isSyncingBlog }" width="12" height="12" />
+              </span>
+            </div>
             <div class="am-item" @click="openAccountDetails"><Icon class="ic ic-sm" icon="lucide:user" /><span>{{ $t('accountDetails') || 'Account Details' }}</span></div>
             <div class="am-item" @click="openSettings"><Icon class="ic ic-sm" icon="lucide:settings" /><span>{{ $t('settings') || 'Settings' }}</span></div>
             <div class="am-item logout" @click="clickLogout"><Icon class="ic ic-sm" icon="lucide:log-out" /><span>{{ $t('logOut') }}</span></div>
@@ -116,6 +126,39 @@ import {useUiStore} from "@/store/ui.js";
 import {useUserStore} from "@/store/user.js";
 import {useEmailStore} from "@/store/email.js";
 import {userDraftStore} from "@/store/draft.js";
+import {userSyncBlogLevel} from "@/request/user.js";
+import {ElMessage} from "element-plus";
+
+const isSyncingBlog = ref(false);
+const blogTierName = computed(() => {
+  const b = userStore.user?.blogLevel;
+  if (b?.levelName) return b.levelName;
+  const roleCode = userStore.user?.role?.roleCode || '';
+  if (roleCode === 'user_lv1') return 'LV.1 活跃学者';
+  if (roleCode === 'user_lv0') return 'LV.0 认证书友';
+  if (roleCode === 'master') return '站长统领';
+  return '未认证书友';
+});
+
+async function handleSyncBlogInDropdown() {
+  if (isSyncingBlog.value) return;
+  isSyncingBlog.value = true;
+  try {
+    const res = await userSyncBlogLevel();
+    if (res?.message) {
+      ElMessage({
+        message: res.message,
+        type: res.synced ? "success" : "info",
+        plain: true
+      });
+    }
+    await userStore.fetchUserInfo?.();
+  } catch (e) {
+    ElMessage.error(e?.message || '同步博客等级失败');
+  } finally {
+    isSyncingBlog.value = false;
+  }
+}
 
 function openAccountDetails() {
   if (userinfoRef.value && userinfoRef.value.handleClose) {
@@ -1007,6 +1050,54 @@ function formatName(email) {
 .am-storage-label { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-secondary); margin-bottom: 6px; }
 .storage-bar { height: 6px; background: var(--bg-hover); border-radius: 3px; overflow: hidden; }
 .storage-fill { height: 100%; background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary)); border-radius: 3px; transition: width .3s ease; }
+.am-blog-tier {
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-surface-variant, rgba(99, 102, 241, 0.04));
+  font-size: 12px;
+  cursor: pointer;
+  transition: background .15s ease;
+}
+.am-blog-tier:hover {
+  background: rgba(99, 102, 241, 0.08);
+}
+.am-blog-tier .am-tier-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.am-blog-tier .tier-ic {
+  color: #6366f1;
+}
+.am-blog-tier .tier-label {
+  color: var(--text-secondary);
+  font-size: 11.5px;
+}
+.am-blog-tier .tier-name {
+  font-weight: 600;
+  color: #6366f1;
+  font-size: 11.5px;
+}
+.am-blog-tier .tier-sync-action {
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  transition: color .15s ease, transform .15s ease;
+}
+.am-blog-tier .tier-sync-action:hover {
+  color: #6366f1;
+  transform: rotate(45deg);
+}
+.am-blog-tier .is-spinning {
+  animation: am-spin 1s linear infinite;
+}
+@keyframes am-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
 .am-item { padding: 10px 16px; display: flex; align-items: center; gap: 12px; cursor: pointer; color: var(--text-secondary); font-size: 13.5px; transition: background .15s, color .15s; }
 .am-item:hover { background: var(--bg-hover); color: var(--text-primary); }
 .am-item.logout:hover { color: var(--danger); }

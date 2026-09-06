@@ -17,19 +17,12 @@ const roleService = {
 	async ensureStandardRoles(c) {
 		const userDb = getUserDb(c);
 		try {
-			// Fast check: if all 6 standard roles already exist, exit immediately
-			const check = await userDb.prepare(`SELECT count(*) as cnt FROM role WHERE role_code IN ('visitor', 'user_base', 'user_lv0', 'user_lv1', 'moderator', 'master')`).first();
-			if (check && Number(check.cnt) >= 6) {
-				return;
-			}
-		} catch (e) {
-			// table or column might not exist yet, continue with column creation
-		}
-		try {
 			const cols = [
 				{ name: 'storage_quota_mb', sql: 'ALTER TABLE role ADD COLUMN storage_quota_mb INTEGER DEFAULT 5;' },
 				{ name: 'allow_attachment', sql: 'ALTER TABLE role ADD COLUMN allow_attachment INTEGER DEFAULT 0;' },
-				{ name: 'role_code', sql: 'ALTER TABLE role ADD COLUMN role_code TEXT DEFAULT "custom";' }
+				{ name: 'role_code', sql: 'ALTER TABLE role ADD COLUMN role_code TEXT DEFAULT "custom";' },
+				{ name: 'tag_text', sql: 'ALTER TABLE role ADD COLUMN tag_text TEXT DEFAULT "";' },
+				{ name: 'tag_color', sql: 'ALTER TABLE role ADD COLUMN tag_color TEXT DEFAULT "";' }
 			];
 			for (const col of cols) {
 				const colInfo = await userDb.prepare(`SELECT * FROM pragma_table_info('role') WHERE name = ? LIMIT 1`).bind(col.name).first();
@@ -37,6 +30,16 @@ const roleService = {
 					await userDb.prepare(col.sql).run();
 				}
 			}
+
+			// Fast check: if all 6 standard roles already exist and have tags, exit immediately
+			const check = await userDb.prepare(`SELECT count(*) as cnt FROM role WHERE role_code IN ('visitor', 'user_base', 'user_lv0', 'user_lv1', 'moderator', 'master') AND tag_text IS NOT NULL AND tag_text != '' AND tag_text != 'tag_text'`).first();
+			if (check && Number(check.cnt) >= 6) {
+				return;
+			}
+		} catch (e) {
+			// continue with creation/update
+		}
+		try {
 
 			const standardRoles = [
 				{
@@ -50,6 +53,8 @@ const roleService = {
 					accountCount: 0,
 					storageQuotaMb: 0,
 					allowAttachment: 0,
+					tagText: '开源体验',
+					tagColor: '#6366f1',
 					description: '开源体验与巡检用户，全功能UI交互沙箱，无持久化写入权限，配额0MB',
 					permKeys: ['setting:query', 'role:query', 'analysis:query', 'user:query']
 				},
@@ -64,6 +69,8 @@ const roleService = {
 					accountCount: 1,
 					storageQuotaMb: 5,
 					allowAttachment: 0,
+					tagText: '基础成员',
+					tagColor: '#64748b',
 					description: '默认注册用户，具备基础使用权限，纯文本收发(无附件)，每日5封上限',
 					permKeys: ['email:send', 'email:delete', 'account:query', 'account:add', 'account:delete', 'my:delete']
 				},
@@ -78,6 +85,8 @@ const roleService = {
 					accountCount: 2,
 					storageQuotaMb: 10,
 					allowAttachment: 0,
+					tagText: '认证书友',
+					tagColor: '#10b981',
 					description: '已注册/绑定 blog.epomail.com 博客用户，配额提升至10MB，每日8封发信权',
 					permKeys: ['email:send', 'email:delete', 'account:query', 'account:add', 'account:delete', 'my:delete']
 				},
@@ -92,6 +101,8 @@ const roleService = {
 					accountCount: 3,
 					storageQuotaMb: 25,
 					allowAttachment: 1,
+					tagText: '活跃学者',
+					tagColor: '#06b6d4',
 					description: '参与博客讨论与活跃互动的进阶用户，配额25MB，每日10封，开放附件发送权限',
 					permKeys: ['email:send', 'email:delete', 'account:query', 'account:add', 'account:delete', 'my:delete']
 				},
@@ -106,6 +117,8 @@ const roleService = {
 					accountCount: 10,
 					storageQuotaMb: 500,
 					allowAttachment: 1,
+					tagText: '协同管理',
+					tagColor: '#f59e0b',
 					description: '非站长管理员，具备细分管控权限，无权修改自身权限与站长权限',
 					permKeys: [
 						'email:send', 'email:delete', 'account:query', 'account:add', 'account:delete', 'my:delete',
@@ -124,6 +137,8 @@ const roleService = {
 					accountCount: 0,
 					storageQuotaMb: 1024,
 					allowAttachment: 1,
+					tagText: '最高统领',
+					tagColor: '#ef4444',
 					description: '全站最高权力拥有者，全功能不受限',
 					permKeys: ['*']
 				}
@@ -136,12 +151,13 @@ const roleService = {
 						INSERT INTO role (
 							name, key, description, ban_email, ban_email_type, avail_domain,
 							sort, is_default, send_count, send_type, account_count,
-							storage_quota_mb, allow_attachment, role_code
-						) VALUES (?, ?, ?, '', 0, '', ?, ?, ?, ?, ?, ?, ?, ?)
+							storage_quota_mb, allow_attachment, role_code, tag_text, tag_color
+						) VALUES (?, ?, ?, '', 0, '', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 					`).bind(
 						defRole.name, defRole.key, defRole.description,
 						defRole.sort, defRole.isDefault, defRole.sendCount, defRole.sendType, defRole.accountCount,
-						defRole.storageQuotaMb, defRole.allowAttachment, defRole.roleCode
+						defRole.storageQuotaMb, defRole.allowAttachment, defRole.roleCode,
+						defRole.tagText, defRole.tagColor
 					).run();
 
 					const roleId = insRes.meta?.last_row_id;
@@ -151,10 +167,13 @@ const roleService = {
 				} else {
 					await userDb.prepare(`
 						UPDATE role 
-						SET role_code = ?, storage_quota_mb = ?, allow_attachment = ?, description = ?, send_type = ?, send_count = ?
+						SET role_code = ?, storage_quota_mb = ?, allow_attachment = ?, description = ?, send_type = ?, send_count = ?,
+						    tag_text = CASE WHEN tag_text = '' OR tag_text = 'tag_text' OR tag_text IS NULL THEN ? ELSE tag_text END,
+						    tag_color = CASE WHEN tag_color = '' OR tag_color = 'tag_color' OR tag_color IS NULL THEN ? ELSE tag_color END
 						WHERE role_id = ?
 					`).bind(
 						defRole.roleCode, defRole.storageQuotaMb, defRole.allowAttachment, defRole.description, defRole.sendType, defRole.sendCount,
+						defRole.tagText, defRole.tagColor,
 						existing.role_id
 					).run();
 					await this.assignPermsInternal(userDb, existing.role_id, defRole.permKeys);
@@ -188,7 +207,7 @@ const roleService = {
 	},
 
 	async add(c, params, userId) {
-		let { name, permIds = [], banEmail = [], availDomain = [], storageQuotaMb = 5, allowAttachment = 0, roleCode = 'custom' } = params;
+		let { name, permIds = [], banEmail = [], availDomain = [], storageQuotaMb = 5, allowAttachment = 0, roleCode = 'custom', tagText = '', tagColor = '' } = params;
 
 		if (!name) {
 			throw new BizError(t('emptyRoleName'));
@@ -224,7 +243,9 @@ const roleService = {
 			userId,
 			storageQuotaMb: Number(storageQuotaMb || 0),
 			allowAttachment: Number(allowAttachment || 0),
-			roleCode: roleCode || 'custom'
+			roleCode: roleCode || 'custom',
+			tagText: tagText || '',
+			tagColor: tagColor || ''
 		}).returning().get();
 
 		if (permIds.length === 0) {
@@ -250,13 +271,15 @@ const roleService = {
 			r.storageQuotaMb = r.storageQuotaMb !== null && r.storageQuotaMb !== undefined ? Number(r.storageQuotaMb) : 5;
 			r.allowAttachment = r.allowAttachment !== null && r.allowAttachment !== undefined ? Number(r.allowAttachment) : 0;
 			r.roleCode = r.roleCode || (r.key || 'custom');
+			r.tagText = r.tagText || '';
+			r.tagColor = r.tagColor || '';
 		});
 
 		return roleList;
 	},
 
 	async setRole(c, params, callerUserId) {
-		let { name, permIds = [], roleId, banEmail = [], availDomain = [], storageQuotaMb = 5, allowAttachment = 0, roleCode = 'custom' } = params;
+		let { name, permIds = [], roleId, banEmail = [], availDomain = [], storageQuotaMb = 5, allowAttachment = 0, roleCode = 'custom', tagText = '', tagColor = '' } = params;
 
 		if (!name) {
 			throw new BizError(t('emptyRoleName'));
@@ -297,7 +320,9 @@ const roleService = {
 			availDomain,
 			storageQuotaMb: Number(storageQuotaMb || 0),
 			allowAttachment: Number(allowAttachment || 0),
-			roleCode: roleCode || 'custom'
+			roleCode: roleCode || 'custom',
+			tagText: tagText || '',
+			tagColor: tagColor || ''
 		}).where(eq(role.roleId, roleId)).run();
 		
 		await orm(c).delete(rolePerm).where(eq(rolePerm.roleId, roleId)).run();

@@ -12,6 +12,40 @@
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
 
+### 角色UI视觉精细化美化、配额单行智能单位转换、纯净角色尊荣标识、新建/编辑角色860px双列绝对无滑块与博客联动全场景贯通上线 (2026-09-06)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **配额徽章 (`quota-badge`) 严格单行与智能单位转换**:
+       - 站长最高权力显示为纯净「无限制」高亮胶囊（彻底剔除 1024MB 冗余说明）；
+       - 采用以最小有效数字为原则的动态计量换算机制，>= 1024MB 自动转换为 GB；
+       - 设置 `white-space: nowrap !important; word-break: keep-all; height: 22px; line-height: 20px;`，严格杜绝任何换行或高度撑大（height <= 26px）。
+    2. **附件权限标签 (`att-tag`) 完整展示与文案精简**:
+       - 彻底剔除冗余「(无附件)」描述，精简为纯粹鲜明的「开放附件」与「仅纯文本」；
+       - 列宽固定扩展至 140px，搭配 `padding: 0 8px; font-size: 11.5px; border-radius: 6px;`，保证所有分辨率下完整展示零截断。
+    3. **角色身份标识 (`custom-role-badge`) 纯净化与全权限自订**:
+       - 彻底剔除纯文本/含附件/沙箱等功能限制性描述；
+       - 确立 6 大专属尊荣身份标识：参观者（开源体验，#6366f1）、普通用户（基础成员，#64748b）、普通用户 LV.0（认证书友，#10b981）、普通用户 LV.1（活跃学者，#06b6d4）、协管者（协同管理，#f59e0b）、站长（最高统领，#ef4444）；
+       - 在 D1 数据库为 `role` 表新增 `tag_text` 与 `tag_color` 物理字段，在新建/编辑角色表单中提供专属自订标签输入与原生拾色器，支持管理员为任意角色自由定制标签文案与颜色。
+    4. **新建/编辑角色弹窗 (`role-form-dialog`) 860px 双列栅格排布与绝对零滑块 (Zero Scrollbar)**:
+       - 弹窗宽度扩展至 `min(860px, 95vw)`，采用左右双列物理栅格结构（左列：6 大预设芯片、名称、唯一标识、自定义标识与颜色拾取、配额与附件双列卡片、域名与黑名单、排序；右列：权限树容器 max-height 330px、沙箱提示、保存操作大按钮）；
+       - 经 Playwright 自动化审计，弹窗主体 `scrollHeight === clientHeight === 507px`，实现 100% 绝对零滑块。
+    5. **顶栏操作按钮底板加固与药丸封装 (`action-btn-pill`)**:
+       - 为角色管理页与注册码邀请码管理页（`/invite-code`）的 `.header-actions` 注入高质感亚克力背景底板（`var(--bg-surface)` + border + 模糊边框）；
+       - 将操作按钮（新增、搜索、刷新、清理）统一封装于 32x32px 独立药丸容器 (`.action-btn-pill`)，悬停微动微光交互，视觉整齐利落。
+    6. **博客书友等级联动全系统三维贯通**:
+       - **顶栏头像下拉菜单**: 注入 `.am-blog-tier`，实时展示当前书友等级称号（如「博客书友：普通读者/活跃学者」）与极速一键同步入口；
+       - **用户公开详情页 (`/:username`)**: 注入专属 `.blog-linkage-card`「blog.epomail.com 书友分级特权联动」卡片，展现书友等级与邮局特权映射；
+       - **个人中心常规设置页 (`/settings/profile`)**: 增设「博客书友分级联动」专属板块，阐明注册与阅读晋升机制，提供一键同步操作闭环。
+    7. **全局深色/浅色模式视觉融合无白斑**:
+       - 全面重构 `.role-card`、预设模板芯片、颜色选择器、权限树容器与分级阶梯表格的深色模式变量适配，彻底根治深色模式下的刺眼纯白底色。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **Cloudflare Workers 部署 Version ID**: `cffacbf5-6204-4362-bb1d-b8851c888579`。
+    - **epocanvas-mail Git Commit**: `PENDING_COMMIT_HASH` (Short Hash: `PENDING_SHORT_HASH`).
+    - 自动化测试套件 100% 顺利通过：
+      - `node tests/test-role-ui-beautify-and-tag-limits.mjs` (配额单行与无限制验证、附件权限标签无截断验证、纯净身份徽章验证、860px 双列零滑块弹窗审计、/invite-code 药丸底板、头像下拉博客等级、个人设置页联动板块、/:username 博客联动卡片 100% 通过);
+      - `node tests/test-role-hierarchy-and-blog-grading.mjs` (6 大管理组属性核验、博客等级接口连通、Web UI 表格渲染、880px 架构与分级一览弹窗、预设新建角色模板套用与截图验证 100% 通过);
+      - `node --loader ./tests/esm-loader.mjs tests/test-role-permissions-backend-logic.mjs` (配额分级计算、协管者防越权三大拦截、参观者发信禁止与纯文本附件阻断、博客等级进阶算法 100% 通过);
+      - `node tests/test-profile-cover-sync.mjs` (个人背景封面全链路同步回归 100% 通过)。
+
 ### 6大核心管理组权限控制规范、开源参观者沙箱交互、博客书友等级联动阶梯与UI架构透视全景上线 (2026-09-06)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **6 大标准管理组与权限边界全景确立 (6 Core Management Groups & Tier Matrix)**:
