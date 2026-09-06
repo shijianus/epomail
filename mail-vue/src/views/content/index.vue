@@ -1,126 +1,167 @@
 <template>
   <div class="box">
     <div class="header-actions">
-      <el-tooltip :content="$t('back') || 'Back'" placement="bottom">
-        <Icon class="icon btn-back" icon="material-symbols-light:arrow-back-ios-new" width="20" height="20" @click="handleBack"/>
-      </el-tooltip>
-      <el-tooltip :content="$t('reportSpam') || '举报为垃圾邮件'" placement="bottom" v-if="emailStore.contentData.delType !== 'physics'">
-        <Icon class="icon btn-spam" icon="fluent:shield-dismiss-20-regular" width="20" height="20" @click="handleReportSpam"/>
-      </el-tooltip>
-      <el-tooltip :content="$t('delete') || 'Delete'" placement="bottom" v-if="hasPerm('email:delete')">
-        <Icon class="icon btn-delete" icon="fluent:delete-20-regular" width="20" height="20" @click="handleDelete"/>
-      </el-tooltip>
-      <el-tooltip :content="email.unread === 0 ? ($t('markUnread') || '标记为未读') : ($t('markRead') || '标记为已读')" placement="bottom">
-        <Icon class="icon btn-unread" :icon="email.unread === 0 ? 'fluent:mail-unread-20-regular' : 'fluent:mail-read-20-regular'" width="20" height="20" @click="handleToggleRead"/>
-      </el-tooltip>
-      
-      <!-- Snooze Popover -->
-      <el-popover placement="bottom" :width="200" trigger="click" popper-class="header-action-popover" v-if="emailStore.contentData.delType !== 'physics'">
-        <template #reference>
-          <div class="action-icon-wrap btn-snooze" :title="$t('snooze') || '延后'">
-            <Icon class="icon" icon="fluent:clock-20-regular" width="20" height="20"/>
+      <div class="header-actions-left">
+        <el-tooltip :content="$t('back') || 'Back'" placement="bottom">
+          <Icon class="icon btn-back" icon="material-symbols-light:arrow-back-ios-new" width="20" height="20" @click="handleBack"/>
+        </el-tooltip>
+        <el-tooltip :content="$t('archive') || '归档'" placement="bottom" v-if="emailStore.contentData.delType !== 'physics'">
+          <Icon class="icon btn-archive" icon="fluent:archive-20-regular" width="20" height="20" @click="handleArchive"/>
+        </el-tooltip>
+        <el-tooltip :content="$t('reportSpam') || '举报为垃圾邮件'" placement="bottom" v-if="emailStore.contentData.delType !== 'physics'">
+          <Icon class="icon btn-spam" icon="fluent:shield-dismiss-20-regular" width="20" height="20" @click="handleReportSpam"/>
+        </el-tooltip>
+        <el-tooltip :content="$t('delete') || 'Delete'" placement="bottom" v-if="hasPerm('email:delete')">
+          <Icon class="icon btn-delete" icon="fluent:delete-20-regular" width="20" height="20" @click="handleDelete"/>
+        </el-tooltip>
+        <el-tooltip :content="email.unread === 0 ? ($t('markUnread') || '标记为未读') : ($t('markRead') || '标记为已读')" placement="bottom">
+          <Icon class="icon btn-unread" :icon="email.unread === 0 ? 'fluent:mail-unread-20-regular' : 'fluent:mail-read-20-regular'" width="20" height="20" @click="handleToggleRead"/>
+        </el-tooltip>
+        
+        <!-- Snooze Popover -->
+        <el-popover placement="bottom" :width="200" trigger="click" popper-class="header-action-popover" v-if="emailStore.contentData.delType !== 'physics'">
+          <template #reference>
+            <div class="action-icon-wrap btn-snooze" :title="$t('snooze') || '延后'">
+              <Icon class="icon" icon="fluent:clock-20-regular" width="20" height="20"/>
+            </div>
+          </template>
+          <div class="snooze-quick-menu">
+            <div class="snooze-menu-title">{{ $t('snooze') || '延后至...' }}</div>
+            <div class="snooze-menu-item" @click="handleQuickSnooze('today')">
+              <Icon icon="fluent:weather-partly-cloudy-day-16-regular" width="16" />
+              <span>{{ $t('snoozeLaterToday') || '今日稍后 (18:00)' }}</span>
+            </div>
+            <div class="snooze-menu-item" @click="handleQuickSnooze('tomorrow')">
+              <Icon icon="fluent:calendar-ltr-16-regular" width="16" />
+              <span>{{ $t('snoozeTomorrow') || '明天 (09:00)' }}</span>
+            </div>
+            <div class="snooze-menu-item" @click="handleQuickSnooze('weekend')">
+              <Icon icon="fluent:calendar-weekend-16-regular" width="16" />
+              <span>{{ $t('snoozeThisWeekend') || '本周末 (周六 09:00)' }}</span>
+            </div>
+            <div class="snooze-menu-item" @click="handleQuickSnooze('nextweek')">
+              <Icon icon="fluent:calendar-arrow-right-16-regular" width="16" />
+              <span>{{ $t('snoozeNextWeek') || '下周 (周一 09:00)' }}</span>
+            </div>
+            <el-divider style="margin: 6px 0;" />
+            <div class="snooze-menu-item" @click="customSnoozeDialogVisible = true">
+              <Icon icon="fluent:clock-toolbox-20-regular" width="16" />
+              <span>{{ $t('snoozeCustom') || '选择日期和时间...' }}</span>
+            </div>
           </div>
-        </template>
-        <div class="snooze-quick-menu">
-          <div class="snooze-menu-title">{{ $t('snooze') || '延后至...' }}</div>
-          <div class="snooze-menu-item" @click="handleQuickSnooze('today')">
-            <Icon icon="fluent:weather-partly-cloudy-day-16-regular" width="16" />
-            <span>{{ $t('snoozeLaterToday') || '今日稍后 (18:00)' }}</span>
-          </div>
-          <div class="snooze-menu-item" @click="handleQuickSnooze('tomorrow')">
-            <Icon icon="fluent:calendar-ltr-16-regular" width="16" />
-            <span>{{ $t('snoozeTomorrow') || '明天 (09:00)' }}</span>
-          </div>
-          <div class="snooze-menu-item" @click="handleQuickSnooze('weekend')">
-            <Icon icon="fluent:calendar-weekend-16-regular" width="16" />
-            <span>{{ $t('snoozeThisWeekend') || '本周末 (周六 09:00)' }}</span>
-          </div>
-          <div class="snooze-menu-item" @click="handleQuickSnooze('nextweek')">
-            <Icon icon="fluent:calendar-arrow-right-16-regular" width="16" />
-            <span>{{ $t('snoozeNextWeek') || '下周 (周一 09:00)' }}</span>
-          </div>
-          <el-divider style="margin: 6px 0;" />
-          <div class="snooze-menu-item" @click="customSnoozeDialogVisible = true">
-            <Icon icon="fluent:clock-toolbox-20-regular" width="16" />
-            <span>{{ $t('snoozeCustom') || '选择日期和时间...' }}</span>
-          </div>
-        </div>
-      </el-popover>
+        </el-popover>
 
-      <!-- Label as Popover -->
-      <el-popover placement="bottom" :width="220" trigger="click" popper-class="header-action-popover" v-if="emailStore.contentData.delType !== 'physics'">
-        <template #reference>
-          <div class="action-icon-wrap btn-label" :title="$t('labelAs') || '标签'">
-            <Icon class="icon" icon="fluent:tag-20-regular" width="20" height="20"/>
-          </div>
-        </template>
-        <div class="label-quick-menu">
-          <div class="label-menu-title">{{ $t('labelAs') || '添加/移除标签' }}</div>
-          <div 
-            v-for="lbl in availableLabels" 
-            :key="lbl.name" 
-            class="label-menu-item" 
-            @click="toggleLabelOnEmail(lbl.name)"
-          >
-            <el-checkbox :model-value="currentLabels.includes(lbl.name)" @click.stop="toggleLabelOnEmail(lbl.name)" />
-            <span class="label-dot" :style="{ backgroundColor: lbl.color || '#3b82f6' }"></span>
-            <span class="label-text">{{ lbl.name }}</span>
-          </div>
-        </div>
-      </el-popover>
+        <!-- Add to tasks -->
+        <el-tooltip :content="$t('addToTasks') || '添加到任务'" placement="bottom">
+          <Icon class="icon btn-task" icon="fluent:task-list-add-20-regular" width="20" height="20" @click="handleAddToTasks"/>
+        </el-tooltip>
 
-      <el-tooltip :content="$t('star') || 'Star'" placement="bottom" v-if="emailStore.contentData.showStar">
-        <span class="star">
-          <Icon class="icon btn-star" @click="changeStar" v-if="email.isStar" icon="fluent-color:star-16" width="20" height="20"/>
-          <Icon class="icon btn-star" @click="changeStar" v-else icon="solar:star-line-duotone" width="18" height="18"/>
-        </span>
-      </el-tooltip>
-      <el-tooltip :content="$t('reply') || 'Reply'" placement="bottom" v-if="emailStore.contentData.showReply && hasPerm('email:send')">
-        <Icon class="icon btn-reply" @click="openReply" icon="la:reply" width="21" height="21" />
-      </el-tooltip>
-      <el-tooltip :content="$t('forward') || 'Forward'" placement="bottom" v-if="emailStore.contentData.showReply && hasPerm('email:send')">
-        <Icon class="icon btn-forward" @click="openForward" icon="iconoir:arrow-up-right" width="20" height="20" />
-      </el-tooltip>
-      <el-tooltip :content="$t('translateMessage') || '翻译邮件'" placement="bottom">
-        <Icon class="icon btn-translate" icon="fluent:translate-20-regular" width="20" height="20" @click="toggleTranslateBar(threadMessages[threadMessages.length - 1] || email)"/>
-      </el-tooltip>
+        <!-- Move to Popover -->
+        <el-popover placement="bottom" :width="180" trigger="click" popper-class="header-action-popover" v-if="emailStore.contentData.delType !== 'physics'">
+          <template #reference>
+            <div class="action-icon-wrap btn-move" :title="$t('moveTo') || '移动到'">
+              <Icon class="icon" icon="fluent:folder-arrow-right-20-regular" width="20" height="20"/>
+            </div>
+          </template>
+          <div class="move-to-menu">
+            <div class="move-menu-title">{{ $t('moveTo') || '移动到...' }}</div>
+            <div class="move-menu-item" @click="handleMoveTo('inbox')">
+              <Icon icon="fluent:mail-inbox-16-regular" width="16" />
+              <span>{{ $t('moveToInbox') || '收件箱' }}</span>
+            </div>
+            <div class="move-menu-item" @click="handleMoveTo('spam')">
+              <Icon icon="fluent:shield-dismiss-16-regular" width="16" />
+              <span>{{ $t('moveToSpam') || '垃圾邮件' }}</span>
+            </div>
+            <div class="move-menu-item" @click="handleMoveTo('trash')">
+              <Icon icon="fluent:delete-16-regular" width="16" />
+              <span>{{ $t('moveToTrash') || '废纸篓' }}</span>
+            </div>
+          </div>
+        </el-popover>
 
-      <!-- More options -->
-      <el-dropdown trigger="click" @command="handleHeaderMoreCommand">
-        <div class="action-icon-wrap btn-more" :title="$t('more') || '更多选项'">
-          <Icon class="icon" icon="fluent:more-vertical-20-regular" width="20" height="20" />
-        </div>
-        <template #dropdown>
-          <el-dropdown-menu>
-            <el-dropdown-item command="filter">
-              <Icon icon="fluent:filter-20-regular" width="16" style="margin-right: 8px;" />
-              {{ $t('filterMessages') || '过滤此类邮件' }}
-            </el-dropdown-item>
-            <el-dropdown-item command="mute">
-              <Icon icon="fluent:speaker-mute-20-regular" width="16" style="margin-right: 8px;" />
-              {{ $t('muteConversation') || '忽略' }}
-            </el-dropdown-item>
-            <el-dropdown-item command="print">
-              <Icon icon="fluent:print-20-regular" width="16" style="margin-right: 8px;" />
-              {{ $t('printEmail') || '打印' }}
-            </el-dropdown-item>
-          </el-dropdown-menu>
-        </template>
-      </el-dropdown>
+        <!-- Label as Popover -->
+        <el-popover placement="bottom" :width="220" trigger="click" popper-class="header-action-popover" v-if="emailStore.contentData.delType !== 'physics'">
+          <template #reference>
+            <div class="action-icon-wrap btn-label" :title="$t('labelAs') || '标签'">
+              <Icon class="icon" icon="fluent:tag-20-regular" width="20" height="20"/>
+            </div>
+          </template>
+          <div class="label-quick-menu">
+            <div class="label-menu-title">{{ $t('labelAs') || '添加/移除标签' }}</div>
+            <div 
+              v-for="lbl in availableLabels" 
+              :key="lbl.name" 
+              class="label-menu-item" 
+              @click="toggleLabelOnEmail(lbl.name)"
+            >
+              <el-checkbox :model-value="currentLabels.includes(lbl.name)" @click.stop="toggleLabelOnEmail(lbl.name)" />
+              <span class="label-dot" :style="{ backgroundColor: lbl.color || '#3b82f6' }"></span>
+              <span class="label-text">{{ lbl.name }}</span>
+            </div>
+          </div>
+        </el-popover>
+
+        <!-- Translate message -->
+        <el-tooltip :content="$t('translateMessage') || '翻译邮件'" placement="bottom">
+          <Icon class="icon btn-translate" icon="fluent:translate-20-regular" width="20" height="20" @click="toggleTranslateBar(threadMessages[threadMessages.length - 1] || email)"/>
+        </el-tooltip>
+
+        <!-- More options -->
+        <el-dropdown trigger="click" @command="handleHeaderMoreCommand">
+          <div class="action-icon-wrap btn-more" :title="$t('more') || '更多选项'">
+            <Icon class="icon" icon="fluent:more-vertical-20-regular" width="20" height="20" />
+          </div>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item command="filter">
+                <Icon icon="fluent:filter-20-regular" width="16" style="margin-right: 8px;" />
+                {{ $t('filterMessages') || '过滤此类邮件' }}
+              </el-dropdown-item>
+              <el-dropdown-item command="mute">
+                <Icon icon="fluent:speaker-mute-20-regular" width="16" style="margin-right: 8px;" />
+                {{ $t('muteConversation') || '忽略' }}
+              </el-dropdown-item>
+              <el-dropdown-item command="forwardAll" v-if="emailStore.contentData.showReply && hasPerm('email:send')">
+                <Icon icon="iconoir:arrow-up-right" width="16" style="margin-right: 8px;" />
+                {{ $t('forwardAll') || '全部转发' }}
+              </el-dropdown-item>
+              <el-dropdown-item command="printAll">
+                <Icon icon="fluent:print-20-regular" width="16" style="margin-right: 8px;" />
+                {{ $t('printAll') || '全部打印' }}
+              </el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
+      </div>
+
+      <div class="header-actions-right">
+        <el-tooltip :content="isAllExpanded ? ($t('collapseAll') || '全部折叠') : ($t('expandAll') || '全部展开')" placement="bottom" v-if="threadMessages.length > 1">
+          <Icon class="icon btn-expand-all" :icon="isAllExpanded ? 'fluent:arrow-collapse-all-20-regular' : 'fluent:arrow-expand-all-20-regular'" width="20" height="20" @click="toggleExpandAll" />
+        </el-tooltip>
+        <el-tooltip :content="$t('printAll') || '全部打印'" placement="bottom">
+          <Icon class="icon btn-print-all" icon="fluent:print-20-regular" width="20" height="20" @click="handlePrintAll" />
+        </el-tooltip>
+        <el-tooltip :content="$t('inNewWindow') || '在新窗口中打开'" placement="bottom">
+          <Icon class="icon btn-new-window" icon="fluent:open-20-regular" width="19" height="19" @click="handleOpenInNewWindow" />
+        </el-tooltip>
+      </div>
     </div>
     <div></div>
     <el-scrollbar class="scrollbar">
       <div class="container">
         <div class="email-title-row">
           <div class="email-title">{{ email.subject }}</div>
-          <div class="thread-header-bar" v-if="threadMessages.length > 1">
-            <el-tag size="small" type="primary" effect="plain" class="thread-info-tag">
-              <Icon icon="fluent:chat-multiple-16-regular" width="14" style="margin-right: 4px;" />
-              会话聚合 (共 {{ threadMessages.length }} 封邮件)
+          <div class="email-labels-list" v-if="currentLabels.length">
+            <el-tag 
+              v-for="lbl in currentLabels" 
+              :key="lbl" 
+              size="small" 
+              effect="light"
+              class="subject-label-tag"
+            >
+              {{ lbl }}
             </el-tag>
-            <el-button link size="small" type="primary" @click="toggleExpandAll">
-              {{ isAllExpanded ? '全部折叠' : '全部展开' }}
-            </el-button>
           </div>
         </div>
 
@@ -168,22 +209,41 @@
                           <Icon icon="ri:verified-badge-fill" width="18" height="18" style="color: #0284c7; vertical-align: middle;" />
                         </span>
                       </div>
-                      <div style="display: flex; align-items: center; gap: 10px;">
+                      <div class="thread-header-bar" @click.stop>
                         <span class="date">{{ formatDetailDate(msg.createTime) }}</span>
-                        <div class="msg-header-quick-actions" @click.stop>
+                        <div class="msg-header-quick-actions">
+                          <el-tooltip :content="$t('star') || 'Star'" placement="bottom" v-if="emailStore.contentData.showStar">
+                            <span class="msg-act-star" @click="changeStar">
+                              <Icon class="msg-act-icon btn-star" v-if="email.isStar" icon="fluent-color:star-16" width="18" height="18"/>
+                              <Icon class="msg-act-icon btn-star" v-else icon="solar:star-line-duotone" width="17" height="17"/>
+                            </span>
+                          </el-tooltip>
                           <el-tooltip :content="$t('translateMessage') || '翻译邮件'" placement="bottom">
-                            <Icon class="msg-act-icon" icon="fluent:translate-20-regular" width="16" height="16" @click="toggleTranslateBar(msg)"/>
+                            <Icon class="msg-act-icon btn-translate" icon="fluent:translate-20-regular" width="17" height="17" @click="toggleTranslateBar(msg)"/>
                           </el-tooltip>
                           <el-tooltip :content="$t('reply') || '回复'" placement="bottom" v-if="emailStore.contentData.showReply && hasPerm('email:send')">
-                            <Icon class="msg-act-icon" icon="la:reply" width="17" height="17" @click="openReplyMsg(msg)"/>
+                            <Icon class="msg-act-icon btn-reply" icon="la:reply" width="18" height="18" @click="openReplyMsg(msg)"/>
+                          </el-tooltip>
+                          <el-tooltip :content="$t('replyAll') || '回复全部'" placement="bottom" v-if="emailStore.contentData.showReply && hasPerm('email:send')">
+                            <Icon class="msg-act-icon btn-reply-all" icon="fluent:arrow-reply-all-20-regular" width="18" height="18" @click="openReplyAllMsg(msg)"/>
+                          </el-tooltip>
+                          <el-tooltip :content="$t('forward') || '转发'" placement="bottom" v-if="emailStore.contentData.showReply && hasPerm('email:send')">
+                            <Icon class="msg-act-icon btn-forward" icon="iconoir:arrow-up-right" width="17" height="17" @click="openForwardMsg(msg)"/>
+                          </el-tooltip>
+                          <el-tooltip :content="$t('printEmail') || '打印此邮件'" placement="bottom">
+                            <Icon class="msg-act-icon btn-print" icon="fluent:print-20-regular" width="17" height="17" @click="printSingleMsg(msg)"/>
                           </el-tooltip>
                           <el-dropdown trigger="click" @command="(cmd) => handleMsgMoreCommand(cmd, msg)">
-                            <Icon class="msg-act-icon" icon="fluent:more-vertical-20-regular" width="16" height="16" />
+                            <Icon class="msg-act-icon btn-msg-more" icon="fluent:more-vertical-20-regular" width="17" height="17" />
                             <template #dropdown>
                               <el-dropdown-menu>
                                 <el-dropdown-item command="reply" v-if="emailStore.contentData.showReply && hasPerm('email:send')">
                                   <Icon icon="la:reply" width="15" style="margin-right: 8px;" />
                                   {{ $t('reply') || '回复' }}
+                                </el-dropdown-item>
+                                <el-dropdown-item command="replyAll" v-if="emailStore.contentData.showReply && hasPerm('email:send')">
+                                  <Icon icon="fluent:arrow-reply-all-20-regular" width="15" style="margin-right: 8px;" />
+                                  {{ $t('replyAll') || '回复全部' }}
                                 </el-dropdown-item>
                                 <el-dropdown-item command="forward" v-if="emailStore.contentData.showReply && hasPerm('email:send')">
                                   <Icon icon="iconoir:arrow-up-right" width="15" style="margin-right: 8px;" />
@@ -197,15 +257,27 @@
                                   <Icon icon="fluent:shield-dismiss-20-regular" width="15" style="margin-right: 8px;" />
                                   {{ $t('reportSpam') || '举报为垃圾邮件' }}
                                 </el-dropdown-item>
+                                <el-dropdown-item command="downloadEml">
+                                  <Icon icon="fluent:document-arrow-down-16-regular" width="15" style="margin-right: 8px;" />
+                                  {{ $t('downloadEml') || '下载邮件 (.eml)' }}
+                                </el-dropdown-item>
+                                <el-dropdown-item command="viewHeaders">
+                                  <Icon icon="fluent:code-text-16-regular" width="15" style="margin-right: 8px;" />
+                                  {{ $t('viewRawHeaders') || '查看原始邮件与标头' }}
+                                </el-dropdown-item>
                                 <el-dropdown-item command="print">
                                   <Icon icon="fluent:print-20-regular" width="15" style="margin-right: 8px;" />
                                   {{ $t('printEmail') || '打印此邮件' }}
+                                </el-dropdown-item>
+                                <el-dropdown-item command="delete" style="color: #ef4444;" v-if="hasPerm('email:delete')">
+                                  <Icon icon="fluent:delete-20-regular" width="15" style="margin-right: 8px;" />
+                                  {{ $t('delete') || '删除此邮件' }}
                                 </el-dropdown-item>
                               </el-dropdown-menu>
                             </template>
                           </el-dropdown>
                         </div>
-                        <Icon icon="lucide:chevron-up" width="16" height="16" class="ch-arrow" v-if="threadMessages.length > 1" />
+                        <Icon icon="lucide:chevron-up" width="16" height="16" class="ch-arrow" v-if="threadMessages.length > 1" @click.stop="toggleMsg(msg.emailId, index)" />
                       </div>
                     </div>
                     <div class="info-middle">
@@ -429,6 +501,42 @@
         <span class="dialog-footer">
           <el-button @click="filterDialogVisible = false">{{ $t('cancel') || '取消' }}</el-button>
           <el-button type="primary" @click="handleCreateFilter">{{ $t('createFilterBtn') || '创建过滤器' }}</el-button>
+        </span>
+      </template>
+    </el-dialog>
+
+    <!-- Show Original & Raw Headers Dialog -->
+    <el-dialog v-model="rawHeadersDialogVisible" :title="$t('viewRawHeaders') || '查看原始邮件与标头'" width="680px" class="raw-headers-dialog" append-to-body>
+      <div class="raw-headers-modal-body" v-if="currentRawMsg">
+        <el-tabs v-model="rawHeaderTab">
+          <el-tab-pane label="摘要标头 (Summary)" name="summary">
+            <div class="raw-header-table">
+              <div class="rht-row"><span class="rht-key">Message-ID</span><span class="rht-val">{{ currentRawMsg.messageId || currentRawMsg.emailId || 'N/A' }}</span></div>
+              <div class="rht-row"><span class="rht-key">Created</span><span class="rht-val">{{ formatDetailDate(currentRawMsg.createTime) }}</span></div>
+              <div class="rht-row"><span class="rht-key">From</span><span class="rht-val">{{ currentRawMsg.name ? `${currentRawMsg.name} <${currentRawMsg.sendEmail}>` : currentRawMsg.sendEmail }}</span></div>
+              <div class="rht-row"><span class="rht-key">To</span><span class="rht-val">{{ formateReceive(currentRawMsg.recipient) }}</span></div>
+              <div class="rht-row"><span class="rht-key">Subject</span><span class="rht-val">{{ currentRawMsg.subject || email.subject }}</span></div>
+              <div class="rht-row"><span class="rht-key">Security</span><span class="rht-val">Standard Encryption (TLS 1.3 / AES-256)</span></div>
+            </div>
+          </el-tab-pane>
+          <el-tab-pane label="原始文本 (Raw EML)" name="raw">
+            <pre class="raw-eml-pre">{{ getRawEmlText(currentRawMsg) }}</pre>
+          </el-tab-pane>
+        </el-tabs>
+      </div>
+      <template #footer>
+        <span class="dialog-footer" style="display: flex; justify-content: space-between; align-items: center;">
+          <el-button @click="copyRawEml(currentRawMsg)">
+            <Icon icon="fluent:copy-16-regular" width="15" style="margin-right: 4px;" />
+            {{ $t('copy') || '复制到剪贴板' }}
+          </el-button>
+          <div>
+            <el-button @click="rawHeadersDialogVisible = false">{{ $t('close') || '关闭' }}</el-button>
+            <el-button type="primary" @click="handleDownloadEml(currentRawMsg)">
+              <Icon icon="fluent:document-arrow-down-16-regular" width="15" style="margin-right: 4px;" />
+              {{ $t('downloadEml') || '下载 .EML' }}
+            </el-button>
+          </div>
         </span>
       </template>
     </el-dialog>
@@ -890,8 +998,164 @@ const handleMute = () => {
   });
 };
 
-const handlePrint = () => {
+const handleArchive = () => {
+  let list = [...currentLabels.value];
+  if (!list.includes('已归档')) {
+    list.push('已归档');
+  }
+  email.labels = JSON.stringify(list);
+  emailSetLabels(email.emailId, list).then(() => {
+    ElMessage.success(t('archiveSuccess') || '已归档');
+    emailStore.refreshSidebarStats();
+    handleBack();
+  });
+};
+
+const handleAddToTasks = () => {
+  let list = [...currentLabels.value];
+  if (!list.includes('任务待办')) {
+    list.push('任务待办');
+    email.labels = JSON.stringify(list);
+    emailSetLabels(email.emailId, list).then(() => {
+      emailStore.refreshSidebarStats();
+    });
+  }
+  ElMessage.success(t('addedToTasks') || '已添加到任务待办');
+};
+
+const handleMoveTo = (target) => {
+  if (target === 'spam') {
+    handleReportSpam();
+  } else if (target === 'trash') {
+    handleDelete();
+  } else if (target === 'inbox') {
+    let list = currentLabels.value.filter(l => l !== '已归档' && l !== '垃圾邮件');
+    email.labels = JSON.stringify(list);
+    emailSetLabels(email.emailId, list).then(() => {
+      ElMessage.success(t('moveToInbox') || '已移动至收件箱');
+      emailStore.refreshSidebarStats();
+    });
+  }
+};
+
+const openReplyAllMsg = (msg) => {
+  const target = msg || email;
+  uiStore.writerRef.openReply(target);
+};
+
+const handlePrintAll = () => {
   window.print();
+};
+
+const printSingleMsg = (msg) => {
+  const target = msg || email;
+  const printWindow = window.open('', '_blank');
+  if (!printWindow) {
+    window.print();
+    return;
+  }
+  const contentHtml = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <title>${target.subject || email.subject || 'Print Email'}</title>
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; padding: 24px; color: #1e293b; }
+          .header { border-bottom: 2px solid #e2e8f0; padding-bottom: 12px; margin-bottom: 20px; }
+          .title { font-size: 22px; font-weight: bold; margin-bottom: 8px; }
+          .meta { font-size: 13px; color: #64748b; line-height: 1.6; }
+          .body { font-size: 14px; line-height: 1.6; margin-top: 16px; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div class="title">${target.subject || email.subject || ''}</div>
+          <div class="meta">
+            <div><strong>From:</strong> ${target.name ? `${target.name} &lt;${target.sendEmail}&gt;` : target.sendEmail}</div>
+            <div><strong>To:</strong> ${formateReceive(target.recipient)}</div>
+            <div><strong>Date:</strong> ${formatDetailDate(target.createTime)}</div>
+          </div>
+        </div>
+        <div class="body">
+          ${target.content || target.text || ''}
+        </div>
+      </body>
+    </html>
+  `;
+  printWindow.document.write(contentHtml);
+  printWindow.document.close();
+  printWindow.focus();
+  setTimeout(() => {
+    printWindow.print();
+    printWindow.close();
+  }, 300);
+};
+
+const handleOpenInNewWindow = () => {
+  window.open(window.location.href, '_blank');
+};
+
+const handleDownloadEml = (msg) => {
+  const target = msg || email;
+  const emlContent = [
+    `From: ${target.name ? `${target.name} <${target.sendEmail}>` : target.sendEmail}`,
+    `To: ${formateReceive(target.recipient)}`,
+    target.replyTo ? `Reply-To: ${target.replyTo}` : '',
+    `Subject: ${target.subject || email.subject || 'No Subject'}`,
+    `Date: ${new Date(target.createTime || Date.now()).toUTCString()}`,
+    `MIME-Version: 1.0`,
+    `Content-Type: text/html; charset=utf-8`,
+    '',
+    target.content || target.text || ''
+  ].filter(line => line !== '').join('\r\n');
+
+  const blob = new Blob([emlContent], { type: 'message/rfc822' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${(target.subject || 'email').replace(/[\/\\?%*:|"<>]/g, '_')}.eml`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  ElMessage.success(t('downloadEml') || '已下载邮件文件');
+};
+
+const rawHeadersDialogVisible = ref(false);
+const rawHeaderTab = ref('summary');
+const currentRawMsg = ref(null);
+
+const handleViewRawHeaders = (msg) => {
+  currentRawMsg.value = msg || email;
+  rawHeadersDialogVisible.value = true;
+};
+
+const getRawEmlText = (msg) => {
+  if (!msg) return '';
+  return [
+    `Delivered-To: ${formateReceive(msg.recipient)}`,
+    `Received: by epomail.bond with SMTP id mail-${msg.emailId || '0'};`,
+    `        ${new Date(msg.createTime || Date.now()).toUTCString()}`,
+    `Return-Path: <${msg.sendEmail}>`,
+    `From: ${msg.name ? `${msg.name} <${msg.sendEmail}>` : msg.sendEmail}`,
+    `To: ${formateReceive(msg.recipient)}`,
+    msg.replyTo ? `Reply-To: ${msg.replyTo}` : '',
+    `Subject: ${msg.subject || email.subject || 'No Subject'}`,
+    `Date: ${new Date(msg.createTime || Date.now()).toUTCString()}`,
+    `Message-ID: <${msg.messageId || `mail.${msg.emailId || Date.now()}@epomail.bond`}>`,
+    `MIME-Version: 1.0`,
+    `Content-Type: text/html; charset=UTF-8`,
+    `Security: TLS 1.3 256-bit encryption`,
+    '',
+    msg.content || msg.text || ''
+  ].filter(line => line !== '').join('\r\n');
+};
+
+const copyRawEml = (msg) => {
+  const text = getRawEmlText(msg);
+  navigator.clipboard.writeText(text).then(() => {
+    ElMessage.success(t('copySuccess') || '已复制标头内容');
+  });
 };
 
 const handleHeaderMoreCommand = (command) => {
@@ -899,14 +1163,18 @@ const handleHeaderMoreCommand = (command) => {
     openFilterDialog();
   } else if (command === 'mute') {
     handleMute();
-  } else if (command === 'print') {
-    handlePrint();
+  } else if (command === 'printAll') {
+    handlePrintAll();
+  } else if (command === 'forwardAll') {
+    openForward();
   }
 };
 
 const handleMsgMoreCommand = (command, msg) => {
   if (command === 'reply') {
     openReplyMsg(msg);
+  } else if (command === 'replyAll') {
+    openReplyAllMsg(msg);
   } else if (command === 'forward') {
     openForwardMsg(msg);
   } else if (command === 'filter') {
@@ -914,7 +1182,13 @@ const handleMsgMoreCommand = (command, msg) => {
   } else if (command === 'spam') {
     handleReportSpam();
   } else if (command === 'print') {
-    handlePrint();
+    printSingleMsg(msg);
+  } else if (command === 'downloadEml') {
+    handleDownloadEml(msg);
+  } else if (command === 'viewHeaders') {
+    handleViewRawHeaders(msg);
+  } else if (command === 'delete') {
+    handleDelete();
   }
 };
 
@@ -1023,9 +1297,22 @@ const handleReportNotSpam = (emailId) => {
   padding: 9px 15px 8px;
   display: flex;
   align-items: center;
-  gap: 18px;
+  justify-content: space-between;
   box-shadow: var(--header-actions-border);
   font-size: 18px;
+
+  .header-actions-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .header-actions-right {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
   .star {
     display: flex;
     align-items: center;
@@ -1084,14 +1371,14 @@ const handleReportNotSpam = (emailId) => {
       color: var(--text-primary);
     }
 
-    .thread-header-bar {
+    .email-labels-list {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 6px;
 
-      .thread-info-tag {
-        font-weight: 600;
-        border-radius: 6px;
+      .subject-label-tag {
+        border-radius: 4px;
+        font-weight: 500;
       }
     }
   }
@@ -1293,32 +1580,53 @@ const handleReportNotSpam = (emailId) => {
           justify-content: space-between;
           align-items: center;
           
+          .sender-title-wrap {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+          }
+
           .send-name-title {
             font-size: 16px;
             font-weight: bold;
             color: var(--el-text-color-primary);
           }
-          .date {
-            color: var(--regular-text-color);
-            font-size: 13px;
-          }
 
-          .msg-header-quick-actions {
+          .thread-header-bar {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 12px;
 
-            .msg-act-icon {
-              cursor: pointer;
-              color: var(--text-muted, #94a3b8);
-              transition: color 0.15s ease, transform 0.15s ease;
+            .date {
+              color: var(--regular-text-color);
+              font-size: 13px;
+              white-space: nowrap;
+            }
+
+            .msg-header-quick-actions {
               display: flex;
               align-items: center;
-              justify-content: center;
+              gap: 8px;
 
-              &:hover {
-                color: var(--text-primary, #0f172a);
-                transform: scale(1.1);
+              .msg-act-star {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                cursor: pointer;
+              }
+
+              .msg-act-icon {
+                cursor: pointer;
+                color: var(--text-muted, #94a3b8);
+                transition: color 0.15s ease, transform 0.15s ease;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+
+                &:hover {
+                  color: var(--text-primary, #0f172a);
+                  transform: scale(1.1);
+                }
               }
             }
           }
@@ -1620,7 +1928,7 @@ const handleReportNotSpam = (emailId) => {
   flex-direction: column;
   gap: 2px;
 
-  .snooze-menu-title, .label-menu-title {
+  .snooze-menu-title, .label-menu-title, .move-menu-title {
     font-size: 12px;
     font-weight: 600;
     color: var(--text-muted, #94a3b8);
@@ -1629,7 +1937,7 @@ const handleReportNotSpam = (emailId) => {
     letter-spacing: 0.5px;
   }
 
-  .snooze-menu-item, .label-menu-item {
+  .snooze-menu-item, .label-menu-item, .move-menu-item {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -1657,6 +1965,45 @@ const handleReportNotSpam = (emailId) => {
       text-overflow: ellipsis;
       white-space: nowrap;
     }
+  }
+}
+
+.raw-headers-modal-body {
+  .raw-header-table {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-size: 13px;
+    .rht-row {
+      display: flex;
+      padding: 6px 10px;
+      background: var(--el-fill-color-light);
+      border-radius: 6px;
+      .rht-key {
+        width: 110px;
+        font-weight: 600;
+        color: var(--text-secondary);
+        flex-shrink: 0;
+      }
+      .rht-val {
+        color: var(--text-primary);
+        word-break: break-all;
+      }
+    }
+  }
+
+  .raw-eml-pre {
+    background: #0f172a;
+    color: #e2e8f0;
+    padding: 12px 16px;
+    border-radius: 8px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 12px;
+    line-height: 1.5;
+    max-height: 400px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
   }
 }
 </style>

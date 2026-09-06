@@ -571,11 +571,11 @@ function getThreadKey(item) {
        .replace(/^(\[[^\]]+\]|\([^\)]+\))[:：\s]*/g, '')
        .trim().toLowerCase();
 
-  const sender = (item.sendEmail || '').trim().toLowerCase();
   if (!s) {
+    const sender = (item.sendEmail || '').trim().toLowerCase();
     return sender ? `sender_${sender}` : `id_${item.emailId}`;
   }
-  return `subj_${s}_${sender}`;
+  return `subj_${s}`;
 }
 
 function aggregateThreads(items) {

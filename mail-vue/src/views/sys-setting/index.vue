@@ -432,6 +432,64 @@
             </div>
           </div>
 
+          <!-- AI Engine & Large Language Model Hub Card (AI 智能引擎与大模型接入) -->
+          <div class="settings-card ai-hub-card">
+            <div class="card-title">
+              <div class="title-with-badge">
+                <Icon class="ai-title-icon" icon="fluent:bot-sparkle-24-filled" width="20" height="20" style="color: #6366f1; margin-right: 6px; vertical-align: -3px;" />
+                <span>{{ $t('aiHubTitle') || 'AI 智能引擎与大模型接入' }}</span>
+                <el-tooltip effect="dark" :content="$t('aiHubTooltip') || '在系统底层接入 OpenAI 兼容协议大模型或免密使用 Cloudflare Workers AI，用于邮件智能全文翻译、内容提取与规则分析。'">
+                  <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+                </el-tooltip>
+              </div>
+              <el-tag size="small" :type="setting.aiApiKey ? 'success' : 'info'" effect="light" class="ai-status-tag">
+                <Icon :icon="setting.aiApiKey ? 'fluent:checkmark-circle-16-filled' : 'fluent:sparkle-16-filled'" width="13" height="13" style="margin-right: 4px; vertical-align: -1px;" />
+                {{ setting.aiApiKey ? ($t('aiCustomMode') || '自定义大模型已启用') : ($t('aiCfMode') || 'Workers AI 内置免密') }}
+              </el-tag>
+            </div>
+            <div class="card-content">
+              <div class="setting-item">
+                <div class="title-item">
+                  <span>{{ $t('aiProviderTitle') || '大模型接入状态' }}</span>
+                  <el-tooltip effect="dark" :content="$t('aiProviderHint')">
+                    <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+                  </el-tooltip>
+                </div>
+                <div class="forward">
+                  <span class="ai-model-badge">{{ setting.aiModel || 'gpt-4o-mini (@cf/llama-3.1-8b)' }}</span>
+                  <el-button class="opt-button" size="small" type="primary" @click="openAiHubDialog">
+                    <Icon icon="fluent:settings-48-regular" width="18" height="18"/>
+                  </el-button>
+                </div>
+              </div>
+
+              <div class="setting-item">
+                <div class="title-item">
+                  <span>{{ $t('aiConnectionTest') || 'AI 连通性测试' }}</span>
+                </div>
+                <div class="forward">
+                  <el-button size="small" :loading="testingAiInHub" @click="testAiConnectionInHub">
+                    <Icon icon="fluent:flash-checkmark-24-filled" width="15" height="15" style="margin-right: 4px; color: var(--accent-primary);" />
+                    {{ $t('aiTestBtn') || '测试 AI 连通性' }}
+                  </el-button>
+                </div>
+              </div>
+
+              <div class="setting-item quick-presets-row">
+                <div class="title-item">
+                  <span>{{ $t('aiQuickPresets') || '常用大模型预设' }}</span>
+                </div>
+                <div class="ai-presets-chips">
+                  <el-tag size="small" class="preset-chip" @click="applyAiPreset('deepseek')">DeepSeek</el-tag>
+                  <el-tag size="small" class="preset-chip" @click="applyAiPreset('openai')">OpenAI</el-tag>
+                  <el-tag size="small" class="preset-chip" @click="applyAiPreset('claude')">Claude</el-tag>
+                  <el-tag size="small" class="preset-chip" @click="applyAiPreset('gemini')">Gemini</el-tag>
+                  <el-tag size="small" class="preset-chip" @click="applyAiPreset('cf')">Cloudflare AI</el-tag>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <!-- User Data & Capabilities Control Card (用户资料控制) -->
           <div class="settings-card user-data-control-card">
             <div class="card-title">
@@ -2594,13 +2652,77 @@
         <el-button type="primary" style="width: 100%;" :loading="settingLoading" @click="saveBlackList">{{ $t('save') }}</el-button>
       </el-dialog>
 
+      <!-- AI Engine & Large Language Model Modal Dialog -->
+      <el-dialog 
+        v-model="aiHubDialogShow" 
+        :title="$t('aiHubConfigTitle') || 'AI 智能引擎与大模型配置'" 
+        width="560px"
+        class="ai-hub-dialog"
+        :close-on-click-modal="false"
+      >
+        <el-form label-position="top" :model="aiHubForm" class="ai-hub-form">
+          <el-alert
+            :title="$t('aiProviderHint') || '留空 API Key 时将自动免密调用 Cloudflare Workers AI 专属绑定或公共引擎保底。配置后优先请求您的专属大模型服务。'"
+            type="info"
+            :closable="false"
+            show-icon
+            style="margin-bottom: 18px;"
+          />
+          <el-form-item :label="$t('aiApiKey') || 'API 密钥 (API Key)'">
+            <el-input 
+              v-model="aiHubForm.aiApiKey" 
+              type="password" 
+              show-password 
+              placeholder="sk-..." 
+              clearable
+            />
+          </el-form-item>
+          <el-form-item :label="$t('aiApiUrl') || '接口地址 (Base URL)'">
+            <el-input 
+              v-model="aiHubForm.aiApiUrl" 
+              placeholder="https://api.openai.com/v1" 
+              clearable
+            />
+          </el-form-item>
+          <el-form-item :label="$t('aiModel') || '模型标识 (Model Name)'">
+            <el-input 
+              v-model="aiHubForm.aiModel" 
+              placeholder="gpt-4o-mini / deepseek-chat / claude-3-5-haiku-20241022" 
+              clearable
+            />
+          </el-form-item>
+          <div class="presets-quick-bar">
+            <span class="preset-label">{{ $t('aiQuickPresets') || '快速预设' }}:</span>
+            <el-button link size="small" type="primary" @click="fillPresetInForm('deepseek')">DeepSeek</el-button>
+            <el-button link size="small" type="primary" @click="fillPresetInForm('openai')">OpenAI</el-button>
+            <el-button link size="small" type="primary" @click="fillPresetInForm('claude')">Claude (OneAPI)</el-button>
+            <el-button link size="small" type="primary" @click="fillPresetInForm('gemini')">Gemini (OneAPI)</el-button>
+            <el-button link size="small" type="primary" @click="fillPresetInForm('cf')">Cloudflare AI</el-button>
+          </div>
+        </el-form>
+        <template #footer>
+          <div class="dialog-footer" style="display: flex; justify-content: space-between; align-items: center;">
+            <el-button :loading="testingAiInHub" @click="testAiConnectionInHub">
+              <Icon icon="fluent:flash-checkmark-24-filled" width="14" height="14" style="margin-right: 4px;" />
+              {{ $t('aiTestBtn') || '测试连通性' }}
+            </el-button>
+            <div>
+              <el-button @click="aiHubDialogShow = false">{{ $t('cancel') || '取消' }}</el-button>
+              <el-button type="primary" :loading="settingLoading" @click="saveAiHubConfig">
+                {{ $t('save') || '保存配置' }}
+              </el-button>
+            </div>
+          </div>
+        </template>
+      </el-dialog>
+
     </el-scrollbar>
   </div>
 </template>
 
 <script setup>
 import {computed, defineOptions, nextTick, reactive, ref} from "vue";
-import {deleteBackground, setBackground, setBlackList, settingQuery, settingSet, sendWelcomeEmail, testS3Setting, getDbStatus, testDbSetting, scanStorage, cleanupStorage} from "@/request/setting.js";
+import {deleteBackground, setBackground, setBlackList, settingQuery, settingSet, sendWelcomeEmail, testS3Setting, getDbStatus, testDbSetting, scanStorage, cleanupStorage, testAiSetting} from "@/request/setting.js";
 import { testTelegramBot } from "@/request/my.js";
 import {useSettingStore} from "@/store/setting.js";
 import {useUiStore} from "@/store/ui.js";
@@ -2747,6 +2869,81 @@ const s3 = reactive({
 })
 const testingS3 = ref(false)
 const s3TestResult = ref(null)
+
+const aiHubDialogShow = ref(false)
+const testingAiInHub = ref(false)
+const aiHubForm = reactive({
+  aiApiKey: '',
+  aiApiUrl: '',
+  aiModel: ''
+})
+
+const openAiHubDialog = () => {
+  aiHubForm.aiApiKey = setting.value?.aiApiKey || ''
+  aiHubForm.aiApiUrl = setting.value?.aiApiUrl || ''
+  aiHubForm.aiModel = setting.value?.aiModel || ''
+  aiHubDialogShow.value = true
+}
+
+const fillPresetInForm = (provider) => {
+  if (provider === 'deepseek') {
+    aiHubForm.aiApiUrl = 'https://api.deepseek.com/v1'
+    aiHubForm.aiModel = 'deepseek-chat'
+  } else if (provider === 'openai') {
+    aiHubForm.aiApiUrl = 'https://api.openai.com/v1'
+    aiHubForm.aiModel = 'gpt-4o-mini'
+  } else if (provider === 'claude') {
+    aiHubForm.aiApiUrl = 'https://api.anthropic.com/v1'
+    aiHubForm.aiModel = 'claude-3-5-haiku-20241022'
+  } else if (provider === 'gemini') {
+    aiHubForm.aiApiUrl = 'https://generativelanguage.googleapis.com/v1beta/openai'
+    aiHubForm.aiModel = 'gemini-1.5-flash'
+  } else if (provider === 'cf') {
+    aiHubForm.aiApiKey = ''
+    aiHubForm.aiApiUrl = ''
+    aiHubForm.aiModel = '@cf/meta/llama-3.1-8b-instruct'
+  }
+}
+
+const applyAiPreset = (provider) => {
+  openAiHubDialog()
+  fillPresetInForm(provider)
+}
+
+const testAiConnectionInHub = () => {
+  testingAiInHub.value = true
+  testAiSetting({
+    aiApiKey: aiHubForm.aiApiKey || setting.value?.aiApiKey || '',
+    aiApiUrl: aiHubForm.aiApiUrl || setting.value?.aiApiUrl || '',
+    aiModel: aiHubForm.aiModel || setting.value?.aiModel || ''
+  }).then(res => {
+    testingAiInHub.value = false
+    const msg = res.data?.message || res.message || t('aiTestSuccess') || 'AI 连通性测试成功！'
+    ElMessage({
+      type: 'success',
+      message: msg,
+      plain: true
+    })
+  }).catch(err => {
+    testingAiInHub.value = false
+    const errMsg = err.response?.data?.message || err.message || t('aiTestFail') || '测试失败'
+    ElMessage({
+      type: 'error',
+      message: errMsg,
+      plain: true
+    })
+  })
+}
+
+const saveAiHubConfig = () => {
+  editSetting({
+    aiApiKey: (aiHubForm.aiApiKey || '').trim(),
+    aiApiUrl: (aiHubForm.aiApiUrl || '').trim(),
+    aiModel: (aiHubForm.aiModel || '').trim()
+  })
+  aiHubDialogShow.value = false
+}
+
 
 const noticeForm = reactive({
   noticeTitle: '',
@@ -4646,6 +4843,7 @@ function editSetting(settingForm, refreshStatus = true) {
     addS3Show.value = false
     emailPrefixShow.value = false
     aiCodeFilterShow.value = false
+    aiHubDialogShow.value = false
   }).catch((e) => {
     console.error('editSetting error:', e)
     loginOpacity.value = setting.value.loginOpacity
@@ -7322,6 +7520,80 @@ form .el-button {
   }
 }
 
+/* AI Hub Card & Dialog Scoped Styles */
+.ai-hub-card {
+  .title-with-badge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  
+  .ai-status-tag {
+    margin-left: auto;
+    font-weight: 500;
+    border-radius: 6px;
+  }
+
+  .ai-model-badge {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--accent-primary, #6366f1);
+    background: var(--el-fill-color-light);
+    padding: 3px 8px;
+    border-radius: 6px;
+    border: 1px solid var(--el-border-color-lighter);
+  }
+
+  .quick-presets-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .ai-presets-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    width: 100%;
+
+    .preset-chip {
+      cursor: pointer;
+      border-radius: 6px;
+      font-size: 12px;
+      padding: 4px 10px;
+      background: var(--el-fill-color-light);
+      border: 1px solid var(--el-border-color);
+      color: var(--text-primary);
+      transition: all 0.2s ease;
+
+      &:hover {
+        background: var(--accent-primary, #6366f1);
+        color: #ffffff;
+        border-color: var(--accent-primary, #6366f1);
+        transform: translateY(-1px);
+      }
+    }
+  }
+}
+
+.presets-quick-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 8px 12px;
+  background: var(--el-fill-color-light);
+  border-radius: 8px;
+  border: 1px dashed var(--el-border-color);
+
+  .preset-label {
+    font-size: 12px;
+    color: var(--el-text-color-secondary);
+    font-weight: 500;
+  }
+}
 
 </style>
 
@@ -7329,7 +7601,8 @@ form .el-button {
 .el-popper.is-dark {
 }
 
-/* Epomail Storage & Database Hub Dialogs Unscoped Overrides */
+/* Epomail Storage, Database & AI Hub Dialogs Unscoped Overrides */
+.el-dialog.ai-hub-dialog,
 .el-dialog.storage-config-dialog,
 .el-dialog.s3-config-dialog,
 .el-dialog.db-config-dialog,

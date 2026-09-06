@@ -12,6 +12,43 @@
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
 
+### 系统设置独立AI大模型接入板块、Gmail顶栏全面对齐、内嵌thread-header-bar邮件操作组与原始标头查看上线 (2026-09-06)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **管理员系统设置独立 AI 智能引擎与大模型接入板块**:
+       - 在系统设置页面（`/system-setting`）新增独立高质感 AI 引擎板块卡片（`.ai-hub-card`），彻底取代历史分散配置；
+       - 醒目标识当前接入状态徽章（自定义大模型已启用 / Workers AI 内置免密）、当前接入模型标识（Mono等宽字体高质感呈现）、快捷「测试 AI 连通性」诊断按钮以及 5 大常用模型一键预设胶囊（DeepSeek, OpenAI, Claude, Gemini, Cloudflare AI）；
+       - 呼出专属管理对话框（`.ai-hub-dialog`），支持灵活配置 OpenAI 兼容协议 Base URL、API Key 与 Model Name，支持一键快速填充各主流大模型预设，并在弹窗内直接提供测试连通性与实时诊断反馈；
+       - 智能容灾与高可用：留空 API Key 时系统底层免密调用 Cloudflare Workers AI 专属绑定（`@cf/meta/llama-3.1-8b-instruct`）或公共引擎保底，配置后优先走专属大模型通道。
+    2. **彻底删除重复「返回邮件」条目并重构 Gmail 顶栏操作体系**:
+       - 彻底删除此前在非分栏模式下与顶部 Gmail 返回按钮重复的「返回邮件列表」工具栏（`.no-split-back-bar` / `.back-to-list-btn`）；
+       - 顶栏 `.header-actions` 重构为现代弹性布局：
+         - **左对齐操作组 (`.header-actions-left`)**: 返回 (`btn-back`)、归档 (`btn-archive`)、举报垃圾邮件 (`btn-spam`)、删除 (`btn-delete`)、已读/未读切换 (`btn-unread`)、稍后提醒 (`btn-snooze`)、添加到任务待办 (`btn-task`)、移动到 (`btn-move`，支持收件箱/垃圾箱/废纸篓)、标签管理 (`btn-label`)、邮件全文翻译 (`btn-translate`)、更多操作 (`btn-more`，含过滤此类邮件/忽略会话/全部转发/全部打印)；
+         - **右对齐操作组 (`.header-actions-right`)**: 全部展开/全部折叠 (`btn-expand-all`)、全部打印 (`btn-print-all`)、在新窗口中打开 (`btn-new-window`)。
+    3. **邮件内嵌 `class="thread-header-bar"` 真实按钮组与原始标头查看**:
+       - 彻底清理邮件标题行（`.email-title-row`）中过时的静态文字标签（原 `会话聚合 (共 x 封邮件)` 提示）；
+       - 将 `class="thread-header-bar"` 精确移至展开邮件的内部右侧（`.info-top .thread-header-bar`），对齐 Gmail 经典内嵌操作条交互，包含针对当前展开单封邮件的实际操作按钮：
+         - 标准化时间日期戳展示；
+         - 星标切换 (`btn-star`)；
+         - 快捷全文翻译 (`btn-translate`)；
+         - 单封回复 (`btn-reply`)；
+         - 单封回复全部 (`btn-reply-all`)；
+         - 单封转发 (`btn-forward`)；
+         - 单封独立打印 (`btn-print`，弹出独立干净打印视窗)；
+         - 单封三点更多操作菜单 (`btn-msg-more`，包含回复、回复全部、转发、过滤此类邮件、举报垃圾邮件、下载 .eml 邮件、查看原始邮件与标头、打印此邮件、删除此邮件)；
+         - 会话折叠/展开箭头；
+       - 新增「查看原始邮件与标头」高质感对话框（`.raw-headers-dialog`），提供「摘要标头 (Summary)」表格与「原始文本 (Raw EML)」Mono 控制台预览，支持一键复制到剪贴板与下载标准 `.eml` 文件。
+    4. **双向往返会话聚合算法校准与完整中英双语 i18n**:
+       - 校准 `getThreadKey` 提取纯净根主题（`subj_${s}`），根除此前因附加 sender 导致双方来回回复邮件被硬生生拆解为两个独立卡片的缺陷；
+       - 全面补全 `zh.js` 与 `en.js` 缺失的全部国际化键值（`archive`, `addToTasks`, `moveTo`, `expandAll`, `collapseAll`, `printAll`, `inNewWindow`, `replyAll`, `forwardAll`, `downloadEml`, `viewRawHeaders`, `aiHubTitle`, `aiQuickPresets`, `close` 等），杜绝任何未翻译键名泄露。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **Cloudflare Workers 部署 Version ID**: `4ab06773-dbc9-414b-8ffc-7108d5c9747d`。
+    - **epocanvas-mail Git Commit**: `32638022faf5c52daab9c4f00626f4d66b91802a` (Short Hash: `3263802`)。
+    - 自动化测试套件 100% 顺利通过：
+      - `node tests/test-sys-setting-ai-hub-and-thread-actions.mjs` (Admin 登录、系统设置 /system-setting 独立 .ai-hub-card 渲染、测试 AI 连通性、.ai-hub-dialog 预设快速填充 DeepSeek/OpenAI、收件箱重复「返回邮件」删除核验、顶栏 .header-actions 12大左/右操作按钮核验、.email-title-row 静态标签清理核验、展开邮件右对齐 class="thread-header-bar" 8大实际操作按钮完备性核验、.raw-headers-dialog 原始邮件标头查看与复制核验、归档与任务待办 100% 全部通过);
+      - `node tests/test-gmail-ui-and-ai-features.mjs` (Admin 登录获取 Token、测试邮件检索、收件箱右侧面板展开、顶栏 21 大 Gmail 操作按钮完好性审计、.info-bottom「至 我」触发器与详情卡片字段/TLS徽章核验、翻译工具条与语言下拉框核验、后端 /api/email/translate AI 翻译与降级容灾核验、个人垃圾邮件上报与黑名单规则联动核验、已读/未读状态双向流转核验、管理面板 AI 集成 UI 与 /api/setting/ai/test 连通性测试 100% 全部通过);
+      - `node tests/test-invite-code-ui-optimization.mjs` (Admin 登录、4大操作药丸与原有图标完好性审计、el-scrollbar虚拟与原生滑块彻底删除Zero-Scrollbar审计、empty-baseplate质感与行动按钮审计、清空搜索交互闭环、卡片原有功能/复制/菜单审计、暗黑模式双部分画风完全同步无白斑审计、测试注册码自动重置清理 100% 全部通过);
+      - `node tests/test-oauth-apps-ui-optimization.mjs` (protocol-tag 彻底剔除验证、guide-btn 文档教程提示与博客跳转验证、app-card 回调地址去除核验、卡片高度 <= 210px 压缩审计、底栏三大操作按钮核验、明亮/暗黑双模式截图生成与无白斑验证 100% 全部通过)。
+
 ### 用户注册界面白屏崩溃修复、开启注册状态动态同步、注册邀请码必填逻辑校准与错误边界守护上线 (2026-09-06)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **根除注册界面白屏崩溃并引入 ErrorBoundary 错误边界**:

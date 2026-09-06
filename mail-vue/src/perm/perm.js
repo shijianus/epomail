@@ -88,6 +88,7 @@ const routers = {
     'setting:query': [
         {
             path: '/system-setting',
+            alias: ['/settings/system', '/sys-setting'],
             name: 'sys-setting',
             component: () => import('@/views/sys-setting/index.vue'),
             meta: {

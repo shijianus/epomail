@@ -96,12 +96,6 @@
         </router-view>
       </div>
       <div class="reading-pane-column" v-if="showReadingPane">
-        <div v-if="uiStore.readingPane === 'no_split'" class="no-split-back-bar">
-          <el-button link size="small" @click="emailStore.contentData.email = null" class="back-to-list-btn">
-            <Icon icon="lucide:arrow-left" width="16" height="16" style="margin-right: 6px;" />
-            <span>{{ $t('backToMail') || '返回邮件列表' }}</span>
-          </el-button>
-        </div>
         <ContentComponent :key="emailStore.contentData.email?.emailId" />
       </div>
     </div>
@@ -303,19 +297,6 @@ const handleResize = () => {
   }
 }
 
-.no-split-back-bar {
-  padding: 8px 16px;
-  border-bottom: 1px solid var(--border-subtle);
-  background: var(--bg-surface);
-  display: flex;
-  align-items: center;
-
-  .back-to-list-btn {
-    font-size: 13px;
-    font-weight: 500;
-    color: var(--accent-primary);
-  }
-}
 
 .list-column {
   flex: 1;
