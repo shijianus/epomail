@@ -58,6 +58,22 @@ export const DEFAULT_OAUTH_APPS = [
 		logoUrl: 'https://blog.epocanvas.com/logo.svg',
 		scopes: 'openid profile email comments',
 		status: 1
+	},
+	{
+		clientId: 'epo_live_epocanvas_image',
+		clientSecret: 'epo_sec_epocanvas_image_secret_2026',
+		name: 'EpoCanvasImage',
+		homepageUrl: 'https://epocanvas-image.epocanvas.workers.dev',
+		description: 'EpoCanvasImage 官方私有云图床系统与 API 密钥管理授权客户端',
+		redirectUris: JSON.stringify([
+			'https://epocanvas-image.epocanvas.workers.dev/auth/callback',
+			'https://img.epocanvas.com/auth/callback',
+			'http://localhost:8787/auth/callback',
+			'http://127.0.0.1:8787/auth/callback'
+		]),
+		logoUrl: 'https://epocanvas-image.epocanvas.workers.dev/file/BQACAgEAAyEGAAS6jkJbAAMXap1gJHvWyMiwzUPrz6MhNWht3rAAAlAIAAIf-_BEWdrTOKe56fM9BA.svg',
+		scopes: 'openid profile email',
+		status: 1
 	}
 ];
 

@@ -390,6 +390,28 @@ const dbInit = {
 				'openid profile email comments',
 				1
 			).run();
+
+			// Auto-seed default OAuth client for epocanvas-image
+			await userDb.prepare(`
+				INSERT INTO oauth_app (client_id, client_secret, name, homepage_url, description, redirect_uris, logo_url, scopes, status)
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+				ON CONFLICT(client_id) DO NOTHING;
+			`).bind(
+				'epo_live_epocanvas_image',
+				'epo_sec_epocanvas_image_secret_2026',
+				'EpoCanvasImage',
+				'https://epocanvas-image.epocanvas.workers.dev',
+				'EpoCanvasImage 官方私有云图床系统与 API 密钥管理授权客户端',
+				JSON.stringify([
+					'https://epocanvas-image.epocanvas.workers.dev/auth/callback',
+					'https://img.epocanvas.com/auth/callback',
+					'http://localhost:8787/auth/callback',
+					'http://127.0.0.1:8787/auth/callback'
+				]),
+				'https://epocanvas-image.epocanvas.workers.dev/file/BQACAgEAAyEGAAS6jkJbAAMXap1gJHvWyMiwzUPrz6MhNWht3rAAAlAIAAIf-_BEWdrTOKe56fM9BA.svg',
+				'openid profile email',
+				1
+			).run();
 		} catch (e) {
 			console.warn(`初始化 oauth_app 表跳过：${e.message}`);
 		}
