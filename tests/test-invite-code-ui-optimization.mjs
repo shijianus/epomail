@@ -55,11 +55,12 @@ import assert from "assert";
       localStorage.setItem("locale", "zh");
     }, adminToken);
 
-    await page.goto(BASE + "/invite-code", { waitUntil: "networkidle" });
-    await page.waitForTimeout(1000);
+    await page.goto(BASE + "/invite-code", { waitUntil: "domcontentloaded" });
+    await page.waitForTimeout(1500);
 
     // 3. 校验 Part 1：Header 操作栏胶囊药丸与原有图标完好性
     console.log("\n[步骤 3] 验证顶部 Header 操作栏与图标完好性...");
+    await page.waitForSelector(".reg-key .action-btn-pill", { timeout: 10000 });
     const pills = await page.$$(".reg-key .action-btn-pill");
     console.log(`  操作胶囊药丸数量: ${pills.length} 个`);
     assert.ok(pills.length >= 4, "操作栏必须包含至少 4 个 .action-btn-pill 药丸按钮 (添加、搜索、刷新、清理)");

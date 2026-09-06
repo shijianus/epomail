@@ -24,12 +24,24 @@ export function emailReportNotSpam(emailIds) {
     return http.put('/email/reportNotSpam', {emailIds})
 }
 
+export function emailReportSpam(emailIds) {
+    return http.put('/email/reportSpam', {emailIds})
+}
+
+export function emailSetLabels(emailId, labels) {
+    return http.put('/email/labels', {emailId, labels})
+}
+
+export function emailTranslate(params) {
+    return http.post('/email/translate', params)
+}
+
 export function emailLatest(emailId, accountId, allReceive) {
     return http.get('/email/latest', {params: {emailId, accountId, allReceive}, noMsg: true, timeout: 35 * 1000})
 }
 
-export function emailRead(emailIds) {
-    return http.put('/email/read', {emailIds})
+export function emailRead(emailIds, unread) {
+    return http.put('/email/read', {emailIds, unread})
 }
 
 export function emailSend(form,progress) {

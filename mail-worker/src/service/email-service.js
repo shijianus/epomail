@@ -452,6 +452,124 @@ const emailService = {
 			.run();
 	},
 
+	async reportSpam(c, params, userId) {
+		const { emailIds } = params;
+		const emailIdList = Array.isArray(emailIds) ? emailIds.map(Number) : String(emailIds).split(',').map(Number);
+		if (emailIdList.length === 0) return;
+
+		// 1. Mark as spam, clear snooze
+		await orm(c).update(email).set({ isSpam: 1, snoozedTime: null, snoozedEndTime: null }).where(
+			and(eq(email.userId, userId), inArray(email.emailId, emailIdList))
+		).run();
+
+		// 2. Fetch sender info
+		const emailRows = await orm(c).select({ sendEmail: email.sendEmail }).from(email).where(
+			and(eq(email.userId, userId), inArray(email.emailId, emailIdList))
+		).all();
+
+		const senders = [];
+		for (const row of emailRows) {
+			const rawSender = row.sendEmail || '';
+			const match = rawSender.match(/<([^>]+)>/);
+			const cleanSender = (match ? match[1] : rawSender).trim().toLowerCase();
+			if (cleanSender && !senders.includes(cleanSender)) {
+				senders.push(cleanSender);
+			}
+		}
+
+		if (senders.length === 0) return;
+
+		// 3. Update user's personal customLabels
+		const userRow = await userOrm(c).select().from(user).where(eq(user.userId, userId)).get();
+		if (!userRow) return;
+
+		let customLabels = userRow.customLabels;
+		let labelsObj = [];
+		try {
+			const parsed = JSON.parse(customLabels || '[]');
+			if (Array.isArray(parsed)) {
+				labelsObj = parsed;
+			} else if (parsed && typeof parsed === 'object') {
+				if (Array.isArray(parsed.allLabels)) labelsObj = parsed.allLabels;
+				else if (Array.isArray(parsed.customLabels)) labelsObj = parsed.customLabels;
+			}
+		} catch (e) {
+			labelsObj = [];
+		}
+
+		// If present in 信任名单, remove from it
+		const whitelistLabel = labelsObj.find(l => l.name === '信任名单');
+		if (whitelistLabel && whitelistLabel.rules?.[0]?.condition) {
+			const cond = whitelistLabel.rules[0].condition;
+			const wSenders = cond.value ? cond.value.split(',').map(s => s.trim().toLowerCase()) : [];
+			const filtered = wSenders.filter(s => !senders.includes(s));
+			cond.value = filtered.join(',');
+		}
+
+		// Find or create user's personal blacklist / spam filter rule
+		let blacklistLabel = labelsObj.find(l => l.name === '黑名单' || l.name === '个人拦截');
+		if (!blacklistLabel) {
+			blacklistLabel = {
+				id: Date.now().toString(),
+				name: '黑名单',
+				color: '#ef4444',
+				icon: 'fluent:shield-dismiss-20-regular',
+				listVis: false,
+				actions: { targetFolder: 'spam', priority: 1, stopProcessing: true },
+				rules: [{
+					id: Date.now().toString() + 'r',
+					condition: { type: 'sender_is', value: '' },
+					exception: { type: 'none', value: '' }
+				}]
+			};
+			labelsObj.push(blacklistLabel);
+		}
+
+		if (!blacklistLabel.rules || blacklistLabel.rules.length === 0) {
+			blacklistLabel.rules = [{
+				id: Date.now().toString() + 'r',
+				condition: { type: 'sender_is', value: '' },
+				exception: { type: 'none', value: '' }
+			}];
+		}
+		if (!blacklistLabel.actions) {
+			blacklistLabel.actions = { targetFolder: 'spam', priority: 1, stopProcessing: true };
+		} else {
+			blacklistLabel.actions.targetFolder = 'spam';
+			blacklistLabel.actions.priority = 1;
+			blacklistLabel.actions.stopProcessing = true;
+		}
+
+		const bCond = blacklistLabel.rules[0].condition;
+		const existingBlackSenders = bCond.value ? bCond.value.split(',').map(s => s.trim().toLowerCase()).filter(Boolean) : [];
+		let updated = false;
+		for (const s of senders) {
+			if (!existingBlackSenders.includes(s)) {
+				existingBlackSenders.push(s);
+				updated = true;
+			}
+		}
+
+		if (updated) {
+			bCond.value = existingBlackSenders.join(',');
+			const serialized = JSON.stringify(labelsObj);
+			await userOrm(c).update(user).set({ customLabels: serialized }).where(eq(user.userId, userId)).run();
+			const authInfo = await c.env.kv.get(kvConst.AUTH_INFO + userId, { type: 'json' });
+			if (authInfo && authInfo.user) {
+				authInfo.user.customLabels = serialized;
+				await c.env.kv.put(kvConst.AUTH_INFO + userId, JSON.stringify(authInfo), { expirationTtl: 60 * 60 * 24 * 7 });
+			}
+		}
+	},
+
+	async updateLabels(c, params, userId) {
+		const { emailId, labels } = params;
+		const labelsStr = Array.isArray(labels) ? JSON.stringify(labels) : String(labels || '[]');
+		await orm(c).update(email).set({ labels: labelsStr }).where(
+			and(eq(email.userId, userId), eq(email.emailId, Number(emailId)))
+		).run();
+	},
+
 	async setSnooze(c, params, userId) {
 		const { emailIds, time, endTime } = params;
 		const emailIdList = Array.isArray(emailIds) ? emailIds.map(Number) : String(emailIds).split(',').map(Number);
@@ -1728,8 +1846,10 @@ const emailService = {
 	},
 
 	async read(c, params, userId) {
-		const { emailIds } = params;
-		await orm(c).update(email).set({ unread: emailConst.unread.READ }).where(and(eq(email.userId, userId), inArray(email.emailId, emailIds)));
+		const { emailIds, unread } = params;
+		const unreadValue = unread !== undefined ? Number(unread) : emailConst.unread.READ;
+		const emailIdList = Array.isArray(emailIds) ? emailIds.map(Number) : String(emailIds).split(',').map(Number);
+		await orm(c).update(email).set({ unread: unreadValue }).where(and(eq(email.userId, userId), inArray(email.emailId, emailIdList)));
 	},
 
 	async searchSuggestions(c, params, userId) {

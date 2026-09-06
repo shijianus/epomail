@@ -12,7 +12,8 @@ import { onMounted } from 'vue';
 
 onMounted(() => {
   // Always force a hard redirect so Cloudflare serves the React app at /login/
-  window.location.href = '/login/index.html';
+  const search = window.location.search || '';
+  window.location.href = '/login/index.html' + search;
 });
 </script>
 

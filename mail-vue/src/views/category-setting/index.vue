@@ -87,8 +87,8 @@
           <!-- Workers AI Card (迁移自系统设置) -->
           <div class="settings-card">
             <div class="card-title">
-              Workers AI
-              <el-tooltip content="使用 Cloudflare Workers AI 对邮件进行智能识别与过滤" placement="top">
+              {{ $t('aiConfigTitle') }}
+              <el-tooltip :content="$t('aiConfigDesc')" placement="top">
                 <Icon icon="lucide:help-circle" width="14" class="help-icon" />
               </el-tooltip>
             </div>
@@ -105,6 +105,14 @@
                 <div class="forward">
                   <el-button class="opt-button" size="small" type="primary" @click="openAiCodeFilter">
                     <Icon icon="fluent:settings-48-regular" width="18" height="18"/>
+                  </el-button>
+                </div>
+              </div>
+              <div class="setting-item">
+                <div><span>{{ $t('aiApiKey') }} &amp; {{ $t('aiModel') }}</span></div>
+                <div class="forward">
+                  <el-button class="opt-button" size="small" type="primary" @click="openAiConfig">
+                    <Icon icon="fluent:bot-sparkle-24-regular" width="18" height="18"/>
                   </el-button>
                 </div>
               </div>
@@ -310,6 +318,60 @@
       <el-button type="primary" style="width: 100%;" :loading="settingLoading" @click="saveAiCodeFilter">{{ $t('save') }}</el-button>
     </el-dialog>
 
+    <!-- Workers AI / AI Integration Dialog -->
+    <el-dialog v-model="aiConfigShow" class="forward-dialog ai-config-dialog" @closed="resetAiConfig">
+      <template #header>
+        <div class="forward-head">
+          <span class="forward-set-title">{{ $t('aiConfigTitle') }}</span>
+          <el-tooltip effect="dark" :content="$t('aiConfigDesc')">
+            <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+          </el-tooltip>
+        </div>
+      </template>
+      <div class="ai-config-body">
+        <div class="drawer-desc" style="margin-bottom: 14px;">
+          <div class="desc-body">
+            {{ $t('aiConfigDesc') }}
+          </div>
+          <div class="desc-rule">
+            <strong>规则说明：</strong>留空时系统默认免密调用 Cloudflare Workers AI 或公共引擎；配置自定义 API Key 后将优先请求兼容 OpenAI 协议的接口进行邮件分析与全文翻译。
+          </div>
+        </div>
+        <el-form label-position="top">
+          <el-form-item :label="$t('aiApiKey')">
+            <el-input
+              v-model="aiForm.aiApiKey"
+              type="password"
+              show-password
+              placeholder="sk-..."
+              autocomplete="off"
+            />
+          </el-form-item>
+          <el-form-item :label="$t('aiApiUrl')">
+            <el-input
+              v-model="aiForm.aiApiUrl"
+              placeholder="https://api.openai.com/v1"
+            />
+          </el-form-item>
+          <el-form-item :label="$t('aiModel')">
+            <el-input
+              v-model="aiForm.aiModel"
+              placeholder="gpt-4o-mini"
+            />
+          </el-form-item>
+        </el-form>
+        <div style="display: flex; gap: 10px; margin-top: 15px;">
+          <el-button style="flex: 1;" :loading="testingAi" @click="testAi">
+            <Icon icon="fluent:plug-connected-20-regular" width="16" height="16" style="margin-right: 4px;" />
+            {{ $t('aiTestBtn') }}
+          </el-button>
+          <el-button type="primary" style="flex: 1;" :loading="settingLoading" @click="saveAiConfig">
+            {{ $t('aiSaveBtn') }}
+          </el-button>
+        </div>
+      </div>
+    </el-dialog>
+
     <!-- Email Settings: resend token form -->
     <el-dialog v-model="resendTokenFormShow" :title="$t('resendToken')" width="340" @closed="cleanResendTokenForm">
       <form>
@@ -340,7 +402,7 @@
 
 <script setup>
 import { ref, computed, onMounted, reactive, nextTick, watch } from 'vue'
-import { settingQuery, setBlackList, settingSet } from '@/request/setting.js'
+import { settingQuery, setBlackList, settingSet, testAiSetting } from '@/request/setting.js'
 import { useSettingStore } from '@/store/setting.js'
 import { useUiStore } from '@/store/ui.js'
 import Loading from '@/components/loading/index.vue'
@@ -399,6 +461,13 @@ const compareByLengthAndUpperCase = (a, b, key) => {
 // ── Workers AI refs ───────────────────────────────────────────────────
 const aiCodeFilterShow = ref(false)
 const aiCodeFilter = ref([])
+const aiConfigShow = ref(false)
+const testingAi = ref(false)
+const aiForm = reactive({
+  aiApiKey: '',
+  aiApiUrl: '',
+  aiModel: ''
+})
 
 // ── Category filter state ─────────────────────────────────────────────
 const listMode = ref('blacklist')
@@ -530,6 +599,7 @@ function editSetting(settingForm, refreshStatus = true) {
     if (refreshStatus) getSettings()
     resendTokenFormShow.value = false
     aiCodeFilterShow.value = false
+    aiConfigShow.value = false
   }).catch(() => {
     setting.value = { ...setting.value, ...JSON.parse(backup) }
   }).finally(() => {
@@ -571,6 +641,52 @@ function aiCodeFilterAddTag(val) {
 
 function saveAiCodeFilter() {
   editSetting({ aiCodeFilter: aiCodeFilter.value + '' })
+}
+
+function openAiConfig() {
+  aiForm.aiApiKey = setting.value.aiApiKey || ''
+  aiForm.aiApiUrl = setting.value.aiApiUrl || ''
+  aiForm.aiModel = setting.value.aiModel || ''
+  aiConfigShow.value = true
+}
+
+function resetAiConfig() {
+  aiForm.aiApiKey = setting.value.aiApiKey || ''
+  aiForm.aiApiUrl = setting.value.aiApiUrl || ''
+  aiForm.aiModel = setting.value.aiModel || ''
+}
+
+async function testAi() {
+  testingAi.value = true
+  try {
+    const res = await testAiSetting({
+      aiApiKey: aiForm.aiApiKey,
+      aiApiUrl: aiForm.aiApiUrl,
+      aiModel: aiForm.aiModel
+    })
+    ElMessage({
+      message: res.message || (locale.value === 'zh' ? 'AI 连通性测试成功！' : 'AI Connection test succeeded!'),
+      type: 'success',
+      plain: true
+    })
+  } catch (err) {
+    ElMessage({
+      message: (err && err.message) || (locale.value === 'zh' ? 'AI 测试失败，请检查配置与网络' : 'AI connection failed, please check configuration'),
+      type: 'error',
+      plain: true
+    })
+  } finally {
+    testingAi.value = false
+  }
+}
+
+function saveAiConfig() {
+  editSetting({
+    aiApiKey: aiForm.aiApiKey,
+    aiApiUrl: aiForm.aiApiUrl,
+    aiModel: aiForm.aiModel
+  })
+  aiConfigShow.value = false
 }
 
 // ── Email Setting functions ───────────────────────────────────────────
@@ -988,6 +1104,17 @@ async function saveDrawer() {
       position: relative;
       font-size: 16px;
       font-weight: bold;
+    }
+  }
+
+  .ai-config-body {
+    .el-form-item {
+      margin-bottom: 14px;
+      :deep(.el-form-item__label) {
+        font-weight: 500;
+        color: var(--text-primary);
+        margin-bottom: 4px;
+      }
     }
   }
 }

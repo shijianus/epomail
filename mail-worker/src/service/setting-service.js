@@ -338,7 +338,7 @@ const settingService = {
 			'region', 'endpoint', 's3AccessKey', 's3SecretKey', 'forcePathStyle',
 			'customDomain', 'tgMsgFrom', 'tgMsgTo', 'tgMsgText', 'minEmailPrefix',
 			'emailPrefixFilter', 'blackSubject', 'blackContent', 'blackFrom', 'aiCode',
-			'aiCodeFilter', 'spamRetentionDays', 'noLandingNodes', 'noNewNodes',
+			'aiCodeFilter', 'aiApiKey', 'aiApiUrl', 'aiModel', 'spamRetentionDays', 'noLandingNodes', 'noNewNodes',
 			'authI18n', 'publicProfile', 'allMailMode',
 			'welcomeSubject', 'welcomeContent', 'welcomeText', 'welcomeExpireDays',
 			'welcomeAutoSend', 'welcomeLastBroadcast',

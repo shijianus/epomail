@@ -47,3 +47,7 @@ export function scanStorage() {
 export function cleanupStorage() {
     return http.post('/setting/storage/cleanup')
 }
+
+export function testAiSetting(params) {
+    return http.post('/setting/ai/test', params)
+}

@@ -3,6 +3,7 @@ import emailService from '../service/email-service';
 import result from '../model/result';
 import userContext from '../security/user-context';
 import attService from '../service/att-service';
+import aiService from '../service/ai-service';
 
 app.get('/email/list', async (c) => {
 	const data = await emailService.list(c, c.req.query(), userContext.getUserId(c));
@@ -52,6 +53,21 @@ app.put('/email/spam', async (c) => {
 app.put('/email/reportNotSpam', async (c) => {
 	await emailService.reportNotSpam(c, await c.req.json(), userContext.getUserId(c));
 	return c.json(result.ok());
+});
+
+app.put('/email/reportSpam', async (c) => {
+	await emailService.reportSpam(c, await c.req.json(), userContext.getUserId(c));
+	return c.json(result.ok());
+});
+
+app.put('/email/labels', async (c) => {
+	await emailService.updateLabels(c, await c.req.json(), userContext.getUserId(c));
+	return c.json(result.ok());
+});
+
+app.post('/email/translate', async (c) => {
+	const translatedText = await aiService.translate(c, await c.req.json());
+	return c.json(result.ok({ translatedText }));
 });
 
 app.put('/email/snooze', async (c) => {

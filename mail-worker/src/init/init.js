@@ -42,6 +42,7 @@ const dbInit = {
 		await this.v3_11DB(c);
 		await this.v3_12DB(c);
 		await this.v3_13DB(c);
+		await this.v3_14DB(c);
 		await settingService.refresh(c);
 		return c.text('success');
 	},
@@ -221,6 +222,26 @@ const dbInit = {
 				}
 			} catch (e) {
 				console.warn('v3_13DB admin sync warning:', e.message);
+			}
+		}
+	},
+
+	async v3_14DB(c) {
+		const userDb = getUserDb(c);
+		const aiSettingCols = [
+			{ name: 'ai_api_key', sql: `ALTER TABLE setting ADD COLUMN ai_api_key TEXT NOT NULL DEFAULT '';` },
+			{ name: 'ai_api_url', sql: `ALTER TABLE setting ADD COLUMN ai_api_url TEXT NOT NULL DEFAULT '';` },
+			{ name: 'ai_model', sql: `ALTER TABLE setting ADD COLUMN ai_model TEXT NOT NULL DEFAULT '';` }
+		];
+
+		for (const col of aiSettingCols) {
+			try {
+				const colInfo = await userDb.prepare(`SELECT * FROM pragma_table_info('setting') WHERE name = ? limit 1`).bind(col.name).first();
+				if (!colInfo) {
+					await userDb.prepare(col.sql).run();
+				}
+			} catch (e) {
+				console.warn(`跳过 setting 字段 ${col.name}：${e.message}`);
 			}
 		}
 	},

@@ -2,23 +2,111 @@
   <div class="box">
     <div class="header-actions">
       <el-tooltip :content="$t('back') || 'Back'" placement="bottom">
-        <Icon class="icon" icon="material-symbols-light:arrow-back-ios-new" width="20" height="20" @click="handleBack"/>
+        <Icon class="icon btn-back" icon="material-symbols-light:arrow-back-ios-new" width="20" height="20" @click="handleBack"/>
+      </el-tooltip>
+      <el-tooltip :content="$t('reportSpam') || '举报为垃圾邮件'" placement="bottom" v-if="emailStore.contentData.delType !== 'physics'">
+        <Icon class="icon btn-spam" icon="fluent:shield-dismiss-20-regular" width="20" height="20" @click="handleReportSpam"/>
       </el-tooltip>
       <el-tooltip :content="$t('delete') || 'Delete'" placement="bottom" v-if="hasPerm('email:delete')">
-        <Icon class="icon" icon="uiw:delete" width="16" height="16" @click="handleDelete"/>
+        <Icon class="icon btn-delete" icon="fluent:delete-20-regular" width="20" height="20" @click="handleDelete"/>
       </el-tooltip>
+      <el-tooltip :content="email.unread === 0 ? ($t('markUnread') || '标记为未读') : ($t('markRead') || '标记为已读')" placement="bottom">
+        <Icon class="icon btn-unread" :icon="email.unread === 0 ? 'fluent:mail-unread-20-regular' : 'fluent:mail-read-20-regular'" width="20" height="20" @click="handleToggleRead"/>
+      </el-tooltip>
+      
+      <!-- Snooze Popover -->
+      <el-popover placement="bottom" :width="200" trigger="click" popper-class="header-action-popover" v-if="emailStore.contentData.delType !== 'physics'">
+        <template #reference>
+          <div class="action-icon-wrap btn-snooze" :title="$t('snooze') || '延后'">
+            <Icon class="icon" icon="fluent:clock-20-regular" width="20" height="20"/>
+          </div>
+        </template>
+        <div class="snooze-quick-menu">
+          <div class="snooze-menu-title">{{ $t('snooze') || '延后至...' }}</div>
+          <div class="snooze-menu-item" @click="handleQuickSnooze('today')">
+            <Icon icon="fluent:weather-partly-cloudy-day-16-regular" width="16" />
+            <span>{{ $t('snoozeLaterToday') || '今日稍后 (18:00)' }}</span>
+          </div>
+          <div class="snooze-menu-item" @click="handleQuickSnooze('tomorrow')">
+            <Icon icon="fluent:calendar-ltr-16-regular" width="16" />
+            <span>{{ $t('snoozeTomorrow') || '明天 (09:00)' }}</span>
+          </div>
+          <div class="snooze-menu-item" @click="handleQuickSnooze('weekend')">
+            <Icon icon="fluent:calendar-weekend-16-regular" width="16" />
+            <span>{{ $t('snoozeThisWeekend') || '本周末 (周六 09:00)' }}</span>
+          </div>
+          <div class="snooze-menu-item" @click="handleQuickSnooze('nextweek')">
+            <Icon icon="fluent:calendar-arrow-right-16-regular" width="16" />
+            <span>{{ $t('snoozeNextWeek') || '下周 (周一 09:00)' }}</span>
+          </div>
+          <el-divider style="margin: 6px 0;" />
+          <div class="snooze-menu-item" @click="customSnoozeDialogVisible = true">
+            <Icon icon="fluent:clock-toolbox-20-regular" width="16" />
+            <span>{{ $t('snoozeCustom') || '选择日期和时间...' }}</span>
+          </div>
+        </div>
+      </el-popover>
+
+      <!-- Label as Popover -->
+      <el-popover placement="bottom" :width="220" trigger="click" popper-class="header-action-popover" v-if="emailStore.contentData.delType !== 'physics'">
+        <template #reference>
+          <div class="action-icon-wrap btn-label" :title="$t('labelAs') || '标签'">
+            <Icon class="icon" icon="fluent:tag-20-regular" width="20" height="20"/>
+          </div>
+        </template>
+        <div class="label-quick-menu">
+          <div class="label-menu-title">{{ $t('labelAs') || '添加/移除标签' }}</div>
+          <div 
+            v-for="lbl in availableLabels" 
+            :key="lbl.name" 
+            class="label-menu-item" 
+            @click="toggleLabelOnEmail(lbl.name)"
+          >
+            <el-checkbox :model-value="currentLabels.includes(lbl.name)" @click.stop="toggleLabelOnEmail(lbl.name)" />
+            <span class="label-dot" :style="{ backgroundColor: lbl.color || '#3b82f6' }"></span>
+            <span class="label-text">{{ lbl.name }}</span>
+          </div>
+        </div>
+      </el-popover>
+
       <el-tooltip :content="$t('star') || 'Star'" placement="bottom" v-if="emailStore.contentData.showStar">
         <span class="star">
-          <Icon class="icon" @click="changeStar" v-if="email.isStar" icon="fluent-color:star-16" width="20" height="20"/>
-          <Icon class="icon" @click="changeStar" v-else icon="solar:star-line-duotone" width="18" height="18"/>
+          <Icon class="icon btn-star" @click="changeStar" v-if="email.isStar" icon="fluent-color:star-16" width="20" height="20"/>
+          <Icon class="icon btn-star" @click="changeStar" v-else icon="solar:star-line-duotone" width="18" height="18"/>
         </span>
       </el-tooltip>
       <el-tooltip :content="$t('reply') || 'Reply'" placement="bottom" v-if="emailStore.contentData.showReply && hasPerm('email:send')">
-        <Icon class="icon" @click="openReply" icon="la:reply" width="21" height="21" />
+        <Icon class="icon btn-reply" @click="openReply" icon="la:reply" width="21" height="21" />
       </el-tooltip>
       <el-tooltip :content="$t('forward') || 'Forward'" placement="bottom" v-if="emailStore.contentData.showReply && hasPerm('email:send')">
-        <Icon class="icon" @click="openForward" icon="iconoir:arrow-up-right" width="20" height="20" />
+        <Icon class="icon btn-forward" @click="openForward" icon="iconoir:arrow-up-right" width="20" height="20" />
       </el-tooltip>
+      <el-tooltip :content="$t('translateMessage') || '翻译邮件'" placement="bottom">
+        <Icon class="icon btn-translate" icon="fluent:translate-20-regular" width="20" height="20" @click="toggleTranslateBar(threadMessages[threadMessages.length - 1] || email)"/>
+      </el-tooltip>
+
+      <!-- More options -->
+      <el-dropdown trigger="click" @command="handleHeaderMoreCommand">
+        <div class="action-icon-wrap btn-more" :title="$t('more') || '更多选项'">
+          <Icon class="icon" icon="fluent:more-vertical-20-regular" width="20" height="20" />
+        </div>
+        <template #dropdown>
+          <el-dropdown-menu>
+            <el-dropdown-item command="filter">
+              <Icon icon="fluent:filter-20-regular" width="16" style="margin-right: 8px;" />
+              {{ $t('filterMessages') || '过滤此类邮件' }}
+            </el-dropdown-item>
+            <el-dropdown-item command="mute">
+              <Icon icon="fluent:speaker-mute-20-regular" width="16" style="margin-right: 8px;" />
+              {{ $t('muteConversation') || '忽略' }}
+            </el-dropdown-item>
+            <el-dropdown-item command="print">
+              <Icon icon="fluent:print-20-regular" width="16" style="margin-right: 8px;" />
+              {{ $t('printEmail') || '打印' }}
+            </el-dropdown-item>
+          </el-dropdown-menu>
+        </template>
+      </el-dropdown>
     </div>
     <div></div>
     <el-scrollbar class="scrollbar">
@@ -82,14 +170,97 @@
                       </div>
                       <div style="display: flex; align-items: center; gap: 10px;">
                         <span class="date">{{ formatDetailDate(msg.createTime) }}</span>
+                        <div class="msg-header-quick-actions" @click.stop>
+                          <el-tooltip :content="$t('translateMessage') || '翻译邮件'" placement="bottom">
+                            <Icon class="msg-act-icon" icon="fluent:translate-20-regular" width="16" height="16" @click="toggleTranslateBar(msg)"/>
+                          </el-tooltip>
+                          <el-tooltip :content="$t('reply') || '回复'" placement="bottom" v-if="emailStore.contentData.showReply && hasPerm('email:send')">
+                            <Icon class="msg-act-icon" icon="la:reply" width="17" height="17" @click="openReplyMsg(msg)"/>
+                          </el-tooltip>
+                          <el-dropdown trigger="click" @command="(cmd) => handleMsgMoreCommand(cmd, msg)">
+                            <Icon class="msg-act-icon" icon="fluent:more-vertical-20-regular" width="16" height="16" />
+                            <template #dropdown>
+                              <el-dropdown-menu>
+                                <el-dropdown-item command="reply" v-if="emailStore.contentData.showReply && hasPerm('email:send')">
+                                  <Icon icon="la:reply" width="15" style="margin-right: 8px;" />
+                                  {{ $t('reply') || '回复' }}
+                                </el-dropdown-item>
+                                <el-dropdown-item command="forward" v-if="emailStore.contentData.showReply && hasPerm('email:send')">
+                                  <Icon icon="iconoir:arrow-up-right" width="15" style="margin-right: 8px;" />
+                                  {{ $t('forward') || '转发' }}
+                                </el-dropdown-item>
+                                <el-dropdown-item command="filter">
+                                  <Icon icon="fluent:filter-20-regular" width="15" style="margin-right: 8px;" />
+                                  {{ $t('filterMessages') || '过滤此类邮件' }}
+                                </el-dropdown-item>
+                                <el-dropdown-item command="spam" v-if="emailStore.contentData.delType !== 'physics'">
+                                  <Icon icon="fluent:shield-dismiss-20-regular" width="15" style="margin-right: 8px;" />
+                                  {{ $t('reportSpam') || '举报为垃圾邮件' }}
+                                </el-dropdown-item>
+                                <el-dropdown-item command="print">
+                                  <Icon icon="fluent:print-20-regular" width="15" style="margin-right: 8px;" />
+                                  {{ $t('printEmail') || '打印此邮件' }}
+                                </el-dropdown-item>
+                              </el-dropdown-menu>
+                            </template>
+                          </el-dropdown>
+                        </div>
                         <Icon icon="lucide:chevron-up" width="16" height="16" class="ch-arrow" v-if="threadMessages.length > 1" />
                       </div>
                     </div>
                     <div class="info-middle">
                       <span>&lt;{{ msg.sendEmail }}&gt;</span>
                     </div>
-                    <div class="info-bottom">
-                      <span class="source">{{$t('recipient')}}:</span><span class="receive-email">{{ formateReceive(msg.recipient) }}</span>
+                    <!-- Gmail-style info-bottom with 'to me' dropdown -->
+                    <div class="info-bottom" @click.stop>
+                      <el-popover
+                        placement="bottom-start"
+                        :width="380"
+                        trigger="click"
+                        popper-class="gmail-details-popover"
+                        :teleported="true"
+                      >
+                        <template #reference>
+                          <div class="to-me-trigger">
+                            <span class="recipient-label">{{ getRecipientDisplay(msg.recipient) }}</span>
+                            <Icon icon="fluent:chevron-down-12-regular" class="to-me-arrow" />
+                          </div>
+                        </template>
+
+                        <div class="gmail-details-card">
+                          <div class="detail-row">
+                            <span class="dt-label">{{ $t('detailFrom') || '发件人:' }}</span>
+                            <span class="dt-val">{{ msg.name ? `${msg.name} <${msg.sendEmail}>` : msg.sendEmail }}</span>
+                          </div>
+                          <div class="detail-row" v-if="msg.replyTo">
+                            <span class="dt-label">{{ $t('detailReplyTo') || '回复至:' }}</span>
+                            <span class="dt-val">{{ msg.replyTo }}</span>
+                          </div>
+                          <div class="detail-row">
+                            <span class="dt-label">{{ $t('detailTo') || '收件人:' }}</span>
+                            <span class="dt-val">{{ formateReceive(msg.recipient) }}</span>
+                          </div>
+                          <div class="detail-row">
+                            <span class="dt-label">{{ $t('detailDate') || '日期:' }}</span>
+                            <span class="dt-val">{{ formatDetailDate(msg.createTime) }}</span>
+                          </div>
+                          <div class="detail-row">
+                            <span class="dt-label">{{ $t('detailSubject') || '主题:' }}</span>
+                            <span class="dt-val">{{ msg.subject || email.subject }}</span>
+                          </div>
+                          <div class="detail-row" v-if="getSenderDomain(msg.sendEmail)">
+                            <span class="dt-label">{{ $t('detailMailedBy') || '发送方:' }}</span>
+                            <span class="dt-val">{{ getSenderDomain(msg.sendEmail) }}</span>
+                          </div>
+                          <div class="detail-row">
+                            <span class="dt-label">{{ $t('detailSecurity') || '安全性:' }}</span>
+                            <span class="dt-val security-tls">
+                              <Icon icon="fluent:lock-closed-16-regular" width="14" height="14" style="color: #10b981;" />
+                              <span>{{ $t('detailSecurityTls') || '标准加密 (TLS)' }}</span>
+                            </span>
+                          </div>
+                        </div>
+                      </el-popover>
                     </div>
                   </div>
                 </div>
@@ -114,6 +285,36 @@
                   </div>
                 </div>
 
+                <!-- Gmail-Style Translation Banner -->
+                <div class="gmail-translate-bar" v-if="showTranslateMap[msg.emailId]" @click.stop>
+                  <div class="gtb-left">
+                    <Icon icon="fluent:translate-20-regular" width="16" height="16" class="gtb-icon" />
+                    <span class="gtb-title">{{ $t('translateTo') || '翻译为:' }}</span>
+                    <el-select v-model="targetLangMap[msg.emailId]" size="small" class="gtb-select" @change="handleTranslate(msg)">
+                      <el-option label="中文 (简体)" value="zh" />
+                      <el-option label="English" value="en" />
+                      <el-option label="日本語" value="ja" />
+                      <el-option label="한국어" value="ko" />
+                      <el-option label="Français" value="fr" />
+                      <el-option label="Deutsch" value="de" />
+                      <el-option label="Español" value="es" />
+                      <el-option label="Русский" value="ru" />
+                    </el-select>
+                    <el-button size="small" type="primary" link :loading="translatingMap[msg.emailId]" @click="handleTranslate(msg)">
+                      {{ isTranslatedMap[msg.emailId] ? ($t('reTranslate') || '重新翻译') : ($t('translateMessage') || '立即翻译') }}
+                    </el-button>
+                    <template v-if="isTranslatedMap[msg.emailId]">
+                      <el-divider direction="vertical" />
+                      <el-button size="small" link type="primary" @click="toggleViewOriginal(msg.emailId)">
+                        {{ showOriginalMap[msg.emailId] ? ($t('viewTranslation') || '查看翻译') : ($t('viewOriginal') || '查看原文') }}
+                      </el-button>
+                    </template>
+                  </div>
+                  <div class="gtb-right">
+                    <Icon icon="fluent:dismiss-16-regular" width="16" height="16" class="gtb-close" @click="closeTranslate(msg.emailId)" />
+                  </div>
+                </div>
+
                 <el-alert v-if="msg.status === 3" :closable="false" :title="toMessage(msg.message)" class="email-msg" type="error" show-icon @click.stop />
                 <el-alert v-if="msg.status === 4" :closable="false" :title="$t('complained')" class="email-msg" type="warning" show-icon @click.stop />
                 <el-alert v-if="msg.status === 5" :closable="false" :title="$t('delayed')" class="email-msg" type="warning" show-icon @click.stop />
@@ -127,10 +328,21 @@
                 </div>
                 
               </div>
-              <el-scrollbar class="htm-scrollbar" :class="(!msg.attList || msg.attList.length === 0) ? 'bottom-distance' : ''">
+
+              <!-- Translated Content Box -->
+              <div v-if="isTranslatedMap[msg.emailId] && !showOriginalMap[msg.emailId]" class="translated-box">
+                <div class="translated-badge">
+                  <Icon icon="fluent:sparkle-16-filled" width="14" height="14" style="color: #0284c7;" />
+                  <span>{{ $t('translatedByAi') || 'AI 智能提取并翻译' }}</span>
+                </div>
+                <div class="translated-text">{{ translatedTextMap[msg.emailId] }}</div>
+              </div>
+
+              <el-scrollbar v-else class="htm-scrollbar" :class="(!msg.attList || msg.attList.length === 0) ? 'bottom-distance' : ''">
                 <ShadowHtml class="shadow-html" :html="formatImage(msg.content)" v-if="msg.content" />
                 <pre v-else class="email-text" >{{msg.text}}</pre>
               </el-scrollbar>
+
               <div class="att" v-if="msg.attList && msg.attList.length > 0">
                 <div class="att-title">
                   <span>{{$t('attachments')}}</span>
@@ -169,6 +381,58 @@
 
       </div>
     </el-scrollbar>
+
+    <!-- Custom Snooze Dialog -->
+    <el-dialog v-model="customSnoozeDialogVisible" :title="$t('snoozeCustom') || '选择日期和时间'" width="360px" class="custom-snooze-dialog" append-to-body>
+      <div style="margin-bottom: 16px;">
+        <el-date-picker
+          v-model="customSnoozeTime"
+          type="datetime"
+          :placeholder="$t('selectTime') || '请选择时间'"
+          format="YYYY-MM-DD HH:mm:ss"
+          value-format="YYYY-MM-DD HH:mm:ss"
+          style="width: 100%;"
+        />
+      </div>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="customSnoozeDialogVisible = false">{{ $t('cancel') || '取消' }}</el-button>
+          <el-button type="primary" @click="submitCustomSnooze">{{ $t('confirm') || '确定' }}</el-button>
+        </span>
+      </template>
+    </el-dialog>
+
+    <!-- Filter Messages Dialog -->
+    <el-dialog v-model="filterDialogVisible" :title="$t('filterDialogTitle') || '创建过滤规则'" width="480px" class="filter-dialog" append-to-body>
+      <el-form :model="filterForm" label-position="top">
+        <el-form-item :label="$t('filterFrom') || '发件人'">
+          <el-input v-model="filterForm.sender" placeholder="example@domain.com" />
+        </el-form-item>
+        <el-form-item :label="$t('filterSubject') || '主题包含'">
+          <el-input v-model="filterForm.subject" placeholder="关键字或标题" />
+        </el-form-item>
+        <el-form-item :label="$t('filterAction') || '执行操作'">
+          <el-radio-group v-model="filterForm.action">
+            <el-radio value="label">{{ $t('filterActionLabel') || '应用标签' }}</el-radio>
+            <el-radio value="read">{{ $t('filterActionRead') || '标记为已读' }}</el-radio>
+            <el-radio value="spam">{{ $t('filterActionSpam') || '移至垃圾箱' }}</el-radio>
+            <el-radio value="trash">{{ $t('filterActionTrash') || '直接移入回收站' }}</el-radio>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item :label="$t('labelAs') || '选择标签'" v-if="filterForm.action === 'label'">
+          <el-select v-model="filterForm.targetLabel" style="width: 100%;">
+            <el-option v-for="lbl in availableLabels" :key="lbl.name" :label="lbl.name" :value="lbl.name" />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="filterDialogVisible = false">{{ $t('cancel') || '取消' }}</el-button>
+          <el-button type="primary" @click="handleCreateFilter">{{ $t('createFilterBtn') || '创建过滤器' }}</el-button>
+        </span>
+      </template>
+    </el-dialog>
+
     <el-image-viewer
         v-if="showPreview"
         :url-list="srcList"
@@ -182,10 +446,20 @@ import ShadowHtml from '@/components/shadow-html/index.vue'
 import {reactive, ref, computed, watch, onMounted, onUnmounted} from "vue";
 import {useRouter} from 'vue-router'
 import {ElMessage, ElMessageBox} from 'element-plus'
-import {emailDelete, emailRead, emailReportNotSpam} from "@/request/email.js";
+import {
+  emailDelete,
+  emailRead,
+  emailReportNotSpam,
+  emailReportSpam,
+  emailSetLabels,
+  emailTranslate,
+  emailSnooze
+} from "@/request/email.js";
+import { userSetCustomLabels } from "@/request/my.js";
 import {Icon} from "@iconify/vue";
 import {useEmailStore} from "@/store/email.js";
 import {useAccountStore} from "@/store/account.js";
+import {useUserStore} from "@/store/user.js";
 import {formatDetailDate} from "@/utils/day.js";
 import {starAdd, starCancel} from "@/request/star.js";
 import {getExtName, formatBytes} from "@/utils/file-utils.js";
@@ -201,6 +475,7 @@ import {hasPerm} from "@/perm/perm.js";
 const uiStore = useUiStore();
 const settingStore = useSettingStore();
 const accountStore = useAccountStore();
+const userStore = useUserStore();
 const emailStore = useEmailStore();
 const router = useRouter()
 const email = emailStore.contentData.email
@@ -257,7 +532,7 @@ watch(() => accountStore.currentAccountId, () => {
 onMounted(() => {
   if (emailStore.contentData.showUnread && email.unread === EmailUnreadEnum.UNREAD) {
     email.unread = EmailUnreadEnum.READ;
-    emailRead([email.emailId]).then(() => {
+    emailRead([email.emailId], EmailUnreadEnum.READ).then(() => {
       emailStore.refreshSidebarStats();
     });
   }
@@ -304,6 +579,30 @@ function formateReceive(recipient) {
   } catch (e) {
     return recipient || ''
   }
+}
+
+function isRecipientMe(recipient) {
+  if (emailStore.contentData.delType === 'physics' || router.currentRoute.value?.path === '/all-email') {
+    return false;
+  }
+  const myEmail = (accountStore.currentAccount?.email || userStore.user?.email || '').toLowerCase().trim();
+  if (!myEmail) return false;
+  const formatted = formateReceive(recipient).toLowerCase();
+  return formatted.includes(myEmail);
+}
+
+function getRecipientDisplay(recipient) {
+  if (isRecipientMe(recipient)) {
+    return t('toMe') || '至 我';
+  }
+  const rec = formateReceive(recipient);
+  return rec ? (t('toRecipient', { recipient: rec }) || `至 ${rec}`) : (t('toMe') || '至 我');
+}
+
+function getSenderDomain(sendEmail) {
+  if (!sendEmail) return '';
+  const match = sendEmail.match(/@([^>]+)/);
+  return match ? match[1].replace('>', '').trim() : '';
 }
 
 function changeStar() {
@@ -353,7 +652,6 @@ const handleDelete = () => {
         emailStore.refreshSidebarStats();
       })
     } else  {
-
       allEmailDelete(email.emailId).then(() => {
         ElMessage({
           message: t('delSuccessMsg'),
@@ -368,6 +666,313 @@ const handleDelete = () => {
     emailStore.contentData.email = null
   })
 }
+
+const handleReportSpam = () => {
+  ElMessageBox.confirm(
+    t('reportSpamConfirm') || '确定要将此邮件标记为垃圾邮件并移入垃圾箱吗？来自此发件人的未来邮件将默认直接进入您的垃圾箱。',
+    t('reportSpam') || '举报为垃圾邮件',
+    {
+      confirmButtonText: t('confirm') || '确定',
+      cancelButtonText: t('cancel') || '取消',
+      type: 'warning'
+    }
+  ).then(() => {
+    emailReportSpam([email.emailId]).then(() => {
+      ElMessage({
+        message: t('reportSpamSuccess') || '已举报为垃圾邮件，已加入个人拦截',
+        type: 'success',
+        plain: true,
+      });
+      emailStore.deleteIds = [email.emailId];
+      emailStore.refreshSidebarStats();
+      emailStore.contentData.email = null;
+    }).catch(err => {
+      console.error(err);
+      ElMessage.error('操作失败，请重试');
+    });
+  });
+};
+
+const handleToggleRead = () => {
+  const newStatus = email.unread === EmailUnreadEnum.READ ? EmailUnreadEnum.UNREAD : EmailUnreadEnum.READ;
+  emailRead([email.emailId], newStatus).then(() => {
+    email.unread = newStatus;
+    emailStore.refreshSidebarStats();
+    ElMessage.success(newStatus === EmailUnreadEnum.UNREAD ? (t('markUnreadSuccess') || '已标记为未读') : (t('markReadSuccess') || '已标记为已读'));
+    if (newStatus === EmailUnreadEnum.UNREAD) {
+      handleBack();
+    }
+  });
+};
+
+// Snooze Handling
+const customSnoozeDialogVisible = ref(false);
+const customSnoozeTime = ref('');
+
+const handleQuickSnooze = (type) => {
+  const pad = (n) => n.toString().padStart(2, '0');
+  const formatTime = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  
+  const now = new Date();
+  let startTime = new Date();
+  
+  if (type === 'today') {
+    startTime.setHours(18, 0, 0, 0);
+    if (startTime <= now) {
+      startTime = new Date(now.getTime() + 2 * 3600 * 1000);
+    }
+  } else if (type === 'tomorrow') {
+    startTime.setDate(startTime.getDate() + 1);
+    startTime.setHours(9, 0, 0, 0);
+  } else if (type === 'weekend') {
+    const day = startTime.getDay();
+    const diff = (6 - day + 7) % 7 || 7;
+    startTime.setDate(startTime.getDate() + diff);
+    startTime.setHours(9, 0, 0, 0);
+  } else if (type === 'nextweek') {
+    const day = startTime.getDay();
+    const diff = (8 - day) % 7 || 7;
+    startTime.setDate(startTime.getDate() + diff);
+    startTime.setHours(9, 0, 0, 0);
+  }
+
+  const endTime = new Date(startTime.getTime() + 3600 * 1000);
+  const timeStr = formatTime(startTime);
+  const endTimeStr = formatTime(endTime);
+
+  emailSnooze([email.emailId], timeStr, endTimeStr).then(() => {
+    ElMessage.success(t('snoozedSuccess') || '邮件已延后');
+    emailStore.deleteIds = [email.emailId];
+    emailStore.refreshSidebarStats();
+    emailStore.contentData.email = null;
+  });
+};
+
+const submitCustomSnooze = () => {
+  if (!customSnoozeTime.value) {
+    ElMessage.warning(t('selectTime') || '请选择时间');
+    return;
+  }
+  const start = new Date(customSnoozeTime.value);
+  const end = new Date(start.getTime() + 3600 * 1000);
+  const pad = (n) => n.toString().padStart(2, '0');
+  const formatTime = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  
+  emailSnooze([email.emailId], formatTime(start), formatTime(end)).then(() => {
+    ElMessage.success(t('snoozedSuccess') || '邮件已延后');
+    customSnoozeDialogVisible.value = false;
+    emailStore.deleteIds = [email.emailId];
+    emailStore.refreshSidebarStats();
+    emailStore.contentData.email = null;
+  });
+};
+
+// Labels Handling
+const availableLabels = computed(() => {
+  return (uiStore.allLabels || []).filter(l => l.name && l.name !== '系统设置');
+});
+
+const currentLabels = computed(() => {
+  if (!email?.labels) return [];
+  try {
+    const parsed = JSON.parse(email.labels);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    return [];
+  }
+});
+
+const toggleLabelOnEmail = (labelName) => {
+  let list = [...currentLabels.value];
+  if (list.includes(labelName)) {
+    list = list.filter(l => l !== labelName);
+  } else {
+    list.push(labelName);
+  }
+  email.labels = JSON.stringify(list);
+  emailSetLabels(email.emailId, list).then(() => {
+    ElMessage.success(t('labelUpdated') || '标签已更新');
+    emailStore.refreshSidebarStats();
+  });
+};
+
+// Filter Messages Dialog
+const filterDialogVisible = ref(false);
+const filterForm = reactive({
+  sender: '',
+  subject: '',
+  action: 'label',
+  targetLabel: '',
+});
+
+const openFilterDialog = (msg) => {
+  const target = msg || email;
+  filterForm.sender = target?.sendEmail || '';
+  filterForm.subject = target?.subject || email?.subject || '';
+  filterForm.action = 'label';
+  filterForm.targetLabel = availableLabels.value[0]?.name || '社群';
+  filterDialogVisible.value = true;
+};
+
+const handleCreateFilter = () => {
+  const senderVal = (filterForm.sender || '').trim();
+  if (!senderVal && !filterForm.subject) {
+    ElMessage.warning('请输入过滤条件');
+    return;
+  }
+
+  let targetLabel = uiStore.allLabels.find(l => l.name === filterForm.targetLabel);
+  if (filterForm.action === 'spam') {
+    targetLabel = uiStore.allLabels.find(l => l.name === '黑名单' || l.name === '个人拦截');
+    if (!targetLabel) {
+      targetLabel = {
+        id: Date.now().toString(),
+        name: '黑名单',
+        color: '#ef4444',
+        icon: 'fluent:shield-dismiss-20-regular',
+        listVis: false,
+        actions: { targetFolder: 'spam', priority: 1, stopProcessing: true },
+        rules: []
+      };
+      uiStore.allLabels.push(targetLabel);
+    }
+  } else if (filterForm.action === 'trash') {
+    targetLabel = uiStore.allLabels.find(l => l.name === '自动删除');
+    if (!targetLabel) {
+      targetLabel = {
+        id: Date.now().toString(),
+        name: '自动删除',
+        color: '#64748b',
+        icon: 'fluent:delete-20-regular',
+        listVis: false,
+        actions: { targetFolder: 'trash', priority: 1, stopProcessing: true },
+        rules: []
+      };
+      uiStore.allLabels.push(targetLabel);
+    }
+  }
+
+  if (targetLabel) {
+    if (!targetLabel.rules) targetLabel.rules = [];
+    const condition = senderVal 
+      ? { type: 'sender_includes', value: senderVal }
+      : { type: 'subject_include', value: filterForm.subject };
+    
+    targetLabel.rules.push({
+      id: Date.now().toString() + 'r',
+      condition,
+      exception: { type: 'none', value: '' }
+    });
+
+    if (filterForm.action === 'read') {
+      if (!targetLabel.actions) targetLabel.actions = {};
+      targetLabel.actions.markAsRead = true;
+    }
+
+    userSetCustomLabels(JSON.stringify({ allLabels: uiStore.allLabels })).then(() => {
+      ElMessage.success(t('filterCreatedSuccess') || '过滤规则已成功创建并生效');
+      filterDialogVisible.value = false;
+    });
+  } else {
+    filterDialogVisible.value = false;
+  }
+};
+
+const handleMute = () => {
+  let list = [...currentLabels.value];
+  if (!list.includes('已静音')) {
+    list.push('已静音');
+  }
+  email.labels = JSON.stringify(list);
+  emailSetLabels(email.emailId, list).then(() => {
+    ElMessage.success(t('muteSuccess') || '已将该会话静音');
+    handleBack();
+  });
+};
+
+const handlePrint = () => {
+  window.print();
+};
+
+const handleHeaderMoreCommand = (command) => {
+  if (command === 'filter') {
+    openFilterDialog();
+  } else if (command === 'mute') {
+    handleMute();
+  } else if (command === 'print') {
+    handlePrint();
+  }
+};
+
+const handleMsgMoreCommand = (command, msg) => {
+  if (command === 'reply') {
+    openReplyMsg(msg);
+  } else if (command === 'forward') {
+    openForwardMsg(msg);
+  } else if (command === 'filter') {
+    openFilterDialog(msg);
+  } else if (command === 'spam') {
+    handleReportSpam();
+  } else if (command === 'print') {
+    handlePrint();
+  }
+};
+
+// Translation Handling
+const showTranslateMap = reactive({});
+const translatingMap = reactive({});
+const isTranslatedMap = reactive({});
+const translatedTextMap = reactive({});
+const showOriginalMap = reactive({});
+const targetLangMap = reactive({});
+
+const toggleTranslateBar = (msg) => {
+  const target = msg || email;
+  if (!target) return;
+  const id = target.emailId;
+  showTranslateMap[id] = !showTranslateMap[id];
+  if (showTranslateMap[id]) {
+    if (!targetLangMap[id]) targetLangMap[id] = 'zh';
+    if (!isTranslatedMap[id]) {
+      handleTranslate(target);
+    }
+  }
+};
+
+const handleTranslate = (msg) => {
+  const target = msg || email;
+  if (!target) return;
+  const id = target.emailId;
+  const lang = targetLangMap[id] || 'zh';
+  translatingMap[id] = true;
+  showTranslateMap[id] = true;
+
+  emailTranslate({
+    text: target.text || '',
+    html: target.content || '',
+    targetLang: lang
+  }).then((res) => {
+    const transText = res.data?.translatedText || res.translatedText || '';
+    translatedTextMap[id] = transText;
+    isTranslatedMap[id] = true;
+    showOriginalMap[id] = false;
+    ElMessage.success(t('translateSuccess') || '翻译完成');
+  }).catch(err => {
+    console.error('Translation error:', err);
+    ElMessage.error('翻译失败，请检查网络或 AI 接口配置');
+  }).finally(() => {
+    translatingMap[id] = false;
+  });
+};
+
+const toggleViewOriginal = (emailId) => {
+  showOriginalMap[emailId] = !showOriginalMap[emailId];
+};
+
+const closeTranslate = (emailId) => {
+  showTranslateMap[emailId] = false;
+  showOriginalMap[emailId] = true;
+};
 
 const isReporting = ref(false)
 
@@ -418,7 +1023,7 @@ const handleReportNotSpam = (emailId) => {
   padding: 9px 15px 8px;
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 18px;
   box-shadow: var(--header-actions-border);
   font-size: 18px;
   .star {
@@ -428,6 +1033,23 @@ const handleReportNotSpam = (emailId) => {
     min-width: 21px;
   }
   .icon {
+    cursor: pointer;
+    color: var(--text-secondary, #64748b);
+    transition: color 0.15s ease, transform 0.15s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    &:hover {
+      color: var(--text-primary, #0f172a);
+      transform: scale(1.08);
+    }
+  }
+
+  .action-icon-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
     cursor: pointer;
   }
 }
@@ -680,6 +1302,26 @@ const handleReportNotSpam = (emailId) => {
             color: var(--regular-text-color);
             font-size: 13px;
           }
+
+          .msg-header-quick-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+
+            .msg-act-icon {
+              cursor: pointer;
+              color: var(--text-muted, #94a3b8);
+              transition: color 0.15s ease, transform 0.15s ease;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+
+              &:hover {
+                color: var(--text-primary, #0f172a);
+                transform: scale(1.1);
+              }
+            }
+          }
         }
         
         .info-middle {
@@ -689,9 +1331,42 @@ const handleReportNotSpam = (emailId) => {
 
         .info-bottom {
           display: flex;
+          align-items: center;
           gap: 8px;
-          font-size: 13px;
-          color: var(--secondary-text-color);
+          font-size: 12.5px;
+          color: var(--secondary-text-color, #64748b);
+          margin-top: 1px;
+
+          .to-me-trigger {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            cursor: pointer;
+            padding: 2px 6px;
+            border-radius: 4px;
+            transition: background-color 0.15s ease;
+            color: var(--text-secondary, #475569);
+            user-select: none;
+
+            &:hover {
+              background-color: var(--bg-hover, rgba(0, 0, 0, 0.05));
+              color: var(--text-primary, #0f172a);
+            }
+
+            .recipient-label {
+              font-size: 12.5px;
+              max-width: 320px;
+              overflow: hidden;
+              text-overflow: ellipsis;
+              white-space: nowrap;
+            }
+
+            .to-me-arrow {
+              font-size: 12px;
+              color: var(--text-muted, #94a3b8);
+              transition: transform 0.2s;
+            }
+          }
         }
 
         .email-msg {
@@ -821,5 +1496,167 @@ const handleReportNotSpam = (emailId) => {
   margin-bottom: 30px;
 }
 
+.gmail-translate-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bg-elevated, #f8fafc);
+  border: 1px solid var(--border-subtle, #e2e8f0);
+  border-radius: 6px;
+  padding: 6px 12px;
+  margin-top: 12px;
+  gap: 12px;
+  font-size: 13px;
 
+  .gtb-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+
+    .gtb-icon {
+      color: #0284c7;
+      flex-shrink: 0;
+    }
+
+    .gtb-title {
+      font-weight: 500;
+      color: var(--text-primary, #1e293b);
+      font-size: 12.5px;
+    }
+
+    .gtb-select {
+      width: 120px;
+    }
+  }
+
+  .gtb-right {
+    display: flex;
+    align-items: center;
+
+    .gtb-close {
+      cursor: pointer;
+      color: var(--text-muted, #94a3b8);
+      transition: color 0.15s ease;
+      &:hover {
+        color: var(--text-primary, #0f172a);
+      }
+    }
+  }
+}
+
+.translated-box {
+  margin-top: 16px;
+  padding: 16px;
+  background: var(--bg-surface, #ffffff);
+  border: 1px solid var(--border-subtle, #e2e8f0);
+  border-radius: 8px;
+  margin-bottom: 20px;
+
+  .translated-badge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #0284c7;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px dashed var(--border-subtle, #e2e8f0);
+  }
+
+  .translated-text {
+    font-size: 14px;
+    line-height: 1.7;
+    color: var(--text-primary, #1e293b);
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+}
+
+:deep(.gmail-details-popover) {
+  padding: 12px 14px !important;
+  border-radius: 8px !important;
+}
+
+.gmail-details-card {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-primary, #1e293b);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+
+  .detail-row {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+
+    .dt-label {
+      color: var(--text-muted, #64748b);
+      width: 60px;
+      flex-shrink: 0;
+      text-align: right;
+      font-size: 12.5px;
+    }
+
+    .dt-val {
+      flex: 1;
+      word-break: break-all;
+      color: var(--text-primary, #0f172a);
+      font-size: 13px;
+
+      &.security-tls {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+      }
+    }
+  }
+}
+
+.snooze-quick-menu, .label-quick-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+
+  .snooze-menu-title, .label-menu-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted, #94a3b8);
+    padding: 4px 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .snooze-menu-item, .label-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--text-primary, #1e293b);
+    transition: background 0.15s ease;
+
+    &:hover {
+      background: var(--bg-hover, rgba(0, 0, 0, 0.05));
+    }
+
+    .label-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .label-text {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  }
+}
 </style>

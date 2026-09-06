@@ -5,6 +5,7 @@ import s3Service from '../service/s3-service';
 import dbService from '../service/db-service';
 import storageScanService from '../service/storage-scan-service';
 import userContext from "../security/user-context";
+import aiService from '../service/ai-service';
 
 app.put('/setting/set', async (c) => {
 	await settingService.set(c, await c.req.json());
@@ -66,6 +67,12 @@ app.post('/setting/storage/scan', async (c) => {
 app.post('/setting/storage/cleanup', async (c) => {
 	const cleanResult = await storageScanService.cleanup(c);
 	return c.json(result.ok(cleanResult));
+});
+
+app.post('/setting/ai/test', async (c) => {
+	const body = await c.req.json().catch(() => ({}));
+	const testResult = await aiService.testConnection(c, body);
+	return c.json(result.ok(testResult));
 });
 
 
