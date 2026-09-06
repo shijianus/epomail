@@ -253,7 +253,15 @@ const publicService = {
 			throw new BizError(t('notExistUser'));
 		}
 		
-		const roleRow = await roleService.selectById(c, userRow.type);
+		let roleRow = null;
+		if (userRow.email === c.env.admin) {
+			roleRow = await roleService.selectByRoleCode(c, 'master') || await roleService.selectByName(c, '站长');
+			if (!roleRow) {
+				roleRow = { name: '站长', roleCode: 'master', tagText: '最高统领', tagColor: '#ef4444' };
+			}
+		} else {
+			roleRow = await roleService.selectById(c, userRow.type);
+		}
 		
 		const allEmails = await mailOrm(c).select({ 
             createTime: email.createTime, 

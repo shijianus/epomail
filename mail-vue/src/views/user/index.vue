@@ -803,7 +803,8 @@ function formatSendCount(user) {
 function toRoleName(type) {
 
   if (type === 0) {
-    return t('admin')
+    const master = roleList.find(r => r.roleCode === 'master' || r.name === '站长')
+    return master ? master.name : (t('admin') || '站长')
   }
 
   const index = roleList.findIndex(role => role.roleId === type)

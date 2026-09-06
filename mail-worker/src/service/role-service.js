@@ -180,6 +180,13 @@ const roleService = {
 					await this.assignPermsInternal(userDb, existing.role_id, defRole.permKeys);
 				}
 			}
+
+			if (c.env.admin) {
+				const masterRole = await userDb.prepare(`SELECT role_id FROM role WHERE role_code = 'master' OR name = '站长' LIMIT 1`).first();
+				if (masterRole) {
+					await userDb.prepare(`UPDATE user SET type = ? WHERE email = ? AND type != ?`).bind(masterRole.role_id, c.env.admin, masterRole.role_id).run();
+				}
+			}
 		} catch (e) {
 			console.warn('ensureStandardRoles warning:', e.message);
 		}
@@ -427,6 +434,10 @@ const roleService = {
 		})
 
 		return availIndex > -1
+	},
+
+	selectByRoleCode(c, roleCode) {
+		return orm(c).select().from(role).where(eq(role.roleCode, roleCode)).get();
 	},
 
 	selectByName(c, roleName) {

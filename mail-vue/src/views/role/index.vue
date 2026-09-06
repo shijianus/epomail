@@ -470,7 +470,7 @@
 
 <script setup>
 import {Icon} from "@iconify/vue";
-import {computed, defineOptions, nextTick, reactive, ref} from "vue";
+import {computed, defineOptions, nextTick, onBeforeUnmount, onMounted, reactive, ref} from "vue";
 import {roleAdd, roleDelete, rolePermTree, roleRoleList, roleSet, roleSetDef} from "@/request/role.js";
 import {userSyncBlogLevel} from "@/request/user.js";
 import loading from '@/components/loading/index.vue';
@@ -509,7 +509,7 @@ const isVisitor = computed(() => {
 });
 
 const isMaster = computed(() => {
-  return userStore.user?.type === 0 || userStore.user?.role?.roleCode === 'master' || userStore.user?.email === 'admin@epomail.bond';
+  return userStore.user?.type === 0 || userStore.user?.role?.roleCode === 'master' || userStore.user?.role?.name === '站长' || userStore.user?.permKeys?.includes('*');
 });
 
 const isModerator = computed(() => {
@@ -939,9 +939,22 @@ function adjustWidth() {
 
 adjustWidth();
 
-window.onresize = () => {
-  adjustWidth();
+let resizeTimer = null;
+const handleResize = () => {
+  if (resizeTimer) return;
+  resizeTimer = requestAnimationFrame(() => {
+    adjustWidth();
+    resizeTimer = null;
+  });
 };
+
+onMounted(() => {
+  window.addEventListener('resize', handleResize, { passive: true });
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', handleResize);
+});
 </script>
 
 <style scoped lang="scss">
@@ -960,9 +973,7 @@ window.onresize = () => {
   display: flex;
   align-items: center;
   gap: 12px;
-  background: var(--bg-surface, rgba(255, 255, 255, 0.9));
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: var(--bg-surface, #ffffff);
   border-bottom: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.06));
   border-radius: 10px 10px 0 0;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);

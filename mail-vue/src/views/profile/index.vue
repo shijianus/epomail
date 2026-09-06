@@ -35,40 +35,33 @@
                 <span v-else>{{ profileData.userInfo.account }}</span>
               </h1>
               <div class="handle">
-                <Icon class="ic" icon="lucide:mail" style="margin-right: 6px;" />
+                <Icon class="ic" icon="fluent:mail-20-regular" style="margin-right: 6px;" />
                 {{ profileData.userInfo.email }}
               </div>
             </div>
 
-            <p class="bio" v-html="parseInlineMarkdown(profileData.userInfo.bio || (profileData.userInfo.roleName === 'admin' ? 'EpoMail 系统管理员，负责核心平台的维护与安全。我们在数字世界中连接彼此，保护每一次灵感的传递与思想的交汇。为您带来前所未有的纯净沟通体验。' : 'EpoMail 专属用户，致力于安全、高效的邮件通讯。我们在数字世界中连接彼此，保护每一次灵感的传递与思想的交汇。为您带来前所未有的纯净沟通体验。'))"></p>
+            <p class="bio" v-html="parseInlineMarkdown(profileData.userInfo.bio || ((currentRoleName === 'admin' || currentRoleName === '站长' || currentRoleName === '超级管理员') ? 'EpoMail 系统管理员，负责核心平台的维护与安全。我们在数字世界中连接彼此，保护每一次灵感的传递与思想的交汇。为您带来前所未有的纯净沟通体验。' : 'EpoMail 专属用户，致力于安全、高效的邮件通讯。我们在数字世界中连接彼此，保护每一次灵感的传递与思想的交汇。为您带来前所未有的纯净沟通体验。'))"></p>
 
             <!-- Bottom Section: Fixed to bottom -->
             <div class="bottom-section">
               <!-- Detailed Subtitle Tags -->
               <div class="sub-tags-list">
                 <div class="sub-tag-item">
-                  <Icon class="ic" icon="lucide:globe" />
+                  <Icon class="ic" icon="solar:global-linear" />
                   所在时区：{{ timezoneString }}
                 </div>
                 <div class="sub-tag-item">
-                  <Icon class="ic" icon="lucide:shield" />
-                  所属身份组：{{ profileData.userInfo.roleName }}
-                </div>
-                <div class="sub-tag-item" v-if="isOwnProfile">
-                  <Icon class="ic" icon="lucide:book-open" />
-                  博客联动：
-                  <el-button link type="primary" size="small" :loading="syncingBlog" @click="syncBlogLevelHandler" style="padding: 0; font-size: 12px; font-weight: 600; margin-left: 4px;">
-                    同步博客等级
-                  </el-button>
+                  <Icon class="ic" icon="solar:shield-check-linear" />
+                  所属身份组：{{ currentRoleName }}
                 </div>
                 <div class="sub-tag-item">
-                  <Icon class="ic" icon="lucide:calendar" />
+                  <Icon class="ic" icon="solar:calendar-linear" />
                   加入时间：{{ dayjs(profileData.userInfo.joinTime).format('YYYY年M月') }}
                 </div>
               </div>
 
               <el-button type="primary" size="large" style="width: 100%; border-radius: 12px; height: 46px; font-weight: 600;" @click="handleContact">
-                <Icon icon="lucide:send" class="ic" style="margin-right: 8px;" />
+                <Icon icon="fluent:send-24-filled" class="ic" style="margin-right: 8px;" />
                 发送邮件联系我
               </el-button>
             </div>
@@ -124,7 +117,7 @@
               </template>
               <div v-else style="position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 2;">
                 <div style="display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 16px 24px; background: var(--bg-base); border: 1px dashed var(--border-subtle); border-radius: 12px; transform: translateY(-15px);">
-                  <Icon icon="lucide:eye-off" style="font-size: 36px; color: var(--text-muted); opacity: 0.8;" />
+                  <Icon icon="fluent:eye-off-20-regular" style="font-size: 36px; color: var(--text-muted); opacity: 0.8;" />
                   <span style="font-size: 13px; font-weight: 600; color: var(--text-muted); letter-spacing: 1px;">隐私保护已开启，态势数据不可见</span>
                 </div>
               </div>
@@ -157,7 +150,7 @@
                 </div>
               </div>
               <div class="pie-legend" v-else style="display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; min-height: 80px; gap: 8px;">
-                <Icon icon="lucide:eye-off" style="font-size: 32px; color: var(--border-subtle); opacity: 0.5;" />
+                <Icon icon="fluent:eye-off-20-regular" style="font-size: 32px; color: var(--border-subtle); opacity: 0.5;" />
                 <span style="font-size: 13px; font-weight: 600; color: var(--text-muted); letter-spacing: 1px;">来源数据不可见</span>
               </div>
             </div>
@@ -292,10 +285,17 @@ const isOwnProfile = computed(() => {
   if (target === emailPrefix || target === accountName || target === nameVal) {
     return true
   }
-  if (target === 'admin' && (current.type === 0 || current.email === 'admin@epomail.bond')) {
+  if (target === 'admin' && (current.type === 0 || current.email === 'admin@epomail.bond' || current.role?.roleCode === 'master' || current.role?.name === '站长')) {
     return true
   }
   return false
+})
+
+const currentRoleName = computed(() => {
+  if (isOwnProfile.value && userStore.user?.role?.name) {
+    return userStore.user.role.name
+  }
+  return profileData.value?.userInfo?.roleName || '普通用户'
 })
 
 const coverPhotoStyle = computed(() => {

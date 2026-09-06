@@ -133,13 +133,6 @@ defineOptions({
 })
 
 const userStore = useUserStore();
-if (!userStore.user?.userId) {
-  userStore.refreshUserInfo();
-}
-const isVisitor = computed(() => {
-  const r = userStore.user?.role;
-  return r?.roleCode === 'visitor' || r?.name === '参观者' || r?.key === 'visitor' || regKeyData.some(item => item.isMasked);
-});
 const roleStore = useRoleStore();
 const settingStore = useSettingStore();
 const params = reactive({
@@ -147,6 +140,14 @@ const params = reactive({
 })
 
 const {t} = useI18n()
+const regKeyData = reactive([])
+
+const isVisitor = computed(() => {
+  const r = userStore.user?.role;
+  if (r?.roleCode === 'visitor' || r?.name === '参观者' || r?.key === 'visitor') return true;
+  return regKeyData.length > 0 && !!regKeyData[0]?.isMasked;
+});
+
 const roleList = reactive([])
 const addLoading = ref(false)
 const showAdd = ref(false)
@@ -165,8 +166,6 @@ const addForm = reactive({
   roleId: null,
   expireTime: null
 })
-
-const regKeyData = reactive([])
 
 getList(true)
 
@@ -434,9 +433,30 @@ function openAdd() {
 .scrollbar {
   height: calc(100% - 48px);
   position: relative;
-  background: var(--extra-light-fill);
+  background: var(--bg-base, #f8fafc);
+  padding: 14px 16px 16px 16px;
+  box-sizing: border-box;
+
+  @media (max-width: 767px) {
+    padding: 10px;
+  }
   @media (max-width: 372px) {
     height: calc(100% - 85px);
+  }
+
+  :deep(.el-scrollbar__wrap),
+  :deep(.el-scrollbar__wrap--hidden-default) {
+    background: var(--bg-surface, #ffffff);
+    border: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.08));
+    border-radius: 14px;
+    box-shadow: 0 4px 20px -4px rgba(0, 0, 0, 0.04);
+    box-sizing: border-box;
+    min-height: 100%;
+  }
+
+  :deep(.el-scrollbar__view) {
+    min-height: 100%;
+    box-sizing: border-box;
   }
 
   .code-box {
@@ -446,11 +466,17 @@ function openAdd() {
     gap: 15px;
 
     .code-item {
-      background: var(--el-bg-color);
-      border-radius: 8px;
-      border: 1px solid var(--el-border-color);
-      transition: all 200ms;
+      background: var(--bg-elevated, var(--el-bg-color));
+      border-radius: 10px;
+      border: 1px solid var(--border-subtle, var(--el-border-color));
+      transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.2s ease;
+      will-change: transform;
       padding: 15px;
+
+      &:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 18px -4px rgba(0, 0, 0, 0.08);
+      }
 
       .code-info {
         display: flex;
@@ -464,7 +490,7 @@ function openAdd() {
             padding-top: 5px;
 
             .code {
-              font-weight: bold;;
+              font-weight: bold;
               font-size: 16px;
               white-space: nowrap;
               overflow: hidden;
@@ -523,8 +549,6 @@ function openAdd() {
   font-size: 13px;
   line-height: 1.5;
   font-weight: 500;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
 
   .notice-icon {
     flex-shrink: 0;
@@ -538,15 +562,14 @@ function openAdd() {
   align-items: center;
   min-height: 360px;
   padding: 40px 20px;
+  height: 100%;
 
   .empty-baseplate {
     background: var(--bg-surface, #ffffff);
-    padding: 36px 48px;
-    border-radius: 16px;
-    border: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.08));
-    box-shadow: 0 4px 20px -4px rgba(0, 0, 0, 0.06);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    padding: 32px 48px;
+    border-radius: 14px;
+    border: 1px dashed var(--border-subtle, rgba(148, 163, 184, 0.3));
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.03);
     display: flex;
     justify-content: center;
     align-items: center;
@@ -642,9 +665,7 @@ function openAdd() {
   gap: 12px;
   flex-wrap: wrap;
   align-items: center;
-  background: var(--bg-surface, rgba(255, 255, 255, 0.9));
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: var(--bg-surface, #ffffff);
   border-bottom: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.06));
   border-radius: 10px 10px 0 0;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
@@ -711,6 +732,22 @@ function openAdd() {
     border-bottom-color: var(--border-subtle, #334155) !important;
   }
 
+  .reg-key .scrollbar {
+    background: var(--bg-base, #0f172a) !important;
+  }
+
+  .reg-key :deep(.el-scrollbar__wrap),
+  .reg-key :deep(.el-scrollbar__wrap--hidden-default) {
+    background: var(--bg-surface, #1e293b) !important;
+    border-color: var(--border-subtle, rgba(255, 255, 255, 0.08)) !important;
+    box-shadow: 0 4px 20px -4px rgba(0, 0, 0, 0.3) !important;
+  }
+
+  .reg-key .code-box .code-item {
+    background: var(--bg-elevated, #243147) !important;
+    border-color: var(--border-subtle, rgba(255, 255, 255, 0.08)) !important;
+  }
+
   .reg-key .action-btn-pill {
     background: rgba(255, 255, 255, 0.06) !important;
     border-color: rgba(255, 255, 255, 0.12) !important;
@@ -734,9 +771,9 @@ function openAdd() {
   }
 
   .reg-key .empty .empty-baseplate {
-    background: var(--bg-surface, #1e293b) !important;
-    border-color: var(--border-subtle, rgba(255, 255, 255, 0.1)) !important;
-    box-shadow: 0 4px 20px -4px rgba(0, 0, 0, 0.4) !important;
+    background: var(--bg-elevated, #243147) !important;
+    border: 1px dashed rgba(255, 255, 255, 0.15) !important;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2) !important;
 
     :deep(.el-empty__description p) {
       color: #94a3b8 !important;

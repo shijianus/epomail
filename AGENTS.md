@@ -12,6 +12,32 @@
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
 
+### 彻底清理lucide残留、真实身份组同步、el-scrollbar__wrap全局模板底板与界面流畅度优化上线 (2026-09-06)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **彻底清理博客联动与 Lucide 图标残留**:
+       - 彻底剔除用户公开主页（`views/profile/index.vue`）中残留的 `sub-tag-item`（含 `lucide:book-open` 图标与「博客联动：同步博客等级」文案）；
+       - 全面将个人资料页中的 `lucide:` 系列图标（如邮箱、地球、盾牌、日历、发信等）替换为统一的 `fluent:` 与 `solar:` 高清矢量图标，彻底肃清历史遗留。
+    2. **所属身份组（Role Identity）真实全链路动态同步**:
+       - **根因锁定**: 公开资料接口 `getProfile` 历史逻辑根据用户的历史数值 `type` 进行单表直查，而早期数据库中 `admin@epomail.bond` 初始保留了 `type = 1`（映射为普通用户），导致前端在详情页展示「所属身份组：普通用户」，无法体现实际统领身份；
+       - **后端架构加固**: 在 `mail-worker/src/service/public-service.js` 中将站长邮箱明确映射至 `master` 站长角色；在 `user-service.js` 与 `constant.js` 中将管理员标准身份固化为 `master`（`站长`，`type = 6`）；并在 `role-service.js` 中新增 `selectByRoleCode`；
+       - **数据库对齐**: 在远程 D1 生产库将 `admin@epomail.bond` 的 `type` 更新为 6（master），并在 `init.js` 初始化机制中确保未来数据自动同步；
+       - **前端实时水合**: 在 `views/profile/index.vue` 中封装 `currentRoleName` 响应式计算属性，当前登录用户查看自身资料时直接从 Pinia Store 提取角色名，杜绝回退普通用户。
+    3. **注册密钥全容器模板底板 (`el-scrollbar__wrap`) 与内嵌卡片**:
+       - 将模版卡片样式直接赋予 `class="el-scrollbar__wrap el-scrollbar__wrap--hidden-default"` 整体容器，配置 `var(--bg-surface)`、14px 大圆角、1px 细微高质感边框与柔和投影，使列表区域自成一体；
+       - 为空状态内层 `.empty-baseplate` 配置虚线卡片底板，在明亮与暗黑模式下均具备极佳辨识度与层次感。
+    4. **全方位性能与流畅度深度优化（彻底根治卡顿）**:
+       - 移除 `views/reg-key/index.vue` 挂载时冗余触发的 `userStore.refreshUserInfo()`，避免路由切换时引发 `allLabels` 变化、进而触发 `App.vue` 深度侦听器向后端高频发送 `userSetCustomLabels` POST 级联请求以及重绘全局壁纸 `applyMainWallpaper`；
+       - 优化 `isVisitor` 计算属性，改为 O(1) 短路校验；
+       - 彻底剔除 `.header-actions`、`.visitor-notice-bar`、`.empty-baseplate` 中层叠嵌套的 `backdrop-filter: blur(12px)`，释放 GPU 合成线程，消除 60fps 滚动卡顿与重绘开销；
+       - 对 `views/role/index.vue` 的 `window.onresize` 监听注入 `requestAnimationFrame` 硬件节流，并补全 `onBeforeUnmount` 事件解绑，根治主线程卡死与内存泄漏。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **Cloudflare Workers 部署 Version ID**: `af7e6a69-8be8-410f-9a04-107d84d46aca`。
+    - **epocanvas-mail Git Commit**: `8c3b85e39ee47374cfbdd14f915cc2d34989c922` (Short Hash: `8c3b85e`)。
+    - 自动化测试套件 100% 顺利通过：
+      - `node tests/test-identity-sync-and-scrollbar-wrap.mjs` (Admin 登录获取 Token、/api/my/loginUserInfo 身份组同步为站长、/api/public/profile/admin 同步站长、/admin 界面所属身份组显示站长、博客联动与 lucide 零残留、/invite-code 全局 el-scrollbar__wrap 模板底板 14px 圆角边框阴影、暗黑模式模板底板、无 backdrop-filter 性能开销与 60fps 流畅度 100% 全部通过);
+      - `node tests/test-visitor-defaults-and-masking.mjs` (默认角色确认为参观者、def-tag 后置审计、弹窗精确垂直居中审计、el-tree 互斥拉伸展开测试、博客显式 UI 彻底剔除验证、.empty 磨砂背板实心与边框核验、参观者后端数据脱敏与使用历史阻断、前端脱敏警示条与点击复制拦截闭环、零假数据自动清理 100% 全部通过);
+      - `node --loader ./tests/esm-loader.mjs tests/test-role-permissions-backend-logic.mjs` (配额分级计算、协管者防越权三大拦截、参观者发信禁止与纯文本附件阻断、博客等级进阶算法 100% 全部通过)。
+
 ### 角色默认赋予参观者、默认徽章后置、弹窗绝对垂直居中与互斥拉伸、注册码脱敏保护与空状态背板上线 (2026-09-06)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **隐式化博客联动与冗余显式 UI 剔除**:

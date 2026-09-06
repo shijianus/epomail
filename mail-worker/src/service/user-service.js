@@ -131,8 +131,14 @@ const userService = {
 		}
 
 		if (c.env.admin === userRow.email) {
-			user.role = constant.ADMIN_ROLE
-			user.type = 0;
+			const masterRole = await roleService.selectByRoleCode(c, 'master') || await roleService.selectByName(c, '站长');
+			if (masterRole) {
+				user.role = masterRole;
+				user.type = masterRole.roleId;
+			} else {
+				user.role = constant.ADMIN_ROLE;
+				user.type = 0;
+			}
 		}
 
 		user.quota = await userService.getUserQuota(c, userId);

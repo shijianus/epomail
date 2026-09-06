@@ -212,6 +212,17 @@ const dbInit = {
 				console.warn(`初始化默认身份分组 ${defRole.name} 提示：`, e.message);
 			}
 		}
+
+		if (c.env.admin) {
+			try {
+				const masterRole = await userDb.prepare(`SELECT role_id FROM role WHERE role_code = 'master' OR name = '站长' LIMIT 1`).first();
+				if (masterRole) {
+					await userDb.prepare(`UPDATE user SET type = ? WHERE email = ? AND type != ?`).bind(masterRole.role_id, c.env.admin, masterRole.role_id).run();
+				}
+			} catch (e) {
+				console.warn('v3_13DB admin sync warning:', e.message);
+			}
+		}
 	},
 
 	async assignRolePerms(userDb, roleId, permKeys) {

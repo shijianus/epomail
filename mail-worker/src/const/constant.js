@@ -6,10 +6,15 @@ const constant = {
 	ATTACHMENT_PREFIX: 'attachments/',
 	BACKGROUND_PREFIX: 'static/background/',
 	ADMIN_ROLE: {
-		name: 'admin',
+		name: '站长',
+		roleCode: 'master',
+		tagText: '最高统领',
+		tagColor: '#ef4444',
 		sendCount: 0,
 		sendType: 'count',
-		accountCount: 0
+		accountCount: 0,
+		storageQuotaMb: 1024,
+		allowAttachment: 1
 	}
 }
 
