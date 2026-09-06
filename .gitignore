@@ -34,7 +34,12 @@ mail-worker/test-resend.js
 .agent/
 AGENT.md
 AGENTS.md
-temp_login_ui/
+temp_login_ui/node_modules/
+temp_login_ui/dist/
+temp_login_ui/.wrangler/
+temp_login_ui/login/
+temp_login_ui/plans/
+temp_login_ui/guidelines/
 
 # Prototypes and Preview Files
 preview.html
