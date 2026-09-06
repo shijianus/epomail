@@ -39,7 +39,7 @@
 *   **部署上线与自动化测试 (Verification & Deployment)**:
     - **Cloudflare Workers 部署 Version ID**: `0e8e89a0-296c-40d2-8b2d-7ea6db4a823f`。
     - **shijianus-blog Git Commit**: `e5424ddd29642a63d8ec52be99a1accbb6baf91a` (Short Hash: `e5424dd`).
-    - **epocanvas-mail Git Commit**: `814b73cc4bd3350a615475f0cbc67db2705218d6` (Short Hash: `814b73c`).
+    - **epocanvas-mail Git Commit**: `a356f2a1bcbc0cd33a8e7c866a336587e76d8959` (Short Hash: `a356f2a`).
     - 自动化测试套件 100% 顺利通过：
       - `node tests/test-role-hierarchy-and-blog-grading.mjs` (6 大管理组属性核验、博客等级接口连通、Web UI 表格渲染、880px 架构与分级一览弹窗、预设新建角色模板套用与截图验证 100% 通过);
       - `node --loader ./tests/esm-loader.mjs tests/test-role-permissions-backend-logic.mjs` (配额分级计算、协管者防越权三大拦截、参观者发信禁止与纯文本附件阻断、博客等级进阶算法 100% 通过);
