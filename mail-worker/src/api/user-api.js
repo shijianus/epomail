@@ -27,8 +27,18 @@ app.put('/user/setStatus', async (c) => {
 });
 
 app.put('/user/setType', async (c) => {
-	await userService.setType(c, await c.req.json());
+	await userService.setType(c, await c.req.json(), userContext.getUserId(c));
 	return c.json(result.ok());
+});
+
+app.post('/user/syncBlogLevel', async (c) => {
+	const data = await userService.syncBlogLevel(c, userContext.getUserId(c));
+	return c.json(result.ok(data));
+});
+
+app.get('/user/blogLevelInfo', async (c) => {
+	const data = await userService.getBlogLevelInfo(c, userContext.getUserId(c));
+	return c.json(result.ok(data));
 });
 
 app.get('/user/list', async (c) => {

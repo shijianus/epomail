@@ -172,6 +172,25 @@ app.use('*', async (c, next) => {
 
 	c.set('user',authInfo.user)
 
+	// 参观者沙箱拦截模式：体验不同设置但不进行任何持久化修改
+	const isVisitor = authInfo.user?.role?.roleCode === 'visitor' || authInfo.user?.role?.name === '参观者' || authInfo.user?.role?.key === 'visitor';
+	if (isVisitor && ['POST', 'PUT', 'DELETE', 'PATCH'].includes(c.req.method)) {
+		const adminMutationPrefixes = [
+			'/setting/set', '/setting/setBackground', '/setting/deleteBackground', '/setting/setBlacklist',
+			'/role/set', '/role/add', '/role/delete', '/role/setDefault',
+			'/user/setType', '/user/setStatus', '/user/setPwd', '/user/delete', '/user/resetSendCount', '/user/resetTotp',
+			'/regKey/add', '/regKey/delete', '/regKey/clearNotUse',
+			'/admin/oauthApp/add', '/admin/oauthApp/update', '/admin/oauthApp/delete', '/admin/oauthApp/resetSecret', '/admin/oauthApp/status'
+		];
+		if (adminMutationPrefixes.some(prefix => path.startsWith(prefix))) {
+			return c.json({
+				code: 200,
+				message: '【参观者演示沙箱】操作已在前端交互会话中模拟生效（未保存至生产数据库，刷新后自动复原）',
+				data: null
+			});
+		}
+	}
+
 	return await next();
 });
 

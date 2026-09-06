@@ -15,8 +15,8 @@ app.put('/role/setDefault', async (c) => {
 });
 
 app.put('/role/set', async (c) => {
-	await roleService.setRole(c, await c.req.json());
-	return c.json(result.ok());
+	const res = await roleService.setRole(c, await c.req.json(), userContext.getUserId(c));
+	return c.json(result.ok(res));
 });
 
 app.get('/role/tree', async (c) => {
@@ -25,8 +25,8 @@ app.get('/role/tree', async (c) => {
 });
 
 app.delete('/role/delete', async (c) => {
-	await roleService.delete(c, c.req.query());
-	return c.json(result.ok());
+	const res = await roleService.delete(c, c.req.query(), userContext.getUserId(c));
+	return c.json(result.ok(res));
 });
 
 app.get('/role/list', async (c) => {

@@ -49,3 +49,12 @@ export function userResetTotp(userId) {
 export function userPurgeEmails(userId) {
     return http.post('/user/purgeEmails', { userId })
 }
+
+export function userSyncBlogLevel() {
+    return http.post('/user/syncBlogLevel')
+}
+
+export function userBlogLevelInfo() {
+    return http.get('/user/blogLevelInfo')
+}
+

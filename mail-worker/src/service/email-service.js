@@ -583,12 +583,18 @@ const emailService = {
 
 		if (c.env.admin !== userRow.email) {
 
-			//发件被禁用
-			if (roleRow.sendType === 'ban') {
-				throw new BizError(t('bannedSend'), 403);
+			// 检查附件发送权限 (如普通用户 / 普通用户 LV.0 仅支持纯文本，不允许发送附件)
+			const hasAttachments = (attachments && attachments.length > 0) || (imageDataList && imageDataList.length > 0);
+			if (hasAttachments && Number(roleRow.allowAttachment) === 0) {
+				throw new BizError('当前身份分组仅支持发送纯文本邮件，暂不支持发送附件！请前往 blog.epomail.com 参与互动升级至 LV.1 活跃学者解锁！', 403);
 			}
 
-			//发件被禁用
+			// 发件被禁用 (如参观者)
+			if (roleRow.sendType === 'ban') {
+				throw new BizError(roleRow.roleCode === 'visitor' ? '参观者分组仅供功能演示与架构巡检，禁止发送外发邮件！如需发件请注册普通用户。' : t('bannedSend'), 403);
+			}
+
+			// 发件被禁用
 			if (roleRow.sendType === 'internal' && !allInternal) {
 				throw new BizError(t('onlyInternalSend'), 403);
 			}

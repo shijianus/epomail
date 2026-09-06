@@ -54,6 +54,13 @@
                   <Icon class="ic" icon="lucide:shield" />
                   所属身份组：{{ profileData.userInfo.roleName }}
                 </div>
+                <div class="sub-tag-item" v-if="isOwnProfile">
+                  <Icon class="ic" icon="lucide:book-open" />
+                  博客联动：
+                  <el-button link type="primary" size="small" :loading="syncingBlog" @click="syncBlogLevelHandler" style="padding: 0; font-size: 12px; font-weight: 600; margin-left: 4px;">
+                    同步博客等级
+                  </el-button>
+                </div>
                 <div class="sub-tag-item">
                   <Icon class="ic" icon="lucide:calendar" />
                   加入时间：{{ dayjs(profileData.userInfo.joinTime).format('YYYY年M月') }}
@@ -180,6 +187,8 @@ import StatusBar from '@/layout/status-bar/index.vue'
 import Header from '@/layout/header/index.vue'
 import { parseInlineMarkdown } from "@/utils/md-parser.js"
 import { cvtR2Url } from "@/utils/convert.js"
+import { userSyncBlogLevel } from "@/request/user.js"
+import { ElMessage } from "element-plus"
 
 const uiStore = useUiStore()
 const userStore = useUserStore()
@@ -346,6 +355,25 @@ const fetchProfile = () => {
     }).finally(() => {
         loading.value = false
     })
+}
+
+const syncingBlog = ref(false)
+
+const syncBlogLevelHandler = () => {
+  syncingBlog.value = true
+  userSyncBlogLevel().then(res => {
+    ElMessage({
+      message: res?.message || '博客书友等级同步成功！',
+      type: res?.synced ? 'success' : 'info',
+      plain: true
+    })
+    fetchProfile()
+    userStore.initUser?.()
+  }).catch(err => {
+    ElMessage.error(err?.message || '同步博客等级失败')
+  }).finally(() => {
+    syncingBlog.value = false
+  })
 }
 
 onMounted(() => {

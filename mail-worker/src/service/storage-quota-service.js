@@ -36,10 +36,12 @@ const storageQuotaService = {
 		let userQuotaMb = 0;
 		let byoStorageEnabled = 0;
 		let byoStorageConfig = {};
+		let roleQuotaMb = null;
+		let roleCode = '';
 
 		try {
 			const userRow = await userDb.prepare(`
-				SELECT storage_quota_mb, byo_storage_enabled, byo_storage_config 
+				SELECT type, storage_quota_mb, byo_storage_enabled, byo_storage_config 
 				FROM user 
 				WHERE user_id = ?
 			`).bind(userId).first();
@@ -56,6 +58,20 @@ const storageQuotaService = {
 				} else if (typeof userRow.byo_storage_config === 'object' && userRow.byo_storage_config) {
 					byoStorageConfig = userRow.byo_storage_config;
 				}
+
+				if (userRow.type) {
+					try {
+						const roleRow = await userDb.prepare(`SELECT storage_quota_mb, role_code FROM role WHERE role_id = ?`).bind(userRow.type).first();
+						if (roleRow) {
+							if (roleRow.storage_quota_mb !== null && roleRow.storage_quota_mb !== undefined) {
+								roleQuotaMb = Number(roleRow.storage_quota_mb);
+							}
+							if (roleRow.role_code) {
+								roleCode = roleRow.role_code;
+							}
+						}
+					} catch (re) {}
+				}
 			}
 		} catch (err) {
 			console.warn('Failed to query user BYO storage settings:', err.message);
@@ -66,18 +82,37 @@ const storageQuotaService = {
 		const allowUserByo = setting.userByoStorage !== 0;
 		const defaultQuotaMb = Number(setting.defaultStorageQuotaMb ?? 500);
 
-		// Effective quota: user override > system default
-		const effectiveQuotaMb = userQuotaMb > 0 ? userQuotaMb : defaultQuotaMb;
-		const quotaBytes = effectiveQuotaMb > 0 ? effectiveQuotaMb * 1024 * 1024 : 0; // 0 = unlimited
-
 		const isByoActive = byoStorageEnabled === 1 && allowUserByo && !!byoStorageConfig?.bucket && !!byoStorageConfig?.endpoint;
+		const isVisitor = roleCode === 'visitor' || (roleQuotaMb === 0 && !isByoActive);
 
+		// Effective quota priority:
+		// 1) userQuotaMb if > 0
+		// 2) roleQuotaMb if !== null (e.g. Visitor: 0MB, Normal: 5MB, LV.0: 10MB, LV.1: 25MB, Moderator: 500MB)
+		// 3) system default
+		let effectiveQuotaMb = defaultQuotaMb;
+		if (userQuotaMb > 0) {
+			effectiveQuotaMb = userQuotaMb;
+		} else if (roleQuotaMb !== null) {
+			effectiveQuotaMb = roleQuotaMb;
+		}
+
+		let quotaBytes = 0;
 		let usedPercentage = 0;
 		let isExceeded = false;
 
-		if (quotaBytes > 0) {
+		if (isVisitor && !isByoActive) {
+			effectiveQuotaMb = 0;
+			quotaBytes = 0;
+			usedPercentage = usedBytes > 0 ? 100 : 0;
+			isExceeded = true;
+		} else if (effectiveQuotaMb > 0) {
+			quotaBytes = effectiveQuotaMb * 1024 * 1024;
 			usedPercentage = Math.min(100, Math.round((usedBytes / quotaBytes) * 1000) / 10);
 			isExceeded = usedBytes >= quotaBytes;
+		} else {
+			quotaBytes = 0;
+			usedPercentage = 0;
+			isExceeded = false;
 		}
 
 		let storageType = 'KV';
@@ -109,6 +144,8 @@ const storageQuotaService = {
 			quotaBytes,
 			usedPercentage,
 			isExceeded,
+			isVisitor,
+			roleCode,
 			fileCount,
 			allowUserByo,
 			byoStorageEnabled: isByoActive ? 1 : 0,
@@ -132,8 +169,17 @@ const storageQuotaService = {
 			};
 		}
 
-		// If quota is unlimited (0 MB)
-		if (usage.quotaBytes === 0) {
+		// If visitor without BYO storage
+		if (usage.isVisitor && !usage.byoStorageEnabled) {
+			return {
+				allowed: false,
+				reason: `【参观者模式】未分配持久化存储空间 (0MB)。如需存储附件或邮件数据，请先外接第三方数据库与对象存储。`,
+				usage
+			};
+		}
+
+		// If quota is unlimited (0 MB and not visitor)
+		if (usage.quotaBytes === 0 && !usage.isVisitor) {
 			return {
 				allowed: true,
 				usage

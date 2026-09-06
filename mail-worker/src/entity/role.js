@@ -14,6 +14,9 @@ export const role = sqliteTable('role', {
 	userId: integer('user_id'),
 	sendCount: integer('send_count'),
 	sendType: text('send_type').default('count'),
-	accountCount: integer('account_count')
+	accountCount: integer('account_count'),
+	storageQuotaMb: integer('storage_quota_mb').default(5),
+	allowAttachment: integer('allow_attachment').default(0),
+	roleCode: text('role_code').default('custom')
 });
 export default role

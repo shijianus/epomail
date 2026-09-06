@@ -41,8 +41,181 @@ const dbInit = {
 		await this.v3_10DB(c);
 		await this.v3_11DB(c);
 		await this.v3_12DB(c);
+		await this.v3_13DB(c);
 		await settingService.refresh(c);
 		return c.text('success');
+	},
+
+	async v3_13DB(c) {
+		const userDb = getUserDb(c);
+
+		// 1. Ensure role table columns
+		const roleColumns = [
+			{ name: 'storage_quota_mb', sql: `ALTER TABLE role ADD COLUMN storage_quota_mb INTEGER DEFAULT 5;` },
+			{ name: 'allow_attachment', sql: `ALTER TABLE role ADD COLUMN allow_attachment INTEGER DEFAULT 0;` },
+			{ name: 'role_code', sql: `ALTER TABLE role ADD COLUMN role_code TEXT DEFAULT 'custom';` }
+		];
+
+		for (const col of roleColumns) {
+			try {
+				const colInfo = await userDb.prepare(`SELECT * FROM pragma_table_info('role') WHERE name = ? limit 1`).bind(col.name).first();
+				if (!colInfo) {
+					await userDb.prepare(col.sql).run();
+				}
+			} catch (e) {
+				console.warn(`跳过 role 字段 ${col.name}：${e.message}`);
+			}
+		}
+
+		// 2. Standard 6 default groups
+		const standardRoles = [
+			{
+				roleCode: 'visitor',
+				name: '参观者',
+				key: 'visitor',
+				sort: 1,
+				isDefault: 0,
+				sendType: 'ban',
+				sendCount: 0,
+				accountCount: 0,
+				storageQuotaMb: 0,
+				allowAttachment: 0,
+				description: '开源体验与巡检用户，全功能UI交互沙箱，无持久化写入权限，配额0MB',
+				permKeys: ['setting:query', 'role:query', 'analysis:query', 'user:query']
+			},
+			{
+				roleCode: 'user_base',
+				name: '普通用户',
+				key: 'user_base',
+				sort: 2,
+				isDefault: 1,
+				sendType: 'day',
+				sendCount: 5,
+				accountCount: 1,
+				storageQuotaMb: 5,
+				allowAttachment: 0,
+				description: '默认注册用户，具备基础使用权限，纯文本收发(无附件)，每日5封上限',
+				permKeys: ['email:send', 'email:delete', 'account:query', 'account:add', 'account:delete', 'my:delete']
+			},
+			{
+				roleCode: 'user_lv0',
+				name: '普通用户 LV.0',
+				key: 'user_lv0',
+				sort: 3,
+				isDefault: 0,
+				sendType: 'day',
+				sendCount: 8,
+				accountCount: 2,
+				storageQuotaMb: 10,
+				allowAttachment: 0,
+				description: '已注册/绑定 blog.epomail.com 博客用户，配额提升至10MB，每日8封发信权',
+				permKeys: ['email:send', 'email:delete', 'account:query', 'account:add', 'account:delete', 'my:delete']
+			},
+			{
+				roleCode: 'user_lv1',
+				name: '普通用户 LV.1',
+				key: 'user_lv1',
+				sort: 4,
+				isDefault: 0,
+				sendType: 'day',
+				sendCount: 10,
+				accountCount: 3,
+				storageQuotaMb: 25,
+				allowAttachment: 1,
+				description: '参与博客讨论与活跃互动的进阶用户，配额25MB，每日10封，开放附件发送权限',
+				permKeys: ['email:send', 'email:delete', 'account:query', 'account:add', 'account:delete', 'my:delete']
+			},
+			{
+				roleCode: 'moderator',
+				name: '协管者/管理员',
+				key: 'moderator',
+				sort: 5,
+				isDefault: 0,
+				sendType: 'day',
+				sendCount: 100,
+				accountCount: 10,
+				storageQuotaMb: 500,
+				allowAttachment: 1,
+				description: '非站长管理员，具备细分管控权限，无权修改自身权限与站长权限',
+				permKeys: [
+					'email:send', 'email:delete', 'account:query', 'account:add', 'account:delete', 'my:delete',
+					'user:query', 'user:add', 'user:reset-send', 'user:set-pwd', 'user:set-status', 'user:set-type',
+					'all-email:query', 'setting:query', 'role:query', 'analysis:query'
+				]
+			},
+			{
+				roleCode: 'master',
+				name: '站长',
+				key: 'master',
+				sort: 6,
+				isDefault: 0,
+				sendType: 'count',
+				sendCount: 0,
+				accountCount: 0,
+				storageQuotaMb: 1024,
+				allowAttachment: 1,
+				description: '全站最高权力拥有者，全功能不受限',
+				permKeys: ['*']
+			}
+		];
+
+		for (const defRole of standardRoles) {
+			try {
+				let existing = await userDb.prepare(`SELECT * FROM role WHERE role_code = ? OR name = ? LIMIT 1`).bind(defRole.roleCode, defRole.name).first();
+				if (!existing) {
+					const insRes = await userDb.prepare(`
+						INSERT INTO role (
+							name, key, description, ban_email, ban_email_type, avail_domain,
+							sort, is_default, send_count, send_type, account_count,
+							storage_quota_mb, allow_attachment, role_code
+						) VALUES (?, ?, ?, '', 0, '', ?, ?, ?, ?, ?, ?, ?, ?)
+					`).bind(
+						defRole.name, defRole.key, defRole.description,
+						defRole.sort, defRole.isDefault, defRole.sendCount, defRole.sendType, defRole.accountCount,
+						defRole.storageQuotaMb, defRole.allowAttachment, defRole.roleCode
+					).run();
+
+					const roleId = insRes.meta?.last_row_id;
+					if (roleId) {
+						await this.assignRolePerms(userDb, roleId, defRole.permKeys);
+					}
+				} else {
+					await userDb.prepare(`
+						UPDATE role 
+						SET role_code = ?, storage_quota_mb = ?, allow_attachment = ?, description = ?, send_type = ?, send_count = ?
+						WHERE role_id = ?
+					`).bind(
+						defRole.roleCode, defRole.storageQuotaMb, defRole.allowAttachment, defRole.description, defRole.sendType, defRole.sendCount,
+						existing.role_id
+					).run();
+					await this.assignRolePerms(userDb, existing.role_id, defRole.permKeys);
+				}
+			} catch (e) {
+				console.warn(`初始化默认身份分组 ${defRole.name} 提示：`, e.message);
+			}
+		}
+	},
+
+	async assignRolePerms(userDb, roleId, permKeys) {
+		if (!permKeys || permKeys.length === 0) return;
+		try {
+			if (permKeys.includes('*')) {
+				await userDb.prepare(`
+					INSERT OR IGNORE INTO role_perm (role_id, perm_id)
+					SELECT ?, perm_id FROM perm
+				`).bind(roleId).run();
+				return;
+			}
+			const placeholders = permKeys.map(() => '?').join(',');
+			await userDb.prepare(`
+				INSERT OR IGNORE INTO role_perm (role_id, perm_id)
+				SELECT DISTINCT ?, perm_id FROM perm WHERE perm_key IN (${placeholders})
+				UNION
+				SELECT DISTINCT ?, pid FROM perm WHERE perm_key IN (${placeholders}) AND pid > 0
+			`).bind(roleId, ...permKeys, roleId, ...permKeys).run();
+		} catch (e) {
+			console.warn('assignRolePerms warning:', e.message);
+		}
 	},
 
 	async v3_12DB(c) {

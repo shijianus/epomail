@@ -12,6 +12,41 @@
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
 
+### 6大核心管理组权限控制规范、开源参观者沙箱交互、博客书友等级联动阶梯与UI架构透视全景上线 (2026-09-06)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **6 大标准管理组与权限边界全景确立 (6 Core Management Groups & Tier Matrix)**:
+       - **1. 参观者 (Visitor)**: 专供开源巡检与交互演示，0MB 存储配额（如需使用需外置 DB，默认开启外接 DB 支持），禁止外发邮件（`sendType: 'ban'`），开放管理后台只读查看权限；所有管理端变更操作（`POST`/`PUT`/`DELETE`）经安全中间件拦截后返回沙箱模拟成功响应，实现零数据库/KV 污染与真实交互体验；
+       - **2. 普通用户 (Base User)**: 默认注册用户，无后台管理权限，5MB 存储空间，每日 5 封发信上限，严格仅限纯文本收发（`allowAttachment: 0`）；
+       - **3. 普通用户 LV.0**: 已注册/绑定 `blog.epomail.com` 博客账号的书友，存储配额提升至 10MB，发信上限提升至每日 8 封，纯文本收发；
+       - **4. 普通用户 LV.1**: 参与博客讨论与活跃互动的进阶书友（注册满 10 天且发表 3 条有效讨论或累计阅读 100 分钟），配额提升至 25MB，每日 10 封发信上限，**正式解锁普通附件与图片发送权限 (`allowAttachment: 1`)**；
+       - **5. 协管者/管理员 (Moderator)**: 非站长管理员，拥有绝大多数细分管理权限，500MB 存储配额，每日 100 封发信上限，开放附件；**严格防越权约束：禁止修改自身所在权限组，禁止修改站长权限，禁止将任何用户提权为站长**；
+       - **6. 站长 (Webmaster / Master)**: 全站最高权力拥有者，1024MB/无限制配额，无发件上限，全功能不受限。
+    2. **博客系统活跃度等级算法与跨项目协同 (`shijianus-blog`)**:
+       - 在 `shijianus-blog` 中实现 `calculateUserLevel` 算法与 `/api/auth/user-level` 开放查询接口；
+       - 阶梯规则：LV.0（注册即得，配额 10MB/8封）、LV.1（>=10天且>=3条评论或阅读>=100分钟，配额 25MB/10封/开放附件）、LV.2（>=90天且>=30赞或>=20条讨论，配额 50MB/20封/优先通道）、LV.3（>=180天且>=100赞，配额 100MB/50封/至尊学者）；
+       - 在 `USER_LEVEL_SPEC.md` 中固化跨项目等级映射标准与特权定义。
+    3. **后端安全防线、配额计算与拦截加固 (`mail-worker`)**:
+       - **DDL 升级与自动补全**: 在 `init.js` (v3_13DB) 与 `roleService.ensureStandardRoles` 中实现 `storage_quota_mb`、`allow_attachment`、`role_code` 自动列升级与集合式快速初始化；
+       - **存储配额管控**: 在 `storageQuotaService` 中依角色注入精确空间限制；参观者无外置 DB 时彻底阻断附件存储（0MB 超限）；
+       - **发件规则校验**: 在 `emailService.send` 中校验 `allowAttachment` 开关，非授权附件发件直接抛出友好升级指引；
+       - **防越权闭环**: 在 `userService.setType`、`roleService.setRole`、`roleService.delete` 中固化协管者自封与提权防线；
+       - **参观者沙箱拦截器**: 在 `security.js` 中捕获参观者管理端变更，返回 `{ code: 200, message: '【参观者演示沙箱】...' }`，保障演示可用性与底层数据只读隔离。
+    4. **Web UI 视觉与交互体验升级 (`mail-vue`)**:
+       - **角色表格列重构**: 增设角色标识 Tag、存储配额 Badge、发信限额 Badge、附件权限指示及协管者防自改禁用状态；
+       - **架构与分级一览 (880px 居中弹窗)**: 新增「架构与分级一览」透视弹窗，以卡片矩阵展示 6 大管理组核心职能，并呈现博客书友等级阶梯表格与「一键同步博客等级」操作入口；
+       - **新建/编辑角色模板套用**: 新增 6 大预设模板（参观者、普通用户、LV.0、LV.1、协管者、站长）一键套用 Chips，双列排布配额与附件开关；
+       - **个人中心协同**: 在个人主页卡片注入「博客联动：同步博客等级」按钮，实现一键平滑晋升。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **Cloudflare Workers 部署 Version ID**: `0e8e89a0-296c-40d2-8b2d-7ea6db4a823f`。
+    - **shijianus-blog Git Commit**: `e5424ddd29642a63d8ec52be99a1accbb6baf91a` (Short Hash: `e5424dd`).
+    - **epocanvas-mail Git Commit**: `814b73cc4bd3350a615475f0cbc67db2705218d6` (Short Hash: `814b73c`).
+    - 自动化测试套件 100% 顺利通过：
+      - `node tests/test-role-hierarchy-and-blog-grading.mjs` (6 大管理组属性核验、博客等级接口连通、Web UI 表格渲染、880px 架构与分级一览弹窗、预设新建角色模板套用与截图验证 100% 通过);
+      - `node --loader ./tests/esm-loader.mjs tests/test-role-permissions-backend-logic.mjs` (配额分级计算、协管者防越权三大拦截、参观者发信禁止与纯文本附件阻断、博客等级进阶算法 100% 通过);
+      - `node tests/test-profile-cover-sync.mjs` (个人背景封面全链路同步回归 100% 通过);
+      - `node tests/test-profile-scrollbar-isolation.mjs` (用户详情主栏物理隔离与壁纸防穿透回归 100% 通过);
+      - `node --loader ./tests/esm-loader.mjs tests/test-storage-and-db-hub-e2e.mjs` (存储与核心数据库管理中心回归 100% 通过)。
+
 ### 个人背景修改全链路同步至用户详情页cover-photo、渐变与图片智能渲染与响应式监听上线 (2026-09-05)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **排查并锁定个人背景未同步至用户详情页封面根因 (Root Cause Analysis)**:

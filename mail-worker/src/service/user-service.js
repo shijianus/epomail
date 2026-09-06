@@ -505,14 +505,35 @@ const userService = {
 		}
 	},
 
-	async setType(c, params) {
-
+	async setType(c, params, callerUserId) {
 		const { type, userId } = params;
 
 		const roleRow = await roleService.selectById(c, type);
-
 		if (!roleRow) {
 			throw new BizError(t('roleNotExist'));
+		}
+
+		if (callerUserId) {
+			const caller = await this.selectById(c, callerUserId);
+			if (caller) {
+				const callerRole = await roleService.selectById(c, caller.type);
+				if (callerRole?.roleCode === 'visitor') {
+					return { simulated: true, message: '参观者模式：操作已在沙箱中模拟。' };
+				}
+
+				if (caller.email !== c.env.admin) {
+					if (caller.userId === Number(userId)) {
+						throw new BizError('协管者/管理员无权修改自身所在分组权限！', 403);
+					}
+					const targetUser = await this.selectById(c, userId);
+					if (targetUser && targetUser.email === c.env.admin) {
+						throw new BizError('无权修改站长身份！', 403);
+					}
+					if (roleRow.roleCode === 'master') {
+						throw new BizError('仅站长本人可分配站长角色！', 403);
+					}
+				}
+			}
 		}
 
 		await orm(c)
@@ -521,6 +542,89 @@ const userService = {
 			.where(eq(user.userId, userId))
 			.run();
 
+		await this.updateUserInfo(c, userId, true);
+	},
+
+	async getBlogLevelInfo(c, userId) {
+		const userRow = await this.selectById(c, userId);
+		if (!userRow) throw new BizError(t('notExistUser'));
+
+		let blogLevelInfo = null;
+		try {
+			const blogUrl = (c.env.BLOG_BASE_URL || 'https://blog.epocanvas.com').replace(/\/+$/, '');
+			const resp = await fetch(`${blogUrl}/api/auth/user-level?email=${encodeURIComponent(userRow.email)}`, {
+				headers: { 'Accept': 'application/json' }
+			});
+			if (resp.ok) {
+				blogLevelInfo = await resp.json();
+			}
+		} catch (e) {
+			console.warn('Query blog user level error:', e.message);
+		}
+
+		if (!blogLevelInfo || !blogLevelInfo.ok) {
+			return {
+				hasBlogAccount: false,
+				email: userRow.email,
+				level: 0,
+				levelName: '未认证读者',
+				badge: '未认证',
+				message: '未关联 blog.epomail.com 账号。在博客注册相同邮箱账号即可直升 LV.0 并提升配额！'
+			};
+		}
+
+		return {
+			hasBlogAccount: true,
+			...blogLevelInfo
+		};
+	},
+
+	async syncBlogLevel(c, userId) {
+		const userRow = await this.selectById(c, userId);
+		if (!userRow) throw new BizError(t('notExistUser'));
+
+		const blogInfo = await this.getBlogLevelInfo(c, userId);
+		if (!blogInfo || !blogInfo.hasBlogAccount) {
+			return {
+				synced: false,
+				message: blogInfo?.message || '未在 blog.epomail.com 博客中找到此邮箱记录，请先使用相同邮箱在博客注册！',
+				currentRole: userRow.type
+			};
+		}
+
+		const targetRoleCode = blogInfo.mappedEpomailRole || (blogInfo.level >= 1 ? 'user_lv1' : 'user_lv0');
+		const allRoles = await roleService.roleList(c);
+		const targetRole = allRoles.find(r => r.roleCode === targetRoleCode);
+
+		if (!targetRole) {
+			return {
+				synced: false,
+				message: `未找到目标身份分组 [${targetRoleCode}]`,
+				level: blogInfo.level
+			};
+		}
+
+		if (userRow.email === c.env.admin) {
+			return {
+				synced: true,
+				level: blogInfo.level,
+				levelName: blogInfo.levelName,
+				newRoleName: '站长',
+				message: `您是站长，已自动享有最高权限。博客书友等级为【${blogInfo.levelName}】。`
+			};
+		}
+
+		await orm(c).update(user).set({ type: targetRole.roleId }).where(eq(user.userId, userId)).run();
+		await this.updateUserInfo(c, userId, true);
+
+		return {
+			synced: true,
+			level: blogInfo.level,
+			levelName: blogInfo.levelName,
+			newRoleName: targetRole.name,
+			newRoleId: targetRole.roleId,
+			message: `博客等级同步成功！已为您自动匹配并晋升为【${targetRole.name}】，享有 ${targetRole.storageQuotaMb}MB 存储空间与每日 ${targetRole.sendCount} 封发信权限！`
+		};
 	},
 
 	async incrUserSendCount(c, quantity, userId) {
