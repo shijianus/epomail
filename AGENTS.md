@@ -11,6 +11,32 @@
    - 在向用户输出回复时，必须置顶/显式打印出本次提交的完整 Commit Hash 与短 Hash，确保版本可追溯、审计记录完整。
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
+### 注册密钥empty-baseplate高级现代化优化、el-scrollbar滑块彻底删除与前后双部分画风统一上线 (2026-09-06)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **空状态背板 (empty-baseplate) 现代化质感全面升级**:
+       - 彻底剔除 Element Plus 默认自带的灰色纸箱插画，重构为符合现代产品设计语言的自适应高质感卡片组件；
+       - 嵌入专属渐变发光图标底座（64x64px，`fluent:key-20-regular` 矢量高清图标），搭配 17px 加粗主标题与智能说明文案；
+       - 智能上下文快捷 CTA 行动按钮组：常规空状态下提供「立即创建注册码」高亮主按钮与「刷新列表」次按钮；搜索无结果时智能切换为「立即创建注册码」与「清空搜索条件」次按钮，支持一键恢复初始列表；
+       - 双模式细腻边框与实心背景底板（`var(--bg-surface)` / `#243147`），14px 优雅圆角与柔和阴影，测试审计 `background !== "rgba(0,0,0,0)"` 与 `hasBorder === true` 100% 达标。
+    2. **彻底删除 `class="el-scrollbar scrollbar"` 滑块 (Zero Scrollbar)**:
+       - 针对 Element Plus `<el-scrollbar>` 深度消除虚拟滑块轨道与拇指：配置 `:deep(.el-scrollbar__bar)` 与 `:deep(.el-scrollbar__thumb)` 为 `display: none !important; opacity: 0; pointer-events: none; width: 0; height: 0;`；
+       - 彻底移除原生系统与多内核浏览器（WebKit/Chrome/Safari/Firefox/Edge）的滚动条与滑块：配置 `scrollbar-width: none !important;` 与 `&::-webkit-scrollbar { display: none !important; }`；
+       - 彻底剔除原第 610 行历史冲突代码 `:deep(.el-scrollbar__view) { height: calc(100% - 80px); }`，保证高度自适应与弹性伸缩，消除多余滚动条计算，页面平滑滚动且绝对无任何突兀滑块破坏画面。
+    3. **顶部 Header 操作栏与下方内容底板两大核心部分画风深度同步统一**:
+       - **Part 1 顶部栏**: 增设左侧页面主标题与数量气泡徽章（`.header-title-box`，`fluent:key-20-regular` + 标题 + 密钥总数统计）；将操作按钮全面升级为标准 Fluent 矢量高清图标体系（新增 `fluent:add-circle-20-regular`、搜索 `fluent:search-16-regular`、刷新 `fluent:arrow-clockwise-16-regular`、清理 `fluent:broom-sparkle-16-regular`）；将新增按钮升级为带高光阴影的主操作胶囊，视觉节奏主次分明；
+       - **Part 2 主体内容区**: 密钥卡片（`.code-item`）排版精细化，等宽密钥字体，快速复制按钮，脱敏保护标签，三点更多设置菜单，使用次数与角色权限彩色胶囊；
+       - **画风统筹与暗黑模式适配**: 顶部 Header、下方圆角卡片底板（`.el-scrollbar__wrap`）、密钥卡片及空状态底板（`.empty-baseplate`）共享同一套色彩变量系统（`var(--bg-surface)`、`var(--bg-elevated)`、`var(--border-subtle)`），深色模式下同步切换为深蓝黑底色，彻底消灭刺眼白斑，画风前后完全一致。
+    4. **国际化 (i18n) 与代码质量加固**:
+       - 在 `zh.js` 与 `en.js` 补全 `noSearchResult`（未找到匹配的注册码）与 `clearSearch`（清空搜索条件）双语词条；
+       - 修复 `reg-key/index.vue` 中 `message: $('emptyRegKeyMsg')` 的历史语法笔误，纠正为 `t('emptyRegKeyMsg')`。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **Cloudflare Workers 部署 Version ID**: `bbf48b2e-8623-4c04-893d-06cebcb30fe8`。
+    - **epocanvas-mail Git Commit**: `3767a0a8652de08f2a1c09ea4ec3e61352f41a08` (Short Hash: `3767a0a`)。
+    - 自动化测试套件 100% 顺利通过：
+      - `node tests/test-invite-code-ui-optimization.mjs` (顶部标题与数量统计徽章审计、4大操作药丸按钮审计、el-scrollbar虚拟与原生滑块彻底删除Zero-Scrollbar审计、empty-baseplate现代化图标底座/双语标题/说明文本/CTA行动按钮核验、清空搜索交互闭环、暗黑模式双部分画风完全同步无白斑审计 100% 全部通过);
+      - `node tests/test-identity-sync-and-scrollbar-wrap.mjs` (Admin 登录获取 Token、身份组站长同步、/admin 资料页验证、/invite-code 整体模板底板、暗黑模式模板底板与流畅度 100% 全部通过);
+      - `node tests/test-visitor-defaults-and-masking.mjs` (默认角色确认为参观者、def-tag 后置审计、弹窗精确垂直居中审计、el-tree 互斥拉伸展开测试、博客显式 UI 彻底剔除验证、.empty 磨砂背板实心与边框核验、参观者后端数据脱敏与使用历史阻断、前端脱敏警示条与点击复制拦截闭环、零假数据自动清理 100% 全部通过)。
+
 ### OAuth应用管理卡片极小化、隐去回调地址、解除按钮冲突与引导至博客开发教程上线 (2026-09-06)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **OAuth 应用卡片极小化与空间紧缩 (app-card Compact Layout)**:

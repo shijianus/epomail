@@ -272,6 +272,8 @@ const zh = {
     addRegKey: '添加注册码',
     regKey: '注册码',
     noCodeFound: '没有任何注册码',
+    noSearchResult: '未找到匹配的注册码',
+    clearSearch: '清空搜索条件',
     useHistory: '使用记录',
     date: '时间',
     roleDesc: '权限身份',
