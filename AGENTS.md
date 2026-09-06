@@ -11,6 +11,36 @@
    - 在向用户输出回复时，必须置顶/显式打印出本次提交的完整 Commit Hash 与短 Hash，确保版本可追溯、审计记录完整。
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
+
+### 用户注册界面白屏崩溃修复、开启注册状态动态同步、注册邀请码必填逻辑校准与错误边界守护上线 (2026-09-06)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **根除注册界面白屏崩溃并引入 ErrorBoundary 错误边界**:
+       - 彻底解决 `/login/?view=register` 访问及登录页点击「探索节点」时应用全屏白屏崩溃问题；
+       - 深度定位根因：在 `RegisterForm.tsx` 中使用了未声明变量 `effectiveConfig`，触发 `ReferenceError: effectiveConfig is not defined` 导致 React 组件树卸载崩溃；
+       - 规范声明 `effectiveConfig = sysConfig || propsSysConfig || {}`，并在 `App.tsx` 与入口层级构建科幻高质感 `ErrorBoundary` 错误边界守护组件，捕获并隔离渲染异常，提供「重置并返回登录」一键自愈交互。
+    2. **修正开启注册（register）状态动态同步逻辑**:
+       - 彻底解决「后台开启注册但前端仍无法注册、误报未开放注册」的逻辑反转严重问题；
+       - 对齐数据库与后端常量标准：`register === 0` 代表 OPEN（开启注册），`register === 1` 代表 CLOSE（关闭注册）；
+       - 纠正此前将 `register === 0` 误作为关闭判断的逻辑笔误，移除开启注册时误触发的「当前没有可着陆的节点」警报与「当前没有可以探索的新节点，请联系舰长改变航道」阻断；
+       - 仅当管理员明确关闭注册通道（`register === 1`）时，才激活醒目 Sci-Fi 风格警报卡片并禁用提交按钮。
+    3. **校准注册邀请码（regKey）必填与显隐逻辑**:
+       - 对齐系统多级密钥策略：`regKey === 0` 代表 OPEN/REQUIRED（必填注册码），`regKey === 1` 代表 CLOSE/DISABLED（关闭注册码），`regKey === 2` 代表 OPTIONAL（选填注册码）；
+       - 修复此前将 `regKey === 0` 误判为不需要注册码而隐藏输入框、导致后端校验拦截「注册码不能为空」且用户无法输入的死锁故障；
+       - 增设 URL 邀请码参数智能提取与自动回填机制（支持 `?code=...`、`?regKey=...`、`?invite=...`），并增强客户端必填校验与提示。
+    4. **邮箱域名智能适配与真实错误透出**:
+       - 针对 `domainList` 提供智能域名后缀交互（单域名展示徽章、多域名提供半透明磨砂选择下拉框）；针对「隐藏登录域名」场景提供完整邮箱输入指引；
+       - 完整翻译与映射后端错误响应代码（如已注册、注销、密码过短、非法前缀等），彻底根除吞异常或误报假问题，保障用户清晰知晓输入校验结果。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **Cloudflare Workers 部署 Version ID**: `aa0d4d82-f1cb-48d6-b1a2-6fe335128756`。
+    - **epocanvas-mail Git Commit**: `2ed51e892d5c4b8b64e0307044ec3c1db65cb071` (Short Hash: `2ed51e8`)。
+    - 自动化测试套件 100% 顺利通过：
+      - `node tests/test-register-ui-and-sync.mjs` (register=0开启注册测试、regKey=0必填邀请码输入框显隐核验、URL邀请码自动填充核验、客户端密码不一致校验、注册成功自动平滑切回登录核验、regKey=1无码模式核验、register=1关闭注册警示条与按钮禁用核验、双向平滑切换审计 100% 全部通过);
+      - `node tests/test-gmail-ui-and-ai-features.mjs` (Admin 登录获取 Token、测试邮件检索、收件箱右侧面板展开、顶栏 17 大 Gmail 操作按钮完好性审计、.info-bottom「至 我」触发器与详情卡片字段/TLS徽章核验、翻译工具条与语言下拉框核验、后端 /api/email/translate AI 翻译与降级容灾核验、个人垃圾邮件上报与黑名单规则联动核验、已读/未读状态双向流转核验、管理面板 AI 集成 UI 与 /api/setting/ai/test 连通性测试 100% 全部通过);
+      - `node tests/test-invite-code-ui-optimization.mjs` (Admin 登录、4大操作药丸与原有图标完好性审计、el-scrollbar虚拟与原生滑块彻底删除Zero-Scrollbar审计、empty-baseplate质感与行动按钮审计、清空搜索交互闭环、卡片原有功能/复制/菜单审计、暗黑模式双部分画风完全同步无白斑审计、测试注册码自动重置清理 100% 全部通过);
+      - `node tests/test-identity-sync-and-scrollbar-wrap.mjs` (Admin 登录获取 Token、身份组站长同步、/admin 资料页验证、/invite-code 整体模板底板、暗黑模式模板底板与流畅度 100% 全部通过);
+      - `node tests/test-visitor-defaults-and-masking.mjs` (默认角色确认为参观者、def-tag 后置审计、弹窗精确垂直居中审计、el-tree 互斥拉伸展开测试、博客显式 UI 彻底剔除验证、.empty 磨砂背板实心与边框核验、参观者后端数据脱敏与使用历史阻断、前端脱敏警示条与点击复制拦截闭环、零假数据自动清理 100% 全部通过);
+      - 生产环境 Playwright 实时在线审计 (`https://mail.epocanvas.com/login/?view=register` 零控制台错误、零页面崩溃、输入组件完整、邀请码自动回填、双向视图切换 100% 通过)。
+
 ### Gmail风格收件UI升级、to me下拉详情卡片、多维操作快捷栏与AI模型密钥集成及智能全文翻译上线 (2026-09-06)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **遵循最小修复原则学习 Gmail 经典收件交互架构**:
