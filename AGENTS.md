@@ -32,7 +32,7 @@
        - 对 `views/role/index.vue` 的 `window.onresize` 监听注入 `requestAnimationFrame` 硬件节流，并补全 `onBeforeUnmount` 事件解绑，根治主线程卡死与内存泄漏。
 *   **部署上线与自动化测试 (Verification & Deployment)**:
     - **Cloudflare Workers 部署 Version ID**: `af7e6a69-8be8-410f-9a04-107d84d46aca`。
-    - **epocanvas-mail Git Commit**: `8c3b85e39ee47374cfbdd14f915cc2d34989c922` (Short Hash: `8c3b85e`)。
+    - **epocanvas-mail Git Commit**: `c662ed1ba758302cd091a3e39fec32ff05a15e50` (Short Hash: `c662ed1`)。
     - 自动化测试套件 100% 顺利通过：
       - `node tests/test-identity-sync-and-scrollbar-wrap.mjs` (Admin 登录获取 Token、/api/my/loginUserInfo 身份组同步为站长、/api/public/profile/admin 同步站长、/admin 界面所属身份组显示站长、博客联动与 lucide 零残留、/invite-code 全局 el-scrollbar__wrap 模板底板 14px 圆角边框阴影、暗黑模式模板底板、无 backdrop-filter 性能开销与 60fps 流畅度 100% 全部通过);
       - `node tests/test-visitor-defaults-and-masking.mjs` (默认角色确认为参观者、def-tag 后置审计、弹窗精确垂直居中审计、el-tree 互斥拉伸展开测试、博客显式 UI 彻底剔除验证、.empty 磨砂背板实心与边框核验、参观者后端数据脱敏与使用历史阻断、前端脱敏警示条与点击复制拦截闭环、零假数据自动清理 100% 全部通过);
