@@ -42,7 +42,7 @@
        - 全面补全 `zh.js` 与 `en.js` 缺失的全部国际化键值（`archive`, `addToTasks`, `moveTo`, `expandAll`, `collapseAll`, `printAll`, `inNewWindow`, `replyAll`, `forwardAll`, `downloadEml`, `viewRawHeaders`, `aiHubTitle`, `aiQuickPresets`, `close` 等），杜绝任何未翻译键名泄露。
 *   **部署上线与自动化测试 (Verification & Deployment)**:
     - **Cloudflare Workers 部署 Version ID**: `4ab06773-dbc9-414b-8ffc-7108d5c9747d`。
-    - **epocanvas-mail Git Commit**: `32638022faf5c52daab9c4f00626f4d66b91802a` (Short Hash: `3263802`)。
+    - **epocanvas-mail Git Commit**: `9a220975cd2c7b18464c00c21aee9baa3678fc2c` (Short Hash: `9a22097`)。
     - 自动化测试套件 100% 顺利通过：
       - `node tests/test-sys-setting-ai-hub-and-thread-actions.mjs` (Admin 登录、系统设置 /system-setting 独立 .ai-hub-card 渲染、测试 AI 连通性、.ai-hub-dialog 预设快速填充 DeepSeek/OpenAI、收件箱重复「返回邮件」删除核验、顶栏 .header-actions 12大左/右操作按钮核验、.email-title-row 静态标签清理核验、展开邮件右对齐 class="thread-header-bar" 8大实际操作按钮完备性核验、.raw-headers-dialog 原始邮件标头查看与复制核验、归档与任务待办 100% 全部通过);
       - `node tests/test-gmail-ui-and-ai-features.mjs` (Admin 登录获取 Token、测试邮件检索、收件箱右侧面板展开、顶栏 21 大 Gmail 操作按钮完好性审计、.info-bottom「至 我」触发器与详情卡片字段/TLS徽章核验、翻译工具条与语言下拉框核验、后端 /api/email/translate AI 翻译与降级容灾核验、个人垃圾邮件上报与黑名单规则联动核验、已读/未读状态双向流转核验、管理面板 AI 集成 UI 与 /api/setting/ai/test 连通性测试 100% 全部通过);
