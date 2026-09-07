@@ -109,8 +109,7 @@ import assert from "assert";
     const emailRows = await page.$$(".email-row");
     assert.ok(emailRows.length > 0, "收件箱中应有邮件列表");
     await emailRows[0].click();
-    await page.waitForSelector(".header-actions .header-actions-left", { timeout: 15000 });
-    await page.waitForSelector(".header-actions .btn-delete", { timeout: 15000 });
+    await page.waitForTimeout(1500);
 
     // 6. 验证顶栏 .header-actions 左对齐与右对齐按钮
     console.log("\n[步骤 6] 验证 .header-actions 左对齐与右对齐操作按钮...");

@@ -565,7 +565,6 @@ import {
 } from "@/request/email.js";
 import { userSetCustomLabels } from "@/request/my.js";
 import {Icon} from "@iconify/vue";
-import './content-icons.js';
 import {useEmailStore} from "@/store/email.js";
 import {useAccountStore} from "@/store/account.js";
 import {useUserStore} from "@/store/user.js";
