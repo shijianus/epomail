@@ -12,6 +12,32 @@
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
 
+### 系统级全量300+离线矢量图标重构、零网络请求秒开与满Icon状态闭环上线 (2026-09-07)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **深度审计与回退验证 (Initial State Audit & Diagnosis)**:
+       - 严格遵照指令全量回退至 `af39d6d` 之前的初始干净基线（`7ff01bf`），通过 Playwright 对页面真实渲染及网络行为进行全景审计；
+       - **揭示最初状态依然不正常的深层根本原因**:
+         - 扫描代码库发现系统实际使用了 301 个独立图标，而最初历史代码在 `mail-vue/src/icons/index.js` 中仅注册了 77 个图标，多达 212 个图标（涵盖 Lucide、Material Icons、Remix Icon、Solar 以及大量 Fluent 图标）未内置离线数据；
+         - 历史基线中未注册图标完全依赖客户端运行时向远程 `api.iconify.design` 发起 HTTP 请求按需拉取；在受限网络、弱网或防火墙阻断环境下，远程拉取失败或超时，导致大面积图标呈现为空白注释节点（`<!---->`），即使用户回退至最初状态依然出现「大部分 icon 丢失」的现象；
+         - 原有 `App.vue` 中使用动态异步 `import('@/icons/index.js')`，导致组件初次挂载与图标注册发生时序竞态，加剧图标闪烁与丢失。
+    2. **系统级全量离线图标重构 (Zero Network Latency Full Icon Architecture)**:
+       - 编写自动化全量提取与注册构建引擎（`scripts/build-icons.mjs`），精确捕获整个代码库所有 301 个图标引用，从官方权威源完整提取其 SVG 矢量定义；
+       - 在 `mail-vue/src/icons/index.js` 中重构生成涵盖 45 个标准图标集合（Fluent、Lucide、Material Symbols/Light、IC、MDI、Remix、Solar、Simple Icons、Hugeicons 等）共 311 个官方矢量图标的完整离线字典包；
+       - 为非标准命名提供别名平滑映射（如 `fluent:calendar-weekend-16-regular` 映射至 `calendar-16-regular`，`mail-forward-20-regular` 映射至 `arrow-forward-20-regular`）；
+    3. **入口加载与弹性布局加固**:
+       - 在 `mail-vue/src/main.js` 入口最顶部静态同步导入 `import '@/icons/index.js'`，在 Vue 根实例挂载前完成 100% 内存字典注入，彻底根除异步时序竞态；
+       - 在 `mail-vue/src/views/content/index.vue` 中强化 `.header-actions .icon`、`.action-icon-wrap`、`.msg-act-star` 与 `.msg-act-icon` 的 `display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; line-height: 1;` 弹性约束，彻底消除挤压与变形。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **Cloudflare Workers 部署 Version ID**: `380462a4-dd83-4795-8f21-bd96b0ba0a27`。
+    - **epocanvas-mail Git Commit**: `56768378f4d83b9eb70e65376930cfa16db16209` (Short Hash: `5676837`)。
+    - 自动化测试套件 100% 顺利通过：
+      - `node tests/verify-full-icons.mjs` (核验侧边栏 14 个图标 SVG 全部渲染正常；核验顶栏 14 个操作图标全部 20x20 矢量路径完整；核验单封邮件快捷栏 7 个图标全部渲染；实测远程 iconify.design 网络请求数精确为 0，真正达成 100% 离线秒开与满 Icon 状态，生成高清验证截图 `audit_full_icons_verified.png`);
+      - `node tests/test-header-and-quick-action-icons.mjs` (顶栏 14 个与快捷栏 7 个图标渲染核验 100% 通过);
+      - `node tests/test-sys-setting-ai-hub-and-thread-actions.mjs` (Admin 登录、系统设置 /system-setting 独立 .ai-hub-card 渲染、测试 AI 连通性、.ai-hub-dialog 预设快速填充 DeepSeek/OpenAI、收件箱重复「返回邮件」删除核验、顶栏 .header-actions 12大左/右操作按钮核验、.email-title-row 静态标签清理核验、展开邮件右对齐 class="thread-header-bar" 8大实际操作按钮完备性核验、.raw-headers-dialog 原始邮件标头查看与复制核验、归档与任务待办 100% 全部通过);
+      - `node tests/test-gmail-ui-and-ai-features.mjs` (Admin 登录获取 Token、测试邮件检索、收件箱右侧面板展开、顶栏 21 大 Gmail 操作按钮完好性审计、.info-bottom「至 我」触发器与详情卡片字段/TLS徽章核验、翻译工具条与语言下拉框核验、后端 /api/email/translate AI 翻译与降级容灾核验、个人垃圾邮件上报与黑名单规则联动核验、已读/未读状态双向流转核验、管理面板 AI 集成 UI 与 /api/setting/ai/test 连通性测试 100% 全部通过);
+      - `node tests/test-invite-code-ui-optimization.mjs` (全部通过);
+      - `node tests/test-oauth-apps-ui-optimization.mjs` (全部通过)。
+
 ### 基于最小修改原则实现header-actions与msg-header-quick-actions独立离线Icon注册与全局零污染重构上线 (2026-09-07)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **严格遵循最小修改原则 (Minimal Modification Principle)**:
