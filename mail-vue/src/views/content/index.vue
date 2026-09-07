@@ -36,7 +36,7 @@
               <span>{{ $t('snoozeTomorrow') || '明天 (09:00)' }}</span>
             </div>
             <div class="snooze-menu-item" @click="handleQuickSnooze('weekend')">
-              <Icon icon="fluent:calendar-weekend-16-regular" width="16" />
+              <Icon icon="fluent:calendar-16-regular" width="16" />
               <span>{{ $t('snoozeThisWeekend') || '本周末 (周六 09:00)' }}</span>
             </div>
             <div class="snooze-menu-item" @click="handleQuickSnooze('nextweek')">
@@ -1323,9 +1323,10 @@ const handleReportNotSpam = (emailId) => {
     cursor: pointer;
     color: var(--text-secondary, #64748b);
     transition: color 0.15s ease, transform 0.15s ease;
-    display: flex;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
+    flex-shrink: 0;
 
     &:hover {
       color: var(--text-primary, #0f172a);
@@ -1334,10 +1335,12 @@ const handleReportNotSpam = (emailId) => {
   }
 
   .action-icon-wrap {
-    display: flex;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
+    flex-shrink: 0;
+    line-height: 1;
   }
 }
 
@@ -1609,19 +1612,23 @@ const handleReportNotSpam = (emailId) => {
               gap: 8px;
 
               .msg-act-star {
-                display: flex;
+                display: inline-flex;
                 align-items: center;
                 justify-content: center;
                 cursor: pointer;
+                flex-shrink: 0;
               }
 
               .msg-act-icon {
                 cursor: pointer;
                 color: var(--text-muted, #94a3b8);
                 transition: color 0.15s ease, transform 0.15s ease;
-                display: flex;
+                display: inline-flex;
                 align-items: center;
                 justify-content: center;
+                flex-shrink: 0;
+                line-height: 1;
+                vertical-align: middle;
 
                 &:hover {
                   color: var(--text-primary, #0f172a);

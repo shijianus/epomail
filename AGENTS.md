@@ -12,6 +12,25 @@
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
 
+### class="header-actions"与class="msg-header-quick-actions"缺失Icon全量离线补全、同步加载与渲染修复上线 (2026-09-07)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **全面补全顶栏 `.header-actions` 与单封邮件头部 `.msg-header-quick-actions` 缺失图标**:
+       - 深度定位根本原因：`mail-vue` 底层依赖本地离线图标集合（`@/icons/index.js`），此前通过 `addCollection` 注册了 `fluent` 前缀仅包含 7 个历史图标；根据 Iconify 机制，一旦某个前缀被局部注册，Iconify 运行时将停止从远程 `api.iconify.design` 加载该前缀其他图标，导致所有新加入的 Gmail 顶栏操作图标（归档、垃圾邮件、删除、标记已读/未读、延后提醒、添加到任务、移动到、标签、翻译、展开/折叠、打印、新窗口等）以及邮件内嵌快捷操作图标（回复、回复全部、转发、打印、更多菜单等）无法解析，Vue 最终降级为空白注释节点（`<!---->`），仅出现外部容器与 Tooltip 提示文本而图标完全隐形；
+       - 通过 Iconify 官方资源库精准提取并离线内置全部 32 个缺失图标的完整 SVG 矢量定义（涵盖 `fluent`、`iconoir`、`lucide`、`ri`、`ic`、`mdi` 等图标集），避免重复造轮子并确保任何网络环境下（内网、离线、防火墙隔离）100% 瞬时同步秒开；
+       - 纠正 `views/content/index.vue` 中非标准图标名称引用：将不存在的 `fluent:calendar-weekend-16-regular` 纠正为标准的 `fluent:calendar-16-regular`。
+    2. **图标架构加载优化与样式微调**:
+       - 在 `main.js` 入口处采用静态同步导入 `import '@/icons/index.js'`，彻底淘汰原在 `App.vue` 中的异步动态导入，消除组件渲染与图标库注册之间的时序竞态条件；
+       - 为 `.header-actions .icon`、`.header-actions .action-icon-wrap`、`.msg-header-quick-actions .msg-act-icon` 等配置 `display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; line-height: 1;`，杜绝弹性布局挤压与尺寸塌陷。
+    3. **初始化超时容灾加固**:
+       - 将 `mail-vue/src/init/init.js` 中的超时竞态时间从 3000ms 延长至 10000ms，杜绝弱网环境下因鉴权接口偶发延迟导致 Pinia `userStore.user.permKeys` 缺失而误隐藏删除按钮（`btn-delete`）的假阴性问题。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **Cloudflare Workers 部署 Version ID**: `e88d3143-5055-4ce7-ba63-da3ffbe5fe74`。
+    - **epocanvas-mail Git Commit**: `c05c2773e5b21d8df41c402760927e413e700058` (Short Hash: `c05c277`)。
+    - 自动化测试套件 100% 顺利通过：
+      - `node tests/test-header-and-quick-action-icons.mjs` (顶栏 14 个图标 SVG 全部渲染、尺寸正向且含有效矢量路径核验通过；单封邮件内嵌快捷操作栏 7 个图标 SVG 全部渲染且尺寸正常通过);
+      - `node tests/test-sys-setting-ai-hub-and-thread-actions.mjs` (Admin 登录、系统设置 /system-setting 独立 .ai-hub-card 渲染、测试 AI 连通性、.ai-hub-dialog 预设快速填充 DeepSeek/OpenAI、收件箱重复「返回邮件」删除核验、顶栏 .header-actions 12大左/右操作按钮核验、.email-title-row 静态标签清理核验、展开邮件右对齐 class="thread-header-bar" 8大实际操作按钮完备性核验、.raw-headers-dialog 原始邮件标头查看与复制核验、归档与任务待办 100% 全部通过);
+      - `node tests/test-gmail-ui-and-ai-features.mjs` (Admin 登录获取 Token、测试邮件检索、收件箱右侧面板展开、顶栏 21 大 Gmail 操作按钮完好性审计、.info-bottom「至 我」触发器与详情卡片字段/TLS徽章核验、翻译工具条与语言下拉框核验、后端 /api/email/translate AI 翻译与降级容灾核验、个人垃圾邮件上报与黑名单规则联动核验、已读/未读状态双向流转核验、管理面板 AI 集成 UI 与 /api/setting/ai/test 连通性测试 100% 全部通过)。
+
 ### 系统设置独立AI大模型接入板块、Gmail顶栏全面对齐、内嵌thread-header-bar邮件操作组与原始标头查看上线 (2026-09-06)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **管理员系统设置独立 AI 智能引擎与大模型接入板块**:

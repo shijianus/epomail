@@ -30,7 +30,7 @@ export async function init() {
     let setting = null;
 
     try {
-        const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(null), 3000));
+        const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(null), 10000));
 
         if (token) {
             const userPromise = Promise.race([loginUserInfo(), timeoutPromise]).catch(e => {
