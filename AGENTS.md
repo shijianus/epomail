@@ -12,6 +12,27 @@
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
 
+### 基于最小修改原则实现header-actions与msg-header-quick-actions独立离线Icon注册与全局零污染重构上线 (2026-09-07)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **严格遵循最小修改原则 (Minimal Modification Principle)**:
+       - 彻底回退此前对 `mail-vue/src/icons/index.js`、`mail-vue/src/main.js`、`mail-vue/src/App.vue`、`mail-vue/src/init/init.js` 的侵入式全局修改，恢复各全局核心入口文件的纯净原始基线；
+       - 彻底根除因 `icons/index.js` 中使用 `addCollection` 局部劫持 `ic`、`mdi`、`fluent`、`iconoir` 等前缀而导致侧边栏（`aside`）、邮件列表（`email-scroll`）以及个人设置等模块大量已有图标丢失的严重回归缺陷；
+    2. **局部独立 `addIcon` 离线注册机制**:
+       - 新增视图专属模块 `mail-vue/src/views/content/content-icons.js`，通过 `@iconify/vue` 的原子化 API `addIcon(name, data)` 精准离线注册邮件详情视图所必需的全部 37 个官方矢量图标（涵盖 Fluent、Iconoir、Lucide、Remix Icon 等）；
+       - `addIcon` 仅将特定命名图标注入内存字典，绝不创建或重写任何集合前缀（Prefix），绝不干扰 Iconify API 远程按需加载，实现对全局其他组件 100% 零影响、零污染；
+    3. **图标名称规范与弹性布局加固**:
+       - 纠正 `views/content/index.vue` 中非标准图标引用 `fluent:calendar-weekend-16-regular` -> `fluent:calendar-16-regular`（并在 `content-icons.js` 中保留别名映射双重保障）；
+       - 为 `.header-actions .icon`、`.action-icon-wrap`、`.msg-header-quick-actions .msg-act-icon` 与 `.msg-act-star` 配置 `display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; line-height: 1;`，彻底杜绝弹性挤压与尺寸塌陷。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **Cloudflare Workers 部署 Version ID**: `175b1fb8-257a-403e-8f33-b1a1e2be86b5`。
+    - **epocanvas-mail Git Commit**: `0e95a0194c84b62b7331bb5a3a0e6be744396b3e` (Short Hash: `0e95a01`)。
+    - 自动化测试套件 100% 顺利通过：
+      - `node tests/test-header-and-quick-action-icons.mjs` (顶栏 14 个图标 SVG 全部渲染、尺寸正向且含有效矢量路径核验通过；单封邮件内嵌快捷操作栏 7 个图标 SVG 全部渲染且尺寸正常通过);
+      - `node tests/test-sys-setting-ai-hub-and-thread-actions.mjs` (Admin 登录、系统设置 /system-setting 独立 .ai-hub-card 渲染、测试 AI 连通性、.ai-hub-dialog 预设快速填充 DeepSeek/OpenAI、收件箱重复「返回邮件」删除核验、顶栏 .header-actions 12大左/右操作按钮核验、.email-title-row 静态标签清理核验、展开邮件右对齐 class="thread-header-bar" 8大实际操作按钮完备性核验、.raw-headers-dialog 原始邮件标头查看与复制核验、归档与任务待办 100% 全部通过);
+      - `node tests/test-gmail-ui-and-ai-features.mjs` (Admin 登录获取 Token、测试邮件检索、收件箱右侧面板展开、顶栏 21 大 Gmail 操作按钮完好性审计、.info-bottom「至 我」触发器与详情卡片字段/TLS徽章核验、翻译工具条与语言下拉框核验、后端 /api/email/translate AI 翻译与降级容灾核验、个人垃圾邮件上报与黑名单规则联动核验、已读/未读状态双向流转核验、管理面板 AI 集成 UI 与 /api/setting/ai/test 连通性测试 100% 全部通过);
+      - `node tests/test-invite-code-ui-optimization.mjs` (全部通过);
+      - `node tests/test-oauth-apps-ui-optimization.mjs` (全部通过)。
+
 ### class="header-actions"与class="msg-header-quick-actions"缺失Icon全量离线补全、同步加载与渲染修复上线 (2026-09-07)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **全面补全顶栏 `.header-actions` 与单封邮件头部 `.msg-header-quick-actions` 缺失图标**:
