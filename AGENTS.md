@@ -25,7 +25,7 @@
        - 将 `mail-vue/src/init/init.js` 中的超时竞态时间从 3000ms 延长至 10000ms，杜绝弱网环境下因鉴权接口偶发延迟导致 Pinia `userStore.user.permKeys` 缺失而误隐藏删除按钮（`btn-delete`）的假阴性问题。
 *   **部署上线与自动化测试 (Verification & Deployment)**:
     - **Cloudflare Workers 部署 Version ID**: `e88d3143-5055-4ce7-ba63-da3ffbe5fe74`。
-    - **epocanvas-mail Git Commit**: `c05c2773e5b21d8df41c402760927e413e700058` (Short Hash: `c05c277`)。
+    - **epocanvas-mail Git Commit**: `af39d6df9939ceaa9bebf9b7f58cb2e93d86551b` (Short Hash: `af39d6d`)。
     - 自动化测试套件 100% 顺利通过：
       - `node tests/test-header-and-quick-action-icons.mjs` (顶栏 14 个图标 SVG 全部渲染、尺寸正向且含有效矢量路径核验通过；单封邮件内嵌快捷操作栏 7 个图标 SVG 全部渲染且尺寸正常通过);
       - `node tests/test-sys-setting-ai-hub-and-thread-actions.mjs` (Admin 登录、系统设置 /system-setting 独立 .ai-hub-card 渲染、测试 AI 连通性、.ai-hub-dialog 预设快速填充 DeepSeek/OpenAI、收件箱重复「返回邮件」删除核验、顶栏 .header-actions 12大左/右操作按钮核验、.email-title-row 静态标签清理核验、展开邮件右对齐 class="thread-header-bar" 8大实际操作按钮完备性核验、.raw-headers-dialog 原始邮件标头查看与复制核验、归档与任务待办 100% 全部通过);
