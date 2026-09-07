@@ -9,6 +9,7 @@ import { watch, onMounted } from "vue";
 import {useSettingStore} from "@/store/setting.js";
 const settingStore = useSettingStore()
 import zhCn from 'element-plus/es/locale/lang/zh-cn';
+import('@/icons/index.js')
 import { useUiStore } from "@/store/ui.js";
 import { userSetCustomLabels } from "@/request/my.js";
 const { locale } = useI18n()
