@@ -30,7 +30,7 @@
        - `test-ai-hub-card-and-models-detection.mjs`、`test-sys-setting-ai-hub-and-thread-actions.mjs`、`verify-full-icons.mjs`、`test-gmail-ui-and-ai-features.mjs` 100% 全绿通过。
 *   **部署上线与自动化测试 (Verification & Deployment)**:
     - **Cloudflare Workers 部署 Version ID**: `5350a4ae-f4be-4bb0-9d32-67eeb1cc1e75`。
-    - **epocanvas-mail Git Commit**: `888f9a0f09aefe6615de13dc6c77b0610456c020` (Short Hash: `888f9a0`)。
+    - **epocanvas-mail Git Commit**: `588e63058d7ed8095179a3904c694f46f0a49ebc` (Short Hash: `588e630`)。
 
 ### 系统设置ai-hub-card单选单统一画风重构、5大AI限制项与中心弹窗Zero-Scrollbar零滑块双列拓宽上线 (2026-09-08)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
