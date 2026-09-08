@@ -2780,6 +2780,8 @@
                   v-model="aiHubForm.aiApiUrl" 
                   placeholder="https://api.openai.com/v1" 
                   clearable
+                  @input="handleEndpointOrKeyChange"
+                  @clear="handleEndpointOrKeyChange"
                 />
               </el-form-item>
               <el-form-item :label="$t('aiApiKeyLabel') || 'API 密钥 (API Key)'">
@@ -2789,6 +2791,8 @@
                   show-password 
                   placeholder="sk-..." 
                   clearable
+                  @input="handleEndpointOrKeyChange"
+                  @clear="handleEndpointOrKeyChange"
                 />
               </el-form-item>
             </div>
@@ -2819,7 +2823,12 @@
                     :key="modelName" 
                     :label="modelName" 
                     :value="modelName" 
-                  />
+                  >
+                    <div class="ai-model-opt-wrapper">
+                      <span class="ai-model-opt-name">{{ modelName }}</span>
+                      <span v-if="getModelLatency(modelName)" class="ai-model-opt-latency">{{ getModelLatency(modelName) }}ms</span>
+                    </div>
+                  </el-option>
                 </el-select>
               </el-form-item>
 
@@ -2845,40 +2854,17 @@
                     :key="modelName" 
                     :label="modelName" 
                     :value="modelName" 
-                  />
+                  >
+                    <div class="ai-model-opt-wrapper">
+                      <span class="ai-model-opt-name">{{ modelName }}</span>
+                      <span v-if="getModelLatency(modelName)" class="ai-model-opt-latency">{{ getModelLatency(modelName) }}ms</span>
+                    </div>
+                  </el-option>
                 </el-select>
                 <div class="ai-field-hint" style="font-size: 11.5px; color: var(--el-text-color-secondary); margin-top: 4px; line-height: 1.4;">
                   作为系统可用模型池，可前往【权限控制】为不同角色分组（站长/学者/书友/参观者）分级授权允许调用的模型。
                 </div>
               </el-form-item>
-            </div>
-          </div>
-
-          <!-- 大模型连通性测试轻量居中提示卡片 (Minimal Plain Centered Banner) -->
-          <div 
-            v-if="aiTestFeedback" 
-            class="ai-test-live-result is-plain is-center" 
-            :class="{ 'is-success': aiTestFeedback.success, 'is-error': !aiTestFeedback.success }"
-          >
-            <div class="test-res-body" style="display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%;">
-              <Icon 
-                :icon="aiTestFeedback.success ? 'fluent:checkmark-circle-16-filled' : 'fluent:error-circle-16-filled'" 
-                width="16" 
-                height="16" 
-                class="test-status-icon"
-                style="flex-shrink: 0;"
-              />
-              <span class="test-val test-reply-text" style="font-size: 12.5px; line-height: 1.4;">
-                <template v-if="aiTestFeedback.success">
-                  大模型连通性测试通过 (HTTP 200 OK<span v-if="aiTestFeedback.latencyMs">，耗时 {{ aiTestFeedback.latencyMs }}ms</span>)！已自动保存并接入模型 [{{ aiTestFeedback.model }}]。真实回复: "{{ aiTestFeedback.reply }}"
-                </template>
-                <template v-else>
-                  连通性测试未通过 ({{ aiTestFeedback.message || '连接异常' }})：无法正常使用，需测试通过后大模型才可调用。未自动保存，您仍可手动保存加入。
-                </template>
-              </span>
-              <el-button link size="small" @click="aiTestFeedback = null" class="close-res-btn" style="padding: 0; margin-left: 6px; color: inherit; opacity: 0.7;">
-                <Icon icon="fluent:dismiss-16-regular" width="13" height="13" />
-              </el-button>
             </div>
           </div>
         </el-form>
@@ -2909,7 +2895,7 @@
 </template>
 
 <script setup>
-import {computed, defineOptions, nextTick, reactive, ref} from "vue";
+import {computed, defineOptions, nextTick, reactive, ref, watch} from "vue";
 import {deleteBackground, setBackground, setBlackList, settingQuery, settingSet, sendWelcomeEmail, testS3Setting, getDbStatus, testDbSetting, scanStorage, cleanupStorage, testAiSetting, fetchAiModels} from "@/request/setting.js";
 import { testTelegramBot } from "@/request/my.js";
 import {useSettingStore} from "@/store/setting.js";
@@ -3063,7 +3049,19 @@ const testingAiInHub = ref(false)
 const fetchingModels = ref(false)
 const detectedModelsList = ref([])
 const dialogDetectedModels = ref([])
-const aiTestFeedback = ref(null)
+const modelLatencyMap = ref({})
+
+const setModelLatency = (model, ms) => {
+  if (!model || ms === undefined || ms === null) return
+  modelLatencyMap.value = {
+    ...modelLatencyMap.value,
+    [model]: Math.round(ms)
+  }
+}
+
+const getModelLatency = (model) => {
+  return modelLatencyMap.value[model] || null
+}
 
 const aiHubForm = reactive({
   aiApiKey: '',
@@ -3073,20 +3071,49 @@ const aiHubForm = reactive({
 })
 
 const allAvailableModelOptions = computed(() => {
+  const isCustom = !!((aiHubForm.aiApiKey && aiHubForm.aiApiKey.trim()) || (aiHubForm.aiApiUrl && aiHubForm.aiApiUrl.trim()))
   const set = new Set()
-  if (aiHubForm.aiModel) set.add(aiHubForm.aiModel)
+  if (aiHubForm.aiModel) {
+    if (!isCustom || !aiHubForm.aiModel.startsWith('@cf/')) {
+      set.add(aiHubForm.aiModel)
+    }
+  }
   if (Array.isArray(aiHubForm.aiModelsList)) {
-    aiHubForm.aiModelsList.forEach(m => { if (m) set.add(m) })
+    aiHubForm.aiModelsList.forEach(m => {
+      if (m && (!isCustom || !m.startsWith('@cf/'))) {
+        set.add(m)
+      }
+    })
   }
   if (Array.isArray(dialogDetectedModels.value)) {
-    dialogDetectedModels.value.forEach(m => { if (m) set.add(m) })
+    dialogDetectedModels.value.forEach(m => {
+      if (m && (!isCustom || !m.startsWith('@cf/'))) {
+        set.add(m)
+      }
+    })
   }
   if (Array.isArray(detectedModelsList.value)) {
-    detectedModelsList.value.forEach(m => { if (m) set.add(m) })
+    detectedModelsList.value.forEach(m => {
+      if (m && (!isCustom || !m.startsWith('@cf/'))) {
+        set.add(m)
+      }
+    })
   }
-  const fallback = ['gpt-4o-mini', 'deepseek-chat', 'claude-3-5-haiku-20241022', 'gemini-1.5-flash', '@cf/meta/llama-3.1-8b-instruct']
-  fallback.forEach(m => set.add(m))
-  return Array.from(set)
+  if (isCustom) {
+    const fallback = ['deepseek-chat', 'deepseek-reasoner', 'gpt-4o-mini', 'gpt-4o', 'claude-3-5-haiku-20241022', 'gemini-1.5-flash']
+    fallback.forEach(m => set.add(m))
+  } else {
+    const fallback = [
+      '@cf/meta/llama-3.3-70b-instruct',
+      '@cf/meta/llama-3.1-8b-instruct',
+      '@cf/meta/llama-3-8b-instruct',
+      '@cf/qwen/qwen1.5-7b-chat',
+      '@cf/mistral/mistral-7b-instruct-v0.1'
+    ]
+    fallback.forEach(m => set.add(m))
+  }
+  const result = Array.from(set)
+  return isCustom ? result.filter(m => !m.startsWith('@cf/')) : result.filter(m => m.startsWith('@cf/'))
 })
 
 const maskApiKey = (key) => {
@@ -3099,28 +3126,79 @@ const maskApiKey = (key) => {
 const openAiHubDialog = () => {
   aiHubForm.aiApiKey = setting.value?.aiApiKey || ''
   aiHubForm.aiApiUrl = setting.value?.aiApiUrl || ''
-  aiHubForm.aiModel = setting.value?.aiModel || ''
+  const isCustom = !!((aiHubForm.aiApiKey && aiHubForm.aiApiKey.trim()) || (aiHubForm.aiApiUrl && aiHubForm.aiApiUrl.trim()))
+
+  let currentModel = setting.value?.aiModel || ''
+  if (isCustom && currentModel.startsWith('@cf/')) {
+    currentModel = ''
+  } else if (!isCustom && (!currentModel || !currentModel.startsWith('@cf/'))) {
+    currentModel = '@cf/meta/llama-3.1-8b-instruct'
+  }
+  aiHubForm.aiModel = currentModel
+
   const poolStr = setting.value?.aiModels || ''
   if (poolStr) {
-    aiHubForm.aiModelsList = poolStr.split(',').map(s => s.trim()).filter(Boolean)
-  } else if (aiHubForm.aiModel) {
-    aiHubForm.aiModelsList = [aiHubForm.aiModel]
+    let pool = poolStr.split(',').map(s => s.trim()).filter(Boolean)
+    if (isCustom) {
+      pool = pool.filter(m => !m.startsWith('@cf/'))
+    } else {
+      pool = pool.filter(m => m.startsWith('@cf/'))
+    }
+    aiHubForm.aiModelsList = pool.length > 0 ? pool : (currentModel ? [currentModel] : [])
+  } else if (currentModel) {
+    aiHubForm.aiModelsList = [currentModel]
   } else {
     aiHubForm.aiModelsList = []
   }
-  if (dialogDetectedModels.value.length === 0 && detectedModelsList.value.length > 0) {
-    dialogDetectedModels.value = [...detectedModelsList.value]
-  }
+
   aiHubDialogShow.value = true
+  triggerAutoDetectModels(false)
 }
+
+let endpointDebounceTimer = null
+const handleEndpointOrKeyChange = () => {
+  if (endpointDebounceTimer) clearTimeout(endpointDebounceTimer)
+  endpointDebounceTimer = setTimeout(() => {
+    onEndpointOrKeyUpdated()
+  }, 350)
+}
+
+const onEndpointOrKeyUpdated = () => {
+  const isCustom = !!((aiHubForm.aiApiKey && aiHubForm.aiApiKey.trim()) || (aiHubForm.aiApiUrl && aiHubForm.aiApiUrl.trim()))
+  if (isCustom) {
+    if (aiHubForm.aiModel && aiHubForm.aiModel.startsWith('@cf/')) {
+      aiHubForm.aiModel = ''
+    }
+    aiHubForm.aiModelsList = aiHubForm.aiModelsList.filter(m => !m.startsWith('@cf/'))
+    dialogDetectedModels.value = dialogDetectedModels.value.filter(m => !m.startsWith('@cf/'))
+  } else {
+    if (aiHubForm.aiModel && !aiHubForm.aiModel.startsWith('@cf/')) {
+      aiHubForm.aiModel = '@cf/meta/llama-3.1-8b-instruct'
+    }
+    aiHubForm.aiModelsList = aiHubForm.aiModelsList.filter(m => m.startsWith('@cf/'))
+    dialogDetectedModels.value = dialogDetectedModels.value.filter(m => m.startsWith('@cf/'))
+  }
+  lastDetectKey = ''
+  handleFetchModelsInDialog(true)
+}
+
+watch(
+  () => [aiHubForm.aiApiUrl, aiHubForm.aiApiKey],
+  ([newUrl, newKey], [oldUrl, oldKey]) => {
+    if (!aiHubDialogShow.value) return
+    if (newUrl === oldUrl && newKey === oldKey) return
+    handleEndpointOrKeyChange()
+  }
+)
 
 const clearFormInDialog = () => {
   aiHubForm.aiApiKey = ''
   aiHubForm.aiApiUrl = ''
-  aiHubForm.aiModel = ''
-  aiHubForm.aiModelsList = []
+  aiHubForm.aiModel = '@cf/meta/llama-3.1-8b-instruct'
+  aiHubForm.aiModelsList = ['@cf/meta/llama-3.1-8b-instruct']
   dialogDetectedModels.value = []
-  aiTestFeedback.value = null
+  lastDetectKey = ''
+  handleFetchModelsInDialog(true)
 }
 
 let lastDetectKey = ''
@@ -3150,18 +3228,31 @@ const handleFetchModelsInDialog = (silent = false) => {
     lastDetectKey = currentKey
     const resData = res.data || res
     const list = Array.isArray(resData?.models) ? resData.models : []
-    dialogDetectedModels.value = list
-    detectedModelsList.value = list
-    if (!aiHubForm.aiModel && list.length > 0) {
-      aiHubForm.aiModel = list[0]
+    const isCustom = !!((aiHubForm.aiApiKey && aiHubForm.aiApiKey.trim()) || (aiHubForm.aiApiUrl && aiHubForm.aiApiUrl.trim()))
+    const filteredList = isCustom ? list.filter(m => !m.startsWith('@cf/')) : list.filter(m => m.startsWith('@cf/'))
+
+    dialogDetectedModels.value = filteredList
+    detectedModelsList.value = filteredList
+
+    if (resData?.latencyMs) {
+      filteredList.forEach(m => {
+        if (!modelLatencyMap.value[m]) {
+          setModelLatency(m, resData.latencyMs)
+        }
+      })
     }
-    if (aiHubForm.aiModelsList.length === 0 && list.length > 0) {
-      aiHubForm.aiModelsList = list.slice(0, 5)
+
+    if ((!aiHubForm.aiModel || (isCustom && aiHubForm.aiModel.startsWith('@cf/')) || (!isCustom && !aiHubForm.aiModel.startsWith('@cf/'))) && filteredList.length > 0) {
+      aiHubForm.aiModel = filteredList[0]
     }
+    if ((aiHubForm.aiModelsList.length === 0 || (isCustom && aiHubForm.aiModelsList.some(m => m.startsWith('@cf/')))) && filteredList.length > 0) {
+      aiHubForm.aiModelsList = filteredList.slice(0, 5)
+    }
+
     if (!silent) {
       ElMessage({
         type: 'success',
-        message: resData?.message || (list.length ? `成功识别到 ${list.length} 个可用模型` : '已完成模型检测'),
+        message: resData?.message || (filteredList.length ? `成功识别到 ${filteredList.length} 个可用模型` : '已完成模型检测'),
         plain: true
       })
     }
@@ -3191,16 +3282,16 @@ const deleteAiConfig = () => {
     editSetting({
       aiApiKey: '',
       aiApiUrl: '',
-      aiModel: '',
-      aiModels: ''
+      aiModel: '@cf/meta/llama-3.1-8b-instruct',
+      aiModels: '@cf/meta/llama-3.1-8b-instruct'
     })
     aiHubForm.aiApiKey = ''
     aiHubForm.aiApiUrl = ''
-    aiHubForm.aiModel = ''
-    aiHubForm.aiModelsList = []
+    aiHubForm.aiModel = '@cf/meta/llama-3.1-8b-instruct'
+    aiHubForm.aiModelsList = ['@cf/meta/llama-3.1-8b-instruct']
     detectedModelsList.value = []
     dialogDetectedModels.value = []
-    aiTestFeedback.value = null
+    lastDetectKey = ''
     ElMessage({
       type: 'success',
       message: t('aiResetSuccess') || '已清空自定义大模型配置，恢复免密模式',
@@ -3222,26 +3313,32 @@ const testAiConnectionInHub = () => {
     const resData = res.data || res
     const msg = resData?.message || t('aiTestSuccess') || 'AI 连通性测试成功！'
     const models = Array.isArray(resData?.models) ? resData.models : []
-    if (models.length > 0) {
-      detectedModelsList.value = models
-      dialogDetectedModels.value = models
-      if (aiHubDialogShow.value && !aiHubForm.aiModel) {
-        aiHubForm.aiModel = models[0]
+    const isCustom = !!((testPayload.aiApiKey && testPayload.aiApiKey.trim()) || (testPayload.aiApiUrl && testPayload.aiApiUrl.trim()))
+    const filteredModels = isCustom ? models.filter(m => !m.startsWith('@cf/')) : models.filter(m => m.startsWith('@cf/'))
+
+    if (filteredModels.length > 0) {
+      detectedModelsList.value = filteredModels
+      dialogDetectedModels.value = filteredModels
+      if (aiHubDialogShow.value && (!aiHubForm.aiModel || (isCustom && aiHubForm.aiModel.startsWith('@cf/')))) {
+        aiHubForm.aiModel = filteredModels[0]
       }
-      if (aiHubDialogShow.value && aiHubForm.aiModelsList.length === 0) {
-        aiHubForm.aiModelsList = models.slice(0, 5)
+      if (aiHubDialogShow.value && (aiHubForm.aiModelsList.length === 0 || (isCustom && aiHubForm.aiModelsList.some(m => m.startsWith('@cf/'))))) {
+        aiHubForm.aiModelsList = filteredModels.slice(0, 5)
       }
     }
-    const detectedModel = resData?.model || (aiHubDialogShow.value ? aiHubForm.aiModel : setting.value?.aiModel) || 'OpenAI Model'
-    aiTestFeedback.value = {
-      success: true,
-      message: msg,
-      reply: resData?.reply || '连接正常，模型响应就绪。',
-      testPrompt: resData?.testPrompt || testPayload.prompt,
-      latencyMs: resData?.latencyMs !== undefined ? resData.latencyMs : null,
-      model: detectedModel,
-      models: models
+
+    const testedModel = resData?.model || (aiHubDialogShow.value ? aiHubForm.aiModel : setting.value?.aiModel) || ''
+    if (resData?.latencyMs !== undefined && resData?.latencyMs !== null) {
+      if (testedModel) {
+        setModelLatency(testedModel, resData.latencyMs)
+      }
+      filteredModels.forEach(m => {
+        if (!modelLatencyMap.value[m]) {
+          setModelLatency(m, resData.latencyMs)
+        }
+      })
     }
+
     ElMessage({
       type: 'success',
       message: msg,
@@ -3255,18 +3352,9 @@ const testAiConnectionInHub = () => {
   }).catch(err => {
     testingAiInHub.value = false
     const errMsg = err.response?.data?.message || err.message || t('aiTestFail') || '测试失败'
-    aiTestFeedback.value = {
-      success: false,
-      message: errMsg,
-      reply: '',
-      testPrompt: testPayload.prompt,
-      latencyMs: null,
-      model: testPayload.aiModel,
-      models: []
-    }
     ElMessage({
       type: 'error',
-      message: errMsg,
+      message: `${errMsg} (无法正常使用，需测试通过后大模型才可调用)`,
       plain: true
     })
   })
@@ -8026,65 +8114,31 @@ form .el-button {
     line-height: 1.4;
   }
 
-  .ai-test-live-result {
-    margin-top: 14px;
-    padding: 9px 14px;
-    border-radius: 8px;
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
-    transition: all 0.2s ease;
+  .ai-model-opt-wrapper {
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: space-between;
+    width: 100%;
+    gap: 10px;
+  }
 
-    &.is-success {
-      background: #f0fdf4;
-      border-color: #86efac;
-      color: #15803d;
+  .ai-model-opt-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 
-      .test-status-icon {
-        color: #16a34a;
-      }
-      .test-reply-text {
-        color: #15803d;
-      }
-    }
-
-    &.is-error {
-      background: #fef2f2;
-      border-color: #fca5a5;
-      color: #b91c1c;
-
-      .test-status-icon {
-        color: #dc2626;
-      }
-      .test-reply-text {
-        color: #b91c1c;
-      }
-    }
-
-    .test-res-body {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      width: 100%;
-      text-align: center;
-    }
-
-    .test-val {
-      word-break: break-word;
-    }
-
-    .close-res-btn {
-      padding: 0;
-      height: auto;
-      color: currentColor;
-      opacity: 0.6;
-      &:hover {
-        opacity: 1;
-      }
-    }
+  .ai-model-opt-latency {
+    flex-shrink: 0;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 11px;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: rgba(16, 185, 129, 0.12);
+    color: #059669;
+    font-weight: 600;
+    line-height: 1.4;
   }
 }
 
@@ -8250,46 +8304,9 @@ html.dark .ai-hub-dialog .ai-field-hint {
   color: #9ca3af !important;
 }
 
-html.dark .ai-hub-dialog .ai-test-live-result {
-  background: #1e293b !important;
-  border-color: #334155 !important;
-}
-
-html.dark .ai-hub-dialog .ai-test-live-result.is-success {
-  background: rgba(6, 78, 59, 0.28) !important;
-  border-color: #059669 !important;
+html.dark .ai-model-opt-latency {
+  background: rgba(16, 185, 129, 0.22) !important;
   color: #34d399 !important;
-}
-
-html.dark .ai-hub-dialog .ai-test-live-result.is-success .test-status-icon {
-  color: #34d399 !important;
-}
-
-html.dark .ai-hub-dialog .ai-test-live-result.is-success .test-reply-text {
-  color: #a7f3d0 !important;
-  background: transparent !important;
-  border: none !important;
-}
-
-html.dark .ai-hub-dialog .ai-test-live-result.is-error {
-  background: rgba(127, 29, 29, 0.28) !important;
-  border-color: #dc2626 !important;
-  color: #f87171 !important;
-}
-
-html.dark .ai-hub-dialog .ai-test-live-result.is-error .test-status-icon {
-  color: #f87171 !important;
-}
-
-html.dark .ai-hub-dialog .ai-test-live-result.is-error .test-reply-text {
-  color: #fca5a5 !important;
-  background: transparent !important;
-  border: none !important;
-}
-
-html.dark .ai-hub-dialog .ai-test-live-result .test-val {
-  background: transparent !important;
-  border: none !important;
 }
 
 html.dark .ai-model-dropdown,

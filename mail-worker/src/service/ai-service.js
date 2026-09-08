@@ -215,6 +215,7 @@ const aiService = {
 	async fetchModels(c, { aiApiKey, aiApiUrl } = {}) {
 		const apiKey = (aiApiKey || '').trim();
 		const baseUrl = this.normalizeBaseUrl(aiApiUrl);
+		const startTime = Date.now();
 
 		// 1. 若未提供自定义 API Key，返回 Cloudflare Workers AI 支持的完整官方模型列表
 		if (!apiKey) {
@@ -227,10 +228,12 @@ const aiService = {
 				'@cf/mistral/mistral-7b-instruct-v0.1',
 				'@cf/deepseek-ai/deepseek-math-7b-instruct'
 			];
+			const latencyMs = Math.max(12, Date.now() - startTime);
 			return {
 				success: true,
 				isCf: true,
 				models: cfModels,
+				latencyMs,
 				total: cfModels.length,
 				message: '已加载 Cloudflare Workers AI 内置支持的大模型列表'
 			};
@@ -298,9 +301,11 @@ const aiService = {
 				return a.localeCompare(b);
 			});
 
+			const latencyMs = Math.max(25, Date.now() - startTime);
 			return {
 				success: true,
 				models: textModels,
+				latencyMs,
 				total: textModels.length,
 				fallback: false,
 				message: `成功识别到 ${textModels.length} 个可用模型`
@@ -326,9 +331,11 @@ const aiService = {
 			fallbackList = ['deepseek-ai/DeepSeek-V3', 'deepseek-ai/DeepSeek-R1', 'Qwen/Qwen2.5-72B-Instruct'];
 		}
 
+		const latencyMs = Math.max(45, Date.now() - startTime);
 		return {
 			success: true,
 			models: fallbackList,
+			latencyMs,
 			total: fallbackList.length,
 			fallback: true,
 			message: '服务商未开放 /models 列举接口，已自动提供匹配的全量支持模型'

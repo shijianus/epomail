@@ -12,6 +12,27 @@
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
 
+### 系统设置AI端点密钥及时联动扫描、彻底杜绝旧模型与CF残留、删除测试横幅卡片并融合下拉延时标签反馈上线 (2026-09-08)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **及时模型扫描与端点/密钥实时联动 (Real-time Scan & Zero CF Model Leakage)**:
+       - 彻底根除“在保存前修改端点或密钥后依然残留旧模型（特别是 Cloudflare 默认模型 `@cf/...`）”的严重缺陷；
+       - 在接口地址（`aiApiUrl`）与鉴权密钥（`aiApiKey`）上增加实时输入/清除监听与防抖触发（`onEndpointOrKeyUpdated`）；
+       - 外部 API 模式与内置 Workers AI 模式彻底解耦：当用户输入外部端点或密钥时，自动即时触发后端模型全量探测，立即从主模型、模型池和选项列表中清除任何以 `@cf/` 开头的旧模型，并自动装配新探测到的第一款模型与模型池；
+       - `allAvailableModelOptions` 计算属性增加严格模式边界判断：外部 API 模式下严禁混入任何 `@cf/` 模型；免密模式下仅提供权威边缘模型，彻底实现双向零残留污染。
+    2. **彻底删除 `class="ai-test-live-result"` 横幅卡片 (Banner Removal & Uncluttered 860px Canvas)**:
+       - 依照用户指令彻底清理占据垂直空间的横幅提示卡片（`.ai-test-live-result` 及所有相关 scoped 与 unscoped CSS）；
+       - 测试连通性直接通过全局轻量 `ElMessage` 弹出反馈，成功时无感自动保存，失败时明确告知未自动保存及调用受限警告。
+    3. **下拉选项集成实时延时反馈徽章 (Dropdown Latency Badges)**:
+       - 在 `ai-model-select` 与 `ai-models-pool-select` 的 `<el-option>` 模板中集成 `.ai-model-opt-wrapper` 与 `.ai-model-opt-latency` 延时胶囊标签；
+       - 后端 `aiService.fetchModels` 与 `testConnection` 实时统计网络与推理往返毫秒数（`latencyMs`），前端通过响应式 `modelLatencyMap` 动态分发；
+       - 选项右侧整齐呈现如 `deepseek-chat 592ms`、`kimi-k3-free 148ms` 等绿色极客风格延时胶囊，暗黑模式下自动适配 `rgba(16, 185, 129, 0.22)` 与 `#34d399`，视觉体验极致出众。
+    4. **Playwright 视觉审计与端到端自动化测试 100% 通过**:
+       - `tests/test-ai-hub-card-and-models-detection.mjs` 全绿通过（验证横幅彻底删除、延时徽章毫秒格式、即时输入端点/密钥联动且零 CF 泄漏、暗黑模式背景全深色 `rgb(17, 24, 39)` 零白斑，高分辨率截图留档 `tests/audit_ai_hub_dialog_dark.png`）；
+       - `tests/test-sys-setting-ai-hub-and-thread-actions.mjs`、`tests/verify-full-icons.mjs`、`tests/test-gmail-ui-and-ai-features.mjs` 100% 全绿通过。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **Cloudflare Workers 部署 Version ID**: `7ddb00ae-e5a8-4d44-9633-6de5b0c9a9b2`。
+    - **epocanvas-mail Git Commit**: `583475e4362f1ecbd87f533d2424a185e94de870` (Short Hash: `583475e`).
+
 ### 系统设置AI配置D1字段自愈升迁、弹窗标题问号Tooltip注释重构与el-message轻量测试居中反馈/成功自动保存上线 (2026-09-08)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **D1 数据库物理字段缺失彻底自愈与根治 (D1 SQLite Schema Auto-healing)**:

@@ -36,9 +36,11 @@ import assert from "assert";
       localStorage.setItem("setting", JSON.stringify({ lang: "zh" }));
       localStorage.setItem("locale", "zh");
     }, adminToken);
+    await page.goto(BASE + "/inbox", { waitUntil: "domcontentloaded" });
+    await page.waitForTimeout(1500);
 
     await page.goto(BASE + "/system-setting", { waitUntil: "domcontentloaded" });
-    await page.waitForSelector(".settings-card", { timeout: 10000 });
+    await page.waitForSelector(".settings-card", { timeout: 15000 });
     await page.waitForTimeout(1000);
 
     // 3. 验证 .ai-hub-card 卡片要素 (单选单设置 API、5大限制控制项、快捷 API 测试)
@@ -129,7 +131,7 @@ import assert from "assert";
     await page.waitForTimeout(1500);
 
     // 检查下拉菜单是否存在选项
-    const popperOptions = await page.$$eval(".ai-model-dropdown .el-select-dropdown__item, .el-select-dropdown__item", els => els.map(e => e.textContent.trim()).filter(Boolean));
+    const popperOptions = await page.$$eval(".ai-model-dropdown .el-select-dropdown__item", els => els.map(e => e.textContent.trim()).filter(Boolean));
     console.log(`  ✓ 下拉菜单中自动识别到/提供 ${popperOptions.length} 个候选模型:`, popperOptions.slice(0, 5));
     assert.ok(popperOptions.length > 0, "模型下拉菜单必须包含候选模型列表");
 
@@ -147,14 +149,41 @@ import assert from "assert";
     assert.ok(headerTooltip, "弹窗标题栏必须包含 '?' Tooltip 注释图标");
     console.log("  ✓ 显式 alert 已成功转为弹窗标题栏 '?' 注释 Tooltip");
 
-    // 验证 .ai-test-live-result 真实结果反馈卡片被渲染且采用类似 el-message 的 is-plain is-center 极简横条风格
+    // 验证 .ai-test-live-result 横幅提示卡片已被彻底删除 (按用户要求)
     const liveResultCard = await page.$(".ai-hub-dialog .ai-test-live-result");
-    assert.ok(liveResultCard, "点击测试后必须展示 .ai-test-live-result 真实连通性响应卡片");
-    const isPlainCenter = await page.$eval(".ai-hub-dialog .ai-test-live-result", el => el.classList.contains("is-plain") && el.classList.contains("is-center"));
-    assert.ok(isPlainCenter, ".ai-test-live-result 必须使用 is-plain is-center 轻量居中提示栏风格");
-    const replyText = await page.$eval(".ai-hub-dialog .ai-test-live-result .test-val.test-reply-text, .ai-hub-dialog .ai-test-live-result .test-res-body", el => el.textContent.trim());
-    console.log("  ✓ 大模型真实测试响应内容:", replyText);
-    assert.ok(replyText.length > 0, "大模型响应内容必须真实存在，不可为空");
+    assert.strictEqual(liveResultCard, null, "横幅卡片 .ai-test-live-result 必须已被彻底删除");
+    console.log("  ✓ 横幅卡片 .ai-test-live-result 已被彻底移除，转为下拉模型延时反馈");
+
+    // 重新点击主模型输入框，验证下拉模型后面是否展示真实的延时反馈 (.ai-model-opt-latency)
+    await modelSelect.click();
+    await page.waitForTimeout(600);
+    const latencyBadges = await page.$$eval(".ai-model-opt-latency", els => els.map(e => e.textContent.trim()));
+    console.log("  ✓ 下拉模型中展示的延时反馈标签:", latencyBadges.slice(0, 5));
+    assert.ok(latencyBadges.length > 0, "下拉模型必须展示延时反馈 (例如 12ms 或 340ms)");
+    assert.ok(latencyBadges.some(l => /\d+ms/.test(l)), "延时标签必须符合毫秒格式 (\\d+ms)");
+
+    // 测试左列端点/密钥输入对右列模型及模型池的即时扫描联动
+    console.log("  测试左列端点/密钥输入对右列输出的即时联动...");
+    const apiUrlInput = await page.$('.ai-grid-col input[placeholder*="https://"]');
+    const apiKeyInput = await page.$('.ai-grid-col input[placeholder*="sk-"]');
+    assert.ok(apiUrlInput && apiKeyInput, "左列必须存在端点与密钥输入框");
+    await apiUrlInput.fill("https://api.deepseek.com/v1");
+    await apiKeyInput.fill("sk-test-deepseek-key-12345");
+    await page.waitForTimeout(1200);
+
+    // 验证右列输出已即时刷新，且无 CF 默认模型残留
+    const currentModelValue = await page.$eval(".ai-model-select input", el => el.value);
+    console.log("  ✓ 输入外部端点/密钥后，主模型即时联动更新为:", currentModelValue);
+    assert.ok(!currentModelValue.startsWith("@cf/"), "输入外部端点/密钥后，严禁出现旧的 Cloudflare 默认模型残留！");
+
+    // 再次展开下拉单，确认选项全为外部模型且无 @cf/ 残留
+    await modelSelect.click();
+    await page.waitForTimeout(600);
+    const customOptions = await page.$$eval(".ai-model-dropdown .el-select-dropdown__item", els => els.map(e => e.textContent.trim()));
+    console.log("  ✓ 外部 API 模式下候选模型列表:", customOptions.slice(0, 5));
+    const hasCfLeak = customOptions.some(opt => opt.includes("@cf/"));
+    assert.strictEqual(hasCfLeak, false, "输入外部配置后，候选模型列表中严禁泄露任何 @cf/ 默认模型！");
+    console.log("  ✓ 及时模型扫描联动验证通过：无旧 CF 默认模型残留，延时标签正常渲染");
 
     // 6. 验证暗黑模式下 .ai-hub-dialog 彻底无白色填充
     console.log("\n[步骤 6] 切换暗黑模式，审计 .ai-hub-dialog 是否有任何白色填充/白斑...");

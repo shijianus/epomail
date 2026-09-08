@@ -94,7 +94,8 @@ import assert from "assert";
       await testBtn.click({ force: true });
       await page.waitForTimeout(2000);
       const liveResult = await page.$(".ai-hub-dialog .ai-test-live-result");
-      assert.ok(liveResult, "点击后应展示真实大模型连通性测试响应反馈卡片 (.ai-test-live-result)");
+      assert.strictEqual(liveResult, null, "弹窗内 .ai-test-live-result 提示卡片必须已被彻底移除");
+      console.log("  ✓ 连通性测试完成，.ai-test-live-result 提示卡片已成功移除");
     }
 
     // 关闭下拉单与弹窗
