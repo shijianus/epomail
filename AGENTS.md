@@ -42,7 +42,7 @@
        - `tests/test-ai-hub-card-and-models-detection.mjs`、`tests/test-ai-analysis-and-html-translate.mjs`、`tests/verify-full-icons.mjs` 全量通过。
 *   **部署上线与自动化测试 (Verification & Deployment)**:
     - **Cloudflare Workers 部署 Version ID**: `5a65cd33-668c-41a0-888b-a5e56ec88a86`。
-    - **epocanvas-mail Git Commit**: 待提交。
+    - **epocanvas-mail Git Commit**: `15aa36ec9b6f27543f80ebe9ed8cc60f95e7c430` (Short Hash: `15aa36e`)。
 
 ### 分析页AI调用与Token消耗双图对称上线、Gmail级HTML排版格式严格保留邮件翻译闭环上线 (2026-09-08)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
