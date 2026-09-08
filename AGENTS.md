@@ -12,6 +12,31 @@
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
 
+### 系统设置AI配置D1字段自愈升迁、弹窗标题问号Tooltip注释重构与el-message轻量测试居中反馈/成功自动保存上线 (2026-09-08)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **D1 数据库物理字段缺失彻底自愈与根治 (D1 SQLite Schema Auto-healing)**:
+       - 深入定位并根治外部 API / D1 查询时报出的 `D1_ERROR: no such column: ai_api_key: SQLITE_ERROR` 缺陷；
+       - 远端 D1 数据库执行物理升迁，补齐 `ai_api_key`, `ai_api_url`, `ai_model`, `ai_models`, `ai_enabled`, `ai_daily_quota`, `ai_rate_limit_rpm`, `ai_max_tokens`, `ai_admin_only` 9 个物理列并赋予安全默认值；
+       - 在 `mail-worker/src/service/setting-service.js` 中新增 `ensureSettingColumns(c)` 自愈升迁机制，在 `query` 与 `refresh` 中自动检查 SQLite `pragma_table_info` 并动态补充缺失列，杜绝未来任何数据库环境抛错；
+       - 在 `settingService.update` 中增加对 `aiApiKey` 掩码（包含 `******`）的二次保护，防止掩码误覆盖；彻底清理残留的历史测试脏数据。
+    2. **弹窗显式 Alert 彻底清除并转为标题栏 `?` Tooltip 注释 (Header Tooltip Optimization)**:
+       - 彻底删除弹窗主体中冗余显式的 `class="el-alert el-alert--info is-light ai-dialog-alert"` 提示框；
+       - 将其精简转换为弹窗标题“AI 智能引擎与大模型配置”右侧紧贴的带有圆圈问号图标 `?` 的 `<el-tooltip>`，消除对弹窗主体高度的占用，保持 860px 双列画布极致纯净。
+    3. **测试连通性轻量居中提示栏与成功自动保存机制 (Minimal Plain Message Banner & Test Auto-Save)**:
+       - 将原先占据大幅垂直空间的连通性测试卡片重构为类似 Element Plus `el-message is-plain is-center` 的极简横向居中提示条；
+       - **绿色（测试成功）**：提示测试通过 (HTTP 200 OK，响应耗时 xx ms)，展示模型回复，并**自动触发 `saveAiHubConfig(false)` 静默保存**并同步至后端与状态，同时保持弹窗不被强制关闭；
+       - **红色（测试失败）**：提示测试未通过与失败原因，明确注明“无法正常使用，需测试通过后大模型方可正常调用；未自动保存，您仍可手动保存加入”；用户仍可通过底部【保存配置】按钮手动强制保存。
+    4. **Cloudflare Workers AI 原生免费模式与模型池原理解释与审计完全确认**:
+       - 明确解释在免密模式下，系统接入的是 Cloudflare 原生 Workers AI 边缘 GPU 推理服务（每日享有 10,000 Neurons 免费推理额度，官方标准预设模型为 `@cf/meta/llama-3.1-8b-instruct`）；
+       - 查明并清理历史自动化测试用例写入的 `'ai_model'` / `'ai_api_url'` 脏数据字面量；
+       - 确认免密状态下下拉菜单自动提供 Cloudflare 官方支持的 7 个权威边缘大模型列表，配置外部 API 时服务端向 `/models` 发起真实探测。
+    5. **Playwright 视觉审计与自动化测试 100% 通过**:
+       - `tests/test-ai-hub-card-and-models-detection.mjs`（100% 全绿通过，暗黑模式背景审计全为 `rgb(17, 24, 39)` 零白斑，截图人眼核验留档 `tests/audit_ai_hub_dialog_dark.png`）；
+       - `tests/test-sys-setting-ai-hub-and-thread-actions.mjs`、`tests/verify-full-icons.mjs`、`tests/test-gmail-ui-and-ai-features.mjs` 100% 全绿通过。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **Cloudflare Workers 部署 Version ID**: `668287bd-59b1-415f-a10d-08520cb42687`。
+    - **epocanvas-mail Git Commit**: `cbe8fc60dea7b8f850d86628cf9a1d01240847c7` (Short Hash: `cbe8fc6`).
+
 ### 系统设置AI模型自动化融入下拉聚焦识别、多模型池分级授权、真实Prompt测试反馈卡片与预设冗余面板彻底删除上线 (2026-09-08)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **模型识别准确性与交互自动化重构 (Automated Dropdown Model Detection & Zero Extra Buttons)**:

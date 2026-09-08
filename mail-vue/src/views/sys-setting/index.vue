@@ -2752,21 +2752,26 @@
       <!-- AI Engine & Large Language Model Modal Dialog (Expanded 860px Canvas, Zero Scrollbars) -->
       <el-dialog 
         v-model="aiHubDialogShow" 
-        :title="$t('aiHubConfigTitle') || 'AI 智能引擎与大模型配置'" 
         width="860px"
         class="ai-hub-dialog"
         :close-on-click-modal="false"
         align-center
       >
+        <template #header>
+          <div class="ai-hub-dialog-header" style="display: flex; align-items: center; gap: 8px;">
+            <span class="el-dialog__title" style="font-weight: 600;">{{ $t('aiHubConfigTitle') || 'AI 智能引擎与大模型配置' }}</span>
+            <el-tooltip 
+              effect="dark" 
+              :content="$t('aiProviderHint') || '留空 API Key 时将自动免密调用 Cloudflare Workers AI 专属绑定或公共引擎保底。配置后优先请求您的专属大模型服务。'" 
+              placement="top"
+            >
+              <span class="ai-help-icon-wrap" style="display: inline-flex; align-items: center; justify-content: center; cursor: pointer; color: var(--el-text-color-secondary);">
+                <Icon icon="fluent:question-circle-16-regular" width="16" height="16" />
+              </span>
+            </el-tooltip>
+          </div>
+        </template>
         <el-form label-position="top" :model="aiHubForm" class="ai-hub-form">
-          <el-alert
-            :title="$t('aiProviderHint') || '留空 API Key 时将自动免密调用 Cloudflare Workers AI 专属绑定或公共引擎保底。配置后优先请求您的专属大模型服务。'"
-            type="info"
-            :closable="false"
-            show-icon
-            class="ai-dialog-alert"
-          />
-
           <div class="ai-dialog-grid">
             <!-- Left Column: Base URL & API Key -->
             <div class="ai-grid-col">
@@ -2849,38 +2854,31 @@
             </div>
           </div>
 
-          <!-- 大模型真实连通性测试响应结果卡片 (Real Live Prompt Response Feedback) -->
-          <div v-if="aiTestFeedback" class="ai-test-live-result" :class="{ 'is-success': aiTestFeedback.success, 'is-error': !aiTestFeedback.success }">
-            <div class="test-res-header">
-              <div class="test-res-title">
-                <Icon :icon="aiTestFeedback.success ? 'fluent:checkmark-circle-16-filled' : 'fluent:dismiss-circle-16-filled'" width="16" height="16" />
-                <span>{{ aiTestFeedback.success ? '大模型真实连通性测试通过 (HTTP 200 OK)' : '连通性测试异常' }}</span>
-                <span v-if="aiTestFeedback.latencyMs !== null && aiTestFeedback.latencyMs !== undefined" class="test-latency-badge">{{ aiTestFeedback.latencyMs }}ms</span>
-                <span v-if="aiTestFeedback.model" class="test-model-badge">{{ aiTestFeedback.model }}</span>
-              </div>
-              <el-button link size="small" @click="aiTestFeedback = null" class="close-res-btn">
-                <Icon icon="fluent:dismiss-16-regular" width="14" height="14" />
+          <!-- 大模型连通性测试轻量居中提示卡片 (Minimal Plain Centered Banner) -->
+          <div 
+            v-if="aiTestFeedback" 
+            class="ai-test-live-result is-plain is-center" 
+            :class="{ 'is-success': aiTestFeedback.success, 'is-error': !aiTestFeedback.success }"
+          >
+            <div class="test-res-body" style="display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%;">
+              <Icon 
+                :icon="aiTestFeedback.success ? 'fluent:checkmark-circle-16-filled' : 'fluent:error-circle-16-filled'" 
+                width="16" 
+                height="16" 
+                class="test-status-icon"
+                style="flex-shrink: 0;"
+              />
+              <span class="test-val test-reply-text" style="font-size: 12.5px; line-height: 1.4;">
+                <template v-if="aiTestFeedback.success">
+                  大模型连通性测试通过 (HTTP 200 OK<span v-if="aiTestFeedback.latencyMs">，耗时 {{ aiTestFeedback.latencyMs }}ms</span>)！已自动保存并接入模型 [{{ aiTestFeedback.model }}]。真实回复: "{{ aiTestFeedback.reply }}"
+                </template>
+                <template v-else>
+                  连通性测试未通过 ({{ aiTestFeedback.message || '连接异常' }})：无法正常使用，需测试通过后大模型才可调用。未自动保存，您仍可手动保存加入。
+                </template>
+              </span>
+              <el-button link size="small" @click="aiTestFeedback = null" class="close-res-btn" style="padding: 0; margin-left: 6px; color: inherit; opacity: 0.7;">
+                <Icon icon="fluent:dismiss-16-regular" width="13" height="13" />
               </el-button>
-            </div>
-            <div class="test-res-body" v-if="aiTestFeedback.success">
-              <div class="test-row">
-                <span class="test-label">发送测试文本:</span>
-                <span class="test-val test-prompt-text">{{ aiTestFeedback.testPrompt }}</span>
-              </div>
-              <div class="test-row">
-                <span class="test-label">模型真实回复:</span>
-                <span class="test-val test-reply-text">{{ aiTestFeedback.reply }}</span>
-              </div>
-              <div class="test-row" v-if="aiTestFeedback.models && aiTestFeedback.models.length">
-                <span class="test-label">自动载入模型:</span>
-                <span class="test-val">{{ aiTestFeedback.models.length }} 个可用模型已同步注入下拉候选项</span>
-              </div>
-            </div>
-            <div class="test-res-body" v-else>
-              <div class="test-row">
-                <span class="test-label">错误响应:</span>
-                <span class="test-val text-danger">{{ aiTestFeedback.message }}</span>
-              </div>
             </div>
           </div>
         </el-form>
@@ -3234,13 +3232,14 @@ const testAiConnectionInHub = () => {
         aiHubForm.aiModelsList = models.slice(0, 5)
       }
     }
+    const detectedModel = resData?.model || (aiHubDialogShow.value ? aiHubForm.aiModel : setting.value?.aiModel) || 'OpenAI Model'
     aiTestFeedback.value = {
       success: true,
       message: msg,
       reply: resData?.reply || '连接正常，模型响应就绪。',
       testPrompt: resData?.testPrompt || testPayload.prompt,
       latencyMs: resData?.latencyMs !== undefined ? resData.latencyMs : null,
-      model: resData?.model || testPayload.aiModel || 'OpenAI Model',
+      model: detectedModel,
       models: models
     }
     ElMessage({
@@ -3248,6 +3247,11 @@ const testAiConnectionInHub = () => {
       message: msg,
       plain: true
     })
+
+    // 测试成功自动保存加入 (Auto-save on test success)
+    if (aiHubDialogShow.value) {
+      saveAiHubConfig(false)
+    }
   }).catch(err => {
     testingAiInHub.value = false
     const errMsg = err.response?.data?.message || err.message || t('aiTestFail') || '测试失败'
@@ -3268,15 +3272,17 @@ const testAiConnectionInHub = () => {
   })
 }
 
-const saveAiHubConfig = () => {
+const saveAiHubConfig = (closeDialog = true) => {
   const modelsPool = Array.isArray(aiHubForm.aiModelsList) ? aiHubForm.aiModelsList.join(',') : (aiHubForm.aiModelsList || '')
   editSetting({
     aiApiKey: (aiHubForm.aiApiKey || '').trim(),
     aiApiUrl: (aiHubForm.aiApiUrl || '').trim(),
     aiModel: (aiHubForm.aiModel || '').trim(),
     aiModels: modelsPool.trim()
-  })
-  aiHubDialogShow.value = false
+  }, true, closeDialog)
+  if (closeDialog) {
+    aiHubDialogShow.value = false
+  }
 }
 
 
@@ -5151,7 +5157,7 @@ function jump(href) {
   doc.click()
 }
 
-function editSetting(settingForm, refreshStatus = true) {
+function editSetting(settingForm, refreshStatus = true, closeAiDialog = false) {
   if (settingLoading.value) return
   settingLoading.value = true
 
@@ -5183,7 +5189,9 @@ function editSetting(settingForm, refreshStatus = true) {
     addS3Show.value = false
     emailPrefixShow.value = false
     aiCodeFilterShow.value = false
-    aiHubDialogShow.value = false
+    if (closeAiDialog) {
+      aiHubDialogShow.value = false
+    }
   }).catch((e) => {
     console.error('editSetting error:', e)
     loginOpacity.value = setting.value.loginOpacity
@@ -8019,108 +8027,62 @@ form .el-button {
   }
 
   .ai-test-live-result {
-    margin-top: 16px;
-    padding: 14px 16px;
-    border-radius: 10px;
+    margin-top: 14px;
+    padding: 9px 14px;
+    border-radius: 8px;
     background: #f8fafc;
     border: 1px solid #e2e8f0;
     transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 
     &.is-success {
       background: #f0fdf4;
-      border-color: #bbf7d0;
+      border-color: #86efac;
+      color: #15803d;
+
+      .test-status-icon {
+        color: #16a34a;
+      }
+      .test-reply-text {
+        color: #15803d;
+      }
     }
 
     &.is-error {
       background: #fef2f2;
-      border-color: #fecaca;
-    }
+      border-color: #fca5a5;
+      color: #b91c1c;
 
-    .test-res-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 10px;
-
-      .test-res-title {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        font-size: 13px;
-        font-weight: 600;
-        color: #166534;
-
-        .test-latency-badge {
-          display: inline-flex;
-          align-items: center;
-          padding: 1px 6px;
-          border-radius: 4px;
-          font-size: 11px;
-          font-weight: 600;
-          background: #dcfce7;
-          color: #15803d;
-          font-family: ui-monospace, SFMono-Regular, monospace;
-        }
-
-        .test-model-badge {
-          display: inline-flex;
-          align-items: center;
-          padding: 1px 6px;
-          border-radius: 4px;
-          font-size: 11px;
-          background: #e0e7ff;
-          color: #4338ca;
-          font-family: ui-monospace, SFMono-Regular, monospace;
-        }
+      .test-status-icon {
+        color: #dc2626;
       }
-
-      .close-res-btn {
-        padding: 0;
-        height: auto;
-        color: #94a3b8;
-        &:hover {
-          color: #64748b;
-        }
+      .test-reply-text {
+        color: #b91c1c;
       }
     }
 
     .test-res-body {
       display: flex;
-      flex-direction: column;
-      gap: 6px;
-      font-size: 12.5px;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      text-align: center;
+    }
 
-      .test-row {
-        display: flex;
-        align-items: flex-start;
-        gap: 8px;
-        line-height: 1.5;
+    .test-val {
+      word-break: break-word;
+    }
 
-        .test-label {
-          font-weight: 500;
-          color: #475569;
-          flex-shrink: 0;
-          min-width: 82px;
-        }
-
-        .test-val {
-          color: #1e293b;
-          word-break: break-word;
-
-          &.test-prompt-text {
-            color: #64748b;
-            font-style: italic;
-          }
-
-          &.test-reply-text {
-            color: #0f172a;
-            font-weight: 500;
-            background: rgba(255, 255, 255, 0.7);
-            padding: 2px 6px;
-            border-radius: 4px;
-            border: 1px solid rgba(0, 0, 0, 0.05);
-          }
-        }
+    .close-res-btn {
+      padding: 0;
+      height: auto;
+      color: currentColor;
+      opacity: 0.6;
+      &:hover {
+        opacity: 1;
       }
     }
   }
@@ -8294,59 +8256,40 @@ html.dark .ai-hub-dialog .ai-test-live-result {
 }
 
 html.dark .ai-hub-dialog .ai-test-live-result.is-success {
-  background: rgba(6, 78, 59, 0.25) !important;
-  border-color: #065f46 !important;
-}
-
-html.dark .ai-hub-dialog .ai-test-live-result.is-error {
-  background: rgba(127, 29, 29, 0.25) !important;
-  border-color: #991b1b !important;
-}
-
-html.dark .ai-hub-dialog .ai-test-live-result .test-res-title {
+  background: rgba(6, 78, 59, 0.28) !important;
+  border-color: #059669 !important;
   color: #34d399 !important;
 }
 
-html.dark .ai-hub-dialog .ai-test-live-result.is-error .test-res-title {
+html.dark .ai-hub-dialog .ai-test-live-result.is-success .test-status-icon {
+  color: #34d399 !important;
+}
+
+html.dark .ai-hub-dialog .ai-test-live-result.is-success .test-reply-text {
+  color: #a7f3d0 !important;
+  background: transparent !important;
+  border: none !important;
+}
+
+html.dark .ai-hub-dialog .ai-test-live-result.is-error {
+  background: rgba(127, 29, 29, 0.28) !important;
+  border-color: #dc2626 !important;
   color: #f87171 !important;
 }
 
-html.dark .ai-hub-dialog .ai-test-live-result .test-latency-badge {
-  background: #065f46 !important;
-  color: #a7f3d0 !important;
+html.dark .ai-hub-dialog .ai-test-live-result.is-error .test-status-icon {
+  color: #f87171 !important;
 }
 
-html.dark .ai-hub-dialog .ai-test-live-result .test-model-badge {
-  background: #312e81 !important;
-  color: #c7d2fe !important;
-}
-
-html.dark .ai-hub-dialog .ai-test-live-result .test-label {
-  color: #94a3b8 !important;
+html.dark .ai-hub-dialog .ai-test-live-result.is-error .test-reply-text {
+  color: #fca5a5 !important;
+  background: transparent !important;
+  border: none !important;
 }
 
 html.dark .ai-hub-dialog .ai-test-live-result .test-val {
-  color: #e2e8f0 !important;
-}
-
-html.dark .ai-hub-dialog .ai-test-live-result .test-prompt-text {
-  color: #94a3b8 !important;
-}
-
-html.dark .ai-hub-dialog .ai-test-live-result .test-reply-text {
-  background: #111827 !important;
-  color: #f3f4f6 !important;
-  border-color: #374151 !important;
-}
-
-html.dark .ai-hub-dialog .el-alert--info.is-light {
-  background-color: #1e293b !important;
-  border: 1px solid #334155 !important;
-  color: #94a3b8 !important;
-}
-
-html.dark .ai-hub-dialog .el-alert__description {
-  color: #cbd5e1 !important;
+  background: transparent !important;
+  border: none !important;
 }
 
 html.dark .ai-model-dropdown,

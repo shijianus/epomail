@@ -13,7 +13,34 @@ import { isDualDbMode, getDbModeInfo } from '../utils/db-accessor';
 
 const settingService = {
 
+	async ensureSettingColumns(c) {
+		try {
+			const { getUserDb } = await import('../utils/db-accessor');
+			const userDb = getUserDb(c);
+			const aiSettingCols = [
+				{ name: 'ai_api_key', sql: `ALTER TABLE setting ADD COLUMN ai_api_key TEXT NOT NULL DEFAULT '';` },
+				{ name: 'ai_api_url', sql: `ALTER TABLE setting ADD COLUMN ai_api_url TEXT NOT NULL DEFAULT '';` },
+				{ name: 'ai_model', sql: `ALTER TABLE setting ADD COLUMN ai_model TEXT NOT NULL DEFAULT '';` },
+				{ name: 'ai_models', sql: `ALTER TABLE setting ADD COLUMN ai_models TEXT NOT NULL DEFAULT '';` },
+				{ name: 'ai_enabled', sql: `ALTER TABLE setting ADD COLUMN ai_enabled INTEGER NOT NULL DEFAULT 1;` },
+				{ name: 'ai_daily_quota', sql: `ALTER TABLE setting ADD COLUMN ai_daily_quota INTEGER NOT NULL DEFAULT 0;` },
+				{ name: 'ai_rate_limit_rpm', sql: `ALTER TABLE setting ADD COLUMN ai_rate_limit_rpm INTEGER NOT NULL DEFAULT 60;` },
+				{ name: 'ai_max_tokens', sql: `ALTER TABLE setting ADD COLUMN ai_max_tokens INTEGER NOT NULL DEFAULT 2048;` },
+				{ name: 'ai_admin_only', sql: `ALTER TABLE setting ADD COLUMN ai_admin_only INTEGER NOT NULL DEFAULT 0;` }
+			];
+			for (const col of aiSettingCols) {
+				const colInfo = await userDb.prepare(`SELECT * FROM pragma_table_info('setting') WHERE name = ? LIMIT 1`).bind(col.name).first();
+				if (!colInfo) {
+					await userDb.prepare(col.sql).run();
+				}
+			}
+		} catch (e) {
+			console.warn('ensureSettingColumns warning:', e.message);
+		}
+	},
+
 	async refresh(c) {
+		await this.ensureSettingColumns(c);
 		const settingRow = await orm(c).select().from(settingEntity).get();
 		settingRow.resendTokens = JSON.parse(settingRow.resendTokens);
 		if (typeof settingRow.authI18n === 'string') {
@@ -36,6 +63,7 @@ const settingService = {
 		let settingVal = await c.env.kv.get(KvConst.SETTING, { type: 'json' });
 
 		if (!settingVal) {
+			await this.ensureSettingColumns(c);
 			const settingRow = await orm(c).select().from(settingEntity).get();
 			if (!settingRow) {
 				throw new BizError('数据库未初始化 Database not initialized.');
@@ -328,6 +356,10 @@ const settingService = {
 
 		if (params.externalDbToken && params.externalDbToken.includes('******')) {
 			delete params.externalDbToken;
+		}
+
+		if (params.aiApiKey && params.aiApiKey.includes('******')) {
+			delete params.aiApiKey;
 		}
 
 		params.resendTokens = JSON.stringify(resendTokens);

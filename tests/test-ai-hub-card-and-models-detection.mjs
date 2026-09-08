@@ -140,9 +140,18 @@ import assert from "assert";
     await testBtn.click();
     await page.waitForTimeout(2500);
 
-    // 验证 .ai-test-live-result 真实结果反馈卡片被渲染
+    // 验证弹窗主体内显式的 .ai-dialog-alert 已被彻底移除，转为标题栏旁边的 '?' Tooltip 注释
+    const obsoleteAlert = await page.$(".ai-hub-dialog .ai-dialog-alert");
+    assert.strictEqual(obsoleteAlert, null, "弹窗主体内显式的 .ai-dialog-alert 必须彻底移除");
+    const headerTooltip = await page.$(".ai-hub-dialog-header .ai-help-icon-wrap");
+    assert.ok(headerTooltip, "弹窗标题栏必须包含 '?' Tooltip 注释图标");
+    console.log("  ✓ 显式 alert 已成功转为弹窗标题栏 '?' 注释 Tooltip");
+
+    // 验证 .ai-test-live-result 真实结果反馈卡片被渲染且采用类似 el-message 的 is-plain is-center 极简横条风格
     const liveResultCard = await page.$(".ai-hub-dialog .ai-test-live-result");
     assert.ok(liveResultCard, "点击测试后必须展示 .ai-test-live-result 真实连通性响应卡片");
+    const isPlainCenter = await page.$eval(".ai-hub-dialog .ai-test-live-result", el => el.classList.contains("is-plain") && el.classList.contains("is-center"));
+    assert.ok(isPlainCenter, ".ai-test-live-result 必须使用 is-plain is-center 轻量居中提示栏风格");
     const replyText = await page.$eval(".ai-hub-dialog .ai-test-live-result .test-val.test-reply-text, .ai-hub-dialog .ai-test-live-result .test-res-body", el => el.textContent.trim());
     console.log("  ✓ 大模型真实测试响应内容:", replyText);
     assert.ok(replyText.length > 0, "大模型响应内容必须真实存在，不可为空");
@@ -177,8 +186,10 @@ import assert from "assert";
     console.log("  ✓ 已保存暗黑模式弹窗审计截图: tests/audit_ai_hub_dialog_dark.png");
 
     // 关闭弹窗
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(300);
     const cancelBtn = await page.$('.ai-hub-dialog .dialog-footer .el-button:has-text("取消")');
-    if (cancelBtn) await cancelBtn.click();
+    if (cancelBtn) await cancelBtn.click({ force: true }).catch(() => {});
     await page.waitForTimeout(400);
 
     // 恢复明亮模式
