@@ -12,6 +12,35 @@
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
 
+### 系统设置class="settings-card ai-hub-card"极简核心架构重构、模型自动识别接入与暗色调UI弹窗彻底无白斑上线 (2026-09-07)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **`ai-hub-card` 极简核心架构重构与消除杂乱 (Minimalist Core Architecture)**:
+       - 彻底清理原卡片中无用且杂散的内容（如占行分散的快捷预设芯片与散乱标签），严格对齐推荐架构，卡片聚焦展现核心要素：
+         - **Endpoint (接口端点)**: 清晰展示当前 Base URL（未绑定时标注内置 Workers AI 网关）；
+         - **API Key (鉴权密钥)**: 采用安全脱敏掩码（`sk-••••••••`），直观呈现绑定状态与活跃圆点；
+         - **Models (接入模型)**: 直观显示当前生效的主力模型与已识别模型数统计；
+         - **Settings (设置)**: 唤起专属配置对话框；
+         - **Delete (清空重置)**: 支持一键清空自定义配置，安全二次确认并恢复免密 Workers AI；
+       - 内置原生 API 连通性测试按钮（`.forward .el-button:not(.opt-button)`），保证兼容已有测试套件，执行真实可用性测试与模型探测，并以轻量卡片实时呈现响应摘要。
+    2. **大模型自动识别与接入闭环 (Model Auto-detection & Standard Compliance)**:
+       - 后端（`mail-worker/src/service/ai-service.js` 与 `setting-api.js`）新增规范安全的 `/setting/ai/models` 路由；
+       - 采用合规且安全的探测架构，通过服务端向 OpenAI 兼容标准接口发起 `GET /models` 请求，杜绝前端跨域暴露密钥与滥用风险；
+       - 智能过滤非文本推理模型（排除语音、生图、审核等），优先将主力对话模型置顶排序；
+       - 具备优雅降级容灾机制：对未开放 models 列举权限的服务商智能匹配推荐模型；对免密模式自动加载内置可用模型；
+       - 弹窗中内置【自动识别模型】按钮，点击后自动探测并生成模型标签胶囊流，点击任意模型即刻快速填入并接入。
+    3. **暗色调 UI 弹窗彻底杜绝白色填充与白斑 (Zero White Bleeding in Dark Mode)**:
+       - 深度定位根本原因：此前全局非作用域样式中将 `.el-dialog.ai-hub-dialog` 错误归入 `width: min(880px...) !important; background: #ffffff !important;` 规则池，且未在 `html.dark` 中进行对应深色覆盖，导致暗黑模式下被强制涂白且宽度异常变大；
+       - 将其剥离为专属精准弹窗样式（宽度回归恰当的 `600px`），并在全局严格设定 `html.dark .el-dialog.ai-hub-dialog` 及其 header、body、footer、input、alert、detected-box 的全链条深色背景（`rgb(17, 24, 39)`），彻底消灭所有白斑白底。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **Cloudflare Workers 部署 Version ID**: `ea6fd071-269d-4d33-bbf0-791a3920ad60`。
+    - **epocanvas-mail Git Commit**: `4120dbfff485d70dcb2032081b9711ae1b692c4e` (Short Hash: `4120dbf`)。
+    - 自动化测试套件 100% 顺利通过：
+      - `node tests/test-ai-hub-card-and-models-detection.mjs` (核验卡片 Endpoint、API Key、Models、Settings、Delete、内置 API 连通性测试全部具备；核验弹窗自动识别模型与胶囊点击快速填入；暗黑模式 ComputedStyle 背景审计全为深色 `rgb(17, 24, 39)`，100% 无任何白色填充，截图留档 `tests/audit_ai_hub_dialog_dark.png`);
+      - `node tests/test-sys-setting-ai-hub-and-thread-actions.mjs` (Admin 登录、系统设置 /system-setting 独立 .ai-hub-card 渲染、测试 AI 连通性、.ai-hub-dialog 预设快速填充 DeepSeek/OpenAI、收件箱重复「返回邮件」删除核验、顶栏 .header-actions 12大左/右操作按钮核验、.email-title-row 静态标签清理核验、展开邮件右对齐 class="thread-header-bar" 8大实际操作按钮完备性核验、.raw-headers-dialog 原始邮件标头查看与复制核验、归档与任务待办 100% 全部通过);
+      - `node tests/test-gmail-ui-and-ai-features.mjs` (全部通过);
+      - `node tests/verify-full-icons.mjs` (全部通过);
+      - `node tests/test-header-and-quick-action-icons.mjs` (全部通过)。
+
 ### 系统级全量300+离线矢量图标重构、零网络请求秒开与满Icon状态闭环上线 (2026-09-07)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **深度审计与回退验证 (Initial State Audit & Diagnosis)**:
