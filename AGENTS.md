@@ -37,7 +37,7 @@
        - `tests/test-gmail-ui-and-ai-features.mjs`、`tests/test-ai-hub-card-and-models-detection.mjs`、`tests/verify-full-icons.mjs` 全部 100% 通过。
 *   **部署上线与自动化测试 (Verification & Deployment)**:
     - **Cloudflare Workers 部署 Version ID**: `5ba72e9b-9895-4f76-a9f1-62a88fee3854`。
-    - **epocanvas-mail Git Commit**: `218fb12997325d9106ffec2cf7b2cb4b11960703` (Short Hash: `218fb12`).
+    - **epocanvas-mail Git Commit**: `89db0b908129ee2532191a0380da317726130582` (Short Hash: `89db0b9`).
 
 ### 系统设置AI端点密钥及时联动扫描、彻底杜绝旧模型与CF残留、删除测试横幅卡片并融合下拉延时标签反馈上线 (2026-09-08)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
