@@ -12,6 +12,38 @@
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
 
+### 系统设置已选定模型池实时同步角色权限AI允许模型下拉单、彻底杜绝硬编码假数据与来源分类胶囊徽章上线 (2026-09-08)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **根因精准定位与全链路闭环修复 (Root Cause Resolution & Store/Getter Harmonization)**:
+       - **Bug 1**: `mail-vue/src/views/role/index.vue` 原先读取 `settingStore.setting`，而 Pinia store 仅定义了 `state.settings`，导致 `settingStore.setting` 始终为 `undefined`，设置全部丢失；在 `mail-vue/src/store/setting.js` 中新增 `getters: { setting: (state) => state.settings }`，并新增 `setSettings(data)` action 与 `aiModel`, `aiModels` 响应式状态字段，使两种调用方式完全兼容；
+       - **Bug 2**: 角色权限管理页 (`/role`) 原先从未主动拉取最新系统设置，用户刷新或直接进入 `/role` 时只能拿到初始默认值；在 `role/index.vue` 中引入 `settingQuery`，并在组件初始化、`onMounted`、`refresh()`、`openRoleSet(role)` 以及 `openAddRole()` 时主动调用 `fetchFreshSettings()` 刷新 store；
+       - **Bug 3**: 服务端 `mail-worker/src/service/setting-service.js` 的 `websiteConfig(c)` 接口新增同步返回 `aiEnabled`, `aiModel`, `aiModels`，确保应用在前端启动 `init.js` 时即可在全局免额外权限获取到当前系统生效的主模型与模型池配置；
+       - **Bug 4**: 将 `domainOptions` 重构为基于 `settingStore.domainList` 的 `computed` 计算属性，消除静态解构造成的动态数据断链。
+    2. **彻底杜绝硬编码假数据与来源分级徽章体系 (Zero Fake Data & Source Hierarchy Badges)**:
+       - 彻底清除 `role/index.vue` 中原先硬编码的假数据数组 `['gpt-4o-mini', 'gpt-4o', 'deepseek-chat', 'claude-3-5-haiku-20241022', 'gemini-1.5-flash', '@cf/meta/llama-3.1-8b-instruct']`；
+       - 升级 `roleAiModelOptions` 为智能合并映射：
+         - **主推理模型 (`primary`)**: 来自 `settingStore.settings.aiModel`，携带 `[主推理模型]` 靛蓝胶囊徽章；
+         - **系统模型池 (`pool`)**: 来自 `settingStore.settings.aiModels`，携带 `[系统模型池]` 翡翠绿胶囊徽章；
+         - **已分配模型 (`assigned`)**: 角色当前已选定的模型优先回显并保留，携带 `[已分配]` 琥珀橙徽章；
+         - **角色专属模型 (`role`)**: 其它角色已分配的模型保留回显，携带 `[角色专属]` 徽章；
+         - **官方边缘保底 (`default`)**: 仅在系统没有任何配置时提供 Cloudflare Workers AI 官方标准模型 `@cf/meta/llama-3.1-8b-instruct`，严禁产生任何未配置的商业模型残留；
+       - 为角色编辑弹窗中的 AI 模型选择器赋予特定标识类 `class="dialog-input role-ai-models-select"`，在模板中通过 `el-option` 插槽渲染专属 `.role-model-opt-wrapper` 与 `.role-model-opt-badge`；
+       - 在底部补充非 scoped `<style lang="scss">`，完美适配亮色与暗色模式深色调 (`rgb(17, 24, 39)`)，标签右对齐且文本等宽代码字体呈现。
+    3. **Playwright 视觉审计与自动化端到端测试 100% 全绿通过**:
+       - `tests/test-ai-model-pool-sync-to-role.mjs`:
+         - 模拟在系统设置中配置主模型 `deepseek-chat` 与模型池 `['deepseek-chat', 'deepseek-reasoner', 'qwen-turbo']`；
+         - 验证 `websiteConfig` 同步返回对应字段；
+         - 浏览器访问 `/role` 打开角色编辑弹窗与新建角色弹窗；
+         - 展开 `class="role-ai-models-select"`，精确匹配到模型池中全部 3 个候选模型，并验证「主推理模型」与「系统模型池」徽章；
+         - 验证绝无任何 `gpt-4o-mini` 或 `claude-3-5-haiku` 假数据残留；
+         - 模拟选择 `deepseek-reasoner` 并点击保存角色成功；
+         - 切换至暗黑模式审计视觉深色调与徽章对比度，截图留档 `tests/audit_role_ai_models_sync_light.png` 与 `tests/audit_role_ai_models_sync_dark.png`；
+         - 测试结束后自动完全恢复原始系统配置与角色数据，严格恪守零假数据准则；
+       - `tests/test-ai-hub-card-and-models-detection.mjs`、`tests/test-ai-analysis-and-html-translate.mjs`、`tests/verify-full-icons.mjs` 全量通过。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **Cloudflare Workers 部署 Version ID**: `5a65cd33-668c-41a0-888b-a5e56ec88a86`。
+    - **epocanvas-mail Git Commit**: 待提交。
+
 ### 分析页AI调用与Token消耗双图对称上线、Gmail级HTML排版格式严格保留邮件翻译闭环上线 (2026-09-08)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **分析页 AI 用量双图对称重构 (Symmetric AI Analytics Charts & Responsive Grid)**:

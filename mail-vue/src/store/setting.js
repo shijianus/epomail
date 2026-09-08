@@ -11,11 +11,22 @@ export const useSettingStore = defineStore('setting', {
             aiRateLimitRpm: 60,
             aiMaxTokens: 2048,
             aiAdminOnly: 0,
+            aiModel: '',
+            aiModels: '',
         },
         lang: '',
     }),
+    getters: {
+        setting: (state) => state.settings,
+    },
     actions: {
-
+        setSettings(data) {
+            if (!data) return;
+            this.settings = { ...this.settings, ...data };
+            if (data.domainList) {
+                this.domainList = data.domainList;
+            }
+        },
     },
     persist: {
         pick: ['lang'],

@@ -262,7 +262,7 @@
           <!-- AI 模型分级授权 (Allowed AI Models Hierarchy) -->
           <div class="form-row">
             <el-select
-                class="dialog-input"
+                class="dialog-input role-ai-models-select"
                 v-model="form.aiModels"
                 multiple
                 filterable
@@ -275,10 +275,15 @@
             >
               <el-option
                   v-for="item in roleAiModelOptions"
-                  :key="item"
-                  :label="item"
-                  :value="item"
-              />
+                  :key="item.value"
+                  :label="item.value"
+                  :value="item.value"
+              >
+                <div class="role-model-opt-wrapper">
+                  <span class="role-model-opt-name">{{ item.value }}</span>
+                  <span v-if="item.badge" class="role-model-opt-badge" :class="item.badgeType">{{ item.badge }}</span>
+                </div>
+              </el-option>
             </el-select>
           </div>
 
@@ -509,6 +514,7 @@
 import {Icon} from "@iconify/vue";
 import {computed, defineOptions, nextTick, onBeforeUnmount, onMounted, reactive, ref} from "vue";
 import {roleAdd, roleDelete, rolePermTree, roleRoleList, roleSet, roleSetDef} from "@/request/role.js";
+import {settingQuery} from "@/request/setting.js";
 import {userSyncBlogLevel} from "@/request/user.js";
 import loading from '@/components/loading/index.vue';
 import {useRoleStore} from "@/store/role.js";
@@ -582,16 +588,93 @@ const form = reactive({
   aiModels: []
 });
 
+function fetchFreshSettings() {
+  settingQuery().then(data => {
+    if (data) {
+      if (typeof settingStore.setSettings === 'function') {
+        settingStore.setSettings(data);
+      } else {
+        settingStore.settings = { ...settingStore.settings, ...data };
+        if (data.domainList) settingStore.domainList = data.domainList;
+      }
+    }
+  }).catch(() => {});
+}
+
 const roleAiModelOptions = computed(() => {
-  const options = new Set();
-  const currentSetting = settingStore.setting || {};
-  if (currentSetting.aiModel) options.add(currentSetting.aiModel);
-  if (currentSetting.aiModels) {
-    currentSetting.aiModels.split(',').forEach(m => { if (m.trim()) options.add(m.trim()); });
+  const currentSetting = settingStore.settings || settingStore.setting || {};
+  const primaryModel = (currentSetting.aiModel || '').trim();
+  const poolStr = (currentSetting.aiModels || '').trim();
+  const poolModels = poolStr ? poolStr.split(',').map(m => m.trim()).filter(Boolean) : [];
+
+  const optionsMap = new Map();
+
+  // 1. 系统设置中的主推理模型 (Primary Model)
+  if (primaryModel) {
+    optionsMap.set(primaryModel, {
+      value: primaryModel,
+      label: primaryModel,
+      badge: '主推理模型',
+      badgeType: 'primary'
+    });
   }
-  const defaults = ['gpt-4o-mini', 'gpt-4o', 'deepseek-chat', 'claude-3-5-haiku-20241022', 'gemini-1.5-flash', '@cf/meta/llama-3.1-8b-instruct'];
-  defaults.forEach(m => options.add(m));
-  return Array.from(options);
+
+  // 2. 系统设置中被选定的可用多模型池 (aiModels)
+  poolModels.forEach(m => {
+    if (!optionsMap.has(m)) {
+      optionsMap.set(m, {
+        value: m,
+        label: m,
+        badge: '系统模型池',
+        badgeType: 'pool'
+      });
+    }
+  });
+
+  // 3. 当前角色正在编辑已分配的模型 (确保已有分配模型在下拉中正常呈现与回显)
+  if (Array.isArray(form.aiModels)) {
+    form.aiModels.forEach(m => {
+      const clean = typeof m === 'string' ? m.trim() : '';
+      if (clean && !optionsMap.has(clean)) {
+        optionsMap.set(clean, {
+          value: clean,
+          label: clean,
+          badge: '已分配',
+          badgeType: 'assigned'
+        });
+      }
+    });
+  }
+
+  // 4. 所有角色列表中已分配过的模型
+  if (Array.isArray(roles.value)) {
+    roles.value.forEach(r => {
+      const rModels = Array.isArray(r.aiModels) ? r.aiModels : (typeof r.aiModels === 'string' && r.aiModels ? r.aiModels.split(',') : []);
+      rModels.forEach(m => {
+        const clean = typeof m === 'string' ? m.trim() : '';
+        if (clean && !optionsMap.has(clean)) {
+          optionsMap.set(clean, {
+            value: clean,
+            label: clean,
+            badge: '角色专属',
+            badgeType: 'role'
+          });
+        }
+      });
+    });
+  }
+
+  // 5. 零配置时的保底：仅提供 Workers AI 权威官方模型
+  if (optionsMap.size === 0) {
+    optionsMap.set('@cf/meta/llama-3.1-8b-instruct', {
+      value: '@cf/meta/llama-3.1-8b-instruct',
+      label: '@cf/meta/llama-3.1-8b-instruct',
+      badge: 'Workers AI 默认',
+      badgeType: 'default'
+    });
+  }
+
+  return Array.from(optionsMap.values());
 });
 
 function formatQuotaDisplay(mb, roleCode) {
@@ -629,24 +712,27 @@ function getRoleBadgeStyle(row) {
   };
 }
 
-let domainOptions = [];
+const domainOptions = computed(() => {
+  const list = settingStore.domainList || [];
+  return list.map(domain => {
+    const cleanDomain = domain.replace(/^@/, '');
+    return {label: cleanDomain, value: cleanDomain};
+  });
+});
+
 const expand = ref(false);
 let chooseRole = {};
 
+fetchFreshSettings();
 refresh();
 
 rolePermTree().then(treeRes => {
   treeList.push(...treeRes);
 });
 
-domainOptions = domainList.map(domain => {
-  const cleanDomain = domain.replace(/^@/, '');
-  return {label: cleanDomain, value: cleanDomain};
-});
-
 function availDomainChange() {
   const index = form.availDomain.findIndex(domain => {
-    return !domainOptions.map(option => option.value).includes(domain);
+    return !(domainOptions.value || []).map(option => option.value).includes(domain);
   });
   if (index > -1) {
     form.availDomain.splice(index, 1);
@@ -896,6 +982,7 @@ function resetForm() {
 }
 
 function openRoleSet(role) {
+  fetchFreshSettings();
   chooseRole = role;
   dialogType.title = t('changeRoleTitle');
   dialogType.type = 'set';
@@ -920,6 +1007,7 @@ function openRoleSet(role) {
 }
 
 function openAddRole() {
+  fetchFreshSettings();
   dialogType.title = t('addRoleTitle');
   dialogType.type = 'add';
   roleFormShow.value = true;
@@ -948,6 +1036,7 @@ function addRole() {
 }
 
 function refresh() {
+  fetchFreshSettings();
   tableLoading.value = true;
   roles.length = 0;
   getRoleList();
@@ -1002,6 +1091,7 @@ const handleResize = () => {
 };
 
 onMounted(() => {
+  fetchFreshSettings();
   window.addEventListener('resize', handleResize, { passive: true });
 });
 
@@ -1713,6 +1803,82 @@ onBeforeUnmount(() => {
 
   .quota-val {
     color: #e2e8f0 !important;
+  }
+}
+</style>
+
+<style lang="scss">
+.role-model-opt-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 10px;
+
+  .role-model-opt-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 13px;
+  }
+
+  .role-model-opt-badge {
+    flex-shrink: 0;
+    font-size: 11px;
+    padding: 1px 7px;
+    border-radius: 4px;
+    font-weight: 600;
+    line-height: 1.4;
+
+    &.primary {
+      background: rgba(99, 102, 241, 0.12);
+      color: #6366f1;
+      border: 1px solid rgba(99, 102, 241, 0.24);
+    }
+    &.pool {
+      background: rgba(16, 185, 129, 0.12);
+      color: #059669;
+      border: 1px solid rgba(16, 185, 129, 0.24);
+    }
+    &.assigned, &.role {
+      background: rgba(245, 158, 11, 0.12);
+      color: #d97706;
+      border: 1px solid rgba(245, 158, 11, 0.24);
+    }
+    &.default {
+      background: rgba(100, 116, 139, 0.12);
+      color: #64748b;
+      border: 1px solid rgba(100, 116, 139, 0.24);
+    }
+  }
+}
+
+html.dark {
+  .role-model-opt-wrapper {
+    .role-model-opt-badge {
+      &.primary {
+        background: rgba(99, 102, 241, 0.22);
+        color: #818cf8;
+        border-color: rgba(99, 102, 241, 0.35);
+      }
+      &.pool {
+        background: rgba(16, 185, 129, 0.22);
+        color: #34d399;
+        border-color: rgba(16, 185, 129, 0.35);
+      }
+      &.assigned, &.role {
+        background: rgba(245, 158, 11, 0.22);
+        color: #fbbf24;
+        border-color: rgba(245, 158, 11, 0.35);
+      }
+      &.default {
+        background: rgba(148, 163, 184, 0.22);
+        color: #94a3b8;
+        border-color: rgba(148, 163, 184, 0.35);
+      }
+    }
   }
 }
 </style>

@@ -561,7 +561,10 @@ const settingService = {
 			welcomeLastBroadcast: settingRow.welcomeLastBroadcast || '',
 			userTgForward: settingRow.userTgForward ?? 1,
 			userEmailForward: settingRow.userEmailForward ?? 1,
-			userApiSupport: settingRow.userApiSupport ?? 1
+			userApiSupport: settingRow.userApiSupport ?? 1,
+			aiEnabled: settingRow.aiEnabled ?? 1,
+			aiModel: settingRow.aiModel || '',
+			aiModels: settingRow.aiModels || settingRow.aiModel || ''
 		};
 	},
 
