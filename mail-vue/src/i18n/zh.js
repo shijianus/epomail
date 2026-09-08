@@ -1333,7 +1333,17 @@ const zh = {
     aiKeyUnconfigured: '未配置 (免密 Workers AI)',
     aiDefaultEndpoint: '默认官方端点',
     aiWorkersAiBuiltin: 'Workers AI 内置网关',
-    aiTestFeedback: '测试与探测结果',
+    aiApiConfigBtn: '设置 API',
+    aiEnabledLabel: '启用 AI 智能增强功能',
+    aiEnabledHint: '系统级总开关。开启后支持邮件智能全文翻译、核心摘要及自动化内容分析；可一键关闭。',
+    aiDailyQuotaLabel: '单用户每日调用上限',
+    aiDailyQuotaHint: '每位注册用户每天允许发起的大模型请求次数上限，设置为 0 表示不限制调用次数。',
+    aiRateLimitRpmLabel: '请求速率限制 (RPM)',
+    aiRateLimitRpmHint: '每位用户每分钟允许发送的最高请求频率，防止脚本恶意高频刷取接口。',
+    aiMaxTokensLabel: '单次生成最大 Token',
+    aiMaxTokensHint: '限制单次翻译或文本分析允许生成的最大 Token 数量，避免超长输出耗尽调用额度。',
+    aiAdminOnlyLabel: '仅限管理员使用 AI',
+    aiAdminOnlyHint: '开启后仅系统管理员账户可以使用 AI 增强与翻译功能，普通注册用户无法发起大模型请求。',
     close: '关闭'
 }
 export default zh

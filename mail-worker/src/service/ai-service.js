@@ -80,9 +80,14 @@ const aiService = {
 		const snippet = sourceText.slice(0, 4000);
 
 		const settingRow = await settingService.query(c).catch(() => null);
+		if (settingRow && settingRow.aiEnabled === 0) {
+			return sourceText;
+		}
+
 		const apiKey = (settingRow?.aiApiKey || c.env?.AI_API_KEY || '').trim();
 		const apiUrl = (settingRow?.aiApiUrl || c.env?.AI_API_URL || 'https://api.openai.com/v1').trim();
 		const model = (settingRow?.aiModel || c.env?.ai_model || 'gpt-4o-mini').trim();
+		const maxTokens = Number(settingRow?.aiMaxTokens) || 2048;
 
 		const langNames = {
 			zh: 'Simplified Chinese (简体中文)',
@@ -120,7 +125,7 @@ const aiService = {
 							}
 						],
 						temperature: 0.3,
-						max_tokens: 2048
+						max_tokens: maxTokens
 					})
 				});
 

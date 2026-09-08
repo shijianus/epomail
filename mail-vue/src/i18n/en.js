@@ -1341,7 +1341,17 @@ const en = {
     aiKeyUnconfigured: 'Keyless (Workers AI)',
     aiDefaultEndpoint: 'Official OpenAI Endpoint',
     aiWorkersAiBuiltin: 'Workers AI Built-in Gateway',
-    aiTestFeedback: 'Test & Discovery Result',
+    aiApiConfigBtn: 'Configure API',
+    aiEnabledLabel: 'Enable AI Features & Translation',
+    aiEnabledHint: 'Master switch for AI intelligence. Enables email translation, summarization, and rule analysis. Can be turned off anytime.',
+    aiDailyQuotaLabel: 'Daily Quota per User',
+    aiDailyQuotaHint: 'Maximum AI requests allowed per user per day. Set to 0 for unlimited requests.',
+    aiRateLimitRpmLabel: 'Rate Limit (RPM)',
+    aiRateLimitRpmHint: 'Maximum allowed requests per minute per user to prevent high-frequency abuse.',
+    aiMaxTokensLabel: 'Max Generated Tokens',
+    aiMaxTokensHint: 'Maximum token limit for single generation to prevent excessive quota consumption.',
+    aiAdminOnlyLabel: 'Admin Only Access',
+    aiAdminOnlyHint: 'When enabled, only administrators can use AI features. Regular users will not be able to send AI requests.',
     close: 'Close'
 }
 export default en

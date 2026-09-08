@@ -12,6 +12,41 @@
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
 
+### 系统设置ai-hub-card单选单统一画风重构、5大AI限制项与中心弹窗Zero-Scrollbar零滑块双列拓宽上线 (2026-09-08)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **`ai-hub-card` 单选单整合与 5 大限制控制项重构 (Single API Entry & Unified Card Aesthetics)**:
+       - 彻底消除此前将 endpoint、API Key、Models 平铺展示造成的视觉杂乱，与相邻系统设置卡片（如 `storage-db-card`、`user-data-control-card`）画风完全一致；
+       - 主设置条目仅保留单一选单/配置按钮 (`.opt-button` 设置 API)，右侧展示当前接入状态胶囊与脱敏信息，并配备快捷连通性测试按钮；
+       - 卡片其余条目展示对 AI 调用的核心安全与资源限制（均支持自由关闭/限制）：
+         - **启用 AI 智能增强与邮件翻译 (`aiEnabled`)**: 系统级总开关（`el-switch`），关闭后彻底停用 AI 请求；
+         - **单用户每日调用上限 (`aiDailyQuota`)**: 限制单用户每日调用次数上限（0 表示不限，单位：次/天）；
+         - **请求速率限制 RPM (`aiRateLimitRpm`)**: 限制单用户每分钟最高并发调用频率（单位：次/分）；
+         - **单次生成最大 Token (`aiMaxTokens`)**: 限制单次文本推理/翻译的最大生成 Token，避免额度耗尽；
+         - **仅限管理员使用 AI (`aiAdminOnly`)**: 管理员独占开关（`el-switch`），开启后普通注册用户无法发起大模型调用；
+    2. **`ai-hub-dialog` 彻底杜绝中心弹窗双滑块与 860px 宽屏双列拓宽 (860px Canvas & Zero-Scrollbars)**:
+       - 根除固定 600px 窄框导致的挤压问题，将中心弹窗充分拓宽至 `860px` (`width: min(860px, calc(100vw - 32px))`) 并垂直居中 (`align-center`)；
+       - 弹窗表单重构为 `.ai-dialog-grid` 双列响应式网格排布：
+         - **左列**: Base URL 接口地址 + API Key 密钥输入框；
+         - **右列**: Model Name 推理模型 + 自动识别模型按钮，并在下方紧凑排列 5 大快捷预设胶囊；
+       - **彻底消除内外双滑块 (Zero-Scrollbar 零滑块准则)**:
+         - 外层弹窗主体 `.ai-hub-dialog .el-dialog__body` 设定 `overflow-y: visible !important; height: auto !important; max-height: none !important;`，彻底根除外层滚动条；
+         - 内层模型标签区 `.detected-chips-container` 移除 `max-height: 120px` 与 `overflow-y: auto`，在 860px 宽屏下自然流式弹性折行，超过 20 个模型时提供一键展开/收起，彻底根除内层滚动条；
+         - 全局强制隐藏滑块与滚动条（`scrollbar-width: none !important; ::-webkit-scrollbar { display: none !important; }`）；
+       - 严格继承暗黑模式 `#111827` / `rgb(17, 24, 39)` 深色调覆盖，100% 杜绝任何白色填充与白斑。
+    3. **后端 D1 数据库平滑迁移与 AI 资源调度**:
+       - `mail-worker/src/entity/setting.js` 与 `setting-service.js` 扩展支持 `aiEnabled`, `aiDailyQuota`, `aiRateLimitRpm`, `aiMaxTokens`, `aiAdminOnly` 列；
+       - `init.js` 自动完成 D1 表结构平滑升迁；
+       - `ai-service.js` 翻译服务接入总开关判断与动态 `max_tokens` 约束。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **Cloudflare Workers 部署 Version ID**: `97cd7697-7b13-44ff-8cf8-69e4fa2e8114`。
+    - **epocanvas-mail Git Commit**: `fea674e9985a4389b044dd76b915c43aa82668d2` (Short Hash: `fea674e`)。
+    - 自动化测试套件 100% 顺利通过：
+      - `node tests/test-ai-hub-card-and-models-detection.mjs` (核验卡片单选单设置 API 按钮；核验 5 大限制项 switch 与 input-number 控制项；核验弹窗实际尺寸宽 860px；外层与内层 ComputedStyle `overflow-y: visible` 且 `scrollHeight === clientHeight`，100% 达成 Zero-Scrollbar 零滑块；暗黑模式背景 ComputedStyle 全为 `rgb(17, 24, 39)` 零白斑，截图留档 `tests/audit_ai_hub_dialog_dark.png`);
+      - `node tests/test-sys-setting-ai-hub-and-thread-actions.mjs` (Admin 登录、系统设置 /system-setting 独立 .ai-hub-card 渲染、测试 AI 连通性、.ai-hub-dialog 预设快速填充 DeepSeek/OpenAI、收件箱重复「返回邮件」删除核验、顶栏 .header-actions 12大左/右操作按钮核验、.email-title-row 静态标签清理核验、展开邮件右对齐 class="thread-header-bar" 8大实际操作按钮完备性核验、.raw-headers-dialog 原始邮件标头查看与复制核验、归档与任务待办 100% 全部通过);
+      - `node tests/test-gmail-ui-and-ai-features.mjs` (全部通过);
+      - `node tests/verify-full-icons.mjs` (全部通过);
+      - `node tests/test-header-and-quick-action-icons.mjs` (全部通过)。
+
 ### 系统设置class="settings-card ai-hub-card"极简核心架构重构、模型自动识别接入与暗色调UI弹窗彻底无白斑上线 (2026-09-07)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **`ai-hub-card` 极简核心架构重构与消除杂乱 (Minimalist Core Architecture)**:

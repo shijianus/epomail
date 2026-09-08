@@ -442,101 +442,151 @@
                   <Icon class="warning" icon="fe:warning" width="18" height="18"/>
                 </el-tooltip>
               </div>
-              <div class="card-title-actions">
-                <el-tag size="small" :type="setting.aiApiKey ? 'success' : 'info'" effect="light" class="ai-status-tag">
-                  <Icon :icon="setting.aiApiKey ? 'fluent:checkmark-circle-16-filled' : 'fluent:sparkle-16-filled'" width="13" height="13" style="margin-right: 4px; vertical-align: -1px;" />
-                  {{ setting.aiApiKey ? ($t('aiCustomMode') || '自定义大模型已启用') : ($t('aiCfMode') || 'Workers AI 内置免密') }}
-                </el-tag>
-                <el-button class="opt-button" size="small" type="primary" @click="openAiHubDialog" :title="$t('settings') || '设置'">
-                  <Icon icon="fluent:settings-48-regular" width="16" height="16" style="margin-right: 4px;"/>
-                  <span>{{ $t('settings') || '设置' }}</span>
-                </el-button>
-                <el-button class="btn-delete-ai" size="small" type="danger" plain @click="deleteAiConfig" :disabled="!setting.aiApiKey && !setting.aiApiUrl" :title="$t('aiResetTooltip') || '清空自定义配置并恢复免密 Workers AI'">
-                  <Icon icon="fluent:delete-20-regular" width="16" height="16" style="margin-right: 4px;"/>
-                  <span>{{ $t('aiDeleteBtn') || '清空' }}</span>
-                </el-button>
-              </div>
+              <el-tag size="small" :type="setting.aiApiKey ? 'success' : 'info'" effect="light" class="ai-status-tag">
+                <Icon :icon="setting.aiApiKey ? 'fluent:checkmark-circle-16-filled' : 'fluent:sparkle-16-filled'" width="13" height="13" style="margin-right: 4px; vertical-align: -1px;" />
+                {{ setting.aiApiKey ? ($t('aiCustomMode') || '自定义大模型已启用') : ($t('aiCfMode') || 'Workers AI 内置免密') }}
+              </el-tag>
             </div>
             <div class="card-content">
-              <!-- 1. Endpoint -->
+              <!-- Item 1: 大模型 API 接入与配置 (整合为 1 个专用操作选单，展示状态与配置按钮) -->
               <div class="setting-item">
                 <div class="title-item">
-                  <span>{{ $t('aiEndpoint') || 'Endpoint' }}</span>
-                  <el-tooltip effect="dark" :content="$t('aiEndpointHint') || '当前用于调用大模型服务的 Base URL 端点地址'">
-                    <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+                  <span>{{ $t('aiProviderTitle') || '大模型服务与 API 配置' }}</span>
+                  <el-tooltip effect="dark" :content="$t('aiProviderHint') || '配置专属 OpenAI 兼容大模型 API 密钥、接口地址及推理模型。留空时使用 Cloudflare Workers AI 内置免密服务。'">
+                    <Icon class="warning" icon="fe:warning" width="16" height="16"/>
                   </el-tooltip>
                 </div>
-                <div class="forward">
-                  <span class="ai-info-mono" :title="setting.aiApiUrl || 'https://api.openai.com/v1'">
-                    {{ setting.aiApiUrl || (setting.aiApiKey ? 'https://api.openai.com/v1 (默认)' : ($t('aiWorkersAiBuiltin') || 'Workers AI 内置网关')) }}
-                  </span>
+                <div class="forward ai-api-ctrl-right">
+                  <template v-if="setting.aiApiKey">
+                    <el-tag size="small" type="success" effect="light" class="hub-tag">
+                      <Icon icon="fluent:plug-connected-16-filled" width="13" height="13" style="margin-right: 4px; vertical-align: -1px;" />
+                      {{ setting.aiModel || 'OpenAI API' }}
+                    </el-tag>
+                    <el-tag size="small" type="primary" effect="plain" class="hub-sub-tag">{{ maskApiKey(setting.aiApiKey) }}</el-tag>
+                  </template>
+                  <template v-else>
+                    <el-tag size="small" type="info" effect="plain" class="hub-tag">
+                      <Icon icon="fluent:sparkle-16-filled" width="13" height="13" style="margin-right: 4px; vertical-align: -1px;" />
+                      {{ $t('aiCfMode') || 'Workers AI (免密)' }}
+                    </el-tag>
+                  </template>
+
+                  <!-- 整合的配置 API 按钮 (带 opt-button 类名兼顾测试) -->
+                  <el-tooltip effect="dark" :content="$t('aiHubConfigTitle') || '配置大模型 API 与自动识别接入'">
+                    <el-button class="opt-btn-inline opt-button" size="small" type="primary" @click="openAiHubDialog">
+                      <Icon icon="fluent:settings-48-regular" width="15" height="15" style="margin-right: 4px;" />
+                      <span>{{ $t('aiApiConfigBtn') || '设置 API' }}</span>
+                    </el-button>
+                  </el-tooltip>
+
+                  <!-- 快捷连通性测试按钮兼容测试用例: .ai-hub-card .forward .el-button:not(.opt-button) -->
+                  <el-tooltip effect="dark" :content="$t('aiConnectionTest') || '快速测试当前 AI 接口连通性与模型响应'">
+                    <el-button class="opt-btn-inline opt-btn-secondary opt-btn-test-ai" size="small" type="default" :loading="testingAiInHub" @click="testAiConnectionInHub">
+                      <Icon icon="fluent:flash-checkmark-24-filled" width="14" height="14" style="color: var(--accent-primary);" />
+                    </el-button>
+                  </el-tooltip>
                 </div>
               </div>
 
-              <!-- 2. API Key -->
+              <!-- Item 2: AI 智能增强与翻译功能总开关 (可以关闭) -->
               <div class="setting-item">
                 <div class="title-item">
-                  <span>{{ $t('aiApiKeyLabel') || 'API Key' }}</span>
-                  <el-tooltip effect="dark" :content="$t('aiApiKeyHint') || '用于大模型接口鉴权的密钥 (安全脱敏存储)'">
-                    <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+                  <span>{{ $t('aiEnabledLabel') || '启用 AI 智能分析与邮件翻译' }}</span>
+                  <el-tooltip effect="dark" :content="$t('aiEnabledHint') || '系统级总开关。开启后支持邮件智能全文翻译、核心摘要及自动化内容分析；可一键关闭。'">
+                    <Icon class="warning" icon="fe:warning" width="16" height="16"/>
                   </el-tooltip>
                 </div>
                 <div class="forward">
-                  <span class="ai-info-mono ai-key-masked" v-if="setting.aiApiKey">
-                    <span class="key-indicator active"></span>
-                    {{ maskApiKey(setting.aiApiKey) }}
-                  </span>
-                  <span class="ai-info-mono ai-key-unbound" v-else>
-                    <span class="key-indicator"></span>
-                    {{ $t('aiKeyUnconfigured') || '未配置 (免密 Workers AI)' }}
-                  </span>
+                  <el-switch 
+                    :active-value="1" 
+                    :inactive-value="0" 
+                    v-model="setting.aiEnabled" 
+                    @change="(val) => changeField('aiEnabled', val)"
+                  />
                 </div>
               </div>
 
-              <!-- 3. Models -->
+              <!-- Item 3: 单用户每日调用次数限制 (限制次数，0 表示不限) -->
               <div class="setting-item">
                 <div class="title-item">
-                  <span>{{ $t('aiModelsLabel') || 'Models' }}</span>
-                  <el-tooltip effect="dark" :content="$t('aiModelsHint') || '当前生效的推理大模型以及已验证的可用模型识别结果'">
-                    <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+                  <span>{{ $t('aiDailyQuotaLabel') || '单用户每日调用上限' }}</span>
+                  <el-tooltip effect="dark" :content="$t('aiDailyQuotaHint') || '每位普通注册用户每天允许发起的大模型请求次数上限，设置为 0 表示不限制。'">
+                    <Icon class="warning" icon="fe:warning" width="16" height="16"/>
                   </el-tooltip>
                 </div>
-                <div class="forward">
-                  <span class="ai-model-badge">{{ setting.aiModel || (setting.aiApiKey ? 'gpt-4o-mini' : '@cf/meta/llama-3.1-8b-instruct') }}</span>
-                  <el-tag size="small" type="success" effect="plain" class="ai-detected-tag" v-if="detectedModelsList.length">
-                    {{ detectedModelsList.length }} 个可用模型
-                  </el-tag>
+                <div class="forward ai-input-ctrl">
+                  <el-input-number 
+                    size="small" 
+                    :min="0" 
+                    :max="5000" 
+                    :step="10" 
+                    v-model="setting.aiDailyQuota" 
+                    @change="(val) => changeField('aiDailyQuota', val)"
+                    style="width: 110px;"
+                  />
+                  <span class="hub-unit-text">次/天</span>
                 </div>
               </div>
 
-              <!-- 4. API Test (内置 API 测试) -->
-              <div class="setting-item ai-test-row">
+              <!-- Item 4: 请求速率并发限制 (RPM / 次/分钟) -->
+              <div class="setting-item">
                 <div class="title-item">
-                  <span>{{ $t('aiConnectionTest') || 'API 测试' }}</span>
-                  <el-tooltip effect="dark" :content="$t('aiTestHint') || '向接口发送极低消耗探测请求，真实检验 Key 可用性并探测接受的模型列表'">
-                    <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+                  <span>{{ $t('aiRateLimitRpmLabel') || '请求速率限制 (RPM)' }}</span>
+                  <el-tooltip effect="dark" :content="$t('aiRateLimitRpmHint') || '每位用户每分钟允许发送的最高请求频率，防止脚本高频刷取接口。'">
+                    <Icon class="warning" icon="fe:warning" width="16" height="16"/>
                   </el-tooltip>
                 </div>
-                <div class="forward">
-                  <el-button size="small" :loading="testingAiInHub" @click="testAiConnectionInHub">
-                    <Icon icon="fluent:flash-checkmark-24-filled" width="15" height="15" style="margin-right: 4px; color: var(--accent-primary);" />
-                    {{ $t('aiTestBtn') || '测试 AI 连通性' }}
-                  </el-button>
+                <div class="forward ai-input-ctrl">
+                  <el-input-number 
+                    size="small" 
+                    :min="1" 
+                    :max="120" 
+                    :step="5" 
+                    v-model="setting.aiRateLimitRpm" 
+                    @change="(val) => changeField('aiRateLimitRpm', val)"
+                    style="width: 110px;"
+                  />
+                  <span class="hub-unit-text">次/分</span>
                 </div>
               </div>
 
-              <!-- 5. 实时测试与探测反馈栏 (若执行过测试) -->
-              <div class="ai-test-feedback-box" v-if="aiTestFeedback">
-                <div class="feedback-header">
-                  <Icon :icon="aiTestFeedback.success ? 'fluent:checkmark-circle-16-filled' : 'fluent:dismiss-circle-16-filled'" width="16" height="16" :class="aiTestFeedback.success ? 'icon-success' : 'icon-danger'" />
-                  <span class="feedback-msg">{{ aiTestFeedback.message }}</span>
+              <!-- Item 5: 单次最大生成 Token 上限 (Max Tokens) -->
+              <div class="setting-item">
+                <div class="title-item">
+                  <span>{{ $t('aiMaxTokensLabel') || '单次生成最大 Token' }}</span>
+                  <el-tooltip effect="dark" :content="$t('aiMaxTokensHint') || '限制单次翻译或文本分析允许生成的最大 Token 数量，避免超长输出耗尽调用额度。'">
+                    <Icon class="warning" icon="fe:warning" width="16" height="16"/>
+                  </el-tooltip>
                 </div>
-                <div class="feedback-models" v-if="aiTestFeedback.models && aiTestFeedback.models.length">
-                  <span class="detected-label">{{ $t('aiDetectedModelsTitle') || '探测到可用模型:' }}</span>
-                  <div class="models-chips-wrap">
-                    <el-tag size="small" class="mini-model-tag" v-for="m in aiTestFeedback.models.slice(0, 8)" :key="m">{{ m }}</el-tag>
-                    <el-tag size="small" type="info" class="mini-model-tag" v-if="aiTestFeedback.models.length > 8">+{{ aiTestFeedback.models.length - 8 }}</el-tag>
-                  </div>
+                <div class="forward ai-input-ctrl">
+                  <el-input-number 
+                    size="small" 
+                    :min="128" 
+                    :max="8192" 
+                    :step="256" 
+                    v-model="setting.aiMaxTokens" 
+                    @change="(val) => changeField('aiMaxTokens', val)"
+                    style="width: 110px;"
+                  />
+                  <span class="hub-unit-text">Tokens</span>
+                </div>
+              </div>
+
+              <!-- Item 6: 仅限系统管理员可用 AI (可关闭/开启) -->
+              <div class="setting-item">
+                <div class="title-item">
+                  <span>{{ $t('aiAdminOnlyLabel') || '仅限管理员使用 AI' }}</span>
+                  <el-tooltip effect="dark" :content="$t('aiAdminOnlyHint') || '开启后仅系统管理员账户可以使用 AI 增强与翻译功能，普通注册用户无法发起大模型请求。'">
+                    <Icon class="warning" icon="fe:warning" width="16" height="16"/>
+                  </el-tooltip>
+                </div>
+                <div class="forward">
+                  <el-switch 
+                    :active-value="1" 
+                    :inactive-value="0" 
+                    v-model="setting.aiAdminOnly" 
+                    @change="(val) => changeField('aiAdminOnly', val)"
+                  />
                 </div>
               </div>
             </div>
@@ -2704,13 +2754,14 @@
         <el-button type="primary" style="width: 100%;" :loading="settingLoading" @click="saveBlackList">{{ $t('save') }}</el-button>
       </el-dialog>
 
-      <!-- AI Engine & Large Language Model Modal Dialog -->
+      <!-- AI Engine & Large Language Model Modal Dialog (Expanded 860px Canvas, Zero Scrollbars) -->
       <el-dialog 
         v-model="aiHubDialogShow" 
         :title="$t('aiHubConfigTitle') || 'AI 智能引擎与大模型配置'" 
-        width="600px"
+        width="860px"
         class="ai-hub-dialog"
         :close-on-click-modal="false"
+        align-center
       >
         <el-form label-position="top" :model="aiHubForm" class="ai-hub-form">
           <el-alert
@@ -2718,56 +2769,89 @@
             type="info"
             :closable="false"
             show-icon
-            style="margin-bottom: 18px;"
+            class="ai-dialog-alert"
           />
-          <el-form-item :label="$t('aiEndpoint') || '接口地址 (Base URL)'">
-            <el-input 
-              v-model="aiHubForm.aiApiUrl" 
-              placeholder="https://api.openai.com/v1" 
-              clearable
-            />
-          </el-form-item>
-          <el-form-item :label="$t('aiApiKeyLabel') || 'API 密钥 (API Key)'">
-            <el-input 
-              v-model="aiHubForm.aiApiKey" 
-              type="password" 
-              show-password 
-              placeholder="sk-..." 
-              clearable
-            />
-          </el-form-item>
-          <el-form-item :label="$t('aiModelsLabel') || '模型标识 (Model Name)'">
-            <div class="model-input-group">
-              <el-input 
-                v-model="aiHubForm.aiModel" 
-                placeholder="gpt-4o-mini / deepseek-chat / ..." 
-                clearable
-                style="flex: 1;"
-              />
-              <el-button 
-                class="detect-models-btn" 
-                type="primary" 
-                plain 
-                :loading="fetchingModels" 
-                @click="handleFetchModelsInDialog"
-                :title="$t('aiDetectModelsHint') || '向当前接口探测并识别真实可用的模型列表'"
-              >
-                <Icon icon="fluent:sparkle-16-filled" width="14" height="14" style="margin-right: 4px;" />
-                {{ $t('aiDetectModelsBtn') || '自动识别模型' }}
-              </el-button>
-            </div>
-          </el-form-item>
 
-          <!-- 自动识别到的可用模型列表 -->
+          <div class="ai-dialog-grid">
+            <!-- Left Column: Base URL & API Key -->
+            <div class="ai-grid-col">
+              <el-form-item :label="$t('aiEndpoint') || '接口地址 (Base URL)'">
+                <el-input 
+                  v-model="aiHubForm.aiApiUrl" 
+                  placeholder="https://api.openai.com/v1" 
+                  clearable
+                />
+              </el-form-item>
+              <el-form-item :label="$t('aiApiKeyLabel') || 'API 密钥 (API Key)'">
+                <el-input 
+                  v-model="aiHubForm.aiApiKey" 
+                  type="password" 
+                  show-password 
+                  placeholder="sk-..." 
+                  clearable
+                />
+              </el-form-item>
+            </div>
+
+            <!-- Right Column: Model Name & Detect Button & Presets -->
+            <div class="ai-grid-col">
+              <el-form-item :label="$t('aiModelsLabel') || '模型标识 (Model Name)'">
+                <div class="model-input-group">
+                  <el-input 
+                    v-model="aiHubForm.aiModel" 
+                    placeholder="gpt-4o-mini / deepseek-chat / ..." 
+                    clearable
+                    style="flex: 1;"
+                  />
+                  <el-button 
+                    class="detect-models-btn" 
+                    type="primary" 
+                    plain 
+                    :loading="fetchingModels" 
+                    @click="handleFetchModelsInDialog"
+                    :title="$t('aiDetectModelsHint') || '向当前接口探测并识别真实可用的模型列表'"
+                  >
+                    <Icon icon="fluent:sparkle-16-filled" width="14" height="14" style="margin-right: 4px;" />
+                    {{ $t('aiDetectModelsBtn') || '自动识别模型' }}
+                  </el-button>
+                </div>
+              </el-form-item>
+
+              <div class="presets-quick-bar">
+                <span class="preset-label">{{ $t('aiQuickPresets') || '快速预设' }}:</span>
+                <div class="preset-buttons">
+                  <el-button link size="small" type="primary" @click="fillPresetInForm('deepseek')">DeepSeek</el-button>
+                  <el-button link size="small" type="primary" @click="fillPresetInForm('openai')">OpenAI</el-button>
+                  <el-button link size="small" type="primary" @click="fillPresetInForm('claude')">Claude</el-button>
+                  <el-button link size="small" type="primary" @click="fillPresetInForm('gemini')">Gemini</el-button>
+                  <el-button link size="small" type="primary" @click="fillPresetInForm('cf')">Cloudflare AI</el-button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 自动识别到的可用模型列表 (零滑块自然排布) -->
           <div class="detected-models-box" v-if="dialogDetectedModels.length">
             <div class="detected-box-title">
-              <Icon icon="fluent:checkmark-circle-16-filled" width="14" height="14" style="color: #10b981; margin-right: 4px;" />
-              <span>{{ $t('aiDetectedModelsTitle') || '已识别可用模型 (点击快速填入):' }}</span>
-              <span class="detected-count">({{ dialogDetectedModels.length }})</span>
+              <div class="detected-title-left">
+                <Icon icon="fluent:checkmark-circle-16-filled" width="14" height="14" style="color: #10b981; margin-right: 4px;" />
+                <span>{{ $t('aiDetectedModelsTitle') || '已识别可用模型 (点击快速填入):' }}</span>
+                <span class="detected-count">({{ dialogDetectedModels.length }})</span>
+              </div>
+              <el-button 
+                v-if="dialogDetectedModels.length > 20" 
+                link 
+                size="small" 
+                type="primary" 
+                @click="showAllDetectedModels = !showAllDetectedModels"
+                class="toggle-models-btn"
+              >
+                {{ showAllDetectedModels ? ($t('collapseAll') || '收起') : ($t('expandAll') || '展开全部') }}
+              </el-button>
             </div>
             <div class="detected-chips-container">
               <el-tag 
-                v-for="modelName in dialogDetectedModels" 
+                v-for="modelName in displayedDetectedModels" 
                 :key="modelName" 
                 size="small"
                 class="model-pick-chip"
@@ -2776,16 +2860,16 @@
               >
                 {{ modelName }}
               </el-tag>
+              <el-tag 
+                v-if="!showAllDetectedModels && dialogDetectedModels.length > 20" 
+                size="small" 
+                type="info" 
+                class="model-pick-chip more-chip"
+                @click="showAllDetectedModels = true"
+              >
+                +{{ dialogDetectedModels.length - 20 }} 更多...
+              </el-tag>
             </div>
-          </div>
-
-          <div class="presets-quick-bar">
-            <span class="preset-label">{{ $t('aiQuickPresets') || '快速预设' }}:</span>
-            <el-button link size="small" type="primary" @click="fillPresetInForm('deepseek')">DeepSeek</el-button>
-            <el-button link size="small" type="primary" @click="fillPresetInForm('openai')">OpenAI</el-button>
-            <el-button link size="small" type="primary" @click="fillPresetInForm('claude')">Claude (OneAPI)</el-button>
-            <el-button link size="small" type="primary" @click="fillPresetInForm('gemini')">Gemini (OneAPI)</el-button>
-            <el-button link size="small" type="primary" @click="fillPresetInForm('cf')">Cloudflare AI</el-button>
           </div>
         </el-form>
         <template #footer>
@@ -2969,6 +3053,13 @@ const testingAiInHub = ref(false)
 const fetchingModels = ref(false)
 const detectedModelsList = ref([])
 const dialogDetectedModels = ref([])
+const showAllDetectedModels = ref(false)
+const displayedDetectedModels = computed(() => {
+  if (showAllDetectedModels.value) {
+    return dialogDetectedModels.value
+  }
+  return dialogDetectedModels.value.slice(0, 20)
+})
 const aiTestFeedback = ref(null)
 
 const aiHubForm = reactive({
@@ -2988,6 +3079,7 @@ const openAiHubDialog = () => {
   aiHubForm.aiApiKey = setting.value?.aiApiKey || ''
   aiHubForm.aiApiUrl = setting.value?.aiApiUrl || ''
   aiHubForm.aiModel = setting.value?.aiModel || ''
+  showAllDetectedModels.value = false
   if (dialogDetectedModels.value.length === 0 && detectedModelsList.value.length > 0) {
     dialogDetectedModels.value = [...detectedModelsList.value]
   }
@@ -2999,6 +3091,7 @@ const clearFormInDialog = () => {
   aiHubForm.aiApiUrl = ''
   aiHubForm.aiModel = ''
   dialogDetectedModels.value = []
+  showAllDetectedModels.value = false
 }
 
 const selectModelInDialog = (modelName) => {
@@ -5319,7 +5412,7 @@ function editSetting(settingForm, refreshStatus = true) {
 }
 
 
-:deep(.el-dialog:not(.storage-config-dialog):not(.db-domains-dialog):not(.storage-scan-dialog):not(.s3-config-dialog):not(.db-config-dialog):not(.attachment-rule-dialog):not(.welcome-dialog-canvas):not(.notice-popup):not(.auth-prompt-dialog):not(.resend-table)) {
+:deep(.el-dialog:not(.storage-config-dialog):not(.db-domains-dialog):not(.storage-scan-dialog):not(.s3-config-dialog):not(.db-config-dialog):not(.attachment-rule-dialog):not(.welcome-dialog-canvas):not(.notice-popup):not(.auth-prompt-dialog):not(.resend-table):not(.ai-hub-dialog)) {
   width: 400px !important;
   @media (max-width: 440px) {
     width: calc(100% - 40px) !important;
@@ -5333,9 +5426,10 @@ function editSetting(settingForm, refreshStatus = true) {
 :deep(.db-config-dialog.el-dialog),
 :deep(.attachment-rule-dialog.el-dialog),
 :deep(.storage-config-dialog.storage-scan-dialog.el-dialog),
-:deep(.storage-scan-dialog.el-dialog) {
-  width: min(880px, calc(100vw - 32px)) !important;
-  max-width: min(880px, calc(100vw - 32px)) !important;
+:deep(.storage-scan-dialog.el-dialog),
+:deep(.ai-hub-dialog.el-dialog) {
+  width: min(860px, calc(100vw - 32px)) !important;
+  max-width: min(860px, calc(100vw - 32px)) !important;
   background: var(--el-bg-color, #ffffff) !important;
   background-color: var(--el-bg-color, #ffffff) !important;
   border: 1px solid var(--el-border-color-lighter, #e2e8f0) !important;
@@ -5358,7 +5452,8 @@ function editSetting(settingForm, refreshStatus = true) {
 :deep(.s3-config-dialog .el-dialog__header),
 :deep(.db-config-dialog .el-dialog__header),
 :deep(.db-domains-dialog .el-dialog__header),
-:deep(.storage-scan-dialog .el-dialog__header) {
+:deep(.storage-scan-dialog .el-dialog__header),
+:deep(.ai-hub-dialog .el-dialog__header) {
   background: var(--el-bg-color, #ffffff) !important;
   border-bottom: 1px solid var(--el-border-color-lighter, #e2e8f0) !important;
   padding: 14px 20px !important;
@@ -5370,7 +5465,8 @@ function editSetting(settingForm, refreshStatus = true) {
 :deep(.db-config-dialog .el-dialog__body),
 :deep(.db-domains-dialog .el-dialog__body),
 :deep(.storage-scan-dialog .el-dialog__body),
-:deep(.attachment-rule-dialog .el-dialog__body) {
+:deep(.attachment-rule-dialog .el-dialog__body),
+:deep(.ai-hub-dialog .el-dialog__body) {
   background: var(--el-bg-color, #ffffff) !important;
   padding: 16px 20px !important;
   overflow-y: visible !important;
@@ -5382,7 +5478,8 @@ function editSetting(settingForm, refreshStatus = true) {
 :deep(.s3-config-dialog .el-dialog__footer),
 :deep(.db-config-dialog .el-dialog__footer),
 :deep(.db-domains-dialog .el-dialog__footer),
-:deep(.storage-scan-dialog .el-dialog__footer) {
+:deep(.storage-scan-dialog .el-dialog__footer),
+:deep(.ai-hub-dialog .el-dialog__footer) {
   background: var(--el-bg-color, #ffffff) !important;
   border-top: 1px solid var(--el-border-color-lighter, #e2e8f0) !important;
   padding: 12px 20px !important;
@@ -7729,25 +7826,78 @@ form .el-button {
     gap: 6px;
   }
 
-  .card-title-actions {
-    margin-left: auto;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-wrap: wrap;
+  .ai-status-tag {
+    font-weight: 500;
+    border-radius: 6px;
+  }
 
-    .ai-status-tag {
-      font-weight: 500;
+  .ai-api-ctrl-right,
+  .ai-input-ctrl {
+    display: flex !important;
+    justify-content: flex-end !important;
+    align-items: center !important;
+    gap: 8px !important;
+    flex-wrap: wrap !important;
+    margin-left: auto !important;
+
+    .hub-tag {
+      font-size: 12px;
+      padding: 0 8px;
+      height: 26px;
       border-radius: 6px;
     }
 
-    .opt-button,
-    .btn-delete-ai {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
+    .hub-sub-tag {
+      font-family: ui-monospace, SFMono-Regular, monospace;
+      font-size: 11px;
+      padding: 0 6px;
+      height: 22px;
+      border-radius: 4px;
+    }
+
+    .hub-unit-text {
+      font-size: 12px;
+      color: var(--el-text-color-secondary);
       font-weight: 500;
-      border-radius: 6px;
+      user-select: none;
+    }
+
+    .opt-button {
+      display: inline-flex !important;
+      align-items: center !important;
+      gap: 4px !important;
+      font-weight: 500 !important;
+      border-radius: 6px !important;
+      height: 28px !important;
+      padding: 0 10px !important;
+    }
+
+    .el-button.opt-btn-inline {
+      height: 28px !important;
+      margin: 0 !important;
+      border-radius: 6px !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      box-shadow: none !important;
+
+      &.opt-btn-test-ai {
+        width: 28px !important;
+        min-width: 28px !important;
+        padding: 0 !important;
+      }
+    }
+
+    .el-button.opt-btn-secondary {
+      background: var(--el-fill-color-light) !important;
+      border-color: var(--el-border-color) !important;
+      color: var(--el-text-color-primary) !important;
+
+      &:hover {
+        background: var(--el-fill-color) !important;
+        border-color: var(--el-color-primary) !important;
+        color: var(--el-color-primary) !important;
+      }
     }
   }
 
@@ -7797,73 +7947,26 @@ form .el-button {
     border-radius: 6px;
     border: 1px solid var(--el-border-color-lighter);
   }
-
-  .ai-detected-tag {
-    margin-left: 8px;
-    font-size: 11px;
-    border-radius: 6px;
-  }
-
-  .ai-test-row {
-    margin-top: 2px;
-  }
-
-  .ai-test-feedback-box {
-    margin-top: 10px;
-    padding: 10px 14px;
-    background: var(--el-fill-color-light);
-    border: 1px solid var(--el-border-color-lighter);
-    border-radius: 8px;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-
-    .feedback-header {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 12.5px;
-      font-weight: 500;
-
-      .icon-success {
-        color: var(--el-color-success, #10b981);
-      }
-      .icon-danger {
-        color: var(--el-color-danger, #ef4444);
-      }
-      .feedback-msg {
-        color: var(--el-text-color-primary);
-      }
-    }
-
-    .feedback-models {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-      margin-top: 2px;
-
-      .detected-label {
-        font-size: 11.5px;
-        color: var(--el-text-color-secondary);
-      }
-
-      .models-chips-wrap {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 4px;
-
-        .mini-model-tag {
-          font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-          font-size: 11px;
-          border-radius: 4px;
-        }
-      }
-    }
-  }
 }
 
-/* Dialog Scoped Details */
+/* Dialog Scoped Details (Zero Scrollbars, Expanded 860px Canvas) */
 .ai-hub-form {
+  .ai-dialog-alert {
+    margin-bottom: 18px;
+  }
+
+  .ai-dialog-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    align-items: start;
+
+    @media (max-width: 680px) {
+      grid-template-columns: 1fr;
+      gap: 12px;
+    }
+  }
+
   .model-input-group {
     display: flex;
     align-items: center;
@@ -7877,14 +7980,16 @@ form .el-button {
   }
 
   .detected-models-box {
-    margin: 10px 0 16px 0;
-    padding: 10px 12px;
+    margin: 16px 0 0 0;
+    padding: 12px 14px;
     background: var(--el-fill-color-light);
     border: 1px solid var(--el-border-color-lighter);
     border-radius: 8px;
     display: flex;
     flex-direction: column;
     gap: 8px;
+    overflow: visible !important;
+    max-height: none !important;
 
     .detected-box-title {
       font-size: 12px;
@@ -7892,10 +7997,21 @@ form .el-button {
       color: var(--el-text-color-primary);
       display: flex;
       align-items: center;
+      justify-content: space-between;
+
+      .detected-title-left {
+        display: flex;
+        align-items: center;
+      }
 
       .detected-count {
         margin-left: 4px;
         color: var(--el-text-color-secondary);
+      }
+
+      .toggle-models-btn {
+        font-size: 12px;
+        padding: 0 4px;
       }
     }
 
@@ -7903,9 +8019,9 @@ form .el-button {
       display: flex;
       flex-wrap: wrap;
       gap: 6px;
-      max-height: 120px;
-      overflow-y: auto;
-      padding: 2px;
+      max-height: none !important;
+      overflow: visible !important;
+      padding: 2px 0;
 
       .model-pick-chip {
         cursor: pointer;
@@ -7925,6 +8041,11 @@ form .el-button {
           color: #ffffff;
           border-color: var(--accent-primary, #6366f1);
         }
+
+        &.more-chip {
+          border-style: dashed;
+          cursor: pointer;
+        }
       }
     }
   }
@@ -7933,8 +8054,8 @@ form .el-button {
     display: flex;
     align-items: center;
     flex-wrap: wrap;
-    gap: 6px;
-    margin-top: 10px;
+    gap: 8px;
+    margin-top: 4px;
     padding: 8px 12px;
     background: var(--el-fill-color-light);
     border-radius: 8px;
@@ -7944,6 +8065,12 @@ form .el-button {
       font-size: 12px;
       color: var(--el-text-color-secondary);
       font-weight: 500;
+    }
+
+    .preset-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
     }
   }
 }
@@ -7980,10 +8107,10 @@ html.dark .el-dialog.storage-scan-dialog {
   background: #111827 !important;
 }
 
-/* Epomail AI Hub Dialog Dedicated Responsive Styling (Zero White Bleeding in Dark Mode) */
+/* Epomail AI Hub Dialog Dedicated Responsive Styling (Expanded 860px Canvas, Zero Scrollbars & Zero White Bleeding) */
 .el-dialog.ai-hub-dialog {
-  width: min(620px, calc(100vw - 32px)) !important;
-  max-width: min(620px, calc(100vw - 32px)) !important;
+  width: min(860px, calc(100vw - 32px)) !important;
+  max-width: min(860px, calc(100vw - 32px)) !important;
   background-color: #ffffff !important;
   background: #ffffff !important;
   border: 1px solid #e2e8f0 !important;
@@ -7998,7 +8125,7 @@ html.dark .el-dialog.storage-scan-dialog {
   background-color: #ffffff !important;
   background: #ffffff !important;
   border-bottom: 1px solid #e2e8f0 !important;
-  padding: 16px 22px !important;
+  padding: 16px 24px !important;
   margin-right: 0 !important;
   border-top-left-radius: 14px !important;
   border-top-right-radius: 14px !important;
@@ -8013,18 +8140,35 @@ html.dark .el-dialog.storage-scan-dialog {
 .ai-hub-dialog .el-dialog__body {
   background-color: #ffffff !important;
   background: #ffffff !important;
-  padding: 20px 22px !important;
-  overflow-y: auto !important;
-  max-height: calc(85vh - 120px) !important;
+  padding: 20px 24px !important;
+  overflow-y: visible !important;
+  overflow: visible !important;
+  max-height: none !important;
+  height: auto !important;
 }
 
 .ai-hub-dialog .el-dialog__footer {
   background-color: #ffffff !important;
   background: #ffffff !important;
   border-top: 1px solid #e2e8f0 !important;
-  padding: 14px 22px !important;
+  padding: 14px 24px !important;
   border-bottom-left-radius: 14px !important;
   border-bottom-right-radius: 14px !important;
+}
+
+/* ZERO-SCROLLBAR ENFORCEMENT FOR AI HUB DIALOG */
+.ai-hub-dialog ::-webkit-scrollbar,
+.ai-hub-dialog .el-dialog__body::-webkit-scrollbar,
+.ai-hub-dialog .detected-chips-container::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+.ai-hub-dialog,
+.ai-hub-dialog .el-dialog__body,
+.ai-hub-dialog .detected-chips-container {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
 }
 
 /* HTML.DARK STRICT OVERRIDES FOR AI HUB DIALOG - 100% ELIMINATE WHITE BACKGROUND */
@@ -8049,6 +8193,10 @@ html.dark .ai-hub-dialog .el-dialog__body {
   background-color: #111827 !important;
   background: #111827 !important;
   color: #e5e7eb !important;
+  overflow-y: visible !important;
+  overflow: visible !important;
+  max-height: none !important;
+  height: auto !important;
 }
 
 html.dark .ai-hub-dialog .el-dialog__footer {
