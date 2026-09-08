@@ -1317,6 +1317,23 @@ const zh = {
     aiProviderHint: '留空 API Key 时将自动免密调用 Cloudflare Workers AI 专属绑定或公共引擎保底。配置后优先请求您的专属大模型服务。',
     aiTestSuccess: 'AI 连通性测试成功！',
     aiTestFail: 'AI 连通性测试失败，请检查密钥与接口地址。',
+    aiEndpoint: '接口端点 (Endpoint)',
+    aiApiKeyLabel: '鉴权密钥 (API Key)',
+    aiModelsLabel: '接入模型 (Models)',
+    aiDeleteBtn: '清空重置',
+    aiResetTooltip: '清空自定义配置并恢复内置免密 Workers AI',
+    aiResetConfirm: '确定要清空自定义大模型配置吗？清空后将恢复为系统内置免密 Workers AI。',
+    aiResetSuccess: '已清空自定义大模型配置，恢复免密模式',
+    aiDetectModelsBtn: '自动识别模型',
+    aiDetectModelsHint: '向当前配置的接口探测并列举真实可接入的模型',
+    aiDetectSuccess: '已识别可用模型',
+    aiDetectFailed: '未识别到可用模型列表，请手动填入模型标识',
+    aiDetectedModelsTitle: '已探测可用模型 (点击快速填入):',
+    aiKeyConfigured: '已配置私有密钥',
+    aiKeyUnconfigured: '未配置 (免密 Workers AI)',
+    aiDefaultEndpoint: '默认官方端点',
+    aiWorkersAiBuiltin: 'Workers AI 内置网关',
+    aiTestFeedback: '测试与探测结果',
     close: '关闭'
 }
 export default zh

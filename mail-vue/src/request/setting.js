@@ -51,3 +51,7 @@ export function cleanupStorage() {
 export function testAiSetting(params) {
     return http.post('/setting/ai/test', params)
 }
+
+export function fetchAiModels(params) {
+    return http.post('/setting/ai/models', params)
+}

@@ -442,30 +442,80 @@
                   <Icon class="warning" icon="fe:warning" width="18" height="18"/>
                 </el-tooltip>
               </div>
-              <el-tag size="small" :type="setting.aiApiKey ? 'success' : 'info'" effect="light" class="ai-status-tag">
-                <Icon :icon="setting.aiApiKey ? 'fluent:checkmark-circle-16-filled' : 'fluent:sparkle-16-filled'" width="13" height="13" style="margin-right: 4px; vertical-align: -1px;" />
-                {{ setting.aiApiKey ? ($t('aiCustomMode') || '自定义大模型已启用') : ($t('aiCfMode') || 'Workers AI 内置免密') }}
-              </el-tag>
+              <div class="card-title-actions">
+                <el-tag size="small" :type="setting.aiApiKey ? 'success' : 'info'" effect="light" class="ai-status-tag">
+                  <Icon :icon="setting.aiApiKey ? 'fluent:checkmark-circle-16-filled' : 'fluent:sparkle-16-filled'" width="13" height="13" style="margin-right: 4px; vertical-align: -1px;" />
+                  {{ setting.aiApiKey ? ($t('aiCustomMode') || '自定义大模型已启用') : ($t('aiCfMode') || 'Workers AI 内置免密') }}
+                </el-tag>
+                <el-button class="opt-button" size="small" type="primary" @click="openAiHubDialog" :title="$t('settings') || '设置'">
+                  <Icon icon="fluent:settings-48-regular" width="16" height="16" style="margin-right: 4px;"/>
+                  <span>{{ $t('settings') || '设置' }}</span>
+                </el-button>
+                <el-button class="btn-delete-ai" size="small" type="danger" plain @click="deleteAiConfig" :disabled="!setting.aiApiKey && !setting.aiApiUrl" :title="$t('aiResetTooltip') || '清空自定义配置并恢复免密 Workers AI'">
+                  <Icon icon="fluent:delete-20-regular" width="16" height="16" style="margin-right: 4px;"/>
+                  <span>{{ $t('aiDeleteBtn') || '清空' }}</span>
+                </el-button>
+              </div>
             </div>
             <div class="card-content">
+              <!-- 1. Endpoint -->
               <div class="setting-item">
                 <div class="title-item">
-                  <span>{{ $t('aiProviderTitle') || '大模型接入状态' }}</span>
-                  <el-tooltip effect="dark" :content="$t('aiProviderHint')">
+                  <span>{{ $t('aiEndpoint') || 'Endpoint' }}</span>
+                  <el-tooltip effect="dark" :content="$t('aiEndpointHint') || '当前用于调用大模型服务的 Base URL 端点地址'">
                     <Icon class="warning" icon="fe:warning" width="18" height="18"/>
                   </el-tooltip>
                 </div>
                 <div class="forward">
-                  <span class="ai-model-badge">{{ setting.aiModel || 'gpt-4o-mini (@cf/llama-3.1-8b)' }}</span>
-                  <el-button class="opt-button" size="small" type="primary" @click="openAiHubDialog">
-                    <Icon icon="fluent:settings-48-regular" width="18" height="18"/>
-                  </el-button>
+                  <span class="ai-info-mono" :title="setting.aiApiUrl || 'https://api.openai.com/v1'">
+                    {{ setting.aiApiUrl || (setting.aiApiKey ? 'https://api.openai.com/v1 (默认)' : ($t('aiWorkersAiBuiltin') || 'Workers AI 内置网关')) }}
+                  </span>
                 </div>
               </div>
 
+              <!-- 2. API Key -->
               <div class="setting-item">
                 <div class="title-item">
-                  <span>{{ $t('aiConnectionTest') || 'AI 连通性测试' }}</span>
+                  <span>{{ $t('aiApiKeyLabel') || 'API Key' }}</span>
+                  <el-tooltip effect="dark" :content="$t('aiApiKeyHint') || '用于大模型接口鉴权的密钥 (安全脱敏存储)'">
+                    <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+                  </el-tooltip>
+                </div>
+                <div class="forward">
+                  <span class="ai-info-mono ai-key-masked" v-if="setting.aiApiKey">
+                    <span class="key-indicator active"></span>
+                    {{ maskApiKey(setting.aiApiKey) }}
+                  </span>
+                  <span class="ai-info-mono ai-key-unbound" v-else>
+                    <span class="key-indicator"></span>
+                    {{ $t('aiKeyUnconfigured') || '未配置 (免密 Workers AI)' }}
+                  </span>
+                </div>
+              </div>
+
+              <!-- 3. Models -->
+              <div class="setting-item">
+                <div class="title-item">
+                  <span>{{ $t('aiModelsLabel') || 'Models' }}</span>
+                  <el-tooltip effect="dark" :content="$t('aiModelsHint') || '当前生效的推理大模型以及已验证的可用模型识别结果'">
+                    <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+                  </el-tooltip>
+                </div>
+                <div class="forward">
+                  <span class="ai-model-badge">{{ setting.aiModel || (setting.aiApiKey ? 'gpt-4o-mini' : '@cf/meta/llama-3.1-8b-instruct') }}</span>
+                  <el-tag size="small" type="success" effect="plain" class="ai-detected-tag" v-if="detectedModelsList.length">
+                    {{ detectedModelsList.length }} 个可用模型
+                  </el-tag>
+                </div>
+              </div>
+
+              <!-- 4. API Test (内置 API 测试) -->
+              <div class="setting-item ai-test-row">
+                <div class="title-item">
+                  <span>{{ $t('aiConnectionTest') || 'API 测试' }}</span>
+                  <el-tooltip effect="dark" :content="$t('aiTestHint') || '向接口发送极低消耗探测请求，真实检验 Key 可用性并探测接受的模型列表'">
+                    <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+                  </el-tooltip>
                 </div>
                 <div class="forward">
                   <el-button size="small" :loading="testingAiInHub" @click="testAiConnectionInHub">
@@ -475,16 +525,18 @@
                 </div>
               </div>
 
-              <div class="setting-item quick-presets-row">
-                <div class="title-item">
-                  <span>{{ $t('aiQuickPresets') || '常用大模型预设' }}</span>
+              <!-- 5. 实时测试与探测反馈栏 (若执行过测试) -->
+              <div class="ai-test-feedback-box" v-if="aiTestFeedback">
+                <div class="feedback-header">
+                  <Icon :icon="aiTestFeedback.success ? 'fluent:checkmark-circle-16-filled' : 'fluent:dismiss-circle-16-filled'" width="16" height="16" :class="aiTestFeedback.success ? 'icon-success' : 'icon-danger'" />
+                  <span class="feedback-msg">{{ aiTestFeedback.message }}</span>
                 </div>
-                <div class="ai-presets-chips">
-                  <el-tag size="small" class="preset-chip" @click="applyAiPreset('deepseek')">DeepSeek</el-tag>
-                  <el-tag size="small" class="preset-chip" @click="applyAiPreset('openai')">OpenAI</el-tag>
-                  <el-tag size="small" class="preset-chip" @click="applyAiPreset('claude')">Claude</el-tag>
-                  <el-tag size="small" class="preset-chip" @click="applyAiPreset('gemini')">Gemini</el-tag>
-                  <el-tag size="small" class="preset-chip" @click="applyAiPreset('cf')">Cloudflare AI</el-tag>
+                <div class="feedback-models" v-if="aiTestFeedback.models && aiTestFeedback.models.length">
+                  <span class="detected-label">{{ $t('aiDetectedModelsTitle') || '探测到可用模型:' }}</span>
+                  <div class="models-chips-wrap">
+                    <el-tag size="small" class="mini-model-tag" v-for="m in aiTestFeedback.models.slice(0, 8)" :key="m">{{ m }}</el-tag>
+                    <el-tag size="small" type="info" class="mini-model-tag" v-if="aiTestFeedback.models.length > 8">+{{ aiTestFeedback.models.length - 8 }}</el-tag>
+                  </div>
                 </div>
               </div>
             </div>
@@ -2656,7 +2708,7 @@
       <el-dialog 
         v-model="aiHubDialogShow" 
         :title="$t('aiHubConfigTitle') || 'AI 智能引擎与大模型配置'" 
-        width="560px"
+        width="600px"
         class="ai-hub-dialog"
         :close-on-click-modal="false"
       >
@@ -2668,7 +2720,14 @@
             show-icon
             style="margin-bottom: 18px;"
           />
-          <el-form-item :label="$t('aiApiKey') || 'API 密钥 (API Key)'">
+          <el-form-item :label="$t('aiEndpoint') || '接口地址 (Base URL)'">
+            <el-input 
+              v-model="aiHubForm.aiApiUrl" 
+              placeholder="https://api.openai.com/v1" 
+              clearable
+            />
+          </el-form-item>
+          <el-form-item :label="$t('aiApiKeyLabel') || 'API 密钥 (API Key)'">
             <el-input 
               v-model="aiHubForm.aiApiKey" 
               type="password" 
@@ -2677,20 +2736,49 @@
               clearable
             />
           </el-form-item>
-          <el-form-item :label="$t('aiApiUrl') || '接口地址 (Base URL)'">
-            <el-input 
-              v-model="aiHubForm.aiApiUrl" 
-              placeholder="https://api.openai.com/v1" 
-              clearable
-            />
+          <el-form-item :label="$t('aiModelsLabel') || '模型标识 (Model Name)'">
+            <div class="model-input-group">
+              <el-input 
+                v-model="aiHubForm.aiModel" 
+                placeholder="gpt-4o-mini / deepseek-chat / ..." 
+                clearable
+                style="flex: 1;"
+              />
+              <el-button 
+                class="detect-models-btn" 
+                type="primary" 
+                plain 
+                :loading="fetchingModels" 
+                @click="handleFetchModelsInDialog"
+                :title="$t('aiDetectModelsHint') || '向当前接口探测并识别真实可用的模型列表'"
+              >
+                <Icon icon="fluent:sparkle-16-filled" width="14" height="14" style="margin-right: 4px;" />
+                {{ $t('aiDetectModelsBtn') || '自动识别模型' }}
+              </el-button>
+            </div>
           </el-form-item>
-          <el-form-item :label="$t('aiModel') || '模型标识 (Model Name)'">
-            <el-input 
-              v-model="aiHubForm.aiModel" 
-              placeholder="gpt-4o-mini / deepseek-chat / claude-3-5-haiku-20241022" 
-              clearable
-            />
-          </el-form-item>
+
+          <!-- 自动识别到的可用模型列表 -->
+          <div class="detected-models-box" v-if="dialogDetectedModels.length">
+            <div class="detected-box-title">
+              <Icon icon="fluent:checkmark-circle-16-filled" width="14" height="14" style="color: #10b981; margin-right: 4px;" />
+              <span>{{ $t('aiDetectedModelsTitle') || '已识别可用模型 (点击快速填入):' }}</span>
+              <span class="detected-count">({{ dialogDetectedModels.length }})</span>
+            </div>
+            <div class="detected-chips-container">
+              <el-tag 
+                v-for="modelName in dialogDetectedModels" 
+                :key="modelName" 
+                size="small"
+                class="model-pick-chip"
+                :class="{ 'is-selected': aiHubForm.aiModel === modelName }"
+                @click="selectModelInDialog(modelName)"
+              >
+                {{ modelName }}
+              </el-tag>
+            </div>
+          </div>
+
           <div class="presets-quick-bar">
             <span class="preset-label">{{ $t('aiQuickPresets') || '快速预设' }}:</span>
             <el-button link size="small" type="primary" @click="fillPresetInForm('deepseek')">DeepSeek</el-button>
@@ -2702,10 +2790,16 @@
         </el-form>
         <template #footer>
           <div class="dialog-footer" style="display: flex; justify-content: space-between; align-items: center;">
-            <el-button :loading="testingAiInHub" @click="testAiConnectionInHub">
-              <Icon icon="fluent:flash-checkmark-24-filled" width="14" height="14" style="margin-right: 4px;" />
-              {{ $t('aiTestBtn') || '测试连通性' }}
-            </el-button>
+            <div class="footer-left" style="display: flex; align-items: center; gap: 8px;">
+              <el-button :loading="testingAiInHub" @click="testAiConnectionInHub">
+                <Icon icon="fluent:flash-checkmark-24-filled" width="14" height="14" style="margin-right: 4px;" />
+                {{ $t('aiTestBtn') || '测试连通性' }}
+              </el-button>
+              <el-button link type="danger" size="small" @click="clearFormInDialog">
+                <Icon icon="fluent:delete-20-regular" width="14" height="14" style="margin-right: 2px;" />
+                {{ $t('aiDeleteBtn') || '清空' }}
+              </el-button>
+            </div>
             <div>
               <el-button @click="aiHubDialogShow = false">{{ $t('cancel') || '取消' }}</el-button>
               <el-button type="primary" :loading="settingLoading" @click="saveAiHubConfig">
@@ -2722,7 +2816,7 @@
 
 <script setup>
 import {computed, defineOptions, nextTick, reactive, ref} from "vue";
-import {deleteBackground, setBackground, setBlackList, settingQuery, settingSet, sendWelcomeEmail, testS3Setting, getDbStatus, testDbSetting, scanStorage, cleanupStorage, testAiSetting} from "@/request/setting.js";
+import {deleteBackground, setBackground, setBlackList, settingQuery, settingSet, sendWelcomeEmail, testS3Setting, getDbStatus, testDbSetting, scanStorage, cleanupStorage, testAiSetting, fetchAiModels} from "@/request/setting.js";
 import { testTelegramBot } from "@/request/my.js";
 import {useSettingStore} from "@/store/setting.js";
 import {useUiStore} from "@/store/ui.js";
@@ -2872,17 +2966,102 @@ const s3TestResult = ref(null)
 
 const aiHubDialogShow = ref(false)
 const testingAiInHub = ref(false)
+const fetchingModels = ref(false)
+const detectedModelsList = ref([])
+const dialogDetectedModels = ref([])
+const aiTestFeedback = ref(null)
+
 const aiHubForm = reactive({
   aiApiKey: '',
   aiApiUrl: '',
   aiModel: ''
 })
 
+const maskApiKey = (key) => {
+  if (!key) return ''
+  const trimmed = key.trim()
+  if (trimmed.length <= 8) return '••••••••'
+  return `${trimmed.slice(0, 3)}••••••••${trimmed.slice(-4)}`
+}
+
 const openAiHubDialog = () => {
   aiHubForm.aiApiKey = setting.value?.aiApiKey || ''
   aiHubForm.aiApiUrl = setting.value?.aiApiUrl || ''
   aiHubForm.aiModel = setting.value?.aiModel || ''
+  if (dialogDetectedModels.value.length === 0 && detectedModelsList.value.length > 0) {
+    dialogDetectedModels.value = [...detectedModelsList.value]
+  }
   aiHubDialogShow.value = true
+}
+
+const clearFormInDialog = () => {
+  aiHubForm.aiApiKey = ''
+  aiHubForm.aiApiUrl = ''
+  aiHubForm.aiModel = ''
+  dialogDetectedModels.value = []
+}
+
+const selectModelInDialog = (modelName) => {
+  aiHubForm.aiModel = modelName
+}
+
+const handleFetchModelsInDialog = () => {
+  fetchingModels.value = true
+  fetchAiModels({
+    aiApiKey: (aiHubForm.aiApiKey || '').trim(),
+    aiApiUrl: (aiHubForm.aiApiUrl || '').trim()
+  }).then(res => {
+    fetchingModels.value = false
+    const resData = res.data || res
+    const list = Array.isArray(resData?.models) ? resData.models : []
+    dialogDetectedModels.value = list
+    detectedModelsList.value = list
+    if (!aiHubForm.aiModel && list.length > 0) {
+      aiHubForm.aiModel = list[0]
+    }
+    ElMessage({
+      type: 'success',
+      message: resData?.message || (list.length ? `成功识别到 ${list.length} 个可用模型` : '已完成模型检测'),
+      plain: true
+    })
+  }).catch(err => {
+    fetchingModels.value = false
+    const errMsg = err.response?.data?.message || err.message || t('aiDetectFailed') || '识别模型失败'
+    ElMessage({
+      type: 'warning',
+      message: errMsg,
+      plain: true
+    })
+  })
+}
+
+const deleteAiConfig = () => {
+  ElMessageBox.confirm(
+    t('aiResetConfirm') || '确定要清空自定义大模型配置吗？清空后将恢复为系统内置免密 Workers AI。',
+    t('delete') || '清空确认',
+    {
+      confirmButtonText: t('confirm') || '确定',
+      cancelButtonText: t('cancel') || '取消',
+      type: 'warning'
+    }
+  ).then(() => {
+    editSetting({
+      aiApiKey: '',
+      aiApiUrl: '',
+      aiModel: ''
+    })
+    aiHubForm.aiApiKey = ''
+    aiHubForm.aiApiUrl = ''
+    aiHubForm.aiModel = ''
+    detectedModelsList.value = []
+    dialogDetectedModels.value = []
+    aiTestFeedback.value = null
+    ElMessage({
+      type: 'success',
+      message: t('aiResetSuccess') || '已清空自定义大模型配置，恢复免密模式',
+      plain: true
+    })
+  }).catch(() => {})
 }
 
 const fillPresetInForm = (provider) => {
@@ -2912,13 +3091,29 @@ const applyAiPreset = (provider) => {
 
 const testAiConnectionInHub = () => {
   testingAiInHub.value = true
-  testAiSetting({
-    aiApiKey: aiHubForm.aiApiKey || setting.value?.aiApiKey || '',
-    aiApiUrl: aiHubForm.aiApiUrl || setting.value?.aiApiUrl || '',
-    aiModel: aiHubForm.aiModel || setting.value?.aiModel || ''
-  }).then(res => {
+  const testPayload = {
+    aiApiKey: aiHubDialogShow.value ? (aiHubForm.aiApiKey || '') : (setting.value?.aiApiKey || ''),
+    aiApiUrl: aiHubDialogShow.value ? (aiHubForm.aiApiUrl || '') : (setting.value?.aiApiUrl || ''),
+    aiModel: aiHubDialogShow.value ? (aiHubForm.aiModel || '') : (setting.value?.aiModel || '')
+  }
+  testAiSetting(testPayload).then(res => {
     testingAiInHub.value = false
-    const msg = res.data?.message || res.message || t('aiTestSuccess') || 'AI 连通性测试成功！'
+    const resData = res.data || res
+    const msg = resData?.message || t('aiTestSuccess') || 'AI 连通性测试成功！'
+    const models = Array.isArray(resData?.models) ? resData.models : []
+    if (models.length > 0) {
+      detectedModelsList.value = models
+      dialogDetectedModels.value = models
+      if (aiHubDialogShow.value && !aiHubForm.aiModel) {
+        aiHubForm.aiModel = models[0]
+      }
+    }
+    aiTestFeedback.value = {
+      success: true,
+      message: msg,
+      reply: resData?.reply || 'OK',
+      models: models
+    }
     ElMessage({
       type: 'success',
       message: msg,
@@ -2927,6 +3122,12 @@ const testAiConnectionInHub = () => {
   }).catch(err => {
     testingAiInHub.value = false
     const errMsg = err.response?.data?.message || err.message || t('aiTestFail') || '测试失败'
+    aiTestFeedback.value = {
+      success: false,
+      message: errMsg,
+      reply: '',
+      models: []
+    }
     ElMessage({
       type: 'error',
       message: errMsg,
@@ -7527,11 +7728,63 @@ form .el-button {
     align-items: center;
     gap: 6px;
   }
-  
-  .ai-status-tag {
+
+  .card-title-actions {
     margin-left: auto;
-    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+
+    .ai-status-tag {
+      font-weight: 500;
+      border-radius: 6px;
+    }
+
+    .opt-button,
+    .btn-delete-ai {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-weight: 500;
+      border-radius: 6px;
+    }
+  }
+
+  .ai-info-mono {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 12.5px;
+    color: var(--el-text-color-regular);
+    background: var(--el-fill-color-light);
+    padding: 3px 10px;
     border-radius: 6px;
+    border: 1px solid var(--el-border-color-lighter);
+    max-width: 380px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+
+    .key-indicator {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--el-color-info-light-3, #9ca3af);
+      display: inline-block;
+
+      &.active {
+        background: var(--el-color-success, #10b981);
+        box-shadow: 0 0 6px rgba(16, 185, 129, 0.4);
+      }
+    }
+
+    &.ai-key-masked {
+      color: var(--el-color-success-dark-2, #059669);
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
   }
 
   .ai-model-badge {
@@ -7545,53 +7798,153 @@ form .el-button {
     border: 1px solid var(--el-border-color-lighter);
   }
 
-  .quick-presets-row {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
+  .ai-detected-tag {
+    margin-left: 8px;
+    font-size: 11px;
+    border-radius: 6px;
   }
 
-  .ai-presets-chips {
+  .ai-test-row {
+    margin-top: 2px;
+  }
+
+  .ai-test-feedback-box {
+    margin-top: 10px;
+    padding: 10px 14px;
+    background: var(--el-fill-color-light);
+    border: 1px solid var(--el-border-color-lighter);
+    border-radius: 8px;
     display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    width: 100%;
+    flex-direction: column;
+    gap: 6px;
 
-    .preset-chip {
-      cursor: pointer;
-      border-radius: 6px;
-      font-size: 12px;
-      padding: 4px 10px;
-      background: var(--el-fill-color-light);
-      border: 1px solid var(--el-border-color);
-      color: var(--text-primary);
-      transition: all 0.2s ease;
+    .feedback-header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12.5px;
+      font-weight: 500;
 
-      &:hover {
-        background: var(--accent-primary, #6366f1);
-        color: #ffffff;
-        border-color: var(--accent-primary, #6366f1);
-        transform: translateY(-1px);
+      .icon-success {
+        color: var(--el-color-success, #10b981);
+      }
+      .icon-danger {
+        color: var(--el-color-danger, #ef4444);
+      }
+      .feedback-msg {
+        color: var(--el-text-color-primary);
+      }
+    }
+
+    .feedback-models {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-top: 2px;
+
+      .detected-label {
+        font-size: 11.5px;
+        color: var(--el-text-color-secondary);
+      }
+
+      .models-chips-wrap {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+
+        .mini-model-tag {
+          font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+          font-size: 11px;
+          border-radius: 4px;
+        }
       }
     }
   }
 }
 
-.presets-quick-bar {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 6px;
-  padding: 8px 12px;
-  background: var(--el-fill-color-light);
-  border-radius: 8px;
-  border: 1px dashed var(--el-border-color);
+/* Dialog Scoped Details */
+.ai-hub-form {
+  .model-input-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
 
-  .preset-label {
-    font-size: 12px;
-    color: var(--el-text-color-secondary);
-    font-weight: 500;
+    .detect-models-btn {
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+  }
+
+  .detected-models-box {
+    margin: 10px 0 16px 0;
+    padding: 10px 12px;
+    background: var(--el-fill-color-light);
+    border: 1px solid var(--el-border-color-lighter);
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+
+    .detected-box-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--el-text-color-primary);
+      display: flex;
+      align-items: center;
+
+      .detected-count {
+        margin-left: 4px;
+        color: var(--el-text-color-secondary);
+      }
+    }
+
+    .detected-chips-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      max-height: 120px;
+      overflow-y: auto;
+      padding: 2px;
+
+      .model-pick-chip {
+        cursor: pointer;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        font-size: 11.5px;
+        border-radius: 6px;
+        transition: all 0.2s ease;
+
+        &:hover {
+          color: var(--accent-primary, #6366f1);
+          border-color: var(--accent-primary, #6366f1);
+          transform: translateY(-1px);
+        }
+
+        &.is-selected {
+          background: var(--accent-primary, #6366f1);
+          color: #ffffff;
+          border-color: var(--accent-primary, #6366f1);
+        }
+      }
+    }
+  }
+
+  .presets-quick-bar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 10px;
+    padding: 8px 12px;
+    background: var(--el-fill-color-light);
+    border-radius: 8px;
+    border: 1px dashed var(--el-border-color);
+
+    .preset-label {
+      font-size: 12px;
+      color: var(--el-text-color-secondary);
+      font-weight: 500;
+    }
   }
 }
 
@@ -7601,8 +7954,7 @@ form .el-button {
 .el-popper.is-dark {
 }
 
-/* Epomail Storage, Database & AI Hub Dialogs Unscoped Overrides */
-.el-dialog.ai-hub-dialog,
+/* Epomail Storage & Database Hub Dialogs Unscoped Overrides */
 .el-dialog.storage-config-dialog,
 .el-dialog.s3-config-dialog,
 .el-dialog.db-config-dialog,
@@ -7626,6 +7978,129 @@ html.dark .el-dialog.attachment-rule-dialog,
 html.dark .el-dialog.storage-scan-dialog {
   background-color: #111827 !important;
   background: #111827 !important;
+}
+
+/* Epomail AI Hub Dialog Dedicated Responsive Styling (Zero White Bleeding in Dark Mode) */
+.el-dialog.ai-hub-dialog {
+  width: min(620px, calc(100vw - 32px)) !important;
+  max-width: min(620px, calc(100vw - 32px)) !important;
+  background-color: #ffffff !important;
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 14px !important;
+  box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.35) !important;
+  opacity: 1 !important;
+  overflow: visible !important;
+  margin: auto !important;
+}
+
+.ai-hub-dialog .el-dialog__header {
+  background-color: #ffffff !important;
+  background: #ffffff !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+  padding: 16px 22px !important;
+  margin-right: 0 !important;
+  border-top-left-radius: 14px !important;
+  border-top-right-radius: 14px !important;
+}
+
+.ai-hub-dialog .el-dialog__title {
+  color: var(--el-text-color-primary, #0f172a) !important;
+  font-weight: 700 !important;
+  font-size: 16px !important;
+}
+
+.ai-hub-dialog .el-dialog__body {
+  background-color: #ffffff !important;
+  background: #ffffff !important;
+  padding: 20px 22px !important;
+  overflow-y: auto !important;
+  max-height: calc(85vh - 120px) !important;
+}
+
+.ai-hub-dialog .el-dialog__footer {
+  background-color: #ffffff !important;
+  background: #ffffff !important;
+  border-top: 1px solid #e2e8f0 !important;
+  padding: 14px 22px !important;
+  border-bottom-left-radius: 14px !important;
+  border-bottom-right-radius: 14px !important;
+}
+
+/* HTML.DARK STRICT OVERRIDES FOR AI HUB DIALOG - 100% ELIMINATE WHITE BACKGROUND */
+html.dark .el-dialog.ai-hub-dialog {
+  background-color: #111827 !important;
+  background: #111827 !important;
+  border-color: #374151 !important;
+  color: #f3f4f6 !important;
+}
+
+html.dark .ai-hub-dialog .el-dialog__header {
+  background-color: #111827 !important;
+  background: #111827 !important;
+  border-bottom-color: #374151 !important;
+}
+
+html.dark .ai-hub-dialog .el-dialog__title {
+  color: #f3f4f6 !important;
+}
+
+html.dark .ai-hub-dialog .el-dialog__body {
+  background-color: #111827 !important;
+  background: #111827 !important;
+  color: #e5e7eb !important;
+}
+
+html.dark .ai-hub-dialog .el-dialog__footer {
+  background-color: #111827 !important;
+  background: #111827 !important;
+  border-top-color: #374151 !important;
+}
+
+html.dark .ai-hub-dialog .el-form-item__label {
+  color: #d1d5db !important;
+}
+
+html.dark .ai-hub-dialog .el-input__wrapper {
+  background-color: #1f2937 !important;
+  box-shadow: 0 0 0 1px #374151 inset !important;
+}
+
+html.dark .ai-hub-dialog .el-input__inner {
+  color: #f3f4f6 !important;
+}
+
+html.dark .ai-hub-dialog .presets-quick-bar {
+  background: #1f2937 !important;
+  border-color: #374151 !important;
+}
+
+html.dark .ai-hub-dialog .detected-models-box {
+  background: #1f2937 !important;
+  border-color: #374151 !important;
+}
+
+html.dark .ai-hub-dialog .model-pick-chip {
+  background: #111827 !important;
+  border-color: #374151 !important;
+  color: #93c5fd !important;
+}
+
+html.dark .ai-hub-dialog .model-pick-chip:hover,
+html.dark .ai-hub-dialog .model-pick-chip.is-selected {
+  background: #2563eb !important;
+  border-color: #3b82f6 !important;
+  color: #ffffff !important;
+}
+
+html.dark .ai-hub-dialog .el-alert--info.is-light {
+  background-color: #1e293b !important;
+  border: 1px solid #334155 !important;
+  color: #94a3b8 !important;
+}
+
+html.dark .ai-hub-dialog .el-alert__description {
+  color: #cbd5e1 !important;
 }
 
 .el-dialog.storage-config-dialog.db-domains-dialog,

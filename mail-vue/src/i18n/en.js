@@ -1325,6 +1325,23 @@ const en = {
     aiProviderHint: 'When API Key is blank, Cloudflare Workers AI or public translation is used. When configured, your private model endpoint takes priority.',
     aiTestSuccess: 'AI Connection test succeeded!',
     aiTestFail: 'AI Connection test failed. Please verify your credentials and Base URL.',
+    aiEndpoint: 'Endpoint',
+    aiApiKeyLabel: 'API Key',
+    aiModelsLabel: 'Models',
+    aiDeleteBtn: 'Delete',
+    aiResetTooltip: 'Clear custom AI credentials and restore built-in Workers AI',
+    aiResetConfirm: 'Are you sure you want to clear custom AI configuration and restore Cloudflare Workers AI?',
+    aiResetSuccess: 'Custom AI configuration cleared and restored to default',
+    aiDetectModelsBtn: 'Auto-detect Models',
+    aiDetectModelsHint: 'Detect and list available models from current API endpoint',
+    aiDetectSuccess: 'Models detected successfully',
+    aiDetectFailed: 'Could not auto-detect models list. Please enter model name manually.',
+    aiDetectedModelsTitle: 'Detected Available Models (Click to use):',
+    aiKeyConfigured: 'Private Key Configured',
+    aiKeyUnconfigured: 'Keyless (Workers AI)',
+    aiDefaultEndpoint: 'Official OpenAI Endpoint',
+    aiWorkersAiBuiltin: 'Workers AI Built-in Gateway',
+    aiTestFeedback: 'Test & Discovery Result',
     close: 'Close'
 }
 export default en

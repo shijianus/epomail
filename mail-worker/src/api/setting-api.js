@@ -75,4 +75,10 @@ app.post('/setting/ai/test', async (c) => {
 	return c.json(result.ok(testResult));
 });
 
+app.post('/setting/ai/models', async (c) => {
+	const body = await c.req.json().catch(() => ({}));
+	const modelsResult = await aiService.fetchModels(c, body);
+	return c.json(result.ok(modelsResult));
+});
+
 
