@@ -12,6 +12,26 @@
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
 
+### 系统设置ai-hub-card画风统一性深度重构、弹窗按钮挤压彻底修复与Playwright视觉审计通过上线 (2026-09-08)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **标题栏与首行画风严密对齐相邻卡片 (Strict Unified Visual Aesthetics)**:
+       - 彻底移除 `ai-hub-card` 标题特异性添加的紫色机器人图标和右上角徽章，回归与 `storage-db-card`、`user-data-control-card` 等一致的纯文本 + `(i)` Tooltip 纯粹标题栏；
+       - 重构第 1 行操作区：将原来拥挤的长方形文字按钮优化为统一规范的 28x28px 精致正方形选单按钮 (`.opt-btn-inline.opt-button`) 与测试按钮 (`.opt-btn-inline.opt-btn-test-ai`)，搭配单个紧凑状态胶囊，消除拥挤和基线不齐。
+    2. **输入框空白缺陷修复与子项禁用层级联动 (Data Fallback & Disabled Hierarchy)**:
+       - 解决 `aiDailyQuota`, `aiRateLimitRpm`, `aiMaxTokens`, `aiAdminOnly` 因 D1/Pinia 字段未初始化导致数字框渲染为 `[-] [    ] [+]` 的空白黑洞缺陷，在前后端以及 Pinia store 注入保底默认值；
+       - 为每日配额、速率 RPM、最大 Token 和管理员独占开关补充 `:disabled="setting.aiEnabled === 0"` 属性，总开关关闭时自动灰化下级限制项，形成视觉层级联动。
+    3. **弹窗按钮全宽污染根治与模型输入框/预设胶囊横向流排布 (Form Button Isolation)**:
+       - 深度根治 scoped CSS 中 `form .el-button { width: 100%; }` 对 AI 弹窗表单内按钮的侵入污染；
+       - 在 `.ai-hub-form` 与 unscoped `.ai-hub-dialog` 中严格强制 `.el-button { width: auto !important; margin-top: 0 !important; }`；
+       - 恢复 `接入模型 (Models)` 输入框弹性宽度，消除被压扁为 22px 的严重挤压缺陷；
+       - 将 5 大模型预设按钮恢复为标准内嵌小胶囊横向流式布局，彻底消除纵向单列堆叠现象。
+    4. **Playwright 全景视觉截图与端到端测试 100% 通过**:
+       - 亮色与暗色模式下分别进行高分辨率截图与人眼逐项视觉审计，确认无白斑、无挤压、无多余滑块、画风 100% 协调一致；
+       - `test-ai-hub-card-and-models-detection.mjs`、`test-sys-setting-ai-hub-and-thread-actions.mjs`、`verify-full-icons.mjs`、`test-gmail-ui-and-ai-features.mjs` 100% 全绿通过。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **Cloudflare Workers 部署 Version ID**: `5350a4ae-f4be-4bb0-9d32-67eeb1cc1e75`。
+    - **epocanvas-mail Git Commit**: `888f9a0f09aefe6615de13dc6c77b0610456c020` (Short Hash: `888f9a0`)。
+
 ### 系统设置ai-hub-card单选单统一画风重构、5大AI限制项与中心弹窗Zero-Scrollbar零滑块双列拓宽上线 (2026-09-08)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **`ai-hub-card` 单选单整合与 5 大限制控制项重构 (Single API Entry & Unified Card Aesthetics)**:

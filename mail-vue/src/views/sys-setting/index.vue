@@ -435,34 +435,26 @@
           <!-- AI Engine & Large Language Model Hub Card (AI 智能引擎与大模型接入) -->
           <div class="settings-card ai-hub-card">
             <div class="card-title">
-              <div class="title-with-badge">
-                <Icon class="ai-title-icon" icon="fluent:bot-sparkle-24-filled" width="20" height="20" style="color: #6366f1; margin-right: 6px; vertical-align: -3px;" />
-                <span>{{ $t('aiHubTitle') || 'AI 智能引擎与大模型接入' }}</span>
-                <el-tooltip effect="dark" :content="$t('aiHubTooltip') || '在系统底层接入 OpenAI 兼容协议大模型或免密使用 Cloudflare Workers AI，用于邮件智能全文翻译、内容提取与规则分析。'">
-                  <Icon class="warning" icon="fe:warning" width="18" height="18"/>
-                </el-tooltip>
-              </div>
-              <el-tag size="small" :type="setting.aiApiKey ? 'success' : 'info'" effect="light" class="ai-status-tag">
-                <Icon :icon="setting.aiApiKey ? 'fluent:checkmark-circle-16-filled' : 'fluent:sparkle-16-filled'" width="13" height="13" style="margin-right: 4px; vertical-align: -1px;" />
-                {{ setting.aiApiKey ? ($t('aiCustomMode') || '自定义大模型已启用') : ($t('aiCfMode') || 'Workers AI 内置免密') }}
-              </el-tag>
+              {{ $t('aiHubTitle') || 'AI 智能引擎与大模型接入' }}
+              <el-tooltip effect="dark" :content="$t('aiHubTooltip') || '在系统底层接入 OpenAI 兼容协议大模型或免密使用 Cloudflare Workers AI，用于邮件智能全文翻译、内容提取与规则分析。'">
+                <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+              </el-tooltip>
             </div>
             <div class="card-content">
               <!-- Item 1: 大模型 API 接入与配置 (整合为 1 个专用操作选单，展示状态与配置按钮) -->
               <div class="setting-item">
                 <div class="title-item">
-                  <span>{{ $t('aiProviderTitle') || '大模型服务与 API 配置' }}</span>
+                  <span>{{ $t('aiProviderTitle') || '大模型服务与设置 API 配置' }}</span>
                   <el-tooltip effect="dark" :content="$t('aiProviderHint') || '配置专属 OpenAI 兼容大模型 API 密钥、接口地址及推理模型。留空时使用 Cloudflare Workers AI 内置免密服务。'">
                     <Icon class="warning" icon="fe:warning" width="16" height="16"/>
                   </el-tooltip>
                 </div>
-                <div class="forward ai-api-ctrl-right">
+                <div class="forward storage-item-right ai-api-ctrl-right">
                   <template v-if="setting.aiApiKey">
                     <el-tag size="small" type="success" effect="light" class="hub-tag">
                       <Icon icon="fluent:plug-connected-16-filled" width="13" height="13" style="margin-right: 4px; vertical-align: -1px;" />
-                      {{ setting.aiModel || 'OpenAI API' }}
+                      {{ $t('aiCustom') || '自定义' }}: {{ setting.aiModel || 'OpenAI' }}
                     </el-tag>
-                    <el-tag size="small" type="primary" effect="plain" class="hub-sub-tag">{{ maskApiKey(setting.aiApiKey) }}</el-tag>
                   </template>
                   <template v-else>
                     <el-tag size="small" type="info" effect="plain" class="hub-tag">
@@ -471,18 +463,17 @@
                     </el-tag>
                   </template>
 
-                  <!-- 整合的配置 API 按钮 (带 opt-button 类名兼顾测试) -->
-                  <el-tooltip effect="dark" :content="$t('aiHubConfigTitle') || '配置大模型 API 与自动识别接入'">
-                    <el-button class="opt-btn-inline opt-button" size="small" type="primary" @click="openAiHubDialog">
-                      <Icon icon="fluent:settings-48-regular" width="15" height="15" style="margin-right: 4px;" />
-                      <span>{{ $t('aiApiConfigBtn') || '设置 API' }}</span>
-                    </el-button>
-                  </el-tooltip>
-
                   <!-- 快捷连通性测试按钮兼容测试用例: .ai-hub-card .forward .el-button:not(.opt-button) -->
                   <el-tooltip effect="dark" :content="$t('aiConnectionTest') || '快速测试当前 AI 接口连通性与模型响应'">
                     <el-button class="opt-btn-inline opt-btn-secondary opt-btn-test-ai" size="small" type="default" :loading="testingAiInHub" @click="testAiConnectionInHub">
                       <Icon icon="fluent:flash-checkmark-24-filled" width="14" height="14" style="color: var(--accent-primary);" />
+                    </el-button>
+                  </el-tooltip>
+
+                  <!-- 整合的配置 API 选单按钮: .opt-button (28x28px 与相邻卡片完全一致) -->
+                  <el-tooltip effect="dark" :content="$t('aiHubConfigTitle') || '设置 API / 配置大模型与自动识别接入'">
+                    <el-button class="opt-btn-inline opt-button" size="small" type="primary" @click="openAiHubDialog">
+                      <Icon icon="fluent:settings-48-regular" width="15" height="15" />
                     </el-button>
                   </el-tooltip>
                 </div>
@@ -520,6 +511,7 @@
                     :min="0" 
                     :max="5000" 
                     :step="10" 
+                    :disabled="setting.aiEnabled === 0"
                     v-model="setting.aiDailyQuota" 
                     @change="(val) => changeField('aiDailyQuota', val)"
                     style="width: 110px;"
@@ -542,6 +534,7 @@
                     :min="1" 
                     :max="120" 
                     :step="5" 
+                    :disabled="setting.aiEnabled === 0"
                     v-model="setting.aiRateLimitRpm" 
                     @change="(val) => changeField('aiRateLimitRpm', val)"
                     style="width: 110px;"
@@ -564,6 +557,7 @@
                     :min="128" 
                     :max="8192" 
                     :step="256" 
+                    :disabled="setting.aiEnabled === 0"
                     v-model="setting.aiMaxTokens" 
                     @change="(val) => changeField('aiMaxTokens', val)"
                     style="width: 110px;"
@@ -584,6 +578,7 @@
                   <el-switch 
                     :active-value="1" 
                     :inactive-value="0" 
+                    :disabled="setting.aiEnabled === 0"
                     v-model="setting.aiAdminOnly" 
                     @change="(val) => changeField('aiAdminOnly', val)"
                   />
@@ -3823,6 +3818,11 @@ function getSettings() {
     settingData.userTgForward = settingData.userTgForward !== undefined ? Number(settingData.userTgForward) : 1
     settingData.userEmailForward = settingData.userEmailForward !== undefined ? Number(settingData.userEmailForward) : 1
     settingData.userApiSupport = settingData.userApiSupport !== undefined ? Number(settingData.userApiSupport) : 1
+    settingData.aiEnabled = settingData.aiEnabled !== undefined && settingData.aiEnabled !== null ? Number(settingData.aiEnabled) : 1
+    settingData.aiDailyQuota = settingData.aiDailyQuota !== undefined && settingData.aiDailyQuota !== null ? Number(settingData.aiDailyQuota) : 0
+    settingData.aiRateLimitRpm = settingData.aiRateLimitRpm !== undefined && settingData.aiRateLimitRpm !== null ? Number(settingData.aiRateLimitRpm) : 60
+    settingData.aiMaxTokens = settingData.aiMaxTokens !== undefined && settingData.aiMaxTokens !== null ? Number(settingData.aiMaxTokens) : 2048
+    settingData.aiAdminOnly = settingData.aiAdminOnly !== undefined && settingData.aiAdminOnly !== null ? Number(settingData.aiAdminOnly) : 0
     setting.value = settingData
     settingStore.domainList = settingData.domainList || []
     settingStore.settings = { ...settingStore.settings, ...settingData }
@@ -7820,15 +7820,9 @@ form .el-button {
 
 /* AI Hub Card & Dialog Scoped Styles */
 .ai-hub-card {
-  .title-with-badge {
+  .card-title {
     display: flex;
     align-items: center;
-    gap: 6px;
-  }
-
-  .ai-status-tag {
-    font-weight: 500;
-    border-radius: 6px;
   }
 
   .ai-api-ctrl-right,
@@ -7845,6 +7839,8 @@ form .el-button {
       padding: 0 8px;
       height: 26px;
       border-radius: 6px;
+      display: inline-flex;
+      align-items: center;
     }
 
     .hub-sub-tag {
@@ -7862,30 +7858,18 @@ form .el-button {
       user-select: none;
     }
 
-    .opt-button {
-      display: inline-flex !important;
-      align-items: center !important;
-      gap: 4px !important;
-      font-weight: 500 !important;
-      border-radius: 6px !important;
-      height: 28px !important;
-      padding: 0 10px !important;
-    }
-
     .el-button.opt-btn-inline {
+      width: 28px !important;
+      min-width: 28px !important;
       height: 28px !important;
+      padding: 0 !important;
       margin: 0 !important;
+      font-size: 14px !important;
       border-radius: 6px !important;
       display: inline-flex !important;
       align-items: center !important;
       justify-content: center !important;
       box-shadow: none !important;
-
-      &.opt-btn-test-ai {
-        width: 28px !important;
-        min-width: 28px !important;
-        padding: 0 !important;
-      }
     }
 
     .el-button.opt-btn-secondary {
@@ -7951,6 +7935,11 @@ form .el-button {
 
 /* Dialog Scoped Details (Zero Scrollbars, Expanded 860px Canvas) */
 .ai-hub-form {
+  .el-button {
+    width: auto !important;
+    margin-top: 0 !important;
+  }
+
   .ai-dialog-alert {
     margin-bottom: 18px;
   }
@@ -7973,9 +7962,21 @@ form .el-button {
     gap: 8px;
     width: 100%;
 
+    .el-input {
+      flex: 1 1 0% !important;
+      min-width: 0 !important;
+      width: auto !important;
+    }
+
     .detect-models-btn {
-      white-space: nowrap;
-      flex-shrink: 0;
+      white-space: nowrap !important;
+      flex-shrink: 0 !important;
+      width: auto !important;
+      margin: 0 !important;
+      height: 32px !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
     }
   }
 
@@ -8012,6 +8013,8 @@ form .el-button {
       .toggle-models-btn {
         font-size: 12px;
         padding: 0 4px;
+        width: auto !important;
+        margin: 0 !important;
       }
     }
 
@@ -8055,7 +8058,7 @@ form .el-button {
     align-items: center;
     flex-wrap: wrap;
     gap: 8px;
-    margin-top: 4px;
+    margin-top: 8px;
     padding: 8px 12px;
     background: var(--el-fill-color-light);
     border-radius: 8px;
@@ -8065,12 +8068,24 @@ form .el-button {
       font-size: 12px;
       color: var(--el-text-color-secondary);
       font-weight: 500;
+      flex-shrink: 0;
     }
 
     .preset-buttons {
       display: flex;
       flex-wrap: wrap;
+      align-items: center;
       gap: 6px;
+
+      .el-button {
+        width: auto !important;
+        margin: 0 !important;
+        padding: 2px 8px !important;
+        height: 24px !important;
+        font-size: 12px !important;
+        display: inline-flex !important;
+        align-items: center !important;
+      }
     }
   }
 }
@@ -8154,6 +8169,11 @@ html.dark .el-dialog.storage-scan-dialog {
   padding: 14px 24px !important;
   border-bottom-left-radius: 14px !important;
   border-bottom-right-radius: 14px !important;
+}
+
+.ai-hub-dialog form .el-button {
+  width: auto !important;
+  margin-top: 0 !important;
 }
 
 /* ZERO-SCROLLBAR ENFORCEMENT FOR AI HUB DIALOG */

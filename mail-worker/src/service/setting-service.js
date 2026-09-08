@@ -124,6 +124,11 @@ const settingService = {
 		setting.attachmentPolicy = setting.attachmentPolicy !== undefined ? Number(setting.attachmentPolicy) : 0;
 		setting.attachmentMaxSizeMb = setting.attachmentMaxSizeMb !== undefined ? Number(setting.attachmentMaxSizeMb) : 25;
 		setting.attachmentCascadeDelete = setting.attachmentCascadeDelete !== undefined ? Number(setting.attachmentCascadeDelete) : 1;
+		setting.aiEnabled = setting.aiEnabled !== undefined && setting.aiEnabled !== null ? Number(setting.aiEnabled) : 1;
+		setting.aiDailyQuota = setting.aiDailyQuota !== undefined && setting.aiDailyQuota !== null ? Number(setting.aiDailyQuota) : 0;
+		setting.aiRateLimitRpm = setting.aiRateLimitRpm !== undefined && setting.aiRateLimitRpm !== null ? Number(setting.aiRateLimitRpm) : 60;
+		setting.aiMaxTokens = setting.aiMaxTokens !== undefined && setting.aiMaxTokens !== null ? Number(setting.aiMaxTokens) : 2048;
+		setting.aiAdminOnly = setting.aiAdminOnly !== undefined && setting.aiAdminOnly !== null ? Number(setting.aiAdminOnly) : 0;
 
 		const dbModeInfo = getDbModeInfo(c);
 		setting.isDual = dbModeInfo.isDual;
