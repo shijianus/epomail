@@ -383,6 +383,10 @@
                     </template>
                   </div>
                   <div class="gtb-right">
+                    <span v-if="isTranslatedMap[msg.emailId] && !showOriginalMap[msg.emailId]" class="gtb-status-tag">
+                      <Icon icon="fluent:sparkle-16-filled" width="13" height="13" />
+                      <span>已保留原排版翻译</span>
+                    </span>
                     <Icon icon="fluent:dismiss-16-regular" width="16" height="16" class="gtb-close" @click="closeTranslate(msg.emailId)" />
                   </div>
                 </div>
@@ -401,18 +405,9 @@
                 
               </div>
 
-              <!-- Translated Content Box -->
-              <div v-if="isTranslatedMap[msg.emailId] && !showOriginalMap[msg.emailId]" class="translated-box">
-                <div class="translated-badge">
-                  <Icon icon="fluent:sparkle-16-filled" width="14" height="14" style="color: #0284c7;" />
-                  <span>{{ $t('translatedByAi') || 'AI 智能提取并翻译' }}</span>
-                </div>
-                <div class="translated-text">{{ translatedTextMap[msg.emailId] }}</div>
-              </div>
-
-              <el-scrollbar v-else class="htm-scrollbar" :class="(!msg.attList || msg.attList.length === 0) ? 'bottom-distance' : ''">
-                <ShadowHtml class="shadow-html" :html="formatImage(msg.content)" v-if="msg.content" />
-                <pre v-else class="email-text" >{{msg.text}}</pre>
+              <el-scrollbar class="htm-scrollbar" :class="(!msg.attList || msg.attList.length === 0) ? 'bottom-distance' : ''">
+                <ShadowHtml class="shadow-html" :html="formatImage(displayedContent(msg))" v-if="msg.content || translatedHtmlMap[msg.emailId]" />
+                <pre v-else class="email-text" >{{ displayedText(msg) }}</pre>
               </el-scrollbar>
 
               <div class="att" v-if="msg.attList && msg.attList.length > 0">
@@ -1197,8 +1192,25 @@ const showTranslateMap = reactive({});
 const translatingMap = reactive({});
 const isTranslatedMap = reactive({});
 const translatedTextMap = reactive({});
+const translatedHtmlMap = reactive({});
 const showOriginalMap = reactive({});
 const targetLangMap = reactive({});
+
+const displayedContent = (msg) => {
+  if (!msg) return '';
+  if (isTranslatedMap[msg.emailId] && !showOriginalMap[msg.emailId]) {
+    return translatedHtmlMap[msg.emailId] || msg.content;
+  }
+  return msg.content;
+};
+
+const displayedText = (msg) => {
+  if (!msg) return '';
+  if (isTranslatedMap[msg.emailId] && !showOriginalMap[msg.emailId]) {
+    return translatedTextMap[msg.emailId] || msg.text;
+  }
+  return msg.text;
+};
 
 const toggleTranslateBar = (msg) => {
   const target = msg || email;
@@ -1226,8 +1238,11 @@ const handleTranslate = (msg) => {
     html: target.content || '',
     targetLang: lang
   }).then((res) => {
-    const transText = res.data?.translatedText || res.translatedText || '';
+    const data = res.data || res || {};
+    const transText = data.translatedText || '';
+    const transHtml = data.translatedHtml || '';
     translatedTextMap[id] = transText;
+    translatedHtmlMap[id] = transHtml;
     isTranslatedMap[id] = true;
     showOriginalMap[id] = false;
     ElMessage.success(t('translateSuccess') || '翻译完成');
@@ -1848,6 +1863,19 @@ const handleReportNotSpam = (emailId) => {
   .gtb-right {
     display: flex;
     align-items: center;
+
+    .gtb-status-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11.5px;
+      font-weight: 500;
+      color: #0284c7;
+      background: rgba(2, 132, 199, 0.1);
+      padding: 2px 8px;
+      border-radius: 10px;
+      margin-right: 8px;
+    }
 
     .gtb-close {
       cursor: pointer;

@@ -10,7 +10,9 @@ const KvConst = {
 	TOTP_SETUP: "totp_setup:",
 	TOTP_REPLAY: "totp_replay:",
 	WEBAUTHN_SETUP: "webauthn_setup:",
-	WEBAUTHN_PENDING: "webauthn_pending:"
+	WEBAUTHN_PENDING: "webauthn_pending:",
+	AI_DAY_USAGE: "ai_day_usage:",
+	AI_TOTAL_USAGE: "ai_total_usage"
 }
 
 export default KvConst;

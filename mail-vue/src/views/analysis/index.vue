@@ -114,6 +114,19 @@
           <div class="send-count"></div>
         </div>
       </div>
+      <div class="picture-cs picture-ai">
+        <div class="picture-cs-item">
+          <div class="title" style="display: flex; justify-content: space-between; align-items: center;">
+            <span>AI 智能引擎调用与 Token 消耗走势</span>
+            <span class="ai-stat-badge" v-if="aiTotalStats.calls > 0">15 日累计: {{ aiTotalStats.calls }} 次 · {{ aiTotalStats.tokensText }} Tokens</span>
+          </div>
+          <div class="ai-usage-line"></div>
+        </div>
+        <div class="picture-cs-item">
+          <div class="title">AI 大模型用量分布与占比</div>
+          <div class="ai-model-pie"></div>
+        </div>
+      </div>
     </div>
   </el-scrollbar>
 </template>
@@ -184,6 +197,18 @@ const emailColumnData = {
   daysData: []
 }
 
+const aiLineData = reactive({
+  xdata: [],
+  calls: [],
+  tokens: []
+})
+const aiModelData = ref([])
+const aiTotalStats = reactive({
+  calls: 0,
+  tokens: 0,
+  tokensText: '0'
+})
+
 const topic = computed(() => ({
   color: uiStore.dark ? '#E5EAF3' : '#303133',
   background: uiStore.dark ? '#141414' : '#FFFFFF',
@@ -201,6 +226,8 @@ let senderPie = null
 let increaseLine = null
 let emailColumn = null
 let sendGauge = null
+let aiUsageLine = null
+let aiModelPie = null
 let first = true
 let boxKey = ref(0)
 let senderPieLeft = window.innerWidth < 500 ? `${window.innerWidth - 110}` : '72%'
@@ -236,6 +263,18 @@ onMounted(() => {
     emailColumnData.receiveData = data.emailDayCount.receiveDayCount.map(item => item.total)
     emailColumnData.sendData = data.emailDayCount.sendDayCount.map(item => item.total)
     emailColumnData.interceptData = (data.emailDayCount.interceptDayCount || []).map(item => item.total)
+
+    if (data.aiAnalytics) {
+      aiLineData.xdata = (data.aiAnalytics.dayCount || []).map(item => dayjs(item.date).format("M.D"));
+      aiLineData.calls = (data.aiAnalytics.dayCount || []).map(item => item.calls);
+      aiLineData.tokens = (data.aiAnalytics.dayCount || []).map(item => item.tokens);
+      aiTotalStats.calls = data.aiAnalytics.totalCalls || 0;
+      aiTotalStats.tokens = data.aiAnalytics.totalTokens || 0;
+      aiTotalStats.tokensText = aiTotalStats.tokens >= 1000000
+        ? `${(aiTotalStats.tokens / 1000000).toFixed(2)}M`
+        : (aiTotalStats.tokens >= 1000 ? `${(aiTotalStats.tokens / 1000).toFixed(1)}k` : `${aiTotalStats.tokens}`);
+      aiModelData.value = data.aiAnalytics.modelRatio || [];
+    }
 
     // 计算拦截率
     const totalRecvWithHard = receiveTotal.value + numberCount.hardInterceptTotal;
@@ -300,6 +339,8 @@ function initPicture() {
     createIncreaseLine()
     createEmailColumnChart();
     createSendGauge();
+    createAiUsageLine();
+    createAiModelPie();
   })
 }
 
@@ -763,6 +804,237 @@ function createSendGauge() {
   sendGauge.setOption(option);
 }
 
+function createAiUsageLine() {
+  const dom = document.querySelector(".ai-usage-line");
+  if (!dom) return;
+  if (aiUsageLine) {
+    aiUsageLine.dispose();
+  }
+  aiUsageLine = echarts.init(dom);
+
+  const option = {
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: {
+        type: 'cross',
+        crossStyle: {
+          color: topic.value.crossColor
+        },
+        lineStyle: {
+          color: topic.value.crossColor
+        }
+      },
+      backgroundColor: topic.value.background,
+      borderColor: topic.value.splitLineColor,
+      borderWidth: 1,
+      padding: 10,
+      textStyle: {
+        color: topic.value.color
+      },
+      formatter: function (params) {
+        let title = params[0] ? params[0].name : '';
+        let str = `<div style="font-weight:600;margin-bottom:4px;">${title}</div>`;
+        params.forEach(item => {
+          const unit = item.seriesName.includes('Token') ? ' Tokens' : ' 次';
+          str += `${item.marker} ${item.seriesName}: <b>${item.value}</b>${unit}<br/>`;
+        });
+        return str;
+      }
+    },
+    legend: {
+      data: ['AI 调用次数', 'Token 消耗'],
+      textStyle: {
+        color: topic.value.color
+      },
+      top: '5',
+      right: '25'
+    },
+    grid: {
+      top: '50',
+      right: '50',
+      left: '45',
+      bottom: '35',
+      containLabel: true
+    },
+    xAxis: {
+      type: 'category',
+      data: aiLineData.xdata,
+      boundaryGap: false,
+      axisTick: { show: false },
+      axisLine: {
+        lineStyle: {
+          color: topic.value.axisColor,
+          width: 1
+        }
+      },
+      axisLabel: {
+        color: topic.value.color
+      }
+    },
+    yAxis: [
+      {
+        type: 'value',
+        name: '调用 (次)',
+        nameTextStyle: {
+          color: topic.value.color,
+          fontSize: 12
+        },
+        minInterval: 1,
+        splitLine: {
+          show: true,
+          lineStyle: {
+            color: topic.value.splitLineColor,
+            type: 'solid'
+          }
+        },
+        axisLine: {
+          show: true,
+          lineStyle: {
+            color: topic.value.axisColor
+          }
+        },
+        axisLabel: {
+          color: topic.value.color
+        }
+      },
+      {
+        type: 'value',
+        name: 'Tokens',
+        nameTextStyle: {
+          color: topic.value.color,
+          fontSize: 12
+        },
+        minInterval: 1,
+        splitLine: { show: false },
+        axisLine: {
+          show: true,
+          lineStyle: {
+            color: topic.value.axisColor
+          }
+        },
+        axisLabel: {
+          color: topic.value.color,
+          formatter: (v) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v
+        }
+      }
+    ],
+    series: [
+      {
+        name: 'AI 调用次数',
+        type: 'line',
+        smooth: true,
+        data: aiLineData.calls,
+        yAxisIndex: 0,
+        itemStyle: {
+          color: '#6366f1'
+        },
+        areaStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: 'rgba(99, 102, 241, 0.35)' },
+            { offset: 1, color: 'rgba(99, 102, 241, 0.02)' }
+          ])
+        }
+      },
+      {
+        name: 'Token 消耗',
+        type: 'line',
+        smooth: true,
+        data: aiLineData.tokens,
+        yAxisIndex: 1,
+        itemStyle: {
+          color: '#10b981'
+        },
+        lineStyle: {
+          width: 2,
+          type: 'solid'
+        },
+        areaStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: 'rgba(16, 185, 129, 0.25)' },
+            { offset: 1, color: 'rgba(16, 185, 129, 0.01)' }
+          ])
+        }
+      }
+    ]
+  };
+
+  aiUsageLine.setOption(option);
+}
+
+function createAiModelPie() {
+  const dom = document.querySelector(".ai-model-pie");
+  if (!dom) return;
+  if (aiModelPie) {
+    aiModelPie.dispose();
+  }
+  aiModelPie = echarts.init(dom);
+
+  const hasData = aiModelData.value && aiModelData.value.length > 0 && aiModelData.value.some(d => d.value > 0);
+  const pieData = hasData
+    ? aiModelData.value
+    : [{ name: '暂无 AI 调用记录', value: 0 }];
+
+  const option = {
+    tooltip: {
+      trigger: 'item',
+      backgroundColor: topic.value.background,
+      textStyle: {
+        color: topic.value.color
+      },
+      borderColor: topic.value.splitLineColor,
+      borderWidth: 1,
+      formatter: params => {
+        if (!hasData) return `暂无调用记录`;
+        return `${params.marker} ${params.name}：${params.value} 次 (${params.percent}%)`;
+      }
+    },
+    legend: {
+      type: 'scroll',
+      orient: 'vertical',
+      left: '15',
+      top: 'center',
+      textStyle: {
+        color: topic.value.color
+      },
+      formatter: function (name) {
+        return truncateTextByWidth(name, 120);
+      }
+    },
+    series: [
+      {
+        name: '模型占比',
+        type: 'pie',
+        radius: ['45%', '70%'],
+        center: ['65%', '50%'],
+        avoidLabelOverlap: false,
+        itemStyle: {
+          borderRadius: 8,
+          borderColor: topic.value.background,
+          borderWidth: 2
+        },
+        label: {
+          show: false,
+          position: 'center'
+        },
+        emphasis: {
+          label: {
+            show: hasData,
+            fontSize: 14,
+            fontWeight: 'bold',
+            color: topic.value.color,
+            formatter: '{b}\n{d}%'
+          }
+        },
+        data: pieData,
+        color: hasData
+          ? ['#6366F1', '#3CB2FF', '#10B981', '#F59E0B', '#EC4899', '#8B5CF6', '#14B8A6']
+          : [uiStore.dark ? '#374151' : '#E5E7EB']
+      }
+    ]
+  };
+
+  aiModelPie.setOption(option);
+}
 
 </script>
 <style>
@@ -897,7 +1169,7 @@ function createSendGauge() {
     display: grid;
     grid-template-columns: 500px 1fr;
     gap: 20px;
-    @media (max-width: 1620px) {
+    @media (max-width: 1200px) {
       grid-template-columns: 1fr;
     }
     @media (max-width: 1024px) {
@@ -939,7 +1211,7 @@ function createSendGauge() {
     display: grid;
     grid-template-columns: 1fr 500px;
     gap: 20px;
-    @media (max-width: 1620px) {
+    @media (max-width: 1200px) {
       grid-template-columns: 1fr;
       gap: 15px;
     }
@@ -962,7 +1234,31 @@ function createSendGauge() {
           height: 250px;
         }
       }
+
+      .ai-usage-line {
+        height: 350px;
+        @media (max-width: 767px) {
+          height: 280px;
+        }
+      }
+
+      .ai-model-pie {
+        height: 350px;
+        @media (max-width: 767px) {
+          height: 280px;
+        }
+      }
     }
+  }
+
+  .ai-stat-badge {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--el-color-primary);
+    background: var(--el-color-primary-light-9);
+    padding: 2px 10px;
+    border-radius: 12px;
+    margin-right: 15px;
   }
 }
 

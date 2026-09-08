@@ -12,6 +12,33 @@
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
 
+### 分析页AI调用与Token消耗双图对称上线、Gmail级HTML排版格式严格保留邮件翻译闭环上线 (2026-09-08)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **分析页 AI 用量双图对称重构 (Symmetric AI Analytics Charts & Responsive Grid)**:
+       - 在分析页 (`/analysis`) 底部新增标准响应式对称图表容器 `class="picture-cs picture-ai"`，与上方“邮件收发走势 + 今日发信仪表盘”行画风完美统一；
+       - **左侧图表** (`class="ai-usage-line"`): 15 日 AI 智能引擎调用量与 Token 消耗趋势双轴渐变折线/面积图（左轴为调用次数，右轴为 Token 消耗量，悬浮 Tooltip 动态展示双指标与单位）；标题右侧集成 `15 日累计: X 次 · Y Tokens` 胶囊徽章；
+       - **右侧图表** (`class="ai-model-pie"`): AI 大模型用量分布与占比环形甜甜圈图（带模型名称智能截断、多颜色映射与空状态优雅占位环）；
+       - 优化分析页响应式断点至 `1200px`，确保在 1440x900、1366x768、1920x1080 等主流桌面分辨率下双图完全左右对称排列，暗黑模式色彩一致适配。
+    2. **Gmail 级 HTML 邮件排版格式严格保留翻译 (Native Gmail-Style In-Place HTML Translation)**:
+       - 彻底根除旧版本将富文本邮件全部转为纯文本放入 `.translated-box` 抹杀排版样式的缺陷；
+       - 服务端 `aiService.translate`:
+         - 自动识别 HTML 富文本邮件，指示大模型严格遵循“100% 保持 HTML 标签、内联样式、表格、布局、属性、图片与链接不变，仅翻译人类可读的可见文本节点”；
+         - 引入 base64 图片与 `<style>` 标签占位保护器，防止巨大数据消耗 Token 及模型截断；自动剥除 markdown 代码块包裹并安全还原；
+         - 返回 `{ translatedText, translatedHtml, isHtml, model, tokens }`；
+       - 客户端 `content/index.vue`:
+         - 彻底删除破坏性 `.translated-box` 纯文本容器，邮件内容继续在 `<ShadowHtml>` 容器内无缝原地渲染，完美保留彩色标题、表格、徽章、边框等原生排版；
+         - 顶栏 Gmail 风格翻译条集成 `已保留原排版翻译` 状态胶囊，支持在“查看原文”与“查看翻译”之间无损一键来回切换。
+    3. **真实用量统计与零假数据准则 (KV Real AI Usage Tracking & Zero Fake Data)**:
+       - 在 `mail-worker/src/const/kv-const.js` 与 `ai-service.js` 中新增 `recordUsage(c, { model, tokens, calls })`；
+       - 每次翻译、连通性测试与验证码提取真实记录当日用量 (`ai_day_usage:YYYY-MM-DD`) 与历史总量 (`ai_total_usage`)，分析接口 `/api/analysis/echarts` 实时并入 `aiAnalytics` 返回；
+       - 无任何硬编码假数据，0 用量时展示真实 0 刻度与优雅空状态。
+    4. **Playwright 视觉审计与自动化测试 100% 通过**:
+       - `tests/test-ai-analysis-and-html-translate.mjs` 100% 全绿通过（验证 15 日 AI 统计数据、540px+500px 对称双图渲染、HTML 表格与样式标签保留、Gmail 翻译条交互，截图留档 `tests/audit_analysis_ai_charts_light.png`、`tests/audit_analysis_ai_charts_dark.png`、`tests/audit_email_html_translated.png`）；
+       - `tests/test-gmail-ui-and-ai-features.mjs`、`tests/test-ai-hub-card-and-models-detection.mjs`、`tests/verify-full-icons.mjs` 全部 100% 通过。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **Cloudflare Workers 部署 Version ID**: `5ba72e9b-9895-4f76-a9f1-62a88fee3854`。
+    - **epocanvas-mail Git Commit**: `218fb12997325d9106ffec2cf7b2cb4b11960703` (Short Hash: `218fb12`).
+
 ### 系统设置AI端点密钥及时联动扫描、彻底杜绝旧模型与CF残留、删除测试横幅卡片并融合下拉延时标签反馈上线 (2026-09-08)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **及时模型扫描与端点/密钥实时联动 (Real-time Scan & Zero CF Model Leakage)**:

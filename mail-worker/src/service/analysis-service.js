@@ -55,6 +55,10 @@ const analysisService = {
 		//获取时差
 		const diffHours = localDate.diff(utcDate, 'hour',true);
 
+		const todayTz = toUtc().tz(timeZone).subtract(1, 'day');
+		const previousDays = Array.from({ length: 15 }, (_, i) => {
+			return todayTz.subtract(i, 'day').format('YYYY-MM-DD');
+		}).reverse();
 
 		const [
 			numberCount,
@@ -64,7 +68,9 @@ const analysisService = {
 			sendDayCountRaw,
 			interceptDayCountRaw,
 			daySendTotalRaw,
-			hardInterceptTotalRaw
+			hardInterceptTotalRaw,
+			aiTotalRaw,
+			...aiDayRawList
 		] = await Promise.all([
 			analysisDao.numberCount(c),
 
@@ -76,7 +82,6 @@ const analysisService = {
 				.orderBy(desc(count()))
 				.limit(6),
 
-
 			analysisDao.userDayCount(c, diffHours),
 			analysisDao.receiveDayCount(c, diffHours),
 			analysisDao.sendDayCount(c, diffHours),
@@ -84,16 +89,54 @@ const analysisService = {
 
 			c.env.kv.get(kvConst.SEND_DAY_COUNT + dayjs().format('YYYY-MM-DD')),
 			c.env.kv.get(kvConst.HARD_INTERCEPT_TOTAL),
+			c.env.kv.get(kvConst.AI_TOTAL_USAGE, { type: 'json' }).catch(() => null),
+			...previousDays.map(day => c.env.kv.get(kvConst.AI_DAY_USAGE + day, { type: 'json' }).catch(() => null))
 		]);
 
-
-		const userDayCount = this.filterEmptyDay(userDayCountRaw, timeZone);
-		const receiveDayCount = this.filterEmptyDay(receiveDayCountRaw, timeZone);
-		const sendDayCount = this.filterEmptyDay(sendDayCountRaw, timeZone);
-		const interceptDayCount = this.filterEmptyDay(interceptDayCountRaw, timeZone);
+		const userDayCount = this.filterEmptyDay(userDayCountRaw, previousDays);
+		const receiveDayCount = this.filterEmptyDay(receiveDayCountRaw, previousDays);
+		const sendDayCount = this.filterEmptyDay(sendDayCountRaw, previousDays);
+		const interceptDayCount = this.filterEmptyDay(interceptDayCountRaw, previousDays);
 
 		const daySendTotal = daySendTotalRaw || 0;
 		const hardInterceptTotal = Number(hardInterceptTotalRaw || 0);
+
+		// AI 用量走势与模型分布
+		const aiDayCount = previousDays.map((day, idx) => {
+			const item = aiDayRawList[idx] || {};
+			return {
+				date: day,
+				calls: Number(item.calls || 0),
+				tokens: Number(item.tokens || 0)
+			};
+		});
+
+		const modelMap = {};
+		if (aiTotalRaw && aiTotalRaw.models) {
+			for (const [m, count] of Object.entries(aiTotalRaw.models)) {
+				modelMap[m] = (modelMap[m] || 0) + count;
+			}
+		} else {
+			aiDayRawList.forEach(item => {
+				if (item && item.models) {
+					for (const [m, count] of Object.entries(item.models)) {
+						modelMap[m] = (modelMap[m] || 0) + count;
+					}
+				}
+			});
+		}
+
+		const aiModelRatio = Object.entries(modelMap).map(([name, value]) => ({
+			name,
+			value: Number(value)
+		})).sort((a, b) => b.value - a.value);
+
+		const aiAnalytics = {
+			dayCount: aiDayCount,
+			modelRatio: aiModelRatio,
+			totalCalls: Number(aiTotalRaw?.calls || aiDayCount.reduce((acc, cur) => acc + cur.calls, 0)),
+			totalTokens: Number(aiTotalRaw?.tokens || aiDayCount.reduce((acc, cur) => acc + cur.tokens, 0))
+		};
 
 		return {
 			numberCount: {
@@ -109,22 +152,17 @@ const analysisService = {
 				sendDayCount,
 				interceptDayCount
 			},
-			daySendTotal: Number(daySendTotal)
+			daySendTotal: Number(daySendTotal),
+			aiAnalytics
 		};
 	},
 
-	filterEmptyDay(data, timeZone) {
-		const today = toUtc().tz(timeZone).subtract(1, 'day');
-		const previousDays = Array.from({ length: 15 }, (_, i) => {
-			return today.subtract(i, 'day').format('YYYY-MM-DD');
-		}).reverse();
-
-		return  previousDays.map(day => {
+	filterEmptyDay(data, previousDays) {
+		return previousDays.map(day => {
 			const index = data.findIndex(item => item.date === day)
 			const total = index > - 1 ? data[index].total : 0
 			return {date: day,total}
 		})
-
 	},
 
 	echartsCacheKey(params = {}) {

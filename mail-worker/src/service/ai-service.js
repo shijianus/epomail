@@ -1,8 +1,40 @@
 import emailUtils from '../utils/email-utils';
 import { settingConst } from '../const/entity-const';
 import settingService from './setting-service';
+import kvConst from '../const/kv-const';
+import dayjs from 'dayjs';
 
 const aiService = {
+	async recordUsage(c, { model, tokens = 0, calls = 1 } = {}) {
+		if (!c?.env?.kv) return;
+		try {
+			const today = dayjs().format('YYYY-MM-DD');
+			const dayKey = kvConst.AI_DAY_USAGE + today;
+			const totalKey = kvConst.AI_TOTAL_USAGE;
+			const m = (model || 'default').trim();
+			const t = Math.max(0, Math.round(Number(tokens) || 0));
+			const numCalls = Math.max(1, Math.round(Number(calls) || 1));
+
+			// 1. 更新当日用量
+			const dayData = (await c.env.kv.get(dayKey, { type: 'json' })) || { calls: 0, tokens: 0, models: {} };
+			dayData.calls = (dayData.calls || 0) + numCalls;
+			dayData.tokens = (dayData.tokens || 0) + t;
+			dayData.models = dayData.models || {};
+			dayData.models[m] = (dayData.models[m] || 0) + numCalls;
+			await c.env.kv.put(dayKey, JSON.stringify(dayData), { expirationTtl: 86400 * 60 });
+
+			// 2. 更新历史总量
+			const totalData = (await c.env.kv.get(totalKey, { type: 'json' })) || { calls: 0, tokens: 0, models: {} };
+			totalData.calls = (totalData.calls || 0) + numCalls;
+			totalData.tokens = (totalData.tokens || 0) + t;
+			totalData.models = totalData.models || {};
+			totalData.models[m] = (totalData.models[m] || 0) + numCalls;
+			await c.env.kv.put(totalKey, JSON.stringify(totalData));
+		} catch (err) {
+			console.warn('Failed to record AI usage to KV:', err);
+		}
+	},
+
 	async extractCode(c, email, options = {}) {
 		if (!this.shouldExtractCode(options.aiCode, options.aiCodeFilter, email)) {
 			return '';
@@ -20,7 +52,8 @@ const aiService = {
 				return '';
 			}
 
-			const result = await ai.run(c.env.ai_model || '@cf/meta/llama-3.1-8b-instruct', {
+			const chosenModel = c.env.ai_model || '@cf/meta/llama-3.1-8b-instruct';
+			const result = await ai.run(chosenModel, {
 				messages: [
 					{
 						role: 'system',
@@ -34,6 +67,8 @@ const aiService = {
 				temperature: 0,
 				max_tokens: 32
 			});
+
+			await this.recordUsage(c, { model: chosenModel, tokens: 32, calls: 1 });
 
 			const content = typeof result === 'string' ? result : result?.response || '';
 			const json = JSON.parse(content);
@@ -71,23 +106,56 @@ const aiService = {
 
 	async translate(c, options = {}) {
 		const { text, html, targetLang = 'zh' } = options;
-		let sourceText = text || '';
-		if (!sourceText && html) {
-			sourceText = emailUtils.htmlToText(html);
+		const isHtml = Boolean(html && /<[a-z][\s\S]*>/i.test(html));
+		let sourcePayload = '';
+		const dataUriPlaceholders = [];
+		const stylePlaceholders = [];
+
+		if (isHtml) {
+			let workingHtml = html;
+			// 保护内嵌样式表标签 <style>...</style>，避免浪费 token 且保持 100% 原始样式
+			workingHtml = workingHtml.replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, (match) => {
+				const id = `__EPO_STYLE_${stylePlaceholders.length}__`;
+				stylePlaceholders.push({ id, match });
+				return id;
+			});
+			// 保护 base64 图片 data URI，避免巨大文本消耗 token 且防止模型截断
+			workingHtml = workingHtml.replace(/data:image\/[a-zA-Z0-9.+_-]+;base64,[A-Za-z0-9+/=]+/g, (match) => {
+				const id = `__EPO_IMG_${dataUriPlaceholders.length}__`;
+				dataUriPlaceholders.push({ id, match });
+				return id;
+			});
+			// 长度保护（保留前 24000 字符）
+			sourcePayload = workingHtml.slice(0, 24000);
+		} else {
+			let sourceText = text || '';
+			if (!sourceText && html) {
+				sourceText = emailUtils.htmlToText(html);
+			}
+			sourcePayload = emailUtils.formatText(sourceText || '').trim().slice(0, 4000);
 		}
-		sourceText = emailUtils.formatText(sourceText || '').trim();
-		if (!sourceText) return '';
-		const snippet = sourceText.slice(0, 4000);
+
+		if (!sourcePayload) {
+			return {
+				translatedText: '',
+				translatedHtml: '',
+				isHtml: false
+			};
+		}
 
 		const settingRow = await settingService.query(c).catch(() => null);
 		if (settingRow && settingRow.aiEnabled === 0) {
-			return sourceText;
+			return {
+				translatedText: isHtml ? emailUtils.htmlToText(html) : sourcePayload,
+				translatedHtml: isHtml ? html : '',
+				isHtml
+			};
 		}
 
 		const apiKey = (settingRow?.aiApiKey || c.env?.AI_API_KEY || '').trim();
 		const apiUrl = (settingRow?.aiApiUrl || c.env?.AI_API_URL || 'https://api.openai.com/v1').trim();
 		let model = (options.model || settingRow?.aiModel || c.env?.ai_model || 'gpt-4o-mini').trim();
-		const maxTokens = Number(settingRow?.aiMaxTokens) || 2048;
+		const maxTokens = Number(settingRow?.aiMaxTokens) || (isHtml ? 4096 : 2048);
 
 		// 角色权限模型分级校验 (Role Model Permission Hierarchy)
 		try {
@@ -118,6 +186,31 @@ const aiService = {
 		};
 		const targetLangName = langNames[targetLang] || targetLang;
 
+		const restorePlaceholders = (content) => {
+			if (!content) return '';
+			let res = content.replace(/^```(?:html)?\s*\n?/i, '').replace(/\n?```\s*$/i, '').trim();
+			if (stylePlaceholders.length > 0) {
+				for (const p of stylePlaceholders) {
+					res = res.replaceAll(p.id, p.match);
+				}
+			}
+			if (dataUriPlaceholders.length > 0) {
+				for (const p of dataUriPlaceholders) {
+					res = res.replaceAll(p.id, p.match);
+				}
+			}
+			return res;
+		};
+
+		const systemPrompt = isHtml
+			? `You are an expert HTML email translator. Translate the human-readable text in the given HTML email into ${targetLangName}.
+CRITICAL INSTRUCTIONS:
+1. STRICTLY PRESERVE all HTML structure, tags, DOCTYPE, head/body, attributes, inline styles, CSS, links, tables, layout, and image tags unchanged.
+2. ONLY translate human-readable visible text between tags and inside alt/title attributes.
+3. Keep all placeholders like __EPO_IMG_0__ or __EPO_STYLE_0__ completely intact.
+4. Output ONLY the resulting translated HTML directly. Do NOT wrap in markdown code fences (no \`\`\`html or \`\`\`), and do not add any explanation or preamble.`
+			: `You are an expert email translator. Translate the given email text into ${targetLangName}. Maintain original paragraphs, tone, and format cleanly. Output ONLY the translated text without commentary or markdown code fences.`;
+
 		// 1. If custom API key configured, use OpenAI-compatible API
 		if (apiKey) {
 			try {
@@ -127,19 +220,14 @@ const aiService = {
 					method: 'POST',
 					headers: {
 						'Content-Type': 'application/json',
-						'Authorization': `Bearer ${apiKey}`
+						'Authorization': `Bearer ${apiKey}`,
+						'User-Agent': 'EpocanvasMail/3.0'
 					},
 					body: JSON.stringify({
 						model: model || 'gpt-4o-mini',
 						messages: [
-							{
-								role: 'system',
-								content: `You are an expert email translator. Translate the given email text into ${targetLangName}. Maintain original paragraphs, tone, and format cleanly. Output ONLY the translated text without introductory commentary or markdown fences.`
-							},
-							{
-								role: 'user',
-								content: snippet
-							}
+							{ role: 'system', content: systemPrompt },
+							{ role: 'user', content: sourcePayload }
 						],
 						temperature: 0.3,
 						max_tokens: maxTokens
@@ -148,8 +236,19 @@ const aiService = {
 
 				if (resp.ok) {
 					const data = await resp.json();
-					const content = data?.choices?.[0]?.message?.content?.trim();
-					if (content) return content;
+					const rawContent = data?.choices?.[0]?.message?.content?.trim();
+					if (rawContent) {
+						const finalContent = isHtml ? restorePlaceholders(rawContent) : rawContent;
+						const totalTokens = data?.usage?.total_tokens || Math.ceil((sourcePayload.length + finalContent.length) / 4);
+						await this.recordUsage(c, { model: model || 'gpt-4o-mini', tokens: totalTokens, calls: 1 });
+						return {
+							translatedText: isHtml ? emailUtils.htmlToText(finalContent) : finalContent,
+							translatedHtml: isHtml ? finalContent : '',
+							isHtml,
+							model: model || 'gpt-4o-mini',
+							tokens: totalTokens
+						};
+					}
 				} else {
 					console.warn('Custom AI translate returned status:', resp.status);
 				}
@@ -164,20 +263,25 @@ const aiService = {
 				const cfModel = c.env.ai_model || '@cf/meta/llama-3.1-8b-instruct';
 				const result = await c.env.ai.run(cfModel, {
 					messages: [
-						{
-							role: 'system',
-							content: `You are an expert email translator. Translate the following email text into ${targetLangName}. Preserve paragraphs and return ONLY the translated text without any explanation.`
-						},
-						{
-							role: 'user',
-							content: snippet
-						}
+						{ role: 'system', content: systemPrompt },
+						{ role: 'user', content: sourcePayload }
 					],
 					temperature: 0.2,
-					max_tokens: 2048
+					max_tokens: isHtml ? 4096 : 2048
 				});
-				const content = typeof result === 'string' ? result : result?.response || '';
-				if (content && content.trim()) return content.trim();
+				const rawContent = typeof result === 'string' ? result : result?.response || '';
+				if (rawContent && rawContent.trim()) {
+					const finalContent = isHtml ? restorePlaceholders(rawContent.trim()) : rawContent.trim();
+					const totalTokens = Math.ceil((sourcePayload.length + finalContent.length) / 4);
+					await this.recordUsage(c, { model: cfModel, tokens: totalTokens, calls: 1 });
+					return {
+						translatedText: isHtml ? emailUtils.htmlToText(finalContent) : finalContent,
+						translatedHtml: isHtml ? finalContent : '',
+						isHtml,
+						model: cfModel,
+						tokens: totalTokens
+					};
+				}
 			} catch (e) {
 				console.error('Workers AI translation failed:', e);
 			}
@@ -185,19 +289,33 @@ const aiService = {
 
 		// 3. Fallback: Free translation endpoint
 		try {
-			const gtUrl = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${encodeURIComponent(targetLang)}&dt=t&q=${encodeURIComponent(snippet.slice(0, 2000))}`;
+			const plainToTrans = isHtml ? (emailUtils.htmlToText(html) || sourcePayload) : sourcePayload;
+			const gtUrl = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${encodeURIComponent(targetLang)}&dt=t&q=${encodeURIComponent(plainToTrans.slice(0, 2000))}`;
 			const gtRes = await fetch(gtUrl);
 			if (gtRes.ok) {
 				const gtData = await gtRes.json();
 				if (Array.isArray(gtData) && Array.isArray(gtData[0])) {
-					return gtData[0].map(item => item[0]).filter(Boolean).join('');
+					const transText = gtData[0].map(item => item[0]).filter(Boolean).join('');
+					return {
+						translatedText: transText,
+						translatedHtml: isHtml ? `<div style="font-family: inherit; line-height: 1.6;">${transText.replace(/\n/g, '<br/>')}</div>` : '',
+						isHtml,
+						model: 'google-translate',
+						tokens: 0
+					};
 				}
 			}
 		} catch (e) {
 			console.error('Public translation fallback failed:', e);
 		}
 
-		return sourceText;
+		return {
+			translatedText: isHtml ? emailUtils.htmlToText(html) : sourcePayload,
+			translatedHtml: isHtml ? html : '',
+			isHtml,
+			model: 'original',
+			tokens: 0
+		};
 	},
 
 	normalizeBaseUrl(apiUrl) {
@@ -373,6 +491,7 @@ const aiService = {
 
 				const latencyMs = Date.now() - startTime;
 				const cfModelsRes = await this.fetchModels(c, { aiApiKey: '', aiApiUrl: baseUrl });
+				await this.recordUsage(c, { model: cfModel, tokens: 60, calls: 1 });
 
 				return {
 					success: true,
@@ -420,6 +539,7 @@ const aiService = {
 
 		const data = await resp.json().catch(() => ({}));
 		const reply = data?.choices?.[0]?.message?.content?.trim() || '连通成功，模型响应正常。';
+		await this.recordUsage(c, { model: chosenModel, tokens: data?.usage?.total_tokens || 80, calls: 1 });
 
 		// 伴随探测该 Key 接受的模型列表
 		let detectedModels = [];

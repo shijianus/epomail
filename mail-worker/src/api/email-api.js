@@ -66,8 +66,11 @@ app.put('/email/labels', async (c) => {
 });
 
 app.post('/email/translate', async (c) => {
-	const translatedText = await aiService.translate(c, await c.req.json());
-	return c.json(result.ok({ translatedText }));
+	const res = await aiService.translate(c, await c.req.json());
+	if (typeof res === 'string') {
+		return c.json(result.ok({ translatedText: res, translatedHtml: '', isHtml: false }));
+	}
+	return c.json(result.ok(res));
 });
 
 app.put('/email/snooze', async (c) => {
