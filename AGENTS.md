@@ -34,7 +34,7 @@
        - 截图人眼审计验证通过（`tests/audit_ai_hub_dialog_dark.png` 与 `tests/audit_role_dark.png`）。
 *   **部署上线与自动化测试 (Verification & Deployment)**:
     - **Cloudflare Workers 部署 Version ID**: `513c186e-9290-4276-becc-637a4966bb6d`。
-    - **epocanvas-mail Git Commit**: `72b86fefddd31f2be22d2ce45d3504f3c4a9abc7` (Short Hash: `72b86fe`)。
+    - **epocanvas-mail Git Commit**: `d103cd4edd4fbedbeaec669fc068bed2c5648dfa` (Short Hash: `d103cd4`)。
 
 ### 系统设置ai-hub-card画风统一性深度重构、弹窗按钮挤压彻底修复与Playwright视觉审计通过上线 (2026-09-08)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
