@@ -19,6 +19,7 @@ export const role = sqliteTable('role', {
 	allowAttachment: integer('allow_attachment').default(0),
 	roleCode: text('role_code').default('custom'),
 	tagText: text('tag_text').default(''),
-	tagColor: text('tag_color').default('')
+	tagColor: text('tag_color').default(''),
+	aiModels: text('ai_models').default('')
 });
 export default role

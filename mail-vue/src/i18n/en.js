@@ -1329,6 +1329,7 @@ const en = {
     aiEndpoint: 'Endpoint',
     aiApiKeyLabel: 'API Key',
     aiModelsLabel: 'Models',
+    aiModelsPoolLabel: 'Available Models Pool',
     aiDeleteBtn: 'Delete',
     aiResetTooltip: 'Clear custom AI credentials and restore built-in Workers AI',
     aiResetConfirm: 'Are you sure you want to clear custom AI configuration and restore Cloudflare Workers AI?',

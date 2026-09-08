@@ -129,6 +129,7 @@ const settingService = {
 		setting.aiRateLimitRpm = setting.aiRateLimitRpm !== undefined && setting.aiRateLimitRpm !== null ? Number(setting.aiRateLimitRpm) : 60;
 		setting.aiMaxTokens = setting.aiMaxTokens !== undefined && setting.aiMaxTokens !== null ? Number(setting.aiMaxTokens) : 2048;
 		setting.aiAdminOnly = setting.aiAdminOnly !== undefined && setting.aiAdminOnly !== null ? Number(setting.aiAdminOnly) : 0;
+		setting.aiModels = setting.aiModels || setting.aiModel || '';
 
 		const dbModeInfo = getDbModeInfo(c);
 		setting.isDual = dbModeInfo.isDual;
@@ -343,7 +344,7 @@ const settingService = {
 			'region', 'endpoint', 's3AccessKey', 's3SecretKey', 'forcePathStyle',
 			'customDomain', 'tgMsgFrom', 'tgMsgTo', 'tgMsgText', 'minEmailPrefix',
 			'emailPrefixFilter', 'blackSubject', 'blackContent', 'blackFrom', 'aiCode',
-			'aiCodeFilter', 'aiApiKey', 'aiApiUrl', 'aiModel',
+			'aiCodeFilter', 'aiApiKey', 'aiApiUrl', 'aiModel', 'aiModels',
 			'aiEnabled', 'aiDailyQuota', 'aiRateLimitRpm', 'aiMaxTokens', 'aiAdminOnly',
 			'spamRetentionDays', 'noLandingNodes', 'noNewNodes',
 			'authI18n', 'publicProfile', 'allMailMode',

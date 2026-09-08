@@ -1321,6 +1321,7 @@ const zh = {
     aiEndpoint: '接口端点 (Endpoint)',
     aiApiKeyLabel: '鉴权密钥 (API Key)',
     aiModelsLabel: '接入模型 (Models)',
+    aiModelsPoolLabel: '可用多模型池 (Models Pool)',
     aiDeleteBtn: '清空重置',
     aiResetTooltip: '清空自定义配置并恢复内置免密 Workers AI',
     aiResetConfirm: '确定要清空自定义大模型配置吗？清空后将恢复为系统内置免密 Workers AI。',

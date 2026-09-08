@@ -2788,89 +2788,106 @@
               </el-form-item>
             </div>
 
-            <!-- Right Column: Model Name & Detect Button & Presets -->
+            <!-- Right Column: Primary Model & Multi-model Pool (Integrated auto-detection inside input wrapper dropdown) -->
             <div class="ai-grid-col">
-              <el-form-item :label="$t('aiModelsLabel') || '模型标识 (Model Name)'">
-                <div class="model-input-group">
-                  <el-input 
-                    v-model="aiHubForm.aiModel" 
-                    placeholder="gpt-4o-mini / deepseek-chat / ..." 
-                    clearable
-                    style="flex: 1;"
+              <el-form-item :label="$t('aiModelsLabel') || '主推理模型 (Primary Model)'">
+                <el-select 
+                  v-model="aiHubForm.aiModel" 
+                  filterable
+                  allow-create
+                  default-first-option
+                  clearable
+                  class="ai-model-select"
+                  popper-class="ai-model-dropdown"
+                  :placeholder="$t('aiModelPlaceholder') || '选择或键入主推理模型 (如 deepseek-chat, gpt-4o-mini)'" 
+                  :loading="fetchingModels"
+                  @focus="triggerAutoDetectModels(false)"
+                  @visible-change="handleModelDropdownVisible"
+                  style="width: 100%;"
+                >
+                  <template #prefix>
+                    <Icon v-if="fetchingModels" icon="fluent:spinner-ios-20-filled" class="is-loading" width="15" height="15" style="color: var(--accent-primary);" />
+                    <Icon v-else icon="fluent:sparkle-16-filled" width="15" height="15" style="color: var(--accent-primary);" />
+                  </template>
+                  <el-option 
+                    v-for="modelName in allAvailableModelOptions" 
+                    :key="modelName" 
+                    :label="modelName" 
+                    :value="modelName" 
                   />
-                  <el-button 
-                    class="detect-models-btn" 
-                    type="primary" 
-                    plain 
-                    :loading="fetchingModels" 
-                    @click="handleFetchModelsInDialog"
-                    :title="$t('aiDetectModelsHint') || '向当前接口探测并识别真实可用的模型列表'"
-                  >
-                    <Icon icon="fluent:sparkle-16-filled" width="14" height="14" style="margin-right: 4px;" />
-                    {{ $t('aiDetectModelsBtn') || '自动识别模型' }}
-                  </el-button>
-                </div>
+                </el-select>
               </el-form-item>
 
-              <div class="presets-quick-bar">
-                <span class="preset-label">{{ $t('aiQuickPresets') || '快速预设' }}:</span>
-                <div class="preset-buttons">
-                  <el-button link size="small" type="primary" @click="fillPresetInForm('deepseek')">DeepSeek</el-button>
-                  <el-button link size="small" type="primary" @click="fillPresetInForm('openai')">OpenAI</el-button>
-                  <el-button link size="small" type="primary" @click="fillPresetInForm('claude')">Claude</el-button>
-                  <el-button link size="small" type="primary" @click="fillPresetInForm('gemini')">Gemini</el-button>
-                  <el-button link size="small" type="primary" @click="fillPresetInForm('cf')">Cloudflare AI</el-button>
+              <el-form-item :label="$t('aiModelsPoolLabel') || '可用模型池 (Available Models Pool)'">
+                <el-select 
+                  v-model="aiHubForm.aiModelsList" 
+                  multiple
+                  filterable
+                  allow-create
+                  default-first-option
+                  clearable
+                  collapse-tags
+                  collapse-tags-tooltip
+                  class="ai-models-pool-select"
+                  popper-class="ai-models-pool-dropdown"
+                  :placeholder="$t('aiModelsPoolPlaceholder') || '选择或键入本站允许调用的多个模型'" 
+                  :loading="fetchingModels"
+                  @focus="triggerAutoDetectModels(false)"
+                  style="width: 100%;"
+                >
+                  <el-option 
+                    v-for="modelName in allAvailableModelOptions" 
+                    :key="modelName" 
+                    :label="modelName" 
+                    :value="modelName" 
+                  />
+                </el-select>
+                <div class="ai-field-hint" style="font-size: 11.5px; color: var(--el-text-color-secondary); margin-top: 4px; line-height: 1.4;">
+                  作为系统可用模型池，可前往【权限控制】为不同角色分组（站长/学者/书友/参观者）分级授权允许调用的模型。
                 </div>
-              </div>
+              </el-form-item>
             </div>
           </div>
 
-          <!-- 自动识别到的可用模型列表 (零滑块自然排布) -->
-          <div class="detected-models-box" v-if="dialogDetectedModels.length">
-            <div class="detected-box-title">
-              <div class="detected-title-left">
-                <Icon icon="fluent:checkmark-circle-16-filled" width="14" height="14" style="color: #10b981; margin-right: 4px;" />
-                <span>{{ $t('aiDetectedModelsTitle') || '已识别可用模型 (点击快速填入):' }}</span>
-                <span class="detected-count">({{ dialogDetectedModels.length }})</span>
+          <!-- 大模型真实连通性测试响应结果卡片 (Real Live Prompt Response Feedback) -->
+          <div v-if="aiTestFeedback" class="ai-test-live-result" :class="{ 'is-success': aiTestFeedback.success, 'is-error': !aiTestFeedback.success }">
+            <div class="test-res-header">
+              <div class="test-res-title">
+                <Icon :icon="aiTestFeedback.success ? 'fluent:checkmark-circle-16-filled' : 'fluent:dismiss-circle-16-filled'" width="16" height="16" />
+                <span>{{ aiTestFeedback.success ? '大模型真实连通性测试通过 (HTTP 200 OK)' : '连通性测试异常' }}</span>
+                <span v-if="aiTestFeedback.latencyMs !== null && aiTestFeedback.latencyMs !== undefined" class="test-latency-badge">{{ aiTestFeedback.latencyMs }}ms</span>
+                <span v-if="aiTestFeedback.model" class="test-model-badge">{{ aiTestFeedback.model }}</span>
               </div>
-              <el-button 
-                v-if="dialogDetectedModels.length > 20" 
-                link 
-                size="small" 
-                type="primary" 
-                @click="showAllDetectedModels = !showAllDetectedModels"
-                class="toggle-models-btn"
-              >
-                {{ showAllDetectedModels ? ($t('collapseAll') || '收起') : ($t('expandAll') || '展开全部') }}
+              <el-button link size="small" @click="aiTestFeedback = null" class="close-res-btn">
+                <Icon icon="fluent:dismiss-16-regular" width="14" height="14" />
               </el-button>
             </div>
-            <div class="detected-chips-container">
-              <el-tag 
-                v-for="modelName in displayedDetectedModels" 
-                :key="modelName" 
-                size="small"
-                class="model-pick-chip"
-                :class="{ 'is-selected': aiHubForm.aiModel === modelName }"
-                @click="selectModelInDialog(modelName)"
-              >
-                {{ modelName }}
-              </el-tag>
-              <el-tag 
-                v-if="!showAllDetectedModels && dialogDetectedModels.length > 20" 
-                size="small" 
-                type="info" 
-                class="model-pick-chip more-chip"
-                @click="showAllDetectedModels = true"
-              >
-                +{{ dialogDetectedModels.length - 20 }} 更多...
-              </el-tag>
+            <div class="test-res-body" v-if="aiTestFeedback.success">
+              <div class="test-row">
+                <span class="test-label">发送测试文本:</span>
+                <span class="test-val test-prompt-text">{{ aiTestFeedback.testPrompt }}</span>
+              </div>
+              <div class="test-row">
+                <span class="test-label">模型真实回复:</span>
+                <span class="test-val test-reply-text">{{ aiTestFeedback.reply }}</span>
+              </div>
+              <div class="test-row" v-if="aiTestFeedback.models && aiTestFeedback.models.length">
+                <span class="test-label">自动载入模型:</span>
+                <span class="test-val">{{ aiTestFeedback.models.length }} 个可用模型已同步注入下拉候选项</span>
+              </div>
+            </div>
+            <div class="test-res-body" v-else>
+              <div class="test-row">
+                <span class="test-label">错误响应:</span>
+                <span class="test-val text-danger">{{ aiTestFeedback.message }}</span>
+              </div>
             </div>
           </div>
         </el-form>
         <template #footer>
           <div class="dialog-footer" style="display: flex; justify-content: space-between; align-items: center;">
             <div class="footer-left" style="display: flex; align-items: center; gap: 8px;">
-              <el-button :loading="testingAiInHub" @click="testAiConnectionInHub">
+              <el-button class="opt-btn-test-ai-dialog" :loading="testingAiInHub" @click="testAiConnectionInHub">
                 <Icon icon="fluent:flash-checkmark-24-filled" width="14" height="14" style="margin-right: 4px;" />
                 {{ $t('aiTestBtn') || '测试连通性' }}
               </el-button>
@@ -3048,19 +3065,30 @@ const testingAiInHub = ref(false)
 const fetchingModels = ref(false)
 const detectedModelsList = ref([])
 const dialogDetectedModels = ref([])
-const showAllDetectedModels = ref(false)
-const displayedDetectedModels = computed(() => {
-  if (showAllDetectedModels.value) {
-    return dialogDetectedModels.value
-  }
-  return dialogDetectedModels.value.slice(0, 20)
-})
 const aiTestFeedback = ref(null)
 
 const aiHubForm = reactive({
   aiApiKey: '',
   aiApiUrl: '',
-  aiModel: ''
+  aiModel: '',
+  aiModelsList: []
+})
+
+const allAvailableModelOptions = computed(() => {
+  const set = new Set()
+  if (aiHubForm.aiModel) set.add(aiHubForm.aiModel)
+  if (Array.isArray(aiHubForm.aiModelsList)) {
+    aiHubForm.aiModelsList.forEach(m => { if (m) set.add(m) })
+  }
+  if (Array.isArray(dialogDetectedModels.value)) {
+    dialogDetectedModels.value.forEach(m => { if (m) set.add(m) })
+  }
+  if (Array.isArray(detectedModelsList.value)) {
+    detectedModelsList.value.forEach(m => { if (m) set.add(m) })
+  }
+  const fallback = ['gpt-4o-mini', 'deepseek-chat', 'claude-3-5-haiku-20241022', 'gemini-1.5-flash', '@cf/meta/llama-3.1-8b-instruct']
+  fallback.forEach(m => set.add(m))
+  return Array.from(set)
 })
 
 const maskApiKey = (key) => {
@@ -3074,7 +3102,14 @@ const openAiHubDialog = () => {
   aiHubForm.aiApiKey = setting.value?.aiApiKey || ''
   aiHubForm.aiApiUrl = setting.value?.aiApiUrl || ''
   aiHubForm.aiModel = setting.value?.aiModel || ''
-  showAllDetectedModels.value = false
+  const poolStr = setting.value?.aiModels || ''
+  if (poolStr) {
+    aiHubForm.aiModelsList = poolStr.split(',').map(s => s.trim()).filter(Boolean)
+  } else if (aiHubForm.aiModel) {
+    aiHubForm.aiModelsList = [aiHubForm.aiModel]
+  } else {
+    aiHubForm.aiModelsList = []
+  }
   if (dialogDetectedModels.value.length === 0 && detectedModelsList.value.length > 0) {
     dialogDetectedModels.value = [...detectedModelsList.value]
   }
@@ -3085,21 +3120,36 @@ const clearFormInDialog = () => {
   aiHubForm.aiApiKey = ''
   aiHubForm.aiApiUrl = ''
   aiHubForm.aiModel = ''
+  aiHubForm.aiModelsList = []
   dialogDetectedModels.value = []
-  showAllDetectedModels.value = false
+  aiTestFeedback.value = null
 }
 
-const selectModelInDialog = (modelName) => {
-  aiHubForm.aiModel = modelName
+let lastDetectKey = ''
+const triggerAutoDetectModels = (force = false) => {
+  const currentKey = `${aiHubForm.aiApiUrl || ''}@@${aiHubForm.aiApiKey || ''}`
+  if (!force && lastDetectKey === currentKey && dialogDetectedModels.value.length > 0) {
+    return
+  }
+  handleFetchModelsInDialog(true)
 }
 
-const handleFetchModelsInDialog = () => {
+const handleModelDropdownVisible = (visible) => {
+  if (visible && dialogDetectedModels.value.length === 0) {
+    triggerAutoDetectModels(false)
+  }
+}
+
+const handleFetchModelsInDialog = (silent = false) => {
+  if (fetchingModels.value) return
   fetchingModels.value = true
+  const currentKey = `${aiHubForm.aiApiUrl || ''}@@${aiHubForm.aiApiKey || ''}`
   fetchAiModels({
     aiApiKey: (aiHubForm.aiApiKey || '').trim(),
     aiApiUrl: (aiHubForm.aiApiUrl || '').trim()
   }).then(res => {
     fetchingModels.value = false
+    lastDetectKey = currentKey
     const resData = res.data || res
     const list = Array.isArray(resData?.models) ? resData.models : []
     dialogDetectedModels.value = list
@@ -3107,19 +3157,26 @@ const handleFetchModelsInDialog = () => {
     if (!aiHubForm.aiModel && list.length > 0) {
       aiHubForm.aiModel = list[0]
     }
-    ElMessage({
-      type: 'success',
-      message: resData?.message || (list.length ? `成功识别到 ${list.length} 个可用模型` : '已完成模型检测'),
-      plain: true
-    })
+    if (aiHubForm.aiModelsList.length === 0 && list.length > 0) {
+      aiHubForm.aiModelsList = list.slice(0, 5)
+    }
+    if (!silent) {
+      ElMessage({
+        type: 'success',
+        message: resData?.message || (list.length ? `成功识别到 ${list.length} 个可用模型` : '已完成模型检测'),
+        plain: true
+      })
+    }
   }).catch(err => {
     fetchingModels.value = false
-    const errMsg = err.response?.data?.message || err.message || t('aiDetectFailed') || '识别模型失败'
-    ElMessage({
-      type: 'warning',
-      message: errMsg,
-      plain: true
-    })
+    if (!silent) {
+      const errMsg = err.response?.data?.message || err.message || t('aiDetectFailed') || '识别模型失败'
+      ElMessage({
+        type: 'warning',
+        message: errMsg,
+        plain: true
+      })
+    }
   })
 }
 
@@ -3136,11 +3193,13 @@ const deleteAiConfig = () => {
     editSetting({
       aiApiKey: '',
       aiApiUrl: '',
-      aiModel: ''
+      aiModel: '',
+      aiModels: ''
     })
     aiHubForm.aiApiKey = ''
     aiHubForm.aiApiUrl = ''
     aiHubForm.aiModel = ''
+    aiHubForm.aiModelsList = []
     detectedModelsList.value = []
     dialogDetectedModels.value = []
     aiTestFeedback.value = null
@@ -3152,37 +3211,13 @@ const deleteAiConfig = () => {
   }).catch(() => {})
 }
 
-const fillPresetInForm = (provider) => {
-  if (provider === 'deepseek') {
-    aiHubForm.aiApiUrl = 'https://api.deepseek.com/v1'
-    aiHubForm.aiModel = 'deepseek-chat'
-  } else if (provider === 'openai') {
-    aiHubForm.aiApiUrl = 'https://api.openai.com/v1'
-    aiHubForm.aiModel = 'gpt-4o-mini'
-  } else if (provider === 'claude') {
-    aiHubForm.aiApiUrl = 'https://api.anthropic.com/v1'
-    aiHubForm.aiModel = 'claude-3-5-haiku-20241022'
-  } else if (provider === 'gemini') {
-    aiHubForm.aiApiUrl = 'https://generativelanguage.googleapis.com/v1beta/openai'
-    aiHubForm.aiModel = 'gemini-1.5-flash'
-  } else if (provider === 'cf') {
-    aiHubForm.aiApiKey = ''
-    aiHubForm.aiApiUrl = ''
-    aiHubForm.aiModel = '@cf/meta/llama-3.1-8b-instruct'
-  }
-}
-
-const applyAiPreset = (provider) => {
-  openAiHubDialog()
-  fillPresetInForm(provider)
-}
-
 const testAiConnectionInHub = () => {
   testingAiInHub.value = true
   const testPayload = {
     aiApiKey: aiHubDialogShow.value ? (aiHubForm.aiApiKey || '') : (setting.value?.aiApiKey || ''),
     aiApiUrl: aiHubDialogShow.value ? (aiHubForm.aiApiUrl || '') : (setting.value?.aiApiUrl || ''),
-    aiModel: aiHubDialogShow.value ? (aiHubForm.aiModel || '') : (setting.value?.aiModel || '')
+    aiModel: aiHubDialogShow.value ? (aiHubForm.aiModel || '') : (setting.value?.aiModel || ''),
+    prompt: 'Hello! Please confirm AI service connection with a short friendly response.'
   }
   testAiSetting(testPayload).then(res => {
     testingAiInHub.value = false
@@ -3195,11 +3230,17 @@ const testAiConnectionInHub = () => {
       if (aiHubDialogShow.value && !aiHubForm.aiModel) {
         aiHubForm.aiModel = models[0]
       }
+      if (aiHubDialogShow.value && aiHubForm.aiModelsList.length === 0) {
+        aiHubForm.aiModelsList = models.slice(0, 5)
+      }
     }
     aiTestFeedback.value = {
       success: true,
       message: msg,
-      reply: resData?.reply || 'OK',
+      reply: resData?.reply || '连接正常，模型响应就绪。',
+      testPrompt: resData?.testPrompt || testPayload.prompt,
+      latencyMs: resData?.latencyMs !== undefined ? resData.latencyMs : null,
+      model: resData?.model || testPayload.aiModel || 'OpenAI Model',
       models: models
     }
     ElMessage({
@@ -3214,6 +3255,9 @@ const testAiConnectionInHub = () => {
       success: false,
       message: errMsg,
       reply: '',
+      testPrompt: testPayload.prompt,
+      latencyMs: null,
+      model: testPayload.aiModel,
       models: []
     }
     ElMessage({
@@ -3225,10 +3269,12 @@ const testAiConnectionInHub = () => {
 }
 
 const saveAiHubConfig = () => {
+  const modelsPool = Array.isArray(aiHubForm.aiModelsList) ? aiHubForm.aiModelsList.join(',') : (aiHubForm.aiModelsList || '')
   editSetting({
     aiApiKey: (aiHubForm.aiApiKey || '').trim(),
     aiApiUrl: (aiHubForm.aiApiUrl || '').trim(),
-    aiModel: (aiHubForm.aiModel || '').trim()
+    aiModel: (aiHubForm.aiModel || '').trim(),
+    aiModels: modelsPool.trim()
   })
   aiHubDialogShow.value = false
 }
@@ -7956,135 +8002,125 @@ form .el-button {
     }
   }
 
-  .model-input-group {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    width: 100%;
+  .ai-model-select,
+  .ai-models-pool-select {
+    width: 100% !important;
 
-    .el-input {
-      flex: 1 1 0% !important;
-      min-width: 0 !important;
-      width: auto !important;
-    }
-
-    .detect-models-btn {
-      white-space: nowrap !important;
-      flex-shrink: 0 !important;
-      width: auto !important;
-      margin: 0 !important;
-      height: 32px !important;
-      display: inline-flex !important;
-      align-items: center !important;
-      justify-content: center !important;
+    .is-loading {
+      animation: rotating 2s linear infinite;
     }
   }
 
-  .detected-models-box {
-    margin: 16px 0 0 0;
-    padding: 12px 14px;
-    background: var(--el-fill-color-light);
-    border: 1px solid var(--el-border-color-lighter);
-    border-radius: 8px;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    overflow: visible !important;
-    max-height: none !important;
+  .ai-field-hint {
+    font-size: 11.5px;
+    color: var(--el-text-color-secondary);
+    margin-top: 4px;
+    line-height: 1.4;
+  }
 
-    .detected-box-title {
-      font-size: 12px;
-      font-weight: 600;
-      color: var(--el-text-color-primary);
+  .ai-test-live-result {
+    margin-top: 16px;
+    padding: 14px 16px;
+    border-radius: 10px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    transition: all 0.2s ease;
+
+    &.is-success {
+      background: #f0fdf4;
+      border-color: #bbf7d0;
+    }
+
+    &.is-error {
+      background: #fef2f2;
+      border-color: #fecaca;
+    }
+
+    .test-res-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
+      margin-bottom: 10px;
 
-      .detected-title-left {
+      .test-res-title {
         display: flex;
         align-items: center;
+        gap: 6px;
+        font-size: 13px;
+        font-weight: 600;
+        color: #166534;
+
+        .test-latency-badge {
+          display: inline-flex;
+          align-items: center;
+          padding: 1px 6px;
+          border-radius: 4px;
+          font-size: 11px;
+          font-weight: 600;
+          background: #dcfce7;
+          color: #15803d;
+          font-family: ui-monospace, SFMono-Regular, monospace;
+        }
+
+        .test-model-badge {
+          display: inline-flex;
+          align-items: center;
+          padding: 1px 6px;
+          border-radius: 4px;
+          font-size: 11px;
+          background: #e0e7ff;
+          color: #4338ca;
+          font-family: ui-monospace, SFMono-Regular, monospace;
+        }
       }
 
-      .detected-count {
-        margin-left: 4px;
-        color: var(--el-text-color-secondary);
-      }
-
-      .toggle-models-btn {
-        font-size: 12px;
-        padding: 0 4px;
-        width: auto !important;
-        margin: 0 !important;
-      }
-    }
-
-    .detected-chips-container {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      max-height: none !important;
-      overflow: visible !important;
-      padding: 2px 0;
-
-      .model-pick-chip {
-        cursor: pointer;
-        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-        font-size: 11.5px;
-        border-radius: 6px;
-        transition: all 0.2s ease;
-
+      .close-res-btn {
+        padding: 0;
+        height: auto;
+        color: #94a3b8;
         &:hover {
-          color: var(--accent-primary, #6366f1);
-          border-color: var(--accent-primary, #6366f1);
-          transform: translateY(-1px);
-        }
-
-        &.is-selected {
-          background: var(--accent-primary, #6366f1);
-          color: #ffffff;
-          border-color: var(--accent-primary, #6366f1);
-        }
-
-        &.more-chip {
-          border-style: dashed;
-          cursor: pointer;
+          color: #64748b;
         }
       }
     }
-  }
 
-  .presets-quick-bar {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-top: 8px;
-    padding: 8px 12px;
-    background: var(--el-fill-color-light);
-    border-radius: 8px;
-    border: 1px dashed var(--el-border-color);
-
-    .preset-label {
-      font-size: 12px;
-      color: var(--el-text-color-secondary);
-      font-weight: 500;
-      flex-shrink: 0;
-    }
-
-    .preset-buttons {
+    .test-res-body {
       display: flex;
-      flex-wrap: wrap;
-      align-items: center;
+      flex-direction: column;
       gap: 6px;
+      font-size: 12.5px;
 
-      .el-button {
-        width: auto !important;
-        margin: 0 !important;
-        padding: 2px 8px !important;
-        height: 24px !important;
-        font-size: 12px !important;
-        display: inline-flex !important;
-        align-items: center !important;
+      .test-row {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        line-height: 1.5;
+
+        .test-label {
+          font-weight: 500;
+          color: #475569;
+          flex-shrink: 0;
+          min-width: 82px;
+        }
+
+        .test-val {
+          color: #1e293b;
+          word-break: break-word;
+
+          &.test-prompt-text {
+            color: #64748b;
+            font-style: italic;
+          }
+
+          &.test-reply-text {
+            color: #0f172a;
+            font-weight: 500;
+            background: rgba(255, 255, 255, 0.7);
+            padding: 2px 6px;
+            border-radius: 4px;
+            border: 1px solid rgba(0, 0, 0, 0.05);
+          }
+        }
       }
     }
   }
@@ -8238,27 +8274,69 @@ html.dark .ai-hub-dialog .el-input__inner {
   color: #f3f4f6 !important;
 }
 
-html.dark .ai-hub-dialog .presets-quick-bar {
-  background: #1f2937 !important;
-  border-color: #374151 !important;
+html.dark .ai-hub-dialog .el-select__wrapper {
+  background-color: #1f2937 !important;
+  box-shadow: 0 0 0 1px #374151 inset !important;
+  color: #f3f4f6 !important;
 }
 
-html.dark .ai-hub-dialog .detected-models-box {
-  background: #1f2937 !important;
-  border-color: #374151 !important;
+html.dark .ai-hub-dialog .el-select__selected-item {
+  color: #f3f4f6 !important;
 }
 
-html.dark .ai-hub-dialog .model-pick-chip {
+html.dark .ai-hub-dialog .ai-field-hint {
+  color: #9ca3af !important;
+}
+
+html.dark .ai-hub-dialog .ai-test-live-result {
+  background: #1e293b !important;
+  border-color: #334155 !important;
+}
+
+html.dark .ai-hub-dialog .ai-test-live-result.is-success {
+  background: rgba(6, 78, 59, 0.25) !important;
+  border-color: #065f46 !important;
+}
+
+html.dark .ai-hub-dialog .ai-test-live-result.is-error {
+  background: rgba(127, 29, 29, 0.25) !important;
+  border-color: #991b1b !important;
+}
+
+html.dark .ai-hub-dialog .ai-test-live-result .test-res-title {
+  color: #34d399 !important;
+}
+
+html.dark .ai-hub-dialog .ai-test-live-result.is-error .test-res-title {
+  color: #f87171 !important;
+}
+
+html.dark .ai-hub-dialog .ai-test-live-result .test-latency-badge {
+  background: #065f46 !important;
+  color: #a7f3d0 !important;
+}
+
+html.dark .ai-hub-dialog .ai-test-live-result .test-model-badge {
+  background: #312e81 !important;
+  color: #c7d2fe !important;
+}
+
+html.dark .ai-hub-dialog .ai-test-live-result .test-label {
+  color: #94a3b8 !important;
+}
+
+html.dark .ai-hub-dialog .ai-test-live-result .test-val {
+  color: #e2e8f0 !important;
+}
+
+html.dark .ai-hub-dialog .ai-test-live-result .test-prompt-text {
+  color: #94a3b8 !important;
+}
+
+html.dark .ai-hub-dialog .ai-test-live-result .test-reply-text {
   background: #111827 !important;
+  color: #f3f4f6 !important;
   border-color: #374151 !important;
-  color: #93c5fd !important;
-}
-
-html.dark .ai-hub-dialog .model-pick-chip:hover,
-html.dark .ai-hub-dialog .model-pick-chip.is-selected {
-  background: #2563eb !important;
-  border-color: #3b82f6 !important;
-  color: #ffffff !important;
 }
 
 html.dark .ai-hub-dialog .el-alert--info.is-light {
@@ -8269,6 +8347,24 @@ html.dark .ai-hub-dialog .el-alert--info.is-light {
 
 html.dark .ai-hub-dialog .el-alert__description {
   color: #cbd5e1 !important;
+}
+
+html.dark .ai-model-dropdown,
+html.dark .ai-models-pool-dropdown {
+  background: #1f2937 !important;
+  border-color: #374151 !important;
+}
+
+html.dark .ai-model-dropdown .el-select-dropdown__item,
+html.dark .ai-models-pool-dropdown .el-select-dropdown__item {
+  color: #f3f4f6 !important;
+}
+
+html.dark .ai-model-dropdown .el-select-dropdown__item.hover,
+html.dark .ai-model-dropdown .el-select-dropdown__item:hover,
+html.dark .ai-models-pool-dropdown .el-select-dropdown__item.hover,
+html.dark .ai-models-pool-dropdown .el-select-dropdown__item:hover {
+  background-color: #374151 !important;
 }
 
 .el-dialog.storage-config-dialog.db-domains-dialog,

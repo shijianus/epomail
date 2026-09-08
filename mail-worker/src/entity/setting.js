@@ -55,6 +55,7 @@ export const setting = sqliteTable('setting', {
 	aiApiKey: text('ai_api_key').default('').notNull(),
 	aiApiUrl: text('ai_api_url').default('').notNull(),
 	aiModel: text('ai_model').default('').notNull(),
+	aiModels: text('ai_models').default('').notNull(),
 	aiEnabled: integer('ai_enabled').default(1).notNull(),
 	aiDailyQuota: integer('ai_daily_quota').default(0).notNull(),
 	aiRateLimitRpm: integer('ai_rate_limit_rpm').default(60).notNull(),

@@ -76,23 +76,37 @@ import assert from "assert";
     const dialog = await page.$(".ai-hub-dialog");
     assert.ok(dialog, "必须成功展开 .ai-hub-dialog 对话框");
 
-    // 测试快速预设按钮 (DeepSeek)
-    console.log("  测试 DeepSeek 预设快速填充...");
-    const deepseekPreset = await page.$('.ai-hub-dialog .presets-quick-bar .el-button:has-text("DeepSeek")');
-    assert.ok(deepseekPreset, "弹窗中应包含 DeepSeek 快速预设按钮");
-    await deepseekPreset.click();
-    await page.waitForTimeout(300);
+    // 验证模型选择器与模型池
+    const modelSelect = await page.$(".ai-hub-dialog .ai-model-select");
+    assert.ok(modelSelect, "弹窗中应包含主推理模型下拉选择框 (.ai-model-select)");
+    const poolSelect = await page.$(".ai-hub-dialog .ai-models-pool-select");
+    assert.ok(poolSelect, "弹窗中应包含多模型池下拉选择框 (.ai-models-pool-select)");
 
-    const inputs = await page.$$eval(".ai-hub-dialog input", els => els.map(e => e.value));
-    console.log("  填充后输入框值:", inputs);
-    assert.ok(inputs.some(v => v.includes("api.deepseek.com")), "Base URL 应自动填充 DeepSeek 地址");
-    assert.ok(inputs.some(v => v.includes("deepseek-chat")), "Model Name 应自动填充 deepseek-chat");
+    // 点击主模型选择框测试聚焦自动探测
+    console.log("  测试聚焦主模型选择框自动探测模型...");
+    await modelSelect.click();
+    await page.waitForTimeout(1000);
 
-    // 关闭弹窗
-    const cancelBtn = await page.$('.ai-hub-dialog .dialog-footer .el-button:has-text("取消")');
-    if (cancelBtn) await cancelBtn.click();
+    // 运行连通性测试
+    const testBtn = await page.$('.ai-hub-dialog .opt-btn-test-ai-dialog, .ai-hub-dialog .dialog-footer .el-button:has-text("连通性"), .ai-hub-dialog .dialog-footer .el-button:has-text("测试")');
+    if (testBtn) {
+      console.log("  测试弹窗内真实连通性测试...");
+      await testBtn.click({ force: true });
+      await page.waitForTimeout(2000);
+      const liveResult = await page.$(".ai-hub-dialog .ai-test-live-result");
+      assert.ok(liveResult, "点击后应展示真实大模型连通性测试响应反馈卡片 (.ai-test-live-result)");
+    }
+
+    // 关闭下拉单与弹窗
+    await page.keyboard.press('Escape');
     await page.waitForTimeout(400);
-    console.log("  ✓ AI 预设填充与弹窗交互验证通过");
+    const isDialogOpen = await page.$eval('.ai-hub-dialog', el => el.offsetParent !== null).catch(() => false);
+    if (isDialogOpen) {
+      const cancelBtn = await page.$('.ai-hub-dialog .dialog-footer .el-button:has-text("取消")');
+      if (cancelBtn) await cancelBtn.click({ force: true });
+    }
+    await page.waitForTimeout(400);
+    console.log("  ✓ AI 核心配置与自动化模型识别/测试交互验证通过");
 
     // 5. 验证收件箱阅读面板与 Gmail UI
     console.log("\n[步骤 5] 导航至收件箱 (/inbox) 验证 Gmail 风格顶栏与内嵌 thread-header-bar...");

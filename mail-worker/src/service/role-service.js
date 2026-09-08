@@ -22,7 +22,8 @@ const roleService = {
 				{ name: 'allow_attachment', sql: 'ALTER TABLE role ADD COLUMN allow_attachment INTEGER DEFAULT 0;' },
 				{ name: 'role_code', sql: 'ALTER TABLE role ADD COLUMN role_code TEXT DEFAULT "custom";' },
 				{ name: 'tag_text', sql: 'ALTER TABLE role ADD COLUMN tag_text TEXT DEFAULT "";' },
-				{ name: 'tag_color', sql: 'ALTER TABLE role ADD COLUMN tag_color TEXT DEFAULT "";' }
+				{ name: 'tag_color', sql: 'ALTER TABLE role ADD COLUMN tag_color TEXT DEFAULT "";' },
+				{ name: 'ai_models', sql: 'ALTER TABLE role ADD COLUMN ai_models TEXT DEFAULT "";' }
 			];
 			for (const col of cols) {
 				const colInfo = await userDb.prepare(`SELECT * FROM pragma_table_info('role') WHERE name = ? LIMIT 1`).bind(col.name).first();
@@ -215,7 +216,7 @@ const roleService = {
 	},
 
 	async add(c, params, userId) {
-		let { name, permIds = [], banEmail = [], availDomain = [], storageQuotaMb = 5, allowAttachment = 0, roleCode = 'custom', tagText = '', tagColor = '' } = params;
+		let { name, permIds = [], banEmail = [], availDomain = [], storageQuotaMb = 5, allowAttachment = 0, roleCode = 'custom', tagText = '', tagColor = '', aiModels = [] } = params;
 
 		if (!name) {
 			throw new BizError(t('emptyRoleName'));
@@ -243,6 +244,7 @@ const roleService = {
 
 		banEmail = banEmail.join(',');
 		availDomain = availDomain.join(',');
+		const aiModelsStr = Array.isArray(aiModels) ? aiModels.join(',') : (typeof aiModels === 'string' ? aiModels : '');
 
 		roleRow = await orm(c).insert(role).values({
 			...params,
@@ -253,7 +255,8 @@ const roleService = {
 			allowAttachment: Number(allowAttachment || 0),
 			roleCode: roleCode || 'custom',
 			tagText: tagText || '',
-			tagColor: tagColor || ''
+			tagColor: tagColor || '',
+			aiModels: aiModelsStr
 		}).returning().get();
 
 		if (permIds.length === 0) {
@@ -275,6 +278,7 @@ const roleService = {
 		roleList.forEach(r => {
 			r.banEmail = (r.banEmail || "").split(",").filter(item => item !== "");
 			r.availDomain = (r.availDomain || "").split(",").filter(item => item !== "");
+			r.aiModels = (r.aiModels || "").split(",").filter(item => item !== "");
 			r.permIds = permList.filter(p => p.roleId === r.roleId).map(p => p.permId);
 			r.storageQuotaMb = r.storageQuotaMb !== null && r.storageQuotaMb !== undefined ? Number(r.storageQuotaMb) : 5;
 			r.allowAttachment = r.allowAttachment !== null && r.allowAttachment !== undefined ? Number(r.allowAttachment) : 0;
@@ -287,7 +291,7 @@ const roleService = {
 	},
 
 	async setRole(c, params, callerUserId) {
-		let { name, permIds = [], roleId, banEmail = [], availDomain = [], storageQuotaMb = 5, allowAttachment = 0, roleCode = 'custom', tagText = '', tagColor = '' } = params;
+		let { name, permIds = [], roleId, banEmail = [], availDomain = [], storageQuotaMb = 5, allowAttachment = 0, roleCode = 'custom', tagText = '', tagColor = '', aiModels = [] } = params;
 
 		if (!name) {
 			throw new BizError(t('emptyRoleName'));
@@ -321,6 +325,7 @@ const roleService = {
 
 		banEmail = banEmail.join(',');
 		availDomain = availDomain.join(',');
+		const aiModelsStr = Array.isArray(aiModels) ? aiModels.join(',') : (typeof aiModels === 'string' ? aiModels : '');
 
 		await orm(c).update(role).set({
 			...params,
@@ -330,7 +335,8 @@ const roleService = {
 			allowAttachment: Number(allowAttachment || 0),
 			roleCode: roleCode || 'custom',
 			tagText: tagText || '',
-			tagColor: tagColor || ''
+			tagColor: tagColor || '',
+			aiModels: aiModelsStr
 		}).where(eq(role.roleId, roleId)).run();
 		
 		await orm(c).delete(rolePerm).where(eq(rolePerm.roleId, roleId)).run();

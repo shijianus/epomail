@@ -94,6 +94,20 @@
           </template>
         </el-table-column>
 
+        <el-table-column label="AI 授权模型" min-width="160">
+          <template #default="props">
+            <div v-if="props.row.aiModels && props.row.aiModels.length > 0" class="role-ai-models-tags" style="display: flex; flex-wrap: wrap; gap: 4px;">
+              <el-tag v-for="m in props.row.aiModels.slice(0, 2)" :key="m" size="small" type="primary" effect="plain" style="font-size: 11px;">
+                {{ m }}
+              </el-tag>
+              <el-tag v-if="props.row.aiModels.length > 2" size="small" type="info" effect="plain" style="font-size: 11px;">
+                +{{ props.row.aiModels.length - 2 }}
+              </el-tag>
+            </div>
+            <span v-else style="font-size: 12px; color: var(--el-text-color-secondary);">跟随全局 (全部)</span>
+          </template>
+        </el-table-column>
+
         <el-table-column :label="$t('order')" :width="sortWidth" prop="sort"/>
 
         <el-table-column v-if="desShow" :label="$t('description')" min-width="180" prop="description">
@@ -241,6 +255,29 @@
                   :key="item.value"
                   :label="item.label"
                   :value="item.value"
+              />
+            </el-select>
+          </div>
+
+          <!-- AI 模型分级授权 (Allowed AI Models Hierarchy) -->
+          <div class="form-row">
+            <el-select
+                class="dialog-input"
+                v-model="form.aiModels"
+                multiple
+                filterable
+                allow-create
+                default-first-option
+                :reserve-keyword="false"
+                tag-type="primary"
+                placeholder="允许调用的 AI 模型 (留空代表允许全部或跟随系统全局)"
+                style="width: 100%;"
+            >
+              <el-option
+                  v-for="item in roleAiModelOptions"
+                  :key="item"
+                  :label="item"
+                  :value="item"
               />
             </el-select>
           </div>
@@ -485,7 +522,8 @@ defineOptions({
   name: 'role'
 })
 
-const {domainList} = useSettingStore();
+const settingStore = useSettingStore();
+const {domainList} = settingStore;
 const {t, locale} = useI18n();
 const userStore = useUserStore();
 const roleStore = useRoleStore();
@@ -540,7 +578,20 @@ const form = reactive({
   accountCount: 1,
   sort: 0,
   isDefault: 0,
-  availDomain: []
+  availDomain: [],
+  aiModels: []
+});
+
+const roleAiModelOptions = computed(() => {
+  const options = new Set();
+  const currentSetting = settingStore.setting || {};
+  if (currentSetting.aiModel) options.add(currentSetting.aiModel);
+  if (currentSetting.aiModels) {
+    currentSetting.aiModels.split(',').forEach(m => { if (m.trim()) options.add(m.trim()); });
+  }
+  const defaults = ['gpt-4o-mini', 'gpt-4o', 'deepseek-chat', 'claude-3-5-haiku-20241022', 'gemini-1.5-flash', '@cf/meta/llama-3.1-8b-instruct'];
+  defaults.forEach(m => options.add(m));
+  return Array.from(options);
 });
 
 function formatQuotaDisplay(mb, roleCode) {
@@ -838,6 +889,7 @@ function resetForm() {
   form.accountCount = 1;
   form.banEmail = [];
   form.availDomain = [];
+  form.aiModels = [];
   if (tree.value) {
     tree.value.setCheckedKeys([]);
   }
@@ -861,6 +913,7 @@ function openRoleSet(role) {
   form.accountCount = role.accountCount || 0;
   form.banEmail = role.banEmail || [];
   form.availDomain = role.availDomain || [];
+  form.aiModels = Array.isArray(role.aiModels) ? [...role.aiModels] : (typeof role.aiModels === 'string' && role.aiModels ? role.aiModels.split(',').map(s => s.trim()).filter(Boolean) : []);
   nextTick(() => {
     tree.value?.setCheckedKeys(role.permIds || []);
   });

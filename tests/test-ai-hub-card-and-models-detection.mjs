@@ -111,57 +111,41 @@ import assert from "assert";
     const gridEl = await page.$(".ai-hub-dialog .ai-dialog-grid");
     assert.ok(gridEl, "弹窗必须采用 .ai-dialog-grid 双列横向网格排布");
 
-    // 验证弹窗内有自动识别模型按钮
-    const detectBtn = await page.$(".ai-hub-dialog .detect-models-btn");
-    assert.ok(detectBtn, "弹窗中必须存在自动识别模型按钮 (.detect-models-btn)");
+    // 验证主推理模型下拉框与模型池多选下拉框存在 (自动化融入输入框)
+    const modelSelect = await page.$(".ai-hub-dialog .ai-model-select");
+    assert.ok(modelSelect, "主推理模型下拉框 (.ai-model-select) 必须存在于弹窗内");
+    const poolSelect = await page.$(".ai-hub-dialog .ai-models-pool-select");
+    assert.ok(poolSelect, "多模型池配置框 (.ai-models-pool-select) 必须存在于弹窗内");
 
-    // 点击 DeepSeek 预设
-    console.log("  点击 DeepSeek 预设快速填充...");
-    const deepseekBtn = await page.$('.ai-hub-dialog .presets-quick-bar .el-button:has-text("DeepSeek")');
-    assert.ok(deepseekBtn, "弹窗中必须存在 DeepSeek 预设按钮");
-    await deepseekBtn.click();
-    await page.waitForTimeout(300);
+    // 验证预设提示栏和多余标签容器已被彻底删除 (根据用户要求)
+    const obsoletePresets = await page.$(".ai-hub-dialog .presets-quick-bar");
+    assert.strictEqual(obsoletePresets, null, "多余的 .presets-quick-bar 必须彻底删除");
+    const obsoleteDetectedBox = await page.$(".ai-hub-dialog .detected-models-box");
+    assert.strictEqual(obsoleteDetectedBox, null, "独立占位的 .detected-models-box 必须彻底删除，自动化融入下拉框");
 
-    const inputsAfterPreset = await page.$$eval(".ai-hub-dialog input", els => els.map(e => e.value));
-    console.log("  预设填充后输入框值:", inputsAfterPreset);
-    assert.ok(inputsAfterPreset.some(v => v.includes("api.deepseek.com")), "Endpoint 应填充 DeepSeek 地址");
-    assert.ok(inputsAfterPreset.some(v => v.includes("deepseek-chat")), "Model 应填充 deepseek-chat");
+    // 点击主模型输入框触发自动探测与下拉展开
+    console.log("  点击主模型输入框测试聚焦自动探测...");
+    await modelSelect.click();
+    await page.waitForTimeout(1500);
 
-    // 点击自动识别模型按钮
-    console.log("  点击自动识别模型按钮...");
-    await detectBtn.click();
-    await page.waitForTimeout(2000);
+    // 检查下拉菜单是否存在选项
+    const popperOptions = await page.$$eval(".ai-model-dropdown .el-select-dropdown__item, .el-select-dropdown__item", els => els.map(e => e.textContent.trim()).filter(Boolean));
+    console.log(`  ✓ 下拉菜单中自动识别到/提供 ${popperOptions.length} 个候选模型:`, popperOptions.slice(0, 5));
+    assert.ok(popperOptions.length > 0, "模型下拉菜单必须包含候选模型列表");
 
-    // 检查是否显示已识别模型标签列表或提示，并审计内层绝对无滑块
-    const detectedBox = await page.$(".ai-hub-dialog .detected-models-box");
-    if (detectedBox) {
-      const chipCount = await page.$$eval(".ai-hub-dialog .model-pick-chip", els => els.length);
-      console.log(`  ✓ 成功探测并渲染了 ${chipCount} 个模型胶囊标签`);
+    // 测试真实的连通性测试 (发送测试 Prompt 并展示大模型真实响应卡片)
+    console.log("  执行真实大模型连通性测试...");
+    const testBtn = await page.$('.ai-hub-dialog .opt-btn-test-ai-dialog, .ai-hub-dialog .dialog-footer .el-button:has-text("连通性"), .ai-hub-dialog .dialog-footer .el-button:has-text("测试")');
+    assert.ok(testBtn, "弹窗底部必须存在【测试连通性】按钮");
+    await testBtn.click();
+    await page.waitForTimeout(2500);
 
-      const chipsScrollAudit = await page.$eval(".ai-hub-dialog .detected-chips-container", el => {
-        const cs = window.getComputedStyle(el);
-        return {
-          overflowY: cs.overflowY,
-          clientHeight: el.clientHeight,
-          scrollHeight: el.scrollHeight,
-          hasScrollbar: el.scrollHeight > el.clientHeight
-        };
-      });
-      console.log(`  内层模型胶囊区滚动条审计: overflowY=${chipsScrollAudit.overflowY}, clientHeight=${chipsScrollAudit.clientHeight}, scrollHeight=${chipsScrollAudit.scrollHeight}, hasScrollbar=${chipsScrollAudit.hasScrollbar}`);
-      assert.notStrictEqual(chipsScrollAudit.overflowY, "auto", "模型标签容器严禁设置 overflow-y: auto 产生内层滑块");
-      assert.notStrictEqual(chipsScrollAudit.overflowY, "scroll", "模型标签容器严禁设置 overflow-y: scroll 产生内层滑块");
-      assert.strictEqual(chipsScrollAudit.hasScrollbar, false, "模型标签容器必须自然排布流动折行，严禁出现内层滑块！");
-
-      if (chipCount > 0) {
-        // 点击第一个模型胶囊
-        const firstChip = await page.$(".ai-hub-dialog .model-pick-chip");
-        await firstChip.click();
-        await page.waitForTimeout(200);
-        console.log("  ✓ 模型胶囊点击填入正常");
-      }
-    } else {
-      console.log("  (当前未填有效 Key，后端返回智能提示或降级推荐)");
-    }
+    // 验证 .ai-test-live-result 真实结果反馈卡片被渲染
+    const liveResultCard = await page.$(".ai-hub-dialog .ai-test-live-result");
+    assert.ok(liveResultCard, "点击测试后必须展示 .ai-test-live-result 真实连通性响应卡片");
+    const replyText = await page.$eval(".ai-hub-dialog .ai-test-live-result .test-val.test-reply-text, .ai-hub-dialog .ai-test-live-result .test-res-body", el => el.textContent.trim());
+    console.log("  ✓ 大模型真实测试响应内容:", replyText);
+    assert.ok(replyText.length > 0, "大模型响应内容必须真实存在，不可为空");
 
     // 6. 验证暗黑模式下 .ai-hub-dialog 彻底无白色填充
     console.log("\n[步骤 6] 切换暗黑模式，审计 .ai-hub-dialog 是否有任何白色填充/白斑...");

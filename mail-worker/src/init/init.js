@@ -232,6 +232,7 @@ const dbInit = {
 			{ name: 'ai_api_key', sql: `ALTER TABLE setting ADD COLUMN ai_api_key TEXT NOT NULL DEFAULT '';` },
 			{ name: 'ai_api_url', sql: `ALTER TABLE setting ADD COLUMN ai_api_url TEXT NOT NULL DEFAULT '';` },
 			{ name: 'ai_model', sql: `ALTER TABLE setting ADD COLUMN ai_model TEXT NOT NULL DEFAULT '';` },
+			{ name: 'ai_models', sql: `ALTER TABLE setting ADD COLUMN ai_models TEXT NOT NULL DEFAULT '';` },
 			{ name: 'ai_enabled', sql: `ALTER TABLE setting ADD COLUMN ai_enabled INTEGER NOT NULL DEFAULT 1;` },
 			{ name: 'ai_daily_quota', sql: `ALTER TABLE setting ADD COLUMN ai_daily_quota INTEGER NOT NULL DEFAULT 0;` },
 			{ name: 'ai_rate_limit_rpm', sql: `ALTER TABLE setting ADD COLUMN ai_rate_limit_rpm INTEGER NOT NULL DEFAULT 60;` },

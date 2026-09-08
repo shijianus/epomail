@@ -12,6 +12,30 @@
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
 
+### 系统设置AI模型自动化融入下拉聚焦识别、多模型池分级授权、真实Prompt测试反馈卡片与预设冗余面板彻底删除上线 (2026-09-08)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **模型识别准确性与交互自动化重构 (Automated Dropdown Model Detection & Zero Extra Buttons)**:
+       - 彻底删除独立的 `class="detect-models-btn"` 按钮，将其无缝自动化融入输入框结构中；
+       - 输入框采用 Element Plus `el-select`（支持 `filterable`, `allow-create`, `default-first-option`），前缀配备优雅的 AI 闪光图标与加载指示器；
+       - 只要输入了 Base URL 与 API Key（或免密 Workers AI），当用户点击或聚焦进入模型输入框时，系统自动发起后端全量真实模型探测并动态填充下拉选项；
+       - 后端升级支持 `/models` 与 `/v1/models` 双端点自动轮询智能探测，不过滤任何可用对话推理模型，并在免密模式或代理模式提供全服务商真实权威模型池；
+       - 彻底删除独立的 `class="detected-models-box"` 面板及其容器与标签流，直接在下拉框内优雅展示与选择。
+    2. **真实大模型 Prompt 测试交互与反馈面板 (Real Prompt Live Test Feedback Card)**:
+       - 彻底重构测试连通性交互，服务端真正向大模型发送包含系统提示与用户 Prompt 的真实测试请求并计算往返毫秒数（`latencyMs`）；
+       - 前端弹窗与卡片新增 `.ai-test-live-result` 真实测试结果响应面板：实时呈现 200 OK 连通状态、响应耗时（ms）、响应模型名称、发送的测试 Prompt 以及大模型真实生成的回复内容，提供坚实可见的证据链。
+    3. **彻底删除多余的预设提示框 (Removal of Obsolete Presets Bar)**:
+       - 彻底清理 `class="presets-quick-bar"` 预设提示框及对应所有按钮和 scoped / unscoped CSS 规则，模型直接通过自动化下拉单即选即用。
+    4. **多模型池支持与角色分级授权体系 (Multi-Model Pool & Role Model Hierarchy)**:
+       - 系统设置新增 `aiModels`（可用多模型池 `el-select multiple`），与主推理模型 `aiModel` 协同工作；
+       - 角色权限管理 (`/role`) 新增“AI 授权模型”列与编辑表单多选配置项，支持为不同权限角色（站长、协同管理、认证书友、活跃学者、基础成员、参观者）分级授权允许调用的 AI 模型；
+       - 后端翻译与大模型服务在调用时严格进行角色模型白名单分级校验与平滑流转。
+    5. **Playwright 视觉审计与自动化测试 100% 通过**:
+       - `tests/test-ai-hub-card-and-models-detection.mjs`、`tests/test-sys-setting-ai-hub-and-thread-actions.mjs`、`tests/verify-full-icons.mjs`、`tests/test-gmail-ui-and-ai-features.mjs` 100% 全绿通过；
+       - 截图人眼审计验证通过（`tests/audit_ai_hub_dialog_dark.png` 与 `tests/audit_role_dark.png`）。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **Cloudflare Workers 部署 Version ID**: `513c186e-9290-4276-becc-637a4966bb6d`。
+    - **epocanvas-mail Git Commit**: `72b86fefddd31f2be22d2ce45d3504f3c4a9abc7` (Short Hash: `72b86fe`)。
+
 ### 系统设置ai-hub-card画风统一性深度重构、弹窗按钮挤压彻底修复与Playwright视觉审计通过上线 (2026-09-08)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **标题栏与首行画风严密对齐相邻卡片 (Strict Unified Visual Aesthetics)**:
