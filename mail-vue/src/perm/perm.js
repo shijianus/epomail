@@ -26,9 +26,14 @@ export default {
 }
 
 export function hasPerm(permKey) {
-    const {permKeys} = useUserStore().user;
-    if (!permKeys) return false;
-    return permKeys.includes('*') || permKeys.includes(permKey);
+    const user = useUserStore().user;
+    if (!user || !user.permKeys) return false;
+    const {permKeys} = user;
+    if (permKeys.includes('*')) return true;
+    if (Array.isArray(permKey)) {
+        return permKey.some(key => permKeys.includes(key));
+    }
+    return permKeys.includes(permKey);
 }
 
 

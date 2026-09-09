@@ -11,6 +11,40 @@
    - 在向用户输出回复时，必须置顶/显式打印出本次提交的完整 Commit Hash 与短 Hash，确保版本可追溯、审计记录完整。
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
+### 角色弹窗滑块尺寸牢固锁定、隐式药丸滑块生效、预设模板3x2像素级对齐、全权限用户查看闭环与真实身份组E2E全绿上线 (2026-09-09)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **角色弹窗 `.el-scrollbar__wrap` 尺寸牢固锁定与防无限下延 (Strict Scrollbar Wrap Locking)**:
+       - 根因分析：原先 `.perm-tree-wrap` 与 `.el-scrollbar__wrap` 未对容器实施强行高度约束，当权限树节点递归全量展开（内容高达 1240px）时，滚动包装层向下无序蔓延撑破弹窗边界；
+       - 重构优化：`.perm-tree-wrap` 严格锁定为 `height: 372px; min-height: 372px; max-height: 372px; flex: none; overflow: hidden;`；
+       - 对 `:deep(.el-scrollbar__wrap)` 及 `:deep(.el-scrollbar__wrap--hidden-default)` 注入 `height: 100% !important; max-height: 372px !important; overflow-y: auto !important; overflow-x: hidden !important;`，并隐藏浏览器原生丑陋滚动条（`scrollbar-width: none; &::-webkit-scrollbar { display: none; }`），杜绝滚动层向下过度蔓延。
+    2. **优雅隐式药丸滑块体系 (Implicit Pill Scrollbar with Smooth Fade-in)**:
+       - 满足“隐式滑块”需求：移除 `<el-scrollbar>` 的 `always` 常驻属性，滑块条（`.el-scrollbar__bar.is-vertical`）初始状态保持 `opacity: 0` 隐式静默；
+       - 当鼠标滑入（`:hover`）或获得焦点（`:focus-within`）时平滑过渡显式淡入（`opacity: 0.85`），并配合圆角 4px 精致靛蓝/淡紫药丸滑块（亮色 `rgba(99, 102, 241, 0.35)`，暗色 `rgba(129, 140, 248, 0.45)`），既维持视觉极简纯粹，又确保滚动操作极致顺滑。
+    3. **`.preset-templates` 尺寸固定与 `el-button--small is-round` 3x2 矩阵像素级对齐 (Preset Templates 3x2 Matrix)**:
+       - 根因分析：原先 Element Plus 自带 `.el-button + .el-button { margin-left: 12px; }`，且在 Flex 换行排版下导致第二行按钮左缩进错位，容器高度上下跳动；
+       - 重构优化：`.preset-templates` 锁定尺寸 `height: 98px; min-height: 98px; max-height: 98px; overflow: hidden; flex-shrink: 0;`；
+       - 内部 `.preset-chips` 采用现代 CSS Grid 3 列等宽布局（`grid-template-columns: repeat(3, 1fr); gap: 6px;`），彻底清除 `margin: 0 !important; margin-left: 0 !important;`；
+       - 6 大预设身份组按钮（参观者、普通用户、普通用户 LV.0、普通用户 LV.1、协管者、站长）按 3x2 网格绝对严格对称对齐，高度统一 26px，圆角 13px，亮暗模式深浅背景完美适配。
+    4. **权限查看逻辑彻底闭环与“允许查看即可实际查看”严格对齐 (Permission Alignment & Zero-403 E2E Navigation)**:
+       - **根因 1 (核心网关 Bug)**: `mail-vue/src/perm/perm.js` 的 `hasPerm(permKey)` 原先仅支持单个字符串查询，当主布局调用 `hasPerm(['all-email:query','user:query','role:query',...])` 传入数组时，因 Array 比较始终返回 `false`，导致非站长管理员登录后管理侧栏被彻底隐藏；升级 `hasPerm` 完美支持数组校验（`permKey.some(...)`）；
+       - **根因 2 (侧边栏与主菜单缺失入口)**: 在 `mail-vue/src/layout/aside/index.vue` 左侧边栏底部与 `mail-vue/src/layout/header/index.vue` 个人菜单中新增「管理后台」与「设置」常驻直达入口，具备查询权限的用户可一键进入对应管理路由；
+       - **根因 3 (API 权限缺失与 403)**: 在 `mail-worker/src/security/security.js` 的 `premKey['setting:query']` 中补全补齐 `/setting/db/status` 鉴权路径；在 `role/index.vue` 中对无系统设置写权限的用户智能降级采用公共 `websiteConfig()`，杜绝页面加载时的 403 异常弹窗；
+       - **权限树与表单绑定优化**: `updateCheckedPermsCount()` 与表单保存严格基于叶子节点（`getCheckedKeys(true)`），结合 `[...new Set(...)]` 去重入库，彻底保障角色权限与用户实际生效权限 100% 对齐。
+    5. **Playwright 真实新建身份组与真实用户测试全链路 100% 全绿通过 (Playwright Live E2E Audit)**:
+       - 编写并执行完整端到端测试 `tests/test-role-scrollbar-and-perm-alignment.mjs`:
+         - 审计 `.preset-templates`: 高度严格锁定 98px，6 个按钮 3x2 矩阵绝对几何对齐（两行第 1 列 X 坐标均为 342px，宽度均为 123.1875px）；
+         - 审计 `.perm-tree-wrap` 与 `.el-scrollbar__wrap`: 高度严格锁定 372px，内部全量展开 1240px 时不撑开外壳，滑块初始 `opacity: 0` 呈隐式；
+         - Admin 创建真实测试角色（包含 `user:query`, `role:query`, `analysis:query`, `reg-key:query`, `setting:query`, `all-email:query` 6 项查询权限）；
+         - Admin 创建赋予该角色的真实独立测试用户；
+         - 启动独立 Browser Context 登录该测试用户：侧边栏显式展现「管理后台」；
+         - 测试用户顺利访问 `/role`（成功加载 7 个角色并可打开修改弹窗查看权限明细）、`/all-users`（正常渲染用户列表表格）、`/analysis`（正常渲染数据看板），全链路零 403 错误，页面交互无瑕疵；
+         - 真实截图存证：`tests/audit_role_dialog_light_fixed.png`、`tests/audit_role_dialog_dark_fixed.png`、`tests/audit_test_user_role_view.png`、`tests/audit_test_user_analysis_view.png`；
+         - 测试完成自动销毁测试用户与测试角色，恪守零假数据准则。
+       - 运行 `tests/audit_new_features.mjs` 与 `tests/test-ai-model-pool-sync-to-role.mjs` 均 100% 通过。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **Cloudflare Workers 部署 Version ID**: `55223097-12bf-4410-b43d-adf69e00f33e`。
+    - **epocanvas-mail Git Commit**: `9d88515199a17f10f0f830b2840fe803ad365de6` (Short Hash: `9d88515`)。
+
 ### 角色弹窗说明与展开收起精简、下拉无截断呈现、卡片分割线消除、v1.1.0版本轮替同步与官方URL矩阵全面上线 (2026-09-09)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **角色弹窗冗余说明与展开收起精简 (Role Dialog Simplification & 0px Strict Alignment)**:

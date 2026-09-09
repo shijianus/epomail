@@ -300,25 +300,30 @@
               <span class="perm-title">权限分配细则</span>
               <span class="perm-count-badge">{{ locale === 'zh' ? `已选 ${checkedPermsCount} 项` : `${checkedPermsCount} Selected` }}</span>
             </div>
+            <div class="perm-header-actions">
+              <el-button link type="primary" size="small" class="expand-toggle-btn" @click="toggleExpandAll">
+                <Icon :icon="expandAll ? 'lucide:chevrons-down-up' : 'lucide:chevrons-up-down'" width="14" height="14" style="margin-right: 3px;" />
+                {{ expandAll ? '全部收起' : '全部展开' }}
+              </el-button>
+            </div>
           </div>
 
           <div class="perm-tree-wrap">
-            <el-scrollbar class="perm-tree-scrollbar" always>
+            <el-scrollbar class="perm-tree-scrollbar">
               <el-tree
                   :expand-on-click-node="false"
                   :check-on-click-node="false"
-                  accordion
                   ref="tree"
                   :data="treeList"
                   show-checkbox
                   node-key="permId"
-                  :default-expand-all="false"
+                  :default-expand-all="true"
                   :props="{ label: 'name' }"
                   @check="updateCheckedPermsCount"
               >
                 <template #default="{ node, data }">
                   <div class="tree-node-content">
-                    <span class="tree-node-label">{{ node.label }}</span>
+                    <span class="tree-node-label" :title="node.label">{{ node.label }}</span>
                     <span class="send-num" v-if="data.permKey === 'email:send'" @click.stop>
                       <el-input-number v-if="form.sendType === 'day' || form.sendType === 'count'" v-model="form.sendCount" controls-position="right" :min="0" :max="99999" size="small"
                                        :placeholder="$t('total')">
@@ -516,9 +521,10 @@
 import {Icon} from "@iconify/vue";
 import {computed, defineOptions, nextTick, onBeforeUnmount, onMounted, reactive, ref} from "vue";
 import {roleAdd, roleDelete, rolePermTree, roleRoleList, roleSet, roleSetDef} from "@/request/role.js";
-import {settingQuery} from "@/request/setting.js";
+import {settingQuery, websiteConfig} from "@/request/setting.js";
 import {userSyncBlogLevel} from "@/request/user.js";
 import loading from '@/components/loading/index.vue';
+import {hasPerm} from "@/perm/perm.js";
 import {useRoleStore} from "@/store/role.js";
 import {useUserStore} from "@/store/user.js";
 import {useSettingStore} from "@/store/setting.js";
@@ -591,16 +597,29 @@ const form = reactive({
 });
 
 function fetchFreshSettings() {
-  settingQuery().then(data => {
-    if (data) {
-      if (typeof settingStore.setSettings === 'function') {
-        settingStore.setSettings(data);
-      } else {
-        settingStore.settings = { ...settingStore.settings, ...data };
-        if (data.domainList) settingStore.domainList = data.domainList;
+  if (hasPerm('setting:query')) {
+    settingQuery().then(data => {
+      if (data) {
+        if (typeof settingStore.setSettings === 'function') {
+          settingStore.setSettings(data);
+        } else {
+          settingStore.settings = { ...settingStore.settings, ...data };
+          if (data.domainList) settingStore.domainList = data.domainList;
+        }
       }
-    }
-  }).catch(() => {});
+    }).catch(() => {});
+  } else {
+    websiteConfig().then(data => {
+      if (data) {
+        if (data.domainList) settingStore.domainList = data.domainList;
+        if (typeof settingStore.setSettings === 'function') {
+          settingStore.setSettings(data);
+        } else {
+          settingStore.settings = { ...settingStore.settings, ...data };
+        }
+      }
+    }).catch(() => {});
+  }
 }
 
 const roleAiModelOptions = computed(() => {
@@ -722,22 +741,22 @@ const domainOptions = computed(() => {
   });
 });
 
-const expand = ref(false);
+const expandAll = ref(true);
 const checkedPermsCount = ref(0);
 let chooseRole = {};
 
 function updateCheckedPermsCount() {
   if (!tree.value) return;
-  const checked = tree.value.getCheckedKeys() || [];
+  const checked = tree.value.getCheckedKeys(true) || [];
   checkedPermsCount.value = checked.length;
 }
 
-function onNodeCollapse() {
-  if (expand.value) {
-    expand.value = false;
-    if (tree.value?.store) {
-      tree.value.store.accordion = true;
-    }
+function toggleExpandAll() {
+  expandAll.value = !expandAll.value;
+  if (!tree.value?.store) return;
+  const nodes = tree.value.store.nodesMap;
+  for (const key in nodes) {
+    nodes[key].expanded = expandAll.value;
   }
 }
 
@@ -814,7 +833,7 @@ function applyTemplate(type) {
       form.sendCount = 0;
       form.accountCount = 0;
       form.sort = 1;
-      selectPermsByKeys(['setting:query', 'role:query', 'analysis:query', 'user:query']);
+      selectPermsByKeys(['setting:query', 'role:query', 'analysis:query', 'user:query', 'reg-key:query']);
       break;
     case 'user_base':
       form.name = '普通用户';
@@ -953,9 +972,10 @@ function setRole() {
   }
 
   const params = {...form, roleId: chooseRole.roleId};
-  const checkedId = tree.value.getCheckedKeys();
-  const halfId = tree.value.getHalfCheckedKeys();
-  params.permIds = [...checkedId, ...halfId];
+  const checkedLeafIds = tree.value ? tree.value.getCheckedKeys(true) : [];
+  const halfId = tree.value ? tree.value.getHalfCheckedKeys() : [];
+  const checkedParentIds = tree.value ? tree.value.getCheckedKeys(false).filter(id => !checkedLeafIds.includes(id)) : [];
+  params.permIds = [...checkedLeafIds, ...halfId, ...checkedParentIds];
 
   permLoading.value = true;
   roleSet(params).then((res) => {
@@ -993,7 +1013,7 @@ function resetForm() {
   form.banEmail = [];
   form.availDomain = [];
   form.aiModels = [];
-  expand.value = false;
+  expandAll.value = true;
   checkedPermsCount.value = 0;
   if (tree.value) {
     tree.value.setCheckedKeys([]);
@@ -1006,7 +1026,7 @@ function openRoleSet(role) {
   dialogType.title = t('changeRoleTitle');
   dialogType.type = 'set';
   roleFormShow.value = true;
-  expand.value = false;
+  expandAll.value = true;
   form.sort = role.sort;
   form.name = role.name;
   form.roleCode = role.roleCode || role.key || 'custom';
@@ -1023,7 +1043,6 @@ function openRoleSet(role) {
   form.aiModels = Array.isArray(role.aiModels) ? [...role.aiModels] : (typeof role.aiModels === 'string' && role.aiModels ? role.aiModels.split(',').map(s => s.trim()).filter(Boolean) : []);
   nextTick(() => {
     tree.value?.setCheckedKeys(role.permIds || []);
-    expandChange(false);
     updateCheckedPermsCount();
   });
 }
@@ -1032,19 +1051,20 @@ function openAddRole() {
   fetchFreshSettings();
   dialogType.title = t('addRoleTitle');
   dialogType.type = 'add';
+  resetForm();
   roleFormShow.value = true;
-  expand.value = false;
+  expandAll.value = true;
   nextTick(() => {
-    expandChange(false);
     updateCheckedPermsCount();
   });
 }
 
 function addRole() {
   const params = {...form};
-  const checkedId = tree.value.getCheckedKeys();
-  const halfId = tree.value.getHalfCheckedKeys();
-  params.permIds = [...checkedId, ...halfId];
+  const checkedLeafIds = tree.value ? tree.value.getCheckedKeys(true) : [];
+  const halfId = tree.value ? tree.value.getHalfCheckedKeys() : [];
+  const checkedParentIds = tree.value ? tree.value.getCheckedKeys(false).filter(id => !checkedLeafIds.includes(id)) : [];
+  params.permIds = [...checkedLeafIds, ...halfId, ...checkedParentIds];
 
   permLoading.value = true;
   roleAdd(params).then(() => {
@@ -1358,25 +1378,65 @@ onBeforeUnmount(() => {
 
 /* Preset Template Buttons */
 .preset-templates {
+  height: 98px;
+  min-height: 98px;
+  max-height: 98px;
+  box-sizing: border-box;
   background: var(--bg-elevated, #f8fafc);
   border: 1px dashed var(--border-mid, #cbd5e1);
-  padding: 10px 12px;
+  padding: 8px 12px;
   border-radius: 8px;
-  margin-bottom: 6px;
+  margin-bottom: 0 !important;
+  overflow: hidden;
+  flex-shrink: 0;
 
   .preset-label {
     font-size: 12px;
     font-weight: 600;
     color: var(--text-secondary, #475569);
-    margin-bottom: 8px;
+    margin-bottom: 6px;
+    height: 18px;
+    line-height: 18px;
     display: flex;
     align-items: center;
   }
 
   .preset-chips {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
     gap: 6px;
+    width: 100%;
+
+    :deep(.el-button),
+    .el-button {
+      margin: 0 !important;
+      margin-left: 0 !important;
+      width: 100% !important;
+      height: 26px !important;
+      padding: 0 4px !important;
+      font-size: 11.5px !important;
+      font-weight: 500;
+      border-radius: 13px !important;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      box-sizing: border-box;
+      background: var(--bg-surface, #ffffff);
+      border-color: var(--border-subtle, #e2e8f0);
+      color: var(--text-primary, #334155);
+      transition: all 0.15s ease;
+
+      &:hover {
+        background: var(--primary-color-light, rgba(99, 102, 241, 0.08));
+        border-color: var(--accent-primary, #6366f1);
+        color: var(--accent-primary, #6366f1);
+        transform: translateY(-1px);
+      }
+    }
   }
 }
 
@@ -1554,25 +1614,56 @@ onBeforeUnmount(() => {
         letter-spacing: 0.2px;
       }
     }
+
+    .perm-actions {
+      display: flex;
+      align-items: center;
+
+      .expand-toggle-btn {
+        font-size: 11.5px;
+        color: var(--accent-primary, #6366f1);
+        padding: 0 4px;
+        height: 24px;
+
+        &:hover {
+          color: #4f46e5;
+          background: rgba(99, 102, 241, 0.08);
+        }
+      }
+    }
   }
 
   .perm-tree-wrap {
     border: 1px solid var(--border-subtle, #e2e8f0);
     border-radius: 10px;
     background: var(--bg-elevated, #f8fafc);
-    flex: 1;
-    min-height: 0;
+    height: 372px;
+    min-height: 372px;
+    max-height: 372px;
+    flex: none;
     display: flex;
     flex-direction: column;
     overflow: hidden;
     position: relative;
 
     .perm-tree-scrollbar {
-      height: 100%;
+      height: 100% !important;
+      max-height: 100% !important;
       width: 100%;
 
-      :deep(.el-scrollbar__wrap) {
-        overflow-x: hidden;
+      :deep(.el-scrollbar__wrap),
+      :deep(.el-scrollbar__wrap--hidden-default) {
+        height: 100% !important;
+        max-height: 372px !important;
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+        &::-webkit-scrollbar {
+          width: 0 !important;
+          height: 0 !important;
+          display: none !important;
+        }
       }
 
       :deep(.el-scrollbar__view) {
@@ -1580,17 +1671,26 @@ onBeforeUnmount(() => {
       }
 
       :deep(.el-scrollbar__bar.is-vertical) {
-        width: 6px;
+        width: 5px;
         right: 2px;
+        opacity: 0;
+        transition: opacity 0.25s ease;
 
         .el-scrollbar__thumb {
-          background-color: rgba(99, 102, 241, 0.4);
-          border-radius: 6px;
+          background-color: rgba(99, 102, 241, 0.35);
+          border-radius: 4px;
           transition: background-color 0.2s ease;
 
           &:hover {
             background-color: var(--accent-primary, #6366f1);
           }
+        }
+      }
+
+      &:hover,
+      &:focus-within {
+        :deep(.el-scrollbar__bar.is-vertical) {
+          opacity: 0.85;
         }
       }
     }
@@ -1896,6 +1996,23 @@ onBeforeUnmount(() => {
   .tag-picker-row .color-picker-box {
     background: var(--bg-elevated, #1e293b) !important;
     border-color: var(--border-subtle, rgba(99, 102, 241, 0.18)) !important;
+  }
+
+  .preset-templates {
+    .preset-chips {
+      :deep(.el-button),
+      .el-button {
+        background: rgba(255, 255, 255, 0.05) !important;
+        border-color: rgba(255, 255, 255, 0.12) !important;
+        color: #e2e8f0 !important;
+
+        &:hover {
+          background: rgba(99, 102, 241, 0.25) !important;
+          border-color: rgba(99, 102, 241, 0.5) !important;
+          color: #818cf8 !important;
+        }
+      }
+    }
   }
 
   .modal-col-right .perm-tree-wrap {

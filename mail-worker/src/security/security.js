@@ -91,7 +91,7 @@ const premKey = {
 	'user:delete': ['/user/delete','/user/deleteAccount'],
 	'all-email:query': ['/allEmail/list','/allEmail/latest'],
 	'all-email:delete': ['/allEmail/delete','/allEmail/batchDelete'],
-	'setting:query': ['/setting/query', '/admin/oauthApp/list'],
+	'setting:query': ['/setting/query', '/admin/oauthApp/list', '/setting/db/status'],
 	'setting:set': ['/setting/set', '/setting/setBackground','/setting/deleteBackground','/setting/setBlacklist', '/admin/oauthApp/add', '/admin/oauthApp/update', '/admin/oauthApp/resetSecret', '/admin/oauthApp/status', '/admin/oauthApp/delete'],
 	'analysis:query': ['/analysis/echarts'],
 	'reg-key:add': ['/regKey/add'],
