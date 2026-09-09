@@ -37,7 +37,7 @@
        - 回归测试 `tests/test-group-ui-consistency-and-visitor-clean.mjs` 与 `tests/test-user-general-settings-binding-and-defaults.mjs` 全部 100% 通过。
 *   **部署上线与自动化测试 (Verification & Deployment)**:
     - **Cloudflare Workers 部署 Version ID**: `8508b4f4-72ee-42d0-b1c3-b418bf8f7c8f`。
-    - **epocanvas-mail Git Commit**: `cc57a266d372b0dbd099412b5c624f099b488e23` (Short Hash: `cc57a26`)。
+    - **epocanvas-mail Git Commit**: `e5f7b742de1912c4bd436b34e86005c80ffd0583` (Short Hash: `e5f7b74`)。
 
 ### 常规默认设置严格绑定用户、新账户全量规范化默认值、多账户隔离与持久化优化上线 (2026-09-09)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
