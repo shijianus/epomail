@@ -55,15 +55,18 @@ export async function init() {
             if (user) {
                 accountStore.currentAccountId = user.account.accountId;
                 accountStore.currentAccount = user.account;
-                userStore.user = user;
+                userStore.applyUserInfo(user);
 
                 const routers = permsToRouter(user.permKeys);
                 routers.forEach(routerData => {
                     router.addRoute('layout', routerData);
                 });
+            } else {
+                uiStore.resetToDefaults();
             }
 
         } else {
+            uiStore.resetToDefaults();
             setting = await Promise.race([websiteConfig(), timeoutPromise]).catch(e => {
                 console.error('websiteConfig failed:', e);
                 return null;

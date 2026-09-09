@@ -11,6 +11,38 @@
    - 在向用户输出回复时，必须置顶/显式打印出本次提交的完整 Commit Hash 与短 Hash，确保版本可追溯、审计记录完整。
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
+### 常规默认设置严格绑定用户、新账户全量规范化默认值、多账户隔离与持久化优化上线 (2026-09-09)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **用户个性化常规设置严格绑定与多账户彻底隔离 (Strict Per-User General Settings Binding & Complete Isolation)**:
+       - 根因分析：原先 `uiStore` 通过 `pinia-plugin-persistedstate` 将视图密度（`density`）、主题壁纸（`themeWallpaper`）、阅读窗格（`readingPane`）、外观色调（`themeMode`）等全量持久化在浏览器的全局 `localStorage` 中；当 Admin 或其他用户修改过个性化配置后，同一浏览器新建或登录其他账户时，前序用户的配置直接渗透污染新账户，导致新账户呈现“非默认”混乱状态；
+       - 重构治理：在 `mail-vue/src/store/user.js` 中新增权威同步逻辑 `applyUserInfo(user)`，并在系统初始化 [`mail-vue/src/init/init.js`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/init/init.js) 中强制调用；登录时以服务端绑定的用户个人资料（`user`）为唯一权威来源覆盖重设本地 `uiStore`，杜绝任何历史遗留污染；
+       - 登出净化：在 [`mail-vue/src/layout/header/index.vue`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/layout/header/index.vue) 的 `clickLogout` 中增加 `localStorage.removeItem("ui")` 并调用 `uiStore.resetToDefaults()`，确保登出后本地存储彻底归零。
+    2. **新建账户全量规范化默认值校准 (Canonical Defaults Alignment for New Accounts)**:
+       - **阅读窗格 (Reading Pane)**: 后端 [`mail-worker/src/service/user-service.js`](file:///home/shijian/projects/epocanvas-mail/mail-worker/src/service/user-service.js) 与前端 `uiStore` 中，将未配置用户的兜底阅读窗格由原先错误的 `'right'`（收件箱右侧）校正为标准 Gmail 规范的 `'no_split'`（无拆分）；
+       - **全局主题壁纸 (Main Wallpaper)**: 明确锁定默认值为 `'none'`（默认纯净卡片），未设置壁纸的新建用户绝不带入任何背景图；
+       - **外观色调 (Theme Mode)**: 增加 `themeMode` 用户绑定支持，后端 profile 保存 `themeMode`，新建账户统一为 `'auto'`（跟随系统）；
+       - **系统语言 (Language)**: 增加 `lang` 绑定与持久化保存，不同用户切换语言独立生效且互不干扰；
+       - **视图密度、收件箱类型、数据隐私、邮件会话**: 严格校准为 `'default'`、`'default'`、全部开启 `true` 与未设置简介 `''`。
+    3. **设置修改全链路实时持久化与双向绑定 (Full-Stack Realtime Settings Mutation & Persistence)**:
+       - 外观色调（`themeMode`）在 `profile-setting/index.vue`（点击暗色/亮色/跟随系统）与 `header/index.vue`（顶栏快捷切换）中同步触发 `updateProfile({ themeMode })`，写入服务端 KV；
+       - 系统语言（`lang`）切换时同步通过 `updateProfile({ lang })` 写入个人资料；
+       - 视图密度、收件箱类型、阅读窗格、会话模式、主题壁纸与透光度在修改时均实时保存至后端，多端登录无缝衔接。
+    4. **Playwright 跨用户多账户隔离与新账户默认值 E2E 审计 100% 全绿 (Playwright Live E2E Audit)**:
+       - 编写并执行端到端多账户隔离测试 [`tests/test-user-general-settings-binding-and-defaults.mjs`](file:///home/shijian/projects/epocanvas-mail/tests/test-user-general-settings-binding-and-defaults.mjs):
+         - 新建 User A 登录访问 `/settings/general`：逐项精确断言 简介（未设置）、色调（跟随系统）、壁纸（默认纯净）、封面（默认极光）、密度（默认 54px）、收件箱（默认收件箱）、阅读窗格（无拆分）100% 达成全量默认；
+         - User A 修改设置：视图密度设为「紧凑」、阅读窗格设为「收件箱右侧」、壁纸设为「深蓝星芒」、色调设为「暗色调」；
+         - 同一浏览器切换至新建 User B：断言 User B **完全不受 User A 影响**，阅读窗格依然为「无拆分」，视图密度依然为「默认」，壁纸依然为「默认纯净」；
+         - 切换回 User A：断言 User A 绑定的个性化设置（紧凑、收件箱右侧、深蓝星芒）完好如初；
+         - 测试结束自动清理 User A 与 User B，恪守零假数据准则。
+       - 留存视觉审计截图：
+         - `tests/audit_new_user_default_general_settings.png`
+         - `tests/audit_user_a_customized_settings.png`
+         - `tests/audit_user_b_isolated_defaults.png`
+       - 回归测试 `tests/test-group-ui-consistency-and-visitor-clean.mjs` 100% 通过。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **Cloudflare Workers 部署 Version ID**: `adb830d1-a4c2-44f8-ad12-1b53175c5bd2`。
+    - **epocanvas-mail Git Commit**: PENDING_COMMIT_HASH.
+
 ### 冗余导航删除、全用户组UI与写邮件入口一致、无沙盒真实鉴权与权限单次提示优化上线 (2026-09-09)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **删除冗余导航与下拉管理项 (Sidebar & Header Nav Section Cleanup)**:

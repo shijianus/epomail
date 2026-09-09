@@ -101,6 +101,7 @@ const props = defineProps({
 import router from "@/router";
 import hanburger from '@/components/hamburger/index.vue'
 import {logout} from "@/request/login.js";
+import {updateProfile} from "@/request/my.js";
 import {Icon} from "@iconify/vue";
 import {useUiStore} from "@/store/ui.js";
 import {useUserStore} from "@/store/user.js";
@@ -713,7 +714,9 @@ function openDark(e) {
 }
 
 function switchDark(nextIsDark, root) {
-  uiStore.setThemeMode(nextIsDark ? 'dark' : 'light')
+  const mode = nextIsDark ? 'dark' : 'light'
+  uiStore.setThemeMode(mode)
+  updateProfile({ themeMode: mode }).catch(() => {})
 }
 
 
@@ -726,6 +729,8 @@ function clickLogout() {
   logoutLoading.value = true
   logout().then(() => {
     localStorage.removeItem("token")
+    localStorage.removeItem("ui")
+    uiStore.resetToDefaults()
     router.replace('/login')
   }).finally(() => {
     logoutLoading.value = false

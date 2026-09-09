@@ -169,10 +169,12 @@ const userService = {
         user.density = profile.density || 'default';
         user.inboxType = profile.inboxType || 'default';
         user.inboxConfig = profile.inboxConfig || {};
-        user.readingPane = profile.readingPane || 'right';
+        user.readingPane = profile.readingPane || 'no_split';
         user.conversationView = profile.conversationView ?? true;
-        user.themeWallpaper = profile.themeWallpaper || '';
+        user.themeWallpaper = profile.themeWallpaper || 'none';
         user.themeWallpaperOpacity = profile.themeWallpaperOpacity ?? 85;
+        user.themeMode = profile.themeMode || 'auto';
+        user.lang = profile.lang || '';
         user.personalTelegram = profile.personalTelegram || {
             enabled: false,
             botToken: '',

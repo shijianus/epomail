@@ -78,9 +78,9 @@ export const useUiStore = defineStore('ui', {
                 position: 'right'
             }
         },
-        readingPane: 'right', // 'right' | 'below' | 'no_split'
+        readingPane: 'no_split', // 'no_split' | 'right' | 'below'
         conversationView: true,
-        themeWallpaper: '', // preset id or image url
+        themeWallpaper: 'none', // preset id or 'none' or image url
         themeWallpaperOpacity: 85
     }),
     getters: {
@@ -242,6 +242,49 @@ export const useUiStore = defineStore('ui', {
                     });
                 }
             }
+        },
+        resetToDefaults() {
+            this.density = 'default';
+            this.inboxType = 'default';
+            this.readingPane = 'no_split';
+            this.conversationView = true;
+            this.themeWallpaper = 'none';
+            this.themeWallpaperOpacity = 85;
+            this.resetLabelsToDefault();
+            this.resetInboxConfig();
+            this.setThemeMode('auto');
+            this.applyMainWallpaper();
+        },
+        resetInboxConfig() {
+            this.inboxConfig = {
+                default: {
+                    categories: { primary: true, promotions: true, social: true, updates: true, forums: false },
+                    includeStarredInPrimary: true
+                },
+                priority: {
+                    sections: [
+                        { type: 'important_unread', maxItems: 10 },
+                        { type: 'starred', maxItems: 10 },
+                        { type: 'none', maxItems: 10 },
+                        { type: 'everything', maxItems: 25 }
+                    ],
+                    hideEmpty: true
+                },
+                multiple: {
+                    panels: [
+                        { query: 'is:starred', title: '星标邮件' },
+                        { query: 'is:unread', title: '未读邮件' },
+                        { query: 'has:attachment', title: '含附件' },
+                        { query: 'label:work', title: '工作' }
+                    ],
+                    maxItems: 10,
+                    position: 'right'
+                }
+            };
+        },
+        resetLabelsToDefault() {
+            this.allLabels = JSON.parse(JSON.stringify(BUILTIN_LABELS));
+            this.ensureDefaultRules();
         }
     },
     persist: {

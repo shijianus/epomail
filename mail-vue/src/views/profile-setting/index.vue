@@ -700,7 +700,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, defineOptions } from 'vue'
+import { ref, reactive, computed, watch, defineOptions } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { Icon } from '@iconify/vue'
@@ -721,6 +721,9 @@ const uiStore = useUiStore()
 const settingStore = useSettingStore()
 
 const langSelect = ref(settingStore.lang || 'zh')
+watch(() => settingStore.lang, (val) => {
+  langSelect.value = val || 'zh'
+})
 
 // Bio
 const bioDialogShow = ref(false)
@@ -732,6 +735,9 @@ const customWallpaperDialogShow = ref(false)
 const uploadingWallpaper = ref(false)
 const customWallpaperUrl = ref('')
 const sliderOpacity = ref(uiStore.themeWallpaperOpacity || 85)
+watch(() => uiStore.themeWallpaperOpacity, (val) => {
+  sliderOpacity.value = val || 85
+})
 
 const customCoverDialogShow = ref(false)
 const uploadingCover = ref(false)
@@ -792,6 +798,7 @@ const multipleConfig = reactive({
 
 function setTheme(mode) {
   uiStore.setThemeMode(mode)
+  updateProfile({ themeMode: mode }).catch(() => {})
 }
 
 function getPresetThumbStyle(preset) {
@@ -992,7 +999,9 @@ function changeLang(lang) {
   }
   localStorage.setItem('setting', JSON.stringify({ ...setting, lang }))
   settingStore.lang = lang
-  window.location.reload()
+  updateProfile({ lang }).catch(() => {}).finally(() => {
+    window.location.reload()
+  })
 }
 
 function showSetBio() {
