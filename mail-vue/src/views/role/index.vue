@@ -297,48 +297,56 @@
         <div class="modal-col-right">
           <!-- Permission Tree Header -->
           <div class="perm-tree-header">
-            <span class="perm-title">权限分配细则</span>
+            <div class="perm-title-group">
+              <Icon icon="lucide:shield-check" class="perm-header-ic" width="16" height="16" />
+              <span class="perm-title">权限分配细则</span>
+              <span class="perm-count-badge">{{ locale === 'zh' ? `已选 ${checkedPermsCount} 项` : `${checkedPermsCount} Selected` }}</span>
+            </div>
             <el-radio-group v-model="expand" size="small" @change="expandChange" class="perm-expand">
-              <el-radio-button :label="$t('expand')" :value="true"/>
-              <el-radio-button :label="$t('collapse')" :value="false"/>
+              <el-radio-button :value="true">{{ $t('expand') }}</el-radio-button>
+              <el-radio-button :value="false">{{ $t('collapse') }}</el-radio-button>
             </el-radio-group>
           </div>
 
           <div class="perm-tree-wrap">
-            <el-tree
-                :expand-on-click-node="false"
-                :check-on-click-node="false"
-                accordion
-                ref="tree"
-                :data="treeList"
-                show-checkbox
-                node-key="permId"
-                :default-expand-all="expand"
-                :props="{ label: 'name' }"
-            >
-              <template #default="{ node, data }">
-                <div class="tree-node-content">
-                  <span>{{ node.label }}</span>
-                  <span class="send-num" v-if="data.permKey === 'email:send'" @click.stop>
-                    <el-input-number v-if="form.sendType === 'day' || form.sendType === 'count'" v-model="form.sendCount" controls-position="right" :min="0" :max="99999" size="small"
-                                     :placeholder="$t('total')">
-                    </el-input-number>
-                    <el-select v-model="form.sendType" placeholder="Select" size="small"
-                               :style="`width: ${ locale === 'zh' ? 70 : 90 }px; margin-left: 5px;`">
-                      <el-option :label="$t('total')" value="count"/>
-                      <el-option :label="$t('daily')" value="day"/>
-                      <el-option :label="$t('internal')" value="internal"/>
-                      <el-option :label="$t('btnBan')" value="ban"/>
-                    </el-select>
-                  </span>
-                  <span class="send-num" v-if="data.permKey === 'account:add'" @click.stop>
-                    <el-input-number v-model="form.accountCount" controls-position="right" :min="0" :max="99999"
-                                     size="small" :placeholder="$t('total')">
-                    </el-input-number>
-                  </span>
-                </div>
-              </template>
-            </el-tree>
+            <el-scrollbar class="perm-tree-scrollbar" always>
+              <el-tree
+                  :expand-on-click-node="false"
+                  :check-on-click-node="false"
+                  :accordion="!expand"
+                  ref="tree"
+                  :data="treeList"
+                  show-checkbox
+                  node-key="permId"
+                  :default-expand-all="expand"
+                  :props="{ label: 'name' }"
+                  @check="updateCheckedPermsCount"
+                  @node-collapse="onNodeCollapse"
+              >
+                <template #default="{ node, data }">
+                  <div class="tree-node-content">
+                    <span class="tree-node-label">{{ node.label }}</span>
+                    <span class="send-num" v-if="data.permKey === 'email:send'" @click.stop>
+                      <el-input-number v-if="form.sendType === 'day' || form.sendType === 'count'" v-model="form.sendCount" controls-position="right" :min="0" :max="99999" size="small"
+                                       :placeholder="$t('total')">
+                      </el-input-number>
+                      <el-select v-model="form.sendType" placeholder="Select" size="small"
+                                 :style="`width: ${ locale === 'zh' ? 70 : 90 }px; margin-left: 5px;`">
+                        <el-option :label="$t('total')" value="count"/>
+                        <el-option :label="$t('daily')" value="day"/>
+                        <el-option :label="$t('internal')" value="internal"/>
+                        <el-option :label="$t('btnBan')" value="ban"/>
+                      </el-select>
+                    </span>
+                    <span class="send-num" v-if="data.permKey === 'account:add'" @click.stop>
+                      <el-input-number v-model="form.accountCount" controls-position="right" :min="0" :max="99999"
+                                       size="small" :placeholder="$t('total')">
+                      </el-input-number>
+                    </span>
+                  </div>
+                </template>
+              </el-tree>
+            </el-scrollbar>
           </div>
 
           <div v-if="isVisitor" class="visitor-dialog-notice">
@@ -346,7 +354,8 @@
             <span>您当前处于参观者沙箱模式，点击保存将在当前界面模拟生效，不持久化至数据库。</span>
           </div>
 
-          <el-button class="btn" type="primary" :loading="permLoading" @click="roleFormClick">
+          <el-button class="btn btn-save-role" type="primary" :loading="permLoading" @click="roleFormClick">
+            <Icon icon="lucide:check" width="16" height="16" style="margin-right: 6px;" />
             {{ isVisitor ? '体验保存 (沙箱模拟)' : $t('save') }}
           </el-button>
         </div>
@@ -721,7 +730,23 @@ const domainOptions = computed(() => {
 });
 
 const expand = ref(false);
+const checkedPermsCount = ref(0);
 let chooseRole = {};
+
+function updateCheckedPermsCount() {
+  if (!tree.value) return;
+  const checked = tree.value.getCheckedKeys() || [];
+  checkedPermsCount.value = checked.length;
+}
+
+function onNodeCollapse() {
+  if (expand.value) {
+    expand.value = false;
+    if (tree.value?.store) {
+      tree.value.store.accordion = true;
+    }
+  }
+}
 
 fetchFreshSettings();
 refresh();
@@ -765,6 +790,7 @@ function selectPermsByKeys(keys) {
     }
     collect(treeList);
     tree.value.setCheckedKeys(allIds);
+    updateCheckedPermsCount();
     return;
   }
   const matchedIds = [];
@@ -778,6 +804,7 @@ function selectPermsByKeys(keys) {
   }
   search(treeList);
   tree.value.setCheckedKeys(matchedIds);
+  updateCheckedPermsCount();
 }
 
 function applyTemplate(type) {
@@ -912,16 +939,13 @@ function delRole(role) {
 }
 
 function expandChange(e) {
-  if (e) {
-    const nodes = tree.value?.store.nodesMap;
-    for (const key in nodes) {
-      nodes[key].expanded = true;
-    }
-  } else {
-    const nodes = tree.value?.store.nodesMap;
-    for (const key in nodes) {
-      nodes[key].expanded = false;
-    }
+  if (!tree.value) return;
+  if (tree.value.store) {
+    tree.value.store.accordion = !e;
+  }
+  const nodes = tree.value.store.nodesMap;
+  for (const key in nodes) {
+    nodes[key].expanded = !!e;
   }
 }
 
@@ -976,6 +1000,8 @@ function resetForm() {
   form.banEmail = [];
   form.availDomain = [];
   form.aiModels = [];
+  expand.value = false;
+  checkedPermsCount.value = 0;
   if (tree.value) {
     tree.value.setCheckedKeys([]);
   }
@@ -987,6 +1013,7 @@ function openRoleSet(role) {
   dialogType.title = t('changeRoleTitle');
   dialogType.type = 'set';
   roleFormShow.value = true;
+  expand.value = false;
   form.sort = role.sort;
   form.name = role.name;
   form.roleCode = role.roleCode || role.key || 'custom';
@@ -1003,6 +1030,8 @@ function openRoleSet(role) {
   form.aiModels = Array.isArray(role.aiModels) ? [...role.aiModels] : (typeof role.aiModels === 'string' && role.aiModels ? role.aiModels.split(',').map(s => s.trim()).filter(Boolean) : []);
   nextTick(() => {
     tree.value?.setCheckedKeys(role.permIds || []);
+    expandChange(false);
+    updateCheckedPermsCount();
   });
 }
 
@@ -1011,6 +1040,11 @@ function openAddRole() {
   dialogType.title = t('addRoleTitle');
   dialogType.type = 'add';
   roleFormShow.value = true;
+  expand.value = false;
+  nextTick(() => {
+    expandChange(false);
+    updateCheckedPermsCount();
+  });
 }
 
 function addRole() {
@@ -1437,6 +1471,12 @@ onBeforeUnmount(() => {
   overflow: visible !important;
   margin: auto !important;
 
+  .dialog-title-bar {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
   .el-dialog__body {
     padding: 16px 22px 22px;
     overflow: visible !important;
@@ -1445,12 +1485,13 @@ onBeforeUnmount(() => {
 
 .role-edit-grid {
   display: grid;
-  grid-template-columns: 1.1fr 1fr;
+  grid-template-columns: 1.15fr 1fr;
   gap: 20px;
-  align-items: start;
+  align-items: stretch; /* Strict equal-height alignment for both columns */
 
   @media (max-width: 768px) {
     grid-template-columns: 1fr;
+    align-items: start;
   }
 }
 
@@ -1459,6 +1500,9 @@ onBeforeUnmount(() => {
   flex-direction: column;
   gap: 10px;
 
+  .preset-templates,
+  .form-row,
+  .form-grid-pair,
   .dialog-input {
     margin-bottom: 0 !important;
   }
@@ -1467,27 +1511,89 @@ onBeforeUnmount(() => {
 .modal-col-right {
   display: flex;
   flex-direction: column;
+  height: 100%; /* Match left column height */
 
   .perm-tree-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
     margin-bottom: 8px;
+    height: 32px;
+    flex-shrink: 0;
 
-    .perm-title {
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--text-secondary, #475569);
+    .perm-title-group {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+
+      .perm-header-ic {
+        color: var(--accent-primary, #6366f1);
+      }
+
+      .perm-title {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text-secondary, #475569);
+      }
+
+      .perm-count-badge {
+        font-size: 11px;
+        padding: 2px 7px;
+        border-radius: 12px;
+        background: rgba(99, 102, 241, 0.1);
+        color: var(--accent-primary, #6366f1);
+        font-weight: 500;
+        letter-spacing: 0.2px;
+      }
+    }
+
+    .perm-expand {
+      :deep(.el-radio-button__inner) {
+        padding: 5px 11px;
+        font-size: 12px;
+        font-weight: 500;
+      }
     }
   }
 
   .perm-tree-wrap {
     border: 1px solid var(--border-subtle, #e2e8f0);
     border-radius: 10px;
-    padding: 8px 10px;
     background: var(--bg-elevated, #f8fafc);
-    max-height: 330px;
-    overflow-y: auto;
+    height: 372px;
+    max-height: 372px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+
+    .perm-tree-scrollbar {
+      height: 100%;
+      width: 100%;
+
+      :deep(.el-scrollbar__wrap) {
+        overflow-x: hidden;
+      }
+
+      :deep(.el-scrollbar__view) {
+        padding: 8px 10px;
+      }
+
+      :deep(.el-scrollbar__bar.is-vertical) {
+        width: 6px;
+        right: 2px;
+
+        .el-scrollbar__thumb {
+          background-color: rgba(99, 102, 241, 0.4);
+          border-radius: 6px;
+          transition: background-color 0.2s ease;
+
+          &:hover {
+            background-color: var(--accent-primary, #6366f1);
+          }
+        }
+      }
+    }
 
     :deep(.el-tree) {
       background: transparent !important;
@@ -1496,8 +1602,12 @@ onBeforeUnmount(() => {
 
     :deep(.el-tree-node__content) {
       border-radius: 6px;
-      margin: 1px 0;
+      margin: 2px 0;
+      padding-right: 8px;
+      min-height: 32px;
+      height: auto;
       color: var(--text-primary);
+      transition: background-color 0.15s ease;
 
       &:hover {
         background: var(--bg-hover, #f1f5f9) !important;
@@ -1520,14 +1630,31 @@ onBeforeUnmount(() => {
     display: flex;
     align-items: center;
     gap: 6px;
+    flex-shrink: 0;
   }
 
-  .btn {
+  .btn.btn-save-role {
     width: 100%;
     margin-top: 12px;
     height: 40px;
     font-weight: 600;
+    font-size: 14px;
     border-radius: 8px;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.25);
+    transition: all 0.2s ease;
+
+    &:hover {
+      box-shadow: 0 4px 14px rgba(99, 102, 241, 0.35);
+      transform: translateY(-1px);
+    }
+
+    &:active {
+      transform: translateY(0);
+    }
   }
 }
 
@@ -1535,12 +1662,28 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   width: 100%;
+  min-width: 0;
+
+  .tree-node-label {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 13px;
+  }
 }
 
 .send-num {
-  margin-left: 10px;
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  padding-left: 8px;
+
   .el-input-number {
-    width: 95px;
+    width: 90px;
   }
 }
 
@@ -1756,6 +1899,18 @@ onBeforeUnmount(() => {
   }
 
   .modal-col-right .perm-tree-wrap {
+    .perm-tree-scrollbar {
+      :deep(.el-scrollbar__bar.is-vertical) {
+        .el-scrollbar__thumb {
+          background-color: rgba(129, 140, 248, 0.45) !important;
+
+          &:hover {
+            background-color: #818cf8 !important;
+          }
+        }
+      }
+    }
+
     :deep(.el-tree) {
       background: transparent !important;
       color: var(--text-primary, #f8fafc) !important;
@@ -1770,6 +1925,16 @@ onBeforeUnmount(() => {
 
     :deep(.el-tree-node:focus > .el-tree-node__content) {
       background: var(--bg-hover, #1f293d) !important;
+    }
+  }
+
+  .perm-title-group {
+    .perm-title {
+      color: #f8fafc !important;
+    }
+    .perm-count-badge {
+      background: rgba(99, 102, 241, 0.22) !important;
+      color: #a5b4fc !important;
     }
   }
 

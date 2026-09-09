@@ -11,6 +11,33 @@
    - 在向用户输出回复时，必须置顶/显式打印出本次提交的完整 Commit Hash 与短 Hash，确保版本可追溯、审计记录完整。
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
+### 角色权限身份弹窗左右0偏差严格对齐、权限树互斥与统一展开解耦协同、显式药丸滑块与已选计数徽章上线 (2026-09-09)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **左右两列严密等高与「保存」按钮绝对底部对齐 (Strict 0px Grid Stretch Alignment)**:
+       - 根因分析：原先 `.role-edit-grid` 使用 `align-items: start`，且 `.perm-tree-wrap` 使用固定的 `max-height: 330px`，导致左列（包含 8 个表单项，高 465px）与右列（高 344px~412px）严重不对称；「保存」按钮悬停在半空，下方残留 100px~170px 巨大空白洞，且随树的折叠上下跳动；
+       - 重构优化：`.role-edit-grid` 采用 `align-items: stretch`，`.modal-col-right` 设置 `height: 100%`，`.perm-tree-wrap` 设定精准高度 `height: 372px; max-height: 372px;`，使右列总高度精准达到 `32px + 8px + 372px + 12px + 40px = 464px`；
+       - 「保存」按钮自动下沉锁定于右侧底部，与左侧最底部「排序」计数器底边达成 0 像素偏差（实测 Delta Bottom = 0.5px 内），彻底杜绝悬空与弹跳，并加入白色对勾图标与悬浮微投影。
+    2. **显式可拖拽药丸滑块体系 (`<el-scrollbar>` Always Thumb)**:
+       - 彻底解决原生 `overflow-y: auto` 在系统默认隐藏滚动条时导致底部树节点（如“用户列表”）被腰斩截断且用户无法知悉可滚动的问题；
+       - 引入 `<el-scrollbar class="perm-tree-scrollbar" always>` 配合圆角 6px 药丸滑块（亮色 `rgba(99, 102, 241, 0.4)`，暗色 `rgba(129, 140, 248, 0.45)`），滑块常驻可见并支持丝滑拖拽与滚轮滚动，平滑承载高达 1240px 的全量展开权限项。
+    3. **手风琴互斥 (`accordion`) 与「统一展开」解耦协同 (Dynamic Accordion & Unified Expand)**:
+       - 根因分析：原 `<el-tree>` 写死 `accordion`，在点击「展开全部」时，若未解耦 accordion，任意点击节点会触发 Element Plus 手风琴同级互斥折叠，导致「展开」单选高亮但下方节点收拢的状态撕裂；
+       - 动态绑定 `:accordion="!expand"`，并在 `expandChange(e)` 时优先动态调整 `tree.value.store.accordion = !e`，点击「展开全部」时解除互斥限制并递归展开全部 9 个主模块及子权限（展开内容总高 1240px）；点击「收起全部」时关闭所有层级并自动重设互斥手风琴模式；
+       - `onNodeCollapse` 具备智能状态感知，手动收起时平滑脱离“全部展开”状态并启用互斥，互斥与统一展开完美和谐统一。
+    4. **权限细则头部视觉美化与实时计数徽章 (Header Shield & Count Badge)**:
+       - 标题栏升级为 `<Icon icon="lucide:shield-check" />` 护盾图标 + `权限分配细则`；
+       - 动态计算并展示胶囊徽章 `<span class="perm-count-badge">已选 X 项</span>`，在打开弹窗、套用模板、重置表单及点击复选框（`@check`）时精准实时响应；
+       - 树节点特殊配置项（邮件发送配额与单位、添加邮箱限制）增加 `margin-left: auto` 靠右统一整齐排列，彻底杜绝与节点文字拥挤错位。
+    5. **Playwright 视觉与几何审计 100% 全绿通过**:
+       - `tests/audit_role_form_dialog_detail.mjs`:
+         - 初始态左右高度均为 465px，底边偏差 Delta Bottom = 0.5px；
+         - 展开态内容高度 1240px，弹窗外壳严格维持 576px 不随内容膨胀，滑块常驻且正常拖拽滚动；
+         - 亮色与暗色模式视觉审计截图全部留档：`tests/audit_role_dialog_light_initial.png`、`tests/audit_role_dialog_light_expanded_top.png`、`tests/audit_role_dialog_light_expanded_bottom.png`、`tests/audit_role_dialog_dark_expanded_top.png`、`tests/audit_role_dialog_dark_expanded_bottom.png`、`tests/audit_role_dialog_dark_initial.png`；
+       - `tests/test-ai-model-pool-sync-to-role.mjs`、`tests/test-ai-hub-endpoint-and-selective-test.mjs`、`tests/verify-full-icons.mjs` 全部 100% 全绿通过。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **Cloudflare Workers 部署 Version ID**: `db4c0612-065c-4d00-aed5-74b904016b8a`。
+    - **epocanvas-mail Git Commit**: `PENDING_COMMIT_HASH` (Short Hash: `PENDING`).
+
 ### OAuth 授权页直接采用博客现成标签页图片、按钮0偏差对齐、Duotone权限图标体系与生产端全链路审计上线 (2026-09-08)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **直接扫描采用现成标签页展示图片，拒绝虚假新建与假图标 (Direct Real Tab Logo Display)**:
