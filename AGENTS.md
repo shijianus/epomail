@@ -11,6 +11,46 @@
    - 在向用户输出回复时，必须置顶/显式打印出本次提交的完整 Commit Hash 与短 Hash，确保版本可追溯、审计记录完整。
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
+### 角色弹窗说明与展开收起精简、下拉无截断呈现、卡片分割线消除、v1.1.0版本轮替同步与官方URL矩阵全面上线 (2026-09-09)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **角色弹窗冗余说明与展开收起精简 (Role Dialog Simplification & 0px Strict Alignment)**:
+       - 彻底删除 `.form-grid-pair` 中已过时的说明文案 `0MB为无存储(参观者需外接DB)` 与 `LV.1及以上书友开放附件`；
+       - 移除头部切换按钮组 `<el-radio-group v-model="expand" class="perm-expand">`，权限树头部回归简洁纯粹的护盾图标 + `权限分配细则` + 动态实时徽章 `已选 X 项`；
+       - `<el-tree>` 固化标准手风琴互斥模式（`accordion` 且 `:default-expand-all="false"`），既保持节点折叠整洁，又由 `<el-scrollbar always>` 药丸滑块平滑支持滚动；
+       - 右列 `.perm-tree-wrap` 采用响应式弹性伸缩 `flex: 1; min-height: 0;`，两列总高度均为 444px，底部「保存」按钮与左侧「排序」输入框底边达成绝对 0 像素偏差（实测 Delta Bottom = 0.00px）。
+    2. **`el-select__wrapper` 下拉框无截断优化 (Zero-Ellipsis Select Presentation)**:
+       - 根因分析：Element Plus 默认对 `.el-select__placeholder` 和 `.el-select__tags-text` / `.el-select__selected-item` 施加 `text-overflow: ellipsis; white-space: nowrap;`，导致角色弹窗与系统设置中稍长文本或标签在末尾产生突兀的 `...` 截断；
+       - 全局 `style.css` 与角色弹窗组件深入注入样式：`.el-select__placeholder` 与 `.el-select__tags-text` 设置 `text-overflow: clip !important; max-width: none !important;`；
+       - 将角色弹窗 AI 模型占位符由过长的 26 字符精简为清晰明确的 `允许调用的 AI 模型 (留空代表允许全部)`；
+       - 在系统设置可用模型池中移除 `collapse-tags` 与 `collapse-tags-tooltip`，使模型池标签完整展开并自然换行呈现，杜绝折叠为 `+N` 和 `...`。
+    3. **卡片内部分割线彻底消除 (Divider Removal in `.card-content`)**:
+       - 在 `.card-content` 全局容器规则中注入 `& > * { border-bottom: none !important; }`，彻底清除任意卡片内部子元素间的可见底部分割线；
+       - 同步重构 `.storage-db-card .setting-item`，移除原有 `border-bottom: 1px solid ...`，使存储与系统卡片视觉画风高度纯净、浑然一体。
+    4. **全局版本严格轮替同步至 `v1.1.0` (SemVer Bump to v1.1.0 & Unified Sync)**:
+       - 审计 Git 历史：前置版本标签为 `v1.0.6`，距今已有 212 次提交，涵盖 Gmail UI 全面重构、300+ 离线图标系统、AI Hub 与多模型池架构、OAuth 2.0 / OIDC 认证中心、角色细粒度权限系统与存储治理；依据语义化版本规范，本次正式轮替升级至 `v1.1.0`；
+       - 建立统一版本常量模块 `mail-vue/src/const/version.js`，导出 `APP_VERSION = 'v1.1.0'` 与 `APP_VERSION_TAG = 'EpoMail v1.1.0 · Cloudflare Workers'`；
+       - 底栏状态栏 `.status-text.version-tag` 与系统设置「关于」卡片中的版本徽章 `<el-badge>` 统一动态读取该常量，实现两处版本严格 100% 同步展示；
+       - 同步升级 `mail-vue/package.json` 与 `mail-worker/package.json` 版本号至 `1.1.0`。
+    5. **官方交流、赞助与文档 URL 矩阵全面上线 (Official URL Matrix Migration)**:
+       - 交流 GitHub: 全面指向官方上游仓库 `https://github.com/shijianus/epomail`，更新 Releases 页面与最新版本检查 API 接口；
+       - 交流 Telegram: 替换旧第三方群组为自有频道 `https://t.me/epomail`；
+       - 赞助渠道: 替换旧 skymail 链接为自有博客赞助页占位符 `https://blog.epocanvas.com/support`；
+       - 帮助文档: 替换旧文档为官方文档站地址 `https://docs.epocanvas.com/epomail`。
+    6. **Playwright 全链路自动化与视觉审计 100% 全绿通过**:
+       - 执行 `tests/audit_new_features.mjs`:
+         - 状态栏版本: `EpoMail v1.1.0 · Cloudflare Workers`；
+         - 关于卡片版本: `v1.1.0`；
+         - 5 项跳转链接全部精确断言通过；
+         - `.card-content` 内可见分割线实测计数为 0；
+         - 角色弹窗说明与切换按钮已清除；
+         - 所有 `el-select__wrapper` 绝无 `...` 尾部截断；
+         - 左右两列底边偏差 Delta Bottom = 0.00px；
+         - 视觉审计截图留档：`tests/audit_about_card_clean.png`、`tests/audit_role_dialog_light_clean.png`、`tests/audit_role_dialog_dark_clean.png`；
+       - `tests/test-ai-model-pool-sync-to-role.mjs` 与 `tests/verify-full-icons.mjs` 全部 100% 通过。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **Cloudflare Workers 部署 Version ID**: `2d164123-bf1a-48f8-a222-b18e21d30990`。
+    - **epocanvas-mail Git Commit**: `48e6a47c5d0ff37037e85b551d5bdc666bd60b5f` (Short Hash: `48e6a47`).
+
 ### 角色权限身份弹窗左右0偏差严格对齐、权限树互斥与统一展开解耦协同、显式药丸滑块与已选计数徽章上线 (2026-09-09)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **左右两列严密等高与「保存」按钮绝对底部对齐 (Strict 0px Grid Stretch Alignment)**:
