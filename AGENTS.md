@@ -12,6 +12,37 @@
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
 
+### 系统设置AI Hub接口端点智能补齐与回退、选定模型按需测试与0-Token测速优化、移除无实效管理员开关上线 (2026-09-08)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **移除无实效设置项 `aiAdminOnly` (Removal of Redundant Flag)**:
+       - 彻底删除 `.ai-hub-card` 中的「仅限管理员使用 AI」设置项；AI 权限已解耦并固化为基于 `/role` 角色模型授权体系统一管控，消除了无实际同步逻辑与状态割裂的问题。
+    2. **取消自动测试、选定模型按需测试与 API 用量提醒 (Selective On-Demand Test & Token Hint)**:
+       - 彻底取消模型下拉框聚焦/展开以及弹窗打开时的隐式自动连通性测试与模型探测，杜绝 API 额外配额消耗与测试循环；
+       - 下拉菜单初始展开直接即时展示所有可用候选模型（零网络请求、零延迟开销）；
+       - 仅在用户主动点击「测试连通性」(`opt-btn-test-ai-dialog`) 或点击「保存配置」时，才对当前选定的模型（主推理模型与多模型池中的模型）发起连通性测试；
+       - 在测试连通性按钮旁增加带有圆圈问号 `?` 图标的 `<el-tooltip>`，显式提示测试可能消耗极少量 API Token；
+       - 保存配置前自动执行选定模型连通性验证，仅在验证通过后才持久化并关闭弹窗。
+    3. **0-Token 测速优化与极简延迟测量 (Zero-Token Latency Optimization)**:
+       - 优化大模型连通性与延时测算机制：优先采用免消耗 Token 的元数据拉取方案 (`GET /models` 或 `GET /v1/models/{model}`)，在仅验证 API Key 与网络往返的情况下计算真实毫秒延迟，达成 0-Token 纯测速；
+       - 若元数据接口不可用，则平滑降级至 `max_tokens: 1` 的单 Token 极简连通测试，最大程度节约用户 API 配额；
+       - 对于 Cloudflare Workers AI，增强本地 binding 健壮性自愈校验，消除特定预设模型废弃对保存校验造成的阻塞。
+    4. **接口端点智能补齐、精确 URL 支持与原始回退 (Smart Endpoint Candidate Probing & Raw Fallback)**:
+       - 接口地址（Base URL）支持输入服务商根域名（如 `https://api.openai.com`、`https://api.deepseek.com`、`https://api.anthropic.com`），系统自动探测 `/v1/chat/completions`、`/chat/completions`、`/v1/messages` 等多协议候选路径；
+       - 支持直接输入完整端点 URL 进行精确匹配；若所有候选补齐探测均不匹配，自动平滑回退至用户输入的原始完整 URL；
+       - 在「接口地址 (Base URL)」标签旁增加圆圈问号 `?` 的 `<el-tooltip>`，详尽说明根域名自动补齐与精确 URL 输入规则。
+    5. **Playwright 视觉审计与自动化端到端测试 100% 全绿通过**:
+       - `tests/test-ai-hub-endpoint-and-selective-test.mjs`:
+         - 验证 `aiAdminOnly` 设置项彻底移除；
+         - 验证接口地址与测试按钮旁带有完整问号注释 Tooltip；
+         - 验证展开下拉框直接渲染候选模型列表且无后台触发请求；
+         - 验证点击测试连通性仅测算选定模型与模型池，并保持弹窗打开；
+         - 验证保存配置时触发测试并持久化成功；
+         - 测试全程自动恢复配置，恪守零假数据准则；
+       - `tests/test-ai-hub-card-and-models-detection.mjs`、`tests/test-shijianus-oauth-authorize-visual.mjs`、`tests/verify-full-icons.mjs` 全部 100% 全绿通过。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **Cloudflare Workers 部署 Version ID**: `484a499e-6d13-4d0e-9ae6-ef5198fec73e`。
+    - **epocanvas-mail Git Commit**: `PENDING_COMMIT_HASH` (Short Hash: `PENDING`).
+
 ### 系统设置已选定模型池实时同步角色权限AI允许模型下拉单、彻底杜绝硬编码假数据与来源分类胶囊徽章上线 (2026-09-08)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **根因精准定位与全链路闭环修复 (Root Cause Resolution & Store/Getter Harmonization)**:

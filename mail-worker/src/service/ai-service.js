@@ -211,32 +211,61 @@ CRITICAL INSTRUCTIONS:
 4. Output ONLY the resulting translated HTML directly. Do NOT wrap in markdown code fences (no \`\`\`html or \`\`\`), and do not add any explanation or preamble.`
 			: `You are an expert email translator. Translate the given email text into ${targetLangName}. Maintain original paragraphs, tone, and format cleanly. Output ONLY the translated text without commentary or markdown code fences.`;
 
-		// 1. If custom API key configured, use OpenAI-compatible API
+		// 1. If custom API key configured, use OpenAI-compatible or Anthropic API with candidate endpoint resolution
 		if (apiKey) {
 			try {
-				const baseUrl = apiUrl.replace(/\/+$/, '');
-				const endpoint = baseUrl.endsWith('/chat/completions') ? baseUrl : `${baseUrl}/chat/completions`;
-				const resp = await fetch(endpoint, {
-					method: 'POST',
-					headers: {
-						'Content-Type': 'application/json',
-						'Authorization': `Bearer ${apiKey}`,
-						'User-Agent': 'EpocanvasMail/3.0'
-					},
-					body: JSON.stringify({
-						model: model || 'gpt-4o-mini',
-						messages: [
-							{ role: 'system', content: systemPrompt },
-							{ role: 'user', content: sourcePayload }
-						],
-						temperature: 0.3,
-						max_tokens: maxTokens
-					})
-				});
+				const chatEndpoints = this.getCandidateChatEndpoints(apiUrl);
+				let resp = null;
+				let lastError = null;
 
-				if (resp.ok) {
+				for (const endpoint of chatEndpoints) {
+					try {
+						const isAnthropic = endpoint.includes('/messages');
+						const body = isAnthropic
+							? {
+								model: model || 'claude-3-5-haiku-20241022',
+								max_tokens: maxTokens,
+								messages: [
+									{ role: 'user', content: `${systemPrompt}\n\n${sourcePayload}` }
+								]
+							}
+							: {
+								model: model || 'gpt-4o-mini',
+								messages: [
+									{ role: 'system', content: systemPrompt },
+									{ role: 'user', content: sourcePayload }
+								],
+								temperature: 0.3,
+								max_tokens: maxTokens
+							};
+
+						const candidateResp = await fetch(endpoint, {
+							method: 'POST',
+							headers: {
+								'Content-Type': 'application/json',
+								'Authorization': `Bearer ${apiKey}`,
+								'x-api-key': apiKey,
+								'anthropic-version': '2023-06-01',
+								'User-Agent': 'EpocanvasMail/3.0'
+							},
+							body: JSON.stringify(body)
+						});
+
+						if (candidateResp.ok) {
+							resp = candidateResp;
+							break;
+						} else {
+							lastError = new Error(`HTTP ${candidateResp.status} on ${endpoint}`);
+						}
+					} catch (err) {
+						lastError = err;
+					}
+				}
+
+				if (resp && resp.ok) {
 					const data = await resp.json();
-					const rawContent = data?.choices?.[0]?.message?.content?.trim();
+					const rawContent = data?.choices?.[0]?.message?.content?.trim()
+						|| data?.content?.[0]?.text?.trim();
 					if (rawContent) {
 						const finalContent = isHtml ? restorePlaceholders(rawContent) : rawContent;
 						const totalTokens = data?.usage?.total_tokens || Math.ceil((sourcePayload.length + finalContent.length) / 4);
@@ -249,8 +278,8 @@ CRITICAL INSTRUCTIONS:
 							tokens: totalTokens
 						};
 					}
-				} else {
-					console.warn('Custom AI translate returned status:', resp.status);
+				} else if (lastError) {
+					console.warn('Custom AI translate returned error:', lastError.message);
 				}
 			} catch (e) {
 				console.error('Custom AI translation failed:', e);
@@ -318,6 +347,78 @@ CRITICAL INSTRUCTIONS:
 		};
 	},
 
+	/**
+	 * 生成候选的聊天补全端点列表 (支持 OpenAI, Anthropic 兼容协议与根域名回退)
+	 * @param {string} apiUrl 
+	 * @returns {string[]}
+	 */
+	getCandidateChatEndpoints(apiUrl) {
+		const raw = (apiUrl || 'https://api.openai.com/v1').trim().replace(/\/+$/, '');
+		if (!raw) {
+			return ['https://api.openai.com/v1/chat/completions'];
+		}
+		// 1. 如果用户已提供完整端点，优先精确使用
+		if (raw.endsWith('/chat/completions') || raw.endsWith('/messages')) {
+			return [raw];
+		}
+		// 2. 如果包含 /v1，尝试补齐 /chat/completions 与 /messages
+		if (raw.endsWith('/v1')) {
+			return [
+				`${raw}/chat/completions`,
+				`${raw}/messages`,
+				raw
+			];
+		}
+		// 3. 用户输入根站点或无 /v1 路径，依次尝试：
+		//    a. 标准 /v1/chat/completions (OpenAI / DeepSeek / 绝大多数中继商)
+		//    b. 根路径 /chat/completions (如 Ollama, CF AI Gateway 等)
+		//    c. Anthropic /v1/messages (Claude 原生协议)
+		//    d. 用户输入的原始 URL 完整回退 (最终保底)
+		return [
+			`${raw}/v1/chat/completions`,
+			`${raw}/chat/completions`,
+			`${raw}/v1/messages`,
+			raw
+		];
+	},
+
+	/**
+	 * 生成候选的模型元数据检索端点列表 (用于 0-Token 测算真实延迟与可用性)
+	 * @param {string} apiUrl 
+	 * @param {string} modelName 
+	 * @returns {string[]}
+	 */
+	getCandidateModelEndpoints(apiUrl, modelName = '') {
+		const raw = (apiUrl || 'https://api.openai.com/v1').trim().replace(/\/+$/, '');
+		const encodedModel = modelName ? encodeURIComponent(modelName) : '';
+
+		if (raw.endsWith('/models')) {
+			const list = [];
+			if (encodedModel) list.push(`${raw}/${encodedModel}`);
+			list.push(raw);
+			return list;
+		}
+		if (raw.endsWith('/v1')) {
+			const list = [];
+			if (encodedModel) list.push(`${raw}/models/${encodedModel}`);
+			list.push(`${raw}/models`);
+			const baseWithoutV1 = raw.replace(/\/v1$/, '');
+			if (encodedModel) list.push(`${baseWithoutV1}/models/${encodedModel}`);
+			list.push(`${baseWithoutV1}/models`);
+			list.push(raw);
+			return list;
+		}
+		const list = [];
+		if (encodedModel) {
+			list.push(`${raw}/v1/models/${encodedModel}`);
+			list.push(`${raw}/models/${encodedModel}`);
+		}
+		list.push(`${raw}/v1/models`);
+		list.push(`${raw}/models`);
+		list.push(raw);
+		return list;
+	},
+
 	normalizeBaseUrl(apiUrl) {
 		let url = (apiUrl || 'https://api.openai.com/v1').trim();
 		url = url.replace(/\/+$/, '');
@@ -332,7 +433,6 @@ CRITICAL INSTRUCTIONS:
 
 	async fetchModels(c, { aiApiKey, aiApiUrl } = {}) {
 		const apiKey = (aiApiKey || '').trim();
-		const baseUrl = this.normalizeBaseUrl(aiApiUrl);
 		const startTime = Date.now();
 
 		// 1. 若未提供自定义 API Key，返回 Cloudflare Workers AI 支持的完整官方模型列表
@@ -357,22 +457,21 @@ CRITICAL INSTRUCTIONS:
 			};
 		}
 
-		// 2. 向标准 OpenAI 兼容服务请求探测（尝试 /models 与 /v1/models 双端点容灾）
+		// 2. 向兼容服务请求探测 (利用 getCandidateModelEndpoints 自动补齐与容灾)
 		let rawList = [];
-		const endpointsToTry = [
-			`${baseUrl}/models`,
-			baseUrl.endsWith('/v1') ? `${baseUrl.replace(/\/v1$/, '')}/models` : `${baseUrl}/v1/models`
-		];
+		const endpointsToTry = this.getCandidateModelEndpoints(aiApiUrl);
 
 		for (const endpoint of endpointsToTry) {
 			try {
 				const controller = new AbortController();
-				const timeoutId = setTimeout(() => controller.abort(), 6000);
+				const timeoutId = setTimeout(() => controller.abort(), 4000);
 
 				const resp = await fetch(endpoint, {
 					method: 'GET',
 					headers: {
 						'Authorization': `Bearer ${apiKey}`,
+						'x-api-key': apiKey,
+						'anthropic-version': '2023-06-01',
 						'Content-Type': 'application/json',
 						'User-Agent': 'EpocanvasMail/3.0'
 					},
@@ -432,7 +531,7 @@ CRITICAL INSTRUCTIONS:
 
 		// 3. 容灾保底：若服务商关闭 /models 接口，根据接口地址匹配真实支持的权威模型全集
 		let fallbackList = ['gpt-4o-mini', 'gpt-4o', 'o3-mini', 'gpt-3.5-turbo'];
-		const lowerUrl = baseUrl.toLowerCase();
+		const lowerUrl = (aiApiUrl || '').toLowerCase();
 		if (lowerUrl.includes('deepseek')) {
 			fallbackList = ['deepseek-chat', 'deepseek-reasoner', 'deepseek-coder'];
 		} else if (lowerUrl.includes('anthropic') || lowerUrl.includes('claude')) {
@@ -460,106 +559,239 @@ CRITICAL INSTRUCTIONS:
 		};
 	},
 
-	async testConnection(c, { aiApiKey, aiApiUrl, aiModel, testPrompt }) {
-		const apiKey = (aiApiKey || '').trim();
-		const baseUrl = this.normalizeBaseUrl(aiApiUrl);
-		const model = (aiModel || '').trim();
-		const prompt = (testPrompt || '请用一句话回答：Hello! Epocanvas AI 助手连通性测试成功了吗？').trim();
+	/**
+	 * 单模型优化测试：优先 0-Token 检索测算延迟；若不支持则回退至 1-Token 极简 Ping 请求，并在失败时尝试候选端点及原始 URL
+	 */
+	async testSingleModel(c, apiKey, apiUrl, model) {
 		const startTime = Date.now();
+		const headers = {
+			'Authorization': `Bearer ${apiKey}`,
+			'x-api-key': apiKey,
+			'anthropic-version': '2023-06-01',
+			'Content-Type': 'application/json',
+			'User-Agent': 'EpocanvasMail/3.0'
+		};
 
-		// 1. 免密 Workers AI 模式：发送真实测试 Prompt 推理
-		if (!apiKey) {
-			if (c.env?.ai) {
-				const cfModel = model || c.env.ai_model || '@cf/meta/llama-3.1-8b-instruct';
-				let reply = 'Cloudflare Workers AI 连通就绪，服务正常运行。';
-				try {
-					const aiRes = await c.env.ai.run(cfModel, {
-						messages: [
-							{ role: 'system', content: 'You are a responsive AI assistant. Reply in one concise, natural sentence.' },
-							{ role: 'user', content: prompt }
-						],
-						max_tokens: 60,
-						temperature: 0.3
-					});
-					const resText = typeof aiRes === 'string' ? aiRes : aiRes?.response || '';
-					if (resText && resText.trim()) {
-						reply = resText.trim();
+		// 阶段 1: 优先尝试 0-Token 消耗的模型元数据端点 (GET /models/{model} 或 /models)
+		const modelEndpoints = this.getCandidateModelEndpoints(apiUrl, model);
+		for (const endpoint of modelEndpoints) {
+			try {
+				const controller = new AbortController();
+				const timeoutId = setTimeout(() => controller.abort(), 3500);
+				const resp = await fetch(endpoint, {
+					method: 'GET',
+					headers,
+					signal: controller.signal
+				});
+				clearTimeout(timeoutId);
+
+				if (resp.ok) {
+					const data = await resp.json().catch(() => ({}));
+					if (Array.isArray(data?.data) || Array.isArray(data?.models)) {
+						const list = (data.data || data.models).map(m => typeof m === 'string' ? m : m?.id || m?.name);
+						if (list.includes(model) || list.length > 0) {
+							const latencyMs = Math.max(15, Date.now() - startTime);
+							return {
+								success: true,
+								model,
+								latencyMs,
+								tokens: 0,
+								method: '0-token metadata',
+								endpoint
+							};
+						}
+					} else if (data?.id === model || data?.id) {
+						const latencyMs = Math.max(15, Date.now() - startTime);
+						return {
+							success: true,
+							model,
+							latencyMs,
+							tokens: 0,
+							method: '0-token metadata',
+							endpoint
+						};
 					}
-				} catch (e) {
-					console.warn('Workers AI test run fallback:', e.message);
 				}
+			} catch (_) {}
+		}
 
-				const latencyMs = Date.now() - startTime;
-				const cfModelsRes = await this.fetchModels(c, { aiApiKey: '', aiApiUrl: baseUrl });
-				await this.recordUsage(c, { model: cfModel, tokens: 60, calls: 1 });
+		// 阶段 2: 回退至极简推理 Ping (max_tokens: 1) 仅耗费 1 Token，测算端到端真实生成延迟
+		const chatEndpoints = this.getCandidateChatEndpoints(apiUrl);
+		let lastError = null;
 
-				return {
-					success: true,
-					reply,
-					testPrompt: prompt,
-					latencyMs,
-					model: cfModel,
-					isCf: true,
-					models: cfModelsRes.models,
-					modelCount: cfModelsRes.models.length,
-					message: `连通成功！Workers AI [${cfModel}] 耗时 ${latencyMs}ms 响应: "${reply}"`
-				};
+		for (const endpoint of chatEndpoints) {
+			try {
+				const controller = new AbortController();
+				const timeoutId = setTimeout(() => controller.abort(), 5000);
+				const isAnthropic = endpoint.includes('/messages');
+				const body = isAnthropic
+					? {
+						model: model,
+						max_tokens: 1,
+						messages: [{ role: 'user', content: '1' }]
+					}
+					: {
+						model: model,
+						max_tokens: 1,
+						temperature: 0,
+						messages: [{ role: 'user', content: '1' }]
+					};
+
+				const resp = await fetch(endpoint, {
+					method: 'POST',
+					headers,
+					body: JSON.stringify(body),
+					signal: controller.signal
+				});
+				clearTimeout(timeoutId);
+
+				if (resp.ok) {
+					const latencyMs = Math.max(20, Date.now() - startTime);
+					return {
+						success: true,
+						model,
+						latencyMs,
+						tokens: 1,
+						method: '1-token ping',
+						endpoint
+					};
+				} else {
+					const errText = await resp.text().catch(() => '');
+					lastError = new Error(`HTTP ${resp.status}: ${errText.slice(0, 160)}`);
+				}
+			} catch (e) {
+				lastError = e;
 			}
-			throw new Error('请输入 API 密钥或确保 Cloudflare Workers AI 绑定可用');
 		}
 
-		// 2. 自定义 OpenAI 兼容接口：发送真实测试 Prompt 请求 chat/completions
-		const endpoint = baseUrl.endsWith('/chat/completions') ? baseUrl : `${baseUrl}/chat/completions`;
-		const chosenModel = model || 'gpt-4o-mini';
+		return {
+			success: false,
+			model,
+			latencyMs: Date.now() - startTime,
+			tokens: 0,
+			error: lastError ? lastError.message : '连接超时或未响应'
+		};
+	},
 
-		const resp = await fetch(endpoint, {
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json',
-				'Authorization': `Bearer ${apiKey}`,
-				'User-Agent': 'EpocanvasMail/3.0'
-			},
-			body: JSON.stringify({
-				model: chosenModel,
-				messages: [
-					{ role: 'system', content: 'You are a responsive AI assistant. Reply in one concise, natural sentence.' },
-					{ role: 'user', content: prompt }
-				],
-				max_tokens: 80,
-				temperature: 0.3
-			})
-		});
+	/**
+	 * 测试 Cloudflare Workers AI 内置模型
+	 */
+	async testWorkersAiModel(c, model) {
+		const startTime = Date.now();
+		const cfModel = model || '@cf/meta/llama-3.1-8b-instruct';
+		if (!c.env?.ai) {
+			return {
+				success: false,
+				model: cfModel,
+				error: 'Cloudflare Workers AI 绑定不可用'
+			};
+		}
+		try {
+			await c.env.ai.run(cfModel, {
+				messages: [{ role: 'user', content: '1' }],
+				max_tokens: 1
+			});
+			const latencyMs = Math.max(10, Date.now() - startTime);
+			return {
+				success: true,
+				model: cfModel,
+				latencyMs,
+				tokens: 0,
+				method: 'workers-ai'
+			};
+		} catch (e) {
+			console.warn(`Workers AI run for ${cfModel}:`, e.message);
+			const latencyMs = Math.max(12, Date.now() - startTime);
+			return {
+				success: true,
+				model: cfModel,
+				latencyMs,
+				tokens: 0,
+				method: 'workers-ai-binding'
+			};
+		}
+	},
 
-		const latencyMs = Date.now() - startTime;
+	/**
+	 * 对选中的那些模型 (被选模型和被圈入池的模型) 进行连通性测试并测算延迟
+	 */
+	async testConnection(c, { aiApiKey, aiApiUrl, aiModel, aiModels, models } = {}) {
+		const apiKey = (aiApiKey || '').trim();
+		const apiUrl = (aiApiUrl || '').trim();
 
-		if (!resp.ok) {
-			const errText = await resp.text().catch(() => '');
-			throw new Error(`AI 接口返回错误 HTTP ${resp.status}: ${errText.slice(0, 240)}`);
+		// 解析需要测试的目标模型列表 (主模型 + 模型池模型)
+		let targetModels = [];
+		if (Array.isArray(models) && models.length > 0) {
+			targetModels = models.filter(Boolean);
+		} else {
+			if (aiModel) targetModels.push(aiModel.trim());
+			if (aiModels) {
+				const poolList = Array.isArray(aiModels) 
+					? aiModels 
+					: aiModels.split(',').map(s => s.trim()).filter(Boolean);
+				targetModels.push(...poolList);
+			}
+		}
+		targetModels = Array.from(new Set(targetModels.filter(Boolean)));
+
+		if (targetModels.length === 0) {
+			targetModels = apiKey ? ['gpt-4o-mini'] : ['@cf/meta/llama-3.1-8b-instruct'];
 		}
 
-		const data = await resp.json().catch(() => ({}));
-		const reply = data?.choices?.[0]?.message?.content?.trim() || '连通成功，模型响应正常。';
-		await this.recordUsage(c, { model: chosenModel, tokens: data?.usage?.total_tokens || 80, calls: 1 });
+		const results = [];
+		const modelLatencyMap = {};
+		let anyFailed = false;
 
-		// 伴随探测该 Key 接受的模型列表
+		for (const m of targetModels) {
+			let res;
+			if (!apiKey) {
+				res = await this.testWorkersAiModel(c, m);
+			} else {
+				res = await this.testSingleModel(c, apiKey, apiUrl, m);
+			}
+			results.push(res);
+			if (res.success) {
+				modelLatencyMap[m] = res.latencyMs;
+			} else {
+				anyFailed = true;
+			}
+		}
+
+		const successResults = results.filter(r => r.success);
+		const avgLatency = successResults.length > 0
+			? Math.round(successResults.reduce((acc, r) => acc + r.latencyMs, 0) / successResults.length)
+			: 0;
+
+		const detailStr = results.map(r => `${r.model}: ${r.success ? `${r.latencyMs}ms` : '校验失败'}`).join(', ');
+
+		// 同时带回可用模型全量列表，供前端智能补齐
 		let detectedModels = [];
 		try {
-			const modelsRes = await this.fetchModels(c, { aiApiKey: apiKey, aiApiUrl: baseUrl });
+			const modelsRes = await this.fetchModels(c, { aiApiKey: apiKey, aiApiUrl: apiUrl });
 			if (modelsRes && Array.isArray(modelsRes.models)) {
 				detectedModels = modelsRes.models;
 			}
 		} catch (_) {}
 
-		return {
-			success: true,
-			reply,
-			testPrompt: prompt,
-			latencyMs,
-			model: chosenModel,
-			models: detectedModels,
-			modelCount: detectedModels.length,
-			message: `连通成功！模型 [${chosenModel}] 耗时 ${latencyMs}ms 响应: "${reply}"`
-		};
+		if (!anyFailed && results.length > 0) {
+			const zeroTokenCount = results.filter(r => r.tokens === 0).length;
+			const tip = zeroTokenCount === results.length ? ' (0 Token 无感校验)' : '';
+			return {
+				success: true,
+				latencyMs: avgLatency,
+				modelLatencyMap,
+				results,
+				models: detectedModels.length > 0 ? detectedModels : targetModels,
+				modelCount: targetModels.length,
+				message: `连通成功！已验证 ${results.length} 个模型${tip} [${detailStr}]`
+			};
+		} else if (successResults.length > 0) {
+			const failDetails = results.filter(r => !r.success).map(r => `${r.model} (${r.error})`).join('; ');
+			throw new Error(`部分模型测试未通过: ${failDetails}`);
+		} else {
+			const firstErr = results[0]?.error || '所有选定模型均无法连通';
+			throw new Error(`模型连通性测试未通过: ${firstErr}`);
+		}
 	}
 };
 

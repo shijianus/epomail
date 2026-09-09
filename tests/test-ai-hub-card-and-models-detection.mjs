@@ -56,7 +56,7 @@ import assert from "assert";
     assert.ok(cardText.includes("每日调用上限"), "卡片应包含单用户每日调用上限限制项");
     assert.ok(cardText.includes("速率限制"), "卡片应包含请求速率 RPM 限制项");
     assert.ok(cardText.includes("Token"), "卡片应包含单次最大 Token 限制项");
-    assert.ok(cardText.includes("管理员"), "卡片应包含仅限管理员使用 AI 限制项");
+    assert.strictEqual(cardText.includes("仅限管理员使用 AI"), false, "卡片已根据规范移除无实效的仅限管理员使用 AI 限制项");
 
     // 验证单个设置 API 按钮
     const settingsBtn = await page.$(".ai-hub-card .opt-button");
@@ -64,7 +64,7 @@ import assert from "assert";
 
     // 验证控制项的 switch 与 input-number 组件
     const switches = await page.$$(".ai-hub-card .el-switch");
-    assert.ok(switches.length >= 2, "卡片中应至少包含启用开关与管理员独占 2 个 el-switch 开关");
+    assert.ok(switches.length >= 1, "卡片中应包含启用 AI 开关");
 
     const inputNumbers = await page.$$(".ai-hub-card .el-input-number");
     assert.ok(inputNumbers.length >= 3, "卡片中应至少包含每日次数、速率RPM、最大Token 3 个 el-input-number 控制项");
@@ -72,7 +72,7 @@ import assert from "assert";
     // 验证快捷 API 连通性测试按钮
     const testAiBtn = await page.$(".ai-hub-card .forward .el-button:not(.opt-button)");
     assert.ok(testAiBtn, "卡片中必须存在快捷 API 测试按钮 (.forward .el-button:not(.opt-button))");
-    console.log("  ✓ 卡片具备单一选单设置 API、5 大 AI 限制控制项与快捷连通性测试按钮，画风高度一致");
+    console.log("  ✓ 卡片具备单一选单设置 API、AI 限制控制项与快捷连通性测试按钮，画风高度一致");
 
     // 4. 执行卡片快捷 API 测试
     console.log("\n[步骤 4] 执行卡片快捷 API 连通性测试...");
@@ -148,6 +148,16 @@ import assert from "assert";
     const headerTooltip = await page.$(".ai-hub-dialog-header .ai-help-icon-wrap");
     assert.ok(headerTooltip, "弹窗标题栏必须包含 '?' Tooltip 注释图标");
     console.log("  ✓ 显式 alert 已成功转为弹窗标题栏 '?' 注释 Tooltip");
+
+    // 验证接口地址 (Base URL) 旁边包含 '?' Tooltip 注释
+    const endpointTooltip = await page.$(".ai-form-item-label .ai-help-icon-wrap");
+    assert.ok(endpointTooltip, "接口地址 (Base URL) label 旁边必须包含 '?' Tooltip 注释");
+    console.log("  ✓ 接口地址 label 旁边包含完整的 '?' Tooltip 注释");
+
+    // 验证测试连通性按钮旁边包含 '?' API 消耗提醒 Tooltip 注释
+    const testUsageTooltip = await page.$(".footer-left .ai-help-icon-wrap");
+    assert.ok(testUsageTooltip, "连通性测试按钮旁边必须包含 '?' API 用量提醒 Tooltip 注释");
+    console.log("  ✓ 连通性测试按钮旁边包含 '?' API 用量提醒 Tooltip 注释");
 
     // 验证 .ai-test-live-result 横幅提示卡片已被彻底删除 (按用户要求)
     const liveResultCard = await page.$(".ai-hub-dialog .ai-test-live-result");

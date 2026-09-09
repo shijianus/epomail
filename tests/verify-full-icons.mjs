@@ -42,7 +42,8 @@ async function verify() {
     localStorage.setItem("locale", "zh");
   }, token);
   await page.goto(`${BASE_URL}/inbox`, { waitUntil: "networkidle" });
-  await page.waitForTimeout(2000);
+  await page.waitForSelector(".aside", { timeout: 15000 });
+  await page.waitForTimeout(1000);
 
   // 3. 验证侧边栏 aside 图标
   console.log("\n[步骤 3] 验证侧边栏 (aside) 图标渲染...");
@@ -70,7 +71,8 @@ async function verify() {
   const rows = await page.$$(".email-row");
   assert.ok(rows.length > 0, "收件箱中应有邮件列表");
   await rows[0].click();
-  await page.waitForTimeout(2000);
+  await page.waitForSelector(".aside", { timeout: 15000 });
+  await page.waitForTimeout(1000);
 
   // 5. 验证 .header-actions 图标
   console.log("\n[步骤 5] 验证 .header-actions 顶栏图标...");

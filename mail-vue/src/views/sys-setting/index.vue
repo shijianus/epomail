@@ -565,25 +565,6 @@
                   <span class="hub-unit-text">Tokens</span>
                 </div>
               </div>
-
-              <!-- Item 6: 仅限系统管理员可用 AI (可关闭/开启) -->
-              <div class="setting-item">
-                <div class="title-item">
-                  <span>{{ $t('aiAdminOnlyLabel') || '仅限管理员使用 AI' }}</span>
-                  <el-tooltip effect="dark" :content="$t('aiAdminOnlyHint') || '开启后仅系统管理员账户可以使用 AI 增强与翻译功能，普通注册用户无法发起大模型请求。'">
-                    <Icon class="warning" icon="fe:warning" width="16" height="16"/>
-                  </el-tooltip>
-                </div>
-                <div class="forward">
-                  <el-switch 
-                    :active-value="1" 
-                    :inactive-value="0" 
-                    :disabled="setting.aiEnabled === 0"
-                    v-model="setting.aiAdminOnly" 
-                    @change="(val) => changeField('aiAdminOnly', val)"
-                  />
-                </div>
-              </div>
             </div>
           </div>
 
@@ -2775,10 +2756,24 @@
           <div class="ai-dialog-grid">
             <!-- Left Column: Base URL & API Key -->
             <div class="ai-grid-col">
-              <el-form-item :label="$t('aiEndpoint') || '接口地址 (Base URL)'">
+              <el-form-item>
+                <template #label>
+                  <div class="ai-form-item-label" style="display: flex; align-items: center; gap: 4px;">
+                    <span>{{ $t('aiEndpoint') || '接口地址 (Base URL)' }}</span>
+                    <el-tooltip 
+                      effect="dark" 
+                      :content="$t('aiEndpointTooltip') || '支持直接输入服务站点根域名（如 https://api.openai.com 或 https://api.deepseek.com），系统将自动尝试匹配补齐如 /v1/chat/completions 等接入路径；亦可直接填入完整终端 URL 精确使用。若自动尝试均失败，将直接回退为您输入的原始 URL 发起尝试。'" 
+                      placement="top"
+                    >
+                      <span class="ai-help-icon-wrap" style="display: inline-flex; align-items: center; justify-content: center; cursor: pointer; color: var(--el-text-color-secondary);">
+                        <Icon icon="fluent:question-circle-16-regular" width="15" height="15" />
+                      </span>
+                    </el-tooltip>
+                  </div>
+                </template>
                 <el-input 
                   v-model="aiHubForm.aiApiUrl" 
-                  placeholder="https://api.openai.com/v1" 
+                  :placeholder="$t('aiEndpointPlaceholder') || 'https://api.openai.com/v1 或直接输入站点域名'" 
                   clearable
                   @input="handleEndpointOrKeyChange"
                   @clear="handleEndpointOrKeyChange"
@@ -2797,7 +2792,7 @@
               </el-form-item>
             </div>
 
-            <!-- Right Column: Primary Model & Multi-model Pool (Integrated auto-detection inside input wrapper dropdown) -->
+            <!-- Right Column: Primary Model & Multi-model Pool (Initial available models without auto-testing) -->
             <div class="ai-grid-col">
               <el-form-item :label="$t('aiModelsLabel') || '主推理模型 (Primary Model)'">
                 <el-select 
@@ -2809,14 +2804,10 @@
                   class="ai-model-select"
                   popper-class="ai-model-dropdown"
                   :placeholder="$t('aiModelPlaceholder') || '选择或键入主推理模型 (如 deepseek-chat, gpt-4o-mini)'" 
-                  :loading="fetchingModels"
-                  @focus="triggerAutoDetectModels(false)"
-                  @visible-change="handleModelDropdownVisible"
                   style="width: 100%;"
                 >
                   <template #prefix>
-                    <Icon v-if="fetchingModels" icon="fluent:spinner-ios-20-filled" class="is-loading" width="15" height="15" style="color: var(--accent-primary);" />
-                    <Icon v-else icon="fluent:sparkle-16-filled" width="15" height="15" style="color: var(--accent-primary);" />
+                    <Icon icon="fluent:sparkle-16-filled" width="15" height="15" style="color: var(--accent-primary);" />
                   </template>
                   <el-option 
                     v-for="modelName in allAvailableModelOptions" 
@@ -2845,8 +2836,6 @@
                   class="ai-models-pool-select"
                   popper-class="ai-models-pool-dropdown"
                   :placeholder="$t('aiModelsPoolPlaceholder') || '选择或键入本站允许调用的多个模型'" 
-                  :loading="fetchingModels"
-                  @focus="triggerAutoDetectModels(false)"
                   style="width: 100%;"
                 >
                   <el-option 
@@ -2871,10 +2860,21 @@
         <template #footer>
           <div class="dialog-footer" style="display: flex; justify-content: space-between; align-items: center;">
             <div class="footer-left" style="display: flex; align-items: center; gap: 8px;">
-              <el-button class="opt-btn-test-ai-dialog" :loading="testingAiInHub" @click="testAiConnectionInHub">
-                <Icon icon="fluent:flash-checkmark-24-filled" width="14" height="14" style="margin-right: 4px;" />
-                {{ $t('aiTestBtn') || '测试连通性' }}
-              </el-button>
+              <div style="display: inline-flex; align-items: center; gap: 4px;">
+                <el-button class="opt-btn-test-ai-dialog" :loading="testingAiInHub" @click="testAiConnectionInHub">
+                  <Icon icon="fluent:flash-checkmark-24-filled" width="14" height="14" style="margin-right: 4px;" />
+                  {{ $t('aiTestBtn') || '测试连通性' }}
+                </el-button>
+                <el-tooltip 
+                  effect="dark" 
+                  :content="$t('aiTestUsageHint') || '测试连通性与保存时将对当前选中的主模型及模型池可用性进行测算。优先采用 0-Token 检索协议无感测算延迟；若服务商不支持则发送 1-Token 极简请求，操作可能会消耗极少量 API 额度。'" 
+                  placement="top"
+                >
+                  <span class="ai-help-icon-wrap" style="display: inline-flex; align-items: center; justify-content: center; cursor: pointer; color: var(--el-text-color-secondary);">
+                    <Icon icon="fluent:question-circle-16-regular" width="15" height="15" />
+                  </span>
+                </el-tooltip>
+              </div>
               <el-button link type="danger" size="small" @click="clearFormInDialog">
                 <Icon icon="fluent:delete-20-regular" width="14" height="14" style="margin-right: 2px;" />
                 {{ $t('aiDeleteBtn') || '清空' }}
@@ -2882,7 +2882,7 @@
             </div>
             <div>
               <el-button @click="aiHubDialogShow = false">{{ $t('cancel') || '取消' }}</el-button>
-              <el-button type="primary" :loading="settingLoading" @click="saveAiHubConfig">
+              <el-button type="primary" :loading="settingLoading || testingAiInHub" @click="saveAiHubConfig">
                 {{ $t('save') || '保存配置' }}
               </el-button>
             </div>
@@ -3152,7 +3152,7 @@ const openAiHubDialog = () => {
   }
 
   aiHubDialogShow.value = true
-  triggerAutoDetectModels(false)
+  // 遵循规范：默认不进行连通性测试，一开始直接展示可用模型，杜绝自动触发网络请求与 API 消耗
 }
 
 let endpointDebounceTimer = null
@@ -3160,26 +3160,33 @@ const handleEndpointOrKeyChange = () => {
   if (endpointDebounceTimer) clearTimeout(endpointDebounceTimer)
   endpointDebounceTimer = setTimeout(() => {
     onEndpointOrKeyUpdated()
-  }, 350)
+  }, 300)
 }
 
 const onEndpointOrKeyUpdated = () => {
   const isCustom = !!((aiHubForm.aiApiKey && aiHubForm.aiApiKey.trim()) || (aiHubForm.aiApiUrl && aiHubForm.aiApiUrl.trim()))
   if (isCustom) {
     if (aiHubForm.aiModel && aiHubForm.aiModel.startsWith('@cf/')) {
-      aiHubForm.aiModel = ''
+      aiHubForm.aiModel = 'deepseek-chat'
     }
     aiHubForm.aiModelsList = aiHubForm.aiModelsList.filter(m => !m.startsWith('@cf/'))
     dialogDetectedModels.value = dialogDetectedModels.value.filter(m => !m.startsWith('@cf/'))
+    if (!aiHubForm.aiModel) {
+      aiHubForm.aiModel = 'deepseek-chat'
+    }
+    if (aiHubForm.aiModelsList.length === 0) {
+      aiHubForm.aiModelsList = ['deepseek-chat', 'deepseek-reasoner']
+    }
   } else {
     if (aiHubForm.aiModel && !aiHubForm.aiModel.startsWith('@cf/')) {
       aiHubForm.aiModel = '@cf/meta/llama-3.1-8b-instruct'
     }
     aiHubForm.aiModelsList = aiHubForm.aiModelsList.filter(m => m.startsWith('@cf/'))
     dialogDetectedModels.value = dialogDetectedModels.value.filter(m => m.startsWith('@cf/'))
+    if (aiHubForm.aiModelsList.length === 0) {
+      aiHubForm.aiModelsList = ['@cf/meta/llama-3.1-8b-instruct']
+    }
   }
-  lastDetectKey = ''
-  handleFetchModelsInDialog(true)
 }
 
 watch(
@@ -3197,76 +3204,6 @@ const clearFormInDialog = () => {
   aiHubForm.aiModel = '@cf/meta/llama-3.1-8b-instruct'
   aiHubForm.aiModelsList = ['@cf/meta/llama-3.1-8b-instruct']
   dialogDetectedModels.value = []
-  lastDetectKey = ''
-  handleFetchModelsInDialog(true)
-}
-
-let lastDetectKey = ''
-const triggerAutoDetectModels = (force = false) => {
-  const currentKey = `${aiHubForm.aiApiUrl || ''}@@${aiHubForm.aiApiKey || ''}`
-  if (!force && lastDetectKey === currentKey && dialogDetectedModels.value.length > 0) {
-    return
-  }
-  handleFetchModelsInDialog(true)
-}
-
-const handleModelDropdownVisible = (visible) => {
-  if (visible && dialogDetectedModels.value.length === 0) {
-    triggerAutoDetectModels(false)
-  }
-}
-
-const handleFetchModelsInDialog = (silent = false) => {
-  if (fetchingModels.value) return
-  fetchingModels.value = true
-  const currentKey = `${aiHubForm.aiApiUrl || ''}@@${aiHubForm.aiApiKey || ''}`
-  fetchAiModels({
-    aiApiKey: (aiHubForm.aiApiKey || '').trim(),
-    aiApiUrl: (aiHubForm.aiApiUrl || '').trim()
-  }).then(res => {
-    fetchingModels.value = false
-    lastDetectKey = currentKey
-    const resData = res.data || res
-    const list = Array.isArray(resData?.models) ? resData.models : []
-    const isCustom = !!((aiHubForm.aiApiKey && aiHubForm.aiApiKey.trim()) || (aiHubForm.aiApiUrl && aiHubForm.aiApiUrl.trim()))
-    const filteredList = isCustom ? list.filter(m => !m.startsWith('@cf/')) : list.filter(m => m.startsWith('@cf/'))
-
-    dialogDetectedModels.value = filteredList
-    detectedModelsList.value = filteredList
-
-    if (resData?.latencyMs) {
-      filteredList.forEach(m => {
-        if (!modelLatencyMap.value[m]) {
-          setModelLatency(m, resData.latencyMs)
-        }
-      })
-    }
-
-    if ((!aiHubForm.aiModel || (isCustom && aiHubForm.aiModel.startsWith('@cf/')) || (!isCustom && !aiHubForm.aiModel.startsWith('@cf/'))) && filteredList.length > 0) {
-      aiHubForm.aiModel = filteredList[0]
-    }
-    if ((aiHubForm.aiModelsList.length === 0 || (isCustom && aiHubForm.aiModelsList.some(m => m.startsWith('@cf/')))) && filteredList.length > 0) {
-      aiHubForm.aiModelsList = filteredList.slice(0, 5)
-    }
-
-    if (!silent) {
-      ElMessage({
-        type: 'success',
-        message: resData?.message || (filteredList.length ? `成功识别到 ${filteredList.length} 个可用模型` : '已完成模型检测'),
-        plain: true
-      })
-    }
-  }).catch(err => {
-    fetchingModels.value = false
-    if (!silent) {
-      const errMsg = err.response?.data?.message || err.message || t('aiDetectFailed') || '识别模型失败'
-      ElMessage({
-        type: 'warning',
-        message: errMsg,
-        plain: true
-      })
-    }
-  })
 }
 
 const deleteAiConfig = () => {
@@ -3291,7 +3228,6 @@ const deleteAiConfig = () => {
     aiHubForm.aiModelsList = ['@cf/meta/llama-3.1-8b-instruct']
     detectedModelsList.value = []
     dialogDetectedModels.value = []
-    lastDetectKey = ''
     ElMessage({
       type: 'success',
       message: t('aiResetSuccess') || '已清空自定义大模型配置，恢复免密模式',
@@ -3300,43 +3236,47 @@ const deleteAiConfig = () => {
   }).catch(() => {})
 }
 
+// 仅在用户主动点击「测试连通性」或保存时，对选中的主模型和模型池模型发起真实连通与测速
 const testAiConnectionInHub = () => {
   testingAiInHub.value = true
+  const isDialog = aiHubDialogShow.value
+  const apiKey = isDialog ? (aiHubForm.aiApiKey || '') : (setting.value?.aiApiKey || '')
+  const apiUrl = isDialog ? (aiHubForm.aiApiUrl || '') : (setting.value?.aiApiUrl || '')
+
+  const selectedModel = isDialog ? (aiHubForm.aiModel || '') : (setting.value?.aiModel || '')
+  const poolList = isDialog
+    ? (Array.isArray(aiHubForm.aiModelsList) ? aiHubForm.aiModelsList : [])
+    : (setting.value?.aiModels ? setting.value.aiModels.split(',').map(s => s.trim()) : [])
+
+  const modelsToTest = Array.from(new Set([selectedModel, ...poolList].filter(Boolean)))
+
   const testPayload = {
-    aiApiKey: aiHubDialogShow.value ? (aiHubForm.aiApiKey || '') : (setting.value?.aiApiKey || ''),
-    aiApiUrl: aiHubDialogShow.value ? (aiHubForm.aiApiUrl || '') : (setting.value?.aiApiUrl || ''),
-    aiModel: aiHubDialogShow.value ? (aiHubForm.aiModel || '') : (setting.value?.aiModel || ''),
-    prompt: 'Hello! Please confirm AI service connection with a short friendly response.'
+    aiApiKey: apiKey,
+    aiApiUrl: apiUrl,
+    aiModel: selectedModel,
+    aiModels: poolList.join(','),
+    models: modelsToTest
   }
+
   testAiSetting(testPayload).then(res => {
     testingAiInHub.value = false
     const resData = res.data || res
     const msg = resData?.message || t('aiTestSuccess') || 'AI 连通性测试成功！'
-    const models = Array.isArray(resData?.models) ? resData.models : []
-    const isCustom = !!((testPayload.aiApiKey && testPayload.aiApiKey.trim()) || (testPayload.aiApiUrl && testPayload.aiApiUrl.trim()))
-    const filteredModels = isCustom ? models.filter(m => !m.startsWith('@cf/')) : models.filter(m => m.startsWith('@cf/'))
 
-    if (filteredModels.length > 0) {
-      detectedModelsList.value = filteredModels
-      dialogDetectedModels.value = filteredModels
-      if (aiHubDialogShow.value && (!aiHubForm.aiModel || (isCustom && aiHubForm.aiModel.startsWith('@cf/')))) {
-        aiHubForm.aiModel = filteredModels[0]
-      }
-      if (aiHubDialogShow.value && (aiHubForm.aiModelsList.length === 0 || (isCustom && aiHubForm.aiModelsList.some(m => m.startsWith('@cf/'))))) {
-        aiHubForm.aiModelsList = filteredModels.slice(0, 5)
-      }
+    if (resData?.modelLatencyMap && typeof resData.modelLatencyMap === 'object') {
+      Object.entries(resData.modelLatencyMap).forEach(([m, lat]) => {
+        if (lat) setModelLatency(m, lat)
+      })
+    } else if (resData?.latencyMs) {
+      modelsToTest.forEach(m => setModelLatency(m, resData.latencyMs))
     }
 
-    const testedModel = resData?.model || (aiHubDialogShow.value ? aiHubForm.aiModel : setting.value?.aiModel) || ''
-    if (resData?.latencyMs !== undefined && resData?.latencyMs !== null) {
-      if (testedModel) {
-        setModelLatency(testedModel, resData.latencyMs)
-      }
-      filteredModels.forEach(m => {
-        if (!modelLatencyMap.value[m]) {
-          setModelLatency(m, resData.latencyMs)
-        }
-      })
+    const models = Array.isArray(resData?.models) ? resData.models : []
+    const isCustom = !!((apiKey && apiKey.trim()) || (apiUrl && apiUrl.trim()))
+    const filteredModels = isCustom ? models.filter(m => !m.startsWith('@cf/')) : models.filter(m => m.startsWith('@cf/'))
+    if (filteredModels.length > 0) {
+      dialogDetectedModels.value = Array.from(new Set([...dialogDetectedModels.value, ...filteredModels]))
+      detectedModelsList.value = Array.from(new Set([...detectedModelsList.value, ...filteredModels]))
     }
 
     ElMessage({
@@ -3344,33 +3284,84 @@ const testAiConnectionInHub = () => {
       message: msg,
       plain: true
     })
-
-    // 测试成功自动保存加入 (Auto-save on test success)
-    if (aiHubDialogShow.value) {
-      saveAiHubConfig(false)
-    }
+    // 明确规范：点击测试仅测试并提示，严禁自动保存触发副作用循环
   }).catch(err => {
     testingAiInHub.value = false
     const errMsg = err.response?.data?.message || err.message || t('aiTestFail') || '测试失败'
     ElMessage({
       type: 'error',
-      message: `${errMsg} (无法正常使用，需测试通过后大模型才可调用)`,
+      message: `${errMsg} (需确保连通正常后大模型方可调用)`,
       plain: true
     })
   })
 }
 
 const saveAiHubConfig = (closeDialog = true) => {
+  const isCustom = !!((aiHubForm.aiApiKey && aiHubForm.aiApiKey.trim()) || (aiHubForm.aiApiUrl && aiHubForm.aiApiUrl.trim()))
   const modelsPool = Array.isArray(aiHubForm.aiModelsList) ? aiHubForm.aiModelsList.join(',') : (aiHubForm.aiModelsList || '')
-  editSetting({
+
+  const selectedModel = (aiHubForm.aiModel || '').trim()
+  const poolList = Array.isArray(aiHubForm.aiModelsList)
+    ? aiHubForm.aiModelsList.filter(Boolean)
+    : (modelsPool ? modelsPool.split(',').map(s => s.trim()).filter(Boolean) : [])
+  const modelsToTest = Array.from(new Set([selectedModel, ...poolList].filter(Boolean)))
+
+  if (isCustom && modelsToTest.length === 0) {
+    ElMessage({
+      type: 'warning',
+      message: '请选择或键入至少一个主推理模型或模型池模型',
+      plain: true
+    })
+    return
+  }
+
+  // 保存时才对选择的那些模型(被选模型和被圈入池的模型)进行测试并提示
+  testingAiInHub.value = true
+  const testPayload = {
     aiApiKey: (aiHubForm.aiApiKey || '').trim(),
     aiApiUrl: (aiHubForm.aiApiUrl || '').trim(),
-    aiModel: (aiHubForm.aiModel || '').trim(),
-    aiModels: modelsPool.trim()
-  }, true, closeDialog)
-  if (closeDialog) {
-    aiHubDialogShow.value = false
+    aiModel: selectedModel,
+    aiModels: poolList.join(','),
+    models: modelsToTest
   }
+
+  testAiSetting(testPayload).then(res => {
+    testingAiInHub.value = false
+    const resData = res.data || res
+
+    if (resData?.modelLatencyMap && typeof resData.modelLatencyMap === 'object') {
+      Object.entries(resData.modelLatencyMap).forEach(([m, lat]) => {
+        if (lat) setModelLatency(m, lat)
+      })
+    } else if (resData?.latencyMs) {
+      modelsToTest.forEach(m => setModelLatency(m, resData.latencyMs))
+    }
+
+    editSetting({
+      aiApiKey: (aiHubForm.aiApiKey || '').trim(),
+      aiApiUrl: (aiHubForm.aiApiUrl || '').trim(),
+      aiModel: selectedModel,
+      aiModels: poolList.join(',')
+    }, true, closeDialog)
+
+    if (closeDialog) {
+      aiHubDialogShow.value = false
+    }
+
+    ElMessage({
+      type: 'success',
+      message: `连通测试通过，已成功保存大模型配置！[${resData?.message || '200 OK'}]`,
+      plain: true
+    })
+  }).catch(err => {
+    testingAiInHub.value = false
+    const errMsg = err.response?.data?.message || err.message || t('aiTestFail') || '测试失败'
+    ElMessage({
+      type: 'error',
+      message: `模型连通性测试未通过: ${errMsg}。配置未自动保存，请检查接口配置或选择可用模型。`,
+      plain: true
+    })
+  })
 }
 
 
