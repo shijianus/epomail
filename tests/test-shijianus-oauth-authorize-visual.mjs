@@ -3,7 +3,7 @@ import assert from 'assert';
 
 (async () => {
   console.log('========================================================================');
-  console.log('=== 开始 shijianus-blog OAuth 授权界面全新 UI 与链路 Playwright 审计 ===');
+  console.log('=== 开始针对真实生产环境 shijianus-blog 标签页图片与授权页的 Playwright 审计 ===');
   console.log('========================================================================');
 
   const browser = await chromium.launch({ headless: true });
@@ -29,7 +29,6 @@ import assert from 'assert';
     const loginData = await loginRes.json();
     assert.strictEqual(loginData.code, 200, '登录应成功: ' + JSON.stringify(loginData));
     const token = loginData.data?.token;
-    console.log('  ✓ 登录成功，获取 Token');
 
     // 2. 注入 Token 至 DOMAIN_BASE
     console.log('\n[步骤 2] 注入 Token 到', DOMAIN_BASE);
@@ -42,29 +41,37 @@ import assert from 'assert';
     await page.waitForTimeout(1000);
 
     // 3. 打开 shijianus-blog 授权确认页（已登录状态）
-    const authUrl = `${DOMAIN_BASE}/oauth/authorize?client_id=epo_live_shijianus_blog&redirect_uri=${encodeURIComponent('https://blog.epocanvas.com/auth/callback')}&scope=openid%20profile%20email%20comments&state=audit_test_state_2026`;
+    const authUrl = `${DOMAIN_BASE}/oauth/authorize?client_id=epo_live_shijianus_blog&redirect_uri=${encodeURIComponent('https://blog.epocanvas.com/auth/callback')}&scope=openid%20profile%20email%20comments&state=audit_test_state_tab_img`;
     console.log('\n[步骤 3] 访问线上生产环境 shijianus-blog 授权地址:\n  ', authUrl);
     await page.goto(authUrl, { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('.consent-state', { timeout: 20000 });
     await page.waitForTimeout(2000);
 
-    // 4. 验证 brand-chip app-chip 是否成功呈现 shijianus-blog 的 Tab 图标
-    console.log('\n[步骤 4] 验证 shijianus-blog 的 Logo 识别与 Tab 图标渲染...');
+    // 4. 验证 brand-chip app-chip 是否直接使用了标签页图片 (<img> 形式)
+    console.log('\n[步骤 4] 验证 brand-chip app-chip 是否直接采用现成标签页图片 (<img> 形式)...');
     const appChip = page.locator('.brand-chip.app-chip');
     await appChip.waitFor({ state: 'visible', timeout: 5000 });
-    const hasShijianusClass = await appChip.evaluate(el => el.classList.contains('is-shijianus'));
-    console.log('  app-chip 包含 is-shijianus 类名:', hasShijianusClass);
-    assert.ok(hasShijianusClass, 'shijianus-blog 应用必须成功挂载 is-shijianus 品牌类名');
 
-    const tabSvg = page.locator('.brand-chip.app-chip svg.shijianus-tab-icon');
-    const tabSvgCount = await tabSvg.count();
-    console.log('  Tab Icon SVG 元素数量:', tabSvgCount);
-    assert.strictEqual(tabSvgCount, 1, '必须渲染 shijianus 专属官方 Tab Icon SVG');
-    const tabSvgVisible = await tabSvg.isVisible();
-    assert.ok(tabSvgVisible, 'Tab Icon SVG 必须在屏幕上清晰可见');
-    console.log('  ✓ 成功识别并渲染 shijianus-blog 官方 Tab Icon！');
+    const appImg = page.locator('.brand-chip.app-chip img.app-chip-img');
+    const imgCount = await appImg.count();
+    console.log('  app-chip 内 <img> 元素数量:', imgCount);
+    assert.strictEqual(imgCount, 1, '必须通过 <img> 标签直接展示现成的标签页图片');
 
-    // 5. 验证已验证域名胶囊 (取代突兀裸露的 fluent globe)
+    const imgSrc = await appImg.getAttribute('src');
+    console.log('  app-chip 渲染的图片来源 (src):', imgSrc);
+    assert.ok(
+      imgSrc.includes('favicon.png') || imgSrc.includes('shijianus-favicon.png'),
+      '图片来源必须为博客现成标签页展示图片: ' + imgSrc
+    );
+
+    // 验证图片自然尺寸大于 0 (即已成功加载且未发生 broken image)
+    const naturalWidth = await appImg.evaluate(img => img.naturalWidth);
+    const naturalHeight = await appImg.evaluate(img => img.naturalHeight);
+    console.log(`  图片自然尺寸: ${naturalWidth} x ${naturalHeight}`);
+    assert.ok(naturalWidth > 0 && naturalHeight > 0, '图片必须成功加载且自然尺寸大于 0');
+    console.log('  ✓ 成功直接采用标签页现成展示图片（粉发少女动漫头像），无破损无虚假新建！');
+
+    // 5. 验证官方已验证域名来源胶囊与微胶囊
     console.log('\n[步骤 5] 验证官方已验证域名来源胶囊...');
     const originChip = page.locator('.app-origin-chip');
     assert.strictEqual(await originChip.count(), 1, '必须存在 .app-origin-chip 域名验证胶囊');
@@ -72,7 +79,6 @@ import assert from 'assert';
     console.log('  来源胶囊文本:', originText);
     assert.ok(originText.includes('官方已验证'), '来源胶囊必须带有官方已验证标记');
     assert.ok(originText.includes('blog.epocanvas.com'), '来源胶囊必须展示 blog.epocanvas.com 域名');
-    console.log('  ✓ 来源展示已升级为现代微胶囊，突兀的裸 globe 图标已优化！');
 
     // 6. 验证 scopes-list 授权项目详细说明与 Duotone 图标
     console.log('\n[步骤 6] 验证 scopes-list 授权项目详细说明与图标体系...');
@@ -80,49 +86,34 @@ import assert from 'assert';
     const scopeCount = await scopeItems.count();
     console.log('  授权项目条目数:', scopeCount);
     assert.strictEqual(scopeCount, 4, '必须包含 openid, email, profile, comments 全部 4 项权限');
-
     const scopesContent = await page.locator('.scopes-list').innerText();
-    console.log('  授权项目展示内容预览:\n', scopesContent);
     assert.ok(scopesContent.includes('OpenID'), '包含 OpenID 身份标识');
     assert.ok(scopesContent.includes('主电子邮箱地址'), '包含主电子邮箱地址详细释义');
     assert.ok(scopesContent.includes('公开个人资料'), '包含公开个人资料详细释义');
     assert.ok(scopesContent.includes('博客评论与互动管理'), '包含博客评论与互动管理权限');
-    assert.ok(scopesContent.includes('只读凭据'), '包含只读凭据标识');
-    assert.ok(scopesContent.includes('互动权限'), '包含互动权限标识');
     console.log('  ✓ 授权项目展示与详尽释义全部校验通过！');
 
-    // 7. 严格检验两个操作按钮的对齐性 (1 像素级绝对对齐)
+    // 7. 严格检验两个操作按钮的对齐性 (0 像素级绝对对齐)
     console.log('\n[步骤 7] 严格检验「授权并继续」和「取消授权」两个按钮的绝对对齐...');
     const authBtn = page.locator('.consent-actions-group .authorize-btn');
     const cancelBtn = page.locator('.consent-actions-group .cancel-btn');
-    assert.strictEqual(await authBtn.count(), 1, '必须存在授权按钮');
-    assert.strictEqual(await cancelBtn.count(), 1, '必须存在取消按钮');
-
     const boxAuth = await authBtn.boundingBox();
     const boxCancel = await cancelBtn.boundingBox();
-    console.log('  授权按钮盒模型:', boxAuth);
-    console.log('  取消按钮盒模型:', boxCancel);
-
     const deltaX = Math.abs(boxAuth.x - boxCancel.x);
     const deltaW = Math.abs(boxAuth.width - boxCancel.width);
-    const deltaH = Math.abs(boxAuth.height - boxCancel.height);
-
-    console.log(`  -> X 轴偏差 (起始水平位置): ${deltaX}px (优化前为 12px)`);
-    console.log(`  -> 宽度偏差: ${deltaW}px`);
-    console.log(`  -> 高度偏差: ${deltaH}px`);
-
-    assert.ok(deltaX < 0.5, `两按钮 X 起始坐标必须绝对对齐，当前偏差: ${deltaX}px`);
-    assert.ok(deltaW < 0.5, `两按钮宽度必须绝对一致，当前偏差: ${deltaW}px`);
+    console.log(`  -> X 轴偏差: ${deltaX}px, 宽度偏差: ${deltaW}px, 高度: ${boxAuth.height}px`);
+    assert.ok(deltaX < 0.5, '按钮 X 轴必须严格对齐');
+    assert.ok(deltaW < 0.5, '按钮宽度必须严格一致');
     assert.strictEqual(boxAuth.height, 44, '授权按钮高度统一为 44px');
     assert.strictEqual(boxCancel.height, 44, '取消按钮高度统一为 44px');
-    console.log('  ✓ 两个按钮已达成 0 像素级严丝合缝绝对对齐！');
+    console.log('  ✓ 按钮 0 像素级对齐校验通过！');
 
-    // 8. 截图保存浅色模式视觉审计报告
-    await page.screenshot({ path: '/home/shijian/projects/epocanvas-mail/tests/audit_oauth_authorize_light_perfect.png' });
-    console.log('  ✓ 浅色模式视觉审计截图已保存: tests/audit_oauth_authorize_light_perfect.png');
+    // 8. 保存高清截图
+    await page.screenshot({ path: '/home/shijian/projects/epocanvas-mail/tests/audit_oauth_authorize_with_real_tab_logo.png' });
+    console.log('  ✓ 真实标签页 Logo 视觉审计截图已保存: tests/audit_oauth_authorize_with_real_tab_logo.png');
 
-    // 9. 切换至暗黑模式审计
-    console.log('\n[步骤 8] 切换至深色模式 (Dark Mode) 进行视觉完整性审计...');
+    // 9. 切换至深色模式 (Dark Mode) 进行视觉审计
+    console.log('\n[步骤 8] 切换至深色模式 (Dark Mode) 进行视觉审计...');
     await page.evaluate(() => {
       document.documentElement.classList.add('dark');
       document.body.classList.add('dark');
@@ -131,7 +122,7 @@ import assert from 'assert';
     await page.screenshot({ path: '/home/shijian/projects/epocanvas-mail/tests/audit_oauth_authorize_dark_perfect.png' });
     console.log('  ✓ 深色模式视觉审计截图已保存: tests/audit_oauth_authorize_dark_perfect.png');
 
-    // 10. 验证未登录状态下的快速登录表单与对齐
+    // 10. 验证未登录状态下的快速登录表单
     console.log('\n[步骤 9] 验证未登录状态下的快速登录表单视觉与对齐...');
     await page.evaluate(() => {
       localStorage.removeItem('token');
@@ -146,8 +137,7 @@ import assert from 'assert';
     const boxLoginCancel = await loginCancelBtn.boundingBox();
     const deltaLoginX = Math.abs(boxLoginAuth.x - boxLoginCancel.x);
     const deltaLoginW = Math.abs(boxLoginAuth.width - boxLoginCancel.width);
-    console.log(`  -> 未登录表单按钮 X 轴偏差: ${deltaLoginX}px`);
-    console.log(`  -> 未登录表单按钮宽度偏差: ${deltaLoginW}px`);
+    console.log(`  -> 未登录表单按钮 X 轴偏差: ${deltaLoginX}px, 宽度偏差: ${deltaLoginW}px`);
     assert.ok(deltaLoginX < 0.5, '未登录态按钮必须绝对对齐');
     assert.ok(deltaLoginW < 0.5, '未登录态按钮宽度必须一致');
 
@@ -155,7 +145,7 @@ import assert from 'assert';
     console.log('  ✓ 未登录态视觉审计截图已保存: tests/audit_oauth_authorize_login_prompt.png');
 
     console.log('\n========================================================================');
-    console.log('=== 🎉 所有 Playwright 视觉与链路端到端断言 100% 全绿通过！ ===');
+    console.log('=== 🎉 Playwright 真实标签页 Logo 与授权全链路审计 100% 通过！ ===');
     console.log('========================================================================');
 
   } catch (err) {

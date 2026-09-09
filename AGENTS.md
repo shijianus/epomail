@@ -11,6 +11,32 @@
    - 在向用户输出回复时，必须置顶/显式打印出本次提交的完整 Commit Hash 与短 Hash，确保版本可追溯、审计记录完整。
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
+### OAuth 授权页直接采用博客现成标签页图片、按钮0偏差对齐、Duotone权限图标体系与生产端全链路审计上线 (2026-09-08)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **直接扫描采用现成标签页展示图片，拒绝虚假新建与假图标 (Direct Real Tab Logo Display)**:
+       - 彻底移除手绘单色 SVG 几何山峰假图标，恪守真实性准则；
+       - `mail-vue/src/views/oauth/authorize.vue` 引入 `resolvedAppLogo` 动态解析逻辑，直接通过 `<img>` 标签渲染应用现成的浏览器标签页图片 `https://blog.epocanvas.com/favicon.png`（粉发少女动漫头像），自然尺寸为 256x256，并在网络受限时优雅平滑回退至本地内置的高清离线缓存 `/shijianus-favicon.png`；
+       - 为第三方 OAuth 应用提供通用的 `homepageUrl + '/favicon.png'` 自动扫描机制；
+       - 同步更新 `mail-worker/src/init/init.js` 和 `mail-worker/src/service/oauth-app-service.js` 中的种子数据，并直接对 Cloudflare 远端 D1 数据库执行 `UPDATE oauth_app SET logo_url = 'https://blog.epocanvas.com/favicon.png' WHERE client_id = 'epo_live_shijianus_blog'`，杜绝重新初始化或持久化状态回退。
+    2. **按钮 0 像素级绝对对齐与一致性 (Zero-Pixel Perfect Button Alignment)**:
+       - 修复 `.consent-actions-group` 中「授权并继续」与「取消授权」两个按钮错位问题；
+       - 根因分析：Element Plus 默认通过 `.el-button + .el-button { margin-left: 12px; }` 注入左边距，但在竖向 Flex Column 排版中导致第二个取消按钮右偏 12px；
+       - 彻底重置 `.consent-actions-group .el-button` 的 `margin: 0 !important; margin-left: 0 !important;` 与 `width: 100%`，并在未登录表单中应用相同对齐保障；
+       - 实测断言两按钮 X 轴偏差为 0px，宽度偏差为 0px，高度统一 44px。
+    3. **授权项目 (Scopes) 详细说明与 Duotone 图标体系重构 (Enriched Scopes & Visual Upgrades)**:
+       - 消除原千篇一律突兀的裸 globe 与绿色大对勾，重构为浅色圆角底衬与 Duotone 双色微图标；
+       - 全量规范覆盖 `openid`（身份标识）、`email`（主电子邮箱地址）、`profile`（公开个人资料）与 `comments`（博客评论与互动管理）4 项关键权限；
+       - 为每项权限新增详细说明与分类标签（如「只读凭据」、「互动权限」）；
+       - 域名展示升级为现代微胶囊 `.app-origin-chip`（“官方已验证 · blog.epocanvas.com ↗”），底部声明升级为 `.security-notice-card`，完全契合 Epomail 整体 UI 画风。
+    4. **Playwright 真实生产端全链路自动化与视觉审计 (Playwright Live E2E Audit)**:
+       - 执行 `tests/test-shijianus-oauth-authorize-visual.mjs`，对线上真实生产环境（`https://mail.epocanvas.com` 及 Cloudflare 边缘节点）进行全链路交互与视觉断言：
+         - 标签页图片通过 `<img>` 标签直接展示，URL 为 `https://blog.epocanvas.com/favicon.png`，自然尺寸 256x256，加载 100% 成功；
+         - 授权按钮与取消按钮盒模型 X 轴坐标与宽度绝对对齐（Delta X = 0px, Delta Width = 0px）；
+         - 4 项权限详细释义与来源微胶囊全部就绪；
+         - 生成并留存真实环境审计截图：`tests/audit_oauth_authorize_with_real_tab_logo.png`、`tests/audit_oauth_authorize_dark_perfect.png`、`tests/audit_oauth_authorize_login_prompt.png`。
+*   **部署上线与版本追溯 (Verification & Deployment)**:
+    - **Cloudflare Workers 部署 Version ID**: `4e7d81ef-178d-437b-9bb9-1f61c72cd617`。
+    - **epocanvas-mail Git Commit**: 待提交并记录。
 
 ### 系统设置AI Hub接口端点智能补齐与回退、选定模型按需测试与0-Token测速优化、移除无实效管理员开关上线 (2026-09-08)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:

@@ -55,7 +55,7 @@ export const DEFAULT_OAUTH_APPS = [
 			'http://localhost:4334/auth/callback',
 			'http://127.0.0.1:4334/auth/callback'
 		]),
-		logoUrl: 'https://blog.epocanvas.com/logo.svg',
+		logoUrl: 'https://blog.epocanvas.com/favicon.png',
 		scopes: 'openid profile email comments',
 		status: 1
 	},

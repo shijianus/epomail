@@ -413,7 +413,7 @@ const dbInit = {
 					'http://localhost:4334/auth/callback',
 					'http://127.0.0.1:4334/auth/callback'
 				]),
-				'https://blog.epocanvas.com/logo.svg',
+				'https://blog.epocanvas.com/favicon.png',
 				'openid profile email comments',
 				1
 			).run();
