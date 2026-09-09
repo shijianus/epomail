@@ -1238,6 +1238,7 @@ const en = {
     unlimitedQuota: 'Unlimited Capacity',
     unlimitedBadge: 'Unlimited',
     quotaUsedNotice: 'Currently provided by system storage pool. You can configure personal Backblaze B2 for large independent space.',
+    visitorStorageNotice: 'Visitors have 0MB storage quota by default and cannot receive external emails except the official welcome email; connect your personal S3 bucket to lift limits.',
     quotaByoNotice: 'You have enabled personal object storage. Attachments are saved directly in your bucket and do not consume public quota.',
     byoStorageTitle: 'Personal Object Storage (Backblaze B2 / S3)',
     byoStorageBound: 'Personal bucket successfully connected',

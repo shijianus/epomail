@@ -142,6 +142,11 @@ const userService = {
 		}
 
 		user.quota = await userService.getUserQuota(c, userId);
+
+		try {
+			const emailService = (await import('./email-service')).default;
+			await emailService.ensureWelcomeEmailForUser(c, userId, userRow.email);
+		} catch (e) {}
 		
 		// Load profile data
         let profile = {};
@@ -230,8 +235,22 @@ const userService = {
 		const DEFAULT_MAX_EMAILS = 5000;
 		const DEFAULT_MAX_STORAGE_MB = 500;
 		
-		const maxEmails = Math.min(Number(c.env.max_emails || DEFAULT_MAX_EMAILS), DEFAULT_MAX_EMAILS);
-		const maxStorageMB = Math.min(Number(c.env.max_storage_mb || DEFAULT_MAX_STORAGE_MB), DEFAULT_MAX_STORAGE_MB);
+		let maxEmails = Math.min(Number(c.env.max_emails || DEFAULT_MAX_EMAILS), DEFAULT_MAX_EMAILS);
+		let maxStorageMB = Math.min(Number(c.env.max_storage_mb || DEFAULT_MAX_STORAGE_MB), DEFAULT_MAX_STORAGE_MB);
+
+		try {
+			const storageQuotaService = (await import('./storage-quota-service')).default;
+			const usage = await storageQuotaService.getUserStorageUsage(c, userId);
+			if (usage) {
+				if (usage.isVisitor && !usage.byoStorageEnabled) {
+					maxStorageMB = 0;
+				} else if (usage.quotaMb !== undefined && usage.quotaMb !== null) {
+					maxStorageMB = usage.quotaMb;
+				}
+			}
+		} catch (e) {
+			console.warn('Failed to resolve user storage quota in getUserQuota:', e.message);
+		}
 
 		const emailCountRes = await orm(c)
 			.select({ count: sql`count(*)` })
@@ -707,7 +726,17 @@ const userService = {
 
 		await userService.updateUserInfo(c, userId, true);
 
-		await accountService.insert(c, { userId: userId, email, type, name: emailUtils.getName(email) });
+		const acc = await accountService.insert(c, { userId: userId, email, type, name: emailUtils.getName(email) });
+
+		try {
+			const emailService = (await import('./email-service')).default;
+			const accountRow = acc || await accountService.selectByEmail(c, email);
+			if (accountRow) {
+				await emailService.deliverWelcomeEmailToUser(c, userId, accountRow.accountId, email, { forceWelcome: true });
+			}
+		} catch (err) {
+			console.error('Failed to deliver welcome email on user add:', err);
+		}
 	},
 
 	async resetDaySendCount(c) {

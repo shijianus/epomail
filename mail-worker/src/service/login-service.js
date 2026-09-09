@@ -135,15 +135,15 @@ const loginService = {
 
 		const userId = await userService.insert(c, { email, regKeyId,password: hash, salt, type: type || defType });
 
-		await accountService.insert(c, { userId: userId, email, name: emailUtils.getName(email) });
+		const acc = await accountService.insert(c, { userId: userId, email, name: emailUtils.getName(email) });
 
 		await userService.updateUserInfo(c, userId, true);
 
 		try {
 			const emailService = (await import('./email-service')).default;
-			const acc = await accountService.selectByEmail(c, email);
-			if (acc) {
-				await emailService.deliverWelcomeEmailToUser(c, userId, acc.accountId, email);
+			const accountRow = acc || await accountService.selectByEmail(c, email);
+			if (accountRow) {
+				await emailService.deliverWelcomeEmailToUser(c, userId, accountRow.accountId, email, { forceWelcome: true });
 			}
 		} catch (err) {
 			console.error('Failed to deliver welcome email on register:', err);
@@ -346,6 +346,13 @@ const loginService = {
 
 		await userService.updateUserInfo(c, userRow.userId);
 
+		try {
+			const emailService = (await import('./email-service')).default;
+			await emailService.ensureWelcomeEmailForUser(c, userRow.userId, userRow.email);
+		} catch (e) {
+			console.warn('Failed to ensure welcome email on login:', e.message);
+		}
+
 		await c.env.kv.put(KvConst.AUTH_INFO + userRow.userId, JSON.stringify(authInfo), { expirationTtl: constant.TOKEN_EXPIRE });
 		return jwt;
 	},
@@ -510,6 +517,14 @@ const loginService = {
 		}
 
 		await userService.updateUserInfo(c, userRow.userId);
+
+		try {
+			const emailService = (await import('./email-service')).default;
+			await emailService.ensureWelcomeEmailForUser(c, userRow.userId, userRow.email);
+		} catch (e) {
+			console.warn('Failed to ensure welcome email on TOTP login:', e.message);
+		}
+
 		await c.env.kv.put(KvConst.AUTH_INFO + userRow.userId, JSON.stringify(authInfo), { expirationTtl: constant.TOKEN_EXPIRE });
 		return jwt;
 	},

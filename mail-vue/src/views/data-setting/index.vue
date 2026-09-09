@@ -308,9 +308,9 @@
           <div class="meter-body">
             <div class="meter-numbers">
               <span class="used-val">{{ storageUsage.usedMb || '0.00' }} MB</span>
-              <span class="total-val">/ {{ storageUsage.quotaMb === 0 ? $t('unlimitedQuota') : storageUsage.quotaMb + ' MB' }}</span>
+              <span class="total-val">/ {{ storageUsage.isVisitor ? '0 MB' : (storageUsage.quotaMb === 0 ? $t('unlimitedQuota') : storageUsage.quotaMb + ' MB') }}</span>
               <span class="pct-badge" :class="{ 'warning': storageUsage.usedPercentage > 80, 'danger': storageUsage.usedPercentage >= 100 }">
-                {{ storageUsage.quotaMb === 0 ? $t('unlimitedBadge') : storageUsage.usedPercentage + '%' }}
+                {{ storageUsage.isVisitor ? (storageUsage.byoStorageEnabled ? storageUsage.usedPercentage + '%' : '0 MB') : (storageUsage.quotaMb === 0 ? $t('unlimitedBadge') : storageUsage.usedPercentage + '%') }}
               </span>
             </div>
             <div class="progress-track" v-if="storageUsage.quotaMb > 0">
@@ -322,7 +322,7 @@
             </div>
             <div class="meter-footnote">
               <Icon icon="fluent:info-16-regular" width="14" height="14" />
-              <span>{{ storageUsage.byoStorageEnabled ? $t('quotaByoNotice') : $t('quotaUsedNotice') }}</span>
+              <span>{{ storageUsage.byoStorageEnabled ? $t('quotaByoNotice') : (storageUsage.isVisitor ? $t('visitorStorageNotice') : $t('quotaUsedNotice')) }}</span>
             </div>
           </div>
         </div>
@@ -726,15 +726,18 @@ const forwardForm = reactive({
 
 // 4. User Storage & BYO Storage States
 const storageUsage = reactive({
+  userId: null,
   usedBytes: 0,
   usedMb: '0.00',
-  quotaMb: 500,
+  quotaMb: 0,
   quotaBytes: 0,
   usedPercentage: 0,
   fileCount: 0,
   allowUserByo: true,
   byoStorageEnabled: 0,
   byoStorageConfig: null,
+  isVisitor: false,
+  roleCode: '',
   storageType: 'KV'
 })
 
@@ -758,8 +761,9 @@ const byoForm = reactive({
 async function fetchUserStorage() {
   try {
     const res = await getUserStorage()
-    if (res && res.data) {
-      Object.assign(storageUsage, res.data)
+    const payload = res?.data || res
+    if (payload && typeof payload === 'object') {
+      Object.assign(storageUsage, payload)
     }
   } catch (err) {
     console.warn('Failed to load user storage:', err)
@@ -824,12 +828,13 @@ async function handleTestUserByoConnection() {
   userByoTestResult.value = null
   try {
     const res = await testUserStorage(byoForm)
-    if (res.data) {
-      userByoTestResult.value = res.data
-      if (res.data.ok) {
-        ElMessage.success(res.data.message || '存储桶连接测试成功！')
+    const resultData = res?.data || res
+    if (resultData) {
+      userByoTestResult.value = resultData
+      if (resultData.ok) {
+        ElMessage.success(resultData.message || '存储桶连接测试成功！')
       } else {
-        ElMessage.error(res.data.message || '连接测试未通过')
+        ElMessage.error(resultData.message || '连接测试未通过')
       }
     }
   } catch (err) {
@@ -862,10 +867,11 @@ async function testCurrentByoConnection() {
   testingUserByo.value = true
   try {
     const res = await testUserStorage({})
-    if (res.data?.ok) {
-      ElMessage.success(res.data.message || '个人存储桶连通性正常！')
+    const resultData = res?.data || res
+    if (resultData?.ok) {
+      ElMessage.success(resultData.message || '个人存储桶连通性正常！')
     } else {
-      ElMessage.error(res.data?.message || '个人存储桶诊断未通过')
+      ElMessage.error(resultData?.message || '个人存储桶诊断未通过')
     }
   } catch (err) {
     ElMessage.error(err.message || '诊断失败')

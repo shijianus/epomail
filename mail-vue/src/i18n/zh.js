@@ -1230,6 +1230,7 @@ const zh = {
     unlimitedQuota: '不限容量',
     unlimitedBadge: '无限制',
     quotaUsedNotice: '当前存储由系统池提供，可按需配置个人 Backblaze B2 获得超大独立空间。',
+    visitorStorageNotice: '参观者默认未分配持久化存储空间 (0MB)，除官方欢迎引导信件外无法接收外部信件；接入个人专属 S3 存储桶即可突破限制。',
     quotaByoNotice: '您已启用个人对象存储桶，附件将直接保存在您的专属 Bucket 中，不占用公共配额。',
     byoStorageTitle: '个人对象存储 (Backblaze B2 / S3)',
     byoStorageBound: '已成功绑定个人存储桶',

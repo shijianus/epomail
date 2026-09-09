@@ -11,6 +11,34 @@
    - 在向用户输出回复时，必须置顶/显式打印出本次提交的完整 Commit Hash 与短 Hash，确保版本可追溯、审计记录完整。
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
+### 欢迎邮件全账户必达与自愈机制上线、0MB参观者配额豁免与外部邮件拦截、用量面板精准响应 (2026-09-09)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **全员欢迎邮件必达与 0MB 存储配额豁免 (Universal Welcome Email Delivery & 0MB Storage Quota Exemption)**:
+       - 根因分析：参观者（Visitor）角色配额为 0MB 且默认无持久化存储空间；原先邮件投递逻辑严格受制于存储配额限制，导致新创建或注册的参观者无法接收任何邮件；同时原 `accountService.selectByEmail` 缺失导致新注册触发静默失败；
+       - 重构治理：创建 `mail-worker/src/const/welcome-template.js` 默认兜底模板；实现 `accountService.selectByEmail(c, email)` 并让 `insert` 返回完整插入行；
+       - 全链路必达与自愈：在 `emailService` 中新增 `ensureWelcomeEmailForUser(c, userId, userEmail)`，配合 `HAS_WELCOME_${userId}` KV 高速缓存，在用户注册（`register`）、管理员添加用户（`user/add`）、用户登录（`login` / TOTP `login`）以及收件箱拉取（`email/list`、`loginUserInfo`）全链路保底触发，确保任意新账户（含 0MB 参观者）创建后 100% 收到官方认证、星标重要的欢迎引导信件；
+       - 逻辑隔离：系统内置欢迎信投递不受用户存储配额或外接 DB 限制，单封引导信件天然豁免。
+    2. **参观者外部来信精准拦截与合规防护 (Strict Inbound Email Rejection for 0MB Visitors)**:
+       - 在 `mail-worker/src/email/email.js` 的收信网关（`onEmail`）中，引入 `getUserQuota(c, userId)` 精确校验；
+       - 若收件人处于 0MB 配额（参观者且未接入个人 S3/BYO 存储），以 550 状态码优雅拒收外部发信（`The recipient has no storage space allocated (0MB).`），杜绝 0MB 用户被外部垃圾邮件撑爆系统池。
+    3. **数据设置页用量响应与 0MB 专属提示校准 (Data Setting Storage Meter Calibration & Proper Unwrapping)**:
+       - 根因分析：`mail-vue` 的 Axios 响应拦截器默认解包 `data.data`；而 `data-setting/index.vue` 曾尝试读取 `res.data` 导致 `storageUsage` 无法从后端 `/my/storage` 赋值，卡片错误显示初始兜底 500MB；
+       - 重构治理：在 `data-setting/index.vue` 中对 `getUserStorage()` 与 `testUserStorage()` 返回值统一适配 `res?.data || res`，补齐 `storageUsage` 响应式对象的 `isVisitor` 与 `roleCode` 初始化；
+       - 界面完美呈现：参观者登录进入 `/settings/data` 时，配额卡片精准标示为 `/ 0 MB`，徽章呈现 `0 MB`，并清晰展示参观者专属提示文案（`$t('visitorStorageNotice')`），注明除官方欢迎引导信件外无法接收外部信件。
+    4. **Playwright 全链路多角色 E2E 审计 100% 全绿 (Playwright Live E2E Audit)**:
+       - 编写并执行完整端到端测试 [`tests/test-welcome-email-visitor-and-all-accounts.mjs`](file:///home/shijian/projects/epocanvas-mail/tests/test-welcome-email-visitor-and-all-accounts.mjs):
+         - 步骤 1: Admin 登录并获取角色定义；
+         - 步骤 2: Admin 创建 0MB 存储空间的参观者账号；
+         - 步骤 3: 参观者登录，断言收件箱邮件总数精确为 1（发件人 `admin@epocanvas.com`、`isOfficial = 1`、`isStar = 1`、主题与正文完整包含新手引导）；
+         - 步骤 4: 浏览器实际访问参观者收件箱，点击打开欢迎邮件详情渲染正常；
+         - 步骤 5: 参观者访问 `/settings/data`，断言卡片清晰展示 `/ 0 MB`、`0 MB` 徽章与欢迎邮件专属豁免说明；
+         - 步骤 6: 创建普通用户并验证欢迎邮件同样 100% 成功接收；
+         - 测试全程自动物理清理测试账号，恪守零假数据残留准则。
+       - 回归测试 `tests/test-group-ui-consistency-and-visitor-clean.mjs` 与 `tests/test-user-general-settings-binding-and-defaults.mjs` 全部 100% 通过。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **Cloudflare Workers 部署 Version ID**: `8508b4f4-72ee-42d0-b1c3-b418bf8f7c8f`。
+    - **epocanvas-mail Git Commit**: `cc57a266d372b0dbd099412b5c624f099b488e23` (Short Hash: `cc57a26`)。
+
 ### 常规默认设置严格绑定用户、新账户全量规范化默认值、多账户隔离与持久化优化上线 (2026-09-09)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **用户个性化常规设置严格绑定与多账户彻底隔离 (Strict Per-User General Settings Binding & Complete Isolation)**:

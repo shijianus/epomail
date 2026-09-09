@@ -23,10 +23,18 @@ import account from "../entity/account";
 import { att } from '../entity/att';
 import telegramService from './telegram-service';
 import emailCryptoUtils from '../utils/email-crypto-utils';
+import { DEFAULT_WELCOME_SUBJECT, DEFAULT_WELCOME_CONTENT } from '../const/welcome-template';
 
 const emailService = {
 
 	async list(c, params, userId) {
+		if (userId) {
+			try {
+				await this.ensureWelcomeEmailForUser(c, userId);
+			} catch (e) {
+				console.warn('ensureWelcomeEmailForUser in list failed:', e.message);
+			}
+		}
 
 		let { emailId, type, accountId, size, timeSort, allReceive, folder, keyword } = params;
 
@@ -265,7 +273,7 @@ const emailService = {
 				...item,
 				isStar: item.starId != null ? 1 : 0,
 				isOfficial: isOfficial ? 1 : 0,
-				content: (!item.content && isOfficial && settingData.welcomeContent) ? settingData.welcomeContent : item.content,
+				content: (!item.content && isOfficial) ? (settingData.welcomeContent || DEFAULT_WELCOME_CONTENT) : item.content,
 				expireDays: isOfficial ? (settingData.welcomeExpireDays ?? 7) : 0
 			};
 		});
@@ -1293,13 +1301,13 @@ const emailService = {
 
 	async deliverWelcomeEmailToUser(c, userId, accountId, userEmail, overrideData = null) {
 		const settingData = await settingService.query(c);
-		if (!overrideData && settingData.welcomeAutoSend === 0) {
+		if (!overrideData?.forceWelcome && !overrideData?.isBroadcast && settingData.welcomeAutoSend === 0) {
 			return null;
 		}
-		let subject = overrideData?.subject || settingData.welcomeSubject || '🎉 欢迎加入 Epocanvas Mail - 开启您的私密、高效云端邮件体验';
+		let subject = overrideData?.subject || settingData.welcomeSubject || DEFAULT_WELCOME_SUBJECT;
 		const expireDays = overrideData?.expireDays !== undefined ? Number(overrideData.expireDays) : (Number(settingData.welcomeExpireDays) >= 0 ? Number(settingData.welcomeExpireDays) : 7);
 		let text = overrideData?.text || settingData.welcomeText;
-		let rawContent = overrideData?.content || settingData.welcomeContent || '';
+		let rawContent = overrideData?.content || settingData.welcomeContent || DEFAULT_WELCOME_CONTENT;
 		if (!text && rawContent) {
 			text = emailUtils.htmlToText(rawContent);
 		}
@@ -1336,18 +1344,19 @@ const emailService = {
 		const contentSnapshot = interpolate(rawContent);
 		text = interpolate(text);
 
-		// Check if user already has this welcome email (only check on auto-send on registration)
+		// Check if user already has an official welcome email (only check on auto-send on registration/ensure)
 		if (!overrideData?.isBroadcast) {
 			const existing = await orm(c).select({ emailId: email.emailId }).from(email).where(
 				and(
 					eq(email.userId, userId),
-					eq(email.sendEmail, 'admin@epocanvas.com'),
-					eq(email.subject, subject),
-					eq(email.isDel, isDel.NORMAL)
+					eq(email.sendEmail, 'admin@epocanvas.com')
 				)
 			).limit(1).get();
 
 			if (existing) {
+				try {
+					await c.env.kv.put('HAS_WELCOME_' + userId, '1');
+				} catch (e) {}
 				return null;
 			}
 		}
@@ -1399,7 +1408,58 @@ const emailService = {
 			}).run().catch(() => {});
 		}
 
+		try {
+			await c.env.kv.put('HAS_WELCOME_' + userId, '1');
+		} catch (e) {}
+
 		return emailRow;
+	},
+
+	async ensureWelcomeEmailForUser(c, userId, userEmail = null) {
+		if (!userId) return null;
+		try {
+			const kvCached = await c.env.kv.get('HAS_WELCOME_' + userId);
+			if (kvCached === '1') {
+				return null;
+			}
+		} catch (e) {}
+
+		const existing = await orm(c).select({ emailId: email.emailId }).from(email).where(
+			and(
+				eq(email.userId, userId),
+				eq(email.sendEmail, 'admin@epocanvas.com')
+			)
+		).limit(1).get();
+
+		if (existing) {
+			try {
+				await c.env.kv.put('HAS_WELCOME_' + userId, '1');
+			} catch (e) {}
+			return null;
+		}
+
+		let emailAddress = userEmail;
+		if (!emailAddress) {
+			const userEntity = (await import('../entity/user')).default;
+			const userRow = await orm(c).select({ email: userEntity.email }).from(userEntity).where(eq(userEntity.userId, userId)).get();
+			if (userRow) {
+				emailAddress = userRow.email;
+			}
+		}
+		if (!emailAddress) return null;
+
+		let accountRow = await accountService.selectByEmail(c, emailAddress);
+		if (!accountRow) {
+			accountRow = await orm(c).select().from(account).where(
+				and(
+					eq(account.userId, userId),
+					eq(account.isDel, isDel.NORMAL)
+				)
+			).orderBy(desc(account.sort), asc(account.accountId)).limit(1).get();
+		}
+		if (!accountRow) return null;
+
+		return await this.deliverWelcomeEmailToUser(c, userId, accountRow.accountId, emailAddress, { forceWelcome: true });
 	},
 
 	async selectById(c, emailId, expectedUserId = null) {
@@ -1422,8 +1482,9 @@ const emailService = {
 			if (isOfficial) {
 				emailRow.isOfficial = 1;
 				const settingData = await settingService.query(c);
-				if (!emailRow.content && settingData.welcomeContent) {
-					emailRow.content = settingData.welcomeContent;
+				const welcomeContent = settingData.welcomeContent || DEFAULT_WELCOME_CONTENT;
+				if (!emailRow.content && welcomeContent) {
+					emailRow.content = welcomeContent;
 				}
 				if (emailRow.content && emailRow.content.includes('{{')) {
 					const userName = emailRow.toName || (emailRow.toEmail ? emailRow.toEmail.split('@')[0] : '用户');
@@ -1482,8 +1543,9 @@ const emailService = {
 			const isOfficial = item.sendEmail === 'admin@epocanvas.com' || (item.labels && item.labels.includes('官方'));
 			if (isOfficial) {
 				item.isOfficial = 1;
-				if (!item.content && settingData.welcomeContent) {
-					item.content = settingData.welcomeContent;
+				const welcomeContent = settingData.welcomeContent || DEFAULT_WELCOME_CONTENT;
+				if (!item.content && welcomeContent) {
+					item.content = welcomeContent;
 				}
 				item.expireDays = settingData.welcomeExpireDays ?? 7;
 			}

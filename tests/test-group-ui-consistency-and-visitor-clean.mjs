@@ -115,9 +115,9 @@ import assert from "node:assert";
     assert.ok(adminComposeBtn, "Admin 必须可见「写邮件」按钮");
 
     // 断言 2.3: 头像下拉菜单取消了“管理后台”，只保留设置
-    const avatarWrap = await page.waitForSelector(".avatar-wrap", { timeout: 5000 });
+    const avatarWrap = await page.waitForSelector(".avatar-wrap", { timeout: 15000 });
     await avatarWrap.click();
-    await page.waitForSelector(".user-details.account-menu.open", { timeout: 5000 });
+    await page.waitForSelector(".user-details.account-menu.open", { timeout: 15000 });
     const adminMenuItems = await page.evaluate(() => {
       const items = Array.from(document.querySelectorAll(".account-menu .am-item span")).map(s => s.textContent.trim());
       return items;

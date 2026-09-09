@@ -103,6 +103,15 @@ const accountService = {
 		return orm(c).select().from(account).where(sql`${account.email} COLLATE NOCASE = ${email}`).get();
 	},
 
+	selectByEmail(c, email) {
+		return orm(c).select().from(account).where(
+			and(
+				sql`${account.email} COLLATE NOCASE = ${email}`,
+				eq(account.isDel, isDel.NORMAL)
+			)
+		).get();
+	},
+
 	list(c, params, userId) {
 
 		let { accountId, size, lastSort } = params;
@@ -169,7 +178,7 @@ const accountService = {
 	},
 
 	async insert(c, params) {
-		await orm(c).insert(account).values({ ...params }).returning();
+		return await orm(c).insert(account).values({ ...params }).returning().get();
 	},
 
 	async insertList(c, list) {

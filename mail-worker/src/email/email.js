@@ -104,6 +104,10 @@ export async function email(message, env, ctx) {
 
 			// 检查用户配额
 			const quota = await userService.getUserQuota({ env: env }, account.userId);
+			if (quota.maxStorageMB === 0) {
+				message.setReject('The recipient has no storage space allocated (0MB).');
+				return;
+			}
 			if (quota.usedEmails >= quota.maxEmails * 0.95) {
 				message.setReject(`Recipient mailbox is full (email count limit reached 95%).`);
 				return;
