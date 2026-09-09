@@ -800,7 +800,7 @@
               <div class="concerning-item">
                 <span>{{ $t('version') }} :</span>
                 <el-badge is-dot :hidden="!hasUpdate">
-                  <el-button @click="jump('https://github.com/your-username/epocanvas-mail/releases')">
+                  <el-button @click="jump('https://github.com/shijianus/epomail/releases')">
                     {{ currentVersion }}
                     <template #icon>
                       <Icon icon="qlementine-icons:version-control-16" style="font-size: 20px" color="#1890FF"/>
@@ -811,13 +811,13 @@
               <div class="concerning-item">
                 <span>{{ $t('community') }} : </span>
                 <div class="community">
-                  <el-button @click="jump('https://github.com/your-username/epocanvas-mail')">
+                  <el-button @click="jump('https://github.com/shijianus/epomail')">
                     Github
                     <template #icon>
                       <Icon icon="codicon:github-inverted" width="22" height="22"/>
                     </template>
                   </el-button>
-                  <el-button @click="jump('https://t.me/cloud_mail_tg')">
+                  <el-button @click="jump('https://t.me/epomail')">
                     Telegram
                     <template #icon>
                       <Icon icon="logos:telegram" width="30" height="30"/>
@@ -827,7 +827,7 @@
               </div>
               <div class="concerning-item">
                 <span>{{ $t('support') }} : </span>
-                <el-button @click="jump('https://doc.skymail.ink/support.html')">
+                <el-button @click="jump('https://blog.epocanvas.com/support')">
                   {{ t('supportDesc') }}
                   <template #icon>
                     <Icon color="#79D6B5" icon="simple-icons:buymeacoffee" width="20" height="20"/>
@@ -836,7 +836,7 @@
               </div>
               <div class="concerning-item">
                 <span>{{ $t('help') }} : </span>
-                <el-button @click="jump('https://doc.skymail.ink')">
+                <el-button @click="jump('https://docs.epocanvas.com/epomail')">
                   {{ t('document') }}
                   <template #icon>
                     <Icon color="#79D6B5" icon="fluent-color:document-32" width="18" height="18"/>
@@ -2831,8 +2831,6 @@
                   allow-create
                   default-first-option
                   clearable
-                  collapse-tags
-                  collapse-tags-tooltip
                   class="ai-models-pool-select"
                   popper-class="ai-models-pool-dropdown"
                   :placeholder="$t('aiModelsPoolPlaceholder') || '选择或键入本站允许调用的多个模型'" 
@@ -2916,12 +2914,13 @@ import {formatDetailDate} from "@/utils/day.js";
 import {useI18n} from 'vue-i18n';
 import {ElMessageBox, ElMessage} from "element-plus";
 import axios from "axios";
+import { APP_VERSION } from "@/const/version.js";
 
 defineOptions({
   name: 'sys-setting'
 })
 
-const currentVersion = 'v3.0.0'
+const currentVersion = APP_VERSION;
 const hasUpdate = ref(false)
 let getUpdateErrorCount = 1;
 const {t, locale} = useI18n();
@@ -4074,7 +4073,7 @@ const resendList = computed(() => {
 
 function getUpdate() {
   if (getUpdateErrorCount > 5 || !getUpdateErrorCount) return
-  axios.get('https://api.github.com/repos/your-username/epocanvas-mail/releases/latest').then(({data}) => {
+  axios.get('https://api.github.com/repos/shijianus/epomail/releases/latest').then(({data}) => {
     hasUpdate.value = data.name !== currentVersion
     getUpdateErrorCount = 0
   }).catch(e => {
@@ -5415,6 +5414,10 @@ function editSetting(settingForm, refreshStatus = true, closeAiDialog = false) {
   display: flex;
   flex-direction: column;
   gap: 10px;
+
+  & > * {
+    border-bottom: none !important;
+  }
 }
 
 .custom-ui-tabs {
@@ -7543,10 +7546,10 @@ form .el-button {
     align-items: center;
     padding: 7px 0;
     gap: 12px;
-    border-bottom: 1px solid var(--el-border-color-extra-light, rgba(0, 0, 0, 0.04));
+    border-bottom: none !important;
 
     &:last-child {
-      border-bottom: none;
+      border-bottom: none !important;
     }
 
     > .title-item {

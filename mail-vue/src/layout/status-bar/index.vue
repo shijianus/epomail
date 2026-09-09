@@ -13,12 +13,13 @@
         <span>{{ currentMailModeConfig.title }}</span>
       </div>
     </el-tooltip>
-    <div class="status-text version-tag">EpoMail v1.0.3 · Cloudflare Workers</div>
+    <div class="status-text version-tag">{{ APP_VERSION_TAG }}</div>
   </div>
 </template>
 
 <script setup>
 import { computed, ref, onMounted, onUnmounted, watch } from 'vue';
+import { APP_VERSION_TAG } from '@/const/version.js';
 import { useUiStore } from '@/store/ui.js';
 import { useEmailStore } from '@/store/email.js';
 import { useSettingStore } from '@/store/setting.js';

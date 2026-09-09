@@ -216,7 +216,6 @@
                 controls-position="right" 
                 style="width: 100%;" 
               />
-              <div class="pair-tip">0MB为无存储(参观者需外接DB)</div>
             </div>
 
             <div class="pair-item">
@@ -230,7 +229,6 @@
                   inactive-text="仅纯文本"
                 />
               </div>
-              <div class="pair-tip">LV.1及以上书友开放附件</div>
             </div>
           </div>
 
@@ -270,7 +268,7 @@
                 default-first-option
                 :reserve-keyword="false"
                 tag-type="primary"
-                placeholder="允许调用的 AI 模型 (留空代表允许全部或跟随系统全局)"
+                placeholder="允许调用的 AI 模型 (留空代表允许全部)"
                 style="width: 100%;"
             >
               <el-option
@@ -302,10 +300,6 @@
               <span class="perm-title">权限分配细则</span>
               <span class="perm-count-badge">{{ locale === 'zh' ? `已选 ${checkedPermsCount} 项` : `${checkedPermsCount} Selected` }}</span>
             </div>
-            <el-radio-group v-model="expand" size="small" @change="expandChange" class="perm-expand">
-              <el-radio-button :value="true">{{ $t('expand') }}</el-radio-button>
-              <el-radio-button :value="false">{{ $t('collapse') }}</el-radio-button>
-            </el-radio-group>
           </div>
 
           <div class="perm-tree-wrap">
@@ -313,15 +307,14 @@
               <el-tree
                   :expand-on-click-node="false"
                   :check-on-click-node="false"
-                  :accordion="!expand"
+                  accordion
                   ref="tree"
                   :data="treeList"
                   show-checkbox
                   node-key="permId"
-                  :default-expand-all="expand"
+                  :default-expand-all="false"
                   :props="{ label: 'name' }"
                   @check="updateCheckedPermsCount"
-                  @node-collapse="onNodeCollapse"
               >
                 <template #default="{ node, data }">
                   <div class="tree-node-content">
@@ -1481,6 +1474,21 @@ onBeforeUnmount(() => {
     padding: 16px 22px 22px;
     overflow: visible !important;
   }
+
+  .el-select__wrapper {
+    .el-select__placeholder {
+      white-space: nowrap !important;
+      overflow: visible !important;
+      text-overflow: clip !important;
+    }
+    .el-select__selected-item,
+    .el-select__tags-text {
+      max-width: none !important;
+      overflow: visible !important;
+      text-overflow: clip !important;
+      white-space: normal !important;
+    }
+  }
 }
 
 .role-edit-grid {
@@ -1546,22 +1554,14 @@ onBeforeUnmount(() => {
         letter-spacing: 0.2px;
       }
     }
-
-    .perm-expand {
-      :deep(.el-radio-button__inner) {
-        padding: 5px 11px;
-        font-size: 12px;
-        font-weight: 500;
-      }
-    }
   }
 
   .perm-tree-wrap {
     border: 1px solid var(--border-subtle, #e2e8f0);
     border-radius: 10px;
     background: var(--bg-elevated, #f8fafc);
-    height: 372px;
-    max-height: 372px;
+    flex: 1;
+    min-height: 0;
     display: flex;
     flex-direction: column;
     overflow: hidden;

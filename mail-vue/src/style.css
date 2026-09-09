@@ -671,6 +671,16 @@ html:not(.dark) .el-popper .el-popper__arrow::before {
     z-index: 3000 !important;
 }
 
+/* Ensure dropdown selections & placeholders do not truncate with ellipsis tail */
+.el-select__wrapper .el-select__placeholder {
+    text-overflow: clip !important;
+}
+
+.el-select__wrapper .el-select__tags-text {
+    max-width: none !important;
+    text-overflow: clip !important;
+}
+
 .el-dropdown-menu {
     background: var(--bg-surface) !important;
     border-radius: 10px !important;

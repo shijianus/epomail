@@ -1041,6 +1041,10 @@ async function saveDrawer() {
   display: flex;
   flex-direction: column;
   gap: 10px;
+
+  & > * {
+    border-bottom: none !important;
+  }
 }
 
 .setting-item {
