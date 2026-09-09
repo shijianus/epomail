@@ -49,7 +49,11 @@
        - `tests/test-ai-model-pool-sync-to-role.mjs` 与 `tests/verify-full-icons.mjs` 全部 100% 通过。
 *   **部署上线与自动化测试 (Verification & Deployment)**:
     - **Cloudflare Workers 部署 Version ID**: `2d164123-bf1a-48f8-a222-b18e21d30990`。
-    - **epocanvas-mail Git Commit**: `48e6a47c5d0ff37037e85b551d5bdc666bd60b5f` (Short Hash: `48e6a47`).
+    - **epocanvas-mail Git Commit**: `48e6a47c5d0ff37037e85b551d5bdc666bd60b5f` (Short Hash: `48e6a47`)。
+    - **GitHub Release 发布**:
+      - Git Tag: `v1.1.0` (commit `7558fc8a1729b18cbe60e54138aada10c7a155ae`)；
+      - GitHub Release URL: `https://github.com/shijianus/epomail/releases/tag/v1.1.0`；
+      - 自动化工作流 `.github/workflows/release.yml` 触发运行并构建发布成功，官方 Release 说明与源码打包现已正式上线。
 
 ### 角色权限身份弹窗左右0偏差严格对齐、权限树互斥与统一展开解耦协同、显式药丸滑块与已选计数徽章上线 (2026-09-09)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
