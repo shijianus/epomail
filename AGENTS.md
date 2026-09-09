@@ -41,7 +41,7 @@
        - `tests/test-ai-hub-card-and-models-detection.mjs`、`tests/test-shijianus-oauth-authorize-visual.mjs`、`tests/verify-full-icons.mjs` 全部 100% 全绿通过。
 *   **部署上线与自动化测试 (Verification & Deployment)**:
     - **Cloudflare Workers 部署 Version ID**: `484a499e-6d13-4d0e-9ae6-ef5198fec73e`。
-    - **epocanvas-mail Git Commit**: `PENDING_COMMIT_HASH` (Short Hash: `PENDING`).
+    - **epocanvas-mail Git Commit**: `5f221309144c9c42652efbb5fe501eebed4af7ea` (Short Hash: `5f22130`).
 
 ### 系统设置已选定模型池实时同步角色权限AI允许模型下拉单、彻底杜绝硬编码假数据与来源分类胶囊徽章上线 (2026-09-08)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
