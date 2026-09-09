@@ -41,7 +41,7 @@
        - 回归测试 `tests/test-group-ui-consistency-and-visitor-clean.mjs` 100% 通过。
 *   **部署上线与自动化测试 (Verification & Deployment)**:
     - **Cloudflare Workers 部署 Version ID**: `adb830d1-a4c2-44f8-ad12-1b53175c5bd2`。
-    - **epocanvas-mail Git Commit**: PENDING_COMMIT_HASH.
+    - **epocanvas-mail Git Commit**: `f345c997a68a627af27022cd4310c61a47908be2` (Short Hash: `f345c99`)。
 
 ### 冗余导航删除、全用户组UI与写邮件入口一致、无沙盒真实鉴权与权限单次提示优化上线 (2026-09-09)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
