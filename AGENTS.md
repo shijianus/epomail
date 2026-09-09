@@ -48,7 +48,7 @@
        - 回归测试 `tests/test-ai-model-pool-sync-to-role.mjs` 100% 通过。
 *   **部署上线与自动化测试 (Verification & Deployment)**:
     - **Cloudflare Workers 部署 Version ID**: `ffc60e6a-4cfe-41f0-8f4e-2c29a832fa10`。
-    - **epocanvas-mail Git Commit**: PENDING_COMMIT_HASH.
+    - **epocanvas-mail Git Commit**: `5a5524fc9e577495735345773b477d97628048c7` (Short Hash: `5a5524f`)。
 
 ### 角色弹窗滑块尺寸牢固锁定、隐式药丸滑块生效、预设模板3x2像素级对齐、全权限用户查看闭环与真实身份组E2E全绿上线 (2026-09-09)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
