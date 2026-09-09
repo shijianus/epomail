@@ -36,7 +36,7 @@
          - 生成并留存真实环境审计截图：`tests/audit_oauth_authorize_with_real_tab_logo.png`、`tests/audit_oauth_authorize_dark_perfect.png`、`tests/audit_oauth_authorize_login_prompt.png`。
 *   **部署上线与版本追溯 (Verification & Deployment)**:
     - **Cloudflare Workers 部署 Version ID**: `4e7d81ef-178d-437b-9bb9-1f61c72cd617`。
-    - **epocanvas-mail Git Commit**: 待提交并记录。
+    - **epocanvas-mail Git Commit**: `0665a0d1b16ebb5a6a48ca455452ae61231f5560` (Short Hash: `0665a0d`)。
 
 ### 系统设置AI Hub接口端点智能补齐与回退、选定模型按需测试与0-Token测速优化、移除无实效管理员开关上线 (2026-09-08)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
