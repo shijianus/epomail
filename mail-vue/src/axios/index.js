@@ -102,7 +102,6 @@ http.interceptors.request.use(config => {
                 plain: true,
                 grouping: true
             })
-            ElMessage.error('')
         } else if (error.response) {
             ElMessage({
                 message: i18n.global.t('serverBusyErrorMsg'),

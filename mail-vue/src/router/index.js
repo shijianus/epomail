@@ -120,6 +120,26 @@ const routes = [
                 }
             },
             {
+                path: '/sent',
+                name: 'send',
+                component: () => import('@/views/send/index.vue'),
+                meta: {
+                    title: 'sent',
+                    name: 'send',
+                    menu: true
+                }
+            },
+            {
+                path: '/drafts',
+                name: 'draft',
+                component: () => import('@/views/draft/index.vue'),
+                meta: {
+                    title: 'drafts',
+                    name: 'draft',
+                    menu: true
+                }
+            },
+            {
                 path: '/starred',
                 name: 'star',
                 component: () => import('@/views/star/index.vue'),

@@ -533,11 +533,6 @@ const userService = {
 		if (callerUserId) {
 			const caller = await this.selectById(c, callerUserId);
 			if (caller) {
-				const callerRole = await roleService.selectById(c, caller.type);
-				if (callerRole?.roleCode === 'visitor') {
-					return { simulated: true, message: '参观者模式：操作已在沙箱中模拟。' };
-				}
-
 				if (caller.email !== c.env.admin) {
 					if (caller.userId === Number(userId)) {
 						throw new BizError('协管者/管理员无权修改自身所在分组权限！', 403);

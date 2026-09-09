@@ -19,17 +19,6 @@
         架构与分级一览
       </el-button>
 
-      <!-- Visitor Sandbox Tour Banner -->
-      <div v-if="isVisitor" class="visitor-banner">
-        <Icon icon="solar:shield-warning-bold-duotone" width="16" height="16" />
-        <span>参观者演示沙箱模式：可巡检管理后台与体验完整交互，所有修改均不会保存至生产库</span>
-      </div>
-
-      <!-- Moderator Status Indicator -->
-      <div v-else-if="isModerator" class="moderator-banner">
-        <Icon icon="lucide:shield-alert" width="15" height="15" />
-        <span>协管者模式：具备细分管理权限，无权修改自身分组或站长权限</span>
-      </div>
     </div>
 
     <el-scrollbar class="perm-scrollbar">
@@ -347,14 +336,9 @@
             </el-scrollbar>
           </div>
 
-          <div v-if="isVisitor" class="visitor-dialog-notice">
-            <Icon icon="solar:info-circle-bold" width="15" height="15" />
-            <span>您当前处于参观者沙箱模式，点击保存将在当前界面模拟生效，不持久化至数据库。</span>
-          </div>
-
           <el-button class="btn btn-save-role" type="primary" :loading="permLoading" @click="roleFormClick">
             <Icon icon="lucide:check" width="16" height="16" style="margin-right: 6px;" />
-            {{ isVisitor ? '体验保存 (沙箱模拟)' : $t('save') }}
+            {{ $t('save') }}
           </el-button>
         </div>
       </div>
@@ -979,9 +963,8 @@ function setRole() {
 
   permLoading.value = true;
   roleSet(params).then((res) => {
-    const msg = isVisitor.value ? '【参观者演示沙箱】操作已在会话中模拟生效（未持久化至数据库）' : t('saveSuccessMsg');
     ElMessage({
-      message: msg,
+      message: t('saveSuccessMsg'),
       type: "success",
       plain: true
     });
@@ -1068,9 +1051,8 @@ function addRole() {
 
   permLoading.value = true;
   roleAdd(params).then(() => {
-    const msg = isVisitor.value ? '【参观者演示沙箱】操作已在会话中模拟生效（未持久化至数据库）' : t('addSuccessMsg');
     ElMessage({
-      message: msg,
+      message: t('addSuccessMsg'),
       type: "success",
       plain: true
     });
@@ -1113,7 +1095,7 @@ function handleSyncBlogTier() {
     getRoleList();
     userStore.refreshUserList?.();
   }).catch(e => {
-    ElMessage.error(e?.message || '同步博客等级失败');
+    console.warn('handleSyncBlogTier error:', e);
   }).finally(() => {
     syncingBlog.value = false;
   });
@@ -1207,20 +1189,6 @@ onBeforeUnmount(() => {
     border-radius: 8px;
     height: 32px;
   }
-}
-
-.visitor-banner {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: rgba(245, 158, 11, 0.12);
-  border: 1px solid rgba(245, 158, 11, 0.3);
-  color: #d97706;
-  font-size: 12px;
-  font-weight: 500;
-  padding: 4px 10px;
-  border-radius: 6px;
-  margin-left: auto;
 }
 
 .moderator-banner {
@@ -1717,20 +1685,6 @@ onBeforeUnmount(() => {
     :deep(.el-tree-node:focus > .el-tree-node__content) {
       background: var(--bg-hover, #f1f5f9) !important;
     }
-  }
-
-  .visitor-dialog-notice {
-    background: rgba(245, 158, 11, 0.1);
-    border: 1px solid rgba(245, 158, 11, 0.25);
-    color: #b45309;
-    font-size: 12px;
-    padding: 8px 10px;
-    border-radius: 6px;
-    margin-top: 10px;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    flex-shrink: 0;
   }
 
   .btn.btn-save-role {

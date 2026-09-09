@@ -25,10 +25,6 @@
         <Icon class="icon" icon="fluent:broom-sparkle-16-regular" width="18" height="18"/>
       </div>
     </div>
-    <div v-if="isVisitor" class="visitor-notice-bar">
-      <Icon class="notice-icon" icon="solar:shield-warning-bold" width="16" height="16" />
-      <span>参观者演示模式：注册密钥与使用记录已启用安全脱敏保护，仅供体验管理界面与交互流程，不可复制生产密钥。</span>
-    </div>
 
     <el-scrollbar class="scrollbar">
       <div  class="loading" :class="regKeyLoading ? 'loading-show' : 'loading-hide'" :style="regKeyFirst ? 'background: transparent' : ''">
@@ -597,24 +593,6 @@ function openAdd() {
   }
 }
 
-.visitor-notice-bar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 18px;
-  background: rgba(245, 158, 11, 0.08);
-  border-bottom: 1px solid rgba(245, 158, 11, 0.2);
-  color: #b45309;
-  font-size: 13px;
-  line-height: 1.5;
-  font-weight: 500;
-
-  .notice-icon {
-    flex-shrink: 0;
-    color: #f59e0b;
-  }
-}
-
 .empty {
   display: flex;
   justify-content: center;
@@ -867,16 +845,6 @@ function openAdd() {
       background: rgba(99, 102, 241, 0.25) !important;
       border-color: rgba(99, 102, 241, 0.5) !important;
       color: #818cf8 !important;
-    }
-  }
-
-  .reg-key .visitor-notice-bar {
-    background: rgba(245, 158, 11, 0.15) !important;
-    border-bottom-color: rgba(245, 158, 11, 0.3) !important;
-    color: #fbbf24 !important;
-
-    .notice-icon {
-      color: #fbbf24 !important;
     }
   }
 

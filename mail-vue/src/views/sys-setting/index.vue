@@ -4283,7 +4283,6 @@ function saveWelcomeTemplate() {
     welcomeEmailShow.value = false
   }).catch(e => {
     console.error('saveWelcomeTemplate error:', e)
-    ElMessage.error(t('operationFailed') || '保存失败')
   }).finally(() => {
     savingWelcome.value = false
   })
@@ -5275,7 +5274,6 @@ function editSetting(settingForm, refreshStatus = true, closeAiDialog = false) {
     loginOpacity.value = setting.value.loginOpacity
     setting.value = {...setting.value, ...JSON.parse(backup || '{}')}
     settingStore.settings = { ...settingStore.settings, ...setting.value }
-    ElMessage.error(t('operationFailed') || '保存失败')
   }).finally(() => {
     settingLoading.value = false
     clearS3Loading.value = false

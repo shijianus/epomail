@@ -222,16 +222,6 @@ const roleService = {
 			throw new BizError(t('emptyRoleName'));
 		}
 
-		if (userId) {
-			const caller = await userService.selectById(c, userId);
-			if (caller) {
-				const callerRole = await this.selectById(c, caller.type);
-				if (callerRole?.roleCode === 'visitor') {
-					return { simulated: true, message: '参观者模式：配置已在沙箱中模拟，未持久化至生产数据库。' };
-				}
-			}
-		}
-
 		let roleRow = await orm(c).select().from(role).where(eq(role.name, name)).get();
 		if (roleRow) {
 			throw new BizError(t('roleNameExist'));
@@ -302,10 +292,6 @@ const roleService = {
 		if (callerUserId) {
 			const caller = await userService.selectById(c, callerUserId);
 			if (caller) {
-				const callerRole = await this.selectById(c, caller.type);
-				if (callerRole?.roleCode === 'visitor') {
-					return { simulated: true, message: '参观者模式：配置已在沙箱中模拟，未持久化至生产数据库。' };
-				}
 				if (caller.email !== c.env.admin) {
 					if (caller.type === Number(roleId)) {
 						throw new BizError('协管者/管理员无权修改自身所在分组的权限配置！', 403);
@@ -366,10 +352,6 @@ const roleService = {
 		if (callerUserId) {
 			const caller = await userService.selectById(c, callerUserId);
 			if (caller) {
-				const callerRole = await this.selectById(c, caller.type);
-				if (callerRole?.roleCode === 'visitor') {
-					return { simulated: true, message: '参观者模式：操作已在沙箱中模拟。' };
-				}
 				if (caller.email !== c.env.admin && caller.type === Number(roleId)) {
 					throw new BizError('协管者/管理员无权删除自身所在分组！', 403);
 				}

@@ -11,6 +11,45 @@
    - 在向用户输出回复时，必须置顶/显式打印出本次提交的完整 Commit Hash 与短 Hash，确保版本可追溯、审计记录完整。
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
+### 冗余导航删除、全用户组UI与写邮件入口一致、无沙盒真实鉴权与权限单次提示优化上线 (2026-09-09)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **删除冗余导航与下拉管理项 (Sidebar & Header Nav Section Cleanup)**:
+       - 彻底删除侧边栏底部管理和设置区域（`.aside-container` 内的 `.nav-section` 带有 `style="margin-top: 20px; padding-top: 12px; border-top: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.06));"`）；
+       - 在头像下拉菜单（`.account-menu`）中取消 `class="am-item"` 的“管理”项，因为“设定”页面已内嵌完整的用户与权限管理体系，普通用户与管理员界面保持统一纯粹，无需多此一举；
+       - 同步清理组件内冗余的 `isSettingsMode`、`isManageRoute`、`openManage`、`openSettings` 逻辑。
+    2. **全用户组 UI 与写邮件/发件箱一致性保障 (Unified UI Across All Roles)**:
+       - 移除了 `mail-vue/src/layout/aside/index.vue` 写邮件按钮（`.compose-btn-wrapper`）、已发送（`send`）与草稿箱（`draft`）上的 `v-perm="'email:send'"` 指令；
+       - 严格区分“权限控制”与“UI 一致性需求”：所有角色（管理员、普通用户、参观者）主界面均具备写邮件按钮和常规邮箱分类，与管理员界面保持绝对一致；
+       - 将 `/sent` 与 `/drafts` 路由提升至静态子路由，防止未授权发信的用户直接访问对应页面时发生 404，并在无发信权限时由交互或接口进行合理响应。
+    3. **彻底去除沙盒环境标注与无实效 Mock (Complete Removal of Sandbox Labels & Mocks)**:
+       - 参观者界面不再标注“沙盒环境/沙箱模式”，与管理员所见界面完全对齐；
+       - 彻底移除了角色管理页面顶部的 `visitor-banner` 与 `moderator-banner` 横幅；
+       - 彻底移除了注册密钥页面顶部的 `visitor-notice-bar` 提示条；
+       - 彻底移除了角色编辑弹窗内的 `visitor-dialog-notice`，弹窗保存按钮统一恢复为标准 `{{ $t('save') }}`（移除了 `(沙箱模拟)` 字样）；
+       - 后端 `mail-worker/src/security/security.js`、`role-service.js`、`user-service.js` 中彻底清除针对参观者的假数据 mock 与 simulated 模拟返回，执行真实鉴权。
+    4. **修改失败/权限不足提示精简确保仅出现 1 次 (Strict Single Toast on Mutation Rejection)**:
+       - 根因分析：原先未授权用户提交表单时，后端的 403 异常先被 axios 全局响应拦截器捕获并弹出 1 次警告（`未授权` / `权限不足`）；随后业务组件内的 `.catch` 块又二次调用了 `ElMessage.error(t('operationFailed') || '保存失败')`，导致屏幕上叠出 2 个提示弹窗；
+       - 优化治理：清理 `sys-setting/index.vue`、`role/index.vue` 中的 catch 重复 `ElMessage.error`，并移除 `axios/index.js` 中无用的超时空报错；统一由全局拦截器精准弹出 1 次权威明确的权限说明（`权限不足`），实现单次明确提示。
+    5. **Playwright 全链路多角色 E2E 与视觉审计 100% 全绿 (Playwright Live E2E Audit)**:
+       - 编写并执行完整端到端测试 `tests/test-group-ui-consistency-and-visitor-clean.mjs`:
+         - 审计 Admin: 侧边栏底部多余 `nav-section` 完全清除，头像下拉菜单仅保留「账户详情」、「设定」、「退出」；
+         - 审计 Normal User: 具备写邮件按钮与已发送/草稿箱，侧边栏与下拉菜单无多余管理项；
+         - 审计 Visitor: 完整渲染「写邮件」按钮并可正常展开写信弹窗；角色页面顶部绝无沙盒横幅，弹窗内无沙盒提示，保存按钮为「保存」；
+         - 交互审计 Visitor 保存角色: 真实触发 403 权限不足，断言页面 `.el-message` 数量精确为 1（单次提示）；
+         - 审计 Visitor `/reg-key`: 无任何沙盒横幅，亮暗模式视觉审计完美；
+         - 测试全程具备自动清理临时测试账号逻辑，恪守零假数据残留准则。
+       - 存留截图存证：
+         - `tests/audit_admin_sidebar_and_dropdown.png`
+         - `tests/audit_normal_user_inbox.png`
+         - `tests/audit_visitor_compose_modal.png`
+         - `tests/audit_visitor_role_dialog_clean.png`
+         - `tests/audit_visitor_single_toast_403.png`
+         - `tests/audit_visitor_reg_key_dark_clean.png`
+       - 回归测试 `tests/test-ai-model-pool-sync-to-role.mjs` 100% 通过。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **Cloudflare Workers 部署 Version ID**: `ffc60e6a-4cfe-41f0-8f4e-2c29a832fa10`。
+    - **epocanvas-mail Git Commit**: PENDING_COMMIT_HASH.
+
 ### 角色弹窗滑块尺寸牢固锁定、隐式药丸滑块生效、预设模板3x2像素级对齐、全权限用户查看闭环与真实身份组E2E全绿上线 (2026-09-09)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **角色弹窗 `.el-scrollbar__wrap` 尺寸牢固锁定与防无限下延 (Strict Scrollbar Wrap Locking)**:

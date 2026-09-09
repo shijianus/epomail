@@ -79,9 +79,6 @@
             </div>
             <div class="am-item" @click="openAccountDetails"><span>{{ $t('accountDetails') || 'Account Details' }}</span></div>
             <div class="am-item" @click="openSettings"><span>{{ $t('settings') || 'Settings' }}</span></div>
-            <div v-if="hasPerm(['all-email:query','user:query','role:query','setting:query','analysis:query','reg-key:query'])" class="am-item" @click="openManage">
-              <span>{{ $t('manage') || '管理后台' }}</span>
-            </div>
             <div class="am-item logout" @click="clickLogout"><span>{{ $t('logOut') }}</span></div>
           </div>
         </template>
@@ -128,27 +125,6 @@ function openSettings() {
     userinfoRef.value.handleClose()
   }
   router.push('/settings/profile')
-}
-
-function openManage() {
-  if (userinfoRef.value && userinfoRef.value.handleClose) {
-    userinfoRef.value.handleClose()
-  }
-  if (hasPerm('user:query')) {
-    router.push({ name: 'user' })
-  } else if (hasPerm('role:query')) {
-    router.push({ name: 'role' })
-  } else if (hasPerm('analysis:query')) {
-    router.push({ name: 'analysis' })
-  } else if (hasPerm('setting:query')) {
-    router.push({ name: 'sys-setting' })
-  } else if (hasPerm('all-email:query')) {
-    router.push({ name: 'all-email' })
-  } else if (hasPerm('reg-key:query')) {
-    router.push({ name: 'reg-key' })
-  } else {
-    router.push('/settings/profile')
-  }
 }
 
 function highlightTextOnPage(keyword) {

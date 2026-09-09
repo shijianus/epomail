@@ -3,7 +3,7 @@
     <div class="scroll" style="flex: 1; overflow-y: auto; overflow-x: hidden; scrollbar-width: none;">
       <div>
         <!-- Compose Button -->
-        <div v-perm="'email:send'" class="compose-btn-wrapper" @click="openSend">
+        <div class="compose-btn-wrapper" @click="openSend">
           <button class="compose-btn">
             <span class="nav-ic-wrap">
               <Icon icon="material-symbols:edit-outline-sharp" width="24" height="24"/>
@@ -40,7 +40,7 @@
             <span class="nav-count" v-if="urgentSnoozedCount > 0">{{ urgentSnoozedCount }}</span>
             <span class="nav-count muted" v-else-if="waitingSnoozedCount > 0">{{ waitingSnoozedCount }}</span>
           </div>
-          <div class="nav-item" @click="router.push({name: 'send'})" v-perm="'email:send'" :class="route.name === 'send' ? 'active' : ''" :title="$t('sent')">
+          <div class="nav-item" @click="router.push({name: 'send'})" :class="route.name === 'send' ? 'active' : ''" :title="$t('sent')">
             <span class="nav-ic-wrap">
               <Icon icon="cil:send" width="20" height="20" />
               <div class="sidebar-gray-dot" v-if="sendCount > 0"></div>
@@ -48,7 +48,7 @@
             <span class="nav-label">{{$t('sent')}}</span>
             <span class="nav-count muted" v-if="sendCount > 0">{{ sendCount }}</span>
           </div>
-          <div class="nav-item" @click="router.push({name: 'draft'})" v-perm="'email:send'" :class="route.name === 'draft' ? 'active' : ''" :title="$t('drafts')">
+          <div class="nav-item" @click="router.push({name: 'draft'})" :class="route.name === 'draft' ? 'active' : ''" :title="$t('drafts')">
             <span class="nav-ic-wrap">
               <Icon icon="ep:document" width="20" height="20" />
               <div class="sidebar-gray-dot" v-if="draftCount > 0"></div>
@@ -114,33 +114,6 @@
             </div>
           </template>
         </div>
-        
-        <!-- Management & System Navigation -->
-        <div class="nav-section" style="margin-top: 20px; padding-top: 12px; border-top: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.06));">
-          <div 
-            v-if="hasPerm(['all-email:query','user:query','role:query','setting:query','analysis:query','reg-key:query'])"
-            class="nav-item manage-nav-item" 
-            @click="openManage" 
-            :class="isSettingsMode && isManageRoute ? 'active' : ''" 
-            :title="$t('manage') || '管理后台'"
-          >
-            <span class="nav-ic-wrap">
-              <Icon icon="fluent:shield-task-24-regular" width="20" height="20" />
-            </span>
-            <span class="nav-label">{{ $t('manage') || '管理后台' }}</span>
-          </div>
-          <div 
-            class="nav-item settings-nav-item" 
-            @click="openSettings" 
-            :class="isSettingsMode && !isManageRoute ? 'active' : ''" 
-            :title="$t('settings') || '设置'"
-          >
-            <span class="nav-ic-wrap">
-              <Icon icon="lucide:settings" width="20" height="20" />
-            </span>
-            <span class="nav-label">{{ $t('settings') || '设置' }}</span>
-          </div>
-        </div>
 
       </div>
     </div>
@@ -173,36 +146,6 @@ const userStore = useUserStore();
 const uiStore = useUiStore();
 const emailStore = useEmailStore();
 const route = useRoute();
-
-const isSettingsMode = computed(() => {
-  return ['user-profile', 'profile', 'general-setting', 'profile-setting', 'setting', 'data-setting', 'label-setting', 'category-setting', 'analysis', 'user', 'all-email', 'role', 'reg-key', 'sys-setting', 'oauth-app'].includes(route.name);
-});
-
-const isManageRoute = computed(() => {
-  return ['analysis', 'user', 'all-email', 'role', 'reg-key', 'sys-setting', 'oauth-app'].includes(route.name);
-});
-
-function openManage() {
-  if (hasPerm('user:query')) {
-    router.push({ name: 'user' });
-  } else if (hasPerm('role:query')) {
-    router.push({ name: 'role' });
-  } else if (hasPerm('analysis:query')) {
-    router.push({ name: 'analysis' });
-  } else if (hasPerm('setting:query')) {
-    router.push({ name: 'sys-setting' });
-  } else if (hasPerm('all-email:query')) {
-    router.push({ name: 'all-email' });
-  } else if (hasPerm('reg-key:query')) {
-    router.push({ name: 'reg-key' });
-  } else {
-    router.push('/settings/profile');
-  }
-}
-
-function openSettings() {
-  router.push('/settings/profile');
-}
 
 // Use global sidebar stats from emailStore
 const unreadCount = computed(() => emailStore.sidebarStats?.inboxUnread || 0);
