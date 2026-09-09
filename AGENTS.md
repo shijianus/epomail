@@ -36,7 +36,7 @@
        - `tests/test-ai-model-pool-sync-to-role.mjs`、`tests/test-ai-hub-endpoint-and-selective-test.mjs`、`tests/verify-full-icons.mjs` 全部 100% 全绿通过。
 *   **部署上线与自动化测试 (Verification & Deployment)**:
     - **Cloudflare Workers 部署 Version ID**: `db4c0612-065c-4d00-aed5-74b904016b8a`。
-    - **epocanvas-mail Git Commit**: `PENDING_COMMIT_HASH` (Short Hash: `PENDING`).
+    - **epocanvas-mail Git Commit**: `c583600646a5f2e34bd6a8338e8ad399cb1d8c35` (Short Hash: `c583600`).
 
 ### OAuth 授权页直接采用博客现成标签页图片、按钮0偏差对齐、Duotone权限图标体系与生产端全链路审计上线 (2026-09-08)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
