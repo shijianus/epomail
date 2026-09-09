@@ -43,7 +43,7 @@
        - 运行 `tests/audit_new_features.mjs` 与 `tests/test-ai-model-pool-sync-to-role.mjs` 均 100% 通过。
 *   **部署上线与自动化测试 (Verification & Deployment)**:
     - **Cloudflare Workers 部署 Version ID**: `55223097-12bf-4410-b43d-adf69e00f33e`。
-    - **epocanvas-mail Git Commit**: `9d88515199a17f10f0f830b2840fe803ad365de6` (Short Hash: `9d88515`)。
+    - **epocanvas-mail Git Commit**: `02f26c5f057b248c9365e672170a4c7862d328d3` (Short Hash: `02f26c5`)。
 
 ### 角色弹窗说明与展开收起精简、下拉无截断呈现、卡片分割线消除、v1.1.0版本轮替同步与官方URL矩阵全面上线 (2026-09-09)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
