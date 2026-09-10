@@ -42,7 +42,7 @@
        - 严格恪守测试后自动重置清理准则，零假数据残留。
 *   **部署上线与自动化测试 (Verification & Deployment)**:
     - **Cloudflare Workers 部署 Version ID**: `8e8115e5-97b5-4a73-87e2-38d3e42be457`。
-    - **epocanvas-mail Git Commit**: PENDING_COMMIT_HASH.
+    - **epocanvas-mail Git Commit**: `f628a58b09047ad44328a01be10f9c2ee44315f5` (Short Hash: `f628a58`)。
 
 ### 下拉组件完整呈现、默认色调卡片对比度提升与冗余方框去除、注册密钥多重方框精简上线 (2026-09-09)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
