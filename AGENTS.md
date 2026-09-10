@@ -32,7 +32,7 @@
        - 严格恪守测试后自动重置清理准则，零假数据残留。
 *   **部署上线与自动化测试 (Verification & Deployment)**:
     - **Cloudflare Workers 部署 Version ID**: `582c5e3a-0795-4604-99c1-3ce0fc5c8dd2`。
-    - **epocanvas-mail Git Commit**: PENDING_COMMIT_HASH (Short Hash: PENDING_SHORT_HASH)。
+    - **epocanvas-mail Git Commit**: `18d9ed7b61dbf00cb1ad1ed5157258390da2a44a` (Short Hash: `18d9ed7`)。
 
 ### Bento 空间归集底板全场景圈定与画风统一、`el-select` 方框增大与防外溢彻底根治上线 (2026-09-10)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
