@@ -39,7 +39,10 @@ import assert from "node:assert";
       localStorage.setItem("token", t);
       localStorage.setItem("setting", JSON.stringify({ lang: "zh" }));
       localStorage.setItem("locale", "zh");
+      document.documentElement.classList.remove("dark");
     }, adminToken);
+    await page.goto(BASE + "/inbox", { waitUntil: "networkidle" });
+    await page.waitForTimeout(1000);
 
     // --------------------------------------------------------------------------------------
     // 步骤 2: 审计 class="el-select" 显示完整，而非只显示部分
@@ -47,17 +50,18 @@ import assert from "node:assert";
     console.log("\n[步骤 2] 审计 class=\"el-select\" 显示完整性...");
     await page.goto(BASE + "/role", { waitUntil: "networkidle" });
     await page.waitForSelector(".el-table", { timeout: 15000 });
-    await page.waitForTimeout(600);
+    await page.waitForTimeout(800);
 
     // 打开修改弹窗
-    const actionDropdown = await page.waitForSelector(".el-table__row:first-child .el-dropdown button");
+    const actionDropdown = await page.waitForSelector(".el-table tbody tr:first-child .el-dropdown button", { timeout: 5000 });
     await actionDropdown.click();
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(400);
 
-    const editItem = await page.waitForSelector(".el-dropdown-menu:not([style*='display: none']) .el-dropdown-menu__item:first-child");
+    const editItem = await page.locator(".el-dropdown-menu .el-dropdown-menu__item:has-text('修改')").first();
     await editItem.click();
 
-    const dialog = await page.waitForSelector(".role-form-dialog");
+    const dialog = await page.waitForSelector(".role-form-dialog", { timeout: 5000 });
+    await page.waitForTimeout(600);
     await page.waitForTimeout(600);
 
     // 检查角色弹窗中所有的 el-select
@@ -68,12 +72,15 @@ import assert from "node:assert";
         const wrapper = sel.querySelector(".el-select__wrapper");
         const placeholder = sel.querySelector(".el-select__placeholder");
         const wrapperRect = wrapper ? wrapper.getBoundingClientRect() : null;
+        const pRect = placeholder ? placeholder.getBoundingClientRect() : null;
+        const pStyle = placeholder ? window.getComputedStyle(placeholder) : null;
         return {
           className: sel.className,
           width: rect.width,
           wrapperWidth: wrapperRect ? wrapperRect.width : 0,
           placeholderText: placeholder ? placeholder.innerText.trim() : "",
-          isClippedOrOverflowHidden: placeholder ? (window.getComputedStyle(placeholder).overflow === "hidden" && window.getComputedStyle(placeholder).textOverflow === "clip") : false
+          isClippedWithClip: pStyle ? (pStyle.overflow === "hidden" && pStyle.textOverflow === "clip") : false,
+          isTextSpillingOutOfBox: (pRect && wrapperRect) ? (pRect.right > wrapperRect.right + 2) : false
         };
       });
     });
@@ -82,9 +89,10 @@ import assert from "node:assert";
     assert(roleSelectMetrics.length >= 2, "角色弹窗内应至少有2个 el-select");
     for (const sm of roleSelectMetrics) {
       assert(sm.width > 75, `el-select 宽度必须充足以完整显示内容，实测: ${sm.width}px`);
-      assert(!sm.isClippedOrOverflowHidden, `el-select placeholder 不能被强制 overflow:hidden + text-overflow:clip 盲切`);
+      assert(!sm.isClippedWithClip, `el-select placeholder 不能被强制 text-overflow:clip 盲切`);
+      assert(!sm.isTextSpillingOutOfBox, `el-select 文字绝不能跑出/溢出到方框之外，必须安全包裹在方框内`);
     }
-    console.log("  ✓ 角色弹窗中 el-select 均完整呈现且具有充足布局伸缩性");
+    console.log("  ✓ 角色弹窗中 el-select 均完整呈现且文字绝不走出方框");
 
     // 截图角色弹窗亮色
     const dialogBox = page.locator(".role-form-dialog");
@@ -199,14 +207,17 @@ import assert from "node:assert";
       return {
         headerBorder: hStyle ? hStyle.borderStyle : "none",
         headerBg: hStyle ? hStyle.backgroundColor : "transparent",
+        headerRadius: hStyle ? hStyle.borderRadius : "0px",
         appsBorder: aStyle ? aStyle.borderStyle : "none",
-        appsBg: aStyle ? aStyle.backgroundColor : "transparent"
+        appsBg: aStyle ? aStyle.backgroundColor : "transparent",
+        appsRadius: aStyle ? aStyle.borderRadius : "0px"
       };
     });
     console.log("  默认模式下 header-container 与 apps-container 审计:", JSON.stringify(defaultModeBoxAudit, null, 2));
-    assert(defaultModeBoxAudit.headerBorder === "none", "默认色调下 header-container 不应有方框边框");
-    assert(defaultModeBoxAudit.appsBorder === "none", "默认色调下 apps-container 不应有外层方框边框");
-    console.log("  ✓ 默认色调下成功移除了 header-container 与 apps-container 的冗余方框");
+    assert(defaultModeBoxAudit.headerBorder === "solid", "默认色调下 header-container 应具备圈定地盘的边框底板");
+    assert(defaultModeBoxAudit.appsBorder === "solid", "默认色调下 apps-container 应具备圈定地盘的边框底板");
+    assert.ok(parseInt(defaultModeBoxAudit.headerRadius) >= 14, "header-container 圆角应 >= 14px 达成现代 Bento 风格");
+    console.log("  ✓ 默认色调下成功建立了 Bento 空间归集底板，圈定地盘并锚定下方对象");
 
     // 截图默认模式下各主要页面亮暗色调
     // 1) /oauth-app

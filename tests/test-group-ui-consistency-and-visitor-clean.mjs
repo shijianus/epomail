@@ -96,6 +96,7 @@ import assert from "node:assert";
       document.documentElement.classList.remove("dark");
     }, adminToken);
     await page.goto(BASE + "/inbox", { waitUntil: "networkidle" });
+    await page.waitForSelector(".aside-container", { timeout: 15000 });
     await page.waitForTimeout(1000);
 
     // 断言 2.1: 侧边栏不存在多余的管理和设置 nav-section

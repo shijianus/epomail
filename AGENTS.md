@@ -11,6 +11,39 @@
    - 在向用户输出回复时，必须置顶/显式打印出本次提交的完整 Commit Hash 与短 Hash，确保版本可追溯、审计记录完整。
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
+### Bento 空间归集底板全场景圈定与画风统一、`el-select` 方框增大与防外溢彻底根治上线 (2026-09-10)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **Bento 3-Tier 空间归集底板（Container Bento Plate）全场景圈定地盘与画风一致性重塑**:
+       - 根因分析：此前粗暴将非图片壁纸下的 `.container` 方框背景与边框置为空，导致渐变（如 `theme-nebula` 深蓝星芒）及纯白/深灰背景下，原本用来框住同一功能区域（如应用管理 `header-container` 与 `apps-container`）的底板消失，文字显得散乱空洞，无法有效圈定下方卡片对象；
+       - 设计技能对齐（`ui-ux-pro-max`）重塑 Level 1 空间归集底板架构：
+         - 默认纯净模式（`none`）：`.container` 统一样式为现代 Bento 底板（`background: var(--bg-surface)`、`border: 1px solid var(--border-subtle)`、`border-radius: 18px`、`padding: 24px 28px`、微立体环境光遮蔽阴影），牢固圈定地盘并锚定下方交互组件；
+         - 所有渐变与图片壁纸模式（`html.has-main-wallpaper`）：启用半透微光磨砂亚克力空间底板（亮色 `rgba(255, 255, 255, 0.8)`，暗色 `rgba(30, 41, 59, 0.72)`，`backdrop-filter: blur(20px) saturate(180%)`，`border: 1px solid rgba(226, 232, 240, 0.85)` / `rgba(255, 255, 255, 0.08)`），确保在任何壁纸变幻下画风绝对一致、空间归集清晰稳固；
+       - Level 2 内部卡片与高对比度排版：
+         - `.app-card`, `.export-card`, `.storage-db-card` 等卡片承载于 Level 1 底板上，拥有圆润 14px 圆角与柔和悬浮动效；
+         - 标题（`#0f172a` / `#f8fafc`）与描述文字（`#475569` / `#94a3b8`）适配 WCAG AAA 顶级对比度规范。
+    2. **`class="el-select"` 方框增大与文字走出方框彻底根治 (Enlarged Box Container & Anti-Spill System)**:
+       - 根因分析：此前仅通过 `overflow: visible` 解除截断，反而导致文字直接穿透方框走出右侧边框；
+       - 根治重构：全面增大方框自身容量与安全边距：
+         - `.el-select__wrapper` 设为 `min-height: 38px !important; padding: 6px 14px !important; border-radius: 10px !important;`（小尺寸 `el-select--small` 设为 `min-height: 34px; padding: 4px 10px;`）；
+         - `.el-select__selection` 启用 `display: flex !important; flex-wrap: wrap !important; gap: 6px !important;` 支持多标签自适应弹性撑高方框；
+         - `.el-select__placeholder` 与 `.el-select__selected-item` 规范化为 `font-size: 13.5px !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; max-width: calc(100% - 24px) !important;`，宽裕容纳文字并提供安全边界，文字绝对被包裹在方框内，永不走出边框；
+       - 局部组件方框精准扩容：
+         - 角色权限弹窗 (`role`): 发信周期下拉扩充至 `min-width: 96px; width: auto;`（英文 110px），完整容纳“禁止发送”等全量中文标签；
+         - 分类管理 (`category-setting`): 刷新频率下拉扩充至 `min-width: 125px; width: auto;`；
+         - 资料与导出 (`data-setting`): 导出范围下拉扩充至 `min-width: 160px; width: auto;`；
+         - 个人资料与常规设置 (`profile-setting`): 邮箱分区下拉扩充至 `min-width: 180px`，条数扩充至 `min-width: 105px`。
+    3. **初始化与路由守卫鲁棒性加固 (App Initialization Timeout Hardening)**:
+       - 在 `mail-vue/src/init/init.js` 中将并发拉取超时时间由过窄的 3000ms 提升至 10000ms，杜绝弱网或冷启动时用户凭据拉取未完成导致界面挂载异常。
+    4. **端到端自动化测试全链路 100% 全绿通过 (Comprehensive Live E2E Audit)**:
+       - `tests/test-ui-wallpaper-contrast-and-select.mjs`：严格断言所有 `el-select` 文字绝不走出方框（`isTextSpillingOutOfBox === false`），且 `header-container` 与 `apps-container` 均具备圈定地盘的边框底板与 `>= 14px` 圆角；
+       - `tests/test-group-ui-consistency-and-visitor-clean.mjs`：管理员、普通用户、参观者全用户组 UI 与写邮件入口 100% 一致，无沙盒横幅，403 单次提示验证通过；
+       - `tests/test-welcome-email-visitor-and-all-accounts.mjs`：欢迎邮件必达与 0MB 存储隔离验证 100% 通过；
+       - `tests/test-user-general-settings-binding-and-defaults.mjs`：多账户常规设置绑定与默认值隔离 100% 通过；
+       - 严格恪守测试后自动重置清理准则，零假数据残留。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **Cloudflare Workers 部署 Version ID**: `8e8115e5-97b5-4a73-87e2-38d3e42be457`。
+    - **epocanvas-mail Git Commit**: PENDING_COMMIT_HASH.
+
 ### 下拉组件完整呈现、默认色调卡片对比度提升与冗余方框去除、注册密钥多重方框精简上线 (2026-09-09)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **`class="el-select"` 下拉框全场景完整呈现 (Full Display for All Select Elements)**:

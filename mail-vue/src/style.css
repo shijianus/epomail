@@ -671,47 +671,93 @@ html:not(.dark) .el-popper .el-popper__arrow::before {
     z-index: 3000 !important;
 }
 
-/* Ensure class="el-select" displays completely without partial clipping or cutoff */
+/* Ensure class="el-select" wrapper is generously sized and comfortably bounds all text without spilling out */
 .el-select {
-    min-width: fit-content;
+    min-width: 130px;
     max-width: 100%;
+    box-sizing: border-box;
 }
 
 .el-select .el-select__wrapper {
     width: 100%;
-    min-height: 32px;
+    min-height: 38px !important;
     height: auto !important;
-    box-sizing: border-box;
+    padding: 6px 14px !important;
+    border-radius: 10px !important;
+    box-sizing: border-box !important;
+    display: flex !important;
+    align-items: center !important;
+    transition: border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.el-select--small .el-select__wrapper {
+    min-height: 34px !important;
+    padding: 4px 10px !important;
+}
+
+.el-select--large .el-select__wrapper {
+    min-height: 44px !important;
+    padding: 8px 16px !important;
 }
 
 .el-select .el-select__selection {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
-    align-items: center;
-    width: 100%;
-    min-width: 0;
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 6px !important;
+    align-items: center !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    padding: 2px 0 !important;
 }
 
+/* Safely bound all placeholders and selected items inside the enlarged box */
 .el-select .el-select__placeholder {
+    font-size: 13.5px !important;
     white-space: nowrap !important;
-    max-width: none !important;
-    overflow: visible !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    max-width: calc(100% - 24px) !important;
+    display: inline-block !important;
+    line-height: 1.5 !important;
+}
+
+.el-select .el-select__selected-item {
+    font-size: 13.5px !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    max-width: calc(100% - 24px) !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    line-height: 1.5 !important;
+}
+
+.el-select .el-select__tags-text {
+    font-size: 13px !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    max-width: 240px !important;
     display: inline-block !important;
 }
 
-.el-select .el-select__selected-item,
-.el-select .el-select__tags-text {
-    white-space: nowrap !important;
-    max-width: none !important;
-    overflow: visible !important;
+.el-select .el-tag {
+    margin: 2px 0 !important;
+    border-radius: 6px !important;
+    height: auto !important;
+    min-height: 24px !important;
+    line-height: 22px !important;
+    padding: 0 8px !important;
 }
 
 .el-select-dropdown__item {
     white-space: nowrap !important;
-    text-overflow: clip !important;
+    text-overflow: ellipsis !important;
+    overflow: hidden !important;
     max-width: none !important;
     padding: 0 16px !important;
+    height: 36px !important;
+    line-height: 36px !important;
 }
 
 .el-dropdown-menu {
@@ -1106,57 +1152,152 @@ html.has-main-wallpaper .main-view {
     background: transparent !important;
 }
 
-/* Clean Layout Optimization: Non-image backgrounds (default clean and gradients) do not require artificial outer .container boxes */
-html:not(.has-image-wallpaper) .settings-content .header-container,
-html:not(.has-image-wallpaper) .settings-content .apps-container,
-html:not(.has-image-wallpaper) .settings-content .export-container,
-html:not(.has-image-wallpaper) .settings-content .storage-container {
-    background: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
-    padding: 0 !important;
+/* Bento Grid 空间分层体系：Level 1 区域地盘底板 (Spatial Grouping Container Plates)
+   无论是默认模式、平滑渐变还是照片壁纸，底板均起到圈定地盘、锚定模块与保护文本可读性的核心作用 */
+.settings-content .container,
+.settings-content .settings-card,
+.settings-content .header-container,
+.settings-content .apps-container,
+.settings-content .export-container,
+.settings-content .storage-container,
+.settings-content .forwarding-container,
+.settings-content .api-tokens-container,
+.settings-content .labels-container,
+.settings-content .modern-list,
+.settings-content .tech-row,
+.settings-content .el-card,
+.settings-content .table-wrap,
+.settings-content .table-container {
+    background: var(--bg-surface) !important;
+    border: 1px solid var(--border-subtle) !important;
+    border-radius: 18px !important;
+    padding: 24px 28px !important;
+    margin-bottom: 24px !important;
+    box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.04) !important;
+    box-sizing: border-box !important;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
 
-/* Ensure individual cards stand out with clear contrast against canvas in default and gradient modes */
-.settings-content .settings-card,
+html.dark:not(.has-main-wallpaper) .settings-content .container,
+html.dark:not(.has-main-wallpaper) .settings-content .settings-card,
+html.dark:not(.has-main-wallpaper) .settings-content .header-container,
+html.dark:not(.has-main-wallpaper) .settings-content .apps-container,
+html.dark:not(.has-main-wallpaper) .settings-content .export-container,
+html.dark:not(.has-main-wallpaper) .settings-content .storage-container,
+html.dark:not(.has-main-wallpaper) .settings-content .forwarding-container,
+html.dark:not(.has-main-wallpaper) .settings-content .api-tokens-container {
+    background: var(--bg-surface) !important;
+    border: 1px solid var(--border-subtle) !important;
+    box-shadow: 0 6px 24px -2px rgba(0, 0, 0, 0.35) !important;
+}
+
+/* 在所有渐变、照片壁纸环境下，自动激活亚克力磨砂毛玻璃底板，圈定地盘并保护 100% 文本对比度 */
+html.has-main-wallpaper .settings-content .container,
+html.has-main-wallpaper .settings-content .settings-card,
+html.has-main-wallpaper .settings-content .header-container,
+html.has-main-wallpaper .settings-content .apps-container,
+html.has-main-wallpaper .settings-content .export-container,
+html.has-main-wallpaper .settings-content .storage-container,
+html.has-main-wallpaper .settings-content .forwarding-container,
+html.has-main-wallpaper .settings-content .api-tokens-container,
+html.has-main-wallpaper .settings-content .labels-container,
+html.has-main-wallpaper .settings-content .modern-list,
+html.has-main-wallpaper .settings-content .tech-row,
+html.has-main-wallpaper .settings-content .el-card,
+html.has-main-wallpaper .settings-content .table-wrap,
+html.has-main-wallpaper .settings-content .table-container {
+    background: rgba(255, 255, 255, 0.8) !important;
+    backdrop-filter: blur(20px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+    border: 1px solid rgba(226, 232, 240, 0.85) !important;
+    border-radius: 18px !important;
+    box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.06), 0 2px 8px rgba(0, 0, 0, 0.02) !important;
+    padding: 24px 28px !important;
+}
+
+html.dark.has-main-wallpaper .settings-content .container,
+html.dark.has-main-wallpaper .settings-content .settings-card,
+html.dark.has-main-wallpaper .settings-content .header-container,
+html.dark.has-main-wallpaper .settings-content .apps-container,
+html.dark.has-main-wallpaper .settings-content .export-container,
+html.dark.has-main-wallpaper .settings-content .storage-container,
+html.dark.has-main-wallpaper .settings-content .forwarding-container,
+html.dark.has-main-wallpaper .settings-content .api-tokens-container,
+html.dark.has-main-wallpaper .settings-content .labels-container,
+html.dark.has-main-wallpaper .settings-content .modern-list,
+html.dark.has-main-wallpaper .settings-content .tech-row,
+html.dark.has-main-wallpaper .settings-content .el-card,
+html.dark.has-main-wallpaper .settings-content .table-wrap,
+html.dark.has-main-wallpaper .settings-content .table-container {
+    background: rgba(30, 41, 59, 0.72) !important;
+    backdrop-filter: blur(20px) saturate(160%) !important;
+    -webkit-backdrop-filter: blur(20px) saturate(160%) !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    box-shadow: 0 12px 32px -8px rgba(0, 0, 0, 0.38) !important;
+}
+
+/* Level 2: 底板内部的独立交互实体卡片 (Inner Interactive Cards inside Bento Plate) */
 .settings-content .app-card,
 .settings-content .export-card,
 .settings-content .storage-db-card {
-    background: var(--bg-surface) !important;
-    border: 1px solid var(--border-subtle) !important;
+    background: rgba(255, 255, 255, 0.95) !important;
+    border: 1px solid rgba(226, 232, 240, 0.9) !important;
     border-radius: 14px !important;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03) !important;
+    transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.2s ease !important;
 }
 
-/* Personal settings cards (profile-info, profile-setting, setting) on --bg-base canvas */
-.settings-content .container:not(.header-container):not(.apps-container):not(.export-container):not(.storage-container) {
-    background: var(--bg-surface);
-    border: 1px solid var(--border-subtle);
-    border-radius: 14px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+.settings-content .app-card:hover,
+.settings-content .export-card:hover,
+.settings-content .storage-db-card:hover {
+    box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.08) !important;
+    border-color: rgba(99, 102, 241, 0.35) !important;
 }
 
-/* On complex color-changing image wallpapers (e.g. snow mountain / custom photos),
-   frosted acrylic container boxes are applied to protect 100% text legibility */
-html.has-image-wallpaper .settings-content .container,
-html.has-image-wallpaper .settings-content .settings-card,
-html.has-image-wallpaper .settings-content .header-container,
-html.has-image-wallpaper .settings-content .apps-container,
-html.has-image-wallpaper .settings-content .export-container,
-html.has-image-wallpaper .settings-content .storage-container,
-html.has-image-wallpaper .settings-content .labels-container,
-html.has-image-wallpaper .settings-content .modern-list,
-html.has-image-wallpaper .settings-content .tech-row,
-html.has-image-wallpaper .settings-content .el-card,
-html.has-image-wallpaper .settings-content .table-wrap,
-html.has-image-wallpaper .settings-content .table-container {
-    background: color-mix(in srgb, var(--bg-surface) var(--panel-alpha, 92%), transparent) !important;
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border: 1px solid var(--border-subtle) !important;
-    border-radius: 14px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-    padding: 24px !important;
+html.dark .settings-content .app-card,
+html.dark .settings-content .export-card,
+html.dark .settings-content .storage-db-card {
+    background: rgba(15, 23, 42, 0.85) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25) !important;
+}
+
+html.dark .settings-content .app-card:hover,
+html.dark .settings-content .export-card:hover,
+html.dark .settings-content .storage-db-card:hover {
+    box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.45) !important;
+    border-color: rgba(129, 140, 248, 0.4) !important;
+}
+
+/* 确保底板内的标题与描述在任何模式下均具备顶级对比度与排版舒适感 */
+.settings-content .header-container .main-title,
+.settings-content .apps-container .apps-count-title,
+.settings-content .container .title,
+.settings-content .settings-card .title {
+    color: var(--text-color, #0f172a) !important;
+    font-weight: 700 !important;
+    letter-spacing: -0.02em !important;
+}
+
+html.dark .settings-content .header-container .main-title,
+html.dark .settings-content .apps-container .apps-count-title,
+html.dark .settings-content .container .title,
+html.dark .settings-content .settings-card .title {
+    color: #f8fafc !important;
+}
+
+.settings-content .header-container .section-intro,
+.settings-content .container .section-intro,
+.settings-content .settings-card .desc {
+    color: var(--regular-text-color, #475569) !important;
+    font-size: 13.5px !important;
+    line-height: 1.6 !important;
+}
+
+html.dark .settings-content .header-container .section-intro,
+html.dark .settings-content .container .section-intro,
+html.dark .settings-content .settings-card .desc {
+    color: #94a3b8 !important;
 }
 
 html.has-main-wallpaper .split-view-container {

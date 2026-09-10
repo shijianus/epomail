@@ -33,7 +33,7 @@
                 <div>
                   <el-select
                       @change="change"
-                      style="min-width: 110px; width: auto;"
+                      style="min-width: 125px; width: auto;"
                       v-model="setting.autoRefresh"
                       placeholder="Select"
                   >
