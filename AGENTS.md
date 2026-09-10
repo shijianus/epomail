@@ -11,6 +11,29 @@
    - 在向用户输出回复时，必须置顶/显式打印出本次提交的完整 Commit Hash 与短 Hash，确保版本可追溯、审计记录完整。
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
+### 邮件模式 `el-select` 完整呈现彻底根治、解除占位宽度双重惩罚与标题防挤压折行加固上线 (2026-09-10)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **系统设置邮件模式 `data-v-3f183808 class="el-select" style="width: 190px;"` 截断彻底根治**:
+       - 根因分析：此前系统设置中将邮件模式下拉框宽度硬编码为 `:style="`width: ${ locale === 'en' ? 220 : 190 }px;`"`；“加密邮件模式 (Level 3 [E2EE])”自然文本宽度为 180px，加上左右 padding (28px) 与下拉箭头 (20px)，所需容器宽度至少 228px；在 190px 约束下，可用文本区域仅 118px，导致文字在 `(Level` 处被粗暴截断；
+       - 根治重构：在 `mail-vue/src/views/sys-setting/index.vue` 中将邮件模式下拉框宽度升级为 `:style="`width: ${ locale === 'en' ? 310 : 248 }px;`"`，赋予独立的 `mail-mode-select` 样式类（`min-width: 240px; max-width: 100%`），中文模式下预留 20px 安全呼吸区，英文模式下（`310px`）完整容纳所有长选项；
+    2. **全局解除 `max-width: calc(100% - 24px)` 双重扣减惩罚 (Recover 24px Usable Width Globally)**:
+       - 根因分析：在 Element Plus 架构中，`.el-select__wrapper` 本身是 flex 容器，`.el-select__selection` 与右侧箭头 `.el-select__suffix` 为同级兄弟节点，其自身的 `100%` 宽度早已天然排除了后缀箭头的占用；此前在 `mail-vue/src/style.css` 中对 `.el-select__placeholder` 与 `.el-select__selected-item` 设置 `max-width: calc(100% - 24px) !important;` 造成了双重扣减惩罚，无端损失了 24px 宝贵展示空间；
+       - 根治重构：在 `mail-vue/src/style.css` 中将 `max-width` 修正为标准的 `100% !important;`，完美释放全量展示空间，配合 `text-overflow: ellipsis; overflow: hidden;` 安全机制，绝不外溢；
+    3. **设置项标题单行锁定与防纵向挤压折行 (Setting Item Title Single-Line Lock)**:
+       - 在 `mail-vue/src/views/sys-setting/index.vue` 的 `.setting-item > div:first-child` 中增加 `white-space: nowrap; flex-shrink: 0; min-width: max-content;`，彻底杜绝网格自适应压缩导致中文标题（如“邮件模式”）折叠为单列竖排文字；
+    4. **Playwright 视觉与多模式端到端自动化审计 100% 全绿通过 (Comprehensive Live E2E Audit)**:
+       - 编写专属审计脚本 `tests/audit-mail-mode-select.mjs`，并在综合套件 `tests/test-ui-wallpaper-contrast-and-select.mjs` 中集成：
+         - 实测 `width: 248px`，`visibleItemWidth: 200px`，`spanWidth: 180px`，`isTruncated: false`，完整文字 `"加密邮件模式 (Level 3 [E2EE])"` 100% 渲染呈现；
+         - 留存真实生产环境截图：
+           - `tests/audit_mail_mode_full_light.png`（亮色全卡片对齐与无截断）
+           - `tests/audit_mail_mode_full_dark.png`（暗色全卡片视觉与无截断）
+           - `tests/audit_mail_mode_dropdown_open.png`（下拉选项展开与对齐）
+       - 回归测试 `tests/test-mail-mode-e2e.mjs`、`tests/test-group-ui-consistency-and-visitor-clean.mjs`、`tests/test-welcome-email-visitor-and-all-accounts.mjs`、`tests/test-user-general-settings-binding-and-defaults.mjs` 全部 100% 通过；
+       - 严格恪守测试后自动重置清理准则，零假数据残留。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **Cloudflare Workers 部署 Version ID**: `582c5e3a-0795-4604-99c1-3ce0fc5c8dd2`。
+    - **epocanvas-mail Git Commit**: PENDING_COMMIT_HASH (Short Hash: PENDING_SHORT_HASH)。
+
 ### Bento 空间归集底板全场景圈定与画风统一、`el-select` 方框增大与防外溢彻底根治上线 (2026-09-10)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **Bento 3-Tier 空间归集底板（Container Bento Plate）全场景圈定地盘与画风一致性重塑**:

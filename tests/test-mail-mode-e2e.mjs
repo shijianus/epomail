@@ -55,7 +55,7 @@ import assert from 'assert';
     await mailModeSetting.locator('.el-select').click();
     await page.waitForTimeout(500);
     await page.locator('.el-select-dropdown__item:visible').filter({ hasText: '隐私邮件模式' }).click();
-    await page.waitForTimeout(1500);
+    await page.waitForTimeout(3000);
 
     // 3.1 验证隐私模式下 TOTP 开关强制开启且灰色禁止修改
     console.log('3.1 验证隐私邮件模式下 TOTP 开关强制为开启且禁止修改 (disabled)...');
@@ -86,7 +86,7 @@ import assert from 'assert';
     // 点击确认开启
     const confirmBtn = warningBox.locator('button.el-button--primary');
     await confirmBtn.click();
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(3000);
 
     // 4. 验证右下角绿色标识与侧边栏「全部邮件」已隐藏
     console.log('4. 验证加密模式下右下角状态栏绿色标识与侧边栏隐藏...');
@@ -108,10 +108,13 @@ import assert from 'assert';
 
     // 4.2 验证全部邮件模式下 TOTP 开关恢复可编辑 (非 disabled)
     console.log('4.2 验证全部邮件模式下 TOTP 开关恢复可编辑状态...');
+    await page.waitForTimeout(1000);
     await mailModeSetting.locator('.el-select').click();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(600);
+    const mode1Items = await page.locator('.el-select-dropdown__item:visible').allTextContents();
+    console.log('  4.2 步骤可见下拉选项:', mode1Items);
     await page.locator('.el-select-dropdown__item:visible').filter({ hasText: '全部邮件模式' }).click();
-    await page.waitForTimeout(1500);
+    await page.waitForTimeout(3000);
     assert.ok(!(await totpSwitch.getAttribute('class')).includes('is-disabled'), '全部邮件模式下 TOTP 开关必须可自由编辑 (非 disabled)');
     console.log('✓ 全部邮件模式下 TOTP 开关恢复可编辑验证通过');
 

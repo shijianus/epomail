@@ -716,7 +716,7 @@ html:not(.dark) .el-popper .el-popper__arrow::before {
     white-space: nowrap !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
-    max-width: calc(100% - 24px) !important;
+    max-width: 100% !important;
     display: inline-block !important;
     line-height: 1.5 !important;
 }
@@ -726,7 +726,7 @@ html:not(.dark) .el-popper .el-popper__arrow::before {
     white-space: nowrap !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
-    max-width: calc(100% - 24px) !important;
+    max-width: 100% !important;
     display: inline-flex !important;
     align-items: center !important;
     line-height: 1.5 !important;

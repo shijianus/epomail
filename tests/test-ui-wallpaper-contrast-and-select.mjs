@@ -137,6 +137,45 @@ import assert from "node:assert";
     assert(dataSelectWidth >= 140, `资料设置导出范围 el-select 宽度应 >= 140px 以完整显示文本，实测: ${dataSelectWidth}px`);
     console.log("  ✓ 资料设置 emailExportRange el-select 完整显示");
 
+    // 检查系统设置中的邮件模式 el-select (mail-mode-select)
+    console.log("\n  检查系统设置中的邮件模式 el-select...");
+    const sysLink = page.locator(".settings-nav-item").filter({ hasText: /系统设置|System Settings/i });
+    if (await sysLink.count() > 0) {
+      await sysLink.first().click();
+      await page.waitForTimeout(2500);
+    } else {
+      await page.goto(BASE + "/settings/profile", { waitUntil: "domcontentloaded" });
+      await page.waitForTimeout(1500);
+      const sLink = page.locator(".settings-nav-item").filter({ hasText: /系统设置|System Settings/i });
+      await sLink.first().click();
+      await page.waitForTimeout(2500);
+    }
+    const mailModeSelectMetrics = await page.evaluate(() => {
+      const item = Array.from(document.querySelectorAll(".setting-item")).find(el => el.textContent.includes("邮件模式"));
+      if (!item) return null;
+      const sel = item.querySelector(".el-select");
+      if (!sel) return null;
+      const ph = sel.querySelector(".el-select__placeholder") || sel.querySelector(".el-select__selected-item:not(.is-hidden)");
+      const span = ph ? ph.querySelector("span") : null;
+      const text = span ? span.textContent.trim() : (ph ? ph.textContent.trim() : "");
+      return {
+        width: sel.getBoundingClientRect().width,
+        isTruncated: ph ? (ph.scrollWidth > ph.clientWidth) : false,
+        text
+      };
+    });
+    console.log("  系统设置邮件模式 el-select 实测指标:", mailModeSelectMetrics);
+    assert(mailModeSelectMetrics, "必须找到系统设置邮件模式 el-select");
+    assert(mailModeSelectMetrics.width >= 240, `邮件模式 el-select 宽度必须 >= 240px，实测: ${mailModeSelectMetrics.width}px`);
+    assert(!mailModeSelectMetrics.isTruncated, `邮件模式文字绝不能被截断！当前展示: '${mailModeSelectMetrics.text}'`);
+    assert(
+      mailModeSelectMetrics.text.includes("加密邮件模式 (Level 3 [E2EE])") ||
+      mailModeSelectMetrics.text.includes("隐私邮件模式 (Level 2 [推荐])") ||
+      mailModeSelectMetrics.text.includes("全部邮件模式 (Level 1)"),
+      `邮件模式必须完整显示相应级别名称与等级，当前: '${mailModeSelectMetrics.text}'`
+    );
+    console.log("  ✓ 系统设置邮件模式 el-select 100% 完整显示无任何截断！");
+
     // --------------------------------------------------------------------------------------
     // 步骤 3: 审计注册密钥 class="el-scrollbar scrollbar" 3重方框消除至最多2层与对比度
     // --------------------------------------------------------------------------------------

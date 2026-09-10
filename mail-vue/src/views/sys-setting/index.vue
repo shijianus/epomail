@@ -45,9 +45,10 @@
                   </el-tooltip>
                   <el-select
                       @change="(val) => changeMailMode(val)"
-                      :style="`width: ${ locale === 'en' ? 220 : 190 }px;`"
+                      :style="`width: ${ locale === 'en' ? 310 : 248 }px;`"
                       v-model="setting.allMailMode"
                       placeholder="Select"
+                      class="mail-mode-select"
                   >
                     <el-option
                         v-for="item in mailModeOptions"
@@ -5465,6 +5466,9 @@ function editSetting(settingForm, refreshStatus = true, closeAiDialog = false) {
     display: flex;
     align-items: center;
     gap: 5px;
+    white-space: nowrap;
+    flex-shrink: 0;
+    min-width: max-content;
   }
 
   > div:last-child {
@@ -5473,6 +5477,11 @@ function editSetting(settingForm, refreshStatus = true, closeAiDialog = false) {
     justify-items: flex-end;
     font-weight: normal;
   }
+}
+
+.mail-mode-select {
+  min-width: 240px;
+  max-width: 100%;
 }
 
 .r2domain-item {
