@@ -33,7 +33,7 @@
                 <div>
                   <el-select
                       @change="change"
-                      :style="`width: ${ locale === 'en' ? 100 : 80 }px;`"
+                      style="min-width: 110px; width: auto;"
                       v-model="setting.autoRefresh"
                       placeholder="Select"
                   >

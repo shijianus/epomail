@@ -399,7 +399,11 @@ const handleResize = () => {
   flex: 1;
   height: 100%;
   overflow-y: auto;
-  background: var(--bg-surface);
+  background: var(--bg-base);
+  
+  .main-view {
+    background: transparent;
+  }
   
   @media (min-width: 1024px) {
     padding: 24px 40px;

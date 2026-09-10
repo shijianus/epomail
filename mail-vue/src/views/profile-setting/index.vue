@@ -532,7 +532,7 @@
         <div style="display: flex; flex-direction: column; gap: 10px;">
           <div v-for="(sec, sIdx) in priorityConfig.sections" :key="sIdx" style="display: flex; align-items: center; gap: 10px;">
             <span style="width: 55px; font-size: 13px; font-weight: 600;">分区 {{ sIdx + 1 }}:</span>
-            <el-select v-model="sec.type" size="small" style="width: 170px;">
+            <el-select v-model="sec.type" size="small" style="min-width: 170px; width: auto;">
               <el-option label="重要且未读" value="important_unread" />
               <el-option label="重要邮件" value="important" />
               <el-option label="未读邮件" value="unread" />
@@ -540,7 +540,7 @@
               <el-option label="无 (隐藏分区)" value="none" />
               <el-option v-if="sIdx === 3" label="其余所有邮件" value="everything" />
             </el-select>
-            <el-select v-model="sec.maxItems" size="small" style="width: 90px;">
+            <el-select v-model="sec.maxItems" size="small" style="min-width: 95px; width: auto;">
               <el-option :label="'5 条'" :value="5" />
               <el-option :label="'10 条'" :value="10" />
               <el-option :label="'25 条'" :value="25" />

@@ -155,6 +155,7 @@ import assert from "node:assert";
 
     const quotaCard = page.locator(".quota-meter-card");
     await quotaCard.waitFor({ state: "visible", timeout: 10000 });
+    await page.waitForFunction(() => document.querySelector(".total-val")?.innerText?.includes("/ 0 MB"), null, { timeout: 10000 }).catch(() => {});
     const storageCardText = await quotaCard.innerText();
     console.log("  存储用量卡片文字摘要:\n    " + storageCardText.replace(/\n+/g, " "));
 

@@ -446,13 +446,10 @@ function openAdd() {
 .scrollbar {
   height: calc(100% - 48px);
   position: relative;
-  background: var(--bg-base, #f8fafc);
-  padding: 14px 16px 16px 16px;
+  background: transparent;
+  padding: 0;
   box-sizing: border-box;
 
-  @media (max-width: 767px) {
-    padding: 10px;
-  }
   @media (max-width: 372px) {
     height: calc(100% - 85px);
   }
@@ -473,10 +470,10 @@ function openAdd() {
 
   :deep(.el-scrollbar__wrap),
   :deep(.el-scrollbar__wrap--hidden-default) {
-    background: var(--bg-surface, #ffffff);
-    border: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.08));
-    border-radius: 14px;
-    box-shadow: 0 4px 20px -4px rgba(0, 0, 0, 0.04);
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
     box-sizing: border-box;
     min-height: 100%;
     scrollbar-width: none !important;
@@ -495,22 +492,24 @@ function openAdd() {
   }
 
   .code-box {
-    padding: 15px 15px 25px 15px;
+    padding: 16px 2px 25px 2px;
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-    gap: 15px;
+    gap: 16px;
 
     .code-item {
-      background: var(--bg-elevated, var(--el-bg-color));
-      border-radius: 10px;
-      border: 1px solid var(--border-subtle, var(--el-border-color));
+      background: var(--bg-surface, #ffffff);
+      border-radius: 12px;
+      border: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.08));
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
       transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.2s ease;
       will-change: transform;
-      padding: 15px;
+      padding: 18px 20px;
 
       &:hover {
         transform: translateY(-2px);
         box-shadow: 0 6px 18px -4px rgba(0, 0, 0, 0.08);
+        border-color: var(--border-mid);
       }
 
       .code-info {

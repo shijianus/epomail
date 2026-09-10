@@ -11,6 +11,50 @@
    - 在向用户输出回复时，必须置顶/显式打印出本次提交的完整 Commit Hash 与短 Hash，确保版本可追溯、审计记录完整。
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
+### 下拉组件完整呈现、默认色调卡片对比度提升与冗余方框去除、注册密钥多重方框精简上线 (2026-09-09)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **`class="el-select"` 下拉框全场景完整呈现 (Full Display for All Select Elements)**:
+       - 根因分析：之前部分 `el-select` 设置了过窄的固定宽度（如 70px、80px、100px），且使用了 `text-overflow: clip` 或缺乏弹性伸缩空间，导致长选项与提示占位符在渲染时出现文字截断；
+       - 全局重构：在 [`mail-vue/src/style.css`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/style.css) 中定义权威 `class="el-select"` 规范：移除粗暴的截断属性，设置 `min-width: fit-content` 与 `max-width: 100%`，确保 `.el-select__wrapper` 支持自动折行与自适应弹性伸缩（`min-height: 34px; height: auto;`）；
+       - 局部精准校准：
+         - 分类管理 (`category-setting`): 刷新频率下拉由 `80px` 提升为 `min-width: 110px; width: auto;`；
+         - 资料与导出 (`data-setting`): 导出范围下拉由 `130px` 升级为 `min-width: 150px; width: auto;`；
+         - 角色权限弹窗 (`role`): 发信类型下拉由 `70px` 提升为 `min-width: 84px; width: auto;`，同时为表单栅格项分配 `flex: 1 1 0%; min-width: 0;` 弹性伸缩，确保域名与 AI 模型池下拉完整展开；
+         - 个人资料与常规设置 (`profile-setting`): 邮箱分区与显示条数下拉提升至自适应 `min-width: 170px` 与 `95px`。
+    2. **默认色调卡片对比色重构与景深强化 (Default Theme Contrast Elevation & Pure Card Aesthetics)**:
+       - 根因分析：原设置画布容器背景被写死为 `var(--bg-surface)`，而各个分类、应用、导出、存储、资料卡片同样使用 `var(--bg-surface)`，导致亮色下全白（`#ffffff` 对 `#ffffff`）、暗色下全黑（`#111827` 对 `#111827`），对比色荡然无存，产生视觉缺陷；
+       - 重构治理：在 [`mail-vue/src/layout/main/index.vue`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/layout/main/index.vue) 中将 `.settings-content` 画布背景明确回归为系统基础色 `var(--bg-base)`（亮色 `#f1f3f9`，暗色 `#0b0f19`），并消除内部 `.main-view` 的多余底色；
+       - 卡片层次分明：各功能卡片（`.settings-card`, `.app-card`, `.export-card`, `.storage-db-card` 等）承载于 `--bg-surface` 上，配合 `border: 1px solid var(--border-subtle)` 与轻量投影，在亮色与暗色模式下均展现清晰、舒适、现代的高对比度视觉层级。
+    3. **默认色调冗余 `.container` 外框消除与壁纸场景按需保护 (Conditional Wallpaper Container Protection)**:
+       - 根因分析：`.container` 方框及磨砂背景原本是为了在风景等复杂变色图片壁纸中保护文字可读性，而在纯色或平滑渐变背景下套用外层大方框会造成严重的“框中框”视觉冗余；
+       - 架构解耦：在 [`mail-vue/src/store/ui.js`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/store/ui.js) 中实现 `isImageWallpaper` 权威判定器，精准识别照片壁纸（如 `theme-mountain` 或外部图片链接），并在 `<html>` 动态挂载 `has-image-wallpaper` 类名；
+       - 默认模式纯净化：在默认纯净（`none`）及非图片背景下，`.header-container`、`.apps-container`、`.export-container`、`.storage-container` 等外层方框自动将背景、边框与阴影设为 `transparent` / `none`，彻底消除冗余外框；
+       - 图片壁纸按需保护：当切换到复杂风景壁纸时，自动激活 `backdrop-filter: blur(20px)` 磨砂亚克力与半透明边框保护层，实现“默认极简纯粹，复杂壁纸安全可读”。
+    4. **注册密钥 (`class="el-scrollbar scrollbar"`) 3 重方框精简至 1~2 层 (Registration Key Multi-Box Flattening)**:
+       - 根因分析：原页面中 `.scrollbar` 存在深灰色外壳背景 (第 1 层框) -> `.el-scrollbar__wrap` 设置了 `14px` 圆角、边框与阴影 (第 2 层框) -> 内部 `.code-item` 又带有边框与阴影 (第 3 层框)，造成严重的视觉嵌套压抑感；
+       - 精简优化：在 [`mail-vue/src/views/reg-key/index.vue`](file:///home/shijian/projects/epocanvas-mail/mail-vue/src/views/reg-key/index.vue) 中去除 `.scrollbar` 的背景色与多余 padding，移除 `.el-scrollbar__wrap` 冗余边框与阴影，直接将 `.code-item` 作为清晰纯粹的卡片实体呈现，整体层级降至 1~2 层以内，亮暗色调下均通透舒适。
+    5. **Playwright 视觉与架构审计 100% 全绿通过 (Playwright Live E2E Audit)**:
+       - 编写并执行完整端到端测试 [`tests/test-ui-wallpaper-contrast-and-select.mjs`](file:///home/shijian/projects/epocanvas-mail/tests/test-ui-wallpaper-contrast-and-select.mjs):
+         - 步骤 1: Admin 鉴权登录；
+         - 步骤 2: 审计角色弹窗、分类管理、资料设置中的 `el-select`，测量其实际渲染宽度与排版，证实绝无截断（0px 裁剪）；
+         - 步骤 3: 审计注册密钥 `/invite-code` 方框层级，严格断言边框外壳层级从 3 重降至 1 层；
+         - 步骤 4: 跨壁纸与明暗色调多维度视觉对比：
+           - 默认色调（`none`）: header-container 与 apps-container 成功去除方框，亮色与暗色卡片对比度提升；
+           - 渐变色调（`theme-nebula`）: 无需粗暴外框，平滑渐变与卡片文字辨识度极高；
+           - 复杂图片壁纸（`theme-mountain`）: 验证 20px 磨砂亚克力方框准确介入，文字 100% 清晰防眩光；
+         - 留存多维度视觉审计对比截图：
+           - `tests/audit_select_full_display_light.png` / `tests/audit_select_full_display_dark.png`
+           - `tests/audit_reg_key_clean_boxes_light.png` / `tests/audit_reg_key_clean_boxes_dark.png`
+           - `tests/audit_wallpaper_none_category_light.png` / `tests/audit_wallpaper_none_category_dark.png`
+           - `tests/audit_wallpaper_none_data_light.png` / `tests/audit_wallpaper_none_data_dark.png`
+           - `tests/audit_wallpaper_none_oauth_light.png` / `tests/audit_wallpaper_none_oauth_dark.png`
+           - `tests/audit_wallpaper_gradient_light.png` / `tests/audit_wallpaper_gradient_dark.png`
+           - `tests/audit_wallpaper_mountain_light.png` / `tests/audit_wallpaper_mountain_dark.png`
+       - 回归测试 `tests/test-welcome-email-visitor-and-all-accounts.mjs`、`tests/test-group-ui-consistency-and-visitor-clean.mjs` 与 `tests/test-user-general-settings-binding-and-defaults.mjs` 全部 100% 成功通过，恪守零假数据残留准则。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **Cloudflare Workers 部署 Version ID**: `57a0d045-86a8-470a-8751-ff4e36717fe9`。
+    - **epocanvas-mail Git Commit**: PENDING_COMMIT_HASH (Short Hash: PENDING_SHORT_HASH)。
+
 ### 欢迎邮件全账户必达与自愈机制上线、0MB参观者配额豁免与外部邮件拦截、用量面板精准响应 (2026-09-09)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **全员欢迎邮件必达与 0MB 存储配额豁免 (Universal Welcome Email Delivery & 0MB Storage Quota Exemption)**:

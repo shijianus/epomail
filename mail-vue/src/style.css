@@ -671,14 +671,47 @@ html:not(.dark) .el-popper .el-popper__arrow::before {
     z-index: 3000 !important;
 }
 
-/* Ensure dropdown selections & placeholders do not truncate with ellipsis tail */
-.el-select__wrapper .el-select__placeholder {
-    text-overflow: clip !important;
+/* Ensure class="el-select" displays completely without partial clipping or cutoff */
+.el-select {
+    min-width: fit-content;
+    max-width: 100%;
 }
 
-.el-select__wrapper .el-select__tags-text {
+.el-select .el-select__wrapper {
+    width: 100%;
+    min-height: 32px;
+    height: auto !important;
+    box-sizing: border-box;
+}
+
+.el-select .el-select__selection {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    align-items: center;
+    width: 100%;
+    min-width: 0;
+}
+
+.el-select .el-select__placeholder {
+    white-space: nowrap !important;
     max-width: none !important;
+    overflow: visible !important;
+    display: inline-block !important;
+}
+
+.el-select .el-select__selected-item,
+.el-select .el-select__tags-text {
+    white-space: nowrap !important;
+    max-width: none !important;
+    overflow: visible !important;
+}
+
+.el-select-dropdown__item {
+    white-space: nowrap !important;
     text-overflow: clip !important;
+    max-width: none !important;
+    padding: 0 16px !important;
 }
 
 .el-dropdown-menu {
@@ -1073,21 +1106,57 @@ html.has-main-wallpaper .main-view {
     background: transparent !important;
 }
 
-/* Comprehensive Settings Frosted Acrylic Mask Protection */
-html.has-main-wallpaper .settings-content .container,
-html.has-main-wallpaper .settings-content .settings-card,
-html.has-main-wallpaper .settings-content .labels-container,
-html.has-main-wallpaper .settings-content .modern-list,
-html.has-main-wallpaper .settings-content .tech-row,
-html.has-main-wallpaper .settings-content .el-card,
-html.has-main-wallpaper .settings-content .table-wrap,
-html.has-main-wallpaper .settings-content .table-container {
-    background: color-mix(in srgb, var(--bg-surface) var(--panel-alpha, 90%), transparent) !important;
+/* Clean Layout Optimization: Non-image backgrounds (default clean and gradients) do not require artificial outer .container boxes */
+html:not(.has-image-wallpaper) .settings-content .header-container,
+html:not(.has-image-wallpaper) .settings-content .apps-container,
+html:not(.has-image-wallpaper) .settings-content .export-container,
+html:not(.has-image-wallpaper) .settings-content .storage-container {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+}
+
+/* Ensure individual cards stand out with clear contrast against canvas in default and gradient modes */
+.settings-content .settings-card,
+.settings-content .app-card,
+.settings-content .export-card,
+.settings-content .storage-db-card {
+    background: var(--bg-surface) !important;
+    border: 1px solid var(--border-subtle) !important;
+    border-radius: 14px !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+}
+
+/* Personal settings cards (profile-info, profile-setting, setting) on --bg-base canvas */
+.settings-content .container:not(.header-container):not(.apps-container):not(.export-container):not(.storage-container) {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: 14px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+/* On complex color-changing image wallpapers (e.g. snow mountain / custom photos),
+   frosted acrylic container boxes are applied to protect 100% text legibility */
+html.has-image-wallpaper .settings-content .container,
+html.has-image-wallpaper .settings-content .settings-card,
+html.has-image-wallpaper .settings-content .header-container,
+html.has-image-wallpaper .settings-content .apps-container,
+html.has-image-wallpaper .settings-content .export-container,
+html.has-image-wallpaper .settings-content .storage-container,
+html.has-image-wallpaper .settings-content .labels-container,
+html.has-image-wallpaper .settings-content .modern-list,
+html.has-image-wallpaper .settings-content .tech-row,
+html.has-image-wallpaper .settings-content .el-card,
+html.has-image-wallpaper .settings-content .table-wrap,
+html.has-image-wallpaper .settings-content .table-container {
+    background: color-mix(in srgb, var(--bg-surface) var(--panel-alpha, 92%), transparent) !important;
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     border: 1px solid var(--border-subtle) !important;
     border-radius: 14px;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    padding: 24px !important;
 }
 
 html.has-main-wallpaper .split-view-container {

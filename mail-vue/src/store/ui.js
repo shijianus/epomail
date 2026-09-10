@@ -212,12 +212,35 @@ export const useUiStore = defineStore('ui', {
                 root.style.setProperty('--panel-alpha', `${this.themeWallpaperOpacity || 85}%`);
                 root.classList.add('has-main-wallpaper');
                 if (document.body) document.body.classList.add('has-main-wallpaper');
+
+                // Distinguish complex color-changing image wallpapers from clean gradients/solid backgrounds
+                const isImg = this.themeWallpaper === 'theme-mountain' || 
+                    (typeof this.themeWallpaper === 'string' && (
+                        this.themeWallpaper.startsWith('http://') || 
+                        this.themeWallpaper.startsWith('https://') || 
+                        this.themeWallpaper.startsWith('data:image') ||
+                        this.themeWallpaper.startsWith('/') ||
+                        this.themeWallpaper.includes('.jpg') ||
+                        this.themeWallpaper.includes('.png') ||
+                        this.themeWallpaper.includes('.webp')
+                    ));
+                if (isImg) {
+                    root.classList.add('has-image-wallpaper');
+                    if (document.body) document.body.classList.add('has-image-wallpaper');
+                } else {
+                    root.classList.remove('has-image-wallpaper');
+                    if (document.body) document.body.classList.remove('has-image-wallpaper');
+                }
             } else {
                 root.style.setProperty('--main-wallpaper-url', 'none');
                 root.style.setProperty('--main-wallpaper-alpha', '100%');
                 root.style.setProperty('--panel-alpha', '100%');
                 root.classList.remove('has-main-wallpaper');
-                if (document.body) document.body.classList.remove('has-main-wallpaper');
+                root.classList.remove('has-image-wallpaper');
+                if (document.body) {
+                    document.body.classList.remove('has-main-wallpaper');
+                    document.body.classList.remove('has-image-wallpaper');
+                }
             }
         },
         initTheme() {

@@ -57,7 +57,7 @@
 
               <div class="opt-field">
                 <span class="opt-label">{{ $t('exportRange') || '时间范围' }}:</span>
-                <el-select v-model="emailExportRange" size="small" class="range-select" style="width: 130px;">
+                <el-select v-model="emailExportRange" size="small" class="range-select" style="min-width: 150px; width: auto;">
                   <el-option :label="$t('exportAllTime') || '全部历史邮件'" value="all" />
                   <el-option :label="$t('exportLast30Days') || '最近 30 天'" value="30d" />
                   <el-option :label="$t('exportLast1Year') || '最近 1 年'" value="1y" />

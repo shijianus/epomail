@@ -100,6 +100,7 @@ const routes = [
             },
             {
                 path: '/settings/category',
+                alias: ['/category-setting', '/category'],
                 name: 'category-setting',
                 component: () => import('@/views/category-setting/index.vue'),
                 meta: {

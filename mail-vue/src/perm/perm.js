@@ -94,6 +94,7 @@ const routers = {
     ],
     'reg-key:query': [{
         path: '/invite-code',
+        alias: ['/reg-key', '/settings/reg-key'],
         name: 'reg-key',
         component: () => import('@/views/reg-key/index.vue'),
         meta: {
