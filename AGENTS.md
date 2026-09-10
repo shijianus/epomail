@@ -53,7 +53,7 @@
        - 回归测试 `tests/test-welcome-email-visitor-and-all-accounts.mjs`、`tests/test-group-ui-consistency-and-visitor-clean.mjs` 与 `tests/test-user-general-settings-binding-and-defaults.mjs` 全部 100% 成功通过，恪守零假数据残留准则。
 *   **部署上线与自动化测试 (Verification & Deployment)**:
     - **Cloudflare Workers 部署 Version ID**: `57a0d045-86a8-470a-8751-ff4e36717fe9`。
-    - **epocanvas-mail Git Commit**: PENDING_COMMIT_HASH (Short Hash: PENDING_SHORT_HASH)。
+    - **epocanvas-mail Git Commit**: `c8132526605dd4774b798708613e44ebe9914134` (Short Hash: `c813252`)。
 
 ### 欢迎邮件全账户必达与自愈机制上线、0MB参观者配额豁免与外部邮件拦截、用量面板精准响应 (2026-09-09)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
