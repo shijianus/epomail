@@ -100,9 +100,9 @@ import assert from 'node:assert';
   // 切换并测试 Mode 0
   console.log('4. 切换并验证 Mode 0【隐私邮件模式】...');
   await selectEl.click();
-  await page.waitForTimeout(400);
-  await page.locator('.el-select-dropdown__item:visible').filter({ hasText: '隐私邮件模式' }).click();
   await page.waitForTimeout(600);
+  await page.locator('.el-select-dropdown__item:visible').filter({ hasText: '隐私邮件模式' }).click();
+  await page.waitForTimeout(1200);
   const metricsMode0 = await getSelectMetrics();
   console.log('Mode 0 (隐私邮件模式) 实测指标:', JSON.stringify(metricsMode0, null, 2));
   assert.strictEqual(metricsMode0.isTruncated, false, 'Mode 0 文字绝不允许被截断！');
@@ -112,9 +112,9 @@ import assert from 'node:assert';
   // 切换并测试 Mode 1
   console.log('5. 切换并验证 Mode 1【全部邮件模式】...');
   await selectEl.click();
-  await page.waitForTimeout(400);
-  await page.locator('.el-select-dropdown__item:visible').filter({ hasText: '全部邮件模式' }).click();
   await page.waitForTimeout(600);
+  await page.locator('.el-select-dropdown__item:visible').filter({ hasText: '全部邮件模式' }).click();
+  await page.waitForTimeout(1200);
   const metricsMode1 = await getSelectMetrics();
   console.log('Mode 1 (全部邮件模式) 实测指标:', JSON.stringify(metricsMode1, null, 2));
   assert.strictEqual(metricsMode1.isTruncated, false, 'Mode 1 文字绝不允许被截断！');

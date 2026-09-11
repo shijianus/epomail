@@ -14,54 +14,52 @@
     </div>
 
     <div class="labels-container" v-if="uiStore.allLabels.length > 0">
-      <div class="modern-list">
-        <div class="list-row tech-row" v-for="(label, index) in uiStore.allLabels" :key="label.name"
-             :draggable="dragEnabledIndex === index"
-             @dragstart="onDragStart($event, index)"
-             @dragover.prevent
-             @dragenter.prevent="onDragEnter($event, index)"
-             @dragend="onDragEnd"
-             @drop="onDrop"
-             :class="{ 'is-dragging': dragIndex === index }">
-          <div class="drag-handle" :title="$t('dragToReorder') || 'Drag to reorder'"
-               @mouseenter="dragEnabledIndex = index"
-               @mouseleave="dragEnabledIndex = -1">
-            <Icon icon="lucide:grip-vertical" width="18" />
+      <div class="list-row tech-row" v-for="(label, index) in uiStore.allLabels" :key="label.name"
+           :draggable="dragEnabledIndex === index"
+           @dragstart="onDragStart($event, index)"
+           @dragover.prevent
+           @dragenter.prevent="onDragEnter($event, index)"
+           @dragend="onDragEnd"
+           @drop="onDrop"
+           :class="{ 'is-dragging': dragIndex === index }">
+        <div class="drag-handle" :title="$t('dragToReorder') || 'Drag to reorder'"
+             @mouseenter="dragEnabledIndex = index"
+             @mouseleave="dragEnabledIndex = -1">
+          <Icon icon="lucide:grip-vertical" width="18" />
+        </div>
+        <div class="label-pill-cell" style="padding-left: 8px;">
+          <div class="label-pill" :style="{ '--pill-color': label.color || 'var(--accent-primary)' }">
+            <div v-if="(label.icon || '').startsWith('<svg')" v-html="label.icon" style="width: 18px; height: 18px; display: inline-flex; justify-content: center; align-items: center; fill: currentColor;"></div>
+            <Icon v-else :icon="label.icon || 'ic:baseline-label'" width="18" />
+            <span>{{ label.name || label }}</span>
           </div>
-          <div class="label-pill-cell" style="padding-left: 8px;">
-            <div class="label-pill" :style="{ '--pill-color': label.color || 'var(--accent-primary)' }">
-              <div v-if="(label.icon || '').startsWith('<svg')" v-html="label.icon" style="width: 18px; height: 18px; display: inline-flex; justify-content: center; align-items: center; fill: currentColor;"></div>
-              <Icon v-else :icon="label.icon || 'ic:baseline-label'" width="18" />
-              <span>{{ label.name || label }}</span>
-            </div>
-          </div>
+        </div>
 
-          <div class="stats-group">
-            <div class="stat-item">
-              <span class="stat-val">{{ label.stats?.total || 0 }}</span>
-              <span class="stat-lbl">{{ $t('statTotal') || 'Total' }}</span>
-            </div>
-            <div class="stat-item">
-              <span class="stat-val">{{ label.stats?.current || 0 }}</span>
-              <span class="stat-lbl">{{ $t('statCurrent') || 'Current' }}</span>
-            </div>
-            <div class="stat-item">
-              <span class="stat-val">{{ label.stats?.unread || 0 }}</span>
-              <span class="stat-lbl">{{ $t('statUnread') || 'Unread' }}</span>
-            </div>
+        <div class="stats-group">
+          <div class="stat-item">
+            <span class="stat-val">{{ label.stats?.total || 0 }}</span>
+            <span class="stat-lbl">{{ $t('statTotal') || 'Total' }}</span>
           </div>
+          <div class="stat-item">
+            <span class="stat-val">{{ label.stats?.current || 0 }}</span>
+            <span class="stat-lbl">{{ $t('statCurrent') || 'Current' }}</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-val">{{ label.stats?.unread || 0 }}</span>
+            <span class="stat-lbl">{{ $t('statUnread') || 'Unread' }}</span>
+          </div>
+        </div>
 
-          <div class="visibility-cell">
-             <el-switch v-model="label.listVis" size="small" :active-text="$t('show') || 'Show'" :inactive-text="$t('hide') || 'Hide'" inline-prompt />
-          </div>
-          <div class="actions-cell">
-            <el-button link class="action-btn edit-btn" @click="startEdit(index)" :title="$t('edit') || 'Edit'">
-              <Icon icon="lucide:pencil" width="16" />
-            </el-button>
-            <el-button link class="action-btn delete-btn" @click="confirmDelete(index)" :title="$t('delete') || 'Delete'">
-              <Icon icon="lucide:trash-2" width="16" />
-            </el-button>
-          </div>
+        <div class="visibility-cell">
+           <el-switch v-model="label.listVis" size="small" :active-text="$t('show') || 'Show'" :inactive-text="$t('hide') || 'Hide'" inline-prompt />
+        </div>
+        <div class="actions-cell">
+          <el-button link class="action-btn edit-btn" @click="startEdit(index)" :title="$t('edit') || 'Edit'">
+            <Icon icon="lucide:pencil" width="16" />
+          </el-button>
+          <el-button link class="action-btn delete-btn" @click="confirmDelete(index)" :title="$t('delete') || 'Delete'">
+            <Icon icon="lucide:trash-2" width="16" />
+          </el-button>
         </div>
       </div>
     </div>
@@ -778,35 +776,34 @@ const onDrop = () => {
   margin-bottom: 12px;
 }
 
-.modern-list {
+.labels-container {
   display: flex;
   flex-direction: column;
-  background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: 14px;
-  padding: 12px;
+  gap: 8px;
+  width: 100%;
+}
+
+.labels-container:hover .tech-row:not(:hover) {
+  opacity: 0.7;
 }
 
 .tech-row {
   display: flex;
   align-items: center;
-  padding: 16px 12px;
-  border: 1px solid transparent;
-  border-bottom: 1px solid var(--border-subtle);
-  transition: all 0.2s ease;
-  border-radius: 8px;
-  margin-bottom: 4px;
-}
-
-.modern-list:hover .tech-row:not(:hover) {
-  opacity: 0.6;
+  padding: 14px 18px;
+  border-radius: 12px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+  box-sizing: border-box;
 }
 
 .tech-row:hover {
   background-color: var(--bg-hover);
   border-color: var(--border-mid);
   transform: translateX(4px);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  box-shadow: 0 4px 14px -2px rgba(0, 0, 0, 0.06);
 }
 
 .tech-row.is-dragging {

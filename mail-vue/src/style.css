@@ -1177,14 +1177,12 @@ html.has-main-wallpaper .main-view {
 .settings-content .container,
 .settings-content .settings-card,
 .settings-content .header-container,
+.settings-content .header-area,
 .settings-content .apps-container,
 .settings-content .export-container,
 .settings-content .storage-container,
 .settings-content .forwarding-container,
 .settings-content .api-tokens-container,
-.settings-content .labels-container,
-.settings-content .modern-list,
-.settings-content .tech-row,
 .settings-content .el-card,
 .settings-content .table-wrap,
 .settings-content .table-container {
@@ -1201,6 +1199,7 @@ html.has-main-wallpaper .main-view {
 html.dark:not(.has-main-wallpaper) .settings-content .container,
 html.dark:not(.has-main-wallpaper) .settings-content .settings-card,
 html.dark:not(.has-main-wallpaper) .settings-content .header-container,
+html.dark:not(.has-main-wallpaper) .settings-content .header-area,
 html.dark:not(.has-main-wallpaper) .settings-content .apps-container,
 html.dark:not(.has-main-wallpaper) .settings-content .export-container,
 html.dark:not(.has-main-wallpaper) .settings-content .storage-container,
@@ -1215,14 +1214,12 @@ html.dark:not(.has-main-wallpaper) .settings-content .api-tokens-container {
 html.has-main-wallpaper .settings-content .container,
 html.has-main-wallpaper .settings-content .settings-card,
 html.has-main-wallpaper .settings-content .header-container,
+html.has-main-wallpaper .settings-content .header-area,
 html.has-main-wallpaper .settings-content .apps-container,
 html.has-main-wallpaper .settings-content .export-container,
 html.has-main-wallpaper .settings-content .storage-container,
 html.has-main-wallpaper .settings-content .forwarding-container,
 html.has-main-wallpaper .settings-content .api-tokens-container,
-html.has-main-wallpaper .settings-content .labels-container,
-html.has-main-wallpaper .settings-content .modern-list,
-html.has-main-wallpaper .settings-content .tech-row,
 html.has-main-wallpaper .settings-content .el-card,
 html.has-main-wallpaper .settings-content .table-wrap,
 html.has-main-wallpaper .settings-content .table-container {
@@ -1238,14 +1235,12 @@ html.has-main-wallpaper .settings-content .table-container {
 html.dark.has-main-wallpaper .settings-content .container,
 html.dark.has-main-wallpaper .settings-content .settings-card,
 html.dark.has-main-wallpaper .settings-content .header-container,
+html.dark.has-main-wallpaper .settings-content .header-area,
 html.dark.has-main-wallpaper .settings-content .apps-container,
 html.dark.has-main-wallpaper .settings-content .export-container,
 html.dark.has-main-wallpaper .settings-content .storage-container,
 html.dark.has-main-wallpaper .settings-content .forwarding-container,
 html.dark.has-main-wallpaper .settings-content .api-tokens-container,
-html.dark.has-main-wallpaper .settings-content .labels-container,
-html.dark.has-main-wallpaper .settings-content .modern-list,
-html.dark.has-main-wallpaper .settings-content .tech-row,
 html.dark.has-main-wallpaper .settings-content .el-card,
 html.dark.has-main-wallpaper .settings-content .table-wrap,
 html.dark.has-main-wallpaper .settings-content .table-container {
@@ -1287,6 +1282,88 @@ html.dark .settings-content .export-card:hover,
 html.dark .settings-content .storage-db-card:hover {
     box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.45) !important;
     border-color: rgba(129, 140, 248, 0.4) !important;
+}
+
+/* labels-container 纯净布局容器：杜绝多余底板嵌套，由内部 tech-row 基元自主呈现 */
+.settings-content .labels-container {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin-bottom: 24px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+}
+
+html.has-main-wallpaper .settings-content .labels-container,
+html.dark.has-main-wallpaper .settings-content .labels-container {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+/* 独立基元 class="list-row tech-row" 自主底层与紧凑间隙体系 */
+.settings-content .tech-row {
+    background: var(--bg-surface) !important;
+    border: 1px solid var(--border-subtle) !important;
+    border-radius: 12px !important;
+    padding: 14px 18px !important;
+    margin: 0 !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03) !important;
+    box-sizing: border-box !important;
+    transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.2s ease, background-color 0.2s ease !important;
+}
+
+.settings-content .tech-row:hover {
+    background-color: var(--bg-hover) !important;
+    border-color: var(--border-mid) !important;
+    transform: translateX(4px) !important;
+    box-shadow: 0 4px 14px -2px rgba(0, 0, 0, 0.06) !important;
+}
+
+html.dark:not(.has-main-wallpaper) .settings-content .tech-row {
+    background: var(--bg-surface) !important;
+    border: 1px solid var(--border-subtle) !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25) !important;
+}
+
+html.dark:not(.has-main-wallpaper) .settings-content .tech-row:hover {
+    background: var(--bg-hover) !important;
+    border-color: var(--border-mid) !important;
+    box-shadow: 0 6px 18px -2px rgba(0, 0, 0, 0.45) !important;
+}
+
+/* 独立基元 tech-row 在壁纸模式下的磨砂亚克力保护 */
+html.has-main-wallpaper .settings-content .tech-row {
+    background: rgba(255, 255, 255, 0.88) !important;
+    backdrop-filter: blur(16px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(16px) saturate(180%) !important;
+    border: 1px solid rgba(226, 232, 240, 0.85) !important;
+    box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.05) !important;
+}
+
+html.has-main-wallpaper .settings-content .tech-row:hover {
+    background: rgba(255, 255, 255, 0.96) !important;
+    border-color: rgba(99, 102, 241, 0.4) !important;
+    box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.12) !important;
+}
+
+html.dark.has-main-wallpaper .settings-content .tech-row {
+    background: rgba(30, 41, 59, 0.8) !important;
+    backdrop-filter: blur(16px) saturate(160%) !important;
+    -webkit-backdrop-filter: blur(16px) saturate(160%) !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    box-shadow: 0 4px 14px -2px rgba(0, 0, 0, 0.28) !important;
+}
+
+html.dark.has-main-wallpaper .settings-content .tech-row:hover {
+    background: rgba(45, 58, 80, 0.9) !important;
+    border-color: rgba(129, 140, 248, 0.4) !important;
+    box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.45) !important;
 }
 
 /* 确保底板内的标题与描述在任何模式下均具备顶级对比度与排版舒适感 */
