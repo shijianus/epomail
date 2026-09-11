@@ -11,6 +11,33 @@
    - 在向用户输出回复时，必须置顶/显式打印出本次提交的完整 Commit Hash 与短 Hash，确保版本可追溯、审计记录完整。
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
+### labels-container 冗余嵌套根除、多重底板剥离与独立基元 list-row tech-row 紧凑间距体验加固上线 (2026-09-11)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **冗余嵌套彻底根除与模板打底单层化 (Redundant Nesting Elimination)**:
+       - 根因分析：此前 `label-setting/index.vue` 模板中存在 `<div class="labels-container"><div class="modern-list"><div class="list-row tech-row">...</div></div></div>`，导致 2 层外壳包裹，同时在全局 CSS 作用下形成了 3 层重叠底板（外层框、中层框与内层卡片）；
+       - 根治重构：彻底移除多余的 `<div class="modern-list">` 容器层级，将各标签基元直接置于 `.labels-container` 之下，从 3 层嵌套精简至清晰标准的 1 层布局容器结构。
+    2. **剥离多余外框底板，只保留基元自主底层 (Strip Outer Bento Plates & Retain Primitive Autonomy)**:
+       - 治理方案：在 `style.css` 中将 `.labels-container` 与 `.modern-list` 从 Level 1 Bento 底板选择器中完全剔除，解除全局 `!important` 强加的背景色、18px 边框与阴影；
+       - 纯净容器定义：显式定义 `.settings-content .labels-container` 为纯净透明的弹性流式容器（`background: transparent !important; border: none !important; padding: 0 !important;`），杜绝任何不必要的嵌套外框；
+       - 基元自主底层保留：每个 `.list-row.tech-row` 单独作为 Level 2 交互实体卡片呈现，具备自主的圆角底板（`border-radius: 12px; background: var(--bg-surface); border: 1px solid var(--border-subtle);`），悬浮微动效（`translateX(4px)` 与层次投影），并在壁纸环境下启用 16px 磨砂亚克力玻璃模糊保护（`backdrop-filter: blur(16px)`）。
+    3. **紧凑舒适间距治理 (Compact & Balanced Spacing System)**:
+       - 根因分析：此前 `style.css` 为行基元注入了 `margin-bottom: 24px !important; padding: 24px 28px !important;`，导致行间距过大且内部臃肿；
+       - 紧凑重塑：废除 24px 夸张间距，由 `.labels-container` 统一提供 `gap: 8px` 的紧凑舒适间距，并微调各基元内边距至舒适标准的 `14px 18px`，让整个标签列表视觉紧凑、饱满而优雅。
+    4. **Playwright 生产环境真实端到端全维度审计 100% 全绿 (Comprehensive Live E2E Audit)**:
+       - 编写并执行专用审计脚本 `tests/audit-labels-container.mjs`：
+         - 结构实测断言：`hasModernList: false`，`labelsContainerBg: rgba(0, 0, 0, 0)`，`labelsContainerPadding: 0px`；
+         - 尺寸与间距实测断言：`rowGap: 8px`，`rowHeight: 67px`，`rowBorderRadius: 12px`；
+         - 跨模式视觉表现截图：
+           - `tests/audit_labels_light.png`（默认亮色：无多余底板，基元自主呈现）
+           - `tests/audit_labels_dark.png`（默认暗色：高对比度暗调卡片）
+           - `tests/audit_labels_wallpaper_light.png`（壁纸亮色：16px 磨砂亚克力高透）
+           - `tests/audit_labels_wallpaper_dark.png`（壁纸暗色：16px 磨砂亚克力深色）
+       - 回归综合测试 `tests/audit-mail-mode-select.mjs`、`tests/test-ui-wallpaper-contrast-and-select.mjs`、`tests/test-group-ui-consistency-and-visitor-clean.mjs`、`tests/test-welcome-email-visitor-and-all-accounts.mjs`、`tests/test-user-general-settings-binding-and-defaults.mjs` 全部 100% 成功通过；
+       - 严格恪守零假数据残留准则。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **Cloudflare Workers 部署 Version ID**: `c598f247-6a40-4f4e-bf27-ed2d545250e3`。
+    - **epocanvas-mail Git Commit**: `018902e5b63baf9671b8f5f0789f2ebcafa61551` (Short Hash: `018902e`).
+
 ### 邮件模式下拉框尺寸锁定固定（零抖动·零形变）、文字自适应字体缩放与多语言 i18n 完整适配加固上线 (2026-09-11)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **锁定容器固定尺寸，杜绝随内容切换抖动形变 (Strictly Fixed Select Width)**:
