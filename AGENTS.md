@@ -37,7 +37,7 @@
        - 回归测试套件 `tests/test-group-ui-consistency-and-visitor-clean.mjs` 全部 100% 成功全绿通过。
 *   **部署上线与自动化测试 (Verification & Deployment)**:
     - **Cloudflare Workers 部署 Version ID**: `c7a2adca-4e3a-4f1f-a484-8d0ce6fdc9bb`。
-    - **epocanvas-mail Git Commit**: `PENDING_COMMIT_HASH`。
+    - **epocanvas-mail Git Commit**: `5855db14f87157c1380a19dc3f4eac885889f08c` (Short Hash: `5855db1`)。
 
 ### 多域名独立信箱上下文锁定、默认发件人严密对齐（杜绝错传）与全链路信箱隔离加固上线 (2026-09-11)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
