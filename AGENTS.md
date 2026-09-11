@@ -36,7 +36,7 @@
        - 严格恪守零假数据残留准则。
 *   **部署上线与自动化测试 (Verification & Deployment)**:
     - **Cloudflare Workers 部署 Version ID**: `f7d3ee14-7347-486b-a70d-f9477e344d38`。
-    - **epocanvas-mail Git Commit**: PENDING_COMMIT_HASH (Short Hash: PENDING_SHORT_HASH)。
+    - **epocanvas-mail Git Commit**: `25c5f6c4c6d3bca8430a0bdf96446e17dfba28af` (Short Hash: `25c5f6c`).
 
 ### 邮件模式下拉框自适应严密贴合（刚刚好·零冗余空白·零截断）、全模式精准尺寸计算与下拉弹层全量展开加固上线 (2026-09-11)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
