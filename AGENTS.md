@@ -42,7 +42,7 @@
        - 严格恪守零假数据残留准则。
 *   **部署上线与自动化测试 (Verification & Deployment)**:
     - **Cloudflare Workers 部署 Version ID**: `8ab057b3-26b2-4164-aabe-e9c75fd58c85`。
-    - **epocanvas-mail Git Commit**: 待提交 (Pending Commit)。
+    - **epocanvas-mail Git Commit**: `141c6733fd9cc5a1403c86f6d1ba35023b3320ca` (Short Hash: `141c673`).
 
 ### labels-container 冗余嵌套根除、多重底板剥离与独立基元 list-row tech-row 紧凑间距体验加固上线 (2026-09-11)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
