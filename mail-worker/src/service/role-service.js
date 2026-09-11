@@ -32,10 +32,25 @@ const roleService = {
 				}
 			}
 
-			// Fast check: if all 6 standard roles already exist, have tags, and visitor is default, exit immediately
-			const check = await userDb.prepare(`SELECT count(*) as cnt FROM role WHERE role_code IN ('visitor', 'user_base', 'user_lv0', 'user_lv1', 'moderator', 'master') AND tag_text IS NOT NULL AND tag_text != '' AND tag_text != 'tag_text'`).first();
-			const visitorCheck = await userDb.prepare(`SELECT is_default FROM role WHERE role_code = 'visitor' LIMIT 1`).first();
-			if (check && Number(check.cnt) >= 6 && visitorCheck && Number(visitorCheck.is_default) === 1) {
+			// Check if roles have been initialized once
+			const roleCount = await userDb.prepare(`SELECT count(*) as cnt FROM role`).first();
+			const hasRoles = roleCount && Number(roleCount.cnt) > 0;
+
+			let hasSeeded = false;
+			try {
+				const flag = await c?.env?.kv?.get('roles_seeded_v2');
+				hasSeeded = flag === '1';
+			} catch (_) {}
+
+			if (hasRoles || hasSeeded) {
+				// 已经存在角色：绝不复活已被站长删除的空选项（如 user_lv0/user_lv1），绝不覆盖站长已自订的权限与属性
+				// 仅确保站长 (master) 角色及管理员账户绑定
+				if (c?.env?.admin) {
+					const masterRole = await userDb.prepare(`SELECT role_id FROM role WHERE role_code = 'master' OR name = '站长' LIMIT 1`).first();
+					if (masterRole) {
+						await userDb.prepare(`UPDATE user SET type = ? WHERE email = ? AND type != ?`).bind(masterRole.role_id, c.env.admin, masterRole.role_id).run();
+					}
+				}
 				return;
 			}
 		} catch (e) {
@@ -166,23 +181,16 @@ const roleService = {
 					if (roleId) {
 						await this.assignPermsInternal(userDb, roleId, defRole.permKeys);
 					}
-				} else {
-					await userDb.prepare(`
-						UPDATE role 
-						SET role_code = ?, storage_quota_mb = ?, allow_attachment = ?, description = ?, send_type = ?, send_count = ?, is_default = ?,
-						    tag_text = CASE WHEN tag_text = '' OR tag_text = 'tag_text' OR tag_text IS NULL THEN ? ELSE tag_text END,
-						    tag_color = CASE WHEN tag_color = '' OR tag_color = 'tag_color' OR tag_color IS NULL THEN ? ELSE tag_color END
-						WHERE role_id = ?
-					`).bind(
-						defRole.roleCode, defRole.storageQuotaMb, defRole.allowAttachment, defRole.description, defRole.sendType, defRole.sendCount, defRole.isDefault,
-						defRole.tagText, defRole.tagColor,
-						existing.role_id
-					).run();
-					await this.assignPermsInternal(userDb, existing.role_id, defRole.permKeys);
 				}
 			}
 
-			if (c.env.admin) {
+			try {
+				if (c?.env?.kv) {
+					await c.env.kv.put('roles_seeded_v2', '1');
+				}
+			} catch (_) {}
+
+			if (c?.env?.admin) {
 				const masterRole = await userDb.prepare(`SELECT role_id FROM role WHERE role_code = 'master' OR name = '站长' LIMIT 1`).first();
 				if (masterRole) {
 					await userDb.prepare(`UPDATE user SET type = ? WHERE email = ? AND type != ?`).bind(masterRole.role_id, c.env.admin, masterRole.role_id).run();
@@ -324,7 +332,17 @@ const roleService = {
 			tagColor: tagColor || '',
 			aiModels: aiModelsStr
 		}).where(eq(role.roleId, roleId)).run();
-		
+
+		const targetRole = await this.selectById(c, roleId);
+		if (targetRole?.roleCode === 'visitor' || targetRole?.key === 'visitor' || targetRole?.name === '参观者') {
+			// 参观者默认禁止关闭对"用户列表" (user:query) 的查看权限
+			const userDb = getUserDb(c);
+			const userQueryPerm = await userDb.prepare(`SELECT perm_id FROM perm WHERE perm_key = 'user:query' LIMIT 1`).first();
+			if (userQueryPerm && !permIds.includes(userQueryPerm.perm_id)) {
+				permIds.push(userQueryPerm.perm_id);
+			}
+		}
+
 		await orm(c).delete(rolePerm).where(eq(rolePerm.roleId, roleId)).run();
 
 		if (permIds.length > 0) {

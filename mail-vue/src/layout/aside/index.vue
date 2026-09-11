@@ -92,7 +92,7 @@
             </div>
           </div>
           <template v-for="(label, idx) in uiStore.allLabels" :key="'lbl-'+idx">
-            <div class="nav-item" v-if="label.listVis !== false" :title="label.name || label" @click="handleLabelClick(label)" :class="isLabelActive(label) ? 'active' : ''">
+            <div class="nav-item" v-if="label.listVis !== false" :title="getLabelDisplayName(label.name || label, t)" @click="handleLabelClick(label)" :class="isLabelActive(label) ? 'active' : ''">
               <span class="nav-ic-wrap">
                 <div v-if="(label.icon || '').startsWith('<svg')" v-html="label.icon" style="width: 20px; height: 20px; display: inline-flex; justify-content: center; align-items: center; fill: currentColor;" :style="{ color: label.color || 'inherit' }"></div>
                 <Icon v-else :icon="label.icon || 'ic:baseline-label'" width="20" height="20" :style="{ color: label.color || 'inherit' }" />
@@ -103,7 +103,7 @@
                   <div class="sidebar-red-dot" v-if="getLabelStats(label.name).unread > 0"></div>
                 </template>
               </span>
-              <span class="nav-label" :style="{ color: label.color || 'inherit' }">{{ label.name || label }}</span>
+              <span class="nav-label" :style="{ color: label.color || 'inherit' }">{{ getLabelDisplayName(label.name || label, t) }}</span>
               <template v-if="(label.name || label) === '推销'">
                 <span class="nav-count muted" v-if="getLabelStats(label.name).unread > 0">{{ getLabelStats(label.name).unread }}</span>
                 <span class="nav-count muted" v-else-if="getLabelStats(label.name).read > 0">{{ getLabelStats(label.name).read }}</span>
@@ -140,7 +140,10 @@ import {useEmailStore} from "@/store/email.js";
 import {hasPerm} from "@/perm/perm.js";
 import { ElMessage } from 'element-plus';
 import { computed, ref, onMounted, onBeforeUnmount } from 'vue';
+import { useI18n } from 'vue-i18n';
+import { getLabelDisplayName } from '@/utils/label-i18n.js';
 
+const { t } = useI18n();
 const settingStore = useSettingStore();
 const userStore = useUserStore();
 const uiStore = useUiStore();

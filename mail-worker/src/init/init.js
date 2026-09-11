@@ -70,148 +70,152 @@ const dbInit = {
 			}
 		}
 
-		// 2. Standard 6 default groups
-		const standardRoles = [
-			{
-				roleCode: 'visitor',
-				name: '参观者',
-				key: 'visitor',
-				sort: 1,
-				isDefault: 1,
-				sendType: 'ban',
-				sendCount: 0,
-				accountCount: 0,
-				storageQuotaMb: 0,
-				allowAttachment: 0,
-				tagText: '开源体验',
-				tagColor: '#6366f1',
-				description: '开源体验与巡检用户，全功能UI交互沙箱，无持久化写入权限，配额0MB',
-				permKeys: ['setting:query', 'role:query', 'analysis:query', 'user:query', 'reg-key:query']
-			},
-			{
-				roleCode: 'user_base',
-				name: '普通用户',
-				key: 'user_base',
-				sort: 2,
-				isDefault: 0,
-				sendType: 'day',
-				sendCount: 5,
-				accountCount: 1,
-				storageQuotaMb: 5,
-				allowAttachment: 0,
-				tagText: '基础成员',
-				tagColor: '#64748b',
-				description: '默认注册用户，具备基础使用权限，纯文本收发(无附件)，每日5封上限',
-				permKeys: ['email:send', 'email:delete', 'account:query', 'account:add', 'account:delete', 'my:delete']
-			},
-			{
-				roleCode: 'user_lv0',
-				name: '普通用户 LV.0',
-				key: 'user_lv0',
-				sort: 3,
-				isDefault: 0,
-				sendType: 'day',
-				sendCount: 8,
-				accountCount: 2,
-				storageQuotaMb: 10,
-				allowAttachment: 0,
-				tagText: '认证书友',
-				tagColor: '#10b981',
-				description: '已注册/绑定 blog.epomail.com 博客用户，配额提升至10MB，每日8封发信权',
-				permKeys: ['email:send', 'email:delete', 'account:query', 'account:add', 'account:delete', 'my:delete']
-			},
-			{
-				roleCode: 'user_lv1',
-				name: '普通用户 LV.1',
-				key: 'user_lv1',
-				sort: 4,
-				isDefault: 0,
-				sendType: 'day',
-				sendCount: 10,
-				accountCount: 3,
-				storageQuotaMb: 25,
-				allowAttachment: 1,
-				tagText: '活跃学者',
-				tagColor: '#06b6d4',
-				description: '参与博客讨论与活跃互动的进阶用户，配额25MB，每日10封，开放附件发送权限',
-				permKeys: ['email:send', 'email:delete', 'account:query', 'account:add', 'account:delete', 'my:delete']
-			},
-			{
-				roleCode: 'moderator',
-				name: '协管者/管理员',
-				key: 'moderator',
-				sort: 5,
-				isDefault: 0,
-				sendType: 'day',
-				sendCount: 100,
-				accountCount: 10,
-				storageQuotaMb: 500,
-				allowAttachment: 1,
-				tagText: '协同管理',
-				tagColor: '#f59e0b',
-				description: '非站长管理员，具备细分管控权限，无权修改自身权限与站长权限',
-				permKeys: [
-					'email:send', 'email:delete', 'account:query', 'account:add', 'account:delete', 'my:delete',
-					'user:query', 'user:add', 'user:reset-send', 'user:set-pwd', 'user:set-status', 'user:set-type',
-					'all-email:query', 'setting:query', 'role:query', 'analysis:query'
-				]
-			},
-			{
-				roleCode: 'master',
-				name: '站长',
-				key: 'master',
-				sort: 6,
-				isDefault: 0,
-				sendType: 'count',
-				sendCount: 0,
-				accountCount: 0,
-				storageQuotaMb: 1024,
-				allowAttachment: 1,
-				tagText: '最高统领',
-				tagColor: '#ef4444',
-				description: '全站最高权力拥有者，全功能不受限',
-				permKeys: ['*']
-			}
-		];
+		// 2. Standard 6 default groups (仅在全新未初始化时播种，杜绝站长删除 LV.0 / LV.1 后在此被强制复活)
+		let hasRoleSeeded = false;
+		try {
+			const flag = await c?.env?.kv?.get('roles_seeded_v2');
+			hasRoleSeeded = flag === '1';
+		} catch (_) {}
 
-		for (const defRole of standardRoles) {
-			try {
-				let existing = await userDb.prepare(`SELECT * FROM role WHERE role_code = ? OR name = ? LIMIT 1`).bind(defRole.roleCode, defRole.name).first();
-				if (!existing) {
-					const insRes = await userDb.prepare(`
-						INSERT INTO role (
-							name, key, description, ban_email, ban_email_type, avail_domain,
-							sort, is_default, send_count, send_type, account_count,
-							storage_quota_mb, allow_attachment, role_code, tag_text, tag_color
-						) VALUES (?, ?, ?, '', 0, '', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-					`).bind(
-						defRole.name, defRole.key, defRole.description,
-						defRole.sort, defRole.isDefault, defRole.sendCount, defRole.sendType, defRole.accountCount,
-						defRole.storageQuotaMb, defRole.allowAttachment, defRole.roleCode,
-						defRole.tagText, defRole.tagColor
-					).run();
+		const roleCount = await userDb.prepare(`SELECT count(*) as count FROM role`).first();
+		const shouldSeedRoles = !hasRoleSeeded && (!roleCount || Number(roleCount.count) === 0);
 
-					const roleId = insRes.meta?.last_row_id;
-					if (roleId) {
-						await this.assignRolePerms(userDb, roleId, defRole.permKeys);
-					}
-				} else {
-					await userDb.prepare(`
-						UPDATE role 
-						SET role_code = ?, storage_quota_mb = ?, allow_attachment = ?, description = ?, send_type = ?, send_count = ?, is_default = ?,
-						    tag_text = CASE WHEN tag_text = '' OR tag_text = 'tag_text' OR tag_text IS NULL THEN ? ELSE tag_text END,
-						    tag_color = CASE WHEN tag_color = '' OR tag_color = 'tag_color' OR tag_color IS NULL THEN ? ELSE tag_color END
-						WHERE role_id = ?
-					`).bind(
-						defRole.roleCode, defRole.storageQuotaMb, defRole.allowAttachment, defRole.description, defRole.sendType, defRole.sendCount, defRole.isDefault,
-						defRole.tagText, defRole.tagColor,
-						existing.role_id
-					).run();
-					await this.assignRolePerms(userDb, existing.role_id, defRole.permKeys);
+		if (shouldSeedRoles) {
+			const standardRoles = [
+				{
+					roleCode: 'visitor',
+					name: '参观者',
+					key: 'visitor',
+					sort: 1,
+					isDefault: 1,
+					sendType: 'ban',
+					sendCount: 0,
+					accountCount: 0,
+					storageQuotaMb: 0,
+					allowAttachment: 0,
+					tagText: '开源体验',
+					tagColor: '#6366f1',
+					description: '开源体验与巡检用户，全功能UI交互沙箱，无持久化写入权限，配额0MB',
+					permKeys: ['setting:query', 'role:query', 'analysis:query', 'user:query', 'reg-key:query']
+				},
+				{
+					roleCode: 'user_base',
+					name: '普通用户',
+					key: 'user_base',
+					sort: 2,
+					isDefault: 0,
+					sendType: 'day',
+					sendCount: 5,
+					accountCount: 1,
+					storageQuotaMb: 5,
+					allowAttachment: 0,
+					tagText: '基础成员',
+					tagColor: '#64748b',
+					description: '默认注册用户，具备基础使用权限，纯文本收发(无附件)，每日5封上限',
+					permKeys: ['email:send', 'email:delete', 'account:query', 'account:add', 'account:delete', 'my:delete']
+				},
+				{
+					roleCode: 'user_lv0',
+					name: '普通用户 LV.0',
+					key: 'user_lv0',
+					sort: 3,
+					isDefault: 0,
+					sendType: 'day',
+					sendCount: 8,
+					accountCount: 2,
+					storageQuotaMb: 10,
+					allowAttachment: 0,
+					tagText: '认证书友',
+					tagColor: '#10b981',
+					description: '已注册/绑定 blog.epomail.com 博客用户，配额提升至10MB，每日8封发信权',
+					permKeys: ['email:send', 'email:delete', 'account:query', 'account:add', 'account:delete', 'my:delete']
+				},
+				{
+					roleCode: 'user_lv1',
+					name: '普通用户 LV.1',
+					key: 'user_lv1',
+					sort: 4,
+					isDefault: 0,
+					sendType: 'day',
+					sendCount: 10,
+					accountCount: 3,
+					storageQuotaMb: 25,
+					allowAttachment: 1,
+					tagText: '活跃学者',
+					tagColor: '#06b6d4',
+					description: '参与博客讨论与活跃互动的进阶用户，配额25MB，每日10封，开放附件发送权限',
+					permKeys: ['email:send', 'email:delete', 'account:query', 'account:add', 'account:delete', 'my:delete']
+				},
+				{
+					roleCode: 'moderator',
+					name: '协管者/管理员',
+					key: 'moderator',
+					sort: 5,
+					isDefault: 0,
+					sendType: 'day',
+					sendCount: 100,
+					accountCount: 10,
+					storageQuotaMb: 500,
+					allowAttachment: 1,
+					tagText: '协同管理',
+					tagColor: '#f59e0b',
+					description: '非站长管理员，具备细分管控权限，无权修改自身权限与站长权限',
+					permKeys: [
+						'email:send', 'email:delete', 'account:query', 'account:add', 'account:delete', 'my:delete',
+						'user:query', 'user:add', 'user:reset-send', 'user:set-pwd', 'user:set-status', 'user:set-type',
+						'all-email:query', 'setting:query', 'role:query', 'analysis:query'
+					]
+				},
+				{
+					roleCode: 'master',
+					name: '站长',
+					key: 'master',
+					sort: 6,
+					isDefault: 0,
+					sendType: 'count',
+					sendCount: 0,
+					accountCount: 0,
+					storageQuotaMb: 1024,
+					allowAttachment: 1,
+					tagText: '最高统领',
+					tagColor: '#ef4444',
+					description: '全站最高权力拥有者，全功能不受限',
+					permKeys: ['*']
 				}
-			} catch (e) {
-				console.warn(`初始化默认身份分组 ${defRole.name} 提示：`, e.message);
+			];
+
+			for (const defRole of standardRoles) {
+				try {
+					let existing = await userDb.prepare(`SELECT * FROM role WHERE role_code = ? OR name = ? LIMIT 1`).bind(defRole.roleCode, defRole.name).first();
+					if (!existing) {
+						const insRes = await userDb.prepare(`
+							INSERT INTO role (
+								name, key, description, ban_email, ban_email_type, avail_domain,
+								sort, is_default, send_count, send_type, account_count,
+								storage_quota_mb, allow_attachment, role_code, tag_text, tag_color
+							) VALUES (?, ?, ?, '', 0, '', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+						`).bind(
+							defRole.name, defRole.key, defRole.description,
+							defRole.sort, defRole.isDefault, defRole.sendCount, defRole.sendType, defRole.accountCount,
+							defRole.storageQuotaMb, defRole.allowAttachment, defRole.roleCode,
+							defRole.tagText, defRole.tagColor
+						).run();
+
+						const roleId = insRes.meta?.last_row_id;
+						if (roleId) {
+							await this.assignRolePerms(userDb, roleId, defRole.permKeys);
+						}
+					}
+				} catch (e) {
+					console.warn(`初始化默认身份分组 ${defRole.name} 提示：`, e.message);
+				}
 			}
+
+			try {
+				if (c?.env?.kv) {
+					await c.env.kv.put('roles_seeded_v2', '1');
+				}
+			} catch (_) {}
 		}
 
 		if (c.env.admin) {
@@ -392,53 +396,9 @@ const dbInit = {
 				);
 			`).run();
 
-			// Auto-seed default OAuth client for shijianus-blog
-			await userDb.prepare(`
-				INSERT INTO oauth_app (client_id, client_secret, name, homepage_url, description, redirect_uris, logo_url, scopes, status)
-				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-				ON CONFLICT(client_id) DO NOTHING;
-			`).bind(
-				'epo_live_shijianus_blog',
-				'epo_sec_shijianus_blog_secret',
-				'shijianus-blog',
-				'https://blog.epocanvas.com',
-				'EpoCanvas / shijianus 博客原生集成客户端',
-				JSON.stringify([
-					'https://blog.epocanvas.com/auth/callback',
-					'https://shijianus-blog.pages.dev/auth/callback',
-					'https://blog.shijianus.com/auth/callback',
-					'https://pvzos.com/auth/callback',
-					'http://localhost:4321/auth/callback',
-					'http://127.0.0.1:4321/auth/callback',
-					'http://localhost:4334/auth/callback',
-					'http://127.0.0.1:4334/auth/callback'
-				]),
-				'https://blog.epocanvas.com/favicon.png',
-				'openid profile email comments',
-				1
-			).run();
-
-			// Auto-seed default OAuth client for epocanvas-image
-			await userDb.prepare(`
-				INSERT INTO oauth_app (client_id, client_secret, name, homepage_url, description, redirect_uris, logo_url, scopes, status)
-				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-				ON CONFLICT(client_id) DO NOTHING;
-			`).bind(
-				'epo_live_epocanvas_image',
-				'epo_sec_epocanvas_image_secret_2026',
-				'EpoCanvasImage',
-				'https://img.epocanvas.com',
-				'EpoCanvasImage 官方私有云图床系统与 API 密钥管理授权客户端',
-				JSON.stringify([
-					'https://img.epocanvas.com/auth/callback',
-					'https://epocanvas-image.epocanvas.workers.dev/auth/callback',
-					'http://localhost:8787/auth/callback',
-					'http://127.0.0.1:8787/auth/callback'
-				]),
-				'https://img.epocanvas.com/file/BQACAgEAAyEGAAS6jkJbAAMXap1gJHvWyMiwzUPrz6MhNWht3rAAAlAIAAIf-_BEWdrTOKe56fM9BA.svg',
-				'openid profile email',
-				1
-			).run();
+			// Auto-seed default OAuth app via oauthAppService (with dynamic cryptographically secure random secret)
+			const oauthAppService = (await import('../service/oauth-app-service')).default;
+			await oauthAppService.ensureTables(c);
 		} catch (e) {
 			console.warn(`初始化 oauth_app 表跳过：${e.message}`);
 		}

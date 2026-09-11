@@ -97,7 +97,7 @@
             >
               <el-checkbox :model-value="currentLabels.includes(lbl.name)" @click.stop="toggleLabelOnEmail(lbl.name)" />
               <span class="label-dot" :style="{ backgroundColor: lbl.color || '#3b82f6' }"></span>
-              <span class="label-text">{{ lbl.name }}</span>
+              <span class="label-text">{{ getLabelDisplayName(lbl.name, t) }}</span>
             </div>
           </div>
         </el-popover>
@@ -488,7 +488,7 @@
         </el-form-item>
         <el-form-item :label="$t('labelAs') || '选择标签'" v-if="filterForm.action === 'label'">
           <el-select v-model="filterForm.targetLabel" style="width: 100%;">
-            <el-option v-for="lbl in availableLabels" :key="lbl.name" :label="lbl.name" :value="lbl.name" />
+            <el-option v-for="lbl in availableLabels" :key="lbl.name" :label="getLabelDisplayName(lbl.name, t)" :value="lbl.name" />
           </el-select>
         </el-form-item>
       </el-form>
@@ -574,6 +574,7 @@ import {useUiStore} from "@/store/ui.js";
 import {useI18n} from "vue-i18n";
 import {EmailUnreadEnum} from "@/enums/email-enum.js";
 import {hasPerm} from "@/perm/perm.js";
+import {getLabelDisplayName} from "@/utils/label-i18n.js";
 
 const uiStore = useUiStore();
 const settingStore = useSettingStore();

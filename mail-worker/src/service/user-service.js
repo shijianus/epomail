@@ -21,6 +21,7 @@ import reqUtils from '../utils/req-utils';
 import {oauth} from "../entity/oauth";
 import oauthService from "./oauth-service";
 import emailCryptoUtils from '../utils/email-crypto-utils';
+import { getDefaultUserLabelsString } from '../const/default-labels';
 
 const userService = {
 
@@ -114,20 +115,7 @@ const userService = {
 		user.type = userRow.type;
 		user.customLabels = userRow.customLabels;
 		if (!user.customLabels || user.customLabels === '[]') {
-			user.customLabels = JSON.stringify({
-				allLabels: [
-					{ name: '社群', icon: 'ic:outline-people-alt', color: '#3b82f6', listVis: true, stats: { total: 0, current: 0, unread: 0 }, rules: [
-						{ condition: { type: 'sender_address_includes', value: 'gmail.com, outlook.com, qq.com, 163.com, yahoo.com, hotmail.com, foxmail.com, sina.com' } }
-					]},
-					{ name: '订阅', icon: 'ic:outline-subscriptions', color: '#10b981', listVis: true, stats: { total: 0, current: 0, unread: 0 }, rules: [
-						{ condition: { type: 'system_setting', value: '' } }
-					]},
-					{ name: '推销', icon: 'ic:outline-local-offer', color: '#f59e0b', listVis: true, stats: { total: 0, current: 0, unread: 0 }, rules: [
-						{ condition: { type: 'system_setting', value: '' } }
-					]},
-					{ name: '工作', icon: 'ic:outline-work-outline', color: '#8b5cf6', listVis: true, stats: { total: 0, current: 0, unread: 0 }, rules: []}
-				]
-			});
+			user.customLabels = getDefaultUserLabelsString();
 		}
 
 		if (c.env.admin === userRow.email) {
@@ -329,20 +317,7 @@ const userService = {
 	},
 
 	async insert(c, params) {
-		const defaultLabelsStr = JSON.stringify({
-			allLabels: [
-				{ name: '社群', icon: 'ic:outline-people-alt', color: '#3b82f6', listVis: true, stats: { total: 0, current: 0, unread: 0 }, rules: [
-					{ condition: { type: 'sender_address_includes', value: 'gmail.com, outlook.com, qq.com, 163.com, yahoo.com, hotmail.com, foxmail.com, sina.com' } }
-				]},
-				{ name: '订阅', icon: 'ic:outline-subscriptions', color: '#10b981', listVis: true, stats: { total: 0, current: 0, unread: 0 }, rules: [
-					{ condition: { type: 'system_setting', value: '' } }
-				]},
-				{ name: '推销', icon: 'ic:outline-local-offer', color: '#f59e0b', listVis: true, stats: { total: 0, current: 0, unread: 0 }, rules: [
-					{ condition: { type: 'system_setting', value: '' } }
-				]},
-				{ name: '工作', icon: 'ic:outline-work-outline', color: '#8b5cf6', listVis: true, stats: { total: 0, current: 0, unread: 0 }, rules: []}
-			]
-		});
+		const defaultLabelsStr = getDefaultUserLabelsString();
 		const finalParams = { customLabels: defaultLabelsStr, ...params };
 		const { userId } = await orm(c).insert(user).values(finalParams).returning().get();
 		return userId;

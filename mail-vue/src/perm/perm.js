@@ -61,6 +61,7 @@ const routers = {
     }],
     'role:query': [{
         path: '/role',
+        alias: ['/settings/role', '/settings/roles', '/roles'],
         name: 'role',
         component: () => import('@/views/role/index.vue'),
         meta: {
@@ -72,7 +73,7 @@ const routers = {
     'setting:query': [
         {
             path: '/system-setting',
-            alias: ['/settings/system', '/sys-setting'],
+            alias: ['/settings/system', '/sys-setting', '/settings/sys-setting'],
             name: 'sys-setting',
             component: () => import('@/views/sys-setting/index.vue'),
             meta: {

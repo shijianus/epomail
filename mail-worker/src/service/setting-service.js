@@ -159,6 +159,12 @@ const settingService = {
 		setting.aiAdminOnly = setting.aiAdminOnly !== undefined && setting.aiAdminOnly !== null ? Number(setting.aiAdminOnly) : 0;
 		setting.aiModels = setting.aiModels || setting.aiModel || '';
 
+		setting.blogUrl = (c.env.BLOG_BASE_URL || 'https://blog.epocanvas.com').replace(/\/+$/, '');
+		setting.docsUrl = (c.env.DOCS_URL || 'https://docs.epocanvas.com/epomail').replace(/\/+$/, '');
+		setting.supportUrl = (c.env.SUPPORT_URL || 'https://blog.epocanvas.com/support').replace(/\/+$/, '');
+		setting.telegramLink = (c.env.TELEGRAM_LINK || 'https://t.me/epomail').replace(/\/+$/, '');
+		setting.githubLink = (c.env.GITHUB_LINK || 'https://github.com/shijianus/epomail').replace(/\/+$/, '');
+
 		const dbModeInfo = getDbModeInfo(c);
 		setting.isDual = dbModeInfo.isDual;
 		setting.hasUserDb = dbModeInfo.hasUserDb;
@@ -564,7 +570,12 @@ const settingService = {
 			userApiSupport: settingRow.userApiSupport ?? 1,
 			aiEnabled: settingRow.aiEnabled ?? 1,
 			aiModel: settingRow.aiModel || '',
-			aiModels: settingRow.aiModels || settingRow.aiModel || ''
+			aiModels: settingRow.aiModels || settingRow.aiModel || '',
+			blogUrl: (c.env.BLOG_BASE_URL || settingRow.blogUrl || 'https://blog.epocanvas.com').replace(/\/+$/, ''),
+			docsUrl: (c.env.DOCS_URL || settingRow.docsUrl || 'https://docs.epocanvas.com/epomail').replace(/\/+$/, ''),
+			supportUrl: (c.env.SUPPORT_URL || settingRow.supportUrl || 'https://blog.epocanvas.com/support').replace(/\/+$/, ''),
+			telegramLink: (c.env.TELEGRAM_LINK || settingRow.telegramLink || 'https://t.me/epomail').replace(/\/+$/, ''),
+			githubLink: (c.env.GITHUB_LINK || settingRow.githubLink || 'https://github.com/shijianus/epomail').replace(/\/+$/, '')
 		};
 	},
 

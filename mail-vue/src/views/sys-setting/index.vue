@@ -802,7 +802,7 @@
               <div class="concerning-item">
                 <span>{{ $t('version') }} :</span>
                 <el-badge is-dot :hidden="!hasUpdate">
-                  <el-button @click="jump('https://github.com/shijianus/epomail/releases')">
+                  <el-button @click="jump(getOfficialLink('releases', settingStore))">
                     {{ currentVersion }}
                     <template #icon>
                       <Icon icon="qlementine-icons:version-control-16" style="font-size: 20px" color="#1890FF"/>
@@ -813,13 +813,13 @@
               <div class="concerning-item">
                 <span>{{ $t('community') }} : </span>
                 <div class="community">
-                  <el-button @click="jump('https://github.com/shijianus/epomail')">
+                  <el-button @click="jump(getOfficialLink('github', settingStore))">
                     Github
                     <template #icon>
                       <Icon icon="codicon:github-inverted" width="22" height="22"/>
                     </template>
                   </el-button>
-                  <el-button @click="jump('https://t.me/epomail')">
+                  <el-button @click="jump(getOfficialLink('telegram', settingStore))">
                     Telegram
                     <template #icon>
                       <Icon icon="logos:telegram" width="30" height="30"/>
@@ -829,7 +829,7 @@
               </div>
               <div class="concerning-item">
                 <span>{{ $t('support') }} : </span>
-                <el-button @click="jump('https://blog.epocanvas.com/support')">
+                <el-button @click="jump(getOfficialLink('support', settingStore))">
                   {{ t('supportDesc') }}
                   <template #icon>
                     <Icon color="#79D6B5" icon="simple-icons:buymeacoffee" width="20" height="20"/>
@@ -838,7 +838,7 @@
               </div>
               <div class="concerning-item">
                 <span>{{ $t('help') }} : </span>
-                <el-button @click="jump('https://docs.epocanvas.com/epomail')">
+                <el-button @click="jump(getOfficialLink('docs', settingStore))">
                   {{ t('document') }}
                   <template #icon>
                     <Icon color="#79D6B5" icon="fluent-color:document-32" width="18" height="18"/>
@@ -2915,8 +2915,8 @@ import {fileToBase64} from "@/utils/file-utils.js";
 import {formatDetailDate} from "@/utils/day.js";
 import {useI18n} from 'vue-i18n';
 import {ElMessageBox, ElMessage} from "element-plus";
-import axios from "axios";
 import { APP_VERSION } from "@/const/version.js";
+import { getOfficialLink } from "@/const/links-const.js";
 
 defineOptions({
   name: 'sys-setting'
@@ -4100,17 +4100,19 @@ const resendList = computed(() => {
 });
 
 function getUpdate() {
-  if (getUpdateErrorCount > 5 || !getUpdateErrorCount) return
-  axios.get('https://api.github.com/repos/shijianus/epomail/releases/latest').then(({data}) => {
-    hasUpdate.value = data.name !== currentVersion
-    getUpdateErrorCount = 0
-  }).catch(e => {
-    getUpdateErrorCount++
-    setTimeout(() => {
-      getUpdate()
-    }, 2000)
-    console.error('检查更新失败：', e)
-  })
+  if (getUpdateErrorCount > 5) return
+  fetch('https://api.github.com/repos/shijianus/epomail/releases/latest')
+    .then(res => res.json())
+    .then(data => {
+      if (data && data.name) {
+        hasUpdate.value = data.name !== currentVersion
+      }
+      getUpdateErrorCount = 0
+    })
+    .catch(e => {
+      getUpdateErrorCount++
+      console.warn('检查更新失败：', e)
+    })
 }
 
 function saveAddVerifyCount() {

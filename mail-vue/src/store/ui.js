@@ -124,18 +124,13 @@ export const useUiStore = defineStore('ui', {
                 '工作': []
             }
 
-            // 强制恢复被错误删除的工作标签
-            if (!this.allLabels.some(l => l.name === '工作')) {
-                this.allLabels.push({ name: '工作', icon: 'ic:outline-work-outline', color: '#8b5cf6', listVis: true, stats: { total: 0, current: 0, unread: 0 }, rules: [] })
-            } else {
-                // Ensure the icon is updated if it was previously migrated from 系统设置
-                const workLabel = this.allLabels.find(l => l.name === '工作')
-                if (workLabel.icon === 'ic:outline-settings') {
-                    workLabel.icon = 'ic:outline-work-outline'
-                }
+            // 允许用户完全自由删除、修改所有标签（包括工作在内的4个默认标签）
+            const workLabel = this.allLabels.find(l => l.name === '工作')
+            if (workLabel && workLabel.icon === 'ic:outline-settings') {
+                workLabel.icon = 'ic:outline-work-outline'
             }
 
-            // 保证内置标签存在（如果被删则不重注入——除了工作外，其他均允许用户删除）
+            // 规则兜底：若用户保留了内置标签且规则为空，按需注入规范规则；若用户删除了标签则绝不强行复活
             this.allLabels.forEach(label => {
                 const canonicals = CANONICAL[label.name]
                 if (!canonicals) return

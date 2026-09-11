@@ -307,12 +307,21 @@
                   show-checkbox
                   node-key="permId"
                   :default-expand-all="true"
-                  :props="{ label: 'name' }"
+                  :props="{ label: 'name', disabled: isPermDisabled }"
                   @check="updateCheckedPermsCount"
               >
                 <template #default="{ node, data }">
                   <div class="tree-node-content">
                     <span class="tree-node-label" :title="node.label">{{ node.label }}</span>
+                    <el-tag
+                      v-if="data.permKey === 'user:query' && (form.roleCode === 'visitor' || form.name === '参观者' || chooseRole?.roleCode === 'visitor' || chooseRole?.name === '参观者')"
+                      size="small"
+                      type="info"
+                      effect="plain"
+                      style="margin-left: 8px; font-size: 11px; height: 20px; line-height: 18px;"
+                    >
+                      {{ locale === 'zh' ? '参观者必备·禁止关闭' : 'Visitor Required' }}
+                    </el-tag>
                     <span class="send-num" v-if="data.permKey === 'email:send'" @click.stop>
                       <el-input-number v-if="form.sendType === 'day' || form.sendType === 'count'" v-model="form.sendCount" controls-position="right" :min="0" :max="99999" size="small"
                                        :placeholder="$t('total')">
@@ -359,7 +368,7 @@
           <div class="intro-left">
             <div class="intro-title">开源体验 · 阶梯式赋能 · 博客深度协同</div>
             <div class="intro-desc">
-              系统预置 6 大基础管理与用户分组。读者在 <strong>blog.epomail.com</strong> (shijianus-blog) 的阅读与讨论将自动转化为 EpoMail 的配额跃升与特权解锁。
+              系统预置基础管理与用户分组模板。其中「普通用户 LV.0」与「普通用户 LV.1」为官方内置示例空选项，未接入 blog.epocanvas.com 等级巡查机制（Client Secret 彼此独立随机隔离）。第三方站长可根据业务需要自由修改、重新配置或直接完全删除，对系统正常运作与邮件收发没有任何影响。
             </div>
           </div>
           <div class="intro-right">
@@ -403,11 +412,11 @@
               <span class="card-badge bg-amber">3. 普通用户 LV.0</span>
               <span class="card-quota">10 MB 配额</span>
             </div>
-            <div class="card-summary">已注册并绑定 blog.epomail.com 博客书友账号的用户，注册即刻自动升级，尊享配额提升。</div>
+            <div class="card-summary">内置示例选项（可完全删除）。预置书友进阶分组示例，站长可自由删除或根据自身博客/系统自订升级规则。</div>
             <div class="card-props">
               <div class="prop-item"><Icon icon="lucide:file-text" class="text-info" /> 纯文本极速收发</div>
               <div class="prop-item"><Icon icon="lucide:send" class="text-primary" /> 每日上限：8 封/天</div>
-              <div class="prop-item"><Icon icon="lucide:link" class="text-amber" /> 博客账号认证绑定</div>
+              <div class="prop-item"><Icon icon="lucide:trash-2" class="text-muted" /> 站长可随时安全删除</div>
             </div>
           </div>
 
@@ -416,11 +425,11 @@
               <span class="card-badge bg-emerald">4. 普通用户 LV.1</span>
               <span class="card-quota">25 MB 配额</span>
             </div>
-            <div class="card-summary">参与 blog.epomail.com 活跃讨论的书友分组，加入 10 天且发表 3 条有效讨论即可晋升，正式解锁附件权限！</div>
+            <div class="card-summary">内置示例选项（可完全删除）。活跃进阶分组示例，解锁附件与图片权限，站长可自由删除或自订。</div>
             <div class="card-props">
               <div class="prop-item"><Icon icon="lucide:paperclip" class="text-success" /> <strong>解锁附件与图片发送</strong></div>
               <div class="prop-item"><Icon icon="lucide:send" class="text-primary" /> 每日上限：10 封/天</div>
-              <div class="prop-item"><Icon icon="lucide:award" class="text-success" /> 博客活跃学者认证</div>
+              <div class="prop-item"><Icon icon="lucide:trash-2" class="text-muted" /> 站长可随时安全删除</div>
             </div>
           </div>
 
@@ -945,6 +954,27 @@ function expandChange(e) {
   }
 }
 
+function isPermDisabled(data) {
+  if (data?.permKey === 'user:query') {
+    if (form.roleCode === 'visitor' || form.name === '参观者' || chooseRole?.roleCode === 'visitor' || chooseRole?.name === '参观者') {
+      return true;
+    }
+  }
+  return false;
+}
+
+function findPermIdByPermKey(nodes, key) {
+  if (!nodes || !nodes.length) return null;
+  for (const n of nodes) {
+    if (n.permKey === key) return n.permId;
+    if (n.children && n.children.length) {
+      const res = findPermIdByPermKey(n.children, key);
+      if (res) return res;
+    }
+  }
+  return null;
+}
+
 function setRole() {
   if (!form.name) {
     ElMessage({
@@ -960,6 +990,13 @@ function setRole() {
   const halfId = tree.value ? tree.value.getHalfCheckedKeys() : [];
   const checkedParentIds = tree.value ? tree.value.getCheckedKeys(false).filter(id => !checkedLeafIds.includes(id)) : [];
   params.permIds = [...checkedLeafIds, ...halfId, ...checkedParentIds];
+
+  if (form.roleCode === 'visitor' || form.name === '参观者' || chooseRole?.roleCode === 'visitor' || chooseRole?.name === '参观者') {
+    const userQueryId = findPermIdByPermKey(treeList, 'user:query');
+    if (userQueryId && !params.permIds.includes(userQueryId)) {
+      params.permIds.push(userQueryId);
+    }
+  }
 
   permLoading.value = true;
   roleSet(params).then((res) => {
@@ -1025,7 +1062,25 @@ function openRoleSet(role) {
   form.availDomain = role.availDomain || [];
   form.aiModels = Array.isArray(role.aiModels) ? [...role.aiModels] : (typeof role.aiModels === 'string' && role.aiModels ? role.aiModels.split(',').map(s => s.trim()).filter(Boolean) : []);
   nextTick(() => {
-    tree.value?.setCheckedKeys(role.permIds || []);
+    let permIdsToSet = role.permIds || [];
+    const isVisitorRole = role.roleCode === 'visitor' || role.name === '参观者';
+    if (isVisitorRole) {
+      const userQueryId = findPermIdByPermKey(treeList, 'user:query');
+      if (userQueryId && !permIdsToSet.includes(userQueryId)) {
+        permIdsToSet = [...permIdsToSet, userQueryId];
+      }
+    }
+    if (tree.value?.store?.nodesMap) {
+      for (const key in tree.value.store.nodesMap) {
+        const node = tree.value.store.nodesMap[key];
+        if (node.data?.permKey === 'user:query') {
+          node.disabled = isVisitorRole;
+        } else {
+          node.disabled = false;
+        }
+      }
+    }
+    tree.value?.setCheckedKeys(permIdsToSet);
     updateCheckedPermsCount();
   });
 }
@@ -1038,6 +1093,11 @@ function openAddRole() {
   roleFormShow.value = true;
   expandAll.value = true;
   nextTick(() => {
+    if (tree.value?.store?.nodesMap) {
+      for (const key in tree.value.store.nodesMap) {
+        tree.value.store.nodesMap[key].disabled = false;
+      }
+    }
     updateCheckedPermsCount();
   });
 }
@@ -1048,6 +1108,13 @@ function addRole() {
   const halfId = tree.value ? tree.value.getHalfCheckedKeys() : [];
   const checkedParentIds = tree.value ? tree.value.getCheckedKeys(false).filter(id => !checkedLeafIds.includes(id)) : [];
   params.permIds = [...checkedLeafIds, ...halfId, ...checkedParentIds];
+
+  if (form.roleCode === 'visitor' || form.name === '参观者') {
+    const userQueryId = findPermIdByPermKey(treeList, 'user:query');
+    if (userQueryId && !params.permIds.includes(userQueryId)) {
+      params.permIds.push(userQueryId);
+    }
+  }
 
   permLoading.value = true;
   roleAdd(params).then(() => {

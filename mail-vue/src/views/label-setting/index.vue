@@ -31,7 +31,7 @@
           <div class="label-pill" :style="{ '--pill-color': label.color || 'var(--accent-primary)' }">
             <div v-if="(label.icon || '').startsWith('<svg')" v-html="label.icon" style="width: 18px; height: 18px; display: inline-flex; justify-content: center; align-items: center; fill: currentColor;"></div>
             <Icon v-else :icon="label.icon || 'ic:baseline-label'" width="18" />
-            <span>{{ label.name || label }}</span>
+            <span>{{ getLabelDisplayName(label.name || label, t) }}</span>
           </div>
         </div>
 
@@ -79,7 +79,7 @@
         <div class="form-group">
           <label>Parent Label</label>
           <el-select v-model="form.parent" size="large" placeholder="None" clearable style="width: 100%">
-             <el-option v-for="(l, i) in uiStore.allLabels" :key="i" :label="l.name" :value="l.name" :disabled="editIndex === i" />
+             <el-option v-for="(l, i) in uiStore.allLabels" :key="i" :label="getLabelDisplayName(l.name, t)" :value="l.name" :disabled="editIndex === i" />
           </el-select>
         </div>
         <div class="form-group">
@@ -395,10 +395,10 @@
 import { ref, onMounted } from 'vue'
 import { useUiStore } from '@/store/ui.js'
 import { useAccountStore } from '@/store/account.js'
-import { emailSearchSuggestions } from '@/request/email.js'
 import { Icon } from '@iconify/vue'
 import { ElMessage } from 'element-plus'
 import { useI18n } from 'vue-i18n'
+import { getLabelDisplayName } from '@/utils/label-i18n.js'
 
 const { t } = useI18n()
 const uiStore = useUiStore()

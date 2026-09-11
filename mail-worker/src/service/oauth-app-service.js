@@ -38,44 +38,20 @@ function maskSecret(secret) {
 	return secret.substring(0, 8) + '••••••••' + secret.substring(secret.length - 4);
 }
 
-export const DEFAULT_OAUTH_APPS = [
-	{
-		clientId: 'epo_live_shijianus_blog',
-		clientSecret: 'epo_sec_shijianus_blog_secret',
-		name: 'shijianus-blog',
-		homepageUrl: 'https://blog.epocanvas.com',
-		description: 'EpoCanvas / shijianus 博客原生集成客户端',
-		redirectUris: JSON.stringify([
-			'https://blog.epocanvas.com/auth/callback',
-			'https://shijianus-blog.pages.dev/auth/callback',
-			'https://blog.shijianus.com/auth/callback',
-			'https://pvzos.com/auth/callback',
-			'http://localhost:4321/auth/callback',
-			'http://127.0.0.1:4321/auth/callback',
-			'http://localhost:4334/auth/callback',
-			'http://127.0.0.1:4334/auth/callback'
-		]),
-		logoUrl: 'https://blog.epocanvas.com/favicon.png',
-		scopes: 'openid profile email comments',
-		status: 1
-	},
-	{
-		clientId: 'epo_live_epocanvas_image',
-		clientSecret: 'epo_sec_epocanvas_image_secret_2026',
-		name: 'EpoCanvasImage',
-		homepageUrl: 'https://img.epocanvas.com',
-		description: 'EpoCanvasImage 官方私有云图床系统与 API 密钥管理授权客户端',
-		redirectUris: JSON.stringify([
-			'https://img.epocanvas.com/auth/callback',
-			'https://epocanvas-image.epocanvas.workers.dev/auth/callback',
-			'http://localhost:8787/auth/callback',
-			'http://127.0.0.1:8787/auth/callback'
-		]),
-		logoUrl: 'https://img.epocanvas.com/file/BQACAgEAAyEGAAS6jkJbAAMXap1gJHvWyMiwzUPrz6MhNWht3rAAAlAIAAIf-_BEWdrTOKe56fM9BA.svg',
-		scopes: 'openid profile email',
-		status: 1
-	}
-];
+// 默认官方内置示例 App 模板（Client Secret 严格随机生成，保障私密安全，站长可自由删除或自接）
+export const SAMPLE_OAUTH_APP_TEMPLATE = {
+	name: 'shijianus-blog',
+	homepageUrl: 'https://blog.epocanvas.com',
+	description: 'EpoCanvas / shijianus 博客原生集成示例应用（官方内置示例，站长可随时修改或直接删除）',
+	redirectUris: JSON.stringify([
+		'https://blog.epocanvas.com/auth/callback',
+		'https://shijianus-blog.pages.dev/auth/callback',
+		'http://localhost:4321/auth/callback'
+	]),
+	logoUrl: 'https://blog.epocanvas.com/favicon.png',
+	scopes: 'openid profile email comments',
+	status: 1
+};
 
 const oauthAppService = {
 	async ensureTables(c) {
@@ -111,26 +87,50 @@ const oauthAppService = {
 				);
 			`).run();
 
-			// Auto-seed default OAuth apps
-			for (const defApp of DEFAULT_OAUTH_APPS) {
-				try {
+			// 首次初始化：若未曾标记过初始播种且表为空，仅播种 1 个带有完全随机密钥的 shijianus-blog 示例 App
+			let hasSeeded = false;
+			try {
+				const flag = await c?.env?.kv?.get('oauth_app_seeded_v2');
+				hasSeeded = flag === '1';
+			} catch (_) {}
+
+			if (!hasSeeded) {
+				const existingCount = await userDb.prepare(`SELECT count(*) as count FROM oauth_app`).first();
+				if (!existingCount || Number(existingCount.count) === 0) {
+					const randomClientId = `epo_live_${genRandomHex(12)}`;
+					const randomClientSecret = `epo_sec_${genSecureSecret(32)}`;
 					await userDb.prepare(`
 						INSERT INTO oauth_app (client_id, client_secret, name, homepage_url, description, redirect_uris, logo_url, scopes, status)
-						VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-						ON CONFLICT(client_id) DO NOTHING;
+						VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
 					`).bind(
-						defApp.clientId,
-						defApp.clientSecret,
-						defApp.name,
-						defApp.homepageUrl,
-						defApp.description,
-						defApp.redirectUris,
-						defApp.logoUrl,
-						defApp.scopes,
-						defApp.status
+						randomClientId,
+						randomClientSecret,
+						SAMPLE_OAUTH_APP_TEMPLATE.name,
+						SAMPLE_OAUTH_APP_TEMPLATE.homepageUrl,
+						SAMPLE_OAUTH_APP_TEMPLATE.description,
+						SAMPLE_OAUTH_APP_TEMPLATE.redirectUris,
+						SAMPLE_OAUTH_APP_TEMPLATE.logoUrl,
+						SAMPLE_OAUTH_APP_TEMPLATE.scopes,
+						SAMPLE_OAUTH_APP_TEMPLATE.status
 					).run();
+				}
+				try {
+					if (c?.env?.kv) {
+						await c.env.kv.put('oauth_app_seeded_v2', '1');
+					}
 				} catch (_) {}
 			}
+
+			// 清理旧版本硬编码残留应用与密钥（移除默认注入的 EpoCanvasImage，并将历史硬编码 secret 转换为独立随机安全 secret）
+			try {
+				await userDb.prepare(`DELETE FROM oauth_app WHERE client_id = 'epo_live_epocanvas_image' OR client_secret = 'epo_sec_epocanvas_image_secret_2026'`).run();
+
+				const legacyApp = await userDb.prepare(`SELECT id FROM oauth_app WHERE client_secret = 'epo_sec_shijianus_blog_secret' LIMIT 1`).first();
+				if (legacyApp) {
+					const rotatedSecret = `epo_sec_${genSecureSecret(32)}`;
+					await userDb.prepare(`UPDATE oauth_app SET client_secret = ? WHERE id = ?`).bind(rotatedSecret, legacyApp.id).run();
+				}
+			} catch (_) {}
 		} catch (e) {
 			// ignore if already exists
 		}
@@ -153,43 +153,7 @@ const oauthAppService = {
 
 	async getByClientId(c, clientId) {
 		await this.ensureTables(c);
-		let app = await orm(c).select().from(oauthApp).where(eq(oauthApp.clientId, clientId)).get();
-		if (!app) {
-			const fallback = DEFAULT_OAUTH_APPS.find(a => a.clientId === clientId);
-			if (fallback) {
-				try {
-					const userDb = getUserDb(c) || c?.env?.db;
-					if (userDb) {
-						await userDb.prepare(`
-							INSERT INTO oauth_app (client_id, client_secret, name, homepage_url, description, redirect_uris, logo_url, scopes, status)
-							VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-							ON CONFLICT(client_id) DO UPDATE SET
-								redirect_uris = excluded.redirect_uris,
-								status = excluded.status;
-						`).bind(
-							fallback.clientId,
-							fallback.clientSecret,
-							fallback.name,
-							fallback.homepageUrl,
-							fallback.description,
-							fallback.redirectUris,
-							fallback.logoUrl,
-							fallback.scopes,
-							fallback.status
-						).run();
-						app = await orm(c).select().from(oauthApp).where(eq(oauthApp.clientId, clientId)).get();
-					}
-				} catch (e) {
-					return {
-						id: 1,
-						...fallback,
-						redirectUris: normalizeRedirectUris(fallback.redirectUris),
-						clientSecretMasked: maskSecret(fallback.clientSecret)
-					};
-				}
-			}
-		}
-		return app;
+		return await orm(c).select().from(oauthApp).where(eq(oauthApp.clientId, clientId)).get();
 	},
 
 	async add(c, params) {

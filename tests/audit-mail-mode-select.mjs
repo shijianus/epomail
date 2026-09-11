@@ -139,11 +139,18 @@ import assert from 'node:assert';
 
   // 7. 切换英文语言并审计固定宽度 260px 与英文 i18n
   console.log('7. 验证英文环境下的固定宽度 260px 与 i18n 完整性...');
+  await page.request.put(BASE + '/api/my/updateProfile', {
+    data: { lang: 'en' },
+    headers: { Authorization: token, 'Content-Type': 'application/json' }
+  });
   await page.evaluate(() => {
     localStorage.setItem('locale', 'en');
     localStorage.setItem('setting', JSON.stringify({ lang: 'en' }));
   });
-  await page.goto(BASE + '/settings/sys-setting', { waitUntil: 'networkidle' });
+  await page.goto(BASE + '/settings/profile', { waitUntil: 'networkidle' });
+  await page.waitForTimeout(1500);
+  const sysLinkEn = page.locator('.settings-nav-item').filter({ hasText: /系统设置|System Settings/i });
+  await sysLinkEn.first().click();
   await page.waitForTimeout(2000);
 
   const enSelectEl = page.locator('.mail-mode-select');
@@ -163,6 +170,10 @@ import assert from 'node:assert';
   }
 
   // 恢复回中文并重新加载
+  await page.request.put(BASE + '/api/my/updateProfile', {
+    data: { lang: 'zh' },
+    headers: { Authorization: token, 'Content-Type': 'application/json' }
+  });
   await page.evaluate(() => {
     localStorage.setItem('locale', 'zh');
     localStorage.setItem('setting', JSON.stringify({ lang: 'zh' }));

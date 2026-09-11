@@ -11,6 +11,39 @@
    - 在向用户输出回复时，必须置顶/显式打印出本次提交的完整 Commit Hash 与短 Hash，确保版本可追溯、审计记录完整。
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
+### 系统硬编码默认项全维度优化、参观者权限锁定、OAuth密钥私密随机化与官方链接收敛加固上线 (2026-09-11)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **参观者“用户列表”查看权限严格锁定与防撤销机制 (Visitor Role Permission Lock)**:
+       - 前端 UI 锁定与警示：在角色管理 (`role/index.vue`) 中，编辑参观者 (`visitor`) 时，动态锁定 `user:query`（用户列表/用户查看）树节点复选框为不可编辑（`:disabled="true"`），并在右侧显式展示琥珀色高亮警示徽章「`参观者必备·禁止关闭`」；表单提交时强行注入该权限 ID，杜绝漏传。
+       - 后端 D1 数据库级强制保留：在 `role-service.js` 的 `update` 方法中加入白名单保护拦截，若角色标识为 `visitor`，不论调用方传入何种权限数组，服务端一律强制追加保留 `user:query` (permId: 7)，物理阻止关闭操作。
+    2. **OAuth 应用默认配置精简、私密安全性与删除持久性 (Secure OAuth App Defaults & Confidentiality)**:
+       - 默认示例精简：全局仅保留 1 个官方示例 App（`shijianus-blog`，指向 `blog.epocanvas.com`），清晰标注为示例应用；
+       - 严格私密保密与随机化：彻底消除代码库中任何硬编码的生产 Secret；每个站长实例初始化或创建应用时，均由密码学安全随机生成器（`genSecureSecret(32)`）生成全新随机密钥；
+       - 根除死循环复生：移除了此前按 `clientId` 查询缺失即自动向数据库回写默认 App 的自动复活逻辑，站长在后台执行删除操作后保持永久彻底删除；
+       - 历史脏数据与泄露令牌物理清理：在数据表初始化迁移中，自动删除历史遗留的 `epo_live_epocanvas_image`，并将旧的硬编码 `epo_sec_shijianus_blog_secret` 物理轮转为独立安全随机密钥。
+    3. **内置空角色层级可自由删除与持久移除 (Role Tier Deletion Persistence & Zero Resurrection)**:
+       - 修复 `v3_13DB` 与 `role-service.js`：建立基于 KV 标记（`roles_seeded_v2`）的一次性播种机制，`user_lv0`（普通用户 LV.0）与 `user_lv1`（普通用户 LV.1）被站长删除后绝不再自动补充创建；
+       - 并在角色弹窗中明确说明其为内置空选项，无需时机接入外部 blog。
+    4. **个人标签多语言 i18n 完整映射与用户自主权 (Personal Labels i18n & User Autonomy)**:
+       - 国际化动态适配：创建 `label-i18n.js` 工具及语言键映射，默认预置标签（“社群”、“订阅”、“推销”、“工作”）在不同语言模式（`zh`/`en`）下自动双向映射渲染为 `Social`、`Subscriptions`、`Promotions`、`Work`；
+       - 杜绝强制复活：彻底移除 `mail-vue/src/store/ui.js` 中强制补齐“工作”标签的硬编码逻辑，用户修改命名或删除标签后永久生效，不被篡改。
+    5. **外部官方链接收敛、环境变量动态覆盖与组件鲁棒性 (External Links Dynamic Convergence)**:
+       - 官方链接统一收敛：收敛 `blogUrl`、`docsUrl`、`supportUrl`、`telegramLink`、`githubLink`，后端提供动态环境变量覆盖（如 `BLOG_BASE_URL` 等），并通过 `/api/setting/websiteConfig` 输出；
+       - 前端通过 `getOfficialLink` 工具统筹调度，在系统设置 (`sys-setting`) 与应用管理 (`oauth-app`) 页面动态生效；
+       - 根除 `sys-setting` 中 `axios` 未定义导致的组件挂载致命异常，升级为现代化轻量原生 `fetch` 与健壮的异常捕获。
+    6. **Playwright 生产环境真实端到端全维度审计 100% 全绿 (Comprehensive Live E2E Audit)**:
+       - 编写并执行全量专属审计脚本 `tests/audit-hardcoded-defaults-optimization.mjs`：
+         - 步骤 1：参观者 `user:query` 权限锁定、UI 禁用状态与后端防撤销拦截断言 100% 通过；
+         - 步骤 2：OAuth 应用列表无任何硬编码泄露，示例 App 随机密钥验证通过，站长删除后零复活验证通过；
+         - 步骤 3：角色层级空选项删除持久性（绝不复生）验证通过；
+         - 步骤 4：个人标签中文/英文（`Subscriptions`, `Social`, `Promotions`, `Work`）i18n 映射与持久化验证通过；
+         - 步骤 5：外部收敛链接 API 校验及系统设置页面按钮跳转目标校验 100% 通过；
+       - 回归测试套件 `tests/audit-mail-mode-select.mjs`、`tests/audit-labels-container.mjs`、`tests/test-group-ui-consistency-and-visitor-clean.mjs` 全部 100% 成功通过；
+       - 严格恪守零假数据残留准则。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **Cloudflare Workers 部署 Version ID**: `8ab057b3-26b2-4164-aabe-e9c75fd58c85`。
+    - **epocanvas-mail Git Commit**: 待提交 (Pending Commit)。
+
 ### labels-container 冗余嵌套根除、多重底板剥离与独立基元 list-row tech-row 紧凑间距体验加固上线 (2026-09-11)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **冗余嵌套彻底根除与模板打底单层化 (Redundant Nesting Elimination)**:

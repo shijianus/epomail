@@ -428,10 +428,14 @@ import {
   setOAuthAppStatus,
   deleteOAuthApp
 } from '@/request/oauth-app.js'
+import { useSettingStore } from '@/store/setting.js'
+import { getOfficialLink } from '@/const/links-const.js'
 
 defineOptions({
   name: 'oauth-app'
 })
+
+const settingStore = useSettingStore()
 
 const { t } = useI18n()
 const loading = ref(false)
@@ -640,7 +644,8 @@ function openCreateDialog() {
 }
 
 function openBlogTutorial() {
-  window.open('https://blog.epocanvas.com', '_blank')
+  const url = getOfficialLink('blog', settingStore)
+  window.open(url, '_blank')
 }
 
 function openEditDialog(app) {
