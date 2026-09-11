@@ -38,7 +38,7 @@
        - 回归测试套件 `tests/audit-mail-mode-select.mjs`、`tests/audit-labels-container.mjs`、`tests/test-group-ui-consistency-and-visitor-clean.mjs`、`tests/test-welcome-email-visitor-and-all-accounts.mjs` 全部 100% 成功全绿通过。
 *   **部署上线与自动化测试 (Verification & Deployment)**:
     - **Cloudflare Workers 部署 Version ID**: `35aff484-96cc-4ea7-a5c6-48328dd8d37c`。
-    - **epocanvas-mail Git Commit**: `fa1deea38dde732a48e0be8e268b01e064b27042` (Short Hash: `fa1deea`)。
+    - **epocanvas-mail Git Commit**: `3d240efb193373035ee5aac78354e4e5da9bb05a` (Short Hash: `3d240ef`)。
 
 ### 系统硬编码默认项全维度优化、参观者权限锁定、OAuth密钥私密随机化与官方链接收敛加固上线 (2026-09-11)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
