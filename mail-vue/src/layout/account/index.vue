@@ -340,6 +340,13 @@ function refresh() {
 function changeAccount(account) {
   accountStore.currentAccountId = account.accountId
   accountStore.currentAccount = account
+  if (account.email) {
+    localStorage.setItem('loginEmail', account.email)
+    if (userStore.user) {
+      userStore.user.account = account
+      userStore.user.email = account.email
+    }
+  }
 }
 
 function add() {
@@ -408,8 +415,19 @@ function getAccountList() {
     if (list.length < queryParams.size) {
       noLoading.value = true
     }
-    if (accounts.length === 0) {
-      accountStore.currentAccount = list[0]
+    if (accounts.length === 0 && list.length > 0) {
+      const storedLoginEmail = localStorage.getItem('loginEmail');
+      const matched = list.find(a => 
+        (storedLoginEmail && a.email && a.email.toLowerCase() === storedLoginEmail.toLowerCase()) ||
+        (accountStore.currentAccountId && a.accountId === accountStore.currentAccountId)
+      );
+      if (matched) {
+        accountStore.currentAccount = matched;
+        accountStore.currentAccountId = matched.accountId;
+      } else if (!accountStore.currentAccount?.email) {
+        accountStore.currentAccount = list[0];
+        accountStore.currentAccountId = list[0].accountId;
+      }
     }
 
     accounts.push(...list)

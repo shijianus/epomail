@@ -7,6 +7,7 @@ import userService from '../service/user-service';
 import permService from '../service/perm-service';
 import { t } from '../i18n/i18n'
 import app from '../hono/hono';
+import { isAdminUser } from '../utils/admin-utils';
 
 const exclude = [
 	'/login',
@@ -130,7 +131,10 @@ app.use('*', async (c, next) => {
 		throw new BizError(t('authExpired'), 401);
 	}
 
-	const { userId, token } = result;
+	const { userId, token, loginEmail } = result;
+	if (loginEmail) {
+		c.set('loginEmail', loginEmail);
+	}
 	const authInfo = await c.env.kv.get(KvConst.AUTH_INFO + userId, { type: 'json' });
 
 	if (!authInfo) {
@@ -155,7 +159,7 @@ app.use('*', async (c, next) => {
 			return path.startsWith(item);
 		});
 
-		if (userPermIndex === -1 && authInfo.user.email !== c.env.admin) {
+		if (userPermIndex === -1 && !isAdminUser(c, authInfo.user)) {
 			throw new BizError(t('unauthorized'), 403);
 		}
 

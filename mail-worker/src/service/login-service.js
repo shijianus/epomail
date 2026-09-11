@@ -368,8 +368,13 @@ const loginService = {
 			await this.lazyMigratePassword(c, userRow.userId, password);
 		}
 
+		const activeLoginEmail = inputEmail.includes('@') ? inputEmail : userRow.email;
 		const uuid = uuidv4();
-		const jwt = await JwtUtils.generateToken(c, { userId: userRow.userId, token: uuid });
+		const jwt = await JwtUtils.generateToken(c, { 
+			userId: userRow.userId, 
+			loginEmail: activeLoginEmail,
+			token: uuid 
+		});
 
 		let authInfo = await c.env.kv.get(KvConst.AUTH_INFO + userRow.userId, { type: 'json' });
 
@@ -403,7 +408,7 @@ const loginService = {
 		}
 
 		await c.env.kv.put(KvConst.AUTH_INFO + userRow.userId, JSON.stringify(authInfo), { expirationTtl: constant.TOKEN_EXPIRE });
-		return jwt;
+		return { token: jwt, email: activeLoginEmail, userId: userRow.userId };
 	},
 
 	async verifyTotpLogin(c, params) {
@@ -547,8 +552,13 @@ const loginService = {
 		}
 
 		// Generate formal session JWT
+		const activeLoginEmail = targetEmail && targetEmail.includes('@') ? targetEmail : userRow.email;
 		const uuid = uuidv4();
-		const jwt = await JwtUtils.generateToken(c, { userId: userRow.userId, token: uuid });
+		const jwt = await JwtUtils.generateToken(c, { 
+			userId: userRow.userId, 
+			loginEmail: activeLoginEmail,
+			token: uuid 
+		});
 
 		let authInfo = await c.env.kv.get(KvConst.AUTH_INFO + userRow.userId, { type: 'json' });
 
@@ -575,7 +585,7 @@ const loginService = {
 		}
 
 		await c.env.kv.put(KvConst.AUTH_INFO + userRow.userId, JSON.stringify(authInfo), { expirationTtl: constant.TOKEN_EXPIRE });
-		return jwt;
+		return { token: jwt, email: activeLoginEmail, userId: userRow.userId };
 	},
 
 	async logout(c, userId) {

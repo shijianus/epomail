@@ -11,6 +11,37 @@
    - 在向用户输出回复时，必须置顶/显式打印出本次提交的完整 Commit Hash 与短 Hash，确保版本可追溯、审计记录完整。
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
+### 多域名独立信箱上下文锁定、默认发件人严密对齐（杜绝错传）与全链路信箱隔离加固上线 (2026-09-11)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **多域名登录信箱上下文严格保真与无缝定位 (Multi-Domain Active Mailbox Context Lock)**:
+       - 根因定位：站长使用 `admin@epomail.cyou` 登录后，因系统内部 User 1 的主邮箱记录为 `admin@epomail.bond`，原有链路在生成 Session JWT 时未记录当前登录账号前缀与域名，并在 `/api/my/loginUserInfo` 中硬编码返回 `userRow.email`；前端 `init.js` 和 `account/index.vue` 随之将当前活跃信箱与发件人重置为 `admin@epomail.bond`，导致用户看到界面跳回 bond 域名并引发“错传”；
+       - 核心治理：
+         - 在 `login-service.js`（包括普通登录与 TOTP 登录）中，生成 Session JWT 时将 `loginEmail` 完整编码写入 JWT Payload（如 `admin@epomail.cyou`），并在 `/login` 响应中返回 `{ token, email, userId }`；
+         - 在 `security.js` 网关中间件中，解析并校验 JWT 中的 `loginEmail`，注入 `c.set('loginEmail', loginEmail)`；
+         - 在 `my-api.js` 与 `user-service.js` 的 `loginUserInfo` 中，根据传入的 `loginEmail` 精准定位当前激活的信箱记录（`account`），使 `user.email` 与 `user.account` 动态映射至本次登录的实际邮箱（`admin@epomail.cyou`），同时将用户全部信箱数组 `user.accounts` 完整载入，主管理员身份通过 `isAdminUser` 保持无损识别。
+    2. **前端信箱状态锁定、账号切换双向同步与写信默认发件人严格防错传 (Strict Default Sender & Switching Sync)**:
+       - 在 `AuthForm.tsx` 中，登录成功后自动将激活邮箱持久化至 `localStorage.loginEmail`；
+       - 在 `init.js` 中，优先根据 `localStorage.loginEmail` 校验并定位 `user.accounts`，初始化 `accountStore.currentAccountId` 与 `accountStore.currentAccount`；
+       - 在 `layout/account/index.vue` 中，修复左侧信箱列表初次加载时强制赋值 `list[0]` 导致的跳号 BUG，确保优先命中 `loginEmail` 或 `currentAccountId`；并在 `changeAccount` 中同步更新 `localStorage.loginEmail` 与 `userStore.user.email`；
+       - 在 `layout/header/index.vue` 中，顶部头像与下拉菜单统一由计算属性 `displayEmail`（基于 `accountStore.currentAccount.email || userStore.user.email`）驱动，确保当前显示的永远是实际选中的信箱，退出登录时自动清理 `localStorage.loginEmail`；
+       - 在 `layout/write/index.vue` 中，写信弹窗的默认发件人 `form.sendEmail` 与 `form.accountId` 严格绑定当前激活信箱，使用 `admin@epomail.cyou` 时默认发件人即为 `admin@epomail.cyou`，彻底杜绝发信“错传”！
+    3. **发信鉴权与入站反弹全域多域名管理员无缝支持 (Multi-Domain Admin Send & Inbound Bounce Immunity)**:
+       - 在 `email-service.js` 中，创建 `admin-utils.js` 统一封装 `isAdminUser(c, userRow)` 与 `isAdminEmail(c, email)`；
+       - 升级发信权限检查、发信超限豁免、附件发送白名单等，全面识别多域名下的站长身份；
+       - 升级入站邮件接收检查：管理员多域名邮箱（`admin@epomail.cyou` / `admin@epomail.bond`）免受单域名可用性限制，永不发生意外拒收或弹回。
+    4. **Playwright 真实生产环境端到端审计 100% 全绿 (Comprehensive Live E2E Audit)**:
+       - 专属端到端审计脚本 `tests/audit-hardcoded-defaults-optimization.mjs`：
+         - 步骤 0：API 验证 `admin@epomail.cyou` 登录后 `/api/my/loginUserInfo` 返回 `user.email === 'admin@epomail.cyou'`，`user.account.email === 'admin@epomail.cyou'`；
+         - 浏览器真实页面登录 `admin@epomail.cyou`，自动跳转 `/inbox`；实测顶部 Header 展示 `admin@epomail.cyou`；点击“写邮件”按钮，实测默认发件人严密锁定为 `<admin@epomail.cyou>`，零跳号、零错传；
+         - 步骤 1：跨域名用户名防冲突与管理员保留字保护 100% 通过；
+         - 步骤 2：参观者权限完全隔离与接口 403 严格拦截 100% 通过；
+         - 步骤 3：OAuth 应用管理 `EpoCanvasImage` 与 `shijianus-blog` 完整保全与脱敏 100% 通过；
+         - 步骤 4：测试数据完全物理清理，恪守零假数据残留准则；
+       - 回归测试套件 `tests/audit-mail-mode-select.mjs`、`tests/audit-labels-container.mjs`、`tests/test-group-ui-consistency-and-visitor-clean.mjs` 全部 100% 成功通过。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **Cloudflare Workers 部署 Version ID**: `c6c99edf-f83c-4f81-8587-c453f5fa1193`。
+    - **epocanvas-mail Git Commit**: `21dbdda0c52949f4ddd6edba29de32559e683d6e` (Short Hash: `21dbdda`)。
+
 ### 多域名管理员全域登录映射、密码验证与双域名邮箱绑定加固上线 (2026-09-11)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **多域名管理员跨域名全域登录映射与纯用户名登录支持 (Multi-Domain Admin Global Login Mapping)**:

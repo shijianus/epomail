@@ -63,17 +63,17 @@
           <span class="badge"></span>
         </button>
       </el-tooltip>
-      <el-dropdown v-if="userStore.user && userStore.user.email" ref="userinfoRef" trigger="click" @visible-change="onDropdownVisibleChange" :teleported="true" popper-class="detail-dropdown">
+      <el-dropdown v-if="displayEmail" ref="userinfoRef" trigger="click" @visible-change="onDropdownVisibleChange" :teleported="true" popper-class="detail-dropdown">
         <div class="avatar-wrap" @mouseenter="clearCloseTimer" @mouseleave="startCloseTimer">
-          <div class="avatar">{{ formatName(userStore.user.email) }}</div>
+          <div class="avatar">{{ formatName(displayEmail) }}</div>
         </div>
         <template #dropdown>
           <div class="user-details account-menu open" @mouseenter="clearCloseTimer" @mouseleave="startCloseTimer" style="position:relative;top:0;transform:none;opacity:1;box-shadow:none;border:none;">
             <div class="am-header">
-              <div class="am-avatar">{{ formatName(userStore.user.email) }}</div>
+              <div class="am-avatar">{{ formatName(displayEmail) }}</div>
               <div style="overflow:hidden">
-                <div class="am-name">{{ userStore.user.name }}</div>
-                <div class="am-email" @click="copyEmail(userStore.user.email)" style="cursor:pointer">{{ userStore.user.email }}</div>
+                <div class="am-name">{{ accountStore.currentAccount?.name || userStore.user?.name || '' }}</div>
+                <div class="am-email" @click="copyEmail(displayEmail)" style="cursor:pointer">{{ displayEmail }}</div>
                 <div class="am-status"><span class="status-dot"></span><span>{{ userStore.user.role?.name || '' }}</span></div>
               </div>
             </div>
@@ -105,6 +105,7 @@ import {updateProfile} from "@/request/my.js";
 import {Icon} from "@iconify/vue";
 import {useUiStore} from "@/store/ui.js";
 import {useUserStore} from "@/store/user.js";
+import {useAccountStore} from "@/store/account.js";
 import {useEmailStore} from "@/store/email.js";
 import {userDraftStore} from "@/store/draft.js";
 
@@ -113,7 +114,9 @@ function openAccountDetails() {
     userinfoRef.value.handleClose()
   }
   let username = ''
-  if (userStore.user?.email) {
+  if (displayEmail.value) {
+    username = displayEmail.value.split('@')[0]
+  } else if (userStore.user?.email) {
     username = userStore.user.email.split('@')[0]
   } else {
     username = 'me'
@@ -186,6 +189,8 @@ const {t} = useI18n();
 const route = useRoute();
 const settingStore = useSettingStore();
 const userStore = useUserStore();
+const accountStore = useAccountStore();
+const displayEmail = computed(() => accountStore.currentAccount?.email || userStore.user?.email || '');
 const uiStore = useUiStore();
 const emailStore = useEmailStore();
 const logoutLoading = ref(false)
@@ -729,6 +734,7 @@ function clickLogout() {
   logoutLoading.value = true
   logout().then(() => {
     localStorage.removeItem("token")
+    localStorage.removeItem("loginEmail")
     localStorage.removeItem("ui")
     uiStore.resetToDefaults()
     router.replace('/login')

@@ -53,8 +53,16 @@ export async function init() {
             }
 
             if (user) {
-                accountStore.currentAccountId = user.account.accountId;
-                accountStore.currentAccount = user.account;
+                const storedLoginEmail = localStorage.getItem('loginEmail');
+                if (storedLoginEmail && user.accounts && user.accounts.length) {
+                    const matchedAcc = user.accounts.find(a => a.email && a.email.toLowerCase() === storedLoginEmail.toLowerCase());
+                    if (matchedAcc) {
+                        user.account = matchedAcc;
+                        user.email = matchedAcc.email;
+                    }
+                }
+                accountStore.currentAccountId = user.account?.accountId || 0;
+                accountStore.currentAccount = user.account || {};
                 userStore.applyUserInfo(user);
 
                 const routers = permsToRouter(user.permKeys);

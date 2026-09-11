@@ -221,6 +221,10 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
         if (token) {
           localStorage.setItem('token', token);
         }
+        const activeEmail = data.data?.email || (email.includes('@') ? email.trim().toLowerCase() : '');
+        if (activeEmail) {
+          localStorage.setItem('loginEmail', activeEmail);
+        }
         setStatus("success");
         cameraState.authSuccessOpacity = 1;
         let finalMsg = i18n.loginSuccess || data.message || data.msg;
@@ -282,6 +286,10 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
         const token = data.data?.token || data.token;
         if (token) {
           localStorage.setItem('token', token);
+        }
+        const activeEmail = data.data?.email || (email.includes('@') ? email.trim().toLowerCase() : '');
+        if (activeEmail) {
+          localStorage.setItem('loginEmail', activeEmail);
         }
         setStatus("success");
         cameraState.authSuccessOpacity = 1;

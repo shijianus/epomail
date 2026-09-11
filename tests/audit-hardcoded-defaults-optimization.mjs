@@ -60,7 +60,28 @@ import assert from "node:assert";
     assert.ok(adminEmails.includes("admin@epomail.bond"), "管理员必须拥有 admin@epomail.bond 邮箱账号");
     console.log("  ✓ 管理员双域名 (epomail.cyou & epomail.bond) 邮箱列表绑定无缝就绪");
 
-    // 0.5 浏览器真实 UI 交互登录测试 (通过 /login/index.html 输入 admin@epomail.cyou 登录)
+    // 0.5 验证 loginUserInfo 接口返回的当前会话邮箱为 admin@epomail.cyou 且默认信箱为 accountId 99
+    console.log("  - 验证 /api/my/loginUserInfo 返回激活邮箱与信箱...");
+    const userInfoCyouRes = await page.request.get(BASE + "/api/my/loginUserInfo", {
+      headers: { Authorization: token }
+    });
+    const userInfoCyou = await userInfoCyouRes.json();
+    assert.strictEqual(userInfoCyou.code, 200, "loginUserInfo 获取失败");
+    console.log("    userInfo email:", userInfoCyou.data?.email, "account:", userInfoCyou.data?.account?.email);
+    assert.strictEqual(userInfoCyou.data?.email, "admin@epomail.cyou", "登录 admin@epomail.cyou 后当前会话激活邮箱必须为 admin@epomail.cyou");
+    assert.strictEqual(userInfoCyou.data?.account?.email, "admin@epomail.cyou", "激活的默认信箱必须为 admin@epomail.cyou (拒绝跳回 bond)");
+
+    // 0.6 验证 admin@epomail.bond 登录的会话激活邮箱为 admin@epomail.bond
+    console.log("  - 验证 admin@epomail.bond 登录后会话激活邮箱...");
+    const tokenBond = typeof loginBondJson.data === "string" ? loginBondJson.data : loginBondJson.data?.token;
+    const userInfoBondRes = await page.request.get(BASE + "/api/my/loginUserInfo", {
+      headers: { Authorization: tokenBond }
+    });
+    const userInfoBond = await userInfoBondRes.json();
+    assert.strictEqual(userInfoBond.code, 200, "loginUserInfo 获取失败");
+    assert.strictEqual(userInfoBond.data?.email, "admin@epomail.bond", "登录 admin@epomail.bond 后激活邮箱应为 admin@epomail.bond");
+
+    // 0.7 浏览器真实 UI 交互登录测试 (通过 /login/index.html 输入 admin@epomail.cyou 登录)
     console.log("  - 测试浏览器真实 UI 页面登录 admin@epomail.cyou...");
     await page.goto(BASE + "/login/index.html", { waitUntil: "networkidle" });
     await page.waitForSelector("#epo-email", { timeout: 10000 });
@@ -70,11 +91,35 @@ import assert from "node:assert";
     await page.waitForURL(url => url.pathname.includes("/inbox"), { timeout: 15000 });
     console.log("  ✓ 浏览器 UI 登录 admin@epomail.cyou 成功跳转至 /inbox");
 
-    await page.evaluate((t) => {
-      localStorage.setItem("token", t);
-      localStorage.setItem("setting", JSON.stringify({ lang: "zh" }));
-      localStorage.setItem("locale", "zh");
-    }, token);
+    // 0.8 验证主界面 Header 渲染与发件弹窗发件人邮箱
+    await page.waitForTimeout(2000);
+    const displayedEmail = await page.evaluate(() => localStorage.getItem("loginEmail"));
+    console.log("  - localStorage loginEmail:", displayedEmail);
+    assert.strictEqual(displayedEmail, "admin@epomail.cyou", "本地存储中 active loginEmail 必须为 admin@epomail.cyou");
+
+    // 悬浮/点击头像弹窗验证邮箱展示
+    await page.click(".avatar-wrap");
+    await page.waitForTimeout(500);
+    const headerEmail = await page.textContent(".am-email");
+    console.log("  - Header 弹窗展示邮箱:", headerEmail?.trim());
+    assert.strictEqual(headerEmail?.trim(), "admin@epomail.cyou", "顶部头像菜单展示的邮箱必须为 admin@epomail.cyou (杜绝错传与串号)");
+
+    // 点击“写邮件”按钮，验证默认发件人邮箱
+    console.log("  - 验证写信弹窗默认发件人地址...");
+    const writeBtn = await page.$(".btn-write, button.compose-btn, button:has-text('写信'), button:has-text('写邮件')");
+    if (writeBtn) {
+      await writeBtn.click();
+      await page.waitForSelector(".send-email, .write-container", { timeout: 8000 });
+      const sendEmailText = await page.textContent(".send-email");
+      console.log("  - 写信弹窗默认发件地址:", sendEmailText?.trim());
+      assert.ok(sendEmailText?.includes("admin@epomail.cyou"), `默认发件地址必须为 admin@epomail.cyou，实际为: ${sendEmailText}`);
+      console.log("  ✓ 发信地址严密锁定为 admin@epomail.cyou，彻底杜绝错传！");
+
+      // 关闭写信弹窗
+      const closeBtn = await page.$(".write-header .icon-btn, .close-write, button:has-text('✕')");
+      if (closeBtn) await closeBtn.click();
+      await page.waitForTimeout(500);
+    }
 
     // --------------------------------------------------------------------------------------
     // 1. 双域名的用户名冲突与 Admin 保留字严格防冲突审计

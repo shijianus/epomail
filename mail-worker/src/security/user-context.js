@@ -15,5 +15,9 @@ const userContext = {
 		const result = await JwtUtils.verifyToken(c,jwt);
 		return result?.token;
 	},
+
+	getLoginEmail(c) {
+		return c.get('loginEmail') || '';
+	}
 };
 export default userContext;

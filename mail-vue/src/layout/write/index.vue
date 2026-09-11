@@ -508,14 +508,15 @@ function formatImage(content) {
 }
 
 function open() {
-  if (!accountStore.currentAccount.email) {
-    form.sendEmail = userStore.user.email;
-    form.accountId = userStore.user.account.accountId;
-    form.name = userStore.user.name;
+  const activeAcc = accountStore.currentAccount?.email ? accountStore.currentAccount : userStore.user?.account;
+  if (activeAcc && activeAcc.email) {
+    form.sendEmail = activeAcc.email;
+    form.accountId = activeAcc.accountId;
+    form.name = activeAcc.name || userStore.user?.name || '';
   } else {
-    form.sendEmail = accountStore.currentAccount.email;
-    form.accountId = accountStore.currentAccount.accountId;
-    form.name = accountStore.currentAccount.name;
+    form.sendEmail = userStore.user?.email || '';
+    form.accountId = userStore.user?.account?.accountId || 0;
+    form.name = userStore.user?.name || '';
   }
   show.value = true;
   editor.value.focus()

@@ -8,12 +8,18 @@ app.post('/login', async (c) => {
 	if (typeof loginRes === 'object' && loginRes.mfaRequired) {
 		return c.json(result.ok(loginRes));
 	}
+	if (typeof loginRes === 'object' && loginRes.token) {
+		return c.json(result.ok(loginRes));
+	}
 	return c.json(result.ok({ token: loginRes }));
 });
 
 app.post('/login/totp', async (c) => {
-	const token = await loginService.verifyTotpLogin(c, await c.req.json());
-	return c.json(result.ok({ token: token }));
+	const tokenRes = await loginService.verifyTotpLogin(c, await c.req.json());
+	if (typeof tokenRes === 'object' && tokenRes.token) {
+		return c.json(result.ok(tokenRes));
+	}
+	return c.json(result.ok({ token: tokenRes }));
 });
 
 app.post('/register', async (c) => {

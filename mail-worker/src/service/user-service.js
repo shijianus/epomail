@@ -22,6 +22,7 @@ import {oauth} from "../entity/oauth";
 import oauthService from "./oauth-service";
 import emailCryptoUtils from '../utils/email-crypto-utils';
 import { getDefaultUserLabelsString } from '../const/default-labels';
+import { isAdminEmail, isAdminUser } from '../utils/admin-utils';
 
 const userService = {
 
@@ -90,7 +91,7 @@ const userService = {
         return url;
 	},
 
-	async loginUserInfo(c, userId) {
+	async loginUserInfo(c, userId, loginEmail = '') {
 
 		const userRow = await userService.selectById(c, userId);
 
@@ -98,18 +99,42 @@ const userService = {
 			throw new BizError(t('authExpired'), 401);
 		}
 
-		const [account, roleRow, permKeys] = await Promise.all([
-			accountService.selectByEmailIncludeDel(c, userRow.email),
+		// 判定当前会话应激活的信箱账号：优先使用当前会话指定的登录邮箱
+		let account = null;
+		const userAccounts = await accountService.list(c, { size: 30 }, userId);
+		if (loginEmail) {
+			account = (userAccounts || []).find(a => a.email && a.email.toLowerCase() === loginEmail.toLowerCase());
+			if (!account) {
+				account = await accountService.selectByEmailIncludeDel(c, loginEmail);
+			}
+		}
+		if (!account || account.userId !== userId) {
+			account = (userAccounts || []).find(a => a.email && a.email.toLowerCase() === userRow.email.toLowerCase());
+			if (!account) {
+				account = await accountService.selectByEmailIncludeDel(c, userRow.email);
+			}
+		}
+		if (!account) {
+			if (userAccounts && userAccounts.length > 0) {
+				account = userAccounts[0];
+			}
+		}
+
+		const isMaster = isAdminUser(c, userRow) || (account && isAdminEmail(c, account.email));
+
+		const [roleRow, permKeys] = await Promise.all([
 			roleService.selectById(c, userRow.type),
-			userRow.email === c.env.admin ? Promise.resolve(['*']) : permService.userPermKeys(c, userId)
+			isMaster ? Promise.resolve(['*']) : permService.userPermKeys(c, userId)
 		]);
 
 		const user = {};
 		user.userId = userRow.userId;
 		user.sendCount = userRow.sendCount;
-		user.email = userRow.email;
+		user.email = account ? account.email : userRow.email;
+		user.primaryEmail = userRow.email;
 		user.account = account;
-		user.name = account.name;
+		user.accounts = userAccounts || [];
+		user.name = account ? account.name : emailUtils.getName(user.email);
 		user.permKeys = permKeys;
 		user.role = roleRow;
 		user.type = userRow.type;
@@ -118,7 +143,7 @@ const userService = {
 			user.customLabels = getDefaultUserLabelsString();
 		}
 
-		if (c.env.admin === userRow.email) {
+		if (isMaster) {
 			const masterRole = await roleService.selectByRoleCode(c, 'master') || await roleService.selectByName(c, '站长');
 			if (masterRole) {
 				user.role = masterRole;
@@ -456,11 +481,11 @@ const userService = {
 				sendAction.hasPerm = false;
 			}
 
-			if (user.email === c.env.admin) {
+			if (isAdminUser(c, user)) {
 				sendAction.sendType = constant.ADMIN_ROLE.sendType;
 				sendAction.sendCount = constant.ADMIN_ROLE.sendCount;
 				sendAction.hasPerm = true;
-				user.type = 0
+				user.type = 0;
 			}
 
 			user.sendAction = sendAction;
@@ -529,12 +554,12 @@ const userService = {
 		if (callerUserId) {
 			const caller = await this.selectById(c, callerUserId);
 			if (caller) {
-				if (caller.email !== c.env.admin) {
+				if (!isAdminUser(c, caller)) {
 					if (caller.userId === Number(userId)) {
 						throw new BizError('协管者/管理员无权修改自身所在分组权限！', 403);
 					}
 					const targetUser = await this.selectById(c, userId);
-					if (targetUser && targetUser.email === c.env.admin) {
+					if (targetUser && isAdminUser(c, targetUser)) {
 						throw new BizError('无权修改站长身份！', 403);
 					}
 					if (roleRow.roleCode === 'master') {
@@ -628,7 +653,7 @@ const userService = {
 			};
 		}
 
-		if (userRow.email === c.env.admin) {
+		if (isAdminUser(c, userRow)) {
 			return {
 				synced: true,
 				level: blogInfo.level,
@@ -777,7 +802,7 @@ const userService = {
 			throw new BizError(t('userNotExist'));
 		}
 
-		if (userRow.type === 0 || userRow.email === c.env.admin) {
+		if (userRow.type === 0 || isAdminUser(c, userRow)) {
 			throw new BizError('Cannot purge administrator emails', 403);
 		}
 
