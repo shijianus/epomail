@@ -615,6 +615,10 @@ const totpService = {
 			throw new BizError(t('notExistUser'));
 		}
 
+		if (targetUserId === 1 && Number(adminUserId) !== 1) {
+			throw new BizError('无权重置站长二步验证！', 403);
+		}
+
 		const now = new Date().toISOString();
 
 		// Audit Log

@@ -148,19 +148,28 @@ import assert from "node:assert";
     assert.strictEqual(regBondJson.code, 200, `注册 ${testBondEmail} 应成功: ${regBondJson.message}`);
     console.log(`  ✓ 成功注册 ${testBondEmail}`);
 
-    console.log(`  - 尝试在第二域名注册冲突用户: ${testCyouEmail}...`);
+    console.log(`  - 尝试在第二域名注册同前缀用户 (先到先得 ID 分配): ${testCyouEmail}...`);
     const regCyouRes = await page.request.post(BASE + "/api/register", {
       data: { email: testCyouEmail, password: "password123" },
       headers: { "Content-Type": "application/json" }
     });
     const regCyouJson = await regCyouRes.json();
     console.log(`    响应: code=${regCyouJson.code}, message=${regCyouJson.message}`);
-    assert.notStrictEqual(regCyouJson.code, 200, "禁止在另一域名注册已存在的相同用户名！");
-    assert.ok(
-      regCyouJson.message.includes("系统内用户名全局唯一") || regCyouJson.message.includes("已被占用"),
-      `错误提示必须包含全局唯一提示: ${regCyouJson.message}`
-    );
-    console.log("  ✓ 双域名用户名冲突检测 100% 拦截通过");
+    assert.strictEqual(regCyouJson.code, 200, "第二域名注册同前缀用户应成功并分配全邮箱用户名");
+
+    // 登录第二用户验证分配的用户名是完整邮箱
+    const loginCyouUserRes = await page.request.post(BASE + "/api/login", {
+      data: { email: testCyouEmail, password: "password123" },
+      headers: { "Content-Type": "application/json" }
+    });
+    const loginCyouUserJson = await loginCyouUserRes.json();
+    const tokenCyouUser = typeof loginCyouUserJson.data === "string" ? loginCyouUserJson.data : loginCyouUserJson.data?.token;
+    const infoCyouUserRes = await page.request.get(BASE + "/api/my/loginUserInfo", {
+      headers: { Authorization: tokenCyouUser }
+    });
+    const infoCyouUserJson = await infoCyouUserRes.json();
+    assert.strictEqual(infoCyouUserJson.data?.account?.name, testCyouEmail, "后续者名下账号的用户名必须为全邮箱");
+    console.log("  ✓ 先到先得 ID 分配机制验证通过：先行者独占简写，后续者分配全邮箱");
 
     // 1.3 尝试通过另一用户添加相同别名别名防抢占测试
     console.log("  - 测试通过另一用户添加别名防抢占...");
@@ -385,7 +394,7 @@ import assert from "node:assert";
     // 4. 清理所有测试生成的脏数据 (零假数据准则)
     // --------------------------------------------------------------------------------------
     console.log("\n[4. 清理测试产生的临时账号与数据]");
-    const usersToClean = [testBondEmail, anotherUserEmail, visitorUserEmail, "visitor_test_1789121994911@epomail.bond"];
+    const usersToClean = [testBondEmail, testCyouEmail, anotherUserEmail, visitorUserEmail, "visitor_test_1789121994911@epomail.bond"];
     const userListFinalRes = await page.request.get(BASE + "/api/user/list?size=50", {
       headers: { Authorization: token }
     });

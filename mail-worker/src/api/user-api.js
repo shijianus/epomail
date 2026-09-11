@@ -12,17 +12,17 @@ app.post('/user/resetTotp', async (c) => {
 });
 
 app.delete('/user/delete', async (c) => {
-	await userService.physicsDelete(c, c.req.query());
+	await userService.physicsDelete(c, c.req.query(), userContext.getUserId(c));
 	return c.json(result.ok());
 });
 
 app.put('/user/setPwd', async (c) => {
-	await userService.setPwd(c, await c.req.json());
+	await userService.setPwd(c, await c.req.json(), userContext.getUserId(c));
 	return c.json(result.ok());
 });
 
 app.put('/user/setStatus', async (c) => {
-	await userService.setStatus(c, await c.req.json());
+	await userService.setStatus(c, await c.req.json(), userContext.getUserId(c));
 	return c.json(result.ok());
 });
 
@@ -67,12 +67,12 @@ app.get('/user/allAccount', async (c) => {
 });
 
 app.delete('/user/deleteAccount', async (c) => {
-	await accountService.physicsDelete(c, c.req.query());
+	await accountService.physicsDelete(c, c.req.query(), userContext.getUserId(c));
 	return c.json(result.ok());
 });
 
 app.post('/user/purgeEmails', async (c) => {
-	const data = await userService.purgeUserEmails(c, await c.req.json());
+	const data = await userService.purgeUserEmails(c, await c.req.json(), userContext.getUserId(c));
 	return c.json(result.ok(data));
 });
 

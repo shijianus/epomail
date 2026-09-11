@@ -54,13 +54,11 @@ const accountService = {
 			throw new BizError(t('adminReserved'));
 		}
 
-		// 全局跨域名检查：非当前用户已持有的同名前缀禁止添加
+		// 用户名抢注规则：若别人已经拥有该短用户名，当前用户添加该别名时，名称使用完整邮箱
 		const existingNameRow = await this.selectByNameIncludeDel(c, localName);
+		let assignedName = localName;
 		if (existingNameRow && existingNameRow.userId !== userId) {
-			if (existingNameRow.isDel === isDel.DELETE) {
-				throw new BizError(t('isDelAccount'));
-			}
-			throw new BizError(t('usernameTakenCrossDomainAlias'));
+			assignedName = email;
 		}
 
 		let accountRow = await this.selectByEmailIncludeDel(c, email);
@@ -103,7 +101,7 @@ const accountService = {
 		}
 
 
-		accountRow = await orm(c).insert(account).values({ email: email, userId: userId, name: emailUtils.getName(email) }).returning().get();
+		accountRow = await orm(c).insert(account).values({ email: email, userId: userId, name: assignedName }).returning().get();
 
 		if (addEmailVerify === settingConst.addEmailVerify.COUNT && !addVerifyOpen) {
 			const row = await verifyRecordService.increaseAddCount(c);
@@ -280,10 +278,14 @@ const accountService = {
 		return { list, total }
 	},
 
-	async physicsDelete(c, params) {
-		const { accountId } = params
-		await emailService.physicsDeleteByAccountId(c, accountId)
-		await orm(c).delete(account).where(eq(account.accountId, accountId)).run();
+	async physicsDelete(c, params, callerUserId) {
+		const { accountId } = params;
+		const aid = Number(accountId);
+		if (aid === 1) {
+			throw new BizError('系统主站长信箱（Account 1）禁止物理删除！', 403);
+		}
+		await emailService.physicsDeleteByAccountId(c, aid);
+		await orm(c).delete(account).where(eq(account.accountId, aid)).run();
 	},
 
 	async setAllReceive(c, params, userId) {

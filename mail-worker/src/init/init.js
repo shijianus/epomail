@@ -293,10 +293,10 @@ const dbInit = {
 				if (!existingAcc) {
 					await userDb.prepare(`
 						INSERT INTO account (email, status, user_id, is_del, name, all_receive, sort)
-						VALUES (?, 0, ?, 0, 'admin', 1, 0)
-					`).bind(visitorEmail, visitorUser.user_id).run();
-				} else if (existingAcc.user_id !== visitorUser.user_id) {
-					await userDb.prepare(`UPDATE account SET user_id = ?, is_del = 0 WHERE account_id = ?`).bind(visitorUser.user_id, existingAcc.account_id).run();
+						VALUES (?, 0, ?, 0, ?, 1, 0)
+					`).bind(visitorEmail, visitorUser.user_id, visitorEmail).run();
+				} else {
+					await userDb.prepare(`UPDATE account SET user_id = ?, name = ?, is_del = 0 WHERE account_id = ?`).bind(visitorUser.user_id, visitorEmail, existingAcc.account_id).run();
 				}
 			}
 

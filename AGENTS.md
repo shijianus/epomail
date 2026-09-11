@@ -11,6 +11,41 @@
    - 在向用户输出回复时，必须置顶/显式打印出本次提交的完整 Commit Hash 与短 Hash，确保版本可追溯、审计记录完整。
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
+### 用户名先到先得分配机制、个人主页身份解耦与全域零日漏洞防御加固上线 (2026-09-11)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **用户名先到先得分配机制 (First-Come-First-Served Username Allocation)**:
+       - 需求对齐：首个注册某一本地用户名（前缀）的用户独占该简短用户名（如 `name = 'alice'`），后续在其他域名注册相同本地名的用户，其用户名直接被赋予其完整邮箱（如 `name = 'alice@epomail.cyou'`）；
+       - 核心治理：
+         - 在 `login-service.js` 的 `register`、`user-service.js` 的 `add` 以及 `account-service.js` 的别名 `add` 中统一实施先到先得分配策略；
+         - 若 `account` 表中已存在该短用户名，后续注册者不再被暴力拦截，而是优雅退化为全邮箱作为系统用户名，先行者的短用户名所有权得到严格保障；
+         - 纯用户名登录与公共 Profile 解析优先映射至先行者持有者。
+    2. **站长与参观者个人主页解耦与精准路由 (Master Admin vs Visitor Profile Decoupling)**:
+       - 根因治理：此前 Header 中的个人主页跳转仅提取 `@` 前缀，导致 `admin@epomail.cyou`（参观者）与 `admin@epomail.bond`（站长）均路由至 `/admin` 并混合展示站长信息；
+       - 核心修复：
+         - Header `openAccountDetails()` 逻辑重构：仅主站长（`admin@epomail.bond` 或 `master` 角色）导航至 `/admin`；普通用户/参观者优先导航至名下简洁用户名（若用户名含 `@` 则导航至 `/${displayEmail}` 如 `/admin@epomail.cyou`）；
+         - 公共 Profile 解析 `public-service.js` 的 `getProfile()`：`admin` 严格指向主站长 `c.env.admin`；含 `@` 的路径精确匹配对应邮箱的拥有者；若未公开 Profile，非本人且非管理员访问严格抛出 403 Forbidden；
+         - Profile 页面 `profile/index.vue` 的 `isOwnProfile` 计算属性重构：优先比较完整邮箱，`/admin` 仅主站长判定为本人，杜绝参观者误判为主页主人。
+    3. **全域零日安全漏洞全面扫描与加固 (Comprehensive Zero-Day Vulnerability Hardening)**:
+       - **BOLA / IDOR 漏洞防御 (`/user/purgeEmails`)**: 此前 `/user/purgeEmails` 缺少权限配置与调用者鉴权，任何登录用户均可清空任意用户的全量邮件；现将其纳入 `security.js` 的 `requirePerms`（绑定 `user:delete`），并在 `user-service.js` 中严密校验调用者权限，并永久封锁对超级管理员（User 1）的邮件清空操作；
+       - **主管理员最高特权防误删、防停用保护**: 在 `user-service.js` 的 `physicsDelete`、`setStatus`、`setPwd` 以及 `account-service.js` 的 `deleteAccount` 中建立硬性防护，严格禁止外部 API 物理删除 User 1、封禁 User 1、重置 User 1 密码或删除主站长信箱（Account 1）；在 `totp-service.js` 中严禁重置 User 1 的 TOTP 2FA；
+       - **生产环境未授权模拟收件切断 (`/test-receive`)**: 从 `security.js` 免鉴权白名单中移除，并在 `test-api.js` 中建立生产环境硬拦截（`disabled in production`，403 Forbidden）；
+       - **OSS 模糊路径越权绕过阻断 (`/oss-url/*`)**: 将 `security.js` 的白名单前缀匹配从 `'/oss'` 严格修正为 `'/oss/'`，阻断利用前缀模糊匹配绕过鉴权直接访问敏感文件的漏洞；
+       - **邮件渲染 Stored XSS 彻底防护 (`ShadowHtml`)**: 引入 `DOMPurify` 库，在将邮件 HTML 写入 Shadow DOM 前进行深度清洗，剥离 `<script>`、`<iframe>`、`object`、`embed`、`form` 及 `onerror`/`onload` 等内联危险事件处理器，彻底杜绝恶意邮件脚本盗取 Session JWT；
+       - **Telegram WebApp 敏感信息缓存与令牌过期加固**: 将 `getEmailContent` 的 JWT 令牌严格限制为 7 天过期，并将响应头从公共长缓存改为 `private, no-cache, no-store, must-revalidate`；
+       - **OAuth 授权状态与会话注销实时联动**: 在 `oauth-provider-service.js` 中增加对 KV `AUTH_INFO` 活跃 Token 的强校验，用户退出登录后，其历史授权会话立即失效。
+    4. **Playwright 真实生产环境全链路 E2E 自动化审计 100% 全绿 (Comprehensive Live E2E Audit)**:
+       - 专属审计套件 `tests/audit-zero-day-and-username-allocation.mjs`：
+         - 步骤 1：站长特权保护实测通过（防物理删除 403、防封禁 403、主信箱防删除 403、防清空邮件 403、`/admin` 严格解析至 User 1）；
+         - 步骤 2：参观者账号隔离与 `/admin@epomail.cyou` 专属主页实测通过（越权调用 purgeEmails 被 403 拦截，`/admin@epomail.cyou` 准确呈现“参观者”与 0MB 配额，未公开模式下越权查看 `/admin` 严格返回 403）；
+         - 步骤 3：用户名先到先得机制实测通过（先行者独占简短用户名，后续跨域注册者被分配全邮箱用户名，先行者所有权不被篡夺）；
+         - 步骤 4：零日漏洞加固实测通过（生产环境 `/test-receive` 未授权 401、已授权 403 严格切断；`/oss-url` 模糊越权修复 401 拦截）；
+         - 步骤 5：浏览器 UI 真实渲染实测通过，参观者主页完整呈现参观者身份标识；
+         - 步骤 6：测试数据 100% 物理清理，恪守零假数据残留准则；
+       - 回归测试套件 `tests/audit-hardcoded-defaults-optimization.mjs` 100% 全绿通过。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **Cloudflare Workers 部署 Version ID**: `0f4ade9b-a805-4df4-bfb4-dbf24d347372`。
+    - **epocanvas-mail Git Commit**: `4215b1588170b0db190291253abf2827c9216688` (Short Hash: `4215b15`)。
+
 ### 防范跨域名同名前缀身份劫持零号漏洞、彻底解耦站长与演示参观者账号及严格权限隔离加固上线 (2026-09-11)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **彻底根除跨域名同名前缀映射提权漏洞 (Cross-Domain Local Name Spoofing Immunity)**:

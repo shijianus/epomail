@@ -113,15 +113,18 @@ function openAccountDetails() {
   if (userinfoRef.value && userinfoRef.value.handleClose) {
     userinfoRef.value.handleClose()
   }
-  let username = ''
-  if (displayEmail.value) {
-    username = displayEmail.value.split('@')[0]
-  } else if (userStore.user?.email) {
-    username = userStore.user.email.split('@')[0]
+  const currentEmail = (displayEmail.value || userStore.user?.email || '').toLowerCase()
+  let targetPath = ''
+  if (currentEmail === 'admin@epomail.bond' || userStore.user?.role?.roleCode === 'master' || userStore.user?.role?.name === '站长') {
+    targetPath = 'admin'
+  } else if (accountStore.currentAccount?.name && !accountStore.currentAccount.name.includes('@')) {
+    targetPath = accountStore.currentAccount.name
+  } else if (userStore.user?.name && !userStore.user.name.includes('@')) {
+    targetPath = userStore.user.name
   } else {
-    username = 'me'
+    targetPath = currentEmail
   }
-  router.push(`/${username}`)
+  router.push(`/${targetPath}`)
 }
 
 function openSettings() {

@@ -7,6 +7,7 @@
 <script setup>
 import { ref, onMounted, watch } from 'vue'
 import {useUiStore} from "@/store/ui.js";
+import DOMPurify from 'dompurify';
 
 const uiStore = useUiStore();
 
@@ -26,11 +27,15 @@ function updateContent() {
 
   // 1. 提取 <body> 的 style 属性（如果存在）
   const bodyStyleRegex = /<body[^>]*style="([^"]*)"[^>]*>/i;
-  const bodyStyleMatch = props.html.match(bodyStyleRegex);
+  const bodyStyleMatch = (props.html || '').match(bodyStyleRegex);
   const bodyStyle = bodyStyleMatch ? bodyStyleMatch[1] : '';
 
-  // 2. 移除 <body> 标签（保留内容）
-  const cleanedHtml = props.html.replace(/<\/?body[^>]*>/gi, '');
+  // 2. 移除 <body> 标签（保留内容）并使用 DOMPurify 进行 XSS 防御清洗
+  const rawHtml = (props.html || '').replace(/<\/?body[^>]*>/gi, '');
+  const cleanedHtml = DOMPurify.sanitize(rawHtml, {
+    ADD_ATTR: ['target'],
+    FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'form']
+  });
 
   // 3. 将 body 的 style 应用到 .shadow-content
   shadowRoot.innerHTML = `

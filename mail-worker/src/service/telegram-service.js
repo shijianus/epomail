@@ -54,7 +54,7 @@ const telegramService = {
 
 		const tgChatIds = tgChatId.split(',');
 
-		const jwtToken = await jwtUtils.generateToken(c, { emailId: email.emailId })
+		const jwtToken = await jwtUtils.generateToken(c, { emailId: email.emailId }, 7 * 24 * 3600);
 
 		const webAppUrl = customDomain ? `${domainUtils.toOssDomain(customDomain)}/api/telegram/getEmail/${jwtToken}` : 'https://www.cloudflare.com/404'
 		const inlineKeyboard = [
@@ -143,7 +143,7 @@ const telegramService = {
 		const { botToken, chatId, topicId } = personalTgConfig;
 		const { customDomain, tgMsgTo, tgMsgFrom, tgMsgText } = await settingService.query(c);
 
-		const jwtToken = await jwtUtils.generateToken(c, { emailId: email.emailId });
+		const jwtToken = await jwtUtils.generateToken(c, { emailId: email.emailId }, 7 * 24 * 3600);
 		const webAppUrl = customDomain ? `${domainUtils.toOssDomain(customDomain)}/api/telegram/getEmail/${jwtToken}` : 'https://www.cloudflare.com/404';
 
 		const inlineKeyboard = [

@@ -3,6 +3,7 @@ import oauthAppService from './oauth-app-service';
 import userService from './user-service';
 import jwtUtils from '../utils/jwt-utils';
 import constant from '../const/constant';
+import KvConst from '../const/kv-const';
 
 const encoder = new TextEncoder();
 
@@ -52,14 +53,17 @@ const oauthProviderService = {
 		if (jwt) {
 			const payload = await jwtUtils.verifyToken(c, jwt);
 			if (payload && payload.userId) {
-				const userRow = await userService.selectById(c, payload.userId);
-				if (userRow && userRow.status === 0) {
-					currentUser = {
-						userId: userRow.userId,
-						email: userRow.email,
-						name: userRow.name || userRow.email.split('@')[0],
-						avatar: userRow.avatar || ''
-					};
+				const authInfo = await c.env.kv.get(KvConst.AUTH_INFO + payload.userId, { type: 'json' });
+				if (authInfo && authInfo.tokens && authInfo.tokens.includes(payload.token)) {
+					const userRow = await userService.selectById(c, payload.userId);
+					if (userRow && userRow.status === 0) {
+						currentUser = {
+							userId: userRow.userId,
+							email: userRow.email,
+							name: userRow.name || userRow.email.split('@')[0],
+							avatar: userRow.avatar || ''
+						};
+					}
 				}
 			}
 		}
@@ -105,6 +109,11 @@ const oauthProviderService = {
 
 		const payload = await jwtUtils.verifyToken(c, jwt);
 		if (!payload || !payload.userId) {
+			throw new BizError('登录会话已过期，请重新登录', 401);
+		}
+
+		const authInfo = await c.env.kv.get(KvConst.AUTH_INFO + payload.userId, { type: 'json' });
+		if (!authInfo || !authInfo.tokens || !authInfo.tokens.includes(payload.token)) {
 			throw new BizError('登录会话已过期，请重新登录', 401);
 		}
 

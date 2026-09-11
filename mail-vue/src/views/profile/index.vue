@@ -40,7 +40,7 @@
               </div>
             </div>
 
-            <p class="bio" v-html="parseInlineMarkdown(profileData.userInfo.bio || ((currentRoleName === 'admin' || currentRoleName === '站长' || currentRoleName === '超级管理员') ? 'EpoMail 系统管理员，负责核心平台的维护与安全。我们在数字世界中连接彼此，保护每一次灵感的传递与思想的交汇。为您带来前所未有的纯净沟通体验。' : 'EpoMail 专属用户，致力于安全、高效的邮件通讯。我们在数字世界中连接彼此，保护每一次灵感的传递与思想的交汇。为您带来前所未有的纯净沟通体验。'))"></p>
+            <p class="bio" v-html="parseInlineMarkdown(profileData.userInfo.bio || ((profileData.userInfo.email === 'admin@epomail.bond' || profileData.userInfo.roleName === '站长' || profileData.userInfo.roleName === 'master') ? 'EpoMail 系统管理员，负责核心平台的维护与安全。我们在数字世界中连接彼此，保护每一次灵感的传递与思想的交汇。为您带来前所未有的纯净沟通体验。' : 'EpoMail 专属用户，致力于安全、高效的邮件通讯。我们在数字世界中连接彼此，保护每一次灵感的传递与思想的交汇。为您带来前所未有的纯净沟通体验。'))"></p>
 
             <!-- Bottom Section: Fixed to bottom -->
             <div class="bottom-section">
@@ -276,18 +276,25 @@ const isOwnProfile = computed(() => {
   const target = username.value?.toLowerCase()
   if (!target) return false
 
-  const emailPrefix = current.email ? current.email.split('@')[0].toLowerCase() : ''
-  const accountName = typeof current.account === 'string' 
-    ? current.account.toLowerCase() 
-    : (current.account?.name?.toLowerCase() || '')
-  const nameVal = current.name ? current.name.toLowerCase() : ''
+  const currentEmail = (current.email || '').toLowerCase()
+  const displayEmailVal = (accountStore.currentAccount?.email || '').toLowerCase()
 
-  if (target === emailPrefix || target === accountName || target === nameVal) {
+  // 1. 完整邮箱精确命中
+  if (target === currentEmail || target === displayEmailVal) {
     return true
   }
-  if (target === 'admin' && (current.type === 0 || current.email === 'admin@epomail.bond' || current.role?.roleCode === 'master' || current.role?.name === '站长')) {
+
+  // 2. target 为 'admin' 时，仅系统主站长 (admin@epomail.bond) 判定为本人
+  if (target === 'admin') {
+    return currentEmail === 'admin@epomail.bond' || current.role?.roleCode === 'master' || current.role?.name === '站长'
+  }
+
+  // 3. 用户名精确命中（不含 @ 的唯一用户名持有者）
+  const userName = (current.name || '').toLowerCase()
+  if (userName && !userName.includes('@') && target === userName) {
     return true
   }
+
   return false
 })
 

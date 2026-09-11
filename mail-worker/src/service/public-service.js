@@ -17,6 +17,8 @@ import { isDel, roleConst } from '../const/entity-const';
 import email from '../entity/email';
 import user from '../entity/user';
 import userService from './user-service';
+import accountService from './account-service';
+import { isAdminUser } from '../utils/admin-utils';
 import KvConst from '../const/kv-const';
 
 
@@ -215,42 +217,67 @@ const publicService = {
 	},
 
 	async getProfile(c, username) {
+		const cleanTarget = (username || '').trim().toLowerCase();
+		if (!cleanTarget) {
+			throw new BizError(t('notExistUser'));
+		}
+
+		let userRow = null;
+		if (cleanTarget.includes('@')) {
+			// 1. 完整邮箱精准匹配
+			userRow = await userOrm(c).select().from(user).where(sql`${user.email} COLLATE NOCASE = ${cleanTarget}`).get();
+			if (!userRow) {
+				const accRow = await accountService.selectByEmailIncludeDel(c, cleanTarget);
+				if (accRow && accRow.userId) {
+					userRow = await userOrm(c).select().from(user).where(eq(user.userId, accRow.userId)).get();
+				}
+			}
+		} else if (cleanTarget === 'admin') {
+			// 2. 纯 'admin' 明确指向主站长 c.env.admin
+			userRow = await userOrm(c).select().from(user).where(sql`${user.email} COLLATE NOCASE = ${c.env.admin}`).get();
+		} else {
+			// 3. 优先匹配抢注该短用户名的持有者（account.name = cleanTarget）
+			const accRow = await accountService.selectByNameIncludeDel(c, cleanTarget);
+			if (accRow && accRow.userId) {
+				userRow = await userOrm(c).select().from(user).where(eq(user.userId, accRow.userId)).get();
+			}
+			if (!userRow) {
+				userRow = await userOrm(c).select().from(user).where(like(user.email, `${cleanTarget}@%`)).get();
+			}
+		}
+
+		if (!userRow) {
+			throw new BizError(t('notExistUser'));
+		}
+
 		const settingStr = await c.env.kv.get(KvConst.SETTING);
 		let publicProfileEnabled = 0;
 		if (settingStr) {
-		    try {
-		        const settings = JSON.parse(settingStr);
-		        publicProfileEnabled = settings.publicProfile || 0;
-		    } catch (e) {}
-		}
-		
-		if (publicProfileEnabled === 0) {
-		    // Not public. Verify token.
-		    const jwt = c.req.header(constant.TOKEN_HEADER);
-		    if (!jwt) throw new BizError(t('unauthorized'), 401);
-		    
-		    const result = await jwtUtils.verifyToken(c, jwt);
-        	if (!result) throw new BizError(t('authExpired'), 401);
-        	
-        	const { userId, token } = result;
-        	const authInfo = await c.env.kv.get(KvConst.AUTH_INFO + userId, { type: 'json' });
-        	
-        	if (!authInfo || !authInfo.tokens.includes(token)) {
-        		throw new BizError(t('authExpired'), 401);
-        	}
-        	
-        	const currentUser = authInfo.user;
-        	
-        	// Allow if current user matches username, or is admin
-        	const currentUsername = currentUser.email.split('@')[0];
-        	if (currentUsername !== username && currentUser.email !== c.env.admin) {
-        	    throw new BizError(t('unauthorized'), 403);
-        	}
+			try {
+				const settings = JSON.parse(settingStr);
+				publicProfileEnabled = settings.publicProfile || 0;
+			} catch (e) {}
 		}
 
-		const userRow = await userOrm(c).select().from(user).where(like(user.email, `${username}@%`)).get();
-		if (!userRow) {
-			throw new BizError(t('notExistUser'));
+		if (publicProfileEnabled === 0) {
+			const jwt = c.req.header(constant.TOKEN_HEADER);
+			if (!jwt) throw new BizError(t('unauthorized'), 401);
+
+			const result = await jwtUtils.verifyToken(c, jwt);
+			if (!result) throw new BizError(t('authExpired'), 401);
+
+			const { userId, token } = result;
+			const authInfo = await c.env.kv.get(KvConst.AUTH_INFO + userId, { type: 'json' });
+
+			if (!authInfo || !authInfo.tokens.includes(token)) {
+				throw new BizError(t('authExpired'), 401);
+			}
+
+			const currentUser = authInfo.user;
+			const isSelf = currentUser.userId === userRow.userId || currentUser.email?.toLowerCase() === userRow.email?.toLowerCase();
+			if (!isSelf && !isAdminUser(c, currentUser)) {
+				throw new BizError(t('unauthorized'), 403);
+			}
 		}
 		
 		let roleRow = null;

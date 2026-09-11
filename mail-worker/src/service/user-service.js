@@ -369,9 +369,21 @@ const userService = {
 		await c.env.kv.delete(kvConst.AUTH_INFO + userId)
 	},
 
-	async physicsDelete(c, params) {
+	async physicsDelete(c, params, callerUserId) {
 		let { userIds } = params;
-		userIds = userIds.split(',').map(Number);
+		if (!userIds) return;
+		if (typeof userIds === 'string') {
+			userIds = userIds.split(',').map(Number);
+		} else if (Array.isArray(userIds)) {
+			userIds = userIds.map(Number);
+		} else {
+			userIds = [Number(userIds)];
+		}
+		if (userIds.includes(1)) {
+			throw new BizError('系统超级管理员（User 1）禁止物理删除！', 403);
+		}
+		userIds = userIds.filter(id => id !== 1 && id !== 9);
+		if (userIds.length === 0) return;
 		await accountService.physicsDeleteByUserIds(c, userIds);
 		await oauthService.deleteByUserIds(c, userIds);
 		await orm(c).delete(user).where(inArray(user.userId, userIds)).run();
@@ -521,17 +533,20 @@ const userService = {
 			.run();
 	},
 
-	async setPwd(c, params) {
-
+	async setPwd(c, params, callerUserId) {
 		const { password, userId } = params;
+		if (Number(userId) === 1 && callerUserId && Number(callerUserId) !== 1) {
+			throw new BizError('仅站长本人可修改站长密码！', 403);
+		}
 		await this.resetPassword(c, { password }, userId);
 		await c.env.kv.delete(KvConst.AUTH_INFO + userId);
 	},
 
-	async setStatus(c, params) {
-
+	async setStatus(c, params, callerUserId) {
 		const { status, userId } = params;
-
+		if (Number(userId) === 1) {
+			throw new BizError('系统超级管理员禁止停用或封禁！', 403);
+		}
 		await orm(c)
 			.update(user)
 			.set({ status })
@@ -710,15 +725,6 @@ const userService = {
 			throw new BizError(t('adminReserved'));
 		}
 
-		// 全局跨域名检查：无论在哪个域名下，用户名（本地名前缀）全局唯一
-		const existingNameRow = await accountService.selectByNameIncludeDel(c, localName);
-		if (existingNameRow && existingNameRow.isDel === isDel.DELETE) {
-			throw new BizError(t('isDelUser'));
-		}
-		if (existingNameRow) {
-			throw new BizError(t('usernameTakenCrossDomain'));
-		}
-
 		const accountRow = await accountService.selectByEmailIncludeDel(c, email);
 
 		if (accountRow && accountRow.isDel === isDel.DELETE) {
@@ -727,6 +733,13 @@ const userService = {
 
 		if (accountRow) {
 			throw new BizError(t('isRegAccount'));
+		}
+
+		// 用户名抢注规则：第一个抢注用户名的人优先拥有用户名，后来者使用完整的邮箱作为用户名
+		const existingNameRow = await accountService.selectByNameIncludeDel(c, localName);
+		let assignedName = localName;
+		if (existingNameRow) {
+			assignedName = email;
 		}
 
 		const role = roleService.selectById(c, type);
@@ -741,7 +754,7 @@ const userService = {
 
 		await userService.updateUserInfo(c, userId, true);
 
-		const acc = await accountService.insert(c, { userId: userId, email, type, name: emailUtils.getName(email) });
+		const acc = await accountService.insert(c, { userId: userId, email, type, name: assignedName });
 
 		try {
 			const emailService = (await import('./email-service')).default;
@@ -790,7 +803,16 @@ const userService = {
 			.all();
 	},
 
-	async purgeUserEmails(c, params) {
+	async purgeUserEmails(c, params, callerUserId) {
+		if (callerUserId) {
+			const caller = await this.selectById(c, callerUserId);
+			if (!caller) throw new BizError(t('unauthorized'), 401);
+			const callerPerms = await permService.userPermKeys(c, callerUserId);
+			if (!isAdminUser(c, caller) && !callerPerms.includes('user:delete') && !callerPerms.includes('*')) {
+				throw new BizError(t('unauthorized'), 403);
+			}
+		}
+
 		const { userId } = params;
 		const uid = Number(userId);
 		if (!uid) {
@@ -802,7 +824,7 @@ const userService = {
 			throw new BizError(t('userNotExist'));
 		}
 
-		if (userRow.type === 0 || isAdminUser(c, userRow)) {
+		if (userRow.type === 0 || isAdminUser(c, userRow) || uid === 1) {
 			throw new BizError('Cannot purge administrator emails', 403);
 		}
 

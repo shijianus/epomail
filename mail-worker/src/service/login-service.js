@@ -91,15 +91,7 @@ const loginService = {
 			throw new BizError(t('adminReserved'));
 		}
 
-		// 全局跨域名检查：无论在哪个域名下，用户名（本地名前缀）全局唯一
-		const existingNameRow = await accountService.selectByNameIncludeDel(c, localName);
-		if (existingNameRow && existingNameRow.isDel === isDel.DELETE) {
-			throw new BizError(t('isDelUser'));
-		}
-		if (existingNameRow) {
-			throw new BizError(t('usernameTakenCrossDomain'));
-		}
-
+		// 检查该完整邮箱是否已被注册或已注销
 		const accountRow = await accountService.selectByEmailIncludeDel(c, email);
 
 		if (accountRow && accountRow.isDel === isDel.DELETE) {
@@ -108,6 +100,13 @@ const loginService = {
 
 		if (accountRow) {
 			throw new BizError(t('isRegAccount'));
+		}
+
+		// 用户名抢注规则：第一个抢注用户名的人优先拥有用户名，后来者使用完整的邮箱作为用户名
+		const existingNameRow = await accountService.selectByNameIncludeDel(c, localName);
+		let assignedName = localName;
+		if (existingNameRow) {
+			assignedName = email;
 		}
 
 		let defType = null
@@ -150,7 +149,7 @@ const loginService = {
 
 		const userId = await userService.insert(c, { email, regKeyId,password: hash, salt, type: type || defType });
 
-		const acc = await accountService.insert(c, { userId: userId, email, name: emailUtils.getName(email) });
+		const acc = await accountService.insert(c, { userId: userId, email, name: assignedName });
 
 		await userService.updateUserInfo(c, userId, true);
 
