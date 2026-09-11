@@ -112,5 +112,14 @@ export function clearUserStorage() {
     return http.delete('/my/storage');
 }
 
+export function getMyOauthGrants() {
+    return http.get('/my/oauthGrants');
+}
 
+export function revokeMyOauthGrant(id) {
+    return http.delete(`/my/oauthGrants/${id}`);
+}
 
+export function revokeMyOauthGrantByClient(clientId) {
+    return http.post('/my/revokeOauthGrant', { clientId });
+}

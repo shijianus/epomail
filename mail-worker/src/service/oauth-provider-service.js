@@ -137,6 +137,13 @@ const oauthProviderService = {
 		// 存入 KV 缓存，TTL 为 300 秒 (5分钟)
 		await c.env.kv.put(`OAUTH_CODE_${code}`, JSON.stringify(authPayload), { expirationTtl: 300 });
 
+		// 持久化用户授权记录 (oauth_grant)
+		try {
+			await oauthAppService.recordGrant(c, user.userId, app.clientId, scope || 'openid profile email');
+		} catch (e) {
+			console.error('Failed to record oauth_grant:', e);
+		}
+
 		const finalUrl = new URL(redirect_uri);
 		finalUrl.searchParams.set('code', code);
 		if (state) {
@@ -267,6 +274,13 @@ const oauthProviderService = {
 		const user = await userService.selectById(c, payload.userId);
 		if (!user || user.status !== 0) {
 			throw new BizError('用户不存在或已失效', 401);
+		}
+
+		if (payload.clientId) {
+			const isRevoked = await oauthAppService.isGrantRevoked(c, payload.userId, payload.clientId);
+			if (isRevoked) {
+				throw new BizError('该应用的访问权限已被用户撤销 (Access grant revoked)', 401);
+			}
 		}
 
 		const isAdmin = Boolean(

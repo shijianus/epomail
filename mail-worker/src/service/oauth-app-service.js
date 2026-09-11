@@ -304,6 +304,15 @@ const oauthAppService = {
 		}
 
 		await orm(c).delete(oauthApp).where(eq(oauthApp.id, id)).run();
+
+		// 同步清理与此应用关联的授权记录
+		try {
+			const userDb = getUserDb(c) || c?.env?.db;
+			if (userDb && app.clientId) {
+				await userDb.prepare(`DELETE FROM oauth_grant WHERE client_id = ?`).bind(app.clientId).run();
+			}
+		} catch (_) {}
+
 		return { success: true };
 	},
 
@@ -311,6 +320,150 @@ const oauthAppService = {
 		if (!app || !redirectUri) return false;
 		const allowed = normalizeRedirectUris(app.redirectUris);
 		return allowed.includes(redirectUri.trim());
+	},
+
+	// 记录或更新用户对 OAuth 应用的授权
+	async recordGrant(c, userId, clientId, scopes = 'openid profile email') {
+		await this.ensureTables(c);
+		const userDb = getUserDb(c) || c?.env?.db;
+		if (!userDb || !userId || !clientId) return;
+
+		const existing = await userDb.prepare(`
+			SELECT id FROM oauth_grant WHERE user_id = ? AND client_id = ? LIMIT 1
+		`).bind(userId, clientId).first();
+
+		const now = new Date().toISOString();
+		if (existing) {
+			await userDb.prepare(`
+				UPDATE oauth_grant SET scopes = ?, updated_at = ? WHERE id = ?
+			`).bind(scopes, now, existing.id).run();
+		} else {
+			await userDb.prepare(`
+				INSERT INTO oauth_grant (user_id, client_id, scopes, created_at, updated_at)
+				VALUES (?, ?, ?, ?, ?)
+			`).bind(userId, clientId, scopes, now, now).run();
+		}
+
+		// 移除针对该客户端的撤销标记
+		try {
+			if (c?.env?.kv) {
+				await c.env.kv.delete(`REVOKED_GRANT_${userId}_${clientId}`);
+			}
+		} catch (_) {}
+	},
+
+	// 获取当前用户的所有授权记录与全站生态应用列表
+	async getUserGrants(c, userId) {
+		await this.ensureTables(c);
+		const userDb = getUserDb(c) || c?.env?.db;
+		if (!userDb || !userId) return { grants: [], ecosystemApps: [] };
+
+		const grantRows = await userDb.prepare(`
+			SELECT id, user_id as userId, client_id as clientId, scopes, created_at as createdAt, updated_at as updatedAt
+			FROM oauth_grant
+			WHERE user_id = ?
+			ORDER BY updated_at DESC
+		`).bind(userId).all();
+
+		const appRows = await userDb.prepare(`
+			SELECT id, client_id as clientId, name, homepage_url as homepageUrl, description, logo_url as logoUrl, scopes, status
+			FROM oauth_app
+		`).all();
+
+		const appMap = new Map();
+		const ecosystemApps = [];
+		for (const app of (appRows.results || [])) {
+			appMap.set(app.clientId, app);
+			if (Number(app.status) === 1) {
+				ecosystemApps.push({
+					id: app.id,
+					clientId: app.clientId,
+					name: app.name,
+					homepageUrl: app.homepageUrl,
+					description: app.description,
+					logoUrl: app.logoUrl,
+					scopes: app.scopes
+				});
+			}
+		}
+
+		const grants = (grantRows.results || []).map(g => {
+			const app = appMap.get(g.clientId);
+			return {
+				id: g.id,
+				clientId: g.clientId,
+				scopes: g.scopes,
+				createdAt: g.createdAt,
+				updatedAt: g.updatedAt,
+				appName: app ? app.name : g.clientId,
+				appLogo: app ? app.logoUrl : '',
+				homepageUrl: app ? app.homepageUrl : '',
+				appDescription: app ? app.description : '',
+				appStatus: app ? app.status : 1,
+				isVerified: true
+			};
+		});
+
+		return {
+			grants,
+			ecosystemApps
+		};
+	},
+
+	// 撤销用户对特定应用的授权
+	async revokeGrant(c, userId, grantIdOrClientId) {
+		await this.ensureTables(c);
+		const userDb = getUserDb(c) || c?.env?.db;
+		if (!userDb || !userId) return { success: false };
+
+		let grant = null;
+		if (typeof grantIdOrClientId === 'number' || /^\d+$/.test(String(grantIdOrClientId))) {
+			grant = await userDb.prepare(`
+				SELECT id, client_id as clientId FROM oauth_grant WHERE id = ? AND user_id = ?
+			`).bind(Number(grantIdOrClientId), userId).first();
+		}
+		if (!grant) {
+			grant = await userDb.prepare(`
+				SELECT id, client_id as clientId FROM oauth_grant WHERE client_id = ? AND user_id = ?
+			`).bind(String(grantIdOrClientId), userId).first();
+		}
+
+		if (!grant) {
+			throw new BizError('未找到对应的授权记录或已被撤销', 404);
+		}
+
+		await userDb.prepare(`
+			DELETE FROM oauth_grant WHERE id = ? AND user_id = ?
+		`).bind(grant.id, userId).run();
+
+		// 写入 KV 撤销黑名单，立即使该用户针对该 client_id 的 access token 实时失效
+		try {
+			if (c?.env?.kv) {
+				await c.env.kv.put(`REVOKED_GRANT_${userId}_${grant.clientId}`, '1', { expirationTtl: 86400 * 30 });
+			}
+		} catch (_) {}
+
+		return { success: true, revokedClientId: grant.clientId };
+	},
+
+	// 检查特定客户端授权是否已被撤销
+	async isGrantRevoked(c, userId, clientId) {
+		if (!userId || !clientId) return false;
+		try {
+			if (c?.env?.kv) {
+				const revoked = await c.env.kv.get(`REVOKED_GRANT_${userId}_${clientId}`);
+				if (revoked === '1') return true;
+			}
+		} catch (_) {}
+
+		const userDb = getUserDb(c) || c?.env?.db;
+		if (!userDb) return false;
+
+		const grant = await userDb.prepare(`
+			SELECT id FROM oauth_grant WHERE user_id = ? AND client_id = ? LIMIT 1
+		`).bind(userId, clientId).first();
+
+		return !grant;
 	}
 };
 

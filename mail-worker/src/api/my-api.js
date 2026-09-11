@@ -2,6 +2,7 @@ import app from '../hono/hono';
 import userService from '../service/user-service';
 import totpService from '../service/totp-service';
 import telegramService from '../service/telegram-service';
+import oauthAppService from '../service/oauth-app-service';
 import result from '../model/result';
 import userContext from '../security/user-context';
 
@@ -143,6 +144,26 @@ app.put('/my/storage', async (c) => {
 
 app.delete('/my/storage', async (c) => {
 	const data = await userService.clearUserStorage(c, userContext.getUserId(c));
+	return c.json(result.ok(data));
+});
+
+// 获取当前登录用户已授权的应用列表及生态应用
+app.get('/my/oauthGrants', async (c) => {
+	const data = await oauthAppService.getUserGrants(c, userContext.getUserId(c));
+	return c.json(result.ok(data));
+});
+
+// 解除特定应用授权 (通过 grant id)
+app.delete('/my/oauthGrants/:id', async (c) => {
+	const grantId = c.req.param('id');
+	const data = await oauthAppService.revokeGrant(c, userContext.getUserId(c), grantId);
+	return c.json(result.ok(data));
+});
+
+// 解除特定应用授权 (通过 client_id 或 id)
+app.post('/my/revokeOauthGrant', async (c) => {
+	const body = await c.req.json();
+	const data = await oauthAppService.revokeGrant(c, userContext.getUserId(c), body.id || body.clientId);
 	return c.json(result.ok(data));
 });
 
