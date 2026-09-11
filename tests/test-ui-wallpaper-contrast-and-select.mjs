@@ -165,8 +165,7 @@ import assert from "node:assert";
       };
     });
     console.log("  系统设置邮件模式 el-select 实测指标:", mailModeSelectMetrics);
-    assert(mailModeSelectMetrics, "必须找到系统设置邮件模式 el-select");
-    assert(mailModeSelectMetrics.width >= 240, `邮件模式 el-select 宽度必须 >= 240px，实测: ${mailModeSelectMetrics.width}px`);
+    assert(mailModeSelectMetrics.width >= 180 && mailModeSelectMetrics.width <= 235, `邮件模式 el-select 宽度必须刚刚好贴合文字（180px~235px，无空白），实测: ${mailModeSelectMetrics.width}px`);
     assert(!mailModeSelectMetrics.isTruncated, `邮件模式文字绝不能被截断！当前展示: '${mailModeSelectMetrics.text}'`);
     assert(
       mailModeSelectMetrics.text.includes("加密邮件模式 (Level 3 [E2EE])") ||

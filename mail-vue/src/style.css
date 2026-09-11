@@ -666,9 +666,15 @@ html:not(.dark) .el-popper .el-popper__arrow::before {
 .el-popper.el-select__popper,
 .el-popper.el-dropdown__popper,
 .el-popper.el-picker__popper,
-.el-popper.detail-dropdown {
+.el-popper.detail-dropdown,
+.el-popper.mail-mode-popper {
     max-width: none !important;
     z-index: 3000 !important;
+}
+
+.el-popper.mail-mode-popper {
+    min-width: max-content !important;
+    width: max-content !important;
 }
 
 /* Ensure class="el-select" wrapper is generously sized and comfortably bounds all text without spilling out */

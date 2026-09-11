@@ -57,37 +57,77 @@ import assert from 'node:assert';
     await page.waitForTimeout(2000);
   }
 
-  const metrics = await selectEl.evaluate((el) => {
-    const wrapper = el.querySelector('.el-select__wrapper');
-    const placeholder = el.querySelector('.el-select__placeholder');
-    const visibleItem = el.querySelector('.el-select__selected-item:not(.is-hidden)') || placeholder;
-    const span = el.querySelector('.el-select__placeholder span') || el.querySelector('.el-select__selected-item span');
-    const settingItem = el.closest('.setting-item');
-    const titleEl = settingItem ? settingItem.children[0] : null;
+  const getSelectMetrics = async () => {
+    return await selectEl.evaluate((el) => {
+      const wrapper = el.querySelector('.el-select__wrapper');
+      const placeholder = el.querySelector('.el-select__placeholder');
+      const visibleItem = el.querySelector('.el-select__selected-item:not(.is-hidden)') || placeholder;
+      const span = el.querySelector('.el-select__placeholder span') || el.querySelector('.el-select__selected-item span');
+      const suffix = el.querySelector('.el-select__suffix');
+      const settingItem = el.closest('.setting-item');
+      const titleEl = settingItem ? settingItem.children[0] : null;
 
-    return {
-      outerHTML: el.outerHTML,
-      selectWidth: el.getBoundingClientRect().width,
-      wrapperWidth: wrapper ? wrapper.getBoundingClientRect().width : null,
-      visibleItemWidth: visibleItem ? visibleItem.getBoundingClientRect().width : null,
-      visibleItemScrollWidth: visibleItem ? visibleItem.scrollWidth : null,
-      visibleItemClientWidth: visibleItem ? visibleItem.clientWidth : null,
-      spanWidth: span ? span.getBoundingClientRect().width : null,
-      spanScrollWidth: span ? span.scrollWidth : null,
-      textContent: span ? span.textContent.trim() : (visibleItem ? visibleItem.textContent.trim() : ''),
-      isTruncated: visibleItem ? (visibleItem.scrollWidth > visibleItem.clientWidth) : null,
-      titleWidth: titleEl ? titleEl.getBoundingClientRect().width : null,
-      titleHeight: titleEl ? titleEl.getBoundingClientRect().height : null
-    };
-  });
+      const spanRect = span ? span.getBoundingClientRect() : null;
+      const suffixRect = suffix ? suffix.getBoundingClientRect() : null;
+      const gap = (spanRect && suffixRect) ? (suffixRect.left - spanRect.right) : null;
 
-  console.log('加密邮件模式真实审计指标:', JSON.stringify(metrics, null, 2));
+      return {
+        selectWidth: Math.round(el.getBoundingClientRect().width),
+        wrapperWidth: wrapper ? Math.round(wrapper.getBoundingClientRect().width) : null,
+        visibleItemWidth: visibleItem ? Math.round(visibleItem.getBoundingClientRect().width) : null,
+        spanWidth: span ? Math.round(span.getBoundingClientRect().width) : null,
+        textContent: span ? span.textContent.trim() : (visibleItem ? visibleItem.textContent.trim() : ''),
+        isTruncated: visibleItem ? (visibleItem.scrollWidth > visibleItem.clientWidth) : null,
+        gapTextToArrow: gap !== null ? Math.round(gap) : null,
+        titleWidth: titleEl ? Math.round(titleEl.getBoundingClientRect().width) : null
+      };
+    });
+  };
 
-  // 严格断言
-  assert.strictEqual(metrics.isTruncated, false, '邮件模式 el-select 文字绝不允许被截断！');
-  assert.ok(metrics.textContent.includes('加密邮件模式 (Level 3 [E2EE])'), `文本必须完整包含 '加密邮件模式 (Level 3 [E2EE])'，当前: '${metrics.textContent}'`);
-  assert.ok(metrics.selectWidth >= 240, `el-select 容器宽度必须 >= 240px，当前: ${metrics.selectWidth}px`);
-  assert.ok(metrics.titleWidth >= 75, `标题 '邮件模式' 应保持单行宽度（>=75px），当前宽度: ${metrics.titleWidth}px`);
+  const metricsMode2 = await getSelectMetrics();
+  console.log('Mode 2 (加密邮件模式) 实测指标:', JSON.stringify(metricsMode2, null, 2));
+
+  // 严格断言 Mode 2
+  assert.strictEqual(metricsMode2.isTruncated, false, 'Mode 2 文字绝不允许被截断！');
+  assert.ok(metricsMode2.textContent.includes('加密邮件模式 (Level 3 [E2EE])'), `文本必须完整包含 '加密邮件模式 (Level 3 [E2EE])'`);
+  assert.strictEqual(metricsMode2.selectWidth, 230, `Mode 2 宽度必须刚好为 230px 贴合文字，当前: ${metricsMode2.selectWidth}px`);
+  assert.ok(metricsMode2.gapTextToArrow <= 12 && metricsMode2.gapTextToArrow >= 4, `文字与箭头间距必须刚刚好（4~12px，无空白），当前间距: ${metricsMode2.gapTextToArrow}px`);
+
+  // 切换并测试 Mode 0
+  console.log('4. 切换并验证 Mode 0【隐私邮件模式】...');
+  await selectEl.click();
+  await page.waitForTimeout(400);
+  await page.locator('.el-select-dropdown__item:visible').filter({ hasText: '隐私邮件模式' }).click();
+  await page.waitForTimeout(600);
+  const metricsMode0 = await getSelectMetrics();
+  console.log('Mode 0 (隐私邮件模式) 实测指标:', JSON.stringify(metricsMode0, null, 2));
+  assert.strictEqual(metricsMode0.isTruncated, false, 'Mode 0 文字绝不允许被截断！');
+  assert.strictEqual(metricsMode0.selectWidth, 226, `Mode 0 宽度必须刚好为 226px 贴合文字，当前: ${metricsMode0.selectWidth}px`);
+  assert.ok(metricsMode0.gapTextToArrow <= 12 && metricsMode0.gapTextToArrow >= 4, `文字与箭头间距必须刚刚好（4~12px，无空白），当前间距: ${metricsMode0.gapTextToArrow}px`);
+
+  // 切换并测试 Mode 1
+  console.log('5. 切换并验证 Mode 1【全部邮件模式】...');
+  await selectEl.click();
+  await page.waitForTimeout(400);
+  await page.locator('.el-select-dropdown__item:visible').filter({ hasText: '全部邮件模式' }).click();
+  await page.waitForTimeout(600);
+  const metricsMode1 = await getSelectMetrics();
+  console.log('Mode 1 (全部邮件模式) 实测指标:', JSON.stringify(metricsMode1, null, 2));
+  assert.strictEqual(metricsMode1.isTruncated, false, 'Mode 1 文字绝不允许被截断！');
+  assert.strictEqual(metricsMode1.selectWidth, 184, `Mode 1 宽度必须刚好为 184px 贴合文字，当前: ${metricsMode1.selectWidth}px`);
+  assert.ok(metricsMode1.gapTextToArrow <= 12 && metricsMode1.gapTextToArrow >= 4, `文字与箭头间距必须刚刚好（4~12px，无空白），当前间距: ${metricsMode1.gapTextToArrow}px`);
+
+  // 恢复 Mode 2
+  console.log('6. 恢复 Mode 2 并留存高质量视觉截图...');
+  await selectEl.click();
+  await page.waitForTimeout(400);
+  await page.locator('.el-select-dropdown__item:visible').filter({ hasText: '加密邮件模式' }).click();
+  await page.waitForTimeout(600);
+  const msgBox2 = page.locator('.el-message-box');
+  if (await msgBox2.isVisible()) {
+    await msgBox2.locator('button.el-button--primary').click();
+    await page.waitForTimeout(1000);
+  }
 
   // 截图整个卡片 (亮色模式)
   const card = page.locator('.settings-card').first();
@@ -107,6 +147,6 @@ import assert from 'node:assert';
   await page.screenshot({ path: 'tests/audit_mail_mode_dropdown_open.png' });
   console.log('✓ 已生成下拉选项展开截图: tests/audit_mail_mode_dropdown_open.png');
 
-  console.log('\n=== 所有断言 100% 通过！视觉与尺寸完全达标！===');
+  console.log('\n=== 所有断言 100% 通过！视觉与尺寸完全刚刚好（不多不少零空白）！===');
   await browser.close();
 })();

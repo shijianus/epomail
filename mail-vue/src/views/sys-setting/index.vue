@@ -45,10 +45,11 @@
                   </el-tooltip>
                   <el-select
                       @change="(val) => changeMailMode(val)"
-                      :style="`width: ${ locale === 'en' ? 310 : 248 }px;`"
+                      :style="{ width: mailModeSelectWidth }"
                       v-model="setting.allMailMode"
                       placeholder="Select"
                       class="mail-mode-select"
+                      popper-class="mail-mode-popper"
                   >
                     <el-option
                         v-for="item in mailModeOptions"
@@ -3814,6 +3815,21 @@ const mailModeOptions = computed(() => [
   { value: 2, label: `${t('encryptedMailMode')} (Level 3 [E2EE])` }
 ]);
 
+const mailModeSelectWidth = computed(() => {
+  const m = Number(setting.value?.allMailMode);
+  const isEn = locale.value === 'en';
+  if (isEn) {
+    if (m === 1) return '178px';
+    if (m === 2) return '272px';
+    return '316px';
+  }
+  // zh / default snug width: no excess blank space, clean 7-8px gap to arrow
+  if (m === 1) return '184px';
+  if (m === 0) return '226px';
+  if (m === 2) return '230px';
+  return '226px';
+});
+
 const currentMailModeSecurityBadge = computed(() => {
   const m = Number(setting.value?.allMailMode);
   if (m === 2) {
@@ -5480,8 +5496,15 @@ function editSetting(settingForm, refreshStatus = true, closeAiDialog = false) {
 }
 
 .mail-mode-select {
-  min-width: 240px;
+  min-width: 0 !important;
   max-width: 100%;
+  transition: width 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+:deep(.mail-mode-popper),
+.mail-mode-popper {
+  min-width: max-content !important;
+  width: max-content !important;
 }
 
 .r2domain-item {

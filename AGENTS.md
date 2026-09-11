@@ -11,6 +11,38 @@
    - 在向用户输出回复时，必须置顶/显式打印出本次提交的完整 Commit Hash 与短 Hash，确保版本可追溯、审计记录完整。
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
+### 邮件模式下拉框自适应严密贴合（刚刚好·零冗余空白·零截断）、全模式精准尺寸计算与下拉弹层全量展开加固上线 (2026-09-11)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **彻底消除固定过宽与多余空白（刚刚好，不多也不少，不要有空白）**:
+       - 根因分析：此前为解决文字截断，设置了固定的 248px 并在 `.mail-mode-select` 中设置了 `min-width: 240px;`；在“全部邮件模式 (Level 1)”等较短选项下，右侧产生了 58px~66px 的大片空洞空白，与右侧下拉箭头距离过远，造成严重视觉冗余与松散感；
+       - 根治重构：移除 `min-width: 240px;`，重构为响应式动态紧密贴合宽度计算 `mailModeSelectWidth`：
+         - 中文（zh）：
+           - Mode 1 (`全部邮件模式 (Level 1)`): 精准 `184px`（文字 134px + 左右内边距 28px + 箭头 14px + 呼吸间距 8px，实测间距 8px，0 空白）；
+           - Mode 0 (`隐私邮件模式 (Level 2 [推荐])`): 精准 `226px`（文字 177px，实测间距 7px，0 空白）；
+           - Mode 2 (`加密邮件模式 (Level 3 [E2EE])`): 精准 `230px`（文字 180px，实测间距 8px，0 空白）；
+         - 英文（en）：
+           - Mode 1 (`All Mail Mode (Level 1)`): `178px`；
+           - Mode 2 (`Encrypted Mail Mode (Level 3 [E2EE])`): `272px`；
+           - Mode 0 (`Privacy Mail Mode (Level 2 [Recommended])`): `316px`；
+       - 添加平滑宽度渐变过渡 `transition: width 0.2s cubic-bezier(0.4, 0, 0.2, 1);`，切换模式时丝滑变形。
+    2. **下拉弹层全量无截断展示保障 (`popper-class="mail-mode-popper"`)**:
+       - 在 `sys-setting/index.vue` 与 `style.css` 中为下拉浮层赋予 `.mail-mode-popper` 并定义 `min-width: max-content !important; width: max-content !important;`，确保不论收起时触发器宽度多么紧凑，下拉菜单展开时均按最长选项完整舒展，杜绝任何选项受限于窄宽度。
+    3. **Playwright 视觉与多模式端到端自动化审计 100% 全绿通过 (Comprehensive Live E2E Audit)**:
+       - 运行并全面升级 `tests/audit-mail-mode-select.mjs`：
+         - Mode 2 实测: `selectWidth: 230px`, `isTruncated: false`, `gapTextToArrow: 8px`
+         - Mode 0 实测: `selectWidth: 226px`, `isTruncated: false`, `gapTextToArrow: 7px`
+         - Mode 1 实测: `selectWidth: 184px`, `isTruncated: false`, `gapTextToArrow: 8px`
+         - 严格断言间距在 4~12px 之间，完美实现“刚刚好，不多也不少，不要有空白”；
+         - 更新留存高清截图：
+           - `tests/audit_mail_mode_full_light.png`
+           - `tests/audit_mail_mode_full_dark.png`
+           - `tests/audit_mail_mode_dropdown_open.png`
+       - 回归综合测试 `tests/test-ui-wallpaper-contrast-and-select.mjs`、`tests/test-mail-mode-e2e.mjs`、`tests/test-group-ui-consistency-and-visitor-clean.mjs`、`tests/test-welcome-email-visitor-and-all-accounts.mjs`、`tests/test-user-general-settings-binding-and-defaults.mjs` 全部 100% 成功通过；
+       - 恪守零假数据残留准则。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **Cloudflare Workers 部署 Version ID**: `4860e8b9-2502-4117-ad89-41070227e2d5`。
+    - **epocanvas-mail Git Commit**: PENDING_COMMIT_HASH (Short Hash: PENDING_SHORT_HASH)。
+
 ### 邮件模式 `el-select` 完整呈现彻底根治、解除占位宽度双重惩罚与标题防挤压折行加固上线 (2026-09-10)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **系统设置邮件模式 `data-v-3f183808 class="el-select" style="width: 190px;"` 截断彻底根治**:
