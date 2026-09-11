@@ -13,76 +13,83 @@ import assert from "node:assert";
 
   try {
     // --------------------------------------------------------------------------------------
-    // 0. Admin 多域名全域登录与凭证全链路审计 (admin@epomail.cyou, admin@epomail.bond, admin)
+    // 0. 账号身份与角色隔离全链路审计 (admin@epomail.bond 站长 vs admin@epomail.cyou 参观者)
     // --------------------------------------------------------------------------------------
-    console.log("\n[0. Admin 多域名全域登录审计]");
+    console.log("\n[0. 站长与参观者账号身份严格隔离审计]");
     
-    // 0.1 验证 admin@epomail.cyou 登录
-    console.log("  - 测试 admin@epomail.cyou 使用管理员密码登录...");
-    const loginCyouRes = await page.request.post(BASE + "/api/login", {
-      data: { email: "admin@epomail.cyou", password: "123456" },
-      headers: { "Content-Type": "application/json" }
-    });
-    const loginCyouJson = await loginCyouRes.json();
-    assert.strictEqual(loginCyouJson.code, 200, `admin@epomail.cyou 登录失败: ${JSON.stringify(loginCyouJson)}`);
-    console.log("  ✓ admin@epomail.cyou 登录成功，获取 Token");
-
-    // 0.2 验证 admin@epomail.bond 登录
-    console.log("  - 测试 admin@epomail.bond 使用管理员密码登录...");
+    // 0.1 验证 admin@epomail.bond 登录为超级管理员（站长）
+    console.log("  - 测试 admin@epomail.bond 登录 (超级管理员 / 站长)...");
     const loginBondRes = await page.request.post(BASE + "/api/login", {
       data: { email: "admin@epomail.bond", password: "123456" },
       headers: { "Content-Type": "application/json" }
     });
     const loginBondJson = await loginBondRes.json();
     assert.strictEqual(loginBondJson.code, 200, "admin@epomail.bond 登录失败");
-    console.log("  ✓ admin@epomail.bond 登录成功，获取 Token");
+    const tokenBond = typeof loginBondJson.data === "string" ? loginBondJson.data : loginBondJson.data?.token;
+    console.log("  ✓ admin@epomail.bond 登录成功，获取站长 Token");
 
-    // 0.3 验证纯用户名 admin 登录
-    console.log("  - 测试纯用户名 admin 使用管理员密码登录...");
+    const userInfoBondRes = await page.request.get(BASE + "/api/my/loginUserInfo", {
+      headers: { Authorization: tokenBond }
+    });
+    const userInfoBond = await userInfoBondRes.json();
+    assert.strictEqual(userInfoBond.code, 200, "loginUserInfo 获取失败");
+    assert.strictEqual(userInfoBond.data?.email, "admin@epomail.bond", "主站长邮箱必须为 admin@epomail.bond");
+    assert.ok(
+      userInfoBond.data?.role?.roleCode === "master" || userInfoBond.data?.role?.name === "站长",
+      `admin@epomail.bond 必须为站长角色，实际为: ${userInfoBond.data?.role?.name}`
+    );
+    assert.ok(userInfoBond.data?.permKeys?.includes("*"), "站长必须拥有全量权限 (*)");
+    console.log("  ✓ admin@epomail.bond 确认为系统唯一站长 (Master)，具备最高全权");
+
+    // 0.2 验证纯用户名 admin 登录映射至站长
+    console.log("  - 测试纯用户名 admin 登录映射...");
     const loginAdminRes = await page.request.post(BASE + "/api/login", {
       data: { email: "admin", password: "123456" },
       headers: { "Content-Type": "application/json" }
     });
     const loginAdminJson = await loginAdminRes.json();
     assert.strictEqual(loginAdminJson.code, 200, "纯用户名 admin 登录失败");
-    console.log("  ✓ 纯用户名 admin 登录成功，获取 Token");
+    console.log("  ✓ 纯用户名 admin 登录映射站长成功");
 
-    const token = typeof loginCyouJson.data === "string" ? loginCyouJson.data : loginCyouJson.data?.token;
-
-    // 0.4 验证管理员账户列表中同时拥有双域名邮箱
-    const accListRes = await page.request.get(BASE + "/api/account/list?size=10", {
-      headers: { Authorization: token }
+    // 0.3 验证 admin@epomail.cyou 登录为【参观者 (visitor)】，绝对禁止晋升站长（零号漏洞防范）
+    console.log("  - 测试 admin@epomail.cyou 登录 (公开演示 / 参观者)...");
+    const loginCyouRes = await page.request.post(BASE + "/api/login", {
+      data: { email: "admin@epomail.cyou", password: "123456" },
+      headers: { "Content-Type": "application/json" }
     });
-    const accListJson = await accListRes.json();
-    const adminEmails = (accListJson.data || []).map(a => a.email);
-    console.log("  - 管理员当前绑定邮箱列表:", adminEmails);
-    assert.ok(adminEmails.includes("admin@epomail.cyou"), "管理员必须拥有 admin@epomail.cyou 邮箱账号");
-    assert.ok(adminEmails.includes("admin@epomail.bond"), "管理员必须拥有 admin@epomail.bond 邮箱账号");
-    console.log("  ✓ 管理员双域名 (epomail.cyou & epomail.bond) 邮箱列表绑定无缝就绪");
+    const loginCyouJson = await loginCyouRes.json();
+    assert.strictEqual(loginCyouJson.code, 200, `admin@epomail.cyou 登录失败: ${JSON.stringify(loginCyouJson)}`);
+    const tokenCyou = typeof loginCyouJson.data === "string" ? loginCyouJson.data : loginCyouJson.data?.token;
+    console.log("  ✓ admin@epomail.cyou 登录成功，获取参观者 Token");
 
-    // 0.5 验证 loginUserInfo 接口返回的当前会话邮箱为 admin@epomail.cyou 且默认信箱为 accountId 99
-    console.log("  - 验证 /api/my/loginUserInfo 返回激活邮箱与信箱...");
     const userInfoCyouRes = await page.request.get(BASE + "/api/my/loginUserInfo", {
-      headers: { Authorization: token }
+      headers: { Authorization: tokenCyou }
     });
     const userInfoCyou = await userInfoCyouRes.json();
     assert.strictEqual(userInfoCyou.code, 200, "loginUserInfo 获取失败");
-    console.log("    userInfo email:", userInfoCyou.data?.email, "account:", userInfoCyou.data?.account?.email);
-    assert.strictEqual(userInfoCyou.data?.email, "admin@epomail.cyou", "登录 admin@epomail.cyou 后当前会话激活邮箱必须为 admin@epomail.cyou");
-    assert.strictEqual(userInfoCyou.data?.account?.email, "admin@epomail.cyou", "激活的默认信箱必须为 admin@epomail.cyou (拒绝跳回 bond)");
+    console.log("    admin@epomail.cyou 身份审计: email =", userInfoCyou.data?.email, ", role =", userInfoCyou.data?.role?.name, ", roleCode =", userInfoCyou.data?.role?.roleCode);
+    assert.strictEqual(userInfoCyou.data?.email, "admin@epomail.cyou", "登录邮箱必须保持 admin@epomail.cyou (不跳号)");
+    assert.ok(
+      userInfoCyou.data?.role?.roleCode === "visitor" || userInfoCyou.data?.role?.name === "参观者",
+      `admin@epomail.cyou 必须是参观者角色 (visitor)，绝不能晋升为站长！实际角色: ${userInfoCyou.data?.role?.name}`
+    );
+    assert.strictEqual(userInfoCyou.data?.type, 2, "admin@epomail.cyou 的角色类型必须为 2 (参观者)");
+    assert.ok(!userInfoCyou.data?.permKeys?.includes("user:query"), "参观者绝对不能拥有 user:query (用户列表) 权限！");
+    assert.ok(!userInfoCyou.data?.permKeys?.includes("*"), "参观者绝对不能拥有 * 超级管理员权限！");
+    console.log("  ✓ 安全防御审计通过：admin@epomail.cyou 严格保持为参观者，无越权晋升漏洞！");
 
-    // 0.6 验证 admin@epomail.bond 登录的会话激活邮箱为 admin@epomail.bond
-    console.log("  - 验证 admin@epomail.bond 登录后会话激活邮箱...");
-    const tokenBond = typeof loginBondJson.data === "string" ? loginBondJson.data : loginBondJson.data?.token;
-    const userInfoBondRes = await page.request.get(BASE + "/api/my/loginUserInfo", {
-      headers: { Authorization: tokenBond }
+    // 0.4 验证参观者调用用户列表接口被严格拦截 (403 Forbidden)
+    console.log("  - 验证 admin@epomail.cyou 访问 /api/user/list 接口拦截...");
+    const userListCyouRes = await page.request.get(BASE + "/api/user/list", {
+      headers: { Authorization: tokenCyou }
     });
-    const userInfoBond = await userInfoBondRes.json();
-    assert.strictEqual(userInfoBond.code, 200, "loginUserInfo 获取失败");
-    assert.strictEqual(userInfoBond.data?.email, "admin@epomail.bond", "登录 admin@epomail.bond 后激活邮箱应为 admin@epomail.bond");
+    const userListCyouJson = await userListCyouRes.json();
+    console.log(`    响应: code=${userListCyouJson.code}, message=${userListCyouJson.message}`);
+    assert.strictEqual(userListCyouJson.code, 403, "参观者调用 /api/user/list 必须被 403 严格拒绝！");
+    console.log("  ✓ 参观者接口访问 403 严格拦截验证通过");
 
-    // 0.7 浏览器真实 UI 交互登录测试 (通过 /login/index.html 输入 admin@epomail.cyou 登录)
-    console.log("  - 测试浏览器真实 UI 页面登录 admin@epomail.cyou...");
+    // 0.5 浏览器真实 UI 交互登录测试 (输入 admin@epomail.cyou 登录，审计页面渲染与角色身份)
+    console.log("  - 测试浏览器真实 UI 页面登录 admin@epomail.cyou (参观者)...");
     await page.goto(BASE + "/login/index.html", { waitUntil: "networkidle" });
     await page.waitForSelector("#epo-email", { timeout: 10000 });
     await page.fill("#epo-email", "admin@epomail.cyou");
@@ -91,35 +98,21 @@ import assert from "node:assert";
     await page.waitForURL(url => url.pathname.includes("/inbox"), { timeout: 15000 });
     console.log("  ✓ 浏览器 UI 登录 admin@epomail.cyou 成功跳转至 /inbox");
 
-    // 0.8 验证主界面 Header 渲染与发件弹窗发件人邮箱
+    // 0.6 验证主界面 Header 展示的是 admin@epomail.cyou 与 参观者 状态
     await page.waitForTimeout(2000);
     const displayedEmail = await page.evaluate(() => localStorage.getItem("loginEmail"));
-    console.log("  - localStorage loginEmail:", displayedEmail);
     assert.strictEqual(displayedEmail, "admin@epomail.cyou", "本地存储中 active loginEmail 必须为 admin@epomail.cyou");
 
-    // 悬浮/点击头像弹窗验证邮箱展示
     await page.click(".avatar-wrap");
     await page.waitForTimeout(500);
     const headerEmail = await page.textContent(".am-email");
-    console.log("  - Header 弹窗展示邮箱:", headerEmail?.trim());
-    assert.strictEqual(headerEmail?.trim(), "admin@epomail.cyou", "顶部头像菜单展示的邮箱必须为 admin@epomail.cyou (杜绝错传与串号)");
+    const headerStatus = await page.textContent(".am-status");
+    console.log("  - Header 展示邮箱:", headerEmail?.trim(), ", 身份徽章:", headerStatus?.trim());
+    assert.strictEqual(headerEmail?.trim(), "admin@epomail.cyou", "展示邮箱必须为 admin@epomail.cyou");
+    assert.ok(headerStatus?.includes("参观者"), `身份必须展示为「参观者」，实际为: ${headerStatus}`);
+    console.log("  ✓ UI 真实展示：admin@epomail.cyou 确认为参观者身份，绝不篡改");
 
-    // 点击“写邮件”按钮，验证默认发件人邮箱
-    console.log("  - 验证写信弹窗默认发件人地址...");
-    const writeBtn = await page.$(".btn-write, button.compose-btn, button:has-text('写信'), button:has-text('写邮件')");
-    if (writeBtn) {
-      await writeBtn.click();
-      await page.waitForSelector(".send-email, .write-container", { timeout: 8000 });
-      const sendEmailText = await page.textContent(".send-email");
-      console.log("  - 写信弹窗默认发件地址:", sendEmailText?.trim());
-      assert.ok(sendEmailText?.includes("admin@epomail.cyou"), `默认发件地址必须为 admin@epomail.cyou，实际为: ${sendEmailText}`);
-      console.log("  ✓ 发信地址严密锁定为 admin@epomail.cyou，彻底杜绝错传！");
-
-      // 关闭写信弹窗
-      const closeBtn = await page.$(".write-header .icon-btn, .close-write, button:has-text('✕')");
-      if (closeBtn) await closeBtn.click();
-      await page.waitForTimeout(500);
-    }
+    const token = tokenBond;
 
     // --------------------------------------------------------------------------------------
     // 1. 双域名的用户名冲突与 Admin 保留字严格防冲突审计

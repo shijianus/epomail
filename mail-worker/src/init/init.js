@@ -267,26 +267,54 @@ const dbInit = {
 		}
 
 		// 确保管理员在所有已配置域名下均具备默认 account 邮箱
-		if (c.env.admin) {
-			try {
-				const adminLocal = emailUtils.getName(c.env.admin);
+		// 确保演示参观者账号 admin@epomail.cyou 独立存在且归属参观者角色 (type: 2)，绝不越权晋升站长
+		try {
+			const visitorRole = await userDb.prepare(`SELECT role_id FROM role WHERE role_code = 'visitor' OR key = 'visitor' LIMIT 1`).first();
+			const visitorRoleId = visitorRole ? visitorRole.role_id : 2;
+			const visitorEmail = 'admin@epomail.cyou';
+			
+			let visitorUser = await userDb.prepare(`SELECT user_id, type FROM user WHERE email = ?`).bind(visitorEmail).first();
+			if (!visitorUser) {
+				// 预设安全 PBKDF2 哈希密码 123456
+				const defHash = 'pbkdf2:100000:wYbOCP3rv6muivmiYwmd/oXXroIcxp7/VcB02M+Ac5w=';
+				const defSalt = 'ZmUlWbNgsFel3E0oxnPHcA==';
+				await userDb.prepare(`
+					INSERT INTO user (email, password, salt, type, status, is_del, create_time, update_time)
+					VALUES (?, ?, ?, ?, 0, 0, datetime('now'), datetime('now'))
+				`).bind(visitorEmail, defHash, defSalt, visitorRoleId).run();
+				visitorUser = await userDb.prepare(`SELECT user_id, type FROM user WHERE email = ?`).bind(visitorEmail).first();
+			} else if (visitorUser.type !== visitorRoleId) {
+				await userDb.prepare(`UPDATE user SET type = ?, is_del = 0 WHERE user_id = ?`).bind(visitorRoleId, visitorUser.user_id).run();
+			}
+
+			if (visitorUser) {
+				// 确保 account 表中 admin@epomail.cyou 指向该独立的参观者用户，绝不挂在站长名下
+				const existingAcc = await userDb.prepare(`SELECT account_id, user_id FROM account WHERE email = ?`).bind(visitorEmail).first();
+				if (!existingAcc) {
+					await userDb.prepare(`
+						INSERT INTO account (email, status, user_id, is_del, name, all_receive, sort)
+						VALUES (?, 0, ?, 0, 'admin', 1, 0)
+					`).bind(visitorEmail, visitorUser.user_id).run();
+				} else if (existingAcc.user_id !== visitorUser.user_id) {
+					await userDb.prepare(`UPDATE account SET user_id = ?, is_del = 0 WHERE account_id = ?`).bind(visitorUser.user_id, existingAcc.account_id).run();
+				}
+			}
+
+			// 确保超级管理员 (User 1) 仅绑定自身主邮箱 c.env.admin (admin@epomail.bond)，绝不越权关联其他域名信箱
+			if (c.env.admin) {
 				const adminUser = await userDb.prepare(`SELECT user_id FROM user WHERE email = ?`).bind(c.env.admin).first();
 				if (adminUser) {
-					const domains = Array.isArray(c.env.domain) ? c.env.domain : [c.env.domain];
-					for (let i = 0; i < domains.length; i++) {
-						const domain = domains[i];
-						const fullEmail = `${adminLocal}@${domain}`.toLowerCase();
-						const existingAcc = await userDb.prepare(`SELECT account_id, user_id, is_del FROM account WHERE email = ?`).bind(fullEmail).first();
-						if (!existingAcc) {
-							await userDb.prepare(`INSERT INTO account (email, status, user_id, is_del, name, all_receive, sort) VALUES (?, 0, ?, 0, ?, 1, ?)`).bind(fullEmail, adminUser.user_id, adminLocal, i).run();
-						} else if (existingAcc.user_id !== adminUser.user_id || existingAcc.is_del === 1) {
-							await userDb.prepare(`UPDATE account SET user_id = ?, is_del = 0 WHERE account_id = ?`).bind(adminUser.user_id, existingAcc.account_id).run();
-						}
+					const adminAcc = await userDb.prepare(`SELECT account_id FROM account WHERE email = ? AND user_id = ?`).bind(c.env.admin, adminUser.user_id).first();
+					if (!adminAcc) {
+						await userDb.prepare(`
+							INSERT INTO account (email, status, user_id, is_del, name, all_receive, sort)
+							VALUES (?, 0, ?, 0, ?, 1, 0)
+						`).bind(c.env.admin, adminUser.user_id, emailUtils.getName(c.env.admin)).run();
 					}
 				}
-			} catch (e) {
-				console.warn('admin multi-domain accounts sync warning:', e.message);
 			}
+		} catch (e) {
+			console.warn('visitor and admin accounts sync warning:', e.message);
 		}
 	},
 

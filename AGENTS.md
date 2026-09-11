@@ -11,6 +11,34 @@
    - 在向用户输出回复时，必须置顶/显式打印出本次提交的完整 Commit Hash 与短 Hash，确保版本可追溯、审计记录完整。
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
+### 防范跨域名同名前缀身份劫持零号漏洞、彻底解耦站长与演示参观者账号及严格权限隔离加固上线 (2026-09-11)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **彻底根除跨域名同名前缀映射提权漏洞 (Cross-Domain Local Name Spoofing Immunity)**:
+       - 根因定位与反思：此前为支持多域名登录，在 `login-service.js` 和 `admin-utils.js` 中加入了“若邮箱本地名与管理员前缀相同（即 `admin`）且域名在配置域名列表中，自动判定为站长并映射至 User 1”的危险逻辑；此举导致外部公开演示账号 `admin@epomail.cyou` 被错误晋升为站长并绑定到了 User 1 名下，构成了严重的跨域名同名身份劫持/提权安全隐患（零号漏洞）；
+       - 核心治理：
+         - 彻底废除 `login-service.js` 中任何依据本地名 `@` 跨域名映射主管理员的隐式提权代码，登录一律严格按用户实际提供的完整邮箱或名下关联的独立账号进行精准密码验证；
+         - 修复 `admin-utils.js`，严格限定站长 `isAdminEmail` 与 `isAdminUser` 必须严格等于系统环境变量 `c.env.admin`（`admin@epomail.bond`）或 `User 1` 本身，绝不跨域名扩散至任何其他同名前缀的邮箱或账号；
+         - 纯用户名登录仅支持在输入纯字符串 `"admin"`（不带 `@`）时作为快捷别名映射至 `c.env.admin`。
+    2. **独立还原演示参观者账号 `admin@epomail.cyou` (Decoupled Demo Visitor Account)**:
+       - 账号与信箱彻底解耦：在 D1 数据库中物理重建独立的演示参观者用户（`user_id: 9`，`email: 'admin@epomail.cyou'`，统一安全密码 `123456`，角色类型 `type: 2`，对应 `role_code: 'visitor'`，参观者）；
+       - 信箱所有权物理对齐：在 `account` 表中将 `admin@epomail.cyou`（`account_id: 99`）的归属物理绑定至 User 9（参观者），超级管理员 User 1 名下仅保留系统主站长信箱 `admin@epomail.bond`（`account_id: 1`），两者完全隔离，绝不串号、绝不跨域共享；
+       - `init.js` 自愈机制修正：废除 `v3_14DB` 中自动将各域名 `admin@...` 账号夺取并绑定至 User 1 的破坏性逻辑，改为持久化确保演示参观者账号独立运行于 `visitor` 角色之下。
+    3. **参观者权限防线严格锁定与越权防御 (Strict Visitor Permissions Enforcement)**:
+       - 登录 `admin@epomail.cyou` 时，系统获取的是 User 9 的会话 Token；
+       - `/api/my/loginUserInfo` 返回：`user.email: 'admin@epomail.cyou'`, `role: { roleCode: 'visitor', name: '参观者' }`, `type: 2`；
+       - 参观者权限严格生效：**无 `user:query` 权限**，侧边栏无用户列表导航，动态路由不挂载 `/all-users`，直接调用 `GET /api/user/list` 严格返回 403 Forbidden；发件类型为 `ban`，禁止向外部发送邮件，配额严格限制为 0MB，实现极致安全的只读演示沙箱。
+    4. **Playwright 生产环境真实端到端全维度审计 100% 全绿 (Comprehensive Live E2E Audit)**:
+       - 专属审计脚本 `tests/audit-hardcoded-defaults-optimization.mjs`：
+         - 步骤 0：API 验证 `admin@epomail.bond` 登录成功，确认为系统唯一站长 (`master`，全权 `*`)；验证 `admin@epomail.cyou` 登录成功，确认为独立参观者 (`visitor`，类型 2，无 `user:query`，无 `*`)；实测 `admin@epomail.cyou` 调用 `/api/user/list` 严格返回 403 拦截；实测浏览器 UI 登录 `admin@epomail.cyou`，Header 状态徽章真实呈现「参观者」；
+         - 步骤 1：双域名用户名冲突与保留字全局拦截 100% 通过；
+         - 步骤 2：参观者权限完全隔离、后端防撤销拦截与 403 保护 100% 通过；
+         - 步骤 3：OAuth 应用管理 `EpoCanvasImage` 与 `shijianus-blog` 完整保全与脱敏 100% 通过；
+         - 步骤 4：测试数据完全物理清理，恪守零假数据残留准则；
+       - 回归测试套件 `tests/test-group-ui-consistency-and-visitor-clean.mjs` 全部 100% 成功全绿通过。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **Cloudflare Workers 部署 Version ID**: `c7a2adca-4e3a-4f1f-a484-8d0ce6fdc9bb`。
+    - **epocanvas-mail Git Commit**: `PENDING_COMMIT_HASH`。
+
 ### 多域名独立信箱上下文锁定、默认发件人严密对齐（杜绝错传）与全链路信箱隔离加固上线 (2026-09-11)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **多域名登录信箱上下文严格保真与无缝定位 (Multi-Domain Active Mailbox Context Lock)**:

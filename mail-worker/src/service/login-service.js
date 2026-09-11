@@ -270,17 +270,10 @@ const loginService = {
 		}
 
 		if (!userRow) {
-			// 2. 检查多域名下的管理员映射与纯用户名登录
+			// 2. 纯用户名登录支持（如直接输入 'admin'）
 			const adminLocal = c.env.admin ? emailUtils.getName(c.env.admin).toLowerCase() : '';
-			const configuredDomains = Array.isArray(c.env.domain) ? c.env.domain : [c.env.domain];
-			if (inputEmail.includes('@')) {
-				const localPart = emailUtils.getName(inputEmail).toLowerCase();
-				const domainPart = emailUtils.getDomain(inputEmail);
-				if (adminLocal && localPart === adminLocal && configuredDomains.includes(domainPart)) {
-					userRow = await userService.selectByEmailIncludeDel(c, c.env.admin);
-				}
-			} else if (inputEmail) {
-				if (adminLocal && inputEmail === adminLocal) {
+			if (inputEmail && !inputEmail.includes('@')) {
+				if (adminLocal && inputEmail.toLowerCase() === adminLocal) {
 					userRow = await userService.selectByEmailIncludeDel(c, c.env.admin);
 				} else {
 					const accountRow = await accountService.selectByNameIncludeDel(c, inputEmail);
