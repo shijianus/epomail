@@ -40,7 +40,7 @@
        - 回归测试套件 `tests/audit-mail-mode-select.mjs`、`tests/audit-labels-container.mjs`、`tests/test-group-ui-consistency-and-visitor-clean.mjs` 全部 100% 成功通过。
 *   **部署上线与自动化测试 (Verification & Deployment)**:
     - **Cloudflare Workers 部署 Version ID**: `c6c99edf-f83c-4f81-8587-c453f5fa1193`。
-    - **epocanvas-mail Git Commit**: `21dbdda0c52949f4ddd6edba29de32559e683d6e` (Short Hash: `21dbdda`)。
+    - **epocanvas-mail Git Commit**: `f4df5a720cbfb7b9015ba6a9e14a821cb8b77051` (Short Hash: `f4df5a7`)。
 
 ### 多域名管理员全域登录映射、密码验证与双域名邮箱绑定加固上线 (2026-09-11)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
