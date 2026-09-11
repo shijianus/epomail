@@ -11,6 +11,27 @@
    - 在向用户输出回复时，必须置顶/显式打印出本次提交的完整 Commit Hash 与短 Hash，确保版本可追溯、审计记录完整。
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
+### 欢迎邮件KV脏缓存自愈、参观者欢迎邮件补发API、全链路24项验收审计100%全绿上线 (2026-09-11)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **欢迎邮件 KV 脏缓存自愈修复 (Welcome Email Stale KV Cache Healing)**:
+       - 根因定位：`admin@epomail.cyou`（userId=9）经多次账号迁移/恢复后，KV 中 `HAS_WELCOME_9` 被置为 `'1'`，但 DB email 表中实际无任何欢迎邮件；`ensureWelcomeEmailForUser` 信任 KV 缓存直接返回 `null`，导致欢迎邮件被永久阻塞；
+       - 核心治理：
+         - `email-service.js` 的 `ensureWelcomeEmailForUser`：KV 缓存为 `'1'` 时新增 DB 双重验证，若 DB 无实际欢迎邮件则清除脏 KV 并重新触发投递，彻底消除账号恢复场景下的自愈失效；
+         - `init.js` 的 `v3_14DB`：重建/修复参观者账号后主动执行 `kv.delete('HAS_WELCOME_' + userId)`，确保下次登录必然触发欢迎邮件自愈投递；
+         - `user-api.js`：新增 `POST /api/user/sendWelcomeEmail` 管理员端点，可对任意用户强制清除 KV 缓存并补发官方欢迎邮件；已通过该端点为 `admin@epomail.cyou` 成功补发欢迎邮件（`emailId: 140`）；
+         - `security.js`：`/user/sendWelcomeEmail` 纳入 `requirePerms` 权限保护体系（绑定 `user:add`），仅站长/管理员可调用。
+    2. **全链路验收审计 24 项 100% 全绿 (Full System Audit 24/24)**:
+       - 审计脚本 `tests/full-system-audit-2026.mjs`（10 维度 / 24 检查项）：
+         - §1 站长登录与身份验证：5/5 ✅（admin@epomail.bond、纯用户名 admin、master 角色、全量权限 *）；
+         - §2 参观者身份隔离：5/5 ✅（admin@epomail.cyou、非 master、无 *、GET /user/list 403）；
+         - §3 欢迎邮件全链路：9/9 ✅（新参观者、新普通用户均收到 admin@epocanvas.com 官方邮件，isOfficial=1）；
+         - §4 公共主页路由精准解析：4/4 ✅（/admin→站长、/admin@epomail.cyou→参观者，严格不混淆）；
+         - §5 前端页面 UI 渲染：登录页正常渲染 ✅；
+         - §CLEANUP 测试数据物理清理：userId 134、135 完全清除，零假数据残留 ✅。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **Cloudflare Workers 部署 Version ID**: `2fb151b7-a173-4ae3-936e-151da951f8eb`。
+    - **epocanvas-mail Git Commit**: `6ff8c07` (Full: `6ff8c073b6...`)。
+
 ### 用户名先到先得分配机制、个人主页身份解耦与全域零日漏洞防御加固上线 (2026-09-11)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **用户名先到先得分配机制 (First-Come-First-Served Username Allocation)**:
