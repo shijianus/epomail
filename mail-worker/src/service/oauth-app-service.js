@@ -121,10 +121,8 @@ const oauthAppService = {
 				} catch (_) {}
 			}
 
-			// 清理旧版本硬编码残留应用与密钥（移除默认注入的 EpoCanvasImage，并将历史硬编码 secret 转换为独立随机安全 secret）
+			// 保留站长自建或关联的应用，杜绝硬编码删除；将历史硬编码 secret 转换为独立随机安全 secret
 			try {
-				await userDb.prepare(`DELETE FROM oauth_app WHERE client_id = 'epo_live_epocanvas_image' OR client_secret = 'epo_sec_epocanvas_image_secret_2026'`).run();
-
 				const legacyApp = await userDb.prepare(`SELECT id FROM oauth_app WHERE client_secret = 'epo_sec_shijianus_blog_secret' LIMIT 1`).first();
 				if (legacyApp) {
 					const rotatedSecret = `epo_sec_${genSecureSecret(32)}`;

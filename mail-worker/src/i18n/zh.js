@@ -119,7 +119,10 @@ const zh = {
 	emptyPwdMsg: '密码不能为空',
 	globalTotpDisabled: '全站两步验证已由管理员关闭，暂不可进行两步验证配置',
 	dbTestSuccess: '数据库连通性诊断成功',
-	dbTestFail: '数据库连通性诊断失败'
+	dbTestFail: '数据库连通性诊断失败',
+	adminReserved: '该用户名为系统保留管理员账号，禁止注册',
+	usernameTakenCrossDomain: '该用户名已被占用，系统内用户名全局唯一',
+	usernameTakenCrossDomainAlias: '该用户名已被其他用户占用，系统内用户名全局唯一'
 }
 
 export default zh;

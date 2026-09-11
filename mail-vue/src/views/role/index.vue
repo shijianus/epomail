@@ -316,11 +316,11 @@
                     <el-tag
                       v-if="data.permKey === 'user:query' && (form.roleCode === 'visitor' || form.name === '参观者' || chooseRole?.roleCode === 'visitor' || chooseRole?.name === '参观者')"
                       size="small"
-                      type="info"
+                      type="danger"
                       effect="plain"
                       style="margin-left: 8px; font-size: 11px; height: 20px; line-height: 18px;"
                     >
-                      {{ locale === 'zh' ? '参观者必备·禁止关闭' : 'Visitor Required' }}
+                      {{ locale === 'zh' ? '参观者禁止查看用户列表' : 'Visitor Forbidden' }}
                     </el-tag>
                     <span class="send-num" v-if="data.permKey === 'email:send'" @click.stop>
                       <el-input-number v-if="form.sendType === 'day' || form.sendType === 'count'" v-model="form.sendCount" controls-position="right" :min="0" :max="99999" size="small"
@@ -826,7 +826,7 @@ function applyTemplate(type) {
       form.sendCount = 0;
       form.accountCount = 0;
       form.sort = 1;
-      selectPermsByKeys(['setting:query', 'role:query', 'analysis:query', 'user:query', 'reg-key:query']);
+      selectPermsByKeys(['setting:query', 'role:query', 'analysis:query', 'reg-key:query']);
       break;
     case 'user_base':
       form.name = '普通用户';
@@ -993,8 +993,8 @@ function setRole() {
 
   if (form.roleCode === 'visitor' || form.name === '参观者' || chooseRole?.roleCode === 'visitor' || chooseRole?.name === '参观者') {
     const userQueryId = findPermIdByPermKey(treeList, 'user:query');
-    if (userQueryId && !params.permIds.includes(userQueryId)) {
-      params.permIds.push(userQueryId);
+    if (userQueryId) {
+      params.permIds = params.permIds.filter(id => id !== userQueryId);
     }
   }
 
@@ -1066,8 +1066,8 @@ function openRoleSet(role) {
     const isVisitorRole = role.roleCode === 'visitor' || role.name === '参观者';
     if (isVisitorRole) {
       const userQueryId = findPermIdByPermKey(treeList, 'user:query');
-      if (userQueryId && !permIdsToSet.includes(userQueryId)) {
-        permIdsToSet = [...permIdsToSet, userQueryId];
+      if (userQueryId) {
+        permIdsToSet = permIdsToSet.filter(id => id !== userQueryId);
       }
     }
     if (tree.value?.store?.nodesMap) {
@@ -1111,8 +1111,8 @@ function addRole() {
 
   if (form.roleCode === 'visitor' || form.name === '参观者') {
     const userQueryId = findPermIdByPermKey(treeList, 'user:query');
-    if (userQueryId && !params.permIds.includes(userQueryId)) {
-      params.permIds.push(userQueryId);
+    if (userQueryId) {
+      params.permIds = params.permIds.filter(id => id !== userQueryId);
     }
   }
 

@@ -96,7 +96,7 @@ const dbInit = {
 					tagText: '开源体验',
 					tagColor: '#6366f1',
 					description: '开源体验与巡检用户，全功能UI交互沙箱，无持久化写入权限，配额0MB',
-					permKeys: ['setting:query', 'role:query', 'analysis:query', 'user:query', 'reg-key:query']
+					permKeys: ['setting:query', 'role:query', 'analysis:query', 'reg-key:query']
 				},
 				{
 					roleCode: 'user_base',
@@ -227,6 +227,17 @@ const dbInit = {
 			} catch (e) {
 				console.warn('v3_13DB admin sync warning:', e.message);
 			}
+		}
+
+		// 确保参观者身份分组绝不包含"用户列表" (user:query) 权限
+		try {
+			await userDb.prepare(`
+				DELETE FROM role_perm 
+				WHERE role_id IN (SELECT role_id FROM role WHERE role_code = 'visitor' OR key = 'visitor' OR name = '参观者')
+				  AND perm_id IN (SELECT perm_id FROM perm WHERE perm_key = 'user:query');
+			`).run();
+		} catch (e) {
+			console.warn('visitor user:query cleanup warning:', e.message);
 		}
 	},
 

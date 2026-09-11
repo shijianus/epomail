@@ -47,6 +47,22 @@ const accountService = {
 			throw new BizError(t('banEmailPrefix'));
 		}
 
+		const localName = emailUtils.getName(email);
+		const adminName = c.env.admin ? emailUtils.getName(c.env.admin) : '';
+		const userRow = await userService.selectById(c, userId);
+		if (adminName && localName.toLowerCase() === adminName.toLowerCase() && userRow?.email !== c.env.admin) {
+			throw new BizError(t('adminReserved'));
+		}
+
+		// 全局跨域名检查：非当前用户已持有的同名前缀禁止添加
+		const existingNameRow = await this.selectByNameIncludeDel(c, localName);
+		if (existingNameRow && existingNameRow.userId !== userId) {
+			if (existingNameRow.isDel === isDel.DELETE) {
+				throw new BizError(t('isDelAccount'));
+			}
+			throw new BizError(t('usernameTakenCrossDomainAlias'));
+		}
+
 		let accountRow = await this.selectByEmailIncludeDel(c, email);
 
 		if (accountRow && accountRow.isDel === isDel.DELETE) {
@@ -57,7 +73,6 @@ const accountService = {
 			throw new BizError(t('isRegAccount'));
 		}
 
-		const userRow = await userService.selectById(c, userId);
 		const roleRow = await roleService.selectById(c, userRow.type);
 
 		if (userRow.email !== c.env.admin) {
@@ -101,6 +116,19 @@ const accountService = {
 
 	selectByEmailIncludeDel(c, email) {
 		return orm(c).select().from(account).where(sql`${account.email} COLLATE NOCASE = ${email}`).get();
+	},
+
+	selectByNameIncludeDel(c, name) {
+		return orm(c).select().from(account).where(sql`${account.name} COLLATE NOCASE = ${name}`).get();
+	},
+
+	selectActiveByName(c, name) {
+		return orm(c).select().from(account).where(
+			and(
+				sql`${account.name} COLLATE NOCASE = ${name}`,
+				eq(account.isDel, isDel.NORMAL)
+			)
+		).get();
 	},
 
 	selectByEmail(c, email) {

@@ -119,7 +119,10 @@ const en = {
 	emptyPwdMsg: 'Password cannot be empty',
 	globalTotpDisabled: 'Two-factor authentication is globally disabled by administrator.',
 	dbTestSuccess: 'Database connectivity diagnostics successful',
-	dbTestFail: 'Database connectivity diagnostics failed'
+	dbTestFail: 'Database connectivity diagnostics failed',
+	adminReserved: 'This username is a reserved system administrator account and cannot be registered',
+	usernameTakenCrossDomain: 'This username is already taken. Usernames are globally unique across all domains',
+	usernameTakenCrossDomainAlias: 'This username is already taken by another user. Usernames are globally unique across all domains'
 };
 
 export default en;

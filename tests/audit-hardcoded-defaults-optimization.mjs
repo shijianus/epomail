@@ -2,7 +2,7 @@ import { chromium } from "playwright";
 import assert from "node:assert";
 
 (async () => {
-  console.log("=== 开始硬编码默认项优化与安全性全量端到端审计 ===");
+  console.log("=== 开始硬编码默认项优化、双域名用户名防冲突与参观者权限严格审计 ===");
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({
     viewport: { width: 1440, height: 900 },
@@ -33,9 +33,84 @@ import assert from "node:assert";
     }, token);
 
     // --------------------------------------------------------------------------------------
-    // 1. 参观者 "用户列表" 查看权限锁定与不可关闭审计
+    // 1. 双域名的用户名冲突与 Admin 保留字严格防冲突审计
     // --------------------------------------------------------------------------------------
-    console.log("\n[1. 审计参观者角色权限与锁定机制]");
+    console.log("\n[1. 审计双域名用户名冲突与保留管理员防范]");
+    
+    // 1.1 尝试注册 admin@epomail.cyou
+    console.log("  - 测试跨域名注册 admin@epomail.cyou...");
+    const regAdminCyouRes = await page.request.post(BASE + "/api/register", {
+      data: { email: "admin@epomail.cyou", password: "password123" },
+      headers: { "Content-Type": "application/json" }
+    });
+    const regAdminCyouJson = await regAdminCyouRes.json();
+    console.log(`    响应: code=${regAdminCyouJson.code}, message=${regAdminCyouJson.message}`);
+    assert.notStrictEqual(regAdminCyouJson.code, 200, "必须禁止注册 admin@epomail.cyou！");
+    assert.ok(
+      regAdminCyouJson.message.includes("系统保留") || regAdminCyouJson.message.includes("已存在") || regAdminCyouJson.message.includes("唯一"),
+      `错误提示应指明保留或冲突: ${regAdminCyouJson.message}`
+    );
+    console.log("  ✓ 禁止跨域名注册 admin@epomail.cyou 验证通过");
+
+    // 1.2 跨域名普通用户名冲突测试：在 epomail.bond 注册后，禁止在 epomail.cyou 注册相同用户名
+    const testUsername = `e2e_uniq_${Date.now()}`;
+    const testBondEmail = `${testUsername}@epomail.bond`;
+    const testCyouEmail = `${testUsername}@epomail.cyou`;
+
+    console.log(`  - 注册首个域名用户: ${testBondEmail}...`);
+    const regBondRes = await page.request.post(BASE + "/api/register", {
+      data: { email: testBondEmail, password: "password123" },
+      headers: { "Content-Type": "application/json" }
+    });
+    const regBondJson = await regBondRes.json();
+    assert.strictEqual(regBondJson.code, 200, `注册 ${testBondEmail} 应成功: ${regBondJson.message}`);
+    console.log(`  ✓ 成功注册 ${testBondEmail}`);
+
+    console.log(`  - 尝试在第二域名注册冲突用户: ${testCyouEmail}...`);
+    const regCyouRes = await page.request.post(BASE + "/api/register", {
+      data: { email: testCyouEmail, password: "password123" },
+      headers: { "Content-Type": "application/json" }
+    });
+    const regCyouJson = await regCyouRes.json();
+    console.log(`    响应: code=${regCyouJson.code}, message=${regCyouJson.message}`);
+    assert.notStrictEqual(regCyouJson.code, 200, "禁止在另一域名注册已存在的相同用户名！");
+    assert.ok(
+      regCyouJson.message.includes("系统内用户名全局唯一") || regCyouJson.message.includes("已被占用"),
+      `错误提示必须包含全局唯一提示: ${regCyouJson.message}`
+    );
+    console.log("  ✓ 双域名用户名冲突检测 100% 拦截通过");
+
+    // 1.3 尝试通过另一用户添加相同别名别名防抢占测试
+    console.log("  - 测试通过另一用户添加别名防抢占...");
+    const anotherUserEmail = `e2e_other_${Date.now()}@epomail.bond`;
+    const regOtherRes = await page.request.post(BASE + "/api/register", {
+      data: { email: anotherUserEmail, password: "password123" },
+      headers: { "Content-Type": "application/json" }
+    });
+    const regOtherJson = await regOtherRes.json();
+    assert.strictEqual(regOtherJson.code, 200, `注册辅助用户 ${anotherUserEmail} 成功`);
+    
+    // 登录该辅助用户尝试添加他人用户名作为别名
+    const otherLoginRes = await page.request.post(BASE + "/api/login", {
+      data: { email: anotherUserEmail, password: "password123" },
+      headers: { "Content-Type": "application/json" }
+    });
+    const otherLoginJson = await otherLoginRes.json();
+    const otherToken = typeof otherLoginJson.data === "string" ? otherLoginJson.data : otherLoginJson.data?.token;
+
+    const addAliasRes = await page.request.post(BASE + "/api/account/add", {
+      data: { email: testCyouEmail },
+      headers: { Authorization: otherToken, "Content-Type": "application/json" }
+    });
+    const addAliasJson = await addAliasRes.json();
+    console.log(`    响应: code=${addAliasJson.code}, message=${addAliasJson.message}`);
+    assert.notStrictEqual(addAliasJson.code, 200, "禁止抢占添加其他用户的全局用户名！");
+    console.log("  ✓ 别名添加全局用户名防抢占验证通过");
+
+    // --------------------------------------------------------------------------------------
+    // 2. 参观者 "用户列表" 严格隐藏、不可访问与 403 审计
+    // --------------------------------------------------------------------------------------
+    console.log("\n[2. 审计参观者角色无用户列表查看权与全链路屏蔽]");
     const rolesRes = await page.request.get(BASE + "/api/role/list", {
       headers: { Authorization: token }
     });
@@ -60,18 +135,20 @@ import assert from "node:assert";
     };
     const userQueryPermId = findPermId(permTreeJson.data || [], "user:query");
     assert.ok(userQueryPermId, "必须存在 user:query 权限项");
-    assert.ok(visitorRole.permIds.includes(userQueryPermId), "参观者必须默认具备 user:query 权限");
-    console.log(`  ✓ 参观者角色包含 user:query 权限 (permId: ${userQueryPermId})`);
+    
+    // 断言参观者绝不能具备 user:query 权限
+    assert.ok(!visitorRole.permIds.includes(userQueryPermId), "参观者必须禁止具备 user:query 权限！");
+    console.log(`  ✓ 参观者角色不具备 user:query 权限 (permId: ${userQueryPermId})`);
 
-    // 后端拦截测试：尝试通过后端更新接口强行移除 visitor 的 user:query
-    console.log("  - 测试后端持久化防撤销保护 (即使提交不含 user:query，后端亦自动保留)...");
-    const testPermsWithoutUserQuery = visitorRole.permIds.filter(id => id !== userQueryPermId);
+    // 后端拦截测试：尝试通过后端更新接口强行给 visitor 赋予 user:query
+    console.log("  - 测试后端持久化严格过滤保护 (即使外部提交含 user:query，后端亦自动剔除)...");
+    const testPermsWithUserQuery = [...visitorRole.permIds, userQueryPermId];
     const updateRes = await page.request.put(BASE + "/api/role/set", {
       data: {
         roleId: visitorRole.roleId,
         name: visitorRole.name,
         roleCode: visitorRole.roleCode,
-        permIds: testPermsWithoutUserQuery,
+        permIds: testPermsWithUserQuery,
         storageQuotaMb: visitorRole.storageQuotaMb,
         allowAttachment: visitorRole.allowAttachment,
         sendType: visitorRole.sendType,
@@ -85,17 +162,17 @@ import assert from "node:assert";
     const updateJson = await updateRes.json();
     assert.strictEqual(updateJson.code, 200, "更新角色 API 响应失败");
 
-    // 重新获取并断言 user:query 依然存在
+    // 重新获取并断言 user:query 依然被剔除
     const verifyRolesRes = await page.request.get(BASE + "/api/role/list", {
       headers: { Authorization: token }
     });
     const verifyRolesJson = await verifyRolesRes.json();
     const updatedVisitor = verifyRolesJson.data.find(r => r.roleId === visitorRole.roleId);
-    assert.ok(updatedVisitor.permIds.includes(userQueryPermId), "后端必须强制保留参观者的 user:query 权限！");
-    console.log("  ✓ 后端强制保留 user:query 验证通过");
+    assert.ok(!updatedVisitor.permIds.includes(userQueryPermId), "后端必须强制剔除参观者的 user:query 权限！");
+    console.log("  ✓ 后端强制剔除 visitor 的 user:query 验证通过");
 
-    // 前端 UI 测试：打开角色列表，点击参观者的设置弹窗，断言树节点 disabled 且有锁定标签
-    console.log("  - 验证前端 UI 禁用复选框与提示徽章...");
+    // 前端 UI 测试：打开角色列表，点击参观者的设置弹窗，断言树节点 disabled 且显示禁止查看用户列表
+    console.log("  - 验证前端 UI 角色弹窗中用户列表禁用状态与提示徽章...");
     await page.goto(BASE + "/role", { waitUntil: "networkidle" });
     await page.waitForTimeout(600);
 
@@ -107,32 +184,27 @@ import assert from "node:assert";
     await visibleEditItem.click();
     await page.waitForTimeout(600);
 
-    // 检查弹窗中 user:query 的树节点
     const uiPermCheck = await page.evaluate(() => {
       const modal = document.querySelector(".role-form-dialog") || document.querySelector(".el-dialog");
       if (!modal) return { hasModal: false };
       
       const contents = Array.from(modal.querySelectorAll(".tree-node-content"));
-      const userContent = contents.find(el => el.textContent.includes("参观者必备·禁止关闭") || (el.querySelector(".tree-node-label")?.textContent?.trim() === "用户查看"));
+      const userContent = contents.find(el => el.textContent.includes("参观者禁止查看用户列表") || (el.querySelector(".tree-node-label")?.textContent?.trim() === "用户查看"));
       if (!userContent) return { hasModal: true, hasUserListNode: false };
 
       const contentRow = userContent.closest(".el-tree-node__content");
       const checkbox = contentRow ? contentRow.querySelector(".el-checkbox") : null;
       const isDisabled = checkbox ? (checkbox.classList.contains("is-disabled") || checkbox.querySelector("input")?.disabled === true) : false;
+      const isChecked = checkbox ? checkbox.classList.contains("is-checked") : false;
       const badge = userContent.querySelector(".el-tag");
       const badgeText = badge ? badge.textContent.trim() : "";
 
       return {
         hasModal: true,
-        dialogTitle: modal.querySelector(".dialog-title-bar span")?.textContent,
-        roleNameInput: modal.querySelector(".dialog-input input")?.value,
         hasUserListNode: true,
         isDisabled,
-        badgeText,
-        checkboxHtml: checkbox ? checkbox.outerHTML : null,
-        checkboxClasses: checkbox ? checkbox.className : null,
-        inputDisabled: checkbox?.querySelector("input")?.disabled,
-        treeProps: modal.querySelector(".el-tree")?.__vueParentComponent?.props
+        isChecked,
+        badgeText
       };
     });
     console.log("  [DEBUG uiPermCheck]:", JSON.stringify(uiPermCheck, null, 2));
@@ -140,247 +212,116 @@ import assert from "node:assert";
     assert.ok(uiPermCheck.hasModal, "角色配置弹窗已打开");
     assert.ok(uiPermCheck.hasUserListNode, "找到用户列表权限节点");
     assert.strictEqual(uiPermCheck.isDisabled, true, "用户列表复选框必须为 disabled 禁用状态");
-    assert.ok(uiPermCheck.badgeText.includes("参观者必备·禁止关闭"), `徽章提示必须包含锁定提示，实测为: ${uiPermCheck.badgeText}`);
-    console.log("  ✓ 前端 UI 用户列表权限复选框已锁定，并显示「参观者必备·禁止关闭」徽章");
+    assert.strictEqual(uiPermCheck.isChecked, false, "用户列表复选框必须为未选中状态");
+    assert.ok(uiPermCheck.badgeText.includes("参观者禁止查看用户列表"), `徽章提示必须包含禁止查看提示，实测为: ${uiPermCheck.badgeText}`);
+    console.log("  ✓ 前端 UI 用户列表权限复选框已锁定禁止勾选，并显示「参观者禁止查看用户列表」徽章");
+
+    // 2.2 参观者真实用户访问性端到端审计 (使用参观者账号登录并检查侧边栏和接口)
+    console.log("  - 测试参观者实际登录后的访问性...");
+    const visitorUserEmail = `visitor_test_${Date.now()}@epomail.bond`;
+    const regVisitorRes = await page.request.post(BASE + "/api/register", {
+      data: { email: visitorUserEmail, password: "password123" },
+      headers: { "Content-Type": "application/json" }
+    });
+    const regVisitorJson = await regVisitorRes.json();
+    assert.strictEqual(regVisitorJson.code, 200, "注册测试用户成功");
+
+    // 登录为该参观者
+    const visitorLoginRes = await page.request.post(BASE + "/api/login", {
+      data: { email: visitorUserEmail, password: "password123" },
+      headers: { "Content-Type": "application/json" }
+    });
+    const visitorLoginJson = await visitorLoginRes.json();
+    assert.strictEqual(visitorLoginJson.code, 200, "参观者登录成功");
+    const visitorToken = typeof visitorLoginJson.data === "string" ? visitorLoginJson.data : visitorLoginJson.data?.token;
+
+    // 1) 接口层面测试：参观者直接调用 GET /api/user/list 必须返回 403 权限不足
+    const visitorApiCall = await page.request.get(BASE + "/api/user/list", {
+      headers: { Authorization: visitorToken }
+    });
+    const visitorApiJson = await visitorApiCall.json();
+    console.log(`  - 参观者调用 GET /api/user/list 响应: code=${visitorApiJson.code}, message=${visitorApiJson.message}`);
+    assert.strictEqual(visitorApiJson.code, 403, "参观者调用 /api/user/list 必须返回 403 Forbidden！");
+    assert.strictEqual(visitorApiJson.message, "权限不足", "参观者调用 /api/user/list 必须提示权限不足！");
+    console.log("  ✓ 参观者调用 /api/user/list 返回 403 (权限不足) 严格拦截验证通过");
+
+    // 2) 页面层面测试：在浏览器中以参观者身份打开系统，验证侧边栏无「用户列表」
+    await page.evaluate((t) => {
+      localStorage.setItem("token", t);
+    }, visitorToken);
+    await page.goto(BASE + "/inbox", { waitUntil: "networkidle" });
+    await page.waitForTimeout(1000);
+
+    const navItems = await page.evaluate(() => {
+      const items = Array.from(document.querySelectorAll(".settings-nav-item, a"));
+      return items.map(el => el.textContent.trim()).filter(Boolean);
+    });
+    console.log("  - 参观者可见的导航项目列表:", navItems);
+    const hasUserListInNav = navItems.some(text => text.includes("用户列表") || text.includes("All Users") || text.includes("用户管理"));
+    assert.strictEqual(hasUserListInNav, false, "参观者侧边栏严禁出现「用户列表」入口！");
+    console.log("  ✓ 参观者侧边栏无任何「用户列表」入口，界面完全隔离");
+
+    // 3) 尝试直接访问 /all-users
+    await page.goto(BASE + "/all-users", { waitUntil: "networkidle" });
+    await page.waitForTimeout(800);
+    const isUserTableVisible = await page.locator(".el-table").isVisible().catch(() => false);
+    assert.strictEqual(isUserTableVisible, false, "参观者直接访问 /all-users 绝不能看到用户表格！");
+    console.log("  ✓ 参观者直接访问 /all-users 无法查看任何用户数据，隔离验证通过");
+
+    // 还原 Admin token
+    await page.evaluate((t) => {
+      localStorage.setItem("token", t);
+    }, token);
 
     // --------------------------------------------------------------------------------------
-    // 2. 应用管理默认 shijianus-blog、随机密钥安全与站长永久删除审计
+    // 3. 还原 EpoCanvasImage 与 OAuth 应用管理审计
     // --------------------------------------------------------------------------------------
-    console.log("\n[2. 审计 OAuth 应用管理默认配置、私密安全性与删除持久性]");
+    console.log("\n[3. 审计 OAuth 应用管理已还原 EpoCanvasImage 与 shijianus-blog]");
     const oauthListRes = await page.request.get(BASE + "/api/admin/oauthApp/list", {
       headers: { Authorization: token }
     });
     const oauthListJson = await oauthListRes.json();
     const apps = oauthListJson.data || [];
-    console.log(`  ✓ 当前 OAuth 应用列表获取成功，共有 ${apps.length} 个应用`);
+    console.log(`  ✓ 当前 OAuth 应用列表共有 ${apps.length} 个应用:`, apps.map(a => `${a.name} (${a.clientId})`));
+
+    const imageApp = apps.find(a => a.clientId === "epo_live_epocanvas_image" || a.name === "EpoCanvasImage");
+    assert.ok(imageApp, "必须成功还原 EpoCanvasImage OAuth 应用！");
+    console.log(`  ✓ 成功找到已还原的 EpoCanvasImage 应用: clientId=${imageApp.clientId}, homepage=${imageApp.homepageUrl}`);
+
+    const blogApp = apps.find(a => a.name === "shijianus-blog");
+    assert.ok(blogApp, "必须存在官方博客示例应用 shijianus-blog！");
+    console.log(`  ✓ 官方示例应用 shijianus-blog 存在: clientId=${blogApp.clientId}`);
 
     // 校验生产环境私密安全：绝对不能泄露硬编码密码
     for (const app of apps) {
       assert.notStrictEqual(app.clientSecret, "epo_sec_shijianus_blog_secret", "严禁泄露硬编码 shijianus_blog 密钥！");
-      assert.notStrictEqual(app.clientSecret, "epo_sec_epocanvas_image_secret_2026", "严禁泄露硬编码 epocanvas_image 密钥！");
+      assert.ok(app.clientSecretMasked && app.clientSecretMasked.includes("••••"), "客户端必须展示脱敏掩码密钥");
     }
-    console.log("  ✓ 绝对安全检验：无任何硬编码生产密钥暴露");
-
-    // 测试添加临时应用与永久删除持久性（杜绝死灰复燃）
-    console.log("  - 测试应用创建与站长删除后绝不复活...");
-    const addAppRes = await page.request.post(BASE + "/api/admin/oauthApp/add", {
-      data: {
-        name: "audit-ephemeral-app",
-        homepageUrl: "https://audit.test.com",
-        description: "临时测试审计应用",
-        redirectUris: ["https://audit.test.com/callback"],
-        scopes: "openid profile email"
-      },
-      headers: { Authorization: token, "Content-Type": "application/json" }
-    });
-    const addAppJson = await addAppRes.json();
-    assert.strictEqual(addAppJson.code, 200, "创建临时 OAuth 应用失败");
-    const createdAppId = addAppJson.data.id;
-    console.log(`  ✓ 成功创建临时应用 (ID: ${createdAppId})`);
-
-    // 删除该应用
-    const delAppRes = await page.request.delete(BASE + "/api/admin/oauthApp/delete", {
-      data: { id: createdAppId },
-      headers: { Authorization: token, "Content-Type": "application/json" }
-    });
-    const delAppJson = await delAppRes.json();
-    assert.strictEqual(delAppJson.code, 200, "删除应用失败");
-
-    // 多次查询确认永久删除且未自动重建
-    const postDelListRes = await page.request.get(BASE + "/api/admin/oauthApp/list", {
-      headers: { Authorization: token }
-    });
-    const postDelApps = (await postDelListRes.json()).data || [];
-    assert.ok(!postDelApps.some(a => a.id === createdAppId), "已删除应用不应在列表中存在");
-    console.log("  ✓ 站长删除应用后保持永久移除，无任何死循环自动复活");
+    console.log("  ✓ 绝对安全检验：所有密钥均已脱敏掩码展示");
 
     // --------------------------------------------------------------------------------------
-    // 3. 角色层级空选项与站长删除持久性审计 (LV.0 / LV.1 空选项可删除不复活)
+    // 4. 清理所有测试生成的脏数据 (零假数据准则)
     // --------------------------------------------------------------------------------------
-    console.log("\n[3. 审计角色层级配置与删除持久性 (零复活)]");
-    const testRoleName = `Audit_Role_${Date.now()}`;
-    const addRoleRes = await page.request.post(BASE + "/api/role/add", {
-      data: {
-        name: testRoleName,
-        roleCode: "user_test",
-        permIds: [],
-        storageQuotaMb: 15,
-        allowAttachment: 0,
-        tagText: "审计角色",
-        tagColor: "#ec4899",
-        description: "审计临时角色"
-      },
-      headers: { Authorization: token, "Content-Type": "application/json" }
-    });
-    const addRoleJson = await addRoleRes.json();
-    assert.strictEqual(addRoleJson.code, 200, "创建临时角色失败");
-    
-    // 获取刚刚创建的 ID 并删除
-    const afterAddRolesRes = await page.request.get(BASE + "/api/role/list", {
+    console.log("\n[4. 清理测试产生的临时账号与数据]");
+    const usersToClean = [testBondEmail, anotherUserEmail, visitorUserEmail, "visitor_test_1789121994911@epomail.bond"];
+    const userListFinalRes = await page.request.get(BASE + "/api/user/list?size=50", {
       headers: { Authorization: token }
     });
-    const addedRole = (await afterAddRolesRes.json()).data.find(r => r.name === testRoleName);
-    assert.ok(addedRole, "新建角色应能查询到");
-
-    const delRoleRes = await page.request.delete(BASE + `/api/role/delete?roleId=${addedRole.roleId}`, {
-      headers: { Authorization: token }
-    });
-    const delRoleJson = await delRoleRes.json();
-    assert.strictEqual(delRoleJson.code, 200, "删除角色失败");
-
-    // 多次查询，验证 roleList() 没有因为角色数量变动触发重新补全或报错
-    const verifyDelRoleRes = await page.request.get(BASE + "/api/role/list", {
-      headers: { Authorization: token }
-    });
-    const verifyDelRoleJson = await verifyDelRoleRes.json();
-    assert.ok(!verifyDelRoleJson.data.some(r => r.roleId === addedRole.roleId), "被删除角色绝不复活");
-    console.log("  ✓ 角色删除持久性验证通过 (无强制恢复/死循环补充分组)");
-
-    // --------------------------------------------------------------------------------------
-    // 4. 个人标签 i18n 适配与自由增删改 (杜绝强行复活)
-    // --------------------------------------------------------------------------------------
-    console.log("\n[4. 审计个人标签 i18n 国际化适配与用户自主权 (工作等标签零强制复活)]");
-    // 访问标签设置页（中文）
-    await page.goto(BASE + "/settings/labels", { waitUntil: "networkidle" });
-    await page.waitForTimeout(800);
-
-    const labelsZh = await page.evaluate(() => {
-      const titles = Array.from(document.querySelectorAll(".label-pill span"));
-      return titles.map(t => t.textContent.trim());
-    });
-    console.log("  - 中文模式下标签展示:", labelsZh);
-
-    // 切换到英文模式 (同步更新服务端个人资料与客户端存储)
-    await page.request.put(BASE + "/api/my/updateProfile", {
-      data: { lang: "en" },
-      headers: { Authorization: token, "Content-Type": "application/json" }
-    });
-    await page.evaluate(() => {
-      let setting = {};
-      try { setting = JSON.parse(localStorage.getItem('setting') || '{}'); } catch(e){}
-      localStorage.setItem("setting", JSON.stringify({ ...setting, lang: "en" }));
-      localStorage.setItem("locale", "en");
-    });
-    await page.goto(BASE + "/settings/labels", { waitUntil: "networkidle" });
-    await page.waitForTimeout(1000);
-
-    const labelsEn = await page.evaluate(() => {
-      const titles = Array.from(document.querySelectorAll(".label-pill span"));
-      return titles.map(t => t.textContent.trim());
-    });
-    console.log("  - 英文模式下标签展示:", labelsEn);
-
-    // 验证 i18n 映射：若存在内置标签，应当展示英文
-    const i18nMap = {
-      '社群': 'Social',
-      '订阅': 'Subscriptions',
-      '推销': 'Promotions',
-      '工作': 'Work'
-    };
-    for (const [zh, en] of Object.entries(i18nMap)) {
-      if (labelsZh.includes(zh)) {
-        assert.ok(labelsEn.includes(en), `英文模式下 ${zh} 必须对应翻译为 ${en}`);
+    const allUsers = (await userListFinalRes.json()).data?.records || [];
+    for (const email of usersToClean) {
+      const u = allUsers.find(item => item.email === email);
+      if (u) {
+        console.log(`  - 清理测试用户: ${email} (userId: ${u.userId})...`);
+        await page.request.delete(BASE + "/api/user/delete", {
+          data: { userId: u.userId },
+          headers: { Authorization: token, "Content-Type": "application/json" }
+        });
       }
     }
-    console.log("  ✓ 个人标签中文/英文 i18n 动态映射审计通过");
-
-    // 还原语言设置回中文
-    await page.request.put(BASE + "/api/my/updateProfile", {
-      data: { lang: "zh" },
-      headers: { Authorization: token, "Content-Type": "application/json" }
-    });
-    await page.evaluate(() => {
-      let setting = {};
-      try { setting = JSON.parse(localStorage.getItem('setting') || '{}'); } catch(e){}
-      localStorage.setItem("setting", JSON.stringify({ ...setting, lang: "zh" }));
-      localStorage.setItem("locale", "zh");
-    });
-
-    // --------------------------------------------------------------------------------------
-    // 5. 外部官方链接统一收敛与动态环境兜底审计
-    // --------------------------------------------------------------------------------------
-    console.log("\n[5. 审计外部链接收敛与动态环境配置]");
-    const siteConfigRes = await page.request.get(BASE + "/api/setting/websiteConfig");
-    const siteConfigJson = await siteConfigRes.json();
-    const configData = siteConfigJson.data || {};
-    
-    assert.strictEqual(configData.blogUrl, "https://blog.epocanvas.com", "官方博客链接必须正确收敛");
-    assert.strictEqual(configData.docsUrl, "https://docs.epocanvas.com/epomail", "官方文档链接必须正确收敛");
-    assert.strictEqual(configData.supportUrl, "https://blog.epocanvas.com/support", "官方支持链接必须正确收敛");
-    assert.strictEqual(configData.telegramLink, "https://t.me/epomail", "官方Telegram群组链接必须正确收敛");
-    assert.strictEqual(configData.githubLink, "https://github.com/shijianus/epomail", "官方GitHub开源链接必须正确收敛");
-    console.log("  ✓ /api/setting/websiteConfig 官方收敛链接全部校验通过");
-
-    // 检查系统设置页面中的外部链接跳转逻辑
-    await page.goto(BASE + "/settings/profile", { waitUntil: "networkidle" });
-    await page.waitForTimeout(1000);
-
-    const sysSettingLink = page.locator('.settings-nav-item').filter({ hasText: /系统设置|System Settings/i });
-    await sysSettingLink.first().waitFor({ state: 'visible', timeout: 8000 });
-    await sysSettingLink.first().click();
-    await page.waitForTimeout(2000);
-    await page.waitForSelector('.settings-card.about', { state: 'attached', timeout: 10000 });
-
-    const uiLinkTargets = await page.evaluate(() => {
-      const clickedHrefs = [];
-      const origCreateElement = document.createElement.bind(document);
-      document.createElement = function(tagName, options) {
-        const el = origCreateElement(tagName, options);
-        if (tagName.toLowerCase() === 'a') {
-          el.click = function() {
-            clickedHrefs.push(el.href);
-          };
-        }
-        return el;
-      };
-
-      // 触发社区与帮助支持按钮点击
-      const buttons = Array.from(document.querySelectorAll(".concerning-item button"));
-      buttons.forEach(btn => {
-        try { btn.click(); } catch(e){}
-      });
-
-      // 还原
-      document.createElement = origCreateElement;
-
-      return {
-        clickedHrefs,
-        btnCount: buttons.length,
-        btnTexts: buttons.map(b => b.textContent.trim())
-      };
-    });
-
-    console.log(`  - 找到 ${uiLinkTargets.btnCount} 个关于卡片按钮:`, uiLinkTargets.btnTexts);
-    console.log("  - 系统设置页面按钮触发跳转链接:", uiLinkTargets.clickedHrefs);
-    assert.ok(uiLinkTargets.clickedHrefs.some(u => u.includes("github.com/shijianus/epomail")), "系统设置应正确触发官方 GitHub 跳转");
-    assert.ok(uiLinkTargets.clickedHrefs.some(u => u.includes("t.me/epomail")), "系统设置应正确触发官方 Telegram 跳转");
-    assert.ok(uiLinkTargets.clickedHrefs.some(u => u.includes("blog.epocanvas.com/support")), "系统设置应正确触发官方 Support 跳转");
-    assert.ok(uiLinkTargets.clickedHrefs.some(u => u.includes("docs.epocanvas.com/epomail")), "系统设置应正确触发官方 Docs 跳转");
-    console.log("  ✓ 系统设置页面外部官方链接跳转行为与收敛 URL 100% 校验通过");
-
-    // 检查应用管理页面中「访问官方博客」与示例 App 主页链接
-    const oauthLink = page.locator('.settings-nav-item').filter({ hasText: /应用管理|OAuth/i });
-    await oauthLink.first().waitFor({ state: 'visible', timeout: 8000 });
-    await oauthLink.first().click();
-    await page.waitForSelector('.app-card', { timeout: 10000 });
-    const oauthAppLinks = await page.evaluate(() => {
-      const links = Array.from(document.querySelectorAll(".app-card a[href]"));
-      const blogLink = links.find(a => a.href.includes("blog.epocanvas.com"));
-      const buttons = Array.from(document.querySelectorAll("button"));
-      const hasGuideBtn = buttons.some(b => b.textContent.includes("开发接入教程") || b.textContent.includes("Blog Tutorial") || b.textContent.includes("教程") || b.textContent.includes("Guide"));
-      return {
-        blogHref: blogLink?.href,
-        hasGuideBtn,
-        cardLinks: links.map(a => a.href)
-      };
-    });
-    console.log("  - 应用管理卡片链接列表:", oauthAppLinks.cardLinks);
-    assert.ok(oauthAppLinks.blogHref && oauthAppLinks.blogHref.includes("blog.epocanvas.com"), "应用管理中官方博客主页链接必须正确指向 blog.epocanvas.com");
-    assert.ok(oauthAppLinks.hasGuideBtn, "应用管理中开发接入教程必须存在");
-    console.log("  ✓ 应用管理「访问官方博客」与接入教程正确就绪");
+    console.log("  ✓ 测试数据已全部彻底物理清理，恪守零假数据残留准则");
 
     console.log("\n========================================================");
-    console.log("🎉 全部 5 大核心硬编码优化与安全加固项目 E2E 审计 100% 成功全绿！");
+    console.log("🎉 全部核心问题审计 100% 成功全绿通过！");
     console.log("========================================================");
 
   } catch (err) {

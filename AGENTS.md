@@ -11,6 +11,35 @@
    - 在向用户输出回复时，必须置顶/显式打印出本次提交的完整 Commit Hash 与短 Hash，确保版本可追溯、审计记录完整。
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
+### 双域名用户名冲突根治、管理员保留字锁定、参观者用户列表权限彻底剥离与专案EpoCanvasImage应用还原上线 (2026-09-11)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **双域名/多域名用户名冲突彻底解决与管理员保留字全局保护 (Cross-Domain Username Collision & Admin Reservation)**:
+       - 根因分析：此前注册时仅通过完整邮箱 (`selectByEmailIncludeDel`) 做单域名匹配，导致系统在双域名（`epomail.bond`, `epomail.cyou`）配置下，不同域名可重复注册相同本地用户名，甚至出现第 2 个 admin（`admin@epomail.cyou`）并存的严重混乱；
+       - 核心治理：
+         - 在 `account-service.js` 中新增 `selectByNameIncludeDel(c, name)` 与 `selectActiveByName(c, name)` 方法；
+         - 在注册接口 (`login-service.js` 的 `register`) 与用户新增接口 (`user-service.js` 的 `add`) 中强行拦截管理员保留字：若本地用户名与 `c.env.admin` 前缀（`admin`）一致，立即拒绝并抛出 `BizError(t('adminReserved'))`（「`该用户名为系统保留管理员账号，禁止注册`」）；
+         - 跨域名全局用户名唯一校验：任何用户注册时，如果在 `account` 表中已存在相同本地用户名（无论在哪个域名下，包含已注销），一律拦截并提示 `BizError(t('usernameTakenCrossDomain'))`（「`该用户名已被占用，系统内用户名全局唯一`」）；
+         - 别名添加防抢占机制：在 `account-service.js` 的 `add()` 中加入防抢占校验，非原用户名持有者禁止跨域名添加相同用户名，有效保护站长与所有用户的全局数字身份所有权；已清理历史脏数据。
+    2. **参观者“用户列表”查看权限彻底剥离、UI隐藏与接口 403 严格屏蔽 (Visitor User List Full Isolation & 403)**:
+       - 权限收敛与后端过滤：在 `init.js` 与 `role-service.js` 中将参观者 (`visitor`) 的默认权限集严格剔除 `user:query`；在 `role-service.js` 的 `update()` 拦截中，若角色标识为 `visitor`，一律物理过滤并剥离 `user:query` (permId: 7)，物理杜绝任何后台管理员给参观者开启用户列表查看权；
+       - 前端 UI 锁定与警示：在角色管理 (`role/index.vue`) 中，编辑参观者 (`visitor`) 时，锁定 `user:query` 为 `:disabled="true"` 且绝不默认勾选，并附带醒目红色危险徽章「`参观者禁止查看用户列表`」；
+       - 侧边栏与路由动态屏蔽：参观者因不具备 `user:query` 权限，侧边栏完全隐藏“用户列表”导航入口；动态路由守卫不挂载 `/all-users`；
+       - 后端接口防护：参观者直接发起 API 请求 `GET /api/user/list` 时，安全网关直接拒绝并响应 `code: 403, message: "权限不足"`。
+    3. **专案 EpoCanvasImage OAuth 应用完整还原与非默认示例保全 (EpoCanvasImage Restoration & Preservation)**:
+       - 专案定位明确：澄清 `EpoCanvasImage` 是站长个人专案的外链 App (`repo外链App`)，而非官方给所有第三方的内置示例 App；
+       - 彻底根除硬编码删除：移除 `oauth-app-service.js` 中此前对 `epo_live_epocanvas_image` 的暴力删除逻辑；
+       - 数据表物理还原：在生产 D1 数据库中完整还原 `epo_live_epocanvas_image`（`name: 'EpoCanvasImage'`, `homepage_url: 'https://img.epocanvas.com'`，多重授权回调 URL 与 SVG Logo），密钥保持脱敏保密，站长可在 `/settings/oauth-apps` 中统一可视化管理 `shijianus-blog` 与 `EpoCanvasImage`。
+    4. **Playwright 生产环境真实端到端全维度审计 100% 全绿 (Comprehensive Live E2E Audit)**:
+       - 专属审计脚本 `tests/audit-hardcoded-defaults-optimization.mjs`：
+         - 步骤 1：跨域名注册 `admin@epomail.cyou` 被 100% 拦截并提示系统保留管理员账号；跨域名注册同名用户被 100% 拦截提示用户名全局唯一；别名添加他人用户名被 100% 拦截；
+         - 步骤 2：参观者 `user:query` 权限默认不具备、修改时后端自动剔除断言通过；角色弹窗 UI 禁用且展示「`参观者禁止查看用户列表`」；实际使用参观者账号登录，侧边栏无任何「用户列表」入口，直接访问 `/all-users` 无法查看，API 调用 `GET /api/user/list` 严格返回 403（权限不足）；
+         - 步骤 3：OAuth 应用列表成功查询到 `EpoCanvasImage` 与 `shijianus-blog`，所有密钥均已脱敏；
+         - 步骤 4：测试数据自动完全重置与物理清理，恪守零残留准则；
+       - 回归测试套件 `tests/audit-mail-mode-select.mjs`、`tests/audit-labels-container.mjs`、`tests/test-group-ui-consistency-and-visitor-clean.mjs`、`tests/test-welcome-email-visitor-and-all-accounts.mjs` 全部 100% 成功全绿通过。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **Cloudflare Workers 部署 Version ID**: `35aff484-96cc-4ea7-a5c6-48328dd8d37c`。
+    - **epocanvas-mail Git Commit**: `fa1deea38dde732a48e0be8e268b01e064b27042` (Short Hash: `fa1deea`)。
+
 ### 系统硬编码默认项全维度优化、参观者权限锁定、OAuth密钥私密随机化与官方链接收敛加固上线 (2026-09-11)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **参观者“用户列表”查看权限严格锁定与防撤销机制 (Visitor Role Permission Lock)**:

@@ -73,7 +73,7 @@ const roleService = {
 					tagText: '开源体验',
 					tagColor: '#6366f1',
 					description: '开源体验与巡检用户，全功能UI交互沙箱，无持久化写入权限，配额0MB',
-					permKeys: ['setting:query', 'role:query', 'analysis:query', 'user:query', 'reg-key:query']
+					permKeys: ['setting:query', 'role:query', 'analysis:query', 'reg-key:query']
 				},
 				{
 					roleCode: 'user_base',
@@ -335,11 +335,11 @@ const roleService = {
 
 		const targetRole = await this.selectById(c, roleId);
 		if (targetRole?.roleCode === 'visitor' || targetRole?.key === 'visitor' || targetRole?.name === '参观者') {
-			// 参观者默认禁止关闭对"用户列表" (user:query) 的查看权限
+			// 参观者严格禁止查看"用户列表" (user:query)
 			const userDb = getUserDb(c);
 			const userQueryPerm = await userDb.prepare(`SELECT perm_id FROM perm WHERE perm_key = 'user:query' LIMIT 1`).first();
-			if (userQueryPerm && !permIds.includes(userQueryPerm.perm_id)) {
-				permIds.push(userQueryPerm.perm_id);
+			if (userQueryPerm && permIds.includes(userQueryPerm.perm_id)) {
+				permIds = permIds.filter(id => id !== userQueryPerm.perm_id);
 			}
 		}
 

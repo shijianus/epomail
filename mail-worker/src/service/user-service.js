@@ -679,6 +679,21 @@ const userService = {
 			throw new BizError(t('pwdMinLength'));
 		}
 
+		const localName = emailUtils.getName(email);
+		const adminName = c.env.admin ? emailUtils.getName(c.env.admin) : '';
+		if (adminName && localName.toLowerCase() === adminName.toLowerCase()) {
+			throw new BizError(t('adminReserved'));
+		}
+
+		// 全局跨域名检查：无论在哪个域名下，用户名（本地名前缀）全局唯一
+		const existingNameRow = await accountService.selectByNameIncludeDel(c, localName);
+		if (existingNameRow && existingNameRow.isDel === isDel.DELETE) {
+			throw new BizError(t('isDelUser'));
+		}
+		if (existingNameRow) {
+			throw new BizError(t('usernameTakenCrossDomain'));
+		}
+
 		const accountRow = await accountService.selectByEmailIncludeDel(c, email);
 
 		if (accountRow && accountRow.isDel === isDel.DELETE) {
