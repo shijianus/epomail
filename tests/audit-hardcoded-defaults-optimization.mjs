@@ -13,19 +13,63 @@ import assert from "node:assert";
 
   try {
     // --------------------------------------------------------------------------------------
-    // 0. Admin 登录
+    // 0. Admin 多域名全域登录与凭证全链路审计 (admin@epomail.cyou, admin@epomail.bond, admin)
     // --------------------------------------------------------------------------------------
-    console.log("\n[0. Admin 登录]");
-    const loginRes = await page.request.post(BASE + "/api/login", {
+    console.log("\n[0. Admin 多域名全域登录审计]");
+    
+    // 0.1 验证 admin@epomail.cyou 登录
+    console.log("  - 测试 admin@epomail.cyou 使用管理员密码登录...");
+    const loginCyouRes = await page.request.post(BASE + "/api/login", {
+      data: { email: "admin@epomail.cyou", password: "123456" },
+      headers: { "Content-Type": "application/json" }
+    });
+    const loginCyouJson = await loginCyouRes.json();
+    assert.strictEqual(loginCyouJson.code, 200, `admin@epomail.cyou 登录失败: ${JSON.stringify(loginCyouJson)}`);
+    console.log("  ✓ admin@epomail.cyou 登录成功，获取 Token");
+
+    // 0.2 验证 admin@epomail.bond 登录
+    console.log("  - 测试 admin@epomail.bond 使用管理员密码登录...");
+    const loginBondRes = await page.request.post(BASE + "/api/login", {
       data: { email: "admin@epomail.bond", password: "123456" },
       headers: { "Content-Type": "application/json" }
     });
-    const loginJson = await loginRes.json();
-    assert.strictEqual(loginJson.code, 200, "Admin 登录失败");
-    const token = typeof loginJson.data === "string" ? loginJson.data : loginJson.data?.token;
-    console.log("  ✓ Admin 登录成功");
+    const loginBondJson = await loginBondRes.json();
+    assert.strictEqual(loginBondJson.code, 200, "admin@epomail.bond 登录失败");
+    console.log("  ✓ admin@epomail.bond 登录成功，获取 Token");
 
-    await page.goto(BASE + "/inbox", { waitUntil: "domcontentloaded" });
+    // 0.3 验证纯用户名 admin 登录
+    console.log("  - 测试纯用户名 admin 使用管理员密码登录...");
+    const loginAdminRes = await page.request.post(BASE + "/api/login", {
+      data: { email: "admin", password: "123456" },
+      headers: { "Content-Type": "application/json" }
+    });
+    const loginAdminJson = await loginAdminRes.json();
+    assert.strictEqual(loginAdminJson.code, 200, "纯用户名 admin 登录失败");
+    console.log("  ✓ 纯用户名 admin 登录成功，获取 Token");
+
+    const token = typeof loginCyouJson.data === "string" ? loginCyouJson.data : loginCyouJson.data?.token;
+
+    // 0.4 验证管理员账户列表中同时拥有双域名邮箱
+    const accListRes = await page.request.get(BASE + "/api/account/list?size=10", {
+      headers: { Authorization: token }
+    });
+    const accListJson = await accListRes.json();
+    const adminEmails = (accListJson.data || []).map(a => a.email);
+    console.log("  - 管理员当前绑定邮箱列表:", adminEmails);
+    assert.ok(adminEmails.includes("admin@epomail.cyou"), "管理员必须拥有 admin@epomail.cyou 邮箱账号");
+    assert.ok(adminEmails.includes("admin@epomail.bond"), "管理员必须拥有 admin@epomail.bond 邮箱账号");
+    console.log("  ✓ 管理员双域名 (epomail.cyou & epomail.bond) 邮箱列表绑定无缝就绪");
+
+    // 0.5 浏览器真实 UI 交互登录测试 (通过 /login/index.html 输入 admin@epomail.cyou 登录)
+    console.log("  - 测试浏览器真实 UI 页面登录 admin@epomail.cyou...");
+    await page.goto(BASE + "/login/index.html", { waitUntil: "networkidle" });
+    await page.waitForSelector("#epo-email", { timeout: 10000 });
+    await page.fill("#epo-email", "admin@epomail.cyou");
+    await page.fill("#epo-password", "123456");
+    await page.click('button[type="submit"]');
+    await page.waitForURL(url => url.pathname.includes("/inbox"), { timeout: 15000 });
+    console.log("  ✓ 浏览器 UI 登录 admin@epomail.cyou 成功跳转至 /inbox");
+
     await page.evaluate((t) => {
       localStorage.setItem("token", t);
       localStorage.setItem("setting", JSON.stringify({ lang: "zh" }));

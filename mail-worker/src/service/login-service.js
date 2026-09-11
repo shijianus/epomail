@@ -242,11 +242,12 @@ const loginService = {
 
 		const { email, password } = params;
 
-		if ((!email || !password) && !noVerifyPwd) {
+		const inputEmail = (email || '').trim().toLowerCase();
+		if ((!inputEmail || !password) && !noVerifyPwd) {
 			throw new BizError(t('emailAndPwdEmpty'));
 		}
 
-		const failKey = KvConst.LOGIN_FAIL + email;
+		const failKey = KvConst.LOGIN_FAIL + inputEmail;
 		let failCountStr = await c.env.kv.get(failKey);
 		let failCount = failCountStr ? parseInt(failCountStr) : 0;
 
@@ -258,7 +259,37 @@ const loginService = {
 			await c.env.kv.put(failKey, (failCount + 1).toString(), { expirationTtl: 12 * 60 * 60 });
 		};
 
-		const userRow = await userService.selectByEmailIncludeDel(c, email);
+		let userRow = await userService.selectByEmailIncludeDel(c, inputEmail);
+
+		if (!userRow) {
+			// 1. 尝试从 account 表查询是否为用户的附属/别名邮箱
+			const accountRow = await accountService.selectByEmailIncludeDel(c, inputEmail);
+			if (accountRow && accountRow.userId) {
+				userRow = await userService.selectByIdIncludeDel(c, accountRow.userId);
+			}
+		}
+
+		if (!userRow) {
+			// 2. 检查多域名下的管理员映射与纯用户名登录
+			const adminLocal = c.env.admin ? emailUtils.getName(c.env.admin).toLowerCase() : '';
+			const configuredDomains = Array.isArray(c.env.domain) ? c.env.domain : [c.env.domain];
+			if (inputEmail.includes('@')) {
+				const localPart = emailUtils.getName(inputEmail).toLowerCase();
+				const domainPart = emailUtils.getDomain(inputEmail);
+				if (adminLocal && localPart === adminLocal && configuredDomains.includes(domainPart)) {
+					userRow = await userService.selectByEmailIncludeDel(c, c.env.admin);
+				}
+			} else if (inputEmail) {
+				if (adminLocal && inputEmail === adminLocal) {
+					userRow = await userService.selectByEmailIncludeDel(c, c.env.admin);
+				} else {
+					const accountRow = await accountService.selectByNameIncludeDel(c, inputEmail);
+					if (accountRow && accountRow.userId) {
+						userRow = await userService.selectByIdIncludeDel(c, accountRow.userId);
+					}
+				}
+			}
+		}
 
 		if (!userRow) {
 			await incrementFail();
@@ -327,6 +358,9 @@ const loginService = {
 		// Clear fail count on success
 		if (failCount > 0) {
 			await c.env.kv.delete(failKey);
+		}
+		if (userRow.email && (KvConst.LOGIN_FAIL + userRow.email) !== failKey) {
+			await c.env.kv.delete(KvConst.LOGIN_FAIL + userRow.email);
 		}
 
 		// If legacy single-round SHA-256 hash was detected, upgrade to PBKDF2 lazily

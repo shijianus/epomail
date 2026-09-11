@@ -265,6 +265,29 @@ const dbInit = {
 				console.warn(`跳过 setting 字段 ${col.name}：${e.message}`);
 			}
 		}
+
+		// 确保管理员在所有已配置域名下均具备默认 account 邮箱
+		if (c.env.admin) {
+			try {
+				const adminLocal = emailUtils.getName(c.env.admin);
+				const adminUser = await userDb.prepare(`SELECT user_id FROM user WHERE email = ?`).bind(c.env.admin).first();
+				if (adminUser) {
+					const domains = Array.isArray(c.env.domain) ? c.env.domain : [c.env.domain];
+					for (let i = 0; i < domains.length; i++) {
+						const domain = domains[i];
+						const fullEmail = `${adminLocal}@${domain}`.toLowerCase();
+						const existingAcc = await userDb.prepare(`SELECT account_id, user_id, is_del FROM account WHERE email = ?`).bind(fullEmail).first();
+						if (!existingAcc) {
+							await userDb.prepare(`INSERT INTO account (email, status, user_id, is_del, name, all_receive, sort) VALUES (?, 0, ?, 0, ?, 1, ?)`).bind(fullEmail, adminUser.user_id, adminLocal, i).run();
+						} else if (existingAcc.user_id !== adminUser.user_id || existingAcc.is_del === 1) {
+							await userDb.prepare(`UPDATE account SET user_id = ?, is_del = 0 WHERE account_id = ?`).bind(adminUser.user_id, existingAcc.account_id).run();
+						}
+					}
+				}
+			} catch (e) {
+				console.warn('admin multi-domain accounts sync warning:', e.message);
+			}
+		}
 	},
 
 	async assignRolePerms(userDb, roleId, permKeys) {
