@@ -677,6 +677,20 @@ html:not(.dark) .el-popper .el-popper__arrow::before {
     width: max-content !important;
 }
 
+.el-popper.mail-mode-popper .el-select-dropdown__item {
+    font-size: 13px !important;
+}
+
+.mail-mode-select .el-select__selected-item,
+.mail-mode-select .el-select__placeholder {
+    font-size: var(--mail-mode-fs, 12px) !important;
+}
+
+.mail-mode-select .el-select__selected-item span,
+.mail-mode-select .el-select__placeholder span {
+    font-size: var(--mail-mode-fs, 12px) !important;
+}
+
 /* Ensure class="el-select" wrapper is generously sized and comfortably bounds all text without spilling out */
 .el-select {
     min-width: 130px;

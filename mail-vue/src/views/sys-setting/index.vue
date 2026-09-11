@@ -45,7 +45,7 @@
                   </el-tooltip>
                   <el-select
                       @change="(val) => changeMailMode(val)"
-                      :style="{ width: mailModeSelectWidth }"
+                      :style="{ width: mailModeFixedSelectWidth, '--mail-mode-fs': mailModeFontSize }"
                       v-model="setting.allMailMode"
                       placeholder="Select"
                       class="mail-mode-select"
@@ -3811,48 +3811,59 @@ const tgMsgLabelWidth = computed(() => locale.value === 'en' ? '120px' : '100px'
 
 const mailModeOptions = computed(() => [
   { value: 1, label: `${t('allMailMode')} (Level 1)` },
-  { value: 0, label: `${t('privacyMailMode')} (Level 2 [推荐])` },
+  { value: 0, label: `${t('privacyMailMode')} (Level 2 [${locale.value === 'en' ? 'Recommended' : '推荐'}])` },
   { value: 2, label: `${t('encryptedMailMode')} (Level 3 [E2EE])` }
 ]);
 
-const mailModeSelectWidth = computed(() => {
+// 固定尺寸：宽度由语言决定且不随选中内容变化，杜绝容器抖动变形
+const mailModeFixedSelectWidth = computed(() => {
+  return locale.value === 'en' ? '260px' : '210px';
+});
+
+// 字体大小自适应：通过微调字体大小兼容不同文字长度的最小变化，确保在固定容器中零截断且无过大空白
+const mailModeFontSize = computed(() => {
   const m = Number(setting.value?.allMailMode);
   const isEn = locale.value === 'en';
   if (isEn) {
-    if (m === 1) return '178px';
-    if (m === 2) return '272px';
-    return '316px';
+    if (m === 1) return '12.5px';
+    if (m === 2) return '11.5px';
+    return '11px';
   }
-  // zh / default snug width: no excess blank space, clean 7-8px gap to arrow
-  if (m === 1) return '184px';
-  if (m === 0) return '226px';
-  if (m === 2) return '230px';
-  return '226px';
+  // 中文环境下：短文本使用 13.5px 饱满居中，较长文本使用 12px 严密贴合
+  if (m === 1) return '13.5px';
+  return '12px';
 });
 
 const currentMailModeSecurityBadge = computed(() => {
   const m = Number(setting.value?.allMailMode);
+  const isEn = locale.value === 'en';
   if (m === 2) {
     return {
-      levelText: 'Level 3: 最高绝密',
+      levelText: isEn ? 'Level 3: Top Secret' : 'Level 3: 最高绝密',
       tagType: 'success',
       icon: 'fluent:shield-lock-16-filled',
-      tooltip: '最高绝密级 (Maximum Zero-Knowledge E2EE)：全量100%往来信件采用 AES-256-GCM + HKDF-SHA256 加密，仅收发双方私钥可解密；管理员全接口阻断，严禁查阅任何邮件正文及元数据；强制开启 2FA；强制禁用外部推送与转发。'
+      tooltip: isEn
+        ? 'Maximum Zero-Knowledge E2EE: 100% of emails are encrypted with AES-256-GCM + HKDF-SHA256. Private keys are never shared with admin. 2FA is strictly enforced; external push/forwarding is disabled.'
+        : '最高绝密级 (Maximum Zero-Knowledge E2EE)：全量100%往来信件采用 AES-256-GCM + HKDF-SHA256 加密，仅收发双方私钥可解密；管理员全接口阻断，严禁查阅任何邮件正文及元数据；强制开启 2FA；强制禁用外部推送与转发。'
     };
   }
   if (m === 1) {
     return {
-      levelText: 'Level 1: 明文基础',
+      levelText: isEn ? 'Level 1: Plaintext' : 'Level 1: 明文基础',
       tagType: 'info',
       icon: 'fluent:lock-open-16-regular',
-      tooltip: '明文基础级 (Standard Plaintext)：邮件纯明文流转存储；管理员具备全站邮件审查权限；支持自由配置 2FA 与多渠道推送。'
+      tooltip: isEn
+        ? 'Standard Plaintext: Emails are stored in plaintext. Admin can audit all emails. Supports 2FA and multi-channel forwarding.'
+        : '明文基础级 (Standard Plaintext)：邮件纯明文流转存储；管理员具备全站邮件审查权限；支持自由配置 2FA 与多渠道推送。'
     };
   }
   return {
-    levelText: 'Level 2: 增强隐私',
+    levelText: isEn ? 'Level 2: Privacy' : 'Level 2: 增强隐私',
     tagType: 'primary',
     icon: 'fluent:shield-checkmark-16-filled',
-    tooltip: '增强隐私级 (Selective E2EE & Spam Isolation [推荐])：正常往来邮件强制密文存储，管理员在全站邮件中严禁查阅任何正常邮件；仅允许审查垃圾邮件及系统截断无主件；强制开启 2FA，防篡改保护。'
+    tooltip: isEn
+      ? 'Selective E2EE & Spam Isolation [Recommended]: Inbound and outbound emails are encrypted. Admin cannot read normal emails. 2FA is strictly enforced.'
+      : '增强隐私级 (Selective E2EE & Spam Isolation [推荐])：正常往来邮件强制密文存储，管理员在全站邮件中严禁查阅任何正常邮件；仅允许审查垃圾邮件及系统截断无主件；强制开启 2FA，防篡改保护。'
   };
 });
 
@@ -5496,15 +5507,29 @@ function editSetting(settingForm, refreshStatus = true, closeAiDialog = false) {
 }
 
 .mail-mode-select {
-  min-width: 0 !important;
   max-width: 100%;
-  transition: width 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.mail-mode-select :deep(.el-select__selected-item),
+.mail-mode-select :deep(.el-select__placeholder) {
+  font-size: var(--mail-mode-fs, 12px) !important;
+  transition: font-size 0.15s ease;
+}
+
+.mail-mode-select :deep(.el-select__selected-item span),
+.mail-mode-select :deep(.el-select__placeholder span) {
+  font-size: var(--mail-mode-fs, 12px) !important;
 }
 
 :deep(.mail-mode-popper),
 .mail-mode-popper {
   min-width: max-content !important;
   width: max-content !important;
+}
+
+:deep(.mail-mode-popper) .el-select-dropdown__item,
+.mail-mode-popper .el-select-dropdown__item {
+  font-size: 13px !important;
 }
 
 .r2domain-item {

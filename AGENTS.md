@@ -11,6 +11,33 @@
    - 在向用户输出回复时，必须置顶/显式打印出本次提交的完整 Commit Hash 与短 Hash，确保版本可追溯、审计记录完整。
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
+### 邮件模式下拉框尺寸锁定固定（零抖动·零形变）、文字自适应字体缩放与多语言 i18n 完整适配加固上线 (2026-09-11)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **锁定容器固定尺寸，杜绝随内容切换抖动形变 (Strictly Fixed Select Width)**:
+       - 需求澄清：下拉框尺寸必须是固定的，绝不允许因为用户选择 Level 1、Level 2 或 Level 3 而动态改变组件宽高引起界面抖动；
+       - 重构治理：在 `sys-setting/index.vue` 中定义基于国际化语言的固定尺寸 `mailModeFixedSelectWidth`（中文模式严格锁定为 `210px`，英文模式严格锁定为 `260px`）；切换模式时宽度绝不发生任何像素级变化。
+    2. **自适应微调字体大小兼容不同文字长度 (Dynamic Font-Size Adaptation for Minimal Variance)**:
+       - 根因分析：在固定宽度约束下，各模式文本字符长度存在差异（中文全部邮件模式 13 字符，加密与隐私模式 18 字符；英文最长 40 字符）；
+       - 缩放机制：通过 CSS 变量 `--mail-mode-fs` 动态注入 `mailModeFontSize`：
+         - 中文（zh）：短文本（Level 1）采用标准 `13.5px` 保持饱满适中；较长文本（Level 2/3）微调为 `12px`，严密贴合固定容器，杜绝截断（`isTruncated: false`），箭头间距维持在舒适标准的 10~13px；
+         - 英文（en）：Level 1 采用 `12.5px`，Level 3 采用 `11.5px`，Level 2（40字符）采用 `11px`，在 260px 固定宽度中完美舒展。
+    3. **全语言 i18n 完备性强化 (Comprehensive i18n Compatibility)**:
+       - 彻底解决模式选项中硬编码中文问题：在 `mailModeOptions` 中将 `[推荐]` 重构为 `${locale.value === 'en' ? 'Recommended' : '推荐'}`；
+       - 安全徽章级别文案与悬浮提示完全实现双语国际化（`Level 1: Plaintext`, `Level 2: Privacy`, `Level 3: Top Secret` 及对应详细安全说明）。
+    4. **Playwright 真实生产环境全指标与多模式审计 100% 全绿 (Comprehensive Live E2E Audit)**:
+       - 升级并执行 `tests/audit-mail-mode-select.mjs`：
+         - 中文固定尺寸实测断言：Mode 2 (210px, 12px, gap 10px, 0%截断) === Mode 0 (210px, 12px, gap 13px, 0%截断) === Mode 1 (210px, 13.5px, 0%截断)；
+         - 英文固定尺寸实测断言：Mode 0/1/2 严格固定 260px，0% 截断；
+         - 更新留存高质量审计截图：
+           - `tests/audit_mail_mode_full_light.png`
+           - `tests/audit_mail_mode_full_dark.png`
+           - `tests/audit_mail_mode_dropdown_open.png`
+       - 回归综合测试 `tests/test-ui-wallpaper-contrast-and-select.mjs`、`tests/test-mail-mode-e2e.mjs`、`tests/test-group-ui-consistency-and-visitor-clean.mjs`、`tests/test-welcome-email-visitor-and-all-accounts.mjs`、`tests/test-user-general-settings-binding-and-defaults.mjs` 全部 100% 成功通过；
+       - 严格恪守零假数据残留准则。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **Cloudflare Workers 部署 Version ID**: `f7d3ee14-7347-486b-a70d-f9477e344d38`。
+    - **epocanvas-mail Git Commit**: PENDING_COMMIT_HASH (Short Hash: PENDING_SHORT_HASH)。
+
 ### 邮件模式下拉框自适应严密贴合（刚刚好·零冗余空白·零截断）、全模式精准尺寸计算与下拉弹层全量展开加固上线 (2026-09-11)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **彻底消除固定过宽与多余空白（刚刚好，不多也不少，不要有空白）**:
