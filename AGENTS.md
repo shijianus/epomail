@@ -11,6 +11,42 @@
    - 在向用户输出回复时，必须置顶/显式打印出本次提交的完整 Commit Hash 与短 Hash，确保版本可追溯、审计记录完整。
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
+### 个人资料分区第三方应用与数据共享板块（对标Gmail/Google账号）、实时权限吊销与全链路审计上线 (2026-09-11)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **第三方应用与数据共享板块（对标 Gmail / Google 账号）**:
+       - 需求对齐：在资料分区（`views/data-setting/index.vue`）中建立全新第 4 核心板块（`#thirdPartyApps`），对标 Gmail / Google 账号“第三方应用与服务”及“与第三方共享的数据”安全架构；
+       - 概览指标卡片：直观呈现已关联应用总数、单点登录（SSO）安全承诺与数据自主控制原则；
+       - 授权应用卡片网格：直观展示应用品牌 Logo、官方受信徽章、应用名称、官网跳转、共享数据范围胶囊（OpenID 身份标识、公开个人资料、电子邮件地址、评论交互等）以及客户端 ID；
+       - Google 账号风格详情弹窗：
+         - 明确呈现“此应用有权访问的数据”列表与访问范围说明；
+         - 明确列出“此应用绝对无法访问的数据”安全底线（密码与密钥、两步验证 / Passkey 凭据、私密收件箱内容、系统管理员设置）；
+         - 遵循 RFC 6749 行业安全技术标准，展示授权时间戳与 Client ID 便捷复制；
+         - 危险操作区配备“移除此应用的全部访问权限”按钮与二次安全确认防误触弹窗；
+       - 优雅空状态展台：无第三方应用授权时，呈现 Google 风格友好空状态及生态应用展台（`shijianus-blog`、`EpoCanvasImage`）；
+       - 底部三大安全支柱常识卡：密码从不共享、数据范围完全掌控、随时随地一键即时撤销；
+       - 管理员专属快捷入口：管理员角色可一键无缝跳转至 `/settings/oauth-apps` 进行 OAuth 应用全生命周期管理。
+    2. **后端持久化与毫秒级实时权限吊销 (OAuth Grant Persistence & Instant Revocation)**:
+       - 授权记录持久化：在 `oauth-provider-service.js` 的 `authorize` 流程中，自动调用 `oauthAppService.recordGrant` 将授权关系持久化至 `oauth_grant` 数据表，并清除历史撤销标记；
+       - 实时权限吊销黑名单：在 `oauth-app-service.js` 的 `revokeGrant` 中，除物理删除 `oauth_grant` 记录外，同步向 Cloudflare KV 写入 30 天撤销标记 `REVOKED_GRANT_${userId}_${clientId} = '1'`；
+       - 边缘即时阻断：在 `oauthProviderService.userInfo` 中建立实时授权校验，外部客户端即使持有未过期 Access Token，在用户点击解除授权后亦被毫秒级实时阻断（401 Unauthorized 拦截：`该应用的访问权限已被用户撤销`）；
+       - 应用删除级联清理：在 `oauthAppService.delete` 中增加级联清理机制，应用删除时自动清理关联的所有授权记录。
+    3. **Playwright 真实生产环境全链路自动化审计 100% 全绿 (Comprehensive Live E2E Audit)**:
+       - 专属审计套件 `tests/audit-third-party-data-sharing.mjs`（11 项检查点全部 100% 通过）：
+         - ① 站长 API 登录获取会话 Token 成功；
+         - ② 获取第三方应用与授权记录 API 成功；
+         - ③ 验证模拟应用授权记录持久化并返回；
+         - ④ 模拟外部应用持有 Access Token 成功获取用户公开资料；
+         - ⑤ 调用撤销授权 API 成功物理删除记录并写入 KV 吊销黑名单；
+         - ⑥ 外部客户端再次使用原 Access Token 访问 UserInfo 端点，被 401 实时拦截，验证实时吊销防御机制生效；
+         - ⑦ Playwright 浏览器真实环境打开 `/settings/data-setting#thirdPartyApps` 页面渲染成功；
+         - ⑧ 概览卡片、已关联应用列表、受信徽章与数据标签真实渲染验证通过；
+         - ⑨ 点击应用卡片弹出 Google 账号风格详情弹窗，验证权限列表与隐私保障清单渲染；
+         - ⑩ 在弹窗内点击解除授权并确认，应用卡片实时卸载，平滑切换至优雅空状态展台；
+         - ⑪ 物理清理测试数据，恪守零假数据残留准则。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **Cloudflare Workers 部署 Version ID**: `f1d90cad-3d4b-428a-8735-730dedbf790f`。
+    - **epocanvas-mail Git Commit**: `3234d69d31c0363a7f943b51578b8975a1825113` (Short Hash: `3234d69`)。
+
 ### 欢迎邮件KV脏缓存自愈、参观者欢迎邮件补发API、全链路24项验收审计100%全绿上线 (2026-09-11)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **欢迎邮件 KV 脏缓存自愈修复 (Welcome Email Stale KV Cache Healing)**:
