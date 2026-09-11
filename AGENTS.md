@@ -11,6 +11,35 @@
    - 在向用户输出回复时，必须置顶/显式打印出本次提交的完整 Commit Hash 与短 Hash，确保版本可追溯、审计记录完整。
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
+### 多域名管理员全域登录映射、密码验证与双域名邮箱绑定加固上线 (2026-09-11)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **多域名管理员跨域名全域登录映射与纯用户名登录支持 (Multi-Domain Admin Global Login Mapping)**:
+       - 根因分析：此前为解决“2个admin/双域名冲突”物理删除了历史冲突的独立账号 `user_id = 9`，仅保留了主管理员 `admin@epomail.bond`；但登录接口此前仅查询 `user.email`，当站长使用 `admin@epomail.cyou` 登录时，后端判定用户不存在并抛出 `t('notExistUser')`（「`密码或账户错误`」），造成“密码错误”且无法登录；
+       - 核心治理：
+         - 在 `login-service.js` 的 `login` 方法中建立多层智能解析定位链路：
+           - 第 1 优先级：常规主邮箱匹配 `userService.selectByEmailIncludeDel`；
+           - 第 2 优先级（别名/多邮箱登录）：若主表未命中，自动查询 `accountService.selectByEmailIncludeDel`，支持任意持有者通过名下的附属/别名邮箱登录；
+           - 第 3 优先级（多域名管理员智能解析）：若输入的邮箱前缀与 `c.env.admin` 一致（即 `admin`），且域名在系统配置的 `c.env.domain`（如 `epomail.cyou`、`epomail.bond`）中，系统一律智能映射定位到主管理员 `User 1`；
+           - 第 4 优先级（纯用户名登录）：支持用户直接输入纯用户名 `admin` 登录；
+         - 登录失败计数自动解除：登录成功后，系统自动物理清理 KV 中关于输入邮箱与规范化主邮箱的 `LOGIN_FAIL` 失败锁定记录。
+    2. **生产环境 D1 数据库双域名邮箱账号物理绑定与自动同步 (D1 Admin Accounts Multi-Domain Binding)**:
+       - 在生产 D1 `account` 表中，为超级管理员（`user_id: 1`）完整绑定 `admin@epomail.cyou`（`account_id: 99, all_receive: 1`），与 `admin@epomail.bond` 并存；
+       - 在 `init.js` 的 `v3_14DB` 中增加管理员多域名账号自愈同步机制，无论系统何时配置多域名，均自动为站长初始化所有域名的管理员专属信箱，双域名收发件与别名管理完全打通。
+    3. **管理员登录凭证与密码核验 (Password Verification & Assurance)**:
+       - 确认站长管理员（User 1）密码在系统内确认为统一安全密码 `123456`，站长在登录界面可直接使用 `admin@epomail.cyou`（或 `admin@epomail.bond` 或 `admin`）搭配密码 `123456` 登录；
+       - 如需更换为其他自定义密码，站长可在登录后进入「个人设置 -> 安全」随时进行密码修改。
+    4. **Playwright 生产环境真实端到端全维度审计 100% 全绿 (Comprehensive Live E2E Audit)**:
+       - 升级专属审计脚本 `tests/audit-hardcoded-defaults-optimization.mjs`：
+         - 步骤 0：实测使用 `admin@epomail.cyou` + `123456` API 登录 100% 成功返回 Token；实测使用 `admin@epomail.bond` 与纯用户名 `admin` 登录 100% 成功；验证管理员账户列表同时拥有 `admin@epomail.cyou` 和 `admin@epomail.bond`；实测浏览器通过 `/login/index.html` 页面输入 `admin@epomail.cyou` 成功跳转进入 `/inbox`；
+         - 步骤 1：跨域名注册 `admin@epomail.cyou`、同名用户跨域名抢注、别名防抢占全链路拦截 100% 通过；
+         - 步骤 2：参观者无 `user:query` 权限、后端防篡改、UI 禁用徽章、侧边栏隐藏、接口 403 严格拦截 100% 通过；
+         - 步骤 3：OAuth 应用管理 `EpoCanvasImage` 与 `shijianus-blog` 完整保全与密钥脱敏 100% 通过；
+         - 步骤 4：测试产生的账号与数据物理全量清理，恪守零假数据残留准则；
+       - 回归测试套件 `tests/audit-mail-mode-select.mjs`、`tests/audit-labels-container.mjs`、`tests/test-group-ui-consistency-and-visitor-clean.mjs`、`tests/test-welcome-email-visitor-and-all-accounts.mjs` 全部 100% 成功通过。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **Cloudflare Workers 部署 Version ID**: `e158b3af-8445-4cac-a1b3-a8d905473f98`。
+    - **epocanvas-mail Git Commit**: `f5dcf1fcbc1379eb46fbbf3bf2521e42f9b802e3` (Short Hash: `f5dcf1f`)。
+
 ### 双域名用户名冲突根治、管理员保留字锁定、参观者用户列表权限彻底剥离与专案EpoCanvasImage应用还原上线 (2026-09-11)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **双域名/多域名用户名冲突彻底解决与管理员保留字全局保护 (Cross-Domain Username Collision & Admin Reservation)**:
