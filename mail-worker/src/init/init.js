@@ -298,6 +298,12 @@ const dbInit = {
 				} else {
 					await userDb.prepare(`UPDATE account SET user_id = ?, name = ?, is_del = 0 WHERE account_id = ?`).bind(visitorUser.user_id, visitorEmail, existingAcc.account_id).run();
 				}
+
+				// 清除参观者账号的 HAS_WELCOME KV 脏缓存，确保下次登录时能触发欢迎邮件投递
+				// 修复账号被恢复/迁移后 KV 残留导致欢迎邮件被永久阻塞的问题
+				try {
+					await c.env.kv.delete('HAS_WELCOME_' + visitorUser.user_id);
+				} catch (_) {}
 			}
 
 			// 确保超级管理员 (User 1) 仅绑定自身主邮箱 c.env.admin (admin@epomail.bond)，绝不越权关联其他域名信箱

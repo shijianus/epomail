@@ -1422,7 +1422,17 @@ const emailService = {
 		try {
 			const kvCached = await c.env.kv.get('HAS_WELCOME_' + userId);
 			if (kvCached === '1') {
-				return null;
+				// 双重验证：KV 说已发过，但需检查 DB 实际是否存在（防止账号恢复/迁移后 KV 残留阻塞欢迎邮件）
+				const dbCheck = await orm(c).select({ emailId: email.emailId }).from(email).where(
+					and(
+						eq(email.userId, userId),
+						eq(email.sendEmail, 'admin@epocanvas.com'),
+						eq(email.isDel, isDel.NORMAL)
+					)
+				).limit(1).get();
+				if (dbCheck) return null; // 确实已有，正常跳过
+				// KV 为脏缓存（账号曾被删除再恢复），清除后重新发送
+				await c.env.kv.delete('HAS_WELCOME_' + userId).catch(() => {});
 			}
 		} catch (e) {}
 

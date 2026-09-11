@@ -76,4 +76,18 @@ app.post('/user/purgeEmails', async (c) => {
 	return c.json(result.ok(data));
 });
 
+// 管理员强制为指定用户补发官方欢迎邮件（修复账号恢复后欢迎邮件缺失问题）
+app.post('/user/sendWelcomeEmail', async (c) => {
+	const { userId, email: userEmail } = await c.req.json();
+	if (!userId) {
+		return c.json(result.fail('userId 不能为空'));
+	}
+	// 先清除 KV 缓存，强制重新投递
+	try {
+		await c.env.kv.delete('HAS_WELCOME_' + userId);
+	} catch (_) {}
+	const emailService = (await import('../service/email-service')).default;
+	const emailRow = await emailService.ensureWelcomeEmailForUser(c, Number(userId), userEmail || null);
+	return c.json(result.ok({ delivered: !!emailRow, emailId: emailRow?.emailId }));
+});
 
