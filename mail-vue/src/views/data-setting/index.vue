@@ -405,28 +405,13 @@
 
     <!-- Section 4: 第三方应用和服务 (Third-Party Apps & Services) -->
     <div class="container third-party-apps-container" id="thirdPartyApps">
-      <div class="section-header-flex">
-        <div>
-          <div class="title">{{ $t('thirdPartyAppsTitle') || '第三方应用和服务' }}</div>
-          <div class="section-intro">
-            {{ $t('thirdPartyAppsDesc') || '管理已关联到您 Epomail 账号的第三方应用与网站，随时查看或移除访问权限。' }}
-          </div>
-        </div>
-        <div class="header-right-actions" v-if="hasPerm('setting:query')">
-          <el-button 
-            type="default" 
-            size="small" 
-            @click="router.push({ name: 'oauth-app' })"
-            class="manage-oauth-btn"
-          >
-            <Icon icon="fluent:apps-settings-20-regular" width="15" height="15" />
-            <span>{{ $t('thirdPartyManageAppsBtn') || '管理 OAuth 应用' }}</span>
-          </el-button>
-        </div>
+      <div class="title">{{ $t('thirdPartyAppsTitle') || '第三方应用和服务' }}</div>
+      <div class="section-intro">
+        {{ $t('thirdPartyAppsDesc') || '管理已关联到您 Epomail 账号的第三方应用与网站，随时查看或移除访问权限。' }}
       </div>
 
-      <!-- Search & Filter Bar (当有关联应用且大于 1 个时显示) -->
-      <div class="apps-toolbar" v-if="userGrants.length > 1">
+      <!-- Search & Filter Bar (当有关联应用时显示) -->
+      <div class="apps-toolbar" v-if="userGrants.length > 0">
         <div class="search-input-wrap">
           <el-input
             v-model="appSearchQuery"
@@ -921,12 +906,10 @@
 <script setup>
 import { ref, reactive, computed, onMounted, defineOptions } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Icon } from '@iconify/vue'
 import { useUserStore } from '@/store/user.js'
 import { useSettingStore } from '@/store/setting.js'
-import { hasPerm } from '@/perm/perm.js'
 import {
   exportUserData,
   testTelegramBot,
@@ -945,7 +928,6 @@ defineOptions({
 })
 
 const { t } = useI18n()
-const router = useRouter()
 const userStore = useUserStore()
 const settingStore = useSettingStore()
 
@@ -1261,8 +1243,8 @@ async function handleRevokeGrant(grant) {
     await revokeMyOauthGrant(grant.id)
     ElMessage.success((t('thirdPartyRevokeSuccess') || '已成功移除「{name}」的访问权限').replace('{name}', appName))
 
-    userGrants.value = userGrants.value.filter(g => g.id !== grant.id)
-    if (selectedAppDetail.value?.id === grant.id) {
+    userGrants.value = userGrants.value.filter(g => g.id !== grant.id && g.clientId !== grant.clientId)
+    if (selectedAppDetail.value?.id === grant.id || selectedAppDetail.value?.clientId === grant.clientId) {
       appDetailModalShow.value = false
       selectedAppDetail.value = null
     }
@@ -2420,28 +2402,7 @@ function triggerFileDownload(content, filename, mimeType) {
    Section 4: Third-Party Apps & Data Sharing (第三方应用与数据共享)
    ========================================================================== */
 .third-party-apps-container {
-  .section-header-flex {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 16px;
-    margin-bottom: 6px;
 
-    @media (max-width: 767px) {
-      flex-direction: column;
-      align-items: stretch;
-    }
-
-    .manage-oauth-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      border-radius: 8px;
-      font-weight: 500;
-      white-space: nowrap;
-      margin-top: 2px;
-    }
-  }
 
 
   /* 2. Toolbar & Search */
@@ -2797,7 +2758,12 @@ function triggerFileDownload(content, filename, mimeType) {
 /* ==========================================================================
    App Detail Dialog (Google Account Style Modal)
    ========================================================================== */
-.app-detail-dialog {
+:deep(.app-detail-dialog), .app-detail-dialog {
+  border-radius: 16px !important;
+  background: var(--bg-surface, #ffffff) !important;
+  border: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.08)) !important;
+  box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.2) !important;
+
   .app-detail-dialog-head {
     display: flex;
     align-items: center;
@@ -2874,6 +2840,9 @@ function triggerFileDownload(content, filename, mimeType) {
     flex-direction: column;
     gap: 18px;
     padding-top: 6px;
+    max-height: 56vh;
+    overflow-y: auto;
+    padding-right: 4px;
 
     .dialog-sub-section {
       display: flex;
@@ -3000,6 +2969,31 @@ function triggerFileDownload(content, filename, mimeType) {
     .danger-revoke-btn {
       border-radius: 8px;
     }
+  }
+}
+</style>
+
+<style lang="scss">
+.app-detail-dialog.el-dialog {
+  background: var(--bg-surface, #ffffff) !important;
+  border-radius: 16px !important;
+  border: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.08)) !important;
+  box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.25) !important;
+  overflow: hidden;
+
+  .el-dialog__header {
+    padding: 20px 24px 14px;
+    border-bottom: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.06));
+    margin-right: 0;
+  }
+
+  .el-dialog__body {
+    padding: 18px 24px;
+  }
+
+  .el-dialog__footer {
+    padding: 14px 24px 18px;
+    border-top: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.06));
   }
 }
 </style>

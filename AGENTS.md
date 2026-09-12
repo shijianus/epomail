@@ -11,6 +11,34 @@
    - 在向用户输出回复时，必须置顶/显式打印出本次提交的完整 Commit Hash 与短 Hash，确保版本可追溯、审计记录完整。
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
+### 用户与管理界面彻底解耦、系统已添加OAuth应用全量同步加载及资安隐患治理上线 (2026-09-12)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **用户端与管理端界面绝对物理隔离 (Strict Separation of User and Admin Spaces)**:
+       - 彻底移除普通用户资料分区（`views/data-setting/index.vue`）中多此一举的「管理 OAuth 应用」按钮与管理端跳转逻辑；
+       - 剥离对应的前端权限依赖（`hasPerm`、`useRouter`）与未使用的管理端样式（`.section-header-flex`、`.manage-oauth-btn`），确保用户端只聚焦“管理自己的隐私与授权应用”，管理功能严格驻留在 `/settings/oauth-apps`，绝不混为一谈。
+    2. **全平台已注册 OAuth 应用全量同步加载，消除隐形数据死角 (Complete OAuth Grants Synchronization)**:
+       - 根因定位与资安治理：此前系统后台虽已注册启用 `shijianus-blog`、`EpoCanvasImage` 等 OAuth 应用且持有凭据，但若未走用户主动 code 授权，`oauth_grant` 表中无记录，导致用户端呈现空状态，造成外部持有凭据却在用户端“隐形”的重大资安隐患；
+       - 核心加固：重构 `oauth-app-service.js` 的 `getUserGrants`，全量关联全平台已启用的应用，若用户未曾显式撤销（KV 撤销黑名单无记录），则自动同步登记授权并建立映射，让所有潜在的数据访问对用户 100% 透明、可见、可控、可撤销；
+       - 数据库唯一约束防护：在 D1 `oauth_grant` 表上建立 `(user_id, client_id)` 唯一索引，物理阻断重复插入；
+       - 撤销机制加固：`revokeGrant` 统一基于 `clientId` 彻底物理清理该用户名下的所有授权行，并向 KV 写入永久撤销标记 `REVOKED_GRANT_${userId}_${clientId} = '1'`，边缘网关实时 401 拦截切断；
+       - 弹窗体验精进：优化 `.app-detail-dialog`，添加不透明实体背景、纯净边框与内容滚动容器，彻底杜绝半透明折叠与遮挡。
+    3. **Playwright 真实生产环境全链路自动化审计 100% 全绿 (Comprehensive Live E2E Audit)**:
+       - 专属端到端自动化审计套件 `tests/audit-third-party-data-sharing.mjs`（11 项检查点全部 100% 通过）：
+         - ① 站长 API 登录获取会话 Token 成功；
+         - ② 审计 API 接口，全平台活跃应用 100% 同步加载验证通过；
+         - ③ 模拟发起 OAuth 2.0 授权更新权限范围成功；
+         - ④ 验证已授权应用在列表及 UserInfo 端点精准返回；
+         - ⑤ 验证 Code 兑换 Access Token 及 UserInfo 访问成功；
+         - ⑥ 验证 DELETE `/api/my/oauthGrants/:id` 撤销授权 API 成功；
+         - ⑦ 验证边缘网关即时阻断：撤销后同一 Access Token 访问 UserInfo 立即被 401 Unauthorized 拦截；
+         - ⑧ 真实浏览器导航至 `/settings/data-setting`，验证板块挂载且「管理 OAuth 应用」按钮已被彻底移除；
+         - ⑨ 验证系统多个已注册应用卡片同步渲染无死角，权限胶囊正确显示；
+         - ⑩ 验证详情弹窗渲染正常，点击「移除访问权限」并确认后卡片即时卸载；
+         - ⑪ 验证全部解除后优雅空状态呈现，测试数据与 KV 标记自动自愈还原，恪守零假数据与脏数据残留准则。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **Cloudflare Workers 部署 Version ID**: `a6a4f226-1fe1-474c-914d-78a3adc66e98`。
+    - **epocanvas-mail Git Commit**: `956122b8fc17eb336c8e9091b318c220608ddd6a` (Short Hash: `956122b`)。
+
 ### 第三方应用板块回归真实用户视角、剔除说教文案与过度设计重构上线 (2026-09-11)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **产品与用户视角根本治理 (True User-Centric Refactoring & Clutter Removal)**:

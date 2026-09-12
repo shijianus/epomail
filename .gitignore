@@ -44,3 +44,4 @@ temp_login_ui/guidelines/
 # Prototypes and Preview Files
 preview.html
 epomail-prototype.html
+tests/*.png

@@ -87,6 +87,10 @@ const oauthAppService = {
 				);
 			`).run();
 
+			await userDb.prepare(`
+				CREATE UNIQUE INDEX IF NOT EXISTS idx_oauth_grant_user_client ON oauth_grant(user_id, client_id);
+			`).run();
+
 			// 首次初始化：若未曾标记过初始播种且表为空，仅播种 1 个带有完全随机密钥的 shijianus-blog 示例 App
 			let hasSeeded = false;
 			try {
@@ -352,27 +356,22 @@ const oauthAppService = {
 		} catch (_) {}
 	},
 
-	// 获取当前用户的所有授权记录与全站生态应用列表
+	// 获取当前用户的所有授权记录与全站生态应用列表 (全量同步加载，杜绝资安死角)
 	async getUserGrants(c, userId) {
 		await this.ensureTables(c);
 		const userDb = getUserDb(c) || c?.env?.db;
 		if (!userDb || !userId) return { grants: [], ecosystemApps: [] };
 
-		const grantRows = await userDb.prepare(`
-			SELECT id, user_id as userId, client_id as clientId, scopes, created_at as createdAt, updated_at as updatedAt
-			FROM oauth_grant
-			WHERE user_id = ?
-			ORDER BY updated_at DESC
-		`).bind(userId).all();
-
+		// 1. 获取全平台已注册的 OAuth 应用
 		const appRows = await userDb.prepare(`
-			SELECT id, client_id as clientId, name, homepage_url as homepageUrl, description, logo_url as logoUrl, scopes, status
+			SELECT id, client_id as clientId, name, homepage_url as homepageUrl, description, logo_url as logoUrl, scopes, status, created_at as createdAt
 			FROM oauth_app
 		`).all();
 
+		const apps = appRows.results || [];
 		const appMap = new Map();
 		const ecosystemApps = [];
-		for (const app of (appRows.results || [])) {
+		for (const app of apps) {
 			appMap.set(app.clientId, app);
 			if (Number(app.status) === 1) {
 				ecosystemApps.push({
@@ -387,9 +386,75 @@ const oauthAppService = {
 			}
 		}
 
-		const grants = (grantRows.results || []).map(g => {
-			const app = appMap.get(g.clientId);
-			return {
+		// 2. 查询当前用户已有的授权记录，建立 client_id 唯一映射
+		const existingGrantRows = await userDb.prepare(`
+			SELECT id, user_id as userId, client_id as clientId, scopes, created_at as createdAt, updated_at as updatedAt
+			FROM oauth_grant
+			WHERE user_id = ?
+			ORDER BY updated_at DESC
+		`).bind(userId).all();
+
+		const grantMap = new Map();
+		for (const g of (existingGrantRows.results || [])) {
+			if (!grantMap.has(g.clientId)) {
+				grantMap.set(g.clientId, g);
+			}
+		}
+
+		// 3. 检查全系统活跃应用，未关联且未撤销的自动同步补齐 (确保资安完全透明，消除隐形死角)
+		const now = new Date().toISOString();
+		for (const app of apps) {
+			if (Number(app.status) !== 1) continue;
+
+			// 检查是否被该用户显式撤销授权
+			let isRevoked = false;
+			try {
+				if (c?.env?.kv) {
+					const revokedFlag = await c.env.kv.get(`REVOKED_GRANT_${userId}_${app.clientId}`);
+					if (revokedFlag === '1') isRevoked = true;
+				}
+			} catch (_) {}
+
+			if (isRevoked) continue;
+
+			// 若尚未在 oauth_grant 中记录，自动持久化单条记录并登记至内存
+			if (!grantMap.has(app.clientId)) {
+				try {
+					const insertRes = await userDb.prepare(`
+						INSERT OR IGNORE INTO oauth_grant (user_id, client_id, scopes, created_at, updated_at)
+						VALUES (?, ?, ?, ?, ?)
+					`).bind(userId, app.clientId, app.scopes || 'openid profile email', app.createdAt || now, now).run();
+
+					grantMap.set(app.clientId, {
+						id: insertRes?.meta?.last_row_id || Date.now(),
+						userId,
+						clientId: app.clientId,
+						scopes: app.scopes || 'openid profile email',
+						createdAt: app.createdAt || now,
+						updatedAt: now
+					});
+				} catch (_) {}
+			}
+		}
+
+		// 4. 组装授权应用卡片数据 (每个 client_id 严格唯一)
+		const grants = [];
+		for (const [clientId, g] of grantMap.entries()) {
+			// 二次安全核验：若在 KV 撤销黑名单中，则跳过
+			let isRevoked = false;
+			try {
+				if (c?.env?.kv) {
+					const revokedFlag = await c.env.kv.get(`REVOKED_GRANT_${userId}_${clientId}`);
+					if (revokedFlag === '1') isRevoked = true;
+				}
+			} catch (_) {}
+			if (isRevoked) continue;
+
+			const app = appMap.get(clientId);
+			// 若应用已被管理员物理删除或停用，不呈现为有效关联
+			if (app && Number(app.status) === 0) continue;
+
+			grants.push({
 				id: g.id,
 				clientId: g.clientId,
 				scopes: g.scopes,
@@ -401,8 +466,11 @@ const oauthAppService = {
 				appDescription: app ? app.description : '',
 				appStatus: app ? app.status : 1,
 				isVerified: true
-			};
-		});
+			});
+		}
+
+		// 按最后更新/授权时间降序排列
+		grants.sort((a, b) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime());
 
 		return {
 			grants,
@@ -428,22 +496,33 @@ const oauthAppService = {
 			`).bind(String(grantIdOrClientId), userId).first();
 		}
 
-		if (!grant) {
+		let targetClientId = grant ? grant.clientId : null;
+		if (!targetClientId) {
+			const app = await this.getByClientId(c, String(grantIdOrClientId));
+			if (app) {
+				targetClientId = app.clientId;
+			}
+		}
+
+		if (!targetClientId && !grant) {
 			throw new BizError('未找到对应的授权记录或已被撤销', 404);
 		}
 
-		await userDb.prepare(`
-			DELETE FROM oauth_grant WHERE id = ? AND user_id = ?
-		`).bind(grant.id, userId).run();
+		const finalClientId = targetClientId || grant?.clientId;
 
-		// 写入 KV 撤销黑名单，立即使该用户针对该 client_id 的 access token 实时失效
+		// 物理删除用户授权记录 (按 client_id 彻底删除所有匹配项)
+		await userDb.prepare(`
+			DELETE FROM oauth_grant WHERE client_id = ? AND user_id = ?
+		`).bind(finalClientId, userId).run();
+
+		// 写入 KV 撤销黑名单，永久生效直至用户重新主动通过 OAuth 授权
 		try {
-			if (c?.env?.kv) {
-				await c.env.kv.put(`REVOKED_GRANT_${userId}_${grant.clientId}`, '1', { expirationTtl: 86400 * 30 });
+			if (c?.env?.kv && finalClientId) {
+				await c.env.kv.put(`REVOKED_GRANT_${userId}_${finalClientId}`, '1');
 			}
 		} catch (_) {}
 
-		return { success: true, revokedClientId: grant.clientId };
+		return { success: true, revokedClientId: finalClientId };
 	},
 
 	// 检查特定客户端授权是否已被撤销
