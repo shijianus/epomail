@@ -30,7 +30,7 @@
        - 恪守零假数据与脏数据残留准则。
 *   **部署上线与自动化测试 (Verification & Deployment)**:
     - **Cloudflare Workers 部署 Version ID**: `a9f45ca6-5581-4a62-abff-aea8ff20ea81`。
-    - **epocanvas-mail Git Commit**: `a5607ecb783378b9d5cd6f47f8ea08053a0489e4` (Short Hash: `a5607ec`)。
+    - **epocanvas-mail Git Commit**: `b05b48474adfe9efd3894f19e699ac41f6e55994` (Short Hash: `b05b484`)。
 
 ### AI 智能引擎配置左右等大对称、多模型池尽力完整展示、杜绝省略截断、+N精准折叠与灰底规范上线 (2026-09-12)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
