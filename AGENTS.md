@@ -11,6 +11,28 @@
    - 在向用户输出回复时，必须置顶/显式打印出本次提交的完整 Commit Hash 与短 Hash，确保版本可追溯、审计记录完整。
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
+### AI 可用多模型池 (Models Pool) 单条折叠收敛、+N 定向表达与零溢出 UI 架构上线 (2026-09-12)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **多模型池单条折叠与 +N 定向表达模式 (Single-Row Collapse with +N Directed Pill Badge)**:
+       - 根因定位与视觉治理：此前 `ai-models-pool-select` 开启 `multiple` 多选模式后，未启用折叠策略，导致系统配置 5~10 个以上可用模型时，所有 Tag 标签全量平铺折行换行，控件纵向无限扩张伸展，破坏了 `.ai-dialog-grid` 双列对称网格并造成严重的高度失衡；
+       - 核心配置：在 `el-select` 上深度接入官方折叠架构 `collapse-tags`、`collapse-tags-tooltip` 与 `:max-collapse-tags="1"`，多模型选定时仅展示首个主模型 Tag，其余统一收敛折叠入定向 `+N` 胶囊徽章；
+       - 对称视觉呼应：模型池新增专属 Fluent Prefix 前缀图标 `<Icon icon="fluent:server-multiple-20-filled" ... />`，与左侧/上方的首选主模型火花图标严格对齐；
+       - 定向 UI 胶囊徽章：深度定制 `.el-tag:not(.is-closable)` 样式，呈现为等宽微型徽章（Pill Badge），具备主题紫背景（`rgba(99, 102, 241, 0.1)`）、精细边框、`ui-monospace` 粗体字形与 Hover 动效，告别暗淡灰块；
+       - 单行不换行防护：限制 `.el-select__wrapper` 与 `.el-select__selection` 的 `flex-wrap: nowrap; overflow: hidden;`，首选 Tag 文本自适应截断省略（`text-overflow: ellipsis`），确保整体高度（~40px）与单选输入框严格一致，杜绝任何无限扩张延申。
+    2. **生产部署与端到端自动化审计 (Live Verification & E2E Audit)**:
+       - 专属端到端自动化审计套件 `tests/test-ai-models-pool-collapse.mjs` 6/6 项全部 100% 绿灯通过：
+         - ① 站长 API 登录获取会话 Token 成功；
+         - ② 打开系统设置页面加载完成；
+         - ③ 唤起 AI 配置弹窗成功；
+         - ④ 验证前缀图标与 `collapse-tags` 生效，多选状态下精准渲染首个模型 Tag 及 `+ 4` 定向折叠徽章；
+         - ⑤ 验证单条高度（41px 与首选主模型 40px 单行对齐），外层弹窗主体严格为 Zero-Scrollbars 无滚动条；
+         - ⑥ 悬停 `+N` 标签正常触发 Tooltip 浮层展示全量折叠模型列表；
+       - 回归测试套件 `tests/test-ai-hub-card-and-models-detection.mjs` 全部通过，暗黑模式 100% 消除白斑；
+       - 恪守零假数据残留准则。
+*   **部署上线与版本追溯 (Verification & Deployment)**:
+    - **Cloudflare Workers 部署 Version ID**: `82ecf154-6774-458e-87fc-96b76f5a2e08`。
+    - **epocanvas-mail Git Commit**: `5a641467918d13e3dfee9991795515ecdacfefdf` (Short Hash: `5a64146`)。
+
 ### 第三方应用检索全面整合至全局顶栏、消除局部冗余输入框及内置应用精准检索上线 (2026-09-12)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **全局顶栏搜索全面整合与局部冗余输入框消除 (Topbar Search Integration & Clutter Removal)**:

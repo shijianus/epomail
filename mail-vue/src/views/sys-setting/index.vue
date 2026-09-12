@@ -2829,6 +2829,9 @@
                 <el-select 
                   v-model="aiHubForm.aiModelsList" 
                   multiple
+                  collapse-tags
+                  collapse-tags-tooltip
+                  :max-collapse-tags="1"
                   filterable
                   allow-create
                   default-first-option
@@ -2838,6 +2841,9 @@
                   :placeholder="$t('aiModelsPoolPlaceholder') || '选择或键入本站允许调用的多个模型'" 
                   style="width: 100%;"
                 >
+                  <template #prefix>
+                    <Icon icon="fluent:server-multiple-20-filled" width="15" height="15" style="color: var(--accent-primary);" />
+                  </template>
                   <el-option 
                     v-for="modelName in allAvailableModelOptions" 
                     :key="modelName" 
@@ -8158,6 +8164,63 @@ form .el-button {
     }
   }
 
+  .ai-models-pool-select {
+    :deep(.el-select__wrapper) {
+      flex-wrap: nowrap;
+      overflow: hidden;
+    }
+
+    :deep(.el-select__selection) {
+      flex-wrap: nowrap;
+      overflow: hidden;
+      max-width: 100%;
+      align-items: center;
+      gap: 5px;
+    }
+
+    :deep(.el-tag.is-closable) {
+      max-width: calc(100% - 60px);
+      flex-shrink: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      margin: 0;
+      border-radius: 6px;
+
+      .el-tag__content {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+    }
+
+    :deep(.el-tag:not(.is-closable)) {
+      flex-shrink: 0;
+      cursor: pointer;
+      font-weight: 700;
+      font-size: 11.5px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      padding: 0 8px;
+      height: 22px;
+      line-height: 20px;
+      border-radius: 9999px;
+      color: var(--accent-primary, #6366f1) !important;
+      background: rgba(99, 102, 241, 0.1) !important;
+      border: 1px solid rgba(99, 102, 241, 0.25) !important;
+      transition: all 0.2s ease;
+
+      &:hover {
+        background: rgba(99, 102, 241, 0.18) !important;
+        border-color: var(--accent-primary, #6366f1) !important;
+      }
+
+      .el-tag__content {
+        font-weight: 700;
+        color: inherit;
+      }
+    }
+  }
+
   .ai-field-hint {
     font-size: 11.5px;
     color: var(--el-text-color-secondary);
@@ -8376,6 +8439,73 @@ html.dark .ai-model-dropdown .el-select-dropdown__item:hover,
 html.dark .ai-models-pool-dropdown .el-select-dropdown__item.hover,
 html.dark .ai-models-pool-dropdown .el-select-dropdown__item:hover {
   background-color: #374151 !important;
+}
+
+/* AI Models Pool Select: Single-row +N directional collapse display */
+.ai-hub-dialog .ai-models-pool-select .el-select__wrapper {
+  flex-wrap: nowrap !important;
+  overflow: hidden !important;
+}
+
+.ai-hub-dialog .ai-models-pool-select .el-select__selection {
+  flex-wrap: nowrap !important;
+  overflow: hidden !important;
+  align-items: center !important;
+  gap: 5px !important;
+}
+
+.ai-hub-dialog .ai-models-pool-select .el-tag.is-closable {
+  max-width: calc(100% - 60px) !important;
+  flex-shrink: 1 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  margin: 0 !important;
+  border-radius: 6px !important;
+}
+
+.ai-hub-dialog .ai-models-pool-select .el-tag.is-closable .el-tag__content {
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+/* Directed +N collapse badge pill */
+.ai-hub-dialog .ai-models-pool-select .el-tag:not(.is-closable) {
+  flex-shrink: 0 !important;
+  cursor: pointer !important;
+  font-weight: 700 !important;
+  font-size: 11.5px !important;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+  padding: 0 8px !important;
+  height: 22px !important;
+  line-height: 20px !important;
+  border-radius: 9999px !important;
+  color: var(--accent-primary, #6366f1) !important;
+  background: rgba(99, 102, 241, 0.1) !important;
+  border: 1px solid rgba(99, 102, 241, 0.25) !important;
+  transition: all 0.2s ease !important;
+}
+
+.ai-hub-dialog .ai-models-pool-select .el-tag:not(.is-closable):hover {
+  background: rgba(99, 102, 241, 0.18) !important;
+  border-color: var(--accent-primary, #6366f1) !important;
+}
+
+.ai-hub-dialog .ai-models-pool-select .el-tag:not(.is-closable) .el-tag__content {
+  font-weight: 700 !important;
+  color: inherit !important;
+}
+
+html.dark .ai-hub-dialog .ai-models-pool-select .el-tag:not(.is-closable) {
+  background: rgba(99, 102, 241, 0.2) !important;
+  color: #a5b4fc !important;
+  border-color: rgba(99, 102, 241, 0.4) !important;
+}
+
+html.dark .ai-hub-dialog .ai-models-pool-select .el-tag:not(.is-closable):hover {
+  background: rgba(99, 102, 241, 0.3) !important;
+  border-color: #818cf8 !important;
 }
 
 .el-dialog.storage-config-dialog.db-domains-dialog,
