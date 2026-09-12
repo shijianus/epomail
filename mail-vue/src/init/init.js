@@ -7,6 +7,7 @@ import {permsToRouter} from "@/perm/perm.js";
 import router from "@/router";
 import {websiteConfig} from "@/request/setting.js";
 import i18n from "@/i18n/index.js";
+import {clearAuthStorage} from "@/utils/auth.js";
 
 export async function init() {
     document.title = '\u200B'
@@ -70,7 +71,21 @@ export async function init() {
                     router.addRoute('layout', routerData);
                 });
             } else {
+                // Token 存在但无法获取用户信息，说明 token 已过期或已被销毁，执行清理并强制退回到登录页
                 uiStore.resetToDefaults();
+                clearAuthStorage({ preserveEmail: true });
+                try {
+                    sessionStorage.setItem('auth_expired_msg', '登录凭证已过期，请重新登录');
+                } catch (_) {}
+
+                const pathname = window.location.pathname;
+                const isOauth = pathname.startsWith('/oauth');
+                const isPublicProfile = pathname !== '/' && !['inbox', 'all', 'sent', 'drafts', 'starred', 'snoozed', 'spam', 'trash', 'message', 'settings', 'system-setting', 'sys-setting', 'all-users', 'role', 'roles', 'invite-code', 'reg-key', 'analysis', 'login'].some(p => pathname.toLowerCase().startsWith('/' + p));
+
+                if (!isOauth && !isPublicProfile) {
+                    window.location.replace('/login/?reason=expired');
+                    return;
+                }
             }
 
         } else {

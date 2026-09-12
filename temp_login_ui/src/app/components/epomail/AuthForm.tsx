@@ -138,6 +138,30 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
   const rawI18n = sysConfig?.authI18n || {};
   const i18n = (rawI18n.zh || rawI18n.en) ? (rawI18n[userLang] || {}) : rawI18n;
 
+  // 挂载时检测登录凭证失效提示及自动回填上次登录邮箱
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const searchParams = new URLSearchParams(window.location.search);
+      const isExpired = searchParams.get("reason") === "expired" || searchParams.get("expired") === "true";
+      const storedMsg = sessionStorage.getItem("auth_expired_msg");
+
+      if (isExpired || storedMsg) {
+        const msg = storedMsg || (isZh ? "登录凭证已过期，请重新登录" : "Session expired, please log in again");
+        setErrorMsg(msg);
+        sessionStorage.removeItem("auth_expired_msg");
+        cameraState.authErrorOpacity = 1;
+      }
+
+      const urlEmail = searchParams.get("email");
+      const storedEmail = localStorage.getItem("loginEmail");
+      if (urlEmail) {
+        setEmail(urlEmail);
+      } else if (storedEmail) {
+        setEmail(storedEmail);
+      }
+    }
+  }, [isZh]);
+
   useEffect(() => {
     if (errorMsg) {
       const duration = Number(i18n.alertDuration) || 4000;

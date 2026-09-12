@@ -1243,12 +1243,19 @@ const deleteConfirm = () => {
   }).then(() => {
     userDelete().then(() => {
       localStorage.removeItem('token');
-      router.replace('/login');
+      localStorage.removeItem('loginEmail');
+      localStorage.removeItem('ui');
+      try {
+        sessionStorage.clear();
+      } catch (_) {}
       ElMessage({
         message: t('delSuccessMsg'),
         type: 'success',
         plain: true,
       })
+      setTimeout(() => {
+        window.location.replace('/login/');
+      }, 500);
     })
   })
 }

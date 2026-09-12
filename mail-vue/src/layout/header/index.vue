@@ -84,7 +84,7 @@
         </template>
       </el-dropdown>
       <div v-else-if="props.isProfile" class="guest-login-btn" style="display:flex;align-items:center;">
-        <el-button type="primary" size="small" @click="router.push('/login')" style="border-radius:8px;">{{ $t('login') || '登录' }}</el-button>
+        <el-button type="primary" size="small" @click="goToLogin" style="border-radius:8px;">{{ $t('login') || '登录' }}</el-button>
       </div>
     </div>
   </div>
@@ -760,14 +760,27 @@ function changeAside() {
   uiStore.asideShow = !uiStore.asideShow
 }
 
+function goToLogin() {
+  localStorage.removeItem("token")
+  window.location.replace('/login/')
+}
+
 function clickLogout() {
   logoutLoading.value = true
-  logout().then(() => {
+  const finalizeLogout = () => {
     localStorage.removeItem("token")
-    localStorage.removeItem("loginEmail")
     localStorage.removeItem("ui")
+    try {
+      sessionStorage.clear()
+    } catch (_) {}
     uiStore.resetToDefaults()
-    router.replace('/login')
+    window.location.replace('/login/')
+  }
+  logout().then(() => {
+    finalizeLogout()
+  }).catch(() => {
+    // 即使后端凭证已失效返回 401，客户端也必须彻底清除状态并硬退出至登录页
+    finalizeLogout()
   }).finally(() => {
     logoutLoading.value = false
   })

@@ -239,19 +239,29 @@ router.beforeEach((to, from, next) => {
 
     const token = localStorage.getItem('token')
 
-    if (!token && !['login', 'profile', 'oauth-authorize'].includes(to.name)) {
+    // 1. 目标为登录界面：无论是从何处跳转，直接硬重定向到独立的 /login/ 应用，避免 SPA 内部循环拦截
+    if (to.name === 'login' || to.path === '/login' || to.path === '/login/') {
+        removeLoading();
+        window.location.replace('/login/' + (window.location.search || ''));
+        return;
+    }
+
+    // 2. 无 token 时防止动态管理路由未加载而贪婪匹配到 /:username (profile) 导致的异常展示
+    const protectedSystemPaths = [
+        'system-setting', 'sys-setting', 'all-users', 'role', 'roles',
+        'reg-key', 'invite-code', 'analysis', 'oauth-apps', 'oauth-app', 'settings'
+    ];
+    if (!token && to.name === 'profile' && protectedSystemPaths.includes(to.params.username?.toLowerCase())) {
         removeLoading();
         window.location.replace('/login/');
         return;
     }
 
-    if (!token && to.name === 'login') {
-        loadBackground(next)
-        return
-    }
-
-    if (token && to.name === 'login') {
-        return next(from.path)
+    // 3. 无 token 且访问受保护的内部路由：立即硬重定向到登录页
+    if (!token && !['login', 'profile', 'oauth-authorize'].includes(to.name)) {
+        removeLoading();
+        window.location.replace('/login/');
+        return;
     }
 
     next()

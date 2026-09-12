@@ -114,6 +114,7 @@ import dayjs from "dayjs";
 import {useI18n} from "vue-i18n";
 import router from "@/router/index.js";
 import {ElMessageBox} from "element-plus";
+import {forceLogoutToLogin} from "@/utils/auth.js";
 
 defineExpose({
   open,
@@ -388,8 +389,7 @@ async function sendEmail() {
       position: 'bottom-right'
     })
     if (e.code === 401) {
-      localStorage.removeItem('token');
-      router.replace('/login');
+      forceLogoutToLogin(e.message);
     }
     show.value = true
     addRecipientRecord();

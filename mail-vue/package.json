@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite --mode dev",
     "remote": "vite --mode remote",
-    "build": "vite build --mode release",
+    "build": "vite build --mode release && cp -r ../temp_login_ui/dist ../mail-worker/dist/login",
     "eo": "vite build --mode eo",
     "preview": "vite preview"
   },
