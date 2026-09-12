@@ -184,13 +184,7 @@ import assert from "assert";
     // 验证标题与导言
     const sectionTitle = await thirdPartySection.locator(".title").innerText();
     console.log("板块主标题:", sectionTitle);
-    assert.ok(sectionTitle.includes("与第三方应用和网站共享的数据"), "标题必须清晰准确");
-
-    // 验证三大概览度量卡片 (Gmail 结构)
-    const statCards = thirdPartySection.locator(".overview-stat-card");
-    const statCount = await statCards.count();
-    console.log(`发现 ${statCount} 个 Gmail 风格概览度量卡片`);
-    assert.strictEqual(statCount, 3, "必须展示 3 个概览保障卡片");
+    assert.ok(sectionTitle.includes("第三方应用和服务"), "标题必须清晰准确");
 
     // 验证应用卡片与权限胶囊
     const appCard = thirdPartySection.locator(".connected-app-card").first();
@@ -198,19 +192,12 @@ import assert from "assert";
     const appCardText = await appCard.innerText();
     console.log("应用卡片文字摘要:", appCardText.split("\n").slice(0, 3).join(" | "));
     assert.ok(appCardText.includes("shijianus-blog"), "卡片必须展示应用名称");
-    assert.ok(appCardText.includes("官方受信"), "卡片必须展示官方受信徽章");
 
     // 验证权限胶囊标签
     const scopePills = appCard.locator(".shared-scope-chip");
     const pillsCount = await scopePills.count();
     console.log(`应用卡片展示了 ${pillsCount} 个数据共享胶囊`);
-    assert.ok(pillsCount >= 3, "必须清晰展示公开资料、邮箱地址等共享范围");
-
-    // 验证三大教育常识卡片
-    const pillarCards = thirdPartySection.locator(".pillar-card");
-    const pillarCount = await pillarCards.count();
-    console.log(`展示了 ${pillarCount} 个安全支柱常识卡片`);
-    assert.strictEqual(pillarCount, 3, "必须展示 3 个 Google 风格安全支柱");
+    assert.ok(pillsCount >= 3, "必须清晰展示快捷登录、公开资料、邮箱地址等共享范围");
 
     // 截图 1: 卡片网格展示态
     await page.screenshot({
@@ -219,8 +206,8 @@ import assert from "assert";
     });
     console.log("✓ 卡片网格态截图已保存: tests/audit_third_party_grid.png");
 
-    // 测试点击「查看权限详情」弹窗
-    console.log("9. 测试点击「查看权限详情」弹窗...");
+    // 测试点击「查看详情」弹窗
+    console.log("9. 测试点击「查看详情」弹窗...");
     const detailBtn = appCard.locator(".view-detail-btn");
     await detailBtn.click();
     await page.waitForSelector(".app-detail-dialog", { state: "visible", timeout: 5000 });
@@ -229,11 +216,10 @@ import assert from "assert";
     console.log("弹窗应用名称:", modalTitle);
     assert.strictEqual(modalTitle, "shijianus-blog", "弹窗标题必须匹配");
 
-    // 验证 Google 招牌功能："此应用绝对无法访问的数据"
-    const cannotAccessText = await page.locator(".app-detail-dialog .cannot-access-card").innerText();
-    console.log("无权访问清单预览:", cannotAccessText.split("\n").slice(0, 2).join(" | "));
-    assert.ok(cannotAccessText.includes("登录密码"), "必须明确保障密码不被访问");
-    assert.ok(cannotAccessText.includes("两步验证"), "必须明确保障 2FA 不被访问");
+    // 验证弹窗中已授予的权限列表
+    const modalAccessText = await page.locator(".app-detail-dialog .can-access-list").innerText();
+    console.log("已授予权限列表预览:", modalAccessText.split("\n").slice(0, 2).join(" | "));
+    assert.ok(modalAccessText.includes("快捷登录") || modalAccessText.includes("基本资料"), "必须展示已授予的权限");
 
     // 截图 2: 详情弹窗态
     await page.screenshot({

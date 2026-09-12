@@ -403,76 +403,36 @@
       </div>
     </div>
 
-    <!-- Section 4: 与第三方应用和网站共享的数据 (Third-Party Apps & Data Sharing - 学习 Gmail / Google 账号构造) -->
+    <!-- Section 4: 第三方应用和服务 (Third-Party Apps & Services) -->
     <div class="container third-party-apps-container" id="thirdPartyApps">
       <div class="section-header-flex">
         <div>
-          <div class="title">{{ $t('thirdPartyAppsTitle') || '与第三方应用和网站共享的数据' }}</div>
+          <div class="title">{{ $t('thirdPartyAppsTitle') || '第三方应用和服务' }}</div>
           <div class="section-intro">
-            {{ $t('thirdPartyAppsDesc') || '查看您已使用 Epomail 账号登录或授权访问数据的第三方网站与应用程序。清晰了解它们有权访问您的哪些数据（如公开资料、电子邮箱），并可随时审查或一键撤销访问权限。' }}
+            {{ $t('thirdPartyAppsDesc') || '管理已关联到您 Epomail 账号的第三方应用与网站，随时查看或移除访问权限。' }}
           </div>
         </div>
         <div class="header-right-actions" v-if="hasPerm('setting:query')">
           <el-button 
-            type="primary" 
-            plain 
+            type="default" 
             size="small" 
             @click="router.push({ name: 'oauth-app' })"
             class="manage-oauth-btn"
           >
-            <Icon icon="fluent:apps-settings-20-regular" width="16" height="16" />
-            <span>{{ $t('thirdPartyManageAppsBtn') || '管理系统 OAuth 应用' }}</span>
+            <Icon icon="fluent:apps-settings-20-regular" width="15" height="15" />
+            <span>{{ $t('thirdPartyManageAppsBtn') || '管理 OAuth 应用' }}</span>
           </el-button>
         </div>
       </div>
 
-      <!-- Gmail-Style Highlights / Overview Banner (度量卡片与安全保障) -->
-      <div class="apps-overview-grid">
-        <!-- 1. 已关联应用 -->
-        <div class="overview-stat-card">
-          <div class="stat-icon-wrap primary-icon">
-            <Icon icon="fluent:apps-list-24-filled" width="22" height="22" />
-          </div>
-          <div class="stat-meta">
-            <div class="stat-value-row">
-              <span class="stat-number">{{ userGrants.length }}</span>
-              <span class="stat-unit">{{ $t('thirdPartyConnectedApps') || '已关联应用' }}</span>
-            </div>
-            <div class="stat-hint">{{ userGrants.length > 0 ? (filteredGrants.length + ' 个处于活跃授权状态') : '暂无外部应用持有授权' }}</div>
-          </div>
-        </div>
-
-        <!-- 2. 免密单点登录 SSO -->
-        <div class="overview-stat-card">
-          <div class="stat-icon-wrap sso-icon">
-            <Icon icon="fluent:fingerprint-24-filled" width="22" height="22" />
-          </div>
-          <div class="stat-meta">
-            <div class="stat-title">{{ $t('thirdPartySsoTitle') || '免密单点登录 (SSO)' }}</div>
-            <div class="stat-hint">{{ $t('thirdPartySsoDesc') || '基于 OpenID Connect 规范，密码永不与第三方共享' }}</div>
-          </div>
-        </div>
-
-        <!-- 3. 数据安全与自主控制 -->
-        <div class="overview-stat-card">
-          <div class="stat-icon-wrap security-icon">
-            <Icon icon="fluent:shield-checkmark-24-filled" width="22" height="22" />
-          </div>
-          <div class="stat-meta">
-            <div class="stat-title">{{ $t('thirdPartySecurityTitle') || '数据安全与自主控制' }}</div>
-            <div class="stat-hint">{{ $t('thirdPartySecurityDesc') || '严格按最小权限范围授权，支持一键即时解除关联并切断访问' }}</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Search & Filter Bar (当有关联应用时显示) -->
-      <div class="apps-toolbar" v-if="userGrants.length > 0">
+      <!-- Search & Filter Bar (当有关联应用且大于 1 个时显示) -->
+      <div class="apps-toolbar" v-if="userGrants.length > 1">
         <div class="search-input-wrap">
           <el-input
             v-model="appSearchQuery"
             size="small"
             clearable
-            :placeholder="$t('thirdPartySearchPlaceholder') || '搜索已关联应用或网站域名...'"
+            :placeholder="$t('thirdPartySearchPlaceholder') || '搜索应用或网站域名...'"
             class="app-search-input"
           >
             <template #prefix>
@@ -496,8 +456,8 @@
 
       <!-- Loading State -->
       <div v-if="grantsLoading && userGrants.length === 0" class="apps-loading-state">
-        <Icon icon="solar:restart-circle-bold-duotone" width="32" height="32" class="spin-icon" />
-        <span>正在加载已关联的第三方应用与数据共享列表...</span>
+        <Icon icon="solar:restart-circle-bold-duotone" width="28" height="28" class="spin-icon" />
+        <span>正在加载已关联的应用...</span>
       </div>
 
       <!-- 1. 有已授权应用时的卡片网格 -->
@@ -523,12 +483,8 @@
             <div class="app-header-meta">
               <div class="app-name-row">
                 <span class="app-main-name" :title="grant.appName">{{ grant.appName }}</span>
-                <el-tag size="small" type="success" effect="plain" round class="verified-pill">
-                  <Icon icon="solar:shield-check-bold" width="12" height="12" style="margin-right: 3px;" />
-                  {{ $t('thirdPartyVerifiedBadge') || '官方受信应用' }}
-                </el-tag>
                 <el-tag v-if="Number(grant.appStatus) === 0" size="small" type="danger" effect="plain" round class="status-pill">
-                  {{ $t('thirdPartyStatusDisabled') || '系统已停用' }}
+                  {{ $t('thirdPartyStatusDisabled') || '已停用' }}
                 </el-tag>
               </div>
 
@@ -553,10 +509,6 @@
 
           <!-- Shared Scopes Chips -->
           <div class="app-shared-scopes-section">
-            <div class="scopes-section-label">
-              <Icon icon="fluent:data-whisper-20-regular" width="14" height="14" class="whisper-ic" />
-              <span>{{ $t('thirdPartyCanAccessTitle') || '此应用有权访问的数据' }}:</span>
-            </div>
             <div class="scope-pills-wrap">
               <div 
                 v-for="scope in parseScopeList(grant.scopes)" 
@@ -573,7 +525,7 @@
           <!-- App Card Footer Actions -->
           <div class="app-card-footer">
             <div class="footer-left-info">
-              <span class="client-id-badge" :title="grant.clientId">Client: {{ formatClientIdShort(grant.clientId) }}</span>
+              <span class="grant-date-badge">{{ formatDateTime(grant.createdAt) }}</span>
             </div>
             <div class="footer-btn-actions">
               <el-button 
@@ -582,8 +534,7 @@
                 @click="openAppDetailModal(grant)"
                 class="view-detail-btn"
               >
-                <Icon icon="solar:eye-linear" width="14" height="14" />
-                <span>{{ $t('thirdPartyViewDetailsBtn') || '查看权限详情' }}</span>
+                <span>{{ $t('thirdPartyViewDetailsBtn') || '查看详情' }}</span>
               </el-button>
               <el-button 
                 size="small" 
@@ -593,7 +544,6 @@
                 @click="handleRevokeGrant(grant)"
                 class="revoke-access-btn"
               >
-                <Icon icon="solar:link-broken-minimalistic-linear" width="14" height="14" />
                 <span>{{ $t('thirdPartyRevokeBtn') || '移除访问权限' }}</span>
               </el-button>
             </div>
@@ -603,108 +553,19 @@
 
       <!-- No match search result -->
       <div v-else-if="userGrants.length > 0 && filteredGrants.length === 0" class="no-search-results">
-        <Icon icon="solar:magnifer-linear" width="32" height="32" class="empty-icon" />
-        <div class="empty-text">未找到匹配「{{ appSearchQuery }}」的已关联应用</div>
+        <Icon icon="solar:magnifer-linear" width="28" height="28" class="empty-icon" />
+        <div class="empty-text">未找到匹配「{{ appSearchQuery }}」的应用</div>
       </div>
 
-      <!-- 2. 当没有已授权应用时的 Google 风格空状态与生态应用推荐 -->
+      <!-- 2. 当没有已授权应用时的简洁空状态 -->
       <div v-else class="empty-apps-container">
         <div class="empty-hero-card">
           <div class="empty-icon-box">
-            <Icon icon="fluent:shield-task-48-filled" width="48" height="48" class="shield-empty-ic" />
+            <Icon icon="fluent:shield-task-28-regular" width="32" height="32" class="shield-empty-ic" />
           </div>
           <div class="empty-hero-content">
-            <div class="empty-hero-title">{{ $t('thirdPartyEmptyTitle') || '暂无关联的第三方应用或网站' }}</div>
-            <div class="empty-hero-desc">{{ $t('thirdPartyEmptyDesc') || '您目前尚未授权任何外部应用访问您的 Epomail 账号。' }}</div>
-            <div class="empty-hero-subhint">{{ $t('thirdPartyEmptyHint') || '当您在支持的网站或应用程序（如合作博客、相册服务、开发者社区）上点击「使用 Epomail 登录」并确认授权后，它们会自动展示在这里。' }}</div>
-          </div>
-        </div>
-
-        <!-- Ecosystem Apps Showcase (支持 Epomail 登录的生态应用) -->
-        <div class="ecosystem-showcase" v-if="ecosystemApps.length > 0">
-          <div class="ecosystem-title-row">
-            <div class="eco-title">
-              <Icon icon="fluent:sparkle-20-filled" width="16" height="16" class="eco-sparkle-ic" />
-              <span>{{ $t('thirdPartyEcosystemTitle') || '支持使用 Epomail 快捷登录的生态应用' }}</span>
-            </div>
-            <div class="eco-desc">{{ $t('thirdPartyEcosystemDesc') || '您可以在以下官方受信应用中直接使用 Epomail 账号安全登录，无需重复注册密码：' }}</div>
-          </div>
-
-          <div class="ecosystem-grid">
-            <div 
-              v-for="app in ecosystemApps" 
-              :key="app.id" 
-              class="ecosystem-app-card"
-            >
-              <div class="eco-card-top">
-                <div class="eco-avatar" :style="(!app.logoUrl) ? { background: getAvatarBg(app.name) } : {}">
-                  <img v-if="app.logoUrl" :src="app.logoUrl" :alt="app.name" class="eco-logo" />
-                  <span v-else class="eco-initial">{{ getInitialChar(app.name) }}</span>
-                </div>
-                <div class="eco-info">
-                  <div class="eco-name">{{ app.name }}</div>
-                  <a v-if="app.homepageUrl" :href="app.homepageUrl" target="_blank" class="eco-link">
-                    <span>{{ getHostname(app.homepageUrl) }}</span>
-                    <Icon icon="lucide:external-link" width="10" height="10" />
-                  </a>
-                </div>
-              </div>
-              <div class="eco-desc-text">{{ app.description || '支持 Epomail 统一身份鉴权与安全单点登录' }}</div>
-              <div class="eco-scopes-row">
-                <span class="eco-scopes-badge" v-for="s in parseScopeList(app.scopes).slice(0, 3)" :key="s.key">
-                  {{ s.name }}
-                </span>
-              </div>
-              <div class="eco-card-action" v-if="app.homepageUrl">
-                <a :href="app.homepageUrl" target="_blank" class="eco-visit-btn">
-                  <span>{{ $t('thirdPartyVisitSite') || '前往体验' }}</span>
-                  <Icon icon="solar:arrow-right-up-linear" width="12" height="12" />
-                </a>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Gmail / Google Account Style Educational Guidance Cards (隐私常识与安全防护) -->
-      <div class="security-pillars-section">
-        <div class="pillars-title-row">
-          <Icon icon="fluent:shield-badge-20-filled" width="18" height="18" class="pillar-main-ic" />
-          <span class="pillars-title">{{ $t('thirdPartyLearnSecurityTitle') || '关于第三方应用与您的 Epomail 数据安全' }}</span>
-        </div>
-
-        <div class="pillars-grid">
-          <!-- Pillar 1 -->
-          <div class="pillar-card">
-            <div class="pillar-head">
-              <div class="pillar-icon-box lock-ic">
-                <Icon icon="fluent:lock-closed-24-filled" width="20" height="20" />
-              </div>
-              <span class="p-title">{{ $t('thirdPartyPillar1Title') || '密码从不与第三方共享' }}</span>
-            </div>
-            <div class="p-desc">{{ $t('thirdPartyPillar1Desc') || '使用 Epomail 登录基于行业标准 OpenID Connect 协议。第三方仅获得加密签发的受限访问令牌，永远无法获知您的账号主密码。' }}</div>
-          </div>
-
-          <!-- Pillar 2 -->
-          <div class="pillar-card">
-            <div class="pillar-head">
-              <div class="pillar-icon-box control-ic">
-                <Icon icon="fluent:options-24-filled" width="20" height="20" />
-              </div>
-              <span class="p-title">{{ $t('thirdPartyPillar2Title') || '数据范围由您完全掌控' }}</span>
-            </div>
-            <div class="p-desc">{{ $t('thirdPartyPillar2Desc') || '应用只能访问您在授权窗口中明确勾选同意的数据范围。遵循最小特权原则，杜绝无授权的数据采集。' }}</div>
-          </div>
-
-          <!-- Pillar 3 -->
-          <div class="pillar-card">
-            <div class="pillar-head">
-              <div class="pillar-icon-box revoke-ic">
-                <Icon icon="fluent:plug-disconnected-24-filled" width="20" height="20" />
-              </div>
-              <span class="p-title">{{ $t('thirdPartyPillar3Title') || '随时随地一键即时撤销' }}</span>
-            </div>
-            <div class="p-desc">{{ $t('thirdPartyPillar3Desc') || '如果您不再使用或不再信任某个应用，点击移除后，系统会立即在边缘网关作废所有已签发的访问令牌，连接通道即刻阻断。' }}</div>
+            <div class="empty-hero-title">{{ $t('thirdPartyEmptyTitle') || '暂无已关联的应用' }}</div>
+            <div class="empty-hero-desc">{{ $t('thirdPartyEmptyDesc') || '您尚未授权任何第三方应用或网站访问您的 Epomail 账号。' }}</div>
           </div>
         </div>
       </div>
@@ -970,11 +831,11 @@
       </template>
     </el-dialog>
 
-    <!-- DIALOG: 第三方应用授权详情与隐私防护弹窗 (Google Account Style Third-Party Access Modal) -->
+    <!-- DIALOG: 第三方应用详情与权限弹窗 -->
     <el-dialog
       v-model="appDetailModalShow"
       class="app-detail-dialog"
-      width="580px"
+      width="520px"
       destroy-on-close
     >
       <template #header>
@@ -986,10 +847,6 @@
           <div class="head-info">
             <div class="head-name-row">
               <span class="head-app-name">{{ selectedAppDetail.appName }}</span>
-              <el-tag size="small" type="success" effect="plain" round class="verified-tag">
-                <Icon icon="solar:shield-check-bold" width="12" height="12" style="margin-right: 3px;" />
-                {{ $t('thirdPartyVerifiedBadge') || '官方受信应用' }}
-              </el-tag>
             </div>
             <div class="head-origin-row" v-if="selectedAppDetail.homepageUrl">
               <a :href="selectedAppDetail.homepageUrl" target="_blank" class="head-link">
@@ -1002,11 +859,10 @@
       </template>
 
       <div class="app-detail-dialog-body" v-if="selectedAppDetail">
-        <!-- 1. 该应用有权访问的数据 -->
+        <!-- 1. 该应用已获得的权限 -->
         <div class="dialog-sub-section">
           <div class="sec-title-row">
-            <Icon icon="fluent:checkmark-circle-20-filled" width="18" height="18" style="color: var(--el-color-success);" />
-            <span class="sec-title">{{ $t('thirdPartyCanAccessTitle') || '此应用有权访问的数据' }}</span>
+            <span class="sec-title">{{ $t('thirdPartyCanAccessTitle') || '已授予的访问权限' }}</span>
           </div>
           <div class="can-access-list">
             <div 
@@ -1020,7 +876,6 @@
               <div class="item-info-col">
                 <div class="item-title-line">
                   <span class="item-name">{{ scope.name }}</span>
-                  <span class="item-key font-mono">{{ scope.key }}</span>
                 </div>
                 <div class="item-desc">{{ scope.desc }}</div>
               </div>
@@ -1028,63 +883,18 @@
           </div>
         </div>
 
-        <!-- 2. 该应用无权访问的数据 (Google Account Signature Feature) -->
+        <!-- 2. 基本授权信息 -->
         <div class="dialog-sub-section">
-          <div class="sec-title-row">
-            <Icon icon="fluent:dismiss-circle-20-filled" width="18" height="18" style="color: var(--el-color-danger);" />
-            <span class="sec-title">{{ $t('thirdPartyCannotAccessTitle') || '此应用绝对无法访问的数据' }}</span>
-          </div>
-          <div class="cannot-access-card">
-            <div class="cannot-row">
-              <Icon icon="lucide:x" width="15" height="15" class="cross-ic" />
-              <span>{{ $t('thirdPartyNoPasswordAccess') || '您的 Epomail 登录密码及 TOTP / Passkey 两步验证密钥' }}</span>
-            </div>
-            <div class="cannot-row">
-              <Icon icon="lucide:x" width="15" height="15" class="cross-ic" />
-              <span>{{ $t('thirdPartyNoMailAccess') || '您的收件箱及私人邮件通信往来记录（除非显式授予邮件管理权限）' }}</span>
-            </div>
-            <div class="cannot-row">
-              <Icon icon="lucide:x" width="15" height="15" class="cross-ic" />
-              <span>{{ $t('thirdPartyNoAdminAccess') || '您的账户管理权限、系统设置或其他信箱别名' }}</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- 3. 技术规范与元数据 -->
-        <div class="dialog-sub-section">
-          <div class="sec-title-row">
-            <Icon icon="fluent:code-circle-20-filled" width="18" height="18" style="color: var(--accent-primary);" />
-            <span class="sec-title">{{ $t('thirdPartyTechDetails') || '技术规范与授权信息' }}</span>
-          </div>
           <div class="tech-info-grid">
             <div class="tech-row">
-              <span class="t-label">{{ $t('thirdPartyClientId') || 'Client ID' }}:</span>
-              <span class="t-val code-font">
-                {{ selectedAppDetail.clientId }}
-                <el-button link type="primary" size="small" @click="copyText(selectedAppDetail.clientId)" title="复制 Client ID">
-                  <Icon icon="solar:copy-linear" width="13" height="13" />
-                </el-button>
-              </span>
-            </div>
-            <div class="tech-row">
-              <span class="t-label">{{ $t('thirdPartyAuthProtocol') || '授权协议规范' }}:</span>
-              <span class="t-val">OAuth 2.0 / OpenID Connect (RFC 6749)</span>
-            </div>
-            <div class="tech-row">
-              <span class="t-label">{{ $t('thirdPartyGrantDate') || '首次授权时间' }}:</span>
+              <span class="t-label">{{ $t('thirdPartyGrantDate') || '首次关联时间' }}:</span>
               <span class="t-val">{{ formatDateTime(selectedAppDetail.createdAt) }}</span>
             </div>
-            <div class="tech-row">
-              <span class="t-label">{{ $t('thirdPartyLastUpdate') || '最近活跃同步' }}:</span>
-              <span class="t-val">{{ formatDateTime(selectedAppDetail.updatedAt) }}</span>
+            <div class="tech-row" v-if="selectedAppDetail.clientId">
+              <span class="t-label">客户端 ID:</span>
+              <span class="t-val code-font">{{ selectedAppDetail.clientId }}</span>
             </div>
           </div>
-        </div>
-
-        <!-- 警告提示 -->
-        <div class="warning-callout">
-          <Icon icon="solar:danger-triangle-bold" width="16" height="16" class="warn-ic" />
-          <span>{{ $t('thirdPartyWarningNotice') || '警告：移除访问权限后，该应用对您账号的访问通道将立即被切断，您在该网站的登录态可能会立即失效。' }}</span>
         </div>
       </div>
 
@@ -1092,12 +902,13 @@
         <div class="dialog-footer-between" v-if="selectedAppDetail">
           <el-button 
             type="danger" 
+            plain
             :loading="revokingGrantId === selectedAppDetail.id"
             @click="handleRevokeFromModal(selectedAppDetail)"
             class="danger-revoke-btn"
           >
             <Icon icon="solar:link-broken-minimalistic-linear" width="16" height="16" style="margin-right: 4px;" />
-            {{ $t('thirdPartyRevokeAllAccess') || '移除此应用的全部访问权限' }}
+            {{ $t('thirdPartyRevokeAllAccess') || '移除访问权限' }}
           </el-button>
           <el-button @click="appDetailModalShow = false">{{ $t('close') || '关闭' }}</el-button>
         </div>
@@ -1534,40 +1345,40 @@ function parseScopeList(scopesStr) {
   const dict = {
     openid: {
       key: 'openid',
-      name: t('scopeOpenIdTitle') || '唯一身份标识 (OpenID)',
-      desc: t('scopeOpenIdDesc') || '安全验证您的身份，生成跨站单点登录凭证，免除重复输入密码',
+      name: t('scopeOpenIdTitle') || '快捷登录',
+      desc: t('scopeOpenIdDesc') || '使用您的 Epomail 账号快捷登录该应用',
       icon: 'solar:key-minimalistic-square-3-bold-duotone',
       color: '#3b82f6',
       bg: 'rgba(59, 130, 246, 0.12)'
     },
     email: {
       key: 'email',
-      name: t('scopeEmailTitle') || '电子邮箱地址 (Email)',
-      desc: t('scopeEmailDesc') || '访问您的主要电子邮箱地址，用于建立账号绑定及接收重要通知',
+      name: t('scopeEmailTitle') || '电子邮箱',
+      desc: t('scopeEmailDesc') || '查看您的主要电子邮箱地址',
       icon: 'solar:letter-bold-duotone',
       color: '#06b6d4',
       bg: 'rgba(6, 182, 212, 0.12)'
     },
     profile: {
       key: 'profile',
-      name: t('scopeProfileTitle') || '个人公开资料 (Profile)',
-      desc: t('scopeProfileDesc') || '访问您的公开昵称、用户名及头像，用于在该应用内展现个人主页',
+      name: t('scopeProfileTitle') || '基本资料',
+      desc: t('scopeProfileDesc') || '查看您的公开昵称和头像',
       icon: 'solar:user-circle-bold-duotone',
       color: '#8b5cf6',
       bg: 'rgba(139, 92, 246, 0.12)'
     },
     comments: {
       key: 'comments',
-      name: t('scopeCommentsTitle') || '社区互动与评论 (Comments)',
-      desc: t('scopeCommentsDesc') || '允许在授权的博客或社区平台上使用您的 Epomail 身份发表留言',
+      name: t('scopeCommentsTitle') || '评论互动',
+      desc: t('scopeCommentsDesc') || '允许以您的身份在该应用内发表评论或互动',
       icon: 'solar:chat-round-dots-bold-duotone',
       color: '#10b981',
       bg: 'rgba(16, 185, 129, 0.12)'
     },
     'mail:read': {
       key: 'mail:read',
-      name: t('scopeMailReadTitle') || '邮件读取权限 (Mail Read)',
-      desc: t('scopeMailReadDesc') || '读取收件箱邮件列表与邮件正文（高敏感度）',
+      name: t('scopeMailReadTitle') || '读取邮件',
+      desc: t('scopeMailReadDesc') || '读取收件箱邮件列表与正文',
       icon: 'solar:inbox-line-bold-duotone',
       color: '#ef4444',
       bg: 'rgba(239, 68, 68, 0.12)'
@@ -1578,7 +1389,7 @@ function parseScopeList(scopesStr) {
     return dict[s] || {
       key: s,
       name: s,
-      desc: t('scopeCustomDesc') || '应用申请的特定业务交互权限',
+      desc: t('scopeCustomDesc') || '该应用申请的业务交互权限',
       icon: 'solar:shield-keyhole-bold-duotone',
       color: '#6366f1',
       bg: 'rgba(99, 102, 241, 0.12)'
@@ -2632,101 +2443,6 @@ function triggerFileDownload(content, filename, mimeType) {
     }
   }
 
-  /* 1. Top Highlights / Overview Grid */
-  .apps-overview-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 14px;
-    margin-top: 14px;
-    margin-bottom: 20px;
-
-    @media (max-width: 900px) {
-      grid-template-columns: 1fr;
-    }
-
-    .overview-stat-card {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      padding: 16px 18px;
-      border-radius: 12px;
-      background: var(--bg-surface);
-      border: 1px solid var(--border-subtle);
-      transition: all 0.2s ease;
-
-      &:hover {
-        border-color: var(--border-mid);
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
-      }
-
-      .stat-icon-wrap {
-        width: 44px;
-        height: 44px;
-        border-radius: 10px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        flex-shrink: 0;
-
-        &.primary-icon {
-          background: color-mix(in srgb, var(--accent-primary, #3b82f6) 12%, transparent);
-          color: var(--accent-primary, #3b82f6);
-        }
-
-        &.sso-icon {
-          background: color-mix(in srgb, #10b981 12%, transparent);
-          color: #10b981;
-        }
-
-        &.security-icon {
-          background: color-mix(in srgb, #8b5cf6 12%, transparent);
-          color: #8b5cf6;
-        }
-      }
-
-      .stat-meta {
-        display: flex;
-        flex-direction: column;
-        gap: 2px;
-        overflow: hidden;
-
-        .stat-value-row {
-          display: flex;
-          align-items: baseline;
-          gap: 6px;
-
-          .stat-number {
-            font-size: 22px;
-            font-weight: 700;
-            color: var(--text-primary);
-            line-height: 1;
-            font-family: var(--font-mono, monospace);
-          }
-
-          .stat-unit {
-            font-size: 13px;
-            font-weight: 600;
-            color: var(--text-primary);
-          }
-        }
-
-        .stat-title {
-          font-size: 13.5px;
-          font-weight: 600;
-          color: var(--text-primary);
-        }
-
-        .stat-hint {
-          font-size: 11.5px;
-          color: var(--text-secondary);
-          line-height: 1.4;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-      }
-    }
-  }
 
   /* 2. Toolbar & Search */
   .apps-toolbar {
@@ -3021,33 +2737,32 @@ function triggerFileDownload(content, filename, mimeType) {
   }
 
   /* 4. Empty State with Ecosystem Apps */
+  /* 4. Empty State */
   .empty-apps-container {
     display: flex;
     flex-direction: column;
-    gap: 20px;
     margin-bottom: 24px;
 
     .empty-hero-card {
       display: flex;
-      align-items: flex-start;
-      gap: 20px;
-      padding: 24px 28px;
+      align-items: center;
+      gap: 16px;
+      padding: 24px;
       border-radius: 12px;
-      background: color-mix(in srgb, var(--accent-primary, #3b82f6) 3%, var(--bg-surface));
+      background: var(--bg-surface);
       border: 1px dashed var(--border-subtle);
 
       @media (max-width: 640px) {
         flex-direction: column;
-        align-items: center;
         text-align: center;
-        gap: 14px;
+        gap: 12px;
         padding: 20px;
       }
 
       .empty-icon-box {
-        width: 64px;
-        height: 64px;
-        border-radius: 16px;
+        width: 44px;
+        height: 44px;
+        border-radius: 10px;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -3063,264 +2778,14 @@ function triggerFileDownload(content, filename, mimeType) {
         flex: 1;
 
         .empty-hero-title {
-          font-size: 16px;
-          font-weight: 700;
-          color: var(--text-primary);
-          margin-bottom: 4px;
-        }
-
-        .empty-hero-desc {
-          font-size: 13.5px;
-          color: var(--text-primary);
-          line-height: 1.5;
-          margin-bottom: 4px;
-        }
-
-        .empty-hero-subhint {
-          font-size: 12.5px;
-          color: var(--text-secondary);
-          line-height: 1.55;
-        }
-      }
-    }
-
-    .ecosystem-showcase {
-      display: flex;
-      flex-direction: column;
-      gap: 14px;
-
-      .ecosystem-title-row {
-        display: flex;
-        flex-direction: column;
-        gap: 3px;
-
-        .eco-title {
-          display: flex;
-          align-items: center;
-          gap: 6px;
           font-size: 14.5px;
           font-weight: 600;
           color: var(--text-primary);
-
-          .eco-sparkle-ic {
-            color: var(--accent-primary, #3b82f6);
-          }
+          margin-bottom: 3px;
         }
 
-        .eco-desc {
-          font-size: 12.5px;
-          color: var(--text-secondary);
-        }
-      }
-
-      .ecosystem-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-        gap: 14px;
-
-        .ecosystem-app-card {
-          padding: 16px 18px;
-          border-radius: 10px;
-          background: var(--bg-surface);
-          border: 1px solid var(--border-subtle);
-          display: flex;
-          flex-direction: column;
-          gap: 10px;
-          transition: all 0.2s ease;
-
-          &:hover {
-            border-color: var(--border-mid);
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
-          }
-
-          .eco-card-top {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-
-            .eco-avatar {
-              width: 36px;
-              height: 36px;
-              border-radius: 8px;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              flex-shrink: 0;
-              overflow: hidden;
-
-              .eco-logo {
-                width: 100%;
-                height: 100%;
-                object-fit: cover;
-              }
-
-              .eco-initial {
-                color: #ffffff;
-                font-weight: 700;
-                font-size: 15px;
-              }
-            }
-
-            .eco-info {
-              flex: 1;
-              min-width: 0;
-
-              .eco-name {
-                font-size: 14px;
-                font-weight: 600;
-                color: var(--text-primary);
-                white-space: nowrap;
-                overflow: hidden;
-                text-overflow: ellipsis;
-              }
-
-              .eco-link {
-                display: inline-flex;
-                align-items: center;
-                gap: 3px;
-                font-size: 11.5px;
-                color: var(--accent-primary, #3b82f6);
-                text-decoration: none;
-
-                &:hover {
-                  text-decoration: underline;
-                }
-              }
-            }
-          }
-
-          .eco-desc-text {
-            font-size: 12px;
-            color: var(--text-secondary);
-            line-height: 1.45;
-            display: -webkit-box;
-            -webkit-line-clamp: 2;
-            -webkit-box-orient: vertical;
-            overflow: hidden;
-          }
-
-          .eco-scopes-row {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 5px;
-
-            .eco-scopes-badge {
-              font-size: 11px;
-              color: var(--text-secondary);
-              background: color-mix(in srgb, var(--accent-primary, #3b82f6) 6%, transparent);
-              padding: 2px 6px;
-              border-radius: 4px;
-            }
-          }
-
-          .eco-card-action {
-            display: flex;
-            justify-content: flex-end;
-            padding-top: 4px;
-
-            .eco-visit-btn {
-              display: inline-flex;
-              align-items: center;
-              gap: 4px;
-              font-size: 12px;
-              font-weight: 500;
-              color: var(--accent-primary, #3b82f6);
-              text-decoration: none;
-              padding: 4px 10px;
-              border-radius: 6px;
-              background: color-mix(in srgb, var(--accent-primary, #3b82f6) 8%, transparent);
-
-              &:hover {
-                background: color-mix(in srgb, var(--accent-primary, #3b82f6) 16%, transparent);
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-
-  /* 5. Google Account Style Educational Pillars */
-  .security-pillars-section {
-    padding-top: 18px;
-    border-top: 1px solid var(--border-subtle);
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-
-    .pillars-title-row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-
-      .pillar-main-ic {
-        color: var(--accent-primary, #3b82f6);
-      }
-
-      .pillars-title {
-        font-size: 14px;
-        font-weight: 600;
-        color: var(--text-primary);
-      }
-    }
-
-    .pillars-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 14px;
-
-      @media (max-width: 900px) {
-        grid-template-columns: 1fr;
-      }
-
-      .pillar-card {
-        padding: 16px;
-        border-radius: 10px;
-        background: color-mix(in srgb, var(--accent-primary, #3b82f6) 2%, var(--bg-surface));
-        border: 1px solid var(--border-subtle);
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-
-        .pillar-head {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-
-          .pillar-icon-box {
-            width: 34px;
-            height: 34px;
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-shrink: 0;
-
-            &.lock-ic {
-              background: color-mix(in srgb, #3b82f6 12%, transparent);
-              color: #3b82f6;
-            }
-
-            &.control-ic {
-              background: color-mix(in srgb, #10b981 12%, transparent);
-              color: #10b981;
-            }
-
-            &.revoke-ic {
-              background: color-mix(in srgb, #f59e0b 12%, transparent);
-              color: #f59e0b;
-            }
-          }
-
-          .p-title {
-            font-size: 13px;
-            font-weight: 600;
-            color: var(--text-primary);
-          }
-        }
-
-        .p-desc {
-          font-size: 12px;
+        .empty-hero-desc {
+          font-size: 13px;
           color: var(--text-secondary);
           line-height: 1.5;
         }
@@ -3488,29 +2953,6 @@ function triggerFileDownload(content, filename, mimeType) {
         }
       }
 
-      .cannot-access-card {
-        padding: 12px 14px;
-        border-radius: 8px;
-        background: color-mix(in srgb, var(--el-color-danger, #ef4444) 3%, var(--bg-surface));
-        border: 1px solid color-mix(in srgb, var(--el-color-danger, #ef4444) 15%, transparent);
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-
-        .cannot-row {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          font-size: 12.5px;
-          color: var(--text-primary);
-
-          .cross-ic {
-            color: var(--el-color-danger, #ef4444);
-            flex-shrink: 0;
-          }
-        }
-      }
-
       .tech-info-grid {
         display: grid;
         grid-template-columns: 1fr;
@@ -3545,24 +2987,6 @@ function triggerFileDownload(content, filename, mimeType) {
             }
           }
         }
-      }
-    }
-
-    .warning-callout {
-      display: flex;
-      align-items: flex-start;
-      gap: 8px;
-      padding: 10px 12px;
-      border-radius: 8px;
-      background: color-mix(in srgb, #f59e0b 10%, transparent);
-      border: 1px solid color-mix(in srgb, #f59e0b 20%, transparent);
-      color: #b45309;
-      font-size: 12px;
-      line-height: 1.45;
-
-      .warn-ic {
-        flex-shrink: 0;
-        margin-top: 2px;
       }
     }
   }
