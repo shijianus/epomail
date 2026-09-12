@@ -405,36 +405,23 @@
 
     <!-- Section 4: 第三方应用和服务 (Third-Party Apps & Services) -->
     <div class="container third-party-apps-container" id="thirdPartyApps">
-      <div class="title">{{ $t('thirdPartyAppsTitle') || '第三方应用和服务' }}</div>
-      <div class="section-intro">
-        {{ $t('thirdPartyAppsDesc') || '管理已关联到您 Epomail 账号的第三方应用与网站，随时查看或移除访问权限。' }}
-      </div>
-
-      <!-- Search & Filter Bar (当有关联应用时显示) -->
-      <div class="apps-toolbar" v-if="userGrants.length > 0">
-        <div class="search-input-wrap">
-          <el-input
-            v-model="appSearchQuery"
-            size="small"
-            clearable
-            :placeholder="$t('thirdPartySearchPlaceholder') || '搜索应用或网站域名...'"
-            class="app-search-input"
-          >
-            <template #prefix>
-              <Icon icon="lucide:search" width="14" height="14" class="search-ic" />
-            </template>
-          </el-input>
+      <div class="section-head-flex">
+        <div class="head-left-col">
+          <div class="title">{{ $t('thirdPartyAppsTitle') || '第三方应用和服务' }}</div>
+          <div class="section-intro">
+            {{ $t('thirdPartyAppsDesc') || '管理已关联到您 Epomail 账号的第三方应用与网站，随时查看或移除访问权限。' }}
+          </div>
         </div>
-        <div class="toolbar-right">
+        <div class="head-right-actions" v-if="userGrants.length > 0">
           <el-button 
             size="small" 
             :loading="grantsLoading" 
             @click="fetchOauthGrants" 
-            class="refresh-btn" 
+            class="refresh-grants-btn" 
             circle
-            title="刷新"
+            :title="$t('refresh') || '刷新'"
           >
-            <Icon icon="solar:restart-linear" width="14" height="14" />
+            <Icon icon="solar:restart-linear" width="15" height="15" />
           </el-button>
         </div>
       </div>
@@ -539,7 +526,7 @@
       <!-- No match search result -->
       <div v-else-if="userGrants.length > 0 && filteredGrants.length === 0" class="no-search-results">
         <Icon icon="solar:magnifer-linear" width="28" height="28" class="empty-icon" />
-        <div class="empty-text">未找到匹配「{{ appSearchQuery }}」的应用</div>
+        <div class="empty-text">未找到匹配「{{ activeSearchKeyword }}」的应用</div>
       </div>
 
       <!-- 2. 当没有已授权应用时的简洁空状态 -->
@@ -910,6 +897,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Icon } from '@iconify/vue'
 import { useUserStore } from '@/store/user.js'
 import { useSettingStore } from '@/store/setting.js'
+import { useEmailStore } from '@/store/email.js'
 import {
   exportUserData,
   testTelegramBot,
@@ -930,6 +918,7 @@ defineOptions({
 const { t } = useI18n()
 const userStore = useUserStore()
 const settingStore = useSettingStore()
+const emailStore = useEmailStore()
 
 // 1. Export Data States
 const exportingFull = ref(false)
@@ -1004,20 +993,37 @@ const ecosystemApps = ref([])
 const revokingGrantId = ref(null)
 const appDetailModalShow = ref(false)
 const selectedAppDetail = ref(null)
-const appSearchQuery = ref('')
+// 内置高精准第三方应用检索函数 (针对 app 名称、clientId、域名、权限范围与说明进行深度多维匹配)
+function matchAppByKeyword(app, keyword) {
+  if (!app || !keyword) return true
+  const raw = keyword.trim().toLowerCase()
+  // 提取可能的语法前缀 app: / oauth: / client:
+  const q = raw.replace(/^(app:|oauth:|client:)/i, '').trim()
+  if (!q) return true
 
+  const nameMatch = (app.appName || '').toLowerCase().includes(q)
+  const clientMatch = (app.clientId || '').toLowerCase().includes(q)
+  const hostMatch = (app.homepageUrl || '').toLowerCase().includes(q)
+  const descMatch = (app.appDescription || '').toLowerCase().includes(q)
+  const scopesMatch = (app.scopes || '').toLowerCase().includes(q)
+
+  return nameMatch || clientMatch || hostMatch || descMatch || scopesMatch
+}
+
+// 提取当前顶栏 topbar-search 活跃检索关键词 (兼容全局设置搜索前缀)
+const activeSearchKeyword = computed(() => {
+  const kw = (emailStore.searchKeyword || '').trim()
+  if (!kw) return ''
+  return kw.replace(/^(all:|global:)/i, '').trim()
+})
+
+// 兼容顶栏 topbar-search 检索体系，实现应用实时精准过滤
 const filteredGrants = computed(() => {
-  if (!appSearchQuery.value || !appSearchQuery.value.trim()) {
+  const kw = activeSearchKeyword.value
+  if (!kw) {
     return userGrants.value
   }
-  const q = appSearchQuery.value.trim().toLowerCase()
-  return userGrants.value.filter(g => {
-    const nameMatch = (g.appName || '').toLowerCase().includes(q)
-    const clientMatch = (g.clientId || '').toLowerCase().includes(q)
-    const hostMatch = (g.homepageUrl || '').toLowerCase().includes(q)
-    const descMatch = (g.appDescription || '').toLowerCase().includes(q)
-    return nameMatch || clientMatch || hostMatch || descMatch
-  })
+  return userGrants.value.filter(g => matchAppByKeyword(g, kw))
 })
 
 async function fetchUserStorage() {
@@ -2405,30 +2411,44 @@ function triggerFileDownload(content, filename, mimeType) {
 
 
 
-  /* 2. Toolbar & Search */
-  .apps-toolbar {
+  /* Header flex with subtle refresh action */
+  .section-head-flex {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: space-between;
-    gap: 12px;
-    margin-bottom: 16px;
+    gap: 16px;
+    margin-bottom: 18px;
 
-    .search-input-wrap {
-      max-width: 320px;
-      width: 100%;
+    .head-left-col {
+      flex: 1;
 
-      .app-search-input {
-        border-radius: 8px;
+      .title {
+        margin-bottom: 4px;
+      }
+      .section-intro {
+        margin-bottom: 0;
       }
     }
 
-    .toolbar-right {
+    .head-right-actions {
       display: flex;
       align-items: center;
       gap: 8px;
+      padding-top: 2px;
 
-      .refresh-btn {
+      .refresh-grants-btn {
+        width: 32px;
+        height: 32px;
         border-radius: 8px;
+        border: 1px solid var(--border-subtle);
+        background: var(--bg-surface);
+        color: var(--text-secondary);
+        transition: all 0.2s ease;
+
+        &:hover {
+          color: var(--accent-primary, #3b82f6);
+          border-color: var(--accent-primary, #3b82f6);
+        }
       }
     }
   }

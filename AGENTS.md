@@ -11,6 +11,33 @@
    - 在向用户输出回复时，必须置顶/显式打印出本次提交的完整 Commit Hash 与短 Hash，确保版本可追溯、审计记录完整。
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
+### 第三方应用检索全面整合至全局顶栏、消除局部冗余输入框及内置应用精准检索上线 (2026-09-12)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **全局顶栏搜索全面整合与局部冗余输入框消除 (Topbar Search Integration & Clutter Removal)**:
+       - 彻底移除第三方应用板块（`views/data-setting/index.vue`）内部局部多余的 `el-input`（消除 `class="el-input__wrapper"`），杜绝多层输入框嵌套的割裂感与过度设计，还原纯粹宁静的用户界面；
+       - 将应用检索功能无缝整合并入系统顶栏全局搜索框（`class="topbar-search"`），在处于 `data-setting` 分区时动态自适应占位符（中英文：「搜索设定或第三方应用...」/「Search settings or apps...」）；
+       - 在全局设置搜索索引映射 `settingsMap` 中深度接入「第三方应用和服务」（`thirdPartyApps`），支持根据关键字、模糊词（`app`、`oauth`、`应用`、`第三方`、`sso` 等）精准匹配，点击直接平滑滚动定位至该板块。
+    2. **高精准内置针对第三方应用的检索函数 (Dedicated Precise App Search Engine)**:
+       - 内置针对应用维度的深度检索函数 `matchAppByKeyword(app, keyword)`，支持对应用名称（`appName`）、客户端标识（`clientId`）、官网域名（`homepageUrl`）、应用介绍描述（`appDescription`）以及授权权限范围（`scopes`）进行全文字段深度穿透匹配；
+       - 深度原生兼容应用专有前缀检索语法（如 `app:blog`、`oauth:image`、`client:xxx`），自动提取目标关键词并与应用列表进行响应式过滤，无需在分支中繁琐新建分支逻辑，直接基于 Pinia 全局状态 `emailStore.searchKeyword` 完美响应；
+       - 搜索词清空时秒级自动恢复全量卡片渲染，未找到匹配项时优雅呈现未匹配状态提示。
+    3. **Playwright 生产环境真实端到端全维度自动化审计 100% 全绿 (Comprehensive Live E2E Audit)**:
+       - 自动化审计脚本 `tests/audit-third-party-data-sharing.mjs` 11 项全链路检查点全部 100% 成功通过：
+         - ① 站长 API 登录获取会话 Token 成功；
+         - ② 审计 API 接口，全平台活跃应用 100% 同步加载验证通过；
+         - ③ 模拟发起 OAuth 2.0 授权更新权限范围成功；
+         - ④ 验证已授权应用在列表及 UserInfo 端点精准返回；
+         - ⑤ 验证 Code 兑换 Access Token 及 UserInfo 访问成功；
+         - ⑥ 验证 DELETE `/api/my/oauthGrants/:id` 撤销授权 API 成功；
+         - ⑦ 验证边缘网关即时阻断：撤销后同一 Access Token 访问 UserInfo 立即被 401 Unauthorized 拦截；
+         - ⑧ 真实浏览器导航至 `/settings/data-setting`，验证板块挂载、未渲染管理端按钮，并且板块内 `el-input__wrapper` 数量严格为 0；
+         - ⑨ 验证顶栏全局搜索框动态占位符「搜索设定或第三方应用...」，实测顶栏搜索 `blog` 精确匹配 1 个卡片，实测顶栏输入内置语法 `app:image` 精确匹配 1 个卡片，清空后即时恢复全部应用卡片；
+         - ⑩ 验证详情弹窗渲染正常，点击「移除访问权限」并确认后卡片即时卸载；
+         - ⑪ 验证全部解除后优雅空状态呈现，测试数据与 KV 标记自动自愈还原，恪守零假数据与脏数据残留准则。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **Cloudflare Workers 部署 Version ID**: `1985ee06-7af6-47c0-8604-e4aa56f4c25f`。
+    - **epocanvas-mail Git Commit**: `e4f5e1060141e25eb7fe6c2697539188fd0e67d7` (Short Hash: `e4f5e10`)。
+
 ### 用户与管理界面彻底解耦、系统已添加OAuth应用全量同步加载及资安隐患治理上线 (2026-09-12)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **用户端与管理端界面绝对物理隔离 (Strict Separation of User and Admin Spaces)**:

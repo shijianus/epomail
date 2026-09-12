@@ -587,6 +587,7 @@ const zh = {
     systemCheckTooltip: '此规则由系统内置逻辑驱动，无法修改',
     backToMail: '返回邮件',
     searchSettings: '搜索设定',
+    searchSettingsOrApps: '搜索设定或第三方应用...',
     note: '注意',
     deleteLabelWarning: '这只会移除标签标记，相关邮件不会被删除。',
     saveLabel: '保存标签',

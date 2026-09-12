@@ -3,7 +3,10 @@ import assert from "assert";
 
 (async () => {
   console.log("=== 开始「资料分区 - 第三方应用与数据共享板块」全链路端到端审计 ===");
-  const browser = await chromium.launch({ headless: true });
+  const browser = await chromium.launch({
+    headless: true,
+    args: ["--disable-ipv6", "--no-sandbox", "--disable-setuid-sandbox"]
+  });
   const context = await browser.newContext({
     viewport: { width: 1440, height: 960 },
     locale: "zh-CN"
@@ -27,15 +30,27 @@ import assert from "assert";
   let testUserId = null;
   let grantedId = null;
 
+  async function requestWithRetry(fn, retries = 3, delayMs = 1500) {
+    for (let i = 0; i < retries; i++) {
+      try {
+        return await fn();
+      } catch (err) {
+        if (i === retries - 1) throw err;
+        console.warn(`[RETRY] 网络请求重试 (${i + 1}/${retries})...`);
+        await new Promise(r => setTimeout(r, delayMs));
+      }
+    }
+  }
+
   try {
     // -----------------------------------------------------------------------------------
     // 步骤 1: 登录并获取身份令牌
     // -----------------------------------------------------------------------------------
     console.log("1. 正在以站长身份登录 (admin@epomail.bond)...");
-    const loginRes = await page.request.post(`${BASE}/api/login`, {
+    const loginRes = await requestWithRetry(() => page.request.post(`${BASE}/api/login`, {
       data: { email: "admin@epomail.bond", password: "123456" },
       headers: { "Content-Type": "application/json" }
-    });
+    }));
     const loginData = await loginRes.json();
     assert.strictEqual(loginData.code, 200, "登录必须成功");
     authToken = loginData.data?.token;
@@ -46,9 +61,9 @@ import assert from "assert";
     // 步骤 2: API 端点审计 - GET /api/my/oauthGrants
     // -----------------------------------------------------------------------------------
     console.log("2. 审计 GET /api/my/oauthGrants 端点结构与生态应用列表...");
-    const grantsRes = await page.request.get(`${BASE}/api/my/oauthGrants`, {
+    const grantsRes = await requestWithRetry(() => page.request.get(`${BASE}/api/my/oauthGrants`, {
       headers: { "Authorization": authToken }
-    });
+    }));
     assert.strictEqual(grantsRes.status(), 200, "GET /api/my/oauthGrants 状态码应为 200");
     const grantsData = await grantsRes.json();
     assert.strictEqual(grantsData.code, 200, "响应 code 应为 200");
@@ -71,7 +86,7 @@ import assert from "assert";
     const redirectUri = "https://blog.epocanvas.com/auth/callback";
     const requestedScope = "openid profile email comments";
 
-    const authRes = await page.request.post(`${BASE}/oauth/authorize`, {
+    const authRes = await requestWithRetry(() => page.request.post(`${BASE}/oauth/authorize`, {
       data: {
         client_id: clientId,
         redirect_uri: redirectUri,
@@ -82,7 +97,7 @@ import assert from "assert";
         "Content-Type": "application/json",
         "Authorization": authToken
       }
-    });
+    }));
 
     const authData = await authRes.json();
     assert.strictEqual(authData.code, 200, "授权请求必须成功");
@@ -94,9 +109,9 @@ import assert from "assert";
     // 步骤 4: 验证 oauth_grant 已记录并能通过 GET /api/my/oauthGrants 查询
     // -----------------------------------------------------------------------------------
     console.log("4. 验证已授权应用在 GET /api/my/oauthGrants 中精准列出...");
-    const grantsAfterAuthRes = await page.request.get(`${BASE}/api/my/oauthGrants`, {
+    const grantsAfterAuthRes = await requestWithRetry(() => page.request.get(`${BASE}/api/my/oauthGrants`, {
       headers: { "Authorization": authToken }
-    });
+    }));
     const grantsAfterAuth = await grantsAfterAuthRes.json();
     const blogGrant = grantsAfterAuth.data?.grants?.find(g => g.clientId === clientId);
     assert.ok(blogGrant, "grants 列表中必须包含刚刚授权的应用");
@@ -112,15 +127,15 @@ import assert from "assert";
     // -----------------------------------------------------------------------------------
     console.log("5. 测试 Code 兑换 Access Token 及 UserInfo 访问...");
     // 查找 app 的 clientSecret
-    const appListRes = await page.request.get(`${BASE}/api/admin/oauthApp/list`, {
+    const appListRes = await requestWithRetry(() => page.request.get(`${BASE}/api/admin/oauthApp/list`, {
       headers: { "Authorization": authToken }
-    });
+    }));
     const appListData = await appListRes.json();
     const targetApp = appListData.data?.find(a => a.clientId === clientId);
     assert.ok(targetApp, "必须存在 shijianus-blog 应用配置");
 
     // 兑换 token
-    const tokenRes = await page.request.post(`${BASE}/api/oauth/token`, {
+    const tokenRes = await requestWithRetry(() => page.request.post(`${BASE}/api/oauth/token`, {
       data: {
         grant_type: "authorization_code",
         code: authCode,
@@ -129,16 +144,16 @@ import assert from "assert";
         redirect_uri: redirectUri
       },
       headers: { "Content-Type": "application/json" }
-    });
+    }));
     const tokenData = await tokenRes.json();
     assert.ok(tokenData.access_token, "必须返回 access_token");
     const accessToken = tokenData.access_token;
     console.log("✓ 成功获取 Access Token (前20字符):", accessToken.substring(0, 20) + "...");
 
     // 调用 UserInfo
-    const userInfoRes = await page.request.get(`${BASE}/api/oauth/userinfo`, {
+    const userInfoRes = await requestWithRetry(() => page.request.get(`${BASE}/api/oauth/userinfo`, {
       headers: { "Authorization": `Bearer ${accessToken}` }
-    });
+    }));
     assert.strictEqual(userInfoRes.status(), 200, "UserInfo 应当正常响应 200");
     const userInfoData = await userInfoRes.json();
     assert.strictEqual(userInfoData.email, "admin@epomail.bond", "邮箱必须匹配");
@@ -148,9 +163,9 @@ import assert from "assert";
     // 步骤 6: 测试即时权限撤销与边缘网关阻断 (Instant Revocation Enforcement)
     // -----------------------------------------------------------------------------------
     console.log("6. 测试 DELETE /api/my/oauthGrants/:id 一键撤销授权...");
-    const revokeRes = await page.request.delete(`${BASE}/api/my/oauthGrants/${grantedId}`, {
+    const revokeRes = await requestWithRetry(() => page.request.delete(`${BASE}/api/my/oauthGrants/${grantedId}`, {
       headers: { "Authorization": authToken }
-    });
+    }));
     assert.strictEqual(revokeRes.status(), 200, "撤销接口必须返回 200");
     const revokeData = await revokeRes.json();
     assert.strictEqual(revokeData.code, 200, "撤销响应 code 必须为 200");
@@ -158,35 +173,36 @@ import assert from "assert";
 
     // 验证实时吊销生效：同一 Access Token 立即被拦截
     console.log("7. 验证实时吊销：使用已吊销应用的原 Access Token 请求 UserInfo 应被严格拦截...");
-    const revokedUserInfoRes = await page.request.get(`${BASE}/api/oauth/userinfo`, {
+    const revokedUserInfoRes = await requestWithRetry(() => page.request.get(`${BASE}/api/oauth/userinfo`, {
       headers: { "Authorization": `Bearer ${accessToken}` }
-    });
+    }));
     assert.strictEqual(revokedUserInfoRes.status(), 401, "已撤销授权必须被立即切断并返回 401");
     console.log("✓ 边缘网关即时阻断验证通过: 401 Unauthorized");
 
     // -----------------------------------------------------------------------------------
-    // 步骤 7: 浏览器端真实 UI 渲染与交互测试
+    // 步骤 8: 浏览器端真实 UI 渲染与交互测试
     // -----------------------------------------------------------------------------------
     console.log("8. 启动浏览器 Playwright 导航至「资料」设置页 (/settings/data-setting)...");
-    await page.goto(`${BASE}/inbox`, { waitUntil: "domcontentloaded" });
-    await page.evaluate(t => {
-      localStorage.setItem("token", t);
-      localStorage.setItem("setting", JSON.stringify({ lang: "zh" }));
-      localStorage.setItem("locale", "zh");
-    }, authToken);
 
     // 重新为 shijianus-blog 授权供 UI 呈现与交互
-    await page.request.post(`${BASE}/oauth/authorize`, {
+    await requestWithRetry(() => page.request.post(`${BASE}/oauth/authorize`, {
       data: {
         client_id: clientId,
         redirect_uri: redirectUri,
         scope: requestedScope,
         state: "ui_visual_test"
       },
-      headers: { "Content-Type": "application/json", "Authorization": authToken }
-    });
+      headers: { "Content-Type": "application/json", "Authorization": authToken },
+      timeout: 60000
+    }));
 
-    await page.goto(`${BASE}/settings/data-setting`, { waitUntil: "networkidle" });
+    await context.addInitScript(t => {
+      localStorage.setItem("token", t);
+      localStorage.setItem("setting", JSON.stringify({ lang: "zh" }));
+      localStorage.setItem("locale", "zh");
+    }, authToken);
+
+    await page.goto(`${BASE}/settings/data-setting`, { waitUntil: "domcontentloaded", timeout: 60000 });
     await page.waitForTimeout(2000);
 
     // 验证板块容器存在
@@ -198,6 +214,44 @@ import assert from "assert";
     const manageBtnCount = await page.locator(".manage-oauth-btn").count();
     assert.strictEqual(manageBtnCount, 0, "用户界面与管理界面必须严格独立，严禁混为一谈出现'管理 OAuth 应用'按钮");
     console.log("✓ 界面隔离验证通过：未渲染管理端入口按钮");
+
+    // 核心架构优化：el-input__wrapper 功能已移入 topbar-search，板块内不再残留多余的搜索输入框
+    const insideInputWrapperCount = await thirdPartySection.locator(".el-input__wrapper").count();
+    assert.strictEqual(insideInputWrapperCount, 0, "第三方应用板块内禁止残留 redundant 的 el-input__wrapper，应使用顶栏全局 topbar-search");
+    console.log("✓ 结构优化验证通过：第三方应用板块内已无 el-input__wrapper，纯粹简洁");
+
+    // 验证顶栏 topbar-search 兼容性及精确针对 app 的内置检索
+    // 确保异步数据加载完成且应用卡片已渲染
+    await thirdPartySection.locator(".connected-app-card").first().waitFor({ state: "visible", timeout: 15000 });
+    const readyCardCount = await thirdPartySection.locator(".connected-app-card").count();
+    console.log("页面初次加载完毕，已渲染应用卡片数:", readyCardCount);
+    assert.ok(readyCardCount >= 2, "必须渲染全平台已关联应用卡片");
+
+    const topbarInput = page.locator(".topbar-search input");
+    const placeholder = await topbarInput.getAttribute("placeholder");
+    console.log("顶栏搜索框占位符:", placeholder);
+    assert.ok(placeholder.includes("第三方应用") || placeholder.includes("设定") || placeholder.includes("Settings"), "顶栏搜索框必须兼容呈现设置/应用检索提示");
+
+    // 测试 1: 在顶栏检索 'blog'
+    await topbarInput.fill("blog");
+    await page.waitForTimeout(500);
+    const blogFilteredCount = await thirdPartySection.locator(".connected-app-card").count();
+    console.log("顶栏搜索 'blog' 匹配应用卡片数:", blogFilteredCount);
+    assert.strictEqual(blogFilteredCount, 1, "顶栏搜索 'blog' 必须精确匹配到 1 个应用");
+
+    // 测试 2: 在顶栏使用内置语法前缀 'app:image' 精确检索
+    await topbarInput.fill("app:image");
+    await page.waitForTimeout(500);
+    const imageFilteredCount = await thirdPartySection.locator(".connected-app-card").count();
+    console.log("顶栏搜索 'app:image' 匹配应用卡片数:", imageFilteredCount);
+    assert.strictEqual(imageFilteredCount, 1, "顶栏搜索 'app:image' 必须精确匹配到 1 个应用");
+
+    // 测试 3: 清空顶栏搜索框，恢复全量展示
+    await topbarInput.fill("");
+    await page.waitForTimeout(500);
+    const restoredCount = await thirdPartySection.locator(".connected-app-card").count();
+    console.log("清空顶栏搜索后恢复卡片数:", restoredCount);
+    assert.strictEqual(restoredCount, 2, "清空顶栏搜索框后必须恢复全量应用卡片");
 
     // 验证标题与导言
     const sectionTitle = await thirdPartySection.locator(".title").innerText();

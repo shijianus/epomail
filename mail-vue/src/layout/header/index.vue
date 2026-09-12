@@ -14,7 +14,7 @@
         <span class="search-icon" @click="handleSearch" :title="$t('search') || 'Search'">
           <Icon icon="lucide:search" width="18" height="18"/>
         </span>
-        <input type="text" :placeholder="isSettingsMode && route.name !== 'all-email' ? ($t('searchSettings') || 'Search settings') : route.name === 'all-email' ? ($t('searchAllMail') || 'Search all mail...') : ($t('searchMail') || 'Search mail')" v-model="emailStore.searchKeyword" @input="handleSearchInput" @keyup.enter="handleSearch" @keydown.tab.prevent="handleTabComplete" @focus="searchFocus = true" @blur="onSearchBlur" />
+        <input type="text" :placeholder="isSettingsMode && route.name !== 'all-email' ? (route.name === 'data-setting' ? ($t('searchSettingsOrApps') || '搜索设定或第三方应用...') : ($t('searchSettings') || 'Search settings')) : route.name === 'all-email' ? ($t('searchAllMail') || 'Search all mail...') : ($t('searchMail') || 'Search mail')" v-model="emailStore.searchKeyword" @input="handleSearchInput" @keyup.enter="handleSearch" @keydown.tab.prevent="handleTabComplete" @focus="searchFocus = true" @blur="onSearchBlur" />
         <span class="clear-icon" v-show="emailStore.searchKeyword" @mousedown.prevent @click.stop="clearSearch" :title="$t('clear') || 'Clear'">
           <Icon icon="lucide:x" width="15" height="15"/>
         </span>
@@ -347,7 +347,8 @@ const settingsMap = computed(() => [
     items: [
       { text: t('dataExportTitle') || 'Export Data', id: 'dataExport' },
       { text: t('forwardingAndPushTitle') || t('forwardingRulesTitle') || 'Forwarding & Push', id: 'forwarding' },
-      { text: t('apiDeveloperTitle') || 'API & Developer Access', id: 'apiAccess' }
+      { text: t('apiDeveloperTitle') || 'API & Developer Access', id: 'apiAccess' },
+      { text: t('thirdPartyAppsTitle') || '第三方应用和服务', id: 'thirdPartyApps', keywords: ['app', 'oauth', '应用', '第三方', '授权', '单点登录', 'sso', 'shijianus-blog', 'epocanvasimage', 'client'] }
     ]
   },
   {
@@ -452,8 +453,23 @@ const settingsSearchResults = computed(() => {
   let cleanKeyword = keyword.replace(/^(all:|global:)/i, '').trim().toLowerCase();
   if (!cleanKeyword) return [];
   
+  const appPrefixMatch = cleanKeyword.match(/^(app:|oauth:|client:)\s*(.*)/i);
+  const targetAppQuery = appPrefixMatch ? appPrefixMatch[2].trim() : '';
+
   return settingsMap.value.map(group => {
-    const matchedItems = group.items.filter(item => item.text.toLowerCase().includes(cleanKeyword));
+    const matchedItems = group.items.filter(item => {
+      if (appPrefixMatch) {
+        if (item.id === 'thirdPartyApps') {
+          if (!targetAppQuery) return true;
+          return (item.keywords && item.keywords.some(k => k.toLowerCase().includes(targetAppQuery))) ||
+                 item.text.toLowerCase().includes(targetAppQuery);
+        }
+        return false;
+      }
+      const matchText = item.text.toLowerCase().includes(cleanKeyword);
+      const matchKw = item.keywords && item.keywords.some(k => k.toLowerCase().includes(cleanKeyword));
+      return matchText || matchKw;
+    });
     if (matchedItems.length > 0) {
       return { ...group, items: matchedItems }
     }
@@ -498,7 +514,18 @@ function highlightSetting(text) {
 function goToSetting(routeName, itemId) {
   searchFocus.value = false;
   if (route.name !== routeName) {
-    router.push({ name: routeName });
+    router.push({ name: routeName, hash: itemId ? `#${itemId}` : undefined });
+    if (itemId) {
+      setTimeout(() => {
+        const el = document.getElementById(itemId);
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 300);
+    }
+  } else if (itemId) {
+    const el = document.getElementById(itemId);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   }
 }
 

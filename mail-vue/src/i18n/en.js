@@ -592,6 +592,7 @@ const en = {
     systemCheckTooltip: 'This rule is driven by built-in system logic and cannot be modified.',
     backToMail: 'Back to Mail',
     searchSettings: 'Search settings',
+    searchSettingsOrApps: 'Search settings or apps...',
     note: 'Note',
     deleteLabelWarning: 'This will only remove the label tag. Associated emails will not be deleted.',
     saveLabel: 'Save Label',
