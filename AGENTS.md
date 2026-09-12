@@ -11,6 +11,34 @@
    - 在向用户输出回复时，必须置顶/显式打印出本次提交的完整 Commit Hash 与短 Hash，确保版本可追溯、审计记录完整。
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
+### 登录失败与凭证过期被动强制退出优化、杜绝路由困留与回退到登录界面上线 (2026-09-12)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **被动/强制退出全链路无痕重定向至 /login/ (Instant Hard Redirect to /login/)**:
+       - 根因定位：此前当登录凭证过期（401）时，Axios 采用 Vue Router 软路由跳转（`router.replace('/login')`），该链路严重依赖当前视图组件正常销毁、异步路由分包下载、`loadBackground` 壁纸加载及中间重定向；一旦未销毁组件因读取空用户数据抛错、或路由守卫死锁，用户即被困死在当前页面无法回到登录页；
+       - 统一治理：新增 `mail-vue/src/utils/auth.js` 工具模块，封装统一退出逻辑 `forceLogoutToLogin(message)` 与 `clearAuthStorage()`，一键清理 `localStorage`（`token`、`ui`）及会话存储，保留 `loginEmail` 用于回填；
+       - 硬重定向保障：无论在何种复杂视图状态下，统一通过 `window.location.replace('/login/?reason=expired')` 直接击穿 SPA 内部路由陷阱，瞬间销毁所有后台挂起的未结长任务，百分之百确定性回退至纯净的独立登录应用界面。
+    2. **Axios 响应与错误拦截器彻底重构 (Comprehensive 401 Interception)**:
+       - 优先级前置：将 `data.code === 401` 判定移至 `if (noMsg)` 逻辑前，彻底解决长轮询（`emailLatest`、`allEmailLatest`）静默请求在 token 过期时吞掉 401 并停留在收件箱的陈年缺陷；
+       - 网络层 401 拦截：在 Axios `(error) =>` 错误回调中全面补齐对 HTTP 401 状态码的实时捕获，杜绝被误报为「服务器繁忙」而停留在当前页面的情况。
+    3. **路由守卫与动态管理路由保护 (Router Guards & Profile Decoupling)**:
+       - 根除死锁：移除 `router.beforeEach` 中针对 `to.name === 'login'` 的 `next(from.path)` 强制阻拦逻辑，用户导航到 `/login` 时直接硬跳转至 `/login/`，彻底消除死循环困留；
+       - 动态管理路由越权/误入防御：针对未登录或 token 失效场景，识别保留的管理路径（`system-setting`、`role`、`all-users`、`reg-key`、`analysis` 等），防止因动态权限未加载而被通配符贪婪匹配到 `/:username`（Profile 公开主页），统一阻断并重定向至登录页。
+    4. **登录应用体验与自动回填 (AuthForm Smooth Continuity)**:
+       - 登录界面 `AuthForm.tsx` 在挂载时智能检测 `?reason=expired` 与 `sessionStorage` 消息，若凭证过期则高亮温和警示气泡（「登录凭证已过期，请重新登录」）；
+       - 自动从本地缓存读取上次登录的邮箱账号进行预填，用户仅需输入密码或 2FA 验证码即可迅速重新连结，告别重复输入。
+    5. **Playwright 真实生产环境全维度自动化审计 100% 全绿 (Comprehensive Live E2E Audit)**:
+       - 专属端到端自动化审计套件 `tests/test-forced-logout-to-login.mjs` 7 项全链路检查点全部 100% 成功通过：
+         - ① 真实站长 API 登录获取有效会话 Token 验证通过；
+         - ② 审计主动退出：点击顶部头像下拉菜单「退出登录」，验证即刻硬重定向至 `/login/` 且本地 Token 彻底销毁；
+         - ③ 审计被动 401 退出：注入伪造/过期 Token 进入受保护页面，验证前端立即被拦截并强制退回 `/login/?reason=expired`，Token 自动自愈清空，登录表单正常渲染零白屏；
+         - ④ 审计动态管理路由防护：无 Token 直接访问 `/system-setting`、`/role`、`/all-users`，全部被拦截重定向至 `/login/`，彻底杜绝误入假 Profile 主页；
+         - ⑤ 审计访问 `/login`：验证彻底消除 `next(from.path)` 困留并顺畅抵达登录页；
+         - ⑥ 重新登录验证：在登出界面输入凭据重新登录，顺畅回流回收件箱 `/inbox`；
+         - ⑦ 验证无假数据残留，保存终态快照 `tests/audit_login_flow_healthy.png`。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **Cloudflare Workers 部署 Version ID**: `54a23958-3fc4-4d8f-ab35-8af2c1d550e7`。
+    - **epocanvas-mail Git Commit**: `c87074b754a9a63a081cfcdb6abd726c9c945be9` (Short Hash: `c87074b`)。
+
 ### AI 可用多模型池 (Models Pool) 单条折叠收敛、+N 定向表达与零溢出 UI 架构上线 (2026-09-12)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **多模型池单条折叠与 +N 定向表达模式 (Single-Row Collapse with +N Directed Pill Badge)**:
