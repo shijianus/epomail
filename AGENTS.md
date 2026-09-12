@@ -37,7 +37,7 @@
        - 恪守零假数据与脏数据残留准则。
 *   **部署上线与自动化测试 (Verification & Deployment)**:
     - **Cloudflare Workers 部署 Version ID**: `ed86c3cf-7e79-46e1-bc38-78c514f5adbf`。
-    - **epocanvas-mail Git Commit**: `PENDING_COMMIT_HASH`。
+    - **epocanvas-mail Git Commit**: `eb2116153f2fa2ec136b66eb582a00e31d7c7179` (Short Hash: `eb21161`)。
 
 ### 登录失败与凭证过期被动强制退出优化、杜绝路由困留与回退到登录界面上线 (2026-09-12)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
