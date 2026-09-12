@@ -37,7 +37,7 @@
          - ⑪ 验证全部解除后优雅空状态呈现，测试数据与 KV 标记自动自愈还原，恪守零假数据与脏数据残留准则。
 *   **部署上线与自动化测试 (Verification & Deployment)**:
     - **Cloudflare Workers 部署 Version ID**: `a6a4f226-1fe1-474c-914d-78a3adc66e98`。
-    - **epocanvas-mail Git Commit**: `956122b8fc17eb336c8e9091b318c220608ddd6a` (Short Hash: `956122b`)。
+    - **epocanvas-mail Git Commit**: `322308525d3a23557c50d0d955e2e5af66eb5f8f` (Short Hash: `3223085`)。
 
 ### 第三方应用板块回归真实用户视角、剔除说教文案与过度设计重构上线 (2026-09-11)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
