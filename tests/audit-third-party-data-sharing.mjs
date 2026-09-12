@@ -249,7 +249,7 @@ import assert from "assert";
     await emptyHero.waitFor({ state: "visible", timeout: 5000 });
     const emptyTitle = await emptyHero.locator(".empty-hero-title").innerText();
     console.log("空状态标题:", emptyTitle);
-    assert.ok(emptyTitle.includes("暂无关联的第三方应用或网站"), "必须正确恢复为空状态");
+    assert.ok(emptyTitle.includes("暂无已关联的应用"), "必须正确恢复为空状态");
 
     // 截图 3: 空状态与生态应用展示态
     await page.screenshot({
