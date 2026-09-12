@@ -31,7 +31,7 @@
        - 恪守零假数据残留准则。
 *   **部署上线与版本追溯 (Verification & Deployment)**:
     - **Cloudflare Workers 部署 Version ID**: `82ecf154-6774-458e-87fc-96b76f5a2e08`。
-    - **epocanvas-mail Git Commit**: `5a641467918d13e3dfee9991795515ecdacfefdf` (Short Hash: `5a64146`)。
+    - **epocanvas-mail Git Commit**: `40c86dd5af0d9c3e277b7eea0d255fa0cbca9ba3` (Short Hash: `40c86dd`)。
 
 ### 第三方应用检索全面整合至全局顶栏、消除局部冗余输入框及内置应用精准检索上线 (2026-09-12)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
