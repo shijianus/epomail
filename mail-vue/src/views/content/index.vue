@@ -1200,7 +1200,15 @@ const targetLangMap = reactive({});
 const displayedContent = (msg) => {
   if (!msg) return '';
   if (isTranslatedMap[msg.emailId] && !showOriginalMap[msg.emailId]) {
-    return translatedHtmlMap[msg.emailId] || msg.content;
+    const transHtml = translatedHtmlMap[msg.emailId];
+    if (transHtml && /<[a-z][\s\S]*>/i.test(transHtml)) {
+      return transHtml;
+    }
+    const transText = translatedTextMap[msg.emailId];
+    if (transText) {
+      return `<div class="translated-embed-body" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; line-height: 1.7; white-space: pre-wrap; word-break: break-word; padding: 4px 0;">${transText}</div>`;
+    }
+    return msg.content;
   }
   return msg.content;
 };
@@ -1239,9 +1247,13 @@ const handleTranslate = (msg) => {
     html: target.content || '',
     targetLang: lang
   }).then((res) => {
-    const data = res.data || res || {};
-    const transText = data.translatedText || '';
-    const transHtml = data.translatedHtml || '';
+    const data = (res && res.data !== undefined) ? res.data : (res || {});
+    const transText = (data.translatedText || '').trim();
+    const transHtml = (data.translatedHtml || '').trim();
+    if (!transText && !transHtml) {
+      ElMessage.warning('翻译结果为空，请重试或检查模型配置');
+      return;
+    }
     translatedTextMap[id] = transText;
     translatedHtmlMap[id] = transHtml;
     isTranslatedMap[id] = true;
@@ -1249,7 +1261,7 @@ const handleTranslate = (msg) => {
     ElMessage.success(t('translateSuccess') || '翻译完成');
   }).catch(err => {
     console.error('Translation error:', err);
-    ElMessage.error('翻译失败，请检查网络或 AI 接口配置');
+    ElMessage.error(err?.message || '翻译失败，请检查网络或 AI 接口配置');
   }).finally(() => {
     translatingMap[id] = false;
   });

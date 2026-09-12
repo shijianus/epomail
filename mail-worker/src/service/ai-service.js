@@ -186,9 +186,35 @@ const aiService = {
 		};
 		const targetLangName = langNames[targetLang] || targetLang;
 
+		const extractCleanContent = (raw) => {
+			if (!raw || typeof raw !== 'string') return '';
+			let text = raw;
+			// 1. 剔除思维链推理标签 (DeepSeek R1 / Reasoning models: <think>...</think>)
+			text = text.replace(/<think\b[^>]*>[\s\S]*?<\/think>/gi, '').trim();
+
+			// 2. 剥离 Markdown 代码块包裹 (```html ... ``` 或 ``` ... ```)
+			const codeBlockMatch = text.match(/```(?:html|xml)?\s*\n?([\s\S]*?)\n?```/i);
+			if (codeBlockMatch && codeBlockMatch[1]) {
+				text = codeBlockMatch[1].trim();
+			} else {
+				text = text.replace(/^```(?:html|xml)?\s*\n?/i, '').replace(/\n?```\s*$/i, '').trim();
+			}
+
+			// 3. 剔除模型常见的客套前缀/提示语 (如 "Here is the translation:" 或 "转换为简体中文：")
+			text = text.replace(/^(?:Here is the (?:translated |HTML )?(?:email|translation|HTML)?[：:]?\s*\n*|Translation[：:]?\s*\n*|Below is the [^\n]*\n+|Sure, [^\n]*\n+|Here's the translation[^\n]*\n+|转换为(?:简体中文|繁体中文|英文)[：:]?\s*\n*)/i, '').trim();
+
+			// 4. 防御部分模型先复读原文 HTML 再输出译文 HTML 的极端情况
+			const doubleHtmlMatch = text.match(/<[a-z][\s\S]*?>[\s\S]*?<\/[a-z]>[\s\S]*?(?:转换为|翻译为|Translated)[^\n]*\n*([\s\S]*?<[a-z][\s\S]*?>[\s\S]*?<\/[a-z]>)/i);
+			if (doubleHtmlMatch && doubleHtmlMatch[1]) {
+				text = doubleHtmlMatch[1].trim();
+			}
+
+			return text;
+		};
+
 		const restorePlaceholders = (content) => {
 			if (!content) return '';
-			let res = content.replace(/^```(?:html)?\s*\n?/i, '').replace(/\n?```\s*$/i, '').trim();
+			let res = extractCleanContent(content);
 			if (stylePlaceholders.length > 0) {
 				for (const p of stylePlaceholders) {
 					res = res.replaceAll(p.id, p.match);
@@ -202,84 +228,111 @@ const aiService = {
 			return res;
 		};
 
-		const systemPrompt = isHtml
-			? `You are an expert HTML email translator. Translate the human-readable text in the given HTML email into ${targetLangName}.
-CRITICAL INSTRUCTIONS:
-1. STRICTLY PRESERVE all HTML structure, tags, DOCTYPE, head/body, attributes, inline styles, CSS, links, tables, layout, and image tags unchanged.
-2. ONLY translate human-readable visible text between tags and inside alt/title attributes.
-3. Keep all placeholders like __EPO_IMG_0__ or __EPO_STYLE_0__ completely intact.
-4. Output ONLY the resulting translated HTML directly. Do NOT wrap in markdown code fences (no \`\`\`html or \`\`\`), and do not add any explanation or preamble.`
-			: `You are an expert email translator. Translate the given email text into ${targetLangName}. Maintain original paragraphs, tone, and format cleanly. Output ONLY the translated text without commentary or markdown code fences.`;
+		const buildTranslationResult = (content, modelName, tokenCount = 0) => {
+			const cleaned = extractCleanContent(content);
+			const restored = isHtml ? restorePlaceholders(cleaned) : cleaned;
+			const hasHtmlTags = Boolean(restored && /<[a-z][\s\S]*>/i.test(restored));
 
-		// 1. If custom API key configured, use OpenAI-compatible or Anthropic API with candidate endpoint resolution
+			const transText = hasHtmlTags ? emailUtils.htmlToText(restored) : restored;
+			const transHtml = hasHtmlTags
+				? restored
+				: `<div class="translated-embed-body" style="font-family: inherit; line-height: 1.7; white-space: pre-wrap; word-break: break-word;">${transText}</div>`;
+
+			return {
+				translatedText: transText,
+				translatedHtml: transHtml,
+				isHtml: true,
+				model: modelName,
+				tokens: tokenCount
+			};
+		};
+
+		const systemPrompt = isHtml
+			? `You are an automated HTML email translation engine.
+Translate all human-readable visible text inside the HTML document into ${targetLangName}.
+STRICT RULES:
+1. Directly output ONLY the resulting translated HTML.
+2. Do NOT output the original source language text or duplicate paragraphs.
+3. Do NOT output conversational phrases, thinking steps, or intro text (e.g. no "Here is the translation" or "转换为简体中文").
+4. Do NOT wrap output in markdown code fences or backticks (no \`\`\`html or \`\`\`).
+5. All HTML tags, attributes, inline styles, CSS, links, and structure must remain 100% identical. Only the human-readable text between tags should be translated.
+6. Keep all placeholder tokens like __EPO_IMG_0__ or __EPO_STYLE_0__ strictly intact.`
+			: `You are an automated email translation engine.
+Translate the given email text into natural, fluent ${targetLangName}.
+STRICT RULES:
+1. Maintain original paragraph breaks, layout, and formatting cleanly.
+2. Directly output ONLY the translated text without commentary, thinking steps, conversational preambles, or markdown code fences.`;
+
+		// 1. If custom API key configured, use OpenAI-compatible or Anthropic API with candidate model and endpoint resolution
 		if (apiKey) {
 			try {
 				const chatEndpoints = this.getCandidateChatEndpoints(apiUrl);
-				let resp = null;
-				let lastError = null;
+				const poolModels = (settingRow?.aiModelsPool || '').split(',').map(m => m.trim()).filter(Boolean);
+				const candidateModels = Array.from(new Set([model, ...poolModels].filter(Boolean)));
+				if (candidateModels.length === 0) candidateModels.push('gpt-4o-mini');
 
-				for (const endpoint of chatEndpoints) {
-					try {
-						const isAnthropic = endpoint.includes('/messages');
-						const body = isAnthropic
-							? {
-								model: model || 'claude-3-5-haiku-20241022',
-								max_tokens: maxTokens,
-								messages: [
-									{ role: 'user', content: `${systemPrompt}\n\n${sourcePayload}` }
-								]
+				for (const currentModel of candidateModels) {
+					let resp = null;
+					let lastError = null;
+
+					for (const endpoint of chatEndpoints) {
+						try {
+							const isAnthropic = endpoint.includes('/messages');
+							const body = isAnthropic
+								? {
+									model: currentModel,
+									max_tokens: maxTokens,
+									messages: [
+										{ role: 'user', content: `${systemPrompt}\n\n${sourcePayload}` }
+									]
+								}
+								: {
+									model: currentModel,
+									messages: [
+										{ role: 'system', content: systemPrompt },
+										{ role: 'user', content: sourcePayload }
+									],
+									temperature: 0.1,
+									max_tokens: maxTokens
+								};
+
+							const candidateResp = await fetch(endpoint, {
+								method: 'POST',
+								headers: {
+									'Content-Type': 'application/json',
+									'Authorization': `Bearer ${apiKey}`,
+									'x-api-key': apiKey,
+									'anthropic-version': '2023-06-01',
+									'User-Agent': 'EpocanvasMail/3.0'
+								},
+								body: JSON.stringify(body),
+								signal: AbortSignal.timeout(12000)
+							});
+
+							if (candidateResp.ok) {
+								resp = candidateResp;
+								break;
+							} else {
+								lastError = new Error(`HTTP ${candidateResp.status} on ${endpoint}`);
 							}
-							: {
-								model: model || 'gpt-4o-mini',
-								messages: [
-									{ role: 'system', content: systemPrompt },
-									{ role: 'user', content: sourcePayload }
-								],
-								temperature: 0.3,
-								max_tokens: maxTokens
-							};
-
-						const candidateResp = await fetch(endpoint, {
-							method: 'POST',
-							headers: {
-								'Content-Type': 'application/json',
-								'Authorization': `Bearer ${apiKey}`,
-								'x-api-key': apiKey,
-								'anthropic-version': '2023-06-01',
-								'User-Agent': 'EpocanvasMail/3.0'
-							},
-							body: JSON.stringify(body)
-						});
-
-						if (candidateResp.ok) {
-							resp = candidateResp;
-							break;
-						} else {
-							lastError = new Error(`HTTP ${candidateResp.status} on ${endpoint}`);
+						} catch (err) {
+							lastError = err;
 						}
-					} catch (err) {
-						lastError = err;
 					}
-				}
 
-				if (resp && resp.ok) {
-					const data = await resp.json();
-					const rawContent = data?.choices?.[0]?.message?.content?.trim()
-						|| data?.content?.[0]?.text?.trim();
-					if (rawContent) {
-						const finalContent = isHtml ? restorePlaceholders(rawContent) : rawContent;
-						const totalTokens = data?.usage?.total_tokens || Math.ceil((sourcePayload.length + finalContent.length) / 4);
-						await this.recordUsage(c, { model: model || 'gpt-4o-mini', tokens: totalTokens, calls: 1 });
-						return {
-							translatedText: isHtml ? emailUtils.htmlToText(finalContent) : finalContent,
-							translatedHtml: isHtml ? finalContent : '',
-							isHtml,
-							model: model || 'gpt-4o-mini',
-							tokens: totalTokens
-						};
+					if (resp && resp.ok) {
+						const data = await resp.json().catch(() => null);
+						const rawContent = data?.choices?.[0]?.message?.content
+							|| data?.content?.[0]?.text
+							|| '';
+						if (typeof rawContent === 'string' && rawContent.trim()) {
+							const totalTokens = data?.usage?.total_tokens || Math.ceil((sourcePayload.length + rawContent.length) / 4);
+							await this.recordUsage(c, { model: currentModel, tokens: totalTokens, calls: 1 });
+							return buildTranslationResult(rawContent, currentModel, totalTokens);
+						}
+					} else if (lastError) {
+						console.warn(`Model ${currentModel} translate returned error:`, lastError.message);
 					}
-				} else if (lastError) {
-					console.warn('Custom AI translate returned error:', lastError.message);
 				}
 			} catch (e) {
 				console.error('Custom AI translation failed:', e);
@@ -288,63 +341,54 @@ CRITICAL INSTRUCTIONS:
 
 		// 2. Fallback to Cloudflare Workers AI
 		if (c.env?.ai) {
-			try {
-				const cfModel = c.env.ai_model || '@cf/meta/llama-3.1-8b-instruct';
-				const result = await c.env.ai.run(cfModel, {
-					messages: [
-						{ role: 'system', content: systemPrompt },
-						{ role: 'user', content: sourcePayload }
-					],
-					temperature: 0.2,
-					max_tokens: isHtml ? 4096 : 2048
-				});
-				const rawContent = typeof result === 'string' ? result : result?.response || '';
-				if (rawContent && rawContent.trim()) {
-					const finalContent = isHtml ? restorePlaceholders(rawContent.trim()) : rawContent.trim();
-					const totalTokens = Math.ceil((sourcePayload.length + finalContent.length) / 4);
-					await this.recordUsage(c, { model: cfModel, tokens: totalTokens, calls: 1 });
-					return {
-						translatedText: isHtml ? emailUtils.htmlToText(finalContent) : finalContent,
-						translatedHtml: isHtml ? finalContent : '',
-						isHtml,
-						model: cfModel,
-						tokens: totalTokens
-					};
+			const cfModels = [
+				c.env.ai_model,
+				'@cf/meta/llama-3.3-70b-instruct',
+				'@cf/meta/llama-3.1-8b-instruct',
+				'@cf/qwen/qwen2.5-7b-instruct'
+			].filter(Boolean);
+
+			for (const cfModel of cfModels) {
+				try {
+					const result = await c.env.ai.run(cfModel, {
+						messages: [
+							{ role: 'system', content: systemPrompt },
+							{ role: 'user', content: sourcePayload }
+						],
+						temperature: 0.1,
+						max_tokens: isHtml ? 4096 : 2048
+					});
+					const rawContent = typeof result === 'string' ? result : result?.response || '';
+					if (typeof rawContent === 'string' && rawContent.trim()) {
+						const totalTokens = Math.ceil((sourcePayload.length + rawContent.length) / 4);
+						await this.recordUsage(c, { model: cfModel, tokens: totalTokens, calls: 1 });
+						return buildTranslationResult(rawContent.trim(), cfModel, totalTokens);
+					}
+				} catch (e) {
+					console.warn(`Workers AI ${cfModel} translation failed:`, e.message);
 				}
-			} catch (e) {
-				console.error('Workers AI translation failed:', e);
 			}
 		}
 
-		// 3. Fallback: Free translation endpoint
+		// 3. Fallback: Free translation endpoint (Google Translate API)
 		try {
 			const plainToTrans = isHtml ? (emailUtils.htmlToText(html) || sourcePayload) : sourcePayload;
-			const gtUrl = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${encodeURIComponent(targetLang)}&dt=t&q=${encodeURIComponent(plainToTrans.slice(0, 2000))}`;
-			const gtRes = await fetch(gtUrl);
+			const gtUrl = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${encodeURIComponent(targetLang)}&dt=t&q=${encodeURIComponent(plainToTrans.slice(0, 3000))}`;
+			const gtRes = await fetch(gtUrl, { signal: AbortSignal.timeout(6000) });
 			if (gtRes.ok) {
 				const gtData = await gtRes.json();
 				if (Array.isArray(gtData) && Array.isArray(gtData[0])) {
 					const transText = gtData[0].map(item => item[0]).filter(Boolean).join('');
-					return {
-						translatedText: transText,
-						translatedHtml: isHtml ? `<div style="font-family: inherit; line-height: 1.6;">${transText.replace(/\n/g, '<br/>')}</div>` : '',
-						isHtml,
-						model: 'google-translate',
-						tokens: 0
-					};
+					if (transText) {
+						return buildTranslationResult(transText, 'google-translate', 0);
+					}
 				}
 			}
 		} catch (e) {
 			console.error('Public translation fallback failed:', e);
 		}
 
-		return {
-			translatedText: isHtml ? emailUtils.htmlToText(html) : sourcePayload,
-			translatedHtml: isHtml ? html : '',
-			isHtml,
-			model: 'original',
-			tokens: 0
-		};
+		return buildTranslationResult(isHtml ? html : sourcePayload, 'original', 0);
 	},
 
 	/**

@@ -5301,9 +5301,10 @@ function resetAuthI18nForm() {
   const rawI18n = (setting.value && setting.value.authI18n) || {}
   
   // Support both legacy flat format and new { zh: {}, en: {} } format
-  const isLanguagePartitioned = Boolean(rawI18n && (rawI18n.zh || rawI18n.en))
+  const isLanguagePartitioned = Boolean(rawI18n && (rawI18n.zh || rawI18n.en));
   
-  ['zh', 'en'].forEach(lang => {
+  const targetLangs = ['zh', 'en'];
+  targetLangs.forEach(lang => {
     if (!authI18nForm[lang]) {
       authI18nForm[lang] = createDefaultAuthLangObj()
     }

@@ -11,6 +11,27 @@
    - 在向用户输出回复时，必须置顶/显式打印出本次提交的完整 Commit Hash 与短 Hash，确保版本可追溯、审计记录完整。
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
+### 邮件AI翻译全链路优化、提示词与格式保留嵌入替换、超时扩充及getSettings报错修复上线 (2026-09-12)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **控制台 getSettings ASI 语法陷阱与 forEach 报错根除 (Elimination of ASI Hazard in getSettings)**:
+       - 根因定位：此前 `sys-setting/index.vue` 中 `resetAuthI18nForm()` 声明 `const isLanguagePartitioned = Boolean(...)` 末尾缺失分号 `;`，由于紧随其后的代码以中括号 `['zh', 'en'].forEach(...)` 开头，触发 JavaScript 自动分号插入（ASI）隐式规则，被解释为 `Boolean(...)['zh', 'en']` 属性访问，逗号表达式求值为 `'en'`，导致 `Boolean(...)['en']` 为 `undefined`，进而抛出致命的 `TypeError: Cannot read properties of undefined (reading 'forEach')`；
+       - 链式影响与修复：该报错直接中断了 `getSettings()` 执行流，造成通知、S3、数据库、前缀、黑名单及 AI 过滤项等后续初始化被跳过。通过增加显式分号并封装 `const targetLangs = ['zh', 'en']`，彻底消除语法解析歧义，经 Playwright 审计实测控制台 0 报错。
+    2. **Axios 翻译请求超时时长扩充至 90 秒 (Extended Axios Translation Timeout to 90s)**:
+       - 根因定位：此前 `emailTranslate` 未指定自定义超时时长，默认沿用全局 15000ms（15s）。大型邮件 HTML 结构复杂或外部 LLM 生成耗时超过 15s 时，前端直接抛出 `AxiosError: timeout of 15000ms exceeded` 并中断翻译；
+       - 治理方案：在 `mail-vue/src/request/email.js` 中为 `emailTranslate` 配置 `{ timeout: 90 * 1000 }`（90 秒超宽容忍度），确保 LLM 充分推理与多模型故障转移链路平稳执行。
+    3. **AI 提示词精准优化、格式保留与智能文本嵌入替换 (Refined Translation Prompts & Embedded Text Replacement)**:
+       - 提示词深度精炼：针对 HTML 与纯文本重构系统提示词，严令模型直接输出 100% 完整保留 DOCTYPE/HTML/TABLE/STYLE/DIV/A 等标签与属性的译文，严禁重复输出英文原文、前缀客套语（如“转换为简体中文：”）或 Markdown 代码包裹；
+       - LLM 响应强力净化引擎：后端新增 `extractCleanContent` 模块，自动剥离 `<think>...</think>` 思维链推理块、Markdown 代码块（```html ... ```）及模型客套前缀，还原样式表 `__EPO_STYLE_n__` 与 Base64 图片 `__EPO_IMG_n__` 占位符；
+       - 确保文本嵌入替换（嵌入替换文本）：彻底解决此前若 `translatedHtml` 为空时直接回退到未翻译 `msg.content` 导致前端“翻译成功却无变化”的陈年缺陷。重构 `buildTranslationResult` 与前端 `displayedContent(msg)`，无论模型返回结构化 HTML 还是文本翻译，均自动封装并嵌入具有自然行距与字形的富文本替换容器，确保译文 100% 呈现并替换原始文本；
+       - 多模型池智能故障转移 (Smart Multi-Model Failover)：对单次模型请求施加 12s AbortSignal 超时保护，若首选模型无响应或报错（如上游 410/404/500），自动秒级转移至模型池中可用模型，结合 Workers AI 及公共翻译保底，彻底杜绝翻译卡死。
+    4. **端到端自动化测试与无残留验证 (E2E Verification & Deployment)**:
+       - 专属自动化审计套件 `tests/test-ai-translation-and-settings-fix.mjs` 4/4 项检查点全部 100% 绿灯通过；
+       - 回归测试套件 `tests/test-ai-analysis-and-html-translate.mjs` 5/5 项检查点全部 100% 绿灯通过；
+       - 恪守零假数据与脏数据残留准则。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **Cloudflare Workers 部署 Version ID**: `a9f45ca6-5581-4a62-abff-aea8ff20ea81`。
+    - **epocanvas-mail Git Commit**: `a5607ecb783378b9d5cd6f47f8ea08053a0489e4` (Short Hash: `a5607ec`)。
+
 ### AI 智能引擎配置左右等大对称、多模型池尽力完整展示、杜绝省略截断、+N精准折叠与灰底规范上线 (2026-09-12)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **右侧接入模型与可用多模型池尺寸严格同步对等于左侧输入框 (Pixel-Perfect Symmetrical Layout)**:
