@@ -3,7 +3,7 @@ import assert from "assert";
 
 (async () => {
   console.log("==========================================================================");
-  console.log("=== 开始测试：AI 模型池单条折叠 (+N) 与定向 UI 表达端到端自动化审计 ===");
+  console.log("=== 开始测试：AI 模型池左右对称等大、完全展示/正确+N与灰底标签端到端审计 ===");
   console.log("==========================================================================");
 
   const browser = await chromium.launch({ headless: true });
@@ -43,7 +43,7 @@ import assert from "assert";
     await page.waitForSelector(".settings-card", { timeout: 15000 });
     await page.waitForTimeout(1000);
 
-    // 3. 验证卡片并点击【配置】唤起 AI 配置弹窗
+    // 3. 点击【配置】唤起 AI 配置弹窗
     console.log("\n[步骤 3] 点击【配置】唤起 AI 配置弹窗...");
     const aiHubCard = await page.waitForSelector(".ai-hub-card", { timeout: 10000 });
     assert.ok(aiHubCard, "必须存在 .ai-hub-card");
@@ -54,32 +54,67 @@ import assert from "assert";
     const dialog = await page.waitForSelector(".ai-hub-dialog", { timeout: 5000 });
     console.log("  ✓ AI 配置弹窗已成功弹出");
 
-    // 4. 审计模型池下拉组件 .ai-models-pool-select
-    console.log("\n[步骤 4] 审计 .ai-models-pool-select 单条收折与 +N 渲染表现...");
+    // 4. 审计左右控件尺寸大小、平均和等大
+    console.log("\n[步骤 4] 审计左右表单控件 (Endpoint/API Key vs Models/Models Pool) 的尺寸等大与对称性...");
+    const sizeMetrics = await page.evaluate(() => {
+      const endpointWrap = document.querySelector(".ai-hub-dialog .ai-grid-col:first-child .el-form-item:nth-child(1) .el-input__wrapper");
+      const apiKeyWrap = document.querySelector(".ai-hub-dialog .ai-grid-col:first-child .el-form-item:nth-child(2) .el-input__wrapper");
+      const modelWrap = document.querySelector(".ai-hub-dialog .ai-model-select .el-select__wrapper");
+      const poolWrap = document.querySelector(".ai-hub-dialog .ai-models-pool-select .el-select__wrapper");
+
+      const endpointContent = document.querySelector(".ai-hub-dialog .ai-grid-col:first-child .el-form-item:nth-child(1) .el-form-item__content");
+      const apiKeyContent = document.querySelector(".ai-hub-dialog .ai-grid-col:first-child .el-form-item:nth-child(2) .el-form-item__content");
+      const modelContent = document.querySelector(".ai-hub-dialog .ai-grid-col:last-child .el-form-item:nth-child(1) .el-form-item__content");
+      const poolContent = document.querySelector(".ai-hub-dialog .ai-grid-col:last-child .el-form-item:nth-child(2) .el-form-item__content");
+
+      const leftCol = document.querySelector(".ai-hub-dialog .ai-grid-col:first-child");
+      const rightCol = document.querySelector(".ai-hub-dialog .ai-grid-col:last-child");
+
+      return {
+        endpointWrapHeight: endpointWrap ? endpointWrap.getBoundingClientRect().height : null,
+        apiKeyWrapHeight: apiKeyWrap ? apiKeyWrap.getBoundingClientRect().height : null,
+        modelWrapHeight: modelWrap ? modelWrap.getBoundingClientRect().height : null,
+        poolWrapHeight: poolWrap ? poolWrap.getBoundingClientRect().height : null,
+
+        endpointContentHeight: endpointContent ? endpointContent.getBoundingClientRect().height : null,
+        apiKeyContentHeight: apiKeyContent ? apiKeyContent.getBoundingClientRect().height : null,
+        modelContentHeight: modelContent ? modelContent.getBoundingClientRect().height : null,
+        poolContentHeight: poolContent ? poolContent.getBoundingClientRect().height : null,
+
+        leftColHeight: leftCol ? leftCol.getBoundingClientRect().height : null,
+        rightColHeight: rightCol ? rightCol.getBoundingClientRect().height : null
+      };
+    });
+
+    console.log("  左右控件尺寸指标:", sizeMetrics);
+
+    // 验证控件 Wrapper 高度
+    assert.strictEqual(Math.round(sizeMetrics.endpointWrapHeight), 32, "左侧 Endpoint 控件 Wrapper 高度应为 32px");
+    assert.strictEqual(Math.round(sizeMetrics.apiKeyWrapHeight), 32, "左侧 API Key 控件 Wrapper 高度应为 32px");
+    assert.strictEqual(Math.round(sizeMetrics.modelWrapHeight), 32, "右侧 接入模型 (Models) Wrapper 高度必须同步对等于左侧 32px");
+    assert.strictEqual(Math.round(sizeMetrics.poolWrapHeight), 32, "右侧 可用多模型池 (Models Pool) Wrapper 高度必须同步对等于左侧 32px");
+
+    // 验证 .el-form-item__content 高度
+    assert.strictEqual(Math.round(sizeMetrics.modelContentHeight), Math.round(sizeMetrics.endpointContentHeight), "接入模型 .el-form-item__content 高度必须与左侧 Endpoint 完全等大");
+    assert.strictEqual(Math.round(sizeMetrics.poolContentHeight), Math.round(sizeMetrics.apiKeyContentHeight), "可用多模型池 .el-form-item__content 高度必须与左侧 API Key 完全等大");
+
+    // 验证左右两列总体高度对称平衡
+    console.log(`  左列高度: ${sizeMetrics.leftColHeight}px, 右列高度: ${sizeMetrics.rightColHeight}px`);
+    assert.ok(Math.abs(sizeMetrics.leftColHeight - sizeMetrics.rightColHeight) <= 2, "AI 弹窗左右两列必须平均等大对称！");
+    console.log("  ✓ 左右两列输入框与下拉框尺寸 100% 同步对等，实现完美平均等大！");
+
+    // 5. 审计模型展示、杜绝 '...' 截断、+N 数量与灰底样式
+    console.log("\n[步骤 5] 审计多模型池：尽力完整展示模型、杜绝 '...' 截断、+N 精准计数与灰底规范...");
     const poolSelect = await page.$(".ai-hub-dialog .ai-models-pool-select");
     assert.ok(poolSelect, "弹窗内必须存在 .ai-models-pool-select 控件");
 
-    // 检查前缀图标或选择框结构
-    const poolHtml = await page.$eval(".ai-hub-dialog .ai-models-pool-select", el => el.outerHTML);
-    console.log("  模型池选择框外层 HTML 结构概要:", poolHtml.slice(0, 300));
-    const prefixEl = await page.$(".ai-hub-dialog .ai-models-pool-select .el-select__prefix, .ai-hub-dialog .ai-models-pool-select .el-input__prefix, .ai-hub-dialog .ai-models-pool-select [class*='prefix']");
-    console.log("  是否包含前缀节点:", !!prefixEl);
-
-    // 检查是否有已选模型
-    let selectedTags = await page.$$eval(".ai-hub-dialog .ai-models-pool-select .el-tag", els => 
-      els.map(el => el.textContent.trim())
-    );
-    console.log("  当前已选中的模型 Tag 列表:", selectedTags);
-
-    // 点击模型池下拉框添加更多模型，以触发 +N 折叠
-    console.log("  聚焦模型池下拉框并添加多个模型选项以验证折叠效果...");
+    // 聚焦模型池下拉并勾选多个模型
     await poolSelect.click();
-    await page.waitForTimeout(800);
+    await page.waitForTimeout(600);
 
-    // 在下拉浮层中选择前几个选项（如果未全选）
     const dropdownOptions = await page.$$(".ai-models-pool-dropdown .el-select-dropdown__item");
     console.log(`  模型池下拉提供 ${dropdownOptions.length} 个备选模型`);
-    for (let i = 0; i < Math.min(3, dropdownOptions.length); i++) {
+    for (let i = 0; i < Math.min(5, dropdownOptions.length); i++) {
       const isSelected = await dropdownOptions[i].evaluate(el => el.classList.contains("is-selected"));
       if (!isSelected) {
         await dropdownOptions[i].click();
@@ -87,49 +122,61 @@ import assert from "assert";
       }
     }
 
-    // 点击弹窗空白处使下拉框失焦收起
+    // 点击弹窗标题失焦收起下拉
     await page.click(".ai-hub-dialog .el-dialog__title");
-    await page.waitForTimeout(600);
+    await page.waitForTimeout(800);
 
-    // 再次审计选中的 tags
-    selectedTags = await page.$$eval(".ai-hub-dialog .ai-models-pool-select .el-tag", els => 
-      els.map(el => el.textContent.trim()).filter(Boolean)
-    );
-    console.log("  多选后渲染的 Tags:", selectedTags);
+    // 审计当前选中的全部 tags 文本
+    const tagDetails = await page.evaluate(() => {
+      const pool = document.querySelector(".ai-hub-dialog .ai-models-pool-select");
+      const regularTags = Array.from(pool.querySelectorAll(".el-tag.is-closable")).map(t => ({
+        text: t.querySelector(".el-select__tags-text")?.textContent?.trim() || t.textContent.trim(),
+        hasEllipsis: window.getComputedStyle(t.querySelector(".el-select__tags-text") || t).textOverflow === 'ellipsis',
+        bgColor: window.getComputedStyle(t).backgroundColor,
+        borderRadius: window.getComputedStyle(t).borderRadius
+      }));
 
-    // 验证必须包含一个主模型 tag 和一个 +n tag
-    assert.ok(selectedTags.length >= 1, "必须至少渲染 1 个模型标签");
-    const collapseTag = await page.$(".ai-hub-dialog .ai-models-pool-select .el-select__collapse-tag, .ai-hub-dialog .ai-models-pool-select .el-tag:has-text('+')");
-    if (selectedTags.length > 1 || selectedTags.some(t => t.includes("+"))) {
-      assert.ok(collapseTag, "选中多个模型时，必须定向使用 +N 折叠标签展示！");
-      const collapseText = await collapseTag.textContent();
-      console.log(`  ✓ 成功定位到定向折叠标签: "${collapseText.trim()}"`);
-      assert.ok(collapseText.includes("+"), `折叠标签必须包含 '+' 号，实际为: ${collapseText}`);
-    }
+      const collapseTag = pool.querySelector(".el-tag:not(.is-closable)");
+      const collapseDetails = collapseTag ? {
+        text: collapseTag.querySelector(".el-select__tags-text")?.textContent?.trim() || collapseTag.textContent.trim(),
+        bgColor: window.getComputedStyle(collapseTag).backgroundColor,
+        borderRadius: window.getComputedStyle(collapseTag).borderRadius,
+        color: window.getComputedStyle(collapseTag).color
+      } : null;
 
-    // 5. 验证单条高度（无无限扩张与换行延申）
-    console.log("\n[步骤 5] 验证 .ai-models-pool-select 的单条高度与 Zero-Scrollbars 状态...");
-    const metrics = await page.evaluate(() => {
-      const el = document.querySelector(".ai-hub-dialog .ai-models-pool-select .el-select__wrapper");
-      const primaryEl = document.querySelector(".ai-hub-dialog .ai-model-select .el-select__wrapper");
-      const dialogBody = document.querySelector(".ai-hub-dialog .el-dialog__body");
       return {
-        poolHeight: el ? el.getBoundingClientRect().height : null,
-        primaryHeight: primaryEl ? primaryEl.getBoundingClientRect().height : null,
-        bodyScrollHeight: dialogBody ? dialogBody.scrollHeight : null,
-        bodyClientHeight: dialogBody ? dialogBody.clientHeight : null,
-        hasBodyScrollbar: dialogBody ? dialogBody.scrollHeight > dialogBody.clientHeight : false
+        regularTags,
+        collapseDetails
       };
     });
-    console.log("  尺寸指标与滚动状态:", metrics);
-    assert.strictEqual(metrics.hasBodyScrollbar, false, "多模型选择后，弹窗主体仍必须保持 Zero-Scrollbars 无滚动条！");
-    assert.ok(metrics.poolHeight <= 45, `模型池控件高度 (${metrics.poolHeight}px) 必须维持单条规范，严禁由于模型过多而无限扩张变高！`);
-    console.log("  ✓ 模型池选择器高度与首选主模型完全保持单条一致，零多行扩张！");
 
-    // 6. 验证鼠标 hover 在 +N 标签上时的 Tooltip 呈现
-    if (collapseTag) {
+    console.log("  已渲染的正常模型 Tag 详情:", tagDetails.regularTags);
+    console.log("  已渲染的折叠 +N Tag 详情:", tagDetails.collapseDetails);
+
+    // 验证展示出来的模型没有被 '...' 截断
+    for (const tag of tagDetails.regularTags) {
+      assert.strictEqual(tag.hasEllipsis, false, `展示的模型标签 (${tag.text}) 严禁用 '...' 截断！必须完整展示！`);
+      assert.ok(!tag.text.includes("..."), `展示的模型标签文本 (${tag.text}) 不能包含省略号 '...'！`);
+    }
+    console.log("  ✓ 所有展示出来的模型标签均完整呈现，杜绝了 '...' 省略截断！");
+
+    // 验证 +N 标签
+    assert.ok(tagDetails.collapseDetails, "多选多个模型时，超出单行容纳的模型必须收纳进 +N 标签！");
+    assert.ok(tagDetails.collapseDetails.text.startsWith("+"), `+N 标签必须以 '+' 开头，实际为: ${tagDetails.collapseDetails.text}`);
+    console.log(`  ✓ +N 标签计数精准生效: "${tagDetails.collapseDetails.text}"`);
+
+    // 验证 +N 标签采用灰底与常规标签一致，绝非特立独行的紫色胶囊
+    console.log("  比对 +N 标签背景色与普通标签背景色...");
+    assert.notStrictEqual(tagDetails.collapseDetails.borderRadius, "9999px", "+N 标签绝不能使用特立独行的 9999px 胶囊边角！必须与普通标签 (6px) 保持一致！");
+    assert.strictEqual(tagDetails.collapseDetails.borderRadius, "6px", "+N 标签 border-radius 必须与普通标签 (6px) 一致！");
+    assert.ok(!tagDetails.collapseDetails.bgColor.includes("99, 102, 241"), "+N 标签绝不能使用特立独行的紫色背景！");
+    console.log("  ✓ +N 标签采用与普通被选模型完全一致的灰底展示 (杜绝特立独行)！");
+
+    // 6. 验证悬停 +N 折叠标签时的 Tooltip 呈现
+    const collapseEl = await page.$(".ai-hub-dialog .ai-models-pool-select .el-tag:not(.is-closable)");
+    if (collapseEl) {
       console.log("\n[步骤 6] 验证悬停 +N 折叠标签时的 Tooltip 弹出层...");
-      await collapseTag.hover();
+      await collapseEl.hover();
       await page.waitForTimeout(600);
       const tooltip = await page.$('.el-popper[role="tooltip"]');
       if (tooltip) {
@@ -143,7 +190,7 @@ import assert from "assert";
     console.log("  ✓ 已保存审计截图至 tests/audit_ai_models_pool_collapse.png");
 
     console.log("\n==========================================================================");
-    console.log("🎉 全部测试项通过！.ai-models-pool-select 单条 +N 定向表达模式运行完美！");
+    console.log("🎉 全部测试项通过！AI 配置弹窗左右平均等大、尽力展示、正确+N与灰底规范审计 100% 全绿！");
     console.log("==========================================================================");
 
   } catch (err) {

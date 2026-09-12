@@ -11,6 +11,34 @@
    - 在向用户输出回复时，必须置顶/显式打印出本次提交的完整 Commit Hash 与短 Hash，确保版本可追溯、审计记录完整。
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
+### AI 智能引擎配置左右等大对称、多模型池尽力完整展示、杜绝省略截断、+N精准折叠与灰底规范上线 (2026-09-12)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **右侧接入模型与可用多模型池尺寸严格同步对等于左侧输入框 (Pixel-Perfect Symmetrical Layout)**:
+       - 根因定位与失衡治理：此前右侧「接入模型 (Models)」和「可用多模型池 (Models Pool)」的下拉 Wrapper 高度为 40px~44px，且多模型池内部包含 `.ai-field-hint` 提示文案，导致右列 `.el-form-item__content` 高度严重失衡（高达 80px），与左侧「接口端点 (Endpoint)」、「鉴权密钥 (API Key)」的 32px 控件产生巨大的高低落差与不对称；
+       - 左右等大同步对等：全面重构 `.ai-hub-dialog` 内下拉控件尺寸规范，严格将 `.ai-model-select` 与 `.ai-models-pool-select` 的 `.el-select__wrapper` 限制为 `height: 32px; min-height: 32px; padding: 1px 11px; border-radius: 8px;`，使其与左侧两个 `el-input` 完全 1:1 对等；
+       - 提示文案优雅收敛：将多模型池底部的冗余文案解耦转为 Label 旁的标准 Fluent 帮助气泡 `<el-tooltip>`，与左上角接口端点 Tooltip 严格对称呼应；
+       - 左右两列完美对称：左右两列表单项 `.el-form-item__content` 高度严格统一为 32px，第一行与第二行左右水平对齐到单像素，整列高度均为 160px，彻底实现左右平均与等大。
+    2. **多模型池尽力完整展示、杜绝 "..." 省略截断与动态精准 +N 折叠架构 (Complete Tag Display with Dynamic +N)**:
+       - 根因定位：此前机械硬编码 `:max-collapse-tags="1"` 并应用 `text-overflow: ellipsis`，导致即使单行空间充裕也只显示 1 个模型，且模型名稍长即被截断为 `deepseek-v4-...`，造成 "+N" 数字失真以及模型名无法完整辨识；
+       - 动态容量测算引擎：接入 `updatePoolMaxCollapseTags` 响应式算法，基于当前下拉框实际可用宽度与 12px 字体 Canvas 精准测算各模型 Tag 像素占用宽度，在保证不换行（单行 32px）的前提下，尽最大可能排布渲染能够完整展示的模型（1~4 个）；
+       - 杜绝 "..." 截断：所有展示出来的模型标签设置 `overflow: visible; text-overflow: clip;`，严禁使用 "..." 截断模型名称，保证只要能展示出来的模型必定完整呈现其名称；
+       - 精准 +N 替代：无法完整容纳的模型坚决不强行挤占或部分截断，统一隐入 `+N`（省略的模型真实数量）标签中，悬停即刻弹出 Tooltip 完整浮层；
+       - 杜绝特立独行：彻底剔除此前的紫色胶囊徽章（`9999px` 药丸样式与高亮紫背景），将 `+N` 标签样式与普通已选模型标签（`class="el-tag is-closable el-tag--info el-tag--default el-tag--light"`）统一为沉稳纯正的灰底（`#f1f5f9` / `#f8fafc`）与 6px 圆角，深色模式自动适应 `#1f2937`，保持视觉高度一致与和谐。
+    3. **Playwright 真实生产环境全链路自动化审计 100% 全绿 (Comprehensive Live E2E Audit)**:
+       - 专属端到端自动化审计套件 `tests/test-ai-models-pool-collapse.mjs` 6 项全链路检查点全部 100% 成功通过：
+         - ① 站长 API 登录获取有效会话 Token 成功；
+         - ② 打开系统设置页面加载完成；
+         - ③ 唤起 AI 配置弹窗成功；
+         - ④ 验证左右两列控件 Wrapper（Endpoint: 32px, API Key: 32px, Models: 32px, Models Pool: 32px）与 `.el-form-item__content`（均为 32px）尺寸 100% 对等，左右列总高严格为 160px vs 160px，平均等大对称验证通过；
+         - ⑤ 验证多模型池中渲染的模型无任何 "..." 截断，标签完整展示；
+         - ⑥ 验证 +N 标签计数精准，边角圆角 6px 与灰底无白斑，杜绝特立独行紫色药丸；
+         - ⑦ 悬停 +N 标签正常触发 Tooltip 浮层展示全量折叠模型列表；
+       - 回归审计套件 `tests/test-ai-hub-card-and-models-detection.mjs` 验证通过，暗黑模式 100% 无白斑；
+       - 恪守零假数据与脏数据残留准则。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **Cloudflare Workers 部署 Version ID**: `ed86c3cf-7e79-46e1-bc38-78c514f5adbf`。
+    - **epocanvas-mail Git Commit**: `PENDING_COMMIT_HASH`。
+
 ### 登录失败与凭证过期被动强制退出优化、杜绝路由困留与回退到登录界面上线 (2026-09-12)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **被动/强制退出全链路无痕重定向至 /login/ (Instant Hard Redirect to /login/)**:

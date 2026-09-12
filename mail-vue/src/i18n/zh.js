@@ -1376,6 +1376,7 @@ const zh = {
     aiApiKeyLabel: '鉴权密钥 (API Key)',
     aiModelsLabel: '接入模型 (Models)',
     aiModelsPoolLabel: '可用多模型池 (Models Pool)',
+    aiModelsPoolTooltip: '作为系统可用模型池，可前往【权限控制】为不同角色分组（站长/学者/书友/参观者）分级授权允许调用的模型。',
     aiDeleteBtn: '清空重置',
     aiResetTooltip: '清空自定义配置并恢复内置免密 Workers AI',
     aiResetConfirm: '确定要清空自定义大模型配置吗？清空后将恢复为系统内置免密 Workers AI。',

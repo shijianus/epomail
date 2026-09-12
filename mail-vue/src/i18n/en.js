@@ -1384,6 +1384,7 @@ const en = {
     aiApiKeyLabel: 'API Key',
     aiModelsLabel: 'Models',
     aiModelsPoolLabel: 'Available Models Pool',
+    aiModelsPoolTooltip: 'Available models pool for the system. You can configure role-based model permissions in Access Control.',
     aiDeleteBtn: 'Delete',
     aiResetTooltip: 'Clear custom AI credentials and restore built-in Workers AI',
     aiResetConfirm: 'Are you sure you want to clear custom AI configuration and restore Cloudflare Workers AI?',

@@ -2796,7 +2796,7 @@
 
             <!-- Right Column: Primary Model & Multi-model Pool (Initial available models without auto-testing) -->
             <div class="ai-grid-col">
-              <el-form-item :label="$t('aiModelsLabel') || '主推理模型 (Primary Model)'">
+              <el-form-item :label="$t('aiModelsLabel') || '接入模型 (Models)'">
                 <el-select 
                   v-model="aiHubForm.aiModel" 
                   filterable
@@ -2825,13 +2825,28 @@
                 </el-select>
               </el-form-item>
 
-              <el-form-item :label="$t('aiModelsPoolLabel') || '可用模型池 (Available Models Pool)'">
+              <el-form-item>
+                <template #label>
+                  <div class="ai-form-item-label" style="display: flex; align-items: center; gap: 4px;">
+                    <span>{{ $t('aiModelsPoolLabel') || '可用多模型池 (Models Pool)' }}</span>
+                    <el-tooltip 
+                      effect="dark" 
+                      :content="$t('aiModelsPoolTooltip') || '作为系统可用模型池，可前往【权限控制】为不同角色分组（站长/学者/书友/参观者）分级授权允许调用的模型。'" 
+                      placement="top"
+                    >
+                      <span class="ai-help-icon-wrap" style="display: inline-flex; align-items: center; justify-content: center; cursor: pointer; color: var(--el-text-color-secondary);">
+                        <Icon icon="fluent:question-circle-16-regular" width="15" height="15" />
+                      </span>
+                    </el-tooltip>
+                  </div>
+                </template>
                 <el-select 
+                  ref="aiModelsPoolSelectRef"
                   v-model="aiHubForm.aiModelsList" 
                   multiple
                   collapse-tags
                   collapse-tags-tooltip
-                  :max-collapse-tags="1"
+                  :max-collapse-tags="poolMaxCollapseTags"
                   filterable
                   allow-create
                   default-first-option
@@ -2856,9 +2871,6 @@
                     </div>
                   </el-option>
                 </el-select>
-                <div class="ai-field-hint" style="font-size: 11.5px; color: var(--el-text-color-secondary); margin-top: 4px; line-height: 1.4;">
-                  作为系统可用模型池，可前往【权限控制】为不同角色分组（站长/学者/书友/参观者）分级授权允许调用的模型。
-                </div>
               </el-form-item>
             </div>
           </div>
@@ -2901,7 +2913,7 @@
 </template>
 
 <script setup>
-import {computed, defineOptions, nextTick, reactive, ref, watch} from "vue";
+import {computed, defineOptions, nextTick, onMounted, onUnmounted, reactive, ref, watch} from "vue";
 import {deleteBackground, setBackground, setBlackList, settingQuery, settingSet, sendWelcomeEmail, testS3Setting, getDbStatus, testDbSetting, scanStorage, cleanupStorage, testAiSetting, fetchAiModels} from "@/request/setting.js";
 import { testTelegramBot } from "@/request/my.js";
 import {useSettingStore} from "@/store/setting.js";
@@ -3077,6 +3089,73 @@ const aiHubForm = reactive({
   aiModelsList: []
 })
 
+const poolMaxCollapseTags = ref(1)
+const aiModelsPoolSelectRef = ref(null)
+
+const poolTagFont = '12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
+
+const updatePoolMaxCollapseTags = () => {
+  const list = aiHubForm.aiModelsList
+  if (!Array.isArray(list) || list.length <= 1) {
+    poolMaxCollapseTags.value = 1
+    return
+  }
+
+  // Available width inside select wrapper
+  let availableWidth = 310
+  if (aiModelsPoolSelectRef.value?.$el) {
+    const wrapper = aiModelsPoolSelectRef.value.$el.querySelector('.el-select__wrapper')
+    if (wrapper && wrapper.clientWidth > 0) {
+      // clientWidth minus horizontal padding (22px) + prefix (~24px) + suffix clear/arrow (~28px) + gap safety (6px)
+      availableWidth = Math.max(100, wrapper.clientWidth - 80)
+    }
+  }
+
+  const total = list.length
+  // Each tag width: textWidth + tag padding (12px) + border (2px) + close icon (~16px) = textWidth + 30px
+  const tagWidths = list.map(m => Math.ceil(getTextWidth(String(m || ''), poolTagFont) + 30))
+
+  // Can all tags fit without any collapse tag?
+  const allTagsTotalWidth = tagWidths.reduce((a, b) => a + b, 0) + (total - 1) * 5
+  if (allTagsTotalWidth <= availableWidth) {
+    poolMaxCollapseTags.value = total
+    return
+  }
+
+  // Find max K (from total - 1 down to 1) that fits together with '+ (total - K)'
+  let bestK = 1
+  for (let k = total - 1; k >= 1; k--) {
+    const omittedCount = total - k
+    const collapseText = `+ ${omittedCount}`
+    const collapseTagWidth = Math.ceil(getTextWidth(collapseText, poolTagFont) + 14) // 12px padding + 2px border, no close icon
+    const tagsWidth = tagWidths.slice(0, k).reduce((a, b) => a + b, 0)
+    const gaps = k * 5
+    const totalRequired = tagsWidth + collapseTagWidth + gaps
+    if (totalRequired <= availableWidth) {
+      bestK = k
+      break
+    }
+  }
+
+  poolMaxCollapseTags.value = Math.max(1, bestK)
+}
+
+watch(
+  () => aiHubForm.aiModelsList,
+  () => {
+    nextTick(updatePoolMaxCollapseTags)
+  },
+  { deep: true }
+)
+
+onMounted(() => {
+  window.addEventListener('resize', updatePoolMaxCollapseTags)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', updatePoolMaxCollapseTags)
+})
+
 const allAvailableModelOptions = computed(() => {
   const isCustom = !!((aiHubForm.aiApiKey && aiHubForm.aiApiKey.trim()) || (aiHubForm.aiApiUrl && aiHubForm.aiApiUrl.trim()))
   const set = new Set()
@@ -3159,6 +3238,11 @@ const openAiHubDialog = () => {
   }
 
   aiHubDialogShow.value = true
+  nextTick(() => {
+    updatePoolMaxCollapseTags()
+    setTimeout(updatePoolMaxCollapseTags, 100)
+    setTimeout(updatePoolMaxCollapseTags, 300)
+  })
   // 遵循规范：默认不进行连通性测试，一开始直接展示可用模型，杜绝自动触发网络请求与 API 消耗
 }
 
@@ -8155,9 +8239,42 @@ form .el-button {
     }
   }
 
+  /* Synchronize right column selects to be equal in size, height and padding to left inputs */
   .ai-model-select,
   .ai-models-pool-select {
     width: 100% !important;
+
+    :deep(.el-select__wrapper) {
+      height: 32px !important;
+      min-height: 32px !important;
+      max-height: 32px !important;
+      line-height: 30px !important;
+      padding: 1px 11px !important;
+      border-radius: 8px !important;
+      box-sizing: border-box !important;
+      font-size: 14px !important;
+      display: flex !important;
+      align-items: center !important;
+    }
+
+    :deep(.el-select__prefix) {
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      height: 100% !important;
+      margin-right: 6px !important;
+      flex-shrink: 0 !important;
+    }
+
+    :deep(.el-select__placeholder) {
+      line-height: 30px !important;
+      font-size: 13.5px !important;
+    }
+
+    :deep(.el-select__selected-item) {
+      line-height: 30px !important;
+      font-size: 13.5px !important;
+    }
 
     .is-loading {
       animation: rotating 2s linear infinite;
@@ -8166,57 +8283,71 @@ form .el-button {
 
   .ai-models-pool-select {
     :deep(.el-select__wrapper) {
-      flex-wrap: nowrap;
-      overflow: hidden;
+      flex-wrap: nowrap !important;
+      overflow: hidden !important;
     }
 
     :deep(.el-select__selection) {
-      flex-wrap: nowrap;
-      overflow: hidden;
-      max-width: 100%;
-      align-items: center;
-      gap: 5px;
+      flex-wrap: nowrap !important;
+      overflow: hidden !important;
+      max-width: 100% !important;
+      min-width: 0 !important;
+      height: 100% !important;
+      align-items: center !important;
+      gap: 5px !important;
+      padding: 0 !important;
+    }
+
+    :deep(.el-select__selected-item) {
+      line-height: normal !important;
+      font-size: 12px !important;
+      display: inline-flex !important;
+      align-items: center !important;
+    }
+
+    :deep(.el-tag) {
+      height: 22px !important;
+      line-height: 20px !important;
+      padding: 0 6px !important;
+      border-radius: 6px !important;
+      font-size: 12px !important;
+      font-weight: 500 !important;
+      margin: 0 !important;
+      flex-shrink: 0 !important;
+      background-color: var(--el-fill-color-light, #f1f5f9) !important;
+      border: 1px solid var(--el-border-color-lighter, #e2e8f0) !important;
+      color: var(--el-text-color-regular, #475569) !important;
+      box-sizing: border-box !important;
+      overflow: visible !important;
+      white-space: nowrap !important;
+      text-overflow: clip !important;
+
+      .el-tag__content {
+        overflow: visible !important;
+        text-overflow: clip !important;
+        white-space: nowrap !important;
+      }
+
+      .el-select__tags-text {
+        overflow: visible !important;
+        text-overflow: clip !important;
+        white-space: nowrap !important;
+      }
     }
 
     :deep(.el-tag.is-closable) {
-      max-width: calc(100% - 60px);
-      flex-shrink: 1;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      margin: 0;
-      border-radius: 6px;
-
-      .el-tag__content {
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
+      max-width: none !important;
     }
 
+    /* +N collapse tag: Uniform gray background, identical to regular tags (no special purple pill badge) */
     :deep(.el-tag:not(.is-closable)) {
-      flex-shrink: 0;
-      cursor: pointer;
-      font-weight: 700;
-      font-size: 11.5px;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-      padding: 0 8px;
-      height: 22px;
-      line-height: 20px;
-      border-radius: 9999px;
-      color: var(--accent-primary, #6366f1) !important;
-      background: rgba(99, 102, 241, 0.1) !important;
-      border: 1px solid rgba(99, 102, 241, 0.25) !important;
-      transition: all 0.2s ease;
+      cursor: pointer !important;
+      transition: all 0.2s ease !important;
 
       &:hover {
-        background: rgba(99, 102, 241, 0.18) !important;
-        border-color: var(--accent-primary, #6366f1) !important;
-      }
-
-      .el-tag__content {
-        font-weight: 700;
-        color: inherit;
+        background-color: #e2e8f0 !important;
+        border-color: #cbd5e1 !important;
+        color: #1e293b !important;
       }
     }
   }
@@ -8441,6 +8572,42 @@ html.dark .ai-models-pool-dropdown .el-select-dropdown__item:hover {
   background-color: #374151 !important;
 }
 
+/* Synchronize right column selects to be equal in size, height and padding to left inputs */
+.ai-hub-dialog .ai-model-select .el-select__wrapper,
+.ai-hub-dialog .ai-models-pool-select .el-select__wrapper {
+  height: 32px !important;
+  min-height: 32px !important;
+  max-height: 32px !important;
+  line-height: 30px !important;
+  padding: 1px 11px !important;
+  border-radius: 8px !important;
+  box-sizing: border-box !important;
+  font-size: 14px !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+.ai-hub-dialog .ai-model-select .el-select__prefix,
+.ai-hub-dialog .ai-models-pool-select .el-select__prefix {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  height: 100% !important;
+  margin-right: 6px !important;
+  flex-shrink: 0 !important;
+}
+
+.ai-hub-dialog .ai-model-select .el-select__placeholder,
+.ai-hub-dialog .ai-models-pool-select .el-select__placeholder {
+  line-height: 30px !important;
+  font-size: 13.5px !important;
+}
+
+.ai-hub-dialog .ai-model-select .el-select__selected-item {
+  line-height: 30px !important;
+  font-size: 13.5px !important;
+}
+
 /* AI Models Pool Select: Single-row +N directional collapse display */
 .ai-hub-dialog .ai-models-pool-select .el-select__wrapper {
   flex-wrap: nowrap !important;
@@ -8450,62 +8617,79 @@ html.dark .ai-models-pool-dropdown .el-select-dropdown__item:hover {
 .ai-hub-dialog .ai-models-pool-select .el-select__selection {
   flex-wrap: nowrap !important;
   overflow: hidden !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  height: 100% !important;
   align-items: center !important;
   gap: 5px !important;
+  padding: 0 !important;
+}
+
+.ai-hub-dialog .ai-models-pool-select .el-select__selected-item {
+  line-height: normal !important;
+  font-size: 12px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+}
+
+/* Selected model tags inside pool select: Display model name completely with zero truncation ellipsis */
+.ai-hub-dialog .ai-models-pool-select .el-tag {
+  height: 22px !important;
+  line-height: 20px !important;
+  padding: 0 6px !important;
+  border-radius: 6px !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  margin: 0 !important;
+  flex-shrink: 0 !important;
+  background-color: var(--el-fill-color-light, #f1f5f9) !important;
+  border: 1px solid var(--el-border-color-lighter, #e2e8f0) !important;
+  color: var(--el-text-color-regular, #475569) !important;
+  box-sizing: border-box !important;
+  overflow: visible !important;
+  white-space: nowrap !important;
+  text-overflow: clip !important;
+}
+
+.ai-hub-dialog .ai-models-pool-select .el-tag .el-tag__content {
+  overflow: visible !important;
+  text-overflow: clip !important;
+  white-space: nowrap !important;
+}
+
+.ai-hub-dialog .ai-models-pool-select .el-tag .el-select__tags-text {
+  overflow: visible !important;
+  text-overflow: clip !important;
+  white-space: nowrap !important;
 }
 
 .ai-hub-dialog .ai-models-pool-select .el-tag.is-closable {
-  max-width: calc(100% - 60px) !important;
-  flex-shrink: 1 !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
-  white-space: nowrap !important;
-  margin: 0 !important;
-  border-radius: 6px !important;
+  max-width: none !important;
 }
 
-.ai-hub-dialog .ai-models-pool-select .el-tag.is-closable .el-tag__content {
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
-  white-space: nowrap !important;
-}
-
-/* Directed +N collapse badge pill */
+/* +N collapse tag: Uniform gray background, identical to regular tags (no special purple pill badge) */
 .ai-hub-dialog .ai-models-pool-select .el-tag:not(.is-closable) {
-  flex-shrink: 0 !important;
   cursor: pointer !important;
-  font-weight: 700 !important;
-  font-size: 11.5px !important;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
-  padding: 0 8px !important;
-  height: 22px !important;
-  line-height: 20px !important;
-  border-radius: 9999px !important;
-  color: var(--accent-primary, #6366f1) !important;
-  background: rgba(99, 102, 241, 0.1) !important;
-  border: 1px solid rgba(99, 102, 241, 0.25) !important;
   transition: all 0.2s ease !important;
 }
 
 .ai-hub-dialog .ai-models-pool-select .el-tag:not(.is-closable):hover {
-  background: rgba(99, 102, 241, 0.18) !important;
-  border-color: var(--accent-primary, #6366f1) !important;
+  background-color: #e2e8f0 !important;
+  border-color: #cbd5e1 !important;
+  color: #1e293b !important;
 }
 
-.ai-hub-dialog .ai-models-pool-select .el-tag:not(.is-closable) .el-tag__content {
-  font-weight: 700 !important;
-  color: inherit !important;
-}
-
-html.dark .ai-hub-dialog .ai-models-pool-select .el-tag:not(.is-closable) {
-  background: rgba(99, 102, 241, 0.2) !important;
-  color: #a5b4fc !important;
-  border-color: rgba(99, 102, 241, 0.4) !important;
+/* Dark mode theme support for pool select tags */
+html.dark .ai-hub-dialog .ai-models-pool-select .el-tag {
+  background-color: #1f2937 !important;
+  border-color: #374151 !important;
+  color: #d1d5db !important;
 }
 
 html.dark .ai-hub-dialog .ai-models-pool-select .el-tag:not(.is-closable):hover {
-  background: rgba(99, 102, 241, 0.3) !important;
-  border-color: #818cf8 !important;
+  background-color: #374151 !important;
+  border-color: #4b5563 !important;
+  color: #f3f4f6 !important;
 }
 
 .el-dialog.storage-config-dialog.db-domains-dialog,
