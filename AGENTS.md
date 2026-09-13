@@ -11,6 +11,31 @@
    - 在向用户输出回复时，必须置顶/显式打印出本次提交的完整 Commit Hash 与短 Hash，确保版本可追溯、审计记录完整。
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
+
+### 邮件AI翻译目标语言配置、同语言互译拦截、图片无技术前缀纯净遮罩与繁体中文支持上线 (2026-09-12)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **默认翻译目标语言配置与持久化存储 (Configurable Translation Target Language)**:
+       - 在偏好设置（`/settings/general`）中新增「翻译目标语言」独立配置区（`#translate-lang-section`）；
+       - 支持选择并持久化到本地存储（`uiStore.defaultTranslateLang`）；
+       - 扩充全系统语言字典至 15 种主流语言，原生支持正體中文（繁體中文, `zh-Hant`）、英语、日语、韩语、法语、德语、西班牙语、俄语、葡萄牙语、意大利语、阿拉伯语、泰语、越南语、印尼语等。
+    2. **严格拦截针对源语言翻译为原语言 (Strict Anti-Loop Same-Language Defense)**:
+       - 智能语言侦测（`detectSourceLanguage`）：前端毫秒级侦测邮件源语言类型；
+       - 若邮件源语言与用户的默认目标语言相同（例如中文邮件且默认目标为中文）：点击翻译按钮绝不发起无效后端 API 调用，直接呼出并展开翻译工具条（`class="gmail-translate-bar"`），自动智能切换推荐替代语言（中文源推荐英文 `en`，英文源推荐法语 `fr`），并提示用户；
+       - 手动选择同语言点击翻译时即刻拦截并切换替代语言，杜绝“中文翻译为中文”或“英文翻译为英文”的无效调用与 Token 浪费；
+       - 后端在 `translate()` 施加二次纵深防御，彻底杜绝任何客户端直接发起的无效同语言互译。
+    3. **图片 OCR 纯净遮罩与无前缀覆盖 (Pure Visual Masking Without Technical Prefixes)**:
+       - 彻底剔除所有诸如 `[图片文字识别与翻译 / Image OCR]` 或 `[图片译文]:` 等技术前缀，仅直接展示纯净的目标语言译文；
+       - 采用包裹结构（`.epo-trans-img-container` / `.epo-trans-img-wrap`）与绝对定位（`position: absolute; inset: 0`）遮罩层（`.epo-trans-img-mask` / `.epo-trans-img-overlay`）直接覆盖原图文本区域，具有半透明毛玻璃质感、白字深底，深度自适应暗黑模式；
+       - 鼠标悬停（`:hover`）时遮罩层平滑淡化至 0.18 透明度，方便用户随时穿透查看原图；
+       - 仅针对 `<img>` 标签进行 OCR 与遮罩处理，`<video>`、`<audio>` 等其他多媒体资源 100% 完好无损保留。
+    4. **Playwright 端到端全链路自动化测试 100% 通过**:
+       - 专属语言与遮罩套件 `tests/test-ai-translation-lang-and-mask-e2e.mjs` 5 项全链路检查点 100% 全绿通过；
+       - 分片负载均衡套件 `tests/test-ai-chunking-loadbalance-and-ocr-e2e.mjs` 100% 全绿通过；
+       - 恪守零假数据与脏数据残留准则。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **Cloudflare Workers 部署 Version ID**: `fad73e06-ae8a-4915-993c-c80fda163778`。
+    - **epocanvas-mail Git Commit**: `39f7829874f790f4ad7c1cc4e9813b450da3fa94` (Short Hash: `39f7829`).
+
 ### 邮件AI翻译多片并发负载均衡分片系统、天然语义保护句子切分、图片OCR单独覆盖展示与长邮件零截断上线 (2026-09-12)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **智能分片系统与天然语义保护 (Adaptive Semantic Chunking Engine)**:
