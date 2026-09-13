@@ -239,7 +239,7 @@ const aiService = {
 	},
 
 	/**
-	 * 对 HTML 内的图片进行 OCR 识别与专属覆盖卡片装配 (Dedicated Image OCR & Visual Text Masking)
+	 * 对 HTML 内的图片进行 OCR 识别与专属覆盖卡片装配 (0ee51d3 最小修改显示原则：仅覆盖文本区域，无文字图片严格保持原样)
 	 */
 	async enhanceImagesWithOverlayAndOcr(c, skeleton, segments, rawBlocks = [], apiKey = '', apiUrl = '') {
 		const imgRegex = /<img\b([^>]*)>/gi;
@@ -263,7 +263,13 @@ const aiService = {
 			const altText = (altMatch?.[2] || '').trim();
 			const titleText = (titleMatch?.[2] || '').trim();
 			const ariaText = (ariaMatch?.[2] || '').trim();
-			const descriptiveText = altText || titleText || ariaText;
+			const rawDescriptiveText = altText || titleText || ariaText;
+
+			// 过滤纯占位或装饰性词汇（无实际文本价值）
+			const placeholderRegex = /^(icon|avatar|spacer|divider|bullet|image|img|photo|picture|bg|background|thumbnail|decoration|decorative|placeholder)$/i;
+			const descriptiveText = (!rawDescriptiveText || placeholderRegex.test(rawDescriptiveText.toLowerCase()))
+				? ''
+				: rawDescriptiveText;
 
 			// 提取 src 属性
 			const srcMatch = attrs.match(/\bsrc=(["'])(.*?)\1/i);
@@ -276,7 +282,7 @@ const aiService = {
 			try {
 				let imageText = task.descriptiveText;
 
-				// 若无 alt/title/aria 说明，尝试 OCR Vision 视觉提取
+				// 若无 alt/title/aria 描述性文本，尝试 OCR 视觉提取图片内部文字
 				if (!imageText && task.src) {
 					// 1. 若为 Base64 图片，还原原始数据后尝试 Workers AI OCR
 					if (task.src.includes('__EPO_RAW_')) {
@@ -333,7 +339,7 @@ const aiService = {
 									],
 									max_tokens: 150
 								}),
-								signal: AbortSignal.timeout(7000)
+								signal: AbortSignal.timeout(4000)
 							}).catch(() => null);
 
 							if (vRes && vRes.ok) {
@@ -347,7 +353,7 @@ const aiService = {
 					}
 				}
 
-				// 若成功提取到图片语义文本或包含有效字符
+				// 严格准则：只针对有有效文本的图片进行覆盖装配！无文本图片保持 100% 原样不作任何修改！
 				if (imageText && /[a-zA-Z\u4e00-\u9fa5]/.test(imageText) && !imageText.includes('__EPO_RAW_')) {
 					const segId = segments.length;
 					segments.push({ id: segId, text: imageText, type: 'ocr' });
@@ -371,9 +377,11 @@ const aiService = {
 
 					let wrappedImgHtml = '';
 					if (isSmall) {
-						wrappedImgHtml = `<span class="epo-trans-img-container" style="position: relative; display: inline-flex; flex-direction: column; align-items: center; max-width: 100%; margin: 4px 0; vertical-align: middle;"><span class="epo-trans-img-wrap" style="position: relative; display: inline-block;">${cleanImgTag}</span><span class="epo-trans-img-overlay epo-trans-img-mask small-badge" style="display: block; background: rgba(15, 23, 42, 0.92); color: #ffffff; padding: 2px 8px; font-size: 11px; line-height: 1.3; border-radius: 4px; margin-top: 4px; text-align: center; word-break: break-word;"><span class="epo-ocr-translated-text">__EPO_SEG_${segId}__</span></span></span>`;
+						// 小型图片/Badge：采用 0ee51d3 精准附着结构，无技术前缀纯净译文
+						wrappedImgHtml = `<figure class="epo-trans-img-container" style="position: relative; display: inline-flex; flex-direction: column; max-width: 100%; margin: 4px 0; border-radius: 6px; overflow: hidden; border: 1px solid rgba(99, 102, 241, 0.3); vertical-align: middle; box-sizing: border-box;">${cleanImgTag}<figcaption class="epo-trans-img-overlay epo-trans-img-mask small-badge" style="display: block; box-sizing: border-box; background: rgba(15, 23, 42, 0.92); color: #ffffff; padding: 2px 8px; font-size: 11px; line-height: 1.3; border-top: 1px solid #6366f1; text-align: center; word-break: break-word;"><span class="epo-ocr-translated-text" style="color: #ffffff; font-weight: 500;">__EPO_SEG_${segId}__</span></figcaption></figure>`;
 					} else {
-						wrappedImgHtml = `<span class="epo-trans-img-container" style="position: relative; display: inline-block; max-width: 100%; margin: 6px 0; vertical-align: top; overflow: hidden; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.12);"><span class="epo-trans-img-wrap" style="position: relative; display: block;">${cleanImgTag}</span><span class="epo-trans-img-overlay epo-trans-img-mask" style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(15, 23, 42, 0.78); backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px); color: #ffffff; padding: 8px 12px; font-size: 13px; line-height: 1.45; font-weight: 500; text-align: center; border-radius: inherit; box-sizing: border-box; z-index: 2; word-break: break-word; transition: opacity 0.2s ease;"><span class="epo-ocr-translated-text" style="color: #ffffff; font-weight: 500; word-break: break-word;">__EPO_SEG_${segId}__</span></span></span>`;
+						// 标准/大图：采用 0ee51d3 底部覆盖结构，仅覆盖文本部分，无技术前缀纯净译文，悬停透光
+						wrappedImgHtml = `<figure class="epo-trans-img-container" style="position: relative; display: inline-block; max-width: 100%; margin: 6px 0; border-radius: 8px; overflow: hidden; border: 1px solid rgba(99, 102, 241, 0.35); vertical-align: top; box-sizing: border-box; box-shadow: 0 2px 8px rgba(0,0,0,0.12);">${cleanImgTag}<figcaption class="epo-trans-img-overlay epo-trans-img-mask" style="position: absolute; bottom: 0; left: 0; right: 0; box-sizing: border-box; background: rgba(15, 23, 42, 0.88); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); color: #f8fafc; padding: 6px 12px; font-size: 12px; line-height: 1.4; border-top: 2px solid #6366f1; text-align: left; z-index: 2; transition: opacity 0.25s ease;"><div class="epo-ocr-translated-text" style="color: #ffffff; font-weight: 500; word-break: break-word;">__EPO_SEG_${segId}__</div></figcaption></figure>`;
 					}
 
 					enhancedSkeleton = enhancedSkeleton.replace(task.fullTag, wrappedImgHtml);
@@ -387,7 +395,7 @@ const aiService = {
 	/**
 	 * 将抽取出的文本片段进行智能分片，设定安全上限并按需切片以防模型超载或截断 (Adaptive Chunking System)
 	 */
-	chunkSegments(segments, maxItemsPerChunk = 6, maxCharsPerChunk = 600) {
+	chunkSegments(segments, maxItemsPerChunk = 8, maxCharsPerChunk = 800) {
 		const chunks = [];
 		let currentChunk = [];
 		let currentChars = 0;
@@ -399,8 +407,8 @@ const aiService = {
 			// 智能切片决策：达到条目上限、字符上限、或遇到独立图片OCR分片且当前批次已有内容时，立即密封前片，开始新切片
 			const shouldSplit = currentChunk.length >= maxItemsPerChunk ||
 				(currentChars + len > maxCharsPerChunk && currentChunk.length > 0) ||
-				(isOcr && currentChunk.length >= 3) ||
-				(len > 300 && currentChunk.length >= 2);
+				(isOcr && currentChunk.length >= 4) ||
+				(len > 400 && currentChunk.length >= 3);
 
 			if (shouldSplit) {
 				chunks.push(currentChunk);
@@ -447,7 +455,8 @@ const aiService = {
 			overallDeadlineMs = 55000,
 			startTime = Date.now(),
 			preferredEndpoint = null,
-			targetLang = 'zh'
+			targetLang = 'zh',
+			srcLang = 'en'
 		} = config;
 
 		let usedModel = model || 'gpt-4o-mini';
@@ -459,7 +468,7 @@ const aiService = {
 				const chatEndpoints = this.getCandidateChatEndpoints(apiUrl);
 				const candidateModels = Array.from(new Set([model, ...poolModels].filter(Boolean)));
 				if (apiUrl && apiUrl.includes('121628.xyz')) {
-					for (const m of ['gemma-26b-a4b-it-free', 'gemma-4-31b-it-free', 'riva-translate-4b-v2', 'riva-translate-4b-v1.1']) {
+					for (const m of ['gemma-26b-a4b-it-free', 'deepseek-v4-flash-free', 'glm-5.2-free', 'llama-3.1-8b-free']) {
 						if (!candidateModels.includes(m)) candidateModels.push(m);
 					}
 				}
@@ -476,7 +485,7 @@ const aiService = {
 						if (Date.now() - startTime > overallDeadlineMs) break;
 						try {
 							const remainingMs = Math.max(1000, overallDeadlineMs - (Date.now() - startTime));
-							const callTimeout = Math.min(10000, remainingMs);
+							const callTimeout = Math.min(5000, remainingMs);
 							const isAnthropic = endpoint.includes('/messages');
 							const body = isAnthropic
 								? {
@@ -574,13 +583,14 @@ const aiService = {
 		if (Date.now() - startTime < overallDeadlineMs) {
 			const sampleSnippet = prompt.slice(0, 1000);
 			const targetParam = targetLang === 'zh-Hant' ? 'zh-TW' : (targetLang || 'zh');
+			const srcParam = srcLang === 'zh-Hant' ? 'zh-TW' : (srcLang || 'en');
 			try {
-				const mmUrl = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(sampleSnippet)}&langpair=auto|${encodeURIComponent(targetParam)}`;
+				const mmUrl = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(sampleSnippet)}&langpair=${encodeURIComponent(srcParam)}|${encodeURIComponent(targetParam)}`;
 				const mmRes = await fetch(mmUrl, { signal: AbortSignal.timeout(4000) }).catch(() => null);
 				if (mmRes && mmRes.ok) {
 					const mmData = await mmRes.json().catch(() => null);
 					const transText = mmData?.responseData?.translatedText;
-					if (transText && typeof transText === 'string' && transText.trim()) {
+					if (transText && typeof transText === 'string' && transText.trim() && !transText.includes('IS AN INVALID SOURCE LANGUAGE')) {
 						return { text: transText.trim(), model: 'mymemory-translate', tokens: 0, endpoint: null };
 					}
 				}
@@ -670,7 +680,7 @@ const aiService = {
 		const poolModels = (settingRow?.aiModels || settingRow?.aiModelsPool || '').split(',').map(m => m.trim()).filter(Boolean);
 		const maxTokens = Number(settingRow?.aiMaxTokens) || 2048;
 		const startTime = Date.now();
-		const overallDeadlineMs = 60000;
+		const overallDeadlineMs = 80000;
 
 		const llmConfig = {
 			apiKey,
@@ -680,6 +690,7 @@ const aiService = {
 			maxTokens,
 			overallDeadlineMs,
 			startTime,
+			srcLang: detectedSrcLang || 'en',
 			targetLang: finalTargetLang
 		};
 
@@ -711,27 +722,33 @@ STRICT RULES:
 		const skeleton = await this.enhanceImagesWithOverlayAndOcr(c, rawSkeleton, segments, rawBlocks, apiKey, apiUrl);
 
 		if (segments.length > 0) {
-			const chunks = this.chunkSegments(segments, 6, 600);
+			const chunks = this.chunkSegments(segments, 8, 800);
 			const translatedMap = {};
 			let accumulatedTokens = 0;
 			let lastModel = model;
 
-			// 构建多模型负载均衡候选池
-			const candidateModels = Array.from(new Set([model, ...poolModels].filter(Boolean)));
+			// 构建多模型候选池：优先使用配置的主模型，确保极速响应
+			const candidateModels = [];
+			if (model) candidateModels.push(model);
+			for (const m of poolModels) {
+				if (!candidateModels.includes(m)) candidateModels.push(m);
+			}
 			if (apiUrl && apiUrl.includes('121628.xyz')) {
-				for (const m of ['gemma-26b-a4b-it-free', 'riva-translate-4b-v2', 'gemma-4-31b-it-free', 'deepseek-v4-flash-free', 'llama-3.2-11b-vision-free']) {
+				for (const m of ['gemma-26b-a4b-it-free', 'deepseek-v4-flash-free', 'glm-5.2-free', 'llama-3.1-8b-free']) {
 					if (!candidateModels.includes(m)) candidateModels.push(m);
 				}
 			}
 			if (candidateModels.length === 0) candidateModels.push('gpt-4o-mini');
 
-			// 并发翻译工作池 (Concurrency Limit: 3，多片并发负载均衡)
-			const concurrency = Math.min(3, chunks.length);
+			// 并发翻译工作池 (Concurrency Limit: 2，防中继端排队阻塞)
+			const unhealthyModels = new Set();
+			const concurrency = Math.min(2, chunks.length);
 			let nextChunkIndex = 0;
 
 			const worker = async () => {
 				while (nextChunkIndex < chunks.length) {
-					if (Date.now() - startTime > overallDeadlineMs) break;
+					// 距离整体超时仅剩 8 秒时，立即跳出 LLM 循环，将未处理分片交由极速并发保底补偿
+					if (Date.now() - startTime > overallDeadlineMs - 8000) break;
 					const chunkIdx = nextChunkIndex++;
 					const chunk = chunks[chunkIdx];
 
@@ -740,22 +757,22 @@ STRICT RULES:
 
 					const systemPrompt = `You are a professional translator. Output only the translated lines with [ID] prefix preserved. Do not add commentary or explanations.`;
 
-					// 模型池轮询负载均衡 (Round-Robin Model Load Balancing)
-					const initialModel = candidateModels[chunkIdx % candidateModels.length];
-					const modelsToTry = [initialModel, ...candidateModels.filter(m => m !== initialModel)];
+					// 智能筛选健康候选模型，所有分片均优先使用首选主模型（避免轮转到掉线/截断模型）
+					const healthyCandidates = candidateModels.filter(m => !unhealthyModels.has(m));
+					const modelsToTry = healthyCandidates.length > 0 ? healthyCandidates : candidateModels.slice(0, 2);
 
 					let bestChunkMap = {};
-					let chunkModel = initialModel;
+					let chunkModel = modelsToTry[0] || model;
 					let chunkTokens = 0;
 
 					for (const currentModel of modelsToTry) {
-						if (Date.now() - startTime > overallDeadlineMs) break;
+						if (Date.now() - startTime > overallDeadlineMs - 8000) break;
 						try {
 							const res = await this.callSingleLlm(c, chunkPrompt, systemPrompt, {
 								...llmConfig,
 								model: currentModel,
-								poolModels: [], // 已在外部进行模型轮转
-								overallDeadlineMs: Math.min(overallDeadlineMs, Date.now() - startTime + 10000)
+								poolModels: [],
+								overallDeadlineMs: Math.min(overallDeadlineMs, Date.now() - startTime + 6000)
 							});
 
 							if (res && res.text && res.model !== 'original') {
@@ -772,28 +789,11 @@ STRICT RULES:
 								if (Object.keys(parsed).length > Object.keys(bestChunkMap).length) {
 									bestChunkMap = { ...bestChunkMap, ...parsed };
 								}
+							} else {
+								unhealthyModels.add(currentModel);
 							}
-						} catch (_) {}
-					}
-
-					// 保底补偿：若该分片中仍有未翻译条目，尝试 Workers AI 或公共翻译逐条补偿，确保 100% 译文覆盖零截断
-					const targetParam = finalTargetLang === 'zh-Hant' ? 'zh-TW' : (finalTargetLang || 'zh');
-					for (const item of chunk) {
-						if (!bestChunkMap[item.id]) {
-							try {
-								const mmUrl = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(item.text.slice(0, 500))}&langpair=auto|${encodeURIComponent(targetParam)}`;
-								const mmRes = await fetch(mmUrl, { signal: AbortSignal.timeout(3000) }).catch(() => null);
-								if (mmRes && mmRes.ok) {
-									const mmData = await mmRes.json().catch(() => null);
-									const transText = mmData?.responseData?.translatedText;
-									if (transText && typeof transText === 'string' && transText.trim()) {
-										bestChunkMap[item.id] = transText.trim();
-									}
-								}
-							} catch (_) {}
-							if (!bestChunkMap[item.id]) {
-								bestChunkMap[item.id] = item.text;
-							}
+						} catch (_) {
+							unhealthyModels.add(currentModel);
 						}
 					}
 
@@ -805,6 +805,46 @@ STRICT RULES:
 
 			const workers = Array.from({ length: concurrency }, () => worker());
 			await Promise.all(workers);
+
+			// =========================================================================
+			// 零截断全链路终极保障 (Zero-Truncation Global Batch Compensation)
+			// 检查全邮件所有分片，若有任何条目未翻译（因模型漏行、超时中断或提前退出），立即并发极速补偿，彻底杜绝后半部分未翻译痛点！
+			// =========================================================================
+			const missingSegments = segments.filter(item => !translatedMap[item.id]);
+			if (missingSegments.length > 0) {
+				const targetParam = finalTargetLang === 'zh-Hant' ? 'zh-TW' : (finalTargetLang || 'zh');
+				const srcParam = (detectedSrcLang === 'zh-Hant' ? 'zh-TW' : detectedSrcLang) || 'en';
+				await Promise.allSettled(missingSegments.map(async (item) => {
+					try {
+						const mmUrl = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(item.text.slice(0, 500))}&langpair=${encodeURIComponent(srcParam)}|${encodeURIComponent(targetParam)}`;
+						const mmRes = await fetch(mmUrl, { signal: AbortSignal.timeout(3500) }).catch(() => null);
+						if (mmRes && mmRes.ok) {
+							const mmData = await mmRes.json().catch(() => null);
+							const transText = mmData?.responseData?.translatedText;
+							if (transText && typeof transText === 'string' && transText.trim() && !transText.includes('IS AN INVALID SOURCE LANGUAGE')) {
+								translatedMap[item.id] = transText.trim();
+								return;
+							}
+						}
+					} catch (_) {}
+
+					if (c.env?.ai && !translatedMap[item.id]) {
+						try {
+							const cfRes = await c.env.ai.run('@cf/meta/llama-3.1-8b-instruct', {
+								messages: [
+									{ role: 'system', content: `Translate into ${targetLangName}. Output ONLY the translated text:` },
+									{ role: 'user', content: item.text.slice(0, 500) }
+								],
+								max_tokens: 250
+							}).catch(() => null);
+							const raw = cfRes?.response || '';
+							if (raw && raw.trim()) {
+								translatedMap[item.id] = raw.trim();
+							}
+						} catch (_) {}
+					}
+				}));
+			}
 
 			// 回填译文并还原所有原始样式与代码块
 			let restoredHtml = skeleton;

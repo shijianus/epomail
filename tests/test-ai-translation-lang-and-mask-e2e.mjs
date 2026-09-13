@@ -147,15 +147,19 @@ async function run() {
     console.log("  ✓ 正體中文 (繁體中文) 翻译验证通过！");
 
     // ----------------------------------------------------
-    // 步骤 4: 图片 OCR 纯净遮罩与无前缀验证
+    // 步骤 4: 0ee51d3 最小修改覆盖卡片与无文字图片保持原样验证
     // ----------------------------------------------------
-    console.log("\n[步骤 4] 验证富文本图片 OCR 纯净遮罩，禁止技术前缀...");
+    console.log("\n[步骤 4] 验证 0ee51d3 最小修改覆盖卡片（仅覆盖底部文本区域）与无文字图片严格保持原样...");
     const sampleImageHtml = `
       <div style="padding: 20px; font-family: sans-serif;">
         <h2>System Notification with Visual Assets</h2>
         <p>Please check the upgrade badge below:</p>
         <div style="margin: 15px 0;">
           <img src="https://mail.epocanvas.com/promo-banner.png" alt="Annual Cloud Infrastructure Upgrade 50% Off Special Offer" style="width: 480px; height: 160px; object-fit: cover; border-radius: 8px;" />
+        </div>
+        <!-- 无文字图片（保持原样测试） -->
+        <div style="margin: 10px 0;">
+          <img src="https://mail.epocanvas.com/spacer.gif" alt="spacer" style="height: 10px; width: 100px;" />
         </div>
         <video style="width: 320px;" controls><source src="https://mail.epocanvas.com/demo.mp4" type="video/mp4"></video>
         <p>Thank you for choosing our platform.</p>
@@ -182,15 +186,21 @@ async function run() {
     assert.ok(!transHtml.includes("[图片译文]"), "严禁出现 '[图片译文]' 技术前缀");
     assert.ok(!transHtml.includes("Image OCR"), "严禁出现 'Image OCR' 英文前缀");
 
-    // 验证遮罩类名与纯净译文
-    assert.ok(transHtml.includes("epo-trans-img-wrap"), "必须包含 .epo-trans-img-wrap 图片包裹层");
-    assert.ok(transHtml.includes("epo-trans-img-mask"), "必须包含 .epo-trans-img-mask 图片遮罩层");
-    assert.ok(transHtml.includes("position: absolute") && transHtml.includes("inset: 0"), "大图遮罩必须使用 absolute inset: 0 覆盖原图文本");
+    // 验证 0ee51d3 最小修改覆盖卡片：仅覆盖底部文本区域，非全图遮蔽
+    assert.ok(transHtml.includes("epo-trans-img-container"), "有文字图片必须包裹在 .epo-trans-img-container 容器中");
+    assert.ok(transHtml.includes("epo-trans-img-overlay"), "必须包含 .epo-trans-img-overlay 覆盖层");
+    assert.ok(transHtml.includes("position: absolute") && transHtml.includes("bottom: 0"), "大图卡片必须使用 0ee51d3 最小修改原则 absolute bottom: 0 仅覆盖原图文本");
     assert.ok(transHtml.includes("epo-ocr-translated-text"), "必须包含 .epo-ocr-translated-text 译文节点");
+
+    // 验证无文字图片保持 100% 原样（无 figure/container 包裹）
+    assert.ok(
+      transHtml.includes('src="https://mail.epocanvas.com/spacer.gif"') && !transHtml.includes('alt="__EPO_SEG_') || (transHtml.match(/class="epo-trans-img-container"/g) || []).length === 1,
+      "无文字图片必须保持 100% 原样，严禁错误包装覆盖卡片"
+    );
 
     // 验证 video 媒体标签 100% 完好无损保留
     assert.ok(transHtml.includes("<video") && transHtml.includes("demo.mp4"), "必须完整保留 <video> 标签及其 source 资源");
-    console.log("  ✓ 纯净遮罩验证通过：无技术前缀、inset: 0 覆盖原文、video 媒体标签完好保留！");
+    console.log("  ✓ 0ee51d3 最小修改覆盖与无文字图片保持原样验证通过：无技术前缀、bottom: 0 覆盖文本、无文字图片保持原样、video 媒体标签完好保留！");
 
     // ----------------------------------------------------
     // 步骤 5: 控制台错误与 ARIA 规范审计

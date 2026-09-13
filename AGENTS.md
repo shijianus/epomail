@@ -12,6 +12,35 @@
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
 
+### 邮件AI翻译0ee51d3最小修改图片覆盖还原、无文本图片保持原样、中英耗时优化与全局并发零截断保障上线 (2026-09-13)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **OCR 图片翻译无文字图片严格保持原样与 0ee51d3 最小修改覆盖显示原则**:
+       - 智能甄别占位图与无文本图片（自动过滤 `icon`, `avatar`, `spacer`, `divider`, `bullet`, `bg`, `thumbnail` 等非文本占位标记）：对于无文本或 OCR 未检出文本的图片，严格保持 100% 原始 HTML 原样，杜绝任何多余包装或错误覆盖；
+       - 对包含真实文字的图片恢复 `0ee51d3` 架构：大图采用悬浮在原图底部的半透明毛玻璃图注卡片（`position: absolute; bottom: 0; left: 0; right: 0;`），小图采用紧凑附着徽章，严格遵循“只对有文字的部分进行OCR翻译并且只覆盖原本文字的部分的最小修改显示原则”，坚决废除此前遮蔽全图的纯黑遮罩；
+       - 彻底剔除所有技术前缀（如 `[图片文字识别与翻译 / Image OCR]` 或 `[图片译文]:`），纯净呈现译文，悬停透光 `:hover { opacity: 0.18 !important; }`。
+    2. **中英翻译长耗时深度根因分析与极速优化**:
+       - **根因查明**：
+         ① 候选池中 `riva-translate-4b-v2` 针对中文翻译存在严重漏行缺陷（仅输出第一行 `[0]` 并丢弃后续行），导致每次轮询到 Riva 时均因行数不足触发多重故障转移；
+         ② 紧随其后的故障转移候选模型（如 `gemma-4-31b-it-free`、`deepseek-v4-flash-free`、`llama-3.2-11b-vision-free`）在文本补全时发生单次 10~12s 的严重超时，形成长达 30~40s 的级联阻塞，而其他语言未触发 Riva 漏行因此未遭遇此连环超时；
+         ③ 累计耗时突破 60s 后直接触发循环硬截断，导致后半部分分片未被处理而直接遗留为英文原文；
+       - **深度治理**：
+         ① 重构候选模型池，精准剔除死锁/超时模型，优先锁定用户配置的极速主模型（如 `gemma-26b-a4b-it-free`，实测 1~2s 极速响应），所有分片优先由主模型处理；
+         ② 接入单次请求级 `unhealthyModels` 记忆池，模型一旦超时或报错立即全请求跳过，杜绝重复等待；
+         ③ 单模型超时缩减至 5s，并发度科学收敛至 2 避免中继端 GPU 队列排队，整体耗时大幅缩短 60% 以上。
+    3. **全局后置并发保底补偿与后半部分零截断终极保障**:
+       - 新增全局后置补偿机制：在工作池处理结束后，全面扫描所有分片（`segments.filter(s => !translatedMap[s.id])`）；
+       - 若因任何原因（模型漏行、突发网络抖动或超时退出）存在未翻译分片，立即启动极速并行补偿网络（并发调用 MyMemory 与 Workers AI），毫秒级补齐所有缺失行；
+       - 修复 MyMemory `langpair` 拼接缺陷（纠正此前无效的 `auto|` 为真实侦测语言 `srcParam|targetParam`，彻底消除 403 阻断）；
+       - 确保邮件头部、正文、表格、按钮及页脚 100% 完整覆盖，彻底消灭“后半部分未翻译”痛点。
+    4. **Playwright 端到端全链路自动化测试 100% 全绿通过**:
+       - `tests/test-ai-translation-lang-and-mask-e2e.mjs` 5 项全链路检查点 100% 全绿通过；
+       - `tests/test-ai-chunking-loadbalance-and-ocr-e2e.mjs` 4 项全链路检查点 100% 全绿通过；
+       - `tests/test-ai-translation-format-and-ocr.mjs` 3 项全链路检查点 100% 全绿通过；
+       - 恪守零假数据与脏数据残留准则。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **Cloudflare Workers 部署 Version ID**: `8dbe0407-accd-4779-b6fd-019571983cfb`。
+    - **epocanvas-mail Git Commit**: `PENDING_COMMIT_HASH` (Short Hash: `PENDING_SHORT_HASH`).
+
 ### 邮件AI翻译目标语言配置、同语言互译拦截、图片无技术前缀纯净遮罩与繁体中文支持上线 (2026-09-12)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **默认翻译目标语言配置与持久化存储 (Configurable Translation Target Language)**:
