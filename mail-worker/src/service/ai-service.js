@@ -190,8 +190,15 @@ const aiService = {
 		const rawBlocks = [];
 		let clean = html || '';
 
-		// 1. 保护内嵌样式表 <style>、脚本 <script>、矢量图 <svg>、代码块 <code>、视频 <video> 与音频 <audio>
-		clean = clean.replace(/<(style|script|svg|code|video|audio)\b[^>]*>[\s\S]*?<\/\1>/gi, (match) => {
+		// 1. 保护内嵌样式表 <style>、脚本 <script>、矢量图 <svg>、代码块 <code>/<pre>、视频 <video>、音频 <audio>、画布 <canvas> 与嵌入帧 <iframe>
+		clean = clean.replace(/<(style|script|svg|code|pre|video|audio|canvas|iframe)\b[^>]*>[\s\S]*?<\/\1>/gi, (match) => {
+			const id = `<!--__EPO_RAW_${rawBlocks.length}__-->`;
+			rawBlocks.push({ id, match });
+			return id;
+		});
+
+		// 保护自闭合或无配对闭合标签的 <video>、<audio>、<source>、<track>、<iframe>、<embed>、<canvas>
+		clean = clean.replace(/<(video|audio|source|track|iframe|embed|canvas)\b[^>]*\/?>/gi, (match) => {
 			const id = `<!--__EPO_RAW_${rawBlocks.length}__-->`;
 			rawBlocks.push({ id, match });
 			return id;
@@ -241,7 +248,11 @@ const aiService = {
 	/**
 	 * 对 HTML 内的图片进行 OCR 识别与专属覆盖卡片装配 (0ee51d3 最小修改显示原则：仅覆盖文本区域，无文字图片严格保持原样)
 	 */
-	async enhanceImagesWithOverlayAndOcr(c, skeleton, segments, rawBlocks = [], apiKey = '', apiUrl = '') {
+	async enhanceImagesWithOverlayAndOcr(c, skeleton, segments, rawBlocks = [], apiKey = '', apiUrl = '', enableOcr = false) {
+		if (!enableOcr) {
+			return skeleton; // 未开启图片 OCR 实验功能时，100% 保持所有图片原样，不触碰任何图片
+		}
+
 		const imgRegex = /<img\b([^>]*)>/gi;
 		let match;
 		const ocrTasks = [];
@@ -265,15 +276,38 @@ const aiService = {
 			const ariaText = (ariaMatch?.[2] || '').trim();
 			const rawDescriptiveText = altText || titleText || ariaText;
 
-			// 过滤纯占位或装饰性词汇（无实际文本价值）
-			const placeholderRegex = /^(icon|avatar|spacer|divider|bullet|image|img|photo|picture|bg|background|thumbnail|decoration|decorative|placeholder)$/i;
-			const descriptiveText = (!rawDescriptiveText || placeholderRegex.test(rawDescriptiveText.toLowerCase()))
-				? ''
-				: rawDescriptiveText;
-
 			// 提取 src 属性
 			const srcMatch = attrs.match(/\bsrc=(["'])(.*?)\1/i);
 			const src = (srcMatch?.[2] || '').trim();
+
+			// 1. 严格甄别并过滤视频播放器、海报帧及多媒体控件，绝不把视频误认为图片
+			const isVideoElement =
+				/\b(video|player|play-btn|play-button|movie|media-player|poster|youtube|vimeo|stream)\b/i.test(attrs) ||
+				/\b(video|player|movie|play_button|poster|youtube|vimeo)\b/i.test(src) ||
+				/\b(video|player|watch video|play video|movie|trailer)\b/i.test(rawDescriptiveText);
+			if (isVideoElement) {
+				continue;
+			}
+
+			// 2. 严格甄别并过滤 Logo、品牌图标、水印、头像等非文本内容图片（不需要对 logo 进行说明，保持 100% 原样）
+			const isLogoOrBrand =
+				/\b(logo|brand|trademark|watermark|favicon|badge|avatar|emblem|icon|header-logo|footer-logo)\b/i.test(attrs) ||
+				/\b(logo|brand|icon|avatar|spacer|bullet|divider|favicon)\b/i.test(src) ||
+				/\b(logo|brand|trademark|watermark|favicon|badge|avatar|emblem|symbol|mascot)\b/i.test(rawDescriptiveText) ||
+				/(company[-_]?logo|brand[-_]?logo|site[-_]?logo|header[-_]?logo|logo[-_]?img|logo\.(png|jpg|jpeg|svg|webp|gif))/i.test(src);
+			if (isLogoOrBrand) {
+				continue;
+			}
+
+			// 3. 过滤纯占位或装饰性词汇（无实际文本价值）
+			const isPlaceholder =
+				/\b(spacer|divider|bullet|avatar|thumbnail|decoration|decorative|placeholder|tracking|tracker|pixel|blank|transparent)\b/i.test(rawDescriptiveText) ||
+				/\b(spacer|divider|bullet|avatar|pixel|blank|transparent)\b/i.test(src);
+			if (isPlaceholder) {
+				continue;
+			}
+
+			const descriptiveText = rawDescriptiveText;
 
 			ocrTasks.push({ fullTag, attrs, src, descriptiveText, altMatch, titleMatch });
 		}
@@ -370,7 +404,7 @@ const aiService = {
 					}
 					const cleanImgTag = `<img ${updatedAttrs.trim()}>`;
 
-					// 识别是否为小型图标或高度受限的 Logo (<=60px)
+					// 识别是否为小型图标 (<=60px)
 					const isSmall = /\bheight:\s*([0-5]?\d)px/i.test(task.attrs) ||
 						/\bheight=["']([0-5]?\d)["']/i.test(task.attrs) ||
 						/\bwidth:\s*([0-5]?\d)px/i.test(task.attrs);
@@ -380,8 +414,8 @@ const aiService = {
 						// 小型图片/Badge：采用 0ee51d3 精准附着结构，无技术前缀纯净译文
 						wrappedImgHtml = `<figure class="epo-trans-img-container" style="position: relative; display: inline-flex; flex-direction: column; max-width: 100%; margin: 4px 0; border-radius: 6px; overflow: hidden; border: 1px solid rgba(99, 102, 241, 0.3); vertical-align: middle; box-sizing: border-box;">${cleanImgTag}<figcaption class="epo-trans-img-overlay epo-trans-img-mask small-badge" style="display: block; box-sizing: border-box; background: rgba(15, 23, 42, 0.92); color: #ffffff; padding: 2px 8px; font-size: 11px; line-height: 1.3; border-top: 1px solid #6366f1; text-align: center; word-break: break-word;"><span class="epo-ocr-translated-text" style="color: #ffffff; font-weight: 500;">__EPO_SEG_${segId}__</span></figcaption></figure>`;
 					} else {
-						// 标准/大图：采用 0ee51d3 底部覆盖结构，仅覆盖文本部分，无技术前缀纯净译文，悬停透光
-						wrappedImgHtml = `<figure class="epo-trans-img-container" style="position: relative; display: inline-block; max-width: 100%; margin: 6px 0; border-radius: 8px; overflow: hidden; border: 1px solid rgba(99, 102, 241, 0.35); vertical-align: top; box-sizing: border-box; box-shadow: 0 2px 8px rgba(0,0,0,0.12);">${cleanImgTag}<figcaption class="epo-trans-img-overlay epo-trans-img-mask" style="position: absolute; bottom: 0; left: 0; right: 0; box-sizing: border-box; background: rgba(15, 23, 42, 0.88); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); color: #f8fafc; padding: 6px 12px; font-size: 12px; line-height: 1.4; border-top: 2px solid #6366f1; text-align: left; z-index: 2; transition: opacity 0.25s ease;"><div class="epo-ocr-translated-text" style="color: #ffffff; font-weight: 500; word-break: break-word;">__EPO_SEG_${segId}__</div></figcaption></figure>`;
+						// 标准/大图：采用 0ee51d3 底部覆盖结构，仅精准覆盖原图底部文本条，绝不遮挡其它图形，悬停透光
+						wrappedImgHtml = `<figure class="epo-trans-img-container" style="position: relative; display: inline-block; max-width: 100%; margin: 6px 0; border-radius: 8px; overflow: hidden; border: 1px solid rgba(99, 102, 241, 0.35); vertical-align: top; box-sizing: border-box; box-shadow: 0 2px 8px rgba(0,0,0,0.12);">${cleanImgTag}<figcaption class="epo-trans-img-overlay epo-trans-img-mask" style="position: absolute; bottom: 0; left: 0; right: 0; max-height: 35%; box-sizing: border-box; background: rgba(15, 23, 42, 0.82); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); color: #f8fafc; padding: 4px 10px; font-size: 11px; line-height: 1.35; border-top: 1px solid #6366f1; text-align: left; z-index: 2; transition: opacity 0.25s ease;"><div class="epo-ocr-translated-text" style="color: #ffffff; font-weight: 500; word-break: break-word;">__EPO_SEG_${segId}__</div></figcaption></figure>`;
 					}
 
 					enhancedSkeleton = enhancedSkeleton.replace(task.fullTag, wrappedImgHtml);
@@ -394,8 +428,9 @@ const aiService = {
 
 	/**
 	 * 将抽取出的文本片段进行智能分片，设定安全上限并按需切片以防模型超载或截断 (Adaptive Chunking System)
+	 * 扩充单批容量至 20 项 / 1600 字符，保留完整语义上下文，大幅缩短串行排队轮询时间，实现句子级秒翻译
 	 */
-	chunkSegments(segments, maxItemsPerChunk = 8, maxCharsPerChunk = 800) {
+	chunkSegments(segments, maxItemsPerChunk = 20, maxCharsPerChunk = 1600) {
 		const chunks = [];
 		let currentChunk = [];
 		let currentChars = 0;
@@ -404,11 +439,11 @@ const aiService = {
 			const len = seg.text.length;
 			const isOcr = seg.type === 'ocr';
 
-			// 智能切片决策：达到条目上限、字符上限、或遇到独立图片OCR分片且当前批次已有内容时，立即密封前片，开始新切片
+			// 智能切片决策：达到条目上限(20)、字符上限(1600)、或独立图片OCR分片达到一定量时切片
 			const shouldSplit = currentChunk.length >= maxItemsPerChunk ||
 				(currentChars + len > maxCharsPerChunk && currentChunk.length > 0) ||
-				(isOcr && currentChunk.length >= 4) ||
-				(len > 400 && currentChunk.length >= 3);
+				(isOcr && currentChunk.length >= 6) ||
+				(len > 600 && currentChunk.length >= 4);
 
 			if (shouldSplit) {
 				chunks.push(currentChunk);
@@ -485,7 +520,7 @@ const aiService = {
 						if (Date.now() - startTime > overallDeadlineMs) break;
 						try {
 							const remainingMs = Math.max(1000, overallDeadlineMs - (Date.now() - startTime));
-							const callTimeout = Math.min(5000, remainingMs);
+							const callTimeout = Math.min(9000, remainingMs);
 							const isAnthropic = endpoint.includes('/messages');
 							const body = isAnthropic
 								? {
@@ -615,7 +650,8 @@ const aiService = {
 	},
 
 	async translate(c, options = {}) {
-		let { text, html, targetLang = 'zh', strategy = 'auto' } = options;
+		let { text, html, targetLang = 'zh', strategy = 'auto', enableOcr } = options;
+		const shouldOcr = enableOcr !== undefined ? Boolean(enableOcr) : true;
 		const isHtml = Boolean(html && /<[a-z][\s\S]*>/i.test(html));
 
 		const sampleContent = (text || emailUtils.htmlToText(html || '')).slice(0, 3000);
@@ -719,10 +755,10 @@ STRICT RULES:
 		// 2. 如果是富文本 HTML 邮件：双轨驱动 (Dual-Track: In-Place Segment Replacement & Direct Whole-Document Fallback)
 		// 方案一 (常规核心方案): 抽取所有文本节点与图片，分片并发负载均衡翻译并精准回填，保证 100% 原始样式与排版、暗黑模式完全自适应、图片 OCR 专属覆盖
 		const { skeleton: rawSkeleton, segments, rawBlocks } = this.extractHtmlSegments(html);
-		const skeleton = await this.enhanceImagesWithOverlayAndOcr(c, rawSkeleton, segments, rawBlocks, apiKey, apiUrl);
+		const skeleton = await this.enhanceImagesWithOverlayAndOcr(c, rawSkeleton, segments, rawBlocks, apiKey, apiUrl, shouldOcr);
 
 		if (segments.length > 0) {
-			const chunks = this.chunkSegments(segments, 8, 800);
+			const chunks = this.chunkSegments(segments, 20, 1600);
 			const translatedMap = {};
 			let accumulatedTokens = 0;
 			let lastModel = model;
@@ -772,7 +808,7 @@ STRICT RULES:
 								...llmConfig,
 								model: currentModel,
 								poolModels: [],
-								overallDeadlineMs: Math.min(overallDeadlineMs, Date.now() - startTime + 6000)
+								overallDeadlineMs: Math.min(overallDeadlineMs, Date.now() - startTime + 10000)
 							});
 
 							if (res && res.text && res.model !== 'original') {

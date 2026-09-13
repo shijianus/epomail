@@ -443,11 +443,13 @@
         </div>
       </div>
 
-      <!-- 翻译目标语言 (Default Translation Target Language) -->
+      <!-- 翻译目标语言 (Default Translation Target Language - 带问号提示，不显式展示说明文本) -->
       <div class="item" id="translate-lang-section">
-        <div>
-          <div>{{ $t('defaultTranslateLang') || '翻译目标语言' }}</div>
-          <div class="sub-hint">{{ $t('defaultTranslateLangDesc') || '配置阅读邮件时的默认翻译目标语言' }}</div>
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <span>{{ $t('defaultTranslateLang') || '翻译目标语言' }}</span>
+          <el-tooltip :content="$t('defaultTranslateLangDesc') || '配置阅读邮件时的默认翻译目标语言'" placement="top">
+            <Icon icon="fluent:question-circle-16-regular" width="16" height="16" style="cursor: pointer; color: var(--text-muted); vertical-align: middle;" />
+          </el-tooltip>
         </div>
         <div>
           <el-select
@@ -472,6 +474,19 @@
             <el-option label="Tiếng Việt" value="vi" />
             <el-option label="Bahasa Indonesia" value="id" />
           </el-select>
+        </div>
+      </div>
+
+      <!-- 图片 OCR 识别与翻译开关 (Image OCR Translation Toggle - 实验性功能问号提示) -->
+      <div class="item" id="translate-ocr-section">
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <span>{{ $t('enableImageOcr') || '图片 OCR 识别翻译' }}</span>
+          <el-tooltip :content="$t('enableImageOcrDesc') || '实验性功能：开启后识别并翻译邮件内具有文本价值的图片文字'" placement="top">
+            <Icon icon="fluent:question-circle-16-regular" width="16" height="16" style="cursor: pointer; color: var(--text-muted); vertical-align: middle;" />
+          </el-tooltip>
+        </div>
+        <div>
+          <el-switch v-model="uiStore.enableImageOcr" />
         </div>
       </div>
     </div>

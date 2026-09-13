@@ -394,7 +394,7 @@
                   <div class="gtb-left">
                     <Icon icon="fluent:translate-20-regular" width="16" height="16" class="gtb-icon" />
                     <span class="gtb-title">{{ $t('translateTo') || '翻译为:' }}</span>
-                    <el-select v-model="targetLangMap[msg.emailId]" size="small" class="gtb-select" style="width: 135px;" @change="handleTranslate(msg)">
+                    <el-select v-model="targetLangMap[msg.emailId]" size="small" class="gtb-select" style="width: 135px;" @change="handleTranslate(msg, true)">
                       <el-option label="中文 (简体)" value="zh" />
                       <el-option label="正體中文 (繁體)" value="zh-Hant" />
                       <el-option label="English" value="en" />
@@ -1235,6 +1235,8 @@ const translatedTextMap = reactive({});
 const translatedHtmlMap = reactive({});
 const showOriginalMap = reactive({});
 const targetLangMap = reactive({});
+const activeTranslationAbortControllers = reactive({});
+const activeTranslationSeqMap = reactive({});
 
 const displayedContent = (msg) => {
   if (!msg) return '';
@@ -1346,11 +1348,22 @@ const toggleTranslateBar = (msg) => {
   }
 };
 
-const handleTranslate = (msg) => {
+const handleTranslate = (msg, isLanguageSwitch = false) => {
   const target = msg || email;
   if (!target) return;
   const id = target.emailId;
-  if (translatingMap[id]) return; // 防并发重复点击锁
+
+  // 1. 若当前邮件已有在途的旧翻译请求，立即主动终止旧请求并静默转到最新请求！
+  if (activeTranslationAbortControllers[id]) {
+    try {
+      activeTranslationAbortControllers[id].abort();
+    } catch (_) {}
+    delete activeTranslationAbortControllers[id];
+  }
+
+  // 2. 生成请求唯一时间戳序号，确保若旧请求延时到达也彻底静默废弃
+  const currentSeq = Date.now();
+  activeTranslationSeqMap[id] = currentSeq;
 
   const rawContent = target.text || target.content || '';
   const srcLang = detectSourceLanguage(rawContent);
@@ -1360,21 +1373,31 @@ const handleTranslate = (msg) => {
   if (isSameLanguage(srcLang, lang)) {
     const altLang = getAlternateTargetLanguage(srcLang, uiStore.defaultTranslateLang);
     targetLangMap[id] = altLang;
-    ElMessage.closeAll();
-    ElMessage.warning(t('sameLangNotice') || '原文已是该语言，已为您切换目标语言，请点击立即翻译');
+    if (!isLanguageSwitch) {
+      ElMessage.closeAll();
+      ElMessage.warning(t('sameLangNotice') || '原文已是该语言，已为您切换目标语言');
+    }
     showTranslateMap[id] = true;
+    translatingMap[id] = false;
     return;
   }
 
   translatingMap[id] = true;
   showTranslateMap[id] = true;
 
+  const controller = new AbortController();
+  activeTranslationAbortControllers[id] = controller;
+
   emailTranslate({
     text: target.text || '',
     html: target.content || '',
-    targetLang: lang
-  }).then((res) => {
-    ElMessage.closeAll(); // 确保关闭任何残留提示，一次交互最多仅展示 1 个提示
+    targetLang: lang,
+    enableOcr: Boolean(uiStore.enableImageOcr)
+  }, { signal: controller.signal }).then((res) => {
+    // 若序号落后（用户在未完成状态下切换了新语言），静默抛弃旧响应
+    if (activeTranslationSeqMap[id] !== currentSeq) return;
+
+    ElMessage.closeAll();
     const data = (res && res.data !== undefined) ? res.data : (res || {});
     const transText = (data.translatedText || '').trim();
     const transHtml = (data.translatedHtml || '').trim();
@@ -1388,11 +1411,21 @@ const handleTranslate = (msg) => {
     showOriginalMap[id] = false;
     ElMessage.success(t('translateSuccess') || '翻译完成');
   }).catch(err => {
+    // 若请求被新语言主动终止，静默处理：严禁弹窗、严禁报错提示，以最新请求为准
+    if (activeTranslationSeqMap[id] !== currentSeq) return;
+    if (err?.name === 'AbortError' || err?.name === 'CanceledError' || err?.code === 'ERR_CANCELED' || err?.message?.includes('canceled') || err?.message?.includes('aborted')) {
+      return;
+    }
+
     console.error('Translation error:', err);
-    ElMessage.closeAll(); // 确保关闭任何残留提示，一次交互最多仅展示 1 个提示
+    ElMessage.closeAll();
     ElMessage.error(t('translateFailed') || '翻译失败，请稍后重试或检查模型配置');
   }).finally(() => {
-    translatingMap[id] = false;
+    // 只有最新一次请求完成时，才重置正在翻译中加载状态
+    if (activeTranslationSeqMap[id] === currentSeq) {
+      translatingMap[id] = false;
+      delete activeTranslationAbortControllers[id];
+    }
   });
 };
 
@@ -1401,6 +1434,13 @@ const toggleViewOriginal = (emailId) => {
 };
 
 const closeTranslate = (emailId) => {
+  if (activeTranslationAbortControllers[emailId]) {
+    try {
+      activeTranslationAbortControllers[emailId].abort();
+    } catch (_) {}
+    delete activeTranslationAbortControllers[emailId];
+  }
+  translatingMap[emailId] = false;
   showTranslateMap[emailId] = false;
   showOriginalMap[emailId] = true;
 };

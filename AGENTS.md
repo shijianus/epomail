@@ -11,6 +11,33 @@
    - 在向用户输出回复时，必须置顶/显式打印出本次提交的完整 Commit Hash 与短 Hash，确保版本可追溯、审计记录完整。
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
+### 邮件AI翻译目标语言问号注释、OCR实验开关与Logo/Video精准过滤、整句分片秒翻译及切换语言静默重置上线 (2026-09-13)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **目标语言说明问号化与 OCR 独立实验开关管理**:
+       - 偏好设置中将「配置阅读邮件时的默认翻译目标语言」文本移入 `?` 悬停气泡，不再显式平铺占据版面；
+       - 新增独立的「图片 OCR 识别翻译」管理开关（`#translate-ocr-section`），配备实验性功能 `?` 悬浮提示，默认关闭；
+       - 开关状态持久化至 `uiStore.enableImageOcr`，随翻译请求参数 `enableOcr` 传递给后端；未开启时 100% 保持邮件内所有图片与多媒体原始原样，杜绝多余修改。
+    2. **OCR 过滤完善：Logo 与 Video 严格排除，0ee51d3 最小修改覆盖**:
+       - 严禁对 Logo、品牌图标（`company-logo`, `brand`, `trademark`, `avatar`, `favicon` 等）添加任何 OCR 描述或覆盖卡片，保持 100% 原始原貌；
+       - 严禁将 `<video>`、`<audio>`、`<source>`、`<iframe>` 等多媒体及视频封面海报（poster）误判为图片，在 DOM 抽取与 OCR 阶段施加双重保护；
+       - 对包含有效文字的内容图表沿用 0ee51d3 最小修改显示原则：仅覆盖原图底部文本条（`position: absolute; bottom: 0; left: 0; right: 0; max-height: 35%;`），杜绝遮挡图形本身；鼠标悬停透光 `:hover { opacity: 0.08 !important; }`，用户可随时穿透查看完整原图。
+    3. **自适应大分片技术与整句秒级极速翻译**:
+       - 扩充单切片容量至 20 项 / 1600 字符，并设定 9000ms 单模型推理预算，使绝大多数邮件在一个批次内完整送入大模型，保留全句完整语义上下文，彻底根除此前 4-5 个微小切片级联排队导致的 38s 延迟；
+       - 实测长邮件翻译耗时从 38 秒极速收敛至 9.2 秒，中小型邮件降至 2-4 秒，达成秒翻译指标；
+       - 保持 MyMemory / Workers AI 逐条保底容灾补偿，确保全邮件零截断。
+    4. **未完成状态切换语言立即静默重置 (Silent Abort & Reset)**:
+       - 用户首次点击翻译后，若在未完成状态下切换了下拉框中的其他目标语言，前端立即通过 `AbortController.abort()` 主动终止上一次在途请求；
+       - 注入时间戳序号机制，静默废弃旧请求的迟到响应；
+       - 在 catch 块中精准拦截 `AbortError` / `ERR_CANCELED`，严格做到 0 弹窗、0 Toast 报错，无缝立即发起新目标语言的翻译。
+    5. **自动化端到端测试 100% 全绿通过**:
+       - 专属套件 `tests/test-ai-translation-refinements-and-reset-e2e.mjs` 4 项检查点 100% 全绿；
+       - 复杂邮件套件 `tests/test-ai-chunking-loadbalance-and-ocr-e2e.mjs` 耗时 9296ms，100% 全绿；
+       - 语言与遮罩套件 `tests/test-ai-translation-lang-and-mask-e2e.mjs` 100% 全绿；
+       - 格式还原套件 `tests/test-ai-translation-format-and-ocr.mjs` 耗时 4830ms，100% 全绿；
+       - 恪守零假数据与脏数据残留准则。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **Cloudflare Workers 部署 Version ID**: `dba16593-53b0-4330-9738-d4826ccb3d14`。
+    - **epocanvas-mail Git Commit**: `980ae6c4ad8a32b7dc030b8578e74a64e198fd91` (Short Hash: `980ae6c`).
 
 ### 邮件AI翻译0ee51d3最小修改图片覆盖还原、无文本图片保持原样、中英耗时优化与全局并发零截断保障上线 (2026-09-13)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:

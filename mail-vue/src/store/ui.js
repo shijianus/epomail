@@ -82,7 +82,8 @@ export const useUiStore = defineStore('ui', {
         conversationView: true,
         themeWallpaper: 'none', // preset id or 'none' or image url
         themeWallpaperOpacity: 85,
-        defaultTranslateLang: 'zh' // 默认翻译目标语言
+        defaultTranslateLang: 'zh', // 默认翻译目标语言
+        enableImageOcr: false // 是否启用图片 OCR 识别与翻译 (实验性功能)
     }),
     getters: {
         // 向后兼容：其他地方读取 customLabels / defaultLabels 时转发到 allLabels
@@ -320,7 +321,8 @@ export const useUiStore = defineStore('ui', {
             'conversationView',
             'themeWallpaper',
             'themeWallpaperOpacity',
-            'defaultTranslateLang'
+            'defaultTranslateLang',
+            'enableImageOcr'
         ],
     },
 })

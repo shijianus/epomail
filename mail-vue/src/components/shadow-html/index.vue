@@ -98,7 +98,7 @@ function updateContent() {
       .epo-trans-img-container:hover .epo-trans-img-overlay,
       .epo-trans-img-mask:hover,
       .epo-trans-img-overlay:hover {
-        opacity: 0.18 !important;
+        opacity: 0.08 !important;
       }
 
     </style>

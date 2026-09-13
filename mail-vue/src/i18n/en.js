@@ -1345,6 +1345,8 @@ const en = {
     translateTo: 'Translate to:',
     defaultTranslateLang: 'Translation Target Language',
     defaultTranslateLangDesc: 'Preferred target language when translating messages',
+    enableImageOcr: 'Image OCR Translation',
+    enableImageOcrDesc: 'Experimental feature: Extract and translate textual content in email images',
     sameLangNotice: 'Message is already in target language; please choose a different language',
     alreadyInTargetLang: 'Message is already in your preferred language; translation bar opened',
     printEmail: 'Print',
