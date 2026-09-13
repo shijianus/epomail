@@ -68,7 +68,7 @@ function updateContent() {
       }
 
       .shadow-content {
-        background: transparent;
+        background: ${uiStore.dark ? '#ffffff' : 'transparent'};
         width: fit-content;
         height: fit-content;
         min-width: 100%;

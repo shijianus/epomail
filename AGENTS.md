@@ -11,6 +11,32 @@
    - 在向用户输出回复时，必须置顶/显式打印出本次提交的完整 Commit Hash 与短 Hash，确保版本可追溯、审计记录完整。
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
+### 邮件AI翻译DOM骨架原位回填、100%格式与表格卡片还原、暗黑模式适配与图片OCR翻译上线 (2026-09-12)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **DOM 骨架原位回填与 100% 格式还原 (In-Place Segment Replacement Architecture)**:
+       - 彻底废除此前将大体量 HTML 邮件降级剥离为纯文本 `<p>` 段落的陈旧逻辑，彻底解决“原本格式丢失、仅输出平铺文字”的痛点；
+       - 引入 `extractHtmlSegments` 骨架分片抽取算法：预先保护 `<style>`、`<script>`、`<svg>`、`<code>` 和 Base64 图片大文本，生成纯净无损的 DOM 骨架 `skeleton`；
+       - 精准提取标签间的可见自然文本节点以及 `<img>` 标签的 `alt` 与 `title` 属性，注入微型编号占位符 `__EPO_SEG_${id}__`；
+       - 接入智能分片引擎 `chunkSegments`（每批最多 20 项 / 1500 字符），防范超大邮件单次推理超时或 Token 溢出；
+       - 批量翻译完成后原位精准回填，并恢复所有内嵌样式与资源。实测表格 `<table>`、单元格 `<th>`/`<td>`、彩色卡片背景、高亮行动按钮 `<a href="...">`、链接、图片 100% 像素级完整保留！
+    2. **暗黑模式自适应与纯黑字体根除 (Dark Mode Native & Zero Black-on-Dark Flaws)**:
+       - 根因分析：此前降级纯文本未保留原邮件背景色，在 `ShadowHtml` 开启暗黑模式的 `filter: invert(1)` 滤镜时，由于内容层背景透明，`:host` 的浅色文字被无情反转为纯黑色 `#000000`，直接裸露在应用暗色底色上，导致“纯黑字体暗色调非常尴尬”；
+       - 全面治理：在 `ShadowHtml.vue` 中为 `.shadow-content` 注入深色模式白色底基 `background: ${uiStore.dark ? '#ffffff' : 'transparent'}`，配合 `filter: invert(1)` 自动反转为原生深色底色与高对比度浅色字体；并在 `views/content/index.vue` 的 fallback 容器中赋予 `color: inherit; font-family: inherit;`，彻底根除纯黑字体。
+    3. **双轨架构与全格式备份保障 (Dual-Strategy Translation & Format Fallback)**:
+       - 方案一（常规核心方案）：DOM 骨架分片提取与原位回填引擎（In-Place Segment Replacement），零样式损失、毫秒级响应、单片受控；
+       - 方案二（备份备选方案）：整包格式直译 (Whole-Document Format Translation)，若无可用独立文本节点或特定指令时直接发送带格式 HTML，并进行标签闭合与结构完整性校验，双轨互补保障。
+    4. **图片 OCR 识别与翻译图注自动附着 (Image OCR Text Recognition & Bilingual Captioning)**:
+       - 接入 `enhanceImagesWithOcr` 模块，自动扫描邮件内包含价值文本的图片（Base64 或远程 URL）；
+       - 支持 Cloudflare Workers AI Vision / OCR 模型或中继 Vision 接口提取图片文字，自动加入翻译片段队列；
+       - 在原始图片下方优雅附加深浅自适应的 OCR 图注卡片 `<figcaption class="epo-ocr-trans">`，并将图片的 `alt` 和 `title` 同步替换为译文。
+    5. **Playwright 端到端全链路自动化测试 100% 通过**:
+       - 专属测试套件 `tests/test-ai-translation-format-and-ocr.mjs` 验证通过：表格、暗黑卡片背景、高亮按钮链接、图片属性与中文译文 100% 保留，控制台 0 报错；
+       - 回归套件 `tests/test-ai-translation-live-e2e.mjs` 4/4 项检查点全绿；
+       - 回归套件 `tests/test-ai-translation-and-settings-fix.mjs` 4/4 项检查点全绿。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **Cloudflare Workers 部署 Version ID**: `4ab34aa9-3fc5-4a94-9814-3a027a1df2d1`。
+    - **epocanvas-mail Git Commit**: `07456aa7a0f278e8d6b2ffee1e9e0c71940a9c64` (Short Hash: `07456aa`).
+
 ### 邮件AI翻译503根除、多模型池属性修复、单次调用超时扩充至10s与多模型瞬时转移、WAI-ARIA焦点合规与单一提示管控上线 (2026-09-12)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **503 报错与提前超时根因排查与治理 (Root-Cause Fix of Translation Failures & 503 Elimination)**:

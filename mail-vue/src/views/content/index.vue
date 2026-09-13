@@ -1238,7 +1238,7 @@ const displayedContent = (msg) => {
     }
     const transText = translatedTextMap[msg.emailId];
     if (transText) {
-      return `<div class="translated-embed-body" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; line-height: 1.7; white-space: pre-wrap; word-break: break-word; padding: 4px 0;">${transText}</div>`;
+      return `<div class="translated-embed-body" style="color: inherit; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; line-height: 1.7; white-space: pre-wrap; word-break: break-word; padding: 4px 0;">${transText}</div>`;
     }
     return msg.content;
   }

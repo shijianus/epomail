@@ -104,59 +104,347 @@ const aiService = {
 		return filterList.some(item => item === fromEmail || item === fromDomain);
 	},
 
+	/**
+	 * 智能抽取 HTML 中的文本片段与图片，保留 100% 原始 DOM 骨架 (DOM Skeleton & Segment Extractor)
+	 */
+	extractHtmlSegments(html) {
+		const rawBlocks = [];
+		let clean = html || '';
+
+		// 1. 保护内嵌样式表 <style>、脚本 <script>、矢量图 <svg> 与代码块 <code>
+		clean = clean.replace(/<(style|script|svg|code)\b[^>]*>[\s\S]*?<\/\1>/gi, (match) => {
+			const id = `<!--__EPO_RAW_${rawBlocks.length}__-->`;
+			rawBlocks.push({ id, match });
+			return id;
+		});
+
+		// 2. 保护 Base64 图片大文本，避免消耗巨大 token 且防止模型截断
+		clean = clean.replace(/data:image\/[a-zA-Z0-9.+_-]+;base64,[A-Za-z0-9+/=]+/g, (match) => {
+			const id = `<!--__EPO_RAW_${rawBlocks.length}__-->`;
+			rawBlocks.push({ id, match });
+			return id;
+		});
+
+		const segments = [];
+
+		// 3. 抽取 <img> 标签的 alt 与 title 属性并注入标记
+		clean = clean.replace(/<img\b([^>]*)>/gi, (imgTag, attrs) => {
+			let newAttrs = attrs.replace(/\b(alt|title)=(["'])(.*?)\2/gi, (attrMatch, attrName, quote, attrVal) => {
+				const trimmed = (attrVal || '').trim();
+				if (!trimmed || trimmed.includes('__EPO_RAW_') || !/[a-zA-Z\u4e00-\u9fa5]/.test(trimmed)) return attrMatch;
+				const segId = segments.length;
+				segments.push({ id: segId, text: trimmed, type: 'attr' });
+				return `${attrName}=${quote}__EPO_SEG_${segId}__${quote}`;
+			});
+			return `<img ${newAttrs.trim()}>`;
+		});
+
+		// 4. 抽取标签间的纯文本节点 (Text Nodes between > and <)
+		const skeleton = clean.replace(/>([^<]+)</g, (match, text) => {
+			const trimmed = (text || '').trim();
+			if (!trimmed || trimmed.includes('__EPO_RAW_')) return match;
+			if (!/[a-zA-Z\u00C0-\u024F\u4e00-\u9fa5]/.test(trimmed)) return match;
+			if (trimmed.length < 2 && !/[a-zA-Z\u4e00-\u9fa5]/.test(trimmed)) return match;
+
+			const segId = segments.length;
+			segments.push({ id: segId, text: trimmed, type: 'node' });
+			const leadingWs = text.match(/^\s*/)[0];
+			const trailingWs = text.match(/\s*$/)[0];
+			return `>${leadingWs}__EPO_SEG_${segId}__${trailingWs}<`;
+		});
+
+		return { skeleton, segments, rawBlocks };
+	},
+
+	/**
+	 * 对 HTML 内的图片进行 OCR 识别，并生成图注翻译标记
+	 */
+	async enhanceImagesWithOcr(c, skeleton, segments, apiKey, apiUrl) {
+		const imgRegex = /<img\b([^>]*?)src=(["'])(.*?)\2([^>]*)>/gi;
+		let match;
+		const ocrTasks = [];
+		let enhancedSkeleton = skeleton;
+		let count = 0;
+
+		while ((match = imgRegex.exec(skeleton)) !== null && count < 2) {
+			const fullTag = match[0];
+			const src = match[3];
+			count++;
+			if (!src || src.includes('tracker') || src.includes('pixel') || src.length < 40) continue;
+			ocrTasks.push({ fullTag, src });
+		}
+
+		for (const task of ocrTasks) {
+			try {
+				let ocrText = '';
+				// 尝试 Workers AI Vision / OCR
+				if (c.env?.ai && task.src.startsWith('data:image/')) {
+					try {
+						const base64Data = task.src.split(',')[1];
+						if (base64Data && base64Data.length < 300000) {
+							const binary = atob(base64Data);
+							const bytes = new Uint8Array(binary.length);
+							for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+							const aiRes = await c.env.ai.run('@cf/unum/uform-gen2-qwen-500m', {
+								image: Array.from(bytes),
+								prompt: 'Extract all readable text in this image:'
+							}).catch(() => null);
+							const text = (aiRes?.description || aiRes?.text || '').trim();
+							if (text && !text.toLowerCase().includes('no text') && text.length > 2) {
+								ocrText = text;
+							}
+						}
+					} catch (_) {}
+				}
+
+				// 尝试中继 Vision 模型
+				if (!ocrText && apiKey && (task.src.startsWith('http://') || task.src.startsWith('https://'))) {
+					try {
+						const endpoint = apiUrl.endsWith('/chat/completions') ? apiUrl : `${apiUrl.replace(/\/+$/, '')}/v1/chat/completions`;
+						const vRes = await fetch(endpoint, {
+							method: 'POST',
+							headers: {
+								'Content-Type': 'application/json',
+								'Authorization': `Bearer ${apiKey}`
+							},
+							body: JSON.stringify({
+								model: 'gpt-4o-mini',
+								messages: [
+									{
+										role: 'user',
+										content: [
+											{ type: 'text', text: 'Extract all readable text in this image. If no readable text, reply NONE. Output only the extracted text:' },
+											{ type: 'image_url', image_url: { url: task.src } }
+										]
+									}
+								],
+								max_tokens: 150
+							}),
+							signal: AbortSignal.timeout(3000)
+						}).catch(() => null);
+
+						if (vRes && vRes.ok) {
+							const vData = await vRes.json().catch(() => null);
+							const text = (vData?.choices?.[0]?.message?.content || '').trim();
+							if (text && !text.toUpperCase().includes('NONE') && text.length > 2) {
+								ocrText = text;
+							}
+						}
+					} catch (_) {}
+				}
+
+				if (ocrText) {
+					const segId = segments.length;
+					segments.push({ id: segId, text: ocrText, type: 'ocr' });
+					const caption = `\n<figcaption class="epo-ocr-trans" style="font-size: 11px; margin: 4px 0 8px; padding: 4px 10px; border-left: 2px solid #6366f1; background: rgba(99, 102, 241, 0.08); color: inherit; opacity: 0.88; border-radius: 4px; line-height: 1.4; display: block;">🖼️ <strong>[图片文字识别与翻译]</strong>: __EPO_SEG_${segId}__</figcaption>`;
+					enhancedSkeleton = enhancedSkeleton.replace(task.fullTag, `${task.fullTag}${caption}`);
+				}
+			} catch (_) {}
+		}
+
+		return enhancedSkeleton;
+	},
+
+	/**
+	 * 将抽取出的文本片段进行智能分片，单片字符数与条目数受控以防模型超载或超时
+	 */
+	chunkSegments(segments, maxItemsPerChunk = 20, maxCharsPerChunk = 1500) {
+		const chunks = [];
+		let currentChunk = [];
+		let currentChars = 0;
+
+		for (const seg of segments) {
+			const len = seg.text.length;
+			if (currentChunk.length >= maxItemsPerChunk || (currentChars + len > maxCharsPerChunk && currentChunk.length > 0)) {
+				chunks.push(currentChunk);
+				currentChunk = [];
+				currentChars = 0;
+			}
+			currentChunk.push(seg);
+			currentChars += len;
+		}
+		if (currentChunk.length > 0) {
+			chunks.push(currentChunk);
+		}
+		return chunks;
+	},
+
+	/**
+	 * 执行单次 LLM 推理调用（含多端点锁定、模型故障转移与 Workers AI 保底）
+	 */
+	async callSingleLlm(c, prompt, systemPrompt, config = {}) {
+		const {
+			apiKey,
+			apiUrl,
+			model,
+			poolModels = [],
+			maxTokens = 2048,
+			overallDeadlineMs = 55000,
+			startTime = Date.now(),
+			preferredEndpoint = null
+		} = config;
+
+		let usedModel = model || 'gpt-4o-mini';
+		let totalTokens = 0;
+
+		// 1. 自定义接口调用与多模型故障转移
+		if (apiKey) {
+			try {
+				const chatEndpoints = this.getCandidateChatEndpoints(apiUrl);
+				const candidateModels = Array.from(new Set([model, ...poolModels].filter(Boolean)));
+				if (apiUrl && apiUrl.includes('121628.xyz')) {
+					for (const m of ['gemma-26b-a4b-it-free', 'gemma-4-31b-it-free', 'riva-translate-4b-v2', 'riva-translate-4b-v1.1']) {
+						if (!candidateModels.includes(m)) candidateModels.push(m);
+					}
+				}
+				if (candidateModels.length === 0) candidateModels.push('gpt-4o-mini');
+
+				let activeEndpoint = preferredEndpoint;
+
+				for (const currentModel of candidateModels) {
+					if (Date.now() - startTime > overallDeadlineMs) break;
+					let resp = null;
+					const endpointsToTry = activeEndpoint ? [activeEndpoint] : chatEndpoints;
+
+					for (const endpoint of endpointsToTry) {
+						if (Date.now() - startTime > overallDeadlineMs) break;
+						try {
+							const remainingMs = Math.max(1000, overallDeadlineMs - (Date.now() - startTime));
+							const callTimeout = Math.min(10000, remainingMs);
+							const isAnthropic = endpoint.includes('/messages');
+							const body = isAnthropic
+								? {
+									model: currentModel,
+									max_tokens: maxTokens,
+									messages: [
+										{ role: 'user', content: `${systemPrompt}\n\n${prompt}` }
+									]
+								}
+								: {
+									model: currentModel,
+									messages: [
+										{ role: 'system', content: systemPrompt },
+										{ role: 'user', content: prompt }
+									],
+									temperature: 0.1,
+									max_tokens: maxTokens
+								};
+
+							const candidateResp = await fetch(endpoint, {
+								method: 'POST',
+								headers: {
+									'Content-Type': 'application/json',
+									'Authorization': `Bearer ${apiKey}`,
+									'x-api-key': apiKey,
+									'anthropic-version': '2023-06-01',
+									'User-Agent': 'EpocanvasMail/3.0'
+								},
+								body: JSON.stringify(body),
+								signal: AbortSignal.timeout(callTimeout)
+							});
+
+							if (candidateResp.ok) {
+								activeEndpoint = endpoint;
+								resp = candidateResp;
+								break;
+							} else if (candidateResp.status !== 404) {
+								activeEndpoint = endpoint;
+								break;
+							}
+						} catch (_) {
+							break;
+						}
+					}
+
+					if (resp && resp.ok) {
+						const data = await resp.json().catch(() => null);
+						const rawContent = data?.choices?.[0]?.message?.content
+							|| data?.choices?.[0]?.message?.reasoning_content
+							|| data?.content?.[0]?.text
+							|| '';
+						if (typeof rawContent === 'string' && rawContent.trim()) {
+							totalTokens = data?.usage?.total_tokens || Math.ceil((prompt.length + rawContent.length) / 4);
+							usedModel = currentModel;
+							await this.recordUsage(c, { model: currentModel, tokens: totalTokens, calls: 1 }).catch(() => null);
+							return { text: rawContent.trim(), model: usedModel, tokens: totalTokens, endpoint: activeEndpoint };
+						}
+					}
+				}
+			} catch (_) {}
+		}
+
+		// 2. Cloudflare Workers AI 兜底
+		if (c.env?.ai && (Date.now() - startTime < overallDeadlineMs)) {
+			const cfModels = [
+				c.env.ai_model,
+				'@cf/meta/llama-3.1-8b-instruct',
+				'@cf/qwen/qwen1.5-7b-chat',
+				'@cf/meta/llama-3-8b-instruct'
+			].filter(Boolean);
+
+			for (const cfModel of cfModels) {
+				if (Date.now() - startTime > overallDeadlineMs) break;
+				try {
+					const result = await c.env.ai.run(cfModel, {
+						messages: [
+							{ role: 'system', content: systemPrompt },
+							{ role: 'user', content: prompt }
+						],
+						temperature: 0.1,
+						max_tokens: maxTokens
+					});
+					const rawContent = typeof result === 'string' ? result : result?.response || '';
+					if (typeof rawContent === 'string' && rawContent.trim()) {
+						totalTokens = Math.ceil((prompt.length + rawContent.length) / 4);
+						usedModel = cfModel;
+						await this.recordUsage(c, { model: cfModel, tokens: totalTokens, calls: 1 }).catch(() => null);
+						return { text: rawContent.trim(), model: usedModel, tokens: totalTokens, endpoint: null };
+					}
+				} catch (_) {}
+			}
+		}
+
+		// 3. 公共 API 兜底 (MyMemory & Google)
+		if (Date.now() - startTime < overallDeadlineMs) {
+			const sampleSnippet = prompt.slice(0, 1000);
+			try {
+				const mmUrl = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(sampleSnippet)}&langpair=auto|zh`;
+				const mmRes = await fetch(mmUrl, { signal: AbortSignal.timeout(4000) }).catch(() => null);
+				if (mmRes && mmRes.ok) {
+					const mmData = await mmRes.json().catch(() => null);
+					const transText = mmData?.responseData?.translatedText;
+					if (transText && typeof transText === 'string' && transText.trim()) {
+						return { text: transText.trim(), model: 'mymemory-translate', tokens: 0, endpoint: null };
+					}
+				}
+			} catch (_) {}
+
+			try {
+				const gtUrl = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=zh&dt=t&q=${encodeURIComponent(sampleSnippet)}`;
+				const gtRes = await fetch(gtUrl, { signal: AbortSignal.timeout(4000) }).catch(() => null);
+				if (gtRes && gtRes.ok) {
+					const gtData = await gtRes.json().catch(() => null);
+					if (Array.isArray(gtData) && Array.isArray(gtData[0])) {
+						const transText = gtData[0].map(item => item[0]).filter(Boolean).join('');
+						if (transText) {
+							return { text: transText.trim(), model: 'google-translate', tokens: 0, endpoint: null };
+						}
+					}
+				}
+			} catch (_) {}
+		}
+
+		return { text: prompt, model: 'original', tokens: 0, endpoint: null };
+	},
+
 	async translate(c, options = {}) {
-		const { text, html, targetLang = 'zh' } = options;
+		const { text, html, targetLang = 'zh', strategy = 'auto' } = options;
 		const isHtml = Boolean(html && /<[a-z][\s\S]*>/i.test(html));
-		let isDirectHtml = false;
-		let sourcePayload = '';
-		const dataUriPlaceholders = [];
-		const stylePlaceholders = [];
-
-		if (isHtml) {
-			let workingHtml = html;
-			// 保护内嵌样式表标签 <style>...</style>，避免浪费 token 且保持 100% 原始样式
-			workingHtml = workingHtml.replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, (match) => {
-				const id = `__EPO_STYLE_${stylePlaceholders.length}__`;
-				stylePlaceholders.push({ id, match });
-				return id;
-			});
-			// 保护 base64 图片 data URI，避免巨大文本消耗 token 且防止模型截断
-			workingHtml = workingHtml.replace(/data:image\/[a-zA-Z0-9.+_-]+;base64,[A-Za-z0-9+/=]+/g, (match) => {
-				const id = `__EPO_IMG_${dataUriPlaceholders.length}__`;
-				dataUriPlaceholders.push({ id, match });
-				return id;
-			});
-
-			if (workingHtml.length <= 1500) {
-				isDirectHtml = true;
-				sourcePayload = workingHtml;
-			} else {
-				// 复杂/超大型邮件包含成千上万行嵌套样式与表格，整包生成 HTML 极度缓慢并容易引发超时与 503 报错
-				// 提取纯净自然正文，快速精准翻译并嵌入高颜值自适应替换容器，实现可靠嵌入替换
-				isDirectHtml = false;
-				const extractedText = emailUtils.htmlToText(workingHtml || html) || emailUtils.formatText(text || '');
-				sourcePayload = extractedText.slice(0, 2500);
-			}
-		} else {
-			let sourceText = text || '';
-			if (!sourceText && html) {
-				sourceText = emailUtils.htmlToText(html);
-			}
-			sourcePayload = emailUtils.formatText(sourceText || '').trim().slice(0, 2500);
-		}
-
-		if (!sourcePayload) {
-			return {
-				translatedText: '',
-				translatedHtml: '',
-				isHtml: false
-			};
-		}
 
 		const settingRow = await settingService.query(c).catch(() => null);
 		if (settingRow && settingRow.aiEnabled === 0) {
 			return {
-				translatedText: isHtml ? emailUtils.htmlToText(html) : sourcePayload,
+				translatedText: isHtml ? emailUtils.htmlToText(html) : (text || ''),
 				translatedHtml: isHtml ? html : '',
 				isHtml
 			};
@@ -165,9 +453,8 @@ const aiService = {
 		const apiKey = (settingRow?.aiApiKey || c.env?.AI_API_KEY || '').trim();
 		const apiUrl = (settingRow?.aiApiUrl || c.env?.AI_API_URL || 'https://api.openai.com/v1').trim();
 		let model = (options.model || settingRow?.aiModel || c.env?.ai_model || 'gpt-4o-mini').trim();
-		const maxTokens = Number(settingRow?.aiMaxTokens) || (isDirectHtml ? 2048 : 1024);
 
-		// 角色权限模型分级校验 (Role Model Permission Hierarchy)
+		// 角色权限模型分级校验
 		try {
 			const userObj = c.get?.('user');
 			if (userObj?.type) {
@@ -195,266 +482,145 @@ const aiService = {
 			ru: 'Russian (Русский)'
 		};
 		const targetLangName = langNames[targetLang] || targetLang;
+		const poolModels = (settingRow?.aiModels || settingRow?.aiModelsPool || '').split(',').map(m => m.trim()).filter(Boolean);
+		const maxTokens = Number(settingRow?.aiMaxTokens) || 2048;
+		const startTime = Date.now();
+		const overallDeadlineMs = 60000;
 
-		const extractCleanContent = (raw) => {
-			if (!raw || typeof raw !== 'string') return '';
-			let text = raw;
-			// 1. 剔除思维链推理标签 (DeepSeek R1 / Reasoning models: <think>...</think>)
-			text = text.replace(/<think\b[^>]*>[\s\S]*?<\/think>/gi, '').trim();
-
-			// 2. 剥离 Markdown 代码块包裹 (```html ... ``` 或 ``` ... ```)
-			const codeBlockMatch = text.match(/```(?:html|xml)?\s*\n?([\s\S]*?)\n?```/i);
-			if (codeBlockMatch && codeBlockMatch[1]) {
-				text = codeBlockMatch[1].trim();
-			} else {
-				text = text.replace(/^```(?:html|xml)?\s*\n?/i, '').replace(/\n?```\s*$/i, '').trim();
-			}
-
-			// 3. 剔除模型常见的客套前缀/提示语 (如 "Here is the translation:" 或 "转换为简体中文：")
-			text = text.replace(/^(?:Here is the (?:translated |HTML )?(?:email|translation|HTML)?[：:]?\s*\n*|Translation[：:]?\s*\n*|Below is the [^\n]*\n+|Sure, [^\n]*\n+|Here's the translation[^\n]*\n+|转换为(?:简体中文|繁体中文|英文)[：:]?\s*\n*)/i, '').trim();
-
-			// 4. 防御部分模型先复读原文 HTML 再输出译文 HTML 的极端情况
-			const doubleHtmlMatch = text.match(/<[a-z][\s\S]*?>[\s\S]*?<\/[a-z]>[\s\S]*?(?:转换为|翻译为|Translated)[^\n]*\n*([\s\S]*?<[a-z][\s\S]*?>[\s\S]*?<\/[a-z]>)/i);
-			if (doubleHtmlMatch && doubleHtmlMatch[1]) {
-				text = doubleHtmlMatch[1].trim();
-			}
-
-			return text;
+		const llmConfig = {
+			apiKey,
+			apiUrl,
+			model,
+			poolModels,
+			maxTokens,
+			overallDeadlineMs,
+			startTime
 		};
 
-		const restorePlaceholders = (content) => {
-			if (!content) return '';
-			let res = extractCleanContent(content);
-			if (stylePlaceholders.length > 0) {
-				for (const p of stylePlaceholders) {
-					res = res.replaceAll(p.id, p.match);
+		// 1. 如果是纯文本邮件 (Plain Text Translation)
+		if (!isHtml) {
+			const sourceText = emailUtils.formatText(text || html || '').trim();
+			if (!sourceText) {
+				return { translatedText: '', translatedHtml: '', isHtml: false };
+			}
+			const systemPrompt = `You are a professional email translation engine.
+Translate the following email text into natural, fluent ${targetLangName}.
+STRICT RULES:
+1. Maintain original paragraph breaks, indentation, and formatting cleanly.
+2. Directly output ONLY the translated text without commentary, thinking steps, conversational preambles, or markdown code fences.`;
+
+			const res = await this.callSingleLlm(c, sourceText.slice(0, 4000), systemPrompt, llmConfig);
+			return {
+				translatedText: res.text,
+				translatedHtml: '',
+				isHtml: false,
+				model: res.model,
+				tokens: res.tokens
+			};
+		}
+
+		// 2. 如果是富文本 HTML 邮件：双轨驱动 (Dual-Track: In-Place Segment Replacement & Direct Whole-Document Fallback)
+		// 方案一 (常规核心方案): 抽取所有文本节点与属性，分片翻译并精准回填，保证 100% 原始样式与排版、暗黑模式完全自适应、图片 OCR
+		const { skeleton: rawSkeleton, segments, rawBlocks } = this.extractHtmlSegments(html);
+		const skeleton = await this.enhanceImagesWithOcr(c, rawSkeleton, segments, apiKey, apiUrl);
+
+		if (segments.length > 0) {
+			const chunks = this.chunkSegments(segments, 20, 1500);
+			const translatedMap = {};
+			let accumulatedTokens = 0;
+			let lastModel = model;
+
+			for (const chunk of chunks) {
+				if (Date.now() - startTime > overallDeadlineMs) break;
+				const chunkPrompt = `Translate each numbered line into ${targetLangName}.
+STRICT RULES:
+1. Maintain the exact [ID] prefix at the start of each line, e.g. "[0] 译文".
+2. Directly output ONLY the numbered translated lines. Do not omit any lines, and do not include explanations or markdown code blocks:
+${chunk.map(item => `[${item.id}] ${item.text}`).join('\n')}`;
+
+				const systemPrompt = `You are a high-precision line-by-line translation assistant. Translate each line faithfully into ${targetLangName}. Keep each line's [ID] prefix strictly intact.`;
+
+				const res = await this.callSingleLlm(c, chunkPrompt, systemPrompt, {
+					...llmConfig,
+					preferredEndpoint: llmConfig.preferredEndpoint
+				});
+				if (res.endpoint) llmConfig.preferredEndpoint = res.endpoint;
+				accumulatedTokens += res.tokens;
+				lastModel = res.model;
+
+				// 解析按行对应的编号译文
+				const lines = (res.text || '').split('\n').map(l => l.trim()).filter(Boolean);
+				for (const line of lines) {
+					const m = line.match(/^\[(\d+)\]\s*(.*)$/);
+					if (m) {
+						const id = parseInt(m[1], 10);
+						if (m[2].trim()) translatedMap[id] = m[2].trim();
+					}
+				}
+				// 保底处理未精准匹配的条目
+				for (let i = 0; i < chunk.length; i++) {
+					const item = chunk[i];
+					if (!translatedMap[item.id]) {
+						const fallbackLine = (lines[i] || '').replace(/^\[\d+\]\s*/, '').trim();
+						translatedMap[item.id] = fallbackLine || item.text;
+					}
 				}
 			}
-			if (dataUriPlaceholders.length > 0) {
-				for (const p of dataUriPlaceholders) {
-					res = res.replaceAll(p.id, p.match);
-				}
+
+			// 回填译文并还原所有原始样式与代码块
+			let restoredHtml = skeleton;
+			for (const [id, transText] of Object.entries(translatedMap)) {
+				restoredHtml = restoredHtml.replaceAll(`__EPO_SEG_${id}__`, transText);
 			}
-			return res;
-		};
+			for (const seg of segments) {
+				restoredHtml = restoredHtml.replaceAll(`__EPO_SEG_${seg.id}__`, seg.text);
+			}
+			for (const raw of rawBlocks) {
+				restoredHtml = restoredHtml.replaceAll(raw.id, raw.match);
+			}
 
-		const buildTranslationResult = (content, modelName, tokenCount = 0) => {
-			const cleaned = extractCleanContent(content);
-			const restored = isDirectHtml ? restorePlaceholders(cleaned) : cleaned;
-			const hasHtmlTags = Boolean(restored && /<[a-z][\s\S]*>/i.test(restored));
-
-			const transText = hasHtmlTags ? emailUtils.htmlToText(restored) : restored;
-			const paragraphs = (transText || '')
-				.split(/\n{2,}/)
-				.map(p => p.trim())
-				.filter(Boolean)
-				.map(p => `<p style="margin: 0.6em 0;">${p.replace(/\n/g, '<br/>')}</p>`);
-			const embeddedHtml = paragraphs.length > 0
-				? `<div class="translated-embed-body" style="font-family: inherit; line-height: 1.7; word-break: break-word;">${paragraphs.join('')}</div>`
-				: `<div class="translated-embed-body" style="font-family: inherit; line-height: 1.7; white-space: pre-wrap; word-break: break-word;">${transText}</div>`;
-			const transHtml = hasHtmlTags ? restored : embeddedHtml;
+			// 包装在自适应无侵入根容器中，避免纯黑字体，自适应暗黑模式
+			const finalHtml = `<div class="translated-mail-root" style="color: inherit; font-family: inherit;">${restoredHtml}</div>`;
+			const finalPlainText = emailUtils.htmlToText(restoredHtml);
 
 			return {
-				translatedText: transText,
-				translatedHtml: transHtml,
+				translatedText: finalPlainText,
+				translatedHtml: finalHtml,
 				isHtml: true,
-				model: modelName,
-				tokens: tokenCount
+				model: lastModel,
+				tokens: accumulatedTokens
 			};
-		};
+		}
 
-		const systemPrompt = isDirectHtml
-			? `You are an automated HTML email translation engine.
+		// 方案二 (备案/备用方案): 若无可用文本节点或 direct 策略要求，执行整包格式直译
+		const directSystemPrompt = `You are an automated HTML email translation engine.
 Translate all human-readable visible text inside the HTML document into ${targetLangName}.
 STRICT RULES:
 1. Directly output ONLY the resulting translated HTML.
-2. Do NOT output the original source language text or duplicate paragraphs.
-3. Do NOT output conversational phrases, thinking steps, or intro text (e.g. no "Here is the translation" or "转换为简体中文").
-4. Do NOT wrap output in markdown code fences or backticks (no \`\`\`html or \`\`\`).
-5. All HTML tags, attributes, inline styles, CSS, links, and structure must remain 100% identical. Only the human-readable text between tags should be translated.
-6. Keep all placeholder tokens like __EPO_IMG_0__ or __EPO_STYLE_0__ strictly intact.`
-			: `You are an automated email translation engine.
-Translate the given email text into natural, fluent ${targetLangName}.
-STRICT RULES:
-1. Maintain original paragraph breaks, layout, and formatting cleanly.
-2. Directly output ONLY the translated text without commentary, thinking steps, conversational preambles, or markdown code fences.`;
+2. All HTML tags, attributes, inline styles, CSS, links, tables, and colors must remain 100% identical. Only the human-readable text between tags should be translated.
+3. Do NOT wrap output in markdown code fences (no \`\`\`html or \`\`\`).`;
 
-		const startTime = Date.now();
-		const overallDeadlineMs = 60000; // 宽裕的 60s 总体超时保护（前端配置了 90s 超时）
+		const directRes = await this.callSingleLlm(c, html.slice(0, 4000), directSystemPrompt, llmConfig);
+		let cleanDirectHtml = directRes.text.replace(/```(?:html|xml)?\s*\n?([\s\S]*?)\n?```/i, '$1').trim();
+		const hasValidStructure = cleanDirectHtml && /<[a-z][\s\S]*>/i.test(cleanDirectHtml);
 
-		// 1. If custom API key configured, use OpenAI-compatible or Anthropic API with candidate model and endpoint resolution
-		if (apiKey) {
-			try {
-				const chatEndpoints = this.getCandidateChatEndpoints(apiUrl);
-				const poolModels = (settingRow?.aiModels || settingRow?.aiModelsPool || '').split(',').map(m => m.trim()).filter(Boolean);
-				const candidateModels = Array.from(new Set([model, ...poolModels].filter(Boolean)));
-				if (apiUrl && apiUrl.includes('121628.xyz')) {
-					for (const m of ['gemma-26b-a4b-it-free', 'gemma-4-31b-it-free', 'riva-translate-4b-v2', 'riva-translate-4b-v1.1']) {
-						if (!candidateModels.includes(m)) candidateModels.push(m);
-					}
-				}
-				if (candidateModels.length === 0) candidateModels.push('gpt-4o-mini');
-
-				let preferredEndpoint = null;
-
-				for (const currentModel of candidateModels) {
-					if (Date.now() - startTime > overallDeadlineMs) {
-						console.warn('AI translation deadline reached, skipping remaining models');
-						break;
-					}
-					let resp = null;
-					let lastError = null;
-
-					const endpointsToTry = preferredEndpoint ? [preferredEndpoint] : chatEndpoints;
-
-					for (const endpoint of endpointsToTry) {
-						if (Date.now() - startTime > overallDeadlineMs) break;
-						try {
-							const remainingMs = Math.max(1000, overallDeadlineMs - (Date.now() - startTime));
-							const callTimeout = Math.min(10000, remainingMs); // 单次模型调用最多 10s，超时立即向下一个模型故障转移
-							const isAnthropic = endpoint.includes('/messages');
-							const body = isAnthropic
-								? {
-									model: currentModel,
-									max_tokens: maxTokens,
-									messages: [
-										{ role: 'user', content: `${systemPrompt}\n\n${sourcePayload}` }
-									]
-								}
-								: {
-									model: currentModel,
-									messages: [
-										{ role: 'system', content: systemPrompt },
-										{ role: 'user', content: sourcePayload }
-									],
-									temperature: 0.1,
-									max_tokens: maxTokens
-								};
-
-							const candidateResp = await fetch(endpoint, {
-								method: 'POST',
-								headers: {
-									'Content-Type': 'application/json',
-									'Authorization': `Bearer ${apiKey}`,
-									'x-api-key': apiKey,
-									'anthropic-version': '2023-06-01',
-									'User-Agent': 'EpocanvasMail/3.0'
-								},
-								body: JSON.stringify(body),
-								signal: AbortSignal.timeout(callTimeout)
-							});
-
-							if (candidateResp.ok) {
-								preferredEndpoint = endpoint;
-								resp = candidateResp;
-								break;
-							} else {
-								lastError = new Error(`HTTP ${candidateResp.status} on ${endpoint}`);
-								// 若返回非 404（如 410 Gone / 400 / 429 / 500），说明该端点确实存在，锁定端点并跳出尝试下一个模型
-								if (candidateResp.status !== 404) {
-									preferredEndpoint = endpoint;
-									break;
-								}
-							}
-						} catch (err) {
-							lastError = err;
-							// 超时或连接异常，直接跳出换下一个模型
-							break;
-						}
-					}
-
-					if (resp && resp.ok) {
-						const data = await resp.json().catch(() => null);
-						const rawContent = data?.choices?.[0]?.message?.content
-							|| data?.choices?.[0]?.message?.reasoning_content
-							|| data?.content?.[0]?.text
-							|| '';
-						if (typeof rawContent === 'string' && rawContent.trim()) {
-							const totalTokens = data?.usage?.total_tokens || Math.ceil((sourcePayload.length + rawContent.length) / 4);
-							await this.recordUsage(c, { model: currentModel, tokens: totalTokens, calls: 1 });
-							return buildTranslationResult(rawContent, currentModel, totalTokens);
-						}
-					} else if (lastError) {
-						console.warn(`Model ${currentModel} translate returned error:`, lastError.message);
-					}
-				}
-			} catch (e) {
-				console.error('Custom AI translation failed:', e);
-			}
+		if (hasValidStructure) {
+			return {
+				translatedText: emailUtils.htmlToText(cleanDirectHtml),
+				translatedHtml: cleanDirectHtml,
+				isHtml: true,
+				model: directRes.model,
+				tokens: directRes.tokens
+			};
 		}
 
-		// 2. Fallback to Cloudflare Workers AI
-		if (c.env?.ai && (Date.now() - startTime < overallDeadlineMs)) {
-			const cfModels = [
-				c.env.ai_model,
-				'@cf/meta/llama-3.1-8b-instruct',
-				'@cf/qwen/qwen1.5-7b-chat',
-				'@cf/meta/llama-3-8b-instruct'
-			].filter(Boolean);
-
-			for (const cfModel of cfModels) {
-				if (Date.now() - startTime > overallDeadlineMs) break;
-				try {
-					const remainingMs = Math.max(1000, overallDeadlineMs - (Date.now() - startTime));
-					const result = await c.env.ai.run(cfModel, {
-						messages: [
-							{ role: 'system', content: systemPrompt },
-							{ role: 'user', content: sourcePayload }
-						],
-						temperature: 0.1,
-						max_tokens: isDirectHtml ? 2048 : 1024
-					});
-					const rawContent = typeof result === 'string' ? result : result?.response || '';
-					if (typeof rawContent === 'string' && rawContent.trim()) {
-						const totalTokens = Math.ceil((sourcePayload.length + rawContent.length) / 4);
-						await this.recordUsage(c, { model: cfModel, tokens: totalTokens, calls: 1 });
-						return buildTranslationResult(rawContent.trim(), cfModel, totalTokens);
-					}
-				} catch (e) {
-					console.warn(`Workers AI ${cfModel} translation failed:`, e.message);
-				}
-			}
-		}
-
-		// 3. Fallback: Free translation endpoints (MyMemory API & Google Translate)
-		if (Date.now() - startTime < overallDeadlineMs) {
-			const plainToTrans = isDirectHtml ? (emailUtils.htmlToText(html) || sourcePayload) : sourcePayload;
-			const sampleSnippet = plainToTrans.slice(0, 1000);
-
-			// 尝试 MyMemory 免费公共翻译 API
-			try {
-				const mmUrl = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(sampleSnippet)}&langpair=auto|${encodeURIComponent(targetLang)}`;
-				const mmRes = await fetch(mmUrl, { signal: AbortSignal.timeout(5000) });
-				if (mmRes.ok) {
-					const mmData = await mmRes.json().catch(() => null);
-					const transText = mmData?.responseData?.translatedText;
-					if (transText && typeof transText === 'string' && transText.trim()) {
-						return buildTranslationResult(transText.trim(), 'mymemory-translate', 0);
-					}
-				}
-			} catch (e) {
-				console.warn('MyMemory translation fallback failed:', e.message);
-			}
-
-			// 尝试 Google Translate API
-			try {
-				const gtUrl = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${encodeURIComponent(targetLang)}&dt=t&q=${encodeURIComponent(sampleSnippet)}`;
-				const gtRes = await fetch(gtUrl, { signal: AbortSignal.timeout(5000) });
-				if (gtRes.ok) {
-					const gtData = await gtRes.json().catch(() => null);
-					if (Array.isArray(gtData) && Array.isArray(gtData[0])) {
-						const transText = gtData[0].map(item => item[0]).filter(Boolean).join('');
-						if (transText) {
-							return buildTranslationResult(transText, 'google-translate', 0);
-						}
-					}
-				}
-			} catch (e) {
-				console.warn('Google translation fallback failed:', e.message);
-			}
-		}
-
-		return buildTranslationResult(isDirectHtml ? html : sourcePayload, 'original', 0);
+		return {
+			translatedText: emailUtils.htmlToText(html),
+			translatedHtml: html,
+			isHtml: true,
+			model: 'original',
+			tokens: 0
+		};
 	},
 
 	/**
