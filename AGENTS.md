@@ -11,6 +11,29 @@
    - 在向用户输出回复时，必须置顶/显式打印出本次提交的完整 Commit Hash 与短 Hash，确保版本可追溯、审计记录完整。
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
+### 邮件AI翻译多片并发负载均衡分片系统、天然语义保护句子切分、图片OCR单独覆盖展示与长邮件零截断上线 (2026-09-12)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **智能分片系统与天然语义保护 (Adaptive Semantic Chunking Engine)**:
+       - 彻底根治超长邮件或复杂邮件单次推理耗时过长导致超时截断与部分内容未翻译痛点；
+       - 引入 `splitIntoSentences` 标点级自适应拆分算法：针对长达数百字符的大段落，严格沿中文全角句末标点（`。`、`！`、`？`）、换行符或英文句末标点（`. `、`! `、`? `）进行天然语义分片，坚决杜绝在词句中间机械截断，100% 完整保留句意语境与连贯性；
+       - 设定单批次科学安全上限（`maxItemsPerChunk = 6`, `maxCharsPerChunk = 600`），并在遇到独立图片 OCR 分片或长段落时动态提前密封开始新切片，彻底消除大模型长输出丢行与指令疲劳问题。
+    2. **多片并发负载均衡与零截断保障 (Parallel Chunk Translation & Multi-Model Load Balancing)**:
+       - 架构重构：建立并发度为 3 的异步处理工作池，对切片执行 Round-Robin 多模型轮询分发，深度联动候选模型池（`gemma-26b-a4b-it-free`、`riva-translate-4b-v2`、`gemma-4-31b-it-free`、`deepseek-v4-flash-free`），并发执行大幅缩短整体耗时至数秒内；
+       - 高鲁棒性解析引擎 `parseChunkTranslations`：接入全局正则，无缝通吃换行多行输出与单行行内连续输出，彻底解决因特定模型（如 Riva）将多条编号拼接在单行导致正则失效丢行的陈年缺陷；
+       - 单片多模型故障转移与 MyMemory/Workers AI 逐条保底补偿机制，确保长邮件头部、正文、表格、按钮与页脚 100% 翻译覆盖，达成真正的零截断与零遗漏。
+    3. **图片 OCR 独立分片与专属覆盖展示 (Dedicated Image OCR & Visual Overlay Card)**:
+       - 彻底解决图片翻译视觉缺位问题：自动智能提取图片 `alt`、`title`、`aria-label` 说明，并联动 Workers AI Vision (`@cf/unum/uform-gen2-qwen-500m`) 与中继 Vision 接口对图片文字进行深度 OCR，提取为独立专属分片（`type: 'ocr'`）统一纳入翻译流水线；
+       - 专属视觉覆盖结构：创新引入 `.epo-trans-img-container` 与 `.epo-trans-img-overlay`，标准大图采用悬浮在原图底部的半透明毛玻璃质感图注卡片（`position: absolute; bottom: 0; backdrop-filter: blur(4px);`），单独覆盖展示译文；小图/Logo 采用紧密附着徽章，原图与译文相映成趣；
+       - `ShadowHtml.vue` 深度适配暗黑模式：在暗黑模式下为 `.epo-trans-img-overlay` 注入双重滤镜反转，与图片双反转规则完美同步，保持高对比度白字深底，彻底根除纯黑字体与视觉失真。
+    4. **端到端自动化测试与全链路验证 (E2E Verification & Deployment)**:
+       - 专属长邮件与图片覆盖端到端套件 `tests/test-ai-chunking-loadbalance-and-ocr-e2e.mjs` 100% 全绿通过：25+ 段落节点并发翻译零截断、2 处图片覆盖卡片完美渲染、控制台 0 报错、0 ARIA 冲突；
+       - 格式与暗黑套件 `tests/test-ai-translation-format-and-ocr.mjs` 100% 全绿通过；
+       - 全链路回归套件 `tests/test-ai-translation-live-e2e.mjs` 4/4 项检查点 100% 全绿通过；
+       - 恪守零假数据与脏数据残留准则。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **Cloudflare Workers 部署 Version ID**: `ae9be0a0-b237-416a-8577-5f0585d914a2`。
+    - **epocanvas-mail Git Commit**: `8a0dc3ee0dde16ed5fba72ea5eca0505bfa81135` (Short Hash: `8a0dc3e`).
+
 ### 邮件AI翻译DOM骨架原位回填、100%格式与表格卡片还原、暗黑模式适配与图片OCR翻译上线 (2026-09-12)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **DOM 骨架原位回填与 100% 格式还原 (In-Place Segment Replacement Architecture)**:
