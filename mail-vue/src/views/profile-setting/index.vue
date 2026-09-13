@@ -442,6 +442,38 @@
           </el-select>
         </div>
       </div>
+
+      <!-- 翻译目标语言 (Default Translation Target Language) -->
+      <div class="item" id="translate-lang-section">
+        <div>
+          <div>{{ $t('defaultTranslateLang') || '翻译目标语言' }}</div>
+          <div class="sub-hint">{{ $t('defaultTranslateLangDesc') || '配置阅读邮件时的默认翻译目标语言' }}</div>
+        </div>
+        <div>
+          <el-select
+            v-model="uiStore.defaultTranslateLang"
+            class="language-select"
+            placeholder="Select"
+            style="width: 180px;"
+          >
+            <el-option label="中文 (简体)" value="zh" />
+            <el-option label="正體中文 (繁體)" value="zh-Hant" />
+            <el-option label="English" value="en" />
+            <el-option label="日本語" value="ja" />
+            <el-option label="한국어" value="ko" />
+            <el-option label="Français" value="fr" />
+            <el-option label="Deutsch" value="de" />
+            <el-option label="Español" value="es" />
+            <el-option label="Русский" value="ru" />
+            <el-option label="Português" value="pt" />
+            <el-option label="Italiano" value="it" />
+            <el-option label="العربية" value="ar" />
+            <el-option label="ไทย" value="th" />
+            <el-option label="Tiếng Việt" value="vi" />
+            <el-option label="Bahasa Indonesia" value="id" />
+          </el-select>
+        </div>
+      </div>
     </div>
 
     <!-- Section 4: 数据隐私 (Data Privacy) -->

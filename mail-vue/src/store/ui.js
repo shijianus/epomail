@@ -81,7 +81,8 @@ export const useUiStore = defineStore('ui', {
         readingPane: 'no_split', // 'no_split' | 'right' | 'below'
         conversationView: true,
         themeWallpaper: 'none', // preset id or 'none' or image url
-        themeWallpaperOpacity: 85
+        themeWallpaperOpacity: 85,
+        defaultTranslateLang: 'zh' // 默认翻译目标语言
     }),
     getters: {
         // 向后兼容：其他地方读取 customLabels / defaultLabels 时转发到 allLabels
@@ -318,7 +319,8 @@ export const useUiStore = defineStore('ui', {
             'readingPane',
             'conversationView',
             'themeWallpaper',
-            'themeWallpaperOpacity'
+            'themeWallpaperOpacity',
+            'defaultTranslateLang'
         ],
     },
 })

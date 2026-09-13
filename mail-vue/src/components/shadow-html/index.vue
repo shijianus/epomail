@@ -76,9 +76,29 @@ function updateContent() {
         ${bodyStyle ? bodyStyle : ''} /* 注入 body 的 style */
       }
 
-      img, video, svg, .epo-trans-img-overlay {
+      img, video, svg, .epo-trans-img-overlay, .epo-trans-img-mask {
         ${uiStore.dark ? 'filter: invert(1) hue-rotate(180deg);' : ''}
         max-width: 100%;
+      }
+
+      .epo-trans-img-wrap, .epo-trans-img-container {
+        position: relative;
+        display: inline-block;
+        max-width: 100%;
+        vertical-align: top;
+      }
+
+      .epo-trans-img-mask, .epo-trans-img-overlay {
+        cursor: pointer;
+        pointer-events: auto;
+        transition: opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+
+      .epo-trans-img-wrap:hover .epo-trans-img-mask,
+      .epo-trans-img-container:hover .epo-trans-img-overlay,
+      .epo-trans-img-mask:hover,
+      .epo-trans-img-overlay:hover {
+        opacity: 0.18 !important;
       }
 
     </style>

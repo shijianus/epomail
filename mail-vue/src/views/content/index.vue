@@ -394,8 +394,9 @@
                   <div class="gtb-left">
                     <Icon icon="fluent:translate-20-regular" width="16" height="16" class="gtb-icon" />
                     <span class="gtb-title">{{ $t('translateTo') || '翻译为:' }}</span>
-                    <el-select v-model="targetLangMap[msg.emailId]" size="small" class="gtb-select" @change="handleTranslate(msg)">
+                    <el-select v-model="targetLangMap[msg.emailId]" size="small" class="gtb-select" style="width: 135px;" @change="handleTranslate(msg)">
                       <el-option label="中文 (简体)" value="zh" />
+                      <el-option label="正體中文 (繁體)" value="zh-Hant" />
                       <el-option label="English" value="en" />
                       <el-option label="日本語" value="ja" />
                       <el-option label="한국어" value="ko" />
@@ -403,6 +404,12 @@
                       <el-option label="Deutsch" value="de" />
                       <el-option label="Español" value="es" />
                       <el-option label="Русский" value="ru" />
+                      <el-option label="Português" value="pt" />
+                      <el-option label="Italiano" value="it" />
+                      <el-option label="العربية" value="ar" />
+                      <el-option label="ไทย" value="th" />
+                      <el-option label="Tiếng Việt" value="vi" />
+                      <el-option label="Bahasa Indonesia" value="id" />
                     </el-select>
                     <el-button size="small" type="primary" link :loading="translatingMap[msg.emailId]" @click="handleTranslate(msg)">
                       {{ isTranslatedMap[msg.emailId] ? ($t('reTranslate') || '重新翻译') : ($t('translateMessage') || '立即翻译') }}
@@ -1253,13 +1260,86 @@ const displayedText = (msg) => {
   return msg.text;
 };
 
+const detectSourceLanguage = (content) => {
+  if (!content) return 'en';
+  const clean = content.replace(/<[^>]*>/g, ' ').replace(/https?:\/\/\S+/g, ' ');
+
+  const chineseChars = (clean.match(/[\u4e00-\u9fa5]/g) || []).length;
+  const japaneseKana = (clean.match(/[\u3040-\u30ff]/g) || []).length;
+  const koreanHangul = (clean.match(/[\uac00-\ud7af]/g) || []).length;
+  const cyrillicChars = (clean.match(/[\u0400-\u04ff]/g) || []).length;
+  const arabicChars = (clean.match(/[\u0600-\u06ff]/g) || []).length;
+  const thaiChars = (clean.match(/[\u0e00-\u0e7f]/g) || []).length;
+
+  if (japaneseKana >= 2) return 'ja';
+  if (koreanHangul >= 2) return 'ko';
+  if (cyrillicChars >= 3) return 'ru';
+  if (arabicChars >= 3) return 'ar';
+  if (thaiChars >= 3) return 'th';
+
+  if (chineseChars >= 2) {
+    const tradMatches = (clean.match(/[體點為國實學發電網麼這門說時後話開關與這裏讓當從會對應]/g) || []).length;
+    const simpMatches = (clean.match(/[体点为国实学发电网么这门说时后话开关与这里让当从会对应]/g) || []).length;
+    if (tradMatches > simpMatches && tradMatches >= 1) {
+      return 'zh-Hant';
+    }
+    return 'zh';
+  }
+
+  const lower = clean.toLowerCase();
+  const frCount = (lower.match(/\b(le|la|les|un|une|des|du|de|pour|avec|dans|sur|est|sont|cette|vous|nous|bonjour|merci)\b/g) || []).length;
+  const deCount = (lower.match(/\b(der|die|das|und|in|den|von|zu|mit|sich|des|auf|für|ist|nicht|hallo|danke)\b/g) || []).length;
+  const esCount = (lower.match(/\b(el|la|los|las|un|una|de|en|y|a|por|para|con|no|es|son|hola|gracias)\b/g) || []).length;
+
+  if (frCount >= 3 && frCount > deCount && frCount > esCount) return 'fr';
+  if (deCount >= 3 && deCount > frCount && deCount > esCount) return 'de';
+  if (esCount >= 3 && esCount > frCount && esCount > deCount) return 'es';
+
+  return 'en';
+};
+
+const isSameLanguage = (langA, langB) => {
+  if (!langA || !langB) return false;
+  if (langA === langB) return true;
+  if (langA === 'zh' && (langB === 'zh-Hans' || langB === 'zh-CN')) return true;
+  if (langA === 'zh-Hant' && (langB === 'zh-TW' || langB === 'zh-HK')) return true;
+  return false;
+};
+
+const getAlternateTargetLanguage = (srcLang, preferredLang) => {
+  if (srcLang === 'zh' || srcLang === 'zh-Hant') {
+    return 'en';
+  }
+  if (srcLang === 'en') {
+    return preferredLang && preferredLang !== 'en' ? preferredLang : 'fr';
+  }
+  return preferredLang && !isSameLanguage(srcLang, preferredLang) ? preferredLang : 'en';
+};
+
 const toggleTranslateBar = (msg) => {
   const target = msg || email;
   if (!target) return;
   const id = target.emailId;
   showTranslateMap[id] = !showTranslateMap[id];
+
   if (showTranslateMap[id]) {
-    if (!targetLangMap[id]) targetLangMap[id] = 'zh';
+    const userDefault = uiStore.defaultTranslateLang || 'zh';
+    const rawContent = target.text || target.content || '';
+    const srcLang = detectSourceLanguage(rawContent);
+
+    // 检查源语言与默认目标语言是否相同
+    const isSameLang = isSameLanguage(srcLang, userDefault);
+
+    if (isSameLang) {
+      // 原文已是默认目标语言：呼出翻译工具条而不会自动执行翻译，并提供合理的替代目标语言
+      const altLang = getAlternateTargetLanguage(srcLang, userDefault);
+      targetLangMap[id] = altLang;
+      ElMessage.closeAll();
+      ElMessage.info(t('alreadyInTargetLang') || '原文已是您的首选语言，已呼出翻译工具条');
+      return;
+    }
+
+    targetLangMap[id] = userDefault;
     if (!isTranslatedMap[id]) {
       handleTranslate(target);
     }
@@ -1272,7 +1352,20 @@ const handleTranslate = (msg) => {
   const id = target.emailId;
   if (translatingMap[id]) return; // 防并发重复点击锁
 
-  const lang = targetLangMap[id] || 'zh';
+  const rawContent = target.text || target.content || '';
+  const srcLang = detectSourceLanguage(rawContent);
+  let lang = targetLangMap[id] || uiStore.defaultTranslateLang || 'zh';
+
+  // 严格禁止针对源语言翻译为原语言 (杜绝中文翻译为中文等无效调用)
+  if (isSameLanguage(srcLang, lang)) {
+    const altLang = getAlternateTargetLanguage(srcLang, uiStore.defaultTranslateLang);
+    targetLangMap[id] = altLang;
+    ElMessage.closeAll();
+    ElMessage.warning(t('sameLangNotice') || '原文已是该语言，已为您切换目标语言，请点击立即翻译');
+    showTranslateMap[id] = true;
+    return;
+  }
+
   translatingMap[id] = true;
   showTranslateMap[id] = true;
 
