@@ -76,7 +76,7 @@ function updateContent() {
         ${bodyStyle ? bodyStyle : ''} /* 注入 body 的 style */
       }
 
-      img, video, svg {
+      img, video, svg, .epo-trans-img-overlay {
         ${uiStore.dark ? 'filter: invert(1) hue-rotate(180deg);' : ''}
         max-width: 100%;
       }
