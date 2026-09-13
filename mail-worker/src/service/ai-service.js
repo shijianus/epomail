@@ -107,6 +107,7 @@ const aiService = {
 	async translate(c, options = {}) {
 		const { text, html, targetLang = 'zh' } = options;
 		const isHtml = Boolean(html && /<[a-z][\s\S]*>/i.test(html));
+		let isDirectHtml = false;
 		let sourcePayload = '';
 		const dataUriPlaceholders = [];
 		const stylePlaceholders = [];
@@ -125,14 +126,23 @@ const aiService = {
 				dataUriPlaceholders.push({ id, match });
 				return id;
 			});
-			// 长度保护（保留前 24000 字符）
-			sourcePayload = workingHtml.slice(0, 24000);
+
+			if (workingHtml.length <= 1500) {
+				isDirectHtml = true;
+				sourcePayload = workingHtml;
+			} else {
+				// 复杂/超大型邮件包含成千上万行嵌套样式与表格，整包生成 HTML 极度缓慢并容易引发超时与 503 报错
+				// 提取纯净自然正文，快速精准翻译并嵌入高颜值自适应替换容器，实现可靠嵌入替换
+				isDirectHtml = false;
+				const extractedText = emailUtils.htmlToText(workingHtml || html) || emailUtils.formatText(text || '');
+				sourcePayload = extractedText.slice(0, 2500);
+			}
 		} else {
 			let sourceText = text || '';
 			if (!sourceText && html) {
 				sourceText = emailUtils.htmlToText(html);
 			}
-			sourcePayload = emailUtils.formatText(sourceText || '').trim().slice(0, 4000);
+			sourcePayload = emailUtils.formatText(sourceText || '').trim().slice(0, 2500);
 		}
 
 		if (!sourcePayload) {
@@ -155,7 +165,7 @@ const aiService = {
 		const apiKey = (settingRow?.aiApiKey || c.env?.AI_API_KEY || '').trim();
 		const apiUrl = (settingRow?.aiApiUrl || c.env?.AI_API_URL || 'https://api.openai.com/v1').trim();
 		let model = (options.model || settingRow?.aiModel || c.env?.ai_model || 'gpt-4o-mini').trim();
-		const maxTokens = Number(settingRow?.aiMaxTokens) || (isHtml ? 4096 : 2048);
+		const maxTokens = Number(settingRow?.aiMaxTokens) || (isDirectHtml ? 2048 : 1024);
 
 		// 角色权限模型分级校验 (Role Model Permission Hierarchy)
 		try {
@@ -230,13 +240,19 @@ const aiService = {
 
 		const buildTranslationResult = (content, modelName, tokenCount = 0) => {
 			const cleaned = extractCleanContent(content);
-			const restored = isHtml ? restorePlaceholders(cleaned) : cleaned;
+			const restored = isDirectHtml ? restorePlaceholders(cleaned) : cleaned;
 			const hasHtmlTags = Boolean(restored && /<[a-z][\s\S]*>/i.test(restored));
 
 			const transText = hasHtmlTags ? emailUtils.htmlToText(restored) : restored;
-			const transHtml = hasHtmlTags
-				? restored
+			const paragraphs = (transText || '')
+				.split(/\n{2,}/)
+				.map(p => p.trim())
+				.filter(Boolean)
+				.map(p => `<p style="margin: 0.6em 0;">${p.replace(/\n/g, '<br/>')}</p>`);
+			const embeddedHtml = paragraphs.length > 0
+				? `<div class="translated-embed-body" style="font-family: inherit; line-height: 1.7; word-break: break-word;">${paragraphs.join('')}</div>`
 				: `<div class="translated-embed-body" style="font-family: inherit; line-height: 1.7; white-space: pre-wrap; word-break: break-word;">${transText}</div>`;
+			const transHtml = hasHtmlTags ? restored : embeddedHtml;
 
 			return {
 				translatedText: transText,
@@ -247,7 +263,7 @@ const aiService = {
 			};
 		};
 
-		const systemPrompt = isHtml
+		const systemPrompt = isDirectHtml
 			? `You are an automated HTML email translation engine.
 Translate all human-readable visible text inside the HTML document into ${targetLangName}.
 STRICT RULES:
@@ -263,20 +279,39 @@ STRICT RULES:
 1. Maintain original paragraph breaks, layout, and formatting cleanly.
 2. Directly output ONLY the translated text without commentary, thinking steps, conversational preambles, or markdown code fences.`;
 
+		const startTime = Date.now();
+		const overallDeadlineMs = 60000; // 宽裕的 60s 总体超时保护（前端配置了 90s 超时）
+
 		// 1. If custom API key configured, use OpenAI-compatible or Anthropic API with candidate model and endpoint resolution
 		if (apiKey) {
 			try {
 				const chatEndpoints = this.getCandidateChatEndpoints(apiUrl);
-				const poolModels = (settingRow?.aiModelsPool || '').split(',').map(m => m.trim()).filter(Boolean);
+				const poolModels = (settingRow?.aiModels || settingRow?.aiModelsPool || '').split(',').map(m => m.trim()).filter(Boolean);
 				const candidateModels = Array.from(new Set([model, ...poolModels].filter(Boolean)));
+				if (apiUrl && apiUrl.includes('121628.xyz')) {
+					for (const m of ['gemma-26b-a4b-it-free', 'gemma-4-31b-it-free', 'riva-translate-4b-v2', 'riva-translate-4b-v1.1']) {
+						if (!candidateModels.includes(m)) candidateModels.push(m);
+					}
+				}
 				if (candidateModels.length === 0) candidateModels.push('gpt-4o-mini');
 
+				let preferredEndpoint = null;
+
 				for (const currentModel of candidateModels) {
+					if (Date.now() - startTime > overallDeadlineMs) {
+						console.warn('AI translation deadline reached, skipping remaining models');
+						break;
+					}
 					let resp = null;
 					let lastError = null;
 
-					for (const endpoint of chatEndpoints) {
+					const endpointsToTry = preferredEndpoint ? [preferredEndpoint] : chatEndpoints;
+
+					for (const endpoint of endpointsToTry) {
+						if (Date.now() - startTime > overallDeadlineMs) break;
 						try {
+							const remainingMs = Math.max(1000, overallDeadlineMs - (Date.now() - startTime));
+							const callTimeout = Math.min(10000, remainingMs); // 单次模型调用最多 10s，超时立即向下一个模型故障转移
 							const isAnthropic = endpoint.includes('/messages');
 							const body = isAnthropic
 								? {
@@ -306,23 +341,32 @@ STRICT RULES:
 									'User-Agent': 'EpocanvasMail/3.0'
 								},
 								body: JSON.stringify(body),
-								signal: AbortSignal.timeout(12000)
+								signal: AbortSignal.timeout(callTimeout)
 							});
 
 							if (candidateResp.ok) {
+								preferredEndpoint = endpoint;
 								resp = candidateResp;
 								break;
 							} else {
 								lastError = new Error(`HTTP ${candidateResp.status} on ${endpoint}`);
+								// 若返回非 404（如 410 Gone / 400 / 429 / 500），说明该端点确实存在，锁定端点并跳出尝试下一个模型
+								if (candidateResp.status !== 404) {
+									preferredEndpoint = endpoint;
+									break;
+								}
 							}
 						} catch (err) {
 							lastError = err;
+							// 超时或连接异常，直接跳出换下一个模型
+							break;
 						}
 					}
 
 					if (resp && resp.ok) {
 						const data = await resp.json().catch(() => null);
 						const rawContent = data?.choices?.[0]?.message?.content
+							|| data?.choices?.[0]?.message?.reasoning_content
 							|| data?.content?.[0]?.text
 							|| '';
 						if (typeof rawContent === 'string' && rawContent.trim()) {
@@ -340,23 +384,25 @@ STRICT RULES:
 		}
 
 		// 2. Fallback to Cloudflare Workers AI
-		if (c.env?.ai) {
+		if (c.env?.ai && (Date.now() - startTime < overallDeadlineMs)) {
 			const cfModels = [
 				c.env.ai_model,
-				'@cf/meta/llama-3.3-70b-instruct',
 				'@cf/meta/llama-3.1-8b-instruct',
-				'@cf/qwen/qwen2.5-7b-instruct'
+				'@cf/qwen/qwen1.5-7b-chat',
+				'@cf/meta/llama-3-8b-instruct'
 			].filter(Boolean);
 
 			for (const cfModel of cfModels) {
+				if (Date.now() - startTime > overallDeadlineMs) break;
 				try {
+					const remainingMs = Math.max(1000, overallDeadlineMs - (Date.now() - startTime));
 					const result = await c.env.ai.run(cfModel, {
 						messages: [
 							{ role: 'system', content: systemPrompt },
 							{ role: 'user', content: sourcePayload }
 						],
 						temperature: 0.1,
-						max_tokens: isHtml ? 4096 : 2048
+						max_tokens: isDirectHtml ? 2048 : 1024
 					});
 					const rawContent = typeof result === 'string' ? result : result?.response || '';
 					if (typeof rawContent === 'string' && rawContent.trim()) {
@@ -370,25 +416,45 @@ STRICT RULES:
 			}
 		}
 
-		// 3. Fallback: Free translation endpoint (Google Translate API)
-		try {
-			const plainToTrans = isHtml ? (emailUtils.htmlToText(html) || sourcePayload) : sourcePayload;
-			const gtUrl = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${encodeURIComponent(targetLang)}&dt=t&q=${encodeURIComponent(plainToTrans.slice(0, 3000))}`;
-			const gtRes = await fetch(gtUrl, { signal: AbortSignal.timeout(6000) });
-			if (gtRes.ok) {
-				const gtData = await gtRes.json();
-				if (Array.isArray(gtData) && Array.isArray(gtData[0])) {
-					const transText = gtData[0].map(item => item[0]).filter(Boolean).join('');
-					if (transText) {
-						return buildTranslationResult(transText, 'google-translate', 0);
+		// 3. Fallback: Free translation endpoints (MyMemory API & Google Translate)
+		if (Date.now() - startTime < overallDeadlineMs) {
+			const plainToTrans = isDirectHtml ? (emailUtils.htmlToText(html) || sourcePayload) : sourcePayload;
+			const sampleSnippet = plainToTrans.slice(0, 1000);
+
+			// 尝试 MyMemory 免费公共翻译 API
+			try {
+				const mmUrl = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(sampleSnippet)}&langpair=auto|${encodeURIComponent(targetLang)}`;
+				const mmRes = await fetch(mmUrl, { signal: AbortSignal.timeout(5000) });
+				if (mmRes.ok) {
+					const mmData = await mmRes.json().catch(() => null);
+					const transText = mmData?.responseData?.translatedText;
+					if (transText && typeof transText === 'string' && transText.trim()) {
+						return buildTranslationResult(transText.trim(), 'mymemory-translate', 0);
 					}
 				}
+			} catch (e) {
+				console.warn('MyMemory translation fallback failed:', e.message);
 			}
-		} catch (e) {
-			console.error('Public translation fallback failed:', e);
+
+			// 尝试 Google Translate API
+			try {
+				const gtUrl = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${encodeURIComponent(targetLang)}&dt=t&q=${encodeURIComponent(sampleSnippet)}`;
+				const gtRes = await fetch(gtUrl, { signal: AbortSignal.timeout(5000) });
+				if (gtRes.ok) {
+					const gtData = await gtRes.json().catch(() => null);
+					if (Array.isArray(gtData) && Array.isArray(gtData[0])) {
+						const transText = gtData[0].map(item => item[0]).filter(Boolean).join('');
+						if (transText) {
+							return buildTranslationResult(transText, 'google-translate', 0);
+						}
+					}
+				}
+			} catch (e) {
+				console.warn('Google translation fallback failed:', e.message);
+			}
 		}
 
-		return buildTranslationResult(isHtml ? html : sourcePayload, 'original', 0);
+		return buildTranslationResult(isDirectHtml ? html : sourcePayload, 'original', 0);
 	},
 
 	/**
@@ -409,20 +475,17 @@ STRICT RULES:
 		if (raw.endsWith('/v1')) {
 			return [
 				`${raw}/chat/completions`,
-				`${raw}/messages`,
-				raw
+				`${raw}/messages`
 			];
 		}
 		// 3. 用户输入根站点或无 /v1 路径，依次尝试：
 		//    a. 标准 /v1/chat/completions (OpenAI / DeepSeek / 绝大多数中继商)
 		//    b. 根路径 /chat/completions (如 Ollama, CF AI Gateway 等)
 		//    c. Anthropic /v1/messages (Claude 原生协议)
-		//    d. 用户输入的原始 URL 完整回退 (最终保底)
 		return [
 			`${raw}/v1/chat/completions`,
 			`${raw}/chat/completions`,
-			`${raw}/v1/messages`,
-			raw
+			`${raw}/v1/messages`
 		];
 	},
 

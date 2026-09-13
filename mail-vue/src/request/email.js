@@ -33,7 +33,7 @@ export function emailSetLabels(emailId, labels) {
 }
 
 export function emailTranslate(params) {
-    return http.post('/email/translate', params, { timeout: 90 * 1000 })
+    return http.post('/email/translate', params, { noMsg: true, timeout: 90 * 1000 })
 }
 
 export function emailLatest(emailId, accountId, allReceive) {

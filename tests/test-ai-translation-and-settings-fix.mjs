@@ -61,7 +61,8 @@ import assert from "assert";
       headers: {
         Authorization: token,
         "Content-Type": "application/json"
-      }
+      },
+      timeout: 60000
     });
     const transData = await transRes.json();
     console.log("  翻译接口响应状态与字段:", {

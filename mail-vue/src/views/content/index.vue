@@ -3,19 +3,29 @@
     <div class="header-actions">
       <div class="header-actions-left">
         <el-tooltip :content="$t('back') || 'Back'" placement="bottom">
-          <Icon class="icon btn-back" icon="material-symbols-light:arrow-back-ios-new" width="20" height="20" @click="handleBack"/>
+          <span class="action-icon-wrap" role="button" tabindex="0" @click="handleBack">
+            <Icon class="icon btn-back" icon="material-symbols-light:arrow-back-ios-new" width="20" height="20"/>
+          </span>
         </el-tooltip>
         <el-tooltip :content="$t('archive') || '归档'" placement="bottom" v-if="emailStore.contentData.delType !== 'physics'">
-          <Icon class="icon btn-archive" icon="fluent:archive-20-regular" width="20" height="20" @click="handleArchive"/>
+          <span class="action-icon-wrap" role="button" tabindex="0" @click="handleArchive">
+            <Icon class="icon btn-archive" icon="fluent:archive-20-regular" width="20" height="20"/>
+          </span>
         </el-tooltip>
         <el-tooltip :content="$t('reportSpam') || '举报为垃圾邮件'" placement="bottom" v-if="emailStore.contentData.delType !== 'physics'">
-          <Icon class="icon btn-spam" icon="fluent:shield-dismiss-20-regular" width="20" height="20" @click="handleReportSpam"/>
+          <span class="action-icon-wrap" role="button" tabindex="0" @click="handleReportSpam">
+            <Icon class="icon btn-spam" icon="fluent:shield-dismiss-20-regular" width="20" height="20"/>
+          </span>
         </el-tooltip>
         <el-tooltip :content="$t('delete') || 'Delete'" placement="bottom" v-if="hasPerm('email:delete')">
-          <Icon class="icon btn-delete" icon="fluent:delete-20-regular" width="20" height="20" @click="handleDelete"/>
+          <span class="action-icon-wrap" role="button" tabindex="0" @click="handleDelete">
+            <Icon class="icon btn-delete" icon="fluent:delete-20-regular" width="20" height="20"/>
+          </span>
         </el-tooltip>
         <el-tooltip :content="email.unread === 0 ? ($t('markUnread') || '标记为未读') : ($t('markRead') || '标记为已读')" placement="bottom">
-          <Icon class="icon btn-unread" :icon="email.unread === 0 ? 'fluent:mail-unread-20-regular' : 'fluent:mail-read-20-regular'" width="20" height="20" @click="handleToggleRead"/>
+          <span class="action-icon-wrap" role="button" tabindex="0" @click="handleToggleRead">
+            <Icon class="icon btn-unread" :icon="email.unread === 0 ? 'fluent:mail-unread-20-regular' : 'fluent:mail-read-20-regular'" width="20" height="20"/>
+          </span>
         </el-tooltip>
         
         <!-- Snooze Popover -->
@@ -53,7 +63,9 @@
 
         <!-- Add to tasks -->
         <el-tooltip :content="$t('addToTasks') || '添加到任务'" placement="bottom">
-          <Icon class="icon btn-task" icon="fluent:task-list-add-20-regular" width="20" height="20" @click="handleAddToTasks"/>
+          <span class="action-icon-wrap btn-task" role="button" tabindex="0" @click="handleAddToTasks">
+            <Icon class="icon" icon="fluent:task-list-add-20-regular" width="20" height="20" />
+          </span>
         </el-tooltip>
 
         <!-- Move to Popover -->
@@ -104,7 +116,9 @@
 
         <!-- Translate message -->
         <el-tooltip :content="$t('translateMessage') || '翻译邮件'" placement="bottom">
-          <Icon class="icon btn-translate" icon="fluent:translate-20-regular" width="20" height="20" @click="toggleTranslateBar(threadMessages[threadMessages.length - 1] || email)"/>
+          <span class="action-icon-wrap btn-translate-wrap" role="button" tabindex="0" @click="toggleTranslateBar(threadMessages[threadMessages.length - 1] || email)">
+            <Icon class="icon btn-translate" icon="fluent:translate-20-regular" width="20" height="20" />
+          </span>
         </el-tooltip>
 
         <!-- More options -->
@@ -137,13 +151,19 @@
 
       <div class="header-actions-right">
         <el-tooltip :content="isAllExpanded ? ($t('collapseAll') || '全部折叠') : ($t('expandAll') || '全部展开')" placement="bottom" v-if="threadMessages.length > 1">
-          <Icon class="icon btn-expand-all" :icon="isAllExpanded ? 'fluent:arrow-collapse-all-20-regular' : 'fluent:arrow-expand-all-20-regular'" width="20" height="20" @click="toggleExpandAll" />
+          <span class="action-icon-wrap" role="button" tabindex="0" @click="toggleExpandAll">
+            <Icon class="icon btn-expand-all" :icon="isAllExpanded ? 'fluent:arrow-collapse-all-20-regular' : 'fluent:arrow-expand-all-20-regular'" width="20" height="20" />
+          </span>
         </el-tooltip>
         <el-tooltip :content="$t('printAll') || '全部打印'" placement="bottom">
-          <Icon class="icon btn-print-all" icon="fluent:print-20-regular" width="20" height="20" @click="handlePrintAll" />
+          <span class="action-icon-wrap" role="button" tabindex="0" @click="handlePrintAll">
+            <Icon class="icon btn-print-all" icon="fluent:print-20-regular" width="20" height="20" />
+          </span>
         </el-tooltip>
         <el-tooltip :content="$t('inNewWindow') || '在新窗口中打开'" placement="bottom">
-          <Icon class="icon btn-new-window" icon="fluent:open-20-regular" width="19" height="19" @click="handleOpenInNewWindow" />
+          <span class="action-icon-wrap" role="button" tabindex="0" @click="handleOpenInNewWindow">
+            <Icon class="icon btn-new-window" icon="fluent:open-20-regular" width="19" height="19" />
+          </span>
         </el-tooltip>
       </div>
     </div>
@@ -213,28 +233,40 @@
                         <span class="date">{{ formatDetailDate(msg.createTime) }}</span>
                         <div class="msg-header-quick-actions">
                           <el-tooltip :content="$t('star') || 'Star'" placement="bottom" v-if="emailStore.contentData.showStar">
-                            <span class="msg-act-star" @click="changeStar">
+                            <span class="msg-act-star" role="button" tabindex="0" @click="changeStar">
                               <Icon class="msg-act-icon btn-star" v-if="email.isStar" icon="fluent-color:star-16" width="18" height="18"/>
                               <Icon class="msg-act-icon btn-star" v-else icon="solar:star-line-duotone" width="17" height="17"/>
                             </span>
                           </el-tooltip>
                           <el-tooltip :content="$t('translateMessage') || '翻译邮件'" placement="bottom">
-                            <Icon class="msg-act-icon btn-translate" icon="fluent:translate-20-regular" width="17" height="17" @click="toggleTranslateBar(msg)"/>
+                            <span class="msg-act-icon btn-translate" role="button" tabindex="0" @click="toggleTranslateBar(msg)">
+                              <Icon icon="fluent:translate-20-regular" width="17" height="17"/>
+                            </span>
                           </el-tooltip>
                           <el-tooltip :content="$t('reply') || '回复'" placement="bottom" v-if="emailStore.contentData.showReply && hasPerm('email:send')">
-                            <Icon class="msg-act-icon btn-reply" icon="la:reply" width="18" height="18" @click="openReplyMsg(msg)"/>
+                            <span class="msg-act-icon btn-reply" role="button" tabindex="0" @click="openReplyMsg(msg)">
+                              <Icon icon="la:reply" width="18" height="18"/>
+                            </span>
                           </el-tooltip>
                           <el-tooltip :content="$t('replyAll') || '回复全部'" placement="bottom" v-if="emailStore.contentData.showReply && hasPerm('email:send')">
-                            <Icon class="msg-act-icon btn-reply-all" icon="fluent:arrow-reply-all-20-regular" width="18" height="18" @click="openReplyAllMsg(msg)"/>
+                            <span class="msg-act-icon btn-reply-all" role="button" tabindex="0" @click="openReplyAllMsg(msg)">
+                              <Icon icon="fluent:arrow-reply-all-20-regular" width="18" height="18"/>
+                            </span>
                           </el-tooltip>
                           <el-tooltip :content="$t('forward') || '转发'" placement="bottom" v-if="emailStore.contentData.showReply && hasPerm('email:send')">
-                            <Icon class="msg-act-icon btn-forward" icon="iconoir:arrow-up-right" width="17" height="17" @click="openForwardMsg(msg)"/>
+                            <span class="msg-act-icon btn-forward" role="button" tabindex="0" @click="openForwardMsg(msg)">
+                              <Icon icon="iconoir:arrow-up-right" width="17" height="17"/>
+                            </span>
                           </el-tooltip>
                           <el-tooltip :content="$t('printEmail') || '打印此邮件'" placement="bottom">
-                            <Icon class="msg-act-icon btn-print" icon="fluent:print-20-regular" width="17" height="17" @click="printSingleMsg(msg)"/>
+                            <span class="msg-act-icon btn-print" role="button" tabindex="0" @click="printSingleMsg(msg)">
+                              <Icon icon="fluent:print-20-regular" width="17" height="17"/>
+                            </span>
                           </el-tooltip>
                           <el-dropdown trigger="click" @command="(cmd) => handleMsgMoreCommand(cmd, msg)">
-                            <Icon class="msg-act-icon btn-msg-more" icon="fluent:more-vertical-20-regular" width="17" height="17" />
+                            <span class="msg-act-icon btn-msg-more" role="button" tabindex="0">
+                              <Icon icon="fluent:more-vertical-20-regular" width="17" height="17" />
+                            </span>
                             <template #dropdown>
                               <el-dropdown-menu>
                                 <el-dropdown-item command="reply" v-if="emailStore.contentData.showReply && hasPerm('email:send')">
@@ -1238,6 +1270,8 @@ const handleTranslate = (msg) => {
   const target = msg || email;
   if (!target) return;
   const id = target.emailId;
+  if (translatingMap[id]) return; // 防并发重复点击锁
+
   const lang = targetLangMap[id] || 'zh';
   translatingMap[id] = true;
   showTranslateMap[id] = true;
@@ -1247,11 +1281,12 @@ const handleTranslate = (msg) => {
     html: target.content || '',
     targetLang: lang
   }).then((res) => {
+    ElMessage.closeAll(); // 确保关闭任何残留提示，一次交互最多仅展示 1 个提示
     const data = (res && res.data !== undefined) ? res.data : (res || {});
     const transText = (data.translatedText || '').trim();
     const transHtml = (data.translatedHtml || '').trim();
     if (!transText && !transHtml) {
-      ElMessage.warning('翻译结果为空，请重试或检查模型配置');
+      ElMessage.warning(t('translateEmpty') || '翻译结果为空，请重试或检查模型配置');
       return;
     }
     translatedTextMap[id] = transText;
@@ -1261,7 +1296,8 @@ const handleTranslate = (msg) => {
     ElMessage.success(t('translateSuccess') || '翻译完成');
   }).catch(err => {
     console.error('Translation error:', err);
-    ElMessage.error(err?.message || '翻译失败，请检查网络或 AI 接口配置');
+    ElMessage.closeAll(); // 确保关闭任何残留提示，一次交互最多仅展示 1 个提示
+    ElMessage.error(t('translateFailed') || '翻译失败，请稍后重试或检查模型配置');
   }).finally(() => {
     translatingMap[id] = false;
   });

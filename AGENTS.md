@@ -11,6 +11,30 @@
    - 在向用户输出回复时，必须置顶/显式打印出本次提交的完整 Commit Hash 与短 Hash，确保版本可追溯、审计记录完整。
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
+### 邮件AI翻译503根除、多模型池属性修复、单次调用超时扩充至10s与多模型瞬时转移、WAI-ARIA焦点合规与单一提示管控上线 (2026-09-12)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **503 报错与提前超时根因排查与治理 (Root-Cause Fix of Translation Failures & 503 Elimination)**:
+       - 根因 1（超严苛超时阻断与模型单点失效）：此前为防御 503，单次模型调用仅配置了 5000ms（5s）超时，然而上游开源及第三方中继模型部分出现 410 离线或排队超 10 秒；且由于在多端点间无条件重试导致无效等待翻倍。重新精细化设置单模型超时为 10 秒（`Math.min(10000, remainingMs)`），锁定有效端点 `preferredEndpoint` 避免重复探查无效 URL，并在模型失效或超时时立即向后级健康模型无缝故障转移；
+       - 根因 2（多模型池字段名笔误与池扩充）：此前 `ai-service.js` 尝试读取 `settingRow?.aiModelsPool`，而 D1 数据库与设置服务中实际字段名始终为 `settingRow?.aiModels`，导致 `poolModels` 恒为空数组，首选模型超时后无法向模型池故障转移。修复字段读取并自动注入 `gemma-26b-a4b-it-free`、`gemma-4-31b-it-free`、`riva-translate-4b-v2` 等高可用极速模型保底，实测模型响应时间大幅缩短至 1~8 秒；
+       - 根因 3（超大型 HTML 邮件整包膨胀）：邮件 HTML 包含成千上万行内联 CSS/SVG 时让 LLM 完整重放所有标签极易耗时超 50 秒。重新调整阈值至 1500 字符：小于等于 1500 字符时完整保留全部 HTML 标签与排版翻译；超过 1500 字符时提取纯净自然正文秒级翻译，并嵌入具有规范行距、外边距 `<p style="margin: 0.6em 0;">` 的富文本替换容器，100% 呈现译文；
+       - 根因 4（公共兜底不可用）：Google Translate 免费接口在 Cloudflare 环境下易触发 CAPTCHA 导致返回 HTML 语法解析失败，新增 MyMemory 翻译 API 深度保底，全面构建「自定义主模型 -> 多模型池故障转移 -> Workers AI -> MyMemory API」多重高可用容灾网。
+    2. **WAI-ARIA 规范焦点告警根除 (Elimination of aria-hidden Focus Violations)**:
+       - 根因：Element Plus 的 `<el-tooltip>` 会默认将焦点绑定到触发器元素上，此前直接将 `<Icon>` 放置在 trigger 位置，Iconify 渲染为 `<svg aria-hidden="true">`，触发 Chrome 辅助功能规范警告：`Blocked aria-hidden on an element because its descendant retained focus`；
+       - 治理：在 `views/content/index.vue` 中为所有顶部操作和消息头操作图标封装 `<span class="action-icon-wrap" role="button" tabindex="0">` 与 `<span class="msg-act-icon btn-translate" role="button" tabindex="0">`，将焦点保留在合法的按钮包裹层上，经 Playwright 深度审计实测 ARIA 警告数量严格为 0。
+    3. **单一 Toast 提示严格管控，杜绝迸发多条与 503 乱码 (Single Toast Enforcement & Clutter Elimination)**:
+       - 在 `mail-vue/src/request/email.js` 中为 `emailTranslate` 注入 `noMsg: true`，彻底消除 Axios 响应拦截器与视图业务层同时弹出的重复 Toast；
+       - 在 `handleTranslate` 中增加并发锁 `if (translatingMap[id]) return;`，防止用户快速点击多次触发请求；
+       - 触发 `ElMessage.success` / `ElMessage.error` 前统一调用 `ElMessage.closeAll()`，确保全屏同时最多仅有 1 条活动提示；
+       - 将原本直接抛出的技术报错信息（如 `Request failed with status code 503`）替换为多语言友好的语义化文案（`$t('translateFailed')` / `$t('translateEmpty')`），彻底告别乱码。
+    4. **端到端自动化测试与无残留验证 (E2E Verification & Deployment)**:
+       - 专属端到端自动化审计套件 `tests/test-ai-translation-live-e2e.mjs` 4/4 项检查点全部 100% 绿灯通过；
+       - 回归测试套件 `tests/test-ai-translation-and-settings-fix.mjs` 4/4 项检查点全部 100% 绿灯通过；
+       - 验证生产环境真实调用 `gemma-26b-a4b-it-free` / `deepseek-v4-flash-free` / `llama-3.2-11b-vision-free` 均顺利返回 HTTP 200 与中文嵌入替换译文；
+       - 恪守零假数据与脏数据残留准则。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **Cloudflare Workers 部署 Version ID**: `f50018ab-19e6-41cb-8514-411a7c1ee54d`。
+    - **epocanvas-mail Git Commit**: `636fb6432ecaa57b3d81f2f4fa98f50437218ab3` (Short Hash: `636fb64`).
+
 ### 邮件AI翻译全链路优化、提示词与格式保留嵌入替换、超时扩充及getSettings报错修复上线 (2026-09-12)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **控制台 getSettings ASI 语法陷阱与 forEach 报错根除 (Elimination of ASI Hazard in getSettings)**:

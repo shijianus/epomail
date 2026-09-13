@@ -1328,6 +1328,8 @@ const zh = {
     translateMessage: '翻译邮件',
     translating: '翻译中...',
     translateSuccess: '翻译完成',
+    translateEmpty: '翻译结果为空，请重试或检查模型配置',
+    translateFailed: '翻译失败，请稍后重试或检查模型配置',
     viewOriginal: '查看原文',
     viewTranslation: '查看翻译',
     translatedByAi: 'AI 智能提取并翻译',

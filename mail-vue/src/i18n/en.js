@@ -1336,6 +1336,8 @@ const en = {
     translateMessage: 'Translate message',
     translating: 'Translating...',
     translateSuccess: 'Translation completed',
+    translateEmpty: 'Translation result is empty, please retry or check model settings',
+    translateFailed: 'Translation failed, please retry later or check model settings',
     viewOriginal: 'View original',
     viewTranslation: 'View translation',
     translatedByAi: 'AI Translated Content',
