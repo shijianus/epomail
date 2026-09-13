@@ -35,7 +35,7 @@
        - 回归套件 `tests/test-ai-translation-and-settings-fix.mjs` 4/4 项检查点全绿。
 *   **部署上线与自动化测试 (Verification & Deployment)**:
     - **Cloudflare Workers 部署 Version ID**: `4ab34aa9-3fc5-4a94-9814-3a027a1df2d1`。
-    - **epocanvas-mail Git Commit**: `07456aa7a0f278e8d6b2ffee1e9e0c71940a9c64` (Short Hash: `07456aa`).
+    - **epocanvas-mail Git Commit**: `2288ce7f28651c173dbadc9492aba83b1115b833` (Short Hash: `2288ce7`).
 
 ### 邮件AI翻译503根除、多模型池属性修复、单次调用超时扩充至10s与多模型瞬时转移、WAI-ARIA焦点合规与单一提示管控上线 (2026-09-12)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
