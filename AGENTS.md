@@ -39,7 +39,7 @@
        - 恪守零假数据与脏数据残留准则。
 *   **部署上线与自动化测试 (Verification & Deployment)**:
     - **Cloudflare Workers 部署 Version ID**: `8dbe0407-accd-4779-b6fd-019571983cfb`。
-    - **epocanvas-mail Git Commit**: `PENDING_COMMIT_HASH` (Short Hash: `PENDING_SHORT_HASH`).
+    - **epocanvas-mail Git Commit**: `fff3da8d21b8a0a35a8af7362016c08cf2f028ab` (Short Hash: `fff3da8`).
 
 ### 邮件AI翻译目标语言配置、同语言互译拦截、图片无技术前缀纯净遮罩与繁体中文支持上线 (2026-09-12)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
