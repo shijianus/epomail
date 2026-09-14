@@ -1,3 +1,4 @@
+// Client-side multilingual welcome email templates
 export const WELCOME_TEMPLATES = {
   zh: {
     lang: 'zh',
@@ -1874,3 +1875,4 @@ export function getWelcomeTemplate(lang = 'zh') {
   }
   return WELCOME_TEMPLATES['zh'];
 }
+

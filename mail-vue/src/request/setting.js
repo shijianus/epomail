@@ -28,6 +28,14 @@ export function sendWelcomeEmail(params) {
     return http.post('/setting/sendWelcomeEmail', params)
 }
 
+export function sendGlobalEmail(params) {
+    return http.post('/setting/sendGlobalEmail', params)
+}
+
+export function getGlobalEmailConfig() {
+    return http.get('/setting/globalEmailConfig')
+}
+
 export function testS3Setting(params) {
     return http.post('/setting/s3/test', params)
 }

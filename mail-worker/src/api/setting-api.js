@@ -42,6 +42,16 @@ app.post('/setting/sendWelcomeEmail', async (c) => {
 	return c.json(result.ok(res));
 });
 
+app.post('/setting/sendGlobalEmail', async (c) => {
+	const res = await settingService.sendGlobalBroadcastEmail(c, await c.req.json());
+	return c.json(result.ok(res));
+});
+
+app.get('/setting/globalEmailConfig', async (c) => {
+	const res = await settingService.getGlobalEmailConfig(c);
+	return c.json(result.ok(res));
+});
+
 app.post('/setting/s3/test', async (c) => {
 	const body = await c.req.json();
 	const testResult = await s3Service.testConnection(body);

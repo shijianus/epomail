@@ -21,9 +21,22 @@ export async function init() {
 
     const token = localStorage.getItem('token');
     if (!settingStore.lang) {
-        let lang = navigator.language.split('-')[0]
-        lang = lang === 'zh' ? lang : 'en'
-        settingStore.lang = lang
+        const rawNav = (navigator.language || '').toLowerCase();
+        let lang = 'en';
+        if (rawNav.startsWith('zh-tw') || rawNav.startsWith('zh-hk') || rawNav.startsWith('zh-mo') || rawNav.startsWith('zh-hant')) {
+            lang = 'zh-Hant';
+        } else if (rawNav.startsWith('zh')) {
+            lang = 'zh';
+        } else if (rawNav.startsWith('fr')) {
+            lang = 'fr';
+        } else if (rawNav.startsWith('es')) {
+            lang = 'es';
+        } else if (rawNav.startsWith('nl')) {
+            lang = 'nl';
+        } else {
+            lang = 'en';
+        }
+        settingStore.lang = lang;
     }
 
     i18n.global.locale.value = settingStore.lang

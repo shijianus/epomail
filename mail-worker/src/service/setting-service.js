@@ -17,7 +17,8 @@ const settingService = {
 		try {
 			const { getUserDb } = await import('../utils/db-accessor');
 			const userDb = getUserDb(c);
-			const aiSettingCols = [
+			if (!userDb) return;
+			const settingCols = [
 				{ name: 'ai_api_key', sql: `ALTER TABLE setting ADD COLUMN ai_api_key TEXT NOT NULL DEFAULT '';` },
 				{ name: 'ai_api_url', sql: `ALTER TABLE setting ADD COLUMN ai_api_url TEXT NOT NULL DEFAULT '';` },
 				{ name: 'ai_model', sql: `ALTER TABLE setting ADD COLUMN ai_model TEXT NOT NULL DEFAULT '';` },
@@ -26,12 +27,31 @@ const settingService = {
 				{ name: 'ai_daily_quota', sql: `ALTER TABLE setting ADD COLUMN ai_daily_quota INTEGER NOT NULL DEFAULT 0;` },
 				{ name: 'ai_rate_limit_rpm', sql: `ALTER TABLE setting ADD COLUMN ai_rate_limit_rpm INTEGER NOT NULL DEFAULT 60;` },
 				{ name: 'ai_max_tokens', sql: `ALTER TABLE setting ADD COLUMN ai_max_tokens INTEGER NOT NULL DEFAULT 2048;` },
-				{ name: 'ai_admin_only', sql: `ALTER TABLE setting ADD COLUMN ai_admin_only INTEGER NOT NULL DEFAULT 0;` }
+				{ name: 'ai_admin_only', sql: `ALTER TABLE setting ADD COLUMN ai_admin_only INTEGER NOT NULL DEFAULT 0;` },
+				{ name: 'welcome_templates', sql: `ALTER TABLE setting ADD COLUMN welcome_templates TEXT NOT NULL DEFAULT '{}';` },
+				{ name: 'welcome_lang', sql: `ALTER TABLE setting ADD COLUMN welcome_lang TEXT NOT NULL DEFAULT 'zh';` },
+				{ name: 'global_email_config', sql: `ALTER TABLE setting ADD COLUMN global_email_config TEXT NOT NULL DEFAULT '{}';` }
 			];
-			for (const col of aiSettingCols) {
-				const colInfo = await userDb.prepare(`SELECT * FROM pragma_table_info('setting') WHERE name = ? LIMIT 1`).bind(col.name).first();
-				if (!colInfo) {
-					await userDb.prepare(col.sql).run();
+
+			let existingCols = new Set();
+			try {
+				const info = await userDb.prepare("PRAGMA table_info('setting')").all();
+				if (info?.results && Array.isArray(info.results)) {
+					for (const r of info.results) {
+						if (r.name) existingCols.add(r.name);
+					}
+				}
+			} catch (e) {
+				console.warn('PRAGMA table_info check failed:', e?.message);
+			}
+
+			for (const col of settingCols) {
+				if (existingCols.size === 0 || !existingCols.has(col.name)) {
+					try {
+						await userDb.prepare(col.sql).run();
+					} catch (e) {
+						// Ignore duplicate column name
+					}
 				}
 			}
 		} catch (e) {
@@ -48,6 +68,20 @@ const settingService = {
 				settingRow.authI18n = JSON.parse(settingRow.authI18n);
 			} catch (e) {
 				settingRow.authI18n = {};
+			}
+		}
+		if (typeof settingRow.welcomeTemplates === 'string') {
+			try {
+				settingRow.welcomeTemplates = JSON.parse(settingRow.welcomeTemplates);
+			} catch (e) {
+				settingRow.welcomeTemplates = {};
+			}
+		}
+		if (typeof settingRow.globalEmailConfig === 'string') {
+			try {
+				settingRow.globalEmailConfig = JSON.parse(settingRow.globalEmailConfig);
+			} catch (e) {
+				settingRow.globalEmailConfig = {};
 			}
 		}
 		c.set('setting', settingRow);
@@ -159,6 +193,19 @@ const settingService = {
 		setting.aiAdminOnly = setting.aiAdminOnly !== undefined && setting.aiAdminOnly !== null ? Number(setting.aiAdminOnly) : 0;
 		setting.aiModels = setting.aiModels || setting.aiModel || '';
 
+		if (typeof setting.welcomeTemplates === 'string') {
+			try { setting.welcomeTemplates = JSON.parse(setting.welcomeTemplates); } catch (e) { setting.welcomeTemplates = {}; }
+		} else if (!setting.welcomeTemplates) {
+			setting.welcomeTemplates = {};
+		}
+		setting.welcomeLang = setting.welcomeLang || 'zh';
+
+		if (typeof setting.globalEmailConfig === 'string') {
+			try { setting.globalEmailConfig = JSON.parse(setting.globalEmailConfig); } catch (e) { setting.globalEmailConfig = {}; }
+		} else if (!setting.globalEmailConfig) {
+			setting.globalEmailConfig = {};
+		}
+
 		setting.blogUrl = (c.env.BLOG_BASE_URL || 'https://blog.epocanvas.com').replace(/\/+$/, '');
 		setting.docsUrl = (c.env.DOCS_URL || 'https://docs.epocanvas.com/epomail').replace(/\/+$/, '');
 		setting.supportUrl = (c.env.SUPPORT_URL || 'https://blog.epocanvas.com/support').replace(/\/+$/, '');
@@ -257,6 +304,7 @@ const settingService = {
 	},
 
 	async set(c, params) {
+		await this.ensureSettingColumns(c);
 		const settingData = await this.query(c);
 		let resendTokens = { ...settingData.resendTokens, ...params.resendTokens };
 		Object.keys(resendTokens).forEach(domain => {
@@ -273,6 +321,14 @@ const settingService = {
 
 		if (params.authI18n && typeof params.authI18n === 'object') {
 			params.authI18n = JSON.stringify(params.authI18n);
+		}
+
+		if (params.welcomeTemplates && typeof params.welcomeTemplates === 'object') {
+			params.welcomeTemplates = JSON.stringify(params.welcomeTemplates);
+		}
+
+		if (params.globalEmailConfig && typeof params.globalEmailConfig === 'object') {
+			params.globalEmailConfig = JSON.stringify(params.globalEmailConfig);
 		}
 
 		if (params.allMailMode !== undefined) {
@@ -387,7 +443,7 @@ const settingService = {
 			'spamRetentionDays', 'noLandingNodes', 'noNewNodes',
 			'authI18n', 'publicProfile', 'allMailMode',
 			'welcomeSubject', 'welcomeContent', 'welcomeText', 'welcomeExpireDays',
-			'welcomeAutoSend', 'welcomeLastBroadcast',
+			'welcomeAutoSend', 'welcomeLastBroadcast', 'welcomeTemplates', 'welcomeLang', 'globalEmailConfig',
 			'userTgForward', 'userEmailForward', 'userApiSupport',
 			'userByoStorage', 'defaultStorageQuotaMb', 'storageProvider',
 			'externalDbEnabled', 'externalDbProvider', 'externalDbEndpoint',
@@ -462,9 +518,13 @@ const settingService = {
 	},
 
 	async sendWelcomeEmailToAll(c, params) {
-		let { welcomeSubject, welcomeContent, welcomeText, welcomeExpireDays, welcomeAutoSend } = params || {};
+		await this.ensureSettingColumns(c);
+		let { welcomeSubject, welcomeContent, welcomeText, welcomeExpireDays, welcomeAutoSend, lang, welcomeTemplates } = params || {};
+		const { getWelcomeTemplate } = await import('../const/welcome-template');
+		const currentTpl = getWelcomeTemplate(lang || 'zh');
+
 		if (!welcomeSubject || !welcomeSubject.trim()) {
-			welcomeSubject = '🎉 欢迎加入 Epocanvas Mail - 开启您的私密、高效云端邮件体验';
+			welcomeSubject = currentTpl.subject;
 		}
 		welcomeExpireDays = Number(welcomeExpireDays) >= 0 ? Number(welcomeExpireDays) : 7;
 		welcomeAutoSend = welcomeAutoSend === 0 ? 0 : 1;
@@ -475,14 +535,21 @@ const settingService = {
 			welcomeText = emailUtils.htmlToText(welcomeContent);
 		}
 
-		await this.set(c, {
+		const savePayload = {
 			welcomeSubject,
 			welcomeContent: welcomeContent || '',
 			welcomeText: welcomeText || '',
 			welcomeExpireDays,
 			welcomeAutoSend,
-			welcomeLastBroadcast: nowIso
-		});
+			welcomeLastBroadcast: nowIso,
+			welcomeLang: lang || 'zh'
+		};
+
+		if (welcomeTemplates && typeof welcomeTemplates === 'object') {
+			savePayload.welcomeTemplates = welcomeTemplates;
+		}
+
+		await this.set(c, savePayload);
 
 		const user = (await import('../entity/user')).default;
 		const account = (await import('../entity/account')).default;
@@ -507,6 +574,7 @@ const settingService = {
 					expireDays: welcomeExpireDays,
 					content: welcomeContent,
 					text: welcomeText,
+					lang: lang || 'zh',
 					isBroadcast: true
 				});
 				if (res) deliverCount++;
@@ -514,6 +582,136 @@ const settingService = {
 		}
 
 		return { success: true, deliverCount, totalUsers: users.length };
+	},
+
+	async getGlobalEmailConfig(c) {
+		await this.ensureSettingColumns(c);
+		const settingRow = await this.get(c, true);
+		let cfg = settingRow.globalEmailConfig || {};
+		if (typeof cfg === 'string') {
+			try { cfg = JSON.parse(cfg); } catch (e) { cfg = {}; }
+		}
+		return cfg;
+	},
+
+	async sendGlobalBroadcastEmail(c, params) {
+		await this.ensureSettingColumns(c);
+		let {
+			subject,
+			content,
+			text,
+			targetType,
+			targetRoleIds,
+			expireDays,
+			sendToNewUsers,
+			isStarred,
+			senderName
+		} = params || {};
+
+		if (!subject || !subject.trim()) {
+			throw new BizError('邮件主题不能为空 Email subject cannot be empty');
+		}
+		if (!content || !content.trim()) {
+			throw new BizError('邮件正文不能为空 Email content cannot be empty');
+		}
+
+		targetType = targetType === 'roles' ? 'roles' : 'all';
+		if (!Array.isArray(targetRoleIds)) {
+			targetRoleIds = targetRoleIds ? [Number(targetRoleIds)] : [];
+		} else {
+			targetRoleIds = targetRoleIds.map(Number).filter(n => !isNaN(n));
+		}
+
+		expireDays = Number(expireDays) >= 0 ? Number(expireDays) : 0;
+		sendToNewUsers = Number(sendToNewUsers) === 1 ? 1 : 0;
+		isStarred = isStarred === 0 ? 0 : 1;
+		const nowIso = new Date().toISOString();
+
+		if (!text && content) {
+			const emailUtils = (await import('../utils/email-utils')).default;
+			text = emailUtils.htmlToText(content);
+		}
+
+		const globalConfig = {
+			active: 1,
+			subject,
+			content,
+			text: text || '',
+			targetType,
+			targetRoleIds,
+			expireDays,
+			sendToNewUsers,
+			isStarred,
+			senderName: senderName || 'Epocanvas 官方团队',
+			lastBroadcastTime: nowIso
+		};
+
+		await this.set(c, {
+			globalEmailConfig: globalConfig
+		});
+
+		if (sendToNewUsers === 1) {
+			try {
+				await c.env.kv.put('ACTIVE_GLOBAL_EMAIL', JSON.stringify(globalConfig));
+			} catch (e) {}
+		} else {
+			try {
+				await c.env.kv.delete('ACTIVE_GLOBAL_EMAIL');
+			} catch (e) {}
+		}
+
+		const user = (await import('../entity/user')).default;
+		const account = (await import('../entity/account')).default;
+		const emailService = (await import('./email-service')).default;
+		const { eq, and, inArray } = await import('drizzle-orm');
+
+		let users = [];
+		if (targetType === 'roles' && targetRoleIds.length > 0) {
+			users = await orm(c).select({
+				userId: user.userId,
+				email: user.email,
+				type: user.type
+			}).from(user).where(and(
+				eq(user.status, 0),
+				eq(user.isDel, 0),
+				inArray(user.type, targetRoleIds)
+			)).all();
+		} else {
+			users = await orm(c).select({
+				userId: user.userId,
+				email: user.email,
+				type: user.type
+			}).from(user).where(and(eq(user.status, 0), eq(user.isDel, 0))).all();
+		}
+
+		let deliverCount = 0;
+		for (const u of users) {
+			const acc = await orm(c).select({
+				accountId: account.accountId,
+				name: account.name
+			}).from(account).where(and(eq(account.userId, u.userId), eq(account.isDel, 0))).orderBy(account.sort).limit(1).get();
+
+			if (acc) {
+				const res = await emailService.deliverGlobalEmailToUser(c, u.userId, acc.accountId, u.email, {
+					subject,
+					content,
+					text,
+					expireDays,
+					isStarred,
+					senderName: senderName || 'Epocanvas 官方团队'
+				});
+				if (res) deliverCount++;
+			}
+		}
+
+		return {
+			success: true,
+			deliverCount,
+			totalUsers: users.length,
+			targetType,
+			targetRoleIds,
+			sendToNewUsers
+		};
 	},
 
 	async websiteConfig(c) {
@@ -565,6 +763,9 @@ const settingService = {
 			welcomeExpireDays: settingRow.welcomeExpireDays ?? 7,
 			welcomeAutoSend: settingRow.welcomeAutoSend ?? 1,
 			welcomeLastBroadcast: settingRow.welcomeLastBroadcast || '',
+			welcomeTemplates: settingRow.welcomeTemplates || {},
+			welcomeLang: settingRow.welcomeLang || 'zh',
+			globalEmailConfig: settingRow.globalEmailConfig || {},
 			userTgForward: settingRow.userTgForward ?? 1,
 			userEmailForward: settingRow.userEmailForward ?? 1,
 			userApiSupport: settingRow.userApiSupport ?? 1,

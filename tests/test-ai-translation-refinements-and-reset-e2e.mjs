@@ -50,11 +50,12 @@ async function run() {
     await page.evaluate(({ token }) => {
       localStorage.setItem("token", token);
       localStorage.setItem("loginEmail", "admin@epomail.bond");
-      localStorage.setItem("ui", JSON.stringify({ dark: false, locale: "zh" }));
+      localStorage.setItem("ui", JSON.stringify({ dark: false, locale: "zh", defaultTranslateLang: "zh" }));
+      localStorage.setItem("setting", JSON.stringify({ lang: "zh" }));
     }, { token });
 
     await page.goto(BASE + "/settings/general", { waitUntil: "networkidle" });
-    await page.waitForTimeout(1500);
+    await page.waitForTimeout(2000);
 
     // 验证目标语言区域：不可显式展示 "配置阅读邮件时的默认翻译目标语言"
     const langSection = page.locator("#translate-lang-section");

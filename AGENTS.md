@@ -11,6 +11,31 @@
    - 在向用户输出回复时，必须置顶/显式打印出本次提交的完整 Commit Hash 与短 Hash，确保版本可追溯、审计记录完整。
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
+
+### 专案主流多语言支持(正体中文/法/西/荷)、多语言欢迎邮件(站长默认语言联动与6国Tab切换)、网站公告全域公告邮件(admin@epocanvas.com站长通道/受众分组/TTL/新人自动补发)上线 (2026-09-14)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **全专案多语言原生支持 (Multi-Language Native Expansion)**:
+       - 补齐并深度对齐全专案多语言字典，原生覆盖主流语言：中文简体 (`zh`)、正體中文 (繁體, `zh-Hant`)、English (`en`)、Français (`fr`)、Español (`es`)、Nederlands (`nl`)；
+       - 前端 `mail-vue/src/i18n` 与后端 `mail-worker/src/i18n` 建立同构语言包；
+       - 修复 `vue-i18n` 特殊 `@` 符号转义语法，杜绝 `SyntaxError: 10` 解析异常；偏好设置多语言即时无损热切换，并持久化于 `localStorage` 与用户资料。
+    2. **全员系统欢迎邮件多语言化与站长默认语言深度联动 (Multilingual Welcome Email System)**:
+       - 欢迎邮件全面扩充至专案全部 6 种语言版本，内建高质感 Azure 渐变卡片模板与完整双语/本地化排版；
+       - 站长发送的默认信件版本严格取决于站长当前使用的默认语言（"默认语言直接决定了常规语言"）；
+       - 弹窗顶端新增 6 国语言版本切换 Pill 导航条（含站长默认标识徽章），支持自由切换各语言预览与富文本编辑，支持单语言恢复默认模板、持久化独立保存与一键全员投递。
+    3. **网站公告新增「全域公告邮件」站长通道与受众控制 (Global Broadcast Email Hub)**:
+       - 网站公告卡片新增独立的「全域公告邮件」通道入驻与配置区；
+       - 采用与邮件 Compose 一致的统一沉浸式视觉交互规范，发件人通道锁定为官方站长 `admin@epocanvas.com`；
+       - 支持受众灵活分流：全平台所有注册用户 (`all`) vs 指定用户分组 / 角色 (`roles`)；
+       - 配备高级规则设置：公告留存时效 TTL（7天 / 30天 / 永久 等自动过期清理）、持续发给后来的新人（新注册用户登录时自动补发激活）、收件箱星标置顶提醒；
+       - D1 数据库自适应扩充 `welcome_templates`, `welcome_lang`, `global_email_config` 字段，兼具 KV 缓存与 D1 热读容灾。
+    4. **Playwright 全链路端到端自动化测试 100% 全绿通过**:
+       - 专属测试套件 `tests/test-multilingual-and-global-email-e2e.mjs` 5 大全链路检查点 100% 顺利通过；
+       - 回归测试套件 `tests/test-ai-translation-refinements-and-reset-e2e.mjs` 4 大检查点 100% 顺利通过；
+       - 完成多语言切换、欢迎邮件 6 语言 Tab 与全域公告弹窗视觉审计截屏；恪守零假数据与自动还原准则。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **Cloudflare Workers 部署 Version ID**: `b02b357f-a6b1-497f-8e5a-0ffbb887e55c`。
+    - **epocanvas-mail Git Commit**: `a1ed8610e6a628cb785c83ab1277f7706d9d83bd` (Short Hash: `a1ed861`).
+
 ### 邮件AI翻译目标语言问号注释、OCR实验开关与Logo/Video精准过滤、整句分片秒翻译及切换语言静默重置上线 (2026-09-13)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **目标语言说明问号化与 OCR 独立实验开关管理**:

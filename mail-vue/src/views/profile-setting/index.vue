@@ -434,11 +434,15 @@
             :model-value="langSelect"
             class="language-select"
             placeholder="Select"
-            style="width: 150px;"
+            style="width: 175px;"
             @change="changeLang"
           >
             <el-option label="中文 (简体)" value="zh" @pointerdown.prevent.stop="changeLang('zh')"/>
+            <el-option label="正體中文 (繁體)" value="zh-Hant" @pointerdown.prevent.stop="changeLang('zh-Hant')"/>
             <el-option label="English" value="en" @pointerdown.prevent.stop="changeLang('en')"/>
+            <el-option label="Français" value="fr" @pointerdown.prevent.stop="changeLang('fr')"/>
+            <el-option label="Español" value="es" @pointerdown.prevent.stop="changeLang('es')"/>
+            <el-option label="Nederlands" value="nl" @pointerdown.prevent.stop="changeLang('nl')"/>
           </el-select>
         </div>
       </div>
@@ -465,6 +469,7 @@
             <el-option label="한국어" value="ko" />
             <el-option label="Français" value="fr" />
             <el-option label="Deutsch" value="de" />
+            <el-option label="Nederlands" value="nl" />
             <el-option label="Español" value="es" />
             <el-option label="Русский" value="ru" />
             <el-option label="Português" value="pt" />

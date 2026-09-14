@@ -23,7 +23,7 @@ import account from "../entity/account";
 import { att } from '../entity/att';
 import telegramService from './telegram-service';
 import emailCryptoUtils from '../utils/email-crypto-utils';
-import { DEFAULT_WELCOME_SUBJECT, DEFAULT_WELCOME_CONTENT } from '../const/welcome-template';
+import { DEFAULT_WELCOME_SUBJECT, DEFAULT_WELCOME_CONTENT, getWelcomeTemplate } from '../const/welcome-template';
 import { isAdminEmail, isAdminUser } from '../utils/admin-utils';
 
 const emailService = {
@@ -1306,10 +1306,37 @@ const emailService = {
 		if (!overrideData?.forceWelcome && !overrideData?.isBroadcast && settingData.welcomeAutoSend === 0) {
 			return null;
 		}
-		let subject = overrideData?.subject || settingData.welcomeSubject || DEFAULT_WELCOME_SUBJECT;
+
+		// Multi-language template resolution
+		let tplLang = overrideData?.lang || null;
+		if (!tplLang) {
+			try {
+				const userEntity = (await import('../entity/user')).default;
+				const userRow = await orm(c).select().from(userEntity).where(eq(userEntity.userId, userId)).get();
+				if (userRow?.lang) {
+					tplLang = userRow.lang;
+				}
+			} catch (e) {}
+		}
+		if (!tplLang) {
+			tplLang = settingData.welcomeLang || settingData.defaultLang || 'zh';
+		}
+		const fallbackTpl = getWelcomeTemplate(tplLang);
+
+		let customTemplates = {};
+		try {
+			if (typeof settingData.welcomeTemplates === 'string') {
+				customTemplates = JSON.parse(settingData.welcomeTemplates || '{}');
+			} else if (typeof settingData.welcomeTemplates === 'object' && settingData.welcomeTemplates) {
+				customTemplates = settingData.welcomeTemplates;
+			}
+		} catch (e) {}
+
+		const langTpl = customTemplates[tplLang] || {};
+		let subject = overrideData?.subject || langTpl.welcomeSubject || langTpl.subject || (tplLang === 'zh' ? settingData.welcomeSubject : '') || fallbackTpl.subject;
 		const expireDays = overrideData?.expireDays !== undefined ? Number(overrideData.expireDays) : (Number(settingData.welcomeExpireDays) >= 0 ? Number(settingData.welcomeExpireDays) : 7);
-		let text = overrideData?.text || settingData.welcomeText;
-		let rawContent = overrideData?.content || settingData.welcomeContent || DEFAULT_WELCOME_CONTENT;
+		let text = overrideData?.text || langTpl.welcomeText || langTpl.text || (tplLang === 'zh' ? settingData.welcomeText : '');
+		let rawContent = overrideData?.content || langTpl.welcomeContent || langTpl.content || (tplLang === 'zh' ? settingData.welcomeContent : '') || fallbackTpl.content;
 		if (!text && rawContent) {
 			text = emailUtils.htmlToText(rawContent);
 		}
@@ -1447,6 +1474,7 @@ const emailService = {
 			try {
 				await c.env.kv.put('HAS_WELCOME_' + userId, '1');
 			} catch (e) {}
+			await this.ensureGlobalEmailForUser(c, userId, userEmail).catch(() => {});
 			return null;
 		}
 
@@ -1471,7 +1499,161 @@ const emailService = {
 		}
 		if (!accountRow) return null;
 
-		return await this.deliverWelcomeEmailToUser(c, userId, accountRow.accountId, emailAddress, { forceWelcome: true });
+		const welcomeRes = await this.deliverWelcomeEmailToUser(c, userId, accountRow.accountId, emailAddress, { forceWelcome: true });
+		await this.ensureGlobalEmailForUser(c, userId, emailAddress).catch(() => {});
+		return welcomeRes;
+	},
+
+	async deliverGlobalEmailToUser(c, userId, accountId, userEmail, options = {}) {
+		const {
+			subject,
+			content,
+			text,
+			expireDays = 0,
+			isStarred = 1,
+			senderName = 'Epocanvas 官方团队'
+		} = options;
+
+		const settingData = await settingService.query(c);
+		const now = new Date().toISOString();
+		const snoozedEndTime = Number(expireDays) > 0 ? new Date(Date.now() + Number(expireDays) * 86400000).toISOString() : null;
+
+		let userName = emailUtils.getName(userEmail) || (userEmail ? userEmail.split('@')[0] : '用户');
+		try {
+			const userEntity = (await import('../entity/user')).default;
+			const userRow = await orm(c).select({ nickname: userEntity.nickname, email: userEntity.email }).from(userEntity).where(eq(userEntity.userId, userId)).get();
+			if (userRow && userRow.nickname) {
+				userName = userRow.nickname;
+			}
+		} catch (e) {}
+
+		const domain = userEmail ? (userEmail.split('@')[1] || 'epomail.bond') : 'epomail.bond';
+		const dateStr = new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' });
+
+		const interpolate = (str) => {
+			if (!str || typeof str !== 'string') return str;
+			return str
+				.replace(/\{\{\s*user_name\s*\}\}/gi, userName)
+				.replace(/\{\{\s*username\s*\}\}/gi, userName)
+				.replace(/\{\{\s*user_id\s*\}\}/gi, String(userId))
+				.replace(/\{\{\s*user_email\s*\}\}/gi, userEmail || '')
+				.replace(/\{\{\s*domain\s*\}\}/gi, domain)
+				.replace(/\{\{\s*current_date\s*\}\}/gi, dateStr)
+				.replace(/\{\{\s*date\s*\}\}/gi, dateStr);
+		};
+
+		const finalSubject = interpolate(subject);
+		const finalContent = interpolate(content);
+		const finalText = interpolate(text || emailUtils.htmlToText(content));
+
+		let globalEmailData = {
+			userId: userId,
+			accountId: accountId,
+			sendEmail: 'admin@epocanvas.com',
+			name: senderName,
+			subject: finalSubject,
+			content: finalContent,
+			text: finalText,
+			toEmail: userEmail,
+			toName: userName,
+			recipient: JSON.stringify([{ address: userEmail, name: userName }]),
+			cc: '[]',
+			bcc: '[]',
+			inReplyTo: '',
+			relation: '',
+			messageId: '',
+			type: emailConst.type.RECEIVE,
+			status: 0,
+			unread: emailConst.unread.UNREAD,
+			isDel: isDel.NORMAL,
+			isSpam: 0,
+			snoozedTime: snoozedEndTime ? now : null,
+			snoozedEndTime: snoozedEndTime,
+			labels: JSON.stringify(['全域公告', '官方']),
+			code: '',
+			createTime: now
+		};
+
+		if (userId && emailCryptoUtils.shouldEncryptEmail(settingData?.allMailMode, globalEmailData)) {
+			const cryptoKey = await emailCryptoUtils.getUserEmailCryptoKey(c.env, userId);
+			globalEmailData = await emailCryptoUtils.encryptEmailRecord(globalEmailData, cryptoKey);
+		}
+
+		const emailRow = await orm(c).insert(email).values(globalEmailData).returning().get();
+
+		if (emailRow && emailRow.emailId && isStarred) {
+			await orm(c).insert(star).values({
+				userId: userId,
+				emailId: emailRow.emailId,
+				createTime: now
+			}).run().catch(() => {});
+		}
+
+		return emailRow;
+	},
+
+	async ensureGlobalEmailForUser(c, userId, userEmail = null) {
+		if (!userId) return null;
+		let globalConfig = null;
+		try {
+			globalConfig = await c.env.kv.get('ACTIVE_GLOBAL_EMAIL', { type: 'json' });
+		} catch (e) {}
+
+		if (!globalConfig || !globalConfig.active || !globalConfig.sendToNewUsers) {
+			const settingData = await settingService.query(c);
+			globalConfig = settingData?.globalEmailConfig;
+			if (typeof globalConfig === 'string') {
+				try { globalConfig = JSON.parse(globalConfig); } catch (e) { globalConfig = null; }
+			}
+		}
+
+		if (!globalConfig || !globalConfig.active || !globalConfig.sendToNewUsers) {
+			return null;
+		}
+
+		const userEntity = (await import('../entity/user')).default;
+		const userRow = await orm(c).select().from(userEntity).where(eq(userEntity.userId, userId)).get();
+		if (!userRow) return null;
+
+		if (globalConfig.targetType === 'roles') {
+			const allowedRoles = globalConfig.targetRoleIds || [];
+			if (!allowedRoles.includes(userRow.type)) {
+				return null;
+			}
+		}
+
+		const kvKey = `HAS_GLOBAL_EMAIL_${userId}_${globalConfig.lastBroadcastTime || 'default'}`;
+		try {
+			const hasReceived = await c.env.kv.get(kvKey);
+			if (hasReceived === '1') return null;
+		} catch (e) {}
+
+		const existing = await orm(c).select({ emailId: email.emailId }).from(email).where(
+			and(
+				eq(email.userId, userId),
+				eq(email.sendEmail, 'admin@epocanvas.com'),
+				eq(email.subject, globalConfig.subject),
+				eq(email.isDel, isDel.NORMAL)
+			)
+		).limit(1).get();
+
+		if (existing) {
+			try { await c.env.kv.put(kvKey, '1'); } catch (e) {}
+			return null;
+		}
+
+		let emailAddress = userEmail || userRow.email;
+		let accountRow = await accountService.selectByEmail(c, emailAddress);
+		if (!accountRow) {
+			accountRow = await orm(c).select().from(account).where(
+				and(eq(account.userId, userId), eq(account.isDel, isDel.NORMAL))
+			).orderBy(desc(account.sort), asc(account.accountId)).limit(1).get();
+		}
+		if (!accountRow) return null;
+
+		const result = await this.deliverGlobalEmailToUser(c, userId, accountRow.accountId, emailAddress, globalConfig);
+		try { await c.env.kv.put(kvKey, '1'); } catch (e) {}
+		return result;
 	},
 
 	async selectById(c, emailId, expectedUserId = null) {

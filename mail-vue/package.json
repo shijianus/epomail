@@ -28,6 +28,7 @@
     "libphonenumber-js": "^1.13.12",
     "lodash-es": "^4.17.21",
     "nprogress": "^0.2.0",
+    "opencc-js": "^1.4.2",
     "path": "^0.12.7",
     "pinia": "^3.0.2",
     "pinia-plugin-persistedstate": "^4.2.0",
