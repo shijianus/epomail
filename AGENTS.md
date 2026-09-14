@@ -34,7 +34,7 @@
        - 完成多语言切换、欢迎邮件 6 语言 Tab 与全域公告弹窗视觉审计截屏；恪守零假数据与自动还原准则。
 *   **部署上线与自动化测试 (Verification & Deployment)**:
     - **Cloudflare Workers 部署 Version ID**: `b02b357f-a6b1-497f-8e5a-0ffbb887e55c`。
-    - **epocanvas-mail Git Commit**: `a1ed8610e6a628cb785c83ab1277f7706d9d83bd` (Short Hash: `a1ed861`).
+    - **epocanvas-mail Git Commit**: `aa1955eeb1b564f11a370892c48ea94f7c21015f` (Short Hash: `aa1955e`).
 
 ### 邮件AI翻译目标语言问号注释、OCR实验开关与Logo/Video精准过滤、整句分片秒翻译及切换语言静默重置上线 (2026-09-13)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
