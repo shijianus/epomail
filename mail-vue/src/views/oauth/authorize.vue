@@ -4,7 +4,7 @@
       <!-- Loading State -->
       <div v-if="pageLoading" class="loading-state">
         <Icon icon="solar:restart-circle-bold-duotone" width="40" height="40" class="spin-icon" />
-        <span class="loading-text">{{ $t('loading') || '正在加载授权信息...' }}</span>
+        <span class="loading-text">{{ $t('loading') }}</span>
       </div>
 
       <!-- Error State -->
@@ -12,10 +12,10 @@
         <div class="err-icon-wrap">
           <Icon icon="solar:danger-circle-bold-duotone" width="44" height="44" />
         </div>
-        <div class="err-title">{{ $t('oauthAuthorizeTitle') || '授权请求失败' }}</div>
+        <div class="err-title">{{ $t('oauthAuthorizeTitle') }}</div>
         <div class="err-desc">{{ errorMessage }}</div>
         <el-button type="primary" plain @click="goHome" class="error-return-btn">
-          {{ $t('back') || '返回首页' }}
+          {{ $t('back') }}
         </el-button>
       </div>
 
@@ -55,16 +55,16 @@
 
         <div class="auth-headings">
           <div class="auth-title">
-            <span>登录并授权 </span>
-            <span class="highlight-app-name">{{ authInfo.app?.name || '第三方应用' }}</span>
+            <span>{{ $t('loginAndAuthorize') }}</span>
+            <span class="highlight-app-name">{{ authInfo.app?.name || $t('thirdPartyApp') }}</span>
           </div>
-          <div class="auth-subtitle">请先验证您的 Epomail 账号以继续完成受信应用授权。</div>
+          <div class="auth-subtitle">{{ $t('oauthVerifySubtitle') }}</div>
         </div>
 
         <div class="inline-login-form">
           <el-input 
             v-model="loginForm.email" 
-            placeholder="邮箱地址 (例如: user@epomail.bond)" 
+            :placeholder="$t('oauthEmailPlaceholder')" 
             size="large"
             clearable
           >
@@ -115,7 +115,7 @@
               @click="handleCancel" 
               class="cancel-btn"
             >
-              {{ $t('cancelAuthorization') || '取消' }}
+              {{ $t('cancelAuthorization') }}
             </el-button>
           </div>
         </div>
@@ -158,8 +158,8 @@
         <!-- Headings -->
         <div class="auth-headings">
           <div class="auth-title">
-            <span class="highlight-app-name">{{ authInfo.app?.name || '第三方应用' }}</span>
-            <span class="title-tail"> {{ $t('oauthAuthorizeSub') || '申请访问您的 Epomail 账号' }}</span>
+            <span class="highlight-app-name">{{ authInfo.app?.name || $t('thirdPartyApp') }}</span>
+            <span class="title-tail"> {{ $t('oauthAuthorizeSub') }}</span>
           </div>
 
           <!-- Verified Origin Capsule -->
@@ -184,14 +184,14 @@
             <div class="user-email font-mono">{{ authInfo.user?.email }}</div>
           </div>
           <el-button link type="primary" size="small" @click="handleSwitchAccount" class="switch-act-btn">
-            {{ $t('switchAccount') || '切换账号' }}
+            {{ $t('switchAccount') }}
           </el-button>
         </div>
 
         <!-- Scopes Permission List -->
         <div class="scopes-section">
           <div class="scopes-title-row">
-            <span class="scopes-title">{{ $t('oauthScopesRequested') || '此应用将申请以下权限：' }}</span>
+            <span class="scopes-title">{{ $t('oauthScopesRequested') }}</span>
             <span class="scopes-count-pill">{{ scopeList.length }} 项</span>
           </div>
 
@@ -223,7 +223,7 @@
           </div>
           <div class="sec-text-content">
             <div class="sec-notice-desc">
-              {{ $t('securityNoticeDesc') || '授权过程严格受限，绝不会泄露您的账号密码或邮件正文。您随时可在安全中心撤销授权。' }}
+              {{ $t('securityNoticeDesc') }}
             </div>
           </div>
         </div>
@@ -237,7 +237,7 @@
             @click="handleConfirmAuthorize" 
             class="authorize-btn"
           >
-            {{ $t('authorizeAndContinue') || '授权并继续' }}
+            {{ $t('authorizeAndContinue') }}
           </el-button>
           
           <el-button 
@@ -245,7 +245,7 @@
             @click="handleCancel" 
             class="cancel-btn"
           >
-            {{ $t('cancelAuthorization') || '取消授权' }}
+            {{ $t('cancelAuthorization') }}
           </el-button>
         </div>
 
@@ -342,9 +342,9 @@ const scopeList = computed(() => {
   const dict = {
     openid: {
       key: 'openid',
-      name: t('scopeOpenidName') || 'OpenID 身份标识',
-      desc: t('scopeOpenidDesc') || '安全校验您的唯一用户凭证 (OpenID)，用于跨系统建立免密单点登录受信会话。',
-      badge: t('scopeBadgeRead') || '只读凭据',
+      name: t('scopeOpenidName'),
+      desc: t('scopeOpenidDesc'),
+      badge: t('scopeBadgeRead'),
       isAction: false,
       icon: 'solar:key-minimalistic-square-3-bold-duotone',
       color: '#3b82f6',
@@ -352,9 +352,9 @@ const scopeList = computed(() => {
     },
     email: {
       key: 'email',
-      name: t('scopeEmailName') || '主电子邮箱地址',
-      desc: t('scopeEmailDesc') || '读取绑定的主要邮箱地址与验证状态，用于博客互动通知、作者回复提醒及找回访问凭证。',
-      badge: t('scopeBadgeRead') || '只读凭据',
+      name: t('scopeEmailName'),
+      desc: t('scopeEmailDesc'),
+      badge: t('scopeBadgeRead'),
       isAction: false,
       icon: 'solar:letter-bold-duotone',
       color: '#06b6d4',
@@ -362,9 +362,9 @@ const scopeList = computed(() => {
     },
     profile: {
       key: 'profile',
-      name: t('scopeProfileName') || '公开个人资料',
-      desc: t('scopeProfileDesc') || '读取您的公开显示昵称、账户头像与基本偏好，用于在博客评论区及个人中心展示专属身份卡片。',
-      badge: t('scopeBadgeRead') || '只读凭据',
+      name: t('scopeProfileName'),
+      desc: t('scopeProfileDesc'),
+      badge: t('scopeBadgeRead'),
       isAction: false,
       icon: 'solar:user-circle-bold-duotone',
       color: '#8b5cf6',
@@ -372,9 +372,9 @@ const scopeList = computed(() => {
     },
     comments: {
       key: 'comments',
-      name: t('scopeCommentsName') || '博客评论与互动管理',
-      desc: t('scopeCommentsDesc') || '允许代表您在博客文章下方发表优质评论、点赞互动、编辑及管理名下发言，免除重复输入访客凭据。',
-      badge: t('scopeBadgeAction') || '互动权限',
+      name: t('scopeCommentsName'),
+      desc: t('scopeCommentsDesc'),
+      badge: t('scopeBadgeAction'),
       isAction: true,
       icon: 'solar:chat-round-dots-bold-duotone',
       color: '#10b981',
@@ -382,9 +382,9 @@ const scopeList = computed(() => {
     },
     offline_access: {
       key: 'offline_access',
-      name: t('scopeOfflineName') || '安全离线保持',
-      desc: t('scopeOfflineDesc') || '保持您的长期安全登录状态，避免短期内频繁重复拉起授权。',
-      badge: t('scopeBadgeRead') || '只读凭据',
+      name: t('scopeOfflineName'),
+      desc: t('scopeOfflineDesc'),
+      badge: t('scopeBadgeRead'),
       isAction: false,
       icon: 'solar:shield-check-bold-duotone',
       color: '#f59e0b',
@@ -443,7 +443,7 @@ async function fetchAuthorizeDetails() {
       authInfo.state = res.state || route.query.state || ''
     }
   } catch (err) {
-    errorMessage.value = err.message || '获取授权应用信息失败'
+    errorMessage.value = err.message || t('fetchAppInfoFailed')
   } finally {
     pageLoading.value = false
   }
@@ -490,7 +490,7 @@ async function handleConfirmAuthorize() {
       window.location.replace(res.redirectUri)
     }
   } catch (err) {
-    ElMessage.error(err.message || '授权确认失败')
+    ElMessage.error(err.message || t('authorizeFailed'))
   } finally {
     authorizing.value = false
   }
@@ -527,7 +527,7 @@ function handleCancel() {
 
 async function handleInlineLogin() {
   if (!loginForm.email.trim() || !loginForm.password.trim()) {
-    ElMessage.warning('请输入邮箱地址和密码')
+    ElMessage.warning(t('enterEmailAndPassword'))
     return
   }
 
@@ -547,7 +547,7 @@ async function handleInlineLogin() {
     if (err.message && err.message.includes('TOTP')) {
       requireTotp.value = true
     }
-    ElMessage.error(err.message || '登录失败，请检查账号密码')
+    ElMessage.error(err.message || t('loginFailedCheckCreds'))
   } finally {
     loggingIn.value = false
   }

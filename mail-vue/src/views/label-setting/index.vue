@@ -70,7 +70,7 @@
     </div>
 
     <!-- Drawer for Add/Edit -->
-    <el-drawer v-model="isEditorOpen" :title="editIndex === -1 ? ($t('createLabel') || '新建标签') : ($t('editLabel') || '编辑标签')" size="400px" destroy-on-close class="label-drawer">
+    <el-drawer v-model="isEditorOpen" :title="editIndex === -1 ? ($t('createLabel')) : ($t('editLabel'))" size="400px" destroy-on-close class="label-drawer">
       <div class="editor-form">
         <div class="form-group">
           <label>{{ $t('name') || 'Name' }}</label>
@@ -83,7 +83,7 @@
           </el-select>
         </div>
         <div class="form-group">
-          <label>{{ $t('icon') || '标签图标' }}</label>
+          <label>{{ $t('icon') }}</label>
           <div class="swatches" style="margin-bottom: 8px; flex-wrap: wrap; gap: 8px;">
              <div class="swatch" 
                   v-for="ico in presetIcons" :key="ico"
@@ -99,7 +99,7 @@
                   style="background-color: var(--bg-hover)">
                   <div v-html="svgStr" style="width: 18px; height: 18px; display: flex; justify-content: center; align-items: center;" :style="{ color: form.icon === svgStr ? form.color : 'var(--text-secondary)', fill: 'currentColor' }"></div>
              </div>
-             <div class="swatch" v-if="(uiStore.customSvgs || []).length < 5" @click="isSvgModalOpen = true" style="background-color: var(--bg-hover); border: 1px dashed var(--border-mid); cursor: pointer;" :title="$t('addCustomIcon') || '添加自定义 SVG'">
+             <div class="swatch" v-if="(uiStore.customSvgs || []).length < 5" @click="isSvgModalOpen = true" style="background-color: var(--bg-hover); border: 1px dashed var(--border-mid); cursor: pointer;" :title="$t('addCustomIcon')">
                 <Icon icon="lucide:plus" width="18" color="var(--text-secondary)" />
              </div>
           </div>
@@ -124,7 +124,7 @@
         <div class="form-group" style="margin-top: 8px;">
           <label style="display:flex; align-items:center; gap:8px;">
             {{ $t('classificationRules') || 'Rules' }}
-            <span v-if="form.rules && form.rules.length > 0" class="rules-count-badge">{{ form.rules.length }} 条</span>
+            <span v-if="form.rules && form.rules.length > 0" class="rules-count-badge">{{ $t('rulesCount', { count: form.rules.length }) }}</span>
           </label>
           <p style="font-size: 12px; color: var(--text-muted); margin: 0 0 8px 0; line-height: 1.4;">
             {{ $t('rulesDesc') || 'Emails matching these rules will automatically receive this label.' }}
@@ -139,9 +139,9 @@
                 <template v-if="isSystemRule(rule)">
                   <div class="rule-cond" style="align-items: center; display: flex; gap: 6px;">
                     <span class="cond-lbl" style="display: flex; align-items: center; gap: 4px; font-weight: 500;">
-                      <Icon icon="lucide:settings" width="14" /> {{ $t('systemCheck') || '系统自查' }}
+                      <Icon icon="lucide:settings" width="14" /> {{ $t('systemCheck') }}
                     </span>
-                    <el-tooltip :content="$t('systemCheckTooltip') || '此规则由系统内置逻辑驱动，无法修改'" placement="top">
+                    <el-tooltip :content="$t('systemCheckTooltip')" placement="top">
                       <Icon icon="lucide:help-circle" width="14" style="color: var(--text-secondary); cursor: help; outline: none;" />
                     </el-tooltip>
                   </div>
@@ -150,7 +150,7 @@
                 <!-- ② sender_address_includes：将域名渲染为 chips -->
                 <template v-else-if="rule.condition?.type === 'sender_address_includes'">
                   <div class="rule-cond" style="align-items: flex-start; flex-wrap: wrap; gap: 6px;">
-                    <span class="cond-lbl" style="white-space:nowrap; margin-top:2px;">If 发件人域名包含:</span>
+                    <span class="cond-lbl" style="white-space:nowrap; margin-top:2px;">{{ $t('ifSenderDomainContains') }}</span>
                     <div class="domain-chips">
                       <span v-for="d in parseDomainList(rule.condition.value)" :key="d" class="domain-chip">{{ d }}</span>
                     </div>
@@ -175,7 +175,7 @@
               </div>
 
               <!-- 删除按钮：系统规则禁止删除 -->
-              <el-tooltip v-if="isSystemRule(rule)" content="系统内置规则，不可删除" placement="top">
+              <el-tooltip v-if="isSystemRule(rule)" :content="$t('systemRuleCannotDelete')" placement="top">
                 <span class="rule-del rule-del--locked">
                   <Icon icon="lucide:lock" width="14" />
                 </span>
@@ -188,7 +188,7 @@
 
           <button class="add-rule-btn" @click.prevent="openRuleBuilder">
             <Icon icon="lucide:plus" width="16" />
-            <span>添加自定义规则</span>
+            <span>{{ $t('addCustomRule') }}</span>
           </button>
         </div>
       </div>
@@ -375,16 +375,13 @@
     </el-dialog>
 
     <!-- Custom SVG Modal -->
-    <el-dialog v-model="isSvgModalOpen" :title="$t('addCustomIcon') || '添加自定义 SVG'" width="450px" destroy-on-close>
-      <div style="margin-bottom: 12px; font-size: 13px; color: var(--text-secondary); line-height: 1.5;">
-        请在下方粘贴您的自定义 SVG 代码。<br/>
-        建议使用 <code style="background: var(--bg-hover); padding: 2px 4px; border-radius: 4px;">viewBox="0 0 24 24"</code> 并将主要路径的颜色设置为 <code style="background: var(--bg-hover); padding: 2px 4px; border-radius: 4px;">fill="currentColor"</code> 以支持颜色切换。
-      </div>
+    <el-dialog v-model="isSvgModalOpen" :title="$t('addCustomIcon')" width="450px" destroy-on-close>
+      <div style="margin-bottom: 12px; font-size: 13px; color: var(--text-secondary); line-height: 1.5;" v-html="$t('customSvgModalDesc')"></div>
       <el-input v-model="customSvgInput" type="textarea" :rows="6" placeholder="<svg ...> ... </svg>" style="font-family: monospace;" />
       <template #footer>
         <div style="display: flex; justify-content: flex-end; gap: 12px;">
-          <el-button @click="isSvgModalOpen = false">{{ $t('cancel') || '取消' }}</el-button>
-          <el-button type="primary" @click="saveCustomSvg">{{ $t('save') || '保存' }}</el-button>
+          <el-button @click="isSvgModalOpen = false">{{ $t('cancel') }}</el-button>
+          <el-button type="primary" @click="saveCustomSvg">{{ $t('save') }}</el-button>
         </div>
       </template>
     </el-dialog>
@@ -447,7 +444,7 @@ const form = ref({ name: '', icon: 'ic:baseline-label', color: '#3b82f6', parent
 
 const startAdd = () => {
   if (uiStore.allLabels.length >= 7) {
-    ElMessage.warning(t('maxLabelsReached') || '最多只能创建 7 个标签')
+    ElMessage.warning(t('maxLabelsReached'))
     return
   }
   editIndex.value = -1
@@ -479,12 +476,12 @@ const saveCustomSvg = () => {
       form.value.icon = val
       isSvgModalOpen.value = false
       customSvgInput.value = ''
-      ElMessage.success('自定义图标已添加')
+      ElMessage.success(t('customIconAdded'))
     } else {
-      ElMessage.warning('最多只能添加 5 个自定义图标')
+      ElMessage.warning(t('maxCustomIconsReached'))
     }
   } else {
-    ElMessage.error('请输入有效的 SVG 代码 (需以 <svg> 开头)')
+    ElMessage.error(t('invalidSvgCode'))
   }
 }
 
@@ -647,7 +644,7 @@ const saveLabel = () => {
   }
   
   if (len > 18) {
-    ElMessage.warning(t('labelNameTooLong') || '名称不能超过18个拉丁字符（中文占2个字符）')
+    ElMessage.warning(t('labelNameTooLong'))
     return
   }
   

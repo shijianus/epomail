@@ -96,7 +96,7 @@
               <span class="nav-ic-wrap">
                 <div v-if="(label.icon || '').startsWith('<svg')" v-html="label.icon" style="width: 20px; height: 20px; display: inline-flex; justify-content: center; align-items: center; fill: currentColor;" :style="{ color: label.color || 'inherit' }"></div>
                 <Icon v-else :icon="label.icon || 'ic:baseline-label'" width="20" height="20" :style="{ color: label.color || 'inherit' }" />
-                <template v-if="(label.name || label) === '推销'">
+                <template v-if="['推销', '推銷', 'Promotions', 'promotions'].includes(label.name || label)">
                   <div class="sidebar-gray-dot" v-if="getLabelStats(label.name).unread > 0 || getLabelStats(label.name).read > 0"></div>
                 </template>
                 <template v-else>
@@ -104,7 +104,7 @@
                 </template>
               </span>
               <span class="nav-label" :style="{ color: label.color || 'inherit' }">{{ getLabelDisplayName(label.name || label, t) }}</span>
-              <template v-if="(label.name || label) === '推销'">
+              <template v-if="['推销', '推銷', 'Promotions', 'promotions'].includes(label.name || label)">
                 <span class="nav-count muted" v-if="getLabelStats(label.name).unread > 0">{{ getLabelStats(label.name).unread }}</span>
                 <span class="nav-count muted" v-else-if="getLabelStats(label.name).read > 0">{{ getLabelStats(label.name).read }}</span>
               </template>
@@ -171,7 +171,7 @@ const newLabelName = ref('');
 const handleAddLabel = () => {
   if (newLabelName.value.trim()) {
     if (uiStore.allLabels.length >= 7) {
-      ElMessage.warning('最多只能创建 7 个标签');
+      ElMessage.warning(t('maxLabelsReached'));
       uiStore.showAddLabel = false;
       return;
     }

@@ -262,7 +262,7 @@
                       <Icon icon="fluent:database-checkmark-20-filled" width="13" height="13" style="margin-right: 4px; vertical-align: -1px;" />
                       Backblaze B2 / S3
                     </el-tag>
-                    <el-tag v-if="setting.customDomain" size="small" type="primary" effect="plain" class="hub-sub-tag">0元出站加速</el-tag>
+                    <el-tag v-if="setting.customDomain" size="small" type="primary" effect="plain" class="hub-sub-tag">{{ $t('freeOutboundSpeedup') }}</el-tag>
                   </template>
                   <template v-else>
                     <el-tag size="small" type="info" effect="plain" class="hub-tag">
@@ -437,8 +437,8 @@
           <!-- AI Engine & Large Language Model Hub Card (AI 智能引擎与大模型接入) -->
           <div class="settings-card ai-hub-card">
             <div class="card-title">
-              {{ $t('aiHubTitle') || 'AI 智能引擎与大模型接入' }}
-              <el-tooltip effect="dark" :content="$t('aiHubTooltip') || '在系统底层接入 OpenAI 兼容协议大模型或免密使用 Cloudflare Workers AI，用于邮件智能全文翻译、内容提取与规则分析。'">
+              {{ $t('aiHubTitle') }}
+              <el-tooltip effect="dark" :content="$t('aiHubTooltip')">
                 <Icon class="warning" icon="fe:warning" width="18" height="18"/>
               </el-tooltip>
             </div>
@@ -446,8 +446,8 @@
               <!-- Item 1: 大模型 API 接入与配置 (整合为 1 个专用操作选单，展示状态与配置按钮) -->
               <div class="setting-item">
                 <div class="title-item">
-                  <span>{{ $t('aiProviderTitle') || '大模型服务与设置 API 配置' }}</span>
-                  <el-tooltip effect="dark" :content="$t('aiProviderHint') || '配置专属 OpenAI 兼容大模型 API 密钥、接口地址及推理模型。留空时使用 Cloudflare Workers AI 内置免密服务。'">
+                  <span>{{ $t('aiProviderTitle') }}</span>
+                  <el-tooltip effect="dark" :content="$t('aiProviderHint')">
                     <Icon class="warning" icon="fe:warning" width="16" height="16"/>
                   </el-tooltip>
                 </div>
@@ -455,25 +455,25 @@
                   <template v-if="setting.aiApiKey">
                     <el-tag size="small" type="success" effect="light" class="hub-tag">
                       <Icon icon="fluent:plug-connected-16-filled" width="13" height="13" style="margin-right: 4px; vertical-align: -1px;" />
-                      {{ $t('aiCustom') || '自定义' }}: {{ setting.aiModel || 'OpenAI' }}
+                      {{ $t('aiCustom') }}: {{ setting.aiModel || 'OpenAI' }}
                     </el-tag>
                   </template>
                   <template v-else>
                     <el-tag size="small" type="info" effect="plain" class="hub-tag">
                       <Icon icon="fluent:sparkle-16-filled" width="13" height="13" style="margin-right: 4px; vertical-align: -1px;" />
-                      {{ $t('aiCfMode') || 'Workers AI (免密)' }}
+                      {{ $t('aiCfMode') }}
                     </el-tag>
                   </template>
 
                   <!-- 快捷连通性测试按钮兼容测试用例: .ai-hub-card .forward .el-button:not(.opt-button) -->
-                  <el-tooltip effect="dark" :content="$t('aiConnectionTest') || '快速测试当前 AI 接口连通性与模型响应'">
+                  <el-tooltip effect="dark" :content="$t('aiConnectionTest')">
                     <el-button class="opt-btn-inline opt-btn-secondary opt-btn-test-ai" size="small" type="default" :loading="testingAiInHub" @click="testAiConnectionInHub">
                       <Icon icon="fluent:flash-checkmark-24-filled" width="14" height="14" style="color: var(--accent-primary);" />
                     </el-button>
                   </el-tooltip>
 
                   <!-- 整合的配置 API 选单按钮: .opt-button (28x28px 与相邻卡片完全一致) -->
-                  <el-tooltip effect="dark" :content="$t('aiHubConfigTitle') || '设置 API / 配置大模型与自动识别接入'">
+                  <el-tooltip effect="dark" :content="$t('aiHubConfigTitle')">
                     <el-button class="opt-btn-inline opt-button" size="small" type="primary" @click="openAiHubDialog">
                       <Icon icon="fluent:settings-48-regular" width="15" height="15" />
                     </el-button>
@@ -484,8 +484,8 @@
               <!-- Item 2: AI 智能增强与翻译功能总开关 (可以关闭) -->
               <div class="setting-item">
                 <div class="title-item">
-                  <span>{{ $t('aiEnabledLabel') || '启用 AI 智能分析与邮件翻译' }}</span>
-                  <el-tooltip effect="dark" :content="$t('aiEnabledHint') || '系统级总开关。开启后支持邮件智能全文翻译、核心摘要及自动化内容分析；可一键关闭。'">
+                  <span>{{ $t('aiEnabledLabel') }}</span>
+                  <el-tooltip effect="dark" :content="$t('aiEnabledHint')">
                     <Icon class="warning" icon="fe:warning" width="16" height="16"/>
                   </el-tooltip>
                 </div>
@@ -502,8 +502,8 @@
               <!-- Item 3: 单用户每日调用次数限制 (限制次数，0 表示不限) -->
               <div class="setting-item">
                 <div class="title-item">
-                  <span>{{ $t('aiDailyQuotaLabel') || '单用户每日调用上限' }}</span>
-                  <el-tooltip effect="dark" :content="$t('aiDailyQuotaHint') || '每位普通注册用户每天允许发起的大模型请求次数上限，设置为 0 表示不限制。'">
+                  <span>{{ $t('aiDailyQuotaLabel') }}</span>
+                  <el-tooltip effect="dark" :content="$t('aiDailyQuotaHint')">
                     <Icon class="warning" icon="fe:warning" width="16" height="16"/>
                   </el-tooltip>
                 </div>
@@ -518,15 +518,15 @@
                     @change="(val) => changeField('aiDailyQuota', val)"
                     style="width: 110px;"
                   />
-                  <span class="hub-unit-text">次/天</span>
+                  <span class="hub-unit-text">{{ $t('timesPerDay') }}</span>
                 </div>
               </div>
 
               <!-- Item 4: 请求速率并发限制 (RPM / 次/分钟) -->
               <div class="setting-item">
                 <div class="title-item">
-                  <span>{{ $t('aiRateLimitRpmLabel') || '请求速率限制 (RPM)' }}</span>
-                  <el-tooltip effect="dark" :content="$t('aiRateLimitRpmHint') || '每位用户每分钟允许发送的最高请求频率，防止脚本高频刷取接口。'">
+                  <span>{{ $t('aiRateLimitRpmLabel') }}</span>
+                  <el-tooltip effect="dark" :content="$t('aiRateLimitRpmHint')">
                     <Icon class="warning" icon="fe:warning" width="16" height="16"/>
                   </el-tooltip>
                 </div>
@@ -541,15 +541,15 @@
                     @change="(val) => changeField('aiRateLimitRpm', val)"
                     style="width: 110px;"
                   />
-                  <span class="hub-unit-text">次/分</span>
+                  <span class="hub-unit-text">{{ $t('timesPerMinute') }}</span>
                 </div>
               </div>
 
               <!-- Item 5: 单次最大生成 Token 上限 (Max Tokens) -->
               <div class="setting-item">
                 <div class="title-item">
-                  <span>{{ $t('aiMaxTokensLabel') || '单次生成最大 Token' }}</span>
-                  <el-tooltip effect="dark" :content="$t('aiMaxTokensHint') || '限制单次翻译或文本分析允许生成的最大 Token 数量，避免超长输出耗尽调用额度。'">
+                  <span>{{ $t('aiMaxTokensLabel') }}</span>
+                  <el-tooltip effect="dark" :content="$t('aiMaxTokensHint')">
                     <Icon class="warning" icon="fe:warning" width="16" height="16"/>
                   </el-tooltip>
                 </div>
@@ -629,8 +629,8 @@
               </div>
               <div class="setting-item">
                 <div class="title-item">
-                  <span>{{ $t('userByoStorageSetting') || '用户第三方存储接入' }}</span>
-                  <el-tooltip effect="dark" :content="$t('userByoStorageSettingTooltip') || '允许用户在资料页接入个人的 Backblaze B2 或 AWS S3 对象存储桶托管个人附件'">
+                  <span>{{ $t('userByoStorageSetting') }}</span>
+                  <el-tooltip effect="dark" :content="$t('userByoStorageSettingTooltip')">
                     <Icon class="warning" icon="fe:warning" width="18" height="18"/>
                   </el-tooltip>
                 </div>
@@ -645,8 +645,8 @@
               </div>
               <div class="setting-item">
                 <div class="title-item">
-                  <span>{{ $t('defaultStorageQuotaSetting') || '默认存储配额 (MB)' }}</span>
-                  <el-tooltip effect="dark" :content="$t('defaultStorageQuotaSettingTooltip') || '新用户的初始存储配额限制，设置为 0 表示不限制容量'">
+                  <span>{{ $t('defaultStorageQuotaSetting') }}</span>
+                  <el-tooltip effect="dark" :content="$t('defaultStorageQuotaSettingTooltip')">
                     <Icon class="warning" icon="fe:warning" width="18" height="18"/>
                   </el-tooltip>
                 </div>
@@ -1178,10 +1178,10 @@
                 :loading="testingTg" 
                 :disabled="(!tgBotToken && !setting.tgBotToken) || !tgChatId?.length"
                 @click="handleTestAdminTelegram"
-                :title="$t('tgTestSend') || '发送测试消息'"
+                :title="$t('tgTestSend')"
               >
                 <Icon icon="fluent:send-20-regular" width="14" height="14" style="margin-right: 3px;" />
-                <span>{{ $t('tgTestSend') || '发送测试' }}</span>
+                <span>{{ $t('tgTestSend') }}</span>
               </el-button>
             </div>
             <el-input 
@@ -1189,7 +1189,7 @@
               type="password" 
               show-password 
               :disabled="Number(setting.allMailMode) === 2" 
-              :placeholder="setting.tgBotToken || $t('tgBotTokenPlaceholder') || '例如：123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ'" 
+              :placeholder="setting.tgBotToken || $t('tgBotTokenPlaceholder')" 
               clearable 
             />
           </div>
@@ -1203,14 +1203,14 @@
               v-model="tgChatId" 
               :disabled="Number(setting.allMailMode) === 2" 
               tag-type="primary" 
-              :placeholder="$t('toBotTokenDesc') || '例如：123456789 或 目标频道 ID'" 
+              :placeholder="$t('toBotTokenDesc')" 
               @add-tag="addChatTag"
             />
           </div>
 
           <div class="dialog-field">
             <div class="d-label-row">
-              <span class="d-label">{{ $t('customDomain') || 'API 反代 / 自定义域名 (可选)' }}</span>
+              <span class="d-label">{{ $t('customDomain') }}</span>
               <span class="d-sub-hint">留空默认使用官方 API</span>
             </div>
             <el-input 
@@ -1309,7 +1309,7 @@
           </div>
           <div class="dialog-field">
             <div class="d-label-row">
-              <span class="d-label">{{ $t('otherEmail') || '第三方邮箱列表' }}</span>
+              <span class="d-label">{{ $t('otherEmail') }}</span>
               <span class="d-sub-hint">支持多个邮箱（输入后回车添加）</span>
             </div>
             <el-input-tag tag-type="primary" :placeholder="$t('otherEmailInputDesc')" v-model="forwardEmail"
@@ -1343,7 +1343,7 @@
         <div class="forward-set-body">
           <div class="dialog-field">
             <div class="d-label-row">
-              <span class="d-label">{{ $t('ruleEmails') || '转发规则目标邮箱' }}</span>
+              <span class="d-label">{{ $t('ruleEmails') }}</span>
               <span class="d-sub-hint">输入邮箱后回车添加</span>
             </div>
             <el-input-tag :disabled="Number(setting.allMailMode) === 2" :placeholder="$t('ruleEmailsInputDesc')" tag-type="primary" v-model="ruleEmail"
@@ -1722,7 +1722,7 @@
                 <template v-else>
                   <div class="rich-mode-indicator">
                     <Icon icon="fluent:text-edit-style-20-regular" width="15" height="15" />
-                    <span>{{ $t('richTextMode') || '富文本可视化编辑' }}</span>
+                    <span>{{ $t('richTextMode') }}</span>
                   </div>
                 </template>
               </div>
@@ -1734,7 +1734,7 @@
               <div class="editor-right-tools">
                 <!-- Unified Mode Toggle Switch (Segmented Control - Pure Icon with Tooltips) -->
                 <div class="editor-mode-switch">
-                  <el-tooltip :content="$t('richTextMode') || '富文本模式'" effect="dark" placement="top">
+                  <el-tooltip :content="$t('richTextMode')" effect="dark" placement="top">
                     <button
                       type="button"
                       class="mode-switch-btn"
@@ -1745,7 +1745,7 @@
                       <Icon icon="fluent:text-edit-style-20-regular" width="16" height="16" />
                     </button>
                   </el-tooltip>
-                  <el-tooltip :content="$t('markdownSourceMode') || '源码 / Markdown 模式'" effect="dark" placement="top">
+                  <el-tooltip :content="$t('markdownSourceMode')" effect="dark" placement="top">
                     <button
                       type="button"
                       class="mode-switch-btn"
@@ -2040,7 +2040,7 @@
                 <template v-else>
                   <div class="rich-mode-indicator">
                     <Icon icon="fluent:text-edit-style-20-regular" width="15" height="15" />
-                    <span>{{ $t('richTextMode') || '富文本可视化编辑' }}</span>
+                    <span>{{ $t('richTextMode') }}</span>
                   </div>
                 </template>
               </div>
@@ -2050,7 +2050,7 @@
               <!-- Right Group: Mode Segmented Switch + Actions -->
               <div class="editor-right-tools">
                 <div class="editor-mode-switch">
-                  <el-tooltip :content="$t('richTextMode') || '富文本模式'" effect="dark" placement="top">
+                  <el-tooltip :content="$t('richTextMode')" effect="dark" placement="top">
                     <button
                       type="button"
                       class="mode-switch-btn"
@@ -2061,7 +2061,7 @@
                       <Icon icon="fluent:text-edit-style-20-regular" width="16" height="16" />
                     </button>
                   </el-tooltip>
-                  <el-tooltip :content="$t('markdownSourceMode') || '源码 / Markdown 模式'" effect="dark" placement="top">
+                  <el-tooltip :content="$t('markdownSourceMode')" effect="dark" placement="top">
                     <button
                       type="button"
                       class="mode-switch-btn"
@@ -2902,7 +2902,7 @@
                 <span class="g-lbl">{{ $t('dbScopeLabel') }}:</span>
                 <span class="g-val">
                   用户账号 · 2FA · OAuth
-                  <el-tooltip effect="dark" :content="$t('dbUserDomainDetail') || dbStatusInfo?.domains?.user?.scope || '用户账号、哈希口令、2FA密钥、Passkeys、RBAC权限及OAuth开放平台'">
+                  <el-tooltip effect="dark" :content="$t('dbUserDomainDetail') || dbStatusInfo?.domains?.user?.scope">
                     <Icon class="warning" icon="fe:warning" width="13" height="13" style="margin-left: 2px; vertical-align: -1px;"/>
                   </el-tooltip>
                 </span>
@@ -2939,7 +2939,7 @@
                 <span class="g-lbl">{{ $t('dbScopeLabel') }}:</span>
                 <span class="g-val">
                   邮件列表 · 正文 · 号池
-                  <el-tooltip effect="dark" :content="dbStatusInfo?.domains?.mail?.scope || '邮件列表、纯文本邮件正文、收发邮箱号池、联系人'">
+                  <el-tooltip effect="dark" :content="dbStatusInfo?.domains?.mail?.scope || $t('dbScopeMail')">
                     <Icon class="warning" icon="fe:warning" width="13" height="13" style="margin-left: 2px; vertical-align: -1px;"/>
                   </el-tooltip>
                 </span>
@@ -2976,7 +2976,7 @@
                 <span class="g-lbl">{{ $t('dbScopeLabel') }}:</span>
                 <span class="g-val">
                   大体积多媒体 · CDN免流
-                  <el-tooltip effect="dark" :content="dbStatusInfo?.domains?.attachment?.scope || '邮件大附件二进制实体、SHA-256 去重哈希、0元 CDN 直链下载'">
+                  <el-tooltip effect="dark" :content="dbStatusInfo?.domains?.attachment?.scope || $t('dbScopeAttachment')">
                     <Icon class="warning" icon="fe:warning" width="13" height="13" style="margin-left: 2px; vertical-align: -1px;"/>
                   </el-tooltip>
                 </span>
@@ -2995,7 +2995,7 @@
           <div class="dialog-footer-actions">
             <el-button type="primary" :loading="scanningDbDomains" @click="handleRefreshDbDomains">
               <Icon icon="fluent:arrow-sync-20-regular" width="14" height="14" style="margin-right: 4px;" />
-              {{ $t('dbRefreshDomains') || '刷新透视' }}
+              {{ $t('dbRefreshDomains') }}
             </el-button>
           </div>
         </template>
@@ -3084,10 +3084,10 @@
       >
         <template #header>
           <div class="ai-hub-dialog-header" style="display: flex; align-items: center; gap: 8px;">
-            <span class="el-dialog__title" style="font-weight: 600;">{{ $t('aiHubConfigTitle') || 'AI 智能引擎与大模型配置' }}</span>
+            <span class="el-dialog__title" style="font-weight: 600;">{{ $t('aiHubConfigTitle') }}</span>
             <el-tooltip 
               effect="dark" 
-              :content="$t('aiProviderHint') || '留空 API Key 时将自动免密调用 Cloudflare Workers AI 专属绑定或公共引擎保底。配置后优先请求您的专属大模型服务。'" 
+              :content="$t('aiProviderHint')" 
               placement="top"
             >
               <span class="ai-help-icon-wrap" style="display: inline-flex; align-items: center; justify-content: center; cursor: pointer; color: var(--el-text-color-secondary);">
@@ -3103,10 +3103,10 @@
               <el-form-item>
                 <template #label>
                   <div class="ai-form-item-label" style="display: flex; align-items: center; gap: 4px;">
-                    <span>{{ $t('aiEndpoint') || '接口地址 (Base URL)' }}</span>
+                    <span>{{ $t('aiEndpoint') }}</span>
                     <el-tooltip 
                       effect="dark" 
-                      :content="$t('aiEndpointTooltip') || '支持直接输入服务站点根域名（如 https://api.openai.com 或 https://api.deepseek.com），系统将自动尝试匹配补齐如 /v1/chat/completions 等接入路径；亦可直接填入完整终端 URL 精确使用。若自动尝试均失败，将直接回退为您输入的原始 URL 发起尝试。'" 
+                      :content="$t('aiEndpointTooltip')" 
                       placement="top"
                     >
                       <span class="ai-help-icon-wrap" style="display: inline-flex; align-items: center; justify-content: center; cursor: pointer; color: var(--el-text-color-secondary);">
@@ -3117,13 +3117,13 @@
                 </template>
                 <el-input 
                   v-model="aiHubForm.aiApiUrl" 
-                  :placeholder="$t('aiEndpointPlaceholder') || 'https://api.openai.com/v1 或直接输入站点域名'" 
+                  :placeholder="$t('aiEndpointPlaceholder')" 
                   clearable
                   @input="handleEndpointOrKeyChange"
                   @clear="handleEndpointOrKeyChange"
                 />
               </el-form-item>
-              <el-form-item :label="$t('aiApiKeyLabel') || 'API 密钥 (API Key)'">
+              <el-form-item :label="$t('aiApiKeyLabel')">
                 <el-input 
                   v-model="aiHubForm.aiApiKey" 
                   type="password" 
@@ -3138,7 +3138,7 @@
 
             <!-- Right Column: Primary Model & Multi-model Pool (Initial available models without auto-testing) -->
             <div class="ai-grid-col">
-              <el-form-item :label="$t('aiModelsLabel') || '接入模型 (Models)'">
+              <el-form-item :label="$t('aiModelsLabel')">
                 <el-select 
                   v-model="aiHubForm.aiModel" 
                   filterable
@@ -3147,7 +3147,7 @@
                   clearable
                   class="ai-model-select"
                   popper-class="ai-model-dropdown"
-                  :placeholder="$t('aiModelPlaceholder') || '选择或键入主推理模型 (如 deepseek-chat, gpt-4o-mini)'" 
+                  :placeholder="$t('aiModelPlaceholder')" 
                   style="width: 100%;"
                 >
                   <template #prefix>
@@ -3170,10 +3170,10 @@
               <el-form-item>
                 <template #label>
                   <div class="ai-form-item-label" style="display: flex; align-items: center; gap: 4px;">
-                    <span>{{ $t('aiModelsPoolLabel') || '可用多模型池 (Models Pool)' }}</span>
+                    <span>{{ $t('aiModelsPoolLabel') }}</span>
                     <el-tooltip 
                       effect="dark" 
-                      :content="$t('aiModelsPoolTooltip') || '作为系统可用模型池，可前往【权限控制】为不同角色分组（站长/学者/书友/参观者）分级授权允许调用的模型。'" 
+                      :content="$t('aiModelsPoolTooltip')" 
                       placement="top"
                     >
                       <span class="ai-help-icon-wrap" style="display: inline-flex; align-items: center; justify-content: center; cursor: pointer; color: var(--el-text-color-secondary);">
@@ -3195,7 +3195,7 @@
                   clearable
                   class="ai-models-pool-select"
                   popper-class="ai-models-pool-dropdown"
-                  :placeholder="$t('aiModelsPoolPlaceholder') || '选择或键入本站允许调用的多个模型'" 
+                  :placeholder="$t('aiModelsPoolPlaceholder')" 
                   style="width: 100%;"
                 >
                   <template #prefix>
@@ -3223,11 +3223,11 @@
               <div style="display: inline-flex; align-items: center; gap: 4px;">
                 <el-button class="opt-btn-test-ai-dialog" :loading="testingAiInHub" @click="testAiConnectionInHub">
                   <Icon icon="fluent:flash-checkmark-24-filled" width="14" height="14" style="margin-right: 4px;" />
-                  {{ $t('aiTestBtn') || '测试连通性' }}
+                  {{ $t('aiTestBtn') }}
                 </el-button>
                 <el-tooltip 
                   effect="dark" 
-                  :content="$t('aiTestUsageHint') || '测试连通性与保存时将对当前选中的主模型及模型池可用性进行测算。优先采用 0-Token 检索协议无感测算延迟；若服务商不支持则发送 1-Token 极简请求，操作可能会消耗极少量 API 额度。'" 
+                  :content="$t('aiTestUsageHint')" 
                   placement="top"
                 >
                   <span class="ai-help-icon-wrap" style="display: inline-flex; align-items: center; justify-content: center; cursor: pointer; color: var(--el-text-color-secondary);">
@@ -3237,13 +3237,13 @@
               </div>
               <el-button link type="danger" size="small" @click="clearFormInDialog">
                 <Icon icon="fluent:delete-20-regular" width="14" height="14" style="margin-right: 2px;" />
-                {{ $t('aiDeleteBtn') || '清空' }}
+                {{ $t('aiDeleteBtn') }}
               </el-button>
             </div>
             <div>
-              <el-button @click="aiHubDialogShow = false">{{ $t('cancel') || '取消' }}</el-button>
+              <el-button @click="aiHubDialogShow = false">{{ $t('cancel') }}</el-button>
               <el-button type="primary" :loading="settingLoading || testingAiInHub" @click="saveAiHubConfig">
-                {{ $t('save') || '保存配置' }}
+                {{ $t('save') }}
               </el-button>
             </div>
           </div>
@@ -3643,11 +3643,11 @@ const clearFormInDialog = () => {
 
 const deleteAiConfig = () => {
   ElMessageBox.confirm(
-    t('aiResetConfirm') || '确定要清空自定义大模型配置吗？清空后将恢复为系统内置免密 Workers AI。',
-    t('delete') || '清空确认',
+    t('aiResetConfirm'),
+    t('delete'),
     {
-      confirmButtonText: t('confirm') || '确定',
-      cancelButtonText: t('cancel') || '取消',
+      confirmButtonText: t('confirm'),
+      cancelButtonText: t('cancel'),
       type: 'warning'
     }
   ).then(() => {
@@ -3665,7 +3665,7 @@ const deleteAiConfig = () => {
     dialogDetectedModels.value = []
     ElMessage({
       type: 'success',
-      message: t('aiResetSuccess') || '已清空自定义大模型配置，恢复免密模式',
+      message: t('aiResetSuccess'),
       plain: true
     })
   }).catch(() => {})
@@ -3696,7 +3696,7 @@ const testAiConnectionInHub = () => {
   testAiSetting(testPayload).then(res => {
     testingAiInHub.value = false
     const resData = res.data || res
-    const msg = resData?.message || t('aiTestSuccess') || 'AI 连通性测试成功！'
+    const msg = resData?.message || t('aiTestSuccess')
 
     if (resData?.modelLatencyMap && typeof resData.modelLatencyMap === 'object') {
       Object.entries(resData.modelLatencyMap).forEach(([m, lat]) => {
@@ -3722,7 +3722,7 @@ const testAiConnectionInHub = () => {
     // 明确规范：点击测试仅测试并提示，严禁自动保存触发副作用循环
   }).catch(err => {
     testingAiInHub.value = false
-    const errMsg = err.response?.data?.message || err.message || t('aiTestFail') || '测试失败'
+    const errMsg = err.response?.data?.message || err.message || t('aiTestFail')
     ElMessage({
       type: 'error',
       message: `${errMsg} (需确保连通正常后大模型方可调用)`,
@@ -3790,7 +3790,7 @@ const saveAiHubConfig = (closeDialog = true) => {
     })
   }).catch(err => {
     testingAiInHub.value = false
-    const errMsg = err.response?.data?.message || err.message || t('aiTestFail') || '测试失败'
+    const errMsg = err.response?.data?.message || err.message || t('aiTestFail')
     ElMessage({
       type: 'error',
       message: `模型连通性测试未通过: ${errMsg}。配置未自动保存，请检查接口配置或选择可用模型。`,
@@ -4084,8 +4084,8 @@ function changeMailMode(val) {
       t('encryptedMailModeWarningMsg'),
       t('encryptedMailModeWarningTitle'),
       {
-        confirmButtonText: t('confirm') || '确定开启',
-        cancelButtonText: t('cancel') || '取消',
+        confirmButtonText: t('confirm'),
+        cancelButtonText: t('cancel'),
         type: 'warning',
         dangerouslyUseHTMLString: true,
         customClass: 'encrypted-mode-confirm-dialog'
@@ -4118,8 +4118,8 @@ function changeTotpSwitch(val) {
       t('disableTotpConfirmMsg'),
       t('disableTotpConfirmTitle'),
       {
-        confirmButtonText: t('confirm') || '确定关闭',
-        cancelButtonText: t('cancel') || '取消',
+        confirmButtonText: t('confirm'),
+        cancelButtonText: t('cancel'),
         type: 'warning',
         dangerouslyUseHTMLString: true,
         customClass: 'disable-totp-confirm-dialog'
@@ -4491,7 +4491,7 @@ function resetToDefaultWelcomeTemplate() {
       }
     })
   }
-  ElMessage.success(t('welcomeResetTemplate') || '已恢复官方默认模板')
+  ElMessage.success(t('welcomeResetTemplate'))
 }
 
 function setEditorFormat(format) {
@@ -4568,7 +4568,7 @@ function saveWelcomeTemplate() {
   settingSet(payload).then(() => {
     setting.value = { ...setting.value, ...payload }
     settingStore.settings = { ...settingStore.settings, ...payload }
-    ElMessage.success(t('welcomeSaveSuccess') || '欢迎邮件模板配置已保存')
+    ElMessage.success(t('welcomeSaveSuccess'))
     welcomeEmailShow.value = false
   }).catch(e => {
     console.error('saveWelcomeTemplate error:', e)
@@ -4622,12 +4622,12 @@ function confirmBroadcastWelcome() {
 
     sendWelcomeEmail(payload).then(res => {
       const count = res.deliverCount ?? res.totalUsers ?? 0
-      ElMessage.success(t('welcomeBroadcastSuccess', { count }) || `已成功向全员 ${count} 位用户投递官方欢迎邮件！`)
+      ElMessage.success(t('welcomeBroadcastSuccess', { count }))
       getSettings()
       welcomeEmailShow.value = false
     }).catch(e => {
       console.error('sendWelcomeEmail error:', e)
-      ElMessage.error(t('operationFailed') || '投递失败')
+      ElMessage.error(t('operationFailed'))
     }).finally(() => {
       sendingWelcome.value = false
     })
@@ -4771,10 +4771,10 @@ function saveGlobalEmailDraft() {
   }
 
   settingSet({ globalEmailConfig: JSON.stringify(payload) }).then(() => {
-    ElMessage.success(t('globalEmailSaveSuccess') || '全域公告配置已保存')
+    ElMessage.success(t('globalEmailSaveSuccess'))
   }).catch(e => {
     console.error('saveGlobalEmailDraft error:', e)
-    ElMessage.error(t('operationFailed') || '保存失败')
+    ElMessage.error(t('operationFailed'))
   }).finally(() => {
     savingGlobalEmail.value = false
   })
@@ -4791,15 +4791,15 @@ function confirmBroadcastGlobalEmail() {
   globalEmailForm.content = finalContent
 
   if (!globalEmailForm.subject || !globalEmailForm.subject.trim()) {
-    ElMessage.warning(t('subjectRequired') || '请输入公告主题')
+    ElMessage.warning(t('subjectRequired'))
     return
   }
   if (!finalContent || !finalContent.trim()) {
-    ElMessage.warning(t('contentRequired') || '请输入公告正文')
+    ElMessage.warning(t('contentRequired'))
     return
   }
 
-  let targetDesc = t('globalEmailAudienceAll') || '全平台所有注册用户'
+  let targetDesc = t('globalEmailAudienceAll')
   if (globalEmailForm.targetType === 'roles') {
     const roleNames = availableRoles.value
       .filter(r => globalEmailForm.targetRoleIds.includes(r.roleId))
@@ -4807,13 +4807,13 @@ function confirmBroadcastGlobalEmail() {
     targetDesc = roleNames.length > 0 ? roleNames.join(', ') : '未选择具体角色'
   }
 
-  const confirmMsg = t('globalEmailConfirmMsg', { target: targetDesc }) || `此操作将以站长 (admin@epocanvas.com) 身份向目标范围（${targetDesc}）的所有用户直接投递全域公告邮件，是否确认立即投递？`
+  const confirmMsg = t('globalEmailConfirmMsg', { target: targetDesc })
 
   ElMessageBox.confirm(
     confirmMsg,
-    t('globalEmailConfirmTitle') || '确认发送全域公告邮件？',
+    t('globalEmailConfirmTitle'),
     {
-      confirmButtonText: t('globalEmailBroadcastBtn') || '立即发送全域公告',
+      confirmButtonText: t('globalEmailBroadcastBtn'),
       cancelButtonText: t('cancel'),
       type: 'warning',
       customClass: 'welcome-confirm-box high-risk-modal',
@@ -4833,11 +4833,11 @@ function confirmBroadcastGlobalEmail() {
 
     sendGlobalEmail(payload).then(res => {
       const count = res.deliverCount ?? res.totalUsers ?? 0
-      ElMessage.success(t('globalEmailBroadcastSuccess', { count }) || `已成功向 ${count} 位用户投递全域公告邮件！`)
+      ElMessage.success(t('globalEmailBroadcastSuccess', { count }))
       globalEmailDialogShow.value = false
     }).catch(e => {
       console.error('sendGlobalEmail error:', e)
-      ElMessage.error(t('operationFailed') || '投递失败')
+      ElMessage.error(t('operationFailed'))
     }).finally(() => {
       sendingGlobalEmail.value = false
     })
@@ -4860,7 +4860,7 @@ function openEmailPrefix() {
 
 function openForwardRules() {
   if (Number(setting.value?.allMailMode) === 2) {
-    ElMessage.warning(t('forwardRulesEncryptedTooltip') || '加密模式下无法查看任何用户的任何邮件，请前往用户的资料分区增设。')
+    ElMessage.warning(t('forwardRulesEncryptedTooltip'))
     return
   }
   ruleType.value = setting.value.ruleType
@@ -4957,7 +4957,7 @@ async function handleTestS3Connection() {
   }
 
   if (!form.bucket || !form.endpoint || !form.s3AccessKey || !form.s3SecretKey) {
-    ElMessage.warning(t('s3FillRequiredFields') || '请先填写 Bucket、Endpoint、Access Key 和 Secret Key')
+    ElMessage.warning(t('s3FillRequiredFields'))
     return
   }
 
@@ -4969,13 +4969,13 @@ async function handleTestS3Connection() {
     if (data) {
       s3TestResult.value = data
       if (data.ok) {
-        ElMessage.success(data.message || '连接测试成功！')
+        ElMessage.success(data.message || t('connectionTestSuccess'))
       } else {
-        ElMessage.error(data.message || '连接测试失败')
+        ElMessage.error(data.message || t('connectionTestFailed'))
       }
     }
   } catch (err) {
-    ElMessage.error(err.message || '测试连接异常')
+    ElMessage.error(err.message || t('connectionTestAbnormal'))
   } finally {
     testingS3.value = false
   }
@@ -5039,7 +5039,7 @@ async function handleTestDbConnection() {
 
   if (dbForm.provider !== 'd1' && dbForm.enabled === 1) {
     if (!form.externalDbEndpoint || (!form.externalDbToken && !setting.value.externalDbToken)) {
-      ElMessage.warning(t('dbFillRequiredFields') || '请先填写数据库接入点 URL 与认证令牌')
+      ElMessage.warning(t('dbFillRequiredFields'))
       return
     }
   }
@@ -5099,7 +5099,7 @@ function clearDb() {
 
 async function handleQuickTestS3() {
   if (!setting.value.bucket || !setting.value.endpoint) {
-    ElMessage.info(t('storageNotConfigured') || '尚未配置第三方存储，请点击「S3 / Backblaze B2 配置」进行接入')
+    ElMessage.info(t('storageNotConfigured'))
     openAddS3()
     return
   }
@@ -5154,16 +5154,16 @@ async function handleQuickTestStorageAndDb() {
     const s3Data = s3Res.status === 'fulfilled' ? (s3Res.value?.data !== undefined ? s3Res.value.data : s3Res.value) : null
 
     if (dbData?.ok && (!s3Data || s3Data.ok)) {
-      ElMessage.success(`全链路诊断通过！数据库响应: ${dbData.latencyMs}ms | 存储响应: ${s3Data?.latencyMs || 2}ms`)
+      ElMessage.success(t('systemDiagnosticSuccess', { dbMs: dbData.latencyMs, s3Ms: s3Data?.latencyMs || 2 }))
     } else {
       const errs = []
       if (dbData && !dbData.ok) errs.push(`数据库: ${dbData.message}`)
       if (s3Data && !s3Data.ok) errs.push(`存储: ${s3Data.message}`)
-      ElMessage.error(`连通性异常: ${errs.join(' | ')}`)
+      ElMessage.error(t('systemDiagnosticFailed', { errors: errs.join(' | ') }))
     }
     loadDbStatus()
   } catch (err) {
-    ElMessage.error(err.message || '连通性诊断异常')
+    ElMessage.error(err.message || t('connectivityDiagnoseAbnormal'))
   } finally {
     testingStorageQuick.value = false
   }
@@ -5193,7 +5193,7 @@ async function saveAttachmentRule() {
     attachmentCascadeDelete: attachmentRuleForm.cascadeDelete
   })
   attachmentRuleShow.value = false
-  ElMessage.success(t('saveAttachmentRule') + ' ' + (t('successful') || '成功'))
+  ElMessage.success(t('saveAttachmentRule') + ' ' + (t('successful')))
 }
 
 async function openDbDomainsDetail() {
@@ -5208,10 +5208,10 @@ async function handleRefreshDbDomains() {
     const data = res?.data !== undefined ? res.data : res
     if (data) {
       dbStatusInfo.value = data
-      ElMessage.success(t('dbRefreshSuccess') || '数据库架构与状态刷新成功')
+      ElMessage.success(t('dbRefreshSuccess'))
     }
   } catch (e) {
-    ElMessage.error(e.message || '刷新数据库状态失败')
+    ElMessage.error(e.message || t('refreshDbStatusFailed'))
   } finally {
     scanningDbDomains.value = false
   }
@@ -5232,7 +5232,7 @@ async function handleRunStorageScan() {
       ElMessage.success(t('storageScanSuccess'))
     }
   } catch (e) {
-    ElMessage.error(e.message || '扫描失败')
+    ElMessage.error(e.message || t('scanFailed'))
   } finally {
     scanningStorage.value = false
   }
@@ -5252,7 +5252,7 @@ async function handleCleanupStorage() {
     await handleRunStorageScan()
   } catch (e) {
     if (e !== 'cancel') {
-      ElMessage.error(e.message || '清理失败')
+      ElMessage.error(e.message || t('cleanFailed'))
     }
   } finally {
     cleaningStorage.value = false
@@ -5264,13 +5264,13 @@ const testingTg = ref(false);
 
 async function handleTestAdminTelegram() {
   if (Number(setting.value?.allMailMode) === 2) {
-    ElMessage.warning(t('encryptedModeTgDisabledTip') || '加密邮件模式下 Telegram 机器人已被强制关闭');
+    ElMessage.warning(t('encryptedModeTgDisabledTip'));
     return;
   }
   const token = tgBotToken.value || setting.value.tgBotToken;
   const chatId = tgChatId.value?.[0];
   if (!token || !chatId) {
-    ElMessage.warning(t('tgFillRequiredFields') || '请先填写 Bot Token 与至少一个 Chat ID');
+    ElMessage.warning(t('tgFillRequiredFields'));
     return;
   }
   testingTg.value = true;
@@ -5279,10 +5279,10 @@ async function handleTestAdminTelegram() {
       botToken: token,
       chatId: String(chatId).trim(),
     });
-    ElMessage.success(t('tgTestSuccess') || '测试消息已成功发送至 Telegram！请前往客户端查收。');
+    ElMessage.success(t('tgTestSuccess'));
   } catch (err) {
     console.error('Test telegram failed:', err);
-    ElMessage.error(err.message || '发送测试消息失败，请检查 Token 与 Chat ID 是否正确');
+    ElMessage.error(err.message || t('sendTgTestMsgFailed'));
   } finally {
     testingTg.value = false;
   }
@@ -5290,7 +5290,7 @@ async function handleTestAdminTelegram() {
 
 function tgBotSave() {
   if (Number(setting.value?.allMailMode) === 2) {
-    ElMessage.warning(t('encryptedModeTgDisabledTip') || '加密邮件模式下 Telegram 机器人已被强制关闭')
+    ElMessage.warning(t('encryptedModeTgDisabledTip'))
     return
   }
   const form = {
@@ -5316,7 +5316,7 @@ function forwardEmailSave() {
 
 function ruleEmailSave() {
   if (Number(setting.value?.allMailMode) === 2) {
-    ElMessage.warning(t('forwardRulesEncryptedTooltip') || '加密模式下无法查看任何用户的任何邮件，请前往用户的资料分区增设。')
+    ElMessage.warning(t('forwardRulesEncryptedTooltip'))
     return
   }
   const form = {
@@ -5736,7 +5736,7 @@ function syncToOtherLang() {
     })
   }
   saveAuthI18n()
-  ElMessage.success(t('syncSuccess') || '同步成功')
+  ElMessage.success(t('syncSuccess'))
 }
 
 function jump(href) {

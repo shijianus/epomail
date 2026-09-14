@@ -69,10 +69,10 @@ export const useUiStore = defineStore('ui', {
             },
             multiple: {
                 panels: [
-                    { query: 'is:starred', title: '星标邮件' },
-                    { query: 'is:unread', title: '未读邮件' },
-                    { query: 'has:attachment', title: '含附件' },
-                    { query: 'label:work', title: '工作' }
+                    { query: 'is:starred', title: 'Starred' },
+                    { query: 'is:unread', title: 'Unread' },
+                    { query: 'has:attachment', title: 'Attachment' },
+                    { query: 'label:work', title: 'Work' }
                 ],
                 maxItems: 10,
                 position: 'right'
@@ -292,10 +292,10 @@ export const useUiStore = defineStore('ui', {
                 },
                 multiple: {
                     panels: [
-                        { query: 'is:starred', title: '星标邮件' },
-                        { query: 'is:unread', title: '未读邮件' },
-                        { query: 'has:attachment', title: '含附件' },
-                        { query: 'label:work', title: '工作' }
+                        { query: 'is:starred', title: 'Starred' },
+                        { query: 'is:unread', title: 'Unread' },
+                        { query: 'has:attachment', title: 'Attachment' },
+                        { query: 'label:work', title: 'Work' }
                     ],
                     maxItems: 10,
                     position: 'right'

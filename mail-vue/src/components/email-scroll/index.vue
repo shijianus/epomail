@@ -49,7 +49,7 @@
               <div class="unread-bar" v-if="item.unread === EmailUnreadEnum.UNREAD && showUnread"></div>
               <el-checkbox :class=" props.type === 'all-email' ? 'all-email-checkbox' : 'checkbox'"
                            v-model="item.checked" @click.stop></el-checkbox>
-              <div @click.stop="starChange(item)" class="pc-star" v-if="showStar" :title="item.isStar ? ($t('starred') || '已加星标') : ($t('star') || '加星标')">
+              <div @click.stop="starChange(item)" class="pc-star" v-if="showStar" :title="item.isStar ? $t('starred') : $t('star')">
                 <Icon v-if="item.isStar" icon="fluent-color:star-16" width="18" height="18"/>
                 <Icon v-else icon="solar:star-line-duotone" width="18" height="18"/>
               </div>
@@ -69,9 +69,9 @@
                       </el-tooltip>
                     </div>
                   </div>
-                  <div class="sender-name-wrap">
-                    <span class="sender-name-text">
-                      <slot name="name" :email="item">
+                  <div class="sender-name-group">
+                    <span class="sender-name" :class="{ 'sender-name-bold': item.unread === EmailUnreadEnum.UNREAD }">
+                      <slot name="name" :item="item">
                         <span v-html="highlightMatch(item.name || '')"></span>
                       </slot>
                     </span>
@@ -79,11 +79,11 @@
                     <span 
                       v-if="item.threadCount && item.threadCount > 1" 
                       class="thread-count-badge"
-                      :title="`共 ${item.threadCount} 封会话邮件`"
+                      :title="$t('threadCountTooltip', { count: item.threadCount })"
                     >
                       {{ item.threadCount }}
                     </span>
-                    <span v-if="item.sendEmail === 'admin@epocanvas.com' || item.isOfficial" class="official-verified-badge" :title="$t('officialVerified') || '官方认证'">
+                    <span v-if="item.sendEmail === 'admin@epocanvas.com' || item.isOfficial" class="official-verified-badge" :title="$t('officialVerified')">
                       <Icon icon="ri:verified-badge-fill" width="15" height="15" style="color: #0284c7; vertical-align: middle; margin-left: 3px;" />
                     </span>
                   </div>
@@ -100,10 +100,10 @@
                     type="danger" 
                     effect="dark" 
                     class="spam-intercept-tag" 
-                    v-if="item.isSpam === 1 || (item.labels && (item.labels.includes('推销') || item.labels.includes('垃圾')))" 
+                    v-if="item.isSpam === 1 || (item.labels && (item.labels.includes('推销') || item.labels.includes('推銷') || item.labels.includes('Promotions') || item.labels.includes('垃圾') || item.labels.includes('Spam')))" 
                     style="margin-right: 6px; font-weight: 700; border-radius: 4px; box-shadow: 0 2px 4px rgba(245, 108, 108, 0.2);"
                   >
-                    <Icon icon="mdi:shield-alert" width="12" style="margin-right: 2px;" /> 拦截
+                    <Icon icon="mdi:shield-alert" width="12" style="margin-right: 2px;" /> {{ $t('interceptBadge') }}
                   </el-tag>
 
                   <el-tag

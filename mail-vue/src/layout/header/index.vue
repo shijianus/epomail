@@ -14,8 +14,8 @@
         <span class="search-icon" @click="handleSearch" :title="$t('search') || 'Search'">
           <Icon icon="lucide:search" width="18" height="18"/>
         </span>
-        <input type="text" :placeholder="isSettingsMode && route.name !== 'all-email' ? (route.name === 'data-setting' ? ($t('searchSettingsOrApps') || '搜索设定或第三方应用...') : ($t('searchSettings') || 'Search settings')) : route.name === 'all-email' ? ($t('searchAllMail') || 'Search all mail...') : ($t('searchMail') || 'Search mail')" v-model="emailStore.searchKeyword" @input="handleSearchInput" @keyup.enter="handleSearch" @keydown.tab.prevent="handleTabComplete" @focus="searchFocus = true" @blur="onSearchBlur" />
-        <span class="clear-icon" v-show="emailStore.searchKeyword" @mousedown.prevent @click.stop="clearSearch" :title="$t('clear') || 'Clear'">
+        <input type="text" :placeholder="isSettingsMode && route.name !== 'all-email' ? (route.name === 'data-setting' ? $t('searchSettingsOrApps') : $t('searchSettings')) : route.name === 'all-email' ? $t('searchAllMail') : $t('searchMail')" v-model="emailStore.searchKeyword" @input="handleSearchInput" @keyup.enter="handleSearch" @keydown.tab.prevent="handleTabComplete" @focus="searchFocus = true" @blur="onSearchBlur" />
+        <span class="clear-icon" v-show="emailStore.searchKeyword" @mousedown.prevent @click.stop="clearSearch" :title="$t('clear')">
           <Icon icon="lucide:x" width="15" height="15"/>
         </span>
         
@@ -36,7 +36,7 @@
              </div>
            </div>
            <div v-if="settingsSearchResults.length === 0" class="settings-search-empty">
-             {{ $t('noData') || 'No results found' }}
+             {{ $t('noData') }}
            </div>
         </div>
       </div>
@@ -44,7 +44,7 @@
 
     <!-- Right Section: Actions & Avatar -->
     <div class="topbar-actions">
-      <el-tooltip :content="uiStore.dark ? ($t('lightMode') || 'Light Mode') : ($t('darkMode') || 'Dark Mode')" placement="bottom">
+      <el-tooltip :content="uiStore.dark ? $t('lightMode') : $t('darkMode')" placement="bottom">
         <button v-if="uiStore.dark" class="icon-btn theme-toggle-btn" @click="openDark($event)">
           <Icon icon="lucide:sun" width="22" height="22"/>
         </button>
@@ -52,12 +52,12 @@
           <Icon icon="lucide:moon" width="22" height="22"/>
         </button>
       </el-tooltip>
-      <el-tooltip :content="$t('help') || 'Support'" placement="bottom">
+      <el-tooltip :content="$t('help')" placement="bottom">
         <button class="icon-btn">
           <Icon icon="lucide:help-circle" width="22" height="22"/>
         </button>
       </el-tooltip>
-      <el-tooltip v-if="settingStore.settings?.notice === 0" :content="$t('notice') || 'Notice'" placement="bottom">
+      <el-tooltip v-if="settingStore.settings?.notice === 0" :content="$t('notice')" placement="bottom">
         <button class="icon-btn" @click="openNotice">
           <Icon icon="lucide:bell" width="22" height="22"/>
           <span class="badge"></span>
@@ -74,17 +74,17 @@
               <div style="overflow:hidden">
                 <div class="am-name">{{ accountStore.currentAccount?.name || userStore.user?.name || '' }}</div>
                 <div class="am-email" @click="copyEmail(displayEmail)" style="cursor:pointer">{{ displayEmail }}</div>
-                <div class="am-status"><span class="status-dot"></span><span>{{ userStore.user.role?.name || '' }}</span></div>
+                <div class="am-status"><span class="status-dot"></span><span>{{ localizedRoleName }}</span></div>
               </div>
             </div>
-            <div class="am-item" @click="openAccountDetails"><span>{{ $t('accountDetails') || 'Account Details' }}</span></div>
-            <div class="am-item" @click="openSettings"><span>{{ $t('settings') || 'Settings' }}</span></div>
+            <div class="am-item" @click="openAccountDetails"><span>{{ $t('accountDetails') }}</span></div>
+            <div class="am-item" @click="openSettings"><span>{{ $t('settings') }}</span></div>
             <div class="am-item logout" @click="clickLogout"><span>{{ $t('logOut') }}</span></div>
           </div>
         </template>
       </el-dropdown>
       <div v-else-if="props.isProfile" class="guest-login-btn" style="display:flex;align-items:center;">
-        <el-button type="primary" size="small" @click="goToLogin" style="border-radius:8px;">{{ $t('login') || '登录' }}</el-button>
+        <el-button type="primary" size="small" @click="goToLogin" style="border-radius:8px;">{{ $t('login') }}</el-button>
       </div>
     </div>
   </div>
@@ -348,7 +348,7 @@ const settingsMap = computed(() => [
       { text: t('dataExportTitle') || 'Export Data', id: 'dataExport' },
       { text: t('forwardingAndPushTitle') || t('forwardingRulesTitle') || 'Forwarding & Push', id: 'forwarding' },
       { text: t('apiDeveloperTitle') || 'API & Developer Access', id: 'apiAccess' },
-      { text: t('thirdPartyAppsTitle') || '第三方应用和服务', id: 'thirdPartyApps', keywords: ['app', 'oauth', '应用', '第三方', '授权', '单点登录', 'sso', 'shijianus-blog', 'epocanvasimage', 'client'] }
+      { text: t('thirdPartyAppsTitle'), id: 'thirdPartyApps', keywords: ['app', 'oauth', '应用', '第三方', '授权', '单点登录', 'sso', 'shijianus-blog', 'epocanvasimage', 'client'] }
     ]
   },
   {
@@ -548,7 +548,17 @@ function clearSearch() {
 }
 
 const accountCount = computed(() => {
-  return userStore.user.role.accountCount
+  return userStore.user.role?.accountCount
+})
+
+const localizedRoleName = computed(() => {
+  const role = userStore.user?.role
+  if (!role) return ''
+  if (role.roleCode === 'master' || role.name === '站长' || role.name === '站長') return t('roleMaster')
+  if (role.roleCode === 'moderator' || role.name?.includes('协管') || role.name?.includes('協管')) return t('roleModerator')
+  if (role.roleCode === 'visitor' || role.name === '参观者' || role.name === '參觀者') return t('roleVisitor')
+  if (role.roleCode === 'user_base' || role.roleCode === 'user_lv0' || role.roleCode === 'user_lv1' || role.name?.includes('普通用户') || role.name?.includes('普通用戶')) return t('roleUserBase')
+  return role.name || ''
 })
 
 function handleSearch() {

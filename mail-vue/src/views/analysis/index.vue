@@ -46,7 +46,7 @@
         <div class="number-item">
           <div class="top">
             <div class="left">
-              <div style="font-weight: 600;">系统拦截率</div>
+              <div style="font-weight: 600;">{{ $t('systemInterceptRate') }}</div>
               <div>
                 <el-statistic :formatter="value => Math.round(value) + '%'" :value="interceptRateData"/>
               </div>
@@ -58,8 +58,8 @@
             </div>
           </div>
           <div class="delete-ratio">
-            <div>垃圾邮件 <span style="color: #E6A23C; font-weight: 600;">{{ numberCount.interceptReceiveTotal || 0 }}</span></div>
-            <div>拦截邮件 <span style="color: #f56c6c; font-weight: 600;">{{ numberCount.hardInterceptTotal || 0 }}</span></div>
+            <div>{{ $t('spamEmails') }} <span style="color: #E6A23C; font-weight: 600;">{{ numberCount.interceptReceiveTotal || 0 }}</span></div>
+            <div>{{ $t('interceptedEmails') }} <span style="color: #f56c6c; font-weight: 600;">{{ numberCount.hardInterceptTotal || 0 }}</span></div>
           </div>
         </div>
         <div class="number-item">
@@ -88,8 +88,8 @@
             <span>{{ $t('emailSource') }}</span>
             <span class="source-button" v-if="false">
               <el-radio-group v-model="checkedSourceType">
-                <el-radio-button label="发件人" value="sender"/>
-                <el-radio-button label="邮箱" value="email"/>
+                <el-radio-button :label="$t('sender')" value="sender"/>
+                <el-radio-button :label="$t('email')" value="email"/>
               </el-radio-group>
             </span>
           </div>
@@ -117,13 +117,13 @@
       <div class="picture-cs picture-ai">
         <div class="picture-cs-item">
           <div class="title" style="display: flex; justify-content: space-between; align-items: center;">
-            <span>AI 智能引擎调用与 Token 消耗走势</span>
-            <span class="ai-stat-badge" v-if="aiTotalStats.calls > 0">15 日累计: {{ aiTotalStats.calls }} 次 · {{ aiTotalStats.tokensText }} Tokens</span>
+            <span>{{ $t('aiCallAndTokenTrend') }}</span>
+            <span class="ai-stat-badge" v-if="aiTotalStats.calls > 0">{{ $t('fifteenDaysTotalCalls', { calls: aiTotalStats.calls, tokens: aiTotalStats.tokensText }) }}</span>
           </div>
           <div class="ai-usage-line"></div>
         </div>
         <div class="picture-cs-item">
-          <div class="title">AI 大模型用量分布与占比</div>
+          <div class="title">{{ $t('aiModelUsageDistribution') }}</div>
           <div class="ai-model-pie"></div>
         </div>
       </div>
@@ -628,7 +628,7 @@ function createEmailColumnChart() {
       }
     },
     legend: {
-      data: [t('emailReceived'), t('emailSent'), '拦截'],
+      data: [t('emailReceived'), t('emailSent'), t('intercept')],
       top: '0',
       textStyle: {
         color: topic.value.color,  // 图例文字颜色
@@ -713,7 +713,7 @@ function createEmailColumnChart() {
         }
       },
       {
-        name: '拦截',
+        name: t('intercept'),
         type: 'bar',
         stack: 'total', // 堆叠组标识（必须相同）
         emphasis: {
@@ -842,7 +842,7 @@ function createAiUsageLine() {
       }
     },
     legend: {
-      data: ['AI 调用次数', 'Token 消耗'],
+      data: [t('aiCallCount'), t('tokenConsumption')],
       textStyle: {
         color: topic.value.color
       },
@@ -874,7 +874,7 @@ function createAiUsageLine() {
     yAxis: [
       {
         type: 'value',
-        name: '调用 (次)',
+        name: t('callUnit'),
         nameTextStyle: {
           color: topic.value.color,
           fontSize: 12
@@ -920,7 +920,7 @@ function createAiUsageLine() {
     ],
     series: [
       {
-        name: 'AI 调用次数',
+        name: t('aiCallCount'),
         type: 'line',
         smooth: true,
         data: aiLineData.calls,
@@ -936,7 +936,7 @@ function createAiUsageLine() {
         }
       },
       {
-        name: 'Token 消耗',
+        name: t('tokenConsumption'),
         type: 'line',
         smooth: true,
         data: aiLineData.tokens,
@@ -972,7 +972,7 @@ function createAiModelPie() {
   const hasData = aiModelData.value && aiModelData.value.length > 0 && aiModelData.value.some(d => d.value > 0);
   const pieData = hasData
     ? aiModelData.value
-    : [{ name: '暂无 AI 调用记录', value: 0 }];
+    : [{ name: t('noAiCallRecords'), value: 0 }];
 
   const option = {
     tooltip: {
@@ -984,7 +984,7 @@ function createAiModelPie() {
       borderColor: topic.value.splitLineColor,
       borderWidth: 1,
       formatter: params => {
-        if (!hasData) return `暂无调用记录`;
+        if (!hasData) return t('noAiCallRecords');
         return `${params.marker} ${params.name}：${params.value} 次 (${params.percent}%)`;
       }
     },
@@ -1002,7 +1002,7 @@ function createAiModelPie() {
     },
     series: [
       {
-        name: '模型占比',
+        name: t('modelRatio'),
         type: 'pie',
         radius: ['45%', '70%'],
         center: ['65%', '50%'],

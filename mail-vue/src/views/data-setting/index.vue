@@ -3,9 +3,9 @@
     
     <!-- Section 1: 用户资料与数据汇出 (Data Export) -->
     <div class="container export-container" id="dataExport">
-      <div class="title">{{ $t('dataExportTitle') || '用户资料与数据汇出' }}</div>
+      <div class="title">{{ $t('dataExportTitle') }}</div>
       <div class="section-intro">
-        {{ $t('dataExportDesc') || '您可以将您的个人账户资料、邮件历史、通讯录以及自定义配置一键打包导出并下载到本地，格式兼容通用开放标准。' }}
+        {{ $t('dataExportDesc') }}
       </div>
 
       <div class="export-cards-grid">
@@ -16,10 +16,10 @@
           </div>
           <div class="export-meta">
             <div class="export-title-row">
-              <span class="export-title">{{ $t('exportAllData') || '汇出全量数据 (完整备份)' }}</span>
+              <span class="export-title">{{ $t('exportAllData') }}</span>
               <el-tag size="small" type="primary" effect="plain" round class="format-pill">JSON</el-tag>
             </div>
-            <div class="export-desc">{{ $t('exportAllDataDesc') || '包含完整的账户个资、历史邮件归档、通讯录、分类与标签规则及安全设置' }}</div>
+            <div class="export-desc">{{ $t('exportAllDataDesc') }}</div>
           </div>
           <div class="export-action">
             <el-button 
@@ -29,7 +29,7 @@
               class="action-btn"
             >
               <Icon icon="lucide:download" width="15" height="15" />
-              <span>{{ $t('exportDownloadBtn') || '打包并下载' }} (JSON)</span>
+              <span>{{ $t('exportDownloadBtn') }} (JSON)</span>
             </el-button>
           </div>
         </div>
@@ -41,26 +41,26 @@
           </div>
           <div class="export-meta">
             <div class="export-title-row">
-              <span class="export-title">{{ $t('exportEmailsOnly') || '邮件历史归档' }}</span>
+              <span class="export-title">{{ $t('exportEmailsOnly') }}</span>
             </div>
-            <div class="export-desc">{{ $t('exportEmailsOnlyDesc') || '仅导出收发邮件数据，支持标准 MBOX、JSON 或 CSV 格式' }}</div>
+            <div class="export-desc">{{ $t('exportEmailsOnlyDesc') }}</div>
             
             <div class="export-options-bar">
               <div class="opt-field">
-                <span class="opt-label">{{ $t('exportFormat') || '导出格式' }}:</span>
+                <span class="opt-label">{{ $t('exportFormat') }}:</span>
                 <el-radio-group v-model="emailExportFormat" size="small">
-                  <el-radio-button label="mbox">MBOX (通用)</el-radio-button>
+                  <el-radio-button label="mbox">MBOX ({{ $t('common') }})</el-radio-button>
                   <el-radio-button label="json">JSON</el-radio-button>
                   <el-radio-button label="csv">CSV</el-radio-button>
                 </el-radio-group>
               </div>
 
               <div class="opt-field">
-                <span class="opt-label">{{ $t('exportRange') || '时间范围' }}:</span>
+                <span class="opt-label">{{ $t('exportRange') }}:</span>
                 <el-select v-model="emailExportRange" size="small" class="range-select" style="min-width: 160px; width: auto;">
-                  <el-option :label="$t('exportAllTime') || '全部历史邮件'" value="all" />
-                  <el-option :label="$t('exportLast30Days') || '最近 30 天'" value="30d" />
-                  <el-option :label="$t('exportLast1Year') || '最近 1 年'" value="1y" />
+                  <el-option :label="$t('exportAllTime')" value="all" />
+                  <el-option :label="$t('exportLast30Days')" value="30d" />
+                  <el-option :label="$t('exportLast1Year')" value="1y" />
                 </el-select>
               </div>
             </div>
@@ -73,7 +73,7 @@
               class="action-btn"
             >
               <Icon icon="lucide:download" width="15" height="15" />
-              <span>{{ $t('exportDownloadBtn') || '打包并下载' }}</span>
+              <span>{{ $t('exportDownloadBtn') }}</span>
             </el-button>
           </div>
         </div>
@@ -85,10 +85,10 @@
           </div>
           <div class="export-meta">
             <div class="export-title-row">
-              <span class="export-title">{{ $t('exportContactsOnly') || '通讯录与配置' }}</span>
+              <span class="export-title">{{ $t('exportContactsOnly') }}</span>
               <el-tag size="small" type="info" effect="plain" round class="format-pill">JSON</el-tag>
             </div>
-            <div class="export-desc">{{ $t('exportContactsOnlyDesc') || '导出联系人名录、自定义别名规则与系统个性化偏好' }}</div>
+            <div class="export-desc">{{ $t('exportContactsOnlyDesc') }}</div>
           </div>
           <div class="export-action">
             <el-button 
@@ -98,7 +98,7 @@
               class="action-btn"
             >
               <Icon icon="lucide:download" width="15" height="15" />
-              <span>{{ $t('exportDownloadBtn') || '打包并下载' }}</span>
+              <span>{{ $t('exportDownloadBtn') }}</span>
             </el-button>
           </div>
         </div>
@@ -107,9 +107,9 @@
 
     <!-- Section 2: 邮件与消息转发 (Personal TG Push & Email Forwarding) -->
     <div class="container forwarding-container" id="forwarding" v-if="allowUserTg || allowUserEmailForward">
-      <div class="title">{{ $t('forwardingAndPushTitle') || '邮件与消息转发' }}</div>
+      <div class="title">{{ $t('forwardingAndPushTitle') }}</div>
       <div class="section-intro">
-        {{ $t('forwardingSectionDesc') || '配置个人 Telegram 消息推送通道与进站邮件的自动规则转发，实现跨终端即时触达。' }}
+        {{ $t('forwardingSectionDesc') }}
       </div>
       
       <!-- 1. Telegram 消息推送 (以 Button 设置弹窗形式集成) -->
@@ -117,17 +117,17 @@
         <div class="tg-item-info">
           <div class="tg-item-title-row">
             <Icon icon="fluent:bot-20-filled" width="18" height="18" class="tg-bot-icon" />
-            <span class="tg-title-text">{{ $t('tgPushNotification') || 'Telegram 消息推送' }}</span>
+            <span class="tg-title-text">{{ $t('tgPushNotification') }}</span>
           </div>
           <div class="sub-hint">
-            {{ tgForm.enabled ? (tgForm.chatId ? `已启用 · 私人专属通知通道已开启 (${tgForm.chatId})` : '已启用 · 实时接收到达您邮箱的所有邮件推送') : ($t('tgPushNotificationDesc') || '绑定个人专属 Telegram 机器人，实时接收到达您的邮件通知') }}
+            {{ tgForm.enabled ? (tgForm.chatId ? $t('tgEnabledWithChatId', { chatId: tgForm.chatId }) : $t('tgEnabledRealtime')) : $t('tgPushNotificationDesc') }}
           </div>
         </div>
         <div class="tg-item-actions">
           <el-tag :type="tgForm.enabled ? 'success' : 'info'" size="small" effect="plain" round class="status-tag">
-            {{ tgForm.enabled ? ($t('enabled') || '已启用') : ($t('disabled') || '未启用') }}
+            {{ tgForm.enabled ? ($t('enabled')) : ($t('disabled')) }}
           </el-tag>
-          <el-button class="opt-button" size="small" type="primary" @click="openTgSettingDialog" :title="$t('settings') || '配置'">
+          <el-button class="opt-button" size="small" type="primary" @click="openTgSettingDialog" :title="$t('settings')">
             <Icon icon="fluent:settings-48-regular" width="18" height="18"/>
           </el-button>
         </div>
@@ -139,8 +139,8 @@
           <!-- 启用自动转发开关 -->
           <div class="item forward-toggle-row">
             <div class="toggle-info">
-              <div class="fw-title">{{ $t('forwardingEnable') || '启用自动邮件转发' }}</div>
-              <div class="sub-hint">{{ $t('forwardingRulesDesc') || '规则转发只会转发设置邮箱所接收的邮件' }}</div>
+              <div class="fw-title">{{ $t('forwardingEnable') }}</div>
+              <div class="sub-hint">{{ $t('forwardingRulesDesc') }}</div>
             </div>
             <div class="toggle-action">
               <el-switch v-model="forwardForm.enabled" @change="saveForwardSettings(false)" />
@@ -151,13 +151,13 @@
             <!-- 目的地邮箱 -->
             <div class="item forward-field-item">
               <div class="field-label-col">
-                <div class="fw-label">{{ $t('forwardingDestination') || '转发目的地邮箱' }}</div>
-                <div class="sub-hint">{{ $t('forwardingDestinationDesc') || '接收转发邮件的目标地址' }}</div>
+                <div class="fw-label">{{ $t('forwardingDestination') }}</div>
+                <div class="sub-hint">{{ $t('forwardingDestinationDesc') }}</div>
               </div>
               <div class="forward-input-wrap">
                 <el-input 
                   v-model="forwardForm.targets" 
-                  :placeholder="$t('forwardingDestinationPlaceholder') || '输入目标邮箱地址，多个邮箱用英文逗号分隔，如 yourname@gmail.com'" 
+                  :placeholder="$t('forwardingDestinationPlaceholder')" 
                   clearable 
                 >
                   <template #prefix>
@@ -170,8 +170,8 @@
             <!-- 触发规则类型 -->
             <div class="item forward-rule-item align-start">
               <div class="field-label-col">
-                <div class="fw-label">{{ $t('forwardingType') || '转发触发规则' }}</div>
-                <div class="sub-hint">{{ $t('forwardingTypeSubhint') || '选择在何种条件下触发转发' }}</div>
+                <div class="fw-label">{{ $t('forwardingType') }}</div>
+                <div class="sub-hint">{{ $t('forwardingTypeSubhint') }}</div>
               </div>
               <div class="forward-type-wrapper">
                 <div class="forward-type-group">
@@ -186,8 +186,8 @@
                         <div class="radio-inner-dot" v-if="forwardForm.mode === 'all'"></div>
                       </div>
                       <div class="rule-card-text">
-                        <div class="r-title">{{ $t('forwardingTypeAll') || '全部邮件直接抄送转发' }}</div>
-                        <div class="r-desc">{{ $t('forwardingTypeAllDesc') || '所有进入当前邮箱的邮件无条件抄送转发至目的地' }}</div>
+                        <div class="r-title">{{ $t('forwardingTypeAll') }}</div>
+                        <div class="r-desc">{{ $t('forwardingTypeAllDesc') }}</div>
                       </div>
                     </div>
                   </div>
@@ -203,8 +203,8 @@
                         <div class="radio-inner-dot" v-if="forwardForm.mode === 'alias'"></div>
                       </div>
                       <div class="rule-card-text">
-                        <div class="r-title">{{ $t('forwardingTypeAlias') || '特定前缀/字母别名转发' }}</div>
-                        <div class="r-desc">{{ $t('forwardingTypeAliasDesc') || '仅当收件邮箱匹配指定别名前缀时触发转发（如 billing、dev-*）' }}</div>
+                        <div class="r-title">{{ $t('forwardingTypeAlias') }}</div>
+                        <div class="r-desc">{{ $t('forwardingTypeAliasDesc') }}</div>
                       </div>
                     </div>
 
@@ -212,12 +212,12 @@
                     <div v-if="forwardForm.mode === 'alias'" class="alias-inline-subbox" @click.stop>
                       <div class="alias-sub-label">
                         <Icon icon="fluent:tag-multiple-16-regular" width="14" height="14" />
-                        <span>{{ $t('forwardingAliasPrefix') || '匹配的前缀/别名' }}:</span>
+                        <span>{{ $t('forwardingAliasPrefix') }}:</span>
                       </div>
                       <el-input 
                         v-model="forwardForm.aliasPrefixes" 
                         size="small" 
-                        :placeholder="$t('forwardingAliasPrefixPlaceholder') || '多个前缀用逗号隔开，如 billing, dev, notice'" 
+                        :placeholder="$t('forwardingAliasPrefixPlaceholder')" 
                         clearable
                         style="width: 100%;"
                       />
@@ -235,8 +235,8 @@
                         <div class="radio-inner-dot" v-if="forwardForm.mode === 'rules'"></div>
                       </div>
                       <div class="rule-card-text">
-                        <div class="r-title">{{ $t('forwardingTypeRules') || '智能规则过滤转发' }}</div>
-                        <div class="r-desc">{{ $t('forwardingTypeRulesDesc') || '仅当满足特定条件（如重要邮件或含特定关键词）时触发转发' }}</div>
+                        <div class="r-title">{{ $t('forwardingTypeRules') }}</div>
+                        <div class="r-desc">{{ $t('forwardingTypeRulesDesc') }}</div>
                       </div>
                     </div>
                   </div>
@@ -247,15 +247,15 @@
             <!-- 高级选项 -->
             <div class="item forward-options-item align-start no-border">
               <div class="field-label-col">
-                <div class="fw-label">{{ $t('advancedOptions') || '高级选项' }}</div>
-                <div class="sub-hint">{{ $t('advancedOptionsDesc') || '保留原件与转发主题标头' }}</div>
+                <div class="fw-label">{{ $t('advancedOptions') }}</div>
+                <div class="sub-hint">{{ $t('advancedOptionsDesc') }}</div>
               </div>
               <div class="feature-checkboxes">
                 <el-checkbox v-model="forwardForm.keepCopy">
-                  <span class="chk-label">{{ $t('forwardingKeepCopy') || '在收件箱中保留邮件原件' }}</span>
+                  <span class="chk-label">{{ $t('forwardingKeepCopy') }}</span>
                 </el-checkbox>
                 <el-checkbox v-model="forwardForm.addPrefix">
-                  <span class="chk-label">{{ $t('forwardingSubjectPrefix') || '在转发邮件主题添加 [Fwd] 标头' }}</span>
+                  <span class="chk-label">{{ $t('forwardingSubjectPrefix') }}</span>
                 </el-checkbox>
               </div>
             </div>
@@ -269,7 +269,7 @@
                   class="save-forward-btn"
                 >
                   <Icon icon="fluent:save-20-regular" width="16" height="16" style="margin-right: 6px;" />
-                  {{ $t('save') || '保存转发规则' }}
+                  {{ $t('save') }}
                 </el-button>
               </div>
             </div>
@@ -407,9 +407,9 @@
     <div class="container third-party-apps-container" id="thirdPartyApps">
       <div class="section-head-flex">
         <div class="head-left-col">
-          <div class="title">{{ $t('thirdPartyAppsTitle') || '第三方应用和服务' }}</div>
+          <div class="title">{{ $t('thirdPartyAppsTitle') }}</div>
           <div class="section-intro">
-            {{ $t('thirdPartyAppsDesc') || '管理已关联到您 Epomail 账号的第三方应用与网站，随时查看或移除访问权限。' }}
+            {{ $t('thirdPartyAppsDesc') }}
           </div>
         </div>
         <div class="head-right-actions" v-if="userGrants.length > 0">
@@ -419,7 +419,7 @@
             @click="fetchOauthGrants" 
             class="refresh-grants-btn" 
             circle
-            :title="$t('refresh') || '刷新'"
+            :title="$t('refresh')"
           >
             <Icon icon="solar:restart-linear" width="15" height="15" />
           </el-button>
@@ -456,7 +456,7 @@
               <div class="app-name-row">
                 <span class="app-main-name" :title="grant.appName">{{ grant.appName }}</span>
                 <el-tag v-if="Number(grant.appStatus) === 0" size="small" type="danger" effect="plain" round class="status-pill">
-                  {{ $t('thirdPartyStatusDisabled') || '已停用' }}
+                  {{ $t('thirdPartyStatusDisabled') }}
                 </el-tag>
               </div>
 
@@ -506,7 +506,7 @@
                 @click="openAppDetailModal(grant)"
                 class="view-detail-btn"
               >
-                <span>{{ $t('thirdPartyViewDetailsBtn') || '查看详情' }}</span>
+                <span>{{ $t('thirdPartyViewDetailsBtn') }}</span>
               </el-button>
               <el-button 
                 size="small" 
@@ -516,7 +516,7 @@
                 @click="handleRevokeGrant(grant)"
                 class="revoke-access-btn"
               >
-                <span>{{ $t('thirdPartyRevokeBtn') || '移除访问权限' }}</span>
+                <span>{{ $t('thirdPartyRevokeBtn') }}</span>
               </el-button>
             </div>
           </div>
@@ -536,8 +536,8 @@
             <Icon icon="fluent:shield-task-28-regular" width="32" height="32" class="shield-empty-ic" />
           </div>
           <div class="empty-hero-content">
-            <div class="empty-hero-title">{{ $t('thirdPartyEmptyTitle') || '暂无已关联的应用' }}</div>
-            <div class="empty-hero-desc">{{ $t('thirdPartyEmptyDesc') || '您尚未授权任何第三方应用或网站访问您的 Epomail 账号。' }}</div>
+            <div class="empty-hero-title">{{ $t('thirdPartyEmptyTitle') }}</div>
+            <div class="empty-hero-desc">{{ $t('thirdPartyEmptyDesc') }}</div>
           </div>
         </div>
       </div>
@@ -552,14 +552,14 @@
     >
       <template #header>
         <div class="forward-head">
-          <span class="forward-set-title">{{ $t('tgBotConfigTitle') || 'Telegram 消息推送配置' }}</span>
+          <span class="forward-set-title">{{ $t('tgBotConfigTitle') }}</span>
         </div>
       </template>
 
       <div class="forward-set-body">
         <div class="tg-dialog-hint">
           <Icon icon="fluent:info-16-regular" width="16" height="16" style="flex-shrink:0; margin-top:2px; color:var(--accent-primary);" />
-          <span>{{ $t('tgPersonalBotDesc') || '绑定您的私有 Telegram 机器人，实时接收到达您的新邮件通知。' }}</span>
+          <span>{{ $t('tgPersonalBotDesc') }}</span>
         </div>
 
         <div class="dialog-field">
@@ -583,7 +583,7 @@
         </div>
 
         <div class="dialog-field">
-          <span class="d-label">{{ $t('tgTopicId') || 'Topic / Thread ID (可选)' }}</span>
+          <span class="d-label">{{ $t('tgTopicId') }}</span>
           <el-input 
             v-model="tgForm.topicId" 
             placeholder="群组话题 ID，如不需要请留空" 
@@ -592,10 +592,10 @@
         </div>
 
         <div class="dialog-field">
-          <span class="d-label">{{ $t('tgPushMode') || '推送类型偏好' }}</span>
+          <span class="d-label">{{ $t('tgPushMode') }}</span>
           <el-radio-group v-model="tgForm.mode" style="margin-top: 4px;">
-            <el-radio label="all">{{ $t('tgModeAll') || '所有进站邮件' }}</el-radio>
-            <el-radio label="important">{{ $t('tgModeImportant') || '仅重要/验证码邮件' }}</el-radio>
+            <el-radio label="all">{{ $t('tgModeAll') }}</el-radio>
+            <el-radio label="important">{{ $t('tgModeImportant') }}</el-radio>
           </el-radio-group>
         </div>
       </div>
@@ -610,18 +610,18 @@
             style="border-radius: 8px;"
           >
             <Icon icon="fluent:send-20-regular" width="16" height="16" style="margin-right: 4px;" />
-            {{ $t('sendTestMsg') || '发送测试消息' }}
+            {{ $t('sendTestMsg') }}
           </el-button>
           
           <div style="display: flex; gap: 10px;">
-            <el-button @click="tgSettingDialogShow = false">{{ $t('cancel') || '取消' }}</el-button>
+            <el-button @click="tgSettingDialogShow = false">{{ $t('cancel') }}</el-button>
             <el-button 
               type="primary" 
               :loading="savingTg" 
               @click="saveTgSettingsFromModal"
               style="border-radius: 8px;"
             >
-              {{ $t('save') || '保存配置' }}
+              {{ $t('save') }}
             </el-button>
           </div>
         </div>
@@ -834,7 +834,7 @@
         <!-- 1. 该应用已获得的权限 -->
         <div class="dialog-sub-section">
           <div class="sec-title-row">
-            <span class="sec-title">{{ $t('thirdPartyCanAccessTitle') || '已授予的访问权限' }}</span>
+            <span class="sec-title">{{ $t('thirdPartyCanAccessTitle') }}</span>
           </div>
           <div class="can-access-list">
             <div 
@@ -859,7 +859,7 @@
         <div class="dialog-sub-section">
           <div class="tech-info-grid">
             <div class="tech-row">
-              <span class="t-label">{{ $t('thirdPartyGrantDate') || '首次关联时间' }}:</span>
+              <span class="t-label">{{ $t('thirdPartyGrantDate') }}:</span>
               <span class="t-val">{{ formatDateTime(selectedAppDetail.createdAt) }}</span>
             </div>
             <div class="tech-row" v-if="selectedAppDetail.clientId">
@@ -880,9 +880,9 @@
             class="danger-revoke-btn"
           >
             <Icon icon="solar:link-broken-minimalistic-linear" width="16" height="16" style="margin-right: 4px;" />
-            {{ $t('thirdPartyRevokeAllAccess') || '移除访问权限' }}
+            {{ $t('thirdPartyRevokeAllAccess') }}
           </el-button>
-          <el-button @click="appDetailModalShow = false">{{ $t('close') || '关闭' }}</el-button>
+          <el-button @click="appDetailModalShow = false">{{ $t('close') }}</el-button>
         </div>
       </template>
     </el-dialog>
@@ -1088,7 +1088,7 @@ function resetByoModalForm() {
 
 async function handleTestUserByoConnection() {
   if (!byoForm.bucket || !byoForm.endpoint || !byoForm.s3AccessKey || !byoForm.s3SecretKey) {
-    ElMessage.warning('请填写完整的存储桶信息 (Bucket, Endpoint, Key ID, Secret Key)')
+    ElMessage.warning(t('fillCompleteBucketInfo'))
     return
   }
 
@@ -1100,13 +1100,13 @@ async function handleTestUserByoConnection() {
     if (resultData) {
       userByoTestResult.value = resultData
       if (resultData.ok) {
-        ElMessage.success(resultData.message || '存储桶连接测试成功！')
+        ElMessage.success(resultData.message || t('connectionTestSuccess'))
       } else {
-        ElMessage.error(resultData.message || '连接测试未通过')
+        ElMessage.error(resultData.message || t('connectionTestFailed'))
       }
     }
   } catch (err) {
-    ElMessage.error(err.message || '测试连接异常')
+    ElMessage.error(err.message || t('connectionTestAbnormal'))
   } finally {
     testingUserByo.value = false
   }
@@ -1114,18 +1114,18 @@ async function handleTestUserByoConnection() {
 
 async function handleSaveUserByoStorage() {
   if (!byoForm.bucket || !byoForm.endpoint || !byoForm.s3AccessKey || !byoForm.s3SecretKey) {
-    ElMessage.warning('请填写完整的存储桶信息 (Bucket, Endpoint, Key ID, Secret Key)')
+    ElMessage.warning(t('fillCompleteBucketInfo'))
     return
   }
 
   savingUserByo.value = true
   try {
     const res = await updateUserStorage(byoForm)
-    ElMessage.success(res.message || '个人对象存储绑定成功！')
+    ElMessage.success(res.message || t('bucketBindSuccess'))
     byoModalShow.value = false
     await fetchUserStorage()
   } catch (err) {
-    ElMessage.error(err.message || '绑定存储桶失败')
+    ElMessage.error(err.message || t('bucketBindFailed'))
   } finally {
     savingUserByo.value = false
   }
@@ -1137,12 +1137,12 @@ async function testCurrentByoConnection() {
     const res = await testUserStorage({})
     const resultData = res?.data || res
     if (resultData?.ok) {
-      ElMessage.success(resultData.message || '个人存储桶连通性正常！')
+      ElMessage.success(resultData.message || t('bucketHealthy'))
     } else {
-      ElMessage.error(resultData?.message || '个人存储桶诊断未通过')
+      ElMessage.error(resultData?.message || t('bucketDiagnoseFailed'))
     }
   } catch (err) {
-    ElMessage.error(err.message || '诊断失败')
+    ElMessage.error(err.message || t('diagnoseFailed'))
   } finally {
     testingUserByo.value = false
   }
@@ -1150,14 +1150,14 @@ async function testCurrentByoConnection() {
 
 async function handleDisconnectByoStorage() {
   try {
-    await ElMessageBox.confirm('确定要解除绑定的个人对象存储桶吗？解除后系统将恢复使用默认系统存储。', '确认解除绑定', {
+    await ElMessageBox.confirm(t('confirmUnbindBucketMsg'), t('confirmUnbindBucketTitle'), {
       type: 'warning',
-      confirmButtonText: '确认解除',
-      cancelButtonText: '取消'
+      confirmButtonText: t('confirmUnbind'),
+      cancelButtonText: t('cancel')
     })
     disconnectingByo.value = true
     await clearUserStorage()
-    ElMessage.success('已解除个人存储桶绑定，恢复默认系统存储。')
+    ElMessage.success(t('unbindBucketSuccess'))
     await fetchUserStorage()
   } catch (e) {
     // cancelled
@@ -1170,10 +1170,10 @@ const currentMailMode = ref(0)
 
 const sendQuotaText = computed(() => {
   const user = userStore.user
-  if (!user || !user.role) return '计算中...'
+  if (!user || !user.role) return t('calculating')
   const sendCount = user.sendCount || 0
   const maxCount = user.role.sendCount
-  if (!maxCount) return `${sendCount} / 无限`
+  if (!maxCount) return `${sendCount} / ${t('unlimited')}`
   return `${sendCount} / ${maxCount}`
 })
 
@@ -1231,23 +1231,23 @@ function openAppDetailModal(grant) {
 
 async function handleRevokeGrant(grant) {
   if (!grant) return
-  const appName = grant.appName || grant.clientId || '第三方应用'
+  const appName = grant.appName || grant.clientId || t('thirdPartyApp')
   try {
-    const confirmMsg = (t('thirdPartyRevokeConfirmMsg') || '确定要解除与「{name}」的关联并移除其访问权限吗？解除后该应用将无法再访问您的 Epomail 数据或使用您的账号登录。如需再次使用，需重新进行授权。').replace('{name}', appName)
+    const confirmMsg = (t('thirdPartyRevokeConfirmMsg')).replace('{name}', appName)
     await ElMessageBox.confirm(
       confirmMsg,
-      t('thirdPartyRevokeConfirmTitle') || '解除应用授权',
+      t('thirdPartyRevokeConfirmTitle'),
       {
         type: 'warning',
-        confirmButtonText: t('thirdPartyRevokeBtn') || '移除访问权限',
-        cancelButtonText: t('cancel') || '取消',
+        confirmButtonText: t('thirdPartyRevokeBtn'),
+        cancelButtonText: t('cancel'),
         confirmButtonClass: 'el-button--danger'
       }
     )
 
     revokingGrantId.value = grant.id
     await revokeMyOauthGrant(grant.id)
-    ElMessage.success((t('thirdPartyRevokeSuccess') || '已成功移除「{name}」的访问权限').replace('{name}', appName))
+    ElMessage.success((t('thirdPartyRevokeSuccess')).replace('{name}', appName))
 
     userGrants.value = userGrants.value.filter(g => g.id !== grant.id && g.clientId !== grant.clientId)
     if (selectedAppDetail.value?.id === grant.id || selectedAppDetail.value?.clientId === grant.clientId) {
@@ -1256,7 +1256,7 @@ async function handleRevokeGrant(grant) {
     }
   } catch (err) {
     if (err !== 'cancel' && err?.message !== 'cancel') {
-      ElMessage.error(err?.message || '移除访问权限失败')
+      ElMessage.error(err?.message || t('removePermissionFailed'))
     }
   } finally {
     revokingGrantId.value = null
@@ -1333,40 +1333,40 @@ function parseScopeList(scopesStr) {
   const dict = {
     openid: {
       key: 'openid',
-      name: t('scopeOpenIdTitle') || '快捷登录',
-      desc: t('scopeOpenIdDesc') || '使用您的 Epomail 账号快捷登录该应用',
+      name: t('scopeOpenIdTitle'),
+      desc: t('scopeOpenIdDesc'),
       icon: 'solar:key-minimalistic-square-3-bold-duotone',
       color: '#3b82f6',
       bg: 'rgba(59, 130, 246, 0.12)'
     },
     email: {
       key: 'email',
-      name: t('scopeEmailTitle') || '电子邮箱',
-      desc: t('scopeEmailDesc') || '查看您的主要电子邮箱地址',
+      name: t('scopeEmailTitle'),
+      desc: t('scopeEmailDesc'),
       icon: 'solar:letter-bold-duotone',
       color: '#06b6d4',
       bg: 'rgba(6, 182, 212, 0.12)'
     },
     profile: {
       key: 'profile',
-      name: t('scopeProfileTitle') || '基本资料',
-      desc: t('scopeProfileDesc') || '查看您的公开昵称和头像',
+      name: t('scopeProfileTitle'),
+      desc: t('scopeProfileDesc'),
       icon: 'solar:user-circle-bold-duotone',
       color: '#8b5cf6',
       bg: 'rgba(139, 92, 246, 0.12)'
     },
     comments: {
       key: 'comments',
-      name: t('scopeCommentsTitle') || '评论互动',
-      desc: t('scopeCommentsDesc') || '允许以您的身份在该应用内发表评论或互动',
+      name: t('scopeCommentsTitle'),
+      desc: t('scopeCommentsDesc'),
       icon: 'solar:chat-round-dots-bold-duotone',
       color: '#10b981',
       bg: 'rgba(16, 185, 129, 0.12)'
     },
     'mail:read': {
       key: 'mail:read',
-      name: t('scopeMailReadTitle') || '读取邮件',
-      desc: t('scopeMailReadDesc') || '读取收件箱邮件列表与正文',
+      name: t('scopeMailReadTitle'),
+      desc: t('scopeMailReadDesc'),
       icon: 'solar:inbox-line-bold-duotone',
       color: '#ef4444',
       bg: 'rgba(239, 68, 68, 0.12)'
@@ -1377,7 +1377,7 @@ function parseScopeList(scopesStr) {
     return dict[s] || {
       key: s,
       name: s,
-      desc: t('scopeCustomDesc') || '该应用申请的业务交互权限',
+      desc: t('scopeCustomDesc'),
       icon: 'solar:shield-keyhole-bold-duotone',
       color: '#6366f1',
       bg: 'rgba(99, 102, 241, 0.12)'
@@ -1388,7 +1388,7 @@ function parseScopeList(scopesStr) {
 async function copyText(text) {
   try {
     await navigator.clipboard.writeText(text)
-    ElMessage.success('已复制到剪贴板')
+    ElMessage.success(t('copiedToClipboard'))
   } catch (err) {
     ElMessage.info(text)
   }
@@ -1423,14 +1423,14 @@ async function saveTgSettings(showToast = true) {
     userStore.user.personalTelegram = { ...tgForm }
     if (showToast) {
       ElMessage({
-        message: t('tgSavedSuccess') || '个人 Telegram 配置保存成功',
+        message: t('tgSavedSuccess'),
         type: 'success',
         plain: true
       })
     }
   } catch (err) {
     ElMessage({
-      message: err.message || '保存失败',
+      message: err.message || t('saveFailed'),
       type: 'error',
       plain: true
     })
@@ -1442,7 +1442,7 @@ async function saveTgSettings(showToast = true) {
 async function handleTestTelegram() {
   if (!tgForm.botToken || !tgForm.chatId) {
     ElMessage({
-      message: '请先填写 Bot Token 与 Chat ID',
+      message: t('fillTgBotTokenChatId'),
       type: 'warning',
       plain: true
     })
@@ -1457,13 +1457,13 @@ async function handleTestTelegram() {
       topicId: tgForm.topicId
     })
     ElMessage({
-      message: t('tgTestSuccess') || '测试消息发送成功，请在 Telegram 中查收！',
+      message: t('tgTestSuccess'),
       type: 'success',
       plain: true
     })
   } catch (err) {
     ElMessage({
-      message: err.message || '发送测试消息失败',
+      message: err.message || t('sendTestMsgFailed'),
       type: 'error',
       plain: true
     })
@@ -1481,14 +1481,14 @@ async function saveForwardSettings(showToast = true) {
     userStore.user.personalForwarding = { ...forwardForm }
     if (showToast) {
       ElMessage({
-        message: t('forwardingSavedSuccess') || '邮件转发规则保存成功',
+        message: t('forwardingSavedSuccess'),
         type: 'success',
         plain: true
       })
     }
   } catch (err) {
     ElMessage({
-      message: err.message || '保存失败',
+      message: err.message || t('saveFailed'),
       type: 'error',
       plain: true
     })
@@ -1512,13 +1512,13 @@ async function handleExportFullBackup() {
       'application/json'
     )
     ElMessage({
-      message: t('exportSuccess') || '资料汇出成功',
+      message: t('exportSuccess'),
       type: 'success',
       plain: true
     })
   } catch (err) {
     ElMessage({
-      message: err.message || '导出失败',
+      message: err.message || t('exportFailed'),
       type: 'error',
       plain: true
     })
@@ -1580,13 +1580,13 @@ async function handleExportEmails() {
     }
 
     ElMessage({
-      message: t('exportSuccess') || '邮件归档汇出成功',
+      message: t('exportSuccess'),
       type: 'success',
       plain: true
     })
   } catch (err) {
     ElMessage({
-      message: err.message || '导出邮件归档失败',
+      message: err.message || t('exportArchiveFailed'),
       type: 'error',
       plain: true
     })
@@ -1610,13 +1610,13 @@ async function handleExportContacts() {
       'application/json'
     )
     ElMessage({
-      message: t('exportSuccess') || '通讯录与配置汇出成功',
+      message: t('exportSuccess'),
       type: 'success',
       plain: true
     })
   } catch (err) {
     ElMessage({
-      message: err.message || '导出失败',
+      message: err.message || t('exportFailed'),
       type: 'error',
       plain: true
     })

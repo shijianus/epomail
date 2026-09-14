@@ -3,12 +3,12 @@
     
     <!-- Section 1: 个人简介 (Bio) -->
     <div class="container">
-      <div class="title">{{ $t('bio') || '个人简介' }}</div>
+      <div class="title">{{ $t('bio') }}</div>
       <div class="item bio-item">
-        <div>{{ $t('bio') || '个人签名' }}</div>
+        <div>{{ $t('bio') }}</div>
         <div class="bio-preview-group">
           <div class="bio-preview-box">
-            <div class="bio-display" v-html="parseInlineMarkdown(userStore.user.bio) || ($t('notSet') || '未设置个人简介')"></div>
+            <div class="bio-display" v-html="parseInlineMarkdown(userStore.user.bio) || ($t('notSet'))"></div>
           </div>
           <el-button class="opt-button" size="small" type="primary" plain @click="showSetBio">
             <Icon icon="lsicon:edit-outline" width="16" height="16" />
@@ -19,11 +19,11 @@
 
     <!-- Section 2: 外观与主栏美化 (Appearance & Wallpaper) -->
     <div class="container">
-      <div class="title">{{ $t('visualMedia') || '外观与美化' }}</div>
+      <div class="title">{{ $t('visualMedia') }}</div>
 
       <!-- 1. 外观色调 (长方形并排卡片，不霸占整行) -->
       <div class="item theme-item">
-        <div>{{ $t('themeMode') || '外观色调' }}</div>
+        <div>{{ $t('themeMode') }}</div>
         <div class="theme-options-group">
           <!-- Dark Mode -->
           <div 
@@ -40,7 +40,7 @@
             </div>
             <div class="theme-rect-label">
               <Icon icon="fluent:weather-moon-20-filled" width="14" height="14" />
-              <span>{{ $t('darkMode') || '暗色调' }}</span>
+              <span>{{ $t('darkMode') }}</span>
             </div>
             <div class="active-check-badge" v-if="uiStore.themeMode === 'dark'">
               <Icon icon="fluent:checkmark-12-filled" width="10" height="10" />
@@ -62,7 +62,7 @@
             </div>
             <div class="theme-rect-label">
               <Icon icon="fluent:weather-sunny-20-filled" width="14" height="14" />
-              <span>{{ $t('lightMode') || '亮色调' }}</span>
+              <span>{{ $t('lightMode') }}</span>
             </div>
             <div class="active-check-badge" v-if="uiStore.themeMode === 'light'">
               <Icon icon="fluent:checkmark-12-filled" width="10" height="10" />
@@ -87,7 +87,7 @@
             </div>
             <div class="theme-rect-label">
               <Icon icon="fluent:desktop-20-filled" width="14" height="14" />
-              <span>{{ $t('systemMode') || '跟随系统' }}</span>
+              <span>{{ $t('systemMode') }}</span>
             </div>
             <div class="active-check-badge" v-if="uiStore.themeMode === 'auto' || uiStore.themeMode === 'system'">
               <Icon icon="fluent:checkmark-12-filled" width="10" height="10" />
@@ -100,8 +100,8 @@
       <!-- 2. 全局主题壁纸 (5x2 网格，尺寸与外观色调卡片统一) -->
       <div class="item wallpaper-item">
         <div>
-          <div>{{ $t('mainPanelWallpaper') || '全局主题壁纸' }}</div>
-          <div class="sub-hint">应用于全站整体背景</div>
+          <div>{{ $t('mainPanelWallpaper') }}</div>
+          <div class="sub-hint">{{ $t('appliedToWholeSiteBg') }}</div>
         </div>
         <div class="wallpaper-control-wrap">
           <!-- 预设主题列表与自定义加号卡片 (5x2 范围) -->
@@ -121,7 +121,7 @@
                   <Icon icon="fluent:checkmark-12-filled" width="10" height="10" />
                 </div>
               </div>
-              <span class="wallpaper-name">{{ langSelect === 'en' ? preset.nameEn : preset.nameZh }}</span>
+              <span class="wallpaper-name">{{ getPresetName(preset, langSelect) }}</span>
             </div>
 
             <!-- 自定义壁纸加号卡片 -->
@@ -136,13 +136,13 @@
                   <Icon icon="fluent:checkmark-12-filled" width="10" height="10" />
                 </div>
               </div>
-              <span class="wallpaper-name">{{ $t('customWallpaper') || '自定义' }}</span>
+              <span class="wallpaper-name">{{ $t('customWallpaper') }}</span>
             </div>
           </div>
 
           <!-- 透光度滑块 -->
           <div class="opacity-slider-row" v-if="uiStore.themeWallpaper && uiStore.themeWallpaper !== 'none'">
-            <span class="opacity-label">{{ $t('wallpaperOpacity') || '界面透光度' }}：{{ uiStore.themeWallpaperOpacity || 85 }}%</span>
+            <span class="opacity-label">{{ $t('wallpaperOpacity') }}：{{ uiStore.themeWallpaperOpacity || 85 }}%</span>
             <el-slider 
               v-model="sliderOpacity" 
               :min="50" 
@@ -158,8 +158,8 @@
       <!-- 3. 个人背景封面设置 (主要针对账户详情界面的 cover-photo) -->
       <div class="item wallpaper-item">
         <div>
-          <div>{{ $t('profileCoverPhoto') || '个人背景' }}</div>
-          <div class="sub-hint">账户详情与公开主页封面</div>
+          <div>{{ $t('profileCoverPhoto') }}</div>
+          <div class="sub-hint">{{ $t('profileCoverPhotoDesc') }}</div>
         </div>
         <div class="wallpaper-control-wrap">
           <div class="wallpaper-presets-grid cover-presets-grid">
@@ -178,7 +178,7 @@
                   <Icon icon="fluent:checkmark-12-filled" width="10" height="10" />
                 </div>
               </div>
-              <span class="wallpaper-name">{{ langSelect === 'en' ? preset.nameEn : preset.nameZh }}</span>
+              <span class="wallpaper-name">{{ getPresetName(preset, langSelect) }}</span>
             </div>
 
             <!-- 自定义封面加号卡片 -->
@@ -193,7 +193,7 @@
                   <Icon icon="fluent:checkmark-12-filled" width="10" height="10" />
                 </div>
               </div>
-              <span class="wallpaper-name">{{ $t('customCover') || '自定义' }}</span>
+              <span class="wallpaper-name">{{ $t('customCover') }}</span>
             </div>
           </div>
         </div>
@@ -202,11 +202,11 @@
 
     <!-- Section 3: 偏好设置 (Preferences) -->
     <div class="container">
-      <div class="title">{{ $t('preferences') || '偏好设置' }}</div>
+      <div class="title">{{ $t('preferences') }}</div>
 
       <!-- 1. 视图密度 (Density) -->
       <div class="item density-item">
-        <div>{{ $t('density') || '视图密度' }}</div>
+        <div>{{ $t('density') }}</div>
         <div class="density-group">
           <!-- 默认 (54px) -->
           <div 
@@ -219,7 +219,7 @@
               <div class="demo-line def"><div class="demo-dot"></div><div class="demo-bar"></div></div>
             </div>
             <div class="density-meta">
-              <span class="d-name">{{ $t('densityDefault') || '默认' }}</span>
+              <span class="d-name">{{ $t('densityDefault') }}</span>
               <span class="d-sub">54px</span>
             </div>
             <div class="active-check-badge" v-if="uiStore.density === 'default'">
@@ -239,7 +239,7 @@
               <div class="demo-line comf"><div class="demo-dot"></div><div class="demo-bar"></div></div>
             </div>
             <div class="density-meta">
-              <span class="d-name">{{ $t('densityComfortable') || '宽松' }}</span>
+              <span class="d-name">{{ $t('densityComfortable') }}</span>
               <span class="d-sub">48px</span>
             </div>
             <div class="active-check-badge" v-if="uiStore.density === 'comfortable'">
@@ -260,7 +260,7 @@
               <div class="demo-line comp"><div class="demo-bar full"></div></div>
             </div>
             <div class="density-meta">
-              <span class="d-name">{{ $t('densityCompact') || '紧凑' }}</span>
+              <span class="d-name">{{ $t('densityCompact') }}</span>
               <span class="d-sub">36px</span>
             </div>
             <div class="active-check-badge" v-if="uiStore.density === 'compact'">
@@ -272,13 +272,13 @@
 
       <!-- 2. 收件箱类型 (Inbox Type) -->
       <div class="item inbox-type-item">
-        <div>{{ $t('inboxType') || '收件箱类型' }}</div>
+        <div>{{ $t('inboxType') }}</div>
         <div class="inbox-type-wrapper">
           <!-- 1. Default (Customize) -->
           <div class="inbox-type-row">
             <el-radio v-model="uiStore.inboxType" label="default" @change="onInboxTypeChange">
-              <span class="type-name">{{ $t('inboxTypeDefault') || '默认收件箱' }}</span>
-              <span class="type-desc">{{ $t('inboxTypeDefaultDesc') || '按主要、推广、社交、更新等分类标签组织' }}</span>
+              <span class="type-name">{{ $t('inboxTypeDefault') }}</span>
+              <span class="type-desc">{{ $t('inboxTypeDefaultDesc') }}</span>
             </el-radio>
             <el-button 
               size="small" 
@@ -287,39 +287,39 @@
               class="customize-btn"
               @click="openCustomizeModal('default')"
             >
-              {{ $t('customize') || '自定义' }}
+              {{ $t('customize') }}
             </el-button>
           </div>
 
           <!-- 2. Important first -->
           <div class="inbox-type-row">
             <el-radio v-model="uiStore.inboxType" label="important" @change="onInboxTypeChange">
-              <span class="type-name">{{ $t('inboxTypeImportant') || '重要邮件优先' }}</span>
-              <span class="type-desc">{{ $t('inboxTypeImportantDesc') || '顶部展示重要邮件，下方展示其余邮件' }}</span>
+              <span class="type-name">{{ $t('inboxTypeImportant') }}</span>
+              <span class="type-desc">{{ $t('inboxTypeImportantDesc') }}</span>
             </el-radio>
           </div>
 
           <!-- 3. Unread first -->
           <div class="inbox-type-row">
             <el-radio v-model="uiStore.inboxType" label="unread" @change="onInboxTypeChange">
-              <span class="type-name">{{ $t('inboxTypeUnread') || '未读邮件优先' }}</span>
-              <span class="type-desc">{{ $t('inboxTypeUnreadDesc') || '顶部展示未读邮件，下方展示已读邮件' }}</span>
+              <span class="type-name">{{ $t('inboxTypeUnread') }}</span>
+              <span class="type-desc">{{ $t('inboxTypeUnreadDesc') }}</span>
             </el-radio>
           </div>
 
           <!-- 4. Starred first -->
           <div class="inbox-type-row">
             <el-radio v-model="uiStore.inboxType" label="starred" @change="onInboxTypeChange">
-              <span class="type-name">{{ $t('inboxTypeStarred') || '星标邮件优先' }}</span>
-              <span class="type-desc">{{ $t('inboxTypeStarredDesc') || '顶部展示星标邮件，下方展示其余邮件' }}</span>
+              <span class="type-name">{{ $t('inboxTypeStarred') }}</span>
+              <span class="type-desc">{{ $t('inboxTypeStarredDesc') }}</span>
             </el-radio>
           </div>
 
           <!-- 5. Priority Inbox (Customize) -->
           <div class="inbox-type-row">
             <el-radio v-model="uiStore.inboxType" label="priority" @change="onInboxTypeChange">
-              <span class="type-name">{{ $t('inboxTypePriority') || '优先收件箱' }}</span>
-              <span class="type-desc">{{ $t('inboxTypePriorityDesc') || '自定义重要且未读、星标等多组智能分区' }}</span>
+              <span class="type-name">{{ $t('inboxTypePriority') }}</span>
+              <span class="type-desc">{{ $t('inboxTypePriorityDesc') }}</span>
             </el-radio>
             <el-button 
               size="small" 
@@ -328,15 +328,15 @@
               class="customize-btn"
               @click="openCustomizeModal('priority')"
             >
-              {{ $t('customize') || '自定义' }}
+              {{ $t('customize') }}
             </el-button>
           </div>
 
           <!-- 6. Multiple Inboxes (Customize) -->
           <div class="inbox-type-row">
             <el-radio v-model="uiStore.inboxType" label="multiple" @change="onInboxTypeChange">
-              <span class="type-name">{{ $t('inboxTypeMultiple') || '多收件箱' }}</span>
-              <span class="type-desc">{{ $t('inboxTypeMultipleDesc') || '配置多组独立查询面板堆叠展示' }}</span>
+              <span class="type-name">{{ $t('inboxTypeMultiple') }}</span>
+              <span class="type-desc">{{ $t('inboxTypeMultipleDesc') }}</span>
             </el-radio>
             <el-button 
               size="small" 
@@ -345,7 +345,7 @@
               class="customize-btn"
               @click="openCustomizeModal('multiple')"
             >
-              {{ $t('customize') || '自定义' }}
+              {{ $t('customize') }}
             </el-button>
           </div>
         </div>
@@ -353,7 +353,7 @@
 
       <!-- 3. 阅读窗格 (Reading Pane - 精简纯粹) -->
       <div class="item pane-item">
-        <div>{{ $t('readingPane') || '阅读窗格' }}</div>
+        <div>{{ $t('readingPane') }}</div>
         <div class="pane-options-group">
           <!-- 1. No split -->
           <div 
@@ -365,7 +365,7 @@
               <div class="pane-box full-list"></div>
             </div>
             <div class="pane-meta">
-              <span class="p-name">{{ $t('readingPaneNoSplit') || '无拆分' }}</span>
+              <span class="p-name">{{ $t('readingPaneNoSplit') }}</span>
             </div>
             <div class="active-check-badge" v-if="uiStore.readingPane === 'no_split'">
               <Icon icon="fluent:checkmark-12-filled" width="10" height="10" />
@@ -383,7 +383,7 @@
               <div class="pane-box right-read"></div>
             </div>
             <div class="pane-meta">
-              <span class="p-name">{{ $t('readingPaneRight') || '收件箱右侧' }}</span>
+              <span class="p-name">{{ $t('readingPaneRight') }}</span>
             </div>
             <div class="active-check-badge" v-if="uiStore.readingPane === 'right'">
               <Icon icon="fluent:checkmark-12-filled" width="10" height="10" />
@@ -401,7 +401,7 @@
               <div class="pane-box bottom-read"></div>
             </div>
             <div class="pane-meta">
-              <span class="p-name">{{ $t('readingPaneBelow') || '收件箱下方' }}</span>
+              <span class="p-name">{{ $t('readingPaneBelow') }}</span>
             </div>
             <div class="active-check-badge" v-if="uiStore.readingPane === 'below'">
               <Icon icon="fluent:checkmark-12-filled" width="10" height="10" />
@@ -413,8 +413,8 @@
       <!-- 4. 邮件会话模式 (Email Threading - 带问号提示) -->
       <div class="item">
         <div style="display: flex; align-items: center; gap: 6px;">
-          <span>{{ $t('emailThreading') || '邮件会话模式' }}</span>
-          <el-tooltip :content="$t('conversationViewDesc') || '将同一主题的相关邮件聚合成对话'" placement="top">
+          <span>{{ $t('emailThreading') }}</span>
+          <el-tooltip :content="$t('conversationViewDesc')" placement="top">
             <Icon icon="fluent:question-circle-16-regular" width="16" height="16" style="cursor: pointer; color: var(--text-muted); vertical-align: middle;" />
           </el-tooltip>
         </div>
@@ -428,7 +428,7 @@
 
       <!-- 5. 系统语言 (带锚点 #language-section) -->
       <div class="item" id="language-section">
-        <div>{{ $t('systemLanguage') || '系统语言' }}</div>
+        <div>{{ $t('systemLanguage') }}</div>
         <div>
           <el-select
             :model-value="langSelect"
@@ -450,8 +450,8 @@
       <!-- 翻译目标语言 (Default Translation Target Language - 带问号提示，不显式展示说明文本) -->
       <div class="item" id="translate-lang-section">
         <div style="display: flex; align-items: center; gap: 6px;">
-          <span>{{ $t('defaultTranslateLang') || '翻译目标语言' }}</span>
-          <el-tooltip :content="$t('defaultTranslateLangDesc') || '配置阅读邮件时的默认翻译目标语言'" placement="top">
+          <span>{{ $t('defaultTranslateLang') }}</span>
+          <el-tooltip :content="$t('defaultTranslateLangDesc')" placement="top">
             <Icon icon="fluent:question-circle-16-regular" width="16" height="16" style="cursor: pointer; color: var(--text-muted); vertical-align: middle;" />
           </el-tooltip>
         </div>
@@ -485,8 +485,8 @@
       <!-- 图片 OCR 识别与翻译开关 (Image OCR Translation Toggle - 实验性功能问号提示) -->
       <div class="item" id="translate-ocr-section">
         <div style="display: flex; align-items: center; gap: 6px;">
-          <span>{{ $t('enableImageOcr') || '图片 OCR 识别翻译' }}</span>
-          <el-tooltip :content="$t('enableImageOcrDesc') || '实验性功能：开启后识别并翻译邮件内具有文本价值的图片文字'" placement="top">
+          <span>{{ $t('enableImageOcr') }}</span>
+          <el-tooltip :content="$t('enableImageOcrDesc')" placement="top">
             <Icon icon="fluent:question-circle-16-regular" width="16" height="16" style="cursor: pointer; color: var(--text-muted); vertical-align: middle;" />
           </el-tooltip>
         </div>
@@ -498,25 +498,25 @@
 
     <!-- Section 4: 数据隐私 (Data Privacy) -->
     <div class="container">
-      <div class="title">{{ $t('dataPrivacy') || '数据隐私' }}</div>
+      <div class="title">{{ $t('dataPrivacy') }}</div>
       <div class="privacy-group">
         <div class="privacy-item">
-          <span>{{ $t('showStats') || '展示数据统计' }}</span>
+          <span>{{ $t('showStats') }}</span>
           <el-switch :model-value="userStore.user.showStats ?? true" @change="val => savePrivacy('showStats', val)" />
         </div>
         <div class="privacy-item">
-          <span>{{ $t('showTrend') || '展示态势分布' }}</span>
+          <span>{{ $t('showTrend') }}</span>
           <el-switch :model-value="userStore.user.showTrend ?? true" @change="val => savePrivacy('showTrend', val)" />
         </div>
         <div class="privacy-item">
-          <span>{{ $t('showSources') || '展示来源分布' }}</span>
+          <span>{{ $t('showSources') }}</span>
           <el-switch :model-value="userStore.user.showSources ?? true" @change="val => savePrivacy('showSources', val)" />
         </div>
       </div>
     </div>
 
     <!-- DIALOG: 个人简介编辑弹窗 -->
-    <el-dialog v-model="bioDialogShow" :title="$t('bio') || '个人简介'" width="400px">
+    <el-dialog v-model="bioDialogShow" :title="$t('bio')" width="400px">
       <div style="padding: 10px 0;">
         <el-input 
           type="textarea" 
@@ -524,13 +524,13 @@
           :maxlength="150" 
           show-word-limit
           v-model="accountBio" 
-          :placeholder="$t('bioPlaceholder') || '在这里输入个人简介...（支持 **加粗**、*斜体* 等 Markdown 语法）'"
+          :placeholder="$t('bioPlaceholder')"
         />
       </div>
       <template #footer>
         <div style="display: flex; justify-content: flex-end; gap: 10px;">
-          <el-button @click="bioDialogShow = false">{{ $t('cancel') || '取消' }}</el-button>
-          <el-button type="primary" :loading="bioLoading" @click="saveBio">{{ $t('save') || '保存' }}</el-button>
+          <el-button @click="bioDialogShow = false">{{ $t('cancel') }}</el-button>
+          <el-button type="primary" :loading="bioLoading" @click="saveBio">{{ $t('save') }}</el-button>
         </div>
       </template>
     </el-dialog>
@@ -538,37 +538,37 @@
     <!-- DIALOG: 默认收件箱标签自定义弹窗 -->
     <el-dialog 
       v-model="customizeDefaultShow" 
-      :title="$t('customizeInbox') || '自定义收件箱设置'" 
+      :title="$t('customizeInbox')" 
       width="440px"
     >
       <div style="padding: 6px 0;">
-        <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 12px;">选择要在收件箱中显示的分类标签页：</p>
+        <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 12px;">{{ $t('chooseCategoriesToShow') }}</p>
         <div style="display: flex; flex-direction: column; gap: 10px;">
           <el-checkbox v-model="defaultCatConfig.primary" disabled>
-            <span style="font-weight: bold;">主要 (Primary)</span> - 核心通信（必选）
+            {{ $t('categoryPrimaryDesc') }}
           </el-checkbox>
           <el-checkbox v-model="defaultCatConfig.promotions">
-            <span>推广 (Promotions)</span> - 商业促销与折扣简报
+            {{ $t('categoryPromotionsDesc') }}
           </el-checkbox>
           <el-checkbox v-model="defaultCatConfig.social">
-            <span>社交 (Social)</span> - 社交网络与媒体动态
+            {{ $t('categorySocialDesc') }}
           </el-checkbox>
           <el-checkbox v-model="defaultCatConfig.updates">
-            <span>订阅与动态 (Updates)</span> - 账单、收据与系统通知
+            {{ $t('categoryUpdatesDesc') }}
           </el-checkbox>
           <el-checkbox v-model="defaultCatConfig.forums">
-            <span>论坛 (Forums)</span> - 讨论群组与邮件列表
+            {{ $t('categoryForumsDesc') }}
           </el-checkbox>
         </div>
         <el-divider style="margin: 14px 0;" />
         <el-checkbox v-model="defaultCatConfig.includeStarredInPrimary">
-          <span>{{ $t('includeStarredInPrimary') || '将星标邮件纳入主要标签' }}</span>
+          <span>{{ $t('includeStarredInPrimary') }}</span>
         </el-checkbox>
       </div>
       <template #footer>
         <div style="display: flex; justify-content: flex-end; gap: 10px;">
-          <el-button @click="customizeDefaultShow = false">{{ $t('cancel') || '取消' }}</el-button>
-          <el-button type="primary" @click="saveDefaultCustomize">{{ $t('save') || '保存' }}</el-button>
+          <el-button @click="customizeDefaultShow = false">{{ $t('cancel') }}</el-button>
+          <el-button type="primary" @click="saveDefaultCustomize">{{ $t('save') }}</el-button>
         </div>
       </template>
     </el-dialog>
@@ -576,39 +576,39 @@
     <!-- DIALOG: 优先收件箱自定义弹窗 -->
     <el-dialog 
       v-model="customizePriorityShow" 
-      :title="$t('customizePriority') || '自定义优先收件箱分区'" 
+      :title="$t('customizePriority')" 
       width="480px"
     >
       <div style="padding: 6px 0;">
-        <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 12px;">配置4个独立分区与显示条数：</p>
+        <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 12px;">{{ $t('configurePrioritySections') }}</p>
         <div style="display: flex; flex-direction: column; gap: 10px;">
           <div v-for="(sec, sIdx) in priorityConfig.sections" :key="sIdx" style="display: flex; align-items: center; gap: 10px;">
-            <span style="width: 55px; font-size: 13px; font-weight: 600;">分区 {{ sIdx + 1 }}:</span>
+            <span style="width: 75px; font-size: 13px; font-weight: 600;">{{ $t('sectionIndex', { index: sIdx + 1 }) }}:</span>
             <el-select v-model="sec.type" size="small" style="min-width: 180px; width: auto;">
-              <el-option label="重要且未读" value="important_unread" />
-              <el-option label="重要邮件" value="important" />
-              <el-option label="未读邮件" value="unread" />
-              <el-option label="星标邮件" value="starred" />
-              <el-option label="无 (隐藏分区)" value="none" />
-              <el-option v-if="sIdx === 3" label="其余所有邮件" value="everything" />
+              <el-option :label="$t('importantAndUnread')" value="important_unread" />
+              <el-option :label="$t('importantEmails')" value="important" />
+              <el-option :label="$t('unreadEmails')" value="unread" />
+              <el-option :label="$t('starredEmails')" value="starred" />
+              <el-option :label="$t('noneHideSection')" value="none" />
+              <el-option v-if="sIdx === 3" :label="$t('allOtherEmails')" value="everything" />
             </el-select>
             <el-select v-model="sec.maxItems" size="small" style="min-width: 105px; width: auto;">
-              <el-option :label="'5 条'" :value="5" />
-              <el-option :label="'10 条'" :value="10" />
-              <el-option :label="'25 条'" :value="25" />
-              <el-option :label="'50 条'" :value="50" />
+              <el-option :label="$t('itemsCount', { count: 5 })" :value="5" />
+              <el-option :label="$t('itemsCount', { count: 10 })" :value="10" />
+              <el-option :label="$t('itemsCount', { count: 25 })" :value="25" />
+              <el-option :label="$t('itemsCount', { count: 50 })" :value="50" />
             </el-select>
           </div>
         </div>
         <el-divider style="margin: 14px 0;" />
         <el-checkbox v-model="priorityConfig.hideEmpty">
-          <span>{{ $t('hideSectionWhenEmpty') || '分区为空时自动隐藏' }}</span>
+          <span>{{ $t('hideSectionWhenEmpty') }}</span>
         </el-checkbox>
       </div>
       <template #footer>
         <div style="display: flex; justify-content: flex-end; gap: 10px;">
-          <el-button @click="customizePriorityShow = false">{{ $t('cancel') || '取消' }}</el-button>
-          <el-button type="primary" @click="savePriorityCustomize">{{ $t('save') || '保存' }}</el-button>
+          <el-button @click="customizePriorityShow = false">{{ $t('cancel') }}</el-button>
+          <el-button type="primary" @click="savePriorityCustomize">{{ $t('save') }}</el-button>
         </div>
       </template>
     </el-dialog>
@@ -616,43 +616,43 @@
     <!-- DIALOG: 多收件箱自定义弹窗 -->
     <el-dialog 
       v-model="customizeMultipleShow" 
-      :title="$t('customizeMultiple') || '自定义多收件箱面板'" 
+      :title="$t('customizeMultiple')" 
       width="500px"
     >
       <div style="padding: 6px 0;">
-        <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 12px;">配置最多4组独立的搜索面板：</p>
+        <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 12px;">{{ $t('configureSearchPanes') }}</p>
         <div style="display: flex; flex-direction: column; gap: 8px;">
           <div v-for="(pane, pIdx) in multipleConfig.panels" :key="pIdx" style="display: flex; align-items: center; gap: 8px;">
-            <span style="width: 55px; font-size: 13px; font-weight: 600;">面板 {{ pIdx + 1 }}:</span>
-            <el-input v-model="pane.query" size="small" placeholder="搜索条件 (如 is:starred)" style="width: 170px;" />
-            <el-input v-model="pane.title" size="small" placeholder="面板标题" style="width: 150px;" />
+            <span style="width: 75px; font-size: 13px; font-weight: 600;">{{ $t('paneIndex', { index: pIdx + 1 }) }}:</span>
+            <el-input v-model="pane.query" size="small" :placeholder="$t('searchCriteriaPlaceholder')" style="width: 170px;" />
+            <el-input v-model="pane.title" size="small" :placeholder="$t('paneTitlePlaceholder')" style="width: 150px;" />
           </div>
         </div>
         <div style="margin-top: 14px;">
-          <label style="font-size: 13px; font-weight: bold; margin-right: 12px;">{{ $t('inboxPosition') || '布局位置' }}：</label>
+          <label style="font-size: 13px; font-weight: bold; margin-right: 12px;">{{ $t('inboxPosition') }}：</label>
           <el-radio-group v-model="multipleConfig.position" size="small">
-            <el-radio label="right">{{ $t('posRight') || '收件箱右侧' }}</el-radio>
-            <el-radio label="above">{{ $t('posAbove') || '收件箱上方' }}</el-radio>
-            <el-radio label="below">{{ $t('posBelow') || '收件箱下方' }}</el-radio>
+            <el-radio label="right">{{ $t('posRight') }}</el-radio>
+            <el-radio label="above">{{ $t('posAbove') }}</el-radio>
+            <el-radio label="below">{{ $t('posBelow') }}</el-radio>
           </el-radio-group>
         </div>
       </div>
       <template #footer>
         <div style="display: flex; justify-content: flex-end; gap: 10px;">
-          <el-button @click="customizeMultipleShow = false">{{ $t('cancel') || '取消' }}</el-button>
-          <el-button type="primary" @click="saveMultipleCustomize">{{ $t('save') || '保存' }}</el-button>
+          <el-button @click="customizeMultipleShow = false">{{ $t('cancel') }}</el-button>
+          <el-button type="primary" @click="saveMultipleCustomize">{{ $t('save') }}</el-button>
         </div>
       </template>
     </el-dialog>
     <!-- DIALOG: 自定义壁纸弹窗 -->
     <el-dialog 
       v-model="customWallpaperDialogShow" 
-      :title="$t('customWallpaper') || '自定义全局主题壁纸'" 
+      :title="$t('customWallpaper')" 
       width="450px"
     >
       <div style="padding: 10px 0; display: flex; flex-direction: column; gap: 16px;">
         <div style="font-size: 13px; color: var(--text-secondary);">
-          您可以上传本地壁纸图片（最大 25MB）或输入在线高清图片直链：
+          {{ $t('uploadWallpaperDesc') }}
         </div>
         
         <div style="display: flex; gap: 10px; align-items: center;">
@@ -663,7 +663,7 @@
           >
             <el-button type="primary" plain :loading="uploadingWallpaper">
               <Icon icon="lucide:upload" width="15" height="15" style="margin-right: 6px;" />
-              {{ $t('uploadWallpaper') || '上传本地壁纸' }}
+              {{ $t('uploadWallpaper') }}
             </el-button>
           </el-upload>
 
@@ -673,7 +673,7 @@
             link 
             @click="clearWallpaper"
           >
-            {{ $t('clearWallpaper') || '恢复默认' }}
+            {{ $t('clearWallpaper') }}
           </el-button>
         </div>
 
@@ -681,17 +681,17 @@
           <el-input
             v-model="customWallpaperUrl"
             size="default"
-            :placeholder="$t('wallpaperUrlPlaceholder') || '在线图片直链 (https://...)'"
+            :placeholder="$t('wallpaperUrlPlaceholder')"
             clearable
           />
           <el-button type="primary" @click="applyCustomUrlWallpaper">
-            {{ $t('applyWallpaper') || '应用' }}
+            {{ $t('applyWallpaper') }}
           </el-button>
         </div>
       </div>
       <template #footer>
         <div style="display: flex; justify-content: flex-end;">
-          <el-button @click="customWallpaperDialogShow = false">{{ $t('cancel') || '关闭' }}</el-button>
+          <el-button @click="customWallpaperDialogShow = false">{{ $t('cancel') }}</el-button>
         </div>
       </template>
     </el-dialog>
@@ -699,12 +699,12 @@
     <!-- DIALOG: 自定义个人背景弹窗 -->
     <el-dialog 
       v-model="customCoverDialogShow" 
-      :title="$t('customCover') || '自定义个人背景封面'" 
+      :title="$t('customCover')" 
       width="450px"
     >
       <div style="padding: 10px 0; display: flex; flex-direction: column; gap: 16px;">
         <div style="font-size: 13px; color: var(--text-secondary);">
-          自定义账户详情界面的封面横幅背景（Cover Photo）：
+          {{ $t('uploadCoverDesc') }}
         </div>
         
         <div style="display: flex; gap: 10px; align-items: center;">
@@ -715,7 +715,7 @@
           >
             <el-button type="primary" plain :loading="uploadingCover">
               <Icon icon="lucide:upload" width="15" height="15" style="margin-right: 6px;" />
-              {{ $t('uploadCover') || '上传封面图片' }}
+              {{ $t('uploadCover') }}
             </el-button>
           </el-upload>
 
@@ -725,7 +725,7 @@
             link 
             @click="clearCover"
           >
-            {{ $t('clearWallpaper') || '恢复默认' }}
+            {{ $t('clearWallpaper') }}
           </el-button>
         </div>
 
@@ -733,17 +733,17 @@
           <el-input
             v-model="customCoverUrl"
             size="default"
-            :placeholder="$t('coverUrlPlaceholder') || '封面图片直链 (https://...)'"
+            :placeholder="$t('coverUrlPlaceholder')"
             clearable
           />
           <el-button type="primary" @click="applyCustomUrlCover">
-            {{ $t('applyWallpaper') || '应用' }}
+            {{ $t('applyWallpaper') }}
           </el-button>
         </div>
       </div>
       <template #footer>
         <div style="display: flex; justify-content: flex-end;">
-          <el-button @click="customCoverDialogShow = false">{{ $t('cancel') || '关闭' }}</el-button>
+          <el-button @click="customCoverDialogShow = false">{{ $t('cancel') }}</el-button>
         </div>
       </template>
     </el-dialog>
@@ -761,7 +761,7 @@ import { useUiStore } from '@/store/ui.js'
 import { useSettingStore } from '@/store/setting.js'
 import { updateProfile, uploadImage } from '@/request/my.js'
 import { parseInlineMarkdown } from '@/utils/md-parser.js'
-import { THEME_PRESETS, COVER_PRESETS } from '@/utils/theme-presets.js'
+import { THEME_PRESETS, COVER_PRESETS, getPresetName } from '@/utils/theme-presets.js'
 
 defineOptions({
   name: 'general-setting'
@@ -882,18 +882,18 @@ function getCoverThumbStyle(preset) {
 function selectPresetWallpaper(preset) {
   uiStore.setThemeWallpaper(preset.id)
   updateProfile({ themeWallpaper: preset.id }).catch(() => {})
-  ElMessage.success(t('saveSuccessMsg') || '主题已应用')
+  ElMessage.success(t('saveSuccessMsg'))
 }
 
 function selectPresetCover(preset) {
   userStore.user.backgroundUrl = preset.url
   updateProfile({ backgroundUrl: preset.url }).catch(() => {})
-  ElMessage.success('个人背景已更新')
+  ElMessage.success(t('coverPhotoUpdated'))
 }
 
 async function handleUploadCustomWallpaper({ file }) {
   if (file.size > 25 * 1024 * 1024) {
-    ElMessage.error(t('imageSizeLimitMsg') || '图片大小不能超过 25MB')
+    ElMessage.error(t('imageSizeLimitMsg'))
     return
   }
   uploadingWallpaper.value = true
@@ -906,10 +906,10 @@ async function handleUploadCustomWallpaper({ file }) {
       uiStore.setThemeWallpaper(url)
       await updateProfile({ themeWallpaper: url })
       customWallpaperDialogShow.value = false
-      ElMessage.success('自定义壁纸已应用')
+      ElMessage.success(t('wallpaperApplied'))
     }
   } catch (e) {
-    ElMessage.error(e.message || '上传壁纸失败')
+    ElMessage.error(e.message || t('uploadWallpaperFailed'))
   } finally {
     uploadingWallpaper.value = false
   }
@@ -917,7 +917,7 @@ async function handleUploadCustomWallpaper({ file }) {
 
 async function handleUploadCustomCover({ file }) {
   if (file.size > 25 * 1024 * 1024) {
-    ElMessage.error(t('imageSizeLimitMsg') || '图片大小不能超过 25MB')
+    ElMessage.error(t('imageSizeLimitMsg'))
     return
   }
   uploadingCover.value = true
@@ -930,10 +930,10 @@ async function handleUploadCustomCover({ file }) {
       userStore.user.backgroundUrl = url
       await updateProfile({ backgroundUrl: url })
       customCoverDialogShow.value = false
-      ElMessage.success('个人背景封面已应用')
+      ElMessage.success(t('coverPhotoUpdated'))
     }
   } catch (e) {
-    ElMessage.error(e.message || '上传封面失败')
+    ElMessage.error(e.message || t('uploadCoverFailed'))
   } finally {
     uploadingCover.value = false
   }
@@ -945,7 +945,7 @@ function applyCustomUrlWallpaper() {
   uiStore.setThemeWallpaper(url)
   updateProfile({ themeWallpaper: url }).catch(() => {})
   customWallpaperDialogShow.value = false
-  ElMessage.success('壁纸已应用')
+  ElMessage.success(t('wallpaperApplied'))
 }
 
 function applyCustomUrlCover() {
@@ -954,7 +954,7 @@ function applyCustomUrlCover() {
   userStore.user.backgroundUrl = url
   updateProfile({ backgroundUrl: url }).catch(() => {})
   customCoverDialogShow.value = false
-  ElMessage.success('个人背景封面已应用')
+  ElMessage.success(t('coverPhotoUpdated'))
 }
 
 function clearWallpaper() {
@@ -962,7 +962,7 @@ function clearWallpaper() {
   customWallpaperUrl.value = ''
   updateProfile({ themeWallpaper: 'none' }).catch(() => {})
   customWallpaperDialogShow.value = false
-  ElMessage.success('已恢复默认壁纸')
+  ElMessage.success(t('defaultWallpaperRestored'))
 }
 
 function clearCover() {
@@ -970,7 +970,7 @@ function clearCover() {
   customCoverUrl.value = ''
   updateProfile({ backgroundUrl: '' }).catch(() => {})
   customCoverDialogShow.value = false
-  ElMessage.success('已恢复默认个人背景')
+  ElMessage.success(t('defaultCoverRestored'))
 }
 
 function onOpacityChange(val) {
@@ -981,13 +981,13 @@ function onOpacityChange(val) {
 function selectDensity(density) {
   uiStore.setDensity(density)
   updateProfile({ density }).catch(() => {})
-  ElMessage.success(t('saveSuccessMsg') || '视图密度已调整')
+  ElMessage.success(t('saveSuccessMsg'))
 }
 
 function onInboxTypeChange(val) {
   uiStore.setInboxType(val)
   updateProfile({ inboxType: val }).catch(() => {})
-  ElMessage.success(t('saveSuccessMsg') || '收件箱类型已更新')
+  ElMessage.success(t('saveSuccessMsg'))
 }
 
 function openCustomizeModal(type) {
@@ -1013,33 +1013,33 @@ function saveDefaultCustomize() {
   uiStore.setInboxConfig('default', { ...defaultCatConfig })
   updateProfile({ inboxConfig: uiStore.inboxConfig }).catch(() => {})
   customizeDefaultShow.value = false
-  ElMessage.success(t('saveSuccessMsg') || '设置已保存')
+  ElMessage.success(t('saveSuccessMsg'))
 }
 
 function savePriorityCustomize() {
   uiStore.setInboxConfig('priority', { ...priorityConfig })
   updateProfile({ inboxConfig: uiStore.inboxConfig }).catch(() => {})
   customizePriorityShow.value = false
-  ElMessage.success(t('saveSuccessMsg') || '设置已保存')
+  ElMessage.success(t('saveSuccessMsg'))
 }
 
 function saveMultipleCustomize() {
   uiStore.setInboxConfig('multiple', { ...multipleConfig })
   updateProfile({ inboxConfig: uiStore.inboxConfig }).catch(() => {})
   customizeMultipleShow.value = false
-  ElMessage.success(t('saveSuccessMsg') || '设置已保存')
+  ElMessage.success(t('saveSuccessMsg'))
 }
 
 function selectReadingPane(pane) {
   uiStore.setReadingPane(pane)
   updateProfile({ readingPane: pane }).catch(() => {})
-  ElMessage.success(t('saveSuccessMsg') || '阅读窗格已更新')
+  ElMessage.success(t('saveSuccessMsg'))
 }
 
 function onConversationViewChange(val) {
   uiStore.setConversationView(val)
   updateProfile({ conversationView: val }).catch(() => {})
-  ElMessage.success(t('saveSuccessMsg') || '会话模式已更新')
+  ElMessage.success(t('saveSuccessMsg'))
 }
 
 function changeLang(lang) {
@@ -1066,7 +1066,7 @@ function saveBio() {
   updateProfile({ bio: accountBio.value }).then(() => {
     userStore.user.bio = accountBio.value
     bioDialogShow.value = false
-    ElMessage.success(t('saveSuccessMsg') || '个人简介已更新')
+    ElMessage.success(t('saveSuccessMsg'))
   }).finally(() => {
     bioLoading.value = false
   })
@@ -1075,7 +1075,7 @@ function saveBio() {
 function savePrivacy(field, val) {
   updateProfile({ [field]: val }).then(() => {
     userStore.user[field] = val
-    ElMessage.success(t('saveSuccessMsg') || '设置已保存')
+    ElMessage.success(t('saveSuccessMsg'))
   })
 }
 </script>

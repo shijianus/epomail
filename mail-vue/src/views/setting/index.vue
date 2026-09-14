@@ -2,7 +2,7 @@
   <div class="box">
     <!-- Section 1: Account Security Information -->
     <div class="container">
-      <div class="title">{{ $t('securitySetting') || '安全设置' }}</div>
+      <div class="title">{{ $t('securitySetting') }}</div>
       <div class="item">
         <div>{{ $t('username') }}</div>
         <div>
@@ -35,7 +35,7 @@
 
     <!-- Section 2: Google-Style 2-Step Verification Center -->
     <div class="container two-factor-center" v-if="totpStatus.globalEnabled">
-      <div class="title">{{ $t('twoFactorCenter') || '两步验证中心' }}</div>
+      <div class="title">{{ $t('twoFactorCenter') }}</div>
 
       <!-- Hero Status Banner -->
       <div class="two-factor-banner" :class="{ 'is-enabled': totpStatus.enabled }">
@@ -46,14 +46,14 @@
           </div>
           <div class="banner-texts">
             <div class="banner-status-row">
-              <span class="banner-title">{{ $t('totpTitle') || '两步验证 (2FA)' }}</span>
+              <span class="banner-title">{{ $t('totpTitle') }}</span>
               <el-tag
                 :type="totpStatus.enabled ? 'success' : 'info'"
                 effect="dark"
                 round
                 class="status-pill"
               >
-                {{ totpStatus.enabled ? ($t('totpEnabled') || '已启用') : ($t('totpDisabled') || '未启用') }}
+                {{ totpStatus.enabled ? ($t('totpEnabled')) : ($t('totpDisabled')) }}
               </el-tag>
             </div>
             <div class="banner-desc">
@@ -61,7 +61,7 @@
                 {{ totpStatus.createdAt ? $t('twoFactorProtectedSince', { date: formatDate(totpStatus.createdAt) }) : $t('totpEnabledDesc') }}
               </span>
               <span v-else>
-                {{ $t('twoFactorBannerDisabledDesc') || '为您的账号添加一层额外安全防线。启用后，登录需要密码和第二步验证。' }}
+                {{ $t('twoFactorBannerDisabledDesc') }}
               </span>
             </div>
           </div>
@@ -76,7 +76,7 @@
             class="action-pill-btn"
           >
             <Icon icon="fluent:power-20-regular" width="16" height="16" style="margin-right: 6px;" />
-            {{ $t('turnOff2FA') || '停用两步验证' }}
+            {{ $t('turnOff2FA') }}
           </el-button>
           <el-button
             v-else
@@ -86,7 +86,7 @@
             class="action-pill-btn primary-glow"
           >
             <Icon icon="fluent:shield-keyhole-20-filled" width="16" height="16" style="margin-right: 6px;" />
-            {{ $t('turnOn2FA') || '设置两步验证' }}
+            {{ $t('turnOn2FA') }}
           </el-button>
         </div>
       </div>
@@ -94,8 +94,8 @@
       <!-- Second-Step Verification Methods -->
       <div class="second-steps-card">
         <div class="card-header">
-          <div class="sub-title">{{ $t('secondStepMethods') || '可用的第二步验证方式' }}</div>
-          <div class="sub-desc">{{ $t('secondStepMethodsDesc') || '通过以下安全验证方式确认是您本人在登录：' }}</div>
+          <div class="sub-title">{{ $t('secondStepMethods') }}</div>
+          <div class="sub-desc">{{ $t('secondStepMethodsDesc') }}</div>
         </div>
 
         <div class="methods-list">
@@ -106,13 +106,13 @@
             </div>
             <div class="method-content">
               <div class="method-headline">
-                <span class="method-name">{{ $t('authenticatorApp') || '身份验证器应用' }}</span>
+                <span class="method-name">{{ $t('authenticatorApp') }}</span>
                 <el-tag :type="totpStatus.totpConfigured ? 'success' : 'info'" size="small" effect="plain" round>
-                  {{ totpStatus.totpConfigured ? ($t('configured') || '已配置') : ($t('notConfigured') || '未配置') }}
+                  {{ totpStatus.totpConfigured ? ($t('configured')) : ($t('notConfigured')) }}
                 </el-tag>
               </div>
               <div class="method-subtext">
-                {{ $t('authenticatorAppDesc') || '使用 Google Authenticator、Microsoft Authenticator 或 1Password 等应用获取动态验证码。' }}
+                {{ $t('authenticatorAppDesc') }}
               </div>
             </div>
             <div class="method-action">
@@ -123,7 +123,7 @@
                 :loading="totpLoading"
                 @click="startTotpSetup"
               >
-                {{ totpStatus.totpConfigured ? ($t('reconfigure') || '重新配置') : ($t('turnOn2FA') || '立即设置') }}
+                {{ totpStatus.totpConfigured ? ($t('reconfigure')) : ($t('turnOn2FA')) }}
               </el-button>
             </div>
           </div>
@@ -135,16 +135,16 @@
             </div>
             <div class="method-content">
               <div class="method-headline">
-                <span class="method-name">{{ $t('backupCodesTitle') || '备用恢复码' }}</span>
+                <span class="method-name">{{ $t('backupCodesTitle') }}</span>
                 <el-tag v-if="totpStatus.enabled" type="warning" size="small" effect="plain" round>
                   {{ $t('backupCodesRemainingCount', { count: totpStatus.backupCodesRemaining }) }}
                 </el-tag>
                 <el-tag v-else type="info" size="small" effect="plain" round>
-                  {{ $t('notConfigured') || '未配置' }}
+                  {{ $t('notConfigured') }}
                 </el-tag>
               </div>
               <div class="method-subtext">
-                {{ $t('backupCodesDesc') || '10 组一次性安全代码，在您无法使用验证器或安全密钥时用于紧急登录。' }}
+                {{ $t('backupCodesDesc') }}
               </div>
             </div>
             <div class="method-action dual-actions">
@@ -153,17 +153,17 @@
                   size="default"
                   @click="openViewBackupCodesModal"
                 >
-                  {{ $t('viewBackupCodesBtn') || '查看代码' }}
+                  {{ $t('viewBackupCodesBtn') }}
                 </el-button>
                 <el-button
                   size="default"
                   @click="openRegenBackupModal"
                 >
-                  {{ $t('totpRegenBackupBtn') || '生成新代码' }}
+                  {{ $t('totpRegenBackupBtn') }}
                 </el-button>
               </template>
               <el-button v-else size="default" disabled>
-                {{ $t('viewBackupCodesBtn') || '查看代码' }}
+                {{ $t('viewBackupCodesBtn') }}
               </el-button>
             </div>
           </div>
@@ -176,13 +176,13 @@
               </div>
               <div class="method-content">
                 <div class="method-headline">
-                  <span class="method-name">{{ $t('passkeysAndSecurityKeys') || '通行密钥与安全密钥' }}</span>
+                  <span class="method-name">{{ $t('passkeysAndSecurityKeys') }}</span>
                   <el-tag :type="passkeyList.length > 0 ? 'success' : 'info'" size="small" effect="plain" round>
-                    {{ passkeyList.length > 0 ? `${passkeyList.length} 个密钥` : ($t('notConfigured') || '未配置') }}
+                    {{ passkeyList.length > 0 ? $t('keysCount', { count: passkeyList.length }) : $t('notConfigured') }}
                   </el-tag>
                 </div>
                 <div class="method-subtext">
-                  {{ $t('passkeysDesc') || '使用硬件安全密钥 (如 YubiKey) 或设备生物识别 (Touch ID / Face ID / Windows Hello) 作为抗钓鱼的两步验证。' }}
+                  {{ $t('passkeysDesc') }}
                 </div>
               </div>
               <div class="method-action">
@@ -193,7 +193,7 @@
                   @click="openAddPasskeyModal"
                 >
                   <Icon icon="fluent:add-12-filled" width="14" height="14" style="margin-right: 4px;" />
-                  {{ $t('addSecurityKeyBtn') || '添加安全密钥' }}
+                  {{ $t('addSecurityKeyBtn') }}
                 </el-button>
               </div>
             </div>
@@ -209,7 +209,7 @@
                   <Icon icon="fluent:usb-plug-20-regular" width="18" height="18" class="key-icon" />
                   <div class="passkey-details">
                     <span class="passkey-name">{{ key.name }}</span>
-                    <span class="passkey-date">{{ $t('tabRegisteredAt') || '添加于' }}: {{ formatDate(key.createdAt) }}</span>
+                    <span class="passkey-date">{{ $t('tabRegisteredAt') }}: {{ formatDate(key.createdAt) }}</span>
                   </div>
                 </div>
                 <div class="passkey-actions">
@@ -225,7 +225,7 @@
               </div>
             </div>
             <div v-else class="empty-passkeys-hint">
-              <span>{{ $t('noSecurityKeys') || '尚未添加任何安全密钥' }}</span>
+              <span>{{ $t('noSecurityKeys') }}</span>
             </div>
           </div>
         </div>
@@ -234,12 +234,12 @@
 
     <!-- Section 3: Account Deletion -->
     <div class="container del-email" v-perm="'my:delete'">
-      <div class="title">{{ $t('deleteUser') || '注销账号' }}</div>
+      <div class="title">{{ $t('deleteUser') }}</div>
       <div class="del-msg">
         {{ $t('delAccountMsg') }}
       </div>
       <div class="del-action">
-        <el-button type="danger" plain @click="deleteConfirm">{{ $t('deleteUserBtn') || '注销账号' }}</el-button>
+        <el-button type="danger" plain @click="deleteConfirm">{{ $t('deleteUserBtn') }}</el-button>
       </div>
     </div>
 
@@ -307,7 +307,7 @@
             />
           </div>
           <div class="dialog-footer-actions dual-actions">
-            <el-button @click="setupStep = 1">{{ $t('backBtn') || '返回' }}</el-button>
+            <el-button @click="setupStep = 1">{{ $t('backBtn') }}</el-button>
             <el-button type="primary" :loading="enableLoading" @click="submitEnableTotp">
               {{ $t('totpVerifyAndEnable') }}
             </el-button>
@@ -350,13 +350,13 @@
     <!-- View Backup Codes Modal -->
     <el-dialog
       v-model="viewBackupDialogVisible"
-      :title="$t('viewBackupCodesBtn') || '查看备用恢复码'"
+      :title="$t('viewBackupCodesBtn')"
       width="460px"
       destroy-on-close
     >
       <div v-if="viewBackupCodesList.length === 0 && !viewBackupVerified" class="password-verify-box">
         <div class="dialog-sub-desc">
-          {{ $t('verifyPasswordToViewDesc') || '出于安全考虑，查看备用恢复码需要验证您的登录密码：' }}
+          {{ $t('verifyPasswordToViewDesc') }}
         </div>
         <el-input
           type="password"
@@ -395,14 +395,14 @@
       <template #footer>
         <div class="dialog-footer">
           <template v-if="!viewBackupVerified">
-            <el-button @click="viewBackupDialogVisible = false">{{ $t('cancel') || '取消' }}</el-button>
+            <el-button @click="viewBackupDialogVisible = false">{{ $t('cancel') }}</el-button>
             <el-button type="primary" :loading="viewBackupLoading" @click="submitViewBackupCodes">
-              {{ $t('confirm') || '确认验证' }}
+              {{ $t('confirm') }}
             </el-button>
           </template>
           <template v-else>
             <el-button type="primary" class="w-full" @click="viewBackupDialogVisible = false">
-              {{ $t('totpDone') || '完成' }}
+              {{ $t('totpDone') }}
             </el-button>
           </template>
         </div>
@@ -455,14 +455,14 @@
       <template #footer>
         <div class="dialog-footer">
           <template v-if="regenResultCodes.length === 0">
-            <el-button @click="regenDialogVisible = false">{{ $t('cancel') || '取消' }}</el-button>
+            <el-button @click="regenDialogVisible = false">{{ $t('cancel') }}</el-button>
             <el-button type="primary" :loading="regenLoading" @click="submitRegenBackupCodes">
               {{ $t('totpConfirmRegen') }}
             </el-button>
           </template>
           <template v-else>
             <el-button type="primary" class="w-full" @click="regenDialogVisible = false">
-              {{ $t('totpDone') || '完成' }}
+              {{ $t('totpDone') }}
             </el-button>
           </template>
         </div>
@@ -472,7 +472,7 @@
     <!-- Add Passkey / Security Key Modal -->
     <el-dialog
       v-model="addPasskeyDialogVisible"
-      :title="$t('addSecurityKeyBtn') || '添加安全密钥'"
+      :title="$t('addSecurityKeyBtn')"
       width="440px"
       destroy-on-close
     >
@@ -481,10 +481,10 @@
           {{ $t('passkeysDesc') }}
         </div>
         <div class="key-name-field">
-          <span class="field-label">{{ $t('securityKeyName') || '密钥名称' }}</span>
+          <span class="field-label">{{ $t('securityKeyName') }}</span>
           <el-input
             v-model="newPasskeyName"
-            :placeholder="$t('securityKeyNamePlaceholder') || '例如：MacBook Touch ID、YubiKey 5C'"
+            :placeholder="$t('securityKeyNamePlaceholder')"
             maxlength="40"
             @keyup.enter="handleCreatePasskey"
           />
@@ -492,9 +492,9 @@
       </div>
       <template #footer>
         <div class="dialog-footer">
-          <el-button @click="addPasskeyDialogVisible = false">{{ $t('cancel') || '取消' }}</el-button>
+          <el-button @click="addPasskeyDialogVisible = false">{{ $t('cancel') }}</el-button>
           <el-button type="primary" :loading="passkeyLoading" @click="handleCreatePasskey">
-            {{ $t('continue') || '开始注册验证' }}
+            {{ $t('continue') }}
           </el-button>
         </div>
       </template>
@@ -528,7 +528,7 @@
       </div>
       <template #footer>
         <div class="dialog-footer">
-          <el-button @click="disableDialogVisible = false">{{ $t('cancel') || '取消' }}</el-button>
+          <el-button @click="disableDialogVisible = false">{{ $t('cancel') }}</el-button>
           <el-button type="danger" :loading="disableLoading" @click="submitDisableTotp">
             {{ $t('totpConfirmDisable') }}
           </el-button>
@@ -1036,10 +1036,10 @@ const handleCreatePasskey = async () => {
 const confirmDeletePasskey = (key) => {
   ElMessageBox.confirm(
     t('deleteSecurityKeyConfirm', { name: key.name }) || `Are you sure you want to remove security key "${key.name}"?`,
-    t('deleteSecurityKey') || '删除密钥',
+    t('deleteSecurityKey'),
     {
-      confirmButtonText: t('confirm') || '确认',
-      cancelButtonText: t('cancel') || '取消',
+      confirmButtonText: t('confirm'),
+      cancelButtonText: t('cancel'),
       type: 'warning'
     }
   ).then(async () => {

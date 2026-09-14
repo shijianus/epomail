@@ -8,25 +8,25 @@
           <div class="settings-sidebar-content">
             <div class="settings-title" @click="router.push({name: 'email'})">
               <Icon icon="lucide:arrow-left" width="18" height="18" />
-              <span>{{$t('backToMail') || 'Back to Mail'}}</span>
+              <span>{{$t('backToMail')}}</span>
             </div>
             
-            <div class="nav-section-title">{{$t('tabSetting') || 'Settings'}}</div>
+            <div class="nav-section-title">{{$t('tabSetting')}}</div>
             <div class="settings-nav-group">
             <router-link :to="{name: 'user-profile'}" class="settings-nav-item" :class="{active: route.name === 'user-profile' || route.name === 'profile'}">
-              <Icon icon="fluent:person-20-regular" width="20" height="20" /> {{$t('profile') || '个资'}}
+              <Icon icon="fluent:person-20-regular" width="20" height="20" /> {{$t('profile')}}
             </router-link>
             <router-link :to="{name: 'general-setting'}" class="settings-nav-item" :class="{active: route.name === 'general-setting' || route.name === 'profile-setting'}">
-              <Icon icon="fluent:settings-48-regular" width="20" height="20" /> {{$t('general') || '常规'}}
+              <Icon icon="fluent:settings-48-regular" width="20" height="20" /> {{$t('general')}}
             </router-link>
             <router-link :to="{name: 'setting'}" class="settings-nav-item" :class="{active: route.name === 'setting'}">
-              <Icon icon="fluent:shield-checkmark-20-regular" width="20" height="20" /> {{$t('security') || 'Security'}}
+              <Icon icon="fluent:shield-checkmark-20-regular" width="20" height="20" /> {{$t('security')}}
             </router-link>
             <router-link :to="{name: 'data-setting'}" class="settings-nav-item" :class="{active: route.name === 'data-setting'}">
-              <Icon icon="fluent:database-person-20-regular" width="20" height="20" /> {{$t('data') || '资料'}}
+              <Icon icon="fluent:database-person-20-regular" width="20" height="20" /> {{$t('data')}}
             </router-link>
             <router-link :to="{name: 'label-setting'}" class="settings-nav-item" :class="{active: route.name === 'label-setting'}">
-              <Icon icon="lucide:tags" width="20" height="20" /> {{$t('labels') || 'Labels'}}
+              <Icon icon="lucide:tags" width="20" height="20" /> {{$t('labels')}}
             </router-link>
             </div>
 
@@ -59,11 +59,11 @@
               </router-link>
 
               <router-link v-if="hasPerm('setting:query')" :to="{name: 'oauth-app'}" class="settings-nav-item" :class="{active: route.name === 'oauth-app'}">
-                <Icon icon="fluent:apps-24-regular" width="18" height="18" /> {{$t('oauthApps') || '应用管理'}}
+                <Icon icon="fluent:apps-24-regular" width="18" height="18" /> {{$t('oauthApps')}}
               </router-link>
 
               <router-link :to="{name: 'category-setting'}" class="settings-nav-item" :class="{active: route.name === 'category-setting'}">
-                <Icon icon="lucide:network" width="18" height="18" /> {{$t('categorySetting') || 'Category Settings'}}
+                <Icon icon="lucide:network" width="18" height="18" /> {{$t('categorySetting')}}
               </router-link>
             </template>
           </div>

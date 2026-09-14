@@ -16,7 +16,7 @@
 
       <el-button size="small" type="primary" plain class="hierarchy-btn" @click="hierarchyVisible = true">
         <Icon icon="lucide:shield-check" width="16" height="16" style="margin-right: 4px;" />
-        架构与分级一览
+        {{ $t('roleStructureOverview') }}
       </el-button>
 
     </div>
@@ -35,10 +35,10 @@
         <el-table-column :label="$t('role')" prop="name" :min-width="roleWidth">
           <template #default="props">
             <div class="role-name-cell">
-              <span class="role-title">{{ props.row.name }}</span>
+              <span class="role-title">{{ formatRoleName(props.row) }}</span>
               <span v-if="getRoleBadge(props.row)" class="custom-badge-wrapper">
                 <span class="custom-role-badge" :style="getRoleBadgeStyle(props.row)">
-                  {{ getRoleBadge(props.row).text }}
+                  {{ formatRoleBadgeText(props.row) }}
                 </span>
               </span>
               <span v-if="props.row.isDefault"><el-tag size="small" effect="dark" class="role-tag def-tag">{{ $t('default') }}</el-tag></span>
@@ -46,44 +46,44 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="存储配额" width="140">
+        <el-table-column :label="$t('storageQuota')" width="140">
           <template #default="props">
             <div class="quota-badge">
               <Icon icon="lucide:hard-drive" width="14" height="14" class="col-ic" />
-              <span v-if="props.row.roleCode === 'master'" class="quota-master">无限制</span>
+              <span v-if="props.row.roleCode === 'master'" class="quota-master">{{ $t('unlimited') }}</span>
               <span v-else-if="props.row.storageQuotaMb === 0" class="quota-zero">0 MB</span>
               <span v-else class="quota-val">{{ formatQuotaDisplay(props.row.storageQuotaMb, props.row.roleCode) }}</span>
             </div>
           </template>
         </el-table-column>
 
-        <el-table-column label="发件上限" width="130">
+        <el-table-column :label="$t('sendLimit')" width="130">
           <template #default="props">
             <div class="send-badge">
               <Icon icon="lucide:send" width="13" height="13" class="col-ic" />
-              <span v-if="props.row.sendType === 'ban'" class="text-banned">禁止发信</span>
-              <span v-else-if="props.row.sendType === 'day'">{{ props.row.sendCount }} 封/天</span>
-              <span v-else-if="props.row.sendType === 'internal'">仅限站内</span>
-              <span v-else-if="props.row.sendCount === 0 || !props.row.sendCount">无限制</span>
-              <span v-else>累计 {{ props.row.sendCount }} 封</span>
+              <span v-if="props.row.sendType === 'ban'" class="text-banned">{{ $t('forbiddenSend') }}</span>
+              <span v-else-if="props.row.sendType === 'day'">{{ $t('dailyLimitCount', { count: props.row.sendCount }) }}</span>
+              <span v-else-if="props.row.sendType === 'internal'">{{ $t('internalOnly') }}</span>
+              <span v-else-if="props.row.sendCount === 0 || !props.row.sendCount">{{ $t('unlimited') }}</span>
+              <span v-else>{{ $t('totalSentCount', { count: props.row.sendCount }) }}</span>
             </div>
           </template>
         </el-table-column>
 
-        <el-table-column label="附件权限" width="140">
+        <el-table-column :label="$t('attachmentPerm')" width="140">
           <template #default="props">
             <el-tag v-if="props.row.allowAttachment === 1" size="small" type="success" effect="light" class="att-tag">
               <Icon icon="lucide:paperclip" width="12" height="12" style="margin-right: 4px;" />
-              开放附件
+              {{ $t('openAttachment') }}
             </el-tag>
             <el-tag v-else size="small" type="info" effect="plain" class="att-tag">
               <Icon icon="lucide:file-text" width="12" height="12" style="margin-right: 4px;" />
-              仅纯文本
+              {{ $t('plainTextOnly') }}
             </el-tag>
           </template>
         </el-table-column>
 
-        <el-table-column label="AI 授权模型" min-width="160">
+        <el-table-column :label="$t('allowedAiModels')" min-width="160">
           <template #default="props">
             <div v-if="props.row.aiModels && props.row.aiModels.length > 0" class="role-ai-models-tags" style="display: flex; flex-wrap: wrap; gap: 4px;">
               <el-tag v-for="m in props.row.aiModels.slice(0, 2)" :key="m" size="small" type="primary" effect="plain" style="font-size: 11px;">
@@ -93,7 +93,7 @@
                 +{{ props.row.aiModels.length - 2 }}
               </el-tag>
             </div>
-            <span v-else style="font-size: 12px; color: var(--el-text-color-secondary);">跟随全局 (全部)</span>
+            <span v-else style="font-size: 12px; color: var(--el-text-color-secondary);">{{ $t('followGlobalAll') }}</span>
           </template>
         </el-table-column>
 
@@ -102,7 +102,7 @@
         <el-table-column v-if="desShow" :label="$t('description')" min-width="180" prop="description">
           <template #default="props">
             <div class="description" :title="props.row.description">
-              <span>{{ props.row.description }}</span>
+              <span>{{ formatRoleDesc(props.row) }}</span>
             </div>
           </template>
         </el-table-column>
@@ -162,33 +162,33 @@
           <div class="preset-templates">
             <div class="preset-label">
               <Icon icon="lucide:sparkles" width="13" height="13" style="color: #6366f1; margin-right: 4px;" />
-              快捷套用系统分组模板：
+              {{ $t('quickApplyGroupTemplate') }}：
             </div>
             <div class="preset-chips">
-              <el-button size="small" round @click="applyTemplate('visitor')">参观者</el-button>
-              <el-button size="small" round @click="applyTemplate('user_base')">普通用户</el-button>
-              <el-button size="small" round @click="applyTemplate('user_lv0')">普通用户 LV.0</el-button>
-              <el-button size="small" round @click="applyTemplate('user_lv1')">普通用户 LV.1</el-button>
-              <el-button size="small" round @click="applyTemplate('moderator')">协管者</el-button>
-              <el-button size="small" round @click="applyTemplate('master')">站长</el-button>
+              <el-button size="small" round @click="applyTemplate('visitor')">{{ $t('roleVisitor') }}</el-button>
+              <el-button size="small" round @click="applyTemplate('user_base')">{{ $t('roleUserBase') }}</el-button>
+              <el-button size="small" round @click="applyTemplate('user_lv0')">{{ $t('roleUserBase') }} LV.0</el-button>
+              <el-button size="small" round @click="applyTemplate('user_lv1')">{{ $t('roleUserBase') }} LV.1</el-button>
+              <el-button size="small" round @click="applyTemplate('moderator')">{{ $t('roleModerator') }}</el-button>
+              <el-button size="small" round @click="applyTemplate('master')">{{ $t('roleMaster') }}</el-button>
             </div>
           </div>
 
           <div class="form-row">
             <el-input class="dialog-input" v-model="form.name" type="text" :maxlength="16" :placeholder="$t('roleName')" autocomplete="off"/>
-            <el-input class="dialog-input" v-model="form.roleCode" type="text" :maxlength="20" placeholder="分组代码 (如 user_lv0)" autocomplete="off"/>
+            <el-input class="dialog-input" v-model="form.roleCode" type="text" :maxlength="20" :placeholder="$t('groupCodePlaceholder')" autocomplete="off"/>
           </div>
 
           <!-- Tag Text & Tag Color Customizer -->
           <div class="form-row tag-picker-row">
-            <el-input class="dialog-input" v-model="form.tagText" type="text" :maxlength="10" placeholder="自订标签 (如 活跃学者)" autocomplete="off">
+            <el-input class="dialog-input" v-model="form.tagText" type="text" :maxlength="10" :placeholder="$t('customTagPlaceholder')" autocomplete="off">
               <template #prefix>
                 <Icon icon="lucide:tag" width="14" height="14" style="color: var(--text-muted);" />
               </template>
             </el-input>
             <div class="color-picker-box">
               <el-color-picker v-model="form.tagColor" size="default" :predefine="['#6366f1','#10b981','#06b6d4','#f59e0b','#ef4444','#8b5cf6','#64748b']" />
-              <span class="color-label" :style="{ color: form.tagColor || 'var(--text-secondary)' }">色彩</span>
+              <span class="color-label" :style="{ color: form.tagColor || 'var(--text-secondary)' }">{{ $t('color') }}</span>
             </div>
           </div>
 
@@ -197,7 +197,7 @@
           <!-- Quota & Attachment Grid -->
           <div class="form-grid-pair">
             <div class="pair-item">
-              <div class="pair-label">默认存储配额 (MB)</div>
+              <div class="pair-label">{{ $t('defaultStorageQuotaMb') }}</div>
               <el-input-number 
                 v-model="form.storageQuotaMb" 
                 :min="0" 
@@ -208,14 +208,14 @@
             </div>
 
             <div class="pair-item">
-              <div class="pair-label">允许发送邮件附件</div>
+              <div class="pair-label">{{ $t('allowSendAttachment') }}</div>
               <div class="switch-box">
                 <el-switch 
                   v-model="form.allowAttachment" 
                   :active-value="1" 
                   :inactive-value="0" 
-                  active-text="开放附件" 
-                  inactive-text="仅纯文本"
+                  active-text="{{ $t('openAttachment') }}" 
+                  inactive-text="{{ $t('plainTextOnly') }}"
                 />
               </div>
             </div>
@@ -257,7 +257,7 @@
                 default-first-option
                 :reserve-keyword="false"
                 tag-type="primary"
-                placeholder="允许调用的 AI 模型 (留空代表允许全部)"
+                :placeholder="$t('allowAiModelsPlaceholder')"
                 style="width: 100%;"
             >
               <el-option
@@ -401,7 +401,7 @@
             </div>
             <div class="card-summary">系统默认注册用户，无后台管理权限，具备基础邮箱收发能力，纯文本收发，无附件能力。</div>
             <div class="card-props">
-              <div class="prop-item"><Icon icon="lucide:file-text" class="text-info" /> 仅纯文本收发</div>
+              <div class="prop-item"><Icon icon="lucide:file-text" class="text-info" /> {{ $t('plainTextOnly') }}收发</div>
               <div class="prop-item"><Icon icon="lucide:send" class="text-primary" /> 每日上限：5 封/天</div>
               <div class="prop-item"><Icon icon="lucide:shield-off" class="text-muted" /> 无管理后台权限</div>
             </div>
@@ -699,6 +699,44 @@ function formatQuotaDisplay(mb, roleCode) {
     return (Number.isInteger(gb) ? gb : Number(gb.toFixed(1))) + ' GB';
   }
   return mb + ' MB';
+}
+
+
+function formatRoleName(row) {
+  if (!row) return ''
+  const code = row.roleCode || row.key
+  if (code === 'master') return t('roleMaster')
+  if (code === 'moderator') return t('roleModerator')
+  if (code === 'visitor') return t('roleVisitor')
+  if (code === 'user_base') return t('roleUserBase')
+  if (code === 'user_lv0') return `${t('roleUserBase')} LV.0`
+  if (code === 'user_lv1') return `${t('roleUserBase')} LV.1`
+  return row.name || ''
+}
+
+function formatRoleBadgeText(row) {
+  const badge = getRoleBadge(row)
+  if (!badge) return ''
+  const code = row.roleCode || row.key
+  if (code === 'user_base') return t('roleTagBaseMember')
+  if (code === 'master') return t('roleTagMaster')
+  if (code === 'visitor') return t('roleTagVisitor')
+  if (code === 'user_lv0') return t('roleTagCertifiedReader')
+  if (code === 'user_lv1') return t('roleTagActiveScholar')
+  if (code === 'moderator') return t('roleTagModerator')
+  return badge.text
+}
+
+function formatRoleDesc(row) {
+  if (!row) return ''
+  const code = row.roleCode || row.key
+  if (code === 'master') return t('masterRoleDesc')
+  if (code === 'visitor') return t('visitorRoleDesc')
+  if (code === 'user_base') return t('userBaseRoleDesc')
+  if (code === 'user_lv0') return t('userLv0RoleDesc')
+  if (code === 'user_lv1') return t('userLv1RoleDesc')
+  if (code === 'moderator') return t('moderatorRoleDesc')
+  return row.description || ''
 }
 
 function getRoleBadge(row) {

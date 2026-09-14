@@ -3,23 +3,23 @@
     <!-- 1. Header & Overview Card -->
     <div class="container header-container">
       <div class="header-top-row">
-        <div class="main-title">{{ $t('oauthAppsTitle') || 'OAuth 开放平台与应用管理' }}</div>
+        <div class="main-title">{{ $t('oauthAppsTitle') }}</div>
         <div class="header-actions">
-          <el-tooltip :content="$t('oauthBlogGuideTooltip') || '前往官方博客阅读 OAuth 2.0 / OIDC 第三方接入完整开发教程与最佳实践'" placement="bottom">
+          <el-tooltip :content="$t('oauthBlogGuideTooltip')" placement="bottom">
             <el-button @click="openBlogTutorial" class="guide-btn">
               <Icon icon="fluent:book-open-20-regular" width="16" height="16" style="margin-right: 6px;" />
-              <span>{{ $t('oauthBlogGuide') || '开发接入教程' }}</span>
+              <span>{{ $t('oauthBlogGuide') }}</span>
               <Icon icon="fluent:open-16-regular" width="12" height="12" style="margin-left: 4px; opacity: 0.7;" />
             </el-button>
           </el-tooltip>
           <el-button type="primary" @click="openCreateDialog" class="create-app-btn">
             <Icon icon="fluent:add-circle-20-regular" width="16" height="16" style="margin-right: 6px;" />
-            {{ $t('registerNewApp') || '注册新应用' }}
+            {{ $t('registerNewApp') }}
           </el-button>
         </div>
       </div>
       <div class="section-intro">
-        {{ $t('oauthAppsDesc') || '面向管理员的开放平台。在此创建并管理接入 Epomail 的第三方应用，生成专属 Client ID 和 Client Secret，支持任何 Web、移动端或外部系统通过 Epomail 原生实现单点登录 (SSO)。' }}
+        {{ $t('oauthAppsDesc') }}
       </div>
 
       <!-- OIDC Standard Endpoints Bar -->
@@ -27,25 +27,25 @@
         <div class="endpoint-chip" @click="copyEndpoint('/.well-known/openid-configuration')">
           <span class="ep-badge get">GET</span>
           <span class="ep-path font-mono">/.well-known/openid-configuration</span>
-          <span class="ep-hint">Discovery 元数据</span>
+          <span class="ep-hint">{{ $t('discoveryMetadata') }}</span>
           <Icon icon="fluent:copy-16-regular" width="13" height="13" class="copy-ic" />
         </div>
         <div class="endpoint-chip" @click="copyEndpoint('/oauth/authorize')">
           <span class="ep-badge get">GET</span>
           <span class="ep-path font-mono">/oauth/authorize</span>
-          <span class="ep-hint">用户授权端点</span>
+          <span class="ep-hint">{{ $t('userAuthEndpoint') }}</span>
           <Icon icon="fluent:copy-16-regular" width="13" height="13" class="copy-ic" />
         </div>
         <div class="endpoint-chip" @click="copyEndpoint('/api/oauth/token')">
           <span class="ep-badge post">POST</span>
           <span class="ep-path font-mono">/api/oauth/token</span>
-          <span class="ep-hint">令牌置换端点</span>
+          <span class="ep-hint">{{ $t('tokenExchangeEndpoint') }}</span>
           <Icon icon="fluent:copy-16-regular" width="13" height="13" class="copy-ic" />
         </div>
         <div class="endpoint-chip" @click="copyEndpoint('/api/oauth/userinfo')">
           <span class="ep-badge get">GET</span>
           <span class="ep-path font-mono">/api/oauth/userinfo</span>
-          <span class="ep-hint">用户资料端点</span>
+          <span class="ep-hint">{{ $t('userProfileEndpoint') }}</span>
           <Icon icon="fluent:copy-16-regular" width="13" height="13" class="copy-ic" />
         </div>
       </div>
@@ -55,12 +55,12 @@
     <div class="container apps-container">
       <div class="apps-header-row">
         <div class="apps-count-title">
-          <span>{{ $t('oauthApps') || '已接入的应用' }}</span>
+          <span>{{ $t('oauthApps') }}</span>
           <span class="count-bubble">{{ appsList.length }}</span>
         </div>
         <el-button link type="primary" size="small" @click="fetchApps" :loading="loading">
           <Icon icon="fluent:arrow-clockwise-16-regular" width="14" height="14" style="margin-right: 4px;" />
-          {{ $t('refresh') || '刷新列表' }}
+          {{ $t('refresh') }}
         </el-button>
       </div>
 
@@ -69,16 +69,16 @@
         <div class="empty-icon-wrap">
           <Icon icon="fluent:apps-24-regular" width="36" height="36" />
         </div>
-        <div class="empty-title">{{ $t('noAppsCreated') || '尚未创建任何 OAuth 应用' }}</div>
-        <div class="empty-desc">{{ $t('noAppsCreatedDesc') || '点击上方「注册新应用」按钮，为您的第三方网站、移动端 App 或开源面板开启 Epomail 快捷登录。' }}</div>
+        <div class="empty-title">{{ $t('noAppsCreated') }}</div>
+        <div class="empty-desc">{{ $t('noAppsCreatedDesc') }}</div>
         <div class="empty-actions">
           <el-button type="primary" @click="openCreateDialog">
             <Icon icon="fluent:add-16-filled" width="15" height="15" style="margin-right: 4px;" />
-            {{ $t('registerNewApp') || '立即注册应用' }}
+            {{ $t('registerNewApp') }}
           </el-button>
           <el-button @click="openBlogTutorial">
             <Icon icon="fluent:book-open-16-regular" width="15" height="15" style="margin-right: 4px;" />
-            {{ $t('oauthBlogGuide') || '开发接入教程' }}
+            {{ $t('oauthBlogGuide') }}
           </el-button>
         </div>
       </div>
@@ -112,14 +112,14 @@
                 :inactive-value="0"
                 size="small"
                 @change="(val) => handleStatusChange(app, val)"
-                :title="app.status === 1 ? ($t('appStatusActive') || '运行中') : ($t('appStatusDisabled') || '已停用')"
+                :title="app.status === 1 ? ($t('appStatusActive')) : ($t('appStatusDisabled'))"
               />
             </div>
           </div>
 
           <!-- Card Description -->
-          <div class="app-desc-text" :title="app.description || '暂无应用详细描述信息'">
-            {{ app.description || '暂无应用详细描述信息' }}
+          <div class="app-desc-text" :title="app.description || $t('noAppDesc')">
+            {{ app.description || $t('noAppDesc') }}
           </div>
 
           <!-- Credentials Field -->
@@ -128,7 +128,7 @@
               <span class="cred-label">Client ID</span>
               <div class="cred-val font-mono">
                 <span class="cred-mono-text" :title="app.clientId">{{ app.clientId }}</span>
-                <el-button link type="primary" size="small" class="cred-action-btn" @click="copyText(app.clientId, 'Client ID')" :title="$t('copy') || '复制'">
+                <el-button link type="primary" size="small" class="cred-action-btn" @click="copyText(app.clientId, 'Client ID')" :title="$t('copy')">
                   <Icon icon="fluent:copy-16-regular" width="13" height="13" />
                 </el-button>
               </div>
@@ -137,7 +137,7 @@
               <span class="cred-label">Client Secret</span>
               <div class="cred-val font-mono">
                 <span class="masked-secret">{{ app.clientSecretMasked || '••••••••••••••••' }}</span>
-                <el-button link type="primary" size="small" class="cred-action-btn" @click="handleResetSecret(app)" :title="$t('resetSecret') || '重新生成密钥'">
+                <el-button link type="primary" size="small" class="cred-action-btn" @click="handleResetSecret(app)" :title="$t('resetSecret')">
                   <Icon icon="fluent:arrow-sync-16-regular" width="13" height="13" />
                 </el-button>
               </div>
@@ -148,16 +148,16 @@
           <div class="app-card-footer">
             <el-button size="small" @click="openQuickGuideWithApp(app)" class="action-btn">
               <Icon icon="fluent:code-16-regular" width="13" height="13" style="margin-right: 4px;" />
-              {{ $t('integrationGuide') || '集成代码' }}
+              {{ $t('integrationGuide') }}
             </el-button>
             <div class="footer-right-actions">
               <el-button size="small" @click="openEditDialog(app)" class="action-btn">
                 <Icon icon="fluent:edit-16-regular" width="13" height="13" style="margin-right: 3px;" />
-                {{ $t('edit') || '编辑' }}
+                {{ $t('edit') }}
               </el-button>
               <el-button size="small" type="danger" plain @click="handleDeleteApp(app)" class="action-btn danger">
                 <Icon icon="fluent:delete-16-regular" width="13" height="13" style="margin-right: 3px;" />
-                {{ $t('delete') || '删除' }}
+                {{ $t('delete') }}
               </el-button>
             </div>
           </div>
@@ -168,7 +168,7 @@
     <!-- DIALOG 1: 注册/编辑应用 (Register / Edit Application Modal) -->
     <el-dialog
       v-model="appDialogShow"
-      :title="editingAppId ? ($t('editApp') || '编辑 OAuth 应用') : ($t('registerNewApp') || '注册新应用')"
+      :title="editingAppId ? ($t('editApp')) : ($t('registerNewApp'))"
       width="560px"
       destroy-on-close
       class="oauth-dialog"
@@ -176,12 +176,12 @@
       <div class="dialog-body-form">
         <div class="dialog-field">
           <div class="d-label-row">
-            <span class="d-label">{{ $t('appName') || '应用名称' }} <span class="required-star">*</span></span>
-            <span class="d-sub-hint">将在用户授权界面醒目呈现</span>
+            <span class="d-label">{{ $t('appName') }} <span class="required-star">*</span></span>
+            <span class="d-sub-hint">{{ $t('appNameDisplayHint') }}</span>
           </div>
           <el-input 
             v-model="appForm.name" 
-            :placeholder="$t('appNamePlaceholder') || '例如：企业内部 OA、博客系统、Nextcloud'" 
+            :placeholder="$t('appNamePlaceholder')" 
             maxlength="60"
             clearable
           />
@@ -189,8 +189,8 @@
 
         <div class="dialog-field">
           <div class="d-label-row">
-            <span class="d-label">{{ $t('homepageUrl') || '应用主页 URL' }} <span class="required-star">*</span></span>
-            <span class="d-sub-hint">应用的官方网站或入口地址</span>
+            <span class="d-label">{{ $t('homepageUrl') }} <span class="required-star">*</span></span>
+            <span class="d-sub-hint">{{ $t('homepageUrlHint') }}</span>
           </div>
           <el-input 
             v-model="appForm.homepageUrl" 
@@ -201,22 +201,22 @@
 
         <div class="dialog-field">
           <div class="d-label-row">
-            <span class="d-label">{{ $t('appDesc') || '应用描述' }}</span>
-            <span class="d-sub-hint">简要说明该应用的业务用途与背景</span>
+            <span class="d-label">{{ $t('appDesc') }}</span>
+            <span class="d-sub-hint">{{ $t('appDescHint') }}</span>
           </div>
           <el-input 
             v-model="appForm.description" 
             type="textarea" 
             :rows="2" 
-            :placeholder="$t('appDescPlaceholder') || '例如：用于员工使用 Epomail 账号快捷登录企业知识库系统'" 
+            :placeholder="$t('appDescPlaceholder')" 
             maxlength="200"
           />
         </div>
 
         <div class="dialog-field">
           <div class="d-label-row">
-            <span class="d-label">{{ $t('callbackUrls') || '授权回调 URL (Redirect URIs)' }} <span class="required-star">*</span></span>
-            <span class="d-sub-hint">支持多个地址（换行或逗号分隔）</span>
+            <span class="d-label">{{ $t('callbackUrls') }} <span class="required-star">*</span></span>
+            <span class="d-sub-hint">{{ $t('redirectUrisHint') }}</span>
           </div>
           <el-input 
             v-model="appForm.redirectUrisText" 
@@ -225,14 +225,14 @@
             :placeholder="$t('callbackUrlsPlaceholder') || 'https://example.com/api/auth/callback\nhttp://localhost:3000/api/auth/callback/epomail'"
           />
           <div class="input-bottom-tips">
-            仅允许在列表中的 URL 接收授权 Code，支持同时配置生产环境与本地调试地址。
+            {{ $t('redirectUrisNote') }}
           </div>
         </div>
 
         <div class="dialog-field">
           <div class="d-label-row">
-            <span class="d-label">{{ $t('appLogo') || '应用图标 URL (可选)' }}</span>
-            <span class="d-sub-hint">推荐 128x128 像素的 PNG / SVG 图标</span>
+            <span class="d-label">{{ $t('appLogo') }}</span>
+            <span class="d-sub-hint">{{ $t('logoUrlHint') }}</span>
           </div>
           <el-input 
             v-model="appForm.logoUrl" 
@@ -244,9 +244,9 @@
 
       <template #footer>
         <div class="dialog-footer-actions">
-          <el-button @click="appDialogShow = false">{{ $t('cancel') || '取消' }}</el-button>
+          <el-button @click="appDialogShow = false">{{ $t('cancel') }}</el-button>
           <el-button type="primary" :loading="savingApp" @click="submitSaveApp">
-            {{ editingAppId ? ($t('save') || '保存修改') : ($t('registerNewApp') || '确认创建应用') }}
+            {{ editingAppId ? ($t('save')) : ($t('registerNewApp')) }}
           </el-button>
         </div>
       </template>
@@ -255,7 +255,7 @@
     <!-- DIALOG 2: 密钥生成 / 重置成功提示 (GitHub-style Secret Generated Reveal Modal) -->
     <el-dialog
       v-model="secretModalShow"
-      :title="$t('newSecretGenerated') || '专属安全密钥已生成'"
+      :title="$t('newSecretGenerated')"
       width="520px"
       :close-on-click-modal="false"
       :close-on-press-escape="false"
@@ -265,8 +265,8 @@
         <div class="secret-warning-banner">
           <Icon icon="fluent:warning-20-filled" width="20" height="20" class="warn-ic" />
           <div class="warn-text">
-            <strong>{{ $t('importantNotice') || '请立即复制并妥善保存 Client Secret' }}</strong>
-            <p>{{ $t('newSecretNotice') || '出于安全保护原则，此完整密钥离开此窗口后将不再以明文显示。若遗失需重新生成。' }}</p>
+            <strong>{{ $t('importantNotice') }}</strong>
+            <p>{{ $t('newSecretNotice') }}</p>
           </div>
         </div>
 
@@ -296,7 +296,7 @@
       <template #footer>
         <div class="secret-modal-footer">
           <el-button type="primary" @click="secretModalShow = false" class="saved-confirm-btn">
-            {{ $t('iHaveSavedSecret') || '我已妥善复制并保存密钥' }}
+            {{ $t('iHaveSavedSecret') }}
           </el-button>
         </div>
       </template>
@@ -305,14 +305,14 @@
     <!-- DIALOG 3: 快速集成指南与代码生成器 (Integration Playground Dialog) -->
     <el-dialog
       v-model="quickGuideDialogShow"
-      :title="$t('oauthQuickGuide') || 'OAuth 2.0 / OIDC 快速集成指南'"
+      :title="$t('oauthQuickGuide')"
       width="680px"
       class="oauth-dialog guide-dialog"
     >
       <div class="guide-dialog-content">
         <div class="guide-app-selector">
-          <span class="sel-label">使用此应用凭据生成范例：</span>
-          <el-select v-model="selectedGuideAppId" placeholder="选择应用" style="width: 260px;" size="small">
+          <span class="sel-label">{{ $t('useCredsGenerateExample') }}</span>
+          <el-select v-model="selectedGuideAppId" :placeholder="$t('selectAppPlaceholder')" style="width: 260px;" size="small">
             <el-option
               v-for="app in appsList"
               :key="app.id"
@@ -626,7 +626,7 @@ async function fetchApps() {
       selectedGuideAppId.value = appsList.value[0].id
     }
   } catch (err) {
-    ElMessage.error(err.message || '获取 OAuth 应用列表失败')
+    ElMessage.error(err.message || t('getAppsFailed'))
   } finally {
     loading.value = false
   }
@@ -669,16 +669,16 @@ function openQuickGuideWithApp(app) {
 
 async function submitSaveApp() {
   if (!appForm.name.trim()) {
-    ElMessage.warning('应用名称不能为空')
+    ElMessage.warning(t('appNameRequired'))
     return
   }
   if (!appForm.homepageUrl.trim()) {
-    ElMessage.warning('请提供应用主页 URL')
+    ElMessage.warning(t('appHomepageRequired'))
     return
   }
   const uris = appForm.redirectUrisText.split(/[\r\n,]+/).map(s => s.trim()).filter(Boolean)
   if (uris.length === 0) {
-    ElMessage.warning('请至少提供一个有效的授权回调地址 (Redirect URI)')
+    ElMessage.warning(t('redirectUriRequired'))
     return
   }
 
@@ -696,7 +696,7 @@ async function submitSaveApp() {
     if (editingAppId.value) {
       payload.id = editingAppId.value
       await updateOAuthApp(payload)
-      ElMessage.success('应用配置更新成功')
+      ElMessage.success(t('appConfigUpdated'))
       appDialogShow.value = false
       await fetchApps()
     } else {
@@ -714,7 +714,7 @@ async function submitSaveApp() {
       }
     }
   } catch (err) {
-    ElMessage.error(err.message || '保存应用失败')
+    ElMessage.error(err.message || t('saveAppFailed'))
   } finally {
     savingApp.value = false
   }
@@ -723,10 +723,10 @@ async function submitSaveApp() {
 async function handleResetSecret(app) {
   try {
     await ElMessageBox.confirm(
-      t('resetSecretConfirm') || '确定要重新生成 Client Secret 吗？旧密钥将立即失效，正在使用旧密钥的外部服务将无法换取令牌。',
+      t('resetSecretConfirm'),
       '重置密钥确认',
       {
-        confirmButtonText: '确定重置',
+        confirmButtonText: t('confirmReset'),
         cancelButtonText: '取消',
         type: 'warning'
       }
@@ -741,10 +741,10 @@ async function handleResetSecret(app) {
       secretModalShow.value = true
     }
     await fetchApps()
-    ElMessage.success('Client Secret 已成功重置')
+    ElMessage.success(t('clientSecretResetSuccess'))
   } catch (err) {
     if (err !== 'cancel') {
-      ElMessage.error(err.message || '重置密钥失败')
+      ElMessage.error(err.message || t('resetSecretFailed'))
     }
   }
 }
@@ -752,10 +752,10 @@ async function handleResetSecret(app) {
 async function handleStatusChange(app, statusVal) {
   try {
     await setOAuthAppStatus(app.id, statusVal)
-    ElMessage.success(statusVal === 1 ? '应用已启用' : '应用已停用')
+    ElMessage.success(statusVal === 1 ? t('appEnabled') : t('appDisabled'))
   } catch (err) {
     app.status = statusVal === 1 ? 0 : 1
-    ElMessage.error(err.message || '修改状态失败')
+    ElMessage.error(err.message || t('updateStatusFailed'))
   }
 }
 
@@ -765,18 +765,18 @@ async function handleDeleteApp(app) {
       `确定要删除应用「${app.name}」吗？删除后该应用将彻底无法接入 Epomail，此操作不可撤销。`,
       '删除应用确认',
       {
-        confirmButtonText: '确认删除',
+        confirmButtonText: t('confirmDelete'),
         cancelButtonText: '取消',
         type: 'error'
       }
     )
 
     await deleteOAuthApp(app.id)
-    ElMessage.success('应用已成功删除')
+    ElMessage.success(t('appDeletedSuccess'))
     await fetchApps()
   } catch (err) {
     if (err !== 'cancel') {
-      ElMessage.error(err.message || '删除应用失败')
+      ElMessage.error(err.message || t('deleteAppFailed'))
     }
   }
 }
@@ -789,14 +789,14 @@ function copyEndpoint(endpointPath) {
 function copyText(text, label) {
   if (!text) return
   navigator.clipboard.writeText(text).then(() => {
-    ElMessage.success(`${label || '内容'} 已复制到剪贴板`)
+    ElMessage.success(t('copySuccessMsg'))
   })
 }
 
 function copyCode(code) {
   if (!code) return
   navigator.clipboard.writeText(code).then(() => {
-    ElMessage.success('代码已复制到剪贴板')
+    ElMessage.success(t('copiedToClipboard'))
   })
 }
 

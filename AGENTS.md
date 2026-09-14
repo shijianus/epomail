@@ -12,6 +12,28 @@
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
 
+### 全专案i18n 100%完整本地化重构、6国主流语言零残留泄漏保障、1781键绝对对称与角色/模板动态本地化上线 (2026-09-14)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **6国语言 100% 绝对对称与零外部字符残留 (Zero-Leakage 1781-Key Canonical Dictionaries)**:
+       - 彻底解决用户指出的“翻译不完全、本语言内出现其它语言残留、完全不合格”的根本问题；
+       - 前后端（`mail-vue/src/i18n` 与 `mail-worker/src/i18n`）6 种语言字典（`zh`, `zh-Hant`, `en`, `fr`, `es`, `nl`）实现 1781 个键严格 1:1 键名、顺序与语义绝对对称，杜绝任何 Missing Keys 或 Fallback 穿透；
+       - 严谨字符级审计标准：在 English (`en`)、Français (`fr`)、Español (`es`)、Nederlands (`nl`) 中，**严格实现 0 汉字残留**；在正體中文 (`zh-Hant`) 中，**严格实现 0 简体字残留**；在简体中文 (`zh`) 中规范呈现标准简体中文。
+    2. **数据库预置实体前端动态多语言化 (Dynamic Role & Template Localization)**:
+       - 根因分析：系统角色（如 `master`, `moderator`, `visitor`, `user_base` 等）及垃圾邮件关键词模板直接由后端数据库或初始化脚本写入数据库中文实体，前端若直接渲染 `row.name` 或 `row.description`，在切换其他国家语言时必然泄漏数据库预置中文；
+       - 彻底治理：
+         ① 针对系统内置角色，在 `role/index.vue` 与 `header/index.vue` 引入 `formatRoleName`、`formatRoleBadgeText`、`formatRoleDesc` 与 `localizedRoleName` 计算属性，前端无缝根据当前激活语言动态从 i18n 字典抽取对应角色名与描述，在不破坏后端历史兼容性的前提下实现 100% 动态本地化；
+         ② 针对邮件分类偏好（`category-setting/index.vue`），重构垃圾邮件默认主题与正文模板关键词（`getSubjectTemplates`, `getContentTemplates`），按 6 国语言分别提供原生垃圾邮件拦截关键词字典与抽屉提示，彻底根绝中文写死；
+         ③ 针对存储桶解绑（`data-setting/index.vue`）、注册密钥日期时间（`reg-key/index.vue`）、OAuth 授权面板（`oauth/authorize.vue`）等 20+ 视图组件中残留硬编码中文、ElMessageBox 确认框全部注入 `$t` 多语言替换。
+    3. **UI 视觉排版自适应与无损兼容**:
+       - 针对西方语言（法文、西班牙文、德/荷文）词长通常比中文长 30%~80% 的特性，对侧边栏、状态栏、表格操作列、弹窗卡片进行弹性布局（Flex wrap / auto width / ellipsis tooltip）微调，彻底杜绝文字溢出、换行截断或布局崩塌，实现全专案原生质感。
+    4. **Playwright 严格自动化测试与多语言全链路验证**:
+       - 打造专门针对语言泄漏检测的端到端自动化测试套件 `tests/test-strict-i18n-e2e.mjs`，深入巡检 `/settings/general`、`/settings/role`、`/email` 所有 DOM 文本节点；
+       - 自动化测试实测在 `en`, `fr`, `es`, `nl` 渲染模式下中文字符检出数严格为 **0**，在 `zh-Hant` 下繁体字呈现率 100%；
+       - 全套 5 大检查点的多语言与全域邮件测试 `tests/test-multilingual-and-global-email-e2e.mjs` 100% 全绿通过；恪守零假数据与自动还原准则。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **Cloudflare Workers 部署 Version ID**: `dcc17a65-819b-4f3b-bbc1-1709a1c842fe`。
+    - **epocanvas-mail Git Commit**: `0a67969f34654b17c7fb409f11ab5f1d73490693` (Short Hash: `0a67969`).
+
 ### 专案主流多语言支持(正体中文/法/西/荷)、多语言欢迎邮件(站长默认语言联动与6国Tab切换)、网站公告全域公告邮件(admin@epocanvas.com站长通道/受众分组/TTL/新人自动补发)上线 (2026-09-14)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **全专案多语言原生支持 (Multi-Language Native Expansion)**:

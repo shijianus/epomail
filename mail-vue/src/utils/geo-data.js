@@ -16,9 +16,16 @@ import { getCountries } from 'libphonenumber-js';
 import countries from 'i18n-iso-countries';
 import zhLocale from 'i18n-iso-countries/langs/zh.json';
 import enLocale from 'i18n-iso-countries/langs/en.json';
+import frLocale from 'i18n-iso-countries/langs/fr.json';
+import esLocale from 'i18n-iso-countries/langs/es.json';
+import nlLocale from 'i18n-iso-countries/langs/nl.json';
+import zhHantCountries from './countries-zh-hant.json';
 
 countries.registerLocale(zhLocale);
 countries.registerLocale(enLocale);
+countries.registerLocale(frLocale);
+countries.registerLocale(esLocale);
+countries.registerLocale(nlLocale);
 
 const PRIORITY_CODES = [
   'HK', 'MO', 'TW', 'CN', 'US', 'CA', 'GB', 'JP', 'SG', 'AU',
@@ -82,18 +89,21 @@ const MO_PARISHES = [
 const HK_SUBDIVISIONS = Object.entries(HK_ZH_MAP).map(([en, zh]) => ({
   value: zh,
   labelZh: zh,
+  labelZhHant: zh.replace('中西区', '中西區').replace('湾仔区', '灣仔區').replace('东区', '東區').replace('南区', '南區').replace('油尖旺区', '油尖旺區').replace('深水埗区', '深水埗區').replace('九龙城区', '九龍城區').replace('黄大仙区', '黃大仙區').replace('观塘区', '觀塘區').replace('葵青区', '葵青區').replace('荃湾区', '荃灣區').replace('屯门区', '屯門區').replace('元朗区', '元朗區').replace('北区', '北區').replace('大埔区', '大埔區').replace('沙田区', '沙田區').replace('西贡区', '西貢區').replace('离岛区', '離島區'),
   labelEn: en
 }));
 
 const CN_SUBDIVISIONS = Object.entries(CN_ZH_MAP).map(([en, zh]) => ({
   value: zh,
   labelZh: zh,
+  labelZhHant: zh.replace('省', '省').replace('市', '市').replace('自治区', '自治區').replace('广东', '廣東').replace('浙江', '浙江').replace('江苏', '江蘇').replace('山东', '山東').replace('四川', '四川').replace('辽宁', '遼寧').replace('吉林', '吉林').replace('黑龙江', '黑龍江').replace('广西', '廣西').replace('贵州', '貴州').replace('云南', '雲南').replace('陕西', '陝西').replace('内蒙古', '內蒙古').replace('宁夏', '寧夏').replace('新疆维吾尔', '新疆維吾爾'),
   labelEn: en
 }));
 
 const TW_SUBDIVISIONS = Object.entries(TW_ZH_MAP).map(([en, zh]) => ({
   value: zh,
   labelZh: zh,
+  labelZhHant: zh.replace('台北市', '臺北市').replace('新北市', '新北市').replace('桃园市', '桃園市').replace('台中市', '臺中市').replace('台南市', '臺南市').replace('高雄市', '高雄市').replace('基隆市', '基隆市').replace('新竹市', '新竹市').replace('嘉义市', '嘉義市').replace('宜兰县', '宜蘭縣').replace('花莲县', '花蓮縣').replace('台东县', '臺東縣').replace('澎湖县', '澎湖縣').replace('金门县', '金門縣').replace('连江县', '連江縣').replace('苗栗县', '苗栗縣').replace('彰化县', '彰化縣').replace('南投县', '南投縣').replace('云林县', '雲林縣').replace('屏东县', '屏東縣'),
   labelEn: en
 }));
 
@@ -152,10 +162,33 @@ function buildIsoCountries() {
       );
     } catch (e) {}
 
+    let nameZhHant = zhHantCountries[code];
+    if (Array.isArray(nameZhHant)) nameZhHant = nameZhHant[0];
+    nameZhHant = nameZhHant || nameZh;
+    if (code === 'AC') {
+      nameZh = '阿森松岛';
+      nameZhHant = '阿森松島';
+      nameEn = 'Ascension Island';
+    } else if (code === 'TA') {
+      nameZh = '特里斯坦-达库尼亚';
+      nameZhHant = '特里斯坦-達庫尼亞';
+      nameEn = 'Tristan da Cunha';
+    } else {
+      nameZh = nameZh || code;
+      nameEn = nameEn || code;
+    }
+    let nameFr = countries.getName(code, 'fr') || nameEn;
+    let nameEs = countries.getName(code, 'es') || nameEn;
+    let nameNl = countries.getName(code, 'nl') || nameEn;
+
     return {
       code,
       nameZh,
+      nameZhHant,
       nameEn,
+      nameFr,
+      nameEs,
+      nameNl,
       flag,
       flagClass
     };
@@ -227,10 +260,22 @@ export function hasPostalCode(countryCode) {
  */
 export function getPostalCodeLabel(countryCode, lang = 'zh') {
   const hasZip = hasPostalCode(countryCode);
-  if (hasZip) {
-    return lang === 'zh' ? '邮政编码：' : 'Postal Code / ZIP:';
+  if (lang === 'zh-Hant') {
+    return hasZip ? '郵遞區號：' : '郵遞區號 (選填)：';
   }
-  return lang === 'zh' ? '邮政编码 (选填)：' : 'Postal Code (Optional):';
+  if (lang === 'fr') {
+    return hasZip ? 'Code postal :' : 'Code postal (optionnel) :';
+  }
+  if (lang === 'es') {
+    return hasZip ? 'Código postal:' : 'Código postal (opcional):';
+  }
+  if (lang === 'nl') {
+    return hasZip ? 'Postcode:' : 'Postcode (optioneel):';
+  }
+  if (lang === 'en') {
+    return hasZip ? 'Postal Code / ZIP:' : 'Postal Code (Optional):';
+  }
+  return hasZip ? '邮政编码：' : '邮政编码 (选填)：';
 }
 
 /**
@@ -239,15 +284,52 @@ export function getPostalCodeLabel(countryCode, lang = 'zh') {
 export function getPostalCodePlaceholder(countryCode, lang = 'zh') {
   const upper = (countryCode || '').toUpperCase();
   if (!hasPostalCode(upper)) {
-    return lang === 'zh' ? '当地无邮政编码（留空或选填）' : 'No postal code used locally (optional)';
+    if (lang === 'zh-Hant') return '當地無郵遞區號（留空或選填）';
+    if (lang === 'fr') return 'Aucun code postal local (optionnel)';
+    if (lang === 'es') return 'Sin código postal local (opcional)';
+    if (lang === 'nl') return 'Geen lokale postcode (optioneel)';
+    if (lang === 'en') return 'No postal code used locally (optional)';
+    return '当地无邮政编码（留空或选填）';
   }
-  if (upper === 'CN') return lang === 'zh' ? '6 位数字邮政编码 (如: 100000)' : '6-digit postal code (e.g. 100000)';
-  if (upper === 'US') return lang === 'zh' ? '5 位 ZIP Code (如: 94105)' : '5-digit ZIP code (e.g. 94105)';
-  if (upper === 'TW') return lang === 'zh' ? '邮递区号 (如: 100)' : 'Postal code (e.g. 100)';
-  if (upper === 'JP') return lang === 'zh' ? '7 位数字邮编 (如: 100-0001)' : '7-digit postal code (e.g. 100-0001)';
-  if (upper === 'GB') return lang === 'zh' ? '英国邮政编码 (如: SW1A 1AA)' : 'UK postcode (e.g. SW1A 1AA)';
-  if (upper === 'CA') return lang === 'zh' ? '加拿大邮编 (如: K1A 0B1)' : 'Canadian postal code (e.g. K1A 0B1)';
-  return lang === 'zh' ? '输入邮政编码' : 'Enter postal code';
+  if (lang === 'zh-Hant') {
+    if (upper === 'TW') return '郵遞區號 (如: 100)';
+    if (upper === 'CN') return '6 位數字郵政編碼 (如: 100000)';
+    if (upper === 'US') return '5 位 ZIP Code (如: 94105)';
+    if (upper === 'JP') return '7 位數字郵編 (如: 100-0001)';
+    if (upper === 'GB') return '英國郵政編碼 (如: SW1A 1AA)';
+    if (upper === 'CA') return '加拿大郵編 (如: K1A 0B1)';
+    return '輸入郵遞區號';
+  }
+  if (lang === 'fr') {
+    if (upper === 'FR') return 'Code postal à 5 chiffres (ex. 75001)';
+    if (upper === 'US') return 'Code ZIP à 5 chiffres (ex. 94105)';
+    return 'Entrez le code postal';
+  }
+  if (lang === 'es') {
+    if (upper === 'ES') return 'Código postal de 5 dígitos (ej. 28001)';
+    if (upper === 'US') return 'Código ZIP de 5 dígitos (ej. 94105)';
+    return 'Ingrese código postal';
+  }
+  if (lang === 'nl') {
+    if (upper === 'NL') return '4 cijfers en 2 letters (bijv. 1012 AB)';
+    return 'Voer postcode in';
+  }
+  if (lang === 'en') {
+    if (upper === 'CN') return '6-digit postal code (e.g. 100000)';
+    if (upper === 'US') return '5-digit ZIP code (e.g. 94105)';
+    if (upper === 'TW') return 'Postal code (e.g. 100)';
+    if (upper === 'JP') return '7-digit postal code (e.g. 100-0001)';
+    if (upper === 'GB') return 'UK postcode (e.g. SW1A 1AA)';
+    if (upper === 'CA') return 'Canadian postal code (e.g. K1A 0B1)';
+    return 'Enter postal code';
+  }
+  if (upper === 'CN') return '6 位数字邮政编码 (如: 100000)';
+  if (upper === 'US') return '5 位 ZIP Code (如: 94105)';
+  if (upper === 'TW') return '邮递区号 (如: 100)';
+  if (upper === 'JP') return '7 位数字邮编 (如: 100-0001)';
+  if (upper === 'GB') return '英国邮政编码 (如: SW1A 1AA)';
+  if (upper === 'CA') return '加拿大邮编 (如: K1A 0B1)';
+  return '输入邮政编码';
 }
 
 /**
@@ -270,4 +352,14 @@ export function formatStructuredAddress(addr, lang = 'zh') {
   if (addr.postalCode && hasPostalCode(addr.country)) parts.push(`[${addr.postalCode}]`);
 
   return parts.join(' · ');
+}
+
+export function getCountryDisplayName(countryMeta, lang = 'zh') {
+  if (!countryMeta) return '';
+  if (lang === 'zh-Hant') return countryMeta.nameZhHant || countryMeta.nameZh;
+  if (lang === 'fr') return countryMeta.nameFr || countryMeta.nameEn;
+  if (lang === 'es') return countryMeta.nameEs || countryMeta.nameEn;
+  if (lang === 'nl') return countryMeta.nameNl || countryMeta.nameEn;
+  if (lang === 'en') return countryMeta.nameEn;
+  return countryMeta.nameZh;
 }

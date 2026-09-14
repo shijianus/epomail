@@ -3,11 +3,11 @@
     
     <!-- Section 1: 基本信息 -->
     <div class="container">
-      <div class="title">{{ $t('basicInfo') || '基本信息' }}</div>
+      <div class="title">{{ $t('basicInfo') }}</div>
 
       <!-- 个人资料照片 -->
       <div class="item media-item">
-        <div>{{ $t('profilePhoto') || '个人资料照片' }}</div>
+        <div>{{ $t('profilePhoto') }}</div>
         <div class="image-preview-group">
           <el-avatar
             :size="72"
@@ -35,12 +35,12 @@
 
       <!-- 名称 / 昵称 -->
       <div class="item">
-        <div>{{ $t('nickname') || '名称' }}</div>
+        <div>{{ $t('nickname') }}</div>
         <div>
           <span class="user-name">
             <span>{{ userStore.user.nickname || userStore.user.name || $t('notSet') }}</span>
             <span class="edit-name" @click="openNameModal">
-              {{ $t('change') || '修改' }}
+              {{ $t('change') }}
             </span>
           </span>
         </div>
@@ -48,12 +48,12 @@
 
       <!-- 性别 -->
       <div class="item">
-        <div>{{ $t('gender') || '性别' }}</div>
+        <div>{{ $t('gender') }}</div>
         <div>
           <span class="user-name">
             <span>{{ formatGenderDisplay(userStore.user.gender, userStore.user.genderCustom) }}</span>
             <span class="edit-name" @click="openGenderModal">
-              {{ $t('change') || '修改' }}
+              {{ $t('change') }}
             </span>
           </span>
         </div>
@@ -61,12 +61,12 @@
 
       <!-- 生日 -->
       <div class="item">
-        <div>{{ $t('birthday') || '生日' }}</div>
+        <div>{{ $t('birthday') }}</div>
         <div>
           <span class="user-name">
             <span>{{ formatBirthdayDisplay(userStore.user.birthday) }}</span>
             <span class="edit-name" @click="openBirthdayModal">
-              {{ $t('change') || '修改' }}
+              {{ $t('change') }}
             </span>
           </span>
         </div>
@@ -75,11 +75,11 @@
 
     <!-- Section 2: 联系信息 -->
     <div class="container">
-      <div class="title">{{ $t('contactInfo') || '联系信息' }}</div>
+      <div class="title">{{ $t('contactInfo') }}</div>
 
       <!-- 电子邮件 (只读展示，不附带多余冗余提示) -->
       <div class="item">
-        <div>{{ $t('profileEmail') || '电子邮件' }}</div>
+        <div>{{ $t('profileEmail') }}</div>
         <div class="email-val-wrap">
           <span class="font-mono" style="font-weight: 500;">{{ userStore.user.email }}</span>
         </div>
@@ -87,7 +87,7 @@
 
       <!-- 电话号码 -->
       <div class="item" style="align-items: flex-start;">
-        <div>{{ $t('phones') || '电话' }}</div>
+        <div>{{ $t('phones') }}</div>
         <div class="phones-container">
           <div class="phone-list" v-if="phoneList.length > 0">
             <div v-for="(p, idx) in phoneList" :key="p.id || idx" class="phone-row">
@@ -103,7 +103,7 @@
           <div :style="{ marginTop: phoneList.length > 0 ? '10px' : '0' }">
             <el-button type="primary" size="small" @click="openPhoneModal">
               <Icon icon="lucide:plus" width="14" height="14" style="margin-right: 4px;" />
-              {{ $t('addPhone') || '添加电话号码' }}
+              {{ $t('addPhone') }}
             </el-button>
           </div>
         </div>
@@ -112,16 +112,16 @@
 
     <!-- Section 3: 常用地址 -->
     <div class="container">
-      <div class="title">{{ $t('addresses') || '常用地址' }}</div>
+      <div class="title">{{ $t('addresses') }}</div>
 
       <!-- 住家地址 -->
       <div class="item">
-        <div>{{ $t('homeAddress') || '住家地址' }}</div>
+        <div>{{ $t('homeAddress') }}</div>
         <div>
           <span class="user-name">
             <span :class="{ 'text-muted': !addressObj.home }">{{ formatAddressDisplay(addressObj.home) || $t('notSet') }}</span>
             <span class="edit-name" @click="openAddressModal('home')">
-              {{ $t('change') || '修改' }}
+              {{ $t('change') }}
             </span>
           </span>
         </div>
@@ -129,12 +129,12 @@
 
       <!-- 公司地址 -->
       <div class="item">
-        <div>{{ $t('workAddress') || '公司地址' }}</div>
+        <div>{{ $t('workAddress') }}</div>
         <div>
           <span class="user-name">
             <span :class="{ 'text-muted': !addressObj.work }">{{ formatAddressDisplay(addressObj.work) || $t('notSet') }}</span>
             <span class="edit-name" @click="openAddressModal('work')">
-              {{ $t('change') || '修改' }}
+              {{ $t('change') }}
             </span>
           </span>
         </div>
@@ -142,12 +142,12 @@
 
       <!-- 其他地址 -->
       <div class="item">
-        <div>{{ $t('otherAddress') || '其他地址' }}</div>
+        <div>{{ $t('otherAddress') }}</div>
         <div>
           <span class="user-name">
             <span :class="{ 'text-muted': !addressObj.other }">{{ formatAddressDisplay(addressObj.other) || $t('notSet') }}</span>
             <span class="edit-name" @click="openAddressModal('other')">
-              {{ $t('change') || '修改' }}
+              {{ $t('change') }}
             </span>
           </span>
         </div>
@@ -158,16 +158,16 @@
 
     <!-- Section 4: 关联设置与安全凭据 -->
     <div class="container">
-      <div class="title">{{ $t('associatedSettings') || '关联设置与安全' }}</div>
+      <div class="title">{{ $t('associatedSettings') }}</div>
 
       <!-- 系统语言 -->
       <div class="item">
-        <div>{{ $t('systemLanguage') || '系统语言' }}</div>
+        <div>{{ $t('systemLanguage') }}</div>
         <div>
           <span class="user-name">
             <span>{{ currentLanguageDisplay }}</span>
             <span class="edit-name" @click="goToGeneralLanguage">
-              {{ $t('change') || '修改' }}
+              {{ $t('change') }}
             </span>
           </span>
         </div>
@@ -175,13 +175,13 @@
 
       <!-- EpoCanvas 密码 -->
       <div class="item">
-        <div>EpoCanvas {{ $t('password') || '密码' }}</div>
+        <div>EpoCanvas {{ $t('password') }}</div>
         <div>
           <span class="user-name">
             <span class="font-mono" style="letter-spacing: 2px;">••••••••••••</span>
             <span v-if="passwordChangedText" style="font-size: 12px; color: var(--text-muted); margin-left: 8px;">{{ passwordChangedText }}</span>
             <span class="edit-name" @click="goToSecurityPassword" style="margin-left: 12px;">
-              {{ $t('change') || '修改' }}
+              {{ $t('change') }}
             </span>
           </span>
         </div>
@@ -189,12 +189,12 @@
     </div>
 
     <!-- MODAL 1: 头像上传/修改弹窗 -->
-    <el-dialog v-model="avatarDialogShow" :title="$t('avatar') || '个人资料照片'" width="380px">
+    <el-dialog v-model="avatarDialogShow" :title="$t('avatar')" width="380px">
       <div style="display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 12px 0;">
         <el-avatar :size="96" :src="avatarPreviewUrl || userStore.user.avatarUrl">
           <Icon icon="lucide:user" width="48" height="48" />
         </el-avatar>
-        <div style="color: var(--text-muted); font-size: 13px;">支持 JPG、PNG、GIF 格式图片，大小 25MB 以内</div>
+        <div style="color: var(--text-muted); font-size: 13px;">{{ $t('avatarUploadHint') }}</div>
         <div style="display: flex; gap: 12px; margin-top: 8px;">
           <el-upload
             :show-file-list="false"
@@ -202,7 +202,7 @@
             accept="image/*"
           >
             <el-button type="primary" :loading="avatarLoading">
-              {{ $t('upload') || '上传新照片' }}
+              {{ $t('upload') }}
             </el-button>
           </el-upload>
           <el-button 
@@ -212,85 +212,85 @@
             :loading="avatarLoading"
             @click="handleDeleteAvatar"
           >
-            {{ $t('delete') || '移除照片' }}
+            {{ $t('delete') }}
           </el-button>
         </div>
       </div>
     </el-dialog>
 
     <!-- MODAL 2: 名称修改弹窗 -->
-    <el-dialog v-model="nameDialogShow" :title="$t('nickname') || '修改名称'" width="420px">
+    <el-dialog v-model="nameDialogShow" :title="$t('nickname')" width="420px">
       <div style="padding: 10px 0;">
-        <label style="display: block; font-size: 13px; font-weight: bold; margin-bottom: 6px;">名称 / 昵称：</label>
+        <label style="display: block; font-size: 13px; font-weight: bold; margin-bottom: 6px;">{{ $t('nameOrNickname') }}：</label>
         <el-input 
           v-model="editNickname" 
           :maxlength="50" 
           show-word-limit 
-          placeholder="请输入您的名称或昵称"
+          :placeholder="$t('enterNameOrNicknamePlaceholder')"
           clearable
         />
       </div>
       <template #footer>
         <div style="display: flex; justify-content: flex-end; gap: 10px;">
-          <el-button @click="nameDialogShow = false">{{ $t('cancel') || '取消' }}</el-button>
-          <el-button type="primary" :loading="nameLoading" @click="saveNickname">{{ $t('save') || '保存' }}</el-button>
+          <el-button @click="nameDialogShow = false">{{ $t('cancel') }}</el-button>
+          <el-button type="primary" :loading="nameLoading" @click="saveNickname">{{ $t('save') }}</el-button>
         </div>
       </template>
     </el-dialog>
 
     <!-- MODAL 3: 性别修改弹窗 -->
-    <el-dialog v-model="genderDialogShow" :title="$t('gender') || '设置性别'" width="420px">
+    <el-dialog v-model="genderDialogShow" :title="$t('gender')" width="420px">
       <div style="padding: 10px 0;">
         <el-radio-group v-model="editGender" style="display: flex; flex-direction: column; align-items: flex-start; gap: 12px;">
-          <el-radio value="male">{{ $t('genderMale') || '男' }}</el-radio>
-          <el-radio value="female">{{ $t('genderFemale') || '女' }}</el-radio>
-          <el-radio value="prefer_not_to_say">{{ $t('genderPreferNot') || '不愿透露' }}</el-radio>
-          <el-radio value="custom">{{ $t('genderCustom') || '自订性别' }}</el-radio>
+          <el-radio value="male">{{ $t('genderMale') }}</el-radio>
+          <el-radio value="female">{{ $t('genderFemale') }}</el-radio>
+          <el-radio value="prefer_not_to_say">{{ $t('genderPreferNot') }}</el-radio>
+          <el-radio value="custom">{{ $t('genderCustom') }}</el-radio>
         </el-radio-group>
         <div v-if="editGender === 'custom'" style="margin-top: 14px;">
           <el-input 
             v-model="editGenderCustom" 
             :maxlength="50" 
             show-word-limit 
-            placeholder="请输入自订性别（50字内）" 
+            :placeholder="$t('enterCustomGenderPlaceholder')" 
           />
         </div>
       </div>
       <template #footer>
         <div style="display: flex; justify-content: flex-end; gap: 10px;">
-          <el-button @click="genderDialogShow = false">{{ $t('cancel') || '取消' }}</el-button>
-          <el-button type="primary" :loading="genderLoading" @click="saveGender">{{ $t('save') || '保存' }}</el-button>
+          <el-button @click="genderDialogShow = false">{{ $t('cancel') }}</el-button>
+          <el-button type="primary" :loading="genderLoading" @click="saveGender">{{ $t('save') }}</el-button>
         </div>
       </template>
     </el-dialog>
 
     <!-- MODAL 4: 生日设置弹窗 -->
-    <el-dialog v-model="birthdayDialogShow" :title="$t('birthday') || '设置生日'" width="380px">
+    <el-dialog v-model="birthdayDialogShow" :title="$t('birthday')" width="380px">
       <div style="padding: 10px 0; display: flex; justify-content: center;">
         <el-date-picker
           v-model="editBirthday"
           type="date"
           format="YYYY-MM-DD"
           value-format="YYYY-MM-DD"
-          placeholder="选择出生日期"
+          :placeholder="$t('selectBirthDatePlaceholder')"
           :disabled-date="disableFutureDates"
           style="width: 100%;"
         />
       </div>
       <template #footer>
         <div style="display: flex; justify-content: flex-end; gap: 10px;">
-          <el-button @click="birthdayDialogShow = false">{{ $t('cancel') || '取消' }}</el-button>
-          <el-button type="primary" :loading="birthdayLoading" @click="saveBirthday">{{ $t('save') || '保存' }}</el-button>
+          <el-button @click="birthdayDialogShow = false">{{ $t('cancel') }}</el-button>
+          <el-button type="primary" :loading="birthdayLoading" @click="saveBirthday">{{ $t('save') }}</el-button>
         </div>
       </template>
     </el-dialog>
 
     <!-- MODAL 5: 添加电话号码弹窗 (ISO 3166-1 标准国家与号段) -->
-    <el-dialog v-model="phoneDialogShow" :title="$t('addPhone') || '添加电话号码'" width="460px">
+    <el-dialog v-model="phoneDialogShow" :title="$t('addPhone')" width="460px">
       <div style="display: flex; flex-direction: column; gap: 16px; padding: 10px 0;">
         <div>
           <label style="display: block; font-size: 13px; font-weight: bold; margin-bottom: 6px;">
-            {{ langSelect === 'zh' ? '国家 / 地区：' : 'Country / Region:' }}
+            {{ $t('countryRegion') }}
           </label>
           <el-select 
             v-model="newPhoneCountry" 
@@ -306,13 +306,13 @@
             <el-option
               v-for="item in COUNTRY_OPTIONS"
               :key="item.code"
-              :label="`${langSelect === 'zh' ? item.nameZh : item.nameEn} (${item.dialCode || 'E.164'})`"
+              :label="`${getCountryDisplayName(item, langSelect)} (${item.dialCode || 'E.164'})`"
               :value="item.code"
             >
               <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
                 <div style="display: flex; align-items: center; gap: 10px;">
                   <span :class="['fi', getFlagClass(item.code), 'fib']" style="width: 20px; height: 15px; border-radius: 2px; box-shadow: 0 0 1px rgba(0,0,0,0.3); display: inline-block; flex-shrink: 0;"></span>
-                  <span>{{ langSelect === 'zh' ? item.nameZh : item.nameEn }}</span>
+                  <span>{{ getCountryDisplayName(item, langSelect) }}</span>
                 </div>
                 <span style="color: var(--el-text-color-secondary); font-size: 13px; font-family: monospace;">{{ item.dialCode }}</span>
               </div>
@@ -322,11 +322,11 @@
 
         <div>
           <label style="display: block; font-size: 13px; font-weight: bold; margin-bottom: 6px;">
-            {{ langSelect === 'zh' ? '电话号码：' : 'Phone Number:' }}
+            {{ $t('phoneNumberLabel') }}
           </label>
           <el-input
             v-model="newPhoneNumber"
-            :placeholder="selectedCountryMeta.placeholder ? (langSelect === 'zh' ? `如: ${selectedCountryMeta.placeholder}` : `e.g. ${selectedCountryMeta.placeholder}`) : ($t('phoneNumber') || '电话号码')"
+            :placeholder="selectedCountryMeta.placeholder ? ((langSelect === 'zh' || langSelect === 'zh-Hant') ? `如: ${selectedCountryMeta.placeholder}` : `e.g. ${selectedCountryMeta.placeholder}`) : ($t('phoneNumber'))"
             clearable
             class="phone-number-input"
             @input="onPhoneInput"
@@ -340,26 +340,26 @@
           <!-- 校验反馈：仅在有错误或验证成功时显示反馈，绝不暴露内部规则文本 -->
           <div class="phone-validation-feedback" :class="{ 'is-error': phoneValidationError, 'is-valid': phoneValidationSuccess }" v-if="phoneValidationError || phoneValidationSuccess">
             <span v-if="phoneValidationError">⚠️ {{ phoneValidationError }}</span>
-            <span v-else-if="phoneValidationSuccess" style="color: #10b981;">✓ 格式正确</span>
+            <span v-else-if="phoneValidationSuccess" style="color: #10b981;">{{ $t('formatCorrect') }}</span>
           </div>
         </div>
 
         <div>
           <label style="display: block; font-size: 13px; font-weight: bold; margin-bottom: 6px;">
-            {{ $t('phoneLabel') || '号码类型' }}：
+            {{ $t('phoneLabel') }}：
           </label>
           <el-select v-model="newPhoneLabel" :fit-input-width="true" style="width: 100%;" class="custom-country-select">
-            <el-option :label="$t('phoneLabelMobile') || '手机'" value="mobile" />
-            <el-option :label="$t('phoneLabelWork') || '工作'" value="work" />
-            <el-option :label="$t('phoneLabelHome') || '住宅'" value="home" />
-            <el-option :label="$t('phoneLabelOther') || '其他'" value="other" />
+            <el-option :label="$t('phoneLabelMobile')" value="mobile" />
+            <el-option :label="$t('phoneLabelWork')" value="work" />
+            <el-option :label="$t('phoneLabelHome')" value="home" />
+            <el-option :label="$t('phoneLabelOther')" value="other" />
           </el-select>
         </div>
       </div>
       <template #footer>
         <div style="display: flex; justify-content: flex-end; gap: 10px;">
-          <el-button @click="phoneDialogShow = false">{{ $t('cancel') || '取消' }}</el-button>
-          <el-button type="primary" :loading="phoneLoading" @click="saveNewPhone">{{ $t('add') || '添加' }}</el-button>
+          <el-button @click="phoneDialogShow = false">{{ $t('cancel') }}</el-button>
+          <el-button type="primary" :loading="phoneLoading" @click="saveNewPhone">{{ $t('add') }}</el-button>
         </div>
       </template>
     </el-dialog>
@@ -374,7 +374,7 @@
         <!-- 1. 国家 / 地区 下拉框 -->
         <div>
           <label style="display: block; font-size: 13px; font-weight: bold; margin-bottom: 6px;">
-            {{ langSelect === 'zh' ? '国家 / 地区：' : 'Country / Region:' }}
+            {{ $t('countryRegion') }}
           </label>
           <el-select 
             v-model="addressForm.country" 
@@ -390,12 +390,12 @@
             <el-option
               v-for="item in ISO_COUNTRIES"
               :key="item.code"
-              :label="langSelect === 'zh' ? item.nameZh : item.nameEn"
+              :label="getCountryDisplayName(item, langSelect)"
               :value="item.code"
             >
               <div style="display: flex; align-items: center; gap: 10px; width: 100%;">
                 <span :class="['fi', getFlagClass(item.code), 'fib']" style="width: 20px; height: 15px; border-radius: 2px; box-shadow: 0 0 1px rgba(0,0,0,0.3); display: inline-block; flex-shrink: 0;"></span>
-                <span>{{ langSelect === 'zh' ? item.nameZh : item.nameEn }}</span>
+                <span>{{ getCountryDisplayName(item, langSelect) }}</span>
               </div>
             </el-option>
           </el-select>
@@ -412,7 +412,7 @@
             :fit-input-width="true"
             style="width: 100%;"
             class="custom-country-select"
-            :placeholder="langSelect === 'zh' ? '请选择所属区域' : 'Please select area'"
+            :placeholder="$t('selectAreaPlaceholder')"
           >
             <el-option
               v-for="sub in subdivisionOptions"
@@ -424,18 +424,18 @@
         </div>
         <div v-else>
           <label style="display: block; font-size: 13px; font-weight: bold; margin-bottom: 6px;">
-            {{ langSelect === 'zh' ? '省份 / 州 / 区域：' : 'State / Province / Region:' }}
+            {{ $t('stateProvinceRegion') }}
           </label>
           <el-input 
             v-model="addressForm.state" 
-            :placeholder="langSelect === 'zh' ? '请输入省份或区域' : 'Enter state or region'" 
+            :placeholder="$t('enterStateOrRegionPlaceholder')" 
           />
         </div>
 
         <!-- 3. 城市 / 市区 -->
         <div>
           <label style="display: block; font-size: 13px; font-weight: bold; margin-bottom: 6px;">
-            {{ langSelect === 'zh' ? '城市 / 城区：' : 'City / Area:' }}
+            {{ $t('cityArea') }}
           </label>
           <el-input 
             v-model="addressForm.city" 
@@ -446,13 +446,13 @@
         <!-- 4. 详细街道与门牌地址 -->
         <div>
           <label style="display: block; font-size: 13px; font-weight: bold; margin-bottom: 6px;">
-            {{ langSelect === 'zh' ? '详细地址 (街道、大厦、门牌)：' : 'Street & Building Address:' }}
+            {{ $t('streetBuildingAddress') }}
           </label>
           <el-input 
             v-model="addressForm.street" 
             type="textarea"
             :rows="2"
-            :placeholder="langSelect === 'zh' ? '街道名称、门牌号、大厦/小区、楼层、室号' : 'Street name, building, floor, unit'" 
+            :placeholder="$t('streetAddressPlaceholder')" 
           />
         </div>
 
@@ -471,15 +471,15 @@
         <!-- 实时标准地址预览 -->
         <div v-if="addressFormattedPreview" style="background: var(--el-fill-color-light); border-radius: 6px; padding: 10px 12px; font-size: 13px; color: var(--el-text-color-regular);">
           <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 2px;">
-            {{ langSelect === 'zh' ? '规范地址预览：' : 'Standard Address Preview:' }}
+            {{ $t('standardAddressPreview') }}
           </div>
           <div style="font-weight: 500;">{{ addressFormattedPreview }}</div>
         </div>
       </div>
       <template #footer>
         <div style="display: flex; justify-content: flex-end; gap: 10px;">
-          <el-button @click="addressDialogShow = false">{{ $t('cancel') || '取消' }}</el-button>
-          <el-button type="primary" :loading="addressLoading" @click="saveAddress">{{ $t('save') || '保存' }}</el-button>
+          <el-button @click="addressDialogShow = false">{{ $t('cancel') }}</el-button>
+          <el-button type="primary" :loading="addressLoading" @click="saveAddress">{{ $t('save') }}</el-button>
         </div>
       </template>
     </el-dialog>
@@ -496,7 +496,7 @@ import { Icon } from '@iconify/vue'
 import { useUserStore } from '@/store/user.js'
 import { useSettingStore } from '@/store/setting.js'
 import { updateProfile, uploadImage, getGeo } from '@/request/my.js'
-import { COUNTRY_OPTIONS, validatePhoneNumber, getDefaultCountryCode, formatPhoneNumber, formatPhoneInput, getMaxPhoneDigits } from '@/utils/phone-validator.js'
+import { COUNTRY_OPTIONS, getCountryDisplayName, validatePhoneNumber, getDefaultCountryCode, formatPhoneNumber, formatPhoneInput, getMaxPhoneDigits } from '@/utils/phone-validator.js'
 import { ISO_COUNTRIES, getSubdivisionsByCountry, formatStructuredAddress, hasPostalCode, getPostalCodeLabel, getPostalCodePlaceholder, getFlagClass } from '@/utils/geo-data.js'
 
 defineOptions({
@@ -561,7 +561,15 @@ const addressObj = computed(() => {
 })
 
 const currentLanguageDisplay = computed(() => {
-  return langSelect.value === 'en' ? 'English' : '中文 (简体)'
+  const map = {
+    'zh': '中文 (简体)',
+    'zh-Hant': '正體中文 (繁體)',
+    'en': 'English',
+    'fr': 'Français',
+    'es': 'Español',
+    'nl': 'Nederlands'
+  }
+  return map[langSelect.value] || 'English'
 })
 
 const passwordChangedText = computed(() => {
@@ -569,15 +577,16 @@ const passwordChangedText = computed(() => {
   if (!ts) return ''
   try {
     const d = new Date(ts)
-    if (isNaN(d.getTime())) return `上次变更时间：${ts}`
+    if (isNaN(d.getTime())) return t('lastChangeTime', { time: ts })
     const year = d.getFullYear()
     const month = d.getMonth() + 1
     const day = d.getDate()
-    return langSelect.value === 'en'
-      ? `Last changed: ${year}-${month < 10 ? '0' + month : month}-${day < 10 ? '0' + day : day}`
-      : `上次变更时间：${year}年${month}月${day}日`
+    const formatted = (langSelect.value === 'zh' || langSelect.value === 'zh-Hant')
+      ? `${year}年${month}月${day}日`
+      : `${year}-${month < 10 ? '0' + month : month}-${day < 10 ? '0' + day : day}`
+    return t('lastChangeTime', { time: formatted })
   } catch (e) {
-    return `上次变更时间：${ts}`
+    return t('lastChangeTime', { time: ts })
   }
 })
 
@@ -594,32 +603,32 @@ const addressFormattedPreview = computed(() => {
 })
 
 function formatGenderDisplay(gender, custom) {
-  if (!gender) return t('notSet') || '未设置'
-  if (gender === 'male') return t('genderMale') || '男'
-  if (gender === 'female') return t('genderFemale') || '女'
-  if (gender === 'prefer_not_to_say') return t('genderPreferNot') || '不愿透露'
-  if (gender === 'custom') return `${t('genderCustom') || '自订'}: ${custom || ''}`
+  if (!gender) return t('notSet')
+  if (gender === 'male') return t('genderMale')
+  if (gender === 'female') return t('genderFemale')
+  if (gender === 'prefer_not_to_say') return t('genderPreferNot')
+  if (gender === 'custom') return `${t('genderCustom')}: ${custom || ''}`
   return gender
 }
 
 function formatBirthdayDisplay(bday) {
-  if (!bday) return t('notSet') || '未设置'
+  if (!bday) return t('notSet')
   try {
     const parts = bday.split('-')
     if (parts.length === 3) {
-      return langSelect.value === 'en'
-        ? `${parts[0]}-${parts[1]}-${parts[2]}`
-        : `${parts[0]}年${Number(parts[1])}月${Number(parts[2])}日`
+      return (langSelect.value === 'zh' || langSelect.value === 'zh-Hant')
+        ? `${parts[0]}年${Number(parts[1])}月${Number(parts[2])}日`
+        : `${parts[0]}-${parts[1]}-${parts[2]}`
     }
   } catch (e) {}
   return bday
 }
 
 function formatPhoneLabel(label) {
-  if (label === 'mobile') return t('phoneLabelMobile') || '手机'
-  if (label === 'work') return t('phoneLabelWork') || '工作'
-  if (label === 'home') return t('phoneLabelHome') || '住宅'
-  return t('phoneLabelOther') || '其他'
+  if (label === 'mobile') return t('phoneLabelMobile')
+  if (label === 'work') return t('phoneLabelWork')
+  if (label === 'home') return t('phoneLabelHome')
+  return t('phoneLabelOther')
 }
 
 function getCountryFlag(code) {
@@ -746,7 +755,7 @@ async function saveNewPhone() {
 
   const existing = phoneList.value.find(p => p.number === res.cleanNum && p.countryCode === newPhoneCountry.value)
   if (existing) {
-    ElMessage.warning(t('phoneExistsError') || '该电话号码已存在')
+    ElMessage.warning(t('phoneExistsError'))
     return
   }
 
@@ -766,9 +775,9 @@ async function saveNewPhone() {
     await updateProfile({ phones: updatedPhones })
     userStore.user.phones = updatedPhones
     phoneDialogShow.value = false
-    ElMessage.success(t('saveSuccessMsg') || '电话号码添加成功')
+    ElMessage.success(t('saveSuccessMsg'))
   } catch (e) {
-    ElMessage.error(e.message || '添加失败')
+    ElMessage.error(e.message || t('addFailed'))
   } finally {
     phoneLoading.value = false
   }
@@ -779,11 +788,11 @@ async function deletePhone(index) {
   if (!target) return
 
   ElMessageBox.confirm(
-    t('delPhoneConfirm', { number: target.formatted || target.number }) || `确定要移除电话号码 “${target.formatted || target.number}” 吗？`,
-    t('delete') || '删除确认',
+    t('delPhoneConfirm', { number: target.formatted || target.number }),
+    t('delete'),
     {
-      confirmButtonText: t('confirm') || '确定',
-      cancelButtonText: t('cancel') || '取消',
+      confirmButtonText: t('confirm'),
+      cancelButtonText: t('cancel'),
       type: 'warning'
     }
   ).then(async () => {
@@ -791,9 +800,9 @@ async function deletePhone(index) {
       const updatedPhones = phoneList.value.filter((_, idx) => idx !== index)
       await updateProfile({ phones: updatedPhones })
       userStore.user.phones = updatedPhones
-      ElMessage.success('电话号码已移除')
+      ElMessage.success(t('phoneRemoved'))
     } catch (e) {
-      ElMessage.error(e.message || '移除失败')
+      ElMessage.error(e.message || t('removeFailed'))
     }
   }).catch(() => {})
 }
@@ -811,24 +820,60 @@ function formatAddressDisplay(addr) {
 
 function getCityPlaceholder() {
   const c = addressForm.value.country
-  if (c === 'HK') return langSelect.value === 'zh' ? '如: 中环 / 铜锣湾 / 尖沙咀 / 旺角等' : 'e.g. Central, Causeway Bay, Tsim Sha Tsui'
-  if (c === 'MO') return langSelect.value === 'zh' ? '如: 新口岸 / 氹仔市区 / 黑沙环等' : 'e.g. NAPE, Taipa Central, Areia Preta'
-  if (c === 'TW') return langSelect.value === 'zh' ? '如: 信义区 / 大安区 / 板桥区等' : 'e.g. Xinyi Dist., Da-an Dist.'
-  if (c === 'CN') return langSelect.value === 'zh' ? '如: 朝阳区 / 海淀区 / 天河区等' : 'e.g. Chaoyang Dist., Haidian Dist.'
-  return langSelect.value === 'zh' ? '城市或地区名称' : 'City or local area'
+  if (langSelect.value === 'zh-Hant') {
+    if (c === 'HK') return '如: 中環 / 銅鑼灣 / 尖沙咀 / 旺角等'
+    if (c === 'MO') return '如: 新口岸 / 氹仔市區 / 黑沙環等'
+    if (c === 'TW') return '如: 信義區 / 大安區 / 板橋區等'
+    if (c === 'CN') return '如: 朝陽區 / 海淀區 / 天河區等'
+    return '城市或地區名稱'
+  }
+  if (langSelect.value === 'zh') {
+    if (c === 'HK') return '如: 中环 / 铜锣湾 / 尖沙咀 / 旺角等'
+    if (c === 'MO') return '如: 新口岸 / 氹仔市区 / 黑沙环等'
+    if (c === 'TW') return '如: 信义区 / 大安区 / 板桥区等'
+    if (c === 'CN') return '如: 朝阳区 / 海淀区 / 天河区等'
+    return '城市或地区名称'
+  }
+  if (c === 'HK') return 'e.g. Central, Causeway Bay, Tsim Sha Tsui'
+  if (c === 'MO') return 'e.g. NAPE, Taipa Central, Areia Preta'
+  if (c === 'TW') return 'e.g. Xinyi Dist., Da-an Dist.'
+  if (c === 'CN') return 'e.g. Chaoyang Dist., Haidian Dist.'
+  return 'City or local area'
 }
 
 function getSubdivisionLabel() {
   const c = addressForm.value.country
-  if (c === 'HK') return langSelect.value === 'zh' ? '区议会分区 (18区)' : 'District (18 Districts)'
-  if (c === 'MO') return langSelect.value === 'zh' ? '堂区 (8堂区)' : 'Parish'
-  if (c === 'TW') return langSelect.value === 'zh' ? '县市 (22县市)' : 'City / County'
-  if (c === 'CN') return langSelect.value === 'zh' ? '省份 / 直辖市 / 自治区' : 'Province / Municipality'
-  if (c === 'JP') return langSelect.value === 'zh' ? '都道府县' : 'Prefecture'
-  if (c === 'US') return langSelect.value === 'zh' ? '州 (State)' : 'State'
-  if (c === 'GB') return langSelect.value === 'zh' ? '大区 / 郡 (Region / County)' : 'Region / County'
-  if (c === 'SG') return langSelect.value === 'zh' ? '规划分区' : 'Planning Region'
-  return langSelect.value === 'zh' ? '省份 / 州 / 区域' : 'State / Province / Region'
+  if (langSelect.value === 'zh-Hant') {
+    if (c === 'HK') return '區議會分區 (18區)'
+    if (c === 'MO') return '堂區 (8堂區)'
+    if (c === 'TW') return '縣市 (22縣市)'
+    if (c === 'CN') return '省份 / 直轄市 / 自治區'
+    if (c === 'JP') return '都道府縣'
+    if (c === 'US') return '州 (State)'
+    if (c === 'GB') return '大區 / 郡 (Region / County)'
+    if (c === 'SG') return '規劃分區'
+    return '省份 / 州 / 區域'
+  }
+  if (langSelect.value === 'zh') {
+    if (c === 'HK') return '区议会分区 (18区)'
+    if (c === 'MO') return '堂区 (8堂区)'
+    if (c === 'TW') return '县市 (22县市)'
+    if (c === 'CN') return '省份 / 直辖市 / 自治区'
+    if (c === 'JP') return '都道府县'
+    if (c === 'US') return '州 (State)'
+    if (c === 'GB') return '大区 / 郡 (Region / County)'
+    if (c === 'SG') return '规划分区'
+    return '省份 / 州 / 区域'
+  }
+  if (c === 'HK') return 'District (18 Districts)'
+  if (c === 'MO') return 'Parish'
+  if (c === 'TW') return 'City / County'
+  if (c === 'CN') return 'Province / Municipality'
+  if (c === 'JP') return 'Prefecture'
+  if (c === 'US') return 'State'
+  if (c === 'GB') return 'Region / County'
+  if (c === 'SG') return 'Planning Region'
+  return 'State / Province / Region'
 }
 
 function openAddressModal(type) {
@@ -881,9 +926,9 @@ function openAddressModal(type) {
 }
 
 function getAddressModalTitle() {
-  if (currentAddressType.value === 'home') return t('homeAddress') || '住家地址'
-  if (currentAddressType.value === 'work') return t('workAddress') || '公司地址'
-  return t('otherAddress') || '其他地址'
+  if (currentAddressType.value === 'home') return t('homeAddress')
+  if (currentAddressType.value === 'work') return t('workAddress')
+  return t('otherAddress')
 }
 
 async function saveAddress() {
@@ -897,9 +942,9 @@ async function saveAddress() {
     await updateProfile({ addresses: updated })
     userStore.user.addresses = updated
     addressDialogShow.value = false
-    ElMessage.success(t('saveSuccessMsg') || '地址保存成功')
+    ElMessage.success(t('saveSuccessMsg'))
   } catch (e) {
-    ElMessage.error(e.message || '保存失败')
+    ElMessage.error(e.message || t('saveFailed'))
   } finally {
     addressLoading.value = false
   }
@@ -908,7 +953,7 @@ async function saveAddress() {
 async function handleUploadAvatar(options) {
   const file = options.file
   if (file.size > 25 * 1024 * 1024) {
-    ElMessage.error(t('imageSizeLimitMsg') || '图片大小不能超过 25MB')
+    ElMessage.error(t('imageSizeLimitMsg'))
     return
   }
   avatarLoading.value = true
@@ -922,10 +967,10 @@ async function handleUploadAvatar(options) {
       userStore.user.avatarUrl = url
       avatarPreviewUrl.value = url
       avatarDialogShow.value = false
-      ElMessage.success(t('saveSuccessMsg') || '头像更新成功')
+      ElMessage.success(t('saveSuccessMsg'))
     }
   } catch (e) {
-    ElMessage.error(e.message || '上传失败')
+    ElMessage.error(e.message || t('uploadFailed'))
   } finally {
     avatarLoading.value = false
   }
@@ -938,9 +983,9 @@ async function handleDeleteAvatar() {
     userStore.user.avatarUrl = ''
     avatarPreviewUrl.value = ''
     avatarDialogShow.value = false
-    ElMessage.success('头像已移除')
+    ElMessage.success(t('avatarRemoved'))
   } catch (e) {
-    ElMessage.error(e.message || '操作失败')
+    ElMessage.error(e.message || t('operateFailed'))
   } finally {
     avatarLoading.value = false
   }
@@ -949,7 +994,7 @@ async function handleDeleteAvatar() {
 async function saveNickname() {
   const val = editNickname.value.trim()
   if (!val) {
-    ElMessage.warning('名称不能为空')
+    ElMessage.warning(t('nameCannotBeEmpty'))
     return
   }
   nameLoading.value = true
@@ -957,9 +1002,9 @@ async function saveNickname() {
     await updateProfile({ nickname: val })
     userStore.user.nickname = val
     nameDialogShow.value = false
-    ElMessage.success(t('saveSuccessMsg') || '保存成功')
+    ElMessage.success(t('saveSuccessMsg'))
   } catch (e) {
-    ElMessage.error(e.message || '保存失败')
+    ElMessage.error(e.message || t('saveFailed'))
   } finally {
     nameLoading.value = false
   }
@@ -975,9 +1020,9 @@ async function saveGender() {
     userStore.user.gender = editGender.value
     userStore.user.genderCustom = editGender.value === 'custom' ? editGenderCustom.value.trim() : ''
     genderDialogShow.value = false
-    ElMessage.success(t('saveSuccessMsg') || '保存成功')
+    ElMessage.success(t('saveSuccessMsg'))
   } catch (e) {
-    ElMessage.error(e.message || '保存失败')
+    ElMessage.error(e.message || t('saveFailed'))
   } finally {
     genderLoading.value = false
   }
@@ -989,9 +1034,9 @@ async function saveBirthday() {
     await updateProfile({ birthday: editBirthday.value || '' })
     userStore.user.birthday = editBirthday.value || ''
     birthdayDialogShow.value = false
-    ElMessage.success(t('saveSuccessMsg') || '保存成功')
+    ElMessage.success(t('saveSuccessMsg'))
   } catch (e) {
-    ElMessage.error(e.message || '保存失败')
+    ElMessage.error(e.message || t('saveFailed'))
   } finally {
     birthdayLoading.value = false
   }

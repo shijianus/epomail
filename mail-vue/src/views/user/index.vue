@@ -233,9 +233,9 @@
       <div class="details">
         <div v-if="userDetails.username"><span class="details-item-title">LinuxDo:</span>
           <el-avatar :src="userDetails.avatar" :size="30" class="linuxdo-avatar"  />
-          <span style="margin: 0 10px">用户名：{{userDetails.username}}</span>
+          <span style="margin: 0 10px">{{ $t('username') }}: {{userDetails.username}}</span>
           <span>
-                    等级：<el-tag type="success">{{userDetails.trustLevel}}</el-tag>
+                    {{ $t('trustLevel') }}: <el-tag type="success">{{userDetails.trustLevel}}</el-tag>
                   </span>
         </div>
         <div v-if="!sendNumShow"><span
@@ -804,7 +804,7 @@ function toRoleName(type) {
 
   if (type === 0) {
     const master = roleList.find(r => r.roleCode === 'master' || r.name === '站长')
-    return master ? master.name : (t('admin') || '站长')
+    return master ? master.name : t('admin')
   }
 
   const index = roleList.findIndex(role => role.roleId === type)
@@ -855,7 +855,7 @@ function resetTotp(user) {
 function handlePurgeUserEmails(userRow) {
   if (userRow.status !== 1) {
     ElMessage({
-      message: t('purgeRequireBannedMsg') || '必须先对该用户进行【封禁】处理，才能强制清空其邮件释放存储空间',
+      message: t('purgeRequireBannedMsg'),
       type: 'warning',
       plain: true
     });
@@ -873,7 +873,7 @@ function handlePurgeUserEmails(userRow) {
   ).then(() => {
     userPurgeEmails(userRow.userId).then(() => {
       ElMessage({
-        message: t('purgeEmailsSuccess') || '已成功清空该封禁用户的邮件，存储空间已释放',
+        message: t('purgeEmailsSuccess'),
         type: 'success',
         plain: true
       });

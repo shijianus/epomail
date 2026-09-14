@@ -11,7 +11,7 @@
           <div class="settings-card">
             <div class="card-title">
               {{ $t('emailSetting') }}
-              <el-tooltip content="邮件收发及转发相关的基础设置" placement="top">
+              <el-tooltip :content="$t('emailSettingsTooltip')" placement="top">
                 <Icon icon="lucide:help-circle" width="14" class="help-icon" />
               </el-tooltip>
             </div>
@@ -122,26 +122,26 @@
           <!-- 基础名单 Card -->
           <div class="settings-card">
             <div class="card-title">
-              基础名单规则
-              <el-tooltip content="当工作在黑名单模式时，名单内的地址或后缀将被拦截入垃圾桶。在白名单模式时，只有名单内的地址会被放行，其余都会进入垃圾桶。" placement="top">
+              {{ $t('basicListRules') }}
+              <el-tooltip :content="$t('basicListRulesTooltip')" placement="top">
                 <Icon icon="lucide:help-circle" width="14" class="help-icon" />
               </el-tooltip>
             </div>
             <div class="card-content">
               <div class="setting-item">
-                <div><span>名单模式</span></div>
+                <div><span>{{ $t('listMode') }}</span></div>
                 <div>
                   <el-radio-group v-model="listMode" @change="setMode" size="small">
-                    <el-radio value="blacklist" size="small">黑名单</el-radio>
-                    <el-radio value="whitelist" size="small">白名单</el-radio>
+                    <el-radio value="blacklist" size="small">{{ $t('blacklist') }}</el-radio>
+                    <el-radio value="whitelist" size="small">{{ $t('whitelist') }}</el-radio>
                   </el-radio-group>
                 </div>
               </div>
               <div class="setting-item">
-                <div><span>规则明细</span></div>
+                <div><span>{{ $t('ruleDetails') }}</span></div>
                 <div>
                   <el-button class="opt-button" size="small" type="primary" @click="openDrawer('list')">
-                    <Icon icon="lucide:settings-2" width="16" /> 设置 ({{ (listMode === 'whitelist' ? whitelistEntries : blacklistEntries).length }})
+                    <Icon icon="lucide:settings-2" width="16" /> {{ $t('settings') }} ({{ (listMode === 'whitelist' ? whitelistEntries : blacklistEntries).length }})
                   </el-button>
                 </div>
               </div>
@@ -151,17 +151,17 @@
           <!-- 硬拦截 Card -->
           <div class="settings-card">
             <div class="card-title">
-              硬拦截规则
-              <el-tooltip content="硬拦截规则会直接在服务器底层丢弃邮件，完全不进入垃圾桶。请谨慎配置。" placement="top">
+              {{ $t('hardBlockRules') }}
+              <el-tooltip :content="$t('hardBlockRulesTooltip')" placement="top">
                 <Icon icon="lucide:help-circle" width="14" class="help-icon" />
               </el-tooltip>
             </div>
             <div class="card-content">
               <div class="setting-item">
-                <div><span>拦截发件人</span></div>
+                <div><span>{{ $t('blockSender') }}</span></div>
                 <div>
                   <el-button class="opt-button" size="small" type="primary" @click="openDrawer('block')">
-                    <Icon icon="lucide:settings-2" width="16" /> 设置 ({{ hardBlockEntries.length }})
+                    <Icon icon="lucide:settings-2" width="16" /> {{ $t('settings') }} ({{ hardBlockEntries.length }})
                   </el-button>
                 </div>
               </div>
@@ -171,56 +171,56 @@
           <!-- 内容过滤 Card -->
           <div class="settings-card">
             <div class="card-title">
-              内容及标题过滤
-              <el-tooltip content="如果标题或正文包含了这些关键词，邮件会自动归类到垃圾桶。" placement="top">
+              {{ $t('contentTitleFilter') }}
+              <el-tooltip :content="$t('contentTitleFilterTooltip')" placement="top">
                 <Icon icon="lucide:help-circle" width="14" class="help-icon" />
               </el-tooltip>
             </div>
             <div class="card-content">
               <div class="setting-item">
-                <div><span>阻挡站内邮件 (标题)</span></div>
+                <div><span>{{ $t('blockInternalMailSubject') }}</span></div>
                 <div>
                   <el-switch v-model="blockInternalSubject" @change="saveSubjectDirectly" size="small" />
                 </div>
               </div>
               <div class="setting-item">
-                <div><span>过滤标题</span></div>
+                <div><span>{{ $t('filterSubject') }}</span></div>
                 <div>
                   <el-button class="opt-button" size="small" type="primary" @click="openDrawer('subject')">
-                    <Icon icon="lucide:settings-2" width="16" /> 设置 ({{ blackSubject.length }})
+                    <Icon icon="lucide:settings-2" width="16" /> {{ $t('settings') }} ({{ blackSubject.length }})
                   </el-button>
                 </div>
               </div>
               <div class="setting-item">
-                <div><span>阻挡站内邮件 (内容)</span></div>
+                <div><span>{{ $t('blockInternalMailContent') }}</span></div>
                 <div>
                   <el-switch v-model="blockInternalContent" @change="saveContentDirectly" size="small" />
                 </div>
               </div>
               <div class="setting-item">
-                <div><span>过滤内容</span></div>
+                <div><span>{{ $t('filterContent') }}</span></div>
                 <div>
                   <el-button class="opt-button" size="small" type="primary" @click="openDrawer('content')">
-                    <Icon icon="lucide:settings-2" width="16" /> 设置 ({{ blackContent.length }})
+                    <Icon icon="lucide:settings-2" width="16" /> {{ $t('settings') }} ({{ blackContent.length }})
                   </el-button>
                 </div>
               </div>
             </div>
           </div>
 
-          <!-- 高级过滤选项 Card -->
+          <!-- {{ $t('advancedFilterOptions') }} Card -->
           <div class="settings-card">
             <div class="card-title">
-              高级过滤选项
-              <el-tooltip content="开启以下严格选项以拦截结构异常或可疑的邮件 (拦截入垃圾桶)。" placement="top">
+              {{ $t('advancedFilterOptions') }}
+              <el-tooltip :content="$t('advancedFilterOptionsTooltip')" placement="top">
                 <Icon icon="lucide:help-circle" width="14" class="help-icon" />
               </el-tooltip>
             </div>
             <div class="card-content">
               <div class="setting-item">
                 <div>
-                   <span>空发件人拦截</span>
-                   <el-tooltip content="拦截没有发件人姓名 (Sender Name) 仅有地址的异常邮件。" placement="top"><Icon icon="lucide:info" width="12" style="margin-left: 4px; color: var(--text-muted); cursor: help;"/></el-tooltip>
+                   <span>{{ $t('emptySenderIntercept') }}</span>
+                   <el-tooltip :content="$t('emptySenderInterceptTooltip')" placement="top"><Icon icon="lucide:info" width="12" style="margin-left: 4px; color: var(--text-muted); cursor: help;"/></el-tooltip>
                 </div>
                 <div>
                   <el-switch v-model="blockEmptyName" @change="saveFlagsDirectly" size="small" />
@@ -228,8 +228,8 @@
               </div>
               <div class="setting-item">
                 <div>
-                  <span>严格收件人匹配</span>
-                  <el-tooltip content="拦截收件人(To/Cc)中不包含您当前邮箱地址的邮件 (防止密送群发)。" placement="top"><Icon icon="lucide:info" width="12" style="margin-left: 4px; color: var(--text-muted); cursor: help;"/></el-tooltip>
+                  <span>{{ $t('strictRecipientMatching') }}</span>
+                  <el-tooltip :content="$t('strictRecipientMatchingTooltip')" placement="top"><Icon icon="lucide:info" width="12" style="margin-left: 4px; color: var(--text-muted); cursor: help;"/></el-tooltip>
                 </div>
                 <div>
                   <el-switch v-model="blockNotToMe" @change="saveFlagsDirectly" size="small" />
@@ -237,8 +237,8 @@
               </div>
               <div class="setting-item">
                 <div>
-                  <span>可执行附件限制</span>
-                  <el-tooltip content="拦截包含可执行文件 (.exe, .bat, .cmd, .scr, .vbs, .js) 附件的邮件。" placement="top"><Icon icon="lucide:info" width="12" style="margin-left: 4px; color: var(--text-muted); cursor: help;"/></el-tooltip>
+                  <span>{{ $t('executableAttachmentLimit') }}</span>
+                  <el-tooltip :content="$t('executableAttachmentLimitTooltip')" placement="top"><Icon icon="lucide:info" width="12" style="margin-left: 4px; color: var(--text-muted); cursor: help;"/></el-tooltip>
                 </div>
                 <div>
                   <el-switch v-model="blockExecutable" @change="saveFlagsDirectly" size="small" />
@@ -261,40 +261,40 @@
     >
       <div class="drawer-content">
         <div class="drawer-desc" v-if="drawerTarget === 'list'">
-          <div class="desc-title">{{ listMode === 'whitelist' ? '放行名单 (Whitelist)' : '拦截名单 (Blacklist)' }}</div>
+          <div class="desc-title">{{ listMode === 'whitelist' ? $t('whitelist') : $t('blacklist') }}</div>
           <div class="desc-body">
-             {{ listMode === 'whitelist' ? '仅允许以下地址发送的邮件，未在名单内的邮件将被归类至垃圾桶。' : '当发件人匹配以下地址时，邮件将被归类至垃圾桶。' }}
+             {{ listMode === 'whitelist' ? $t('whitelistDesc') : $t('blacklistDesc') }}
           </div>
           <div class="desc-rule">
-            <strong>规则简述：</strong>支持精确邮箱 (例 <code>spam@a.com</code>)、域名后缀 (例 <code>a.com</code>) 以及通配符模式 (例 <code>*@*.a.com</code>)。
+            <strong>{{ $t('ruleBrief') }}：</strong>{{ $t('ruleBriefList') }}
           </div>
         </div>
         <div class="drawer-desc" v-else-if="drawerTarget === 'block'">
-          <div class="desc-title">彻底丢弃规则</div>
-          <div class="desc-body">当发件人匹配以下地址时，邮件将在到达时被直接销毁。</div>
+          <div class="desc-title">{{ $t('hardBlockRules') }}</div>
+          <div class="desc-body">{{ $t('hardBlockDesc') }}</div>
           <div class="desc-rule">
-            <strong>规则简述：</strong>支持精确邮箱、域名及通配符模式 (如 <code>*@spam.com</code>)。
+            <strong>{{ $t('ruleBrief') }}：</strong>{{ $t('hardBlockRuleBrief') }}
           </div>
-          <span class="warning-text"><Icon icon="lucide:alert-triangle" width="14"/> 警告：匹配的邮件将完全消失，不进垃圾桶。</span>
+          <span class="warning-text"><Icon icon="lucide:alert-triangle" width="14"/> {{ $t('hardBlockWarning') }}</span>
         </div>
         <div class="drawer-desc" v-else-if="drawerTarget === 'subject'">
-          <div class="desc-title">标题关键词过滤</div>
-          <div class="desc-body">如果邮件的标题中包含以下任一关键词，该邮件将被自动归类至垃圾桶。</div>
+          <div class="desc-title">{{ $t('filterSubject') }}</div>
+          <div class="desc-body">{{ $t('filterSubjectDesc') }}</div>
         </div>
         <div class="drawer-desc" v-else-if="drawerTarget === 'content'">
-          <div class="desc-title">正文关键词过滤</div>
-          <div class="desc-body">如果邮件的正文或HTML内容中包含以下任一关键词，该邮件将被自动归类至垃圾桶。</div>
+          <div class="desc-title">{{ $t('filterContent') }}</div>
+          <div class="desc-body">{{ $t('filterContentDesc') }}</div>
         </div>
 
         <div class="drawer-actions">
-          <el-button @click="clearCurrent" size="small">清空</el-button>
-          <el-button @click="restoreDefaultTemplates" size="small">恢复默认模板</el-button>
-          <el-button type="primary" @click="saveDrawer" size="small" :loading="drawerLoading">保存</el-button>
+          <el-button @click="clearCurrent" size="small">{{ $t('clear') }}</el-button>
+          <el-button @click="restoreDefaultTemplates" size="small">{{ $t('restoreDefaultTemplates') }}</el-button>
+          <el-button type="primary" @click="saveDrawer" size="small" :loading="drawerLoading">{{ $t('save') }}</el-button>
         </div>
 
         <el-input-tag
             v-model="currentDrawerArray"
-            placeholder="输入规则后按回车添加..."
+            :placeholder="$t('inputRuleEnterPlaceholder')"
             class="drawer-tag-input"
         />
       </div>
@@ -534,21 +534,32 @@ const hardBlockTemplates = [
   '*@viagra-deals.net'
 ]
 
-const subjectTemplates = [
-  '免费', '促销', 'casino', 'viagra', 'lottery', 'winner', 'urgent'
-]
+function getSubjectTemplates(lang) {
+  if (lang === 'zh-Hant') {
+    return ['免費', '促銷', '中獎', '大獎', 'casino', 'viagra', 'lottery', 'winner', 'urgent']
+  }
+  if (lang === 'zh') {
+    return ['免费', '促销', '中奖', '大奖', 'casino', 'viagra', 'lottery', 'winner', 'urgent']
+  }
+  return ['free', 'promo', 'promotion', 'winner', 'lottery', 'urgent', 'casino', 'viagra', 'claim', 'congratulations']
+}
 
-const contentTemplates = [
-  '发票', '中奖', '贷款', '赌场', '博彩', '免费领取', '代开',
-  '退款通知', '急聘', 'pharmacy', 'crypto', 'bitcoin', 'giveaway', 'loan'
-]
+function getContentTemplates(lang) {
+  if (lang === 'zh-Hant') {
+    return ['發票', '中獎', '貸款', '賭場', '博彩', '免費領取', '代開', '退款通知', '急聘', 'pharmacy', 'crypto', 'bitcoin', 'giveaway', 'loan']
+  }
+  if (lang === 'zh') {
+    return ['发票', '中奖', '贷款', '赌场', '博彩', '免费领取', '代开', '退款通知', '急聘', 'pharmacy', 'crypto', 'bitcoin', 'giveaway', 'loan']
+  }
+  return ['invoice', 'winner', 'loan', 'casino', 'gambling', 'free giveaway', 'refund notice', 'urgent hiring', 'pharmacy', 'crypto', 'bitcoin']
+}
 
 const drawerTitle = computed(() => {
-  if (drawerTarget.value === 'list') return '设置基础名单规则'
-  if (drawerTarget.value === 'block') return '设置硬拦截规则'
-  if (drawerTarget.value === 'subject') return '设置标题过滤关键词'
-  if (drawerTarget.value === 'content') return '设置内容过滤关键词'
-  return '设置'
+  if (drawerTarget.value === 'list') return `${t('settings')} - ${t('basicListRules')}`
+  if (drawerTarget.value === 'block') return `${t('settings')} - ${t('hardBlockRules')}`
+  if (drawerTarget.value === 'subject') return `${t('settings')} - ${t('filterSubject')}`
+  if (drawerTarget.value === 'content') return `${t('settings')} - ${t('filterContent')}`
+  return t('settings')
 })
 
 // ── Lifecycle ───────────────────────────────────────────────────────
@@ -665,13 +676,13 @@ async function testAi() {
       aiModel: aiForm.aiModel
     })
     ElMessage({
-      message: res.message || (locale.value === 'zh' ? 'AI 连通性测试成功！' : 'AI Connection test succeeded!'),
+      message: res.message || t('aiConnectionSuccess'),
       type: 'success',
       plain: true
     })
   } catch (err) {
     ElMessage({
-      message: (err && err.message) || (locale.value === 'zh' ? 'AI 测试失败，请检查配置与网络' : 'AI connection failed, please check configuration'),
+      message: (err && err.message) || t('aiConnectionFailed'),
       type: 'error',
       plain: true
     })
@@ -864,27 +875,27 @@ function setMode(mode) {
 async function saveListDirectly() {
   try {
     await setBlackList({ blackFrom: getListSaveString() })
-    ElMessage.success('已保存基础名单模式')
+    ElMessage.success(t('basicListSaved'))
   } catch (e) {}
 }
 
 async function saveFlagsDirectly() {
   try {
     await setBlackList({ blackFrom: getListSaveString() })
-    ElMessage.success('已保存高级过滤选项')
+    ElMessage.success(t('advancedFilterSaved'))
   } catch (e) {}
 }
 
 async function saveSubjectDirectly() {
   try {
     await setBlackList({ blackSubject: getSubjectSaveString() })
-    ElMessage.success('已保存标题过滤设置')
+    ElMessage.success(t('subjectFilterSaved'))
   } catch (e) {}
 }
 async function saveContentDirectly() {
   try {
     await setBlackList({ blackContent: getContentSaveString() })
-    ElMessage.success('已保存内容过滤设置')
+    ElMessage.success(t('contentFilterSaved'))
   } catch (e) {}
 }
 
@@ -914,9 +925,9 @@ function restoreDefaultTemplates() {
   } else if (drawerTarget.value === 'block') {
      currentDrawerArray.value = [...hardBlockTemplates]
   } else if (drawerTarget.value === 'subject') {
-     currentDrawerArray.value = [...subjectTemplates]
+     currentDrawerArray.value = [...getSubjectTemplates(locale.value)]
   } else if (drawerTarget.value === 'content') {
-     currentDrawerArray.value = [...contentTemplates]
+     currentDrawerArray.value = [...getContentTemplates(locale.value)]
   }
 }
 
@@ -942,10 +953,10 @@ async function saveDrawer() {
 
   try {
     await setBlackList(payload)
-    ElMessage.success('已保存过滤规则')
+    ElMessage.success(t('rulesSavedSuccess'))
     drawerVisible.value = false
   } catch (e) {
-    ElMessage.error('保存失败')
+    ElMessage.error(t('saveFailed'))
   } finally {
     drawerLoading.value = false
   }

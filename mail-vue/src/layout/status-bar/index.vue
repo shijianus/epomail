@@ -39,23 +39,23 @@ const currentMailModeConfig = computed(() => {
     return {
       tagClass: 'mode-red',
       icon: 'fluent:eye-20-filled',
-      title: t('allMailModeStatus') || '全部邮件模式',
-      desc: t('allMailModeStatusDesc') || '你的来往邮件不受基础隐私保护，请注意保护个人隐私，不要将重要邮件发送到本邮箱'
+      title: t('allMailModeStatus'),
+      desc: t('allMailModeStatusDesc')
     };
   } else if (mode === 2) {
     return {
       tagClass: 'mode-green',
       icon: 'fluent:shield-lock-20-filled',
-      title: t('encryptedMailModeStatus') || '加密邮件模式',
-      desc: t('encryptedMailModeStatusDesc') || '全站邮件采用高强度中心化加密存储，仅收发双方可查看，任何第三方及管理员均无法查阅'
+      title: t('encryptedMailModeStatus'),
+      desc: t('encryptedMailModeStatusDesc')
     };
   } else {
     // Mode 0: 隐私邮件模式 (Orange indicator)
     return {
       tagClass: 'mode-orange',
       icon: 'fluent:shield-keyhole-20-filled',
-      title: t('privacyMailModeStatus') || '隐私邮件模式',
-      desc: t('privacyMailModeStatusDesc') || '你的来往邮件受到基础的隐私保护，但是垃圾箱的邮件将被严格检查，请注意垃圾箱的隐私邮件'
+      title: t('privacyMailModeStatus'),
+      desc: t('privacyMailModeStatusDesc')
     };
   }
 });

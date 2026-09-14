@@ -21,7 +21,7 @@
       <div class="action-btn-pill" @click="refresh" :title="$t('refresh')">
         <Icon class="icon" icon="ion:reload" width="16" height="16"/>
       </div>
-      <div class="action-btn-pill" @click="clearNotUse" :title="$t('clearUnused') || '清理无用注册码'">
+      <div class="action-btn-pill" @click="clearNotUse" :title="$t('clearUnused')">
         <Icon class="icon" icon="fluent:broom-sparkle-16-regular" width="18" height="18"/>
       </div>
     </div>
@@ -37,7 +37,7 @@
               <div class="info-left-item code-row">
                 <span class="code" :class="{ 'code-masked': isVisitor || item.isMasked }" @click="copyCode(item)">{{ item.code }}</span>
                 <el-tag v-if="isVisitor || item.isMasked" size="small" type="warning" effect="plain" class="masked-tag">
-                  脱敏保护
+                  {{ $t('visitorModeDesensitizeProtect') }}
                 </el-tag>
               </div>
               <div class="info-left-item">
@@ -74,17 +74,17 @@
         <div class="empty-baseplate" v-if="!regKeyFirst">
           <el-empty
             :image-size="isMobile ? 100 : 120"
-            :description="params.code ? ($t('noSearchResult') || '未找到匹配的注册码') : $t('noCodeFound')"
+            :description="params.code ? $t('noSearchResult') : $t('noCodeFound')"
           >
             <template #default>
               <div class="empty-actions">
                 <el-button type="primary" class="empty-btn empty-btn-primary" @click="openAdd">
                   <Icon icon="ion:add-outline" width="16" height="16" class="btn-icon" />
-                  <span>{{ $t('addRegKey') || $t('add') }}</span>
+                  <span>{{ $t('addRegKey') }}</span>
                 </el-button>
                 <el-button v-if="params.code" class="empty-btn empty-btn-secondary" @click="refresh">
                   <Icon icon="ion:reload" width="14" height="14" class="btn-icon" />
-                  <span>{{ $t('clearSearch') || '清空搜索条件' }}</span>
+                  <span>{{ $t('clearSearch') }}</span>
                 </el-button>
               </div>
             </template>
@@ -235,22 +235,14 @@ function formatUserCreateTime(regKey) {
   const currentYear = dayjs().year();
   const expireYear = createTime.year();
 
-  if (settingStore.lang === 'en') {
-
-    if (expireYear === currentYear) {
-      return createTime.format('MMM D, HH:mm');
-    } else {
-      return createTime.format('MMM D, YYYY HH:mm');
-    }
-
+  if (settingStore.lang === 'zh' || settingStore.lang === 'zh-Hant') {
+    return expireYear === currentYear
+      ? createTime.format('M月D日 HH:mm')
+      : createTime.format('YYYY年M月D日 HH:mm');
   } else {
-
-    if (expireYear === currentYear) {
-      return createTime.format('M月D日 HH:mm');
-    } else {
-      return createTime.format('YYYY年M月D日 HH:mm');
-    }
-
+    return expireYear === currentYear
+      ? createTime.format('MMM D, HH:mm')
+      : createTime.format('MMM D, YYYY HH:mm');
   }
 
 }
@@ -260,18 +252,14 @@ function formatExpireTime(expireTime) {
   const currentYear = dayjs().year();
   const expireYear = expireDate.year();
 
-  if (settingStore.lang === 'en') {
-
-    return expireYear === currentYear
-        ? expireDate.format('MMM D')
-        : expireDate.format('MMM D, YYYY');
-
-  } else {
-
+  if (settingStore.lang === 'zh' || settingStore.lang === 'zh-Hant') {
     return expireYear === currentYear
         ? expireDate.format('M月D日')
         : expireDate.format('YYYY年M月D日');
-
+  } else {
+    return expireYear === currentYear
+        ? expireDate.format('MMM D')
+        : expireDate.format('MMM D, YYYY');
   }
 }
 
@@ -303,7 +291,7 @@ async function copyCode(itemOrCode) {
   const isItemMasked = typeof itemOrCode === 'object' ? itemOrCode?.isMasked : false;
   if (isVisitor.value || isItemMasked || (typeof code === 'string' && code.includes('•'))) {
     ElMessage({
-      message: '参观者演示模式：注册密钥已启用脱敏保护，禁止复制！',
+      message: t('visitorCopyForbidden'),
       type: 'warning',
       plain: true,
     });
@@ -319,7 +307,7 @@ async function copyCode(itemOrCode) {
   } catch (err) {
     console.error('复制失败:', err);
     ElMessage({
-      message: '复制失败',
+      message: t('copyFailed'),
       type: 'error',
       plain: true,
     })

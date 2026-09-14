@@ -23,10 +23,17 @@ import examples from 'libphonenumber-js/examples.mobile.json';
 import countries from 'i18n-iso-countries';
 import zhLocale from 'i18n-iso-countries/langs/zh.json';
 import enLocale from 'i18n-iso-countries/langs/en.json';
+import frLocale from 'i18n-iso-countries/langs/fr.json';
+import esLocale from 'i18n-iso-countries/langs/es.json';
+import nlLocale from 'i18n-iso-countries/langs/nl.json';
+import zhHantCountries from './countries-zh-hant.json';
 
 // Register standard ISO locales
 countries.registerLocale(zhLocale);
 countries.registerLocale(enLocale);
+countries.registerLocale(frLocale);
+countries.registerLocale(esLocale);
+countries.registerLocale(nlLocale);
 
 // Top priority countries to list first in the UI dropdown
 const PRIORITY_CODES = [
@@ -416,4 +423,14 @@ export function validatePhoneNumber(countryCode, rawNumber) {
     cleanNum: digitsOnly,
     formatted: formatPhoneInput(digitsOnly, countryCode)
   };
+}
+
+export function getCountryDisplayName(countryMeta, lang = 'zh') {
+  if (!countryMeta) return '';
+  if (lang === 'zh-Hant') return countryMeta.nameZhHant || countryMeta.nameZh;
+  if (lang === 'fr') return countryMeta.nameFr || countryMeta.nameEn;
+  if (lang === 'es') return countryMeta.nameEs || countryMeta.nameEn;
+  if (lang === 'nl') return countryMeta.nameNl || countryMeta.nameEn;
+  if (lang === 'en') return countryMeta.nameEn;
+  return countryMeta.nameZh;
 }

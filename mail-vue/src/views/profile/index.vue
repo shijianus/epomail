@@ -40,7 +40,7 @@
               </div>
             </div>
 
-            <p class="bio" v-html="parseInlineMarkdown(profileData.userInfo.bio || ((profileData.userInfo.email === 'admin@epomail.bond' || profileData.userInfo.roleName === '站长' || profileData.userInfo.roleName === 'master') ? 'EpoMail 系统管理员，负责核心平台的维护与安全。我们在数字世界中连接彼此，保护每一次灵感的传递与思想的交汇。为您带来前所未有的纯净沟通体验。' : 'EpoMail 专属用户，致力于安全、高效的邮件通讯。我们在数字世界中连接彼此，保护每一次灵感的传递与思想的交汇。为您带来前所未有的纯净沟通体验。'))"></p>
+            <p class="bio" v-html="parseInlineMarkdown(profileData.userInfo.bio || ((profileData.userInfo.email === 'admin@epomail.bond' || profileData.userInfo.roleCode === 'master' || ['master', '站长', '站長'].includes(profileData.userInfo.roleName)) ? $t('adminDefaultBio') : $t('userDefaultBio')))"></p>
 
             <!-- Bottom Section: Fixed to bottom -->
             <div class="bottom-section">
@@ -48,41 +48,41 @@
               <div class="sub-tags-list">
                 <div class="sub-tag-item">
                   <Icon class="ic" icon="solar:global-linear" />
-                  所在时区：{{ timezoneString }}
+                  {{ $t('timezoneLabel') }}{{ timezoneString }}
                 </div>
                 <div class="sub-tag-item">
                   <Icon class="ic" icon="solar:shield-check-linear" />
-                  所属身份组：{{ currentRoleName }}
+                  {{ $t('roleGroupLabel') }}{{ currentRoleName }}
                 </div>
                 <div class="sub-tag-item">
                   <Icon class="ic" icon="solar:calendar-linear" />
-                  加入时间：{{ dayjs(profileData.userInfo.joinTime).format('YYYY年M月') }}
+                  {{ $t('joinTimeLabel') }}{{ dayjs(profileData.userInfo.joinTime).format('YYYY/MM') }}
                 </div>
               </div>
 
               <el-button type="primary" size="large" style="width: 100%; border-radius: 12px; height: 46px; font-weight: 600;" @click="handleContact">
                 <Icon icon="fluent:send-24-filled" class="ic" style="margin-right: 8px;" />
-                发送邮件联系我
+                {{ $t('contactMeByEmail') }}
               </el-button>
             </div>
           </div>
 
           <!-- Right Side: Analytics Dashboard -->
           <div class="profile-analysis">
-        <div class="section-heading">账户数据与分析看板</div>
+        <div class="section-heading">{{ $t('accountDataAnalyticsBoard') }}</div>
 
         <!-- Top Gradient Cards -->
         <div class="stats-row">
           <div class="stat-card blue">
-            <div class="stat-title"><svg class="ic" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg> 今日发件</div>
+            <div class="stat-title"><svg class="ic" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg> {{ $t('todaySent') }}</div>
             <div class="stat-val">{{ profileData.userInfo.showStats ? profileData.stats.todaySent : '**' }}</div>
           </div>
           <div class="stat-card green">
-            <div class="stat-title"><svg class="ic" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg> 今日收件</div>
+            <div class="stat-title"><svg class="ic" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg> {{ $t('todayReceived') }}</div>
             <div class="stat-val">{{ profileData.userInfo.showStats ? profileData.stats.todayReceived : '**' }}</div>
           </div>
           <div class="stat-card orange">
-            <div class="stat-title"><svg class="ic" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg> 个人拦截率</div>
+            <div class="stat-title"><svg class="ic" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg> {{ $t('personalInterceptRate') }}</div>
             <div class="stat-val">{{ profileData.userInfo.showStats ? profileData.stats.interceptRate : '**' }}</div>
           </div>
         </div>
@@ -93,10 +93,10 @@
           <!-- 邮件增长 (Email Growth 100% STACKED Bar Chart) -->
           <div class="chart-card">
             <div class="chart-title">
-              <span>邮件处理态势分布</span>
+              <span>{{ $t('emailHandlingTrend') }}</span>
               <div class="chart-legends-top" v-if="profileData.userInfo.showTrend">
-                <div class="legend-pill"><div class="legend-color" style="background:var(--color-receive);"></div>接收</div>
-                <div class="legend-pill"><div class="legend-color" style="background:var(--color-intercept);"></div>拦截</div>
+                <div class="legend-pill"><div class="legend-color" style="background:var(--color-receive);"></div>{{ $t('receive') }}</div>
+                <div class="legend-pill"><div class="legend-color" style="background:var(--color-intercept);"></div>{{ $t('intercept') }}</div>
               </div>
             </div>
             <div class="bar-chart-container">
@@ -109,16 +109,16 @@
               <template v-if="profileData.userInfo.showTrend">
                 <div class="bar-col" v-for="(item, i) in profileData.trend" :key="item.date">
                   <div class="bar-wrapper" style="height: 100%;" :style="i === profileData.trend.length - 1 ? 'box-shadow: 0 0 16px rgba(16,185,129,0.3);' : ''">
-                    <div class="segment seg-receive" :style="{height: item.receivePercent + '%'}" @mousemove="showTooltip($event, `接收占比: ${item.receivePercent}%`, 'var(--color-receive)')" @mouseleave="hideTooltip"></div>
-                    <div class="segment seg-intercept" :style="{height: item.interceptPercent + '%'}" @mousemove="showTooltip($event, `拦截占比: ${item.interceptPercent}%`, 'var(--color-intercept)')" @mouseleave="hideTooltip"></div>
+                    <div class="segment seg-receive" :style="{height: item.receivePercent + '%'}" @mousemove="showTooltip($event, `${$t('receive')}: ${item.receivePercent}%`, 'var(--color-receive)')" @mouseleave="hideTooltip"></div>
+                    <div class="segment seg-intercept" :style="{height: item.interceptPercent + '%'}" @mousemove="showTooltip($event, `${$t('intercept')}: ${item.interceptPercent}%`, 'var(--color-intercept)')" @mouseleave="hideTooltip"></div>
                   </div>
-                  <div class="bar-label" :style="i === profileData.trend.length - 1 ? 'color:var(--text-primary); font-weight:bold;' : ''">{{ i === profileData.trend.length - 1 ? '今日' : item.label }}</div>
+                  <div class="bar-label" :style="i === profileData.trend.length - 1 ? 'color:var(--text-primary); font-weight:bold;' : ''">{{ i === profileData.trend.length - 1 ? $t('today') : item.label }}</div>
                 </div>
               </template>
               <div v-else style="position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 2;">
                 <div style="display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 16px 24px; background: var(--bg-base); border: 1px dashed var(--border-subtle); border-radius: 12px; transform: translateY(-15px);">
                   <Icon icon="fluent:eye-off-20-regular" style="font-size: 36px; color: var(--text-muted); opacity: 0.8;" />
-                  <span style="font-size: 13px; font-weight: 600; color: var(--text-muted); letter-spacing: 1px;">隐私保护已开启，态势数据不可见</span>
+                  <span style="font-size: 13px; font-weight: 600; color: var(--text-muted); letter-spacing: 1px;">{{ $t('privacyProtectionEnabledTrendHidden') }}</span>
                 </div>
               </div>
             </div>
@@ -127,7 +127,7 @@
           <!-- 邮件来源 (Email Sources SVG Pie Chart) -->
           <div class="chart-card">
             <div class="chart-title">
-              <span>来源分布</span>
+              <span>{{ $t('sourceDistribution') }}</span>
             </div>
             <div class="pie-chart-container">
               <div class="pie-ring">
@@ -139,19 +139,19 @@
                 </svg>
                 <div class="pie-total">
                   <span class="pie-total-val">{{ profileData.userInfo.showSources ? profileData.sources.total : '**' }}</span>
-                  <span class="pie-total-lbl">总量</span>
+                  <span class="pie-total-lbl">{{ $t('totalAmount') }}</span>
                 </div>
               </div>
               
               <div class="pie-legend" v-if="profileData.userInfo.showSources">
-                <div class="legend-item" v-for="(source, index) in computedSources" :key="source.domain" :style="source.domain === '其它来源' ? 'margin-top: 4px; padding-top: 4px; border-top: 1px dashed var(--border-subtle);' : ''" @mousemove="showTooltip($event, `${source.domain}: ${source.percent}%`, source.color)" @mouseleave="hideTooltip">
-                  <div class="legend-dot"><div class="dot" :style="{background: source.color}"></div> {{ source.domain }}</div>
-                  <span style="font-family: monospace;" :style="source.domain === '其它来源' ? 'color:var(--text-muted);' : ''">{{ source.percent }}%</span>
+                <div class="legend-item" v-for="(source, index) in computedSources" :key="source.domain" :style="source.domain === '其它来源' || source.domain === 'Other Sources' ? 'margin-top: 4px; padding-top: 4px; border-top: 1px dashed var(--border-subtle);' : ''" @mousemove="showTooltip($event, `${source.domain}: ${source.percent}%`, source.color)" @mouseleave="hideTooltip">
+                  <div class="legend-dot"><div class="dot" :style="{background: source.color}"></div> {{ source.domain === '其它来源' ? $t('otherSources') : source.domain }}</div>
+                  <span style="font-family: monospace;" :style="source.domain === '其它来源' || source.domain === 'Other Sources' ? 'color:var(--text-muted);' : ''">{{ source.percent }}%</span>
                 </div>
               </div>
               <div class="pie-legend" v-else style="display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; min-height: 80px; gap: 8px;">
                 <Icon icon="fluent:eye-off-20-regular" style="font-size: 32px; color: var(--border-subtle); opacity: 0.5;" />
-                <span style="font-size: 13px; font-weight: 600; color: var(--text-muted); letter-spacing: 1px;">来源数据不可见</span>
+                <span style="font-size: 13px; font-weight: 600; color: var(--text-muted); letter-spacing: 1px;">{{ $t('sourcesDataHidden') }}</span>
               </div>
             </div>
           </div>
@@ -168,6 +168,8 @@
 </template>
 
 <script setup>
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 import { ref, onMounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getProfile } from '@/request/public.js'
@@ -195,7 +197,7 @@ const timezoneString = computed(() => {
   const offset = -new Date().getTimezoneOffset() / 60;
   const offsetStr = offset >= 0 ? `+${offset}` : `${offset}`;
   let localeName = tz;
-  if (tz === 'Asia/Shanghai') localeName = '北京';
+  if (tz === 'Asia/Shanghai') localeName = t('beijing') || 'Beijing';
   return `${localeName} (GMT${offsetStr})`;
 })
 
@@ -230,7 +232,7 @@ const computedSources = computed(() => {
     let otherPercent = profileData.value.sources.otherPercent || 0
     
     // 1. Remove '其它来源' or 'Other' from top list and add to otherPercent
-    const otherIndex = topSources.findIndex(s => s.domain === '其它来源' || s.domain === 'Other')
+    const otherIndex = topSources.findIndex(s => s.domain === '其它来源' || s.domain === 'Other' || s.domain === t('otherSources'))
     if (otherIndex !== -1) {
         otherPercent += topSources[otherIndex].percent
         topSources.splice(otherIndex, 1)
@@ -258,7 +260,7 @@ const computedSources = computed(() => {
     
     if (otherPercent > 0) {
         list.push({
-            domain: '其它来源',
+            domain: t('otherSources'),
             percent: parseFloat(otherPercent.toFixed(1)), // Fix precision issues
             color: colors[3],
             dasharray: `${otherPercent} 100`,
@@ -286,7 +288,7 @@ const isOwnProfile = computed(() => {
 
   // 2. target 为 'admin' 时，仅系统主站长 (admin@epomail.bond) 判定为本人
   if (target === 'admin') {
-    return currentEmail === 'admin@epomail.bond' || current.role?.roleCode === 'master' || current.role?.name === '站长'
+    return currentEmail === 'admin@epomail.bond' || current.role?.roleCode === 'master' || ['master', '站长', '站長'].includes(current.role?.name)
   }
 
   // 3. 用户名精确命中（不含 @ 的唯一用户名持有者）
@@ -299,10 +301,15 @@ const isOwnProfile = computed(() => {
 })
 
 const currentRoleName = computed(() => {
+  const code = (isOwnProfile.value ? userStore.user?.role?.roleCode : profileData.value?.userInfo?.roleCode) || ''
+  if (code === 'master') return t('roleMaster')
+  if (code === 'moderator') return t('roleModerator')
+  if (code === 'visitor') return t('roleVisitor')
+  if (code === 'user_base' || code === 'user_lv0' || code === 'user_lv1') return t('roleUserBase')
   if (isOwnProfile.value && userStore.user?.role?.name) {
     return userStore.user.role.name
   }
-  return profileData.value?.userInfo?.roleName || '普通用户'
+  return profileData.value?.userInfo?.roleName || t('roleUserBase')
 })
 
 const coverPhotoStyle = computed(() => {
