@@ -32,7 +32,7 @@
        - 全套 5 大检查点的多语言与全域邮件测试 `tests/test-multilingual-and-global-email-e2e.mjs` 100% 全绿通过；恪守零假数据与自动还原准则。
 *   **部署上线与自动化测试 (Verification & Deployment)**:
     - **Cloudflare Workers 部署 Version ID**: `dcc17a65-819b-4f3b-bbc1-1709a1c842fe`。
-    - **epocanvas-mail Git Commit**: `0a67969f34654b17c7fb409f11ab5f1d73490693` (Short Hash: `0a67969`).
+    - **epocanvas-mail Git Commit**: `42c33f196050af036f0061b19c447d829b58ea98` (Short Hash: `42c33f1`).
 
 ### 专案主流多语言支持(正体中文/法/西/荷)、多语言欢迎邮件(站长默认语言联动与6国Tab切换)、网站公告全域公告邮件(admin@epocanvas.com站长通道/受众分组/TTL/新人自动补发)上线 (2026-09-14)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
