@@ -32,7 +32,7 @@
 *   **部署上线与自动化测试 (Verification & Deployment)**:
     - **Cloudflare Workers 部署 Version ID**: `71028b57-ae1d-48d4-9ea1-3008c122ac09`。
     - **生产访问域名**: `https://epomail.epocanvas.workers.dev`。
-    - **epocanvas-mail Git Commit**: 待提交后完整回填。
+    - **epocanvas-mail Git Commit**: `d35ec94b49e7097218bf31868939137232b40da1` (Short Hash: `d35ec94`)。
 
 ### epomail 与 epomail-android 全量代码推送远端 GitHub、SSH 推送通道切换上线 (2026-09-17)
 *   **推送范围与通道 (Push Scope & Channel)**:
