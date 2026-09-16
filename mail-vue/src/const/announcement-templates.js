@@ -100,6 +100,29 @@ export const GLOBAL_ANNOUNCEMENT_TEMPLATES = {
   }
 };
 
+export function normalizeLangKey(lang) {
+  const norm = (lang || '').toLowerCase();
+  if (norm.startsWith('zh-hant') || norm.startsWith('zh-tw') || norm.startsWith('zh-hk')) {
+    return 'zh-Hant';
+  }
+  if (norm.startsWith('zh')) {
+    return 'zh';
+  }
+  if (norm.startsWith('fr')) {
+    return 'fr';
+  }
+  if (norm.startsWith('es')) {
+    return 'es';
+  }
+  if (norm.startsWith('nl')) {
+    return 'nl';
+  }
+  if (norm.startsWith('en')) {
+    return 'en';
+  }
+  return 'zh';
+}
+
 export function getAnnouncementTemplate(lang = 'zh') {
   return GLOBAL_ANNOUNCEMENT_TEMPLATES[normalizeLangKey(lang)] || GLOBAL_ANNOUNCEMENT_TEMPLATES.zh;
 }

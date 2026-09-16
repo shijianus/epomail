@@ -41,10 +41,13 @@ app.get('/user/blogLevelInfo', async (c) => {
 	return c.json(result.ok(data));
 });
 
-app.get('/user/list', async (c) => {
-	const data = await userService.list(c, c.req.query(), userContext.getUserId(c));
+const handleUserList = async (c) => {
+	const query = c.req.method === 'GET' ? c.req.query() : (await c.req.json().catch(() => ({})));
+	const data = await userService.list(c, query, userContext.getUserId(c));
 	return c.json(result.ok(data));
-});
+};
+app.get('/user/list', handleUserList);
+app.post('/user/list', handleUserList);
 
 app.post('/user/add', async (c) => {
 	await userService.add(c, await c.req.json());

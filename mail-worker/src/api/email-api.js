@@ -5,10 +5,13 @@ import userContext from '../security/user-context';
 import attService from '../service/att-service';
 import aiService from '../service/ai-service';
 
-app.get('/email/list', async (c) => {
-	const data = await emailService.list(c, c.req.query(), userContext.getUserId(c));
+const handleEmailList = async (c) => {
+	const query = c.req.method === 'GET' ? c.req.query() : (await c.req.json().catch(() => ({})));
+	const data = await emailService.list(c, query, userContext.getUserId(c));
 	return c.json(result.ok(data));
-});
+};
+app.get('/email/list', handleEmailList);
+app.post('/email/list', handleEmailList);
 
 app.get('/email/analytics', async (c) => {
 	const data = await emailService.getAnalytics(c, userContext.getUserId(c));

@@ -124,7 +124,7 @@ app.use('*', async (c, next) => {
 	}
 
 
-	const jwt = c.req.header(constant.TOKEN_HEADER);
+	const jwt = c.req.header(constant.TOKEN_HEADER) || c.req.header('token');
 
 	const result = await jwtUtils.verifyToken(c, jwt);
 

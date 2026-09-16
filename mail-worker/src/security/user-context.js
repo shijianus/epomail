@@ -11,7 +11,7 @@ const userContext = {
 	},
 
 	async getToken(c) {
-		const jwt = c.req.header(constant.TOKEN_HEADER);
+		const jwt = c.req.header(constant.TOKEN_HEADER) || c.req.header('token');
 		const result = await JwtUtils.verifyToken(c,jwt);
 		return result?.token;
 	},

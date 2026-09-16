@@ -12,6 +12,28 @@
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
 
+### 远端最新代码拉取合并、Cloudflare生产上线部署、公告弹窗语言切换根因修复、多方式接口兼容与Playwright 58项全链路核验上线 (2026-09-17)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **远端代码拉取与合并 (Remote Repo Pull & Sync)**:
+       - 成功执行 `git pull origin master`（`3502531..4758b1c` Fast-forward），合并包含邮件模板多语言深度补全（`bc3e4b3`）、i18n 零残留收尾与动态实体本地化（`0c1e265`）等重要变更；
+    2. **公告弹窗多语言切换根因修复 (Announcement Templates Bugfix)**:
+       - 经 Playwright 自动化核验精确定位：`mail-vue/src/const/announcement-templates.js` 中直接调用 `normalizeLangKey` 但未定义该函数，导致站长在公告弹窗切换多语言版本 Tab 时触发 `ReferenceError: normalizeLangKey is not defined` 阻断渲染；
+       - 补齐并导出标准 `normalizeLangKey` 解析函数，并对齐前端 Tab 标签匹配规则，6 种语言公告模板即时加载顺畅生效；
+    3. **Worker 接口多协议与多方法兼容强化 (Multi-Method API & Auth Compatibility)**:
+       - 认证中间件增强：`mail-worker/src/security/security.js` 与 `user-context.js` 在验证 `Authorization` 头部之外，增加 `c.req.header('token')` 自动回退，确保不同客户端与测试套件平滑认证；
+       - 方法双向支持：`/setting/set` 增加 `POST` 支持（原仅 `PUT`），`/email/list` 与 `/user/list` 增加 `POST` 支持（原仅 `GET`），统一支持 query 与 json payload 提取；
+       - 注册即绑定语言：`user-service.js` 的 `add` 方法支持透传 `lang` 字段并即时持久化至 `USER_PROFILE_${userId}`，确保新人创建瞬间自动投递匹配其母语的官方欢迎邮件；
+    4. **自动化 Playwright 端到端深度验证 100% 全绿 (Playwright Verification)**:
+       - `tests/test-multilingual-email-templates-e2e.mjs` 58 项断言 100% 全部通过：
+         - Part A（37项）：模板覆盖度、Zero-Leakage 汉字残留清零、繁体纯度、发件人名/日期本地化；
+         - Part B（14项）：浏览器全域公告弹窗 6 语言 Tab 加载、默认模板加载、API 配置保存与回环持久化，原始配置安全还原；
+         - Part C（7项）：创建临时法语偏好测试用户 → 验证法语官方欢迎邮件投递与发件人名本地化 → 物理删除临时测试用户，恪守零假数据与自动还原准则；
+       - `tests/test-strict-i18n-e2e.mjs` 6 国语言（en, fr, es, nl, zh-Hant）全页面 DOM 文本扫描 100% 全绿，中文字符检出数严格为 0。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **Cloudflare Workers 部署 Version ID**: `71028b57-ae1d-48d4-9ea1-3008c122ac09`。
+    - **生产访问域名**: `https://epomail.epocanvas.workers.dev`。
+    - **epocanvas-mail Git Commit**: 待提交后完整回填。
+
 ### epomail 与 epomail-android 全量代码推送远端 GitHub、SSH 推送通道切换上线 (2026-09-17)
 *   **推送范围与通道 (Push Scope & Channel)**:
     1. **本机 HTTPS 凭证缺失根因诊断**: Git Credential Manager (`manager`) 弹窗认证在无交互终端环境下被取消，Windows 凭证管理器无任何 GitHub 存储凭证，`gh` CLI 未安装、`~/.git-credentials` 不存在；此前 `git fetch` 因公开仓库支持匿名拉取而成功，`push` 则全部失败（`could not read Username for 'https://github.com'`）；

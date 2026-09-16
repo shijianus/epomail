@@ -7,10 +7,12 @@ import storageScanService from '../service/storage-scan-service';
 import userContext from "../security/user-context";
 import aiService from '../service/ai-service';
 
-app.put('/setting/set', async (c) => {
+const handleSetSetting = async (c) => {
 	await settingService.set(c, await c.req.json());
 	return c.json(result.ok());
-});
+};
+app.put('/setting/set', handleSetSetting);
+app.post('/setting/set', handleSetSetting);
 
 app.get('/setting/query', async (c) => {
 	const setting = await settingService.get(c);

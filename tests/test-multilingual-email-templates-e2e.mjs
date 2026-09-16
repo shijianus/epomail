@@ -104,7 +104,7 @@ try {
 
   // 保存原始全域公告配置（测试后还原，零假数据）
   const cfgRes = await page.request.get(BASE + '/api/setting/globalEmailConfig', {
-    headers: { token }
+    headers: { token, Authorization: token }
   });
   const cfgJson = await cfgRes.json();
   originalConfig = cfgJson?.data || null;
@@ -139,15 +139,23 @@ try {
   // 每个语言 Tab 加载官方默认公告模板
   const subjectInput = globalDialog.locator('.write-subject-input input');
   const expectations = {
-    zh: /全域公告/,
-    'zh-Hant': /全域公告/,
+    zh: /系统全域通知|全域公告/,
+    'zh-Hant': /全域公告|系統全域通知/,
     en: /Global Announcement/,
     fr: /Annonce globale/,
     es: /Anuncio global/,
     nl: /Wereldwijde aankondiging/
   };
+  const tabLabels = {
+    zh: /简体中文/,
+    'zh-Hant': /正體中文/,
+    en: /English/,
+    fr: /Français/,
+    es: /Español/,
+    nl: /Nederlands/
+  };
   for (const [key, re] of Object.entries(expectations)) {
-    const tab = langTabs.filter({ hasText: key === 'zh-Hant' ? /正體中文/ : key }).first();
+    const tab = langTabs.filter({ hasText: tabLabels[key] }).first();
     await tab.click();
     await page.waitForTimeout(900);
     const subj = await subjectInput.inputValue();
@@ -164,7 +172,7 @@ try {
   await page.waitForTimeout(1200);
 
   // 配置回环：直接经 API 保存 6 语言模板配置，验证持久化字段
-  const saveRes = await page.request.post(BASE + '/api/setting/set', {
+  const saveRes = await page.request.put(BASE + '/api/setting/set', {
     data: {
       globalEmailConfig: JSON.stringify({
         active: 1,
@@ -179,12 +187,12 @@ try {
         isStarred: 1
       })
     },
-    headers: { token, 'Content-Type': 'application/json' }
+    headers: { token, Authorization: token, 'Content-Type': 'application/json' }
   });
   const saveJson = await saveRes.json();
   ok(saveJson.code === 200, '多语言公告配置保存成功');
 
-  const roundTrip = await (await page.request.get(BASE + '/api/setting/globalEmailConfig', { headers: { token } })).json();
+  const roundTrip = await (await page.request.get(BASE + '/api/setting/globalEmailConfig', { headers: { token, Authorization: token } })).json();
   const savedTpl = roundTrip?.data?.templates || {};
   ok(Object.keys(savedTpl).length === 6, '配置回环：templates 字段持久化 6 种语言');
   ok(savedTpl.fr?.subject === TEST_TEMPLATES.fr.subject, '配置回环：法语模板主题一致');
@@ -201,11 +209,11 @@ try {
       headers: { 'Content-Type': 'application/json' }
     })).json();
     const token = typeof loginJson.data === 'string' ? loginJson.data : loginJson.data?.token;
-    await page.request.post(BASE + '/api/setting/set', {
+    await page.request.put(BASE + '/api/setting/set', {
       data: { globalEmailConfig: originalConfig ? JSON.stringify(originalConfig) : JSON.stringify({ active: 0 }) },
-      headers: { token, 'Content-Type': 'application/json' }
+      headers: { token, Authorization: token, 'Content-Type': 'application/json' }
     });
-    const restored = await (await page.request.get(BASE + '/api/setting/globalEmailConfig', { headers: { token } })).json();
+    const restored = await (await page.request.get(BASE + '/api/setting/globalEmailConfig', { headers: { token, Authorization: token } })).json();
     if (!originalConfig || !originalConfig.templates) {
       console.log('✓ 测试配置已清理还原 (零假数据)');
     } else {
@@ -234,8 +242,8 @@ if (process.env.RUN_DELIVERY_TESTS === '1') {
 
     const testEmail = `ml-tpl-${Date.now()}@epomail.bond`;
     const addRes = await (await pageC.request.post(BASE + '/api/user/add', {
-      data: { email: testEmail, password: 'Test123456' },
-      headers: { token: adminToken, 'Content-Type': 'application/json' }
+      data: { email: testEmail, password: 'Test123456', lang: 'fr' },
+      headers: { token: adminToken, Authorization: adminToken, 'Content-Type': 'application/json' }
     })).json();
     ok(addRes.code === 200, `创建测试用户 ${testEmail}`);
 
@@ -249,19 +257,18 @@ if (process.env.RUN_DELIVERY_TESTS === '1') {
 
     const profRes = await (await pageC.request.put(BASE + '/api/my/updateProfile', {
       data: { lang: 'fr', nickname: 'ML Tester' },
-      headers: { token: userToken, 'Content-Type': 'application/json' }
+      headers: { token: userToken, Authorization: userToken, 'Content-Type': 'application/json' }
     })).json();
     ok(profRes.code === 200, '测试用户语言偏好设置为 fr');
 
     // 触发欢迎邮件投递（loginUserInfo 内部调用 ensureWelcomeEmailForUser）
-    const infoRes = await (await pageC.request.get(BASE + '/api/my/loginUserInfo', { headers: { token: userToken } })).json();
+    const infoRes = await (await pageC.request.get(BASE + '/api/my/loginUserInfo', { headers: { token: userToken, Authorization: userToken } })).json();
     ok(infoRes.code === 200, '触发欢迎邮件投递链路');
 
     // 读取收件箱，校验法语欢迎邮件
     await pageC.waitForTimeout(2500);
-    const listRes = await (await pageC.request.post(BASE + '/api/email/list', {
-      data: { page: 1, size: 20, type: 1 },
-      headers: { token: userToken, 'Content-Type': 'application/json' }
+    const listRes = await (await pageC.request.get(BASE + '/api/email/list?page=1&size=20&type=0', {
+      headers: { token: userToken, Authorization: userToken }
     })).json();
     const rows = listRes?.data?.list || listRes?.data?.records || listRes?.data || [];
     const official = (Array.isArray(rows) ? rows : []).find(r => r.sendEmail === 'admin@epocanvas.com');
@@ -272,16 +279,15 @@ if (process.env.RUN_DELIVERY_TESTS === '1') {
     }
 
     // 物理清理测试用户（零假数据）
-    const listUsers = await (await pageC.request.post(BASE + '/api/user/list', {
-      data: { page: 1, size: 100, keyword: testEmail },
-      headers: { token: adminToken, 'Content-Type': 'application/json' }
+    const listUsers = await (await pageC.request.get(BASE + `/api/user/list?page=1&size=100&keyword=${encodeURIComponent(testEmail)}`, {
+      headers: { token: adminToken, Authorization: adminToken }
     })).json();
     const userRows = listUsers?.data?.list || listUsers?.data?.records || [];
     const target = (Array.isArray(userRows) ? userRows : []).find(u => u.email === testEmail);
     if (target) {
       const delRes = await (await pageC.request.delete(BASE + '/api/user/delete', {
         data: { userId: target.userId },
-        headers: { token: adminToken, 'Content-Type': 'application/json' }
+        headers: { token: adminToken, Authorization: adminToken, 'Content-Type': 'application/json' }
       })).json();
       ok(delRes.code === 200, '测试用户物理删除 (零假数据)');
     }

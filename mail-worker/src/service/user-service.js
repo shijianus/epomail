@@ -752,6 +752,12 @@ const userService = {
 
 		const userId = await userService.insert(c, { email, password: hash, salt, type });
 
+		if (params.lang) {
+			try {
+				await c.env.kv.put('USER_PROFILE_' + userId, JSON.stringify({ lang: params.lang, nickname: params.name || assignedName }));
+			} catch (e) {}
+		}
+
 		await userService.updateUserInfo(c, userId, true);
 
 		const acc = await accountService.insert(c, { userId: userId, email, type, name: assignedName });
