@@ -12,6 +12,17 @@
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
 
+### epomail 与 epomail-android 全量代码推送远端 GitHub、SSH 推送通道切换上线 (2026-09-17)
+*   **推送范围与通道 (Push Scope & Channel)**:
+    1. **本机 HTTPS 凭证缺失根因诊断**: Git Credential Manager (`manager`) 弹窗认证在无交互终端环境下被取消，Windows 凭证管理器无任何 GitHub 存储凭证，`gh` CLI 未安装、`~/.git-credentials` 不存在；此前 `git fetch` 因公开仓库支持匿名拉取而成功，`push` 则全部失败（`could not read Username for 'https://github.com'`）；
+    2. **依用户指令切换本机既有 SSH 密钥通道**: `~/.ssh/id_ed25519` 经 `ssh -T git@github.com` 验证认证身份为 `shijianus`，两仓库 origin 的 push URL 由 HTTPS 切换为 `git@github.com:...`（fetch 保持 HTTPS 匿名拉取不受影响）；
+    3. **epomail (Web) 全量推送**: `git push origin master` 成功 `3502531..be7eacc`，6 个本地积压提交（`bc3e4b3` / `ffefe02` / `0c1e265` / `2498250` / `45d5b63` / `be7eacc`）全量上远端；
+    4. **epomail-android 全量推送**: `git push origin main` 成功 `efb2022..941b14e`，契约对齐与多功能扩展版本正式推送远端，解除「仅本地 commit」状态；
+    5. 同步回填本文件过期状态：i18n 收尾记录与 epomail-android 记录由「未 push」更新为已推送。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **epocanvas-mail Git Commit**: （本记录提交 Hash 见下方回填行）。
+    - 生产 `wrangler deploy` 本次未执行（仅代码推送，部署仍待有凭证机器执行）。
+
 ### 邮件模板多语言深度补全、欢迎邮件四语言零残留翻译、全域公告6语言模板与按收件人语言投递、系统标签多语言映射上线 (2026-09-16)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **欢迎邮件 en/fr/es/nl 模板汉字残留彻底清零 (Zero-Leakage Email Template Completion)**:
@@ -63,9 +74,9 @@
        - 字典最终态：6 语言 × 2017 键严格对称，1572 个代码字面量键 100% 命中，缺失键为 0；本地测试数据（D1 种子站长账号）仅存于 `.wrangler/state-v2` 本地状态，不入库不入仓。
 *   **部署上线与自动化测试 (Verification & Deployment)**:
     - **epocanvas-mail Git Commit**: `0c1e2659edeba92cb99823903da62ce55c780e53` (Short Hash: `0c1e265`)。
-    - 本地验证：`vite build` 前端构建通过、temp_login_ui 构建通过、六语言 Playwright 路由扫描全绿；暂未执行生产 `wrangler deploy`（按要求暂不 push/不部署）。
+    - 本地验证：`vite build` 前端构建通过、temp_login_ui 构建通过、六语言 Playwright 路由扫描全绿；代码已于 2026-09-17 推送远端 GitHub（见上方 SSH 推送记录）；生产 `wrangler deploy` 仍待在有凭证的机器执行。
 
-### epomail-android 专案克隆落地、全量 API 契约对齐 epomail Web 后端、多功能扩展与真实环境 E2E 全绿上线 (2026-09-16)  【epomail-android 仓库 · 仅本地 commit，未 push，等待用户确认】
+### epomail-android 专案克隆落地、全量 API 契约对齐 epomail Web 后端、多功能扩展与真实环境 E2E 全绿上线 (2026-09-16)  【epomail-android 仓库 · 已于 2026-09-17 推送远端 origin/main】
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **跨仓库 git 隔离克隆 (Isolated Clone)**:
        - 将 `https://github.com/shijianus/epomail-android`（Flutter/Material 3 原生客户端）克隆至 `Desktop/epomail-android`，与 Web 专案 `Desktop/epomail` 完全独立成两个 git 仓库，互不嵌套、互不污染；
@@ -84,7 +95,7 @@
     5. **工具链现代化 (Toolchain Modernization)**:
        - Gradle 8.4→8.14、AGP 8.3.2→8.11.1、Kotlin 1.9.24→2.2.20（Flutter 3.47.4 最低要求）、google_fonts 6.3.0→6.3.3（Dart 3.10 const 兼容）；CI `flutter-version` 3.24.5→3.47.4 与本地验证环境对齐。
 *   **部署上线与自动化测试 (Verification & Deployment)**:
-    - **epomail-android Git Commit**: `941b14e1e897c2ec1bf05660a14922f553fa81de` (Short Hash: `941b14e`)。**状态：仅本地 commit，未 push（遵用户指令，等待测试确认）**。
+    - **epomail-android Git Commit**: `941b14e1e897c2ec1bf05660a14922f553fa81de` (Short Hash: `941b14e`)。**状态：已于 2026-09-17 经用户确认通过 SSH 推送远端 origin/main（`efb2022..941b14e`）**。
     - 测试产物：`build/app/outputs/flutter-apk/app-release.apk`（55.5MB）；E2E 与单元测试套件随仓库 `test/` 目录提交。
 
 ### 全专案i18n 100%完整本地化重构、6国主流语言零残留泄漏保障、1781键绝对对称与角色/模板动态本地化上线 (2026-09-14)
