@@ -62,7 +62,7 @@
        - 视觉审计：登录页、权限控制页 + 层级全景弹窗（中英双语截图）、系统设置、写信弹窗（发件人正确锁定当前信箱）渲染完好，无键名裸露、无布局崩坏；
        - 字典最终态：6 语言 × 2017 键严格对称，1572 个代码字面量键 100% 命中，缺失键为 0；本地测试数据（D1 种子站长账号）仅存于 `.wrangler/state-v2` 本地状态，不入库不入仓。
 *   **部署上线与自动化测试 (Verification & Deployment)**:
-    - **epocanvas-mail Git Commit**: 待本记录提交后回填（Short Hash: `0c1e265`）。
+    - **epocanvas-mail Git Commit**: `0c1e2659edeba92cb99823903da62ce55c780e53` (Short Hash: `0c1e265`)。
     - 本地验证：`vite build` 前端构建通过、temp_login_ui 构建通过、六语言 Playwright 路由扫描全绿；暂未执行生产 `wrangler deploy`（按要求暂不 push/不部署）。
 
 ### 全专案i18n 100%完整本地化重构、6国主流语言零残留泄漏保障、1781键绝对对称与角色/模板动态本地化上线 (2026-09-14)
