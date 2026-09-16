@@ -65,6 +65,28 @@
     - **epocanvas-mail Git Commit**: `0c1e2659edeba92cb99823903da62ce55c780e53` (Short Hash: `0c1e265`)。
     - 本地验证：`vite build` 前端构建通过、temp_login_ui 构建通过、六语言 Playwright 路由扫描全绿；暂未执行生产 `wrangler deploy`（按要求暂不 push/不部署）。
 
+### epomail-android 专案克隆落地、全量 API 契约对齐 epomail Web 后端、多功能扩展与真实环境 E2E 全绿上线 (2026-09-16)  【epomail-android 仓库 · 仅本地 commit，未 push，等待用户确认】
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **跨仓库 git 隔离克隆 (Isolated Clone)**:
+       - 将 `https://github.com/shijianus/epomail-android`（Flutter/Material 3 原生客户端）克隆至 `Desktop/epomail-android`，与 Web 专案 `Desktop/epomail` 完全独立成两个 git 仓库，互不嵌套、互不污染；
+       - 全程未对 remote 执行任何 push，仅在本地 commit，等待用户测试确认后另行推送。
+    2. **全量 API 契约系统性对齐 (Full Contract Alignment with mail-worker)**:
+       - 根因定位：原 Android 客户端按想象中的通用 API 编写，与 epomail Web 后端（`mail-worker`）存在系统性契约错配：字段名 `from/fromName/to/isRead` vs 真实 `sendEmail/name/toEmail/unread`（后端 `unread: 0=未读, 1=已读`）；`type: 2/3/4` 虚构 vs 真实仅 `0=收件/1=发件` 且垃圾箱/垃圾/延后/全部经由 `folder` 参数查询；分页 `page/pageSize` vs 真实 `emailId` keyset 游标 + `size(<=50)`；发信 payload `to/cc/bcc/attIds` vs 真实 `{accountId,name,sendType,emailId,receiveEmail[],text,content,subject,attachments[{content(base64),filename,size,contentType}]}`；星标/删除/垃圾等参数形态全错；`/my/resetPassword` 实为 `{password}` 单字段等；
+       - 模型层按 `email.js/account.js` 实体与 `loginUserInfo/getSidebarStats/getUserStorageUsage` 真实响应全量重写（含 `labels`/`cc` JSON 字符串、`isOfficial`、`attList`、`permKeys:['*']` 站长判定、`customLabels` 标签解析）；
+       - API 层按 `email-api.js/star-api.js/account-api.js/login-api.js/my-api.js` 逐端点重写，并新增 translate/snooze/labels/reportSpam/reportNotSpam/restore/searchSuggestions/register/storage 端点；附件下载走 `/attachments/<key>`（非 `/api` 前缀）；新增 `EPO_HTTP_PROXY` 可选代理通道（本机 TUN fake-ip 对专案域名握手失败场景下的合法逃生口）。
+    3. **Web 大部分功能移动端落地 (Feature Parity)**:
+       - 标签系统（抽屉标签导航 + `sidebarStats.labelStats` 未读计数 + `PUT /email/labels` 打标）、Snooze 延后（预设/自定义，`YYYY-MM-DD HH:mm:ss` 契约）、垃圾邮件双向上报（个人黑名单联动）、垃圾箱还原、已读/未读双向；
+       - AI 翻译条（`POST /email/translate`，8 目标语言，AI 关闭时优雅降级）；附件选择与下载；本地草稿（与 Web localStorage 草稿同构）；官方欢迎邮件认证徽章（`isOfficial`，admin@epocanvas.com）与验证码提取；应用内注册页（域名选择器 + regKey 0/1/2 语义）；存储用量卡片（`/my/storage`，参观者 0MB 语境感知）；主题模式以服务端用户资料为唯一权威来源同步（与 Web init 一致）；2FA TOTP 登录、多信箱切换、搜索建议。
+    4. **测试与零残留准则 (Testing & Zero-Residue Discipline)**:
+       - 新增 `test/models_test.dart`（真实后端响应夹具）与 `test/api_contract_test.dart`（mock 传输层逐端点断言路径/方法/参数/载荷），29/29 全绿；
+       - 新增 `test/e2e_live_test.dart`：对真实生产部署（epomail.epocanvas.workers.dev）全链路 E2E——admin 建临时真实用户 → 应用自有客户端登录 → 欢迎邮件官方/星标/内容断言 → 已读未读往返 → 星标往返 → 标签持久化 → 延后/取消 → sidebarStats/storage/account → 真实发信入 Sent（type=1）→ 物理删除测试邮件 → finally 物理删除临时用户（`/user/delete` physicsDelete）并断言不可再检索，100% 通过，**零假数据残留**；
+       - `flutter analyze` 0 error / 0 warning；Release APK 本地构建成功（55.5MB，v1.1.0+2）。
+    5. **工具链现代化 (Toolchain Modernization)**:
+       - Gradle 8.4→8.14、AGP 8.3.2→8.11.1、Kotlin 1.9.24→2.2.20（Flutter 3.47.4 最低要求）、google_fonts 6.3.0→6.3.3（Dart 3.10 const 兼容）；CI `flutter-version` 3.24.5→3.47.4 与本地验证环境对齐。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **epomail-android Git Commit**: `941b14e1e897c2ec1bf05660a14922f553fa81de` (Short Hash: `941b14e`)。**状态：仅本地 commit，未 push（遵用户指令，等待测试确认）**。
+    - 测试产物：`build/app/outputs/flutter-apk/app-release.apk`（55.5MB）；E2E 与单元测试套件随仓库 `test/` 目录提交。
+
 ### 全专案i18n 100%完整本地化重构、6国主流语言零残留泄漏保障、1781键绝对对称与角色/模板动态本地化上线 (2026-09-14)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **6国语言 100% 绝对对称与零外部字符残留 (Zero-Leakage 1781-Key Canonical Dictionaries)**:
