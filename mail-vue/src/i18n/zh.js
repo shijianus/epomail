@@ -2020,6 +2020,9 @@ const zh = {
     edtGlobalPlaceholder: '在此编辑全域公告的 HTML / Markdown 源码内容...',
     globalEmailLangTab: '分发语言版本',
     globalEmailNoRoleSelected: '未选择任何身份组',
+    sampleAppDesc: 'EpoCanvas / shijianus 博客原生集成示例应用（官方内置示例，站长可随时修改或直接删除）',
+    legacyBaseRoleDesc: '默认普通用户分组，仅具备基础收发与常规使用权限',
+    recommendedTag: '推荐',
 };
 
 export default zh;

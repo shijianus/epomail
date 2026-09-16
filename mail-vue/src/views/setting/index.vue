@@ -583,7 +583,7 @@ const passwordChangedText = computed(() => {
     const year = d.getFullYear()
     const month = d.getMonth() + 1
     const day = d.getDate()
-    const isZhLang = settingStore.lang !== 'en'
+    const isZhLang = settingStore.lang === 'zh' || settingStore.lang === 'zh-Hant'
     const formatted = isZhLang
       ? `${year}年${month}月${day}日`
       : `${year}-${month < 10 ? '0' + month : month}-${day < 10 ? '0' + day : day}`

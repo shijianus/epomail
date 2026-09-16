@@ -2020,6 +2020,9 @@ const zhHant = {
     edtGlobalPlaceholder: '在此編輯全域公告的 HTML / Markdown 原始碼內容...',
     globalEmailLangTab: '分發語言版本',
     globalEmailNoRoleSelected: '未選擇任何身分組',
+    sampleAppDesc: 'EpoCanvas / shijianus 部落格原生整合範例應用（官方內建範例，站長可隨時修改或直接刪除）',
+    legacyBaseRoleDesc: '預設普通使用者分組，僅具備基礎收發與常規使用權限',
+    recommendedTag: '推薦',
 };
 
 export default zhHant;

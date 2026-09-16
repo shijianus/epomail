@@ -2020,6 +2020,9 @@ const es = {
     edtGlobalPlaceholder: 'Edita aquí el HTML / Markdown del anuncio global...',
     globalEmailLangTab: 'Idiomas de distribución',
     globalEmailNoRoleSelected: 'Ningún grupo seleccionado',
+    sampleAppDesc: 'Aplicación de ejemplo de integración nativa con el blog EpoCanvas / shijianus (ejemplo oficial integrado; el webmaster puede editarla o eliminarla en cualquier momento)',
+    legacyBaseRoleDesc: 'Grupo de usuario regular por defecto, solo con permisos básicos de correo y uso estándar',
+    recommendedTag: 'Recomendado',
 };
 
 export default es;

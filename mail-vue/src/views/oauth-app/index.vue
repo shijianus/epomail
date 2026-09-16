@@ -118,8 +118,8 @@
           </div>
 
           <!-- Card Description -->
-          <div class="app-desc-text" :title="app.description || $t('noAppDesc')">
-            {{ app.description || $t('noAppDesc') }}
+          <div class="app-desc-text" :title="localizedAppDesc(app.description) || $t('noAppDesc')">
+            {{ localizedAppDesc(app.description) || $t('noAppDesc') }}
           </div>
 
           <!-- Credentials Field -->
@@ -438,6 +438,12 @@ defineOptions({
 const settingStore = useSettingStore()
 
 const { t } = useI18n()
+
+const SAMPLE_APP_SEED_DESC = 'EpoCanvas / shijianus 博客原生集成示例应用（官方内置示例，站长可随时修改或直接删除）';
+function localizedAppDesc(desc) {
+  if (!desc) return '';
+  return desc.trim() === SAMPLE_APP_SEED_DESC ? t('sampleAppDesc') : desc;
+}
 const loading = ref(false)
 const appsList = ref([])
 

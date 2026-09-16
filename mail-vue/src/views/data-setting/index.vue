@@ -475,8 +475,8 @@
           </div>
 
           <!-- App Description -->
-          <div class="app-card-desc" v-if="grant.appDescription">
-            {{ grant.appDescription }}
+          <div class="app-card-desc" v-if="localizedGrantDesc(grant.appDescription)">
+            {{ localizedGrantDesc(grant.appDescription) }}
           </div>
 
           <!-- Shared Scopes Chips -->
@@ -916,6 +916,12 @@ defineOptions({
 })
 
 const { t } = useI18n()
+
+const SAMPLE_APP_SEED_DESC = 'EpoCanvas / shijianus 博客原生集成示例应用（官方内置示例，站长可随时修改或直接删除）';
+function localizedGrantDesc(desc) {
+  if (!desc) return '';
+  return desc.trim() === SAMPLE_APP_SEED_DESC ? t('sampleAppDesc') : desc;
+}
 const userStore = useUserStore()
 const settingStore = useSettingStore()
 const emailStore = useEmailStore()

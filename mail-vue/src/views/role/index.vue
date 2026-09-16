@@ -711,6 +711,7 @@ function formatRoleName(row) {
   if (code === 'user_base') return t('roleBase')
   if (code === 'user_lv0') return `${t('roleBase')} LV.0`
   if (code === 'user_lv1') return `${t('roleBase')} LV.1`
+  if (row.name && row.name.trim() === '普通用户' && row.roleCode !== 'master') return t('roleBase')
   return row.name || ''
 }
 
@@ -736,6 +737,7 @@ function formatRoleDesc(row) {
   if (code === 'user_lv0') return t('userLv0RoleDesc')
   if (code === 'user_lv1') return t('userLv1RoleDesc')
   if (code === 'moderator') return t('moderatorRoleDesc')
+  if (row.description && row.description.trim() === '只有普通使用权限') return t('legacyBaseRoleDesc')
   return row.description || ''
 }
 

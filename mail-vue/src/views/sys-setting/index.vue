@@ -4078,7 +4078,7 @@ const tgMsgLabelWidth = computed(() => locale.value === 'en' ? '120px' : '100px'
 
 const mailModeOptions = computed(() => [
   { value: 1, label: `${t('allMailMode')} (Level 1)` },
-  { value: 0, label: `${t('privacyMailMode')} (Level 2 [${locale.value === 'en' ? 'Recommended' : '推荐'}])` },
+  { value: 0, label: `${t('privacyMailMode')} (Level 2 [${t('recommendedTag')}])` },
   { value: 2, label: `${t('encryptedMailMode')} (Level 3 [E2EE])` }
 ]);
 

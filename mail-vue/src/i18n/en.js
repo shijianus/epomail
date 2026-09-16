@@ -2020,6 +2020,9 @@ const en = {
     edtGlobalPlaceholder: 'Edit the global announcement HTML / Markdown source here...',
     globalEmailLangTab: 'Distribution languages',
     globalEmailNoRoleSelected: 'No group selected',
+    sampleAppDesc: 'EpoCanvas / shijianus blog native integration sample app (official built-in example; the webmaster may edit or delete it at any time)',
+    legacyBaseRoleDesc: 'Default regular user group with only basic mail and standard usage permissions',
+    recommendedTag: 'Recommended',
 };
 
 export default en;

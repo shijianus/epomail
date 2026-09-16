@@ -2020,6 +2020,9 @@ const nl = {
     edtGlobalPlaceholder: 'Bewerk hier de HTML / Markdown-bron van de wereldwijde aankondiging...',
     globalEmailLangTab: 'Distributietailen',
     globalEmailNoRoleSelected: 'Geen groep geselecteerd',
+    sampleAppDesc: 'Voorbeeld-app met native integratie voor de EpoCanvas / shijianus blog (officieel ingebouwd voorbeeld; de beheerder kan deze op elk moment aanpassen of verwijderen)',
+    legacyBaseRoleDesc: 'Standaard gewone gebruikersgroep met alleen basis mail- en standaardgebruiksrechten',
+    recommendedTag: 'Aanbevolen',
 };
 
 export default nl;
