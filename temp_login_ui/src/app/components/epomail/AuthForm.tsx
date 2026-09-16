@@ -479,7 +479,7 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
             <FloatingField
               id="epo-email"
               type="email"
-              label={i18n.emailLabel || "EMAIL"}
+              label={i18n.emailLabel || (isZh ? "邮箱地址" : "EMAIL")}
               icon={<Mail size={16} strokeWidth={1.8} />}
               value={email}
               onChange={setEmail}
@@ -496,7 +496,7 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
             <FloatingField
               id="epo-password"
               type={showPassword ? "text" : "password"}
-              label={i18n.passwordLabel || "PASSWORD"}
+              label={i18n.passwordLabel || (isZh ? "登录密码" : "PASSWORD")}
               icon={<Lock size={16} strokeWidth={1.8} />}
               value={password}
               onChange={setPassword}
@@ -515,7 +515,7 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
                   onClick={() => setShowPassword((s) => !s)}
                   className="p-1 transition-colors"
                   style={{ color: "var(--epo-muted)" }}
-                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  aria-label={showPassword ? (isZh ? "隐藏密码" : "Hide password") : (isZh ? "显示密码" : "Show password")}
                 >
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
@@ -528,14 +528,14 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
                 style={{ color: "var(--epo-muted)" }}
               >
                 <input type="checkbox" className="accent-[var(--epo-purple-glow)]" />
-                {i18n.stayInOrbit || "Stay in orbit"}
+                {i18n.stayInOrbit || (isZh ? "保持轨道连接" : "Stay in orbit")}
               </label>
               <a
                 href="#"
                 className="text-[13px] transition-colors hover:text-[var(--epo-cyan-glow)]"
                 style={{ color: "var(--epo-muted)" }}
               >
-                {i18n.forgotPassword || "Forgot password?"}
+                {i18n.forgotPassword || (isZh ? "忘记密码？" : "Forgot password?")}
               </a>
             </div>
 
@@ -587,7 +587,7 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
             <div className="flex items-center gap-3">
               <div className="h-px flex-1" style={{ background: "rgba(139,147,196,0.2)" }} />
               <span className="text-[12px]" style={{ color: "var(--epo-muted)" }}>
-                {i18n.orContinueWith || "or continue with"}
+                {i18n.orContinueWith || (isZh ? "或通过以下方式继续" : "or continue with")}
               </span>
               <div className="h-px flex-1" style={{ background: "rgba(139,147,196,0.2)" }} />
             </div>
@@ -610,7 +610,7 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
             </div>
 
             <p className="text-center text-[13px]" style={{ color: "var(--epo-muted)" }}>
-              {i18n.newToCanvas || "New to the canvas?"}{" "}
+              {i18n.newToCanvas || (isZh ? "还没有接入画布？" : "New to the canvas?")}{" "}
               <a
                 href="#"
                 onClick={(e) => { e.preventDefault(); onSwitch(); }}

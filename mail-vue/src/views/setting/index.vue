@@ -579,15 +579,17 @@ const passwordChangedText = computed(() => {
   if (!ts) return ''
   try {
     const d = new Date(ts)
-    if (isNaN(d.getTime())) return `上次变更时间：${ts}`
+    if (isNaN(d.getTime())) return t('lastChangedAt', { time: ts })
     const year = d.getFullYear()
     const month = d.getMonth() + 1
     const day = d.getDate()
-    return settingStore.lang === 'en'
-      ? `Last changed: ${year}-${month < 10 ? '0' + month : month}-${day < 10 ? '0' + day : day}`
-      : `上次变更时间：${year}年${month}月${day}日`
+    const isZhLang = settingStore.lang !== 'en'
+    const formatted = isZhLang
+      ? `${year}年${month}月${day}日`
+      : `${year}-${month < 10 ? '0' + month : month}-${day < 10 ? '0' + day : day}`
+    return t('lastChangedAt', { time: formatted })
   } catch (e) {
-    return `上次变更时间：${ts}`
+    return t('lastChangedAt', { time: ts })
   }
 })
 

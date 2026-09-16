@@ -429,7 +429,7 @@
       <!-- Loading State -->
       <div v-if="grantsLoading && userGrants.length === 0" class="apps-loading-state">
         <Icon icon="solar:restart-circle-bold-duotone" width="28" height="28" class="spin-icon" />
-        <span>正在加载已关联的应用...</span>
+        <span>{{ $t('loadingAuthorizedApps') }}</span>
       </div>
 
       <!-- 1. 有已授权应用时的卡片网格 -->
@@ -526,7 +526,7 @@
       <!-- No match search result -->
       <div v-else-if="userGrants.length > 0 && filteredGrants.length === 0" class="no-search-results">
         <Icon icon="solar:magnifer-linear" width="28" height="28" class="empty-icon" />
-        <div class="empty-text">未找到匹配「{{ activeSearchKeyword }}」的应用</div>
+        <div class="empty-text">{{ $t('noAppsMatchKeyword', { kw: activeSearchKeyword }) }}</div>
       </div>
 
       <!-- 2. 当没有已授权应用时的简洁空状态 -->
@@ -577,7 +577,7 @@
           <span class="d-label">{{ $t('tgChatId') || 'Chat ID' }} <span style="color: var(--el-color-danger)">*</span></span>
           <el-input 
             v-model="tgForm.chatId" 
-            placeholder="例如：987654321 或 -100123456789" 
+            :placeholder="$t('tgChatIdExample')" 
             clearable
           />
         </div>
@@ -586,7 +586,7 @@
           <span class="d-label">{{ $t('tgTopicId') }}</span>
           <el-input 
             v-model="tgForm.topicId" 
-            placeholder="群组话题 ID，如不需要请留空" 
+            :placeholder="$t('tgTopicIdHint')" 
             clearable
           />
         </div>
@@ -684,8 +684,8 @@
             <span class="g-title">{{ $t('b2GuidanceTitle') }}</span>
           </div>
           <div class="g-content">
-            • 节点示例：<code>s3.us-west-004.backblazeb2.com</code><br/>
-            • 请在 Backblaze 控制台创建一个存储桶并生成具有 Read & Write 权限的 Application Key。
+            {{ $t('b2NodeHint') }}<br/>
+            {{ $t('b2BucketKeyHint') }}
           </div>
         </div>
 
@@ -863,7 +863,7 @@
               <span class="t-val">{{ formatDateTime(selectedAppDetail.createdAt) }}</span>
             </div>
             <div class="tech-row" v-if="selectedAppDetail.clientId">
-              <span class="t-label">客户端 ID:</span>
+              <span class="t-label">{{ $t('clientIdLabel') }}</span>
               <span class="t-val code-font">{{ selectedAppDetail.clientId }}</span>
             </div>
           </div>

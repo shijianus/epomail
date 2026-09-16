@@ -330,7 +330,7 @@
                 <span>pages/api/auth/[...nextauth].ts 或 auth.ts</span>
                 <el-button link type="primary" size="small" @click="copyCode(nextAuthSnippet)">
                   <Icon icon="fluent:copy-16-regular" width="13" height="13" style="margin-right: 4px;" />
-                  复制配置
+                  {{ $t('copyConfig') }}
                 </el-button>
               </div>
               <pre class="code-body font-mono"><code>{{ nextAuthSnippet }}</code></pre>
@@ -341,10 +341,10 @@
           <el-tab-pane label="Node.js / Express" name="nodejs">
             <div class="code-block-wrapper">
               <div class="code-header">
-                <span>OAuth 2.0 授权码兑换与 UserInfo 提取</span>
+                <span>{{ $t('nodejsSampleCaption') }}</span>
                 <el-button link type="primary" size="small" @click="copyCode(nodeJsSnippet)">
                   <Icon icon="fluent:copy-16-regular" width="13" height="13" style="margin-right: 4px;" />
-                  复制代码
+                  {{ $t('copyCodeSample') }}
                 </el-button>
               </div>
               <pre class="code-body font-mono"><code>{{ nodeJsSnippet }}</code></pre>
@@ -355,10 +355,10 @@
           <el-tab-pane label="Python (FastAPI / Authlib)" name="python">
             <div class="code-block-wrapper">
               <div class="code-header">
-                <span>FastAPI + Authlib 标准 OIDC Client</span>
+                <span>{{ $t('fastapiSampleCaption') }}</span>
                 <el-button link type="primary" size="small" @click="copyCode(pythonSnippet)">
                   <Icon icon="fluent:copy-16-regular" width="13" height="13" style="margin-right: 4px;" />
-                  复制配置
+                  {{ $t('copyConfig') }}
                 </el-button>
               </div>
               <pre class="code-body font-mono"><code>{{ pythonSnippet }}</code></pre>
@@ -369,10 +369,10 @@
           <el-tab-pane label="cURL / REST API" name="curl">
             <div class="code-block-wrapper">
               <div class="code-header">
-                <span>标准 3 步 HTTP 置换流程</span>
+                <span>{{ $t('curlSampleCaption') }}</span>
                 <el-button link type="primary" size="small" @click="copyCode(curlSnippet)">
                   <Icon icon="fluent:copy-16-regular" width="13" height="13" style="margin-right: 4px;" />
-                  复制命令
+                  {{ $t('copyCommand') }}
                 </el-button>
               </div>
               <pre class="code-body font-mono"><code>{{ curlSnippet }}</code></pre>
@@ -380,10 +380,10 @@
           </el-tab-pane>
 
           <!-- General OIDC (Casdoor / Keycloak / Portainer) Tab -->
-          <el-tab-pane label="通用 OIDC 面板配置" name="general">
+          <el-tab-pane :label="$t('generalOidcPanelTab')" name="general">
             <div class="general-oidc-table">
               <div class="oidc-param-row">
-                <span class="p-name">Issuer (颁发者 URL)</span>
+                <span class="p-name">{{ $t('issuerLabel') }}</span>
                 <span class="p-val font-mono">{{ currentOrigin }}</span>
               </div>
               <div class="oidc-param-row">
@@ -727,7 +727,7 @@ async function handleResetSecret(app) {
       '重置密钥确认',
       {
         confirmButtonText: t('confirmReset'),
-        cancelButtonText: '取消',
+        cancelButtonText: t('cancel'),
         type: 'warning'
       }
     )
@@ -762,11 +762,11 @@ async function handleStatusChange(app, statusVal) {
 async function handleDeleteApp(app) {
   try {
     await ElMessageBox.confirm(
-      `确定要删除应用「${app.name}」吗？删除后该应用将彻底无法接入 Epomail，此操作不可撤销。`,
-      '删除应用确认',
+      t('deleteAppConfirm', { name: app.name }),
+      t('deleteAppConfirmTitle'),
       {
         confirmButtonText: t('confirmDelete'),
-        cancelButtonText: '取消',
+        cancelButtonText: t('cancel'),
         type: 'error'
       }
     )
@@ -830,7 +830,7 @@ function formatDate(isoStr) {
   if (!isoStr) return ''
   try {
     const d = new Date(isoStr)
-    return `创建于 ${d.toLocaleDateString()}`
+    return t('createdAtLabel', { date: d.toLocaleDateString() })
   } catch (e) {
     return isoStr
   }

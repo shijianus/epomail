@@ -57,7 +57,7 @@
           <Icon icon="lucide:help-circle" width="22" height="22"/>
         </button>
       </el-tooltip>
-      <el-tooltip v-if="settingStore.settings?.notice === 0" :content="$t('notice')" placement="bottom">
+      <el-tooltip v-if="settingStore.settings?.notice === 0" :content="$t('noticeTitle')" placement="bottom">
         <button class="icon-btn" @click="openNotice">
           <Icon icon="lucide:bell" width="22" height="22"/>
           <span class="badge"></span>
@@ -353,7 +353,7 @@ const settingsMap = computed(() => [
   },
   {
     route: 'sys-setting',
-    title: t('sysSetting') || 'System Settings',
+    title: t('SystemSettings') || 'System Settings',
     items: [
       { text: t('websiteSetting') || 'Website Settings', id: 'websiteSetting' },
       { text: t('loginDomain') || 'Login Domain', id: 'loginDomain' },
@@ -557,7 +557,7 @@ const localizedRoleName = computed(() => {
   if (role.roleCode === 'master' || role.name === '站长' || role.name === '站長') return t('roleMaster')
   if (role.roleCode === 'moderator' || role.name?.includes('协管') || role.name?.includes('協管')) return t('roleModerator')
   if (role.roleCode === 'visitor' || role.name === '参观者' || role.name === '參觀者') return t('roleVisitor')
-  if (role.roleCode === 'user_base' || role.roleCode === 'user_lv0' || role.roleCode === 'user_lv1' || role.name?.includes('普通用户') || role.name?.includes('普通用戶')) return t('roleUserBase')
+  if (role.roleCode === 'user_base' || role.roleCode === 'user_lv0' || role.roleCode === 'user_lv1' || role.name?.includes('普通用户') || role.name?.includes('普通用戶')) return t('roleBase')
   return role.name || ''
 })
 

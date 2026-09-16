@@ -818,24 +818,24 @@ export const WELCOME_TEMPLATES = {
             <circle cx="34" cy="105" r="5" fill="#F59E0B"/>
             <text x="48" y="109" fill="#0F172A" font-size="11" font-weight="700">GitHub Security Alert</text>
             <rect x="220" y="95" width="72" height="20" rx="4" fill="#FEF3C7"/>
-            <text x="256" y="109" fill="#D97706" font-size="9.5" font-weight="700" text-anchor="middle">⭐ 重要星标</text>
+            <text x="256" y="109" fill="#D97706" font-size="9.5" font-weight="700" text-anchor="middle">⭐ Starred</text>
             <rect x="18" y="128" width="284" height="36" rx="6" fill="#F1F5F9" stroke="#CBD5E1" stroke-width="1"/>
-            <text x="32" y="151" fill="#64748B" font-size="11" font-family="monospace">🔍 毫秒级全文即时检索...</text>
+            <text x="32" y="151" fill="#64748B" font-size="11" font-family="monospace">🔍 Millisecond full-text search...</text>
             <rect x="238" y="134" width="54" height="24" rx="4" fill="#0078D4"/>
-            <text x="265" y="150" fill="#FFFFFF" font-size="10" font-weight="700" text-anchor="middle">回车检索</text>
+            <text x="265" y="150" fill="#FFFFFF" font-size="10" font-weight="700" text-anchor="middle">Press Enter</text>
           </svg>
         </div>
         <div style="flex: 1; min-width: 280px;">
           <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(124, 58, 237, 0.1); border: 1px solid rgba(124, 58, 237, 0.25); padding: 4px 12px; border-radius: 9999px; color: #7c3aed; font-size: 12.5px; font-weight: 700; margin-bottom: 10px;">
-            📥 进阶工作流 · 极简轻快
+            📥 Advanced Workflow · Light & Fast
           </div>
-          <h3 style="font-size: 17.5px; font-weight: 800; color: #0f172a; margin: 0 0 8px;">稍后处理 (Snooze)、星标代办与全文即时检索</h3>
+          <h3 style="font-size: 17.5px; font-weight: 800; color: #0f172a; margin: 0 0 8px;">Snooze, Stars & Instant Full-Text Search</h3>
           <p style="font-size: 13.5px; color: #475569; line-height: 1.7; margin: 0 0 14px;">
-            内置现代高效的工作流体验。重要的信件可以一键设为稍后提醒（Snooze），配合星标代办归档、自定义分类标签与全文即时检索，即使面对成百上千封邮件也能游刃有余、井井有条。
+            A modern, highly efficient workflow. Important messages can be snoozed with one click, archived with stars, organized with custom labels and found instantly via full-text search — stay on top of hundreds of emails effortlessly.
           </p>
           <div>
-            <span style="background: #ede9fe; color: #5b21b6; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; margin-right: 8px;">⏰ 稍后处理代办</span>
-            <span style="background: #ede9fe; color: #5b21b6; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600;">⭐ 星标快捷归档</span>
+            <span style="background: #ede9fe; color: #5b21b6; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; margin-right: 8px;">⏰ Snooze & To-do</span>
+            <span style="background: #ede9fe; color: #5b21b6; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600;">⭐ Star & Archive</span>
           </div>
         </div>
       </div>
@@ -844,15 +844,15 @@ export const WELCOME_TEMPLATES = {
       <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; background: linear-gradient(135deg, #fff1f2 0%, #ffffff 100%); border: 1px solid #fecdd3; border-radius: 16px; padding: 24px 28px; box-shadow: 0 4px 16px rgba(225, 29, 72, 0.05); flex-wrap: wrap;">
         <div style="flex: 1; min-width: 280px;">
           <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(225, 29, 72, 0.1); border: 1px solid rgba(225, 29, 72, 0.25); padding: 4px 12px; border-radius: 9999px; color: #e11d48; font-size: 12.5px; font-weight: 700; margin-bottom: 10px;">
-            🔀 别名隔离 · 垃圾邮件一键熔断
+            🔀 Alias Isolation · One-Click Spam Shield
           </div>
-          <h3 style="font-size: 17.5px; font-weight: 800; color: #0f172a; margin: 0 0 8px;">各平台独立别名分发，外部泄露一键切断</h3>
+          <h3 style="font-size: 17.5px; font-weight: 800; color: #0f172a; margin: 0 0 8px;">Unique aliases per platform, instantly cut off on leaks</h3>
           <p style="font-size: 13.5px; color: #475569; line-height: 1.7; margin: 0 0 14px;">
-            支持为 GitHub、Steam 或各类网站独立分配专属别名。一旦某个外部平台遭遇数据泄露或被垃圾营销骚扰，只需一键禁用该别名即可物理熔断，你的真实Main邮箱永远安全隐身。
+            Assign a dedicated alias to GitHub, Steam or any website. If a platform suffers a data breach or spam abuse, just disable that alias to cut it off — your real primary inbox stays hidden forever.
           </p>
           <div>
-            <span style="background: #ffe4e6; color: #9f1239; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; margin-right: 8px;">🛑 一键物理熔断</span>
-            <span style="background: #ffe4e6; color: #9f1239; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600;">🛡️ 真实Main号隐身</span>
+            <span style="background: #ffe4e6; color: #9f1239; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; margin-right: 8px;">🛑 One-Click Shield</span>
+            <span style="background: #ffe4e6; color: #9f1239; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600;">🛡️ True Identity Hidden</span>
           </div>
         </div>
         <div style="width: 300px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
@@ -868,7 +868,7 @@ export const WELCOME_TEMPLATES = {
             <rect x="18" y="52" width="76" height="110" rx="8" fill="#0078D4" filter="drop-shadow(0 4px 10px rgba(0,120,212,0.25))"/>
             <circle cx="56" cy="85" r="14" fill="#FFFFFF" fill-opacity="0.2"/>
             <text x="56" y="90" fill="#FFFFFF" font-size="14" font-weight="800" text-anchor="middle">Main</text>
-            <text x="56" y="118" fill="#FFFFFF" font-size="11" font-weight="700" text-anchor="middle">Main邮箱</text>
+            <text x="56" y="118" fill="#FFFFFF" font-size="11" font-weight="700" text-anchor="middle">Primary</text>
             <text x="56" y="134" fill="#BFDBFE" font-size="9" font-weight="600" text-anchor="middle">🔒 Safe & Hidden</text>
             <path d="M94 72H130C140 72 140 64 150 64H170" stroke="#10B981" stroke-width="1.8"/>
             <path d="M94 107H170" stroke="#10B981" stroke-width="1.8"/>
@@ -911,13 +911,13 @@ export const WELCOME_TEMPLATES = {
       </div>
       <div style="font-size: 13.5px; color: #475569; line-height: 1.9;">
         <div><strong>1. Experience Starring & Snoozing: </strong> This welcome email is automatically placed in your [Snoozed] and [Starred] folders. Click to explore instant triage.</div>
-        <div><strong>2. Set Up Profile & Appearance: </strong> 前往「个人设置」上传属于你的专属头像、昵称，并切换喜欢的个性化Main题。</div>
-        <div><strong>3. Compose Your First Email: </strong> 点击左上角「写邮件」，即刻体验流畅轻快的撰写与Global极速投递。</div>
+        <div><strong>2. Set Up Profile & Appearance: </strong> Go to "Profile Settings" to upload your own avatar and nickname, and pick a personalized theme.</div>
+        <div><strong>3. Compose Your First Email: </strong> Click "Compose" in the top-left corner and enjoy smooth writing with lightning-fast global delivery.</div>
       </div>
     </div>
 
     <div style="margin-top: 24px; padding-top: 16px; border-top: 1px dashed #cbd5e1; font-size: 12.5px; color: #94a3b8; line-height: 1.65;">
-      <div>📌 <strong>贴心提示：</strong> This is an official onboarding email. The system has set an auto-cleanup retention period; it will safely expire automatically without requiring manual deletion.</div>
+      <div>📌 <strong>Tip:</strong> This is an official onboarding email. The system has set an auto-cleanup retention period; it will safely expire automatically without requiring manual deletion.</div>
       <div style="margin-top: 10px; font-weight: 600; color: #64748b;">Epocanvas Mail Team · Powering Your Productive Days</div>
     </div>
   </div>
@@ -1126,24 +1126,24 @@ export const WELCOME_TEMPLATES = {
             <circle cx="34" cy="105" r="5" fill="#F59E0B"/>
             <text x="48" y="109" fill="#0F172A" font-size="11" font-weight="700">Alerte sécurité GitHub</text>
             <rect x="220" y="95" width="72" height="20" rx="4" fill="#FEF3C7"/>
-            <text x="256" y="109" fill="#D97706" font-size="9.5" font-weight="700" text-anchor="middle">⭐ 重要星标</text>
+            <text x="256" y="109" fill="#D97706" font-size="9.5" font-weight="700" text-anchor="middle">⭐ Favori</text>
             <rect x="18" y="128" width="284" height="36" rx="6" fill="#F1F5F9" stroke="#CBD5E1" stroke-width="1"/>
-            <text x="32" y="151" fill="#64748B" font-size="11" font-family="monospace">🔍 毫秒级全文即时检索...</text>
+            <text x="32" y="151" fill="#64748B" font-size="11" font-family="monospace">🔍 Recherche plein texte instantanée...</text>
             <rect x="238" y="134" width="54" height="24" rx="4" fill="#0078D4"/>
-            <text x="265" y="150" fill="#FFFFFF" font-size="10" font-weight="700" text-anchor="middle">回车检索</text>
+            <text x="265" y="150" fill="#FFFFFF" font-size="10" font-weight="700" text-anchor="middle">Appuyez sur Entrée</text>
           </svg>
         </div>
         <div style="flex: 1; min-width: 280px;">
           <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(124, 58, 237, 0.1); border: 1px solid rgba(124, 58, 237, 0.25); padding: 4px 12px; border-radius: 9999px; color: #7c3aed; font-size: 12.5px; font-weight: 700; margin-bottom: 10px;">
-            📥 进阶工作流 · 极简轻快
+            📥 Flux avancé · Simple et rapide
           </div>
-          <h3 style="font-size: 17.5px; font-weight: 800; color: #0f172a; margin: 0 0 8px;">稍后处理 (Snooze)、星标代办与全文即时检索</h3>
+          <h3 style="font-size: 17.5px; font-weight: 800; color: #0f172a; margin: 0 0 8px;">Report (Snooze), favoris et recherche instantanée</h3>
           <p style="font-size: 13.5px; color: #475569; line-height: 1.7; margin: 0 0 14px;">
-            内置现代高效的工作流体验。重要的信件可以一键设为稍后提醒（Snooze），配合星标代办归档、自定义分类标签与全文即时检索，即使面对成百上千封邮件也能游刃有余、井井有条。
+            Un flux de travail moderne et efficace. Reportez les messages importants en un clic, archivez-les par favoris, organisez-les avec des étiquettes personnalisées et retrouvez-les instantanément grâce à la recherche plein texte — gardez le contrôle même avec des centaines d’e-mails.
           </p>
           <div>
-            <span style="background: #ede9fe; color: #5b21b6; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; margin-right: 8px;">⏰ 稍后处理代办</span>
-            <span style="background: #ede9fe; color: #5b21b6; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600;">⭐ 星标快捷归档</span>
+            <span style="background: #ede9fe; color: #5b21b6; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; margin-right: 8px;">⏰ Report & À faire</span>
+            <span style="background: #ede9fe; color: #5b21b6; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600;">⭐ Favori & Archivage</span>
           </div>
         </div>
       </div>
@@ -1152,15 +1152,15 @@ export const WELCOME_TEMPLATES = {
       <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; background: linear-gradient(135deg, #fff1f2 0%, #ffffff 100%); border: 1px solid #fecdd3; border-radius: 16px; padding: 24px 28px; box-shadow: 0 4px 16px rgba(225, 29, 72, 0.05); flex-wrap: wrap;">
         <div style="flex: 1; min-width: 280px;">
           <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(225, 29, 72, 0.1); border: 1px solid rgba(225, 29, 72, 0.25); padding: 4px 12px; border-radius: 9999px; color: #e11d48; font-size: 12.5px; font-weight: 700; margin-bottom: 10px;">
-            🔀 别名隔离 · 垃圾邮件一键熔断
+            🔀 Alias isolés · Bouclier anti-spam en un clic
           </div>
-          <h3 style="font-size: 17.5px; font-weight: 800; color: #0f172a; margin: 0 0 8px;">各平台独立别名分发，外部泄露一键切断</h3>
+          <h3 style="font-size: 17.5px; font-weight: 800; color: #0f172a; margin: 0 0 8px;">Des alias uniques par plateforme, coupables instantanément en cas de fuite</h3>
           <p style="font-size: 13.5px; color: #475569; line-height: 1.7; margin: 0 0 14px;">
-            支持为 GitHub、Steam 或各类网站独立分配专属别名。一旦某个外部平台遭遇数据泄露或被垃圾营销骚扰，只需一键禁用该别名即可物理熔断，你的真实Principal邮箱永远安全隐身。
+            Attribuez un alias dédié à GitHub, Steam ou tout autre site. En cas de fuite de données ou de spam, désactivez simplement cet alias pour le couper physiquement — votre véritable boîte principale reste masquée pour toujours.
           </p>
           <div>
-            <span style="background: #ffe4e6; color: #9f1239; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; margin-right: 8px;">🛑 一键物理熔断</span>
-            <span style="background: #ffe4e6; color: #9f1239; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600;">🛡️ 真实Principal号隐身</span>
+            <span style="background: #ffe4e6; color: #9f1239; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; margin-right: 8px;">🛑 Bouclier en un clic</span>
+            <span style="background: #ffe4e6; color: #9f1239; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600;">🛡️ Identité principale masquée</span>
           </div>
         </div>
         <div style="width: 300px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
@@ -1176,7 +1176,7 @@ export const WELCOME_TEMPLATES = {
             <rect x="18" y="52" width="76" height="110" rx="8" fill="#0078D4" filter="drop-shadow(0 4px 10px rgba(0,120,212,0.25))"/>
             <circle cx="56" cy="85" r="14" fill="#FFFFFF" fill-opacity="0.2"/>
             <text x="56" y="90" fill="#FFFFFF" font-size="14" font-weight="800" text-anchor="middle">Principal</text>
-            <text x="56" y="118" fill="#FFFFFF" font-size="11" font-weight="700" text-anchor="middle">Principal邮箱</text>
+            <text x="56" y="118" fill="#FFFFFF" font-size="11" font-weight="700" text-anchor="middle">Principale</text>
             <text x="56" y="134" fill="#BFDBFE" font-size="9" font-weight="600" text-anchor="middle">🔒 En sécurité</text>
             <path d="M94 72H130C140 72 140 64 150 64H170" stroke="#10B981" stroke-width="1.8"/>
             <path d="M94 107H170" stroke="#10B981" stroke-width="1.8"/>
@@ -1219,13 +1219,13 @@ export const WELCOME_TEMPLATES = {
       </div>
       <div style="font-size: 13.5px; color: #475569; line-height: 1.9;">
         <div><strong>1. Découvrez les favoris et rappels : </strong> Cet email est automatiquement placé dans vos dossiers [En attente] et [Favoris]. Cliquez pour explorer le tri rapide.</div>
-        <div><strong>2. Personnalisez votre profil : </strong> 前往「个人设置」上传属于你的专属头像、昵称，并切换喜欢的个性化Principal题。</div>
-        <div><strong>3. Écrivez votre premier email : </strong> 点击左上角「写邮件」，即刻体验流畅轻快的撰写与Mondial极速投递。</div>
+        <div><strong>2. Personnalisez votre profil : </strong> Rendez-vous dans « Paramètres du profil » pour importer votre avatar et votre pseudo, puis choisissez un thème personnalisé.</div>
+        <div><strong>3. Écrivez votre premier email : </strong> Cliquez sur « Écrire » en haut à gauche et profitez d’une rédaction fluide et d’une livraison mondiale ultra-rapide.</div>
       </div>
     </div>
 
     <div style="margin-top: 24px; padding-top: 16px; border-top: 1px dashed #cbd5e1; font-size: 12.5px; color: #94a3b8; line-height: 1.65;">
-      <div>📌 <strong>贴心提示：</strong> Ceci est un message officiel d'accueil. Une période de rétention automatique est configurée ; il sera nettoyé automatiquement.</div>
+      <div>📌 <strong>Astuce :</strong> Ceci est un message officiel d'accueil. Une période de rétention automatique est configurée ; il sera nettoyé automatiquement.</div>
       <div style="margin-top: 10px; font-weight: 600; color: #64748b;">L'équipe Epocanvas Mail · Pour vos journées productives</div>
     </div>
   </div>
@@ -1434,24 +1434,24 @@ export const WELCOME_TEMPLATES = {
             <circle cx="34" cy="105" r="5" fill="#F59E0B"/>
             <text x="48" y="109" fill="#0F172A" font-size="11" font-weight="700">Alerta de seguridad GitHub</text>
             <rect x="220" y="95" width="72" height="20" rx="4" fill="#FEF3C7"/>
-            <text x="256" y="109" fill="#D97706" font-size="9.5" font-weight="700" text-anchor="middle">⭐ 重要星标</text>
+            <text x="256" y="109" fill="#D97706" font-size="9.5" font-weight="700" text-anchor="middle">⭐ Destacado</text>
             <rect x="18" y="128" width="284" height="36" rx="6" fill="#F1F5F9" stroke="#CBD5E1" stroke-width="1"/>
-            <text x="32" y="151" fill="#64748B" font-size="11" font-family="monospace">🔍 毫秒级全文即时检索...</text>
+            <text x="32" y="151" fill="#64748B" font-size="11" font-family="monospace">🔍 Búsqueda instantánea de texto completo...</text>
             <rect x="238" y="134" width="54" height="24" rx="4" fill="#0078D4"/>
-            <text x="265" y="150" fill="#FFFFFF" font-size="10" font-weight="700" text-anchor="middle">回车检索</text>
+            <text x="265" y="150" fill="#FFFFFF" font-size="10" font-weight="700" text-anchor="middle">Pulsa Enter</text>
           </svg>
         </div>
         <div style="flex: 1; min-width: 280px;">
           <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(124, 58, 237, 0.1); border: 1px solid rgba(124, 58, 237, 0.25); padding: 4px 12px; border-radius: 9999px; color: #7c3aed; font-size: 12.5px; font-weight: 700; margin-bottom: 10px;">
-            📥 进阶工作流 · 极简轻快
+            📥 Flujo avanzado · Ligero y ágil
           </div>
-          <h3 style="font-size: 17.5px; font-weight: 800; color: #0f172a; margin: 0 0 8px;">稍后处理 (Snooze)、星标代办与全文即时检索</h3>
+          <h3 style="font-size: 17.5px; font-weight: 800; color: #0f172a; margin: 0 0 8px;">Posponer, destacados y búsqueda instantánea</h3>
           <p style="font-size: 13.5px; color: #475569; line-height: 1.7; margin: 0 0 14px;">
-            内置现代高效的工作流体验。重要的信件可以一键设为稍后提醒（Snooze），配合星标代办归档、自定义分类标签与全文即时检索，即使面对成百上千封邮件也能游刃有余、井井有条。
+            Un flujo de trabajo moderno y eficiente. Posponga los mensajes importantes con un clic, archívelos con destacados, organícelos con etiquetas personalizadas y encuéntralos al instante con la búsqueda de texto completo — mantén el control incluso con cientos de correos.
           </p>
           <div>
-            <span style="background: #ede9fe; color: #5b21b6; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; margin-right: 8px;">⏰ 稍后处理代办</span>
-            <span style="background: #ede9fe; color: #5b21b6; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600;">⭐ 星标快捷归档</span>
+            <span style="background: #ede9fe; color: #5b21b6; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; margin-right: 8px;">⏰ Pospuesto & Pendientes</span>
+            <span style="background: #ede9fe; color: #5b21b6; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600;">⭐ Destacar & Archivar</span>
           </div>
         </div>
       </div>
@@ -1460,15 +1460,15 @@ export const WELCOME_TEMPLATES = {
       <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; background: linear-gradient(135deg, #fff1f2 0%, #ffffff 100%); border: 1px solid #fecdd3; border-radius: 16px; padding: 24px 28px; box-shadow: 0 4px 16px rgba(225, 29, 72, 0.05); flex-wrap: wrap;">
         <div style="flex: 1; min-width: 280px;">
           <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(225, 29, 72, 0.1); border: 1px solid rgba(225, 29, 72, 0.25); padding: 4px 12px; border-radius: 9999px; color: #e11d48; font-size: 12.5px; font-weight: 700; margin-bottom: 10px;">
-            🔀 别名隔离 · 垃圾邮件一键熔断
+            🔀 Aislamiento de alias · Escudo antispam de un clic
           </div>
-          <h3 style="font-size: 17.5px; font-weight: 800; color: #0f172a; margin: 0 0 8px;">各平台独立别名分发，外部泄露一键切断</h3>
+          <h3 style="font-size: 17.5px; font-weight: 800; color: #0f172a; margin: 0 0 8px;">Alias únicos por plataforma, cortados al instante ante fugas</h3>
           <p style="font-size: 13.5px; color: #475569; line-height: 1.7; margin: 0 0 14px;">
-            支持为 GitHub、Steam 或各类网站独立分配专属别名。一旦某个外部平台遭遇数据泄露或被垃圾营销骚扰，只需一键禁用该别名即可物理熔断，你的真实Principal邮箱永远安全隐身。
+            Asigna un alias exclusivo a GitHub, Steam o cualquier sitio. Si una plataforma sufre una fuga de datos o spam, basta con desactivar ese alias para cortarlo físicamente — tu bandeja principal real permanece oculta para siempre.
           </p>
           <div>
-            <span style="background: #ffe4e6; color: #9f1239; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; margin-right: 8px;">🛑 一键物理熔断</span>
-            <span style="background: #ffe4e6; color: #9f1239; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600;">🛡️ 真实Principal号隐身</span>
+            <span style="background: #ffe4e6; color: #9f1239; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; margin-right: 8px;">🛑 Escudo de un clic</span>
+            <span style="background: #ffe4e6; color: #9f1239; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600;">🛡️ Identidad principal oculta</span>
           </div>
         </div>
         <div style="width: 300px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
@@ -1484,7 +1484,7 @@ export const WELCOME_TEMPLATES = {
             <rect x="18" y="52" width="76" height="110" rx="8" fill="#0078D4" filter="drop-shadow(0 4px 10px rgba(0,120,212,0.25))"/>
             <circle cx="56" cy="85" r="14" fill="#FFFFFF" fill-opacity="0.2"/>
             <text x="56" y="90" fill="#FFFFFF" font-size="14" font-weight="800" text-anchor="middle">Principal</text>
-            <text x="56" y="118" fill="#FFFFFF" font-size="11" font-weight="700" text-anchor="middle">Principal邮箱</text>
+            <text x="56" y="118" fill="#FFFFFF" font-size="11" font-weight="700" text-anchor="middle">Principal</text>
             <text x="56" y="134" fill="#BFDBFE" font-size="9" font-weight="600" text-anchor="middle">🔒 Seguro y oculto</text>
             <path d="M94 72H130C140 72 140 64 150 64H170" stroke="#10B981" stroke-width="1.8"/>
             <path d="M94 107H170" stroke="#10B981" stroke-width="1.8"/>
@@ -1527,13 +1527,13 @@ export const WELCOME_TEMPLATES = {
       </div>
       <div style="font-size: 13.5px; color: #475569; line-height: 1.9;">
         <div><strong>1. Prueba destacados y posponer: </strong> Este correo de bienvenida está archivado automáticamente en [Pospuestos] y [Destacados]. Haz clic para explorar.</div>
-        <div><strong>2. Configura tu perfil y tema: </strong> 前往「个人设置」上传属于你的专属头像、昵称，并切换喜欢的个性化Principal题。</div>
-        <div><strong>3. Redacta tu primer correo: </strong> 点击左上角「写邮件」，即刻体验流畅轻快的撰写与Global极速投递。</div>
+        <div><strong>2. Configura tu perfil y tema: </strong> Ve a «Ajustes de perfil» para subir tu propio avatar y apodo, y elige un tema personalizado.</div>
+        <div><strong>3. Redacta tu primer correo: </strong> Haz clic en «Redactar» en la esquina superior izquierda y disfruta de una escritura fluida y un envío global ultrarrápido.</div>
       </div>
     </div>
 
     <div style="margin-top: 24px; padding-top: 16px; border-top: 1px dashed #cbd5e1; font-size: 12.5px; color: #94a3b8; line-height: 1.65;">
-      <div>📌 <strong>贴心提示：</strong> Este es un correo oficial del sistema. Se ha establecido un período de retención automática; caducará de forma segura sin requerir eliminación manual.</div>
+      <div>📌 <strong>Consejo:</strong> Este es un correo oficial del sistema. Se ha establecido un período de retención automática; caducará de forma segura sin requerir eliminación manual.</div>
       <div style="margin-top: 10px; font-weight: 600; color: #64748b;">El equipo de Epocanvas Mail · Impulsando tus días productivos</div>
     </div>
   </div>
@@ -1742,24 +1742,24 @@ export const WELCOME_TEMPLATES = {
             <circle cx="34" cy="105" r="5" fill="#F59E0B"/>
             <text x="48" y="109" fill="#0F172A" font-size="11" font-weight="700">GitHub-beveiligingsmelding</text>
             <rect x="220" y="95" width="72" height="20" rx="4" fill="#FEF3C7"/>
-            <text x="256" y="109" fill="#D97706" font-size="9.5" font-weight="700" text-anchor="middle">⭐ 重要星标</text>
+            <text x="256" y="109" fill="#D97706" font-size="9.5" font-weight="700" text-anchor="middle">⭐ Ster</text>
             <rect x="18" y="128" width="284" height="36" rx="6" fill="#F1F5F9" stroke="#CBD5E1" stroke-width="1"/>
-            <text x="32" y="151" fill="#64748B" font-size="11" font-family="monospace">🔍 毫秒级全文即时检索...</text>
+            <text x="32" y="151" fill="#64748B" font-size="11" font-family="monospace">🔍 Zoeken in volledige tekst...</text>
             <rect x="238" y="134" width="54" height="24" rx="4" fill="#0078D4"/>
-            <text x="265" y="150" fill="#FFFFFF" font-size="10" font-weight="700" text-anchor="middle">回车检索</text>
+            <text x="265" y="150" fill="#FFFFFF" font-size="10" font-weight="700" text-anchor="middle">Druk op Enter</text>
           </svg>
         </div>
         <div style="flex: 1; min-width: 280px;">
           <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(124, 58, 237, 0.1); border: 1px solid rgba(124, 58, 237, 0.25); padding: 4px 12px; border-radius: 9999px; color: #7c3aed; font-size: 12.5px; font-weight: 700; margin-bottom: 10px;">
-            📥 进阶工作流 · 极简轻快
+            📥 Geavanceerde workflow · Licht & snel
           </div>
-          <h3 style="font-size: 17.5px; font-weight: 800; color: #0f172a; margin: 0 0 8px;">稍后处理 (Snooze)、星标代办与全文即时检索</h3>
+          <h3 style="font-size: 17.5px; font-weight: 800; color: #0f172a; margin: 0 0 8px;">Snooze, sterren & direct zoeken in volledige tekst</h3>
           <p style="font-size: 13.5px; color: #475569; line-height: 1.7; margin: 0 0 14px;">
-            内置现代高效的工作流体验。重要的信件可以一键设为稍后提醒（Snooze），配合星标代办归档、自定义分类标签与全文即时检索，即使面对成百上千封邮件也能游刃有余、井井有条。
+            Een moderne, efficiënte workflow. Stel belangrijke berichten met één klik uit, archiveer ze met sterren, organiseer ze met eigen labels en vind ze direct terug via zoeken in volledige tekst — behoud overzicht, zelfs bij honderden e-mails.
           </p>
           <div>
-            <span style="background: #ede9fe; color: #5b21b6; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; margin-right: 8px;">⏰ 稍后处理代办</span>
-            <span style="background: #ede9fe; color: #5b21b6; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600;">⭐ 星标快捷归档</span>
+            <span style="background: #ede9fe; color: #5b21b6; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; margin-right: 8px;">⏰ Snooze & Te doen</span>
+            <span style="background: #ede9fe; color: #5b21b6; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600;">⭐ Ster & Archiveren</span>
           </div>
         </div>
       </div>
@@ -1768,15 +1768,15 @@ export const WELCOME_TEMPLATES = {
       <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; background: linear-gradient(135deg, #fff1f2 0%, #ffffff 100%); border: 1px solid #fecdd3; border-radius: 16px; padding: 24px 28px; box-shadow: 0 4px 16px rgba(225, 29, 72, 0.05); flex-wrap: wrap;">
         <div style="flex: 1; min-width: 280px;">
           <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(225, 29, 72, 0.1); border: 1px solid rgba(225, 29, 72, 0.25); padding: 4px 12px; border-radius: 9999px; color: #e11d48; font-size: 12.5px; font-weight: 700; margin-bottom: 10px;">
-            🔀 别名隔离 · 垃圾邮件一键熔断
+            🔀 Alias-isolatie · Antispam met één klik
           </div>
-          <h3 style="font-size: 17.5px; font-weight: 800; color: #0f172a; margin: 0 0 8px;">各平台独立别名分发，外部泄露一键切断</h3>
+          <h3 style="font-size: 17.5px; font-weight: 800; color: #0f172a; margin: 0 0 8px;">Unieke alias per platform, direct afgesloten bij lekkages</h3>
           <p style="font-size: 13.5px; color: #475569; line-height: 1.7; margin: 0 0 14px;">
-            支持为 GitHub、Steam 或各类网站独立分配专属别名。一旦某个外部平台遭遇数据泄露或被垃圾营销骚扰，只需一键禁用该别名即可物理熔断，你的真实Hoofd邮箱永远安全隐身。
+            Wijs een speciale alias toe aan GitHub, Steam of elke website. Bij een datalek of spam hoef je die alias alleen uit te schakelen om hem fysiek af te sluiten — je echte primaire inbox blijft voor altijd verborgen.
           </p>
           <div>
-            <span style="background: #ffe4e6; color: #9f1239; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; margin-right: 8px;">🛑 一键物理熔断</span>
-            <span style="background: #ffe4e6; color: #9f1239; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600;">🛡️ 真实Hoofd号隐身</span>
+            <span style="background: #ffe4e6; color: #9f1239; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; margin-right: 8px;">🛑 Shield met één klik</span>
+            <span style="background: #ffe4e6; color: #9f1239; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600;">🛡️ Echte identiteit verborgen</span>
           </div>
         </div>
         <div style="width: 300px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
@@ -1792,7 +1792,7 @@ export const WELCOME_TEMPLATES = {
             <rect x="18" y="52" width="76" height="110" rx="8" fill="#0078D4" filter="drop-shadow(0 4px 10px rgba(0,120,212,0.25))"/>
             <circle cx="56" cy="85" r="14" fill="#FFFFFF" fill-opacity="0.2"/>
             <text x="56" y="90" fill="#FFFFFF" font-size="14" font-weight="800" text-anchor="middle">Hoofd</text>
-            <text x="56" y="118" fill="#FFFFFF" font-size="11" font-weight="700" text-anchor="middle">Hoofd邮箱</text>
+            <text x="56" y="118" fill="#FFFFFF" font-size="11" font-weight="700" text-anchor="middle">Primair</text>
             <text x="56" y="134" fill="#BFDBFE" font-size="9" font-weight="600" text-anchor="middle">🔒 Veilig en verborgen</text>
             <path d="M94 72H130C140 72 140 64 150 64H170" stroke="#10B981" stroke-width="1.8"/>
             <path d="M94 107H170" stroke="#10B981" stroke-width="1.8"/>
@@ -1835,13 +1835,13 @@ export const WELCOME_TEMPLATES = {
       </div>
       <div style="font-size: 13.5px; color: #475569; line-height: 1.9;">
         <div><strong>1. Ervaar sterren en uitstellen: </strong> Deze welkomstmail is automatisch in uw mappen [Uitgesteld] en [Met ster] geplaatst. Klik om te ontdekken.</div>
-        <div><strong>2. Stel profiel en thema in: </strong> 前往「个人设置」上传属于你的专属头像、昵称，并切换喜欢的个性化Hoofd题。</div>
-        <div><strong>3. Stel uw eerste e-mail op: </strong> 点击左上角「写邮件」，即刻体验流畅轻快的撰写与Wereldwijd极速投递。</div>
+        <div><strong>2. Stel profiel en thema in: </strong> Ga naar «Profielinstellingen» om je eigen avatar en nickname te uploaden en kies een gepersonaliseerd thema.</div>
+        <div><strong>3. Stel uw eerste e-mail op: </strong> Klik linksboven op «Schrijven» en geniet van vloeiend schrijven met razendsnelle wereldwijde bezorging.</div>
       </div>
     </div>
 
     <div style="margin-top: 24px; padding-top: 16px; border-top: 1px dashed #cbd5e1; font-size: 12.5px; color: #94a3b8; line-height: 1.65;">
-      <div>📌 <strong>贴心提示：</strong> Dit is een officiële welkomstmail van het systeem. Er is een automatische bewaartermijn ingesteld; het bericht verloopt veilig automatisch.</div>
+      <div>📌 <strong>Tip:</strong> Dit is een officiële welkomstmail van het systeem. Er is een automatische bewaartermijn ingesteld; het bericht verloopt veilig automatisch.</div>
       <div style="margin-top: 10px; font-weight: 600; color: #64748b;">Het Epocanvas Mail-team · Voor uw productieve dagen</div>
     </div>
   </div>
@@ -1873,4 +1873,175 @@ export function getWelcomeTemplate(lang = 'zh') {
     return WELCOME_TEMPLATES['en'];
   }
   return WELCOME_TEMPLATES['zh'];
+}
+
+// ===== Shared email i18n helpers (language -> locale / sender / fallback name) =====
+export const LANG_LOCALE_MAP = {
+  zh: 'zh-CN',
+  'zh-Hant': 'zh-TW',
+  en: 'en-US',
+  fr: 'fr-FR',
+  es: 'es-ES',
+  nl: 'nl-NL'
+};
+
+export const SENDER_NAME_MAP = {
+  zh: 'Epocanvas 官方团队',
+  'zh-Hant': 'Epocanvas 官方團隊',
+  en: 'Epocanvas Official Team',
+  fr: 'Équipe officielle Epocanvas',
+  es: 'Equipo oficial de Epocanvas',
+  nl: 'Epocanvas Officieel Team'
+};
+
+export const USER_FALLBACK_NAME_MAP = {
+  zh: '用户',
+  'zh-Hant': '用戶',
+  en: 'User',
+  fr: 'Utilisateur',
+  es: 'Usuario',
+  nl: 'Gebruiker'
+};
+
+export function normalizeLangKey(lang) {
+  const norm = (lang || '').toLowerCase();
+  if (norm.startsWith('zh-hant') || norm.startsWith('zh-tw') || norm.startsWith('zh-hk')) {
+    return 'zh-Hant';
+  }
+  if (norm.startsWith('zh')) {
+    return 'zh';
+  }
+  if (norm.startsWith('fr')) {
+    return 'fr';
+  }
+  if (norm.startsWith('es')) {
+    return 'es';
+  }
+  if (norm.startsWith('nl')) {
+    return 'nl';
+  }
+  if (norm.startsWith('en')) {
+    return 'en';
+  }
+  return 'zh';
+}
+
+export function getLocaleByLang(lang) {
+  return LANG_LOCALE_MAP[normalizeLangKey(lang)] || 'zh-CN';
+}
+
+export function getSenderNameByLang(lang) {
+  return SENDER_NAME_MAP[normalizeLangKey(lang)] || SENDER_NAME_MAP.zh;
+}
+
+export function getUserFallbackNameByLang(lang) {
+  return USER_FALLBACK_NAME_MAP[normalizeLangKey(lang)] || USER_FALLBACK_NAME_MAP.zh;
+}
+
+export function formatDateByLang(lang) {
+  return new Date().toLocaleDateString(getLocaleByLang(lang), { year: 'numeric', month: 'long', day: 'numeric' });
+}
+
+// ===== Default global announcement email templates (6 languages) =====
+export const GLOBAL_ANNOUNCEMENT_TEMPLATES = {
+  zh: {
+    lang: 'zh',
+    subject: '📢 Epocanvas Mail 全域公告：系统服务更新通知',
+    content: `<div style="max-width: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', Roboto, sans-serif; color: #1e293b; line-height: 1.7; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; padding: 32px;">
+  <h2 style="color: #0f172a; margin-top: 0; font-size: 20px; font-weight: 700;">系统全域通知</h2>
+  <p style="color: #475569; font-size: 15px;">尊敬的 {{user_name}}：</p>
+  <p style="color: #475569; font-size: 14.5px;">我们在此向您推送最新的全域服务公告，致力于为您提供更高效、纯净且智能的邮箱服务。</p>
+  <div style="background: #f8fafc; border-left: 4px solid #2563eb; padding: 14px 18px; margin: 20px 0; border-radius: 0 8px 8px 0;">
+    <strong style="color: #1e293b;">公告要点：</strong>
+    <p style="margin: 6px 0 0; color: #64748b; font-size: 14px;">1. 在此编辑您的公告内容<br>2. 支持多语言模板，按收件人语言自动分发<br>3. 支持 {{current_date}} 等动态变量占位符</p>
+  </div>
+  <p style="color: #94a3b8; font-size: 12.5px; margin-top: 28px; border-top: 1px dashed #e2e8f0; padding-top: 16px;">
+    此邮件由系统站长 (admin@epocanvas.com) 统一发布 · 祝您使用愉快！
+  </p>
+</div>`
+  },
+  'zh-Hant': {
+    lang: 'zh-Hant',
+    subject: '📢 Epocanvas Mail 全域公告：系統服務更新通知',
+    content: `<div style="max-width: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', Roboto, sans-serif; color: #1e293b; line-height: 1.7; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; padding: 32px;">
+  <h2 style="color: #0f172a; margin-top: 0; font-size: 20px; font-weight: 700;">系統全域通知</h2>
+  <p style="color: #475569; font-size: 15px;">尊敬的 {{user_name}}：</p>
+  <p style="color: #475569; font-size: 14.5px;">我們在此向您推送最新的全域服務公告，致力於為您提供更高效、純淨且智能的郵箱服務。</p>
+  <div style="background: #f8fafc; border-left: 4px solid #2563eb; padding: 14px 18px; margin: 20px 0; border-radius: 0 8px 8px 0;">
+    <strong style="color: #1e293b;">公告要點：</strong>
+    <p style="margin: 6px 0 0; color: #64748b; font-size: 14px;">1. 在此編輯您的公告內容<br>2. 支援多語言模板，按收件人語言自動分發<br>3. 支援 {{current_date}} 等動態變數佔位符</p>
+  </div>
+  <p style="color: #94a3b8; font-size: 12.5px; margin-top: 28px; border-top: 1px dashed #e2e8f0; padding-top: 16px;">
+    此郵件由系統站長 (admin@epocanvas.com) 統一發佈 · 祝您使用愉快！
+  </p>
+</div>`
+  },
+  en: {
+    lang: 'en',
+    subject: '📢 Epocanvas Mail Global Announcement: Service Update Notice',
+    content: `<div style="max-width: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1e293b; line-height: 1.7; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; padding: 32px;">
+  <h2 style="color: #0f172a; margin-top: 0; font-size: 20px; font-weight: 700;">Global System Notice</h2>
+  <p style="color: #475569; font-size: 15px;">Dear {{user_name}},</p>
+  <p style="color: #475569; font-size: 14.5px;">We are publishing the latest global service announcement, committed to delivering a faster, cleaner and smarter mailbox experience.</p>
+  <div style="background: #f8fafc; border-left: 4px solid #2563eb; padding: 14px 18px; margin: 20px 0; border-radius: 0 8px 8px 0;">
+    <strong style="color: #1e293b;">Highlights:</strong>
+    <p style="margin: 6px 0 0; color: #64748b; font-size: 14px;">1. Edit your announcement content here<br>2. Multilingual templates are delivered per recipient language<br>3. Dynamic placeholders such as {{current_date}} are supported</p>
+  </div>
+  <p style="color: #94a3b8; font-size: 12.5px; margin-top: 28px; border-top: 1px dashed #e2e8f0; padding-top: 16px;">
+    Published by the site administrator (admin@epocanvas.com) · Enjoy your stay!
+  </p>
+</div>`
+  },
+  fr: {
+    lang: 'fr',
+    subject: '📢 Epocanvas Mail Annonce globale : avis de mise à jour du service',
+    content: `<div style="max-width: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1e293b; line-height: 1.7; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; padding: 32px;">
+  <h2 style="color: #0f172a; margin-top: 0; font-size: 20px; font-weight: 700;">Avis global du système</h2>
+  <p style="color: #475569; font-size: 15px;">Cher(ère) {{user_name}},</p>
+  <p style="color: #475569; font-size: 14.5px;">Nous publions la dernière annonce globale de service, engagés à vous offrir une messagerie plus rapide, plus propre et plus intelligente.</p>
+  <div style="background: #f8fafc; border-left: 4px solid #2563eb; padding: 14px 18px; margin: 20px 0; border-radius: 0 8px 8px 0;">
+    <strong style="color: #1e293b;">Points clés :</strong>
+    <p style="margin: 6px 0 0; color: #64748b; font-size: 14px;">1. Modifiez le contenu de votre annonce ici<br>2. Les modèles multilingues sont distribués selon la langue du destinataire<br>3. Les variables dynamiques comme {{current_date}} sont prises en charge</p>
+  </div>
+  <p style="color: #94a3b8; font-size: 12.5px; margin-top: 28px; border-top: 1px dashed #e2e8f0; padding-top: 16px;">
+    Publié par l'administrateur du site (admin@epocanvas.com) · Bonne continuation !
+  </p>
+</div>`
+  },
+  es: {
+    lang: 'es',
+    subject: '📢 Epocanvas Mail Anuncio global: aviso de actualización del servicio',
+    content: `<div style="max-width: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1e293b; line-height: 1.7; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; padding: 32px;">
+  <h2 style="color: #0f172a; margin-top: 0; font-size: 20px; font-weight: 700;">Aviso global del sistema</h2>
+  <p style="color: #475569; font-size: 15px;">Estimado(a) {{user_name}}:</p>
+  <p style="color: #475569; font-size: 14.5px;">Publicamos el último anuncio global del servicio, comprometidos a ofrecerte un buzón más rápido, limpio e inteligente.</p>
+  <div style="background: #f8fafc; border-left: 4px solid #2563eb; padding: 14px 18px; margin: 20px 0; border-radius: 0 8px 8px 0;">
+    <strong style="color: #1e293b;">Puntos destacados:</strong>
+    <p style="margin: 6px 0 0; color: #64748b; font-size: 14px;">1. Edita aquí el contenido de tu anuncio<br>2. Las plantillas multilingües se entregan según el idioma del destinatario<br>3. Se admiten marcadores dinámicos como {{current_date}}</p>
+  </div>
+  <p style="color: #94a3b8; font-size: 12.5px; margin-top: 28px; border-top: 1px dashed #e2e8f0; padding-top: 16px;">
+    Publicado por el administrador del sitio (admin@epocanvas.com) · ¡Que disfrutes el servicio!
+  </p>
+</div>`
+  },
+  nl: {
+    lang: 'nl',
+    subject: '📢 Epocanvas Mail Wereldwijde aankondiging: melding servicedienst update',
+    content: `<div style="max-width: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1e293b; line-height: 1.7; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; padding: 32px;">
+  <h2 style="color: #0f172a; margin-top: 0; font-size: 20px; font-weight: 700;">Wereldwijde systeemmelding</h2>
+  <p style="color: #475569; font-size: 15px;">Beste {{user_name}},</p>
+  <p style="color: #475569; font-size: 14.5px;">Wij publiceren de nieuwste wereldwijde serviceaankondiging, met de inzet om je een snellere, schonere en slimmere mailbox te bieden.</p>
+  <div style="background: #f8fafc; border-left: 4px solid #2563eb; padding: 14px 18px; margin: 20px 0; border-radius: 0 8px 8px 0;">
+    <strong style="color: #1e293b;">Kernpunten:</strong>
+    <p style="margin: 6px 0 0; color: #64748b; font-size: 14px;">1. Bewerk hier de inhoud van je aankondiging<br>2. Meertalige sjablonen worden per ontvangerstaal bezorgd<br>3. Dynamische variabelen zoals {{current_date}} worden ondersteund</p>
+  </div>
+  <p style="color: #94a3b8; font-size: 12.5px; margin-top: 28px; border-top: 1px dashed #e2e8f0; padding-top: 16px;">
+    Gepubliceerd door de sitebeheerder (admin@epocanvas.com) · Veel plezier!
+  </p>
+</div>`
+  }
+};
+
+export function getGlobalAnnouncementTemplate(lang = 'zh') {
+  return GLOBAL_ANNOUNCEMENT_TEMPLATES[normalizeLangKey(lang)] || GLOBAL_ANNOUNCEMENT_TEMPLATES.zh;
 }

@@ -334,7 +334,7 @@
             {{ $t('aiConfigDesc') }}
           </div>
           <div class="desc-rule">
-            <strong>规则说明：</strong>留空时系统默认免密调用 Cloudflare Workers AI 或公共引擎；配置自定义 API Key 后将优先请求兼容 OpenAI 协议的接口进行邮件分析与全文翻译。
+            <strong>{{ $t('ruleNoteLabel') }}</strong>{{ $t('aiConfigRuleNote') }}
           </div>
         </div>
         <el-form label-position="top">

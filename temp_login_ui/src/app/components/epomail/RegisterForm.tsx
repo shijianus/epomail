@@ -468,7 +468,7 @@ export function RegisterForm({ canvasRef, onSwitch, sysConfig: propsSysConfig }:
             onClick={() => setShowPassword((s) => !s)}
             className="p-1 transition-colors hover:text-white"
             style={{ color: "var(--epo-muted)" }}
-            aria-label={showPassword ? "Hide password" : "Show password"}
+            aria-label={showPassword ? (isZh ? "隐藏密码" : "Hide password") : (isZh ? "显示密码" : "Show password")}
           >
             {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
           </button>

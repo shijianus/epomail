@@ -25,7 +25,16 @@ export const BUILTIN_LABEL_MAP = {
   '帳單': 'labelBilling',
   'billing': 'labelBilling',
   '通知': 'labelNotice',
-  'notice': 'labelNotice'
+  'notice': 'labelNotice',
+  '官方': 'officialTag',
+  'official': 'officialTag',
+  '全域公告': 'globalAnnouncementTag',
+  '全域公告郵件': 'globalAnnouncementTag',
+  'global announcement': 'globalAnnouncementTag',
+  '代办': 'todoTag',
+  '代辦': 'todoTag',
+  'to-do': 'todoTag',
+  'todo': 'todoTag'
 };
 
 /**

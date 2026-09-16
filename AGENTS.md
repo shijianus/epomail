@@ -12,6 +12,35 @@
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
 
+### 邮件模板多语言深度补全、欢迎邮件四语言零残留翻译、全域公告6语言模板与按收件人语言投递、系统标签多语言映射上线 (2026-09-16)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **欢迎邮件 en/fr/es/nl 模板汉字残留彻底清零 (Zero-Leakage Email Template Completion)**:
+       - 审计发现远端 42c33f1 上线的欢迎邮件模板中，English / Français / Español / Nederlands 四语版本存在约 58 处汉字残留（SVG 插画标签、进阶工作流段落、别名隔离段落、上手引导步骤 2/3、贴心提示等大量正文仍为中文，并夹杂「Main题」「Principal号」「Hoofd邮箱」等半截翻译）；
+       - 逐段精确翻译替换（按语言分段处理，杜绝跨语言段污染），worker 端 `mail-worker/src/const/welcome-template.js` 与前端镜像 `mail-vue/src/const/welcome-templates.js` 同步修复；
+       - 修复后经自动化断言验证：en/fr/es/nl 欢迎与公告模板汉字残留严格为 0，zh-Hant 繁体模板无简体字残留。
+    2. **全域公告邮件 6 语言默认模板与按收件人语言投递 (Multilingual Global Announcement Delivery)**:
+       - 新增 `GLOBAL_ANNOUNCEMENT_TEMPLATES` 6 语言官方默认公告模板（zh/zh-Hant/en/fr/es/nl），支持 `{{user_name}}`、`{{current_date}}` 等动态变量占位符；
+       - `deliverGlobalEmailToUser` 重构为按收件人语言解析模板链路：自定义多语言模板（`templates` 字段）→ 站长单语言模板 → 官方默认模板；每用户独立快照投递，同一广播向中文用户发中文版、法语用户发法语版；
+       - `sendGlobalBroadcastEmail` 支持并规范化 `templates` 参数（6 语言白名单过滤、非空校验），持久化至 `globalEmailConfig` 并透传 KV `ACTIVE_GLOBAL_EMAIL`，新人自动补发链路同步继承；
+       - 发件人名按语言本地化（`Epocanvas 官方团队` / `Epocanvas Official Team` / `Équipe officielle Epocanvas` 等），公告日期 `{{current_date}}` 按收件人 locale 呈现。
+    3. **用户语言解析根因修复 (resolveUserLang Fix)**:
+       - 根因定位：原欢迎邮件投递读取 D1 `user.lang` 列（实体中不存在，恒为 undefined），导致用户语言偏好永不生效、始终回落站长默认语言；
+       - 修复：新增 `resolveUserLang` 共享解析器，从 KV `USER_PROFILE_${userId}` 读取用户语言绑定 → 站长默认语言 → zh 三级回退，欢迎邮件与公告邮件投递统一复用；兜底文案（`欢迎使用...`）与用户名兜底（用户/User/Utilisateur...）同步按语言本地化。
+    4. **前端全域公告弹窗 6 语言 Tab 与多语言配置持久化 (Announcement Dialog Language Tabs)**:
+       - 「全域公告邮件」弹窗新增与欢迎邮件一致的语言版本 Tab 切换条（含站长默认语言徽章），每个 Tab 独立编辑主题与正文，切换时自动保存草稿至对应语言槽位；
+       - 空槽位自动预填官方默认公告模板；保存草稿与广播投递均携带 `templates` 多语言配置，配置回环读写验证通过；
+       - 弹窗内残留硬编码中文（工具栏 Tooltip、aria 标签、占位符、欢迎通道副标题、未选择角色提示等）全部 i18n 化，524 个引用键 × 6 语言字典零缺失。
+    5. **系统标签多语言映射补全 (Official / Announcement / To-do Label i18n)**:
+       - `label-i18n.js` 新增 `官方`、`全域公告`、`代办/待办` 等系统邮件标签映射，非中文界面下邮件标签优雅呈现为 Official / Global Announcement / To-do；
+       - 6 语言字典补齐 `globalAnnouncementTag`、`todoTag` 键，与既有 `officialTag` 形成完整系统标签多语言体系。
+    6. **新增专属 E2E 套件 `tests/test-multilingual-email-templates-e2e.mjs`**:
+       - Part A（无服务器依赖）：模板覆盖度、Zero-Leakage 汉字残留、繁简体纯度、发件人名/localize 日期/语言归一化等 37 项断言 100% 通过；
+       - Part B：生产 UI 全域公告弹窗 6 语言 Tab、各语言默认模板加载、多语言配置保存与回环断言，测试配置自动还原（零假数据）；
+       - Part C（`RUN_DELIVERY_TESTS=1` 门控）：创建临时测试用户 → 设置法语偏好 → 触发欢迎邮件投递 → 断言法语主题与本地化发件人名 → 测试用户物理清理。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - 本地验证：`vite build` 前端构建通过、`wrangler deploy --dry-run` Worker 打包通过、Part A 自动化断言 37/37 全绿、临时脚本与本地 miniflare 状态零残留清理；
+    - 本机无 Cloudflare 部署凭证，生产 `wrangler deploy` 待在有凭证的机器执行后方可记录 Version ID。
+
 ### 全专案i18n 100%完整本地化重构、6国主流语言零残留泄漏保障、1781键绝对对称与角色/模板动态本地化上线 (2026-09-14)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **6国语言 100% 绝对对称与零外部字符残留 (Zero-Leakage 1781-Key Canonical Dictionaries)**:

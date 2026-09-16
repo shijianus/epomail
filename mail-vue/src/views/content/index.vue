@@ -2,7 +2,7 @@
   <div class="box">
     <div class="header-actions">
       <div class="header-actions-left">
-        <el-tooltip :content="$t('back') || 'Back'" placement="bottom">
+        <el-tooltip :content="$t('backBtn') || 'Back'" placement="bottom">
           <span class="action-icon-wrap" role="button" tabindex="0" @click="handleBack">
             <Icon class="icon btn-back" icon="material-symbols-light:arrow-back-ios-new" width="20" height="20"/>
           </span>
@@ -1475,7 +1475,7 @@ const handleReportNotSpam = (emailId) => {
   }).catch((err) => {
     console.error(err);
     ElMessage({
-      message: '操作失败，请重试',
+      message: t('operationFailedMsg'),
       type: 'error',
       plain: true,
     })

@@ -70,20 +70,20 @@
           </template>
         </el-table-column>
 
-        <el-table-column :label="$t('attachmentPerm')" width="140">
+        <el-table-column :label="$t('attachmentPermission')" width="140">
           <template #default="props">
             <el-tag v-if="props.row.allowAttachment === 1" size="small" type="success" effect="light" class="att-tag">
               <Icon icon="lucide:paperclip" width="12" height="12" style="margin-right: 4px;" />
-              {{ $t('openAttachment') }}
+              {{ $t('allowAttachments') }}
             </el-tag>
             <el-tag v-else size="small" type="info" effect="plain" class="att-tag">
               <Icon icon="lucide:file-text" width="12" height="12" style="margin-right: 4px;" />
-              {{ $t('plainTextOnly') }}
+              {{ $t('textOnly') }}
             </el-tag>
           </template>
         </el-table-column>
 
-        <el-table-column :label="$t('allowedAiModels')" min-width="160">
+        <el-table-column :label="$t('aiAuthorizedModels')" min-width="160">
           <template #default="props">
             <div v-if="props.row.aiModels && props.row.aiModels.length > 0" class="role-ai-models-tags" style="display: flex; flex-wrap: wrap; gap: 4px;">
               <el-tag v-for="m in props.row.aiModels.slice(0, 2)" :key="m" size="small" type="primary" effect="plain" style="font-size: 11px;">
@@ -162,13 +162,13 @@
           <div class="preset-templates">
             <div class="preset-label">
               <Icon icon="lucide:sparkles" width="13" height="13" style="color: #6366f1; margin-right: 4px;" />
-              {{ $t('quickApplyGroupTemplate') }}：
+              {{ $t('quickApplyTemplates') }}
             </div>
             <div class="preset-chips">
               <el-button size="small" round @click="applyTemplate('visitor')">{{ $t('roleVisitor') }}</el-button>
-              <el-button size="small" round @click="applyTemplate('user_base')">{{ $t('roleUserBase') }}</el-button>
-              <el-button size="small" round @click="applyTemplate('user_lv0')">{{ $t('roleUserBase') }} LV.0</el-button>
-              <el-button size="small" round @click="applyTemplate('user_lv1')">{{ $t('roleUserBase') }} LV.1</el-button>
+              <el-button size="small" round @click="applyTemplate('user_base')">{{ $t('roleBase') }}</el-button>
+              <el-button size="small" round @click="applyTemplate('user_lv0')">{{ $t('roleBase') }} LV.0</el-button>
+              <el-button size="small" round @click="applyTemplate('user_lv1')">{{ $t('roleBase') }} LV.1</el-button>
               <el-button size="small" round @click="applyTemplate('moderator')">{{ $t('roleModerator') }}</el-button>
               <el-button size="small" round @click="applyTemplate('master')">{{ $t('roleMaster') }}</el-button>
             </div>
@@ -176,12 +176,12 @@
 
           <div class="form-row">
             <el-input class="dialog-input" v-model="form.name" type="text" :maxlength="16" :placeholder="$t('roleName')" autocomplete="off"/>
-            <el-input class="dialog-input" v-model="form.roleCode" type="text" :maxlength="20" :placeholder="$t('groupCodePlaceholder')" autocomplete="off"/>
+            <el-input class="dialog-input" v-model="form.roleCode" type="text" :maxlength="20" :placeholder="$t('roleCodePlaceholder')" autocomplete="off"/>
           </div>
 
           <!-- Tag Text & Tag Color Customizer -->
           <div class="form-row tag-picker-row">
-            <el-input class="dialog-input" v-model="form.tagText" type="text" :maxlength="10" :placeholder="$t('customTagPlaceholder')" autocomplete="off">
+            <el-input class="dialog-input" v-model="form.tagText" type="text" :maxlength="10" :placeholder="$t('tagTextPlaceholder')" autocomplete="off">
               <template #prefix>
                 <Icon icon="lucide:tag" width="14" height="14" style="color: var(--text-muted);" />
               </template>
@@ -197,7 +197,7 @@
           <!-- Quota & Attachment Grid -->
           <div class="form-grid-pair">
             <div class="pair-item">
-              <div class="pair-label">{{ $t('defaultStorageQuotaMb') }}</div>
+              <div class="pair-label">{{ $t('defaultStorageQuotaLabel') }}</div>
               <el-input-number 
                 v-model="form.storageQuotaMb" 
                 :min="0" 
@@ -208,14 +208,14 @@
             </div>
 
             <div class="pair-item">
-              <div class="pair-label">{{ $t('allowSendAttachment') }}</div>
+              <div class="pair-label">{{ $t('allowSendingAttachments') }}</div>
               <div class="switch-box">
-                <el-switch 
-                  v-model="form.allowAttachment" 
-                  :active-value="1" 
-                  :inactive-value="0" 
-                  active-text="{{ $t('openAttachment') }}" 
-                  inactive-text="{{ $t('plainTextOnly') }}"
+                <el-switch
+                  v-model="form.allowAttachment"
+                  :active-value="1"
+                  :inactive-value="0"
+                  :active-text="$t('allowAttachments')"
+                  :inactive-text="$t('textOnly')"
                 />
               </div>
             </div>
@@ -257,7 +257,7 @@
                 default-first-option
                 :reserve-keyword="false"
                 tag-type="primary"
-                :placeholder="$t('allowAiModelsPlaceholder')"
+                :placeholder="$t('aiModelSelectPlaceholder')"
                 style="width: 100%;"
             >
               <el-option
@@ -286,13 +286,13 @@
           <div class="perm-tree-header">
             <div class="perm-title-group">
               <Icon icon="lucide:shield-check" class="perm-header-ic" width="16" height="16" />
-              <span class="perm-title">权限分配细则</span>
-              <span class="perm-count-badge">{{ locale === 'zh' ? `已选 ${checkedPermsCount} 项` : `${checkedPermsCount} Selected` }}</span>
+              <span class="perm-title">{{ $t('permissionAllocationDetail') }}</span>
+              <span class="perm-count-badge">{{ $t('selectedCount', { n: checkedPermsCount }) }}</span>
             </div>
             <div class="perm-header-actions">
               <el-button link type="primary" size="small" class="expand-toggle-btn" @click="toggleExpandAll">
                 <Icon :icon="expandAll ? 'lucide:chevrons-down-up' : 'lucide:chevrons-up-down'" width="14" height="14" style="margin-right: 3px;" />
-                {{ expandAll ? '全部收起' : '全部展开' }}
+                {{ expandAll ? $t('collapseAll') : $t('expandAll') }}
               </el-button>
             </div>
           </div>
@@ -359,22 +359,22 @@
       class="role-hierarchy-dialog"
       width="880px"
       top="4vh"
-      title="EpoMail 权限控制模板与书友分级全景一览"
+      :title="$t('rlHTitle')"
       align-center
     >
       <div class="hierarchy-container">
         <!-- Banner Intro -->
         <div class="hierarchy-intro">
           <div class="intro-left">
-            <div class="intro-title">开源体验 · 阶梯式赋能 · 博客深度协同</div>
+            <div class="intro-title">{{ $t('rlHIntroTitle') }}</div>
             <div class="intro-desc">
-              系统预置基础管理与用户分组模板。其中「普通用户 LV.0」与「普通用户 LV.1」为官方内置示例空选项，未接入 blog.epocanvas.com 等级巡查机制（Client Secret 彼此独立随机隔离）。第三方站长可根据业务需要自由修改、重新配置或直接完全删除，对系统正常运作与邮件收发没有任何影响。
+              {{ $t('rlHIntroDesc') }}
             </div>
           </div>
           <div class="intro-right">
             <el-button type="primary" size="default" :loading="syncingBlog" @click="handleSyncBlogTier">
               <Icon icon="lucide:refresh-cw" width="14" height="14" style="margin-right: 6px;" />
-              一键同步博客等级
+              {{ $t('rlHSyncBlog') }}
             </el-button>
           </div>
         </div>
@@ -383,79 +383,79 @@
         <div class="roles-grid">
           <div class="role-card role-card-visitor">
             <div class="card-top">
-              <span class="card-badge bg-cyan">1. 参观者 (Visitor)</span>
-              <span class="card-quota">0 MB (外接DB)</span>
+              <span class="card-badge bg-cyan">{{ $t('rlHCard1Badge') }}</span>
+              <span class="card-quota">{{ $t('rlHCard1Quota') }}</span>
             </div>
-            <div class="card-summary">开源巡检与交互演示用户，不分配存储空间(需外置DB)。拥有后台设置查看权限，交互配置仅供体验，不持久化保存。</div>
+            <div class="card-summary">{{ $t('rlHCard1Summary') }}</div>
             <div class="card-props">
-              <div class="prop-item"><Icon icon="lucide:x" class="text-danger" /> 附件发送：禁止</div>
-              <div class="prop-item"><Icon icon="lucide:send" class="text-muted" /> 外发上限：0 封 (禁用)</div>
-              <div class="prop-item"><Icon icon="lucide:eye" class="text-success" /> 管理端：只读沙箱体验</div>
+              <div class="prop-item"><Icon icon="lucide:x" class="text-danger" /> {{ $t('rlHCard1P1') }}</div>
+              <div class="prop-item"><Icon icon="lucide:send" class="text-muted" /> {{ $t('rlHCard1P2') }}</div>
+              <div class="prop-item"><Icon icon="lucide:eye" class="text-success" /> {{ $t('rlHCard1P3') }}</div>
             </div>
           </div>
 
           <div class="role-card role-card-base">
             <div class="card-top">
-              <span class="card-badge bg-blue">2. 普通用户 (Base)</span>
-              <span class="card-quota">5 MB 配额</span>
+              <span class="card-badge bg-blue">{{ $t('rlHCard2Badge') }}</span>
+              <span class="card-quota">{{ $t('rlHCard2Quota') }}</span>
             </div>
-            <div class="card-summary">系统默认注册用户，无后台管理权限，具备基础邮箱收发能力，纯文本收发，无附件能力。</div>
+            <div class="card-summary">{{ $t('rlHCard2Summary') }}</div>
             <div class="card-props">
-              <div class="prop-item"><Icon icon="lucide:file-text" class="text-info" /> {{ $t('plainTextOnly') }}收发</div>
-              <div class="prop-item"><Icon icon="lucide:send" class="text-primary" /> 每日上限：5 封/天</div>
-              <div class="prop-item"><Icon icon="lucide:shield-off" class="text-muted" /> 无管理后台权限</div>
+              <div class="prop-item"><Icon icon="lucide:file-text" class="text-info" /> {{ $t('rlHCard2P1') }}</div>
+              <div class="prop-item"><Icon icon="lucide:send" class="text-primary" /> {{ $t('rlHCard2P2') }}</div>
+              <div class="prop-item"><Icon icon="lucide:shield-off" class="text-muted" /> {{ $t('rlHCard2P3') }}</div>
             </div>
           </div>
 
           <div class="role-card role-card-lv0">
             <div class="card-top">
-              <span class="card-badge bg-amber">3. 普通用户 LV.0</span>
-              <span class="card-quota">10 MB 配额</span>
+              <span class="card-badge bg-amber">{{ $t('rlHCard3Badge') }}</span>
+              <span class="card-quota">{{ $t('rlHCard3Quota') }}</span>
             </div>
-            <div class="card-summary">内置示例选项（可完全删除）。预置书友进阶分组示例，站长可自由删除或根据自身博客/系统自订升级规则。</div>
+            <div class="card-summary">{{ $t('rlHCard3Summary') }}</div>
             <div class="card-props">
-              <div class="prop-item"><Icon icon="lucide:file-text" class="text-info" /> 纯文本极速收发</div>
-              <div class="prop-item"><Icon icon="lucide:send" class="text-primary" /> 每日上限：8 封/天</div>
-              <div class="prop-item"><Icon icon="lucide:trash-2" class="text-muted" /> 站长可随时安全删除</div>
+              <div class="prop-item"><Icon icon="lucide:file-text" class="text-info" /> {{ $t('rlHCard3P1') }}</div>
+              <div class="prop-item"><Icon icon="lucide:send" class="text-primary" /> {{ $t('rlHCard3P2') }}</div>
+              <div class="prop-item"><Icon icon="lucide:trash-2" class="text-muted" /> {{ $t('rlHCard3P3') }}</div>
             </div>
           </div>
 
           <div class="role-card role-card-lv1">
             <div class="card-top">
-              <span class="card-badge bg-emerald">4. 普通用户 LV.1</span>
-              <span class="card-quota">25 MB 配额</span>
+              <span class="card-badge bg-emerald">{{ $t('rlHCard4Badge') }}</span>
+              <span class="card-quota">{{ $t('rlHCard4Quota') }}</span>
             </div>
-            <div class="card-summary">内置示例选项（可完全删除）。活跃进阶分组示例，解锁附件与图片权限，站长可自由删除或自订。</div>
+            <div class="card-summary">{{ $t('rlHCard4Summary') }}</div>
             <div class="card-props">
-              <div class="prop-item"><Icon icon="lucide:paperclip" class="text-success" /> <strong>解锁附件与图片发送</strong></div>
-              <div class="prop-item"><Icon icon="lucide:send" class="text-primary" /> 每日上限：10 封/天</div>
-              <div class="prop-item"><Icon icon="lucide:trash-2" class="text-muted" /> 站长可随时安全删除</div>
+              <div class="prop-item"><Icon icon="lucide:paperclip" class="text-success" /> <strong>{{ $t('rlHCard4P1') }}</strong></div>
+              <div class="prop-item"><Icon icon="lucide:send" class="text-primary" /> {{ $t('rlHCard4P2') }}</div>
+              <div class="prop-item"><Icon icon="lucide:trash-2" class="text-muted" /> {{ $t('rlHCard3P3') }}</div>
             </div>
           </div>
 
           <div class="role-card role-card-mod">
             <div class="card-top">
-              <span class="card-badge bg-purple">5. 协管者/管理员</span>
-              <span class="card-quota">500 MB 配额</span>
+              <span class="card-badge bg-purple">{{ $t('rlHCard5Badge') }}</span>
+              <span class="card-quota">{{ $t('rlHCard5Quota') }}</span>
             </div>
-            <div class="card-summary">非站长管理员，拥有细分模块管理权限，默认管理权限完备，但<strong>无权修改自身分组管理权限与站长权限</strong>。</div>
+            <div class="card-summary">{{ $t('rlHCard5SummaryA') }}<strong>{{ $t('rlHCard5SummaryB') }}</strong>。</div>
             <div class="card-props">
-              <div class="prop-item"><Icon icon="lucide:check" class="text-success" /> 支持附件与大容量</div>
-              <div class="prop-item"><Icon icon="lucide:send" class="text-primary" /> 每日上限：100 封/天</div>
-              <div class="prop-item"><Icon icon="lucide:lock" class="text-danger" /> 严格禁止自封与提权</div>
+              <div class="prop-item"><Icon icon="lucide:check" class="text-success" /> {{ $t('rlHCard5P1') }}</div>
+              <div class="prop-item"><Icon icon="lucide:send" class="text-primary" /> {{ $t('rlHCard5P2') }}</div>
+              <div class="prop-item"><Icon icon="lucide:lock" class="text-danger" /> {{ $t('rlHCard5P3') }}</div>
             </div>
           </div>
 
           <div class="role-card role-card-master">
             <div class="card-top">
-              <span class="card-badge bg-gold">6. 站长 (Master)</span>
-              <span class="card-quota">1024 MB (无限制)</span>
+              <span class="card-badge bg-gold">{{ $t('rlHCard6Badge') }}</span>
+              <span class="card-quota">{{ $t('rlHCard6Quota') }}</span>
             </div>
-            <div class="card-summary">全站最高权力拥有者，拥有全模块、全接口无限制管控权力，全功能自由调度。</div>
+            <div class="card-summary">{{ $t('rlHCard6Summary') }}</div>
             <div class="card-props">
-              <div class="prop-item"><Icon icon="lucide:crown" class="text-gold" /> 最高管理主权</div>
-              <div class="prop-item"><Icon icon="lucide:infinity" class="text-primary" /> 发信与存储无限制</div>
-              <div class="prop-item"><Icon icon="lucide:sparkles" class="text-purple" /> 全局底座治理</div>
+              <div class="prop-item"><Icon icon="lucide:crown" class="text-gold" /> {{ $t('rlHCard6P1') }}</div>
+              <div class="prop-item"><Icon icon="lucide:infinity" class="text-primary" /> {{ $t('rlHCard6P2') }}</div>
+              <div class="prop-item"><Icon icon="lucide:sparkles" class="text-purple" /> {{ $t('rlHCard6P3') }}</div>
             </div>
           </div>
         </div>
@@ -464,42 +464,42 @@
         <div class="blog-grading-section">
           <div class="grading-header">
             <Icon icon="lucide:book-open" width="18" height="18" style="color: #6366f1; margin-right: 6px;" />
-            <span>blog.epomail.com 书友等级进阶规则（与邮局权益联动）</span>
+            <span>{{ $t('rlHGradingHeader') }}</span>
           </div>
           <div class="grading-table-wrap">
             <table class="grading-table">
               <thead>
                 <tr>
-                  <th>等级称号</th>
-                  <th>博客达成要求</th>
-                  <th>邮局对应分组</th>
-                  <th>特权与配额提升</th>
+                  <th>{{ $t('rlHThTier') }}</th>
+                  <th>{{ $t('rlHThReq') }}</th>
+                  <th>{{ $t('rlHThGroup') }}</th>
+                  <th>{{ $t('rlHThPerks') }}</th>
                 </tr>
               </thead>
               <tbody>
                 <tr>
-                  <td><span class="badge-pill pill-lv0">LV.0 认证书友</span></td>
-                  <td>在博客注册并绑定账号（即刻达成）</td>
-                  <td>普通用户 LV.0</td>
-                  <td>10MB 存储，8封/天发信，纯文本收发</td>
+                  <td><span class="badge-pill pill-lv0">{{ $t('rlHLv0Badge') }}</span></td>
+                  <td>{{ $t('rlHLv0Req') }}</td>
+                  <td>{{ $t('rlHLv0Group') }}</td>
+                  <td>{{ $t('rlHLv0Perks') }}</td>
                 </tr>
                 <tr>
-                  <td><span class="badge-pill pill-lv1">LV.1 活跃学者</span></td>
-                  <td>注册满 10 天，发表 3 条讨论评论（或阅读 100 分钟）</td>
-                  <td>普通用户 LV.1</td>
-                  <td><strong>25MB 存储，10封/天发信，解锁附件发送</strong></td>
+                  <td><span class="badge-pill pill-lv1">{{ $t('rlHLv1Badge') }}</span></td>
+                  <td>{{ $t('rlHLv1Req') }}</td>
+                  <td>{{ $t('rlHLv1Group') }}</td>
+                  <td><strong>{{ $t('rlHLv1Perks') }}</strong></td>
                 </tr>
                 <tr>
-                  <td><span class="badge-pill pill-lv2">LV.2 资深贡献者</span></td>
-                  <td>注册满 90 天，获得 30 个社区点赞或发表 20 条优质讨论</td>
-                  <td>普通用户 LV.2 (进阶)</td>
-                  <td>50MB 存储，20封/天发信，优先发信通道</td>
+                  <td><span class="badge-pill pill-lv2">{{ $t('rlHLv2Badge') }}</span></td>
+                  <td>{{ $t('rlHLv2Req') }}</td>
+                  <td>{{ $t('rlHLv2Group') }}</td>
+                  <td>{{ $t('rlHLv2Perks') }}</td>
                 </tr>
                 <tr>
-                  <td><span class="badge-pill pill-lv3">LV.3 终身学者</span></td>
-                  <td>注册满 180 天，累计获得 100 个点赞，精选作者</td>
-                  <td>普通用户 LV.3 (至尊)</td>
-                  <td>100MB 存储，50封/天发信，全功能极速通道</td>
+                  <td><span class="badge-pill pill-lv3">{{ $t('rlHLv3Badge') }}</span></td>
+                  <td>{{ $t('rlHLv3Req') }}</td>
+                  <td>{{ $t('rlHLv3Group') }}</td>
+                  <td>{{ $t('rlHLv3Perks') }}</td>
                 </tr>
               </tbody>
             </table>
@@ -628,7 +628,7 @@ const roleAiModelOptions = computed(() => {
     optionsMap.set(primaryModel, {
       value: primaryModel,
       label: primaryModel,
-      badge: '主推理模型',
+      badge: t('aiBadgePrimary'),
       badgeType: 'primary'
     });
   }
@@ -639,7 +639,7 @@ const roleAiModelOptions = computed(() => {
       optionsMap.set(m, {
         value: m,
         label: m,
-        badge: '系统模型池',
+        badge: t('aiBadgePool'),
         badgeType: 'pool'
       });
     }
@@ -653,7 +653,7 @@ const roleAiModelOptions = computed(() => {
         optionsMap.set(clean, {
           value: clean,
           label: clean,
-          badge: '已分配',
+          badge: t('aiBadgeAssigned'),
           badgeType: 'assigned'
         });
       }
@@ -670,7 +670,7 @@ const roleAiModelOptions = computed(() => {
           optionsMap.set(clean, {
             value: clean,
             label: clean,
-            badge: '角色专属',
+            badge: t('aiBadgeRole'),
             badgeType: 'role'
           });
         }
@@ -683,7 +683,7 @@ const roleAiModelOptions = computed(() => {
     optionsMap.set('@cf/meta/llama-3.1-8b-instruct', {
       value: '@cf/meta/llama-3.1-8b-instruct',
       label: '@cf/meta/llama-3.1-8b-instruct',
-      badge: 'Workers AI 默认',
+      badge: t('workersAiDefaultBadge'),
       badgeType: 'default'
     });
   }
@@ -692,7 +692,7 @@ const roleAiModelOptions = computed(() => {
 });
 
 function formatQuotaDisplay(mb, roleCode) {
-  if (roleCode === 'master') return '无限制';
+  if (roleCode === 'master') return t('unlimited');
   if (!mb || mb === 0) return '0 MB';
   if (mb >= 1024) {
     const gb = mb / 1024;
@@ -708,9 +708,9 @@ function formatRoleName(row) {
   if (code === 'master') return t('roleMaster')
   if (code === 'moderator') return t('roleModerator')
   if (code === 'visitor') return t('roleVisitor')
-  if (code === 'user_base') return t('roleUserBase')
-  if (code === 'user_lv0') return `${t('roleUserBase')} LV.0`
-  if (code === 'user_lv1') return `${t('roleUserBase')} LV.1`
+  if (code === 'user_base') return t('roleBase')
+  if (code === 'user_lv0') return `${t('roleBase')} LV.0`
+  if (code === 'user_lv1') return `${t('roleBase')} LV.1`
   return row.name || ''
 }
 
@@ -744,14 +744,14 @@ function getRoleBadge(row) {
     return { text: row.tagText, color: row.tagColor && row.tagColor !== 'tag_color' ? row.tagColor : '#6366f1' };
   }
   const defaults = {
-    visitor: { text: '开源体验', color: '#6366f1' },
-    user_base: { text: '基础成员', color: '#64748b' },
-    user_lv0: { text: '认证书友', color: '#10b981' },
-    user_lv1: { text: '活跃学者', color: '#06b6d4' },
-    moderator: { text: '协同管理', color: '#f59e0b' },
-    master: { text: '最高统领', color: '#ef4444' }
+    visitor: { text: t('roleTagVisitor'), color: '#6366f1' },
+    user_base: { text: t('roleTagBaseMember'), color: '#64748b' },
+    user_lv0: { text: t('roleTagCertifiedReader'), color: '#10b981' },
+    user_lv1: { text: t('roleTagActiveScholar'), color: '#06b6d4' },
+    moderator: { text: t('roleTagModerator'), color: '#f59e0b' },
+    master: { text: t('roleTagMaster'), color: '#ef4444' }
   };
-  return defaults[row.roleCode] || (row.name ? { text: '自定义组', color: '#8b5cf6' } : null);
+  return defaults[row.roleCode] || (row.name ? { text: t('roleTagCustom'), color: '#8b5cf6' } : null);
 }
 
 function getRoleBadgeStyle(row) {
@@ -853,11 +853,11 @@ function selectPermsByKeys(keys) {
 function applyTemplate(type) {
   switch(type) {
     case 'visitor':
-      form.name = '参观者';
+      form.name = t('roleVisitor');
       form.roleCode = 'visitor';
-      form.tagText = '开源体验';
+      form.tagText = t('roleTagVisitor');
       form.tagColor = '#6366f1';
-      form.description = '开源体验与巡检用户，全功能UI交互沙箱，无持久化写入权限，配额0MB';
+      form.description = t('visitorRoleDesc');
       form.storageQuotaMb = 0;
       form.allowAttachment = 0;
       form.sendType = 'ban';
@@ -867,11 +867,11 @@ function applyTemplate(type) {
       selectPermsByKeys(['setting:query', 'role:query', 'analysis:query', 'reg-key:query']);
       break;
     case 'user_base':
-      form.name = '普通用户';
+      form.name = t('roleBase');
       form.roleCode = 'user_base';
-      form.tagText = '基础成员';
+      form.tagText = t('roleTagBaseMember');
       form.tagColor = '#64748b';
-      form.description = '默认注册用户，具备基础使用权限，纯文本收发(无附件)，每日5封上限';
+      form.description = t('userBaseRoleDesc');
       form.storageQuotaMb = 5;
       form.allowAttachment = 0;
       form.sendType = 'day';
@@ -881,11 +881,11 @@ function applyTemplate(type) {
       selectPermsByKeys(['email:send', 'email:delete', 'account:query', 'account:add', 'account:delete', 'my:delete']);
       break;
     case 'user_lv0':
-      form.name = '普通用户 LV.0';
+      form.name = `${t('roleBase')} LV.0`;
       form.roleCode = 'user_lv0';
-      form.tagText = '认证书友';
+      form.tagText = t('roleTagCertifiedReader');
       form.tagColor = '#10b981';
-      form.description = '已注册/绑定 blog.epomail.com 博客用户，配额提升至10MB，每日8封发信权';
+      form.description = t('userLv0RoleDesc');
       form.storageQuotaMb = 10;
       form.allowAttachment = 0;
       form.sendType = 'day';
@@ -895,11 +895,11 @@ function applyTemplate(type) {
       selectPermsByKeys(['email:send', 'email:delete', 'account:query', 'account:add', 'account:delete', 'my:delete']);
       break;
     case 'user_lv1':
-      form.name = '普通用户 LV.1';
+      form.name = `${t('roleBase')} LV.1`;
       form.roleCode = 'user_lv1';
-      form.tagText = '活跃学者';
+      form.tagText = t('roleTagActiveScholar');
       form.tagColor = '#06b6d4';
-      form.description = '参与博客讨论与活跃互动的进阶用户，配额25MB，每日10封，开放附件发送权限';
+      form.description = t('userLv1RoleDesc');
       form.storageQuotaMb = 25;
       form.allowAttachment = 1;
       form.sendType = 'day';
@@ -909,11 +909,11 @@ function applyTemplate(type) {
       selectPermsByKeys(['email:send', 'email:delete', 'account:query', 'account:add', 'account:delete', 'my:delete']);
       break;
     case 'moderator':
-      form.name = '协管者/管理员';
+      form.name = t('roleModerator');
       form.roleCode = 'moderator';
-      form.tagText = '协同管理';
+      form.tagText = t('roleTagModerator');
       form.tagColor = '#f59e0b';
-      form.description = '非站长管理员，具备细分管控权限，无权修改自身权限与站长权限';
+      form.description = t('moderatorRoleDesc');
       form.storageQuotaMb = 500;
       form.allowAttachment = 1;
       form.sendType = 'day';
@@ -927,11 +927,11 @@ function applyTemplate(type) {
       ]);
       break;
     case 'master':
-      form.name = '站长';
+      form.name = t('roleMaster');
       form.roleCode = 'master';
-      form.tagText = '最高统领';
+      form.tagText = t('roleTagMaster');
       form.tagColor = '#ef4444';
-      form.description = '全站最高权力拥有者，全功能不受限';
+      form.description = t('masterRoleDesc');
       form.storageQuotaMb = 1024;
       form.allowAttachment = 1;
       form.sendType = 'count';

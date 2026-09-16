@@ -305,11 +305,11 @@ const currentRoleName = computed(() => {
   if (code === 'master') return t('roleMaster')
   if (code === 'moderator') return t('roleModerator')
   if (code === 'visitor') return t('roleVisitor')
-  if (code === 'user_base' || code === 'user_lv0' || code === 'user_lv1') return t('roleUserBase')
+  if (code === 'user_base' || code === 'user_lv0' || code === 'user_lv1') return t('roleBase')
   if (isOwnProfile.value && userStore.user?.role?.name) {
     return userStore.user.role.name
   }
-  return profileData.value?.userInfo?.roleName || t('roleUserBase')
+  return profileData.value?.userInfo?.roleName || t('roleBase')
 })
 
 const coverPhotoStyle = computed(() => {

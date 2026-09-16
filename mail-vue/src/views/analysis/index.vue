@@ -89,7 +89,7 @@
             <span class="source-button" v-if="false">
               <el-radio-group v-model="checkedSourceType">
                 <el-radio-button :label="$t('sender')" value="sender"/>
-                <el-radio-button :label="$t('email')" value="email"/>
+                <el-radio-button :label="$t('emailAccount')" value="email"/>
               </el-radio-group>
             </span>
           </div>
@@ -835,7 +835,7 @@ function createAiUsageLine() {
         let title = params[0] ? params[0].name : '';
         let str = `<div style="font-weight:600;margin-bottom:4px;">${title}</div>`;
         params.forEach(item => {
-          const unit = item.seriesName.includes('Token') ? ' Tokens' : ' 次';
+          const unit = item.seriesName.includes('Token') ? ' Tokens' : t('aiCallsUnit');
           str += `${item.marker} ${item.seriesName}: <b>${item.value}</b>${unit}<br/>`;
         });
         return str;
@@ -985,7 +985,7 @@ function createAiModelPie() {
       borderWidth: 1,
       formatter: params => {
         if (!hasData) return t('noAiCallRecords');
-        return `${params.marker} ${params.name}：${params.value} 次 (${params.percent}%)`;
+        return `${params.marker} ${params.name}: ${params.value} ${t('aiCallsUnit')} (${params.percent}%)`;
       }
     },
     legend: {

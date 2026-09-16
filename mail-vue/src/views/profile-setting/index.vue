@@ -586,9 +586,9 @@
             <span style="width: 75px; font-size: 13px; font-weight: 600;">{{ $t('sectionIndex', { index: sIdx + 1 }) }}:</span>
             <el-select v-model="sec.type" size="small" style="min-width: 180px; width: auto;">
               <el-option :label="$t('importantAndUnread')" value="important_unread" />
-              <el-option :label="$t('importantEmails')" value="important" />
+              <el-option :label="$t('importantMail')" value="important" />
               <el-option :label="$t('unreadEmails')" value="unread" />
-              <el-option :label="$t('starredEmails')" value="starred" />
+              <el-option :label="$t('starred')" value="starred" />
               <el-option :label="$t('noneHideSection')" value="none" />
               <el-option v-if="sIdx === 3" :label="$t('allOtherEmails')" value="everything" />
             </el-select>

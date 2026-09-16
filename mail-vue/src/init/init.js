@@ -88,7 +88,7 @@ export async function init() {
                 uiStore.resetToDefaults();
                 clearAuthStorage({ preserveEmail: true });
                 try {
-                    sessionStorage.setItem('auth_expired_msg', '登录凭证已过期，请重新登录');
+                    sessionStorage.setItem('auth_expired_msg', i18n.global.t('authExpiredMsg'));
                 } catch (_) {}
 
                 const pathname = window.location.pathname;

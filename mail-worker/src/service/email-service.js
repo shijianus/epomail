@@ -23,7 +23,7 @@ import account from "../entity/account";
 import { att } from '../entity/att';
 import telegramService from './telegram-service';
 import emailCryptoUtils from '../utils/email-crypto-utils';
-import { DEFAULT_WELCOME_SUBJECT, DEFAULT_WELCOME_CONTENT, getWelcomeTemplate } from '../const/welcome-template';
+import { DEFAULT_WELCOME_SUBJECT, DEFAULT_WELCOME_CONTENT, getWelcomeTemplate, getGlobalAnnouncementTemplate, getLocaleByLang, getSenderNameByLang, getUserFallbackNameByLang, formatDateByLang, normalizeLangKey } from '../const/welcome-template';
 import { isAdminEmail, isAdminUser } from '../utils/admin-utils';
 
 const emailService = {
@@ -1301,6 +1301,25 @@ const emailService = {
 		return document.toString();
 	},
 
+	// Resolve a user's preferred email language: profile KV binding -> admin default -> zh
+	async resolveUserLang(c, userId, settingData = null) {
+		try {
+			const profileStr = await c.env.kv.get('USER_PROFILE_' + userId);
+			if (profileStr) {
+				const profile = JSON.parse(profileStr);
+				if (profile && profile.lang) {
+					return normalizeLangKey(profile.lang);
+				}
+			}
+		} catch (e) {}
+		if (!settingData) {
+			try {
+				settingData = await settingService.query(c);
+			} catch (e) {}
+		}
+		return normalizeLangKey(settingData?.welcomeLang || settingData?.defaultLang || 'zh');
+	},
+
 	async deliverWelcomeEmailToUser(c, userId, accountId, userEmail, overrideData = null) {
 		const settingData = await settingService.query(c);
 		if (!overrideData?.forceWelcome && !overrideData?.isBroadcast && settingData.welcomeAutoSend === 0) {
@@ -1308,19 +1327,7 @@ const emailService = {
 		}
 
 		// Multi-language template resolution
-		let tplLang = overrideData?.lang || null;
-		if (!tplLang) {
-			try {
-				const userEntity = (await import('../entity/user')).default;
-				const userRow = await orm(c).select().from(userEntity).where(eq(userEntity.userId, userId)).get();
-				if (userRow?.lang) {
-					tplLang = userRow.lang;
-				}
-			} catch (e) {}
-		}
-		if (!tplLang) {
-			tplLang = settingData.welcomeLang || settingData.defaultLang || 'zh';
-		}
+		let tplLang = overrideData?.lang || await this.resolveUserLang(c, userId, settingData);
 		const fallbackTpl = getWelcomeTemplate(tplLang);
 
 		let customTemplates = {};
@@ -1341,11 +1348,19 @@ const emailService = {
 			text = emailUtils.htmlToText(rawContent);
 		}
 		if (!text) {
-			text = '欢迎使用 Epocanvas Mail，开启您的私密、高效云端邮件体验！';
+			const welcomeFallbackTextMap = {
+				zh: '欢迎使用 Epocanvas Mail，开启您的私密、高效云端邮件体验！',
+				'zh-Hant': '歡迎使用 Epocanvas Mail，開啟您的私密、高效雲端郵件體驗！',
+				en: 'Welcome to Epocanvas Mail — enjoy a private, efficient cloud email experience!',
+				fr: 'Bienvenue sur Epocanvas Mail — profitez d\'une expérience de messagerie cloud privée et efficace !',
+				es: '¡Bienvenido a Epocanvas Mail! Disfruta de una experiencia de correo en la nube privada y eficiente.',
+				nl: 'Welkom bij Epocanvas Mail — geniet van een privé- en efficiënte cloud-e-mailervaring!'
+			};
+			text = welcomeFallbackTextMap[tplLang] || welcomeFallbackTextMap.zh;
 		}
 
 		// Interpolate dynamic template placeholders ({{user_name}}, {{user_id}}, {{user_email}}, {{domain}}, {{current_date}})
-		let userName = emailUtils.getName(userEmail) || (userEmail ? userEmail.split('@')[0] : '用户');
+		let userName = emailUtils.getName(userEmail) || (userEmail ? userEmail.split('@')[0] : getUserFallbackNameByLang(tplLang));
 		try {
 			const userEntity = (await import('../entity/user')).default;
 			const userRow = await orm(c).select({ nickname: userEntity.nickname, email: userEntity.email }).from(userEntity).where(eq(userEntity.userId, userId)).get();
@@ -1355,7 +1370,7 @@ const emailService = {
 		} catch (e) {}
 
 		const domain = userEmail ? (userEmail.split('@')[1] || 'epomail.bond') : 'epomail.bond';
-		const dateStr = new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' });
+		const dateStr = formatDateByLang(tplLang);
 
 		const interpolate = (str) => {
 			if (!str || typeof str !== 'string') return str;
@@ -1397,7 +1412,7 @@ const emailService = {
 			userId: userId,
 			accountId: accountId,
 			sendEmail: 'admin@epocanvas.com',
-			name: 'Epocanvas 官方团队',
+			name: getSenderNameByLang(tplLang),
 			subject: subject,
 			content: contentSnapshot, // Immutable snapshot with interpolated user variables
 			text: text,
@@ -1511,14 +1526,34 @@ const emailService = {
 			text,
 			expireDays = 0,
 			isStarred = 1,
-			senderName = 'Epocanvas 官方团队'
+			senderName,
+			templates = null
 		} = options;
 
 		const settingData = await settingService.query(c);
 		const now = new Date().toISOString();
 		const snoozedEndTime = Number(expireDays) > 0 ? new Date(Date.now() + Number(expireDays) * 86400000).toISOString() : null;
 
-		let userName = emailUtils.getName(userEmail) || (userEmail ? userEmail.split('@')[0] : '用户');
+		// Resolve recipient language: user binding -> admin default -> zh
+		const tplLang = await this.resolveUserLang(c, userId, settingData);
+
+		// Pick per-language template: custom multilingual template -> legacy single template -> official default
+		let tplSubject = subject;
+		let tplContent = content;
+		let tplText = text;
+		if (templates && typeof templates === 'object' && templates[tplLang]) {
+			const langTpl = templates[tplLang];
+			if (langTpl.subject && String(langTpl.subject).trim()) tplSubject = langTpl.subject;
+			if (langTpl.content && String(langTpl.content).trim()) tplContent = langTpl.content;
+			if (langTpl.text && String(langTpl.text).trim()) tplText = langTpl.text;
+		}
+		if ((!tplSubject || !String(tplSubject).trim()) || (!tplContent || !String(tplContent).trim())) {
+			const defTpl = getGlobalAnnouncementTemplate(tplLang);
+			if (!tplSubject || !String(tplSubject).trim()) tplSubject = defTpl.subject;
+			if (!tplContent || !String(tplContent).trim()) tplContent = defTpl.content;
+		}
+
+		let userName = emailUtils.getName(userEmail) || (userEmail ? userEmail.split('@')[0] : getUserFallbackNameByLang(tplLang));
 		try {
 			const userEntity = (await import('../entity/user')).default;
 			const userRow = await orm(c).select({ nickname: userEntity.nickname, email: userEntity.email }).from(userEntity).where(eq(userEntity.userId, userId)).get();
@@ -1528,7 +1563,7 @@ const emailService = {
 		} catch (e) {}
 
 		const domain = userEmail ? (userEmail.split('@')[1] || 'epomail.bond') : 'epomail.bond';
-		const dateStr = new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' });
+		const dateStr = formatDateByLang(tplLang);
 
 		const interpolate = (str) => {
 			if (!str || typeof str !== 'string') return str;
@@ -1542,15 +1577,16 @@ const emailService = {
 				.replace(/\{\{\s*date\s*\}\}/gi, dateStr);
 		};
 
-		const finalSubject = interpolate(subject);
-		const finalContent = interpolate(content);
-		const finalText = interpolate(text || emailUtils.htmlToText(content));
+		const finalSubject = interpolate(tplSubject);
+		const finalContent = interpolate(tplContent);
+		const finalText = interpolate(tplText || emailUtils.htmlToText(tplContent));
+		const resolvedSenderName = senderName || getSenderNameByLang(tplLang);
 
 		let globalEmailData = {
 			userId: userId,
 			accountId: accountId,
 			sendEmail: 'admin@epocanvas.com',
-			name: senderName,
+			name: resolvedSenderName,
 			subject: finalSubject,
 			content: finalContent,
 			text: finalText,

@@ -1156,13 +1156,13 @@
           <div class="admin-notice-callout">
             <Icon icon="fluent:bot-20-filled" width="20" height="20" class="notice-icon" />
             <div class="notice-body">
-              <div class="notice-title">系统全局 Telegram 机器人 (管理员专属)</div>
+              <div class="notice-title">{{ $t('sysTgBotAdminOnly') }}</div>
               <div class="notice-text">
-                由系统管理员配置，用于全站运维与监控告警。全站 3 大邮件模式运作规则：<br/>
-                • <b>全部邮件模式</b>：推送全站所有进站邮件到管理员 TG；<br/>
-                • <b>隐私邮件模式</b>：仅推送垃圾/可疑邮件与未分配邮件的安全通知；<br/>
-                • <b>加密邮件模式</b>：完全关闭推送，保障端到端加密数据安全。<br/>
-                <i>提示：普通注册用户的个人邮件推送，由用户在个人「资料」设置中自行配置私有 TG Bot。</i>
+                {{ $t('sysTgBotRulesDesc') }}<br/>
+                • <b>{{ $t('modeAllDescItem') }}</b>；<br/>
+                • <b>{{ $t('modePrivacyDescItem') }}</b>；<br/>
+                • <b>{{ $t('modeEncryptedDescItem') }}</b>。<br/>
+                <i>{{ $t('sysTgBotUserTip') }}</i>
               </div>
             </div>
           </div>
@@ -1197,7 +1197,7 @@
           <div class="dialog-field">
             <div class="d-label-row">
               <span class="d-label">{{ $t('tgChatId') || 'Chat ID' }} <span style="color: var(--el-color-danger)">*</span></span>
-              <span class="d-sub-hint">支持多个 Chat ID（回车添加）</span>
+              <span class="d-sub-hint">{{ $t('supportMultipleChatIds') }}</span>
             </div>
             <el-input-tag 
               v-model="tgChatId" 
@@ -1211,21 +1211,21 @@
           <div class="dialog-field">
             <div class="d-label-row">
               <span class="d-label">{{ $t('customDomain') }}</span>
-              <span class="d-sub-hint">留空默认使用官方 API</span>
+              <span class="d-sub-hint">{{ $t('tgProxyEmptyHint') }}</span>
             </div>
             <el-input 
               v-model="customDomain" 
               :disabled="Number(setting.allMailMode) === 2" 
-              placeholder="例如：https://tg-proxy.yourdomain.com" 
+              :placeholder="$t('tgProxyPlaceholder')" 
               clearable 
             />
           </div>
 
           <div class="dialog-field" style="margin-top: 2px;">
-            <span class="d-label">推送内容与字段偏好</span>
+            <span class="d-label">{{ $t('tgFieldPrefsLabel') }}</span>
             <div class="tg-options-grid">
               <div class="tg-opt-item">
-                <span class="opt-label">{{ t('from') }} (发件人)</span>
+                <span class="opt-label">{{ t('from') }} ({{ $t('tgFieldSender') }})</span>
                 <el-select :disabled="Number(setting.allMailMode) === 2" v-model="tgMsgFrom" size="default">
                   <el-option
                     v-for="item in tgMsgFromOption"
@@ -1236,7 +1236,7 @@
                 </el-select>
               </div>
               <div class="tg-opt-item">
-                <span class="opt-label">{{ t('recipient') }} (收件人)</span>
+                <span class="opt-label">{{ t('recipient') }} ({{ $t('tgFieldRecipient') }})</span>
                 <el-select :disabled="Number(setting.allMailMode) === 2" v-model="tgMsgTo" size="default">
                   <el-option
                     v-for="item in tgMsgToOption"
@@ -1247,7 +1247,7 @@
                 </el-select>
               </div>
               <div class="tg-opt-item">
-                <span class="opt-label">{{ t('emailText') }} (邮件正文)</span>
+                <span class="opt-label">{{ t('emailText') }} ({{ $t('tgFieldBody') }})</span>
                 <el-select :disabled="Number(setting.allMailMode) === 2" v-model="tgMsgText" size="default">
                   <el-option
                     v-for="item in tgMsgTextOption"
@@ -1288,21 +1288,21 @@
           <div class="admin-notice-callout">
             <Icon icon="fluent:mail-forward-20-filled" width="20" height="20" class="notice-icon" />
             <div class="notice-body">
-              <div class="notice-title">第三方转发邮箱与受信任号池</div>
+              <div class="notice-title">{{ $t('fwdPoolTitle') }}</div>
               <div class="notice-text">
                 <template v-if="Number(setting.allMailMode) === 1">
-                  • <b>底层无损路由</b>：在此添加的第三方邮箱若在 Cloudflare Email Routing 中完成解析验证，系统将直接通过底层路由无损转发，不占用系统发信额度；若未在 Cloudflare 验证，则通过发信引擎自动抄送。<br/>
-                  • <b>用户端号池支持</b>：在此验证的邮箱构成全站受信任号池。用户在个人端配置这些邮箱作为转发目的地时，系统将在底层静默使用无损转发（不消耗用户发信额度）；若用户输入未验证邮箱，则自动通过抄送引擎并消耗其个人发信额度。<br/>
-                  • <b>全站转发生效</b>：当前处于全部邮件模式，全站所有进站邮件均会向启用的第三方邮箱执行转发。
+                  • <b>{{ $t('fwdLosslessTitle') }}</b>{{ $t('fwdLosslessDesc') }}<br/>
+                  • <b>{{ $t('fwdPoolSupportTitle') }}</b>{{ $t('fwdPoolSupportDesc') }}<br/>
+                  • <b>{{ $t('fwdAllModeTitle') }}</b>{{ $t('fwdAllModeDesc') }}
                 </template>
                 <template v-else-if="Number(setting.allMailMode) === 0">
-                  • <b>底层无损路由</b>：在此添加的第三方邮箱若在 Cloudflare Email Routing 中完成解析验证，系统将直接通过底层路由无损转发，不占用系统发信额度；若未在 Cloudflare 验证，则通过发信引擎自动抄送。<br/>
-                  • <b>用户端号池支持</b>：在此验证的邮箱构成全站受信任号池。用户在个人端配置这些邮箱作为转发目的地时，系统将在底层静默使用无损转发（不消耗用户发信额度）；若用户输入未验证邮箱，则自动通过抄送引擎并消耗其个人发信额度。<br/>
-                  • <b>隐私过滤保护</b>：当前处于隐私邮件模式，仅对垃圾/可疑邮件与无主邮件执行转发，普通用户的正常邮件不予转发。
+                  • <b>{{ $t('fwdLosslessTitle') }}</b>{{ $t('fwdLosslessDesc') }}<br/>
+                  • <b>{{ $t('fwdPoolSupportTitle') }}</b>{{ $t('fwdPoolSupportDesc') }}<br/>
+                  • <b>{{ $t('fwdPrivacyTitle') }}</b>{{ $t('fwdPrivacyDesc') }}
                 </template>
                 <template v-else-if="Number(setting.allMailMode) === 2">
-                  • <b>受信任验证号池</b>：在此添加并验证的第三方邮箱作为全站受信任号池。<br/>
-                  • <b>个人端配置要求</b>：在加密邮件模式下，系统全局转发已被关闭。第三方邮件必须由用户在个人的「资料」分区中单独配置才能正常完成转发任务，否则无法完成转发。
+                  • <b>{{ $t('fwdTrustedTitle') }}</b>{{ $t('fwdTrustedDesc') }}<br/>
+                  • <b>{{ $t('fwdPersonalTitle') }}</b>{{ $t('fwdPersonalDesc') }}
                 </template>
               </div>
             </div>
@@ -1310,7 +1310,7 @@
           <div class="dialog-field">
             <div class="d-label-row">
               <span class="d-label">{{ $t('otherEmail') }}</span>
-              <span class="d-sub-hint">支持多个邮箱（输入后回车添加）</span>
+              <span class="d-sub-hint">{{ $t('supportMultipleEmails') }}</span>
             </div>
             <el-input-tag tag-type="primary" :placeholder="$t('otherEmailInputDesc')" v-model="forwardEmail"
                           @add-tag="emailAddTag"></el-input-tag>
@@ -1344,7 +1344,7 @@
           <div class="dialog-field">
             <div class="d-label-row">
               <span class="d-label">{{ $t('ruleEmails') }}</span>
-              <span class="d-sub-hint">输入邮箱后回车添加</span>
+              <span class="d-sub-hint">{{ $t('emailEnterToAdd') }}</span>
             </div>
             <el-input-tag :disabled="Number(setting.allMailMode) === 2" :placeholder="$t('ruleEmailsInputDesc')" tag-type="primary" v-model="ruleEmail"
                           @add-tag="ruleEmailAddTag"/>
@@ -1374,18 +1374,18 @@
       >
         <div class="drawer-content">
           <div class="drawer-desc">
-            <div class="desc-title">{{ $t('signUpVerification') }}频次阈值规则</div>
+            <div class="desc-title">{{ $t('signUpThresholdTitle') }}</div>
             <div class="desc-body">
-              当单一客户端 IP 每日尝试注册账号的次数达到设定阈值后，系统将自动要求进行 Cloudflare Turnstile 人机验证，以防范脚本批量扫号与恶意注册。
+              {{ $t('signUpThresholdDesc') }}
             </div>
             <div class="desc-rule">
-              <strong>规则说明：</strong>在面板下拉菜单中选择【规则】时此阈值生效。选择【启用】为每次注册均强制人机验证，选择【关闭】为不验证。
+              <strong>{{ $t('ruleNoteLabel') }}</strong>{{ $t('signUpThresholdNote') }}
             </div>
           </div>
 
           <div style="margin-bottom: 16px;">
             <div style="font-size: 13px; font-weight: 600; margin-bottom: 8px; color: var(--el-text-color-primary);">
-              单 IP 每日注册触发阈值
+              {{ $t('signUpThresholdLabel') }}
             </div>
             <el-input-number v-model="regVerifyCount" :min="1" :max="9999" style="width: 100%;">
               <template #suffix>
@@ -1412,18 +1412,18 @@
       >
         <div class="drawer-content">
           <div class="drawer-desc">
-            <div class="desc-title">{{ $t('addEmailVerification') }}频次阈值规则</div>
+            <div class="desc-title">{{ $t('addEmailThresholdTitle') }}</div>
             <div class="desc-body">
-              当单一客户端 IP 每日添加邮箱别名/子邮箱的次数达到设定阈值后，系统将自动要求进行 Cloudflare Turnstile 人机验证，以防范自动化高频批量生成邮箱。
+              {{ $t('addEmailThresholdDesc') }}
             </div>
             <div class="desc-rule">
-              <strong>规则说明：</strong>在面板下拉菜单中选择【规则】时此阈值生效。选择【启用】为每次添加均强制验证，选择【关闭】为不验证。
+              <strong>{{ $t('ruleNoteLabel') }}</strong>{{ $t('addEmailThresholdNote') }}
             </div>
           </div>
 
           <div style="margin-bottom: 16px;">
             <div style="font-size: 13px; font-weight: 600; margin-bottom: 8px; color: var(--el-text-color-primary);">
-              单 IP 每日添加邮箱触发阈值
+              {{ $t('addEmailThresholdLabel') }}
             </div>
             <el-input-number v-model="addVerifyCount" :min="1" :max="9999" style="width: 100%;">
               <template #suffix>
@@ -1558,7 +1558,7 @@
             </div>
             <div class="recipients-content">
               <span class="audience-pill">{{ $t('welcomeAllUsers') }}</span>
-              <span class="recipients-subtext">（系统官方自动欢迎通道）</span>
+              <span class="recipients-subtext">{{ $t('officialWelcomeChannel') }}</span>
             </div>
           </div>
 
@@ -1607,18 +1607,18 @@
                 <template v-if="welcomeEditorFormat === 'source'">
                   <!-- Group 1: Headings -->
                   <div class="tool-subgroup">
-                    <el-tooltip content="H1 一级标题" effect="dark" placement="top">
-                      <div class="tool-icon-btn text-icon-btn" @click="insertMarkdownSyntax('# ', '\n', '一级标题')">
+                    <el-tooltip :content="$t('mdH1Tip')" effect="dark" placement="top">
+                      <div class="tool-icon-btn text-icon-btn" @click="insertMarkdownSyntax('# ', '\n', t('mdSampleH1'))">
                         <span class="btn-text-badge">H1</span>
                       </div>
                     </el-tooltip>
-                    <el-tooltip content="H2 二级标题" effect="dark" placement="top">
-                      <div class="tool-icon-btn text-icon-btn" @click="insertMarkdownSyntax('## ', '\n', '二级标题')">
+                    <el-tooltip :content="$t('mdH2Tip')" effect="dark" placement="top">
+                      <div class="tool-icon-btn text-icon-btn" @click="insertMarkdownSyntax('## ', '\n', t('mdSampleH2'))">
                         <span class="btn-text-badge">H2</span>
                       </div>
                     </el-tooltip>
-                    <el-tooltip content="H3 三级标题" effect="dark" placement="top">
-                      <div class="tool-icon-btn text-icon-btn" @click="insertMarkdownSyntax('### ', '\n', '三级标题')">
+                    <el-tooltip :content="$t('mdH3Tip')" effect="dark" placement="top">
+                      <div class="tool-icon-btn text-icon-btn" @click="insertMarkdownSyntax('### ', '\n', t('mdSampleH3'))">
                         <span class="btn-text-badge">H3</span>
                       </div>
                     </el-tooltip>
@@ -1628,23 +1628,23 @@
 
                   <!-- Group 2: Inline Styles -->
                   <div class="tool-subgroup">
-                    <el-tooltip content="加粗 (Bold)" effect="dark" placement="top">
-                      <div class="tool-icon-btn" @click="insertMarkdownSyntax('**', '**', '加粗文本')">
+                    <el-tooltip :content="$t('mdBoldTip')" effect="dark" placement="top">
+                      <div class="tool-icon-btn" @click="insertMarkdownSyntax('**', '**', t('mdSampleBold'))">
                         <Icon icon="ri:bold" width="15" height="15" />
                       </div>
                     </el-tooltip>
-                    <el-tooltip content="斜体 (Italic)" effect="dark" placement="top">
-                      <div class="tool-icon-btn" @click="insertMarkdownSyntax('*', '*', '斜体文本')">
+                    <el-tooltip :content="$t('mdItalicTip')" effect="dark" placement="top">
+                      <div class="tool-icon-btn" @click="insertMarkdownSyntax('*', '*', t('mdSampleItalic'))">
                         <Icon icon="ri:italic" width="15" height="15" />
                       </div>
                     </el-tooltip>
-                    <el-tooltip content="删除线 (Strikethrough)" effect="dark" placement="top">
-                      <div class="tool-icon-btn" @click="insertMarkdownSyntax('~~', '~~', '删除文本')">
+                    <el-tooltip :content="$t('mdStrikeTip')" effect="dark" placement="top">
+                      <div class="tool-icon-btn" @click="insertMarkdownSyntax('~~', '~~', t('mdSampleStrike'))">
                         <Icon icon="ri:strikethrough" width="15" height="15" />
                       </div>
                     </el-tooltip>
-                    <el-tooltip content="下划线 (Underline)" effect="dark" placement="top">
-                      <div class="tool-icon-btn" @click="insertMarkdownSyntax('<u>', '</u>', '下划线文本')">
+                    <el-tooltip :content="$t('mdUnderlineTip')" effect="dark" placement="top">
+                      <div class="tool-icon-btn" @click="insertMarkdownSyntax('<u>', '</u>', t('mdSampleUnderline'))">
                         <Icon icon="ri:underline" width="15" height="15" />
                       </div>
                     </el-tooltip>
@@ -1654,18 +1654,18 @@
 
                   <!-- Group 3: Quotes & Code -->
                   <div class="tool-subgroup">
-                    <el-tooltip content="引用块 (Quote)" effect="dark" placement="top">
-                      <div class="tool-icon-btn" @click="insertMarkdownSyntax('> ', '\n', '引用文字')">
+                    <el-tooltip :content="$t('mdQuoteTip')" effect="dark" placement="top">
+                      <div class="tool-icon-btn" @click="insertMarkdownSyntax('> ', '\n', t('mdSampleQuote'))">
                         <Icon icon="ri:double-quotes-l" width="15" height="15" />
                       </div>
                     </el-tooltip>
-                    <el-tooltip content="行内代码 (Inline Code)" effect="dark" placement="top">
+                    <el-tooltip :content="$t('mdInlineCodeTip')" effect="dark" placement="top">
                       <div class="tool-icon-btn" @click="insertMarkdownSyntax('`', '`', 'code')">
                         <Icon icon="ri:code-line" width="15" height="15" />
                       </div>
                     </el-tooltip>
-                    <el-tooltip content="代码块 (Code Block)" effect="dark" placement="top">
-                      <div class="tool-icon-btn" @click="insertMarkdownSyntax('```html\n', '\n```\n', '<div>代码块内容</div>')">
+                    <el-tooltip :content="$t('mdCodeBlockTip')" effect="dark" placement="top">
+                      <div class="tool-icon-btn" @click="insertMarkdownSyntax('```html\n', '\n```\n', '<div>' + t('mdSampleCodeBlock') + '</div>')">
                         <Icon icon="ri:code-box-line" width="15" height="15" />
                       </div>
                     </el-tooltip>
@@ -1675,18 +1675,18 @@
 
                   <!-- Group 4: Lists -->
                   <div class="tool-subgroup">
-                    <el-tooltip content="无序列表 (Bullet List)" effect="dark" placement="top">
-                      <div class="tool-icon-btn" @click="insertMarkdownSyntax('- ', '\n', '列表项')">
+                    <el-tooltip :content="$t('mdUlTip')" effect="dark" placement="top">
+                      <div class="tool-icon-btn" @click="insertMarkdownSyntax('- ', '\n', t('mdSampleListItem'))">
                         <Icon icon="ri:list-unordered" width="15" height="15" />
                       </div>
                     </el-tooltip>
-                    <el-tooltip content="有序列表 (Numbered List)" effect="dark" placement="top">
-                      <div class="tool-icon-btn" @click="insertMarkdownSyntax('1. ', '\n', '列表项')">
+                    <el-tooltip :content="$t('mdOlTip')" effect="dark" placement="top">
+                      <div class="tool-icon-btn" @click="insertMarkdownSyntax('1. ', '\n', t('mdSampleListItem'))">
                         <Icon icon="ri:list-ordered" width="15" height="15" />
                       </div>
                     </el-tooltip>
-                    <el-tooltip content="任务清单 (Task List)" effect="dark" placement="top">
-                      <div class="tool-icon-btn" @click="insertMarkdownSyntax('- [ ] ', '\n', '待办事项')">
+                    <el-tooltip :content="$t('mdTaskTip')" effect="dark" placement="top">
+                      <div class="tool-icon-btn" @click="insertMarkdownSyntax('- [ ] ', '\n', t('mdSampleTodo'))">
                         <Icon icon="ri:checkbox-line" width="15" height="15" />
                       </div>
                     </el-tooltip>
@@ -1696,22 +1696,22 @@
 
                   <!-- Group 5: Inserts (Link, Image, Table, Divider) -->
                   <div class="tool-subgroup">
-                    <el-tooltip content="插入链接 (Link)" effect="dark" placement="top">
-                      <div class="tool-icon-btn" @click="insertMarkdownSyntax('[链接文字](', ')', 'https://example.com')">
+                    <el-tooltip :content="$t('mdLinkTip')" effect="dark" placement="top">
+                      <div class="tool-icon-btn" @click="insertMarkdownSyntax('[' + t('mdSampleLinkText') + '(', ')', 'https://example.com')">
                         <Icon icon="ri:link" width="15" height="15" />
                       </div>
                     </el-tooltip>
-                    <el-tooltip content="插入图片 (Image)" effect="dark" placement="top">
-                      <div class="tool-icon-btn" @click="insertMarkdownSyntax('![图片描述](', ')', 'https://example.com/image.png')">
+                    <el-tooltip :content="$t('mdImageTip')" effect="dark" placement="top">
+                      <div class="tool-icon-btn" @click="insertMarkdownSyntax('![' + t('mdSampleImageText') + '(', ')', 'https://example.com/image.png')">
                         <Icon icon="ri:image-line" width="15" height="15" />
                       </div>
                     </el-tooltip>
-                    <el-tooltip content="插入表格 (Table)" effect="dark" placement="top">
-                      <div class="tool-icon-btn" @click="insertMarkdownSyntax('\n| 标题 1 | 标题 2 |\n| :--- | :--- |\n| 内容 1 | 内容 2 |\n', '', '')">
+                    <el-tooltip :content="$t('mdTableTip')" effect="dark" placement="top">
+                      <div class="tool-icon-btn" @click="insertMarkdownSyntax(t('mdSampleTable'), '', '')">
                         <Icon icon="ri:table-line" width="15" height="15" />
                       </div>
                     </el-tooltip>
-                    <el-tooltip content="分割线 (Divider)" effect="dark" placement="top">
+                    <el-tooltip :content="$t('mdDividerTip')" effect="dark" placement="top">
                       <div class="tool-icon-btn" @click="insertMarkdownSyntax('\n---\n', '', '')">
                         <Icon icon="ri:separator" width="15" height="15" />
                       </div>
@@ -1740,7 +1740,7 @@
                       class="mode-switch-btn"
                       :class="{ 'is-active': welcomeEditorFormat === 'rich' }"
                       @click="setEditorFormat('rich')"
-                      aria-label="富文本模式"
+                      :aria-label="$t('richTextMode')"
                     >
                       <Icon icon="fluent:text-edit-style-20-regular" width="16" height="16" />
                     </button>
@@ -1751,7 +1751,7 @@
                       class="mode-switch-btn"
                       :class="{ 'is-active': welcomeEditorFormat === 'source' }"
                       @click="setEditorFormat('source')"
-                      aria-label="源码 / Markdown 模式"
+                      :aria-label="$t('markdownSourceMode')"
                     >
                       <Icon icon="fluent:code-20-regular" width="16" height="16" />
                     </button>
@@ -1801,7 +1801,7 @@
                   <el-input
                     type="textarea"
                     v-model="welcomeEmailForm.welcomeContent"
-                    placeholder="<!-- HTML / Markdown 正文内容 -->"
+                    :placeholder="$t('edtContentPlaceholder')"
                     class="source-textarea-fullscreen"
                   />
                 </div>
@@ -1958,6 +1958,28 @@
             </div>
           </div>
 
+          <!-- 2.1 Multi-language Tabs Switcher -->
+          <div class="welcome-lang-row">
+            <div class="recipients-label">
+              <Icon icon="fluent:local-language-24-regular" width="16" height="16" class="recipients-icon" />
+              <span>{{ $t('globalEmailLangTab') }}:</span>
+            </div>
+            <div class="welcome-lang-tabs">
+              <div
+                v-for="l in supportedWelcomeLangs"
+                :key="l.key"
+                class="lang-tab-pill"
+                :class="{ 'is-active': globalActiveLang === l.key }"
+                @click="switchGlobalLang(l.key)"
+              >
+                <span>{{ l.label }}</span>
+                <span v-if="l.key === adminDefaultLangKey" class="admin-badge" :title="$t('welcomeEmailAdminLangBadge')">
+                  {{ $t('default') }}
+                </span>
+              </div>
+            </div>
+          </div>
+
           <!-- 3. Email Subject Bar -->
           <div class="welcome-subject-bar">
             <el-input
@@ -1980,18 +2002,18 @@
               <div class="editor-left-tools">
                 <template v-if="globalEmailEditorFormat === 'source'">
                   <div class="tool-subgroup">
-                    <el-tooltip content="H1 一级标题" effect="dark" placement="top">
-                      <div class="tool-icon-btn text-icon-btn" @click="insertGlobalSyntax('# ', '\n', '一级标题')">
+                    <el-tooltip :content="$t('mdH1Tip')" effect="dark" placement="top">
+                      <div class="tool-icon-btn text-icon-btn" @click="insertGlobalSyntax('# ', '\n', t('mdSampleH1'))">
                         <span class="btn-text-badge">H1</span>
                       </div>
                     </el-tooltip>
-                    <el-tooltip content="H2 二级标题" effect="dark" placement="top">
-                      <div class="tool-icon-btn text-icon-btn" @click="insertGlobalSyntax('## ', '\n', '二级标题')">
+                    <el-tooltip :content="$t('mdH2Tip')" effect="dark" placement="top">
+                      <div class="tool-icon-btn text-icon-btn" @click="insertGlobalSyntax('## ', '\n', t('mdSampleH2'))">
                         <span class="btn-text-badge">H2</span>
                       </div>
                     </el-tooltip>
-                    <el-tooltip content="H3 三级标题" effect="dark" placement="top">
-                      <div class="tool-icon-btn text-icon-btn" @click="insertGlobalSyntax('### ', '\n', '三级标题')">
+                    <el-tooltip :content="$t('mdH3Tip')" effect="dark" placement="top">
+                      <div class="tool-icon-btn text-icon-btn" @click="insertGlobalSyntax('### ', '\n', t('mdSampleH3'))">
                         <span class="btn-text-badge">H3</span>
                       </div>
                     </el-tooltip>
@@ -2000,18 +2022,18 @@
                   <div class="tool-divider"></div>
 
                   <div class="tool-subgroup">
-                    <el-tooltip content="加粗 (Bold)" effect="dark" placement="top">
-                      <div class="tool-icon-btn" @click="insertGlobalSyntax('**', '**', '加粗文本')">
+                    <el-tooltip :content="$t('mdBoldTip')" effect="dark" placement="top">
+                      <div class="tool-icon-btn" @click="insertGlobalSyntax('**', '**', t('mdSampleBold'))">
                         <Icon icon="ri:bold" width="15" height="15" />
                       </div>
                     </el-tooltip>
-                    <el-tooltip content="斜体 (Italic)" effect="dark" placement="top">
-                      <div class="tool-icon-btn" @click="insertGlobalSyntax('*', '*', '斜体文本')">
+                    <el-tooltip :content="$t('mdItalicTip')" effect="dark" placement="top">
+                      <div class="tool-icon-btn" @click="insertGlobalSyntax('*', '*', t('mdSampleItalic'))">
                         <Icon icon="ri:italic" width="15" height="15" />
                       </div>
                     </el-tooltip>
-                    <el-tooltip content="代码块 (Code Block)" effect="dark" placement="top">
-                      <div class="tool-icon-btn" @click="insertGlobalSyntax('```html\n', '\n```\n', '<div>公告内容</div>')">
+                    <el-tooltip :content="$t('mdCodeBlockTip')" effect="dark" placement="top">
+                      <div class="tool-icon-btn" @click="insertGlobalSyntax('```html\n', '\n```\n', '<div>' + t('mdSampleNotice') + '</div>')">
                         <Icon icon="ri:code-box-line" width="15" height="15" />
                       </div>
                     </el-tooltip>
@@ -2020,17 +2042,17 @@
                   <div class="tool-divider"></div>
 
                   <div class="tool-subgroup">
-                    <el-tooltip content="无序列表" effect="dark" placement="top">
-                      <div class="tool-icon-btn" @click="insertGlobalSyntax('- ', '\n', '列表项')">
+                    <el-tooltip :content="$t('mdUlTip')" effect="dark" placement="top">
+                      <div class="tool-icon-btn" @click="insertGlobalSyntax('- ', '\n', t('mdSampleListItem'))">
                         <Icon icon="ri:list-unordered" width="15" height="15" />
                       </div>
                     </el-tooltip>
-                    <el-tooltip content="插入链接" effect="dark" placement="top">
-                      <div class="tool-icon-btn" @click="insertGlobalSyntax('[链接文字](', ')', 'https://example.com')">
+                    <el-tooltip :content="$t('mdLinkTip')" effect="dark" placement="top">
+                      <div class="tool-icon-btn" @click="insertGlobalSyntax('[' + t('mdSampleLinkText') + '(', ')', 'https://example.com')">
                         <Icon icon="ri:link" width="15" height="15" />
                       </div>
                     </el-tooltip>
-                    <el-tooltip content="分割线" effect="dark" placement="top">
+                    <el-tooltip :content="$t('mdDividerTip')" effect="dark" placement="top">
                       <div class="tool-icon-btn" @click="insertGlobalSyntax('\n---\n', '', '')">
                         <Icon icon="ri:separator" width="15" height="15" />
                       </div>
@@ -2056,7 +2078,7 @@
                       class="mode-switch-btn"
                       :class="{ 'is-active': globalEmailEditorFormat === 'rich' }"
                       @click="setGlobalEmailEditorFormat('rich')"
-                      aria-label="富文本模式"
+                      :aria-label="$t('richTextMode')"
                     >
                       <Icon icon="fluent:text-edit-style-20-regular" width="16" height="16" />
                     </button>
@@ -2067,7 +2089,7 @@
                       class="mode-switch-btn"
                       :class="{ 'is-active': globalEmailEditorFormat === 'source' }"
                       @click="setGlobalEmailEditorFormat('source')"
-                      aria-label="源码 / Markdown 模式"
+                      :aria-label="$t('markdownSourceMode')"
                     >
                       <Icon icon="fluent:code-20-regular" width="16" height="16" />
                     </button>
@@ -2108,7 +2130,7 @@
                   <el-input
                     type="textarea"
                     v-model="globalEmailForm.content"
-                    placeholder="<!-- HTML / Markdown 全域公告正文内容 -->"
+                    :placeholder="$t('edtGlobalPlaceholder')"
                     class="source-textarea-fullscreen"
                   />
                 </div>
@@ -2236,7 +2258,7 @@
           <div class="b2-guidance-box compact" v-if="s3.provider === 'backblaze'">
             <Icon icon="fluent:sparkle-20-filled" width="15" height="15" class="g-icon" />
             <span>
-              <strong>Backblaze B2 免流方案</strong>: 免费 10GB 存储；节点示例 <code>s3.us-west-004.backblazeb2.com</code>；配合 Cloudflare CDN 享 <strong>Bandwidth Alliance 0 元出站流量 (Zero Egress Fee)</strong>！
+              <strong>{{ $t('backblazeGuideTitle') }}</strong>{{ $t('backblazeGuideDesc') }}
             </span>
           </div>
 
@@ -2439,14 +2461,14 @@
           <div class="b2-guidance-box compact" v-if="dbForm.provider === 'turso'">
             <Icon icon="fluent:sparkle-20-filled" width="15" height="15" class="g-icon" />
             <span>
-              <strong>Turso (LibSQL) 指南</strong>: 适用于将海量邮件与附件数据卸载至全球分布式 SQLite；接入点示例 <code>https://[db-name]-[org].turso.io</code>；支持 Auth Token 鉴权直连。
+              <strong>{{ $t('tursoGuideTitle') }}</strong>{{ $t('tursoGuideDesc') }}
             </span>
           </div>
 
           <div class="b2-guidance-box compact" v-else-if="dbForm.provider === 'd1'">
             <Icon icon="fluent:info-20-filled" width="15" height="15" class="g-icon" />
             <span>
-              <strong>Cloudflare 原生 D1 指南</strong>: 默认单库模式全部数据保存在单一 D1 数据库中；可在 <code>wrangler.toml</code> 绑定 <code>USER_DB</code> 与 <code>MAIL_DB</code> 启用双库物理隔离。
+              <strong>{{ $t('d1GuideTitle') }}</strong>{{ $t('d1GuideDesc') }}
             </span>
           </div>
 
@@ -2530,7 +2552,7 @@
                 </div>
                 <el-input 
                   v-model="dbForm.name" 
-                  placeholder="例如: epomail_mail_db" 
+                  :placeholder="$t('dbNamePlaceholder')" 
                   clearable 
                 />
               </div>
@@ -2727,7 +2749,7 @@
               <div class="sum-right">
                 <span class="safe-tag-pill">
                   <Icon icon="fluent:shield-checkmark-20-filled" width="14" height="14" style="color: #10b981; margin-right: 4px;" />
-                  无损体检保护
+                  {{ $t('losslessScanProtection') }}
                   <el-tooltip effect="dark" :content="$t('cleanupSafeTip')">
                     <Icon class="warning" icon="fe:warning" width="14" height="14" style="margin-left: 4px; vertical-align: -2px;"/>
                   </el-tooltip>
@@ -2857,7 +2879,7 @@
             <div class="b-left">
               <Icon icon="fluent:database-link-20-filled" width="18" height="18" class="b-icon" />
               <span>
-                当前运行架构: 
+                {{ $t('currentArchitectureLabel') }} 
                 <strong>
                   {{ setting.externalDbEnabled === 1 ? ($t('dbModeExternal') + ' (' + (setting.externalDbName || setting.externalDbProvider || 'Turso') + ')') : (isDualDb ? $t('dbModeDual') : $t('dbModeSingle')) }}
                 </strong>
@@ -2868,7 +2890,7 @@
             </div>
             <div class="b-right">
               <el-tag size="small" :type="setting.externalDbEnabled === 1 ? 'warning' : (isDualDb ? 'success' : 'primary')" effect="light">
-                {{ setting.externalDbEnabled === 1 ? '第三方托管分流' : (isDualDb ? '双库物理隔离' : '单库集中共享 (默认开箱即用)') }}
+                {{ setting.externalDbEnabled === 1 ? $t('archTagExternal') : (isDualDb ? $t('archTagDual') : $t('archTagSingle')) }}
               </el-tag>
             </div>
           </div>
@@ -2901,13 +2923,13 @@
 
                 <span class="g-lbl">{{ $t('dbScopeLabel') }}:</span>
                 <span class="g-val">
-                  用户账号 · 2FA · OAuth
+                  {{ $t('dataScopeAccounts') }}
                   <el-tooltip effect="dark" :content="$t('dbUserDomainDetail') || dbStatusInfo?.domains?.user?.scope">
                     <Icon class="warning" icon="fe:warning" width="13" height="13" style="margin-left: 2px; vertical-align: -1px;"/>
                   </el-tooltip>
                 </span>
 
-                <span class="g-lbl">当前统计:</span>
+                <span class="g-lbl">{{ $t('currentStatsLabel') }}</span>
                 <span class="g-val stats">{{ dbStatusInfo?.stats?.userCount ?? dbStatusInfo?.domains?.user?.count ?? 0 }} {{ $t('dbStatsUsers') }}</span>
               </div>
             </div>
@@ -2938,13 +2960,13 @@
 
                 <span class="g-lbl">{{ $t('dbScopeLabel') }}:</span>
                 <span class="g-val">
-                  邮件列表 · 正文 · 号池
+                  {{ $t('dataScopeMails') }}
                   <el-tooltip effect="dark" :content="dbStatusInfo?.domains?.mail?.scope || $t('dbScopeMail')">
                     <Icon class="warning" icon="fe:warning" width="13" height="13" style="margin-left: 2px; vertical-align: -1px;"/>
                   </el-tooltip>
                 </span>
 
-                <span class="g-lbl">当前统计:</span>
+                <span class="g-lbl">{{ $t('currentStatsLabel') }}</span>
                 <span class="g-val stats">{{ dbStatusInfo?.stats?.emailCount ?? dbStatusInfo?.domains?.mail?.count ?? 0 }} {{ $t('dbStatsEmails') }} · {{ dbStatusInfo?.stats?.accountCount ?? dbStatusInfo?.domains?.mail?.accountCount ?? 0 }} {{ $t('dbStatsAccounts') }}</span>
               </div>
             </div>
@@ -2975,16 +2997,16 @@
 
                 <span class="g-lbl">{{ $t('dbScopeLabel') }}:</span>
                 <span class="g-val">
-                  大体积多媒体 · CDN免流
+                  {{ $t('dataScopeMedia') }}
                   <el-tooltip effect="dark" :content="dbStatusInfo?.domains?.attachment?.scope || $t('dbScopeAttachment')">
                     <Icon class="warning" icon="fe:warning" width="13" height="13" style="margin-left: 2px; vertical-align: -1px;"/>
                   </el-tooltip>
                 </span>
 
-                <span class="g-lbl">当前统计:</span>
+                <span class="g-lbl">{{ $t('currentStatsLabel') }}</span>
                 <span class="g-val stats">
                   {{ dbStatusInfo?.stats?.attCount ?? dbStatusInfo?.domains?.attachment?.count ?? 0 }} {{ $t('dbStatsAtts') }}
-                  <el-tag v-if="setting.customDomain" size="small" type="primary" effect="light" style="margin-left: 4px;">0元CDN</el-tag>
+                  <el-tag v-if="setting.customDomain" size="small" type="primary" effect="light" style="margin-left: 4px;">{{ $t('zeroCostCdnTag') }}</el-tag>
                 </span>
               </div>
             </div>
@@ -3014,12 +3036,12 @@
       >
         <div class="drawer-content">
           <div class="drawer-desc">
-            <div class="desc-title">{{ $t('emailPrefix') }}规则设置</div>
+            <div class="desc-title">{{ $t('emailPrefixRuleTitle') }}</div>
             <div class="desc-body">
-              限制用户注册或添加邮箱时的前缀最小字符位数，并过滤禁止使用的敏感或保留关键词。
+              {{ $t('emailPrefixRuleDesc') }}
             </div>
             <div class="desc-rule">
-              <strong>规则简述：</strong>支持限定字符最小长度；在下方输入禁止前缀词并按回车添加（支持逗号或空格批量粘贴），系统将自动去重排重。
+              <strong>{{ $t('ruleNoteLabel') }}</strong>{{ $t('emailPrefixRuleNote') }}
             </div>
           </div>
 
@@ -3259,6 +3281,7 @@ import {computed, defineOptions, nextTick, onMounted, onUnmounted, reactive, ref
 import {deleteBackground, setBackground, setBlackList, settingQuery, settingSet, sendWelcomeEmail, sendGlobalEmail, getGlobalEmailConfig, testS3Setting, getDbStatus, testDbSetting, scanStorage, cleanupStorage, testAiSetting, fetchAiModels} from "@/request/setting.js";
 import { roleRoleList } from "@/request/role.js";
 import { WELCOME_TEMPLATES, getWelcomeTemplate, DEFAULT_WELCOME_SUBJECT, DEFAULT_WELCOME_CONTENT } from "@/const/welcome-templates.js";
+import { getAnnouncementTemplate } from "@/const/announcement-templates.js";
 import { testTelegramBot } from "@/request/my.js";
 import {useSettingStore} from "@/store/setting.js";
 import {useUiStore} from "@/store/ui.js";
@@ -3725,7 +3748,7 @@ const testAiConnectionInHub = () => {
     const errMsg = err.response?.data?.message || err.message || t('aiTestFail')
     ElMessage({
       type: 'error',
-      message: `${errMsg} (需确保连通正常后大模型方可调用)`,
+      message: `${errMsg} ${t('aiTestNeedsConnection')}`,
       plain: true
     })
   })
@@ -3785,7 +3808,7 @@ const saveAiHubConfig = (closeDialog = true) => {
 
     ElMessage({
       type: 'success',
-      message: `连通测试通过，已成功保存大模型配置！[${resData?.message || '200 OK'}]`,
+      message: t('aiTestSaveSuccess', { msg: resData?.message || '200 OK' }),
       plain: true
     })
   }).catch(err => {
@@ -3793,7 +3816,7 @@ const saveAiHubConfig = (closeDialog = true) => {
     const errMsg = err.response?.data?.message || err.message || t('aiTestFail')
     ElMessage({
       type: 'error',
-      message: `模型连通性测试未通过: ${errMsg}。配置未自动保存，请检查接口配置或选择可用模型。`,
+      message: t('aiTestFailedNoSave', { msg: errMsg }),
       plain: true
     })
   })
@@ -3878,6 +3901,66 @@ const globalEmailForm = reactive({
   sendToNewUsers: 1,
   isStarred: 1
 })
+
+const globalActiveLang = ref('zh')
+const globalTemplatesMap = reactive({
+  zh: { subject: '', content: '' },
+  'zh-Hant': { subject: '', content: '' },
+  en: { subject: '', content: '' },
+  fr: { subject: '', content: '' },
+  es: { subject: '', content: '' },
+  nl: { subject: '', content: '' }
+})
+
+function switchGlobalLang(targetKey) {
+  if (globalActiveLang.value === targetKey) return
+  // Save current editor content into the active lang slot
+  let currentContent = globalEmailForm.content || ''
+  if (globalEmailEditorFormat.value === 'rich' && globalEditorRef.value && globalEditorRef.value.getContent) {
+    try {
+      const richText = globalEditorRef.value.getContent()
+      if (richText !== undefined) currentContent = richText
+    } catch (e) {}
+  }
+  globalTemplatesMap[globalActiveLang.value] = {
+    subject: globalEmailForm.subject || '',
+    content: currentContent
+  }
+  globalActiveLang.value = targetKey
+  const nextTpl = globalTemplatesMap[targetKey] || {}
+  const defTpl = getAnnouncementTemplate(targetKey)
+  globalEmailForm.subject = nextTpl.subject || defTpl.subject
+  globalEmailForm.content = nextTpl.content || defTpl.content
+  globalEmailEditorFormat.value = 'rich'
+  nextTick(() => {
+    if (globalEditorRef.value && globalEditorRef.value.setContent) {
+      globalEditorRef.value.setContent(globalEmailForm.content)
+    }
+  })
+}
+
+function collectGlobalTemplates() {
+  // Sync current editor content into the active lang slot, then return only fully filled templates
+  let currentContent = globalEmailForm.content || ''
+  if (globalEmailEditorFormat.value === 'rich' && globalEditorRef.value && globalEditorRef.value.getContent) {
+    try {
+      const richText = globalEditorRef.value.getContent()
+      if (richText !== undefined) currentContent = richText
+    } catch (e) {}
+  }
+  globalTemplatesMap[globalActiveLang.value] = {
+    subject: globalEmailForm.subject || '',
+    content: currentContent
+  }
+  const out = {}
+  supportedWelcomeLangs.forEach(item => {
+    const tpl = globalTemplatesMap[item.key]
+    if (tpl && tpl.subject && String(tpl.subject).trim() && tpl.content && String(tpl.content).trim()) {
+      out[item.key] = { subject: tpl.subject, content: tpl.content, text: '' }
+    }
+  })
+  return Object.keys(out).length > 0 ? out : null
+}
 
 function compileMarkdownToHtml(src) {
   if (!src) return ''
@@ -4020,34 +4103,27 @@ const mailModeFontSize = computed(() => {
 
 const currentMailModeSecurityBadge = computed(() => {
   const m = Number(setting.value?.allMailMode);
-  const isEn = locale.value === 'en';
   if (m === 2) {
     return {
-      levelText: isEn ? 'Level 3: Top Secret' : 'Level 3: 最高绝密',
+      levelText: t('privacyLevel3Text'),
       tagType: 'success',
       icon: 'fluent:shield-lock-16-filled',
-      tooltip: isEn
-        ? 'Maximum Zero-Knowledge E2EE: 100% of emails are encrypted with AES-256-GCM + HKDF-SHA256. Private keys are never shared with admin. 2FA is strictly enforced; external push/forwarding is disabled.'
-        : '最高绝密级 (Maximum Zero-Knowledge E2EE)：全量100%往来信件采用 AES-256-GCM + HKDF-SHA256 加密，仅收发双方私钥可解密；管理员全接口阻断，严禁查阅任何邮件正文及元数据；强制开启 2FA；强制禁用外部推送与转发。'
+      tooltip: t('privacyLevel3Tooltip')
     };
   }
   if (m === 1) {
     return {
-      levelText: isEn ? 'Level 1: Plaintext' : 'Level 1: 明文基础',
+      levelText: t('privacyLevel1Text'),
       tagType: 'info',
       icon: 'fluent:lock-open-16-regular',
-      tooltip: isEn
-        ? 'Standard Plaintext: Emails are stored in plaintext. Admin can audit all emails. Supports 2FA and multi-channel forwarding.'
-        : '明文基础级 (Standard Plaintext)：邮件纯明文流转存储；管理员具备全站邮件审查权限；支持自由配置 2FA 与多渠道推送。'
+      tooltip: t('privacyLevel1Tooltip')
     };
   }
   return {
-    levelText: isEn ? 'Level 2: Privacy' : 'Level 2: 增强隐私',
+    levelText: t('privacyLevel2Text'),
     tagType: 'primary',
     icon: 'fluent:shield-checkmark-16-filled',
-    tooltip: isEn
-      ? 'Selective E2EE & Spam Isolation [Recommended]: Inbound and outbound emails are encrypted. Admin cannot read normal emails. 2FA is strictly enforced.'
-      : '增强隐私级 (Selective E2EE & Spam Isolation [推荐])：正常往来邮件强制密文存储，管理员在全站邮件中严禁查阅任何正常邮件；仅允许审查垃圾邮件及系统截断无主件；强制开启 2FA，防篡改保护。'
+    tooltip: t('privacyLevel2Tooltip')
   };
 });
 
@@ -4457,7 +4533,7 @@ function toggleFullscreen() {
   isWelcomeFullscreen.value = !isWelcomeFullscreen.value
 }
 
-function insertMarkdownSyntax(prefix, suffix = '', defaultText = '内容') {
+function insertMarkdownSyntax(prefix, suffix = '', defaultText = '') {
   const textarea = document.querySelector('.source-textarea-fullscreen textarea')
   if (!textarea) return
   const start = textarea.selectionStart || 0
@@ -4643,6 +4719,16 @@ function openGlobalEmailDialog() {
 
   // 2. Fetch or load cached global email config
   getGlobalEmailConfig().then(cfg => {
+    globalActiveLang.value = adminDefaultLangKey.value || 'zh'
+    // Populate per-language template map from saved multilingual templates (empty slots fall back to official defaults on switch)
+    const savedLangTpl = (cfg && cfg.templates && typeof cfg.templates === 'object') ? cfg.templates : {}
+    supportedWelcomeLangs.forEach(item => {
+      const saved = savedLangTpl[item.key] || {}
+      globalTemplatesMap[item.key] = {
+        subject: saved.subject || '',
+        content: saved.content || ''
+      }
+    })
     if (cfg && (cfg.subject || cfg.content)) {
       globalEmailForm.subject = cfg.subject || ''
       globalEmailForm.content = cfg.content || ''
@@ -4665,6 +4751,12 @@ function openGlobalEmailDialog() {
     此邮件由系统站长 (admin@epocanvas.com) 统一发布 · 祝您使用愉快！
   </p>
 </div>`
+      // Prefer the saved custom template of the active language when present
+      const activeTpl = globalTemplatesMap[globalActiveLang.value]
+      if (activeTpl && activeTpl.subject && activeTpl.content) {
+        globalEmailForm.subject = activeTpl.subject
+        globalEmailForm.content = activeTpl.content
+      }
       globalEmailForm.targetType = 'all'
       globalEmailForm.targetRoleIds = []
       globalEmailForm.expireDays = 30
@@ -4731,7 +4823,7 @@ function onGlobalContentChange(content) {
   globalEmailForm.content = content
 }
 
-function insertGlobalSyntax(prefix, suffix = '', defaultText = '内容') {
+function insertGlobalSyntax(prefix, suffix = '', defaultText = '') {
   const textarea = document.querySelector('.global-email-dialog-canvas .source-textarea-fullscreen textarea')
   if (!textarea) return
   const start = textarea.selectionStart || 0
@@ -4763,6 +4855,7 @@ function saveGlobalEmailDraft() {
   const payload = {
     subject: globalEmailForm.subject,
     content: finalContent,
+    templates: collectGlobalTemplates(),
     targetType: globalEmailForm.targetType,
     targetRoleIds: globalEmailForm.targetRoleIds,
     expireDays: Number(globalEmailForm.expireDays),
@@ -4804,7 +4897,7 @@ function confirmBroadcastGlobalEmail() {
     const roleNames = availableRoles.value
       .filter(r => globalEmailForm.targetRoleIds.includes(r.roleId))
       .map(r => r.roleName)
-    targetDesc = roleNames.length > 0 ? roleNames.join(', ') : '未选择具体角色'
+    targetDesc = roleNames.length > 0 ? roleNames.join(', ') : t('globalEmailNoRoleSelected')
   }
 
   const confirmMsg = t('globalEmailConfirmMsg', { target: targetDesc })
@@ -4824,6 +4917,7 @@ function confirmBroadcastGlobalEmail() {
     const payload = {
       subject: globalEmailForm.subject,
       content: finalContent,
+      templates: collectGlobalTemplates(),
       targetType: globalEmailForm.targetType,
       targetRoleIds: globalEmailForm.targetRoleIds,
       expireDays: Number(globalEmailForm.expireDays),
@@ -5139,7 +5233,7 @@ async function handleQuickTestStorageAndDb() {
         s3SecretKey: setting.value.s3SecretKey,
         forcePathStyle: setting.value.forcePathStyle,
         customDomain: setting.value.customDomain
-      }) : Promise.resolve({ ok: true, message: 'Cloudflare 原生存储 (R2/KV)', latencyMs: 2 }),
+      }) : Promise.resolve({ ok: true, message: t('cfNativeStorage'), latencyMs: 2 }),
       testDbSetting({
         externalDbEnabled: setting.value.externalDbEnabled,
         externalDbProvider: setting.value.externalDbProvider,
@@ -5157,8 +5251,8 @@ async function handleQuickTestStorageAndDb() {
       ElMessage.success(t('systemDiagnosticSuccess', { dbMs: dbData.latencyMs, s3Ms: s3Data?.latencyMs || 2 }))
     } else {
       const errs = []
-      if (dbData && !dbData.ok) errs.push(`数据库: ${dbData.message}`)
-      if (s3Data && !s3Data.ok) errs.push(`存储: ${s3Data.message}`)
+      if (dbData && !dbData.ok) errs.push(`${t('diagDbLabel')}: ${dbData.message}`)
+      if (s3Data && !s3Data.ok) errs.push(`${t('diagStorageLabel')}: ${s3Data.message}`)
       ElMessage.error(t('systemDiagnosticFailed', { errors: errs.join(' | ') }))
     }
     loadDbStatus()
@@ -5270,7 +5364,7 @@ async function handleTestAdminTelegram() {
   const token = tgBotToken.value || setting.value.tgBotToken;
   const chatId = tgChatId.value?.[0];
   if (!token || !chatId) {
-    ElMessage.warning(t('tgFillRequiredFields'));
+    ElMessage.warning(t('fillTgBotTokenChatId'));
     return;
   }
   testingTg.value = true;

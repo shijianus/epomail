@@ -117,7 +117,7 @@ export function LoginCard({ canvasRef, onSwitch, sysConfig }: LoginCardProps) {
                   const userLang = isZh ? 'zh' : 'en';
                   const rawI18n = sysConfig?.authI18n || {};
                   const currentI18n = (rawI18n.zh || rawI18n.en) ? (rawI18n[userLang] || {}) : rawI18n;
-                  return currentI18n.loginSubtitle || "Step into the canvas. Your signals await.";
+                  return currentI18n.loginSubtitle || (isZh ? "步入画布，你的信号正在等待。" : "Step into the canvas. Your signals await.");
                 })()}
               </p>
             </div>

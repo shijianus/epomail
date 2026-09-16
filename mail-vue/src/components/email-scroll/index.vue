@@ -241,7 +241,7 @@
             <template #default>
               <div class="right-dropdown-item">
                 <Icon icon="ic:outline-report-gmailerrorred" width="20" height="20" />
-                <span>{{t('markSpam') || 'Spam'}}</span>
+                <span>{{t('spam') || 'Spam'}}</span>
               </div>
             </template>
           </el-dropdown-item>
@@ -902,7 +902,7 @@ function handleSpam(emailId) {
 
 function handleRestore(emailId) {
   emailRestore(emailId).then(() => {
-    ElMessage.success(t('restoreSuccess') || 'Email restored');
+    ElMessage.success(t('restoreSuccessMsg') || 'Email restored');
     deleteEmailFromList([emailId]);
     emailStore.refreshSidebarStats();
   });

@@ -15,7 +15,7 @@
         <div class="err-title">{{ $t('oauthAuthorizeTitle') }}</div>
         <div class="err-desc">{{ errorMessage }}</div>
         <el-button type="primary" plain @click="goHome" class="error-return-btn">
-          {{ $t('back') }}
+          {{ $t('backBtn') }}
         </el-button>
       </div>
 
@@ -77,7 +77,7 @@
             v-model="loginForm.password" 
             type="password" 
             show-password 
-            placeholder="账号登录密码" 
+            :placeholder="$t('accountLoginPassword')" 
             size="large"
             @keyup.enter="handleInlineLogin"
           >
@@ -89,7 +89,7 @@
           <el-input 
             v-if="requireTotp"
             v-model="loginForm.code" 
-            placeholder="6 位数字 TOTP 动态验证码" 
+            :placeholder="$t('totpCodePlaceholder')" 
             size="large"
             maxlength="6"
             @keyup.enter="handleInlineLogin"
@@ -107,7 +107,7 @@
               @click="handleInlineLogin" 
               class="authorize-btn"
             >
-              登录并接续授权
+              {{ $t('loginAndContinueAuth') }}
             </el-button>
 
             <el-button 
@@ -165,9 +165,9 @@
           <!-- Verified Origin Capsule -->
           <div v-if="authInfo.app?.homepageUrl" class="app-origin-chip">
             <Icon icon="solar:shield-check-bold" width="13" height="13" class="verified-icon" />
-            <span class="verified-label">官方已验证</span>
+            <span class="verified-label">{{ $t('officiallyVerified') }}</span>
             <span class="chip-divider">·</span>
-            <a :href="authInfo.app.homepageUrl" target="_blank" class="origin-host-link" title="前往应用官方网站">
+            <a :href="authInfo.app.homepageUrl" target="_blank" class="origin-host-link" :title="$t('visitAppWebsite')">
               <span>{{ getHostname(authInfo.app.homepageUrl) }}</span>
               <Icon icon="solar:arrow-right-up-linear" width="11" height="11" class="ext-icon" />
             </a>
@@ -192,7 +192,7 @@
         <div class="scopes-section">
           <div class="scopes-title-row">
             <span class="scopes-title">{{ $t('oauthScopesRequested') }}</span>
-            <span class="scopes-count-pill">{{ scopeList.length }} 项</span>
+            <span class="scopes-count-pill">{{ $t('itemsCount', { count: scopeList.length }) }}</span>
           </div>
 
           <div class="scopes-list">
@@ -399,9 +399,9 @@ const scopeList = computed(() => {
     } else {
       result.push({
         key: s,
-        name: `${s} 访问凭据`,
-        desc: `允许此应用安全访问所请求的「${s}」系统服务与关联数据。`,
-        badge: '系统权限',
+        name: t('oauthScopeFallbackName', { scope: s }),
+        desc: t('oauthScopeFallbackDesc', { scope: s }),
+        badge: t('oauthScopeSystemBadge'),
         isAction: false,
         icon: 'solar:shield-keyhole-bold-duotone',
         color: '#6366f1',
@@ -429,7 +429,7 @@ async function fetchAuthorizeDetails() {
     }
 
     if (!query.client_id) {
-      errorMessage.value = '缺少必要的 client_id 参数，请检查第三方应用的请求地址。'
+      errorMessage.value = t('missingClientIdError')
       return
     }
 

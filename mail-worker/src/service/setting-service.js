@@ -605,14 +605,39 @@ const settingService = {
 			expireDays,
 			sendToNewUsers,
 			isStarred,
-			senderName
+			senderName,
+			templates
 		} = params || {};
+
+		// Normalize multilingual templates: keep only supported langs with non-empty subject & content
+		const SUPPORTED_BROADCAST_LANGS = ['zh', 'zh-Hant', 'en', 'fr', 'es', 'nl'];
+		let normalizedTemplates = null;
+		if (templates && typeof templates === 'object' && !Array.isArray(templates)) {
+			for (const langKey of SUPPORTED_BROADCAST_LANGS) {
+				const tpl = templates[langKey];
+				if (tpl && typeof tpl === 'object' && tpl.subject && String(tpl.subject).trim() && tpl.content && String(tpl.content).trim()) {
+					if (!normalizedTemplates) normalizedTemplates = {};
+					normalizedTemplates[langKey] = {
+						subject: String(tpl.subject),
+						content: String(tpl.content),
+						text: tpl.text ? String(tpl.text) : ''
+					};
+				}
+			}
+		}
 
 		if (!subject || !subject.trim()) {
 			throw new BizError('邮件主题不能为空 Email subject cannot be empty');
 		}
 		if (!content || !content.trim()) {
 			throw new BizError('邮件正文不能为空 Email content cannot be empty');
+		}
+		if (normalizedTemplates) {
+			// Any language missing from custom templates falls back to the legacy single template per recipient language
+			const missing = SUPPORTED_BROADCAST_LANGS.filter(l => !normalizedTemplates[l]);
+			if (missing.length > 0) {
+				console.warn('sendGlobalBroadcastEmail: multilingual templates missing for langs, fallback to base template:', missing.join(', '));
+			}
 		}
 
 		targetType = targetType === 'roles' ? 'roles' : 'all';
@@ -637,12 +662,13 @@ const settingService = {
 			subject,
 			content,
 			text: text || '',
+			templates: normalizedTemplates || null,
 			targetType,
 			targetRoleIds,
 			expireDays,
 			sendToNewUsers,
 			isStarred,
-			senderName: senderName || 'Epocanvas 官方团队',
+			senderName: senderName || null,
 			lastBroadcastTime: nowIso
 		};
 
@@ -696,9 +722,10 @@ const settingService = {
 					subject,
 					content,
 					text,
+					templates: normalizedTemplates || globalConfig.templates || null,
 					expireDays,
 					isStarred,
-					senderName: senderName || 'Epocanvas 官方团队'
+					senderName: senderName || null
 				});
 				if (res) deliverCount++;
 			}
