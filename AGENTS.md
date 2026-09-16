@@ -38,6 +38,7 @@
        - Part B：生产 UI 全域公告弹窗 6 语言 Tab、各语言默认模板加载、多语言配置保存与回环断言，测试配置自动还原（零假数据）；
        - Part C（`RUN_DELIVERY_TESTS=1` 门控）：创建临时测试用户 → 设置法语偏好 → 触发欢迎邮件投递 → 断言法语主题与本地化发件人名 → 测试用户物理清理。
 *   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **epocanvas-mail Git Commit**: `bc3e4b3a58a68f4373dbd00e19e55772bd88e528` (Short Hash: `bc3e4b3`)。
     - 本地验证：`vite build` 前端构建通过、`wrangler deploy --dry-run` Worker 打包通过、Part A 自动化断言 37/37 全绿、临时脚本与本地 miniflare 状态零残留清理；
     - 本机无 Cloudflare 部署凭证，生产 `wrangler deploy` 待在有凭证的机器执行后方可记录 Version ID。
 
