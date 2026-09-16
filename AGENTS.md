@@ -20,7 +20,7 @@
     4. **epomail-android 全量推送**: `git push origin main` 成功 `efb2022..941b14e`，契约对齐与多功能扩展版本正式推送远端，解除「仅本地 commit」状态；
     5. 同步回填本文件过期状态：i18n 收尾记录与 epomail-android 记录由「未 push」更新为已推送。
 *   **部署上线与自动化测试 (Verification & Deployment)**:
-    - **epocanvas-mail Git Commit**: （本记录提交 Hash 见下方回填行）。
+    - **epocanvas-mail Git Commit**: `4353acc552aef0087c8821d00210226a5339098d` (Short Hash: `4353acc`)。
     - 生产 `wrangler deploy` 本次未执行（仅代码推送，部署仍待有凭证机器执行）。
 
 ### 邮件模板多语言深度补全、欢迎邮件四语言零残留翻译、全域公告6语言模板与按收件人语言投递、系统标签多语言映射上线 (2026-09-16)
