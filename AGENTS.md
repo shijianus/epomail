@@ -42,6 +42,29 @@
     - 本地验证：`vite build` 前端构建通过、`wrangler deploy --dry-run` Worker 打包通过、Part A 自动化断言 37/37 全绿、临时脚本与本地 miniflare 状态零残留清理；
     - 本机无 Cloudflare 部署凭证，生产 `wrangler deploy` 待在有凭证的机器执行后方可记录 Version ID。
 
+### i18n 零残留收尾：种子实体动态本地化、登录页双语回退、推荐徽标/日期格式修复与 2017 键对称回归审计上线 (2026-09-16)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **可回归 i18n 审计工具三件套 (Reusable i18n Audit Toolchain)**:
+       - 新增 `scripts/i18n-audit.mjs`：静态提取全部 `.vue/.js` 中 `$t()/t()/i18n.global.t()` 字面量键（含动态用法探测），与 6 语言字典做差集，杜绝「代码已用、字典缺失」导致的键名裸露渲染；
+       - 新增 `scripts/i18n-hardcoded.mjs`：剥离 i18n 包裹、回退串、console、注释、正则与数据比对后，精准定位模板/脚本中用户可见硬编码中文；
+       - 新增 `scripts/i18n-symmetry.mjs`：校验 zh/zh-Hant/en/es/fr/nl 六语言字典键集绝对对称。
+    2. **数据库种子实体动态本地化收尾 (Seed Entity Dynamic Localization)**:
+       - OAuth 官方示例应用（shijianus-blog）描述、遗留基础角色「普通用户」名称与「只有普通使用权限」描述，改由 `sampleAppDesc`/`legacyBaseRoleDesc`/`roleBase` 键动态渲染，彻底杜绝英文/法/西/荷界面残留数据库预置中文；
+       - 应用管理与第三方应用板块卡片描述同步走 `localizedAppDesc`/`localizedGrantDesc` 映射。
+    3. **React 登录应用（temp_login_ui）双语回退补全 (Login App Bilingual Fallbacks)**:
+       - 为 AuthForm/LoginCard/RegisterForm 中 EMAIL/PASSWORD/Stay in orbit/Forgot password/or continue with/New to the canvas/Show password aria 等十余处仅英文回退的硬编码补齐 `isZh` 中文回退，登录页在 zh 浏览器环境下实现 100% 中文、en 环境 100% 英文，零中英混杂。
+    4. **残留硬编码与格式修复 (Residual Hardcode & Locale Fixes)**:
+       - 系统设置「邮件模式」下拉【推荐】徽标改用 `recommendedTag` 键，修复 es/fr/nl/zh-Hant 下推荐二字残留；
+       - 安全设置「上次变更时间」日期格式按 zh/zh-Hant（年月日）与其他语言（ISO）分流，修复西/法/荷语下年月日残留；
+       - 系统设置 Markdown 双工具栏 17 项提示与样例插入文本、TG 机器人与第三方转发公告、Turnstile 阈值规则、存储指南、隐私等级徽标、AI 连通测试消息、KV 键说明、OAuth 授权页与 oauth-app 代码范例 UI、注册密钥/标签/全部邮件/邮件滚动组件等全部用户可见文案完成 i18n 化（对应 42c33f1/bc3e4b3 已收录主体，本提交补齐映射与最终键）。
+    5. **多语言全链路浏览器验证 (Playwright Multi-Language Route Sweep)**:
+       - 本地 `wrangler dev`（本地 D1/KV 全真栈）+ 构建产物实测：20 条路由 × zh/zh-Hant/en/es/fr/nl 六语言 Playwright `innerText` 扫描——en/es/fr/nl 模式 CJK 残留为 0（仅语言选择器按国际惯例保留语言原名「中文 (简体)」），zh-Hant 模式简体特有字残留为 0；
+       - 视觉审计：登录页、权限控制页 + 层级全景弹窗（中英双语截图）、系统设置、写信弹窗（发件人正确锁定当前信箱）渲染完好，无键名裸露、无布局崩坏；
+       - 字典最终态：6 语言 × 2017 键严格对称，1572 个代码字面量键 100% 命中，缺失键为 0；本地测试数据（D1 种子站长账号）仅存于 `.wrangler/state-v2` 本地状态，不入库不入仓。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **epocanvas-mail Git Commit**: 待本记录提交后回填（Short Hash: `0c1e265`）。
+    - 本地验证：`vite build` 前端构建通过、temp_login_ui 构建通过、六语言 Playwright 路由扫描全绿；暂未执行生产 `wrangler deploy`（按要求暂不 push/不部署）。
+
 ### 全专案i18n 100%完整本地化重构、6国主流语言零残留泄漏保障、1781键绝对对称与角色/模板动态本地化上线 (2026-09-14)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **6国语言 100% 绝对对称与零外部字符残留 (Zero-Leakage 1781-Key Canonical Dictionaries)**:
