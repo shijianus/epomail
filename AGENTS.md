@@ -39,7 +39,7 @@
        - 前端 `vite build` 编译 0 报错；
        - `tests/test-multilingual-email-templates-e2e.mjs` 51 项端到端断言 100% 全绿，测试配置与状态完全自动还原，恪守零假数据与自动还原准则。
 *   **部署上线与自动化测试 (Verification & Deployment)**:
-    - **epocanvas-mail Git Commit**: PENDING (Short Hash: PENDING).
+    - **epocanvas-mail Git Commit**: `cff8c3bcff144209b31981117aacbe71be6f6c1c` (Short Hash: `cff8c3b`).
 
 ### 远端最新代码拉取合并、Cloudflare生产上线部署、公告弹窗语言切换根因修复、多方式接口兼容与Playwright 58项全链路核验上线 (2026-09-17)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
