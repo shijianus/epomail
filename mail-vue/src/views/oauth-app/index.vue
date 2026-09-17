@@ -3,7 +3,12 @@
     <!-- 1. Header & Overview Card -->
     <div class="container header-container">
       <div class="header-top-row">
-        <div class="main-title">{{ $t('oauthAppsTitle') }}</div>
+        <div class="main-title" style="display: inline-flex; align-items: center; gap: 6px;">
+          <span>{{ $t('oauthAppsTitle') }}</span>
+          <el-tooltip effect="dark" :content="$t('oauthAppsDesc')" placement="top">
+            <Icon icon="fluent:question-circle-16-regular" width="16" height="16" style="cursor: pointer; color: var(--el-text-color-secondary);" />
+          </el-tooltip>
+        </div>
         <div class="header-actions">
           <el-tooltip :content="$t('oauthBlogGuideTooltip')" placement="bottom">
             <el-button @click="openBlogTutorial" class="guide-btn">
@@ -17,9 +22,6 @@
             {{ $t('registerNewApp') }}
           </el-button>
         </div>
-      </div>
-      <div class="section-intro">
-        {{ $t('oauthAppsDesc') }}
       </div>
 
       <!-- OIDC Standard Endpoints Bar -->
@@ -176,8 +178,12 @@
       <div class="dialog-body-form">
         <div class="dialog-field">
           <div class="d-label-row">
-            <span class="d-label">{{ $t('appName') }} <span class="required-star">*</span></span>
-            <span class="d-sub-hint">{{ $t('appNameDisplayHint') }}</span>
+            <span class="d-label" style="display: inline-flex; align-items: center; gap: 4px;">
+              {{ $t('appName') }} <span class="required-star">*</span>
+              <el-tooltip effect="dark" :content="$t('appNameDisplayHint')" placement="top">
+                <Icon icon="fluent:question-circle-16-regular" width="14" height="14" style="cursor: pointer; color: var(--el-text-color-secondary);" />
+              </el-tooltip>
+            </span>
           </div>
           <el-input 
             v-model="appForm.name" 
@@ -189,8 +195,12 @@
 
         <div class="dialog-field">
           <div class="d-label-row">
-            <span class="d-label">{{ $t('homepageUrl') }} <span class="required-star">*</span></span>
-            <span class="d-sub-hint">{{ $t('homepageUrlHint') }}</span>
+            <span class="d-label" style="display: inline-flex; align-items: center; gap: 4px;">
+              {{ $t('homepageUrl') }} <span class="required-star">*</span>
+              <el-tooltip effect="dark" :content="$t('homepageUrlHint')" placement="top">
+                <Icon icon="fluent:question-circle-16-regular" width="14" height="14" style="cursor: pointer; color: var(--el-text-color-secondary);" />
+              </el-tooltip>
+            </span>
           </div>
           <el-input 
             v-model="appForm.homepageUrl" 
@@ -201,8 +211,12 @@
 
         <div class="dialog-field">
           <div class="d-label-row">
-            <span class="d-label">{{ $t('appDesc') }}</span>
-            <span class="d-sub-hint">{{ $t('appDescHint') }}</span>
+            <span class="d-label" style="display: inline-flex; align-items: center; gap: 4px;">
+              {{ $t('appDesc') }}
+              <el-tooltip effect="dark" :content="$t('appDescHint')" placement="top">
+                <Icon icon="fluent:question-circle-16-regular" width="14" height="14" style="cursor: pointer; color: var(--el-text-color-secondary);" />
+              </el-tooltip>
+            </span>
           </div>
           <el-input 
             v-model="appForm.description" 
@@ -215,8 +229,12 @@
 
         <div class="dialog-field">
           <div class="d-label-row">
-            <span class="d-label">{{ $t('callbackUrls') }} <span class="required-star">*</span></span>
-            <span class="d-sub-hint">{{ $t('redirectUrisHint') }}</span>
+            <span class="d-label" style="display: inline-flex; align-items: center; gap: 4px;">
+              {{ $t('callbackUrls') }} <span class="required-star">*</span>
+              <el-tooltip effect="dark" :content="`${$t('redirectUrisHint')} (${$t('redirectUrisNote')})`" placement="top">
+                <Icon icon="fluent:question-circle-16-regular" width="14" height="14" style="cursor: pointer; color: var(--el-text-color-secondary);" />
+              </el-tooltip>
+            </span>
           </div>
           <el-input 
             v-model="appForm.redirectUrisText" 
@@ -224,15 +242,16 @@
             :rows="3" 
             :placeholder="$t('callbackUrlsPlaceholder') || 'https://example.com/api/auth/callback\nhttp://localhost:3000/api/auth/callback/epomail'"
           />
-          <div class="input-bottom-tips">
-            {{ $t('redirectUrisNote') }}
-          </div>
         </div>
 
         <div class="dialog-field">
           <div class="d-label-row">
-            <span class="d-label">{{ $t('appLogo') }}</span>
-            <span class="d-sub-hint">{{ $t('logoUrlHint') }}</span>
+            <span class="d-label" style="display: inline-flex; align-items: center; gap: 4px;">
+              {{ $t('appLogo') }}
+              <el-tooltip effect="dark" :content="$t('logoUrlHint')" placement="top">
+                <Icon icon="fluent:question-circle-16-regular" width="14" height="14" style="cursor: pointer; color: var(--el-text-color-secondary);" />
+              </el-tooltip>
+            </span>
           </div>
           <el-input 
             v-model="appForm.logoUrl" 

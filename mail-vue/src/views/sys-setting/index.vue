@@ -32,7 +32,7 @@
               <div class="setting-item">
                 <div>
                   <span>{{ $t('mailMode') }}</span>
-                  <el-tooltip effect="dark" :content="$t('mailModeDesc')">
+                  <el-tooltip effect="dark" :content="mailModeCurrentTooltip">
                     <Icon class="warning" icon="fe:warning" width="18" height="18"/>
                   </el-tooltip>
                 </div>
@@ -63,7 +63,7 @@
               <div class="setting-item">
                 <div>
                   <span>{{ $t('totpSetting') }}</span>
-                  <el-tooltip effect="dark" :content="isTotpLocked ? $t('totpLockedDesc') : $t('totpSettingDesc')">
+                  <el-tooltip effect="dark" :content="totpTooltip">
                     <Icon class="warning" icon="fe:warning" width="18" height="18"/>
                   </el-tooltip>
                 </div>
@@ -149,6 +149,9 @@
                 >
                   <Icon icon="fluent:image-20-filled" width="16" height="16" />
                   <span>{{ $t('staticUi') }}</span>
+                  <el-tooltip effect="dark" :content="$t('staticUiTip')" placement="top">
+                    <Icon icon="fluent:question-circle-16-regular" width="14" height="14" style="margin-left: 4px; vertical-align: -1px;" />
+                  </el-tooltip>
                 </div>
               </div>
 
@@ -229,10 +232,6 @@
                       </el-button>
                     </div>
                   </div>
-                </div>
-                <div class="static-ui-tip">
-                  <Icon icon="fe:warning" width="14" height="14" />
-                  <span>{{ $t('staticUiTip') }}</span>
                 </div>
               </template>
             </div>
@@ -392,7 +391,7 @@
               <div class="setting-item" :class="{ 'item-disabled': Number(setting.allMailMode) === 2 }">
                 <div class="title-item">
                   <span>{{ $t('tgBot') }}</span>
-                  <el-tooltip effect="dark" :content="$t('tgBotDesc')">
+                  <el-tooltip effect="dark" :content="tgBotCurrentTooltip">
                     <Icon class="warning" icon="fe:warning" width="18" height="18"/>
                   </el-tooltip>
                 </div>
@@ -677,7 +676,7 @@
               <div class="setting-item">
                 <div class="title-item">
                   <span>{{ $t('signUpVerification') }}</span>
-                  <el-tooltip effect="dark" :content="$t('signUpVerificationTooltip')">
+                  <el-tooltip effect="dark" :content="signUpVerificationCurrentTooltip">
                     <Icon class="warning" icon="fe:warning" width="18" height="18"/>
                   </el-tooltip>
                 </div>
@@ -701,7 +700,7 @@
               <div class="setting-item">
                 <div class="title-item">
                   <span>{{ $t('addEmailVerification') }}</span>
-                  <el-tooltip effect="dark" :content="$t('addEmailVerificationTooltip')">
+                  <el-tooltip effect="dark" :content="addEmailVerificationCurrentTooltip">
                     <Icon class="warning" icon="fe:warning" width="18" height="18"/>
                   </el-tooltip>
                 </div>
@@ -1196,8 +1195,12 @@
 
           <div class="dialog-field">
             <div class="d-label-row">
-              <span class="d-label">{{ $t('tgChatId') || 'Chat ID' }} <span style="color: var(--el-color-danger)">*</span></span>
-              <span class="d-sub-hint">{{ $t('supportMultipleChatIds') }}</span>
+              <div style="display: inline-flex; align-items: center; gap: 4px;">
+                <span class="d-label">{{ $t('tgChatId') || 'Chat ID' }} <span style="color: var(--el-color-danger)">*</span></span>
+                <el-tooltip effect="dark" :content="$t('supportMultipleChatIds')" placement="top">
+                  <Icon icon="fluent:question-circle-16-regular" width="15" height="15" style="cursor: pointer; color: var(--el-text-color-secondary);" />
+                </el-tooltip>
+              </div>
             </div>
             <el-input-tag 
               v-model="tgChatId" 
@@ -1210,8 +1213,12 @@
 
           <div class="dialog-field">
             <div class="d-label-row">
-              <span class="d-label">{{ $t('customDomain') }}</span>
-              <span class="d-sub-hint">{{ $t('tgProxyEmptyHint') }}</span>
+              <div style="display: inline-flex; align-items: center; gap: 4px;">
+                <span class="d-label">{{ $t('customDomain') }}</span>
+                <el-tooltip effect="dark" :content="$t('tgProxyEmptyHint')" placement="top">
+                  <Icon icon="fluent:question-circle-16-regular" width="15" height="15" style="cursor: pointer; color: var(--el-text-color-secondary);" />
+                </el-tooltip>
+              </div>
             </div>
             <el-input 
               v-model="customDomain" 
@@ -1309,8 +1316,12 @@
           </div>
           <div class="dialog-field">
             <div class="d-label-row">
-              <span class="d-label">{{ $t('otherEmail') }}</span>
-              <span class="d-sub-hint">{{ $t('supportMultipleEmails') }}</span>
+              <div style="display: inline-flex; align-items: center; gap: 4px;">
+                <span class="d-label">{{ $t('otherEmail') }}</span>
+                <el-tooltip effect="dark" :content="$t('supportMultipleEmails')" placement="top">
+                  <Icon icon="fluent:question-circle-16-regular" width="15" height="15" style="cursor: pointer; color: var(--el-text-color-secondary);" />
+                </el-tooltip>
+              </div>
             </div>
             <el-input-tag tag-type="primary" :placeholder="$t('otherEmailInputDesc')" v-model="forwardEmail"
                           @add-tag="emailAddTag"></el-input-tag>
@@ -1343,8 +1354,12 @@
         <div class="forward-set-body">
           <div class="dialog-field">
             <div class="d-label-row">
-              <span class="d-label">{{ $t('ruleEmails') }}</span>
-              <span class="d-sub-hint">{{ $t('emailEnterToAdd') }}</span>
+              <div style="display: inline-flex; align-items: center; gap: 4px;">
+                <span class="d-label">{{ $t('ruleEmails') }}</span>
+                <el-tooltip effect="dark" :content="$t('emailEnterToAdd')" placement="top">
+                  <Icon icon="fluent:question-circle-16-regular" width="15" height="15" style="cursor: pointer; color: var(--el-text-color-secondary);" />
+                </el-tooltip>
+              </div>
             </div>
             <el-input-tag :disabled="Number(setting.allMailMode) === 2" :placeholder="$t('ruleEmailsInputDesc')" tag-type="primary" v-model="ruleEmail"
                           @add-tag="ruleEmailAddTag"/>
@@ -1373,19 +1388,12 @@
           class="unified-drawer"
       >
         <div class="drawer-content">
-          <div class="drawer-desc">
-            <div class="desc-title">{{ $t('signUpThresholdTitle') }}</div>
-            <div class="desc-body">
-              {{ $t('signUpThresholdDesc') }}
-            </div>
-            <div class="desc-rule">
-              <strong>{{ $t('ruleNoteLabel') }}</strong>{{ $t('signUpThresholdNote') }}
-            </div>
-          </div>
-
           <div style="margin-bottom: 16px;">
-            <div style="font-size: 13px; font-weight: 600; margin-bottom: 8px; color: var(--el-text-color-primary);">
-              {{ $t('signUpThresholdLabel') }}
+            <div style="font-size: 13px; font-weight: 600; margin-bottom: 8px; color: var(--el-text-color-primary); display: flex; align-items: center; gap: 4px;">
+              <span>{{ $t('signUpThresholdLabel') }}</span>
+              <el-tooltip effect="dark" :content="$t('signUpThresholdDesc') + ' ' + $t('signUpThresholdNote')" placement="top">
+                <Icon icon="fluent:question-circle-16-regular" width="16" height="16" style="cursor: pointer; color: var(--el-text-color-secondary);" />
+              </el-tooltip>
             </div>
             <el-input-number v-model="regVerifyCount" :min="1" :max="9999" style="width: 100%;">
               <template #suffix>
@@ -1411,19 +1419,12 @@
           class="unified-drawer"
       >
         <div class="drawer-content">
-          <div class="drawer-desc">
-            <div class="desc-title">{{ $t('addEmailThresholdTitle') }}</div>
-            <div class="desc-body">
-              {{ $t('addEmailThresholdDesc') }}
-            </div>
-            <div class="desc-rule">
-              <strong>{{ $t('ruleNoteLabel') }}</strong>{{ $t('addEmailThresholdNote') }}
-            </div>
-          </div>
-
           <div style="margin-bottom: 16px;">
-            <div style="font-size: 13px; font-weight: 600; margin-bottom: 8px; color: var(--el-text-color-primary);">
-              {{ $t('addEmailThresholdLabel') }}
+            <div style="font-size: 13px; font-weight: 600; margin-bottom: 8px; color: var(--el-text-color-primary); display: flex; align-items: center; gap: 4px;">
+              <span>{{ $t('addEmailThresholdLabel') }}</span>
+              <el-tooltip effect="dark" :content="$t('addEmailThresholdDesc') + ' ' + $t('addEmailThresholdNote')" placement="top">
+                <Icon icon="fluent:question-circle-16-regular" width="16" height="16" style="cursor: pointer; color: var(--el-text-color-secondary);" />
+              </el-tooltip>
             </div>
             <el-input-number v-model="addVerifyCount" :min="1" :max="9999" style="width: 100%;">
               <template #suffix>
@@ -2215,18 +2216,24 @@
           <!-- Top Row: Provider Presets (4 Pills horizontally in 1 row) -->
           <div class="dialog-field preset-field">
             <div class="d-label-row">
-              <span class="d-field-title">{{ $t('providerPreset') }}</span>
-              <span class="d-sub-hint">{{ $t('providerPresetHint') }}</span>
+              <div style="display: inline-flex; align-items: center; gap: 4px;">
+                <span class="d-field-title">{{ $t('providerPreset') }}</span>
+                <el-tooltip effect="dark" :content="$t('providerPresetHint')" placement="top">
+                  <Icon icon="fluent:question-circle-16-regular" width="15" height="15" style="cursor: pointer; color: var(--el-text-color-secondary);" />
+                </el-tooltip>
+              </div>
             </div>
             <div class="provider-preset-pills-row">
-              <div 
-                class="provider-pill" 
-                :class="{ active: s3.provider === 'backblaze' }" 
-                @click="selectS3Provider('backblaze')"
-              >
-                <Icon icon="simple-icons:backblaze" width="15" height="15" class="p-icon b2" />
-                <span>{{ $t('b2Preset') }}</span>
-              </div>
+              <el-tooltip effect="dark" :content="$t('backblazeGuideDesc')" placement="top">
+                <div 
+                  class="provider-pill" 
+                  :class="{ active: s3.provider === 'backblaze' }" 
+                  @click="selectS3Provider('backblaze')"
+                >
+                  <Icon icon="simple-icons:backblaze" width="15" height="15" class="p-icon b2" />
+                  <span>{{ $t('b2Preset') }}</span>
+                </div>
+              </el-tooltip>
               <div 
                 class="provider-pill" 
                 :class="{ active: s3.provider === 'aws' }" 
@@ -2254,14 +2261,6 @@
             </div>
           </div>
 
-          <!-- Backblaze B2 Guidance (Compact Single Line / Flex) -->
-          <div class="b2-guidance-box compact" v-if="s3.provider === 'backblaze'">
-            <Icon icon="fluent:sparkle-20-filled" width="15" height="15" class="g-icon" />
-            <span>
-              <strong>{{ $t('backblazeGuideTitle') }}</strong>{{ $t('backblazeGuideDesc') }}
-            </span>
-          </div>
-
           <!-- Main 2-Column Grid for Input Fields -->
           <div class="s3-form-2col">
             <!-- Left Column -->
@@ -2269,8 +2268,12 @@
               <!-- Bucket Field -->
               <div class="dialog-field">
                 <div class="d-label-row">
-                  <span class="d-field-title">{{ $t('bucketName') }} *</span>
-                  <span class="d-sub-hint">{{ $t('bucketNameHint') }}</span>
+                  <div style="display: inline-flex; align-items: center; gap: 4px;">
+                    <span class="d-field-title">{{ $t('bucketName') }} *</span>
+                    <el-tooltip effect="dark" :content="$t('bucketNameHint')" placement="top">
+                      <Icon icon="fluent:question-circle-16-regular" width="15" height="15" style="cursor: pointer; color: var(--el-text-color-secondary);" />
+                    </el-tooltip>
+                  </div>
                 </div>
                 <el-input 
                   v-model="s3.bucket" 
@@ -2282,8 +2285,12 @@
               <!-- Endpoint Field -->
               <div class="dialog-field">
                 <div class="d-label-row">
-                  <span class="d-field-title">{{ $t('endpoint') }} *</span>
-                  <span class="d-sub-hint">{{ $t('endpointHint') }}</span>
+                  <div style="display: inline-flex; align-items: center; gap: 4px;">
+                    <span class="d-field-title">{{ $t('endpoint') }} *</span>
+                    <el-tooltip effect="dark" :content="$t('endpointHint')" placement="top">
+                      <Icon icon="fluent:question-circle-16-regular" width="15" height="15" style="cursor: pointer; color: var(--el-text-color-secondary);" />
+                    </el-tooltip>
+                  </div>
                 </div>
                 <el-input 
                   v-model="s3.endpoint" 
@@ -2295,8 +2302,12 @@
               <!-- Custom CDN Domain (Bandwidth Alliance) -->
               <div class="dialog-field">
                 <div class="d-label-row">
-                  <span class="d-field-title">{{ $t('customCdnDomain') }}</span>
-                  <span class="d-sub-hint">{{ $t('customCdnDomainHint') }}</span>
+                  <div style="display: inline-flex; align-items: center; gap: 4px;">
+                    <span class="d-field-title">{{ $t('customCdnDomain') }}</span>
+                    <el-tooltip effect="dark" :content="$t('customCdnDomainHint')" placement="top">
+                      <Icon icon="fluent:question-circle-16-regular" width="15" height="15" style="cursor: pointer; color: var(--el-text-color-secondary);" />
+                    </el-tooltip>
+                  </div>
                 </div>
                 <el-input 
                   v-model="s3.customDomain" 
@@ -2312,8 +2323,12 @@
               <div class="dialog-row-2col">
                 <div class="dialog-field">
                   <div class="d-label-row">
-                    <span class="d-field-title">{{ $t('region') }}</span>
-                    <span class="d-sub-hint">{{ $t('regionHint') }}</span>
+                    <div style="display: inline-flex; align-items: center; gap: 4px;">
+                      <span class="d-field-title">{{ $t('region') }}</span>
+                      <el-tooltip effect="dark" :content="$t('regionHint')" placement="top">
+                        <Icon icon="fluent:question-circle-16-regular" width="15" height="15" style="cursor: pointer; color: var(--el-text-color-secondary);" />
+                      </el-tooltip>
+                    </div>
                   </div>
                   <el-input 
                     v-model="s3.region" 
@@ -2343,8 +2358,12 @@
               <!-- Credentials Fields -->
               <div class="dialog-field">
                 <div class="d-label-row">
-                  <span class="d-field-title">{{ s3.provider === 'backblaze' ? 'Key ID (Access Key) *' : $t('s3AccessKeyId') + ' *' }}</span>
-                  <span class="d-sub-hint">{{ setting.s3AccessKey ? $t('configured') + ': ' + setting.s3AccessKey : $t('s3AccessKeyHint') }}</span>
+                  <div style="display: inline-flex; align-items: center; gap: 4px;">
+                    <span class="d-field-title">{{ s3.provider === 'backblaze' ? 'Key ID (Access Key) *' : $t('s3AccessKeyId') + ' *' }}</span>
+                    <el-tooltip effect="dark" :content="setting.s3AccessKey ? $t('configured') + ': ' + setting.s3AccessKey : $t('s3AccessKeyHint')" placement="top">
+                      <Icon icon="fluent:question-circle-16-regular" width="15" height="15" style="cursor: pointer; color: var(--el-text-color-secondary);" />
+                    </el-tooltip>
+                  </div>
                 </div>
                 <el-input 
                   v-model="s3.s3AccessKey" 
@@ -2356,8 +2375,12 @@
 
               <div class="dialog-field">
                 <div class="d-label-row">
-                  <span class="d-field-title">{{ s3.provider === 'backblaze' ? 'Application Key (Secret Key) *' : $t('s3SecretKey') + ' *' }}</span>
-                  <span class="d-sub-hint">{{ setting.s3SecretKey ? $t('encrypted') : $t('s3SecretKeyHint') }}</span>
+                  <div style="display: inline-flex; align-items: center; gap: 4px;">
+                    <span class="d-field-title">{{ s3.provider === 'backblaze' ? 'Application Key (Secret Key) *' : $t('s3SecretKey') + ' *' }}</span>
+                    <el-tooltip effect="dark" :content="setting.s3SecretKey ? $t('encrypted') : $t('s3SecretKeyHint')" placement="top">
+                      <Icon icon="fluent:question-circle-16-regular" width="15" height="15" style="cursor: pointer; color: var(--el-text-color-secondary);" />
+                    </el-tooltip>
+                  </div>
                 </div>
                 <el-input 
                   v-model="s3.s3SecretKey" 
@@ -2418,26 +2441,34 @@
           <!-- Database Provider Presets -->
           <div class="dialog-field preset-field">
             <div class="d-label-row">
-              <span class="d-field-title">{{ $t('dbProviderPreset') }}</span>
-              <span class="d-sub-hint">{{ $t('dbProviderPresetHint') }}</span>
+              <div style="display: inline-flex; align-items: center; gap: 4px;">
+                <span class="d-field-title">{{ $t('dbProviderPreset') }}</span>
+                <el-tooltip effect="dark" :content="$t('dbProviderPresetHint')" placement="top">
+                  <Icon icon="fluent:question-circle-16-regular" width="15" height="15" style="cursor: pointer; color: var(--el-text-color-secondary);" />
+                </el-tooltip>
+              </div>
             </div>
             <div class="provider-preset-pills-row">
-              <div 
-                class="provider-pill" 
-                :class="{ active: dbForm.provider === 'turso' }" 
-                @click="selectDbProvider('turso')"
-              >
-                <Icon icon="simple-icons:turso" width="15" height="15" class="p-icon b2" />
-                <span>{{ $t('tursoPreset') }}</span>
-              </div>
-              <div 
-                class="provider-pill" 
-                :class="{ active: dbForm.provider === 'd1' }" 
-                @click="selectDbProvider('d1')"
-              >
-                <Icon icon="simple-icons:cloudflare" width="15" height="15" class="p-icon r2" />
-                <span>{{ $t('d1Preset') }}</span>
-              </div>
+              <el-tooltip effect="dark" :content="$t('tursoGuideDesc')" placement="top">
+                <div 
+                  class="provider-pill" 
+                  :class="{ active: dbForm.provider === 'turso' }" 
+                  @click="selectDbProvider('turso')"
+                >
+                  <Icon icon="simple-icons:turso" width="15" height="15" class="p-icon b2" />
+                  <span>{{ $t('tursoPreset') }}</span>
+                </div>
+              </el-tooltip>
+              <el-tooltip effect="dark" :content="$t('d1GuideDesc')" placement="top">
+                <div 
+                  class="provider-pill" 
+                  :class="{ active: dbForm.provider === 'd1' }" 
+                  @click="selectDbProvider('d1')"
+                >
+                  <Icon icon="simple-icons:cloudflare" width="15" height="15" class="p-icon r2" />
+                  <span>{{ $t('d1Preset') }}</span>
+                </div>
+              </el-tooltip>
               <div 
                 class="provider-pill" 
                 :class="{ active: dbForm.provider === 'd1_http' }" 
@@ -2457,27 +2488,6 @@
             </div>
           </div>
 
-          <!-- Provider Guidance Box (Compact) -->
-          <div class="b2-guidance-box compact" v-if="dbForm.provider === 'turso'">
-            <Icon icon="fluent:sparkle-20-filled" width="15" height="15" class="g-icon" />
-            <span>
-              <strong>{{ $t('tursoGuideTitle') }}</strong>{{ $t('tursoGuideDesc') }}
-            </span>
-          </div>
-
-          <div class="b2-guidance-box compact" v-else-if="dbForm.provider === 'd1'">
-            <Icon icon="fluent:info-20-filled" width="15" height="15" class="g-icon" />
-            <span>
-              <strong>{{ $t('d1GuideTitle') }}</strong>{{ $t('d1GuideDesc') }}
-            </span>
-          </div>
-
-          <!-- Notice when external DB is disabled -->
-          <div class="b2-guidance-box compact" v-if="dbForm.provider !== 'd1' && dbForm.enabled !== 1">
-            <Icon icon="fluent:info-20-filled" width="15" height="15" class="g-icon" />
-            <span>{{ $t('dbDisabledNotice') }}</span>
-          </div>
-
           <!-- 2-Column Form for External DB -->
           <div class="s3-form-2col" v-if="dbForm.provider !== 'd1'">
             <!-- Left Column -->
@@ -2485,8 +2495,12 @@
               <!-- Enable Switch -->
               <div class="dialog-field">
                 <div class="d-label-row">
-                  <span class="d-field-title">{{ $t('enableExternalDb') }}</span>
-                  <span class="d-sub-hint">{{ $t('enableExternalDbHint') }}</span>
+                  <div style="display: inline-flex; align-items: center; gap: 4px;">
+                    <span class="d-field-title">{{ $t('enableExternalDb') }}</span>
+                    <el-tooltip effect="dark" :content="$t('enableExternalDbHint')" placement="top">
+                      <Icon icon="fluent:question-circle-16-regular" width="15" height="15" style="cursor: pointer; color: var(--el-text-color-secondary);" />
+                    </el-tooltip>
+                  </div>
                 </div>
                 <div class="fps-switch-wrapper" style="margin-top: 4px;">
                   <el-switch 
@@ -2503,8 +2517,12 @@
               <!-- Endpoint Field -->
               <div class="dialog-field" v-if="dbForm.enabled === 1">
                 <div class="d-label-row">
-                  <span class="d-field-title">{{ $t('dbEndpoint') }} *</span>
-                  <span class="d-sub-hint">{{ $t('dbEndpointHint') }}</span>
+                  <div style="display: inline-flex; align-items: center; gap: 4px;">
+                    <span class="d-field-title">{{ $t('dbEndpoint') }} *</span>
+                    <el-tooltip effect="dark" :content="$t('dbEndpointHint')" placement="top">
+                      <Icon icon="fluent:question-circle-16-regular" width="15" height="15" style="cursor: pointer; color: var(--el-text-color-secondary);" />
+                    </el-tooltip>
+                  </div>
                 </div>
                 <el-input 
                   v-model="dbForm.endpoint" 
@@ -2532,8 +2550,12 @@
               <!-- Auth Token -->
               <div class="dialog-field">
                 <div class="d-label-row">
-                  <span class="d-field-title">{{ $t('dbAuthToken') }} *</span>
-                  <span class="d-sub-hint">{{ setting.externalDbToken ? $t('configured') + ': ' + setting.externalDbToken : $t('dbAuthTokenHint') }}</span>
+                  <div style="display: inline-flex; align-items: center; gap: 4px;">
+                    <span class="d-field-title">{{ $t('dbAuthToken') }} *</span>
+                    <el-tooltip effect="dark" :content="setting.externalDbToken ? $t('configured') + ': ' + setting.externalDbToken : $t('dbAuthTokenHint')" placement="top">
+                      <Icon icon="fluent:question-circle-16-regular" width="15" height="15" style="cursor: pointer; color: var(--el-text-color-secondary);" />
+                    </el-tooltip>
+                  </div>
                 </div>
                 <el-input 
                   v-model="dbForm.token" 
@@ -2547,8 +2569,12 @@
               <!-- Database Name / Namespace -->
               <div class="dialog-field">
                 <div class="d-label-row">
-                  <span class="d-field-title">{{ $t('dbName') }}</span>
-                  <span class="d-sub-hint">{{ $t('dbNameHint') }}</span>
+                  <div style="display: inline-flex; align-items: center; gap: 4px;">
+                    <span class="d-field-title">{{ $t('dbName') }}</span>
+                    <el-tooltip effect="dark" :content="$t('dbNameHint')" placement="top">
+                      <Icon icon="fluent:question-circle-16-regular" width="15" height="15" style="cursor: pointer; color: var(--el-text-color-secondary);" />
+                    </el-tooltip>
+                  </div>
                 </div>
                 <el-input 
                   v-model="dbForm.name" 
@@ -2603,21 +2629,14 @@
         class="storage-config-dialog attachment-rule-dialog"
       >
         <div class="s3-modal-body">
-          <!-- Notice when external S3 is not configured -->
-          <div class="b2-guidance-box" style="margin-bottom: 12px;" v-if="!setting.bucket">
-            <div class="g-header">
-              <Icon icon="fluent:info-20-filled" width="16" height="16" class="g-icon" />
-              <span class="g-title">{{ $t('attachmentRuleNoS3Title') }}</span>
-            </div>
-            <div class="g-content">
-              {{ $t('attachmentRuleNoS3Desc') }}
-            </div>
-          </div>
-
           <div class="dialog-field">
             <div class="d-label-row">
-              <span class="d-field-title">{{ $t('attachmentPolicyLabel') }}</span>
-              <span class="d-sub-hint">{{ $t('attachmentStorageRuleDesc') }}</span>
+              <div style="display: inline-flex; align-items: center; gap: 4px;">
+                <span class="d-field-title">{{ $t('attachmentPolicyLabel') }}</span>
+                <el-tooltip effect="dark" :content="$t('attachmentStorageRuleDesc')" placement="top">
+                  <Icon icon="fluent:question-circle-16-regular" width="15" height="15" style="cursor: pointer; color: var(--el-text-color-secondary);" />
+                </el-tooltip>
+              </div>
             </div>
             
             <div class="policy-card-group">
@@ -2632,8 +2651,10 @@
                   <div class="p-title">
                     <Icon icon="simple-icons:backblaze" width="16" height="16" class="p-brand-icon b2" />
                     <span>{{ $t('policyB2First') }}</span>
+                    <el-tooltip effect="dark" :content="$t('policyB2FirstDesc')" placement="top">
+                      <Icon icon="fluent:question-circle-16-regular" width="14" height="14" style="cursor: pointer; color: var(--el-text-color-secondary); margin-left: 4px;" />
+                    </el-tooltip>
                   </div>
-                  <div class="p-desc">{{ $t('policyB2FirstDesc') }}</div>
                 </div>
               </div>
 
@@ -2648,8 +2669,10 @@
                   <div class="p-title">
                     <Icon icon="fluent:split-horizontal-20-filled" width="16" height="16" class="p-brand-icon smart" />
                     <span>{{ $t('policySmartTier') }}</span>
+                    <el-tooltip effect="dark" :content="$t('policySmartTierDesc')" placement="top">
+                      <Icon icon="fluent:question-circle-16-regular" width="14" height="14" style="cursor: pointer; color: var(--el-text-color-secondary); margin-left: 4px;" />
+                    </el-tooltip>
                   </div>
-                  <div class="p-desc">{{ $t('policySmartTierDesc') }}</div>
                 </div>
               </div>
 
@@ -2664,8 +2687,10 @@
                   <div class="p-title">
                     <Icon icon="simple-icons:cloudflare" width="16" height="16" class="p-brand-icon r2" />
                     <span>{{ $t('policyEdgeFirst') }}</span>
+                    <el-tooltip effect="dark" :content="$t('policyEdgeFirstDesc')" placement="top">
+                      <Icon icon="fluent:question-circle-16-regular" width="14" height="14" style="cursor: pointer; color: var(--el-text-color-secondary); margin-left: 4px;" />
+                    </el-tooltip>
                   </div>
-                  <div class="p-desc">{{ $t('policyEdgeFirstDesc') }}</div>
                 </div>
               </div>
             </div>
@@ -2674,14 +2699,18 @@
           <!-- Max Attachment Size -->
           <div class="dialog-field">
             <div class="d-label-row">
-              <span class="d-field-title">{{ $t('maxAttachmentSize') }}</span>
-              <span class="d-sub-hint">{{ $t('maxAttachmentSizeHint') }}</span>
+              <div style="display: inline-flex; align-items: center; gap: 4px;">
+                <span class="d-field-title">{{ $t('maxAttachmentSize') }}</span>
+                <el-tooltip effect="dark" :content="$t('maxAttachmentSizeHint')" placement="top">
+                  <Icon icon="fluent:question-circle-16-regular" width="15" height="15" style="cursor: pointer; color: var(--el-text-color-secondary);" />
+                </el-tooltip>
+              </div>
             </div>
             <el-input-number 
               v-model="attachmentRuleForm.maxSizeMb" 
               :min="1" 
               :max="500" 
-              :step="5"
+              :step="5" 
               style="width: 100%;"
             >
               <template #suffix>
@@ -2693,8 +2722,12 @@
           <!-- Cascade Delete -->
           <div class="dialog-field">
             <div class="d-label-row">
-              <span class="d-field-title">{{ $t('cascadeDeleteAttachment') }}</span>
-              <span class="d-sub-hint">{{ $t('cascadeDeleteAttachmentHint') }}</span>
+              <div style="display: inline-flex; align-items: center; gap: 4px;">
+                <span class="d-field-title">{{ $t('cascadeDeleteAttachment') }}</span>
+                <el-tooltip effect="dark" :content="$t('cascadeDeleteAttachmentHint')" placement="top">
+                  <Icon icon="fluent:question-circle-16-regular" width="15" height="15" style="cursor: pointer; color: var(--el-text-color-secondary);" />
+                </el-tooltip>
+              </div>
             </div>
             <div class="fps-switch-wrapper" style="margin-top: 6px;">
               <el-switch 
@@ -3035,19 +3068,12 @@
           class="unified-drawer"
       >
         <div class="drawer-content">
-          <div class="drawer-desc">
-            <div class="desc-title">{{ $t('emailPrefixRuleTitle') }}</div>
-            <div class="desc-body">
-              {{ $t('emailPrefixRuleDesc') }}
-            </div>
-            <div class="desc-rule">
-              <strong>{{ $t('ruleNoteLabel') }}</strong>{{ $t('emailPrefixRuleNote') }}
-            </div>
-          </div>
-
           <div style="margin-bottom: 16px;">
-            <div style="font-size: 13px; font-weight: 600; margin-bottom: 8px; color: var(--el-text-color-primary);">
-              {{ $t('emailPrefixMinLength') }}
+            <div style="font-size: 13px; font-weight: 600; margin-bottom: 8px; color: var(--el-text-color-primary); display: flex; align-items: center; gap: 4px;">
+              <span>{{ $t('emailPrefixMinLength') }}</span>
+              <el-tooltip effect="dark" :content="$t('emailPrefixRuleDesc') + ' ' + $t('emailPrefixRuleNote')" placement="top">
+                <Icon icon="fluent:question-circle-16-regular" width="16" height="16" style="cursor: pointer; color: var(--el-text-color-secondary);" />
+              </el-tooltip>
             </div>
             <el-input-number v-model="minEmailPrefix" :min="1" :max="30" style="width: 100%;">
               <template #suffix>
@@ -4147,6 +4173,53 @@ const thirdEmailTooltip = computed(() => {
 });
 
 const previousMailMode = ref(0);
+
+const totpTooltip = computed(() => {
+  const mode = Number(setting.value?.allMailMode);
+  if (mode === 0) {
+    return t('totpModePrivacyDesc');
+  }
+  if (mode === 2) {
+    return t('totpModeEncryptedDesc');
+  }
+  return t('totpModeAllDesc');
+});
+
+const mailModeCurrentTooltip = computed(() => {
+  const mode = Number(setting.value?.allMailMode);
+  if (mode === 0) {
+    return t('mailModePrivacyDesc');
+  }
+  if (mode === 2) {
+    return t('mailModeEncryptedDesc');
+  }
+  return t('mailModeAllDesc');
+});
+
+const tgBotCurrentTooltip = computed(() => {
+  const mode = Number(setting.value?.allMailMode);
+  if (mode === 0) {
+    return t('tgBotModePrivacyDesc');
+  }
+  if (mode === 2) {
+    return t('tgBotModeEncryptedDesc');
+  }
+  return t('tgBotModeAllDesc');
+});
+
+const signUpVerificationCurrentTooltip = computed(() => {
+  const v = Number(setting.value?.registerVerify);
+  if (v === 0) return t('signUpVerifyModeEnable');
+  if (v === 1) return t('signUpVerifyModeDisable');
+  return t('signUpVerifyModeRules');
+});
+
+const addEmailVerificationCurrentTooltip = computed(() => {
+  const v = Number(setting.value?.addEmailVerify);
+  if (v === 0) return t('addEmailVerifyModeEnable');
+  if (v === 1) return t('addEmailVerifyModeDisable');
+  return t('addEmailVerifyModeRules');
+});
 
 const isTotpLocked = computed(() => {
   const mode = Number(setting.value?.allMailMode);

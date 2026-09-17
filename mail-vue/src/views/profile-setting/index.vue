@@ -100,8 +100,12 @@
       <!-- 2. 全局主题壁纸 (5x2 网格，尺寸与外观色调卡片统一) -->
       <div class="item wallpaper-item">
         <div>
-          <div>{{ $t('mainPanelWallpaper') }}</div>
-          <div class="sub-hint">{{ $t('appliedToWholeSiteBg') }}</div>
+          <div style="display: inline-flex; align-items: center; gap: 6px;">
+            <span>{{ $t('mainPanelWallpaper') }}</span>
+            <el-tooltip :content="$t('appliedToWholeSiteBg')" placement="top">
+              <Icon icon="fluent:question-circle-16-regular" width="16" height="16" style="cursor: pointer; color: var(--text-muted); vertical-align: middle;" />
+            </el-tooltip>
+          </div>
         </div>
         <div class="wallpaper-control-wrap">
           <!-- 预设主题列表与自定义加号卡片 (5x2 范围) -->
@@ -158,8 +162,12 @@
       <!-- 3. 个人背景封面设置 (主要针对账户详情界面的 cover-photo) -->
       <div class="item wallpaper-item">
         <div>
-          <div>{{ $t('profileCoverPhoto') }}</div>
-          <div class="sub-hint">{{ $t('profileCoverPhotoDesc') }}</div>
+          <div style="display: inline-flex; align-items: center; gap: 6px;">
+            <span>{{ $t('profileCoverPhoto') }}</span>
+            <el-tooltip :content="$t('profileCoverPhotoDesc')" placement="top">
+              <Icon icon="fluent:question-circle-16-regular" width="16" height="16" style="cursor: pointer; color: var(--text-muted); vertical-align: middle;" />
+            </el-tooltip>
+          </div>
         </div>
         <div class="wallpaper-control-wrap">
           <div class="wallpaper-presets-grid cover-presets-grid">
@@ -277,8 +285,12 @@
           <!-- 1. Default (Customize) -->
           <div class="inbox-type-row">
             <el-radio v-model="uiStore.inboxType" label="default" @change="onInboxTypeChange">
-              <span class="type-name">{{ $t('inboxTypeDefault') }}</span>
-              <span class="type-desc">{{ $t('inboxTypeDefaultDesc') }}</span>
+              <span class="type-name" style="display: inline-flex; align-items: center; gap: 4px;">
+                {{ $t('inboxTypeDefault') }}
+                <el-tooltip :content="$t('inboxTypeDefaultDesc')" placement="top">
+                  <Icon icon="fluent:question-circle-16-regular" width="14" height="14" style="cursor: pointer; color: var(--text-muted); vertical-align: middle;" />
+                </el-tooltip>
+              </span>
             </el-radio>
             <el-button 
               size="small" 
@@ -294,32 +306,48 @@
           <!-- 2. Important first -->
           <div class="inbox-type-row">
             <el-radio v-model="uiStore.inboxType" label="important" @change="onInboxTypeChange">
-              <span class="type-name">{{ $t('inboxTypeImportant') }}</span>
-              <span class="type-desc">{{ $t('inboxTypeImportantDesc') }}</span>
+              <span class="type-name" style="display: inline-flex; align-items: center; gap: 4px;">
+                {{ $t('inboxTypeImportant') }}
+                <el-tooltip :content="$t('inboxTypeImportantDesc')" placement="top">
+                  <Icon icon="fluent:question-circle-16-regular" width="14" height="14" style="cursor: pointer; color: var(--text-muted); vertical-align: middle;" />
+                </el-tooltip>
+              </span>
             </el-radio>
           </div>
 
           <!-- 3. Unread first -->
           <div class="inbox-type-row">
             <el-radio v-model="uiStore.inboxType" label="unread" @change="onInboxTypeChange">
-              <span class="type-name">{{ $t('inboxTypeUnread') }}</span>
-              <span class="type-desc">{{ $t('inboxTypeUnreadDesc') }}</span>
+              <span class="type-name" style="display: inline-flex; align-items: center; gap: 4px;">
+                {{ $t('inboxTypeUnread') }}
+                <el-tooltip :content="$t('inboxTypeUnreadDesc')" placement="top">
+                  <Icon icon="fluent:question-circle-16-regular" width="14" height="14" style="cursor: pointer; color: var(--text-muted); vertical-align: middle;" />
+                </el-tooltip>
+              </span>
             </el-radio>
           </div>
 
           <!-- 4. Starred first -->
           <div class="inbox-type-row">
             <el-radio v-model="uiStore.inboxType" label="starred" @change="onInboxTypeChange">
-              <span class="type-name">{{ $t('inboxTypeStarred') }}</span>
-              <span class="type-desc">{{ $t('inboxTypeStarredDesc') }}</span>
+              <span class="type-name" style="display: inline-flex; align-items: center; gap: 4px;">
+                {{ $t('inboxTypeStarred') }}
+                <el-tooltip :content="$t('inboxTypeStarredDesc')" placement="top">
+                  <Icon icon="fluent:question-circle-16-regular" width="14" height="14" style="cursor: pointer; color: var(--text-muted); vertical-align: middle;" />
+                </el-tooltip>
+              </span>
             </el-radio>
           </div>
 
           <!-- 5. Priority Inbox (Customize) -->
           <div class="inbox-type-row">
             <el-radio v-model="uiStore.inboxType" label="priority" @change="onInboxTypeChange">
-              <span class="type-name">{{ $t('inboxTypePriority') }}</span>
-              <span class="type-desc">{{ $t('inboxTypePriorityDesc') }}</span>
+              <span class="type-name" style="display: inline-flex; align-items: center; gap: 4px;">
+                {{ $t('inboxTypePriority') }}
+                <el-tooltip :content="$t('inboxTypePriorityDesc')" placement="top">
+                  <Icon icon="fluent:question-circle-16-regular" width="14" height="14" style="cursor: pointer; color: var(--text-muted); vertical-align: middle;" />
+                </el-tooltip>
+              </span>
             </el-radio>
             <el-button 
               size="small" 
@@ -335,8 +363,12 @@
           <!-- 6. Multiple Inboxes (Customize) -->
           <div class="inbox-type-row">
             <el-radio v-model="uiStore.inboxType" label="multiple" @change="onInboxTypeChange">
-              <span class="type-name">{{ $t('inboxTypeMultiple') }}</span>
-              <span class="type-desc">{{ $t('inboxTypeMultipleDesc') }}</span>
+              <span class="type-name" style="display: inline-flex; align-items: center; gap: 4px;">
+                {{ $t('inboxTypeMultiple') }}
+                <el-tooltip :content="$t('inboxTypeMultipleDesc')" placement="top">
+                  <Icon icon="fluent:question-circle-16-regular" width="14" height="14" style="cursor: pointer; color: var(--text-muted); vertical-align: middle;" />
+                </el-tooltip>
+              </span>
             </el-radio>
             <el-button 
               size="small" 

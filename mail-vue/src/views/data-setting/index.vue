@@ -3,9 +3,11 @@
     
     <!-- Section 1: 用户资料与数据汇出 (Data Export) -->
     <div class="container export-container" id="dataExport">
-      <div class="title">{{ $t('dataExportTitle') }}</div>
-      <div class="section-intro">
-        {{ $t('dataExportDesc') }}
+      <div class="title" style="display: inline-flex; align-items: center; gap: 6px;">
+        <span>{{ $t('dataExportTitle') }}</span>
+        <el-tooltip effect="dark" :content="$t('dataExportDesc')" placement="top">
+          <Icon icon="fluent:question-circle-16-regular" width="16" height="16" style="cursor: pointer; color: var(--el-text-color-secondary);" />
+        </el-tooltip>
       </div>
 
       <div class="export-cards-grid">
@@ -107,20 +109,22 @@
 
     <!-- Section 2: 邮件与消息转发 (Personal TG Push & Email Forwarding) -->
     <div class="container forwarding-container" id="forwarding" v-if="allowUserTg || allowUserEmailForward">
-      <div class="title">{{ $t('forwardingAndPushTitle') }}</div>
-      <div class="section-intro">
-        {{ $t('forwardingSectionDesc') }}
+      <div class="title" style="display: inline-flex; align-items: center; gap: 6px;">
+        <span>{{ $t('forwardingAndPushTitle') }}</span>
+        <el-tooltip effect="dark" :content="$t('forwardingSectionDesc')" placement="top">
+          <Icon icon="fluent:question-circle-16-regular" width="16" height="16" style="cursor: pointer; color: var(--el-text-color-secondary);" />
+        </el-tooltip>
       </div>
       
       <!-- 1. Telegram 消息推送 (以 Button 设置弹窗形式集成) -->
       <div class="item tg-push-item" v-if="allowUserTg">
         <div class="tg-item-info">
-          <div class="tg-item-title-row">
+          <div class="tg-item-title-row" style="display: inline-flex; align-items: center; gap: 6px;">
             <Icon icon="fluent:bot-20-filled" width="18" height="18" class="tg-bot-icon" />
             <span class="tg-title-text">{{ $t('tgPushNotification') }}</span>
-          </div>
-          <div class="sub-hint">
-            {{ tgForm.enabled ? (tgForm.chatId ? $t('tgEnabledWithChatId', { chatId: tgForm.chatId }) : $t('tgEnabledRealtime')) : $t('tgPushNotificationDesc') }}
+            <el-tooltip effect="dark" :content="tgForm.enabled ? (tgForm.chatId ? $t('tgEnabledWithChatId', { chatId: tgForm.chatId }) : $t('tgEnabledRealtime')) : $t('tgPushNotificationDesc')" placement="top">
+              <Icon icon="fluent:question-circle-16-regular" width="14" height="14" style="cursor: pointer; color: var(--el-text-color-secondary);" />
+            </el-tooltip>
           </div>
         </div>
         <div class="tg-item-actions">
@@ -139,8 +143,12 @@
           <!-- 启用自动转发开关 -->
           <div class="item forward-toggle-row">
             <div class="toggle-info">
-              <div class="fw-title">{{ $t('forwardingEnable') }}</div>
-              <div class="sub-hint">{{ $t('forwardingRulesDesc') }}</div>
+              <div class="fw-title" style="display: inline-flex; align-items: center; gap: 6px;">
+                <span>{{ $t('forwardingEnable') }}</span>
+                <el-tooltip effect="dark" :content="$t('forwardingRulesDesc')" placement="top">
+                  <Icon icon="fluent:question-circle-16-regular" width="14" height="14" style="cursor: pointer; color: var(--el-text-color-secondary);" />
+                </el-tooltip>
+              </div>
             </div>
             <div class="toggle-action">
               <el-switch v-model="forwardForm.enabled" @change="saveForwardSettings(false)" />
@@ -151,8 +159,12 @@
             <!-- 目的地邮箱 -->
             <div class="item forward-field-item">
               <div class="field-label-col">
-                <div class="fw-label">{{ $t('forwardingDestination') }}</div>
-                <div class="sub-hint">{{ $t('forwardingDestinationDesc') }}</div>
+                <div class="fw-label" style="display: inline-flex; align-items: center; gap: 6px;">
+                  <span>{{ $t('forwardingDestination') }}</span>
+                  <el-tooltip effect="dark" :content="$t('forwardingDestinationDesc')" placement="top">
+                    <Icon icon="fluent:question-circle-16-regular" width="14" height="14" style="cursor: pointer; color: var(--el-text-color-secondary);" />
+                  </el-tooltip>
+                </div>
               </div>
               <div class="forward-input-wrap">
                 <el-input 
@@ -170,8 +182,12 @@
             <!-- 触发规则类型 -->
             <div class="item forward-rule-item align-start">
               <div class="field-label-col">
-                <div class="fw-label">{{ $t('forwardingType') }}</div>
-                <div class="sub-hint">{{ $t('forwardingTypeSubhint') }}</div>
+                <div class="fw-label" style="display: inline-flex; align-items: center; gap: 6px;">
+                  <span>{{ $t('forwardingType') }}</span>
+                  <el-tooltip effect="dark" :content="$t('forwardingTypeSubhint')" placement="top">
+                    <Icon icon="fluent:question-circle-16-regular" width="14" height="14" style="cursor: pointer; color: var(--el-text-color-secondary);" />
+                  </el-tooltip>
+                </div>
               </div>
               <div class="forward-type-wrapper">
                 <div class="forward-type-group">
@@ -247,8 +263,12 @@
             <!-- 高级选项 -->
             <div class="item forward-options-item align-start no-border">
               <div class="field-label-col">
-                <div class="fw-label">{{ $t('advancedOptions') }}</div>
-                <div class="sub-hint">{{ $t('advancedOptionsDesc') }}</div>
+                <div class="fw-label" style="display: inline-flex; align-items: center; gap: 6px;">
+                  <span>{{ $t('advancedOptions') }}</span>
+                  <el-tooltip effect="dark" :content="$t('advancedOptionsDesc')" placement="top">
+                    <Icon icon="fluent:question-circle-16-regular" width="14" height="14" style="cursor: pointer; color: var(--el-text-color-secondary);" />
+                  </el-tooltip>
+                </div>
               </div>
               <div class="feature-checkboxes">
                 <el-checkbox v-model="forwardForm.keepCopy">
@@ -280,9 +300,11 @@
 
     <!-- Section 3: 存储空间与个人云存储 (Storage Quota & BYO Cloud Storage) -->
     <div class="container storage-container" id="userStorage">
-      <div class="title">{{ $t('userStorageTitle') }}</div>
-      <div class="section-intro">
-        {{ $t('userStorageDesc') }}
+      <div class="title" style="display: inline-flex; align-items: center; gap: 6px;">
+        <span>{{ $t('userStorageTitle') }}</span>
+        <el-tooltip effect="dark" :content="$t('userStorageDesc')" placement="top">
+          <Icon icon="fluent:question-circle-16-regular" width="16" height="16" style="cursor: pointer; color: var(--el-text-color-secondary);" />
+        </el-tooltip>
       </div>
 
       <div class="storage-cards-grid">
@@ -407,9 +429,11 @@
     <div class="container third-party-apps-container" id="thirdPartyApps">
       <div class="section-head-flex">
         <div class="head-left-col">
-          <div class="title">{{ $t('thirdPartyAppsTitle') }}</div>
-          <div class="section-intro">
-            {{ $t('thirdPartyAppsDesc') }}
+          <div class="title" style="display: inline-flex; align-items: center; gap: 6px;">
+            <span>{{ $t('thirdPartyAppsTitle') }}</span>
+            <el-tooltip effect="dark" :content="$t('thirdPartyAppsDesc')" placement="top">
+              <Icon icon="fluent:question-circle-16-regular" width="16" height="16" style="cursor: pointer; color: var(--el-text-color-secondary);" />
+            </el-tooltip>
           </div>
         </div>
         <div class="head-right-actions" v-if="userGrants.length > 0">
@@ -639,18 +663,24 @@
       <div class="s3-modal-body">
         <div class="dialog-field">
           <div class="d-label-row">
-            <span class="d-field-title">{{ $t('providerPreset') }}</span>
-            <span class="d-sub-hint">{{ $t('providerPresetHint') }}</span>
+            <span class="d-field-title" style="display: inline-flex; align-items: center; gap: 4px;">
+              {{ $t('providerPreset') }}
+              <el-tooltip effect="dark" :content="$t('providerPresetHint')" placement="top">
+                <Icon icon="fluent:question-circle-16-regular" width="14" height="14" style="cursor: pointer; color: var(--el-text-color-secondary);" />
+              </el-tooltip>
+            </span>
           </div>
           <div class="provider-preset-pills">
-            <div 
-              class="provider-pill" 
-              :class="{ active: byoForm.provider === 'backblaze' }" 
-              @click="selectUserByoProvider('backblaze')"
-            >
-              <Icon icon="simple-icons:backblaze" width="16" height="16" class="p-icon b2" />
-              <span>{{ $t('b2Preset') }}</span>
-            </div>
+            <el-tooltip effect="dark" :content="`${$t('b2GuidanceTitle')}: ${$t('b2NodeHint')} ${$t('b2BucketKeyHint')}`" placement="top">
+              <div 
+                class="provider-pill" 
+                :class="{ active: byoForm.provider === 'backblaze' }" 
+                @click="selectUserByoProvider('backblaze')"
+              >
+                <Icon icon="simple-icons:backblaze" width="16" height="16" class="p-icon b2" />
+                <span>{{ $t('b2Preset') }}</span>
+              </div>
+            </el-tooltip>
             <div 
               class="provider-pill" 
               :class="{ active: byoForm.provider === 'aws' }" 
@@ -678,29 +708,26 @@
           </div>
         </div>
 
-        <div class="b2-guidance-box" v-if="byoForm.provider === 'backblaze'">
-          <div class="g-header">
-            <Icon icon="fluent:sparkle-20-filled" width="16" height="16" class="g-icon" />
-            <span class="g-title">{{ $t('b2GuidanceTitle') }}</span>
-          </div>
-          <div class="g-content">
-            {{ $t('b2NodeHint') }}<br/>
-            {{ $t('b2BucketKeyHint') }}
-          </div>
-        </div>
-
         <div class="dialog-field">
           <div class="d-label-row">
-            <span class="d-field-title">{{ $t('bucketName') }} *</span>
-            <span class="d-sub-hint">{{ $t('bucketNameHint') }}</span>
+            <span class="d-field-title" style="display: inline-flex; align-items: center; gap: 4px;">
+              {{ $t('bucketName') }} *
+              <el-tooltip effect="dark" :content="$t('bucketNameHint')" placement="top">
+                <Icon icon="fluent:question-circle-16-regular" width="14" height="14" style="cursor: pointer; color: var(--el-text-color-secondary);" />
+              </el-tooltip>
+            </span>
           </div>
           <el-input v-model="byoForm.bucket" :placeholder="$t('bucketPlaceholder')" clearable />
         </div>
 
         <div class="dialog-field">
           <div class="d-label-row">
-            <span class="d-field-title">{{ $t('endpoint') }} *</span>
-            <span class="d-sub-hint">{{ $t('endpointHint') }}</span>
+            <span class="d-field-title" style="display: inline-flex; align-items: center; gap: 4px;">
+              {{ $t('endpoint') }} *
+              <el-tooltip effect="dark" :content="$t('endpointHint')" placement="top">
+                <Icon icon="fluent:question-circle-16-regular" width="14" height="14" style="cursor: pointer; color: var(--el-text-color-secondary);" />
+              </el-tooltip>
+            </span>
           </div>
           <el-input 
             v-model="byoForm.endpoint" 
@@ -712,16 +739,24 @@
         <div class="dialog-row-2col">
           <div class="dialog-field">
             <div class="d-label-row">
-              <span class="d-field-title">{{ $t('region') }}</span>
-              <span class="d-sub-hint">{{ $t('regionHint') }}</span>
+              <span class="d-field-title" style="display: inline-flex; align-items: center; gap: 4px;">
+                {{ $t('region') }}
+                <el-tooltip effect="dark" :content="$t('regionHint')" placement="top">
+                  <Icon icon="fluent:question-circle-16-regular" width="14" height="14" style="cursor: pointer; color: var(--el-text-color-secondary);" />
+                </el-tooltip>
+              </span>
             </div>
             <el-input v-model="byoForm.region" placeholder="us-west-004 / auto" clearable />
           </div>
 
           <div class="dialog-field">
             <div class="d-label-row">
-              <span class="d-field-title">{{ $t('forcePathStyle') }}</span>
-              <span class="d-sub-hint">{{ $t('forcePathStyleDesc') }}</span>
+              <span class="d-field-title" style="display: inline-flex; align-items: center; gap: 4px;">
+                {{ $t('forcePathStyle') }}
+                <el-tooltip effect="dark" :content="$t('forcePathStyleDesc')" placement="top">
+                  <Icon icon="fluent:question-circle-16-regular" width="14" height="14" style="cursor: pointer; color: var(--el-text-color-secondary);" />
+                </el-tooltip>
+              </span>
             </div>
             <div class="fps-switch-wrapper">
               <el-switch :active-value="1" :inactive-value="0" v-model="byoForm.forcePathStyle" />
@@ -732,8 +767,12 @@
 
         <div class="dialog-field">
           <div class="d-label-row">
-            <span class="d-field-title">{{ byoForm.provider === 'backblaze' ? 'Key ID (Access Key) *' : $t('s3AccessKeyId') + ' *' }}</span>
-            <span class="d-sub-hint">{{ storageUsage.byoStorageConfig?.s3AccessKey ? $t('configured') + ': ' + storageUsage.byoStorageConfig.s3AccessKey : $t('s3AccessKeyHint') }}</span>
+            <span class="d-field-title" style="display: inline-flex; align-items: center; gap: 4px;">
+              {{ byoForm.provider === 'backblaze' ? 'Key ID (Access Key) *' : $t('s3AccessKeyId') + ' *' }}
+              <el-tooltip effect="dark" :content="storageUsage.byoStorageConfig?.s3AccessKey ? $t('configured') + ': ' + storageUsage.byoStorageConfig.s3AccessKey : $t('s3AccessKeyHint')" placement="top">
+                <Icon icon="fluent:question-circle-16-regular" width="14" height="14" style="cursor: pointer; color: var(--el-text-color-secondary);" />
+              </el-tooltip>
+            </span>
           </div>
           <el-input 
             v-model="byoForm.s3AccessKey" 
@@ -744,8 +783,12 @@
 
         <div class="dialog-field">
           <div class="d-label-row">
-            <span class="d-field-title">{{ byoForm.provider === 'backblaze' ? 'Application Key (Secret Key) *' : $t('s3SecretKey') + ' *' }}</span>
-            <span class="d-sub-hint">{{ storageUsage.byoStorageConfig?.s3SecretKey ? $t('encrypted') : $t('s3SecretKeyHint') }}</span>
+            <span class="d-field-title" style="display: inline-flex; align-items: center; gap: 4px;">
+              {{ byoForm.provider === 'backblaze' ? 'Application Key (Secret Key) *' : $t('s3SecretKey') + ' *' }}
+              <el-tooltip effect="dark" :content="storageUsage.byoStorageConfig?.s3SecretKey ? $t('encrypted') : $t('s3SecretKeyHint')" placement="top">
+                <Icon icon="fluent:question-circle-16-regular" width="14" height="14" style="cursor: pointer; color: var(--el-text-color-secondary);" />
+              </el-tooltip>
+            </span>
           </div>
           <el-input 
             v-model="byoForm.s3SecretKey" 
@@ -758,8 +801,12 @@
 
         <div class="dialog-field">
           <div class="d-label-row">
-            <span class="d-field-title">{{ $t('customCdnDomain') }}</span>
-            <span class="d-sub-hint">{{ $t('customCdnDomainHint') }}</span>
+            <span class="d-field-title" style="display: inline-flex; align-items: center; gap: 4px;">
+              {{ $t('customCdnDomain') }}
+              <el-tooltip effect="dark" :content="$t('customCdnDomainHint')" placement="top">
+                <Icon icon="fluent:question-circle-16-regular" width="14" height="14" style="cursor: pointer; color: var(--el-text-color-secondary);" />
+              </el-tooltip>
+            </span>
           </div>
           <el-input v-model="byoForm.customDomain" :placeholder="$t('customCdnPlaceholder')" clearable />
         </div>

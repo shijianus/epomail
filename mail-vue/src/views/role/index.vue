@@ -366,9 +366,11 @@
         <!-- Banner Intro -->
         <div class="hierarchy-intro">
           <div class="intro-left">
-            <div class="intro-title">{{ $t('rlHIntroTitle') }}</div>
-            <div class="intro-desc">
-              {{ $t('rlHIntroDesc') }}
+            <div class="intro-title" style="display: inline-flex; align-items: center; gap: 6px;">
+              <span>{{ $t('rlHIntroTitle') }}</span>
+              <el-tooltip effect="dark" :content="$t('rlHIntroDesc')" placement="top">
+                <Icon icon="fluent:question-circle-16-regular" width="16" height="16" style="cursor: pointer; color: var(--el-text-color-secondary);" />
+              </el-tooltip>
             </div>
           </div>
           <div class="intro-right">

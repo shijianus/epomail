@@ -94,8 +94,12 @@
       <!-- Second-Step Verification Methods -->
       <div class="second-steps-card">
         <div class="card-header">
-          <div class="sub-title">{{ $t('secondStepMethods') }}</div>
-          <div class="sub-desc">{{ $t('secondStepMethodsDesc') }}</div>
+          <div class="sub-title" style="display: inline-flex; align-items: center; gap: 6px;">
+            <span>{{ $t('secondStepMethods') }}</span>
+            <el-tooltip effect="dark" :content="$t('secondStepMethodsDesc')" placement="top">
+              <Icon icon="fluent:question-circle-16-regular" width="16" height="16" style="cursor: pointer; color: var(--el-text-color-secondary);" />
+            </el-tooltip>
+          </div>
         </div>
 
         <div class="methods-list">

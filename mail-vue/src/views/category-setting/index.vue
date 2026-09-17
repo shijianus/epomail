@@ -24,10 +24,10 @@
                 </div>
               </div>
               <div class="setting-item">
-                <div>
+                <div style="display: inline-flex; align-items: center; gap: 4px;">
                   <span>{{ $t('autoRefresh') }}</span>
                   <el-tooltip effect="dark" :content="$t('autoRefreshDesc')">
-                    <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+                    <Icon icon="fluent:question-circle-16-regular" width="16" height="16" style="cursor: pointer; color: var(--el-text-color-secondary);"/>
                   </el-tooltip>
                 </div>
                 <div>
@@ -54,10 +54,10 @@
                 </div>
               </div>
               <div class="setting-item">
-                <div>
+                <div style="display: inline-flex; align-items: center; gap: 4px;">
                   <span>{{ $t('noRecipientTitle') }}</span>
                   <el-tooltip effect="dark" :content="$t('noRecipientDesc')">
-                    <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+                    <Icon icon="fluent:question-circle-16-regular" width="16" height="16" style="cursor: pointer; color: var(--el-text-color-secondary);"/>
                   </el-tooltip>
                 </div>
                 <div>
@@ -253,39 +253,20 @@
     <!-- Unified Drawer for Editing -->
     <el-drawer
         v-model="drawerVisible"
-        :title="drawerTitle"
         direction="rtl"
         size="450px"
         :before-close="handleDrawerClose"
         class="unified-drawer"
     >
+      <template #header>
+        <div style="display: inline-flex; align-items: center; gap: 6px;">
+          <span style="font-size: 16px; font-weight: 600; color: var(--el-text-color-primary);">{{ drawerTitle }}</span>
+          <el-tooltip v-if="drawerTooltipContent" effect="dark" :content="drawerTooltipContent" placement="bottom">
+            <Icon icon="fluent:question-circle-16-regular" width="16" height="16" style="cursor: pointer; color: var(--el-text-color-secondary);" />
+          </el-tooltip>
+        </div>
+      </template>
       <div class="drawer-content">
-        <div class="drawer-desc" v-if="drawerTarget === 'list'">
-          <div class="desc-title">{{ listMode === 'whitelist' ? $t('whitelist') : $t('blacklist') }}</div>
-          <div class="desc-body">
-             {{ listMode === 'whitelist' ? $t('whitelistDesc') : $t('blacklistDesc') }}
-          </div>
-          <div class="desc-rule">
-            <strong>{{ $t('ruleBrief') }}：</strong>{{ $t('ruleBriefList') }}
-          </div>
-        </div>
-        <div class="drawer-desc" v-else-if="drawerTarget === 'block'">
-          <div class="desc-title">{{ $t('hardBlockRules') }}</div>
-          <div class="desc-body">{{ $t('hardBlockDesc') }}</div>
-          <div class="desc-rule">
-            <strong>{{ $t('ruleBrief') }}：</strong>{{ $t('hardBlockRuleBrief') }}
-          </div>
-          <span class="warning-text"><Icon icon="lucide:alert-triangle" width="14"/> {{ $t('hardBlockWarning') }}</span>
-        </div>
-        <div class="drawer-desc" v-else-if="drawerTarget === 'subject'">
-          <div class="desc-title">{{ $t('filterSubject') }}</div>
-          <div class="desc-body">{{ $t('filterSubjectDesc') }}</div>
-        </div>
-        <div class="drawer-desc" v-else-if="drawerTarget === 'content'">
-          <div class="desc-title">{{ $t('filterContent') }}</div>
-          <div class="desc-body">{{ $t('filterContentDesc') }}</div>
-        </div>
-
         <div class="drawer-actions">
           <el-button @click="clearCurrent" size="small">{{ $t('clear') }}</el-button>
           <el-button @click="restoreDefaultTemplates" size="small">{{ $t('restoreDefaultTemplates') }}</el-button>
@@ -303,10 +284,10 @@
     <!-- Workers AI: aiCodeFilter Dialog -->
     <el-dialog v-model="aiCodeFilterShow" class="forward-dialog" @closed="resetAiCodeFilter">
       <template #header>
-        <div class="forward-head">
+        <div class="forward-head" style="display: inline-flex; align-items: center; gap: 6px;">
           <span class="forward-set-title">{{ $t('codeRecognitionRules') }}</span>
           <el-tooltip effect="dark" :content="$t('codeRecognitionRulesDesc')">
-            <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+            <Icon icon="fluent:question-circle-16-regular" width="16" height="16" style="cursor: pointer; color: var(--el-text-color-secondary);"/>
           </el-tooltip>
         </div>
       </template>
@@ -321,22 +302,14 @@
     <!-- Workers AI / AI Integration Dialog -->
     <el-dialog v-model="aiConfigShow" class="forward-dialog ai-config-dialog" @closed="resetAiConfig">
       <template #header>
-        <div class="forward-head">
+        <div class="forward-head" style="display: inline-flex; align-items: center; gap: 6px;">
           <span class="forward-set-title">{{ $t('aiConfigTitle') }}</span>
-          <el-tooltip effect="dark" :content="$t('aiConfigDesc')">
-            <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+          <el-tooltip effect="dark" :content="`${$t('aiConfigDesc')} (${$t('ruleNoteLabel')}${$t('aiConfigRuleNote')})`">
+            <Icon icon="fluent:question-circle-16-regular" width="16" height="16" style="cursor: pointer; color: var(--el-text-color-secondary);"/>
           </el-tooltip>
         </div>
       </template>
       <div class="ai-config-body">
-        <div class="drawer-desc" style="margin-bottom: 14px;">
-          <div class="desc-body">
-            {{ $t('aiConfigDesc') }}
-          </div>
-          <div class="desc-rule">
-            <strong>{{ $t('ruleNoteLabel') }}</strong>{{ $t('aiConfigRuleNote') }}
-          </div>
-        </div>
         <el-form label-position="top">
           <el-form-item :label="$t('aiApiKey')">
             <el-input
@@ -560,6 +533,23 @@ const drawerTitle = computed(() => {
   if (drawerTarget.value === 'subject') return `${t('settings')} - ${t('filterSubject')}`
   if (drawerTarget.value === 'content') return `${t('settings')} - ${t('filterContent')}`
   return t('settings')
+})
+
+const drawerTooltipContent = computed(() => {
+  if (drawerTarget.value === 'list') {
+    const modeDesc = listMode.value === 'whitelist' ? t('whitelistDesc') : t('blacklistDesc')
+    return `${modeDesc} (${t('ruleBrief')}: ${t('ruleBriefList')})`
+  }
+  if (drawerTarget.value === 'block') {
+    return `${t('hardBlockDesc')} (${t('ruleBrief')}: ${t('hardBlockRuleBrief')}) - ${t('hardBlockWarning')}`
+  }
+  if (drawerTarget.value === 'subject') {
+    return t('filterSubjectDesc')
+  }
+  if (drawerTarget.value === 'content') {
+    return t('filterContentDesc')
+  }
+  return ''
 })
 
 // ── Lifecycle ───────────────────────────────────────────────────────

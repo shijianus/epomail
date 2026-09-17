@@ -11,6 +11,35 @@
    - 在向用户输出回复时，必须置顶/显式打印出本次提交的完整 Commit Hash 与短 Hash，确保版本可追溯、审计记录完整。
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
+### 全专案显式注释文本彻底隐式化、2FA与模式联动动态气泡深度优化、抽屉/弹窗多语言提示重构上线 (2026-09-17)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **全专案显式注释文本全面清零与隐式化重构 (Zero Explicit Hint Text & Fluent Icon Tooltip System)**:
+       - 彻底贯彻“禁止任何显式注释文本，全部改为隐式”的要求，系统性排查并清除全专案视图中的所有显式提示类容器（`.sub-hint`, `.section-intro`, `.d-sub-hint`, `.drawer-desc`, `.intro-desc`, `.sub-desc`, `.input-bottom-tips`, `.static-ui-tip`, `.b2-guidance-box` 等）；
+       - 统一将说明文案重构为依托 `el-tooltip` 的隐式悬浮气泡，触发器统一采用 Fluent 图标 `fluent:question-circle-16-regular`（渲染为 `class="el-tooltip__trigger iconify iconify--fluent"`），与专案设计语言保持 100% 优雅统一；
+       - 重构覆盖范围：
+         ① `sys-setting/index.vue`：静态 UI 说明、S3/DB 预设与配置字段提示、抽屉描述全面隐式化；
+         ② `data-setting/index.vue`：数据汇出、邮件与 TG 消息转发、存储空间与第三方应用标题及所有字段说明、BYO S3 配置提示全面隐式化；
+         ③ `oauth-app/index.vue`：应用管理标题说明、新建/编辑表单 5 大字段提示与回调 URL 规则说明全面隐式化；
+         ④ `profile-setting/index.vue`：壁纸说明、个人封面说明、收件箱 6 种模式选项说明全面转为隐式气泡；
+         ⑤ `role/index.vue`：权限全景层级弹窗介绍转为标题内联隐式气泡；
+         ⑥ `setting/index.vue`：两步验证第二步方式说明转为标题内联隐式气泡；
+         ⑦ `category-setting/index.vue`：白名单/黑名单/阻断/主题/正文过滤抽屉的大段显式说明剥离，转为抽屉 Header 标题右侧动态气泡；AI 识别与配置弹窗说明转为标题隐式气泡。
+    2. **不同运行模式下隐式注释气泡内容的动态响应与深度优化 (Dynamic Mode-Aware Tooltip Optimization)**:
+       - **两步验证 (2FA/TOTP)**：根据当前系统运行模式动态匹配提示，杜绝长文本平铺混杂：
+         - “全部邮件”模式（Level 1, `allMailMode === 1`）：`设置是否允许用户使用TOTP，开启后用户可以且推荐启用二步验证`；
+         - “隐私邮件”模式（Level 2, `allMailMode === 0`）：`当前模式默认允许用户设置自己的TOTP且禁止关闭，以提升用户的安全`；
+         - “加密邮件”模式（Level 3, `allMailMode === 2`）：`全站强制开启 TOTP 两步验证以保障密钥派生安全与数据隐私，禁止关闭`；
+       - **邮件模式 (Mail Mode)**：动态匹配当前所选模式的精简核心权责描述，代替以往三合一冗长说明；
+       - **Telegram 机器人与通知**：根据全部邮件/隐私邮件/加密邮件三种模式动态提示频道通知、状态联动与数据边界；
+       - **人机验证 (Turnstile)**：注册与新增邮箱验证根据已启用/已禁用/规则触发实时切换精准描述。
+    3. **6 国语言字典 100% 绝对对称与零外部字符残留 (Canonical i18n Symmetry)**:
+       - 6 语言（`zh`, `zh-Hant`, `en`, `fr`, `es`, `nl`）同步新增 15 个对称模式描述键，总键数达 2032 键，`scripts/i18n-symmetry.mjs` 验证 100% 绝对对称；
+       - `scripts/i18n-audit.mjs` 静态代码审计 1573 个字面量键零缺失，`scripts/i18n-hardcoded.mjs` 验证无硬编码泄漏。
+    4. **自动化测试与端到端回归验证 (Verification & Zero Residue)**:
+       - 前端 `vite build` 编译 0 报错；
+       - `tests/test-multilingual-email-templates-e2e.mjs` 51 项端到端断言 100% 全绿，测试配置与状态完全自动还原，恪守零假数据与自动还原准则。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **epocanvas-mail Git Commit**: PENDING (Short Hash: PENDING).
 
 ### 远端最新代码拉取合并、Cloudflare生产上线部署、公告弹窗语言切换根因修复、多方式接口兼容与Playwright 58项全链路核验上线 (2026-09-17)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
