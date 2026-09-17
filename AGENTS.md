@@ -33,7 +33,7 @@
 *   **部署上线与自动化测试 (Verification & Deployment)**:
     - **Cloudflare Workers 部署 Version ID**: `d8378945-9dcd-487e-8cd1-72346abdf743`。
     - **生产访问域名**: `https://mail.epocanvas.com`。
-    - **epocanvas-mail Git Commit**: `726607f2f61f5d478996a36b2ff633fca13ab8cc` (Short Hash: `726607f`).
+    - **epocanvas-mail Git Commit**: `25985b1d0ca1c71e59222a3ecb3a9c53532834ef` (Short Hash: `25985b1`).
 
 ### 全专案显式注释文本彻底隐式化、2FA与模式联动动态气泡深度优化、抽屉/弹窗多语言提示重构上线 (2026-09-17)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
