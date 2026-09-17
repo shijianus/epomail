@@ -11,6 +11,30 @@
    - 在向用户输出回复时，必须置顶/显式打印出本次提交的完整 Commit Hash 与短 Hash，确保版本可追溯、审计记录完整。
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
+
+### 生产环境 Cloudflare (mail.epocanvas.com) 真实部署上线、Playwright 视觉端到端截屏全链路核验、Vue-i18n 特殊字符转义与规则抽屉缺陷修复 (2026-09-17)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **真实生产环境 (mail.epocanvas.com) 完整全栈上线与构建部署 (Production Deployment)**:
+       - 执行生产编译并在 `mail-worker` 成功部署至 Cloudflare Workers 生产集群；
+       - 最新部署 Version ID: `d8378945-9dcd-487e-8cd1-72346abdf743`，绑定 KV、D1 与 Assets 静态资源；
+       - 生产直接访问域名：`https://mail.epocanvas.com` 与 `https://epomail.epocanvas.workers.dev`；
+    2. **Vue-i18n 消息特殊字符转义与多语言参数名标准化 (Vue-i18n Parser Resilience)**:
+       - 根因排查：在引入规则简述、邮箱示例与诊断文本时，字面量包含 `@`（`*@*.a.com`、`spam@a.com`）与 `|`（Markdown 管道符号、全链路诊断分隔符），触发 Vue-i18n 编译器的 linked message 与 plural 解析器报错（`SyntaxError: 10`），导致组件响应式渲染中断；
+       - 修复：全量字典规范转义：字面量 `@` 统一转义为 `{'@'}`，字面量 `|` 统一转义为 `{'|'}`；
+       - 参数命名对齐：修复西语/法语/荷语字典中被翻译的占位符（如 `{días}` 因非 ASCII 字符中断解析，统一规范为 `{days}`；`{nombre}`/`{cantidad}`/`{aantal}` 统一为 `{count}`；`{fecha}`/`{datum}` 统一为 `{date}`；`{destinataire}`/`{destinatario}` 统一为 `{recipient}`）；
+       - 6 语言 × 2032 个字典键经 Vue-i18n 编译器全面扫描测试，实现 0 Error 编译通过。
+    3. **分类规则抽屉组件缺陷修复 (Category Setting Drawer Bugfix)**:
+       - 修复 `category-setting/index.vue` 模板中未引入模板函数的引用错误（`subjectTemplates`/`contentTemplates` -> `getSubjectTemplates(locale.value)`/`getContentTemplates(locale.value)`）；
+       - 规范抽屉触发按钮定位与 `.unified-drawer` / `.el-drawer` 容器交互。
+    4. **真实生产环境 Playwright 视觉截屏核验 100% 全绿 (Playwright Live Visual Regression)**:
+       - 新增自动化套件 `tests/test-cf-live-screenshots-e2e.mjs`，直接在生产真实环境 `https://mail.epocanvas.com` 完成管理员鉴权与全页面测试；
+       - 视觉断言全绿，保存 11 项高质量无遮罩截屏产物（涵盖系统设置全景、2FA 动态气泡、邮件模式气泡、S3 对象存储全隐式提示配置弹窗、资料汇出全景与气泡、OAuth 开放平台全景与新建应用弹窗、常规设置 6 种收件箱模式、安全设置两步验证方式气泡、分类设置全景与规则抽屉无显式提示核验）；
+       - `tests/test-multilingual-email-templates-e2e.mjs` 51 项测试持续全绿，遵循零假数据与自动重置准则。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **Cloudflare Workers 部署 Version ID**: `d8378945-9dcd-487e-8cd1-72346abdf743`。
+    - **生产访问域名**: `https://mail.epocanvas.com`。
+    - **epocanvas-mail Git Commit**: `726607f2f61f5d478996a36b2ff633fca13ab8cc` (Short Hash: `726607f`).
+
 ### 全专案显式注释文本彻底隐式化、2FA与模式联动动态气泡深度优化、抽屉/弹窗多语言提示重构上线 (2026-09-17)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **全专案显式注释文本全面清零与隐式化重构 (Zero Explicit Hint Text & Fluent Icon Tooltip System)**:

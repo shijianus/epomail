@@ -790,7 +790,7 @@ async function loadSettings() {
 
     if (!rawContent) {
       hardBlockEntries.value = [...hardBlockTemplates]
-      blackContent.value = [...contentTemplates]
+      blackContent.value = [...getContentTemplates(locale.value)]
       isInitBlock = true
       isInitContent = true
     } else if (rawContent.startsWith('__hardblock,')) {
@@ -809,7 +809,7 @@ async function loadSettings() {
     }
     let isInitSubject = false
     if (!rawSubject) {
-      blackSubject.value = [...subjectTemplates]
+      blackSubject.value = [...getSubjectTemplates(locale.value)]
       isInitSubject = true
     } else {
       blackSubject.value = rawSubject ? rawSubject.split(',').filter(Boolean) : []
