@@ -11,6 +11,20 @@
    - 在向用户输出回复时，必须置顶/显式打印出本次提交的完整 Commit Hash 与短 Hash，确保版本可追溯、审计记录完整。
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
+### UI 全面审计：本地全真栈浏览器实测 + 全仓静态扫描，P0×4/P1×9/P2×25 分级发现与优化路线图 (2026-09-19)
+*   **审计范围与方法 (Audit Scope & Methodology, 只读审计，未改动任何业务代码)**:
+    1. **本地全真栈实测**：全新构建产物 + `wrangler dev --config wrangler-dev.toml` 起本地栈，真实浏览器逐页核验登录页/登录流程/收件箱/读信/写信/常规·安全·系统设置/分析/角色/个人主页（明暗双模式）+ 375px 移动端（列表/读信/侧栏可达性三重探测），可访问性树逐页扫描；
+    2. **全仓静态扫描**：`!important`/内联 style/硬编码色值/z-index/@media 覆盖/aria 与 role/图标前缀分布/键盘处理/巨型组件逐项取证，temp_login_ui 与 mail-vue 全覆盖；
+    3. **完整报告**：`doc/ui-audit-20260919.md`（全部 file:line 均经实际读取验证）。
+*   **关键发现 (Key Findings)**:
+    1. **P0×4**：① 登录页「行星撞击」随机全屏红/白闪光警报（`PassingPlanets.tsx` 命中机制 + HUD 闪烁），光敏性癫痫风险（WCAG 2.3.1）且与邮件产品语义无关；② 登录页「保持轨道连接」复选框无绑定，邮箱无论勾选与否均无条件写入 localStorage（`AuthForm.tsx:277,316`），公共设备隐私残留；③ 6 个邮件视图各自持有 `while(true)` 轮询死循环（email/all/spam/snoozed/trash/all-email），后台不暂停、永不终止、`autoRefresh=0` 仍每 3 秒空转；④ profile-info 经 `import('country-state-city')` 触发 8.72 MB 懒加载 chunk（产物实测 8,716,486 B），移动端近不可用；
+    2. **P1×9**：移动端（<768px）侧栏/写信/文件夹导航完全不可达（hamburger 组件在 header 以拼写错误 `import hanburger` 引入后从未渲染，实测点击 Logo/标题/左缘滑动均无法打开抽屉）；移动端列表行主题被挤压至不可见；登录页（`navigator.language` 中文）↔ 主应用（`setting.lang` 默认 en）语言断层 + 登录应用 96 处 `isZh` 硬编码双语与主应用 vue-i18n 六语言体系割裂；a11y 系统性缺失（全应用 aria-* 仅 8 处、顶栏图标按钮无可访问名称、侧栏导航为无角色 generic、邮件行全文入可访问性树）；样式体系 1803 个 `!important`（sys-setting 单文件 729）+ 641 处内联 style + 954 处硬编码色值绕开令牌；图标 12+ 套混用（fluent 278/lucide 81/fe 62/solar 28/ri 26/…）；忘记密码 `href="#"` 与 Google/GitHub 假按钮；首屏 1.18 MB 单 chunk 无 manualChunks；`prefers-reduced-motion` 全仓仅 3 处点状覆盖；
+    3. **P2×25**：登录页 Logo 矩形亮块未融合、生产标签标题残留 "Login Screen UI Layout Plan"（`temp_login_ui/index.html:8`）、登录表单标签双范式、读信无独立路由刷新丢态、设置表单标签换行+右侧留白失衡、安全页 2FA CTA 同屏重复、分析页 echarts 默认蓝不搭主题且空态策略不一致、角色表格横向截断无提示、个人主页 donut "100%" 溢出、移动端状态栏重叠、读信工具栏 10 图标挤爆 375px、sys-setting 9489 行巨型组件、PWA 空壳配置（globPatterns/runtimeCaching 全空）、生产 `app.config.devtools=true`、`/test` 路由暴露生产、Windows `cp -r` 构建脚本不可执行、登录应用 50 个 shadcn 组件约 5000 行零引用死代码、websiteConfig 三重请求、外部 Google Fonts 阻塞、特效色值传参 bug（pickColor 枚举外静默随机）、星空粒子密度 2.7 万颗/帧、错误消息中文子串匹配协议化、仓库根目录 60+ 一次性文件堆积等；
+    4. **值得肯定**：路由 100% 懒加载、Element Plus/echarts 按需、暗色模式 View Transitions 机制现代且明暗双模式实测无白斑、227 处 el-tooltip 隐式提示体系贯彻、email-scroll 列表骨架与空态兜底、辅助定时器清理完备。
+*   **优化路线图 (Roadmap)**: 第一批止血（P0×4 + 移动端导航/列表两行化）→ 第二批体验一致性（语言同步、i18n hook 化、图标收敛、a11y 补齐、分包、reduced-motion）→ 第三批还债（!important 只出不进、sys-setting 拆分、PWA 补齐或摘除、死代码清理、根目录归档）。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **epocanvas-mail Git Commit**: 本记录对应提交 Hash 见下方回填提交（只读审计任务，无生产部署，生产 Version ID 不变）。
+
 ### 全专案全量体检 (2026-09-19)：静态审计三件套 + 构建核验 + 密钥安全审计 + 全新库引导链回归 + 五大测试套件全绿与 UI 核验套件 §5 方法缺陷修复
 *   **体检范围与方法 (Full Health-Check Scope & Methodology, 全部本地+生产双端执行)**:
     1. **静态审计三件套全绿**：`scripts/i18n-symmetry.mjs` 6 语言 × 2032 键绝对对称 ✓；`scripts/i18n-audit.mjs` 1573 个字面量键零缺失、动态 t() 用法 0 ✓；`scripts/i18n-hardcoded.mjs` 287 行残留均属已知白名单可接受项（语言原生名/兜底串，exit=0）✓；
