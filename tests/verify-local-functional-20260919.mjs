@@ -38,9 +38,9 @@ try {
 
   const info = await api('/my/loginUserInfo', { token });
   ok(info.json?.code === 200, 'loginUserInfo 返回 200');
-  ok(info.json?.data?.user?.email === ADMIN.email, 'loginEmail 上下文精准映射当前信箱');
-  const permKeys = info.json?.data?.user?.permKeys || info.json?.data?.permKeys || [];
-  ok(permKeys.includes('*') || info.json?.data?.user?.role?.roleCode === 'master', '站长身份 (master/*) 识别');
+  ok(info.json?.data?.email === ADMIN.email, 'loginEmail 上下文精准映射当前信箱');
+  const permKeys = info.json?.data?.permKeys || [];
+  ok(permKeys.includes('*') || info.json?.data?.role?.roleCode === 'master', '站长身份 (master/*) 识别');
 
   // ============ §2 信箱与侧边栏 ============
   console.log('\n=== §2 信箱与侧边栏统计 ===');
@@ -61,7 +61,7 @@ try {
   const emailList = await api('/email/list?folder=inbox&size=10', { token });
   ok(emailList.json?.code === 200, '收件箱列表 (keyset 分页)');
 
-  const latest = await api('/email/latest?emailId=0&size=5', { token }).catch(() => ({ json: null }));
+  const latest = await api('/email/latest?emailId=0&accountId=' + accountId + '&allReceive=0', { token });
   ok(latest.json === null || latest.json?.code === 200 || latest.json?.code === undefined, '长轮询 latest 端点可达');
 
   // 发信（本地无真实外发通道，预期优雅受理或明确报错而非 500 崩溃）
@@ -100,24 +100,25 @@ try {
 
   // ============ §6 注册链路与临时用户 ============
   console.log('\n=== §6 注册链路（临时用户, finally 物理清理） ===');
+  const tempRegEmail = 'verify-temp-' + Date.now() + '@example.com';
   const reg = await api('/register', {
     method: 'POST',
-    body: { email: 'verify-temp-918@example.com', password: 'Temp123456' }
+    body: { email: tempRegEmail, password: 'Temp123456' }
   });
   ok(reg.json?.code === 200, '开放注册受理 (code=' + reg.json?.code + ')');
 
   const regLogin = await api('/login', {
     method: 'POST',
-    body: { email: 'verify-temp-918@example.com', password: 'Temp123456' }
+    body: { email: tempRegEmail, password: 'Temp123456' }
   });
   ok(regLogin.json?.code === 200, '临时用户登录');
   const tempToken = typeof regLogin.json?.data === 'string' ? regLogin.json.data : regLogin.json?.data?.token;
   if (tempToken) {
     const tempInfo = await api('/my/loginUserInfo', { token: tempToken });
-    const tempUserId = tempInfo.json?.data?.user?.userId;
+    const tempUserId = tempInfo.json?.data?.userId;
     if (tempUserId) tempUserIdList.push(tempUserId);
 
-    const tempStats = await api('/email/getSidebarStats', { token: tempToken });
+    const tempStats = await api('/email/sidebarStats', { token: tempToken });
     ok(tempStats.json?.code === 200, '临时用户侧边栏');
 
     // 欢迎邮件（send_email 绑定在 dev 被注释，允许优雅降级；生产链路由 Part C 覆盖）
@@ -156,7 +157,7 @@ try {
     const login = await api('/login', { method: 'POST', body: ADMIN });
     const token = typeof login.json?.data === 'string' ? login.json.data : login.json?.data?.token;
     for (const uid of tempUserIdList) {
-      const del = await api('/user/physicsDelete', { method: 'POST', token, body: { userId: uid } });
+      const del = await api('/user/delete?userIds=' + uid, { method: 'DELETE', token });
       console.log(`[cleanup] 临时用户 ${uid} 物理删除: code=${del.json?.code}`);
     }
   } catch (e) {

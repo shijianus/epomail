@@ -47,7 +47,7 @@ await assert.rejects(
 	'getEncryptionKey must reject empty or whitespace-only keys'
 );
 
-const validKeyEnv = { totp_enc_key: 'epomail-totp-encryption-master-key-32b' };
+const validKeyEnv = { totp_enc_key: 'local-dev-totp-enc-key-NOT-FOR-PROD' };
 const cryptoKey = await totpUtils.getEncryptionKey(validKeyEnv);
 assert(cryptoKey, 'getEncryptionKey should succeed with valid totp_enc_key');
 console.log('✅ Test 1 Passed: getEncryptionKey strictly enforces totp_enc_key without any fallbacks.');
@@ -139,7 +139,7 @@ const mockContext = {
 	env: {
 		db: mockD1,
 		kv: mockKv,
-		totp_enc_key: 'epomail-totp-encryption-master-key-32b',
+		totp_enc_key: 'local-dev-totp-enc-key-NOT-FOR-PROD',
 		domain: ['epomail.bond']
 	},
 	req: {

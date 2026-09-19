@@ -15,7 +15,7 @@ describe('TOTP Backend Fixes & Security Audit Tests', () => {
 		await expect(totpUtils.getEncryptionKey({ jwt_secret: 'some-jwt-secret' })).rejects.toThrow('totp_enc_key is not configured');
 		await expect(totpUtils.getEncryptionKey({ totp_enc_key: '   ' })).rejects.toThrow('totp_enc_key is not configured');
 
-		const validKeyEnv = { totp_enc_key: 'epomail-totp-encryption-master-key-32b' };
+		const validKeyEnv = { totp_enc_key: 'local-dev-totp-enc-key-NOT-FOR-PROD' };
 		const cryptoKey = await totpUtils.getEncryptionKey(validKeyEnv);
 		expect(cryptoKey).toBeDefined();
 	});
@@ -74,7 +74,7 @@ describe('TOTP Backend Fixes & Security Audit Tests', () => {
 		const mockContext = {
 			env: {
 				kv: mockKv,
-				totp_enc_key: 'epomail-totp-encryption-master-key-32b',
+				totp_enc_key: 'local-dev-totp-enc-key-NOT-FOR-PROD',
 				domain: ['epomail.bond']
 			},
 			req: {
@@ -153,7 +153,7 @@ describe('TOTP Backend Fixes & Security Audit Tests', () => {
 		const mockContext = {
 			env: {
 				kv: mockKv,
-				totp_enc_key: 'epomail-totp-encryption-master-key-32b',
+				totp_enc_key: 'local-dev-totp-enc-key-NOT-FOR-PROD',
 				domain: ['epomail.bond']
 			},
 			get: (key) => key === 'user' ? { userId: testUserId, email: lockedEmail } : null,

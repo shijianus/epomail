@@ -25,6 +25,11 @@ lerna-debug.log*
 .env
 **/.env
 
+# wrangler 本地机密变量（严禁入库）
+.dev.vars
+**/.dev.vars
+!.dev.vars.example
+
 mail-worker/.env
 mail-worker/d1_output.json
 mail-worker/kv_setting.json

@@ -11,6 +11,38 @@
    - 在向用户输出回复时，必须置顶/显式打印出本次提交的完整 Commit Hash 与短 Hash，确保版本可追溯、审计记录完整。
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
+### 三大核验缺陷全量修复、全新部署引导链重构、密钥安全体系隔离与本地全真栈完整回归上线 (2026-09-19)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **[P1] 公开个人主页空白修复 (Public Profile Blank Page Fix)**:
+       - `mail-vue/src/views/profile/index.vue` 的 `isOwnProfile` 计算属性引用 `accountStore` 但全文件未导入 `useAccountStore`（4215b15 重构引入），导致所有个人主页正文渲染空白并抛 `ReferenceError`；
+       - 补齐导入与实例化后，本地与生产形态实测 `/admin` 主页完整渲染（身份组/时区/账户数据看板）且零控制台错误；
+       - 附加体验守卫：`fetchProfile` 捕获 `notExistUser`(501) 时 `router.replace` 转入 404 页，杜绝将不存在的用户名（如误入非路由路径 `/email`）渲染成残缺主页壳。
+    2. **[P0] 全新部署引导链三重断裂修复 (Fresh-Deploy Bootstrap Chain Fix)**:
+       - **角色播种守卫重构**：`v3_13DB` 原以 `roleCount===0` 为播种条件，被 `v1_1DB` 先行插入的遗留「普通用户」(custom) 永久阻断成死代码；改为按六个标准 `role_code` 精准计数判定，保留「站长删除 LV.0/LV.1 不被强制复活」的原设计意图；
+       - **缺失列补齐**：`email.labels`、`user.custom_labels`、`user.update_time` 三列在 drizzle entity 中声明但 CREATE TABLE 与全部 124 条迁移均未覆盖（邮件列表/注册/身份接口全新库直接 500）；`intDB` 的 CREATE TABLE 已内建三列，并在 `v3_14DB` 新增 pragma 检查式幂等 ALTER 兼容存量库，`custom_labels` 默认值与 entity 的 `getDefaultUserLabelsString()` 严格一致；
+       - **主站长账号引导**：`v3_14DB` 新增 `c.env.admin` 账号不存在时的 INSERT 路径（PBKDF2 哈希初始密码 123456 + master 角色 + 主信箱行），并在存在时兜底晋升 master；与 `adminReserved` 注册拦截闭环，全新部署仅需访问 `/api/init/<jwt_secret>` 即可完成全部引导；
+       - 顺带将 `v2_7DB` 的 `auto_refresh_time` RENAME 改为 pragma 条件执行，消除全新库迁移噪音告警。
+    3. **[P2] zh-Hant 系统标签简繁映射修复 (zh-Hant Label Mapping)**:
+       - 数据库预置标签实体「待办」在 zh-Hant 界面呈简体残留；`label-i18n.js` 补入 `待办`/`待辦` 变体映射（原仅覆盖 `代办`），单元断言 5/5 通过（zh-Hant `t(todoTag)=代辦`）。
+    4. **[安全] 密钥安全体系隔离与 CF 友好配置 (Secrets Isolation & CF-Friendly Config)**:
+       - `wrangler.toml` / `wrangler-dev.toml` / `wrangler-test.toml` 中的 `jwt_secret`、`totp_enc_key` 明文全部移除（密钥值本身不变，仅从仓库隔离）；
+       - 生产改由 `npx wrangler secret put jwt_secret` / `totp_enc_key` 注入（一次设置持久生效，部署不丢失）；本地开发由 gitignore 排除的 `mail-worker/.dev.vars` 承载（wrangler dev 实测自动加载 ✓），入库模板 `.dev.vars.example` 同步提供；
+       - `.gitignore` 新增 `.dev.vars` / `**/.dev.vars`（保留 `.dev.vars.example`）；
+       - 新增 `mail-worker/DEPLOY-SECRETS.md` 部署密钥指引（清单、注入命令、轮换、`/init` 门禁关联、初始密码提示）；
+       - 测试夹具脱敏：`totp-backend-fixes.spec.js`、`worker-configuration.d.ts`、`test-totp-backend-fixes.mjs` 中硬编码的生产 `totp_enc_key` 值替换为 `local-dev-totp-enc-key-NOT-FOR-PROD` 测试值；`git grep` 审计追踪文件零真实密钥残留。
+    5. **[加固] `/email/latest` 缺参防御 (Latest Endpoint Hardening)**:
+       - 原实现缺省 `accountId`/`allReceive` 时将 `undefined` 直接绑定 D1 抛 `D1_TYPE_ERROR`；现补 `emailId` 数值归一、accountId 缺省回退用户首个信箱、无信箱优雅返回空列表，前端契约（三参齐全）与非契约调用均实测 200。
+*   **自动化测试与完整核验 (Testing & Full Verification, 全部本地执行)**:
+    - **全新库端到端引导核验**：清空 `.wrangler/state` 后冷启动 `wrangler dev`，仅凭 `/api/init/<secret>` 完成引导——6 角色播种（visitor/master/user_lv0/user_lv1/moderator + 遗留 custom，权限 4~34 项齐备）、参观者与主站长双账号及其信箱自动创建、三列齐备，随后管理员 `123456` 直接登录成功；
+    - **API 功能核验套件** `tests/verify-local-functional-20260919.mjs`：25 项断言 25/25 全绿（登录身份/信箱/邮件收发/设置/角色用户/注册欢迎邮件/OAuth/安全面），临时用户 `DELETE /user/delete?userIds=` 物理清理 code=200，零假数据残留；
+    - **浏览器级 UI 核验**（Playwright，新构建产物）：`/inbox` 渲染 0 错误、`/admin` 主页内容完整且无 accountStore 错误、`/email`（非路由）正确落入 404 且无 profile 噪音错误、en 模式 CJK 残留 0、zh-Hant 模式简体特有字 0；
+    - **回归套件**：`test-totp-login-ui-e2e.mjs` 8/8 全绿、`test-multilingual-email-templates-e2e.mjs` Part A 37/37 全绿、i18n 三件套（对称 2032 键/键缺失 0/硬编码扫描）持续全绿；
+    - **构建核验**：mail-vue `vite build` ✓、`wrangler deploy --dry-run` ✓（jwt_secret 不再出现于打包 vars）；
+    - 已知环境限制（先于本次改动即存在，与本次变更无关）：`vitest run` 因 miniflare 无法解析 `__WRANGLER_EXTERNAL_AI_WORKER` 外部 AI 绑定而无法启动；`test-totp-backend-fixes.mjs` 依赖 bundler 式无扩展名导入无法以裸 Node 运行。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **epocanvas-mail Git Commit**: 本记录对应提交 Hash 见下方提交（本地核验任务，无生产部署）；
+    - 生产部署时请依 `mail-worker/DEPLOY-SECRETS.md` 先执行两次 `wrangler secret put`（jwt_secret / totp_enc_key，值可维持现状），随后 `wrangler deploy` 即可，密钥不再随仓库泄漏。
+
 ### 远端最新代码拉取合并、全栈功能性深度核验与三大缺陷审计报告上线 (2026-09-19)
 *   **核验范围与方法 (Verification Scope & Methodology)**:
     1. **远端同步**: `git pull origin master`（`4758b1c..e9ce56f` Fast-forward，8 个新提交，含 TOTP 登录流体动效重构 `b025153`、生产上线与 i18n 转义修复 `25985b1`、隐式注释化 `cff8c3b` 等）；

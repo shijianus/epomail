@@ -1737,11 +1737,30 @@ const emailService = {
 
 	async latest(c, params, userId) {
 		let { emailId, accountId, allReceive } = params;
+		emailId = Number(emailId) || 0;
 		allReceive = Number(allReceive);
 
 		if (isNaN(allReceive)) {
-			let accountRow = await accountService.selectById(c, accountId);
+			// 缺省 allReceive 时依据 accountId 判定；accountId 也缺失时回退用户首个信箱，避免 undefined 入参导致 D1 绑定报错
+			let accountRow = accountId ? await accountService.selectById(c, accountId) : null;
+			if (!accountRow) {
+				const myAccounts = await accountService.list(c, { size: 1 }, userId);
+				accountRow = Array.isArray(myAccounts) ? myAccounts[0] : null;
+			}
+			if (!accountRow) {
+				return [];
+			}
 			allReceive = accountRow.allReceive;
+			if (!accountId) {
+				accountId = accountRow.accountId;
+			}
+		} else if (!accountId) {
+			const myAccounts = await accountService.list(c, { size: 1 }, userId);
+			const firstAccount = Array.isArray(myAccounts) ? myAccounts[0] : null;
+			if (!firstAccount) {
+				return [];
+			}
+			accountId = firstAccount.accountId;
 		}
 
 		let list = await orm(c).select({...email}).from(email)

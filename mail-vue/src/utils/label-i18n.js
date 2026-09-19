@@ -33,6 +33,8 @@ export const BUILTIN_LABEL_MAP = {
   'global announcement': 'globalAnnouncementTag',
   '代办': 'todoTag',
   '代辦': 'todoTag',
+  '待办': 'todoTag',
+  '待辦': 'todoTag',
   'to-do': 'todoTag',
   'todo': 'todoTag'
 };

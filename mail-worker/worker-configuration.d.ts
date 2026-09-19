@@ -14,7 +14,7 @@ declare namespace Cloudflare {
 		assets: Fetcher;
 		admin: "admin@epomail.bond";
 		jwt_secret: "123456";
-		totp_enc_key: "epomail-totp-encryption-master-key-32b";
+		totp_enc_key: "local-dev-totp-enc-key-NOT-FOR-PROD";
 		domain: string;
 		RESEND_API_KEY: string;
 	}

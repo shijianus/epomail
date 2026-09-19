@@ -177,6 +177,7 @@ import dayjs from 'dayjs'
 import { Icon } from '@iconify/vue'
 import { useUiStore } from '@/store/ui.js'
 import { useUserStore } from '@/store/user.js'
+import { useAccountStore } from '@/store/account.js'
 import StatusBar from '@/layout/status-bar/index.vue'
 import Header from '@/layout/header/index.vue'
 import { parseInlineMarkdown } from "@/utils/md-parser.js"
@@ -185,6 +186,7 @@ import { ElMessage } from "element-plus"
 
 const uiStore = useUiStore()
 const userStore = useUserStore()
+const accountStore = useAccountStore()
 
 const route = useRoute()
 const router = useRouter()
@@ -363,6 +365,11 @@ const fetchProfile = () => {
             }
         }
     }).catch(err => {
+        // 用户名不存在（如误将内部路径当作主页访问）时转入 404，避免渲染残缺的主页壳
+        if (err?.code === 501 || err?.response?.data?.code === 501) {
+            router.replace({ name: '404' })
+            return
+        }
         console.error('Failed to load profile', err)
     }).finally(() => {
         loading.value = false

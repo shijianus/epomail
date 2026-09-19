@@ -2,6 +2,7 @@ import settingService from '../service/setting-service';
 import emailUtils from '../utils/email-utils';
 import { emailConst } from "../const/entity-const";
 import { getUserDb, getMailDb } from '../utils/db-accessor';
+import { getDefaultUserLabelsString } from '../const/default-labels';
 
 const dbInit = {
 	async init(c) {
@@ -70,15 +71,18 @@ const dbInit = {
 			}
 		}
 
-		// 2. Standard 6 default groups (仅在全新未初始化时播种，杜绝站长删除 LV.0 / LV.1 后在此被强制复活)
+		// 2. Standard 6 default groups (仅在六个标准身份分组均不存在时播种，杜绝站长删除 LV.0 / LV.1 后在此被强制复活)
 		let hasRoleSeeded = false;
 		try {
 			const flag = await c?.env?.kv?.get('roles_seeded_v2');
 			hasRoleSeeded = flag === '1';
 		} catch (_) {}
 
-		const roleCount = await userDb.prepare(`SELECT count(*) as count FROM role`).first();
-		const shouldSeedRoles = !hasRoleSeeded && (!roleCount || Number(roleCount.count) === 0);
+		// 以 role_code 精准判定标准角色是否已播种：v1_1DB 先行插入的遗留「普通用户」(custom) 不再阻断播种
+		const standardRoleCount = await userDb.prepare(
+			`SELECT count(*) as count FROM role WHERE role_code IN ('visitor','user_base','user_lv0','user_lv1','moderator','master')`
+		).first();
+		const shouldSeedRoles = !hasRoleSeeded && (!standardRoleCount || Number(standardRoleCount.count) === 0);
 
 		if (shouldSeedRoles) {
 			const standardRoles = [
@@ -243,6 +247,26 @@ const dbInit = {
 
 	async v3_14DB(c) {
 		const userDb = getUserDb(c);
+		const mailDb = getMailDb(c);
+
+		// v3_15 兼容迁移：为存量库补齐 entity 已声明但历史 DDL 遗漏的列（全新库由 CREATE TABLE 直接建立，此处幂等跳过）
+		const userLabelsDefault = getDefaultUserLabelsString().replace(/'/g, "''");
+		const legacyMissingCols = [
+			{ db: userDb, table: 'user', name: 'update_time', sql: `ALTER TABLE user ADD COLUMN update_time DATETIME DEFAULT CURRENT_TIMESTAMP;` },
+			{ db: userDb, table: 'user', name: 'custom_labels', sql: `ALTER TABLE user ADD COLUMN custom_labels TEXT NOT NULL DEFAULT '${userLabelsDefault}';` },
+			{ db: mailDb, table: 'email', name: 'labels', sql: `ALTER TABLE email ADD COLUMN labels TEXT NOT NULL DEFAULT '[]';` }
+		];
+		for (const col of legacyMissingCols) {
+			try {
+				const colInfo = await col.db.prepare(`SELECT * FROM pragma_table_info('${col.table}') WHERE name = ? limit 1`).bind(col.name).first();
+				if (!colInfo) {
+					await col.db.prepare(col.sql).run();
+				}
+			} catch (e) {
+				console.warn(`跳过 ${col.table} 字段 ${col.name}：${e.message}`);
+			}
+		}
+
 		const aiSettingCols = [
 			{ name: 'ai_api_key', sql: `ALTER TABLE setting ADD COLUMN ai_api_key TEXT NOT NULL DEFAULT '';` },
 			{ name: 'ai_api_url', sql: `ALTER TABLE setting ADD COLUMN ai_api_url TEXT NOT NULL DEFAULT '';` },
@@ -308,8 +332,27 @@ const dbInit = {
 
 			// 确保超级管理员 (User 1) 仅绑定自身主邮箱 c.env.admin (admin@epomail.bond)，绝不越权关联其他域名信箱
 			if (c.env.admin) {
-				const adminUser = await userDb.prepare(`SELECT user_id FROM user WHERE email = ?`).bind(c.env.admin).first();
+				let adminUser = await userDb.prepare(`SELECT user_id FROM user WHERE email = ?`).bind(c.env.admin).first();
+				if (!adminUser) {
+					// 全新部署引导：主站长账号不存在时直接创建（注册端 adminReserved 拦截站长邮箱，无法走注册路径）
+					// 初始密码为预设安全 PBKDF2 哈希的 123456，与演示参观者一致，站长登录后可在「个人设置->安全」修改
+					const masterRoleRow = await userDb.prepare(`SELECT role_id FROM role WHERE role_code = 'master' OR name = '站长' LIMIT 1`).first();
+					const masterRoleId = masterRoleRow ? masterRoleRow.role_id : 1;
+					const defHash = 'pbkdf2:100000:wYbOCP3rv6muivmiYwmd/oXXroIcxp7/VcB02M+Ac5w=';
+					const defSalt = 'ZmUlWbNgsFel3E0oxnPHcA==';
+					await userDb.prepare(`
+						INSERT INTO user (email, password, salt, type, status, is_del, create_time, update_time, custom_labels)
+						VALUES (?, ?, ?, ?, 0, 0, datetime('now'), datetime('now'), ?)
+					`).bind(c.env.admin, defHash, defSalt, masterRoleId, getDefaultUserLabelsString()).run();
+					adminUser = await userDb.prepare(`SELECT user_id FROM user WHERE email = ?`).bind(c.env.admin).first();
+					console.log(`[init] 已创建主站长账号 ${c.env.admin} (user_id=${adminUser?.user_id})，初始密码 123456，请登录后立即修改`);
+				}
 				if (adminUser) {
+					// 若站长账号尚未晋升 master（历史遗留普通账号），此处兜底晋升
+					const masterRoleRow = await userDb.prepare(`SELECT role_id FROM role WHERE role_code = 'master' OR name = '站长' LIMIT 1`).first();
+					if (masterRoleRow) {
+						await userDb.prepare(`UPDATE user SET type = ? WHERE user_id = ? AND type != ?`).bind(masterRoleRow.role_id, adminUser.user_id, masterRoleRow.role_id).run();
+					}
 					const adminAcc = await userDb.prepare(`SELECT account_id FROM account WHERE email = ? AND user_id = ?`).bind(c.env.admin, adminUser.user_id).first();
 					if (!adminAcc) {
 						await userDb.prepare(`
@@ -623,7 +666,12 @@ const dbInit = {
 	async v2_7DB(c) {
 		const userDb = getUserDb(c);
 		try {
-			await userDb.prepare(`ALTER TABLE setting RENAME COLUMN auto_refresh_time TO auto_refresh;`).run();
+			// 仅当旧列 auto_refresh_time 存在且新列 auto_refresh 尚不存在时才重命名（全新库 CREATE TABLE 已含 auto_refresh）
+			const oldCol = await userDb.prepare(`SELECT * FROM pragma_table_info('setting') WHERE name = 'auto_refresh_time' limit 1`).first();
+			const newCol = await userDb.prepare(`SELECT * FROM pragma_table_info('setting') WHERE name = 'auto_refresh' limit 1`).first();
+			if (oldCol && !newCol) {
+				await userDb.prepare(`ALTER TABLE setting RENAME COLUMN auto_refresh_time TO auto_refresh;`).run();
+			}
 		} catch (e) {
 			console.warn(`跳过字段：${e.message}`);
 		}
@@ -1080,6 +1128,7 @@ const dbInit = {
 				subject TEXT,
 				content TEXT,
 				text TEXT,
+				labels TEXT NOT NULL DEFAULT '[]',
 				create_time DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
 				is_del INTEGER DEFAULT 0 NOT NULL
 			)
@@ -1134,8 +1183,10 @@ const dbInit = {
 				salt TEXT NOT NULL,
 				status INTEGER DEFAULT 0 NOT NULL,
 				create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+				update_time DATETIME DEFAULT CURRENT_TIMESTAMP,
 				active_time DATETIME,
-				is_del INTEGER DEFAULT 0 NOT NULL
+				is_del INTEGER DEFAULT 0 NOT NULL,
+				custom_labels TEXT NOT NULL DEFAULT '${getDefaultUserLabelsString().replace(/'/g, "''")}'
 			)
 		`).run();
 
