@@ -23,7 +23,7 @@
     4. **值得肯定**：路由 100% 懒加载、Element Plus/echarts 按需、暗色模式 View Transitions 机制现代且明暗双模式实测无白斑、227 处 el-tooltip 隐式提示体系贯彻、email-scroll 列表骨架与空态兜底、辅助定时器清理完备。
 *   **优化路线图 (Roadmap)**: 第一批止血（P0×4 + 移动端导航/列表两行化）→ 第二批体验一致性（语言同步、i18n hook 化、图标收敛、a11y 补齐、分包、reduced-motion）→ 第三批还债（!important 只出不进、sys-setting 拆分、PWA 补齐或摘除、死代码清理、根目录归档）。
 *   **部署上线与自动化测试 (Verification & Deployment)**:
-    - **epocanvas-mail Git Commit**: 本记录对应提交 Hash 见下方回填提交（只读审计任务，无生产部署，生产 Version ID 不变）。
+    - **epocanvas-mail Git Commit**: `402586260823497094ec55cbec83c921ddd36b64` (Short Hash: `4025862`)（只读审计任务，无生产部署，生产 Version ID 不变）。
 
 ### 全专案全量体检 (2026-09-19)：静态审计三件套 + 构建核验 + 密钥安全审计 + 全新库引导链回归 + 五大测试套件全绿与 UI 核验套件 §5 方法缺陷修复
 *   **体检范围与方法 (Full Health-Check Scope & Methodology, 全部本地+生产双端执行)**:
