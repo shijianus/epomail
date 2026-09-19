@@ -13,8 +13,8 @@
         </div>
 
         <!-- Mail Menu -->
-        <div class="nav-section">
-          <div class="nav-item" @click="router.push({name: 'email'})" :class="route.name === 'email' ? 'active' : ''" :title="$t('inbox')">
+        <div class="nav-section" @keydown.enter.prevent="$event.target.click()">
+          <div class="nav-item" role="button" tabindex="0" @click="router.push({name: 'email'})" :class="route.name === 'email' ? 'active' : ''" :title="$t('inbox')">
             <span class="nav-ic-wrap">
               <Icon icon="hugeicons:mailbox-01" width="20" height="20" />
               <div class="sidebar-red-dot" v-if="unreadCount > 0"></div>
@@ -22,7 +22,7 @@
             <span class="nav-label">{{$t('inbox')}}</span>
             <span class="nav-count" v-if="unreadCount > 0">{{ unreadCount }}</span>
           </div>
-          <div class="nav-item" @click="router.push({name: 'star'})" :class="route.name === 'star' ? 'active' : ''" :title="$t('starred')">
+          <div class="nav-item" role="button" tabindex="0" @click="router.push({name: 'star'})" :class="route.name === 'star' ? 'active' : ''" :title="$t('starred')">
             <span class="nav-ic-wrap">
               <Icon icon="solar:star-line-duotone" width="20" height="20" />
               <div class="sidebar-red-dot" v-if="starCount > 0"></div>
@@ -30,7 +30,7 @@
             <span class="nav-label">{{$t('starred')}}</span>
             <span class="nav-count" v-if="starCount > 0">{{ starCount }}</span>
           </div>
-          <div class="nav-item" @click="router.push({name: 'snoozed'})" :class="route.name === 'snoozed' ? 'active' : ''" :title="$t('snoozed') || 'Snoozed'">
+          <div class="nav-item" role="button" tabindex="0" @click="router.push({name: 'snoozed'})" :class="route.name === 'snoozed' ? 'active' : ''" :title="$t('snoozed') || 'Snoozed'">
             <span class="nav-ic-wrap">
               <Icon icon="ic:outline-access-time" width="20" height="20" />
               <div class="sidebar-red-dot" v-if="urgentSnoozedCount > 0"></div>
@@ -40,7 +40,7 @@
             <span class="nav-count" v-if="urgentSnoozedCount > 0">{{ urgentSnoozedCount }}</span>
             <span class="nav-count muted" v-else-if="waitingSnoozedCount > 0">{{ waitingSnoozedCount }}</span>
           </div>
-          <div class="nav-item" @click="router.push({name: 'send'})" :class="route.name === 'send' ? 'active' : ''" :title="$t('sent')">
+          <div class="nav-item" role="button" tabindex="0" @click="router.push({name: 'send'})" :class="route.name === 'send' ? 'active' : ''" :title="$t('sent')">
             <span class="nav-ic-wrap">
               <Icon icon="cil:send" width="20" height="20" />
               <div class="sidebar-gray-dot" v-if="sendCount > 0"></div>
@@ -48,7 +48,7 @@
             <span class="nav-label">{{$t('sent')}}</span>
             <span class="nav-count muted" v-if="sendCount > 0">{{ sendCount }}</span>
           </div>
-          <div class="nav-item" @click="router.push({name: 'draft'})" :class="route.name === 'draft' ? 'active' : ''" :title="$t('drafts')">
+          <div class="nav-item" role="button" tabindex="0" @click="router.push({name: 'draft'})" :class="route.name === 'draft' ? 'active' : ''" :title="$t('drafts')">
             <span class="nav-ic-wrap">
               <Icon icon="ep:document" width="20" height="20" />
               <div class="sidebar-gray-dot" v-if="draftCount > 0"></div>
@@ -56,7 +56,7 @@
             <span class="nav-label">{{$t('drafts')}}</span>
             <span class="nav-count muted" v-if="draftCount > 0">{{ draftCount }}</span>
           </div>
-          <div class="nav-item" @click="router.push({name: 'user-all-email'})" :class="route.name === 'user-all-email' ? 'active' : ''" :title="$t('allMail')">
+          <div class="nav-item" role="button" tabindex="0" @click="router.push({name: 'user-all-email'})" :class="route.name === 'user-all-email' ? 'active' : ''" :title="$t('allMail')">
             <span class="nav-ic-wrap">
               <Icon icon="mdi:email-multiple-outline" width="22" height="22" />
               <div class="sidebar-gray-dot" v-if="allMailCount > 0"></div>
@@ -64,7 +64,7 @@
             <span class="nav-label">{{$t('allMail')}}</span>
             <span class="nav-count muted" v-if="allMailCount > 0">{{ allMailCount }}</span>
           </div>
-          <div class="nav-item" @click="router.push({name: 'spam'})" :class="route.name === 'spam' ? 'active' : ''" :title="$t('spam') || 'Spam'">
+          <div class="nav-item" role="button" tabindex="0" @click="router.push({name: 'spam'})" :class="route.name === 'spam' ? 'active' : ''" :title="$t('spam') || 'Spam'">
             <span class="nav-ic-wrap">
               <Icon icon="ic:outline-report-gmailerrorred" width="20" height="20" />
               <div class="sidebar-gray-dot" v-if="spamCount > 0"></div>
@@ -74,7 +74,7 @@
             <span class="nav-count muted" v-if="spamCount > 0">{{ spamCount }}</span>
             <span class="nav-count muted" v-else-if="spamReadCount > 0">{{ spamReadCount }}</span>
           </div>
-          <div class="nav-item" @click="router.push({name: 'trash'})" :class="route.name === 'trash' ? 'active' : ''" :title="$t('trash') || 'Trash'">
+          <div class="nav-item" role="button" tabindex="0" @click="router.push({name: 'trash'})" :class="route.name === 'trash' ? 'active' : ''" :title="$t('trash') || 'Trash'">
             <span class="nav-ic-wrap">
               <Icon icon="ic:outline-delete" width="20" height="20" />
               <div class="sidebar-gray-dot" v-if="trashCount > 0"></div>
@@ -84,7 +84,7 @@
           </div>
         </div>
         
-        <div class="nav-section" id="labelSection" style="margin-top: 32px;">
+        <div class="nav-section" id="labelSection" style="margin-top: 32px;" @keydown.enter.prevent="$event.target.click()">
           <div class="nav-section-label">
             <span class="section-title">{{ $t('labels') || 'Labels' }}</span>
             <div class="label-add-btn" :title="$t('createNewLabel') || 'Create new label'" @click.stop="uiStore.showAddLabel = true">
@@ -92,7 +92,7 @@
             </div>
           </div>
           <template v-for="(label, idx) in uiStore.allLabels" :key="'lbl-'+idx">
-            <div class="nav-item" v-if="label.listVis !== false" :title="getLabelDisplayName(label.name || label, t)" @click="handleLabelClick(label)" :class="isLabelActive(label) ? 'active' : ''">
+            <div class="nav-item" role="button" tabindex="0" v-if="label.listVis !== false" :title="getLabelDisplayName(label.name || label, t)" @click="handleLabelClick(label)" :class="isLabelActive(label) ? 'active' : ''">
               <span class="nav-ic-wrap">
                 <div v-if="(label.icon || '').startsWith('<svg')" v-html="label.icon" style="width: 20px; height: 20px; display: inline-flex; justify-content: center; align-items: center; fill: currentColor;" :style="{ color: label.color || 'inherit' }"></div>
                 <Icon v-else :icon="label.icon || 'ic:baseline-label'" width="20" height="20" :style="{ color: label.color || 'inherit' }" />
@@ -203,7 +203,11 @@ const isLabelActive = (label) => {
 
 const isMobile = ref(window.innerWidth < 1025)
 const handleResize = () => {
-  isMobile.value = window.innerWidth < 1025
+  const mobile = window.innerWidth < 1025
+  // 跨断点切换时同步抽屉开合：进入移动端收起抽屉，回到桌面恢复侧栏
+  if (mobile && !isMobile.value) uiStore.asideShow = false
+  if (!mobile && isMobile.value) uiStore.asideShow = true
+  isMobile.value = mobile
 }
 
 const getLabelStats = (name) => {

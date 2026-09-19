@@ -11,6 +11,8 @@ interface LoginCardProps {
 }
 
 export function LoginCard({ canvasRef, onSwitch, sysConfig }: LoginCardProps) {
+  // 尊重系统「减少动态效果」偏好：关闭 3D 视差
+  const reduceMotion = typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   // Cursor parallax — card floats opposite to the pointer.
   const px = useMotionValue(0);
   const py = useMotionValue(0);
@@ -22,13 +24,14 @@ export function LoginCard({ canvasRef, onSwitch, sysConfig }: LoginCardProps) {
   const translateY = useTransform(sy, [-1, 1], [8, -8]);
 
   useEffect(() => {
+    if (reduceMotion) return;
     const onMove = (e: PointerEvent) => {
       px.set((e.clientX / window.innerWidth) * 2 - 1);
       py.set((e.clientY / window.innerHeight) * 2 - 1);
     };
     window.addEventListener("pointermove", onMove);
     return () => window.removeEventListener("pointermove", onMove);
-  }, [px, py]);
+  }, [px, py, reduceMotion]);
 
   return (
     <div
@@ -40,10 +43,10 @@ export function LoginCard({ canvasRef, onSwitch, sysConfig }: LoginCardProps) {
         animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
         transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
         style={{
-          rotateX,
-          rotateY,
-          x: translateX,
-          y: translateY,
+          rotateX: reduceMotion ? 0 : rotateX,
+          rotateY: reduceMotion ? 0 : rotateY,
+          x: reduceMotion ? 0 : translateX,
+          y: reduceMotion ? 0 : translateY,
           transformStyle: "preserve-3d",
         }}
         className="relative w-full max-w-[420px]"
@@ -78,7 +81,7 @@ export function LoginCard({ canvasRef, onSwitch, sysConfig }: LoginCardProps) {
             className="pointer-events-none absolute -left-1/3 -top-1/3 h-2/3 w-2/3 rounded-full"
             style={{
               background:
-                "radial-gradient(circle, rgba(255,255,255,0.12), transparent 70%)",
+                "radial-gradient(circle, rgba(255,255,255,0.05), transparent 78%)",
             }}
           />
 

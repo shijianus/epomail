@@ -42,7 +42,16 @@ const PURPLE: [number, number, number] = [168, 85, 247];
 const INDIGO: [number, number, number] = [99, 102, 241];
 const CYAN: [number, number, number] = [103, 232, 249];
 
-function pickColor(c?: "purple" | "cyan" | "indigo"): [number, number, number] {
+function pickColor(c?: "purple" | "cyan" | "indigo" | string): [number, number, number] {
+  // 支持调用方直接传十六进制色值（如错误提示 #eab308 / 成功提示 #22c55e）
+  if (typeof c === "string" && c.startsWith("#")) {
+    const hex = c.slice(1);
+    const full = hex.length === 3 ? hex.split("").map(ch => ch + ch).join("") : hex;
+    const num = parseInt(full, 16);
+    if (!Number.isNaN(num) && full.length === 6) {
+      return [(num >> 16) & 255, (num >> 8) & 255, num & 255];
+    }
+  }
   if (c === "cyan") return CYAN;
   if (c === "indigo") return INDIGO;
   if (c === "purple") return PURPLE;
@@ -136,7 +145,7 @@ export const CanvasBackground = forwardRef<CanvasHandle>((_props, ref) => {
     let stars: Star[] = [];
 
     const buildStars = () => {
-      const count = Math.round((width * height) / 75); // Balanced Density for intense hyper-drive feel
+      const count = Math.round((width * height) / 600); // 低密度巡航：按屏幕面积自适应且为低端设备留足余量
       stars = Array.from({ length: count }, () => ({
         x: (Math.random() - 0.5) * 3500, // wider field
         y: (Math.random() - 0.5) * 3500,

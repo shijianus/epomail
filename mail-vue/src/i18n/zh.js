@@ -243,6 +243,8 @@ const zh = {
     admin: '超级管理员',
     addUser: '添加用户',
     select: '请选择',
+
+    selectMail: '选择邮件',
     unknown: '未知',
     changePerm: '修改权限',
     from: '发件人',

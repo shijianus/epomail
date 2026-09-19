@@ -25,6 +25,15 @@
     </el-footer>
   </el-container>
   <writer ref="writerRef" />
+  <!-- 移动端写信悬浮按钮：写信入口只在侧栏抽屉内，移动端直达 -->
+  <button
+      v-if="!isSettingsMode && isMobile && hasPerm('email:send')"
+      class="compose-fab"
+      :aria-label="$t('writeEmail')"
+      @click="uiStore.writerRef?.open?.()"
+  >
+    <Icon icon="material-symbols:edit-outline-sharp" width="26" height="26"/>
+  </button>
 </template>
 
 <script setup>
@@ -33,6 +42,8 @@ import Header from '@/layout/header/index.vue'
 import Main from '@/layout/main/index.vue'
 import StatusBar from '@/layout/status-bar/index.vue'
 import { ref, onMounted, onBeforeUnmount, computed, watch, nextTick } from 'vue'
+import { Icon } from '@iconify/vue'
+import { hasPerm } from '@/perm/perm.js'
 import {useUiStore} from "@/store/ui.js";
 import {useRoute, useRouter} from "vue-router";
 import writer from '@/layout/write/index.vue'
@@ -48,8 +59,12 @@ const isSettingsMode = computed(() => {
 })
 
 const handleResize = () => {
-  isMobile.value = window.innerWidth < 1025
-  uiStore.asideShow = window.innerWidth > 1024;
+  const mobile = window.innerWidth < 1025
+  // 仅在跨断点时同步抽屉开合：移动端软键盘/地址栏收展等 resize 不应把抽屉砸关
+  if (mobile !== isMobile.value) {
+    uiStore.asideShow = !mobile
+  }
+  isMobile.value = mobile
 }
 
 const checkComposeQuery = () => {
@@ -90,6 +105,13 @@ onMounted(() => {
 watch(() => route.query.composeTo, (newVal) => {
   if (newVal) {
     checkComposeQuery();
+  }
+});
+
+// 移动端：任何路由跳转后自动收起抽屉侧栏
+watch(() => route.name, () => {
+  if (isMobile.value) {
+    uiStore.asideShow = false
   }
 });
 
@@ -190,5 +212,29 @@ onBeforeUnmount(() => {
   display: flex;
   pointer-events: none;
   opacity: 0;
+}
+
+/* 移动端写信 FAB */
+.compose-fab {
+  position: fixed;
+  right: 18px;
+  bottom: 36px;
+  z-index: 90;
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  border: none;
+  background: linear-gradient(135deg, var(--el-color-primary), var(--el-color-primary-light-3, #8b5cf6));
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 18px rgba(99, 102, 241, 0.45);
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.compose-fab:active {
+  transform: scale(0.94);
 }
 </style>

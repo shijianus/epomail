@@ -193,11 +193,12 @@ const routes = [
         name: 'oauth-authorize',
         component: () => import('@/views/oauth/authorize.vue')
     },
-    {
+    // /test 仅开发模式注册，不暴露生产
+    ...(import.meta.env.DEV ? [{
         path: '/test',
         name: 'test',
         component: () => import('@/views/test/index.vue')
-    },
+    }] : []),
     {
         path: '/:username',
         name: 'profile',

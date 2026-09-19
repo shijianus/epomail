@@ -19,6 +19,8 @@ try {
     console.error('App init failed:', e);
 }
 app.use(router).use(i18n).directive('perm',perm)
-app.config.devtools = true;
+if (import.meta.env.DEV) {
+    app.config.devtools = true;
+}
 
 app.mount('#app');

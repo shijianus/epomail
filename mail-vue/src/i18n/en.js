@@ -243,6 +243,8 @@ const en = {
     admin: 'Admin',
     addUser: 'Add User',
     select: 'Select',
+
+    selectMail: 'Select mail',
     unknown: 'Unknown',
     changePerm: 'Change Role',
     from: 'From',

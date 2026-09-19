@@ -1498,6 +1498,23 @@ const handleReportNotSpam = (emailId) => {
   box-shadow: var(--header-actions-border);
   font-size: 18px;
 
+  /* 窄屏：动作图标条允许横向滚动，避免图标被裁切挤压 */
+  @media (max-width: 767px) {
+    overflow-x: auto;
+    scrollbar-width: none;
+    gap: 8px;
+
+    .header-actions-left {
+      gap: 10px;
+      flex-shrink: 0;
+    }
+
+    .header-actions-right {
+      gap: 10px;
+      flex-shrink: 0;
+    }
+  }
+
   .header-actions-left {
     display: flex;
     align-items: center;

@@ -5,6 +5,7 @@
           v-model="checkAll"
           :indeterminate="isIndeterminate"
           :disabled="!emailList.length || loading"
+          :aria-label="$t('selectMail')"
           @change="handleCheckAllChange"
       >
       </el-checkbox>
@@ -48,7 +49,7 @@
             >
               <div class="unread-bar" v-if="item.unread === EmailUnreadEnum.UNREAD && showUnread"></div>
               <el-checkbox :class=" props.type === 'all-email' ? 'all-email-checkbox' : 'checkbox'"
-                           v-model="item.checked" @click.stop></el-checkbox>
+                           v-model="item.checked" :aria-label="$t('selectMail')" @click.stop></el-checkbox>
               <div @click.stop="starChange(item)" class="pc-star" v-if="showStar" :title="item.isStar ? $t('starred') : $t('star')">
                 <Icon v-if="item.isStar" icon="fluent-color:star-16" width="18" height="18"/>
                 <Icon v-else icon="solar:star-line-duotone" width="18" height="18"/>
@@ -125,7 +126,7 @@
                         <span v-html="highlightMatch(item.subject || '\u200B')"></span>
                       </slot>
                     </span>
-                    <span class="email-snippet-text" v-if="item.formatText && item.formatText.trim()">&nbsp;-&nbsp;<span v-html="highlightMatch(item.formatText)"></span></span>
+                    <span class="email-snippet-text" v-if="item.formatText && item.formatText.trim()">&nbsp;-&nbsp;<span v-html="highlightMatch(displaySnippet(item.formatText))"></span></span>
                   </div>
 
                   <div class="user-info" v-if="showUserInfo">
@@ -503,6 +504,23 @@ function highlightMatch(text) {
       return escapeHtml(part);
     }
   }).join('');
+}
+
+// 列表行摘要仅保留有限窗口，避免整封邮件正文进入 DOM 与可访问性树；
+// 有搜索关键词且关键词位于窗口之外时，平移窗口让关键词命中可见。
+const SNIPPET_MAX = 160
+function displaySnippet(text) {
+  const s = (text || '').trim()
+  if (s.length <= SNIPPET_MAX) return s
+  const kw = emailStore.searchParsed?.cleanKeyword || ''
+  if (kw) {
+    const i = s.indexOf(kw)
+    if (i > SNIPPET_MAX - 40) {
+      const from = Math.max(0, i - 40)
+      return '…' + s.slice(from, from + SNIPPET_MAX)
+    }
+  }
+  return s.slice(0, SNIPPET_MAX)
 }
 
 defineExpose({
@@ -1544,6 +1562,12 @@ function loadData() {
         max-width: 130px;
       }
 
+      @media (max-width: 767px) {
+        flex: 0 1 auto;
+        max-width: 42%;
+        min-width: 0;
+      }
+
       &.is-unread {
         .sender-name-text {
           font-weight: 700;
@@ -1668,6 +1692,19 @@ function loadData() {
           text-overflow: ellipsis;
           min-width: 0;
           flex: 1;
+        }
+
+        // 窄屏：主题优先占满剩余宽度并正确省略，摘要隐藏（两行化第一步行）
+        @media (max-width: 767px) {
+          .email-subject-text {
+            flex-shrink: 1;
+            flex-grow: 1;
+            min-width: 0;
+          }
+
+          .email-snippet-text {
+            display: none;
+          }
         }
       }
 

@@ -55,7 +55,32 @@ export default defineConfig(({mode}) => {
             target: 'es2022',
             outDir: env.VITE_OUT_DIR || 'dist',
             emptyOutDir: true,
-            assetsInclude: ['**/*.json']
+            assetsInclude: ['**/*.json'],
+            chunkSizeWarningLimit: 1500,
+            rollupOptions: {
+                output: {
+                    // 厂商分包：业务改动不再击穿整个 vendor 缓存
+                    // 注意：Vite 7 已不支持 build.manualChunks 顶层简写（会被静默忽略），必须挂在 rollupOptions.output 下
+                    manualChunks(id) {
+                        if (!id.includes('node_modules')) return undefined
+                        if (id.includes('element-plus') || id.includes('@element-plus') || id.includes('@ctrl/tinycolor')) return 'element-plus'
+                        if (id.includes('echarts') || id.includes('zrender')) return 'echarts'
+                        if (
+                            id.includes('/@vue/') ||
+                            id.includes('/node_modules/vue/') ||
+                            id.includes('vue-router') ||
+                            id.includes('/pinia') ||
+                            id.includes('vue-i18n') ||
+                            id.includes('@vueuse/') ||
+                            id.includes('/axios/') ||
+                            id.includes('/dayjs/') ||
+                            id.includes('lodash-es') ||
+                            id.includes('@vue/devtools')
+                        ) return 'vue-vendor'
+                        return undefined
+                    }
+                }
+            }
         }
     }
 })

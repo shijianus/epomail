@@ -444,7 +444,7 @@ function createSenderPie() {
         labelLine: {
           show: true
         },
-        color: ['#3CB2FF', '#13DEB9', '#FBBF24', '#FF7F50', '#BAE6FD', '#C084FC'] // 添加符合主题的配色
+        color: ['#6366F1', '#14B8A6', '#F59E0B', '#EC4899', '#8B5CF6', '#06B6D4'] // 主题一致性配色（紫/靛/青系）
       }
     ]
   }
@@ -571,18 +571,18 @@ function createIncreaseLine() {
         smooth: 0.1,
         symbol: 'none',
         lineStyle: {
-          color: '#1D84FF',
+          color: '#6366F1',
           width: 2.5
         },
         areaStyle: {
           color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
             {
               offset: 0,
-              color: 'rgba(29, 132, 255, 0.3)'
+              color: 'rgba(99, 102, 241, 0.3)'
             },
             {
               offset: 1,
-              color: 'rgba(29, 132, 255, 0.03)'
+              color: 'rgba(99, 102, 241, 0.03)'
             }
           ])
         },
@@ -694,7 +694,7 @@ function createEmailColumnChart() {
         },
         data: emailColumnData.receiveData,
         itemStyle: {
-          color: '#3CB2FF',
+          color: '#6366F1',
         }
       },
       {
@@ -709,7 +709,7 @@ function createEmailColumnChart() {
         },
         data: emailColumnData.sendData,
         itemStyle: {
-          color: '#13deb9',
+          color: '#14B8A6',
         }
       },
       {
@@ -724,7 +724,7 @@ function createEmailColumnChart() {
         },
         data: emailColumnData.interceptData,
         itemStyle: {
-          color: '#f56c6c',
+          color: '#EF4444',
         }
       }
     ]

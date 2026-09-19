@@ -243,6 +243,8 @@ const zhHant = {
     admin: '超級管理員',
     addUser: '新增使用者',
     select: '請選擇',
+
+    selectMail: '選擇郵件',
     unknown: '未知',
     changePerm: '修改許可權',
     from: '發件人',

@@ -2,6 +2,9 @@
   <div class="topbar" :class="!hasPerm('email:send') ? 'not-send' : ''">
     <!-- Left Section: Logo acting as toggle -->
     <div class="topbar-left">
+      <button class="icon-btn mobile-menu-btn" @click="changeAside" :aria-label="$t('toggleSidebar')">
+        <Icon icon="lucide:menu" width="22" height="22"/>
+      </button>
       <div class="brand-wrapper" @click="props.isProfile ? router.push('/') : changeAside()" style="cursor:pointer" :title="props.isProfile ? ($t('home') || 'Home') : ($t('toggleSidebar') || 'Toggle Sidebar')">
         <img src="/logo.svg" alt="Logo" class="brand-logo" />
         <span class="brand-name">EpoCanvas</span>
@@ -45,20 +48,20 @@
     <!-- Right Section: Actions & Avatar -->
     <div class="topbar-actions">
       <el-tooltip :content="uiStore.dark ? $t('lightMode') : $t('darkMode')" placement="bottom">
-        <button v-if="uiStore.dark" class="icon-btn theme-toggle-btn" @click="openDark($event)">
+        <button v-if="uiStore.dark" class="icon-btn theme-toggle-btn" :aria-label="$t('lightMode')" @click="openDark($event)">
           <Icon icon="lucide:sun" width="22" height="22"/>
         </button>
-        <button v-else class="icon-btn theme-toggle-btn" @click="openDark($event)">
+        <button v-else class="icon-btn theme-toggle-btn" :aria-label="$t('darkMode')" @click="openDark($event)">
           <Icon icon="lucide:moon" width="22" height="22"/>
         </button>
       </el-tooltip>
       <el-tooltip :content="$t('help')" placement="bottom">
-        <button class="icon-btn">
+        <button class="icon-btn" :aria-label="$t('help')">
           <Icon icon="lucide:help-circle" width="22" height="22"/>
         </button>
       </el-tooltip>
       <el-tooltip v-if="settingStore.settings?.notice === 0" :content="$t('noticeTitle')" placement="bottom">
-        <button class="icon-btn" @click="openNotice">
+        <button class="icon-btn" :aria-label="$t('noticeTitle')" @click="openNotice">
           <Icon icon="lucide:bell" width="22" height="22"/>
           <span class="badge"></span>
         </button>
@@ -860,6 +863,18 @@ function formatName(email) {
 
 .hamburger-wrapper:hover {
   background: var(--bg-hover);
+}
+
+/* 移动端汉堡入口：仅在 <1025px 显示，桌面隐藏（桌面由 Logo 点击收合侧栏）。
+   用 button 前缀提升特异性：下方 .icon-btn(1020 行) 的 display:flex 同特异性且声明更靠后，会被其覆盖 */
+button.mobile-menu-btn {
+  display: none;
+}
+
+@media (max-width: 1024px) {
+  button.mobile-menu-btn {
+    display: flex;
+  }
 }
 
 .brand-wrapper { 

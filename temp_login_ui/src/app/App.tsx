@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect, useState, useMemo } from "react";
 import { CanvasBackground } from "./components/epomail/CanvasBackground";
 import type { CanvasHandle } from "./components/epomail/CanvasBackground";
 import { LoginCard } from "./components/epomail/LoginCard";
@@ -7,25 +7,36 @@ import { PassingPlanets } from "./components/epomail/PassingPlanets";
 import { cameraState, updateCameraPhysics } from "./components/epomail/cameraStore";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 
+// 站点配置整页只需拉取一次，登录/注册视图切换不再重复请求
+let sysConfigPromise: Promise<any> | null = null;
+function loadSysConfig(): Promise<any> {
+  if (!sysConfigPromise) {
+    sysConfigPromise = fetch('/api/setting/websiteConfig')
+      .then(r => r.json())
+      .then(data => (data.code === 200 ? data.data : null))
+      .catch(e => {
+        sysConfigPromise = null;
+        console.error(e);
+        return null;
+      });
+  }
+  return sysConfigPromise;
+}
+
 export default function App() {
   const [view, setView] = useState<'login' | 'register'>('login');
   const [sysConfig, setSysConfig] = useState<any>(null);
   const canvasRef = useRef<CanvasHandle | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const overlayRef = useRef<HTMLDivElement>(null);
-  const warningRef = useRef<HTMLDivElement>(null);
   const authErrorRef = useRef<HTMLDivElement>(null);
   const authSuccessRef = useRef<HTMLDivElement>(null);
+  // 尊重系统「减少动态效果」：跳过行星飞掠等装饰动画（星空画布内部已自行适配）
+  const reduceMotion = useMemo(
+    () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+    []
+  );
 
   useEffect(() => {
-    fetch('/api/setting/websiteConfig')
-      .then(r => r.json())
-      .then(data => {
-        if (data.code === 200) {
-          setSysConfig(data.data);
-        }
-      })
-      .catch(console.error);
+    loadSysConfig().then(setSysConfig);
   }, []);
 
   useEffect(() => {
@@ -45,15 +56,6 @@ export default function App() {
     } else {
       window.history.pushState(null, '', '/login/');
     }
-    // Refresh configuration whenever view is toggled
-    fetch('/api/setting/websiteConfig')
-      .then(r => r.json())
-      .then(data => {
-        if (data.code === 200) {
-          setSysConfig(data.data);
-        }
-      })
-      .catch(console.error);
   };
 
   useEffect(() => {
@@ -67,24 +69,8 @@ export default function App() {
       // Update global camera physics
       updateCameraPhysics(dt);
 
-      // Apply overlay
-      if (overlayRef.current) {
-        overlayRef.current.style.opacity = cameraState.overlayOpacity.toString();
-        overlayRef.current.style.background = cameraState.overlayColor;
-        overlayRef.current.style.pointerEvents = cameraState.overlayOpacity > 0 ? "auto" : "none";
-      }
-      
-      // Apply warning border
-      // Note: we intentionally use ONLY opacity (not visibility) to avoid triggering Layout Reflow.
-      // pointer-events-none class handles interaction blocking. visibility would cause full layout recalc on collision.
-      if (warningRef.current) {
-        // Suppress the red warning HUD if the yellow or green auth warning is active
-        const effectiveWarningOpacity = (cameraState.authErrorOpacity > 0 || cameraState.authSuccessOpacity > 0) ? 0 : cameraState.warningOpacity;
-        warningRef.current.style.opacity = effectiveWarningOpacity.toString();
-      }
-
       if (authErrorRef.current) {
-        // Suppress yellow if green is active (assuming green has same priority, but if green is active, yellow shouldn't be anyway)
+        // Suppress yellow if green is active
         const effectiveErrorOpacity = cameraState.authSuccessOpacity > 0 ? 0 : cameraState.authErrorOpacity;
         authErrorRef.current.style.opacity = effectiveErrorOpacity.toString();
       }
@@ -107,7 +93,7 @@ export default function App() {
         style={{ background: "var(--epo-void)" }}
       >
         <CanvasBackground ref={canvasRef} />
-        <PassingPlanets />
+        {!reduceMotion && <PassingPlanets />}
         <div className="relative h-full min-h-screen">
           <ErrorBoundary onReset={() => handleSwitchView('login')}>
             {view === 'login' ? (
@@ -118,75 +104,14 @@ export default function App() {
           </ErrorBoundary>
         </div>
       </div>
-      
-      {/* Pass-through overlay effect */}
-      <div 
-        ref={overlayRef}
-        className="fixed inset-0 z-50 transition-colors duration-0"
-        style={{ opacity: 0, pointerEvents: 'none', willChange: 'opacity, background-color', transform: 'translateZ(0)' }}
-      />
-      
-      {/* Sci-Fi Red Warning HUD on collision */}
-      <div 
-        ref={warningRef}
-        className="fixed inset-0 z-[60] pointer-events-none overflow-hidden"
-        style={{ 
-          opacity: 0,
-          /* visibility intentionally omitted — paint elements upfront, toggle only via opacity (GPU Composite) */
-          willChange: 'opacity', 
-          transform: 'translateZ(0)',
-          background: 'radial-gradient(ellipse at center, transparent 40%, rgba(220, 38, 38, 0.25) 100%)',
-          boxShadow: 'inset 0 0 120px rgba(220, 38, 38, 0.6)'
-        }}
-      >
-        {/* Diagonal caution stripes on top & bottom edge */}
-        <div 
-          className="absolute top-0 left-0 right-0 h-3 sm:h-4 opacity-80"
-          style={{ backgroundImage: 'repeating-linear-gradient(-45deg, rgba(220,38,38,0.9), rgba(220,38,38,0.9) 15px, transparent 15px, transparent 30px)' }}
-        />
-        <div 
-          className="absolute bottom-0 left-0 right-0 h-3 sm:h-4 opacity-80"
-          style={{ backgroundImage: 'repeating-linear-gradient(-45deg, rgba(220,38,38,0.9), rgba(220,38,38,0.9) 15px, transparent 15px, transparent 30px)' }}
-        />
-
-        {/* Corner Brackets */}
-        <div className="absolute top-0 left-0 w-16 h-16 sm:w-32 sm:h-32 border-t-8 border-l-8 border-red-600/90 m-6 sm:m-8" />
-        <div className="absolute top-0 right-0 w-16 h-16 sm:w-32 sm:h-32 border-t-8 border-r-8 border-red-600/90 m-6 sm:m-8" />
-        <div className="absolute bottom-0 left-0 w-16 h-16 sm:w-32 sm:h-32 border-b-8 border-l-8 border-red-600/90 m-6 sm:m-8" />
-        <div className="absolute bottom-0 right-0 w-16 h-16 sm:w-32 sm:h-32 border-b-8 border-r-8 border-red-600/90 m-6 sm:m-8" />
-
-        {/* HUD Data Top Left */}
-        <div className="absolute top-12 left-12 sm:top-16 sm:left-20 text-red-500 font-mono text-[10px] sm:text-sm font-bold tracking-[0.2em] uppercase leading-relaxed drop-shadow-md">
-          <span className="animate-pulse">SYS.WARN // 0xDEAD</span><br/>
-          IMPACT DETECTED<br/>
-          CRITICAL AVOIDANCE
-        </div>
-
-        {/* HUD Data Bottom Right */}
-        <div className="absolute bottom-12 right-12 sm:bottom-16 sm:right-20 text-red-500 font-mono text-[10px] sm:text-sm font-bold tracking-[0.2em] text-right uppercase leading-relaxed drop-shadow-md">
-          HULL INTEGRITY COMPROMISED<br/>
-          AUTO-REPAIR: <span className="animate-pulse">ENGAGED</span>
-        </div>
-
-        {/* Center Warning Banner */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center opacity-90">
-           <div className="flex items-center gap-4 sm:gap-6 border-y-2 border-red-500/80 py-2 px-8 sm:py-3 sm:px-12 bg-red-950/70">
-             <div className="w-3 h-3 sm:w-4 sm:h-4 bg-red-500 animate-ping rounded-full" />
-             <div className="text-red-500 font-mono text-lg sm:text-3xl font-black tracking-[0.4em] sm:tracking-[0.5em] uppercase">
-               WARNING
-             </div>
-             <div className="w-3 h-3 sm:w-4 sm:h-4 bg-red-500 animate-ping rounded-full" />
-           </div>
-        </div>
-      </div>
 
       {/* Yellow Warning HUD on Login Error */}
-      <div 
+      <div
         ref={authErrorRef}
         className="fixed inset-0 z-[55] pointer-events-none overflow-hidden transition-opacity duration-300"
-        style={{ 
+        style={{
           opacity: 0,
-          willChange: 'opacity', 
+          willChange: 'opacity',
           transform: 'translateZ(0)',
           background: 'radial-gradient(ellipse at center, transparent 60%, rgba(234, 179, 8, 0.05) 100%)',
           boxShadow: 'inset 0 0 100px rgba(234, 179, 8, 0.2)'
@@ -199,12 +124,12 @@ export default function App() {
       </div>
 
       {/* Green Success HUD on Login Success */}
-      <div 
+      <div
         ref={authSuccessRef}
         className="fixed inset-0 z-[55] pointer-events-none overflow-hidden transition-opacity duration-300"
-        style={{ 
+        style={{
           opacity: 0,
-          willChange: 'opacity', 
+          willChange: 'opacity',
           transform: 'translateZ(0)',
           background: 'radial-gradient(ellipse at center, transparent 60%, rgba(34, 197, 94, 0.05) 100%)',
           boxShadow: 'inset 0 0 100px rgba(34, 197, 94, 0.2)'

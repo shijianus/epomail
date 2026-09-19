@@ -177,4 +177,18 @@ const unreadCount = computed(() => {
     border: 1px solid rgba(82, 196, 26, 0.25);
   }
 }
+
+/* 窄屏：隐藏版本号避免与模式徽章重叠，压缩文本 */
+@media (max-width: 767px) {
+  .version-tag {
+    display: none;
+  }
+
+  .status-text {
+    font-size: 10px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
 </style>

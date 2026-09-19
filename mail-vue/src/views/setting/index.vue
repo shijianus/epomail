@@ -78,16 +78,6 @@
             <Icon icon="fluent:power-20-regular" width="16" height="16" style="margin-right: 6px;" />
             {{ $t('turnOff2FA') }}
           </el-button>
-          <el-button
-            v-else
-            type="primary"
-            :loading="totpLoading"
-            @click="startTotpSetup"
-            class="action-pill-btn primary-glow"
-          >
-            <Icon icon="fluent:shield-keyhole-20-filled" width="16" height="16" style="margin-right: 6px;" />
-            {{ $t('turnOn2FA') }}
-          </el-button>
         </div>
       </div>
 

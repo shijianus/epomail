@@ -19,6 +19,23 @@ import {
 import type { CanvasHandle } from "./CanvasBackground";
 import { cameraState } from "./cameraStore";
 
+// 登录成功后把语言偏好同步给主应用（仅当主应用尚无语言设置时写入，避免覆盖用户既有选择）
+function syncLangToMainApp() {
+  try {
+    const raw = localStorage.getItem('setting');
+    const setting = raw ? JSON.parse(raw) : null;
+    if (setting && setting.lang) return;
+    const nav = ((typeof navigator !== 'undefined' && navigator.language) || 'en').toLowerCase();
+    const lang = /^(zh-tw|zh-hk|zh-mo|zh-hant)/.test(nav) ? 'zh-Hant'
+      : nav.startsWith('zh') ? 'zh'
+      : nav.startsWith('fr') ? 'fr'
+      : nav.startsWith('es') ? 'es'
+      : nav.startsWith('nl') ? 'nl'
+      : 'en';
+    localStorage.setItem('setting', JSON.stringify({ ...(setting || {}), lang }));
+  } catch { /* 主应用设置不可解析时不干预 */ }
+}
+
 interface AuthFormProps {
   canvasRef: React.RefObject<CanvasHandle | null>;
   onSwitch: () => void;
@@ -137,6 +154,7 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
   const [status, setStatus] = useState<Status>("idle");
   const [errorMsg, setErrorMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
+  const [stayInOrbit, setStayInOrbit] = useState(false);
 
   const otpInputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
@@ -273,9 +291,13 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
           localStorage.setItem('token', token);
         }
         const activeEmail = data.data?.email || (email.includes('@') ? email.trim().toLowerCase() : '');
-        if (activeEmail) {
+        if (activeEmail && stayInOrbit) {
           localStorage.setItem('loginEmail', activeEmail);
         }
+        if (activeEmail && !stayInOrbit) {
+          localStorage.removeItem('loginEmail');
+        }
+        syncLangToMainApp();
         setStatus("success");
         cameraState.authSuccessOpacity = 1;
         let finalMsg = i18n.loginSuccess || data.message || data.msg;
@@ -314,9 +336,13 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
       localStorage.setItem('token', token);
     }
     const activeEmail = data.data?.email || (email.includes('@') ? email.trim().toLowerCase() : '');
-    if (activeEmail) {
+    if (activeEmail && stayInOrbit) {
       localStorage.setItem('loginEmail', activeEmail);
     }
+    if (activeEmail && !stayInOrbit) {
+      localStorage.removeItem('loginEmail');
+    }
+    syncLangToMainApp();
     setStatus("success");
     cameraState.authSuccessOpacity = 1;
     setSuccessMsg(isZh ? "两步验证成功，正在进入…" : "2FA Verified, entering…");
@@ -690,11 +716,15 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
                   className="flex cursor-pointer items-center gap-2 text-[13px]"
                   style={{ color: "var(--epo-muted)" }}
                 >
-                  <input type="checkbox" className="accent-[var(--epo-purple-glow)]" />
+                  <input type="checkbox" checked={stayInOrbit} onChange={(e) => setStayInOrbit(e.target.checked)} className="accent-[var(--epo-purple-glow)]" />
                   {i18n.stayInOrbit || (isZh ? "保持轨道连接" : "Stay in orbit")}
                 </label>
                 <a
                   href="#"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setErrorMsg(i18n.forgotPasswordHint || (isZh ? "请联系站长在管理后台为你重置密码" : "Please contact the site administrator to reset your password."));
+                  }}
                   className="text-[13px] transition-colors hover:text-[var(--epo-cyan-glow)]"
                   style={{ color: "var(--epo-muted)" }}
                 >
@@ -760,6 +790,7 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
                   <button
                     key={provider}
                     type="button"
+                    onClick={() => setErrorMsg(i18n.oauthComingSoon || (isZh ? "第三方登录尚未开放，敬请期待" : "Third-party sign-in is coming soon."))}
                     className="epomail-display flex h-11 items-center justify-center gap-2 rounded-xl border text-[13px] transition-colors cursor-pointer"
                     style={{
                       borderColor: "rgba(139,147,196,0.25)",

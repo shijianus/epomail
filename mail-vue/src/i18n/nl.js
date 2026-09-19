@@ -243,6 +243,8 @@ const nl = {
     admin: 'Admin',
     addUser: 'Gebruiker toevoegen',
     select: 'Select',
+
+    selectMail: 'E-mail selecteren',
     unknown: 'Unknown',
     changePerm: 'Rol wijzigen',
     from: 'From',

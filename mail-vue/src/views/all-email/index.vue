@@ -126,6 +126,7 @@
 
 <script setup>
 import ShadowHtml from "@/components/shadow-html/index.vue";
+import { useEmailPolling } from '@/utils/use-email-polling.js';
 import {starAdd, starCancel} from "@/request/star.js";
 import emailScroll from "@/components/email-scroll/index.vue"
 import {computed, defineOptions, reactive, ref, watch, onMounted} from "vue";
@@ -422,67 +423,27 @@ function getEmailList(emailId, size) {
   return allEmailList({emailId, size, ...params, ...extra})
 }
 
-async function latest() {
-
-  while (true) {
-
-    let autoRefresh = settingStore.settings.autoRefresh;
-
-    await sleep(autoRefresh > 1 ? autoRefresh * 1000 : 3000);
-
+useEmailPolling({
+  routeName: 'all-email',
+  tick: async () => {
     const latestId = sysEmailScroll.value.latestEmail?.emailId
+    if (!latestId && latestId !== 0) return
+    if (params.type !== 'receive') return
 
-    if (autoRefresh < 2) {
-      continue
+    const curTimeSort = params.timeSort
+    const list = await allEmailLatest(latestId)
+
+    if (list.length === 0) return
+    if (params.type !== 'receive') return
+    // 确保回来之后条件没变
+    if (params.timeSort !== curTimeSort) return
+
+    for (let email of list) {
+      sysEmailScroll.value.addItem(email)
+      await sleep(50)
     }
-
-    if (!latestId && latestId !== 0) {
-      continue
-    }
-
-    if (route.name !== 'all-email') {
-      continue
-    }
-
-
-    if (params.type !== 'receive') {
-      continue
-    }
-
-    try {
-
-      const curTimeSort = params.timeSort
-      let list = await allEmailLatest(latestId)
-
-      if (list.length === 0) {
-        continue
-      }
-
-      if (params.type !== 'receive') {
-        continue
-      }
-
-      // 确保回来之后条件没变
-      if (params.timeSort !== curTimeSort) {
-        continue
-      }
-
-      for (let email of list) {
-
-        sysEmailScroll.value.addItem(email)
-        await sleep(50)
-
-      }
-
-    } catch (e) {
-      if (e.code === 401 || e.code === 403) {
-        settingStore.settings.autoRefresh = 0;
-      }
-      console.error(e)
-    }
-
   }
-}
+})
 
 </script>
 <style>

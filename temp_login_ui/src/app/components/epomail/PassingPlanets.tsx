@@ -220,8 +220,9 @@ export function PassingPlanets() {
         let vx = 0, vy = 0, vz = 0;
         let targetX = 0, targetY = 0;
 
-        // GLOBAL RULE: 10% hit, 90% miss!
-        const isHit = Math.random() < 0.10;
+        // GLOBAL RULE: 撞击/全屏警报系统已按 UI 审计移除——行星仅作装饰性飞掠，永不命中。
+        // 保留 isHit 推导骨架以便未来恢复（运行时恒为 false，不会触发 warningOpacity/overlayOpacity）。
+        const isHit = Math.random() < 0;
         let hitType: Planet["hitType"] = "none";
 
         if (isHit) {

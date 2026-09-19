@@ -36,6 +36,8 @@ import router from "@/router/index.js";
 import {Icon} from "@iconify/vue";
 import { useRoute } from 'vue-router'
 
+import { useEmailPolling } from '@/utils/use-email-polling.js';
+
 defineOptions({
   name: 'spam'
 })
@@ -75,61 +77,40 @@ function jumpContent(email) {
 
 const existIds = new Set();
 
-async function latest() {
-  while (true) {
-
-    let autoRefresh = settingStore.settings.autoRefresh;
-    await sleep(autoRefresh > 1 ? autoRefresh * 1000 : 3000);
-
-    if (route.name !== 'spam') {
-      continue;
-    }
-
+useEmailPolling({
+  routeName: 'spam',
+  tick: async () => {
+    if (!scroll.value.firstLoad) return
     const latestId = scroll.value.latestEmail?.emailId
 
-    if (!scroll.value.firstLoad && autoRefresh > 1) {
-      try {
-        const accountId = accountStore.currentAccountId
-        const allReceive = scroll.value.latestEmail?.allReceive
-        const curTimeSort = params.timeSort
-        let list = []
+    const accountId = accountStore.currentAccountId
+    const allReceive = scroll.value.latestEmail?.allReceive
+    const curTimeSort = params.timeSort
+    let list = []
 
-        //确保发起请求时最后一个邮件是当前账号的,或者
-        if (accountId === scroll.value.latestEmail?.reqAccountId) {
-          list = await emailLatest(latestId, accountId, allReceive);
-        }
+    //确保发起请求时最后一个邮件是当前账号的,或者
+    if (accountId === scroll.value.latestEmail?.reqAccountId) {
+      list = await emailLatest(latestId, accountId, allReceive);
+    }
 
-        //确保请求回来后，账号没有切换，时间排序没有改变，全部邮件类型没变
-        if (accountId === accountStore.currentAccountId && params.timeSort === curTimeSort && allReceive === accountStore.currentAccount.allReceive) {
-          if (list.length > 0) {
+    //确保请求回来后，账号没有切换，时间排序没有改变，全部邮件类型没变
+    if (accountId === accountStore.currentAccountId && params.timeSort === curTimeSort && allReceive === accountStore.currentAccount.allReceive) {
+      if (list.length > 0) {
+        for (let email of list) {
+          email.reqAccountId = accountId;
+          email.allReceive = allReceive;
 
-            for (let email of list) {
+          if (!existIds.has(email.emailId)) {
+            existIds.add(email.emailId)
+            scroll.value.addItem(email)
 
-              email.reqAccountId = accountId;
-              email.allReceive = allReceive;
-
-              if (!existIds.has(email.emailId)) {
-
-                existIds.add(email.emailId)
-                scroll.value.addItem(email)
-
-                await sleep(50)
-              }
-
-            }
-
+            await sleep(50)
           }
-
         }
-      } catch (e) {
-        if (e.code === 401 || e.code === 403) {
-          settingStore.settings.autoRefresh = 0;
-        }
-        console.error(e)
       }
     }
   }
-}
+})
 
 function addStar(email) {
   emailStore.starScroll?.addItem(email)
