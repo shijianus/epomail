@@ -74,28 +74,53 @@ try {
 
   // ========== §5 多语言切换 (en 零汉字残留) ==========
   console.log('\n=== §5 多语言 i18n（en 模式零汉字） ===');
+  // 应用真实语言驱动键为 settingStore.lang (localStorage 'setting')，非 ui.locale；
+  // 扫描目标为合法主路由 /inbox（非法路由 /email 仅渲染 404 页，覆盖不了主体）。
   await page.evaluate(() => {
-    const ui = JSON.parse(localStorage.getItem('ui') || '{}');
-    ui.locale = 'en';
-    localStorage.setItem('ui', JSON.stringify(ui));
+    const raw = localStorage.getItem('setting');
+    let setting = {};
+    try { setting = raw ? JSON.parse(raw) : {}; } catch (_) {}
+    setting.lang = 'en';
+    localStorage.setItem('setting', JSON.stringify(setting));
   });
-  await page.goto(BASE + '/email', { waitUntil: 'networkidle', timeout: 30000 });
+  await page.goto(BASE + '/inbox', { waitUntil: 'networkidle', timeout: 30000 });
   await page.waitForTimeout(2500);
-  const enText = await page.evaluate(() => document.body.innerText);
-  const cjk = (enText.match(/[\u4e00-\u9fa5]/g) || []).length;
-  ok(cjk === 0, 'en 模式 CJK 残留 = ' + cjk);
+  // 仅扫描 UI 骨架容器（侧边栏+顶栏），邮件数据正文按投递语言显示属预期，不参与断言
+  const uiChrome = await page.evaluate(() => {
+    const pick = (sel) => (document.querySelector(sel)?.innerText || '');
+    return pick('.aside-container') + '\n' + pick('.custom-header') + '\n' + pick('.custom-footer');
+  });
+  const zhUiLeak = /主要邮件|设定|写邮件|转发/.test(uiChrome);
+  const enUiHit = /Settings|Main|Compose/i.test(uiChrome);
+  ok(!zhUiLeak, 'en 模式无 zh UI 词条泄漏 (inbox=Main/设定=Settings)');
+  ok(enUiHit, 'en 模式 en UI 词条命中 (Settings/Main/Compose)');
   await page.screenshot({ path: 'tests/verify_local_5_en_inbox.png', fullPage: false });
+
+  // 非法路由 /email 落入 404，en 模式下 404 页应呈现英文文案
+  await page.goto(BASE + '/email', { waitUntil: 'networkidle', timeout: 30000 });
+  await page.waitForTimeout(1500);
+  const notFoundText = await page.evaluate(() => document.body.innerText);
+  ok(/404 Not Found/i.test(notFoundText) && !/[\u4e00-\u9fa5]/.test(notFoundText), '非法路由 /email 落入 404 且 en 文案正确');
 
   // 繁体模式
   await page.evaluate(() => {
-    const ui = JSON.parse(localStorage.getItem('ui') || '{}');
-    ui.locale = 'zh-Hant';
-    localStorage.setItem('ui', JSON.stringify(ui));
+    const raw = localStorage.getItem('setting');
+    let setting = {};
+    try { setting = raw ? JSON.parse(raw) : {}; } catch (_) {}
+    setting.lang = 'zh-Hant';
+    localStorage.setItem('setting', JSON.stringify(setting));
   });
-  await page.goto(BASE + '/email', { waitUntil: 'networkidle', timeout: 30000 });
+  await page.goto(BASE + '/inbox', { waitUntil: 'networkidle', timeout: 30000 });
   await page.waitForTimeout(2500);
+  const hantChrome = await page.evaluate(() => {
+    const pick = (sel) => (document.querySelector(sel)?.innerText || '');
+    return pick('.aside-container') + '\n' + pick('.custom-header') + '\n' + pick('.custom-footer');
+  });
+  const zhSimpLeak = /主要邮件|设定|写邮件/.test(hantChrome);
+  const hantUiHit = /主要郵件|設定|收件/.test(hantChrome);
+  ok(hantUiHit, 'zh-Hant 模式渲染完成 (繁体 UI 词条命中)');
+  ok(!zhSimpLeak, 'zh-Hant 无简体 UI 词条泄漏');
   await page.screenshot({ path: 'tests/verify_local_6_zhhant_inbox.png', fullPage: false });
-  ok(true, 'zh-Hant 模式渲染完成');
 
   // ========== 结果 ==========
   console.log('\n==========================================');

@@ -11,6 +11,25 @@
    - 在向用户输出回复时，必须置顶/显式打印出本次提交的完整 Commit Hash 与短 Hash，确保版本可追溯、审计记录完整。
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
+### 全专案全量体检 (2026-09-19)：静态审计三件套 + 构建核验 + 密钥安全审计 + 全新库引导链回归 + 五大测试套件全绿与 UI 核验套件 §5 方法缺陷修复
+*   **体检范围与方法 (Full Health-Check Scope & Methodology, 全部本地+生产双端执行)**:
+    1. **静态审计三件套全绿**：`scripts/i18n-symmetry.mjs` 6 语言 × 2032 键绝对对称 ✓；`scripts/i18n-audit.mjs` 1573 个字面量键零缺失、动态 t() 用法 0 ✓；`scripts/i18n-hardcoded.mjs` 287 行残留均属已知白名单可接受项（语言原生名/兜底串，exit=0）✓；
+    2. **构建核验三件全绿**：mail-vue `vite build` ✓（PWA generateSW 生成）；temp_login_ui `vite build` ✓；mail-worker `wrangler deploy --dry-run` ✓（504 静态资源 + KV/D1×3/AI/Assets 全绑定就绪，jwt_secret/totp_enc_key 不出现于打包 vars）；
+    3. **密钥安全体系审计通过**：git 追踪的 4 个 wrangler toml 中 `jwt_secret` 出现处均为安全注释或 CI 环境变量占位符（`${JWT_SECRET}` 运行时注入）；真实密钥值正则模式全仓扫描 0 命中；`.dev.vars` 经 `.gitignore` 正确隔离（git 追踪数 0），`.dev.vars.example` 模板与 `DEPLOY-SECRETS.md` 指引齐备；
+    4. **全新库冷启动引导链实证通过**：备份并清空 `.wrangler/state` 后以 `wrangler dev --config wrangler-dev.toml` 冷启动（生产 wrangler.toml 因 ai 绑定 remote 会话需 CF 登录凭证，本机无凭证属已知环境限制，非缺陷），仅凭 `/api/init/<jwt_secret>` 一次调用完成引导并返回 success，站长 `admin@example.com` 以初始密码 `123456` 直接登录成功（JWT 签发）——5cfdaf9 重构的引导链（角色播种守卫 + 缺失列补齐 + 主站长 INSERT）在全新库上端到端有效；
+    5. **API 功能核验套件** `tests/verify-local-functional-20260919.mjs`：25 项断言 25/25 全绿（站长身份/信箱/侧边栏/存储/邮件收发/系统设置/角色用户/注册链路临时用户 finally 物理清理/OAuth 平台/401 拦截与 admin 保留字拦截），零假数据残留；
+    6. **回归套件**：`tests/test-totp-login-ui-e2e.mjs` 8/8 全绿；`tests/test-multilingual-email-templates-e2e.mjs` 51/51 全绿（测试配置自动还原）；`tests/test-strict-i18n-e2e.mjs` 面向生产 mail.epocanvas.com 的 6 国语言严格 DOM 扫描 100% 全绿（en/fr/es/nl 零中文、zh-Hant 繁体正常，测试语言环境自动还原）；
+    7. **浏览器级 UI 核验套件** `tests/verify-local-ui-20260919.mjs` 修复后 12/12 全绿、控制台错误 0（详见下）。
+*   **体检发现与修复 (Findings & Fix)**:
+    1. **[已修复] UI 核验套件 §5 双重方法缺陷导致 i18n 误报**：
+       - 现象：`verify-local-ui-20260919.mjs` §5 报「en 模式 CJK 残留 = 11」；深入诊断发现该 11 字符全部来自 zh 语言下 404 页面的正常文案（「404错误, 找不到页面」7 字 + 「返回首页」4 字），前端 i18n 本体零缺陷（404 页走 `$t('error404')`/`$t('home')`，六语言字典齐备，`setting.lang=en` 时正确渲染 "404 Not Found"）；
+       - 根因①：脚本以 `localStorage.ui.locale='en'` 切换语言，而应用真实驱动键为 `settingStore.lang`（localStorage `setting` 键），语言实际未切换；
+       - 根因②：扫描目标 `/email` 为故意非法路由（仅渲染 404 页，覆盖不了收件箱主体），且对 `document.body.innerText` 全量扫描会把按站长默认语言投递的邮件数据正文（欢迎邮件中文内容）误计入 UI 泄漏（en 模式 /inbox 实测 CJK 1098 字符全部来自欢迎邮件正文，UI 词条零泄漏）；
+       - 修复：§5 改用真实驱动键 `setting.lang` 切换、扫描合法主路由 `/inbox` 并仅对 UI 骨架容器（`.aside-container`/`.custom-header`/`.custom-footer`）做词条级断言（en 无 zh 词条泄漏 + en 词条命中；zh-Hant 繁体词条命中 + 无简体词条泄漏），并新增「非法路由 /email 落入 404 且 en 文案正确」与 404 en 文案零中文断言；修复后 12/12 全绿；
+    2. **[非缺陷·记录] 欢迎邮件正文在 en 界面下呈中文属预期设计**：邮件数据按投递时站长默认语言快照存储，界面词条与数据内容分离，符合多语言投递架构。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **epocanvas-mail Git Commit**: 本记录对应提交 Hash 见下方提交（体检+测试工具修复任务，无生产部署；生产 6 语言严格 i18n 扫描实测当前生产行为正常）。
+
 ### 三大核验缺陷全量修复、全新部署引导链重构、密钥安全体系隔离与本地全真栈完整回归上线 (2026-09-19)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **[P1] 公开个人主页空白修复 (Public Profile Blank Page Fix)**:
