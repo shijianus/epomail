@@ -11,6 +11,22 @@
    - 在向用户输出回复时，必须置顶/显式打印出本次提交的完整 Commit Hash 与短 Hash，确保版本可追溯、审计记录完整。
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
+
+### UI 修复批次全量审计核验：中断修复抢救（构建损坏+分包无效+抽屉砸关+汉堡特异性）、P0×4/P1×9/P2×25 逐项修复状态矩阵、本地全真栈浏览器回归 (2026-09-20)
+*   **审计范围与方法 (Audit Scope & Methodology, 针对工作区 82 文件未提交修复批次 +495/−5723 行)**:
+    1. 逐文件 diff 审读 + 与基线同口径全仓静态扫描 + 生产构建核验 + i18n 三件套；
+    2. 本地全真栈（`vite build` 全新产物 + `wrangler dev --config wrangler-dev.toml`）真实浏览器实测：登录页（1280px）、登录流程（admin/123456 → /inbox）、收件箱 en 渲染、375px 移动端（汉堡/抽屉/FAB/列表行/状态栏），Pinia `$subscribe` 运行时插桩定位抽屉关闭根因，裁剪截屏取证；
+    3. 完整报告：`doc/ui-audit-20260920.md`（含 P0×4/P1×9/P2×25 逐项修复状态矩阵与 file:line 证据）。
+*   **关键发现与修复 (Key Findings & Fixes, F1–F4 已修复并回归)**:
+    1. **[P0·F1] 修复批次系中断状态、生产构建已损坏**：P0-3 轮询重构在 email/all/spam/snoozed/trash 五个视图只删 `try {` 未删配套 `} catch`，`vite build` 直接失败；按 all-email 正确迁移形态（composable 自带 401/403 兜底）机械修复五处，重建通过（24.9s）；
+    2. **[P1·F2] manualChunks 在 Vite 7 被静默忽略**：配置写在 `build` 顶层，而 vite@7.1.5 已移除该顶层简写（运行时仅警告文案含该词），入口 chunk 纹丝不动 1,183KB 且无任何报错；移挂 `build.rollupOptions.output.manualChunks` 后入口实降 **895.79KB (gzip 303KB)**，element-plus 595KB/echarts 543KB/vue-vendor 287KB 独立缓存 chunk，首屏 modulepreload 仅 vue-vendor+element-plus、echarts 按需；
+    3. **[P1·F3] 任意 resize 砸关移动端抽屉**：`layout/index.vue` handleResize 每次 resize 强制 `asideShow = innerWidth > 1024`，移动端软键盘弹出/地址栏收展即触发（修复批次只改了 aside 侧、漏掉 layout 侧同型缺陷）；改为仅跨断点同步，插桩验证抽屉状态稳定；
+    4. **[P2·F4] 汉堡按钮桌面可见**：`.mobile-menu-btn{display:none}`（869 行）声明早于 `.icon-btn{display:flex}`（1020 行）被同特异性顺序覆盖，1280px 实测 `display:flex`；改 `button.mobile-menu-btn` 提升特异性后桌面隐藏 ✓、移动端显示 ✓；
+    5. **待办新发现**：F5 375px 列表行主题仅 30px 宽（P1-2 修复不达标，建议真两行化）；F6 375px 顶栏溢出、头像 x=448 完全出屏（退出登录/设置入口不可达）；F7 P0-4 部分修复——13 国本地直出但 country-state-city 8,716KB chunk 仍在产物、未列出国家仍触发；F8 登录应用裸协议键（`emailAndPwdEmpty`）、zh 浏览器会话过期提示呈英文、提示无 `role="alert"`；F9/F10 a11y·样式债与零引用依赖（@mui/recharts 等）、`cp -r` 构建脚本维持基线判断。
+*   **修复批次核验通过项 (Verified Passes)**: P0-1 行星撞击红/白闪光警报全删 ✓、P0-2 「保持轨道连接」真实受控（实测未勾选登录后 `loginEmail=null`）✓、P0-3 轮询 `while(true)` 归零（composable 卸载终止/后台暂停/关刷新不请求）✓、P1-1 移动端汉堡+抽屉+FAB 全链可用（FAB 实测唤起写信弹窗）✓、P1-4 摘要 160 字符截断+顶栏 aria+导航语义化 ✓、P1-7 假功能给真实反馈 ✓、P1-9 全局 reduced-motion 杀停 ✓、登录应用删净 50 个 shadcn 死代码组件（−5723 行）、星空密度降 12.5 倍、websiteConfig 去重、devtools//test 生产隔离 ✓；i18n 三件套全绿（2033 键×6 语言对称/1574 字面量键零缺失/hardcoded exit=0）✓。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **epocanvas-mail Git Commit**: `ba7f575`（UI 修复批次+四处校正，含完整消息）；本审计记录提交 Hash 见下方 docs 提交。无生产部署（生产 Version ID 不变），生产部署时按既有流程 `wrangler deploy` 即可。
+
 ### UI 全面审计：本地全真栈浏览器实测 + 全仓静态扫描，P0×4/P1×9/P2×25 分级发现与优化路线图 (2026-09-19)
 *   **审计范围与方法 (Audit Scope & Methodology, 只读审计，未改动任何业务代码)**:
     1. **本地全真栈实测**：全新构建产物 + `wrangler dev --config wrangler-dev.toml` 起本地栈，真实浏览器逐页核验登录页/登录流程/收件箱/读信/写信/常规·安全·系统设置/分析/角色/个人主页（明暗双模式）+ 375px 移动端（列表/读信/侧栏可达性三重探测），可访问性树逐页扫描；
