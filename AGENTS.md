@@ -11,6 +11,29 @@
    - 在向用户输出回复时，必须置顶/显式打印出本次提交的完整 Commit Hash 与短 Hash，确保版本可追溯、审计记录完整。
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
+### 登录界面两步验证 (TOTP/Passkey) 复杂流体动效与丝滑交互深度重构上线 (2026-09-18)
+*   **功能需求与标准对齐 (Feature & Standards Alignment)**:
+    1. **流体高度自适应与星际跃迁连续态 (Fluid Glass Morphing & Cosmic Warp Continuity)**:
+       - 彻底解决密码登录向两步验证切换时高度瞬间塌陷抽搐问题：引入 `motion.div layout` 弹簧物理（`stiffness: 320, damping: 30`），卡片在高度变化时如同液体玻璃平滑收缩；
+       - 背景跃迁连续性：进入 2FA 阶段不突然打断背景动画，而是由狂暴加速平滑降速至巡航状态（`cameraState.vzTarget = 1.35`），并释放全域高能青光脉冲（`canvasRef.current?.pulse({ color: "cyan", strength: 2.2 })`）；
+    2. **6 位数字舱次序点亮与 3-3 节奏分块 (Staggered Digit Reveal & 3-3 Layout)**:
+       - 6 个输入框采用 `stagger` 动画次序微弹入场（`delay: idx * 0.035`），第 3 与第 4 格之间引入微光节奏分隔符 `-`；
+       - 首格自动聚焦并带有青光呼吸导引；首个输入框配置 `autoComplete="one-time-code"`，无缝支持 iOS / Android 原生钥匙串与短信一键填充；
+    3. **击键能量阶梯递进与满 6 位自动提交 (Progressive Burst & Auto-submit)**:
+       - 击键粒子反馈根据输入位数阶梯递进（紫 -> 靛 -> 青，能级逐级充能）；
+       - 敲满 6 位或一键粘贴 6 位后，6 个格子激活贯通青光电弧，延时 120ms 自动触发提交校验，无需手动移步点击按钮；
+    4. **空间排异物理联动与震颤自动清空重聚 (Overload Reject & Auto Clear Refocus)**:
+       - 校验失败时联动全局 3D 摄像机与空间粒子（`cameraState.shakeIntensity = 18`, `cameraState.authErrorOpacity = 1`, 紫色反冲粒子）；
+       - 6 个输入框高频左右震颤（Shake），震动结束后自动清空错误数字并自动将光标重归第 1 格，极大降低重试成本；
+    5. **WebAuthn 通行密钥 (Passkey) 快速多因素解锁与 3D 翻转备用代码 (Passkey & 3D Flip)**:
+       - 激活后端准备好的 Passkey 基础设施：检测到用户具有通行密钥时，顶部呈现「使用通行密钥 (Passkey / 指纹) 一键验证」高质感霓虹按钮；
+       - 动态口令与应急备用代码切换采用 3D X 轴立体翻转（`rotateX: [-12, 0]`），备用代码支持清洗空格并自动格式化；
+       - 引入 30 秒动态口令周期微型 SVG 环形进度指示器与轻量折叠排查抽屉（时钟同步、备用代码、联系管理员）；
+    6. **端到端自动化测试与零假数据验证 (Playwright E2E & Zero Residue)**:
+       - 新增专属测试套件 `tests/test-totp-login-ui-e2e.mjs`，涵盖 8 项核心动效与流转断言，100% 全部通过；
+       - 保存高质量全景视觉审计快照 `tests/audit_totp_login_motion.png`。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **epocanvas-mail Git Commit**: `20451b50a2923a4f7bb854bfe8e6ce0ec43d9fac` (Short Hash: `20451b5`).
 
 ### 生产环境 Cloudflare (mail.epocanvas.com) 真实部署上线、Playwright 视觉端到端截屏全链路核验、Vue-i18n 特殊字符转义与规则抽屉缺陷修复 (2026-09-17)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
