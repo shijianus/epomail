@@ -33,7 +33,7 @@
        - 新增专属测试套件 `tests/test-totp-login-ui-e2e.mjs`，涵盖 8 项核心动效与流转断言，100% 全部通过；
        - 保存高质量全景视觉审计快照 `tests/audit_totp_login_motion.png`。
 *   **部署上线与自动化测试 (Verification & Deployment)**:
-    - **epocanvas-mail Git Commit**: `20451b50a2923a4f7bb854bfe8e6ce0ec43d9fac` (Short Hash: `20451b5`).
+    - **epocanvas-mail Git Commit**: `b0251537e0a56b7d3b80f794ce79ff839871f945` (Short Hash: `b025153`).
 
 ### 生产环境 Cloudflare (mail.epocanvas.com) 真实部署上线、Playwright 视觉端到端截屏全链路核验、Vue-i18n 特殊字符转义与规则抽屉缺陷修复 (2026-09-17)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
