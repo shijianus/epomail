@@ -28,7 +28,7 @@
        - 修复：§5 改用真实驱动键 `setting.lang` 切换、扫描合法主路由 `/inbox` 并仅对 UI 骨架容器（`.aside-container`/`.custom-header`/`.custom-footer`）做词条级断言（en 无 zh 词条泄漏 + en 词条命中；zh-Hant 繁体词条命中 + 无简体词条泄漏），并新增「非法路由 /email 落入 404 且 en 文案正确」与 404 en 文案零中文断言；修复后 12/12 全绿；
     2. **[非缺陷·记录] 欢迎邮件正文在 en 界面下呈中文属预期设计**：邮件数据按投递时站长默认语言快照存储，界面词条与数据内容分离，符合多语言投递架构。
 *   **部署上线与自动化测试 (Verification & Deployment)**:
-    - **epocanvas-mail Git Commit**: 本记录对应提交 Hash 见下方提交（体检+测试工具修复任务，无生产部署；生产 6 语言严格 i18n 扫描实测当前生产行为正常）。
+    - **epocanvas-mail Git Commit**: `9a0f08990d5f45def620009171fbaf7c7ce18500` (Short Hash: `9a0f089`)（体检+测试工具修复任务，无生产部署；生产 6 语言严格 i18n 扫描实测当前生产行为正常）。
 
 ### 三大核验缺陷全量修复、全新部署引导链重构、密钥安全体系隔离与本地全真栈完整回归上线 (2026-09-19)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
