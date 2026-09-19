@@ -11,6 +11,23 @@
    - 在向用户输出回复时，必须置顶/显式打印出本次提交的完整 Commit Hash 与短 Hash，确保版本可追溯、审计记录完整。
 4. **零假数据与测试自动还原准则**:
    - 严禁在数据库或 KV 中硬编码、残留假数据或临时令牌，所有测试必须具备自动重置清理能力。
+### 远端最新代码拉取合并、全栈功能性深度核验与三大缺陷审计报告上线 (2026-09-19)
+*   **核验范围与方法 (Verification Scope & Methodology)**:
+    1. **远端同步**: `git pull origin master`（`4758b1c..e9ce56f` Fast-forward，8 个新提交，含 TOTP 登录流体动效重构 `b025153`、生产上线与 i18n 转义修复 `25985b1`、隐式注释化 `cff8c3b` 等）；
+    2. **静态审计三件套**: `i18n-symmetry.mjs` 6 语言 × 2032 键绝对对称 ✓、`i18n-audit.mjs` 1573 字面量键零缺失 ✓、`i18n-hardcoded.mjs` 扫描残留均为已知可接受项（语言原生名/兜底串）✓；
+    3. **构建核验**: temp_login_ui `vite build` ✓、mail-vue `vite build --mode release` ✓（PWA 生成 ✓）、mail-worker `wrangler deploy --dry-run` 打包通过（504 静态资源 + 全绑定就绪）✓；
+    4. **既有套件回归**: `test-totp-login-ui-e2e.mjs` 8/8 全绿、`test-multilingual-email-templates-e2e.mjs` Part A 37/37 全绿；
+    5. **本地全真栈全新库核验**: 清空 `.wrangler/state` 后 `wrangler dev` + `/api/init` 走全新部署路径，实证全新部署引导链缺陷（见下）；随后手动播种标准角色引导站长，新增 `tests/verify-local-functional-20260919.mjs` 25 项 API 断言全通过（含临时用户 physicsDelete 零残留清理）；
+    6. **浏览器级 UI 核验**: 新增 `tests/verify-local-ui-20260919.mjs`，本地与生产 mail.epocanvas.com 双端真实登录冒烟——收件箱渲染 ✓、写信默认发件人锁定当前信箱 ✓、en 模式 CJK 残留 0 ✓、zh-Hant 模式简体特有字 0 ✓（注：应用真实 locale 驱动为 `settingStore.lang`（localStorage `setting` 键），非 `ui.locale`）。
+*   **重大缺陷发现 (Critical Findings)**:
+    1. **[P0·安全] 生产 `wrangler.toml` 秘钥随公开 GitHub 仓库泄漏**: `jwt_secret = "123456"` 与 `totp_enc_key` 均为 git 追踪文件且仓库可匿名拉取，任何第三方可自行签发 User 1 站长合法 JWT 完全接管 mail.epocanvas.com，并可解密全站 TOTP 密钥；生产部署时必须改由 Secret/环境注入并立即轮换两密钥；
+    2. **[P1·功能] 任意个人主页渲染空白**: `mail-vue/src/views/profile/index.vue:282` 的 `isOwnProfile` 计算属性引用 `accountStore` 但全文件未导入 `useAccountStore`（4215b15 重构引入），生产 `/admin` 实测页面正文空白（仅剩顶栏）并抛 `ReferenceError: accountStore is not defined`，所有公开主页均不可用，证据快照 `tests/verify_prod_admin_profile.png`；
+    3. **[P0·全新部署引导链三重断裂]**（生产因历史库幸免，新装即坏死）: ① `v1_1DB` 先行插入遗留角色「普通用户」(custom)，致 `v3_13DB` 六标准角色播种守卫 `roleCount===0` 永不成立成死代码；② `email.labels` 与 `user.custom_labels` 两列在 drizzle entity 中声明但 CREATE TABLE 与全部 124 条 ADD COLUMN 迁移均未覆盖，邮件列表/注册/登录身份接口直接 500；③ `v3_14DB` 参观者 INSERT 引用不存在的 `user.update_time` 列报错，且主站长账号（`c.env.admin`）全链路只有 UPDATE 晋升无 INSERT、注册端又被 `adminReserved` 拦截，全新部署永远无法获得管理员；
+    4. **[P2·i18n] zh-Hant 界面下系统标签呈现简体**: 数据库预置标签实体「待办」在 zh-Hant 模式未映射为「待辦」（label-i18n 仅覆盖非中文场景）。
+*   **部署上线与自动化测试 (Verification & Deployment)**:
+    - **epocanvas-mail Git Commit**: 本记录对应提交 Hash 见下方提交（核验任务，无生产部署，Version ID 不变 `d8378945-9dcd-487e-8cd1-72346abdf743`）。
+    - 本地 `.wrangler/state` 与 `.wrangler/state-v2` 旧状态已备份为 `*.bak-20260919`；测试临时用户已全部 physicsDelete，零假数据残留。
+
 ### 登录界面两步验证 (TOTP/Passkey) 复杂流体动效与丝滑交互深度重构上线 (2026-09-18)
 *   **功能需求与标准对齐 (Feature & Standards Alignment)**:
     1. **流体高度自适应与星际跃迁连续态 (Fluid Glass Morphing & Cosmic Warp Continuity)**:
