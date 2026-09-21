@@ -11,7 +11,7 @@
 ---
 
 ### 感官打磨二批：hover 反馈 / reduced-motion 门禁 / 崩溃页六语言 / 收件箱四端动态巡检 (2026-09-21)
-*   **关联提交 (Git Commit)**: `<HASH>` (Short: `<SHORT>`)
+*   **关联提交 (Git Commit)**: `bb141e41ae71172c3a9aa1acdc25ac8a2e6df916` (Short: `bb141e4`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com)` (Version ID: `1e4ffe69-33bc-454f-9875-583660211c5a`，100% 流量；上一基线 `78f0e34e-370d-47bc-9dc4-d92163b2ac32`)
 *   **功能需求与变更清单 (Changes & Feature Alignment)**:
     - [x] 主提交按钮 hover 反馈：AuthForm/RegisterForm 提交按钮 whileHover（y -1.5 + brightness 1.12 + 阴影抬升），reduced-motion 下仅保留亮度变化；OAuth 按钮 motion 化补 hover 抬升；统一补 focus-visible 环与 disabled 降透明

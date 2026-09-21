@@ -10,7 +10,7 @@
 ---
 
 ### 动态感官专项审计：登录面 + 收件箱四端（CLS / hover / reduced-motion / 对比度 / 主题真实性） (2026-09-21)
-*   **关联提交 (Git Commit)**: `<HASH>` (Short: `<SHORT>`)
+*   **关联提交 (Git Commit)**: `bb141e41ae71172c3a9aa1acdc25ac8a2e6df916` (Short: `bb141e4`)
 *   **专项证据索引 (Evidence)**: `tests/verify-sensory-sweep.mjs`（新增，33 断言）、`tests/shots/sensory_*.png` ×9、`tests/verify-login-polish.mjs`（62 断言 ×本地/线上）、`tests/live_integrity.json`、`tests/live_browser_metrics.json`
 *   **体检/审计范围与方法 (Scope & Methodology)**:
     1. 范围：登录面（公开，6 语言/亮暗/375/1440）+ 收件箱（本地全真栈登录态，1440 亮/暗、375、768）；线上 mail.epocanvas.com（Version `1e4ffe69`）
