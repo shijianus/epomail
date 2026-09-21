@@ -1,10 +1,10 @@
 {
   "summary": {
     "origin": "https://mail.epocanvas.com",
-    "checkedAt": "2026-09-21T15:40:23.243Z",
-    "bootMs": 8055,
-    "totalRequests": 55,
-    "totalBytes": 6449801,
+    "checkedAt": "2026-09-21T17:21:14.886Z",
+    "bootMs": 6247,
+    "totalRequests": 56,
+    "totalBytes": 6459092,
     "byType": {
       "document": {
         "n": 12,
@@ -12,14 +12,14 @@
       },
       "stylesheet": {
         "n": 8,
-        "bytes": 1501032
+        "bytes": 1503447
       },
       "script": {
         "n": 12,
-        "bytes": 4687398
+        "bytes": 4694274
       },
       "xhr": {
-        "n": 7,
+        "n": 8,
         "bytes": 0
       },
       "image": {
@@ -37,52 +37,52 @@
     },
     "slowestTtfb": [
       {
-        "url": "/registerSW.js",
+        "url": "/login/",
         "status": 200,
-        "size": 134,
-        "ttfb": 6411
+        "size": 1364,
+        "ttfb": 1046
       },
       {
-        "url": "/assets/element-plus-DYxc-xQq.js",
+        "url": "/",
         "status": 200,
-        "size": 594862,
-        "ttfb": 2804
-      },
-      {
-        "url": "/assets/index-DPWZHvwV.css",
-        "status": 200,
-        "size": 458491,
-        "ttfb": 2803
+        "size": 11085,
+        "ttfb": 967
       },
       {
         "url": "/assets/vue-vendor-Coz7PjHv.js",
         "status": 200,
         "size": 287352,
-        "ttfb": 2803
+        "ttfb": 890
+      },
+      {
+        "url": "/assets/element-plus-DYxc-xQq.js",
+        "status": 200,
+        "size": 594862,
+        "ttfb": 890
       },
       {
         "url": "/inbox",
         "status": 200,
         "size": 11085,
-        "ttfb": 1925
-      },
-      {
-        "url": "/assets/index-BfCAj9MJ.js",
-        "status": 200,
-        "size": 895785,
-        "ttfb": 1876
-      },
-      {
-        "url": "/assets/element-plus-DWqCYft0.css",
-        "status": 200,
-        "size": 237005,
-        "ttfb": 1874
+        "ttfb": 788
       },
       {
         "url": "/sw.js",
         "status": 200,
         "size": 0,
-        "ttfb": 1797
+        "ttfb": 754
+      },
+      {
+        "url": "/assets/index-BfCAj9MJ.js",
+        "status": 200,
+        "size": 895785,
+        "ttfb": 666
+      },
+      {
+        "url": "/assets/vue-vendor-Coz7PjHv.js",
+        "status": 200,
+        "size": 287352,
+        "ttfb": 664
       }
     ],
     "consoleErrors": [],
@@ -118,7 +118,7 @@
     {
       "ok": true,
       "name": "根路径可访问并完成引导",
-      "detail": "落地 URL=https://mail.epocanvas.com/login/ 耗时=8055ms"
+      "detail": "落地 URL=https://mail.epocanvas.com/login/ 耗时=6247ms"
     },
     {
       "ok": true,
@@ -212,12 +212,12 @@
     },
     {
       "ok": true,
-      "name": "GET /login/assets/index-Cor1tWnM.js → 200",
+      "name": "GET /login/assets/index-CAN2oisl.js → 200",
       "detail": "实际=200"
     },
     {
       "ok": true,
-      "name": "GET /login/assets/index-BFlA9JqW.css → 200",
+      "name": "GET /login/assets/index-N3ZxXR3D.css → 200",
       "detail": "实际=200"
     },
     {

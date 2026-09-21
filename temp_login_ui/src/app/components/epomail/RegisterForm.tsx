@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
-import { motion, AnimatePresence } from "motion/react";
+import { motion, AnimatePresence, useReducedMotion } from "motion/react";
 import { Mail, Lock, Eye, EyeOff, ArrowRight, Check, Loader2, AlertCircle, KeyRound, ChevronDown } from "lucide-react";
 import type { CanvasHandle } from "./CanvasBackground";
 import { cameraState } from "./cameraStore";
@@ -160,6 +160,16 @@ export function RegisterForm({ canvasRef, onSwitch, sysConfig: propsSysConfig }:
 
   const lang = useMemo(() => resolveAuthLang(), []);
   const t = useMemo(() => createT(lang), [lang]);
+  const reduceMotion = !!useReducedMotion();
+  // 主提交按钮的 hover 抬升反馈；reduced-motion 下只保留亮度变化，不做位移
+  const submitHover = reduceMotion
+    ? { filter: "brightness(1.12)", transition: { duration: 0.18, ease: "easeOut" as const } }
+    : {
+        y: -1.5,
+        filter: "brightness(1.12)",
+        boxShadow: "0 14px 40px rgba(79,70,229,0.62), inset 0 1px 0 rgba(255,255,255,0.32)",
+        transition: { duration: 0.18, ease: "easeOut" as const },
+      };
   const rawI18n = effectiveConfig?.authI18n || {};
   const i18n = (rawI18n.zh || rawI18n.en ? rawI18n[lang] || rawI18n.en || rawI18n.zh : rawI18n) as Record<string, string>;
   const tr = (key: string, dictKey?: string) => i18n[key] || t(dictKey || key);
@@ -518,9 +528,10 @@ export function RegisterForm({ canvasRef, onSwitch, sysConfig: propsSysConfig }:
       {/* Action / Submit Button */}
       <motion.button
         type="submit"
+        whileHover={isRegisterClosed ? undefined : submitHover}
         whileTap={{ scale: isRegisterClosed ? 1 : 0.96 }}
         disabled={status !== "idle" || isRegisterClosed}
-        className={`epomail-display relative mt-1 flex h-12 w-full items-center justify-center gap-2 overflow-hidden rounded-xl text-[15px] tracking-wide text-white ${
+        className={`epomail-display relative mt-1 flex h-12 w-full items-center justify-center gap-2 overflow-hidden rounded-xl text-[15px] tracking-wide text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#67e8f9] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b0e22] ${
           isRegisterClosed ? "opacity-60 cursor-not-allowed" : "cursor-pointer"
         }`}
         style={{

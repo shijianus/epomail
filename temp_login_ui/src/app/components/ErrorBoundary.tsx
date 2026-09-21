@@ -1,4 +1,5 @@
 import React, { Component, ErrorInfo, ReactNode } from "react";
+import { createT, resolveAuthLang } from "../i18n/authLocale";
 
 interface Props {
   children: ReactNode;
@@ -37,6 +38,7 @@ export class ErrorBoundary extends Component<Props, State> {
   };
 
   public render() {
+    const t = createT(resolveAuthLang());
     if (this.state.hasError) {
       return (
         <div className="relative z-50 flex min-h-screen items-center justify-center p-6 bg-[#05060F] text-white">
@@ -45,10 +47,10 @@ export class ErrorBoundary extends Component<Props, State> {
               <span className="text-2xl text-red-400">⚠️</span>
             </div>
             <h2 className="text-base font-bold tracking-wider text-red-400 font-mono uppercase">
-              SYS.ANOMALY // 界面渲染异常
+              {t('crashTitle')}
             </h2>
             <p className="mt-3 text-xs text-slate-400 leading-relaxed font-mono">
-              {this.state.error?.message || "An unexpected error occurred during rendering."}
+              {this.state.error?.message || t('crashFallback')}
             </p>
             <div className="mt-6 flex justify-center gap-4">
               <button
@@ -56,7 +58,7 @@ export class ErrorBoundary extends Component<Props, State> {
                 onClick={this.handleReset}
                 className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-sm font-medium transition-all shadow-lg cursor-pointer"
               >
-                重置并返回登录
+                {t('crashReset')}
               </button>
             </div>
           </div>

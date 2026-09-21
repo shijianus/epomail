@@ -95,6 +95,8 @@ try {
     ok(sub === exp.subtitle, `副标题六语言文案 (${exp.lang})`, `got="${sub}"`);
     ok(btnText.includes(exp.button), `登录按钮文案 (${exp.lang})`, `got="${btnText}"`);
     ok(labelText.includes(exp.label), `邮箱标签文案 (${exp.lang})`, `got="${labelText}"`);
+    const htmlLang = await page.evaluate(() => document.documentElement.lang);
+    ok(htmlLang === exp.lang, `<html lang> 与渲染语言一致 (${exp.lang})`, `got="${htmlLang}"`);
     ok(bodyBg === 'rgb(5, 6, 15)', 'body 底色为深空色（无白闪）', `got=${bodyBg}`);
     ok(fontLoaded, 'Space Grotesk 自托管字体已加载');
     ok(external.filter((u) => /fonts\.(googleapis|gstatic)\.com/.test(u)).length === 0, '零 Google Fonts 外部请求', external.join(','));

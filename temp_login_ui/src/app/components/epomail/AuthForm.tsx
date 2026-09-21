@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
-import { motion, AnimatePresence } from "motion/react";
+import { motion, AnimatePresence, useReducedMotion } from "motion/react";
 import {
   Mail,
   Lock,
@@ -161,6 +161,16 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
 
   const lang = useMemo(() => resolveAuthLang(), []);
   const t = useMemo(() => createT(lang), [lang]);
+  const reduceMotion = !!useReducedMotion();
+  // 主提交按钮的 hover 抬升反馈；reduced-motion 下只保留亮度变化，不做位移
+  const submitHover = reduceMotion
+    ? { filter: "brightness(1.12)", transition: { duration: 0.18, ease: "easeOut" as const } }
+    : {
+        y: -1.5,
+        filter: "brightness(1.12)",
+        boxShadow: "0 14px 40px rgba(79,70,229,0.62), inset 0 1px 0 rgba(255,255,255,0.32)",
+        transition: { duration: 0.18, ease: "easeOut" as const },
+      };
   const rawI18n = sysConfig?.authI18n || {};
   // 管理后台 authI18n 仍具最高优先级；嵌套结构按当前语言取子字典并回退 en/zh
   const i18n = (rawI18n.zh || rawI18n.en ? rawI18n[lang] || rawI18n.en || rawI18n.zh : rawI18n) as Record<string, string>;
@@ -668,10 +678,10 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
                ========================================================================= */
             <motion.form
               key="password-form"
-              initial={{ opacity: 0, y: -10 }}
+              initial={reduceMotion ? false : { opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -12, filter: "blur(4px)" }}
-              transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+              exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -12, filter: "blur(4px)" }}
+              transition={reduceMotion ? { duration: 0 } : { duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
               onSubmit={handlePasswordSubmit}
               className="flex flex-col gap-7 pt-4"
             >
@@ -767,9 +777,10 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
 
               <motion.button
                 type="submit"
+                whileHover={submitHover}
                 whileTap={{ scale: 0.96 }}
                 disabled={status !== "idle"}
-                className="epomail-display relative mt-1 flex h-12 w-full items-center justify-center gap-2 overflow-hidden rounded-xl text-[15px] tracking-wide text-white cursor-pointer"
+                className="epomail-display relative mt-1 flex h-12 w-full items-center justify-center gap-2 overflow-hidden rounded-xl text-[15px] tracking-wide text-white cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#67e8f9] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b0e22] disabled:cursor-not-allowed disabled:opacity-60"
                 style={{
                   background: "var(--epo-brand-gradient)",
                   boxShadow:
@@ -820,11 +831,14 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
 
               <div className="grid grid-cols-2 gap-3">
                 {["Google", "GitHub"].map((provider) => (
-                  <button
+                  <motion.button
                     key={provider}
                     type="button"
                     onClick={() => setErrorMsg(tr('oauthComingSoon'))}
-                    className="epomail-display flex h-11 items-center justify-center gap-2 rounded-xl border text-[13px] transition-colors cursor-pointer"
+                    whileHover={reduceMotion ? { opacity: 1 } : { opacity: 1, y: -1.5 }}
+                    whileTap={{ scale: 0.98 }}
+                    transition={{ duration: 0.18, ease: "easeOut" }}
+                    className="epomail-display flex h-11 items-center justify-center gap-2 rounded-xl border text-[13px] transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#67e8f9]"
                     style={{
                       borderColor: "rgba(139,147,196,0.25)",
                       background: "rgba(255,255,255,0.04)",
@@ -839,7 +853,7 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
                     >
                       {t('oauthSoon')}
                     </span>
-                  </button>
+                  </motion.button>
                 ))}
               </div>
 
@@ -861,10 +875,10 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
                ========================================================================= */
             <motion.form
               key="totp-form"
-              initial={{ opacity: 0, y: 14, filter: "blur(4px)" }}
-              animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-              exit={{ opacity: 0, y: 14, filter: "blur(4px)" }}
-              transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+              initial={reduceMotion ? false : { opacity: 0, y: 14, filter: "blur(4px)" }}
+              animate={reduceMotion ? { opacity: 1, y: 0 } : { opacity: 1, y: 0, filter: "blur(0px)" }}
+              exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 14, filter: "blur(4px)" }}
+              transition={reduceMotion ? { duration: 0 } : { duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
               onSubmit={handleTotpSubmit}
               className="flex flex-col gap-5 pt-1"
             >
@@ -1126,9 +1140,10 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
               {/* Submit Verification Button */}
               <motion.button
                 type="submit"
+                whileHover={submitHover}
                 whileTap={{ scale: 0.96 }}
                 disabled={status !== "idle"}
-                className="epomail-display relative mt-1 flex h-12 w-full items-center justify-center gap-2 overflow-hidden rounded-xl text-[15px] tracking-wide text-white cursor-pointer"
+                className="epomail-display relative mt-1 flex h-12 w-full items-center justify-center gap-2 overflow-hidden rounded-xl text-[15px] tracking-wide text-white cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#67e8f9] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b0e22] disabled:cursor-not-allowed disabled:opacity-60"
                 style={{
                   background: "var(--epo-brand-gradient)",
                   boxShadow:

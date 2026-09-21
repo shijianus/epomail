@@ -6,6 +6,7 @@ import { RegisterCard } from "./components/epomail/RegisterCard";
 import { PassingPlanets } from "./components/epomail/PassingPlanets";
 import { cameraState, updateCameraPhysics } from "./components/epomail/cameraStore";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { resolveAuthLang } from "./i18n/authLocale";
 
 // 站点配置整页只需拉取一次，登录/注册视图切换不再重复请求
 let sysConfigPromise: Promise<any> | null = null;
@@ -37,6 +38,11 @@ export default function App() {
 
   useEffect(() => {
     loadSysConfig().then(setSysConfig);
+  }, []);
+
+  // 让 <html lang> 与实际渲染语言一致，供读屏与翻译工具识别
+  useEffect(() => {
+    document.documentElement.lang = resolveAuthLang();
   }, []);
 
   useEffect(() => {

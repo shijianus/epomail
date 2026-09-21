@@ -10,6 +10,27 @@
 
 ---
 
+### 感官打磨二批：hover 反馈 / reduced-motion 门禁 / 崩溃页六语言 / 收件箱四端动态巡检 (2026-09-21)
+*   **关联提交 (Git Commit)**: `<HASH>` (Short: `<SHORT>`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com)` (Version ID: `1e4ffe69-33bc-454f-9875-583660211c5a`，100% 流量；上一基线 `78f0e34e-370d-47bc-9dc4-d92163b2ac32`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 主提交按钮 hover 反馈：AuthForm/RegisterForm 提交按钮 whileHover（y -1.5 + brightness 1.12 + 阴影抬升），reduced-motion 下仅保留亮度变化；OAuth 按钮 motion 化补 hover 抬升；统一补 focus-visible 环与 disabled 降透明
+    - [x] reduced-motion 门禁：LoginCard/RegisterCard 入场 blur/位移/淡入、AuthForm 两级表单切换动画在 prefers-reduced-motion 下整体跳过（motion/react useReducedMotion，响应式）
+    - [x] 崩溃兜底页六语言：ErrorBoundary 硬编码中英混排文案接入 authLocale（crashTitle/crashFallback/crashReset ×6 语言对称）
+    - [x] `<html lang>` 与渲染语言同步：App.tsx 挂载时写入 resolveAuthLang()，供读屏与翻译工具识别
+    - [x] 巡检套件升级：tests/verify-sensory-sweep.mjs 修正收件箱行选择器（.email-row）、暗色改走真实头部主题切换并断言生效与还原、新增列表行文本渲染断言；tests/verify-login-polish.mjs 新增 6 项 `<html lang>` 断言
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：temp_login_ui 2.4s / mail-vue release 构建通过 / worker `--dry-run` 编译通过；i18n 三件套全绿（symmetry ALL SYMMETRIC、audit 0 缺失、hardcoded 304 行既有基线未变动）
+    - [x] 本地感官巡检：tests/verify-sensory-sweep.mjs 33/33（登录面 CLS≤0.0021、提交按钮 hover 三项计算样式变化、reduced-motion 零 blur/淡入残留、副标题对比度 6.38:1；收件箱 1440 亮/暗 + 375 + 768 登录进箱、零横向溢出、CLS≤0.0009、零 pageerror、列表行 hover 反馈）
+    - [x] 本地六语言断言：tests/verify-login-polish.mjs 62/62（原 56 项 + 6 项 `<html lang>`）
+    - [x] 生产线上六语言断言：62/62（同一脚本对 https://mail.epocanvas.com 复跑）
+    - [x] 线上完整性：tests/verify-live-integrity.mjs 370 文件 → 369 逐字节一致 / 0 差异 / 0 失败 / 1 预期不服务（_headers），标记 6/6，CF 缓存 366/369（新资产首访 MISS 属预期）
+    - [x] 线上浏览器：tests/verify-live-browser.mjs 25/25（首屏引导 6.2s，零 >2MB 响应）
+    - [x] 零假数据残留：本地巡检仅登录会话与只读浏览；暗色经头部开关二次点击还原（html.dark=false 断言通过）；生产零写入、零登录
+*   **证据截图 (Evidence)**: `tests/shots/sensory_login_desktop.png`、`tests/shots/sensory_login_mobile_375.png`、`tests/shots/sensory_inbox_light.png`、`tests/shots/sensory_inbox_dark.png`、`tests/shots/sensory_inbox_mobile_375.png`、`tests/shots/sensory_inbox_tablet_768.png`、`tests/shots/sensory_live_login_zh.png`、`tests/shots/sensory_live_login_fr.png`、`tests/shots/sensory_live_register_fr.png`
+
+---
+
 ### 登录页视觉打磨与六语言 i18n 闭环上线：唯一未登录可见面 /login/ 打磨 + 构建链跨平台化 + 依赖清理 (2026-09-21)
 *   **关联提交 (Git Commit)**: `a08102720905466fcbceb73833f08fdf3168c536` (Short: `a081027`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com)` (Version ID: `78f0e34e-370d-47bc-9dc4-d92163b2ac32`，100% 流量；上一基线 `09855ed7-282c-401f-ba23-2c792694358a`)

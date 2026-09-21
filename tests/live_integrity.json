@@ -1,7 +1,7 @@
 {
   "summary": {
     "origin": "https://mail.epocanvas.com",
-    "checkedAt": "2026-09-21T15:37:44.253Z",
+    "checkedAt": "2026-09-21T17:20:39.208Z",
     "localFiles": 370,
     "byteIdentical": 369,
     "differed": 0,
@@ -13,10 +13,10 @@
     },
     "over2MB": [],
     "edgeTimingMs": {
-      "min": 227,
-      "p50": 635,
-      "p90": 1791,
-      "max": 12336
+      "min": 217,
+      "p50": 302,
+      "p90": 841,
+      "max": 6163
     },
     "cacheHit": "369/369",
     "cfBeaconInjected": [
@@ -85,7 +85,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 6283,
+      "ms": 6163,
       "ok": true
     },
     {
@@ -98,7 +98,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 598,
+      "ms": 511,
       "ok": true
     },
     {
@@ -111,7 +111,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 801,
+      "ms": 530,
       "ok": true
     },
     {
@@ -124,7 +124,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 947,
+      "ms": 527,
       "ok": true
     },
     {
@@ -137,7 +137,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 1113,
+      "ms": 496,
       "ok": true
     },
     {
@@ -150,7 +150,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 505,
+      "ms": 521,
       "ok": true
     },
     {
@@ -163,7 +163,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 688,
+      "ms": 496,
       "ok": true
     },
     {
@@ -176,7 +176,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 1044,
+      "ms": 448,
       "ok": true
     },
     {
@@ -189,7 +189,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 689,
+      "ms": 254,
       "ok": true
     },
     {
@@ -202,7 +202,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 760,
+      "ms": 245,
       "ok": true
     },
     {
@@ -215,7 +215,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 342,
+      "ms": 243,
       "ok": true
     },
     {
@@ -228,7 +228,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 1041,
+      "ms": 235,
       "ok": true
     },
     {
@@ -241,7 +241,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 436,
+      "ms": 239,
       "ok": true
     },
     {
@@ -254,7 +254,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 450,
+      "ms": 238,
       "ok": true
     },
     {
@@ -267,7 +267,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 558,
+      "ms": 236,
       "ok": true
     },
     {
@@ -280,7 +280,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 652,
+      "ms": 234,
       "ok": true
     },
     {
@@ -293,7 +293,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 505,
+      "ms": 225,
       "ok": true
     },
     {
@@ -306,7 +306,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 469,
+      "ms": 228,
       "ok": true
     },
     {
@@ -319,7 +319,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 1289,
+      "ms": 362,
       "ok": true
     },
     {
@@ -332,7 +332,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 1312,
+      "ms": 385,
       "ok": true
     },
     {
@@ -345,7 +345,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 434,
+      "ms": 234,
       "ok": true
     },
     {
@@ -358,7 +358,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 449,
+      "ms": 229,
       "ok": true
     },
     {
@@ -371,7 +371,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 645,
+      "ms": 230,
       "ok": true
     },
     {
@@ -384,7 +384,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 539,
+      "ms": 371,
       "ok": true
     },
     {
@@ -397,7 +397,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 3490,
+      "ms": 359,
       "ok": true
     },
     {
@@ -410,7 +410,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 1630,
+      "ms": 358,
       "ok": true
     },
     {
@@ -423,7 +423,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 329,
+      "ms": 233,
       "ok": true
     },
     {
@@ -436,7 +436,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 530,
+      "ms": 234,
       "ok": true
     },
     {
@@ -449,7 +449,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 520,
+      "ms": 231,
       "ok": true
     },
     {
@@ -462,7 +462,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 325,
+      "ms": 217,
       "ok": true
     },
     {
@@ -475,7 +475,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 2011,
+      "ms": 358,
       "ok": true
     },
     {
@@ -488,7 +488,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 687,
+      "ms": 243,
       "ok": true
     },
     {
@@ -501,7 +501,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 1182,
+      "ms": 237,
       "ok": true
     },
     {
@@ -514,7 +514,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 505,
+      "ms": 247,
       "ok": true
     },
     {
@@ -527,7 +527,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 491,
+      "ms": 229,
       "ok": true
     },
     {
@@ -540,7 +540,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 858,
+      "ms": 264,
       "ok": true
     },
     {
@@ -553,7 +553,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 856,
+      "ms": 266,
       "ok": true
     },
     {
@@ -566,7 +566,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 246,
+      "ms": 234,
       "ok": true
     },
     {
@@ -579,7 +579,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 633,
+      "ms": 237,
       "ok": true
     },
     {
@@ -592,7 +592,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 565,
+      "ms": 241,
       "ok": true
     },
     {
@@ -605,7 +605,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 977,
+      "ms": 274,
       "ok": true
     },
     {
@@ -618,7 +618,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 892,
+      "ms": 248,
       "ok": true
     },
     {
@@ -631,7 +631,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 7789,
+      "ms": 867,
       "ok": true
     },
     {
@@ -644,7 +644,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 408,
+      "ms": 247,
       "ok": true
     },
     {
@@ -657,7 +657,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 836,
+      "ms": 227,
       "ok": true
     },
     {
@@ -670,7 +670,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 3250,
+      "ms": 395,
       "ok": true
     },
     {
@@ -683,7 +683,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 5446,
+      "ms": 1142,
       "ok": true
     },
     {
@@ -696,7 +696,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 387,
+      "ms": 241,
       "ok": true
     },
     {
@@ -709,7 +709,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 645,
+      "ms": 231,
       "ok": true
     },
     {
@@ -722,7 +722,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 1024,
+      "ms": 359,
       "ok": true
     },
     {
@@ -735,7 +735,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 821,
+      "ms": 381,
       "ok": true
     },
     {
@@ -748,7 +748,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 422,
+      "ms": 396,
       "ok": true
     },
     {
@@ -761,7 +761,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 516,
+      "ms": 354,
       "ok": true
     },
     {
@@ -774,7 +774,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 559,
+      "ms": 227,
       "ok": true
     },
     {
@@ -787,7 +787,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 560,
+      "ms": 283,
       "ok": true
     },
     {
@@ -800,7 +800,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 554,
+      "ms": 288,
       "ok": true
     },
     {
@@ -813,7 +813,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 499,
+      "ms": 278,
       "ok": true
     },
     {
@@ -826,7 +826,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 723,
+      "ms": 291,
       "ok": true
     },
     {
@@ -839,7 +839,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 921,
+      "ms": 288,
       "ok": true
     },
     {
@@ -852,7 +852,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 488,
+      "ms": 281,
       "ok": true
     },
     {
@@ -865,7 +865,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 489,
+      "ms": 353,
       "ok": true
     },
     {
@@ -878,7 +878,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 392,
+      "ms": 233,
       "ok": true
     },
     {
@@ -891,7 +891,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 359,
+      "ms": 243,
       "ok": true
     },
     {
@@ -904,7 +904,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 383,
+      "ms": 233,
       "ok": true
     },
     {
@@ -917,7 +917,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 309,
+      "ms": 236,
       "ok": true
     },
     {
@@ -930,7 +930,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 621,
+      "ms": 308,
       "ok": true
     },
     {
@@ -943,7 +943,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 487,
+      "ms": 304,
       "ok": true
     },
     {
@@ -956,7 +956,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 499,
+      "ms": 298,
       "ok": true
     },
     {
@@ -969,7 +969,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 551,
+      "ms": 299,
       "ok": true
     },
     {
@@ -982,7 +982,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 484,
+      "ms": 221,
       "ok": true
     },
     {
@@ -995,7 +995,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 309,
+      "ms": 230,
       "ok": true
     },
     {
@@ -1008,7 +1008,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 424,
+      "ms": 307,
       "ok": true
     },
     {
@@ -1021,7 +1021,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 851,
+      "ms": 326,
       "ok": true
     },
     {
@@ -1034,7 +1034,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 514,
+      "ms": 254,
       "ok": true
     },
     {
@@ -1047,7 +1047,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 616,
+      "ms": 517,
       "ok": true
     },
     {
@@ -1060,7 +1060,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 337,
+      "ms": 468,
       "ok": true
     },
     {
@@ -1073,7 +1073,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 342,
+      "ms": 521,
       "ok": true
     },
     {
@@ -1086,7 +1086,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 259,
+      "ms": 226,
       "ok": true
     },
     {
@@ -1099,7 +1099,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 254,
+      "ms": 276,
       "ok": true
     },
     {
@@ -1112,7 +1112,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 238,
+      "ms": 294,
       "ok": true
     },
     {
@@ -1125,7 +1125,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 469,
+      "ms": 968,
       "ok": true
     },
     {
@@ -1138,7 +1138,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 430,
+      "ms": 282,
       "ok": true
     },
     {
@@ -1151,7 +1151,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 281,
+      "ms": 228,
       "ok": true
     },
     {
@@ -1164,7 +1164,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 548,
+      "ms": 236,
       "ok": true
     },
     {
@@ -1177,7 +1177,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 753,
+      "ms": 985,
       "ok": true
     },
     {
@@ -1190,7 +1190,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 775,
+      "ms": 376,
       "ok": true
     },
     {
@@ -1203,7 +1203,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 2255,
+      "ms": 841,
       "ok": true
     },
     {
@@ -1216,7 +1216,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 12336,
+      "ms": 2910,
       "ok": true
     },
     {
@@ -1229,7 +1229,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 440,
+      "ms": 625,
       "ok": true
     },
     {
@@ -1242,7 +1242,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 876,
+      "ms": 231,
       "ok": true
     },
     {
@@ -1255,7 +1255,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 287,
+      "ms": 227,
       "ok": true
     },
     {
@@ -1268,7 +1268,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 983,
+      "ms": 231,
       "ok": true
     },
     {
@@ -1281,7 +1281,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 975,
+      "ms": 262,
       "ok": true
     },
     {
@@ -1294,7 +1294,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 234,
+      "ms": 227,
       "ok": true
     },
     {
@@ -1307,7 +1307,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 339,
+      "ms": 230,
       "ok": true
     },
     {
@@ -1320,7 +1320,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 313,
+      "ms": 242,
       "ok": true
     },
     {
@@ -1333,7 +1333,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 492,
+      "ms": 337,
       "ok": true
     },
     {
@@ -1346,7 +1346,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 510,
+      "ms": 243,
       "ok": true
     },
     {
@@ -1359,7 +1359,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 1105,
+      "ms": 378,
       "ok": true
     },
     {
@@ -1372,7 +1372,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 401,
+      "ms": 276,
       "ok": true
     },
     {
@@ -1385,7 +1385,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 818,
+      "ms": 322,
       "ok": true
     },
     {
@@ -1398,7 +1398,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 1047,
+      "ms": 920,
       "ok": true
     },
     {
@@ -1411,7 +1411,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 1704,
+      "ms": 816,
       "ok": true
     },
     {
@@ -1424,7 +1424,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 532,
+      "ms": 366,
       "ok": true
     },
     {
@@ -1437,7 +1437,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 721,
+      "ms": 228,
       "ok": true
     },
     {
@@ -1450,7 +1450,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 255,
+      "ms": 236,
       "ok": true
     },
     {
@@ -1463,7 +1463,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 1975,
+      "ms": 858,
       "ok": true
     },
     {
@@ -1476,7 +1476,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 5696,
+      "ms": 3244,
       "ok": true
     },
     {
@@ -1489,7 +1489,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 790,
+      "ms": 635,
       "ok": true
     },
     {
@@ -1502,7 +1502,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 395,
+      "ms": 361,
       "ok": true
     },
     {
@@ -1515,7 +1515,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 3049,
+      "ms": 1779,
       "ok": true
     },
     {
@@ -1528,7 +1528,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 438,
+      "ms": 226,
       "ok": true
     },
     {
@@ -1541,7 +1541,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 272,
+      "ms": 260,
       "ok": true
     },
     {
@@ -1554,7 +1554,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 1372,
+      "ms": 302,
       "ok": true
     },
     {
@@ -1567,7 +1567,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 3032,
+      "ms": 1651,
       "ok": true
     },
     {
@@ -1580,7 +1580,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 647,
+      "ms": 360,
       "ok": true
     },
     {
@@ -1593,7 +1593,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 394,
+      "ms": 275,
       "ok": true
     },
     {
@@ -1606,7 +1606,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 269,
+      "ms": 241,
       "ok": true
     },
     {
@@ -1619,7 +1619,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 707,
+      "ms": 225,
       "ok": true
     },
     {
@@ -1632,7 +1632,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 850,
+      "ms": 248,
       "ok": true
     },
     {
@@ -1645,7 +1645,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 285,
+      "ms": 417,
       "ok": true
     },
     {
@@ -1658,7 +1658,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 704,
+      "ms": 585,
       "ok": true
     },
     {
@@ -1671,7 +1671,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 445,
+      "ms": 338,
       "ok": true
     },
     {
@@ -1684,7 +1684,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 238,
+      "ms": 221,
       "ok": true
     },
     {
@@ -1697,7 +1697,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 1024,
+      "ms": 262,
       "ok": true
     },
     {
@@ -1710,7 +1710,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 399,
+      "ms": 269,
       "ok": true
     },
     {
@@ -1723,7 +1723,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 465,
+      "ms": 271,
       "ok": true
     },
     {
@@ -1736,7 +1736,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 579,
+      "ms": 251,
       "ok": true
     },
     {
@@ -1749,7 +1749,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 770,
+      "ms": 527,
       "ok": true
     },
     {
@@ -1762,7 +1762,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 633,
+      "ms": 235,
       "ok": true
     },
     {
@@ -1775,7 +1775,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 1017,
+      "ms": 1384,
       "ok": true
     },
     {
@@ -1788,7 +1788,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 434,
+      "ms": 281,
       "ok": true
     },
     {
@@ -1801,7 +1801,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 2228,
+      "ms": 1008,
       "ok": true
     },
     {
@@ -1814,7 +1814,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 1212,
+      "ms": 599,
       "ok": true
     },
     {
@@ -1827,7 +1827,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 854,
+      "ms": 544,
       "ok": true
     },
     {
@@ -1840,7 +1840,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 1139,
+      "ms": 931,
       "ok": true
     },
     {
@@ -1853,7 +1853,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 706,
+      "ms": 418,
       "ok": true
     },
     {
@@ -1866,7 +1866,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 1020,
+      "ms": 733,
       "ok": true
     },
     {
@@ -1879,7 +1879,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 1092,
+      "ms": 597,
       "ok": true
     },
     {
@@ -1892,7 +1892,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 334,
+      "ms": 265,
       "ok": true
     },
     {
@@ -1905,7 +1905,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 806,
+      "ms": 254,
       "ok": true
     },
     {
@@ -1918,7 +1918,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 788,
+      "ms": 289,
       "ok": true
     },
     {
@@ -1931,7 +1931,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 363,
+      "ms": 283,
       "ok": true
     },
     {
@@ -1944,7 +1944,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 1002,
+      "ms": 408,
       "ok": true
     },
     {
@@ -1957,7 +1957,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 717,
+      "ms": 282,
       "ok": true
     },
     {
@@ -1970,7 +1970,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 1791,
+      "ms": 504,
       "ok": true
     },
     {
@@ -1983,7 +1983,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 1723,
+      "ms": 439,
       "ok": true
     },
     {
@@ -1996,7 +1996,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 431,
+      "ms": 302,
       "ok": true
     },
     {
@@ -2009,7 +2009,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 539,
+      "ms": 407,
       "ok": true
     },
     {
@@ -2022,7 +2022,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 259,
+      "ms": 233,
       "ok": true
     },
     {
@@ -2035,7 +2035,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 526,
+      "ms": 297,
       "ok": true
     },
     {
@@ -2048,7 +2048,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 635,
+      "ms": 279,
       "ok": true
     },
     {
@@ -2061,7 +2061,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 272,
+      "ms": 584,
       "ok": true
     },
     {
@@ -2074,7 +2074,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 575,
+      "ms": 328,
       "ok": true
     },
     {
@@ -2087,7 +2087,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 822,
+      "ms": 376,
       "ok": true
     },
     {
@@ -2100,7 +2100,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 248,
+      "ms": 237,
       "ok": true
     },
     {
@@ -2113,7 +2113,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 1314,
+      "ms": 326,
       "ok": true
     },
     {
@@ -2126,7 +2126,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 1330,
+      "ms": 441,
       "ok": true
     },
     {
@@ -2139,7 +2139,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 305,
+      "ms": 219,
       "ok": true
     },
     {
@@ -2152,7 +2152,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 2761,
+      "ms": 661,
       "ok": true
     },
     {
@@ -2165,7 +2165,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 2786,
+      "ms": 600,
       "ok": true
     },
     {
@@ -2178,7 +2178,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 1758,
+      "ms": 445,
       "ok": true
     },
     {
@@ -2191,7 +2191,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 902,
+      "ms": 350,
       "ok": true
     },
     {
@@ -2204,7 +2204,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 480,
+      "ms": 238,
       "ok": true
     },
     {
@@ -2217,7 +2217,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 356,
+      "ms": 239,
       "ok": true
     },
     {
@@ -2230,7 +2230,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 589,
+      "ms": 267,
       "ok": true
     },
     {
@@ -2243,7 +2243,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 800,
+      "ms": 303,
       "ok": true
     },
     {
@@ -2256,7 +2256,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 3036,
+      "ms": 3386,
       "ok": true
     },
     {
@@ -2269,7 +2269,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 1910,
+      "ms": 1234,
       "ok": true
     },
     {
@@ -2282,7 +2282,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 308,
+      "ms": 290,
       "ok": true
     },
     {
@@ -2295,7 +2295,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 350,
+      "ms": 261,
       "ok": true
     },
     {
@@ -2308,7 +2308,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 683,
+      "ms": 394,
       "ok": true
     },
     {
@@ -2321,7 +2321,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 1150,
+      "ms": 828,
       "ok": true
     },
     {
@@ -2334,7 +2334,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 315,
+      "ms": 233,
       "ok": true
     },
     {
@@ -2347,7 +2347,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 798,
+      "ms": 556,
       "ok": true
     },
     {
@@ -2360,7 +2360,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 1658,
+      "ms": 467,
       "ok": true
     },
     {
@@ -2373,7 +2373,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 817,
+      "ms": 337,
       "ok": true
     },
     {
@@ -2386,7 +2386,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 716,
+      "ms": 351,
       "ok": true
     },
     {
@@ -2399,7 +2399,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 563,
+      "ms": 287,
       "ok": true
     },
     {
@@ -2412,7 +2412,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 535,
+      "ms": 295,
       "ok": true
     },
     {
@@ -2425,7 +2425,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 686,
+      "ms": 408,
       "ok": true
     },
     {
@@ -2438,7 +2438,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 1048,
+      "ms": 414,
       "ok": true
     },
     {
@@ -2451,7 +2451,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 278,
+      "ms": 223,
       "ok": true
     },
     {
@@ -2464,7 +2464,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 228,
+      "ms": 220,
       "ok": true
     },
     {
@@ -2477,7 +2477,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 4020,
+      "ms": 1161,
       "ok": true
     },
     {
@@ -2490,7 +2490,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 2537,
+      "ms": 1011,
       "ok": true
     },
     {
@@ -2503,7 +2503,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 456,
+      "ms": 256,
       "ok": true
     },
     {
@@ -2516,7 +2516,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 341,
+      "ms": 250,
       "ok": true
     },
     {
@@ -2529,7 +2529,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 2332,
+      "ms": 1040,
       "ok": true
     },
     {
@@ -2542,7 +2542,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 2615,
+      "ms": 754,
       "ok": true
     },
     {
@@ -2555,7 +2555,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 689,
+      "ms": 298,
       "ok": true
     },
     {
@@ -2568,7 +2568,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 816,
+      "ms": 399,
       "ok": true
     },
     {
@@ -2581,7 +2581,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 765,
+      "ms": 282,
       "ok": true
     },
     {
@@ -2594,7 +2594,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 621,
+      "ms": 295,
       "ok": true
     },
     {
@@ -2607,7 +2607,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 563,
+      "ms": 252,
       "ok": true
     },
     {
@@ -2620,7 +2620,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 635,
+      "ms": 394,
       "ok": true
     },
     {
@@ -2633,7 +2633,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 241,
+      "ms": 238,
       "ok": true
     },
     {
@@ -2646,7 +2646,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 1282,
+      "ms": 533,
       "ok": true
     },
     {
@@ -2659,7 +2659,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 1389,
+      "ms": 412,
       "ok": true
     },
     {
@@ -2672,7 +2672,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 634,
+      "ms": 254,
       "ok": true
     },
     {
@@ -2685,7 +2685,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 1185,
+      "ms": 256,
       "ok": true
     },
     {
@@ -2698,7 +2698,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 365,
+      "ms": 243,
       "ok": true
     },
     {
@@ -2711,7 +2711,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 319,
+      "ms": 235,
       "ok": true
     },
     {
@@ -2724,7 +2724,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 431,
+      "ms": 253,
       "ok": true
     },
     {
@@ -2737,7 +2737,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 449,
+      "ms": 246,
       "ok": true
     },
     {
@@ -2750,7 +2750,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 668,
+      "ms": 235,
       "ok": true
     },
     {
@@ -2763,7 +2763,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 1112,
+      "ms": 576,
       "ok": true
     },
     {
@@ -2776,7 +2776,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 2505,
+      "ms": 1224,
       "ok": true
     },
     {
@@ -2789,7 +2789,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 1043,
+      "ms": 537,
       "ok": true
     },
     {
@@ -2802,7 +2802,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 1158,
+      "ms": 544,
       "ok": true
     },
     {
@@ -2815,7 +2815,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 238,
+      "ms": 237,
       "ok": true
     },
     {
@@ -2828,7 +2828,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 267,
+      "ms": 256,
       "ok": true
     },
     {
@@ -2841,7 +2841,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 976,
+      "ms": 510,
       "ok": true
     },
     {
@@ -2854,7 +2854,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 1402,
+      "ms": 553,
       "ok": true
     },
     {
@@ -2867,7 +2867,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 310,
+      "ms": 229,
       "ok": true
     },
     {
@@ -2880,7 +2880,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 949,
+      "ms": 222,
       "ok": true
     },
     {
@@ -2893,7 +2893,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 429,
+      "ms": 288,
       "ok": true
     },
     {
@@ -2906,7 +2906,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 698,
+      "ms": 430,
       "ok": true
     },
     {
@@ -2919,7 +2919,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 477,
+      "ms": 284,
       "ok": true
     },
     {
@@ -2932,7 +2932,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 840,
+      "ms": 301,
       "ok": true
     },
     {
@@ -2945,7 +2945,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 2927,
+      "ms": 2061,
       "ok": true
     },
     {
@@ -2958,7 +2958,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 438,
+      "ms": 260,
       "ok": true
     },
     {
@@ -2971,7 +2971,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 1136,
+      "ms": 259,
       "ok": true
     },
     {
@@ -2984,7 +2984,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 295,
+      "ms": 260,
       "ok": true
     },
     {
@@ -2997,7 +2997,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 781,
+      "ms": 247,
       "ok": true
     },
     {
@@ -3010,7 +3010,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 365,
+      "ms": 262,
       "ok": true
     },
     {
@@ -3023,7 +3023,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 275,
+      "ms": 256,
       "ok": true
     },
     {
@@ -3036,7 +3036,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 304,
+      "ms": 232,
       "ok": true
     },
     {
@@ -3049,7 +3049,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 248,
+      "ms": 227,
       "ok": true
     },
     {
@@ -3062,33 +3062,33 @@
       "beaconInjected": true,
       "status": 200,
       "cache": "HIT",
-      "ms": 630,
+      "ms": 399,
       "ok": true
     },
     {
-      "rel": "/login/assets/index-BFlA9JqW.css",
-      "size": 36680,
-      "localMd5": "793f88a617a308948eba39c076470ee8",
-      "liveMd5": "793f88a617a308948eba39c076470ee8",
+      "rel": "/login/assets/index-CAN2oisl.js",
+      "size": 379336,
+      "localMd5": "60784a5587e7c02319b1d5e6e1c95c0c",
+      "liveMd5": "60784a5587e7c02319b1d5e6e1c95c0c",
       "compare": "byte-exact md5",
-      "liveBytes": 36680,
+      "liveBytes": 379336,
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 1128,
+      "ms": 3788,
       "ok": true
     },
     {
-      "rel": "/login/assets/index-Cor1tWnM.js",
-      "size": 377044,
-      "localMd5": "0ed27d9ea429498aa9c91c72a19fcf5f",
-      "liveMd5": "0ed27d9ea429498aa9c91c72a19fcf5f",
+      "rel": "/login/assets/index-N3ZxXR3D.css",
+      "size": 37485,
+      "localMd5": "007927a9b825292b63eb8178840a1fea",
+      "liveMd5": "007927a9b825292b63eb8178840a1fea",
       "compare": "byte-exact md5",
-      "liveBytes": 377044,
+      "liveBytes": 37485,
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 8792,
+      "ms": 334,
       "ok": true
     },
     {
@@ -3101,7 +3101,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 1448,
+      "ms": 440,
       "ok": true
     },
     {
@@ -3114,20 +3114,20 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 700,
+      "ms": 271,
       "ok": true
     },
     {
       "rel": "/login/index.html",
       "size": 997,
-      "localMd5": "260635249e26a5fae2d20918540430e2",
-      "liveMd5": "260635249e26a5fae2d20918540430e2",
+      "localMd5": "dda30b2e9920bc01888e68e377a2e9f6",
+      "liveMd5": "dda30b2e9920bc01888e68e377a2e9f6",
       "compare": "html-normalized (CF beacon stripped + whitespace-insensitive)",
       "liveBytes": 1364,
       "beaconInjected": true,
       "status": 200,
       "cache": "HIT",
-      "ms": 351,
+      "ms": 232,
       "ok": true
     },
     {
@@ -3140,7 +3140,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 374,
+      "ms": 242,
       "ok": true
     },
     {
@@ -3153,7 +3153,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 339,
+      "ms": 244,
       "ok": true
     },
     {
@@ -3166,7 +3166,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 307,
+      "ms": 230,
       "ok": true
     },
     {
@@ -3179,7 +3179,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 580,
+      "ms": 224,
       "ok": true
     },
     {
@@ -3192,7 +3192,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 2066,
+      "ms": 443,
       "ok": true
     },
     {
@@ -3205,7 +3205,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 809,
+      "ms": 247,
       "ok": true
     },
     {
@@ -3218,7 +3218,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 480,
+      "ms": 236,
       "ok": true
     },
     {
@@ -3231,7 +3231,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 2146,
+      "ms": 643,
       "ok": true
     },
     {
@@ -3244,7 +3244,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 257,
+      "ms": 221,
       "ok": true
     },
     {
@@ -3257,7 +3257,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 762,
+      "ms": 259,
       "ok": true
     },
     {
@@ -3270,7 +3270,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 739,
+      "ms": 284,
       "ok": true
     },
     {
@@ -3283,7 +3283,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 235,
+      "ms": 231,
       "ok": true
     },
     {
@@ -3296,7 +3296,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 1929,
+      "ms": 675,
       "ok": true
     },
     {
@@ -3309,7 +3309,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 242,
+      "ms": 230,
       "ok": true
     },
     {
@@ -3322,7 +3322,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 476,
+      "ms": 320,
       "ok": true
     },
     {
@@ -3335,7 +3335,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 296,
+      "ms": 347,
       "ok": true
     },
     {
@@ -3361,7 +3361,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 404,
+      "ms": 514,
       "ok": true
     },
     {
@@ -3374,7 +3374,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 333,
+      "ms": 300,
       "ok": true
     },
     {
@@ -3387,7 +3387,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 338,
+      "ms": 696,
       "ok": true
     },
     {
@@ -3400,7 +3400,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 562,
+      "ms": 495,
       "ok": true
     },
     {
@@ -3413,7 +3413,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 264,
+      "ms": 554,
       "ok": true
     },
     {
@@ -3426,7 +3426,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 1198,
+      "ms": 1134,
       "ok": true
     },
     {
@@ -3439,7 +3439,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 300,
+      "ms": 352,
       "ok": true
     },
     {
@@ -3452,7 +3452,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 6482,
+      "ms": 4201,
       "ok": true
     },
     {
@@ -3465,7 +3465,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 6449,
+      "ms": 1850,
       "ok": true
     },
     {
@@ -3478,7 +3478,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 2203,
+      "ms": 862,
       "ok": true
     },
     {
@@ -3491,7 +3491,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 2708,
+      "ms": 1207,
       "ok": true
     },
     {
@@ -3504,7 +3504,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 283,
+      "ms": 251,
       "ok": true
     },
     {
@@ -3517,7 +3517,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 443,
+      "ms": 265,
       "ok": true
     },
     {
@@ -3530,7 +3530,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 1077,
+      "ms": 389,
       "ok": true
     },
     {
@@ -3543,7 +3543,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 316,
+      "ms": 243,
       "ok": true
     },
     {
@@ -3556,7 +3556,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 318,
+      "ms": 237,
       "ok": true
     },
     {
@@ -3569,7 +3569,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 476,
+      "ms": 426,
       "ok": true
     },
     {
@@ -3582,7 +3582,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 447,
+      "ms": 233,
       "ok": true
     },
     {
@@ -3595,7 +3595,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 654,
+      "ms": 230,
       "ok": true
     },
     {
@@ -3608,7 +3608,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 467,
+      "ms": 225,
       "ok": true
     },
     {
@@ -3621,7 +3621,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 373,
+      "ms": 236,
       "ok": true
     },
     {
@@ -3634,7 +3634,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 975,
+      "ms": 243,
       "ok": true
     },
     {
@@ -3647,7 +3647,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 1483,
+      "ms": 233,
       "ok": true
     },
     {
@@ -3660,7 +3660,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 1424,
+      "ms": 228,
       "ok": true
     },
     {
@@ -3673,7 +3673,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 773,
+      "ms": 249,
       "ok": true
     },
     {
@@ -3686,7 +3686,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 631,
+      "ms": 239,
       "ok": true
     },
     {
@@ -3699,7 +3699,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 1037,
+      "ms": 325,
       "ok": true
     },
     {
@@ -3712,7 +3712,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 818,
+      "ms": 248,
       "ok": true
     },
     {
@@ -3725,7 +3725,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 626,
+      "ms": 247,
       "ok": true
     },
     {
@@ -3738,7 +3738,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 593,
+      "ms": 258,
       "ok": true
     },
     {
@@ -3751,7 +3751,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 453,
+      "ms": 236,
       "ok": true
     },
     {
@@ -3764,7 +3764,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 676,
+      "ms": 229,
       "ok": true
     },
     {
@@ -3777,7 +3777,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 635,
+      "ms": 373,
       "ok": true
     },
     {
@@ -3790,7 +3790,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 1492,
+      "ms": 536,
       "ok": true
     },
     {
@@ -3803,7 +3803,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 1124,
+      "ms": 379,
       "ok": true
     },
     {
@@ -3816,7 +3816,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 678,
+      "ms": 380,
       "ok": true
     },
     {
@@ -3829,7 +3829,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 751,
+      "ms": 381,
       "ok": true
     },
     {
@@ -3842,7 +3842,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 680,
+      "ms": 422,
       "ok": true
     },
     {
@@ -3855,7 +3855,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 598,
+      "ms": 555,
       "ok": true
     },
     {
@@ -3868,7 +3868,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 550,
+      "ms": 399,
       "ok": true
     },
     {
@@ -3881,7 +3881,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 862,
+      "ms": 414,
       "ok": true
     },
     {
@@ -3894,7 +3894,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 1281,
+      "ms": 478,
       "ok": true
     },
     {
@@ -3907,7 +3907,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 1877,
+      "ms": 543,
       "ok": true
     },
     {
@@ -3920,7 +3920,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 730,
+      "ms": 468,
       "ok": true
     },
     {
@@ -3933,7 +3933,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 487,
+      "ms": 411,
       "ok": true
     },
     {
@@ -3946,7 +3946,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 892,
+      "ms": 400,
       "ok": true
     },
     {
@@ -3959,7 +3959,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 926,
+      "ms": 540,
       "ok": true
     },
     {
@@ -3972,7 +3972,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 1120,
+      "ms": 424,
       "ok": true
     },
     {
@@ -3985,7 +3985,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 680,
+      "ms": 537,
       "ok": true
     },
     {
@@ -3998,7 +3998,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 591,
+      "ms": 502,
       "ok": true
     },
     {
@@ -4011,7 +4011,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 707,
+      "ms": 418,
       "ok": true
     },
     {
@@ -4024,7 +4024,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 493,
+      "ms": 395,
       "ok": true
     },
     {
@@ -4037,7 +4037,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 1148,
+      "ms": 708,
       "ok": true
     },
     {
@@ -4050,7 +4050,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 1498,
+      "ms": 1162,
       "ok": true
     },
     {
@@ -4063,7 +4063,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 719,
+      "ms": 390,
       "ok": true
     },
     {
@@ -4076,7 +4076,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 1497,
+      "ms": 327,
       "ok": true
     },
     {
@@ -4089,7 +4089,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 1004,
+      "ms": 1043,
       "ok": true
     },
     {
@@ -4102,7 +4102,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 1433,
+      "ms": 1265,
       "ok": true
     },
     {
@@ -4115,7 +4115,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 655,
+      "ms": 710,
       "ok": true
     },
     {
@@ -4128,7 +4128,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 680,
+      "ms": 247,
       "ok": true
     },
     {
@@ -4141,7 +4141,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 474,
+      "ms": 269,
       "ok": true
     },
     {
@@ -4154,7 +4154,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 619,
+      "ms": 391,
       "ok": true
     },
     {
@@ -4167,7 +4167,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 398,
+      "ms": 365,
       "ok": true
     },
     {
@@ -4180,7 +4180,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 403,
+      "ms": 238,
       "ok": true
     },
     {
@@ -4193,7 +4193,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 500,
+      "ms": 528,
       "ok": true
     },
     {
@@ -4206,7 +4206,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 1490,
+      "ms": 1153,
       "ok": true
     },
     {
@@ -4219,7 +4219,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 859,
+      "ms": 231,
       "ok": true
     },
     {
@@ -4232,7 +4232,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 310,
+      "ms": 347,
       "ok": true
     },
     {
@@ -4245,7 +4245,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 612,
+      "ms": 406,
       "ok": true
     },
     {
@@ -4258,7 +4258,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 305,
+      "ms": 239,
       "ok": true
     },
     {
@@ -4271,7 +4271,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 315,
+      "ms": 258,
       "ok": true
     },
     {
@@ -4284,7 +4284,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 418,
+      "ms": 237,
       "ok": true
     },
     {
@@ -4297,7 +4297,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 431,
+      "ms": 240,
       "ok": true
     },
     {
@@ -4310,7 +4310,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 278,
+      "ms": 247,
       "ok": true
     },
     {
@@ -4323,7 +4323,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 310,
+      "ms": 240,
       "ok": true
     },
     {
@@ -4336,7 +4336,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 701,
+      "ms": 234,
       "ok": true
     },
     {
@@ -4349,7 +4349,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 444,
+      "ms": 260,
       "ok": true
     },
     {
@@ -4362,7 +4362,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 290,
+      "ms": 252,
       "ok": true
     },
     {
@@ -4375,7 +4375,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 800,
+      "ms": 243,
       "ok": true
     },
     {
@@ -4401,7 +4401,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 971,
+      "ms": 596,
       "ok": true
     },
     {
@@ -4414,7 +4414,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 4474,
+      "ms": 673,
       "ok": true
     },
     {
@@ -4427,7 +4427,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 1787,
+      "ms": 663,
       "ok": true
     },
     {
@@ -4440,7 +4440,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 1402,
+      "ms": 644,
       "ok": true
     },
     {
@@ -4453,7 +4453,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 959,
+      "ms": 520,
       "ok": true
     },
     {
@@ -4466,7 +4466,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 2167,
+      "ms": 1148,
       "ok": true
     },
     {
@@ -4479,7 +4479,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 1499,
+      "ms": 1346,
       "ok": true
     },
     {
@@ -4492,7 +4492,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 248,
+      "ms": 231,
       "ok": true
     },
     {
@@ -4505,7 +4505,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 229,
+      "ms": 246,
       "ok": true
     },
     {
@@ -4518,7 +4518,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 560,
+      "ms": 521,
       "ok": true
     },
     {
@@ -4531,7 +4531,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 670,
+      "ms": 370,
       "ok": true
     },
     {
@@ -4544,7 +4544,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 799,
+      "ms": 561,
       "ok": true
     },
     {
@@ -4557,7 +4557,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 497,
+      "ms": 371,
       "ok": true
     },
     {
@@ -4570,7 +4570,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 1559,
+      "ms": 796,
       "ok": true
     },
     {
@@ -4583,7 +4583,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 1227,
+      "ms": 828,
       "ok": true
     },
     {
@@ -4596,7 +4596,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 279,
+      "ms": 228,
       "ok": true
     },
     {
@@ -4609,7 +4609,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 249,
+      "ms": 237,
       "ok": true
     },
     {
@@ -4622,7 +4622,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 567,
+      "ms": 356,
       "ok": true
     },
     {
@@ -4635,7 +4635,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 958,
+      "ms": 362,
       "ok": true
     },
     {
@@ -4648,7 +4648,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 519,
+      "ms": 339,
       "ok": true
     },
     {
@@ -4661,7 +4661,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 542,
+      "ms": 478,
       "ok": true
     },
     {
@@ -4674,7 +4674,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 1286,
+      "ms": 884,
       "ok": true
     },
     {
@@ -4687,7 +4687,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 1339,
+      "ms": 778,
       "ok": true
     },
     {
@@ -4700,7 +4700,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 299,
+      "ms": 224,
       "ok": true
     },
     {
@@ -4713,7 +4713,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 227,
+      "ms": 230,
       "ok": true
     },
     {
@@ -4726,7 +4726,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 675,
+      "ms": 369,
       "ok": true
     },
     {
@@ -4739,7 +4739,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 691,
+      "ms": 434,
       "ok": true
     },
     {
@@ -4752,7 +4752,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 1127,
+      "ms": 325,
       "ok": true
     },
     {
@@ -4765,7 +4765,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 583,
+      "ms": 305,
       "ok": true
     },
     {
@@ -4778,7 +4778,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 1287,
+      "ms": 686,
       "ok": true
     },
     {
@@ -4791,7 +4791,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 1331,
+      "ms": 529,
       "ok": true
     },
     {
@@ -4804,7 +4804,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 229,
+      "ms": 247,
       "ok": true
     },
     {
@@ -4817,7 +4817,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 330,
+      "ms": 246,
       "ok": true
     },
     {
@@ -4830,7 +4830,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 4113,
+      "ms": 1252,
       "ok": true
     },
     {
@@ -4843,7 +4843,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 1238,
+      "ms": 568,
       "ok": true
     },
     {
@@ -4856,7 +4856,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 2970,
+      "ms": 974,
       "ok": true
     },
     {
@@ -4869,7 +4869,7 @@
       "beaconInjected": false,
       "status": 200,
       "cache": "HIT",
-      "ms": 349,
+      "ms": 255,
       "ok": true
     }
   ]

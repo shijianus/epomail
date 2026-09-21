@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from "react";
-import { motion, useMotionValue, useSpring, useTransform } from "motion/react";
+import { motion, useMotionValue, useReducedMotion, useSpring, useTransform } from "motion/react";
 import type { CanvasHandle } from "./CanvasBackground";
 import { createTr, resolveAuthLang } from "../../i18n/authLocale";
 
@@ -12,8 +12,8 @@ interface LoginCardProps {
 }
 
 export function LoginCard({ canvasRef, onSwitch, sysConfig }: LoginCardProps) {
-  // 尊重系统「减少动态效果」偏好：关闭 3D 视差
-  const reduceMotion = typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  // 尊重系统「减少动态效果」偏好：关闭 3D 视差与入场位移/模糊
+  const reduceMotion = !!useReducedMotion();
   const lang = useMemo(() => resolveAuthLang(), []);
   const tr = useMemo(() => createTr(sysConfig?.authI18n, lang), [sysConfig, lang]);
   // Cursor parallax — card floats opposite to the pointer.
@@ -42,9 +42,9 @@ export function LoginCard({ canvasRef, onSwitch, sysConfig }: LoginCardProps) {
       style={{ perspective: 1200 }}
     >
       <motion.div
-        initial={{ opacity: 0, y: 24, filter: "blur(12px)" }}
-        animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-        transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+        initial={reduceMotion ? false : { opacity: 0, y: 24, filter: "blur(12px)" }}
+        animate={reduceMotion ? { opacity: 1, y: 0 } : { opacity: 1, y: 0, filter: "blur(0px)" }}
+        transition={reduceMotion ? { duration: 0 } : { duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
         style={{
           rotateX: reduceMotion ? 0 : rotateX,
           rotateY: reduceMotion ? 0 : rotateY,

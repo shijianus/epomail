@@ -9,6 +9,30 @@
 
 ---
 
+### 动态感官专项审计：登录面 + 收件箱四端（CLS / hover / reduced-motion / 对比度 / 主题真实性） (2026-09-21)
+*   **关联提交 (Git Commit)**: `<HASH>` (Short: `<SHORT>`)
+*   **专项证据索引 (Evidence)**: `tests/verify-sensory-sweep.mjs`（新增，33 断言）、`tests/shots/sensory_*.png` ×9、`tests/verify-login-polish.mjs`（62 断言 ×本地/线上）、`tests/live_integrity.json`、`tests/live_browser_metrics.json`
+*   **体检/审计范围与方法 (Scope & Methodology)**:
+    1. 范围：登录面（公开，6 语言/亮暗/375/1440）+ 收件箱（本地全真栈登录态，1440 亮/暗、375、768）；线上 mail.epocanvas.com（Version `1e4ffe69`）
+    2. 方法：Playwright PerformanceObserver（layout-shift / longtask）、scrollWidth-clientWidth 溢出探针、computed-style hover/focus 前后比对、`reducedMotion: 'reduce'` 上下文残留探针、WCAG 相对亮度对比度、真实头部主题切换往返
+*   **核心发现与缺陷矩阵 (Key Findings & Matrix)**:
+    - **[P1·体验]**: 登录/注册主提交按钮 hover 零反馈——computed filter/transform/boxShadow 前后完全一致，可点性无感知线索（根因：仅 whileTap 无 whileHover，且 boxShadow 为内联样式压制 CSS hover）
+    - **[P1·无障碍]**: prefers-reduced-motion 下卡片入场动画未门禁，实测残留 `filter: blur(1.696px)` / `opacity: 0.8586`（根因：LoginCard/RegisterCard 的 motion.div 入场未读取 reduceMotion）
+    - **[P2·合规/红线]**: ErrorBoundary 崩溃兜底页中英混排硬编码（"SYS.ANOMALY // 界面渲染异常" + 英文回退 + 中文按钮），违反六语言对称红线
+    - **[P2·无障碍]**: `/login/` 的 `<html lang="en">` 固定，与实际渲染语言（zh/fr/…）不符，读屏与翻译工具误判
+    - **[P2·巡检盲区]**: 暗色上下文仅依赖 prefers-color-scheme，而 mail-vue 主题由服务端用户档案驱动（store/user.js 登录时 setThemeMode 覆盖本地预置），导致"暗色"截图与亮色逐字节相同——假通过；已改为真实头部切换 + `html.dark` 生效/还原双断言
+    - **[P2·巡检盲区]**: 收件箱行选择器 `.email-scroll-item/[class*="mail-item"]` 与真实 DOM（`.email-row`）失配，行数恒 0 使行渲染/行 hover 断言空态跳过——假通过；已修正并新增行文本非空断言
+    - **[说明·非缺陷]**: 本地收件箱登录失败根因为本地 D1 凭据为 `admin123`（非历史 `123456`）叠加 KV `login_fail:` 锁定计数（≥5 次锁 12h），清除锁定键后登录链路正常，非前端回归
+*   **治理修复与回归结果 (Fixes & Verification)**:
+    - 提交按钮 whileHover（y -1.5 + brightness 1.12 + 阴影抬升，reduced-motion 仅亮度）+ OAuth 按钮 motion 化 hover + focus-visible 环 + disabled 降透明；实测 hover 三项计算样式全部变化
+    - 卡片入场与两级表单切换动画整体门禁 useReducedMotion；reduced-motion 上下文实测 `filter: none / opacity: 1`
+    - ErrorBoundary 文案接入 authLocale 六语言；App.tsx 动态写入 `<html lang>`，6 语言断言全过
+    - 回归：本地感官 33/33、本地/线上六语言 62/62、线上完整性 369/369 逐字节（0 差异/0 失败）、线上浏览器 25/25、i18n 三件套全绿
+    - **Roadmap**: mail-vue 304 行硬编码基线单列批次治理；生产环境感官巡检扩展需用户授权登录态后进行；ErrorBoundary 之外 temp_login_ui 残余英文字面量（console 级）复查
+*   **视觉验收结论 (Visual Acceptance)**: 登录面 1440/375 亮暗、收件箱 1440 亮/暗 + 375 + 768 截图人工核验通过：无白闪、无横向溢出、行 unread-bar/加粗层级正确、暗色令牌完整、移动端 FAB 与两行网格行正常
+
+---
+
 ### 登录可见面专项审计与打磨：/login/ 渲染阻塞、白闪、二语言缺口等 8 项发现治理 (2026-09-21)
 *   **关联提交 (Git Commit)**: `a08102720905466fcbceb73833f08fdf3168c536` (Short: `a081027`)
 *   **专项证据索引 (Evidence)**: `tests/verify-login-polish.mjs`（新增，56 断言 ×本地/线上双跑）、`tests/polish_after_*.png` ×3、`tests/live_polish_*.png` ×4、`tests/live_integrity.json`、`tests/live_browser_metrics.json`
