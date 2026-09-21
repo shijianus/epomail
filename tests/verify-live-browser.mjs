@@ -183,7 +183,9 @@ await guard.screenshot({ path: SHOT('04_inbox_unauthenticated_desktop_1440') });
 console.log('\n=== 5) 线上 PWA 与关键静态资产可达性 ===');
 const probe = await browser.newPage();
 wire(probe, 'pwa');
-for (const p of ['/sw.js', '/manifest.webmanifest', '/registerSW.js', '/logo.svg', '/login/assets/index-Cc1cA06M.js', '/login/assets/index-gOtbi3zJ.css']) {
+const loginHtml = await readFile('/home/shijian/projects/epocanvas-mail/mail-worker/dist/login/index.html', 'utf8');
+const loginAssets = [...loginHtml.matchAll(/(?:src|href)="(\/login\/assets\/[^"]+)"/g)].map((m) => m[1]);
+for (const p of ['/sw.js', '/manifest.webmanifest', '/registerSW.js', '/logo.svg', ...loginAssets]) {
   const r = await probe.goto(`${ORIGIN}${p}`, { waitUntil: 'commit', timeout: 60000 }).catch(() => null);
   const st = r ? r.status() : 0;
   ok(st === 200, `GET ${p} → 200`, `实际=${st}`);

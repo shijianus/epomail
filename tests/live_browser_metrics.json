@@ -1,30 +1,34 @@
 {
   "summary": {
     "origin": "https://mail.epocanvas.com",
-    "checkedAt": "2026-09-21T14:21:51.549Z",
-    "bootMs": 12122,
-    "totalRequests": 48,
-    "totalBytes": 6165755,
+    "checkedAt": "2026-09-21T15:40:23.243Z",
+    "bootMs": 8055,
+    "totalRequests": 55,
+    "totalBytes": 6449801,
     "byType": {
       "document": {
         "n": 12,
-        "bytes": 27134
+        "bytes": 27626
       },
       "stylesheet": {
         "n": 8,
-        "bytes": 1498203
+        "bytes": 1501032
       },
       "script": {
         "n": 12,
-        "bytes": 4618305
+        "bytes": 4687398
       },
       "xhr": {
-        "n": 8,
+        "n": 7,
         "bytes": 0
       },
       "image": {
         "n": 4,
         "bytes": 10329
+      },
+      "font": {
+        "n": 8,
+        "bytes": 211632
       },
       "fetch": {
         "n": 4,
@@ -36,49 +40,49 @@
         "url": "/registerSW.js",
         "status": 200,
         "size": 134,
-        "ttfb": 3286
-      },
-      {
-        "url": "/assets/vue-vendor-Coz7PjHv.js",
-        "status": 200,
-        "size": 287352,
-        "ttfb": 2143
+        "ttfb": 6411
       },
       {
         "url": "/assets/element-plus-DYxc-xQq.js",
         "status": 200,
         "size": 594862,
-        "ttfb": 2143
+        "ttfb": 2804
       },
       {
         "url": "/assets/index-DPWZHvwV.css",
         "status": 200,
         "size": 458491,
-        "ttfb": 2142
+        "ttfb": 2803
+      },
+      {
+        "url": "/assets/vue-vendor-Coz7PjHv.js",
+        "status": 200,
+        "size": 287352,
+        "ttfb": 2803
+      },
+      {
+        "url": "/inbox",
+        "status": 200,
+        "size": 11085,
+        "ttfb": 1925
       },
       {
         "url": "/assets/index-BfCAj9MJ.js",
         "status": 200,
         "size": 895785,
-        "ttfb": 1755
+        "ttfb": 1876
       },
       {
-        "url": "/assets/element-plus-DYxc-xQq.js",
+        "url": "/assets/element-plus-DWqCYft0.css",
         "status": 200,
-        "size": 594862,
-        "ttfb": 1754
+        "size": 237005,
+        "ttfb": 1874
       },
       {
-        "url": "/assets/index-BfCAj9MJ.js",
+        "url": "/sw.js",
         "status": 200,
-        "size": 895785,
-        "ttfb": 1720
-      },
-      {
-        "url": "/registerSW.js",
-        "status": 200,
-        "size": 134,
-        "ttfb": 1499
+        "size": 0,
+        "ttfb": 1797
       }
     ],
     "consoleErrors": [],
@@ -86,8 +90,8 @@
     "failedRequests": [],
     "dark": {
       "rootClass": null,
-      "bodyBg": "rgb(255, 255, 255)",
-      "bodyLuma": 100,
+      "bodyBg": "rgb(5, 6, 15)",
+      "bodyLuma": 3,
       "scrollW": 375,
       "clientW": 375,
       "emailVisible": true
@@ -103,7 +107,7 @@
       "pwd": true,
       "submit": true,
       "logo": true,
-      "text": "EpoCanvas Mail Step into the canvas. Your signals await. EMAIL PASSWORD Stay in orbit Forgot password? Initiate Login or continue with Google GitHub New to the canvas? Explore Node",
+      "text": "EpoCanvas Mail Step into the canvas. Your signals await. EMAIL PASSWORD Stay in orbit Forgot password? Initiate Login or continue with Google SOON GitHub SOON New to the canvas? Explore Node",
       "scrollW": 1440,
       "clientW": 1440
     },
@@ -114,7 +118,7 @@
     {
       "ok": true,
       "name": "根路径可访问并完成引导",
-      "detail": "落地 URL=https://mail.epocanvas.com/login/ 耗时=12122ms"
+      "detail": "落地 URL=https://mail.epocanvas.com/login/ 耗时=8055ms"
     },
     {
       "ok": true,
@@ -208,12 +212,12 @@
     },
     {
       "ok": true,
-      "name": "GET /login/assets/index-Cc1cA06M.js → 200",
+      "name": "GET /login/assets/index-Cor1tWnM.js → 200",
       "detail": "实际=200"
     },
     {
       "ok": true,
-      "name": "GET /login/assets/index-gOtbi3zJ.css → 200",
+      "name": "GET /login/assets/index-BFlA9JqW.css → 200",
       "detail": "实际=200"
     },
     {

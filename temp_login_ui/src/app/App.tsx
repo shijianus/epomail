@@ -12,8 +12,8 @@ let sysConfigPromise: Promise<any> | null = null;
 function loadSysConfig(): Promise<any> {
   if (!sysConfigPromise) {
     sysConfigPromise = fetch('/api/setting/websiteConfig')
-      .then(r => r.json())
-      .then(data => (data.code === 200 ? data.data : null))
+      .then(r => (r.ok ? r.json() : null))
+      .then(data => (data && data.code === 200 ? data.data : null))
       .catch(e => {
         sysConfigPromise = null;
         console.error(e);

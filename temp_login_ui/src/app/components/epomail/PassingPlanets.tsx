@@ -187,6 +187,8 @@ export function PassingPlanets() {
             // Allow planets to remain partially visible during pass-through so the collision effect is seen
             if (p.z < 800 && p.z > 0) opacity *= Math.max(0.4, (p.z) / 800); 
             if (p.z <= 0) opacity *= 0.4; // Maintain visibility while behind camera for dramatic effect
+            // 行星仅作背景景深：封顶不透明度，避免巨大星体穿透半透明登录卡片、压过表单文字
+            opacity = Math.min(opacity, 0.6);
 
             // Removed display: none toggle which caused massive layout reflow stutters.
             // Opacity and pointer-events-none handle invisibility efficiently.

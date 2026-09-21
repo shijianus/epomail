@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "motion/react";
 import {
@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import type { CanvasHandle } from "./CanvasBackground";
 import { cameraState } from "./cameraStore";
+import { createT, resolveAuthLang } from "../../i18n/authLocale";
 
 // 登录成功后把语言偏好同步给主应用（仅当主应用尚无语言设置时写入，避免覆盖用户既有选择）
 function syncLangToMainApp() {
@@ -158,10 +159,12 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
 
   const otpInputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
-  const isZh = typeof navigator !== 'undefined' && navigator.language.toLowerCase().startsWith('zh');
-  const userLang = isZh ? 'zh' : 'en';
+  const lang = useMemo(() => resolveAuthLang(), []);
+  const t = useMemo(() => createT(lang), [lang]);
   const rawI18n = sysConfig?.authI18n || {};
-  const i18n = (rawI18n.zh || rawI18n.en) ? (rawI18n[userLang] || {}) : rawI18n;
+  // 管理后台 authI18n 仍具最高优先级；嵌套结构按当前语言取子字典并回退 en/zh
+  const i18n = (rawI18n.zh || rawI18n.en ? rawI18n[lang] || rawI18n.en || rawI18n.zh : rawI18n) as Record<string, string>;
+  const tr = (key: string, dictKey?: string) => i18n[key] || t(dictKey || key);
 
   // 30s TOTP period countdown
   useEffect(() => {
@@ -183,7 +186,7 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
       const storedMsg = sessionStorage.getItem("auth_expired_msg");
 
       if (isExpired || storedMsg) {
-        const msg = storedMsg || (isZh ? "登录凭证已过期，请重新登录" : "Session expired, please log in again");
+        const msg = storedMsg || (t('sessionExpired'));
         setErrorMsg(msg);
         sessionStorage.removeItem("auth_expired_msg");
         cameraState.authErrorOpacity = 1;
@@ -197,7 +200,7 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
         setEmail(storedEmail);
       }
     }
-  }, [isZh]);
+  }, [lang]);
 
   useEffect(() => {
     if (errorMsg) {
@@ -226,29 +229,29 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
   }, [stage, isBackupCode]);
 
   const mapErrorMessage = (rawMsg: string) => {
-    if (!rawMsg) return isZh ? "验证失败" : "Verification failed";
+    if (!rawMsg) return t('verifyFailed');
     if (rawMsg === "totpSessionExpired" || rawMsg.includes("过期")) {
-      return isZh ? "两步验证会话已过期，请重新登录" : "2FA session expired, please log in again";
+      return t('totpSessionExpired');
     }
     if (rawMsg === "totpTooManyAttempts" || rawMsg.includes("过多")) {
-      return isZh ? "尝试次数过多，请重新登录" : "Too many attempts, please log in again";
+      return t('tooManyAttempts');
     }
     if (rawMsg === "totpCodeInvalid" || rawMsg.includes("验证码错误")) {
-      return isZh ? "验证码错误，请重新输入" : "Invalid verification code, please try again";
+      return t('invalidCode');
     }
     if (rawMsg === "backupCodeInvalid" || rawMsg.includes("备用代码")) {
-      return isZh ? "备用代码无效或已被使用" : "Invalid or already used backup code";
+      return t('backupCodeInvalid');
     }
     if (rawMsg === "totpCodeReplay" || rawMsg.includes("已使用")) {
-      return isZh ? "验证码已被使用，请等待 30 秒后输入新码" : "Code already used, please wait for next code";
+      return t('codeReused');
     }
     if (rawMsg === "accountLocked" || rawMsg.includes("锁定")) {
-      return isZh ? "连续错误次数过多，账号已锁定 12 小时" : "Account locked for 12 hours due to too many failed attempts";
+      return t('accountLocked');
     }
     // 服务端已按 Accept-Language 本地化；万一仍收到裸协议键（camelCase、无空格），
     // 兜底为通用文案，绝不把 "IncorrectPwd" 这类内部键名直接抛给用户。
     if (/^[A-Za-z][A-Za-z0-9_]*$/.test(rawMsg) && /[a-z][A-Z]|[A-Z][a-z]+[A-Z]/.test(rawMsg)) {
-      return isZh ? "操作失败，请稍后重试" : "Operation failed, please try again";
+      return t('opFailed');
     }
     return rawMsg;
   };
@@ -307,7 +310,7 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
         cameraState.authSuccessOpacity = 1;
         let finalMsg = i18n.loginSuccess || data.message || data.msg;
         if (!finalMsg || finalMsg.toLowerCase() === 'success') {
-          finalMsg = isZh ? "成功连结节点" : "Node Link Established";
+          finalMsg = t('loginSuccess');
         }
         setSuccessMsg(finalMsg);
         canvasRef.current?.pulse({ strength: 2 });
@@ -318,7 +321,7 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
       } else {
         setStatus("idle");
         const mappedError = mapErrorMessage(data.message || data.msg);
-        setErrorMsg(mappedError || i18n.invalidCredentials || (isZh ? "填写的坐标不存在" : "Specified coordinates do not exist"));
+        setErrorMsg(mappedError || tr('invalidCredentials'));
 
         cameraState.authErrorOpacity = 1;
         cameraState.shakeIntensity = 20;
@@ -331,7 +334,7 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
     })
     .catch((err) => {
       setStatus("idle");
-      setErrorMsg((isZh ? '连结错误: ' : 'Link error: ') + (err.message || err));
+      setErrorMsg((t('linkErrorPrefix')) + (err.message || err));
     });
   };
 
@@ -350,7 +353,7 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
     syncLangToMainApp();
     setStatus("success");
     cameraState.authSuccessOpacity = 1;
-    setSuccessMsg(isZh ? "两步验证成功，正在进入…" : "2FA Verified, entering…");
+    setSuccessMsg(t('totpSuccess'));
     canvasRef.current?.pulse({ strength: 2.2, color: "cyan" });
     canvasRef.current?.burst({ strength: 2.5, color: "cyan" });
     setTimeout(() => {
@@ -367,7 +370,7 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
       : (currentIsBackup ? backupCode.trim() : totpDigits.join("").trim());
 
     if (!code) {
-      setErrorMsg(isZh ? "请输入验证码" : "Please enter verification code");
+      setErrorMsg(t('enterCode'));
       return;
     }
 
@@ -414,7 +417,7 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
     })
     .catch((err) => {
       setStatus("idle");
-      setErrorMsg((isZh ? '验证错误: ' : 'Verification error: ') + (err.message || err));
+      setErrorMsg((t('verifyErrorPrefix')) + (err.message || err));
     });
   };
 
@@ -425,7 +428,7 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
 
   const handlePasskeyLogin = async () => {
     if (typeof window === 'undefined' || !window.PublicKeyCredential || !passkeyChallenge) {
-      setErrorMsg(isZh ? "当前环境暂不支持通行密钥" : "Passkeys not supported in this browser");
+      setErrorMsg(t('passkeyUnsupported'));
       return;
     }
 
@@ -504,7 +507,7 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
     } catch (err: any) {
       setStatus("idle");
       if (err.name !== 'NotAllowedError') {
-        setErrorMsg(err.message || (isZh ? "安全密钥验证失败" : "Security key verification failed"));
+        setErrorMsg(err.message || (t('securityKeyFailed')));
       }
     }
   };
@@ -675,7 +678,7 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
               <FloatingField
                 id="epo-email"
                 type="email"
-                label={i18n.emailLabel || (isZh ? "邮箱地址" : "EMAIL")}
+                label={tr('emailLabel')}
                 icon={<Mail size={16} strokeWidth={1.8} />}
                 value={email}
                 onChange={setEmail}
@@ -692,7 +695,7 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
               <FloatingField
                 id="epo-password"
                 type={showPassword ? "text" : "password"}
-                label={i18n.passwordLabel || (isZh ? "登录密码" : "PASSWORD")}
+                label={tr('passwordLabel')}
                 icon={<Lock size={16} strokeWidth={1.8} />}
                 value={password}
                 onChange={setPassword}
@@ -711,7 +714,7 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
                     onClick={() => setShowPassword((s) => !s)}
                     className="p-1 transition-colors"
                     style={{ color: "var(--epo-muted)" }}
-                    aria-label={showPassword ? (isZh ? "隐藏密码" : "Hide password") : (isZh ? "显示密码" : "Show password")}
+                    aria-label={showPassword ? (t('hidePassword')) : (t('showPassword'))}
                   >
                     {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
@@ -720,22 +723,45 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
 
               <div className="flex items-center justify-between">
                 <label
-                  className="flex cursor-pointer items-center gap-2 text-[13px]"
+                  className="flex cursor-pointer select-none items-center gap-2 text-[13px]"
                   style={{ color: "var(--epo-muted)" }}
                 >
-                  <input type="checkbox" checked={stayInOrbit} onChange={(e) => setStayInOrbit(e.target.checked)} className="accent-[var(--epo-purple-glow)]" />
-                  {i18n.stayInOrbit || (isZh ? "保持轨道连接" : "Stay in orbit")}
+                  <input
+                    type="checkbox"
+                    checked={stayInOrbit}
+                    onChange={(e) => setStayInOrbit(e.target.checked)}
+                    className="peer sr-only"
+                  />
+                  <span
+                    aria-hidden="true"
+                    className="flex h-4 w-4 shrink-0 items-center justify-center rounded-[5px] border transition-all duration-200 peer-focus-visible:ring-2 peer-focus-visible:ring-[#67e8f9]"
+                    style={
+                      stayInOrbit
+                        ? {
+                            background: "var(--epo-brand-gradient)",
+                            borderColor: "transparent",
+                            boxShadow: "0 0 12px rgba(124,58,237,0.45)",
+                          }
+                        : {
+                            borderColor: "rgba(139,147,196,0.45)",
+                            background: "rgba(255,255,255,0.04)",
+                          }
+                    }
+                  >
+                    {stayInOrbit && <Check size={11} strokeWidth={3.5} color="#fff" />}
+                  </span>
+                  {tr('stayInOrbit')}
                 </label>
                 <a
                   href="#"
                   onClick={(e) => {
                     e.preventDefault();
-                    setErrorMsg(i18n.forgotPasswordHint || (isZh ? "请联系站长在管理后台为你重置密码" : "Please contact the site administrator to reset your password."));
+                    setErrorMsg(tr('forgotPasswordHint'));
                   }}
                   className="text-[13px] transition-colors hover:text-[var(--epo-cyan-glow)]"
                   style={{ color: "var(--epo-muted)" }}
                 >
-                  {i18n.forgotPassword || (isZh ? "忘记密码？" : "Forgot password?")}
+                  {tr('forgotPassword')}
                 </a>
               </div>
 
@@ -768,17 +794,17 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
                 <span className="relative flex items-center gap-2">
                   {status === "idle" && (
                     <>
-                      {i18n.initiateLogin || (isZh ? "登录" : "Initiate Login")} <ArrowRight size={17} />
+                      {tr('initiateLogin')} <ArrowRight size={17} />
                     </>
                   )}
                   {status === "warping" && (
                     <>
-                      <Loader2 size={17} className="animate-spin" /> {i18n.warping || (isZh ? "验证中…" : "Warping…")}
+                      <Loader2 size={17} className="animate-spin" /> {tr('warping')}
                     </>
                   )}
                   {status === "success" && (
                     <>
-                      <Check size={17} /> {i18n.connected || (isZh ? "已连接" : "Connected")}
+                      <Check size={17} /> {tr('connected')}
                     </>
                   )}
                 </span>
@@ -787,7 +813,7 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
               <div className="flex items-center gap-3">
                 <div className="h-px flex-1" style={{ background: "rgba(139,147,196,0.2)" }} />
                 <span className="text-[12px]" style={{ color: "var(--epo-muted)" }}>
-                  {i18n.orContinueWith || (isZh ? "或通过以下方式继续" : "or continue with")}
+                  {tr('orContinueWith')}
                 </span>
                 <div className="h-px flex-1" style={{ background: "rgba(139,147,196,0.2)" }} />
               </div>
@@ -797,28 +823,35 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
                   <button
                     key={provider}
                     type="button"
-                    onClick={() => setErrorMsg(i18n.oauthComingSoon || (isZh ? "第三方登录尚未开放，敬请期待" : "Third-party sign-in is coming soon."))}
+                    onClick={() => setErrorMsg(tr('oauthComingSoon'))}
                     className="epomail-display flex h-11 items-center justify-center gap-2 rounded-xl border text-[13px] transition-colors cursor-pointer"
                     style={{
                       borderColor: "rgba(139,147,196,0.25)",
                       background: "rgba(255,255,255,0.04)",
                       color: "var(--epo-ink)",
+                      opacity: 0.82,
                     }}
                   >
                     {provider}
+                    <span
+                      className="rounded-full border px-1.5 py-px text-[9px] uppercase tracking-wider"
+                      style={{ borderColor: "rgba(139,147,196,0.35)", color: "var(--epo-muted)" }}
+                    >
+                      {t('oauthSoon')}
+                    </span>
                   </button>
                 ))}
               </div>
 
               <p className="text-center text-[13px]" style={{ color: "var(--epo-muted)" }}>
-                {i18n.newToCanvas || (isZh ? "还没有接入画布？" : "New to the canvas?")}{" "}
+                {tr('newToCanvas')}{" "}
                 <a
                   href="#"
                   onClick={(e) => { e.preventDefault(); onSwitch(); }}
                   className="transition-colors hover:text-[var(--epo-cyan-glow)]"
                   style={{ color: "var(--epo-purple-glow)" }}
                 >
-                  {i18n.exploreNode || (isZh ? "探索节点" : "Explore Node")}
+                  {tr('exploreNode')}
                 </a>
               </p>
             </motion.form>
@@ -847,7 +880,7 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
                 className="flex items-center gap-1.5 text-[13px] transition-colors hover:text-[var(--epo-cyan-glow)] cursor-pointer self-start"
                 style={{ color: "var(--epo-muted)" }}
               >
-                <ArrowLeft size={15} /> {isZh ? "返回重新输入密码" : "Back to password login"}
+                <ArrowLeft size={15} /> {t('backToPassword')}
               </button>
 
               {/* Optional Passkey Quick Unlock Button */}
@@ -861,7 +894,7 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
                   className="group relative flex w-full items-center justify-center gap-2.5 rounded-xl border border-indigo-500/35 bg-gradient-to-r from-indigo-500/15 via-purple-500/10 to-cyan-500/15 p-3 text-[13px] font-medium text-indigo-200 transition-all hover:border-cyan-400/50 hover:text-white hover:shadow-[0_0_20px_rgba(99,102,241,0.25)] cursor-pointer"
                 >
                   <KeyRound size={16} className="text-cyan-400 transition-transform group-hover:rotate-12" />
-                  <span>{isZh ? "使用通行密钥 (Passkey / 指纹) 一键验证" : "Verify with Passkey / Security Key"}</span>
+                  <span>{t('passkeyVerify')}</span>
                 </motion.button>
               )}
 
@@ -872,13 +905,13 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
                 </div>
                 <h2 className="text-[16px] font-semibold text-[var(--epo-ink)] tracking-wide">
                   {isBackupCode
-                    ? (isZh ? "使用备用代码验证" : "Backup Code Verification")
-                    : (isZh ? "两步身份验证 (2FA)" : "Two-Factor Authentication")}
+                    ? (t('backupCodeTitle'))
+                    : (t('totpTitle'))}
                 </h2>
                 <p className="text-[12px] leading-relaxed" style={{ color: "var(--epo-muted)" }}>
                   {isBackupCode
-                    ? (isZh ? "请输入启用 2FA 时保存的 8 位应急备用代码" : "Enter one of your 8-character recovery backup codes")
-                    : (isZh ? "请输入身份验证器 App 生成的 6 位动态验证码" : "Enter the 6-digit code from your authenticator app")}
+                    ? (t('backupCodeHint'))
+                    : (t('totpHint'))}
                 </p>
                 {mfaEmail && (
                   <div className="text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-[rgba(103,232,249,0.1)] text-[var(--epo-cyan-glow)] border border-[rgba(103,232,249,0.25)]">
@@ -979,8 +1012,8 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
                         </div>
                         <span>
                           {secondsLeftInPeriod <= 5
-                            ? (isZh ? `口令即将刷新 (${secondsLeftInPeriod}s)` : `Refreshing soon (${secondsLeftInPeriod}s)`)
-                            : (isZh ? `动态口令周期 (${secondsLeftInPeriod}s)` : `Code period (${secondsLeftInPeriod}s)`)}
+                            ? (t('totpRefreshing').replace('{s}', String(secondsLeftInPeriod)))
+                            : (t('totpPeriod').replace('{s}', String(secondsLeftInPeriod)))}
                         </span>
                       </div>
                       <button
@@ -989,7 +1022,7 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
                         className="flex items-center gap-1 hover:text-[var(--epo-cyan-glow)] transition-colors cursor-pointer"
                       >
                         <HelpCircle size={12} />
-                        <span>{isZh ? "无法验证？" : "Having trouble?"}</span>
+                        <span>{t('havingTrouble')}</span>
                       </button>
                     </div>
                   </motion.div>
@@ -1015,7 +1048,7 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
                     <FloatingField
                       id="epo-backup-code"
                       type="text"
-                      label={isZh ? "备用代码 (XXXX-XXXX)" : "RECOVERY CODE (XXXX-XXXX)"}
+                      label={t('backupCodeLabel')}
                       icon={<KeyRound size={16} strokeWidth={1.8} />}
                       value={backupCode}
                       onChange={(val) => {
@@ -1036,7 +1069,7 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
                       }}
                     />
                     <p className="text-center text-[11px]" style={{ color: "var(--epo-muted)" }}>
-                      {isZh ? "每组备用代码仅可使用一次，核销后自动作废" : "Single-use recovery code. Inactivated immediately after login."}
+                      {t('backupCodeNote')}
                     </p>
                   </motion.div>
                 )}
@@ -1054,12 +1087,12 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
                     style={{ color: "var(--epo-muted)" }}
                   >
                     <p className="font-medium text-[var(--epo-ink)] mb-1">
-                      {isZh ? "两步验证排查建议：" : "2FA Troubleshooting:"}
+                      {t('troubleshootTitle')}
                     </p>
                     <ul className="list-disc pl-4 space-y-1">
-                      <li>{isZh ? "请确认手机时间已开启「自动同步」，与标准网络时间一致（时钟偏差是验证失败的主要原因）。" : "Ensure phone time is set to 'Automatic' and matches standard network time."}</li>
-                      <li>{isZh ? "若验证器应用丢失，可切换为「应急备用代码」紧急登录。" : "If authenticator is lost, switch to Backup Code below to recover access."}</li>
-                      <li>{isZh ? "如无可用代码，请联系系统管理员申请两步验证重置。" : "Contact your administrator to request a 2FA reset if locked out."}</li>
+                      <li>{t('troubleshoot1')}</li>
+                      <li>{t('troubleshoot2')}</li>
+                      <li>{t('troubleshoot3')}</li>
                     </ul>
                   </motion.div>
                 )}
@@ -1080,11 +1113,11 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
                 >
                   {isBackupCode ? (
                     <>
-                      <Smartphone size={14} /> {isZh ? "使用验证器动态验证码" : "Use Authenticator Code"}
+                      <Smartphone size={14} /> {t('useTotpCode')}
                     </>
                   ) : (
                     <>
-                      <KeyRound size={14} /> {isZh ? "使用应急备用代码登录" : "Use a Backup Code instead"}
+                      <KeyRound size={14} /> {t('useBackupCode')}
                     </>
                   )}
                 </button>
@@ -1120,17 +1153,17 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
                 <span className="relative flex items-center gap-2">
                   {status === "idle" && (
                     <>
-                      {isZh ? "验证并进入系统" : "Verify & Proceed"} <ArrowRight size={17} />
+                      {t('verifyProceed')} <ArrowRight size={17} />
                     </>
                   )}
                   {status === "warping" && (
                     <>
-                      <Loader2 size={17} className="animate-spin" /> {isZh ? "验证中…" : "Verifying…"}
+                      <Loader2 size={17} className="animate-spin" /> {t('verifying')}
                     </>
                   )}
                   {status === "success" && (
                     <>
-                      <Check size={17} /> {isZh ? "验证成功" : "Verified"}
+                      <Check size={17} /> {t('verified')}
                     </>
                   )}
                 </span>

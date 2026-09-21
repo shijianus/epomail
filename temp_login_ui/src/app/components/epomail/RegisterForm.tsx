@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "motion/react";
 import { Mail, Lock, Eye, EyeOff, ArrowRight, Check, Loader2, AlertCircle, KeyRound, ChevronDown } from "lucide-react";
 import type { CanvasHandle } from "./CanvasBackground";
 import { cameraState } from "./cameraStore";
+import { createT, resolveAuthLang } from "../../i18n/authLocale";
 
 interface RegisterFormProps {
   canvasRef: React.RefObject<CanvasHandle | null>;
@@ -157,10 +158,11 @@ export function RegisterForm({ canvasRef, onSwitch, sysConfig: propsSysConfig }:
 
   const effectiveConfig = sysConfig || propsSysConfig || {};
 
-  const isZh = typeof navigator !== "undefined" && navigator.language.toLowerCase().startsWith("zh");
-  const userLang = isZh ? "zh" : "en";
+  const lang = useMemo(() => resolveAuthLang(), []);
+  const t = useMemo(() => createT(lang), [lang]);
   const rawI18n = effectiveConfig?.authI18n || {};
-  const i18n = rawI18n.zh || rawI18n.en ? rawI18n[userLang] || {} : rawI18n;
+  const i18n = (rawI18n.zh || rawI18n.en ? rawI18n[lang] || rawI18n.en || rawI18n.zh : rawI18n) as Record<string, string>;
+  const tr = (key: string, dictKey?: string) => i18n[key] || t(dictKey || key);
 
   // Backend specification:
   // register: 0 = OPEN (开启注册), 1 = CLOSE (关闭注册)
@@ -205,7 +207,7 @@ export function RegisterForm({ canvasRef, onSwitch, sysConfig: propsSysConfig }:
       const closedMsg =
         i18n.noNewNodes ||
         effectiveConfig?.noLandingNodes ||
-        (isZh ? "当前未开放注册通道，请联系管理员开启" : "Registration is currently disabled");
+        (t('regClosedNotice'));
       setErrorMsg(closedMsg);
       cameraState.authErrorOpacity = 1;
       cameraState.shakeIntensity = 20;
@@ -214,7 +216,7 @@ export function RegisterForm({ canvasRef, onSwitch, sysConfig: propsSysConfig }:
 
     let cleanEmail = email.trim();
     if (!cleanEmail) {
-      setErrorMsg(isZh ? "请输入邮箱地址" : "Please enter an email address");
+      setErrorMsg(t('enterEmail'));
       cameraState.authErrorOpacity = 1;
       return;
     }
@@ -224,33 +226,33 @@ export function RegisterForm({ canvasRef, onSwitch, sysConfig: propsSysConfig }:
       if (selectedDomain) {
         cleanEmail = `${cleanEmail}${selectedDomain.startsWith("@") ? selectedDomain : "@" + selectedDomain}`;
       } else {
-        setErrorMsg(isZh ? "请输入包含域名的完整邮箱 (如 user@domain.com)" : "Please enter a full email with domain");
+        setErrorMsg(t('enterFullEmail'));
         cameraState.authErrorOpacity = 1;
         return;
       }
     }
 
     if (!password) {
-      setErrorMsg(isZh ? "请输入密码" : "Please enter a password");
+      setErrorMsg(t('enterPassword'));
       cameraState.authErrorOpacity = 1;
       return;
     }
 
     if (password.length < 6) {
-      setErrorMsg(isZh ? "密码长度不能少于 6 位" : "Password must be at least 6 characters");
+      setErrorMsg(t('passwordTooShort'));
       cameraState.authErrorOpacity = 1;
       return;
     }
 
     if (password !== confirmPassword) {
-      setErrorMsg(i18n.passwordMismatch || (isZh ? "两次输入的密码不一致" : "Passwords do not match"));
+      setErrorMsg(tr('passwordMismatch'));
       cameraState.authErrorOpacity = 1;
       canvasRef.current?.burst({ strength: 2, color: "#eab308" });
       return;
     }
 
     if (isRegKeyRequired && !code.trim()) {
-      setErrorMsg(isZh ? "请输入注册邀请码" : "Please enter the registration code");
+      setErrorMsg(t('enterRegCode'));
       cameraState.authErrorOpacity = 1;
       cameraState.shakeIntensity = 15;
       return;
@@ -280,7 +282,7 @@ export function RegisterForm({ canvasRef, onSwitch, sysConfig: propsSysConfig }:
 
           let finalMsg = i18n.registerSuccess || data.message || data.msg;
           if (!finalMsg || finalMsg.toLowerCase() === "success") {
-            finalMsg = isZh ? "节点创建成功，正在前往登录..." : "Node Successfully Created, redirecting to login...";
+            finalMsg = t('registerSuccess');
           }
           setSuccessMsg(finalMsg);
 
@@ -298,25 +300,25 @@ export function RegisterForm({ canvasRef, onSwitch, sysConfig: propsSysConfig }:
           let friendlyMsg = rawErrMsg;
 
           // Map backend translation keys
-          if (rawErrMsg === "regDisabled") friendlyMsg = isZh ? "注册功能已关闭" : "Registration is disabled";
-          else if (rawErrMsg === "emptyRegKey") friendlyMsg = isZh ? "注册邀请码不能为空" : "Registration code is required";
-          else if (rawErrMsg === "notExistRegKey") friendlyMsg = isZh ? "注册码不存在或已失效" : "Registration code not found";
-          else if (rawErrMsg === "noRegKeyTotal" || rawErrMsg === "noRegKeyCount") friendlyMsg = isZh ? "注册码使用次数已耗尽" : "Registration code uses exhausted";
-          else if (rawErrMsg === "regKeyExpire") friendlyMsg = isZh ? "注册码已过期" : "Registration code expired";
-          else if (rawErrMsg === "isRegAccount") friendlyMsg = isZh ? "该邮箱已被注册，请直接登录" : "This email is already registered";
-          else if (rawErrMsg === "isDelAccount" || rawErrMsg === "isDelUser") friendlyMsg = isZh ? "该邮箱已被注销" : "This account has been deleted";
-          else if (rawErrMsg === "notEmailDomain") friendlyMsg = isZh ? "不支持该邮箱域名后缀" : "Email domain not supported";
-          else if (rawErrMsg === "notEmail") friendlyMsg = isZh ? "邮箱格式不正确" : "Invalid email format";
-          else if (rawErrMsg === "pwdMinLength") friendlyMsg = isZh ? "密码至少六位" : "Password must be at least 6 characters";
-          else if (rawErrMsg === "pwdLengthLimit") friendlyMsg = isZh ? "密码长度超出限制" : "Password length exceeded";
-          else if (rawErrMsg === "banEmailPrefix") friendlyMsg = isZh ? "邮箱名包含非法字符" : "Email prefix contains prohibited characters";
-          else if (rawErrMsg === "minEmailPrefix") friendlyMsg = isZh ? "邮箱名长度不足" : "Email prefix too short";
-          else if (!friendlyMsg) friendlyMsg = isZh ? "注册失败，请检查输入" : "Registration failed";
+          if (rawErrMsg === "regDisabled") friendlyMsg = t('regDisabled');
+          else if (rawErrMsg === "emptyRegKey") friendlyMsg = t('emptyRegKey');
+          else if (rawErrMsg === "notExistRegKey") friendlyMsg = t('notExistRegKey');
+          else if (rawErrMsg === "noRegKeyTotal" || rawErrMsg === "noRegKeyCount") friendlyMsg = t('noRegKeyTotal');
+          else if (rawErrMsg === "regKeyExpire") friendlyMsg = t('regKeyExpire');
+          else if (rawErrMsg === "isRegAccount") friendlyMsg = t('isRegAccount');
+          else if (rawErrMsg === "isDelAccount" || rawErrMsg === "isDelUser") friendlyMsg = t('isDelAccount');
+          else if (rawErrMsg === "notEmailDomain") friendlyMsg = t('notEmailDomain');
+          else if (rawErrMsg === "notEmail") friendlyMsg = t('invalidEmailFormat');
+          else if (rawErrMsg === "pwdMinLength") friendlyMsg = t('passwordMinSix');
+          else if (rawErrMsg === "pwdLengthLimit") friendlyMsg = t('passwordTooLong');
+          else if (rawErrMsg === "banEmailPrefix") friendlyMsg = t('emailIllegalChars');
+          else if (rawErrMsg === "minEmailPrefix") friendlyMsg = t('emailTooShort');
+          else if (!friendlyMsg) friendlyMsg = t('registerFailed');
 
           // 服务端已按 Accept-Language 本地化；万一仍收到裸协议键（camelCase、无空格），
           // 兜底为通用文案，绝不把内部键名直接抛给用户。
           if (/^[A-Za-z][A-Za-z0-9_]*$/.test(friendlyMsg) && /[a-z][A-Z]|[A-Z][a-z]+[A-Z]/.test(friendlyMsg)) {
-            friendlyMsg = isZh ? "注册失败，请检查输入" : "Registration failed, please check your input";
+            friendlyMsg = t('registerFailedCheck');
           }
 
           setErrorMsg(friendlyMsg);
@@ -327,7 +329,7 @@ export function RegisterForm({ canvasRef, onSwitch, sysConfig: propsSysConfig }:
       })
       .catch((err) => {
         setStatus("idle");
-        setErrorMsg((isZh ? "网络或服务连接异常: " : "Network or service error: ") + (err.message || err));
+        setErrorMsg(t('networkErrorPrefix') + (err.message || err));
       });
   };
 
@@ -400,10 +402,10 @@ export function RegisterForm({ canvasRef, onSwitch, sysConfig: propsSysConfig }:
         <div className="rounded-xl border border-red-500/30 bg-red-950/40 px-4 py-3 text-center backdrop-blur-sm shadow-inner">
           <div className="flex items-center justify-center gap-2 text-xs font-mono font-semibold text-red-400 uppercase tracking-wider">
             <AlertCircle size={15} />
-            <span>{isZh ? "未开放公开注册通道" : "REGISTRATION CHANNEL CLOSED"}</span>
+            <span>{t('regChannelClosed')}</span>
           </div>
           <p className="mt-1 text-[12px] text-red-300/80 leading-relaxed">
-            {effectiveConfig?.noLandingNodes || (isZh ? "当前节点暂未开放自主着陆注册，请联系管理员开启" : "Registration is currently closed by the administrator.")}
+            {effectiveConfig?.noLandingNodes || (t('regClosedDesc'))}
           </p>
         </div>
       )}
@@ -413,8 +415,8 @@ export function RegisterForm({ canvasRef, onSwitch, sysConfig: propsSysConfig }:
         id="epo-email"
         type="text"
         disabled={isRegisterClosed}
-        label={i18n.emailLabel || (isZh ? "邮箱地址" : "EMAIL ADDRESS")}
-        placeholder={domainOptions.length > 0 ? (isZh ? "用户名" : "username") : (isZh ? "邮箱地址 (user@domain.com)" : "user@domain.com")}
+        label={tr('emailLabel', 'regEmailLabel')}
+        placeholder={domainOptions.length > 0 ? (t('usernameLabel')) : (t('emailPlaceholderFull'))}
         icon={<Mail size={16} strokeWidth={1.8} />}
         value={email}
         onChange={setEmail}
@@ -457,7 +459,7 @@ export function RegisterForm({ canvasRef, onSwitch, sysConfig: propsSysConfig }:
         id="epo-password"
         type={showPassword ? "text" : "password"}
         disabled={isRegisterClosed}
-        label={i18n.passwordLabel || (isZh ? "设置登录密码" : "PASSWORD")}
+        label={tr('passwordLabel', 'regPasswordLabel')}
         icon={<Lock size={16} strokeWidth={1.8} />}
         value={password}
         onChange={setPassword}
@@ -476,7 +478,7 @@ export function RegisterForm({ canvasRef, onSwitch, sysConfig: propsSysConfig }:
             onClick={() => setShowPassword((s) => !s)}
             className="p-1 transition-colors hover:text-white"
             style={{ color: "var(--epo-muted)" }}
-            aria-label={showPassword ? (isZh ? "隐藏密码" : "Hide password") : (isZh ? "显示密码" : "Show password")}
+            aria-label={showPassword ? (t('hidePassword')) : (t('showPassword'))}
           >
             {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
           </button>
@@ -488,7 +490,7 @@ export function RegisterForm({ canvasRef, onSwitch, sysConfig: propsSysConfig }:
         id="epo-confirm-password"
         type={showPassword ? "text" : "password"}
         disabled={isRegisterClosed}
-        label={i18n.confirmPasswordLabel || (isZh ? "确认登录密码" : "CONFIRM PASSWORD")}
+        label={tr('confirmPasswordLabel')}
         icon={<Lock size={16} strokeWidth={1.8} />}
         value={confirmPassword}
         onChange={setConfirmPassword}
@@ -503,8 +505,8 @@ export function RegisterForm({ canvasRef, onSwitch, sysConfig: propsSysConfig }:
           disabled={isRegisterClosed}
           label={
             isRegKeyRequired
-              ? i18n.codeLabel || (isZh ? "注册邀请码 (必填)" : "REGISTRATION CODE (Required)")
-              : i18n.codeLabelOptional || (isZh ? "注册邀请码 (选填)" : "REGISTRATION CODE (Optional)")
+              ? tr('codeLabel')
+              : tr('codeLabelOptional')
           }
           icon={<KeyRound size={16} strokeWidth={1.8} />}
           value={code}
@@ -544,19 +546,19 @@ export function RegisterForm({ canvasRef, onSwitch, sysConfig: propsSysConfig }:
         <span className="relative flex items-center gap-2 font-medium">
           {isRegisterClosed ? (
             <>
-              <AlertCircle size={17} /> {i18n.regClosed || (isZh ? "注册通道已关闭" : "Registration Closed")}
+              <AlertCircle size={17} /> {tr('regClosed')}
             </>
           ) : status === "idle" ? (
             <>
-              {i18n.initiateRegister || (isZh ? "创建并连接节点" : "Initiate Registration")} <ArrowRight size={17} />
+              {tr('initiateRegister')} <ArrowRight size={17} />
             </>
           ) : status === "warping" ? (
             <>
-              <Loader2 size={17} className="animate-spin" /> {i18n.warping || (isZh ? "连接跃迁中…" : "Warping…")}
+              <Loader2 size={17} className="animate-spin" /> {tr('warping', 'warpingReg')}
             </>
           ) : (
             <>
-              <Check size={17} /> {i18n.connected || (isZh ? "注册成功" : "Connected")}
+              <Check size={17} /> {tr('connected', 'connectedReg')}
             </>
           )}
         </span>
@@ -564,7 +566,7 @@ export function RegisterForm({ canvasRef, onSwitch, sysConfig: propsSysConfig }:
 
       {/* Switch to login link */}
       <p className="text-center text-[13px] mt-1" style={{ color: "var(--epo-muted)" }}>
-        {i18n.alreadyHaveNode || (isZh ? "已有节点坐标？" : "Already have a node?")}{" "}
+        {tr('alreadyHaveNode')}{" "}
         <a
           href="#"
           onClick={(e) => {
@@ -574,7 +576,7 @@ export function RegisterForm({ canvasRef, onSwitch, sysConfig: propsSysConfig }:
           className="transition-colors hover:text-[var(--epo-cyan-glow)] cursor-pointer font-medium"
           style={{ color: "var(--epo-purple-glow)" }}
         >
-          {i18n.loginHere || (isZh ? "返回登录" : "Login here")}
+          {tr('loginHere')}
         </a>
       </p>
     </form>

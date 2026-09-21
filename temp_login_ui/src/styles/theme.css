@@ -147,7 +147,10 @@
   }
 
   body {
-    @apply bg-background text-foreground;
+    /* 登录页为固定深空视觉：body 底色必须与 --epo-void 一致，
+       否则 CSS 生效到 React 首帧之间会闪一帧白底（原 bg-background = #ffffff）。 */
+    @apply text-foreground;
+    background: var(--epo-void);
   }
 
   /**

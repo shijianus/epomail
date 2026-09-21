@@ -1,6 +1,7 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { motion, useMotionValue, useSpring, useTransform } from "motion/react";
 import type { CanvasHandle } from "./CanvasBackground";
+import { createTr, resolveAuthLang } from "../../i18n/authLocale";
 
 import { AuthForm } from "./AuthForm";
 
@@ -13,6 +14,8 @@ interface LoginCardProps {
 export function LoginCard({ canvasRef, onSwitch, sysConfig }: LoginCardProps) {
   // 尊重系统「减少动态效果」偏好：关闭 3D 视差
   const reduceMotion = typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const lang = useMemo(() => resolveAuthLang(), []);
+  const tr = useMemo(() => createTr(sysConfig?.authI18n, lang), [sysConfig, lang]);
   // Cursor parallax — card floats opposite to the pointer.
   const px = useMotionValue(0);
   const py = useMotionValue(0);
@@ -56,7 +59,7 @@ export function LoginCard({ canvasRef, onSwitch, sysConfig }: LoginCardProps) {
           className="relative overflow-hidden rounded-3xl p-8 sm:p-10"
           style={{
             background:
-              "linear-gradient(145deg, rgba(20,24,54,0.55), rgba(10,12,30,0.35))",
+              "linear-gradient(145deg, rgba(16,20,46,0.72), rgba(8,10,26,0.56))",
             backdropFilter: "blur(28px) saturate(140%)",
             WebkitBackdropFilter: "blur(28px) saturate(140%)",
             boxShadow:
@@ -89,7 +92,7 @@ export function LoginCard({ canvasRef, onSwitch, sysConfig }: LoginCardProps) {
             {/* Brand header */}
             <div className="mb-8 flex flex-col items-center text-center">
               <img
-                src="/logo.svg"
+                src={`${import.meta.env.BASE_URL}logo.svg`}
                 alt="EpoMail Logo"
                 className="h-16 w-16"
                 style={{
@@ -115,13 +118,7 @@ export function LoginCard({ canvasRef, onSwitch, sysConfig }: LoginCardProps) {
                 className="mt-2 text-[13px]"
                 style={{ color: "var(--epo-muted)" }}
               >
-                {(() => {
-                  const isZh = typeof navigator !== 'undefined' && navigator.language.toLowerCase().startsWith('zh');
-                  const userLang = isZh ? 'zh' : 'en';
-                  const rawI18n = sysConfig?.authI18n || {};
-                  const currentI18n = (rawI18n.zh || rawI18n.en) ? (rawI18n[userLang] || {}) : rawI18n;
-                  return currentI18n.loginSubtitle || (isZh ? "步入画布，你的信号正在等待。" : "Step into the canvas. Your signals await.");
-                })()}
+                {tr('loginSubtitle')}
               </p>
             </div>
 
