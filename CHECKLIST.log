@@ -11,7 +11,7 @@
 ---
 
 ### AGENTS.md 极致瘦身重构与历史记录分流（CHECKLIST.log / REPORTS.md 独立拆分与文件职能格式化规范确立） (2026-09-21)
-*   **关联提交 (Git Commit)**: 待主提交生成后回填 (Short: 待回填)
+*   **关联提交 (Git Commit)**: `a8f48fef2186381598952de7c38f2d159f151190` (Short: `a8f48fe`)
 *   **部署环境 (Deployment)**: `本地规范治理 / 制度架构确立`
 *   **功能需求与变更清单 (Changes & Feature Alignment)**:
     - [x] AGENTS.md 瘦身治理：从 4538 行 (677KB) 精简至 126 行 (8.7KB)，消除 AI Context Overflow 截断隐患，体积降幅达 98.7%；
