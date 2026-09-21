@@ -10,6 +10,27 @@
 
 ---
 
+### 生产部署上线：优化版 UI 推送至 mail.epocanvas.com 并完成线上国际网络全量核验（构建链三缺陷修复） (2026-09-21)
+*   **关联提交 (Git Commit)**: `bd1d7c62e191a704235cf0662b5fc28b055c58b8` (Short: `bd1d7c6`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com / epomail.epocanvas.workers.dev)` (Version ID: `09855ed7-282c-401f-ba23-2c792694358a`，100% 流量；过程版本 `849a7282-90c1-403b-92ec-df0311a25383` → `91dcf41f-b145-4226-a828-eab2d8de2a44`；回滚基线 `d8378945-9dcd-487e-8cd1-72346abdf743`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 生产部署：`cd mail-worker && npx wrangler deploy`，`[build]` 链自动跑通 mail-vue + temp_login_ui 构建；secrets（jwt_secret / totp_enc_key）跨部署保留，未触碰；
+    - [x] 修复 [P1·安全泄露]：`temp_login_ui/vite.config.ts` 移除 `@cloudflare/vite-plugin`——该插件把含构建机绝对路径的 `wrangler.json` 写进产物并随 `/login/wrangler.json` 公开可下载（200 / application/json / 1275B）；修复后线上该路径返回 SPA 外壳、`/home/shijian` 出现 0 次；
+    - [x] 修复 [P1·陈旧/嵌套产物]：`mail-vue/package.json` build 的 `cp` 加 `rm -rf` 幂等；`wrangler.toml [build]` 改为 temp_login_ui 先构建、拷贝单点化，消除 `dist/login/dist` 408K 嵌套死重与"登录页旧包服务"隐患；
+    - [x] 修复 [P1·冷检出部署失败]：`wrangler.toml` / `wrangler-test.toml` / `wrangler-action.toml` 统一先构建 temp_login_ui（其 dist 未入库，旧顺序在全新克隆上 cp 失败即中断部署链）；
+    - [x] 新增核验工具：`tests/verify-live-integrity.mjs`（全量产物 ⇄ 线上边缘 md5 比对，归一化 CF beacon 注入与 index.html 307 规范化，带重试）、`tests/verify-live-browser.mjs`（真实浏览器 25 断言）；
+    - [x] 证据入库：`tests/live_integrity.json`、`tests/live_browser_metrics.json`、`tests/live_01..04_*.png` ×4。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 冷检出构建演练：清空 `temp_login_ui/dist` 与 `mail-worker/dist` 后从零构建并部署成功，CF 回报 "No updated asset files to upload"（冷构建与已部署内容逐字节相同，构建可复现）；
+    - [x] 线上资源完整性：本地 368 文件 ⇄ 线上 367 逐字节一致 / 0 不一致 / 0 网络失败 / 1 预期不直供（`_headers`）；最大 chunk 874.79 KiB、0 个 >2MB；CF 缓存命中 367/367；
+    - [x] UI 修复标记线上命中 6/6：F5 `grid-template-areas:"sender right" "main   main"`、F5 `height:var(--38af7367)`（行高唯一真源）、F6 `mobile-search-btn`（CSS+JS）、阅读窗格列（JS+CSS）；
+    - [x] 线上真实浏览器 25/25 全绿：根路径 SPA 引导→客户端守卫→`/login/`；登录页 1440/375/暗色偏好三态零横向溢出；`/inbox` 未登录被守卫拦回；生产入口 chunk `/assets/index-BfCAj9MJ.js` 被真实浏览器下载执行（200，与线上 index.html 声明一致）；PWA 资产全 200；零 console error / pageerror / 失败请求；
+    - [x] 边缘性能：热连接 TTFB 220–270ms（CF SJC，`cf-cache-status: HIT`）；沙箱内每请求 5s 系本地 DNS 解析假象（解析到 198.18.0.126 基准网段），已用单连接复用剥离；
+    - [x] i18n 三件套：6 语言 2033/1888 键 ALL SYMMETRIC、1574 字面量键零缺失、动态 t() 0 处；
+    - [x] 零假数据/零生产写入：全程未登录任何生产账号、未写生产 D1/KV、未截取真实用户数据（生产库 123 个真实账号，登录态核验需另行授权）。
+
+---
+
 ### UI 审计复核批次：F5 行高唯一真源 / F6 移动搜索浮层 / F8 服务层本地化闭环 / backup 中断缺陷修复 / 不当改动文件级向前回退 (2026-09-21)
 *   **关联提交 (Git Commit)**: `33c15c7aafd78e359830d0d8eb20484a2938637d` (Short: `33c15c7`)
 *   **部署环境 (Deployment)**: `本地全真栈 (wrangler dev @127.0.0.1:8787，mail-vue vite build 12.73s 产物)`

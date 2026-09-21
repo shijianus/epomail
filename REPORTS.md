@@ -9,6 +9,33 @@
 
 ---
 
+### 生产部署完整性与国际网络专项审计：构建链三缺陷（含一处公开配置泄露）、线上 367/368 逐字节一致、25/25 浏览器断言、CF 行为归一化方法论 (2026-09-21)
+*   **关联提交 (Git Commit)**: `bd1d7c62e191a704235cf0662b5fc28b055c58b8` (Short: `bd1d7c6`)
+*   **专项证据索引 (Evidence)**: `tests/verify-live-integrity.mjs`、`tests/verify-live-browser.mjs`、`tests/live_integrity.json`、`tests/live_browser_metrics.json`、`tests/live_01..04_*.png` ×4
+*   **审计范围与方法 (Scope & Methodology)**:
+    1. 范围与环境：Cloudflare 生产 `mail.epocanvas.com`（Worker `epomail`，D1×3 / KV / AI / Assets 全绑定），审计时线上版本为 `d8378945-9dcd-487e-8cd1-72346abdf743`（2026-09-17，早于全部 UI 修复）→ 部署后 `09855ed7-282c-401f-ba23-2c792694358a`（100% 流量）；
+    2. 工具与脚本：`wrangler deploy / deployments status / d1 execute --remote`（只读 SQL）、Node keep-alive md5 全量比对、Playwright 真实浏览器（1440/375/暗色）、curl 时间分解（dns/tcp/tls/ttfb）；
+    3. 方法：对线上每个静态资源做逐字节 md5 比对；对 Cloudflare 自有行为（Web Analytics beacon 注入、`index.html`→目录 307 规范化、`_headers` 不直供）先归一化再判定，避免把平台行为误判为部署缺陷；
+    4. 安全边界：生产库含 123 个真实账号，全程零写入——不登录、不改数据、不截取真实用户画面。
+*   **核心发现与缺陷矩阵 (Key Findings & Matrix)**:
+    - **[P1·安全/信息泄露]** `https://mail.epocanvas.com/login/wrangler.json` 公开可下载（200 / application.json / 1275B），内容含构建机绝对路径 `/home/shijian/projects/epocanvas-mail/temp_login_ui/wrangler.jsonc` 等部署拓扑信息。根因：`temp_login_ui/vite.config.ts` 挂 `@cloudflare/vite-plugin`，该插件把解析后的 wrangler 配置写进构建产物；而 `.assetsignore` 只在 assets 根目录生效，子目录 `dist/login/.assetsignore` 被忽略。已根因修复（移除插件），重构建 JS/CSS 哈希不变，线上该路径现返回 SPA 外壳、本机路径 0 次；
+    - **[P1·部署正确性]** 构建链顺序缺陷：`mail-vue` build 脚本的 `cp -r ../temp_login_ui/dist` 跑在 temp_login_ui 构建**之前**，导致 (a) 全新克隆（`temp_login_ui/dist` 未入库，`.gitignore:44`）cp 失败并经 `&&` 中断整条部署链；(b) 非冷检出时把**上一次**的旧登录产物拷进生产；(c) `wrangler.toml` 末尾的 `cp` 因目标已存在而嵌套出 `dist/login/dist`（408K 死重）。已修复：temp_login_ui 先构建 + 拷贝单点化 + `rm -rf` 幂等；
+    - **[P2·观测]** 直接 GET `/_headers` 返回 SPA 外壳（10718B text/html）而非文件本身——`_headers` 是 Cloudflare Pages 约定，Workers Assets 将其作为配置消费而非静态文件；其缓存规则在线上确已生效（`/assets/*` immutable 1 年、`/tinymce/*` 与 `/image/*` 7 天，与文件内容逐字一致），故无实际影响；
+    - **[P2·观测]** Cloudflare Web Analytics beacon（`static.cloudflareinsights.com/beacon.min.js`，+367B）对浏览器类 UA 注入 HTML、对 curl 类 UA 不注入，导致同一 URL 出现两种 md5；属 `[observability] enabled=true` 的自有 RUM，非缺陷，但任何"线上 HTML md5 == 构建产物 md5"的核验必须先剥离；
+    - **[P2·观测]** `/index.html`、`/login/index.html` 返回 307 至规范目录 URL（`/`、`/login/`），为 CF Assets 标准行为；
+    - **[P2·观测]** 独立 React 登录页（`/login/`，temp_login_ui）为固定暗色视觉设计，不响应 `prefers-color-scheme`；mail-vue 主应用具备完整亮/暗主题。登录页是否跟随系统配色属设计决策，未擅自改动；
+    - **[P2·观测]** 沙箱内每请求约 5s 的 TTFB 系本地 DNS 解析假象（解析到 198.18.0.126 基准测试网段）；单连接复用后真实边缘 TTFB 220–270ms（CF SJC，`cf-cache-status: HIT`）。任何"国际网络很慢"的结论必须先剥离该假象。
+*   **治理修复与回归结果 (Fixes & Verification)**:
+    - 部署：三次 `wrangler deploy`（`849a7282` → `91dcf41f` → `09855ed7`），secrets 跨部署保留未触碰；冷检出演练（清空两个 dist 从零构建）成功且 CF 回报 "No updated asset files to upload"，证明构建可复现；
+    - 完整性：本地 368 文件 ⇄ 线上 **367 逐字节一致 / 0 不一致 / 0 网络失败 / 1 预期不直供**；最大单文件 874.79 KiB、0 个 >2MB chunk；CF 缓存命中 367/367；
+    - UI 修复标记线上命中 6/6：F5 `grid-template-areas:"sender right" "main   main"`、F5 行高唯一真源 `height:var(--38af7367)`、F6 `mobile-search-btn`（CSS+JS）、阅读窗格列（JS+CSS）；
+    - 浏览器：25/25 全绿，含"生产入口 chunk 被真实浏览器下载执行"这一关键证据（`/assets/index-BfCAj9MJ.js` =200 且与线上 index.html 声明一致），证明线上运行的确为新包；全程零 console error / pageerror / 失败请求；
+    - 传递性结论：线上包与本地已核验包逐字节一致，而本地包已通过 80/80 断言与 24 张截图（`tests/ui21_after_*`），故登录态收件箱 UI 的视觉正确性由该等价关系传递成立；
+    - 未做（需另行授权）：登录任何生产账号做登录态实测——会写入 demo 账号活跃字段与 KV 会话，且截图可能含真实用户数据。
+*   **后续路线图 (Roadmap)**: temp_login_ui 未使用依赖清理（`@cloudflare/vite-plugin` 现为未使用 devDependency，另含 `@cloudflare/workerd-windows-64` 等 Windows 专用 pinned 二进制，删除需同步 pnpm-lock，避免拖垮部署链）；登录页是否跟随系统暗色偏好的设计决策；i18n-hardcoded 304 行既有基线；`mail-vue/package.json` 的 `cp -r` 在 Windows cmd 下不可用（既有 P2，`doc/ui-audit-20260920.md:87`）。
+
+---
+
 ### UI 审计复核与全分辨率量化视觉核验：F5–F8 闭环、backup 中断提交缺陷定位、不当改动文件级向前回退、80 断言全绿 (2026-09-21)
 *   **关联提交 (Git Commit)**: `33c15c7aafd78e359830d0d8eb20484a2938637d` (Short: `33c15c7`)
 *   **专项证据索引 (Evidence)**: `tests/verify-ui-20260921.mjs`（80 断言）、`tests/ui21_after_metrics.json` / `tests/ui21_before_metrics.json`、`tests/ui21_after_*.png` ×24 / `tests/ui21_before_*.png` ×23
