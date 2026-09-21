@@ -10,6 +10,27 @@
 
 ---
 
+### UI 审计复核批次：F5 行高唯一真源 / F6 移动搜索浮层 / F8 服务层本地化闭环 / backup 中断缺陷修复 / 不当改动文件级向前回退 (2026-09-21)
+*   **关联提交 (Git Commit)**: `33c15c7aafd78e359830d0d8eb20484a2938637d` (Short: `33c15c7`)
+*   **部署环境 (Deployment)**: `本地全真栈 (wrangler dev @127.0.0.1:8787，mail-vue vite build 12.73s 产物)`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] F5：`email-scroll/index.vue` itemHeight 改为唯一真源 computed，CSS 经 `v-bind(rowHeightCss)` 取值；新增 `isNarrowRow(<=767)` 对齐两行断点；移动端行改 grid-template-areas 真两行（64px）；删除死代码 `.phone-time`；
+    - [x] F6：回退 `.topbar-search{display:none}`（消灭搜索入口的过度改动），保留 `.brand-name/.help-btn` 隐藏；新增 `.mobile-search-btn/.mobile-search-close` 图标浮层（展开 355px 宽、自动聚焦、路由切换自动收起）；
+    - [x] F8：6 语言字典补 73 扁平服务键 + 34 项 perms 嵌套块；`i18n.js` 改 `await changeLanguage(lang)`；perm-service 按 perm_key 取词缺词回退；email-service 两处硬编码中文改 t()；登录/注册错误补 `role="alert"` 与裸键兜底；
+    - [x] D1：`init.js` v3_1DB 改逐列 PRAGMA 守卫条件式 ALTER（原整批 batch 非幂等致 /email/list 500）；
+    - [x] 六视图删除未定义的 `latest()` 调用（ReferenceError 源头）；
+    - [x] 文件级向前回退（commit 不回头）：删除 `scripts-add-i18n-keys.mjs`、`scripts-fix-fr-apostrophes.mjs`、`src/i18n/index.js` 三个死文件；
+    - [x] 核验套件升级：`tests/verify-ui-20260921.mjs` 行高契约/阅读栏链路/WCAG 对比度/§8 目标路由修正，80 断言；24 张 after + 23 张 before 截图与 metrics JSON 入库。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：mail-vue vite build 通过 (12.73s，入口 895.79KB / gzip 303.05KB，无 8.7MB chunk)；wrangler deploy --dry-run 通过；
+    - [x] 自动化测试套件：`tests/verify-ui-20260921.mjs after` 全绿 (80/80 断言通过，0 失败)；
+    - [x] 行高契约：375 reserved 4032==scrollH、63 槽位(62 封+1 页脚)；768/1280/暗色 3276==3276；末行底边 Δ 恰为 1×rowH；
+    - [x] 浏览器全真栈实测：375/768/1280/1440 × 亮暗 截图留档；阅读栏桌面+移动链路全过；WCAG 亮 17.85:1 / 暗 16.96:1；抽屉 resize 稳定；全程零控制台错误；
+    - [x] i18n 三件套：1888 键×6 语言对称 / 1574 字面量键零缺失 / 动态 t() 0 处；
+    - [x] 零假数据残留：60 封 [UITEST21] 邮件物理删除 (total 64→4)、admin 凭证/盐还原、KV login_fail 清除、地址弹窗核验零写接口。
+
+---
+
 ### AGENTS.md 极致瘦身重构与历史记录分流（CHECKLIST.log / REPORTS.md 独立拆分与文件职能格式化规范确立） (2026-09-21)
 *   **关联提交 (Git Commit)**: `a8f48fef2186381598952de7c38f2d159f151190` (Short: `a8f48fe`)
 *   **部署环境 (Deployment)**: `本地规范治理 / 制度架构确立`

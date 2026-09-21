@@ -9,6 +9,34 @@
 
 ---
 
+### UI 审计复核与全分辨率量化视觉核验：F5–F8 闭环、backup 中断提交缺陷定位、不当改动文件级向前回退、80 断言全绿 (2026-09-21)
+*   **关联提交 (Git Commit)**: `33c15c7aafd78e359830d0d8eb20484a2938637d` (Short: `33c15c7`)
+*   **专项证据索引 (Evidence)**: `tests/verify-ui-20260921.mjs`（80 断言）、`tests/ui21_after_metrics.json` / `tests/ui21_before_metrics.json`、`tests/ui21_after_*.png` ×24 / `tests/ui21_before_*.png` ×23
+*   **审计范围与方法 (Scope & Methodology)**:
+    1. 范围与环境：本地全真栈（`mail-vue` vite build 12.73s + `wrangler dev --config wrangler-dev.toml` @127.0.0.1:8787），覆盖 375/768/1280/1440 四分辨率 × 亮/暗双主题，含登录页、收件箱列表、阅读栏、抽屉、个人主页地址弹窗；
+    2. 工具与脚本：Playwright 量化插桩（行高契约/对比度/溢出/焦点）、i18n 静态三件套、`wrangler deploy --dry-run`、D1 `pragma_table_info` 幂等性核验；
+    3. 方法：对 7e30e05 backup 中断提交逐文件 diff 定位缺陷；对"不建议/非问题"的改动按用户红线做**文件级向前回退**（commit 永不回头，回退=新提交恢复文件内容）。
+*   **核心发现与缺陷矩阵 (Key Findings & Matrix)**:
+    - **[P0·阻塞]** backup 提交使 `v3_1DB` 迁移变为非幂等整批 batch：任一列已存在即整批中止 → `is_spam` 缺失 → `/email/list` 500；已改逐列 PRAGMA 守卫条件式 ALTER；
+    - **[P0·阻塞]** 六个列表视图 `onMounted` 残留未定义的 `latest()` 调用，每次进入列表页抛 `ReferenceError`（§10 控制台错误源头）；已删除调用、保留轮询 composable 仍在用的 import；
+    - **[P0·体验阻断]** worker 语言协商失效：per-request `i18next.init({lng})` 对已初始化实例被忽略，语言永停 zh 兜底，英文浏览器收到中文错误文案；已改 `await changeLanguage(lang)`，en 实测 "Incorrect email or password"；
+    - **[P1·重要]** F5 行高漂移量化：JS itemHeight vs CSS 实渲 375px 83/80（3px/行）、768–1366px 83/52（31px/行，62 行累积约 1922px 幻影滚动区）、桌面三档密度各差 2px；根因是 `isMobile<1367` 与 CSS 两行断点 767 错位；已改 itemHeight 唯一真源 + `v-bind(rowHeightCss)` + `isNarrowRow(<=767)`，移动端行改 grid 真两行（原 flex-wrap 实测渲三行）收敛 64px；
+    - **[P1·重要]** F6 上一批次 `.topbar-search{display:none}` 直接消灭移动端搜索入口（过度改动，判定为"不建议"并回退）；同块 `.brand-name/.help-btn` 隐藏经实测有效予以保留（头像回屏内 x=329 right=365）；重做为图标触发浮层：输入框 355px、自动聚焦、right=365 不越界、可真实过滤、可收起；
+    - **[P1·重要]** F8 实测比报告更大：6 语言字典缺 72 个 worker 服务键 + perms 裸键直抛用户；已补 73 扁平键 + 34 项 perms 嵌套块（1888 键×6 对称），perm-service 按稳定 perm_key 取词缺词回退库内原文，email-service 两处硬编码中文改 t()，登录/注册错误补 `role="alert" aria-live="assertive"` 与 camelCase 裸键兜底；
+    - **[P1·核验体系缺陷]** 旧套件 §8 导航到 `/setting`（落 404 通配，body 仅 18 字），F7"无巨型 chunk"结论从未真正测到个人主页；已修正为 `/settings/profile` 并实测 ISO 国家 245 项 / US 州 51 项、全程零写接口调用；
+    - **[P2·次要]** 虚拟列表尾部为 noMoreData 页脚预留整行槽位（自绘 15px / 预留 rowH），列表底部留约 42–52px 呼吸空白；判定为可接受底边距，未重构虚拟列表，契约断言按"末行底边与预留区底边仅差 1 个页脚槽位"精确化；
+    - **[P2·次要]** backup 提交入库了三个死文件：插入锚点错误的一次性加词脚本、贪婪正则会把引号定界符转 U+2019 的 fr 修复脚本（从未运行）、引用非本包依赖 vue-i18n 且零引用的 `src/i18n/index.js`；已文件级删除。
+*   **治理修复与回归结果 (Fixes & Verification)**:
+    - 行高契约四组全过：375（reserved 4032==scrollH、4032/64=63 槽位）、768/1280/暗色1280（3276==3276、3276/52=63），末行底边 Δ 恰为 1×rowH（页脚槽位），零幻影空白；
+    - WCAG 对比度：亮色主题/发件人 17.85:1、暗色 16.96:1 / 14.69:1，均 ≥ AA；换肤后 375px 行高仍 64px（换肤不改布局）；
+    - 阅读栏主干链路桌面+移动各一组全过（点击行→pane 渲染 175 字→无横向溢出→返回复位）；抽屉 resize 扰动保持打开；全程零控制台错误；
+    - 构建：mail-vue 12.73s 通过，入口 895.79KB (gzip 303.05KB)，最大产物 876K，无 8.7MB country-state-city chunk；`wrangler deploy --dry-run` 通过；
+    - i18n 三件套：1888 键×6 语言 100% 对称 / 1574 字面量键零缺失 / 动态 t() 0 处；
+    - 零假数据：60 封 `[UITEST21]` 测试邮件物理删除（total 64→4、残留 0）、admin 凭证/盐已还原、KV `login_fail:*` 残留清除、地址弹窗核验全程零写接口。
+*   **后续路线图 (Roadmap，维持基线判断不扩大范围)**: 57 处硬编码中文 BizError（多为 OAuth RFC-6749 协议串）、i18n-hardcoded 304 行可疑（含 `views/sys-setting/index.vue:4814-4824` 硬编码广播模板）、`!important` 1807 处、14 套图标体系、sys-setting 9489 行、temp_login_ui 零引用依赖、mail-vue 构建脚本 `cp -r` 在 Windows 不可用。
+
+---
+
 ### UI 修复批次全量审计核验：中断修复抢救（构建损坏+分包无效+抽屉砸关+汉堡特异性）、P0×4/P1×9/P2×25 逐项修复状态矩阵、本地全真栈浏览器回归 (2026-09-20)
 *   **审计范围与方法 (Audit Scope & Methodology, 针对工作区 82 文件未提交修复批次 +495/−5723 行)**:
     1. 逐文件 diff 审读 + 与基线同口径全仓静态扫描 + 生产构建核验 + i18n 三件套；
