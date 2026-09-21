@@ -56,7 +56,7 @@
         </button>
       </el-tooltip>
       <el-tooltip :content="$t('help')" placement="bottom">
-        <button class="icon-btn" :aria-label="$t('help')">
+        <button class="icon-btn help-btn" :aria-label="$t('help')">
           <Icon icon="lucide:help-circle" width="22" height="22"/>
         </button>
       </el-tooltip>
@@ -1011,11 +1011,44 @@ button.mobile-menu-btn {
   }
 }
 
-.topbar-actions { 
-  display: flex; 
-  align-items: center; 
-  gap: 6px; 
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   padding-right: 8px;
+}
+
+/* 窄屏顶栏防溢出：收起品牌文字/搜索/帮助入口，确保头像（账户菜单：退出登录/设置）始终可达 */
+@media (max-width: 767px) {
+  .topbar {
+    padding: 0 10px;
+  }
+
+  .topbar-left {
+    min-width: 0;
+    gap: 6px;
+  }
+
+  .brand-wrapper {
+    gap: 8px;
+  }
+
+  .brand-name {
+    display: none;
+  }
+
+  .topbar-search {
+    display: none;
+  }
+
+  .topbar-actions {
+    gap: 2px;
+    padding-right: 0;
+  }
+
+  .topbar-actions .help-btn {
+    display: none;
+  }
 }
 
 .icon-btn { 

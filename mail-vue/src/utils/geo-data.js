@@ -1,10 +1,12 @@
 /**
  * Standard Geolocation & Administrative Division Dataset
  * Powered by industry-standard npm packages:
- * - country-state-city (ISO 3166-1 & ISO 3166-2, loaded on-demand for zero initial lag)
  * - i18n-iso-countries (ISO 3166-1 multilingual standards)
  * - libphonenumber-js (ISO 3166-1 official territory codes)
- * 
+ *
+ * 省州数据策略：不再依赖 country-state-city 整包数据（约 8.7MB，此前拖垮个人主页），
+ * 改为内置精简子集（见 LOCAL_INTL_SUBDIVISIONS）；未列出的国家优雅降级为不展示省州下拉。
+ *
  * Strict naming adherence:
  * - 香港 / Hong Kong
  * - 澳门 / Macau
@@ -202,12 +204,8 @@ function buildIsoCountries() {
 
 export const ISO_COUNTRIES = buildIsoCountries();
 
-// Lazy cache for country-state-city standard module
-let cachedCscState = null;
-
 // 常用国际国家/地区一级行政区本地精简数据（ISO 3166-2 常用集）。
-// 命中本地数据即同步返回，避免后台整包拉取 country-state-city（约 8.7MB）；
-// 未列出的国家仍回退到 country-state-city 懒加载，保持全量兼容。
+// 命中本地数据即同步返回；未列出的国家优雅降级为不展示省州下拉（不再整包拉取 8.7MB 数据）。
 const intl = (name) => ({ value: name, labelZh: name, labelEn: name });
 const LOCAL_INTL_SUBDIVISIONS = {
   US: ['Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado', 'Connecticut', 'Delaware', 'District of Columbia', 'Florida', 'Georgia', 'Hawaii', 'Idaho', 'Illinois', 'Indiana', 'Iowa', 'Kansas', 'Kentucky', 'Louisiana', 'Maine', 'Maryland', 'Massachusetts', 'Michigan', 'Minnesota', 'Mississippi', 'Missouri', 'Montana', 'Nebraska', 'Nevada', 'New Hampshire', 'New Jersey', 'New Mexico', 'New York', 'North Carolina', 'North Dakota', 'Ohio', 'Oklahoma', 'Oregon', 'Pennsylvania', 'Rhode Island', 'South Carolina', 'South Dakota', 'Tennessee', 'Texas', 'Utah', 'Vermont', 'Virginia', 'Washington', 'West Virginia', 'Wisconsin', 'Wyoming'].map(intl),
@@ -226,8 +224,9 @@ const LOCAL_INTL_SUBDIVISIONS = {
 };
 
 /**
- * Get subdivisions for a country dynamically
- * Instant synchronous return for HK, MO, CN, TW; asynchronously supplements other countries via country-state-city
+ * Get subdivisions for a country synchronously.
+ * 本地精简数据集直出（HK/MO/CN/TW + LOCAL_INTL_SUBDIVISIONS）；
+ * 未列出的国家返回空数组，表单侧按「无省州下拉」优雅降级。
  */
 export function getSubdivisionsByCountry(countryCode) {
   if (!countryCode) return [];
@@ -239,20 +238,6 @@ export function getSubdivisionsByCountry(countryCode) {
   if (upper === 'TW') return TW_SUBDIVISIONS;
 
   if (LOCAL_INTL_SUBDIVISIONS[upper]) return LOCAL_INTL_SUBDIVISIONS[upper];
-
-  if (cachedCscState) {
-    const states = cachedCscState.getStatesOfCountry(upper) || [];
-    return states.map(s => ({
-      value: s.name,
-      labelZh: s.name,
-      labelEn: s.name
-    }));
-  }
-
-  // Pre-fetch country-state-city in background for international countries
-  import('country-state-city').then(mod => {
-    cachedCscState = mod.State;
-  }).catch(() => {});
 
   return [];
 }

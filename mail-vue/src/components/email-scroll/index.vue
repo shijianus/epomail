@@ -1486,6 +1486,16 @@ function loadData() {
       padding: 0 16px !important;
     }
 
+    // 窄屏两行化：行高自动伸展（第一行发件人+时间，第二行主题独占）
+    @media (max-width: 767px) {
+      &.density-compact, &.density-comfortable, &.density-default {
+        height: auto !important;
+        min-height: 56px;
+        padding-top: 7px !important;
+        padding-bottom: 7px !important;
+      }
+    }
+
     &.all-email {
       height: 54px;
     }
@@ -1544,6 +1554,12 @@ function loadData() {
       min-width: 0;
       overflow: hidden;
       white-space: nowrap;
+
+      // 窄屏两行化：发件人/时间占第一行，主题区整行换行
+      @media (max-width: 767px) {
+        flex-wrap: wrap;
+        row-gap: 3px;
+      }
     }
 
     .email-sender-area {
@@ -1563,9 +1579,10 @@ function loadData() {
       }
 
       @media (max-width: 767px) {
-        flex: 0 1 auto;
-        max-width: 42%;
+        flex: 1 1 auto;
+        max-width: none;
         min-width: 0;
+        padding-right: 8px;
       }
 
       &.is-unread {
@@ -1641,6 +1658,12 @@ function loadData() {
       padding-right: 16px;
       font-size: 13px;
 
+      // 窄屏：主题区整行铺满（两行化第二行）
+      @media (max-width: 767px) {
+        flex: 1 1 100%;
+        padding-right: 0;
+      }
+
       .code-tag {
         flex: 0 0 auto;
         max-width: 160px;
@@ -1694,14 +1717,8 @@ function loadData() {
           flex: 1;
         }
 
-        // 窄屏：主题优先占满剩余宽度并正确省略，摘要隐藏（两行化第一步行）
+        // 窄屏：主题独占第二行完整呈现，摘要隐藏
         @media (max-width: 767px) {
-          .email-subject-text {
-            flex-shrink: 1;
-            flex-grow: 1;
-            min-width: 0;
-          }
-
           .email-snippet-text {
             display: none;
           }
@@ -1739,6 +1756,11 @@ function loadData() {
       align-items: center;
       justify-content: flex-end;
       flex-shrink: 0;
+
+      // 窄屏：随内容自适应宽度，与发件人同处第一行
+      @media (max-width: 767px) {
+        flex: 0 0 auto;
+      }
 
       .email-time.is-unread {
         font-weight: 700;
