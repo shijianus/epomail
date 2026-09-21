@@ -10,6 +10,27 @@
 
 ---
 
+### 登录页视觉打磨与六语言 i18n 闭环上线：唯一未登录可见面 /login/ 打磨 + 构建链跨平台化 + 依赖清理 (2026-09-21)
+*   **关联提交 (Git Commit)**: `a08102720905466fcbceb73833f08fdf3168c536` (Short: `a081027`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com)` (Version ID: `78f0e34e-370d-47bc-9dc4-d92163b2ac32`，100% 流量；上一基线 `09855ed7-282c-401f-ba23-2c792694358a`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 字体自托管：移除渲染阻塞的 fonts.googleapis.com @import，Inter/Space Grotesk latin 可变字体 woff2 随产物同源分发（70.5KB）
+    - [x] 白闪修复：index.html 内联 body 底色 #05060f + theme-color/color-scheme；theme.css body 底色改 --epo-void
+    - [x] 原生白色复选框 → 品牌化自定义复选框（sr-only 输入 + 16px 渐变盒 + focus-visible 环）
+    - [x] 行星飞掠噪声抑制（不透明度封顶 0.6 + 卡片亚克力不透明度提升）；OAuth 按钮 soon 徽标；logo 改 BASE_URL
+    - [x] 六语言 i18n 闭环：新增 temp_login_ui/src/app/i18n/authLocale.ts（92 词条 ×6 语言），95 处 isZh 二值回退重构为 t()/tr()
+    - [x] 构建链跨平台：scripts/copy-login-dist.mjs 替换 mail-vue build 的 rm -rf/cp -r；移除未使用的 @cloudflare/vite-plugin
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：temp_login_ui 2.5s / mail-vue 14.4s / worker 试编译通过；i18n 三件套全绿（hardcoded 304 行为既有基线，未变动）
+    - [x] 本地六语言断言：tests/verify-login-polish.mjs 56/56（zh/zh-Hant/en/es/fr/nl 渲染 + 字体 + 白闪 + 复选框 + 零外部字体请求 + 零 console 错误）
+    - [x] 生产线上六语言断言：56/56（同一脚本对 https://mail.epocanvas.com 复跑）
+    - [x] 线上完整性：tests/verify-live-integrity.mjs 370 文件 → 369 逐字节一致 / 0 差异 / 0 失败 / 1 预期不服务（_headers），标记 6/6，CF 缓存 369/369
+    - [x] 线上浏览器：tests/verify-live-browser.mjs 25/25（登录资产探针改为从本地产物动态读取新哈希）
+    - [x] 零假数据残留：全程零生产写入，未登录任何账号
+*   **证据截图 (Evidence)**: `tests/polish_after_login_zh/fr.png`、`tests/polish_after_register_fr.png`（本地）、`tests/live_polish_login_zh/fr/es.png`、`tests/live_polish_register_fr.png`（线上）
+
+---
+
 ### 生产部署上线：优化版 UI 推送至 mail.epocanvas.com 并完成线上国际网络全量核验（构建链三缺陷修复） (2026-09-21)
 *   **关联提交 (Git Commit)**: `bd1d7c62e191a704235cf0662b5fc28b055c58b8` (Short: `bd1d7c6`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com / epomail.epocanvas.workers.dev)` (Version ID: `09855ed7-282c-401f-ba23-2c792694358a`，100% 流量；过程版本 `849a7282-90c1-403b-92ec-df0311a25383` → `91dcf41f-b145-4226-a828-eab2d8de2a44`；回滚基线 `d8378945-9dcd-487e-8cd1-72346abdf743`)

@@ -9,6 +9,35 @@
 
 ---
 
+### 登录可见面专项审计与打磨：/login/ 渲染阻塞、白闪、二语言缺口等 8 项发现治理 (2026-09-21)
+*   **关联提交 (Git Commit)**: `a08102720905466fcbceb73833f08fdf3168c536` (Short: `a081027`)
+*   **专项证据索引 (Evidence)**: `tests/verify-login-polish.mjs`（新增，56 断言 ×本地/线上双跑）、`tests/polish_after_*.png` ×3、`tests/live_polish_*.png` ×4、`tests/live_integrity.json`、`tests/live_browser_metrics.json`
+*   **体检/审计范围与方法 (Scope & Methodology)**:
+    1. 范围：唯一未登录可见面 `/login/`（React 子应用 temp_login_ui）+ 构建链 + 依赖清单；线上环境 mail.epocanvas.com（Version `78f0e34e`）
+    2. 方法：Playwright 六语言上下文渲染断言、计算样式探针（body 底色/复选框/字体加载）、网络请求外部域名审计、产物逐字节比对
+*   **核心发现与缺陷矩阵 (Key Findings & Matrix)**:
+    - **[P1·阻塞/体验]**: 登录页 CSS 内含渲染阻塞的 `@import url(fonts.googleapis.com)`；在无法访问 Google 的网络（中国大陆）下首屏长时间挂起，且设计字体永远不生效
+    - **[P1·体验]**: body 底色为 `#ffffff`（theme.css `bg-background`），深空画布挂载前后闪白帧；移动端浏览器 chrome 亦为白色（缺 theme-color/color-scheme）
+    - **[P1·合规/红线]**: 登录/注册页仅 zh/en 二值回退，与主应用六语言红线不对称（es/fr/nl 用户见英文、zh-Hant 用户见简体）
+    - **[P2·样式]**: "保持轨道连接" 为原生复选框，未勾选态呈白色方块，与深色玻璃拟态冲突
+    - **[P2·样式]**: 行星飞掠（最大 1200px）穿透半透明登录卡片，星体压过 EMAIL/PASSWORD 表单文字
+    - **[P2·体验]**: Google/GitHub OAuth 按钮视觉完全可点但仅弹"尚未开放"提示，存在误导
+    - **[P2·健壮性]**: 卡片 logo 硬编码 `/logo.svg`，偶然依赖主应用根资产；`loadSysConfig` 未校验 `r.ok` 即 `r.json()`
+    - **[P2·工程]**: mail-vue build 的 `rm -rf && cp -r` 在 Windows cmd 不可用；temp_login_ui 仍挂已弃用的 `@cloudflare/vite-plugin`（此前 P1 配置泄露根因，存在回归风险）
+*   **治理修复与回归结果 (Fixes & Verification)**:
+    - 字体自托管（latin 可变 woff2 70.5KB，`/assets/*` immutable 1y）→ 线上断言"零 Google Fonts 外部请求 + Space Grotesk 已加载"通过
+    - 白闪三层修复（inline 底色 / meta / theme.css）→ 计算样式 `rgb(5, 6, 15)` 断言通过
+    - 六语言字典 `src/app/i18n/authLocale.ts`（92 词条，zh/en 逐字保留）+ 95 处调用点重构；主应用 `setting.lang` 优先于 navigator 的覆盖断言通过
+    - 自定义复选框、行星不透明度封顶 0.6、卡片亚克力不透明度提升、OAuth soon 徽标、BASE_URL logo、`r.ok` 防御
+    - `scripts/copy-login-dist.mjs` 跨平台拷贝；移除 `@cloudflare/vite-plugin` 并同步 lockfile（-23 行），冷构建复验产物一致
+    - 回归：本地 56/56、线上 56/56、完整性 369/370 逐字节一致、浏览器 25/25、i18n 三件套全绿、worker 试编译通过
+*   **后续路线图 (Roadmap)**:
+    - mail-vue 既有 304 行硬编码基线（`views/setting/index.vue:582`、`views/sys-setting/index.vue:4747,4814-4824,5793` 等）为历史遗留，需独立批次包裹入六语言字典，本批次未触碰以避免与登录面打磨耦合
+    - temp_login_ui 其余零引用依赖（@mui/*、recharts、react-slick 等）与 Windows-only pinned 二进制：不影响产物体积（tree-shaking 后未打包），移除需 Windows 实机复验，列为低优先级
+    - ErrorBoundary 崩溃兜底页仍为英文单语，属紧急兜底面，列为低优先级
+
+---
+
 ### 生产部署完整性与国际网络专项审计：构建链三缺陷（含一处公开配置泄露）、线上 367/368 逐字节一致、25/25 浏览器断言、CF 行为归一化方法论 (2026-09-21)
 *   **关联提交 (Git Commit)**: `bd1d7c62e191a704235cf0662b5fc28b055c58b8` (Short: `bd1d7c6`)
 *   **专项证据索引 (Evidence)**: `tests/verify-live-integrity.mjs`、`tests/verify-live-browser.mjs`、`tests/live_integrity.json`、`tests/live_browser_metrics.json`、`tests/live_01..04_*.png` ×4
