@@ -43,4 +43,6 @@ admin = "admin@example.com"				#管理员的邮箱	示例: admin@example.com
 #   npx wrangler secret put jwt_secret --config wrangler-test.toml
 
 [build]
-command = "pnpm --prefix ../mail-vue install && pnpm --prefix ../mail-vue run build"
+# temp_login_ui 必须先构建：mail-vue 的 build 会把 ../temp_login_ui/dist 拷进 ./dist/login，
+# 而该目录未入库（.gitignore 排除），缺失时 cp 失败会中断整条构建链。
+command = "pnpm --prefix ../temp_login_ui install && pnpm --prefix ../temp_login_ui run build && pnpm --prefix ../mail-vue install && pnpm --prefix ../mail-vue run build"

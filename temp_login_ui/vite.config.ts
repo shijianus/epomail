@@ -4,9 +4,6 @@ import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 
 
-import { cloudflare } from "@cloudflare/vite-plugin";
-
-
 function figmaAssetResolver() {
   return {
     name: 'figma-asset-resolver',
@@ -26,8 +23,9 @@ export default defineConfig({
     // The React and Tailwind plugins are both required for Make, even if
     // Tailwind is not being actively used – do not remove them
     react(),
-    tailwindcss(),
-    cloudflare()
+    tailwindcss()
+    // 不挂 @cloudflare/vite-plugin：本子项目只作为纯静态产物被拷进 mail-worker/dist/login，
+    // 该插件会把含构建机绝对路径的 wrangler.json 写进 dist 并随生产资源公开发布。
   ],
   resolve: {
     alias: {

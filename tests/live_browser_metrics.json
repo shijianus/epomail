@@ -1,0 +1,240 @@
+{
+  "summary": {
+    "origin": "https://mail.epocanvas.com",
+    "checkedAt": "2026-09-21T14:21:51.549Z",
+    "bootMs": 12122,
+    "totalRequests": 48,
+    "totalBytes": 6165755,
+    "byType": {
+      "document": {
+        "n": 12,
+        "bytes": 27134
+      },
+      "stylesheet": {
+        "n": 8,
+        "bytes": 1498203
+      },
+      "script": {
+        "n": 12,
+        "bytes": 4618305
+      },
+      "xhr": {
+        "n": 8,
+        "bytes": 0
+      },
+      "image": {
+        "n": 4,
+        "bytes": 10329
+      },
+      "fetch": {
+        "n": 4,
+        "bytes": 11784
+      }
+    },
+    "slowestTtfb": [
+      {
+        "url": "/registerSW.js",
+        "status": 200,
+        "size": 134,
+        "ttfb": 3286
+      },
+      {
+        "url": "/assets/vue-vendor-Coz7PjHv.js",
+        "status": 200,
+        "size": 287352,
+        "ttfb": 2143
+      },
+      {
+        "url": "/assets/element-plus-DYxc-xQq.js",
+        "status": 200,
+        "size": 594862,
+        "ttfb": 2143
+      },
+      {
+        "url": "/assets/index-DPWZHvwV.css",
+        "status": 200,
+        "size": 458491,
+        "ttfb": 2142
+      },
+      {
+        "url": "/assets/index-BfCAj9MJ.js",
+        "status": 200,
+        "size": 895785,
+        "ttfb": 1755
+      },
+      {
+        "url": "/assets/element-plus-DYxc-xQq.js",
+        "status": 200,
+        "size": 594862,
+        "ttfb": 1754
+      },
+      {
+        "url": "/assets/index-BfCAj9MJ.js",
+        "status": 200,
+        "size": 895785,
+        "ttfb": 1720
+      },
+      {
+        "url": "/registerSW.js",
+        "status": 200,
+        "size": 134,
+        "ttfb": 1499
+      }
+    ],
+    "consoleErrors": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "dark": {
+      "rootClass": null,
+      "bodyBg": "rgb(255, 255, 255)",
+      "bodyLuma": 100,
+      "scrollW": 375,
+      "clientW": 375,
+      "emailVisible": true
+    },
+    "mobileMetrics": {
+      "scrollW": 375,
+      "clientW": 375,
+      "emailVisible": true,
+      "overflowX": 0
+    },
+    "loginDom": {
+      "email": true,
+      "pwd": true,
+      "submit": true,
+      "logo": true,
+      "text": "EpoCanvas Mail Step into the canvas. Your signals await. EMAIL PASSWORD Stay in orbit Forgot password? Initiate Login or continue with Google GitHub New to the canvas? Explore Node",
+      "scrollW": 1440,
+      "clientW": 1440
+    },
+    "pass": 25,
+    "fail": 0
+  },
+  "report": [
+    {
+      "ok": true,
+      "name": "根路径可访问并完成引导",
+      "detail": "落地 URL=https://mail.epocanvas.com/login/ 耗时=12122ms"
+    },
+    {
+      "ok": true,
+      "name": "未登录访问根路径被守卫导向登录页",
+      "detail": "https://mail.epocanvas.com/login/"
+    },
+    {
+      "ok": true,
+      "name": "线上登录页邮箱/密码输入框均已渲染",
+      "detail": ""
+    },
+    {
+      "ok": true,
+      "name": "线上登录页提交按钮已渲染",
+      "detail": ""
+    },
+    {
+      "ok": true,
+      "name": "线上登录页文案已本地化渲染",
+      "detail": "EpoCanvas Mail Step into the canvas. Your signals await. EMAIL PASSWORD Stay in orbit Forg"
+    },
+    {
+      "ok": true,
+      "name": "桌面 1440 无横向溢出",
+      "detail": "scrollW=1440 clientW=1440"
+    },
+    {
+      "ok": true,
+      "name": "移动 375 登录输入框完整可见且在视口内",
+      "detail": ""
+    },
+    {
+      "ok": true,
+      "name": "移动 375 无横向溢出",
+      "detail": "overflowX=0px scrollW=375 clientW=375"
+    },
+    {
+      "ok": true,
+      "name": "暗色偏好下移动 375 仍无横向溢出",
+      "detail": "scrollW=375 clientW=375 overflowX=0px"
+    },
+    {
+      "ok": true,
+      "name": "暗色偏好下登录输入框仍完整可见",
+      "detail": ""
+    },
+    {
+      "ok": true,
+      "name": "/inbox 未登录可访问且不白屏",
+      "detail": "落地=https://mail.epocanvas.com/login/ 正文长度=160"
+    },
+    {
+      "ok": true,
+      "name": "未登录命中 /inbox 被守卫拦回登录界面",
+      "detail": "https://mail.epocanvas.com/login/"
+    },
+    {
+      "ok": true,
+      "name": "/inbox 引导过程零 JS 运行时异常",
+      "detail": "pageErrors=0"
+    },
+    {
+      "ok": true,
+      "name": "线上 mail-vue 入口 chunk 已被真实浏览器下载执行（守卫为客户端行为）",
+      "detail": "/assets/index-BfCAj9MJ.js=200"
+    },
+    {
+      "ok": true,
+      "name": "入口 chunk 与线上 index.html 声明一致",
+      "detail": "声明=/assets/index-BfCAj9MJ.js 实取=/assets/index-BfCAj9MJ.js"
+    },
+    {
+      "ok": true,
+      "name": "GET /sw.js → 200",
+      "detail": "实际=200"
+    },
+    {
+      "ok": true,
+      "name": "GET /manifest.webmanifest → 200",
+      "detail": "实际=200"
+    },
+    {
+      "ok": true,
+      "name": "GET /registerSW.js → 200",
+      "detail": "实际=200"
+    },
+    {
+      "ok": true,
+      "name": "GET /logo.svg → 200",
+      "detail": "实际=200"
+    },
+    {
+      "ok": true,
+      "name": "GET /login/assets/index-Cc1cA06M.js → 200",
+      "detail": "实际=200"
+    },
+    {
+      "ok": true,
+      "name": "GET /login/assets/index-gOtbi3zJ.css → 200",
+      "detail": "实际=200"
+    },
+    {
+      "ok": true,
+      "name": "全站零失败请求",
+      "detail": "none"
+    },
+    {
+      "ok": true,
+      "name": "全站零 console error",
+      "detail": "none"
+    },
+    {
+      "ok": true,
+      "name": "全站零 pageerror",
+      "detail": "none"
+    },
+    {
+      "ok": true,
+      "name": "无 >2MB 单次响应",
+      "detail": "none"
+    }
+  ]
+}

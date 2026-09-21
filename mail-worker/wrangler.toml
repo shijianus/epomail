@@ -66,4 +66,8 @@ admin = "admin@epomail.bond"				#管理员的邮箱	示例: admin@example.com
 # 注意：/init/<secret> 初始化门禁使用的就是 jwt_secret 的值。
 
 [build]
-command = "pnpm --prefix ../mail-vue install && pnpm --prefix ../mail-vue run build && pnpm --prefix ../temp_login_ui install && pnpm --prefix ../temp_login_ui run build && cp -r ../temp_login_ui/dist ./dist/login"
+# 顺序约束：temp_login_ui 必须先于 mail-vue 构建。
+# mail-vue 的 build 脚本会把 ../temp_login_ui/dist 拷进 ./dist/login，
+# 若先跑 mail-vue，冷检出（temp_login_ui/dist 未入库、被 .gitignore 排除）时 cp 会失败并经 && 中断整条部署链；
+# 即便非冷检出，也会把上一次的旧登录产物拷进生产。拷贝只保留 mail-vue build 内这一处，避免重复 cp 造成 dist/login/dist 嵌套。
+command = "pnpm --prefix ../temp_login_ui install && pnpm --prefix ../temp_login_ui run build && pnpm --prefix ../mail-vue install && pnpm --prefix ../mail-vue run build"
