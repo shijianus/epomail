@@ -245,6 +245,11 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
     if (rawMsg === "accountLocked" || rawMsg.includes("锁定")) {
       return isZh ? "连续错误次数过多，账号已锁定 12 小时" : "Account locked for 12 hours due to too many failed attempts";
     }
+    // 服务端已按 Accept-Language 本地化；万一仍收到裸协议键（camelCase、无空格），
+    // 兜底为通用文案，绝不把 "IncorrectPwd" 这类内部键名直接抛给用户。
+    if (/^[A-Za-z][A-Za-z0-9_]*$/.test(rawMsg) && /[a-z][A-Z]|[A-Z][a-z]+[A-Z]/.test(rawMsg)) {
+      return isZh ? "操作失败，请稍后重试" : "Operation failed, please try again";
+    }
     return rawMsg;
   };
 
@@ -612,6 +617,8 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
             {errorMsg && (
               <motion.div
                 key="error"
+                role="alert"
+                aria-live="assertive"
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}

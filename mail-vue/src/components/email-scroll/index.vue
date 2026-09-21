@@ -88,7 +88,6 @@
                       <Icon icon="ri:verified-badge-fill" width="15" height="15" style="color: #0284c7; vertical-align: middle; margin-left: 3px;" />
                     </span>
                   </div>
-                  <span class="phone-time">{{ item.formatCreateTime }}</span>
                 </div>
 
                 <!-- 2. Subject & Snippet Area (Flex 1, strictly 1 line, "Subject - Content") -->
@@ -449,6 +448,8 @@ const latestEmail = ref(null)
 const scrollbarRef = ref(null)
 let reqLock = false
 let isMobile = ref(innerWidth < 1367)
+// 与 CSS 两行化断点 @media (max-width: 767px) 严格同源，避免行高契约在 768~1366px 区间错位
+let isNarrowRow = ref(innerWidth <= 767)
 let skeletonRows = 0
 const timePaddingRight = ref('');
 const keyCount = ref(0);
@@ -544,6 +545,7 @@ onActivated(() => {
 
 const handleResize = () => {
   isMobile.value = innerWidth < 1367
+  isNarrowRow.value = innerWidth <= 767
 }
 
 const handleWheel = () => {
@@ -745,16 +747,19 @@ const list = computed(() => {
   return [...aggregateThreads(finalResult), ...expandList];
 })
 
+// 虚拟滚动行高的唯一真源：CSS 通过 v-bind(rowHeightCss) 直接取此值，
+// 二者不可能再出现「JS 预留 83px / CSS 实渲 80px」式的逐行漂移。
 const itemHeight = computed(() => {
-    if (props.type === 'all-email') {
-      return isMobile.value ? 132 : 65;
-    } else {
-      if (isMobile.value) return 83;
-      if (uiStore.density === 'compact') return 36;
-      if (uiStore.density === 'comfortable') return 48;
-      return 54;
+    if (isNarrowRow.value) {
+      return props.type === 'all-email' ? 88 : 64;
     }
+    if (props.type === 'all-email') return 54;
+    if (uiStore.density === 'compact') return 38;
+    if (uiStore.density === 'comfortable') return 46;
+    return 52;
 })
+
+const rowHeightCss = computed(() => itemHeight.value + 'px')
 
 watch(emailList, () => {
   updateHasScrollbar();
@@ -1456,7 +1461,8 @@ function loadData() {
   display: flex;
   align-items: center;
   width: 100%;
-    height: 52px;
+    // 行高唯一真源来自 JS 的 itemHeight（见 rowHeightCss），保证虚拟滚动预留高度 == 实渲高度
+    height: v-bind(rowHeightCss);
     border-bottom: 1px solid var(--border-subtle);
     background: transparent;
     cursor: pointer;
@@ -1471,33 +1477,24 @@ function loadData() {
       user-select: none;
     }
     &.density-compact {
-      height: 38px !important;
       padding: 0 12px !important;
       .sender-name-text, .email-subject-text {
         font-size: 13px !important;
       }
     }
     &.density-comfortable {
-      height: 46px !important;
       padding: 0 14px !important;
     }
     &.density-default {
-      height: 52px !important;
       padding: 0 16px !important;
     }
 
-    // 窄屏两行化：行高自动伸展（第一行发件人+时间，第二行主题独占）
+    // 窄屏两行化：固定行高（由 rowHeightCss 提供），仅调整内边距，绝不用 height:auto 破坏虚拟滚动契约
     @media (max-width: 767px) {
       &.density-compact, &.density-comfortable, &.density-default {
-        height: auto !important;
-        min-height: 56px;
-        padding-top: 7px !important;
-        padding-bottom: 7px !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
       }
-    }
-
-    &.all-email {
-      height: 54px;
     }
 
     &:hover {
@@ -1555,10 +1552,16 @@ function loadData() {
       overflow: hidden;
       white-space: nowrap;
 
-      // 窄屏两行化：发件人/时间占第一行，主题区整行换行
+      // 窄屏两行化：用 grid 显式分区，保证「发件人 + 时间」同处第一行、主题独占第二行。
+      // 行数恒定 => 行高恒定 => 与虚拟滚动 itemHeight 严格一致（flex-wrap 会因内容宽度不定而溢出到第三行）
       @media (max-width: 767px) {
-        flex-wrap: wrap;
-        row-gap: 3px;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-areas:
+          "sender right"
+          "main   main";
+        align-items: center;
+        row-gap: 2px;
       }
     }
 
@@ -1579,7 +1582,8 @@ function loadData() {
       }
 
       @media (max-width: 767px) {
-        flex: 1 1 auto;
+        grid-area: sender;
+        flex: none;
         max-width: none;
         min-width: 0;
         padding-right: 8px;
@@ -1641,10 +1645,6 @@ function loadData() {
           flex-shrink: 0;
         }
       }
-
-      .phone-time {
-        display: none;
-      }
     }
 
     .email-main-area {
@@ -1660,7 +1660,9 @@ function loadData() {
 
       // 窄屏：主题区整行铺满（两行化第二行）
       @media (max-width: 767px) {
-        flex: 1 1 100%;
+        grid-area: main;
+        flex: none;
+        min-width: 0;
         padding-right: 0;
       }
 
@@ -1757,9 +1759,10 @@ function loadData() {
       justify-content: flex-end;
       flex-shrink: 0;
 
-      // 窄屏：随内容自适应宽度，与发件人同处第一行
+      // 窄屏：与发件人同处第一行右侧，宽度随内容自适应
       @media (max-width: 767px) {
-        flex: 0 0 auto;
+        grid-area: right;
+        flex: none;
       }
 
       .email-time.is-unread {

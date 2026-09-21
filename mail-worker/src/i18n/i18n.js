@@ -23,9 +23,11 @@ app.use('*', async (c, next) => {
 	} else if (rawHeader.startsWith('en')) {
 		lang = 'en';
 	}
-	i18next.init({
-		lng: lang,
-	});
+	// 必须用 changeLanguage 而非 init：i18next 对已初始化实例再次 init 会被忽略，
+	// 导致语言永远停在首次 init 的 fallback（zh），英文浏览器也会收到中文文案。
+	if (i18next.language !== lang) {
+		await i18next.changeLanguage(lang);
+	}
 	return await next()
 })
 

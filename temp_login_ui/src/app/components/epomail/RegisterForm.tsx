@@ -313,6 +313,12 @@ export function RegisterForm({ canvasRef, onSwitch, sysConfig: propsSysConfig }:
           else if (rawErrMsg === "minEmailPrefix") friendlyMsg = isZh ? "邮箱名长度不足" : "Email prefix too short";
           else if (!friendlyMsg) friendlyMsg = isZh ? "注册失败，请检查输入" : "Registration failed";
 
+          // 服务端已按 Accept-Language 本地化；万一仍收到裸协议键（camelCase、无空格），
+          // 兜底为通用文案，绝不把内部键名直接抛给用户。
+          if (/^[A-Za-z][A-Za-z0-9_]*$/.test(friendlyMsg) && /[a-z][A-Z]|[A-Z][a-z]+[A-Z]/.test(friendlyMsg)) {
+            friendlyMsg = isZh ? "注册失败，请检查输入" : "Registration failed, please check your input";
+          }
+
           setErrorMsg(friendlyMsg);
           cameraState.authErrorOpacity = 1;
           cameraState.shakeIntensity = 20;
@@ -355,6 +361,8 @@ export function RegisterForm({ canvasRef, onSwitch, sysConfig: propsSysConfig }:
               {errorMsg && (
                 <motion.div
                   key="error"
+                  role="alert"
+                  aria-live="assertive"
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.95 }}

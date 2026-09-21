@@ -53,7 +53,6 @@ const params = reactive({
 
 onMounted(() => {
   emailStore.emailScroll = scroll;
-  latest()
 })
 
 

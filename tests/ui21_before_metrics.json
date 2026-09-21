@@ -1,0 +1,260 @@
+{
+  "tag": "before",
+  "ts": "2026-09-21T11:16:48.686Z",
+  "checks": [
+    {
+      "pass": true,
+      "label": "登录成功跳转主应用",
+      "detail": "http://127.0.0.1:8787/inbox"
+    },
+    {
+      "pass": true,
+      "label": "1280px 汉堡按钮隐藏",
+      "detail": "none"
+    },
+    {
+      "pass": true,
+      "label": "1280px 搜索框可见",
+      "detail": "flex"
+    },
+    {
+      "pass": true,
+      "label": "375px 汉堡按钮显示",
+      "detail": "flex"
+    },
+    {
+      "pass": true,
+      "label": "375px 头像完整在屏内（账户菜单可达）",
+      "detail": "{\"x\":329,\"y\":14,\"w\":36,\"right\":365} vw=375"
+    },
+    {
+      "pass": true,
+      "label": "375px 顶栏无横向溢出",
+      "detail": "scrollW=375 clientW=375"
+    },
+    {
+      "pass": false,
+      "label": "375px 邮件搜索入口仍存在（功能不可丢失）",
+      "detail": "search=none icon=null"
+    },
+    {
+      "pass": true,
+      "label": "收件箱列表已渲染",
+      "detail": "25 行"
+    },
+    {
+      "pass": true,
+      "label": "移动端各行高度一致（虚拟滚动前提）",
+      "detail": "[80,80,80,80,80,80,80,80,80,80]"
+    },
+    {
+      "pass": true,
+      "label": "移动端行高 ≥60px（容纳两行）",
+      "detail": "80px"
+    },
+    {
+      "pass": true,
+      "label": "移动端主题宽度 ≥150px（可读）",
+      "detail": "285px"
+    },
+    {
+      "pass": true,
+      "label": "相邻行间距 == 行高（无重叠/空隙）",
+      "detail": "[80,81,80,80,80] vs h=80"
+    },
+    {
+      "pass": false,
+      "label": "滚动到底部无大片空白（行高契约正确）",
+      "detail": "底部空白=-820px"
+    },
+    {
+      "pass": true,
+      "label": "抽屉打开且在屏内",
+      "detail": "{\"cls\":\"el-aside aside aside-show\",\"x\":0,\"w\":231}"
+    },
+    {
+      "pass": true,
+      "label": "resize 扰动后抽屉保持打开",
+      "detail": "{\"x\":0,\"w\":231}"
+    },
+    {
+      "pass": true,
+      "label": "768px 顶栏无溢出",
+      "detail": "scrollW=768 clientW=768"
+    },
+    {
+      "pass": true,
+      "label": "暗色模式切换执行并截图",
+      "detail": "dark=true"
+    },
+    {
+      "pass": true,
+      "label": "个人设置页已加载",
+      "detail": "{\"hasCountry\":false,\"len\":18}"
+    },
+    {
+      "pass": true,
+      "label": "无 >2MB 的巨型资源请求（F7：8.7MB country-state-city 已消除）",
+      "detail": "[]"
+    },
+    {
+      "pass": false,
+      "label": "登录失败 UI 不显示裸协议键",
+      "detail": "裸键=IncorrectPwd"
+    },
+    {
+      "pass": false,
+      "label": "API 返回 message 为本地化文案而非裸键",
+      "detail": "裸键=IncorrectPwd"
+    },
+    {
+      "pass": false,
+      "label": "错误提示具备 role=alert / aria-live（读屏可播报）",
+      "detail": "[]"
+    },
+    {
+      "pass": false,
+      "label": "en 浏览器下登录错误同样本地化",
+      "detail": "裸键=IncorrectPwd"
+    },
+    {
+      "pass": true,
+      "label": "en 浏览器下错误文案为英文（非中文串扰）",
+      "detail": "\"IncorrectPwd\""
+    },
+    {
+      "pass": false,
+      "label": "全程零控制台错误",
+      "detail": "1 条 -> ReferenceError: latest is not defined\n    at http://127.0.0.1:8787/assets/index-ZAj_EhAe.js:1:656\n    at http://127.0.0.1:8787/assets/vue-vendor-Coz7PjHv.js:13:12740\n    at fs (http://127.0.0.1:8787/a"
+    }
+  ],
+  "bigRequests": [],
+  "desktop1280": {
+    "hamburger": "none",
+    "brandName": "block",
+    "search": "flex",
+    "help": "flex"
+  },
+  "mobile375Topbar": {
+    "vw": 375,
+    "topbarScrollW": 375,
+    "topbarClientW": 375,
+    "hamburger": "flex",
+    "brandName": "none",
+    "search": "none",
+    "help": "none",
+    "actions": {
+      "x": 237,
+      "y": 12,
+      "w": 128,
+      "right": 365
+    },
+    "avatar": {
+      "x": 329,
+      "y": 14,
+      "w": 36,
+      "right": 365
+    },
+    "searchIcon": null
+  },
+  "mobileRows": {
+    "rowCount": 25,
+    "heights": [
+      80,
+      80,
+      80,
+      80,
+      80,
+      80,
+      80,
+      80,
+      80,
+      80
+    ],
+    "wrapperStyleH": "4233px",
+    "wrapperActualH": 4233,
+    "wrapperMarginTop": "0px",
+    "virtualScrollH": 4233,
+    "virtualClientH": 678,
+    "subjectW": 285,
+    "subjectText": "🎉 欢迎来到 Epocanvas Mail · 开启你的专",
+    "senderW": 127,
+    "rowTops": [
+      112,
+      192,
+      273,
+      353,
+      433,
+      513
+    ]
+  },
+  "mobileScrollBottom": {
+    "scrollTop": 3555,
+    "scrollH": 5229,
+    "clientH": 678,
+    "rendered": 34,
+    "wrapperStyleH": "2905px",
+    "wrapperMt": "2324px",
+    "contentBottom": 1610,
+    "vBottom": 790
+  },
+  "drawer": {
+    "cls": "el-aside aside aside-show",
+    "x": 0,
+    "w": 231
+  },
+  "drawerAfterResize": {
+    "x": 0,
+    "w": 231
+  },
+  "tablet768": {
+    "search": "flex",
+    "hamburger": "flex",
+    "topbarScrollW": 768,
+    "topbarClientW": 768
+  },
+  "dark": true,
+  "settingPage": {
+    "hasCountry": false,
+    "len": 18
+  },
+  "bigRequestsAfterProfile": [],
+  "loginLeafTexts": [
+    "EpoCanvas Mail",
+    "步入画布，你的信号正在等待。",
+    "邮箱地址",
+    "登录密码",
+    "忘记密码？",
+    "或通过以下方式继续",
+    "Google",
+    "GitHub",
+    "探索节点",
+    "IncorrectPwd"
+  ],
+  "loginApiMessages": [
+    {
+      "url": "/api/login",
+      "code": 501,
+      "message": "IncorrectPwd"
+    }
+  ],
+  "errorA11y": [],
+  "loginLeafTextsEn": [
+    "EpoCanvas Mail",
+    "Step into the canvas. Your signals await.",
+    "EMAIL",
+    "PASSWORD",
+    "Forgot password?",
+    "or continue with",
+    "Google",
+    "GitHub",
+    "Explore Node",
+    "IncorrectPwd"
+  ],
+  "loginApiMessagesEn": [
+    "IncorrectPwd"
+  ],
+  "consoleErrors": [
+    "ReferenceError: latest is not defined\n    at http://127.0.0.1:8787/assets/index-ZAj_EhAe.js:1:656\n    at http://127.0.0.1:8787/assets/vue-vendor-Coz7PjHv.js:13:12740\n    at fs (http://127.0.0.1:8787/a"
+  ]
+}

@@ -1,0 +1,688 @@
+{
+  "tag": "after",
+  "ts": "2026-09-21T12:19:49.465Z",
+  "checks": [
+    {
+      "pass": true,
+      "label": "登录成功跳转主应用",
+      "detail": "http://127.0.0.1:8787/inbox"
+    },
+    {
+      "pass": true,
+      "label": "light1440 主题态与预期一致",
+      "detail": "dark=false"
+    },
+    {
+      "pass": true,
+      "label": "light1440 邮件主题对比度 ≥ 4.5:1 (WCAG AA)",
+      "detail": "{\"fg\":\"15,23,42\",\"bg\":\"255,255,255\",\"ratio\":17.85}"
+    },
+    {
+      "pass": true,
+      "label": "light1440 发件人文字对比度 ≥ 3:1",
+      "detail": "{\"fg\":\"15,23,42\",\"bg\":\"255,255,255\",\"ratio\":17.85}"
+    },
+    {
+      "pass": true,
+      "label": "1280px 汉堡按钮隐藏",
+      "detail": "none"
+    },
+    {
+      "pass": true,
+      "label": "1280px 搜索框可见",
+      "detail": "flex"
+    },
+    {
+      "pass": true,
+      "label": "desktop1280 列表已渲染",
+      "detail": "26 行"
+    },
+    {
+      "pass": true,
+      "label": "desktop1280 已真正滚动到底",
+      "detail": "scrollTop=2610 scrollH=3276 clientH=666"
+    },
+    {
+      "pass": true,
+      "label": "desktop1280 wrapper 预留高度 == scrollHeight",
+      "detail": "reserved=3276 scrollH=3276"
+    },
+    {
+      "pass": true,
+      "label": "desktop1280 scrollHeight 为实渲行高的整数倍（零逐行漂移）",
+      "detail": "scrollH=3276 / rowH=52 = 63 槽位（62 封 + 1 页脚）"
+    },
+    {
+      "pass": true,
+      "label": "desktop1280 末行底边与预留区底边仅差页脚槽位（无幻影空白）",
+      "detail": "Δ=52px 期望=52px 页脚实绘=15px"
+    },
+    {
+      "pass": true,
+      "label": "desktop1280Detail 点击邮件行打开阅读栏且内容已渲染",
+      "detail": "pane=true text=175字"
+    },
+    {
+      "pass": true,
+      "label": "desktop1280Detail 阅读栏宽度未超出视口",
+      "detail": "paneW=1049 vw=1280"
+    },
+    {
+      "pass": true,
+      "label": "desktop1280Detail 阅读态整页无横向溢出",
+      "detail": "scrollW-clientW=0px"
+    },
+    {
+      "pass": true,
+      "label": "desktop1280Detail 阅读栏存在返回按钮（可回到列表）",
+      "detail": "true"
+    },
+    {
+      "pass": true,
+      "label": "desktop1280Detail 返回后阅读栏关闭且列表复位",
+      "detail": "{\"hasPane\":false,\"rows\":29}"
+    },
+    {
+      "pass": true,
+      "label": "375px 汉堡按钮显示",
+      "detail": "flex"
+    },
+    {
+      "pass": true,
+      "label": "375px 头像完整在屏内（账户菜单可达）",
+      "detail": "{\"x\":329,\"y\":14,\"w\":36,\"right\":365} vw=375"
+    },
+    {
+      "pass": true,
+      "label": "375px 顶栏无横向溢出",
+      "detail": "scrollW=375 clientW=375"
+    },
+    {
+      "pass": true,
+      "label": "375px 邮件搜索入口仍存在（功能不可丢失）",
+      "detail": "search=none icon={\"x\":195,\"y\":12,\"w\":40,\"right\":235}"
+    },
+    {
+      "pass": true,
+      "label": "375px 点击搜索图标后搜索框展开",
+      "detail": "flex"
+    },
+    {
+      "pass": true,
+      "label": "375px 搜索输入框宽度可用（≥200px）",
+      "detail": "355px"
+    },
+    {
+      "pass": true,
+      "label": "375px 搜索浮层未超出视口",
+      "detail": "right=365 vw=375"
+    },
+    {
+      "pass": true,
+      "label": "375px 展开后输入框自动获得焦点（免二次点击）",
+      "detail": "true"
+    },
+    {
+      "pass": true,
+      "label": "375px 搜索关键词后列表被正确收窄",
+      "detail": "kw=Epocanvas 27→9 行"
+    },
+    {
+      "pass": true,
+      "label": "375px 关闭按钮可收起搜索浮层",
+      "detail": "none"
+    },
+    {
+      "pass": true,
+      "label": "收件箱列表已渲染",
+      "detail": "27 行"
+    },
+    {
+      "pass": true,
+      "label": "移动端各行高度一致（虚拟滚动前提）",
+      "detail": "[64,64,64,64,64,64,64,64,64,64]"
+    },
+    {
+      "pass": true,
+      "label": "移动端行高 ≥60px（容纳两行）",
+      "detail": "64px"
+    },
+    {
+      "pass": true,
+      "label": "移动端主题宽度 ≥150px（可读）",
+      "detail": "285px"
+    },
+    {
+      "pass": true,
+      "label": "相邻行间距 == 行高（无重叠/空隙）",
+      "detail": "[64,64,64,64,64] vs h=64"
+    },
+    {
+      "pass": true,
+      "label": "mobile375 列表已渲染",
+      "detail": "24 行"
+    },
+    {
+      "pass": true,
+      "label": "mobile375 已真正滚动到底",
+      "detail": "scrollTop=3354 scrollH=4032 clientH=678"
+    },
+    {
+      "pass": true,
+      "label": "mobile375 wrapper 预留高度 == scrollHeight",
+      "detail": "reserved=4032 scrollH=4032"
+    },
+    {
+      "pass": true,
+      "label": "mobile375 scrollHeight 为实渲行高的整数倍（零逐行漂移）",
+      "detail": "scrollH=4032 / rowH=64 = 63 槽位（62 封 + 1 页脚）"
+    },
+    {
+      "pass": true,
+      "label": "mobile375 末行底边与预留区底边仅差页脚槽位（无幻影空白）",
+      "detail": "Δ=64px 期望=64px 页脚实绘=15px"
+    },
+    {
+      "pass": true,
+      "label": "mobile375Detail 点击邮件行打开阅读栏且内容已渲染",
+      "detail": "pane=true text=175字"
+    },
+    {
+      "pass": true,
+      "label": "mobile375Detail 阅读栏宽度未超出视口",
+      "detail": "paneW=375 vw=375"
+    },
+    {
+      "pass": true,
+      "label": "mobile375Detail 阅读态整页无横向溢出",
+      "detail": "scrollW-clientW=0px"
+    },
+    {
+      "pass": true,
+      "label": "mobile375Detail 阅读栏存在返回按钮（可回到列表）",
+      "detail": "true"
+    },
+    {
+      "pass": true,
+      "label": "mobile375Detail 返回后阅读栏关闭且列表复位",
+      "detail": "{\"hasPane\":false,\"rows\":27}"
+    },
+    {
+      "pass": true,
+      "label": "抽屉打开且在屏内",
+      "detail": "{\"cls\":\"el-aside aside aside-show\",\"x\":0,\"w\":231}"
+    },
+    {
+      "pass": true,
+      "label": "resize 扰动后抽屉保持打开",
+      "detail": "{\"x\":0,\"w\":231}"
+    },
+    {
+      "pass": true,
+      "label": "768px 顶栏无溢出",
+      "detail": "scrollW=768 clientW=768"
+    },
+    {
+      "pass": true,
+      "label": "tablet768 列表已渲染",
+      "detail": "31 行"
+    },
+    {
+      "pass": true,
+      "label": "tablet768 已真正滚动到底",
+      "detail": "scrollTop=2386 scrollH=3276 clientH=890"
+    },
+    {
+      "pass": true,
+      "label": "tablet768 wrapper 预留高度 == scrollHeight",
+      "detail": "reserved=3276 scrollH=3276"
+    },
+    {
+      "pass": true,
+      "label": "tablet768 scrollHeight 为实渲行高的整数倍（零逐行漂移）",
+      "detail": "scrollH=3276 / rowH=52 = 63 槽位（62 封 + 1 页脚）"
+    },
+    {
+      "pass": true,
+      "label": "tablet768 末行底边与预留区底边仅差页脚槽位（无幻影空白）",
+      "detail": "Δ=52px 期望=52px 页脚实绘=15px"
+    },
+    {
+      "pass": true,
+      "label": "暗色模式切换按钮可见",
+      "detail": ""
+    },
+    {
+      "pass": true,
+      "label": "点击后进入暗色模式（html/body 带 dark 类）",
+      "detail": "dark=true"
+    },
+    {
+      "pass": true,
+      "label": "dark1280 主题态与预期一致",
+      "detail": "dark=true"
+    },
+    {
+      "pass": true,
+      "label": "dark1280 邮件主题对比度 ≥ 4.5:1 (WCAG AA)",
+      "detail": "{\"fg\":\"248,250,252\",\"bg\":\"17,24,39\",\"ratio\":16.96}"
+    },
+    {
+      "pass": true,
+      "label": "dark1280 发件人文字对比度 ≥ 3:1",
+      "detail": "{\"fg\":\"229,234,243\",\"bg\":\"17,24,39\",\"ratio\":14.69}"
+    },
+    {
+      "pass": true,
+      "label": "dark1280 列表已渲染",
+      "detail": "26 行"
+    },
+    {
+      "pass": true,
+      "label": "dark1280 已真正滚动到底",
+      "detail": "scrollTop=2610 scrollH=3276 clientH=666"
+    },
+    {
+      "pass": true,
+      "label": "dark1280 wrapper 预留高度 == scrollHeight",
+      "detail": "reserved=3276 scrollH=3276"
+    },
+    {
+      "pass": true,
+      "label": "dark1280 scrollHeight 为实渲行高的整数倍（零逐行漂移）",
+      "detail": "scrollH=3276 / rowH=52 = 63 槽位（62 封 + 1 页脚）"
+    },
+    {
+      "pass": true,
+      "label": "dark1280 末行底边与预留区底边仅差页脚槽位（无幻影空白）",
+      "detail": "Δ=52px 期望=52px 页脚实绘=15px"
+    },
+    {
+      "pass": true,
+      "label": "dark375 主题态与预期一致",
+      "detail": "dark=true"
+    },
+    {
+      "pass": true,
+      "label": "dark375 邮件主题对比度 ≥ 4.5:1 (WCAG AA)",
+      "detail": "{\"fg\":\"248,250,252\",\"bg\":\"17,24,39\",\"ratio\":16.96}"
+    },
+    {
+      "pass": true,
+      "label": "dark375 发件人文字对比度 ≥ 3:1",
+      "detail": "{\"fg\":\"229,234,243\",\"bg\":\"17,24,39\",\"ratio\":14.69}"
+    },
+    {
+      "pass": true,
+      "label": "暗色下 375px 行高与亮色一致（换肤不改布局）",
+      "detail": "dark=64px light=64px"
+    },
+    {
+      "pass": true,
+      "label": "再次点击可切回亮色模式",
+      "detail": "dark=false"
+    },
+    {
+      "pass": true,
+      "label": "个人主页真实渲染（非 404 空页）",
+      "detail": "{\"path\":\"/settings/profile\",\"len\":282,\"hasEditEntry\":true}"
+    },
+    {
+      "pass": true,
+      "label": "个人主页地址编辑入口存在",
+      "detail": "true"
+    },
+    {
+      "pass": true,
+      "label": "地址弹窗打开且含国家/地区下拉",
+      "detail": "{\"open\":true,\"selects\":2,\"entries\":8}"
+    },
+    {
+      "pass": true,
+      "label": "国家/地区下拉全量就位（ISO 3166-1，≥200 项）",
+      "detail": "245 项"
+    },
+    {
+      "pass": true,
+      "label": "选择美国后出现州/省二级下拉（分级区划数据可用）",
+      "detail": "{\"open\":true,\"selects\":2}"
+    },
+    {
+      "pass": true,
+      "label": "州/省下拉选项完整（US 应为 51 项）",
+      "detail": "51 项"
+    },
+    {
+      "pass": true,
+      "label": "地址弹窗已取消关闭",
+      "detail": "{\"open\":false,\"selects\":0}"
+    },
+    {
+      "pass": true,
+      "label": "省州核验全程零写接口调用（未落库任何假数据）",
+      "detail": "[]"
+    },
+    {
+      "pass": true,
+      "label": "无 >2MB 的巨型资源请求（F7：8.7MB country-state-city 已消除）",
+      "detail": "[]"
+    },
+    {
+      "pass": true,
+      "label": "个人主页未加载 country-state-city 整包",
+      "detail": "[]"
+    },
+    {
+      "pass": true,
+      "label": "登录失败 UI 不显示裸协议键",
+      "detail": "无裸键"
+    },
+    {
+      "pass": true,
+      "label": "API 返回 message 为本地化文案而非裸键",
+      "detail": "无裸键"
+    },
+    {
+      "pass": true,
+      "label": "错误提示具备 role=alert / aria-live（读屏可播报）",
+      "detail": "[{\"role\":\"alert\",\"live\":\"assertive\",\"txt\":\"账户或密码错误\"}]"
+    },
+    {
+      "pass": true,
+      "label": "en 浏览器下登录错误同样本地化",
+      "detail": "无裸键"
+    },
+    {
+      "pass": true,
+      "label": "en 浏览器下错误文案为英文（非中文串扰）",
+      "detail": "\"Incorrect email or password\""
+    },
+    {
+      "pass": true,
+      "label": "全程零控制台错误",
+      "detail": "0 条"
+    }
+  ],
+  "bigRequests": [],
+  "contrast_light1440": {
+    "dark": false,
+    "subject": {
+      "fg": "15,23,42",
+      "bg": "255,255,255",
+      "ratio": 17.85
+    },
+    "sender": {
+      "fg": "15,23,42",
+      "bg": "255,255,255",
+      "ratio": 17.85
+    },
+    "preview": null
+  },
+  "desktop1280": {
+    "scrollTop": 2610,
+    "scrollH": 3276,
+    "clientH": 666,
+    "rendered": 26,
+    "rowH": 52,
+    "reserved": 3276,
+    "totalSlots": 63,
+    "emailSlots": 62,
+    "footerSlot": true,
+    "footerH": 15,
+    "wrapperBottom": 778,
+    "lastRowBottom": 726,
+    "atBottom": true
+  },
+  "desktop1280Detail": {
+    "url": "/inbox",
+    "hasPane": true,
+    "paneW": 1049,
+    "paneTextLen": 175,
+    "hasBackBtn": true,
+    "overflowX": 0,
+    "vw": 1280
+  },
+  "desktop1280DetailBack": {
+    "hasPane": false,
+    "rows": 29
+  },
+  "mobile375Topbar": {
+    "vw": 375,
+    "topbarScrollW": 375,
+    "topbarClientW": 375,
+    "hamburger": "flex",
+    "brandName": "none",
+    "search": "none",
+    "help": "none",
+    "actions": {
+      "x": 195,
+      "y": 12,
+      "w": 170,
+      "right": 365
+    },
+    "avatar": {
+      "x": 329,
+      "y": 14,
+      "w": 36,
+      "right": 365
+    },
+    "searchIcon": {
+      "x": 195,
+      "y": 12,
+      "w": 40,
+      "right": 235
+    }
+  },
+  "mobileSearchOverlay": {
+    "searchDisplay": "flex",
+    "inputW": 355,
+    "inputH": 48,
+    "inputRight": 365,
+    "focused": true,
+    "topbarScrollW": 375,
+    "topbarClientW": 375,
+    "vw": 375
+  },
+  "searchKeyword": {
+    "kw": "Epocanvas",
+    "before": 27
+  },
+  "mobileSearchResult": {
+    "k": "Epocanvas",
+    "n": 9,
+    "subjects": [
+      "🎉 欢迎来到 Epocanvas Mail · 开",
+      "[UITEST21] 第56封：这是一封用于验证移动",
+      "[UITEST21] 第49封：这是一封用于验证移动"
+    ],
+    "before": 27
+  },
+  "mobileRows": {
+    "rowCount": 27,
+    "heights": [
+      64,
+      64,
+      64,
+      64,
+      64,
+      64,
+      64,
+      64,
+      64,
+      64
+    ],
+    "wrapperStyleH": "4032px",
+    "wrapperActualH": 4032,
+    "wrapperMarginTop": "0px",
+    "virtualScrollH": 4032,
+    "virtualClientH": 678,
+    "subjectW": 285,
+    "subjectText": "🎉 欢迎来到 Epocanvas Mail · 开启你的专",
+    "senderW": 127,
+    "rowTops": [
+      112,
+      176,
+      240,
+      304,
+      368,
+      432
+    ]
+  },
+  "mobile375": {
+    "scrollTop": 3354,
+    "scrollH": 4032,
+    "clientH": 678,
+    "rendered": 24,
+    "rowH": 64,
+    "reserved": 4032,
+    "totalSlots": 63,
+    "emailSlots": 62,
+    "footerSlot": true,
+    "footerH": 15,
+    "wrapperBottom": 790,
+    "lastRowBottom": 726,
+    "atBottom": true
+  },
+  "mobile375Detail": {
+    "url": "/inbox",
+    "hasPane": true,
+    "paneW": 375,
+    "paneTextLen": 175,
+    "hasBackBtn": true,
+    "overflowX": 0,
+    "vw": 375
+  },
+  "mobile375DetailBack": {
+    "hasPane": false,
+    "rows": 27
+  },
+  "drawer": {
+    "cls": "el-aside aside aside-show",
+    "x": 0,
+    "w": 231
+  },
+  "drawerAfterResize": {
+    "x": 0,
+    "w": 231
+  },
+  "tablet768": {
+    "scrollTop": 2386,
+    "scrollH": 3276,
+    "clientH": 890,
+    "rendered": 31,
+    "rowH": 52,
+    "reserved": 3276,
+    "totalSlots": 63,
+    "emailSlots": 62,
+    "footerSlot": true,
+    "footerH": 15,
+    "wrapperBottom": 1001,
+    "lastRowBottom": 949,
+    "atBottom": true
+  },
+  "dark": true,
+  "contrast_dark1280": {
+    "dark": true,
+    "subject": {
+      "fg": "248,250,252",
+      "bg": "17,24,39",
+      "ratio": 16.96
+    },
+    "sender": {
+      "fg": "229,234,243",
+      "bg": "17,24,39",
+      "ratio": 14.69
+    },
+    "preview": null
+  },
+  "dark1280": {
+    "scrollTop": 2610,
+    "scrollH": 3276,
+    "clientH": 666,
+    "rendered": 26,
+    "rowH": 52,
+    "reserved": 3276,
+    "totalSlots": 63,
+    "emailSlots": 62,
+    "footerSlot": true,
+    "footerH": 15,
+    "wrapperBottom": 777,
+    "lastRowBottom": 725,
+    "atBottom": true
+  },
+  "contrast_dark375": {
+    "dark": true,
+    "subject": {
+      "fg": "248,250,252",
+      "bg": "17,24,39",
+      "ratio": 16.96
+    },
+    "sender": {
+      "fg": "229,234,243",
+      "bg": "17,24,39",
+      "ratio": 14.69
+    },
+    "preview": null
+  },
+  "darkMobileRowH": 64,
+  "settingPage": {
+    "path": "/settings/profile",
+    "len": 282,
+    "hasEditEntry": true
+  },
+  "addressDialog": {
+    "open": true,
+    "selects": 2,
+    "entries": 8
+  },
+  "countryOptionCount": 245,
+  "subdivisionSelects": {
+    "open": true,
+    "selects": 2
+  },
+  "subdivisionOptionCount": 51,
+  "geoWriteCalls": [],
+  "bigRequestsAfterProfile": [],
+  "loginLeafTexts": [
+    "EpoCanvas Mail",
+    "步入画布，你的信号正在等待。",
+    "邮箱地址",
+    "登录密码",
+    "忘记密码？",
+    "或通过以下方式继续",
+    "Google",
+    "GitHub",
+    "探索节点",
+    "账户或密码错误"
+  ],
+  "loginApiMessages": [
+    {
+      "url": "/api/login",
+      "code": 501,
+      "message": "账户或密码错误"
+    }
+  ],
+  "errorA11y": [
+    {
+      "role": "alert",
+      "live": "assertive",
+      "txt": "账户或密码错误"
+    }
+  ],
+  "loginLeafTextsEn": [
+    "EpoCanvas Mail",
+    "Step into the canvas. Your signals await.",
+    "EMAIL",
+    "PASSWORD",
+    "Forgot password?",
+    "or continue with",
+    "Google",
+    "GitHub",
+    "Explore Node",
+    "Incorrect email or password"
+  ],
+  "loginApiMessagesEn": [
+    "Incorrect email or password"
+  ],
+  "consoleErrors": []
+}

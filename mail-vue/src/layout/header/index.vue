@@ -1,5 +1,5 @@
 <template>
-  <div class="topbar" :class="!hasPerm('email:send') ? 'not-send' : ''">
+  <div class="topbar" :class="[!hasPerm('email:send') ? 'not-send' : '', mobileSearchOpen ? 'search-open' : '']">
     <!-- Left Section: Logo acting as toggle -->
     <div class="topbar-left">
       <button class="icon-btn mobile-menu-btn" @click="changeAside" :aria-label="$t('toggleSidebar')">
@@ -17,10 +17,13 @@
         <span class="search-icon" @click="handleSearch" :title="$t('search') || 'Search'">
           <Icon icon="lucide:search" width="18" height="18"/>
         </span>
-        <input type="text" :placeholder="isSettingsMode && route.name !== 'all-email' ? (route.name === 'data-setting' ? $t('searchSettingsOrApps') : $t('searchSettings')) : route.name === 'all-email' ? $t('searchAllMail') : $t('searchMail')" v-model="emailStore.searchKeyword" @input="handleSearchInput" @keyup.enter="handleSearch" @keydown.tab.prevent="handleTabComplete" @focus="searchFocus = true" @blur="onSearchBlur" />
+        <input ref="searchInputRef" type="text" :placeholder="isSettingsMode && route.name !== 'all-email' ? (route.name === 'data-setting' ? $t('searchSettingsOrApps') : $t('searchSettings')) : route.name === 'all-email' ? $t('searchAllMail') : $t('searchMail')" v-model="emailStore.searchKeyword" @input="handleSearchInput" @keyup.enter="handleSearch" @keydown.tab.prevent="handleTabComplete" @focus="searchFocus = true" @blur="onSearchBlur" />
         <span class="clear-icon" v-show="emailStore.searchKeyword" @mousedown.prevent @click.stop="clearSearch" :title="$t('clear')">
           <Icon icon="lucide:x" width="15" height="15"/>
         </span>
+        <button class="mobile-search-close" type="button" :aria-label="$t('close')" @click="closeMobileSearch">
+          <Icon icon="lucide:x" width="18" height="18"/>
+        </button>
         
         <!-- Dropdown for all-email syntax suggestions -->
         <div v-if="route.name === 'all-email' && searchFocus && allEmailSuggestions.length > 0" class="settings-search-dropdown" style="padding: 4px 0;">
@@ -47,6 +50,12 @@
 
     <!-- Right Section: Actions & Avatar -->
     <div class="topbar-actions">
+      <el-tooltip :content="$t('search')" placement="bottom">
+        <button v-if="!props.isProfile" class="icon-btn mobile-search-btn" :aria-label="$t('search')"
+                :aria-expanded="mobileSearchOpen" @click="toggleMobileSearch">
+          <Icon icon="lucide:search" width="22" height="22"/>
+        </button>
+      </el-tooltip>
       <el-tooltip :content="uiStore.dark ? $t('lightMode') : $t('darkMode')" placement="bottom">
         <button v-if="uiStore.dark" class="icon-btn theme-toggle-btn" :aria-label="$t('lightMode')" @click="openDark($event)">
           <Icon icon="lucide:sun" width="22" height="22"/>
@@ -204,6 +213,21 @@ const userInfoShow = ref(false)
 const userinfoRef = ref({})
 
 const searchFocus = ref(false)
+
+// 窄屏顶栏放不下常驻搜索框，改为图标按需展开浮层：入口不丢失，且不挤爆 375px 顶栏
+const mobileSearchOpen = ref(false)
+const searchInputRef = ref(null)
+
+function toggleMobileSearch() {
+  mobileSearchOpen.value = !mobileSearchOpen.value
+  if (mobileSearchOpen.value) {
+    nextTick(() => searchInputRef.value?.focus())
+  }
+}
+
+function closeMobileSearch() {
+  mobileSearchOpen.value = false
+}
 
 let closeTimer = null;
 
@@ -429,7 +453,11 @@ const isGlobalSearch = computed(() => {
   return /^(all:|global:)/i.test(keyword) && keyword.length > 4;
 })
 
-import { watch } from 'vue';
+import { watch, nextTick } from 'vue';
+
+watch(() => route.fullPath, () => {
+  mobileSearchOpen.value = false
+});
 
 let highlightDebounceTimer = null;
 watch(() => emailStore.searchKeyword, (newVal) => {
@@ -1018,10 +1046,18 @@ button.mobile-menu-btn {
   padding-right: 8px;
 }
 
-/* 窄屏顶栏防溢出：收起品牌文字/搜索/帮助入口，确保头像（账户菜单：退出登录/设置）始终可达 */
+/* 窄屏专用控件在桌面默认隐藏 */
+.mobile-search-btn,
+.mobile-search-close {
+  display: none;
+}
+
+/* 窄屏顶栏防溢出：收起品牌文字/帮助入口，搜索改为图标按需展开的浮层，
+   既保住搜索功能入口，又确保头像（账户菜单：退出登录/设置）始终可达 */
 @media (max-width: 767px) {
   .topbar {
     padding: 0 10px;
+    position: relative;
   }
 
   .topbar-left {
@@ -1037,8 +1073,48 @@ button.mobile-menu-btn {
     display: none;
   }
 
+  .mobile-search-btn {
+    display: flex;
+  }
+
   .topbar-search {
     display: none;
+  }
+
+  .topbar.search-open .topbar-search {
+    display: flex;
+    position: absolute;
+    left: 10px;
+    right: 10px;
+    top: calc(100% + 6px);
+    padding: 0;
+    max-width: none;
+    z-index: 60;
+  }
+
+  .topbar.search-open .search-box input {
+    background: var(--bg-surface);
+    border-color: var(--border-mid);
+    box-shadow: 0 10px 28px rgba(0, 0, 0, .18);
+    padding-right: 76px;
+  }
+
+  .mobile-search-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    right: 40px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
   }
 
   .topbar-actions {

@@ -629,19 +629,23 @@ const dbInit = {
 		const mailDb = getMailDb(c);
 		const userDb = getUserDb(c);
 
-		try {
-			await mailDb.batch([
-				mailDb.prepare(`ALTER TABLE email ADD COLUMN is_spam INTEGER NOT NULL DEFAULT 0;`),
-				mailDb.prepare(`ALTER TABLE email ADD COLUMN snoozed_time DATETIME;`)
-			]);
-		} catch (e) {
-			console.warn(`跳过字段：${e.message}`);
-		}
+		// 逐列 PRAGMA 守卫：此前用 batch 批量 ALTER，批内任一列已存在即整体抛错，
+		// 导致同批其余列永不落库（存量库缺 is_spam 时 /email/list 直接 500）。
+		const cols = [
+			{ db: mailDb, table: 'email', name: 'is_spam', sql: `ALTER TABLE email ADD COLUMN is_spam INTEGER NOT NULL DEFAULT 0;` },
+			{ db: mailDb, table: 'email', name: 'snoozed_time', sql: `ALTER TABLE email ADD COLUMN snoozed_time DATETIME;` },
+			{ db: userDb, table: 'setting', name: 'spam_retention_days', sql: `ALTER TABLE setting ADD COLUMN spam_retention_days INTEGER NOT NULL DEFAULT 7;` }
+		];
 
-		try {
-			await userDb.prepare(`ALTER TABLE setting ADD COLUMN spam_retention_days INTEGER NOT NULL DEFAULT 7;`).run();
-		} catch (e) {
-			console.warn(`跳过字段：${e.message}`);
+		for (const col of cols) {
+			try {
+				const colInfo = await col.db.prepare(`SELECT * FROM pragma_table_info('${col.table}') WHERE name = ? limit 1`).bind(col.name).first();
+				if (!colInfo) {
+					await col.db.prepare(col.sql).run();
+				}
+			} catch (e) {
+				console.warn(`跳过 ${col.table} 字段 ${col.name}：${e.message}`);
+			}
 		}
 	},
 

@@ -168,7 +168,6 @@ const currentEmail = ref(null)
 
 onMounted(() => {
   emailStore.emailScroll = sysEmailScroll.value;
-  latest();
 })
 
 const formatImage = (content) => {
