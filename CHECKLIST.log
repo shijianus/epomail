@@ -10,6 +10,24 @@
 
 ---
 
+### 系统设置「存储与核心数据库」卡片行距失步修复与状态胶囊越界裁切根治 (2026-09-22)
+*   **关联提交 (Git Commit)**: `151641948748ca102bba3273ce2ad13864a081eb` (Short: `1516419`)
+*   **部署环境 (Deployment)**: `本地全真栈`（隔离沙箱实例，未触达生产与开发者本机 D1/KV 状态）
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 行距失步根因治理：移除 `.storage-db-card .setting-item` 独有的 `padding: 7px 0`。该 padding 叠加 `.card-content` 的 `gap: 10px` 后视觉净空达 24px，而全站其余 8 张卡片均为 10px；同时将列间距由 12px 收敛为基类一致的 10px。
+    - [x] 控件孤行根因治理：右侧操作组 `flex-wrap` 由 `wrap` 改为 `nowrap` 使胶囊与按钮整组绑定，并在条目级引入 `flex-wrap: wrap` + `row-gap: 6px`，容纳不下时整组换至次行右对齐，实现文案零截断与按钮零孤行。
+    - [x] 越界裁切根因治理：`.hub-tag` 剥离 `max-width: none !important` 与 `overflow: visible !important`，收敛为 `max-width: 100%`；按钮/数字框/开关/单位文本统一 `flex-shrink: 0`。修复 AI 卡片英文语境整组越出卡片右边界 176px、被 `.settings-card { overflow: hidden }` 裁切致「配置 API」按钮不可见不可点击。
+    - [x] `ai-hub-card` 同族缺陷同步治理：条目改为 flex 整组换行模型，与存储卡片排版机制对齐。
+    - [x] 窄屏（≤500px）适配：卡片可用宽度仅 207px，放开状态胶囊内文字折行与操作组内堆叠，修复长文案胶囊越界 38~63px 导致的按钮不可点击。
+    - [x] 新增排版回归护栏 `tests/audit-sys-setting-card-rhythm.mjs`：以「视觉净空（内容→内容）」而非元素盒间距为度量口径，覆盖 zh/en × 1440px/375px 四象限，断言行距基线同步、条目零附加垂直 padding、零控件越界、操作组整组同行。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：mail-vue `vite build` 14.69s 通过，零报错；`node --check mail-worker/src/index.js` 语法通过（本次未改动 Worker）。
+    - [x] 自动化测试套件：`node tests/audit-sys-setting-card-rhythm.mjs` 全绿 (40/40 断言通过)。
+    - [x] 浏览器全真栈实测：修复前存储卡片行距 24px、行高 56/64px 且按钮孤行；修复后行距 [10,10,10,10]、行高 28px 单行；AI 卡片英文越界由 176px 归零。
+    - [x] 交互命中实测：5 个配置按钮（对象存储/域详情/数据库配置/存储体检/AI 配置）在桌面与移动端均可命中并成功唤起弹窗。
+    - [x] i18n 静态审计三件套：`i18n-symmetry` 6 语言 1888 键 ALL SYMMETRIC；`i18n-audit` 缺失键 0；`i18n-hardcoded` 304 行与修复前基线持平零回归。
+    - [x] 零假数据残留：验证全程使用隔离沙箱（`--persist-to /tmp/epo-fresh` 冷启动播种），未向开发者本机 `.wrangler/state` 写入任何业务数据；巡检脚本为纯只读渲染测量。
+
 ### 全量安全深度审计加固与漏洞闭环：P0/P1/P2 防护 + SSRF 阻断 + XSS 三重防御 + 会话脱敏 (2026-09-22)
 *   **关联提交 (Git Commit)**: `7ee3a66d5fb17c44983ff2b7f35534d82c815524` (Short: `7ee3a66`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com / epomail.epocanvas.workers.dev)` (Version ID: `2b5947b8-2b61-4ff9-b49a-66740c8fa4cd`，100% 流量；上一基线 `e748401a-a679-4bab-b1fd-2cbcdc5c7c1b`) + `本地全真栈`
