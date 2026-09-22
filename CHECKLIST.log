@@ -10,6 +10,24 @@
 
 ---
 
+### 通用设置页 UI 优化：底部留白修复 / 标签单行化 / es-fr-nl 全量本地化 (2026-09-21)
+*   **关联提交 (Git Commit)**: `054b49a6370de361b235f71aa98e7ae64952858e` (Short: `054b49a`)
+*   **部署环境 (Deployment)**: `本地全真栈 (wrangler dev 127.0.0.1:8787)`（生产待发布）
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 底部零留白根因修复：`mail-vue/src/layout/main/index.vue` 的 `.main-view` 由 `height:100%` 改为 `height:auto; min-height:100%`，内容溢出后 `padding-bottom` 不再悬空（全站设置页通用受益）；`style.css` 新增 `.settings-content .main-view > .container:not(:has(~ .container)) { margin-bottom: 0 }`，末块底板不再叠加 24px，尾部留白与顶部对称（桌面 64px / 移动 46px）
+    - [x] 标签列宽重排：`profile-setting/index.vue` `.item` 栅格由 `110px + gap 80px` 调整为 `170px + gap 20px`，控件列起始 x 保持 190px 不变，长标签获得单行空间；`white-space: nowrap` 保障不折行，"?" 紧邻文本右缘（不落入行中）
+    - [x] 移除 3 处冗余内联 flex 样式（emailThreading / 翻译目标语言 / OCR 行），统一由 `.item > div:first-child` 承载
+    - [x] 六语言标签精简（补义下沉至 "?" tooltip）：`enableImageOcr` → zh「图片 OCR 翻译」/ en「Image OCR」/ es「OCR de imagen」/ fr「OCR d'image」/ nl「Afbeelding-OCR」；`defaultTranslateLang` → en「Translate To」/ es「Traducir a」/ fr「Traduire en」/ nl「Vertalen naar」；`mainPanelWallpaper`、`profileCoverPhoto`、`emailThreading` 同步精简
+    - [x] es/fr/nl 系统性半机翻清理：通用设置页可见面约 60 键/语言按本地自然表达重写（板块标题、单选项、阅读窗格选项、按钮、tooltip、占位符、消息），非逐字对齐
+    - [x] mail-worker 服务端字典未改动（UI 键服务端不消费，键集对称性不受影响）
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：mail-vue `vite build` 通过（构建后以 `scripts/copy-login-dist.mjs` 还原 `mail-worker/dist/login`）
+    - [x] 自动化测试套件：新增 `tests/audit-general-settings-spacing.mjs`（Playwright，route 拦截零写入切换语言）全绿 **38 通过 / 0 失败**（6 语言 × 桌面 1440 / 移动 375 双视口），断言尾部留白 ≥40px、全部 `.item` 标签零换行、零 pageerror
+    - [x] 浏览器全真栈实测：12 张截图逐一目视复核（zh/zh-Hant/en/es/fr/nl 桌面 + 移动），标签单行、"?" 位置自然、底部留白对称
+    - [x] i18n 静态审计三件套：`i18n-symmetry.mjs` ALL SYMMETRIC（vue 2033 键 / worker 1888 键）、`i18n-audit.mjs` 代码引用零缺失、`i18n-hardcoded.mjs` 304 行为既有基线未变动
+    - [x] 零假数据残留：巡检仅只读浏览与语言 route 拦截，未调用 updateProfile，管理员档案零写入
+*   **证据截图 (Evidence)**: `/tmp/gs-after/general_{desktop,mobile}_{zh,zh-Hant,en,es,fr,nl}.png`（修复前基线见 `/tmp/gs-before/`）
+
 ### 感官打磨二批：hover 反馈 / reduced-motion 门禁 / 崩溃页六语言 / 收件箱四端动态巡检 (2026-09-21)
 *   **关联提交 (Git Commit)**: `bb141e41ae71172c3a9aa1acdc25ac8a2e6df916` (Short: `bb141e4`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com)` (Version ID: `1e4ffe69-33bc-454f-9875-583660211c5a`，100% 流量；上一基线 `78f0e34e-370d-47bc-9dc4-d92163b2ac32`)
