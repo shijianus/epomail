@@ -12,7 +12,7 @@
 
 ### 系统设置「存储与核心数据库」卡片行距失步修复与状态胶囊越界裁切根治 (2026-09-22)
 *   **关联提交 (Git Commit)**: `151641948748ca102bba3273ce2ad13864a081eb` (Short: `1516419`)
-*   **部署环境 (Deployment)**: `本地全真栈`（隔离沙箱实例，未触达生产与开发者本机 D1/KV 状态）
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com / epomail.epocanvas.workers.dev)` (Version ID: `869c5621-e6fe-4b51-9409-2bb8efc77744`，100% 流量；上一基线 `2b5947b8-2b61-4ff9-b49a-66740c8fa4cd`) + `本地全真栈`
 *   **功能需求与变更清单 (Changes & Feature Alignment)**:
     - [x] 行距失步根因治理：移除 `.storage-db-card .setting-item` 独有的 `padding: 7px 0`。该 padding 叠加 `.card-content` 的 `gap: 10px` 后视觉净空达 24px，而全站其余 8 张卡片均为 10px；同时将列间距由 12px 收敛为基类一致的 10px。
     - [x] 控件孤行根因治理：右侧操作组 `flex-wrap` 由 `wrap` 改为 `nowrap` 使胶囊与按钮整组绑定，并在条目级引入 `flex-wrap: wrap` + `row-gap: 6px`，容纳不下时整组换至次行右对齐，实现文案零截断与按钮零孤行。
@@ -27,6 +27,15 @@
     - [x] 交互命中实测：5 个配置按钮（对象存储/域详情/数据库配置/存储体检/AI 配置）在桌面与移动端均可命中并成功唤起弹窗。
     - [x] i18n 静态审计三件套：`i18n-symmetry` 6 语言 1888 键 ALL SYMMETRIC；`i18n-audit` 缺失键 0；`i18n-hardcoded` 304 行与修复前基线持平零回归。
     - [x] 零假数据残留：验证全程使用隔离沙箱（`--persist-to /tmp/epo-fresh` 冷启动播种），未向开发者本机 `.wrangler/state` 写入任何业务数据；巡检脚本为纯只读渲染测量。
+*   **生产部署与线上核验 (Production Deployment & Live Verification)**:
+    - [x] 部署前置校验：`git log 7ee3a66..HEAD` 确认自线上基线以来**唯一源码变更**即本次 `mail-vue/src/views/sys-setting/index.vue`（+59/-6），其余 3 个提交均为 docs/test 记录，部署不夹带未审计改动。
+    - [x] 生产部署执行：`npx wrangler deploy` 成功，构建链 `temp_login_ui → mail-vue` 全绿，上传 43 项资源，Version ID `869c5621-e6fe-4b51-9409-2bb8efc77744`；`[build] command` 由源码全新构建，非本地产物直传。
+    - [x] 线上产物指纹核验：`https://mail.epocanvas.com/assets/index-CU5_iboE.css` 与本地已验证构建**内容哈希同名**（哈希由内容推导，等价于字节级一致），其内规则为 `.storage-db-card .setting-item{display:flex;flex-wrap:wrap;...;gap:6px 10px}`，`padding:7px` 已消失。
+    - [x] 唯一样式源确认：遍历线上全部 28 个 CSS 分块，仅 `index-CU5_iboE.css` 定义 `.storage-db-card .setting-item`，排除旧样式残留与双源覆盖。
+    - [x] 入口链路与缓存策略确认：`/system-setting` HTML 入口 JS 由 `index--imlMjWi.js` 轮替为 `index-DkP2fMcl.js`；HTML 为 `max-age=0, must-revalidate`，哈希资源为 `immutable`，SW 仅 precache `logo.svg` 与 `manifest.webmanifest` 且无 runtimeCaching —— 用户回访必然拉取新构建，无陈旧缓存陷阱。
+    - [x] 线上真实浏览器实测（只读巡检账号 `admin@epomail.cyou`，具备 `setting:query`）：zh/en × 1440px/375px 四象限断言全绿，存储卡片与 AI 卡片行距均为 `[10,10,10,10]`，条目零附加 padding，零控件越出卡片右边界。
+    - [x] 线上真实数据形态验证：生产处于**双数据库物理隔离模式**，状态胶囊文案「双数据库物理隔离模式」长于本地沙箱样本，实测整组换行后胶囊与两个按钮仍同处次行右对齐、无截断无越界。
+    - [x] 旧版本资源已下线：请求上一版入口 `index--imlMjWi.js` 已回落至 SPA `index.html`，确认旧构建产物不再被服务。
 
 ### 全量安全深度审计加固与漏洞闭环：P0/P1/P2 防护 + SSRF 阻断 + XSS 三重防御 + 会话脱敏 (2026-09-22)
 *   **关联提交 (Git Commit)**: `7ee3a66d5fb17c44983ff2b7f35534d82c815524` (Short: `7ee3a66`)
