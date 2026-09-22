@@ -12,7 +12,7 @@
 
 ### 全量安全深度审计加固与漏洞闭环：P0/P1/P2 防护 + SSRF 阻断 + XSS 三重防御 + 会话脱敏 (2026-09-22)
 *   **关联提交 (Git Commit)**: `7ee3a66d5fb17c44983ff2b7f35534d82c815524` (Short: `7ee3a66`)
-*   **部署环境 (Deployment)**: `本地全真栈` (Cloudflare Workers + Vue 3 SPA + Vite Preview)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com / epomail.epocanvas.workers.dev)` (Version ID: `2b5947b8-2b61-4ff9-b49a-66740c8fa4cd`，100% 流量；上一基线 `e748401a-a679-4bab-b1fd-2cbcdc5c7c1b`) + `本地全真栈`
 *   **功能需求与变更清单 (Changes & Feature Alignment)**:
     - [x] 越权修改防御 (A-01): `user-service.js` `updateProfile` 强制引入 `ALLOWED_PROFILE_FIELDS` 白名单过滤，严格禁止覆盖 `userId`/`email`/`type`/`roleId`/`status`；KV 身份缓存仅同步安全展示属性。
     - [x] 邮件转发中继与循环防护 (A-29): `user-service.js` 校验 `personalForwarding.targets`（严格正则、上限 5 个）；`email.js` 转发循环阻断（匹配到收件人或发件人自动跳过）。
@@ -25,12 +25,16 @@
     - [x] 健壮性与流式防护 (A-11/A-21/A-27): `att-service.js` 配额超限立即 return；`role-service.js` 新增角色强制 `isDefault: CLOSE`；`email.js` 采用流式字节计数器（>25MB 立即取消），杜绝 Worker OOM；移除 `email-service.js` 中 `resendToken` 控制台打印。
 *   **自动化测试与核验清单 (Verification Checklist)**:
     - [x] 本地构建核验：mail-vue `vite build` 19.38s 通过；mail-worker `wrangler deploy --dry-run` 编译通过。
+    - [x] 生产部署执行：`wrangler deploy` 成功发布至 Version ID `2b5947b8-2b61-4ff9-b49a-66740c8fa4cd`。
     - [x] 自动化测试套件：新建 `tests/test-security-hardening-evidence.mjs` 覆盖 SSRF/XSS/JWT TTL/白名单/配额/角色防御，全绿 **43 通过 / 0 失败**。
     - [x] 路由权限门禁核验：`gate.mjs` 扫描 137 条路由，遗漏权限项为 **0 项缺失**，死规则为 **0 项**。
-    - [x] 登录面六语言与无障碍实测：`tests/verify-login-polish.mjs` 全绿 **62 通过 / 0 失败**。
+    - [x] 生产环境浏览器巡检：`tests/verify-live-browser.mjs` 全绿 **25 通过 / 0 失败**（全站零失败请求、零 console error、零 pageerror、无 >2MB 响应、PWA 静态资产 200）。
+    - [x] 生产环境六语言登录巡检：`tests/verify-login-polish.mjs https://mail.epocanvas.com` 全绿 **62 通过 / 0 失败**。
+    - [x] 生产环境通用设置排版巡检：`tests/audit-general-settings-spacing.mjs https://mail.epocanvas.com` 全绿 **38 通过 / 0 失败**（6 语言 × 双视口，底部留白桌面 64px / 移动 46px、标签 0 换行、零 pageerror）。
     - [x] 本地全真栈感官与端到端实测：`tests/verify-sensory-sweep.mjs` 对 `http://127.0.0.1:8787` 全绿 **33 通过 / 0 失败**（四端响应式、暗色生效与还原、CLS 布局偏移 < 0.001、零横向溢出、零 pageerror）。
     - [x] 静态 i18n 三件套审计：`i18n-symmetry.mjs` ALL SYMMETRIC（vue 2033 键 / worker 1888 键）、`i18n-audit.mjs` 代码引用零缺失。
     - [x] 零假数据残留：测试均采用沙箱、算法断言与只读浏览，未对数据库或 KV 写入任何假数据残留。
+
 
 ---
 
