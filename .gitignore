@@ -51,3 +51,4 @@ temp_login_ui/guidelines/
 preview.html
 epomail-prototype.html
 tests/*.png
+.qoder/

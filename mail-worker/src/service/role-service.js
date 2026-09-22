@@ -246,6 +246,7 @@ const roleService = {
 
 		roleRow = await orm(c).insert(role).values({
 			...params,
+			isDefault: roleConst.isDefault.CLOSE,
 			banEmail,
 			availDomain,
 			userId,

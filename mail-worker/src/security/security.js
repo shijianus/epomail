@@ -70,7 +70,17 @@ const requirePerms = [
 	'/regKey/list',
 	'/regKey/delete',
 	'/regKey/clearNotUse',
-	'/regKey/history'
+	'/regKey/history',
+	'/setting/db/status',
+	'/setting/globalEmailConfig',
+	'/setting/sendWelcomeEmail',
+	'/setting/sendGlobalEmail',
+	'/setting/ai/test',
+	'/setting/ai/models',
+	'/setting/s3/test',
+	'/setting/db/test',
+	'/setting/storage/scan',
+	'/setting/storage/cleanup'
 ];
 
 const premKey = {
@@ -94,7 +104,12 @@ const premKey = {
 	'all-email:query': ['/allEmail/list','/allEmail/latest'],
 	'all-email:delete': ['/allEmail/delete','/allEmail/batchDelete'],
 	'setting:query': ['/setting/query', '/admin/oauthApp/list', '/setting/db/status', '/setting/globalEmailConfig'],
-	'setting:set': ['/setting/set', '/setting/setBackground','/setting/deleteBackground','/setting/setBlacklist', '/admin/oauthApp/add', '/admin/oauthApp/update', '/admin/oauthApp/resetSecret', '/admin/oauthApp/status', '/admin/oauthApp/delete', '/setting/sendWelcomeEmail', '/setting/sendGlobalEmail', '/setting/globalEmailConfig'],
+	'setting:set': [
+		'/setting/set', '/setting/setBackground','/setting/deleteBackground','/setting/setBlacklist',
+		'/admin/oauthApp/add', '/admin/oauthApp/update', '/admin/oauthApp/resetSecret', '/admin/oauthApp/status', '/admin/oauthApp/delete',
+		'/setting/sendWelcomeEmail', '/setting/sendGlobalEmail', '/setting/globalEmailConfig',
+		'/setting/ai/test', '/setting/ai/models', '/setting/s3/test', '/setting/db/test', '/setting/storage/scan', '/setting/storage/cleanup'
+	],
 	'analysis:query': ['/analysis/echarts'],
 	'reg-key:add': ['/regKey/add'],
 	'reg-key:query': ['/regKey/list','/regKey/history'],
@@ -144,6 +159,10 @@ app.use('*', async (c, next) => {
 
 	if (!authInfo.tokens.includes(token)) {
 		throw new BizError(t('authExpired'), 401);
+	}
+
+	if (authInfo.user && authInfo.user.status === 1) {
+		throw new BizError(t('isBanUser'), 403);
 	}
 
 	const permIndex = requirePerms.findIndex(item => {

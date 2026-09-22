@@ -20,12 +20,13 @@ const jwtUtils = {
 		};
 
 		const now = Math.floor(Date.now() / 1000);
-		const exp = expiresInSeconds ? now + expiresInSeconds : undefined;
+		const defaultTtl = 30 * 24 * 3600; // 30 days default expiration
+		const exp = now + (expiresInSeconds || defaultTtl);
 
 		const fullPayload = {
 			...payload,
 			iat: now,
-			...(exp ? { exp } : {})
+			exp
 		};
 
 		const headerStr = base64url(encoder.encode(JSON.stringify(header)));

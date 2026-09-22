@@ -3,6 +3,7 @@ import settingService from './setting-service';
 import domainUtils from '../utils/domain-uitls';
 import { settingConst } from '../const/entity-const';
 import s3Signer from '../utils/s3-signer';
+import { isSafePublicUrl } from '../utils/url-utils';
 
 const s3Service = {
 
@@ -166,6 +167,14 @@ const s3Service = {
 				message: '配置信息不完整，请提供 Bucket 名称、Endpoint 节点、Access Key 及 Secret Key。'
 			};
 		}
+
+		if (!isSafePublicUrl(endpoint)) {
+			return {
+				ok: false,
+				message: 'Endpoint 节点地址不合法或属于受限内网地址。'
+			};
+		}
+
 
 		const provider = s3Signer.detectProvider(endpoint);
 		const probeKey = `epomail_probe_check_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.tmp`;

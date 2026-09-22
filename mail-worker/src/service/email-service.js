@@ -952,7 +952,6 @@ const emailService = {
 	},
 
 	async sendByResend(resendToken, params) {
-		console.log('RESEND TOKEN IS:', resendToken);
 		if (resendToken && resendToken.startsWith('mailjet:')) {
 			return await this.sendByMailjet(resendToken, params);
 		}

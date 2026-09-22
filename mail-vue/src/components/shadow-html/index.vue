@@ -25,16 +25,23 @@ let shadowRoot = null
 function updateContent() {
   if (!shadowRoot) return;
 
-  // 1. 提取 <body> 的 style 属性（如果存在）
+  // 1. 提取 <body> 的 style 属性（如果存在）并进行严格的 CSS 安全白名单防御
   const bodyStyleRegex = /<body[^>]*style="([^"]*)"[^>]*>/i;
   const bodyStyleMatch = (props.html || '').match(bodyStyleRegex);
-  const bodyStyle = bodyStyleMatch ? bodyStyleMatch[1] : '';
+  const rawBodyStyle = bodyStyleMatch ? bodyStyleMatch[1] : '';
+  let safeBodyStyle = '';
+  // 坚决防御：禁止任何闭合标签、HTML实体、表达式、JS协议与CSS导入
+  if (rawBodyStyle && !/[<>{}\\]|expression|url\s*\(|@import|javascript:/i.test(rawBodyStyle)) {
+    if (/^[\w\s\-#%:,.;()]+$/.test(rawBodyStyle)) {
+      safeBodyStyle = rawBodyStyle;
+    }
+  }
 
   // 2. 移除 <body> 标签（保留内容）并使用 DOMPurify 进行 XSS 防御清洗
   const rawHtml = (props.html || '').replace(/<\/?body[^>]*>/gi, '');
   const cleanedHtml = DOMPurify.sanitize(rawHtml, {
     ADD_ATTR: ['target'],
-    FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'form']
+    FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'form', 'style']
   });
 
   // 3. 将 body 的 style 应用到 .shadow-content
@@ -73,7 +80,7 @@ function updateContent() {
         height: fit-content;
         min-width: 100%;
         ${uiStore.dark ? 'filter: invert(1) hue-rotate(180deg);' : ''}
-        ${bodyStyle ? bodyStyle : ''} /* 注入 body 的 style */
+        ${safeBodyStyle ? safeBodyStyle : ''} /* 注入经过白名单安全校验的 body style */
       }
 
       img, video, svg, .epo-trans-img-overlay, .epo-trans-img-mask {

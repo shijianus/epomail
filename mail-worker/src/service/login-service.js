@@ -25,6 +25,18 @@ import orm from '../entity/orm.js';
 import user from '../entity/user.js';
 import { eq } from 'drizzle-orm';
 
+function getSafeSessionUser(userRow) {
+	if (!userRow) return null;
+	const safe = { ...userRow };
+	delete safe.password;
+	delete safe.salt;
+	delete safe.totpSecret;
+	delete safe.totpBackupCodes;
+	delete safe.byoStorageConfig;
+	delete safe.securityKeys;
+	return safe;
+}
+
 const loginService = {
 
 	async register(c, params, oauth = false) {
@@ -255,7 +267,11 @@ const loginService = {
 		}
 
 		const incrementFail = async () => {
-			await c.env.kv.put(failKey, (failCount + 1).toString(), { expirationTtl: 12 * 60 * 60 });
+			try {
+				let latest = await c.env.kv.get(failKey);
+				let current = latest ? parseInt(latest) : 0;
+				await c.env.kv.put(failKey, (current + 1).toString(), { expirationTtl: 12 * 60 * 60 });
+			} catch {}
 		};
 
 		let userRow = await userService.selectByEmailIncludeDel(c, inputEmail);
@@ -382,7 +398,7 @@ const loginService = {
 
 			authInfo = {
 				tokens: [],
-				user: userRow,
+				user: getSafeSessionUser(userRow),
 				refreshTime: dayjs().toISOString()
 			};
 
@@ -562,7 +578,7 @@ const loginService = {
 		} else {
 			authInfo = {
 				tokens: [uuid],
-				user: userRow,
+				user: getSafeSessionUser(userRow),
 				refreshTime: dayjs().toISOString()
 			};
 		}
@@ -587,7 +603,11 @@ const loginService = {
 			const index = authInfo.tokens.findIndex(item => item === token);
 			if (index > -1) {
 				authInfo.tokens.splice(index, 1);
-				await c.env.kv.put(KvConst.AUTH_INFO + userId, JSON.stringify(authInfo));
+			}
+			if (authInfo.tokens.length === 0) {
+				await c.env.kv.delete(KvConst.AUTH_INFO + userId);
+			} else {
+				await c.env.kv.put(KvConst.AUTH_INFO + userId, JSON.stringify(authInfo), { expirationTtl: constant.TOKEN_EXPIRE });
 			}
 		}
 	}

@@ -1,11 +1,26 @@
 import { parseHTML } from 'linkedom';
-import domainUtils from '../utils/domain-uitls';
+import domainUtils from '../utils/domain-uitls.js';
 
 export default function emailHtmlTemplate(html, domain) {
 
 	const { document } = parseHTML(html);
-	document.querySelectorAll('script').forEach(script => script.remove());
+	document.querySelectorAll('script, iframe, object, embed, form, base, applet').forEach(el => el.remove());
+	document.querySelectorAll('*').forEach(el => {
+		for (const attr of Array.from(el.attributes || [])) {
+			if (attr.name.toLowerCase().startsWith('on') || (attr.value && attr.value.toLowerCase().includes('javascript:'))) {
+				el.removeAttribute(attr.name);
+			}
+		}
+	});
+	const bodyEl = document.querySelector('body');
+	if (bodyEl && bodyEl.hasAttribute('style')) {
+		const rawStyle = bodyEl.getAttribute('style') || '';
+		if (/[<>{}\\]|expression|url\s*\(|@import|javascript:/i.test(rawStyle) || !/^[a-zA-Z0-9\s:;._#%,'"-]+$/.test(rawStyle)) {
+			bodyEl.removeAttribute('style');
+		}
+	}
 	html = document.toString();
+
 	html = html.replace(/{{domain}}/g, domainUtils.toOssDomain(domain) + '/');
 	const safeHtmlJson = JSON.stringify(html).replace(/</g, '\\u003C');
 
@@ -14,6 +29,7 @@ export default function emailHtmlTemplate(html, domain) {
 <head>
     <meta charset='UTF-8'>
     <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' data: blob: https:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; object-src 'none';">
     <style>
         * {
             box-sizing: border-box;
@@ -47,13 +63,17 @@ export default function emailHtmlTemplate(html, domain) {
             const container = document.getElementById('container');
             const shadowRoot = container.attachShadow({ mode: 'open' });
 
-            // 提取 <body> 的 style 属性
+            // 提取 <body> 的 style 属性并严格清洗，防御 CSS/HTML 逃逸与 XSS
             const bodyStyleRegex = /<body[^>]*style="([^"]*)"[^>]*>/i;
             const bodyStyleMatch = html.match(bodyStyleRegex);
-            const bodyStyle = bodyStyleMatch ? bodyStyleMatch[1] : '';
+            let bodyStyle = bodyStyleMatch ? bodyStyleMatch[1] : '';
+            if (/[<>{}\\\\]|expression|url\\s*\\(|@import|javascript:/i.test(bodyStyle) || !/^[a-zA-Z0-9\\s:;._#%,'"-]+$/.test(bodyStyle)) {
+                bodyStyle = '';
+            }
 
             // 移除 <body> 标签
             const cleanedHtml = html.replace(/<\\/?body[^>]*>/gi, '');
+
 
             // 渲染内容
             shadowRoot.innerHTML = \`

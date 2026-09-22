@@ -23,11 +23,27 @@ const kvObjService = {
 			return null;
 		}
 
+		const rawType = (obj.metadata?.contentType || '').toLowerCase().trim();
+		const SAFE_INLINE_IMAGE_TYPES = [
+			'image/png', 'image/jpeg', 'image/jpg', 'image/gif',
+			'image/webp', 'image/avif', 'image/bmp', 'image/x-icon'
+		];
+
+		let finalType = 'application/octet-stream';
+		let finalDisposition = 'attachment';
+
+		if (SAFE_INLINE_IMAGE_TYPES.includes(rawType)) {
+			finalType = rawType;
+			finalDisposition = obj.metadata?.contentDisposition?.startsWith('inline') ? 'inline' : 'attachment';
+		}
+
 		return new Response(obj.value, {
 			headers: {
-				'Content-Type': obj.metadata?.contentType || 'application/octet-stream',
-				'Content-Disposition': obj.metadata?.contentDisposition || null,
-				'Cache-Control': obj.metadata?.cacheControl || null
+				'Content-Type': finalType,
+				'Content-Disposition': finalDisposition,
+				'Cache-Control': obj.metadata?.cacheControl || 'public, max-age=86400',
+				'X-Content-Type-Options': 'nosniff',
+				'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; sandbox"
 			}
 		});
 	},

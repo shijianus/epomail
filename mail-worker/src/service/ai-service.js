@@ -3,6 +3,8 @@ import { settingConst } from '../const/entity-const';
 import settingService from './setting-service';
 import kvConst from '../const/kv-const';
 import dayjs from 'dayjs';
+import { isSafePublicUrl } from '../utils/url-utils';
+
 
 const aiService = {
 	async recordUsage(c, { model, tokens = 0, calls = 1 } = {}) {
@@ -1023,6 +1025,16 @@ STRICT RULES:
 		const apiKey = (aiApiKey || '').trim();
 		const startTime = Date.now();
 
+		if (aiApiUrl && !isSafePublicUrl(aiApiUrl)) {
+			return {
+				success: false,
+				models: [],
+				latencyMs: 0,
+				total: 0,
+				message: 'AI API URL 包含不合法或内网受限地址'
+			};
+		}
+
 		// 1. 若未提供自定义 API Key，返回 Cloudflare Workers AI 支持的完整官方模型列表
 		if (!apiKey) {
 			const cfModels = [
@@ -1306,6 +1318,16 @@ STRICT RULES:
 	async testConnection(c, { aiApiKey, aiApiUrl, aiModel, aiModels, models } = {}) {
 		const apiKey = (aiApiKey || '').trim();
 		const apiUrl = (aiApiUrl || '').trim();
+
+		if (apiUrl && !isSafePublicUrl(apiUrl)) {
+			return {
+				success: false,
+				avgLatency: 0,
+				detail: 'AI API URL 包含不合法或内网受限地址',
+				results: [],
+				detectedModels: []
+			};
+		}
 
 		// 解析需要测试的目标模型列表 (主模型 + 模型池模型)
 		let targetModels = [];

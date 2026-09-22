@@ -23,6 +23,7 @@ import oauthService from "./oauth-service";
 import emailCryptoUtils from '../utils/email-crypto-utils';
 import { getDefaultUserLabelsString } from '../const/default-labels';
 import { isAdminEmail, isAdminUser } from '../utils/admin-utils';
+import verifyUtils from '../utils/verify-utils';
 
 const userService = {
 
@@ -45,15 +46,54 @@ const userService = {
                 profile = JSON.parse(profileStr);
             }
         } catch (e) {}
-        
-        if (params.background && !params.backgroundUrl) params.backgroundUrl = params.background;
-        if (params.backgroundUrl && !params.background) params.background = params.backgroundUrl;
-        Object.assign(profile, params);
+
+        const ALLOWED_PROFILE_FIELDS = [
+            'nickname', 'bio', 'avatarUrl', 'backgroundUrl', 'customLabels',
+            'signature', 'themeMode', 'personalForwarding', 'background',
+            'showStats', 'showTrend', 'showSources'
+        ];
+
+        const safeParams = {};
+        for (const key of ALLOWED_PROFILE_FIELDS) {
+            if (params && params[key] !== undefined) {
+                safeParams[key] = params[key];
+            }
+        }
+
+        if (safeParams.background && !safeParams.backgroundUrl) safeParams.backgroundUrl = safeParams.background;
+        if (safeParams.backgroundUrl && !safeParams.background) safeParams.background = safeParams.backgroundUrl;
+
+        // Sanitize personalForwarding if present
+        if (safeParams.personalForwarding && typeof safeParams.personalForwarding === 'object') {
+            const pfw = safeParams.personalForwarding;
+            const validTargets = (pfw.targets || '')
+                .split(',')
+                .map(t => t.trim().toLowerCase())
+                .filter(t => t && verifyUtils.isEmail(t))
+                .slice(0, 5)
+                .join(',');
+            safeParams.personalForwarding = {
+                enabled: !!pfw.enabled,
+                mode: ['all', 'alias', 'rules'].includes(pfw.mode) ? pfw.mode : 'all',
+                aliasPrefixes: typeof pfw.aliasPrefixes === 'string' ? pfw.aliasPrefixes.slice(0, 200) : '',
+                addPrefix: !!pfw.addPrefix,
+                targets: validTargets
+            };
+        }
+
+        Object.assign(profile, safeParams);
         await c.env.kv.put('USER_PROFILE_' + userId, JSON.stringify(profile));
-        
+
         const authInfo = await c.env.kv.get(KvConst.AUTH_INFO + userId, { type: 'json' });
 		if (authInfo && authInfo.user) {
-            Object.assign(authInfo.user, params);
+            // Only sync safe UI/profile attributes to session cache.
+            // NEVER allow mutating security identity fields (userId, email, type, roleId, status, isDel, etc.)!
+            const safeSessionFields = ['nickname', 'bio', 'avatarUrl', 'backgroundUrl', 'customLabels', 'signature', 'personalForwarding'];
+            for (const f of safeSessionFields) {
+                if (safeParams[f] !== undefined) {
+                    authInfo.user[f] = safeParams[f];
+                }
+            }
 			await c.env.kv.put(KvConst.AUTH_INFO + userId, JSON.stringify(authInfo), { expirationTtl: constant.TOKEN_EXPIRE });
 		}
 	},
@@ -387,6 +427,12 @@ const userService = {
 		await accountService.physicsDeleteByUserIds(c, userIds);
 		await oauthService.deleteByUserIds(c, userIds);
 		await orm(c).delete(user).where(inArray(user.userId, userIds)).run();
+		for (const id of userIds) {
+			try {
+				await c.env.kv.delete(KvConst.AUTH_INFO + id);
+				await c.env.kv.delete('USER_PROFILE_' + id);
+			} catch (e) {}
+		}
 	},
 
 	async list(c, params) {
@@ -422,7 +468,24 @@ const userService = {
 
 
 		const query = orm(c).select({
-			...user,
+			userId: user.userId,
+			email: user.email,
+			type: user.type,
+			status: user.status,
+			isDel: user.isDel,
+			createTime: user.createTime,
+			activeTime: user.activeTime,
+			createIp: user.createIp,
+			activeIp: user.activeIp,
+			os: user.os,
+			browser: user.browser,
+			device: user.device,
+			regKeyId: user.regKeyId,
+			storageQuotaMb: user.storageQuotaMb,
+			allowAttachment: user.allowAttachment,
+			maxStorageMB: user.maxStorageMB,
+			totpEnabled: user.totpEnabled,
+			customLabels: user.customLabels,
 			username: oauth.username,
 			trustLevel: oauth.trustLevel,
 			avatar: oauth.avatar,
@@ -591,6 +654,9 @@ const userService = {
 			.run();
 
 		await this.updateUserInfo(c, userId, true);
+		try {
+			await c.env.kv.delete(KvConst.AUTH_INFO + userId);
+		} catch (e) {}
 	},
 
 	async getBlogLevelInfo(c, userId) {

@@ -43,21 +43,27 @@ export async function email(message, env, ctx) {
 			return;
 		}
 
+		// 收件大小限制
+		const maxLimitMB = (env.admin === message.to) ? 100 : 25;
+		const maxLimitBytes = maxLimitMB * 1024 * 1024;
 		const reader = message.raw.getReader();
+		const decoder = new TextDecoder();
 		let content = '';
+		let totalBytes = 0;
 
 		while (true) {
 			const { done, value } = await reader.read();
 			if (done) break;
-			content += new TextDecoder().decode(value);
+			totalBytes += value ? value.byteLength : 0;
+			if (totalBytes > maxLimitBytes) {
+				try { await reader.cancel(); } catch (_) {}
+				message.setReject(`Email exceeds the maximum allowed size of ${maxLimitMB}MB`);
+				return;
+			}
+			content += decoder.decode(value, { stream: true });
 		}
+		content += decoder.decode();
 
-		// 收件大小限制
-		const maxLimitMB = (env.admin === message.to) ? 100 : 25;
-		if (content.length > maxLimitMB * 1024 * 1024) {
-			message.setReject(`Email exceeds the maximum allowed size of ${maxLimitMB}MB`);
-			return;
-		}
 
 		const email = await PostalMime.parse(content);
 
@@ -310,8 +316,15 @@ export async function email(message, env, ctx) {
 
 						if (shouldForward) {
 							const targets = pfw.targets.split(',').map(t => t.trim()).filter(Boolean);
+							const currentTo = (message.to || '').trim().toLowerCase();
+							const currentFrom = (email.from?.address || '').trim().toLowerCase();
 
 							for (const target of targets) {
+								const cleanTarget = target.trim().toLowerCase();
+								if (!cleanTarget || cleanTarget === currentTo || cleanTarget === currentFrom) {
+									console.warn(`Prevented forwarding loop: target [${target}] matches recipient or sender`);
+									continue;
+								}
 								let cfForwardSuccess = false;
 								try {
 									// 尝试 Cloudflare 原生无损转发（若已在 CF Email Routing 中验证）

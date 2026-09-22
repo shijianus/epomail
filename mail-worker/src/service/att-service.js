@@ -25,6 +25,7 @@ const attService = {
 			const quotaCheck = await storageQuotaService.checkQuotaAvailable(c, userId, totalIncomingBytes);
 			if (!quotaCheck.allowed) {
 				console.warn(`User ${userId} storage quota exceeded: ${quotaCheck.reason}`);
+				return;
 			}
 		}
 

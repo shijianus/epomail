@@ -5,7 +5,7 @@ import { userOrm, mailOrm } from '../entity/orm';
 import { getUserDb, getMailDb } from '../utils/db-accessor';
 import { v4 as uuidv4 } from 'uuid';
 import { and, asc, desc, eq, sql, like } from 'drizzle-orm';
-import saltHashUtils from '../utils/crypto-utils';
+import totpUtils from '../utils/totp-utils';
 import cryptoUtils from '../utils/crypto-utils';
 import emailUtils from '../utils/email-utils';
 import roleService from './role-service';
@@ -42,18 +42,9 @@ const publicService = {
 				isDel: email.isDel,
 		}).from(email)
 
-		if (!size) {
-			size = 20
-		}
-
-		if (!num) {
-			num = 1
-		}
-
-		size = Number(size);
-		num = Number(num);
-
-		num = (num - 1) * size;
+		size = Math.min(Math.max(1, Number(size) || 20), 100);
+		num = Math.max(1, Number(num) || 1);
+		const offset = (num - 1) * size;
 
 		let conditions = []
 
@@ -97,7 +88,7 @@ const publicService = {
 			query.orderBy(desc(email.emailId));
 		}
 
-		return query.limit(size).offset(num);
+		return query.limit(size).offset(offset);
 
 	},
 
@@ -188,18 +179,18 @@ const publicService = {
 
 	async genToken(c, params) {
 
-		await this.verifyUser(c, params)
+		await this.verifyUser(c, params);
 
 		const uuid = uuidv4();
 
-		await c.env.kv.put(KvConst.PUBLIC_KEY, uuid);
+		await c.env.kv.put(KvConst.PUBLIC_KEY, uuid, { expirationTtl: 24 * 3600 });
 
-		return {token: uuid}
+		return { token: uuid };
 	},
 
 	async verifyUser(c, params) {
 
-		const { email, password } = params
+		const { email, password, code, totpCode } = params;
 
 		const userRow = await userService.selectByEmailIncludeDel(c, email);
 
@@ -211,10 +202,27 @@ const publicService = {
 			throw new BizError(t('notExistUser'));
 		}
 
+		if (userRow.status === 1) {
+			throw new BizError(t('isBanUser'));
+		}
+
 		if (!await cryptoUtils.verifyPassword(password, userRow.salt, userRow.password)) {
 			throw new BizError(t('IncorrectPwd'));
 		}
+
+		if (userRow.totpSecret) {
+			const mfaCode = (totpCode || code || '').trim();
+			if (!mfaCode) {
+				throw new BizError(t('totpCodeInvalid'));
+			}
+			const plainSecret = await totpUtils.decryptSecret(userRow.totpSecret, c.env);
+			const totpCheck = await totpUtils.verifyTOTP(plainSecret, mfaCode, 1);
+			if (!totpCheck.isValid) {
+				throw new BizError(t('totpCodeInvalid'));
+			}
+		}
 	},
+
 
 	async getProfile(c, username) {
 		const cleanTarget = (username || '').trim().toLowerCase();
