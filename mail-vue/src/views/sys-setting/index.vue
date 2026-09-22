@@ -7,7 +7,7 @@
       <div class="scroll-body">
         <div class="card-grid">
           <!-- Website Settings Card -->
-          <div class="settings-card">
+          <div class="settings-card website-card">
             <div class="card-title">{{ $t('websiteSetting') }}</div>
             <div class="card-content">
               <div class="setting-item">
@@ -48,6 +48,7 @@
                       :style="{ width: mailModeFixedSelectWidth, '--mail-mode-fs': mailModeFontSize }"
                       v-model="setting.allMailMode"
                       placeholder="Select"
+                      size="small"
                       class="mail-mode-select"
                       popper-class="mail-mode-popper"
                   >
@@ -92,6 +93,7 @@
                       :style="`width: ${ locale === 'en' ?  100 : 80 }px;`"
                       v-model="setting.regKey"
                       placeholder="Select"
+                      size="small"
                   >
                     <el-option
                         v-for="item in regKeyOptions"
@@ -6067,8 +6069,44 @@ function editSetting(settingForm, refreshStatus = true, closeAiDialog = false) {
   cursor: help;
 }
 
+/* Unify control heights: el-select defaulted to 38px, taller than the 28px switches around it.
+   In English the mail-mode row needs 469px against 422px of card width, so the group wraps to a
+   second line instead of running off the card edge where overflow:hidden would clip the select. */
+.website-card {
+  .setting-item {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 6px 8px;
+
+    > div:first-child {
+      flex-shrink: 0;
+    }
+
+    > div:last-child {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: nowrap;
+      margin-left: auto;
+    }
+
+    .hub-tag {
+      font-size: 11px;
+      padding: 0 5px;
+    }
+  }
+}
+
+/* The card used to carry min-height: 386px to stop the taller Static UI tab jumping; the grid
+   already equalises it with its row partner, so that floor only added dead space. The tab bar's
+   own 6px margin is dropped too so its gap to the first row matches the 10px page-wide rhythm. */
 .customization-card {
-  min-height: 386px;
+  .custom-ui-tabs {
+    margin-bottom: 0;
+  }
 }
 
 .static-ui-tip {
@@ -8914,6 +8952,7 @@ form .el-button {
 /* Below 500px the card offers ~207px of content width, so a long status pill overflows the
    card even after the whole group wraps, and overflow:hidden makes the config buttons unclickable. */
 @media (max-width: 500px) {
+  .website-card,
   .storage-db-card,
   .ai-hub-card {
     .storage-item-right,
@@ -8934,6 +8973,19 @@ form .el-button {
       line-height: 1.35;
       justify-content: flex-start;
       text-align: left;
+    }
+  }
+
+  /* The mail-mode select width is pinned per locale by JS to prevent jitter, but a narrow
+     row is only ~207px, so the pinned width must yield here or it overflows the card. */
+  .website-card {
+    .setting-item > div:last-child {
+      flex-wrap: wrap;
+      row-gap: 6px;
+    }
+
+    .mail-mode-select {
+      width: 100% !important;
     }
   }
 }

@@ -1,10 +1,15 @@
 /**
- * 系统设置「存储与核心数据库 / AI 智能引擎」卡片排版巡检。
+ * 系统设置卡片排版巡检：网站设置 / 个性化设置 / 存储与核心数据库 / AI 智能引擎。
  *
  * 守护三条回归红线：
  *   1. .setting-item 视觉净空必须与同级卡片一致（.card-content gap 基线），禁止条目自身再加垂直 padding 造成行距失步；
- *   2. 行内控件（按钮 / 胶囊 / 输入框）绝不允许越过卡片右边界被裁切（否则管理员无法点击配置按钮）；
+ *   2. 行内控件（按钮 / 胶囊 / 输入框 / 下拉框）绝不允许越过卡片右边界被裁切（否则管理员无法点击或选择）；
  *   3. 右侧操作组必须整组换行，禁止组内拆分导致按钮成为孤行。
+ *
+ * 度量口径说明：有底色/描边的行（如个性化设置的 Dynamic/Static 分段切换条）其 padding 属于可见盒内部，
+ * 不计入行间空白；无描边的普通 setting-item 其 padding 与 gap 视觉等价，必须计入。
+ *
+ * 同排卡片按产品决策保持 grid 等高拉伸，故「底部留白」仅作观测输出，不参与断言。
  *
  * 纯只读巡检：不写入任何账号数据或系统设置。
  * 用法：node tests/audit-sys-setting-card-rhythm.mjs [baseUrl] [outDir]
@@ -21,7 +26,7 @@ const OUT = process.argv[3] || '/tmp/sys-setting-rhythm';
 const ADMIN = process.env.AUDIT_ADMIN || 'admin@epomail.bond';
 const PWD = process.env.AUDIT_PWD || 'admin123';
 
-const GUARDED = ['.storage-db-card', '.ai-hub-card'];
+const GUARDED = ['.website-card', '.customization-card', '.storage-db-card', '.ai-hub-card'];
 const VIEWPORTS = [['desktop', { width: 1440, height: 900 }], ['mobile', { width: 375, height: 720 }]];
 const LOCALES = ['zh', 'en'];
 
@@ -48,8 +53,14 @@ const MEASURE = () => {
       const pt = parse(cs.paddingTop);
       const pb = parse(cs.paddingBottom);
       const mb = parse(cs.marginBottom);
+      // 有底色/描边的行（如分段切换条）其 padding 属于可见盒内部，不计入行间空白；
+      // 无描边的普通 setting-item 其 padding 与 gap 视觉等价，必须计入。
+      const painted = (cs.backgroundColor && !/^(rgba\(0, 0, 0, 0\)|transparent)$/.test(cs.backgroundColor))
+        || cs.backgroundImage !== 'none'
+        || parse(cs.borderTopWidth) + parse(cs.borderBottomWidth) > 0;
       // 右侧操作组 = 最后一个元素子节点；组内所有控件必须共处同一条视觉基线
-      const group = it.lastElementChild;
+      const isSettingItem = it.classList.contains('setting-item');
+      const group = isSettingItem ? it.lastElementChild : null;
       const controls = group ? [...group.children].filter((k) => k.getBoundingClientRect().width > 0) : [];
       const centers = controls.map((k) => {
         const b = k.getBoundingClientRect();
@@ -58,8 +69,10 @@ const MEASURE = () => {
       const over = controls.map((k) => Math.round(k.getBoundingClientRect().right - cr.right)).filter((v) => v > 0.5);
       return {
         label: (it.innerText || '').trim().replace(/\s+/g, ' ').slice(0, 20),
-        contentTop: r.top + pt,
-        contentBottom: r.bottom - pb,
+        isSettingItem,
+        painted,
+        contentTop: painted ? r.top : r.top + pt,
+        contentBottom: painted ? r.bottom : r.bottom - pb,
         contentHeight: Math.round(r.height - pt - pb),
         selfPadV: `${cs.paddingTop}/${cs.paddingBottom}`,
         splitGroup: centers.length > 1 && Math.max(...centers) - Math.min(...centers) > 6,
@@ -68,10 +81,13 @@ const MEASURE = () => {
     });
     const gaps = [];
     for (let i = 1; i < rows.length; i++) gaps.push(Math.round(rows[i].contentTop - rows[i - 1].contentBottom));
+    const lastBottom = rows.length ? rows[rows.length - 1].contentBottom : 0;
     return {
       title: (card.querySelector('.card-title')?.innerText || '').trim().replace(/\s+/g, ' '),
       cls: card.className,
       baselineGap: parse(cCs.rowGap),
+      cardHeight: Math.round(cr.height),
+      deadSpace: rows.length ? Math.round(cr.bottom - parse(cCs.borderBottomWidth) - parse(cCs.paddingBottom) - lastBottom) : 0,
       gaps,
       rows,
     };
@@ -112,7 +128,7 @@ try {
 
       const maxBaseline = Math.max(...cards.map((c) => c.baselineGap));
       for (const c of cards) {
-        console.log(`  ${(c.title || '(无标题)').padEnd(30)} gaps=[${c.gaps.join(',')}] h=[${c.rows.map((r) => r.contentHeight).join(',')}]`);
+        console.log(`  ${(c.title || '(无标题)').padEnd(30)} H=${String(c.cardHeight).padEnd(4)} 底部空白=${String(c.deadSpace).padEnd(4)} gaps=[${c.gaps.join(',')}] h=[${c.rows.map((r) => r.contentHeight).join(',')}]`);
       }
 
       for (const sel of GUARDED) {
@@ -123,8 +139,8 @@ try {
         check(loose.length === 0, `${tag} ${sel} 行距与全站基线(${maxBaseline}px)同步`,
           loose.length ? `超出 ${loose.length} 处: [${card.gaps.join(',')}]` : `[${card.gaps.join(',')}]`);
 
-        const padded = card.rows.filter((r) => r.selfPadV !== '0px/0px');
-        check(padded.length === 0, `${tag} ${sel} 条目未附加额外垂直 padding`,
+        const padded = card.rows.filter((r) => r.isSettingItem && r.selfPadV !== '0px/0px');
+        check(padded.length === 0, `${tag} ${sel} setting-item 未附加额外垂直 padding`,
           padded.map((r) => r.selfPadV).join(' ') || '全部 0');
 
         const clipped = card.rows.filter((r) => r.maxOverflow > 0);
@@ -140,11 +156,16 @@ try {
         }
       }
 
+      // 同排卡片按产品决策保持 grid 等高拉伸，故底部留白仅作观测，不作断言
+      const custom = cards.find((c) => c.cls.includes('customization-card'));
+      if (custom) console.log(`  · ${tag} .customization-card H=${custom.cardHeight} 底部留白=${custom.deadSpace}px（等高拉伸，符合预期）`);
+
       check(errors.length === 0, `${tag} 零 pageerror`, errors.slice(0, 2).join(' | '));
 
       if (vpName === 'desktop') {
-        for (const sel of ['.storage-db-card', '.ai-hub-card']) {
-          await page.locator(sel).first().screenshot({ path: join(OUT, `${sel.replace(/[.]/g, '')}_${lang}.png`) });
+        for (const sel of GUARDED) {
+          const loc = page.locator(sel).first();
+          if (await loc.count()) await loc.screenshot({ path: join(OUT, `${sel.replace(/[.]/g, '')}_${lang}.png`) });
         }
       }
       await ctx.close();
