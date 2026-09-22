@@ -10,6 +10,29 @@
 
 ---
 
+### 系统设置「网站设置」控件行高失步与下拉框越界裁切治理、「个性化设置」等高排版同步 (2026-09-22)
+*   **关联提交 (Git Commit)**: `ef8f998d2407aa564bef337ab56e87b5e0cddfec` (Short: `ef8f998`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com / epomail.epocanvas.workers.dev)` (Version ID: `4d7e0dbf-c009-4e78-94ff-becd1bfe2149`，100% 流量；上一基线 `869c5621-e6fe-4b51-9409-2bb8efc77744`) + `本地全真栈`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 控件高度失步治理：网站设置卡片内 `el-select`（邮件模式、注册码）未声明 `size`，落到全局放大的 38px 盒高，而相邻 `el-switch` 为 28px、`el-button` 为 24px，使该两行明显高出其余 6 行。补 `size="small"` 后行高收敛为 34px。
+    - [x] 下拉框越界裁切治理：邮件模式行右侧为「状态胶囊 + JS 按语言写死宽度的下拉框」(zh 210 / en 260，写死为防容器抖动)。原 `.setting-item` 走 `grid auto 1fr`、右单元再拆 `1fr auto`，英文合计 469px > 卡片可用 422px，下拉框越出卡片右边界 16px 并被 `.settings-card { overflow: hidden }` 裁切。改为与存储/AI 卡片同一排版模型（条目 `flex-wrap: wrap` + `gap: 6px 8px`，右侧整组 `nowrap` 绑定，容纳不下时整组换至次行右对齐），并收紧胶囊内边距，使中文可单行容纳（卡片 H 448 → 440）。
+    - [x] 窄屏越界治理：≤500px 时整行仅约 207px，写死宽度的下拉框必然越出卡片 76~119px。媒体查询内令其 `width: 100%` 让位行宽并允许组内堆叠。
+    - [x] 「个性化设置」等高同步：移除硬编码 `min-height: 386px`。该地板值原为 Dynamic/Static 两 tab 间防抖动预留，但同排卡片高度本就由 grid 等高拉伸对齐 —— 实测桌面端两 tab 态卡片恒为 467px、高差 0px，地板值已无必要，仅在移动端强撑空白。
+    - [x] 分段切换条节奏同步：`.custom-ui-tabs` 的 `margin-bottom` 6px → 0，其到首行净空回归全站 10px 基线。
+    - [x] 巡检度量口径修正：有底色/描边的行（分段切换条）其 padding 属可见盒内部，不计入行间空白；无描边的 `setting-item` 其 padding 与 gap 视觉等价，必须计入。修正前该差异被误报为 14px 行距失步。
+    - [x] 巡检范围由 2 张卡片扩展至 4 张（网站设置 / 个性化设置 / 存储与核心数据库 / AI 智能引擎）。
+    - [x] 产品决策留档：经确认，同排卡片**保持 grid 等高拉伸**（`align-items: normal`），因此「个性化设置」底部约 215px 留白属预期观测值而非缺陷，巡检脚本仅输出不断言。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：mail-vue `vite build` 12.77s 通过，零报错。
+    - [x] 自动化测试套件：`node tests/audit-sys-setting-card-rhythm.mjs` 全绿 (76/76 断言通过，zh/en × 1440px/375px 四象限 × 4 卡片)。
+    - [x] 行高收敛实测：网站设置由 `[28,28,38,28,28,38,28,28]` 收敛为 `[28,28,34,28,28,34,28,28]`（中文单行）；四张卡片行距统一 10px。
+    - [x] 越界归零实测：网站设置移动端由 +76/+119px 越界归零；桌面端英文下拉框不再被裁切。
+    - [x] tab 切换零抖动复验：桌面端 Dynamic/Static 两态卡片高度恒 467px、高差 0px，证明移除 `min-height` 未引入回归。
+    - [x] 线上产物字节级比对：生产 `assets/index-DPIjm0e0.css` 与本地已验证构建 md5 完全一致 (`4894057caf453fae98d97ec7c1138f35`)，且为唯一定义该规则的样式分块。
+    - [x] 线上真实浏览器实测：桌面 zh/en 四象限断言通过；移动端「网站设置」实时测量 `gaps=[10,10,10,10,10,10,10]`、`maxOverflow=0px`（该账号线上为 Level 3 E2EE 最长文案，构成额外压力测试）。
+    - [x] i18n 静态审计三件套：`i18n-symmetry` ALL SYMMETRIC；`i18n-audit` 缺失键 0；`i18n-hardcoded` 304 行与基线持平零回归。
+    - [x] 零假数据残留：全程只读巡检，未写入任何系统设置与账号数据；沙箱实例与临时目录已清理。
+
 ### 系统设置「存储与核心数据库」卡片行距失步修复与状态胶囊越界裁切根治 (2026-09-22)
 *   **关联提交 (Git Commit)**: `151641948748ca102bba3273ce2ad13864a081eb` (Short: `1516419`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com / epomail.epocanvas.workers.dev)` (Version ID: `869c5621-e6fe-4b51-9409-2bb8efc77744`，100% 流量；上一基线 `2b5947b8-2b61-4ff9-b49a-66740c8fa4cd`) + `本地全真栈`
