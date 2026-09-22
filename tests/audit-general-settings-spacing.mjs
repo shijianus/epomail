@@ -97,10 +97,12 @@ try {
         if (j && j.data && typeof j.data === 'object') j.data.lang = forcedLang;
         body = JSON.stringify(j);
       } catch { /* 保持原样 */ }
+      // body 已被解码，必须剥离 content-encoding/content-length，否则 CDN 压缩响应经浏览器二次解码会失败
+      const { 'content-encoding': _ce, 'content-length': _cl, ...hdrs } = res.headers();
       await route.fulfill({
         response: res,
         body,
-        headers: { ...res.headers(), 'content-type': 'application/json' },
+        headers: { ...hdrs, 'content-type': 'application/json' },
       });
     });
 
@@ -109,7 +111,16 @@ try {
     await page.locator('#epo-email').fill(ADMIN);
     await page.locator('#epo-password').fill(PWD);
     await page.locator('button[type="submit"]').click();
-    await page.waitForTimeout(6000);
+    try {
+      await page.waitForURL(/\/inbox/, { timeout: 20000 });
+    } catch {
+      // 登录后首个鉴权请求早于 token 落盘的 401 竞态会被弹回 /login/?reason=expired，token 已在 localStorage，直接重进收件箱即可恢复
+      const hasToken = await page.evaluate(() => !!localStorage.getItem('token'));
+      if (hasToken) {
+        await page.goto(BASE + '/inbox', { waitUntil: 'networkidle', timeout: 60000 });
+      }
+    }
+    await page.waitForTimeout(2000);
     ok(page.url().includes('/inbox'), `${vpName} 登录成功`, page.url());
 
     for (const lang of LANGS) {
