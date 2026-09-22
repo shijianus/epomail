@@ -8358,10 +8358,10 @@ form .el-button {
 .storage-db-card {
   .setting-item {
     display: flex;
+    flex-wrap: wrap;
     justify-content: space-between;
     align-items: center;
-    padding: 7px 0;
-    gap: 12px;
+    gap: 6px 10px;
     border-bottom: none !important;
 
     &:last-child {
@@ -8381,8 +8381,15 @@ form .el-button {
     justify-content: flex-end !important;
     align-items: center !important;
     gap: 8px !important;
-    flex-wrap: wrap !important;
+    flex-wrap: nowrap !important;
     margin-left: auto !important;
+
+    > .el-button,
+    > .el-input-number,
+    > .el-switch,
+    > .hub-unit-text {
+      flex-shrink: 0;
+    }
 
     .hub-unit-text {
       font-size: 12px;
@@ -8423,8 +8430,7 @@ form .el-button {
       font-size: 11.5px;
       font-weight: 500;
       border-radius: 6px;
-      max-width: none !important;
-      overflow: visible !important;
+      max-width: 100% !important;
       white-space: nowrap !important;
     }
 
@@ -8777,14 +8783,33 @@ form .el-button {
     align-items: center;
   }
 
+  .setting-item {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 6px 10px;
+
+    > div:first-child {
+      flex-shrink: 0;
+    }
+  }
+
   .ai-api-ctrl-right,
   .ai-input-ctrl {
     display: flex !important;
     justify-content: flex-end !important;
     align-items: center !important;
     gap: 8px !important;
-    flex-wrap: wrap !important;
+    flex-wrap: nowrap !important;
     margin-left: auto !important;
+
+    > .el-button,
+    > .el-input-number,
+    > .el-switch,
+    > .hub-unit-text {
+      flex-shrink: 0;
+    }
 
     .hub-tag {
       font-size: 12px;
@@ -8793,6 +8818,7 @@ form .el-button {
       border-radius: 6px;
       display: inline-flex;
       align-items: center;
+      max-width: 100% !important;
     }
 
     .hub-sub-tag {
@@ -8882,6 +8908,33 @@ form .el-button {
     padding: 3px 8px;
     border-radius: 6px;
     border: 1px solid var(--el-border-color-lighter);
+  }
+}
+
+/* Below 500px the card offers ~207px of content width, so a long status pill overflows the
+   card even after the whole group wraps, and overflow:hidden makes the config buttons unclickable. */
+@media (max-width: 500px) {
+  .storage-db-card,
+  .ai-hub-card {
+    .storage-item-right,
+    .ai-api-ctrl-right,
+    .ai-input-ctrl {
+      flex-wrap: wrap !important;
+      row-gap: 6px !important;
+      max-width: 100% !important;
+    }
+
+    .hub-tag {
+      height: auto;
+      min-height: 20px;
+      padding-top: 3px;
+      padding-bottom: 3px;
+      max-width: 100% !important;
+      white-space: normal !important;
+      line-height: 1.35;
+      justify-content: flex-start;
+      text-align: left;
+    }
   }
 }
 
