@@ -1196,6 +1196,11 @@ html.has-main-wallpaper .main-view {
     transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
 
+/* 页面收尾：最后一个底板不再叠加 24px 下边距，尾部留白由 main-view 的 padding-bottom 统一提供（与顶部对称） */
+.settings-content .main-view > .container:not(:has(~ .container)) {
+    margin-bottom: 0 !important;
+}
+
 html.dark:not(.has-main-wallpaper) .settings-content .container,
 html.dark:not(.has-main-wallpaper) .settings-content .settings-card,
 html.dark:not(.has-main-wallpaper) .settings-content .header-container,

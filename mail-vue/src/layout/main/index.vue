@@ -403,6 +403,9 @@ const handleResize = () => {
   
   .main-view {
     background: transparent;
+    /* height:100% 会把页面根节点钉死在视口高度，内容溢出后 padding-bottom 悬空、底部零留白 */
+    height: auto;
+    min-height: 100%;
   }
   
   @media (min-width: 1024px) {

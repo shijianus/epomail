@@ -1303,7 +1303,7 @@ totpModeAllDesc: '设置是否允许用户使用TOTP，开启后用户可以且�
     translateTo: '翻译为:',
     defaultTranslateLang: '翻译目标语言',
     defaultTranslateLangDesc: '配置阅读邮件时的默认翻译目标语言',
-    enableImageOcr: '图片 OCR 识别翻译',
+    enableImageOcr: '图片 OCR 翻译',
     enableImageOcrDesc: '实验性功能：开启后识别并翻译邮件内具有文本价值的图片文字',
     sameLangNotice: '原文已是目标语言，请选择其他目标语言进行翻译',
     alreadyInTargetLang: '原文已是您的首选语言，已呼出翻译工具条',

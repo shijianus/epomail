@@ -444,7 +444,7 @@
 
       <!-- 4. 邮件会话模式 (Email Threading - 带问号提示) -->
       <div class="item">
-        <div style="display: flex; align-items: center; gap: 6px;">
+        <div>
           <span>{{ $t('emailThreading') }}</span>
           <el-tooltip :content="$t('conversationViewDesc')" placement="top">
             <Icon icon="fluent:question-circle-16-regular" width="16" height="16" style="cursor: pointer; color: var(--text-muted); vertical-align: middle;" />
@@ -481,7 +481,7 @@
 
       <!-- 翻译目标语言 (Default Translation Target Language - 带问号提示，不显式展示说明文本) -->
       <div class="item" id="translate-lang-section">
-        <div style="display: flex; align-items: center; gap: 6px;">
+        <div>
           <span>{{ $t('defaultTranslateLang') }}</span>
           <el-tooltip :content="$t('defaultTranslateLangDesc')" placement="top">
             <Icon icon="fluent:question-circle-16-regular" width="16" height="16" style="cursor: pointer; color: var(--text-muted); vertical-align: middle;" />
@@ -516,7 +516,7 @@
 
       <!-- 图片 OCR 识别与翻译开关 (Image OCR Translation Toggle - 实验性功能问号提示) -->
       <div class="item" id="translate-ocr-section">
-        <div style="display: flex; align-items: center; gap: 6px;">
+        <div>
           <span>{{ $t('enableImageOcr') }}</span>
           <el-tooltip :content="$t('enableImageOcrDesc')" placement="top">
             <Icon icon="fluent:question-circle-16-regular" width="16" height="16" style="cursor: pointer; color: var(--text-muted); vertical-align: middle;" />
@@ -1138,8 +1138,9 @@ function savePrivacy(field, val) {
 
     .item {
       display: grid;
-      grid-template-columns: 110px 1fr;
-      gap: 80px;
+      /* 标签列 110px→170px、列间距 80px→20px：控件列起始位置不变，长标签获得单行展示空间 */
+      grid-template-columns: 170px 1fr;
+      gap: 20px;
       position: relative;
       align-items: center;
 
@@ -1151,6 +1152,10 @@ function savePrivacy(field, val) {
       > div:first-child {
         font-weight: bold;
         color: var(--text-primary);
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        white-space: nowrap;
       }
 
       .sub-hint {
