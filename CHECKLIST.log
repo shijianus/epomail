@@ -10,7 +10,32 @@
 
 ---
 
+### 全量安全深度审计加固与漏洞闭环：P0/P1/P2 防护 + SSRF 阻断 + XSS 三重防御 + 会话脱敏 (2026-09-22)
+*   **关联提交 (Git Commit)**: `7ee3a66d5fb17c44983ff2b7f35534d82c815524` (Short: `7ee3a66`)
+*   **部署环境 (Deployment)**: `本地全真栈` (Cloudflare Workers + Vue 3 SPA + Vite Preview)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 越权修改防御 (A-01): `user-service.js` `updateProfile` 强制引入 `ALLOWED_PROFILE_FIELDS` 白名单过滤，严格禁止覆盖 `userId`/`email`/`type`/`roleId`/`status`；KV 身份缓存仅同步安全展示属性。
+    - [x] 邮件转发中继与循环防护 (A-29): `user-service.js` 校验 `personalForwarding.targets`（严格正则、上限 5 个）；`email.js` 转发循环阻断（匹配到收件人或发件人自动跳过）。
+    - [x] 全量凭证脱敏与幽灵会话清除 (A-02/A-03/A-36): `user-service.js` `list` 采用安全列投影，彻底移除 `password`/`salt`/`totpSecret`/S3 凭证；`login-service.js` 会话入库前通过 `getSafeSessionUser` 深度脱敏；用户物理删除与修改角色类型时同步吊销 KV 缓存。
+    - [x] JWT 令牌到期兜底 (A-03): `jwt-utils.js` `generateToken` 默认注入 30 天 `exp` TTL；登出请求安全清理令牌。
+    - [x] 邮件富文本与模板 XSS 彻底防护 (A-04/A-30): `shadow-html/index.vue` 与 `email-html.js` 对 body style 注入严格执行字符集白名单校验（剥离 `<>{}\`、`javascript:`、`expression`、`@import`），DOMPurify 禁用 `<style>` 标签，`email-html.js` 剥离全部内联 `on*` 事件与危险标签并注入 CSP。
+    - [x] R2/OSS 附件输出防 XSS (A-30): `r2-api.js` 与 `kv-obj-service.js` 限制安全内联图片 MIME 白名单，非图片强制设为 `application/octet-stream`、`attachment`、`X-Content-Type-Options: nosniff` 并注入沙箱 CSP。
+    - [x] SSRF 带外探测全面阻断 (A-31): 新建 `mail-worker/src/utils/url-utils.js` 实现 `isSafePublicUrl`，并在 `ai-service.js`（`fetchModels`、`testConnection`）与 `s3-service.js`（`testConnection`）全面部署，阻断回环/RFC 1918/云元数据。
+    - [x] 权限网关与安全门禁闭环 (A-05/A-06): 补齐 `security.js` 10 条遗漏路由鉴权声明，`gate.mjs` 扫描 137 条路由 100% 对齐；中间件补齐封禁用户 403 检查；`/public/genToken` 补齐 MFA 校验与 24h 到期限制。
+    - [x] 健壮性与流式防护 (A-11/A-21/A-27): `att-service.js` 配额超限立即 return；`role-service.js` 新增角色强制 `isDefault: CLOSE`；`email.js` 采用流式字节计数器（>25MB 立即取消），杜绝 Worker OOM；移除 `email-service.js` 中 `resendToken` 控制台打印。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：mail-vue `vite build` 19.38s 通过；mail-worker `wrangler deploy --dry-run` 编译通过。
+    - [x] 自动化测试套件：新建 `tests/test-security-hardening-evidence.mjs` 覆盖 SSRF/XSS/JWT TTL/白名单/配额/角色防御，全绿 **43 通过 / 0 失败**。
+    - [x] 路由权限门禁核验：`gate.mjs` 扫描 137 条路由，遗漏权限项为 **0 项缺失**，死规则为 **0 项**。
+    - [x] 登录面六语言与无障碍实测：`tests/verify-login-polish.mjs` 全绿 **62 通过 / 0 失败**。
+    - [x] 本地全真栈感官与端到端实测：`tests/verify-sensory-sweep.mjs` 对 `http://127.0.0.1:8787` 全绿 **33 通过 / 0 失败**（四端响应式、暗色生效与还原、CLS 布局偏移 < 0.001、零横向溢出、零 pageerror）。
+    - [x] 静态 i18n 三件套审计：`i18n-symmetry.mjs` ALL SYMMETRIC（vue 2033 键 / worker 1888 键）、`i18n-audit.mjs` 代码引用零缺失。
+    - [x] 零假数据残留：测试均采用沙箱、算法断言与只读浏览，未对数据库或 KV 写入任何假数据残留。
+
+---
+
 ### 通用设置页 UI 优化：底部留白修复 / 标签单行化 / es-fr-nl 全量本地化 (2026-09-21)
+
 *   **关联提交 (Git Commit)**: `054b49a6370de361b235f71aa98e7ae64952858e` (Short: `054b49a`)；巡检脚本生产兼容修复 `5ef394dccc743c6197108d0012be6148a4e11096` (Short: `5ef394d`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com / epomail.epocanvas.workers.dev)` (Version ID: `e748401a-a679-4bab-b1fd-2cbcdc5c7c1b`，100% 流量；上一基线 `1e4ffe69-33bc-454f-9875-583660211c5a`)
 *   **功能需求与变更清单 (Changes & Feature Alignment)**:

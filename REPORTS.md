@@ -9,7 +9,37 @@
 
 ---
 
+### 底层架构全量安全深度审计与加固报告（P0/P1/P2 漏洞治理与闭环核验） (2026-09-22)
+*   **关联提交 (Git Commit)**: `7ee3a66d5fb17c44983ff2b7f35534d82c815524` (Short: `7ee3a66`)
+*   **专项文档索引 (Detailed Doc)**: `doc/security-audit-2026-09-22.md`
+*   **体检/审计范围与方法 (Scope & Methodology)**:
+    1. 范围与环境：Cloudflare Workers (mail-worker) + 前端 (mail-vue / temp_login_ui) 底层代码与协议全景；涵盖身份鉴权、租户隔离、XSS/CSP、SSRF、会话安全、存储配额、默认角色权限与诊断接口。
+    2. 工具与脚本：代码审计静态三件套（i18n-symmetry / i18n-audit / i18n-hardcoded）、自动化安全加固断言套件（`tests/test-security-hardening-evidence.mjs`）、Playwright 感官与视觉核验（`tests/verify-sensory-sweep.mjs`、`tests/verify-login-polish.mjs`）、权限路由网关扫描工具（`gate.mjs`）。
+*   **核心发现与缺陷矩阵 (Key Findings & Matrix)**:
+    - **[P0·致命/越权] (A-01)**: `/my/updateProfile` 允许任意输入字段无过滤覆盖，可篡改 `userId`/`type` 越权劫持全站与主站长账号；`personalForwarding.targets` 无有效校验，存在开放邮件中继风险。
+    - **[P0·致命/泄密] (A-02/A-03)**: `/user/list` 投影返回全表列，导致全库用户 `password`/`salt`/`totpSecret`/S3 凭证泄露；KV 会话明文持久化且无默认到期时间。
+    - **[P0·致命/XSS] (A-04/A-30)**: `shadow-html` body style 注入绕过 DOMPurify 同源 XSS；`/oss/*`、`/attachments/*` 匿名文件回显自选 Content-Type 存在存储型 XSS。
+    - **[P1·重要/安全] (A-05/A-06/A-31/A-36)**: `/public/genToken` 缺乏有效限流与 MFA/状态校验，签发无 TTL 全局令牌；权限网关 10 条敏感管理路由未纳入校验；AI 与 S3 测试接口存在带外 SSRF 隐患；账号物理删除后旧 KV 会话未吊销（幽灵会话）。
+    - **[P2·次要/缺陷] (A-11/A-21/A-27)**: 附件服务在配额超限后未提前返回仍执行写入；角色新增接口允许未授权设置 `isDefault: 1` 劫持默认角色；邮件解析流全量读入内存存在 OOM 隐患；邮件转发存在自我循环转发风险。
+*   **治理修复与回归结果 (Fixes & Verification)**:
+    - [x] **A-01 & 越权修复**: `updateProfile` 强制执行 `ALLOWED_PROFILE_FIELDS` 白名单过滤；安全更新展示属性，严禁越权污染身份缓存；`personalForwarding` 严格限制最多 5 个合规邮箱。
+    - [x] **A-02/A-03 & 凭证脱敏**: `user.list` 改用安全投影白名单，彻底移除敏感凭证字段；KV 会话经 `getSafeSessionUser` 深度脱敏；`jwtUtils.generateToken` 默认注入 30 天 `exp` TTL；登出清理会话。
+    - [x] **A-04/A-30 & XSS 三重防御**: `shadow-html/index.vue` 与 `email-html.js` 对 body style 注入严格过滤（阻断 `<`, `>`, `{`, `}`, `expression`, `javascript:`, `@import`）；DOMPurify 禁用 `<style>`；R2/OSS 附件输出限制 MIME 白名单，其它一律安全下载并注入严格 CSP 与 `nosniff`。
+    - [x] **A-05/A-06/A-31/A-36 & 权限与 SSRF 防护**: 补齐权限网关缺失路由，`gate.mjs` 扫描 137 条路由 100% 鉴权覆盖；引入 `isSafePublicUrl` 严格阻断回环/RFC 1918/云元数据 IP；删除用户/修改类型即时清理 KV 会话防止幽灵令牌；`genToken` 补齐 MFA/封禁校验与 24h 到期。
+    - [x] **P2 加固**: 邮件流接收改用流式字节计数器，超 25MB 立即取消读取并拒绝，杜绝 Worker OOM；个人转发增加同域与收件人防死循环检查；附件服务超配额立即返回；角色新增强制 `isDefault: CLOSE`；移除 `resendToken` 打印日志。
+    - [x] **测试证据链闭环**:
+      - `tests/test-security-hardening-evidence.mjs`: **43/43 断言全绿**（SSRF/XSS/JWT TTL/白名单/配额/角色）。
+      - `node scripts/i18n-symmetry.mjs`: **ALL SYMMETRIC**（vue 2033 键 / worker 1888 键）。
+      - `mail-vue` 构建：通过（耗时 19.38s，零警告零报错）。
+      - `mail-worker` dry-run 编译：通过。
+      - `tests/verify-sensory-sweep.mjs`: **33/33 通过**（桌面/平板/移动三端 + 亮暗双色 + 真实头部主题往返切换 + 零横向溢出 + CLS < 0.001）。
+      - `tests/verify-login-polish.mjs`: **62/62 通过**（六语言双视口）。
+      - 零假数据残留：测试数据全部内存模拟与沙箱运行，无真实数据库/KV污染。
+
+---
+
 ### 动态感官专项审计：登录面 + 收件箱四端（CLS / hover / reduced-motion / 对比度 / 主题真实性） (2026-09-21)
+
 *   **关联提交 (Git Commit)**: `bb141e41ae71172c3a9aa1acdc25ac8a2e6df916` (Short: `bb141e4`)
 *   **专项证据索引 (Evidence)**: `tests/verify-sensory-sweep.mjs`（新增，33 断言）、`tests/shots/sensory_*.png` ×9、`tests/verify-login-polish.mjs`（62 断言 ×本地/线上）、`tests/live_integrity.json`、`tests/live_browser_metrics.json`
 *   **体检/审计范围与方法 (Scope & Methodology)**:
