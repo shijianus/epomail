@@ -482,8 +482,6 @@ const userService = {
 			device: user.device,
 			regKeyId: user.regKeyId,
 			storageQuotaMb: user.storageQuotaMb,
-			allowAttachment: user.allowAttachment,
-			maxStorageMB: user.maxStorageMB,
 			totpEnabled: user.totpEnabled,
 			customLabels: user.customLabels,
 			username: oauth.username,
@@ -513,7 +511,7 @@ const userService = {
 
 		const userIds = list.map(user => user.userId);
 
-		const types = [...new Set(list.map(user => user.type))];
+		const types = [...new Set(list.map(user => user.type).filter(t => t !== null && t !== undefined))];
 
 		const [emailCounts, delEmailCounts, sendCounts, delSendCounts, accountCounts, delAccountCounts, roleList] = await Promise.all([
 			emailService.selectUserEmailCountList(c, userIds, emailConst.type.RECEIVE),
@@ -808,7 +806,7 @@ const userService = {
 			assignedName = email;
 		}
 
-		const role = roleService.selectById(c, type);
+		const role = await roleService.selectById(c, type);
 
 		if (!role) {
 			throw new BizError(t('roleNotExist'));

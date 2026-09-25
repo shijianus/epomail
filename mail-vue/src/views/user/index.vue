@@ -198,7 +198,7 @@
             <div class="email-row">{{ props.row.email }}</div>
           </template>
         </el-table-column>
-        <el-table-column property="address" :label="t('tabStatus')"  :width="locale === 'en' ? 75 : 65" >
+        <el-table-column property="isDel" :label="t('tabStatus')"  :width="locale === 'en' ? 75 : 65" >
           <template #default="props">
             <el-tag type="primary" disable-transitions v-if="props.row.isDel === 0">{{$t('active')}}</el-tag>
             <el-tag type="info" disable-transitions v-if="props.row.isDel === 1">{{$t('deleted')}}</el-tag>
@@ -283,11 +283,11 @@
         <div>
           <span class="details-item-title">{{ $t('sendEmail') }}:</span>
           <span>{{ formatSendCount(userDetails) }}</span>
-          <el-tag style="margin-left: 10px" v-if="userDetails.sendAction.hasPerm">
+          <el-tag style="margin-left: 10px" v-if="userDetails.sendAction?.hasPerm">
             {{ formatSendType(userDetails) }}
           </el-tag>
           <el-button size="small" style="margin-left: 10px"
-                     v-if="userDetails.sendAction.hasPerm && userDetails.sendAction.sendCount"
+                     v-if="userDetails.sendAction?.hasPerm && userDetails.sendAction?.sendCount"
                      @click="resetSendCount(userDetails)" type="primary">{{ $t('reset') }}
           </el-button>
         </div>
@@ -385,7 +385,7 @@
 </template>
 
 <script setup>
-import {defineOptions, h, reactive, ref, watch} from 'vue'
+import {computed, defineOptions, h, onMounted, onUnmounted, reactive, ref, watch} from 'vue'
 import {
   userList,
   userDelete,
@@ -456,14 +456,20 @@ const triggerRef = ref({
     return position.value;
   }
 })
-const domainList = settingStore.domainList
+const domainList = computed(() => settingStore.domainList || [])
 
 const addForm = reactive({
   email: '',
-  suffix: settingStore.domainList[0],
+  suffix: settingStore.domainList?.[0] || '',
   password: '',
   type: null,
 })
+
+watch(() => settingStore.domainList, (list) => {
+  if (list && list.length > 0 && !addForm.suffix) {
+    addForm.suffix = list[0]
+  }
+}, { immediate: true })
 
 const params = reactive({
   email: '',
@@ -536,11 +542,7 @@ const filterItem = reactive({
   receive: ['normal', 'del']
 })
 
-window.addEventListener('wheel', (event) => {
-  if (dropdownShow.value) {
-    dropdownRef.value.handleClose();
-  }
-})
+
 
 function visibleChange(e) {
   dropdownShow.value = e;
@@ -704,7 +706,7 @@ const openSelect = () => {
 
 function resetAddForm() {
   addForm.email = ''
-  addForm.suffix = settingStore.domainList[0]
+  addForm.suffix = settingStore.domainList?.[0] || ''
   addForm.type = null
   addForm.password = ''
 }
@@ -779,15 +781,17 @@ function submit() {
 
 
 function formatSendType(user) {
+  if (!user?.sendAction) return ''
   if (user.sendAction.sendType === 'day') return t('daily')
   if (user.sendAction.sendType === 'count') return t('total')
   if (user.sendAction.sendType === 'ban') return t('sendBanned')
   if (user.sendAction.sendType === 'internal') return t('sendInternal')
+  return ''
 }
 
 function formatSendCount(user) {
 
-  if (!user.sendAction.hasPerm) {
+  if (!user?.sendAction?.hasPerm) {
     return t('unauthorized')
   }
 
@@ -795,7 +799,7 @@ function formatSendCount(user) {
     return t('unlimited');
   }
 
-  let count = user.sendCount + '/' + user.sendAction.sendCount
+  let count = (user.sendCount || 0) + '/' + user.sendAction.sendCount
 
   return count
 }
@@ -1078,8 +1082,8 @@ function getUserList(loading = true) {
     newParams.isDel = 1
   }
   userList(newParams).then(data => {
-    users.value = data.list.map(item => ({...item, checkedClass: ''}))
-    total.value = data.total
+    users.value = (data?.list || []).map(item => ({...item, checkedClass: ''}))
+    total.value = data?.total || 0
     scrollbarRef.value?.setScrollTop(0);
   }).finally(() => {
     tableLoading.value = false
@@ -1089,11 +1093,26 @@ function getUserList(loading = true) {
   })
 }
 
-window.onresize = () => {
-  adjustWidth()
-};
+const handleWheel = () => {
+  if (dropdownShow.value) {
+    dropdownRef.value?.handleClose();
+  }
+}
 
-adjustWidth()
+const handleResize = () => {
+  adjustWidth()
+}
+
+onMounted(() => {
+  adjustWidth()
+  window.addEventListener('wheel', handleWheel)
+  window.addEventListener('resize', handleResize)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('wheel', handleWheel)
+  window.removeEventListener('resize', handleResize)
+})
 
 function adjustWidth() {
   const width = window.innerWidth
