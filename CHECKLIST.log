@@ -10,6 +10,33 @@
 
 ---
 
+### 修复用户列表加载抛错 "Cannot convert undefined or null to object" 与全真栈健壮性打磨 (2026-09-25)
+*   **关联提交 (Git Commit)**: `3e248514c6826888cb1d904667765a775b3be6bb` (Short: `3e24851`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com / epomail.epocanvas.workers.dev)` (Version ID: `7ac61bb9-29ce-434a-936c-af950bccee3a`，100% 流量) + `本地全真栈`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 后端 Drizzle ORM 致命抛错治理：定位到 `mail-worker/src/service/user-service.js` 的 `userService.list` 查询投影中包含了 `user.allowAttachment` 与 `user.maxStorageMB`。这两个字段在 `mail-worker/src/entity/user.js` 中并不存在（为 undefined），导致 Drizzle ORM 在执行 `orderSelectedFields` 时对 `undefined` 调用 `Object.entries()`，抛出原生 `TypeError: Cannot convert undefined or null to object`。已彻底移除这两个无效投影字段。
+    - [x] 角色去重与查询健壮性：在 `userService.list` 聚合角色信息前，对 `types` 列表过滤掉 `null` 与 `undefined`，避免无效空角色查询。
+    - [x] 异步操作修补：在 `userService.add` 中为 `roleService.selectById(c, type)` 补充遗漏的 `await`，杜绝未决 Promise 导致的逻辑分支异常。
+    - [x] 前端响应式与状态健壮性打磨：
+        - 将 `mail-vue/src/views/user/index.vue` 中的 `domainList` 转为 `computed(() => settingStore.domainList || [])`，并配以 immediate 监听，避免冷启动状态下 `domainList` 尚未就绪时导致新增用户表单后缀取值出现 undefined。
+        - 针对模板和方法中对 `userDetails.sendAction`、`formatSendType`、`formatSendCount` 的访问全面加入可选链 (`?.`) 和降级默认值，防止空数据或权限未开通用户报错。
+        - 列表响应解析增加防御性容错保护：`(data?.list || []).map(...)` 与 `data?.total || 0`。
+        - 修复表格账号状态列绑定的字段名错误：`property="address"` -> `property="isDel"`。
+        - 将未托管的全局 `window.addEventListener('wheel')` 和 `window.onresize` 规范封装进 Vue 的 `onMounted` / `onUnmounted` 生命周期钩子，消除全局事件泄漏与闭包滞留风险。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：mail-vue `vite build` 15.46s 编译通过，零报错零警告。
+    - [x] 静态多语言三件套：`node scripts/i18n-symmetry.mjs` (ALL SYMMETRIC, 2033/1888 keys)、`node scripts/i18n-audit.mjs` (0 missing keys)、`node scripts/i18n-hardcoded.mjs` 均正常通过。
+    - [x] 线上真实端到端自动化核验：`node tests/verify-user-list-live.mjs` 100% 通过：
+        - [x] 步骤 1：管理员权限鉴权登录，成功置换 JWT Token。
+        - [x] 步骤 2：线上生产 `/api/user/list` 接口协议验证通过（HTTP 200，成功返回 123 名用户列表与完整分页）。
+        - [x] 步骤 3：桌面端 (1440x900) 真实渲染验证通过，用户列表表格成功渲染 15 行，零错误 Toast 弹出，控制台零 JS 抛错，生成截图 `tests/verify_user_list_desktop_1440.png`。
+        - [x] 步骤 4：用户详情弹窗/抽屉交互验证通过，发信限制与统计数据格式化正确，生成截图 `tests/verify_user_list_details.png`。
+        - [x] 步骤 5：移动端视口 (375x812) 响应式验证通过，横向零溢出裁切，表格自适应呈现，生成截图 `tests/verify_user_list_mobile_375.png`。
+        - [x] 步骤 6：暗色模式 (Dark Mode) 全景验证通过，高对比度主题一致性良好，生成截图 `tests/verify_user_list_dark_1440.png`。
+    - [x] 零假数据残留：测试账号角色在 `finally` 阶段自动物理复原 (`UPDATE user SET type = 1 WHERE user_id = 133`)，KV 临时缓存自动彻底清理 (`auth-uid:133`)，线上零脏数据遗留。
+
+---
+
 ### 系统设置「网站设置」控件行高失步与下拉框越界裁切治理、「个性化设置」等高排版同步 (2026-09-22)
 *   **关联提交 (Git Commit)**: `ef8f998d2407aa564bef337ab56e87b5e0cddfec` (Short: `ef8f998`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com / epomail.epocanvas.workers.dev)` (Version ID: `4d7e0dbf-c009-4e78-94ff-becd1bfe2149`，100% 流量；上一基线 `869c5621-e6fe-4b51-9409-2bb8efc77744`) + `本地全真栈`
