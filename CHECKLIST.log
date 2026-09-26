@@ -10,6 +10,32 @@
 
 ---
 
+### 邮件会话模式深度修复与显式隔离线无框排版优化 (2026-09-26)
+*   **关联提交 (Git Commit)**: `dc69eca42b4ddb3d392457e981f43dfa4e0918b4` (Short: `dc69eca`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com / epomail.epocanvas.workers.dev)` (Version ID: `7e67bf18-d4d5-4646-afdd-236485fe11c5`，100% 流量) + `本地全真栈`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 多轮主题前缀迭代归一化与健壮会话聚合 (`mail-vue/src/utils/thread-utils.js`):
+        - 抽取 `normalizeSubject` 工具函数，采用 `while` 循环迭代剥离邮件主题中多层叠加的回复与转发前缀（`Re:`, `Fwd:`, `回复:`, `转发:`, `[Tag]` 等），修复多轮回复因单次正则替换导致的聚合键漂移断裂缺陷；
+        - `email-scroll` 与 `content` 统一引入统一 `getThreadKey` 逻辑，确保会话聚合跨列表与详情完全对称。
+    - [x] 邮件阅读无框化与消息间显式隔离线 (`content/index.vue`):
+        - 会话内各消息卡片彻底取消外层包围框 (`border: none !important; border-radius: 0; background: transparent;`)；
+        - 在会话消息流（相关邮件聚合的多封信件）之间插入语义化显式隔离线 `<div class="thread-message-divider" role="separator"></div>`（1px 细线，色值对齐 `--border-subtle`）；
+        - 折叠历史消息与展开消息自适应隔离间距（展开状态上下边距 `24px 0 20px 0`，折叠行间距 `0` 紧凑贴合），信件末尾自然顺接底栏；
+        - 邮件详情标题栏新增会话数量指示徽标 (`.email-title .thread-count-badge`)，直观反馈当前聚合信件数。
+    - [x] 个人设置常驻明示会话说明文案 (`profile-setting/index.vue`):
+        - 在「邮件会话模式」设置项下直接明示「将同一主题的相关邮件聚合成对话」描述文案（`.sub-hint`），告别鼠标悬停问号隐藏式查看，直观明了。
+    - [x] 代码与注释纯净性规范 (Zero Forbidden Terms):
+        - 代码、变量名与注释中严格零出现任何第三方专有平台关键词，遵循中立规范工程标准。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：mail-vue `vite build` 15.91s 成功，Cloudflare Workers 部署就绪；
+    - [x] 静态多语言对称性：`node scripts/i18n-symmetry.mjs` (mail-vue 2039 键 / mail-worker 1888 键 6 语言 100% 严格对称)；
+    - [x] 静态代码引用审计：`node scripts/i18n-audit.mjs` (1579 处字面量引用零缺失)；
+    - [x] 真实线上 Playwright 端到端全真验证：`tests/test-conversation-view-and-dividers.mjs` 全部 8/8 关键断言 100% PASS；
+    - [x] 全真视觉截图归档：`tests/verify_conversation_thread_and_dividers.png`；
+    - [x] 零假数据残留：测试创建的 3 轮会话收发邮件记录在 `finally` 阶段全部物理清除 (HTTP 200)。
+
+---
+
 ### 邮件阅读视觉排版升级：自然顺接无缝底栏、去繁去框与分类表情反应交互上线 (2026-09-26)
 *   **关联提交 (Git Commit)**: `4af2985e72d68aa8a15c3e2d5f55fe0fcb036022` (Short: `4af2985`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com / epomail.epocanvas.workers.dev)` (Version ID: `8d1eb644-d12b-415d-a949-806484d8eb62`，100% 流量) + `本地全真栈`
