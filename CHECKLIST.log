@@ -10,6 +10,39 @@
 
 ---
 
+### 邮件阅读视觉排版升级：自然顺接无缝底栏、去繁去框与分类表情反应交互上线 (2026-09-26)
+*   **关联提交 (Git Commit)**: `4af2985e72d68aa8a15c3e2d5f55fe0fcb036022` (Short: `4af2985`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com / epomail.epocanvas.workers.dev)` (Version ID: `8d1eb644-d12b-415d-a949-806484d8eb62`，100% 流量) + `本地全真栈`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 底部快捷操作栏自然顺接与动态悬浮 (inline-reply)：
+        - 长信件滚动期间处于悬浮状态 (`is-floating`)，带有轻微上边框 (`1px solid var(--border-subtle)`) 和阴影以明确标识信件最大可见阅读区域；
+        - 滚动到底部或信件高度不足一屏时，悬浮自动解除并自然顺接在信件正文末尾，上边框无缝变为 `border-top: 1px solid transparent` 且零投影，无任何多余分割线隔离；
+        - 引入 ResizeObserver 与智能滚动检测 (`scrollHeight` vs `clientHeight + scrollTop`) 动态平滑响应视口及内容尺寸变化。
+    - [x] 去繁去框、告别多余条条框框 (.container & .thread-msg-item)：
+        - 彻底去除邮件卡片外层厚重包围框 (`border: none !important; border-radius: 0; background: transparent;`)；
+        - 去除附件区 `.att` 多重嵌套框 (`border: none; padding: 0;`)；
+        - 会话消息流采用极简自然排版，视线更为开阔纯粹。
+    - [x] 智能条件表情反应 (Conditional Reaction Button)：
+        - 识别官方公告、订阅、推销、系统自动化通知及 noreply 类邮件 (`canSendReaction`)，在此类信件中自动隐藏表情回应按键，规避无效交互。
+    - [x] 表情选择器体验重构与边界防溢出 (Emoji Reaction Popover)：
+        - 修复 `.emoji-chip` 放大 hover 导致的方框溢出与裁切缺陷，采用标准 8 列 32px × 32px 弹性规整网格；
+        - 打造多分类标签栏（常用、表情、手势、标志），提供更丰富多元的情绪表达；
+        - 彻底隐藏选择器显式滚动条 (`scrollbar-width: none; overflow-y: hidden;`)，视觉干净整洁。
+    - [x] 代码纯净性与规范约束 (Neutral Clean Codebase)：
+        - 全量清理视图组件与 Store 中所有专有品牌字样及内部注释，变量名与 CSS 选择器标准化统一；
+        - 保持 6 语言 i18n 严格对称（100% 对齐，零缺失键）。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：mail-vue `vite build` 成功构建 (耗时 14.60s)，Cloudflare Workers 部署就绪；
+    - [x] 静态审计套件：`node scripts/i18n-symmetry.mjs` (6 语言 2039 键 100% 对称全绿)；
+    - [x] 真实线上 Playwright 端到端回归：`tests/verify-gmail-layout-live.mjs` 全部 15/15 项断言 100% PASS；
+    - [x] 多端全真渲染核验：
+        - 桌面端 1440x900 视口核验截图通过 (`tests/verify_gmail_layout_desktop_1440.png`)
+        - 暗色模式 Dark Mode 深度适配截图通过 (`tests/verify_gmail_layout_dark_1440.png`)
+        - 移动端 375x812 响应式横向滚动核验截图通过 (`tests/verify_gmail_layout_mobile_375.png`)
+    - [x] 零假数据残留：测试样本与临时交互数据已在 `finally` 阶段全部物理清除 (HTTP 200)。
+
+---
+
 ### Gmail排版深度复刻：满宽吸附回复底栏、紧贴发信人至称呼与真实互动功能上线 (2026-09-25)
 *   **关联提交 (Git Commit)**: `2ea0560e463875b4fee3c6ba38dc8a8602eeece9` (Short: `2ea0560`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com / epomail.epocanvas.workers.dev)` (Version ID: `aac8ee57-24e0-42ac-ad7a-2a0003120886`，100% 流量) + `本地全真栈`
