@@ -10,6 +10,49 @@
 
 ---
 
+### 对齐 Gmail 邮件详情排版分层与悬浮快捷回复体验上线 (2026-09-25)
+*   **关联提交 (Git Commit)**: `a8d841a13c3a0aa31b72c1d82580f2e9c7a1e561` (Short: `a8d841a`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com / epomail.epocanvas.workers.dev)` (Version ID: `b3437b1d-859e-4e14-8274-16078ae66cae`，100% 流量) + `本地全真栈`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 顶栏操作区分组与呼吸留白 (header-actions)：
+        - 对齐 Gmail 工具栏排版规范，将分散拥挤的单排按钮整合为六大独立逻辑区块（导航区、会话处置区、状态/待办区、归类与标签区、工具操作区、全局视图区）。
+        - 各逻辑区块之间引入微弱竖向细分割线 (`.header-action-divider`) 与留白空隙，消除功能交叉带来的按键拥挤与误触。
+        - 图标按钮采用统一 32px 圆形呼吸底色交互效果 (`.action-icon-wrap`)，悬浮操作质感更强。
+    - [x] 会话头栏双层排版重构 (thread-header-bar)：
+        - 将原有单行排版重构为清晰的双层层次结构：
+            - 第一层（元信息层 `.thread-meta-bar`）：右侧紧凑呈现邮件收发完整时间 (`.date`)、星标收藏 (`.msg-act-star`) 与会话展开/折叠箭头 (`.ch-arrow`)；
+            - 第二层（快捷操作层 `.thread-actions-bar`）：一字排开高频常用操作图标（回复、全部回复、转发、消息翻译、单封打印、更多下拉菜单）。
+        - 针对移动端视口 (<= 600px) 添加自适应弹性换行，排版优雅不挤压。
+    - [x] 接收者身份动态区分 (recipient-label)：
+        - 移除原泛指模糊的“至我”，替换为根据收件人信息动态格式化的“至 {接收者名称}”（多语言对称支持：`toRecipient: '至 {recipient}'` / `to {recipient}` 等）。
+        - 提取真实接收者昵称或邮箱前缀，便于后续接入第三方域名邮箱后清晰识别与区分多收件人身份。
+    - [x] 精简冗余发件人明细展示 (info-middle)：
+        - 彻底移除发件人姓名下方重复显示的 `<email@domain>` 地址行 (`.info-middle`)，完整收发人详情统一在展开详情浮层中呈现，保持首屏视野干净纯粹。
+    - [x] 快捷回复视口自适应悬浮吸附 (inline-reply)：
+        - 对齐 Gmail 经典交互：在邮件内容超过一屏高度时长信件状态下，快捷回复操作区以胶囊药丸形态悬浮吸附于视口底部 (`position: sticky; bottom: 16px; z-index: 10`)，并配以轻柔阴影和边框；
+        - 当信件较短（不足一屏）或用户滚动至信件末尾时，自然停靠归位于信件末端，不错位也不阻挡内容。
+    - [x] 移动端与暗色模式自适应加固：
+        - 为发件人头像 (`.sender-avatar`) 补全 `flex-shrink: 0`，防止在极端长名称或窄屏视口下被弹性盒挤压消失。
+        - 标题文本增加截断保护 (`overflow: hidden; text-overflow: ellipsis; white-space: nowrap`)。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：mail-vue `vite build` 13.30s 编译通过，零报错零警告。
+    - [x] 静态多语言三件套：`node scripts/i18n-symmetry.mjs` (ALL SYMMETRIC, 2033 keys 六语言对称)、`node scripts/i18n-audit.mjs` (0 missing keys)、`node scripts/i18n-hardcoded.mjs` 均正常通过。
+    - [x] 生产真实端到端自动化核验：`node tests/verify-gmail-layout-live.mjs` 全部 11 项断言 100% 通过：
+        - [x] 步骤 1：测试账户鉴权登录，成功换取生产 JWT Token。
+        - [x] 步骤 2：生成包含 25 个长段落的高仿长测试邮件并成功写入收件箱。
+        - [x] 步骤 3：Playwright 启动无头浏览器直连生产环境。
+        - [x] 步骤 4：打开测试邮件进入邮件详情视图。
+        - [x] 步骤 5：验证 `header-actions` 功能区分组与 4 条分隔线，图标尺寸 32px × 32px 严格合规。
+        - [x] 步骤 6：验证 `thread-header-bar` 成功升级为 2 层排版（Layer 1 元信息 + Layer 2 快捷操作 6 按钮）。
+        - [x] 步骤 7：验证 `recipient-label` 渲染为动态“至 audit_normal_1789140856529”，不含“至我”。
+        - [x] 步骤 8：验证 `.info-middle` 节点数量为 0，彻底移除冗余地址展示。
+        - [x] 步骤 9：验证 `inline-reply` 计算样式为 `position: sticky; bottom: 16px; border-radius: 28px`，且在长视口中始终悬浮可见。
+        - [x] 步骤 10：验证暗色模式 (Dark Mode) 高对比度呈现，生成截图 `tests/verify_gmail_layout_dark_1440.png`。
+        - [x] 步骤 11：验证移动端视口 (375x812) 响应式自适应，头像/发件人/分层操作无遮挡，生成截图 `tests/verify_gmail_layout_mobile_375.png`。
+    - [x] 零假数据残留：测试邮件在 `finally` 阶段自动物理删除（HTTP 200，`physical=true`），线上数据库无脏数据残留。
+
+---
+
 ### 修复用户列表加载抛错 "Cannot convert undefined or null to object" 与全真栈健壮性打磨 (2026-09-25)
 *   **关联提交 (Git Commit)**: `3e248514c6826888cb1d904667765a775b3be6bb` (Short: `3e24851`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com / epomail.epocanvas.workers.dev)` (Version ID: `7ac61bb9-29ce-434a-936c-af950bccee3a`，100% 流量) + `本地全真栈`
