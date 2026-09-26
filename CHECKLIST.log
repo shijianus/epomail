@@ -10,6 +10,58 @@
 
 ---
 
+### Gmail排版深度复刻：满宽吸附回复底栏、紧贴发信人至称呼与真实互动功能上线 (2026-09-25)
+*   **关联提交 (Git Commit)**: `2ea0560e463875b4fee3c6ba38dc8a8602eeece9` (Short: `2ea0560`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com / epomail.epocanvas.workers.dev)` (Version ID: `aac8ee57-24e0-42ac-ad7a-2a0003120886`，100% 流量) + `本地全真栈`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 满宽底部操作栏重构 (inline-reply)：
+        - 彻底废除旧版悬浮“胶囊”药丸形态与 fit-content 窄条设计，对齐 Gmail 经典实体整行底栏；
+        - 底栏全宽铺满 (`width: calc(100% + 40px); margin: 24px -20px 0 -20px; box-sizing: border-box;`)，作为邮件阅读区域的实体下限基准；
+        - 底栏下方绝对无任何信件内容透出渗漏 (`background: var(--bg-surface); border-top: 1px solid var(--border-subtle);`)，滚动至信件底部自然归位；
+        - 内置完备的高频实体动作按键：回复 (`Reply`)、全部回复 (`Reply all`，仅多收件人时动态呈现)、转发 (`Forward`)、表情反应添加器 (`Add reaction`)。
+    - [x] 发件人与至{名称}间距极致紧凑优化 (info-bottom)：
+        - 解决原有因为右侧 2 层操作栏高度将 `.info-bottom` 挤压下移 60px 的排版缺陷；
+        - 将 `.info-bottom`（至 {接收者名称}）嵌套至 `.sender-info-col` 内部，紧紧跟随在发件人姓名标题下方 (`gap: 2px; margin-top: 1px;`)；
+        - 实测发件人名称与接收者名称垂直间距仅 3.0px（远小于 15px 预期），高度对齐 Gmail 紧凑精致的排版视觉。
+    - [x] 头像悬停联系人卡片 (Avatar Hover Contact Card)：
+        - 发件人头像鼠标悬浮即弹出联系人交互卡片 (`contact-hover-card`)；
+        - 提供 100% 可用的真实功能按钮：一键写信发信给该联系人、一键复制邮箱地址（带轻提示）、一键创建针对该发件人的自动化过滤规则。
+    - [x] 完整“全部回复”功能深度落地 (Reply All Feature)：
+        - 邮件写信器组件 (`layout/write/index.vue`) 正式实现并暴露 `openReplyAll` 接口；
+        - 智能解析当前信件的全部收件人与发件人列表，自动去重并剔除当前用户自身账号，准确填充 `receiveEmail` 字段。
+    - [x] 邮件级表情互动体系 (Emoji Reactions)：
+        - 在邮件操作栏与底部实体动作栏分别集成表情选择器 Popover；
+        - 支持 👍、❤️、😂、🎉、🚀、👏、🔥、👀 等核心表情点赞；
+        - 邮件正文下方实时渲染表情徽章 (`msg-reactions-bar` / `reaction-badge`)，支持点赞计数与高亮状态持久化存储。
+    - [x] 消息更多菜单真实功能拓展 (Message More Actions)：
+        - 下拉菜单补全未读标记 (`unread`)、拉黑拦截发件人 (`blockSender`)、过滤规则 (`filter`)、EML 源文件下载 (`downloadEml`)、原始报头查看 (`viewHeaders`)、单封打印 (`print`)、邮件删除 (`delete`)；
+        - 所有菜单命令具备真实后端调用与状态更新，零空占位符。
+    - [x] 严格六语言对称与 i18n 闭环：
+        - 新增 `addReaction`, `reactionAdded`, `reactionRemoved`, `confirmBlockSenderTitle`, `confirmBlockSenderMsg`, `copyAddressSuccess` 六大键值；
+        - `zh`, `zh-Hant`, `en`, `es`, `fr`, `nl` 6 种语言字典保持 100% 绝对对称（2039 键）。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：mail-vue `vite build` 15.32s 编译通过，静态资源完整打包写入 `mail-worker/dist`。
+    - [x] 静态多语言三件套：`node scripts/i18n-symmetry.mjs` (ALL SYMMETRIC, 2039 keys 六语言对称)、`node scripts/i18n-audit.mjs` (0 missing keys)、`node scripts/i18n-hardcoded.mjs` 均 100% 通过。
+    - [x] 云端生产部署：Cloudflare Workers `aac8ee57-24e0-42ac-ad7a-2a0003120886` 部署成功，全球边缘节点就绪。
+    - [x] 生产真实端到端自动化核验：`node tests/verify-gmail-layout-live.mjs` 直连生产环境 `https://mail.epocanvas.com`，全部 14 项断言 100% 通过：
+        - [x] 步骤 1：测试账户鉴权登录，成功换取生产 JWT Token。
+        - [x] 步骤 2：生成包含 25 个长段落的长测试邮件，模拟全真长信件阅读栈。
+        - [x] 步骤 3：Playwright 启动桌面端 (1440x900) 真实浏览器访问 `https://mail.epocanvas.com/inbox`。
+        - [x] 步骤 4：打开测试邮件进入详情视图。
+        - [x] 步骤 5：验证 `header-actions` 4 条功能区分隔线，图标轻触区舒适。
+        - [x] 步骤 6：验证 `thread-header-bar` 2 层结构（元信息层与操作层）。
+        - [x] 步骤 7：验证 `recipient-label` 渲染 "至 audit_normal_1789140856529"（绝无泛指"至 我"）。
+        - [x] 步骤 8：验证 `info-bottom` 紧贴发件人下方，实测垂直间距仅 3.0px（完全解决下沉问题）。
+        - [x] 步骤 9：验证已彻底删除多余的 `info-middle` (数量 0)。
+        - [x] 步骤 10：验证 `inline-reply` 样式计算值 `position: sticky`, `bottom: 0px`, 盒模型宽度 1209px（满宽整行，实体底栏界定信件下限，下方零文本透出），包含完整的回复、转发与表情反应按键。
+        - [x] 步骤 11：验证发件人头像 Hover 浮层与联系人卡片交互。
+        - [x] 步骤 12：验证 Emoji 表情反应互动与状态徽章渲染。
+        - [x] 步骤 13：暗色模式视觉回归与截图存档 (`tests/verify_gmail_layout_dark_1440.png`)。
+        - [x] 步骤 14：移动端视口 (375x812) 响应式横向滚动与分层回归 (`tests/verify_gmail_layout_mobile_375.png`)。
+    - [x] 零假数据残留：测试邮件在测试套件 `finally` 阶段通过 `/api/email/delete` 执行物理彻底删除。
+
+---
+
 ### 对齐 Gmail 邮件详情排版分层与悬浮快捷回复体验上线 (2026-09-25)
 *   **关联提交 (Git Commit)**: `a8d841a13c3a0aa31b72c1d82580f2e9c7a1e561` (Short: `a8d841a`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com / epomail.epocanvas.workers.dev)` (Version ID: `b3437b1d-859e-4e14-8274-16078ae66cae`，100% 流量) + `本地全真栈`
