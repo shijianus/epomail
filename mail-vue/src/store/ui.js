@@ -50,7 +50,7 @@ export const useUiStore = defineStore('ui', {
             sysEmail: 0
         },
         lastSyncTime: Date.now(),
-        // Gmail-style core view preferences
+        // Core view preferences
         density: 'default', // 'default' | 'comfortable' | 'compact'
         inboxType: 'default', // 'default' | 'important' | 'unread' | 'starred' | 'priority' | 'multiple'
         inboxConfig: {

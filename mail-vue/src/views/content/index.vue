@@ -191,7 +191,7 @@
       </div>
     </div>
     <div></div>
-    <el-scrollbar class="scrollbar">
+    <el-scrollbar class="scrollbar" ref="contentScrollbarRef" @scroll="handleContentScroll">
       <div class="container">
         <div class="email-title-row">
           <div class="email-title">{{ email.subject }}</div>
@@ -214,7 +214,11 @@
             v-for="(msg, index) in threadMessages" 
             :key="msg.emailId"
             class="thread-msg-item"
-            :class="{ 'is-collapsed': !isMsgExpanded(msg.emailId, index), 'is-last': index === threadMessages.length - 1 }"
+            :class="{ 
+              'is-collapsed': !isMsgExpanded(msg.emailId, index), 
+              'is-last': index === threadMessages.length - 1,
+              'in-thread': threadMessages.length > 1
+            }"
           >
             <!-- Collapsed Card Header -->
             <div 
@@ -296,13 +300,13 @@
                           </span>
                         </div>
 
-                        <!-- Gmail-style info-bottom immediately below sender name with NO GAP -->
+                        <!-- Recipient info row immediately below sender name -->
                         <div class="info-bottom" @click.stop>
                           <el-popover
                             placement="bottom-start"
                             :width="380"
                             trigger="click"
-                            popper-class="gmail-details-popover"
+                            popper-class="mail-details-popover"
                             :teleported="true"
                           >
                             <template #reference>
@@ -312,7 +316,7 @@
                               </div>
                             </template>
 
-                            <div class="gmail-details-card">
+                            <div class="mail-details-card">
                               <div class="detail-row">
                                 <span class="dt-label">{{ $t('detailFrom') }}</span>
                                 <span class="dt-val">{{ msg.name ? `${msg.name} <${msg.sendEmail}>` : msg.sendEmail }}</span>
@@ -380,7 +384,14 @@
                               <Icon icon="iconoir:arrow-up-right" width="17" height="17"/>
                             </span>
                           </el-tooltip>
-                          <el-popover placement="bottom" trigger="click" :width="280" popper-class="emoji-reaction-popover" :teleported="true">
+                          <el-popover 
+                            v-if="canSendReaction(msg)"
+                            placement="bottom" 
+                            trigger="click" 
+                            :width="296" 
+                            popper-class="emoji-reaction-popover" 
+                            :teleported="true"
+                          >
                             <template #reference>
                               <el-tooltip :content="$t('addReaction')" placement="bottom">
                                 <span class="msg-act-icon btn-reaction" role="button" tabindex="0">
@@ -388,10 +399,29 @@
                                 </span>
                               </el-tooltip>
                             </template>
-                            <div class="quick-reactions-grid">
-                              <span v-for="em in ['👍', '❤️', '😂', '🎉', '🚀', '👏', '🔥', '👀']" :key="em" class="emoji-chip" @click="toggleEmojiReaction(em, msg)">
-                                {{ em }}
-                              </span>
+                            <div class="reaction-picker-card">
+                              <div class="reaction-category-tabs">
+                                <span 
+                                  v-for="(cat, cIdx) in emojiCategories" 
+                                  :key="cat.name" 
+                                  class="cat-tab" 
+                                  :class="{ active: currentEmojiCat === cIdx }"
+                                  @click="currentEmojiCat = cIdx"
+                                  :title="cat.name"
+                                >
+                                  <Icon :icon="cat.icon" width="15" height="15" />
+                                </span>
+                              </div>
+                              <div class="reaction-picker-grid">
+                                <span 
+                                  v-for="em in emojiCategories[currentEmojiCat].emojis" 
+                                  :key="em" 
+                                  class="emoji-chip" 
+                                  @click="toggleEmojiReaction(em, msg)"
+                                >
+                                  {{ em }}
+                                </span>
+                              </div>
                             </div>
                           </el-popover>
                           <el-tooltip :content="$t('translateMessage')" placement="bottom">
@@ -483,8 +513,8 @@
                   </div>
                 </div>
 
-                <!-- Gmail-Style Translation Banner -->
-                <div class="gmail-translate-bar" v-if="showTranslateMap[msg.emailId]" @click.stop>
+                <!-- In-place Translation Banner -->
+                <div class="mail-translate-bar" v-if="showTranslateMap[msg.emailId]" @click.stop>
                   <div class="gtb-left">
                     <Icon icon="fluent:translate-20-regular" width="16" height="16" class="gtb-icon" />
                     <span class="gtb-title">{{ $t('translateTo') }}</span>
@@ -585,8 +615,12 @@
           </div>
         </div>
 
-        <!-- Full-width Gmail Footer Actions Bar (class="inline-reply") -->
-        <div class="inline-reply" v-if="emailStore.contentData.showReply && hasPerm('email:send')">
+        <!-- Footer Actions Bar (class="inline-reply") -->
+        <div 
+          class="inline-reply" 
+          :class="{ 'is-floating': isReplyFloating }" 
+          v-if="emailStore.contentData.showReply && hasPerm('email:send')"
+        >
           <div class="footer-action-btn btn-reply" role="button" tabindex="0" @click="openReplyMsg(activeOrLastMsg)">
             <Icon icon="la:reply" width="18" height="18" />
             <span>{{ $t('reply') || 'Reply' }}</span>
@@ -600,16 +634,43 @@
             <span>{{ $t('forward') || 'Forward' }}</span>
           </div>
 
-          <el-popover placement="top-start" trigger="click" :width="280" popper-class="emoji-reaction-popover" :teleported="true">
+          <!-- Conditional Reaction Button: Hidden for newsletters/promotions/no-reply -->
+          <el-popover 
+            v-if="canSendReaction(activeOrLastMsg)"
+            placement="top-start" 
+            trigger="click" 
+            :width="296" 
+            popper-class="emoji-reaction-popover" 
+            :teleported="true"
+          >
             <template #reference>
               <div class="footer-reaction-btn" role="button" tabindex="0" :title="$t('addReaction') || 'Add reaction'">
                 <Icon icon="fluent:emoji-add-24-regular" width="20" height="20" />
               </div>
             </template>
-            <div class="quick-reactions-grid">
-              <span v-for="em in ['👍', '❤️', '😂', '🎉', '🚀', '👏', '🔥', '👀']" :key="em" class="emoji-chip" @click="toggleEmojiReaction(em, activeOrLastMsg)">
-                {{ em }}
-              </span>
+            <div class="reaction-picker-card">
+              <div class="reaction-category-tabs">
+                <span 
+                  v-for="(cat, cIdx) in emojiCategories" 
+                  :key="cat.name" 
+                  class="cat-tab" 
+                  :class="{ active: currentEmojiCat === cIdx }"
+                  @click="currentEmojiCat = cIdx"
+                  :title="cat.name"
+                >
+                  <Icon :icon="cat.icon" width="15" height="15" />
+                </span>
+              </div>
+              <div class="reaction-picker-grid">
+                <span 
+                  v-for="em in emojiCategories[currentEmojiCat].emojis" 
+                  :key="em" 
+                  class="emoji-chip" 
+                  @click="toggleEmojiReaction(em, activeOrLastMsg)"
+                >
+                  {{ em }}
+                </span>
+              </div>
             </div>
           </el-popover>
         </div>
@@ -714,7 +775,7 @@
 </template>
 <script setup>
 import ShadowHtml from '@/components/shadow-html/index.vue'
-import {reactive, ref, computed, watch, onMounted, onUnmounted} from "vue";
+import {reactive, ref, computed, watch, onMounted, onUnmounted, nextTick} from "vue";
 import {useRouter} from 'vue-router'
 import {ElMessage, ElMessageBox} from 'element-plus'
 import {
@@ -797,6 +858,58 @@ function openForwardMsg(msg) {
   uiStore.writerRef.openForward(msg || email)
 }
 
+const contentScrollbarRef = ref(null);
+const isReplyFloating = ref(false);
+let replyResizeObserver = null;
+
+const getScrollWrap = () => {
+  const refVal = contentScrollbarRef.value;
+  if (refVal) {
+    if (refVal.wrapRef?.nodeType === 1) return refVal.wrapRef;
+    if (refVal.wrapRef?.value?.nodeType === 1) return refVal.wrapRef.value;
+    if (refVal.$el?.querySelector) {
+      const el = refVal.$el.querySelector('.el-scrollbar__wrap');
+      if (el) return el;
+    }
+  }
+  if (typeof document !== 'undefined') {
+    return document.querySelector('.scrollbar .el-scrollbar__wrap');
+  }
+  return null;
+};
+
+const handleContentScroll = ({ scrollTop }) => {
+  const wrap = getScrollWrap();
+  if (!wrap) return;
+  const { scrollHeight, clientHeight } = wrap;
+  if (scrollHeight > clientHeight + 30) {
+    isReplyFloating.value = (scrollHeight - clientHeight - scrollTop) > 20;
+  } else {
+    isReplyFloating.value = false;
+  }
+};
+
+const checkFloatingState = () => {
+  const wrap = getScrollWrap();
+  if (!wrap) {
+    isReplyFloating.value = false;
+    return;
+  }
+  const { scrollHeight, clientHeight, scrollTop } = wrap;
+  if (scrollHeight > clientHeight + 30) {
+    isReplyFloating.value = (scrollHeight - clientHeight - scrollTop) > 20;
+  } else {
+    isReplyFloating.value = false;
+  }
+};
+
+watch(() => threadMessages.value, () => {
+  nextTick(() => {
+    checkFloatingState();
+    setTimeout(checkFloatingState, 100);
+  });
+}, { deep: true });
+
 watch(() => accountStore.currentAccountId, () => {
   handleBack()
 })
@@ -808,10 +921,31 @@ onMounted(() => {
       emailStore.refreshSidebarStats();
     });
   }
+  nextTick(() => {
+    checkFloatingState();
+    const wrap = getScrollWrap();
+    if (wrap && typeof ResizeObserver !== 'undefined') {
+      replyResizeObserver = new ResizeObserver(() => {
+        checkFloatingState();
+      });
+      replyResizeObserver.observe(wrap);
+      const container = wrap.querySelector('.container');
+      if (container) replyResizeObserver.observe(container);
+    }
+  });
+  window.addEventListener('resize', checkFloatingState);
+  setTimeout(checkFloatingState, 50);
+  setTimeout(checkFloatingState, 200);
+  setTimeout(checkFloatingState, 500);
 })
 
 onUnmounted(() => {
   emailStore.contentData.showUnread = false;
+  window.removeEventListener('resize', checkFloatingState);
+  if (replyResizeObserver) {
+    replyResizeObserver.disconnect();
+    replyResizeObserver = null;
+  }
 })
 
 function openReply() {
@@ -1053,6 +1187,63 @@ function toggleEmojiReaction(emoji, msg) {
   }
   saveReactions();
 }
+
+function canSendReaction(msg) {
+  if (!msg) return false;
+  if (!hasPerm('email:send')) return false;
+  if (msg.sendEmail === 'admin@epocanvas.com' || msg.isOfficial) return false;
+  const sender = (msg.sendEmail || '').toLowerCase();
+  if (
+    sender.includes('noreply') ||
+    sender.includes('no-reply') ||
+    sender.includes('donotreply') ||
+    sender.includes('notification') ||
+    sender.includes('newsletter') ||
+    sender.includes('bounces') ||
+    sender.includes('mailer-daemon') ||
+    sender.includes('system')
+  ) {
+    return false;
+  }
+  if (msg.replyTo && (msg.replyTo.toLowerCase().includes('noreply') || msg.replyTo.toLowerCase().includes('no-reply'))) {
+    return false;
+  }
+  if (msg.isSpam === 1) return false;
+  try {
+    const labels = typeof msg.labels === 'string' ? JSON.parse(msg.labels) : msg.labels;
+    if (Array.isArray(labels)) {
+      const blockedLabels = ['推销', '订阅', 'Promotions', 'Subscriptions', 'Newsletter', '垃圾邮件', 'Spam'];
+      if (labels.some(l => blockedLabels.includes(l))) {
+        return false;
+      }
+    }
+  } catch (e) {}
+  return true;
+}
+
+const currentEmojiCat = ref(0);
+const emojiCategories = [
+  {
+    name: '常用',
+    icon: 'fluent:sparkle-16-regular',
+    emojis: ['👍', '❤️', '🎉', '👏', '😂', '🔥', '🚀', '👀']
+  },
+  {
+    name: '表情',
+    icon: 'fluent:emoji-20-regular',
+    emojis: ['😀', '😊', '🥰', '😎', '🤔', '🥳', '😅', '😇', '😍', '🤩', '🤗', '😋', '😜', '🧐', '😴', '🙄']
+  },
+  {
+    name: '手势',
+    icon: 'fluent:hand-wave-20-regular',
+    emojis: ['👌', '✌️', '💪', '🙏', '🤝', '🙌', '🫡', '✍️', '👍', '👎', '👊', '🤞', '👋', '🫶', '👐', '🖖']
+  },
+  {
+    name: '标志',
+    icon: 'fluent:star-20-regular',
+    emojis: ['✨', '💯', '⭐', '💡', '🎯', '📌', '✅', '☕', '🍻', '💖', '🌈', '⚡', '🏆', '💎', '🔔', '🎈']
+  }
+];
 
 function changeStar() {
   if (email.isStar) {
@@ -1958,21 +2149,28 @@ const handleReportNotSpam = (emailId) => {
     flex: 1;
 
     .thread-msg-item {
-      border: 1px solid var(--border-subtle, #e2e8f0);
-      border-radius: 8px;
-      background: var(--bg-surface, #ffffff);
+      border: none !important;
+      border-radius: 0;
+      background: transparent;
       overflow: visible;
       transition: all 0.2s ease;
 
-      &.is-collapsed {
-        overflow: hidden;
-        &:hover {
-          background: var(--bg-hover, #f8fafc);
-        }
-      }
+      &.in-thread {
+        border: none !important;
+        border-radius: 0;
+        background: transparent;
 
-      &.is-last {
-        border-color: var(--border-subtle, #e2e8f0);
+        &.is-collapsed {
+          overflow: hidden;
+          &:hover {
+            background: var(--bg-hover, #f8fafc);
+          }
+        }
+
+        &:not(:last-child) {
+          padding-bottom: 16px;
+          margin-bottom: 16px;
+        }
       }
     }
 
@@ -2032,10 +2230,10 @@ const handleReportNotSpam = (emailId) => {
     }
 
     .thread-expanded-body {
-      padding: 16px;
+      padding: 0;
       
       .email-info {
-        border-bottom: 1px solid var(--border-subtle, #e2e8f0);
+        border-bottom: 1px solid var(--border-subtle, #f1f5f9);
       }
     }
   }
@@ -2048,12 +2246,11 @@ const handleReportNotSpam = (emailId) => {
     flex-direction: column;
 
     .att {
-      margin-top: 30px;
-      margin-bottom: 30px;
-      border: 1px solid var(--light-border-color);
-      padding: 14px;
-      border-radius: 6px;
-      width: fit-content;
+      margin-top: 24px;
+      margin-bottom: 24px;
+      border: none;
+      padding: 0;
+      width: 100%;
       .att-box {
         min-width: min(410px,calc(100vw - 60px));
         max-width: 600px;
@@ -2452,30 +2649,39 @@ const handleReportNotSpam = (emailId) => {
       }
     }
 
-    /* Full-width Gmail Footer Actions Bar */
+    /* Footer Actions Bar */
     .inline-reply {
       position: sticky;
       bottom: 0;
       z-index: 15;
-      width: calc(100% + 40px);
-      margin-left: -20px;
-      margin-right: -20px;
+      width: 100%;
       margin-top: 24px;
-      padding: 12px 20px;
+      padding: 16px 0 24px 0;
       display: flex;
       align-items: center;
       gap: 12px;
       background: var(--bg-surface, #ffffff);
-      border-top: 1px solid var(--border-subtle, #e2e8f0);
-      box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.04);
+      border-top: 1px solid transparent;
+      box-shadow: none;
       box-sizing: border-box;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease, padding 0.2s ease;
 
-      @media (max-width: 1023px) {
-        width: calc(100% + 30px);
-        margin-left: -15px;
-        margin-right: -15px;
-        padding: 10px 15px;
-        gap: 8px;
+      /* When floating over long content before reaching bottom */
+      &.is-floating {
+        width: calc(100% + 40px);
+        margin-left: -20px;
+        margin-right: -20px;
+        padding: 12px 20px;
+        border-top: 1px solid var(--border-subtle, #e2e8f0);
+        box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.04);
+
+        @media (max-width: 1023px) {
+          width: calc(100% + 30px);
+          margin-left: -15px;
+          margin-right: -15px;
+          padding: 10px 15px;
+          gap: 8px;
+        }
       }
 
       .footer-action-btn {
@@ -2537,7 +2743,7 @@ const handleReportNotSpam = (emailId) => {
   margin-bottom: 30px;
 }
 
-.gmail-translate-bar {
+.mail-translate-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -2628,12 +2834,12 @@ const handleReportNotSpam = (emailId) => {
   }
 }
 
-:deep(.gmail-details-popover) {
+:deep(.mail-details-popover) {
   padding: 12px 14px !important;
   border-radius: 8px !important;
 }
 
-.gmail-details-card {
+.mail-details-card {
   font-size: 13px;
   line-height: 1.6;
   color: var(--text-primary, #1e293b);
@@ -2798,24 +3004,71 @@ const handleReportNotSpam = (emailId) => {
   }
 }
 
-.quick-reactions-grid {
+:deep(.emoji-reaction-popover) {
+  padding: 8px !important;
+  border-radius: 12px !important;
+  width: 296px !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.12), 0 8px 10px -6px rgba(0, 0, 0, 0.08) !important;
+}
+
+.reaction-picker-card {
   display: flex;
-  align-items: center;
-  justify-content: space-around;
-  padding: 6px 4px;
+  flex-direction: column;
   gap: 6px;
+  user-select: none;
 
-  .emoji-chip {
-    font-size: 20px;
-    cursor: pointer;
-    padding: 4px;
-    border-radius: 6px;
-    transition: transform 0.1s ease, background 0.1s ease;
-    user-select: none;
+  .reaction-category-tabs {
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border-subtle, #e2e8f0);
 
-    &:hover {
-      transform: scale(1.25);
-      background: var(--bg-hover, #f1f5f9);
+    .cat-tab {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      cursor: pointer;
+      color: var(--text-muted, #94a3b8);
+      transition: all 0.15s ease;
+
+      &:hover {
+        background: var(--bg-hover, rgba(0, 0, 0, 0.05));
+        color: var(--text-primary, #334155);
+      }
+
+      &.active {
+        background: rgba(2, 132, 199, 0.1);
+        color: #0284c7;
+      }
+    }
+  }
+
+  .reaction-picker-grid {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 3px;
+    padding: 2px;
+    max-height: 80px;
+    overflow-y: hidden;
+
+    .emoji-chip {
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      cursor: pointer;
+      border-radius: 6px;
+      transition: background 0.15s ease;
+
+      &:hover {
+        background: var(--bg-hover, rgba(0, 0, 0, 0.06));
+      }
     }
   }
 }
