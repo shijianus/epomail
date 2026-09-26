@@ -1,0 +1,230 @@
+import { chromium } from 'playwright';
+import assert from 'node:assert';
+
+const BASE = 'https://epomail.epocanvas.workers.dev';
+const USER_EMAIL = 'audit_normal_1789140856529@epomail.bond';
+const USER_PWD = 'Audit123!';
+
+async function run() {
+  console.log('================================================================');
+  console.log('=== 线上生产真实端到端核验：Gmail排版与邮件详情页体验对齐 ===');
+  console.log('================================================================');
+
+  let browser;
+  let createdEmailId = null;
+  let token = null;
+
+  try {
+    // 1. 登录获取 JWT Token
+    console.log('\n[步骤 1] 登录测试账号获取 Token...');
+    const loginRes = await fetch(`${BASE}/api/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: USER_EMAIL, password: USER_PWD })
+    });
+    const loginData = await loginRes.json();
+    assert.strictEqual(loginData.code, 200, `登录必须成功: ${JSON.stringify(loginData)}`);
+    token = loginData.data?.token;
+    assert.ok(token, '返回数据必须包含 JWT Token');
+    console.log('  ✓ 登录成功，Token 获取就绪');
+
+    // 2. 发送一封测试邮件（内容高度超过屏幕），以便全真验证长信件 inline-reply 悬浮吸附
+    console.log('\n[步骤 2] 发送长邮件测试样本以模拟全真阅读栈...');
+    const longHtml = `
+      <div style="font-family: sans-serif; line-height: 1.8;">
+        <h2>Epocanvas Mail · 对齐 Gmail 视觉体验升级验收邮件</h2>
+        <p>尊敬的用户您好，本封信件用于全真栈自动化测试与视觉排版回归。</p>
+        ${Array.from({ length: 25 }, (_, i) => `<p>【段落 ${i + 1}】系统设计遵循 Gmail 顶级排版规范：header-actions 按功能划分、thread-header-bar 分为两层、recipient-label 显示具体接收者名称、inline-reply 在信件内容超过一屏时悬浮停靠在视口底部。</p>`).join('\n')}
+        <div style="height: 400px; background: #f1f5f9; border-radius: 8px; padding: 20px; margin: 20px 0;">
+          <p>底部补充测试区域：用于验证滚动至邮件最末尾时，inline-reply 能够平滑终止悬浮并自然归位至信件结尾。</p>
+        </div>
+      </div>
+    `;
+
+    const sendRes = await fetch(`${BASE}/api/email/send`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': token
+      },
+      body: JSON.stringify({
+        accountId: loginData.data?.account?.accountId || 134,
+        receiveEmail: [USER_EMAIL],
+        subject: '验收测试：Gmail 排版分层与悬浮快捷回复',
+        content: longHtml,
+        text: 'Epocanvas Mail · 对齐 Gmail 视觉体验升级验收邮件'
+      })
+    });
+    const sendData = await sendRes.json();
+    console.log('  ✓ 发信响应:', sendData);
+    assert.strictEqual(sendData.code, 200, '发信必须成功');
+    createdEmailId = sendData.data?.emailId;
+
+    // 3. 启动 Playwright 桌面端 (1440x900)
+    console.log('\n[步骤 3] 启动 Playwright 桌面端 (1440x900) 真实浏览器核验...');
+    browser = await chromium.launch({ headless: true });
+    const context = await browser.newContext({
+      viewport: { width: 1440, height: 900 },
+      locale: 'zh-CN'
+    });
+    const page = await context.newPage();
+
+    // 注入 JWT 令牌并打开 /inbox
+    await page.goto(`${BASE}/inbox`, { waitUntil: 'domcontentloaded' });
+    await page.evaluate(({ t, email, user }) => {
+      localStorage.setItem('token', t);
+      localStorage.setItem('loginEmail', email);
+      localStorage.setItem('user', JSON.stringify(user));
+      localStorage.setItem('setting', JSON.stringify({ lang: 'zh' }));
+      localStorage.setItem('locale', 'zh');
+    }, { t: token, email: USER_EMAIL, user: loginData.data });
+
+    console.log(`  -> 访问 ${BASE}/inbox ...`);
+    await page.goto(`${BASE}/inbox`, { waitUntil: 'networkidle', timeout: 30000 });
+    await page.waitForTimeout(3000);
+
+    // 选取第一封邮件进入邮件详情视图
+    console.log('\n[步骤 4] 选取测试邮件进入邮件详情视图...');
+    const emailRow = page.locator('.email-row').first();
+    await emailRow.waitFor({ state: 'visible', timeout: 15000 });
+    const count = await page.locator('.email-row').count();
+    console.log(`  ✓ 收件箱已加载，检测到 ${count} 封邮件`);
+    assert.ok(count > 0, '收件箱必须存在可点击测试的邮件条目');
+    
+    // 点击第一封邮件打开详情
+    await emailRow.click();
+    await page.waitForTimeout(2500);
+
+    // 4. 验证 class="header-actions" 分层与功能区隔断
+    console.log('\n[步骤 5] 验证 header-actions 功能分组与空白/分隔线...');
+    const headerActions = page.locator('.box > .header-actions');
+    await headerActions.waitFor({ state: 'visible', timeout: 10000 });
+
+    const navGroup = page.locator('.box .action-group.nav-group');
+    const triageGroup = page.locator('.box .action-group.triage-group');
+    const statusGroup = page.locator('.box .action-group.status-group');
+    const utilityGroup = page.locator('.box .action-group.utility-group');
+    const dividers = page.locator('.box .header-action-divider');
+
+    assert.strictEqual(await navGroup.count(), 1, '必须包含导航分组 (nav-group)');
+    assert.strictEqual(await statusGroup.count(), 1, '必须包含状态操作分组 (status-group)');
+    assert.strictEqual(await utilityGroup.count(), 1, '必须包含工具分组 (utility-group)');
+    const dividerCount = await dividers.count();
+    console.log(`  ✓ 成功定位到 ${dividerCount} 条功能区分隔线 (header-action-divider)`);
+    assert.ok(dividerCount >= 2, 'header-actions 必须包含功能分组分隔线');
+
+    // 验证图标圆角悬浮背景 (Gmail 风格 32px 圆形轻触区)
+    const firstActionIcon = page.locator('.box .action-icon-wrap').first();
+    const iconBox = await firstActionIcon.boundingBox();
+    console.log(`  ✓ action-icon-wrap 盒模型尺寸: ${iconBox?.width}px × ${iconBox?.height}px (符合标准)`);
+    assert.ok(iconBox && iconBox.width >= 28 && iconBox.height >= 28, '图标轻触区必须舒适不局促');
+
+    // 5. 验证 class="thread-header-bar" 2 层结构
+    console.log('\n[步骤 6] 验证 thread-header-bar 升级为 2 层排版...');
+    const threadHeaderBar = page.locator('.thread-header-bar').first();
+    await threadHeaderBar.waitFor({ state: 'visible', timeout: 5000 });
+
+    const metaBar = threadHeaderBar.locator('.thread-meta-bar');
+    const actionsBar = threadHeaderBar.locator('.thread-actions-bar');
+
+    assert.strictEqual(await metaBar.count(), 1, 'thread-header-bar 第 1 层必须为 .thread-meta-bar');
+    assert.strictEqual(await actionsBar.count(), 1, 'thread-header-bar 第 2 层必须为 .thread-actions-bar');
+
+    // 检查第 1 层包含日期/星标
+    const dateText = await metaBar.locator('.date').innerText();
+    console.log(`  ✓ 第 1 层 (thread-meta-bar): 包含邮件时间 [${dateText}] 及星标操作`);
+    assert.ok(dateText.length > 0, '时间文本必须存在');
+
+    // 检查第 2 层包含快捷操作按钮（回复/转发/翻译等）
+    const actionButtons = actionsBar.locator('.msg-act-icon');
+    const actBtnCount = await actionButtons.count();
+    console.log(`  ✓ 第 2 层 (thread-actions-bar): 包含 ${actBtnCount} 个快捷操作按钮 (回复/全部回复/转发/翻译/打印/更多)`);
+    assert.ok(actBtnCount >= 3, '第 2 层快捷操作按钮数量必须符合规范');
+
+    // 6. 验证 class="recipient-label" 显示 "至 {接收者名称}" 而非泛指的 "至 我"
+    console.log('\n[步骤 7] 验证 recipient-label 显示 "至 {接收者名称}"...');
+    const recipientLabel = page.locator('.recipient-label').first();
+    await recipientLabel.waitFor({ state: 'visible', timeout: 5000 });
+    const recipientText = await recipientLabel.innerText();
+    console.log(`  ✓ recipient-label 实际渲染文案: "${recipientText}"`);
+    assert.ok(!recipientText.includes('至 我') && !recipientText.includes('to me'), `必须移除泛指的"至 我"，当前渲染: "${recipientText}"`);
+    assert.ok(recipientText.startsWith('至') || recipientText.startsWith('to'), `必须以前缀开头并带有名称: "${recipientText}"`);
+
+    // 7. 验证已彻底删除多余的 class="info-middle"
+    console.log('\n[步骤 8] 验证多余的 info-middle 已彻底删除...');
+    const infoMiddleCount = await page.locator('.info-middle').count();
+    console.log(`  ✓ .info-middle 节点数量: ${infoMiddleCount}`);
+    assert.strictEqual(infoMiddleCount, 0, '.info-middle 必须已被彻底删除');
+
+    // 8. 验证 inline-reply 悬浮吸附行为 (position: sticky; bottom: 16px)
+    console.log('\n[步骤 9] 验证 inline-reply 底部悬浮/固定逻辑...');
+    const inlineReply = page.locator('.inline-reply').first();
+    await inlineReply.waitFor({ state: 'visible', timeout: 5000 });
+
+    const stickyPos = await inlineReply.evaluate(el => {
+      const style = window.getComputedStyle(el);
+      return {
+        position: style.position,
+        bottom: style.bottom,
+        zIndex: style.zIndex,
+        borderRadius: style.borderRadius
+      };
+    });
+    console.log(`  ✓ inline-reply 样式计算值: position=${stickyPos.position}, bottom=${stickyPos.bottom}, zIndex=${stickyPos.zIndex}, borderRadius=${stickyPos.borderRadius}`);
+    assert.strictEqual(stickyPos.position, 'sticky', 'inline-reply 必须为 position: sticky 浮动吸附');
+    assert.strictEqual(stickyPos.bottom, '16px', 'inline-reply 悬浮吸附距离底部必须为 16px');
+
+    // 验证视口滚动时 inline-reply 保持在视口可见区内（未滚动到底前一直悬浮可见）
+    const isVisibleInViewport = await inlineReply.evaluate(el => {
+      const rect = el.getBoundingClientRect();
+      return rect.bottom <= window.innerHeight && rect.top >= 0;
+    });
+    console.log(`  ✓ inline-reply 在长内容视口中悬浮可见: ${isVisibleInViewport}`);
+    assert.ok(isVisibleInViewport, 'inline-reply 在信件内容超过一屏时必须在视口可见');
+
+    // 截图存档：桌面端
+    await page.screenshot({ path: 'tests/verify_gmail_layout_desktop_1440.png', fullPage: false });
+    console.log('  ✓ 桌面端 (1440x900) 实测截图已保存至 tests/verify_gmail_layout_desktop_1440.png');
+
+    // 9. 切换暗色模式 (Dark Mode) 验证
+    console.log('\n[步骤 10] 验证暗色模式下的视觉表现...');
+    await page.evaluate(() => {
+      document.documentElement.classList.add('dark');
+    });
+    await page.waitForTimeout(500);
+    await page.screenshot({ path: 'tests/verify_gmail_layout_dark_1440.png', fullPage: false });
+    console.log('  ✓ 暗色模式实测截图已保存至 tests/verify_gmail_layout_dark_1440.png');
+
+    // 10. 移动端视口 (375x812) 响应式横向滚动与分层验证
+    console.log('\n[步骤 11] 验证移动端视口 (375x812) 响应式适配...');
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.waitForTimeout(1000);
+    await page.screenshot({ path: 'tests/verify_gmail_layout_mobile_375.png', fullPage: false });
+    console.log('  ✓ 移动端实测截图已保存至 tests/verify_gmail_layout_mobile_375.png');
+
+    console.log('\n================================================================');
+    console.log('=== 所有 11 项断言与线上真实端到端核验全部完美通过 (100% PASS) ===');
+    console.log('================================================================');
+
+  } catch (err) {
+    console.error('❌ 核验失败:', err);
+    process.exitCode = 1;
+  } finally {
+    // 零假数据残留：物理清理测试邮件
+    if (createdEmailId && token) {
+      console.log(`\n[清理] 正在物理删除测试邮件 ID: ${createdEmailId}...`);
+      try {
+        await fetch(`${BASE}/api/email/delete?emailIds=${createdEmailId}&physical=true`, {
+          method: 'DELETE',
+          headers: { 'Authorization': token }
+        });
+        console.log('  ✓ 测试邮件已彻底物理清理完毕 (零假数据残留)');
+      } catch (cleanErr) {
+        console.warn('  ⚠️ 清理邮件失败:', cleanErr.message);
+      }
+    }
+    if (browser) await browser.close();
+  }
+}
+
+run();

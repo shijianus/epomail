@@ -2,169 +2,192 @@
   <div class="box">
     <div class="header-actions">
       <div class="header-actions-left">
-        <el-tooltip :content="$t('backBtn') || 'Back'" placement="bottom">
-          <span class="action-icon-wrap" role="button" tabindex="0" @click="handleBack">
-            <Icon class="icon btn-back" icon="material-symbols-light:arrow-back-ios-new" width="20" height="20"/>
-          </span>
-        </el-tooltip>
-        <el-tooltip :content="$t('archive')" placement="bottom" v-if="emailStore.contentData.delType !== 'physics'">
-          <span class="action-icon-wrap" role="button" tabindex="0" @click="handleArchive">
-            <Icon class="icon btn-archive" icon="fluent:archive-20-regular" width="20" height="20"/>
-          </span>
-        </el-tooltip>
-        <el-tooltip :content="$t('reportSpam')" placement="bottom" v-if="emailStore.contentData.delType !== 'physics'">
-          <span class="action-icon-wrap" role="button" tabindex="0" @click="handleReportSpam">
-            <Icon class="icon btn-spam" icon="fluent:shield-dismiss-20-regular" width="20" height="20"/>
-          </span>
-        </el-tooltip>
-        <el-tooltip :content="$t('delete') || 'Delete'" placement="bottom" v-if="hasPerm('email:delete')">
-          <span class="action-icon-wrap" role="button" tabindex="0" @click="handleDelete">
-            <Icon class="icon btn-delete" icon="fluent:delete-20-regular" width="20" height="20"/>
-          </span>
-        </el-tooltip>
-        <el-tooltip :content="email.unread === 0 ? ($t('markUnread')) : ($t('markRead'))" placement="bottom">
-          <span class="action-icon-wrap" role="button" tabindex="0" @click="handleToggleRead">
-            <Icon class="icon btn-unread" :icon="email.unread === 0 ? 'fluent:mail-unread-20-regular' : 'fluent:mail-read-20-regular'" width="20" height="20"/>
-          </span>
-        </el-tooltip>
-        
-        <!-- Snooze Popover -->
-        <el-popover placement="bottom" :width="200" trigger="click" popper-class="header-action-popover" v-if="emailStore.contentData.delType !== 'physics'">
-          <template #reference>
-            <div class="action-icon-wrap btn-snooze" :title="$t('snooze')">
-              <Icon class="icon" icon="fluent:clock-20-regular" width="20" height="20"/>
-            </div>
-          </template>
-          <div class="snooze-quick-menu">
-            <div class="snooze-menu-title">{{ $t('snooze') }}</div>
-            <div class="snooze-menu-item" @click="handleQuickSnooze('today')">
-              <Icon icon="fluent:weather-partly-cloudy-day-16-regular" width="16" />
-              <span>{{ $t('snoozeLaterToday') }}</span>
-            </div>
-            <div class="snooze-menu-item" @click="handleQuickSnooze('tomorrow')">
-              <Icon icon="fluent:calendar-ltr-16-regular" width="16" />
-              <span>{{ $t('snoozeTomorrow') }}</span>
-            </div>
-            <div class="snooze-menu-item" @click="handleQuickSnooze('weekend')">
-              <Icon icon="fluent:calendar-16-regular" width="16" />
-              <span>{{ $t('snoozeThisWeekend') }}</span>
-            </div>
-            <div class="snooze-menu-item" @click="handleQuickSnooze('nextweek')">
-              <Icon icon="fluent:calendar-arrow-right-16-regular" width="16" />
-              <span>{{ $t('snoozeNextWeek') }}</span>
-            </div>
-            <el-divider style="margin: 6px 0;" />
-            <div class="snooze-menu-item" @click="customSnoozeDialogVisible = true">
-              <Icon icon="fluent:clock-toolbox-20-regular" width="16" />
-              <span>{{ $t('snoozeCustom') }}</span>
-            </div>
-          </div>
-        </el-popover>
+        <!-- 1. Navigation Group -->
+        <div class="action-group nav-group">
+          <el-tooltip :content="$t('backBtn') || 'Back'" placement="bottom">
+            <span class="action-icon-wrap" role="button" tabindex="0" @click="handleBack">
+              <Icon class="icon btn-back" icon="material-symbols-light:arrow-back-ios-new" width="20" height="20"/>
+            </span>
+          </el-tooltip>
+        </div>
+        <div class="header-action-divider" role="separator"></div>
 
-        <!-- Add to tasks -->
-        <el-tooltip :content="$t('addToTasks')" placement="bottom">
-          <span class="action-icon-wrap btn-task" role="button" tabindex="0" @click="handleAddToTasks">
-            <Icon class="icon" icon="fluent:task-list-add-20-regular" width="20" height="20" />
-          </span>
-        </el-tooltip>
+        <!-- 2. Triage Group (Archive, Spam, Delete) -->
+        <div class="action-group triage-group" v-if="emailStore.contentData.delType !== 'physics' || hasPerm('email:delete')">
+          <el-tooltip :content="$t('archive')" placement="bottom" v-if="emailStore.contentData.delType !== 'physics'">
+            <span class="action-icon-wrap" role="button" tabindex="0" @click="handleArchive">
+              <Icon class="icon btn-archive" icon="fluent:archive-20-regular" width="20" height="20"/>
+            </span>
+          </el-tooltip>
+          <el-tooltip :content="$t('reportSpam')" placement="bottom" v-if="emailStore.contentData.delType !== 'physics'">
+            <span class="action-icon-wrap" role="button" tabindex="0" @click="handleReportSpam">
+              <Icon class="icon btn-spam" icon="fluent:shield-dismiss-20-regular" width="20" height="20"/>
+            </span>
+          </el-tooltip>
+          <el-tooltip :content="$t('delete') || 'Delete'" placement="bottom" v-if="hasPerm('email:delete')">
+            <span class="action-icon-wrap" role="button" tabindex="0" @click="handleDelete">
+              <Icon class="icon btn-delete" icon="fluent:delete-20-regular" width="20" height="20"/>
+            </span>
+          </el-tooltip>
+        </div>
+        <div class="header-action-divider" role="separator" v-if="emailStore.contentData.delType !== 'physics' || hasPerm('email:delete')"></div>
 
-        <!-- Move to Popover -->
-        <el-popover placement="bottom" :width="180" trigger="click" popper-class="header-action-popover" v-if="emailStore.contentData.delType !== 'physics'">
-          <template #reference>
-            <div class="action-icon-wrap btn-move" :title="$t('moveTo')">
-              <Icon class="icon" icon="fluent:folder-arrow-right-20-regular" width="20" height="20"/>
+        <!-- 3. Status & Task Group (Read/Unread, Snooze, Tasks) -->
+        <div class="action-group status-group">
+          <el-tooltip :content="email.unread === 0 ? ($t('markUnread')) : ($t('markRead'))" placement="bottom">
+            <span class="action-icon-wrap" role="button" tabindex="0" @click="handleToggleRead">
+              <Icon class="icon btn-unread" :icon="email.unread === 0 ? 'fluent:mail-unread-20-regular' : 'fluent:mail-read-20-regular'" width="20" height="20"/>
+            </span>
+          </el-tooltip>
+          
+          <!-- Snooze Popover -->
+          <el-popover placement="bottom" :width="200" trigger="click" popper-class="header-action-popover" v-if="emailStore.contentData.delType !== 'physics'">
+            <template #reference>
+              <div class="action-icon-wrap btn-snooze" :title="$t('snooze')">
+                <Icon class="icon" icon="fluent:clock-20-regular" width="20" height="20"/>
+              </div>
+            </template>
+            <div class="snooze-quick-menu">
+              <div class="snooze-menu-title">{{ $t('snooze') }}</div>
+              <div class="snooze-menu-item" @click="handleQuickSnooze('today')">
+                <Icon icon="fluent:weather-partly-cloudy-day-16-regular" width="16" />
+                <span>{{ $t('snoozeLaterToday') }}</span>
+              </div>
+              <div class="snooze-menu-item" @click="handleQuickSnooze('tomorrow')">
+                <Icon icon="fluent:calendar-ltr-16-regular" width="16" />
+                <span>{{ $t('snoozeTomorrow') }}</span>
+              </div>
+              <div class="snooze-menu-item" @click="handleQuickSnooze('weekend')">
+                <Icon icon="fluent:calendar-16-regular" width="16" />
+                <span>{{ $t('snoozeThisWeekend') }}</span>
+              </div>
+              <div class="snooze-menu-item" @click="handleQuickSnooze('nextweek')">
+                <Icon icon="fluent:calendar-arrow-right-16-regular" width="16" />
+                <span>{{ $t('snoozeNextWeek') }}</span>
+              </div>
+              <el-divider style="margin: 6px 0;" />
+              <div class="snooze-menu-item" @click="customSnoozeDialogVisible = true">
+                <Icon icon="fluent:clock-toolbox-20-regular" width="16" />
+                <span>{{ $t('snoozeCustom') }}</span>
+              </div>
             </div>
-          </template>
-          <div class="move-to-menu">
-            <div class="move-menu-title">{{ $t('moveTo') }}</div>
-            <div class="move-menu-item" @click="handleMoveTo('inbox')">
-              <Icon icon="fluent:mail-inbox-16-regular" width="16" />
-              <span>{{ $t('moveToInbox') }}</span>
-            </div>
-            <div class="move-menu-item" @click="handleMoveTo('spam')">
-              <Icon icon="fluent:shield-dismiss-16-regular" width="16" />
-              <span>{{ $t('moveToSpam') }}</span>
-            </div>
-            <div class="move-menu-item" @click="handleMoveTo('trash')">
-              <Icon icon="fluent:delete-16-regular" width="16" />
-              <span>{{ $t('moveToTrash') }}</span>
-            </div>
-          </div>
-        </el-popover>
+          </el-popover>
 
-        <!-- Label as Popover -->
-        <el-popover placement="bottom" :width="220" trigger="click" popper-class="header-action-popover" v-if="emailStore.contentData.delType !== 'physics'">
-          <template #reference>
-            <div class="action-icon-wrap btn-label" :title="$t('labelAs')">
-              <Icon class="icon" icon="fluent:tag-20-regular" width="20" height="20"/>
-            </div>
-          </template>
-          <div class="label-quick-menu">
-            <div class="label-menu-title">{{ $t('labelAs') }}</div>
-            <div 
-              v-for="lbl in availableLabels" 
-              :key="lbl.name" 
-              class="label-menu-item" 
-              @click="toggleLabelOnEmail(lbl.name)"
-            >
-              <el-checkbox :model-value="currentLabels.includes(lbl.name)" @click.stop="toggleLabelOnEmail(lbl.name)" />
-              <span class="label-dot" :style="{ backgroundColor: lbl.color || '#3b82f6' }"></span>
-              <span class="label-text">{{ getLabelDisplayName(lbl.name, t) }}</span>
-            </div>
-          </div>
-        </el-popover>
+          <!-- Add to tasks -->
+          <el-tooltip :content="$t('addToTasks')" placement="bottom">
+            <span class="action-icon-wrap btn-task" role="button" tabindex="0" @click="handleAddToTasks">
+              <Icon class="icon" icon="fluent:task-list-add-20-regular" width="20" height="20" />
+            </span>
+          </el-tooltip>
+        </div>
+        <div class="header-action-divider" role="separator"></div>
 
-        <!-- Translate message -->
-        <el-tooltip :content="$t('translateMessage')" placement="bottom">
-          <span class="action-icon-wrap btn-translate-wrap" role="button" tabindex="0" @click="toggleTranslateBar(threadMessages[threadMessages.length - 1] || email)">
-            <Icon class="icon btn-translate" icon="fluent:translate-20-regular" width="20" height="20" />
-          </span>
-        </el-tooltip>
+        <!-- 4. Organize Group (Move to, Label as) -->
+        <div class="action-group organize-group" v-if="emailStore.contentData.delType !== 'physics'">
+          <!-- Move to Popover -->
+          <el-popover placement="bottom" :width="180" trigger="click" popper-class="header-action-popover">
+            <template #reference>
+              <div class="action-icon-wrap btn-move" :title="$t('moveTo')">
+                <Icon class="icon" icon="fluent:folder-arrow-right-20-regular" width="20" height="20"/>
+              </div>
+            </template>
+            <div class="move-to-menu">
+              <div class="move-menu-title">{{ $t('moveTo') }}</div>
+              <div class="move-menu-item" @click="handleMoveTo('inbox')">
+                <Icon icon="fluent:mail-inbox-16-regular" width="16" />
+                <span>{{ $t('moveToInbox') }}</span>
+              </div>
+              <div class="move-menu-item" @click="handleMoveTo('spam')">
+                <Icon icon="fluent:shield-dismiss-16-regular" width="16" />
+                <span>{{ $t('moveToSpam') }}</span>
+              </div>
+              <div class="move-menu-item" @click="handleMoveTo('trash')">
+                <Icon icon="fluent:delete-16-regular" width="16" />
+                <span>{{ $t('moveToTrash') }}</span>
+              </div>
+            </div>
+          </el-popover>
 
-        <!-- More options -->
-        <el-dropdown trigger="click" @command="handleHeaderMoreCommand">
-          <div class="action-icon-wrap btn-more" :title="$t('more')">
-            <Icon class="icon" icon="fluent:more-vertical-20-regular" width="20" height="20" />
-          </div>
-          <template #dropdown>
-            <el-dropdown-menu>
-              <el-dropdown-item command="filter">
-                <Icon icon="fluent:filter-20-regular" width="16" style="margin-right: 8px;" />
-                {{ $t('filterMessages') }}
-              </el-dropdown-item>
-              <el-dropdown-item command="mute">
-                <Icon icon="fluent:speaker-mute-20-regular" width="16" style="margin-right: 8px;" />
-                {{ $t('muteConversation') }}
-              </el-dropdown-item>
-              <el-dropdown-item command="forwardAll" v-if="emailStore.contentData.showReply && hasPerm('email:send')">
-                <Icon icon="iconoir:arrow-up-right" width="16" style="margin-right: 8px;" />
-                {{ $t('forwardAll') }}
-              </el-dropdown-item>
-              <el-dropdown-item command="printAll">
-                <Icon icon="fluent:print-20-regular" width="16" style="margin-right: 8px;" />
-                {{ $t('printAll') }}
-              </el-dropdown-item>
-            </el-dropdown-menu>
-          </template>
-        </el-dropdown>
+          <!-- Label as Popover -->
+          <el-popover placement="bottom" :width="220" trigger="click" popper-class="header-action-popover">
+            <template #reference>
+              <div class="action-icon-wrap btn-label" :title="$t('labelAs')">
+                <Icon class="icon" icon="fluent:tag-20-regular" width="20" height="20"/>
+              </div>
+            </template>
+            <div class="label-quick-menu">
+              <div class="label-menu-title">{{ $t('labelAs') }}</div>
+              <div 
+                v-for="lbl in availableLabels" 
+                :key="lbl.name" 
+                class="label-menu-item" 
+                @click="toggleLabelOnEmail(lbl.name)"
+              >
+                <el-checkbox :model-value="currentLabels.includes(lbl.name)" @click.stop="toggleLabelOnEmail(lbl.name)" />
+                <span class="label-dot" :style="{ backgroundColor: lbl.color || '#3b82f6' }"></span>
+                <span class="label-text">{{ getLabelDisplayName(lbl.name, t) }}</span>
+              </div>
+            </div>
+          </el-popover>
+        </div>
+        <div class="header-action-divider" role="separator" v-if="emailStore.contentData.delType !== 'physics'"></div>
+
+        <!-- 5. Utility & More Group (Translate, More options) -->
+        <div class="action-group utility-group">
+          <!-- Translate message -->
+          <el-tooltip :content="$t('translateMessage')" placement="bottom">
+            <span class="action-icon-wrap btn-translate-wrap" role="button" tabindex="0" @click="toggleTranslateBar(threadMessages[threadMessages.length - 1] || email)">
+              <Icon class="icon btn-translate" icon="fluent:translate-20-regular" width="20" height="20" />
+            </span>
+          </el-tooltip>
+
+          <!-- More options -->
+          <el-dropdown trigger="click" @command="handleHeaderMoreCommand">
+            <div class="action-icon-wrap btn-more" :title="$t('more')">
+              <Icon class="icon" icon="fluent:more-vertical-20-regular" width="20" height="20" />
+            </div>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item command="filter">
+                  <Icon icon="fluent:filter-20-regular" width="16" style="margin-right: 8px;" />
+                  {{ $t('filterMessages') }}
+                </el-dropdown-item>
+                <el-dropdown-item command="mute">
+                  <Icon icon="fluent:speaker-mute-20-regular" width="16" style="margin-right: 8px;" />
+                  {{ $t('muteConversation') }}
+                </el-dropdown-item>
+                <el-dropdown-item command="forwardAll" v-if="emailStore.contentData.showReply && hasPerm('email:send')">
+                  <Icon icon="iconoir:arrow-up-right" width="16" style="margin-right: 8px;" />
+                  {{ $t('forwardAll') }}
+                </el-dropdown-item>
+                <el-dropdown-item command="printAll">
+                  <Icon icon="fluent:print-20-regular" width="16" style="margin-right: 8px;" />
+                  {{ $t('printAll') }}
+                </el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
+        </div>
       </div>
 
       <div class="header-actions-right">
-        <el-tooltip :content="isAllExpanded ? ($t('collapseAll')) : ($t('expandAll'))" placement="bottom" v-if="threadMessages.length > 1">
-          <span class="action-icon-wrap" role="button" tabindex="0" @click="toggleExpandAll">
-            <Icon class="icon btn-expand-all" :icon="isAllExpanded ? 'fluent:arrow-collapse-all-20-regular' : 'fluent:arrow-expand-all-20-regular'" width="20" height="20" />
-          </span>
-        </el-tooltip>
-        <el-tooltip :content="$t('printAll')" placement="bottom">
-          <span class="action-icon-wrap" role="button" tabindex="0" @click="handlePrintAll">
-            <Icon class="icon btn-print-all" icon="fluent:print-20-regular" width="20" height="20" />
-          </span>
-        </el-tooltip>
-        <el-tooltip :content="$t('inNewWindow')" placement="bottom">
-          <span class="action-icon-wrap" role="button" tabindex="0" @click="handleOpenInNewWindow">
-            <Icon class="icon btn-new-window" icon="fluent:open-20-regular" width="19" height="19" />
-          </span>
-        </el-tooltip>
+        <div class="action-group view-group">
+          <el-tooltip :content="isAllExpanded ? ($t('collapseAll')) : ($t('expandAll'))" placement="bottom" v-if="threadMessages.length > 1">
+            <span class="action-icon-wrap" role="button" tabindex="0" @click="toggleExpandAll">
+              <Icon class="icon btn-expand-all" :icon="isAllExpanded ? 'fluent:arrow-collapse-all-20-regular' : 'fluent:arrow-expand-all-20-regular'" width="20" height="20" />
+            </span>
+          </el-tooltip>
+          <el-tooltip :content="$t('printAll')" placement="bottom">
+            <span class="action-icon-wrap" role="button" tabindex="0" @click="handlePrintAll">
+              <Icon class="icon btn-print-all" icon="fluent:print-20-regular" width="20" height="20" />
+            </span>
+          </el-tooltip>
+          <el-tooltip :content="$t('inNewWindow')" placement="bottom">
+            <span class="action-icon-wrap" role="button" tabindex="0" @click="handleOpenInNewWindow">
+              <Icon class="icon btn-new-window" icon="fluent:open-20-regular" width="19" height="19" />
+            </span>
+          </el-tooltip>
+        </div>
       </div>
     </div>
     <div></div>
@@ -223,26 +246,27 @@
                   </el-avatar>
                   <div class="info-body">
                     <div class="info-top">
-                      <div style="display: flex; align-items: center; gap: 6px;">
+                      <div class="sender-title-wrap">
                         <span class="send-name-title">{{ msg.name }}</span>
                         <span v-if="msg.sendEmail === 'admin@epocanvas.com' || msg.isOfficial" class="official-verified-badge" :title="$t('officialVerified')">
                           <Icon icon="ri:verified-badge-fill" width="18" height="18" style="color: #0284c7; vertical-align: middle;" />
                         </span>
                       </div>
                       <div class="thread-header-bar" @click.stop>
-                        <span class="date">{{ formatDetailDate(msg.createTime) }}</span>
-                        <div class="msg-header-quick-actions">
+                        <!-- Layer 1: Date, Star, and Collapse Arrow -->
+                        <div class="thread-meta-bar">
+                          <span class="date">{{ formatDetailDate(msg.createTime) }}</span>
                           <el-tooltip :content="$t('star') || 'Star'" placement="bottom" v-if="emailStore.contentData.showStar">
                             <span class="msg-act-star" role="button" tabindex="0" @click="changeStar">
                               <Icon class="msg-act-icon btn-star" v-if="email.isStar" icon="fluent-color:star-16" width="18" height="18"/>
                               <Icon class="msg-act-icon btn-star" v-else icon="solar:star-line-duotone" width="17" height="17"/>
                             </span>
                           </el-tooltip>
-                          <el-tooltip :content="$t('translateMessage')" placement="bottom">
-                            <span class="msg-act-icon btn-translate" role="button" tabindex="0" @click="toggleTranslateBar(msg)">
-                              <Icon icon="fluent:translate-20-regular" width="17" height="17"/>
-                            </span>
-                          </el-tooltip>
+                          <Icon icon="lucide:chevron-up" width="16" height="16" class="ch-arrow" v-if="threadMessages.length > 1" @click.stop="toggleMsg(msg.emailId, index)" />
+                        </div>
+
+                        <!-- Layer 2: Action Buttons Bar -->
+                        <div class="thread-actions-bar">
                           <el-tooltip :content="$t('reply')" placement="bottom" v-if="emailStore.contentData.showReply && hasPerm('email:send')">
                             <span class="msg-act-icon btn-reply" role="button" tabindex="0" @click="openReplyMsg(msg)">
                               <Icon icon="la:reply" width="18" height="18"/>
@@ -256,6 +280,11 @@
                           <el-tooltip :content="$t('forward')" placement="bottom" v-if="emailStore.contentData.showReply && hasPerm('email:send')">
                             <span class="msg-act-icon btn-forward" role="button" tabindex="0" @click="openForwardMsg(msg)">
                               <Icon icon="iconoir:arrow-up-right" width="17" height="17"/>
+                            </span>
+                          </el-tooltip>
+                          <el-tooltip :content="$t('translateMessage')" placement="bottom">
+                            <span class="msg-act-icon btn-translate" role="button" tabindex="0" @click="toggleTranslateBar(msg)">
+                              <Icon icon="fluent:translate-20-regular" width="17" height="17"/>
                             </span>
                           </el-tooltip>
                           <el-tooltip :content="$t('printEmail')" placement="bottom">
@@ -309,11 +338,7 @@
                             </template>
                           </el-dropdown>
                         </div>
-                        <Icon icon="lucide:chevron-up" width="16" height="16" class="ch-arrow" v-if="threadMessages.length > 1" @click.stop="toggleMsg(msg.emailId, index)" />
                       </div>
-                    </div>
-                    <div class="info-middle">
-                      <span>&lt;{{ msg.sendEmail }}&gt;</span>
                     </div>
                     <!-- Gmail-style info-bottom with 'to me' dropdown -->
                     <div class="info-bottom" @click.stop>
@@ -734,12 +759,55 @@ function isRecipientMe(recipient) {
   return formatted.includes(myEmail);
 }
 
+function getRecipientName(recipient) {
+  try {
+    const parsed = typeof recipient === 'string' ? JSON.parse(recipient) : recipient;
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      const myEmail = (accountStore.currentAccount?.email || userStore.user?.email || '').toLowerCase().trim();
+      const match = parsed.find(item => item && item.address && item.address.toLowerCase().trim() === myEmail);
+      if (match && match.name && match.name.trim() && match.name.trim() !== match.address.trim()) {
+        return match.name.trim();
+      }
+      if (match) {
+        if (accountStore.currentAccount?.name && accountStore.currentAccount.name.trim()) {
+          return accountStore.currentAccount.name.trim();
+        }
+        if (userStore.user?.name && userStore.user.name.trim()) {
+          return userStore.user.name.trim();
+        }
+        if (match.address) {
+          return match.address.split('@')[0];
+        }
+      }
+      if (parsed[0].name && parsed[0].name.trim() && parsed[0].name.trim() !== parsed[0].address?.trim()) {
+        return parsed[0].name.trim();
+      }
+      if (parsed[0].address) {
+        return parsed[0].address.split('@')[0];
+      }
+    }
+  } catch (e) {}
+
+  if (accountStore.currentAccount?.name && accountStore.currentAccount.name.trim()) {
+    return accountStore.currentAccount.name.trim();
+  }
+  if (userStore.user?.name && userStore.user.name.trim()) {
+    return userStore.user.name.trim();
+  }
+  const formatted = formateReceive(recipient);
+  if (formatted) {
+    return formatted.includes('@') ? formatted.split('@')[0] : formatted;
+  }
+  return '';
+}
+
 function getRecipientDisplay(recipient) {
-  if (isRecipientMe(recipient)) {
-    return t('toMe');
+  const name = getRecipientName(recipient);
+  if (name) {
+    return t('toRecipient', { recipient: name });
   }
   const rec = formateReceive(recipient);
-  return rec ? t('toRecipient', { recipient: rec }) : t('toMe');
+  return rec ? t('toRecipient', { recipient: rec }) : '';
 }
 
 function getSenderDomain(sendEmail) {
@@ -1491,40 +1559,40 @@ const handleReportNotSpam = (emailId) => {
 }
 
 .header-actions {
-  padding: 9px 15px 8px;
+  padding: 6px 16px;
+  min-height: 48px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   box-shadow: var(--header-actions-border);
+  border-bottom: 1px solid var(--border-subtle, #e2e8f0);
+  background: var(--bg-surface, #ffffff);
   font-size: 18px;
-
-  /* 窄屏：动作图标条允许横向滚动，避免图标被裁切挤压 */
-  @media (max-width: 767px) {
-    overflow-x: auto;
-    scrollbar-width: none;
-    gap: 8px;
-
-    .header-actions-left {
-      gap: 10px;
-      flex-shrink: 0;
-    }
-
-    .header-actions-right {
-      gap: 10px;
-      flex-shrink: 0;
-    }
-  }
 
   .header-actions-left {
     display: flex;
     align-items: center;
-    gap: 16px;
+    gap: 0;
   }
 
   .header-actions-right {
     display: flex;
     align-items: center;
-    gap: 14px;
+    gap: 4px;
+  }
+
+  .action-group {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .header-action-divider {
+    width: 1px;
+    height: 18px;
+    background-color: var(--border-subtle, #e2e8f0);
+    margin: 0 10px;
+    flex-shrink: 0;
   }
 
   .star {
@@ -1554,7 +1622,38 @@ const handleReportNotSpam = (emailId) => {
     justify-content: center;
     cursor: pointer;
     flex-shrink: 0;
-    line-height: 1;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    color: var(--text-secondary, #64748b);
+    transition: background-color 0.15s ease, color 0.15s ease;
+
+    &:hover {
+      background-color: var(--bg-hover, rgba(0, 0, 0, 0.06));
+      color: var(--text-primary, #0f172a);
+    }
+  }
+
+  /* 窄屏：动作图标条允许横向滚动，避免图标被裁切挤压 */
+  @media (max-width: 767px) {
+    overflow-x: auto;
+    scrollbar-width: none;
+    gap: 8px;
+    padding: 6px 10px;
+
+    .header-actions-left {
+      gap: 0;
+      flex-shrink: 0;
+    }
+
+    .header-actions-right {
+      gap: 4px;
+      flex-shrink: 0;
+    }
+
+    .header-action-divider {
+      margin: 0 6px;
+    }
   }
 }
 
@@ -1610,10 +1709,11 @@ const handleReportNotSpam = (emailId) => {
       border: 1px solid var(--border-subtle, #e2e8f0);
       border-radius: 8px;
       background: var(--bg-surface, #ffffff);
-      overflow: hidden;
+      overflow: visible;
       transition: all 0.2s ease;
 
       &.is-collapsed {
+        overflow: hidden;
         &:hover {
           background: var(--bg-hover, #f8fafc);
         }
@@ -1629,6 +1729,7 @@ const handleReportNotSpam = (emailId) => {
       align-items: center;
       justify-content: space-between;
       padding: 12px 16px;
+      border-radius: 8px;
       cursor: pointer;
       gap: 16px;
 
@@ -1783,6 +1884,7 @@ const handleReportNotSpam = (emailId) => {
           color: white;
           font-weight: bold;
           font-size: 18px;
+          flex-shrink: 0;
         }
 
         .info-body {
@@ -1790,40 +1892,49 @@ const handleReportNotSpam = (emailId) => {
           display: flex;
           flex-direction: column;
           gap: 2px;
+          min-width: 0;
         }
 
         .info-top {
           display: flex;
           justify-content: space-between;
-          align-items: center;
+          align-items: flex-start;
+          gap: 12px;
+          min-width: 0;
           
           .sender-title-wrap {
             display: flex;
             align-items: center;
             gap: 6px;
+            min-width: 0;
           }
 
           .send-name-title {
             font-size: 16px;
             font-weight: bold;
             color: var(--el-text-color-primary);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
           }
 
           .thread-header-bar {
             display: flex;
-            align-items: center;
-            gap: 12px;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 6px;
+            flex-shrink: 0;
 
-            .date {
-              color: var(--regular-text-color);
-              font-size: 13px;
-              white-space: nowrap;
-            }
-
-            .msg-header-quick-actions {
+            .thread-meta-bar {
               display: flex;
               align-items: center;
               gap: 8px;
+
+              .date {
+                color: var(--regular-text-color, #64748b);
+                font-size: 12.5px;
+                white-space: nowrap;
+              }
 
               .msg-act-star {
                 display: inline-flex;
@@ -1831,31 +1942,71 @@ const handleReportNotSpam = (emailId) => {
                 justify-content: center;
                 cursor: pointer;
                 flex-shrink: 0;
+                width: 26px;
+                height: 26px;
+                border-radius: 50%;
+                transition: background-color 0.15s ease;
+
+                &:hover {
+                  background-color: var(--bg-hover, rgba(0, 0, 0, 0.05));
+                }
               }
+
+              .ch-arrow {
+                cursor: pointer;
+                color: var(--text-muted, #94a3b8);
+                transition: transform 0.2s ease, color 0.15s ease;
+                &:hover {
+                  color: var(--text-primary, #0f172a);
+                }
+              }
+            }
+
+            .thread-actions-bar {
+              display: flex;
+              align-items: center;
+              gap: 4px;
 
               .msg-act-icon {
                 cursor: pointer;
                 color: var(--text-muted, #94a3b8);
-                transition: color 0.15s ease, transform 0.15s ease;
+                transition: color 0.15s ease, background-color 0.15s ease, transform 0.15s ease;
                 display: inline-flex;
                 align-items: center;
                 justify-content: center;
                 flex-shrink: 0;
-                line-height: 1;
-                vertical-align: middle;
+                width: 28px;
+                height: 28px;
+                border-radius: 50%;
 
                 &:hover {
                   color: var(--text-primary, #0f172a);
-                  transform: scale(1.1);
+                  background-color: var(--bg-hover, rgba(0, 0, 0, 0.05));
+                  transform: scale(1.08);
                 }
               }
             }
           }
-        }
-        
-        .info-middle {
-          color: var(--regular-text-color);
-          font-size: 13px;
+
+          @media (max-width: 600px) {
+            flex-wrap: wrap;
+            gap: 6px;
+
+            .thread-header-bar {
+              width: 100%;
+              align-items: flex-start;
+              margin-top: 4px;
+
+              .thread-meta-bar {
+                width: 100%;
+                justify-content: space-between;
+              }
+
+              .thread-actions-bar {
+                margin-top: 2px;
+              }
+            }
+          }
         }
 
         .info-bottom {
@@ -1992,9 +2143,24 @@ const handleReportNotSpam = (emailId) => {
 
       .inline-reply {
         display: flex;
+        align-items: center;
         gap: 12px;
-        margin-top: 30px;
-        margin-bottom: 40px;
+        margin-top: 24px;
+        margin-bottom: 24px;
+        position: sticky;
+        bottom: 16px;
+        z-index: 10;
+        width: fit-content;
+        background: var(--bg-surface, #ffffff);
+        padding: 6px 14px;
+        border-radius: 28px;
+        border: 1px solid var(--border-subtle, #e2e8f0);
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+        transition: box-shadow 0.2s ease, border-color 0.2s ease;
+
+        &:hover {
+          box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+        }
         
         .reply-btn {
           display: flex;
@@ -2002,6 +2168,7 @@ const handleReportNotSpam = (emailId) => {
           gap: 6px;
           padding: 8px 20px;
           font-size: 14px;
+          border-radius: 20px;
         }
       }
       
