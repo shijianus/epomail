@@ -377,6 +377,7 @@ import {EmailUnreadEnum} from "@/enums/email-enum.js";
 import { UseVirtualList } from '@vueuse/components'
 import { useScroll } from '@vueuse/core'
 import { emailSpam, emailSnooze, emailRestore, emailDelete as realEmailDelete } from "@/request/email.js";
+import { getThreadKey } from "@/utils/thread-utils.js";
 
 const props = defineProps({
   getEmailList: Function,
@@ -582,21 +583,6 @@ const { arrivedState } = useScroll(scrollbarRef, {
 })
 
 
-function getThreadKey(item) {
-  if (!item || item.expand) return null;
-  if (item.threadId) return `thread_${item.threadId}`;
-
-  let s = (item.subject || '').trim();
-  s = s.replace(/^(re|fwd|fw|回复|转发)[:：\s]+/gi, '')
-       .replace(/^(\[[^\]]+\]|\([^\)]+\))[:：\s]*/g, '')
-       .trim().toLowerCase();
-
-  if (!s) {
-    const sender = (item.sendEmail || '').trim().toLowerCase();
-    return sender ? `sender_${sender}` : `id_${item.emailId}`;
-  }
-  return `subj_${s}`;
-}
 
 function aggregateThreads(items) {
   if (!uiStore.conversationView) {

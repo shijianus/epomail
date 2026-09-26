@@ -442,13 +442,11 @@
         </div>
       </div>
 
-      <!-- 4. 邮件会话模式 (Email Threading - 带问号提示) -->
+      <!-- 4. 邮件会话模式 (Email Threading) -->
       <div class="item">
-        <div>
-          <span>{{ $t('emailThreading') }}</span>
-          <el-tooltip :content="$t('conversationViewDesc')" placement="top">
-            <Icon icon="fluent:question-circle-16-regular" width="16" height="16" style="cursor: pointer; color: var(--text-muted); vertical-align: middle;" />
-          </el-tooltip>
+        <div style="flex-direction: column; align-items: flex-start; white-space: normal;">
+          <div>{{ $t('emailThreading') }}</div>
+          <div class="sub-hint">{{ $t('conversationViewDesc') }}</div>
         </div>
         <div class="threading-control">
           <el-switch 

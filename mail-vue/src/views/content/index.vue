@@ -194,7 +194,16 @@
     <el-scrollbar class="scrollbar" ref="contentScrollbarRef" @scroll="handleContentScroll">
       <div class="container">
         <div class="email-title-row">
-          <div class="email-title">{{ email.subject }}</div>
+          <div class="email-title">
+            <span>{{ email.subject }}</span>
+            <span 
+              v-if="threadMessages.length > 1" 
+              class="thread-count-badge" 
+              :title="$t('threadCountTooltip', { count: threadMessages.length })"
+            >
+              {{ threadMessages.length }}
+            </span>
+          </div>
           <div class="email-labels-list" v-if="currentLabels.length">
             <el-tag 
               v-for="lbl in currentLabels" 
@@ -210,16 +219,15 @@
 
         <!-- Thread Messages List -->
         <div class="thread-messages-flow">
-          <div 
-            v-for="(msg, index) in threadMessages" 
-            :key="msg.emailId"
-            class="thread-msg-item"
-            :class="{ 
-              'is-collapsed': !isMsgExpanded(msg.emailId, index), 
-              'is-last': index === threadMessages.length - 1,
-              'in-thread': threadMessages.length > 1
-            }"
-          >
+          <template v-for="(msg, index) in threadMessages" :key="msg.emailId">
+            <div 
+              class="thread-msg-item"
+              :class="{ 
+                'is-collapsed': !isMsgExpanded(msg.emailId, index), 
+                'is-last': index === threadMessages.length - 1,
+                'in-thread': threadMessages.length > 1
+              }"
+            >
             <!-- Collapsed Card Header -->
             <div 
               class="thread-collapsed-header" 
@@ -613,6 +621,15 @@
               </div>
             </div>
           </div>
+
+          <!-- Explicit Divider Line between conversation messages -->
+          <div 
+            class="thread-message-divider" 
+            v-if="threadMessages.length > 1 && index < threadMessages.length - 1"
+            :class="{ 'after-expanded': isMsgExpanded(msg.emailId, index), 'after-collapsed': !isMsgExpanded(msg.emailId, index) }"
+            role="separator"
+          ></div>
+        </template>
         </div>
 
         <!-- Footer Actions Bar (class="inline-reply") -->
@@ -804,6 +821,7 @@ import {useI18n} from "vue-i18n";
 import {EmailUnreadEnum} from "@/enums/email-enum.js";
 import {hasPerm} from "@/perm/perm.js";
 import {getLabelDisplayName} from "@/utils/label-i18n.js";
+import {getThreadKey} from "@/utils/thread-utils.js";
 
 const uiStore = useUiStore();
 const settingStore = useSettingStore();
@@ -819,10 +837,27 @@ const { t } = useI18n()
 
 // Conversation Thread Messages
 const threadMessages = computed(() => {
-  if (email && email.threadEmails && email.threadEmails.length > 1) {
+  if (!email) return []
+  if (!uiStore.conversationView) return [email]
+
+  if (email.threadEmails && email.threadEmails.length > 1) {
     return [...email.threadEmails].sort((a, b) => new Date(a.createTime || 0) - new Date(b.createTime || 0) || a.emailId - b.emailId)
   }
-  return email ? [email] : []
+
+  // Fallback: check if other emails in the active emailScroll list match this thread
+  const scrollInst = emailStore.emailScroll?.value || emailStore.emailScroll
+  const list = scrollInst?.emailList
+  if (Array.isArray(list) && list.length > 0) {
+    const key = getThreadKey(email)
+    if (key) {
+      const matched = list.filter(item => !item.expand && getThreadKey(item) === key)
+      if (matched.length > 1) {
+        return [...matched].sort((a, b) => new Date(a.createTime || 0) - new Date(b.createTime || 0) || a.emailId - b.emailId)
+      }
+    }
+  }
+
+  return [email]
 })
 
 const expandedMap = reactive({})
@@ -2123,10 +2158,26 @@ const handleReportNotSpam = (emailId) => {
     margin-bottom: 12px;
 
     .email-title {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
       font-size: 20px;
       font-weight: bold;
       margin-bottom: 0;
       color: var(--text-primary);
+
+      .thread-count-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        font-weight: 700;
+        background: rgba(91, 110, 245, 0.12);
+        color: var(--accent-primary);
+        padding: 2px 7px;
+        border-radius: 10px;
+        line-height: 1;
+      }
     }
 
     .email-labels-list {
@@ -2144,7 +2195,6 @@ const handleReportNotSpam = (emailId) => {
   .thread-messages-flow {
     display: flex;
     flex-direction: column;
-    gap: 12px;
     margin-top: 10px;
     flex: 1;
 
@@ -2162,15 +2212,27 @@ const handleReportNotSpam = (emailId) => {
 
         &.is-collapsed {
           overflow: hidden;
+          margin-bottom: 0;
           &:hover {
             background: var(--bg-hover, #f8fafc);
           }
         }
+      }
+    }
 
-        &:not(:last-child) {
-          padding-bottom: 16px;
-          margin-bottom: 16px;
-        }
+    .thread-message-divider {
+      width: 100%;
+      height: 1px;
+      background-color: var(--border-subtle, #e2e8f0);
+      border: none;
+      flex-shrink: 0;
+
+      &.after-expanded {
+        margin: 24px 0 20px 0;
+      }
+
+      &.after-collapsed {
+        margin: 0;
       }
     }
 
@@ -2179,9 +2241,14 @@ const handleReportNotSpam = (emailId) => {
       align-items: center;
       justify-content: space-between;
       padding: 12px 16px;
-      border-radius: 8px;
+      border-radius: 4px;
       cursor: pointer;
       gap: 16px;
+      transition: background-color 0.15s ease;
+
+      &:hover {
+        background: var(--bg-hover, #f8fafc);
+      }
 
       .ch-left {
         display: flex;
