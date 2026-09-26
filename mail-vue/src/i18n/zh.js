@@ -2040,6 +2040,12 @@ totpModeAllDesc: '设置是否允许用户使用TOTP，开启后用户可以且�
     sampleAppDesc: 'EpoCanvas / shijianus 博客原生集成示例应用（官方内置示例，站长可随时修改或直接删除）',
     legacyBaseRoleDesc: '默认普通用户分组，仅具备基础收发与常规使用权限',
     recommendedTag: '推荐',
+    addReaction: '添加回应',
+    reactionAdded: '已添加回应 {emoji}',
+    reactionRemoved: '已取消回应 {emoji}',
+    confirmBlockSenderTitle: '拉黑发件人',
+    confirmBlockSenderMsg: '确定要将发件人 "{sender}" 加入黑名单并自动拦截其后续来信吗？',
+    copyAddressSuccess: '已复制邮箱地址',
 };
 
 export default zh;

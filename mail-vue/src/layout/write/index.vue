@@ -119,6 +119,7 @@ import {forceLogoutToLogin} from "@/utils/auth.js";
 defineExpose({
   open,
   openReply,
+  openReplyAll,
   openForward,
   openDraft,
   openWithRecipient
@@ -499,6 +500,74 @@ function openReply(email) {
     })
   })
 
+}
+
+function openReplyAll(email) {
+  resetForm();
+
+  email.subject = email.subject || '';
+
+  const myEmail = (accountStore.currentAccount?.email || userStore.user?.email || '').toLowerCase().trim();
+  const recipientsSet = new Set();
+  if (email.sendEmail && email.sendEmail.toLowerCase().trim() !== myEmail) {
+    recipientsSet.add(email.sendEmail.trim());
+  }
+  try {
+    const parsed = typeof email.recipient === 'string' ? JSON.parse(email.recipient) : email.recipient;
+    if (Array.isArray(parsed)) {
+      parsed.forEach(item => {
+        const addr = (item.address || item).toLowerCase().trim();
+        if (addr && addr !== myEmail) {
+          recipientsSet.add(item.address || item);
+        }
+      });
+    }
+  } catch (e) {
+    if (typeof email.recipient === 'string') {
+      email.recipient.split(/[,;]/).forEach(r => {
+        const addr = r.toLowerCase().trim();
+        if (addr && addr !== myEmail) {
+          recipientsSet.add(r.trim());
+        }
+      });
+    }
+  }
+  if (recipientsSet.size === 0 && email.sendEmail) {
+    recipientsSet.add(email.sendEmail.trim());
+  }
+
+  form.receiveEmail = Array.from(recipientsSet);
+  form.subject = (
+      email.subject.startsWith('Re:') ||
+      email.subject.startsWith('Re：') ||
+      email.subject.startsWith('回复：') ||
+      email.subject.startsWith('回复:')) ? email.subject : 'Re: ' + email.subject;
+  form.sendType = 'reply';
+  form.emailId = email.emailId;
+
+  defValue.value = '';
+
+  setTimeout(() => {
+    defValue.value = `
+    <div></div>
+    <div>
+    <br>
+        ${formatDetailDate(email.createTime)} ${email.name} &lt${email.sendEmail}&gt ${t('wrote')}:
+    </div>
+    <blockquote class="mceNonEditable" style="margin: 0 0 0 0.8ex;border-left: 1px solid rgb(204,204,204);padding-left: 1ex;">
+      <article>
+          ${formatImage(email.content) || `<pre style="font-family: inherit;word-break: break-word;white-space: pre-wrap;margin: 0">${email.text}</pre>`}
+      </article>
+    </blockquote>`;
+    open();
+
+    nextTick(() => {
+      backReply.content = editor.value.getContent();
+      backReply.subject = form.subject;
+      backReply.receiveEmail = form.receiveEmail;
+      backReply.sendType = form.sendType;
+    });
+  });
 }
 
 function formatImage(content) {

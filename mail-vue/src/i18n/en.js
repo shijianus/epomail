@@ -2040,6 +2040,12 @@ totpModeAllDesc: 'Configure whether users can use TOTP. When enabled, 2FA is ava
     sampleAppDesc: 'EpoCanvas / shijianus blog native integration sample app (official built-in example; the webmaster may edit or delete it at any time)',
     legacyBaseRoleDesc: 'Default regular user group with only basic mail and standard usage permissions',
     recommendedTag: 'Recommended',
+    addReaction: 'Add reaction',
+    reactionAdded: 'Added reaction {emoji}',
+    reactionRemoved: 'Removed reaction {emoji}',
+    confirmBlockSenderTitle: 'Block Sender',
+    confirmBlockSenderMsg: 'Are you sure you want to block sender "{sender}" and automatically filter incoming messages?',
+    copyAddressSuccess: 'Email address copied',
 };
 
 export default en;

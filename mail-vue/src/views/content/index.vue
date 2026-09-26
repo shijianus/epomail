@@ -240,18 +240,116 @@
             <div class="content thread-expanded-body" v-else>
               <div class="email-info" @click="threadMessages.length > 1 ? toggleMsg(msg.emailId, index) : null" :style="threadMessages.length > 1 ? 'cursor: pointer;' : ''">
                 <div style="display: flex; gap: 16px;">
-                  <el-avatar :size="44" class="sender-avatar" :class="{ 'official-avatar': msg.sendEmail === 'admin@epocanvas.com' || msg.isOfficial }">
-                    <Icon icon="ri:verified-badge-fill" width="24" height="24" v-if="msg.sendEmail === 'admin@epocanvas.com' || msg.isOfficial" />
-                    <template v-else>{{ msg.name ? msg.name.charAt(0).toUpperCase() : 'U' }}</template>
-                  </el-avatar>
+                  <!-- Avatar with Contact Card Popover -->
+                  <el-popover
+                    placement="bottom-start"
+                    :width="280"
+                    trigger="hover"
+                    popper-class="contact-card-popover"
+                    :teleported="true"
+                    :show-after="300"
+                  >
+                    <template #reference>
+                      <el-avatar :size="44" class="sender-avatar" :class="{ 'official-avatar': msg.sendEmail === 'admin@epocanvas.com' || msg.isOfficial }">
+                        <Icon icon="ri:verified-badge-fill" width="24" height="24" v-if="msg.sendEmail === 'admin@epocanvas.com' || msg.isOfficial" />
+                        <template v-else>{{ msg.name ? msg.name.charAt(0).toUpperCase() : 'U' }}</template>
+                      </el-avatar>
+                    </template>
+                    <div class="contact-hover-card" @click.stop>
+                      <div class="card-head">
+                        <el-avatar :size="40" class="sender-avatar" :class="{ 'official-avatar': msg.sendEmail === 'admin@epocanvas.com' || msg.isOfficial }">
+                          <Icon icon="ri:verified-badge-fill" width="22" height="22" v-if="msg.sendEmail === 'admin@epocanvas.com' || msg.isOfficial" />
+                          <template v-else>{{ msg.name ? msg.name.charAt(0).toUpperCase() : 'U' }}</template>
+                        </el-avatar>
+                        <div class="card-user-info">
+                          <div class="card-name">{{ msg.name }}</div>
+                          <div class="card-email">{{ msg.sendEmail }}</div>
+                        </div>
+                      </div>
+                      <div class="card-actions">
+                        <el-button type="primary" size="small" round @click="handleSendMailTo(msg.sendEmail)" class="btn-card-mail">
+                          <Icon icon="fluent:mail-16-regular" width="15" style="margin-right: 4px;" />
+                          {{ $t('writeEmail') || 'Send mail' }}
+                        </el-button>
+                        <el-tooltip :content="$t('copy') || 'Copy address'" placement="top">
+                          <el-button size="small" circle @click="copyText(msg.sendEmail)">
+                            <Icon icon="fluent:copy-16-regular" width="15" />
+                          </el-button>
+                        </el-tooltip>
+                        <el-tooltip :content="$t('filterMessages') || 'Filter'" placement="top">
+                          <el-button size="small" circle @click="openFilterDialog(msg)">
+                            <Icon icon="fluent:filter-16-regular" width="15" />
+                          </el-button>
+                        </el-tooltip>
+                      </div>
+                    </div>
+                  </el-popover>
+
                   <div class="info-body">
                     <div class="info-top">
-                      <div class="sender-title-wrap">
-                        <span class="send-name-title">{{ msg.name }}</span>
-                        <span v-if="msg.sendEmail === 'admin@epocanvas.com' || msg.isOfficial" class="official-verified-badge" :title="$t('officialVerified')">
-                          <Icon icon="ri:verified-badge-fill" width="18" height="18" style="color: #0284c7; vertical-align: middle;" />
-                        </span>
+                      <!-- Left Column: Sender Info & Recipient (to me) closely stacked -->
+                      <div class="sender-info-col">
+                        <div class="sender-title-wrap">
+                          <span class="send-name-title">{{ msg.name }}</span>
+                          <span v-if="msg.sendEmail === 'admin@epocanvas.com' || msg.isOfficial" class="official-verified-badge" :title="$t('officialVerified')">
+                            <Icon icon="ri:verified-badge-fill" width="18" height="18" style="color: #0284c7; vertical-align: middle;" />
+                          </span>
+                        </div>
+
+                        <!-- Gmail-style info-bottom immediately below sender name with NO GAP -->
+                        <div class="info-bottom" @click.stop>
+                          <el-popover
+                            placement="bottom-start"
+                            :width="380"
+                            trigger="click"
+                            popper-class="gmail-details-popover"
+                            :teleported="true"
+                          >
+                            <template #reference>
+                              <div class="to-me-trigger">
+                                <span class="recipient-label">{{ getRecipientDisplay(msg.recipient) }}</span>
+                                <Icon icon="fluent:chevron-down-12-regular" class="to-me-arrow" />
+                              </div>
+                            </template>
+
+                            <div class="gmail-details-card">
+                              <div class="detail-row">
+                                <span class="dt-label">{{ $t('detailFrom') }}</span>
+                                <span class="dt-val">{{ msg.name ? `${msg.name} <${msg.sendEmail}>` : msg.sendEmail }}</span>
+                              </div>
+                              <div class="detail-row" v-if="msg.replyTo">
+                                <span class="dt-label">{{ $t('detailReplyTo') }}</span>
+                                <span class="dt-val">{{ msg.replyTo }}</span>
+                              </div>
+                              <div class="detail-row">
+                                <span class="dt-label">{{ $t('detailTo') }}</span>
+                                <span class="dt-val">{{ formateReceive(msg.recipient) }}</span>
+                              </div>
+                              <div class="detail-row">
+                                <span class="dt-label">{{ $t('detailDate') }}</span>
+                                <span class="dt-val">{{ formatDetailDate(msg.createTime) }}</span>
+                              </div>
+                              <div class="detail-row">
+                                <span class="dt-label">{{ $t('detailSubject') }}</span>
+                                <span class="dt-val">{{ msg.subject || email.subject }}</span>
+                              </div>
+                              <div class="detail-row" v-if="getSenderDomain(msg.sendEmail)">
+                                <span class="dt-label">{{ $t('detailMailedBy') }}</span>
+                                <span class="dt-val">{{ getSenderDomain(msg.sendEmail) }}</span>
+                              </div>
+                              <div class="detail-row">
+                                <span class="dt-label">{{ $t('detailSecurity') }}</span>
+                                <span class="dt-val security-tls">
+                                  <Icon icon="fluent:lock-closed-16-regular" width="14" height="14" style="color: #10b981;" />
+                                  <span>{{ $t('detailSecurityTls') }}</span>
+                                </span>
+                              </div>
+                            </div>
+                          </el-popover>
+                        </div>
                       </div>
+
+                      <!-- Right Column: Thread Header Bar (2 layers) -->
                       <div class="thread-header-bar" @click.stop>
                         <!-- Layer 1: Date, Star, and Collapse Arrow -->
                         <div class="thread-meta-bar">
@@ -272,7 +370,7 @@
                               <Icon icon="la:reply" width="18" height="18"/>
                             </span>
                           </el-tooltip>
-                          <el-tooltip :content="$t('replyAll')" placement="bottom" v-if="emailStore.contentData.showReply && hasPerm('email:send')">
+                          <el-tooltip :content="$t('replyAll')" placement="bottom" v-if="emailStore.contentData.showReply && hasPerm('email:send') && hasMultipleRecipients(msg)">
                             <span class="msg-act-icon btn-reply-all" role="button" tabindex="0" @click="openReplyAllMsg(msg)">
                               <Icon icon="fluent:arrow-reply-all-20-regular" width="18" height="18"/>
                             </span>
@@ -282,6 +380,20 @@
                               <Icon icon="iconoir:arrow-up-right" width="17" height="17"/>
                             </span>
                           </el-tooltip>
+                          <el-popover placement="bottom" trigger="click" :width="280" popper-class="emoji-reaction-popover" :teleported="true">
+                            <template #reference>
+                              <el-tooltip :content="$t('addReaction')" placement="bottom">
+                                <span class="msg-act-icon btn-reaction" role="button" tabindex="0">
+                                  <Icon icon="fluent:emoji-add-20-regular" width="17" height="17"/>
+                                </span>
+                              </el-tooltip>
+                            </template>
+                            <div class="quick-reactions-grid">
+                              <span v-for="em in ['👍', '❤️', '😂', '🎉', '🚀', '👏', '🔥', '👀']" :key="em" class="emoji-chip" @click="toggleEmojiReaction(em, msg)">
+                                {{ em }}
+                              </span>
+                            </div>
+                          </el-popover>
                           <el-tooltip :content="$t('translateMessage')" placement="bottom">
                             <span class="msg-act-icon btn-translate" role="button" tabindex="0" @click="toggleTranslateBar(msg)">
                               <Icon icon="fluent:translate-20-regular" width="17" height="17"/>
@@ -302,13 +414,21 @@
                                   <Icon icon="la:reply" width="15" style="margin-right: 8px;" />
                                   {{ $t('reply') }}
                                 </el-dropdown-item>
-                                <el-dropdown-item command="replyAll" v-if="emailStore.contentData.showReply && hasPerm('email:send')">
+                                <el-dropdown-item command="replyAll" v-if="emailStore.contentData.showReply && hasPerm('email:send') && hasMultipleRecipients(msg)">
                                   <Icon icon="fluent:arrow-reply-all-20-regular" width="15" style="margin-right: 8px;" />
                                   {{ $t('replyAll') }}
                                 </el-dropdown-item>
                                 <el-dropdown-item command="forward" v-if="emailStore.contentData.showReply && hasPerm('email:send')">
                                   <Icon icon="iconoir:arrow-up-right" width="15" style="margin-right: 8px;" />
                                   {{ $t('forward') }}
+                                </el-dropdown-item>
+                                <el-dropdown-item command="unread">
+                                  <Icon icon="fluent:mail-unread-20-regular" width="15" style="margin-right: 8px;" />
+                                  {{ $t('markUnread') }}
+                                </el-dropdown-item>
+                                <el-dropdown-item command="blockSender">
+                                  <Icon icon="fluent:prohibited-16-regular" width="15" style="margin-right: 8px;" />
+                                  {{ $t('confirmBlockSenderTitle') }}
                                 </el-dropdown-item>
                                 <el-dropdown-item command="filter">
                                   <Icon icon="fluent:filter-20-regular" width="15" style="margin-right: 8px;" />
@@ -339,57 +459,6 @@
                           </el-dropdown>
                         </div>
                       </div>
-                    </div>
-                    <!-- Gmail-style info-bottom with 'to me' dropdown -->
-                    <div class="info-bottom" @click.stop>
-                      <el-popover
-                        placement="bottom-start"
-                        :width="380"
-                        trigger="click"
-                        popper-class="gmail-details-popover"
-                        :teleported="true"
-                      >
-                        <template #reference>
-                          <div class="to-me-trigger">
-                            <span class="recipient-label">{{ getRecipientDisplay(msg.recipient) }}</span>
-                            <Icon icon="fluent:chevron-down-12-regular" class="to-me-arrow" />
-                          </div>
-                        </template>
-
-                        <div class="gmail-details-card">
-                          <div class="detail-row">
-                            <span class="dt-label">{{ $t('detailFrom') }}</span>
-                            <span class="dt-val">{{ msg.name ? `${msg.name} <${msg.sendEmail}>` : msg.sendEmail }}</span>
-                          </div>
-                          <div class="detail-row" v-if="msg.replyTo">
-                            <span class="dt-label">{{ $t('detailReplyTo') }}</span>
-                            <span class="dt-val">{{ msg.replyTo }}</span>
-                          </div>
-                          <div class="detail-row">
-                            <span class="dt-label">{{ $t('detailTo') }}</span>
-                            <span class="dt-val">{{ formateReceive(msg.recipient) }}</span>
-                          </div>
-                          <div class="detail-row">
-                            <span class="dt-label">{{ $t('detailDate') }}</span>
-                            <span class="dt-val">{{ formatDetailDate(msg.createTime) }}</span>
-                          </div>
-                          <div class="detail-row">
-                            <span class="dt-label">{{ $t('detailSubject') }}</span>
-                            <span class="dt-val">{{ msg.subject || email.subject }}</span>
-                          </div>
-                          <div class="detail-row" v-if="getSenderDomain(msg.sendEmail)">
-                            <span class="dt-label">{{ $t('detailMailedBy') }}</span>
-                            <span class="dt-val">{{ getSenderDomain(msg.sendEmail) }}</span>
-                          </div>
-                          <div class="detail-row">
-                            <span class="dt-label">{{ $t('detailSecurity') }}</span>
-                            <span class="dt-val security-tls">
-                              <Icon icon="fluent:lock-closed-16-regular" width="14" height="14" style="color: #10b981;" />
-                              <span>{{ $t('detailSecurityTls') }}</span>
-                            </span>
-                          </div>
-                        </div>
-                      </el-popover>
                     </div>
                   </div>
                 </div>
@@ -498,16 +567,51 @@
                 </div>
               </div>
               
-              <div class="inline-reply" v-if="emailStore.contentData.showReply && hasPerm('email:send')">
-                 <el-button round class="reply-btn" @click="openReplyMsg(msg)">
-                    <Icon icon="la:reply" width="18" height="18" /> {{ $t('reply') || 'Reply' }}
-                 </el-button>
-                 <el-button round class="reply-btn" @click="openForwardMsg(msg)">
-                    <Icon icon="iconoir:arrow-up-right" width="18" height="18" /> {{ $t('forward') || 'Forward' }}
-                 </el-button>
+              <!-- Live Emoji Reaction Badges -->
+              <div class="msg-reactions-bar" v-if="getMsgReactions(msg.emailId).length">
+                <span 
+                  v-for="r in getMsgReactions(msg.emailId)" 
+                  :key="r.emoji" 
+                  class="reaction-badge" 
+                  :class="{ 'is-mine': r.isMine }"
+                  @click="toggleEmojiReaction(r.emoji, msg)"
+                  :title="r.isMine ? ($t('reactionRemoved', { emoji: r.emoji })) : ($t('reactionAdded', { emoji: r.emoji }))"
+                >
+                  <span class="rb-emoji">{{ r.emoji }}</span>
+                  <span class="rb-count">{{ r.count }}</span>
+                </span>
               </div>
             </div>
           </div>
+        </div>
+
+        <!-- Full-width Gmail Footer Actions Bar (class="inline-reply") -->
+        <div class="inline-reply" v-if="emailStore.contentData.showReply && hasPerm('email:send')">
+          <div class="footer-action-btn btn-reply" role="button" tabindex="0" @click="openReplyMsg(activeOrLastMsg)">
+            <Icon icon="la:reply" width="18" height="18" />
+            <span>{{ $t('reply') || 'Reply' }}</span>
+          </div>
+          <div class="footer-action-btn btn-reply-all" role="button" tabindex="0" @click="openReplyAllMsg(activeOrLastMsg)" v-if="hasMultipleRecipients(activeOrLastMsg)">
+            <Icon icon="fluent:arrow-reply-all-20-regular" width="18" height="18" />
+            <span>{{ $t('replyAll') || 'Reply all' }}</span>
+          </div>
+          <div class="footer-action-btn btn-forward" role="button" tabindex="0" @click="openForwardMsg(activeOrLastMsg)">
+            <Icon icon="iconoir:arrow-up-right" width="18" height="18" />
+            <span>{{ $t('forward') || 'Forward' }}</span>
+          </div>
+
+          <el-popover placement="top-start" trigger="click" :width="280" popper-class="emoji-reaction-popover" :teleported="true">
+            <template #reference>
+              <div class="footer-reaction-btn" role="button" tabindex="0" :title="$t('addReaction') || 'Add reaction'">
+                <Icon icon="fluent:emoji-add-24-regular" width="20" height="20" />
+              </div>
+            </template>
+            <div class="quick-reactions-grid">
+              <span v-for="em in ['👍', '❤️', '😂', '🎉', '🚀', '👏', '🔥', '👀']" :key="em" class="emoji-chip" @click="toggleEmojiReaction(em, activeOrLastMsg)">
+                {{ em }}
+              </span>
+            </div>
+          </el-popover>
         </div>
 
       </div>
@@ -814,6 +918,140 @@ function getSenderDomain(sendEmail) {
   if (!sendEmail) return '';
   const match = sendEmail.match(/@([^>]+)/);
   return match ? match[1].replace('>', '').trim() : '';
+}
+
+function hasMultipleRecipients(msg) {
+  if (!msg || !msg.recipient) return false;
+  try {
+    const parsed = typeof msg.recipient === 'string' ? JSON.parse(msg.recipient) : msg.recipient;
+    if (Array.isArray(parsed)) {
+      return parsed.length > 1;
+    }
+  } catch (e) {}
+  const str = String(msg.recipient);
+  return str.includes(',') || str.includes(';');
+}
+
+const activeOrLastMsg = computed(() => {
+  if (threadMessages.value && threadMessages.value.length > 0) {
+    for (let i = threadMessages.value.length - 1; i >= 0; i--) {
+      if (isMsgExpanded(threadMessages.value[i].emailId, i)) {
+        return threadMessages.value[i];
+      }
+    }
+    return threadMessages.value[threadMessages.value.length - 1];
+  }
+  return email;
+});
+
+const handleSendMailTo = (sendEmail) => {
+  if (!sendEmail) return;
+  if (uiStore.writerRef && uiStore.writerRef.openWithRecipient) {
+    uiStore.writerRef.openWithRecipient(sendEmail);
+  } else if (uiStore.writerRef && uiStore.writerRef.open) {
+    uiStore.writerRef.open();
+  }
+};
+
+const copyText = (text) => {
+  if (!text) return;
+  navigator.clipboard.writeText(text).then(() => {
+    ElMessage.success(t('copyAddressSuccess'));
+  }).catch(() => {
+    ElMessage.success(t('copyAddressSuccess'));
+  });
+};
+
+const handleMarkUnread = (msg) => {
+  const targetId = msg?.emailId || email.emailId;
+  emailRead([targetId], EmailUnreadEnum.UNREAD).then(() => {
+    email.unread = EmailUnreadEnum.UNREAD;
+    emailStore.refreshSidebarStats();
+    ElMessage.success(t('markUnreadSuccess'));
+    handleBack();
+  });
+};
+
+const handleBlockSender = (msg) => {
+  const target = msg || email;
+  const sender = target?.sendEmail;
+  if (!sender) return;
+  ElMessageBox.confirm(
+    t('confirmBlockSenderMsg', { sender }),
+    t('confirmBlockSenderTitle'),
+    {
+      confirmButtonText: t('confirm'),
+      cancelButtonText: t('cancel'),
+      type: 'warning'
+    }
+  ).then(() => {
+    let targetLabel = uiStore.allLabels.find(l => l.name === '黑名单' || l.name === '个人拦截');
+    if (!targetLabel) {
+      targetLabel = {
+        id: Date.now().toString(),
+        name: '黑名单',
+        color: '#ef4444',
+        icon: 'fluent:shield-dismiss-20-regular',
+        listVis: false,
+        actions: { targetFolder: 'spam', priority: 1, stopProcessing: true },
+        rules: []
+      };
+      uiStore.allLabels.push(targetLabel);
+    }
+    if (!targetLabel.rules) targetLabel.rules = [];
+    targetLabel.rules.push({
+      id: Date.now().toString() + 'r',
+      condition: { type: 'sender_includes', value: sender },
+      exception: { type: 'none', value: '' }
+    });
+    userSetCustomLabels(JSON.stringify({ allLabels: uiStore.allLabels })).then(() => {
+      ElMessage.success(t('filterCreatedSuccess'));
+      handleReportSpam();
+    });
+  }).catch(() => {});
+};
+
+const reactionsStorageKey = 'epomail_msg_reactions';
+const reactionsState = reactive(JSON.parse(localStorage.getItem(reactionsStorageKey) || '{}'));
+
+function saveReactions() {
+  try {
+    localStorage.setItem(reactionsStorageKey, JSON.stringify(reactionsState));
+  } catch (e) {}
+}
+
+function getMsgReactions(emailId) {
+  if (!emailId || !reactionsState[emailId]) return [];
+  return reactionsState[emailId];
+}
+
+function toggleEmojiReaction(emoji, msg) {
+  const target = msg || email;
+  if (!target || !target.emailId) return;
+  const emailId = target.emailId;
+  if (!reactionsState[emailId]) {
+    reactionsState[emailId] = [];
+  }
+  const list = reactionsState[emailId];
+  const existingIdx = list.findIndex(r => r.emoji === emoji);
+  if (existingIdx > -1) {
+    if (list[existingIdx].isMine) {
+      list[existingIdx].count--;
+      list[existingIdx].isMine = false;
+      if (list[existingIdx].count <= 0) {
+        list.splice(existingIdx, 1);
+      }
+      ElMessage.info(t('reactionRemoved', { emoji }));
+    } else {
+      list[existingIdx].count++;
+      list[existingIdx].isMine = true;
+      ElMessage.success(t('reactionAdded', { emoji }));
+    }
+  } else {
+    list.push({ emoji, count: 1, isMine: true });
+    ElMessage.success(t('reactionAdded', { emoji }));
+  }
+  saveReactions();
 }
 
 function changeStar() {
@@ -1143,7 +1381,11 @@ const handleMoveTo = (target) => {
 
 const openReplyAllMsg = (msg) => {
   const target = msg || email;
-  uiStore.writerRef.openReply(target);
+  if (uiStore.writerRef && uiStore.writerRef.openReplyAll) {
+    uiStore.writerRef.openReplyAll(target);
+  } else if (uiStore.writerRef && uiStore.writerRef.openReply) {
+    uiStore.writerRef.openReply(target);
+  }
 };
 
 const handlePrintAll = () => {
@@ -1280,6 +1522,10 @@ const handleMsgMoreCommand = (command, msg) => {
     openReplyAllMsg(msg);
   } else if (command === 'forward') {
     openForwardMsg(msg);
+  } else if (command === 'unread') {
+    handleMarkUnread(msg);
+  } else if (command === 'blockSender') {
+    handleBlockSender(msg);
   } else if (command === 'filter') {
     openFilterDialog(msg);
   } else if (command === 'spam') {
@@ -1667,6 +1913,11 @@ const handleReportNotSpam = (emailId) => {
   padding-left: 20px;
   padding-right: 20px;
   padding-top: 10px;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+
   @media (max-width: 1023px) {
     padding-left: 15px;
     padding-right: 15px;
@@ -1704,6 +1955,7 @@ const handleReportNotSpam = (emailId) => {
     flex-direction: column;
     gap: 12px;
     margin-top: 10px;
+    flex: 1;
 
     .thread-msg-item {
       border: 1px solid var(--border-subtle, #e2e8f0);
@@ -1901,21 +2153,69 @@ const handleReportNotSpam = (emailId) => {
           align-items: flex-start;
           gap: 12px;
           min-width: 0;
-          
-          .sender-title-wrap {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            min-width: 0;
-          }
 
-          .send-name-title {
-            font-size: 16px;
-            font-weight: bold;
-            color: var(--el-text-color-primary);
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
+          .sender-info-col {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            min-width: 0;
+            flex: 1;
+
+            .sender-title-wrap {
+              display: flex;
+              align-items: center;
+              gap: 6px;
+              min-width: 0;
+            }
+
+            .send-name-title {
+              font-size: 16px;
+              font-weight: bold;
+              color: var(--el-text-color-primary);
+              overflow: hidden;
+              text-overflow: ellipsis;
+              white-space: nowrap;
+            }
+
+            .info-bottom {
+              display: flex;
+              align-items: center;
+              gap: 8px;
+              font-size: 12.5px;
+              color: var(--secondary-text-color, #64748b);
+              margin-top: 1px;
+
+              .to-me-trigger {
+                display: inline-flex;
+                align-items: center;
+                gap: 4px;
+                cursor: pointer;
+                padding: 2px 6px;
+                border-radius: 4px;
+                transition: background-color 0.15s ease;
+                color: var(--text-secondary, #475569);
+                user-select: none;
+
+                &:hover {
+                  background-color: var(--bg-hover, rgba(0, 0, 0, 0.05));
+                  color: var(--text-primary, #0f172a);
+                }
+
+                .recipient-label {
+                  font-size: 12.5px;
+                  max-width: 320px;
+                  overflow: hidden;
+                  text-overflow: ellipsis;
+                  white-space: nowrap;
+                }
+
+                .to-me-arrow {
+                  font-size: 12px;
+                  color: var(--text-muted, #94a3b8);
+                  transition: transform 0.2s;
+                }
+              }
+            }
           }
 
           .thread-header-bar {
@@ -2005,46 +2305,6 @@ const handleReportNotSpam = (emailId) => {
               .thread-actions-bar {
                 margin-top: 2px;
               }
-            }
-          }
-        }
-
-        .info-bottom {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          font-size: 12.5px;
-          color: var(--secondary-text-color, #64748b);
-          margin-top: 1px;
-
-          .to-me-trigger {
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            cursor: pointer;
-            padding: 2px 6px;
-            border-radius: 4px;
-            transition: background-color 0.15s ease;
-            color: var(--text-secondary, #475569);
-            user-select: none;
-
-            &:hover {
-              background-color: var(--bg-hover, rgba(0, 0, 0, 0.05));
-              color: var(--text-primary, #0f172a);
-            }
-
-            .recipient-label {
-              font-size: 12.5px;
-              max-width: 320px;
-              overflow: hidden;
-              text-overflow: ellipsis;
-              white-space: nowrap;
-            }
-
-            .to-me-arrow {
-              font-size: 12px;
-              color: var(--text-muted, #94a3b8);
-              transition: transform 0.2s;
             }
           }
         }
@@ -2141,41 +2401,126 @@ const handleReportNotSpam = (emailId) => {
         }
       }
 
-      .inline-reply {
+      .msg-reactions-bar {
         display: flex;
+        flex-wrap: wrap;
         align-items: center;
-        gap: 12px;
-        margin-top: 24px;
-        margin-bottom: 24px;
-        position: sticky;
-        bottom: 16px;
-        z-index: 10;
-        width: fit-content;
-        background: var(--bg-surface, #ffffff);
-        padding: 6px 14px;
-        border-radius: 28px;
-        border: 1px solid var(--border-subtle, #e2e8f0);
-        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
-        transition: box-shadow 0.2s ease, border-color 0.2s ease;
+        gap: 8px;
+        margin-top: 14px;
+        padding-top: 10px;
+        border-top: 1px dashed var(--border-subtle, #e2e8f0);
 
-        &:hover {
-          box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
-        }
-        
-        .reply-btn {
-          display: flex;
+        .reaction-badge {
+          display: inline-flex;
           align-items: center;
           gap: 6px;
-          padding: 8px 20px;
-          font-size: 14px;
-          border-radius: 20px;
+          padding: 3px 10px;
+          border-radius: 16px;
+          background: var(--bg-elevated, #f1f5f9);
+          border: 1px solid var(--border-subtle, #cbd5e1);
+          font-size: 13px;
+          cursor: pointer;
+          user-select: none;
+          transition: all 0.15s ease;
+
+          &:hover {
+            background: var(--bg-hover, #e2e8f0);
+          }
+
+          &.is-mine {
+            background: rgba(2, 132, 199, 0.12);
+            border-color: #0284c7;
+            color: #0284c7;
+            font-weight: 600;
+          }
+
+          .rb-emoji {
+            font-size: 15px;
+            line-height: 1;
+          }
+
+          .rb-count {
+            font-size: 12px;
+          }
         }
       }
-      
+
       .source {
         white-space: nowrap;
         font-weight: bold;
         padding-right: 10px;
+      }
+    }
+
+    /* Full-width Gmail Footer Actions Bar */
+    .inline-reply {
+      position: sticky;
+      bottom: 0;
+      z-index: 15;
+      width: calc(100% + 40px);
+      margin-left: -20px;
+      margin-right: -20px;
+      margin-top: 24px;
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: var(--bg-surface, #ffffff);
+      border-top: 1px solid var(--border-subtle, #e2e8f0);
+      box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.04);
+      box-sizing: border-box;
+
+      @media (max-width: 1023px) {
+        width: calc(100% + 30px);
+        margin-left: -15px;
+        margin-right: -15px;
+        padding: 10px 15px;
+        gap: 8px;
+      }
+
+      .footer-action-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 18px;
+        border: 1px solid var(--border-subtle, #cbd5e1);
+        border-radius: 20px;
+        font-size: 13.5px;
+        font-weight: 500;
+        color: var(--text-primary, #334155);
+        background: var(--bg-surface, #ffffff);
+        cursor: pointer;
+        user-select: none;
+        transition: all 0.15s ease;
+
+        &:hover {
+          background: var(--bg-hover, #f1f5f9);
+          border-color: var(--text-muted, #94a3b8);
+          color: var(--el-color-primary, #0284c7);
+        }
+
+        &:active {
+          transform: scale(0.98);
+        }
+      }
+
+      .footer-reaction-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        border: 1px solid var(--border-subtle, #cbd5e1);
+        background: var(--bg-surface, #ffffff);
+        color: var(--text-secondary, #64748b);
+        cursor: pointer;
+        transition: all 0.15s ease;
+
+        &:hover {
+          background: var(--bg-hover, #f1f5f9);
+          color: var(--text-primary, #1e293b);
+        }
       }
     }
   }
@@ -2405,6 +2750,73 @@ const handleReportNotSpam = (emailId) => {
     overflow-y: auto;
     white-space: pre-wrap;
     word-break: break-all;
+  }
+}
+
+.contact-hover-card {
+  padding: 6px;
+
+  .card-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+
+    .card-user-info {
+      flex: 1;
+      overflow: hidden;
+
+      .card-name {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--text-primary, #0f172a);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .card-email {
+        font-size: 12px;
+        color: var(--text-muted, #64748b);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        margin-top: 2px;
+      }
+    }
+  }
+
+  .card-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    .btn-card-mail {
+      flex: 1;
+      font-weight: 500;
+    }
+  }
+}
+
+.quick-reactions-grid {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  padding: 6px 4px;
+  gap: 6px;
+
+  .emoji-chip {
+    font-size: 20px;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 6px;
+    transition: transform 0.1s ease, background 0.1s ease;
+    user-select: none;
+
+    &:hover {
+      transform: scale(1.25);
+      background: var(--bg-hover, #f1f5f9);
+    }
   }
 }
 </style>

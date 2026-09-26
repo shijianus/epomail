@@ -2040,6 +2040,12 @@ totpModeAllDesc: 'Instellen of gebruikers TOTP mogen gebruiken. Eenmaal ingescha
     sampleAppDesc: 'Voorbeeld-app met native integratie voor de EpoCanvas / shijianus blog (officieel ingebouwd voorbeeld; de beheerder kan deze op elk moment aanpassen of verwijderen)',
     legacyBaseRoleDesc: 'Standaard gewone gebruikersgroep met alleen basis mail- en standaardgebruiksrechten',
     recommendedTag: 'Aanbevolen',
+    addReaction: 'Reactie toevoegen',
+    reactionAdded: 'Reactie toegevoegd {emoji}',
+    reactionRemoved: 'Reactie verwijderd {emoji}',
+    confirmBlockSenderTitle: 'Afzender blokkeren',
+    confirmBlockSenderMsg: 'Weet u zeker dat u afzender "{sender}" wilt blokkeren en inkomende berichten wilt filteren?',
+    copyAddressSuccess: 'E-mailadres gekopieerd',
 };
 
 export default nl;

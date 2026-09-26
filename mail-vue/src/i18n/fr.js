@@ -2040,6 +2040,12 @@ totpModeAllDesc: 'Définir si les utilisateurs peuvent utiliser TOTP. Lorsqu\'il
     sampleAppDesc: "Exemple d'application d'intégration native au blog EpoCanvas / shijianus (exemple officiel intégré ; l'administrateur peut le modifier ou le supprimer à tout moment)",
     legacyBaseRoleDesc: "Groupe d'utilisateurs réguliers par défaut, avec uniquement les permissions de base de messagerie et d'usage standard",
     recommendedTag: 'Recommandé',
+    addReaction: 'Ajouter une réaction',
+    reactionAdded: 'Réaction ajoutée {emoji}',
+    reactionRemoved: 'Réaction supprimée {emoji}',
+    confirmBlockSenderTitle: 'Bloquer l\'expéditeur',
+    confirmBlockSenderMsg: 'Voulez-vous vraiment bloquer l\'expéditeur "{sender}" et filtrer ses messages entrants ?',
+    copyAddressSuccess: 'Adresse e-mail copiée',
 };
 
 export default fr;

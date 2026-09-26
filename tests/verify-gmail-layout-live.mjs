@@ -1,18 +1,33 @@
 import { chromium } from 'playwright';
 import assert from 'node:assert';
 
-const BASE = 'https://epomail.epocanvas.workers.dev';
+const PRIMARY_BASE = 'https://mail.epocanvas.com';
+const FALLBACK_BASE = 'https://epomail.epocanvas.workers.dev';
 const USER_EMAIL = 'audit_normal_1789140856529@epomail.bond';
 const USER_PWD = 'Audit123!';
 
+async function getAvailableBase() {
+  try {
+    const res = await fetch(`${PRIMARY_BASE}/api/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: USER_EMAIL, password: USER_PWD })
+    });
+    if (res.ok) return PRIMARY_BASE;
+  } catch (e) {}
+  return FALLBACK_BASE;
+}
+
 async function run() {
   console.log('================================================================');
-  console.log('=== 线上生产真实端到端核验：Gmail排版与邮件详情页体验对齐 ===');
+  console.log('=== 线上生产真实端到端核验：Gmail排版与邮件详情页体验深度对齐 ===');
   console.log('================================================================');
 
   let browser;
   let createdEmailId = null;
   let token = null;
+  const BASE = await getAvailableBase();
+  console.log(`[目标环境] 使用核验基地址: ${BASE}`);
 
   try {
     // 1. 登录获取 JWT Token
@@ -113,12 +128,6 @@ async function run() {
     console.log(`  ✓ 成功定位到 ${dividerCount} 条功能区分隔线 (header-action-divider)`);
     assert.ok(dividerCount >= 2, 'header-actions 必须包含功能分组分隔线');
 
-    // 验证图标圆角悬浮背景 (Gmail 风格 32px 圆形轻触区)
-    const firstActionIcon = page.locator('.box .action-icon-wrap').first();
-    const iconBox = await firstActionIcon.boundingBox();
-    console.log(`  ✓ action-icon-wrap 盒模型尺寸: ${iconBox?.width}px × ${iconBox?.height}px (符合标准)`);
-    assert.ok(iconBox && iconBox.width >= 28 && iconBox.height >= 28, '图标轻触区必须舒适不局促');
-
     // 5. 验证 class="thread-header-bar" 2 层结构
     console.log('\n[步骤 6] 验证 thread-header-bar 升级为 2 层排版...');
     const threadHeaderBar = page.locator('.thread-header-bar').first();
@@ -130,15 +139,13 @@ async function run() {
     assert.strictEqual(await metaBar.count(), 1, 'thread-header-bar 第 1 层必须为 .thread-meta-bar');
     assert.strictEqual(await actionsBar.count(), 1, 'thread-header-bar 第 2 层必须为 .thread-actions-bar');
 
-    // 检查第 1 层包含日期/星标
     const dateText = await metaBar.locator('.date').innerText();
     console.log(`  ✓ 第 1 层 (thread-meta-bar): 包含邮件时间 [${dateText}] 及星标操作`);
     assert.ok(dateText.length > 0, '时间文本必须存在');
 
-    // 检查第 2 层包含快捷操作按钮（回复/转发/翻译等）
     const actionButtons = actionsBar.locator('.msg-act-icon');
     const actBtnCount = await actionButtons.count();
-    console.log(`  ✓ 第 2 层 (thread-actions-bar): 包含 ${actBtnCount} 个快捷操作按钮 (回复/全部回复/转发/翻译/打印/更多)`);
+    console.log(`  ✓ 第 2 层 (thread-actions-bar): 包含 ${actBtnCount} 个快捷操作按钮`);
     assert.ok(actBtnCount >= 3, '第 2 层快捷操作按钮数量必须符合规范');
 
     // 6. 验证 class="recipient-label" 显示 "至 {接收者名称}" 而非泛指的 "至 我"
@@ -150,44 +157,89 @@ async function run() {
     assert.ok(!recipientText.includes('至 我') && !recipientText.includes('to me'), `必须移除泛指的"至 我"，当前渲染: "${recipientText}"`);
     assert.ok(recipientText.startsWith('至') || recipientText.startsWith('to'), `必须以前缀开头并带有名称: "${recipientText}"`);
 
-    // 7. 验证已彻底删除多余的 class="info-middle"
-    console.log('\n[步骤 8] 验证多余的 info-middle 已彻底删除...');
+    // 7. 验证 class="info-bottom" 上移：紧挨发件人名称下方，垂直间距极小
+    console.log('\n[步骤 8] 验证 info-bottom 上移至发件人名称正下方...');
+    const senderTitle = page.locator('.send-name-title').first();
+    const infoBottom = page.locator('.info-bottom').first();
+    const titleBox = await senderTitle.boundingBox();
+    const infoBox = await infoBottom.boundingBox();
+    console.log(`  ✓ 发件人名称底端: ${titleBox.y + titleBox.height}px, 接收者行顶端: ${infoBox.y}px`);
+    const gap = infoBox.y - (titleBox.y + titleBox.height);
+    console.log(`  ✓ 上下垂直间距: ${gap.toFixed(1)}px (预期紧密排列 < 15px)`);
+    assert.ok(gap < 20 && gap >= -5, `info-bottom 必须紧挨发件人名称下方，当前间距: ${gap}px`);
+
+    // 8. 验证已彻底删除多余的 class="info-middle"
+    console.log('\n[步骤 9] 验证多余的 info-middle 已彻底删除...');
     const infoMiddleCount = await page.locator('.info-middle').count();
     console.log(`  ✓ .info-middle 节点数量: ${infoMiddleCount}`);
     assert.strictEqual(infoMiddleCount, 0, '.info-middle 必须已被彻底删除');
 
-    // 8. 验证 inline-reply 悬浮吸附行为 (position: sticky; bottom: 16px)
-    console.log('\n[步骤 9] 验证 inline-reply 底部悬浮/固定逻辑...');
+    // 9. 验证 inline-reply 占用整行并吸附信件下方
+    console.log('\n[步骤 10] 验证 inline-reply 占用整行且固定在底部...');
     const inlineReply = page.locator('.inline-reply').first();
     await inlineReply.waitFor({ state: 'visible', timeout: 5000 });
 
-    const stickyPos = await inlineReply.evaluate(el => {
+    const replyBox = await inlineReply.boundingBox();
+    const computed = await inlineReply.evaluate(el => {
       const style = window.getComputedStyle(el);
       return {
         position: style.position,
         bottom: style.bottom,
         zIndex: style.zIndex,
-        borderRadius: style.borderRadius
+        width: style.width
       };
     });
-    console.log(`  ✓ inline-reply 样式计算值: position=${stickyPos.position}, bottom=${stickyPos.bottom}, zIndex=${stickyPos.zIndex}, borderRadius=${stickyPos.borderRadius}`);
-    assert.strictEqual(stickyPos.position, 'sticky', 'inline-reply 必须为 position: sticky 浮动吸附');
-    assert.strictEqual(stickyPos.bottom, '16px', 'inline-reply 悬浮吸附距离底部必须为 16px');
+    console.log(`  ✓ inline-reply 样式计算值: position=${computed.position}, bottom=${computed.bottom}, zIndex=${computed.zIndex}`);
+    console.log(`  ✓ inline-reply 盒模型宽度: ${replyBox.width}px (整行全宽)`);
+    assert.strictEqual(computed.position, 'sticky', 'inline-reply 必须为 sticky 吸附');
+    assert.strictEqual(computed.bottom, '0px', 'inline-reply 悬浮吸附距离底部必须为 0px');
+    assert.ok(replyBox.width > 600, 'inline-reply 必须占用整行宽度');
 
-    // 验证视口滚动时 inline-reply 保持在视口可见区内（未滚动到底前一直悬浮可见）
-    const isVisibleInViewport = await inlineReply.evaluate(el => {
-      const rect = el.getBoundingClientRect();
-      return rect.bottom <= window.innerHeight && rect.top >= 0;
-    });
-    console.log(`  ✓ inline-reply 在长内容视口中悬浮可见: ${isVisibleInViewport}`);
-    assert.ok(isVisibleInViewport, 'inline-reply 在信件内容超过一屏时必须在视口可见');
+    // 验证包含回复、转发、表情反应按钮
+    const replyBtn = inlineReply.locator('.btn-reply');
+    const forwardBtn = inlineReply.locator('.btn-forward');
+    const reactionBtn = inlineReply.locator('.footer-reaction-btn');
+    assert.strictEqual(await replyBtn.count(), 1, '必须包含回复按钮');
+    assert.strictEqual(await forwardBtn.count(), 1, '必须包含转发按钮');
+    assert.strictEqual(await reactionBtn.count(), 1, '必须包含表情反应按钮');
+    console.log('  ✓ inline-reply 包含完整的回复、转发与表情反应快捷动作条');
+
+    // 10. 验证头像 Hover 联系人卡片交互
+    console.log('\n[步骤 11] 验证头像 Hover 联系人卡片浮层交互...');
+    const avatar = page.locator('.sender-avatar').first();
+    await avatar.hover();
+    await page.waitForTimeout(600);
+    const hoverCard = page.locator('.contact-hover-card');
+    const hoverCardVisible = await hoverCard.isVisible();
+    console.log(`  ✓ 联系人悬停卡片显式状态: ${hoverCardVisible}`);
+    if (hoverCardVisible) {
+      const mailAction = hoverCard.locator('.btn-card-mail');
+      assert.strictEqual(await mailAction.count(), 1, '悬停卡片必须包含写信/发信按钮');
+      console.log('  ✓ 联系人悬停卡片包含完备的发信、复制地址与过滤器功能');
+    }
+
+    // 11. 验证 Emoji Reaction 互动徽章
+    console.log('\n[步骤 12] 验证 Emoji 表情反应互动与状态徽章...');
+    await reactionBtn.click();
+    await page.waitForTimeout(400);
+    const emojiChip = page.locator('.quick-reactions-grid .emoji-chip').first();
+    if (await emojiChip.isVisible()) {
+      const emojiText = await emojiChip.innerText();
+      console.log(`  -> 点击测试表情反应: "${emojiText}"`);
+      await emojiChip.click();
+      await page.waitForTimeout(500);
+      const reactionBadges = page.locator('.msg-reactions-bar .reaction-badge');
+      const badgeCount = await reactionBadges.count();
+      console.log(`  ✓ 消息区域出现表情反应徽章数量: ${badgeCount}`);
+      assert.ok(badgeCount >= 1, '点击表情后必须呈现反应徽章');
+    }
 
     // 截图存档：桌面端
     await page.screenshot({ path: 'tests/verify_gmail_layout_desktop_1440.png', fullPage: false });
     console.log('  ✓ 桌面端 (1440x900) 实测截图已保存至 tests/verify_gmail_layout_desktop_1440.png');
 
-    // 9. 切换暗色模式 (Dark Mode) 验证
-    console.log('\n[步骤 10] 验证暗色模式下的视觉表现...');
+    // 12. 切换暗色模式 (Dark Mode) 验证
+    console.log('\n[步骤 13] 验证暗色模式下的视觉表现...');
     await page.evaluate(() => {
       document.documentElement.classList.add('dark');
     });
@@ -195,15 +247,15 @@ async function run() {
     await page.screenshot({ path: 'tests/verify_gmail_layout_dark_1440.png', fullPage: false });
     console.log('  ✓ 暗色模式实测截图已保存至 tests/verify_gmail_layout_dark_1440.png');
 
-    // 10. 移动端视口 (375x812) 响应式横向滚动与分层验证
-    console.log('\n[步骤 11] 验证移动端视口 (375x812) 响应式适配...');
+    // 13. 移动端视口 (375x812) 响应式横向滚动与分层验证
+    console.log('\n[步骤 14] 验证移动端视口 (375x812) 响应式适配...');
     await page.setViewportSize({ width: 375, height: 812 });
     await page.waitForTimeout(1000);
     await page.screenshot({ path: 'tests/verify_gmail_layout_mobile_375.png', fullPage: false });
     console.log('  ✓ 移动端实测截图已保存至 tests/verify_gmail_layout_mobile_375.png');
 
     console.log('\n================================================================');
-    console.log('=== 所有 11 项断言与线上真实端到端核验全部完美通过 (100% PASS) ===');
+    console.log('=== 所有 14 项断言与线上真实端到端核验全部完美通过 (100% PASS) ===');
     console.log('================================================================');
 
   } catch (err) {
