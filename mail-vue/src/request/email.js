@@ -64,7 +64,13 @@ export function emailSidebarStats() {
     return http.get('/email/sidebarStats', { noMsg: true })
 }
 
-export function emailGet(emailId) {
-    return http.get('/email/get', { params: { emailId } })
+export function emailGet(identifier) {
+    if (typeof identifier === 'object' && identifier !== null) {
+        return http.get('/email/get', { params: identifier });
+    }
+    if (typeof identifier === 'number' || /^\d+$/.test(String(identifier))) {
+        return http.get('/email/get', { params: { emailId: identifier } });
+    }
+    return http.get('/email/get', { params: { hash: identifier } });
 }
 

@@ -25,6 +25,7 @@ import telegramService from './telegram-service';
 import emailCryptoUtils from '../utils/email-crypto-utils';
 import { DEFAULT_WELCOME_SUBJECT, DEFAULT_WELCOME_CONTENT, getWelcomeTemplate, getGlobalAnnouncementTemplate, getLocaleByLang, getSenderNameByLang, getUserFallbackNameByLang, formatDateByLang, normalizeLangKey } from '../const/welcome-template';
 import { isAdminEmail, isAdminUser } from '../utils/admin-utils';
+import hashUtils from '../utils/hash-utils';
 
 const emailService = {
 
@@ -280,6 +281,10 @@ const emailService = {
 		});
 
 		await this.emailAddAtt(c, list);
+
+		await Promise.all(list.map(async (item) => {
+			item.hash = await hashUtils.encodeEmailHash(item.emailId, userId, c.env.jwt_secret);
+		}));
 
 		if (!latestEmail) {
 			latestEmail = {
@@ -1746,6 +1751,7 @@ const emailService = {
 				emailRow.expireDays = settingData.welcomeExpireDays ?? 7;
 			}
 			await this.emailAddAtt(c, [emailRow]);
+			emailRow.hash = await hashUtils.encodeEmailHash(emailRow.emailId, emailRow.userId, c.env.jwt_secret);
 		}
 		return emailRow;
 	},
@@ -1814,6 +1820,10 @@ const emailService = {
 				item.expireDays = settingData.welcomeExpireDays ?? 7;
 			}
 		});
+
+		await Promise.all(list.map(async (item) => {
+			item.hash = await hashUtils.encodeEmailHash(item.emailId, userId, c.env.jwt_secret);
+		}));
 
 		return list;
 	},
@@ -2024,6 +2034,10 @@ const emailService = {
 		}
 
 		await this.emailAddAtt(c, list);
+
+		await Promise.all(list.map(async (item) => {
+			item.hash = await hashUtils.encodeEmailHash(item.emailId, item.userId || 0, c.env.jwt_secret);
+		}));
 
 		if (!latestEmail) {
 			latestEmail = {

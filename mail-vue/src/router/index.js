@@ -1,4 +1,5 @@
-import {createRouter, createWebHistory} from 'vue-router'
+import {createRouter} from 'vue-router'
+import createGmailHistory from './gmail-history.js';
 import NProgress from 'nprogress';
 import {useUiStore} from "@/store/ui.js";
 import {useSettingStore} from "@/store/setting.js";
@@ -12,7 +13,7 @@ const routes = [
         component: () => import('@/layout/index.vue'),
         children: [
             {
-                path: '/inbox/:mailId?',
+                path: '/inbox/:mailHash?',
                 name: 'email',
                 component: () => import('@/views/email/index.vue'),
                 meta: {
@@ -22,7 +23,7 @@ const routes = [
                 }
             },
             {
-                path: '/all/:mailId?',
+                path: '/all/:mailHash?',
                 name: 'user-all-email',
                 component: () => import('@/views/all/index.vue'),
                 meta: {
@@ -121,7 +122,7 @@ const routes = [
                 }
             },
             {
-                path: '/sent/:mailId?',
+                path: '/sent/:mailHash?',
                 name: 'send',
                 component: () => import('@/views/send/index.vue'),
                 meta: {
@@ -131,7 +132,7 @@ const routes = [
                 }
             },
             {
-                path: '/drafts/:mailId?',
+                path: '/drafts/:mailHash?',
                 name: 'draft',
                 component: () => import('@/views/draft/index.vue'),
                 meta: {
@@ -141,7 +142,7 @@ const routes = [
                 }
             },
             {
-                path: '/starred/:mailId?',
+                path: '/starred/:mailHash?',
                 name: 'star',
                 component: () => import('@/views/star/index.vue'),
                 meta: {
@@ -151,7 +152,7 @@ const routes = [
                 }
             },
             {
-                path: '/snoozed/:mailId?',
+                path: '/snoozed/:mailHash?',
                 name: 'snoozed',
                 component: () => import('@/views/snoozed/index.vue'),
                 meta: {
@@ -161,7 +162,7 @@ const routes = [
                 }
             },
             {
-                path: '/spam/:mailId?',
+                path: '/spam/:mailHash?',
                 name: 'spam',
                 component: () => import('@/views/spam/index.vue'),
                 meta: {
@@ -171,7 +172,7 @@ const routes = [
                 }
             },
             {
-                path: '/trash/:mailId?',
+                path: '/trash/:mailHash?',
                 name: 'trash',
                 component: () => import('@/views/trash/index.vue'),
                 meta: {
@@ -213,7 +214,7 @@ const routes = [
 
 
 const router = createRouter({
-    history: createWebHistory(import.meta.env.BASE_URL),
+    history: createGmailHistory(0),
     routes
 })
 
@@ -227,6 +228,13 @@ let timer
 let first = true
 
 router.beforeEach((to, from, next) => {
+    // 确保 mailHash 与 mailId 双向参数兼容
+    if (to.params.mailHash && !to.params.mailId) {
+        to.params.mailId = to.params.mailHash;
+    }
+    if (to.params.mailId && !to.params.mailHash) {
+        to.params.mailHash = to.params.mailId;
+    }
 
     if (timer) {
         clearTimeout(timer)

@@ -152,26 +152,28 @@ const wallpaperStyle = computed(() => {
 })
 let isSyncing = false;
 
-async function syncEmailFromRoute(mailId) {
+async function syncEmailFromRoute(mailIdentifier) {
   if (isSyncing) return;
   isSyncing = true;
   try {
-    if (!mailId) {
+    if (!mailIdentifier) {
       if (emailStore.contentData.email) {
         emailStore.contentData.email = null;
       }
       return;
     }
 
-    // If already showing this exact email, no-op
-    if (emailStore.contentData.email && String(emailStore.contentData.email.emailId) === String(mailId)) {
-      return;
+    // If already showing this exact email (by hash or numeric ID), no-op
+    if (emailStore.contentData.email) {
+      if (emailStore.contentData.email.hash === mailIdentifier || String(emailStore.contentData.email.emailId) === String(mailIdentifier)) {
+        return;
+      }
     }
 
     // 1. Check if email is already in loaded list
     const scrollList = emailStore.emailScroll?.value?.emailList || emailStore.emailScroll?.emailList;
     if (Array.isArray(scrollList) && scrollList.length > 0) {
-      const found = scrollList.find(item => String(item.emailId) === String(mailId));
+      const found = scrollList.find(item => item.hash === mailIdentifier || String(item.emailId) === String(mailIdentifier));
       if (found) {
         emailStore.contentData.email = found;
         emailStore.contentData.delType = 'logic';
@@ -182,8 +184,8 @@ async function syncEmailFromRoute(mailId) {
       }
     }
 
-    // 2. Fetch email from API
-    const res = await emailGet(mailId);
+    // 2. Fetch email from API via hash or numeric ID
+    const res = await emailGet(mailIdentifier);
     const emailItem = res?.emailId ? res : res?.data;
     if (emailItem && emailItem.emailId) {
       emailStore.contentData.email = emailItem;
@@ -192,26 +194,26 @@ async function syncEmailFromRoute(mailId) {
       emailStore.contentData.showStar = true;
       emailStore.contentData.showReply = true;
     } else {
-      if (route.params.mailId) {
-        router.replace({ name: route.name, params: { mailId: '' }, query: route.query });
+      if (route.params.mailHash || route.params.mailId) {
+        router.replace({ name: route.name, params: { mailHash: '', mailId: '' }, query: route.query }).catch(() => {});
       }
     }
   } catch (err) {
     console.error('Failed to sync email from route:', err);
-    if (route.params.mailId) {
-      router.replace({ name: route.name, params: { mailId: '' }, query: route.query });
+    if (route.params.mailHash || route.params.mailId) {
+      router.replace({ name: route.name, params: { mailHash: '', mailId: '' }, query: route.query }).catch(() => {});
     }
   } finally {
     isSyncing = false;
   }
 }
 
-// Watch for mailId changes in route
+// Watch for mailHash or mailId changes in route
 watch(
-  () => route.params.mailId,
-  (newMailId, oldMailId) => {
-    if (newMailId !== oldMailId) {
-      syncEmailFromRoute(newMailId);
+  () => route.params.mailHash || route.params.mailId,
+  (newMailParam, oldMailParam) => {
+    if (newMailParam !== oldMailParam) {
+      syncEmailFromRoute(newMailParam);
     }
   },
   { immediate: true }
@@ -222,7 +224,7 @@ watch(
   () => route.name,
   (newRoute, oldRoute) => {
     if (newRoute !== oldRoute) {
-      if (!route.params.mailId && emailStore.contentData.email) {
+      if (!route.params.mailHash && !route.params.mailId && emailStore.contentData.email) {
         emailStore.contentData.email = null;
       }
     }
@@ -233,8 +235,8 @@ watch(
 watch(
   () => emailStore.contentData.email,
   (newEmail) => {
-    if (!newEmail && route.params?.mailId) {
-      router.replace({ name: route.name, params: { mailId: '' }, query: route.query }).catch(() => {});
+    if (!newEmail && (route.params?.mailHash || route.params?.mailId)) {
+      router.replace({ name: route.name, params: { mailHash: '', mailId: '' }, query: route.query }).catch(() => {});
     }
   }
 );

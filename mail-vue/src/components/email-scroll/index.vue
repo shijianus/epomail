@@ -39,7 +39,7 @@
                         :key="keyCount"
         >
           <template #default="{ data: item, index }" >
-            <div :class="['email-row', props.type, 'density-' + (uiStore.density || 'default'), { 'is-selected': emailStore.contentData.email?.emailId === item.emailId }]"
+            <div :class="['email-row', props.type, 'density-' + (uiStore.density || 'default'), { 'is-selected': (emailStore.contentData.email?.hash && emailStore.contentData.email?.hash === item.hash) || emailStore.contentData.email?.emailId === item.emailId }]"
                  :data-checked="item.checked"
                  @click="jumpDetails(item)"
                  v-if="!item.expand"

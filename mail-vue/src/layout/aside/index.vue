@@ -201,7 +201,7 @@ const handleNav = (targetName, targetPath) => {
 
   // 3. Route transition or refresh
   if (route.name === targetName) {
-    if (route.params.mailId) {
+    if (route.params.mailHash || route.params.mailId) {
       emailStore.closeEmail();
     } else {
       // Already on pure list: refresh email list (matching Gmail UX)
@@ -212,7 +212,7 @@ const handleNav = (targetName, targetPath) => {
     }
   } else {
     // Navigating to a different folder
-    router.push(targetPath || { name: targetName, params: { mailId: '' } }).then(() => {
+    router.push(targetPath || { name: targetName, params: { mailHash: '', mailId: '' } }).then(() => {
       emailStore.contentData.email = null;
     }).catch(() => {});
   }
@@ -225,14 +225,14 @@ const handleLabelClick = (label) => {
     uiStore.asideShow = false;
   }
   if (route.name === 'user-all-email') {
-    if (route.params.mailId) {
+    if (route.params.mailHash || route.params.mailId) {
       emailStore.closeEmail();
     } else {
       const scrollInst = emailStore.emailScroll?.value || emailStore.emailScroll;
       if (scrollInst?.refreshList) scrollInst.refreshList();
     }
   } else {
-    router.push({ name: 'user-all-email', params: { mailId: '' } }).then(() => {
+    router.push({ name: 'user-all-email', params: { mailHash: '', mailId: '' } }).then(() => {
       emailStore.contentData.email = null;
     }).catch(() => {});
   }

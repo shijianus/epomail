@@ -4,6 +4,7 @@ import result from '../model/result';
 import userContext from '../security/user-context';
 import attService from '../service/att-service';
 import aiService from '../service/ai-service';
+import hashUtils from '../utils/hash-utils';
 
 const handleEmailList = async (c) => {
 	const query = c.req.method === 'GET' ? c.req.query() : (await c.req.json().catch(() => ({})));
@@ -92,11 +93,22 @@ app.get('/email/searchSuggestions', async (c) => {
 });
 
 app.get('/email/get', async (c) => {
-	const emailId = Number(c.req.query('emailId'));
-	if (!emailId) {
-		return c.json(result.fail('Missing emailId'));
+	const hash = c.req.query('hash') || c.req.query('mailHash');
+	let emailId = Number(c.req.query('emailId'));
+	const userId = userContext.getUserId(c);
+
+	if (hash) {
+		emailId = await hashUtils.decodeEmailHash(hash, userId, c.env.jwt_secret);
+		if (!emailId) {
+			return c.json(result.fail('Email not found'));
+		}
 	}
-	const emailRow = await emailService.selectById(c, emailId, userContext.getUserId(c), true);
+
+	if (!emailId) {
+		return c.json(result.fail('Missing email identifier'));
+	}
+
+	const emailRow = await emailService.selectById(c, emailId, userId, true);
 	if (!emailRow) {
 		return c.json(result.fail('Email not found'));
 	}

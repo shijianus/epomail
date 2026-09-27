@@ -27,27 +27,29 @@ export const useEmailStore = defineStore('email', {
             this.contentData.showUnread = showUnread;
             this.contentData.showStar = showStar;
             this.contentData.showReply = showReply;
-            if (email && email.emailId) {
+            const mailIdentifier = email?.hash || email?.emailId;
+            if (email && mailIdentifier) {
                 const cur = router.currentRoute.value;
                 const targetName = routeName || cur.name;
-                if (cur.params?.mailId != email.emailId) {
+                const curParam = cur.params?.mailHash || cur.params?.mailId;
+                if (curParam !== String(mailIdentifier)) {
                     router.push({
                         name: targetName,
-                        params: { mailId: email.emailId },
+                        params: { mailHash: mailIdentifier, mailId: mailIdentifier },
                         query: cur.query
-                    });
+                    }).catch(() => {});
                 }
             }
         },
         closeEmail() {
             this.contentData.email = null;
             const cur = router.currentRoute.value;
-            if (cur.params?.mailId) {
+            if (cur.params?.mailHash || cur.params?.mailId) {
                 router.push({
                     name: cur.name,
-                    params: { mailId: '' },
+                    params: { mailHash: '', mailId: '' },
                     query: cur.query
-                });
+                }).catch(() => {});
             }
         },
         async refreshSidebarStats() {
