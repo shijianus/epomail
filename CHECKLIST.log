@@ -10,6 +10,22 @@
 
 ---
 
+### EpomailDocs 法律文档站落地：6 语言完整隐私政策与服务条款（EpoCanvasDocs 主题对齐）(2026-09-27)
+*   **关联提交 (Git Commit)**: `2bed02b59f0fd7f23276540d8edc3c8b9eb21c6c` (Short: `2bed02b`)
+*   **部署环境 (Deployment)**: `仓库文档资产`（无生产部署，生产 Version ID 不变；文档可随时并入 EpoCanvasDocs / 独立 Starlight 站点渲染上线）
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 同步远端最新代码（`git pull` Fast-forward `7e30e05..800d27c`，172 文件），本任务基线与远端一致；
+    - [x] 新建 `EpomailDocs/` 专目录承载法律文档，目录约定完全对齐 EpoCanvasDocs 的 Astro 5 + Starlight 主题（默认语言 zh-CN 占文档根路径，en/zh-tw/fr/es/nl 翻译目录同构），语言集合与产品 6 语言 i18n 一一对应，共 12 份全量翻译零兜底缺页；
+    - [x] 《隐私政策》（15 节 + 附录 A）与《服务条款》（16 节）均采用 Google 式「30 秒快速摘要 + 分节详述」结构，双轨适用设计（托管实例实文 + 自托管运营者通用模板）；
+    - [x] 全部技术事实经仓库源码逐项核实后诚实披露：PBKDF2×100,000 密码哈希、JWT 30 天 localStorage 会话（无 Cookie）、三种邮件模式真实加密语义（明确标注服务端静态加密 ≠ 端到端加密）、管理员可见范围、第三方处理者全清单、垃圾箱 7 天物理删除、/my/exportData JSON 导出、软删与物理删语义；
+    - [x] 配图 2 张（`public/images/mail/`）：`data-flow.svg` 数据流与数据边界四层图、`self-host-responsibilities.svg` 开源身份与责任边界图，与 EpoCanvasDocs 图表同视觉语言；
+    - [x] `EpomailDocs/README.md` 提供语言矩阵、并入 EpoCanvasDocs / 独立建站两种接入路径与自托管运营者采用指南。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 12 份文档结构一致性脚本核验通过（h2/h3/提示框/表格/配图/前置元数据逐项对齐，零 MISMATCH）；
+    - [x] 页内锚点按 github-slugger 规则校正（含法语/西语重音字符 slug），两图 PowerShell XML 解析 well-formed；
+    - [x] 两张 SVG 经真实浏览器（本地静态服务）渲染截屏核验，无文字溢出、无布局缺陷；
+    - [x] 零 TODO/占位残留、零虚构技术事实；本任务未改动任何业务代码，i18n 三件套与构建不受影响。
+
 ### Gmail 级多账户前缀隔离与密码学 Hash 防越权路由系统 (2026-09-27)
 *   **关联提交 (Git Commit)**: `4b371a834458cb2be6ab5766ec15e99a91bc2022` (Short: `4b371a8`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com / epomail.epocanvas.workers.dev)` (Version ID: `9d5df8ce-3455-4fba-88fa-a49accec2973`，100% 流量) + `本地全真栈`
