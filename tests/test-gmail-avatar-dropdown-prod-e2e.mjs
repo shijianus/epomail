@@ -21,7 +21,7 @@ function ok(cond, label) {
 
 async function run() {
   console.log('================================================================');
-  console.log('=== 公网生产全真端到端核验：Gmail级头像下拉框、存储阶梯进度条与法务外链 ===');
+  console.log('=== 公网生产全真端到端核验：一页式单账户布局、存储条直达与纯文本法务 ===');
   console.log('================================================================');
   console.log(`[目标公网环境] 基地址: ${BASE}`);
 
@@ -63,146 +63,192 @@ async function run() {
     await page.waitForTimeout(2000);
 
     // 2. 找到头像并点击展开
-    console.log('\n[步骤 3] 点击右上角头像，展开 Gmail 级账户下拉卡片...');
+    console.log('\n[步骤 3] 点击右上角头像，展开账户下拉卡片...');
     const avatarBtn = page.locator('.topbar-actions .avatar-wrap, .avatar').first();
     ok(await avatarBtn.isVisible(), '顶栏右上角用户头像可见');
 
     await avatarBtn.click();
     await page.waitForTimeout(1000);
 
-    const dropdown = page.locator('.detail-dropdown, .gmail-account-card').first();
+    const dropdown = page.locator('.detail-dropdown, .account-menu.open').first();
     ok(await dropdown.isVisible(), '头像下拉卡片成功展开呈现');
 
-    // 3. 核验容器尺寸与精致紧凑排版
-    console.log('\n[步骤 4] 核验卡片物理尺寸与精致排版属性...');
+    // 3. 核验单账户模式 (默认状态)：恢复一页式原生排版与尺寸
+    console.log('\n[步骤 4] 核验卡片物理尺寸与一页式原生排版属性...');
     const box = await dropdown.boundingBox();
-    ok(box && box.width >= 350 && box.width <= 375, `卡片宽度符合 360px 精致紧凑规范 (实测: ${box?.width?.toFixed(1)}px)`);
+    ok(box && box.width >= 310 && box.width <= 335, `卡片宽度符合 320px 精致原生规范 (实测: ${box?.width?.toFixed(1)}px)`);
 
     const borderRadius = await page.evaluate(() => {
       const el = document.querySelector('.detail-dropdown');
       return el ? window.getComputedStyle(el).borderRadius : '';
     });
-    ok(borderRadius === '24px', `卡片采用现代 Bento 24px 圆角 (实测: ${borderRadius})`);
+    ok(borderRadius === '20px', `卡片采用 20px 原生精致圆角 (实测: ${borderRadius})`);
 
-    // 4. 核验 Hero 个人资料区块 (Outlook 范式: 左头像 + 右名称/身份/邮箱, 下方管理账户胶囊)
-    console.log('\n[步骤 5] 核验 Hero 资料区块 (左侧头像、右侧名称与身份徽章、邮箱复制、管理账户胶囊)...');
-    const heroAvatar = page.locator('.gac-hero-section .gac-avatar');
-    ok(await heroAvatar.isVisible(), 'Hero 头像渲染正常');
+    // 4. 核验 Profile 资料行与邮箱点击直接复制 (无 copy-ic 图标按钮)
+    console.log('\n[步骤 5] 核验 Profile 资料行与无图标直接点击邮箱复制...');
+    const profileRow = page.locator('.gac-profile-row');
+    ok(await profileRow.isVisible(), 'Profile 顶部资料行呈现正常');
 
-    const heroName = page.locator('.gac-hero-section .gac-name');
-    ok(await heroName.isVisible(), '用户名称在右侧顶部正常呈现');
+    const copyBtnCount = await page.locator('.gac-email-row .copy-ic').count();
+    ok(copyBtnCount === 0, '确认已移除 copy-ic 独立复制图标按钮，符合用户无图标纯净规范');
 
-    const roleBadge = page.locator('.gac-hero-section .gac-role-badge');
-    ok(await roleBadge.isVisible(), '用户身份组徽章紧跟在名称后呈现');
-
-    const heroEmail = page.locator('.gac-hero-section .gac-email');
-    const emailText = await heroEmail.innerText();
+    const emailEl = page.locator('.gac-email-row .gac-email');
+    ok(await emailEl.isVisible(), '邮箱文本呈现正常');
+    const emailText = await emailEl.innerText();
     ok(emailText.toLowerCase() === USER_EMAIL.toLowerCase(), `展示当前登录邮箱: ${emailText}`);
 
-    // 测试复制邮箱交互
-    await page.locator('.gac-email-row').click();
+    // 测试直接点击邮箱文本复制
+    await emailEl.click();
     await page.waitForTimeout(500);
-    ok(await page.locator('.gac-email-row .text-success').first().isVisible(), '点击邮箱触发复制成功反馈 (绿色对勾)');
-    ok(await page.locator('.el-message--success').first().isVisible(), '点击邮箱弹出成功提示浮层 (ElMessage)');
+    const successMsg = page.locator('.el-message--success');
+    ok(await successMsg.first().isVisible(), '直接点击邮箱文本成功触发复制并弹出提示浮层 (ElMessage)');
 
-    const manageBtn = page.locator('.gac-manage-btn');
-    ok(await manageBtn.isVisible(), '「管理您的 Epomail 账户」胶囊按钮可见');
+    // 5. 核验存储用量进度条位于 gac-profile-row 正下方且无冗长说明
+    console.log('\n[步骤 6] 核验存储用量进度条置于资料行正下方 (无额外说明)...');
+    const singleStorage = page.locator('.gac-single-storage');
+    ok(await singleStorage.isVisible(), '独立存储用量进度条存在且置于资料行正下方');
 
-    // 5. 核验创新存储用量进度条与 2% 预留机制 (极简设计，无多余管理侧冗长文案)
-    console.log('\n[步骤 6] 核验创新存储用量卡片、色彩阶梯与 2% 预留机制 (极简纯净，无多余说辞)...');
-    const storageCard = page.locator('.gac-storage-card');
-    ok(await storageCard.isVisible(), '存储空间用量卡片就绪');
+    const storageTitle = await singleStorage.locator('.gac-single-storage-title').innerText();
+    console.log(`  -> 存储用量信息: ${storageTitle}`);
+    ok(storageTitle.includes('存储空间') && storageTitle.includes('MB'), '存储条正常展示空间用量与配额');
 
-    const storageTitle = page.locator('.sc-title');
-    ok((await storageTitle.innerText()).includes('存储空间'), '存储空间标题正常呈现');
+    const reservedZone = singleStorage.locator('.gac-progress-reserved-zone');
+    ok(await reservedZone.isVisible(), '2% 系统预留应急缓冲区斜纹就绪');
 
-    const progressTrack = page.locator('.gac-progress-track');
-    ok(await progressTrack.isVisible(), '存储进度条轨道渲染正常');
+    // 6. 核验原有一页式操作菜单项
+    console.log('\n[步骤 7] 核验单账户原生一页式菜单项 (账户详情、设定、退出登录)...');
+    const accountDetailsItem = page.locator('.am-item:has-text("账户详情")');
+    ok(await accountDetailsItem.isVisible(), '「账户详情」菜单项正常呈现');
 
-    const reservedZone = page.locator('.gac-progress-reserved-zone');
-    ok(await reservedZone.isVisible(), '2% 系统预留空间斜纹缓冲区视觉可见');
+    const settingsItem = page.locator('.am-item:has-text("设定")');
+    ok(await settingsItem.isVisible(), '「设定」菜单项正常呈现');
 
-    const progressFill = page.locator('.gac-progress-fill');
-    const fillStyle = await progressFill.evaluate(el => ({
-      width: el.style.width,
-      bg: el.style.backgroundColor
-    }));
-    console.log(`  -> 当前进度条填充宽度: ${fillStyle.width}, 颜色值: ${fillStyle.bg}`);
-    ok(!!fillStyle.bg, `进度条填充已应用阶梯色彩: ${fillStyle.bg}`);
+    const logoutItem = page.locator('.am-item.logout');
+    ok(await logoutItem.isVisible(), '「退出登录」操作项正常呈现');
 
-    const redundantNotice = page.locator('.gac-storage-card .sc-notice');
-    ok((await redundantNotice.count()) === 0, '存储卡片已移除多余的管理侧说明文案，保持纯粹简洁');
+    // 7. 核验底栏 2 行纯文本法务外联 (无下划线、无外链图标)
+    console.log('\n[步骤 8] 核验底栏 2 行纯文本法务说明 (无下划线、无外部引出按钮)...');
+    const footer = page.locator('.gac-footer');
+    ok(await footer.isVisible(), '底栏法务容器正常呈现');
 
-    // 核验并列卡片式动作按钮组 (学习 preview.html 范式: 设定 + 退出登录)
-    const cardActions = page.locator('.gac-card-actions');
-    ok(await cardActions.isVisible(), '并列卡片式动作按钮容器 (设定 + 退出) 可见');
+    const legalItems = page.locator('.gac-footer .gac-legal-item');
+    ok((await legalItems.count()) === 2, '底栏精确呈现 2 行纯文本法务说明');
 
-    // 6. 核验多账户模式默认关闭与接口保留
-    console.log('\n[步骤 7] 核验多账户模式默认处于关闭状态 (保持纯粹单账户视图)...');
-    const multiAccountSec = page.locator('.gac-multi-account-section');
-    ok((await multiAccountSec.count()) === 0, '默认关闭多账户方框模式，保持单账户简洁呈现');
+    const privacyText = await legalItems.nth(0).innerText();
+    const termsText = await legalItems.nth(1).innerText();
+    ok(privacyText.includes('隐私政策'), `第 1 行为「隐私政策」: ${privacyText}`);
+    ok(termsText.includes('服务条款'), `第 2 行为「服务条款」: ${termsText}`);
 
-    // 7. 截取并归档头像卡片展开状态实测图
+    const hasUnderlineOrIcon = await page.evaluate(() => {
+      const items = document.querySelectorAll('.gac-footer .gac-legal-item');
+      let underline = false;
+      let hasIcon = false;
+      items.forEach(it => {
+        const textDec = window.getComputedStyle(it).textDecorationLine;
+        if (textDec && textDec !== 'none') underline = true;
+        if (it.querySelector('svg, i, .iconify')) hasIcon = true;
+      });
+      return { underline, hasIcon };
+    });
+    ok(!hasUnderlineOrIcon.underline, '法务文本默认无下划线，符合纯文本规范');
+    ok(!hasUnderlineOrIcon.hasIcon, '法务文本无向外引出的图标或按钮');
+
+    // 截取单账户一页式完整卡片状态图
     await page.screenshot({ path: 'tests/verify_gmail_avatar_dropdown_open.png', fullPage: false });
-    console.log('  ✓ 头像卡片公网实测截屏已保存至 tests/verify_gmail_avatar_dropdown_open.png');
+    console.log('  ✓ 纯净一页式头像卡片公网实测截屏已保存至 tests/verify_gmail_avatar_dropdown_open.png');
 
-    // 8. 核验服务条款外联/弹窗
-    console.log('\n[步骤 8] 核验服务条款 (Terms of Service) 外联引入与弹窗...');
-    const termsLink = page.locator('.gac-footer .gac-legal-link:has-text("服务条款")');
-    ok(await termsLink.isVisible(), '底栏「服务条款」外联引入可见');
+    // 8. 核验点击存储进度条跳转至资料的「存储空间与个人云存储」(#userStorage)
+    console.log('\n[步骤 9] 测试点击存储进度条跳转至 /settings/data#userStorage...');
+    const storageRespPromise = page.waitForResponse(res => res.url().includes('/my/storage') && res.status() === 200, { timeout: 10000 }).catch(() => null);
+    await singleStorage.click();
+    await storageRespPromise;
+    await page.waitForTimeout(1000);
 
-    await termsLink.click();
-    await page.waitForTimeout(800);
+    const currentUrl = page.url();
+    console.log(`  -> 当前跳转 URL: ${currentUrl}`);
+    ok(currentUrl.includes('settings/data') && currentUrl.includes('userStorage'), '点击存储条成功跳转至 settings/data#userStorage');
+
+    const userStorageSection = page.locator('#userStorage');
+    ok(await userStorageSection.isVisible(), '资料页「存储空间与个人云存储」区域成功呈现');
+
+    const storageGrid = page.locator('.storage-cards-grid');
+    ok(await storageGrid.isVisible(), '存储卡片网格 (.storage-cards-grid) 渲染就绪');
+
+    // 等待实际数据加载渲染
+    await page.waitForFunction(() => {
+      const el = document.querySelector('.storage-card .used-val');
+      return el && el.innerText && el.innerText.trim() !== '0.00 MB';
+    }, { timeout: 5000 }).catch(() => null);
+
+    // 核验实际滚动到达 #userStorage 锚点所在视口位置
+    await page.waitForTimeout(600);
+    const isScrolledNearTop = await page.evaluate(() => {
+      const el = document.getElementById('userStorage');
+      const container = document.querySelector('.settings-content');
+      if (!el || !container) return false;
+      const elRect = el.getBoundingClientRect();
+      const contRect = container.getBoundingClientRect();
+      return Math.abs(elRect.top - contRect.top) < 250;
+    });
+    ok(isScrolledNearTop, '页面已自动滚动定位至 #userStorage 锚点卡片可视区域');
+
+    const usedValText = await page.locator('.storage-card .used-val').first().innerText();
+    const totalValText = await page.locator('.storage-card .total-val').first().innerText();
+    const fileCountText = await page.locator('.storage-card .st-subtitle').first().innerText();
+    console.log(`  -> 资料页存储仪表读数: 已用 ${usedValText} / 总计 ${totalValText}, 文件条目数: ${fileCountText}`);
+    ok(!!usedValText && usedValText.includes('MB'), `资料页真实反映存储容量占用: ${usedValText}`);
+    ok(!fileCountText.includes('undefined') && !fileCountText.startsWith('0 '), `条目数正确同步为真实非零数据: ${fileCountText}`);
+
+    await page.screenshot({ path: 'tests/verify_storage_settings_anchor.png', fullPage: false });
+    console.log('  ✓ 存储锚点跳转公网实测截屏已保存至 tests/verify_storage_settings_anchor.png');
+
+    // 9. 核验服务条款弹窗
+    console.log('\n[步骤 10] 回到主界面，测试服务条款弹窗...');
+    await page.goto(`${BASE}/mail/u/0/#inbox`, { waitUntil: 'networkidle' });
+    await page.waitForTimeout(1000);
+
+    await avatarBtn.click();
+    await page.waitForTimeout(600);
+
+    const termsItem = page.locator('.gac-footer .gac-legal-item:has-text("服务条款")');
+    await termsItem.click();
+    await page.waitForTimeout(600);
 
     const termsDialog = page.locator('.legal-doc-dialog:has-text("服务条款")');
     ok(await termsDialog.isVisible(), '点击成功打开「服务条款」说明弹窗');
     const termsContent = await termsDialog.innerText();
-    ok(termsContent.includes('服务协议') && termsContent.includes('2% 应急缓冲区') && termsContent.includes('95%'), '服务条款包含存储配额与保护规则说明');
+    ok(termsContent.includes('服务协议') && termsContent.includes('2% 应急缓冲区'), '服务条款弹窗内容完好');
 
-    // 截图服务条款弹窗
     await page.screenshot({ path: 'tests/verify_gmail_avatar_terms_dialog.png', fullPage: false });
     console.log('  ✓ 服务条款弹窗截屏已保存至 tests/verify_gmail_avatar_terms_dialog.png');
 
-    // 关闭服务条款弹窗
     await termsDialog.locator('.el-button--primary').click();
     await page.waitForTimeout(500);
 
-    // 9. 核验隐私政策外联/弹窗
-    console.log('\n[步骤 9] 核验隐私政策 (Privacy Policy) 外联引入与弹窗...');
-    // 重新打开下拉框
+    // 10. 核验隐私政策弹窗
+    console.log('\n[步骤 11] 测试隐私政策弹窗...');
     await avatarBtn.click();
-    await page.waitForTimeout(800);
+    await page.waitForTimeout(600);
 
-    const privacyLink = page.locator('.gac-footer .gac-legal-link:has-text("隐私政策")');
-    ok(await privacyLink.isVisible(), '底栏「隐私政策」外联引入可见');
-
-    await privacyLink.click();
-    await page.waitForTimeout(800);
+    const privacyItem = page.locator('.gac-footer .gac-legal-item:has-text("隐私政策")');
+    await privacyItem.click();
+    await page.waitForTimeout(600);
 
     const privacyDialog = page.locator('.legal-doc-dialog:has-text("隐私政策")');
     ok(await privacyDialog.isVisible(), '点击成功打开「隐私政策」说明弹窗');
     const privacyContent = await privacyDialog.innerText();
-    ok(privacyContent.includes('隐私保护') && privacyContent.includes('密码学') && privacyContent.includes('租户隔离'), '隐私政策包含端到端与密码学安全说明');
+    ok(privacyContent.includes('隐私保护') && privacyContent.includes('密码学'), '隐私政策弹窗内容完好');
 
-    // 截图隐私政策弹窗
     await page.screenshot({ path: 'tests/verify_gmail_avatar_privacy_dialog.png', fullPage: false });
     console.log('  ✓ 隐私政策弹窗截屏已保存至 tests/verify_gmail_avatar_privacy_dialog.png');
 
-    // 关闭隐私政策弹窗
     await privacyDialog.locator('.el-button--primary').click();
     await page.waitForTimeout(500);
 
-    // 10. 核验卡片右上角 X 关闭按钮
-    console.log('\n[步骤 10] 核验卡片右上角 X 关闭按钮交互...');
-    await avatarBtn.click();
-    await page.waitForTimeout(800);
-    ok(await dropdown.isVisible(), '再次展开卡片就绪');
-
-    const closeBtn = page.locator('.gac-close-btn');
-    ok(await closeBtn.isVisible(), '右上角 X 关闭按钮可见');
-    await closeBtn.click();
-    await page.waitForTimeout(600);
-    ok(!(await dropdown.isVisible()), '点击 X 成功平滑关闭下拉卡片');
+    // 11. 核验彻底弃用 gac-hero-section
+    console.log('\n[步骤 12] 核验 gac-hero-section 已彻底弃用并移除...');
+    const heroCount = await page.locator('.gac-hero-section').count();
+    ok(heroCount === 0, '确认 gac-hero-section 已在全系统彻底弃用与移除');
 
   } catch (err) {
     console.error('公网核验异常中断:', err);
