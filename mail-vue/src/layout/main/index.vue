@@ -234,7 +234,7 @@ watch(
   () => emailStore.contentData.email,
   (newEmail) => {
     if (!newEmail && route.params?.mailId) {
-      router.push({ name: route.name, params: { mailId: '' }, query: route.query });
+      router.replace({ name: route.name, params: { mailId: '' }, query: route.query }).catch(() => {});
     }
   }
 );

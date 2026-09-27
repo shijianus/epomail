@@ -189,23 +189,20 @@ const handleAddLabel = () => {
 };
 
 const handleNav = (targetName, targetPath) => {
-  // 1. Clear selected email so we return to pure list
-  emailStore.contentData.email = null;
-
-  // 2. Clear search keyword when navigating to standard folders
+  // 1. Clear search keyword when navigating to standard folders
   if (emailStore.searchKeyword) {
     emailStore.searchKeyword = '';
   }
 
-  // 3. Close drawer on mobile/tablet
+  // 2. Close drawer on mobile/tablet
   if (window.innerWidth < 1025) {
     uiStore.asideShow = false;
   }
 
-  // 4. Route transition or refresh
+  // 3. Route transition or refresh
   if (route.name === targetName) {
     if (route.params.mailId) {
-      router.push({ name: targetName, params: { mailId: '' } });
+      emailStore.closeEmail();
     } else {
       // Already on pure list: refresh email list (matching Gmail UX)
       const scrollInst = emailStore.emailScroll?.value || emailStore.emailScroll;
@@ -214,26 +211,30 @@ const handleNav = (targetName, targetPath) => {
       }
     }
   } else {
-    router.push({ name: targetName, params: { mailId: '' } });
+    // Navigating to a different folder
+    router.push(targetPath || { name: targetName, params: { mailId: '' } }).then(() => {
+      emailStore.contentData.email = null;
+    }).catch(() => {});
   }
 };
 
 const handleLabelClick = (label) => {
   const labelName = label.name || label;
-  emailStore.contentData.email = null;
   emailStore.searchKeyword = `label:"${labelName}"`;
   if (window.innerWidth < 1025) {
     uiStore.asideShow = false;
   }
   if (route.name === 'user-all-email') {
     if (route.params.mailId) {
-      router.push({ name: 'user-all-email', params: { mailId: '' } });
+      emailStore.closeEmail();
     } else {
       const scrollInst = emailStore.emailScroll?.value || emailStore.emailScroll;
       if (scrollInst?.refreshList) scrollInst.refreshList();
     }
   } else {
-    router.push({ name: 'user-all-email', params: { mailId: '' } });
+    router.push({ name: 'user-all-email', params: { mailId: '' } }).then(() => {
+      emailStore.contentData.email = null;
+    }).catch(() => {});
   }
 };
 
