@@ -3,8 +3,6 @@ title: Terms of Service
 description: EpoCanvas Mail Terms of Service — account rules, acceptable use boundaries, content rights, disclaimers, and the open-source license notes you should know before using the mail service.
 ---
 
-# Terms of Service
-
 **Effective date: September 27, 2026　|　Version: 1.0**
 
 Welcome to EpoCanvas Mail (the "Service"). These terms are the agreement between you and the operator of the Service concerning your use of it. Please take a few minutes to read them — we have kept the language as plain as possible and cover, in one place, what you may do, what you may not do, and what happens when things go wrong.
@@ -15,7 +13,29 @@ Welcome to EpoCanvas Mail (the "Service"). These terms are the agreement between
 - **The bottom line**: no spam, no illegal content, no attacks on the service or on others. Violations can lead to bans and account deletion.
 - **Your mail belongs to you**: we process it only to deliver and store it. Trash is physically cleared 7 days after deletion — export before you say goodbye.
 - **The Service is provided "as is"**: open-source software, best-effort availability, no service-level agreement (SLA).
+- **Unfamiliar wording?**: jump to the [Appendix: quick glossary](#appendix-quick-glossary) at the end for plain-language explanations of the key terms.
 :::
+
+## On this page
+
+1. [Scope and definitions](#1-scope-and-definitions)
+2. [Service overview](#2-service-overview)
+3. [Accounts and security](#3-accounts-and-security)
+4. [Acceptable use policy](#4-acceptable-use-policy)
+5. [Your content and license](#5-your-content-and-license)
+6. [Outbound delivery and third-party services](#6-outbound-delivery-and-third-party-services)
+7. [Availability and changes](#7-availability-and-changes)
+8. [Retention and account termination](#8-retention-and-account-termination)
+9. [Force majeure](#9-force-majeure)
+10. [Disclaimer of warranties (AS-IS)](#10-disclaimer-of-warranties-as-is)
+11. [Limitation of liability](#11-limitation-of-liability)
+12. [Indemnification](#12-indemnification)
+13. [Intellectual property and the open-source license](#13-intellectual-property-and-the-open-source-license)
+14. [Terms for self-hosting operators](#14-terms-for-self-hosting-operators)
+15. [Changes to these terms](#15-changes-to-these-terms)
+16. [Contact us](#16-contact-us)
+
+- [Appendix: quick glossary](#appendix-quick-glossary)
 
 ## 1. Scope and definitions
 
@@ -23,6 +43,7 @@ Welcome to EpoCanvas Mail (the "Service"). These terms are the agreement between
 - **"Operator / we"**: the individual or team that has deployed and runs the instance you use. For the hosted instance `mail.epocanvas.com`, that is the EpoCanvas operations team; for a self-hosted instance, it is whoever deployed it.
 - **"You"**: any natural person or organization that registers, signs in, or otherwise uses the Service.
 - **Dual-track applicability**: EpoCanvas Mail is open-source software and anyone may deploy their own instance. These terms are a **general template**: hosted instances apply them directly, and self-hosting operators may adapt them as their site's terms. Wherever you register, you form the agreement with that site's operator.
+- **Additional terms**: when you use third-party features (outbound delivery, AI translation, Telegram, Linux DO sign-in, etc.), you also agree to the respective third party's terms (see [Section 6](#6-outbound-delivery-and-third-party-services)); privacy matters are governed by the [Privacy Policy](/en/mail/privacy-policy/).
 
 ## 2. Service overview
 
@@ -42,6 +63,7 @@ The Service includes: multi-mailbox management, internal and external mail, atta
 4. **Sign-in protection**: 5 consecutive password failures lock sign-in for 12 hours; an account keeps at most 10 active sessions, and you can sign out on any device to revoke its token immediately.
 5. **Reserved names**: identifiers such as `admin` are reserved by the system and cannot be registered by regular users.
 6. **Registration keys**: operators may configure the instance to require a registration key or to close registration — that is the instance's own managerial right.
+7. **Eligibility**: you must meet the minimum age stated in Section 11 of the [Privacy Policy](/en/mail/privacy-policy/) and make sure your registration and use comply with the laws that apply to you.
 
 ## 4. Acceptable use policy
 
@@ -73,9 +95,9 @@ The Service includes: multi-mailbox management, internal and external mail, atta
 
 Depending on the nature and severity of the violation, the operator may: warn → rate-limit features → quarantine to spam → suspend the account → physically delete the account and all its data. Where unlawful conduct is involved, the operator may retain necessary evidence and cooperate with competent authorities. If your conduct causes the operator to be penalized by Cloudflare or an upstream provider, the operator reserves the right to seek recovery from you (see Section 12).
 
-### 4.3 Appeals
+### 4.3 Appeals and reporting
 
-If you believe enforcement was mistaken, contact the operator through the channels in [Section 16](#16-contact-us); the operator will review and reply within a reasonable time.
+If you believe enforcement was mistaken, contact the operator through the channels in [Section 16](#16-contact-us); the operator will review and reply within a reasonable time. We also welcome reports of others' violations or security concerns (spam sources, phishing pages, unauthorized access attempts) — good-faith reports are all handled seriously; content suspected to be unlawful (above all child sexual abuse material) will be reported to the competent authorities as required by law.
 
 ## 5. Your content and license
 
@@ -95,6 +117,7 @@ If you believe enforcement was mistaken, contact the operator through the channe
 - **Best effort, no SLA**: the Service runs on Cloudflare's free or metered edge infrastructure. The operator makes reasonable efforts to keep it available but does not promise 100% uptime, delivery times, or recovery deadlines.
 - **Evolving features**: the open-source project iterates quickly; features may be added, changed, or removed. Material changes affecting data deletion will be announced in advance.
 - **Maintenance and interruptions**: the operator may suspend part or all of the Service for upgrades, fixes, or abuse handling; outages caused by Cloudflare or upstream AI/delivery providers are not a breach by the operator.
+- **Experimental features**: features labeled "experimental" or in testing (such as image OCR translation) are provided "as is", may be unstable, and can change or be withdrawn at any time — the risk of relying on them for critical work is yours.
 
 ## 8. Retention and account termination
 
@@ -136,13 +159,28 @@ If you are the operator of a self-hosted instance:
 
 ## 15. Changes to these terms
 
-These terms may be revised as the Service evolves. Material changes will be announced via in-site announcement or system mail, with the effective date and version at the top of this page updated. Continuing to use the Service after a change takes effect constitutes acceptance; if you disagree, stop using it and export or delete your data.
+These terms may be revised as the Service evolves. Material changes will be announced via in-site announcement or system mail, with the effective date and version at the top of this page updated. Continuing to use the Service after a change takes effect constitutes acceptance; if you disagree, stop using it and export or delete your data. Past major revisions are archived in the open-source repository's version history and can be retrieved at any time.
 
 ## 16. Contact us
 
 - **Hosted instance (`mail.epocanvas.com`)**: in-product mail or email to `admin@epocanvas.com`;
 - **The open-source project**: issues on the GitHub repository;
 - **Self-hosted sites**: the operator contact published on that site.
+
+---
+
+## Appendix: quick glossary
+
+| Term | One-line explanation |
+| --- | --- |
+| **The Service / instance** | All functionality running on one EpoCanvas Mail deployment (web app, API, and components) |
+| **Operator** | Whoever deployed and runs that instance — the "we" of these terms and the counterparty for your data and use |
+| **Hosted / self-hosted** | Hosted = `mail.epocanvas.com`, run by the EpoCanvas team; self-hosted = an instance deployed by you or a third party |
+| **Your content** | The mail, attachments, and profile you send, receive, and upload; ownership and responsibility are yours |
+| **Processing license** | The limited technical permission you grant the operator so storage, delivery, search, push, and similar features can work (Section 5) |
+| **Acceptable use policy** | The boundaries of allowed and forbidden conduct in Section 4, with the stepped consequences of Section 4.2 |
+| **Soft delete / physical deletion** | Soft delete = flagged as deleted, recoverable by administrators; physical deletion = removed from storage together with attachments and index, unrecoverable |
+| **SLA** | Service-level agreement (uptime and response commitments); this Service is best-effort with no SLA |
 
 ---
 

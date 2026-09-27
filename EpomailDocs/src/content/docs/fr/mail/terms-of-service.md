@@ -3,8 +3,6 @@ title: Conditions d'utilisation (Terms of Service)
 description: Conditions d'utilisation d'EpoCanvas Mail — les règles de compte, les limites d'usage acceptable, les droits sur le contenu, les avertissements et les notes sur la licence open source à connaître avant d'utiliser le service de messagerie.
 ---
 
-# Conditions d'utilisation
-
 **Date d'entrée en vigueur : 27 septembre 2026　|　Version : 1.0**
 
 Bienvenue sur EpoCanvas Mail (le « Service »). Les présentes conditions constituent l'accord passé entre vous et l'opérateur du Service concernant son utilisation. Prenez quelques minutes pour les lire — nous avons gardé le langage aussi clair que possible et couvrons en un seul endroit ce que vous pouvez faire, ce qui est interdit, et ce qui se passe en cas de problème.
@@ -15,7 +13,29 @@ Bienvenue sur EpoCanvas Mail (le « Service »). Les présentes conditions const
 - **La ligne rouge** : pas de spam, pas de contenu illégal, pas d'attaques contre le service ou contre autrui. Toute violation peut entraîner un bannissement et la suppression du compte.
 - **Vos e-mails vous appartiennent** : nous ne les traitons que pour les livrer et les stocker. La corbeille est purgée physiquement 7 jours après la suppression — exportez avant de dire au revoir.
 - **Le Service est fourni « en l'état »** : logiciel open source, disponibilité au mieux, aucun accord de niveau de service (SLA).
+- **Un mot vous échappe ?** Sautez à l'[Annexe : petit glossaire](#annexe--petit-glossaire) en fin de page pour des explications en langage simple.
 :::
+
+## Sur cette page
+
+1. [Champ d'application et définitions](#1-champ-dapplication-et-définitions)
+2. [Présentation du Service](#2-présentation-du-service)
+3. [Comptes et sécurité](#3-comptes-et-sécurité)
+4. [Politique d'utilisation acceptable](#4-politique-dutilisation-acceptable)
+5. [Votre contenu et licence](#5-votre-contenu-et-licence)
+6. [Livraison sortante et services tiers](#6-livraison-sortante-et-services-tiers)
+7. [Disponibilité et évolutions](#7-disponibilité-et-évolutions)
+8. [Conservation et fin du compte](#8-conservation-et-fin-du-compte)
+9. [Force majeure](#9-force-majeure)
+10. [Exclusion de garanties (EN L'ÉTAT)](#10-exclusion-de-garanties-en-létat)
+11. [Limitation de responsabilité](#11-limitation-de-responsabilité)
+12. [Indemnisation](#12-indemnisation)
+13. [Propriété intellectuelle et licence open source](#13-propriété-intellectuelle-et-licence-open-source)
+14. [Conditions pour les opérateurs auto-hébergés](#14-conditions-pour-les-opérateurs-auto-hébergés)
+15. [Modifications des conditions](#15-modifications-des-conditions)
+16. [Nous contacter](#16-nous-contacter)
+
+- [Annexe : petit glossaire](#annexe--petit-glossaire)
 
 ## 1. Champ d'application et définitions
 
@@ -23,6 +43,7 @@ Bienvenue sur EpoCanvas Mail (le « Service »). Les présentes conditions const
 - **« L'opérateur / nous »** : la personne ou l'équipe qui a déployé et exploite l'instance que vous utilisez. Pour l'instance hébergée `mail.epocanvas.com`, il s'agit de l'équipe d'exploitation EpoCanvas ; pour une instance auto-hébergée, de la personne qui l'a déployée.
 - **« Vous »** : toute personne physique ou organisation qui s'inscrit, se connecte ou utilise autrement le Service.
 - **Application à double voie** : EpoCanvas Mail est un logiciel open source et n'importe qui peut déployer sa propre instance. Les présentes conditions sont un **modèle général** : les instances hébergées les appliquent directement, et les opérateurs auto-hébergeurs peuvent les adapter comme conditions de leur site. Où que vous vous inscriviez, vous contractez avec l'opérateur de ce site.
+- **Conditions additionnelles** : lorsque vous utilisez des fonctions tierces (livraison sortante, traduction IA, Telegram, connexion Linux DO, etc.), vous acceptez aussi les conditions du tiers concerné (voir la [section 6](#6-livraison-sortante-et-services-tiers)) ; les questions de confidentialité relèvent de la [Politique de confidentialité](/fr/mail/privacy-policy/).
 
 ## 2. Présentation du Service
 
@@ -42,6 +63,7 @@ Le Service comprend : la gestion multi-boîtes, les e-mails internes et externes
 4. **Protection de la connexion** : 5 échecs de mot de passe consécutifs verrouillent la connexion pendant 12 heures ; un compte conserve au maximum 10 sessions actives, et vous pouvez vous déconnecter depuis n'importe quel appareil pour révoquer son jeton immédiatement.
 5. **Noms réservés** : les identifiants tels que `admin` sont réservés par le système et ne peuvent pas être enregistrés par des utilisateurs ordinaires.
 6. **Clés d'inscription** : les opérateurs peuvent configurer l'instance pour exiger une clé d'inscription ou fermer les inscriptions — c'est un droit de gestion propre à l'instance.
+7. **Conditions d'éligibilité** : vous devez avoir l'âge minimum indiqué à la section 11 de la [Politique de confidentialité](/fr/mail/privacy-policy/) et vous assurer que votre inscription et votre usage respectent les lois qui vous concernent.
 
 ## 4. Politique d'utilisation acceptable
 
@@ -73,9 +95,9 @@ Le Service comprend : la gestion multi-boîtes, les e-mails internes et externes
 
 Selon la nature et la gravité de la violation, l'opérateur peut : avertir → limiter les fonctionnalités → mettre en quarantine anti-spam → suspendre le compte → supprimer physiquement le compte et toutes ses données. En cas d'agissements illégaux, l'opérateur peut conserver les preuves nécessaires et coopérer avec les autorités compétentes. Si votre comportement vaut à l'opérateur une sanction de Cloudflare ou d'un fournisseur amont, l'opérateur se réserve le droit d'en obtenir réparation auprès de vous (voir la section 12).
 
-### 4.3 Recours
+### 4.3 Recours et signalement
 
-Si vous estimez que la mesure est erronée, contactez l'opérateur par les canaux indiqués à la [section 16](#16-nous-contacter) ; l'opérateur réexaminera et répondra dans un délai raisonnable.
+Si vous estimez que la mesure est erronée, contactez l'opérateur par les canaux indiqués à la [section 16](#16-nous-contacter) ; l'opérateur réexaminera et répondra dans un délai raisonnable. Nous vous encourageons également à signaler les violations d'autrui ou les problèmes de sécurité (sources de spam, pages de hameçonnage, tentatives d'accès non autorisé) — les signalements de bonne foi sont tous traités avec sérieux ; les contenus soupçonnés d'être illicites (surtout les contenus d'exploitation sexuelle infantile) seront signalés aux autorités compétentes conformément à la loi.
 
 ## 5. Votre contenu et licence
 
@@ -95,6 +117,7 @@ Si vous estimez que la mesure est erronée, contactez l'opérateur par les canau
 - **Au mieux, sans SLA** : le Service fonctionne sur l'infrastructure de périphérie gratuite ou facturée à l'usage de Cloudflare. L'opérateur déploie des efforts raisonnables pour la disponibilité, sans promettre 100 % de disponibilité, des délais de livraison ni des délais de rétablissement.
 - **Fonctionnalités évolutives** : le projet open source itère rapidement ; des fonctionnalités peuvent être ajoutées, modifiées ou retirées. Les changements importants touchant à la suppression des données seront annoncés à l'avance.
 - **Maintenance et interruptions** : l'opérateur peut suspendre tout ou partie du Service pour mises à niveau, corrections ou traitement des abus ; les indisponibilités causées par Cloudflare ou par des fournisseurs amont d'IA/de livraison ne constituent pas un manquement de l'opérateur.
+- **Fonctions expérimentales** : les fonctions marquées « expérimental » ou en phase de test (comme la traduction OCR d'images) sont fournies « en l'état », peuvent être instables et peuvent changer ou disparaître à tout moment — le risque de les employer pour un usage critique est le vôtre.
 
 ## 8. Conservation et fin du compte
 
@@ -136,13 +159,28 @@ Si vous êtes l'opérateur d'une instance auto-hébergée :
 
 ## 15. Modifications des conditions
 
-Les présentes conditions peuvent être révisées avec l'évolution du Service. Les changements importants seront annoncés par annonce sur le site ou courrier système, avec mise à jour de la date d'entrée en vigueur et de la version en haut de page. Continuer à utiliser le Service après l'entrée en vigueur d'un changement vaut acceptation ; si vous êtes en désaccord, cessez de l'utiliser et exportez ou supprimez vos données.
+Les présentes conditions peuvent être révisées avec l'évolution du Service. Les changements importants seront annoncés par annonce sur le site ou courrier système, avec mise à jour de la date d'entrée en vigueur et de la version en haut de page. Continuer à utiliser le Service après l'entrée en vigueur d'un changement vaut acceptation ; si vous êtes en désaccord, cessez de l'utiliser et exportez ou supprimez vos données. Les révisions majeures passées sont archivées dans l'historique des versions du dépôt open source et peuvent être consultées à tout moment.
 
 ## 16. Nous contacter
 
 - **Instance hébergée (`mail.epocanvas.com`)** : messagerie du produit ou e-mail à `admin@epocanvas.com` ;
 - **Le projet open source** : issues sur le dépôt GitHub ;
 - **Sites auto-hébergés** : le contact opérateur publié sur le site concerné.
+
+---
+
+## Annexe : petit glossaire
+
+| Terme | Explication en une phrase |
+| --- | --- |
+| **Le Service / instance** | Toutes les fonctionnalités exécutées sur un déploiement EpoCanvas Mail (application web, API et composants) |
+| **Opérateur** | Celui ou celle qui a déployé et exploite l'instance — le « nous » des présentes conditions et l'interlocuteur responsable de vos données et de votre usage |
+| **Hébergé / auto-hébergé** | Hébergé = `mail.epocanvas.com`, exploité par l'équipe EpoCanvas ; auto-hébergé = une instance déployée par vous ou un tiers |
+| **Votre contenu** | Les e-mails, pièces jointes et profil que vous envoyez, recevez et téléversez ; la propriété et la responsabilité sont les vôtres |
+| **Licence de traitement** | L'autorisation technique limitée que vous accordez à l'opérateur pour que stockage, livraison, recherche, notifications et fonctions similaires fonctionnent (section 5) |
+| **Politique d'utilisation acceptable** | Les limites des conduites permises et interdites de la section 4, avec les conséquences graduées de la section 4.2 |
+| **Suppression logique / physique** | Logique = marquée comme supprimée, récupérable par les administrateurs ; physique = retirée du stockage avec pièces jointes et index, irrécupérable |
+| **SLA** | Accord de niveau de service (engagements de disponibilité et de réponse) ; ce Service est fourni au mieux, sans SLA |
 
 ---
 

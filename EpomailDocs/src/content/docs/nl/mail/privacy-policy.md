@@ -3,8 +3,6 @@ title: Privacybeleid (Privacy Policy)
 description: Privacybeleid van EpoCanvas Mail — welke informatie we verzamelen, hoe we deze gebruiken en beschermen, wanneer en met welke derden deze wordt gedeeld, en welke controle u over uw gegevens heeft.
 ---
 
-# Privacybeleid
-
 **Ingangsdatum: 27 september 2026　|　Versie: 1.0**
 
 EpoCanvas Mail (de "Dienst" of de "Software") is een **e-maildienst met open broncode**, gebouwd op de Cloudflare-stack (Workers, D1, KV, R2) en gepubliceerd onder de MIT-licentie. Het kan draaien als een openbare gehoste mailbox-site (bijvoorbeeld `mail.epocanvas.com`) of door iedereen zelf worden gehost als een privé-e-maildienst.
@@ -17,7 +15,30 @@ Het doel van dit beleid is eenvoudig: **in gewone taal uitleggen waar uw gegeven
 - **Wie verantwoordelijk is**: de beheerder van de instantie die u gebruikt is de "verwerkingsverantwoordelijke" van uw gegevens. EpoCanvas Mail als open-sourcesoftware verzamelt en uploadt zelf niets.
 - **Dat kan altijd**: alle e-mails exporteren (JSON), berichten en uw account verwijderen, tweestapsverificatie inschakelen en machtigingen van apps van derden intrekken.
 - **Derden om te kennen**: wanneer u op "Vertalen" klikt, wordt de e-mailtekst verzonden naar de AI-vertaaldienst die op uw instantie is ingesteld; wanneer de beheerder uitgaande bezorging aanzet, gaat externe mail via Resend of Mailjet. Zie [sectie 6](#6-diensten-van-derden-en-het-delen-van-gegevens).
+- **Onbekend woord?** Sla door naar [Bijlage B: Sleutelbegrippen](#bijlage-b-sleutelbegrippen) onderaan de pagina: elk begrip komt met een uitleg in één gewone zin.
 :::
+
+## Op deze pagina
+
+1. [Op wie is dit beleid van toepassing?](#1-op-wie-is-dit-beleid-van-toepassing)
+2. [Informatie die we verzamelen](#2-informatie-die-we-verzamelen)
+3. [Waar uw gegevens heengaan: één diagram](#3-waar-uw-gegevens-heengaan-één-diagram)
+4. [Hoe we informatie gebruiken](#4-hoe-we-informatie-gebruiken)
+5. [Opslag, versleuteling en beveiliging](#5-opslag-versleuteling-en-beveiliging)
+6. [Diensten van derden en het delen van gegevens](#6-diensten-van-derden-en-het-delen-van-gegevens)
+7. [AI-functies](#7-ai-functies)
+8. [Bewaartermijnen en verwijdering](#8-bewaartermijnen-en-verwijdering)
+9. [Uw regelmogelijkheden en rechten](#9-uw-regelmogelijkheden-en-rechten)
+10. [Communicatie en notificaties](#10-communicatie-en-notificaties)
+11. [Kinderen en minderjarigen](#11-kinderen-en-minderjarigen)
+12. [Internationale gegevensoverdrachten](#12-internationale-gegevensoverdrachten)
+13. [Gids voor de zelfhostende beheerder](#13-gids-voor-de-zelfhostende-beheerder)
+14. [Wijzigingen in dit beleid](#14-wijzigingen-in-dit-beleid)
+15. [Neem contact op](#15-neem-contact-op)
+
+- [Bijlage A: verhouding tot het open-sourceproject](#bijlage-a-verhouding-tot-het-open-sourceproject)
+- [Bijlage B: Sleutelbegrippen](#bijlage-b-sleutelbegrippen)
+- [Bijlage C: Verwante bronnen](#bijlage-c-verwante-bronnen)
 
 ## 1. Op wie is dit beleid van toepassing?
 
@@ -36,7 +57,7 @@ Zelfhosters kunnen dit beleid direct overnemen als privacyverklaring van hun sit
 
 ## 2. Informatie die we verzamelen
 
-Ingedeeld naar de manier waarop de informatie het systeem binnenkomt.
+Anders dan de meeste internetdiensten willen we dat u eerst het grote plaatje ziet: deze dienst **verzamelt alleen wat strikt noodzakelijk is om uw post te bezorgen**, en blijft bewust alles vermijden waar het advertentie-ecosysteem van afhankelijk is. Ingedeeld naar de manier waarop de informatie het systeem binnenkomt.
 
 ### 2.1 Informatie die u zelf verstrekt
 
@@ -63,6 +84,7 @@ Deze lijst is even belangrijk als de vorige:
 - ❌ **Geen statistiek van derden**: geen Google Analytics, geen Plausible, geen enkele event-tracking.
 - ❌ **Geen gegevensverkoop**: uw gegevens worden under geen enkele omstandigheid verkocht, verhuurd of geruild voor reclamedoeleinden.
 - ❌ **Niets terugmelden**: de open-sourcesoftware "rapporteert" instantiegegevens nooit terug naar de oorspronkelijke auteurs of wie dan ook. Gegevens van een eigen implementatie blijven volledig binnen uw eigen Cloudflare-account.
+- ❌ **Geen verzameling buiten de grenzen**: het systeem leest nooit de contacten, fotobibliotheek, locatie of app-gegevens van uw apparaat; "technische informatie" beperkt zich tot de hierboven genoemde velden rond verzoeken en sessies.
 
 ## 3. Waar uw gegevens heengaan: één diagram
 
@@ -72,6 +94,8 @@ Deze lijst is even belangrijk als de vorige:
 
 ## 4. Hoe we informatie gebruiken
 
+Elk doel heeft een duidelijke grens: buiten de kernlevering, de beveiliging en de functies die u zelf start, is er niets anders.
+
 | Doel | Gebruikte informatie | Toelichting |
 | --- | --- | --- |
 | De e-maildienst leveren | E-mailadres, berichtinhoud, bijlagen | De kernfunctie; zonder kan de dienst niet werken |
@@ -80,6 +104,7 @@ Deze lijst is even belangrijk als de vorige:
 | Systeemmededelingen | E-mailadres, taalvoorkeur | Officiële welkomstmail en aankondigingen worden in de taal van uw interface bezorgd |
 | Spambescherming | Adres van de afzender, berichtinhoud | Beheerders kunnen blacklists en filterregels instellen; de spamquarantaine wordt na 7 dagen automatisch geleegd |
 | Beheer van opslagquota | Grootte van bijlagen, mailboxgebruik | Voorkomt dat één gebruiker de gedeelde bronnen uitput |
+| Geaggregeerde gebruiksstatistieken | Geaggregeerde verzend-/ontvangsttellingen | Alleen een totaaldashboard voor de beheerder (dagelijkse volumes, blokkeringspercentages) — nooit om individuen te profileren |
 
 We gebruiken uw informatie **niet** voor geautomatiseerde besluitvorming, profilering of enig commercieel doel dat niets met de Dienst te maken heeft.
 
@@ -112,6 +137,13 @@ Het bovenstaande is **versleuteling in rust aan de serverkant**: de sleutels wor
 
 ## 6. Diensten van derden en het delen van gegevens
 
+Naar het voorbeeld van de grote aanbieders groeperen we de situaties waarin gegevens de instantie verlaten in vier categorieën, zodat u snel de aard van elke deling kunt beoordelen:
+
+1. **Infrastructuurverwerkers** (altijd, op de achtergrond): Cloudflare levert de runtime, opslag en het netwerk — het fundament van alles;
+2. **Door de beheerder ingestelde functies** (getriggerd bij verzending): uitgaande bezorgproviders dragen uw mail naar de buitenwereld;
+3. **Functies die u zelf start** (alleen op uw klik): vertaling, uploaden van afbeeldingen, Telegram-koppeling, Linux DO-aanmelding;
+4. **Wettelijke vorderingen**: alleen volgens de wettelijke procedure (zie het einde van deze sectie).
+
 Ons principe: **gegevens die niet naar buiten hoeven, gaan nooit weg; en voor gegevens die moeten, staat in de tabel hieronder precies via welke deur ze gaan en wat ze meenemen.**
 
 | Derde | Rol | Wanneer getriggerd | Wat wordt gedeeld |
@@ -127,6 +159,10 @@ Ons principe: **gegevens die niet naar buiten hoeven, gaan nooit weg; en voor ge
 
 :::tip[Wat "we verkopen geen gegevens" concreet betekent]
 Geen van de derden hierboven ontvangt uw gegevens voor advertentiedoeleinden, en met geen van hen hebben wij een afspraak over gegevensverkoop of advertentie-inkomsten. Sommigen (zoals Cloudflare en Resend) verwerken gegevens als "verwerker" in opdracht van de beheerder, elk gebonden aan hun eigen privacybeleid (te raadplegen op hun websites).
+:::
+
+:::note[Wettelijke vorderingen en samenwerking met toezichthouders]
+Tenzij de wet het afdwingt of er een verzoek volgens de wettelijke procedure komt, geeft de beheerder uw gegevens niet uit eigen beweging aan derden vrij. Bij zo'n verzoek toetst de beheerder de rechtmatigheid, maakt alleen het minimum dat de wet vereist vrij en stelt u op de hoogte voor zover de wet dat toestaat. Zelfhostende beheerders vullen hun eigen toezeggingen over samenwerking met autoriteiten aan volgens hun jurisdictie.
 :::
 
 ## 7. AI-functies
@@ -149,6 +185,7 @@ De AI-functies zijn niet gekoppeld aan modeltraining: het systeem gebruikt uw ma
 | Mail van een verwijderd account | Zelfservice-deactivering is een **zachte verwijdering**: mail blijft in de database (technisch herstelbaar) tot een beheerder fysiek verwijdert; na fysieke verwijdering zijn profiel, mailboxen, berichten, bijlagen, OAuth-machtigingen en sessies voorgoed weg |
 | Inloglogboeken (IP/UA) | Bewaard in het gebruikersprofiel tot het account fysiek wordt verwijderd |
 | Sessietokens | Bij serverzijde ingetrokken bij uitloggen; verlopen vanzelf na 30 dagen inactiviteit |
+| Bij stopzetting van de instantie | De beheerder moet vooraf melden en een exportvenster bieden; na de stop wordt de data samen met de Cloudflare-resources van de instantie (D1/KV/R2) vernietigd en niet aan vreemde derden overgedragen |
 
 :::caution[Exporteer vóór het verwijderen]
 Fysieke verwijdering is onomkeerbaar. Om uw gegevens mee te nemen, gebruikt u eerst "Instellingen → Gegevensexport" om een JSON-kopie te downloaden (uw volledige profiel en de volledige tekst van alle niet-verwijderde berichten).
@@ -166,7 +203,7 @@ Welke jurisdictie u ook heeft, de Dienst biedt deze zelfbedieningsgereedschappen
 - **Sessiebeheer**: log uit op elk apparaat om het token van dat apparaat in te trekken.
 - **Bezwaar en afmelden**: zet Telegram-push uit, voorkom AI-overdrachten door nooit op Vertalen te klikken, of kies een instantie zonder extractie van verificatiecodes.
 
-Als uw jurisdictie (EU/EER, VK, Californië, enz.) u extra wettelijke rechten geeft (klacht, beperking van verwerking, enz.), neem dan contact op met de instantiebeheerder om ze uit te oefenen; de beheerder moet binnen de wettelijke termijnen reageren.
+Als uw jurisdictie (EU/EER, VK, Californië, enz.) u extra wettelijke rechten geeft (klacht, beperking van verwerking, enz.), neem dan contact op met de instantiebeheerder om ze uit te oefenen; de beheerder moet binnen de wettelijke termijnen reageren. Over de reactietermijnen: onze belofte is dat **zelfbedieningsacties in de interface (exporteren, verwijderen, machtigingen intrekken, uitloggen) direct werken**; verzoeken die menselijke afhandeling nodig hebben (zoals fysieke verwijdering) worden binnen **30 dagen** beantwoord en afgehandeld. Bent u niet tevreden met de uitkomst, dan kunt u ook een klacht indienen bij de gegevensbeschermingsautoriteit van uw land.
 
 ## 10. Communicatie en notificaties
 
@@ -193,6 +230,8 @@ Heeft u EpoCanvas Mail onder uw eigen domein geïmplementeerd, dan bent u juridi
 
 Dit beleid kan worden bijgewerkt als functies zich ontwikkelen. Wezenlijke wijzigingen (een nieuwe derde, gewijzigde bewaartermijn, een andere versleutelingsmodus, enz.) worden vooraf aangekondigd via een aankondiging op de site of systeemmail, met bijwerking van de "ingangsdatum" en het versienummer bovenaan deze pagina. Blijvend gebruik na een update geldt als acceptatie; bent u het na een wezenlijke wijziging oneens, dan kunt u de Dienst stoppen en uw gegevens exporteren of verwijderen.
 
+Naar sectorgewoonte **verdwijnt de geschiedenis niet**: elke grote herziening van dit beleid wordt gearchiveerd in de versiegeschiedenis van de open-sourcerepository, waar u elke oudere volledige tekst op elk moment kunt teruglezen en vergelijken; zelfhostende beheerders wordt aangeraden dezelfde archiefgewoonte op hun eigen site te houden.
+
 ## 15. Neem contact op
 
 - **Gehoste instantie (`mail.epocanvas.com`)**: neem via de mail in het product of per e-mail contact op met de beheerder: `admin@epocanvas.com`.
@@ -202,3 +241,29 @@ Dit beleid kan worden bijgewerkt als functies zich ontwikkelen. Wezenlijke wijzi
 ## Bijlage A: verhouding tot het open-sourceproject
 
 EpoCanvas Mail is gebouwd op en gaat verder als een open-sourceproject onder de MIT-licentie. Het oorspronkelijke upstream-project is gemaakt door **eoao** (Copyright (c) 2025 eoao) — dank aan upstream en alle bijdragers. Dit beleid is geschreven door de EpoCanvas-gemeenschap en wordt in dezelfde open geest gepubliceerd: **elke beheerder van een EpoCanvas Mail-instantie mag deze tekst vrij overnemen en aanpassen** (MIT-geest, naamsvermelding niet vereist), al raden we aan de zelfhostverklaring in sectie 13 te behouden om dezelfde transparantie jegens uw gebruikers te waarborgen.
+
+## Bijlage B: Sleutelbegrippen
+
+We vermijden jargon zoveel mogelijk; is een technische term onvermijdelijk, lees hem dan met de gewone-taal-uitleg hieronder.
+
+| Begrip | Uitleg in één zin |
+| --- | --- |
+| **Account** | Uw identiteit op een instantie, geïdentificeerd door uw e-mailadres; het wachtwoord wordt alleen als eenrichtingshash bewaard die niemand kan omkeren |
+| **Instantie (site)** | Eén implementatie van EpoCanvas Mail binnen het Cloudflare-account van een persoon of team — bijvoorbeeld `mail.epocanvas.com` of een site van uw bedrijf |
+| **Beheerder** | Wie de instantie implementeert en beheert; de "verwerkingsverantwoordelijke" van uw gegevens, dus het "wij" van dit beleid |
+| **Verwerkingsverantwoordelijke / verwerker** | Wie bepaalt "waarom verzamelen en hoe gebruiken" is de verwerkingsverantwoordelijke (de beheerder); wie de gegevens in opdracht verwerkt is de verwerker (bijv. Cloudflare, Resend) |
+| **Inhoudsgegevens** | De teksten, onderwerpen en bijlagen van uw mail, plus de labels, sterren en leesstatussen die u toepast |
+| **Technische gegevens** | IP-adres, User-Agent van de browser, apparaattype, inlogtijden en vergelijkbare velden, automatisch vastgelegd voor beheer en beveiliging |
+| **localStorage (webopslag)** | Een browsermechanisme dat webgegevens op uw apparaat bewaart over sessies heen; het inlogtoken van deze dienst woont daar, niet in cookies |
+| **Sessietoken (JWT)** | Het "pasje" dat na aanmelding wordt uitgegeven — 30 dagen geldig, maximaal 10 gelijktijdige sessies per account, ingetrokken bij uitloggen |
+| **PBKDF2** | Een wachtwoordhashalgoritme; deze dienst past 100.000 gezouten iteraties toe zodat het oorspronkelijke wachtwoord niet uit de database is af te leiden |
+| **Versleuteling in rust** | Versleuteling bij het wegschrijven naar schijf; de sleutels van deze dienst zijn afgeleid van omgevingsvariabelen van de server, dus een beheerder die server en sleutels beheerst kan technisch ontsleutelen |
+| **End-to-endversleuteling (E2EE)** | Versleuteling waarbij alleen afzender en ontvanger kunnen ontsleutelen; deze dienst **biedt dat niet** — heeft u die sterkte nodig, versleutel de tekst dan zelf met GPG of vergelijkbaar vóór het verzenden |
+| **Telemetrie** | Gedrag van software dat automatisch gebruiksgegevens terugmeldt aan de makers; EpoCanvas Mail heeft nul telemetrie en meldt geen instantiegegevens upstream |
+
+## Bijlage C: Verwante bronnen
+
+- **De Servicevoorwaarden**: samen met dit beleid vormen ze de volledige overeenkomst tussen u en de beheerder (zie de sitenavigatie of de [Servicevoorwaarden](/nl/mail/terms-of-service/)).
+- **De open-sourcerepository**: `github.com/shijianus/epomail` — broncode-audits, issue-feedback en de volledige versiegeschiedenis van de tekst van dit beleid.
+- **De productsite**: `mail.epocanvas.com` — inloggen, registreren en de Dienst gebruiken.
+- **Verder lezen**: de officiële Cloudflare-documentatie over [D1](https://developers.cloudflare.com/d1/), [KV](https://developers.cloudflare.com/kv/), [R2](https://developers.cloudflare.com/r2/) en [Workers AI](https://developers.cloudflare.com/workers-ai/) legt uit hoe de infrastructuur gegevens verwerkt.

@@ -3,8 +3,6 @@ title: Política de privacidad (Privacy Policy)
 description: Política de privacidad de EpoCanvas Mail — qué información recopilamos, cómo la usamos y protegemos, cuándo y con qué terceros se comparte, y qué controles tienes sobre tus datos.
 ---
 
-# Política de privacidad
-
 **Fecha de entrada en vigor: 27 de septiembre de 2026　|　Versión: 1.0**
 
 EpoCanvas Mail (el «Servicio» o el «Software») es un **servicio de correo electrónico de código abierto** construido sobre la pila de Cloudflare (Workers, D1, KV, R2) y publicado bajo la licencia MIT. Puede funcionar como un sitio de buzón alojado público (por ejemplo, `mail.epocanvas.com`) o ser autoalojado por cualquier persona como un servicio de correo privado.
@@ -17,7 +15,30 @@ El propósito de esta política es simple: **explicar en lenguaje claro a dónde
 - **Quién es el responsable**: el operador de la instancia que utilizas es el «responsable del tratamiento» de tus datos. EpoCanvas Mail, como software de código abierto, no recopila ni sube nada por sí mismo.
 - **Siempre puedes**: exportar todos tus correos (JSON), eliminar mensajes y tu cuenta, activar la verificación en dos pasos y revocar las autorizaciones de aplicaciones de terceros.
 - **Terceros que debes conocer**: cuando pulsas «Traducir», el texto del correo se envía al servicio de traducción con IA configurado en tu instancia; cuando el operador activa la entrega saliente, el correo externo se envía mediante Resend o Mailjet. Consulta la [sección 6](#6-servicios-de-terceros-y-compartición-de-datos).
+- **¿Alguna palabra no te suena?** Salta al [Apéndice B: Glosario de términos clave](#apéndice-b-glosario-de-términos-clave) al final de la página: cada término viene con una explicación en una frase.
 :::
+
+## En esta página
+
+1. [¿A quién aplica esta política?](#1-a-quién-aplica-esta-política)
+2. [Información que recopilamos](#2-información-que-recopilamos)
+3. [A dónde van tus datos: un diagrama](#3-a-dónde-van-tus-datos-un-diagrama)
+4. [Cómo usamos la información](#4-cómo-usamos-la-información)
+5. [Almacenamiento, cifrado y seguridad](#5-almacenamiento-cifrado-y-seguridad)
+6. [Servicios de terceros y compartición de datos](#6-servicios-de-terceros-y-compartición-de-datos)
+7. [Funciones de IA](#7-funciones-de-ia)
+8. [Conservación y eliminación](#8-conservación-y-eliminación)
+9. [Tus controles y derechos](#9-tus-controles-y-derechos)
+10. [Comunicaciones y notificaciones](#10-comunicaciones-y-notificaciones)
+11. [Niños y menores](#11-niños-y-menores)
+12. [Transferencias internacionales de datos](#12-transferencias-internacionales-de-datos)
+13. [Guía para el operador autoalojado](#13-guía-para-el-operador-autoalojado)
+14. [Cambios en esta política](#14-cambios-en-esta-política)
+15. [Contáctanos](#15-contáctanos)
+
+- [Apéndice A: relación con el proyecto de código abierto](#apéndice-a-relación-con-el-proyecto-de-código-abierto)
+- [Apéndice B: Glosario de términos clave](#apéndice-b-glosario-de-términos-clave)
+- [Apéndice C: Recursos relacionados](#apéndice-c-recursos-relacionados)
 
 ## 1. ¿A quién aplica esta política?
 
@@ -36,7 +57,7 @@ Los autoalojadores pueden adoptar esta política directamente como declaración 
 
 ## 2. Información que recopilamos
 
-Agrupada según cómo entra en el sistema.
+A diferencia de la mayoría de los servicios de internet, queremos que tengas la visión general antes de los detalles: este servicio **solo recopila lo estrictamente necesario para entregarte el correo**, y se mantiene deliberadamente al margen de todo lo de lo que depende el ecosistema publicitario. Agrupada según cómo entra en el sistema.
 
 ### 2.1 Información que tú aportas
 
@@ -63,6 +84,7 @@ Esta lista importa tanto como la anterior:
 - ❌ **Sin estadísticas de terceros**: ni Google Analytics, ni Plausible, ni ningún seguimiento de eventos.
 - ❌ **Sin venta de datos**: tus datos nunca se venden, alquilan ni intercambian con fines publicitarios, bajo ninguna circunstancia.
 - ❌ **Sin llamada a casa**: el software de código abierto nunca «informa» de los datos de tu instancia a los autores originales ni a nadie. Los datos de un despliegue tuyo se quedan por completo en tu propia cuenta de Cloudflare.
+- ❌ **Sin recolección fuera de límites**: el sistema nunca lee los contactos de tu dispositivo, tu galería, tu ubicación ni los datos de otras aplicaciones; la «información técnica» se limita a los campos relacionados con solicitudes y sesiones listados arriba.
 
 ## 3. A dónde van tus datos: un diagrama
 
@@ -72,6 +94,8 @@ Esta lista importa tanto como la anterior:
 
 ## 4. Cómo usamos la información
 
+Cada finalidad tiene un límite claro: fuera de la entrega, la seguridad y las funciones que tú mismo activas, no hay nada más.
+
 | Finalidad | Información utilizada | Notas |
 | --- | --- | --- |
 | Prestar el servicio de correo | Dirección de correo, contenido de los mensajes, adjuntos | La función principal; sin ella el servicio no puede funcionar |
@@ -80,6 +104,7 @@ Esta lista importa tanto como la anterior:
 | Anuncios del sistema | Dirección de correo, preferencia de idioma | El correo de bienvenida oficial y los anuncios del sitio se entregan en el idioma de tu interfaz |
 | Protección antispam | Dirección del remitente, contenido de los mensajes | Los operadores pueden configurar listas negras y reglas de filtrado; la cuarentena de spam se limpia automáticamente a los 7 días |
 | Gestión de cuotas de almacenamiento | Tamaño de los adjuntos, uso del buzón | Evita que un solo usuario agote los recursos compartidos |
+| Estadísticas operativas agregadas | Recuentos agregados de envío/recepción | Solo un panel global de uso para el operador (volúmenes diarios, tasas de bloqueo) — jamás para perfilar a ninguna persona |
 
 **No** usamos tu información para decisiones automatizadas, perfilado ni ningún fin comercial ajeno al Servicio.
 
@@ -112,6 +137,13 @@ Lo anterior es **cifrado en reposo del lado del servidor**: las claves se deriva
 
 ## 6. Servicios de terceros y compartición de datos
 
+Siguiendo la práctica de los grandes proveedores, agrupamos las situaciones en las que los datos salen de la instancia en cuatro categorías, para que juzgues con rapidez la naturaleza de cada compartición:
+
+1. **Encargados de infraestructura** (siempre, en segundo plano): Cloudflare proporciona la ejecución, el almacenamiento y la red: la base de todo;
+2. **Funciones configuradas por el operador** (se activan al enviar): los proveedores de entrega saliente llevan tu correo al exterior;
+3. **Funciones que activas tú** (solo con tu clic): traducción, subida de imágenes, vinculación de Telegram, inicio de sesión con Linux DO;
+4. **Requerimientos legales**: únicamente conforme al procedimiento legal (ver el final de esta sección).
+
 Nuestro principio: **los datos que no necesitan salir, nunca salen; y los que deben salir, la tabla siguiente indica exactamente por qué puerta pasan y qué llevan.**
 
 | Tercero | Rol | Cuándo se activa | Qué se comparte |
@@ -127,6 +159,10 @@ Nuestro principio: **los datos que no necesitan salir, nunca salen; y los que de
 
 :::tip[Qué significa en concreto «no vendemos datos»]
 Ninguno de los terceros anteriores recibe tus datos con fines publicitarios, y con ninguno de ellos mantenemos relación alguna de venta de datos ni de reparto de ingresos publicitarios. Algunos (como Cloudflare y Resend) tratan los datos como «encargados del tratamiento» por instrucciones del operador, cada uno conforme a su propia política de privacidad (consultable en su sitio web).
+:::
+
+:::note[Requerimientos legales y cooperación con los reguladores]
+Salvo obligación legal o requerimiento conforme al procedimiento legal, el operador no divulgará por iniciativa propia tus datos a terceros. Al recibir tal requerimiento, el operador verificará su legalidad, divulgará solo el mínimo exigido por la ley y te notificará en la medida en que la ley lo permita. Los operadores autoalojados deben añadir sus propios compromisos de cooperación con las autoridades según su jurisdicción.
 :::
 
 ## 7. Funciones de IA
@@ -149,6 +185,7 @@ Las funciones de IA no están conectadas al entrenamiento de modelos: el sistema
 | Correo de una cuenta eliminada | La desactivación por autoservicio es una **eliminación lógica**: el correo permanece en la base de datos (técnicamente recuperable) hasta que un administrador lo elimine físicamente; tras la eliminación física, perfil, buzones, mensajes, adjuntos, autorizaciones OAuth y sesiones desaparecen para siempre |
 | Registros de inicio de sesión (IP/UA) | Se conservan en el perfil de usuario hasta la eliminación física de la cuenta |
 | Tokens de sesión | Revocados en el servidor al cerrar sesión; caducan naturalmente tras 30 días de inactividad |
+| Si la instancia cierra | El operador debe avisar con antelación y ofrecer un plazo para exportar tus datos; tras el cierre, los datos se destruyen junto con los recursos de Cloudflare de la instancia (D1/KV/R2) y no se entregan a terceros sin relación |
 
 :::caution[Exporta antes de eliminar]
 La eliminación física es irrecuperable. Para llevarte tus datos, usa primero «Ajustes → Exportación de datos» y descarga una copia JSON (tu perfil completo y el cuerpo íntegro de todos los mensajes no eliminados).
@@ -166,7 +203,7 @@ Estés donde estés, el Servicio incorpora estas herramientas de autoservicio:
 - **Gestión de sesiones**: cierra sesión en cualquier dispositivo para revocar su token.
 - **Oposición y exclusión**: desactiva el envío a Telegram, evita las transferencias de IA no pulsando nunca «Traducir» o elige una instancia sin extracción de códigos de verificación.
 
-Si tu jurisdicción (UE/EEE, Reino Unido, California, etc.) te otorga derechos legales adicionales (reclamación, limitación del tratamiento, etc.), contacta con el operador de la instancia para ejercerlos; el operador está obligado a responder en los plazos legales.
+Si tu jurisdicción (UE/EEE, Reino Unido, California, etc.) te otorga derechos legales adicionales (reclamación, limitación del tratamiento, etc.), contacta con el operador de la instancia para ejercerlos; el operador está obligado a responder en los plazos legales. Sobre los plazos de respuesta, nuestro compromiso: **las acciones de autoservicio en la interfaz (exportar, eliminar, revocar autorizaciones, cerrar sesión) surten efecto de inmediato**; las solicitudes que requieran tratamiento humano (como la eliminación física) recibirán respuesta y se completarán en un plazo de **30 días**. Si el resultado no te satisface, también puedes presentar una reclamación ante la autoridad de protección de datos de tu país.
 
 ## 10. Comunicaciones y notificaciones
 
@@ -193,6 +230,8 @@ Si has desplegado EpoCanvas Mail bajo tu propio dominio, entonces, jurídica y f
 
 Esta política puede actualizarse a medida que evolucionan las funciones. Los cambios materiales (un nuevo tercero, cambios de conservación, un cambio de modo de cifrado, etc.) se anunciarán con antelación mediante anuncio en el sitio o correo del sistema, actualizando la «fecha de entrada en vigor» y el número de versión en la parte superior de esta página. El uso continuado tras una actualización implica la aceptación; si no estás de acuerdo tras un cambio material, puedes dejar de usar el Servicio y exportar o eliminar tus datos.
 
+Siguiendo la práctica del sector, **el historial no desaparece**: cada revisión importante de esta política queda archivada en el historial de versiones del repositorio de código abierto, donde puedes recuperar y comparar cualquier texto anterior en cualquier momento; se recomienda a los operadores autoalojados mantener el mismo hábito de archivo en su propia documentación.
+
 ## 15. Contáctanos
 
 - **Instancia alojada (`mail.epocanvas.com`)**: contacta con el operador por el correo del producto o por correo electrónico: `admin@epocanvas.com`.
@@ -202,3 +241,29 @@ Esta política puede actualizarse a medida que evolucionan las funciones. Los ca
 ## Apéndice A: relación con el proyecto de código abierto
 
 EpoCanvas Mail se construye sobre un proyecto de código abierto bajo licencia MIT y continúa siendo de código abierto. El proyecto original ascendente fue creado por **eoao** (Copyright (c) 2025 eoao); gracias al proyecto original y a todos los colaboradores. Esta política fue redactada por la comunidad EpoCanvas y se publica con el mismo espíritu abierto: **cualquier operador de una instancia de EpoCanvas Mail puede adoptar y adaptar libremente este texto** (espíritu MIT, sin exigencia de atribución), aunque te recomendamos conservar la declaración de autoalojamiento de la sección 13 para mantener la misma transparencia con tus usuarios.
+
+## Apéndice B: Glosario de términos clave
+
+Evitamos la jerga siempre que es posible; cuando un término técnico es inevitable, léelo con las definiciones en lenguaje llano de abajo.
+
+| Término | Explicación en una frase |
+| --- | --- |
+| **Cuenta** | Tu identidad en una instancia, identificada por tu dirección de correo; la contraseña se guarda solo como hash unidireccional que nadie puede invertir |
+| **Instancia (sitio)** | Un despliegue de EpoCanvas Mail que se ejecuta dentro de la cuenta de Cloudflare de una persona o equipo: por ejemplo `mail.epocanvas.com` o un sitio alojado por tu empresa |
+| **Operador** | La persona o el equipo que despliega y opera la instancia; el «responsable del tratamiento» de tus datos, es decir, el «nosotros» de esta política |
+| **Responsable / encargado del tratamiento** | La parte que decide «por qué recopilar y cómo usar» es el responsable (el operador); la que trata los datos por sus instrucciones es el encargado (p. ej., Cloudflare, Resend) |
+| **Datos de contenido** | Los cuerpos, asuntos y adjuntos del correo que envías y recibes, junto con las etiquetas, estrellas y estados de lectura que aplicas |
+| **Datos técnicos** | Dirección IP, User-Agent del navegador, tipo de dispositivo, horas de inicio de sesión y campos similares registrados automáticamente para operar y proteger el servicio |
+| **localStorage (almacenamiento web)** | Un mecanismo del navegador que conserva datos web en tu dispositivo entre sesiones; el token de inicio de sesión de este servicio vive ahí, no en cookies |
+| **Token de sesión (JWT)** | El «pase» emitido tras iniciar sesión: válido 30 días, como máximo 10 sesiones simultáneas por cuenta, revocado al cerrar sesión |
+| **PBKDF2** | Un algoritmo de hash de contraseñas; este servicio aplica 100 000 iteraciones con sal para que la contraseña original no pueda deducirse de la base de datos |
+| **Cifrado en reposo** | Cifrado aplicado al escribir los datos en disco; las claves de este servicio se derivan de variables de entorno del servidor, así que un operador que controle servidor y claves puede técnicamente descifrar |
+| **Cifrado de extremo a extremo (E2EE)** | Un cifrado donde solo remitente y destinatario pueden descifrar; este servicio **no lo ofrece** — si necesitas esa fuerza, cifra el cuerpo tú mismo con GPG o similar antes de enviarlo |
+| **Telemetría** | Un comportamiento del software que informa automáticamente de datos de uso a sus desarrolladores; EpoCanvas Mail tiene cero telemetría y no reporta ningún dato de instancia aguas arriba |
+
+## Apéndice C: Recursos relacionados
+
+- **Los Términos del servicio**: junto con esta política forman el acuerdo completo entre tú y el operador (ver la navegación del sitio o los [Términos del servicio](/es/mail/terms-of-service/)).
+- **El repositorio de código abierto**: `github.com/shijianus/epomail` — auditoría del código fuente, comentarios por issues y el historial completo de versiones del texto de esta política.
+- **El sitio del producto**: `mail.epocanvas.com` — inicia sesión, regístrate y usa el Servicio.
+- **Para saber más**: la documentación oficial de Cloudflare para [D1](https://developers.cloudflare.com/d1/), [KV](https://developers.cloudflare.com/kv/), [R2](https://developers.cloudflare.com/r2/) y [Workers AI](https://developers.cloudflare.com/workers-ai/) explica cómo trata los datos la infraestructura.

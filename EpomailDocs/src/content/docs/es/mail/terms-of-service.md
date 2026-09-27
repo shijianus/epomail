@@ -3,8 +3,6 @@ title: Términos del servicio (Terms of Service)
 description: Términos del servicio de EpoCanvas Mail — reglas de cuenta, límites de uso aceptable, derechos sobre el contenido, exenciones de responsabilidad y notas sobre la licencia de código abierto que conviene conocer antes de usar el servicio de correo.
 ---
 
-# Términos del servicio
-
 **Fecha de entrada en vigor: 27 de septiembre de 2026　|　Versión: 1.0**
 
 Bienvenido a EpoCanvas Mail (el «Servicio»). Estos términos constituyen el acuerdo entre tú y el operador del Servicio en relación con su uso. Dedica unos minutos a leerlos: hemos procurado un lenguaje lo más claro posible y cubrimos, en un solo lugar, qué puedes hacer, qué no está permitido y qué ocurre cuando algo falla.
@@ -15,7 +13,29 @@ Bienvenido a EpoCanvas Mail (el «Servicio»). Estos términos constituyen el ac
 - **La línea roja**: nada de spam, nada de contenido ilegal, nada de ataques contra el servicio o terceros. Las infracciones pueden acabar en suspensión y eliminación de la cuenta.
 - **Tu correo es tuyo**: solo lo tratamos para entregarlo y almacenarlo. La papelera se depura físicamente 7 días después de la eliminación: exporta antes de despedirte.
 - **El Servicio se ofrece «tal cual»**: software de código abierto, disponibilidad con el máximo esfuerzo, sin acuerdo de nivel de servicio (SLA).
+- **¿Alguna palabra no te suena?** Salta al [Apéndice: glosario rápido](#apéndice-glosario-rápido) al final de la página para explicaciones en lenguaje llano.
 :::
+
+## En esta página
+
+1. [Alcance y definiciones](#1-alcance-y-definiciones)
+2. [Descripción del Servicio](#2-descripción-del-servicio)
+3. [Cuentas y seguridad](#3-cuentas-y-seguridad)
+4. [Política de uso aceptable](#4-política-de-uso-aceptable)
+5. [Tu contenido y licencia](#5-tu-contenido-y-licencia)
+6. [Entrega saliente y servicios de terceros](#6-entrega-saliente-y-servicios-de-terceros)
+7. [Disponibilidad y cambios](#7-disponibilidad-y-cambios)
+8. [Conservación y fin de la cuenta](#8-conservación-y-fin-de-la-cuenta)
+9. [Fuerza mayor](#9-fuerza-mayor)
+10. [Exención de garantías (TAL CUAL)](#10-exención-de-garantías-tal-cual)
+11. [Limitación de responsabilidad](#11-limitación-de-responsabilidad)
+12. [Indemnización](#12-indemnización)
+13. [Propiedad intelectual y licencia de código abierto](#13-propiedad-intelectual-y-licencia-de-código-abierto)
+14. [Términos para operadores autoalojados](#14-términos-para-operadores-autoalojados)
+15. [Cambios en estos términos](#15-cambios-en-estos-términos)
+16. [Contáctanos](#16-contáctanos)
+
+- [Apéndice: glosario rápido](#apéndice-glosario-rápido)
 
 ## 1. Alcance y definiciones
 
@@ -23,6 +43,7 @@ Bienvenido a EpoCanvas Mail (el «Servicio»). Estos términos constituyen el ac
 - **«El operador / nosotros»**: la persona o el equipo que ha desplegado y opera la instancia que utilizas. Para la instancia alojada `mail.epocanvas.com`, es el equipo de operaciones de EpoCanvas; para una instancia autoalojada, quien la haya desplegado.
 - **«Tú»**: toda persona física u organización que se registre, inicie sesión o use de otro modo el Servicio.
 - **Aplicación de doble vía**: EpoCanvas Mail es software de código abierto y cualquiera puede desplegar su propia instancia. Estos términos son una **plantilla general**: las instancias alojadas los aplican directamente, y los operadores autoalojados pueden adaptarlos como términos de su sitio. Donde te registres, formalizas el acuerdo con el operador de ese sitio.
+- **Términos adicionales**: al usar funciones de terceros (entrega saliente, traducción con IA, Telegram, inicio de sesión con Linux DO, etc.), también aceptas los términos del tercero correspondiente (ver la [sección 6](#6-entrega-saliente-y-servicios-de-terceros)); los asuntos de privacidad se rigen por la [Política de privacidad](/es/mail/privacy-policy/).
 
 ## 2. Descripción del Servicio
 
@@ -42,6 +63,7 @@ El Servicio incluye: gestión multi-buzón, correo interno y externo, adjuntos, 
 4. **Protección del inicio de sesión**: 5 fallos de contraseña consecutivos bloquean el acceso 12 horas; una cuenta mantiene como máximo 10 sesiones activas, y puedes cerrar sesión en cualquier dispositivo para revocar su token de inmediato.
 5. **Nombres reservados**: identificadores como `admin` están reservados por el sistema y no pueden registrarse por usuarios ordinarios.
 6. **Claves de registro**: los operadores pueden configurar la instancia para exigir una clave de registro o cerrar el registro: es una facultad de gestión propia de la instancia.
+7. **Requisitos de elegibilidad**: debes tener la edad mínima indicada en la sección 11 de la [Política de privacidad](/es/mail/privacy-policy/) y asegurarte de que tu registro y uso cumplen las leyes que te afectan.
 
 ## 4. Política de uso aceptable
 
@@ -73,9 +95,9 @@ El Servicio incluye: gestión multi-buzón, correo interno y externo, adjuntos, 
 
 Según la naturaleza y gravedad de la infracción, el operador puede: advertir → limitar funciones → poner en cuarentena antispam → suspender la cuenta → eliminar físicamente la cuenta y todos sus datos. Si hay conductas ilícitas, el operador puede conservar las pruebas necesarias y cooperar con las autoridades competentes. Si tu conducta acarrea al operador una sanción de Cloudflare o de un proveedor ascendente, el operador se reserva el derecho de reclamarte (véase la sección 12).
 
-### 4.3 Reclamaciones
+### 4.3 Reclamaciones y reportes
 
-Si crees que la medida es errónea, contacta con el operador por los canales de la [sección 16](#16-contáctanos); el operador lo revisará y responderá en un plazo razonable.
+Si crees que la medida es errónea, contacta con el operador por los canales de la [sección 16](#16-contáctanos); el operador lo revisará y responderá en un plazo razonable. También te animamos a reportar infracciones de otros o problemas de seguridad (fuentes de spam, páginas de phishing, intentos de acceso no autorizado): los reportes de buena fe se tratan todos con seriedad; el contenido sospechoso de ser ilícito (sobre todo material de explotación sexual infantil) se reportará a las autoridades competentes conforme a la ley.
 
 ## 5. Tu contenido y licencia
 
@@ -95,6 +117,7 @@ Si crees que la medida es errónea, contacta con el operador por los canales de 
 - **Con el máximo esfuerzo, sin SLA**: el Servicio funciona sobre la infraestructura perimetral gratuita o de pago por uso de Cloudflare. El operador realiza esfuerzos razonables por la disponibilidad, pero no promete un 100 % de tiempo en línea, plazos de entrega ni plazos de recuperación.
 - **Funciones en evolución**: el proyecto de código abierto itera rápido; las funciones pueden añadirse, cambiar o retirarse. Los cambios materiales que afecten a la eliminación de datos se anunciarán con antelación.
 - **Mantenimiento e interrupciones**: el operador puede suspender parte o todo el Servicio por actualizaciones, correcciones o gestión de abusos; las indisponibilidades causadas por Cloudflare o por proveedores ascendentes de IA/entrega no constituyen incumplimiento del operador.
+- **Funciones experimentales**: las funciones marcadas como «experimentales» o en fase de prueba (como la traducción OCR de imágenes) se ofrecen «tal cual», pueden ser inestables y pueden cambiar o retirarse en cualquier momento: el riesgo de depender de ellas para trabajo crítico es tuyo.
 
 ## 8. Conservación y fin de la cuenta
 
@@ -136,13 +159,28 @@ Si eres el operador de una instancia autoalojada:
 
 ## 15. Cambios en estos términos
 
-Estos términos pueden revisarse a medida que evoluciona el Servicio. Los cambios materiales se anunciarán mediante anuncio en el sitio o correo del sistema, actualizando la fecha de entrada en vigor y la versión en la parte superior de esta página. Seguir usando el Servicio tras la entrada en vigor de un cambio implica su aceptación; si no estás de acuerdo, deja de usarlo y exporta o elimina tus datos.
+Estos términos pueden revisarse a medida que evoluciona el Servicio. Los cambios materiales se anunciarán mediante anuncio en el sitio o correo del sistema, actualizando la fecha de entrada en vigor y la versión en la parte superior de esta página. Seguir usando el Servicio tras la entrada en vigor de un cambio implica su aceptación; si no estás de acuerdo, deja de usarlo y exporta o elimina tus datos. Las revisiones importantes anteriores quedan archivadas en el historial de versiones del repositorio de código abierto y pueden consultarse en cualquier momento.
 
 ## 16. Contáctanos
 
 - **Instancia alojada (`mail.epocanvas.com`)**: correo del producto o correo electrónico a `admin@epocanvas.com`;
 - **El proyecto de código abierto**: incidencias en el repositorio de GitHub;
 - **Sitios autoalojados**: el contacto del operador publicado en ese sitio.
+
+---
+
+## Apéndice: glosario rápido
+
+| Término | Explicación en una frase |
+| --- | --- |
+| **El Servicio / instancia** | Toda la funcionalidad que se ejecuta en un despliegue de EpoCanvas Mail (aplicación web, API y componentes) |
+| **Operador** | Quien despliega y opera esa instancia: el «nosotros» de estos términos y la contraparte responsable de tus datos y tu uso |
+| **Alojado / autoalojado** | Alojado = `mail.epocanvas.com`, operado por el equipo de EpoCanvas; autoalojado = una instancia desplegada por ti o por un tercero |
+| **Tu contenido** | El correo, los adjuntos y el perfil que envías, recibes y subes; la propiedad y la responsabilidad son tuyas |
+| **Licencia de tratamiento** | El permiso técnico limitado que otorgas al operador para que el almacenamiento, la entrega, la búsqueda, las notificaciones y funciones similares funcionen (sección 5) |
+| **Política de uso aceptable** | Los límites de lo permitido y prohibido en la sección 4, con las consecuencias graduales de la sección 4.2 |
+| **Eliminación lógica / física** | Lógica = marcada como eliminada, recuperable por los administradores; física = retirada del almacenamiento junto con adjuntos e índice, irrecuperable |
+| **SLA** | Acuerdo de nivel de servicio (compromisos de disponibilidad y respuesta); este Servicio se ofrece con el máximo esfuerzo, sin SLA |
 
 ---
 

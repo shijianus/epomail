@@ -3,8 +3,6 @@ title: Servicevoorwaarden (Terms of Service)
 description: Servicevoorwaarden van EpoCanvas Mail — accountregels, grenzen van acceptabel gebruik, rechten op inhoud, garantieuitsluitingen en toelichting op de open-sourcelicentie die u moet kennen voordat u de maildienst gebruikt.
 ---
 
-# Servicevoorwaarden
-
 **Ingangsdatum: 27 september 2026　|　Versie: 1.0**
 
 Welkom bij EpoCanvas Mail (de "Dienst"). Deze voorwaarden vormen de overeenkomst tussen u en de beheerder van de Dienst over het gebruik ervan. Neem een paar minuten de tijd — we houden de taal zo eenvoudig mogelijk en zetten op één plek uiteen wat u mag doen, wat niet is toegestaan en wat er gebeurt als er iets misgaat.
@@ -15,7 +13,29 @@ Welkom bij EpoCanvas Mail (de "Dienst"). Deze voorwaarden vormen de overeenkomst
 - **De rode lijn**: geen spam, geen illegale inhoud, geen aanvallen op de dienst of anderen. Overtredingen kunnen leiden tot blokkades en verwijdering van het account.
 - **Uw mail is van u**: we verwerken haar alleen om te bezorgen en op te slaan. De prullenbak wordt 7 dagen na verwijdering fysiek geleegd — exporteer eerst voordat u vaarwel zegt.
 - **De Dienst wordt "as is" geleverd**: open-sourcesoftware, beschikbaarheid naar beste vermogen, geen service-level agreement (SLA).
+- **Onbekend woord?** Sla door naar de [Bijlage: beknopte woordenlijst](#bijlage-beknopte-woordenlijst) onderaan de pagina voor uitleg in gewone taal.
 :::
+
+## Op deze pagina
+
+1. [Toepassingsgebied en definities](#1-toepassingsgebied-en-definities)
+2. [Overzicht van de Dienst](#2-overzicht-van-de-dienst)
+3. [Accounts en beveiliging](#3-accounts-en-beveiliging)
+4. [Beleid voor acceptabel gebruik](#4-beleid-voor-acceptabel-gebruik)
+5. [Uw inhoud en licentie](#5-uw-inhoud-en-licentie)
+6. [Uitgaande bezorging en diensten van derden](#6-uitgaande-bezorging-en-diensten-van-derden)
+7. [Beschikbaarheid en veranderingen](#7-beschikbaarheid-en-veranderingen)
+8. [Bewaartermijnen en beëindiging van het account](#8-bewaartermijnen-en-beëindiging-van-het-account)
+9. [Overmacht](#9-overmacht)
+10. [Garantieuitsluiting (as-is)](#10-garantieuitsluiting-as-is)
+11. [Beperking van aansprakelijkheid](#11-beperking-van-aansprakelijkheid)
+12. [Schadeloosstelling](#12-schadeloosstelling)
+13. [Intellectueel eigendom en de open-sourcelicentie](#13-intellectueel-eigendom-en-de-open-sourcelicentie)
+14. [Voorwaarden voor zelfhostende beheerders](#14-voorwaarden-voor-zelfhostende-beheerders)
+15. [Wijzigingen in deze voorwaarden](#15-wijzigingen-in-deze-voorwaarden)
+16. [Neem contact op](#16-neem-contact-op)
+
+- [Bijlage: beknopte woordenlijst](#bijlage-beknopte-woordenlijst)
 
 ## 1. Toepassingsgebied en definities
 
@@ -23,6 +43,7 @@ Welkom bij EpoCanvas Mail (de "Dienst"). Deze voorwaarden vormen de overeenkomst
 - **"De beheerder / wij"**: de persoon of het team dat de instantie die u gebruikt heeft geïmplementeerd en beheert. Voor de gehoste instantie `mail.epocanvas.com` is dat het EpoCanvas-operationsteam; voor een zelfgehoste instantie is dat degene die haar heeft geïmplementeerd.
 - **"U"**: iedere natuurlijke persoon of organisatie die zich registreert, inlogt of de Dienst anderszins gebruikt.
 - **Dubbele toepasbaarheid**: EpoCanvas Mail is open-sourcesoftware en iedereen kan een eigen instantie draaien. Deze voorwaarden zijn een **algemene sjabloon**: gehoste instanties passen ze direct toe, en zelfhostende beheerders kunnen ze aanpassen als voorwaarden van hun site. Waar u ook registreert: u sluit de overeenkomst met de beheerder van die site.
+- **Aanvullende voorwaarden**: gebruikt u functies van derden (uitgaande bezorging, AI-vertaling, Telegram, Linux DO-aanmelding, enz.), dan gelden ook de voorwaarden van die derde (zie [sectie 6](#6-uitgaande-bezorging-en-diensten-van-derden)); privacyzaken vallen onder het [Privacybeleid](/nl/mail/privacy-policy/).
 
 ## 2. Overzicht van de Dienst
 
@@ -42,6 +63,7 @@ De Dienst omvat: beheer van meerdere mailboxen, interne en externe mail, bijlage
 4. **Bescherming van het inloggen**: 5 opeenvolgende wachtwoordfouten blokkeren het inloggen 12 uur; een account houdt maximaal 10 actieve sessies, en u kunt op elk apparaat uitloggen om het token direct in te trekken.
 5. **Gereserveerde namen**: identificatoren als `admin` zijn door het systeem gereserveerd en kunnen niet door gewone gebruikers worden geregistreerd.
 6. **Registratiesleutels**: beheerders kunnen de instantie instellen op registratie met een sleutel of registratie sluiten — dat is een eigen beheersrecht van de instantie.
+7. **Toelatingseisen**: u moet de minimumleeftijd uit sectie 11 van het [Privacybeleid](/nl/mail/privacy-policy/) hebben bereikt en zorgen dat uw registratie en gebruik binnen de wetten vallen die op u van toepassing zijn.
 
 ## 4. Beleid voor acceptabel gebruik
 
@@ -73,9 +95,9 @@ De Dienst omvat: beheer van meerdere mailboxen, interne en externe mail, bijlage
 
 Afhankelijk van de aard en ernst van de overtreding kan de beheerder: waarschuwen → functies beperken → in spamquarantaine plaatsen → het account opschorten → het account en alle gegevens fysiek verwijderen. Bij onwettig gedrag kan de beheerder noodzakelijk bewijs bewaren en met bevoegde autoriteiten meewerken. Als uw gedrag de beheerder een sanctie van Cloudflare of een upstream-provider oplevert, behoudt de beheerder zich het recht voor u daarop aan te spreken (zie sectie 12).
 
-### 4.3 Bezwaar
+### 4.3 Bezwaar en melden
 
-Meent u dat de maatregel onterecht is, neem dan via de kanalen in [sectie 16](#16-neem-contact-op) contact op met de beheerder; de beheerder heroordeert binnen een redelijke termijn en antwoordt.
+Meent u dat de maatregel onterecht is, neem dan via de kanalen in [sectie 16](#16-neem-contact-op) contact op met de beheerder; de beheerder heroordeert binnen een redelijke termijn en antwoordt. We stimuleren u ook om overtredingen van anderen of beveiligingsproblemen te melden (spambronnen, phishingspagina's, pogingen tot onbevoegde toegang): meldingen in goede trouw worden allemaal serieus behandeld; vermoedelijk illegale inhoud (boven alles seksueel misbruikmateriaal van kinderen) wordt volgens de wet bij de bevoegde autoriteiten gemeld.
 
 ## 5. Uw inhoud en licentie
 
@@ -95,6 +117,7 @@ Meent u dat de maatregel onterecht is, neem dan via de kanalen in [sectie 16](#1
 - **Beste inspanning, geen SLA**: de Dienst draait op de gratis of naar verbruik afgerekende edge-infrastructuur van Cloudflare. De beheerder doet redelijke moeite voor beschikbaarheid, maar belooft geen 100% uptime, bezorgtijden of hersteltermijnen.
 - **Ontwikkelende functies**: het open-sourceproject itereert snel; functies kunnen worden toegevoegd, gewijzigd of verwijderd. Wezenlijke veranderingen die gegevensverwijdering raken, worden vooraf aangekondigd.
 - **Onderhoud en onderbrekingen**: de beheerder kan deel of alles van de Dienst opschorten voor upgrades, fixes of misbruikhandhaving; onbeschikbaarheid veroorzaakt door Cloudflare of upstream AI-/bezorgproviders is geen tekortkoming van de beheerder.
+- **Experimentele functies**: functies met het label "experimenteel" of in testfase (zoals OCR-vertaling van afbeeldingen) worden "as is" geleverd, kunnen onstabiel zijn en kunnen op elk moment veranderen of verdwijnen — het risico om ze voor cruciaal werk te gebruiken is van u.
 
 ## 8. Bewaartermijnen en beëindiging van het account
 
@@ -136,13 +159,28 @@ Bent u de beheerder van een zelfgehoste instantie, dan geldt:
 
 ## 15. Wijzigingen in deze voorwaarden
 
-Deze voorwaarden kunnen worden herzien naarmate de Dienst zich ontwikkelt. Wezenlijke wijzigingen worden aangekondigd via een aankondiging op de site of systeemmail, met bijwerking van de ingangsdatum en versie bovenaan deze pagina. Blijvend gebruik van de Dienst na het ingaan van een wijziging geldt als acceptatie; bent u het oneens, stop dan met gebruik en exporteer of verwijder uw gegevens.
+Deze voorwaarden kunnen worden herzien naarmate de Dienst zich ontwikkelt. Wezenlijke wijzigingen worden aangekondigd via een aankondiging op de site of systeemmail, met bijwerking van de ingangsdatum en versie bovenaan deze pagina. Blijvend gebruik van de Dienst na het ingaan van een wijziging geldt als acceptatie; bent u het oneens, stop dan met gebruik en exporteer of verwijder uw gegevens. Eerdere grote herzieningen zijn gearchiveerd in de versiegeschiedenis van de open-sourcerepository en zijn op elk moment in te zien.
 
 ## 16. Neem contact op
 
 - **Gehoste instantie (`mail.epocanvas.com`)**: mail in het product of e-mail aan `admin@epocanvas.com`;
 - **Het open-sourceproject**: issues in de GitHub-repository;
 - **Zelfhostende sites**: de beheerdercontactgegevens gepubliceerd op die site.
+
+---
+
+## Bijlage: beknopte woordenlijst
+
+| Begrip | Uitleg in één zin |
+| --- | --- |
+| **De Dienst / instantie** | Alle functionaliteit die draait op één EpoCanvas Mail-implementatie (webapp, API en onderdelen) |
+| **Beheerder** | Wie die instantie implementeert en beheert — het "wij" van deze voorwaarden en de tegenpartij voor uw gegevens en gebruik |
+| **Gehost / zelfgehost** | Gehost = `mail.epocanvas.com`, beheerd door het EpoCanvas-team; zelfgehost = een instantie geïmplementeerd door u of een derde |
+| **Uw inhoud** | De mail, bijlagen en het profiel die u verstuurt, ontvangt en uploadt; eigendom en verantwoordelijkheid zijn van u |
+| **Verwerkingslicentie** | De beperkte technische toestemming die u de beheerder geeft zodat opslag, bezorging, zoeken, pushberichten en vergelijkbare functies werken (sectie 5) |
+| **Beleid voor acceptabel gebruik** | De grenzen van toegestaan en verboden gedrag in sectie 4, met de trapsmatige gevolgen van sectie 4.2 |
+| **Zachte / fysieke verwijdering** | Zacht = gemarkeerd als verwijderd, herstelbaar door beheerders; fysiek = samen met bijlagen en index uit de opslag verwijderd, onherstelbaar |
+| **SLA** | Service-level agreement (beschikbaarheids- en reactietoezeggingen); deze Dienst is best-effort, zonder SLA |
 
 ---
 

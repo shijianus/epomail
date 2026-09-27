@@ -3,8 +3,6 @@ title: Privacy Policy
 description: EpoCanvas Mail Privacy Policy — what we collect, how we use and protect your data, when and with which third parties it is shared, and what controls you have over it.
 ---
 
-# Privacy Policy
-
 **Effective date: September 27, 2026　|　Version: 1.0**
 
 EpoCanvas Mail (the "Service" or the "Software") is an **open-source email service** built on the Cloudflare stack (Workers, D1, KV, R2) and released under the MIT License. It can run as a public hosted mailbox site (for example `mail.epocanvas.com`) or be self-hosted by anyone as a private email service.
@@ -17,7 +15,30 @@ The purpose of this policy is simple: **to explain in plain language where your 
 - **Who is responsible**: the operator of the instance you use is the "data controller" of your data. EpoCanvas Mail, as open-source software, collects and uploads nothing by itself.
 - **You can always**: export all your email (JSON), delete messages and your account, enable two-factor authentication, and revoke third-party app grants.
 - **Third parties to know about**: when you click "Translate", email text is sent to the AI translation service your instance is configured with; when the operator enables outbound delivery, external mail is sent via Resend or Mailjet. See [Section 6](#6-third-party-services-and-data-sharing).
+- **Unfamiliar wording?**: jump to [Appendix B: Key terms](#appendix-b-key-terms) at the end — every term comes with a one-line plain-language explanation.
 :::
+
+## On this page
+
+1. [Who this policy applies to](#1-who-this-policy-applies-to)
+2. [Information we collect](#2-information-we-collect)
+3. [Where your data goes: one diagram](#3-where-your-data-goes-one-diagram)
+4. [How we use information](#4-how-we-use-information)
+5. [Storage, encryption, and security](#5-storage-encryption-and-security)
+6. [Third-party services and data sharing](#6-third-party-services-and-data-sharing)
+7. [AI features](#7-ai-features)
+8. [Retention and deletion](#8-retention-and-deletion)
+9. [Your controls and rights](#9-your-controls-and-rights)
+10. [Communications and notifications](#10-communications-and-notifications)
+11. [Children and minors](#11-children-and-minors)
+12. [International data transfers](#12-international-data-transfers)
+13. [Self-hosting operator guide](#13-self-hosting-operator-guide)
+14. [Changes to this policy](#14-changes-to-this-policy)
+15. [Contact us](#15-contact-us)
+
+- [Appendix A: relationship to the open-source project](#appendix-a-relationship-to-the-open-source-project)
+- [Appendix B: Key terms](#appendix-b-key-terms)
+- [Appendix C: Related resources](#appendix-c-related-resources)
 
 ## 1. Who this policy applies to
 
@@ -36,7 +57,7 @@ Self-hosters may adopt this policy directly as their site's privacy statement, r
 
 ## 2. Information we collect
 
-Grouped by how the information enters the system.
+Unlike most internet services, we want you to have the big picture before the details: this service **only collects what is strictly necessary to deliver your mail**, and deliberately stays away from everything the advertising ecosystem depends on. Grouped by how the information enters the system.
 
 ### 2.1 Information you provide
 
@@ -63,6 +84,7 @@ This list matters as much as the one above:
 - ❌ **No third-party analytics**: no Google Analytics, no Plausible, no event tracking of any kind.
 - ❌ **No data sales**: your data is never sold, rented, or traded for advertising — under any circumstances.
 - ❌ **No phone-home**: the open-source software never "reports back" instance data to the upstream authors or anyone else. Data on a deployment you run stays entirely inside your own Cloudflare account.
+- ❌ **No out-of-bounds collection**: the system never reads your device's contacts, photo library, location, or other apps' data; "technical information" is limited to the request- and session-related fields listed above.
 
 ## 3. Where your data goes: one diagram
 
@@ -72,6 +94,8 @@ This list matters as much as the one above:
 
 ## 4. How we use information
 
+We draw a boundary around every purpose — beyond core delivery, security, and features you trigger yourself, there are no other uses.
+
 | Purpose | Information relied on | Notes |
 | --- | --- | --- |
 | Delivering the mail service | Email address, message content, attachments | The core function; the service cannot work without it |
@@ -80,6 +104,7 @@ This list matters as much as the one above:
 | System announcements | Email address, language preference | Official welcome mail and site-wide announcements are delivered in your interface language |
 | Spam protection | Sender address, message content | Operators can configure blocklists and filter rules; the spam quarantine is auto-cleaned after 7 days |
 | Storage quota management | Attachment sizes, mailbox usage | Prevents a single user from exhausting shared resources |
+| Aggregate operational statistics | Aggregated send/receive counts | Only a whole-instance usage dashboard for the operator (daily volumes, block rates) — never used to profile any individual |
 
 We do **not** use your information for automated decision-making, profiling, or any commercial purpose unrelated to the Service.
 
@@ -112,6 +137,13 @@ The above is **server-side encryption at rest**: the keys are derived from envir
 
 ## 6. Third-party services and data sharing
 
+Following the practice of major providers, we group the situations in which data leaves the instance into four categories, so you can quickly judge the nature of every share:
+
+1. **Infrastructure processors** (always, in the background): Cloudflare provides the instance's runtime, storage, and network — the foundation everything rests on;
+2. **Operator-configured features** (triggered when you send): outbound delivery providers carry your mail to the outside world;
+3. **Features you trigger yourself** (only on your click): translation, image upload, Telegram linking, Linux DO sign-in;
+4. **Legal requirements**: only under due legal process (see the end of this section).
+
 Our principle: **data that does not need to leave, never leaves; and for data that must, the table below lists exactly which door it goes through and what it carries.**
 
 | Third party | Role | When triggered | What is shared |
@@ -127,6 +159,10 @@ Our principle: **data that does not need to leave, never leaves; and for data th
 
 :::tip[What "we don't sell data" concretely means]
 None of the parties above receives your data for advertising purposes, and we have no data-sale or ad-revenue arrangement with any of them. Some (such as Cloudflare and Resend) process data as "processors" on the operator's instructions, each governed by its own privacy policy (available on their websites).
+:::
+
+:::note[Legal requests and regulator cooperation]
+Unless compelled by law or served with a request under due legal process, the operator will not proactively disclose your data to third parties. When such a request arrives, the operator will verify its legality, disclose only the minimum the law requires, and notify you where legally permitted. Self-hosting operators should add their own commitments on cooperation with law enforcement for their jurisdiction.
 :::
 
 ## 7. AI features
@@ -149,6 +185,7 @@ The AI features are not connected to model training: the system does not use you
 | Mail of a deleted account | Self-service deactivation is a **soft delete**: mail stays in the database (technically recoverable) until an administrator physically deletes it; after a physical deletion, profile, mailboxes, messages, attachments, OAuth grants and sessions are removed for good |
 | Login records (IP/UA) | Kept in the user profile until the account is physically deleted |
 | Session tokens | Revoked server-side on sign-out; expire naturally after 30 days of inactivity |
+| If the instance shuts down | The operator should give advance notice and provide a window to export your data; after shutdown the data is destroyed along with the instance's Cloudflare resources (D1/KV/R2) and is not handed to unrelated third parties |
 
 :::caution[Export before you delete]
 Physical deletion is unrecoverable. To take your data with you, use "Settings → Data Export" first to download a JSON copy (your full profile and the complete bodies of all non-deleted messages).
@@ -166,7 +203,7 @@ Whatever jurisdiction you are in, the Service builds these self-service tools in
 - **Session management**: sign out on any device to revoke that device's token.
 - **Objection and opt-out**: turn Telegram push off, avoid AI transfers by never clicking Translate, or choose an instance without verification-code extraction.
 
-If your jurisdiction (EU/EEA, UK, California, etc.) grants you additional statutory rights (complaints, restriction of processing, etc.), contact the instance operator to exercise them; the operator is obliged to respond within statutory deadlines.
+If your jurisdiction (EU/EEA, UK, California, etc.) grants you additional statutory rights (complaints, restriction of processing, etc.), contact the instance operator to exercise them; the operator is obliged to respond within statutory deadlines. On response times, our commitment is: **self-service actions in the interface (export, deletion, revoking grants, sign-out) take effect immediately**; requests that need human handling (such as physical deletion) will be answered and completed within **30 days**. If you are unsatisfied with the outcome, you also have the right to lodge a complaint with your local data protection authority.
 
 ## 10. Communications and notifications
 
@@ -193,6 +230,8 @@ If you have deployed EpoCanvas Mail under your own domain, then legally and fact
 
 This policy may be updated as features evolve. Material changes (a new third party, changed retention, a changed encryption mode, etc.) will be announced in advance via in-site announcement or system mail, with the "Effective date" and version number updated at the top of this page. Continued use after an update constitutes acceptance; if you disagree after a material change, you may stop using the Service and export or delete your data.
 
+Following industry practice, **history does not vanish**: every major revision of this policy is archived in the open-source repository's version history, where you can retrieve and compare any earlier full text at any time; self-hosting operators are encouraged to keep the same archiving habit on their own docs.
+
 ## 15. Contact us
 
 - **Hosted instance (`mail.epocanvas.com`)**: contact the operator via in-product mail or email: `admin@epocanvas.com`.
@@ -202,3 +241,29 @@ This policy may be updated as features evolve. Material changes (a new third par
 ## Appendix A: relationship to the open-source project
 
 EpoCanvas Mail is built on and continues as an open-source project released under the MIT License. The upstream original project was created by **eoao** (Copyright (c) 2025 eoao) — thanks to upstream and all contributors. This policy was written by the EpoCanvas community and is released in the same open spirit: **any operator of an EpoCanvas Mail instance may freely adopt and adapt this text** (MIT spirit, no attribution required), though we recommend keeping the self-hosting statement in Section 13 to preserve the same transparency toward your users.
+
+## Appendix B: Key terms
+
+We avoid jargon wherever possible; when a technical term is unavoidable, read it through the plain-language definitions below.
+
+| Term | One-line explanation |
+| --- | --- |
+| **Account** | Your identity on an instance, identified by your email address; the password is stored only as a one-way hash nobody can reverse |
+| **Instance (site)** | One deployment of EpoCanvas Mail running inside a person's or team's Cloudflare account — for example `mail.epocanvas.com` or a site your company hosts |
+| **Operator** | The person or team who deployed and runs the instance; the "data controller" for your data, i.e. the "we" of this policy |
+| **Data controller / processor** | The party deciding "why collect and how to use" is the controller (the operator); the party processing data on its instructions is the processor (e.g. Cloudflare, Resend) |
+| **Content data** | The bodies, subjects, and attachments of the mail you send and receive, plus the labels, stars, and read states you apply |
+| **Technical data** | IP address, browser User-Agent, device type, sign-in times and similar fields recorded automatically for operation and security |
+| **localStorage (web storage)** | A browser mechanism for storing web data on your device across sessions; this service's sign-in token lives there rather than in cookies |
+| **Session token (JWT)** | The "pass" issued after sign-in — valid 30 days, at most 10 concurrent sessions per account, revoked on sign-out |
+| **PBKDF2** | A password-hashing algorithm; this service applies 100,000 salted iterations so the original password cannot be derived from the database |
+| **Encryption at rest** | Encryption applied when data is written to disk; this service's keys are derived from server environment variables, so an operator controlling the server and keys can technically decrypt |
+| **End-to-end encryption (E2EE)** | Encryption where only the sender and recipient can decrypt; this service **does not provide it** — if you need that strength, encrypt the body yourself with GPG or similar before sending |
+| **Telemetry** | A software behavior that automatically reports usage data back to its developers; EpoCanvas Mail has zero telemetry and reports no instance data upstream |
+
+## Appendix C: Related resources
+
+- **The Terms of Service**: together with this policy they form the complete agreement between you and the operator (see the site navigation or the [Terms of Service](/en/mail/terms-of-service/)).
+- **The open-source repository**: `github.com/shijianus/epomail` — source-code audits, issue feedback, and the full version history of this policy's text.
+- **The product site**: `mail.epocanvas.com` — sign in, register, and use the Service.
+- **Further reading**: the official Cloudflare documentation for [D1](https://developers.cloudflare.com/d1/), [KV](https://developers.cloudflare.com/kv/), [R2](https://developers.cloudflare.com/r2/), and [Workers AI](https://developers.cloudflare.com/workers-ai/) explains how the infrastructure processes data.
