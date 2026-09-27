@@ -1307,7 +1307,7 @@ function changeStar() {
 }
 
 const handleBack = () => {
-  emailStore.contentData.email = null
+  emailStore.closeEmail()
 }
 
 const handleDelete = () => {

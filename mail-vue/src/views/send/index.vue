@@ -56,11 +56,12 @@ function changeTimeSort() {
 }
 
 function jumpContent(email) {
-  emailStore.contentData.email = email
-  emailStore.contentData.delType = 'logic'
-  emailStore.contentData.showStar = true
-  emailStore.contentData.showReply = true
-  // router.push('/message')
+  emailStore.openEmail(email, {
+    delType: 'logic',
+    showStar: true,
+    showReply: true,
+    routeName: 'send'
+  });
 }
 
 function addStar(email) {

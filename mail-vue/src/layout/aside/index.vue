@@ -14,7 +14,7 @@
 
         <!-- Mail Menu -->
         <div class="nav-section" @keydown.enter.prevent="$event.target.click()">
-          <div class="nav-item" role="button" tabindex="0" @click="router.push({name: 'email'})" :class="route.name === 'email' ? 'active' : ''" :title="$t('inbox')">
+          <div class="nav-item" role="button" tabindex="0" @click="handleNav('email', '/inbox')" :class="isNavActive('email') ? 'active' : ''" :title="$t('inbox')">
             <span class="nav-ic-wrap">
               <Icon icon="hugeicons:mailbox-01" width="20" height="20" />
               <div class="sidebar-red-dot" v-if="unreadCount > 0"></div>
@@ -22,7 +22,7 @@
             <span class="nav-label">{{$t('inbox')}}</span>
             <span class="nav-count" v-if="unreadCount > 0">{{ unreadCount }}</span>
           </div>
-          <div class="nav-item" role="button" tabindex="0" @click="router.push({name: 'star'})" :class="route.name === 'star' ? 'active' : ''" :title="$t('starred')">
+          <div class="nav-item" role="button" tabindex="0" @click="handleNav('star', '/starred')" :class="isNavActive('star') ? 'active' : ''" :title="$t('starred')">
             <span class="nav-ic-wrap">
               <Icon icon="solar:star-line-duotone" width="20" height="20" />
               <div class="sidebar-red-dot" v-if="starCount > 0"></div>
@@ -30,7 +30,7 @@
             <span class="nav-label">{{$t('starred')}}</span>
             <span class="nav-count" v-if="starCount > 0">{{ starCount }}</span>
           </div>
-          <div class="nav-item" role="button" tabindex="0" @click="router.push({name: 'snoozed'})" :class="route.name === 'snoozed' ? 'active' : ''" :title="$t('snoozed') || 'Snoozed'">
+          <div class="nav-item" role="button" tabindex="0" @click="handleNav('snoozed', '/snoozed')" :class="isNavActive('snoozed') ? 'active' : ''" :title="$t('snoozed') || 'Snoozed'">
             <span class="nav-ic-wrap">
               <Icon icon="ic:outline-access-time" width="20" height="20" />
               <div class="sidebar-red-dot" v-if="urgentSnoozedCount > 0"></div>
@@ -40,7 +40,7 @@
             <span class="nav-count" v-if="urgentSnoozedCount > 0">{{ urgentSnoozedCount }}</span>
             <span class="nav-count muted" v-else-if="waitingSnoozedCount > 0">{{ waitingSnoozedCount }}</span>
           </div>
-          <div class="nav-item" role="button" tabindex="0" @click="router.push({name: 'send'})" :class="route.name === 'send' ? 'active' : ''" :title="$t('sent')">
+          <div class="nav-item" role="button" tabindex="0" @click="handleNav('send', '/sent')" :class="isNavActive('send') ? 'active' : ''" :title="$t('sent')">
             <span class="nav-ic-wrap">
               <Icon icon="cil:send" width="20" height="20" />
               <div class="sidebar-gray-dot" v-if="sendCount > 0"></div>
@@ -48,7 +48,7 @@
             <span class="nav-label">{{$t('sent')}}</span>
             <span class="nav-count muted" v-if="sendCount > 0">{{ sendCount }}</span>
           </div>
-          <div class="nav-item" role="button" tabindex="0" @click="router.push({name: 'draft'})" :class="route.name === 'draft' ? 'active' : ''" :title="$t('drafts')">
+          <div class="nav-item" role="button" tabindex="0" @click="handleNav('draft', '/drafts')" :class="isNavActive('draft') ? 'active' : ''" :title="$t('drafts')">
             <span class="nav-ic-wrap">
               <Icon icon="ep:document" width="20" height="20" />
               <div class="sidebar-gray-dot" v-if="draftCount > 0"></div>
@@ -56,7 +56,7 @@
             <span class="nav-label">{{$t('drafts')}}</span>
             <span class="nav-count muted" v-if="draftCount > 0">{{ draftCount }}</span>
           </div>
-          <div class="nav-item" role="button" tabindex="0" @click="router.push({name: 'user-all-email'})" :class="route.name === 'user-all-email' ? 'active' : ''" :title="$t('allMail')">
+          <div class="nav-item" role="button" tabindex="0" @click="handleNav('user-all-email', '/all')" :class="isNavActive('user-all-email') ? 'active' : ''" :title="$t('allMail')">
             <span class="nav-ic-wrap">
               <Icon icon="mdi:email-multiple-outline" width="22" height="22" />
               <div class="sidebar-gray-dot" v-if="allMailCount > 0"></div>
@@ -64,7 +64,7 @@
             <span class="nav-label">{{$t('allMail')}}</span>
             <span class="nav-count muted" v-if="allMailCount > 0">{{ allMailCount }}</span>
           </div>
-          <div class="nav-item" role="button" tabindex="0" @click="router.push({name: 'spam'})" :class="route.name === 'spam' ? 'active' : ''" :title="$t('spam') || 'Spam'">
+          <div class="nav-item" role="button" tabindex="0" @click="handleNav('spam', '/spam')" :class="isNavActive('spam') ? 'active' : ''" :title="$t('spam') || 'Spam'">
             <span class="nav-ic-wrap">
               <Icon icon="ic:outline-report-gmailerrorred" width="20" height="20" />
               <div class="sidebar-gray-dot" v-if="spamCount > 0"></div>
@@ -74,7 +74,7 @@
             <span class="nav-count muted" v-if="spamCount > 0">{{ spamCount }}</span>
             <span class="nav-count muted" v-else-if="spamReadCount > 0">{{ spamReadCount }}</span>
           </div>
-          <div class="nav-item" role="button" tabindex="0" @click="router.push({name: 'trash'})" :class="route.name === 'trash' ? 'active' : ''" :title="$t('trash') || 'Trash'">
+          <div class="nav-item" role="button" tabindex="0" @click="handleNav('trash', '/trash')" :class="isNavActive('trash') ? 'active' : ''" :title="$t('trash') || 'Trash'">
             <span class="nav-ic-wrap">
               <Icon icon="ic:outline-delete" width="20" height="20" />
               <div class="sidebar-gray-dot" v-if="trashCount > 0"></div>
@@ -188,10 +188,61 @@ const handleAddLabel = () => {
   }
 };
 
+const handleNav = (targetName, targetPath) => {
+  // 1. Clear selected email so we return to pure list
+  emailStore.contentData.email = null;
+
+  // 2. Clear search keyword when navigating to standard folders
+  if (emailStore.searchKeyword) {
+    emailStore.searchKeyword = '';
+  }
+
+  // 3. Close drawer on mobile/tablet
+  if (window.innerWidth < 1025) {
+    uiStore.asideShow = false;
+  }
+
+  // 4. Route transition or refresh
+  if (route.name === targetName) {
+    if (route.params.mailId) {
+      router.push({ name: targetName, params: { mailId: '' } });
+    } else {
+      // Already on pure list: refresh email list (matching Gmail UX)
+      const scrollInst = emailStore.emailScroll?.value || emailStore.emailScroll;
+      if (scrollInst?.refreshList) {
+        scrollInst.refreshList();
+      }
+    }
+  } else {
+    router.push({ name: targetName, params: { mailId: '' } });
+  }
+};
+
 const handleLabelClick = (label) => {
   const labelName = label.name || label;
+  emailStore.contentData.email = null;
   emailStore.searchKeyword = `label:"${labelName}"`;
-  router.push({ name: 'user-all-email' });
+  if (window.innerWidth < 1025) {
+    uiStore.asideShow = false;
+  }
+  if (route.name === 'user-all-email') {
+    if (route.params.mailId) {
+      router.push({ name: 'user-all-email', params: { mailId: '' } });
+    } else {
+      const scrollInst = emailStore.emailScroll?.value || emailStore.emailScroll;
+      if (scrollInst?.refreshList) scrollInst.refreshList();
+    }
+  } else {
+    router.push({ name: 'user-all-email', params: { mailId: '' } });
+  }
+};
+
+const isNavActive = (targetName) => {
+  if (targetName === 'user-all-email') {
+    const kw = emailStore.searchKeyword || '';
+    return route.name === 'user-all-email' && !kw.includes('label:');
+  }
+  return route.name === targetName;
 };
 
 const isLabelActive = (label) => {
@@ -200,6 +251,7 @@ const isLabelActive = (label) => {
   const keyword = emailStore.searchKeyword || '';
   return keyword.includes(`label:"${labelName}"`);
 };
+
 
 const isMobile = ref(window.innerWidth < 1025)
 const handleResize = () => {

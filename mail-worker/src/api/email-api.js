@@ -90,3 +90,16 @@ app.get('/email/searchSuggestions', async (c) => {
 	const data = await emailService.searchSuggestions(c, c.req.query(), userContext.getUserId(c));
 	return c.json(result.ok(data));
 });
+
+app.get('/email/get', async (c) => {
+	const emailId = Number(c.req.query('emailId'));
+	if (!emailId) {
+		return c.json(result.fail('Missing emailId'));
+	}
+	const emailRow = await emailService.selectById(c, emailId, userContext.getUserId(c), true);
+	if (!emailRow) {
+		return c.json(result.fail('Email not found'));
+	}
+	return c.json(result.ok(emailRow));
+});
+

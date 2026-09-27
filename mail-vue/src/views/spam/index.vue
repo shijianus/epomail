@@ -66,12 +66,13 @@ function changeTimeSort() {
 }
 
 function jumpContent(email) {
-  emailStore.contentData.email = email
-  emailStore.contentData.delType = 'logic'
-  emailStore.contentData.showUnread = true
-  emailStore.contentData.showStar = true
-  emailStore.contentData.showReply = true
-  // router.push('/message')
+  emailStore.openEmail(email, {
+    delType: 'logic',
+    showUnread: true,
+    showStar: true,
+    showReply: true,
+    routeName: 'spam'
+  });
 }
 
 const existIds = new Set();

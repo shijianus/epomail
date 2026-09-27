@@ -1691,18 +1691,33 @@ const emailService = {
 		return result;
 	},
 
-	async selectById(c, emailId, expectedUserId = null) {
+	async selectById(c, emailId, expectedUserId = null, includeDel = false) {
 		const conditions = [
-			eq(email.emailId, emailId),
-			eq(email.isDel, isDel.NORMAL)
+			eq(email.emailId, emailId)
 		];
+		if (!includeDel) {
+			conditions.push(eq(email.isDel, isDel.NORMAL));
+		}
 		if (expectedUserId !== null && expectedUserId !== undefined) {
 			conditions.push(eq(email.userId, expectedUserId));
 		}
-		let emailRow = await orm(c).select().from(email).where(
-			and(...conditions))
+		let emailRow = await orm(c)
+			.select({
+				...email,
+				starId: star.starId
+			})
+			.from(email)
+			.leftJoin(
+				star,
+				and(
+					eq(star.emailId, email.emailId),
+					eq(star.userId, expectedUserId || email.userId)
+				)
+			)
+			.where(and(...conditions))
 			.get();
 		if (emailRow) {
+			emailRow.isStar = emailRow.starId != null ? 1 : 0;
 			if (emailRow.userId) {
 				const cryptoKey = await emailCryptoUtils.getUserEmailCryptoKey(c.env, emailRow.userId);
 				emailRow = await emailCryptoUtils.decryptEmailRecord(emailRow, cryptoKey);
@@ -1730,6 +1745,7 @@ const emailService = {
 				}
 				emailRow.expireDays = settingData.welcomeExpireDays ?? 7;
 			}
+			await this.emailAddAtt(c, [emailRow]);
 		}
 		return emailRow;
 	},

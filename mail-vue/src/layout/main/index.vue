@@ -113,6 +113,8 @@ import { hasPerm } from "@/perm/perm.js"
 import { Icon } from "@iconify/vue"
 import router from "@/router/index.js"
 import { getWallpaperCssById } from '@/utils/theme-presets.js'
+import { emailGet } from '@/request/email.js'
+
 
 const settingStore = useSettingStore()
 const uiStore = useUiStore();
@@ -148,10 +150,95 @@ const wallpaperStyle = computed(() => {
     '--panel-alpha': `${uiStore.themeWallpaperOpacity || 88}%`
   }
 })
+let isSyncing = false;
 
-watch(() => route.path, () => {
-  emailStore.contentData.email = null
-})
+async function syncEmailFromRoute(mailId) {
+  if (isSyncing) return;
+  isSyncing = true;
+  try {
+    if (!mailId) {
+      if (emailStore.contentData.email) {
+        emailStore.contentData.email = null;
+      }
+      return;
+    }
+
+    // If already showing this exact email, no-op
+    if (emailStore.contentData.email && String(emailStore.contentData.email.emailId) === String(mailId)) {
+      return;
+    }
+
+    // 1. Check if email is already in loaded list
+    const scrollList = emailStore.emailScroll?.value?.emailList || emailStore.emailScroll?.emailList;
+    if (Array.isArray(scrollList) && scrollList.length > 0) {
+      const found = scrollList.find(item => String(item.emailId) === String(mailId));
+      if (found) {
+        emailStore.contentData.email = found;
+        emailStore.contentData.delType = 'logic';
+        emailStore.contentData.showUnread = true;
+        emailStore.contentData.showStar = true;
+        emailStore.contentData.showReply = true;
+        return;
+      }
+    }
+
+    // 2. Fetch email from API
+    const res = await emailGet(mailId);
+    const emailItem = res?.emailId ? res : res?.data;
+    if (emailItem && emailItem.emailId) {
+      emailStore.contentData.email = emailItem;
+      emailStore.contentData.delType = 'logic';
+      emailStore.contentData.showUnread = true;
+      emailStore.contentData.showStar = true;
+      emailStore.contentData.showReply = true;
+    } else {
+      if (route.params.mailId) {
+        router.replace({ name: route.name, params: { mailId: '' }, query: route.query });
+      }
+    }
+  } catch (err) {
+    console.error('Failed to sync email from route:', err);
+    if (route.params.mailId) {
+      router.replace({ name: route.name, params: { mailId: '' }, query: route.query });
+    }
+  } finally {
+    isSyncing = false;
+  }
+}
+
+// Watch for mailId changes in route
+watch(
+  () => route.params.mailId,
+  (newMailId, oldMailId) => {
+    if (newMailId !== oldMailId) {
+      syncEmailFromRoute(newMailId);
+    }
+  },
+  { immediate: true }
+);
+
+// Watch for route name changes (e.g. switching between folders)
+watch(
+  () => route.name,
+  (newRoute, oldRoute) => {
+    if (newRoute !== oldRoute) {
+      if (!route.params.mailId && emailStore.contentData.email) {
+        emailStore.contentData.email = null;
+      }
+    }
+  }
+);
+
+// Watch for email closure (Back button, Delete, Snooze, Report Spam, Archive)
+watch(
+  () => emailStore.contentData.email,
+  (newEmail) => {
+    if (!newEmail && route.params?.mailId) {
+      router.push({ name: route.name, params: { mailId: '' }, query: route.query });
+    }
+  }
+);
+
 
 watch(() => uiStore.changeNotice, () => {
 

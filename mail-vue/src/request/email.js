@@ -63,3 +63,8 @@ export function emailAnalytics() {
 export function emailSidebarStats() {
     return http.get('/email/sidebarStats', { noMsg: true })
 }
+
+export function emailGet(emailId) {
+    return http.get('/email/get', { params: { emailId } })
+}
+

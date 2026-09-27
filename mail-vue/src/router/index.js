@@ -12,7 +12,7 @@ const routes = [
         component: () => import('@/layout/index.vue'),
         children: [
             {
-                path: '/inbox',
+                path: '/inbox/:mailId?',
                 name: 'email',
                 component: () => import('@/views/email/index.vue'),
                 meta: {
@@ -22,7 +22,7 @@ const routes = [
                 }
             },
             {
-                path: '/all',
+                path: '/all/:mailId?',
                 name: 'user-all-email',
                 component: () => import('@/views/all/index.vue'),
                 meta: {
@@ -121,7 +121,7 @@ const routes = [
                 }
             },
             {
-                path: '/sent',
+                path: '/sent/:mailId?',
                 name: 'send',
                 component: () => import('@/views/send/index.vue'),
                 meta: {
@@ -131,7 +131,7 @@ const routes = [
                 }
             },
             {
-                path: '/drafts',
+                path: '/drafts/:mailId?',
                 name: 'draft',
                 component: () => import('@/views/draft/index.vue'),
                 meta: {
@@ -141,7 +141,7 @@ const routes = [
                 }
             },
             {
-                path: '/starred',
+                path: '/starred/:mailId?',
                 name: 'star',
                 component: () => import('@/views/star/index.vue'),
                 meta: {
@@ -151,7 +151,7 @@ const routes = [
                 }
             },
             {
-                path: '/snoozed',
+                path: '/snoozed/:mailId?',
                 name: 'snoozed',
                 component: () => import('@/views/snoozed/index.vue'),
                 meta: {
@@ -161,7 +161,7 @@ const routes = [
                 }
             },
             {
-                path: '/spam',
+                path: '/spam/:mailId?',
                 name: 'spam',
                 component: () => import('@/views/spam/index.vue'),
                 meta: {
@@ -171,7 +171,7 @@ const routes = [
                 }
             },
             {
-                path: '/trash',
+                path: '/trash/:mailId?',
                 name: 'trash',
                 component: () => import('@/views/trash/index.vue'),
                 meta: {

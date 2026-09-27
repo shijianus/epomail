@@ -39,7 +39,7 @@
                         :key="keyCount"
         >
           <template #default="{ data: item, index }" >
-            <div :class="['email-row', props.type, 'density-' + (uiStore.density || 'default')]"
+            <div :class="['email-row', props.type, 'density-' + (uiStore.density || 'default'), { 'is-selected': emailStore.contentData.email?.emailId === item.emailId }]"
                  :data-checked="item.checked"
                  @click="jumpDetails(item)"
                  v-if="!item.expand"
@@ -1461,6 +1461,10 @@ function loadData() {
 
     @media (pointer: coarse) {
       user-select: none;
+    }
+    &.is-selected {
+      background: var(--email-hover-background, rgba(2, 132, 199, 0.08)) !important;
+      box-shadow: inset 3px 0 0 0 var(--el-color-primary, #0284c7);
     }
     &.density-compact {
       padding: 0 12px !important;

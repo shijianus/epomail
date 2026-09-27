@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { emailSidebarStats } from '@/request/email.js'
+import router from '@/router/index.js'
 
 export const useEmailStore = defineStore('email', {
     state: () => ({
@@ -20,6 +21,35 @@ export const useEmailStore = defineStore('email', {
         sidebarStats: {},
     }),
     actions: {
+        openEmail(email, { delType = 'logic', showUnread = true, showStar = true, showReply = true, routeName = null } = {}) {
+            this.contentData.email = email;
+            this.contentData.delType = delType;
+            this.contentData.showUnread = showUnread;
+            this.contentData.showStar = showStar;
+            this.contentData.showReply = showReply;
+            if (email && email.emailId) {
+                const cur = router.currentRoute.value;
+                const targetName = routeName || cur.name;
+                if (cur.params?.mailId != email.emailId) {
+                    router.push({
+                        name: targetName,
+                        params: { mailId: email.emailId },
+                        query: cur.query
+                    });
+                }
+            }
+        },
+        closeEmail() {
+            this.contentData.email = null;
+            const cur = router.currentRoute.value;
+            if (cur.params?.mailId) {
+                router.push({
+                    name: cur.name,
+                    params: { mailId: '' },
+                    query: cur.query
+                });
+            }
+        },
         async refreshSidebarStats() {
             try {
                 const data = await emailSidebarStats()
