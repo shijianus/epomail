@@ -10,6 +10,44 @@
 
 ---
 
+### 头像卡片极致精简重构：对齐 Outlook 左右布局、极简存储卡片与 preview.html 并列卡片范式 (2026-09-27)
+*   **关联提交 (Git Commit)**: `2c2061202a6f68c4fdf98f8471a3c5959a7ea494` (Short: `2c20612`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com / epomail.epocanvas.workers.dev)` (Version ID: `3b5f5c68-7673-4d3d-969a-50d6aaf3f42f`，100% 流量) + `本地全真栈`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] Outlook 范式紧凑 Hero 区块重构 (`mail-vue/src/layout/header/index.vue`):
+        - 彻底重构居中大块垂直单列，改为「左侧 48px 头像 + 右侧名称、紧随其后的身份徽章、邮箱地址与点击复制」的水平紧凑结构；
+        - 下方居中排列「管理您的 Epomail 账户」胶囊药丸按钮；
+        - 维护纯粹独立品牌体验，不包含任何外部品牌字样。
+    - [x] 极简存储用量监控 (`mail-vue/src/layout/header/index.vue`):
+        - 彻底清理卡片底部原冗长的管理侧技术政策说明（2% 系统保留、95% 垃圾桶清理、98% 暂停接收等文案全部移至法务弹窗）；
+        - 精简保留：云朵图标 +「存储空间」+ 数值比（如 `0.00 MB / 5 MB`）+ 色彩阶梯百分比药丸；
+        - 7px 轨道保留 6 阶动态色彩与 2% 应急斜纹缓冲区，零视觉噪音。
+    - [x] 容器尺寸与 el-scrollbar 精准收缩 (`mail-vue/src/layout/header/index.vue`):
+        - 宽度由 424px 优化为 360px（对标 preview.html 经典尺寸），去除强制 min-height；
+        - `el-scrollbar` 高度设为 `auto`，随内容自然紧凑收缩，彻底解决此前卡片过于庞大的问题。
+    - [x] 学习 preview.html 范式操作卡片 (`mail-vue/src/layout/header/index.vue`):
+        - 单账户模式：单行双格圆角并列卡片容器（设定 + 退出），hover 状态与分割线优雅对齐；
+        - 多账户模式：账户列表卡片 + 双格并列卡片（添加其他账户 + 退出登录）。
+    - [x] 服务条款与隐私政策合规说明完备:
+        - 将技术配额规则与数据保护声明完好封装于弹窗中，底栏外联指示符交互顺畅。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：mail-vue `vite build` 13.09s 零警告零报错构建成功；
+    - [x] 静态多语言审计：`node scripts/i18n-symmetry.mjs` (2054 键 100% 严格对称)；
+    - [x] 静态代码引用审计：`node scripts/i18n-audit.mjs` (1587 处字面量引用零缺失)；
+    - [x] 部署上线：推送到 Cloudflare Workers 生产环境 (Version ID: `3b5f5c68-7673-4d3d-969a-50d6aaf3f42f`)；
+    - [x] 独立子代理 (Subagent `1faf1c38-851c-4a90-abc8-346c3b171fd0`) 客观全真端到端核验：
+        - 运行 `tests/test-gmail-avatar-dropdown-prod-e2e.mjs` 直连生产环境 `https://mail.epocanvas.com`；
+        - 全部 29/29 项生产端到端断言 100% 通过（0 失败，0 告警）；
+        - 实测卡片尺寸精准：`width: 360.0px, borderRadius: 24px`；
+        - 审查 3 张生产验收截屏：
+          - `tests/verify_gmail_avatar_dropdown_open.png`（360px 宽度、Outlook 左右结构 Hero、极简存储卡片、并列卡片操作区）
+          - `tests/verify_gmail_avatar_terms_dialog.png`（服务条款弹窗）
+          - `tests/verify_gmail_avatar_privacy_dialog.png`（隐私政策弹窗）
+        - 独立审计官结论：正式准予交付验收 (VERIFIED & ACCEPTED)；
+    - [x] 零假数据残留：测试全量使用合法只读探针，零临时数据残留。
+
+---
+
 ### Gmail 级 424px 头像卡片、存储阶梯色彩、2%预留机制与服务条款/隐私政策外联体系 (2026-09-27)
 *   **关联提交 (Git Commit)**: `3dc503dc4fb8f588a0648ee30e89e1e4c7745ded` (Short: `3dc503d`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com / epomail.epocanvas.workers.dev)` (Version ID: `8302eff4-66e1-45d7-857a-77802dad30be`，100% 流量) + `本地全真栈`
