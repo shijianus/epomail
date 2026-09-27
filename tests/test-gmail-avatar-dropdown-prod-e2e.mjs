@@ -73,21 +73,27 @@ async function run() {
     const dropdown = page.locator('.detail-dropdown, .gmail-account-card').first();
     ok(await dropdown.isVisible(), '头像下拉卡片成功展开呈现');
 
-    // 3. 核验容器尺寸与样式对齐 Gmail
-    console.log('\n[步骤 4] 核验卡片物理尺寸与 Gmail 样式属性...');
+    // 3. 核验容器尺寸与精致紧凑排版
+    console.log('\n[步骤 4] 核验卡片物理尺寸与精致排版属性...');
     const box = await dropdown.boundingBox();
-    ok(box && box.width >= 400 && box.width <= 430, `卡片宽度符合 Gmail 424px 规范 (实测: ${box?.width?.toFixed(1)}px)`);
+    ok(box && box.width >= 350 && box.width <= 375, `卡片宽度符合 360px 精致紧凑规范 (实测: ${box?.width?.toFixed(1)}px)`);
 
     const borderRadius = await page.evaluate(() => {
       const el = document.querySelector('.detail-dropdown');
       return el ? window.getComputedStyle(el).borderRadius : '';
     });
-    ok(borderRadius === '24px', `卡片采用现代 Bento/Gmail 24px 圆角 (实测: ${borderRadius})`);
+    ok(borderRadius === '24px', `卡片采用现代 Bento 24px 圆角 (实测: ${borderRadius})`);
 
-    // 4. 核验 Hero 个人资料区块
-    console.log('\n[步骤 5] 核验 Hero 资料区块 (大头像、姓名、邮箱复制、身份徽章、管理账户胶囊)...');
+    // 4. 核验 Hero 个人资料区块 (Outlook 范式: 左头像 + 右名称/身份/邮箱, 下方管理账户胶囊)
+    console.log('\n[步骤 5] 核验 Hero 资料区块 (左侧头像、右侧名称与身份徽章、邮箱复制、管理账户胶囊)...');
     const heroAvatar = page.locator('.gac-hero-section .gac-avatar');
-    ok(await heroAvatar.isVisible(), 'Hero 大尺寸渐变头像渲染正常');
+    ok(await heroAvatar.isVisible(), 'Hero 头像渲染正常');
+
+    const heroName = page.locator('.gac-hero-section .gac-name');
+    ok(await heroName.isVisible(), '用户名称在右侧顶部正常呈现');
+
+    const roleBadge = page.locator('.gac-hero-section .gac-role-badge');
+    ok(await roleBadge.isVisible(), '用户身份组徽章紧跟在名称后呈现');
 
     const heroEmail = page.locator('.gac-hero-section .gac-email');
     const emailText = await heroEmail.innerText();
@@ -100,10 +106,10 @@ async function run() {
     ok(await page.locator('.el-message--success').first().isVisible(), '点击邮箱弹出成功提示浮层 (ElMessage)');
 
     const manageBtn = page.locator('.gac-manage-btn');
-    ok(await manageBtn.isVisible(), '「管理您的账户」胶囊按钮可见');
+    ok(await manageBtn.isVisible(), '「管理您的 Epomail 账户」胶囊按钮可见');
 
-    // 5. 核验创新存储用量进度条与 2% 预留机制
-    console.log('\n[步骤 6] 核验创新存储用量卡片、色彩阶梯与 2% 预留机制...');
+    // 5. 核验创新存储用量进度条与 2% 预留机制 (极简设计，无多余管理侧冗长文案)
+    console.log('\n[步骤 6] 核验创新存储用量卡片、色彩阶梯与 2% 预留机制 (极简纯净，无多余说辞)...');
     const storageCard = page.locator('.gac-storage-card');
     ok(await storageCard.isVisible(), '存储空间用量卡片就绪');
 
@@ -124,12 +130,12 @@ async function run() {
     console.log(`  -> 当前进度条填充宽度: ${fillStyle.width}, 颜色值: ${fillStyle.bg}`);
     ok(!!fillStyle.bg, `进度条填充已应用阶梯色彩: ${fillStyle.bg}`);
 
-    const noticeText = await page.locator('.sc-notice').innerText();
-    ok(noticeText.includes('保留 2%') || noticeText.includes('自动清理') || noticeText.includes('95%') || noticeText.includes('98%'),
-      `系统保护提示文本就绪: "${noticeText}"`);
+    const redundantNotice = page.locator('.gac-storage-card .sc-notice');
+    ok((await redundantNotice.count()) === 0, '存储卡片已移除多余的管理侧说明文案，保持纯粹简洁');
 
-    const manageStorageLink = page.locator('.sc-manage-link');
-    ok(await manageStorageLink.isVisible(), '「管理存储」跳转链接可见');
+    // 核验并列卡片式动作按钮组 (学习 preview.html 范式: 设定 + 退出登录)
+    const cardActions = page.locator('.gac-card-actions');
+    ok(await cardActions.isVisible(), '并列卡片式动作按钮容器 (设定 + 退出) 可见');
 
     // 6. 核验多账户模式默认关闭与接口保留
     console.log('\n[步骤 7] 核验多账户模式默认处于关闭状态 (保持纯粹单账户视图)...');

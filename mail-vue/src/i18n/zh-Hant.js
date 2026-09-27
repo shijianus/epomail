@@ -2047,7 +2047,7 @@ totpModeAllDesc: '設定是否允許使用者使用TOTP，開啟後使用者可�
     confirmBlockSenderMsg: '確定要將發件人 "{sender}" 加入黑名單並自動攔截其後續來信嗎？',
     copyAddressSuccess: '已複製郵箱地址',
     // ── Gmail 規範頭像下拉框與儲存配額 ──
-    manageAccount: '管理您的帳戶',
+    manageAccount: '管理您的 Epomail 帳戶',
     storageSpace: '儲存空間',
     reservedSpaceNotice: '系統保留 2% 空間（95% 自動清理垃圾桶，98% 暫停接收郵件）',
     reservedSpaceBadge: '2% 預留',

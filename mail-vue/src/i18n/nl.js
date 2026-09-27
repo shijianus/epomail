@@ -2047,7 +2047,7 @@ totpModeAllDesc: 'Instellen of gebruikers TOTP mogen gebruiken. Eenmaal ingescha
     confirmBlockSenderMsg: 'Weet u zeker dat u afzender "{sender}" wilt blokkeren en inkomende berichten wilt filteren?',
     copyAddressSuccess: 'E-mailadres gekopieerd',
     // ── Gmail standard avatar dropdown and storage quota ──
-    manageAccount: 'Je account beheren',
+    manageAccount: 'Beheer je Epomail-account',
     storageSpace: 'Opslagruimte',
     reservedSpaceNotice: 'Systeem reserveert 2% buffer (Prullenbak geleegd bij 95%, ontvangst gepauzeerd bij 98%)',
     reservedSpaceBadge: '2% Gereserveerd',

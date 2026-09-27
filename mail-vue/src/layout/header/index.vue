@@ -83,45 +83,52 @@
           <div class="user-details account-menu open gmail-account-card" @mouseenter="clearCloseTimer" @mouseleave="startCloseTimer">
             <!-- Top Header Action (Close Button) -->
             <div class="gac-top-bar">
+              <div class="gac-top-spacer"></div>
               <button class="gac-close-btn" :aria-label="$t('close')" @click="closeDropdown">
                 <Icon icon="lucide:x" width="16" height="16" />
               </button>
             </div>
 
-            <!-- Profile Info Hero Block -->
+            <!-- Profile Info Hero Block (Outlook/Gmail hybrid: Left Avatar, Right Name/Role/Email, Below Manage Button) -->
             <div class="gac-hero-section">
-              <div class="gac-avatar-wrap">
-                <div class="gac-avatar">{{ formatName(displayEmail) }}</div>
-              </div>
-              <div class="gac-name">{{ accountStore.currentAccount?.name || userStore.user?.name || '' }}</div>
-              <div class="gac-email-row" @click="copyEmail(displayEmail)" :title="$t('copy')">
-                <span class="gac-email">{{ displayEmail }}</span>
-                <Icon v-if="copiedEmail" icon="lucide:check" width="13" height="13" class="copy-ic text-success" />
-                <Icon v-else icon="lucide:copy" width="13" height="13" class="copy-ic" />
-              </div>
-              <div class="gac-role-badge">
-                <span class="status-dot"></span>
-                <span>{{ localizedRoleName }}</span>
+              <div class="gac-profile-row">
+                <div class="gac-avatar-wrap">
+                  <div class="gac-avatar">{{ formatName(displayEmail) }}</div>
+                </div>
+                <div class="gac-profile-meta">
+                  <div class="gac-name-line">
+                    <span class="gac-name" :title="accountStore.currentAccount?.name || userStore.user?.name || ''">
+                      {{ accountStore.currentAccount?.name || userStore.user?.name || displayEmail }}
+                    </span>
+                    <span class="gac-role-badge">
+                      <span class="status-dot"></span>
+                      <span>{{ localizedRoleName }}</span>
+                    </span>
+                  </div>
+                  <div class="gac-email-row" @click="copyEmail(displayEmail)" :title="$t('copy')">
+                    <span class="gac-email">{{ displayEmail }}</span>
+                    <Icon v-if="copiedEmail" icon="lucide:check" width="13" height="13" class="copy-ic text-success" />
+                    <Icon v-else icon="lucide:copy" width="13" height="13" class="copy-ic" />
+                  </div>
+                </div>
               </div>
 
-              <!-- Manage Account Pill Button (Gmail classic) -->
+              <!-- Manage Account Pill Button (Kept intact) -->
               <div class="gac-manage-btn" @click="openAccountDetails">
-                <Icon icon="lucide:user" width="14" height="14" />
+                <Icon icon="lucide:user-cog" width="14" height="14" />
                 <span>{{ $t('manageAccount') }}</span>
               </div>
             </div>
 
-            <!-- Storage Usage Card (创新存储用量进度条与阶梯色彩) -->
+            <!-- Storage Usage Card (创新存储用量进度条与阶梯色彩，去除多余管理侧冗长文案) -->
             <div class="gac-storage-card">
               <div class="gac-sc-header">
                 <div class="sc-title-group">
-                  <Icon icon="lucide:hard-drive" width="15" height="15" class="sc-icon" />
+                  <Icon icon="lucide:cloud" width="14" height="14" class="sc-icon" />
                   <span class="sc-title">{{ $t('storageSpace') }}</span>
                 </div>
                 <div class="sc-val-group">
-                  <span class="sc-used">{{ storageData.usedMb }} MB</span>
-                  <span class="sc-sep">/</span>
-                  <span class="sc-total">{{ storageData.quotaDisplay }}</span>
+                  <span class="sc-used">{{ storageData.usedMb }} MB / {{ storageData.quotaDisplay }}</span>
                   <span class="sc-pct-pill" :style="{ backgroundColor: storageProgressColor + '20', color: storageProgressColor }">
                     {{ storageData.usedPercentage }}%
                   </span>
@@ -129,7 +136,7 @@
               </div>
 
               <!-- Innovative Progress Bar Track with 2% Reserved Zone -->
-              <div class="gac-progress-track" :title="$t('reservedSpaceNotice')">
+              <div class="gac-progress-track">
                 <div 
                   class="gac-progress-fill" 
                   :style="{ 
@@ -139,32 +146,12 @@
                 ></div>
                 <!-- 2% Reserved Buffer Zone Marker -->
                 <div class="gac-progress-reserved-zone">
-                  <div class="gac-reserved-marker" :title="$t('reservedSpaceBadge') + ': ' + $t('reservedSpaceNotice')"></div>
-                </div>
-              </div>
-
-              <!-- Notice and Quick Jump -->
-              <div class="gac-sc-footer">
-                <div class="sc-notice" v-if="storageData.usedPercentage >= 98" style="color: #ef4444;">
-                  <Icon icon="lucide:alert-triangle" width="13" height="13" />
-                  <span>{{ $t('storageFullWarning') }}</span>
-                </div>
-                <div class="sc-notice" v-else-if="storageData.usedPercentage >= 95" style="color: #f97316;">
-                  <Icon icon="lucide:alert-circle" width="13" height="13" />
-                  <span>{{ $t('trashCleanupWarning') }}</span>
-                </div>
-                <div class="sc-notice" v-else>
-                  <Icon icon="lucide:info" width="13" height="13" />
-                  <span>{{ $t('reservedSpaceNotice') }}</span>
-                </div>
-                <div class="sc-manage-link" @click="openStorageSettings">
-                  <span>{{ $t('manageStorage') }}</span>
-                  <Icon icon="lucide:chevron-right" width="12" height="12" />
+                  <div class="gac-reserved-marker"></div>
                 </div>
               </div>
             </div>
 
-            <!-- Multi-Account Box (默认关闭，管理员开启后完全学习 Gmail 方框模式) -->
+            <!-- Multi-Account Box & Action Buttons Container (学习 preview.html 经典圆角卡片分列范式) -->
             <div v-if="isMultiAccountEnabled" class="gac-multi-account-section">
               <div class="gac-ma-card">
                 <div class="gac-ma-item active">
@@ -175,26 +162,32 @@
                   </div>
                   <Icon icon="lucide:check" width="16" height="16" class="gac-ma-check" />
                 </div>
-                <!-- Add Another Account Row (Gmail Box Pattern) -->
-                <div class="gac-ma-item add-account-item" @click="openAddAccountDialog">
-                  <div class="gac-ma-add-icon">
-                    <Icon icon="lucide:user-plus" width="17" height="17" />
-                  </div>
-                  <div class="gac-ma-add-text">{{ $t('addAnotherAccount') }}</div>
-                </div>
+              </div>
+
+              <div class="gac-card-actions">
+                <button class="gac-card-action-btn add-btn" @click="openAddAccountDialog">
+                  <Icon icon="lucide:user-plus" width="16" height="16" />
+                  <span>{{ $t('addAnotherAccount') }}</span>
+                </button>
+                <div class="gac-card-action-divider"></div>
+                <button class="gac-card-action-btn signout-btn" @click="clickLogout">
+                  <Icon icon="lucide:log-out" width="16" height="16" />
+                  <span>{{ $t('logOut') }}</span>
+                </button>
               </div>
             </div>
 
-            <!-- Quick Action Options -->
-            <div class="gac-actions-section">
-              <div class="gac-action-item" @click="openSettings">
-                <Icon icon="lucide:settings" width="15" height="15" />
+            <!-- Single Account Mode Action Buttons Container (设定 + 退出并列卡片) -->
+            <div v-else class="gac-card-actions">
+              <button class="gac-card-action-btn" @click="openSettings">
+                <Icon icon="lucide:settings" width="16" height="16" />
                 <span>{{ $t('settings') }}</span>
-              </div>
-              <div class="gac-action-item logout" @click="clickLogout">
-                <Icon icon="lucide:log-out" width="15" height="15" />
+              </button>
+              <div class="gac-card-action-divider"></div>
+              <button class="gac-card-action-btn signout-btn" @click="clickLogout">
+                <Icon icon="lucide:log-out" width="16" height="16" />
                 <span>{{ $t('logOut') }}</span>
-              </div>
+              </button>
             </div>
 
             <!-- Footer: Legal Links (隐私政策 · 服务条款) -->
@@ -1105,18 +1098,16 @@ function formatName(email) {
 
 </script>
 <style>
-/* Gmail Standard Avatar Dropdown Popper */
+/* Gmail/Outlook Standard Avatar Dropdown Popper */
 .detail-dropdown {
-  width: 424px !important;
-  max-width: calc(-8px + 100vw) !important;
-  max-height: calc(100dvh - 81px) !important;
-  min-height: 210px !important;
+  width: 360px !important;
+  max-width: calc(-16px + 100vw) !important;
   background: var(--bg-surface) !important;
   border: 1px solid var(--border-mid) !important;
   border-radius: 24px !important;
   padding: 0 !important;
   overflow: hidden !important;
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.24), 0 4px 16px rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.16), 0 4px 12px rgba(0, 0, 0, 0.06) !important;
   z-index: 3000 !important;
   backdrop-filter: blur(20px) !important;
   -webkit-backdrop-filter: blur(20px) !important;
@@ -1126,11 +1117,13 @@ function formatName(email) {
   width: 100% !important;
 }
 .detail-dropdown .el-scrollbar {
+  height: auto !important;
+  max-height: calc(100dvh - 80px) !important;
   overflow: hidden !important;
 }
 .detail-dropdown .el-scrollbar__wrap {
   overflow-x: hidden !important;
-  max-height: calc(100dvh - 81px) !important;
+  max-height: calc(100dvh - 80px) !important;
 }
 .detail-dropdown .el-scrollbar__bar {
   display: none !important;
@@ -1139,10 +1132,10 @@ function formatName(email) {
   display: none !important;
 }
 
-/* Gmail Account Card Inner Styles */
+/* Gmail/Outlook Account Card Inner Styles */
 .gmail-account-card {
   width: 100%;
-  max-width: 424px;
+  max-width: 360px;
   background: var(--bg-surface);
   color: var(--text-primary);
   display: flex;
@@ -1152,12 +1145,16 @@ function formatName(email) {
 
 .gac-top-bar {
   display: flex;
-  justify-content: flex-end;
-  padding: 12px 14px 0;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px 2px;
+}
+.gac-top-spacer {
+  width: 28px;
 }
 .gac-close-btn {
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   border: none;
   background: transparent;
@@ -1173,103 +1170,141 @@ function formatName(email) {
   color: var(--text-primary);
 }
 
+/* Outlook/Gmail hybrid Hero Section: Left Avatar, Right Name/Role/Email */
 .gac-hero-section {
   display: flex;
   flex-direction: column;
+  padding: 2px 16px 12px;
+  box-sizing: border-box;
+}
+.gac-profile-row {
+  display: flex;
   align-items: center;
-  padding: 2px 20px 14px;
-  text-align: center;
+  gap: 12px;
 }
 .gac-avatar-wrap {
-  margin-bottom: 10px;
+  flex-shrink: 0;
 }
 .gac-avatar {
-  width: 68px;
-  height: 68px;
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
   background: linear-gradient(135deg, #6366f1, #8b5cf6);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 26px;
+  font-size: 20px;
   font-weight: 700;
   color: #fff;
-  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.35);
-  border: 3px solid rgba(255, 255, 255, 0.25);
+  box-shadow: 0 2px 10px rgba(99, 102, 241, 0.25);
+  border: 2px solid rgba(255, 255, 255, 0.2);
+}
+.gac-profile-meta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.gac-name-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
 }
 .gac-name {
-  font-size: 16px;
+  font-size: 14.5px;
   font-weight: 700;
   color: var(--text-primary);
   line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gac-role-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 7px;
+  border-radius: 9999px;
+  background: var(--bg-hover);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+.gac-role-badge .status-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #10b981;
 }
 .gac-email-row {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  font-size: 13px;
+  gap: 5px;
+  font-size: 12.5px;
   color: var(--text-secondary);
-  margin-top: 3px;
   cursor: pointer;
-  padding: 2px 8px;
-  border-radius: 6px;
+  padding: 1px 4px;
+  border-radius: 4px;
+  margin-left: -4px;
   transition: background .15s ease, color .15s ease;
+  width: fit-content;
+  max-width: 100%;
 }
 .gac-email-row:hover {
   background: var(--bg-hover);
   color: var(--accent-primary);
 }
+.gac-email {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .gac-email-row .copy-ic {
   opacity: 0.65;
+  flex-shrink: 0;
 }
 .gac-email-row:hover .copy-ic {
   opacity: 1;
 }
-.gac-role-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 6px;
-  padding: 3px 10px;
-  border-radius: 9999px;
-  background: var(--bg-hover);
-  font-size: 11.5px;
-  font-weight: 500;
-  color: var(--text-secondary);
-}
 .gac-manage-btn {
-  margin-top: 12px;
-  padding: 7px 20px;
+  margin-top: 10px;
+  width: 100%;
+  height: 32px;
   border-radius: 9999px;
   border: 1px solid var(--border-mid);
   background: var(--bg-surface);
   color: var(--text-primary);
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: center;
+  gap: 6px;
   transition: all .2s ease;
+  box-sizing: border-box;
 }
 .gac-manage-btn:hover {
   background: var(--bg-hover);
   border-color: var(--accent-primary);
   color: var(--accent-primary);
-  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.15);
-  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.12);
 }
 
 /* Storage Card */
 .gac-storage-card {
-  margin: 6px 16px 12px;
-  padding: 12px 14px;
+  margin: 0 14px 10px;
+  padding: 10px 12px;
   background: var(--bg-subtle);
   border: 1px solid var(--border-subtle);
-  border-radius: 16px;
+  border-radius: 14px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 7px;
 }
 .gac-sc-header {
   display: flex;
@@ -1279,39 +1314,30 @@ function formatName(email) {
 .sc-title-group {
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 12.5px;
+  gap: 5px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--text-primary);
 }
 .sc-val-group {
   display: flex;
   align-items: center;
-  gap: 4px;
-  font-size: 12px;
+  gap: 5px;
+  font-size: 11.5px;
 }
 .sc-used {
-  font-weight: 600;
-  color: var(--text-primary);
-}
-.sc-sep {
-  color: var(--text-muted);
-}
-.sc-total {
+  font-weight: 500;
   color: var(--text-secondary);
 }
 .sc-pct-pill {
-  margin-left: 6px;
-  padding: 1px 7px;
-  border-radius: 10px;
+  padding: 1px 6px;
+  border-radius: 8px;
   font-size: 11px;
   font-weight: 700;
 }
-
-/* Innovative Progress Bar Track with 2% Reserved Zone */
 .gac-progress-track {
-  height: 10px;
-  border-radius: 6px;
+  height: 7px;
+  border-radius: 4px;
   background: rgba(120, 130, 150, 0.16);
   position: relative;
   overflow: hidden;
@@ -1320,7 +1346,7 @@ function formatName(email) {
 }
 .gac-progress-fill {
   height: 100%;
-  border-radius: 6px 0 0 6px;
+  border-radius: 4px 0 0 4px;
   transition: width .4s cubic-bezier(0.4, 0, 0.2, 1), background-color .3s ease;
 }
 .gac-progress-reserved-zone {
@@ -1329,7 +1355,7 @@ function formatName(email) {
   top: 0;
   bottom: 0;
   width: 2%;
-  min-width: 5px;
+  min-width: 4px;
   background: repeating-linear-gradient(45deg, rgba(148, 163, 184, 0.4), rgba(148, 163, 184, 0.4) 2px, transparent 2px, transparent 4px);
   border-left: 1px dashed rgba(148, 163, 184, 0.8);
 }
@@ -1338,71 +1364,74 @@ function formatName(email) {
   height: 100%;
 }
 
-.gac-sc-footer {
+/* Card Buttons Container (preview.html Gmail style) */
+.gac-card-actions {
+  margin: 0 14px 10px;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 11.5px;
-  gap: 8px;
-}
-.sc-notice {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  color: var(--text-muted);
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  flex: 1;
 }
-.sc-manage-link {
+.gac-card-action-btn {
+  flex: 1;
   display: flex;
   align-items: center;
-  gap: 2px;
-  color: var(--accent-primary);
+  justify-content: center;
+  gap: 6px;
+  padding: 9px 0;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 13px;
   font-weight: 500;
   cursor: pointer;
-  white-space: nowrap;
-  transition: opacity .15s ease;
+  transition: background .15s ease, color .15s ease;
 }
-.sc-manage-link:hover {
-  opacity: 0.8;
-  text-decoration: underline;
+.gac-card-action-btn:hover {
+  background: var(--bg-hover);
+}
+.gac-card-action-btn.signout-btn:hover {
+  color: var(--danger);
+  background: rgba(239, 68, 68, 0.08);
+}
+.gac-card-action-divider {
+  width: 1px;
+  background: var(--border-subtle);
+  align-self: stretch;
 }
 
-/* Multi-Account Box (Gmail Pattern) */
+/* Multi-Account Box */
 .gac-multi-account-section {
-  padding: 0 16px 12px;
+  display: flex;
+  flex-direction: column;
 }
 .gac-ma-card {
+  margin: 0 14px 8px;
   border: 1px solid var(--border-mid);
-  border-radius: 16px;
+  border-radius: 14px;
   overflow: hidden;
   background: var(--bg-surface);
 }
 .gac-ma-item {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 14px;
+  gap: 10px;
+  padding: 8px 12px;
   cursor: pointer;
   transition: background .15s ease;
-  border-bottom: 1px solid var(--border-subtle);
-}
-.gac-ma-item:last-child {
-  border-bottom: none;
 }
 .gac-ma-item:hover {
   background: var(--bg-hover);
 }
 .gac-ma-avatar {
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
   background: linear-gradient(135deg, #6366f1, #8b5cf6);
   color: #fff;
   font-weight: 700;
-  font-size: 13px;
+  font-size: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1410,16 +1439,19 @@ function formatName(email) {
 }
 .gac-ma-info {
   flex: 1;
-  overflow: hidden;
+  min-width: 0;
   text-align: left;
 }
 .gac-ma-name {
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 600;
   color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .gac-ma-email {
-  font-size: 11.5px;
+  font-size: 11px;
   color: var(--text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1427,64 +1459,19 @@ function formatName(email) {
 }
 .gac-ma-check {
   color: var(--success);
-}
-.gac-ma-item.add-account-item {
-  color: var(--text-primary);
-}
-.gac-ma-add-icon {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: var(--bg-hover);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--accent-primary);
   flex-shrink: 0;
-}
-.gac-ma-add-text {
-  font-size: 13px;
-  font-weight: 500;
-}
-
-/* Quick Action Options */
-.gac-actions-section {
-  display: flex;
-  flex-direction: column;
-  padding: 0 16px 10px;
-  gap: 3px;
-}
-.gac-action-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 9px 14px;
-  border-radius: 12px;
-  font-size: 13.5px;
-  font-weight: 500;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: all .15s ease;
-}
-.gac-action-item:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
-}
-.gac-action-item.logout:hover {
-  color: var(--danger);
-  background: rgba(239, 68, 68, 0.08);
 }
 
 /* Footer Legal Links */
 .gac-footer {
   border-top: 1px solid var(--border-subtle);
   background: var(--bg-subtle);
-  padding: 11px 16px;
+  padding: 8px 14px 9px;
   display: flex;
   justify-content: center;
   align-items: center;
   gap: 8px;
-  font-size: 12px;
+  font-size: 11.5px;
   color: var(--text-muted);
 }
 .gac-legal-link {

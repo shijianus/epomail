@@ -2047,7 +2047,7 @@ totpModeAllDesc: 'Configurar si los usuarios pueden usar TOTP. Al activarlo, la 
     confirmBlockSenderMsg: '¿Seguro que deseas bloquear al remitente "{sender}" y filtrar sus mensajes entrantes?',
     copyAddressSuccess: 'Dirección de correo copiada',
     // ── Gmail standard avatar dropdown and storage quota ──
-    manageAccount: 'Gestionar tu cuenta',
+    manageAccount: 'Gestionar tu cuenta de Epomail',
     storageSpace: 'Espacio de almacenamiento',
     reservedSpaceNotice: 'El sistema reserva un búfer del 2% (Papelera vaciada al 95%, correos pausados al 98%)',
     reservedSpaceBadge: '2% Reservado',

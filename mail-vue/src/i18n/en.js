@@ -2047,7 +2047,7 @@ totpModeAllDesc: 'Configure whether users can use TOTP. When enabled, 2FA is ava
     confirmBlockSenderMsg: 'Are you sure you want to block sender "{sender}" and automatically filter incoming messages?',
     copyAddressSuccess: 'Email address copied',
     // ── Gmail standard avatar dropdown and storage quota ──
-    manageAccount: 'Manage your Account',
+    manageAccount: 'Manage your Epomail Account',
     storageSpace: 'Storage',
     reservedSpaceNotice: 'System reserves 2% buffer (Trash auto-cleaned at 95%, inbound mail paused at 98%)',
     reservedSpaceBadge: '2% Reserved',
