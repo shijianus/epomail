@@ -2046,6 +2046,22 @@ totpModeAllDesc: 'Instellen of gebruikers TOTP mogen gebruiken. Eenmaal ingescha
     confirmBlockSenderTitle: 'Afzender blokkeren',
     confirmBlockSenderMsg: 'Weet u zeker dat u afzender "{sender}" wilt blokkeren en inkomende berichten wilt filteren?',
     copyAddressSuccess: 'E-mailadres gekopieerd',
+    // ── Gmail standard avatar dropdown and storage quota ──
+    manageAccount: 'Je account beheren',
+    storageSpace: 'Opslagruimte',
+    reservedSpaceNotice: 'Systeem reserveert 2% buffer (Prullenbak geleegd bij 95%, ontvangst gepauzeerd bij 98%)',
+    reservedSpaceBadge: '2% Gereserveerd',
+    manageStorage: 'Opslag beheren',
+    addAnotherAccount: 'Nog een account toevoegen',
+    signOutAllAccounts: 'Uitloggen bij alle accounts',
+    privacyPolicy: 'Privacybeleid',
+    termsOfService: 'Servicevoorwaarden',
+    trashCleanupWarning: 'Opslag bereikte 95%, het systeem leegt de prullenbak automatisch',
+    storageFullWarning: 'Opslag bereikte 98%, ontvangst gepauzeerd met 2% buffer gereserveerd',
+    termsDialogTitle: 'Epocanvas Mail Servicevoorwaarden',
+    privacyDialogTitle: 'Epocanvas Mail Privacybeleid',
+    multiAccountEnabledLabel: 'Multi-account snelle wisselmodus',
+    multiAccountEnabledDesc: 'Uitgelijnd met Gmail-stijl accountvak, voor snel inloggen en schakelen tussen meerdere accounts.',
 };
 
 export default nl;

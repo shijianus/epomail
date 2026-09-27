@@ -2046,6 +2046,22 @@ totpModeAllDesc: 'Configure whether users can use TOTP. When enabled, 2FA is ava
     confirmBlockSenderTitle: 'Block Sender',
     confirmBlockSenderMsg: 'Are you sure you want to block sender "{sender}" and automatically filter incoming messages?',
     copyAddressSuccess: 'Email address copied',
+    // ── Gmail standard avatar dropdown and storage quota ──
+    manageAccount: 'Manage your Account',
+    storageSpace: 'Storage',
+    reservedSpaceNotice: 'System reserves 2% buffer (Trash auto-cleaned at 95%, inbound mail paused at 98%)',
+    reservedSpaceBadge: '2% Reserved',
+    manageStorage: 'Manage storage',
+    addAnotherAccount: 'Add another account',
+    signOutAllAccounts: 'Sign out of all accounts',
+    privacyPolicy: 'Privacy Policy',
+    termsOfService: 'Terms of Service',
+    trashCleanupWarning: 'Storage reached 95%, system will automatically purge trash to free up space',
+    storageFullWarning: 'Storage reached 98%, inbound emails paused with 2% space reserved',
+    termsDialogTitle: 'Epocanvas Mail Terms of Service',
+    privacyDialogTitle: 'Epocanvas Mail Privacy Policy',
+    multiAccountEnabledLabel: 'Multi-Account Fast Switch Mode',
+    multiAccountEnabledDesc: 'Aligns with Gmail box account adding pattern, allowing fast sign-in and switching between multiple accounts.',
 };
 
 export default en;

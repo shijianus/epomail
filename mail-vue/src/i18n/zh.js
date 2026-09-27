@@ -2046,6 +2046,22 @@ totpModeAllDesc: '设置是否允许用户使用TOTP，开启后用户可以且�
     confirmBlockSenderTitle: '拉黑发件人',
     confirmBlockSenderMsg: '确定要将发件人 "{sender}" 加入黑名单并自动拦截其后续来信吗？',
     copyAddressSuccess: '已复制邮箱地址',
+    // ── Gmail 规范头像下拉框与存储配额 ──
+    manageAccount: '管理您的账户',
+    storageSpace: '存储空间',
+    reservedSpaceNotice: '系统保留 2% 空间（95% 自动清理垃圾桶，98% 暂停接收邮件）',
+    reservedSpaceBadge: '2% 预留',
+    manageStorage: '管理存储',
+    addAnotherAccount: '添加其他账户',
+    signOutAllAccounts: '退出所有账户',
+    privacyPolicy: '隐私政策',
+    termsOfService: '服务条款',
+    trashCleanupWarning: '存储用量已达 95%，系统将自动清理垃圾桶以释放空间',
+    storageFullWarning: '存储用量已达 98%，已暂停接收新邮件并保留 2% 空间',
+    termsDialogTitle: 'Epocanvas Mail 服务条款',
+    privacyDialogTitle: 'Epocanvas Mail 隐私政策',
+    multiAccountEnabledLabel: '多账户快速切换模式',
+    multiAccountEnabledDesc: '完全对齐 Gmail 方框添加账户交互体系，支持在同一浏览器下快速登录并切换多个独立账号。',
 };
 
 export default zh;

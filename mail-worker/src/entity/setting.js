@@ -90,7 +90,10 @@ export const setting = sqliteTable('setting', {
 	externalDbTarget: text('external_db_target').default('mail').notNull(),
 	attachmentPolicy: integer('attachment_policy').default(0).notNull(),
 	attachmentMaxSizeMb: integer('attachment_max_size_mb').default(25).notNull(),
-	attachmentCascadeDelete: integer('attachment_cascade_delete').default(1).notNull()
+	attachmentCascadeDelete: integer('attachment_cascade_delete').default(1).notNull(),
+	multiAccountEnabled: integer('multi_account_enabled').default(0).notNull(),
+	termsUrl: text('terms_url').default('').notNull(),
+	privacyUrl: text('privacy_url').default('').notNull()
 });
 export default setting
 

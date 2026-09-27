@@ -30,7 +30,10 @@ const settingService = {
 				{ name: 'ai_admin_only', sql: `ALTER TABLE setting ADD COLUMN ai_admin_only INTEGER NOT NULL DEFAULT 0;` },
 				{ name: 'welcome_templates', sql: `ALTER TABLE setting ADD COLUMN welcome_templates TEXT NOT NULL DEFAULT '{}';` },
 				{ name: 'welcome_lang', sql: `ALTER TABLE setting ADD COLUMN welcome_lang TEXT NOT NULL DEFAULT 'zh';` },
-				{ name: 'global_email_config', sql: `ALTER TABLE setting ADD COLUMN global_email_config TEXT NOT NULL DEFAULT '{}';` }
+				{ name: 'global_email_config', sql: `ALTER TABLE setting ADD COLUMN global_email_config TEXT NOT NULL DEFAULT '{}';` },
+				{ name: 'multi_account_enabled', sql: `ALTER TABLE setting ADD COLUMN multi_account_enabled INTEGER NOT NULL DEFAULT 0;` },
+				{ name: 'terms_url', sql: `ALTER TABLE setting ADD COLUMN terms_url TEXT NOT NULL DEFAULT '';` },
+				{ name: 'privacy_url', sql: `ALTER TABLE setting ADD COLUMN privacy_url TEXT NOT NULL DEFAULT '';` }
 			];
 
 			let existingCols = new Set();
@@ -803,7 +806,10 @@ const settingService = {
 			docsUrl: (c.env.DOCS_URL || settingRow.docsUrl || 'https://docs.epocanvas.com/epomail').replace(/\/+$/, ''),
 			supportUrl: (c.env.SUPPORT_URL || settingRow.supportUrl || 'https://blog.epocanvas.com/support').replace(/\/+$/, ''),
 			telegramLink: (c.env.TELEGRAM_LINK || settingRow.telegramLink || 'https://t.me/epomail').replace(/\/+$/, ''),
-			githubLink: (c.env.GITHUB_LINK || settingRow.githubLink || 'https://github.com/shijianus/epomail').replace(/\/+$/, '')
+			githubLink: (c.env.GITHUB_LINK || settingRow.githubLink || 'https://github.com/shijianus/epomail').replace(/\/+$/, ''),
+			multiAccountEnabled: settingRow.multiAccountEnabled ?? 0,
+			termsUrl: settingRow.termsUrl || '',
+			privacyUrl: settingRow.privacyUrl || ''
 		};
 	},
 

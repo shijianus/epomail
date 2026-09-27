@@ -114,6 +114,19 @@
 
               <div class="setting-item">
                 <div class="title-item">
+                  <span>{{ $t('multiAccountEnabledLabel') }}</span>
+                  <el-tooltip effect="dark" :content="$t('multiAccountEnabledDesc')">
+                    <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+                  </el-tooltip>
+                </div>
+                <div>
+                  <el-switch @change="(val) => changeField('multiAccountEnabled', val)" :before-change="beforeChange" :active-value="1" :inactive-value="0"
+                             v-model="setting.multiAccountEnabled"/>
+                </div>
+              </div>
+
+              <div class="setting-item">
+                <div class="title-item">
                   <span>{{ $t('emailPrefix') }}</span>
                   <el-tooltip effect="dark" :content="$t('emailPrefixDesc')">
                     <Icon class="warning" icon="fe:warning" width="18" height="18"/>
