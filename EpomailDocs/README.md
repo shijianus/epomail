@@ -1,6 +1,6 @@
 # EpomailDocs · EpoCanvas Mail 法律文档（隐私政策与服务条款）
 
-本目录是 **EpoCanvas Mail** 的官方法律文档源文件，包含完整的《隐私政策》（Privacy Policy）与《服务条款》（Terms of Service），**完全对齐 EpoCanvasDocs（`Desktop/EpoCanvasDocs`，即 docs.epocanvas.com 的 Astro 5 + Starlight 文档站）的文档主题与 i18n 目录约定**，可直接落入任何 Starlight 站点（包括 EpoCanvasDocs 本体）渲染上线。
+本目录是 **EpoCanvas Mail** 的官方法律文档站，包含完整的《隐私政策》（Privacy Policy）与《服务条款》（Terms of Service），**完全对齐 EpoCanvasDocs（`Desktop/EpoCanvasDocs`，即 docs.epocanvas.com 的 Astro 5 + Starlight 文档站）的文档主题与 i18n 目录约定**，并且本身就是一个**可直接构建的 Astro 5 + Starlight 站点**（本地已通过 build + 浏览器全语言视觉验证），也可整体并入 EpoCanvasDocs 渲染上线。
 
 - 产品定位：基于 Cloudflare Workers / D1 / KV / R2 的开源（MIT）自托管邮箱服务
 - 托管实例：[mail.epocanvas.com](https://mail.epocanvas.com)
@@ -29,7 +29,21 @@
 
 两图为暗色底（`#0b0f19`）+ Slate 卡片 + 靛蓝/琥珀/翠绿/紫罗兰渐变强调条，与 EpoCanvasDocs `docs-architecture.svg` 系列同一视觉语言；图片统一走站点绝对路径 `/images/mail/…`，由 `public/` 目录提供。
 
-## 如何接入 Starlight 主题渲染上线
+## 本地构建与检视（已验证）
+
+本目录自带完整的 Astro 5 + Starlight 站点骨架（`astro.config.mjs` / `src/content.config.ts` / `src/styles/custom.css` / `public/favicon.svg`），开箱即可构建：
+
+```bash
+cd EpomailDocs
+pnpm install        # 安装依赖（astro ^5 / @astrojs/starlight ^0.32）
+pnpm build          # 产物输出至 dist/（6 语言 12 页 + Pagefind 全文搜索索引）
+pnpm preview        # 本地检视 http://localhost:4321/
+node scripts/validate-anchors.cjs   # 校验 dist 内全部页内锚点与图片引用（当前 294 锚点 0 断链）
+```
+
+构建时 Starlight 会按 Git 提交历史生成「最后更新于」时间戳；`custom.css` 沿用 EpoCanvasDocs 的靛蓝 `#2563eb` 设计变量与侧栏激活态样式，明暗双主题自动适配。部署到正式域名时，只需把 `astro.config.mjs` 顶部的 `SITE_ORIGIN` 换成实际域名。
+
+## 如何接入 Starlight 主题渲染上线（其他路径）
 
 ### 方式 A：并入 EpoCanvasDocs（docs.epocanvas.com/mail/…）
 
@@ -53,6 +67,6 @@
 3. **如实选择邮件模式表述**：隐私政策 §5.2 与服务条款 §4.1 的措辞取决于你选择的「全部 / 隐私 / 加密」模式；
 4. **按辖区补足法定条款**（GDPR / UK GDPR / LGPD / CCPA-CPRA 等）：合法性基础、DPA、投诉渠道；本模板不构成法律意见。
 
-## 一致性保障
+## 一致性保障（Google 式结构）
 
-六语言版本采用**同一份章节骨架**（隐私政策 15 节 + 附录 A；服务条款 16 节），标题、表格、提示框与锚点逐一对应；页内锚点严格按 github-slugger 规则生成（保留法语/西语重音字符，如 `#6-services-tiers-et-partage-des-données`），在 Starlight 下可直接跳转。修改任一语言时，请同步其余五种语言的对应章节。
+参照 [policies.google.com](https://policies.google.com/privacy?hl=zh_CN) 的书写范式，六语言版本均包含：**顶部锚点目录**、**30 秒快速摘要**、**分享情形四分类**、**权利与响应时限承诺（自助即时 / 人工 30 天）**、**归档版本说明**、页末**关键术语表**与**相关资源区**；骨架为「隐私政策：目录 + 15 节 + 附录 A/B/C」「服务条款：目录 + 16 节 + 附录」，标题、表格、提示框与锚点逐一对应。页内锚点严格按 github-slugger 规则生成（保留法语/西语重音字符，如 `#6-services-tiers-et-partage-des-données`；法语「Annexe : …」标题的双连字符 slug 已实测校准），构建后可用 `node scripts/validate-anchors.cjs` 全量复核（294 锚点 0 断链）。修改任一语言时，请同步其余五种语言的对应章节。
