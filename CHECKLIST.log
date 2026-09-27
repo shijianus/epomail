@@ -10,6 +10,41 @@
 
 ---
 
+### Gmail 级多账户前缀隔离与密码学 Hash 防越权路由系统 (2026-09-27)
+*   **关联提交 (Git Commit)**: `4b371a834458cb2be6ab5766ec15e99a91bc2022` (Short: `4b371a8`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com / epomail.epocanvas.workers.dev)` (Version ID: `9d5df8ce-3455-4fba-88fa-a49accec2973`，100% 流量) + `本地全真栈`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 密码学 Hash 防越权与非枚举 URL 架构 (`mail-worker/src/utils/hash-utils.js`):
+        - 彻底废除邮件 URL 中暴露自增数字 ID，杜绝 BOLA / IDOR 越权与全量枚举隐患；
+        - 基于 Web Crypto API HMAC-SHA256 建立高效签名与混淆机制，将邮件 ID 与当前用户 ID (租户隔离) 及安全盐编码为 20 位 URL-Safe Base64 随机熵 Hash (如 `3_mJBHrpIRkcvWRQyXbG`)；
+        - 后端解码严格验证防篡改签名与用户归属，非法或篡改 Hash 立即拒绝拦截 (返回 500 / Email not found)。
+    - [x] 后端 API 与服务全面适配 Hash 解密 (`mail-worker/src/api/email-api.js` & `service/email-service.js`):
+        - `GET /email/get` 增加 `hash` 参数解码处理，并在数据层为列表 (`emailList`, `allEmailList`) 及详情 (`selectById`, `latest`) 统一附加 `.hash` 字段。
+    - [x] 对齐 Gmail 多账户隔离前缀与 Hash 路由系统 (`mail-vue/src/router/gmail-history.js`):
+        - 引入专用 `createGmailHistory(0)`，深度契合 Gmail 官方 URL 规范：`/mail/u/:userIndex/#<folder>/<mailHash>`（当前主账号隔离前缀 `/mail/u/0/`，为多账号架构奠定基础）；
+        - 支持裸根路径 (`/`, `/inbox`, `/sent`) 规范化自动跳转到 `/mail/u/0/#inbox` 等；
+        - 路由参数由 `mailId` 全面升级为 `mailHash`，并在 `beforeEach` 守卫中建立双向参数兼容与导航时序保障。
+    - [x] 侧边栏交互与纯列表一键恢复 (`mail-vue/src/layout/aside/index.vue`):
+        - 优化 `handleNav`：点击「主要邮件」或所在分类时，立即关闭阅读窗并平滑退回纯列表状态 (`https://mail.epocanvas.com/mail/u/0/#inbox`)；
+        - 邮件列表选中高亮态 (`mail-vue/src/components/email-scroll/index.vue`) 支持 `email.hash` 匹配 (`.is-selected`)；
+        - 完美兼容浏览器前进/后退、整页与多栏分屏视窗模式以及深链直达硬刷新。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：mail-vue `vite build` 13.24s 零警告零报错构建成功；
+    - [x] 静态多语言对称性：`node scripts/i18n-symmetry.mjs` (mail-vue 2039 键 / mail-worker 1888 键 6 语言 100% 严格对称)；
+    - [x] 静态代码引用审计：`node scripts/i18n-audit.mjs` (1579 处字面量引用零缺失)；
+    - [x] 公网生产全真端到端自动化核验：`tests/test-gmail-hash-routing-prod-e2e.mjs` 针对生产域名 `https://mail.epocanvas.com` 全部 32/32 项公网断言 100% 通过；
+    - [x] 生产真实核验证据链：
+        - 账户前缀规范化：访问根路径自动规范化为 `https://mail.epocanvas.com/mail/u/0/#inbox`；
+        - 密码学 Hash 随机熵：打开信件进入 `https://mail.epocanvas.com/mail/u/0/#inbox/3_mJBHrpIRkcvWRQyXbG`（20位非数字 Hash，杜绝越权）；
+        - 点击「主要邮件」：视窗即刻关闭，平滑恢复至纯列表 `https://mail.epocanvas.com/mail/u/0/#inbox`；
+        - 浏览器前进/后退：前进恢复邮件详情视窗，后退优雅重置为纯列表；
+        - 深链直达与硬刷新：硬刷新邮件 Hash 链接直接渲染正文，点击分类可再次重置为纯列表；
+        - 防越权与防篡改拦截：篡改伪造 Hash 后请求 `GET /api/email/get?hash=...` 严格拦截拒绝 (HTTP 200/code 500, "Email not found")；
+        - 线上全真视觉截屏归档：`tests/verify_gmail_hash_routing_prod.png` 实测界面干净纯粹；
+    - [x] 零假数据残留：测试过程全量使用只读查询与合法探测，无任何临时记录残留。
+
+---
+
 ### 侧边栏高亮定位与 Gmail 级邮件动态路由/纯列表重置重构 (2026-09-26)
 *   **关联提交 (Git Commit)**: `d45a499c5e1a70abeb8f7cd66ffb83de63c74113` (Short: `d45a499`) | 前序实现: `a1375b8d961f40acf76c290a54af96185c021b52` (Short: `a1375b8`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com / epomail.epocanvas.workers.dev)` (Version ID: `121bec8b-9c68-47d9-996e-1999276afc9e`，100% 流量) + `本地全真栈`
