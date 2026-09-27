@@ -10,6 +10,40 @@
 
 ---
 
+### 头像卡片一页式单账户还原、文本直接复制、存储直达真实数据与纯文本法务底栏 (2026-09-27)
+*   **关联提交 (Git Commit)**: `76516a1695cf86098699e785eaad5b5e73c8230d` (Short: `76516a1`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com / epomail.epocanvas.workers.dev)` (Version ID: `4d9d948d-dcea-42b7-9537-226defd14ad1`，100% 流量) + `本地全真栈`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 邮箱行交互优化 (`mail-vue/src/layout/header/index.vue`):
+        - 彻底取消独立的 `copy-ic` 复制图标按钮；
+        - 直接点击邮箱文本本身触发复制到剪切板，并调出全局成功提示浮层（ElMessage）；
+    - [x] 单账户模式恢复一页式原生排版 (`mail-vue/src/layout/header/index.vue`):
+        - 恢复 `am-header` + `am-item`（账户详情、设定、退出）经典原生一页式紧凑结构，宽度精准固定为 320px、圆角 20px；
+        - 存储进度条独立移至 `gac-profile-row` 正下方，去除冗长技术政策说明，直接展示实际空间用量与 2% 应急斜纹缓冲区；
+    - [x] 多账户卡片模式（对齐 Gmail 范式）(`mail-vue/src/layout/header/index.vue`):
+        - 全系统彻底弃用并物理移除旧版 `gac-hero-section`；
+        - 每个账户均为独立的 `gac-ma-card`；首个方框为当前登录账户（左侧个人资料区点击跳转详情，右侧下拉箭头按钮展开已有账户/添加账户/退出账户）；
+        - 下方居中展示「管理Epomail账户」胶囊药丸按钮（对应「设定」），再下方排列存储进度条与法务底栏；
+    - [x] 存储条直达与真实非零数据修复 (`mail-vue/src/views/data-setting/index.vue`, `mail-worker/src/service/storage-quota-service.js`):
+        - 修复后端 `storage-quota-service.js` 仅统计 attachments 的问题，聚合统计非删除邮件正文尺寸与附件容量，真实反映空间占用（0.13 MB / 24 个文件）；
+        - 前端数据设置页修复 Vue Hash 路由判断失效，引入 `scrollToUserStorage` 与容器平滑滚动，点击存储条直接精准定位至「存储空间与个人云存储」卡片；
+    - [x] 纯文本法务底栏 (`mail-vue/src/layout/header/index.vue`):
+        - `gac-footer` 彻底移除下划线与向外引出按钮/图标，直接居中排列 2 行纯文本（「隐私政策」、「服务条款」），点击无感调起条款说明内置弹窗。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：mail-vue `vite build` 13.32s 零警告零报错构建成功；
+    - [x] 静态多语言审计：`node scripts/i18n-symmetry.mjs` (2054 键 100% 严格对称)；
+    - [x] 静态代码引用审计：`node scripts/i18n-audit.mjs` 零缺失；
+    - [x] 部署上线：推送到 Cloudflare Workers 生产环境 (Version ID: `4d9d948d-dcea-42b7-9537-226defd14ad1`)；
+    - [x] 自动化端到端测试：`node tests/test-gmail-avatar-dropdown-prod-e2e.mjs` 直连生产环境，33/33 全部断言 100% 通过；
+    - [x] 独立子代理 (Subagent `58cfb55a-cf48-4ae4-a6a9-24fd932a9f7c`) 客观 QA & 视觉 UX 审计：
+        - 针对生产真实域名从 0 开始执行客观审计与多账户/单账户深度实测；
+        - 发现并驱动闭环修复了 Hash 模式下 `#userStorage` 锚点滚动定位失效缺陷；
+        - 审查 4 张真实生产截图 (`verify_gmail_avatar_dropdown_open.png`, `verify_storage_settings_anchor.png`, `verify_gmail_avatar_terms_dialog.png`, `verify_gmail_avatar_privacy_dialog.png`)；
+        - 结论：全量核心诉求 100% 达成，正式准予验收交付；
+    - [x] 零假数据残留：测试全量使用合法用户，零临时脏数据残留。
+
+---
+
 ### 头像卡片极致精简重构：对齐 Outlook 左右布局、极简存储卡片与 preview.html 并列卡片范式 (2026-09-27)
 *   **关联提交 (Git Commit)**: `2c2061202a6f68c4fdf98f8471a3c5959a7ea494` (Short: `2c20612`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com / epomail.epocanvas.workers.dev)` (Version ID: `3b5f5c68-7673-4d3d-969a-50d6aaf3f42f`，100% 流量) + `本地全真栈`
