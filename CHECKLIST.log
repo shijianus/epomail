@@ -10,6 +10,21 @@
 
 ---
 
+### EpomailDocs 对标 Google 政策范式增补 + Astro Starlight 站点化与本地 Build/视觉全量核验 (2026-09-27)
+*   **关联提交 (Git Commit)**: `f2b07d0`（内容增补，12 文档 +673 行）+ `02c658c`（Astro Starlight 站点骨架与构建核验，9 文件）
+*   **部署环境 (Deployment)**: `本地 build + astro preview 视觉验证`（无生产部署，生产 Version ID 不变）
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 抓取并解析 policies.google.com/privacy（zh_CN）官方结构，提炼可迁移范式：顶部锚点目录、页末关键词术语表、归档版本说明、分享情形分类、权利与响应时限、相关资源区；
+    - [x] 6 语言 × 2 文档全量增补（+673 行）：目录/关键术语表 12 词/分享情形四分类/法律要求与监管合作提示框/聚合统计不画像承诺/无越界采集承诺/响应时限（自助即时 + 人工 30 天）/实例停运数据处置/归档版本说明/服务条款申诉举报与用语速查附录；
+    - [x] EpomailDocs 站点化：astro.config.mjs（6 语言 locales + 多语言侧栏 + lastUpdated）+ content.config.ts（Starlight 0.32 官方 loader）+ custom.css（EpoCanvasDocs 靛蓝设计变量 + 侧栏激活态）+ favicon + .gitignore + pnpm-lock；
+    - [x] README 更新：本地构建章节、一致性保障说明同步。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：`pnpm install`（49.4s）+ `astro build` 13 页通过（约 17s），Pagefind 6 语言 8045 词索引成功；
+    - [x] 锚点全量校验：`scripts/validate-anchors.cjs` 对 dist 产物 URL 解码比对——294 个页内锚点 0 断链、/images 引用全部存在（修复西语 ¿A slug 与法语 Annexe 双连字符 slug 共 3 处）；
+    - [x] 浏览器全真栈实测（astro preview @127.0.0.1:4321）：zh-CN 隐私政策整页（摘要框/目录跳转/数据流配图/第三方表格/附录术语表）、zh-tw 条款、en 隐私、fr 隐私、nl 条款 375px 移动端逐页截图核验；明暗双主题切换正常；侧栏多语言 label 与激活态、语言切换器渲染全部正确；
+    - [x] 修复视觉缺陷 2 处：正文与 frontmatter 重复 H1（12 文件全量移除）、侧栏激活项对比度不足（借 EpoCanvasDocs 激活态样式）；
+    - [x] 零假数据残留：验证用本地服务已停止，node_modules/dist/.astro 经 .gitignore 排除不入库。
+
 ### EpomailDocs 法律文档站落地：6 语言完整隐私政策与服务条款（EpoCanvasDocs 主题对齐）(2026-09-27)
 *   **关联提交 (Git Commit)**: `2bed02b59f0fd7f23276540d8edc3c8b9eb21c6c` (Short: `2bed02b`)
 *   **部署环境 (Deployment)**: `仓库文档资产`（无生产部署，生产 Version ID 不变；文档可随时并入 EpoCanvasDocs / 独立 Starlight 站点渲染上线）
