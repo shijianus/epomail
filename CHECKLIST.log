@@ -11,8 +11,8 @@
 ---
 
 ### 侧边栏高亮定位与 Gmail 级邮件动态路由/纯列表重置重构 (2026-09-26)
-*   **关联提交 (Git Commit)**: `a1375b8d961f40acf76c290a54af96185c021b52` (Short: `a1375b8`)
-*   **部署环境 (Deployment)**: `本地全真栈`
+*   **关联提交 (Git Commit)**: `d45a499c5e1a70abeb8f7cd66ffb83de63c74113` (Short: `d45a499`) | 前序实现: `a1375b8d961f40acf76c290a54af96185c021b52` (Short: `a1375b8`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com / epomail.epocanvas.workers.dev)` (Version ID: `121bec8b-9c68-47d9-996e-1999276afc9e`，100% 流量) + `本地全真栈`
 *   **功能需求与变更清单 (Changes & Feature Alignment)**:
     - [x] Gmail 级动态邮件路由与深链参数 (`mail-vue/src/router/index.js`):
         - 将全部 8 个邮件路由升级为可选动态参数格式（`/inbox/:mailId?`, `/all/:mailId?`, `/sent/:mailId?`, `/drafts/:mailId?`, `/starred/:mailId?`, `/snoozed/:mailId?`, `/spam/:mailId?`, `/trash/:mailId?`）；
@@ -22,6 +22,7 @@
     - [x] 统一状态驱动与双向路由同步 (`mail-vue/src/store/email.js` & `mail-vue/src/layout/main/index.vue`):
         - 引入 `openEmail(email, options)` 与 `closeEmail()`，在用户点击打开/关闭邮件时自动完成路由与视图双向联动；
         - 在 `layout/main` 建立 `syncEmailFromRoute`，优先命中内存邮件列表，未命中时调用 `emailGet` 优雅兜底并自动选定首封信件；
+        - 优化路由替换时序，避免在不同侧边栏文件夹切换时产生路由竞态覆写；
         - 监听 `contentData.email` 为 `null` 时自动优雅退回纯列表 URL。
     - [x] 侧边栏定位高亮与返回最初纯列表交互 (`mail-vue/src/layout/aside/index.vue`):
         - 升级 `isNavActive`，在 `/inbox/:mailId`、`/sent/:mailId` 等邮件详情状态下，对应侧边项持续稳定保持 active 状态；
@@ -33,11 +34,13 @@
         - 完美兼容整页模式 (`no_split`)、左右分栏模式 (`right`)、上下分栏模式 (`bottom`) 以及移动端视口；
         - 浏览器后退平滑退回纯列表，前进恢复邮件详情，深链直达与硬刷新稳定渲染。
 *   **自动化测试与核验清单 (Verification Checklist)**:
-    - [x] 本地构建核验：mail-vue `vite build` 13.86s 零警告零报错构建成功；
+    - [x] 本地构建核验：mail-vue `vite build` 14.17s 零警告零报错构建成功；
     - [x] 静态多语言对称性：`node scripts/i18n-symmetry.mjs` (mail-vue 2039 键 / mail-worker 1888 键 6 语言 100% 严格对称)；
     - [x] 静态代码引用审计：`node scripts/i18n-audit.mjs` (1579 处字面量引用零缺失)；
     - [x] 全真栈端到端自动化核验：`tests/test-sidebar-url-nav-e2e.mjs` 全部 41/41 项测试用例 100% 通过；
-    - [x] 零假数据残留：测试创建与测试账号已安全登出并验证零脏数据残留。
+    - [x] 公网生产环境端到端自动化核验：`tests/test-sidebar-url-nav-prod-e2e.mjs` 直连 `https://mail.epocanvas.com` 全部 35/35 项公网真实断言 100% 通过；
+    - [x] 线上全真视觉截屏归档：`tests/verify_prod_sidebar_and_url_state.png` 界面渲染正常；
+    - [x] 零假数据残留：测试样本收件记录 [194, 193, 192, 191] 经物理接口 `DELETE /api/email/delete` 全部安全物理清理 (HTTP 200)。
 
 ---
 
