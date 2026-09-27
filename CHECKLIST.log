@@ -10,6 +10,55 @@
 
 ---
 
+### Gmail 级 424px 头像卡片、存储阶梯色彩、2%预留机制与服务条款/隐私政策外联体系 (2026-09-27)
+*   **关联提交 (Git Commit)**: `3dc503dc4fb8f588a0648ee30e89e1e4c7745ded` (Short: `3dc503d`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com / epomail.epocanvas.workers.dev)` (Version ID: `8302eff4-66e1-45d7-857a-77802dad30be`，100% 流量) + `本地全真栈`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] Gmail 级 424px 头像下拉卡片重构 (`mail-vue/src/layout/header/index.vue`):
+        - 尺寸与视觉层级严格对标 Gmail 规范：宽度 424px、24px Bento 大圆角、柔和立体多重阴影，右上角原生 X 关闭按钮；
+        - Hero 个人档案区：72px 大头像、姓名、邮箱地址与点击一键复制（带平滑过渡绿色对勾及 Toast 提示）、角色身份徽章、居中「管理您的账户」操作胶囊；
+        - 清理旧版 280px 样式干扰，全局样式穿透强化 `width: 424px !important; max-width: calc(-8px + 100vw) !important;`。
+    - [x] 创新存储用量展示与阶梯色彩机制 (`mail-vue/src/layout/header/index.vue`):
+        - 接入 `getUserStorage()` 实时获取存储用量，支持格式化容量展示；
+        - 严格 6 阶动态色彩区间：
+          - `<= 10%`: 蓝色 (`#2563eb`)
+          - `11% ~ 25%`: 绿色 (`#10b981`)
+          - `26% ~ 50%`: 黄色 (`#eab308`)
+          - `51% ~ 80%`: 橙色 (`#f97316`)
+          - `81% ~ 98%`: 红色 (`#ef4444`)
+          - `>= 98%`: 灰色 (`#64748b`)
+        - 2% 保护空间隔离：主进度条最大填充严格限制为 98% (`Math.min(98, usedPercentage)`)，右侧独立渲染 2% 斜纹系统预留空间缓冲带；
+        - 系统级保护提示：说明 95% 自动清理垃圾桶、98% 暂停接收新邮件，并附带直达「管理存储」跳转链接。
+    - [x] 多账户模式架构与开关解耦 (`mail-worker` & `mail-vue`):
+        - 实体层与数据库 (`mail-worker/src/entity/setting.js` & `service/setting-service.js`)：新增 `multiAccountEnabled` (int, default 0)，通过 `ensureSettingColumns` 条件式幂等迁移并在 `/setting/website` 暴露；
+        - 前端配置与界面 (`mail-vue/src/store/setting.js` & `views/sys-setting/index.vue`)：新增系统设置开关；
+        - 默认关闭保持纯粹简洁单账户界面；开启后呈现完全对齐 Gmail 的添加账户方框与切换体系。
+    - [x] 服务条款与隐私政策外联与内置弹窗 (`mail-vue/src/layout/header/index.vue`):
+        - 卡片底部居中提供「隐私政策 ↗ · 服务条款 ↗」规范外联；
+        - 实体层扩展 `termsUrl` 与 `privacyUrl`；若配置外部 URL 则新窗口安全跳转 (`target="_blank" rel="noopener noreferrer"`)；未配置时优雅调起内置 Element Plus 模态弹窗呈现详实条款内容。
+    - [x] 多语言严格对称 (`mail-vue/src/i18n/`):
+        - 同步补齐 6 种语言（zh, zh-Hant, en, es, fr, nl）各 15 个对应国际化词条，2054 键 100% 严格对称。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：mail-vue `vite build` 17.30s 零警告零报错构建成功；
+    - [x] 静态多语言审计：`node scripts/i18n-symmetry.mjs` (mail-vue 2054 键 / mail-worker 1888 键 6 语言 100% 严格对称)；
+    - [x] 静态代码引用审计：`node scripts/i18n-audit.mjs` (1579 处字面量引用零缺失)；
+    - [x] 部署上线：成功推送到 Cloudflare Workers 生产环境 (Version ID: `8302eff4-66e1-45d7-857a-77802dad30be`)；
+    - [x] 独立子代理 (Subagent) 客观全真端到端核验：
+        - 启动独立 QA 审计官子代理 (`e7356573-5078-47f6-9aac-97a7ee286d59`) 执行 `tests/test-gmail-avatar-dropdown-prod-e2e.mjs`；
+        - 生产域名直连 `https://mail.epocanvas.com` 全部 27/27 项断言 100% 通过；
+        - 实测卡片尺寸准确：`width: 424px, borderRadius: 24px`；
+        - 阶梯色彩计算准确、2% 斜纹缓冲区正确渲染；
+        - 点击邮箱成功触发复制与绿色对勾视觉反馈；
+        - 服务条款与隐私政策模态弹窗成功打开并呈现规范内容；
+        - 点击右上角 X 按钮平滑关闭卡片；
+        - 归档 3 张公网真实验收截屏：
+          - `tests/verify_gmail_avatar_dropdown_open.png`
+          - `tests/verify_gmail_avatar_terms_dialog.png`
+          - `tests/verify_gmail_avatar_privacy_dialog.png`
+    - [x] 零假数据残留：自动化测试使用管理员登录态只读探针，无临时账户或垃圾记录残留。
+
+---
+
 ### Gmail 级多账户前缀隔离与密码学 Hash 防越权路由系统 (2026-09-27)
 *   **关联提交 (Git Commit)**: `4b371a834458cb2be6ab5766ec15e99a91bc2022` (Short: `4b371a8`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com / epomail.epocanvas.workers.dev)` (Version ID: `9d5df8ce-3455-4fba-88fa-a49accec2973`，100% 流量) + `本地全真栈`
