@@ -10,6 +10,38 @@
 
 ---
 
+### 头像卡片横向法务底栏对齐 Gmail、竖向多账户向下扩展架构与组件尺寸基准绝对对齐 (2026-09-28)
+*   **关联提交 (Git Commit)**: `b6709d1f979ed384e07387230cad5520855122e5` (Short: `b6709d1`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com / epomail.epocanvas.workers.dev)` (Version ID: `d21b9cda-5120-4e6d-9cd3-056b7ac867ec`，100% 流量) + `本地全真栈`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 横向法务底栏对齐 Gmail 格式 (`mail-vue/src/layout/header/index.vue`):
+        - 底栏改为横向排布 (`flex-direction: row; justify-content: center; gap: 6px;`)；
+        - 文案呈现为「隐私政策 · 服务条款」，居中分隔符为精细中点「·」；
+        - 纯文本样式，无下划线、无向外引出图标与多余按钮，平滑交互呼起内置条款弹窗；
+    - [x] 多账户向下竖向卡片架构与 5 账户容量管理 (`mail-vue/src/layout/header/index.vue`):
+        - 废除原左右融合的单一动作按钮，改为竖向向下排布 (`flex-direction: column; gap: 8px;`)；
+        - 支持最多容纳 5 个账户：首个为主账户，展开区紧随最多 4 个其它账户，点击可平滑切换；
+        - 紧随其下为独立的「添加其他账户」卡片 (`.add-account-card`) 与「退出所有账户」卡片 (`.signout-all-card`)；
+    - [x] 组件尺寸基准绝对对齐 (`mail-vue/src/layout/header/index.vue`):
+        - 全部以 `gac-ma-card.current-account-card` 尺寸与盒模型为黄金基准；
+        - 主账户卡片、管理 Epomail 账户按钮、存储进度条、展开区域内的所有卡片（添加账户、退出账户）物理宽度 100% 绝对一致 (290px)；
+        - 统一采用 14px 圆角 (`border-radius: 14px`) 与一致的边框 (`1px solid var(--border-mid)`)，消除视觉跳跃感；
+    - [x] 状态持久化与全真公网验证 (`mail-vue/src/store/setting.js`):
+        - `settingStore` 增加 `settings` 持久化，增强 `isMultiAccountEnabled` 对 pinia 与 `localStorage` 的容错解析。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：mail-vue `vite build` 13.81s 零警告零报错构建成功；
+    - [x] 静态多语言审计：`node scripts/i18n-symmetry.mjs` (2054 键 100% 严格对称)；
+    - [x] 部署上线：推送到 Cloudflare Workers 生产环境 (Version ID: `d21b9cda-5120-4e6d-9cd3-056b7ac867ec`)；
+    - [x] 自动化端到端测试：`node tests/test-gmail-avatar-dropdown-prod-e2e.mjs` 直连生产环境，37/37 全部断言 100% 全绿通过；
+    - [x] 独立子代理 (Subagent `81235b06-8026-43da-ab09-75eb8718a19f`) 客观 QA & 视觉 UX 审计：
+        - 直连生产域名从 0 开始执行客观审计与全真回归；
+        - 实测 5 组件物理宽度全部严格精确为 290px、圆角全部统一为 14px；
+        - 审查 4 张真实生产截图 (`verify_gmail_avatar_dropdown_open.png`, `verify_multi_account_expanded.png`, `verify_storage_settings_anchor.png`, `verify_gmail_avatar_terms_dialog.png`, `verify_gmail_avatar_privacy_dialog.png`)；
+        - 结论：全量核心诉求 100% 达成，综合裁决 PASS 准予交付；
+    - [x] 零假数据残留：测试全量使用合法用户，零临时脏数据残留。
+
+---
+
 ### 头像卡片一页式单账户还原、文本直接复制、存储直达真实数据与纯文本法务底栏 (2026-09-27)
 *   **关联提交 (Git Commit)**: `76516a1695cf86098699e785eaad5b5e73c8230d` (Short: `76516a1`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com / epomail.epocanvas.workers.dev)` (Version ID: `4d9d948d-dcea-42b7-9537-226defd14ad1`，100% 流量) + `本地全真栈`
