@@ -725,6 +725,7 @@ const settingService = {
 					subject,
 					content,
 					text,
+					lang: params?.lang,
 					templates: normalizedTemplates || globalConfig.templates || null,
 					expireDays,
 					isStarred,

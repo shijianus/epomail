@@ -19,11 +19,11 @@ import assert from 'assert';
     console.log('  [Page Exception]:', err.message);
   });
 
-  const BASE = 'https://epomail.epocanvas.workers.dev';
+  const BASE = process.env.BASE_URL || 'https://epomail.epocanvas.workers.dev';
 
   try {
     // Step 1: 登录管理账户
-    console.log('\n[Checkpoint 1] 正在登录 Cloudflare 生产环境...');
+    console.log('\n[Checkpoint 1] 正在登录管理账户...');
     const loginRes = await page.request.post(BASE + '/api/login', {
       data: { email: 'admin@epomail.bond', password: '123456' },
       headers: { 'Content-Type': 'application/json' }
@@ -38,7 +38,7 @@ import assert from 'assert';
 
     // Step 2: 注入 Token 并进入偏好设置验证 6 国多语言切换
     console.log('\n[Checkpoint 2] 验证全站多语言字典与语言切换 (zh, zh-Hant, en, fr, es, nl)...');
-    await page.goto(BASE + '/login/', { waitUntil: 'networkidle' });
+    await page.goto(BASE + '/login/', { waitUntil: 'domcontentloaded' });
     await page.evaluate(({ token }) => {
       localStorage.setItem('token', token);
       localStorage.setItem('loginEmail', 'admin@epomail.bond');
@@ -90,7 +90,7 @@ import assert from 'assert';
 
     // Step 3: 前往系统设置，验证网站公告中的「欢迎邮件」与「全域公告邮件」
     console.log('\n[Checkpoint 3] 导航至系统设置，验证网站公告卡片功能...');
-    await page.goto(BASE + '/settings/sys-setting', { waitUntil: 'networkidle' });
+    await page.goto(BASE + '/system-setting', { waitUntil: 'domcontentloaded' });
     await page.waitForTimeout(2500);
 
     // 查找网站公告卡片
@@ -112,55 +112,20 @@ import assert from 'assert';
     const welcomeDialog = page.locator('.welcome-dialog-canvas').first();
     await welcomeDialog.waitFor({ state: 'visible' });
 
-    // 验证语言版本切换条
+    // 验证语言版本切换条已按需求取消（统一根据管理员语言直接加载和发送）
     const welcomeLangRow = welcomeDialog.locator('.welcome-lang-row');
-    assert.ok(await welcomeLangRow.count() > 0, '欢迎邮件弹窗中应包含多语言版本选择行');
+    assert.strictEqual(await welcomeLangRow.count(), 0, '欢迎邮件弹窗已取消 .welcome-lang-row 多语言选择行');
+    console.log('✓ 欢迎邮件已成功取消 .welcome-lang-row，统一跟随管理员当前语言直接展示');
 
-    const langTabs = welcomeLangRow.locator('.lang-tab-pill');
-    const langTabCount = await langTabs.count();
-    console.log(`欢迎邮件支持的语言 Tab 数量: ${langTabCount}`);
-    assert.strictEqual(langTabCount, 6, '欢迎邮件应支持全部 6 种语言版本');
-
-    // 验证默认徽章（跟随站长当前语言）
-    const adminBadge = welcomeLangRow.locator('.admin-badge');
-    assert.ok(await adminBadge.count() > 0, '应显示默认语言版本徽章');
-
-    // 验证当前中文标题
+    // 验证当前主题直接跟随管理员语言（简体中文）
     const subjectInput = welcomeDialog.locator('.write-subject-input input');
     let curSubject = await subjectInput.inputValue();
-    console.log('当前（简体中文）欢迎邮件主题:', curSubject);
-    assert.ok(curSubject.includes('欢迎来到 Epocanvas Mail') || curSubject.includes('Epocanvas Mail'), '应加载中文欢迎主题');
-
-    // 切换至 English Tab
-    console.log('切换至 English 语言版本...');
-    const enTab = langTabs.filter({ hasText: /English/i }).first();
-    await enTab.click();
-    await page.waitForTimeout(1000);
-    curSubject = await subjectInput.inputValue();
-    console.log('English 欢迎邮件主题:', curSubject);
-    assert.ok(curSubject.includes('Welcome to Epocanvas Mail'), 'English 版本应加载英文主题');
-
-    // 切换至 Français Tab
-    console.log('切换至 Français 语言版本...');
-    const frTab = langTabs.filter({ hasText: /Français/i }).first();
-    await frTab.click();
-    await page.waitForTimeout(1000);
-    curSubject = await subjectInput.inputValue();
-    console.log('Français 欢迎邮件主题:', curSubject);
-    assert.ok(curSubject.includes('Bienvenue') || curSubject.includes('Epocanvas Mail'), 'Français 版本应加载法语主题');
-
-    // 切换至 正體中文 Tab
-    console.log('切换至 正體中文 语言版本...');
-    const hantTab = langTabs.filter({ hasText: /正體中文/i }).first();
-    await hantTab.click();
-    await page.waitForTimeout(1000);
-    curSubject = await subjectInput.inputValue();
-    console.log('正體中文 欢迎邮件主题:', curSubject);
-    assert.ok(curSubject.includes('歡迎來到 Epocanvas Mail'), '正體中文 版本应加载繁体中文主题');
+    console.log('当前（管理员简体中文）欢迎邮件主题:', curSubject);
+    assert.ok(curSubject.includes('欢迎来到 Epocanvas Mail') || curSubject.includes('Epocanvas Mail'), '应直接加载管理员语言欢迎主题');
 
     // 截屏留存
     await page.screenshot({ path: 'tests/audit_welcome_multilingual_tabs.png' });
-    console.log('✓ 欢迎邮件多语言版本切换验证通过，已截屏');
+    console.log('✓ 欢迎邮件管理员语言直接展示验证通过，已截屏');
 
     // 关闭欢迎邮件弹窗
     const closeWelcomeBtn = welcomeDialog.locator('.close-icon-btn');

@@ -1330,8 +1330,9 @@ const emailService = {
 			return null;
 		}
 
-		// Multi-language template resolution
-		let tplLang = overrideData?.lang || await this.resolveUserLang(c, userId, settingData);
+		// 系统邮件默认必须为管理员发送的版本（不随收件人个人语言自动修改）
+		const adminLang = normalizeLangKey(overrideData?.lang || settingData.welcomeLang || settingData.defaultLang || 'zh');
+		let tplLang = adminLang;
 		const fallbackTpl = getWelcomeTemplate(tplLang);
 
 		let customTemplates = {};
@@ -1538,21 +1539,22 @@ const emailService = {
 		const now = new Date().toISOString();
 		const snoozedEndTime = Number(expireDays) > 0 ? new Date(Date.now() + Number(expireDays) * 86400000).toISOString() : null;
 
-		// Resolve recipient language: user binding -> admin default -> zh
-		const tplLang = await this.resolveUserLang(c, userId, settingData);
+		// 系统全域邮件默认必须为管理员发送的版本（不随收件人个人语言自动修改）
+		const adminLang = normalizeLangKey(options?.lang || settingData.defaultLang || 'zh');
+		const tplLang = adminLang;
 
-		// Pick per-language template: custom multilingual template -> legacy single template -> official default
+		// 默认直接采用管理员撰写并发送的原始版本（无需按收件人语言修改），若未传递则采用管理员语言模板
 		let tplSubject = subject;
 		let tplContent = content;
 		let tplText = text;
-		if (templates && typeof templates === 'object' && templates[tplLang]) {
-			const langTpl = templates[tplLang];
+		if ((!tplSubject || !String(tplSubject).trim()) && templates && typeof templates === 'object' && templates[adminLang]) {
+			const langTpl = templates[adminLang];
 			if (langTpl.subject && String(langTpl.subject).trim()) tplSubject = langTpl.subject;
 			if (langTpl.content && String(langTpl.content).trim()) tplContent = langTpl.content;
 			if (langTpl.text && String(langTpl.text).trim()) tplText = langTpl.text;
 		}
 		if ((!tplSubject || !String(tplSubject).trim()) || (!tplContent || !String(tplContent).trim())) {
-			const defTpl = getGlobalAnnouncementTemplate(tplLang);
+			const defTpl = getGlobalAnnouncementTemplate(adminLang);
 			if (!tplSubject || !String(tplSubject).trim()) tplSubject = defTpl.subject;
 			if (!tplContent || !String(tplContent).trim()) tplContent = defTpl.content;
 		}

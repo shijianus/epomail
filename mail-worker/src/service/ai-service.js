@@ -665,6 +665,30 @@ const aiService = {
 			finalTargetLang = this.getAlternateTargetLanguage(detectedSrcLang, finalTargetLang);
 		}
 
+		// 检查官方未修改系统邮件模板（欢迎邮件/全域公告），若未被修改则直接调用对应语言官方模板，若发生修改则退回 AI 翻译
+		try {
+			const { getPredefinedTranslation } = await import('../const/welcome-template');
+			const predefined = getPredefinedTranslation({
+				content: html,
+				text,
+				subject: options.subject || '',
+				toEmail: options.toEmail || '',
+				toName: options.toName || ''
+			}, finalTargetLang);
+			if (predefined) {
+				return {
+					translatedText: predefined.translatedText,
+					translatedHtml: predefined.translatedHtml,
+					translatedSubject: predefined.translatedSubject,
+					isHtml: Boolean(predefined.isHtml),
+					model: 'system-template',
+					engine: 'template'
+				};
+			}
+		} catch (e) {
+			console.warn('Predefined template check failed, falling back to AI:', e);
+		}
+
 		const settingRow = await settingService.query(c).catch(() => null);
 		if (settingRow && settingRow.aiEnabled === 0) {
 			return {

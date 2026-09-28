@@ -2045,3 +2045,128 @@ export const GLOBAL_ANNOUNCEMENT_TEMPLATES = {
 export function getGlobalAnnouncementTemplate(lang = 'zh') {
   return GLOBAL_ANNOUNCEMENT_TEMPLATES[normalizeLangKey(lang)] || GLOBAL_ANNOUNCEMENT_TEMPLATES.zh;
 }
+
+function interpolatePlaceholders(str, userEmail = '', userName = '') {
+  if (!str || typeof str !== 'string') return '';
+  const domain = userEmail ? (userEmail.split('@')[1] || 'epomail.bond') : 'epomail.bond';
+  const name = userName || (userEmail ? userEmail.split('@')[0] : 'User');
+  return str
+    .replace(/\{\{\s*user_name\s*\}\}/gi, name)
+    .replace(/\{\{\s*username\s*\}\}/gi, name)
+    .replace(/\{\{\s*user_email\s*\}\}/gi, userEmail || '')
+    .replace(/\{\{\s*domain\s*\}\}/gi, domain);
+}
+
+function cleanText(str) {
+  if (!str) return '';
+  return str
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function cleanHtmlStructure(str) {
+  if (!str) return '';
+  return str
+    .replace(/\s+/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .trim();
+}
+
+export function getPredefinedTranslation(email, targetLang) {
+  if (!email) return null;
+  const normTarget = normalizeLangKey(targetLang);
+  const SUPPORTED_LANGS = ['zh', 'zh-Hant', 'en', 'fr', 'es', 'nl'];
+  if (!SUPPORTED_LANGS.includes(normTarget)) {
+    return null;
+  }
+
+  const actualContent = email.content || email.html || '';
+  const actualText = email.text || '';
+  const actualSubject = email.subject || '';
+  const toEmail = email.toEmail || '';
+  const toName = email.toName || '';
+
+  const candidateNames = [
+    toName,
+    toEmail ? toEmail.split('@')[0] : '',
+    'Epocanvas 用户',
+    'Epocanvas 用戶',
+    'User',
+    'Epocanvas User'
+  ].filter(Boolean);
+
+  const cleanedActualContent = cleanHtmlStructure(actualContent);
+  const cleanedActualText = cleanText(actualContent || actualText);
+  const cleanedActualSubject = cleanText(actualSubject);
+
+  const templateSets = [
+    { type: 'welcome', templates: WELCOME_TEMPLATES },
+    { type: 'announcement', templates: GLOBAL_ANNOUNCEMENT_TEMPLATES }
+  ];
+
+  for (const set of templateSets) {
+    for (const srcLang of SUPPORTED_LANGS) {
+      const srcTpl = set.templates[srcLang];
+      if (!srcTpl || !srcTpl.content) continue;
+
+      for (const nameCandidate of candidateNames) {
+        const expectedHtml = interpolatePlaceholders(srcTpl.content, toEmail, nameCandidate);
+        const expectedSubject = interpolatePlaceholders(srcTpl.subject, toEmail, nameCandidate);
+
+        const cleanedExpectedHtml = cleanHtmlStructure(expectedHtml);
+        const cleanedExpectedText = cleanText(expectedHtml);
+        const cleanedExpectedSubject = cleanText(expectedSubject);
+
+        let subjectMatches = (cleanedActualSubject === cleanedExpectedSubject);
+        if (!subjectMatches && set.type === 'announcement' && srcLang === 'zh') {
+          if (cleanedActualSubject === cleanText('📢 系统全域通知与版本升级公告')) {
+            subjectMatches = true;
+          }
+        }
+        if (!cleanedActualSubject && (cleanedActualContent.length > 100 || cleanedActualText.length > 50)) {
+          subjectMatches = true;
+        }
+
+        const contentMatches = (cleanedActualContent && cleanedActualContent === cleanedExpectedHtml) ||
+                               (cleanedActualText && cleanedActualText === cleanedExpectedText);
+
+        if (subjectMatches && contentMatches) {
+          const targetTpl = set.templates[normTarget];
+          if (!targetTpl || !targetTpl.content) return null;
+
+          const translatedHtml = interpolatePlaceholders(targetTpl.content, toEmail, toName);
+          const translatedSubject = interpolatePlaceholders(targetTpl.subject, toEmail, toName);
+          const translatedText = cleanText(translatedHtml);
+
+          return {
+            translatedHtml,
+            translatedText,
+            translatedSubject,
+            isHtml: true,
+            engine: 'template',
+            sourceLang: srcLang,
+            targetLang: normTarget,
+            templateType: set.type
+          };
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
