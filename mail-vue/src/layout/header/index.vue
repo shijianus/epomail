@@ -120,14 +120,11 @@
             <div class="am-item" @click="openSettings"><span>{{ $t('settings') }}</span></div>
             <div class="am-item logout" @click="clickLogout"><span>{{ $t('logOut') }}</span></div>
 
-            <!-- Footer: 2 lines of text, no underline, no external icons -->
+            <!-- Footer: Horizontal, directly aligned with Gmail format -->
             <div class="gac-footer">
-              <div class="gac-legal-item" @click.prevent="openPrivacyPolicy">
-                <span>{{ $t('privacyPolicy') }}</span>
-              </div>
-              <div class="gac-legal-item" @click.prevent="openTermsOfService">
-                <span>{{ $t('termsOfService') }}</span>
-              </div>
+              <span class="gac-legal-item" @click.prevent="openPrivacyPolicy">{{ $t('privacyPolicy') }}</span>
+              <span class="gac-legal-separator">·</span>
+              <span class="gac-legal-item" @click.prevent="openTermsOfService">{{ $t('termsOfService') }}</span>
             </div>
           </div>
 
@@ -164,28 +161,51 @@
               </button>
             </div>
 
-            <!-- Expanded Section: Add account + Sign out -->
+            <!-- Expanded Section: Vertically stacked other accounts (up to 4) + Add account + Sign out all -->
             <div v-if="multiAccountExpanded" class="gac-ma-expanded-section">
-              <div class="gac-card-actions">
-                <button class="gac-card-action-btn add-btn" @click="openAddAccountDialog">
+              <!-- Other accounts (max 4, clicking switches to become primary account) -->
+              <div 
+                v-for="acc in otherAccounts" 
+                :key="acc.accountId || acc.email"
+                class="gac-ma-card other-account-card"
+                @click="switchAccount(acc)"
+                :title="$t('switchAccount')"
+              >
+                <div class="gac-ma-user-main">
+                  <div class="gac-ma-avatar other-avatar">{{ formatName(acc.email) }}</div>
+                  <div class="gac-ma-info">
+                    <div class="gac-ma-name-row">
+                      <span class="gac-ma-name">{{ acc.name || acc.email }}</span>
+                    </div>
+                    <div class="gac-ma-email">{{ acc.email }}</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Vertical Add Account Card -->
+              <div class="gac-ma-card gac-ma-action-card add-account-card" @click="openAddAccountDialog">
+                <div class="gac-action-icon">
                   <Icon icon="lucide:user-plus" width="16" height="16" />
-                  <span>{{ $t('addAnotherAccount') }}</span>
-                </button>
-                <div class="gac-card-action-divider"></div>
-                <button class="gac-card-action-btn signout-btn" @click="clickLogout">
+                </div>
+                <span class="gac-action-text">{{ $t('addAnotherAccount') }}</span>
+              </div>
+
+              <!-- Vertical Sign Out of All Accounts Card -->
+              <div class="gac-ma-card gac-ma-action-card signout-all-card" @click="clickLogout">
+                <div class="gac-action-icon">
                   <Icon icon="lucide:log-out" width="16" height="16" />
-                  <span>{{ $t('logOut') }}</span>
-                </button>
+                </div>
+                <span class="gac-action-text">{{ $t('signOutAllAccounts') }}</span>
               </div>
             </div>
 
-            <!-- "管理Epomail账户" (corresponds to Settings "设定") -->
+            <!-- "管理Epomail账户" (aligned sizing with cards) -->
             <div class="gac-manage-btn" @click="openSettings">
-              <Icon icon="lucide:settings" width="14" height="14" />
+              <Icon icon="lucide:settings" width="15" height="15" />
               <span>{{ $t('manageAccount') }}</span>
             </div>
 
-            <!-- Storage Progress Bar (Clickable, directly jumps to /settings/data#userStorage) -->
+            <!-- Storage Progress Bar (aligned sizing with cards) -->
             <div class="gac-single-storage" @click="openStorageSettings" :title="$t('manageStorage')" style="cursor: pointer;">
               <div class="gac-single-storage-header">
                 <span class="gac-single-storage-title">{{ $t('storageSpace') }}: {{ storageData.usedMb }} MB / {{ storageData.quotaDisplay }}</span>
@@ -205,14 +225,11 @@
               </div>
             </div>
 
-            <!-- Footer: 2 lines of text, no underline, no external icons -->
+            <!-- Footer: Horizontal, directly aligned with Gmail format -->
             <div class="gac-footer">
-              <div class="gac-legal-item" @click.prevent="openPrivacyPolicy">
-                <span>{{ $t('privacyPolicy') }}</span>
-              </div>
-              <div class="gac-legal-item" @click.prevent="openTermsOfService">
-                <span>{{ $t('termsOfService') }}</span>
-              </div>
+              <span class="gac-legal-item" @click.prevent="openPrivacyPolicy">{{ $t('privacyPolicy') }}</span>
+              <span class="gac-legal-separator">·</span>
+              <span class="gac-legal-item" @click.prevent="openTermsOfService">{{ $t('termsOfService') }}</span>
             </div>
           </div>
         </template>
@@ -266,6 +283,7 @@ import router from "@/router";
 import hanburger from '@/components/hamburger/index.vue'
 import {logout} from "@/request/login.js";
 import {updateProfile, getUserStorage} from "@/request/my.js";
+import {accountList} from "@/request/account.js";
 import {Icon} from "@iconify/vue";
 import {useUiStore} from "@/store/ui.js";
 import {useUserStore} from "@/store/user.js";
@@ -480,7 +498,20 @@ const storageFillWidth = computed(() => {
 // Multi-account mode flag:
 // "当且仅当管理员设定支援多账户模式时，开源完全学习Gmail的这套添加账户的方框模式，直接完全学习Gmail的方式，默认关闭时保持当前的情况"
 const isMultiAccountEnabled = computed(() => {
-  return Number(settingStore.settings?.multiAccountEnabled) === 1;
+  if (Number(settingStore.settings?.multiAccountEnabled) === 1) return true;
+  try {
+    const raw = localStorage.getItem('setting');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Number(parsed?.multiAccountEnabled) === 1 || Number(parsed?.settings?.multiAccountEnabled) === 1) {
+        return true;
+      }
+    }
+    if (Number(localStorage.getItem('multiAccountEnabled')) === 1) {
+      return true;
+    }
+  } catch (e) {}
+  return false;
 });
 
 const termsDialogVisible = ref(false);
@@ -494,8 +525,52 @@ function closeDropdown() {
 }
 
 const multiAccountExpanded = ref(false);
+const otherAccounts = ref([]);
+
+async function loadOtherAccounts() {
+  if (!isMultiAccountEnabled.value) return;
+  try {
+    const list = await accountList(0, 30);
+    if (Array.isArray(list)) {
+      const currId = accountStore.currentAccountId;
+      const currEmail = (displayEmail.value || '').toLowerCase().trim();
+      let filtered = list.filter(a => {
+        const isSameId = a.accountId && currId && a.accountId === currId;
+        const isSameEmail = a.email && currEmail && a.email.toLowerCase().trim() === currEmail;
+        return !isSameId && !isSameEmail;
+      });
+      // "界面最多可以容纳5个Gmail账户(超出的需要登出旧的采纳新加入)"
+      // 1 active account + max 4 other accounts = 5 total
+      if (filtered.length > 4) {
+        filtered = filtered.slice(0, 4);
+      }
+      otherAccounts.value = filtered;
+    }
+  } catch (err) {
+    console.warn('Failed to load other accounts:', err);
+  }
+}
+
+function switchAccount(acc) {
+  accountStore.currentAccountId = acc.accountId;
+  accountStore.currentAccount = acc;
+  if (acc.email) {
+    localStorage.setItem('loginEmail', acc.email);
+    if (userStore.user) {
+      userStore.user.account = acc;
+      userStore.user.email = acc.email;
+    }
+  }
+  closeDropdown();
+  loadOtherAccounts();
+  ElMessage.success((t('switchAccount') || '切换账号') + ': ' + (acc.name || acc.email));
+}
+
 function toggleMultiAccountExpand() {
   multiAccountExpanded.value = !multiAccountExpanded.value;
+  if (multiAccountExpanded.value) {
+    loadOtherAccounts();
+  }
 }
 
 function openStorageSettings() {
@@ -546,6 +621,9 @@ function onDropdownVisibleChange(visible) {
   if (visible) {
     clearCloseTimer();
     fetchStorageData();
+    if (isMultiAccountEnabled.value) {
+      loadOtherAccounts();
+    }
   } else {
     clearCloseTimer();
   }
@@ -1228,15 +1306,21 @@ function formatName(email) {
   background: #10b981;
 }
 
-/* Standalone Clickable Storage Progress Bar */
+/* Standalone Clickable Storage Progress Bar (aligned to card sizing) */
 .gac-single-storage {
-  margin: 0 16px 10px;
-  padding: 8px 12px;
-  background: var(--bg-subtle);
-  border: 1px solid var(--border-subtle);
-  border-radius: 12px;
+  margin: 0 14px 10px;
+  width: calc(100% - 28px);
+  padding: 10px 12px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-mid);
+  border-radius: 14px;
+  box-sizing: border-box;
   cursor: pointer;
   transition: all .15s ease;
+}
+.gac-multi-account-container .gac-single-storage {
+  margin: 0;
+  width: 100%;
 }
 .gac-single-storage:hover {
   border-color: var(--accent-primary);
@@ -1436,47 +1520,64 @@ function formatName(email) {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
 }
-.gac-card-actions {
-  background: var(--bg-subtle);
-  border: 1px solid var(--border-subtle);
-  border-radius: 12px;
+
+.gac-ma-card.other-account-card {
   display: flex;
-  overflow: hidden;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  cursor: pointer;
 }
-.gac-card-action-btn {
-  flex: 1;
+.gac-ma-card.other-account-card:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent-primary);
+}
+.gac-ma-card.other-account-card .other-avatar {
+  background: linear-gradient(135deg, #10b981, #06b6d4);
+}
+
+.gac-ma-card.gac-ma-action-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+.gac-ma-card.gac-ma-action-card:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent-primary);
+}
+.gac-ma-card.gac-ma-action-card.signout-all-card:hover {
+  color: var(--danger);
+  background: rgba(239, 68, 68, 0.08);
+  border-color: rgba(239, 68, 68, 0.3);
+}
+.gac-action-icon {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 8px 0;
-  border: none;
-  background: transparent;
-  color: var(--text-primary);
-  font-size: 12.5px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background .15s ease, color .15s ease;
+  color: var(--text-secondary);
+  flex-shrink: 0;
 }
-.gac-card-action-btn:hover {
-  background: var(--bg-hover);
-}
-.gac-card-action-btn.signout-btn:hover {
+.gac-ma-card.gac-ma-action-card.signout-all-card:hover .gac-action-icon {
   color: var(--danger);
-  background: rgba(239, 68, 68, 0.08);
 }
-.gac-card-action-divider {
-  width: 1px;
-  background: var(--border-subtle);
-  align-self: stretch;
+.gac-action-text {
+  font-size: 13px;
+  font-weight: 500;
 }
 
+/* "管理Epomail账户" (aligned with gac-ma-card sizing) */
 .gac-manage-btn {
   width: 100%;
-  height: 32px;
-  border-radius: 9999px;
   border: 1px solid var(--border-mid);
+  border-radius: 14px;
   background: var(--bg-surface);
   color: var(--text-primary);
   font-size: 13px;
@@ -1485,7 +1586,8 @@ function formatName(email) {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 8px;
+  padding: 10px 12px;
   transition: all .2s ease;
   box-sizing: border-box;
 }
@@ -1496,14 +1598,15 @@ function formatName(email) {
   box-shadow: 0 2px 8px rgba(99, 102, 241, 0.12);
 }
 
-/* Footer: 2 lines of text, NO underline, NO external link buttons */
+/* Footer: Horizontal, directly aligned with Gmail format */
 .gac-footer {
   border-top: 1px solid var(--border-subtle);
   background: var(--bg-subtle);
   padding: 10px 14px;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
+  justify-content: center;
   gap: 6px;
   font-size: 11.5px;
   color: var(--text-muted);
@@ -1514,10 +1617,17 @@ function formatName(email) {
   text-decoration: none !important;
   transition: color .15s ease;
   user-select: none;
+  padding: 2px 4px;
+  border-radius: 4px;
 }
 .gac-legal-item:hover {
   color: var(--text-primary);
   text-decoration: none !important;
+}
+.gac-legal-separator {
+  color: var(--text-muted);
+  user-select: none;
+  font-size: 11px;
 }
 
 .legal-doc-content {

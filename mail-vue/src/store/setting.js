@@ -32,6 +32,6 @@ export const useSettingStore = defineStore('setting', {
         },
     },
     persist: {
-        pick: ['lang'],
+        pick: ['lang', 'settings'],
     },
 })
