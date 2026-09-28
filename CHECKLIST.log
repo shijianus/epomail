@@ -10,6 +10,17 @@
 
 ---
 
+### EpomailDocs 独立仓库化：自父仓库解除追踪并 gitignore (2026-09-29)
+*   **关联提交 (Git Commit)**: `<见本次提交>`
+*   **部署环境 (Deployment)**: `仓库结构调整（无服务部署）`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] EpomailDocs（法律文档站）自本仓库 git 索引解除追踪（git rm -r --cached），并加入 .gitignore——按专案要求该文档站为独立 git 仓库，禁止放回 epomail 仓库
+    - [x] EpomailDocs 内部已 `git init` 为独立仓库（当前内容版本 4.1：6 语言 × 7 篇 × 42 页，繁中台湾版为正式版本）
+    - [x] 父仓库历史保留 EpomailDocs 早期提交记录以供追溯（2bed02b → e8f7cce）；此后其演进一律在独立仓库进行
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] `git status`：EpomailDocs 不再出现在父仓库追踪列表（仅 .gitignore 变更）
+    - [x] EpomailDocs 独立仓库 `git add -A` 预检 66 文件（node_modules/dist/tmp_laws/screenshots 均被正确排除）
+
 ### EpomailDocs 对标 Google 政策范式增补 + Astro Starlight 站点化与本地 Build/视觉全量核验 (2026-09-27)
 *   **关联提交 (Git Commit)**: `f2b07d0`（内容增补，12 文档 +673 行）+ `02c658c`（Astro Starlight 站点骨架与构建核验，9 文件）
 *   **部署环境 (Deployment)**: `本地 build + astro preview 视觉验证`（无生产部署，生产 Version ID 不变）

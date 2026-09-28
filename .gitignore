@@ -52,3 +52,6 @@ preview.html
 epomail-prototype.html
 tests/*.png
 .qoder/
+
+# EpomailDocs 已独立为专用 git 仓库（禁止放回本仓库），见 EpomailDocs/README.md
+EpomailDocs/
