@@ -10,6 +10,33 @@
 
 ---
 
+### 统一按当前管理员语言直出发信、移除弹窗语言选择行、邮件不可变版本投递与预置翻译直调退回机制 (2026-09-28)
+*   **关联提交 (Git Commit)**: `23ea4a7cec91f243ab3456657ceb567010e2a61d` (Short: `23ea4a7`)
+*   **部署环境 (Deployment)**: `本地全真栈 / 生产 Cloudflare (mail.epocanvas.com)`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 取消发信弹窗语言选择行 (`mail-vue/src/views/sys-setting/index.vue`):
+        - 彻底从「欢迎邮件」与「全域公告邮件」配置弹窗中移除 `.welcome-lang-row` 语言选择行及其对应说明；
+        - 发送语言选择统一绑定至管理员当前使用界面语言 (`adminDefaultLangKey` / `settingStore.lang`)，管理员使用什么语言，弹窗直接展示和发送该语言版本；
+    - [x] 系统邮件不可变版本投递保障 (`mail-worker/src/service/email-service.js`, `setting-service.js`):
+        - 废除服务端向用户分发欢迎邮件与全域公告时根据收件人语言进行自动切换的旧逻辑；
+        - 用户收到的所有官方信件严格以管理员发送的版本为准，保障版本唯一与真实原样；
+    - [x] 官方预置翻译版本极速直调与修改检测降级退回 (`mail-vue/src/utils/mail-translation-helper.js`, `mail-worker/src/const/welcome-template.js`, `mail-worker/src/service/ai-service.js`, `mail-vue/src/views/content/index.vue`):
+        - 建立官方系统邮件结构比对判定机制 (`getPredefinedTranslation`)，支持通配符、变量及 HTML 结构标准化比较；
+        - 用户在邮件详情点击翻译时，若该信件为未修改的官方邮件，直接提取并展示对应语言官方权威翻译，零网络延迟与零 AI Token 消耗；
+        - 动态支持主题与正文联动翻译；若管理员发送时已篡改内容或非官方模板，无缝自动降级退回 AI 智能翻译 (`/api/email/translate`)；
+    - [x] 用户语言偏好持久化完善 (`mail-worker/src/service/user-service.js`):
+        - 补充 `ALLOWED_PROFILE_FIELDS` 与 `safeSessionFields` 中的 `lang` 字段支持，确保多语言偏好变更时会话缓存与 KV 持久化完全一致。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：mail-vue `vite build` 13.70s 零警告零报错成功构建；
+    - [x] 多语言对称审计：`node scripts/i18n-symmetry.mjs` (2054 键 100% 严格对称)；`node scripts/i18n-audit.mjs` (0 缺失)；
+    - [x] 专项自动化回归套件：
+        - `node tests/test-admin-mail-lang-and-translation-fallback.mjs`: 33/33 项全栈单元与 Playwright UI 交互断言 100% 通过；
+        - `node tests/test-multilingual-email-templates-e2e.mjs`: 45/45 项断言 100% 通过；
+        - `node tests/test-multilingual-and-global-email-e2e.mjs`: 5/5 全链路检查点 100% 通过；
+    - [x] 零假数据与会话还原：测试脚本严格在 `finally` 块中复原管理员语言状态并清理环境，零假数据残留。
+
+---
+
 ### 头像卡片横向法务底栏对齐 Gmail、竖向多账户向下扩展架构与组件尺寸基准绝对对齐 (2026-09-28)
 *   **关联提交 (Git Commit)**: `b6709d1f979ed384e07387230cad5520855122e5` (Short: `b6709d1`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com / epomail.epocanvas.workers.dev)` (Version ID: `d21b9cda-5120-4e6d-9cd3-056b7ac867ec`，100% 流量) + `本地全真栈`
