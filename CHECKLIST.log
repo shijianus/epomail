@@ -10,6 +10,21 @@
 
 ---
 
+### EpomailDocs 专案介绍页：六语言完整专案介绍与开发提交链路 (2026-09-29)
+*   **关联提交 (Git Commit)**: `7ad5ebc1bc3b2846d0932c872ef7666b0d07d6bb` (Short: `7ad5ebc`)（EpomailDocs 独立仓库）
+*   **部署环境 (Deployment)**: `本地 build + astro preview 视觉验证`（无生产部署，生产 Version ID 不变）
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 依据参考范式仓库 EpoCanvasDocs（../EpoCanvasDocs）「这是什么／产品简介与核心价值」页面范式，为 EpomailDocs 新增六语言同构《专案介绍》页（mail/project），站点由 7 篇 42 页扩展为 8 篇 48 页
+    - [x] 内容完整：专案定位（自建与商业邮箱双痛点、无服务器第三路径）、五组核心功能（邮件收发／搜索分类／AI 能力／身份权限与开放平台／界面多语言，全部经仓库源码逐项核实）、技术架构（技术栈表 + 双 D1 物理隔离 + 六目录分工表）、安全设计（PBKDF2-HMAC-SHA256 ×100,000 / HMAC 20 位防越权 Hash / XSS 三重防御 / SSRF 阻断 / 137 路由鉴权）、质量保障（102 测试脚本与量化断言）、获取与部署（三步自部署 + /api/init 引导与密钥注入）
+    - [x] commit 链路完整：11 阶段里程碑表（短 Hash 锚点）+ 主仓库 25 个 40 位全量 Hash 里程碑锚点链（`2bbb582` 2026-07-21 → `617cccf` 2026-09-29）+ EpomailDocs 独立仓库 3 个提交全量链（5208abc → 5fb18df → 270cfd1），并注明经 GitHub 提交历史逐条追溯
+    - [x] 新增 `public/images/mail/project-architecture.svg` 系统架构三层图（CLIENTS → CLOUDFLARE EDGE → STORAGE + 底部安全基线，英文微标签跨语言复用、语义由六语言图注承载，浅色 + prefers-color-scheme 暗色双主题）
+    - [x] astro.config.mjs 侧栏首列「专案介绍」并补齐 zh-tw/en/fr/es/nl 五语言 label；EpomailDocs README 同步为 8 篇 × 6 语言（48 页）、7 张配图
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：`pnpm build` 49 页零报错（17.3s），Pagefind 六语言全文索引正常
+    - [x] 锚点全量校验：`scripts/validate-anchors.cjs`——480 个页内锚点 0 断链，/images 引用全部存在
+    - [x] 浏览器全真栈实测：astro preview @127.0.0.1:4326，Playwright 截图 13 张（六语言 × 亮/暗 × 1440/375px），侧栏 8 条目与首项高亮、六语言 label、SVG 明暗适配、里程碑表与提交链路代码块渲染全部正确；发现并修复六语言「frontmatter 标题 + 正文 H1」双标题缺陷（单 H1 定稿后复拍确认）
+    - [x] 零假数据残留：页面全部技术事实（提交 Hash、PBKDF2 迭代次数、i18n 键数 2039/1888、路由数 137、测试断言数）均经 git log 与源码逐项核实；验证用本地服务已停止，node_modules/dist/screenshots 经 .gitignore 排除不入库
+
 ### EpomailDocs 独立仓库化：自父仓库解除追踪并 gitignore (2026-09-29)
 *   **关联提交 (Git Commit)**: `<见本次提交>`
 *   **部署环境 (Deployment)**: `仓库结构调整（无服务部署）`
