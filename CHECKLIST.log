@@ -10,6 +10,25 @@
 
 ---
 
+### EpomailDocs 法律文档站 v5.0：全站去条号引用改造（6 语言 × 7 篇 × SVG）+ 远端仓库同步 (2026-09-29)
+*   **关联提交 (Git Commit)**: `05c222c4ff2531dc17b29994c0806ade1ed99ed0` (Short: `05c222c`)（EpomailDocs 独立仓库，主体改造）；`d3d1d30`（同仓，远端旧结构文档线采纳为历史祖先，树以本地为准）；两提交均已推送至 `github.com/shijianus/epomail-docs` main 分支
+*   **部署环境 (Deployment)**: `本地 build + astro preview 视觉验证`（无生产部署，生产 Version ID 不变）
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] v5.0 核心立场落地：开源专案面向所有国家或地区用户，法律文档不再逐条罗列法域条号——全站法条引用计数归零（此前台湾法规条号堆砌全数移除）；义务表述锚定「适用法律」，各实例适用之法律以其运营者所在地为准；托管实例 `mail.epocanvas.com`（台湾营运）适用台湾现行法律（含《个人资料保护法》仅法规名称）并接受主管机关依法检查监督；自行部署实例由部署者依其所在地法律独立履行义务
+    - [x] 服务器合规标准作为与法域无关之技术事实直接陈述（Cloudflare SOC 2 Type II、ISO/IEC 27001、欧盟标准合同条款）；法定框架行为（180 日证据保存、营销拒绝、电子通知时效）转为运营者承诺表述，行为实质不变
+    - [x] en/es/fr/nl 四语言全量同步 v5.0（28 文件）：隐私政策 §5「法律依据」→「处理性质」、§4.5「特种」→「高敏感个人资料」、§12 改「适用法律与主管监督」；服务条款准据法/管辖按实例类型分列（托管=台湾法+台北地方法院，自部署=部署者属地）；AUP 禁止行为表「对应法源」列改「运营者之处置」（境外反垃圾邮件法规仅保留名称不带条号）；data-security §3 改通用安全维护事项（11 项实质保留）；key-terms 删「告诉乃论」行并全面去条号
+    - [x] 补修上次会话遗漏：zh-tw 可接受使用政策与服务条款两处 frontmatter 描述仍带法条引用（已同步 v5.0 措辞）
+    - [x] 5 张 SVG 配图图内微标签去法条编号（privacy-pillars 五支柱 ART 锚点→概念标签、data-flow 六阶段、legal-architecture 准据法基座、self-host-responsibilities、aup-ladder 零容忍横幅），亮/暗双主题
+    - [x] doc/legal-reference.md 改为 v5.0 立场说明（保留为 2026-09-28 台湾法规核验事实底稿，不再作条号白名单；「写作结论」节改写为 v5.0 规范防回退）；README 文档矩阵/法律要点/配图说明同步；新增 `scripts/check-structure.py` 六语言结构对称性回归检查与 `scripts/apply-mail-v5.py` 同步脚本归档
+    - [x] 远端同步：EpomailDocs 远端 main 为早期单语言草稿（project 15 篇 + legal 9 篇，与本地演进分叉且无共同祖先）——以 `-s ours` 策略合并采纳其历史（d3d1d30），树保持本地六语言站点为唯一事实源，远端旧文档保留于合并父提交可追溯；远端 URL 因 HTTPS 凭证无法非交互认证而切换为 SSH（`git@github.com:shijianus/epomail-docs.git`）
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：`pnpm build` 49 页 18.36s 零报错（Pagefind 六语言索引正常）
+    - [x] 锚点全量校验：`scripts/validate-anchors.cjs`——480 个页内锚点 0 断链
+    - [x] 法条引用归零核验：`scripts/check-article-whitelist.py`——全站 6 语言引用扫描计数 0
+    - [x] 结构对称性核验：`scripts/check-structure.py`——6 语言 × 7 篇标题/表格/配图/提示框 1:1 全绿
+    - [x] 浏览器全真栈实测：astro preview @127.0.0.1:4327，Playwright 截图 10 页面 × 亮/暗 + 5 张 SVG 原件 × 亮/暗逐张目检——图内无法条残留、无文字溢出（修复 data-flow 第 4 阶段标签顶边 1 处后复拍确认）；六语言版本行统一 5.0、抽读 en/es/fr/nl §11/§12 属地化改写全部正确
+    - [x] 零假数据残留：文档全部技术事实（加密语义、保存期限、第三方清单、Cloudflare 认证）经源码与既有底稿核实未变动；验证用本地服务已停止，dist/screenshots/tmp_laws 经 .gitignore 排除不入库
+
 ### EpomailDocs 专案介绍页：六语言完整专案介绍与开发提交链路 (2026-09-29)
 *   **关联提交 (Git Commit)**: `7ad5ebc1bc3b2846d0932c872ef7666b0d07d6bb` (Short: `7ad5ebc`)（EpomailDocs 独立仓库）
 *   **部署环境 (Deployment)**: `本地 build + astro preview 视觉验证`（无生产部署，生产 Version ID 不变）
