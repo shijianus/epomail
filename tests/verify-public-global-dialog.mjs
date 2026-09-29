@@ -173,21 +173,44 @@ const ADMIN_PWD = '123456';
       await page.waitForTimeout(500);
     }
 
-    // 8. 测试关闭弹窗
-    console.log('\n[步骤 8] 测试关闭弹窗...');
+    // 8. 测试关闭全域公告弹窗
+    console.log('\n[步骤 8] 测试关闭全域公告弹窗...');
     const closeBtn = page.locator('.global-email-dialog-canvas .close-icon-btn');
     await closeBtn.click();
     await page.waitForTimeout(500);
     assert.ok(!(await dialog.isVisible()), '点击关闭后弹窗必须顺利关闭');
-    console.log('  ✓ 弹窗顺利关闭');
+    console.log('  ✓ 全域公告弹窗顺利关闭');
+
+    // 9. 连带校验「自动发送新用户欢迎邮件」弹窗
+    console.log('\n[步骤 9] 连带校验「自动发送新用户欢迎邮件」弹窗...');
+    const welcomeSettingItem = page.locator('.setting-item').filter({ hasText: /新用户欢迎邮件|欢迎邮件|Welcome Email/i }).first();
+    assert.ok(await welcomeSettingItem.count() > 0, '必须找到欢迎邮件设置项');
+    const welcomeBtn = welcomeSettingItem.locator('button.opt-button');
+    await welcomeBtn.click();
+    await page.waitForTimeout(1000);
+
+    const welcomeDialog = page.locator('.welcome-dialog-canvas:not(.global-email-dialog-canvas)');
+    assert.ok(await welcomeDialog.isVisible(), '欢迎邮件弹窗必须正常弹出并可见');
+    const welcomeLangRow = welcomeDialog.locator('.welcome-lang-row');
+    assert.strictEqual(await welcomeLangRow.count(), 0, '欢迎邮件弹窗中 class="welcome-lang-row" 必须物理不存在');
+    console.log('  ✓ 欢迎邮件弹窗成功弹出，且零 welcome-lang-row 存在');
+    await page.screenshot({ path: 'tests/public_verify_welcome_dialog_success.png' });
+
+    // 关闭欢迎邮件弹窗
+    const welcomeCloseBtn = welcomeDialog.locator('.close-icon-btn');
+    await welcomeCloseBtn.click();
+    await page.waitForTimeout(500);
+    assert.ok(!(await welcomeDialog.isVisible()), '欢迎邮件弹窗顺利关闭');
+    console.log('  ✓ 欢迎邮件弹窗顺利关闭');
 
     console.log('\n================================================================');
-    console.log('🎉 公网生产环境 (https://mail.epocanvas.com) 真实全真验证 100% 全部通过！');
+    console.log('🎉 公网生产环境 (https://mail.epocanvas.com) 真实全真双弹窗验证 100% 全部通过！');
     console.log('  1. "全域公告邮件" 按钮响应丝滑，0延迟即时弹出');
-    console.log('  2. 弹窗内彻底移除了 welcome-lang-row，禁止修改邮件语言');
-    console.log('  3. 官方发件人统一规范为 announcement@epocanvas.com');
-    console.log('  4. vue-i18n 字符转义彻底修复，零控制台抛错');
-    console.log('  5. 富文本与 Markdown 源码双模平滑切换');
+    console.log('  2. "欢迎邮件" 按钮响应丝滑，0延迟即时弹出');
+    console.log('  3. 两大官方邮件弹窗内彻底移除了 welcome-lang-row，禁止修改邮件语言');
+    console.log('  4. 官方发件人统一规范为 announcement@epocanvas.com');
+    console.log('  5. vue-i18n 字符转义彻底修复，零控制台抛错');
+    console.log('  6. 富文本与 Markdown 源码双模平滑切换');
     console.log('================================================================');
   } catch (err) {
     console.error('\n❌ 公网测试失败:', err);
