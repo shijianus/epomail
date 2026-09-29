@@ -8,18 +8,6 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
-### 父仓库远端合并同步：采纳远端应用开发线 16 提交与核验清单时间序归并 (2026-09-29)
-*   **关联提交 (Git Commit)**: `7ef09382c3f3fbfd457c400606c1e37e845cf9d0` (Short: `7ef0938`)
-*   **部署环境 (Deployment)**: `仓库同步与文档归并`（无服务部署，生产 Version ID 不变）
-*   **功能需求与变更清单 (Changes & Feature Alignment)**:
-    - [x] git fetch 发现父仓与远端分叉：本地 8 提交（EpomailDocs 法律文档站线）↔ 远端 16 提交（另一开发环境推进的 Gmail 头像卡片、官方发件地址 announcement@epocanvas.com、邮件不可变投递与专项审计报告等应用开发）；因父仓提交 Hash 已被 EpomailDocs 专案介绍页里程碑锚点链引用，采用 merge（而非 rebase）保全双方全部 Hash 可追溯
-    - [x] 冲突仅 CHECKLIST.log 一处（双方均在文件顶部追加条目），git 自动归并 246 条目零丢失；手动按各条目引入提交之精确时间戳重排顶部 12 条为严格时间倒序（本地 09-29 三条 → 远端 09-28 四条 → 09-27 按提交时刻交错），修复自动归并产生的非时序排列
-    - [x] EpomailDocs 独立仓库状态在合并后保持：父仓 0 个追踪文件，.gitignore 排除规则生效，独立仓 master 与远端 main 同步（05c222c）
-*   **自动化测试与核验清单 (Verification Checklist)**:
-    - [x] 静态多语言对称性：`node scripts/i18n-symmetry.mjs`——合并树 mail-worker 1888 键 × 6 语言 100% 严格对称（含远端新增词条）
-    - [x] 本地构建核验：mail-vue `vite build` 39.37s 零警告零报错（远端 16 提交应用代码并入后编译通过）
-    - [x] 推送后终检：父仓 master == origin/master（7ef0938）0 ahead/0 behind，工作树干净；核验清单 246 条目完整、表头与文件职能注释无损
-
 ### EpomailDocs 上线就绪审计：远端应用变更技术事实校准与部署配置盘点 (2026-09-30)
 *   **关联提交 (Git Commit)**: `5197f50`（EpomailDocs 独立仓库，完整 Hash 见该仓 git log；已推送 origin/main）
 *   **部署环境 (Deployment)**: `本地 build 审计核验`（无生产部署，生产 Version ID 不变）
@@ -33,6 +21,44 @@
     - [x] 结构与合规回归：check-structure 6 语言 × 7 篇 1:1 全绿；check-article-whitelist 全站法条引用计数 0
     - [x] 文案规范扫描：AI 味总结句/Republic of China 残留 0；破折号链仅存于历史提交引文；六语言联络邮箱一致；「法定/statutory」命中均为合规通用法律用语
     - [x] 零假数据残留：文档技术事实全部经当前源码核实；无验证数据产生
+
+### 父仓库远端合并同步：采纳远端应用开发线 16 提交与核验清单时间序归并 (2026-09-29)
+*   **关联提交 (Git Commit)**: `7ef09382c3f3fbfd457c400606c1e37e845cf9d0` (Short: `7ef0938`)
+*   **部署环境 (Deployment)**: `仓库同步与文档归并`（无服务部署，生产 Version ID 不变）
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] git fetch 发现父仓与远端分叉：本地 8 提交（EpomailDocs 法律文档站线）↔ 远端 16 提交（另一开发环境推进的 Gmail 头像卡片、官方发件地址 announcement@epocanvas.com、邮件不可变投递与专项审计报告等应用开发）；因父仓提交 Hash 已被 EpomailDocs 专案介绍页里程碑锚点链引用，采用 merge（而非 rebase）保全双方全部 Hash 可追溯
+    - [x] 冲突仅 CHECKLIST.log 一处（双方均在文件顶部追加条目），git 自动归并 246 条目零丢失；手动按各条目引入提交之精确时间戳重排顶部 12 条为严格时间倒序（本地 09-29 三条 → 远端 09-28 四条 → 09-27 按提交时刻交错），修复自动归并产生的非时序排列
+    - [x] EpomailDocs 独立仓库状态在合并后保持：父仓 0 个追踪文件，.gitignore 排除规则生效，独立仓 master 与远端 main 同步（05c222c）
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 静态多语言对称性：`node scripts/i18n-symmetry.mjs`——合并树 mail-worker 1888 键 × 6 语言 100% 严格对称（含远端新增词条）
+    - [x] 本地构建核验：mail-vue `vite build` 39.37s 零警告零报错（远端 16 提交应用代码并入后编译通过）
+    - [x] 推送后终检：父仓 master == origin/master（7ef0938）0 ahead/0 behind，工作树干净；核验清单 246 条目完整、表头与文件职能注释无损
+
+### ### 修复全域公告邮件按钮失效、vue-i18n 特殊字符转义与公网全真验证 (2026-09-29)
+*   **关联提交 (Git Commit)**: `ffe4b929d23e188442a252a2fc3f0a621c903ba7` (Short: `ffe4b92`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com / epomail.epocanvas.workers.dev)` (Version ID: `b47f6034-6e8d-48a3-ac59-2f5ae37797f9`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 根因分析与 i18n 字符转义 (`mail-vue/src/i18n/*.js`, `mail-worker/src/i18n/*.js`):
+        - 定位此前按钮点击无响应的根本原因：在 `vue-i18n` 规范中 `@` 符号用于引用解析 (Linked Messages)，未转义的 `announcement@epocanvas.com` 导致挂载弹窗渲染 `globalEmailSenderOfficial` 时抛出 `SyntaxError: 10` 运行时未捕获异常崩溃；
+        - 对 6 国语言字典（zh, zh-Hant, en, es, fr, nl）全量进行 `@` 字符安全转义为 `{'@'}`，彻底杜绝语法崩溃。
+    - [x] 弹窗打开体验优化 (`mail-vue/src/views/sys-setting/index.vue`):
+        - 重构 `openGlobalEmailDialog()`，同步初始化管理员当前语言与模板并立即置 `globalEmailDialogShow = true`，角色列表与缓存配置后台异步拉取，达成 0ms 零延迟即时开窗体验。
+    - [x] 生产全量构建与部署 (`mail-worker`):
+        - 完成 `mail-vue` 生产构建与 `wrangler deploy`，成功发布至生产环境，Version ID 为 `b47f6034-6e8d-48a3-ac59-2f5ae37797f9`。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 多语言对称静态审计：`node scripts/i18n-symmetry.mjs` (2054 键严格对称，100% 对齐)；`node scripts/i18n-audit.mjs` (0 缺失，0 动态 key)；
+    - [x] 公网全真端到端实测 (`tests/verify-public-global-dialog.mjs`):
+        - 访问公网目标 URL `https://mail.epocanvas.com/mail/u/0/#system-setting`；
+        - 定位并点击全域公告邮件按钮 (`class="el-button el-button--primary el-button--small opt-button"`)；
+        - 断言弹窗立即可见，标题为「全域公告邮件」，官方标签显示「官方公告 announcement@epocanvas.com」；
+        - 断言 `welcome-lang-row` 存在数量为 0；目标受众行正常展示；
+        - 断言富文本编辑器正常挂载并成功预填邮件主题；
+        - 断言富文本与 Markdown 源码模式平滑切换成功；
+        - 确认控制台与页面零未捕获运行时报错 (0 page errors, 0 syntax errors)；
+        - 截图留存：`tests/public_verify_global_dialog_success.png` 与 `tests/public_verify_global_markdown_mode.png`；
+    - [x] 零假数据残留：生产数据库 TOTP 状态在 `finally` 块中严格恢复（`totp_enabled = 1`），全真验证零脏数据残留。
+
+---
 
 ### EpomailDocs 法律文档站 v5.0：全站去条号引用改造（6 语言 × 7 篇 × SVG）+ 远端仓库同步 (2026-09-29)
 *   **关联提交 (Git Commit)**: `05c222c4ff2531dc17b29994c0806ade1ed99ed0` (Short: `05c222c`)（EpomailDocs 独立仓库，主体改造）；`d3d1d30`（同仓，远端旧结构文档线采纳为历史祖先，树以本地为准）；两提交均已推送至 `github.com/shijianus/epomail-docs` main 分支

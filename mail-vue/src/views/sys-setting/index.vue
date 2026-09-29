@@ -4694,16 +4694,32 @@ function confirmBroadcastWelcome() {
 
 // Global Announcement Email Handlers
 function openGlobalEmailDialog() {
-  // 1. Fetch available roles
+  // 1. Immediately initialize with active admin language & default template for zero-lag instant UI response
+  globalActiveLang.value = adminDefaultLangKey.value || 'zh'
+  const defaultAnnTpl = getAnnouncementTemplate(globalActiveLang.value)
+  if (!globalEmailForm.subject) {
+    globalEmailForm.subject = defaultAnnTpl.subject
+  }
+  if (!globalEmailForm.content) {
+    globalEmailForm.content = defaultAnnTpl.content
+  }
+  globalEmailEditorFormat.value = 'rich'
+  isGlobalEmailFullscreen.value = false
+  globalEmailDialogShow.value = true
+
+  nextTick(() => {
+    if (globalEditorRef.value && globalEditorRef.value.setContent) {
+      globalEditorRef.value.setContent(globalEmailForm.content)
+    }
+  })
+
+  // 2. Fetch available roles in background
   roleRoleList().then(res => {
     availableRoles.value = Array.isArray(res) ? res : []
   }).catch(() => {})
 
-  // 2. Fetch or load cached global email config
+  // 3. Fetch or load cached global email config in background and sync
   getGlobalEmailConfig().then(cfg => {
-    globalActiveLang.value = adminDefaultLangKey.value || 'zh'
-    const defaultAnnTpl = getAnnouncementTemplate(globalActiveLang.value)
-    // Populate per-language template map from saved multilingual templates (empty slots fall back to official defaults on switch)
     const savedLangTpl = (cfg && cfg.templates && typeof cfg.templates === 'object') ? cfg.templates : {}
     supportedWelcomeLangs.forEach(item => {
       const saved = savedLangTpl[item.key] || {}
@@ -4729,18 +4745,12 @@ function openGlobalEmailDialog() {
     globalEmailForm.sendToNewUsers = cfg?.sendToNewUsers !== undefined ? Number(cfg.sendToNewUsers) : 1
     globalEmailForm.isStarred = cfg?.isStarred !== undefined ? Number(cfg.isStarred) : 1
 
-    globalEmailEditorFormat.value = 'rich'
-    isGlobalEmailFullscreen.value = false
-    globalEmailDialogShow.value = true
-
     nextTick(() => {
       if (globalEditorRef.value && globalEditorRef.value.setContent) {
         globalEditorRef.value.setContent(globalEmailForm.content)
       }
     })
-  }).catch(() => {
-    globalEmailDialogShow.value = true
-  })
+  }).catch(() => {})
 }
 
 function closeGlobalEmailDialog() {
