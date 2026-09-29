@@ -20,6 +20,20 @@
     - [x] 本地构建核验：mail-vue `vite build` 39.37s 零警告零报错（远端 16 提交应用代码并入后编译通过）
     - [x] 推送后终检：父仓 master == origin/master（7ef0938）0 ahead/0 behind，工作树干净；核验清单 246 条目完整、表头与文件职能注释无损
 
+### EpomailDocs 上线就绪审计：远端应用变更技术事实校准与部署配置盘点 (2026-09-30)
+*   **关联提交 (Git Commit)**: `5197f50`（EpomailDocs 独立仓库，完整 Hash 见该仓 git log；已推送 origin/main）
+*   **部署环境 (Deployment)**: `本地 build 审计核验`（无生产部署，生产 Version ID 不变）
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 逐项复核父仓远端 16 个应用提交对法律文档技术事实的影响：email-service/setting-service/star-service（官方发件地址统一为 announcement@epocanvas.com、系统邮件不可变投递）、ai-service + mail-translation-helper（官方邮件翻译走预置模板、客户端本地渲染、无 AI 传输）、storage-quota-service（存储统计口径扩展）、user-service（lang 配置字段）——发现并修复两类过时陈述：project.md 六语言「按收件人语言投递」→ 现行「默认以管理员发送版本投递（不可变快照）+ 预置模板本地渲染 + AI 回退」；privacy-policy §6.2 六语言补充预置模板翻译之透明度披露
+    - [x] 其余技术事实零过时确认：PBKDF2×100,000、失败锁定、JWT 30 日 localStorage、会话上限 10、TOTP AES-256-GCM、垃圾箱 7 日实体删除、配额清理、三种加密模式语义、第三方处理者清单均未被远端提交触及（storage-quota 仅统计口径扩展，文档未声明统计细节）
+    - [x] 部署配置盘点：astro.config.mjs 的 SITE_ORIGIN 仍为 mail.epocanvas.com 占位——文档站 /mail/* 路径与邮件应用 /mail/u/0 路由同域冲突，正式上线须另定域名（如 docs.epocanvas.com）并同步修改 SITE_ORIGIN 一行与 robots.txt 的 Sitemap 行；仓库暂无发布管道（建议 Cloudflare Pages 连接仓库或 wrangler pages deploy dist）；本次已补 public/robots.txt（Allow all + Sitemap 引用，与 SITE_ORIGIN 联动注释）
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：`pnpm build` 49 页 13.93s 零报错
+    - [x] 锚点全量校验：480 个页内锚点 0 断链；跨页内链一次性全检 884 条 0 断链
+    - [x] 结构与合规回归：check-structure 6 语言 × 7 篇 1:1 全绿；check-article-whitelist 全站法条引用计数 0
+    - [x] 文案规范扫描：AI 味总结句/Republic of China 残留 0；破折号链仅存于历史提交引文；六语言联络邮箱一致；「法定/statutory」命中均为合规通用法律用语
+    - [x] 零假数据残留：文档技术事实全部经当前源码核实；无验证数据产生
+
 ### EpomailDocs 法律文档站 v5.0：全站去条号引用改造（6 语言 × 7 篇 × SVG）+ 远端仓库同步 (2026-09-29)
 *   **关联提交 (Git Commit)**: `05c222c4ff2531dc17b29994c0806ade1ed99ed0` (Short: `05c222c`)（EpomailDocs 独立仓库，主体改造）；`d3d1d30`（同仓，远端旧结构文档线采纳为历史祖先，树以本地为准）；两提交均已推送至 `github.com/shijianus/epomail-docs` main 分支
 *   **部署环境 (Deployment)**: `本地 build + astro preview 视觉验证`（无生产部署，生产 Version ID 不变）
