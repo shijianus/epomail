@@ -1956,7 +1956,7 @@ export const GLOBAL_ANNOUNCEMENT_TEMPLATES = {
     <p style="margin: 6px 0 0; color: #64748b; font-size: 14px;">1. 在此编辑您的公告内容<br>2. 支持多语言模板，按收件人语言自动分发<br>3. 支持 {{current_date}} 等动态变量占位符</p>
   </div>
   <p style="color: #94a3b8; font-size: 12.5px; margin-top: 28px; border-top: 1px dashed #e2e8f0; padding-top: 16px;">
-    此邮件由系统站长 (admin@epocanvas.com) 统一发布 · 祝您使用愉快！
+    此邮件由系统站长 (announcement@epocanvas.com) 统一发布 · 祝您使用愉快！
   </p>
 </div>`
   },
@@ -1972,7 +1972,7 @@ export const GLOBAL_ANNOUNCEMENT_TEMPLATES = {
     <p style="margin: 6px 0 0; color: #64748b; font-size: 14px;">1. 在此編輯您的公告內容<br>2. 支援多語言模板，按收件人語言自動分發<br>3. 支援 {{current_date}} 等動態變數佔位符</p>
   </div>
   <p style="color: #94a3b8; font-size: 12.5px; margin-top: 28px; border-top: 1px dashed #e2e8f0; padding-top: 16px;">
-    此郵件由系統站長 (admin@epocanvas.com) 統一發佈 · 祝您使用愉快！
+    此郵件由系統站長 (announcement@epocanvas.com) 統一發佈 · 祝您使用愉快！
   </p>
 </div>`
   },
@@ -1988,7 +1988,7 @@ export const GLOBAL_ANNOUNCEMENT_TEMPLATES = {
     <p style="margin: 6px 0 0; color: #64748b; font-size: 14px;">1. Edit your announcement content here<br>2. Multilingual templates are delivered per recipient language<br>3. Dynamic placeholders such as {{current_date}} are supported</p>
   </div>
   <p style="color: #94a3b8; font-size: 12.5px; margin-top: 28px; border-top: 1px dashed #e2e8f0; padding-top: 16px;">
-    Published by the site administrator (admin@epocanvas.com) · Enjoy your stay!
+    Published by the site administrator (announcement@epocanvas.com) · Enjoy your stay!
   </p>
 </div>`
   },
@@ -2004,7 +2004,7 @@ export const GLOBAL_ANNOUNCEMENT_TEMPLATES = {
     <p style="margin: 6px 0 0; color: #64748b; font-size: 14px;">1. Modifiez le contenu de votre annonce ici<br>2. Les modèles multilingues sont distribués selon la langue du destinataire<br>3. Les variables dynamiques comme {{current_date}} sont prises en charge</p>
   </div>
   <p style="color: #94a3b8; font-size: 12.5px; margin-top: 28px; border-top: 1px dashed #e2e8f0; padding-top: 16px;">
-    Publié par l'administrateur du site (admin@epocanvas.com) · Bonne continuation !
+    Publié par l'administrateur du site (announcement@epocanvas.com) · Bonne continuation !
   </p>
 </div>`
   },
@@ -2020,7 +2020,7 @@ export const GLOBAL_ANNOUNCEMENT_TEMPLATES = {
     <p style="margin: 6px 0 0; color: #64748b; font-size: 14px;">1. Edita aquí el contenido de tu anuncio<br>2. Las plantillas multilingües se entregan según el idioma del destinatario<br>3. Se admiten marcadores dinámicos como {{current_date}}</p>
   </div>
   <p style="color: #94a3b8; font-size: 12.5px; margin-top: 28px; border-top: 1px dashed #e2e8f0; padding-top: 16px;">
-    Publicado por el administrador del sitio (admin@epocanvas.com) · ¡Que disfrutes el servicio!
+    Publicado por el administrador del sitio (announcement@epocanvas.com) · ¡Que disfrutes el servicio!
   </p>
 </div>`
   },
@@ -2036,7 +2036,7 @@ export const GLOBAL_ANNOUNCEMENT_TEMPLATES = {
     <p style="margin: 6px 0 0; color: #64748b; font-size: 14px;">1. Bewerk hier de inhoud van je aankondiging<br>2. Meertalige sjablonen worden per ontvangerstaal bezorgd<br>3. Dynamische variabelen zoals {{current_date}} worden ondersteund</p>
   </div>
   <p style="color: #94a3b8; font-size: 12.5px; margin-top: 28px; border-top: 1px dashed #e2e8f0; padding-top: 16px;">
-    Gepubliceerd door de sitebeheerder (admin@epocanvas.com) · Veel plezier!
+    Gepubliceerd door de sitebeheerder (announcement@epocanvas.com) · Veel plezier!
   </p>
 </div>`
   }
@@ -2045,3 +2045,128 @@ export const GLOBAL_ANNOUNCEMENT_TEMPLATES = {
 export function getGlobalAnnouncementTemplate(lang = 'zh') {
   return GLOBAL_ANNOUNCEMENT_TEMPLATES[normalizeLangKey(lang)] || GLOBAL_ANNOUNCEMENT_TEMPLATES.zh;
 }
+
+function interpolatePlaceholders(str, userEmail = '', userName = '') {
+  if (!str || typeof str !== 'string') return '';
+  const domain = userEmail ? (userEmail.split('@')[1] || 'epomail.bond') : 'epomail.bond';
+  const name = userName || (userEmail ? userEmail.split('@')[0] : 'User');
+  return str
+    .replace(/\{\{\s*user_name\s*\}\}/gi, name)
+    .replace(/\{\{\s*username\s*\}\}/gi, name)
+    .replace(/\{\{\s*user_email\s*\}\}/gi, userEmail || '')
+    .replace(/\{\{\s*domain\s*\}\}/gi, domain);
+}
+
+function cleanText(str) {
+  if (!str) return '';
+  return str
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function cleanHtmlStructure(str) {
+  if (!str) return '';
+  return str
+    .replace(/\s+/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .trim();
+}
+
+export function getPredefinedTranslation(email, targetLang) {
+  if (!email) return null;
+  const normTarget = normalizeLangKey(targetLang);
+  const SUPPORTED_LANGS = ['zh', 'zh-Hant', 'en', 'fr', 'es', 'nl'];
+  if (!SUPPORTED_LANGS.includes(normTarget)) {
+    return null;
+  }
+
+  const actualContent = email.content || email.html || '';
+  const actualText = email.text || '';
+  const actualSubject = email.subject || '';
+  const toEmail = email.toEmail || '';
+  const toName = email.toName || '';
+
+  const candidateNames = [
+    toName,
+    toEmail ? toEmail.split('@')[0] : '',
+    'Epocanvas 用户',
+    'Epocanvas 用戶',
+    'User',
+    'Epocanvas User'
+  ].filter(Boolean);
+
+  const cleanedActualContent = cleanHtmlStructure(actualContent);
+  const cleanedActualText = cleanText(actualContent || actualText);
+  const cleanedActualSubject = cleanText(actualSubject);
+
+  const templateSets = [
+    { type: 'welcome', templates: WELCOME_TEMPLATES },
+    { type: 'announcement', templates: GLOBAL_ANNOUNCEMENT_TEMPLATES }
+  ];
+
+  for (const set of templateSets) {
+    for (const srcLang of SUPPORTED_LANGS) {
+      const srcTpl = set.templates[srcLang];
+      if (!srcTpl || !srcTpl.content) continue;
+
+      for (const nameCandidate of candidateNames) {
+        const expectedHtml = interpolatePlaceholders(srcTpl.content, toEmail, nameCandidate);
+        const expectedSubject = interpolatePlaceholders(srcTpl.subject, toEmail, nameCandidate);
+
+        const cleanedExpectedHtml = cleanHtmlStructure(expectedHtml);
+        const cleanedExpectedText = cleanText(expectedHtml);
+        const cleanedExpectedSubject = cleanText(expectedSubject);
+
+        let subjectMatches = (cleanedActualSubject === cleanedExpectedSubject);
+        if (!subjectMatches && set.type === 'announcement' && srcLang === 'zh') {
+          if (cleanedActualSubject === cleanText('📢 系统全域通知与版本升级公告')) {
+            subjectMatches = true;
+          }
+        }
+        if (!cleanedActualSubject && (cleanedActualContent.length > 100 || cleanedActualText.length > 50)) {
+          subjectMatches = true;
+        }
+
+        const contentMatches = (cleanedActualContent && cleanedActualContent === cleanedExpectedHtml) ||
+                               (cleanedActualText && cleanedActualText === cleanedExpectedText);
+
+        if (subjectMatches && contentMatches) {
+          const targetTpl = set.templates[normTarget];
+          if (!targetTpl || !targetTpl.content) return null;
+
+          const translatedHtml = interpolatePlaceholders(targetTpl.content, toEmail, toName);
+          const translatedSubject = interpolatePlaceholders(targetTpl.subject, toEmail, toName);
+          const translatedText = cleanText(translatedHtml);
+
+          return {
+            translatedHtml,
+            translatedText,
+            translatedSubject,
+            isHtml: true,
+            engine: 'template',
+            sourceLang: srcLang,
+            targetLang: normTarget,
+            templateType: set.type
+          };
+        }
+      }
+    }
+  }
+
+  return null;
+}
+

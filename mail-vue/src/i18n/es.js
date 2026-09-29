@@ -1383,7 +1383,7 @@ totpModeAllDesc: 'Configurar si los usuarios pueden usar TOTP. Al activarlo, la 
     globalEmailAction: 'Transmitir correo',
     globalEmailSendTitle: 'Redactar y transmitir correo de anuncio global',
     globalEmailSender: 'Canal de remitente',
-    globalEmailSenderOfficial: 'Administrador oficial admin',
+    globalEmailSenderOfficial: 'Anuncio oficial announcement@epocanvas.com',
     globalEmailAudience: 'Público objetivo',
     globalEmailAudienceAll: 'Todos los usuarios registrados',
     globalEmailAudienceRoles: 'Grupos de usuarios / Roles específicos',
@@ -2046,6 +2046,22 @@ totpModeAllDesc: 'Configurar si los usuarios pueden usar TOTP. Al activarlo, la 
     confirmBlockSenderTitle: 'Bloquear remitente',
     confirmBlockSenderMsg: '¿Seguro que deseas bloquear al remitente "{sender}" y filtrar sus mensajes entrantes?',
     copyAddressSuccess: 'Dirección de correo copiada',
+    // ── Gmail standard avatar dropdown and storage quota ──
+    manageAccount: 'Gestionar tu cuenta de Epomail',
+    storageSpace: 'Espacio de almacenamiento',
+    reservedSpaceNotice: 'El sistema reserva un búfer del 2% (Papelera vaciada al 95%, correos pausados al 98%)',
+    reservedSpaceBadge: '2% Reservado',
+    manageStorage: 'Gestionar almacenamiento',
+    addAnotherAccount: 'Añadir otra cuenta',
+    signOutAllAccounts: 'Cerrar sesión en todas las cuentas',
+    privacyPolicy: 'Política de privacidad',
+    termsOfService: 'Condiciones del servicio',
+    trashCleanupWarning: 'El almacenamiento alcanzó el 95%, el sistema vaciará la papelera automáticamente',
+    storageFullWarning: 'El almacenamiento alcanzó el 98%, correos pausados con 2% de espacio reservado',
+    termsDialogTitle: 'Condiciones del servicio de Epocanvas Mail',
+    privacyDialogTitle: 'Política de privacidad de Epocanvas Mail',
+    multiAccountEnabledLabel: 'Modo de cambio rápido de múltiples cuentas',
+    multiAccountEnabledDesc: 'Alineado con el patrón de cuentas de Gmail, permitiendo iniciar sesión y alternar entre múltiples cuentas.',
 };
 
 export default es;

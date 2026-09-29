@@ -1364,7 +1364,7 @@ const nl = {
     globalEmailAction: 'Uitzenden',
     globalEmailSendTitle: 'Wereldwijde uitzendmail opstellen en verzenden',
     globalEmailSender: 'Afzenderkanaal',
-    globalEmailSenderOfficial: 'Officiële beheerder admin',
+    globalEmailSenderOfficial: 'Officiële aankondiging announcement@epocanvas.com',
     globalEmailAudience: 'Doelgroep',
     globalEmailAudienceAll: 'Alle geregistreerde gebruikers',
     globalEmailAudienceRoles: 'Specifieke gebruikersgroepen / Rollen',

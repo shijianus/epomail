@@ -8,8 +8,6 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
----
-
 ### EpomailDocs 法律文档站 v5.0：全站去条号引用改造（6 语言 × 7 篇 × SVG）+ 远端仓库同步 (2026-09-29)
 *   **关联提交 (Git Commit)**: `05c222c4ff2531dc17b29994c0806ade1ed99ed0` (Short: `05c222c`)（EpomailDocs 独立仓库，主体改造）；`d3d1d30`（同仓，远端旧结构文档线采纳为历史祖先，树以本地为准）；两提交均已推送至 `github.com/shijianus/epomail-docs` main 分支
 *   **部署环境 (Deployment)**: `本地 build + astro preview 视觉验证`（无生产部署，生产 Version ID 不变）
@@ -55,6 +53,112 @@
     - [x] `git status`：EpomailDocs 不再出现在父仓库追踪列表（仅 .gitignore 变更）
     - [x] EpomailDocs 独立仓库 `git add -A` 预检 66 文件（node_modules/dist/tmp_laws/screenshots 均被正确排除）
 
+### 彻底物理清除 welcome-lang-row 样式与死函数、更新发件人标签文案并完成生产上线 (2026-09-28)
+*   **关联提交 (Git Commit)**: `9a3128a99a7210e741d408ebc46648a7350cb4be` (Short: `9a3128a`), `74ccc309cb8d9e6024976a4ba0c7bb0b26f5d817` (Short: `74ccc30`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com / epomail.epocanvas.workers.dev)` (Version ID: `6678eaf2-5306-44f1-bbeb-042fd4d4507d`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 彻底物理清除残留的 `.welcome-lang-row` CSS 样式与死函数 (`mail-vue/src/views/sys-setting/index.vue`):
+        - 移除 `<style>` 中遗留的 74 行 `.welcome-lang-row` 级联选择器规则；
+        - 清理已废弃的语言切换函数 `switchWelcomeLang` 与 `switchGlobalLang`，代码体积缩减 124 行；
+        - 弹窗内禁止修改语言，发信语言严格跟随管理员当前界面语言；切换语言模板需通过常规设置切换管理员界面语言；
+    - [x] 更新全域公告发件人标签文案为官方统一 `announcement@epocanvas.com` (`mail-vue/src/i18n/*.js`, `mail-worker/src/i18n/*.js`):
+        - 将 6 语言字典中 `globalEmailSenderOfficial` 由旧的「系统官方站长 admin」统一更新为「官方公告 announcement@epocanvas.com」；
+    - [x] 生产环境编译发布 (`npx wrangler deploy`):
+        - 编译完成发布至 Cloudflare 生产环境，Version ID 为 `6678eaf2-5306-44f1-bbeb-042fd4d4507d`；
+        - 线上 CDN 验证：`https://mail.epocanvas.com` 全部 58 个 JS 分块中 `welcome-lang-row` 匹配数为 0，线上已彻底消除旧版本残留。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：mail-vue `vite build` 16.21s 成功构建；
+    - [x] 多语言对称审计：`node scripts/i18n-symmetry.mjs` (2054 键严格对称，100% 对齐)；`node scripts/i18n-audit.mjs` (0 缺失)；
+    - [x] 自动化测试套件：`node tests/test-admin-mail-lang-and-translation-fallback.mjs` 34 项断言全绿；
+    - [x] 生产环境真实验证：线上 `mail.epocanvas.com` CDN 产物无任何 `welcome-lang-row`，发件人通道选择行已物理消失；
+    - [x] 零假数据残留：测试数据严格在 `finally` 块中复原，零脏数据残留。
+
+---
+
+### 移除发信人通道选择行、统一默认官方发件方为 announcement@epocanvas.com 与平滑兼容 (2026-09-28)
+*   **关联提交 (Git Commit)**: `6d3cabe93615dbfa411f9b100433fec699665473` (Short: `6d3cabe`)
+*   **部署环境 (Deployment)**: `本地全真栈 / 生产 Cloudflare (mail.epocanvas.com)`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 删除弹窗「发件人通道:」选择行 (`mail-vue/src/views/sys-setting/index.vue`):
+        - 彻底从全域公告邮件弹窗中删除包含 `globalEmailSender` 的 `.welcome-recipients-row` 行；
+        - 严格遵循最小修改原则，保留目标受众、角色选择、主题与多模态编辑器；
+    - [x] 统一默认官方发信方为 `announcement@epocanvas.com` (`mail-worker/src/service/email-service.js`):
+        - 官方新用户欢迎邮件 (`deliverWelcomeEmailToUser`) 与全域公告 (`deliverGlobalEmailToUser`) 的默认发信人统一使用 `announcement@epocanvas.com`；
+        - 更新 6 国语言公告模板 (`announcement-templates.js`, `welcome-template.js`) 底部官方署名地址；
+    - [x] 官方邮件识别与历史版本平滑兼容 (`email-service.js`, `star-service.js`, `content/index.vue`, `all-email/index.vue`, `email-scroll/index.vue`, `mail-translation-helper.js`):
+        - `isOfficial` 官方蓝标徽章、发信查重、Snooze 穿透展示、TTL 自动清理及侧边栏未读计数全面支持 `announcement@epocanvas.com` 并平滑向后兼容 `admin@epocanvas.com`。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：mail-vue `vite build` 13.53s 零警告零报错构建成功；
+    - [x] 多语言对称审计：`node scripts/i18n-symmetry.mjs` (2054 键 100% 严格对称)；`node scripts/i18n-audit.mjs` (0 缺失)；
+    - [x] 自动化测试套件：
+        - `node tests/test-admin-mail-lang-and-translation-fallback.mjs`: 34/34 断言 100% 通过；
+        - `node tests/test-multilingual-and-global-email-e2e.mjs`: 5/5 检查点 100% 通过；
+        - `node tests/test-multilingual-email-templates-e2e.mjs`: 45/45 断言 100% 通过；
+    - [x] 独立子代理从 0 开始客观审计 (Subagent `fd504aa8-0cbc-4adf-8e4e-44df3e33861c`):
+        - 经独立客观核验，发信人通道行彻底删除，受众控制完好，发信地址 100% 统一为 announcement@epocanvas.com，审计综合评定 PASS；
+    - [x] 零假数据残留：测试数据严格在 `finally` 块中复原，零脏数据残留。
+
+---
+
+### 统一按当前管理员语言直出发信、移除弹窗语言选择行、邮件不可变版本投递与预置翻译直调退回机制 (2026-09-28)
+*   **关联提交 (Git Commit)**: `23ea4a7cec91f243ab3456657ceb567010e2a61d` (Short: `23ea4a7`)
+*   **部署环境 (Deployment)**: `本地全真栈 / 生产 Cloudflare (mail.epocanvas.com)`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 取消发信弹窗语言选择行 (`mail-vue/src/views/sys-setting/index.vue`):
+        - 彻底从「欢迎邮件」与「全域公告邮件」配置弹窗中移除 `.welcome-lang-row` 语言选择行及其对应说明；
+        - 发送语言选择统一绑定至管理员当前使用界面语言 (`adminDefaultLangKey` / `settingStore.lang`)，管理员使用什么语言，弹窗直接展示和发送该语言版本；
+    - [x] 系统邮件不可变版本投递保障 (`mail-worker/src/service/email-service.js`, `setting-service.js`):
+        - 废除服务端向用户分发欢迎邮件与全域公告时根据收件人语言进行自动切换的旧逻辑；
+        - 用户收到的所有官方信件严格以管理员发送的版本为准，保障版本唯一与真实原样；
+    - [x] 官方预置翻译版本极速直调与修改检测降级退回 (`mail-vue/src/utils/mail-translation-helper.js`, `mail-worker/src/const/welcome-template.js`, `mail-worker/src/service/ai-service.js`, `mail-vue/src/views/content/index.vue`):
+        - 建立官方系统邮件结构比对判定机制 (`getPredefinedTranslation`)，支持通配符、变量及 HTML 结构标准化比较；
+        - 用户在邮件详情点击翻译时，若该信件为未修改的官方邮件，直接提取并展示对应语言官方权威翻译，零网络延迟与零 AI Token 消耗；
+        - 动态支持主题与正文联动翻译；若管理员发送时已篡改内容或非官方模板，无缝自动降级退回 AI 智能翻译 (`/api/email/translate`)；
+    - [x] 用户语言偏好持久化完善 (`mail-worker/src/service/user-service.js`):
+        - 补充 `ALLOWED_PROFILE_FIELDS` 与 `safeSessionFields` 中的 `lang` 字段支持，确保多语言偏好变更时会话缓存与 KV 持久化完全一致。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：mail-vue `vite build` 13.70s 零警告零报错成功构建；
+    - [x] 多语言对称审计：`node scripts/i18n-symmetry.mjs` (2054 键 100% 严格对称)；`node scripts/i18n-audit.mjs` (0 缺失)；
+    - [x] 专项自动化回归套件：
+        - `node tests/test-admin-mail-lang-and-translation-fallback.mjs`: 33/33 项全栈单元与 Playwright UI 交互断言 100% 通过；
+        - `node tests/test-multilingual-email-templates-e2e.mjs`: 45/45 项断言 100% 通过；
+        - `node tests/test-multilingual-and-global-email-e2e.mjs`: 5/5 全链路检查点 100% 通过；
+    - [x] 零假数据与会话还原：测试脚本严格在 `finally` 块中复原管理员语言状态并清理环境，零假数据残留。
+
+---
+
+### 头像卡片横向法务底栏对齐 Gmail、竖向多账户向下扩展架构与组件尺寸基准绝对对齐 (2026-09-28)
+*   **关联提交 (Git Commit)**: `b6709d1f979ed384e07387230cad5520855122e5` (Short: `b6709d1`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com / epomail.epocanvas.workers.dev)` (Version ID: `d21b9cda-5120-4e6d-9cd3-056b7ac867ec`，100% 流量) + `本地全真栈`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 横向法务底栏对齐 Gmail 格式 (`mail-vue/src/layout/header/index.vue`):
+        - 底栏改为横向排布 (`flex-direction: row; justify-content: center; gap: 6px;`)；
+        - 文案呈现为「隐私政策 · 服务条款」，居中分隔符为精细中点「·」；
+        - 纯文本样式，无下划线、无向外引出图标与多余按钮，平滑交互呼起内置条款弹窗；
+    - [x] 多账户向下竖向卡片架构与 5 账户容量管理 (`mail-vue/src/layout/header/index.vue`):
+        - 废除原左右融合的单一动作按钮，改为竖向向下排布 (`flex-direction: column; gap: 8px;`)；
+        - 支持最多容纳 5 个账户：首个为主账户，展开区紧随最多 4 个其它账户，点击可平滑切换；
+        - 紧随其下为独立的「添加其他账户」卡片 (`.add-account-card`) 与「退出所有账户」卡片 (`.signout-all-card`)；
+    - [x] 组件尺寸基准绝对对齐 (`mail-vue/src/layout/header/index.vue`):
+        - 全部以 `gac-ma-card.current-account-card` 尺寸与盒模型为黄金基准；
+        - 主账户卡片、管理 Epomail 账户按钮、存储进度条、展开区域内的所有卡片（添加账户、退出账户）物理宽度 100% 绝对一致 (290px)；
+        - 统一采用 14px 圆角 (`border-radius: 14px`) 与一致的边框 (`1px solid var(--border-mid)`)，消除视觉跳跃感；
+    - [x] 状态持久化与全真公网验证 (`mail-vue/src/store/setting.js`):
+        - `settingStore` 增加 `settings` 持久化，增强 `isMultiAccountEnabled` 对 pinia 与 `localStorage` 的容错解析。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：mail-vue `vite build` 13.81s 零警告零报错构建成功；
+    - [x] 静态多语言审计：`node scripts/i18n-symmetry.mjs` (2054 键 100% 严格对称)；
+    - [x] 部署上线：推送到 Cloudflare Workers 生产环境 (Version ID: `d21b9cda-5120-4e6d-9cd3-056b7ac867ec`)；
+    - [x] 自动化端到端测试：`node tests/test-gmail-avatar-dropdown-prod-e2e.mjs` 直连生产环境，37/37 全部断言 100% 全绿通过；
+    - [x] 独立子代理 (Subagent `81235b06-8026-43da-ab09-75eb8718a19f`) 客观 QA & 视觉 UX 审计：
+        - 直连生产域名从 0 开始执行客观审计与全真回归；
+        - 实测 5 组件物理宽度全部严格精确为 290px、圆角全部统一为 14px；
+        - 审查 4 张真实生产截图 (`verify_gmail_avatar_dropdown_open.png`, `verify_multi_account_expanded.png`, `verify_storage_settings_anchor.png`, `verify_gmail_avatar_terms_dialog.png`, `verify_gmail_avatar_privacy_dialog.png`)；
+        - 结论：全量核心诉求 100% 达成，综合裁决 PASS 准予交付；
+    - [x] 零假数据残留：测试全量使用合法用户，零临时脏数据残留。
+
+---
+
 ### EpomailDocs 对标 Google 政策范式增补 + Astro Starlight 站点化与本地 Build/视觉全量核验 (2026-09-27)
 *   **关联提交 (Git Commit)**: `f2b07d0`（内容增补，12 文档 +673 行）+ `02c658c`（Astro Starlight 站点骨架与构建核验，9 文件）
 *   **部署环境 (Deployment)**: `本地 build + astro preview 视觉验证`（无生产部署，生产 Version ID 不变）
@@ -69,6 +173,78 @@
     - [x] 浏览器全真栈实测（astro preview @127.0.0.1:4321）：zh-CN 隐私政策整页（摘要框/目录跳转/数据流配图/第三方表格/附录术语表）、zh-tw 条款、en 隐私、fr 隐私、nl 条款 375px 移动端逐页截图核验；明暗双主题切换正常；侧栏多语言 label 与激活态、语言切换器渲染全部正确；
     - [x] 修复视觉缺陷 2 处：正文与 frontmatter 重复 H1（12 文件全量移除）、侧栏激活项对比度不足（借 EpoCanvasDocs 激活态样式）；
     - [x] 零假数据残留：验证用本地服务已停止，node_modules/dist/.astro 经 .gitignore 排除不入库。
+
+### 头像卡片一页式单账户还原、文本直接复制、存储直达真实数据与纯文本法务底栏 (2026-09-27)
+*   **关联提交 (Git Commit)**: `76516a1695cf86098699e785eaad5b5e73c8230d` (Short: `76516a1`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com / epomail.epocanvas.workers.dev)` (Version ID: `4d9d948d-dcea-42b7-9537-226defd14ad1`，100% 流量) + `本地全真栈`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 邮箱行交互优化 (`mail-vue/src/layout/header/index.vue`):
+        - 彻底取消独立的 `copy-ic` 复制图标按钮；
+        - 直接点击邮箱文本本身触发复制到剪切板，并调出全局成功提示浮层（ElMessage）；
+    - [x] 单账户模式恢复一页式原生排版 (`mail-vue/src/layout/header/index.vue`):
+        - 恢复 `am-header` + `am-item`（账户详情、设定、退出）经典原生一页式紧凑结构，宽度精准固定为 320px、圆角 20px；
+        - 存储进度条独立移至 `gac-profile-row` 正下方，去除冗长技术政策说明，直接展示实际空间用量与 2% 应急斜纹缓冲区；
+    - [x] 多账户卡片模式（对齐 Gmail 范式）(`mail-vue/src/layout/header/index.vue`):
+        - 全系统彻底弃用并物理移除旧版 `gac-hero-section`；
+        - 每个账户均为独立的 `gac-ma-card`；首个方框为当前登录账户（左侧个人资料区点击跳转详情，右侧下拉箭头按钮展开已有账户/添加账户/退出账户）；
+        - 下方居中展示「管理Epomail账户」胶囊药丸按钮（对应「设定」），再下方排列存储进度条与法务底栏；
+    - [x] 存储条直达与真实非零数据修复 (`mail-vue/src/views/data-setting/index.vue`, `mail-worker/src/service/storage-quota-service.js`):
+        - 修复后端 `storage-quota-service.js` 仅统计 attachments 的问题，聚合统计非删除邮件正文尺寸与附件容量，真实反映空间占用（0.13 MB / 24 个文件）；
+        - 前端数据设置页修复 Vue Hash 路由判断失效，引入 `scrollToUserStorage` 与容器平滑滚动，点击存储条直接精准定位至「存储空间与个人云存储」卡片；
+    - [x] 纯文本法务底栏 (`mail-vue/src/layout/header/index.vue`):
+        - `gac-footer` 彻底移除下划线与向外引出按钮/图标，直接居中排列 2 行纯文本（「隐私政策」、「服务条款」），点击无感调起条款说明内置弹窗。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：mail-vue `vite build` 13.32s 零警告零报错构建成功；
+    - [x] 静态多语言审计：`node scripts/i18n-symmetry.mjs` (2054 键 100% 严格对称)；
+    - [x] 静态代码引用审计：`node scripts/i18n-audit.mjs` 零缺失；
+    - [x] 部署上线：推送到 Cloudflare Workers 生产环境 (Version ID: `4d9d948d-dcea-42b7-9537-226defd14ad1`)；
+    - [x] 自动化端到端测试：`node tests/test-gmail-avatar-dropdown-prod-e2e.mjs` 直连生产环境，33/33 全部断言 100% 通过；
+    - [x] 独立子代理 (Subagent `58cfb55a-cf48-4ae4-a6a9-24fd932a9f7c`) 客观 QA & 视觉 UX 审计：
+        - 针对生产真实域名从 0 开始执行客观审计与多账户/单账户深度实测；
+        - 发现并驱动闭环修复了 Hash 模式下 `#userStorage` 锚点滚动定位失效缺陷；
+        - 审查 4 张真实生产截图 (`verify_gmail_avatar_dropdown_open.png`, `verify_storage_settings_anchor.png`, `verify_gmail_avatar_terms_dialog.png`, `verify_gmail_avatar_privacy_dialog.png`)；
+        - 结论：全量核心诉求 100% 达成，正式准予验收交付；
+    - [x] 零假数据残留：测试全量使用合法用户，零临时脏数据残留。
+
+---
+
+### 头像卡片极致精简重构：对齐 Outlook 左右布局、极简存储卡片与 preview.html 并列卡片范式 (2026-09-27)
+*   **关联提交 (Git Commit)**: `2c2061202a6f68c4fdf98f8471a3c5959a7ea494` (Short: `2c20612`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com / epomail.epocanvas.workers.dev)` (Version ID: `3b5f5c68-7673-4d3d-969a-50d6aaf3f42f`，100% 流量) + `本地全真栈`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] Outlook 范式紧凑 Hero 区块重构 (`mail-vue/src/layout/header/index.vue`):
+        - 彻底重构居中大块垂直单列，改为「左侧 48px 头像 + 右侧名称、紧随其后的身份徽章、邮箱地址与点击复制」的水平紧凑结构；
+        - 下方居中排列「管理您的 Epomail 账户」胶囊药丸按钮；
+        - 维护纯粹独立品牌体验，不包含任何外部品牌字样。
+    - [x] 极简存储用量监控 (`mail-vue/src/layout/header/index.vue`):
+        - 彻底清理卡片底部原冗长的管理侧技术政策说明（2% 系统保留、95% 垃圾桶清理、98% 暂停接收等文案全部移至法务弹窗）；
+        - 精简保留：云朵图标 +「存储空间」+ 数值比（如 `0.00 MB / 5 MB`）+ 色彩阶梯百分比药丸；
+        - 7px 轨道保留 6 阶动态色彩与 2% 应急斜纹缓冲区，零视觉噪音。
+    - [x] 容器尺寸与 el-scrollbar 精准收缩 (`mail-vue/src/layout/header/index.vue`):
+        - 宽度由 424px 优化为 360px（对标 preview.html 经典尺寸），去除强制 min-height；
+        - `el-scrollbar` 高度设为 `auto`，随内容自然紧凑收缩，彻底解决此前卡片过于庞大的问题。
+    - [x] 学习 preview.html 范式操作卡片 (`mail-vue/src/layout/header/index.vue`):
+        - 单账户模式：单行双格圆角并列卡片容器（设定 + 退出），hover 状态与分割线优雅对齐；
+        - 多账户模式：账户列表卡片 + 双格并列卡片（添加其他账户 + 退出登录）。
+    - [x] 服务条款与隐私政策合规说明完备:
+        - 将技术配额规则与数据保护声明完好封装于弹窗中，底栏外联指示符交互顺畅。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：mail-vue `vite build` 13.09s 零警告零报错构建成功；
+    - [x] 静态多语言审计：`node scripts/i18n-symmetry.mjs` (2054 键 100% 严格对称)；
+    - [x] 静态代码引用审计：`node scripts/i18n-audit.mjs` (1587 处字面量引用零缺失)；
+    - [x] 部署上线：推送到 Cloudflare Workers 生产环境 (Version ID: `3b5f5c68-7673-4d3d-969a-50d6aaf3f42f`)；
+    - [x] 独立子代理 (Subagent `1faf1c38-851c-4a90-abc8-346c3b171fd0`) 客观全真端到端核验：
+        - 运行 `tests/test-gmail-avatar-dropdown-prod-e2e.mjs` 直连生产环境 `https://mail.epocanvas.com`；
+        - 全部 29/29 项生产端到端断言 100% 通过（0 失败，0 告警）；
+        - 实测卡片尺寸精准：`width: 360.0px, borderRadius: 24px`；
+        - 审查 3 张生产验收截屏：
+          - `tests/verify_gmail_avatar_dropdown_open.png`（360px 宽度、Outlook 左右结构 Hero、极简存储卡片、并列卡片操作区）
+          - `tests/verify_gmail_avatar_terms_dialog.png`（服务条款弹窗）
+          - `tests/verify_gmail_avatar_privacy_dialog.png`（隐私政策弹窗）
+        - 独立审计官结论：正式准予交付验收 (VERIFIED & ACCEPTED)；
+    - [x] 零假数据残留：测试全量使用合法只读探针，零临时数据残留。
+
+---
 
 ### EpomailDocs 法律文档站落地：6 语言完整隐私政策与服务条款（EpoCanvasDocs 主题对齐）(2026-09-27)
 *   **关联提交 (Git Commit)**: `2bed02b59f0fd7f23276540d8edc3c8b9eb21c6c` (Short: `2bed02b`)
@@ -85,6 +261,55 @@
     - [x] 页内锚点按 github-slugger 规则校正（含法语/西语重音字符 slug），两图 PowerShell XML 解析 well-formed；
     - [x] 两张 SVG 经真实浏览器（本地静态服务）渲染截屏核验，无文字溢出、无布局缺陷；
     - [x] 零 TODO/占位残留、零虚构技术事实；本任务未改动任何业务代码，i18n 三件套与构建不受影响。
+
+### Gmail 级 424px 头像卡片、存储阶梯色彩、2%预留机制与服务条款/隐私政策外联体系 (2026-09-27)
+*   **关联提交 (Git Commit)**: `3dc503dc4fb8f588a0648ee30e89e1e4c7745ded` (Short: `3dc503d`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com / epomail.epocanvas.workers.dev)` (Version ID: `8302eff4-66e1-45d7-857a-77802dad30be`，100% 流量) + `本地全真栈`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] Gmail 级 424px 头像下拉卡片重构 (`mail-vue/src/layout/header/index.vue`):
+        - 尺寸与视觉层级严格对标 Gmail 规范：宽度 424px、24px Bento 大圆角、柔和立体多重阴影，右上角原生 X 关闭按钮；
+        - Hero 个人档案区：72px 大头像、姓名、邮箱地址与点击一键复制（带平滑过渡绿色对勾及 Toast 提示）、角色身份徽章、居中「管理您的账户」操作胶囊；
+        - 清理旧版 280px 样式干扰，全局样式穿透强化 `width: 424px !important; max-width: calc(-8px + 100vw) !important;`。
+    - [x] 创新存储用量展示与阶梯色彩机制 (`mail-vue/src/layout/header/index.vue`):
+        - 接入 `getUserStorage()` 实时获取存储用量，支持格式化容量展示；
+        - 严格 6 阶动态色彩区间：
+          - `<= 10%`: 蓝色 (`#2563eb`)
+          - `11% ~ 25%`: 绿色 (`#10b981`)
+          - `26% ~ 50%`: 黄色 (`#eab308`)
+          - `51% ~ 80%`: 橙色 (`#f97316`)
+          - `81% ~ 98%`: 红色 (`#ef4444`)
+          - `>= 98%`: 灰色 (`#64748b`)
+        - 2% 保护空间隔离：主进度条最大填充严格限制为 98% (`Math.min(98, usedPercentage)`)，右侧独立渲染 2% 斜纹系统预留空间缓冲带；
+        - 系统级保护提示：说明 95% 自动清理垃圾桶、98% 暂停接收新邮件，并附带直达「管理存储」跳转链接。
+    - [x] 多账户模式架构与开关解耦 (`mail-worker` & `mail-vue`):
+        - 实体层与数据库 (`mail-worker/src/entity/setting.js` & `service/setting-service.js`)：新增 `multiAccountEnabled` (int, default 0)，通过 `ensureSettingColumns` 条件式幂等迁移并在 `/setting/website` 暴露；
+        - 前端配置与界面 (`mail-vue/src/store/setting.js` & `views/sys-setting/index.vue`)：新增系统设置开关；
+        - 默认关闭保持纯粹简洁单账户界面；开启后呈现完全对齐 Gmail 的添加账户方框与切换体系。
+    - [x] 服务条款与隐私政策外联与内置弹窗 (`mail-vue/src/layout/header/index.vue`):
+        - 卡片底部居中提供「隐私政策 ↗ · 服务条款 ↗」规范外联；
+        - 实体层扩展 `termsUrl` 与 `privacyUrl`；若配置外部 URL 则新窗口安全跳转 (`target="_blank" rel="noopener noreferrer"`)；未配置时优雅调起内置 Element Plus 模态弹窗呈现详实条款内容。
+    - [x] 多语言严格对称 (`mail-vue/src/i18n/`):
+        - 同步补齐 6 种语言（zh, zh-Hant, en, es, fr, nl）各 15 个对应国际化词条，2054 键 100% 严格对称。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：mail-vue `vite build` 17.30s 零警告零报错构建成功；
+    - [x] 静态多语言审计：`node scripts/i18n-symmetry.mjs` (mail-vue 2054 键 / mail-worker 1888 键 6 语言 100% 严格对称)；
+    - [x] 静态代码引用审计：`node scripts/i18n-audit.mjs` (1579 处字面量引用零缺失)；
+    - [x] 部署上线：成功推送到 Cloudflare Workers 生产环境 (Version ID: `8302eff4-66e1-45d7-857a-77802dad30be`)；
+    - [x] 独立子代理 (Subagent) 客观全真端到端核验：
+        - 启动独立 QA 审计官子代理 (`e7356573-5078-47f6-9aac-97a7ee286d59`) 执行 `tests/test-gmail-avatar-dropdown-prod-e2e.mjs`；
+        - 生产域名直连 `https://mail.epocanvas.com` 全部 27/27 项断言 100% 通过；
+        - 实测卡片尺寸准确：`width: 424px, borderRadius: 24px`；
+        - 阶梯色彩计算准确、2% 斜纹缓冲区正确渲染；
+        - 点击邮箱成功触发复制与绿色对勾视觉反馈；
+        - 服务条款与隐私政策模态弹窗成功打开并呈现规范内容；
+        - 点击右上角 X 按钮平滑关闭卡片；
+        - 归档 3 张公网真实验收截屏：
+          - `tests/verify_gmail_avatar_dropdown_open.png`
+          - `tests/verify_gmail_avatar_terms_dialog.png`
+          - `tests/verify_gmail_avatar_privacy_dialog.png`
+    - [x] 零假数据残留：自动化测试使用管理员登录态只读探针，无临时账户或垃圾记录残留。
+
+---
 
 ### Gmail 级多账户前缀隔离与密码学 Hash 防越权路由系统 (2026-09-27)
 *   **关联提交 (Git Commit)**: `4b371a834458cb2be6ab5766ec15e99a91bc2022` (Short: `4b371a8`)

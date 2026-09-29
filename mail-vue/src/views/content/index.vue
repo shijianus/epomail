@@ -195,7 +195,7 @@
       <div class="container">
         <div class="email-title-row">
           <div class="email-title">
-            <span>{{ email.subject }}</span>
+            <span>{{ displayedSubject(email) }}</span>
             <span 
               v-if="threadMessages.length > 1" 
               class="thread-count-badge" 
@@ -235,8 +235,8 @@
               @click="toggleMsg(msg.emailId, index)"
             >
               <div class="ch-left">
-                <el-avatar :size="28" class="sender-avatar mini" :class="{ 'official-avatar': msg.sendEmail === 'admin@epocanvas.com' || msg.isOfficial }">
-                  <Icon icon="ri:verified-badge-fill" width="16" height="16" v-if="msg.sendEmail === 'admin@epocanvas.com' || msg.isOfficial" />
+                <el-avatar :size="28" class="sender-avatar mini" :class="{ 'official-avatar': msg.sendEmail === 'announcement@epocanvas.com' || msg.sendEmail === 'admin@epocanvas.com' || msg.isOfficial }">
+                  <Icon icon="ri:verified-badge-fill" width="16" height="16" v-if="msg.sendEmail === 'announcement@epocanvas.com' || msg.sendEmail === 'admin@epocanvas.com' || msg.isOfficial" />
                   <template v-else>{{ msg.name ? msg.name.charAt(0).toUpperCase() : 'U' }}</template>
                 </el-avatar>
                 <span class="ch-name">{{ msg.name }}</span>
@@ -262,15 +262,15 @@
                     :show-after="300"
                   >
                     <template #reference>
-                      <el-avatar :size="44" class="sender-avatar" :class="{ 'official-avatar': msg.sendEmail === 'admin@epocanvas.com' || msg.isOfficial }">
-                        <Icon icon="ri:verified-badge-fill" width="24" height="24" v-if="msg.sendEmail === 'admin@epocanvas.com' || msg.isOfficial" />
+                      <el-avatar :size="44" class="sender-avatar" :class="{ 'official-avatar': msg.sendEmail === 'announcement@epocanvas.com' || msg.sendEmail === 'admin@epocanvas.com' || msg.isOfficial }">
+                        <Icon icon="ri:verified-badge-fill" width="24" height="24" v-if="msg.sendEmail === 'announcement@epocanvas.com' || msg.sendEmail === 'admin@epocanvas.com' || msg.isOfficial" />
                         <template v-else>{{ msg.name ? msg.name.charAt(0).toUpperCase() : 'U' }}</template>
                       </el-avatar>
                     </template>
                     <div class="contact-hover-card" @click.stop>
                       <div class="card-head">
-                        <el-avatar :size="40" class="sender-avatar" :class="{ 'official-avatar': msg.sendEmail === 'admin@epocanvas.com' || msg.isOfficial }">
-                          <Icon icon="ri:verified-badge-fill" width="22" height="22" v-if="msg.sendEmail === 'admin@epocanvas.com' || msg.isOfficial" />
+                        <el-avatar :size="40" class="sender-avatar" :class="{ 'official-avatar': msg.sendEmail === 'announcement@epocanvas.com' || msg.sendEmail === 'admin@epocanvas.com' || msg.isOfficial }">
+                          <Icon icon="ri:verified-badge-fill" width="22" height="22" v-if="msg.sendEmail === 'announcement@epocanvas.com' || msg.sendEmail === 'admin@epocanvas.com' || msg.isOfficial" />
                           <template v-else>{{ msg.name ? msg.name.charAt(0).toUpperCase() : 'U' }}</template>
                         </el-avatar>
                         <div class="card-user-info">
@@ -303,7 +303,7 @@
                       <div class="sender-info-col">
                         <div class="sender-title-wrap">
                           <span class="send-name-title">{{ msg.name }}</span>
-                          <span v-if="msg.sendEmail === 'admin@epocanvas.com' || msg.isOfficial" class="official-verified-badge" :title="$t('officialVerified')">
+                          <span v-if="msg.sendEmail === 'announcement@epocanvas.com' || msg.sendEmail === 'admin@epocanvas.com' || msg.isOfficial" class="official-verified-badge" :title="$t('officialVerified')">
                             <Icon icon="ri:verified-badge-fill" width="18" height="18" style="color: #0284c7; vertical-align: middle;" />
                           </span>
                         </div>
@@ -343,7 +343,7 @@
                               </div>
                               <div class="detail-row">
                                 <span class="dt-label">{{ $t('detailSubject') }}</span>
-                                <span class="dt-val">{{ msg.subject || email.subject }}</span>
+                                <span class="dt-val">{{ displayedSubject(msg) }}</span>
                               </div>
                               <div class="detail-row" v-if="getSenderDomain(msg.sendEmail)">
                                 <span class="dt-label">{{ $t('detailMailedBy') }}</span>
@@ -502,7 +502,7 @@
                 </div>
 
                 <!-- Official System Mail Banner -->
-                <div class="official-system-banner" v-if="msg.sendEmail === 'admin@epocanvas.com' || msg.isOfficial" @click.stop>
+                <div class="official-system-banner" v-if="msg.sendEmail === 'announcement@epocanvas.com' || msg.sendEmail === 'admin@epocanvas.com' || msg.isOfficial" @click.stop>
                   <div class="banner-left">
                     <Icon icon="ri:verified-badge-fill" width="20" height="20" style="color: #0284c7; flex-shrink: 0;" />
                     <div class="banner-text">
@@ -822,6 +822,7 @@ import {EmailUnreadEnum} from "@/enums/email-enum.js";
 import {hasPerm} from "@/perm/perm.js";
 import {getLabelDisplayName} from "@/utils/label-i18n.js";
 import {getThreadKey} from "@/utils/thread-utils.js";
+import {getPredefinedTranslation} from "@/utils/mail-translation-helper.js";
 
 const uiStore = useUiStore();
 const settingStore = useSettingStore();
@@ -1226,7 +1227,7 @@ function toggleEmojiReaction(emoji, msg) {
 function canSendReaction(msg) {
   if (!msg) return false;
   if (!hasPerm('email:send')) return false;
-  if (msg.sendEmail === 'admin@epocanvas.com' || msg.isOfficial) return false;
+  if (msg.sendEmail === 'announcement@epocanvas.com' || msg.sendEmail === 'admin@epocanvas.com' || msg.isOfficial) return false;
   const sender = (msg.sendEmail || '').toLowerCase();
   if (
     sender.includes('noreply') ||
@@ -1777,6 +1778,16 @@ const showOriginalMap = reactive({});
 const targetLangMap = reactive({});
 const activeTranslationAbortControllers = reactive({});
 const activeTranslationSeqMap = reactive({});
+const translatedSubjectMap = reactive({});
+
+const displayedSubject = (msg) => {
+  if (!msg) return '';
+  const id = msg.emailId;
+  if (isTranslatedMap[id] && !showOriginalMap[id] && translatedSubjectMap[id]) {
+    return translatedSubjectMap[id];
+  }
+  return msg.subject || email.subject || '';
+};
 
 const displayedContent = (msg) => {
   if (!msg) return '';
@@ -1922,6 +1933,21 @@ const handleTranslate = (msg, isLanguageSwitch = false) => {
     return;
   }
 
+  // 3. 检查官方系统邮件（欢迎邮件/全域公告）是否未被修改：若未修改直接调用官方翻译版本；若翻译版本与实际版本不一致（发生了修改）再退回到 AI 翻译
+  const predefined = getPredefinedTranslation(target, lang);
+  if (predefined) {
+    ElMessage.closeAll();
+    translatedTextMap[id] = predefined.translatedText;
+    translatedHtmlMap[id] = predefined.translatedHtml;
+    translatedSubjectMap[id] = predefined.translatedSubject;
+    isTranslatedMap[id] = true;
+    showOriginalMap[id] = false;
+    showTranslateMap[id] = true;
+    translatingMap[id] = false;
+    ElMessage.success(t('translateSuccess'));
+    return;
+  }
+
   translatingMap[id] = true;
   showTranslateMap[id] = true;
 
@@ -1947,6 +1973,9 @@ const handleTranslate = (msg, isLanguageSwitch = false) => {
     }
     translatedTextMap[id] = transText;
     translatedHtmlMap[id] = transHtml;
+    if (data.translatedSubject) {
+      translatedSubjectMap[id] = data.translatedSubject;
+    }
     isTranslatedMap[id] = true;
     showOriginalMap[id] = false;
     ElMessage.success(t('translateSuccess'));

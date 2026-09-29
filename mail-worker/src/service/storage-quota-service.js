@@ -11,11 +11,29 @@ const storageQuotaService = {
 		const mailDb = getMailDb(c);
 		const userDb = getUserDb(c);
 
-		// 1. Query aggregate attachment stats for this user
+		// 1. Query aggregate email and attachment stats for this user
 		let usedBytes = 0;
 		let fileCount = 0;
+		let emailCount = 0;
+		let emailBytes = 0;
+		let attBytes = 0;
 
 		try {
+			// Query email size & count (excluding deleted)
+			const emailStats = await mailDb.prepare(`
+				SELECT 
+					COALESCE(SUM(LENGTH(IFNULL(text, '')) + LENGTH(IFNULL(content, ''))), 0) AS total_bytes,
+					COUNT(1) AS email_count
+				FROM email 
+				WHERE user_id = ? AND is_del = 0
+			`).bind(userId).first();
+
+			if (emailStats) {
+				emailBytes = Number(emailStats.total_bytes || 0);
+				emailCount = Number(emailStats.email_count || 0);
+			}
+
+			// Query attachment size & count
 			const stats = await mailDb.prepare(`
 				SELECT 
 					COALESCE(SUM(size), 0) AS total_bytes,
@@ -25,11 +43,13 @@ const storageQuotaService = {
 			`).bind(userId).first();
 
 			if (stats) {
-				usedBytes = Number(stats.total_bytes || 0);
+				attBytes = Number(stats.total_bytes || 0);
 				fileCount = Number(stats.file_count || 0);
 			}
+
+			usedBytes = emailBytes + attBytes;
 		} catch (err) {
-			console.warn('Failed to query user attachment stats:', err.message);
+			console.warn('Failed to query user attachment and email stats:', err.message);
 		}
 
 		// 2. Query user BYO storage config & quota override
@@ -136,17 +156,24 @@ const storageQuotaService = {
 			safeByoConfig.provider = s3Signer.detectProvider(safeByoConfig.endpoint);
 		}
 
+		const mbVal = usedBytes / (1024 * 1024);
+		const usedMb = usedBytes > 0 && mbVal < 0.01 ? '0.01' : mbVal.toFixed(2);
+
 		return {
 			userId,
 			usedBytes,
-			usedMb: (usedBytes / (1024 * 1024)).toFixed(2),
+			usedMb,
 			quotaMb: effectiveQuotaMb,
 			quotaBytes,
-			usedPercentage,
+			usedPercentage: effectiveQuotaMb > 0 
+				? Math.max(usedBytes > 0 ? 0.1 : 0, Math.min(100, Math.round((usedBytes / quotaBytes) * 1000) / 10))
+				: 0,
 			isExceeded,
 			isVisitor,
 			roleCode,
-			fileCount,
+			fileCount: emailCount + fileCount,
+			emailCount,
+			attachmentCount: fileCount,
 			allowUserByo,
 			byoStorageEnabled: isByoActive ? 1 : 0,
 			byoStorageConfig: safeByoConfig,

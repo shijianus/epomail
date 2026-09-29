@@ -9,6 +9,22 @@
 
 ---
 
+### 邮件不可变投递、语言选择行彻底清除与官方发件地址统一审计专项 (2026-09-28)
+*   **关联提交 (Git Commit)**: `376ea89de8cb8038c013354edb0de6d3246b5d1f` (Short: `376ea89`)
+*   **体检/审计范围与方法 (Scope & Methodology)**:
+    1. 范围与环境：生产全真栈环境，覆盖系统设置、前端 UI 交互弹窗与后端 Worker 翻译及分发逻辑。
+    2. 工具与脚本：使用代码全局静态检索 (`grep`)，i18n 静态扫描三件套 (`node scripts/i18n-symmetry.mjs` / `i18n-audit.mjs`) 以及 Git 工作区检查。
+*   **核心发现与缺陷矩阵 (Key Findings & Matrix)**:
+    - **[P0·阻塞/安全]**: 未发现安全隐患或阻断性错误。旧有遗留的语言切换功能（`switchWelcomeLang`、`switchGlobalLang`）及 `welcome-lang-row` 死代码已在 DOM、模板与 CSS 中彻底物理清除，根除了弹窗状态与全局设定冲突的隐患。
+    - **[P1·重要/体验]**: 官方系统邮件发件地址已全量、统一硬编码升级为 `announcement@epocanvas.com`，并且在后台逻辑（未读统计、Snooze 穿透、清理策略）中对存量 `admin@epocanvas.com` 保持 100% 平滑兼容；不可变投递与预置模板翻译拦截机制运转良好，管理员若修改官方模板，则安全退回 AI 翻译。
+    - **[P2·次要/样式]**: `welcome-dialog-canvas` 及 `global-email-dialog-canvas` 弹窗纯净，无任何违规语言切换 UI 控件；系统设置弹窗默认语言精准依据管理员主站选择 (`settingStore.lang`) 动态推导并生效。
+*   **治理修复与回归结果 (Fixes & Verification)**:
+    - 全面通过对 `mail-vue/src/views/sys-setting/index.vue` 的 DOM、CSS 样式与 Vue 逻辑方法的静态断言与审计；
+    - 全面通过对 `mail-worker/src/service/email-service.js` 和 `mail-worker/src/const/welcome-template.js` 后端投递与拦截翻译机制的审计；
+    - i18n 6 语言字典核对绝对对称，无字面量引用缺失；`git status` 工作区绝对干净，通过本地全真栈自检。
+
+---
+
 ### 底层架构全量安全深度审计与加固报告（P0/P1/P2 漏洞治理与闭环核验） (2026-09-22)
 *   **关联提交 (Git Commit)**: `7ee3a66d5fb17c44983ff2b7f35534d82c815524` (Short: `7ee3a66`)
 *   **专项文档索引 (Detailed Doc)**: `doc/security-audit-2026-09-22.md`

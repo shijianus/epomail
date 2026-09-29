@@ -80,18 +80,157 @@
           <div class="avatar">{{ formatName(displayEmail) }}</div>
         </div>
         <template #dropdown>
-          <div class="user-details account-menu open" @mouseenter="clearCloseTimer" @mouseleave="startCloseTimer" style="position:relative;top:0;transform:none;opacity:1;box-shadow:none;border:none;">
-            <div class="am-header">
+          <!-- Single Account Mode (Default): Completely restored to original layout + storage progress bar below profile row + privacy footer -->
+          <div v-if="!isMultiAccountEnabled" class="user-details account-menu open" @mouseenter="clearCloseTimer" @mouseleave="startCloseTimer" style="position:relative;top:0;transform:none;opacity:1;box-shadow:none;border:none;">
+            <div class="am-header gac-profile-row">
               <div class="am-avatar">{{ formatName(displayEmail) }}</div>
-              <div style="overflow:hidden">
+              <div style="overflow:hidden; flex: 1;">
                 <div class="am-name">{{ accountStore.currentAccount?.name || userStore.user?.name || '' }}</div>
-                <div class="am-email" @click="copyEmail(displayEmail)" style="cursor:pointer">{{ displayEmail }}</div>
+                <div class="gac-email-row">
+                  <span class="am-email gac-email" @click.stop="copyEmail(displayEmail)" style="cursor:pointer;" :title="$t('copy')">
+                    {{ displayEmail }}
+                  </span>
+                </div>
                 <div class="am-status"><span class="status-dot"></span><span>{{ localizedRoleName }}</span></div>
               </div>
             </div>
+
+            <!-- Standalone Storage Progress Bar right below profile row (Clickable, no extra explanations) -->
+            <div class="gac-single-storage" @click="openStorageSettings" :title="$t('manageStorage')" style="cursor: pointer;">
+              <div class="gac-single-storage-header">
+                <span class="gac-single-storage-title">{{ $t('storageSpace') }}: {{ storageData.usedMb }} MB / {{ storageData.quotaDisplay }}</span>
+                <span class="gac-single-storage-pct" :style="{ color: storageProgressColor }">{{ storageData.usedPercentage }}%</span>
+              </div>
+              <div class="gac-progress-track">
+                <div 
+                  class="gac-progress-fill" 
+                  :style="{ 
+                    width: storageFillWidth + '%', 
+                    backgroundColor: storageProgressColor 
+                  }"
+                ></div>
+                <div class="gac-progress-reserved-zone">
+                  <div class="gac-reserved-marker"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Original Menu Items -->
             <div class="am-item" @click="openAccountDetails"><span>{{ $t('accountDetails') }}</span></div>
             <div class="am-item" @click="openSettings"><span>{{ $t('settings') }}</span></div>
             <div class="am-item logout" @click="clickLogout"><span>{{ $t('logOut') }}</span></div>
+
+            <!-- Footer: Horizontal, directly aligned with Gmail format -->
+            <div class="gac-footer">
+              <span class="gac-legal-item" @click.prevent="openPrivacyPolicy">{{ $t('privacyPolicy') }}</span>
+              <span class="gac-legal-separator">·</span>
+              <span class="gac-legal-item" @click.prevent="openTermsOfService">{{ $t('termsOfService') }}</span>
+            </div>
+          </div>
+
+          <!-- Multi-Account Mode (Admin Enabled): Gmail format with individual gac-ma-card -->
+          <div v-else class="user-details account-menu open gmail-account-card gac-multi-account-container" @mouseenter="clearCloseTimer" @mouseleave="startCloseTimer">
+            <!-- Top Bar with Close X -->
+            <div class="gac-top-bar">
+              <div class="gac-top-spacer"></div>
+              <button class="gac-close-btn" :aria-label="$t('close')" @click="closeDropdown">
+                <Icon icon="lucide:x" width="16" height="16" />
+              </button>
+            </div>
+
+            <!-- Current Active Account Box (First Box) -->
+            <div class="gac-ma-card current-account-card">
+              <!-- Left clickable area: Avatar + Name + Role + Email (Click jumps to account details) -->
+              <div class="gac-ma-user-main" @click="openAccountDetails" style="cursor: pointer;" :title="$t('accountDetails')">
+                <div class="gac-ma-avatar">{{ formatName(displayEmail) }}</div>
+                <div class="gac-ma-info">
+                  <div class="gac-ma-name-row">
+                    <span class="gac-ma-name">{{ accountStore.currentAccount?.name || userStore.user?.name || displayEmail }}</span>
+                    <span class="gac-ma-role-badge">
+                      <span class="status-dot"></span>
+                      <span>{{ localizedRoleName }}</span>
+                    </span>
+                  </div>
+                  <div class="gac-ma-email">{{ displayEmail }}</div>
+                </div>
+              </div>
+
+              <!-- Right dropdown button: toggles other accounts & actions -->
+              <button class="gac-ma-toggle-btn" @click.stop="toggleMultiAccountExpand" :aria-label="$t('expand')">
+                <Icon :icon="multiAccountExpanded ? 'lucide:chevron-up' : 'lucide:chevron-down'" width="18" height="18" />
+              </button>
+            </div>
+
+            <!-- Expanded Section: Vertically stacked other accounts (up to 4) + Add account + Sign out all -->
+            <div v-if="multiAccountExpanded" class="gac-ma-expanded-section">
+              <!-- Other accounts (max 4, clicking switches to become primary account) -->
+              <div 
+                v-for="acc in otherAccounts" 
+                :key="acc.accountId || acc.email"
+                class="gac-ma-card other-account-card"
+                @click="switchAccount(acc)"
+                :title="$t('switchAccount')"
+              >
+                <div class="gac-ma-user-main">
+                  <div class="gac-ma-avatar other-avatar">{{ formatName(acc.email) }}</div>
+                  <div class="gac-ma-info">
+                    <div class="gac-ma-name-row">
+                      <span class="gac-ma-name">{{ acc.name || acc.email }}</span>
+                    </div>
+                    <div class="gac-ma-email">{{ acc.email }}</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Vertical Add Account Card -->
+              <div class="gac-ma-card gac-ma-action-card add-account-card" @click="openAddAccountDialog">
+                <div class="gac-action-icon">
+                  <Icon icon="lucide:user-plus" width="16" height="16" />
+                </div>
+                <span class="gac-action-text">{{ $t('addAnotherAccount') }}</span>
+              </div>
+
+              <!-- Vertical Sign Out of All Accounts Card -->
+              <div class="gac-ma-card gac-ma-action-card signout-all-card" @click="clickLogout">
+                <div class="gac-action-icon">
+                  <Icon icon="lucide:log-out" width="16" height="16" />
+                </div>
+                <span class="gac-action-text">{{ $t('signOutAllAccounts') }}</span>
+              </div>
+            </div>
+
+            <!-- "管理Epomail账户" (aligned sizing with cards) -->
+            <div class="gac-manage-btn" @click="openSettings">
+              <Icon icon="lucide:settings" width="15" height="15" />
+              <span>{{ $t('manageAccount') }}</span>
+            </div>
+
+            <!-- Storage Progress Bar (aligned sizing with cards) -->
+            <div class="gac-single-storage" @click="openStorageSettings" :title="$t('manageStorage')" style="cursor: pointer;">
+              <div class="gac-single-storage-header">
+                <span class="gac-single-storage-title">{{ $t('storageSpace') }}: {{ storageData.usedMb }} MB / {{ storageData.quotaDisplay }}</span>
+                <span class="gac-single-storage-pct" :style="{ color: storageProgressColor }">{{ storageData.usedPercentage }}%</span>
+              </div>
+              <div class="gac-progress-track">
+                <div 
+                  class="gac-progress-fill" 
+                  :style="{ 
+                    width: storageFillWidth + '%', 
+                    backgroundColor: storageProgressColor 
+                  }"
+                ></div>
+                <div class="gac-progress-reserved-zone">
+                  <div class="gac-reserved-marker"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Footer: Horizontal, directly aligned with Gmail format -->
+            <div class="gac-footer">
+              <span class="gac-legal-item" @click.prevent="openPrivacyPolicy">{{ $t('privacyPolicy') }}</span>
+              <span class="gac-legal-separator">·</span>
+              <span class="gac-legal-item" @click.prevent="openTermsOfService">{{ $t('termsOfService') }}</span>
+            </div>
           </div>
         </template>
       </el-dropdown>
@@ -99,6 +238,36 @@
         <el-button type="primary" size="small" @click="goToLogin" style="border-radius:8px;">{{ $t('login') }}</el-button>
       </div>
     </div>
+
+    <!-- Built-in Terms of Service Dialog -->
+    <el-dialog v-model="termsDialogVisible" :title="$t('termsDialogTitle')" width="min(640px, 92vw)" class="legal-doc-dialog" append-to-body>
+      <div class="legal-doc-content">
+        <h4>1. 服务协议与使用准则</h4>
+        <p>欢迎使用 Epocanvas Mail。本平台提供纯净、私密且高效的邮件收发与云端协作体验。用户承诺遵守当地法律法规，不利用本服务从事垃圾邮件群发、网络钓鱼或传播有害代码等违规活动。</p>
+        <h4>2. 存储与系统保护机制</h4>
+        <p>系统为每个账户设立合理的存储限额，并永久保留 2% 应急缓冲区。当存储用量达到 95% 时，系统将自动对垃圾桶执行物理清理以释放空间；当用量达到 98% 时，将暂停接收新邮件直到空间释放。</p>
+        <h4>3. 免责声明与知识产权</h4>
+        <p>在适用法律允许的最大范围内，平台对因不可抗力导致的偶发性服务中断不承担连带责任。用户保留其通信内容的全部知识产权与数据所有权。</p>
+      </div>
+      <template #footer>
+        <el-button type="primary" @click="termsDialogVisible = false">{{ $t('confirm') }}</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- Built-in Privacy Policy Dialog -->
+    <el-dialog v-model="privacyDialogVisible" :title="$t('privacyDialogTitle')" width="min(640px, 92vw)" class="legal-doc-dialog" append-to-body>
+      <div class="legal-doc-content">
+        <h4>1. 零冗余与隐私保护原则</h4>
+        <p>Epocanvas Mail 严格践行数据主权与最小化收集原则。我们绝不出售、共享或商业化分析您的个人邮件、通信录或附件数据。</p>
+        <h4>2. 密码学端到端与数据隔离</h4>
+        <p>系统采用先进的密码学 Hash 索引与用户租户隔离架构，彻底杜绝 IDOR 与横向越权。在隐私/加密模式下，邮件正文及附件受密码学密钥严格保护，管理员接口默认阻断访问。</p>
+        <h4>3. 自主管理与遗忘权</h4>
+        <p>用户随时可通过账户中心导出其数据或彻底注销账号。注销后，名下全部邮件、附件及认证元数据将执行不可逆的物理级彻底销毁。</p>
+      </div>
+      <template #footer>
+        <el-button type="primary" @click="privacyDialogVisible = false">{{ $t('confirm') }}</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -113,7 +282,8 @@ const props = defineProps({
 import router from "@/router";
 import hanburger from '@/components/hamburger/index.vue'
 import {logout} from "@/request/login.js";
-import {updateProfile} from "@/request/my.js";
+import {updateProfile, getUserStorage} from "@/request/my.js";
+import {accountList} from "@/request/account.js";
 import {Icon} from "@iconify/vue";
 import {useUiStore} from "@/store/ui.js";
 import {useUserStore} from "@/store/user.js";
@@ -194,7 +364,7 @@ function clearHighlightOnPage() {
   }
 }
 import {useRoute} from "vue-router";
-import {computed, ref} from "vue";
+import {computed, ref, reactive} from "vue";
 import {useSettingStore} from "@/store/setting.js";
 import {hasPerm} from "@/perm/perm.js"
 import {useI18n} from "vue-i18n";
@@ -249,10 +419,211 @@ function startCloseTimer() {
   }
 }
 
+// Storage Quota Reactive Data
+const storageData = reactive({
+  loaded: false,
+  loading: false,
+  usedBytes: 0,
+  usedMb: '0.00',
+  quotaMb: 1024,
+  quotaDisplay: '1024 MB',
+  usedPercentage: 0,
+  fileCount: 0,
+  isVisitor: false,
+  isUnlimited: false,
+});
+
+async function fetchStorageData() {
+  if (storageData.loading) return;
+  storageData.loading = true;
+  try {
+    const res = await getUserStorage();
+    const data = res?.data || res;
+    if (data && typeof data === 'object') {
+      storageData.loaded = true;
+      storageData.usedBytes = Number(data.usedBytes || 0);
+      storageData.usedMb = data.usedMb || (storageData.usedBytes / (1024 * 1024)).toFixed(2);
+      storageData.fileCount = Number(data.fileCount || 0);
+      storageData.isVisitor = !!data.isVisitor;
+
+      const quota = Number(data.quotaMb ?? 1024);
+      storageData.quotaMb = quota;
+      if (quota === 0 && !data.isVisitor) {
+        storageData.isUnlimited = true;
+        storageData.quotaDisplay = t('unlimitedQuota') || '无限空间';
+        storageData.usedPercentage = 0;
+      } else if (quota > 0) {
+        storageData.isUnlimited = false;
+        storageData.quotaDisplay = quota >= 1024 ? (quota / 1024).toFixed(1) + ' GB' : quota + ' MB';
+        const pct = typeof data.usedPercentage === 'number'
+          ? data.usedPercentage
+          : Math.round((storageData.usedBytes / (quota * 1024 * 1024)) * 1000) / 10;
+        storageData.usedPercentage = Math.max(0, Math.min(100, pct));
+      } else {
+        storageData.quotaDisplay = '0 MB';
+        storageData.usedPercentage = storageData.usedBytes > 0 ? 100 : 0;
+      }
+    }
+  } catch (err) {
+    console.warn('Failed to load user storage in header dropdown:', err);
+  } finally {
+    storageData.loading = false;
+  }
+}
+
+// Color scale mapping strictly following user request:
+// - <= 10%: 蓝色 (#2563eb)
+// - 11% ~ 25%: 绿色 (#10b981)
+// - 26% ~ 50%: 黄色 (#eab308)
+// - 51% ~ 80%: 橙色 (#f97316)
+// - 81% ~ 98%: 红色 (#ef4444)
+// - >= 98%: 灰色 (#64748b - 2% reserved space triggered)
+const storageProgressColor = computed(() => {
+  const pct = storageData.usedPercentage;
+  if (pct >= 98) return '#64748b'; // 灰色 (系统预留空间保护态)
+  if (pct > 80) return '#ef4444';  // 红色 (81% ~ 98%)
+  if (pct > 50) return '#f97316';  // 橙色 (51% ~ 80%)
+  if (pct > 25) return '#eab308';  // 黄色 (26% ~ 50%)
+  if (pct > 10) return '#10b981';  // 绿色 (11% ~ 25%)
+  return '#2563eb';                // 蓝色 (10% 及以下)
+});
+
+// "保留存储空间2%不给予填满，永远会流出2%的空间"
+// The fill bar width is strictly capped at 98%
+const storageFillWidth = computed(() => {
+  if (storageData.isUnlimited) return 0;
+  return Math.min(98, Math.max(0, storageData.usedPercentage));
+});
+
+// Multi-account mode flag:
+// "当且仅当管理员设定支援多账户模式时，开源完全学习Gmail的这套添加账户的方框模式，直接完全学习Gmail的方式，默认关闭时保持当前的情况"
+const isMultiAccountEnabled = computed(() => {
+  if (Number(settingStore.settings?.multiAccountEnabled) === 1) return true;
+  try {
+    const raw = localStorage.getItem('setting');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Number(parsed?.multiAccountEnabled) === 1 || Number(parsed?.settings?.multiAccountEnabled) === 1) {
+        return true;
+      }
+    }
+    if (Number(localStorage.getItem('multiAccountEnabled')) === 1) {
+      return true;
+    }
+  } catch (e) {}
+  return false;
+});
+
+const termsDialogVisible = ref(false);
+const privacyDialogVisible = ref(false);
+const copiedEmail = ref(false);
+
+function closeDropdown() {
+  if (userinfoRef.value && userinfoRef.value.handleClose) {
+    userinfoRef.value.handleClose();
+  }
+}
+
+const multiAccountExpanded = ref(false);
+const otherAccounts = ref([]);
+
+async function loadOtherAccounts() {
+  if (!isMultiAccountEnabled.value) return;
+  try {
+    const list = await accountList(0, 30);
+    if (Array.isArray(list)) {
+      const currId = accountStore.currentAccountId;
+      const currEmail = (displayEmail.value || '').toLowerCase().trim();
+      let filtered = list.filter(a => {
+        const isSameId = a.accountId && currId && a.accountId === currId;
+        const isSameEmail = a.email && currEmail && a.email.toLowerCase().trim() === currEmail;
+        return !isSameId && !isSameEmail;
+      });
+      // "界面最多可以容纳5个Gmail账户(超出的需要登出旧的采纳新加入)"
+      // 1 active account + max 4 other accounts = 5 total
+      if (filtered.length > 4) {
+        filtered = filtered.slice(0, 4);
+      }
+      otherAccounts.value = filtered;
+    }
+  } catch (err) {
+    console.warn('Failed to load other accounts:', err);
+  }
+}
+
+function switchAccount(acc) {
+  accountStore.currentAccountId = acc.accountId;
+  accountStore.currentAccount = acc;
+  if (acc.email) {
+    localStorage.setItem('loginEmail', acc.email);
+    if (userStore.user) {
+      userStore.user.account = acc;
+      userStore.user.email = acc.email;
+    }
+  }
+  closeDropdown();
+  loadOtherAccounts();
+  ElMessage.success((t('switchAccount') || '切换账号') + ': ' + (acc.name || acc.email));
+}
+
+function toggleMultiAccountExpand() {
+  multiAccountExpanded.value = !multiAccountExpanded.value;
+  if (multiAccountExpanded.value) {
+    loadOtherAccounts();
+  }
+}
+
+function openStorageSettings() {
+  closeDropdown();
+  router.push('/settings/data#userStorage');
+  const triggerScroll = () => {
+    const el = document.getElementById('userStorage');
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      const container = document.querySelector('.settings-content');
+      if (container) {
+        container.scrollTo({ top: Math.max(0, el.offsetTop - 24), behavior: 'smooth' });
+      }
+    }
+  };
+  setTimeout(triggerScroll, 200);
+  setTimeout(triggerScroll, 600);
+  setTimeout(triggerScroll, 1200);
+}
+
+function openAddAccountDialog() {
+  closeDropdown();
+  router.push('/settings/account');
+}
+
+function openPrivacyPolicy() {
+  closeDropdown();
+  const extUrl = settingStore.settings?.privacyUrl;
+  if (extUrl && typeof extUrl === 'string' && extUrl.startsWith('http')) {
+    window.open(extUrl, '_blank', 'noopener,noreferrer');
+  } else {
+    privacyDialogVisible.value = true;
+  }
+}
+
+function openTermsOfService() {
+  closeDropdown();
+  const extUrl = settingStore.settings?.termsUrl;
+  if (extUrl && typeof extUrl === 'string' && extUrl.startsWith('http')) {
+    window.open(extUrl, '_blank', 'noopener,noreferrer');
+  } else {
+    termsDialogVisible.value = true;
+  }
+}
+
 function onDropdownVisibleChange(visible) {
   userInfoShow.value = visible;
   if (visible) {
     clearCloseTimer();
+    fetchStorageData();
+    if (isMultiAccountEnabled.value) {
+      loadOtherAccounts();
+    }
   } else {
     clearCloseTimer();
   }
@@ -730,8 +1101,10 @@ const formatSize = (bytes) => {
 async function copyEmail(email) {
   try {
     await navigator.clipboard.writeText(email);
+    copiedEmail.value = true;
+    setTimeout(() => { copiedEmail.value = false; }, 2000);
     ElMessage({
-      message: t('copySuccessMsg'),
+      message: t('copyAddressSuccess') || t('copySuccessMsg'),
       type: 'success',
       plain: true,
     })
@@ -833,32 +1206,447 @@ function formatName(email) {
 
 </script>
 <style>
+/* Avatar Dropdown Popper */
 .detail-dropdown {
+  width: 320px !important;
+  max-width: calc(-16px + 100vw) !important;
   background: var(--bg-surface) !important;
   border: 1px solid var(--border-mid) !important;
-  border-radius: 14px !important;
+  border-radius: 20px !important;
   padding: 0 !important;
   overflow: hidden !important;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.28) !important;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.16), 0 2px 8px rgba(0, 0, 0, 0.06) !important;
   z-index: 3000 !important;
   backdrop-filter: blur(20px) !important;
   -webkit-backdrop-filter: blur(20px) !important;
 }
 .detail-dropdown .el-dropdown__list {
   padding: 0 !important;
+  width: 100% !important;
 }
 .detail-dropdown .el-scrollbar {
+  height: auto !important;
+  max-height: calc(100dvh - 80px) !important;
   overflow: hidden !important;
 }
 .detail-dropdown .el-scrollbar__wrap {
   overflow-x: hidden !important;
+  max-height: calc(100dvh - 80px) !important;
 }
 .detail-dropdown .el-scrollbar__bar {
   display: none !important;
 }
-.detail-dropdown .el-popper__arrow::before {
-  background: var(--bg-surface) !important;
-  border-color: var(--border-mid) !important;
+.detail-dropdown .el-popper__arrow {
+  display: none !important;
+}
+
+/* Original Single-Account Menu Styles */
+.user-details.account-menu {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+}
+.am-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 16px 10px;
+}
+.am-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #fff;
+  font-weight: 700;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.am-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gac-email-row {
+  margin: 2px 0;
+}
+.am-email.gac-email {
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: color .15s ease;
+}
+.am-email.gac-email:hover {
+  color: var(--accent-primary);
+  text-decoration: underline;
+}
+.am-status {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.am-status .status-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #10b981;
+}
+
+/* Standalone Clickable Storage Progress Bar (aligned to card sizing) */
+.gac-single-storage {
+  margin: 0 14px 10px;
+  width: calc(100% - 28px);
+  padding: 10px 12px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-mid);
+  border-radius: 14px;
+  box-sizing: border-box;
+  cursor: pointer;
+  transition: all .15s ease;
+}
+.gac-multi-account-container .gac-single-storage {
+  margin: 0;
+  width: 100%;
+}
+.gac-single-storage:hover {
+  border-color: var(--accent-primary);
+  background: var(--bg-hover);
+}
+.gac-single-storage-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+  font-size: 11.5px;
+}
+.gac-single-storage-title {
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+.gac-single-storage-pct {
+  font-weight: 700;
+}
+.gac-progress-track {
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(120, 130, 150, 0.16);
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+}
+.gac-progress-fill {
+  height: 100%;
+  border-radius: 3px 0 0 3px;
+  transition: width .4s cubic-bezier(0.4, 0, 0.2, 1), background-color .3s ease;
+}
+.gac-progress-reserved-zone {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 2%;
+  min-width: 4px;
+  background: repeating-linear-gradient(45deg, rgba(148, 163, 184, 0.4), rgba(148, 163, 184, 0.4) 2px, transparent 2px, transparent 4px);
+  border-left: 1px dashed rgba(148, 163, 184, 0.8);
+}
+.gac-reserved-marker {
+  width: 100%;
+  height: 100%;
+}
+
+.am-item {
+  padding: 10px 16px;
+  font-size: 13.5px;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background .15s ease, color .15s ease;
+}
+.am-item:hover {
+  background: var(--bg-hover);
+  color: var(--accent-primary);
+}
+.am-item.logout:hover {
+  color: var(--danger);
+  background: rgba(239, 68, 68, 0.08);
+}
+
+/* Multi-Account Gmail Pattern */
+.gac-multi-account-container {
+  padding: 10px 14px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.gac-top-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.gac-top-spacer {
+  width: 26px;
+}
+.gac-close-btn {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all .15s ease;
+}
+.gac-close-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.gac-ma-card {
+  border: 1px solid var(--border-mid);
+  border-radius: 14px;
+  background: var(--bg-surface);
+  overflow: hidden;
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+.gac-ma-card.current-account-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+}
+.gac-ma-user-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+.gac-ma-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #fff;
+  font-weight: 700;
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.gac-ma-info {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+}
+.gac-ma-name-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.gac-ma-name {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gac-ma-role-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 6px;
+  border-radius: 9999px;
+  background: var(--bg-hover);
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+.gac-ma-role-badge .status-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #10b981;
+}
+.gac-ma-email {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-top: 1px;
+}
+.gac-ma-toggle-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all .15s ease;
+  flex-shrink: 0;
+  margin-left: 6px;
+}
+.gac-ma-toggle-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.gac-ma-expanded-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.gac-ma-card.other-account-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  cursor: pointer;
+}
+.gac-ma-card.other-account-card:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent-primary);
+}
+.gac-ma-card.other-account-card .other-avatar {
+  background: linear-gradient(135deg, #10b981, #06b6d4);
+}
+
+.gac-ma-card.gac-ma-action-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+.gac-ma-card.gac-ma-action-card:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent-primary);
+}
+.gac-ma-card.gac-ma-action-card.signout-all-card:hover {
+  color: var(--danger);
+  background: rgba(239, 68, 68, 0.08);
+  border-color: rgba(239, 68, 68, 0.3);
+}
+.gac-action-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+.gac-ma-card.gac-ma-action-card.signout-all-card:hover .gac-action-icon {
+  color: var(--danger);
+}
+.gac-action-text {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* "管理Epomail账户" (aligned with gac-ma-card sizing) */
+.gac-manage-btn {
+  width: 100%;
+  border: 1px solid var(--border-mid);
+  border-radius: 14px;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 12px;
+  transition: all .2s ease;
+  box-sizing: border-box;
+}
+.gac-manage-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.12);
+}
+
+/* Footer: Horizontal, directly aligned with Gmail format */
+.gac-footer {
+  border-top: 1px solid var(--border-subtle);
+  background: var(--bg-subtle);
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+.gac-legal-item {
+  cursor: pointer;
+  color: var(--text-muted);
+  text-decoration: none !important;
+  transition: color .15s ease;
+  user-select: none;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+.gac-legal-item:hover {
+  color: var(--text-primary);
+  text-decoration: none !important;
+}
+.gac-legal-separator {
+  color: var(--text-muted);
+  user-select: none;
+  font-size: 11px;
+}
+
+.legal-doc-content {
+  line-height: 1.65;
+  color: var(--text-primary);
+}
+.legal-doc-content h4 {
+  font-size: 15px;
+  font-weight: 700;
+  margin: 16px 0 6px;
+  color: var(--text-primary);
+}
+.legal-doc-content h4:first-child {
+  margin-top: 0;
+}
+.legal-doc-content p {
+  font-size: 13.5px;
+  color: var(--text-secondary);
+  margin: 0;
 }
 </style>
 <style lang="scss" scoped>
@@ -1173,18 +1961,6 @@ button.mobile-menu-btn {
 }
 .avatar:hover { border-color: var(--border-mid); transform: scale(1.02); }
 
-/* Account Menu Dropdown */
-.account-menu { width: 280px; background: var(--bg-surface); overflow: hidden; }
-.am-header { padding: 16px; display: flex; gap: 12px; align-items: center; background: linear-gradient(135deg, rgba(91,110,245,.1), rgba(124,92,191,.1)); border-bottom: 1px solid var(--border-subtle); }
-.am-avatar { width: 44px; height: 44px; border-radius: 50%; background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary)); display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 700; color: #fff; flex-shrink: 0; }
-.am-name { font-size: 14px; font-weight: 700; color: var(--text-primary); text-align: left; }
-.am-email { font-size: 12px; color: var(--text-muted); text-align: left;}
-.am-status { display: flex; align-items: center; gap: 5px; margin-top: 3px; }
-.am-status span { font-size: 11px; color: var(--success); }
-
-.am-item { padding: 10px 16px; display: flex; align-items: center; gap: 12px; cursor: pointer; color: var(--text-secondary); font-size: 13.5px; transition: background .15s, color .15s; }
-.am-item:hover { background: var(--bg-hover); color: var(--text-primary); }
-.am-item.logout:hover { color: var(--danger); }
 .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--success); box-shadow: 0 0 6px var(--success); }
 .ic { display: flex; }
 

@@ -50,7 +50,7 @@ const userService = {
         const ALLOWED_PROFILE_FIELDS = [
             'nickname', 'bio', 'avatarUrl', 'backgroundUrl', 'customLabels',
             'signature', 'themeMode', 'personalForwarding', 'background',
-            'showStats', 'showTrend', 'showSources'
+            'showStats', 'showTrend', 'showSources', 'lang'
         ];
 
         const safeParams = {};
@@ -88,7 +88,7 @@ const userService = {
 		if (authInfo && authInfo.user) {
             // Only sync safe UI/profile attributes to session cache.
             // NEVER allow mutating security identity fields (userId, email, type, roleId, status, isDel, etc.)!
-            const safeSessionFields = ['nickname', 'bio', 'avatarUrl', 'backgroundUrl', 'customLabels', 'signature', 'personalForwarding'];
+            const safeSessionFields = ['nickname', 'bio', 'avatarUrl', 'backgroundUrl', 'customLabels', 'signature', 'personalForwarding', 'lang'];
             for (const f of safeSessionFields) {
                 if (safeParams[f] !== undefined) {
                     authInfo.user[f] = safeParams[f];

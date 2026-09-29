@@ -938,7 +938,8 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, defineOptions } from 'vue'
+import { ref, reactive, computed, onMounted, defineOptions, watch, nextTick } from 'vue'
+import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Icon } from '@iconify/vue'
@@ -962,6 +963,7 @@ defineOptions({
   name: 'data-setting'
 })
 
+const route = useRoute()
 const { t } = useI18n()
 
 const SAMPLE_APP_SEED_DESC = 'EpoCanvas / shijianus 博客原生集成示例应用（官方内置示例，站长可随时修改或直接删除）';
@@ -1260,6 +1262,35 @@ onMounted(async () => {
   initDataFromUserStore()
   await fetchUserStorage()
   await fetchOauthGrants()
+  checkAndScrollToUserStorage()
+})
+
+function scrollToUserStorage() {
+  const el = document.getElementById('userStorage')
+  if (el) {
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    const container = document.querySelector('.settings-content')
+    if (container) {
+      container.scrollTo({ top: Math.max(0, el.offsetTop - 24), behavior: 'smooth' })
+    }
+  }
+}
+
+function checkAndScrollToUserStorage() {
+  const hash = window.location.hash || ''
+  if (hash.includes('userStorage') || route.hash === '#userStorage') {
+    nextTick(() => {
+      setTimeout(scrollToUserStorage, 100)
+      setTimeout(scrollToUserStorage, 400)
+      setTimeout(scrollToUserStorage, 800)
+    })
+  }
+}
+
+watch(() => route.hash, (newHash) => {
+  if (newHash === '#userStorage' || window.location.hash.includes('userStorage')) {
+    checkAndScrollToUserStorage()
+  }
 })
 
 // 第三方应用与数据共享相关方法

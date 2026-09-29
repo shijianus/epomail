@@ -111,13 +111,13 @@ try {
   console.log('  已保存原始全域公告配置以供还原');
 
   // 注入 Token 进入系统设置
-  await page.goto(BASE + '/login/', { waitUntil: 'networkidle' });
+  await page.goto(BASE + '/login/', { waitUntil: 'domcontentloaded' });
   await page.evaluate(({ token }) => {
     localStorage.setItem('token', token);
     localStorage.setItem('loginEmail', 'admin@epomail.bond');
     localStorage.setItem('ui', JSON.stringify({ dark: false, locale: 'zh' }));
   }, { token });
-  await page.goto(BASE + '/system-setting', { waitUntil: 'networkidle' });
+  await page.goto(BASE + '/system-setting', { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(2500);
 
   // 打开全域公告邮件弹窗
@@ -130,40 +130,14 @@ try {
   await globalDialog.waitFor({ state: 'visible' });
   ok(true, '全域公告邮件弹窗打开');
 
-  // 6 语言 Tab 存在
+  // 验证语言版本切换条已按需求取消（统一根据管理员语言直接加载和发送）
   const langRow = globalDialog.locator('.welcome-lang-row');
-  ok(await langRow.count() > 0, '公告弹窗包含多语言版本选择行');
-  const langTabs = langRow.locator('.lang-tab-pill');
-  ok(await langTabs.count() === 6, '公告弹窗支持全部 6 种语言 Tab');
+  ok(await langRow.count() === 0, '公告弹窗已成功取消 .welcome-lang-row 多语言选择行');
 
-  // 每个语言 Tab 加载官方默认公告模板
+  // 验证按当前管理员语言（zh 简体中文）直接加载官方默认公告模板
   const subjectInput = globalDialog.locator('.write-subject-input input');
-  const expectations = {
-    zh: /系统全域通知|全域公告/,
-    'zh-Hant': /全域公告|系統全域通知/,
-    en: /Global Announcement/,
-    fr: /Annonce globale/,
-    es: /Anuncio global/,
-    nl: /Wereldwijde aankondiging/
-  };
-  const tabLabels = {
-    zh: /简体中文/,
-    'zh-Hant': /正體中文/,
-    en: /English/,
-    fr: /Français/,
-    es: /Español/,
-    nl: /Nederlands/
-  };
-  for (const [key, re] of Object.entries(expectations)) {
-    const tab = langTabs.filter({ hasText: tabLabels[key] }).first();
-    await tab.click();
-    await page.waitForTimeout(900);
-    const subj = await subjectInput.inputValue();
-    ok(re.test(subj), `${key} 默认公告模板主题正确: ${subj.slice(0, 48)}`);
-  }
-  // 切回简体
-  await langTabs.filter({ hasText: /简体中文/ }).first().click();
-  await page.waitForTimeout(800);
+  const subj = await subjectInput.inputValue();
+  ok(/系统全域通知|全域公告/.test(subj), '默认按管理员语言加载公告主题: ' + subj.slice(0, 48));
 
   await page.screenshot({ path: 'tests/audit_global_email_multilingual_tabs.png' });
 
@@ -242,7 +216,7 @@ if (process.env.RUN_DELIVERY_TESTS === '1') {
 
     const testEmail = `ml-tpl-${Date.now()}@epomail.bond`;
     const addRes = await (await pageC.request.post(BASE + '/api/user/add', {
-      data: { email: testEmail, password: 'Test123456', lang: 'fr' },
+      data: { email: testEmail, password: 'Test123456', lang: 'fr', type: 1 },
       headers: { token: adminToken, Authorization: adminToken, 'Content-Type': 'application/json' }
     })).json();
     ok(addRes.code === 200, `创建测试用户 ${testEmail}`);
@@ -271,7 +245,7 @@ if (process.env.RUN_DELIVERY_TESTS === '1') {
       headers: { token: userToken, Authorization: userToken }
     })).json();
     const rows = listRes?.data?.list || listRes?.data?.records || listRes?.data || [];
-    const official = (Array.isArray(rows) ? rows : []).find(r => r.sendEmail === 'admin@epocanvas.com');
+    const official = (Array.isArray(rows) ? rows : []).find(r => r.sendEmail === 'announcement@epocanvas.com' || r.sendEmail === 'admin@epocanvas.com');
     ok(!!official, '测试用户收到官方欢迎邮件');
     if (official) {
       ok(/Bienvenue|Epocanvas/.test(official.subject || ''), `欢迎邮件主题为法语版本: ${official.subject}`);

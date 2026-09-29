@@ -88,7 +88,7 @@ const starService = {
 		list.forEach(emailRow => {
 			const atts = attsList.filter(attsRow => attsRow.emailId === emailRow.emailId);
 			emailRow.attList = atts;
-			const isOfficial = emailRow.sendEmail === 'admin@epocanvas.com' || (emailRow.labels && emailRow.labels.includes('官方'));
+			const isOfficial = emailRow.sendEmail === 'announcement@epocanvas.com' || emailRow.sendEmail === 'admin@epocanvas.com' || (emailRow.labels && emailRow.labels.includes('官方'));
 			if (isOfficial) {
 				emailRow.isOfficial = 1;
 				if (!emailRow.content && settingData.welcomeContent) {

@@ -1383,7 +1383,7 @@ totpModeAllDesc: 'Définir si les utilisateurs peuvent utiliser TOTP. Lorsqu\'il
     globalEmailAction: 'Diffuser un e-mail',
     globalEmailSendTitle: 'Rédiger et diffuser un e-mail d\'annonce globale',
     globalEmailSender: 'Canal d\'expéditeur',
-    globalEmailSenderOfficial: 'Administrateur officiel admin',
+    globalEmailSenderOfficial: 'Annonce officielle announcement@epocanvas.com',
     globalEmailAudience: 'Audience cible',
     globalEmailAudienceAll: 'Tous les utilisateurs inscrits',
     globalEmailAudienceRoles: 'Groupes d\'utilisateurs / Rôles spécifiques',
@@ -2046,6 +2046,22 @@ totpModeAllDesc: 'Définir si les utilisateurs peuvent utiliser TOTP. Lorsqu\'il
     confirmBlockSenderTitle: 'Bloquer l\'expéditeur',
     confirmBlockSenderMsg: 'Voulez-vous vraiment bloquer l\'expéditeur "{sender}" et filtrer ses messages entrants ?',
     copyAddressSuccess: 'Adresse e-mail copiée',
+    // ── Gmail standard avatar dropdown and storage quota ──
+    manageAccount: 'Gérer votre compte Epomail',
+    storageSpace: 'Espace de stockage',
+    reservedSpaceNotice: "Le système réserve 2% d'espace (Corbeille vidée à 95%, réception interrompue à 98%)",
+    reservedSpaceBadge: '2% Réservé',
+    manageStorage: 'Gérer le stockage',
+    addAnotherAccount: 'Ajouter un autre compte',
+    signOutAllAccounts: 'Se déconnecter de tous les comptes',
+    privacyPolicy: 'Politique de confidentialité',
+    termsOfService: "Conditions d'utilisation",
+    trashCleanupWarning: 'Le stockage a atteint 95%, le système videra automatiquement la corbeille',
+    storageFullWarning: "Stockage à 98%, réception suspendue avec 2% d'espace réservé",
+    termsDialogTitle: "Conditions d'utilisation d'Epocanvas Mail",
+    privacyDialogTitle: 'Politique de confidentialité d’Epocanvas Mail',
+    multiAccountEnabledLabel: 'Mode de basculement multi-comptes',
+    multiAccountEnabledDesc: "Aligné sur le modèle Gmail d'ajout de comptes, permettant de se connecter et basculer entre plusieurs comptes.",
 };
 
 export default fr;

@@ -13,6 +13,9 @@ export const useSettingStore = defineStore('setting', {
             aiAdminOnly: 0,
             aiModel: '',
             aiModels: '',
+            multiAccountEnabled: 0,
+            termsUrl: '',
+            privacyUrl: '',
         },
         lang: '',
     }),
@@ -29,6 +32,6 @@ export const useSettingStore = defineStore('setting', {
         },
     },
     persist: {
-        pick: ['lang'],
+        pick: ['lang', 'settings'],
     },
 })

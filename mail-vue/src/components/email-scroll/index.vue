@@ -84,7 +84,7 @@
                     >
                       {{ item.threadCount }}
                     </span>
-                    <span v-if="item.sendEmail === 'admin@epocanvas.com' || item.isOfficial" class="official-verified-badge" :title="$t('officialVerified')">
+                    <span v-if="item.sendEmail === 'announcement@epocanvas.com' || item.sendEmail === 'admin@epocanvas.com' || item.isOfficial" class="official-verified-badge" :title="$t('officialVerified')">
                       <Icon icon="ri:verified-badge-fill" width="15" height="15" style="color: #0284c7; vertical-align: middle; margin-left: 3px;" />
                     </span>
                   </div>
@@ -709,7 +709,7 @@ const list = computed(() => {
     } else if (props.type === 'all-email') {
       isCurrent = true;
     } else {
-      isCurrent = !item.isDel && !item.isSpam && (!item.snoozedTime || item.sendEmail === 'admin@epocanvas.com' || item.isOfficial) && item.type === 0;
+      isCurrent = !item.isDel && !item.isSpam && (!item.snoozedTime || item.sendEmail === 'announcement@epocanvas.com' || item.sendEmail === 'admin@epocanvas.com' || item.isOfficial) && item.type === 0;
     }
     
     if (isCurrent) {

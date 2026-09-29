@@ -1383,7 +1383,7 @@ totpModeAllDesc: '設定是否允許使用者使用TOTP，開啟後使用者可�
     globalEmailAction: '發送全域郵件',
     globalEmailSendTitle: '撰寫並發送全域公告郵件',
     globalEmailSender: '發件人通道',
-    globalEmailSenderOfficial: '系統官方站長 admin',
+    globalEmailSenderOfficial: '官方公告 announcement@epocanvas.com',
     globalEmailAudience: '接收範圍',
     globalEmailAudienceAll: '全平臺所有註冊用戶',
     globalEmailAudienceRoles: '指定用戶分組 / 角色',
@@ -2046,6 +2046,22 @@ totpModeAllDesc: '設定是否允許使用者使用TOTP，開啟後使用者可�
     confirmBlockSenderTitle: '攔截發件人',
     confirmBlockSenderMsg: '確定要將發件人 "{sender}" 加入黑名單並自動攔截其後續來信嗎？',
     copyAddressSuccess: '已複製郵箱地址',
+    // ── Gmail 規範頭像下拉框與儲存配額 ──
+    manageAccount: '管理您的 Epomail 帳戶',
+    storageSpace: '儲存空間',
+    reservedSpaceNotice: '系統保留 2% 空間（95% 自動清理垃圾桶，98% 暫停接收郵件）',
+    reservedSpaceBadge: '2% 預留',
+    manageStorage: '管理儲存',
+    addAnotherAccount: '新增其他帳戶',
+    signOutAllAccounts: '登出所有帳戶',
+    privacyPolicy: '隱私政策',
+    termsOfService: '服務條款',
+    trashCleanupWarning: '儲存用量已達 95%，系統將自動清理垃圾桶以釋放空間',
+    storageFullWarning: '儲存用量已達 98%，已暫停接收新郵件並保留 2% 空間',
+    termsDialogTitle: 'Epocanvas Mail 服務條款',
+    privacyDialogTitle: 'Epocanvas Mail 隱私政策',
+    multiAccountEnabledLabel: '多帳戶快速切換模式',
+    multiAccountEnabledDesc: '完全對齊 Gmail 方框新增帳戶互動體系，支援在同一瀏覽器下快速登入並切換多個獨立帳號。',
 };
 
 export default zhHant;

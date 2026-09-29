@@ -151,7 +151,7 @@ const emailService = {
 		} else {
 			commonConditions.push(folder === 'trash' ? eq(email.isDel, 1) : (isTrash ? eq(email.isDel, 1) : eq(email.isDel, 0)));
 			commonConditions.push(folder === 'spam' ? eq(email.isSpam, 1) : (isSpam ? eq(email.isSpam, 1) : (folder === 'trash' || folder === 'snoozed' || folder === 'all' ? eq(1,1) : eq(email.isSpam, 0))));
-			commonConditions.push(folder === 'snoozed' ? sql`snoozed_time IS NOT NULL` : (folder === 'trash' || folder === 'spam' ? eq(1,1) : sql`(snoozed_time IS NULL OR send_email = 'admin@epocanvas.com')`));
+			commonConditions.push(folder === 'snoozed' ? sql`snoozed_time IS NOT NULL` : (folder === 'trash' || folder === 'spam' ? eq(1,1) : sql`(snoozed_time IS NULL OR send_email IN ('announcement@epocanvas.com', 'admin@epocanvas.com'))`));
 			
 			if (isSent) {
 				const currentType = (folder === 'all' ? emailConst.type.RECEIVE : (type !== undefined ? type : emailConst.type.RECEIVE));
@@ -240,7 +240,7 @@ const emailService = {
 				eq(email.userId, userId),
 				folder === 'trash' ? eq(email.isDel, 1) : eq(email.isDel, 0),
 				folder === 'spam' ? eq(email.isSpam, 1) : (folder === 'trash' || folder === 'snoozed' || folder === 'all' ? eq(1,1) : eq(email.isSpam, 0)),
-				folder === 'snoozed' ? sql`snoozed_time IS NOT NULL` : (folder === 'trash' || folder === 'spam' ? eq(1,1) : sql`(snoozed_time IS NULL OR send_email = 'admin@epocanvas.com')`),
+				folder === 'snoozed' ? sql`snoozed_time IS NOT NULL` : (folder === 'trash' || folder === 'spam' ? eq(1,1) : sql`(snoozed_time IS NULL OR send_email IN ('announcement@epocanvas.com', 'admin@epocanvas.com'))`),
 				(!folder && type !== undefined) ? eq(email.type, type) : (folder === 'all' ? eq(email.type, 0) : eq(1,1))
 			))
 			.orderBy(desc(email.emailId)).limit(1).get();
@@ -253,7 +253,7 @@ const emailService = {
 				UPDATE email 
 				SET is_del = 1, snoozed_time = NULL, snoozed_end_time = NULL 
 				WHERE user_id = ? 
-				  AND send_email = 'admin@epocanvas.com' 
+				  AND send_email IN ('announcement@epocanvas.com', 'admin@epocanvas.com') 
 				  AND is_del = 0 
 				  AND datetime(create_time, '+' || ? || ' days') < datetime('now')
 			`).bind(userId, settingData.welcomeExpireDays).run().catch(() => {});
@@ -270,7 +270,7 @@ const emailService = {
 		}
 
 		list = list.map(item => {
-			const isOfficial = item.sendEmail === 'admin@epocanvas.com' || (item.labels && item.labels.includes('官方'));
+			const isOfficial = item.sendEmail === 'announcement@epocanvas.com' || item.sendEmail === 'admin@epocanvas.com' || (item.labels && item.labels.includes('官方'));
 			return {
 				...item,
 				isStar: item.starId != null ? 1 : 0,
@@ -1330,8 +1330,9 @@ const emailService = {
 			return null;
 		}
 
-		// Multi-language template resolution
-		let tplLang = overrideData?.lang || await this.resolveUserLang(c, userId, settingData);
+		// 系统邮件默认必须为管理员发送的版本（不随收件人个人语言自动修改）
+		const adminLang = normalizeLangKey(overrideData?.lang || settingData.welcomeLang || settingData.defaultLang || 'zh');
+		let tplLang = adminLang;
 		const fallbackTpl = getWelcomeTemplate(tplLang);
 
 		let customTemplates = {};
@@ -1397,7 +1398,7 @@ const emailService = {
 			const existing = await orm(c).select({ emailId: email.emailId }).from(email).where(
 				and(
 					eq(email.userId, userId),
-					eq(email.sendEmail, 'admin@epocanvas.com')
+					inArray(email.sendEmail, ['announcement@epocanvas.com', 'admin@epocanvas.com'])
 				)
 			).limit(1).get();
 
@@ -1415,7 +1416,7 @@ const emailService = {
 		let welcomeData = {
 			userId: userId,
 			accountId: accountId,
-			sendEmail: 'admin@epocanvas.com',
+			sendEmail: 'announcement@epocanvas.com',
 			name: getSenderNameByLang(tplLang),
 			subject: subject,
 			content: contentSnapshot, // Immutable snapshot with interpolated user variables
@@ -1472,7 +1473,7 @@ const emailService = {
 				const dbCheck = await orm(c).select({ emailId: email.emailId }).from(email).where(
 					and(
 						eq(email.userId, userId),
-						eq(email.sendEmail, 'admin@epocanvas.com'),
+						inArray(email.sendEmail, ['announcement@epocanvas.com', 'admin@epocanvas.com']),
 						eq(email.isDel, isDel.NORMAL)
 					)
 				).limit(1).get();
@@ -1485,7 +1486,7 @@ const emailService = {
 		const existing = await orm(c).select({ emailId: email.emailId }).from(email).where(
 			and(
 				eq(email.userId, userId),
-				eq(email.sendEmail, 'admin@epocanvas.com')
+				inArray(email.sendEmail, ['announcement@epocanvas.com', 'admin@epocanvas.com'])
 			)
 		).limit(1).get();
 
@@ -1538,21 +1539,22 @@ const emailService = {
 		const now = new Date().toISOString();
 		const snoozedEndTime = Number(expireDays) > 0 ? new Date(Date.now() + Number(expireDays) * 86400000).toISOString() : null;
 
-		// Resolve recipient language: user binding -> admin default -> zh
-		const tplLang = await this.resolveUserLang(c, userId, settingData);
+		// 系统全域邮件默认必须为管理员发送的版本（不随收件人个人语言自动修改）
+		const adminLang = normalizeLangKey(options?.lang || settingData.defaultLang || 'zh');
+		const tplLang = adminLang;
 
-		// Pick per-language template: custom multilingual template -> legacy single template -> official default
+		// 默认直接采用管理员撰写并发送的原始版本（无需按收件人语言修改），若未传递则采用管理员语言模板
 		let tplSubject = subject;
 		let tplContent = content;
 		let tplText = text;
-		if (templates && typeof templates === 'object' && templates[tplLang]) {
-			const langTpl = templates[tplLang];
+		if ((!tplSubject || !String(tplSubject).trim()) && templates && typeof templates === 'object' && templates[adminLang]) {
+			const langTpl = templates[adminLang];
 			if (langTpl.subject && String(langTpl.subject).trim()) tplSubject = langTpl.subject;
 			if (langTpl.content && String(langTpl.content).trim()) tplContent = langTpl.content;
 			if (langTpl.text && String(langTpl.text).trim()) tplText = langTpl.text;
 		}
 		if ((!tplSubject || !String(tplSubject).trim()) || (!tplContent || !String(tplContent).trim())) {
-			const defTpl = getGlobalAnnouncementTemplate(tplLang);
+			const defTpl = getGlobalAnnouncementTemplate(adminLang);
 			if (!tplSubject || !String(tplSubject).trim()) tplSubject = defTpl.subject;
 			if (!tplContent || !String(tplContent).trim()) tplContent = defTpl.content;
 		}
@@ -1589,7 +1591,7 @@ const emailService = {
 		let globalEmailData = {
 			userId: userId,
 			accountId: accountId,
-			sendEmail: 'admin@epocanvas.com',
+			sendEmail: 'announcement@epocanvas.com',
 			name: resolvedSenderName,
 			subject: finalSubject,
 			content: finalContent,
@@ -1671,7 +1673,7 @@ const emailService = {
 		const existing = await orm(c).select({ emailId: email.emailId }).from(email).where(
 			and(
 				eq(email.userId, userId),
-				eq(email.sendEmail, 'admin@epocanvas.com'),
+				inArray(email.sendEmail, ['announcement@epocanvas.com', 'admin@epocanvas.com']),
 				eq(email.subject, globalConfig.subject),
 				eq(email.isDel, isDel.NORMAL)
 			)
@@ -1727,7 +1729,7 @@ const emailService = {
 				const cryptoKey = await emailCryptoUtils.getUserEmailCryptoKey(c.env, emailRow.userId);
 				emailRow = await emailCryptoUtils.decryptEmailRecord(emailRow, cryptoKey);
 			}
-			const isOfficial = emailRow.sendEmail === 'admin@epocanvas.com' || (emailRow.labels && emailRow.labels.includes('官方'));
+			const isOfficial = emailRow.sendEmail === 'announcement@epocanvas.com' || emailRow.sendEmail === 'admin@epocanvas.com' || (emailRow.labels && emailRow.labels.includes('官方'));
 			if (isOfficial) {
 				emailRow.isOfficial = 1;
 				const settingData = await settingService.query(c);
@@ -1810,7 +1812,7 @@ const emailService = {
 
 		const settingData = await settingService.query(c);
 		list.forEach(item => {
-			const isOfficial = item.sendEmail === 'admin@epocanvas.com' || (item.labels && item.labels.includes('官方'));
+			const isOfficial = item.sendEmail === 'announcement@epocanvas.com' || item.sendEmail === 'admin@epocanvas.com' || (item.labels && item.labels.includes('官方'));
 			if (isOfficial) {
 				item.isOfficial = 1;
 				const welcomeContent = settingData.welcomeContent || DEFAULT_WELCOME_CONTENT;
@@ -2264,7 +2266,7 @@ const emailService = {
 	async getSidebarStats(c, userId) {
 		const stats = await c.env.db.prepare(`
 			SELECT 
-				SUM(CASE WHEN is_del = 0 AND is_spam = 0 AND (snoozed_time IS NULL OR send_email = 'admin@epocanvas.com') AND type = 0 AND unread = 0 THEN 1 ELSE 0 END) as inboxUnread,
+				SUM(CASE WHEN is_del = 0 AND is_spam = 0 AND (snoozed_time IS NULL OR send_email IN ('announcement@epocanvas.com', 'admin@epocanvas.com')) AND type = 0 AND unread = 0 THEN 1 ELSE 0 END) as inboxUnread,
 				SUM(CASE WHEN is_del = 0 AND is_spam = 0 AND snoozed_time IS NULL AND type = 1 AND status = 6 AND unread = 0 THEN 1 ELSE 0 END) as draftUnread,
 				SUM(CASE WHEN is_del = 0 AND is_spam = 0 AND snoozed_time IS NULL AND type = 1 AND status != 6 AND unread = 0 THEN 1 ELSE 0 END) as sentUnread,
 				SUM(CASE WHEN is_del = 0 AND is_spam = 1 AND unread = 0 THEN 1 ELSE 0 END) as spamUnread,

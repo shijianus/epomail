@@ -114,6 +114,19 @@
 
               <div class="setting-item">
                 <div class="title-item">
+                  <span>{{ $t('multiAccountEnabledLabel') }}</span>
+                  <el-tooltip effect="dark" :content="$t('multiAccountEnabledDesc')">
+                    <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+                  </el-tooltip>
+                </div>
+                <div>
+                  <el-switch @change="(val) => changeField('multiAccountEnabled', val)" :before-change="beforeChange" :active-value="1" :inactive-value="0"
+                             v-model="setting.multiAccountEnabled"/>
+                </div>
+              </div>
+
+              <div class="setting-item">
+                <div class="title-item">
                   <span>{{ $t('emailPrefix') }}</span>
                   <el-tooltip effect="dark" :content="$t('emailPrefixDesc')">
                     <Icon class="warning" icon="fe:warning" width="18" height="18"/>
@@ -1565,28 +1578,6 @@
             </div>
           </div>
 
-          <!-- 1.1 Multi-language Tabs Switcher -->
-          <div class="welcome-lang-row">
-            <div class="recipients-label">
-              <Icon icon="fluent:local-language-24-regular" width="16" height="16" class="recipients-icon" />
-              <span>{{ $t('welcomeEmailLangTab') }}:</span>
-            </div>
-            <div class="welcome-lang-tabs">
-              <div
-                v-for="l in supportedWelcomeLangs"
-                :key="l.key"
-                class="lang-tab-pill"
-                :class="{ 'is-active': activeWelcomeLang === l.key }"
-                @click="switchWelcomeLang(l.key)"
-              >
-                <span>{{ l.label }}</span>
-                <span v-if="l.key === adminDefaultLangKey" class="admin-badge" :title="$t('welcomeEmailAdminLangBadge')">
-                  {{ $t('default') }}
-                </span>
-              </div>
-            </div>
-          </div>
-
           <!-- 2. Email Subject Bar -->
           <div class="welcome-subject-bar">
             <el-input
@@ -1916,19 +1907,7 @@
         </template>
 
         <div class="welcome-dialog-body">
-          <!-- 1. Sender Channel Row -->
-          <div class="welcome-recipients-row">
-            <div class="recipients-label">
-              <Icon icon="fluent:mail-arrow-double-back-20-regular" width="16" height="16" class="recipients-icon" />
-              <span>{{ $t('globalEmailSender') }}:</span>
-            </div>
-            <div class="recipients-content">
-              <span class="audience-pill official-pill">admin@epocanvas.com</span>
-              <span class="recipients-subtext">（{{ $t('globalEmailSenderOfficial') }}）</span>
-            </div>
-          </div>
-
-          <!-- 2. Target Audience Row -->
+          <!-- Target Audience Row -->
           <div class="welcome-recipients-row audience-selection-row">
             <div class="recipients-label">
               <Icon icon="solar:users-group-rounded-bold" width="16" height="16" class="recipients-icon" />
@@ -1957,28 +1936,6 @@
                     :value="role.roleId"
                   />
                 </el-select>
-              </div>
-            </div>
-          </div>
-
-          <!-- 2.1 Multi-language Tabs Switcher -->
-          <div class="welcome-lang-row">
-            <div class="recipients-label">
-              <Icon icon="fluent:local-language-24-regular" width="16" height="16" class="recipients-icon" />
-              <span>{{ $t('globalEmailLangTab') }}:</span>
-            </div>
-            <div class="welcome-lang-tabs">
-              <div
-                v-for="l in supportedWelcomeLangs"
-                :key="l.key"
-                class="lang-tab-pill"
-                :class="{ 'is-active': globalActiveLang === l.key }"
-                @click="switchGlobalLang(l.key)"
-              >
-                <span>{{ l.label }}</span>
-                <span v-if="l.key === adminDefaultLangKey" class="admin-badge" :title="$t('welcomeEmailAdminLangBadge')">
-                  {{ $t('default') }}
-                </span>
               </div>
             </div>
           </div>
@@ -3940,32 +3897,6 @@ const globalTemplatesMap = reactive({
   nl: { subject: '', content: '' }
 })
 
-function switchGlobalLang(targetKey) {
-  if (globalActiveLang.value === targetKey) return
-  // Save current editor content into the active lang slot
-  let currentContent = globalEmailForm.content || ''
-  if (globalEmailEditorFormat.value === 'rich' && globalEditorRef.value && globalEditorRef.value.getContent) {
-    try {
-      const richText = globalEditorRef.value.getContent()
-      if (richText !== undefined) currentContent = richText
-    } catch (e) {}
-  }
-  globalTemplatesMap[globalActiveLang.value] = {
-    subject: globalEmailForm.subject || '',
-    content: currentContent
-  }
-  globalActiveLang.value = targetKey
-  const nextTpl = globalTemplatesMap[targetKey] || {}
-  const defTpl = getAnnouncementTemplate(targetKey)
-  globalEmailForm.subject = nextTpl.subject || defTpl.subject
-  globalEmailForm.content = nextTpl.content || defTpl.content
-  globalEmailEditorFormat.value = 'rich'
-  nextTick(() => {
-    if (globalEditorRef.value && globalEditorRef.value.setContent) {
-      globalEditorRef.value.setContent(globalEmailForm.content)
-    }
-  })
-}
 
 function collectGlobalTemplates() {
   // Sync current editor content into the active lang slot, then return only fully filled templates
@@ -4529,8 +4460,8 @@ function previewNoticePopup() {
 }
 
 function openWelcomeEmailSetting() {
-  // 1. Determine active language: station master's setting/active lang
-  activeWelcomeLang.value = setting.value.welcomeLang || adminDefaultLangKey.value || 'zh'
+  // 1. Determine active language: directly use current administrator's interface language
+  activeWelcomeLang.value = adminDefaultLangKey.value || 'zh'
 
   // 2. Parse saved welcomeTemplates map if available
   let savedTemplates = {}
@@ -4579,30 +4510,6 @@ function openWelcomeEmailSetting() {
   })
 }
 
-function switchWelcomeLang(targetKey) {
-  if (activeWelcomeLang.value === targetKey) return
-  // Save current content to current lang slot
-  let currentContent = welcomeEmailForm.welcomeContent || ''
-  if (welcomeEditorFormat.value === 'rich' && welcomeEditorRef.value && welcomeEditorRef.value.getContent) {
-    try {
-      const richText = welcomeEditorRef.value.getContent()
-      if (richText !== undefined) currentContent = richText
-    } catch (e) {}
-  }
-  welcomeTemplatesMap[activeWelcomeLang.value] = {
-    subject: welcomeEmailForm.welcomeSubject,
-    content: currentContent
-  }
-
-  activeWelcomeLang.value = targetKey
-  const nextTpl = welcomeTemplatesMap[targetKey] || getWelcomeTemplate(targetKey)
-  welcomeEmailForm.welcomeSubject = nextTpl.subject
-  welcomeEmailForm.welcomeContent = nextTpl.content
-
-  if (welcomeEditorFormat.value === 'rich' && welcomeEditorRef.value && welcomeEditorRef.value.setContent) {
-    welcomeEditorRef.value.setContent(nextTpl.content)
-  }
-}
 
 function toggleFullscreen() {
   isWelcomeFullscreen.value = !isWelcomeFullscreen.value
@@ -4795,6 +4702,7 @@ function openGlobalEmailDialog() {
   // 2. Fetch or load cached global email config
   getGlobalEmailConfig().then(cfg => {
     globalActiveLang.value = adminDefaultLangKey.value || 'zh'
+    const defaultAnnTpl = getAnnouncementTemplate(globalActiveLang.value)
     // Populate per-language template map from saved multilingual templates (empty slots fall back to official defaults on switch)
     const savedLangTpl = (cfg && cfg.templates && typeof cfg.templates === 'object') ? cfg.templates : {}
     supportedWelcomeLangs.forEach(item => {
@@ -4804,40 +4712,22 @@ function openGlobalEmailDialog() {
         content: saved.content || ''
       }
     })
-    if (cfg && (cfg.subject || cfg.content)) {
-      globalEmailForm.subject = cfg.subject || ''
-      globalEmailForm.content = cfg.content || ''
-      globalEmailForm.targetType = cfg.targetType || 'all'
-      globalEmailForm.targetRoleIds = Array.isArray(cfg.targetRoleIds) ? cfg.targetRoleIds : []
-      globalEmailForm.expireDays = cfg.expireDays !== undefined ? Number(cfg.expireDays) : 30
-      globalEmailForm.sendToNewUsers = cfg.sendToNewUsers !== undefined ? Number(cfg.sendToNewUsers) : 1
-      globalEmailForm.isStarred = cfg.isStarred !== undefined ? Number(cfg.isStarred) : 1
+    const activeTpl = globalTemplatesMap[globalActiveLang.value]
+    if (activeTpl && activeTpl.subject && activeTpl.content) {
+      globalEmailForm.subject = activeTpl.subject
+      globalEmailForm.content = activeTpl.content
+    } else if (cfg && cfg.subject && cfg.content) {
+      globalEmailForm.subject = cfg.subject
+      globalEmailForm.content = cfg.content
     } else {
-      globalEmailForm.subject = '📢 系统全域通知与版本升级公告'
-      globalEmailForm.content = `<div style="max-width: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #1e293b; line-height: 1.7; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; padding: 32px;">
-  <h2 style="color: #0f172a; margin-top: 0; font-size: 20px; font-weight: 700;">系统全域通知</h2>
-  <p style="color: #475569; font-size: 15px;">尊敬的 Epocanvas Mail 用户：</p>
-  <p style="color: #475569; font-size: 14.5px;">我们在此向您推送最新的全域服务升级公告，致力于为您提供更高效、纯净且智能的邮箱服务。</p>
-  <div style="background: #f8fafc; border-left: 4px solid #2563eb; padding: 14px 18px; margin: 20px 0; border-radius: 0 8px 8px 0;">
-    <strong style="color: #1e293b;">公告要点说明：</strong>
-    <p style="margin: 6px 0 0; color: #64748b; font-size: 14px;">1. 系统功能优化与服务升级<br>2. 多语言与全域邮件支持已上线<br>3. 敬请体验并随时向管理员反馈意见</p>
-  </div>
-  <p style="color: #94a3b8; font-size: 12.5px; margin-top: 28px; border-top: 1px dashed #e2e8f0; padding-top: 16px;">
-    此邮件由系统站长 (admin@epocanvas.com) 统一发布 · 祝您使用愉快！
-  </p>
-</div>`
-      // Prefer the saved custom template of the active language when present
-      const activeTpl = globalTemplatesMap[globalActiveLang.value]
-      if (activeTpl && activeTpl.subject && activeTpl.content) {
-        globalEmailForm.subject = activeTpl.subject
-        globalEmailForm.content = activeTpl.content
-      }
-      globalEmailForm.targetType = 'all'
-      globalEmailForm.targetRoleIds = []
-      globalEmailForm.expireDays = 30
-      globalEmailForm.sendToNewUsers = 1
-      globalEmailForm.isStarred = 1
+      globalEmailForm.subject = defaultAnnTpl.subject
+      globalEmailForm.content = defaultAnnTpl.content
     }
+    globalEmailForm.targetType = cfg?.targetType || 'all'
+    globalEmailForm.targetRoleIds = Array.isArray(cfg?.targetRoleIds) ? cfg.targetRoleIds : []
+    globalEmailForm.expireDays = cfg?.expireDays !== undefined ? Number(cfg.expireDays) : 30
+    globalEmailForm.sendToNewUsers = cfg?.sendToNewUsers !== undefined ? Number(cfg.sendToNewUsers) : 1
+    globalEmailForm.isStarred = cfg?.isStarred !== undefined ? Number(cfg.isStarred) : 1
 
     globalEmailEditorFormat.value = 'rich'
     isGlobalEmailFullscreen.value = false
@@ -4930,6 +4820,7 @@ function saveGlobalEmailDraft() {
   const payload = {
     subject: globalEmailForm.subject,
     content: finalContent,
+    lang: globalActiveLang.value,
     templates: collectGlobalTemplates(),
     targetType: globalEmailForm.targetType,
     targetRoleIds: globalEmailForm.targetRoleIds,
@@ -4992,6 +4883,7 @@ function confirmBroadcastGlobalEmail() {
     const payload = {
       subject: globalEmailForm.subject,
       content: finalContent,
+      lang: globalActiveLang.value,
       templates: collectGlobalTemplates(),
       targetType: globalEmailForm.targetType,
       targetRoleIds: globalEmailForm.targetRoleIds,
@@ -7596,80 +7488,6 @@ form .el-button {
     }
   }
 
-  .welcome-lang-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 8px 16px;
-    background: var(--el-fill-color-light);
-    border: 1px solid var(--el-border-color-lighter);
-    border-radius: 10px;
-    flex-shrink: 0;
-
-    .recipients-label {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-weight: 700;
-      font-size: 13.5px;
-      color: var(--el-text-color-regular);
-
-      .recipients-icon {
-        color: var(--el-color-primary);
-        display: block;
-      }
-    }
-
-    .welcome-lang-tabs {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex-wrap: wrap;
-
-      .lang-tab-pill {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        background: var(--el-bg-color);
-        padding: 4px 12px;
-        border-radius: 9999px;
-        border: 1px solid var(--el-border-color-lighter);
-        font-size: 12.5px;
-        font-weight: 500;
-        color: var(--el-text-color-regular);
-        cursor: pointer;
-        transition: all 0.2s ease;
-        user-select: none;
-
-        &:hover {
-          color: var(--el-color-primary);
-          border-color: var(--el-color-primary-light-5);
-        }
-
-        &.is-active {
-          background: var(--el-color-primary);
-          color: #ffffff;
-          border-color: var(--el-color-primary);
-          font-weight: 600;
-          box-shadow: 0 2px 8px rgba(var(--el-color-primary-rgb), 0.3);
-
-          .admin-badge {
-            background: rgba(255, 255, 255, 0.25);
-            color: #ffffff;
-          }
-        }
-
-        .admin-badge {
-          background: var(--el-color-primary-light-8);
-          color: var(--el-color-primary);
-          font-size: 10.5px;
-          padding: 1px 6px;
-          border-radius: 10px;
-          font-weight: 600;
-        }
-      }
-    }
-  }
 
   .welcome-subject-bar {
     flex-shrink: 0;
