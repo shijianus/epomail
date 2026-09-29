@@ -10,6 +10,31 @@
 
 ---
 
+### 移除发信人通道选择行、统一默认官方发件方为 announcement@epocanvas.com 与平滑兼容 (2026-09-28)
+*   **关联提交 (Git Commit)**: `6d3cabe93615dbfa411f9b100433fec699665473` (Short: `6d3cabe`)
+*   **部署环境 (Deployment)**: `本地全真栈 / 生产 Cloudflare (mail.epocanvas.com)`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 删除弹窗「发件人通道:」选择行 (`mail-vue/src/views/sys-setting/index.vue`):
+        - 彻底从全域公告邮件弹窗中删除包含 `globalEmailSender` 的 `.welcome-recipients-row` 行；
+        - 严格遵循最小修改原则，保留目标受众、角色选择、主题与多模态编辑器；
+    - [x] 统一默认官方发信方为 `announcement@epocanvas.com` (`mail-worker/src/service/email-service.js`):
+        - 官方新用户欢迎邮件 (`deliverWelcomeEmailToUser`) 与全域公告 (`deliverGlobalEmailToUser`) 的默认发信人统一使用 `announcement@epocanvas.com`；
+        - 更新 6 国语言公告模板 (`announcement-templates.js`, `welcome-template.js`) 底部官方署名地址；
+    - [x] 官方邮件识别与历史版本平滑兼容 (`email-service.js`, `star-service.js`, `content/index.vue`, `all-email/index.vue`, `email-scroll/index.vue`, `mail-translation-helper.js`):
+        - `isOfficial` 官方蓝标徽章、发信查重、Snooze 穿透展示、TTL 自动清理及侧边栏未读计数全面支持 `announcement@epocanvas.com` 并平滑向后兼容 `admin@epocanvas.com`。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：mail-vue `vite build` 13.53s 零警告零报错构建成功；
+    - [x] 多语言对称审计：`node scripts/i18n-symmetry.mjs` (2054 键 100% 严格对称)；`node scripts/i18n-audit.mjs` (0 缺失)；
+    - [x] 自动化测试套件：
+        - `node tests/test-admin-mail-lang-and-translation-fallback.mjs`: 34/34 断言 100% 通过；
+        - `node tests/test-multilingual-and-global-email-e2e.mjs`: 5/5 检查点 100% 通过；
+        - `node tests/test-multilingual-email-templates-e2e.mjs`: 45/45 断言 100% 通过；
+    - [x] 独立子代理从 0 开始客观审计 (Subagent `fd504aa8-0cbc-4adf-8e4e-44df3e33861c`):
+        - 经独立客观核验，发信人通道行彻底删除，受众控制完好，发信地址 100% 统一为 announcement@epocanvas.com，审计综合评定 PASS；
+    - [x] 零假数据残留：测试数据严格在 `finally` 块中复原，零脏数据残留。
+
+---
+
 ### 统一按当前管理员语言直出发信、移除弹窗语言选择行、邮件不可变版本投递与预置翻译直调退回机制 (2026-09-28)
 *   **关联提交 (Git Commit)**: `23ea4a7cec91f243ab3456657ceb567010e2a61d` (Short: `23ea4a7`)
 *   **部署环境 (Deployment)**: `本地全真栈 / 生产 Cloudflare (mail.epocanvas.com)`
