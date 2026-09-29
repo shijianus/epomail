@@ -8,6 +8,26 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### 彻底物理清除 welcome-lang-row 样式与死函数、更新发件人标签文案并完成生产上线 (2026-09-28)
+*   **关联提交 (Git Commit)**: `9a3128a99a7210e741d408ebc46648a7350cb4be` (Short: `9a3128a`), `74ccc309cb8d9e6024976a4ba0c7bb0b26f5d817` (Short: `74ccc30`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com / epomail.epocanvas.workers.dev)` (Version ID: `6678eaf2-5306-44f1-bbeb-042fd4d4507d`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 彻底物理清除残留的 `.welcome-lang-row` CSS 样式与死函数 (`mail-vue/src/views/sys-setting/index.vue`):
+        - 移除 `<style>` 中遗留的 74 行 `.welcome-lang-row` 级联选择器规则；
+        - 清理已废弃的语言切换函数 `switchWelcomeLang` 与 `switchGlobalLang`，代码体积缩减 124 行；
+        - 弹窗内禁止修改语言，发信语言严格跟随管理员当前界面语言；切换语言模板需通过常规设置切换管理员界面语言；
+    - [x] 更新全域公告发件人标签文案为官方统一 `announcement@epocanvas.com` (`mail-vue/src/i18n/*.js`, `mail-worker/src/i18n/*.js`):
+        - 将 6 语言字典中 `globalEmailSenderOfficial` 由旧的「系统官方站长 admin」统一更新为「官方公告 announcement@epocanvas.com」；
+    - [x] 生产环境编译发布 (`npx wrangler deploy`):
+        - 编译完成发布至 Cloudflare 生产环境，Version ID 为 `6678eaf2-5306-44f1-bbeb-042fd4d4507d`；
+        - 线上 CDN 验证：`https://mail.epocanvas.com` 全部 58 个 JS 分块中 `welcome-lang-row` 匹配数为 0，线上已彻底消除旧版本残留。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：mail-vue `vite build` 16.21s 成功构建；
+    - [x] 多语言对称审计：`node scripts/i18n-symmetry.mjs` (2054 键严格对称，100% 对齐)；`node scripts/i18n-audit.mjs` (0 缺失)；
+    - [x] 自动化测试套件：`node tests/test-admin-mail-lang-and-translation-fallback.mjs` 34 项断言全绿；
+    - [x] 生产环境真实验证：线上 `mail.epocanvas.com` CDN 产物无任何 `welcome-lang-row`，发件人通道选择行已物理消失；
+    - [x] 零假数据残留：测试数据严格在 `finally` 块中复原，零脏数据残留。
+
 ---
 
 ### 移除发信人通道选择行、统一默认官方发件方为 announcement@epocanvas.com 与平滑兼容 (2026-09-28)
