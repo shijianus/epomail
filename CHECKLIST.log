@@ -8,6 +8,21 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### EpomailDocs 独立审计修订 v5.1：博客等级联动披露增补与时效数据校正 (2026-09-30)
+*   **关联提交 (Git Commit)**: `52412e3`（EpomailDocs 独立仓库，完整 Hash `52412e393613a8b2763d133a95f6a3205e8cb6ce`，已推送 origin/main；本仓归档提交见 CHECKLIST/REPORTS 变更提交）
+*   **部署环境 (Deployment)**: `本地 build 审计核验`（文档站未部署，无生产 Version ID）
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 独立审计发现并修复第三方清单漏项（P1）：`user-service.js` `getBlogLevelInfo` 于当事人查看博客等级联动时将电子邮件地址经 GET 查询传送至 `blog.epocanvas.com`（`BLOG_BASE_URL` 默认值）——《第三方处理者清单》§2 六语言新增「运营团队博客」行、《隐私政策》§7「经您授权」项六语言同步增补，全站版本 5.0→5.1（生效日期 2026-09-30，42 处版本行同步）
+    - [x] project.md 六语言时效校正（P1）：主仓 510→535 提交、本站 3→10 提交并补全十笔 40 位 Hash 提交链（`fd57a71`→`5197f50`）、阶段表新增「12. 定稿与上线审计」、tests 102→105 个脚本
+    - [x] README 陈旧段修订（P1）：废止 v4.1「736 处条号引用全部合规」表述并全面对齐 v5.0 去条号立场；legal-architecture.svg 引用位置更正为总览；语言矩阵 7→8 篇；锚点数 396→480
+    - [x] 工具补盲（P2）：`check-structure.py` 校验范围 7→8 篇（纳入 project.md）；`package.json` 新增 `check`/`validate` 脚本挂接三件套
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：`pnpm build` 49 页 19.00s 零报错
+    - [x] 锚点全量校验：`validate-anchors.cjs` 480 锚点 0 断链
+    - [x] 结构对称回归：`check-structure.py` 6 语言 × 8 篇 1:1 全绿；`verify-laws.py` 与核验底稿一致
+    - [x] 事实核验：OAuth 访问令牌 2 小时（`oauth-provider-service.js:231-241` expires_in 7200）、Google Fonts 界面加载（`mail-vue/index.html:10-12`）、90% 配额清理（`email-service.js:311-312`）、后端 i18n 1,888 键对称（i18n-symmetry 全绿）均与文档声明一致
+    - [x] 零假数据残留：纯文档与脚本修订，无测试数据产生；主仓文档归档按分流写入 REPORTS.md 与本文件，未触碰 AGENTS.md
+
 ### EpomailDocs 上线就绪审计：远端应用变更技术事实校准与部署配置盘点 (2026-09-30)
 *   **关联提交 (Git Commit)**: `5197f50`（EpomailDocs 独立仓库，完整 Hash 见该仓 git log；已推送 origin/main）
 *   **部署环境 (Deployment)**: `本地 build 审计核验`（无生产部署，生产 Version ID 不变）

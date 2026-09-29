@@ -9,6 +9,23 @@
 
 ---
 
+### EpomailDocs 法律文档站独立审计：技术事实全量核验与 v5.1 修订 (2026-09-30)
+*   **关联提交 (Git Commit)**: `52412e393613a8b2763d133a95f6a3205e8cb6ce` (Short: `52412e3`)（EpomailDocs 独立仓库，已推送 origin/main；本仓归档提交以 CHECKLIST.log 对应条目为准）
+*   **体检/审计范围与方法 (Scope & Methodology)**:
+    1. 范围与环境：EpomailDocs 文档站 6 语言 × 8 篇 48 页全部内容逐篇核验；mail-worker / mail-vue 源码技术事实全量比对（加密语义、保留期限、第三方清单、保留/删除行为、角色体系、域名拓扑）；EpoCanvasDocs 姊妹站产品介绍页格式范式对齐评估。
+    2. 工具与脚本：三路并行只读审计（文档结构对称性 / 源码事实提取 / 格式范式比对）+ 文档站四件套回归（`pnpm build`、`validate-anchors.cjs`、`check-structure.py`、`verify-laws.py`）+ 主仓 `i18n-symmetry.mjs`（后端 1,888 键对称复核，与 project.md 声明一致）。
+*   **核心发现与缺陷矩阵 (Key Findings & Matrix)**:
+    - **[P0·阻塞/安全]**: 未发现。48 页零占位符、零断链、零营销语气残留；高错误风险事实点全部与源码一致——加密三档模式语义与管理员可及范围（全部/隐私/加密）、附件不经邮件加密、注销为软删除且邮箱地址不可重注册、回收站 7 日按「收受之日」起算、外寄投递三通道（Cloudflare Email／Resend／Mailjet）、无 Cookie 改用 localStorage 存 JWT（30 日）、OAuth 访问令牌 2 小时、验证码提取发送正文前 6,000 字符、PBKDF2 十万次迭代、登录失败 5 次锁定 12 小时。
+    - **[P1·重要]**: 三项——①第三方清单漏项：`user-service.js` `getBlogLevelInfo` 于当事人查看博客等级联动时，将电子邮件地址经 GET 查询传送至 `blog.epocanvas.com`（`BLOG_BASE_URL` 默认值），与《第三方处理者清单》「完整清单」声明冲突，六语言均未披露；②project.md 时效过期：主仓 510→535 提交、本站 3→10 提交（v4.1 定稿与 v5.0 上线审计两笔未入 40 位 Hash 链）、阶段表仍写「七篇」（实际 8 篇）、tests 102→105 个脚本；③README 陈旧矛盾：v4.1 时代「736 处条号引用全部合规」及条号格式规范与 v5.0 去条号立场冲突、legal-architecture.svg 引用位置误标「服务条款」（实为总览）、锚点数 396→480。
+    - **[P2·次要]**: 四项——`check-structure.py` 校验清单漏 `project.md`（7→8 篇对称性盲区）；`package.json` 未挂接 check/validate 核验脚本；正式版本效力条款仅 overview/privacy-policy/terms-of-service 3 篇自带（其余 5 篇依赖总览 §4 转引，属可接受设计取舍）；`SITE_ORIGIN` 仍为 `mail.epocanvas.com` 占位且无发布管道（前次上线就绪审计已登记，本次确认仍未解决，正式部署前必须另定域名）。
+    - **格式范式对齐结论**: 与 EpoCanvasDocs 产品介绍页范式（定位/痛点/功能/架构/适用边界/对比/版本/目录树）相比，本站 project.md 已覆盖八大要素且图文对应；可选增补「适合谁／不适合谁」边界段与 FAQ（不阻塞上线）。
+*   **治理修复与回归结果 (Fixes & Verification)**:
+    - v5.1 修订（EpomailDocs 仓提交 `52412e3`）：六语言同步增补博客等级联动披露（《第三方处理者清单》§2 新增运营团队博客行 + 《隐私政策》§7「经您授权」项）；project.md 六语言时效数据与十笔完整 40 位 Hash 提交链更新并新增「12. 定稿与上线审计」阶段；README 陈旧段全部对齐 v5.0 去条号立场；全站版本 5.0→5.1（生效日期 2026-09-30，7 篇法律文档 × 6 语言共 42 处版本行同步）；`check-structure.py` 校验范围纳入 project.md（7→8 篇）；`package.json` 新增 `check`/`validate` 脚本。
+    - 回归全绿：`pnpm build` 49 页 19.00s 零报错；`validate-anchors` 480 锚点 0 断链；`check-structure` 6 语言 × 8 篇 1:1 全对称；`verify-laws` 法规核验底稿比对一致。
+    - 遗留路线图 (Roadmap)：①确定文档站正式域名（如 docs.epocanvas.com/epomail 或独立子域），同步 `SITE_ORIGIN`、robots.txt Sitemap 与应用内 `DOCS_URL`，建立 Cloudflare Pages 发布管道后上线；②上线后按《隐私政策》§13 程序公告 v5.1 变更；③可选：为 acceptable-use 等五篇补自带正式版本条款一句；④时效型数字（提交数/测试数/锚点数）在 project.md 均已带「截至」语义，建议每次文档仓提交前随 `pnpm check` 一并刷新。
+
+---
+
 ### 邮件不可变投递、语言选择行彻底清除与官方发件地址统一审计专项 (2026-09-28)
 *   **关联提交 (Git Commit)**: `376ea89de8cb8038c013354edb0de6d3246b5d1f` (Short: `376ea89`)
 *   **体检/审计范围与方法 (Scope & Methodology)**:
