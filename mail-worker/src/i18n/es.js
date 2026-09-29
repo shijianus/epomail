@@ -1364,7 +1364,7 @@ const es = {
     globalEmailAction: 'Transmitir correo',
     globalEmailSendTitle: 'Redactar y transmitir correo de anuncio global',
     globalEmailSender: 'Canal de remitente',
-    globalEmailSenderOfficial: 'Anuncio oficial announcement@epocanvas.com',
+    globalEmailSenderOfficial: 'Anuncio oficial announcement{\'@\'}epocanvas.com',
     globalEmailAudience: 'Público objetivo',
     globalEmailAudienceAll: 'Todos los usuarios registrados',
     globalEmailAudienceRoles: 'Grupos de usuarios / Roles específicos',

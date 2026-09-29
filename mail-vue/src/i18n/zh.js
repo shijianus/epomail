@@ -1383,7 +1383,7 @@ totpModeAllDesc: '设置是否允许用户使用TOTP，开启后用户可以且�
     globalEmailAction: '发送全域邮件',
     globalEmailSendTitle: '撰写并发送全域公告邮件',
     globalEmailSender: '发件人通道',
-    globalEmailSenderOfficial: '官方公告 announcement@epocanvas.com',
+    globalEmailSenderOfficial: '官方公告 announcement{\'@\'}epocanvas.com',
     globalEmailAudience: '接收范围',
     globalEmailAudienceAll: '全平台所有注册用户',
     globalEmailAudienceRoles: '指定用户分组 / 角色',

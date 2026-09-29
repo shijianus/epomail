@@ -1383,7 +1383,7 @@ totpModeAllDesc: 'Définir si les utilisateurs peuvent utiliser TOTP. Lorsqu\'il
     globalEmailAction: 'Diffuser un e-mail',
     globalEmailSendTitle: 'Rédiger et diffuser un e-mail d\'annonce globale',
     globalEmailSender: 'Canal d\'expéditeur',
-    globalEmailSenderOfficial: 'Annonce officielle announcement@epocanvas.com',
+    globalEmailSenderOfficial: 'Annonce officielle announcement{\'@\'}epocanvas.com',
     globalEmailAudience: 'Audience cible',
     globalEmailAudienceAll: 'Tous les utilisateurs inscrits',
     globalEmailAudienceRoles: 'Groupes d\'utilisateurs / Rôles spécifiques',

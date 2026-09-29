@@ -1364,7 +1364,7 @@ const en = {
     globalEmailAction: 'Broadcast Email',
     globalEmailSendTitle: 'Compose & Send Global Broadcast Email',
     globalEmailSender: 'Sender Channel',
-    globalEmailSenderOfficial: 'Official Announcement announcement@epocanvas.com',
+    globalEmailSenderOfficial: 'Official Announcement announcement{\'@\'}epocanvas.com',
     globalEmailAudience: 'Target Audience',
     globalEmailAudienceAll: 'All Registered Users',
     globalEmailAudienceRoles: 'Specific User Groups / Roles',
