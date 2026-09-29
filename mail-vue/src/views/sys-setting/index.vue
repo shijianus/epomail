@@ -3897,32 +3897,6 @@ const globalTemplatesMap = reactive({
   nl: { subject: '', content: '' }
 })
 
-function switchGlobalLang(targetKey) {
-  if (globalActiveLang.value === targetKey) return
-  // Save current editor content into the active lang slot
-  let currentContent = globalEmailForm.content || ''
-  if (globalEmailEditorFormat.value === 'rich' && globalEditorRef.value && globalEditorRef.value.getContent) {
-    try {
-      const richText = globalEditorRef.value.getContent()
-      if (richText !== undefined) currentContent = richText
-    } catch (e) {}
-  }
-  globalTemplatesMap[globalActiveLang.value] = {
-    subject: globalEmailForm.subject || '',
-    content: currentContent
-  }
-  globalActiveLang.value = targetKey
-  const nextTpl = globalTemplatesMap[targetKey] || {}
-  const defTpl = getAnnouncementTemplate(targetKey)
-  globalEmailForm.subject = nextTpl.subject || defTpl.subject
-  globalEmailForm.content = nextTpl.content || defTpl.content
-  globalEmailEditorFormat.value = 'rich'
-  nextTick(() => {
-    if (globalEditorRef.value && globalEditorRef.value.setContent) {
-      globalEditorRef.value.setContent(globalEmailForm.content)
-    }
-  })
-}
 
 function collectGlobalTemplates() {
   // Sync current editor content into the active lang slot, then return only fully filled templates
@@ -4536,30 +4510,6 @@ function openWelcomeEmailSetting() {
   })
 }
 
-function switchWelcomeLang(targetKey) {
-  if (activeWelcomeLang.value === targetKey) return
-  // Save current content to current lang slot
-  let currentContent = welcomeEmailForm.welcomeContent || ''
-  if (welcomeEditorFormat.value === 'rich' && welcomeEditorRef.value && welcomeEditorRef.value.getContent) {
-    try {
-      const richText = welcomeEditorRef.value.getContent()
-      if (richText !== undefined) currentContent = richText
-    } catch (e) {}
-  }
-  welcomeTemplatesMap[activeWelcomeLang.value] = {
-    subject: welcomeEmailForm.welcomeSubject,
-    content: currentContent
-  }
-
-  activeWelcomeLang.value = targetKey
-  const nextTpl = welcomeTemplatesMap[targetKey] || getWelcomeTemplate(targetKey)
-  welcomeEmailForm.welcomeSubject = nextTpl.subject
-  welcomeEmailForm.welcomeContent = nextTpl.content
-
-  if (welcomeEditorFormat.value === 'rich' && welcomeEditorRef.value && welcomeEditorRef.value.setContent) {
-    welcomeEditorRef.value.setContent(nextTpl.content)
-  }
-}
 
 function toggleFullscreen() {
   isWelcomeFullscreen.value = !isWelcomeFullscreen.value
@@ -7538,80 +7488,6 @@ form .el-button {
     }
   }
 
-  .welcome-lang-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 8px 16px;
-    background: var(--el-fill-color-light);
-    border: 1px solid var(--el-border-color-lighter);
-    border-radius: 10px;
-    flex-shrink: 0;
-
-    .recipients-label {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-weight: 700;
-      font-size: 13.5px;
-      color: var(--el-text-color-regular);
-
-      .recipients-icon {
-        color: var(--el-color-primary);
-        display: block;
-      }
-    }
-
-    .welcome-lang-tabs {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex-wrap: wrap;
-
-      .lang-tab-pill {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        background: var(--el-bg-color);
-        padding: 4px 12px;
-        border-radius: 9999px;
-        border: 1px solid var(--el-border-color-lighter);
-        font-size: 12.5px;
-        font-weight: 500;
-        color: var(--el-text-color-regular);
-        cursor: pointer;
-        transition: all 0.2s ease;
-        user-select: none;
-
-        &:hover {
-          color: var(--el-color-primary);
-          border-color: var(--el-color-primary-light-5);
-        }
-
-        &.is-active {
-          background: var(--el-color-primary);
-          color: #ffffff;
-          border-color: var(--el-color-primary);
-          font-weight: 600;
-          box-shadow: 0 2px 8px rgba(var(--el-color-primary-rgb), 0.3);
-
-          .admin-badge {
-            background: rgba(255, 255, 255, 0.25);
-            color: #ffffff;
-          }
-        }
-
-        .admin-badge {
-          background: var(--el-color-primary-light-8);
-          color: var(--el-color-primary);
-          font-size: 10.5px;
-          padding: 1px 6px;
-          border-radius: 10px;
-          font-weight: 600;
-        }
-      }
-    }
-  }
 
   .welcome-subject-bar {
     flex-shrink: 0;
