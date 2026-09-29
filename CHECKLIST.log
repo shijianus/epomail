@@ -22,19 +22,7 @@
     - [x] 文案规范扫描：AI 味总结句/Republic of China 残留 0；破折号链仅存于历史提交引文；六语言联络邮箱一致；「法定/statutory」命中均为合规通用法律用语
     - [x] 零假数据残留：文档技术事实全部经当前源码核实；无验证数据产生
 
-### 父仓库远端合并同步：采纳远端应用开发线 16 提交与核验清单时间序归并 (2026-09-29)
-*   **关联提交 (Git Commit)**: `7ef09382c3f3fbfd457c400606c1e37e845cf9d0` (Short: `7ef0938`)
-*   **部署环境 (Deployment)**: `仓库同步与文档归并`（无服务部署，生产 Version ID 不变）
-*   **功能需求与变更清单 (Changes & Feature Alignment)**:
-    - [x] git fetch 发现父仓与远端分叉：本地 8 提交（EpomailDocs 法律文档站线）↔ 远端 16 提交（另一开发环境推进的 Gmail 头像卡片、官方发件地址 announcement@epocanvas.com、邮件不可变投递与专项审计报告等应用开发）；因父仓提交 Hash 已被 EpomailDocs 专案介绍页里程碑锚点链引用，采用 merge（而非 rebase）保全双方全部 Hash 可追溯
-    - [x] 冲突仅 CHECKLIST.log 一处（双方均在文件顶部追加条目），git 自动归并 246 条目零丢失；手动按各条目引入提交之精确时间戳重排顶部 12 条为严格时间倒序（本地 09-29 三条 → 远端 09-28 四条 → 09-27 按提交时刻交错），修复自动归并产生的非时序排列
-    - [x] EpomailDocs 独立仓库状态在合并后保持：父仓 0 个追踪文件，.gitignore 排除规则生效，独立仓 master 与远端 main 同步（05c222c）
-*   **自动化测试与核验清单 (Verification Checklist)**:
-    - [x] 静态多语言对称性：`node scripts/i18n-symmetry.mjs`——合并树 mail-worker 1888 键 × 6 语言 100% 严格对称（含远端新增词条）
-    - [x] 本地构建核验：mail-vue `vite build` 39.37s 零警告零报错（远端 16 提交应用代码并入后编译通过）
-    - [x] 推送后终检：父仓 master == origin/master（7ef0938）0 ahead/0 behind，工作树干净；核验清单 246 条目完整、表头与文件职能注释无损
-
-### ### 修复全域公告邮件按钮失效、vue-i18n 特殊字符转义与公网全真验证 (2026-09-29)
+### 修复全域公告邮件按钮失效、vue-i18n 特殊字符转义与公网全真验证 (2026-09-29)
 *   **关联提交 (Git Commit)**: `ffe4b929d23e188442a252a2fc3f0a621c903ba7` (Short: `ffe4b92`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com / epomail.epocanvas.workers.dev)` (Version ID: `b47f6034-6e8d-48a3-ac59-2f5ae37797f9`)
 *   **功能需求与变更清单 (Changes & Feature Alignment)**:
@@ -59,6 +47,18 @@
     - [x] 零假数据残留：生产数据库 TOTP 状态在 `finally` 块中严格恢复（`totp_enabled = 1`），全真验证零脏数据残留。
 
 ---
+
+### 父仓库远端合并同步：采纳远端应用开发线 16 提交与核验清单时间序归并 (2026-09-29)
+*   **关联提交 (Git Commit)**: `7ef09382c3f3fbfd457c400606c1e37e845cf9d0` (Short: `7ef0938`)
+*   **部署环境 (Deployment)**: `仓库同步与文档归并`（无服务部署，生产 Version ID 不变）
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] git fetch 发现父仓与远端分叉：本地 8 提交（EpomailDocs 法律文档站线）↔ 远端 16 提交（另一开发环境推进的 Gmail 头像卡片、官方发件地址 announcement@epocanvas.com、邮件不可变投递与专项审计报告等应用开发）；因父仓提交 Hash 已被 EpomailDocs 专案介绍页里程碑锚点链引用，采用 merge（而非 rebase）保全双方全部 Hash 可追溯
+    - [x] 冲突仅 CHECKLIST.log 一处（双方均在文件顶部追加条目），git 自动归并 246 条目零丢失；手动按各条目引入提交之精确时间戳重排顶部 12 条为严格时间倒序（本地 09-29 三条 → 远端 09-28 四条 → 09-27 按提交时刻交错），修复自动归并产生的非时序排列
+    - [x] EpomailDocs 独立仓库状态在合并后保持：父仓 0 个追踪文件，.gitignore 排除规则生效，独立仓 master 与远端 main 同步（05c222c）
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 静态多语言对称性：`node scripts/i18n-symmetry.mjs`——合并树 mail-worker 1888 键 × 6 语言 100% 严格对称（含远端新增词条）
+    - [x] 本地构建核验：mail-vue `vite build` 39.37s 零警告零报错（远端 16 提交应用代码并入后编译通过）
+    - [x] 推送后终检：父仓 master == origin/master（7ef0938）0 ahead/0 behind，工作树干净；核验清单 246 条目完整、表头与文件职能注释无损
 
 ### EpomailDocs 法律文档站 v5.0：全站去条号引用改造（6 语言 × 7 篇 × SVG）+ 远端仓库同步 (2026-09-29)
 *   **关联提交 (Git Commit)**: `05c222c4ff2531dc17b29994c0806ade1ed99ed0` (Short: `05c222c`)（EpomailDocs 独立仓库，主体改造）；`d3d1d30`（同仓，远端旧结构文档线采纳为历史祖先，树以本地为准）；两提交均已推送至 `github.com/shijianus/epomail-docs` main 分支
