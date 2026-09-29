@@ -1364,7 +1364,7 @@ const zh = {
     globalEmailAction: '发送全域邮件',
     globalEmailSendTitle: '撰写并发送全域公告邮件',
     globalEmailSender: '发件人通道',
-    globalEmailSenderOfficial: '系统官方站长 admin',
+    globalEmailSenderOfficial: '官方公告 announcement@epocanvas.com',
     globalEmailAudience: '接收范围',
     globalEmailAudienceAll: '全平台所有注册用户',
     globalEmailAudienceRoles: '指定用户分组 / 角色',

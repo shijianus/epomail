@@ -1383,7 +1383,7 @@ totpModeAllDesc: 'Configurar si los usuarios pueden usar TOTP. Al activarlo, la 
     globalEmailAction: 'Transmitir correo',
     globalEmailSendTitle: 'Redactar y transmitir correo de anuncio global',
     globalEmailSender: 'Canal de remitente',
-    globalEmailSenderOfficial: 'Administrador oficial admin',
+    globalEmailSenderOfficial: 'Anuncio oficial announcement@epocanvas.com',
     globalEmailAudience: 'Público objetivo',
     globalEmailAudienceAll: 'Todos los usuarios registrados',
     globalEmailAudienceRoles: 'Grupos de usuarios / Roles específicos',

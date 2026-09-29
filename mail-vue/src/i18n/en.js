@@ -1383,7 +1383,7 @@ totpModeAllDesc: 'Configure whether users can use TOTP. When enabled, 2FA is ava
     globalEmailAction: 'Broadcast Email',
     globalEmailSendTitle: 'Compose & Send Global Broadcast Email',
     globalEmailSender: 'Sender Channel',
-    globalEmailSenderOfficial: 'Official Webmaster admin',
+    globalEmailSenderOfficial: 'Official Announcement announcement@epocanvas.com',
     globalEmailAudience: 'Target Audience',
     globalEmailAudienceAll: 'All Registered Users',
     globalEmailAudienceRoles: 'Specific User Groups / Roles',
