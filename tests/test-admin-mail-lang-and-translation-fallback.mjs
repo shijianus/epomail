@@ -22,7 +22,7 @@ const testUserName = 'Alice';
 
 // 1. 构建未修改的官方简体中文欢迎邮件
 const unmodifiedWelcomeZh = {
-  sendEmail: 'admin@epocanvas.com',
+  sendEmail: 'announcement@epocanvas.com',
   isOfficial: 1,
   subject: WELCOME_TEMPLATES.zh.subject,
   content: WELCOME_TEMPLATES.zh.content
@@ -87,7 +87,7 @@ for (const targetLang of ['fr', 'es', 'nl', 'zh-Hant']) {
 // 6. 测试全域公告邮件 (未修改与已修改)
 {
   const unmodifiedAnnZh = {
-    sendEmail: 'admin@epocanvas.com',
+    sendEmail: 'announcement@epocanvas.com',
     isOfficial: 1,
     subject: GLOBAL_ANNOUNCEMENT_TEMPLATES.zh.subject,
     content: GLOBAL_ANNOUNCEMENT_TEMPLATES.zh.content.replace(/\{\{\s*user_name\s*\}\}/g, testUserName),
@@ -226,6 +226,9 @@ try {
 
   const globalLangRow = globalDialog.locator('.welcome-lang-row');
   ok(await globalLangRow.count() === 0, '全域公告弹窗已彻底移除 .welcome-lang-row 语言切换行');
+
+  const senderChannelRow = globalDialog.locator('.recipients-label').filter({ hasText: /发件人通道|Sender Channel/i });
+  ok(await senderChannelRow.count() === 0, '全域公告弹窗已彻底删除「发件人通道:」选择行');
 
   const globalSubjectInput = globalDialog.locator('.write-subject-input input');
   const curGlobalSubject = await globalSubjectInput.inputValue();

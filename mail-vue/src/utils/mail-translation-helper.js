@@ -83,7 +83,7 @@ export function getPredefinedTranslation(email, targetLang) {
   }
 
   // Only official emails sent from admin can match pre-defined system templates
-  const isOfficial = email.sendEmail === 'admin@epocanvas.com' || Boolean(email.isOfficial);
+  const isOfficial = email.sendEmail === 'announcement@epocanvas.com' || email.sendEmail === 'admin@epocanvas.com' || Boolean(email.isOfficial);
   if (!isOfficial) {
     return null;
   }

@@ -216,7 +216,7 @@ if (process.env.RUN_DELIVERY_TESTS === '1') {
 
     const testEmail = `ml-tpl-${Date.now()}@epomail.bond`;
     const addRes = await (await pageC.request.post(BASE + '/api/user/add', {
-      data: { email: testEmail, password: 'Test123456', lang: 'fr' },
+      data: { email: testEmail, password: 'Test123456', lang: 'fr', type: 1 },
       headers: { token: adminToken, Authorization: adminToken, 'Content-Type': 'application/json' }
     })).json();
     ok(addRes.code === 200, `创建测试用户 ${testEmail}`);
@@ -245,7 +245,7 @@ if (process.env.RUN_DELIVERY_TESTS === '1') {
       headers: { token: userToken, Authorization: userToken }
     })).json();
     const rows = listRes?.data?.list || listRes?.data?.records || listRes?.data || [];
-    const official = (Array.isArray(rows) ? rows : []).find(r => r.sendEmail === 'admin@epocanvas.com');
+    const official = (Array.isArray(rows) ? rows : []).find(r => r.sendEmail === 'announcement@epocanvas.com' || r.sendEmail === 'admin@epocanvas.com');
     ok(!!official, '测试用户收到官方欢迎邮件');
     if (official) {
       ok(/Bienvenue|Epocanvas/.test(official.subject || ''), `欢迎邮件主题为法语版本: ${official.subject}`);

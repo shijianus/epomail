@@ -1907,19 +1907,7 @@
         </template>
 
         <div class="welcome-dialog-body">
-          <!-- 1. Sender Channel Row -->
-          <div class="welcome-recipients-row">
-            <div class="recipients-label">
-              <Icon icon="fluent:mail-arrow-double-back-20-regular" width="16" height="16" class="recipients-icon" />
-              <span>{{ $t('globalEmailSender') }}:</span>
-            </div>
-            <div class="recipients-content">
-              <span class="audience-pill official-pill">admin@epocanvas.com</span>
-              <span class="recipients-subtext">（{{ $t('globalEmailSenderOfficial') }}）</span>
-            </div>
-          </div>
-
-          <!-- 2. Target Audience Row -->
+          <!-- Target Audience Row -->
           <div class="welcome-recipients-row audience-selection-row">
             <div class="recipients-label">
               <Icon icon="solar:users-group-rounded-bold" width="16" height="16" class="recipients-icon" />

@@ -141,12 +141,10 @@ import assert from 'assert';
     const globalDialog = page.locator('.global-email-dialog-canvas');
     await globalDialog.waitFor({ state: 'visible' });
 
-    // 验证发件人通道
-    const senderPill = globalDialog.locator('.official-pill');
-    assert.ok(await senderPill.count() > 0, '应显示官方站长发件人通道');
-    const senderText = await senderPill.innerText();
-    assert.strictEqual(senderText, 'admin@epocanvas.com', '发件人必须为 admin@epocanvas.com');
-    console.log('✓ 官方发件人通道验证通过: ' + senderText);
+    // 验证发件人通道已彻底删除（统一由 announcement@epocanvas.com 发送，无需在弹窗展示发件人通道行）
+    const senderChannelRow = globalDialog.locator('.recipients-label').filter({ hasText: /发件人通道|Sender Channel/i });
+    assert.strictEqual(await senderChannelRow.count(), 0, '发件人通道行已按要求彻底删除');
+    console.log('✓ 弹窗已成功删除发件人通道行，默认直接使用 announcement@epocanvas.com 名义发送');
 
     // 验证受众选择单选组
     const audienceRadios = globalDialog.locator('.audience-selection-row .el-radio-button');
