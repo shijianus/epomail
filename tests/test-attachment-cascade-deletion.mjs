@@ -37,6 +37,7 @@ const trashBlock = emailServiceSrc.slice(
 );
 assert(trashBlock.includes('attService.removeByEmailIds'), '回收站 7 日例行清理级联附件对象与索引');
 assert(trashBlock.includes('starService.removeByEmailIds'), '回收站 7 日例行清理级联星标');
+assert(/CHUNK\s*=\s*50/.test(trashBlock) && trashBlock.includes('slice(i, i + CHUNK)'), '回收站清理按 50 分块（全站体量不超 D1 参数上限）');
 const trashOrder = trashBlock.indexOf('attService.removeByEmailIds') < trashBlock.lastIndexOf('orm(c).delete(email)');
 assert(trashOrder, '级联先于邮件行删除执行（去重键保护依赖 attachments 表仍在）');
 
@@ -47,7 +48,7 @@ const deleteFn = emailServiceSrc.slice(
 );
 assert((deleteFn.match(/cascadeDeleteEmails\(/g) || []).length >= 2, '手动彻底删除与 90% 配额清理均接入 cascadeDeleteEmails');
 
-// 3. cascadeDeleteEmails 本体：附件 + 星标 + 限定 userId 范围的行删除
+// 3. cascadeDeleteEmails 本体：附件 + 星标 + 限定 userId 范围的行删除 + 分块（D1 参数上限）
 const cascadeFn = emailServiceSrc.slice(
 	emailServiceSrc.indexOf('async cascadeDeleteEmails'),
 	emailServiceSrc.indexOf('updateEmailStatus(c, params)')
@@ -55,6 +56,7 @@ const cascadeFn = emailServiceSrc.slice(
 assert(cascadeFn.includes('attService.removeByEmailIds'), 'cascadeDeleteEmails 级联附件（removeByEmailIds，含去重键保护）');
 assert(cascadeFn.includes('starService.removeByEmailIds'), 'cascadeDeleteEmails 级联星标');
 assert(cascadeFn.includes('eq(email.userId, userId)'), 'cascadeDeleteEmails 行删除限定 userId（防越权）');
+assert(/CHUNK\s*=\s*50/.test(cascadeFn) && cascadeFn.includes('slice(i, i + CHUNK)'), 'cascadeDeleteEmails 按 50 分块（inArray 不超 D1 100 参数上限）');
 
 // 4. 全部 orm(c).delete(email) 所在函数块均处于级联保护之下（按函数块逐一核对）
 const fnBlocks = emailServiceSrc.split(/\n\tasync /).slice(1);

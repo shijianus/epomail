@@ -640,9 +640,14 @@ const emailService = {
 			)
 		).all();
 		if (trashRows.length > 0) {
+			// 分块级联：D1 单语句绑定参数上限 100，全站回收站体量需按块处理
 			const trashEmailIds = trashRows.map(row => row.emailId);
-			await attService.removeByEmailIds(c, trashEmailIds);
-			await starService.removeByEmailIds(c, trashEmailIds);
+			const CHUNK = 50;
+			for (let i = 0; i < trashEmailIds.length; i += CHUNK) {
+				const chunk = trashEmailIds.slice(i, i + CHUNK);
+				await attService.removeByEmailIds(c, chunk);
+				await starService.removeByEmailIds(c, chunk);
+			}
 		}
 		await orm(c).delete(email).where(
 			and(
@@ -1847,14 +1852,19 @@ const emailService = {
 	},
 
 	// 实体删除用户本人的邮件并级联清理附件与星标（手动彻底删除、90% 配额清理共用）
+	// 分块 50：D1 单语句绑定参数上限 100，兼容「全选彻底删除」等大列表
 	async cascadeDeleteEmails(c, userId, emailIdList) {
-		await attService.removeByEmailIds(c, emailIdList);
-		await starService.removeByEmailIds(c, emailIdList);
-		await orm(c).delete(email).where(
-			and(
-				eq(email.userId, userId),
-				inArray(email.emailId, emailIdList)))
-			.run();
+		const CHUNK = 50;
+		for (let i = 0; i < emailIdList.length; i += CHUNK) {
+			const chunk = emailIdList.slice(i, i + CHUNK);
+			await attService.removeByEmailIds(c, chunk);
+			await starService.removeByEmailIds(c, chunk);
+			await orm(c).delete(email).where(
+				and(
+					eq(email.userId, userId),
+					inArray(email.emailId, chunk)))
+				.run();
+		}
 	},
 
 	updateEmailStatus(c, params) {

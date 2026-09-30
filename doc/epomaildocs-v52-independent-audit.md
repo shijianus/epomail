@@ -173,3 +173,8 @@ v5.2 的**内容质量与法律工程达到可发布水准**：48 页零断链�
 - EpomailDocs：`pnpm build` 49 页 11.88s 零报错；`validate-anchors` 492 锚点 0 断链；`check-structure` 6×8 对称；`verify-laws` / `check-article-whitelist` 通过；本地 http-server 挂载验证：页面/图片/跳转页/sitemap 全 200，内链与图路径 `/epomail/` 前缀正确，canonical/hreflang 为 `docs.epocanvas.com/epomail` 绝对地址。
 
 **剩余事项（须由运营者执行）**：将 EpomailDocs `dist/` 发布至 `docs.epocanvas.com` 的 `/epomail/` 路径（Cloudflare Pages 项目并入 `/epomail` 目录或路由规则均可），发布后以应用内文档链接与 `https://docs.epocanvas.com/epomail/mail/overview/` 双向验证；上线后按 privacy §13 程序公告 v5.3 变更。
+
+### 复审补漏（2026-10-01，从零复检轮）
+
+1. **EpomailDocs fr/es project.md 部分应用修复**：v5.3 修订脚本早前中断运行曾使 fr/es 两语种的 project.md 仅落地存储行（i18n 键数行、tests 行、提交数句、提交链、tests 条目 6 处仍为旧文），且区块级跳过守卫掩盖了该状态。修复：移除区块守卫、全部操作逐操作幂等、es 千分位锚点修正（`2 039` 空格分隔）；六语种全量断言通过（旧数字残留 0、新增表述 6/6 ×4 项）。EpomailDocs `568cb84`。
+2. **主仓级联分块加固**：复审发现 `clearTrashAndSpam`（全站体量）与「全选彻底删除」场景下 `inArray` 传参无上界，可超 D1 单语句 100 绑定参数上限。修复：`cascadeDeleteEmails` 与回收站清理均按 50 一组分块（att/star 级联与行删除），证据测试新增分块断言（21/21）。
