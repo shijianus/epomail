@@ -8,6 +8,20 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### 本地部署与端到端视觉验证轮：文档站 25 截图判图 + 全真栈头像/级联 E2E (2026-10-01)
+*   **关联提交 (Git Commit)**: EpomailDocs `838eb84144c466ef384f489f0361de906ed36a7c` (Short: `838eb84`，已推送 origin/main)；主仓归档提交见 CHECKLIST 对应变更提交
+*   **部署环境 (Deployment)**: `本地部署（不触公网）`——文档站 dist 以 /epomail 路径挂载本地起服；mail-worker wrangler dev 本地模式（D1/KV 全本地）
+*   **变更清单**:
+    - [x] 文档站本地部署并完成 25 张截图逐项判图：8 篇简中全页、6 语种、明暗双主题、6 表格锚点、移动端 375、404/跳转页
+    - [x] 修复视觉验证发现缺陷：project.md 简中版本行堆叠 4→1（全库 48 文件恰 1 断言）；data-security 附件行六语种嵌套→整格重置（脚本幂等化）
+    - [x] 全真栈 E2E：头像上传→自有存储 /static/avatar/2/<sha>.png→200 image/png→资料页渲染 ✓（P1-1）
+    - [x] 全真栈 E2E：物理删除邮件→email/attachments/star 三表 1/1/1→0/0/0 ✓（P0-2）
+*   **核验清单**:
+    - [x] 重建后 492 锚点 0 断链、6×8 对称、laws/whitelist 通过
+    - [x] wrangler dev 本地 workerd 正常（vitest 池失败为该池集成问题，与本机 wrangler dev 无关）
+    - [x] 零残留：头像字段清空、本地 .wrangler/state 物理删除、临时文件即弃
+    - [x] 顶栏字母头像确认为信箱首字母既有设计，非缺陷
+
 ### 从零复检轮：fr/es 补漏、级联分块加固与部署可行性评估 (2026-10-01)
 *   **关联提交 (Git Commit)**: `d5456f071b9bf664020dd9c5e55ba24b21298cc0` (Short: `d5456f`)；EpomailDocs 复审补漏 `568cb84bfb0c19f31c95eaa8df28284fee73cb7f` (Short: `568cb84`，已推送 origin/main)
 *   **部署环境 (Deployment)**: `本地静态核验 + 文档站干净重建与挂载复验`（生产未变更）
