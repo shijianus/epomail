@@ -22,6 +22,8 @@
     - **[P2·次要]**: 四项——sub-processors §2 博客联动行六语言均重复两次；附件存储四级链（用户 BYO S3 → 系统 S3/B2 → R2 → **KV 兜底**）未完整披露；project.md 自引用快照数字过期（539→540 提交、本站 11→12 提交、tests 105→106、i18n 键 2,039/1,888→2,054/1,855）；project.md 破折号链 6 语言 6-7 处超红线（≤2）。
     - **通过项**: 31 项高错误风险技术主张与源码全部一致（PBKDF2 10 万次、TOTP AES-256-GCM、JWT 30 天、会话上限 10、5 次失败锁 12 小时、6 标准角色、验证码前 6,000 字符、MyMemory/Google 备援、Mailjet 通道、OAuth scopes 三项 + 2 小时令牌、Turnstile 注册/新增信箱、Telegram 7 日链接、垃圾 7 日→回收站、90% 清理、数据导出、Google Fonts、博客联动、Linux DO 等）；写作红线（禁用语/条号/版本行/内链前缀/SVG 暗色）全绿。
 *   **治理修复与回归结果 (Fixes & Verification)**:
+    - **同日 v5.3 治理已全部落地**（主仓 `47fd8fc` + EpomailDocs `90c06ed`，报告 §八 补记）：P0-2 三条实体删除路径接入附件级联（证据测试 19/19）；P1-1 头像缺省落实例自有存储、`AVATAR_UPLOAD_URL` 可配，硬编码图床移除；P2 四项与 P3-2 全部修订（六语言同步）；P3-1 改判合规（git 提交链属逐字引文，不计散文红线）；P0-1 发布定案 `docs.epocanvas.com/epomail`（base 配置 + rehypePrefixBase 前缀插件 + robots/跳转页改版）；project.md 六语种补齐版本行。回归全绿：主仓证据测试 19/19 + i18n 对称；文档站 build 49 页零报错、492 锚点 0 断链、本地挂载验证通过。EpomailDocs `90c06ed` 已推送 origin/main。
+    - **剩余事项**：运营者将 `dist/` 发布至 `docs.epocanvas.com/epomail/` 路径（Cloudflare Pages），发布后以应用内链接与站点 URL 双向验证；上线后按 privacy §13 公告。
     - 本轮为纯审计（不改文档站内容）；缺陷治理清单已列入专项文档 §五 修复路线图（v5.3：主仓两处代码修复 → 文档回填 → 发布链路定案 → 六语言博客行去重 → 快照数字改约数 → 破折号改写 → 欢迎邮件 7 日过期入保留期表）。
     - 遗留路线图 (Roadmap)：①P0-2 代码修复后 privacy §8 无需改口，须补「删邮件后附件计数为 0」自动化断言；②P1-1 建议新增 `avatarUploadUrl` setting（缺省关闭或落实例自有存储）；③发布后按 privacy §13 程序公告；④`privacy@`/`admin@` 邮箱可达性上线前自测留痕。
 

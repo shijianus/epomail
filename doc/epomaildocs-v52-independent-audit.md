@@ -147,3 +147,29 @@ v5.2 的**内容质量与法律工程达到可发布水准**：48 页零断链�
 1. 生产探测仅覆盖 HTTP 状态与页面 title 级证据，未对 SPA 内部路由做浏览器级验证（不影响 P0-1 结论：canonical/sitemap 错配由静态配置即可证实）。
 2. `privacy@epocanvas.com` / `admin@epocanvas.com` 邮箱实际可达性未测试；上线前建议自测并留痕。
 3. i18n 键数按顶层键直读，若 project.md 口径为「叶子键」需以 `scripts/i18n-symmetry.mjs` 输出为准复核 P2-3 之具体数值（结论不受影响：两套口径均非文档现值）。
+
+---
+
+## 八、v5.3 治理落地与回归（同日补记）
+
+上节缺陷矩阵的治理已全部落地并提交，逐项对账如下：
+
+| 缺陷 | 治理动作 | 落点 |
+| --- | --- | --- |
+| P0-2 附件不随邮件实体删除 | `clearTrashAndSpam` 删除前 select 待删 id 并级联 `attService.removeByEmailIds` + `starService.removeByEmailIds`；`emailService.delete` 手动彻底删除与 90% 配额清理收敛至新增 `cascadeDeleteEmails`（附件 + 星标 + 限定 userId 行删除）。全部 6 处 `orm(c).delete(email)` 站点经证据测试核验均处级联保护之下；`removeByEmailIds` 内建 SHA-256 去重键保护，幂等安全 | 主仓 `47fd8fc` |
+| P1-1 头像硬编码图床 | `uploadImage` 缺省写实例自有对象存储（`kvObjService.putObj`，写读同源 `/static/*` 路由，`getObj` 防御性标头 + MIME 白名单覆盖）；`AVATAR_UPLOAD_URL` 环境变量可配外部图床；硬编码域名移除。隐私政策 §4.1 的「运营者配置之图片存储服务」表述恢复为真，且个人资料缺省不再出站 | 主仓 `47fd8fc` |
+| P2-1 博客行重复 | 六语言去重（各存 1 行） | EpomailDocs `90c06ed` |
+| P2-2 存储四级链未披露 | privacy §4.2、data-security §2、project §2.1 三处补「自备 S3 → 配置 S3/B2 → R2 绑定 → KV 兜底」全链，六语言同步 | EpomailDocs `90c06ed` |
+| P2-3 快照数字过期 | 改抗腐口径：主仓「逾 540 提交」、本站 12 提交并补入 `79094ac` 完整 Hash、tests「逾百个」、i18n 键数改以 `scripts/i18n-*.mjs` 输出为准 | EpomailDocs `90c06ed` |
+| P3-1 破折号红线 | **改判合规**：project.md 的「——」除 frontmatter description 1 处外全部位于逐字引用的 git 提交链代码块内，属引文（改写即伪造历史）；散文部分各语言 1 处 ≤ 2 处红线。规范结论：逐字引文（git 记录、法条原文）不计入散文红线 | 无需改动 |
+| P3-2 欢迎邮件保留期 | privacy §8 表补「官方系统邮件（欢迎邮件、全域公告）：缺省自投递之日起 7 日自动过期删除」行，六语言同步 | EpomailDocs `90c06ed` |
+| P3-3 rehype 预处理 | `rehypePrefixBase` 已移植（构建期为内链与图路径统一注入 base 前缀）；`rehypeWrapTables` 留待后续站点改造 | EpomailDocs `90c06ed` |
+| P0-1 发布链路 | **定案** `docs.epocanvas.com/epomail`（与主仓 `DOCS_URL` 默认值一致）：`SITE_ORIGIN = https://docs.epocanvas.com`、`base = '/epomail'` 已入 astro.config；robots.txt Sitemap 与根跳转页同步改版；README 上线清单第 1 项勾销 | EpomailDocs `90c06ed` |
+
+**补充发现与顺带修复**：project.md 六语种均缺「生效日期｜版本」行（v5.2 版本行统一检查的漏网项，因此前检查以中文行模式匹配英文语种文件所致），本次已在表头加粗行后补齐，48/48 页版本行齐备。
+
+**回归结果（全部通过）**：
+- 主仓：`tests/test-attachment-cascade-deletion.mjs` 19/19（静态源码断言 + 纯内存 KV mock 行为断言，零假数据）；`node --check` 语法核验；`i18n-symmetry` 全绿（后端 1,888 键 baseline）。注：mail-worker 的 vitest-pool-workers 在本机环境 workerd 启动失败（0 执行），属环境问题、与本次改动无关。
+- EpomailDocs：`pnpm build` 49 页 11.88s 零报错；`validate-anchors` 492 锚点 0 断链；`check-structure` 6×8 对称；`verify-laws` / `check-article-whitelist` 通过；本地 http-server 挂载验证：页面/图片/跳转页/sitemap 全 200，内链与图路径 `/epomail/` 前缀正确，canonical/hreflang 为 `docs.epocanvas.com/epomail` 绝对地址。
+
+**剩余事项（须由运营者执行）**：将 EpomailDocs `dist/` 发布至 `docs.epocanvas.com` 的 `/epomail/` 路径（Cloudflare Pages 项目并入 `/epomail` 目录或路由规则均可），发布后以应用内文档链接与 `https://docs.epocanvas.com/epomail/mail/overview/` 双向验证；上线后按 privacy §13 程序公告 v5.3 变更。
