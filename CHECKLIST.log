@@ -7,6 +7,31 @@
 > 制度规范与工作流指引请见 [AGENTS.md](file:///home/shijian/projects/epocanvas-mail/AGENTS.md)。
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
+### 修复添加额外账户404缺陷并提供原生弹窗与多开支援 (Phase 2) (2026-09-30)
+*   **关联提交 (Git Commit)**: `95cfe5615467899366f38eb8436e731de6c2a2e1` (Short: `95cfe56`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com / epomail.epocanvas.workers.dev)` (Version ID: `d60699cc-3fa3-49eb-8894-3e1038fa4ad5`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 路由层防 404 双重兼容与优雅降级:
+        - 在 `mail-vue/src/router/index.js` 中的 `/settings/profile` 路由别名追加 `'/settings/account'` 与 `'/settings/accounts'`，彻底消除直接访问该 URL 或历史书签的显式 404；
+        - 在顶栏搜索结果跳转函数 (`goToSetting`) 中加入 `router.hasRoute(routeName)` 安全校验防御，非当前注册路由绝不调用 `router.push`。
+    - [x] 原生添加账户模态框 (Gmail Multi-Account Modal):
+        - 在 `mail-vue/src/layout/header/index.vue` 废除原无效跳转，重构为居中原生模态框 `<el-dialog v-model="addAccountDialogVisible">`；
+        - 提供邮箱前缀输入框、可用域名后缀下拉框、实时邮箱地址组合预览与 Cloudflare Turnstile 验证容灾；
+        - 严格集成角色权限检查（`hasPerm('account:add')`）与系统开关（`setting.addEmail`），添加成功后无缝调用 `loadOtherAccounts()` 刷新多账户列表并更新全局 `userStore` 与 `settingStore.settings.addVerifyOpen`。
+    - [x] 顶栏设置全局搜索权限安全过滤与锚点补齐:
+        - 在 `settingsMap` 中为管理类项引入 `perm` 标识 (`sys-setting`, `analysis`, `user`, `all-email`, `role`, `reg-key`)；
+        - `settingsSearchResults` 计算属性严格基于 `hasPerm()` 实施前置安全过滤，未授权普通用户在搜索框绝不展示管理页面项；
+        - 补齐 `profile-info`、`profile-setting`、`setting` 视图中缺损的 20+ 个元素锚点 ID (`#avatar`, `#nickname`, `#phones`, `#bio`, `#theme`, `#density`, `#username` 等)。
+    - [x] 六语言 i18n 绝对对称字典:
+        - 同步更新 `zh.js`, `zh-Hant.js`, `en.js`, `es.js`, `fr.js`, `nl.js`，新增 `noPermAccountAdd`, `adminDisabledAddEmail`, `addAccountModalDesc` 词条。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：mail-vue `vite build` 16.22s 零警告零报错，Wrangler dry-run 编译通过；
+    - [x] 静态多语言三件套：`node scripts/i18n-symmetry.mjs` (2057 键绝对对称)、`node scripts/i18n-audit.mjs` (0 缺失)、`node scripts/i18n-hardcoded.mjs` 全部通过；
+    - [x] 公网全真栈自动化端到端测试 (`tests/test-multi-account-add-modal-e2e.mjs`)：生产环境 `https://mail.epocanvas.com` 14/14 项断言 100% 满分通过；
+    - [x] 既有多账户全真栈回归测试 (`tests/test-gmail-avatar-dropdown-prod-e2e.mjs`)：生产环境 37/37 项断言 100% 满分通过；
+    - [x] 零假数据残留：自动化测试生命周期自动清理，无任何测试假数据残留。
+
+---
 
 ### 公网生产环境真实浏览器端到端测试与视觉审计核验 (2026-09-30)
 *   **关联提交 (Git Commit)**: `833d9e2f228718abaed2edd47d5602ada1e9cfaa` (Short: `833d9e2`)
