@@ -8,6 +8,21 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### 从零复检轮：fr/es 补漏、级联分块加固与部署可行性评估 (2026-10-01)
+*   **关联提交 (Git Commit)**: `d5456f071b9bf664020dd9c5e55ba24b21298cc0` (Short: `d5456f`)；EpomailDocs 复审补漏 `568cb84bfb0c19f31c95eaa8df28284fee73cb7f` (Short: `568cb84`，已推送 origin/main)
+*   **部署环境 (Deployment)**: `本地静态核验 + 文档站干净重建与挂载复验`（生产未变更）
+*   **变更清单**:
+    - [x] 从零复审主仓 diff：email-service 级联三路径、user-service 头像链路逐行复核，工具函数（getExtFileName/getBuffHash hex 输出）URL 安全性确认，前端 avatarUrl 直接消费相对路径兼容
+    - [x] 发现并修复复审引入的边界缺陷：级联 inArray 无分块可超 D1 单语句 100 绑定参数上限 → cascadeDeleteEmails 与回收站清理按 50 分块
+    - [x] 发现并修复 EpomailDocs fr/es project.md 部分应用状态（6 处旧文），脚本幂等化并移除掩盖性区块守卫
+    - [x] 部署可行性评估：主仓无 push 自动部署（release.yml 仅 tag 发 Release），wrangler 本机已认证；docs.epocanvas.com 由 Pages 项目 epocanvas-docs 承载（deploy 脚本为 wrangler pages deploy dist）
+*   **核验清单**:
+    - [x] `tests/test-attachment-cascade-deletion.mjs` 21/21（新增分块断言）；`test-security-hardening-evidence.mjs` 43/43；i18n 三件套 exit 0
+    - [x] EpomailDocs 干净重建（rm dist/.astro）49 页 26.14s 零报错；492 锚点 0 断链；6×8 对称；laws/whitelist 通过
+    - [x] 六语种全量状态断言：旧数字残留 0、12 提交表述 6/6、79094ac 链行 6/6、i18n 新行 6/6、存储新行 6/6、博客/图床/欢迎行 6/6
+    - [x] 本地挂载探测：mail/overview、fr/mail/project、es/mail/privacy-policy、图片、robots、sitemap 全 200 且 fr/es 新内容可见
+    - [x] 两仓推送确认：epomail master 与 epomail-docs main 均与远端同步
+
 ### v5.3 缺陷治理打磨轮：附件级联修复、头像存储治理与文档站发布定案 (2026-09-30)
 *   **关联提交 (Git Commit)**: 代码修复 `47fd8fc92212dd38a0abf7680bce7e972bff7a6a` (Short: `47fd8fc`)；审计归档 `849dcdc08cc81a0c7998b81622e5a947180e9bda` (Short: `849dcdc`)；EpomailDocs v5.3 `90c06edcdd29a90a991bd56ba480c031cf85a9cf` (Short: `90c06ed`，已推送 origin/main)
 *   **部署环境 (Deployment)**: `本地全真栈静态核验 + 文档站本地挂载验证`（生产 Worker 未变更部署；文档站 Pages 发布待运营者执行）
