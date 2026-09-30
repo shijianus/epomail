@@ -8,7 +8,7 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 ### 修复添加额外账户404缺陷并提供原生弹窗与多开支援 (Phase 2) (2026-09-30)
-*   **关联提交 (Git Commit)**: `95cfe5615467899366f38eb8436e731de6c2a2e1` (Short: `95cfe56`)
+*   **关联提交 (Git Commit)**: `4e8a8c509eb91a894824a242c45f576fb059807b` (Short: `4e8a8c5`, Feature Base: `95cfe56`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com / epomail.epocanvas.workers.dev)` (Version ID: `d60699cc-3fa3-49eb-8894-3e1038fa4ad5`)
 *   **功能需求与变更清单 (Changes & Feature Alignment)**:
     - [x] 路由层防 404 双重兼容与优雅降级:
