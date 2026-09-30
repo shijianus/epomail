@@ -500,6 +500,9 @@ const storageFillWidth = computed(() => {
 const isMultiAccountEnabled = computed(() => {
   if (Number(settingStore.settings?.multiAccountEnabled) === 1) return true;
   try {
+    if (Number(localStorage.getItem('multiAccountEnabled')) === 1) {
+      return true;
+    }
     const raw = localStorage.getItem('setting');
     if (raw) {
       const parsed = JSON.parse(raw);
@@ -507,8 +510,12 @@ const isMultiAccountEnabled = computed(() => {
         return true;
       }
     }
-    if (Number(localStorage.getItem('multiAccountEnabled')) === 1) {
-      return true;
+    const sessionsRaw = localStorage.getItem('epo_sessions');
+    if (sessionsRaw) {
+      const sessions = JSON.parse(sessionsRaw);
+      if (Array.isArray(sessions) && sessions.length > 1) {
+        return true;
+      }
     }
   } catch (e) {}
   return false;
@@ -589,6 +596,19 @@ async function loadOtherAccounts() {
 function switchAccount(acc) {
   closeDropdown();
   if (acc.isSession) {
+    try {
+      const rawSessions = localStorage.getItem('epo_sessions');
+      if (rawSessions) {
+        const sessions = JSON.parse(rawSessions);
+        const targetS = sessions.find(s => s.u === acc.u);
+        if (targetS && targetS.token) {
+          localStorage.setItem('token', targetS.token);
+          if (targetS.email) {
+            localStorage.setItem('loginEmail', targetS.email);
+          }
+        }
+      }
+    } catch (_) {}
     window.location.href = `/mail/u/${acc.u}/#inbox`;
     return;
   }
@@ -1254,6 +1274,7 @@ function clickLogout() {
   const finalizeLogout = () => {
     localStorage.removeItem("token")
     localStorage.removeItem("ui")
+    localStorage.removeItem("epo_sessions")
     try {
       sessionStorage.clear()
     } catch (_) {}

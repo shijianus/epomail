@@ -86,6 +86,9 @@ export async function init() {
                 settingStore.settings = setting;
                 settingStore.domainList = setting.domainList;
                 document.title = setting.title;
+                if (setting.multiAccountEnabled !== undefined && setting.multiAccountEnabled !== null) {
+                    localStorage.setItem('multiAccountEnabled', String(setting.multiAccountEnabled));
+                }
             }
 
             if (user) {
@@ -151,6 +154,9 @@ export async function init() {
                 settingStore.settings = setting;
                 settingStore.domainList = setting.domainList;
                 document.title = setting.title;
+                if (setting.multiAccountEnabled !== undefined && setting.multiAccountEnabled !== null) {
+                    localStorage.setItem('multiAccountEnabled', String(setting.multiAccountEnabled));
+                }
             }
         }
     } catch (e) {

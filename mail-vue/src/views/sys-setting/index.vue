@@ -5655,6 +5655,9 @@ function changeField(key, value) {
   if (!settingReady.value) return
   setting.value[key] = value
   settingStore.settings = { ...settingStore.settings, [key]: value }
+  if (key === 'multiAccountEnabled') {
+    localStorage.setItem('multiAccountEnabled', String(value));
+  }
   editSetting({[key]: value}, false)
 }
 
@@ -5824,6 +5827,9 @@ function editSetting(settingForm, refreshStatus = true, closeAiDialog = false) {
   settingSet(settingForm).then(() => {
     settingLoading.value = false
     settingStore.settings = { ...settingStore.settings, ...setting.value, ...settingForm }
+    if (settingForm.multiAccountEnabled !== undefined) {
+      localStorage.setItem('multiAccountEnabled', String(settingForm.multiAccountEnabled));
+    }
     ElMessage({
       message: t('saveSuccessMsg'),
       type: "success",

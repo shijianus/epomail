@@ -214,6 +214,9 @@ const settingService = {
 		setting.supportUrl = (c.env.SUPPORT_URL || 'https://blog.epocanvas.com/support').replace(/\/+$/, '');
 		setting.telegramLink = (c.env.TELEGRAM_LINK || 'https://t.me/epomail').replace(/\/+$/, '');
 		setting.githubLink = (c.env.GITHUB_LINK || 'https://github.com/shijianus/epomail').replace(/\/+$/, '');
+		setting.multiAccountEnabled = setting.multiAccountEnabled !== undefined && setting.multiAccountEnabled !== null ? Number(setting.multiAccountEnabled) : 0;
+		setting.termsUrl = setting.termsUrl || '';
+		setting.privacyUrl = setting.privacyUrl || '';
 
 		const dbModeInfo = getDbModeInfo(c);
 		setting.isDual = dbModeInfo.isDual;
@@ -427,6 +430,10 @@ const settingService = {
 			delete params.aiApiKey;
 		}
 
+		if (params.multiAccountEnabled !== undefined) {
+			params.multiAccountEnabled = (Number(params.multiAccountEnabled) === 1 || params.multiAccountEnabled === true) ? 1 : 0;
+		}
+
 		params.resendTokens = JSON.stringify(resendTokens);
 
 		// Whitelist only valid DB columns in setting table
@@ -451,7 +458,8 @@ const settingService = {
 			'userByoStorage', 'defaultStorageQuotaMb', 'storageProvider',
 			'externalDbEnabled', 'externalDbProvider', 'externalDbEndpoint',
 			'externalDbToken', 'externalDbName', 'externalDbTarget',
-			'attachmentPolicy', 'attachmentMaxSizeMb', 'attachmentCascadeDelete'
+			'attachmentPolicy', 'attachmentMaxSizeMb', 'attachmentCascadeDelete',
+			'multiAccountEnabled', 'termsUrl', 'privacyUrl'
 		];
 
 		const updateData = {};

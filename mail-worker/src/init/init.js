@@ -276,7 +276,10 @@ const dbInit = {
 			{ name: 'ai_daily_quota', sql: `ALTER TABLE setting ADD COLUMN ai_daily_quota INTEGER NOT NULL DEFAULT 0;` },
 			{ name: 'ai_rate_limit_rpm', sql: `ALTER TABLE setting ADD COLUMN ai_rate_limit_rpm INTEGER NOT NULL DEFAULT 60;` },
 			{ name: 'ai_max_tokens', sql: `ALTER TABLE setting ADD COLUMN ai_max_tokens INTEGER NOT NULL DEFAULT 2048;` },
-			{ name: 'ai_admin_only', sql: `ALTER TABLE setting ADD COLUMN ai_admin_only INTEGER NOT NULL DEFAULT 0;` }
+			{ name: 'ai_admin_only', sql: `ALTER TABLE setting ADD COLUMN ai_admin_only INTEGER NOT NULL DEFAULT 0;` },
+			{ name: 'multi_account_enabled', sql: `ALTER TABLE setting ADD COLUMN multi_account_enabled INTEGER NOT NULL DEFAULT 0;` },
+			{ name: 'terms_url', sql: `ALTER TABLE setting ADD COLUMN terms_url TEXT NOT NULL DEFAULT '';` },
+			{ name: 'privacy_url', sql: `ALTER TABLE setting ADD COLUMN privacy_url TEXT NOT NULL DEFAULT '';` }
 		];
 
 		for (const col of aiSettingCols) {

@@ -51,11 +51,22 @@ async function run() {
 
     // 注入 Token 并打开生产首页 (默认单账户模式)
     console.log('\n[步骤 2] 注入 Token 进入邮箱主界面...');
+    let mockSingleAccount = true;
+    await page.route('**/api/setting/websiteConfig', async route => {
+      const response = await route.fetch();
+      const json = await response.json();
+      if (json.data && mockSingleAccount) {
+        json.data.multiAccountEnabled = 0;
+      }
+      await route.fulfill({ json });
+    });
+
     await page.goto(`${BASE}/mail/u/0/#inbox`, { waitUntil: 'domcontentloaded' });
     await page.evaluate(({ t, email }) => {
       localStorage.setItem('token', t);
       localStorage.setItem('loginEmail', email);
       localStorage.setItem('setting', JSON.stringify({ lang: 'zh', viewMode: 'right', multiAccountEnabled: 0 }));
+      localStorage.setItem('multiAccountEnabled', '0');
       localStorage.setItem('locale', 'zh');
     }, { t: token, email: USER_EMAIL });
 
@@ -191,6 +202,7 @@ async function run() {
 
     // 8. 深度核验多账户模式：竖向排布、对齐尺寸、独立添加与退出卡片
     console.log('\n[步骤 9] 深度核验多账户模式：竖向排布、尺寸一致性与多账户展开...');
+    mockSingleAccount = false;
     await page.evaluate(() => {
       const s = JSON.parse(localStorage.getItem('setting') || '{}');
       s.multiAccountEnabled = 1;
