@@ -8,6 +8,35 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### 多账户模式状态常驻化与会话切换防回退加固 (2026-09-30)
+*   **关联提交 (Git Commit)**: `e061a781016c32c9e94a8832c10b35dbf1c5e10d` (Short: `e061a78`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com / epomail.epocanvas.workers.dev)` (Version ID: `63608f36-ad07-4004-8759-7cd8927ecdf9`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 后端 D1 数据库与 KV 缓存持久化闭环:
+        - 修复 `mail-worker/src/service/setting-service.js` 的 `validColumns` 字段白名单，补齐 `'multiAccountEnabled', 'termsUrl', 'privacyUrl'`；
+        - 在 `set` 更新函数中对 `multiAccountEnabled` 规范化为 `0/1` 数值存储，更新 D1 数据库后立即触发 `refresh` 重构并写入 KV 缓存；
+        - 彻底根治管理员保存后后端因白名单遗漏导致字段被静默丢弃、D1 无法持久化的根本性缺陷；
+    - [x] 数据库冷启动与迁移幂等性保障:
+        - 在 `mail-worker/src/init/init.js` 的 `aiSettingCols` 探测更新链中补充 `multi_account_enabled`、`terms_url`、`privacy_url` 条件迁移；
+        - 保证无论是空库冷启动还是存量库热升级，均能安全、幂等地完成 D1 表结构列的注入。
+    - [x] 前端四重容灾防御网络与状态常驻化:
+        - 在 `mail-vue/src/init/init.js` 与 `sys-setting/index.vue` 中建立配置即时下发持久化 (`localStorage.setItem('multiAccountEnabled', ...)`)；
+        - 强化 `mail-vue/src/layout/header/index.vue` 的 `isMultiAccountEnabled` 计算属性，建立 `settingStore.settings`、`localStorage.multiAccountEnabled`、`localStorage.setting` 与多会话 `epo_sessions.length > 1` 的四重容灾判定；
+        - 保证在会话切换、冷启动首帧或接口短暂延时期间，多账户卡片 100% 坚决常驻，彻底杜绝回退单账号老菜单；
+    - [x] 会话切换防竞态与退出清理:
+        - 在 `switchAccount(acc)` 触发 URL 跳转前，前置提取目标会话的 `token` 与 `email` 覆盖更新 `localStorage.token` / `localStorage.loginEmail`，消除页面跳转与异步初始化的 race condition；
+        - 全局注销 `clickLogout` 规范化物理移除 `epo_sessions`，防止历史会话凭证残留。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：mail-vue 构建通过 (耗时 13.82s)，静态资源与 temp_login_ui 完整同步；
+    - [x] 多语言对称与审计：`node scripts/i18n-symmetry.mjs` (2057 键绝对对称)、`node scripts/i18n-audit.mjs` (0 缺失) 全绿；
+    - [x] 独立 QA Auditor 审计：子代理 clean-slate 独立审计签发合格；
+    - [x] 新增公网切换常驻端到端测试 (`tests/test-multi-account-switch-persistence-prod-e2e.mjs`)：生产环境 8/8 项断言 100% 通过；
+    - [x] 登录跳转流程全真栈回归 (`tests/test-multi-account-login-flow-prod-e2e.mjs`)：生产环境 16/16 项断言 100% 通过；
+    - [x] 头像下拉卡片全真栈回归 (`tests/test-gmail-avatar-dropdown-prod-e2e.mjs`)：生产环境 37/37 项断言 100% 通过；
+    - [x] 零假数据残留：测试账号生命周期与 MFA 状态完整恢复，零假数据或安全死角残留。
+
+---
+
 ### 原生登录路由多账户无感添加、会话保持与去品牌化优化 (2026-09-30)
 *   **关联提交 (Git Commit)**: `b6d199f8464a10afa4bb39f349a1b490e3631100` (Short: `b6d199f`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com / epomail.epocanvas.workers.dev)` (Version ID: `76bbcb37-e897-4d46-a8fd-d29e1616b33b`)
