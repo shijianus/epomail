@@ -268,6 +268,66 @@
         <el-button type="primary" @click="privacyDialogVisible = false">{{ $t('confirm') }}</el-button>
       </template>
     </el-dialog>
+
+    <!-- Built-in Add Account Modal (Gmail Multi-Account Support) -->
+    <el-dialog 
+      v-model="addAccountDialogVisible" 
+      :title="$t('addAnotherAccount')" 
+      width="min(460px, 92vw)" 
+      class="add-account-dialog" 
+      append-to-body
+      @closed="resetAddAccountForm"
+    >
+      <div class="add-account-form-body">
+        <p class="add-account-tip">{{ $t('addAccountModalDesc') }}</p>
+        <div class="add-account-input-group">
+          <el-input 
+            v-model="addAccountForm.email" 
+            ref="addAccountInputRef" 
+            type="text" 
+            :placeholder="$t('emailAccount')" 
+            autocomplete="off"
+            @keyup.enter="submitAddAccount"
+          >
+            <template #append>
+              <el-select
+                v-model="addAccountForm.suffix"
+                :placeholder="$t('select')"
+                class="suffix-select"
+                style="width: 150px;"
+              >
+                <el-option
+                  v-for="item in availableDomains"
+                  :key="item"
+                  :label="item"
+                  :value="item"
+                />
+              </el-select>
+            </template>
+          </el-input>
+        </div>
+        <div class="email-preview-row" v-if="addAccountForm.email">
+          <span class="preview-label">{{ $t('emailAccount') }}:</span>
+          <span class="preview-val font-mono">{{ addAccountForm.email + addAccountForm.suffix }}</span>
+        </div>
+        
+        <div
+          class="add-account-turnstile-container"
+          :class="addAccountVerifyShow ? 'turnstile-show' : 'turnstile-hide'"
+          :data-sitekey="settingStore.settings.siteKey"
+          data-callback="onHeaderTurnstileSuccess"
+          data-error-callback="onHeaderTurnstileError"
+        >
+          <span style="font-size: 12px; color: #F56C6C" v-if="addAccountBotError">{{ $t('verifyModuleFailed') }}</span>
+        </div>
+      </div>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="addAccountDialogVisible = false">{{ $t('cancel') }}</el-button>
+          <el-button type="primary" :loading="addAccountLoading" @click="submitAddAccount">{{ $t('add') }}</el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -283,7 +343,9 @@ import router from "@/router";
 import hanburger from '@/components/hamburger/index.vue'
 import {logout} from "@/request/login.js";
 import {updateProfile, getUserStorage} from "@/request/my.js";
-import {accountList} from "@/request/account.js";
+import {accountList, accountAdd} from "@/request/account.js";
+import {isEmail} from "@/utils/verify-utils.js";
+import {ElMessage} from "element-plus";
 import {Icon} from "@iconify/vue";
 import {useUiStore} from "@/store/ui.js";
 import {useUserStore} from "@/store/user.js";
@@ -591,9 +653,142 @@ function openStorageSettings() {
   setTimeout(triggerScroll, 1200);
 }
 
+const addAccountDialogVisible = ref(false);
+const addAccountLoading = ref(false);
+const addAccountVerifyShow = ref(false);
+const addAccountBotError = ref(false);
+let addAccountVerifyToken = '';
+let headerTurnstileId = null;
+const addAccountInputRef = ref(null);
+
+const availableDomains = computed(() => {
+  if (Array.isArray(settingStore.domainList) && settingStore.domainList.length > 0) {
+    return settingStore.domainList;
+  }
+  return ['@epomail.bond'];
+});
+
+const addAccountForm = reactive({
+  email: '',
+  suffix: ''
+});
+
+function resetAddAccountForm() {
+  addAccountForm.email = '';
+  addAccountForm.suffix = availableDomains.value[0] || '';
+  addAccountVerifyToken = '';
+  addAccountVerifyShow.value = false;
+  addAccountLoading.value = false;
+  addAccountBotError.value = false;
+  if (headerTurnstileId && typeof window !== 'undefined' && window.turnstile) {
+    try {
+      window.turnstile.reset(headerTurnstileId);
+    } catch (e) {}
+  }
+}
+
+function initHeaderTurnstile() {
+  const needVerify = settingStore.settings?.addEmailVerify === 0 || 
+    (settingStore.settings?.addEmailVerify === 2 && settingStore.settings?.addVerifyOpen);
+  if (needVerify && !addAccountVerifyToken) {
+    addAccountVerifyShow.value = true;
+    nextTick(() => {
+      if (typeof window !== 'undefined' && window.turnstile) {
+        if (!headerTurnstileId) {
+          try {
+            headerTurnstileId = window.turnstile.render('.add-account-turnstile-container');
+          } catch (err) {
+            addAccountBotError.value = true;
+          }
+        } else {
+          try {
+            window.turnstile.reset(headerTurnstileId);
+          } catch (e) {}
+        }
+      }
+    });
+  }
+}
+
+if (typeof window !== 'undefined') {
+  window.onHeaderTurnstileSuccess = (token) => {
+    addAccountVerifyToken = token;
+    submitAddAccount();
+  };
+  window.onHeaderTurnstileError = () => {
+    addAccountVerifyToken = '';
+  };
+}
+
 function openAddAccountDialog() {
   closeDropdown();
-  router.push('/settings/account');
+  if (!hasPerm('account:add')) {
+    ElMessage.warning(t('noPermAccountAdd') || '您当前所在角色无权添加新邮箱');
+    return;
+  }
+  if (Number(settingStore.settings?.addEmail) === 1) {
+    ElMessage.warning(t('adminDisabledAddEmail') || '管理员已暂停开放新增邮箱');
+    return;
+  }
+  addAccountForm.suffix = availableDomains.value[0] || '';
+  addAccountDialogVisible.value = true;
+  nextTick(() => {
+    addAccountInputRef.value?.focus();
+    initHeaderTurnstile();
+  });
+}
+
+async function submitAddAccount() {
+  const emailPrefix = (addAccountForm.email || '').trim();
+  if (!emailPrefix) {
+    ElMessage.error(t('emptyEmailMsg'));
+    return;
+  }
+  const minLen = Number(settingStore.settings?.minEmailPrefix) || 1;
+  if (emailPrefix.length < minLen) {
+    ElMessage.error(t('minEmailPrefix', { msg: minLen }));
+    return;
+  }
+  const fullEmail = emailPrefix + addAccountForm.suffix;
+  if (!isEmail(fullEmail)) {
+    ElMessage.error(t('notEmailMsg'));
+    return;
+  }
+
+  const needVerify = settingStore.settings?.addEmailVerify === 0 || 
+    (settingStore.settings?.addEmailVerify === 2 && settingStore.settings?.addVerifyOpen);
+  if (needVerify && !addAccountVerifyToken) {
+    if (!addAccountVerifyShow.value) {
+      addAccountVerifyShow.value = true;
+      initHeaderTurnstile();
+    } else if (!addAccountBotError.value) {
+      ElMessage.error(t('botVerifyMsg'));
+    }
+    return;
+  }
+
+  addAccountLoading.value = true;
+  try {
+    const newAcc = await accountAdd(fullEmail, addAccountVerifyToken);
+    if (newAcc && newAcc.addVerifyOpen !== undefined) {
+      if (settingStore.settings) {
+        settingStore.settings.addVerifyOpen = newAcc.addVerifyOpen;
+      }
+    }
+    ElMessage.success(t('addSuccessMsg'));
+    addAccountDialogVisible.value = false;
+    resetAddAccountForm();
+    await loadOtherAccounts();
+    await userStore.refreshUserInfo();
+  } catch (err) {
+    if (err?.code === 400 || err?.response?.data?.code === 400) {
+      addAccountVerifyToken = '';
+      addAccountVerifyShow.value = true;
+      initHeaderTurnstile();
+    }
+  } finally {
+    addAccountLoading.value = false;
+  }
 }
 
 function openPrivacyPolicy() {
@@ -751,6 +946,7 @@ const settingsMap = computed(() => [
   },
   {
     route: 'sys-setting',
+    perm: 'setting:query',
     title: t('SystemSettings') || 'System Settings',
     items: [
       { text: t('websiteSetting') || 'Website Settings', id: 'websiteSetting' },
@@ -784,6 +980,7 @@ const settingsMap = computed(() => [
   },
   {
     route: 'analysis',
+    perm: 'analysis:query',
     title: t('analytics') || 'Analytics',
     items: [
       { text: t('analytics') || 'Data Analytics', id: 'analysis' }
@@ -791,6 +988,7 @@ const settingsMap = computed(() => [
   },
   {
     route: 'user',
+    perm: 'user:query',
     title: t('allUsers') || 'All Users',
     items: [
       { text: t('allUsers') || 'User Management', id: 'user' }
@@ -798,6 +996,7 @@ const settingsMap = computed(() => [
   },
   {
     route: 'all-email',
+    perm: 'all-email:query',
     title: t('allMail') || 'All Mail',
     items: [
       { text: t('allMail') || 'All Mail Management', id: 'all-email' }
@@ -805,6 +1004,7 @@ const settingsMap = computed(() => [
   },
   {
     route: 'role',
+    perm: 'role:query',
     title: t('permissions') || 'Permissions',
     items: [
       { text: t('permissions') || 'Role Permissions', id: 'role' }
@@ -812,6 +1012,7 @@ const settingsMap = computed(() => [
   },
   {
     route: 'reg-key',
+    perm: 'reg-key:query',
     title: t('inviteCode') || 'Invite Code',
     items: [
       { text: t('inviteCode') || 'Registration Key', id: 'reg-key' }
@@ -858,7 +1059,14 @@ const settingsSearchResults = computed(() => {
   const appPrefixMatch = cleanKeyword.match(/^(app:|oauth:|client:)\s*(.*)/i);
   const targetAppQuery = appPrefixMatch ? appPrefixMatch[2].trim() : '';
 
-  return settingsMap.value.map(group => {
+  // 严格基于当前用户实际权限进行前置安全过滤，未授权路由绝不向用户呈现，彻底杜绝 404
+  const accessibleGroups = settingsMap.value.filter(group => {
+    if (group.perm && !hasPerm(group.perm)) return false;
+    if (group.route === 'all-email' && Number(settingStore.settings?.allMailMode) === 2) return false;
+    return true;
+  });
+
+  return accessibleGroups.map(group => {
     const matchedItems = group.items.filter(item => {
       if (appPrefixMatch) {
         if (item.id === 'thirdPartyApps') {
@@ -915,6 +1123,11 @@ function highlightSetting(text) {
 
 function goToSetting(routeName, itemId) {
   searchFocus.value = false;
+  // 防御性校验：若路由未在当前应用上下文注册，绝不执行跳转，杜绝 404
+  if (!router.hasRoute(routeName)) {
+    ElMessage.warning(t('noPermAccountAdd') || '功能不可用或无权访问');
+    return;
+  }
   if (route.name !== routeName) {
     router.push({ name: routeName, hash: itemId ? `#${itemId}` : undefined });
     if (itemId) {
@@ -2003,6 +2216,80 @@ button.mobile-menu-btn {
   text-align: center;
   color: var(--text-muted);
   font-size: 14px;
+}
+
+/* Add Account Modal Styling */
+.add-account-dialog {
+  :deep(.el-dialog__header) {
+    padding: 18px 24px 12px;
+    margin-right: 0;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  :deep(.el-dialog__title) {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+  :deep(.el-dialog__body) {
+    padding: 20px 24px;
+  }
+  :deep(.el-dialog__footer) {
+    padding: 12px 24px 18px;
+    border-top: 1px solid var(--border-subtle);
+  }
+}
+.add-account-tip {
+  margin: 0 0 16px;
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+.add-account-input-group {
+  margin-bottom: 12px;
+  :deep(.el-input-group__append) {
+    padding: 0;
+    border: none;
+    background: transparent;
+  }
+  :deep(.suffix-select) {
+    .el-input__wrapper {
+      border-top-left-radius: 0;
+      border-bottom-left-radius: 0;
+      box-shadow: none !important;
+      border-left: 1px solid var(--border-subtle);
+      background: var(--bg-subtle);
+    }
+  }
+}
+.email-preview-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--bg-subtle);
+  border-radius: 8px;
+  font-size: 12.5px;
+  margin-bottom: 14px;
+  .preview-label {
+    color: var(--text-muted);
+    font-weight: 500;
+  }
+  .preview-val {
+    color: var(--accent-primary);
+    font-weight: 600;
+    word-break: break-all;
+  }
+}
+.add-account-turnstile-container {
+  margin-top: 12px;
+  display: flex;
+  justify-content: center;
+}
+.turnstile-show {
+  display: flex;
+}
+.turnstile-hide {
+  display: none;
 }
 </style>
 <style>

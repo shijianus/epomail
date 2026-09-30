@@ -2062,6 +2062,9 @@ totpModeAllDesc: 'Configurar si los usuarios pueden usar TOTP. Al activarlo, la 
     privacyDialogTitle: 'Política de privacidad de Epocanvas Mail',
     multiAccountEnabledLabel: 'Modo de cambio rápido de múltiples cuentas',
     multiAccountEnabledDesc: 'Alineado con el patrón de cuentas de Gmail, permitiendo iniciar sesión y alternar entre múltiples cuentas.',
+    noPermAccountAdd: 'Su rol actual no tiene permiso para agregar nuevas cuentas de correo',
+    adminDisabledAddEmail: 'El administrador ha deshabilitado temporalmente la adición de nuevas direcciones de correo',
+    addAccountModalDesc: 'Cree y asocie una nueva dirección de correo a su cuenta para alternar rápidamente en la misma vista.',
 };
 
 export default es;

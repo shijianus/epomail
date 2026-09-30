@@ -2062,6 +2062,9 @@ totpModeAllDesc: '設定是否允許使用者使用TOTP，開啟後使用者可�
     privacyDialogTitle: 'Epocanvas Mail 隱私政策',
     multiAccountEnabledLabel: '多帳戶快速切換模式',
     multiAccountEnabledDesc: '完全對齊 Gmail 方框新增帳戶互動體系，支援在同一瀏覽器下快速登入並切換多個獨立帳號。',
+    noPermAccountAdd: '您當前的角色無權新增新郵箱',
+    adminDisabledAddEmail: '管理員已暫停開放新增郵箱',
+    addAccountModalDesc: '建立並關聯一個全新的郵箱地址到您的帳戶，可在同一介面快速切換使用。',
 };
 
 export default zhHant;

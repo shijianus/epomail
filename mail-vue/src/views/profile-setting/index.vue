@@ -4,7 +4,7 @@
     <!-- Section 1: 个人简介 (Bio) -->
     <div class="container">
       <div class="title">{{ $t('bio') }}</div>
-      <div class="item bio-item">
+      <div class="item bio-item" id="bio">
         <div>{{ $t('bio') }}</div>
         <div class="bio-preview-group">
           <div class="bio-preview-box">
@@ -22,7 +22,7 @@
       <div class="title">{{ $t('visualMedia') }}</div>
 
       <!-- 1. 外观色调 (长方形并排卡片，不霸占整行) -->
-      <div class="item theme-item">
+      <div class="item theme-item" id="theme">
         <div>{{ $t('themeMode') }}</div>
         <div class="theme-options-group">
           <!-- Dark Mode -->
@@ -98,7 +98,7 @@
 
       <!-- 2. 主栏底层图片设置 (仅作用于中央主栏，商业级质感) -->
       <!-- 2. 全局主题壁纸 (5x2 网格，尺寸与外观色调卡片统一) -->
-      <div class="item wallpaper-item">
+      <div class="item wallpaper-item" id="wallpaper">
         <div>
           <div style="display: inline-flex; align-items: center; gap: 6px;">
             <span>{{ $t('mainPanelWallpaper') }}</span>
@@ -213,7 +213,7 @@
       <div class="title">{{ $t('preferences') }}</div>
 
       <!-- 1. 视图密度 (Density) -->
-      <div class="item density-item">
+      <div class="item density-item" id="density">
         <div>{{ $t('density') }}</div>
         <div class="density-group">
           <!-- 默认 (54px) -->
@@ -279,7 +279,7 @@
       </div>
 
       <!-- 2. 收件箱类型 (Inbox Type) -->
-      <div class="item inbox-type-item">
+      <div class="item inbox-type-item" id="inboxType">
         <div>{{ $t('inboxType') }}</div>
         <div class="inbox-type-wrapper">
           <!-- 1. Default (Customize) -->
@@ -384,7 +384,7 @@
       </div>
 
       <!-- 3. 阅读窗格 (Reading Pane - 精简纯粹) -->
-      <div class="item pane-item">
+      <div class="item pane-item" id="readingPane">
         <div>{{ $t('readingPane') }}</div>
         <div class="pane-options-group">
           <!-- 1. No split -->
@@ -443,7 +443,7 @@
       </div>
 
       <!-- 4. 邮件会话模式 (Email Threading) -->
-      <div class="item">
+      <div class="item" id="threading">
         <div style="flex-direction: column; align-items: flex-start; white-space: normal;">
           <div>{{ $t('emailThreading') }}</div>
           <div class="sub-hint">{{ $t('conversationViewDesc') }}</div>
@@ -456,8 +456,9 @@
         </div>
       </div>
 
-      <!-- 5. 系统语言 (带锚点 #language-section) -->
-      <div class="item" id="language-section">
+      <!-- 5. 系统语言 (双锚点兼容 #language 与 #language-section) -->
+      <div class="item" id="language" style="position: relative;">
+        <span id="language-section" style="position: absolute; top: -10px;"></span>
         <div>{{ $t('systemLanguage') }}</div>
         <div>
           <el-select
@@ -527,7 +528,7 @@
     </div>
 
     <!-- Section 4: 数据隐私 (Data Privacy) -->
-    <div class="container">
+    <div class="container" id="dataPrivacy">
       <div class="title">{{ $t('dataPrivacy') }}</div>
       <div class="privacy-group">
         <div class="privacy-item">

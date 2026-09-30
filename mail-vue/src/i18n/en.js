@@ -2062,6 +2062,9 @@ totpModeAllDesc: 'Configure whether users can use TOTP. When enabled, 2FA is ava
     privacyDialogTitle: 'Epocanvas Mail Privacy Policy',
     multiAccountEnabledLabel: 'Multi-Account Fast Switch Mode',
     multiAccountEnabledDesc: 'Aligns with Gmail box account adding pattern, allowing fast sign-in and switching between multiple accounts.',
+    noPermAccountAdd: 'Your current role does not have permission to add new email accounts',
+    adminDisabledAddEmail: 'Administrator has temporarily disabled adding new email addresses',
+    addAccountModalDesc: 'Create and associate a new email address with your account for fast switching in the same view.',
 };
 
 export default en;

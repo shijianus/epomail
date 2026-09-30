@@ -3,7 +3,7 @@
     <!-- Section 1: Account Security Information -->
     <div class="container">
       <div class="title">{{ $t('securitySetting') }}</div>
-      <div class="item">
+      <div class="item" id="username">
         <div>{{ $t('username') }}</div>
         <div>
           <span v-if="setNameShow" class="edit-name-input">
@@ -20,11 +20,11 @@
           </span>
         </div>
       </div>
-      <div class="item">
+      <div class="item" id="emailAccount">
         <div>{{ $t('emailAccount') }}</div>
         <div>{{ userStore.user.email }}</div>
       </div>
-      <div class="item">
+      <div class="item" id="password">
         <div>{{ $t('password') }}</div>
         <div style="display: flex; align-items: center; gap: 16px;">
           <el-button type="primary" @click="pwdShow = true">{{ $t('changePwdBtn') }}</el-button>
@@ -34,7 +34,7 @@
     </div>
 
     <!-- Section 2: Google-Style 2-Step Verification Center -->
-    <div class="container two-factor-center" v-if="totpStatus.globalEnabled">
+    <div class="container two-factor-center" id="totp" v-if="totpStatus.globalEnabled">
       <div class="title">{{ $t('twoFactorCenter') }}</div>
 
       <!-- Hero Status Banner -->
@@ -123,7 +123,7 @@
           </div>
 
           <!-- Method 2: Backup Recovery Codes -->
-          <div class="method-item">
+          <div class="method-item" id="backupCodes">
             <div class="method-icon-box backup-icon-box">
               <Icon icon="fluent:password-24-regular" width="22" height="22" />
             </div>
@@ -163,7 +163,7 @@
           </div>
 
           <!-- Method 3: Passkeys & Security Keys (WebAuthn / FIDO2) -->
-          <div class="method-item passkey-section-item">
+          <div class="method-item passkey-section-item" id="passkeys">
             <div class="method-main-row">
               <div class="method-icon-box passkey-icon-box">
                 <Icon icon="fluent:shield-keyhole-24-regular" width="22" height="22" />
@@ -227,7 +227,7 @@
     </div>
 
     <!-- Section 3: Account Deletion -->
-    <div class="container del-email" v-perm="'my:delete'">
+    <div class="container del-email" id="deleteUser" v-perm="'my:delete'">
       <div class="title">{{ $t('deleteUser') }}</div>
       <div class="del-msg">
         {{ $t('delAccountMsg') }}

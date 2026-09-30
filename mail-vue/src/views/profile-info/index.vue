@@ -6,7 +6,7 @@
       <div class="title">{{ $t('basicInfo') }}</div>
 
       <!-- 个人资料照片 -->
-      <div class="item media-item">
+      <div class="item media-item" id="avatar">
         <div>{{ $t('profilePhoto') }}</div>
         <div class="image-preview-group">
           <el-avatar
@@ -34,7 +34,7 @@
       </div>
 
       <!-- 名称 / 昵称 -->
-      <div class="item">
+      <div class="item" id="nickname">
         <div>{{ $t('nickname') }}</div>
         <div>
           <span class="user-name">
@@ -47,7 +47,7 @@
       </div>
 
       <!-- 性别 -->
-      <div class="item">
+      <div class="item" id="gender">
         <div>{{ $t('gender') }}</div>
         <div>
           <span class="user-name">
@@ -60,7 +60,7 @@
       </div>
 
       <!-- 生日 -->
-      <div class="item">
+      <div class="item" id="birthday">
         <div>{{ $t('birthday') }}</div>
         <div>
           <span class="user-name">
@@ -78,7 +78,7 @@
       <div class="title">{{ $t('contactInfo') }}</div>
 
       <!-- 电子邮件 (只读展示，不附带多余冗余提示) -->
-      <div class="item">
+      <div class="item" id="email">
         <div>{{ $t('profileEmail') }}</div>
         <div class="email-val-wrap">
           <span class="font-mono" style="font-weight: 500;">{{ userStore.user.email }}</span>
@@ -86,7 +86,7 @@
       </div>
 
       <!-- 电话号码 -->
-      <div class="item" style="align-items: flex-start;">
+      <div class="item" id="phones" style="align-items: flex-start;">
         <div>{{ $t('phones') }}</div>
         <div class="phones-container">
           <div class="phone-list" v-if="phoneList.length > 0">
@@ -111,7 +111,7 @@
     </div>
 
     <!-- Section 3: 常用地址 -->
-    <div class="container">
+    <div class="container" id="addresses">
       <div class="title">{{ $t('addresses') }}</div>
 
       <!-- 住家地址 -->

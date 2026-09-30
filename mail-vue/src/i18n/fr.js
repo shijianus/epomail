@@ -2062,6 +2062,9 @@ totpModeAllDesc: 'Définir si les utilisateurs peuvent utiliser TOTP. Lorsqu\'il
     privacyDialogTitle: 'Politique de confidentialité d’Epocanvas Mail',
     multiAccountEnabledLabel: 'Mode de basculement multi-comptes',
     multiAccountEnabledDesc: "Aligné sur le modèle Gmail d'ajout de comptes, permettant de se connecter et basculer entre plusieurs comptes.",
+    noPermAccountAdd: "Votre rôle actuel n'a pas la permission d'ajouter de nouveaux comptes de messagerie",
+    adminDisabledAddEmail: "L'administrateur a temporairement désactivé l'ajout de nouvelles adresses e-mail",
+    addAccountModalDesc: 'Créez et associez une nouvelle adresse e-mail à votre compte pour basculer rapidement dans la même vue.',
 };
 
 export default fr;

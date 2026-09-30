@@ -48,7 +48,7 @@ const routes = [
             },
             {
                 path: '/settings/profile',
-                alias: ['/settings/personal', '/settings/profile-info'],
+                alias: ['/settings/personal', '/settings/profile-info', '/settings/account', '/settings/accounts'],
                 name: 'user-profile',
                 component: () => import('@/views/profile-info/index.vue'),
                 meta: {

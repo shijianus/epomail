@@ -2062,6 +2062,9 @@ totpModeAllDesc: 'Instellen of gebruikers TOTP mogen gebruiken. Eenmaal ingescha
     privacyDialogTitle: 'Epocanvas Mail Privacybeleid',
     multiAccountEnabledLabel: 'Multi-account snelle wisselmodus',
     multiAccountEnabledDesc: 'Uitgelijnd met Gmail-stijl accountvak, voor snel inloggen en schakelen tussen meerdere accounts.',
+    noPermAccountAdd: 'Uw huidige rol heeft geen toestemming om nieuwe e-mailaccounts toe te voegen',
+    adminDisabledAddEmail: 'De beheerder heeft het toevoegen van nieuwe e-mailadressen tijdelijk uitgeschakeld',
+    addAccountModalDesc: 'Maak en koppel een nieuw e-mailadres aan uw account om snel te schakelen in dezelfde weergave.',
 };
 
 export default nl;
