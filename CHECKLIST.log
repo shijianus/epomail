@@ -8,6 +8,32 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### 硬编码安全操作通知邮件体系与分级风控实作交付 (Phase 2) (2026-09-30)
+*   **关联提交 (Git Commit)**: `c143f5c3d6019341b5c6b41af0fa7f9571b6327f` (Short: `c143f5c`)
+*   **部署环境 (Deployment)**: `本地全真栈自检与自动化测试`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 硬编码安全操作通知模板集 (`mail-worker/src/const/security-notice-templates.js`)：
+        - 覆盖全部 16 种核心操作，按风险梯度分为 4 个层级 (L1: 环境感知, L2: 凭据变更, L3: 认证因子, L4: 高危降级)；
+        - 提供 6 国语言 (zh, zh-Hant, en, es, fr, nl) 100% 绝对对称模板 (96 套独立文案)；
+        - 打造自包含响应式 HTML 渲染引擎 (`renderSecurityNoticeEmail`)，内嵌矢量盾牌 SVG 图标、操作元数据网格、双向确认与防钓鱼签名，统一发件人 `announcement@epocanvas.com`；
+        - 严格非系统设置可配置设计（防绕过安全基线）。
+    - [x] 安全通知核心引擎 (`mail-worker/src/service/security-notice-service.js`)：
+        - 边缘地理与 UA 上下文精确解析 (CF-Connecting-IP, CF-IPCountry, CF-IPCity, ASN, OS, 浏览器)；
+        - 基于 KV (`USER_KNOWN_ENV_{userId}`) 的环境指纹库对比与 1 小时防疲劳静默去重窗口；
+        - 官方认证标识 (`isOfficial: 1`)、官方标签 (`['官方', '安全']`)，L3/L4 级别自动加注星标 (`star` 表)，兼容端到端邮件加密。
+    - [x] 全链路业务安全埋点集成：
+        - 登录成功与 2FA 登录触发登录环境比对 (`login-service.js`)；连续 5 次密码错误触发账号锁定预警 (`ACCOUNT_LOCKED`)；
+        - 密码重置 (`PASSWORD_CHANGED`)、PAT 令牌创建 (`PAT_CREATED`)、邮件/TG 转发设置修改 (`FORWARDING_MODIFIED`/`TELEGRAM_MODIFIED`)、存储解绑 (`STORAGE_PURGED`) 与销户 (`ACCOUNT_DELETED`) 触发对应安全信 (`user-service.js`)；
+        - TOTP 开启/禁用 (`TOTP_ENABLED`/`TOTP_DISABLED`)、Passkey 注册/删除 (`PASSKEY_ADDED`/`PASSKEY_DELETED`)、备用码更新 (`BACKUP_CODES_REGENERATED`) 触发对应告警 (`totp-service.js`)；
+        - OAuth 第三方应用授权首次访问触发确认信 (`oauth-provider-service.js`)。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：mail-vue `vite build` 17.36s 零警告零报错；
+    - [x] 静态多语言三件套：`node scripts/i18n-symmetry.mjs` 6 语言字典 100% 绝对对称，`node scripts/i18n-audit.mjs` 0 缺失；
+    - [x] 自动化端到端测试：`tests/test-security-notices-e2e.mjs` 全线通过 (954/954 断言通过，覆盖 96 套模板、参数插值、指纹识别、防风暴去重与自动星标投递)；
+    - [x] 零假数据残留：测试数据全部在内存与临时 mock 实例中流转，物理存储无假数据残留。
+
+---
+
 ### EpomailDocs 上线就绪审计：远端应用变更技术事实校准与部署配置盘点 (2026-09-30)
 *   **关联提交 (Git Commit)**: `5197f50`（EpomailDocs 独立仓库，完整 Hash 见该仓 git log；已推送 origin/main）
 *   **部署环境 (Deployment)**: `本地 build 审计核验`（无生产部署，生产 Version ID 不变）
