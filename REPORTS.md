@@ -9,6 +9,24 @@
 
 ---
 
+### EpomailDocs 法律文档站 v5.2 独立复审：技术事实全量对码与生产发布探测 (2026-09-30)
+*   **关联提交 (Git Commit)**: 本仓归档提交见 CHECKLIST.log 对应条目；审计对象 EpomailDocs @ `79094ac9d2686c1014c25824b25318c6206c9270` (Short: `79094ac`，v5.2，已推送 origin/main)，事实基准为主仓 @ `81cccef`
+*   **专项文档索引 (Detailed Doc)**: `doc/epomaildocs-v52-independent-audit.md`（31 项通过矩阵 + 完整缺陷矩阵 + 证据行号）
+*   **体检/审计范围与方法 (Scope & Methodology)**:
+    1. 范围与环境：EpomailDocs 48 页内容逐篇对码；mail-worker / mail-vue 源码逐点取证（加密语义、三条实体删除路径、附件四级存储链、AI 三链路、第三方出站清单、OAuth 参数、会话/锁定参数、版本快照）；**新增生产域名探测**（mail.epocanvas.com / docs.epocanvas.com 实测 HTTP 行为）。
+    2. 工具与脚本：文档站五件套回归（build 49 页 31s 零报错 / 492 锚点 0 断链 / 6×8 结构对称 / 法条底稿一致 / 条号引用 0）+ 六语言红线扫描（禁用语 0、版本行 48 页统一 5.2）+ curl 生产探测 + EpoCanvasDocs 工程惯例对照。
+*   **核心发现与缺陷矩阵 (Key Findings & Matrix)**:
+    - **[P0·阻塞]**: 文档站无有效公网部署——应用内 `DOCS_URL` 默认 `docs.epocanvas.com/epomail` 实测 404；`SITE_ORIGIN=mail.epocanvas.com` 下 `/mail/*` 被 mail Worker SPA fallback 吞没（200 但返回应用壳非文档）；canonical/hreflang/sitemap 全域错配风险。须定发布形态（推荐 docs.epocanvas.com/epomail/ + astro `base` 配置）后方可宣称上线。
+    - **[P0·安全/合规]**: 三条实体删除路径（回收站 7 日例行清理 `email-service.js:644`、手动彻底删除 `:300`、90% 配额清理 `:311`）均只删邮件行、不清理附件对象与索引，与 privacy §8「含附件与索引」及 data-security §2 之保存期限声明不符；附件残留至账号物理删除为止（`attachmentCascadeDelete` 设置无执行点）。代码优先修复：三处接入既有 `attService.removeByEmailIds`（自带去重键保护）。
+    - **[P1·重要]**: 头像上传硬编码第三方图床 `drawing.shijian.qzz.io`（`user-service.js:110`，无 setting 可覆盖），privacy §4.1「运营者配置之图片存储服务」失实、sub-processors §2 未点名、overview §2「上游作者不接触任何实例之运营资料」被反例。
+    - **[P2·次要]**: 四项——sub-processors §2 博客联动行六语言均重复两次；附件存储四级链（用户 BYO S3 → 系统 S3/B2 → R2 → **KV 兜底**）未完整披露；project.md 自引用快照数字过期（539→540 提交、本站 11→12 提交、tests 105→106、i18n 键 2,039/1,888→2,054/1,855）；project.md 破折号链 6 语言 6-7 处超红线（≤2）。
+    - **通过项**: 31 项高错误风险技术主张与源码全部一致（PBKDF2 10 万次、TOTP AES-256-GCM、JWT 30 天、会话上限 10、5 次失败锁 12 小时、6 标准角色、验证码前 6,000 字符、MyMemory/Google 备援、Mailjet 通道、OAuth scopes 三项 + 2 小时令牌、Turnstile 注册/新增信箱、Telegram 7 日链接、垃圾 7 日→回收站、90% 清理、数据导出、Google Fonts、博客联动、Linux DO 等）；写作红线（禁用语/条号/版本行/内链前缀/SVG 暗色）全绿。
+*   **治理修复与回归结果 (Fixes & Verification)**:
+    - 本轮为纯审计（不改文档站内容）；缺陷治理清单已列入专项文档 §五 修复路线图（v5.3：主仓两处代码修复 → 文档回填 → 发布链路定案 → 六语言博客行去重 → 快照数字改约数 → 破折号改写 → 欢迎邮件 7 日过期入保留期表）。
+    - 遗留路线图 (Roadmap)：①P0-2 代码修复后 privacy §8 无需改口，须补「删邮件后附件计数为 0」自动化断言；②P1-1 建议新增 `avatarUploadUrl` setting（缺省关闭或落实例自有存储）；③发布后按 privacy §13 程序公告；④`privacy@`/`admin@` 邮箱可达性上线前自测留痕。
+
+---
+
 ### EpomailDocs 法律文档站独立审计：技术事实全量核验与 v5.1 修订 (2026-09-30)
 *   **关联提交 (Git Commit)**: `52412e393613a8b2763d133a95f6a3205e8cb6ce` (Short: `52412e3`)（EpomailDocs 独立仓库，已推送 origin/main；本仓归档提交以 CHECKLIST.log 对应条目为准）
 *   **体检/审计范围与方法 (Scope & Methodology)**:
