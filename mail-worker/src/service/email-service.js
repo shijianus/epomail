@@ -301,20 +301,12 @@ const emailService = {
 		const { emailIds, physical } = params;
 		const emailIdList = emailIds.split(',').map(Number);
 		if (physical) {
-			await orm(c).delete(email).where(
-				and(
-					eq(email.userId, userId),
-					inArray(email.emailId, emailIdList)))
-				.run();
+			await this.cascadeDeleteEmails(c, userId, emailIdList);
 		} else {
 			const quota = await userService.getUserQuota(c, userId);
 			if (quota.maxStorageBytes > 0 && quota.usedStorageBytes / quota.maxStorageBytes > 0.9) {
 				// Immediate physical delete if quota > 90%
-				await orm(c).delete(email).where(
-					and(
-						eq(email.userId, userId),
-						inArray(email.emailId, emailIdList)))
-					.run();
+				await this.cascadeDeleteEmails(c, userId, emailIdList);
 			} else {
 				const settingRow = await settingService.query(c);
 				const mode = Number(settingRow?.allMailMode);
@@ -640,7 +632,18 @@ const emailService = {
 			)
 		).run();
 
-		// Physical Delete Trash after 7 days
+		// Physical Delete Trash after 7 days (attachments & stars cascade with the rows)
+		const trashRows = await orm(c).select({ emailId: email.emailId }).from(email).where(
+			and(
+				eq(email.isDel, 1),
+				lt(email.createTime, sql`datetime('now', '-7 days')`)
+			)
+		).all();
+		if (trashRows.length > 0) {
+			const trashEmailIds = trashRows.map(row => row.emailId);
+			await attService.removeByEmailIds(c, trashEmailIds);
+			await starService.removeByEmailIds(c, trashEmailIds);
+		}
 		await orm(c).delete(email).where(
 			and(
 				eq(email.isDel, 1),
@@ -1841,6 +1844,17 @@ const emailService = {
 	async physicsDeleteUserIds(c, userIds) {
 		await attService.removeByUserIds(c, userIds);
 		await orm(c).delete(email).where(inArray(email.userId, userIds)).run();
+	},
+
+	// 实体删除用户本人的邮件并级联清理附件与星标（手动彻底删除、90% 配额清理共用）
+	async cascadeDeleteEmails(c, userId, emailIdList) {
+		await attService.removeByEmailIds(c, emailIdList);
+		await starService.removeByEmailIds(c, emailIdList);
+		await orm(c).delete(email).where(
+			and(
+				eq(email.userId, userId),
+				inArray(email.emailId, emailIdList)))
+			.run();
 	},
 
 	updateEmailStatus(c, params) {
