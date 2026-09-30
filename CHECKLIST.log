@@ -8,6 +8,30 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### 公网生产环境真实浏览器端到端测试与视觉审计核验 (2026-09-30)
+*   **关联提交 (Git Commit)**: `833d9e2f228718abaed2edd47d5602ada1e9cfaa` (Short: `833d9e2`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com / epomail.epocanvas.workers.dev)` (Version ID: `c51f0b0f-3b30-4b00-b9ba-221aa688025e`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 真实账号与生产公网全真链路核验 (`tests/test-security-notices-browser.mjs`)：
+        - 站长账号真实登录并获取公网 JWT 认证凭证，记录当前 D1 最大 `email_id` 基线；
+        - 调用生产接口 `POST /api/my/apiTokens` 真实生成测试 PAT 个人访问令牌，触发 Level 2 级安全操作通知邮件；
+        - 自动化启动 Playwright Chromium 无头浏览器，注入凭据直访 `https://mail.epocanvas.com/mail/u/0/#inbox`。
+    - [x] 邮件列表与阅读窗格双重视觉审计与截屏归档：
+        - 收件箱邮件列表审计（截图: `tests/browser_security_notice_inbox_list.png`）：成功定位并呈现来自官方发信人 `Epocanvas Mail 官方安全中心` 与官方认证蓝标，标题为 `🔑 [操作确认] 您已成功创建个人访问令牌(PAT)`；
+        - 邮件阅读窗格首屏审计（截图: `tests/browser_security_notice_reading_pane.png`）：官方系统引导横幅 (`isOfficial: 1`)、7 天自动清理提示、自包含响应式卡片、告警徽章 (`操作提醒`)、大标题 (`个人访问令牌已创建`)、边缘解析上下文网格 (UTC 触发时间、IP 地址、地理位置、设备与 OS、浏览器、网络/ISP、操作细节)；
+        - 邮件阅读窗格滚动全景审计（截图: `tests/browser_security_notice_reading_pane_scrolled.png`）：双向安全建议卡片 (绿色本人操作说明 vs 红色非本人操作防钓鱼警示)、金黄主题 CTA 操作按钮 (`前往安全中心管理账户 →`)、不可取消订阅防伪官方脚注。
+    - [x] 零假数据残留与安全防护还原 (AGENTS.md 准则)：
+        - 自动化物理删除测试生成的 PAT 令牌 (`DELETE /api/my/apiTokens/${id}`)；
+        - 自动化物理删除生产 D1 数据库中因本次测试生成的测试安全提醒邮件 (`email_id > startMaxEmailId`)；
+        - 自动化将站长账号 MFA 两步验证重置并锁定回开启状态 (`totp_enabled = 1`)。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 真实浏览器端到端：`node tests/test-security-notices-browser.mjs` 100% 满分通过；
+    - [x] 运行时健康度：无任何控制台 unhandled error 或 pageerror；
+    - [x] 零假数据残留核验：D1 生产查询 `SELECT COUNT(*) WHERE email_id > 157` 结果为 0；
+    - [x] 生产强安全核验：D1 生产查询站长 `totp_enabled` 确认严格为 1。
+
+---
+
 ### 硬编码安全操作通知邮件体系与分级风控实作交付 (Phase 2) (2026-09-30)
 *   **关联提交 (Git Commit)**: `c143f5c3d6019341b5c6b41af0fa7f9571b6327f` (Short: `c143f5c`)
 *   **部署环境 (Deployment)**: `本地全真栈自检与自动化测试`
