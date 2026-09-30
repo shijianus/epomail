@@ -8,6 +8,33 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### 原生登录路由多账户无感添加、会话保持与去品牌化优化 (2026-09-30)
+*   **关联提交 (Git Commit)**: `b6d199f8464a10afa4bb39f349a1b490e3631100` (Short: `b6d199f`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com / epomail.epocanvas.workers.dev)` (Version ID: `76bbcb37-e897-4d46-a8fd-d29e1616b33b`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 原生登录路由无感添加多账户与生硬模态框清理:
+        - 彻底移除此前生硬加入的添加账户 `<el-dialog>` 模态框及伴生的 300+ 行死表单、Turnstile 容灾逻辑与硬编码样式 (-92 行净精简)；
+        - 点击头像下拉卡片中的「添加其他账户」入口时，直接原生无感跳转至独立登录应用路由 `/login/?action=addAccount&u=${nextU}`；
+        - 登录卡片顶部动态呈现「← 返回当前账户」快捷按键，副标题动态更新为添加新账户指引，邮箱输入框初始保持纯净空白。
+    - [x] 回退登录态 100% 绝对无损保持:
+        - 用户无论通过登录卡片「← 返回当前账户」按钮，还是通过浏览器原生 Back 导航，100% 保持已有主账户的会话凭证（Token 与 sessions 绝不被清除或退出）；
+        - 平滑返回主邮箱界面 `/mail/u/0/#inbox`，零闪退、零白屏、零假登出。
+    - [x] 多会话生命周期与独立账号无缝切换:
+        - 引入标准 `epo_sessions` 浏览器多账号存储架构与 `/mail/u/:index` 路径绑定；
+        - 主应用根据当前 `u` 索引自动同步激活对应账号 Token，并在头部下拉卡片动态展示其他已登录独立会话及别名邮箱；
+        - 点击其他账号平滑切换至目标 `/mail/u/:targetU/#inbox`。
+    - [x] 官方品牌纯粹性深度清洗 (彻底去 Gmail 化):
+        - 6 语言字典 (`zh.js`, `zh-Hant.js`, `en.js`, `es.js`, `fr.js`, `nl.js`) 全面清洗 `multiAccountEnabledDesc`，彻底剔除所有 "Gmail" 词汇，保持六语言 100% 对称；
+        - 重构并重命名 `gmail-history.js` 为 `account-history.js`，类名由 `.gmail-account-card` 更新为 `.epo-account-card`，消除所有代码与注释中的品牌稀释隐患。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：temp_login_ui (2.92s) 与 mail-vue (13.29s) 零报错构建通过，dist 资源完整同步；
+    - [x] 多语言对称与审计：`node scripts/i18n-symmetry.mjs` (2057 键绝对对称)、`node scripts/i18n-audit.mjs` (0 缺失)、`node scripts/i18n-hardcoded.mjs` 全部绿灯；
+    - [x] 新增公网端到端测试套件 (`tests/test-multi-account-login-flow-prod-e2e.mjs`)：生产环境 `https://mail.epocanvas.com` 16/16 项断言 100% 满分通过；
+    - [x] 既有头像下拉全真栈回归 (`tests/test-gmail-avatar-dropdown-prod-e2e.mjs`)：生产环境 37/37 项断言 100% 满分通过；
+    - [x] 零假数据残留：测试账号生命周期自动物理清理，零临时凭证或垃圾数据残留。
+
+---
+
 ### 邮件内容去 AI 味重构与安全通知视觉美化 (De-AI & Minimalist Email Redesign) (2026-09-30)
 *   **关联提交 (Git Commit)**: `668d844a5a94f7f16ade068d44e78cb9c1710151` (Short: `668d844`, Base: `ec77df74a1b2e8198fec5824a56b3f451bf2d54b`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com / epomail.epocanvas.workers.dev)` (Version ID: `9a4ea2b8-c0ab-468d-bccc-fa8a3b83c3b3`)
