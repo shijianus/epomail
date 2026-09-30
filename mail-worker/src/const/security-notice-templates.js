@@ -1028,7 +1028,7 @@ export function renderSecurityNoticeEmail(firstArg, secondArg, thirdArg) {
   }
 
   const rowsHtml = rows.map((r, idx) => `
-    <tr style="border-bottom: ${idx === rows.length - 1 ? 'none' : '1px solid #f1f5f9'};\>
+    <tr style="border-bottom: ${idx === rows.length - 1 ? 'none' : '1px solid #f1f5f9'};">
       <td style="padding: 10px 16px; font-size: 13px; color: #64748b; font-weight: 500; width: 120px; white-space: nowrap; vertical-align: middle;">
         ${r.label}
       </td>
@@ -1091,8 +1091,10 @@ export function renderSecurityNoticeEmail(firstArg, secondArg, thirdArg) {
 
       <!-- Operation Metadata Card -->
       <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; margin: 0 0 22px;">
-        <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 13px;">
-          ${rowsHtml}
+        <table role="presentation" style="width: 100%; border-collapse: collapse; text-align: left; font-size: 13px;">
+          <tbody>
+            ${rowsHtml}
+          </tbody>
         </table>
       </div>
 

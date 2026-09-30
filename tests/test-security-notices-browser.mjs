@@ -6,6 +6,18 @@ const BASE = 'https://mail.epocanvas.com';
 const ADMIN_EMAIL = 'admin@epomail.bond';
 const ADMIN_PWD = '123456';
 
+async function fetchWithRetry(url, options, retries = 3, delay = 1000) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await fetch(url, options);
+    } catch (err) {
+      if (i === retries - 1) throw err;
+      console.warn(`  [Network Warning]: Fetch failed (${err.message}), retrying ${i + 1}/${retries} in ${delay}ms...`);
+      await new Promise(r => setTimeout(r, delay));
+    }
+  }
+}
+
 (async () => {
   console.log('================================================================');
   console.log('🛡️  公网生产环境真实浏览器端到端核验：安全操作通知邮件系统');
@@ -28,7 +40,7 @@ const ADMIN_PWD = '123456';
 
     // 1. 登录获取真实 JWT Token
     console.log('\n[步骤 1] 正在登录生产站长账号获取认证凭证...');
-    const loginRes = await fetch(`${BASE}/api/login`, {
+    const loginRes = await fetchWithRetry(`${BASE}/api/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: ADMIN_EMAIL, password: ADMIN_PWD })
@@ -54,7 +66,7 @@ const ADMIN_PWD = '123456';
     // 2. 真实触发一项安全操作：通过 API 创建一个受控的测试 PAT 令牌 (Level 2: PAT_CREATED)
     console.log('\n[步骤 2] 执行真实安全操作：生成个人访问令牌 (PAT)...');
     const tokenName = `Security-E2E-Key-${Date.now()}`;
-    const patRes = await fetch(`${BASE}/api/my/apiTokens`, {
+    const patRes = await fetchWithRetry(`${BASE}/api/my/apiTokens`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -208,7 +220,7 @@ const ADMIN_PWD = '123456';
     if (testTokenId) {
       try {
         console.log(`  - 物理清理测试 PAT 令牌 (ID: ${testTokenId})...`);
-        const delTokenRes = await fetch(`${BASE}/api/my/apiTokens/${testTokenId}`, {
+        const delTokenRes = await fetchWithRetry(`${BASE}/api/my/apiTokens/${testTokenId}`, {
           method: 'DELETE',
           headers: {
             'Authorization': `Bearer ${token}`
