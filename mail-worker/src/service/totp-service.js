@@ -11,6 +11,8 @@ import userContext from '../security/user-context.js';
 import userService from './user-service.js';
 import emailService from './email-service.js';
 import settingService from './setting-service.js';
+import securityNoticeService from './security-notice-service.js';
+import { SECURITY_EVENT_TYPES } from '../const/security-notice-templates.js';
 import { t } from '../i18n/i18n.js';
 import { Resend } from 'resend';
 import { v4 as uuidv4 } from 'uuid';
@@ -103,26 +105,7 @@ const totpService = {
 
 		// Deliver in-app security alert email
 		try {
-			const targetUser = await userService.selectById(c, userId);
-			if (targetUser) {
-				const acc = await mailOrm(c).select().from((await import('../entity/account')).default)
-					.where(eq((await import('../entity/account')).default.userId, userId)).get();
-				if (acc) {
-					await emailService.deliverWelcomeEmailToUser(c, userId, acc.accountId, targetUser.email, {
-						subject: '🛡️ [安全通知] 您的账号已成功开启两步验证 (2FA)',
-						text: `您好，您的 EpoCanvas Mail 账号 (${targetUser.email}) 已于 ${now} 成功启用了两步验证。除当前设备外，其他会话已自动下线。如非本人操作，请立即修改密码！`,
-						content: `<div style="font-family: sans-serif; padding: 20px; line-height: 1.6;">
-							<h2 style="color: #10b981;">🛡️ 您的账号已成功开启两步验证 (2FA)</h2>
-							<p>您好：</p>
-							<p>您的 EpoCanvas Mail 账号 <strong>${targetUser.email}</strong> 已于 <strong>${now}</strong> 成功启用了两步验证保护体系。</p>
-							<p style="color: #64748b;">为了保障账户安全，系统已自动注销该账号在其他设备上的登录会话。</p>
-							<hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;">
-							<p style="font-size: 12px; color: #94a3b8;">⚠️ 如非本人操作，请立即修改密码并联系系统管理员。</p>
-						</div>`,
-						isBroadcast: true
-					});
-				}
-			}
+			await securityNoticeService.sendNotice(c, userId, SECURITY_EVENT_TYPES.TOTP_ENABLED, {});
 		} catch (err) {
 			console.error('Failed to send 2FA enable notice:', err);
 		}
@@ -283,6 +266,12 @@ const totpService = {
 			totpBackupCodes: backupPayload
 		}).where(eq(user.userId, userId)).run();
 
+		try {
+			await securityNoticeService.sendNotice(c, userId, SECURITY_EVENT_TYPES.BACKUP_CODES_REGENERATED, {});
+		} catch (err) {
+			console.error('Failed to send backup codes notice:', err);
+		}
+
 		return {
 			backupCodes: rawCodes
 		};
@@ -355,22 +344,7 @@ const totpService = {
 
 		// Deliver in-app security alert email
 		try {
-			const acc = await mailOrm(c).select().from((await import('../entity/account')).default)
-				.where(eq((await import('../entity/account')).default.userId, userId)).get();
-			if (acc) {
-				const now = new Date().toISOString();
-				await emailService.deliverWelcomeEmailToUser(c, userId, acc.accountId, userRow.email, {
-					subject: '⚠️ [安全警告] 您的账号已停用两步验证 (2FA)',
-					text: `您好，您的 EpoCanvas Mail 账号 (${userRow.email}) 已于 ${now} 关闭了两步验证保护。如非本人操作，请立即登录并开启 2FA！`,
-					content: `<div style="font-family: sans-serif; padding: 20px; line-height: 1.6;">
-						<h2 style="color: #ef4444;">⚠️ 您的账号已停用两步验证 (2FA)</h2>
-						<p>您好：</p>
-						<p>您的 EpoCanvas Mail 账号 <strong>${userRow.email}</strong> 已于 <strong>${now}</strong> 关闭了两步验证保护。</p>
-						<p style="color: #b91c1c;">当前账户仅受单重密码保护，建议尽快重新开启两步验证以防范凭据泄露风险。</p>
-					</div>`,
-					isBroadcast: true
-				});
-			}
+			await securityNoticeService.sendNotice(c, userId, SECURITY_EVENT_TYPES.TOTP_DISABLED, {});
 		} catch (err) {
 			console.error('Failed to send 2FA disable notice:', err);
 		}
@@ -511,6 +485,14 @@ const totpService = {
 		// Cleanup KV challenge
 		await c.env.kv.delete(KvConst.WEBAUTHN_SETUP + userId);
 
+		try {
+			await securityNoticeService.sendNotice(c, userId, SECURITY_EVENT_TYPES.PASSKEY_ADDED, {
+				keyName: newKey.name
+			});
+		} catch (err) {
+			console.error('Failed to send passkey added notice:', err);
+		}
+
 		return {
 			id: newKey.id,
 			name: newKey.name,
@@ -557,6 +539,9 @@ const totpService = {
 			}
 		}
 
+		const deletedKey = keys.find(k => k.id === passkeyId);
+		const deletedKeyName = deletedKey ? deletedKey.name : passkeyId;
+
 		const filtered = keys.filter(k => k.id !== passkeyId);
 		if (filtered.length === keys.length) {
 			throw new BizError('Security key not found');
@@ -565,6 +550,14 @@ const totpService = {
 		await orm(c).update(user).set({
 			securityKeys: JSON.stringify(filtered)
 		}).where(eq(user.userId, userId)).run();
+
+		try {
+			await securityNoticeService.sendNotice(c, userId, SECURITY_EVENT_TYPES.PASSKEY_DELETED, {
+				keyName: deletedKeyName
+			});
+		} catch (err) {
+			console.error('Failed to send passkey deleted notice:', err);
+		}
 
 		return true;
 	},
@@ -665,17 +658,8 @@ const totpService = {
 				<p style="font-size: 13px; color: #64748b; margin-top: 24px;">⚠️ 如果您并未申请重置，说明您的账号可能存在安全风险，请立即联系管理员。</p>
 			</div>`;
 
-			// 1. In-app mailbox injection
-			const acc = await mailOrm(c).select().from((await import('../entity/account')).default)
-				.where(eq((await import('../entity/account')).default.userId, targetUserId)).get();
-			if (acc) {
-				await emailService.deliverWelcomeEmailToUser(c, targetUserId, acc.accountId, targetUser.email, {
-					subject: alertSubject,
-					text: alertText,
-					content: alertHtml,
-					isBroadcast: true
-				});
-			}
+			// 1. In-app mailbox injection via securityNoticeService
+			await securityNoticeService.sendNotice(c, targetUserId, SECURITY_EVENT_TYPES.TOTP_DISABLED, {});
 
 			// 2. Resend external mail dispatch if configured
 			if (settingData.resendTokens && typeof settingData.resendTokens === 'object') {

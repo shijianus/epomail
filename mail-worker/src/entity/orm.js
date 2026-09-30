@@ -1,5 +1,5 @@
 import { drizzle } from 'drizzle-orm/d1';
-import { getUserDb, getMailDb, getEnv } from '../utils/db-accessor';
+import { getUserDb, getMailDb, getEnv } from '../utils/db-accessor.js';
 
 /**
  * ORM instance for User / Identity domain tables (user, role, perm, setting, oauth_app, etc.)

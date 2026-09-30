@@ -49,7 +49,7 @@ const userService = {
 
         const ALLOWED_PROFILE_FIELDS = [
             'nickname', 'bio', 'avatarUrl', 'backgroundUrl', 'customLabels',
-            'signature', 'themeMode', 'personalForwarding', 'background',
+            'signature', 'themeMode', 'personalForwarding', 'personalTelegram', 'background',
             'showStats', 'showTrend', 'showSources', 'lang'
         ];
 
@@ -83,6 +83,35 @@ const userService = {
 
         Object.assign(profile, safeParams);
         await c.env.kv.put('USER_PROFILE_' + userId, JSON.stringify(profile));
+
+        // Trigger security notices for forwarding / telegram bot changes
+        if (safeParams.personalForwarding !== undefined) {
+            try {
+                const securityNoticeService = (await import('./security-notice-service.js')).default;
+                const { SECURITY_EVENT_TYPES } = await import('../const/security-notice-templates.js');
+                await securityNoticeService.sendNotice(c, userId, SECURITY_EVENT_TYPES.FORWARDING_MODIFIED, {
+                    detail: safeParams.personalForwarding.enabled
+                        ? `Auto-forwarding enabled to: ${safeParams.personalForwarding.targets || 'None'}`
+                        : 'Auto-forwarding disabled'
+                });
+            } catch (e) {
+                console.error('Failed to send forwarding notice:', e);
+            }
+        }
+
+        if (safeParams.personalTelegram !== undefined) {
+            try {
+                const securityNoticeService = (await import('./security-notice-service.js')).default;
+                const { SECURITY_EVENT_TYPES } = await import('../const/security-notice-templates.js');
+                await securityNoticeService.sendNotice(c, userId, SECURITY_EVENT_TYPES.TELEGRAM_MODIFIED, {
+                    detail: safeParams.personalTelegram.enabled
+                        ? `Telegram Bot enabled (chatId: ${safeParams.personalTelegram.chatId ? '***' + String(safeParams.personalTelegram.chatId).slice(-4) : 'configured'})`
+                        : 'Telegram Bot disabled'
+                });
+            } catch (e) {
+                console.error('Failed to send telegram notice:', e);
+            }
+        }
 
         const authInfo = await c.env.kv.get(KvConst.AUTH_INFO + userId, { type: 'json' });
 		if (authInfo && authInfo.user) {
@@ -371,6 +400,14 @@ const userService = {
 		} catch (e) {
 			console.error('Failed to update password timestamp', e);
 		}
+
+		try {
+			const securityNoticeService = (await import('./security-notice-service.js')).default;
+			const { SECURITY_EVENT_TYPES } = await import('../const/security-notice-templates.js');
+			await securityNoticeService.sendNotice(c, userId, SECURITY_EVENT_TYPES.PASSWORD_CHANGED);
+		} catch (e) {
+			console.error('Failed to send password changed notice:', e);
+		}
 	},
 
 	selectByEmail(c, email) {
@@ -405,6 +442,13 @@ const userService = {
 	},
 
 	async delete(c, userId) {
+		try {
+			const securityNoticeService = (await import('./security-notice-service.js')).default;
+			const { SECURITY_EVENT_TYPES } = await import('../const/security-notice-templates.js');
+			await securityNoticeService.sendNotice(c, userId, SECURITY_EVENT_TYPES.ACCOUNT_DELETED);
+		} catch (e) {
+			console.error('Failed to send account deletion notice:', e);
+		}
 		await orm(c).update(user).set({ isDel: isDel.DELETE }).where(eq(user.userId, userId)).run();
 		await c.env.kv.delete(kvConst.AUTH_INFO + userId)
 	},
@@ -1030,6 +1074,16 @@ const userService = {
 			await c.env.kv.put(`API_TOKEN_${tokenStr}`, JSON.stringify({ userId, scopes: tokenObj.scopes, expiresAt: tokenObj.expiresAt }));
 		} catch (e) {}
 
+		try {
+			const securityNoticeService = (await import('./security-notice-service.js')).default;
+			const { SECURITY_EVENT_TYPES } = await import('../const/security-notice-templates.js');
+			await securityNoticeService.sendNotice(c, userId, SECURITY_EVENT_TYPES.PAT_CREATED, {
+				detail: `Token: ${tokenObj.name} (${expiresInDays ? expiresInDays + 'd' : 'never'})`
+			});
+		} catch (e) {
+			console.error('Failed to send PAT notice:', e);
+		}
+
 		return tokenObj;
 	},
 
@@ -1119,6 +1173,16 @@ const userService = {
 			SET byo_storage_enabled = 0, byo_storage_config = '{}' 
 			WHERE user_id = ?
 		`).bind(userId).run();
+
+		try {
+			const securityNoticeService = (await import('./security-notice-service.js')).default;
+			const { SECURITY_EVENT_TYPES } = await import('../const/security-notice-templates.js');
+			await securityNoticeService.sendNotice(c, userId, SECURITY_EVENT_TYPES.STORAGE_PURGED, {
+				detail: 'BYO Storage unlinked and reset to system default'
+			});
+		} catch (e) {
+			console.error('Failed to send storage purged notice:', e);
+		}
 
 		return {
 			ok: true,

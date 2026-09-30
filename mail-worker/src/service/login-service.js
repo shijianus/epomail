@@ -270,7 +270,19 @@ const loginService = {
 			try {
 				let latest = await c.env.kv.get(failKey);
 				let current = latest ? parseInt(latest) : 0;
-				await c.env.kv.put(failKey, (current + 1).toString(), { expirationTtl: 12 * 60 * 60 });
+				const nextCount = current + 1;
+				await c.env.kv.put(failKey, nextCount.toString(), { expirationTtl: 12 * 60 * 60 });
+				if (nextCount >= 5 && userRow && userRow.userId) {
+					try {
+						const securityNoticeService = (await import('./security-notice-service.js')).default;
+						const { SECURITY_EVENT_TYPES } = await import('../const/security-notice-templates.js');
+						await securityNoticeService.sendNotice(c, userRow.userId, SECURITY_EVENT_TYPES.ACCOUNT_LOCKED, {
+							detail: '12 hours lockdown (5 consecutive failed attempts)'
+						});
+					} catch (e) {
+						console.error('Failed to send account locked notice:', e);
+					}
+				}
 			} catch {}
 		};
 
@@ -413,6 +425,13 @@ const loginService = {
 			await emailService.ensureWelcomeEmailForUser(c, userRow.userId, userRow.email);
 		} catch (e) {
 			console.warn('Failed to ensure welcome email on login:', e.message);
+		}
+
+		try {
+			const securityNoticeService = (await import('./security-notice-service.js')).default;
+			await securityNoticeService.checkAndTriggerLoginEnvironmentNotice(c, userRow.userId, userRow.email);
+		} catch (e) {
+			console.warn('Failed to check login environment notice:', e.message);
 		}
 
 		await c.env.kv.put(KvConst.AUTH_INFO + userRow.userId, JSON.stringify(authInfo), { expirationTtl: constant.TOKEN_EXPIRE });
@@ -590,6 +609,13 @@ const loginService = {
 			await emailService.ensureWelcomeEmailForUser(c, userRow.userId, userRow.email);
 		} catch (e) {
 			console.warn('Failed to ensure welcome email on TOTP login:', e.message);
+		}
+
+		try {
+			const securityNoticeService = (await import('./security-notice-service.js')).default;
+			await securityNoticeService.checkAndTriggerLoginEnvironmentNotice(c, userRow.userId, userRow.email);
+		} catch (e) {
+			console.warn('Failed to check login environment notice on TOTP login:', e.message);
 		}
 
 		await c.env.kv.put(KvConst.AUTH_INFO + userRow.userId, JSON.stringify(authInfo), { expirationTtl: constant.TOKEN_EXPIRE });

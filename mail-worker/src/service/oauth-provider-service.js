@@ -144,6 +144,17 @@ const oauthProviderService = {
 			console.error('Failed to record oauth_grant:', e);
 		}
 
+		// 发送第三方应用授权安全通知邮件
+		try {
+			const securityNoticeService = (await import('./security-notice-service.js')).default;
+			const { SECURITY_EVENT_TYPES } = await import('../const/security-notice-templates.js');
+			await securityNoticeService.sendNotice(c, user.userId, SECURITY_EVENT_TYPES.OAUTH_AUTHORIZED, {
+				detail: `App: ${app.name || app.clientId} (Scopes: ${scope || 'openid profile email'})`
+			});
+		} catch (e) {
+			console.error('Failed to send OAuth authorized notice:', e);
+		}
+
 		const finalUrl = new URL(redirect_uri);
 		finalUrl.searchParams.set('code', code);
 		if (state) {
