@@ -7,6 +7,33 @@
 > 制度规范与工作流指引请见 [AGENTS.md](file:///home/shijian/projects/epocanvas-mail/AGENTS.md)。
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
+
+### 邮件内容去 AI 味重构与安全通知视觉美化 (De-AI & Minimalist Email Redesign) (2026-09-30)
+*   **关联提交 (Git Commit)**: `668d844a5a94f7f16ade068d44e78cb9c1710151` (Short: `668d844`, Base: `ec77df74a1b2e8198fec5824a56b3f451bf2d54b`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com / epomail.epocanvas.workers.dev)` (Version ID: `9a4ea2b8-c0ab-468d-bccc-fa8a3b83c3b3`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 去 AI 味与专业化文案重塑 (De-AI Copy across 16 Events in 6 Languages):
+        - 彻底移除标题与网格中的表情包轰炸（`🔔`、`🌍`、`🌐`、`🔑`、`🚨` 等），采用 Stripe/GitHub/1Password 工业级工程文案体系；
+        - 去除直译式问候（如英文 `Hi {name},`、中文 `{name}，您好：`），消除浮夸词汇（如「遭受黑客毁灭性打击」改为「未经授权的访问」）；
+        - 全量 16 项安全事件与 6 种支持语言（zh, zh-Hant, en, es, fr, nl）全真字典对齐，纯净呈现自然人工程师团队的严谨提醒口吻。
+    - [x] 现代极简设计与自适应排版美化 (Modern Minimalist Card Layout):
+        - 顶栏：采用 18px 纯自内联 SVG 盾牌徽标，配合与安全等级相匹配的高对比徽章胶囊，呈现专业工程品质；
+        - 数据元卡片：修复 `<tr>` 语法解析，引入标准 `<tbody>` 与双列规整排版（左列灰度标签、右列等宽 Monospace 时间与 IP），告别错位混乱；
+        - 双向安全建议：打造极柔绿白背景卡片（本人操作无忧提示）与极柔橙白背景卡片（非本人操作警示与防钓鱼应急通道）；
+        - CTA 按钮：现代深色微圆角沉浸式按钮（`#0f172a`），清晰指引「前往安全中心管理账户 →」；
+        - 底栏防伪签名：明确标注官方安全中心署名与不可退订安全声明。
+    - [x] 测试韧性加固与零假数据清理:
+        - `tests/test-security-notices-browser.mjs` 增设网络瞬断自动重试（`fetchWithRetry`），杜绝 Edge TLS 抖动引起的误报；
+        - 验证生命周期确保测试 PAT 物理删除、测试安全邮件从 D1 彻底清理，站长 MFA 强安全防护（`totp_enabled = 1`）完整还原。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 全套单元与架构端到端测试：`node tests/test-security-notices-e2e.mjs` 954/954 项断言 100% 满分通过；
+    - [x] 多语言对称与审计：`node scripts/i18n-symmetry.mjs` (2057 键对称) 与 `node scripts/i18n-audit.mjs` (0 缺失) 全绿；
+    - [x] 公网生产环境真实浏览器端到端实测 (`tests/test-security-notices-browser.mjs`)：生产环境 100% 满分通过；
+    - [x] 邮件阅读窗格截屏全真验收 (`tests/browser_security_notice_reading_pane.png` & `scrolled.png`)：视觉对齐完美无瑕，零布局错位，极简现代感十足；
+    - [x] 零假数据残留：测试 PAT 物理注销，D1 测试邮件彻底物理清空，MFA 强防护确认锁定开启。
+
+---
+
 ### 修复添加额外账户404缺陷并提供原生弹窗与多开支援 (Phase 2) (2026-09-30)
 *   **关联提交 (Git Commit)**: `4e8a8c509eb91a894824a242c45f576fb059807b` (Short: `4e8a8c5`, Feature Base: `95cfe56`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com / epomail.epocanvas.workers.dev)` (Version ID: `d60699cc-3fa3-49eb-8894-3e1038fa4ad5`)
