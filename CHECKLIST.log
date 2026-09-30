@@ -8,6 +8,20 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### EpomailDocs v5.2 独立复审归档：技术事实全量对码与生产发布探测 (2026-09-30)
+*   **关联提交 (Git Commit)**: `0fc3d1ee0b86fa28703f284930fd9f35cf5501a5` (Short: `0fc3d1e`)（本仓审计归档；审计对象 EpomailDocs @ `79094ac` 未改动）
+*   **部署环境 (Deployment)**: `本地审计核验 + 生产域名只读探测`（无生产变更，无 Version ID）
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 独立复审 EpomailDocs v5.2 全部 48 页：31 项高错误风险技术主张逐条对码主仓源码全部一致（完整矩阵见 `doc/epomaildocs-v52-independent-audit.md` §三）
+    - [x] 生产域名只读探测：证实文档站无有效公网部署（DOCS_URL 默认地址 404；mail.epocanvas.com/mail/* 被 SPA fallback 吞没），canonical/sitemap 域名错配风险坐实
+    - [x] 缺陷矩阵：P0×2（发布链路阻塞；三条实体删除路径不清理附件与 privacy §8 声明不符）、P1×1（头像上传硬编码第三方图床）、P2×4（博客行六语言重复、四级存储链未披露、快照数字过期、破折号超红线）、P3×3
+    - [x] v5.3 治理路线图成稿（主仓两处代码修复优先 → 文档回填 → 发布链路定案），REPORTS.md 置顶归档
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 文档站五件套回归：`pnpm build` 49 页 31.05s 零报错；`validate-anchors.cjs` 492 锚点 0 断链；`check-structure.py` 6×8 全对称；`verify-laws.py` 底稿一致；`check-article-whitelist.py` 条号引用 0
+    - [x] 六语言红线扫描：禁用语 0；「生效日期｜版本：5.2」48 页统一；破折号链 project.md 6 语言 6-7 处（红线 ≤2，已列入 P3-1）
+    - [x] 源码取证留痕：`email-service.js:300/311/630-650`（删除路径）、`r2-service.js:resolveStorage`（四级存储链）、`user-service.js:103-120`（头像图床）、`oauth-provider-service.js:315`（scopes）等均在专项文档标注 file:line
+    - [x] 零残留：纯审计无测试数据；EpomailDocs 工作区保持干净（HEAD `79094ac` 未改动）
+
 ### EpomailDocs v5.2 内容完善：正式版本条款全站覆盖与专案介绍增补 (2026-09-30)
 *   **关联提交 (Git Commit)**: `79094ac`（EpomailDocs 独立仓库，完整 Hash `79094ac9d2686c1014c25824b25318c6206c9270`，已推送 origin/main）
 *   **部署环境 (Deployment)**: `本地 build 审计核验`（文档站未部署，无生产 Version ID）
