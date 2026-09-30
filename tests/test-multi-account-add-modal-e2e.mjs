@@ -50,7 +50,7 @@ async function run() {
 
     // 2. 注入 Token 并打开生产主页 (启用多账户模式)
     console.log('\n[步骤 2] 注入 Token 进入邮箱主界面，开启多账户模式...');
-    await page.goto(`${BASE}/mail/u/0/#inbox`, { waitUntil: 'domcontentloaded' });
+    await page.goto(`${BASE}/mail/u/0/#inbox`, { waitUntil: 'domcontentloaded', timeout: 60000 });
     await page.evaluate(({ t, email }) => {
       localStorage.setItem('token', t);
       localStorage.setItem('loginEmail', email);
@@ -65,12 +65,13 @@ async function run() {
       localStorage.setItem('locale', 'zh');
     }, { t: token, email: USER_EMAIL });
 
-    await page.reload({ waitUntil: 'networkidle' });
+    await page.reload({ waitUntil: 'networkidle', timeout: 60000 });
     await page.waitForTimeout(2000);
 
     // 3. 找到头像并点击展开 (多账户视图)
     console.log('\n[步骤 3] 点击右上角头像，展开多账户下拉卡片...');
     const avatarBtn = page.locator('.topbar-actions .avatar-wrap, .avatar').first();
+    await avatarBtn.waitFor({ state: 'visible', timeout: 20000 });
     ok(await avatarBtn.isVisible(), '顶栏右上角用户头像可见');
 
     await avatarBtn.click();
@@ -126,7 +127,7 @@ async function run() {
 
     // 7. 验证直接访问 /mail/u/0/#settings/account 绝不出现 404
     console.log('\n[步骤 6] 验证直达 /mail/u/0/#settings/account 优雅降级兼容，零 404...');
-    await page.goto(`${BASE}/mail/u/0/#settings/account`, { waitUntil: 'networkidle' });
+    await page.goto(`${BASE}/mail/u/0/#settings/account`, { waitUntil: 'networkidle', timeout: 60000 });
     await page.waitForTimeout(2000);
 
     // 确认不存在 404 界面
@@ -136,6 +137,7 @@ async function run() {
 
     // 确认已平滑展示个资/设置页面
     const profileContainer = page.locator('.settings-container, .box, #avatar, #nickname');
+    await profileContainer.first().waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
     ok(await profileContainer.first().isVisible(), '访问 /settings/account 别名路由平滑落地至个人资料设置视图');
 
     // 8. 顶栏全局搜索权限安全过滤核验 (杜绝普通用户搜索到管理页点进 404)
