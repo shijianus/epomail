@@ -8,6 +8,22 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### v5.3 缺陷治理打磨轮：附件级联修复、头像存储治理与文档站发布定案 (2026-09-30)
+*   **关联提交 (Git Commit)**: 代码修复 `47fd8fc92212dd38a0abf7680bce7e972bff7a6a` (Short: `47fd8fc`)；审计归档 `849dcdc08cc81a0c7998b81622e5a947180e9bda` (Short: `849dcdc`)；EpomailDocs v5.3 `90c06edcdd29a90a991bd56ba480c031cf85a9cf` (Short: `90c06ed`，已推送 origin/main)
+*   **部署环境 (Deployment)**: `本地全真栈静态核验 + 文档站本地挂载验证`（生产 Worker 未变更部署；文档站 Pages 发布待运营者执行）
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] P0-2：`clearTrashAndSpam` / 手动彻底删除 / 90% 配额清理三条路径接入附件级联（新增 `cascadeDeleteEmails`，含星标清理与 userId 越权防护），6 处 `delete(email)` 站点全部受级联保护
+    - [x] P1-1：`uploadImage` 移除硬编码图床，缺省写实例自有对象存储（`/static/*` 写读同源），`AVATAR_UPLOAD_URL` 环境变量可配外部图床
+    - [x] EpomailDocs v5.3：博客行六语言去重；附件四级存储链（KV 兜底）三处披露；快照数字抗腐口径 + 提交链补 `79094ac`；欢迎邮件 7 日过期入保留期表；头像披露与代码对齐；project.md 六语种补版本行；全站 5.2→5.3
+    - [x] P0-1 定案：`SITE_ORIGIN=docs.epocanvas.com` + `base=/epomail` + `rehypePrefixBase` 前缀插件 + robots/根跳转页改版（与主仓 `DOCS_URL` 默认值一致）
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 主仓：`tests/test-attachment-cascade-deletion.mjs` 19/19 全绿（静态断言 + KV mock 行为断言，零假数据）；`node --check` 语法核验；`i18n-symmetry` 全绿（1,888 键 baseline）
+    - [x] 文档站：`pnpm build` 49 页 11.88s 零报错；`validate-anchors` 492 锚点 0 断链；`check-structure` 6×8 对称；`verify-laws` / `check-article-whitelist` 通过
+    - [x] 本地挂载验证（http-server 模拟 /epomail 路径）：页面 / 图片 / 跳转页 / sitemap 全 200，内链与图路径 base 前缀正确，canonical/hreflang 为 docs.epocanvas.com/epomail 绝对地址
+    - [x] P3-1 改判合规：project.md「——」除 description 1 处外均属逐字 git 提交链引文，不计散文红线（改写将伪造历史）
+    - [x] 已知环境问题：mail-worker vitest-pool-workers 本机 workerd 启动失败（0 执行），与本次改动无关
+    - [x] 零残留：测试为纯内存 mock + 静态断言，无数据库/KV 写入
+
 ### EpomailDocs v5.2 独立复审归档：技术事实全量对码与生产发布探测 (2026-09-30)
 *   **关联提交 (Git Commit)**: `0fc3d1ee0b86fa28703f284930fd9f35cf5501a5` (Short: `0fc3d1e`)（本仓审计归档；审计对象 EpomailDocs @ `79094ac` 未改动）
 *   **部署环境 (Deployment)**: `本地审计核验 + 生产域名只读探测`（无生产变更，无 Version ID）
