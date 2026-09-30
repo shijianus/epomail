@@ -19,7 +19,29 @@ export async function init() {
 
     uiStore.initTheme();
 
-    const token = localStorage.getItem('token');
+    let token = localStorage.getItem('token');
+    if (typeof window !== 'undefined') {
+        const urlMatch = window.location.pathname.match(/\/mail\/u\/(\d+)/);
+        const currentU = urlMatch ? parseInt(urlMatch[1], 10) : 0;
+        try {
+            const rawSessions = localStorage.getItem('epo_sessions');
+            let sessions = rawSessions ? JSON.parse(rawSessions) : [];
+            const targetSession = sessions.find(s => s.u === currentU);
+            if (targetSession && targetSession.token) {
+                if (token !== targetSession.token) {
+                    token = targetSession.token;
+                    localStorage.setItem('token', token);
+                    if (targetSession.email) {
+                        localStorage.setItem('loginEmail', targetSession.email);
+                    }
+                }
+            } else if (!sessions.length && token) {
+                const email = localStorage.getItem('loginEmail') || '';
+                sessions = [{ u: 0, token, email }];
+                localStorage.setItem('epo_sessions', JSON.stringify(sessions));
+            }
+        } catch (_) {}
+    }
     if (!settingStore.lang) {
         const rawNav = (navigator.language || '').toLowerCase();
         let lang = 'en';
@@ -78,6 +100,24 @@ export async function init() {
                 accountStore.currentAccountId = user.account?.accountId || 0;
                 accountStore.currentAccount = user.account || {};
                 userStore.applyUserInfo(user);
+
+                // Update session info in epo_sessions
+                try {
+                    const urlMatch = window.location.pathname.match(/\/mail\/u\/(\d+)/);
+                    const currentU = urlMatch ? parseInt(urlMatch[1], 10) : 0;
+                    const rawSessions = localStorage.getItem('epo_sessions');
+                    let sessions = rawSessions ? JSON.parse(rawSessions) : [];
+                    let targetS = sessions.find(s => s.u === currentU);
+                    if (!targetS) {
+                        targetS = { u: currentU, token };
+                        sessions.push(targetS);
+                    }
+                    targetS.email = user.email || storedLoginEmail || targetS.email;
+                    targetS.name = user.name || user.nickname || targetS.email;
+                    targetS.avatarUrl = user.avatarUrl || '';
+                    targetS.roleName = user.role?.name || '';
+                    localStorage.setItem('epo_sessions', JSON.stringify(sessions));
+                } catch (_) {}
 
                 const routers = permsToRouter(user.permKeys);
                 routers.forEach(routerData => {

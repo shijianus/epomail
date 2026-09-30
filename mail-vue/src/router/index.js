@@ -1,5 +1,5 @@
 import {createRouter} from 'vue-router'
-import createGmailHistory from './gmail-history.js';
+import createAccountHistory from './account-history.js';
 import NProgress from 'nprogress';
 import {useUiStore} from "@/store/ui.js";
 import {useSettingStore} from "@/store/setting.js";
@@ -214,7 +214,7 @@ const routes = [
 
 
 const router = createRouter({
-    history: createGmailHistory(0),
+    history: createAccountHistory(0),
     routes
 })
 

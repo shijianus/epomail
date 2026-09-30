@@ -2046,7 +2046,7 @@ totpModeAllDesc: 'Instellen of gebruikers TOTP mogen gebruiken. Eenmaal ingescha
     confirmBlockSenderTitle: 'Afzender blokkeren',
     confirmBlockSenderMsg: 'Weet u zeker dat u afzender "{sender}" wilt blokkeren en inkomende berichten wilt filteren?',
     copyAddressSuccess: 'E-mailadres gekopieerd',
-    // ── Gmail standard avatar dropdown and storage quota ──
+    // ── Account dropdown en opslagquotum ──
     manageAccount: 'Beheer je Epomail-account',
     storageSpace: 'Opslagruimte',
     reservedSpaceNotice: 'Systeem reserveert 2% buffer (Prullenbak geleegd bij 95%, ontvangst gepauzeerd bij 98%)',
@@ -2061,7 +2061,7 @@ totpModeAllDesc: 'Instellen of gebruikers TOTP mogen gebruiken. Eenmaal ingescha
     termsDialogTitle: 'Epocanvas Mail Servicevoorwaarden',
     privacyDialogTitle: 'Epocanvas Mail Privacybeleid',
     multiAccountEnabledLabel: 'Multi-account snelle wisselmodus',
-    multiAccountEnabledDesc: 'Uitgelijnd met Gmail-stijl accountvak, voor snel inloggen en schakelen tussen meerdere accounts.',
+    multiAccountEnabledDesc: 'Maakt snel inloggen en naadloos schakelen tussen meerdere onafhankelijke accounts in dezelfde browser mogelijk.',
     noPermAccountAdd: 'Uw huidige rol heeft geen toestemming om nieuwe e-mailaccounts toe te voegen',
     adminDisabledAddEmail: 'De beheerder heeft het toevoegen van nieuwe e-mailadressen tijdelijk uitgeschakeld',
     addAccountModalDesc: 'Maak en koppel een nieuw e-mailadres aan uw account om snel te schakelen in dezelfde weergave.',

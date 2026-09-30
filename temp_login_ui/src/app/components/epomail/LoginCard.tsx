@@ -36,6 +36,12 @@ export function LoginCard({ canvasRef, onSwitch, sysConfig }: LoginCardProps) {
     return () => window.removeEventListener("pointermove", onMove);
   }, [px, py, reduceMotion]);
 
+  const isAddAccount = typeof window !== 'undefined' && (
+    new URLSearchParams(window.location.search).get('action') === 'addAccount' ||
+    new URLSearchParams(window.location.search).get('addAccount') === 'true' ||
+    new URLSearchParams(window.location.search).get('addAccount') === '1'
+  );
+
   return (
     <div
       className="relative z-10 flex min-h-full items-center justify-center px-5 py-10"
@@ -89,6 +95,29 @@ export function LoginCard({ canvasRef, onSwitch, sysConfig }: LoginCardProps) {
           />
 
           <div className="relative">
+            {/* Optional back button when adding account */}
+            {isAddAccount && (
+              <div className="mb-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (window.history.length > 1) {
+                      window.history.back();
+                    } else {
+                      window.location.href = '/mail/u/0/#inbox';
+                    }
+                  }}
+                  className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-indigo-400 hover:text-indigo-300 transition-colors cursor-pointer"
+                >
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="19" y1="12" x2="5" y2="12"></line>
+                    <polyline points="12 19 5 12 12 5"></polyline>
+                  </svg>
+                  <span>{tr('backToAccount')}</span>
+                </button>
+              </div>
+            )}
+
             {/* Brand header */}
             <div className="mb-8 flex flex-col items-center text-center">
               <img
@@ -118,7 +147,7 @@ export function LoginCard({ canvasRef, onSwitch, sysConfig }: LoginCardProps) {
                 className="mt-2 text-[13px]"
                 style={{ color: "var(--epo-muted)" }}
               >
-                {tr('loginSubtitle')}
+                {isAddAccount ? tr('addAccountSubtitle') : tr('loginSubtitle')}
               </p>
             </div>
 

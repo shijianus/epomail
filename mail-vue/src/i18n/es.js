@@ -2046,7 +2046,7 @@ totpModeAllDesc: 'Configurar si los usuarios pueden usar TOTP. Al activarlo, la 
     confirmBlockSenderTitle: 'Bloquear remitente',
     confirmBlockSenderMsg: '¿Seguro que deseas bloquear al remitente "{sender}" y filtrar sus mensajes entrantes?',
     copyAddressSuccess: 'Dirección de correo copiada',
-    // ── Gmail standard avatar dropdown and storage quota ──
+    // ── Menú desplegable de cuenta y cuota de almacenamiento ──
     manageAccount: 'Gestionar tu cuenta de Epomail',
     storageSpace: 'Espacio de almacenamiento',
     reservedSpaceNotice: 'El sistema reserva un búfer del 2% (Papelera vaciada al 95%, correos pausados al 98%)',
@@ -2061,7 +2061,7 @@ totpModeAllDesc: 'Configurar si los usuarios pueden usar TOTP. Al activarlo, la 
     termsDialogTitle: 'Condiciones del servicio de Epocanvas Mail',
     privacyDialogTitle: 'Política de privacidad de Epocanvas Mail',
     multiAccountEnabledLabel: 'Modo de cambio rápido de múltiples cuentas',
-    multiAccountEnabledDesc: 'Alineado con el patrón de cuentas de Gmail, permitiendo iniciar sesión y alternar entre múltiples cuentas.',
+    multiAccountEnabledDesc: 'Permite iniciar sesión rápidamente y alternar sin problemas entre múltiples cuentas independientes en el mismo navegador.',
     noPermAccountAdd: 'Su rol actual no tiene permiso para agregar nuevas cuentas de correo',
     adminDisabledAddEmail: 'El administrador ha deshabilitado temporalmente la adición de nuevas direcciones de correo',
     addAccountModalDesc: 'Cree y asocie una nueva dirección de correo a su cuenta para alternar rápidamente en la misma vista.',

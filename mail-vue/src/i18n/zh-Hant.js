@@ -2046,7 +2046,7 @@ totpModeAllDesc: '設定是否允許使用者使用TOTP，開啟後使用者可�
     confirmBlockSenderTitle: '攔截發件人',
     confirmBlockSenderMsg: '確定要將發件人 "{sender}" 加入黑名單並自動攔截其後續來信嗎？',
     copyAddressSuccess: '已複製郵箱地址',
-    // ── Gmail 規範頭像下拉框與儲存配額 ──
+    // ── 帳戶頭像下拉框與儲存配額 ──
     manageAccount: '管理您的 Epomail 帳戶',
     storageSpace: '儲存空間',
     reservedSpaceNotice: '系統保留 2% 空間（95% 自動清理垃圾桶，98% 暫停接收郵件）',
@@ -2061,7 +2061,7 @@ totpModeAllDesc: '設定是否允許使用者使用TOTP，開啟後使用者可�
     termsDialogTitle: 'Epocanvas Mail 服務條款',
     privacyDialogTitle: 'Epocanvas Mail 隱私政策',
     multiAccountEnabledLabel: '多帳戶快速切換模式',
-    multiAccountEnabledDesc: '完全對齊 Gmail 方框新增帳戶互動體系，支援在同一瀏覽器下快速登入並切換多個獨立帳號。',
+    multiAccountEnabledDesc: '支援在同一瀏覽器下快速登入並無縫切換多個獨立帳號。',
     noPermAccountAdd: '您當前的角色無權新增新郵箱',
     adminDisabledAddEmail: '管理員已暫停開放新增郵箱',
     addAccountModalDesc: '建立並關聯一個全新的郵箱地址到您的帳戶，可在同一介面快速切換使用。',

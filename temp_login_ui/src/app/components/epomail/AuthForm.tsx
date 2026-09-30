@@ -202,11 +202,12 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
         cameraState.authErrorOpacity = 1;
       }
 
+      const isAddAccount = searchParams.get("action") === "addAccount" || searchParams.get("addAccount") === "true" || searchParams.get("addAccount") === "1";
       const urlEmail = searchParams.get("email");
       const storedEmail = localStorage.getItem("loginEmail");
       if (urlEmail) {
         setEmail(urlEmail);
-      } else if (storedEmail) {
+      } else if (storedEmail && !isAddAccount) {
         setEmail(storedEmail);
       }
     }
@@ -304,30 +305,7 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
         }
 
         // Direct Login Success
-        const token = data.data?.token || data.token;
-        if (token) {
-          localStorage.setItem('token', token);
-        }
-        const activeEmail = data.data?.email || (email.includes('@') ? email.trim().toLowerCase() : '');
-        if (activeEmail && stayInOrbit) {
-          localStorage.setItem('loginEmail', activeEmail);
-        }
-        if (activeEmail && !stayInOrbit) {
-          localStorage.removeItem('loginEmail');
-        }
-        syncLangToMainApp();
-        setStatus("success");
-        cameraState.authSuccessOpacity = 1;
-        let finalMsg = i18n.loginSuccess || data.message || data.msg;
-        if (!finalMsg || finalMsg.toLowerCase() === 'success') {
-          finalMsg = t('loginSuccess');
-        }
-        setSuccessMsg(finalMsg);
-        canvasRef.current?.pulse({ strength: 2 });
-        canvasRef.current?.burst({ strength: 2 });
-        setTimeout(() => {
-          window.location.href = '/inbox';
-        }, 800);
+        saveLoginSessionAndRedirect(data, false);
       } else {
         setStatus("idle");
         const mappedError = mapErrorMessage(data.message || data.msg);
@@ -348,27 +326,92 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
     });
   };
 
-  const handleLoginSuccess = (data: any) => {
+  const saveLoginSessionAndRedirect = (data: any, isTotp: boolean = false) => {
     const token = data.data?.token || data.token;
+    const activeEmail = data.data?.email || (email.includes('@') ? email.trim().toLowerCase() : '');
+
+    const searchParams = new URLSearchParams(window.location.search);
+    const isAddAccount = searchParams.get("action") === "addAccount" || searchParams.get("addAccount") === "true" || searchParams.get("addAccount") === "1";
+
+    let targetU = 0;
+    let sessions: Array<{ u: number; token: string; email: string; name?: string }> = [];
+    try {
+      const raw = localStorage.getItem('epo_sessions');
+      if (raw) sessions = JSON.parse(raw);
+    } catch (_) {}
+
+    if (isAddAccount) {
+      const existingToken = localStorage.getItem('token');
+      const existingEmail = localStorage.getItem('loginEmail');
+      if (sessions.length === 0 && existingToken && existingEmail) {
+        sessions.push({ u: 0, token: existingToken, email: existingEmail });
+      }
+
+      const existingIdx = sessions.findIndex(s => s.email && s.email.toLowerCase() === activeEmail.toLowerCase());
+      if (existingIdx >= 0) {
+        sessions[existingIdx].token = token;
+        targetU = sessions[existingIdx].u;
+      } else {
+        const uParam = searchParams.get("u");
+        if (uParam !== null && !isNaN(parseInt(uParam, 10))) {
+          targetU = parseInt(uParam, 10);
+        } else {
+          const maxU = sessions.reduce((max, s) => Math.max(max, s.u), -1);
+          targetU = maxU + 1;
+        }
+        sessions.push({
+          u: targetU,
+          token: token,
+          email: activeEmail,
+          name: data.data?.name || data.data?.nickname || activeEmail
+        });
+      }
+    } else {
+      targetU = 0;
+      sessions = [{
+        u: 0,
+        token: token,
+        email: activeEmail,
+        name: data.data?.name || data.data?.nickname || activeEmail
+      }];
+    }
+
+    try {
+      localStorage.setItem('epo_sessions', JSON.stringify(sessions));
+    } catch (_) {}
+
     if (token) {
       localStorage.setItem('token', token);
     }
-    const activeEmail = data.data?.email || (email.includes('@') ? email.trim().toLowerCase() : '');
-    if (activeEmail && stayInOrbit) {
+    if (activeEmail) {
       localStorage.setItem('loginEmail', activeEmail);
     }
-    if (activeEmail && !stayInOrbit) {
-      localStorage.removeItem('loginEmail');
-    }
+
     syncLangToMainApp();
     setStatus("success");
     cameraState.authSuccessOpacity = 1;
-    setSuccessMsg(t('totpSuccess'));
-    canvasRef.current?.pulse({ strength: 2.2, color: "cyan" });
-    canvasRef.current?.burst({ strength: 2.5, color: "cyan" });
+
+    let finalMsg = isTotp ? t('totpSuccess') : (i18n.loginSuccess || data.message || data.msg);
+    if (!finalMsg || finalMsg.toLowerCase() === 'success') {
+      finalMsg = t('loginSuccess');
+    }
+    setSuccessMsg(finalMsg);
+
+    if (isTotp) {
+      canvasRef.current?.pulse({ strength: 2.2, color: "cyan" });
+      canvasRef.current?.burst({ strength: 2.5, color: "cyan" });
+    } else {
+      canvasRef.current?.pulse({ strength: 2 });
+      canvasRef.current?.burst({ strength: 2 });
+    }
+
     setTimeout(() => {
-      window.location.href = '/inbox';
+      window.location.href = `/mail/u/${targetU}/#inbox`;
     }, 800);
+  };
+
+  const handleLoginSuccess = (data: any) => {
+    saveLoginSessionAndRedirect(data, true);
   };
 
   const triggerTotpSubmit = (overrideCode?: string, overrideIsBackup?: boolean) => {

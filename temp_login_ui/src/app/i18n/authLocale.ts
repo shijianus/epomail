@@ -128,6 +128,8 @@ const zh: Dict = {
   loginHere: '返回登录',
   loginSubtitle: '步入画布，你的信号正在等待。',
   registerSubtitle: '加入星际信道，建立专属通信节点',
+  backToAccount: '返回当前账户',
+  addAccountSubtitle: '登录其他账号以在同一浏览器中快速切换',
 };
 
 const zhHant: Dict = {
@@ -227,6 +229,8 @@ const zhHant: Dict = {
   loginHere: '返回登入',
   loginSubtitle: '步入畫布，你的信號正在等待。',
   registerSubtitle: '加入星際信道，建立專屬通信節點',
+  backToAccount: '返回目前帳戶',
+  addAccountSubtitle: '登入其他帳號以在同一瀏覽器中快速切換',
 };
 
 const en: Dict = {
@@ -326,6 +330,8 @@ const en: Dict = {
   loginHere: 'Login here',
   loginSubtitle: 'Step into the canvas. Your signals await.',
   registerSubtitle: 'Join the network. Establish your node.',
+  backToAccount: 'Back to account',
+  addAccountSubtitle: 'Sign in to another account to switch seamlessly in this browser',
 };
 
 const es: Dict = {
@@ -425,6 +431,8 @@ const es: Dict = {
   loginHere: 'Inicia sesión aquí',
   loginSubtitle: 'Entra en el lienzo. Tus señales esperan.',
   registerSubtitle: 'Únete a la red. Establece tu nodo.',
+  backToAccount: 'Volver a la cuenta',
+  addAccountSubtitle: 'Inicie sesión en otra cuenta para alternar sin problemas',
 };
 
 const fr: Dict = {
@@ -524,6 +532,8 @@ const fr: Dict = {
   loginHere: 'Connectez-vous ici',
   loginSubtitle: 'Entrez dans le canvas. Vos signaux attendent.',
   registerSubtitle: 'Rejoignez le réseau. Établissez votre nœud.',
+  backToAccount: 'Retour au compte',
+  addAccountSubtitle: 'Connectez-vous à un autre compte pour basculer facilement',
 };
 
 const nl: Dict = {
@@ -623,6 +633,8 @@ const nl: Dict = {
   loginHere: 'Hier inloggen',
   loginSubtitle: 'Betreed het canvas. Je signalen wachten.',
   registerSubtitle: 'Word lid van het netwerk. Richt je node op.',
+  backToAccount: 'Terug naar account',
+  addAccountSubtitle: 'Meld u aan bij een ander account om naadloos te schakelen',
 };
 
 export const authDict: Record<AuthLang, Dict> = { zh, 'zh-Hant': zhHant, en, es, fr, nl };

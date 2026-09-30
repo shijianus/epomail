@@ -120,7 +120,7 @@
             <div class="am-item" @click="openSettings"><span>{{ $t('settings') }}</span></div>
             <div class="am-item logout" @click="clickLogout"><span>{{ $t('logOut') }}</span></div>
 
-            <!-- Footer: Horizontal, directly aligned with Gmail format -->
+            <!-- Footer: Legal links -->
             <div class="gac-footer">
               <span class="gac-legal-item" @click.prevent="openPrivacyPolicy">{{ $t('privacyPolicy') }}</span>
               <span class="gac-legal-separator">·</span>
@@ -128,8 +128,8 @@
             </div>
           </div>
 
-          <!-- Multi-Account Mode (Admin Enabled): Gmail format with individual gac-ma-card -->
-          <div v-else class="user-details account-menu open gmail-account-card gac-multi-account-container" @mouseenter="clearCloseTimer" @mouseleave="startCloseTimer">
+          <!-- Multi-Account Mode (Admin Enabled) -->
+          <div v-else class="user-details account-menu open epo-account-card gac-multi-account-container" @mouseenter="clearCloseTimer" @mouseleave="startCloseTimer">
             <!-- Top Bar with Close X -->
             <div class="gac-top-bar">
               <div class="gac-top-spacer"></div>
@@ -166,7 +166,7 @@
               <!-- Other accounts (max 4, clicking switches to become primary account) -->
               <div 
                 v-for="acc in otherAccounts" 
-                :key="acc.accountId || acc.email"
+                :key="acc.isSession ? `session-${acc.u}` : (acc.accountId || acc.email)"
                 class="gac-ma-card other-account-card"
                 @click="switchAccount(acc)"
                 :title="$t('switchAccount')"
@@ -183,7 +183,7 @@
               </div>
 
               <!-- Vertical Add Account Card -->
-              <div class="gac-ma-card gac-ma-action-card add-account-card" @click="openAddAccountDialog">
+              <div class="gac-ma-card gac-ma-action-card add-account-card" @click="openAddAccount">
                 <div class="gac-action-icon">
                   <Icon icon="lucide:user-plus" width="16" height="16" />
                 </div>
@@ -225,7 +225,7 @@
               </div>
             </div>
 
-            <!-- Footer: Horizontal, directly aligned with Gmail format -->
+            <!-- Footer: Legal links -->
             <div class="gac-footer">
               <span class="gac-legal-item" @click.prevent="openPrivacyPolicy">{{ $t('privacyPolicy') }}</span>
               <span class="gac-legal-separator">·</span>
@@ -268,66 +268,6 @@
         <el-button type="primary" @click="privacyDialogVisible = false">{{ $t('confirm') }}</el-button>
       </template>
     </el-dialog>
-
-    <!-- Built-in Add Account Modal (Gmail Multi-Account Support) -->
-    <el-dialog 
-      v-model="addAccountDialogVisible" 
-      :title="$t('addAnotherAccount')" 
-      width="min(460px, 92vw)" 
-      class="add-account-dialog" 
-      append-to-body
-      @closed="resetAddAccountForm"
-    >
-      <div class="add-account-form-body">
-        <p class="add-account-tip">{{ $t('addAccountModalDesc') }}</p>
-        <div class="add-account-input-group">
-          <el-input 
-            v-model="addAccountForm.email" 
-            ref="addAccountInputRef" 
-            type="text" 
-            :placeholder="$t('emailAccount')" 
-            autocomplete="off"
-            @keyup.enter="submitAddAccount"
-          >
-            <template #append>
-              <el-select
-                v-model="addAccountForm.suffix"
-                :placeholder="$t('select')"
-                class="suffix-select"
-                style="width: 150px;"
-              >
-                <el-option
-                  v-for="item in availableDomains"
-                  :key="item"
-                  :label="item"
-                  :value="item"
-                />
-              </el-select>
-            </template>
-          </el-input>
-        </div>
-        <div class="email-preview-row" v-if="addAccountForm.email">
-          <span class="preview-label">{{ $t('emailAccount') }}:</span>
-          <span class="preview-val font-mono">{{ addAccountForm.email + addAccountForm.suffix }}</span>
-        </div>
-        
-        <div
-          class="add-account-turnstile-container"
-          :class="addAccountVerifyShow ? 'turnstile-show' : 'turnstile-hide'"
-          :data-sitekey="settingStore.settings.siteKey"
-          data-callback="onHeaderTurnstileSuccess"
-          data-error-callback="onHeaderTurnstileError"
-        >
-          <span style="font-size: 12px; color: #F56C6C" v-if="addAccountBotError">{{ $t('verifyModuleFailed') }}</span>
-        </div>
-      </div>
-      <template #footer>
-        <div class="dialog-footer">
-          <el-button @click="addAccountDialogVisible = false">{{ $t('cancel') }}</el-button>
-          <el-button type="primary" :loading="addAccountLoading" @click="submitAddAccount">{{ $t('add') }}</el-button>
-        </div>
-      </template>
-    </el-dialog>
   </div>
 </template>
 
@@ -343,8 +283,7 @@ import router from "@/router";
 import hanburger from '@/components/hamburger/index.vue'
 import {logout} from "@/request/login.js";
 import {updateProfile, getUserStorage} from "@/request/my.js";
-import {accountList, accountAdd} from "@/request/account.js";
-import {isEmail} from "@/utils/verify-utils.js";
+import {accountList} from "@/request/account.js";
 import {ElMessage} from "element-plus";
 import {Icon} from "@iconify/vue";
 import {useUiStore} from "@/store/ui.js";
@@ -557,8 +496,7 @@ const storageFillWidth = computed(() => {
   return Math.min(98, Math.max(0, storageData.usedPercentage));
 });
 
-// Multi-account mode flag:
-// "当且仅当管理员设定支援多账户模式时，开源完全学习Gmail的这套添加账户的方框模式，直接完全学习Gmail的方式，默认关闭时保持当前的情况"
+// Multi-account mode flag
 const isMultiAccountEnabled = computed(() => {
   if (Number(settingStore.settings?.multiAccountEnabled) === 1) return true;
   try {
@@ -591,29 +529,69 @@ const otherAccounts = ref([]);
 
 async function loadOtherAccounts() {
   if (!isMultiAccountEnabled.value) return;
+  const others = [];
+  const currentEmail = (displayEmail.value || '').toLowerCase().trim();
+  let currentU = 0;
+  try {
+    const urlMatch = window.location.pathname.match(/\/mail\/u\/(\d+)/);
+    currentU = urlMatch ? parseInt(urlMatch[1], 10) : 0;
+    const raw = localStorage.getItem('epo_sessions');
+    if (raw) {
+      const sessions = JSON.parse(raw);
+      if (Array.isArray(sessions)) {
+        for (const s of sessions) {
+          if (s.u !== currentU && s.token && s.email) {
+            const sEmail = s.email.toLowerCase().trim();
+            if (sEmail !== currentEmail && !others.some(o => o.email.toLowerCase().trim() === sEmail)) {
+              others.push({
+                isSession: true,
+                u: s.u,
+                email: s.email,
+                name: s.name || s.email,
+                roleName: s.roleName || ''
+              });
+            }
+          }
+        }
+      }
+    }
+  } catch (e) {}
+
   try {
     const list = await accountList(0, 30);
     if (Array.isArray(list)) {
       const currId = accountStore.currentAccountId;
-      const currEmail = (displayEmail.value || '').toLowerCase().trim();
-      let filtered = list.filter(a => {
+      for (const a of list) {
         const isSameId = a.accountId && currId && a.accountId === currId;
-        const isSameEmail = a.email && currEmail && a.email.toLowerCase().trim() === currEmail;
-        return !isSameId && !isSameEmail;
-      });
-      // "界面最多可以容纳5个Gmail账户(超出的需要登出旧的采纳新加入)"
-      // 1 active account + max 4 other accounts = 5 total
-      if (filtered.length > 4) {
-        filtered = filtered.slice(0, 4);
+        const aEmail = (a.email || '').toLowerCase().trim();
+        if (!isSameId && aEmail && aEmail !== currentEmail && !others.some(o => o.email.toLowerCase().trim() === aEmail)) {
+          others.push({
+            isSession: false,
+            accountId: a.accountId,
+            email: a.email,
+            name: a.name || a.email
+          });
+        }
       }
-      otherAccounts.value = filtered;
     }
   } catch (err) {
     console.warn('Failed to load other accounts:', err);
   }
+
+  // Max 4 other accounts displayed (1 active account + max 4 other accounts = 5 total)
+  if (others.length > 4) {
+    otherAccounts.value = others.slice(0, 4);
+  } else {
+    otherAccounts.value = others;
+  }
 }
 
 function switchAccount(acc) {
+  closeDropdown();
+  if (acc.isSession) {
+    window.location.href = `/mail/u/${acc.u}/#inbox`;
+    return;
+  }
   accountStore.currentAccountId = acc.accountId;
   accountStore.currentAccount = acc;
   if (acc.email) {
@@ -623,7 +601,6 @@ function switchAccount(acc) {
       userStore.user.email = acc.email;
     }
   }
-  closeDropdown();
   loadOtherAccounts();
   ElMessage.success((t('switchAccount') || '切换账号') + ': ' + (acc.name || acc.email));
 }
@@ -653,142 +630,22 @@ function openStorageSettings() {
   setTimeout(triggerScroll, 1200);
 }
 
-const addAccountDialogVisible = ref(false);
-const addAccountLoading = ref(false);
-const addAccountVerifyShow = ref(false);
-const addAccountBotError = ref(false);
-let addAccountVerifyToken = '';
-let headerTurnstileId = null;
-const addAccountInputRef = ref(null);
-
-const availableDomains = computed(() => {
-  if (Array.isArray(settingStore.domainList) && settingStore.domainList.length > 0) {
-    return settingStore.domainList;
-  }
-  return ['@epomail.bond'];
-});
-
-const addAccountForm = reactive({
-  email: '',
-  suffix: ''
-});
-
-function resetAddAccountForm() {
-  addAccountForm.email = '';
-  addAccountForm.suffix = availableDomains.value[0] || '';
-  addAccountVerifyToken = '';
-  addAccountVerifyShow.value = false;
-  addAccountLoading.value = false;
-  addAccountBotError.value = false;
-  if (headerTurnstileId && typeof window !== 'undefined' && window.turnstile) {
-    try {
-      window.turnstile.reset(headerTurnstileId);
-    } catch (e) {}
-  }
-}
-
-function initHeaderTurnstile() {
-  const needVerify = settingStore.settings?.addEmailVerify === 0 || 
-    (settingStore.settings?.addEmailVerify === 2 && settingStore.settings?.addVerifyOpen);
-  if (needVerify && !addAccountVerifyToken) {
-    addAccountVerifyShow.value = true;
-    nextTick(() => {
-      if (typeof window !== 'undefined' && window.turnstile) {
-        if (!headerTurnstileId) {
-          try {
-            headerTurnstileId = window.turnstile.render('.add-account-turnstile-container');
-          } catch (err) {
-            addAccountBotError.value = true;
-          }
-        } else {
-          try {
-            window.turnstile.reset(headerTurnstileId);
-          } catch (e) {}
-        }
-      }
-    });
-  }
-}
-
-if (typeof window !== 'undefined') {
-  window.onHeaderTurnstileSuccess = (token) => {
-    addAccountVerifyToken = token;
-    submitAddAccount();
-  };
-  window.onHeaderTurnstileError = () => {
-    addAccountVerifyToken = '';
-  };
-}
-
-function openAddAccountDialog() {
+function openAddAccount() {
   closeDropdown();
-  if (!hasPerm('account:add')) {
-    ElMessage.warning(t('noPermAccountAdd') || '您当前所在角色无权添加新邮箱');
-    return;
-  }
   if (Number(settingStore.settings?.addEmail) === 1) {
     ElMessage.warning(t('adminDisabledAddEmail') || '管理员已暂停开放新增邮箱');
     return;
   }
-  addAccountForm.suffix = availableDomains.value[0] || '';
-  addAccountDialogVisible.value = true;
-  nextTick(() => {
-    addAccountInputRef.value?.focus();
-    initHeaderTurnstile();
-  });
-}
-
-async function submitAddAccount() {
-  const emailPrefix = (addAccountForm.email || '').trim();
-  if (!emailPrefix) {
-    ElMessage.error(t('emptyEmailMsg'));
-    return;
-  }
-  const minLen = Number(settingStore.settings?.minEmailPrefix) || 1;
-  if (emailPrefix.length < minLen) {
-    ElMessage.error(t('minEmailPrefix', { msg: minLen }));
-    return;
-  }
-  const fullEmail = emailPrefix + addAccountForm.suffix;
-  if (!isEmail(fullEmail)) {
-    ElMessage.error(t('notEmailMsg'));
-    return;
-  }
-
-  const needVerify = settingStore.settings?.addEmailVerify === 0 || 
-    (settingStore.settings?.addEmailVerify === 2 && settingStore.settings?.addVerifyOpen);
-  if (needVerify && !addAccountVerifyToken) {
-    if (!addAccountVerifyShow.value) {
-      addAccountVerifyShow.value = true;
-      initHeaderTurnstile();
-    } else if (!addAccountBotError.value) {
-      ElMessage.error(t('botVerifyMsg'));
-    }
-    return;
-  }
-
-  addAccountLoading.value = true;
+  let targetU = 1;
   try {
-    const newAcc = await accountAdd(fullEmail, addAccountVerifyToken);
-    if (newAcc && newAcc.addVerifyOpen !== undefined) {
-      if (settingStore.settings) {
-        settingStore.settings.addVerifyOpen = newAcc.addVerifyOpen;
-      }
+    const rawSessions = localStorage.getItem('epo_sessions');
+    const sessions = rawSessions ? JSON.parse(rawSessions) : [];
+    const existingUs = new Set(sessions.map(s => s.u));
+    while (existingUs.has(targetU)) {
+      targetU++;
     }
-    ElMessage.success(t('addSuccessMsg'));
-    addAccountDialogVisible.value = false;
-    resetAddAccountForm();
-    await loadOtherAccounts();
-    await userStore.refreshUserInfo();
-  } catch (err) {
-    if (err?.code === 400 || err?.response?.data?.code === 400) {
-      addAccountVerifyToken = '';
-      addAccountVerifyShow.value = true;
-      initHeaderTurnstile();
-    }
-  } finally {
-    addAccountLoading.value = false;
-  }
+  } catch (_) {}
+  window.location.href = `/login/?action=addAccount&u=${targetU}`;
 }
 
 function openPrivacyPolicy() {
@@ -1598,7 +1455,7 @@ function formatName(email) {
   background: rgba(239, 68, 68, 0.08);
 }
 
-/* Multi-Account Gmail Pattern */
+/* Multi-Account Container Pattern */
 .gac-multi-account-container {
   padding: 10px 14px 14px;
   display: flex;
@@ -1811,7 +1668,7 @@ function formatName(email) {
   box-shadow: 0 2px 8px rgba(99, 102, 241, 0.12);
 }
 
-/* Footer: Horizontal, directly aligned with Gmail format */
+/* Footer: Horizontal legal links */
 .gac-footer {
   border-top: 1px solid var(--border-subtle);
   background: var(--bg-subtle);
@@ -2218,79 +2075,6 @@ button.mobile-menu-btn {
   font-size: 14px;
 }
 
-/* Add Account Modal Styling */
-.add-account-dialog {
-  :deep(.el-dialog__header) {
-    padding: 18px 24px 12px;
-    margin-right: 0;
-    border-bottom: 1px solid var(--border-subtle);
-  }
-  :deep(.el-dialog__title) {
-    font-size: 16px;
-    font-weight: 700;
-    color: var(--text-primary);
-  }
-  :deep(.el-dialog__body) {
-    padding: 20px 24px;
-  }
-  :deep(.el-dialog__footer) {
-    padding: 12px 24px 18px;
-    border-top: 1px solid var(--border-subtle);
-  }
-}
-.add-account-tip {
-  margin: 0 0 16px;
-  font-size: 13px;
-  color: var(--text-muted);
-  line-height: 1.5;
-}
-.add-account-input-group {
-  margin-bottom: 12px;
-  :deep(.el-input-group__append) {
-    padding: 0;
-    border: none;
-    background: transparent;
-  }
-  :deep(.suffix-select) {
-    .el-input__wrapper {
-      border-top-left-radius: 0;
-      border-bottom-left-radius: 0;
-      box-shadow: none !important;
-      border-left: 1px solid var(--border-subtle);
-      background: var(--bg-subtle);
-    }
-  }
-}
-.email-preview-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  background: var(--bg-subtle);
-  border-radius: 8px;
-  font-size: 12.5px;
-  margin-bottom: 14px;
-  .preview-label {
-    color: var(--text-muted);
-    font-weight: 500;
-  }
-  .preview-val {
-    color: var(--accent-primary);
-    font-weight: 600;
-    word-break: break-all;
-  }
-}
-.add-account-turnstile-container {
-  margin-top: 12px;
-  display: flex;
-  justify-content: center;
-}
-.turnstile-show {
-  display: flex;
-}
-.turnstile-hide {
-  display: none;
-}
 </style>
 <style>
 ::highlight(search-highlight) {

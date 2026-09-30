@@ -2046,7 +2046,7 @@ totpModeAllDesc: 'Configure whether users can use TOTP. When enabled, 2FA is ava
     confirmBlockSenderTitle: 'Block Sender',
     confirmBlockSenderMsg: 'Are you sure you want to block sender "{sender}" and automatically filter incoming messages?',
     copyAddressSuccess: 'Email address copied',
-    // ── Gmail standard avatar dropdown and storage quota ──
+    // ── Account avatar dropdown and storage quota ──
     manageAccount: 'Manage your Epomail Account',
     storageSpace: 'Storage',
     reservedSpaceNotice: 'System reserves 2% buffer (Trash auto-cleaned at 95%, inbound mail paused at 98%)',
@@ -2061,7 +2061,7 @@ totpModeAllDesc: 'Configure whether users can use TOTP. When enabled, 2FA is ava
     termsDialogTitle: 'Epocanvas Mail Terms of Service',
     privacyDialogTitle: 'Epocanvas Mail Privacy Policy',
     multiAccountEnabledLabel: 'Multi-Account Fast Switch Mode',
-    multiAccountEnabledDesc: 'Aligns with Gmail box account adding pattern, allowing fast sign-in and switching between multiple accounts.',
+    multiAccountEnabledDesc: 'Allows fast sign-in and seamless switching between multiple independent accounts in the same browser.',
     noPermAccountAdd: 'Your current role does not have permission to add new email accounts',
     adminDisabledAddEmail: 'Administrator has temporarily disabled adding new email addresses',
     addAccountModalDesc: 'Create and associate a new email address with your account for fast switching in the same view.',
