@@ -8,7 +8,24 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### EpomailDocs v5.2 内容完善：正式版本条款全站覆盖与专案介绍增补 (2026-09-30)
+*   **关联提交 (Git Commit)**: `79094ac`（EpomailDocs 独立仓库，完整 Hash `79094ac9d2686c1014c25824b25318c6206c9270`，已推送 origin/main）
+*   **部署环境 (Deployment)**: `本地 build 审计核验`（文档站未部署，无生产 Version ID）
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 正式版本效力条款补全（上轮审计 P2 遗留）：acceptable-use / data-security / sub-processors / key-terms / project 五篇 × 6 语言共 30 处，句式逐语言复用既有三篇原文，全站 8 篇全部自带「繁体中文（台湾）版为正式版本」条款，符合 tw-legal-writing 规范「每份文档开头须载明」
+    - [x] project.md 对照 EpoCanvasDocs 范式增补：新「4. 适合谁与不适合谁」（不承诺 SLA、禁止外发营销、加密不涵盖附件、自部署维护成本四项诚实边界，逐条链接对应法律文档）与「9. 常见疑问」（付费、管理员可见性、删除复原、自部署准备四问）；原第 4-8 节顺延为第 5-10 节，六语言同步重排
+    - [x] 时效数据再校正：主仓 535→539 提交（含远端 e2e 测试合并）、本站 11 提交并补入 v5.1 提交 `52412e3` 至 40 位 Hash 链；链路口径改为「下列链路所示，其后提交见 GitHub」消除自指偏差
+    - [x] README 新增「正式上线检查清单（部署前）」五步（SITE_ORIGIN 域名决策 / robots.txt Sitemap 同步 / 应用内 DOCS_URL 同步 / Cloudflare Pages 发布管道 / pnpm validate 发布前核验）与时效数据维护说明——上轮审计遗留 P1（部署拓扑）的操作路径已文档化
+    - [x] 全站版本 5.1→5.2（生效日期 2026-09-30 不变，42 处版本行同步）；README 锚点数 480→492
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：`pnpm build` 49 页 19.92s 零报错
+    - [x] 锚点全量校验：`validate-anchors.cjs` 492 锚点 0 断链（新增节带来 +12 锚点）
+    - [x] 结构对称回归：`check-structure.py` 6 语言 × 8 篇 1:1 全绿（新增两节六语言对称）；`verify-laws.py` 与核验底稿一致
+    - [x] 条款覆盖断言：5 篇 × 6 语言效力条款 30/30 落位；新节内链逐语言使用本地化前缀（/zh-tw/mail/… 等）与既有文档译名
+    - [x] 零残留：一次性同步脚本已物理删除且未入库（amend 移除）；主仓归档按分流写入本文件，未触碰 AGENTS.md
+
 ### EpomailDocs 独立审计修订 v5.1：博客等级联动披露增补与时效数据校正 (2026-09-30)
+
 *   **关联提交 (Git Commit)**: `52412e3`（EpomailDocs 独立仓库，完整 Hash `52412e393613a8b2763d133a95f6a3205e8cb6ce`，已推送 origin/main；本仓归档提交见 CHECKLIST/REPORTS 变更提交）
 *   **部署环境 (Deployment)**: `本地 build 审计核验`（文档站未部署，无生产 Version ID）
 *   **功能需求与变更清单 (Changes & Feature Alignment)**:
