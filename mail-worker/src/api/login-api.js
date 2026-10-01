@@ -16,7 +16,7 @@ app.post('/login', async (c) => {
 
 app.post('/login/totp', async (c) => {
 	const tokenRes = await loginService.verifyTotpLogin(c, await c.req.json());
-	if (typeof tokenRes === 'object' && tokenRes.token) {
+	if (typeof tokenRes === 'object') {
 		return c.json(result.ok(tokenRes));
 	}
 	return c.json(result.ok({ token: tokenRes }));

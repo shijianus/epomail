@@ -2065,6 +2065,20 @@ totpModeAllDesc: 'Définir si les utilisateurs peuvent utiliser TOTP. Lorsqu\'il
     noPermAccountAdd: "Votre rôle actuel n'a pas la permission d'ajouter de nouveaux comptes de messagerie",
     adminDisabledAddEmail: "L'administrateur a temporairement désactivé l'ajout de nouvelles adresses e-mail",
     addAccountModalDesc: 'Créez et associez une nouvelle adresse e-mail à votre compte pour basculer rapidement dans la même vue.',
+    passkeyOperationCancelledOrNotAllowed: 'Opération annulée ou appareil non prêt. Veuillez vous assurer que le code PIN ou la biométrie du système (ex. Windows Hello) est configuré ou connectez une clé de sécurité et réessayez.',
+    passkeyAlreadyRegistered: 'Cet appareil ou cette clé de sécurité est déjà enregistré sur ce compte.',
+    passkeyRegisterFailed: 'Échec de l’enregistrement de la clé de sécurité, veuillez réessayer',
+    deviceTypeLabel: 'Type d’appareil',
+    deviceTypeOptionAuto: 'Automatique (Recommandé pour tous les appareils / Windows Hello / QR mobile / Clés USB)',
+    deviceTypeOptionPlatform: 'Biométrie intégrée à l’appareil (PIN/empreinte/visage Windows Hello, Mac Touch ID)',
+    deviceTypeOptionCrossPlatform: 'Clé de sécurité matérielle externe (USB YubiKey / clé NFC)',
+    windowsHelloNotice: 'Conseil Windows : si vous utilisez ce PC, assurez-vous que le code PIN ou la biométrie Windows Hello est configuré dans les paramètres Windows, ou insérez une clé de sécurité USB.',
+    keyNameWindowsHello: 'Windows Hello (Ce PC)',
+    keyNameMacTouchId: 'Touch ID (Mac)',
+    keyNameAppleIos: 'Face ID / Touch ID (iOS)',
+    keyNameAndroid: 'Biométrie Android',
+    keyNameLinux: 'Clé de sécurité Linux',
+    keyNameDefault: 'Clé de sécurité',
 };
 
 export default fr;

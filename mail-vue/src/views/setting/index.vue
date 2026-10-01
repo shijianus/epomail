@@ -467,15 +467,29 @@
     <el-dialog
       v-model="addPasskeyDialogVisible"
       :title="$t('addSecurityKeyBtn')"
-      width="440px"
+      width="480px"
       destroy-on-close
     >
-      <div class="add-passkey-content">
+      <div class="add-passkey-content" style="display: flex; flex-direction: column; gap: 16px;">
         <div class="dialog-sub-desc">
           {{ $t('passkeysDesc') }}
         </div>
+
+        <div class="device-type-field">
+          <span class="field-label" style="display: block; font-size: 13px; font-weight: 500; margin-bottom: 6px;">{{ $t('deviceTypeLabel') }}</span>
+          <el-select v-model="selectedDeviceType" style="width: 100%;">
+            <el-option value="auto" :label="$t('deviceTypeOptionAuto')" />
+            <el-option value="platform" :label="$t('deviceTypeOptionPlatform')" />
+            <el-option value="cross-platform" :label="$t('deviceTypeOptionCrossPlatform')" />
+          </el-select>
+        </div>
+
+        <div v-if="isWindowsClient" class="platform-hint-box" style="background: rgba(59, 130, 246, 0.08); border-left: 3px solid #3b82f6; padding: 10px 12px; border-radius: 4px; font-size: 12px; color: var(--el-text-color-regular); line-height: 1.5;">
+          {{ $t('windowsHelloNotice') }}
+        </div>
+
         <div class="key-name-field">
-          <span class="field-label">{{ $t('securityKeyName') }}</span>
+          <span class="field-label" style="display: block; font-size: 13px; font-weight: 500; margin-bottom: 6px;">{{ $t('securityKeyName') }}</span>
           <el-input
             v-model="newPasskeyName"
             :placeholder="$t('securityKeyNamePlaceholder')"
@@ -617,6 +631,10 @@ const passkeyList = ref([])
 const addPasskeyDialogVisible = ref(false)
 const newPasskeyName = ref('')
 const passkeyLoading = ref(false)
+const selectedDeviceType = ref('auto')
+const isWindowsClient = computed(() => {
+  return typeof navigator !== 'undefined' && /Windows/i.test(navigator.userAgent || '');
+})
 
 const setupDialogVisible = ref(false)
 const setupStep = ref(1)
@@ -943,8 +961,19 @@ function base64UrlToBuffer(base64url) {
   return bytes;
 }
 
+const detectDefaultKeyName = () => {
+  const ua = (typeof navigator !== 'undefined' && navigator.userAgent) || '';
+  if (/Windows/i.test(ua)) return t('keyNameWindowsHello');
+  if (/Macintosh|Mac OS/i.test(ua)) return t('keyNameMacTouchId');
+  if (/iPhone|iPad/i.test(ua)) return t('keyNameAppleIos');
+  if (/Android/i.test(ua)) return t('keyNameAndroid');
+  if (/Linux/i.test(ua)) return t('keyNameLinux');
+  return t('keyNameDefault');
+}
+
 const openAddPasskeyModal = () => {
-  newPasskeyName.value = '';
+  newPasskeyName.value = detectDefaultKeyName();
+  selectedDeviceType.value = 'auto';
   addPasskeyDialogVisible.value = true;
 }
 
@@ -966,25 +995,59 @@ const handleCreatePasskey = async () => {
     }
 
     const challengeBytes = base64UrlToBuffer(setupData.challenge);
-    const userIdBytes = new TextEncoder().encode(setupData.user.id);
+    let userIdBytes;
+    try {
+      userIdBytes = base64UrlToBuffer(setupData.user.id);
+      if (userIdBytes.length < 16) {
+        const padded = new Uint8Array(32);
+        padded.set(userIdBytes);
+        userIdBytes = padded;
+      }
+    } catch (e) {
+      userIdBytes = new TextEncoder().encode(setupData.user.id || 'epomail_uid');
+      if (userIdBytes.length < 16) {
+        const padded = new Uint8Array(32);
+        padded.set(userIdBytes);
+        userIdBytes = padded;
+      }
+    }
+
+    const currentHost = window.location.hostname;
+    let effectiveRpId = setupData.rp?.id;
+    if (!effectiveRpId || (effectiveRpId !== currentHost && !currentHost.endsWith('.' + effectiveRpId))) {
+      effectiveRpId = currentHost;
+    }
+
+    const authSelection = {
+      userVerification: 'preferred',
+      residentKey: 'preferred',
+      ...(setupData.authenticatorSelection || {})
+    };
+    if (selectedDeviceType.value === 'platform') {
+      authSelection.authenticatorAttachment = 'platform';
+    } else if (selectedDeviceType.value === 'cross-platform') {
+      authSelection.authenticatorAttachment = 'cross-platform';
+    }
 
     const credential = await navigator.credentials.create({
       publicKey: {
         challenge: challengeBytes,
-        rp: setupData.rp,
+        rp: {
+          name: setupData.rp?.name || 'EpoCanvas Mail',
+          id: effectiveRpId
+        },
         user: {
           id: userIdBytes,
           name: setupData.user.name,
           displayName: setupData.user.displayName
         },
         pubKeyCredParams: setupData.pubKeyCredParams || [
-          { type: 'public-key', alg: -7 },
-          { type: 'public-key', alg: -257 }
+          { type: 'public-key', alg: -7 },   // ES256
+          { type: 'public-key', alg: -257 }, // RS256
+          { type: 'public-key', alg: -37 },  // PS256 (Windows Hello)
+          { type: 'public-key', alg: -8 }    // Ed25519
         ],
-        authenticatorSelection: setupData.authenticatorSelection || {
-          userVerification: 'preferred',
-          residentKey: 'preferred'
-        },
+        authenticatorSelection: authSelection,
         timeout: setupData.timeout || 60000,
         attestation: 'none'
       }
@@ -1017,9 +1080,21 @@ const handleCreatePasskey = async () => {
     await fetchTotpStatus();
     await fetchPasskeys();
   } catch (err) {
-    if (err.name !== 'NotAllowedError') {
+    if (err.name === 'NotAllowedError') {
       ElMessage({
-        message: err.message || 'Failed to register security key',
+        message: t('passkeyOperationCancelledOrNotAllowed') || '操作已取消或设备暂未就绪。请确认已设置系统 PIN/生物识别（如 Windows Hello）或连接安全密钥后重试。',
+        type: 'info',
+        plain: true
+      });
+    } else if (err.name === 'InvalidStateError') {
+      ElMessage({
+        message: t('passkeyAlreadyRegistered') || '该设备或安全密钥已在此账号注册，无需重复添加。',
+        type: 'warning',
+        plain: true
+      });
+    } else {
+      ElMessage({
+        message: err.message || t('passkeyRegisterFailed') || '安全密钥注册失败，请重试',
         type: 'error',
         plain: true
       });

@@ -2065,6 +2065,20 @@ totpModeAllDesc: 'Configure whether users can use TOTP. When enabled, 2FA is ava
     noPermAccountAdd: 'Your current role does not have permission to add new email accounts',
     adminDisabledAddEmail: 'Administrator has temporarily disabled adding new email addresses',
     addAccountModalDesc: 'Create and associate a new email address with your account for fast switching in the same view.',
+    passkeyOperationCancelledOrNotAllowed: 'Operation cancelled or device not ready. Please ensure system PIN/biometrics (e.g. Windows Hello) is set up or connect a security key and retry.',
+    passkeyAlreadyRegistered: 'This device or security key is already registered on this account.',
+    passkeyRegisterFailed: 'Failed to register security key, please retry',
+    deviceTypeLabel: 'Device Type',
+    deviceTypeOptionAuto: 'Automatic (Recommended for all devices / Windows Hello / Phone QR / USB Keys)',
+    deviceTypeOptionPlatform: 'Built-in device biometrics (Windows Hello PIN/fingerprint/face, Mac Touch ID)',
+    deviceTypeOptionCrossPlatform: 'External hardware security key (USB YubiKey / NFC Security Key)',
+    windowsHelloNotice: 'Windows tip: If using this PC, ensure Windows Hello PIN or biometrics is set up in Windows Settings, or insert a USB security key.',
+    keyNameWindowsHello: 'Windows Hello (This PC)',
+    keyNameMacTouchId: 'Touch ID (Mac)',
+    keyNameAppleIos: 'Face ID / Touch ID (iOS)',
+    keyNameAndroid: 'Android Biometrics',
+    keyNameLinux: 'Linux Security Key',
+    keyNameDefault: 'Security Key',
 };
 
 export default en;

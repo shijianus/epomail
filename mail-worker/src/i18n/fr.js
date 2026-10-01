@@ -1855,6 +1855,8 @@ const fr = {
     usernameLengthLimit: 'Le nom d’utilisateur est trop long',
     publicTokenFail: 'La vérification du jeton d’accès public a échoué',
     visitorAttachmentBan: 'Votre rôle actuel ne permet que l’envoi d’e-mails en texte brut : les pièces jointes ne sont pas prises en charge. Rendez-vous sur blog.epomail.com pour participer et passer à LV.1 Érudit actif afin de les débloquer',
+    stepUpDifferentFactorRequired: 'Environnement à haut risque détecté. L’étape 2 requiert un facteur de sécurité différent.',
+    stepUpAbnormalNotice: 'Environnement de connexion ou risque d’appareil anormal détecté. Veuillez effectuer un second facteur de sécurité indépendant pour confirmer votre identité.',
 
     // ===== 权限树本地化（perm-service.tree：按钮按 perm_key，分组按库内名称）=====
     perms: {

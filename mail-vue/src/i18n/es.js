@@ -2065,6 +2065,20 @@ totpModeAllDesc: 'Configurar si los usuarios pueden usar TOTP. Al activarlo, la 
     noPermAccountAdd: 'Su rol actual no tiene permiso para agregar nuevas cuentas de correo',
     adminDisabledAddEmail: 'El administrador ha deshabilitado temporalmente la adición de nuevas direcciones de correo',
     addAccountModalDesc: 'Cree y asocie una nueva dirección de correo a su cuenta para alternar rápidamente en la misma vista.',
+    passkeyOperationCancelledOrNotAllowed: 'Operación cancelada o dispositivo no preparado. Asegúrese de que el PIN o la biometría del sistema (p. ej. Windows Hello) estén configurados o conecte una llave de seguridad y vuelva a intentarlo.',
+    passkeyAlreadyRegistered: 'Este dispositivo o llave de seguridad ya está registrado en esta cuenta.',
+    passkeyRegisterFailed: 'Error al registrar la llave de seguridad, inténtelo de nuevo',
+    deviceTypeLabel: 'Tipo de dispositivo',
+    deviceTypeOptionAuto: 'Automático (Recomendado para todos los dispositivos / Windows Hello / QR móvil / Llaves USB)',
+    deviceTypeOptionPlatform: 'Biometría integrada del dispositivo (PIN/huella/rostro de Windows Hello, Mac Touch ID)',
+    deviceTypeOptionCrossPlatform: 'Llave de seguridad de hardware externa (USB YubiKey / llave NFC)',
+    windowsHelloNotice: 'Consejo para Windows: si utiliza esta PC, asegúrese de que el PIN o la biometría de Windows Hello estén configurados en Configuración de Windows, o inserte una llave de seguridad USB.',
+    keyNameWindowsHello: 'Windows Hello (Este PC)',
+    keyNameMacTouchId: 'Touch ID (Mac)',
+    keyNameAppleIos: 'Face ID / Touch ID (iOS)',
+    keyNameAndroid: 'Biometría de Android',
+    keyNameLinux: 'Llave de seguridad de Linux',
+    keyNameDefault: 'Llave de seguridad',
 };
 
 export default es;

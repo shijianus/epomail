@@ -1855,6 +1855,8 @@ const zhHant = {
     usernameLengthLimit: '使用者名稱長度超出限制',
     publicTokenFail: '公共訪問令牌校驗失敗',
     visitorAttachmentBan: '目前身分分組僅支援發送純文字郵件，暫不支援發送附件！請前往 blog.epomail.com 參與互動升級至 LV.1 活躍學者解鎖',
+    stepUpDifferentFactorRequired: '檢測到高安全風險環境，第二步驗證必須使用不同類型的安全憑據進行核驗',
+    stepUpAbnormalNotice: '檢測到異常登入環境或設備風險，請完成第二項獨立安全驗證以確認您的身份',
 
     // ===== 权限树本地化（perm-service.tree：按钮按 perm_key，分组按库内名称）=====
     perms: {

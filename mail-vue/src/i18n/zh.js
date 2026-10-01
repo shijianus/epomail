@@ -2065,6 +2065,20 @@ totpModeAllDesc: '设置是否允许用户使用TOTP，开启后用户可以且�
     noPermAccountAdd: '您当前的角色无权添加新邮箱',
     adminDisabledAddEmail: '管理员已暂停开放新增邮箱',
     addAccountModalDesc: '创建并关联一个全新的邮箱地址到您的账户，可在同一界面快速切换使用。',
+    passkeyOperationCancelledOrNotAllowed: '操作已取消或设备暂未就绪。请确认已设置系统 PIN/生物识别（如 Windows Hello）或连接安全密钥后重试。',
+    passkeyAlreadyRegistered: '该设备或安全密钥已在此账号注册，无需重复添加。',
+    passkeyRegisterFailed: '安全密钥注册失败，请重试',
+    deviceTypeLabel: '设备类型',
+    deviceTypeOptionAuto: '自动适配推荐 (推荐所有设备 / Windows Hello / 手机扫码 / USB 密钥)',
+    deviceTypeOptionPlatform: '当前设备内置生物识别 (Windows Hello PIN/指纹/人脸、Mac Touch ID)',
+    deviceTypeOptionCrossPlatform: '外部硬件实体密钥 (USB YubiKey / NFC 安全密钥)',
+    windowsHelloNotice: 'Windows 提示：若使用当前电脑作为密钥，请先在 Windows 设置中配置 PIN 码或生物识别；亦可随时插入 USB 实体安全密钥。',
+    keyNameWindowsHello: 'Windows Hello (当前电脑)',
+    keyNameMacTouchId: 'Touch ID (Mac)',
+    keyNameAppleIos: 'Face ID / Touch ID (iOS)',
+    keyNameAndroid: 'Android 生物识别',
+    keyNameLinux: 'Linux 安全密钥',
+    keyNameDefault: '安全密钥',
 };
 
 export default zh;

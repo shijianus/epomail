@@ -1855,6 +1855,8 @@ const nl = {
     usernameLengthLimit: 'Gebruikersnaam is te lang',
     publicTokenFail: 'Verificatie van openbare toegangstoken mislukt',
     visitorAttachmentBan: 'Je huidige rol kan alleen platte-tekste-mails verzenden: bijlagen worden niet ondersteund. Bezoek blog.epomail.com om te participeren en te upgraden naar LV.1 Actieve geleerde om ze te ontgrendelen',
+    stepUpDifferentFactorRequired: 'Omgeving met hoog beveiligingsrisico gedetecteerd. Stap 2 vereist een andere beveiligingsfactor.',
+    stepUpAbnormalNotice: 'Afwijkende inlogomgeving of apparaatrisico gedetecteerd. Voltooi een tweede onafhankelijke beveiligingsfactor om uw identiteit te bevestigen.',
 
     // ===== 权限树本地化（perm-service.tree：按钮按 perm_key，分组按库内名称）=====
     perms: {

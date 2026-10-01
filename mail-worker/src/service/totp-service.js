@@ -380,6 +380,13 @@ const totpService = {
 			{ expirationTtl: 300 }
 		);
 
+		// Generate standard 32-byte opaque user handle (W3C WebAuthn 16-64 bytes requirement for Windows Hello / TPM)
+		const userHandleDigest = await crypto.subtle.digest(
+			'SHA-256',
+			new TextEncoder().encode(`epomail_uid_${userId}`)
+		);
+		const userHandle = webauthnUtils.bufferToBase64Url(new Uint8Array(userHandleDigest));
+
 		return {
 			challenge,
 			rp: {
@@ -387,13 +394,20 @@ const totpService = {
 				id: c.req.header('host')?.split(':')[0] || 'localhost'
 			},
 			user: {
-				id: String(userId),
+				id: userHandle,
+				rawUserId: String(userId),
 				name: email,
 				displayName: email.split('@')[0] || email
 			},
 			pubKeyCredParams: [
-				{ type: 'public-key', alg: -7 },  // ES256
-				{ type: 'public-key', alg: -257 } // RS256
+				{ type: 'public-key', alg: -7 },   // ES256 (NIST P-256 with SHA-256)
+				{ type: 'public-key', alg: -257 }, // RS256 (RSASSA-PKCS1-v1_5 with SHA-256)
+				{ type: 'public-key', alg: -37 },  // PS256 (RSA-PSS with SHA-256) - preferred by Windows Hello TPM
+				{ type: 'public-key', alg: -8 },   // Ed25519 (EdDSA)
+				{ type: 'public-key', alg: -258 }, // RS384
+				{ type: 'public-key', alg: -259 }, // RS512
+				{ type: 'public-key', alg: -35 },  // ES384
+				{ type: 'public-key', alg: -36 }   // ES512
 			],
 			timeout: 60000,
 			attestation: 'none',

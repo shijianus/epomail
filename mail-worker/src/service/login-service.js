@@ -24,6 +24,7 @@ import webauthnUtils from '../utils/webauthn-utils.js';
 import orm from '../entity/orm.js';
 import user from '../entity/user.js';
 import { eq } from 'drizzle-orm';
+import riskService from './risk-service.js';
 
 function getSafeSessionUser(userRow) {
 	if (!userRow) return null;
@@ -350,6 +351,21 @@ const loginService = {
 			const tempToken = 'totp_tmp_' + uuidv4().replace(/-/g, '');
 			const passkeyChallenge = webauthnUtils.generateChallenge();
 
+			// Evaluate black-box risk model
+			const riskAssessment = await riskService.evaluateRisk(c, userRow, params.secPayload || {});
+
+			let backupCodesRemaining = 0;
+			if (userRow.totpBackupCodes) {
+				try {
+					const parsed = typeof userRow.totpBackupCodes === 'string' ? JSON.parse(userRow.totpBackupCodes) : userRow.totpBackupCodes;
+					if (Array.isArray(parsed)) {
+						backupCodesRemaining = parsed.filter(i => i.used === 0).length;
+					} else if (parsed && Array.isArray(parsed.hashedCodes)) {
+						backupCodesRemaining = parsed.hashedCodes.filter(i => i.used === 0).length;
+					}
+				} catch (e) {}
+			}
+
 			await c.env.kv.put(
 				KvConst.TOTP_PENDING + tempToken,
 				JSON.stringify({
@@ -358,6 +374,10 @@ const loginService = {
 					attempts: 0,
 					passkeyChallenge,
 					needsPasswordUpgrade: isLegacy ? password : null,
+					stepUpRequired: riskAssessment.stepUpRequired,
+					riskScore: riskAssessment.riskScore,
+					step: 1,
+					verifiedFactors: [],
 					createdAt: Date.now()
 				}),
 				{ expirationTtl: 300 } // 5 minutes TTL
@@ -370,8 +390,12 @@ const loginService = {
 				email: userRow.email,
 				hasTotp: !!userRow.totpSecret,
 				hasPasskeys: securityKeysList.length > 0,
+				hasBackupCodes: backupCodesRemaining > 0,
 				passkeys: securityKeysList.map(k => ({ id: k.credentialId, type: 'public-key' })),
-				passkeyChallenge
+				passkeyChallenge,
+				stepUpRequired: riskAssessment.stepUpRequired,
+				step: 1,
+				riskFlags: riskAssessment.clientFlags
 			};
 		}
 
@@ -492,6 +516,12 @@ const loginService = {
 			throw new BizError(t('isBanUser'));
 		}
 
+		const factorType = isPasskey ? 'passkey' : (isBackupCode ? 'backup_code' : 'totp');
+
+		if (pendingData.step === 2 && Array.isArray(pendingData.verifiedFactors) && pendingData.verifiedFactors.includes(factorType)) {
+			throw new BizError(t('stepUpDifferentFactorRequired'));
+		}
+
 		if (isPasskey) {
 			// Verify WebAuthn / Passkey signature
 			if (!credentialId || !clientDataJSON || !authenticatorData || !signature) {
@@ -565,7 +595,59 @@ const loginService = {
 			await c.env.kv.put(replayKey, '1', { expirationTtl: 60 });
 		}
 
-		// Verification passed: consume temporary token
+		// Check Step-Up (二验) decision: If step-up required and step 1 just completed
+		if (pendingData.stepUpRequired && (!pendingData.step || pendingData.step === 1)) {
+			let remainingBackupCount = 0;
+			if (userRow.totpBackupCodes) {
+				try {
+					const parsed = typeof userRow.totpBackupCodes === 'string' ? JSON.parse(userRow.totpBackupCodes) : userRow.totpBackupCodes;
+					if (Array.isArray(parsed)) remainingBackupCount = parsed.filter(i => i.used === 0).length;
+					else if (parsed && Array.isArray(parsed.hashedCodes)) remainingBackupCount = parsed.hashedCodes.filter(i => i.used === 0).length;
+				} catch (e) {}
+			}
+
+			let userKeys = [];
+			if (userRow.securityKeys) {
+				try {
+					userKeys = typeof userRow.securityKeys === 'string' ? JSON.parse(userRow.securityKeys) : userRow.securityKeys;
+					if (!Array.isArray(userKeys)) userKeys = [];
+				} catch (e) {}
+			}
+
+			const availableFactors = [];
+			if (userRow.totpSecret) availableFactors.push('totp');
+			if (userKeys.length > 0) availableFactors.push('passkey');
+			if (remainingBackupCount > 0) availableFactors.push('backup_code');
+
+			const remainingFactors = availableFactors.filter(f => f !== factorType);
+
+			if (remainingFactors.length > 0) {
+				// Transition to Step 2
+				pendingData.step = 2;
+				pendingData.verifiedFactors = [factorType];
+				const nextPasskeyChallenge = webauthnUtils.generateChallenge();
+				pendingData.passkeyChallenge = nextPasskeyChallenge;
+
+				await c.env.kv.put(pendingKey, JSON.stringify(pendingData), { expirationTtl: 300 });
+
+				return {
+					stepUpRequired: true,
+					step: 2,
+					tempToken,
+					verifiedFactor: factorType,
+					remainingFactors,
+					hasTotp: !!userRow.totpSecret,
+					hasPasskeys: userKeys.length > 0,
+					hasBackupCodes: remainingBackupCount > 0,
+					passkeys: userKeys.map(k => ({ id: k.credentialId, type: 'public-key' })),
+					passkeyChallenge: nextPasskeyChallenge,
+					email: userRow.email,
+					message: t('stepUpAbnormalNotice')
+				};
+			}
+		}
+
+		// Verification fully passed: consume temporary token
 		await c.env.kv.delete(pendingKey);
 
 		// Clear login fail rate limit

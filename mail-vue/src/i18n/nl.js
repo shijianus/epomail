@@ -2065,6 +2065,20 @@ totpModeAllDesc: 'Instellen of gebruikers TOTP mogen gebruiken. Eenmaal ingescha
     noPermAccountAdd: 'Uw huidige rol heeft geen toestemming om nieuwe e-mailaccounts toe te voegen',
     adminDisabledAddEmail: 'De beheerder heeft het toevoegen van nieuwe e-mailadressen tijdelijk uitgeschakeld',
     addAccountModalDesc: 'Maak en koppel een nieuw e-mailadres aan uw account om snel te schakelen in dezelfde weergave.',
+    passkeyOperationCancelledOrNotAllowed: 'Bewerking geannuleerd of apparaat niet gereed. Zorg ervoor dat systeem-PIN/biometrie (bijv. Windows Hello) is ingesteld of sluit een beveiligingssleutel aan en probeer het opnieuw.',
+    passkeyAlreadyRegistered: 'Dit apparaat of deze beveiligingssleutel is al geregistreerd op dit account.',
+    passkeyRegisterFailed: 'Registratie van beveiligingssleutel mislukt, probeer het opnieuw',
+    deviceTypeLabel: 'Apparaattype',
+    deviceTypeOptionAuto: 'Automatisch (Aanbevolen voor alle apparaten / Windows Hello / Telefoon-QR / USB-sleutels)',
+    deviceTypeOptionPlatform: 'Ingebouwde apparaatbiometrie (Windows Hello PIN/vingerafdruk/gezicht, Mac Touch ID)',
+    deviceTypeOptionCrossPlatform: 'Externe hardwarebeveiligingssleutel (USB YubiKey / NFC-beveiligingssleutel)',
+    windowsHelloNotice: 'Windows-tip: zorg er bij gebruik van deze pc voor dat Windows Hello PIN of biometrie is ingesteld in Windows-instellingen, of sluit een USB-beveiligingssleutel aan.',
+    keyNameWindowsHello: 'Windows Hello (Deze pc)',
+    keyNameMacTouchId: 'Touch ID (Mac)',
+    keyNameAppleIos: 'Face ID / Touch ID (iOS)',
+    keyNameAndroid: 'Android-biometrie',
+    keyNameLinux: 'Linux-beveiligingssleutel',
+    keyNameDefault: 'Beveiligingssleutel',
 };
 
 export default nl;

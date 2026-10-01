@@ -2065,6 +2065,20 @@ totpModeAllDesc: '設定是否允許使用者使用TOTP，開啟後使用者可�
     noPermAccountAdd: '您當前的角色無權新增新郵箱',
     adminDisabledAddEmail: '管理員已暫停開放新增郵箱',
     addAccountModalDesc: '建立並關聯一個全新的郵箱地址到您的帳戶，可在同一介面快速切換使用。',
+    passkeyOperationCancelledOrNotAllowed: '操作已取消或設備暫未就緒。請確認已設定系統 PIN/生物辨識（如 Windows Hello）或連接安全密鑰後重試。',
+    passkeyAlreadyRegistered: '該設備或安全密鑰已在此帳號註冊，無需重複添加。',
+    passkeyRegisterFailed: '安全密鑰註冊失敗，請重試',
+    deviceTypeLabel: '設備類型',
+    deviceTypeOptionAuto: '自動適配推薦 (推薦所有設備 / Windows Hello / 手機掃碼 / USB 密鑰)',
+    deviceTypeOptionPlatform: '當前設備內建生物辨識 (Windows Hello PIN/指紋/人臉、Mac Touch ID)',
+    deviceTypeOptionCrossPlatform: '外部硬體實體密鑰 (USB YubiKey / NFC 安全密鑰)',
+    windowsHelloNotice: 'Windows 提示：若使用當前電腦作為密鑰，請先在 Windows 設定中配置 PIN 碼或生物辨識；亦可隨時插入 USB 實體安全密鑰。',
+    keyNameWindowsHello: 'Windows Hello (現部電腦)',
+    keyNameMacTouchId: 'Touch ID (Mac)',
+    keyNameAppleIos: 'Face ID / Touch ID (iOS)',
+    keyNameAndroid: 'Android 生物辨識',
+    keyNameLinux: 'Linux 安全金鑰',
+    keyNameDefault: '安全金鑰',
 };
 
 export default zhHant;

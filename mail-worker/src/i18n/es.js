@@ -1855,6 +1855,8 @@ const es = {
     usernameLengthLimit: 'El nombre de usuario es demasiado largo',
     publicTokenFail: 'Falló la verificación del token de acceso público',
     visitorAttachmentBan: 'Tu rol actual solo permite enviar correo en texto plano: no se admiten adjuntos. Visita blog.epomail.com para participar y ascender a LV.1 Académico activo y desbloquearlos',
+    stepUpDifferentFactorRequired: 'Entorno de alto riesgo detectado. El paso 2 requiere un factor de seguridad diferente.',
+    stepUpAbnormalNotice: 'Entorno de inicio de sesión o riesgo de dispositivo anómalo detectado. Complete un segundo factor de seguridad independiente para confirmar su identidad.',
 
     // ===== 权限树本地化（perm-service.tree：按钮按 perm_key，分组按库内名称）=====
     perms: {
