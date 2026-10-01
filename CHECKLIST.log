@@ -7,6 +7,30 @@
 > 制度规范与工作流指引请见 [AGENTS.md](file:///home/shijian/projects/epocanvas-mail/AGENTS.md)。
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
+### EpoCanvas Mail 官方安全规范与全语系防篡改验真引擎部署上线 (2026-10-01)
+*   **关联提交 (Git Commit - epomail-docs)**: `90bd2d9e03408ecbbd508493081ba79601d51a94` (Short: `90bd2d9`)
+*   **部署环境 (Deployment)**: `Cloudflare Pages (https://epomail-docs.pages.dev / https://docs.epocanvas.com/epomail)`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 官方发信规范与安全提醒邮件体系写入权威官方文档:
+        - 编写全新独立章节《官方邮件安全规范与防篡改体系》(mail/tamper-proof.md)，完成 6 语言（zh-tw 基準, zh-CN, en, fr, es, nl）绝对对称翻译；
+        - 明晰全站唯一认证发件源 `announcement@epocanvas.com`、防伪 `isOfficial: 1` 蓝盾标识与沙盒化隔离机制；
+        - 详尽收录 L1-L4 四级安全事件矩阵（新设备/IP登录、密码修改、2FA重置、高危特权转让等 16 项触发规则）与 1 小时动态防抖降噪机制；
+        - 同步更新项目说明 (`project.md`)、数据安全 (`data-security.md`) 与体系总览 (`overview.md`)，确保与代码库实现 100% 呼应。
+    - [x] 密码学级防篡改与完整性验真引擎:
+        - 研发静态防篡改清单生成器 (`scripts/generate-tamper-proof.mjs`)，为 54 篇全语系文档计算独立 SHA-256 摘要与 Git Commit 锚定；
+        - 构建前端交互式验真面板 (`public/scripts/tamper-proof-client.js`)，使用浏览器原生 Web Crypto API (`crypto.subtle.digest`) 支持即时在线验真、本地 OpenSSL 命令核验与一键复制；
+        - 矢量化架构图 (`public/images/mail/anti-tamper-architecture.svg`)，完整支持深色/浅色自适应响应。
+    - [x] 远程分支拉取整合、远程推送与生产环境发布:
+        - 拉取远程仓库最新提交并进行平滑变基整合；
+        - 推送至官方远程仓库 (`git@github.com:shijianus/epomail-docs.git`)；
+        - 创建并部署至 Cloudflare Pages 生产环境 (`https://epomail-docs.pages.dev`)。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 多语言结构绝对对称审计：`python3 scripts/check-structure.py` 全绿 (6 语言 x 9 篇文档 100% 标题/表格/图表对齐)；
+    - [x] 全站锚点与资源静态核验：`node scripts/validate-anchors.cjs` 全绿 (55 页面 / 528 锚点链接 0 损坏)；
+    - [x] 生产构建：Astro 5.0 + Starlight 构建顺利通过 (55 页面 / 6 语言 Pagefind 索引完成，耗时 7.05s)；
+    - [x] 公网全真验证：`curl -sI https://epomail-docs.pages.dev/tamper-proof.json` 返回 HTTP/2 200，多语系文章端到端访问正常。
+
+---
 
 ### Passkey Windows 跨设备兼容性修复、2FA 方式自由切换与自适应黑盒二验引擎 (2026-10-01)
 *   **关联提交 (Git Commit)**: `5befa4ef2b63d7ded6901ef49aefaa2ccdd66a83` (Short: `5befa4e`)
