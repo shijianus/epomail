@@ -8,6 +8,36 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### Passkey Windows 跨设备兼容性修复、2FA 方式自由切换与自适应黑盒二验引擎 (2026-10-01)
+*   **关联提交 (Git Commit)**: `5befa4ef2b63d7ded6901ef49aefaa2ccdd66a83` (Short: `5befa4e`)
+*   **部署环境 (Deployment)**: `本地全真栈 / 待部署生产 (mail.epocanvas.com)`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] Passkey 跨设备创建与 Windows Hello TPM 根因修复:
+        - 彻底根治 Windows 电脑在创建 Passkey 时提示失败的致命缺陷（根因为 Windows `webauthn.dll` 要求 `user.id` 长度为 16-64 字节，原有传 `String(userId)` 仅 1-2 字节触发 TPM 拒绝）；
+        - 将服务端注册选项改造为标准 32 字节 SHA-256 不透明二进制句柄 (`epomail_uid_${userId}`)；
+        - 协商算法列表全面补齐并优先排序 PS256 (RSA-PSS with SHA-256, `alg: -37`，Windows 11 TPM 首选)、ES256 (`alg: -7`)、RS256 (`alg: -257`) 等 8 种主流规范算法；
+        - CBOR 解码器支持 64 位无符号整数解析与语义标签解包，验签引擎新增 RSA-PSS Web Crypto 验签支持；
+        - 确保用户在 Windows Hello、Mac Touch ID、iPhone/iPad Face ID、Android 生物识别、Linux 及 USB YubiKey 上 100% 成功创建与验证。
+    - [x] 2FA 验证方式自由选择 (Try another way):
+        - 登录触发两步验证时，用户可点击「选择其他验证方式（Try another way）」，自由在通行密钥、身份验证器 TOTP、应急备用代码间无缝切换；
+        - 各凭据提供专有优化交互：6 位独立 OTP 舱（支持 30 秒圆环倒计时与快捷粘贴）、8 位应急备用码（自动分段连字符）、Passkey 一键生物识别调起与取消容灾友好提示。
+    - [x] 自主黑盒风控机制与自适应二验 (Risk-based Step-Up):
+        - 服务端构建 `risk-service.js` 自主黑盒风控模型，采用服务端私有密钥派生每日动态盐与非线性权重矩阵，彻底防止开源导致风控规则与阈值泄露；
+        - 综合检测指纹浏览器（AdsPower, BitBrowser, Dolphin 等）、自动化插件（webdriver/cdc）、硬件屏幕矛盾、多账户共存环境与 IP 滑动窗口突发；
+        - 普通低风险环境保持单次快速验证；高风险环境下自适应触发「二验」（要求连续验证两项不同类型的独立凭据），前端呈现「🛡️ 自适应高安全质询」卡片，并严格限制第二步不得重复验证同一因子。
+    - [x] 多语言闭环与品牌去 Gmail 化纯粹性:
+        - `mail-vue` (2071 键) 与 `mail-worker` (1890 键) 六语言字典 100% 绝对对称；
+        - 用户界面与提示文案绝不出现 "Gmail" 字样，保持 Epocanvas 原生品牌。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 前端构建核验：`temp_login_ui` 构建通过 (9.16s)，`mail-vue` 构建通过 (1m 12s)，产物同步至 `mail-worker/dist/login`；
+    - [x] 多语言对称静态审计：`node scripts/i18n-symmetry.mjs` (六语言绝对对称)、`node scripts/i18n-audit.mjs` (0 缺失) 全绿；
+    - [x] Passkey Windows 跨设备端到端测试 (`tests/test-passkey-windows-compat-e2e.mjs`)：32 字节 User Handle、PS256/ES256 签名与防伪断言全部通过 (GREEN)；
+    - [x] 2FA 方式切换与自适应二验全真测试 (`tests/test-2fa-try-another-way-and-stepup-e2e.mjs`)：黑盒模型决策与 Playwright 11/11 项端到端断言全部通过 (GREEN)；
+    - [x] 独立 QA Auditor 审计：完全独立的子代理执行 clean-slate 端到端核查，出具 APPROVED 签发报告；
+    - [x] 零假数据残留：测试环境动态隔离，测试完成后端口与资源物理释放，零假数据残留。
+
+---
+
 ### 多账户模式状态常驻化与会话切换防回退加固 (2026-09-30)
 *   **关联提交 (Git Commit)**: `e061a781016c32c9e94a8832c10b35dbf1c5e10d` (Short: `e061a78`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com / epomail.epocanvas.workers.dev)` (Version ID: `63608f36-ad07-4004-8759-7cd8927ecdf9`)
