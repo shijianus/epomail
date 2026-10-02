@@ -8,6 +8,36 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### 2FA 信任设备 30 天免验与双期黑盒风控生命周期模型交付上线 (2026-10-02)
+*   **关联提交 (Git Commit)**: `9c28ede44ea3d7da74a7ff95be8579979313dbfe` (Short: `9c28ede`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare Workers (https://mail.epocanvas.com)` (Version ID: `ec838b82-6b3e-46c1-838d-c724a465c9a3`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 变更点 1 (2FA 界面集成「以后本设备登录不再验证」交互勾选框)：
+        - 在 2FA 各挑战面板（TOTP 动态口令、通行密钥 Passkey、应急备用代码）中集成「以后本设备登录不再验证」选项框；
+        - 默认状态严格为「未勾选（false）」，必须由用户主动点击勾选授权；
+        - 勾选框采用微发光青蓝渐变高亮与圆角设计，外框尺寸严格保持 480px × 670px，0px 布局位移与视觉重排。
+    - [x] 变更点 2 (自研开源黑盒设备认证引擎 device-trust-service.js)：
+        - 基于服务端主密钥 `env.jwt_secret` 派生独立 HMAC-SHA256 签名密钥，生成不透明密文凭据（`epodt_v1.<payload>.<sig>`）；
+        - 时间戳 $T_0$ 经由 32 位伪随机非线性 XOR 掩码加密打包，结合 8 字节密码学随机 Nonce 与客户端设备熵指纹哈希，杜绝外部推测内部周期与参数；
+        - 服务端 KV（`KvConst.DEVICE_TRUST`）双层校准绑定，具备即时失效与物理防伪能力。
+    - [x] 变更点 3 (严格落地双期数学计算模型与自动强制退出)：
+        - **Phase 1 (首次 30 天内免 2FA 窗口)**：$0 \le \Delta t \le 30 \text{ 天}$ 内输入密码登录时，自动核验信任凭据并豁免 2FA，直接完成安全登入；
+        - **Phase 2 (超过 30 天倒计时窗口)**：登录超过 30 天后退出（例如第 31 天登录），2FA 豁免权失效，强制要求重新进行 2FA 认证；
+        - **Hard Eviction (60 天绝对会话熔断)**：在 `security.js` 中严苛校验 `maxSessionEpoch`（$T_0 + 60 \text{ 天}$），会话超过 60 天一律强制自动退出，彻底杜绝永久登录隐患。
+    - [x] 变更点 4 (零信任动态风险自适应降级与二验联动)：
+        - 结合 `risk-service.js` 黑盒风控，凡检测到指纹浏览器、Canvas 篡改或自动化驱动特征，立即无视设备年龄动态熔断信任，强制触发二次验证。
+    - [x] 变更点 5 (六语言对称与静态审计闭环)：
+        - 六语言字典（zh, zh-Hant, en, es, fr, nl）全量闭环 `rememberDevice` 词条，静态审计三件套 100% 通过。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 静态多语言三件套：`node scripts/i18n-symmetry.mjs && node scripts/i18n-audit.mjs` 100% 通过（2125/1929 字典绝对对称，1642 处代码字面量引用零缺失）；
+    - [x] 黑盒生命周期断言套件 (`tests/test-trusted-device-30d-lifecycle-and-blackbox.mjs`)：14/14 项断言全部通过（涵盖 0d、15d、29.9d、31d、45d、61d 各生命周期节点与风控熔断）；
+    - [x] 界面交互与几何物理锁死套件 (`tests/test-trusted-device-ui-and-e2e.mjs`)：6/6 项断言全部通过（实测 480x670 尺寸锁定 0px 偏差）；
+    - [x] 公网全真卡片尺寸与路由端到端测试 (`tests/test-prod-login-card-and-challenge-routing.mjs`)：26/26 项断言全部通过；
+    - [x] 公网 Passkey 跨平台兼容与自适应风控测试 (`tests/test-prod-passkey-and-stepup-live-e2e.mjs`)：26/26 项断言全部通过；
+    - [x] 公网 Passkey 时间锁与生命周期管理测试 (`tests/test-prod-passkey-timelock-and-management.mjs`)：40/40 项断言全部通过；
+    - [x] 公网真实生产环境 2FA 信任设备核验 (`tests/test-prod-trusted-device-live-e2e.mjs`)：7/7 项断言全部通过，已捕获真实公网渲染截图 `tests/verify_prod_trusted_device_checkbox.png`；
+    - [x] 生产零脏数据残留：测试数据均在 `finally` 钩子中物理清除。
+
 ### 个人资料支持添加多个额外电子邮箱与全生命周期管理 (2026-10-02)
 *   **关联提交 (Git Commit)**: `7ce1f2d86cf9d7ed48ea87d46761ce3c17a36670` (Short: `7ce1f2d`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare Workers (https://mail.epocanvas.com)` (Version ID: `0b9d4b80-71ca-4938-91ac-151b3b7bed01`)
