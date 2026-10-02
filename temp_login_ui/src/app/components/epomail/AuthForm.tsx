@@ -1728,14 +1728,52 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
                                 : (t('totpPeriod').replace('{s}', String(secondsLeftInPeriod)))}
                             </span>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => setShowHelp(!showHelp)}
-                            className="flex items-center gap-1 hover:text-[var(--epo-cyan-glow)] transition-colors cursor-pointer"
+                          <div
+                            className="relative inline-flex items-center"
+                            onMouseEnter={() => setShowHelp(true)}
+                            onMouseLeave={() => setShowHelp(false)}
                           >
-                            <HelpCircle size={12} />
-                            <span>{t('havingTrouble')}</span>
-                          </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                setShowHelp((prev) => !prev);
+                              }}
+                              className="flex items-center gap-1 hover:text-[var(--epo-cyan-glow)] transition-colors cursor-pointer group focus-visible:outline-none"
+                              aria-label={t('havingTrouble')}
+                            >
+                              <span>{t('havingTrouble')}</span>
+                              <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 text-[10px] font-bold group-hover:border-[var(--epo-cyan-glow)] group-hover:text-[var(--epo-cyan-glow)] group-hover:bg-cyan-500/10 transition-colors shadow-[0_0_8px_rgba(99,102,241,0.25)]">
+                                ?
+                              </span>
+                            </button>
+
+                            {/* Floating Hover Tooltip: 悬停的"?"解释说明而非下拉菜单 */}
+                            <AnimatePresence>
+                              {showHelp && (
+                                <motion.div
+                                  initial={{ opacity: 0, y: 6, scale: 0.96 }}
+                                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                                  exit={{ opacity: 0, y: 6, scale: 0.96 }}
+                                  transition={{ duration: 0.16, ease: "easeOut" }}
+                                  className="pointer-events-none absolute right-0 bottom-full mb-2 w-64 z-50 rounded-2xl border border-[rgba(139,147,196,0.3)] bg-[rgba(15,18,37,0.96)] p-3 text-[11px] leading-relaxed backdrop-blur-xl shadow-[0_12px_32px_rgba(0,0,0,0.5),0_0_20px_rgba(99,102,241,0.2)] text-left"
+                                  style={{ color: "var(--epo-muted)" }}
+                                >
+                                  <div className="flex items-center gap-1.5 font-semibold text-[var(--epo-ink)] mb-1.5">
+                                    <HelpCircle size={13} className="text-[var(--epo-cyan-glow)] shrink-0" />
+                                    <span>{t('troubleshootTitle')}</span>
+                                  </div>
+                                  <ul className="list-disc pl-4 space-y-1 text-[11px] leading-snug">
+                                    <li>{t('troubleshoot1')}</li>
+                                    <li>{t('troubleshoot2')}</li>
+                                    <li>{t('troubleshoot3')}</li>
+                                  </ul>
+                                  {/* Pointer arrow pointing down to the trigger */}
+                                  <div className="absolute right-3 -bottom-1 h-2 w-2 rotate-45 border-r border-b border-[rgba(139,147,196,0.3)] bg-[rgba(15,18,37,0.96)]" />
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
+                          </div>
                         </div>
                       </motion.div>
                     </AnimatePresence>
@@ -1786,29 +1824,6 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
                       </p>
                     </motion.div>
                   )}
-
-                  {/* Troubleshooting Drawer Card */}
-                  <AnimatePresence>
-                    {showHelp && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: "auto" }}
-                        exit={{ opacity: 0, height: 0 }}
-                        transition={{ duration: 0.25 }}
-                        className="overflow-hidden rounded-xl border border-[rgba(139,147,196,0.2)] bg-[rgba(255,255,255,0.03)] p-3 text-[11px] leading-relaxed backdrop-blur-sm"
-                        style={{ color: "var(--epo-muted)" }}
-                      >
-                        <p className="font-medium text-[var(--epo-ink)] mb-1">
-                          {t('troubleshootTitle')}
-                        </p>
-                        <ul className="list-disc pl-4 space-y-1">
-                          <li>{t('troubleshoot1')}</li>
-                          <li>{t('troubleshoot2')}</li>
-                          <li>{t('troubleshoot3')}</li>
-                        </ul>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
 
                   {/* Submit Verification Button (For OTP and Backup Code) */}
                   {active2FAMethod !== 'passkey' && (
