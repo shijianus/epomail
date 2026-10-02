@@ -364,7 +364,7 @@ export function RegisterForm({ canvasRef, onSwitch, sysConfig: propsSysConfig }:
   };
 
   return (
-    <form onSubmit={handleSubmit} className="relative flex-1 flex flex-col justify-between gap-6 pt-2">
+    <form onSubmit={handleSubmit} className="relative flex flex-col justify-center gap-4 sm:gap-4.5 w-full">
       {/* Toast Notification Container */}
       {typeof document !== "undefined" &&
         createPortal(
@@ -528,7 +528,7 @@ export function RegisterForm({ canvasRef, onSwitch, sysConfig: propsSysConfig }:
       )}
       </div>
 
-      <div className="mt-auto pt-3 flex flex-col gap-3">
+      <div className="pt-2 flex flex-col gap-2.5">
         {/* Action / Submit Button */}
         <motion.button
           type="submit"

@@ -1080,7 +1080,7 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
         transition={{
           layout: { type: "spring", stiffness: 320, damping: 30 },
         }}
-        className="relative flex-1 flex flex-col justify-between"
+        className="relative flex flex-col justify-center w-full"
       >
         <AnimatePresence mode="wait">
           {stage === "password" ? (
@@ -1094,9 +1094,9 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
               exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -12, filter: "blur(4px)" }}
               transition={reduceMotion ? { duration: 0 } : { duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
               onSubmit={handlePasswordSubmit}
-              className="flex-1 flex flex-col justify-between gap-6 pt-1"
+              className="flex flex-col justify-center gap-5 sm:gap-5.5 w-full"
             >
-              <div className="flex flex-col gap-6">
+              <div className="flex flex-col gap-4 sm:gap-4.5">
                 <FloatingField
                   id="epo-email"
                   type="email"
@@ -1234,7 +1234,7 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
                 </motion.button>
               </div>
 
-              <div className="mt-auto pt-3 flex flex-col gap-3">
+              <div className="pt-2 flex flex-col gap-2.5">
                 {sysConfig?.oauthLoginEnabled ? (
                   <div className="flex flex-col gap-3">
                     <div className="flex items-center gap-3">
@@ -1299,13 +1299,13 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
               exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 14, filter: "blur(4px)" }}
               transition={reduceMotion ? { duration: 0 } : { duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
               onSubmit={handleTotpSubmit}
-              className="flex-1 flex flex-col justify-between gap-5 pt-1"
+              className="flex flex-col justify-center gap-4 sm:gap-4.5 w-full"
             >
               {showMethodSelector ? (
                 /* =====================================================================
                    SUB-VIEW: CHOOSE ANOTHER WAY (METHOD SELECTOR)
                    ===================================================================== */
-                <div className="flex-1 flex flex-col justify-between">
+                <div className="flex flex-col justify-center gap-3.5 sm:gap-4 w-full">
                   <div className="flex flex-col gap-4">
                     {/* Back button */}
                     <button
@@ -1497,7 +1497,7 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
                 /* =====================================================================
                    SUB-VIEW: ACTIVE METHOD VERIFICATION
                    ===================================================================== */
-                <div className="flex-1 flex flex-col justify-between">
+                <div className="flex flex-col justify-center gap-3.5 sm:gap-4 w-full">
                   <div className="flex flex-col gap-4">
                     {/* Back button */}
                     <button
@@ -1862,7 +1862,7 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
                   </div>
 
                   {/* Multi-factor "Try another way" selection trigger */}
-                  <div className="mt-auto pt-3 flex flex-col gap-2">
+                  <div className="pt-2 flex flex-col gap-2">
                     {[hasPasskeys, hasTotp, hasBackupCodes].filter(Boolean).length > 1 && (
                       <div className="flex justify-center">
                         <button

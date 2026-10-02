@@ -62,7 +62,7 @@ export function LoginCard({ canvasRef, onSwitch, sysConfig }: LoginCardProps) {
       >
         {/* Acrylic prism block */}
         <div
-          className="relative overflow-hidden rounded-3xl p-8 sm:p-10 h-[620px] sm:h-[670px] min-h-[620px] sm:min-h-[670px] max-h-[620px] sm:max-h-[670px] flex flex-col justify-between box-border"
+          className="relative overflow-hidden rounded-3xl p-8 sm:p-10 h-[620px] sm:h-[670px] min-h-[620px] sm:min-h-[670px] max-h-[620px] sm:max-h-[670px] flex flex-col justify-center box-border"
           style={{
             background:
               "linear-gradient(145deg, rgba(16,20,46,0.72), rgba(8,10,26,0.56))",
@@ -94,10 +94,10 @@ export function LoginCard({ canvasRef, onSwitch, sysConfig }: LoginCardProps) {
             }}
           />
 
-          <div className="relative flex-1 flex flex-col justify-between">
+          <div className="relative flex-1 flex flex-col justify-center">
             {/* Optional back button when adding account */}
             {isAddAccount && (
-              <div className="mb-4">
+              <div className="absolute top-0 left-0">
                 <button
                   type="button"
                   onClick={() => {
@@ -119,7 +119,7 @@ export function LoginCard({ canvasRef, onSwitch, sysConfig }: LoginCardProps) {
             )}
 
             {/* Brand header */}
-            <div className="mb-6 sm:mb-7 flex flex-col items-center text-center">
+            <div className="mb-4 sm:mb-5 flex flex-col items-center text-center">
               <img
                 src={`${import.meta.env.BASE_URL}logo.svg`}
                 alt="EpoMail Logo"
@@ -130,7 +130,7 @@ export function LoginCard({ canvasRef, onSwitch, sysConfig }: LoginCardProps) {
                 }}
               />
               <h1
-                className="epomail-display mt-4"
+                className="epomail-display mt-3.5"
                 style={{
                   fontSize: "26px",
                   fontWeight: 600,
@@ -144,7 +144,7 @@ export function LoginCard({ canvasRef, onSwitch, sysConfig }: LoginCardProps) {
                 {sysConfig?.title || "EpoMail"}
               </h1>
               <p
-                className="mt-2 text-[13px]"
+                className="mt-1.5 text-[13px]"
                 style={{ color: "var(--epo-muted)" }}
               >
                 {isAddAccount ? tr('addAccountSubtitle') : tr('loginSubtitle')}
