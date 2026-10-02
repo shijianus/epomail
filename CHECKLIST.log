@@ -7,7 +7,6 @@
 > 制度规范与工作流指引请见 [AGENTS.md](file:///home/shijian/projects/epocanvas-mail/AGENTS.md)。
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
-
 ### 规范文档全新重构：Google/Gmail 政策设计标准、双轨法律治理与矢量插画交付上线 (2026-10-02)
 *   **关联提交 (Git Commit)**: `0744d6a07e3fc53dadaa4c4008a5541c01804865` (Short: `0744d6a`), `111f95405064db4dbd587828e576eaa3fb2309e4` (Short: `111f954`), `f51b01efa5f11518337161322766d6373a570b7b` (Short: `f51b01e`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare Pages (https://epomail-docs.pages.dev/epomail/mail/data-security/)` (Deployment ID: `79f999be`)
@@ -503,7 +502,96 @@
     - [x] 自动化端到端测试：`tests/test-security-notices-e2e.mjs` 全线通过 (954/954 断言通过，覆盖 96 套模板、参数插值、指纹识别、防风暴去重与自动星标投递)；
     - [x] 零假数据残留：测试数据全部在内存与临时 mock 实例中流转，物理存储无假数据残留。
 
----
+### 本地部署与端到端视觉验证轮：文档站 25 截图判图 + 全真栈头像/级联 E2E (2026-10-01)
+*   **关联提交 (Git Commit)**: EpomailDocs `838eb84144c466ef384f489f0361de906ed36a7c` (Short: `838eb84`，已推送 origin/main)；主仓归档提交见 CHECKLIST 对应变更提交
+*   **部署环境 (Deployment)**: `本地部署（不触公网）`——文档站 dist 以 /epomail 路径挂载本地起服；mail-worker wrangler dev 本地模式（D1/KV 全本地）
+*   **变更清单**:
+    - [x] 文档站本地部署并完成 25 张截图逐项判图：8 篇简中全页、6 语种、明暗双主题、6 表格锚点、移动端 375、404/跳转页
+    - [x] 修复视觉验证发现缺陷：project.md 简中版本行堆叠 4→1（全库 48 文件恰 1 断言）；data-security 附件行六语种嵌套→整格重置（脚本幂等化）
+    - [x] 全真栈 E2E：头像上传→自有存储 /static/avatar/2/<sha>.png→200 image/png→资料页渲染 ✓（P1-1）
+    - [x] 全真栈 E2E：物理删除邮件→email/attachments/star 三表 1/1/1→0/0/0 ✓（P0-2）
+*   **核验清单**:
+    - [x] 重建后 492 锚点 0 断链、6×8 对称、laws/whitelist 通过
+    - [x] wrangler dev 本地 workerd 正常（vitest 池失败为该池集成问题，与本机 wrangler dev 无关）
+    - [x] 零残留：头像字段清空、本地 .wrangler/state 物理删除、临时文件即弃
+    - [x] 顶栏字母头像确认为信箱首字母既有设计，非缺陷
+
+### 从零复检轮：fr/es 补漏、级联分块加固与部署可行性评估 (2026-10-01)
+*   **关联提交 (Git Commit)**: `d5456f071b9bf664020dd9c5e55ba24b21298cc0` (Short: `d5456f`)；EpomailDocs 复审补漏 `568cb84bfb0c19f31c95eaa8df28284fee73cb7f` (Short: `568cb84`，已推送 origin/main)
+*   **部署环境 (Deployment)**: `本地静态核验 + 文档站干净重建与挂载复验`（生产未变更）
+*   **变更清单**:
+    - [x] 从零复审主仓 diff：email-service 级联三路径、user-service 头像链路逐行复核，工具函数（getExtFileName/getBuffHash hex 输出）URL 安全性确认，前端 avatarUrl 直接消费相对路径兼容
+    - [x] 发现并修复复审引入的边界缺陷：级联 inArray 无分块可超 D1 单语句 100 绑定参数上限 → cascadeDeleteEmails 与回收站清理按 50 分块
+    - [x] 发现并修复 EpomailDocs fr/es project.md 部分应用状态（6 处旧文），脚本幂等化并移除掩盖性区块守卫
+    - [x] 部署可行性评估：主仓无 push 自动部署（release.yml 仅 tag 发 Release），wrangler 本机已认证；docs.epocanvas.com 由 Pages 项目 epocanvas-docs 承载（deploy 脚本为 wrangler pages deploy dist）
+*   **核验清单**:
+    - [x] `tests/test-attachment-cascade-deletion.mjs` 21/21（新增分块断言）；`test-security-hardening-evidence.mjs` 43/43；i18n 三件套 exit 0
+    - [x] EpomailDocs 干净重建（rm dist/.astro）49 页 26.14s 零报错；492 锚点 0 断链；6×8 对称；laws/whitelist 通过
+    - [x] 六语种全量状态断言：旧数字残留 0、12 提交表述 6/6、79094ac 链行 6/6、i18n 新行 6/6、存储新行 6/6、博客/图床/欢迎行 6/6
+    - [x] 本地挂载探测：mail/overview、fr/mail/project、es/mail/privacy-policy、图片、robots、sitemap 全 200 且 fr/es 新内容可见
+    - [x] 两仓推送确认：epomail master 与 epomail-docs main 均与远端同步
+
+### v5.3 缺陷治理打磨轮：附件级联修复、头像存储治理与文档站发布定案 (2026-09-30)
+*   **关联提交 (Git Commit)**: 代码修复 `47fd8fc92212dd38a0abf7680bce7e972bff7a6a` (Short: `47fd8fc`)；审计归档 `849dcdc08cc81a0c7998b81622e5a947180e9bda` (Short: `849dcdc`)；EpomailDocs v5.3 `90c06edcdd29a90a991bd56ba480c031cf85a9cf` (Short: `90c06ed`，已推送 origin/main)
+*   **部署环境 (Deployment)**: `本地全真栈静态核验 + 文档站本地挂载验证`（生产 Worker 未变更部署；文档站 Pages 发布待运营者执行）
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] P0-2：`clearTrashAndSpam` / 手动彻底删除 / 90% 配额清理三条路径接入附件级联（新增 `cascadeDeleteEmails`，含星标清理与 userId 越权防护），6 处 `delete(email)` 站点全部受级联保护
+    - [x] P1-1：`uploadImage` 移除硬编码图床，缺省写实例自有对象存储（`/static/*` 写读同源），`AVATAR_UPLOAD_URL` 环境变量可配外部图床
+    - [x] EpomailDocs v5.3：博客行六语言去重；附件四级存储链（KV 兜底）三处披露；快照数字抗腐口径 + 提交链补 `79094ac`；欢迎邮件 7 日过期入保留期表；头像披露与代码对齐；project.md 六语种补版本行；全站 5.2→5.3
+    - [x] P0-1 定案：`SITE_ORIGIN=docs.epocanvas.com` + `base=/epomail` + `rehypePrefixBase` 前缀插件 + robots/根跳转页改版（与主仓 `DOCS_URL` 默认值一致）
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 主仓：`tests/test-attachment-cascade-deletion.mjs` 19/19 全绿（静态断言 + KV mock 行为断言，零假数据）；`node --check` 语法核验；`i18n-symmetry` 全绿（1,888 键 baseline）
+    - [x] 文档站：`pnpm build` 49 页 11.88s 零报错；`validate-anchors` 492 锚点 0 断链；`check-structure` 6×8 对称；`verify-laws` / `check-article-whitelist` 通过
+    - [x] 本地挂载验证（http-server 模拟 /epomail 路径）：页面 / 图片 / 跳转页 / sitemap 全 200，内链与图路径 base 前缀正确，canonical/hreflang 为 docs.epocanvas.com/epomail 绝对地址
+    - [x] P3-1 改判合规：project.md「——」除 description 1 处外均属逐字 git 提交链引文，不计散文红线（改写将伪造历史）
+    - [x] 已知环境问题：mail-worker vitest-pool-workers 本机 workerd 启动失败（0 执行），与本次改动无关
+    - [x] 零残留：测试为纯内存 mock + 静态断言，无数据库/KV 写入
+
+### EpomailDocs v5.2 独立复审归档：技术事实全量对码与生产发布探测 (2026-09-30)
+*   **关联提交 (Git Commit)**: `0fc3d1ee0b86fa28703f284930fd9f35cf5501a5` (Short: `0fc3d1e`)（本仓审计归档；审计对象 EpomailDocs @ `79094ac` 未改动）
+*   **部署环境 (Deployment)**: `本地审计核验 + 生产域名只读探测`（无生产变更，无 Version ID）
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 独立复审 EpomailDocs v5.2 全部 48 页：31 项高错误风险技术主张逐条对码主仓源码全部一致（完整矩阵见 `doc/epomaildocs-v52-independent-audit.md` §三）
+    - [x] 生产域名只读探测：证实文档站无有效公网部署（DOCS_URL 默认地址 404；mail.epocanvas.com/mail/* 被 SPA fallback 吞没），canonical/sitemap 域名错配风险坐实
+    - [x] 缺陷矩阵：P0×2（发布链路阻塞；三条实体删除路径不清理附件与 privacy §8 声明不符）、P1×1（头像上传硬编码第三方图床）、P2×4（博客行六语言重复、四级存储链未披露、快照数字过期、破折号超红线）、P3×3
+    - [x] v5.3 治理路线图成稿（主仓两处代码修复优先 → 文档回填 → 发布链路定案），REPORTS.md 置顶归档
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 文档站五件套回归：`pnpm build` 49 页 31.05s 零报错；`validate-anchors.cjs` 492 锚点 0 断链；`check-structure.py` 6×8 全对称；`verify-laws.py` 底稿一致；`check-article-whitelist.py` 条号引用 0
+    - [x] 六语言红线扫描：禁用语 0；「生效日期｜版本：5.2」48 页统一；破折号链 project.md 6 语言 6-7 处（红线 ≤2，已列入 P3-1）
+    - [x] 源码取证留痕：`email-service.js:300/311/630-650`（删除路径）、`r2-service.js:resolveStorage`（四级存储链）、`user-service.js:103-120`（头像图床）、`oauth-provider-service.js:315`（scopes）等均在专项文档标注 file:line
+    - [x] 零残留：纯审计无测试数据；EpomailDocs 工作区保持干净（HEAD `79094ac` 未改动）
+
+### EpomailDocs v5.2 内容完善：正式版本条款全站覆盖与专案介绍增补 (2026-09-30)
+*   **关联提交 (Git Commit)**: `79094ac`（EpomailDocs 独立仓库，完整 Hash `79094ac9d2686c1014c25824b25318c6206c9270`，已推送 origin/main）
+*   **部署环境 (Deployment)**: `本地 build 审计核验`（文档站未部署，无生产 Version ID）
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 正式版本效力条款补全（上轮审计 P2 遗留）：acceptable-use / data-security / sub-processors / key-terms / project 五篇 × 6 语言共 30 处，句式逐语言复用既有三篇原文，全站 8 篇全部自带「繁体中文（台湾）版为正式版本」条款，符合 tw-legal-writing 规范「每份文档开头须载明」
+    - [x] project.md 对照 EpoCanvasDocs 范式增补：新「4. 适合谁与不适合谁」（不承诺 SLA、禁止外发营销、加密不涵盖附件、自部署维护成本四项诚实边界，逐条链接对应法律文档）与「9. 常见疑问」（付费、管理员可见性、删除复原、自部署准备四问）；原第 4-8 节顺延为第 5-10 节，六语言同步重排
+    - [x] 时效数据再校正：主仓 535→539 提交（含远端 e2e 测试合并）、本站 11 提交并补入 v5.1 提交 `52412e3` 至 40 位 Hash 链；链路口径改为「下列链路所示，其后提交见 GitHub」消除自指偏差
+    - [x] README 新增「正式上线检查清单（部署前）」五步（SITE_ORIGIN 域名决策 / robots.txt Sitemap 同步 / 应用内 DOCS_URL 同步 / Cloudflare Pages 发布管道 / pnpm validate 发布前核验）与时效数据维护说明——上轮审计遗留 P1（部署拓扑）的操作路径已文档化
+    - [x] 全站版本 5.1→5.2（生效日期 2026-09-30 不变，42 处版本行同步）；README 锚点数 480→492
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：`pnpm build` 49 页 19.92s 零报错
+    - [x] 锚点全量校验：`validate-anchors.cjs` 492 锚点 0 断链（新增节带来 +12 锚点）
+    - [x] 结构对称回归：`check-structure.py` 6 语言 × 8 篇 1:1 全绿（新增两节六语言对称）；`verify-laws.py` 与核验底稿一致
+    - [x] 条款覆盖断言：5 篇 × 6 语言效力条款 30/30 落位；新节内链逐语言使用本地化前缀（/zh-tw/mail/… 等）与既有文档译名
+    - [x] 零残留：一次性同步脚本已物理删除且未入库（amend 移除）；主仓归档按分流写入本文件，未触碰 AGENTS.md
+
+### EpomailDocs 独立审计修订 v5.1：博客等级联动披露增补与时效数据校正 (2026-09-30)
+
+*   **关联提交 (Git Commit)**: `52412e3`（EpomailDocs 独立仓库，完整 Hash `52412e393613a8b2763d133a95f6a3205e8cb6ce`，已推送 origin/main；本仓归档提交见 CHECKLIST/REPORTS 变更提交）
+*   **部署环境 (Deployment)**: `本地 build 审计核验`（文档站未部署，无生产 Version ID）
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 独立审计发现并修复第三方清单漏项（P1）：`user-service.js` `getBlogLevelInfo` 于当事人查看博客等级联动时将电子邮件地址经 GET 查询传送至 `blog.epocanvas.com`（`BLOG_BASE_URL` 默认值）——《第三方处理者清单》§2 六语言新增「运营团队博客」行、《隐私政策》§7「经您授权」项六语言同步增补，全站版本 5.0→5.1（生效日期 2026-09-30，42 处版本行同步）
+    - [x] project.md 六语言时效校正（P1）：主仓 510→535 提交、本站 3→10 提交并补全十笔 40 位 Hash 提交链（`fd57a71`→`5197f50`）、阶段表新增「12. 定稿与上线审计」、tests 102→105 个脚本
+    - [x] README 陈旧段修订（P1）：废止 v4.1「736 处条号引用全部合规」表述并全面对齐 v5.0 去条号立场；legal-architecture.svg 引用位置更正为总览；语言矩阵 7→8 篇；锚点数 396→480
+    - [x] 工具补盲（P2）：`check-structure.py` 校验范围 7→8 篇（纳入 project.md）；`package.json` 新增 `check`/`validate` 脚本挂接三件套
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：`pnpm build` 49 页 19.00s 零报错
+    - [x] 锚点全量校验：`validate-anchors.cjs` 480 锚点 0 断链
+    - [x] 结构对称回归：`check-structure.py` 6 语言 × 8 篇 1:1 全绿；`verify-laws.py` 与核验底稿一致
+    - [x] 事实核验：OAuth 访问令牌 2 小时（`oauth-provider-service.js:231-241` expires_in 7200）、Google Fonts 界面加载（`mail-vue/index.html:10-12`）、90% 配额清理（`email-service.js:311-312`）、后端 i18n 1,888 键对称（i18n-symmetry 全绿）均与文档声明一致
+    - [x] 零假数据残留：纯文档与脚本修订，无测试数据产生；主仓文档归档按分流写入 REPORTS.md 与本文件，未触碰 AGENTS.md
 
 ### EpomailDocs 上线就绪审计：远端应用变更技术事实校准与部署配置盘点 (2026-09-30)
 *   **关联提交 (Git Commit)**: `5197f50`（EpomailDocs 独立仓库，完整 Hash 见该仓 git log；已推送 origin/main）

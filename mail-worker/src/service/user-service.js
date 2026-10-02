@@ -14,6 +14,8 @@ import dayjs from 'dayjs';
 import permService from './perm-service';
 import roleService from './role-service';
 import emailUtils from '../utils/email-utils';
+import fileUtils from '../utils/file-utils';
+import kvObjService from './kv-obj-service';
 import saltHashUtils from '../utils/crypto-utils';
 import constant from '../const/constant';
 import { t } from '../i18n/i18n'
@@ -130,34 +132,50 @@ const userService = {
 	async uploadImage(c, userId) {
         const formData = await c.req.formData();
         const file = formData.get('file');
-        
+
         if (!file) throw new BizError('No file');
-        
-        const newFormData = new FormData();
-        newFormData.append('file', file);
-        
-        const res = await fetch('https://drawing.shijian.qzz.io/upload', {
-            method: 'POST',
-            body: newFormData
+
+        // 运营者可经 AVATAR_UPLOAD_URL 指定外部图床；未配置时图片落实例自有对象存储（KV 兜底，写读同源）
+        const externalHost = (c.env.AVATAR_UPLOAD_URL || '').trim().replace(/\/+$/, '');
+        if (externalHost) {
+            const newFormData = new FormData();
+            newFormData.append('file', file);
+
+            const res = await fetch(`${externalHost}/upload`, {
+                method: 'POST',
+                body: newFormData
+            });
+
+            if (!res.ok) {
+                throw new BizError('Failed to upload image to host');
+            }
+
+            const data = await res.json();
+            let url = data.url;
+            if (!url && data.data) {
+                if (data.data.url) url = data.data.url;
+                else if (data.data.links && data.data.links.url) url = data.data.links.url;
+            }
+            if (!url) {
+                url = data[0]?.src || '';
+            }
+            if (!url) throw new BizError('Failed to upload image to host');
+            return url;
+        }
+
+        if (file.size > 5 * 1024 * 1024) {
+            throw new BizError('Image too large (max 5MB)');
+        }
+        const arrayBuffer = await file.arrayBuffer();
+        const buffHash = await fileUtils.getBuffHash(arrayBuffer);
+        const key = `static/avatar/${userId}/${buffHash}${fileUtils.getExtFileName(file.name)}`;
+        await kvObjService.putObj(c, key, arrayBuffer, {
+            contentType: file.type || 'image/png',
+            contentDisposition: 'inline',
+            cacheControl: 'public, max-age=31536000, immutable'
         });
-        
-        if (!res.ok) {
-            // fallback if drawing.shijian.qzz.io is unavailable, just return a dummy or throw
-            throw new BizError('Failed to upload image to host');
-        }
-        
-        const data = await res.json();
-        // Adjust depending on the actual response format of the image host
-        let url = data.url;
-        if (!url && data.data) {
-            if (data.data.url) url = data.data.url;
-            else if (data.data.links && data.data.links.url) url = data.data.links.url;
-        }
-        if (!url) {
-            // fallback
-            url = data[0]?.src || '';
-        }
-        return url;
+        // 对象读取路由为 /static/*（index.js 以 pathname.substring(1) 还原 key），故回显 URL 即 '/' + key
+        return '/' + key;
 	},
 
 	async loginUserInfo(c, userId, loginEmail = '') {
