@@ -9,7 +9,7 @@
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
 ### EpomailDocs v5.8 打磨轮：审计问题全项治理 + 首次公网发布 (2026-10-03)
-*   **关联提交 (Git Commit)**: `<本次提交>`（主仓：P3 注释修正 + 流水归档；EpomailDocs 独立提交 `fcc1d10`，Short: `fcc1d10`）
+*   **关联提交 (Git Commit)**: `75f8125f6d730385588db731fb2899d735e35490` (Short: `75f8125`)；EpomailDocs 独立提交 `fcc1d10f9616b905e1c6b89ccb4e6f8ac953c476` (Short: `fcc1d10`)
 *   **部署环境 (Deployment)**: `Cloudflare Pages — epomail-docs（https://master.epomail-docs.pages.dev，首次公网发布）`
 *   **功能需求与变更清单 (Changes & Feature Alignment)**:
     - [x] P1 治理（×6 语言）：data-security 处理矩阵移除「边缘国家/地区码」入库声称（`user-service.js:272` 证实仅运行时读取），新增「边缘环境信息」行（不入库、随响应销毁）
