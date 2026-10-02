@@ -14,7 +14,8 @@ const KvConst = {
 	WEBAUTHN_TEST: "webauthn_test:",
 	AI_DAY_USAGE: "ai_day_usage:",
 	AI_TOTAL_USAGE: "ai_total_usage",
-	RISK_IP_ACCOUNTS: "risk_ip_acc:"
+	RISK_IP_ACCOUNTS: "risk_ip_acc:",
+	DEVICE_TRUST: "dev_trust:"
 }
 
 export default KvConst;

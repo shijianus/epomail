@@ -25,6 +25,7 @@ import orm from '../entity/orm.js';
 import user from '../entity/user.js';
 import { eq } from 'drizzle-orm';
 import riskService from './risk-service.js';
+import deviceTrustService from './device-trust-service.js';
 
 function getSafeSessionUser(userRow) {
 	if (!userRow) return null;
@@ -353,56 +354,78 @@ const loginService = {
 		const hasActiveTotp = userRow.totpEnabled === 1 && !!userRow.totpSecret;
 		const hasActivePasskey = activePasskeys.length > 0;
 
+		const deviceTag = params.deviceTag || (typeof c.req.header === 'function' ? c.req.header('x-device-tag') : '') || '';
+		const trustedDeviceToken = params.trustedDeviceToken || (typeof c.req.header === 'function' ? c.req.header('x-device-trust') : '') || '';
+
+		let sessionTrustEpoch = null;
+		let sessionMaxEpoch = null;
+
 		if (isGlobalTotpEnabled && (hasActiveTotp || hasActivePasskey)) {
-			const tempToken = 'totp_tmp_' + uuidv4().replace(/-/g, '');
-			const passkeyChallenge = webauthnUtils.generateChallenge();
-
-			// Evaluate black-box risk model
-			const riskAssessment = await riskService.evaluateRisk(c, userRow, params.secPayload || {});
-
-			let backupCodesRemaining = 0;
-			if (userRow.totpBackupCodes) {
-				try {
-					const parsed = typeof userRow.totpBackupCodes === 'string' ? JSON.parse(userRow.totpBackupCodes) : userRow.totpBackupCodes;
-					if (Array.isArray(parsed)) {
-						backupCodesRemaining = parsed.filter(i => i.used === 0).length;
-					} else if (parsed && Array.isArray(parsed.hashedCodes)) {
-						backupCodesRemaining = parsed.hashedCodes.filter(i => i.used === 0).length;
-					}
-				} catch (e) {}
-			}
-
-			await c.env.kv.put(
-				KvConst.TOTP_PENDING + tempToken,
-				JSON.stringify({
-					userId: userRow.userId,
-					email: userRow.email,
-					attempts: 0,
-					passkeyChallenge,
-					needsPasswordUpgrade: isLegacy ? password : null,
-					stepUpRequired: riskAssessment.stepUpRequired,
-					riskScore: riskAssessment.riskScore,
-					step: 1,
-					verifiedFactors: [],
-					createdAt: Date.now()
-				}),
-				{ expirationTtl: 300 } // 5 minutes TTL
+			// Evaluate autonomous black-box device trust state
+			const trustEval = await deviceTrustService.evaluateTrust(
+				c,
+				userRow.userId,
+				deviceTag,
+				trustedDeviceToken,
+				params.secPayload || {}
 			);
 
-			return {
-				mfaRequired: true,
-				tempToken,
-				authType: 'totp',
-				email: userRow.email,
-				hasTotp: !!userRow.totpSecret,
-				hasPasskeys: activePasskeys.length > 0,
-				hasBackupCodes: backupCodesRemaining > 0,
-				passkeys: activePasskeys.map(k => ({ id: k.credentialId, type: 'public-key' })),
-				passkeyChallenge,
-				stepUpRequired: riskAssessment.stepUpRequired,
-				step: 1,
-				riskFlags: riskAssessment.clientFlags
-			};
+			if (trustEval.canBypass2FA) {
+				// Trusted device 30-day grace bypass is active!
+				sessionTrustEpoch = trustEval.trustEpoch;
+				sessionMaxEpoch = trustEval.maxSessionEpoch;
+			} else {
+				const tempToken = 'totp_tmp_' + uuidv4().replace(/-/g, '');
+				const passkeyChallenge = webauthnUtils.generateChallenge();
+
+				// Evaluate black-box risk model
+				const riskAssessment = await riskService.evaluateRisk(c, userRow, params.secPayload || {});
+
+				let backupCodesRemaining = 0;
+				if (userRow.totpBackupCodes) {
+					try {
+						const parsed = typeof userRow.totpBackupCodes === 'string' ? JSON.parse(userRow.totpBackupCodes) : userRow.totpBackupCodes;
+						if (Array.isArray(parsed)) {
+							backupCodesRemaining = parsed.filter(i => i.used === 0).length;
+						} else if (parsed && Array.isArray(parsed.hashedCodes)) {
+							backupCodesRemaining = parsed.hashedCodes.filter(i => i.used === 0).length;
+						}
+					} catch (e) {}
+				}
+
+				await c.env.kv.put(
+					KvConst.TOTP_PENDING + tempToken,
+					JSON.stringify({
+						userId: userRow.userId,
+						email: userRow.email,
+						attempts: 0,
+						passkeyChallenge,
+						needsPasswordUpgrade: isLegacy ? password : null,
+						stepUpRequired: riskAssessment.stepUpRequired,
+						riskScore: riskAssessment.riskScore,
+						step: 1,
+						verifiedFactors: [],
+						deviceTag,
+						createdAt: Date.now()
+					}),
+					{ expirationTtl: 300 } // 5 minutes TTL
+				);
+
+				return {
+					mfaRequired: true,
+					tempToken,
+					authType: 'totp',
+					email: userRow.email,
+					hasTotp: !!userRow.totpSecret,
+					hasPasskeys: activePasskeys.length > 0,
+					hasBackupCodes: backupCodesRemaining > 0,
+					passkeys: activePasskeys.map(k => ({ id: k.credentialId, type: 'public-key' })),
+					passkeyChallenge,
+					stepUpRequired: riskAssessment.stepUpRequired,
+					step: 1,
+					riskFlags: riskAssessment.clientFlags
+				};
+			}
 		}
 
 		// Clear fail count on success
@@ -448,6 +471,11 @@ const loginService = {
 
 		}
 
+		if (sessionMaxEpoch) {
+			authInfo.trustEpoch = sessionTrustEpoch;
+			authInfo.maxSessionEpoch = sessionMaxEpoch;
+		}
+
 		await userService.updateUserInfo(c, userRow.userId);
 
 		try {
@@ -469,7 +497,18 @@ const loginService = {
 	},
 
 	async verifyTotpLogin(c, params) {
-		const { tempToken, code, isBackupCode = false, isPasskey = false, credentialId, clientDataJSON, authenticatorData, signature } = params;
+		const {
+			tempToken,
+			code,
+			isBackupCode = false,
+			isPasskey = false,
+			credentialId,
+			clientDataJSON,
+			authenticatorData,
+			signature,
+			rememberDevice = false,
+			deviceTag
+		} = params;
 
 		if (!tempToken) {
 			throw new BizError(t('totpCodeEmpty'));
@@ -682,6 +721,21 @@ const loginService = {
 			token: uuid 
 		});
 
+		// Issue trusted device token if rememberDevice was requested
+		let issuedTrustToken = null;
+		let sessionTrustEpoch = null;
+		let sessionMaxEpoch = null;
+
+		const effectiveDeviceTag = deviceTag || pendingData.deviceTag || (typeof c.req.header === 'function' ? c.req.header('x-device-tag') : '') || '';
+		if (rememberDevice && effectiveDeviceTag) {
+			const trustResult = await deviceTrustService.issueTrust(c, userRow.userId, effectiveDeviceTag);
+			if (trustResult) {
+				issuedTrustToken = trustResult.trustedDeviceToken;
+				sessionTrustEpoch = trustResult.trustEpoch;
+				sessionMaxEpoch = trustResult.maxSessionEpoch;
+			}
+		}
+
 		let authInfo = await c.env.kv.get(KvConst.AUTH_INFO + userRow.userId, { type: 'json' });
 
 		if (authInfo && (authInfo.user.email === userRow.email)) {
@@ -695,6 +749,11 @@ const loginService = {
 				user: getSafeSessionUser(userRow),
 				refreshTime: dayjs().toISOString()
 			};
+		}
+
+		if (sessionMaxEpoch) {
+			authInfo.trustEpoch = sessionTrustEpoch;
+			authInfo.maxSessionEpoch = sessionMaxEpoch;
 		}
 
 		await userService.updateUserInfo(c, userRow.userId);
@@ -714,7 +773,7 @@ const loginService = {
 		}
 
 		await c.env.kv.put(KvConst.AUTH_INFO + userRow.userId, JSON.stringify(authInfo), { expirationTtl: constant.TOKEN_EXPIRE });
-		return { token: jwt, email: activeLoginEmail, userId: userRow.userId };
+		return { token: jwt, email: activeLoginEmail, userId: userRow.userId, trustedDeviceToken: issuedTrustToken };
 	},
 
 	async logout(c, userId) {

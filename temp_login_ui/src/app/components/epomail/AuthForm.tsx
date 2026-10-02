@@ -252,6 +252,46 @@ function generateSessionHash(): string {
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
+function getOrGenerateDeviceTag(): string {
+  if (typeof window === "undefined") return "";
+  try {
+    let tag = localStorage.getItem("epo_device_tag");
+    if (!tag) {
+      const bytes = new Uint8Array(24);
+      if (window.crypto && window.crypto.getRandomValues) {
+        window.crypto.getRandomValues(bytes);
+      } else {
+        for (let i = 0; i < 24; i++) bytes[i] = Math.floor(Math.random() * 256);
+      }
+      tag = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+      localStorage.setItem("epo_device_tag", tag);
+    }
+    return tag;
+  } catch (_) {
+    return "";
+  }
+}
+
+function getStoredTrustedDeviceToken(): string {
+  if (typeof window === "undefined") return "";
+  try {
+    return localStorage.getItem("epo_trusted_device_token") || "";
+  } catch (_) {
+    return "";
+  }
+}
+
+function setStoredTrustedDeviceToken(token?: string | null) {
+  if (typeof window === "undefined") return;
+  try {
+    if (token) {
+      localStorage.setItem("epo_trusted_device_token", token);
+    } else {
+      localStorage.removeItem("epo_trusted_device_token");
+    }
+  } catch (_) {}
+}
+
 function getInitialChallengeState() {
   if (typeof window === "undefined") {
     return {
@@ -332,6 +372,7 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
   const [errorMsg, setErrorMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
   const [stayInOrbit, setStayInOrbit] = useState(false);
+  const [rememberDevice, setRememberDevice] = useState(false);
 
   const otpInputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
@@ -519,11 +560,13 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
     canvasRef.current?.warp();
 
     const secPayload = collectSecPayload();
+    const deviceTag = getOrGenerateDeviceTag();
+    const trustedDeviceToken = getStoredTrustedDeviceToken();
 
     fetch('/api/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password, secPayload })
+      body: JSON.stringify({ email, password, secPayload, deviceTag, trustedDeviceToken })
     })
     .then(async (res) => {
       const data = await res.json();
@@ -684,6 +727,10 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
     }
 
     syncLangToMainApp();
+    const trustTok = data.data?.trustedDeviceToken || data.trustedDeviceToken;
+    if (trustTok) {
+      setStoredTrustedDeviceToken(trustTok);
+    }
     try {
       sessionStorage.removeItem('epo_2fa_challenge_session');
     } catch (_) {}
@@ -743,7 +790,9 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
       body: JSON.stringify({
         tempToken,
         code,
-        isBackupCode: currentIsBackup
+        isBackupCode: currentIsBackup,
+        rememberDevice: Boolean(rememberDevice),
+        deviceTag: getOrGenerateDeviceTag()
       })
     })
     .then(async (res) => {
@@ -882,7 +931,9 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
           credentialId: credential.id,
           clientDataJSON,
           authenticatorData,
-          signature
+          signature,
+          rememberDevice: Boolean(rememberDevice),
+          deviceTag: getOrGenerateDeviceTag()
         })
       });
       const data = await res.json();
@@ -1630,6 +1681,30 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
                         <KeyRound size={18} className="text-cyan-400 transition-transform group-hover:rotate-12" />
                         <span>{t('passkeyVerify')}</span>
                       </motion.button>
+                      <div className="flex items-center justify-center px-0.5">
+                        <label
+                          className="group inline-flex items-center gap-2 cursor-pointer select-none text-[12px] transition-colors focus-visible:outline-none"
+                          onClick={() => setRememberDevice((prev) => !prev)}
+                        >
+                          <div
+                            className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-[5px] border transition-all duration-200 ${
+                              rememberDevice
+                                ? "bg-gradient-to-br from-cyan-400 to-indigo-500 border-cyan-300 shadow-[0_0_10px_rgba(103,232,249,0.4)]"
+                                : "bg-[rgba(255,255,255,0.04)] border-[rgba(139,147,196,0.3)] group-hover:border-[var(--epo-cyan-glow)]"
+                            }`}
+                          >
+                            {rememberDevice && (
+                              <Check size={11} strokeWidth={3} className="text-[#0b0e22]" />
+                            )}
+                          </div>
+                          <span
+                            className="text-[12px] tracking-wide transition-colors group-hover:text-[var(--epo-ink)]"
+                            style={{ color: rememberDevice ? "var(--epo-ink)" : "var(--epo-muted)" }}
+                          >
+                            {t('rememberDevice')}
+                          </span>
+                        </label>
+                      </div>
                       <p className="text-center text-[11px] leading-relaxed" style={{ color: "var(--epo-muted)" }}>
                         {t('methodPasskeyDesc')}
                       </p>
@@ -1823,6 +1898,34 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
                         {t('backupCodeNote')}
                       </p>
                     </motion.div>
+                  )}
+
+                  {/* Remember Device Checkbox: "以后本设备登录不再验证" */}
+                  {active2FAMethod !== 'passkey' && (
+                    <div className="flex items-center justify-start px-0.5 pt-0.5">
+                      <label
+                        className="group inline-flex items-center gap-2 cursor-pointer select-none text-[12px] transition-colors focus-visible:outline-none"
+                        onClick={() => setRememberDevice((prev) => !prev)}
+                      >
+                        <div
+                          className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-[5px] border transition-all duration-200 ${
+                            rememberDevice
+                              ? "bg-gradient-to-br from-cyan-400 to-indigo-500 border-cyan-300 shadow-[0_0_10px_rgba(103,232,249,0.4)]"
+                              : "bg-[rgba(255,255,255,0.04)] border-[rgba(139,147,196,0.3)] group-hover:border-[var(--epo-cyan-glow)]"
+                          }`}
+                        >
+                          {rememberDevice && (
+                            <Check size={11} strokeWidth={3} className="text-[#0b0e22]" />
+                          )}
+                        </div>
+                        <span
+                          className="text-[12px] tracking-wide transition-colors group-hover:text-[var(--epo-ink)]"
+                          style={{ color: rememberDevice ? "var(--epo-ink)" : "var(--epo-muted)" }}
+                        >
+                          {t('rememberDevice')}
+                        </span>
+                      </label>
+                    </div>
                   )}
 
                   {/* Submit Verification Button (For OTP and Backup Code) */}

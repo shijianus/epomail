@@ -161,6 +161,15 @@ app.use('*', async (c, next) => {
 		throw new BizError(t('authExpired'), 401);
 	}
 
+	// Autonomous Device Trust Horizon: Enforce 60-day absolute session eviction cap
+	if (authInfo.maxSessionEpoch) {
+		const nowSec = Math.floor(Date.now() / 1000);
+		if (nowSec >= authInfo.maxSessionEpoch) {
+			await c.env.kv.delete(KvConst.AUTH_INFO + userId);
+			throw new BizError(t('authExpired'), 401);
+		}
+	}
+
 	if (authInfo.user && authInfo.user.status === 1) {
 		throw new BizError(t('isBanUser'), 403);
 	}
