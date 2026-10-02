@@ -8,6 +8,20 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### EpomailDocs v5.8 视觉与入口打磨轮：翻页卡图标/表格居中/语言协商 (2026-10-03)
+*   **关联提交 (Git Commit)**: `<本次提交>`（主仓流水归档；EpomailDocs 独立提交 `a1c1e89c4e8b85579346304df3d5b37d197b68db`，Short: `a1c1e89`，已推送 origin/main）
+*   **部署环境 (Deployment)**: `Cloudflare Pages epomail-docs 重新发布（Pages Functions 首次上线，master.epomail-docs.pages.dev）`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 反馈①（alt 随被选择语言）：取证确认 en/fr/es/nl 构建 alt/图注本已 100% 本地化；真缺口为入口恒落简中——新增 Pages Functions 三路由按 Accept-Language 协商（zh-Hant→zh-tw、en/fr/es/nl 直配、缺省简中），浏览器所选语言自此决定落地语言与全部 alt/配图
+    - [x] 反馈②（表格居中）：Playwright 实测坐实 1920 视口下 Starlight fit-content 使表格贴左；custom.css margin 改 auto，截图确认对称居中
+    - [x] 反馈③（翻页卡图标）：覆写 Starlight Pagination，9 篇文档各配专属几何图标（主题色描边+强调色细节）；修复 SVG 表达式转义泄漏
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：EpomailDocs build 55 页零报错；anchors 1212/0 断链；check-structure 对称 100%；verify-laws exit 0
+    - [x] 本地协商实测 8 例全绿（root 与 /mail/* 双入口 × 6 语种权重场景，含尾斜杠保留）
+    - [x] 浏览器全真栈实测：翻页卡特写判图（zh 亮/暗、en、fr、375 移动端）、1920 表格居中、en 页英文 alt 全部通过
+    - [x] 线上验证：302 协商全对、en 页 doc-icon 与英文 alt、线上 CSS 与本地哈希一致
+    - [x] 零假数据残留：无测试数据产生；本地预览进程已清理
+
 ### EpomailDocs v5.8 打磨轮：审计问题全项治理 + 首次公网发布 (2026-10-03)
 *   **关联提交 (Git Commit)**: `75f8125f6d730385588db731fb2899d735e35490` (Short: `75f8125`)；EpomailDocs 独立提交 `fcc1d10f9616b905e1c6b89ccb4e6f8ac953c476` (Short: `fcc1d10`)
 *   **部署环境 (Deployment)**: `Cloudflare Pages — epomail-docs（https://master.epomail-docs.pages.dev，首次公网发布）`
