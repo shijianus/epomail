@@ -8,6 +8,19 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### 原理图六语言本地化轮：12 图 × 6 语言 = 72 个 SVG (2026-10-02)
+*   **关联提交 (Git Commit)**: EpomailDocs `c5de61f`（主提交）；清单同步 `6478520` (Short: `c5de61f` / `6478520`)
+*   **部署环境 (Deployment)**: `本地构建与静态核验`（生产 Pages 未触发部署）
+*   **变更清单**:
+    - [x] 12 张原理图全量六语言本地化：根路径（简中）+ zh-tw/en/fr/es/nl 各一套，每种语言的文档配该语言的图（含 aria-label 与图内全部文字）
+    - [x] 新增 scripts/generate-figures.mjs 单源生成器（builders ×2 + 文案字典 ×2）：72 个 SVG 由一处字典驱动，杜绝 72 文件手工同步
+    - [x] 30 个非简中文档图片引用加语言前缀；check-structure.py 图片比对归一化（剥语言前缀后比对），对称校验逻辑保持有效
+    - [x] fr/nl 长文案按容器宽度逐行校准（法文责任边界第三行、法文盾牌底行两处溢出修正）；渲染抽检 12 张无溢出
+*   **核验清单**:
+    - [x] pnpm build 55 页零报错；validate-anchors 1200 锚点 0 断链；check-structure 六语言对称 100%；verify-laws exit 0
+    - [x] 页面级截图确认 zh/fr 图内文字随语言渲染（data-security 纵深防御图、overview 架构图）
+    - [x] tamper-proof.json 重生成并同步提交；临时渲染脚本与截图即弃，工作树干净
+
 ### 法律文档站 v5.7 去幻觉与六语言深度整合轮 (2026-10-02)
 *   **关联提交 (Git Commit)**: EpomailDocs `e6eb758`（主提交，内容见其 Commit Message 全文）；清单同步 `1d0a61c` (Short: `e6eb758` / `1d0a61c`)
 *   **部署环境 (Deployment)**: `本地构建与静态核验`（生产 Pages 未触发部署）
