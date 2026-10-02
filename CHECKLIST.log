@@ -8,6 +8,24 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### 个人资料支持添加多个额外电子邮箱与全生命周期管理 (2026-10-02)
+*   **关联提交 (Git Commit)**: `7ce1f2d86cf9d7ed48ea87d46761ce3c17a36670` (Short: `7ce1f2d`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare Workers (https://mail.epocanvas.com)` (Version ID: `0b9d4b80-71ca-4938-91ac-151b3b7bed01`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 变更点 1 (前端 UI 与模态框交互)：
+        - 在 `mail-vue/src/views/profile-info/index.vue` 个人资料（个资）的「电子邮件」区重构为 `.emails-container`，显示账号主邮箱（带不可删除的 Primary 徽标）与附加个人邮箱列表（带类型标签与删除按钮），新增「添加电子邮箱」按钮与现代化毛玻璃模态弹窗；
+    - [x] 变更点 2 (输入校验与交互体验)：
+        - 模态框支持 RFC 标准电子邮箱格式实时正则校验与报错提示、与已有邮箱及主邮箱排重校验、邮箱标签选择（个人、工作、备用、其他），支持删除确认二次确认模态弹窗与成功气泡反馈，完全适配浅色与暗色模式；
+    - [x] 变更点 3 (后端持久化与安全过滤)：
+        - 在 `mail-worker/src/service/user-service.js` 的 `ALLOWED_PROFILE_FIELDS` 白名单开放 `emails`，引入邮箱规范化清洗（trim、小写化、RFC 正则、长度防爆、最大 20 个限制），并在 `loginUserInfo` 中自动加载用户已保存的额外邮箱列表；
+    - [x] 变更点 4 (六语言严谨闭环与 Vue-i18n 转义修复)：
+        - 同步更新 6 种语言字典（zh, zh-Hant, en, es, fr, nl）共 13 项词条，处理 Vue-i18n `@` 链接占位符转义（`{'@'}`），彻底消除前端编译与模态框渲染报错。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：`mail-vue` 构建通过 (耗时 15.61s)，`mail-worker` 语法与编译校验通过；
+    - [x] 自动化测试套件：`tests/test-profile-multiple-emails-e2e.mjs` 全真公网端到端测试 20/20 项断言 100% 全部通过；
+    - [x] 真实生产浏览器实测核验：添加个人邮箱、添加工作邮箱、格式拦截、重复邮箱拦截、删除确认物理移除全链路闭环，截图保存在 `tests/verify_profile_multiple_emails.png`；
+    - [x] 零假数据残留：测试临时添加的邮箱与测试数据均在 `finally` 块中物理恢复与清理。
+
 ### 2FA 故障排除交互重构：废除撑高抽屉卡片，升级为悬停气泡「?」指引与 0px 零抖动布局 (2026-10-02)
 *   **关联提交 (Git Commit)**: `987f5271c0e85876d76bb956627edaa704c125b4` (Short: `987f527`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare Workers (https://mail.epocanvas.com)` (Version ID: `1a60ffad-9734-468b-abc0-febc545d5ab0`)
