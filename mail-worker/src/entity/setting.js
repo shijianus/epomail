@@ -93,7 +93,9 @@ export const setting = sqliteTable('setting', {
 	attachmentCascadeDelete: integer('attachment_cascade_delete').default(1).notNull(),
 	multiAccountEnabled: integer('multi_account_enabled').default(0).notNull(),
 	termsUrl: text('terms_url').default('').notNull(),
-	privacyUrl: text('privacy_url').default('').notNull()
+	privacyUrl: text('privacy_url').default('').notNull(),
+	oauthLoginEnabled: integer('oauth_login_enabled').default(0).notNull(),
+	oauthProviders: text('oauth_providers').default('{}').notNull()
 });
 export default setting
 

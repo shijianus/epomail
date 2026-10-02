@@ -680,22 +680,14 @@ function openProjectIntro() {
 
 function openPrivacyPolicy() {
   closeDropdown();
-  const extUrl = settingStore.settings?.privacyUrl;
-  if (extUrl && typeof extUrl === 'string' && extUrl.startsWith('http')) {
-    window.open(extUrl, '_blank', 'noopener,noreferrer');
-  } else {
-    privacyDialogVisible.value = true;
-  }
+  const extUrl = settingStore.settings?.privacyUrl || 'https://epomail-docs.pages.dev/epomail/mail/privacy-policy/';
+  window.open(extUrl, '_blank', 'noopener,noreferrer');
 }
 
 function openTermsOfService() {
   closeDropdown();
-  const extUrl = settingStore.settings?.termsUrl;
-  if (extUrl && typeof extUrl === 'string' && extUrl.startsWith('http')) {
-    window.open(extUrl, '_blank', 'noopener,noreferrer');
-  } else {
-    termsDialogVisible.value = true;
-  }
+  const extUrl = settingStore.settings?.termsUrl || 'https://epomail-docs.pages.dev/epomail/mail/terms-of-service/';
+  window.open(extUrl, '_blank', 'noopener,noreferrer');
 }
 
 function onDropdownVisibleChange(visible) {

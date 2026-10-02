@@ -8,6 +8,38 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### epomail-docs 全量英文法务与安全合规重构、Gmail 式双重定位融合、主站直连与单次验真治理 (2026-10-02)
+*   **关联提交 (Git Commit - epocanvas-mail)**: `e86766ee69cb030a133d1b702ec94da8093d5f30` (Short: `e86766e`)
+*   **关联提交 (Git Commit - epomail-docs)**: `d09d6cb021a8d05fcfe74f2603f9bca1b5bf3b39` (Short: `d09d6cb`) | `2af79fa81fb982a0c27d774f4eec4695835b2dce` (Short: `2af79fa`) | `0072b0fdac75b6026edd2b6a04d8320790aeed38` (Short: `0072b0f`)
+*   **部署环境 (Deployment)**: `Cloudflare Pages (https://epomail-docs.pages.dev / https://a2250f1e.epomail-docs.pages.dev)`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 变更点 1 (学习 Google/Gmail 政策范式与全面扩写)：
+        - 彻底消除内容单薄与占位式段落，9 篇核心英文文档全量重构扩写至 ~6,500 词；
+        - 每个主章节均包含 50~150 字的高质量严谨段落，阐释技术逻辑与法律权利；
+        - 采用 H3 细分场景 + 加粗前缀（如 `Account Responsibilities:`、`Zero Telemetry Guarantee:`），辅以规范的 Markdown Callout（`> [!NOTE]`, `> [!IMPORTANT]`, `> [!TIP]`）增强视觉层级；
+        - 每篇文档严格控制插画数量（1~2 张自适应 SVG，全篇最多不超 3 张），保证排版匀称与视觉留白。
+    - [x] 变更点 2 (双重定位深度融合 Dual-Nature Fusion)：
+        - **托管服务定位 (Hosted Instance at `mail.epocanvas.com`)**：说明非商业性质、无商业 SLA 保证、用户通讯内容版权归属、30天垃圾清理与物理擦除；
+        - **开源专案生态定位 (Open-Source Project at `github.com/shijianus/epomail`)**：明确 MIT 协议、自建自由度，自建者为其自身实例及用户的唯一独立数据控制者 (Sole Data Controller)，上游代码库零遥测 (Zero Telemetry)；
+        - **品牌与商标保护原则**：严禁第三方自建或二次开发服务冒充 EpoCanvas Mail 官方服务或使用 `epocanvas.com` 官方域名，必须使用独立域名与联系方式。
+    - [x] 变更点 3 (全球合规与区域风险透明披露)：
+        - 覆盖欧洲经济区/英国 GDPR/UK GDPR（第6条处理依据、完整数据主体权利、监管投诉权）；
+        - 覆盖美国加州 CCPA/CPRA（信息类别披露、绝不销售/共享个人信息用于跨上下文广告、无歧视承诺）；
+        - 亚太及跨国边缘传输：明确披露数据经由 Cloudflare Anycast 全球节点加密传输与边缘计算。
+    - [x] 变更点 4 (杜绝防篡改组件重复与视觉疲劳)：
+        - 重构 `tamper-proof-client.js`，将大型 `#tamper-proof-widget` (class `tamper-proof-panel`) 严格限定在官方防篡改专页 (`tamper-proof.md`) 且全篇仅出现一次；
+        - 彻底移除对隐私政策、服务条款等常规阅读页面的强制注入，消除视觉干扰。
+    - [x] 变更点 5 (主站 `gac-footer` 真实直连)：
+        - 修改 `mail-vue/src/layout/header/index.vue` 中的 `openPrivacyPolicy` 和 `openTermsOfService`，全面由弹窗改造为新标签页直连真实生产文档；
+        - `projectIntro`、`privacyPolicy`、`termsOfService` 三者形成完整官方文档导流闭环。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 独立子代理全真审计：派驻专门审核员全面断言视觉层次、文本密度、单次防篡改呈现与外链直通；
+    - [x] 多语言结构与独立基准核验：`python3 scripts/check-structure.py` 100% 通过（9 篇核心英文基准与多语系对齐）；
+    - [x] 全站锚点与资源静态核验：`node scripts/validate-anchors.cjs` 全绿 (110 页面 / 1056 锚点链接 0 损坏)；
+    - [x] 生产构建：`mail-vue` (15.23s 构建通过) 与 `epomail-docs` (55 页面 / 13910 词 Pagefind 索引完成，6.16s 构建通过)；
+    - [x] 零假数据残留：测试数据全部清理，工作区干净。
+
+
 ### 通行密钥平台本地写入、极简弹窗与 2FA/Passkey 完整生命周期及时间锁上线 (2026-10-02)
 *   **关联提交 (Git Commit)**: `c276c6a95f675750415b50fe078eda39e4db13ca` (Short: `c276c6a`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare Workers (https://mail.epocanvas.com)` (Version ID: `55a33ae6-7b0d-4854-b407-a2442f5cfe36`)

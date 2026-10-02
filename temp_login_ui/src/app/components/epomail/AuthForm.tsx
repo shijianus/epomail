@@ -240,8 +240,21 @@ function FloatingField({
   );
 }
 
+function generateSessionHash(): string {
+  const bytes = new Uint8Array(16);
+  if (typeof window !== "undefined" && window.crypto && window.crypto.getRandomValues) {
+    window.crypto.getRandomValues(bytes);
+  } else {
+    for (let i = 0; i < 16; i++) bytes[i] = Math.floor(Math.random() * 256);
+  }
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
 export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
   const [stage, setStage] = useState<Stage>("password");
+  const [challengeSessionHash, setChallengeSessionHash] = useState<string>("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -297,6 +310,90 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
     const timer = setInterval(updatePeriod, 1000);
     return () => clearInterval(timer);
   }, [stage]);
+
+  const updateChallengeUrl = (methodType: string, hash: string, replace: boolean = false) => {
+    if (typeof window === "undefined" || !hash) return;
+    const targetPath = `/login/challenge/${methodType}_${hash}`;
+    if (window.location.pathname !== targetPath) {
+      if (replace) {
+        window.history.replaceState({ sessionHash: hash, method: methodType }, '', targetPath);
+      } else {
+        window.history.pushState({ sessionHash: hash, method: methodType }, '', targetPath);
+      }
+    }
+  };
+
+  // URL 路由精确同步与跨环境复制自动回退机制
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const handleRouteSync = () => {
+      const pathname = window.location.pathname;
+      const challengeMatch = pathname.match(/\/login\/challenge\/(totp|passkey|backup|select|session)_([A-Za-z0-9_-]+)/);
+
+      if (challengeMatch) {
+        const urlMethodPrefix = challengeMatch[1];
+        const urlHash = challengeMatch[2];
+        let storedSession: any = null;
+        try {
+          const raw = sessionStorage.getItem('epo_2fa_challenge_session');
+          if (raw) storedSession = JSON.parse(raw);
+        } catch (_) {}
+
+        // 严格环境与会话有效性核验：
+        // 1. 本标签页 sessionStorage 必须存在会话
+        // 2. sessionHash 必须与 URL 中的 hash 严格一致
+        // 3. 时间窗口在 10 分钟内
+        // 若在不同环境直接复制粘贴链接打开，因无当前标签页 sessionStorage，自动安全回退至 /login/
+        const isValid = storedSession &&
+          storedSession.sessionHash === urlHash &&
+          (Date.now() - (storedSession.createdAt || 0) < 10 * 60 * 1000);
+
+        if (!isValid) {
+          window.history.replaceState(null, '', '/login/' + window.location.search);
+          sessionStorage.removeItem('epo_2fa_challenge_session');
+          setStage("password");
+          setChallengeSessionHash("");
+        } else {
+          // 当前标签页内正常刷新（F5）或会话内有效跳转：完整恢复 2FA 状态与因子
+          setChallengeSessionHash(urlHash);
+          setTempToken(storedSession.tempToken || "");
+          setMfaEmail(storedSession.email || "");
+          setHasPasskeys(Boolean(storedSession.hasPasskeys));
+          setPasskeysList(storedSession.passkeysList || []);
+          setPasskeyChallenge(storedSession.passkeyChallenge || "");
+          setHasTotp(Boolean(storedSession.hasTotp ?? true));
+          setHasBackupCodes(Boolean(storedSession.hasBackupCodes ?? true));
+          setStepUpActive(Boolean(storedSession.stepUpRequired));
+          setStage("totp");
+
+          if (urlMethodPrefix === 'select') {
+            setShowMethodSelector(true);
+          } else {
+            setShowMethodSelector(false);
+            if (urlMethodPrefix === 'passkey') {
+              setActive2FAMethod('passkey');
+              setIsBackupCode(false);
+            } else if (urlMethodPrefix === 'backup') {
+              setActive2FAMethod('backup_code');
+              setIsBackupCode(true);
+            } else {
+              setActive2FAMethod('totp');
+              setIsBackupCode(false);
+            }
+          }
+        }
+      } else {
+        if (stage === "password") {
+          sessionStorage.removeItem('epo_2fa_challenge_session');
+        }
+      }
+    };
+
+    handleRouteSync();
+    window.addEventListener('popstate', handleRouteSync);
+    return () => window.removeEventListener('popstate', handleRouteSync);
+  }, []);
 
   // 挂载时检测登录凭证失效提示及自动回填上次登录邮箱
   useEffect(() => {
@@ -396,15 +493,26 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
       if (data.code === 200) {
         // Check if 2FA is required
         if (data.data?.mfaRequired || data.mfaRequired) {
-          setTempToken(data.data?.tempToken || data.tempToken);
-          setMfaEmail(data.data?.email || data.email || email);
+          const tToken = data.data?.tempToken || data.tempToken;
+          const targetEmail = data.data?.email || data.email || email;
           const pks = data.data?.passkeys || data.passkeys || [];
           const hasPk = Boolean(data.data?.hasPasskeys || (pks && pks.length > 0));
+          const hasT = Boolean(data.data?.hasTotp ?? true);
+          const hasBc = Boolean(data.data?.hasBackupCodes ?? true);
+          const pkChallenge = data.data?.passkeyChallenge || data.passkeyChallenge || '';
+          const isStepUp = Boolean(data.data?.stepUpRequired || data.stepUpRequired);
+          const rScore = Number(data.data?.riskScore || data.riskScore || 0);
+
+          const newHash = generateSessionHash();
+          setChallengeSessionHash(newHash);
+
+          setTempToken(tToken);
+          setMfaEmail(targetEmail);
           setHasPasskeys(hasPk);
           setPasskeysList(pks);
-          setPasskeyChallenge(data.data?.passkeyChallenge || data.passkeyChallenge || '');
-          setHasTotp(Boolean(data.data?.hasTotp ?? true));
-          setHasBackupCodes(Boolean(data.data?.hasBackupCodes ?? true));
+          setPasskeyChallenge(pkChallenge);
+          setHasTotp(hasT);
+          setHasBackupCodes(hasBc);
 
           setStage("totp");
           setStatus("idle");
@@ -413,17 +521,41 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
           setIsBackupCode(false);
           setShowHelp(false);
           setErrorMsg("");
-          setStepUpActive(false);
+          setStepUpActive(isStepUp);
           setVerifiedFactors([]);
           setShowMethodSelector(false);
 
+          let initialMethod: TwoFAMethod = "totp";
           if (hasPk) {
-            setActive2FAMethod("passkey");
-          } else if (data.data?.hasTotp !== false) {
-            setActive2FAMethod("totp");
+            initialMethod = "passkey";
+          } else if (hasT) {
+            initialMethod = "totp";
           } else {
-            setActive2FAMethod("backup_code");
+            initialMethod = "backup_code";
           }
+          setActive2FAMethod(initialMethod);
+
+          // 保存当前标签页的独立 2FA 会话数据（不同环境复制粘贴链接打开无此数据将自动回退）
+          const sessionData = {
+            sessionHash: newHash,
+            tempToken: tToken,
+            email: targetEmail,
+            hasPasskeys: hasPk,
+            passkeysList: pks,
+            passkeyChallenge: pkChallenge,
+            hasTotp: hasT,
+            hasBackupCodes: hasBc,
+            createdAt: Date.now(),
+            stepUpRequired: isStepUp,
+            riskScore: rScore
+          };
+          try {
+            sessionStorage.setItem('epo_2fa_challenge_session', JSON.stringify(sessionData));
+          } catch (_) {}
+
+          // 更新 URL 为普遍规律前缀 + base64url sha 会话标识
+          const urlMethod = initialMethod === 'backup_code' ? 'backup' : initialMethod;
+          updateChallengeUrl(urlMethod, newHash);
 
           // 连续性星际巡航平滑降速与高能青光脉冲
           cameraState.vzTarget = 1.35;
@@ -515,6 +647,9 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
     }
 
     syncLangToMainApp();
+    try {
+      sessionStorage.removeItem('epo_2fa_challenge_session');
+    } catch (_) {}
     setStatus("success");
     cameraState.authSuccessOpacity = 1;
 
@@ -908,7 +1043,7 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
         transition={{
           layout: { type: "spring", stiffness: 320, damping: 30 },
         }}
-        className="relative"
+        className="relative flex-1 flex flex-col justify-between"
       >
         <AnimatePresence mode="wait">
           {stage === "password" ? (
@@ -922,191 +1057,199 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
               exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -12, filter: "blur(4px)" }}
               transition={reduceMotion ? { duration: 0 } : { duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
               onSubmit={handlePasswordSubmit}
-              className="flex flex-col gap-7 pt-4"
+              className="flex-1 flex flex-col justify-between gap-6 pt-1"
             >
-              <FloatingField
-                id="epo-email"
-                type="email"
-                label={tr('emailLabel')}
-                icon={<Mail size={16} strokeWidth={1.8} />}
-                value={email}
-                onChange={setEmail}
-                hasError={!!errorMsg}
-                onKeyFeedback={(e) => {
-                  const rect = e.currentTarget.getBoundingClientRect();
-                  canvasRef.current?.burst({
-                    x: rect.left + rect.width * (0.3 + Math.random() * 0.4),
-                    y: rect.top + rect.height / 2,
-                  });
-                }}
-              />
-
-              <FloatingField
-                id="epo-password"
-                type={showPassword ? "text" : "password"}
-                label={tr('passwordLabel')}
-                icon={<Lock size={16} strokeWidth={1.8} />}
-                value={password}
-                onChange={setPassword}
-                hasError={!!errorMsg}
-                onKeyFeedback={(e) => {
-                  const rect = e.currentTarget.getBoundingClientRect();
-                  canvasRef.current?.burst({
-                    strength: 1.4,
-                    x: rect.left + rect.width * (0.3 + Math.random() * 0.4),
-                    y: rect.top + rect.height / 2,
-                  });
-                }}
-                trailing={
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword((s) => !s)}
-                    className="p-1 transition-colors"
-                    style={{ color: "var(--epo-muted)" }}
-                    aria-label={showPassword ? (t('hidePassword')) : (t('showPassword'))}
-                  >
-                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                  </button>
-                }
-              />
-
-              <div className="flex items-center justify-between">
-                <label
-                  className="flex cursor-pointer select-none items-center gap-2 text-[13px]"
-                  style={{ color: "var(--epo-muted)" }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={stayInOrbit}
-                    onChange={(e) => setStayInOrbit(e.target.checked)}
-                    className="peer sr-only"
-                  />
-                  <span
-                    aria-hidden="true"
-                    className="flex h-4 w-4 shrink-0 items-center justify-center rounded-[5px] border transition-all duration-200 peer-focus-visible:ring-2 peer-focus-visible:ring-[#67e8f9]"
-                    style={
-                      stayInOrbit
-                        ? {
-                            background: "var(--epo-brand-gradient)",
-                            borderColor: "transparent",
-                            boxShadow: "0 0 12px rgba(124,58,237,0.45)",
-                          }
-                        : {
-                            borderColor: "rgba(139,147,196,0.45)",
-                            background: "rgba(255,255,255,0.04)",
-                          }
-                    }
-                  >
-                    {stayInOrbit && <Check size={11} strokeWidth={3.5} color="#fff" />}
-                  </span>
-                  {tr('stayInOrbit')}
-                </label>
-                <a
-                  href="#"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setErrorMsg(tr('forgotPasswordHint'));
+              <div className="flex flex-col gap-6">
+                <FloatingField
+                  id="epo-email"
+                  type="email"
+                  label={tr('emailLabel')}
+                  icon={<Mail size={16} strokeWidth={1.8} />}
+                  value={email}
+                  onChange={setEmail}
+                  hasError={!!errorMsg}
+                  onKeyFeedback={(e) => {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    canvasRef.current?.burst({
+                      x: rect.left + rect.width * (0.3 + Math.random() * 0.4),
+                      y: rect.top + rect.height / 2,
+                    });
                   }}
-                  className="text-[13px] transition-colors hover:text-[var(--epo-cyan-glow)]"
-                  style={{ color: "var(--epo-muted)" }}
-                >
-                  {tr('forgotPassword')}
-                </a>
-              </div>
+                />
 
-              <motion.button
-                type="submit"
-                whileHover={submitHover}
-                whileTap={{ scale: 0.96 }}
-                disabled={status !== "idle"}
-                className="epomail-display relative mt-1 flex h-12 w-full items-center justify-center gap-2 overflow-hidden rounded-xl text-[15px] tracking-wide text-white cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#67e8f9] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b0e22] disabled:cursor-not-allowed disabled:opacity-60"
-                style={{
-                  background: "var(--epo-brand-gradient)",
-                  boxShadow:
-                    "0 8px 30px rgba(79,70,229,0.45), inset 0 1px 0 rgba(255,255,255,0.25)",
-                }}
-              >
-                <AnimatePresence>
-                  {status === "warping" && (
-                    <motion.span
-                      className="absolute inset-0"
-                      initial={{ x: "-100%" }}
-                      animate={{ x: "100%" }}
-                      transition={{ duration: 1.2, ease: "easeInOut" }}
-                      style={{
-                        background:
-                          "linear-gradient(90deg, transparent, rgba(255,255,255,0.6), transparent)",
-                      }}
-                    />
-                  )}
-                </AnimatePresence>
-
-                <span className="relative flex items-center gap-2">
-                  {status === "idle" && (
-                    <>
-                      {tr('initiateLogin')} <ArrowRight size={17} />
-                    </>
-                  )}
-                  {status === "warping" && (
-                    <>
-                      <Loader2 size={17} className="animate-spin" /> {tr('warping')}
-                    </>
-                  )}
-                  {status === "success" && (
-                    <>
-                      <Check size={17} /> {tr('connected')}
-                    </>
-                  )}
-                </span>
-              </motion.button>
-
-              <div className="flex items-center gap-3">
-                <div className="h-px flex-1" style={{ background: "rgba(139,147,196,0.2)" }} />
-                <span className="text-[12px]" style={{ color: "var(--epo-muted)" }}>
-                  {tr('orContinueWith')}
-                </span>
-                <div className="h-px flex-1" style={{ background: "rgba(139,147,196,0.2)" }} />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                {["Google", "GitHub"].map((provider) => (
-                  <motion.button
-                    key={provider}
-                    type="button"
-                    onClick={() => setErrorMsg(tr('oauthComingSoon'))}
-                    whileHover={reduceMotion ? { opacity: 1 } : { opacity: 1, y: -1.5 }}
-                    whileTap={{ scale: 0.98 }}
-                    transition={{ duration: 0.18, ease: "easeOut" }}
-                    className="epomail-display flex h-11 items-center justify-center gap-2 rounded-xl border text-[13px] transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#67e8f9]"
-                    style={{
-                      borderColor: "rgba(139,147,196,0.25)",
-                      background: "rgba(255,255,255,0.04)",
-                      color: "var(--epo-ink)",
-                      opacity: 0.82,
-                    }}
-                  >
-                    {provider}
-                    <span
-                      className="rounded-full border px-1.5 py-px text-[9px] uppercase tracking-wider"
-                      style={{ borderColor: "rgba(139,147,196,0.35)", color: "var(--epo-muted)" }}
+                <FloatingField
+                  id="epo-password"
+                  type={showPassword ? "text" : "password"}
+                  label={tr('passwordLabel')}
+                  icon={<Lock size={16} strokeWidth={1.8} />}
+                  value={password}
+                  onChange={setPassword}
+                  hasError={!!errorMsg}
+                  onKeyFeedback={(e) => {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    canvasRef.current?.burst({
+                      strength: 1.4,
+                      x: rect.left + rect.width * (0.3 + Math.random() * 0.4),
+                      y: rect.top + rect.height / 2,
+                    });
+                  }}
+                  trailing={
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((s) => !s)}
+                      className="p-1 transition-colors"
+                      style={{ color: "var(--epo-muted)" }}
+                      aria-label={showPassword ? (t('hidePassword')) : (t('showPassword'))}
                     >
-                      {t('oauthSoon')}
+                      {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  }
+                />
+
+                <div className="flex items-center justify-between">
+                  <label
+                    className="flex cursor-pointer select-none items-center gap-2 text-[13px]"
+                    style={{ color: "var(--epo-muted)" }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={stayInOrbit}
+                      onChange={(e) => setStayInOrbit(e.target.checked)}
+                      className="peer sr-only"
+                    />
+                    <span
+                      aria-hidden="true"
+                      className="flex h-4 w-4 shrink-0 items-center justify-center rounded-[5px] border transition-all duration-200 peer-focus-visible:ring-2 peer-focus-visible:ring-[#67e8f9]"
+                      style={
+                        stayInOrbit
+                          ? {
+                              background: "var(--epo-brand-gradient)",
+                              borderColor: "transparent",
+                              boxShadow: "0 0 12px rgba(124,58,237,0.45)",
+                            }
+                          : {
+                              borderColor: "rgba(139,147,196,0.45)",
+                              background: "rgba(255,255,255,0.04)",
+                            }
+                      }
+                    >
+                      {stayInOrbit && <Check size={11} strokeWidth={3.5} color="#fff" />}
                     </span>
-                  </motion.button>
-                ))}
+                    {tr('stayInOrbit')}
+                  </label>
+                  <a
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setErrorMsg(tr('forgotPasswordHint'));
+                    }}
+                    className="text-[13px] transition-colors hover:text-[var(--epo-cyan-glow)]"
+                    style={{ color: "var(--epo-muted)" }}
+                  >
+                    {tr('forgotPassword')}
+                  </a>
+                </div>
+
+                <motion.button
+                  type="submit"
+                  whileHover={submitHover}
+                  whileTap={{ scale: 0.96 }}
+                  disabled={status !== "idle"}
+                  className="epomail-display relative mt-1 flex h-12 w-full items-center justify-center gap-2 overflow-hidden rounded-xl text-[15px] tracking-wide text-white cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#67e8f9] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b0e22] disabled:cursor-not-allowed disabled:opacity-60"
+                  style={{
+                    background: "var(--epo-brand-gradient)",
+                    boxShadow:
+                      "0 8px 30px rgba(79,70,229,0.45), inset 0 1px 0 rgba(255,255,255,0.25)",
+                  }}
+                >
+                  <AnimatePresence>
+                    {status === "warping" && (
+                      <motion.span
+                        className="absolute inset-0"
+                        initial={{ x: "-100%" }}
+                        animate={{ x: "100%" }}
+                        transition={{ duration: 1.2, ease: "easeInOut" }}
+                        style={{
+                          background:
+                            "linear-gradient(90deg, transparent, rgba(255,255,255,0.6), transparent)",
+                        }}
+                      />
+                    )}
+                  </AnimatePresence>
+
+                  <span className="relative flex items-center gap-2">
+                    {status === "idle" && (
+                      <>
+                        {tr('initiateLogin')} <ArrowRight size={17} />
+                      </>
+                    )}
+                    {status === "warping" && (
+                      <>
+                        <Loader2 size={17} className="animate-spin" /> {tr('warping')}
+                      </>
+                    )}
+                    {status === "success" && (
+                      <>
+                        <Check size={17} /> {tr('connected')}
+                      </>
+                    )}
+                  </span>
+                </motion.button>
               </div>
 
-              <p className="text-center text-[13px]" style={{ color: "var(--epo-muted)" }}>
-                {tr('newToCanvas')}{" "}
-                <a
-                  href="#"
-                  onClick={(e) => { e.preventDefault(); onSwitch(); }}
-                  className="transition-colors hover:text-[var(--epo-cyan-glow)]"
-                  style={{ color: "var(--epo-purple-glow)" }}
-                >
-                  {tr('exploreNode')}
-                </a>
-              </p>
+              <div className="mt-auto pt-3 flex flex-col gap-3">
+                {sysConfig?.oauthLoginEnabled ? (
+                  <div className="flex flex-col gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="h-px flex-1" style={{ background: "rgba(139,147,196,0.2)" }} />
+                      <span className="text-[12px]" style={{ color: "var(--epo-muted)" }}>
+                        {tr('orContinueWith')}
+                      </span>
+                      <div className="h-px flex-1" style={{ background: "rgba(139,147,196,0.2)" }} />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      {["Google", "GitHub"].map((provider) => (
+                        <motion.button
+                          key={provider}
+                          type="button"
+                          onClick={() => setErrorMsg(tr('oauthComingSoon'))}
+                          whileHover={reduceMotion ? { opacity: 1 } : { opacity: 1, y: -1.5 }}
+                          whileTap={{ scale: 0.98 }}
+                          transition={{ duration: 0.18, ease: "easeOut" }}
+                          className="epomail-display flex h-11 items-center justify-center gap-2 rounded-xl border text-[13px] transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#67e8f9]"
+                          style={{
+                            borderColor: "rgba(139,147,196,0.25)",
+                            background: "rgba(255,255,255,0.04)",
+                            color: "var(--epo-ink)",
+                            opacity: 0.82,
+                          }}
+                        >
+                          {provider}
+                          <span
+                            className="rounded-full border px-1.5 py-px text-[9px] uppercase tracking-wider"
+                            style={{ borderColor: "rgba(139,147,196,0.35)", color: "var(--epo-muted)" }}
+                          >
+                            {t('oauthSoon')}
+                          </span>
+                        </motion.button>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+
+                <p className="text-center text-[13px]" style={{ color: "var(--epo-muted)" }}>
+                  {tr('newToCanvas')}{" "}
+                  <a
+                    href="#"
+                    onClick={(e) => { e.preventDefault(); onSwitch(); }}
+                    className="transition-colors hover:text-[var(--epo-cyan-glow)]"
+                    style={{ color: "var(--epo-purple-glow)" }}
+                  >
+                    {tr('exploreNode')}
+                  </a>
+                </p>
+              </div>
             </motion.form>
           ) : (
             /* =========================================================================
@@ -1119,208 +1262,234 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
               exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 14, filter: "blur(4px)" }}
               transition={reduceMotion ? { duration: 0 } : { duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
               onSubmit={handleTotpSubmit}
-              className="flex flex-col gap-5 pt-1"
+              className="flex-1 flex flex-col justify-between gap-5 pt-1"
             >
               {showMethodSelector ? (
                 /* =====================================================================
                    SUB-VIEW: CHOOSE ANOTHER WAY (METHOD SELECTOR)
                    ===================================================================== */
-                <div className="flex flex-col gap-4">
-                  {/* Back button */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowMethodSelector(false);
-                      setErrorMsg("");
-                    }}
-                    className="flex items-center gap-1.5 text-[13px] transition-colors hover:text-[var(--epo-cyan-glow)] cursor-pointer self-start"
-                    style={{ color: "var(--epo-muted)" }}
-                  >
-                    <ArrowLeft size={15} /> {t('backToVerification')}
-                  </button>
+                <div className="flex-1 flex flex-col justify-between">
+                  <div className="flex flex-col gap-4">
+                    {/* Back button */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowMethodSelector(false);
+                        setErrorMsg("");
+                        if (challengeSessionHash) {
+                          const methodPrefix = active2FAMethod === 'backup_code' ? 'backup' : active2FAMethod;
+                          updateChallengeUrl(methodPrefix, challengeSessionHash);
+                        }
+                      }}
+                      className="flex items-center gap-1.5 text-[13px] transition-colors hover:text-[var(--epo-cyan-glow)] cursor-pointer self-start"
+                      style={{ color: "var(--epo-muted)" }}
+                    >
+                      <ArrowLeft size={15} /> {t('backToVerification')}
+                    </button>
 
-                  <div className="flex flex-col gap-1">
-                    <h2 className="text-[17px] font-semibold text-[var(--epo-ink)] tracking-wide">
-                      {t('chooseAuthMethod')}
-                    </h2>
-                    <p className="text-[12px] leading-relaxed" style={{ color: "var(--epo-muted)" }}>
-                      {t('chooseAuthMethodDesc')}
-                    </p>
-                  </div>
-
-                  {/* Adaptive Step-Up Alert in selector view */}
-                  {stepUpActive && (
-                    <div className="rounded-xl border border-yellow-500/40 bg-yellow-950/20 p-3 text-[12px] leading-relaxed backdrop-blur-sm shadow-[0_0_15px_rgba(234,179,8,0.15)] flex flex-col gap-1.5">
-                      <div className="flex items-center gap-2 text-yellow-400 font-medium">
-                        <ShieldAlert size={16} className="shrink-0" />
-                        <span>{t('stepUpBadge')}</span>
-                      </div>
-                      <p className="text-yellow-200/80 text-[11px]">
-                        {t('stepUpDesc')}
+                    <div className="flex flex-col gap-1">
+                      <h2 className="text-[17px] font-semibold text-[var(--epo-ink)] tracking-wide">
+                        {t('chooseAuthMethod')}
+                      </h2>
+                      <p className="text-[12px] leading-relaxed" style={{ color: "var(--epo-muted)" }}>
+                        {t('chooseAuthMethodDesc')}
                       </p>
-                      {verifiedFactors.length > 0 && (
-                        <div className="text-[10px] text-green-300 bg-green-950/40 border border-green-500/30 rounded px-2 py-0.5 self-start">
-                          {t('stepUpFactorPassed').replace('{factor}', verifiedFactors.map(getFactorName).join(', '))}
+                    </div>
+
+                    {/* Adaptive Step-Up Alert in selector view */}
+                    {stepUpActive && (
+                      <div className="rounded-xl border border-yellow-500/40 bg-yellow-950/20 p-3 text-[12px] leading-relaxed backdrop-blur-sm shadow-[0_0_15px_rgba(234,179,8,0.15)] flex flex-col gap-1.5">
+                        <div className="flex items-center gap-2 text-yellow-400 font-medium">
+                          <ShieldAlert size={16} className="shrink-0" />
+                          <span>{t('stepUpBadge')}</span>
                         </div>
+                        <p className="text-yellow-200/80 text-[11px]">
+                          {t('stepUpDesc')}
+                        </p>
+                        {verifiedFactors.length > 0 && (
+                          <div className="text-[10px] text-green-300 bg-green-950/40 border border-green-500/30 rounded px-2 py-0.5 self-start">
+                            {t('stepUpFactorPassed').replace('{factor}', verifiedFactors.map(getFactorName).join(', '))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Method options list */}
+                    <div className="flex flex-col gap-2.5 mt-1">
+                      {/* 1. Passkey Option */}
+                      {hasPasskeys && (
+                        <button
+                          type="button"
+                          disabled={verifiedFactors.includes('passkey')}
+                          onClick={() => {
+                            if (verifiedFactors.includes('passkey')) return;
+                            setActive2FAMethod('passkey');
+                            setIsBackupCode(false);
+                            setShowMethodSelector(false);
+                            setErrorMsg("");
+                            if (challengeSessionHash) {
+                              updateChallengeUrl('passkey', challengeSessionHash);
+                            }
+                            setTimeout(() => {
+                              handlePasskeyLogin();
+                            }, 120);
+                          }}
+                          className={`flex items-center justify-between p-3.5 rounded-xl border text-left transition-all ${
+                            verifiedFactors.includes('passkey')
+                              ? 'opacity-40 cursor-not-allowed border-[rgba(139,147,196,0.15)] bg-[rgba(255,255,255,0.01)]'
+                              : active2FAMethod === 'passkey'
+                              ? 'border-indigo-400/60 bg-indigo-500/15 shadow-[0_0_15px_rgba(99,102,241,0.2)] cursor-pointer'
+                              : 'border-[rgba(139,147,196,0.2)] bg-[rgba(255,255,255,0.03)] hover:border-indigo-400/40 hover:bg-[rgba(255,255,255,0.05)] cursor-pointer'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-500/10 border border-indigo-500/30 text-indigo-400">
+                              <KeyRound size={18} />
+                            </div>
+                            <div>
+                              <div className="text-[13px] font-semibold text-[var(--epo-ink)]">
+                                {t('methodPasskeyTitle')}
+                              </div>
+                              <div className="text-[11px] leading-tight text-[var(--epo-muted)] line-clamp-1 mt-0.5">
+                                {t('methodPasskeyDesc')}
+                              </div>
+                              {verifiedFactors.includes('passkey') && (
+                                <span className="text-[10px] text-yellow-400 mt-1 inline-block">
+                                  {t('factorAlreadyUsed')}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <ChevronRight size={16} className="text-[var(--epo-muted)] shrink-0 ml-2" />
+                        </button>
+                      )}
+
+                      {/* 2. TOTP Option */}
+                      {hasTotp && (
+                        <button
+                          type="button"
+                          disabled={verifiedFactors.includes('totp')}
+                          onClick={() => {
+                            if (verifiedFactors.includes('totp')) return;
+                            setActive2FAMethod('totp');
+                            setIsBackupCode(false);
+                            setShowMethodSelector(false);
+                            setErrorMsg("");
+                            if (challengeSessionHash) {
+                              updateChallengeUrl('totp', challengeSessionHash);
+                            }
+                          }}
+                          className={`flex items-center justify-between p-3.5 rounded-xl border text-left transition-all ${
+                            verifiedFactors.includes('totp')
+                              ? 'opacity-40 cursor-not-allowed border-[rgba(139,147,196,0.15)] bg-[rgba(255,255,255,0.01)]'
+                              : active2FAMethod === 'totp'
+                              ? 'border-indigo-400/60 bg-indigo-500/15 shadow-[0_0_15px_rgba(99,102,241,0.2)] cursor-pointer'
+                              : 'border-[rgba(139,147,196,0.2)] bg-[rgba(255,255,255,0.03)] hover:border-indigo-400/40 hover:bg-[rgba(255,255,255,0.05)] cursor-pointer'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-500/10 border border-indigo-500/30 text-indigo-400">
+                              <Smartphone size={18} />
+                            </div>
+                            <div>
+                              <div className="text-[13px] font-semibold text-[var(--epo-ink)]">
+                                {t('methodTotpTitle')}
+                              </div>
+                              <div className="text-[11px] leading-tight text-[var(--epo-muted)] line-clamp-1 mt-0.5">
+                                {t('methodTotpDesc')}
+                              </div>
+                              {verifiedFactors.includes('totp') && (
+                                <span className="text-[10px] text-yellow-400 mt-1 inline-block">
+                                  {t('factorAlreadyUsed')}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <ChevronRight size={16} className="text-[var(--epo-muted)] shrink-0 ml-2" />
+                        </button>
+                      )}
+
+                      {/* 3. Backup Code Option */}
+                      {hasBackupCodes && (
+                        <button
+                          type="button"
+                          disabled={verifiedFactors.includes('backup_code')}
+                          onClick={() => {
+                            if (verifiedFactors.includes('backup_code')) return;
+                            setActive2FAMethod('backup_code');
+                            setIsBackupCode(true);
+                            setShowMethodSelector(false);
+                            setErrorMsg("");
+                            if (challengeSessionHash) {
+                              updateChallengeUrl('backup', challengeSessionHash);
+                            }
+                          }}
+                          className={`flex items-center justify-between p-3.5 rounded-xl border text-left transition-all ${
+                            verifiedFactors.includes('backup_code')
+                              ? 'opacity-40 cursor-not-allowed border-[rgba(139,147,196,0.15)] bg-[rgba(255,255,255,0.01)]'
+                              : active2FAMethod === 'backup_code'
+                              ? 'border-indigo-400/60 bg-indigo-500/15 shadow-[0_0_15px_rgba(99,102,241,0.2)] cursor-pointer'
+                              : 'border-[rgba(139,147,196,0.2)] bg-[rgba(255,255,255,0.03)] hover:border-indigo-400/40 hover:bg-[rgba(255,255,255,0.05)] cursor-pointer'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-500/10 border border-indigo-500/30 text-indigo-400">
+                              <ShieldCheck size={18} />
+                            </div>
+                            <div>
+                              <div className="text-[13px] font-semibold text-[var(--epo-ink)]">
+                                {t('methodBackupTitle')}
+                              </div>
+                              <div className="text-[11px] leading-tight text-[var(--epo-muted)] line-clamp-1 mt-0.5">
+                                {t('methodBackupDesc')}
+                              </div>
+                              {verifiedFactors.includes('backup_code') && (
+                                <span className="text-[10px] text-yellow-400 mt-1 inline-block">
+                                  {t('factorAlreadyUsed')}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <ChevronRight size={16} className="text-[var(--epo-muted)] shrink-0 ml-2" />
+                        </button>
                       )}
                     </div>
-                  )}
-
-                  {/* Method options list */}
-                  <div className="flex flex-col gap-2.5 mt-1">
-                    {/* 1. Passkey Option */}
-                    {hasPasskeys && (
-                      <button
-                        type="button"
-                        disabled={verifiedFactors.includes('passkey')}
-                        onClick={() => {
-                          if (verifiedFactors.includes('passkey')) return;
-                          setActive2FAMethod('passkey');
-                          setIsBackupCode(false);
-                          setShowMethodSelector(false);
-                          setErrorMsg("");
-                          setTimeout(() => {
-                            handlePasskeyLogin();
-                          }, 120);
-                        }}
-                        className={`flex items-center justify-between p-3.5 rounded-xl border text-left transition-all ${
-                          verifiedFactors.includes('passkey')
-                            ? 'opacity-40 cursor-not-allowed border-[rgba(139,147,196,0.15)] bg-[rgba(255,255,255,0.01)]'
-                            : active2FAMethod === 'passkey'
-                            ? 'border-indigo-400/60 bg-indigo-500/15 shadow-[0_0_15px_rgba(99,102,241,0.2)] cursor-pointer'
-                            : 'border-[rgba(139,147,196,0.2)] bg-[rgba(255,255,255,0.03)] hover:border-indigo-400/40 hover:bg-[rgba(255,255,255,0.05)] cursor-pointer'
-                        }`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-500/10 border border-indigo-500/30 text-indigo-400">
-                            <KeyRound size={18} />
-                          </div>
-                          <div>
-                            <div className="text-[13px] font-semibold text-[var(--epo-ink)]">
-                              {t('methodPasskeyTitle')}
-                            </div>
-                            <div className="text-[11px] leading-tight text-[var(--epo-muted)] line-clamp-1 mt-0.5">
-                              {t('methodPasskeyDesc')}
-                            </div>
-                            {verifiedFactors.includes('passkey') && (
-                              <span className="text-[10px] text-yellow-400 mt-1 inline-block">
-                                {t('factorAlreadyUsed')}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        <ChevronRight size={16} className="text-[var(--epo-muted)] shrink-0 ml-2" />
-                      </button>
-                    )}
-
-                    {/* 2. TOTP Option */}
-                    {hasTotp && (
-                      <button
-                        type="button"
-                        disabled={verifiedFactors.includes('totp')}
-                        onClick={() => {
-                          if (verifiedFactors.includes('totp')) return;
-                          setActive2FAMethod('totp');
-                          setIsBackupCode(false);
-                          setShowMethodSelector(false);
-                          setErrorMsg("");
-                        }}
-                        className={`flex items-center justify-between p-3.5 rounded-xl border text-left transition-all ${
-                          verifiedFactors.includes('totp')
-                            ? 'opacity-40 cursor-not-allowed border-[rgba(139,147,196,0.15)] bg-[rgba(255,255,255,0.01)]'
-                            : active2FAMethod === 'totp'
-                            ? 'border-indigo-400/60 bg-indigo-500/15 shadow-[0_0_15px_rgba(99,102,241,0.2)] cursor-pointer'
-                            : 'border-[rgba(139,147,196,0.2)] bg-[rgba(255,255,255,0.03)] hover:border-indigo-400/40 hover:bg-[rgba(255,255,255,0.05)] cursor-pointer'
-                        }`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-500/10 border border-indigo-500/30 text-indigo-400">
-                            <Smartphone size={18} />
-                          </div>
-                          <div>
-                            <div className="text-[13px] font-semibold text-[var(--epo-ink)]">
-                              {t('methodTotpTitle')}
-                            </div>
-                            <div className="text-[11px] leading-tight text-[var(--epo-muted)] line-clamp-1 mt-0.5">
-                              {t('methodTotpDesc')}
-                            </div>
-                            {verifiedFactors.includes('totp') && (
-                              <span className="text-[10px] text-yellow-400 mt-1 inline-block">
-                                {t('factorAlreadyUsed')}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        <ChevronRight size={16} className="text-[var(--epo-muted)] shrink-0 ml-2" />
-                      </button>
-                    )}
-
-                    {/* 3. Backup Code Option */}
-                    {hasBackupCodes && (
-                      <button
-                        type="button"
-                        disabled={verifiedFactors.includes('backup_code')}
-                        onClick={() => {
-                          if (verifiedFactors.includes('backup_code')) return;
-                          setActive2FAMethod('backup_code');
-                          setIsBackupCode(true);
-                          setShowMethodSelector(false);
-                          setErrorMsg("");
-                        }}
-                        className={`flex items-center justify-between p-3.5 rounded-xl border text-left transition-all ${
-                          verifiedFactors.includes('backup_code')
-                            ? 'opacity-40 cursor-not-allowed border-[rgba(139,147,196,0.15)] bg-[rgba(255,255,255,0.01)]'
-                            : active2FAMethod === 'backup_code'
-                            ? 'border-indigo-400/60 bg-indigo-500/15 shadow-[0_0_15px_rgba(99,102,241,0.2)] cursor-pointer'
-                            : 'border-[rgba(139,147,196,0.2)] bg-[rgba(255,255,255,0.03)] hover:border-indigo-400/40 hover:bg-[rgba(255,255,255,0.05)] cursor-pointer'
-                        }`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-500/10 border border-indigo-500/30 text-indigo-400">
-                            <ShieldCheck size={18} />
-                          </div>
-                          <div>
-                            <div className="text-[13px] font-semibold text-[var(--epo-ink)]">
-                              {t('methodBackupTitle')}
-                            </div>
-                            <div className="text-[11px] leading-tight text-[var(--epo-muted)] line-clamp-1 mt-0.5">
-                              {t('methodBackupDesc')}
-                            </div>
-                            {verifiedFactors.includes('backup_code') && (
-                              <span className="text-[10px] text-yellow-400 mt-1 inline-block">
-                                {t('factorAlreadyUsed')}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        <ChevronRight size={16} className="text-[var(--epo-muted)] shrink-0 ml-2" />
-                      </button>
-                    )}
                   </div>
                 </div>
               ) : (
                 /* =====================================================================
                    SUB-VIEW: ACTIVE METHOD VERIFICATION
                    ===================================================================== */
-                <>
-                  {/* Back button */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (stepUpActive) {
-                        setShowMethodSelector(true);
-                      } else {
-                        setStage("password");
-                        setStatus("idle");
-                        setErrorMsg("");
-                        setShowHelp(false);
-                      }
-                    }}
-                    className="flex items-center gap-1.5 text-[13px] transition-colors hover:text-[var(--epo-cyan-glow)] cursor-pointer self-start"
-                    style={{ color: "var(--epo-muted)" }}
-                  >
-                    <ArrowLeft size={15} /> {stepUpActive ? t('chooseAuthMethod') : t('backToPassword')}
-                  </button>
+                <div className="flex-1 flex flex-col justify-between">
+                  <div className="flex flex-col gap-4">
+                    {/* Back button */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (stepUpActive) {
+                          setShowMethodSelector(true);
+                          setErrorMsg("");
+                          setShowHelp(false);
+                          if (challengeSessionHash) {
+                            updateChallengeUrl('select', challengeSessionHash);
+                          }
+                        } else {
+                          try {
+                            sessionStorage.removeItem('epo_2fa_challenge_session');
+                          } catch (_) {}
+                          window.history.pushState(null, '', '/login/' + window.location.search);
+                          setStage("password");
+                          setChallengeSessionHash("");
+                          setStatus("idle");
+                          setErrorMsg("");
+                          setShowHelp(false);
+                        }
+                      }}
+                      className="flex items-center gap-1.5 text-[13px] transition-colors hover:text-[var(--epo-cyan-glow)] cursor-pointer self-start"
+                      style={{ color: "var(--epo-muted)" }}
+                    >
+                      <ArrowLeft size={15} /> {stepUpActive ? t('chooseAuthMethod') : t('backToPassword')}
+                    </button>
 
                   {/* Adaptive Step-Up Alert banner */}
                   {stepUpActive && (
@@ -1615,23 +1784,30 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
                     </motion.button>
                   )}
 
+                  </div>
+
                   {/* Multi-factor "Try another way" selection trigger */}
-                  {[hasPasskeys, hasTotp, hasBackupCodes].filter(Boolean).length > 1 && (
-                    <div className="flex justify-center mt-1">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowMethodSelector(true);
-                          setErrorMsg("");
-                        }}
-                        className="flex items-center gap-1.5 text-[12px] font-medium transition-colors hover:text-[var(--epo-cyan-glow)] cursor-pointer"
-                        style={{ color: "var(--epo-purple-glow)" }}
-                      >
-                        <Smartphone size={14} /> {t('tryAnotherWay')}
-                      </button>
-                    </div>
-                  )}
-                </>
+                  <div className="mt-auto pt-3 flex flex-col gap-2">
+                    {[hasPasskeys, hasTotp, hasBackupCodes].filter(Boolean).length > 1 && (
+                      <div className="flex justify-center">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowMethodSelector(true);
+                            setErrorMsg("");
+                            if (challengeSessionHash) {
+                              updateChallengeUrl('select', challengeSessionHash);
+                            }
+                          }}
+                          className="flex items-center gap-1.5 text-[12px] font-medium transition-colors hover:text-[var(--epo-cyan-glow)] cursor-pointer"
+                          style={{ color: "var(--epo-purple-glow)" }}
+                        >
+                          <Smartphone size={14} /> {t('tryAnotherWay')}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
               )}
             </motion.form>
           )}

@@ -364,7 +364,7 @@ export function RegisterForm({ canvasRef, onSwitch, sysConfig: propsSysConfig }:
   };
 
   return (
-    <form onSubmit={handleSubmit} className="relative flex flex-col gap-6 pt-2">
+    <form onSubmit={handleSubmit} className="relative flex-1 flex flex-col justify-between gap-6 pt-2">
       {/* Toast Notification Container */}
       {typeof document !== "undefined" &&
         createPortal(
@@ -406,6 +406,8 @@ export function RegisterForm({ canvasRef, onSwitch, sysConfig: propsSysConfig }:
           </div>,
           document.body
         )}
+
+      <div className="flex flex-col gap-6">
 
       {/* Closed registration prompt if disabled by admin */}
       {isRegisterClosed && (
@@ -524,72 +526,75 @@ export function RegisterForm({ canvasRef, onSwitch, sysConfig: propsSysConfig }:
           hasError={!!errorMsg}
         />
       )}
+      </div>
 
-      {/* Action / Submit Button */}
-      <motion.button
-        type="submit"
-        whileHover={isRegisterClosed ? undefined : submitHover}
-        whileTap={{ scale: isRegisterClosed ? 1 : 0.96 }}
-        disabled={status !== "idle" || isRegisterClosed}
-        className={`epomail-display relative mt-1 flex h-12 w-full items-center justify-center gap-2 overflow-hidden rounded-xl text-[15px] tracking-wide text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#67e8f9] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b0e22] ${
-          isRegisterClosed ? "opacity-60 cursor-not-allowed" : "cursor-pointer"
-        }`}
-        style={{
-          background: isRegisterClosed ? "rgba(55, 65, 81, 0.6)" : "var(--epo-brand-gradient)",
-          boxShadow: isRegisterClosed ? "none" : "0 8px 30px rgba(79,70,229,0.45), inset 0 1px 0 rgba(255,255,255,0.25)",
-        }}
-      >
-        {/* Sheen sweep during warp */}
-        <AnimatePresence>
-          {status === "warping" && (
-            <motion.span
-              className="absolute inset-0"
-              initial={{ x: "-100%" }}
-              animate={{ x: "100%" }}
-              transition={{ duration: 1.2, ease: "easeInOut" }}
-              style={{
-                background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.6), transparent)",
-              }}
-            />
-          )}
-        </AnimatePresence>
-
-        <span className="relative flex items-center gap-2 font-medium">
-          {isRegisterClosed ? (
-            <>
-              <AlertCircle size={17} /> {tr('regClosed')}
-            </>
-          ) : status === "idle" ? (
-            <>
-              {tr('initiateRegister')} <ArrowRight size={17} />
-            </>
-          ) : status === "warping" ? (
-            <>
-              <Loader2 size={17} className="animate-spin" /> {tr('warping', 'warpingReg')}
-            </>
-          ) : (
-            <>
-              <Check size={17} /> {tr('connected', 'connectedReg')}
-            </>
-          )}
-        </span>
-      </motion.button>
-
-      {/* Switch to login link */}
-      <p className="text-center text-[13px] mt-1" style={{ color: "var(--epo-muted)" }}>
-        {tr('alreadyHaveNode')}{" "}
-        <a
-          href="#"
-          onClick={(e) => {
-            e.preventDefault();
-            onSwitch();
+      <div className="mt-auto pt-3 flex flex-col gap-3">
+        {/* Action / Submit Button */}
+        <motion.button
+          type="submit"
+          whileHover={isRegisterClosed ? undefined : submitHover}
+          whileTap={{ scale: isRegisterClosed ? 1 : 0.96 }}
+          disabled={status !== "idle" || isRegisterClosed}
+          className={`epomail-display relative mt-1 flex h-12 w-full items-center justify-center gap-2 overflow-hidden rounded-xl text-[15px] tracking-wide text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#67e8f9] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b0e22] ${
+            isRegisterClosed ? "opacity-60 cursor-not-allowed" : "cursor-pointer"
+          }`}
+          style={{
+            background: isRegisterClosed ? "rgba(55, 65, 81, 0.6)" : "var(--epo-brand-gradient)",
+            boxShadow: isRegisterClosed ? "none" : "0 8px 30px rgba(79,70,229,0.45), inset 0 1px 0 rgba(255,255,255,0.25)",
           }}
-          className="transition-colors hover:text-[var(--epo-cyan-glow)] cursor-pointer font-medium"
-          style={{ color: "var(--epo-purple-glow)" }}
         >
-          {tr('loginHere')}
-        </a>
-      </p>
+          {/* Sheen sweep during warp */}
+          <AnimatePresence>
+            {status === "warping" && (
+              <motion.span
+                className="absolute inset-0"
+                initial={{ x: "-100%" }}
+                animate={{ x: "100%" }}
+                transition={{ duration: 1.2, ease: "easeInOut" }}
+                style={{
+                  background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.6), transparent)",
+                }}
+              />
+            )}
+          </AnimatePresence>
+
+          <span className="relative flex items-center gap-2 font-medium">
+            {isRegisterClosed ? (
+              <>
+                <AlertCircle size={17} /> {tr('regClosed')}
+              </>
+            ) : status === "idle" ? (
+              <>
+                {tr('initiateRegister')} <ArrowRight size={17} />
+              </>
+            ) : status === "warping" ? (
+              <>
+                <Loader2 size={17} className="animate-spin" /> {tr('warping', 'warpingReg')}
+              </>
+            ) : (
+              <>
+                <Check size={17} /> {tr('connected', 'connectedReg')}
+              </>
+            )}
+          </span>
+        </motion.button>
+
+        {/* Switch to login link */}
+        <p className="text-center text-[13px] mt-1" style={{ color: "var(--epo-muted)" }}>
+          {tr('alreadyHaveNode')}{" "}
+          <a
+            href="#"
+            onClick={(e) => {
+              e.preventDefault();
+              onSwitch();
+            }}
+            className="transition-colors hover:text-[var(--epo-cyan-glow)] cursor-pointer font-medium"
+            style={{ color: "var(--epo-purple-glow)" }}
+          >
+            {tr('loginHere')}
+          </a>
+        </p>
+      </div>
     </form>
   );
 }

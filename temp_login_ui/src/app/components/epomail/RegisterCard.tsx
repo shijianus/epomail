@@ -52,11 +52,11 @@ export function RegisterCard({ canvasRef, onSwitch, sysConfig }: RegisterCardPro
           y: reduceMotion ? 0 : translateY,
           transformStyle: "preserve-3d",
         }}
-        className="relative w-full max-w-[420px]"
+        className="relative w-full max-w-[440px] sm:w-[440px]"
       >
         {/* Acrylic prism block */}
         <div
-          className="relative overflow-hidden rounded-3xl p-8 sm:p-10"
+          className="relative overflow-hidden rounded-3xl p-8 sm:p-10 min-h-[580px] sm:min-h-[600px] flex flex-col justify-between"
           style={{
             background:
               "linear-gradient(145deg, rgba(16,20,46,0.72), rgba(8,10,26,0.56))",
@@ -88,7 +88,7 @@ export function RegisterCard({ canvasRef, onSwitch, sysConfig }: RegisterCardPro
             }}
           />
 
-          <div className="relative">
+          <div className="relative flex-1 flex flex-col justify-between">
             {/* Brand header */}
             <div className="mb-8 flex flex-col items-center text-center">
               <img

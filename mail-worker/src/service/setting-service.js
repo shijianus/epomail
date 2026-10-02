@@ -33,7 +33,9 @@ const settingService = {
 				{ name: 'global_email_config', sql: `ALTER TABLE setting ADD COLUMN global_email_config TEXT NOT NULL DEFAULT '{}';` },
 				{ name: 'multi_account_enabled', sql: `ALTER TABLE setting ADD COLUMN multi_account_enabled INTEGER NOT NULL DEFAULT 0;` },
 				{ name: 'terms_url', sql: `ALTER TABLE setting ADD COLUMN terms_url TEXT NOT NULL DEFAULT '';` },
-				{ name: 'privacy_url', sql: `ALTER TABLE setting ADD COLUMN privacy_url TEXT NOT NULL DEFAULT '';` }
+				{ name: 'privacy_url', sql: `ALTER TABLE setting ADD COLUMN privacy_url TEXT NOT NULL DEFAULT '';` },
+				{ name: 'oauth_login_enabled', sql: `ALTER TABLE setting ADD COLUMN oauth_login_enabled INTEGER NOT NULL DEFAULT 0;` },
+				{ name: 'oauth_providers', sql: `ALTER TABLE setting ADD COLUMN oauth_providers TEXT NOT NULL DEFAULT '{}';` }
 			];
 
 			let existingCols = new Set();
@@ -85,6 +87,13 @@ const settingService = {
 				settingRow.globalEmailConfig = JSON.parse(settingRow.globalEmailConfig);
 			} catch (e) {
 				settingRow.globalEmailConfig = {};
+			}
+		}
+		if (typeof settingRow.oauthProviders === 'string') {
+			try {
+				settingRow.oauthProviders = JSON.parse(settingRow.oauthProviders);
+			} catch (e) {
+				settingRow.oauthProviders = {};
 			}
 		}
 		c.set('setting', settingRow);
@@ -217,6 +226,12 @@ const settingService = {
 		setting.multiAccountEnabled = setting.multiAccountEnabled !== undefined && setting.multiAccountEnabled !== null ? Number(setting.multiAccountEnabled) : 0;
 		setting.termsUrl = setting.termsUrl || '';
 		setting.privacyUrl = setting.privacyUrl || '';
+		setting.oauthLoginEnabled = setting.oauthLoginEnabled !== undefined && setting.oauthLoginEnabled !== null ? Number(setting.oauthLoginEnabled) : 0;
+		if (typeof setting.oauthProviders === 'string') {
+			try { setting.oauthProviders = JSON.parse(setting.oauthProviders); } catch (e) { setting.oauthProviders = {}; }
+		} else if (!setting.oauthProviders) {
+			setting.oauthProviders = {};
+		}
 
 		const dbModeInfo = getDbModeInfo(c);
 		setting.isDual = dbModeInfo.isDual;
@@ -335,6 +350,14 @@ const settingService = {
 
 		if (params.globalEmailConfig && typeof params.globalEmailConfig === 'object') {
 			params.globalEmailConfig = JSON.stringify(params.globalEmailConfig);
+		}
+
+		if (params.oauthLoginEnabled !== undefined) {
+			params.oauthLoginEnabled = Number(params.oauthLoginEnabled) === 1 ? 1 : 0;
+		}
+
+		if (params.oauthProviders && typeof params.oauthProviders === 'object') {
+			params.oauthProviders = JSON.stringify(params.oauthProviders);
 		}
 
 		if (params.allMailMode !== undefined) {
@@ -459,7 +482,8 @@ const settingService = {
 			'externalDbEnabled', 'externalDbProvider', 'externalDbEndpoint',
 			'externalDbToken', 'externalDbName', 'externalDbTarget',
 			'attachmentPolicy', 'attachmentMaxSizeMb', 'attachmentCascadeDelete',
-			'multiAccountEnabled', 'termsUrl', 'privacyUrl'
+			'multiAccountEnabled', 'termsUrl', 'privacyUrl',
+			'oauthLoginEnabled', 'oauthProviders'
 		];
 
 		const updateData = {};
