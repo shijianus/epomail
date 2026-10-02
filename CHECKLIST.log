@@ -8,7 +8,41 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
-### epomail-docs 官方文档全面重构、Gmail 式非商业治理体系、二级目录分组与主站连接升级 (2026-10-01)
+### 通行密钥平台本地写入、极简弹窗与 2FA/Passkey 完整生命周期及时间锁上线 (2026-10-02)
+*   **关联提交 (Git Commit)**: `c276c6a95f675750415b50fe078eda39e4db13ca` (Short: `c276c6a`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare Workers (https://mail.epocanvas.com)` (Version ID: `55a33ae6-7b0d-4854-b407-a2442f5cfe36`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 变更点 1 (Passkey 本地 Resident 写入与智能 UA 识别)：
+        - WebAuthn 注册选项根据客户端 UA 自动推导识别 Windows Hello / Apple 钥匙串 / Android 凭据管理器 / Linux 密钥库，并设定友好建议名称；
+        - 后端强制指定 `authenticatorAttachment: 'platform'`、`residentKey: 'required'`、`requireResidentKey: true`、`userVerification: 'required'`，确保直接调起本机生物识别/PIN 将通行密钥保存在本地设备（TPM/钥匙串），根除一直请求插入 USB 安全密钥的痛点；
+    - [x] 变更点 2 (极简 `<el-dialog>` 弹窗与零开源自选下拉框)：
+        - 前端彻底移除此前用户手动选择“设备类型”的下拉选择器，仅保留密钥名称输入框；
+        - 弹窗顶部呈现后端扫描到的当前设备平台提示与本地保存说明横幅；
+    - [x] 变更点 3 (Passkey 创世初设备与新设备 30 天时间锁安全观察期)：
+        - 创世初设备（首个 Passkey）赋予 `isInitialDevice: true`，注册后立即生效处于 `active` 状态；
+        - 新设备（非创世初设备）赋予 `isInitialDevice: false`，进入 30 天安全时间锁观察期（`pending_verification`），在观察期内无法直接用于登录认证；
+        - 时间锁未满 30 天时拦截手动转正调用；
+        - 支持使用账号绑定的已有 TOTP 验证码快速核准转正（解除时间锁进入 `active`）；
+        - 30 天观察期满后支持手动点击转正；
+    - [x] 变更点 4 (Passkey 在线签名测试与删除重置治理)：
+        - 新增在线测试 Passkey 功能，服务端下发测试 Challenge，客户端调起签名并在服务端验签；
+        - 支持安全删除通行密钥；当全部通行密钥删除且未绑定 TOTP 时，自动降级安全重置 2FA 状态；
+    - [x] 变更点 5 (TOTP 完整生命周期管理)：
+        - 支持「更新验证器」与「停用验证器」，更新与停用均受到主密码安全鉴权保护；
+    - [x] 变更点 6 (多语言与品牌纯粹性)：
+        - 全站保持 6 语言字典 100% 绝对对称（2099 键，0 缺失）；
+        - 全仓代码与界面绝无 "Gmail" 品牌词泄露或稀释，维持 Epocanvas 官方原生纯粹性。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：`mail-vue` 构建通过 (耗时 14.83s，0 错误)；
+    - [x] 云端发布部署：Cloudflare Workers 部署就绪 (Version ID: `55a33ae6-7b0d-4854-b407-a2442f5cfe36`)；
+    - [x] 独立子代理 clean-slate 审计：`Independent QA Auditor` 签发 `[ ✅ APPROVED (100% GREEN) ]` 评定；
+    - [x] 自动化端到端测试套件：
+        - `tests/test-prod-passkey-timelock-and-management.mjs` (40/40 断言全部通过，覆盖设备扫描、创世设备、30天时间锁、在线测试与 UI 弹窗)；
+        - `tests/test-prod-passkey-and-stepup-live-e2e.mjs` (26/26 断言全部通过，覆盖 32 字节 User Handle、TPM PS256 算法协商、黑盒风控与 Try Another Way)；
+    - [x] 浏览器全真栈实测：成功捕获公网设置中心添加通行密钥极简弹窗截图 `tests/verify_prod_passkey_add_simplified_modal.png` 与 2FA 多方式选择截图 `tests/verify_prod_2fa_try_another_way.png`；
+    - [x] 零假数据残留：测试创建的临时密钥均通过 `finally` 在云端物理清理，数据库零污染。
+
+---
 *   **关联提交 (Git Commit - epocanvas-mail)**: `baf115865d1d643a677cae9f02905470d05a8d9a` (Short: `baf1158`)
 *   **关联提交 (Git Commit - epomail-docs)**: `4679a73cfc6728eb4de749587614b8bde656a252` (Short: `4679a73`) | `48bd18c11be22dc7b9e3f87aade0e2b083d1e30e` (Short: `48bd18c`) | `f30218876d1da8e30321e31c97a1a5be024bb968` (Short: `f302188`)
 *   **部署环境 (Deployment)**: `Cloudflare Pages (https://epomail-docs.pages.dev / https://docs.epocanvas.com/epomail)`
