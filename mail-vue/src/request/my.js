@@ -68,8 +68,24 @@ export function deletePasskey(passkeyId) {
     return http.delete(`/my/passkey/${passkeyId}`);
 }
 
-export function renamePasskey(passkeyId, name) {
-    return http.put(`/my/passkey/${passkeyId}`, { name });
+export function updateTotp(data) {
+    return http.post('/my/totp/update', data);
+}
+
+export function approvePasskeyWithTotp(passkeyId, code) {
+    return http.post(`/my/passkey/${passkeyId}/approve-totp`, { code });
+}
+
+export function activateTimelockedPasskey(passkeyId) {
+    return http.post(`/my/passkey/${passkeyId}/activate-timelock`);
+}
+
+export function getPasskeyTestOptions(passkeyId) {
+    return http.post(`/my/passkey/${passkeyId}/test-options`);
+}
+
+export function verifyPasskeyTest(passkeyId, data) {
+    return http.post(`/my/passkey/${passkeyId}/test-verify`, data);
 }
 
 export function getGeo() {

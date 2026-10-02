@@ -11,6 +11,7 @@ const KvConst = {
 	TOTP_REPLAY: "totp_replay:",
 	WEBAUTHN_SETUP: "webauthn_setup:",
 	WEBAUTHN_PENDING: "webauthn_pending:",
+	WEBAUTHN_TEST: "webauthn_test:",
 	AI_DAY_USAGE: "ai_day_usage:",
 	AI_TOTAL_USAGE: "ai_total_usage",
 	RISK_IP_ACCOUNTS: "risk_ip_acc:"

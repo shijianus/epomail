@@ -7,6 +7,31 @@
 > 制度规范与工作流指引请见 [AGENTS.md](file:///home/shijian/projects/epocanvas-mail/AGENTS.md)。
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
+
+### epomail-docs 官方文档全面重构、Gmail 式非商业治理体系、二级目录分组与主站连接升级 (2026-10-01)
+*   **关联提交 (Git Commit - epocanvas-mail)**: `baf115865d1d643a677cae9f02905470d05a8d9a` (Short: `baf1158`)
+*   **关联提交 (Git Commit - epomail-docs)**: `4679a73cfc6728eb4de749587614b8bde656a252` (Short: `4679a73`) | `48bd18c11be22dc7b9e3f87aade0e2b083d1e30e` (Short: `48bd18c`) | `f30218876d1da8e30321e31c97a1a5be024bb968` (Short: `f302188`)
+*   **部署环境 (Deployment)**: `Cloudflare Pages (https://epomail-docs.pages.dev / https://docs.epocanvas.com/epomail)`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 变更点 1：彻底废除语言降级与附属声明。全局清除所有「以繁體中文為準 / 僅供參考 / reference only」等贬损性文案，确立英文及各语系独立权威与对等地位。
+    - [x] 变更点 2：侧边栏全面支持二级标题分组。在 `astro.config.mjs` 中将各语系文档归纳为三大核心类别（Project & Architecture、Privacy & Data Governance、Terms & Community Governance），实现清晰的双层导航层次。
+    - [x] 变更点 3：深度借鉴 Google/Gmail 隐私权政策架构，全面重构英文法务与安全合规体系（9篇核心文档）：
+        - 明确界定责任三元组（Upstream Open-Source Code Provider vs Instance Operator Data Controller vs End User）；
+        - 确立开源非商业定位（Strictly Non-Commercial, Personal / Self-Hosted Use, No Commercial SLA Warranties）；
+        - 全面覆盖为什么处理数据、如何端到端加密、Edge AI 隔离、共享限制与数据保留期限。
+    - [x] 变更点 4：采用矢量 SVG 分区隔离插画。设计并引入 `partition-overview.svg`, `partition-privacy.svg`, `partition-terms.svg`, `partition-security.svg` 等，使用户直观理解各个治理维度的边界。
+    - [x] 变更点 5：主站与文档真实连接。在 `epocanvas-mail`（`mail-vue/src/layout/header/index.vue`）中新增 `projectIntro`（专案介绍）入口，无缝导向 `https://epomail-docs.pages.dev/epomail/mail/project/`，完成 6 语言字典严格对齐。
+    - [x] 变更点 6：密码学防篡改清单全量重算。为全新文档内容计算 SHA-256 指纹并写入 `public/tamper-proof.json`，确保客户端 WebCrypto 验真 100% 成功。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 独立子代理真实浏览器全真审计：派驻 `Independent Final Delivery QA Auditor` 子代理，运行无头 Chromium 访问公网多语系页面，断言二级目录、Gmail 式非商业条款、分区 SVG 渲染与 `#tamper-verify-btn` 密码学验真，签发 `[ ✅ APPROVED ]` 认证；
+    - [x] 多语言结构与独立基准核验：`python3 scripts/check-structure.py` 100% 通过（9 篇核心英文基准与多语系对齐）；
+    - [x] 全站锚点与资源静态核验：`node scripts/validate-anchors.cjs` 全绿 (110 页面 / 1056 锚点链接 0 损坏)；
+    - [x] 主站 i18n 严格闭环：`node scripts/i18n-symmetry.mjs` 验证 6 语言字典 100% 绝对对称 (2099 键，0 缺失)；
+    - [x] 前端构建：`mail-vue` 构建通过 (12.22s，0 错误)；
+    - [x] 零假数据残留：无任何测试脏数据遗留。
+
+---
+
 ### EpoCanvas Mail 官方安全规范与全语系防篡改验真引擎部署上线 (2026-10-01)
 *   **关联提交 (Git Commit - epomail-docs)**: `83c4405a88c3f58a36c84c68ddaaee1e91244e8a` (Short: `83c4405`)
 *   **部署环境 (Deployment)**: `Cloudflare Pages (https://epomail-docs.pages.dev / https://docs.epocanvas.com/epomail)`

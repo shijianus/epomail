@@ -94,6 +94,35 @@ app.delete('/my/passkey/:id', async (c) => {
 	return c.json(result.ok());
 });
 
+app.post('/my/totp/update', async (c) => {
+	const data = await totpService.updateTotp(c, userContext.getUserId(c), await c.req.json());
+	return c.json(result.ok(data));
+});
+
+app.post('/my/passkey/:id/approve-totp', async (c) => {
+	const passkeyId = c.req.param('id');
+	const data = await totpService.approvePasskeyWithTotp(c, userContext.getUserId(c), passkeyId, await c.req.json());
+	return c.json(result.ok(data));
+});
+
+app.post('/my/passkey/:id/activate-timelock', async (c) => {
+	const passkeyId = c.req.param('id');
+	const data = await totpService.activateTimelockedPasskey(c, userContext.getUserId(c), passkeyId);
+	return c.json(result.ok(data));
+});
+
+app.post('/my/passkey/:id/test-options', async (c) => {
+	const passkeyId = c.req.param('id');
+	const data = await totpService.getPasskeyTestOptions(c, userContext.getUserId(c), passkeyId);
+	return c.json(result.ok(data));
+});
+
+app.post('/my/passkey/:id/test-verify', async (c) => {
+	const passkeyId = c.req.param('id');
+	const data = await totpService.verifyPasskeyTest(c, userContext.getUserId(c), passkeyId, await c.req.json());
+	return c.json(result.ok(data));
+});
+
 app.put('/my/passkey/:id', async (c) => {
 	const passkeyId = c.req.param('id');
 	const { name } = await c.req.json();

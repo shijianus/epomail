@@ -122,6 +122,8 @@
 
             <!-- Footer: Legal links -->
             <div class="gac-footer">
+              <span class="gac-legal-item" @click.prevent="openProjectIntro">{{ $t('projectIntro') }}</span>
+              <span class="gac-legal-separator">·</span>
               <span class="gac-legal-item" @click.prevent="openPrivacyPolicy">{{ $t('privacyPolicy') }}</span>
               <span class="gac-legal-separator">·</span>
               <span class="gac-legal-item" @click.prevent="openTermsOfService">{{ $t('termsOfService') }}</span>
@@ -227,6 +229,8 @@
 
             <!-- Footer: Legal links -->
             <div class="gac-footer">
+              <span class="gac-legal-item" @click.prevent="openProjectIntro">{{ $t('projectIntro') }}</span>
+              <span class="gac-legal-separator">·</span>
               <span class="gac-legal-item" @click.prevent="openPrivacyPolicy">{{ $t('privacyPolicy') }}</span>
               <span class="gac-legal-separator">·</span>
               <span class="gac-legal-item" @click.prevent="openTermsOfService">{{ $t('termsOfService') }}</span>
@@ -666,6 +670,12 @@ function openAddAccount() {
     }
   } catch (_) {}
   window.location.href = `/login/?action=addAccount&u=${targetU}`;
+}
+
+function openProjectIntro() {
+  closeDropdown();
+  const extUrl = settingStore.settings?.projectUrl || 'https://epomail-docs.pages.dev/epomail/mail/project/';
+  window.open(extUrl, '_blank', 'noopener,noreferrer');
 }
 
 function openPrivacyPolicy() {

@@ -347,7 +347,13 @@ const loginService = {
 			}
 		}
 
-		if (isGlobalTotpEnabled && (userRow.totpEnabled === 1 || securityKeysList.length > 0)) {
+		// Only active passkeys can be used for login (pending_verification under timelock are excluded)
+		const activePasskeys = securityKeysList.filter(k => k.status !== 'pending_verification');
+
+		const hasActiveTotp = userRow.totpEnabled === 1 && !!userRow.totpSecret;
+		const hasActivePasskey = activePasskeys.length > 0;
+
+		if (isGlobalTotpEnabled && (hasActiveTotp || hasActivePasskey)) {
 			const tempToken = 'totp_tmp_' + uuidv4().replace(/-/g, '');
 			const passkeyChallenge = webauthnUtils.generateChallenge();
 
@@ -389,9 +395,9 @@ const loginService = {
 				authType: 'totp',
 				email: userRow.email,
 				hasTotp: !!userRow.totpSecret,
-				hasPasskeys: securityKeysList.length > 0,
+				hasPasskeys: activePasskeys.length > 0,
 				hasBackupCodes: backupCodesRemaining > 0,
-				passkeys: securityKeysList.map(k => ({ id: k.credentialId, type: 'public-key' })),
+				passkeys: activePasskeys.map(k => ({ id: k.credentialId, type: 'public-key' })),
 				passkeyChallenge,
 				stepUpRequired: riskAssessment.stepUpRequired,
 				step: 1,
@@ -550,6 +556,11 @@ const loginService = {
 				throw new BizError('Unrecognized security key');
 			}
 
+			if (targetKey.status === 'pending_verification') {
+				await incrementAccountFail();
+				throw new BizError(t('passkeyTimelockedNotice') || '该通行密钥处于安全观察期中，尚未激活生效，暂无法用于登录');
+			}
+
 			const isValidSig = await webauthnUtils.verifyAuthenticationSignature({
 				clientDataJSONBase64: clientDataJSON,
 				authenticatorDataBase64: authenticatorData,
@@ -614,9 +625,11 @@ const loginService = {
 				} catch (e) {}
 			}
 
+			const activeUserKeys = userKeys.filter(k => k.status !== 'pending_verification');
+
 			const availableFactors = [];
 			if (userRow.totpSecret) availableFactors.push('totp');
-			if (userKeys.length > 0) availableFactors.push('passkey');
+			if (activeUserKeys.length > 0) availableFactors.push('passkey');
 			if (remainingBackupCount > 0) availableFactors.push('backup_code');
 
 			const remainingFactors = availableFactors.filter(f => f !== factorType);
