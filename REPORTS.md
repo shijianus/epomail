@@ -10,7 +10,7 @@
 ---
 
 ### EpomailDocs v5.7 独立复审：介绍与法律内容全量对码审计与发布状态核查 (2026-10-03)
-*   **关联提交 (Git Commit)**: 归档提交 Hash 待回填（本条随归档提交入库，Hash 由紧随的回填提交写入本行）；审计对象 EpomailDocs @ `6478520`（v5.7，54 页 = 9 篇 × 6 语言），事实基准为主仓 @ `50c69e0`
+*   **关联提交 (Git Commit)**: `6cae7c3804450a899e20188a438543b9b7228997` (Short: `6cae7c3`)；审计对象 EpomailDocs @ `6478520`（v5.7，54 页 = 9 篇 × 6 语言），事实基准为主仓 @ `50c69e0`
 *   **体检/审计范围与方法 (Scope & Methodology)**:
     1. 范围与环境：EpomailDocs 全部 54 页逐篇清点（结构/版本行/效力条款/六语言对称）；mail-worker / mail-vue / EpomailDocs 工程配置源码级逐点取证；docs.epocanvas.com 与 mail.epocanvas.com 线上状态探测。
     2. 工具与脚本：三路并行审计（文档站清点 / 源码事实基线 / EpoCanvasDocs 格式参照）+ 10 项新增定点对码 + `validate-anchors.cjs`（1200 锚点）+ `verify-laws.py`（法条底稿）回归。
