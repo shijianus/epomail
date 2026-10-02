@@ -8,6 +8,36 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### epomail-docs 数据处理与安全维护 (data-security) 彻底重做：全新3幅高精矢量架构图与Google政策卡片流视觉范式上线 (2026-10-02)
+*   **关联提交 (Git Commit - epomail-docs)**: `e6c9f5df9aa4225571e846271ff1312a5790f92c` (Short: `e6c9f5d`) | Manifest: `1a4e02d8df99c7fa583c84525ee186143a05d142` (Short: `1a4e02d`)
+*   **部署环境 (Deployment)**: `Cloudflare Pages (https://epomail-docs.pages.dev/epomail/mail/data-security/ · Version ID: d9b0c36f)`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 变更点 1 (彻底告别纯文本墙，建立 Google-Style 卡片流排版)：
+        - 全文所有 17 项技术与合规小节彻底摒弃密密麻麻的纯文本段落堆叠，全部改写封装为具有舒适呼吸感、语义化图标与状态胶囊徽章的 Google 规范卡片（`.google-card`、`.google-card-header`、`.google-pill`、`.google-card-desc`）；
+        - 卡片内条目均以 `<strong>` 引导核心主题词，严格控制每节文字体量（80~150 词），既充实详尽又层次井然，达到 Google Privacy & Terms 的工业级美学与排版节奏；
+        - 大章节间保留带有微星图标的渐变隐式分割线 `<div class="google-divider"><span class="google-divider-icon">✦</span></div>`。
+    - [x] 变更点 2 (上线 3 幅全新自研高精矢量架构图，解决未生效与 XML 错误)：
+        - 图 1：`public/images/mail/data-security-pipeline.svg`（全链路数据处理与生命周期流水线：无状态接入 ➔ 边缘 V8 Isolate 内存瞬时计算 ➔ AES-256-GCM 密文封包 ➔ KV/D1/R2 分层存储 ➔ 密码学密钥覆写粉碎）；
+        - 图 2：`public/images/mail/defense-layers-architecture.svg`（四层纵深防御技术模型：Layer 1 边缘网络/Anti-SSRF、Layer 2 FIDO2 Passkeys、Layer 3 AES-256 静态加密、Layer 4 Shadow DOM 客户端沙箱/SHA-256 存证），修复 XML 实体转义确保高保真矢量渲染；
+        - 图 3：`public/images/mail/dual-nature-compliance-matrix.svg`（双重属性治理与全球合规矩阵：左右对比官方托管云服务与开源自治专案，下层统领 GDPR、CCPA、APAC 落地要求）。
+    - [x] 变更点 3 (严格杜绝挂件刷屏与视觉疲劳)：
+        - 彻底剥离任何重复的防篡改面板（Tamper-proof Widget），使正文保持纯粹规范属性，杜绝同一页面堆叠重复组件带来的视觉疲劳。
+    - [x] 变更点 4 (双重属性融合治理边界与独立部署者独占责任)：
+        - **官方托管云服务 (`mail.epocanvas.com`)**：明确服务定位、零遥测合规承诺、非商业公益免责范畴与用户定期本地备份通信之法定责任；
+        - **开源代码专案生态 (`epocanvas-mail`)**：明确 MIT 许可证权能与代码审计自由，划定 3 大分发与商标红线（严禁冒用官方商标、完整保留作者版权声明、独立公示自身隐私与法律条款）；
+        - **自建节点唯一数据控制者 (Sole Data Controller)**：自建节点运营者承担唯一、排他的数据控制者法定全责，上游开源代码作者零物理控制权、零访问权限且零连带法律责任。
+    - [x] 变更点 5 (全球多法域合规与密码学能力边界坦诚公开)：
+        - **欧盟 GDPR**：覆盖 Articles 15–22 权利保障、Article 6 合法处理依据及 Cloudflare Anycast 欧盟标准合同条款 (SCCs)；
+        - **加州 CCPA / CPRA**：严正做出「不销售亦不共享个人信息」(Do Not Sell or Share) 承诺与非歧视待遇声明；
+        - **亚太 / 台湾 PDPA**：明确官方运营团队驻地台湾，告知跨国 SMTP 公网中继路由的物理现实，指导用户强化终端安全；
+        - **服务端静态加密与 GPG 风险提示**：坦诚披露 AES-256-GCM 为 Server-side Encryption at Rest，防范脱机勒索与数据库快照泄露，并非端到端加密（E2EE）；对绝对机密场景明确指引在客户端使用 GPG / PGP 本地加解密后再行投递。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+        - [x] 本地六语言结构对称性：`python3 scripts/check-structure.py` 100% 通过（23 个标题、2 张表格、3 幅图表、1 处警示块 5 语系绝对对称，英文独立基准 100% 验证）；
+        - [x] 本地文档锚点审计：`node scripts/validate-anchors.cjs` 检查 110 个页面、1226 个锚点，破损锚点 broken=0；
+        - [x] 本地全页面全真视觉截图核验：Playwright 截取 1440px 全页高分辨率明暗主题图（`data-security-zh-dark.png`、`data-security-zh-light.png`、`data-security-en-dark.png`），暗色深灰与浅色卡片微投影自适应完美；
+        - [x] 生产环境部署与线上验证：Cloudflare Pages 部署成功（版本 ID: `d9b0c36f`），实时 CURL 与 DOM 校验 HTTP 200，3 幅矢量 SVG 链路全部正常加载；
+        - [x] 独立子代理双向盲审：`Visual & Legal Docs Auditor` 子代理完成全真栈深度审查，判定 PASS 满分评级。
+
 ### 登录与2FA卡片几何尺寸锁定均衡、第三方认证管理卡片、URL会话精确化与反复制粘贴自动回退 (2026-10-02)
 *   **关联提交 (Git Commit)**: `dde45257c42bc9e96cc8888214efe8dafadab812` (Short: `dde4525`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare Workers (mail.epocanvas.com)` (Version ID: `9635bac8-7cf0-4548-81d9-2d96d50814d4`)
