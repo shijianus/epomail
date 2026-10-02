@@ -8,6 +8,34 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### 登录与2FA卡片几何尺寸锁定均衡、第三方认证管理卡片、URL会话精确化与反复制粘贴自动回退 (2026-10-02)
+*   **关联提交 (Git Commit)**: `dde45257c42bc9e96cc8888214efe8dafadab812` (Short: `dde4525`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare Workers (mail.epocanvas.com)` (Version ID: `9635bac8-7cf0-4548-81d9-2d96d50814d4`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 变更点 1 (第三方登录隐藏与系统设置管理卡片)：
+        - 登录页面默认隐藏 `class="flex items-center gap-3"`（分割线）与 `class="grid grid-cols-2 gap-3"`（Google/GitHub 按钮区域），受控于 `sysConfig?.oauthLoginEnabled`；
+        - 管理后台系统设置（`mail-vue/src/views/sys-setting/index.vue`）新增专属卡片 `.oauth-sso-card`（第三方认证与单点登录管理）；
+        - 支持配置 Provider 开关、回调地址复制与按键比例调整控件 (`oauthButtonProportion`: Grid / Stacked / Compact)；
+        - 卡片内嵌入与登录页完全同构的高仿真暗色亚克力材质预览按钮：`class="epomail-display flex h-11 items-center justify-center gap-2 rounded-xl border text-[13px] transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#67e8f9] preview-oauth-btn"`。
+    - [x] 变更点 2 (登录/注册/2FA外框几何尺寸均衡稳定)：
+        - 固定外层容器尺寸 `w-full max-w-[440px] sm:w-[440px]`，高度 `min-h-[580px] sm:min-h-[600px] flex flex-col justify-between`；
+        - `AuthForm` 与 `RegisterForm` 内部包装层统一为 `flex-1 flex flex-col justify-between`，底部操作条两极对齐；
+        - 彻底消除在账号密码、2FA 挑战、方法选择抽屉及注册模式间切换时的高度塌陷与尺寸突变。
+    - [x] 变更点 3 (URL 会话精确化与反复制粘贴自动安全回退)：
+        - 初始密码登录严格保持 `https://mail.epocanvas.com/login/`；
+        - 触发 2FA 验证时精确变更为普遍规律前缀 + 当前会话 base64url sha 哈希：`/login/challenge/{method}_{sessionHash}`（包括 `totp_{hash}`、`passkey_{hash}`、`backup_{hash}`、`select_{hash}`）；
+        - 跨环境外溢检测与回退：在新环境/新设备中直接复制粘贴带有 challenge hash 的链接打开时，因缺失合法 `sessionStorage` 会话凭据，前端检测后立即自动执行 `history.replaceState` 安全回退至 `https://mail.epocanvas.com/login/` 并恢复标准密码登录；在原会话标签页内正常刷新（F5）则完整保留 2FA 状态不受影响。
+    - [x] 变更点 4 (Cloudflare SPA 多级路由静态资源代理修正)：
+        - 在 `mail-worker/src/index.js` 中增加路由代理，拦截非静态文件的 `/login/challenge/*` HTML 导航，直接向 `env.assets` 请求 `/login/index.html`，彻底解决公网单页应用深链访问 404 与重定向循环。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 六语言多语言绝对对称性：`node scripts/i18n-symmetry.mjs` 100% 通过（2113 keys 全部对称，0 缺失）；
+    - [x] 字面量代码引用审计：`node scripts/i18n-audit.mjs` 100% 通过（1630 字面量键 0 缺失，0 动态调用）；
+    - [x] 公网全真自动化 E2E 测试套件（`tests/test-prod-login-card-and-challenge-routing.mjs`）：21/21 断言全部通过；
+    - [x] 公网 Passkey 跨设备与自适应风控二验（`tests/test-prod-passkey-and-stepup-live-e2e.mjs`）：26/26 断言全部通过；
+    - [x] 公网 Passkey 时间锁与生命周期（`tests/test-prod-passkey-timelock-and-management.mjs`）：40/40 断言全部通过；
+    - [x] 独立子代理独立审计核验：`Clean-slate Production QA Auditor` 全程独立执行，签发 APPROVED 评级；
+    - [x] 零假数据残留：测试账号与临时状态已在 `finally` 阶段 100% 物理恢复与清理。
+
 ### epomail-docs 数据处理与安全维护 (data-security) 深度重构、Google 政策视觉范式升级与全真上线 (2026-10-02)
 *   **关联提交 (Git Commit - epomail-docs)**: `2b2655d492415174e304ffb5f939b4b9b9a691bc` (Short: `2b2655d`) | `dc4706dbd08aa5c556b63ca0435dfcb5ec437e40` (Short: `dc4706d`)
 *   **关联提交 (Git Commit - epocanvas-mail)**: `6691e292067d53b4dd6b810452309f3f4e24ebca` (Short: `6691e29`)
