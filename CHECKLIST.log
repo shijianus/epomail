@@ -8,6 +8,37 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### 登录与2FA认证卡片几何尺寸全面扩容 (480px x 670px)、居中质感美学复原与自适应二验深度治理 (2026-10-02)
+*   **关联提交 (Git Commit)**: `cf677c1e7eefd8e92206ed911f5b3873ee34b58c` (Short: `cf677c1`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare Workers (https://mail.epocanvas.com)` (Version ID: `632323d7-320d-4e7e-9b28-4e7214a5e558`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 变更点 1 (卡片尺寸全面扩容并绝对物理锁定 480px × 670px)：
+        - 彻底根治此前 440px × 600px 紧凑尺寸导致的拥挤感与按钮贴边问题；
+        - 在 `LoginCard.tsx` 与 `RegisterCard.tsx` 中将外框容器强制设定为 `w-full max-w-[480px] sm:w-[480px]` 及 `class="relative overflow-hidden rounded-3xl p-8 sm:p-10 h-[620px] sm:h-[670px] min-h-[620px] sm:min-h-[670px] max-h-[620px] sm:max-h-[670px] flex flex-col justify-between box-border"`；
+        - 实测登录、注册、TOTP挑战、多因子选择器外框尺寸绝对一致，宽 480px，高 670px，物理偏差严格为 0px，彻底消除任何形式的尺寸跳动。
+    - [x] 变更点 2 (彻底废除单行药丸条，全面复原经典居中质感 2FA 安全卡片)：
+        - 废弃此前局促的单行小药丸，全面复原经典居中大卡片设计（`p-4 rounded-2xl border border-[rgba(139,147,196,0.2)] bg-[rgba(255,255,255,0.03)]`）；
+        - 配置独立的 44px 独立居中发光安全图标舱（`h-11 w-11 rounded-xl bg-indigo-500/10 border-indigo-500/30 text-indigo-400 shadow-[0_0_15px_rgba(99,102,241,0.25)]`）；
+        - 标题（16px）、说明描述（12px 舒适行高）与用户脱敏邮箱胶囊徽章层次井然，UI/UX 质感大幅提升。
+    - [x] 变更点 3 (自适应 Step-Up 紧凑降级机制，彻底消除遮挡截断与贴边隐患)：
+        - 在高风险环境自适应触发 Step-Up 二次验证时，动态启用紧凑型状态栏，瞬间节省 ~94px 垂直空间；
+        - 黄色安全告警横幅与 2FA 核心操作区相得益彰，绝不压迫底部的「返回验证」与辅助操作按键贴边。
+    - [x] 变更点 4 (验证方式选择器卡片按键舒适度全面还原)：
+        - 方法选择器恢复为经典的大卡片布局（`p-3.5 px-4 rounded-2xl`），左侧配置独立辨识度图标舱（`h-10 w-10 shrink-0`）；
+        - 标题与说明描述双行完整舒展展开，右侧配置 `size={18}` 导航引导指示，按键比例与点击热区极具呼吸感。
+    - [x] 变更点 5 (注册表单 4 字段呼吸留白与按钮无死角展示)：
+        - 精细化调校注册表单间距为 `gap-4 sm:gap-4.5`，品牌头部间距优化为 `mb-6 sm:mb-7`；
+        - 注册界面 4 大字段（邮箱+域选择器、密码、确认密码、邀请码）与底部的「已经拥有节点？点此登录」操作按键距离底边保有 > 36px 充裕呼吸留白，绝不贴边或被遮挡截断。
+    - [x] 变更点 6 (直接访问禁止跳转，原地渲染与会话安全)：
+        - 浏览器直访 `/login/challenge/totp_...` 或 `/login/challenge/select_...` 严格在原 URL 原地渲染对应挑战界面（HTTP 200，0 跳转），禁止任何 URL 篡改。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 静态多语言对称性三件套：`node scripts/i18n-symmetry.mjs && node scripts/i18n-audit.mjs` 100% 通过（2113 / 1917 键绝对对称，1630 处字面量引用健全，0 缺失）；
+    - [x] 公网全真端到端卡片尺寸与防跳转测试 (`tests/test-prod-login-card-and-challenge-routing.mjs`)：26/26 项断言全绿通过；
+    - [x] 公网 Passkey 跨设备 TPM 与自适应二验实测 (`tests/test-prod-passkey-and-stepup-live-e2e.mjs`)：26/26 项断言全绿通过；
+    - [x] 公网 Passkey 时间锁与生命周期管理实测 (`tests/test-prod-passkey-timelock-and-management.mjs`)：40/40 项断言全绿通过；
+    - [x] 生产零脏数据：测试临时注册凭据与会话在 `finally` 阶段全部物理清除；
+    - [x] 独立子代理独立审计核验：`Clean-slate Independent Production QA Auditor` 盲审签署 PASS 评级通过（共 92 项生产端到端断言全部成功）。
+
 ### 登录/2FA卡片尺寸绝对物理锁定 (440px x 600px)、禁止任何跳转与边缘路由死循环修复 (2026-10-02)
 *   **关联提交 (Git Commit)**: `d34db1cc96cdca7a543dcfd878bed2b6aed3f2eb` (Short: `d34db1c`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare Workers (https://mail.epocanvas.com)` (Version ID: `2afcb8c9-02e5-405f-a9a5-6e6e07fbcd35`)
