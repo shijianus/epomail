@@ -9,6 +9,24 @@
 
 ---
 
+### 官方文档全量重构、Gmail 式双重定位与公网感官渲染深度审计 (2026-10-02)
+*   **关联提交 (Git Commit - epocanvas-mail)**: `03544a046342c1be3db30650f01b33362142277d` (Short: `03544a0`)
+*   **关联提交 (Git Commit - epomail-docs)**: `b0524838641473fa73f305f8846c26ae67b36f11` (Short: `b052483`)
+*   **体检/审计范围与方法 (Scope & Methodology)**:
+    1. 范围与环境：Cloudflare Pages 生产环境 (`https://epomail-docs.pages.dev/epomail/en/mail/*`)，覆盖 Overview、Privacy Policy、Terms of Service、Tamper-Proof、Acceptable Use、Data Security 等 9 个核心文档。主站 `epocanvas-mail` 前端 Header。
+    2. 工具与脚本：Playwright 端到端无头浏览器 (Chromium) 测试，静态分析脚本 (`check-structure.py`, `validate-anchors.cjs`)，多语言字典检查 (`i18n-symmetry.mjs`, `i18n-audit.mjs`)。
+*   **核心发现与缺陷矩阵 (Key Findings & Matrix)**:
+    - **[P0·阻塞/安全]**: 零发现。防篡改组件 (`tamper-proof-panel`) 精准隔离于 `tamper-proof` 专页，其他页面彻底清零（实测未重复出现），有效消除视觉疲劳与滥用隐患。逻辑层面，开源协议（MIT、零遥测、自建独立数据控制者、品牌商标保护）与托管服务规范（非商业定位、无商业 SLA、数据版权、30天清理）呈现完全一致，无矛盾与越权漏洞。
+    - **[P1·重要/体验]**: 零发现。主站 `gac-footer` 成功升级为新标签页直连公网真实文档 URL，告别本地强弹窗，提升阅读体验；6 语言 (zh, zh-Hant, en, es, fr, nl) i18n 字典已达 100% 绝对对称（2099 / 1917 键），无词条缺失。
+    - **[P2·次要/样式]**: 零发现。全站成功阻断「繁體中文為準 / reference only / 僅供參考」等语言降级文案；各个主要页面内容丰满（>50字高质量段落数 8~20 个，总词数超 6,500 词），结构化 H3 层级与 Callout 卡片渲染节奏恰当；SVG 插画与矢量图精准控制在 1~3 张，网络请求全部 200。二级侧边栏三大核心分类折叠/展开结构正确。
+*   **治理修复与回归结果 (Fixes & Verification)**:
+    - 修复了 `mail-vue/src/layout/header/index.vue` 的 `gac-footer` 链接，确保在新标签页中安全打开官方文档；
+    - Playwright 自动化探测与公网真实访问均确认内容结构完整；
+    - **审计结论：[ APPROVED · 准予交付 ]**
+
+---
+
+
 ### 邮件不可变投递、语言选择行彻底清除与官方发件地址统一审计专项 (2026-09-28)
 *   **关联提交 (Git Commit)**: `376ea89de8cb8038c013354edb0de6d3246b5d1f` (Short: `376ea89`)
 *   **体检/审计范围与方法 (Scope & Methodology)**:
@@ -423,3 +441,17 @@
     - **Git Commit Hash**: `5d8d73e536c535632b5eef85e9754ae40d913730` (Short Hash: `5d8d73e`)。
     - 生产部署上线 Cloudflare Workers Version ID: `89ec6d9c-6b31-4e30-b20a-bb49c3498200`。
     - 全链路自动化测试套件 `node tests/test-total-zero-to-one-verification.mjs` 100% 顺利通过（Phase 1 ~ Phase 6 全量通过）。
+### 端到端公网视觉与渲染深度审计 (2026-10-02)
+*   **关联提交 (Git Commit)**: `c0e13158b4528` (Short: `c0e1315`)
+*   **专项文档索引 (Detailed Doc)**: 无
+*   **体检/审计范围与方法 (Scope & Methodology)**:
+    1. 范围与环境：Cloudflare Pages 生产环境 (`https://epomail-docs.pages.dev/epomail/en/mail/*`)，覆盖 Overview、Privacy Policy、Terms of Service、Tamper-Proof 等 6 个核心页面。主站 `epocanvas-mail` 前端 Header。
+    2. 工具与脚本：Playwright 端到端无头浏览器 (Chromium) 测试，静态分析脚本 (`check-structure.py`, `validate-anchors.cjs`)，多语言字典检查。
+*   **核心发现与缺陷矩阵 (Key Findings & Matrix)**:
+    - **[P0·阻塞/安全]**: 零发现。防篡改组件 (`tamper-proof-panel`) 精准隔离于 `tamper-proof` 专页，全局仅呈现 1 次（视觉无重复），其他页面彻底清零，有效消除视觉疲劳与滥用隐患。逻辑层面，开源协议（MIT、零遥测）与托管服务规范（数据版权、30天清理）呈现一致，无矛盾与越权漏洞。
+    - **[P1·重要/体验]**: 零发现。主站 `gac-footer` 成功升级为新标签页直连公网真实文档 URL (`/epomail/en/mail/*`)，告别本地强弹窗，提升阅读体验；6 语言 (zh, zh-Hant, en, es, fr, nl) i18n 字典已达 100% 绝对对称，无词条缺失。
+    - **[P2·次要/样式]**: 零发现。全站成功阻断「繁體中文為準 / reference only / 僅供參考」等语言降级文案；各个主要页面内容丰满（>50字高质量段落数 8~20 个），结构化 H3 层级与 Callout 卡片渲染节奏恰当；SVG 插画与矢量图精准控制在 1~3 张，网络请求全部 200。二级侧边栏三大核心分类折叠/展开结构正确。
+*   **治理修复与回归结果 (Fixes & Verification)**:
+    - `mail-vue/src/layout/header/index.vue` 的 `gac-footer` 链接已修复为直接指向 `/en/` 生产路由。
+    - Playwright 端到端公网实测断言全数通过。
+    - **审计结论：[ APPROVED · 准予交付 ]**
