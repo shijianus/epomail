@@ -2107,6 +2107,20 @@ totpModeAllDesc: 'Configurar si los usuarios pueden usar TOTP. Al activarlo, la 
     updateTotpBtn: "Actualizar autenticador",
     deleteTotpBtn: "Desactivar autenticador",
     passkeyNotFound: "No se encontró la clave de acceso especificada",
+    oauthAuthTitle: "Autenticación de terceros y SSO",
+    oauthAuthDesc: "Administre Google, GitHub, Microsoft y otros proveedores OAuth, personalice la proporción de botones y las URLs de retorno.",
+    oauthLoginSwitch: "Habilitar inicio de sesión de terceros",
+    oauthLoginSwitchDesc: "Al activarlo, se mostrarán los accesos directos de inicio de sesión en la tarjeta de acceso.",
+    oauthPreviewTitle: "Vista previa de estilos y proporción de botones",
+    oauthButtonProportion: "Proporción de botones",
+    oauthProportionGrid: "Cuadrícula simétrica de 2 columnas (1:1)",
+    oauthProportionStacked: "Apilado de ancho completo (100%)",
+    oauthProportionCompact: "Cápsula de icono compacta",
+    oauthCallbackUrl: "URI de redireccionamiento OAuth",
+    oauthCallbackTip: "Agregue esta dirección a las URIs de redirección autorizadas en la consola de desarrollador del proveedor.",
+    oauthConfigStatusDraft: "En desarrollo",
+    oauthConfigStatusActive: "Configurable",
+    oauthSoon: "Próximamente",
 };
 
 export default es;

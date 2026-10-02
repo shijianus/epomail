@@ -2107,6 +2107,20 @@ totpModeAllDesc: 'Instellen of gebruikers TOTP mogen gebruiken. Eenmaal ingescha
     updateTotpBtn: "Authenticator bijwerken",
     deleteTotpBtn: "Authenticator uitschakelen",
     passkeyNotFound: "Gespecificeerde toegangssleutel niet gevonden",
+    oauthAuthTitle: "Authenticatie van derden & SSO",
+    oauthAuthDesc: "Beheer Google, GitHub, Microsoft en andere OAuth-providers, pas de knopverhoudingen en callback-URL's aan.",
+    oauthLoginSwitch: "Inloggen via derden inschakelen",
+    oauthLoginSwitchDesc: "Wanneer ingeschakeld, worden snelle inlogopties van derden weergegeven op de inlogkaart.",
+    oauthPreviewTitle: "Voorbeeld knopverhouding en -stijl",
+    oauthButtonProportion: "Knopindeling en -verhouding",
+    oauthProportionGrid: "Symmetrisch raster met 2 kolommen (1:1)",
+    oauthProportionStacked: "Gestapeld over volledige breedte (100%)",
+    oauthProportionCompact: "Compacte pictogramcapsule",
+    oauthCallbackUrl: "OAuth-omleidings-URI",
+    oauthCallbackTip: "Voeg dit adres toe aan de Geautoriseerde omleidings-URI's in het ontwikkelaarsdashboard van de provider.",
+    oauthConfigStatusDraft: "In ontwikkeling",
+    oauthConfigStatusActive: "Configureerbaar",
+    oauthSoon: "Binnenkort beschikbaar",
 };
 
 export default nl;

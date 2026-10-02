@@ -2107,6 +2107,20 @@ totpModeAllDesc: '设置是否允许用户使用TOTP，开启后用户可以且�
     updateTotpBtn: "更新验证器",
     deleteTotpBtn: "停用验证器",
     passkeyNotFound: "未找到指定的通行密钥",
+    oauthAuthTitle: "第三方认证与单点登录",
+    oauthAuthDesc: "集中管理 Google、GitHub、Microsoft 等第三方认证 Provider，配置登录按钮比例及回调地址。",
+    oauthLoginSwitch: "启用第三方快捷登录",
+    oauthLoginSwitchDesc: "开启后将在前端登录卡片中呈现快捷登录入口",
+    oauthPreviewTitle: "登录页按钮比例与样式预览",
+    oauthButtonProportion: "按钮排版比例",
+    oauthProportionGrid: "双列对称网格 (1:1)",
+    oauthProportionStacked: "单列全宽堆叠 (100%)",
+    oauthProportionCompact: "紧凑图标胶囊",
+    oauthCallbackUrl: "OAuth 重定向回调地址 (Redirect URI)",
+    oauthCallbackTip: "请在对应平台的开放控制台将此地址填入「授权重定向 URI / Authorized redirect URIs」",
+    oauthConfigStatusDraft: "开发规划中",
+    oauthConfigStatusActive: "支持配置与扩展",
+    oauthSoon: "即将上线",
 };
 
 export default zh;

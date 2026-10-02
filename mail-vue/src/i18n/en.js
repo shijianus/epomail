@@ -2107,6 +2107,20 @@ totpModeAllDesc: 'Configure whether users can use TOTP. When enabled, 2FA is ava
     updateTotpBtn: "Update Authenticator",
     deleteTotpBtn: "Disable Authenticator",
     passkeyNotFound: "Specified passkey not found",
+    oauthAuthTitle: "Third-Party Auth & SSO",
+    oauthAuthDesc: "Manage Google, GitHub, Microsoft and other OAuth providers, customize button layout ratios and callback URLs.",
+    oauthLoginSwitch: "Enable Third-Party Login",
+    oauthLoginSwitchDesc: "When enabled, third-party quick login options will be displayed on the login card.",
+    oauthPreviewTitle: "Login Button Ratio & Style Preview",
+    oauthButtonProportion: "Button Layout Ratio",
+    oauthProportionGrid: "Two-Column Grid (1:1)",
+    oauthProportionStacked: "Full-Width Stacked (100%)",
+    oauthProportionCompact: "Compact Icon Capsule",
+    oauthCallbackUrl: "OAuth Redirect URI",
+    oauthCallbackTip: "Add this URL to Authorized Redirect URIs in your provider developer console.",
+    oauthConfigStatusDraft: "In Development",
+    oauthConfigStatusActive: "Configurable",
+    oauthSoon: "Coming Soon",
 };
 
 export default en;

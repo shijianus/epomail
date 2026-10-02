@@ -252,6 +252,132 @@
             </div>
           </div>
 
+          <!-- Third-Party Auth & SSO Settings Card (第三方认证与单点登录管理) -->
+          <div class="settings-card oauth-sso-card">
+            <div class="card-title">
+              {{ $t('oauthAuthTitle') }}
+              <el-tooltip effect="dark" :content="$t('oauthAuthDesc')">
+                <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+              </el-tooltip>
+            </div>
+            <div class="card-content">
+              <!-- Switch: 启用第三方登录 -->
+              <div class="setting-item">
+                <div class="title-item">
+                  <span>{{ $t('oauthLoginSwitch') }}</span>
+                  <el-tooltip effect="dark" :content="$t('oauthLoginSwitchDesc')">
+                    <Icon class="warning" icon="fe:warning" width="16" height="16"/>
+                  </el-tooltip>
+                </div>
+                <div>
+                  <el-switch
+                    @change="(val) => changeField('oauthLoginEnabled', val)"
+                    :active-value="1"
+                    :inactive-value="0"
+                    v-model="setting.oauthLoginEnabled"
+                  />
+                </div>
+              </div>
+
+              <!-- Button Layout / Proportion selector -->
+              <div class="setting-item">
+                <div class="title-item">
+                  <span>{{ $t('oauthButtonProportion') }}</span>
+                </div>
+                <div>
+                  <el-select
+                    v-model="oauthButtonLayout"
+                    @change="updateOauthConfig"
+                    size="small"
+                    style="width: 170px;"
+                  >
+                    <el-option :label="$t('oauthProportionGrid')" value="grid" />
+                    <el-option :label="$t('oauthProportionStacked')" value="stacked" />
+                    <el-option :label="$t('oauthProportionCompact')" value="compact" />
+                  </el-select>
+                </div>
+              </div>
+
+              <!-- Live Button Preview matching exact login style & proportion -->
+              <div class="oauth-preview-box">
+                <div class="preview-header">
+                  <span class="preview-label">{{ $t('oauthPreviewTitle') }}</span>
+                  <el-tag size="small" :type="setting.oauthLoginEnabled === 1 ? 'success' : 'info'" effect="plain">
+                    {{ setting.oauthLoginEnabled === 1 ? $t('enabled') : $t('disabled') }}
+                  </el-tag>
+                </div>
+                <div class="preview-canvas-card" :class="[oauthButtonLayout]">
+                  <div
+                    class="epomail-display flex h-11 items-center justify-center gap-2 rounded-xl border text-[13px] transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#67e8f9] preview-oauth-btn"
+                    :class="{ 'btn-full': oauthButtonLayout === 'stacked' }"
+                  >
+                    <Icon icon="logos:google-icon" width="15" height="15" />
+                    <span>Google</span>
+                    <span class="oauth-soon-badge">{{ $t('oauthSoon') }}</span>
+                  </div>
+                  <div
+                    class="epomail-display flex h-11 items-center justify-center gap-2 rounded-xl border text-[13px] transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#67e8f9] preview-oauth-btn"
+                    :class="{ 'btn-full': oauthButtonLayout === 'stacked' }"
+                  >
+                    <Icon icon="mdi:github" width="17" height="17" />
+                    <span>GitHub</span>
+                    <span class="oauth-soon-badge">{{ $t('oauthSoon') }}</span>
+                  </div>
+                  <div
+                    v-if="oauthButtonLayout === 'stacked'"
+                    class="epomail-display flex h-11 items-center justify-center gap-2 rounded-xl border text-[13px] transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#67e8f9] preview-oauth-btn btn-full"
+                  >
+                    <Icon icon="logos:microsoft-icon" width="15" height="15" />
+                    <span>Microsoft</span>
+                    <span class="oauth-soon-badge">{{ $t('oauthSoon') }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Providers list & status -->
+              <div class="oauth-providers-list">
+                <div class="oauth-provider-row">
+                  <div class="provider-info">
+                    <Icon icon="logos:google-icon" width="16" height="16" />
+                    <span>Google</span>
+                  </div>
+                  <div class="provider-actions">
+                    <el-tag size="small" type="warning" effect="light">{{ $t('oauthConfigStatusDraft') }}</el-tag>
+                  </div>
+                </div>
+                <div class="oauth-provider-row">
+                  <div class="provider-info">
+                    <Icon icon="mdi:github" width="18" height="18" />
+                    <span>GitHub</span>
+                  </div>
+                  <div class="provider-actions">
+                    <el-tag size="small" type="warning" effect="light">{{ $t('oauthConfigStatusDraft') }}</el-tag>
+                  </div>
+                </div>
+                <div class="oauth-provider-row">
+                  <div class="provider-info">
+                    <Icon icon="logos:microsoft-icon" width="16" height="16" />
+                    <span>Microsoft</span>
+                  </div>
+                  <div class="provider-actions">
+                    <el-tag size="small" type="warning" effect="light">{{ $t('oauthConfigStatusDraft') }}</el-tag>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Callback URL Information -->
+              <div class="oauth-callback-info">
+                <div class="callback-title">{{ $t('oauthCallbackUrl') }}</div>
+                <div class="callback-box">
+                  <code>{{ oauthRedirectUri }}</code>
+                  <el-button size="small" text type="primary" @click="copyOauthRedirectUri">
+                    <Icon icon="fluent:copy-20-regular" width="15" height="15" />
+                  </el-button>
+                </div>
+                <p class="callback-tip">{{ $t('oauthCallbackTip') }}</p>
+              </div>
+            </div>
+          </div>
 
           <!-- Storage & Core Database Hub Card (存储与核心数据库管理) -->
           <div class="settings-card storage-db-card">
@@ -3377,6 +3503,45 @@ const settingStore = useSettingStore();
 const uiStore = useUiStore();
 const {settings: setting} = storeToRefs(settingStore);
 const activeUiTab = ref('dynamic')
+const oauthButtonLayout = ref('grid')
+const oauthRedirectUri = computed(() => {
+  if (typeof window === 'undefined') return 'https://mail.epocanvas.com/api/oauth/callback';
+  return `${window.location.origin}/api/oauth/callback`;
+});
+
+function copyOauthRedirectUri() {
+  if (typeof navigator !== 'undefined' && navigator.clipboard) {
+    navigator.clipboard.writeText(oauthRedirectUri.value).then(() => {
+      ElMessage.success(t('copySuccess') || 'Copied');
+    }).catch(() => {
+      ElMessage.info(oauthRedirectUri.value);
+    });
+  }
+}
+
+function updateOauthConfig() {
+  let providers = setting.value?.oauthProviders;
+  if (typeof providers === 'string') {
+    try { providers = JSON.parse(providers); } catch (_) { providers = {}; }
+  } else if (!providers || typeof providers !== 'object') {
+    providers = {};
+  }
+  providers.buttonLayout = oauthButtonLayout.value;
+  setting.value.oauthProviders = providers;
+  changeField('oauthProviders', providers);
+}
+
+watch(() => setting.value?.oauthProviders, (newVal) => {
+  if (newVal) {
+    let p = newVal;
+    if (typeof p === 'string') {
+      try { p = JSON.parse(p); } catch (_) { p = {}; }
+    }
+    if (p && p.buttonLayout) {
+      oauthButtonLayout.value = p.buttonLayout;
+    }
+  }
+}, { immediate: true });
 const editTitle = ref('')
 const settingLoading = ref(false)
 const clearS3Loading = ref(false)
@@ -5970,6 +6135,156 @@ function editSetting(settingForm, refreshStatus = true, closeAiDialog = false) {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.oauth-sso-card {
+  .oauth-preview-box {
+    margin: 12px 0 16px 0;
+    padding: 14px 16px;
+    background: rgba(16, 20, 46, 0.7);
+    border: 1px solid rgba(139, 147, 196, 0.25);
+    border-radius: 14px;
+    backdrop-filter: blur(12px);
+
+    .preview-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+
+      .preview-label {
+        font-size: 12.5px;
+        font-weight: 500;
+        color: #cbd5e1;
+      }
+    }
+
+    .preview-canvas-card {
+      padding: 12px;
+      background: rgba(8, 10, 26, 0.85);
+      border: 1px solid rgba(139, 147, 196, 0.2);
+      border-radius: 12px;
+      display: flex;
+      gap: 10px;
+
+      &.grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        width: 100%;
+      }
+
+      &.stacked {
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+      }
+
+      &.compact {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 10px;
+      }
+
+      .preview-oauth-btn {
+        display: flex;
+        height: 44px;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        border-radius: 12px;
+        border: 1px solid rgba(139, 147, 196, 0.25);
+        background: rgba(255, 255, 255, 0.04);
+        color: #f1f5f9;
+        font-size: 13px;
+        transition: all 0.2s ease;
+        cursor: pointer;
+        user-select: none;
+
+        &.btn-full {
+          width: 100%;
+        }
+
+        &:hover {
+          border-color: #67e8f9;
+          box-shadow: 0 0 12px rgba(103, 232, 249, 0.3);
+        }
+
+        .oauth-soon-badge {
+          font-size: 9px;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+          padding: 1px 6px;
+          border-radius: 9999px;
+          border: 1px solid rgba(139, 147, 196, 0.35);
+          color: #94a3b8;
+        }
+      }
+    }
+  }
+
+  .oauth-providers-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 12px 0;
+
+    .oauth-provider-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 14px;
+      border-radius: 8px;
+      background: var(--el-fill-color-light);
+      border: 1px solid var(--el-border-color-lighter);
+
+      .provider-info {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 13px;
+        font-weight: 500;
+      }
+    }
+  }
+
+  .oauth-callback-info {
+    margin-top: 14px;
+    padding: 12px 14px;
+    border-radius: 8px;
+    background: var(--el-fill-color-lighter);
+    border: 1px solid var(--el-border-color-lighter);
+
+    .callback-title {
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 6px;
+      color: var(--el-text-color-regular);
+    }
+
+    .callback-box {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 10px;
+      border-radius: 6px;
+      background: var(--el-bg-color);
+      border: 1px solid var(--el-border-color-light);
+
+      code {
+        font-size: 12px;
+        color: var(--el-color-primary);
+        word-break: break-all;
+      }
+    }
+
+    .callback-tip {
+      font-size: 11px;
+      color: var(--el-text-color-secondary);
+      margin-top: 6px;
+      line-height: 1.4;
+    }
+  }
 }
 
 .help-icon {

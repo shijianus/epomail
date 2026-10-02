@@ -2107,6 +2107,20 @@ totpModeAllDesc: 'Définir si les utilisateurs peuvent utiliser TOTP. Lorsqu\'il
     updateTotpBtn: "Mettre à jour l'authentificateur",
     deleteTotpBtn: "Désactiver l'authentificateur",
     passkeyNotFound: "Clé d'accès spécifiée introuvable",
+    oauthAuthTitle: "Authentification tierce et SSO",
+    oauthAuthDesc: "Gérez les fournisseurs OAuth Google, GitHub, Microsoft, personnalisez les ratios des boutons et les URL de rappel.",
+    oauthLoginSwitch: "Activer la connexion tierce",
+    oauthLoginSwitchDesc: "Une fois activé, des boutons de connexion rapide s'afficheront sur la carte de connexion.",
+    oauthPreviewTitle: "Aperçu du style et du ratio des boutons",
+    oauthButtonProportion: "Disposition et ratio des boutons",
+    oauthProportionGrid: "Grille symétrique 2 colonnes (1:1)",
+    oauthProportionStacked: "Empilé pleine largeur (100%)",
+    oauthProportionCompact: "Capsule d'icône compacte",
+    oauthCallbackUrl: "URI de redirection OAuth",
+    oauthCallbackTip: "Ajoutez cette adresse aux URI de redirection autorisées dans la console de votre fournisseur.",
+    oauthConfigStatusDraft: "En cours de développement",
+    oauthConfigStatusActive: "Configurable",
+    oauthSoon: "Bientôt disponible",
 };
 
 export default fr;

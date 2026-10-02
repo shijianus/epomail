@@ -2107,6 +2107,20 @@ totpModeAllDesc: '設定是否允許使用者使用TOTP，開啟後使用者可�
     updateTotpBtn: "更新驗證器",
     deleteTotpBtn: "停用驗證器",
     passkeyNotFound: "未找到指定的通行金鑰",
+    oauthAuthTitle: "第三方認證與單點登入",
+    oauthAuthDesc: "集中管理 Google、GitHub、Microsoft 等第三方認證 Provider，配置登入按鈕比例及回調地址。",
+    oauthLoginSwitch: "啟用第三方快捷登入",
+    oauthLoginSwitchDesc: "開啟後將在前端登入卡片中呈現快捷登入入口",
+    oauthPreviewTitle: "登入頁按鈕比例與樣式預覽",
+    oauthButtonProportion: "按鈕排版比例",
+    oauthProportionGrid: "雙列對稱網格 (1:1)",
+    oauthProportionStacked: "單列全寬堆疊 (100%)",
+    oauthProportionCompact: "緊湊圖示膠囊",
+    oauthCallbackUrl: "OAuth 重定向回調地址 (Redirect URI)",
+    oauthCallbackTip: "請在對應平台的開放控制台將此地址填入「授權重定向 URI / Authorized redirect URIs」",
+    oauthConfigStatusDraft: "開發規劃中",
+    oauthConfigStatusActive: "支援配置與擴展",
+    oauthSoon: "即將上線",
 };
 
 export default zhHant;

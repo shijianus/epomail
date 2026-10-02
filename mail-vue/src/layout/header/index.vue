@@ -674,19 +674,19 @@ function openAddAccount() {
 
 function openProjectIntro() {
   closeDropdown();
-  const extUrl = settingStore.settings?.projectUrl || 'https://epomail-docs.pages.dev/epomail/mail/project/';
+  const extUrl = settingStore.settings?.projectUrl || 'https://epomail-docs.pages.dev/epomail/en/mail/overview/';
   window.open(extUrl, '_blank', 'noopener,noreferrer');
 }
 
 function openPrivacyPolicy() {
   closeDropdown();
-  const extUrl = settingStore.settings?.privacyUrl || 'https://epomail-docs.pages.dev/epomail/mail/privacy-policy/';
+  const extUrl = settingStore.settings?.privacyUrl || 'https://epomail-docs.pages.dev/epomail/en/mail/privacy-policy/';
   window.open(extUrl, '_blank', 'noopener,noreferrer');
 }
 
 function openTermsOfService() {
   closeDropdown();
-  const extUrl = settingStore.settings?.termsUrl || 'https://epomail-docs.pages.dev/epomail/mail/terms-of-service/';
+  const extUrl = settingStore.settings?.termsUrl || 'https://epomail-docs.pages.dev/epomail/en/mail/terms-of-service/';
   window.open(extUrl, '_blank', 'noopener,noreferrer');
 }
 
