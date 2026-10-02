@@ -252,26 +252,79 @@ function generateSessionHash(): string {
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
+function getInitialChallengeState() {
+  if (typeof window === "undefined") {
+    return {
+      stage: "password" as Stage,
+      activeMethod: "totp" as TwoFAMethod,
+      showSelector: false,
+      hash: "",
+      storedSession: null as any,
+    };
+  }
+  const pathname = window.location.pathname;
+  const match = pathname.match(/\/login\/challenge\/(totp|passkey|backup|select|session)_([A-Za-z0-9_-]+)/);
+  if (!match) {
+    return {
+      stage: "password" as Stage,
+      activeMethod: "totp" as TwoFAMethod,
+      showSelector: false,
+      hash: "",
+      storedSession: null as any,
+    };
+  }
+
+  const methodPrefix = match[1];
+  const urlHash = match[2];
+
+  let storedSession: any = null;
+  try {
+    const raw = sessionStorage.getItem('epo_2fa_challenge_session');
+    if (raw) storedSession = JSON.parse(raw);
+  } catch (_) {}
+
+  let activeMethod: TwoFAMethod = "totp";
+  let showSelector = false;
+  if (methodPrefix === "select") {
+    showSelector = true;
+  } else if (methodPrefix === "passkey") {
+    activeMethod = "passkey";
+  } else if (methodPrefix === "backup") {
+    activeMethod = "backup_code";
+  } else {
+    activeMethod = "totp";
+  }
+
+  return {
+    stage: "totp" as Stage,
+    activeMethod,
+    showSelector,
+    hash: urlHash,
+    storedSession,
+  };
+}
+
 export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
-  const [stage, setStage] = useState<Stage>("password");
-  const [challengeSessionHash, setChallengeSessionHash] = useState<string>("");
-  const [email, setEmail] = useState("");
+  const initial = useMemo(() => getInitialChallengeState(), []);
+  const [stage, setStage] = useState<Stage>(initial.stage);
+  const [challengeSessionHash, setChallengeSessionHash] = useState<string>(initial.hash);
+  const [email, setEmail] = useState(initial.storedSession?.email || "");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [tempToken, setTempToken] = useState("");
-  const [mfaEmail, setMfaEmail] = useState("");
+  const [tempToken, setTempToken] = useState(initial.storedSession?.tempToken || "");
+  const [mfaEmail, setMfaEmail] = useState(initial.storedSession?.email || "");
   const [totpDigits, setTotpDigits] = useState<string[]>(["", "", "", "", "", ""]);
   const [backupCode, setBackupCode] = useState("");
-  const [isBackupCode, setIsBackupCode] = useState(false);
-  const [hasPasskeys, setHasPasskeys] = useState(false);
-  const [hasTotp, setHasTotp] = useState(true);
-  const [hasBackupCodes, setHasBackupCodes] = useState(true);
-  const [active2FAMethod, setActive2FAMethod] = useState<TwoFAMethod>("totp");
-  const [showMethodSelector, setShowMethodSelector] = useState(false);
-  const [stepUpActive, setStepUpActive] = useState(false);
+  const [isBackupCode, setIsBackupCode] = useState(initial.activeMethod === "backup_code");
+  const [hasPasskeys, setHasPasskeys] = useState(Boolean(initial.storedSession?.hasPasskeys));
+  const [hasTotp, setHasTotp] = useState(Boolean(initial.storedSession?.hasTotp ?? true));
+  const [hasBackupCodes, setHasBackupCodes] = useState(Boolean(initial.storedSession?.hasBackupCodes ?? true));
+  const [active2FAMethod, setActive2FAMethod] = useState<TwoFAMethod>(initial.activeMethod);
+  const [showMethodSelector, setShowMethodSelector] = useState(initial.showSelector);
+  const [stepUpActive, setStepUpActive] = useState(Boolean(initial.storedSession?.stepUpRequired));
   const [verifiedFactors, setVerifiedFactors] = useState<string[]>([]);
-  const [passkeyChallenge, setPasskeyChallenge] = useState("");
-  const [passkeysList, setPasskeysList] = useState<any[]>([]);
+  const [passkeyChallenge, setPasskeyChallenge] = useState(initial.storedSession?.passkeyChallenge || "");
+  const [passkeysList, setPasskeysList] = useState<any[]>(initial.storedSession?.passkeysList || []);
   const [otpShake, setOtpShake] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [secondsLeftInPeriod, setSecondsLeftInPeriod] = useState(30);
@@ -323,7 +376,7 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
     }
   };
 
-  // URL 路由精确同步与跨环境复制自动回退机制
+  // URL 路由精确同步（严格保持当前 URL，绝不触发跳转，支持浏览器前进/后退）
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -340,23 +393,10 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
           if (raw) storedSession = JSON.parse(raw);
         } catch (_) {}
 
-        // 严格环境与会话有效性核验：
-        // 1. 本标签页 sessionStorage 必须存在会话
-        // 2. sessionHash 必须与 URL 中的 hash 严格一致
-        // 3. 时间窗口在 10 分钟内
-        // 若在不同环境直接复制粘贴链接打开，因无当前标签页 sessionStorage，自动安全回退至 /login/
-        const isValid = storedSession &&
-          storedSession.sessionHash === urlHash &&
-          (Date.now() - (storedSession.createdAt || 0) < 10 * 60 * 1000);
+        setChallengeSessionHash(urlHash);
+        setStage("totp");
 
-        if (!isValid) {
-          window.history.replaceState(null, '', '/login/' + window.location.search);
-          sessionStorage.removeItem('epo_2fa_challenge_session');
-          setStage("password");
-          setChallengeSessionHash("");
-        } else {
-          // 当前标签页内正常刷新（F5）或会话内有效跳转：完整恢复 2FA 状态与因子
-          setChallengeSessionHash(urlHash);
+        if (storedSession && storedSession.sessionHash === urlHash) {
           setTempToken(storedSession.tempToken || "");
           setMfaEmail(storedSession.email || "");
           setHasPasskeys(Boolean(storedSession.hasPasskeys));
@@ -365,32 +405,29 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
           setHasTotp(Boolean(storedSession.hasTotp ?? true));
           setHasBackupCodes(Boolean(storedSession.hasBackupCodes ?? true));
           setStepUpActive(Boolean(storedSession.stepUpRequired));
-          setStage("totp");
+        }
 
-          if (urlMethodPrefix === 'select') {
-            setShowMethodSelector(true);
+        if (urlMethodPrefix === 'select') {
+          setShowMethodSelector(true);
+        } else {
+          setShowMethodSelector(false);
+          if (urlMethodPrefix === 'passkey') {
+            setActive2FAMethod('passkey');
+            setIsBackupCode(false);
+          } else if (urlMethodPrefix === 'backup') {
+            setActive2FAMethod('backup_code');
+            setIsBackupCode(true);
           } else {
-            setShowMethodSelector(false);
-            if (urlMethodPrefix === 'passkey') {
-              setActive2FAMethod('passkey');
-              setIsBackupCode(false);
-            } else if (urlMethodPrefix === 'backup') {
-              setActive2FAMethod('backup_code');
-              setIsBackupCode(true);
-            } else {
-              setActive2FAMethod('totp');
-              setIsBackupCode(false);
-            }
+            setActive2FAMethod('totp');
+            setIsBackupCode(false);
           }
         }
       } else {
-        if (stage === "password") {
-          sessionStorage.removeItem('epo_2fa_challenge_session');
-        }
+        setStage("password");
+        setShowMethodSelector(false);
       }
     };
 
-    handleRouteSync();
     window.addEventListener('popstate', handleRouteSync);
     return () => window.removeEventListener('popstate', handleRouteSync);
   }, []);
@@ -1315,7 +1352,7 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
                     )}
 
                     {/* Method options list */}
-                    <div className="flex flex-col gap-2.5 mt-1">
+                    <div className="flex flex-col gap-2 mt-1">
                       {/* 1. Passkey Option */}
                       {hasPasskeys && (
                         <button
@@ -1327,14 +1364,14 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
                             setIsBackupCode(false);
                             setShowMethodSelector(false);
                             setErrorMsg("");
-                            if (challengeSessionHash) {
-                              updateChallengeUrl('passkey', challengeSessionHash);
-                            }
+                            const hash = challengeSessionHash || generateSessionHash();
+                            if (!challengeSessionHash) setChallengeSessionHash(hash);
+                            updateChallengeUrl('passkey', hash);
                             setTimeout(() => {
                               handlePasskeyLogin();
                             }, 120);
                           }}
-                          className={`flex items-center justify-between p-3.5 rounded-xl border text-left transition-all ${
+                          className={`flex items-center justify-between p-2.5 px-3 rounded-xl border text-left transition-all ${
                             verifiedFactors.includes('passkey')
                               ? 'opacity-40 cursor-not-allowed border-[rgba(139,147,196,0.15)] bg-[rgba(255,255,255,0.01)]'
                               : active2FAMethod === 'passkey'
@@ -1342,25 +1379,25 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
                               : 'border-[rgba(139,147,196,0.2)] bg-[rgba(255,255,255,0.03)] hover:border-indigo-400/40 hover:bg-[rgba(255,255,255,0.05)] cursor-pointer'
                           }`}
                         >
-                          <div className="flex items-center gap-3">
-                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-500/10 border border-indigo-500/30 text-indigo-400">
-                              <KeyRound size={18} />
+                          <div className="flex items-center gap-2.5">
+                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-500/10 border border-indigo-500/30 text-indigo-400">
+                              <KeyRound size={16} />
                             </div>
                             <div>
-                              <div className="text-[13px] font-semibold text-[var(--epo-ink)]">
+                              <div className="text-[13px] font-semibold text-[var(--epo-ink)] leading-tight">
                                 {t('methodPasskeyTitle')}
                               </div>
                               <div className="text-[11px] leading-tight text-[var(--epo-muted)] line-clamp-1 mt-0.5">
                                 {t('methodPasskeyDesc')}
                               </div>
                               {verifiedFactors.includes('passkey') && (
-                                <span className="text-[10px] text-yellow-400 mt-1 inline-block">
+                                <span className="text-[10px] text-yellow-400 mt-0.5 inline-block">
                                   {t('factorAlreadyUsed')}
                                 </span>
                               )}
                             </div>
                           </div>
-                          <ChevronRight size={16} className="text-[var(--epo-muted)] shrink-0 ml-2" />
+                          <ChevronRight size={15} className="text-[var(--epo-muted)] shrink-0 ml-2" />
                         </button>
                       )}
 
@@ -1375,11 +1412,11 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
                             setIsBackupCode(false);
                             setShowMethodSelector(false);
                             setErrorMsg("");
-                            if (challengeSessionHash) {
-                              updateChallengeUrl('totp', challengeSessionHash);
-                            }
+                            const hash = challengeSessionHash || generateSessionHash();
+                            if (!challengeSessionHash) setChallengeSessionHash(hash);
+                            updateChallengeUrl('totp', hash);
                           }}
-                          className={`flex items-center justify-between p-3.5 rounded-xl border text-left transition-all ${
+                          className={`flex items-center justify-between p-2.5 px-3 rounded-xl border text-left transition-all ${
                             verifiedFactors.includes('totp')
                               ? 'opacity-40 cursor-not-allowed border-[rgba(139,147,196,0.15)] bg-[rgba(255,255,255,0.01)]'
                               : active2FAMethod === 'totp'
@@ -1387,25 +1424,25 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
                               : 'border-[rgba(139,147,196,0.2)] bg-[rgba(255,255,255,0.03)] hover:border-indigo-400/40 hover:bg-[rgba(255,255,255,0.05)] cursor-pointer'
                           }`}
                         >
-                          <div className="flex items-center gap-3">
-                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-500/10 border border-indigo-500/30 text-indigo-400">
-                              <Smartphone size={18} />
+                          <div className="flex items-center gap-2.5">
+                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-500/10 border border-indigo-500/30 text-indigo-400">
+                              <Smartphone size={16} />
                             </div>
                             <div>
-                              <div className="text-[13px] font-semibold text-[var(--epo-ink)]">
+                              <div className="text-[13px] font-semibold text-[var(--epo-ink)] leading-tight">
                                 {t('methodTotpTitle')}
                               </div>
                               <div className="text-[11px] leading-tight text-[var(--epo-muted)] line-clamp-1 mt-0.5">
                                 {t('methodTotpDesc')}
                               </div>
                               {verifiedFactors.includes('totp') && (
-                                <span className="text-[10px] text-yellow-400 mt-1 inline-block">
+                                <span className="text-[10px] text-yellow-400 mt-0.5 inline-block">
                                   {t('factorAlreadyUsed')}
                                 </span>
                               )}
                             </div>
                           </div>
-                          <ChevronRight size={16} className="text-[var(--epo-muted)] shrink-0 ml-2" />
+                          <ChevronRight size={15} className="text-[var(--epo-muted)] shrink-0 ml-2" />
                         </button>
                       )}
 
@@ -1420,11 +1457,11 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
                             setIsBackupCode(true);
                             setShowMethodSelector(false);
                             setErrorMsg("");
-                            if (challengeSessionHash) {
-                              updateChallengeUrl('backup', challengeSessionHash);
-                            }
+                            const hash = challengeSessionHash || generateSessionHash();
+                            if (!challengeSessionHash) setChallengeSessionHash(hash);
+                            updateChallengeUrl('backup', hash);
                           }}
-                          className={`flex items-center justify-between p-3.5 rounded-xl border text-left transition-all ${
+                          className={`flex items-center justify-between p-2.5 px-3 rounded-xl border text-left transition-all ${
                             verifiedFactors.includes('backup_code')
                               ? 'opacity-40 cursor-not-allowed border-[rgba(139,147,196,0.15)] bg-[rgba(255,255,255,0.01)]'
                               : active2FAMethod === 'backup_code'
@@ -1432,25 +1469,25 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
                               : 'border-[rgba(139,147,196,0.2)] bg-[rgba(255,255,255,0.03)] hover:border-indigo-400/40 hover:bg-[rgba(255,255,255,0.05)] cursor-pointer'
                           }`}
                         >
-                          <div className="flex items-center gap-3">
-                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-500/10 border border-indigo-500/30 text-indigo-400">
-                              <ShieldCheck size={18} />
+                          <div className="flex items-center gap-2.5">
+                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-500/10 border border-indigo-500/30 text-indigo-400">
+                              <ShieldCheck size={16} />
                             </div>
                             <div>
-                              <div className="text-[13px] font-semibold text-[var(--epo-ink)]">
+                              <div className="text-[13px] font-semibold text-[var(--epo-ink)] leading-tight">
                                 {t('methodBackupTitle')}
                               </div>
                               <div className="text-[11px] leading-tight text-[var(--epo-muted)] line-clamp-1 mt-0.5">
                                 {t('methodBackupDesc')}
                               </div>
                               {verifiedFactors.includes('backup_code') && (
-                                <span className="text-[10px] text-yellow-400 mt-1 inline-block">
+                                <span className="text-[10px] text-yellow-400 mt-0.5 inline-block">
                                   {t('factorAlreadyUsed')}
                                 </span>
                               )}
                             </div>
                           </div>
-                          <ChevronRight size={16} className="text-[var(--epo-muted)] shrink-0 ml-2" />
+                          <ChevronRight size={15} className="text-[var(--epo-muted)] shrink-0 ml-2" />
                         </button>
                       )}
                     </div>
@@ -1509,33 +1546,37 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
                     </div>
                   )}
 
-                  {/* 2FA Header card banner */}
-                  <div className="flex flex-col items-center text-center gap-2 rounded-2xl p-4 border border-[rgba(139,147,196,0.2)] bg-[rgba(255,255,255,0.03)] backdrop-blur-sm">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 shadow-[0_0_15px_rgba(99,102,241,0.2)]">
-                      {active2FAMethod === 'passkey' ? (
-                        <KeyRound size={20} />
-                      ) : active2FAMethod === 'backup_code' ? (
-                        <ShieldCheck size={20} />
-                      ) : (
-                        <Smartphone size={20} />
-                      )}
+                  {/* Compact 2FA status row */}
+                  <div className="flex items-center justify-between px-3 py-2 rounded-xl border border-[rgba(139,147,196,0.2)] bg-[rgba(255,255,255,0.03)] backdrop-blur-sm">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-500/15 border border-indigo-500/30 text-indigo-400">
+                        {active2FAMethod === 'passkey' ? (
+                          <KeyRound size={16} />
+                        ) : active2FAMethod === 'backup_code' ? (
+                          <ShieldCheck size={16} />
+                        ) : (
+                          <Smartphone size={16} />
+                        )}
+                      </div>
+                      <div className="text-left min-w-0">
+                        <div className="text-[13px] font-semibold text-[var(--epo-ink)] leading-tight truncate">
+                          {active2FAMethod === 'passkey'
+                            ? t('methodPasskeyTitle')
+                            : active2FAMethod === 'backup_code'
+                            ? t('backupCodeTitle')
+                            : t('totpTitle')}
+                        </div>
+                        <div className="text-[11px] text-[var(--epo-muted)] leading-tight truncate mt-0.5">
+                          {active2FAMethod === 'passkey'
+                            ? t('methodPasskeyDesc')
+                            : active2FAMethod === 'backup_code'
+                            ? t('backupCodeHint')
+                            : t('totpHint')}
+                        </div>
+                      </div>
                     </div>
-                    <h2 className="text-[16px] font-semibold text-[var(--epo-ink)] tracking-wide">
-                      {active2FAMethod === 'passkey'
-                        ? t('methodPasskeyTitle')
-                        : active2FAMethod === 'backup_code'
-                        ? t('backupCodeTitle')
-                        : t('totpTitle')}
-                    </h2>
-                    <p className="text-[12px] leading-relaxed" style={{ color: "var(--epo-muted)" }}>
-                      {active2FAMethod === 'passkey'
-                        ? t('methodPasskeyDesc')
-                        : active2FAMethod === 'backup_code'
-                        ? t('backupCodeHint')
-                        : t('totpHint')}
-                    </p>
                     {mfaEmail && (
-                      <div className="text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-[rgba(103,232,249,0.1)] text-[var(--epo-cyan-glow)] border border-[rgba(103,232,249,0.25)]">
+                      <div className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-[rgba(103,232,249,0.1)] text-[var(--epo-cyan-glow)] border border-[rgba(103,232,249,0.25)] max-w-[130px] truncate shrink-0 ml-2">
                         {mfaEmail}
                       </div>
                     )}

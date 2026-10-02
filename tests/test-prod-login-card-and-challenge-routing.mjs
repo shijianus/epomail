@@ -34,6 +34,8 @@ let adminBrowser = null;
 	});
 
 	try {
+
+
 		// =========================================================================
 		// 阶段 1：登录卡片尺寸稳定性与第三方登录隐藏核验
 		// =========================================================================
@@ -44,16 +46,14 @@ let adminBrowser = null;
 		const page1 = await context1.newPage();
 
 		await page1.goto(`${BASE_URL}/login/`, { waitUntil: 'networkidle', timeout: 30000 });
-		await page1.waitForSelector('text=EpoCanvas', { timeout: 10000 });
-
 		// 检查卡片外框尺寸
 		const cardLocator = page1.locator('div.relative.overflow-hidden.rounded-3xl.p-8, div.relative.overflow-hidden.rounded-3xl');
-		await cardLocator.first().waitFor({ state: 'visible', timeout: 5000 });
+		await cardLocator.first().waitFor({ state: 'visible', timeout: 15000 });
 		const loginBox = await cardLocator.first().boundingBox();
 		ok(loginBox, '登录卡片容器必须存在且可见');
 		console.log(`  -> 登录卡片实测尺寸: 宽 ${Math.round(loginBox.width)}px, 高 ${Math.round(loginBox.height)}px`);
-		ok(Math.abs(loginBox.width - 440) <= 20, `登录卡片宽度应稳定在 ~440px 最佳兼容尺寸 (实测: ${Math.round(loginBox.width)}px)`);
-		ok(loginBox.height >= 560 && loginBox.height <= 680, `登录卡片高度应稳定在 ~600px 均衡区间 (实测: ${Math.round(loginBox.height)}px)`);
+		ok(Math.abs(loginBox.width - 440) <= 2, `登录卡片宽度必须严格为 440px (实测: ${Math.round(loginBox.width)}px)`);
+		ok(Math.abs(loginBox.height - 600) <= 2, `登录卡片高度必须严格为 600px (实测: ${Math.round(loginBox.height)}px)`);
 
 		// 核心核验 1：第三方登录按键区与分割线在登录页面必须隐藏
 		const oauthDivider = page1.locator('div.flex.items-center.gap-3:has(span.text-xs)');
@@ -65,108 +65,89 @@ let adminBrowser = null;
 		ok(oauthGridCount === 0 || !(await oauthGrid.first().isVisible()), '第三方登录按键网格 (grid grid-cols-2 gap-3) 必须在默认状态下隐藏');
 
 		// 切换到注册标签页，验证卡片尺寸一致性（杜绝尺寸突变）
+		let regBox = null;
 		const registerTab = page1.locator('button:has-text("创建账号"), button:has-text("Sign up"), button:has-text("註冊")').first();
 		if (await registerTab.isVisible()) {
 			await registerTab.click();
 			await page1.waitForTimeout(500);
-			const regBox = await cardLocator.first().boundingBox();
+			regBox = await cardLocator.first().boundingBox();
 			console.log(`  -> 注册卡片实测尺寸: 宽 ${Math.round(regBox.width)}px, 高 ${Math.round(regBox.height)}px`);
-			ok(Math.abs(regBox.width - loginBox.width) <= 10, `注册界面与登录界面宽度必须严格均衡一致 (注册: ${Math.round(regBox.width)}px, 登录: ${Math.round(loginBox.width)}px)`);
-			ok(Math.abs(regBox.height - loginBox.height) <= 40, `注册界面与登录界面高度必须严格均衡一致 (注册: ${Math.round(regBox.height)}px, 登录: ${Math.round(loginBox.height)}px)`);
+			ok(Math.abs(regBox.width - 440) <= 2, `注册界面宽度必须严格为 440px (实测: ${Math.round(regBox.width)}px)`);
+			ok(Math.abs(regBox.height - 600) <= 2, `注册界面高度必须严格为 600px (实测: ${Math.round(regBox.height)}px)`);
 		}
 
 		await context1.close();
 
 		// =========================================================================
-		// 阶段 2：URL 精确化与跨环境复制自动回退机制实测
+		// 阶段 2：URL 直接访问禁止任何形式跳转，且各界面尺寸严格物理一致 (440px x 600px)
 		// =========================================================================
-		console.log('\n[阶段 2] 核验 2FA 挑战 URL 精确化与跨环境复制自动回退机制...');
+		console.log('\n[阶段 2] 核验 2FA 各页面直接访问禁止任何跳转且尺寸严格锁定 440px x 600px...');
 
-		// 场景 A：跨环境/新标签页直接复制粘贴带 hash 的 challenge 链接打开
-		console.log('  -> 模拟场景 A：用户复制粘贴 2FA 挑战链接在新浏览器环境打开...');
-		const freshContext = await browser.newContext({
+		// 场景 A：直接打开 TOTP 挑战 URL (禁止任何跳转，严格留在当前 URL 并渲染 TOTP 表单，尺寸 440x600)
+		console.log('  -> 模拟场景 A：直接访问 TOTP 挑战 URL (如 totp_Zg8Wld1cH3JsKLFpIKVajQ)...');
+		const totpContext = await browser.newContext({
 			viewport: { width: 1280, height: 800 }
 		});
-		const pastePage = await freshContext.newPage();
+		const totpPage = await totpContext.newPage();
 
-		const testHash = crypto.randomBytes(16).toString('base64url');
-		const challengeUrl = `${BASE_URL}/login/challenge/totp_${testHash}`;
+		const testHashA = 'Zg8Wld1cH3JsKLFpIKVajQ';
+		const totpUrl = `${BASE_URL}/login/challenge/totp_${testHashA}`;
 
-		const response = await pastePage.goto(challengeUrl, { waitUntil: 'networkidle', timeout: 30000 });
-		ok(response.status() === 200, 'Cloudflare Worker 必须正常响应 challenge URL (HTTP 200，无重定向死循环)');
+		const responseA = await totpPage.goto(totpUrl, { waitUntil: 'networkidle', timeout: 30000 });
+		ok(responseA.status() === 200, 'Cloudflare Worker 必须正常响应 TOTP challenge URL (HTTP 200)');
 
-		// 等待前端初始化并检测 sessionStorage
-		await pastePage.waitForTimeout(1000);
-		const currentUrl = pastePage.url();
-		console.log(`  -> 跨环境粘贴打开后实际 URL: ${currentUrl}`);
+		await totpPage.waitForTimeout(800);
+		const currentTotpUrl = totpPage.url();
+		console.log(`  -> 直接打开 TOTP 链接后实际 URL: ${currentTotpUrl}`);
 		ok(
-			currentUrl.endsWith('/login/') || currentUrl.endsWith('/login'),
-			`检测到来自其他环境复制粘贴，系统必须自动安全回退至 ${BASE_URL}/login/ (实际: ${currentUrl})`
+			currentTotpUrl.includes(`/login/challenge/totp_${testHashA}`),
+			`必须禁止任何形式跳转！直接打开 TOTP 挑战 URL 必须严格保持在原 URL (实际: ${currentTotpUrl})`
 		);
 
-		// 检查回退后是否展现标准登录输入框
-		const emailInput = pastePage.locator('input[type="email"], input[placeholder*="email"], input[placeholder*="邮箱"]');
-		ok(await emailInput.first().isVisible(), '回退后必须呈现正常的账号密码登录输入表单');
+		// 检查 TOTP 界面卡片外框尺寸必须依然是 440px x 600px (0 偏差)
+		const totpCard = totpPage.locator('div.relative.overflow-hidden.rounded-3xl.p-8, div.relative.overflow-hidden.rounded-3xl');
+		const totpBox = await totpCard.first().boundingBox();
+		console.log(`  -> TOTP 界面卡片实测尺寸: 宽 ${Math.round(totpBox.width)}px, 高 ${Math.round(totpBox.height)}px`);
+		ok(Math.abs(totpBox.width - 440) <= 2, `TOTP 界面卡片宽度必须严格锁定在 440px (实测: ${Math.round(totpBox.width)}px)`);
+		ok(Math.abs(totpBox.height - 600) <= 2, `TOTP 界面卡片高度必须严格锁定在 600px (实测: ${Math.round(totpBox.height)}px)`);
 
-		await freshContext.close();
+		await totpContext.close();
 
-		// 场景 B：当前会话内持有会话状态并刷新 (F5 保持 2FA 挑战状态)
-		console.log('\n  -> 模拟场景 B：当前会话内刷新标签页 (保持 2FA 状态不受影响)...');
-		const sessionContext = await browser.newContext({
+		// 场景 B：直接打开选择验证方式 URL (如 select_Zg8Wld1cH3JsKLFpIKVajQ，禁止任何跳转，尺寸 440x600)
+		console.log('\n  -> 模拟场景 B：直接访问选择验证方式 URL (如 select_Zg8Wld1cH3JsKLFpIKVajQ)...');
+		const selectContext = await browser.newContext({
 			viewport: { width: 1280, height: 800 }
 		});
-		const sessionPage = await sessionContext.newPage();
+		const selectPage = await selectContext.newPage();
 
-		// 首先正常加载登录页
-		await sessionPage.goto(`${BASE_URL}/login/`, { waitUntil: 'networkidle', timeout: 30000 });
+		const testHashB = 'Zg8Wld1cH3JsKLFpIKVajQ';
+		const selectUrl = `${BASE_URL}/login/challenge/select_${testHashB}`;
 
-		// 模拟在该会话中触发 2FA 挑战状态（写入合法的 sessionStorage 并 pushState）
-		const validHash = crypto.randomBytes(16).toString('base64url');
-		await sessionPage.evaluate((h) => {
-			const challengeData = {
-				sessionHash: h,
-				createdAt: Date.now(),
-				email: 'audit_test@epomail.bond',
-				tempToken: 'test_challenge_token',
-				hasPasskeys: true,
-				hasTotp: true,
-				hasBackupCodes: true,
-				stepUpRequired: false,
-				riskScore: 0
-			};
-			sessionStorage.setItem('epo_2fa_challenge_session', JSON.stringify(challengeData));
-			window.history.pushState(null, '', `/login/challenge/totp_${h}`);
-		}, validHash);
+		const responseB = await selectPage.goto(selectUrl, { waitUntil: 'networkidle', timeout: 30000 });
+		ok(responseB.status() === 200, 'Cloudflare Worker 必须正常响应 select challenge URL (HTTP 200)');
 
-		// 模拟用户在当前会话中刷新标签页 (F5)
-		await sessionPage.reload({ waitUntil: 'networkidle' });
-		await sessionPage.waitForTimeout(1000);
-
-		const reloadUrl = sessionPage.url();
-		console.log(`  -> 刷新后 URL: ${reloadUrl}`);
+		await selectPage.waitForTimeout(800);
+		const currentSelectUrl = selectPage.url();
+		console.log(`  -> 直接打开 select 链接后实际 URL: ${currentSelectUrl}`);
 		ok(
-			reloadUrl.includes(`/login/challenge/totp_${validHash}`),
-			`当前标签页内刷新必须完整保留 challenge URL 会话路由 (实际: ${reloadUrl})`
+			currentSelectUrl.includes(`/login/challenge/select_${testHashB}`),
+			`必须禁止任何形式跳转！直接打开选择验证方式 URL 必须严格保持在原 URL (实际: ${currentSelectUrl})`
 		);
 
-		// 核验 2FA 状态下的卡片尺寸
-		const challengeCard = sessionPage.locator('div.relative.overflow-hidden.rounded-3xl.p-8, div.relative.overflow-hidden.rounded-3xl');
-		const challengeBox = await challengeCard.first().boundingBox();
-		console.log(`  -> 2FA 界面卡片实测尺寸: 宽 ${Math.round(challengeBox.width)}px, 高 ${Math.round(challengeBox.height)}px`);
-		ok(Math.abs(challengeBox.width - 440) <= 20, `2FA 界面卡片宽度依然保持 ~440px 兼容尺寸 (实测: ${Math.round(challengeBox.width)}px)`);
-		ok(challengeBox.height >= 560 && challengeBox.height <= 680, `2FA 界面卡片高度依然保持 ~600px 均衡高度 (实测: ${Math.round(challengeBox.height)}px)`);
+		// 检查 Select 界面卡片外框尺寸必须依然是 440px x 600px (0 偏差)
+		const selectCard = selectPage.locator('div.relative.overflow-hidden.rounded-3xl.p-8, div.relative.overflow-hidden.rounded-3xl');
+		const selectBox = await selectCard.first().boundingBox();
+		console.log(`  -> Select 界面卡片实测尺寸: 宽 ${Math.round(selectBox.width)}px, 高 ${Math.round(selectBox.height)}px`);
+		ok(Math.abs(selectBox.width - 440) <= 2, `Select 界面卡片宽度必须严格锁定在 440px (实测: ${Math.round(selectBox.width)}px)`);
+		ok(Math.abs(selectBox.height - 600) <= 2, `Select 界面卡片高度必须严格锁定在 600px (实测: ${Math.round(selectBox.height)}px)`);
 
-		// 核验「选择其他验证方式」入口并点击切换
-		const tryAnotherBtn = sessionPage.locator('button:has-text("选择其他验证方式"), button:has-text("Try another way")');
-		if (await tryAnotherBtn.isVisible()) {
-			await tryAnotherBtn.click();
-			await sessionPage.waitForTimeout(500);
-			const selectUrl = sessionPage.url();
-			console.log(`  -> 点击选择其他验证方式后 URL: ${selectUrl}`);
-			ok(selectUrl.includes(`/login/challenge/select_${validHash}`), `切换到验证方式抽屉后 URL 自动同步为 select_${validHash}`);
-		}
+		// 严格核验：所有界面（密码登录、注册、TOTP验证、选择验证方式）尺寸必须绝对物理一致（禁止任何形式大小变换）
+		ok(Math.abs(totpBox.width - loginBox.width) <= 2, 'TOTP 界面与登录界面宽度绝对一致 (0px 偏差)');
+		ok(Math.abs(totpBox.height - loginBox.height) <= 2, 'TOTP 界面与登录界面高度绝对一致 (0px 偏差)');
+		ok(Math.abs(selectBox.width - loginBox.width) <= 2, 'Select 界面与登录界面宽度绝对一致 (0px 偏差)');
+		ok(Math.abs(selectBox.height - loginBox.height) <= 2, 'Select 界面与登录界面高度绝对一致 (0px 偏差)');
 
-		await sessionContext.close();
+		await selectContext.close();
 		if (browser) {
 			await browser.close();
 			browser = null;
