@@ -7,6 +7,33 @@
 > 制度规范与工作流指引请见 [AGENTS.md](file:///home/shijian/projects/epocanvas-mail/AGENTS.md)。
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
+
+### 认证表单垂直居中重构、消除头部脱节空隙与端到端质感深度优化 (2026-10-02)
+*   **关联提交 (Git Commit)**: `95159952a004a0722b47c90c657f3197dd74eae2` (Short: `9515995`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare Workers (https://mail.epocanvas.com)` (Version ID: `b1239705-ad08-4c41-b1d0-f05bfb19c4c2`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 变更点 1 (全面废除无居中的 justify-between 离散容器，统一为垂直居中布局)：
+        - 在 `LoginCard.tsx` 与 `RegisterCard.tsx` 中，将内部包裹容器由 `class="relative flex-1 flex flex-col justify-between"` 重构为 `class="relative flex-1 flex flex-col justify-center"`，外框容器统一设为 `justify-center`；
+        - 在 `AuthForm.tsx` 中，将 `class="flex-1 flex flex-col justify-between gap-6 pt-1"` 重构为 `class="flex flex-col justify-center gap-5 sm:gap-5.5 w-full"`；
+        - 将方法选择器容器与 2FA 激活方式容器由 `justify-between` 重构为 `class="flex flex-col justify-center gap-3.5 sm:gap-4 w-full"`；
+        - 在 `RegisterForm.tsx` 中，将 `class="relative flex-1 flex flex-col justify-between gap-6 pt-2"` 重构为 `class="relative flex flex-col justify-center gap-4 sm:gap-4.5 w-full"`。
+    - [x] 变更点 2 (彻底消除 Brand Header 与表单内容之间的断层大空隙)：
+        - 将品牌头部容器由 `mb-6 sm:mb-7` 优化为 `mb-4 sm:mb-5`，标题与副标题微调为 `mt-3.5` / `mt-1.5`；
+        - 消除此前由两端对齐强行撑开的 ~150px 视觉断层空隙，使 Logo、品牌名、标语与表单输入字段紧凑凝聚为连贯的整体，间距自然过渡为舒适的 18~20px。
+    - [x] 变更点 3 (消除底部按钮与切换链接的 mt-auto 孤立漂移)：
+        - 移除 `AuthForm` 与 `RegisterForm` 底部容器中的 `mt-auto`，阻止其向卡片最底端过度推挤；
+        - 登录按键、注册按键、密码找回行与切换链接与输入框紧密聚合，上下留白匀称平衡。
+    - [x] 变更点 4 (维持 480px × 670px 物理锁死与零跳转零抖动)：
+        - 桌面端几何尺寸严格锁定为 480px × 670px，实测全界面物理偏差 0px；
+        - 直接访问 TOTP/Select URL 原地渲染，禁止任何未经授权的客户端重定向。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 静态多语言三件套：`node scripts/i18n-symmetry.mjs && node scripts/i18n-audit.mjs` 100% 通过（2113 / 1917 键绝对对称，1630 处字面量引用零缺失）；
+    - [x] 公网全真卡片尺寸与路由端到端测试 (`tests/test-prod-login-card-and-challenge-routing.mjs`)：26/26 项断言全部通过；
+    - [x] 公网 Passkey 兼容性与 Step-Up 自适应风控测试 (`tests/test-prod-passkey-and-stepup-live-e2e.mjs`)：26/26 项断言全部通过；
+    - [x] 公网 Passkey 时间锁与生命周期管理测试 (`tests/test-prod-passkey-timelock-and-management.mjs`)：40/40 项断言全部通过；
+    - [x] 真实生产无头浏览器截图实测核验：登录、注册、TOTP 挑战、选择器界面全部实现完美居中，无断层空隙；
+    - [x] 生产零脏数据残留：测试临时状态与密钥在 `finally` 中物理清除。
+
 ### 规范文档全新重构：Google/Gmail 政策设计标准、双轨法律治理与矢量插画交付上线 (2026-10-02)
 *   **关联提交 (Git Commit)**: `0744d6a07e3fc53dadaa4c4008a5541c01804865` (Short: `0744d6a`), `111f95405064db4dbd587828e576eaa3fb2309e4` (Short: `111f954`), `f51b01efa5f11518337161322766d6373a570b7b` (Short: `f51b01e`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare Pages (https://epomail-docs.pages.dev/epomail/mail/data-security/)` (Deployment ID: `79f999be`)
