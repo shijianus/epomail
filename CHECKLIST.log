@@ -8,6 +8,38 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### epomail-docs 数据处理与安全维护 (data-security) 深度重构、Google 政策视觉范式升级与全真上线 (2026-10-02)
+*   **关联提交 (Git Commit - epomail-docs)**: `2b2655d492415174e304ffb5f939b4b9b9a691bc` (Short: `2b2655d`) | `dc4706dbd08aa5c556b63ca0435dfcb5ec437e40` (Short: `dc4706d`)
+*   **关联提交 (Git Commit - epocanvas-mail)**: `6691e292067d53b4dd6b810452309f3f4e24ebca` (Short: `6691e29`)
+*   **部署环境 (Deployment)**: `Cloudflare Pages (https://epomail-docs.pages.dev/epomail/mail/data-security/ · Version: https://98022135.epomail-docs.pages.dev)`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 变更点 1 (Google/Gmail 政策范式排版与视觉升级)：
+        - 消除内容单薄与生硬表格排版，设计 `.google-hero-card` 导读卡片，内嵌 4 枚核心技术属性药丸标签（零遥测跟踪、AES-256-GCM 静态加密、边缘瞬时执行、全球多法域合规）；
+        - 引入 Google 风格微星隐式分割线 `<div class="google-divider"><span class="google-divider-icon">✦</span></div>`，保障章节间呼吸感与视觉节奏；
+        - 去除冗余的 markdown 页面大标题 `#`，避免与 Starlight 默认顶层 `<h1>` 产生双标题重叠。
+    - [x] 变更点 2 (严控组件与插图密度，杜绝视觉疲劳)：
+        - 全文严控为 **3 张高质量矢量示意图**（`data-flow.svg` 数据全生命周期、`partition-security.svg` 四层纵深防御、`self-host-responsibilities.svg` 权责边界模型），不多不少恰好填补版面；
+        - 彻底清理多余的硬编码 `tamper-proof-panel`，防篡改校验组件仅于专属专页出现一次，杜绝同一页面堆叠重复组件。
+    - [x] 变更点 3 (内容深度扩写与实质技术/法律阐释)：
+        - 全文 6 大章节及 17 项 H3 技术细目，每小节段落篇幅均充实至 80~150 字，杜绝口水话与占位行；
+        - 详尽公开 PBKDF2 (100,000 次加盐迭代)、WebAuthn 硬件公钥、BYO-Storage 自备存储桶解析逻辑，以及 8 行数据处理矩阵与 11 项核心安全维护落实标准。
+    - [x] 变更点 4 (双重属性融合 Dual-Nature Fusion 法律治理)：
+        - **官方托管服务 (`mail.epocanvas.com`)**：明确服务定位、可用性声明、非商业免责边界与用户数据资产保管义务；
+        - **开源专案生态 (`epocanvas-mail`)**：明确 MIT 许可权能、代码审计自由度，确立 3 大分发与商标治理铁律（严禁冒用官方商标、完整保留版权声明、独立提供法律政策）；
+        - **独立自建节点运营者**：确立自建者为唯一且排他的「数据控制者」(Data Controller)，全权承担安全配置与法定合规义务，上游代码库零连带责任。
+    - [x] 变更点 5 (全球多法域合规与当事人风险自知)：
+        - **欧盟 GDPR**：覆盖第 15–22 条当事人权利、第 6 条合法处理基础及 Anycast 跨境 Standard Contractual Clauses (SCCs)；
+        - **美国 CCPA / CPRA**：严正声明「不销售亦不共享个人信息」(Do Not Sell or Share)，落实知情权与非歧视待遇；
+        - **亚太法规与用户风险**：声明托管主体位于台湾，阐明跨国 SMTP 传输物理特性、用户端点防护责任，并在 `:::caution` 中诚实披露服务端静态加密（Server-side Encryption）与端到端加密（GPG/PGP）之技术边界与用户自保指引。
+    - [x] 变更点 6 (六大语言绝对对称)：
+        - 同步完成 6 种语言（zh, zh-tw, en, es, fr, nl）全量重构与内容对齐，结构与图表 100% 对称。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 独立子代理全真审计：派驻 `Docs Visual & Content Auditor` 完成明暗主题截图全量复核，判定 100% 达标；
+    - [x] 多语言结构与独立基准核验：`python3 scripts/check-structure.py` 100% 通过（5 语系结构绝对对称，英文基准校验通过）；
+    - [x] 全站锚点与资源静态核验：`node scripts/validate-anchors.cjs` 全绿 (110 页面 / 1226 锚点链接 0 损坏)；
+    - [x] 本地构建与生产部署：`pnpm run build` 耗时 5.85s，Pagefind 成功索引 6 语言 15,742 词；`wrangler pages deploy` 成功发布上线；
+    - [x] 生产环境真实渲染核验：`https://epomail-docs.pages.dev/epomail/mail/data-security/` 实测抓取验证，新版 Google 风格界面已全量生效。
+
 ### epomail-docs 全量英文法务与安全合规重构、Gmail 式双重定位融合、主站直连与单次验真治理 (2026-10-02)
 *   **关联提交 (Git Commit - epocanvas-mail)**: `e86766ee69cb030a133d1b702ec94da8093d5f30` (Short: `e86766e`)
 *   **关联提交 (Git Commit - epomail-docs)**: `d09d6cb021a8d05fcfe74f2603f9bca1b5bf3b39` (Short: `d09d6cb`) | `2af79fa81fb982a0c27d774f4eec4695835b2dce` (Short: `2af79fa`) | `0072b0fdac75b6026edd2b6a04d8320790aeed38` (Short: `0072b0f`)
