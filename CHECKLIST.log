@@ -8,6 +8,21 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### 法律文档站 v5.7 去幻觉与六语言深度整合轮 (2026-10-02)
+*   **关联提交 (Git Commit)**: EpomailDocs `e6eb758`（主提交，内容见其 Commit Message 全文）；清单同步 `1d0a61c` (Short: `e6eb758` / `1d0a61c`)
+*   **部署环境 (Deployment)**: `本地构建与静态核验`（生产 Pages 未触发部署）
+*   **变更清单**:
+    - [x] 源码事实校准（对照 mail-worker/mail-vue 逐项核实 20 组技术承诺）：移除 tamper-proof 幻觉『16 类 L1-L4 通知矩阵/事件码/指纹库/1h 静默/isOfficial 403 阻断』（源码零实现），改以真实系统邮件目录（欢迎/全域公告/TOTP 开启·停用·管理员重置共 5 类）替代；移除『销毁主密钥密码学灭失』『纳秒级物理销毁』『数分钟阻断 IP』『立即轮换密钥』『HSTS 预加载』『Secure Enclave 永久固化』『PGP 签名』『DNSSEC』『浏览器内 Web Crypto 计算』等无实现或绝对化声明；data-security 加密语义按源码改写（实例级主密钥 HKDF-SHA256 派生、逐用户盐、逐记录 IV、三模式加密语义、附件不在范围）；处理矩阵剔除虚构 ASN/城市/15 组指纹/90 日轮换行
+    - [x] en 九篇按 zh 结构 1:1 全量重译：清除幻觉（Level 16 协议、SPF/DKIM/DMARC 全量校验、iframe 沙箱、$100 上限与 14 岁门槛幻觉、错用配图），补齐 NCII/AI 告知/第三方清单 §2-7/提交链路等缺失章节
+    - [x] 六语言整合：统一效力条款（繁中（台湾）版为正式版本、其余为对照译本，依 tw-legal-writing 制度；overview 效力顺序同步），消除 es/nl 与 zh/en/fr 两种互相矛盾的效力声明；版本头统一 2026-10-02｜5.7（移除『归档版本』残留）；nl instance→instantie/familien→families、es llave de paso→llave de acceso 等术语治理
+    - [x] 配图治理：data-security 三张涂鸦风插图重绘为扁平信息图（四层纵深防御/双轨治理/数据自主控制，浅暗双主题、416×276 保持嵌入不变）；anti-tamper-architecture 改英文微标签并修正失实标签；删除 8 张零引用死图
+*   **核验清单**:
+    - [x] pnpm build 55 页零报错（generate-tamper-proof + astro build + post-build 双轨镜像）
+    - [x] validate-anchors 110 页 1200 锚点 0 断链；check-structure 六语言结构对称 100%（en 9 篇基准通过）；verify-laws exit 0
+    - [x] 10 张构建产物全页截图判图通过（zh/en data-security、zh/en/zh-tw tamper-proof、es/nl 抽样、overview、project；明暗双主题、含新三图与存证面板渲染确认）
+    - [x] tamper-proof.json 全量重生成并按惯例清单同步提交（e6eb758 → 1d0a61c）
+    - [x] 零残留：临时截图/脚本/渲染 PNG 即弃，工作树干净
+
 ### 本地部署与端到端视觉验证轮：文档站 25 截图判图 + 全真栈头像/级联 E2E (2026-10-01)
 *   **关联提交 (Git Commit)**: EpomailDocs `838eb84144c466ef384f489f0361de906ed36a7c` (Short: `838eb84`，已推送 origin/main)；主仓归档提交见 CHECKLIST 对应变更提交
 *   **部署环境 (Deployment)**: `本地部署（不触公网）`——文档站 dist 以 /epomail 路径挂载本地起服；mail-worker wrangler dev 本地模式（D1/KV 全本地）
