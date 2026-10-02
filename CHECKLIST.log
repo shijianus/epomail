@@ -9,7 +9,7 @@
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
 ### 规范文档全新重构：Google/Gmail 政策设计标准、双轨法律治理与矢量插画交付上线 (2026-10-02)
-*   **关联提交 (Git Commit)**: `0744d6a07e3fc53dadaa4c4008a5541c01804865` (Short: `0744d6a`), `111f95405064db4dbd587828e576eaa3fb2309e4` (Short: `111f954`)
+*   **关联提交 (Git Commit)**: `0744d6a07e3fc53dadaa4c4008a5541c01804865` (Short: `0744d6a`), `111f95405064db4dbd587828e576eaa3fb2309e4` (Short: `111f954`), `f51b01efa5f11518337161322766d6373a570b7b` (Short: `f51b01e`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare Pages (https://epomail-docs.pages.dev/epomail/mail/data-security/)` (Deployment ID: `79f999be`)
 *   **功能需求与变更清单 (Changes & Feature Alignment)**:
     - [x] 变更点 1 (全面对标 Google/Gmail 政策排版美学，废除一切生硬卡片外框)：
@@ -38,7 +38,7 @@
     - [x] 文档结构对称性校验：`python3 scripts/check-structure.py` (5 个翻译语言与英文基准 100% 对称)；
     - [x] 生产 CDN 与 SVG 资源核验：3 幅矢量插图 CDN 访问均呈 `HTTP/2 200 OK` (`image/svg+xml`)，naturalWidth=416, naturalHeight=276，无破损；
     - [x] 生产真实环境浏览器截图实测：Playwright 无头浏览器截屏核验通过，排版极佳；
-    - [x] 独立子代理独立审计核验：`Final Visual and Legal Docs Auditor` 盲审签署 PASS 评级通过（视觉质感、法理深度、无冗余组件）。
+    - [x] 独立子代理独立审计核验：`Public Web Visual & Legal Auditor`（从0开始公网全真盲审，覆盖中英双语、浅深色与 390px 移动端）签署 PASS 评级通过（视觉质感、法理深度、无冗余组件、零控制台报错）。
 
 ### 登录与2FA认证卡片几何尺寸全面扩容 (480px x 670px)、居中质感美学复原与自适应二验深度治理 (2026-10-02)
 *   **关联提交 (Git Commit)**: `cf677c1e7eefd8e92206ed911f5b3873ee34b58c` (Short: `cf677c1`)
