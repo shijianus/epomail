@@ -8,6 +8,38 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### 规范文档全新重构：Google/Gmail 政策设计标准、双轨法律治理与矢量插画交付上线 (2026-10-02)
+*   **关联提交 (Git Commit)**: `0744d6a07e3fc53dadaa4c4008a5541c01804865` (Short: `0744d6a`), `111f95405064db4dbd587828e576eaa3fb2309e4` (Short: `111f954`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare Pages (https://epomail-docs.pages.dev/epomail/mail/data-security/)` (Deployment ID: `79f999be`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 变更点 1 (全面对标 Google/Gmail 政策排版美学，废除一切生硬卡片外框)：
+        - 彻底抛弃此前将所有段落强行封装进 `.google-card` 紧凑边框的仪表盘视觉，采用自然纯净的 Google Editorial 纸质画布流式排版；
+        - 正文间距、字偶距与行高（Line-height 1.7~1.8）舒展舒适，并以经典的 Google 极简星形分隔符（`✦ Subtle Star Dividers`）错落点缀各大主章节。
+    - [x] 变更点 2 (自研 3 幅 416x276 Google 风格矢量概念插画)：
+        - `security-trust-shield.svg`（安全承诺与信赖保障）：柔和蓝金锁芯、信封与认证盾牌，象征多层纵深防御；
+        - `dual-nature-scale.svg`（双轨融合治理权责天平）：Hosted 官方云端与 MIT 源码天平对称，象征法律权利与义务平衡；
+        - `data-sovereignty-export.svg`（数据主权、便携导出与遗忘擦除）：用户凭据、.EML/JSON 便携导出蓝箭头与密码学物理销毁保险库。
+    - [x] 变更点 3 (深度构建「双轨架构治理」法律防火墙与开源边界)：
+        - 明确界定官方免费托管服务（`mail.epocanvas.com`）的公益性质、无商业 SLA、反滥用红线（严禁垃圾邮件/钓鱼/攻击/刷量）；
+        - 确立开源专案（`epocanvas-mail`）依托 MIT 协议运作，明示二次开发三大红线：严格禁止滥用「官方」商标、必须完整保留版权与 MIT 许可、第三方托管必须自立独立主体；
+        - 确立独立自建节点运营者为排他性数据控制者（Sole Data Controller），上游作者零日志遥测、零连带担保或赔偿责任。
+    - [x] 变更点 4 (全球多法域合规与密码学能力边界坦诚披露)：
+        - 完备覆盖 GDPR（Art. 15 知情、Art. 20 .eml/JSON 导出、Art. 17 主密钥覆写销毁、SCCs 传输）；
+        - 刚性承诺 CCPA/CPRA「绝不销售或共享个人信息（Do Not Sell or Share）」、限制使用敏感信息与非歧视待遇；
+        - 调适台湾 PDPA 及亚太公网 SMTP 跨境路由现实，提供 72 小时应急响应 SOP 与官方 SRC / 隐私联络渠道；
+        - 坦诚揭示服务端静态加密（AES-256-GCM at rest）防范介质窃取之技术局限，明确指引涉密通讯当事人自主前置客户端 GPG/OpenPGP E2EE 加密。
+    - [x] 变更点 5 (克制规范呈现，防篡改组件零干扰隔离)：
+        - 严格遵循全网仅出现一次原则，隔离 `#tamper-proof-widget` 仅在专用存证页面按需挂载，在 `data-security` 页面零 DOM 注入、零视觉疲劳。
+    - [x] 变更点 6 (全站 6 语言字典与文档 100% 绝对结构对称)：
+        - 同步完成 zh, en, zh-tw, es, fr, nl 6 语言对应章节的 100% 对称性翻译与渲染。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：Astro 55 篇全语言页面静态构建通过 (6.6s)，Pagefind 6 语言全文搜索索引生成完毕 (15061 words)；
+    - [x] 锚点与多语言对称性验证：`node scripts/validate-anchors.cjs` (110 页面、1142 个锚点检查，0 损坏)；
+    - [x] 文档结构对称性校验：`python3 scripts/check-structure.py` (5 个翻译语言与英文基准 100% 对称)；
+    - [x] 生产 CDN 与 SVG 资源核验：3 幅矢量插图 CDN 访问均呈 `HTTP/2 200 OK` (`image/svg+xml`)，naturalWidth=416, naturalHeight=276，无破损；
+    - [x] 生产真实环境浏览器截图实测：Playwright 无头浏览器截屏核验通过，排版极佳；
+    - [x] 独立子代理独立审计核验：`Final Visual and Legal Docs Auditor` 盲审签署 PASS 评级通过（视觉质感、法理深度、无冗余组件）。
+
 ### 登录与2FA认证卡片几何尺寸全面扩容 (480px x 670px)、居中质感美学复原与自适应二验深度治理 (2026-10-02)
 *   **关联提交 (Git Commit)**: `cf677c1e7eefd8e92206ed911f5b3873ee34b58c` (Short: `cf677c1`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare Workers (https://mail.epocanvas.com)` (Version ID: `632323d7-320d-4e7e-9b28-4e7214a5e558`)
