@@ -407,7 +407,7 @@ export function RegisterForm({ canvasRef, onSwitch, sysConfig: propsSysConfig }:
           document.body
         )}
 
-      <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-4 sm:gap-4.5">
 
       {/* Closed registration prompt if disabled by admin */}
       {isRegisterClosed && (

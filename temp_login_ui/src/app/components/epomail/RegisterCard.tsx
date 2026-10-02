@@ -52,11 +52,11 @@ export function RegisterCard({ canvasRef, onSwitch, sysConfig }: RegisterCardPro
           y: reduceMotion ? 0 : translateY,
           transformStyle: "preserve-3d",
         }}
-        className="relative w-full max-w-[440px] sm:w-[440px]"
+        className="relative w-full max-w-[480px] sm:w-[480px]"
       >
         {/* Acrylic prism block */}
         <div
-          className="relative overflow-hidden rounded-3xl p-8 sm:p-10 h-[580px] sm:h-[600px] min-h-[580px] sm:min-h-[600px] max-h-[580px] sm:max-h-[600px] flex flex-col justify-between box-border"
+          className="relative overflow-hidden rounded-3xl p-8 sm:p-10 h-[620px] sm:h-[670px] min-h-[620px] sm:min-h-[670px] max-h-[620px] sm:max-h-[670px] flex flex-col justify-between box-border"
           style={{
             background:
               "linear-gradient(145deg, rgba(16,20,46,0.72), rgba(8,10,26,0.56))",
@@ -90,7 +90,7 @@ export function RegisterCard({ canvasRef, onSwitch, sysConfig }: RegisterCardPro
 
           <div className="relative flex-1 flex flex-col justify-between">
             {/* Brand header */}
-            <div className="mb-8 flex flex-col items-center text-center">
+            <div className="mb-6 sm:mb-7 flex flex-col items-center text-center">
               <img
                 src={`${import.meta.env.BASE_URL}logo.svg`}
                 alt="EpoMail Logo"

@@ -1352,7 +1352,7 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
                     )}
 
                     {/* Method options list */}
-                    <div className="flex flex-col gap-2 mt-1">
+                    <div className="flex flex-col gap-3 mt-1.5">
                       {/* 1. Passkey Option */}
                       {hasPasskeys && (
                         <button
@@ -1371,7 +1371,7 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
                               handlePasskeyLogin();
                             }, 120);
                           }}
-                          className={`flex items-center justify-between p-2.5 px-3 rounded-xl border text-left transition-all ${
+                          className={`flex items-center justify-between p-3.5 px-4 rounded-2xl border text-left transition-all ${
                             verifiedFactors.includes('passkey')
                               ? 'opacity-40 cursor-not-allowed border-[rgba(139,147,196,0.15)] bg-[rgba(255,255,255,0.01)]'
                               : active2FAMethod === 'passkey'
@@ -1379,15 +1379,15 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
                               : 'border-[rgba(139,147,196,0.2)] bg-[rgba(255,255,255,0.03)] hover:border-indigo-400/40 hover:bg-[rgba(255,255,255,0.05)] cursor-pointer'
                           }`}
                         >
-                          <div className="flex items-center gap-2.5">
-                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-500/10 border border-indigo-500/30 text-indigo-400">
-                              <KeyRound size={16} />
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-400">
+                              <KeyRound size={18} />
                             </div>
                             <div>
-                              <div className="text-[13px] font-semibold text-[var(--epo-ink)] leading-tight">
+                              <div className="text-[14px] font-semibold text-[var(--epo-ink)] leading-snug">
                                 {t('methodPasskeyTitle')}
                               </div>
-                              <div className="text-[11px] leading-tight text-[var(--epo-muted)] line-clamp-1 mt-0.5">
+                              <div className="text-[12px] leading-snug text-[var(--epo-muted)] mt-0.5">
                                 {t('methodPasskeyDesc')}
                               </div>
                               {verifiedFactors.includes('passkey') && (
@@ -1397,7 +1397,7 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
                               )}
                             </div>
                           </div>
-                          <ChevronRight size={15} className="text-[var(--epo-muted)] shrink-0 ml-2" />
+                          <ChevronRight size={18} className="text-[var(--epo-muted)] shrink-0 ml-2" />
                         </button>
                       )}
 
@@ -1416,7 +1416,7 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
                             if (!challengeSessionHash) setChallengeSessionHash(hash);
                             updateChallengeUrl('totp', hash);
                           }}
-                          className={`flex items-center justify-between p-2.5 px-3 rounded-xl border text-left transition-all ${
+                          className={`flex items-center justify-between p-3.5 px-4 rounded-2xl border text-left transition-all ${
                             verifiedFactors.includes('totp')
                               ? 'opacity-40 cursor-not-allowed border-[rgba(139,147,196,0.15)] bg-[rgba(255,255,255,0.01)]'
                               : active2FAMethod === 'totp'
@@ -1424,15 +1424,15 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
                               : 'border-[rgba(139,147,196,0.2)] bg-[rgba(255,255,255,0.03)] hover:border-indigo-400/40 hover:bg-[rgba(255,255,255,0.05)] cursor-pointer'
                           }`}
                         >
-                          <div className="flex items-center gap-2.5">
-                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-500/10 border border-indigo-500/30 text-indigo-400">
-                              <Smartphone size={16} />
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-400">
+                              <Smartphone size={18} />
                             </div>
                             <div>
-                              <div className="text-[13px] font-semibold text-[var(--epo-ink)] leading-tight">
+                              <div className="text-[14px] font-semibold text-[var(--epo-ink)] leading-snug">
                                 {t('methodTotpTitle')}
                               </div>
-                              <div className="text-[11px] leading-tight text-[var(--epo-muted)] line-clamp-1 mt-0.5">
+                              <div className="text-[12px] leading-snug text-[var(--epo-muted)] mt-0.5">
                                 {t('methodTotpDesc')}
                               </div>
                               {verifiedFactors.includes('totp') && (
@@ -1442,7 +1442,7 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
                               )}
                             </div>
                           </div>
-                          <ChevronRight size={15} className="text-[var(--epo-muted)] shrink-0 ml-2" />
+                          <ChevronRight size={18} className="text-[var(--epo-muted)] shrink-0 ml-2" />
                         </button>
                       )}
 
@@ -1461,7 +1461,7 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
                             if (!challengeSessionHash) setChallengeSessionHash(hash);
                             updateChallengeUrl('backup', hash);
                           }}
-                          className={`flex items-center justify-between p-2.5 px-3 rounded-xl border text-left transition-all ${
+                          className={`flex items-center justify-between p-3.5 px-4 rounded-2xl border text-left transition-all ${
                             verifiedFactors.includes('backup_code')
                               ? 'opacity-40 cursor-not-allowed border-[rgba(139,147,196,0.15)] bg-[rgba(255,255,255,0.01)]'
                               : active2FAMethod === 'backup_code'
@@ -1469,15 +1469,15 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
                               : 'border-[rgba(139,147,196,0.2)] bg-[rgba(255,255,255,0.03)] hover:border-indigo-400/40 hover:bg-[rgba(255,255,255,0.05)] cursor-pointer'
                           }`}
                         >
-                          <div className="flex items-center gap-2.5">
-                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-500/10 border border-indigo-500/30 text-indigo-400">
-                              <ShieldCheck size={16} />
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-indigo-500/10 border border-indigo-500/30 text-indigo-400">
+                              <ShieldCheck size={18} />
                             </div>
                             <div>
-                              <div className="text-[13px] font-semibold text-[var(--epo-ink)] leading-tight">
+                              <div className="text-[14px] font-semibold text-[var(--epo-ink)] leading-snug">
                                 {t('methodBackupTitle')}
                               </div>
-                              <div className="text-[11px] leading-tight text-[var(--epo-muted)] line-clamp-1 mt-0.5">
+                              <div className="text-[12px] leading-snug text-[var(--epo-muted)] mt-0.5">
                                 {t('methodBackupDesc')}
                               </div>
                               {verifiedFactors.includes('backup_code') && (
@@ -1487,7 +1487,7 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
                               )}
                             </div>
                           </div>
-                          <ChevronRight size={15} className="text-[var(--epo-muted)] shrink-0 ml-2" />
+                          <ChevronRight size={18} className="text-[var(--epo-muted)] shrink-0 ml-2" />
                         </button>
                       )}
                     </div>
@@ -1530,12 +1530,12 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
 
                   {/* Adaptive Step-Up Alert banner */}
                   {stepUpActive && (
-                    <div className="rounded-xl border border-yellow-500/40 bg-yellow-950/20 p-3 text-[12px] leading-relaxed backdrop-blur-sm shadow-[0_0_15px_rgba(234,179,8,0.15)] flex flex-col gap-1.5">
-                      <div className="flex items-center gap-2 text-yellow-400 font-medium">
-                        <ShieldAlert size={16} className="shrink-0" />
+                    <div className="rounded-xl border border-yellow-500/40 bg-yellow-950/20 p-2.5 text-[12px] leading-relaxed backdrop-blur-sm shadow-[0_0_15px_rgba(234,179,8,0.15)] flex flex-col gap-1">
+                      <div className="flex items-center gap-2 text-yellow-400 font-medium text-[12px]">
+                        <ShieldAlert size={15} className="shrink-0" />
                         <span>{t('stepUpBadge')}</span>
                       </div>
-                      <p className="text-yellow-200/80 text-[11px]">
+                      <p className="text-yellow-200/80 text-[11px] leading-snug">
                         {t('stepUpDesc')}
                       </p>
                       {verifiedFactors.length > 0 && (
@@ -1546,41 +1546,75 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
                     </div>
                   )}
 
-                  {/* Compact 2FA status row */}
-                  <div className="flex items-center justify-between px-3 py-2 rounded-xl border border-[rgba(139,147,196,0.2)] bg-[rgba(255,255,255,0.03)] backdrop-blur-sm">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-500/15 border border-indigo-500/30 text-indigo-400">
+                  {/* 2FA Header banner (Adaptive: Compact in Step-Up mode, full centered otherwise) */}
+                  {stepUpActive ? (
+                    <div className="flex items-center justify-between px-3 py-2 rounded-xl border border-[rgba(139,147,196,0.2)] bg-[rgba(255,255,255,0.03)] backdrop-blur-sm">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-500/15 border border-indigo-500/30 text-indigo-400">
+                          {active2FAMethod === 'passkey' ? (
+                            <KeyRound size={16} />
+                          ) : active2FAMethod === 'backup_code' ? (
+                            <ShieldCheck size={16} />
+                          ) : (
+                            <Smartphone size={16} />
+                          )}
+                        </div>
+                        <div className="text-left min-w-0">
+                          <div className="text-[13px] font-semibold text-[var(--epo-ink)] leading-tight truncate">
+                            {active2FAMethod === 'passkey'
+                              ? t('methodPasskeyTitle')
+                              : active2FAMethod === 'backup_code'
+                              ? t('backupCodeTitle')
+                              : t('totpTitle')}
+                          </div>
+                          <div className="text-[11px] text-[var(--epo-muted)] leading-tight truncate mt-0.5">
+                            {active2FAMethod === 'passkey'
+                              ? t('methodPasskeyDesc')
+                              : active2FAMethod === 'backup_code'
+                              ? t('backupCodeHint')
+                              : t('totpHint')}
+                          </div>
+                        </div>
+                      </div>
+                      {mfaEmail && (
+                        <div className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-[rgba(103,232,249,0.1)] text-[var(--epo-cyan-glow)] border border-[rgba(103,232,249,0.25)] shrink-0 ml-2">
+                          {mfaEmail}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    /* 2FA Header card banner (Full centered) */
+                    <div className="flex flex-col items-center text-center gap-2 rounded-2xl p-4 border border-[rgba(139,147,196,0.2)] bg-[rgba(255,255,255,0.03)] backdrop-blur-sm">
+                      <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 shadow-[0_0_15px_rgba(99,102,241,0.25)]">
                         {active2FAMethod === 'passkey' ? (
-                          <KeyRound size={16} />
+                          <KeyRound size={22} />
                         ) : active2FAMethod === 'backup_code' ? (
-                          <ShieldCheck size={16} />
+                          <ShieldCheck size={22} />
                         ) : (
-                          <Smartphone size={16} />
+                          <Smartphone size={22} />
                         )}
                       </div>
-                      <div className="text-left min-w-0">
-                        <div className="text-[13px] font-semibold text-[var(--epo-ink)] leading-tight truncate">
-                          {active2FAMethod === 'passkey'
-                            ? t('methodPasskeyTitle')
-                            : active2FAMethod === 'backup_code'
-                            ? t('backupCodeTitle')
-                            : t('totpTitle')}
+                      <h2 className="text-[16px] font-semibold text-[var(--epo-ink)] tracking-wide">
+                        {active2FAMethod === 'passkey'
+                          ? t('methodPasskeyTitle')
+                          : active2FAMethod === 'backup_code'
+                          ? t('backupCodeTitle')
+                          : t('totpTitle')}
+                      </h2>
+                      <p className="text-[12px] leading-relaxed max-w-[320px]" style={{ color: "var(--epo-muted)" }}>
+                        {active2FAMethod === 'passkey'
+                          ? t('methodPasskeyDesc')
+                          : active2FAMethod === 'backup_code'
+                          ? t('backupCodeHint')
+                          : t('totpHint')}
+                      </p>
+                      {mfaEmail && (
+                        <div className="text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-[rgba(103,232,249,0.1)] text-[var(--epo-cyan-glow)] border border-[rgba(103,232,249,0.25)]">
+                          {mfaEmail}
                         </div>
-                        <div className="text-[11px] text-[var(--epo-muted)] leading-tight truncate mt-0.5">
-                          {active2FAMethod === 'passkey'
-                            ? t('methodPasskeyDesc')
-                            : active2FAMethod === 'backup_code'
-                            ? t('backupCodeHint')
-                            : t('totpHint')}
-                        </div>
-                      </div>
+                      )}
                     </div>
-                    {mfaEmail && (
-                      <div className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-[rgba(103,232,249,0.1)] text-[var(--epo-cyan-glow)] border border-[rgba(103,232,249,0.25)] max-w-[130px] truncate shrink-0 ml-2">
-                        {mfaEmail}
-                      </div>
-                    )}
-                  </div>
+                  )}
 
                   {/* Active Method Input UI */}
                   {active2FAMethod === 'passkey' ? (

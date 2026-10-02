@@ -52,8 +52,8 @@ let adminBrowser = null;
 		const loginBox = await cardLocator.first().boundingBox();
 		ok(loginBox, '登录卡片容器必须存在且可见');
 		console.log(`  -> 登录卡片实测尺寸: 宽 ${Math.round(loginBox.width)}px, 高 ${Math.round(loginBox.height)}px`);
-		ok(Math.abs(loginBox.width - 440) <= 2, `登录卡片宽度必须严格为 440px (实测: ${Math.round(loginBox.width)}px)`);
-		ok(Math.abs(loginBox.height - 600) <= 2, `登录卡片高度必须严格为 600px (实测: ${Math.round(loginBox.height)}px)`);
+		ok(Math.abs(loginBox.width - 480) <= 2, `登录卡片宽度必须严格为 480px (实测: ${Math.round(loginBox.width)}px)`);
+		ok(Math.abs(loginBox.height - 670) <= 2, `登录卡片高度必须严格为 670px (实测: ${Math.round(loginBox.height)}px)`);
 
 		// 核心核验 1：第三方登录按键区与分割线在登录页面必须隐藏
 		const oauthDivider = page1.locator('div.flex.items-center.gap-3:has(span.text-xs)');
@@ -72,8 +72,8 @@ let adminBrowser = null;
 			await page1.waitForTimeout(500);
 			regBox = await cardLocator.first().boundingBox();
 			console.log(`  -> 注册卡片实测尺寸: 宽 ${Math.round(regBox.width)}px, 高 ${Math.round(regBox.height)}px`);
-			ok(Math.abs(regBox.width - 440) <= 2, `注册界面宽度必须严格为 440px (实测: ${Math.round(regBox.width)}px)`);
-			ok(Math.abs(regBox.height - 600) <= 2, `注册界面高度必须严格为 600px (实测: ${Math.round(regBox.height)}px)`);
+			ok(Math.abs(regBox.width - 480) <= 2, `注册界面宽度必须严格为 480px (实测: ${Math.round(regBox.width)}px)`);
+			ok(Math.abs(regBox.height - 670) <= 2, `注册界面高度必须严格为 670px (实测: ${Math.round(regBox.height)}px)`);
 		}
 
 		await context1.close();
@@ -108,12 +108,12 @@ let adminBrowser = null;
 		const totpCard = totpPage.locator('div.relative.overflow-hidden.rounded-3xl.p-8, div.relative.overflow-hidden.rounded-3xl');
 		const totpBox = await totpCard.first().boundingBox();
 		console.log(`  -> TOTP 界面卡片实测尺寸: 宽 ${Math.round(totpBox.width)}px, 高 ${Math.round(totpBox.height)}px`);
-		ok(Math.abs(totpBox.width - 440) <= 2, `TOTP 界面卡片宽度必须严格锁定在 440px (实测: ${Math.round(totpBox.width)}px)`);
-		ok(Math.abs(totpBox.height - 600) <= 2, `TOTP 界面卡片高度必须严格锁定在 600px (实测: ${Math.round(totpBox.height)}px)`);
+		ok(Math.abs(totpBox.width - 480) <= 2, `TOTP 界面卡片宽度必须严格锁定在 480px (实测: ${Math.round(totpBox.width)}px)`);
+		ok(Math.abs(totpBox.height - 670) <= 2, `TOTP 界面卡片高度必须严格锁定在 670px (实测: ${Math.round(totpBox.height)}px)`);
 
 		await totpContext.close();
 
-		// 场景 B：直接打开选择验证方式 URL (如 select_Zg8Wld1cH3JsKLFpIKVajQ，禁止任何跳转，尺寸 440x600)
+		// 场景 B：直接打开选择验证方式 URL (如 select_Zg8Wld1cH3JsKLFpIKVajQ，禁止任何跳转，尺寸 480x670)
 		console.log('\n  -> 模拟场景 B：直接访问选择验证方式 URL (如 select_Zg8Wld1cH3JsKLFpIKVajQ)...');
 		const selectContext = await browser.newContext({
 			viewport: { width: 1280, height: 800 }
@@ -134,12 +134,12 @@ let adminBrowser = null;
 			`必须禁止任何形式跳转！直接打开选择验证方式 URL 必须严格保持在原 URL (实际: ${currentSelectUrl})`
 		);
 
-		// 检查 Select 界面卡片外框尺寸必须依然是 440px x 600px (0 偏差)
+		// 检查 Select 界面卡片外框尺寸必须依然是 480px x 670px (0 偏差)
 		const selectCard = selectPage.locator('div.relative.overflow-hidden.rounded-3xl.p-8, div.relative.overflow-hidden.rounded-3xl');
 		const selectBox = await selectCard.first().boundingBox();
 		console.log(`  -> Select 界面卡片实测尺寸: 宽 ${Math.round(selectBox.width)}px, 高 ${Math.round(selectBox.height)}px`);
-		ok(Math.abs(selectBox.width - 440) <= 2, `Select 界面卡片宽度必须严格锁定在 440px (实测: ${Math.round(selectBox.width)}px)`);
-		ok(Math.abs(selectBox.height - 600) <= 2, `Select 界面卡片高度必须严格锁定在 600px (实测: ${Math.round(selectBox.height)}px)`);
+		ok(Math.abs(selectBox.width - 480) <= 2, `Select 界面卡片宽度必须严格锁定在 480px (实测: ${Math.round(selectBox.width)}px)`);
+		ok(Math.abs(selectBox.height - 670) <= 2, `Select 界面卡片高度必须严格锁定在 670px (实测: ${Math.round(selectBox.height)}px)`);
 
 		// 严格核验：所有界面（密码登录、注册、TOTP验证、选择验证方式）尺寸必须绝对物理一致（禁止任何形式大小变换）
 		ok(Math.abs(totpBox.width - loginBox.width) <= 2, 'TOTP 界面与登录界面宽度绝对一致 (0px 偏差)');

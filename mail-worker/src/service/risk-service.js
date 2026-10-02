@@ -111,7 +111,7 @@ const riskService = {
 		// 2. Black-Box Non-Linear Dynamic Weight Formulation
 		// Weights are derived from HMAC salt:
 		// Anti-detect/fingerprint browsers and automated drivers are major risk factors
-		const wAutomation = 55 + (dynamicSalt[0] % 12);     // ~55-66
+		const wAutomation = 60 + (dynamicSalt[0] % 12);     // ~60-71
 		const wFpBrowser = 58 + (dynamicSalt[1] % 15);      // ~58-72
 		const wHardware = 18 + (dynamicSalt[2] % 10);       // ~18-27
 		const wMultiAccount = 24 + (dynamicSalt[3] % 12);   // ~24-35 (Multi-account device)
