@@ -52,7 +52,8 @@ const userService = {
         const ALLOWED_PROFILE_FIELDS = [
             'nickname', 'bio', 'avatarUrl', 'backgroundUrl', 'customLabels',
             'signature', 'themeMode', 'personalForwarding', 'personalTelegram', 'background',
-            'showStats', 'showTrend', 'showSources', 'lang'
+            'showStats', 'showTrend', 'showSources', 'lang',
+            'gender', 'genderCustom', 'birthday', 'phones', 'addresses', 'emails'
         ];
 
         const safeParams = {};
@@ -64,6 +65,67 @@ const userService = {
 
         if (safeParams.background && !safeParams.backgroundUrl) safeParams.backgroundUrl = safeParams.background;
         if (safeParams.backgroundUrl && !safeParams.background) safeParams.background = safeParams.backgroundUrl;
+
+        // Sanitize emails if present
+        if (safeParams.emails !== undefined) {
+            if (!Array.isArray(safeParams.emails)) {
+                safeParams.emails = [];
+            } else {
+                safeParams.emails = safeParams.emails
+                    .filter(item => item && typeof item.email === 'string' && verifyUtils.isEmail(item.email.trim()))
+                    .slice(0, 20)
+                    .map(item => ({
+                        id: String(item.id || ('email_' + Date.now())).slice(0, 50),
+                        email: item.email.trim().toLowerCase().slice(0, 100),
+                        label: ['work', 'personal', 'recovery', 'other'].includes(item.label) ? item.label : 'other',
+                        createdAt: typeof item.createdAt === 'string' ? item.createdAt.slice(0, 40) : new Date().toISOString()
+                    }));
+            }
+        }
+
+        // Sanitize phones if present
+        if (safeParams.phones !== undefined) {
+            if (!Array.isArray(safeParams.phones)) {
+                safeParams.phones = [];
+            } else {
+                safeParams.phones = safeParams.phones
+                    .filter(p => p && (typeof p.number === 'string' || typeof p.number === 'number'))
+                    .slice(0, 20)
+                    .map(p => ({
+                        id: String(p.id || ('phone_' + Date.now())).slice(0, 50),
+                        countryCode: String(p.countryCode || '').slice(0, 10),
+                        dialCode: String(p.dialCode || '').slice(0, 10),
+                        number: String(p.number || '').replace(/\D/g, '').slice(0, 25),
+                        formatted: String(p.formatted || '').slice(0, 50),
+                        label: ['mobile', 'work', 'home', 'other'].includes(p.label) ? p.label : 'mobile',
+                        createdAt: typeof p.createdAt === 'string' ? p.createdAt.slice(0, 40) : new Date().toISOString()
+                    }));
+            }
+        }
+
+        // Sanitize addresses if present
+        if (safeParams.addresses !== undefined) {
+            if (typeof safeParams.addresses !== 'object' || safeParams.addresses === null) {
+                safeParams.addresses = { home: '', work: '', other: '' };
+            } else {
+                const cleanAddr = {};
+                for (const k of ['home', 'work', 'other']) {
+                    cleanAddr[k] = typeof safeParams.addresses[k] === 'string' ? safeParams.addresses[k].slice(0, 300) : (safeParams.addresses[k] || '');
+                }
+                safeParams.addresses = cleanAddr;
+            }
+        }
+
+        // Sanitize gender, genderCustom, birthday if present
+        if (safeParams.gender !== undefined) {
+            safeParams.gender = ['male', 'female', 'prefer_not_to_say', 'custom'].includes(safeParams.gender) ? safeParams.gender : 'prefer_not_to_say';
+        }
+        if (safeParams.genderCustom !== undefined) {
+            safeParams.genderCustom = typeof safeParams.genderCustom === 'string' ? safeParams.genderCustom.slice(0, 50) : '';
+        }
+        if (safeParams.birthday !== undefined) {
+            safeParams.birthday = typeof safeParams.birthday === 'string' ? safeParams.birthday.slice(0, 20) : '';
+        }
 
         // Sanitize personalForwarding if present
         if (safeParams.personalForwarding && typeof safeParams.personalForwarding === 'object') {
@@ -269,6 +331,7 @@ const userService = {
         user.genderCustom = profile.genderCustom || '';
         user.birthday = profile.birthday || '';
         user.phones = Array.isArray(profile.phones) ? profile.phones : [];
+        user.emails = Array.isArray(profile.emails) ? profile.emails : [];
         user.addresses = profile.addresses || { home: '', work: '', other: '' };
         user.passwordUpdatedAt = profile.passwordUpdatedAt || userRow.createTime || '';
         user.density = profile.density || 'default';
