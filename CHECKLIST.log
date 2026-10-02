@@ -8,6 +8,21 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### EpomailDocs v5.8 打磨轮：审计问题全项治理 + 首次公网发布 (2026-10-03)
+*   **关联提交 (Git Commit)**: `<本次提交>`（主仓：P3 注释修正 + 流水归档；EpomailDocs 独立提交 `fcc1d10`，Short: `fcc1d10`）
+*   **部署环境 (Deployment)**: `Cloudflare Pages — epomail-docs（https://master.epomail-docs.pages.dev，首次公网发布）`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] P1 治理（×6 语言）：data-security 处理矩阵移除「边缘国家/地区码」入库声称（`user-service.js:272` 证实仅运行时读取），新增「边缘环境信息」行（不入库、随响应销毁）
+    - [x] P2 治理（×6 语言）：sub-processors R2 改「可选启用；未启用时附件经 KV存储」；全站移除正文 H1（Starlight 前言 title 为唯一 h1，修复既有双重标题）；legal-reference §9.1 对齐；EpomailDocs 本地流水回填 v5.5–v5.7
+    - [x] 八项补章（×6 语言）：收件域名披露、Cookie 与人机验证、执法请求原则、注销后 90 日实体删除上限（隐私/数据安全/条款三处一致）、事件通报 72 小时、AUP 执行阶梯技术基础（配额 5/8/10/100/不限）、AUP 新增 §8 著作权通知与反通知、条款 §3.2 年龄诚实申报说明
+    - [x] P3（主仓）：`crypto-utils.js` 两处 210,000 注释修正为 100,000（零行为差异）
+    - [x] P0：`wrangler pages deploy dist --project-name epomail-docs` 首次发布成功，修正误入提交的 `.wrangler/` 产物并补 gitignore
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：EpomailDocs `pnpm build` 55 页 19.7s 零报错；check-structure 对称 100%（含 en 基准）；anchors 1212/0 断链；verify-laws exit 0
+    - [x] 源码对码：10 项新增事实声称全部有源码证据（域名/官方发信/国家码/配额/垃圾 7 日/90% 清理/每日重置/Turnstile/无统计脚本/JWT localStorage）
+    - [x] 浏览器全真栈实测：wrangler pages dev 根轨道（＝Pages 生产形态）22 张截图判图全绿（亮/暗 × zh/zh-tw/en × 1440/375）；线上 master.epomail-docs.pages.dev 页面/图片/manifest 全 200、内容 5.8、单 h1
+    - [x] 零假数据残留：误提交的 `.wrangler/` 本地产物已移除并 gitignore；测试数据零产生
+
 ### EpomailDocs v5.7 独立复审归档：全量对码审计与发布状态核查 (2026-10-03)
 *   **关联提交 (Git Commit)**: `6cae7c3804450a899e20188a438543b9b7228997` (Short: `6cae7c3`)；审计对象 EpomailDocs @ `6478520`（v5.7），事实基准主仓 @ `50c69e0`
 *   **部署环境 (Deployment)**: 纯审计轮，未部署；线上探测 docs.epocanvas.com（/epomail 仍 404）+ mail.epocanvas.com
