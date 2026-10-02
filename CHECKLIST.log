@@ -8,6 +8,37 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### 登录/2FA卡片尺寸绝对物理锁定 (440px x 600px)、禁止任何跳转与边缘路由死循环修复 (2026-10-02)
+*   **关联提交 (Git Commit)**: `d34db1cc96cdca7a543dcfd878bed2b6aed3f2eb` (Short: `d34db1c`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare Workers (https://mail.epocanvas.com)` (Version ID: `2afcb8c9-02e5-405f-a9a5-6e6e07fbcd35`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 变更点 1 (卡片外框尺寸绝对锁定，杜绝任何形式的大小变换)：
+        - 在 `LoginCard.tsx` 与 `RegisterCard.tsx` 的外框容器中将类名严格锁定为 `class="relative overflow-hidden rounded-3xl p-8 sm:p-10 h-[580px] sm:h-[600px] min-h-[580px] sm:min-h-[600px] max-h-[580px] sm:max-h-[600px] flex flex-col justify-between box-border"`；
+        - 通过 `h-`、`min-h-`、`max-h-` 与 `box-border` 实施三重物理级钳制，确保桌面端尺寸恒等于 440px × 600px（移动端 580px）；
+        - 实测 `/login/`、`/login/challenge/totp_...`、`/login/challenge/select_...`、`/login/?view=register` 之间尺寸物理偏差严格为 0px，彻底杜绝因视图切换或内容高度导致的尺寸跳动。
+    - [x] 变更点 2 (禁止任何形式跳转，URL 原地保持与首帧同步直出)：
+        - 彻底移除 `AuthForm.tsx` 中检测到缺失本地 `sessionStorage` 时执行的 `window.history.replaceState('/login/')` 强行回退跳转；
+        - 新增 `getInitialChallengeState()` 纯函数，在 React 首帧挂载时直接解析 `window.location.pathname`（`/login/challenge/{method}_{hash}`），同步初始化 `stage`、`active2FAMethod`、`showMethodSelector` 与 `challengeSessionHash`，彻底杜绝首帧渲染闪烁与视图跳动；
+        - 直接在浏览器输入或访问 `https://mail.epocanvas.com/login/challenge/totp_...` 或 `select_...` 时，地址栏严格保持原 URL，原地渲染对应 2FA / 选择器界面，禁止任何重定向。
+    - [x] 变更点 3 (内部组件极度精炼，彻底防止撑爆卡片高度)：
+        - 将 2FA 原有的 160px 巨幅堆叠卡片横幅彻底重构为高度仅 44px 的高精度胶囊状态药丸（包含图标、方法名、副标题与脱敏用户邮箱）；
+        - 将方法选择器中的三项大按钮紧凑化为 `p-2.5 px-3`，将各状态视图内容高度严格收敛在 200~240px 舒适区间，内部留白呼吸感充裕，完全不触碰 600px 高度红线。
+    - [x] 变更点 4 (边缘端 Worker 静态代理根治 307 重定向死循环)：
+        - 在 `mail-worker/src/index.js` 中将代理匹配条件精确收敛为 `if (url.pathname.startsWith('/login/challenge/'))`，内部以 `/login/` 代理 `env.assets.fetch`；
+        - 普通 `/login/` 路径直通静态资源，彻底消除此前因 `/login/index.html` 引发的 307 循环重定向。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 多语言对称性与代码引用静态审计：`node scripts/i18n-symmetry.mjs && node scripts/i18n-audit.mjs` 100% 通过（2113 / 1917 键绝对对称，0 缺失，0 差异，1630 处引用健全）；
+    - [x] 公网全真端到端自动化测试 (`tests/test-prod-login-card-and-challenge-routing.mjs`)：26/26 项断言全绿通过；
+        - 登录卡片实测尺寸：宽 440px, 高 600px（0px 偏差）；
+        - TOTP 挑战卡片实测尺寸：宽 440px, 高 600px（与登录界面 0px 偏差）；
+        - 选择器卡片实测尺寸：宽 440px, 高 600px（与登录界面 0px 偏差）；
+        - 直接访问 TOTP 挑战 URL：禁止任何跳转，地址栏严格保持原 URL，HTTP 200；
+        - 直接访问选择器 URL：禁止任何跳转，地址栏严格保持原 URL，HTTP 200；
+        - 第三方登录默认隐藏，管理后台系统设置专属卡片与高仿真预览按钮正常运作；
+    - [x] 公网 Passkey 跨设备与自适应二验端到端测试 (`tests/test-prod-passkey-and-stepup-live-e2e.mjs`)：26/26 项断言全绿通过；
+    - [x] 零假数据残留：生产数据库临时状态严格还原 (`totp_enabled = 1`)；
+    - [x] 独立子代理独立审计核验：`Clean-slate Production QA Auditor` 盲审签署 PASS 评级通过。
+
 ### epomail-docs 数据处理与安全维护 (data-security) 彻底重做：全新3幅高精矢量架构图与Google政策卡片流视觉范式上线 (2026-10-02)
 *   **关联提交 (Git Commit - epomail-docs)**: `e6c9f5df9aa4225571e846271ff1312a5790f92c` (Short: `e6c9f5d`) | Manifest: `1a4e02d8df99c7fa583c84525ee186143a05d142` (Short: `1a4e02d`)
 *   **部署环境 (Deployment)**: `Cloudflare Pages (https://epomail-docs.pages.dev/epomail/mail/data-security/ · Version ID: d9b0c36f)`
