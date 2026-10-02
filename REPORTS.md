@@ -9,6 +9,23 @@
 
 ---
 
+### EpomailDocs v5.7 独立复审：介绍与法律内容全量对码审计与发布状态核查 (2026-10-03)
+*   **关联提交 (Git Commit)**: 归档提交 Hash 待回填（本条随归档提交入库，Hash 由紧随的回填提交写入本行）；审计对象 EpomailDocs @ `6478520`（v5.7，54 页 = 9 篇 × 6 语言），事实基准为主仓 @ `50c69e0`
+*   **体检/审计范围与方法 (Scope & Methodology)**:
+    1. 范围与环境：EpomailDocs 全部 54 页逐篇清点（结构/版本行/效力条款/六语言对称）；mail-worker / mail-vue / EpomailDocs 工程配置源码级逐点取证；docs.epocanvas.com 与 mail.epocanvas.com 线上状态探测。
+    2. 工具与脚本：三路并行审计（文档站清点 / 源码事实基线 / EpoCanvasDocs 格式参照）+ 10 项新增定点对码 + `validate-anchors.cjs`（1200 锚点）+ `verify-laws.py`（法条底稿）回归。
+*   **核心发现与缺陷矩阵 (Key Findings & Matrix)**:
+    - **[P0·发布/阻塞]**: 法律文档站至今无有效公网部署——`https://docs.epocanvas.com/epomail/mail/overview/` 实测 404（根路径由 EpoCanvasDocs 占用）。v5.3 已定案发布形态且本轮确认 `dist/` 构建产物、`robots.txt`、`_redirects`、tamper-proof manifest 全部就绪，但线上不可达：应用内法务文档默认链接（`DOCS_URL` 缺省 `docs.epocanvas.com/epomail`）、tamper-proof.md 宣称之权威源站均为死链。这是 v5.2 轮 P0-1 的延续，连续两轮未闭环。
+    - **[P1·准确性/过度宣称]**: `data-security.md:70`（六语言同构）处理矩阵「网络与设备资料」行将「来自边缘请求之国家/地区码」列为 D1 存储、留存「至帐号实体删除为止」。源码核实：`user` 表无国家/地区列（`mail-worker/src/entity/user.js`），`cf-ipcountry` 仅运行时读取回传前端用于电话区号预选（`user-service.js:272`；`mail-vue/src/utils/phone-validator.js:161`），不入库。声明收集范围大于实际，须六语言同步修订（改为「请求时读取、不入库」或自存储列移除）。
+    - **[P2·次要]**: 四项——①`sub-processors.md:24` Cloudflare 行无条件列出对象存储（R2），而生产 `wrangler.toml:34-36` R2 绑定注释未启用、附件缺省落 KV（`kv-obj-service.js`；`data-security.md:72`「缺省 KV」表述正确，两处口径不一）；②EpomailDocs 本地 `CHECKLIST.log` 停更于 v5.4/2026-10-01，v5.5–v5.7 三轮仅记主仓流水，站内流水断档；③`data-security.md` 与 `project.md` 两篇六语言缺 H1 标题，与其余 7 篇不一致；④`legal-reference.md` §9.1 自订「法规名称仅保留两处」，但 `data-security.md:128` 亦出现 GDPR/CCPA/CPRA 名称（不带条号，低风险）。
+    - **[P3·代码注释]**: `mail-worker/src/utils/crypto-utils.js:35` 注释写 210,000 迭代与实现常量 100,000 不符（文档声称 100,000 与实现一致，无需改文档，注释须修）。
+    - **通过项**: v5.2 轮 P0-2（实体删除接入附件级联，现为分块 CHUNK=50 实现 `email-service.js:1854-1868`）与 P1-1（头像 `AVATAR_UPLOAD_URL` 可配、硬编码图床移除）治理持续有效；40+ 项高错误风险主张复核全部与源码一致——AES-256-GCM 四字段白名单与三模式语义、HKDF 派生按用户加盐、PBKDF2 100,000、TOTP AES-256-GCM/备用码 SHA-256、JWT 30 日/KV 会话/同帐号上限 10（`login-service.js:391,574`）、OAuth 令牌 7200 秒（`oauth-provider-service.js:258`）、验证码提取前 6,000 字符（`ai-service.js:51`）、翻译备援首 1,000 字符（`ai-service.js:621`）、AI 用量 KV 60 日（`ai-service.js:26`）、Telegram 7 日阅读链接（`telegram-service.js:57,146`）、回收站 7 日/垃圾 7 日/官方邮件 `welcomeExpireDays` 缺省 7 日/90% 配额清理、官方发信 `announcement@`/`admin@` 与 isOfficial（`email-service.js:273`）、不可变快照投递（`email-service.js:1430`）、Shadow DOM + DOMPurify 白名单消毒（`shadow-html/index.vue`）、tamper-proof.json 构建期生成 + 客户端挂载（`astro.config.mjs:114-122`）、Google Fonts（`mail-vue/index.html:10-12`）、`document.cookie` 全仓 0 命中、LinuxDO trust_level、首提交 2026-07-21/MIT；结构 9 篇 × 6 语言 H2 完全对称、版本行 54/54 统一「2026-10-02｜版本 5.7」；条号引用全站 0 命中（符合 v5.0 去条号立场）；72 处图片引用 0 缺失；内链 slug 全部存在；EpoCanvasDocs 家族格式对齐（frontmatter 极简、语言前缀 `zh-tw`、图内文字本地化回退机制一致；版本行/效力条款为法务站合理偏差）。
+*   **治理修复与回归结果 (Fixes & Verification)**:
+    - 本轮为纯审计（不改文档站与产品代码）；`validate-anchors.cjs` 1200 锚点 0 断链、`verify-laws.py` 与核验底稿一致。
+    - 遗留路线图 (Roadmap)：①【最高优先】执行 Cloudflare Pages 发布（`wrangler pages deploy dist --project-name epomail-docs`，绑定 `docs.epocanvas.com/epomail/` 路径或独立子域），发布后双向验证应用内链接与权威源站，并按 privacy §13 程序公告；②P1 国家码过度宣称六语言修订 + sub-processors R2 口径与 data-security 统一；③内容补章建议：Cookie 与追踪技术专节、注销后实体删除时限上限（现「至管理员执行实体删除为止」无天数）、安全事件通报时限具体化（现仅「法定时限内」）、DMCA/知识产权通知-反通知流程、托管实例收件域名（`epomail.bond`/`epomail.cyou`）披露、执法请求透明度、出站反垃圾技术参数（各角色日发信配额入 AUP）、年龄门槛核验机制说明；④EpomailDocs 本地 CHECKLIST.log 回填 v5.5–v5.7 三轮；⑤data-security/project 六语言补 H1；⑥`crypto-utils.js:35` 注释修正；⑦`privacy@`/`admin@epocanvas.com` 邮箱可达性上线前自测留痕（连续两轮挂账）。
+
+---
+
 ### EpomailDocs 法律文档站 v5.2 独立复审：技术事实全量对码与生产发布探测 (2026-09-30)
 *   **关联提交 (Git Commit)**: 本仓归档提交见 CHECKLIST.log 对应条目；审计对象 EpomailDocs @ `79094ac9d2686c1014c25824b25318c6206c9270` (Short: `79094ac`，v5.2，已推送 origin/main)，事实基准为主仓 @ `81cccef`
 *   **专项文档索引 (Detailed Doc)**: `doc/epomaildocs-v52-independent-audit.md`（31 项通过矩阵 + 完整缺陷矩阵 + 证据行号）

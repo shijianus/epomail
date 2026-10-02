@@ -8,6 +8,16 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### EpomailDocs v5.7 独立复审归档：全量对码审计与发布状态核查 (2026-10-03)
+*   **关联提交 (Git Commit)**: 归档提交 Hash 待回填（由紧随的回填提交写入）；审计对象 EpomailDocs @ `6478520`（v5.7），事实基准主仓 @ `50c69e0`
+*   **部署环境 (Deployment)**: 纯审计轮，未部署；线上探测 docs.epocanvas.com（/epomail 仍 404）+ mail.epocanvas.com
+*   **变更清单**:
+    - [x] 54 页法律/介绍文档逐篇清点与 10 项新增定点对码（国家码入库、R2 绑定、OAuth 7200s、会话上限 10、Google Fonts、Shadow DOM/DOMPurify、announcement@ 官方发信、不可变快照投递、TG 7 日链接、AI 6000/1000 字符与用量 KV 60 日）
+    - [x] 审计报告全文归档至 REPORTS.md 置顶条目（P0 发布缺位 / P1 国家码过度宣称 / P2×4 / P3 代码注释）
+*   **核验清单**:
+    - [x] 文档站回归：validate-anchors 1200 锚点 0 断链；verify-laws 与核验底稿一致
+    - [x] 本轮不改文档站与产品代码（纯审计），无测试数据产生
+
 ### 原理图六语言本地化轮：12 图 × 6 语言 = 72 个 SVG (2026-10-02)
 *   **关联提交 (Git Commit)**: EpomailDocs `c5de61f`（主提交）；清单同步 `6478520` (Short: `c5de61f` / `6478520`)
 *   **部署环境 (Deployment)**: `本地构建与静态核验`（生产 Pages 未触发部署）
