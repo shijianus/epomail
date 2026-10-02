@@ -9,7 +9,7 @@
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
 ### EpomailDocs v5.8 视觉与入口打磨轮：翻页卡图标/表格居中/语言协商 (2026-10-03)
-*   **关联提交 (Git Commit)**: `<本次提交>`（主仓流水归档；EpomailDocs 独立提交 `a1c1e89c4e8b85579346304df3d5b37d197b68db`，Short: `a1c1e89`，已推送 origin/main）
+*   **关联提交 (Git Commit)**: `4cf8014279669dbc67ff54ceb47239044c943ac8` (Short: `4cf8014`)；EpomailDocs 独立提交 `a1c1e89c4e8b85579346304df3d5b37d197b68db` (Short: `a1c1e89`，已推送 origin/main）
 *   **部署环境 (Deployment)**: `Cloudflare Pages epomail-docs 重新发布（Pages Functions 首次上线，master.epomail-docs.pages.dev）`
 *   **功能需求与变更清单 (Changes & Feature Alignment)**:
     - [x] 反馈①（alt 随被选择语言）：取证确认 en/fr/es/nl 构建 alt/图注本已 100% 本地化；真缺口为入口恒落简中——新增 Pages Functions 三路由按 Accept-Language 协商（zh-Hant→zh-tw、en/fr/es/nl 直配、缺省简中），浏览器所选语言自此决定落地语言与全部 alt/配图
