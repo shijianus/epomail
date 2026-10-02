@@ -8,6 +8,27 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### 2FA 故障排除交互重构：废除撑高抽屉卡片，升级为悬停气泡「?」指引与 0px 零抖动布局 (2026-10-02)
+*   **关联提交 (Git Commit)**: `987f5271c0e85876d76bb956627edaa704c125b4` (Short: `987f527`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare Workers (https://mail.epocanvas.com)` (Version ID: `1a60ffad-9734-468b-abc0-febc545d5ab0`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 变更点 1 (彻底废除在流内撑高展开的下拉/抽屉式卡片)：
+        - 移除此前位于 OTP 输入区与提交按键之间的折叠式抽屉卡片（`Troubleshooting Drawer Card`），杜绝因展开排错指引而撑高卡片高度或挤压提交按钮的视觉抖动。
+    - [x] 变更点 2 (重构为交互式悬停「?」圆形徽标与亚克力磨砂气泡 Popover)：
+        - 将「无法验证（havingTrouble）」触发器由生硬折叠按钮重构为内联发光徽标组合（`div.relative.inline-flex.items-center`），右侧点缀精致微质感圆环 `?` 标识；
+        - 基于 `<AnimatePresence>` 构建绝对定位脱模气泡（`absolute right-0 bottom-full mb-2 w-64 z-50 rounded-2xl border border-[rgba(139,147,196,0.3)] bg-[rgba(15,18,37,0.96)] p-3 backdrop-blur-xl shadow-2xl`），悬停时浮空浮动在上方，支持点击/移动端触控，具备精准下指向指示箭头；
+        - 卡片外框物理尺寸保持绝对静止（480px × 670px，0px 偏差），彻底消除任何形态的布局重排与跳动。
+    - [x] 变更点 3 (六语言文字精细对称与优雅排版)：
+        - 对齐 6 语言字典（zh: 无法验证, zh-Hant: 無法驗證, en: Having trouble, es: Problemas para verificar, fr: Problème de vérification, nl: Lukt het niet），剔除尾部问号与独立 `[?]` 徽标自然缝合；
+        - 悬停浮层内保留完整的密码学排错指引（时间校准、重载重试、使用备用代码/其他方式）。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 静态多语言三件套：`node scripts/i18n-symmetry.mjs && node scripts/i18n-audit.mjs` 100% 通过（2113 / 1917 键绝对对称，1630 处字面量引用零缺失）；
+    - [x] 公网全真卡片尺寸与路由端到端测试 (`tests/test-prod-login-card-and-challenge-routing.mjs`)：26/26 项断言全部通过；
+    - [x] 公网 Passkey 兼容性与 Step-Up 自适应风控测试 (`tests/test-prod-passkey-and-stepup-live-e2e.mjs`)：26/26 项断言全部通过；
+    - [x] 公网 Passkey 时间锁与生命周期管理测试 (`tests/test-prod-passkey-timelock-and-management.mjs`)：40/40 项断言全部通过；
+    - [x] 真实生产浏览器实测核验：悬停触发轻盈毛玻璃气泡，0px 布局偏移，离焦/移出丝滑淡出；
+    - [x] 生产零脏数据残留：测试临时状态与密钥在 `finally` 中物理清除。
+
 ### 认证表单垂直居中重构、消除头部脱节空隙与端到端质感深度优化 (2026-10-02)
 *   **关联提交 (Git Commit)**: `95159952a004a0722b47c90c657f3197dd74eae2` (Short: `9515995`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare Workers (https://mail.epocanvas.com)` (Version ID: `b1239705-ad08-4c41-b1d0-f05bfb19c4c2`)
