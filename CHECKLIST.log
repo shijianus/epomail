@@ -9,7 +9,7 @@
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
 ### 第三方登录配置状态双向联动、未配置项灰色禁用拦截与管理端匹配保障交付 (2026-10-03)
-*   **关联提交 (Git Commit)**: `PENDING_COMMIT_HASH` (Short: `PENDING_SHORT_HASH`)
+*   **关联提交 (Git Commit)**: `b30c11b37bb90148684365c35aebd6fc77136b3d` (Short: `b30c11b`)
 *   **部署环境 (Deployment)**: `本地全真栈 / 构建核验`
 *   **功能需求与变更清单 (Changes & Feature Alignment)**:
     - [x] 变更点 1 (前端登录态严格区分：已配置激活 vs 未配置/已关闭灰色禁用与拦截):
