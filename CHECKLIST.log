@@ -8,6 +8,30 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### 设定页「个人设置」与「管理控制台」物理分割及身分组URL强绑定防越权 (2026-10-02)
+*   **关联提交 (Git Commit)**: `27b1f32b1960dac6c71bbf0a39cac2ce1d9fc1a0` (Short: `27b1f32`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare Workers (https://mail.epocanvas.com)` (Version ID: `3d599d23-2ab0-4a10-a317-45d81bae2d5f`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 变更点 1 (URL层级物理隔离与规范化)：
+        - 个人设置页面彻底收敛于 `#settings` (`https://mail.epocanvas.com/mail/u/0/#settings/profile`)，涵盖个人资料、通用偏好、账号安全、存储与数据、邮件标签 5 大用户专属面板；
+        - 管理控制台从 URL 层面明确隔离为 `#manage/:roleGroup/*` (例如 `#manage/admin/system`、`#manage/moderator/users`)，并提供 `#admin/*` 一级便捷别名；
+        - 系统级规则设定（`category-setting`，原系统防垃圾邮件/规则/AI配置）从个人设置迁入管理控制台 `/manage/:roleGroup/rules`，杜绝未授权暴露；
+    - [x] 变更点 2 (路由守卫与防越权校验体系)：
+        - 在 `router.beforeEach` 中深度集成权限校验网关：普通用户若试图输入 URL 越权访问任何管理路由，一律强制阻断、弹出无权访问告警并退回 `/settings/profile`；
+        - 身分组 URL 动态强绑定：URL 中的 `:roleGroup` 必须与当前登录用户的真实身分组严格对齐（站长映射为 `admin`、协管者映射为 `moderator`、自定义角色映射为其合法 `roleCode`），若 URL 传入与自身不匹配的分组名将自动规范化；
+        - 细粒度管理分页拦截：仅向用户展示其实际具备权限的管理标签页（如仅具备 `user:query` 的协管者访问 `/system` 将被拦截并自动降级重定向至 `/users`）；
+    - [x] 变更点 3 (侧边栏与顶栏交互重构)：
+        - 侧边栏全面重构为 `#settings` 模式与 `#manage/:roleGroup` 模式双模态互斥切换，展示专属说明文案、URL 徽章与当前身分组专属胶囊；
+        - 提供「切换至管理后台」与「返回个人设置」快捷卡片，顶栏及多账号下拉菜单严格解耦个人设置与管理控制台入口；
+    - [x] 变更点 4 (六语言对称与工程规范闭环)：
+        - 六语言字典（zh, zh-Hant, en, es, fr, nl）全量闭环 9 个新增词条，静态扫描三件套 100% 零缺失。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：`mail-vue` 构建通过 (耗时 12.02s)；
+    - [x] 自动化测试套件：`tests/test-settings-manage-separation.mjs` 覆盖身分组映射、权限判定、优先级跳转与防越权路由拦截模拟，5/5 场景全部通过；
+    - [x] 静态多语言三件套：`node scripts/i18n-symmetry.mjs` 2134/1929 字典绝对对称，`node scripts/i18n-audit.mjs` 1648 处字面量 0 处缺失；
+    - [x] 生产环境真实部署：`npm run deploy` 成功发布至 Cloudflare Workers，Version ID: `3d599d23-2ab0-4a10-a317-45d81bae2d5f`；
+    - [x] 零假数据残留：测试脚本无数据库残留与脏凭据。
+
 ### 个资「添加电子邮箱」按钮位置重构：调整至 email-row 右侧与水平基线对齐 (2026-10-02)
 *   **关联提交 (Git Commit)**: `87dff500d0931eae2e2f3d664d557d7512de816f` (Short: `87dff50`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare Workers (https://mail.epocanvas.com)` (Version ID: `9c197262-ff42-4b3d-aaae-0223763ebe63`)
