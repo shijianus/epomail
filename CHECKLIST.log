@@ -9,7 +9,7 @@
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
 ### 第三方认证与单点登录 1/2/3/4/5 Provider 奇偶自适应布局重塑、矢量品牌图标对齐与几何零溢出全真栈交付 (2026-10-03)
-*   **关联提交 (Git Commit)**: `PENDING_COMMIT_HASH` (Short: `PENDING_SHORT_HASH`)
+*   **关联提交 (Git Commit)**: `753f6793dc63711d3706ce316c1332681309f6d4` (Short: `753f679`)
 *   **部署环境 (Deployment)**: `本地全真栈 / 构建核验`
 *   **功能需求与变更清单 (Changes & Feature Alignment)**:
     - [x] 变更点 1 (1、2、3、4、5 个 Provider 全场景几何排布与奇偶数黄金对称自适应):
