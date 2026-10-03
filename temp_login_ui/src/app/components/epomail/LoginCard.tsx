@@ -119,18 +119,18 @@ export function LoginCard({ canvasRef, onSwitch, sysConfig }: LoginCardProps) {
             )}
 
             {/* Brand header */}
-            <div className="mb-4 sm:mb-5 flex flex-col items-center text-center">
+            <div className={`flex flex-col items-center text-center ${sysConfig?.oauthLoginEnabled ? 'mb-3 sm:mb-4' : 'mb-4 sm:mb-5'}`}>
               <img
                 src={`${import.meta.env.BASE_URL}logo.svg`}
                 alt="EpoMail Logo"
-                className="h-16 w-16"
+                className={sysConfig?.oauthLoginEnabled ? "h-14 w-14 sm:h-16 sm:w-16" : "h-16 w-16"}
                 style={{
                   filter:
                     "drop-shadow(0 0 14px rgba(99,102,241,0.45)) drop-shadow(0 6px 18px rgba(124,58,237,0.35))",
                 }}
               />
               <h1
-                className="epomail-display mt-3.5"
+                className={`epomail-display ${sysConfig?.oauthLoginEnabled ? 'mt-2.5 sm:mt-3' : 'mt-3.5'}`}
                 style={{
                   fontSize: "26px",
                   fontWeight: 600,
@@ -144,7 +144,7 @@ export function LoginCard({ canvasRef, onSwitch, sysConfig }: LoginCardProps) {
                 {sysConfig?.title || "EpoMail"}
               </h1>
               <p
-                className="mt-1.5 text-[13px]"
+                className="mt-1 text-[12.5px] sm:text-[13px]"
                 style={{ color: "var(--epo-muted)" }}
               >
                 {isAddAccount ? tr('addAccountSubtitle') : tr('loginSubtitle')}
