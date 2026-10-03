@@ -118,10 +118,6 @@
             <!-- Original Menu Items -->
             <div class="am-item" @click="openAccountDetails"><span>{{ $t('accountDetails') }}</span></div>
             <div class="am-item" @click="openSettings"><span>{{ $t('settings') }}</span></div>
-            <div v-if="hasManagePerm" class="am-item manage-console-item" @click="openManage">
-              <span>{{ $t('manageConsole') || $t('manage') }}</span>
-              <span class="am-manage-pill">{{ localizedRoleName }}</span>
-            </div>
             <div class="am-item logout" @click="clickLogout"><span>{{ $t('logOut') }}</span></div>
 
             <!-- Footer: Legal links -->
@@ -205,14 +201,10 @@
               </div>
             </div>
 
-            <!-- "个人设置" & "管理控制台" -->
+            <!-- "管理Epomail账户" (aligned sizing with cards) -->
             <div class="gac-manage-btn" @click="openSettings">
               <Icon icon="lucide:settings" width="15" height="15" />
-              <span>{{ $t('settings') }}</span>
-            </div>
-            <div v-if="hasManagePerm" class="gac-manage-btn gac-manage-console-btn" @click="openManage">
-              <Icon icon="eos-icons:system-ok-outlined" width="15" height="15" />
-              <span>{{ $t('manageConsole') || $t('manage') }}</span>
+              <span>{{ $t('manageAccount') }}</span>
             </div>
 
             <!-- Storage Progress Bar (aligned sizing with cards) -->
@@ -303,7 +295,7 @@ import {useUserStore} from "@/store/user.js";
 import {useAccountStore} from "@/store/account.js";
 import {useEmailStore} from "@/store/email.js";
 import {userDraftStore} from "@/store/draft.js";
-import {getRoleGroupSlug, getFirstAllowedManageTab, hasAnyManagePermission} from "@/utils/role-utils.js";
+import {getRoleGroupSlug} from "@/utils/role-utils.js";
 
 function openAccountDetails() {
   if (userinfoRef.value && userinfoRef.value.handleClose) {
@@ -330,14 +322,6 @@ function openSettings() {
   router.push('/settings/profile')
 }
 
-function openManage() {
-  if (userinfoRef.value && userinfoRef.value.handleClose) {
-    userinfoRef.value.handleClose()
-  }
-  const roleGroup = getRoleGroupSlug(userStore.user)
-  const tab = getFirstAllowedManageTab(userStore.user)
-  router.push(`/manage/${roleGroup}/${tab}`)
-}
 
 function highlightTextOnPage(keyword) {
   if (typeof CSS === 'undefined' || !CSS.highlights) return;
@@ -401,7 +385,6 @@ const accountStore = useAccountStore();
 const displayEmail = computed(() => accountStore.currentAccount?.email || userStore.user?.email || '');
 const uiStore = useUiStore();
 const emailStore = useEmailStore();
-const hasManagePerm = computed(() => hasAnyManagePermission(userStore.user));
 const logoutLoading = ref(false)
 const userInfoShow = ref(false)
 const userinfoRef = ref({})
@@ -1519,24 +1502,7 @@ function formatName(email) {
   background: rgba(239, 68, 68, 0.08);
 }
 
-.manage-console-item {
-  display: flex !important;
-  justify-content: space-between !important;
-  align-items: center !important;
-}
-.am-manage-pill {
-  font-size: 11px;
-  background: var(--accent-muted, rgba(99, 102, 241, 0.1));
-  color: var(--accent-primary, #6366f1);
-  padding: 1px 8px;
-  border-radius: 12px;
-  font-weight: 500;
-}
-.gac-manage-console-btn {
-  margin-top: 8px !important;
-  border-color: var(--accent-muted, rgba(99, 102, 241, 0.3)) !important;
-  color: var(--accent-primary, #6366f1) !important;
-}
+
 
 /* Multi-Account Container Pattern */
 .gac-multi-account-container {
