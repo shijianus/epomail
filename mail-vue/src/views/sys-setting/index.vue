@@ -1050,16 +1050,28 @@
                   </el-tooltip>
                 </div>
                 <div class="forward">
+                  <span>{{ $t('auditReport') }}</span>
                   <el-button
                     type="primary"
                     size="small"
-                    plain
-                    @click="router.push(`/manage/${currentRoleSlug}/audit`)"
+                    class="opt-button"
+                    :title="$t('auditReportDesc')"
+                    @click="openAuditReport"
                   >
-                    <Icon icon="fluent:shield-task-24-regular" width="16" height="16" style="margin-right: 4px; vertical-align: -2px;" />
-                    {{ $t('auditReport') }}
+                    <Icon icon="fluent:shield-task-24-regular" width="18" height="18"/>
                   </el-button>
                 </div>
+              </div>
+              <div style="margin-top: 10px; display: flex; justify-content: flex-end;">
+                <el-button
+                  type="primary"
+                  size="small"
+                  plain
+                  @click="openAuditReport"
+                >
+                  <Icon icon="fluent:shield-task-24-regular" width="16" height="16" style="margin-right: 4px; vertical-align: -2px;" />
+                  {{ $t('auditReport') }} ({{ $t('auditTabStream') }} / {{ $t('auditTabRisk') }})
+                </el-button>
               </div>
             </div>
           </div>
@@ -3625,7 +3637,12 @@ const oauthRedirectUri = computed(() => {
   return `${window.location.origin}/api/oauth/callback`;
 });
 const router = useRouter();
-const currentRoleSlug = computed(() => getRoleGroupSlug(userStore.user || userStore.userInfo));
+const currentRoleSlug = computed(() => getRoleGroupSlug(userStore.user || userStore.userInfo) || 'admin');
+
+function openAuditReport() {
+  const roleSlug = currentRoleSlug.value || 'admin';
+  router.push(`/manage/${roleSlug}/audit`);
+}
 
 function copyOauthRedirectUri() {
   if (typeof navigator !== 'undefined' && navigator.clipboard) {
