@@ -9,7 +9,7 @@
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
 ### EpomailDocs v5.9 专案文档拆分扩充轮：功能指南/技术架构 + 真实产品截图 + 内容栏居中 (2026-10-03)
-*   **关联提交 (Git Commit)**: `<本次提交>`（主仓流水归档；EpomailDocs 独立提交 `beb956a1b50b5c4b94d3bbc9b9feba8ef774417a`，Short: `beb956a`，已推送 origin/main）
+*   **关联提交 (Git Commit)**: `8a60539d318eef618b84aa0db4e8a88672c4940d` (Short: `8a60539`)；EpomailDocs 独立提交 `beb956a1b50b5c4b94d3bbc9b9feba8ef774417a` (Short: `beb956a`，已推送 origin/main）
 *   **部署环境 (Deployment)**: `Cloudflare Pages epomail-docs 重新发布（master.epomail-docs.pages.dev，67 页）+ 本地全真栈演示实例（wrangler dev 127.0.0.1:8787，冷启动 init + 20 封演示邮件）`
 *   **功能需求与变更清单 (Changes & Feature Alignment)**:
     - [x] 反馈①（表格居中根治）：Playwright 祖先链取证锁定 `.content-panel > .sl-container`（Starlight margin-inline 回退在本环境解析为 auto/0，宽视口内容栏右贴目录）；custom.css 显式居中，1728/1920/2560 三档实测 gapL=gapR 对称
