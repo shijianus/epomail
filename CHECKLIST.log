@@ -8,6 +8,20 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### EpomailDocs v5.9 专案文档拆分扩充轮：功能指南/技术架构 + 真实产品截图 + 内容栏居中 (2026-10-03)
+*   **关联提交 (Git Commit)**: `<本次提交>`（主仓流水归档；EpomailDocs 独立提交 `beb956a1b50b5c4b94d3bbc9b9feba8ef774417a`，Short: `beb956a`，已推送 origin/main）
+*   **部署环境 (Deployment)**: `Cloudflare Pages epomail-docs 重新发布（master.epomail-docs.pages.dev，67 页）+ 本地全真栈演示实例（wrangler dev 127.0.0.1:8787，冷启动 init + 20 封演示邮件）`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 反馈①（表格居中根治）：Playwright 祖先链取证锁定 `.content-panel > .sl-container`（Starlight margin-inline 回退在本环境解析为 auto/0，宽视口内容栏右贴目录）；custom.css 显式居中，1728/1920/2560 三档实测 gapL=gapR 对称
+    - [x] 反馈②（专案拆分扩充）：新增功能指南（11 节）与技术架构（9 节）×6 语言；project.md §2/§3/§5 压缩为概览互链（节号不变）；侧栏两入口；check-structure DOCS 9→11；全站版本 5.8→5.9（66 文件）
+    - [x] 反馈③（本地部署 + 漂亮数据 + 多语言截图）：mail-vue 构建并入 worker 资产；冷启动 `/api/init` 播种 6 角色；`mail-worker/scripts/seed-demo.py` 生成 20 封演示邮件（官方公告/工作/社群/订阅/推销/验证码/已发送/垃圾/回收站/延后，含星标）经 D1 本地执行；16 张 Playwright 截图（6 语种×亮暗×移动端，服务端 profile 语言驱动）+ 8 张精选入文档站 ui 资产
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：EpomailDocs build 67 页零报错；anchors 1416/0 断链；check-structure 对称 100%（en 基准 11 篇）；verify-laws exit 0
+    - [x] 翻译双代理自查：结构 1:1（features 11 H2 / architecture 9 H2）、表格行数一致、数字零增删、内链语言前缀、术语对齐既有语料
+    - [x] 浏览器全真栈实测：演示实例登录 API 与 UI 登录态注入验证；收件箱/详情/搜索/写信/多语言/暗色截图判图全绿；新页判图全绿；1920 内容栏居中确认
+    - [x] 线上验证：features/architecture 双语 200、5.9 版本行、ui 资产 200、Accept-Language 协商正常
+    - [x] 零假数据残留：演示数据仅存本地 `.wrangler/state`（gitignored），不入库不进生产；删除该目录即完全清除
+
 ### EpomailDocs v5.8 视觉与入口打磨轮：翻页卡图标/表格居中/语言协商 (2026-10-03)
 *   **关联提交 (Git Commit)**: `4cf8014279669dbc67ff54ceb47239044c943ac8` (Short: `4cf8014`)；EpomailDocs 独立提交 `a1c1e89c4e8b85579346304df3d5b37d197b68db` (Short: `a1c1e89`，已推送 origin/main）
 *   **部署环境 (Deployment)**: `Cloudflare Pages epomail-docs 重新发布（Pages Functions 首次上线，master.epomail-docs.pages.dev）`
