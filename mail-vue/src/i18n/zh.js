@@ -2133,6 +2133,15 @@ totpModeAllDesc: '设置是否允许用户使用TOTP，开启后用户可以且�
     oauthConfigStatusDraft: "开发规划中",
     oauthConfigStatusActive: "支持配置与扩展",
     oauthSoon: "即将上线",
+    manageConsole: '管理控制台',
+    backToSettings: '返回个人设置',
+    switchToManage: '进入管理后台',
+    switchToSettings: '返回个人设置',
+    unauthorizedAccess: '越权访问拦截：无权访问该管理模块',
+    settingsDesc: '个人账户偏好与安全设置中心',
+    manageDesc: '站点系统管理与运维控制台',
+    settingsUrlBadge: '个人设置板块',
+    manageUrlBadge: '管理板块',
 };
 
 export default zh;

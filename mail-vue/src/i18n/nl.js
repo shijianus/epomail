@@ -2133,6 +2133,15 @@ totpModeAllDesc: 'Instellen of gebruikers TOTP mogen gebruiken. Eenmaal ingescha
     oauthConfigStatusDraft: "In ontwikkeling",
     oauthConfigStatusActive: "Configureerbaar",
     oauthSoon: "Binnenkort beschikbaar",
+    manageConsole: 'Beheerdersconsole',
+    backToSettings: 'Terug naar gebruikersinstellingen',
+    switchToManage: 'Ga naar beheerdersconsole',
+    switchToSettings: 'Terug naar gebruikersinstellingen',
+    unauthorizedAccess: 'Toegang geweigerd: u heeft geen toestemming om deze beheermodule te openen',
+    settingsDesc: 'Configuratiecentrum voor persoonlijke accountvoorkeuren en beveiliging',
+    manageDesc: 'Beheers- en bedieningsconsole voor sitesysteem',
+    settingsUrlBadge: 'Sectie gebruikersinstellingen',
+    manageUrlBadge: 'Beheerderssectie',
 };
 
 export default nl;

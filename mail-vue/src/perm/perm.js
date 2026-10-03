@@ -38,13 +38,8 @@ export function hasPerm(permKey) {
 
 
 export function permsToRouter(permKeys) {
-    const routerList = []
-    Object.keys(routers).forEach(perm => {
-        if (permKeys.includes(perm) || permKeys.includes('*')) {
-            routerList.push(...routers[perm])
-        }
-    })
-    return routerList;
+    // Management routes are statically configured with dynamic roleGroup bindings in router/index.js
+    return [];
 }
 
 const routers = {

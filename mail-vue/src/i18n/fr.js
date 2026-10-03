@@ -2133,6 +2133,15 @@ totpModeAllDesc: 'Définir si les utilisateurs peuvent utiliser TOTP. Lorsqu\'il
     oauthConfigStatusDraft: "En cours de développement",
     oauthConfigStatusActive: "Configurable",
     oauthSoon: "Bientôt disponible",
+    manageConsole: 'Console de gestion',
+    backToSettings: 'Retour aux paramètres utilisateur',
+    switchToManage: "Aller à la console d'administration",
+    switchToSettings: 'Retour aux paramètres utilisateur',
+    unauthorizedAccess: "Accès refusé : vous n'avez pas l'autorisation d'accéder à ce module de gestion",
+    settingsDesc: 'Centre de configuration des préférences et de la sécurité du compte personnel',
+    manageDesc: "Console d'administration et d'exploitation du système du site",
+    settingsUrlBadge: 'Section des paramètres utilisateur',
+    manageUrlBadge: 'Section de gestion',
 };
 
 export default fr;

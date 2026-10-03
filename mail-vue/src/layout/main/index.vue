@@ -1,77 +1,174 @@
 <template>
   <div class="main-box-hide">
     
-    <!-- Settings Layout -->
+    <!-- Settings & Manage Layout -->
     <div v-if="isSettingsMode" class="settings-layout">
       <div class="settings-sidebar">
         <el-scrollbar>
           <div class="settings-sidebar-content">
-            <div class="settings-title" @click="router.push({name: 'email'})">
-              <Icon icon="lucide:arrow-left" width="18" height="18" />
-              <span>{{$t('backToMail')}}</span>
-            </div>
-            
-            <div class="nav-section-title">{{$t('tabSetting')}}</div>
-            <div class="settings-nav-group">
-            <router-link :to="{name: 'user-profile'}" class="settings-nav-item" :class="{active: route.name === 'user-profile' || route.name === 'profile'}">
-              <Icon icon="fluent:person-20-regular" width="20" height="20" /> {{$t('profile')}}
-            </router-link>
-            <router-link :to="{name: 'general-setting'}" class="settings-nav-item" :class="{active: route.name === 'general-setting' || route.name === 'profile-setting'}">
-              <Icon icon="fluent:settings-48-regular" width="20" height="20" /> {{$t('general')}}
-            </router-link>
-            <router-link :to="{name: 'setting'}" class="settings-nav-item" :class="{active: route.name === 'setting'}">
-              <Icon icon="fluent:shield-checkmark-20-regular" width="20" height="20" /> {{$t('security')}}
-            </router-link>
-            <router-link :to="{name: 'data-setting'}" class="settings-nav-item" :class="{active: route.name === 'data-setting'}">
-              <Icon icon="fluent:database-person-20-regular" width="20" height="20" /> {{$t('data')}}
-            </router-link>
-            <router-link :to="{name: 'label-setting'}" class="settings-nav-item" :class="{active: route.name === 'label-setting'}">
-              <Icon icon="lucide:tags" width="20" height="20" /> {{$t('labels')}}
-            </router-link>
-            </div>
 
-            <template v-if="hasPerm(['all-email:query','user:query','role:query','setting:query','analysis:query','reg-key:query'])">
-              <div class="nav-section-title" style="margin-top: 24px;">{{$t('manage')}}</div>
+            <!-- SECTION 1: User Settings Mode (#settings) -->
+            <template v-if="isUserSettingsMode">
+              <div class="settings-title" @click="router.push({name: 'email'})">
+                <Icon icon="lucide:arrow-left" width="18" height="18" />
+                <span>{{$t('backToMail')}}</span>
+              </div>
               
-              <router-link v-if="hasPerm('analysis:query')" :to="{name: 'analysis'}" class="settings-nav-item" :class="{active: route.name === 'analysis'}">
-                <Icon icon="fluent:data-pie-20-regular" width="20" height="20" /> {{$t('analytics')}}
-              </router-link>
-              
-              <router-link v-if="hasPerm('user:query')" :to="{name: 'user'}" class="settings-nav-item" :class="{active: route.name === 'user'}">
-                <Icon icon="si:user-alt-2-line" width="18" height="18" /> {{$t('allUsers')}}
-              </router-link>
+              <div class="nav-section-header">
+                <div class="nav-section-title">{{$t('tabSetting')}}</div>
+                <div class="nav-section-desc">{{$t('settingsDesc') || '个人账户偏好与安全设置中心'}}</div>
+                <div class="nav-section-url-tag">#settings</div>
+              </div>
 
-              <router-link v-if="hasPerm('all-email:query') && Number(settingStore.settings?.allMailMode) !== 2" :to="{name: 'all-email'}" class="settings-nav-item" :class="{active: route.name === 'all-email'}">
-                <Icon :icon="Number(settingStore.settings?.allMailMode) === 1 ? 'fluent:mail-list-28-regular' : 'fluent:mail-alert-28-regular'" width="20" height="20" />
-                {{ Number(settingStore.settings?.allMailMode) === 1 ? $t('allMail') : ($t('spamAdminPartition') || $t('spam')) }}
-              </router-link>
+              <div class="settings-nav-group">
+                <router-link :to="{name: 'user-profile'}" class="settings-nav-item" :class="{active: route.name === 'user-profile' || route.name === 'profile'}">
+                  <Icon icon="fluent:person-20-regular" width="20" height="20" /> {{$t('profile')}}
+                </router-link>
+                <router-link :to="{name: 'general-setting'}" class="settings-nav-item" :class="{active: route.name === 'general-setting' || route.name === 'profile-setting'}">
+                  <Icon icon="fluent:settings-48-regular" width="20" height="20" /> {{$t('general')}}
+                </router-link>
+                <router-link :to="{name: 'setting'}" class="settings-nav-item" :class="{active: route.name === 'setting'}">
+                  <Icon icon="fluent:shield-checkmark-20-regular" width="20" height="20" /> {{$t('security')}}
+                </router-link>
+                <router-link :to="{name: 'data-setting'}" class="settings-nav-item" :class="{active: route.name === 'data-setting'}">
+                  <Icon icon="fluent:database-person-20-regular" width="20" height="20" /> {{$t('data')}}
+                </router-link>
+                <router-link :to="{name: 'label-setting'}" class="settings-nav-item" :class="{active: route.name === 'label-setting'}">
+                  <Icon icon="lucide:tags" width="20" height="20" /> {{$t('labels')}}
+                </router-link>
+              </div>
 
-              <router-link v-if="hasPerm('role:query')" :to="{name: 'role'}" class="settings-nav-item" :class="{active: route.name === 'role'}">
-                <Icon icon="fluent:lock-closed-16-regular" width="20" height="20" /> {{$t('permissions')}}
-              </router-link>
-
-              <router-link v-if="hasPerm('reg-key:query')" :to="{name: 'reg-key'}" class="settings-nav-item" :class="{active: route.name === 'reg-key'}">
-                <Icon icon="fluent:fingerprint-20-filled" width="20" height="20" /> {{$t('inviteCode')}}
-              </router-link>
-
-              <router-link v-if="hasPerm('setting:query')" :to="{name: 'sys-setting'}" class="settings-nav-item" :class="{active: route.name === 'sys-setting'}">
-                <Icon icon="eos-icons:system-ok-outlined" width="18" height="18" /> {{$t('SystemSettings')}}
-              </router-link>
-
-              <router-link v-if="hasPerm('setting:query')" :to="{name: 'oauth-app'}" class="settings-nav-item" :class="{active: route.name === 'oauth-app'}">
-                <Icon icon="fluent:apps-24-regular" width="18" height="18" /> {{$t('oauthApps')}}
-              </router-link>
-
-              <router-link :to="{name: 'category-setting'}" class="settings-nav-item" :class="{active: route.name === 'category-setting'}">
-                <Icon icon="lucide:network" width="18" height="18" /> {{$t('categorySetting')}}
-              </router-link>
+              <!-- Switch to Manage Console Card (for authorized users) -->
+              <div v-if="hasManagePerm" class="switch-console-card" @click="goToManageConsole" :title="$t('switchToManage') || '进入管理后台'">
+                <div class="switch-card-icon">
+                  <Icon icon="eos-icons:system-ok-outlined" width="18" height="18" />
+                </div>
+                <div class="switch-card-text">
+                  <div class="switch-card-title">{{ $t('manageConsole') || '管理控制台' }}</div>
+                  <div class="switch-card-sub">#manage/{{ currentRoleSlug }}</div>
+                </div>
+                <Icon icon="lucide:chevron-right" width="16" height="16" class="switch-card-arrow" />
+              </div>
             </template>
+
+            <!-- SECTION 2: Management Mode (#manage/:roleGroup) -->
+            <template v-else-if="isManageMode">
+              <div class="settings-title" @click="goToUserSettings">
+                <Icon icon="lucide:arrow-left" width="18" height="18" />
+                <span>{{$t('backToSettings') || '返回个人设置'}}</span>
+              </div>
+              
+              <div class="nav-section-header">
+                <div class="nav-section-title">{{$t('manage')}}</div>
+                <div class="nav-section-desc">{{$t('manageDesc') || '站点系统管理与运维控制台'}}</div>
+                <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 6px;">
+                  <div class="nav-section-url-tag manage-url-tag">#manage/{{ currentRoleSlug }}</div>
+                  <div v-if="currentRoleName" class="manage-role-pill">
+                    <span class="status-dot"></span>
+                    <span>{{ currentRoleName }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="settings-nav-group">
+                <router-link
+                  v-if="hasPerm('analysis:query')"
+                  :to="`/manage/${currentRoleSlug}/analysis`"
+                  class="settings-nav-item"
+                  :class="{active: isTabActive(['manage-analysis', 'analysis'])}"
+                >
+                  <Icon icon="fluent:data-pie-20-regular" width="20" height="20" /> {{$t('analytics')}}
+                </router-link>
+
+                <router-link
+                  v-if="hasPerm('user:query')"
+                  :to="`/manage/${currentRoleSlug}/users`"
+                  class="settings-nav-item"
+                  :class="{active: isTabActive(['manage-users', 'user'])}"
+                >
+                  <Icon icon="si:user-alt-2-line" width="18" height="18" /> {{$t('allUsers')}}
+                </router-link>
+
+                <router-link
+                  v-if="hasPerm('all-email:query') && Number(settingStore.settings?.allMailMode) !== 2"
+                  :to="`/manage/${currentRoleSlug}/mail`"
+                  class="settings-nav-item"
+                  :class="{active: isTabActive(['manage-mail', 'all-email'])}"
+                >
+                  <Icon :icon="Number(settingStore.settings?.allMailMode) === 1 ? 'fluent:mail-list-28-regular' : 'fluent:mail-alert-28-regular'" width="20" height="20" />
+                  {{ Number(settingStore.settings?.allMailMode) === 1 ? $t('allMail') : ($t('spamAdminPartition') || $t('spam')) }}
+                </router-link>
+
+                <router-link
+                  v-if="hasPerm('role:query')"
+                  :to="`/manage/${currentRoleSlug}/roles`"
+                  class="settings-nav-item"
+                  :class="{active: isTabActive(['manage-roles', 'role'])}"
+                >
+                  <Icon icon="fluent:lock-closed-16-regular" width="20" height="20" /> {{$t('permissions')}}
+                </router-link>
+
+                <router-link
+                  v-if="hasPerm('reg-key:query')"
+                  :to="`/manage/${currentRoleSlug}/reg-keys`"
+                  class="settings-nav-item"
+                  :class="{active: isTabActive(['manage-reg-keys', 'reg-key'])}"
+                >
+                  <Icon icon="fluent:fingerprint-20-filled" width="20" height="20" /> {{$t('inviteCode')}}
+                </router-link>
+
+                <router-link
+                  v-if="hasPerm('setting:query')"
+                  :to="`/manage/${currentRoleSlug}/system`"
+                  class="settings-nav-item"
+                  :class="{active: isTabActive(['manage-system', 'sys-setting'])}"
+                >
+                  <Icon icon="eos-icons:system-ok-outlined" width="18" height="18" /> {{$t('SystemSettings')}}
+                </router-link>
+
+                <router-link
+                  v-if="hasPerm('setting:query')"
+                  :to="`/manage/${currentRoleSlug}/apps`"
+                  class="settings-nav-item"
+                  :class="{active: isTabActive(['manage-apps', 'oauth-app'])}"
+                >
+                  <Icon icon="fluent:apps-24-regular" width="18" height="18" /> {{$t('oauthApps')}}
+                </router-link>
+
+                <router-link
+                  v-if="hasPerm('setting:query')"
+                  :to="`/manage/${currentRoleSlug}/rules`"
+                  class="settings-nav-item"
+                  :class="{active: isTabActive(['manage-rules', 'category-setting'])}"
+                >
+                  <Icon icon="lucide:network" width="18" height="18" /> {{$t('categorySetting')}}
+                </router-link>
+              </div>
+
+              <!-- Switch to User Settings Card -->
+              <div class="switch-console-card" @click="goToUserSettings" :title="$t('switchToSettings') || '返回个人设置'">
+                <div class="switch-card-icon">
+                  <Icon icon="fluent:settings-48-regular" width="18" height="18" />
+                </div>
+                <div class="switch-card-text">
+                  <div class="switch-card-title">{{ $t('tabSetting') }}</div>
+                  <div class="switch-card-sub">#settings</div>
+                </div>
+                <Icon icon="lucide:chevron-right" width="16" height="16" class="switch-card-arrow" />
+              </div>
+
+              <div class="bottom-mail-link" @click="router.push({name: 'email'})">
+                <Icon icon="lucide:arrow-left" width="16" height="16" />
+                <span>{{$t('backToMail')}}</span>
+              </div>
+            </template>
+
           </div>
         </el-scrollbar>
       </div>
       <div class="settings-content">
         <router-view class="main-view" v-slot="{ Component,route }">
-          <keep-alive :include="['sys-setting','user','role','analysis','reg-key','oauth-app']">
+          <keep-alive :include="['sys-setting','user','role','analysis','reg-key','oauth-app','category-setting','manage-system','manage-users','manage-roles','manage-analysis','manage-reg-keys','manage-apps','manage-rules','manage-mail']">
             <component :is="Component" :key="route.name"/>
           </keep-alive>
         </router-view>
@@ -107,6 +204,7 @@ import ContentComponent from '@/views/content/index.vue'
 import {useUiStore} from "@/store/ui.js";
 import {useEmailStore} from "@/store/email.js";
 import {useSettingStore} from "@/store/setting.js";
+import {useUserStore} from "@/store/user.js";
 import {computed, onBeforeUnmount, onMounted, watch} from "vue";
 import { useRoute } from 'vue-router'
 import { hasPerm } from "@/perm/perm.js"
@@ -114,11 +212,13 @@ import { Icon } from "@iconify/vue"
 import router from "@/router/index.js"
 import { getWallpaperCssById } from '@/utils/theme-presets.js'
 import { emailGet } from '@/request/email.js'
+import { getRoleGroupSlug, getRoleGroupName, hasAnyManagePermission, getFirstAllowedManageTab } from '@/utils/role-utils.js'
 
 
 const settingStore = useSettingStore()
 const uiStore = useUiStore();
 const emailStore = useEmailStore();
+const userStore = useUserStore();
 const route = useRoute()
 let  innerWidth =  window.innerWidth
 
@@ -127,8 +227,49 @@ let elNotification = null
 const isMobileView = computed(() => window.innerWidth < 768)
 
 const isSettingsMode = computed(() => {
-  return ['user-profile', 'profile', 'general-setting', 'profile-setting', 'setting', 'data-setting', 'label-setting', 'category-setting', 'analysis', 'user', 'all-email', 'role', 'reg-key', 'sys-setting', 'oauth-app'].includes(route.name)
+  return route.path.startsWith('/settings') ||
+         route.path.startsWith('/manage') ||
+         route.path.startsWith('/admin') ||
+         ['user-profile', 'profile', 'general-setting', 'profile-setting', 'setting', 'data-setting', 'label-setting', 'category-setting', 'analysis', 'user', 'all-email', 'role', 'reg-key', 'sys-setting', 'oauth-app',
+          'manage-analysis', 'manage-users', 'manage-mail', 'manage-roles', 'manage-reg-keys', 'manage-system', 'manage-apps', 'manage-rules'].includes(route.name)
 })
+
+const isUserSettingsMode = computed(() => {
+  if (route.path.startsWith('/settings')) return true;
+  return ['user-profile', 'profile', 'general-setting', 'profile-setting', 'setting', 'data-setting', 'label-setting'].includes(route.name)
+})
+
+const isManageMode = computed(() => {
+  if (route.path.startsWith('/manage') || route.path.startsWith('/admin')) return true;
+  return ['manage-analysis', 'manage-users', 'manage-mail', 'manage-roles', 'manage-reg-keys', 'manage-system', 'manage-apps', 'manage-rules',
+          'analysis', 'user', 'role', 'reg-key', 'sys-setting', 'oauth-app', 'category-setting'].includes(route.name)
+})
+
+const currentRoleSlug = computed(() => {
+  return getRoleGroupSlug(userStore.userInfo)
+})
+
+const currentRoleName = computed(() => {
+  return getRoleGroupName(userStore.userInfo)
+})
+
+const hasManagePerm = computed(() => {
+  return hasAnyManagePermission(userStore.userInfo)
+})
+
+function isTabActive(names) {
+  return names.includes(route.name)
+}
+
+function goToManageConsole() {
+  const slug = currentRoleSlug.value
+  const firstTab = getFirstAllowedManageTab(userStore.userInfo)
+  router.push(`/manage/${slug}/${firstTab}`)
+}
+
+function goToUserSettings() {
+  router.push('/settings/profile')
+}
 
 const showReadingPane = computed(() => {
   const mailRoutes = ['email','all-email','send','star','draft','user-all-email','snoozed','spam','trash']
@@ -452,13 +593,153 @@ const handleResize = () => {
   }
 }
 
+.nav-section-header {
+  padding: 4px 20px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+  margin-bottom: 12px;
+}
+
 .nav-section-title {
-  padding: 16px 24px 8px;
-  font-size: 11px;
+  font-size: 16px;
   font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.3;
+}
+
+.nav-section-desc {
+  font-size: 12px;
   color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.8px;
+  margin-top: 4px;
+  line-height: 1.4;
+}
+
+.nav-section-url-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  margin-top: 8px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 4px;
+  background: var(--bg-hover);
+  color: var(--text-muted);
+  border: 1px solid var(--border-subtle);
+  letter-spacing: 0.3px;
+
+  &.manage-url-tag {
+    background: var(--accent-muted);
+    color: var(--text-accent);
+    border-color: rgba(79, 70, 229, 0.2);
+  }
+}
+
+.manage-role-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: 12px;
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--success);
+  font-size: 11px;
+  font-weight: 600;
+
+  .status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--success);
+  }
+}
+
+.switch-console-card {
+  margin: 18px 16px 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+
+  &:hover {
+    background: var(--bg-hover);
+    border-color: var(--accent-primary);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+
+    .switch-card-arrow {
+      transform: translateX(2px);
+      color: var(--accent-primary);
+    }
+
+    .switch-card-icon {
+      background: var(--accent-primary);
+      color: #ffffff;
+    }
+  }
+
+  .switch-card-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: var(--accent-muted);
+    color: var(--text-accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: all 0.2s ease;
+  }
+
+  .switch-card-text {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .switch-card-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .switch-card-sub {
+    font-size: 11px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    color: var(--text-muted);
+    margin-top: 1px;
+  }
+
+  .switch-card-arrow {
+    color: var(--text-muted);
+    transition: transform 0.2s ease, color 0.2s ease;
+    flex-shrink: 0;
+  }
+}
+
+.bottom-mail-link {
+  margin: 12px 16px 0;
+  padding: 8px 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+
+  &:hover {
+    color: var(--text-primary);
+    background: var(--bg-hover);
+  }
 }
 
 .settings-nav-item {

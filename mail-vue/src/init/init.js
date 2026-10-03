@@ -136,7 +136,7 @@ export async function init() {
 
                 const pathname = window.location.pathname;
                 const isOauth = pathname.startsWith('/oauth');
-                const isPublicProfile = pathname !== '/' && !['inbox', 'all', 'sent', 'drafts', 'starred', 'snoozed', 'spam', 'trash', 'message', 'settings', 'system-setting', 'sys-setting', 'all-users', 'role', 'roles', 'invite-code', 'reg-key', 'analysis', 'login'].some(p => pathname.toLowerCase().startsWith('/' + p));
+                const isPublicProfile = pathname !== '/' && !['inbox', 'all', 'sent', 'drafts', 'starred', 'snoozed', 'spam', 'trash', 'message', 'settings', 'manage', 'admin', 'system-setting', 'sys-setting', 'all-users', 'role', 'roles', 'invite-code', 'reg-key', 'analysis', 'login'].some(p => pathname.toLowerCase().startsWith('/' + p));
 
                 if (!isOauth && !isPublicProfile) {
                     window.location.replace('/login/?reason=expired');

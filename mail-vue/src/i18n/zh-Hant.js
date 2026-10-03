@@ -2133,6 +2133,15 @@ totpModeAllDesc: '設定是否允許使用者使用TOTP，開啟後使用者可�
     oauthConfigStatusDraft: "開發規劃中",
     oauthConfigStatusActive: "支援配置與擴展",
     oauthSoon: "即將上線",
+    manageConsole: '管理控制台',
+    backToSettings: '返回個人設定',
+    switchToManage: '進入管理後台',
+    switchToSettings: '返回個人設定',
+    unauthorizedAccess: '越權訪問攔截：無權訪問該管理模組',
+    settingsDesc: '個人帳戶偏好與安全設定中心',
+    manageDesc: '站點系統管理與運維控制台',
+    settingsUrlBadge: '個人設定板塊',
+    manageUrlBadge: '管理板塊',
 };
 
 export default zhHant;

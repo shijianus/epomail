@@ -2133,6 +2133,15 @@ totpModeAllDesc: 'Configure whether users can use TOTP. When enabled, 2FA is ava
     oauthConfigStatusDraft: "In Development",
     oauthConfigStatusActive: "Configurable",
     oauthSoon: "Coming Soon",
+    manageConsole: 'Management Console',
+    backToSettings: 'Back to User Settings',
+    switchToManage: 'Go to Admin Console',
+    switchToSettings: 'Back to User Settings',
+    unauthorizedAccess: 'Access Denied: You do not have permission to access this management module',
+    settingsDesc: 'Personal account preferences and security configuration center',
+    manageDesc: 'Site system management and operations console',
+    settingsUrlBadge: 'User Settings Section',
+    manageUrlBadge: 'Management Section',
 };
 
 export default en;
