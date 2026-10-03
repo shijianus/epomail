@@ -8,6 +8,37 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### 第三方认证与单点登录 (OAuth & SSO) 模态弹窗视口全屏居中、零滑块红线落地与极限形态自适应 (2026-10-03)
+*   **关联提交 (Git Commit)**: `37bee7637fd03faab17c66bfeef848ed9e2129e9` (Short: `37bee76`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare Workers (https://mail.epocanvas.com)` (Version ID: `509e2cd3-74d3-4d46-9254-34888cde8fcb`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 变更点 1 (UI 规范红线全面确立与 Skill 规则固化)：
+        - 响应用户与项目 UI 设计 Skill 规范，在 `.agent/skills/ui-ux-pro-max/SKILL.md` 中制度化确立**普通弹窗禁止滑块 (Zero-Scrollbar Enforcement)**与**弹窗视口绝对居中 (Strict Viewport Centering)** 规范红线；
+        - 明确允许并推崇合理扩展弹窗左右宽度 (640~720px)，采用多列网格 (Multi-column Grid) 排版压缩纵向高度，从根源杜绝纵向撑爆视口与产生滚动滑块；
+    - [x] 变更点 2 (第三方认证配置弹窗 `.oauth-config-dialog` 双列网格紧凑重构)：
+        - 将弹窗宽度扩展至 `680px` (`width: min(680px, calc(100vw - 32px)) !important`)，突破既有 400px 狭窄约束；
+        - `<el-dialog>` 启用 `align-center` 与 `margin: auto !important`，确保在任何视口比例下均精准处于水平与垂直双向中心；
+        - 弹窗内容全面重构为双列网格 (`grid-template-columns: repeat(2, minmax(0, 1fr))`)：
+          * GitHub / Google：1 行 2 列 (Client ID + Client Secret)，整体弹窗高度仅 299px，视口占比 < 35%；
+          * Microsoft / Apple：2 行 2 列 (Client ID/Secret + Tenant/Team ID/Key ID)，整体弹窗高度仅 ~350px；
+          * Custom SSO (极限形态)：4 行紧凑布局 (7 字段全展)，总高度严控至 502px (视口 900px 占比 55%)，上下留白充裕 (> 200px)；
+    - [x] 变更点 3 (单行极简 OAuth 重定向回调条设计)：
+        - 将原本占用大块高度的 Callback 展示框压缩为单行极简集成条 (`.oauth-callback-compact-bar`)，采用代码胶囊截断 + Tooltip 提示 + 一键复制按钮，高度缩减 60%；
+    - [x] 变更点 4 (严密零滑块物理防御与暗色模式深度对齐)：
+        - 弹窗外层容器、Body、Header、Footer 全量注入 `overflow: hidden !important; scrollbar-width: none !important; ::-webkit-scrollbar { display: none !important; }`，彻底清除滚动条与滑块；
+        - 暗色模式下应用纯黑实色背景 (`background: #111827 !important; border: 1px solid #374151 !important`)，彻底杜绝半透明漏光与视觉穿透；
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：`mail-vue` Vite 构建通过 (14.46s, 0 errors)；
+    - [x] Cloudflare 部署：`mail-worker` 成功部署上线 (Version ID: `509e2cd3-74d3-4d46-9254-34888cde8fcb`)；
+    - [x] 静态多语言三件套：`i18n-symmetry.mjs` (2259 keys ALL SYMMETRIC), `i18n-audit.mjs` (0 缺失)；
+    - [x] 自动化全真栈测试：`tests/test-oauth-sso-full-stack.mjs` 51/51 项断言 100% 通过：
+        * 实测弹窗水平尺寸 680px，垂直居中判定通过 (`isVerticallyCentered: true`)，水平居中判定通过 (`isHorizontallyCentered: true`)；
+        * 弹窗内容与整体无滚动条判定全部通过 (`hasBodyScrollbar: false`, `hasDialogScrollbar: false`)；
+        * Custom SSO 极限 7 字段全展实测高度 502px，零滑块且严密保持垂直居中；
+    - [x] 全站回归核验：`tests/test-prod-login-card-and-challenge-routing.mjs` 27/27 项断言全部通过；
+    - [x] 视觉截图审查：`tests/audit_oauth_sso_settings_card.png` (GitHub 弹窗) 与 `tests/audit_oauth_sso_custom_modal.png` (Custom 弹窗) 视觉呈现完美居中、色彩和谐、零滚动滑块；
+    - [x] 零假数据残留：测试数据与 TOTP 状态已全部通过 API 与数据库物理还原，零残留。
+
 ### 操作报告与风控管理控制台原生设计对齐、多模式自动呈现与独立长短链表单系统 (2026-10-03)
 *   **关联提交 (Git Commit)**: `2aca49037253d2e885422c9c0ad1352fa9e7d12c` (Short: `2aca490`)
     - 联动提交 (epomail-docs): `ed500845a7d60611d279cf441e88849b1ca20970` (Short: `ed50084`)
