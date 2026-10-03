@@ -7,6 +7,29 @@
 > 制度规范与工作流指引请见 [AGENTS.md](file:///home/shijian/projects/epocanvas-mail/AGENTS.md)。
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
+
+### 第三方认证与单点登录 (OAuth & SSO) 公网全真栈端到端审计与验证 (2026-10-03)
+*   **关联提交 (Git Commit)**: `4eb683c091effb20662b94de9e58fbc724612afd` (Short: `4eb683c`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare Workers (https://mail.epocanvas.com)` (Version ID: `ed586d60-0fd2-41b5-a5c9-dc811ab1416f`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 变更点 1 (OAuth 连通性探测与鉴权修复)：
+        - 修复 `mail-worker/src/security/security.js` 中 `/oauth/verify` 端点被全局排除导致的未认证 501 报错，将其严密纳入 `setting:set` 权限与管理员鉴权管控；
+        - 在 `mail-worker/src/api/oauth-api.js` 中加入防御式 Token 解析与站长识别机制；
+        - 在 `mail-worker/src/service/oauth-service.js` 中放行无凭据探测的有效 HTTP 响应 (状态码 < 500)，兼容 GitHub API 速率限制探针；
+    - [x] 变更点 2 (公网全真栈自动化测试套件与物理回滚强化)：
+        - 完善 `tests/test-oauth-sso-full-stack.mjs` 的 `finally` 阶段，通过管理员 API 与 D1 原生多指令组合原子重置 `oauth_login_enabled = 0`、`oauth_providers = '{}'` 并刷新 KV 缓存，确保测试后 100% 零假数据残留；
+    - [x] 变更点 3 (系统设置与前端视觉纯净呈现)：
+        - 验证系统设置 `.oauth-sso-card` 纯净规范，彻底确认已移除旧版伪装展示框 (`.oauth-preview-box`) 与开发中标签 (`.oauth-soon-badge`)，5 大主流 Provider 严格按照「1名称 + 1配置按钮」规范呈现；
+        - 专属模态弹窗 (`.oauth-config-dialog`) 正常弹出，Client ID、Secret 输入与标准回调地址 (`/api/oauth/callback/*`) 正确无误；
+        - 视觉审查截图留存至 `tests/audit_oauth_sso_settings_card.png`。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：`mail-vue` Vite 构建通过 (19.73s)、`temp_login_ui` 构建通过 (3.54s)，产物零警告零报错；
+    - [x] 生产 Worker 部署：成功部署至 Cloudflare Workers (Version ID: `ed586d60-0fd2-41b5-a5c9-dc811ab1416f`)；
+    - [x] 自动化测试套件 1：`tests/test-oauth-sso-full-stack.mjs` 全绿 (40/40 断言全部通过)；
+    - [x] 自动化测试套件 2：`tests/test-prod-login-card-and-challenge-routing.mjs` 回归核验全绿 (27/27 断言全部通过)；
+    - [x] 浏览器全真栈实测：登录卡片尺寸 (480x670)、2FA 挑战路由无跳转与卡片尺寸严格一致、OAuth 网格默认隐藏；
+    - [x] 零假数据残留：测试后生产 D1 `totp_enabled = 1`，`oauth_login_enabled = 0`，`oauth_providers = {}`，KV 缓存刷新已完全还原。
+
 ### 操作报告与风控控制台生产环境部署与公网视觉核验 (2026-10-03)
 *   **关联提交 (Git Commit)**: `e5b1b7a70a83e01bc6ef07481ba8ea08c90380eb` (Short: `e5b1b7a`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare Workers (https://mail.epocanvas.com)` (Version ID: `adccc457-d0a0-4b1f-b2e5-a045d9ad051f`)
