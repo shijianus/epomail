@@ -134,7 +134,7 @@
 <script setup>
 import {Icon} from "@iconify/vue";
 import {useTransition} from "@vueuse/core";
-import {defineOptions, onActivated, onDeactivated, onMounted, reactive, ref, watch, computed} from "vue";
+import {defineOptions, onActivated, onDeactivated, onMounted, reactive, ref, watch, computed, nextTick} from "vue";
 import echarts from "@/echarts/index.js";
 import dayjs from "dayjs";
 import {analysisEcharts} from "@/request/analysis.js";
@@ -237,37 +237,41 @@ onMounted(() => {
   const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   analysisEcharts(timeZone).then(data => {
-    receiveTotal.value = data.numberCount.receiveTotal
-    sendTotal.value = data.numberCount.sendTotal
-    userTotal.value = data.numberCount.userTotal
-    numberCount.normalReceiveTotal = data.numberCount.normalReceiveTotal
-    numberCount.normalSendTotal = data.numberCount.normalSendTotal
-    numberCount.normalUserTotal = data.numberCount.normalUserTotal
-    numberCount.delReceiveTotal = data.numberCount.delReceiveTotal
-    numberCount.delSendTotal = data.numberCount.delSendTotal
-    numberCount.delUserTotal = data.numberCount.delUserTotal
+    if (!data || !data.numberCount) {
+      analysisLoading.value = false;
+      return;
+    }
+    receiveTotal.value = data.numberCount.receiveTotal || 0
+    sendTotal.value = data.numberCount.sendTotal || 0
+    userTotal.value = data.numberCount.userTotal || 0
+    numberCount.normalReceiveTotal = data.numberCount.normalReceiveTotal || 0
+    numberCount.normalSendTotal = data.numberCount.normalSendTotal || 0
+    numberCount.normalUserTotal = data.numberCount.normalUserTotal || 0
+    numberCount.delReceiveTotal = data.numberCount.delReceiveTotal || 0
+    numberCount.delSendTotal = data.numberCount.delSendTotal || 0
+    numberCount.delUserTotal = data.numberCount.delUserTotal || 0
     numberCount.interceptReceiveTotal = data.numberCount.interceptReceiveTotal || 0
     numberCount.hardInterceptTotal = data.numberCount.hardInterceptTotal || 0
-    senderData.value = data.receiveRatio.nameRatio.map(item => {
+    senderData.value = (data.receiveRatio?.nameRatio || []).map(item => {
       return {
         name: item.name || ' ',
-        value: item.total,
+        value: item.total || 0,
         isSpam: item.isSpam
       }
     })
 
-    userLineData.xdata = data.userDayCount.map(item => dayjs(item.date).format("M.D"));
-    userLineData.sdata = data.userDayCount.map(item => item.total)
+    userLineData.xdata = (data.userDayCount || []).map(item => dayjs(item.date).format("M.D"));
+    userLineData.sdata = (data.userDayCount || []).map(item => item.total || 0)
 
-    emailColumnData.daysData = data.emailDayCount.receiveDayCount.map(item => dayjs(item.date).format("M.D"))
-    emailColumnData.receiveData = data.emailDayCount.receiveDayCount.map(item => item.total)
-    emailColumnData.sendData = data.emailDayCount.sendDayCount.map(item => item.total)
-    emailColumnData.interceptData = (data.emailDayCount.interceptDayCount || []).map(item => item.total)
+    emailColumnData.daysData = (data.emailDayCount?.receiveDayCount || []).map(item => dayjs(item.date).format("M.D"))
+    emailColumnData.receiveData = (data.emailDayCount?.receiveDayCount || []).map(item => item.total || 0)
+    emailColumnData.sendData = (data.emailDayCount?.sendDayCount || []).map(item => item.total || 0)
+    emailColumnData.interceptData = (data.emailDayCount?.interceptDayCount || []).map(item => item.total || 0)
 
     if (data.aiAnalytics) {
       aiLineData.xdata = (data.aiAnalytics.dayCount || []).map(item => dayjs(item.date).format("M.D"));
-      aiLineData.calls = (data.aiAnalytics.dayCount || []).map(item => item.calls);
-      aiLineData.tokens = (data.aiAnalytics.dayCount || []).map(item => item.tokens);
+      aiLineData.calls = (data.aiAnalytics.dayCount || []).map(item => item.calls || 0);
+      aiLineData.tokens = (data.aiAnalytics.dayCount || []).map(item => item.tokens || 0);
       aiTotalStats.calls = data.aiAnalytics.totalCalls || 0;
       aiTotalStats.tokens = data.aiAnalytics.totalTokens || 0;
       aiTotalStats.tokensText = aiTotalStats.tokens >= 1000000
@@ -284,12 +288,14 @@ onMounted(() => {
       interceptRate.value = 0;
     }
 
-    daySendTotal = data.daySendTotal
+    daySendTotal = data.daySendTotal || 0
     analysisLoading.value = false
     initPicture();
     first = false
+  }).catch(err => {
+    console.error('Failed to load analysisEcharts:', err);
+    analysisLoading.value = false;
   })
-
 })
 
 const widthChange = debounce(initPicture, 500, {
@@ -325,22 +331,29 @@ window.onresize = () => {
   widthChange()
 }
 
+const isAnalysisRoute = () => {
+  return ['analysis', 'manage-analysis'].includes(route.name) ||
+         (route.path && (route.path.includes('analysis') || route.path.includes('analytics')));
+}
+
 watch(() => uiStore.dark, () => {
-  if (route.name !== 'analysis') return
+  if (!isAnalysisRoute()) return
   analysisDark = uiStore.dark
   initPicture()
 })
 
 function initPicture() {
-  if (route.name !== 'analysis') return
+  if (!isAnalysisRoute()) return
   boxKey.value++
-  setTimeout(() => {
-    createSenderPie()
-    createIncreaseLine()
-    createEmailColumnChart();
-    createSendGauge();
-    createAiUsageLine();
-    createAiModelPie();
+  nextTick(() => {
+    setTimeout(() => {
+      createSenderPie()
+      createIncreaseLine()
+      createEmailColumnChart();
+      createSendGauge();
+      createAiUsageLine();
+      createAiModelPie();
+    }, 50)
   })
 }
 
@@ -368,11 +381,13 @@ function truncateTextByWidth(text, maxWidth = 140) {
 }
 
 function createSenderPie() {
+  const dom = document.querySelector(".sender-pie");
+  if (!dom) return;
 
   if (senderPie) {
     senderPie.dispose()
   }
-  senderPie = echarts.init(document.querySelector(".sender-pie"))
+  senderPie = echarts.init(dom)
   let option = {
     tooltip: {
       trigger: 'item',
@@ -398,7 +413,7 @@ function createSenderPie() {
     },
     series: [
       {
-        data: senderData.value.map(item => {
+        data: (senderData.value || []).map(item => {
           if (item.isSpam === 1) {
             return {
               ...item,
@@ -452,12 +467,14 @@ function createSenderPie() {
 }
 
 function createIncreaseLine() {
+  const dom = document.querySelector(".increase-line");
+  if (!dom) return;
 
   if (increaseLine) {
     increaseLine.dispose()
   }
 
-  increaseLine = echarts.init(document.querySelector(".increase-line"))
+  increaseLine = echarts.init(dom)
 
   let option = {
     tooltip: {
@@ -609,12 +626,14 @@ function createIncreaseLine() {
 }
 
 function createEmailColumnChart() {
+  const dom = document.querySelector(".email-column");
+  if (!dom) return;
 
   if (emailColumn) {
     emailColumn.dispose()
   }
 
-  emailColumn = echarts.init(document.querySelector(".email-column"));
+  emailColumn = echarts.init(dom);
 
   const option = {
     tooltip: {
@@ -734,10 +753,13 @@ function createEmailColumnChart() {
 }
 
 function createSendGauge() {
+  const dom = document.querySelector(".send-count");
+  if (!dom) return;
+
   if (sendGauge) {
     sendGauge.dispose()
   }
-  sendGauge = echarts.init(document.querySelector(".send-count"));
+  sendGauge = echarts.init(dom);
   let option = {
     tooltip: {
       textStyle: {
