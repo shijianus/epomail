@@ -23,6 +23,7 @@
 *   **治理修复与回归结果 (Fixes & Verification)**:
     - 本轮为独立审计 + 单项完整性修复：EpomailDocs `e34ce02` 同步 manifest 固化提交号（66 篇 SHA-256 重新生成零字节变化，仅 4 行元数据），重建核验 67 页零报错/1416 锚点 0 断链；线上重新发布未执行（`pnpm run deploy` 待运营者确认）。
     - 后续路线图（R1 文档准确性修订 ×6 语言 → R2 站点工具修补 → R3 产品侧三决策项 → R4 splash 首页等形态升级 → R5 manifest 提交号 CI 化等流程制度化）已列入专项文档第六节。
+    - **同日治理轮闭环（EpomailDocs `08448fb` + `68a014c`，v5.10）**：R1 全部落地——①P1-A/B/C 三处过度宣称六语言修订（TOTP 官方邮件目录收敛为 2 类、is:unread/is:starred 删除、附件表述对齐实现）；②P2-A/C、P2-B、P2-D/E/F/G、P3 两项全项落地（六语言本地图、单库运行披露、提交链路滚动更新、README v5.10 口径、audit-public 相对路径化、翻页卡补两枚图标、check-structure 纳入 en 图片多重集比对 + en/features 补第 6 图）；③全站 5.9→5.10（66 文件）；④核验：build 零报错、anchors 1416/0、structure 6 语言 100%（含 en）、laws exit 0、残留断言 grep 全零、本地 wrangler pages dev + Playwright 7 张截图判图全绿（明暗双主题/四语言关键页/Accept-Language 协商）；⑤R5 部分落地：内容提交与 manifest 同步拆分两提交，固化提交号不再滞后。R3（产品侧：TOTP 邮件实现或维持删除、is: 算子实现或移除 UI chip、附件上限实现）与 R4（splash 首页等形态升级）仍待运营者决策。另：EpomailDocs 根目录 02:18 出现两个来源不明之 ECCP 专案杂散文件（PROJECT_STATE.md/REPORTS.md，未跟踪），已移出仓库隔离至桌面 stray-recovered-2026-10-04/ 备查，未入库未删除。
 
 ### EpomailDocs v5.7 独立复审：介绍与法律内容全量对码审计与发布状态核查 (2026-10-03)
 *   **关联提交 (Git Commit)**: `6cae7c3804450a899e20188a438543b9b7228997` (Short: `6cae7c3`)；审计对象 EpomailDocs @ `6478520`（v5.7，54 页 = 9 篇 × 6 语言），事实基准为主仓 @ `50c69e0`

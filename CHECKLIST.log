@@ -8,6 +8,27 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### EpomailDocs v5.10 审计治理轮：P1×3 全量对码修订 + P2 全项落地 + 本地视觉验证 (2026-10-04)
+*   **关联提交 (Git Commit)**: 见本轮 REPORTS.md 条目（主仓归档提交）；EpomailDocs 独立提交 `08448fb63b011699b129e69266e7150a2174a49e` (Short: `08448fb`，v5.10 内容) + `68a014c` (manifest 固化提交号同步，本轮起内容与同步拆分两提交)
+*   **部署环境 (Deployment)**: `本地全真栈：wrangler pages dev dist:8790（含 Pages Functions Accept-Language 协商）+ Playwright 7 张全页截图判图全绿；线上发布未执行，待运营者 pnpm run deploy`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] P1-A tamper-proof.md（×6）：官方邮件目录移除三类无源码实现之 TOTP 通知邮件，官方发信身份收敛为「欢迎邮件与全域公告」
+    - [x] P1-B features.md（×6）：搜索语法表 is: 行删去 is:unread/is:starred（前后端均无解析）
+    - [x] P1-C features.md（×6）：附件表述改为与实现一致（能力依角色开启；单附件上限依实例设置缺省 25 MB，仅约束公共存储用户）
+    - [x] P2-A architecture.md（×6）：页首架构图改指各自本地化 /images/mail/<locale>/project-architecture.svg；P2-C 补「托管实例当前即以单库运行」；P3 定时任务补每 30 分钟分析缓存刷新
+    - [x] P3 data-security.md（×6）：补主密钥兜底披露（未配置环境变量将退化为内置缺省密钥，应经初始化门禁配置）
+    - [x] P2-B project.md（×6）：提交链路滚动更新至 2026-10-04（主仓逾 560/本站逾 45），里程碑表增第 13 阶段，锚点链 +4/+9 行
+    - [x] P2-D README.md：11 篇 66 页 v5.10 口径 + 配图清单补全；P2-E audit-public.mjs 相对路径化；P2-F 翻页卡补 features/architecture 两枚图标；P2-G check-structure.py 纳入 en（图片比对改多重集，容忍 hero 语言优先顺序），en/features.md 补第 6 图
+    - [x] 全站版本 5.9 → 5.10（66 文件，2026-10-04）；新增 scripts/v510-visual-check.mjs 视觉验证脚本
+    - [x] 意外发现处置：两个 ECCP 专案杂散文件（PROJECT_STATE.md/REPORTS.md，共 10,856 行，02:18 出现于 EpomailDocs 根、来源不明）已移出仓库隔离至桌面 stray-recovered-2026-10-04/，未删除可复核
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] EpomailDocs build 67 页零报错（两次：内容轮后 + manifest 同步轮后）
+    - [x] check-structure.py 6 语言对称 100%（en 首次纳入，图片多重集比对）；validate-anchors.cjs 134 页/1416 锚点/0 断链；verify-laws.py exit 0
+    - [x] 残留断言 grep 全零：is:unread/is:starred/附件 10 个/管理员 100 MB/TOTP 目录三行在全站 66 文件 0 命中
+    - [x] 逻辑内容验证：修订句均与源码逐点对码（附件上限 storage-quota-service.js:236-277、cron index.js:37-49、密钥兜底 email-crypto-utils.js:9-10、单库运行 wrangler.toml:13-28 + db-accessor.js:19-31）
+    - [x] 视觉验证（本地部署）：zh/zh-tw/en/nl 四语关键页 + 暗色主题 + Accept-Language 协商（zh-TW → /epomail/zh-tw/mail/overview/）7 张判图全绿；控制台/网络错误 0；本地图、翻页卡新图标、2 行官方邮件目录表均确认在案
+    - [x] 零假数据：全程未写入任何测试数据；manifest 66 篇 SHA-256 与内容一致（固化提交号 08448fb）
+
 ### EpomailDocs v5.9 独立审计轮：介绍与法律内容全量对码 + tamper-proof 固化提交号同步 (2026-10-04)
 *   **关联提交 (Git Commit)**: 见本轮 `REPORTS.md` 条目（主仓归档提交）；EpomailDocs 独立治理提交 `e34ce0270c42dc7b50f0add6f0a47310046cf37e` (Short: `e34ce02`)
 *   **部署环境 (Deployment)**: `本地全真栈核验（EpomailDocs build 67 页 / anchors 1416 / structure / laws 全量实跑）；线上发布未执行，待运营者执行 pnpm run deploy`
