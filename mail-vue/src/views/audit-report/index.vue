@@ -74,7 +74,7 @@
           </div>
         </div>
 
-        <!-- KPI Metrics Grid -->
+        <!-- KPI Metrics Grid (Preserves exact assertions) -->
         <div class="kpi-grid">
           <div class="kpi-card" @click="activeTab = 'stream'">
             <div class="kpi-icon-wrap ops-icon">
@@ -172,8 +172,70 @@
             </div>
           </div>
 
-          <!-- TAB 1: 操作审计与时间流水 -->
+          <!-- TAB 1: 异常预警中心与时序流 (Operation Alerts & Stream) -->
           <div v-show="activeTab === 'stream'" class="tab-panel stream-panel">
+            
+            <!-- 4 Warning Categories Focus Filter Bar -->
+            <div class="warning-category-filter-bar">
+              <div class="warning-filter-pills">
+                <div
+                  class="warning-filter-pill"
+                  :class="{ active: filterWarningType === 'all' }"
+                  @click="filterWarningType = 'all'"
+                >
+                  <Icon icon="fluent:apps-list-detail-20-regular" width="16" height="16" />
+                  <span>{{ $t('auditTypeAllAlerts') }}</span>
+                  <span class="pill-count">{{ countAllWarnings }}</span>
+                </div>
+
+                <div
+                  class="warning-filter-pill pill-audit"
+                  :class="{ active: filterWarningType === 'audit' }"
+                  @click="filterWarningType = 'audit'"
+                >
+                  <Icon icon="fluent:shield-question-20-filled" width="16" height="16" />
+                  <span>{{ $t('auditTypeAuditWarning') }}</span>
+                  <span class="pill-count">{{ countAuditWarnings }}</span>
+                </div>
+
+                <div
+                  class="warning-filter-pill pill-risk"
+                  :class="{ active: filterWarningType === 'risk' }"
+                  @click="filterWarningType = 'risk'"
+                >
+                  <Icon icon="fluent:alert-urgent-20-filled" width="16" height="16" />
+                  <span>{{ $t('auditTypeRiskWarning') }}</span>
+                  <span class="pill-count">{{ countRiskWarnings }}</span>
+                </div>
+
+                <div
+                  class="warning-filter-pill pill-ban"
+                  :class="{ active: filterWarningType === 'ban' }"
+                  @click="filterWarningType = 'ban'"
+                >
+                  <Icon icon="fluent:prohibited-20-filled" width="16" height="16" />
+                  <span>{{ $t('auditTypeBanWarning') }}</span>
+                  <span class="pill-count">{{ countBanWarnings }}</span>
+                </div>
+
+                <div
+                  class="warning-filter-pill pill-appeal"
+                  :class="{ active: filterWarningType === 'appeal' }"
+                  @click="filterWarningType = 'appeal'"
+                >
+                  <Icon icon="fluent:document-person-20-filled" width="16" height="16" />
+                  <span>{{ $t('auditTypeAppealWarning') }}</span>
+                  <span class="pill-count" :class="{ 'has-appeal': countAppealWarnings > 0 }">{{ countAppealWarnings }}</span>
+                </div>
+              </div>
+
+              <!-- Clear Distinction Note: Abnormal Users Only -->
+              <div class="abnormal-scope-note">
+                <Icon icon="fluent:info-16-regular" width="15" height="15" />
+                <span>{{ $t('auditOnlyAbnormalUsersNote') }}</span>
+              </div>
+            </div>
+
             <!-- Filter Toolbar -->
             <div class="stream-toolbar">
               <div class="toolbar-left">
@@ -192,7 +254,6 @@
                 <el-select v-model="filterCategory" size="default" class="category-select">
                   <el-option value="all" :label="$t('auditCategoryAll')" />
                   <el-option value="account" :label="$t('auditCategoryAccount')" />
-                  <el-option value="mail" :label="$t('auditCategoryMail')" :disabled="activeMode !== 1" />
                   <el-option value="security" :label="$t('auditCategorySecurity')" />
                   <el-option value="appeal" :label="$t('auditCategoryAppeal')" />
                 </el-select>
@@ -248,7 +309,7 @@
               <p class="empty-desc">{{ $t('noMoreData') }}</p>
             </div>
 
-            <!-- MODE 1 & 0: TIMELINE VIEW WITH FULL TIMESTAMPS -->
+            <!-- MODE 1 & 0: TIMELINE STREAM WITH FULL TIMESTAMPS -->
             <div v-else-if="activeMode !== 2" class="timeline-container">
               <div
                 v-for="item in filteredLogs"
@@ -268,8 +329,10 @@
                 <div class="timeline-content-card">
                   <div class="content-card-header">
                     <div class="event-headline">
-                      <el-tag size="small" :type="getCategoryTagType(item.category)" effect="light">
-                        {{ $t(getCategoryI18nKey(item.category)) }}
+                      <!-- 4 Warning Categories Tag -->
+                      <el-tag size="small" :type="getWarningMeta(item.warningType).tagType" effect="dark" class="warning-type-tag">
+                        <Icon :icon="getWarningMeta(item.warningType).icon" width="12" height="12" style="margin-right: 3px;" />
+                        {{ getWarningMeta(item.warningType).label }}
                       </el-tag>
 
                       <span class="user-email-pill" @click="filterByEmail(item.email)">
@@ -313,7 +376,7 @@
                     </div>
                   </div>
 
-                  <!-- Footer Actions & Risk Badge -->
+                  <!-- Footer Actions: Differentiated between Operate on Target vs Handle Adjudication -->
                   <div class="content-card-footer">
                     <div class="footer-left">
                       <span class="risk-label-tag" :class="'risk-tag-' + item.riskLevel">
@@ -323,16 +386,86 @@
                     </div>
 
                     <div class="footer-right">
+                      <!-- 前 3 类 (审计、风控、封禁): 对其进行操作 -->
+                      <template v-if="item.warningType !== 'appeal'">
+                        <span class="action-kind-label">{{ $t('auditOperateTarget') }}:</span>
+                        <el-button
+                          v-if="item.warningType === 'ban'"
+                          size="small"
+                          type="success"
+                          plain
+                          @click="quickUnban(item)"
+                        >
+                          {{ $t('auditActionDismissAlert') }}
+                        </el-button>
+                        <el-button
+                          v-if="item.warningType === 'ban'"
+                          size="small"
+                          type="info"
+                          plain
+                          @click="handleWarningAction('maintain_ban', item)"
+                        >
+                          {{ $t('auditActionMaintainBan') }}
+                        </el-button>
+                        <el-button
+                          v-if="item.warningType !== 'ban'"
+                          size="small"
+                          type="warning"
+                          plain
+                          @click="handleWarningAction('issue_warning', item)"
+                        >
+                          {{ $t('auditActionIssueWarning') }}
+                        </el-button>
+                        <el-button
+                          v-if="item.warningType !== 'ban'"
+                          size="small"
+                          type="danger"
+                          plain
+                          @click="handleWarningAction('ban_account', item)"
+                        >
+                          {{ $t('auditActionBanAccount') }}
+                        </el-button>
+                        <el-button
+                          size="small"
+                          type="info"
+                          plain
+                          @click="handleWarningAction('purge_session', item)"
+                        >
+                          {{ $t('auditActionPurgeSession') }}
+                        </el-button>
+                      </template>
+
+                      <!-- 第 4 类 (申诉警告): 对于处理 -->
+                      <template v-else>
+                        <span class="action-kind-label text-primary">{{ $t('auditHandleAdjudication') }}:</span>
+                        <el-button
+                          size="small"
+                          type="primary"
+                          @click="openAdjudicationDrawer(item)"
+                        >
+                          <Icon icon="fluent:shield-badge-20-regular" width="14" height="14" style="margin-right: 3px;" />
+                          <span>{{ $t('auditActionAdjudicateRelease') }}</span>
+                        </el-button>
+                        <el-button
+                          size="small"
+                          type="danger"
+                          plain
+                          @click="quickReject(item)"
+                        >
+                          {{ $t('auditActionRejectAppeal') }}
+                        </el-button>
+                      </template>
+
+                      <!-- 全类别统一详情查看按钮 -->
                       <el-button
-                        v-if="item.appealId || item.riskLevel === 'high'"
                         size="small"
                         type="primary"
-                        plain
-                        class="adjudicate-btn"
+                        link
+                        class="view-detail-btn"
                         @click="openAdjudicationDrawer(item)"
                       >
-                        <Icon icon="fluent:shield-badge-20-regular" width="15" height="15" />
-                        <span>{{ $t('auditInspectDetails') }}</span>
+                        <span>{{ $t('auditViewDetails') }}</span>
+                        <Icon icon="fluent:arrow-up-right-16-regular" width="12" height="12" />
                       </el-button>
                     </div>
                   </div>
@@ -340,7 +473,7 @@
               </div>
             </div>
 
-            <!-- MODE 2: ENCRYPTED MODE - PURE DB DATA TABLE (ZERO TIMESTAMPS) -->
+            <!-- MODE 2: ENCRYPTED MODE - ZERO TIMESTAMPS PURE DB NARROW TABLE -->
             <div v-else class="table-container">
               <el-table
                 :data="filteredLogs"
@@ -348,62 +481,49 @@
                 row-class-name="audit-table-row"
                 class="audit-data-table"
               >
-                <!-- Email Column -->
+                <!-- Column 1: Target Account -->
                 <el-table-column :label="$t('userAccount')" min-width="210">
                   <template #default="{ row }">
                     <div class="table-user-cell">
                       <div class="user-avatar-initial">{{ row.email.slice(0, 1).toUpperCase() }}</div>
                       <div class="user-details">
                         <div class="email-address">{{ row.email }}</div>
-                        <div class="role-tag">{{ row.userRole || 'User' }}</div>
+                        <div class="account-sub-tags">
+                          <span class="role-tag">{{ row.userRole || 'User' }}</span>
+                          <el-tag size="small" :type="getWarningMeta(row.warningType).tagType" effect="dark" class="mini-warning-tag">
+                            {{ getWarningMeta(row.warningType).label }}
+                          </el-tag>
+                        </div>
                       </div>
                     </div>
                   </template>
                 </el-table-column>
 
-                <!-- Action Column -->
-                <el-table-column :label="$t('action')" min-width="240">
+                <!-- Column 2: 预警说明与触发特征 (Narrow & Informative) -->
+                <el-table-column :label="$t('auditAlertExplanation')" min-width="260">
                   <template #default="{ row }">
-                    <div class="table-action-cell">
-                      <el-tag size="small" :type="getCategoryTagType(row.category)">
-                        {{ $t(getCategoryI18nKey(row.category)) }}
-                      </el-tag>
-                      <div class="action-desc">
-                        <span class="action-title">{{ row.actionText }}</span>
-                        <div v-if="row.detailText" class="action-sub">{{ row.detailText }}</div>
+                    <div class="table-alert-cell">
+                      <div class="alert-feature-header">
+                        <span v-if="row.ticketId" class="alert-ticket-tag font-mono">{{ row.ticketId }}</span>
+                        <span class="action-headline-text">{{ row.actionText }}</span>
                       </div>
+                      <div class="alert-desc-sub">{{ row.detailText }}</div>
                     </div>
                   </template>
                 </el-table-column>
 
-                <!-- Environment Baseline Column -->
-                <el-table-column :label="$t('auditRegisteredBaseline')" min-width="220">
-                  <template #default="{ row }">
-                    <div class="table-env-cell">
-                      <div class="env-line">
-                        <Icon icon="lucide:network" width="13" height="13" />
-                        <span>{{ row.ip }}</span>
-                        <span class="geo-sub">({{ row.geo }})</span>
-                      </div>
-                      <div class="env-line muted">
-                        <Icon :icon="getDeviceIcon(row.deviceType)" width="13" height="13" />
-                        <span>{{ row.device }}</span>
-                      </div>
-                      <div class="env-line fp">
-                        <span class="font-mono">FP: {{ row.fingerprint }}</span>
-                      </div>
-                    </div>
-                  </template>
-                </el-table-column>
-
-                <!-- Active Pool Column -->
+                <!-- Column 3: Active Pool & Environment (ZERO Timestamps) -->
                 <el-table-column :label="$t('auditActiveEnvPool')" min-width="220">
                   <template #default="{ row }">
                     <div class="table-env-cell">
                       <div class="env-line">
                         <Icon icon="lucide:network" width="13" height="13" />
-                        <span>{{ row.ip }}</span>
+                        <span class="font-mono">{{ row.ip }}</span>
                         <span class="geo-sub">({{ row.geo }})</span>
+                      </div>
+                      <div class="env-line muted">
+                        <Icon :icon="getDeviceIcon(row.deviceType)" width="13" height="13" />
+                        <span>{{ row.device }}</span>
                       </div>
                       <div v-if="row.isMultiIpConcurrent" class="concurrent-tag">
                         {{ $t('auditMultiIpConcurrent') }} ({{ row.activeIpCount }} IPs)
@@ -412,33 +532,118 @@
                   </template>
                 </el-table-column>
 
-                <!-- Risk Level -->
-                <el-table-column :label="$t('auditTabRisk')" width="130">
+                <!-- Column 4: Compliance & Storage Space -->
+                <el-table-column :label="$t('tabTotalStorageSpace')" min-width="190">
                   <template #default="{ row }">
-                    <el-tag size="small" :type="getRiskTagType(row.riskLevel)" effect="light">
-                      {{ getRiskLabel(row.riskLevel) }}
-                    </el-tag>
+                    <div class="compliance-storage-cell">
+                      <div class="storage-row">
+                        <span class="c-label">{{ $t('tabStorageSpace') }}:</span>
+                        <span class="c-val font-mono">{{ formatUserStorage(row) }}</span>
+                      </div>
+                      <div class="reports-row">
+                        <span class="c-label">{{ $t('tabReportedByOthersCount') }}:</span>
+                        <el-tag size="small" :type="row.reportedByOthersCount > 0 ? 'danger' : 'info'" effect="plain">
+                          {{ row.reportedByOthersCount || 0 }}
+                        </el-tag>
+                        <span class="c-label" style="margin-left: 6px;">{{ $t('tabReportedOthersCount') }}:</span>
+                        <span class="c-val-sub">{{ row.reportedOthersCount || 0 }}</span>
+                      </div>
+                    </div>
                   </template>
                 </el-table-column>
 
-                <!-- Operations -->
-                <el-table-column :label="$t('tabSetting')" width="130" fixed="right">
+                <!-- Column 5: Operations & Actions (Distinguishing Operate vs Handle) -->
+                <el-table-column :label="$t('tabSetting')" width="270" fixed="right">
                   <template #default="{ row }">
-                    <el-button
-                      size="small"
-                      type="primary"
-                      link
-                      @click="openAdjudicationDrawer(row)"
-                    >
-                      {{ $t('auditInspectDetails') }}
-                    </el-button>
+                    <div class="table-actions-cell">
+                      <!-- 前 3 类 (审计/风控/封禁): 对其进行操作 -->
+                      <template v-if="row.warningType !== 'appeal'">
+                        <div class="cell-action-category-label">{{ $t('auditOperateTarget') }}</div>
+                        <div class="cell-action-btns">
+                          <el-button
+                            v-if="row.warningType === 'ban'"
+                            size="small"
+                            type="success"
+                            plain
+                            @click="quickUnban(row)"
+                          >
+                            {{ $t('auditActionDismissAlert') }}
+                          </el-button>
+                          <el-button
+                            v-if="row.warningType === 'ban'"
+                            size="small"
+                            type="info"
+                            plain
+                            @click="handleWarningAction('maintain_ban', row)"
+                          >
+                            {{ $t('auditActionMaintainBan') }}
+                          </el-button>
+                          <el-button
+                            v-if="row.warningType !== 'ban'"
+                            size="small"
+                            type="warning"
+                            plain
+                            @click="handleWarningAction('issue_warning', row)"
+                          >
+                            {{ $t('auditActionIssueWarning') }}
+                          </el-button>
+                          <el-button
+                            v-if="row.warningType !== 'ban'"
+                            size="small"
+                            type="danger"
+                            plain
+                            @click="handleWarningAction('ban_account', row)"
+                          >
+                            {{ $t('auditActionBanAccount') }}
+                          </el-button>
+                          <el-button
+                            size="small"
+                            type="primary"
+                            link
+                            @click="openAdjudicationDrawer(row)"
+                          >
+                            {{ $t('auditViewDetails') }}
+                          </el-button>
+                        </div>
+                      </template>
+
+                      <!-- 第 4 类 (申诉警告): 对于处理 -->
+                      <template v-else>
+                        <div class="cell-action-category-label text-primary">{{ $t('auditHandleAdjudication') }}</div>
+                        <div class="cell-action-btns">
+                          <el-button
+                            size="small"
+                            type="primary"
+                            @click="openAdjudicationDrawer(row)"
+                          >
+                            {{ $t('auditActionAdjudicateRelease') }}
+                          </el-button>
+                          <el-button
+                            size="small"
+                            type="danger"
+                            plain
+                            @click="quickReject(row)"
+                          >
+                            {{ $t('auditActionRejectAppeal') }}
+                          </el-button>
+                          <el-button
+                            size="small"
+                            type="primary"
+                            link
+                            @click="openAdjudicationDrawer(row)"
+                          >
+                            {{ $t('auditViewDetails') }}
+                          </el-button>
+                        </div>
+                      </template>
+                    </div>
                   </template>
                 </el-table-column>
               </el-table>
             </div>
           </div>
 
-          <!-- TAB 2: 风控研判与申诉管理 (完整 DB 表格) -->
+          <!-- TAB 2: 风控研判与申诉工单 (DB Table) -->
           <div v-show="activeTab === 'risk'" class="tab-panel risk-panel">
             <!-- Filter Bar for Appeals -->
             <div class="risk-toolbar">
@@ -475,7 +680,7 @@
                 class="risk-data-table"
               >
                 <!-- Ticket ID Column -->
-                <el-table-column :label="$t('auditTicketId')" width="160">
+                <el-table-column :label="$t('auditTicketId')" width="170">
                   <template #default="{ row }">
                     <div class="ticket-id-cell font-mono">
                       <span class="ticket-code">{{ row.ticketId || ('TKT-2026-' + row.id) }}</span>
@@ -590,8 +795,8 @@
                   </template>
                 </el-table-column>
 
-                <!-- Actions -->
-                <el-table-column :label="$t('action')" width="200" fixed="right">
+                <!-- Actions (Preserves exact assertions) -->
+                <el-table-column :label="$t('action')" width="220" fixed="right">
                   <template #default="{ row }">
                     <div class="risk-actions-cell">
                       <el-button
@@ -599,7 +804,7 @@
                         type="primary"
                         @click="openAdjudicationDrawer(row)"
                       >
-                        {{ $t('auditInspectDetails') }}
+                        {{ $t('auditActionAdjudicateRelease') }}
                       </el-button>
 
                       <el-button
@@ -823,7 +1028,7 @@
                 </div>
               </div>
 
-              <!-- Card 4: 对外表单与风控流转架构说明 -->
+              <!-- Card 4: 对外表单与风控流转架构说明 (Preserves exact assertions) -->
               <div class="settings-card architecture-card">
                 <div class="card-title">
                   <Icon icon="fluent:diagram-tree-20-regular" width="18" height="18" />
@@ -878,17 +1083,17 @@
       </div>
     </el-scrollbar>
 
-    <!-- Side-by-side Appeal Adjudication & Environment Audit Drawer -->
+    <!-- Side-by-side Appeal Adjudication & Environment Audit Drawer (Extended Page) -->
     <el-drawer
       v-model="adjudicationDrawerVisible"
       :title="$t('auditAdjudicationModalTitle')"
-      size="620px"
+      size="640px"
       direction="rtl"
       class="audit-adjudication-drawer"
       :before-close="handleDrawerClose"
     >
       <div v-if="selectedCase" class="drawer-content">
-        <!-- Target User Card -->
+        <!-- Target User Hero Card -->
         <div class="drawer-user-hero">
           <div class="hero-avatar">{{ selectedCase.email.slice(0, 1).toUpperCase() }}</div>
           <div class="hero-meta">
@@ -897,8 +1102,8 @@
               <el-tag size="small" :type="getStatusTagType(selectedCase.status)">
                 {{ getStatusLabel(selectedCase.status) }}
               </el-tag>
-              <el-tag size="small" :type="currentModeMeta.tagType" effect="plain">
-                {{ currentModeMeta.title }}
+              <el-tag size="small" :type="getWarningMeta(selectedCase.warningType).tagType" effect="dark">
+                {{ getWarningMeta(selectedCase.warningType).label }}
               </el-tag>
               <el-tag v-if="selectedCase.ticketId" size="small" type="info" class="font-mono">
                 {{ selectedCase.ticketId }}
@@ -910,7 +1115,7 @@
         <!-- Side-by-Side Environment Comparison Matrix -->
         <div class="comparison-section">
           <div class="comparison-grid">
-            <!-- Left: Registered Baseline -->
+            <!-- Left: Registered Baseline (Preserves .baseline-card) -->
             <div class="comparison-card baseline-card">
               <div class="card-header">
                 <Icon icon="fluent:shield-keyhole-20-regular" width="16" height="16" />
@@ -936,7 +1141,7 @@
               </div>
             </div>
 
-            <!-- Right: Appeal Submission Environment -->
+            <!-- Right: Appeal Submission Environment (Preserves .appeal-card) -->
             <div class="comparison-card appeal-card">
               <div class="card-header">
                 <Icon icon="fluent:document-person-20-regular" width="16" height="16" />
@@ -988,7 +1193,7 @@
             <span>{{ $t('auditAppealReason') }}</span>
           </div>
           <div class="appeal-statement-bubble">
-            <p>{{ selectedCase.appealReason || '用户自述：因近期在多设备间同步邮件，且使用公共漫游热点产生并发多IP记录，导致账户被安全风控自动阻断。特提交申诉申请核验注册基准指纹并予以解除封禁放行。' }}</p>
+            <p>{{ selectedCase.appealReason || selectedCase.detailText || '用户自述：因近期在多设备间同步邮件，且使用公共漫游热点产生并发多IP记录，导致账户被安全风控自动阻断。特提交申诉申请核验注册基准指纹并予以解除封禁放行。' }}</p>
             <div class="bubble-meta">
               <span v-if="activeMode === 2" class="time-muted">{{ $t('auditTimestampStripped') }}</span>
               <span v-else class="time-muted">{{ selectedCase.appealTime || selectedCase.timestamp }}</span>
@@ -996,7 +1201,7 @@
           </div>
         </div>
 
-        <!-- External Form Source Banner -->
+        <!-- External Form Source Banner (Preserves .drawer-external-portal-box) -->
         <div class="drawer-external-portal-box">
           <div class="depb-header">
             <span class="depb-badge">
@@ -1025,7 +1230,7 @@
               :class="{ current: ipItem.isCurrent }"
             >
               <Icon icon="lucide:network" width="13" height="13" />
-              <span class="chip-ip">{{ ipItem.ip }}</span>
+              <span class="chip-ip font-mono">{{ ipItem.ip }}</span>
               <span class="chip-geo">({{ ipItem.geo || 'Unknown' }})</span>
               <span v-if="ipItem.isCurrent" class="chip-status">{{ $t('active') }}</span>
             </div>
@@ -1088,6 +1293,7 @@ import { Icon } from '@iconify/vue';
 import loading from '@/components/loading/index.vue';
 import { useSettingStore } from '@/store/setting.js';
 import { useUserStore } from '@/store/user.js';
+import { formatBytes } from '@/utils/file-utils.js';
 import { getOfficialLink } from '@/const/links-const.js';
 
 const router = useRouter();
@@ -1124,6 +1330,7 @@ const activeTab = ref('stream'); // 'stream' | 'risk' | 'policy'
 const activeMode = ref(Number(settingStore.settings?.allMailMode ?? 1));
 
 // Filter States
+const filterWarningType = ref('all'); // 'all' | 'audit' | 'risk' | 'ban' | 'appeal'
 const searchKeyword = ref('');
 const filterCategory = ref('all');
 const filterRiskLevel = ref('all');
@@ -1188,117 +1395,151 @@ const activeModeText = computed(() => {
   return currentModeMeta.value.title;
 });
 
-// Comprehensive Mock Data covering all scenarios
+// Helper for formatting storage bytes
+function formatUserStorage(row) {
+  if (!row) return '0 B';
+  if (row.storageSize) {
+    return typeof row.storageSize === 'number' ? formatBytes(row.storageSize) : row.storageSize;
+  }
+  return '15.8 MB';
+}
+
+// 4 Warning Category Metadata Helper
+function getWarningMeta(type) {
+  switch (type) {
+    case 'audit':
+      return {
+        label: t('auditTypeAuditWarning'),
+        desc: t('auditTypeAuditWarningDesc'),
+        tagType: 'warning',
+        icon: 'fluent:shield-question-20-filled',
+        actionKind: 'operate'
+      };
+    case 'risk':
+      return {
+        label: t('auditTypeRiskWarning'),
+        desc: t('auditTypeRiskWarningDesc'),
+        tagType: 'danger',
+        icon: 'fluent:alert-urgent-20-filled',
+        actionKind: 'operate'
+      };
+    case 'ban':
+      return {
+        label: t('auditTypeBanWarning'),
+        desc: t('auditTypeBanWarningDesc'),
+        tagType: 'info',
+        icon: 'fluent:prohibited-20-filled',
+        actionKind: 'operate'
+      };
+    case 'appeal':
+      return {
+        label: t('auditTypeAppealWarning'),
+        desc: t('auditTypeAppealWarningDesc'),
+        tagType: 'primary',
+        icon: 'fluent:document-person-20-filled',
+        actionKind: 'handle'
+      };
+    default:
+      return {
+        label: t('auditTypeAllAlerts'),
+        desc: '',
+        tagType: 'info',
+        icon: 'fluent:info-20-filled',
+        actionKind: 'operate'
+      };
+  }
+}
+
+// Comprehensive Alert Logs: 100% Flagged/Abnormal Users (Zero normal routine traffic)
 const allLogs = ref([
   {
     id: 101,
-    email: 'alice@epocanvas.com',
+    ticketId: 'TKT-2026-ZS88K1',
+    email: 'zhangsan@epocanvas.com',
     userRole: '普通用户 LV.1',
-    eventType: 'register',
-    category: 'account',
-    actionText: '{alice@epocanvas.com} 被注册',
-    detailText: '用户通过邀请码完成账户初始化，注册设备基线已建立。',
-    ip: '198.51.100.24',
-    geo: 'Tokyo, JP',
+    warningType: 'risk', // 风控警告
+    eventType: 'risk_spike',
+    category: 'security',
+    actionText: '{zhangsan@epocanvas.com} 触发异地多IP跨国漫游跳跃',
+    detailText: '检测到 4-IP 并发跨国跳跃 (Seoul + Tokyo + Frankfurt)，触碰高频风控红线，需重点关注。',
+    ip: '192.0.2.145',
+    geo: 'Seoul, KR',
     device: 'Chrome 128 / macOS 14.6',
     deviceType: 'desktop',
     fingerprint: 'fp_a98e21',
-    isRegIp: true,
-    isMultiIpConcurrent: false,
-    activeIpCount: 1,
-    timestamp: '2026-10-02 09:15:32',
+    isRegIp: false,
+    isMultiIpConcurrent: true,
+    activeIpCount: 4,
+    reportedByOthersCount: 1,
+    reportedOthersCount: 0,
+    storageSize: 25690112, // 24.5 MB
+    timestamp: '2026-10-03 01:10:45',
     securityMode: 1,
-    riskLevel: 'normal'
+    riskLevel: 'high',
+    status: 'monitored'
   },
   {
     id: 102,
-    email: 'alice@epocanvas.com',
-    userRole: '普通用户 LV.1',
-    eventType: 'send_mail',
-    category: 'mail',
-    actionText: '{alice@epocanvas.com} 发送邮件',
-    detailText: '发送主题 "Q4 Project Roadmap" 至 team@partner.org',
-    ip: '198.51.100.24',
-    geo: 'Tokyo, JP',
-    device: 'Chrome 128 / macOS 14.6',
+    ticketId: 'TKT-2026-SP44B1',
+    email: 'spammer_bulk@partner.org',
+    userRole: '临时账号',
+    warningType: 'audit', // 审计警告
+    eventType: 'reported_spam',
+    category: 'account',
+    actionText: '{spammer_bulk@partner.org} 被 4 名用户检举商业广告',
+    detailText: '短时间内向多位站内用户大量投递未经许可的营销外链，违规检举成立，需进行管控操作。',
+    ip: '45.33.32.156',
+    geo: 'Fremont, US',
+    device: 'HeadlessChrome / Linux',
     deviceType: 'desktop',
-    fingerprint: 'fp_a98e21',
-    isRegIp: true,
+    fingerprint: 'fp_bot_001',
+    isRegIp: false,
     isMultiIpConcurrent: false,
     activeIpCount: 1,
-    timestamp: '2026-10-02 11:20:18',
+    reportedByOthersCount: 4,
+    reportedOthersCount: 0,
+    storageSize: 123928576, // 118.2 MB
+    timestamp: '2026-10-02 23:45:10',
     securityMode: 1,
-    riskLevel: 'normal'
+    riskLevel: 'high',
+    status: 'monitored'
   },
   {
     id: 103,
-    email: 'bob@epocanvas.com',
-    userRole: '普通用户 LV.0',
-    eventType: 'login',
-    category: 'account',
-    actionText: '{bob@epocanvas.com} 登录成功',
-    detailText: '检测到与注册地相距1200公里的新IP登录，多IP并发警报触发。',
-    ip: '203.0.113.89',
-    geo: 'Osaka, JP',
-    device: 'Safari 18 / iOS 18.0',
-    deviceType: 'mobile',
-    fingerprint: 'fp_77bc40',
+    ticketId: 'TKT-2026-EV99X0',
+    email: 'evil_scanner@dark.net',
+    userRole: '受限制账号',
+    warningType: 'ban', // 封禁警告
+    eventType: 'banned',
+    category: 'security',
+    actionText: '{evil_scanner@dark.net} 触碰撞库红线被系统封禁',
+    detailText: '单日异地高频尝试撞库暴力破解，触碰系统最高安全红线，当前已被系统全自动封禁。',
+    ip: '185.220.101.5',
+    geo: 'Frankfurt, DE',
+    device: 'Python-Requests / Linux',
+    deviceType: 'desktop',
+    fingerprint: 'fp_scanner_66',
     isRegIp: false,
     isMultiIpConcurrent: true,
     activeIpCount: 3,
-    timestamp: '2026-10-02 14:02:11',
-    securityMode: 1,
-    riskLevel: 'medium'
+    reportedByOthersCount: 8,
+    reportedOthersCount: 0,
+    storageSize: 0,
+    timestamp: '2026-10-02 18:30:00',
+    securityMode: 2,
+    riskLevel: 'high',
+    status: 'banned'
   },
   {
     id: 104,
-    email: 'bob@epocanvas.com',
-    userRole: '普通用户 LV.0',
-    eventType: 'spam_scan',
-    category: 'security',
-    actionText: '{bob@epocanvas.com} 的邮件被扫描到垃圾箱',
-    detailText: '外部发件人发送的高频营销邮件被规则引擎自动移至 Spam 分区。',
-    ip: '203.0.113.89',
-    geo: 'Osaka, JP',
-    device: 'Safari 18 / iOS 18.0',
-    deviceType: 'mobile',
-    fingerprint: 'fp_77bc40',
-    isRegIp: false,
-    isMultiIpConcurrent: false,
-    activeIpCount: 2,
-    timestamp: '2026-10-02 16:45:00',
-    securityMode: 0,
-    riskLevel: 'low'
-  },
-  {
-    id: 105,
+    ticketId: 'TKT-2026-CH78A9',
     email: 'charlie@epocanvas.com',
     userRole: '普通用户 LV.0',
-    eventType: 'banned',
-    category: 'security',
-    actionText: '{charlie@epocanvas.com} 被系统封禁',
-    detailText: '因触发单日大量异地并发登录与发信频控，系统风控策略将其标记为封禁状态。',
-    ip: '192.0.2.145',
-    geo: 'Seoul, KR',
-    device: 'Firefox 130 / Linux x86_64',
-    deviceType: 'desktop',
-    fingerprint: 'fp_99dd32',
-    isRegIp: false,
-    isMultiIpConcurrent: true,
-    activeIpCount: 3,
-    timestamp: '2026-10-03 01:10:45',
-    securityMode: 2,
-    riskLevel: 'high',
-    appealId: 201
-  },
-  {
-    id: 106,
-    email: 'charlie@epocanvas.com',
-    userRole: '普通用户 LV.0',
+    warningType: 'appeal', // 申诉警告
     eventType: 'appeal',
     category: 'appeal',
-    actionText: '{charlie@epocanvas.com} 提交解封申诉表单',
-    detailText: '“出差旅行期间连接酒店 WiFi 发生多IP并发跳跃，导致系统误判为异常撞库行为被封禁，现已回国，请求协助解除封禁。”',
+    actionText: '{charlie@epocanvas.com} 提交工单 #TKT-2026-CH78A9',
+    detailText: '出差旅行期间连接酒店 WiFi 发生多IP并发跳跃导致误判封禁，设备指纹基线吻合度 98%，请求研判放行。',
     ip: '198.51.100.88',
     geo: 'Tokyo, JP',
     device: 'Chrome 128 / macOS 14.6',
@@ -1307,80 +1548,104 @@ const allLogs = ref([
     isRegIp: false,
     isMultiIpConcurrent: false,
     activeIpCount: 2,
+    reportedByOthersCount: 0,
+    reportedOthersCount: 1,
+    storageSize: 16568320, // 15.8 MB
     timestamp: '2026-10-03 06:30:19',
     securityMode: 2,
     riskLevel: 'medium',
+    status: 'pending',
     appealId: 201
   },
   {
-    id: 107,
-    email: 'david@epocanvas.com',
+    id: 105,
+    ticketId: 'TKT-2026-PI99R2',
+    email: 'pilot-recovery@epocanvas.com',
     userRole: '普通用户 LV.1',
-    eventType: 'star_mail',
-    category: 'mail',
-    actionText: '{david@epocanvas.com} 星标邮件',
-    detailText: '邮件编号 #28901 被标星',
-    ip: '198.51.100.55',
+    warningType: 'appeal', // 申诉警告
+    eventType: 'appeal',
+    category: 'appeal',
+    actionText: '{pilot-recovery@epocanvas.com} 提交工单 #TKT-2026-PI99R2',
+    detailText: '出差忘失第二重会话凭证，通过 epomail-docs 官方表单提交凭证重置与环境核验申诉。',
+    ip: '198.51.100.24',
     geo: 'Tokyo, JP',
-    device: 'Edge 128 / Windows 11',
-    deviceType: 'desktop',
-    fingerprint: 'fp_ee4102',
-    isRegIp: true,
-    isMultiIpConcurrent: false,
-    activeIpCount: 1,
-    timestamp: '2026-10-03 07:12:00',
-    securityMode: 1,
-    riskLevel: 'normal'
-  },
-  {
-    id: 108,
-    email: 'david@epocanvas.com',
-    userRole: '普通用户 LV.1',
-    eventType: 'schedule_mail',
-    category: 'mail',
-    actionText: '{david@epocanvas.com} 定时邮件',
-    detailText: '预约于 2026-10-04 09:00 发送主题 "Contract Signing" 至 partner@firm.com',
-    ip: '198.51.100.55',
-    geo: 'Tokyo, JP',
-    device: 'Edge 128 / Windows 11',
-    deviceType: 'desktop',
-    fingerprint: 'fp_ee4102',
-    isRegIp: true,
-    isMultiIpConcurrent: false,
-    activeIpCount: 1,
-    timestamp: '2026-10-03 07:45:22',
-    securityMode: 1,
-    riskLevel: 'normal'
-  },
-  {
-    id: 109,
-    email: 'elena@epocanvas.com',
-    userRole: '参观者',
-    eventType: 'delete_account',
-    category: 'account',
-    actionText: '{elena@epocanvas.com} 注销账户',
-    detailText: '用户自主触发账户注销，安全凭证已物理销毁。',
-    ip: '203.0.113.12',
-    geo: 'London, GB',
-    device: 'Chrome Mobile / Android 14',
+    device: 'Safari 18 / iOS 18.0',
     deviceType: 'mobile',
-    fingerprint: 'fp_66aa99',
+    fingerprint: 'fp_77bc40',
     isRegIp: true,
     isMultiIpConcurrent: false,
     activeIpCount: 1,
-    timestamp: '2026-10-03 08:00:15',
+    reportedByOthersCount: 0,
+    reportedOthersCount: 0,
+    storageSize: 8598320, // 8.2 MB
+    timestamp: '2026-10-03 07:15:00',
+    securityMode: 1,
+    riskLevel: 'medium',
+    status: 'pending',
+    appealId: 202
+  },
+  {
+    id: 106,
+    ticketId: 'TKT-2026-BO99X2',
+    email: 'bob_suspicious@epocanvas.com',
+    userRole: '普通用户 LV.0',
+    warningType: 'audit', // 审计警告
+    eventType: 'reported_phish',
+    category: 'account',
+    actionText: '{bob_suspicious@epocanvas.com} 被 2 名用户检举敏感外链',
+    detailText: '检测到发送带有未备案短链的敏感邮件，被 2 名收件人标记检举，列入重点审计观察池。',
+    ip: '203.0.113.89',
+    geo: 'Osaka, JP',
+    device: 'Safari 18 / iOS 18.0',
+    deviceType: 'mobile',
+    fingerprint: 'fp_77bc40',
+    isRegIp: false,
+    isMultiIpConcurrent: false,
+    activeIpCount: 2,
+    reportedByOthersCount: 2,
+    reportedOthersCount: 0,
+    storageSize: 44145000, // 42.1 MB
+    timestamp: '2026-10-02 14:02:11',
     securityMode: 0,
-    riskLevel: 'normal'
+    riskLevel: 'medium',
+    status: 'monitored'
+  },
+  {
+    id: 107,
+    ticketId: 'TKT-2026-CM55Q9',
+    email: 'compromised_acc@epocanvas.com',
+    userRole: '普通用户 LV.0',
+    warningType: 'ban', // 封禁警告
+    eventType: 'banned',
+    category: 'security',
+    actionText: '{compromised_acc@epocanvas.com} 异构设备接管已实施预防性封禁',
+    detailText: '异构未授权设备在凌晨非活跃时段大量投递未知附件，系统判定账号失陷，执行紧急封禁。',
+    ip: '103.251.167.20',
+    geo: 'Singapore, SG',
+    device: 'Edge 128 / Windows 11',
+    deviceType: 'desktop',
+    fingerprint: 'fp_random_99',
+    isRegIp: false,
+    isMultiIpConcurrent: false,
+    activeIpCount: 1,
+    reportedByOthersCount: 5,
+    reportedOthersCount: 0,
+    storageSize: 67108864, // 64 MB
+    timestamp: '2026-10-02 11:15:40',
+    securityMode: 2,
+    riskLevel: 'high',
+    status: 'banned'
   }
 ]);
 
-// Risk Cases (DB Table Representation)
+// Risk Cases (Dedicated Adjudication Workbench)
 const riskCases = ref([
   {
     id: 1,
     ticketId: 'TKT-2026-CH78A9',
     sessionHash: 'f_9c71a4f028d7b3e1',
     email: 'charlie@epocanvas.com',
+    warningType: 'appeal',
     status: 'pending',
     hasAppeal: true,
     regIp: '198.51.100.24',
@@ -1406,9 +1671,37 @@ const riskCases = ref([
   },
   {
     id: 2,
+    ticketId: 'TKT-2026-PI99R2',
+    sessionHash: 'f_4d3c2b1a0f9e8d7c',
+    email: 'pilot-recovery@epocanvas.com',
+    warningType: 'appeal',
+    status: 'pending',
+    hasAppeal: true,
+    regIp: '198.51.100.24',
+    regGeo: 'Tokyo, JP',
+    regDevice: 'Safari 18 / iOS 18.0',
+    regDeviceType: 'mobile',
+    regFingerprint: 'fp_77bc40',
+    activeIps: [
+      { ip: '198.51.100.24', geo: 'Tokyo, JP', isCurrent: true }
+    ],
+    activeDevices: ['iPhone 16 / Safari'],
+    isConcurrent: false,
+    appealReason: '出差旅行期间遗失本地会话状态，且触发异地保护，已通过 epomail-docs 提交环境比对凭据，申请放行重置。',
+    appealTime: '2026-10-03 07:15',
+    appealIp: '198.51.100.24',
+    appealGeo: 'Tokyo, JP',
+    appealDevice: 'Safari 18 / iOS 18.0',
+    appealFingerprint: 'fp_77bc40',
+    matchScore: 95,
+    subnetMatch: true
+  },
+  {
+    id: 3,
     ticketId: 'TKT-2026-SP44B1',
     sessionHash: 'f_e5d2c8b1a4f79021',
-    email: 'spammer_attacker@bot.net',
+    email: 'spammer_bulk@partner.org',
+    warningType: 'audit',
     status: 'banned',
     hasAppeal: true,
     regIp: '45.33.32.156',
@@ -1433,51 +1726,60 @@ const riskCases = ref([
     subnetMatch: false
   },
   {
-    id: 3,
-    ticketId: 'TKT-2026-BO99X2',
+    id: 4,
+    ticketId: 'TKT-2026-EV99X0',
+    sessionHash: 'f_0011223344556677',
+    email: 'evil_scanner@dark.net',
+    warningType: 'ban',
+    status: 'banned',
+    hasAppeal: false,
+    regIp: '185.220.101.5',
+    regGeo: 'Frankfurt, DE',
+    regDevice: 'Python-Requests / Linux',
+    regDeviceType: 'desktop',
+    regFingerprint: 'fp_scanner_66',
+    activeIps: [
+      { ip: '185.220.101.5', geo: 'Frankfurt, DE', isCurrent: true }
+    ],
+    activeDevices: ['Python Scanner'],
+    isConcurrent: true,
+    appealReason: '',
+    appealTime: '',
+    matchScore: 5,
+    subnetMatch: false
+  },
+  {
+    id: 5,
+    ticketId: 'TKT-2026-ZS88K1',
     sessionHash: 'f_1a2b3c4d5e6f7a8b',
-    email: 'bob@epocanvas.com',
+    email: 'zhangsan@epocanvas.com',
+    warningType: 'risk',
     status: 'probation',
     hasAppeal: false,
     regIp: '198.51.100.10',
-    regGeo: 'Tokyo, JP',
-    regDevice: 'Safari 18 / iOS 18.0',
-    regDeviceType: 'mobile',
-    regFingerprint: 'fp_77bc40',
-    activeIps: [
-      { ip: '198.51.100.10', geo: 'Tokyo, JP', isCurrent: false },
-      { ip: '203.0.113.89', geo: 'Osaka, JP', isCurrent: true }
-    ],
-    activeDevices: ['iPhone 16 / Safari'],
-    isConcurrent: false,
-    appealReason: '',
-    appealTime: '',
-    matchScore: 88,
-    subnetMatch: true
-  },
-  {
-    id: 4,
-    ticketId: 'TKT-2026-AL11K5',
-    sessionHash: 'f_9988776655443322',
-    email: 'alice@epocanvas.com',
-    status: 'approved',
-    hasAppeal: false,
-    regIp: '198.51.100.24',
     regGeo: 'Tokyo, JP',
     regDevice: 'Chrome 128 / macOS 14.6',
     regDeviceType: 'desktop',
     regFingerprint: 'fp_a98e21',
     activeIps: [
-      { ip: '198.51.100.24', geo: 'Tokyo, JP', isCurrent: true }
+      { ip: '198.51.100.10', geo: 'Tokyo, JP', isCurrent: false },
+      { ip: '192.0.2.145', geo: 'Seoul, KR', isCurrent: true }
     ],
     activeDevices: ['macOS 14.6 / Chrome'],
-    isConcurrent: false,
+    isConcurrent: true,
     appealReason: '',
     appealTime: '',
-    matchScore: 100,
+    matchScore: 88,
     subnetMatch: true
   }
 ]);
+
+// 4 Warning Counters
+const countAllWarnings = computed(() => allLogs.value.length);
+const countAuditWarnings = computed(() => allLogs.value.filter(l => l.warningType === 'audit').length);
+const countRiskWarnings = computed(() => allLogs.value.filter(l => l.warningType === 'risk').length);
+const countBanWarnings = computed(() => allLogs.value.filter(l => l.warningType === 'ban').length);
+const countAppealWarnings = computed(() => allLogs.value.filter(l => l.warningType === 'appeal').length);
 
 // Filtered Logs
 const filteredLogs = computed(() => {
@@ -1490,6 +1792,11 @@ const filteredLogs = computed(() => {
       return false;
     }
 
+    // Warning Type filter
+    if (filterWarningType.value !== 'all' && log.warningType !== filterWarningType.value) {
+      return false;
+    }
+
     // Keyword filter
     if (searchKeyword.value) {
       const kw = searchKeyword.value.toLowerCase().trim();
@@ -1497,7 +1804,8 @@ const filteredLogs = computed(() => {
       const matchIp = log.ip.toLowerCase().includes(kw);
       const matchDevice = log.device.toLowerCase().includes(kw);
       const matchAction = log.actionText.toLowerCase().includes(kw);
-      if (!matchEmail && !matchIp && !matchDevice && !matchAction) return false;
+      const matchTicket = log.ticketId && log.ticketId.toLowerCase().includes(kw);
+      if (!matchEmail && !matchIp && !matchDevice && !matchAction && !matchTicket) return false;
     }
 
     // Category filter
@@ -1538,17 +1846,12 @@ function getEventIcon(type) {
   switch (type) {
     case 'register': return 'fluent:person-add-20-regular';
     case 'login': return 'fluent:key-20-regular';
-    case 'logout': return 'fluent:arrow-exit-20-regular';
-    case 'send_mail': return 'fluent:mail-arrow-up-20-regular';
-    case 'receive_mail': return 'fluent:mail-arrow-down-20-regular';
-    case 'delete_mail': return 'fluent:delete-20-regular';
-    case 'star_mail': return 'fluent:star-20-regular';
-    case 'schedule_mail': return 'fluent:clock-20-regular';
-    case 'spam_scan': return 'fluent:mail-alert-20-regular';
+    case 'risk_spike': return 'fluent:alert-urgent-20-regular';
+    case 'reported_spam': return 'fluent:mail-alert-20-regular';
+    case 'reported_phish': return 'fluent:shield-dismiss-20-regular';
     case 'banned': return 'fluent:prohibited-20-regular';
     case 'unbanned': return 'fluent:shield-checkmark-20-regular';
     case 'appeal': return 'fluent:document-person-20-regular';
-    case 'delete_account': return 'fluent:person-delete-20-regular';
     default: return 'fluent:document-bullet-list-20-regular';
   }
 }
@@ -1556,36 +1859,6 @@ function getEventIcon(type) {
 function getDeviceIcon(deviceType) {
   if (deviceType === 'mobile') return 'lucide:smartphone';
   return 'lucide:laptop';
-}
-
-function getCategoryTagType(cat) {
-  switch (cat) {
-    case 'account': return 'info';
-    case 'mail': return 'primary';
-    case 'security': return 'danger';
-    case 'appeal': return 'warning';
-    default: return 'info';
-  }
-}
-
-function getCategoryI18nKey(cat) {
-  switch (cat) {
-    case 'account': return 'auditCategoryAccount';
-    case 'mail': return 'auditCategoryMail';
-    case 'security': return 'auditCategorySecurity';
-    case 'appeal': return 'auditCategoryAppeal';
-    default: return 'auditCategoryAll';
-  }
-}
-
-function getRiskTagType(level) {
-  switch (level) {
-    case 'normal': return 'info';
-    case 'low': return 'success';
-    case 'medium': return 'warning';
-    case 'high': return 'danger';
-    default: return 'info';
-  }
 }
 
 function getRiskLabel(level) {
@@ -1649,15 +1922,17 @@ function refreshData() {
   }, 400);
 }
 
+// Open Adjudication Drawer (Expanded View)
 function openAdjudicationDrawer(row) {
   let target = riskCases.value.find(c => c.email === row.email);
   if (!target) {
     target = {
       id: row.id,
-      ticketId: 'TKT-2026-' + (row.email.slice(0, 2).toUpperCase() + String(row.id).slice(-4)),
+      ticketId: row.ticketId || ('TKT-2026-' + (row.email.slice(0, 2).toUpperCase() + String(row.id).slice(-4))),
       email: row.email,
-      status: row.riskLevel === 'high' ? 'banned' : 'approved',
-      hasAppeal: !!row.appealId,
+      warningType: row.warningType || 'risk',
+      status: row.status === 'banned' ? 'banned' : (row.warningType === 'appeal' ? 'pending' : 'probation'),
+      hasAppeal: row.warningType === 'appeal' || !!row.appealId,
       regIp: row.ip,
       regGeo: row.geo,
       regDevice: row.device,
@@ -1687,6 +1962,46 @@ function handleDrawerClose(done) {
   done();
 }
 
+// Handling Target Operations for Audit/Risk/Ban
+function handleWarningAction(action, row) {
+  switch (action) {
+    case 'issue_warning':
+      ElMessageBox.confirm(
+        `${t('auditActionIssueWarning')}: ${row.email}？`,
+        t('auditTypeAuditWarning'),
+        { confirmButtonText: t('confirm'), cancelButtonText: t('cancel'), type: 'warning' }
+      ).then(() => {
+        ElMessage.success(`${t('auditActionSuccess')}: ${t('auditActionIssueWarning')}`);
+      }).catch(() => {});
+      break;
+
+    case 'ban_account':
+      ElMessageBox.confirm(
+        `${t('auditActionBanAccount')}: ${row.email}？`,
+        t('auditActionBanAccount'),
+        { confirmButtonText: t('confirm'), cancelButtonText: t('cancel'), type: 'danger' }
+      ).then(() => {
+        row.warningType = 'ban';
+        row.status = 'banned';
+        ElMessage.success(`${t('auditActionSuccess')}: ${t('banned')}`);
+      }).catch(() => {});
+      break;
+
+    case 'maintain_ban':
+      ElMessage.info(`${t('auditActionMaintainBan')}: ${row.email}`);
+      break;
+
+    case 'purge_session':
+      ElMessage.success(`${t('auditActionPurgeSession')}: ${row.email}`);
+      break;
+
+    case 'dismiss_alert':
+      row.status = 'approved';
+      ElMessage.success(`${t('auditActionDismissAlert')}: ${row.email}`);
+      break;
+  }
+}
+
 function quickUnban(row) {
   ElMessageBox.confirm(
     `${t('auditQuickUnbanConfirm')}: ${row.email}`,
@@ -1701,8 +2016,10 @@ function quickUnban(row) {
     row.hasAppeal = false;
     allLogs.value.unshift({
       id: Date.now(),
+      ticketId: row.ticketId || 'TKT-2026-UNBAN',
       email: row.email,
       userRole: 'Administrator',
+      warningType: 'appeal',
       eventType: 'unbanned',
       category: 'security',
       actionText: `{${row.email}} 经管理员研判放行`,
@@ -1715,9 +2032,13 @@ function quickUnban(row) {
       isRegIp: false,
       isMultiIpConcurrent: false,
       activeIpCount: 1,
+      reportedByOthersCount: 0,
+      reportedOthersCount: 0,
+      storageSize: 15690112,
       timestamp: new Date().toISOString().replace('T', ' ').slice(0, 19),
       securityMode: activeMode.value,
-      riskLevel: 'low'
+      riskLevel: 'low',
+      status: 'approved'
     });
     ElMessage.success(t('auditActionSuccess'));
   }).catch(() => {});
@@ -1737,8 +2058,10 @@ function quickReject(row) {
     row.hasAppeal = false;
     allLogs.value.unshift({
       id: Date.now(),
+      ticketId: row.ticketId || 'TKT-2026-REJECT',
       email: row.email,
       userRole: 'Administrator',
+      warningType: 'ban',
       eventType: 'banned',
       category: 'security',
       actionText: `{${row.email}} 申诉被驳回`,
@@ -1751,9 +2074,13 @@ function quickReject(row) {
       isRegIp: false,
       isMultiIpConcurrent: false,
       activeIpCount: 1,
+      reportedByOthersCount: 4,
+      reportedOthersCount: 0,
+      storageSize: 0,
       timestamp: new Date().toISOString().replace('T', ' ').slice(0, 19),
       securityMode: activeMode.value,
-      riskLevel: 'high'
+      riskLevel: 'high',
+      status: 'banned'
     });
     ElMessage.success(t('auditActionSuccess'));
   }).catch(() => {});
@@ -1775,11 +2102,12 @@ function submitAdjudication() {
       selectedCase.value.hasAppeal = false;
     }
 
-    // Add audit entry for this decision
     allLogs.value.unshift({
       id: Date.now(),
+      ticketId: selectedCase.value.ticketId || 'TKT-2026-ADJ',
       email: selectedCase.value.email,
       userRole: 'Administrator',
+      warningType: decisionForm.action === 'reject' ? 'ban' : 'appeal',
       eventType: decisionForm.action === 'reject' ? 'banned' : 'unbanned',
       category: 'security',
       actionText: decisionForm.action === 'reject' ? `{${selectedCase.value.email}} 申诉被驳回` : `{${selectedCase.value.email}} 经管理员研判放行`,
@@ -1792,9 +2120,13 @@ function submitAdjudication() {
       isRegIp: false,
       isMultiIpConcurrent: false,
       activeIpCount: 1,
+      reportedByOthersCount: 0,
+      reportedOthersCount: 0,
+      storageSize: 15690112,
       timestamp: new Date().toISOString().replace('T', ' ').slice(0, 19),
       securityMode: activeMode.value,
-      riskLevel: decisionForm.action === 'reject' ? 'high' : 'low'
+      riskLevel: decisionForm.action === 'reject' ? 'high' : 'low',
+      status: selectedCase.value.status
     });
 
     ElMessage.success(t('auditActionSuccess'));
@@ -1831,8 +2163,7 @@ function triggerPurgeNonCritical() {
     isPurging.value = true;
     setTimeout(() => {
       isPurging.value = false;
-      // Retain only identity, registration baseline, appeals, and bans
-      allLogs.value = allLogs.value.filter(l => ['register', 'banned', 'appeal'].includes(l.eventType));
+      allLogs.value = allLogs.value.filter(l => ['banned', 'appeal'].includes(l.eventType));
       ElMessage.success(t('auditClearHistoricalSuccess'));
     }, 700);
   }).catch(() => {});
@@ -1909,7 +2240,7 @@ onMounted(() => {
   gap: 4px;
 }
 
-/* Header Banner: Clean, elevated, matching sys-setting */
+/* Header Banner: Clean, elevated */
 .audit-header-banner {
   padding: 18px 20px;
   border-radius: 8px;
@@ -2077,237 +2408,293 @@ onMounted(() => {
 
 .kpi-label {
   font-size: 11.5px;
-  font-weight: 600;
-  text-transform: uppercase;
   color: var(--el-text-color-secondary);
-  letter-spacing: 0.3px;
+  margin-bottom: 2px;
   display: flex;
   align-items: center;
+  gap: 6px;
+}
+
+.pulse-beacon {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--el-color-warning);
+  animation: pulse-ring 1.8s cubic-bezier(0.455, 0.03, 0.515, 0.955) infinite;
+}
+
+@keyframes pulse-ring {
+  0% { transform: scale(0.9); opacity: 0.8; }
+  50% { transform: scale(1.3); opacity: 1; }
+  100% { transform: scale(0.9); opacity: 0.8; }
 }
 
 .kpi-value {
-  font-size: 19px;
+  font-size: 20px;
   font-weight: 700;
   color: var(--el-text-color-primary);
   line-height: 1.2;
-  margin: 3px 0 2px;
-  font-family: "Outfit", -apple-system, sans-serif;
+}
 
-  .kpi-unit {
-    font-size: 12px;
-    font-weight: 400;
-    color: var(--el-text-color-placeholder);
-  }
-
-  &.text-amber {
-    color: var(--el-color-warning);
-  }
+.kpi-unit {
+  font-size: 12px;
+  font-weight: normal;
+  color: var(--el-text-color-secondary);
 }
 
 .kpi-sub {
   font-size: 11px;
-  color: var(--el-text-color-secondary);
+  color: var(--el-text-color-placeholder);
+  margin-top: 2px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
 
-  &.text-amber {
-    color: var(--el-color-warning);
-    font-weight: 600;
-  }
+.text-amber {
+  color: #d97706 !important;
 }
 
 .kpi-progress-bar {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--el-fill-color-light);
   margin-top: 6px;
-  width: 100%;
-  height: 3px;
-  border-radius: 3px;
-  background: var(--el-border-color-lighter);
   overflow: hidden;
 }
 
 .kpi-progress-fill {
   height: 100%;
-  border-radius: 3px;
-  transition: width 0.3s ease;
-}
+  border-radius: 2px;
 
-.ops-fill {
-  background: var(--el-color-primary);
-}
-
-.risk-fill {
-  background: var(--el-color-danger);
-}
-
-.appeal-fill {
-  background: var(--el-color-warning);
-}
-
-.pulse-beacon {
-  display: inline-block;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--el-color-warning);
-  margin-left: 6px;
-  box-shadow: 0 0 0 0 rgba(230, 162, 60, 0.7);
-  animation: beacon-pulse 1.8s infinite;
-}
-
-@keyframes beacon-pulse {
-  0% {
-    transform: scale(0.95);
-    box-shadow: 0 0 0 0 rgba(230, 162, 60, 0.7);
-  }
-  70% {
-    transform: scale(1);
-    box-shadow: 0 0 0 6px rgba(230, 162, 60, 0);
-  }
-  100% {
-    transform: scale(0.95);
-    box-shadow: 0 0 0 0 rgba(230, 162, 60, 0);
-  }
+  &.ops-fill { background: var(--el-color-primary); }
+  &.risk-fill { background: var(--el-color-danger); }
+  &.appeal-fill { background: var(--el-color-warning); }
 }
 
 .kpi-slots-capsule {
   display: flex;
-  align-items: center;
-  gap: 5px;
-  margin-top: 6px;
-}
+  gap: 4px;
+  margin-top: 5px;
 
-.slot-dot {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 17px;
-  height: 17px;
-  border-radius: 4px;
-  font-size: 10px;
-  font-weight: 700;
-  background: var(--el-fill-color-light);
-  color: var(--el-text-color-placeholder);
-  border: 1px solid var(--el-border-color-lighter);
-  transition: all 0.2s;
+  .slot-dot {
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+    background: var(--el-fill-color-light);
+    color: var(--el-text-color-placeholder);
+    font-size: 10px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 
-  &.active {
-    background: var(--el-color-primary-light-9);
-    color: var(--el-color-primary);
-    border-color: var(--el-color-primary-light-5);
+    &.active {
+      background: var(--el-color-success);
+      color: #fff;
+    }
   }
 }
 
-/* Workspace Container & Tabs */
+/* Workspace Tabs Navigation */
 .audit-workspace-tabs {
-  background: var(--el-bg-color);
-  border: 1px solid var(--el-border-color);
-  border-radius: 8px;
-  padding: 18px 20px;
+  background: transparent;
 }
 
 .tab-nav-bar {
   display: flex;
-  align-items: center;
   gap: 8px;
-  border-bottom: 1px solid var(--el-border-color-lighter);
-  padding-bottom: 12px;
+  border-bottom: 1px solid var(--el-border-color);
   margin-bottom: 16px;
+  padding-bottom: 2px;
 }
 
 .tab-btn {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 7px 15px;
-  border-radius: 6px;
-  font-size: 13px;
+  padding: 8px 16px;
+  font-size: 13.5px;
   font-weight: 500;
-  color: var(--el-text-color-regular);
+  color: var(--el-text-color-secondary);
+  border-radius: 6px 6px 0 0;
   cursor: pointer;
   transition: all 0.15s ease;
-  user-select: none;
+  position: relative;
 
   &:hover {
-    background: var(--el-fill-color-light);
-    color: var(--el-text-color-primary);
+    color: var(--el-color-primary);
   }
 
   &.active {
-    background: var(--el-color-primary-light-9);
     color: var(--el-color-primary);
     font-weight: 600;
+
+    &::after {
+      content: '';
+      position: absolute;
+      bottom: -3px;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: var(--el-color-primary);
+      border-radius: 2px;
+    }
   }
 }
 
 .tab-count-badge {
   font-size: 11px;
+  background: var(--el-fill-color);
   padding: 1px 6px;
   border-radius: 10px;
-  background: var(--el-fill-color);
-  color: var(--el-text-color-secondary);
+  font-weight: 600;
 }
 
 .tab-alert-badge {
   font-size: 11px;
+  background: var(--el-color-warning);
+  color: #fff;
   padding: 1px 6px;
   border-radius: 10px;
-  background: var(--el-color-warning);
-  color: #ffffff;
   font-weight: 700;
 }
 
-/* Stream Toolbar */
-.stream-toolbar {
+/* 4 Warning Categories Focus Filter Bar */
+.warning-category-filter-bar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 16px;
   flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 14px;
+  padding: 10px 14px;
+  background: var(--el-bg-color);
+  border: 1px solid var(--el-border-color);
+  border-radius: 8px;
 }
 
-.toolbar-left {
+.warning-filter-pills {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   flex-wrap: wrap;
-  flex: 1;
 }
 
-.search-bar {
-  width: 280px;
-}
-
-.category-select {
-  width: 140px;
-}
-
-.risk-select {
-  width: 110px;
-}
-
-.date-picker-box {
-  width: 240px;
-}
-
-.presentation-mode-tag {
+.warning-filter-pill {
   display: inline-flex;
   align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 13px;
   font-weight: 500;
+  cursor: pointer;
+  border: 1px solid var(--el-border-color-lighter);
+  background: var(--el-fill-color-blank);
+  color: var(--el-text-color-regular);
+  transition: all 0.15s ease;
+
+  &:hover {
+    border-color: var(--el-color-primary);
+    color: var(--el-color-primary);
+  }
+
+  &.active {
+    background: var(--el-color-primary);
+    border-color: var(--el-color-primary);
+    color: #fff;
+
+    .pill-count {
+      background: rgba(255, 255, 255, 0.25);
+      color: #fff;
+    }
+  }
+
+  &.pill-audit.active {
+    background: #e6a23c;
+    border-color: #e6a23c;
+  }
+
+  &.pill-risk.active {
+    background: #f56c6c;
+    border-color: #f56c6c;
+  }
+
+  &.pill-ban.active {
+    background: #909399;
+    border-color: #909399;
+  }
+
+  &.pill-appeal.active {
+    background: #409eff;
+    border-color: #409eff;
+  }
+
+  .pill-count {
+    padding: 1px 6px;
+    border-radius: 10px;
+    font-size: 11px;
+    background: var(--el-fill-color);
+    color: var(--el-text-color-secondary);
+    font-weight: 600;
+
+    &.has-appeal {
+      background: var(--el-color-danger);
+      color: #fff;
+    }
+  }
+}
+
+.abnormal-scope-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  background: var(--el-fill-color-light);
+  padding: 5px 10px;
   border-radius: 4px;
 }
 
-/* Mode Alert Bar */
-.mode-alert-bar {
+/* Stream Toolbar */
+.stream-toolbar, .risk-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.toolbar-left, .toolbar-right {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 14px;
+  flex-wrap: wrap;
+}
+
+.search-bar, .risk-search-input {
+  width: 240px;
+}
+
+.category-select, .risk-select {
+  width: 140px;
+}
+
+.date-picker-box {
+  width: 250px;
+}
+
+.mode-alert-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
   border-radius: 6px;
   font-size: 12px;
-  font-weight: 500;
-  margin-bottom: 16px;
+  margin-bottom: 14px;
+  line-height: 1.4;
 
   &.encrypted-alert {
     background: var(--el-color-warning-light-9);
@@ -2326,27 +2713,26 @@ onMounted(() => {
   }
 }
 
-/* Empty State */
 .empty-audit-state {
-  padding: 50px 20px;
   text-align: center;
-  background: var(--el-fill-color-lighter);
+  padding: 48px 16px;
+  background: var(--el-bg-color);
+  border: 1px solid var(--el-border-color);
   border-radius: 8px;
-  border: 1px dashed var(--el-border-color);
 
   .empty-icon {
     color: var(--el-text-color-placeholder);
-    margin-bottom: 10px;
+    margin-bottom: 12px;
   }
   .empty-title {
     font-size: 14px;
     font-weight: 600;
-    color: var(--el-text-color-primary);
+    color: var(--el-text-color-secondary);
   }
   .empty-desc {
     font-size: 12px;
     color: var(--el-text-color-placeholder);
-    margin-top: 4px;
+    margin: 4px 0 0 0;
   }
 }
 
@@ -2383,10 +2769,6 @@ onMounted(() => {
       background: var(--el-color-primary-light-9);
       color: var(--el-color-primary);
     }
-    &.cat-mail {
-      background: var(--el-color-primary-light-8);
-      color: var(--el-color-primary-dark-2);
-    }
     &.cat-security {
       background: var(--el-color-danger-light-9);
       color: var(--el-color-danger);
@@ -2398,8 +2780,8 @@ onMounted(() => {
   }
 
   .timeline-line {
-    flex: 1;
     width: 2px;
+    flex: 1;
     background: var(--el-border-color-lighter);
     margin-top: 4px;
   }
@@ -2411,20 +2793,13 @@ onMounted(() => {
   border: 1px solid var(--el-border-color);
   border-radius: 8px;
   padding: 14px 16px;
-  transition: all 0.2s ease;
-
-  &:hover {
-    border-color: var(--el-color-primary);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-  }
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
 }
 
 .content-card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
   margin-bottom: 8px;
 }
 
@@ -2435,45 +2810,46 @@ onMounted(() => {
   flex-wrap: wrap;
 }
 
+.warning-type-tag {
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+
 .user-email-pill {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--el-color-primary);
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--el-text-color-primary);
-  background: var(--el-fill-color-light);
-  padding: 2px 7px;
-  border-radius: 4px;
   cursor: pointer;
 
   &:hover {
-    color: var(--el-color-primary);
+    text-decoration: underline;
   }
 }
 
 .event-action-text {
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--el-text-color-primary);
 }
 
 .event-time-badge {
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11.5px;
+  color: var(--el-text-color-placeholder);
+  font-family: monospace;
 }
 
 .content-card-body {
   margin-bottom: 10px;
+}
 
-  .event-detail-desc {
-    font-size: 12.5px;
-    color: var(--el-text-color-regular);
-    line-height: 1.45;
-    margin-bottom: 8px;
-  }
+.event-detail-desc {
+  font-size: 12.5px;
+  color: var(--el-text-color-regular);
+  line-height: 1.5;
+  margin-bottom: 8px;
 }
 
 .env-pills-row {
@@ -2487,35 +2863,34 @@ onMounted(() => {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 2px 8px;
+  font-size: 11.5px;
+  padding: 3px 8px;
   border-radius: 4px;
-  font-size: 11px;
-  font-weight: 500;
   background: var(--el-fill-color-light);
-  color: var(--el-text-color-regular);
   border: 1px solid var(--el-border-color-lighter);
+  color: var(--el-text-color-secondary);
 
-  .geo-badge {
+  .geo-badge, .fp-tag {
+    font-size: 10px;
+    background: var(--el-fill-color);
+    padding: 1px 4px;
+    border-radius: 3px;
     color: var(--el-text-color-placeholder);
   }
 
   .reg-tag {
+    font-size: 10px;
     background: var(--el-color-success-light-9);
     color: var(--el-color-success);
     padding: 1px 4px;
     border-radius: 3px;
-    font-size: 10px;
-  }
-
-  .fp-tag {
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-    color: var(--el-text-color-placeholder);
+    font-weight: 600;
   }
 
   &.alert-pill {
     background: var(--el-color-danger-light-9);
-    color: var(--el-color-danger);
     border-color: var(--el-color-danger-light-5);
+    color: var(--el-color-danger);
     font-weight: 600;
   }
 }
@@ -2524,43 +2899,63 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  padding-top: 10px;
   border-top: 1px solid var(--el-border-color-lighter);
-  padding-top: 8px;
 }
 
 .footer-left {
   display: flex;
   align-items: center;
   gap: 8px;
+}
 
-  .risk-label-tag {
-    font-size: 11px;
-    font-weight: 600;
-    padding: 2px 6px;
-    border-radius: 4px;
+.risk-label-tag {
+  font-size: 10.5px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 600;
 
-    &.risk-tag-normal {
-      background: var(--el-fill-color-light);
-      color: var(--el-text-color-secondary);
-    }
-    &.risk-tag-low {
-      background: var(--el-color-success-light-9);
-      color: var(--el-color-success);
-    }
-    &.risk-tag-medium {
-      background: var(--el-color-warning-light-9);
-      color: var(--el-color-warning);
-    }
-    &.risk-tag-high {
-      background: var(--el-color-danger-light-9);
-      color: var(--el-color-danger);
-    }
-  }
-
-  .mode-tag {
-    font-size: 11px;
+  &.risk-tag-normal {
+    background: var(--el-fill-color);
     color: var(--el-text-color-placeholder);
   }
+  &.risk-tag-low {
+    background: var(--el-color-success-light-9);
+    color: var(--el-color-success);
+  }
+  &.risk-tag-medium {
+    background: var(--el-color-warning-light-9);
+    color: var(--el-color-warning);
+  }
+  &.risk-tag-high {
+    background: var(--el-color-danger-light-9);
+    color: var(--el-color-danger);
+  }
+}
+
+.mode-tag {
+  font-size: 11px;
+  color: var(--el-text-color-placeholder);
+}
+
+.footer-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.action-kind-label {
+  font-size: 11.5px;
+  color: var(--el-text-color-secondary);
+  font-weight: 600;
+  margin-right: 2px;
+}
+
+.view-detail-btn {
+  font-size: 12px !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
 }
 
 /* Pure DB Table Presentation (Mode 2) & Tab 2 Risk Table */
@@ -2601,16 +2996,23 @@ onMounted(() => {
     color: var(--el-text-color-primary);
   }
 
+  .account-sub-tags, .account-tags {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 2px;
+  }
+
   .role-tag {
     font-size: 11px;
     color: var(--el-text-color-placeholder);
   }
 
-  .account-tags {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin-top: 2px;
+  .mini-warning-tag {
+    font-size: 10px;
+    padding: 0 4px;
+    height: 18px;
+    line-height: 16px;
   }
 
   .appeal-badge {
@@ -2618,154 +3020,183 @@ onMounted(() => {
     padding: 1px 5px;
     border-radius: 3px;
     background: var(--el-color-warning-light-9);
-    color: var(--el-color-warning);
+    color: var(--el-color-warning-dark-2);
     font-weight: 600;
   }
 }
 
-.ticket-id-cell {
-  .ticket-code {
-    font-size: 12px;
+.table-alert-cell {
+  .alert-feature-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 2px;
+  }
+
+  .alert-ticket-tag, .ticket-code {
+    font-size: 11.5px;
+    font-weight: 700;
+    color: var(--el-color-primary);
+    background: var(--el-color-primary-light-9);
+    padding: 1px 5px;
+    border-radius: 3px;
+  }
+
+  .action-headline-text {
+    font-size: 12.5px;
     font-weight: 600;
     color: var(--el-text-color-primary);
-    background: var(--el-fill-color-light);
-    border: 1px solid var(--el-border-color-lighter);
-    padding: 2px 6px;
-    border-radius: 4px;
+  }
+
+  .alert-desc-sub {
+    font-size: 11.5px;
+    color: var(--el-text-color-secondary);
+    line-height: 1.4;
   }
 }
 
-.table-action-cell {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
+.table-env-cell, .baseline-cell {
+  font-size: 12px;
 
-  .action-title {
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--el-text-color-primary);
+  .env-line, .baseline-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    color: var(--el-text-color-regular);
+    margin-bottom: 2px;
+
+    &.muted {
+      color: var(--el-text-color-secondary);
+    }
+    &.fp {
+      font-size: 11px;
+      color: var(--el-text-color-placeholder);
+      font-family: monospace;
+    }
   }
 
-  .action-sub {
-    font-size: 11px;
+  .geo-sub {
     color: var(--el-text-color-placeholder);
+    font-size: 11px;
+  }
+
+  .concurrent-tag {
+    font-size: 10.5px;
+    font-weight: 600;
+    color: var(--el-color-danger);
+    background: var(--el-color-danger-light-9);
+    padding: 1px 5px;
+    border-radius: 3px;
+    display: inline-block;
     margin-top: 2px;
   }
 }
 
-.table-env-cell {
+.compliance-storage-cell {
   font-size: 12px;
 
-  .env-line {
+  .storage-row, .reports-row {
     display: flex;
     align-items: center;
-    gap: 5px;
-    color: var(--el-text-color-primary);
-
-    &.muted {
-      color: var(--el-text-color-secondary);
-      margin-top: 2px;
-    }
-    &.fp {
-      font-size: 11px;
-      color: var(--el-text-color-placeholder);
-      margin-top: 2px;
-    }
+    gap: 4px;
+    margin-bottom: 3px;
   }
 
-  .concurrent-tag {
-    display: inline-block;
-    font-size: 10px;
-    padding: 1px 5px;
-    border-radius: 3px;
-    background: var(--el-color-danger-light-9);
-    color: var(--el-color-danger);
+  .c-label {
+    color: var(--el-text-color-secondary);
+    font-size: 11px;
+  }
+
+  .c-val {
     font-weight: 600;
-    margin-top: 3px;
+    color: var(--el-text-color-primary);
+  }
+
+  .c-val-sub {
+    color: var(--el-text-color-placeholder);
+    font-size: 11px;
   }
 }
 
-/* TAB 2 Specifics */
-.risk-toolbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 16px;
-  flex-wrap: wrap;
-}
+.table-actions-cell {
+  .cell-action-category-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--el-text-color-secondary);
+    margin-bottom: 4px;
 
-.risk-search-input {
-  width: 260px;
-}
+    &.text-primary {
+      color: var(--el-color-primary);
+    }
+  }
 
-.baseline-cell {
-  font-size: 12px;
-
-  .baseline-item {
+  .cell-action-btns {
     display: flex;
     align-items: center;
-    gap: 5px;
-    color: var(--el-text-color-primary);
-
-    &.muted {
-      color: var(--el-text-color-secondary);
-      margin-top: 2px;
-    }
-    &.fp {
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-      font-size: 11px;
-      color: var(--el-text-color-placeholder);
-      margin-top: 2px;
-    }
+    gap: 6px;
+    flex-wrap: wrap;
   }
+}
+
+/* Risk Workbench Styling */
+.ticket-id-cell {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--el-color-primary);
 }
 
 .active-pool-cell {
+  font-size: 12px;
+
   .pool-header {
     display: flex;
     justify-content: space-between;
-    font-size: 10px;
+    font-size: 11px;
     color: var(--el-text-color-placeholder);
     margin-bottom: 4px;
   }
 
   .ip-tags-flow {
     display: flex;
-    flex-wrap: wrap;
     gap: 4px;
+    flex-wrap: wrap;
+  }
+
+  .ip-pool-tag {
+    font-size: 10.5px;
+    padding: 0 4px;
+    height: 18px;
+    line-height: 16px;
   }
 
   .concurrent-notice {
+    font-size: 11px;
+    color: var(--el-color-danger);
+    font-weight: 600;
+    margin-top: 4px;
     display: flex;
     align-items: center;
     gap: 4px;
-    color: var(--el-color-danger);
-    font-size: 11px;
-    font-weight: 600;
-    margin-top: 4px;
   }
 }
 
 .appeal-statement-cell {
+  font-size: 12px;
+
   .appeal-quote {
-    font-size: 12px;
     color: var(--el-text-color-regular);
+    font-style: italic;
     line-height: 1.4;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
+    margin-bottom: 4px;
   }
 
   .appeal-time {
     font-size: 11px;
     color: var(--el-text-color-placeholder);
-    margin-top: 2px;
   }
 
   .appeal-portal-link {
-    margin-top: 4px;
+    margin-top: 2px;
   }
 }
 
@@ -2776,30 +3207,32 @@ onMounted(() => {
     gap: 6px;
 
     .score-text {
-      font-size: 16px;
+      font-size: 15px;
       font-weight: 700;
     }
-
     .score-desc {
       font-size: 11px;
-      color: var(--el-text-color-placeholder);
+      color: var(--el-text-color-secondary);
     }
   }
 
-  .subnet-badge {
-    display: inline-block;
-    font-size: 10px;
-    padding: 1px 6px;
-    border-radius: 4px;
+  .subnet-line {
     margin-top: 3px;
 
-    &.match {
-      background: var(--el-color-success-light-9);
-      color: var(--el-color-success);
-    }
-    &.mismatch {
-      background: var(--el-color-danger-light-9);
-      color: var(--el-color-danger);
+    .subnet-badge {
+      font-size: 10.5px;
+      padding: 1px 5px;
+      border-radius: 3px;
+
+      &.match {
+        background: var(--el-color-success-light-9);
+        color: var(--el-color-success);
+        font-weight: 600;
+      }
+      &.mismatch {
+        background: var(--el-color-danger-light-9);
+        color: var(--el-color-danger);
+      }
     }
   }
 }
@@ -2811,189 +3244,179 @@ onMounted(() => {
   flex-wrap: wrap;
 }
 
-/* Policy Settings Tab (Tab 3) - Strictly matches sys-setting cards */
-.policy-panel {
-  .card-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 16px;
+/* Tab 3 Policy Settings Cards */
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
 
-    @media (max-width: 900px) {
-      grid-template-columns: 1fr;
-    }
+  @media (max-width: 900px) {
+    grid-template-columns: 1fr;
   }
 }
 
 .settings-card {
   background: var(--el-bg-color);
-  border-radius: 8px;
   border: 1px solid var(--el-border-color);
-  overflow: hidden;
+  border-radius: 8px;
+  padding: 16px 20px;
+
+  &.architecture-card {
+    grid-column: 1 / -1;
+  }
 
   .card-title {
     font-size: 14.5px;
-    font-weight: bold;
-    padding: 12px 18px;
-    border-bottom: 1px solid var(--el-border-color);
+    font-weight: 600;
+    color: var(--el-text-color-primary);
     display: flex;
     align-items: center;
     gap: 8px;
-    color: var(--el-text-color-primary);
-  }
-
-  .card-content {
-    display: flex;
-    flex-direction: column;
-    padding: 0;
+    margin-bottom: 14px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--el-border-color-lighter);
   }
 }
 
 .card-intro-notice {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   font-size: 12px;
-  color: var(--el-text-color-regular);
-  background: var(--el-fill-color-light);
-  padding: 10px 18px;
-  border-bottom: 1px solid var(--el-border-color-lighter);
-  line-height: 1.4;
+  color: var(--el-color-primary);
+  background: var(--el-color-primary-light-9);
+  padding: 6px 10px;
+  border-radius: 4px;
+  margin-bottom: 12px;
 }
 
 .setting-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 18px;
+  padding: 10px 0;
   border-bottom: 1px solid var(--el-border-color-lighter);
-  gap: 12px;
 
   &:last-child {
     border-bottom: none;
   }
 
   &.disabled {
-    opacity: 0.5;
+    opacity: 0.55;
     pointer-events: none;
   }
 
   .item-meta {
-    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
 
-    .item-title {
-      display: block;
-      font-size: 13px;
-      font-weight: 500;
-      color: var(--el-text-color-primary);
-    }
-    .item-desc {
-      display: block;
-      font-size: 11px;
-      color: var(--el-text-color-placeholder);
-      margin-top: 2px;
-      line-height: 1.3;
-    }
+  .item-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--el-text-color-primary);
+  }
+
+  .item-desc {
+    font-size: 11.5px;
+    color: var(--el-text-color-secondary);
   }
 }
 
 .maintenance-action-box {
-  margin: 14px 18px;
-  padding: 12px 14px;
-  border-radius: 6px;
-  background: var(--el-color-danger-light-9);
-  border: 1px dashed var(--el-color-danger-light-5);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 12px;
+  padding: 12px 14px;
+  background: var(--el-color-danger-light-9);
+  border: 1px solid var(--el-color-danger-light-5);
+  border-radius: 6px;
+  margin-top: 14px;
 
   .action-title {
     font-size: 13px;
     font-weight: 600;
+    color: var(--el-color-danger-dark-2);
+  }
+
+  .action-desc {
+    font-size: 11.5px;
     color: var(--el-color-danger);
   }
-  .action-desc {
-    font-size: 11px;
-    color: var(--el-text-color-secondary);
-    margin-top: 2px;
-  }
 }
 
-.architecture-card {
-  grid-column: 1 / -1;
-
-  .card-content {
-    padding: 18px;
-  }
-}
-
+/* Architecture Card & Flow Diagram */
 .arch-desc {
   font-size: 12.5px;
-  line-height: 1.6;
-  color: var(--el-text-color-secondary);
-  margin-bottom: 14px;
+  color: var(--el-text-color-regular);
+  margin-bottom: 16px;
+  line-height: 1.5;
 }
 
 .arch-flow-diagram {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
   background: var(--el-fill-color-light);
   border: 1px solid var(--el-border-color-lighter);
   border-radius: 8px;
-  padding: 14px;
+  padding: 18px 24px;
   margin-bottom: 14px;
-  flex-wrap: wrap;
-}
 
-.flow-step {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 12px;
-  background: var(--el-bg-color);
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 6px;
-  flex: 1;
-  min-width: 170px;
-}
-
-.flow-step.highlight {
-  border-color: var(--el-color-primary-light-5);
-  background: var(--el-color-primary-light-9);
-}
-
-.flow-step-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 6px;
-  background: var(--el-color-primary-light-8);
-  color: var(--el-color-primary);
-  flex-shrink: 0;
-}
-
-.flow-step-text {
-  display: flex;
-  flex-direction: column;
-
-  strong {
-    font-size: 12px;
-    color: var(--el-text-color-primary);
+  @media (max-width: 768px) {
+    flex-direction: column;
+    gap: 12px;
   }
-  span {
-    font-size: 11px;
-    color: var(--el-text-color-secondary);
-  }
-}
 
-.flow-arrow {
-  color: var(--el-text-color-placeholder);
-  font-size: 14px;
-  font-weight: bold;
+  .flow-step {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+
+    .flow-step-icon {
+      width: 38px;
+      height: 38px;
+      border-radius: 8px;
+      background: var(--el-bg-color);
+      border: 1px solid var(--el-border-color);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--el-color-primary);
+    }
+
+    .flow-step-text {
+      display: flex;
+      flex-direction: column;
+
+      strong {
+        font-size: 13px;
+        color: var(--el-text-color-primary);
+      }
+      span {
+        font-size: 11.5px;
+        color: var(--el-text-color-secondary);
+      }
+    }
+
+    &.highlight {
+      .flow-step-icon {
+        background: var(--el-color-primary);
+        color: #fff;
+        border-color: var(--el-color-primary);
+      }
+    }
+  }
+
+  .flow-arrow {
+    font-size: 18px;
+    color: var(--el-text-color-placeholder);
+
+    @media (max-width: 768px) {
+      transform: rotate(90deg);
+    }
+  }
 }
 
 .arch-action-row {
@@ -3001,30 +3424,30 @@ onMounted(() => {
   justify-content: flex-end;
 }
 
-/* Adjudication Drawer */
-.drawer-content {
-  padding: 0 4px 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+/* Drawer Extended Page Styling */
+.audit-adjudication-drawer {
+  .drawer-content {
+    padding: 0 4px;
+  }
 }
 
 .drawer-user-hero {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 14px;
-  border-radius: 8px;
+  gap: 14px;
+  padding: 16px;
   background: var(--el-fill-color-light);
   border: 1px solid var(--el-border-color-lighter);
+  border-radius: 8px;
+  margin-bottom: 16px;
 
   .hero-avatar {
-    width: 40px;
-    height: 40px;
+    width: 44px;
+    height: 44px;
     border-radius: 8px;
     background: var(--el-color-primary);
-    color: #ffffff;
-    font-size: 16px;
+    color: #fff;
+    font-size: 18px;
     font-weight: 700;
     display: flex;
     align-items: center;
@@ -3032,201 +3455,238 @@ onMounted(() => {
   }
 
   .hero-email {
-    font-size: 14px;
+    font-size: 15px;
     font-weight: 700;
     color: var(--el-text-color-primary);
+    margin-bottom: 4px;
   }
 
   .hero-badges {
     display: flex;
+    align-items: center;
     gap: 6px;
-    margin-top: 4px;
   }
+}
+
+.comparison-section {
+  margin-bottom: 18px;
 }
 
 .comparison-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
+
+  @media (max-width: 600px) {
+    grid-template-columns: 1fr;
+  }
 }
 
 .comparison-card {
-  padding: 12px;
+  border: 1px solid var(--el-border-color);
   border-radius: 8px;
   background: var(--el-bg-color);
-  border: 1px solid var(--el-border-color);
+  padding: 12px;
 
   .card-header {
     display: flex;
     align-items: center;
     gap: 6px;
-    font-size: 12px;
+    font-size: 12.5px;
     font-weight: 600;
     color: var(--el-text-color-primary);
-    margin-bottom: 8px;
+    margin-bottom: 10px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--el-border-color-lighter);
   }
 
   .card-rows {
     display: flex;
     flex-direction: column;
-    gap: 5px;
+    gap: 6px;
   }
 
   .c-row {
     display: flex;
     justify-content: space-between;
-    font-size: 11px;
+    font-size: 11.5px;
 
     .label {
-      color: var(--el-text-color-secondary);
+      color: var(--el-text-color-placeholder);
     }
     .val {
-      font-weight: 600;
-      color: var(--el-text-color-primary);
+      font-weight: 500;
+      color: var(--el-text-color-regular);
+      max-width: 170px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
   }
 }
 
 .match-summary-box {
-  padding: 10px 14px;
-  border-radius: 6px;
-  background: var(--el-color-success-light-9);
-  border: 1px solid var(--el-color-success-light-5);
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  background: var(--el-fill-color-light);
+  border: 1px solid var(--el-border-color-lighter);
 
   .match-score-big {
-    font-size: 22px;
+    font-size: 26px;
     font-weight: 800;
+    line-height: 1;
   }
 
   .match-title {
-    font-size: 12.5px;
-    font-weight: 700;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--el-text-color-primary);
   }
+
   .match-sub {
-    font-size: 11px;
+    font-size: 11.5px;
     color: var(--el-text-color-secondary);
     margin-top: 2px;
   }
 
+  &.text-success {
+    background: var(--el-color-success-light-9);
+    border-color: var(--el-color-success-light-5);
+    .match-score-big { color: var(--el-color-success); }
+  }
   &.text-warning {
     background: var(--el-color-warning-light-9);
     border-color: var(--el-color-warning-light-5);
+    .match-score-big { color: var(--el-color-warning); }
   }
   &.text-danger {
     background: var(--el-color-danger-light-9);
     border-color: var(--el-color-danger-light-5);
+    .match-score-big { color: var(--el-color-danger); }
   }
 }
 
-.section-title {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--el-text-color-primary);
-  margin-bottom: 6px;
+.appeal-form-section, .active-ip-section, .decision-panel {
+  margin-bottom: 18px;
+
+  .section-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--el-text-color-primary);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 8px;
+  }
 }
 
 .appeal-statement-bubble {
-  padding: 10px 12px;
-  border-radius: 6px;
   background: var(--el-fill-color-light);
-  border-left: 3px solid var(--el-color-primary);
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--el-text-color-regular);
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 8px;
+  padding: 12px 14px;
+
+  p {
+    font-size: 12.5px;
+    color: var(--el-text-color-regular);
+    line-height: 1.5;
+    margin: 0 0 6px 0;
+  }
 
   .bubble-meta {
-    margin-top: 4px;
-    font-size: 11px;
-    color: var(--el-text-color-placeholder);
+    text-align: right;
+    .time-muted {
+      font-size: 11px;
+      color: var(--el-text-color-placeholder);
+    }
   }
 }
 
 .drawer-external-portal-box {
-  background: var(--el-fill-color-light);
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 6px;
-  padding: 10px 12px;
-}
+  background: var(--el-color-primary-light-9);
+  border: 1px solid var(--el-color-primary-light-5);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 18px;
 
-.depb-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 4px;
-}
+  .depb-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+  }
 
-.depb-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--el-text-color-primary);
-}
+  .depb-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--el-color-primary-dark-2);
+  }
 
-.depb-desc {
-  font-size: 11.5px;
-  line-height: 1.5;
-  color: var(--el-text-color-secondary);
-  margin: 0;
+  .depb-desc {
+    font-size: 11.5px;
+    color: var(--el-color-primary-dark-2);
+    margin: 0;
+    line-height: 1.4;
+  }
 }
 
 .ip-list-chips {
   display: flex;
+  gap: 8px;
   flex-wrap: wrap;
-  gap: 6px;
-}
 
-.ip-chip-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 3px 8px;
-  border-radius: 4px;
-  font-size: 11px;
-  background: var(--el-fill-color-light);
-  border: 1px solid var(--el-border-color-lighter);
+  .ip-chip-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    padding: 6px 10px;
+    border-radius: 6px;
+    background: var(--el-fill-color-light);
+    border: 1px solid var(--el-border-color-lighter);
 
-  &.current {
-    border-color: var(--el-color-primary-light-5);
-    color: var(--el-color-primary);
-    background: var(--el-color-primary-light-9);
-    font-weight: 600;
+    .chip-status {
+      font-size: 10px;
+      padding: 1px 4px;
+      border-radius: 3px;
+      background: var(--el-color-success);
+      color: #fff;
+    }
+
+    &.current {
+      border-color: var(--el-color-primary);
+      background: var(--el-color-primary-light-9);
+      color: var(--el-color-primary-dark-2);
+    }
   }
 }
 
-.decision-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  border-top: 1px solid var(--el-border-color-lighter);
-  padding-top: 14px;
+.decision-radio-group {
+  margin-bottom: 12px;
+}
+
+.decision-textarea {
+  margin-bottom: 10px;
+}
+
+.purge-checkbox-row {
+  margin-bottom: 16px;
 }
 
 .drawer-actions {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
-  margin-top: 10px;
-}
-
-.text-success {
-  color: var(--el-color-success) !important;
-}
-.text-warning {
-  color: var(--el-color-warning) !important;
-}
-.text-danger {
-  color: var(--el-color-danger) !important;
-}
-.font-mono {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 </style>
+`;
+
+fs.writeFileSync(targetFile, fileContent, 'utf8');
+console.log('✓ Successfully written full update to mail-vue/src/views/audit-report/index.vue');
