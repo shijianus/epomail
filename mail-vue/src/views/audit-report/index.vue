@@ -482,7 +482,7 @@
                 class="audit-data-table"
               >
                 <!-- Column 1: Target Account -->
-                <el-table-column :label="$t('userAccount')" min-width="210">
+                <el-table-column :label="$t('userAccount')" width="190">
                   <template #default="{ row }">
                     <div class="table-user-cell">
                       <div class="user-avatar-initial">{{ row.email.slice(0, 1).toUpperCase() }}</div>
@@ -500,7 +500,7 @@
                 </el-table-column>
 
                 <!-- Column 2: 预警说明与触发特征 (Narrow & Informative) -->
-                <el-table-column :label="$t('auditAlertExplanation')" min-width="260">
+                <el-table-column :label="$t('auditAlertExplanation')" min-width="220">
                   <template #default="{ row }">
                     <div class="table-alert-cell">
                       <div class="alert-feature-header">
@@ -513,7 +513,7 @@
                 </el-table-column>
 
                 <!-- Column 3: Active Pool & Environment (ZERO Timestamps) -->
-                <el-table-column :label="$t('auditActiveEnvPool')" min-width="220">
+                <el-table-column :label="$t('auditActiveEnvPool')" width="190">
                   <template #default="{ row }">
                     <div class="table-env-cell">
                       <div class="env-line">
@@ -533,7 +533,7 @@
                 </el-table-column>
 
                 <!-- Column 4: Compliance & Storage Space -->
-                <el-table-column :label="$t('tabTotalStorageSpace')" min-width="190">
+                <el-table-column :label="$t('tabTotalStorageSpace')" width="170">
                   <template #default="{ row }">
                     <div class="compliance-storage-cell">
                       <div class="storage-row">
@@ -553,12 +553,24 @@
                 </el-table-column>
 
                 <!-- Column 5: Operations & Actions (Distinguishing Operate vs Handle) -->
-                <el-table-column :label="$t('tabSetting')" width="270" fixed="right">
+                <el-table-column :label="$t('tabSetting')" width="230">
                   <template #default="{ row }">
                     <div class="table-actions-cell">
                       <!-- 前 3 类 (审计/风控/封禁): 对其进行操作 -->
                       <template v-if="row.warningType !== 'appeal'">
-                        <div class="cell-action-category-label">{{ $t('auditOperateTarget') }}</div>
+                        <div class="cell-action-category-label">
+                          <span class="action-kind-pill">{{ $t('auditOperateTarget') }}</span>
+                          <el-button
+                            size="small"
+                            type="primary"
+                            link
+                            class="cell-detail-link"
+                            @click="openAdjudicationDrawer(row)"
+                          >
+                            <span>{{ $t('auditViewDetails') }}</span>
+                            <Icon icon="fluent:arrow-up-right-16-regular" width="12" height="12" />
+                          </el-button>
+                        </div>
                         <div class="cell-action-btns">
                           <el-button
                             v-if="row.warningType === 'ban'"
@@ -598,18 +610,30 @@
                           </el-button>
                           <el-button
                             size="small"
-                            type="primary"
-                            link
-                            @click="openAdjudicationDrawer(row)"
+                            type="info"
+                            plain
+                            @click="handleWarningAction('purge_session', row)"
                           >
-                            {{ $t('auditViewDetails') }}
+                            {{ $t('auditActionPurgeSession') }}
                           </el-button>
                         </div>
                       </template>
 
                       <!-- 第 4 类 (申诉警告): 对于处理 -->
                       <template v-else>
-                        <div class="cell-action-category-label text-primary">{{ $t('auditHandleAdjudication') }}</div>
+                        <div class="cell-action-category-label text-primary">
+                          <span class="action-kind-pill appeal-kind">{{ $t('auditHandleAdjudication') }}</span>
+                          <el-button
+                            size="small"
+                            type="primary"
+                            link
+                            class="cell-detail-link"
+                            @click="openAdjudicationDrawer(row)"
+                          >
+                            <span>{{ $t('auditViewDetails') }}</span>
+                            <Icon icon="fluent:arrow-up-right-16-regular" width="12" height="12" />
+                          </el-button>
+                        </div>
                         <div class="cell-action-btns">
                           <el-button
                             size="small"
@@ -625,14 +649,6 @@
                             @click="quickReject(row)"
                           >
                             {{ $t('auditActionRejectAppeal') }}
-                          </el-button>
-                          <el-button
-                            size="small"
-                            type="primary"
-                            link
-                            @click="openAdjudicationDrawer(row)"
-                          >
-                            {{ $t('auditViewDetails') }}
                           </el-button>
                         </div>
                       </template>
@@ -3119,22 +3135,63 @@ onMounted(() => {
 }
 
 .table-actions-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+
   .cell-action-category-label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     font-size: 11px;
     font-weight: 600;
     color: var(--el-text-color-secondary);
-    margin-bottom: 4px;
 
-    &.text-primary {
+    .action-kind-pill {
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--el-color-warning-dark-2);
+      background: var(--el-color-warning-light-9);
+      border: 1px solid var(--el-color-warning-light-5);
+      border-radius: 3px;
+      padding: 1px 5px;
+
+      &.appeal-kind {
+        color: var(--el-color-primary-dark-2);
+        background: var(--el-color-primary-light-9);
+        border-color: var(--el-color-primary-light-5);
+      }
+    }
+
+    .cell-detail-link {
+      padding: 0;
+      height: auto;
+      font-size: 11px;
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
       color: var(--el-color-primary);
+
+      &:hover {
+        color: var(--el-color-primary-light-3);
+      }
     }
   }
 
   .cell-action-btns {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 4px;
     flex-wrap: wrap;
+
+    .el-button {
+      padding: 2px 7px;
+      height: 24px;
+      font-size: 11.5px;
+      margin-left: 0;
+      margin-right: 2px;
+      margin-bottom: 2px;
+    }
   }
 }
 

@@ -8,32 +8,39 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
-### 第三方认证与单点登录板块交互重塑、多 Provider 矢量图标对齐与几何零溢出自适应 (2026-10-03)
-*   **关联提交 (Git Commit)**: `21a92aef21b69ea96d29bf1bffcfe54461e552a3` (Short: `21a92ae`)
+### 第三方认证与单点登录 1/2/3/4/5 Provider 奇偶自适应布局重塑、矢量品牌图标对齐与几何零溢出全真栈交付 (2026-10-03)
+*   **关联提交 (Git Commit)**: `PENDING_COMMIT_HASH` (Short: `PENDING_SHORT_HASH`)
 *   **部署环境 (Deployment)**: `本地全真栈 / 构建核验`
 *   **功能需求与变更清单 (Changes & Feature Alignment)**:
-    - [x] 变更点 1 (第三方快捷登录按钮全面扩展与动态支持):
-        - 彻底摒弃以往仅硬编码支持 2 个提供商（Google、GitHub）的局限，全量扩展支援主流第三方与企业单点登录 Provider：Google、GitHub、Microsoft、Apple、Custom SSO (企业单点登录 / OIDC)；
-        - 支持根据后台 `sysConfig.oauthProviders` 动态感知已配置的提供商及其自定义名称（如 Okta SSO、Linux DO 等），在未配置时优雅降级并展示全量主流快捷登录选项；
+    - [x] 变更点 1 (1、2、3、4、5 个 Provider 全场景几何排布与奇偶数黄金对称自适应):
+        - **1 个 Provider (奇数)**: 渲染单列全宽 Hero 胶囊按钮 (`w-full h-11 justify-between px-4 sm:px-5`)，左侧专属矢量图标 + 专属文案（如 `通过 Google 账号继续`），右侧点缀微动效 `ArrowRight` 引导箭头，层次清晰且避免与下方主登录按钮视觉打架；
+        - **2 个 Provider (偶数)**: 经典 1:1 双列等宽网格 (`grid-cols-2 gap-2.5`)，视觉稳重大气；
+        - **3 个 Provider (奇数)**: 桌面端 3 列一字平铺 (`sm:grid-cols-3 gap-2.5`) 仅占单行 44px；移动端 (375px) 采用「1 顶跨列全宽 + 2 底双列平铺」倒金字塔结构 (`col-span-2 sm:col-span-1` + 2x `col-span-1`)，彻底杜绝 3 列在窄屏下出现文字横向截断 (`Micr...`) 的问题；
+        - **4 个 Provider (偶数)**: 经典 2x2 四宫格对称矩阵 (`grid-cols-2 gap-2 sm:gap-2.5`)；
+        - **5 个 Provider (奇数)**: 桌面端突破性采用 6 列基底网格 (`sm:grid-cols-6`)，第一行 3 个按钮各占 2 列 (`sm:col-span-2`，3x2=6)，第二行 2 个按钮各占 3 列 (`sm:col-span-3`，2x3=6) 实现完美的 3 上 2 下黄金对称，且仅占 2 行 96px；移动端 (375px) 采用「2 + 2 + 1 跨列对称底栏」紧凑排布 (`h-10 sm:h-11`)，第 5 个企业 SSO 按钮跨列横向铺满底栏作为企业单点登录锚点；
     - [x] 变更点 2 (按钮专属矢量 SVG 品牌图标配对与规范类名对齐):
         - 为每个第三方登录按钮深度定制并内联官方高精度矢量 SVG 品牌图标（Google 4色 G 标、GitHub 反白章鱼猫标、Microsoft 4色方块标、Apple 剪影标、Custom SSO 密钥盾牌标）；
         - 严格对齐项目规范按钮类名 `epomail-display flex h-11 items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-3 rounded-xl border text-[12px] sm:text-[13px] transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#67e8f9]`，包含亚克力玻璃拟态暗色边框与悬停高亮微动效；
         - 未配置提供商呈现精致 `SOON` 语义胶囊徽标，已配置提供商呈现全宽激活交互；
     - [x] 变更点 3 (固定几何卡片 h-[620px]/sm:h-[670px] 极限自适应与零溢出保障):
-        - 针对固定尺寸卡片 `.relative.overflow-hidden.rounded-3xl.h-[620px].sm:h-[670px]` 进行纵向节奏优化；
-        - 当开启第三方认证时，智能调整 Brand Header 间距与表单各组件 gap，确保在 375px 移动端（620px 极限高度）与 1440px 桌面端（670px 高度）中完全零溢出、零滑块、零滚动条；
-        - 奇数个提供商时最后一个按钮自动应用 `col-span-2` 跨列对称居中；
+        - 针对固定尺寸卡片 `.relative.overflow-hidden.rounded-3xl.h-[620px].sm:h-[670px]` 进行全场景纵向节奏精细调优；
+        - 当开启第三方认证时，根据 Provider 数量动态优化 Brand Header 间距与表单各组件 gap，确保在 375px 移动端（620px 极限高度，总高度 ≤ 132px，预留 > 30px 安全余量）与 1440px 桌面端（670px 高度）中 100% 零溢出、零滑块、零内部滚动条；
     - [x] 变更点 4 (端到端交互闭环与 OAuth 回调令牌自动接入):
         - 点击已配置 Provider 自动请求 `/api/oauth/authorize/:provider` 换取授权地址并跳转；点击未配置 Provider 友好触发系统级气泡预警；
         - 登录页挂载时自动解析 `/login?oauth_token=...` 与错误参数，实现 SSO 登录成功后的自动会话持久化与跃迁动效。
 *   **自动化测试与核验清单 (Verification Checklist)**:
-    - [x] 登录子应用构建核验：`temp_login_ui` Vite 构建通过 (4.06s, 0 errors)；
-    - [x] 主应用构建核验：`mail-vue` Vite 构建通过 (20.33s, 0 errors)；
+    - [x] 登录子应用构建核验：`temp_login_ui` Vite 构建通过 (2.35s, 0 errors)；
+    - [x] 主应用构建核验：`mail-vue` Vite 构建通过 (12.88s, 0 errors)；
     - [x] 产物同步：`scripts/copy-login-dist.mjs` 同步至 `mail-worker/dist/login` 完成；
     - [x] 多语言对称核验：`i18n-symmetry.mjs` (2,286 键 100% 绝对对称)；
-    - [x] 专项自动化测试：`tests/test-oauth-sso-buttons-verification.mjs` (12/12 断言全绿通过)；
-    - [x] 登录回归套件：`tests/verify-login-polish.mjs` (62/62 断言全绿通过)；
-    - [x] 视觉截图全真核验：`tests/audit_oauth_sso_desktop_1440.png`、`tests/audit_oauth_sso_mobile_375.png`、`tests/audit_oauth_custom_sso_desktop.png` 验证无瑕疵。
+    - [x] 专项全场景端到端测试：`tests/test-oauth-sso-buttons-verification.mjs` (25/25 断言全绿通过，100% 通过率，覆盖 1/2/3/4/5 Provider 在 1440px 桌面端与 375px 移动端)；
+    - [x] 登录全语言回归套件：`tests/verify-login-polish.mjs` (62/62 断言全绿通过)；
+    - [x] 视觉截图全场景核验：
+      * 1 Provider: `tests/audit_oauth_1_provider_desktop.png` & `tests/audit_oauth_1_provider_mobile.png`
+      * 2 Providers: `tests/audit_oauth_2_provider_desktop.png` & `tests/audit_oauth_2_provider_mobile.png`
+      * 3 Providers: `tests/audit_oauth_3_provider_desktop.png` & `tests/audit_oauth_3_provider_mobile.png`
+      * 4 Providers: `tests/audit_oauth_4_provider_desktop.png` & `tests/audit_oauth_4_provider_mobile.png`
+      * 5 Providers: `tests/audit_oauth_5_provider_desktop.png` & `tests/audit_oauth_5_provider_mobile.png`
 
 ### 用户列表与操作报告职责边界厘清、4类预警体系与显式扩展双层架构上线 (2026-10-03)
 *   **关联提交 (Git Commit)**: `90f8e5c581a60d653c7eb835e11b4b3bb9c8d71b` (Short: `90f8e5c`)

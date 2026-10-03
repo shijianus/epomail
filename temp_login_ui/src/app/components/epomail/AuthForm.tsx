@@ -1580,7 +1580,7 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
               </div>
 
               <div className={`${sysConfig?.oauthLoginEnabled ? 'pt-1' : 'pt-2'} flex flex-col gap-2`}>
-                {sysConfig?.oauthLoginEnabled ? (
+                {sysConfig?.oauthLoginEnabled && oauthProviderList.length > 0 ? (
                   <div className="flex flex-col gap-2.5">
                     <div className="flex items-center gap-2.5">
                       <div className="h-px flex-1" style={{ background: "rgba(139,147,196,0.2)" }} />
@@ -1590,40 +1590,180 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
                       <div className="h-px flex-1" style={{ background: "rgba(139,147,196,0.2)" }} />
                     </div>
 
-                    <div className={`grid ${oauthProviderList.length <= 2 ? 'grid-cols-2 gap-2.5' : oauthProviderList.length === 3 ? 'grid-cols-3 gap-2' : 'grid-cols-2 gap-2 sm:gap-2.5'} w-full`}>
-                      {oauthProviderList.map((provider, idx) => (
-                        <motion.button
-                          key={provider.key}
-                          type="button"
-                          onClick={() => handleOAuthProviderClick(provider)}
-                          whileHover={reduceMotion ? { opacity: 1 } : { opacity: 1, y: -1.5, borderColor: "rgba(103,232,249,0.5)", background: "rgba(255,255,255,0.08)" }}
-                          whileTap={{ scale: 0.98 }}
-                          transition={{ duration: 0.18, ease: "easeOut" }}
-                          className={`epomail-display flex h-11 items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-3 rounded-xl border text-[12px] sm:text-[13px] transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#67e8f9] ${
-                            oauthProviderList.length > 2 && oauthProviderList.length % 2 === 1 && idx === oauthProviderList.length - 1
-                              ? 'col-span-2'
-                              : ''
-                          }`}
-                          style={{
-                            borderColor: "rgba(139,147,196,0.25)",
-                            background: "rgba(255,255,255,0.04)",
-                            color: "var(--epo-ink)",
-                            opacity: 0.92,
-                          }}
-                        >
-                          {provider.icon}
-                          <span className="truncate">{provider.name}</span>
-                          {!provider.configured && (
+                    {/* Case 1: 1 Provider (Full-width Hero Capsule) */}
+                    {oauthProviderList.length === 1 && (
+                      <motion.button
+                        key={oauthProviderList[0].key}
+                        type="button"
+                        onClick={() => handleOAuthProviderClick(oauthProviderList[0])}
+                        whileHover={reduceMotion ? { opacity: 1 } : { opacity: 1, y: -1.5, borderColor: "rgba(103,232,249,0.5)", background: "rgba(255,255,255,0.08)" }}
+                        whileTap={{ scale: 0.98 }}
+                        transition={{ duration: 0.18, ease: "easeOut" }}
+                        className="epomail-display flex h-11 w-full items-center justify-between px-4 sm:px-5 rounded-xl border text-[13px] transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#67e8f9]"
+                        style={{
+                          borderColor: "rgba(139,147,196,0.25)",
+                          background: "rgba(255,255,255,0.04)",
+                          color: "var(--epo-ink)",
+                          opacity: 0.92,
+                        }}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          {oauthProviderList[0].icon}
+                          <span className="truncate font-medium">{oauthProviderList[0].name}</span>
+                          {!oauthProviderList[0].configured && (
                             <span
-                              className="rounded-full border px-1 sm:px-1.5 py-px text-[8.5px] sm:text-[9px] uppercase tracking-wider shrink-0"
+                              className="rounded-full border px-1.5 py-px text-[9px] uppercase tracking-wider shrink-0"
                               style={{ borderColor: "rgba(139,147,196,0.35)", color: "var(--epo-muted)" }}
                             >
                               {t('oauthSoon')}
                             </span>
                           )}
-                        </motion.button>
-                      ))}
-                    </div>
+                        </div>
+                        <ArrowRight size={15} className="text-[var(--epo-muted)] shrink-0" />
+                      </motion.button>
+                    )}
+
+                    {/* Case 2: 2 Providers (1:1 Symmetric Twin Columns) */}
+                    {oauthProviderList.length === 2 && (
+                      <div className="grid grid-cols-2 gap-2.5 w-full">
+                        {oauthProviderList.map((provider) => (
+                          <motion.button
+                            key={provider.key}
+                            type="button"
+                            onClick={() => handleOAuthProviderClick(provider)}
+                            whileHover={reduceMotion ? { opacity: 1 } : { opacity: 1, y: -1.5, borderColor: "rgba(103,232,249,0.5)", background: "rgba(255,255,255,0.08)" }}
+                            whileTap={{ scale: 0.98 }}
+                            transition={{ duration: 0.18, ease: "easeOut" }}
+                            className="epomail-display flex h-11 items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-3 rounded-xl border text-[12px] sm:text-[13px] transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#67e8f9]"
+                            style={{
+                              borderColor: "rgba(139,147,196,0.25)",
+                              background: "rgba(255,255,255,0.04)",
+                              color: "var(--epo-ink)",
+                              opacity: 0.92,
+                            }}
+                          >
+                            {provider.icon}
+                            <span className="truncate">{provider.name}</span>
+                            {!provider.configured && (
+                              <span
+                                className="rounded-full border px-1 sm:px-1.5 py-px text-[8.5px] sm:text-[9px] uppercase tracking-wider shrink-0"
+                                style={{ borderColor: "rgba(139,147,196,0.35)", color: "var(--epo-muted)" }}
+                              >
+                                {t('oauthSoon')}
+                              </span>
+                            )}
+                          </motion.button>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Case 3: 3 Providers (Desktop 3-Column / Mobile 1-Top + 2-Bottom) */}
+                    {oauthProviderList.length === 3 && (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-2.5 w-full">
+                        {oauthProviderList.map((provider, idx) => (
+                          <motion.button
+                            key={provider.key}
+                            type="button"
+                            onClick={() => handleOAuthProviderClick(provider)}
+                            whileHover={reduceMotion ? { opacity: 1 } : { opacity: 1, y: -1.5, borderColor: "rgba(103,232,249,0.5)", background: "rgba(255,255,255,0.08)" }}
+                            whileTap={{ scale: 0.98 }}
+                            transition={{ duration: 0.18, ease: "easeOut" }}
+                            className={`epomail-display flex h-11 items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-3 rounded-xl border text-[12px] sm:text-[13px] transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#67e8f9] ${
+                              idx === 0 ? 'col-span-2 sm:col-span-1' : 'col-span-1'
+                            }`}
+                            style={{
+                              borderColor: "rgba(139,147,196,0.25)",
+                              background: "rgba(255,255,255,0.04)",
+                              color: "var(--epo-ink)",
+                              opacity: 0.92,
+                            }}
+                          >
+                            {provider.icon}
+                            <span className="truncate">{provider.name}</span>
+                            {!provider.configured && (
+                              <span
+                                className="rounded-full border px-1 sm:px-1.5 py-px text-[8.5px] sm:text-[9px] uppercase tracking-wider shrink-0"
+                                style={{ borderColor: "rgba(139,147,196,0.35)", color: "var(--epo-muted)" }}
+                              >
+                                {t('oauthSoon')}
+                              </span>
+                            )}
+                          </motion.button>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Case 4: 4 Providers (2x2 Matrix) */}
+                    {oauthProviderList.length === 4 && (
+                      <div className="grid grid-cols-2 gap-2 sm:gap-2.5 w-full">
+                        {oauthProviderList.map((provider) => (
+                          <motion.button
+                            key={provider.key}
+                            type="button"
+                            onClick={() => handleOAuthProviderClick(provider)}
+                            whileHover={reduceMotion ? { opacity: 1 } : { opacity: 1, y: -1.5, borderColor: "rgba(103,232,249,0.5)", background: "rgba(255,255,255,0.08)" }}
+                            whileTap={{ scale: 0.98 }}
+                            transition={{ duration: 0.18, ease: "easeOut" }}
+                            className="epomail-display flex h-11 items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-3 rounded-xl border text-[12px] sm:text-[13px] transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#67e8f9]"
+                            style={{
+                              borderColor: "rgba(139,147,196,0.25)",
+                              background: "rgba(255,255,255,0.04)",
+                              color: "var(--epo-ink)",
+                              opacity: 0.92,
+                            }}
+                          >
+                            {provider.icon}
+                            <span className="truncate">{provider.name}</span>
+                            {!provider.configured && (
+                              <span
+                                className="rounded-full border px-1 sm:px-1.5 py-px text-[8.5px] sm:text-[9px] uppercase tracking-wider shrink-0"
+                                style={{ borderColor: "rgba(139,147,196,0.35)", color: "var(--epo-muted)" }}
+                              >
+                                {t('oauthSoon')}
+                              </span>
+                            )}
+                          </motion.button>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Case 5+: 5+ Providers (Desktop 3-Top + 2-Bottom Symmetric Grid / Mobile 2+2+1 Compact) */}
+                    {oauthProviderList.length >= 5 && (
+                      <div className="grid grid-cols-2 sm:grid-cols-6 gap-1.5 sm:gap-2 w-full">
+                        {oauthProviderList.map((provider, idx) => {
+                          const desktopSpan = idx < 3 ? 'sm:col-span-2' : 'sm:col-span-3';
+                          const mobileSpan = oauthProviderList.length % 2 === 1 && idx === oauthProviderList.length - 1 ? 'col-span-2' : 'col-span-1';
+                          return (
+                            <motion.button
+                              key={provider.key}
+                              type="button"
+                              onClick={() => handleOAuthProviderClick(provider)}
+                              whileHover={reduceMotion ? { opacity: 1 } : { opacity: 1, y: -1.5, borderColor: "rgba(103,232,249,0.5)", background: "rgba(255,255,255,0.08)" }}
+                              whileTap={{ scale: 0.98 }}
+                              transition={{ duration: 0.18, ease: "easeOut" }}
+                              className={`epomail-display flex h-10 sm:h-11 items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-3 rounded-xl border text-[12px] sm:text-[13px] transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#67e8f9] ${mobileSpan} ${desktopSpan}`}
+                              style={{
+                                borderColor: "rgba(139,147,196,0.25)",
+                                background: "rgba(255,255,255,0.04)",
+                                color: "var(--epo-ink)",
+                                opacity: 0.92,
+                              }}
+                            >
+                              {provider.icon}
+                              <span className="truncate">{provider.name}</span>
+                              {!provider.configured && (
+                                <span
+                                  className="rounded-full border px-1 sm:px-1.5 py-px text-[8.5px] sm:text-[9px] uppercase tracking-wider shrink-0"
+                                  style={{ borderColor: "rgba(139,147,196,0.35)", color: "var(--epo-muted)" }}
+                                >
+                                  {t('oauthSoon')}
+                                </span>
+                              )}
+                            </motion.button>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 ) : null}
 

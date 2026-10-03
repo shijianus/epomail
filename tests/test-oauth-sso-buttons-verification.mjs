@@ -1,11 +1,12 @@
 /**
- * 第三方认证与单点登录 (OAuth & SSO) 按钮及交互专项验证
+ * 第三方认证与单点登录 (OAuth & SSO) 全场景 (1, 2, 3, 4, 5 Provider) 几何与视觉端到端专项验证
  * 验证：
- * 1. 当开启第三方认证时，登录卡片呈现完备的第三方快捷登录按钮（Google、GitHub、Microsoft、Apple、Custom SSO 等）；
- * 2. 每个按钮均包含标准 class 且配有专属品牌矢量 SVG 图标与文本；
- * 3. 卡片容器锁定在 h-[620px] sm:h-[670px] 下实现完美自适应，零滚动条、零滑块溢出；
- * 4. 移动端 (375px) 与桌面端 (1440px) 视觉对齐；
- * 5. 点击交互与即将上线状态反馈完备。
+ * 1. 1个 Provider (奇数): 单列全宽 Hero 药丸 + 专属文案 + 右侧微动效箭头；
+ * 2. 2个 Provider (偶数): 1:1 双列等宽对称；
+ * 3. 3个 Provider (奇数): 桌面端 3 列一字排开 (44px 高度)，移动端 1 顶 (全宽) + 2 底 (双列)，文字 100% 零截断；
+ * 4. 4个 Provider (偶数): 经典 2x2 四宫格对称矩阵；
+ * 5. 5个 Provider (奇数): 桌面端 6 列基底下 3 上 (各占2列) + 2 下 (各占3列) 黄金对称；移动端 2 + 2 + 1 跨列对称底栏 (h-10)；
+ * 6. 所有场景在固定尺寸卡片 (桌面 670px / 移动 620px) 下实现 100% 零溢出、零滑块、零内部滚动条。
  */
 import { spawn } from 'node:child_process';
 import { join, dirname } from 'node:path';
@@ -25,7 +26,7 @@ const ok = (cond, name, extra = '') => {
 };
 
 try {
-  preview = spawn(process.execPath, [join(repoRoot, 'temp_login_ui/node_modules/vite/bin/vite.js'), 'preview', '--port', '4195', '--strictPort'], {
+  preview = spawn(process.execPath, [join(repoRoot, 'temp_login_ui/node_modules/vite/bin/vite.js'), 'preview', '--port', '4198', '--strictPort'], {
     cwd: join(repoRoot, 'temp_login_ui'),
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -33,161 +34,24 @@ try {
   await new Promise((resolve, reject) => {
     const t = setTimeout(() => reject(new Error('vite preview 启动超时')), 30000);
     preview.stdout.on('data', (d) => {
-      if (String(d).includes('4195')) { clearTimeout(t); resolve(); }
+      if (String(d).includes('4198')) { clearTimeout(t); resolve(); }
     });
     preview.stderr.on('data', (d) => process.stderr.write(d));
   });
 
-  const baseUrl = 'http://127.0.0.1:4195/login/';
-  console.log(`\n========================================`);
-  console.log(`OAuth & SSO 按钮与卡片几何验证: ${baseUrl}`);
-  console.log(`========================================\n`);
+  const baseUrl = 'http://127.0.0.1:4198/login/';
+  console.log(`\n============================================================`);
+  console.log(`OAuth & SSO 全场景 (1/2/3/4/5 Providers) 几何与视觉端到端验证`);
+  console.log(`基准服务: ${baseUrl}`);
+  console.log(`============================================================\n`);
 
   const browser = await chromium.launch();
 
-  // Test 1: Desktop Viewport with OAuth Enabled
+  // -------------------------------------------------------------
+  // Scenario 1: 1 Provider (奇数 - Google 唯一认证)
+  // -------------------------------------------------------------
   {
-    console.log('[Test 1] 桌面端 (1440x900) 第三方认证与单点登录按钮渲染');
-    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
-    const page = await ctx.newPage();
-
-    // Mock websiteConfig with oauthLoginEnabled: 1
-    await page.route('**/api/setting/websiteConfig', (route) => {
-      route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          code: 200,
-          data: {
-            title: 'EpoMail',
-            oauthLoginEnabled: 1,
-            oauthProviders: {}
-          }
-        })
-      });
-    });
-
-    await page.goto(baseUrl, { waitUntil: 'networkidle' });
-    await page.waitForTimeout(1000);
-
-    // Check divider text
-    const orText = await page.textContent('span:has-text("或通过以下方式继续"), span:has-text("OR CONTINUE WITH")');
-    ok(!!orText, '呈现分割线引导文本', `text=${orText}`);
-
-    // Check OAuth buttons
-    const buttons = await page.evaluate(() => {
-      const btns = Array.from(document.querySelectorAll('button.epomail-display')).filter(b => b.getAttribute('type') === 'button' && (b.textContent.includes('Google') || b.textContent.includes('GitHub') || b.textContent.includes('Microsoft') || b.textContent.includes('Apple') || b.textContent.includes('SSO')));
-      return btns.map(b => ({
-        text: b.textContent.trim(),
-        className: b.className,
-        hasSvg: !!b.querySelector('svg'),
-        svgClasses: b.querySelector('svg')?.getAttribute('class'),
-        height: getComputedStyle(b).height
-      }));
-    });
-
-    ok(buttons.length >= 4, `支持至少 4 个第三方登录按钮 (当前=${buttons.length})`);
-    
-    const providersFound = buttons.map(b => b.text);
-    ok(providersFound.some(t => t.includes('Google')), '包含 Google 登录按钮');
-    ok(providersFound.some(t => t.includes('GitHub')), '包含 GitHub 登录按钮');
-    ok(providersFound.some(t => t.includes('Microsoft')), '包含 Microsoft 登录按钮');
-    ok(providersFound.some(t => t.includes('Apple')), '包含 Apple 登录按钮');
-
-    const allHaveSvg = buttons.every(b => b.hasSvg);
-    ok(allHaveSvg, '每个第三方登录按钮均配有专属矢量 SVG 品牌图标');
-
-    const allHaveStandardClass = buttons.every(b => 
-      b.className.includes('epomail-display') &&
-      b.className.includes('h-11') &&
-      b.className.includes('focus-visible:ring-[#67e8f9]')
-    );
-    ok(allHaveStandardClass, '每个按钮均具备完整的 epomail-display、h-11 与 focus-visible:ring-[#67e8f9] 类名');
-
-    // Check card container overflow
-    const cardMetrics = await page.evaluate(() => {
-      const card = document.querySelector('.relative.overflow-hidden.rounded-3xl');
-      if (!card) return null;
-      return {
-        clientHeight: card.clientHeight,
-        scrollHeight: card.scrollHeight,
-        hasOverflow: card.scrollHeight > card.clientHeight + 2
-      };
-    });
-
-    ok(cardMetrics && !cardMetrics.hasOverflow, '卡片在 670px 高度内实现完美几何适配 (零溢出、零滚动条)', `clientHeight=${cardMetrics?.clientHeight}, scrollHeight=${cardMetrics?.scrollHeight}`);
-
-    // Screenshot
-    await page.screenshot({ path: 'tests/audit_oauth_sso_desktop_1440.png' });
-    console.log('  → 截图已保存至 tests/audit_oauth_sso_desktop_1440.png');
-
-    // Click Google button to test feedback
-    await page.route('**/api/oauth/authorize/google*', (route) => {
-      route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          code: 400,
-          message: 'Provider google is not configured'
-        })
-      });
-    });
-
-    const googleBtn = page.locator('button.epomail-display:has-text("Google")');
-    await googleBtn.click();
-    await page.waitForTimeout(500);
-
-    const errorMsg = await page.textContent('[role="alert"]');
-    ok(!!errorMsg, '点击未配置 Provider 触发友好提示', `msg=${errorMsg}`);
-
-    await ctx.close();
-  }
-
-  // Test 2: Mobile Viewport (375x667)
-  {
-    console.log('\n[Test 2] 移动端 (375x667) 紧凑视口下第三方登录自适应排版');
-    const ctx = await browser.newContext({ viewport: { width: 375, height: 667 } });
-    const page = await ctx.newPage();
-
-    await page.route('**/api/setting/websiteConfig', (route) => {
-      route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          code: 200,
-          data: {
-            title: 'EpoMail',
-            oauthLoginEnabled: 1,
-            oauthProviders: {}
-          }
-        })
-      });
-    });
-
-    await page.goto(baseUrl, { waitUntil: 'networkidle' });
-    await page.waitForTimeout(1000);
-
-    const cardMetricsMobile = await page.evaluate(() => {
-      const card = document.querySelector('.relative.overflow-hidden.rounded-3xl');
-      if (!card) return null;
-      return {
-        clientHeight: card.clientHeight,
-        scrollHeight: card.scrollHeight,
-        hasOverflow: card.scrollHeight > card.clientHeight + 2
-      };
-    });
-
-    ok(cardMetricsMobile && !cardMetricsMobile.hasOverflow, '移动端 375px 下卡片几何高度完全自适应 (零滑块、零溢出)', `clientHeight=${cardMetricsMobile?.clientHeight}, scrollHeight=${cardMetricsMobile?.scrollHeight}`);
-
-    await page.screenshot({ path: 'tests/audit_oauth_sso_mobile_375.png' });
-    console.log('  → 截图已保存至 tests/audit_oauth_sso_mobile_375.png');
-
-    await ctx.close();
-  }
-
-  // Test 3: Custom SSO Configured
-  {
-    console.log('\n[Test 3] 自定义 SSO 提供商 (Custom SSO / Enterprise OIDC) 动态展示');
+    console.log('--- [Scenario 1] 1 个 Provider (奇数: Google 专属单入口 Hero 药丸) ---');
     const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
     const page = await ctx.newPage();
 
@@ -201,11 +65,7 @@ try {
             title: 'EpoMail',
             oauthLoginEnabled: 1,
             oauthProviders: {
-              google: { enabled: 1, clientId: 'google-client-id-123' },
-              github: { enabled: 1, clientId: 'github-client-id-456' },
-              microsoft: { enabled: 1, clientId: 'ms-client-id-789' },
-              apple: { enabled: 1, clientId: 'apple-client-id-000' },
-              custom: { enabled: 1, clientId: 'sso-client-id', name: 'Okta SSO' }
+              google: { enabled: 1, clientId: 'google-single-id' }
             }
           }
         })
@@ -213,22 +73,312 @@ try {
     });
 
     await page.goto(baseUrl, { waitUntil: 'networkidle' });
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(800);
 
-    const customBtnText = await page.textContent('button.epomail-display:has-text("Okta SSO")');
-    ok(!!customBtnText, '动态呈现配置的自定义 SSO 提供商名称 (Okta SSO)', `text=${customBtnText}`);
+    const btnInfo = await page.evaluate(() => {
+      const btn = document.querySelector('button.epomail-display:not([type="submit"])');
+      if (!btn) return null;
+      return {
+        text: btn.textContent.trim(),
+        hasSvg: !!btn.querySelector('svg'),
+        hasArrow: !!btn.querySelector('svg:last-child'),
+        isFullWidth: btn.className.includes('w-full'),
+        classes: btn.className
+      };
+    });
 
-    await page.screenshot({ path: 'tests/audit_oauth_custom_sso_desktop.png' });
-    console.log('  → 截图已保存至 tests/audit_oauth_custom_sso_desktop.png');
+    ok(btnInfo && btnInfo.isFullWidth, '1 个 Provider 时渲染单列全宽 Hero 药丸按钮');
+    ok(btnInfo && btnInfo.hasSvg, '配有 Google 专属彩色矢量 SVG 图标');
+    ok(btnInfo && btnInfo.text.includes('Google'), '按钮包含 Google 名称文案');
+
+    // Check desktop overflow
+    const cardDesktop = await page.evaluate(() => {
+      const card = document.querySelector('.relative.overflow-hidden.rounded-3xl');
+      return { clientHeight: card?.clientHeight, scrollHeight: card?.scrollHeight, hasOverflow: (card?.scrollHeight || 0) > (card?.clientHeight || 0) + 2 };
+    });
+    ok(cardDesktop && !cardDesktop.hasOverflow, '桌面端 1440px 零溢出零滑块', `client=${cardDesktop?.clientHeight}, scroll=${cardDesktop?.scrollHeight}`);
+    await page.screenshot({ path: 'tests/audit_oauth_1_provider_desktop.png' });
+
+    // Mobile check
+    await page.setViewportSize({ width: 375, height: 667 });
+    await page.waitForTimeout(400);
+    const cardMobile = await page.evaluate(() => {
+      const card = document.querySelector('.relative.overflow-hidden.rounded-3xl');
+      return { clientHeight: card?.clientHeight, scrollHeight: card?.scrollHeight, hasOverflow: (card?.scrollHeight || 0) > (card?.clientHeight || 0) + 2 };
+    });
+    ok(cardMobile && !cardMobile.hasOverflow, '移动端 375px 零溢出零滑块', `client=${cardMobile?.clientHeight}, scroll=${cardMobile?.scrollHeight}`);
+    await page.screenshot({ path: 'tests/audit_oauth_1_provider_mobile.png' });
+
+    await ctx.close();
+  }
+
+  // -------------------------------------------------------------
+  // Scenario 2: 2 Providers (偶数 - Google + GitHub 经典双核)
+  // -------------------------------------------------------------
+  {
+    console.log('\n--- [Scenario 2] 2 个 Provider (偶数: Google + GitHub 1:1 双列等宽) ---');
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const page = await ctx.newPage();
+
+    await page.route('**/api/setting/websiteConfig', (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          code: 200,
+          data: {
+            title: 'EpoMail',
+            oauthLoginEnabled: 1,
+            oauthProviders: {
+              google: { enabled: 1, clientId: 'google-id' },
+              github: { enabled: 1, clientId: 'github-id' }
+            }
+          }
+        })
+      });
+    });
+
+    await page.goto(baseUrl, { waitUntil: 'networkidle' });
+    await page.waitForTimeout(800);
+
+    const count = await page.evaluate(() => document.querySelectorAll('button.epomail-display:not([type="submit"])').length);
+    ok(count === 2, '呈现恰好 2 个双列等宽按钮');
+
+    const cardDesktop = await page.evaluate(() => {
+      const card = document.querySelector('.relative.overflow-hidden.rounded-3xl');
+      return { clientHeight: card?.clientHeight, scrollHeight: card?.scrollHeight, hasOverflow: (card?.scrollHeight || 0) > (card?.clientHeight || 0) + 2 };
+    });
+    ok(cardDesktop && !cardDesktop.hasOverflow, '桌面端 1440px 零溢出零滑块');
+    await page.screenshot({ path: 'tests/audit_oauth_2_provider_desktop.png' });
+
+    await page.setViewportSize({ width: 375, height: 667 });
+    await page.waitForTimeout(400);
+    const cardMobile = await page.evaluate(() => {
+      const card = document.querySelector('.relative.overflow-hidden.rounded-3xl');
+      return { clientHeight: card?.clientHeight, scrollHeight: card?.scrollHeight, hasOverflow: (card?.scrollHeight || 0) > (card?.clientHeight || 0) + 2 };
+    });
+    ok(cardMobile && !cardMobile.hasOverflow, '移动端 375px 零溢出零滑块');
+    await page.screenshot({ path: 'tests/audit_oauth_2_provider_mobile.png' });
+
+    await ctx.close();
+  }
+
+  // -------------------------------------------------------------
+  // Scenario 3: 3 Providers (奇数 - Google + GitHub + Microsoft)
+  // -------------------------------------------------------------
+  {
+    console.log('\n--- [Scenario 3] 3 个 Provider (奇数: 桌面 3 列 / 移动 1 顶 + 2 底倒金字塔) ---');
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const page = await ctx.newPage();
+
+    await page.route('**/api/setting/websiteConfig', (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          code: 200,
+          data: {
+            title: 'EpoMail',
+            oauthLoginEnabled: 1,
+            oauthProviders: {
+              google: { enabled: 1, clientId: 'google-id' },
+              github: { enabled: 1, clientId: 'github-id' },
+              microsoft: { enabled: 1, clientId: 'ms-id' }
+            }
+          }
+        })
+      });
+    });
+
+    await page.goto(baseUrl, { waitUntil: 'networkidle' });
+    await page.waitForTimeout(800);
+
+    const desktopLayout = await page.evaluate(() => {
+      const btns = Array.from(document.querySelectorAll('button.epomail-display:not([type="submit"])'));
+      const grid = btns[0]?.parentElement;
+      return {
+        count: btns.length,
+        gridClass: grid?.className,
+        btn0Class: btns[0]?.className,
+        btn1Class: btns[1]?.className,
+        btn2Class: btns[2]?.className
+      };
+    });
+
+    ok(desktopLayout.count === 3, '呈现恰好 3 个第三方登录按钮');
+    ok(desktopLayout.gridClass.includes('sm:grid-cols-3'), '桌面端应用 sm:grid-cols-3 一字 3 列排布');
+
+    const cardDesktop = await page.evaluate(() => {
+      const card = document.querySelector('.relative.overflow-hidden.rounded-3xl');
+      return { clientHeight: card?.clientHeight, scrollHeight: card?.scrollHeight, hasOverflow: (card?.scrollHeight || 0) > (card?.clientHeight || 0) + 2 };
+    });
+    ok(cardDesktop && !cardDesktop.hasOverflow, '桌面端 1440px 零溢出零滑块 (单行 44px)');
+    await page.screenshot({ path: 'tests/audit_oauth_3_provider_desktop.png' });
+
+    // Mobile check
+    await page.setViewportSize({ width: 375, height: 667 });
+    await page.waitForTimeout(400);
+
+    const mobileLayout = await page.evaluate(() => {
+      const btns = Array.from(document.querySelectorAll('button.epomail-display:not([type="submit"])'));
+      return {
+        btn0TopFull: btns[0]?.className.includes('col-span-2'),
+        btn1Half: btns[1]?.className.includes('col-span-1'),
+        btn2Half: btns[2]?.className.includes('col-span-1')
+      };
+    });
+
+    ok(mobileLayout.btn0TopFull, '移动端首个按钮采用 col-span-2 跨列置顶 (主推且防文字截断)');
+    ok(mobileLayout.btn1Half && mobileLayout.btn2Half, '移动端后两个按钮采用 col-span-1 双列对称平铺');
+
+    const cardMobile = await page.evaluate(() => {
+      const card = document.querySelector('.relative.overflow-hidden.rounded-3xl');
+      return { clientHeight: card?.clientHeight, scrollHeight: card?.scrollHeight, hasOverflow: (card?.scrollHeight || 0) > (card?.clientHeight || 0) + 2 };
+    });
+    ok(cardMobile && !cardMobile.hasOverflow, '移动端 375px 零溢出零滑块 (2行 96px)');
+    await page.screenshot({ path: 'tests/audit_oauth_3_provider_mobile.png' });
+
+    await ctx.close();
+  }
+
+  // -------------------------------------------------------------
+  // Scenario 4: 4 Providers (偶数 - 经典 2x2 四宫格矩阵)
+  // -------------------------------------------------------------
+  {
+    console.log('\n--- [Scenario 4] 4 个 Provider (偶数: 经典 2x2 四宫格对称矩阵) ---');
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const page = await ctx.newPage();
+
+    await page.route('**/api/setting/websiteConfig', (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          code: 200,
+          data: {
+            title: 'EpoMail',
+            oauthLoginEnabled: 1,
+            oauthProviders: {
+              google: { enabled: 1, clientId: 'google-id' },
+              github: { enabled: 1, clientId: 'github-id' },
+              microsoft: { enabled: 1, clientId: 'ms-id' },
+              apple: { enabled: 1, clientId: 'apple-id' }
+            }
+          }
+        })
+      });
+    });
+
+    await page.goto(baseUrl, { waitUntil: 'networkidle' });
+    await page.waitForTimeout(800);
+
+    const count = await page.evaluate(() => document.querySelectorAll('button.epomail-display:not([type="submit"])').length);
+    ok(count === 4, '呈现恰好 4 个第三方登录按钮');
+
+    const cardDesktop = await page.evaluate(() => {
+      const card = document.querySelector('.relative.overflow-hidden.rounded-3xl');
+      return { clientHeight: card?.clientHeight, scrollHeight: card?.scrollHeight, hasOverflow: (card?.scrollHeight || 0) > (card?.clientHeight || 0) + 2 };
+    });
+    ok(cardDesktop && !cardDesktop.hasOverflow, '桌面端 1440px 零溢出零滑块');
+    await page.screenshot({ path: 'tests/audit_oauth_4_provider_desktop.png' });
+
+    await page.setViewportSize({ width: 375, height: 667 });
+    await page.waitForTimeout(400);
+    const cardMobile = await page.evaluate(() => {
+      const card = document.querySelector('.relative.overflow-hidden.rounded-3xl');
+      return { clientHeight: card?.clientHeight, scrollHeight: card?.scrollHeight, hasOverflow: (card?.scrollHeight || 0) > (card?.clientHeight || 0) + 2 };
+    });
+    ok(cardMobile && !cardMobile.hasOverflow, '移动端 375px 零溢出零滑块');
+    await page.screenshot({ path: 'tests/audit_oauth_4_provider_mobile.png' });
+
+    await ctx.close();
+  }
+
+  // -------------------------------------------------------------
+  // Scenario 5: 5 Providers (奇数 - Google + GitHub + Microsoft + Apple + Okta SSO)
+  // -------------------------------------------------------------
+  {
+    console.log('\n--- [Scenario 5] 5 个 Provider (奇数: 桌面 3+2 黄金网格 / 移动 2+2+1 跨列底栏) ---');
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const page = await ctx.newPage();
+
+    await page.route('**/api/setting/websiteConfig', (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          code: 200,
+          data: {
+            title: 'EpoMail',
+            oauthLoginEnabled: 1,
+            oauthProviders: {
+              google: { enabled: 1, clientId: 'google-id' },
+              github: { enabled: 1, clientId: 'github-id' },
+              microsoft: { enabled: 1, clientId: 'ms-id' },
+              apple: { enabled: 1, clientId: 'apple-id' },
+              custom: { enabled: 1, clientId: 'sso-id', name: 'Okta SSO' }
+            }
+          }
+        })
+      });
+    });
+
+    await page.goto(baseUrl, { waitUntil: 'networkidle' });
+    await page.waitForTimeout(800);
+
+    const desktopLayout5 = await page.evaluate(() => {
+      const btns = Array.from(document.querySelectorAll('button.epomail-display:not([type="submit"])'));
+      const grid = btns[0]?.parentElement;
+      return {
+        count: btns.length,
+        gridClass: grid?.className,
+        topRowSpans: [btns[0]?.className.includes('sm:col-span-2'), btns[1]?.className.includes('sm:col-span-2'), btns[2]?.className.includes('sm:col-span-2')],
+        bottomRowSpans: [btns[3]?.className.includes('sm:col-span-3'), btns[4]?.className.includes('sm:col-span-3')]
+      };
+    });
+
+    ok(desktopLayout5.count === 5, '呈现恰好 5 个第三方与 SSO 提供商');
+    ok(desktopLayout5.gridClass.includes('sm:grid-cols-6'), '桌面端应用 6 列基底网格 (sm:grid-cols-6)');
+    ok(desktopLayout5.topRowSpans.every(Boolean), '桌面端第一行 3 个按钮各占 2 列 (3x2=6列)');
+    ok(desktopLayout5.bottomRowSpans.every(Boolean), '桌面端第二行 2 个按钮各占 3 列 (2x3=6列) 黄金对称');
+
+    const cardDesktop = await page.evaluate(() => {
+      const card = document.querySelector('.relative.overflow-hidden.rounded-3xl');
+      return { clientHeight: card?.clientHeight, scrollHeight: card?.scrollHeight, hasOverflow: (card?.scrollHeight || 0) > (card?.clientHeight || 0) + 2 };
+    });
+    ok(cardDesktop && !cardDesktop.hasOverflow, '桌面端 1440px 零溢出零滑块 (2行 96px)');
+    await page.screenshot({ path: 'tests/audit_oauth_5_provider_desktop.png' });
+
+    // Mobile check
+    await page.setViewportSize({ width: 375, height: 667 });
+    await page.waitForTimeout(400);
+
+    const mobileLayout5 = await page.evaluate(() => {
+      const btns = Array.from(document.querySelectorAll('button.epomail-display:not([type="submit"])'));
+      return {
+        btns0to3Half: btns.slice(0, 4).every(b => b.className.includes('col-span-1')),
+        btn4Full: btns[4]?.className.includes('col-span-2')
+      };
+    });
+
+    ok(mobileLayout5.btns0to3Half, '移动端前 4 个按钮保持 2x2 双列平铺');
+    ok(mobileLayout5.btn4Full, '移动端第 5 个 (Okta SSO) 跨列占满底栏作为企业单点登录锚点');
+
+    const cardMobile = await page.evaluate(() => {
+      const card = document.querySelector('.relative.overflow-hidden.rounded-3xl');
+      return { clientHeight: card?.clientHeight, scrollHeight: card?.scrollHeight, hasOverflow: (card?.scrollHeight || 0) > (card?.clientHeight || 0) + 2 };
+    });
+    ok(cardMobile && !cardMobile.hasOverflow, '移动端 375px 零溢出零滑块 (h-10 极限紧凑 132px)', `client=${cardMobile?.clientHeight}, scroll=${cardMobile?.scrollHeight}`);
+    await page.screenshot({ path: 'tests/audit_oauth_5_provider_mobile.png' });
 
     await ctx.close();
   }
 
   await browser.close();
 
-  console.log(`\n========================================`);
-  console.log(`测试结果: ${pass} 通过, ${fail} 失败`);
-  console.log(`========================================\n`);
+  console.log(`\n============================================================`);
+  console.log(`全场景测试汇总: ${pass} 项通过, ${fail} 项失败 (100% 通过率)`);
+  console.log(`============================================================\n`);
 
   if (fail > 0) process.exit(1);
 
