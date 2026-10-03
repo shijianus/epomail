@@ -8,6 +8,22 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### 个资「添加电子邮箱」按钮位置重构：调整至 email-row 右侧与水平基线对齐 (2026-10-02)
+*   **关联提交 (Git Commit)**: `87dff500d0931eae2e2f3d664d557d7512de816f` (Short: `87dff50`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare Workers (https://mail.epocanvas.com)` (Version ID: `9c197262-ff42-4b3d-aaae-0223763ebe63`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 变更点 1 (重构按钮布局位置)：
+        - 将个资「电子邮件」项下的「添加电子邮箱」按钮从此前下方独立折行（`margin-top: 10px`）移除，重构为置于首行主邮箱 `email-row` 右侧（`.email-primary-row`），与账号主邮箱卡片水平基线自然齐平；
+    - [x] 变更点 2 (优化单邮箱与多邮箱视图体验)：
+        - 当仅有主邮箱时，标签、主邮箱胶囊和添加按钮处于同一水平行内，与个资页其他行（昵称、性别、生日、常用地址）保持一致的水平紧凑质感；当存在额外个人邮箱时，副邮箱在下方依次垂直罗列，层级分明；
+    - [x] 变更点 3 (响应式与样式适配)：
+        - `.email-primary-row` 引入 `align-items: center; gap: 12px; flex-wrap: wrap;`，在移动端小屏下平滑换行防溢出，在桌面端保持 0px 垂直偏差点对齐。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：`mail-vue` 构建通过 (耗时 15.52s)；
+    - [x] 自动化测试套件：`tests/test-profile-multiple-emails-e2e.mjs` 全真公网端到端测试 22/22 项断言 100% 全部通过；
+    - [x] 几何盒模型实测：按钮位于 `email-row` 右侧 (`btnX: 965.0 >= rowRight: 953.0`)，水平基线居中对齐 (`中心Y差值: 0.0px`)；
+    - [x] 真实生产全真截图：已保存至 `tests/verify_profile_multiple_emails.png`，零脏数据残留。
+
 ### 2FA 信任设备 30 天免验与双期黑盒风控生命周期模型交付上线 (2026-10-02)
 *   **关联提交 (Git Commit)**: `9c28ede44ea3d7da74a7ff95be8579979313dbfe` (Short: `9c28ede`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare Workers (https://mail.epocanvas.com)` (Version ID: `ec838b82-6b3e-46c1-838d-c724a465c9a3`)
