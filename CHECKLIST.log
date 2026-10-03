@@ -7,6 +7,28 @@
 > 制度规范与工作流指引请见 [AGENTS.md](file:///home/shijian/projects/epocanvas-mail/AGENTS.md)。
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
+### 操作报告与风控控制台生产环境部署与公网视觉核验 (2026-10-03)
+*   **关联提交 (Git Commit)**: `e5b1b7a70a83e01bc6ef07481ba8ea08c90380eb` (Short: `e5b1b7a`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare Workers (https://mail.epocanvas.com)` (Version ID: `adccc457-d0a0-4b1f-b2e5-a045d9ad051f`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 变更点 1 (Cloudflare 生产构建与现网发布)：
+        - 执行 `wrangler deploy` 自动完成 `temp_login_ui` + `mail-vue` 完整构建链；
+        - 增量上传 47 项全新核心静态资产，成功部署至生产环境版本 ID `adccc457-d0a0-4b1f-b2e5-a045d9ad051f`；
+    - [x] 变更点 2 (「系统设置」控制按键与入口强化)：
+        - 强化「系统设置」(`sys-setting`) 中的 `audit-policy-card`：右侧增加 `[操作报告 🛡️]` 行内配置按钮，并在卡片底部提供大号专属高对比度直达按键 `[🛡️ 操作报告 (操作审计流水 / 风控研判与申诉)]`；
+        - 补充专用导航函数 `openAuditReport` 确保准确提取动态 `currentRoleSlug` 平滑跳转至 `#manage/admin/audit`；
+    - [x] 变更点 3 (Playwright 公网全真视觉与功能核验)：
+        - 编写并执行生产公网端到端测试套件 `tests/verify-prod-audit-report-visual.mjs`，21/21 项断言 100% 全绿；
+        - 实地验证公网环境下的三安全模式切换（全部模式/隐私模式/加密模式）、时序流水时间轴与表格双视图平滑切换；
+        - 实地验证风控研判抽屉滑出、原始注册基线 vs 申诉提交环境双栏指纹比对、98% 相似度测算与 IP 同网段比对、放行处置单选与清除非重要日志控制；
+        - 产出 4 幅公网高保真全真截图（`tests/verify_prod_sys_setting_audit_card.png`、`tests/verify_prod_audit_stream.png`、`tests/verify_prod_audit_risk_drawer.png`、`tests/verify_prod_audit_policy.png`）。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：`mail-vue` Vite 构建通过 (13.96s)，产物零警告零报错；
+    - [x] 本地 E2E 测试套件：`tests/test-audit-report-e2e.mjs` 全绿 (6/6 通过)；
+    - [x] 公网生产视觉验收：`tests/verify-prod-audit-report-visual.mjs` 全绿 (21/21 通过)；
+    - [x] 多语言对称闭环：6 语言字典 (`zh`, `zh-Hant`, `en`, `es`, `fr`, `nl`) 100% 绝对对称 (2242 keys)，代码引用零缺失；
+    - [x] 零假数据残留：线上核验会话物理隔离，无残留脏数据。
+
 ### 操作报告与风控管理控制台全真前端交付 (2026-10-03)
 *   **关联提交 (Git Commit)**: `16ae84f186c74b1c007fdb51c25e9cda34826b24` (Short: `16ae84f`)
 *   **部署环境 (Deployment)**: `本地全真栈构建与核验 (mail-vue Vite)`
