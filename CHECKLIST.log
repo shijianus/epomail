@@ -8,6 +8,34 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### 操作报告与风控控制台 PM 美学重构与 epomail-docs 对外非认证申诉闭环 (2026-10-03)
+*   **关联提交 (Git Commit)**: `365b686e269b40fc5d611eb9eca3296a32f88c57` (Short: `365b686`)
+    - 联动提交 (epomail-docs): `18749733cf852899450a8b981f33f07a7bc93f06` (Short: `1874973`)
+    - 联动提交 (epocanvas-docs): `185ded38f61555546bdf2c3fa8f5c90b8f052db6` (Short: `185ded3`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare Workers (https://mail.epocanvas.com)` (Version ID: `bbee89be-514f-4caa-ae80-245ed113b68e`) / `Cloudflare Pages (https://docs.epocanvas.com & https://epomail-docs.pages.dev)`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 变更点 1 (双轨对外表单架构解耦与 epomail-docs 独立申诉门户)：
+        - 响应用户核心诉求，将对外公开申诉与密码重置表单剥离至 `epomail-docs`（`https://docs.epocanvas.com/epomail/mail/appeal/`），彻底消除被封禁/忘记密码用户因主站鉴权导致的死循环；
+        - 在 `epomail-docs` 实现 6 语言对称文档（zh, zh-tw, en, es, fr, nl）与交互客户端 `appeal-client.js`：支持实时硬件 Canvas/WebGL SHA-256 指纹采集、表单动态校验与 SLA 工单凭据（Ticket ID 如 `TKT-2026-XXXXX`）生成；
+        - 在 `epocanvas-docs` 配置 302 跨项目优雅重定向，确保主域名路由无缝访问。
+    - [x] 变更点 2 (Webmail 登录「忘记密码？」赛博模态框引导)：
+        - 在 `temp_login_ui` 的 `AuthForm.tsx` 中新增暗色赛博毛玻璃浮层 (`showForgotModal`)；
+        - 自动获取当前登录框预填邮箱，动态拼接六语言本地化 URL，一键导流至 `epomail-docs` 外部核验门户。
+    - [x] 变更点 3 (操作报告与风控控制台 PM 顶级美学重构与体验升级)：
+        - 顶栏增设「← 返回系统设置」与「查看用户对外申诉页面 (epomail-docs) ↗」快速导流面包屑导航；
+        - 4 大 KPI 卡片嵌入微进度条、待审诉单脉动光信标 (pulse beacon) 以及 3-IP / 3-设备环境槽位胶囊；
+        - 申诉研判抽屉中增设「epomail-docs 对外申诉接口」数据来源横幅与 98% 指纹匹配推荐标签；
+        - Tab 3 策略页新增「对外表单与风控流转架构说明」卡片，以 3 步可视化流程图呈现双轨解耦机理；
+        - 严格补齐六语言字典（`auditExternalPortalBadge`, `auditArchStepDocs`, `auditArchStepCloud`, `auditArchStepAdmin`），实现 2,251 词条 100% 绝对对称。
+    - [x] 变更点 4 (独立 PM Subagent 深度验收)：
+        - 委任独立 PM UX Auditor Subagent 对 5 组公网生产实测截图与旅程进行深度评审，签署 `PASSED & APPROVED` 准予发布裁决。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：`mail-vue` Vite 构建通过 (13.16s)，`epomail-docs` 构建通过 (61 pages, 0 errors)；
+    - [x] 静态多语言三件套：`i18n-symmetry.mjs` (ALL SYMMETRIC), `i18n-audit.mjs` (0 缺失), `i18n-hardcoded.mjs` 全绿；
+    - [x] 自动化端到端测试：`tests/verify-appeal-and-audit-integration.mjs` 生产全量全绿 (21/21 项断言全部通过)；
+    - [x] 浏览器全真栈实测：5 张高清公网实测截图归档保存，端到端旅程流畅闭环；
+    - [x] 零假数据残留：测试使用只读会话及标准 API，无任何临时脏数据残留。
+
 ### 第三方认证与单点登录 (OAuth & SSO) 公网全真栈端到端审计与验证 (2026-10-03)
 *   **关联提交 (Git Commit)**: `1812bab8699ba029833b0631a6c7dd944839a2f8` (Short: `1812bab`) / `fc4adda1a24e21ca89cc9d1e1966bad45ed9d081` (Short: `fc4adda`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare Workers (https://mail.epocanvas.com)` (Version ID: `ed586d60-0fd2-41b5-a5c9-dc811ab1416f`)
