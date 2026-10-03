@@ -9,7 +9,7 @@
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
 ### 第三方认证与单点登录 (OAuth & SSO) 公网全真栈端到端审计与验证 (2026-10-03)
-*   **关联提交 (Git Commit)**: `4eb683c091effb20662b94de9e58fbc724612afd` (Short: `4eb683c`)
+*   **关联提交 (Git Commit)**: `1812bab8699ba029833b0631a6c7dd944839a2f8` (Short: `1812bab`) / `fc4adda1a24e21ca89cc9d1e1966bad45ed9d081` (Short: `fc4adda`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare Workers (https://mail.epocanvas.com)` (Version ID: `ed586d60-0fd2-41b5-a5c9-dc811ab1416f`)
 *   **功能需求与变更清单 (Changes & Feature Alignment)**:
     - [x] 变更点 1 (OAuth 连通性探测与鉴权修复)：
