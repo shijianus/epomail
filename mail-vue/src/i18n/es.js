@@ -2257,6 +2257,10 @@ totpModeAllDesc: 'Configurar si los usuarios pueden usar TOTP. Al activarlo, la 
     auditExternalAppealDesc: "Los usuarios pueden remitir apelaciones en epomail-docs sin iniciar sesión, registrando la huella del equipo. Los datos se sincronizan con este panel para su aprobación.",
     auditArchitectureTitle: "Arquitectura de formularios públicos y control de riesgos",
     auditArchitectureDesc: "EpoCanvas aplica una arquitectura dual: los usuarios no autenticados envían tickets y telemetría a través del portal independiente epomail-docs, evitando bloqueos circulares; los administradores resuelven las solicitudes desde este panel.",
+    auditExternalPortalBadge: "Portal de apelación externa epomail-docs",
+    auditArchStepDocs: "Apelación y verificación pública sin autenticación",
+    auditArchStepCloud: "Recopilar huella SHA-256 y subred IP",
+    auditArchStepAdmin: "Adjudicación y liberación del administrador",
 };
 
 export default es;

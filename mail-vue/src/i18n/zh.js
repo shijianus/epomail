@@ -2257,6 +2257,10 @@ totpModeAllDesc: '设置是否允许用户使用TOTP，开启后用户可以且�
     auditExternalAppealDesc: "用户无需登录即可在 epomail-docs 提交申诉表单并自动采集设备环境指纹。数据接入本控制台，管理员比对后可一键放行或重置凭证。",
     auditArchitectureTitle: "对外表单与风控流转架构说明",
     auditArchitectureDesc: "EpoCanvas 采用双轨分离架构：未认证用户通过 epomail-docs 静态门户提交申诉单并采集环境指纹，有效规避受阻账号在主站的鉴权死循环；管理后台通过 D1 与 KV 汇总数据实施秒级放行。",
+    auditExternalPortalBadge: "epomail-docs 对外申诉接口",
+    auditArchStepDocs: "未登录用户对外申诉/核验",
+    auditArchStepCloud: "采集 SHA-256 指纹与 IP 网段",
+    auditArchStepAdmin: "站长风控控制台一键研判放行",
 };
 
 export default zh;

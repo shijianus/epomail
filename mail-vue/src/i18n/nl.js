@@ -2257,6 +2257,10 @@ totpModeAllDesc: 'Instellen of gebruikers TOTP mogen gebruiken. Eenmaal ingescha
     auditExternalAppealDesc: "Gebruikers kunnen zonder inloggen een beroep indienen op epomail-docs, waarbij apparaatvingerafdrukken automatisch worden vastgelegd voor validatie in deze console.",
     auditArchitectureTitle: "Architectuur van openbare formulieren en risicobeheer",
     auditArchitectureDesc: "EpoCanvas hanteert een gescheiden architectuur: niet-ingelogde gebruikers dienen tickets en telemetrie in via het zelfstandige epomail-docs-portaal; beheerders beoordelen de gegevens in D1/KV voor directe vrijgave.",
+    auditExternalPortalBadge: "epomail-docs extern beroepsportaal",
+    auditArchStepDocs: "Niet-geauthenticeerd publiek beroep & verificatie",
+    auditArchStepCloud: "Verzamel SHA-256 vingerafdruk & IP-subnet",
+    auditArchStepAdmin: "Beheerdersbeoordeling & vrijgave met één klik",
 };
 
 export default nl;

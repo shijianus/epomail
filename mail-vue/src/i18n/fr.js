@@ -2257,6 +2257,10 @@ totpModeAllDesc: 'Définir si les utilisateurs peuvent utiliser TOTP. Lorsqu\'il
     auditExternalAppealDesc: "Les utilisateurs peuvent soumettre des recours sur epomail-docs sans connexion, capturant l'empreinte de l'appareil. Les données sont transmises ici pour validation.",
     auditArchitectureTitle: "Architecture des formulaires publics et du contrôle des risques",
     auditArchitectureDesc: "EpoCanvas adopte une architecture découplée : les utilisateurs non authentifiés soumettent leurs demandes via le portail epomail-docs, évitant les boucles de blocage ; l'administrateur valide les dossiers via D1/KV.",
+    auditExternalPortalBadge: "Portail de recours externe epomail-docs",
+    auditArchStepDocs: "Recours et vérification publics sans authentification",
+    auditArchStepCloud: "Collecter l'empreinte SHA-256 et le sous-réseau IP",
+    auditArchStepAdmin: "Arbitrage et déblocage par l'administrateur",
 };
 
 export default fr;

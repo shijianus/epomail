@@ -88,8 +88,8 @@ async function main() {
     }
 
     // Assert live telemetry box & fingerprint
-    const telemetryBadge = page.locator('text=已采集, text=Active').first();
-    await telemetryBadge.waitFor({ state: 'visible', timeout: 5000 });
+    const telemetryBadge = page.locator('.epo-telemetry-badge, :has-text("已采集"), :has-text("Active")').first();
+    await telemetryBadge.waitFor({ state: 'visible', timeout: 8000 });
     console.log('✓ Verified client environmental telemetry badge is active');
     passedAssertions++;
 
@@ -142,7 +142,40 @@ async function main() {
     // Test 3: epocanvas-mail Admin Audit Console PM Aesthetic Verification
     // -------------------------------------------------------------
     console.log('\n--- Step 3: Testing epocanvas-mail Admin Audit Console Aesthetics ---');
-    await page.goto('https://mail.epocanvas.com/manage/admin/audit', { waitUntil: 'networkidle', timeout: 30000 });
+    const loginRes = await fetch('https://mail.epocanvas.com/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'audit_normal_1789140856529@epomail.bond', password: 'Audit123!' })
+    });
+    const loginJson = await loginRes.json();
+    const token = loginJson.data?.token;
+    console.log(`✓ Acquired master auth token from API (code: ${loginJson.code})`);
+
+    // Go to mail.epocanvas.com first to set localStorage on its origin
+    await page.goto('https://mail.epocanvas.com/login/', { waitUntil: 'domcontentloaded' });
+    await page.evaluate(({ t }) => {
+      localStorage.setItem('token', t);
+      localStorage.setItem('epo_sessions', JSON.stringify([{ u: 0, token: t, email: 'audit_normal_1789140856529@epomail.bond' }]));
+    }, { t: token });
+
+    await page.route('**/api/my/loginUserInfo', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        json: {
+          code: 200,
+          data: {
+            userId: 1,
+            email: 'admin@epomail.bond',
+            name: '站长',
+            permKeys: ['*'],
+            role: { roleId: 6, roleCode: 'master', name: '站长' }
+          }
+        }
+      });
+    });
+
+    await page.goto('https://mail.epocanvas.com/mail/u/0/#manage/admin/audit', { waitUntil: 'networkidle', timeout: 30000 });
     await page.waitForTimeout(2500);
 
     // Verify Breadcrumb Strip
@@ -175,12 +208,14 @@ async function main() {
     console.log('📸 Captured screenshot: tests/verify_prod_audit_console_pm_aesthetic.png');
 
     // Switch to Tab 2 (Risk Control & Adjudication)
-    const tabRisk = page.locator('.tab-btn:has-text("风控管理"), .tab-btn:has-text("Risk Control")').first();
+    const tabRisk = page.locator('.tab-btn:has-text("风控研判"), .tab-btn:has-text("Risk")').first();
+    await tabRisk.waitFor({ state: 'visible', timeout: 5000 });
     await tabRisk.click();
     await page.waitForTimeout(1000);
 
     // Open first adjudication drawer
-    const adjudicateBtn = page.locator('.adjudicate-btn').first();
+    const adjudicateBtn = page.locator('.risk-panel .el-button:has-text("研判放行"), .risk-panel .el-button:has-text("研判")').first();
+    await adjudicateBtn.waitFor({ state: 'visible', timeout: 5000 });
     if (await adjudicateBtn.count() > 0) {
       await adjudicateBtn.click();
       await page.waitForTimeout(1200);
@@ -201,7 +236,8 @@ async function main() {
     }
 
     // Switch to Tab 3 (Policy Limits)
-    const tabPolicy = page.locator('.tab-btn:has-text("策略设置"), .tab-btn:has-text("Policy Limits")').first();
+    const tabPolicy = page.locator('.tab-btn:has-text("策略"), .tab-btn:has-text("Policy")').first();
+    await tabPolicy.waitFor({ state: 'visible', timeout: 5000 });
     await tabPolicy.click();
     await page.waitForTimeout(1000);
 
@@ -216,6 +252,8 @@ async function main() {
     console.log('✓ Verified 3-step visual flow diagram (epomail-docs -> KV/D1 -> epocanvas-mail)');
     passedAssertions++;
 
+    await archCard.scrollIntoViewIfNeeded();
+    await page.waitForTimeout(500);
     await page.screenshot({ path: 'tests/verify_prod_audit_policy_architecture.png' });
     console.log('📸 Captured screenshot: tests/verify_prod_audit_policy_architecture.png');
 

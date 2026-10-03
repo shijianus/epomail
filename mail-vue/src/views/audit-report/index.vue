@@ -837,7 +837,7 @@
                       </div>
                       <div class="flow-step-text">
                         <strong>epomail-docs</strong>
-                        <span>未登录用户对外申诉/核验</span>
+                        <span>{{ $t('auditArchStepDocs') }}</span>
                       </div>
                     </div>
                     <div class="flow-arrow">➜</div>
@@ -847,7 +847,7 @@
                       </div>
                       <div class="flow-step-text">
                         <strong>Cloudflare KV / D1</strong>
-                        <span>采集 SHA-256 指纹与 IP 网段</span>
+                        <span>{{ $t('auditArchStepCloud') }}</span>
                       </div>
                     </div>
                     <div class="flow-arrow">➜</div>
@@ -857,7 +857,7 @@
                       </div>
                       <div class="flow-step-text">
                         <strong>epocanvas-mail</strong>
-                        <span>站长风控控制台一键研判放行</span>
+                        <span>{{ $t('auditArchStepAdmin') }}</span>
                       </div>
                     </div>
                   </div>
@@ -997,7 +997,7 @@
           <div class="depb-header">
             <span class="depb-badge">
               <Icon icon="fluent:globe-shield-20-regular" width="14" height="14" />
-              <span>epomail-docs 对外申诉接口</span>
+              <span>{{ $t('auditExternalPortalBadge') }}</span>
             </span>
             <el-button link type="primary" size="small" @click="openExternalAppealPortal">
               <span>{{ $t('auditViewExternalAppealDocs') }}</span>

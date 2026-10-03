@@ -2257,6 +2257,10 @@ totpModeAllDesc: 'Configure whether users can use TOTP. When enabled, 2FA is ava
     auditExternalAppealDesc: "Users can submit appeal forms on epomail-docs without authenticating, automatically capturing device fingerprints. Data synchronizes to this console for 1-click verification and release.",
     auditArchitectureTitle: "Public Form & Risk Workflow Architecture",
     auditArchitectureDesc: "EpoCanvas implements a dual-site architecture: unauthenticated users submit tickets and telemetry via the standalone epomail-docs portal, avoiding login lockouts on the main app; administrators review records in D1/KV for instant clearance.",
+    auditExternalPortalBadge: "epomail-docs External Appeal Portal",
+    auditArchStepDocs: "Unauthenticated Public Appeal & Verification",
+    auditArchStepCloud: "Collect SHA-256 Fingerprint & IP Subnet",
+    auditArchStepAdmin: "Master Adjudication & One-Click Release",
 };
 
 export default en;
