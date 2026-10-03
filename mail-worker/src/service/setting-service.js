@@ -842,7 +842,28 @@ const settingService = {
 			githubLink: (c.env.GITHUB_LINK || settingRow.githubLink || 'https://github.com/shijianus/epomail').replace(/\/+$/, ''),
 			multiAccountEnabled: settingRow.multiAccountEnabled ?? 0,
 			termsUrl: settingRow.termsUrl || '',
-			privacyUrl: settingRow.privacyUrl || ''
+			privacyUrl: settingRow.privacyUrl || '',
+			oauthLoginEnabled: settingRow.oauthLoginEnabled ?? 0,
+			oauthProviders: (() => {
+				let p = settingRow.oauthProviders;
+				if (typeof p === 'string') {
+					try { p = JSON.parse(p); } catch (_) { p = {}; }
+				} else if (!p || typeof p !== 'object') {
+					p = {};
+				}
+				const sanitized = {};
+				for (const [k, v] of Object.entries(p)) {
+					if (v && typeof v === 'object') {
+						sanitized[k] = {
+							enabled: v.enabled,
+							clientId: v.clientId,
+							name: v.name,
+							tenant: v.tenant
+						};
+					}
+				}
+				return sanitized;
+			})()
 		};
 	},
 

@@ -216,26 +216,29 @@ let adminBrowser = null;
 		await oauthCard.first().waitFor({ state: 'visible', timeout: 10000 });
 		ok(await oauthCard.first().isVisible(), '系统设置中必须成功渲染「第三方认证与单点登录 (OAuth & SSO)」专属卡片');
 
-		// 检查按钮比例调整选择器
-		const proportionSlider = adminPage.locator('.oauth-sso-card .el-select');
-		ok(await proportionSlider.first().isVisible(), '卡片中必须包含第三方认证按键比例调整控件 (el-select)');
+		// 检查第三方认证提供商接入按键 (必须包含各 Provider 接入按钮)
+		const configureBtns = adminPage.locator('.oauth-sso-card .opt-button');
+		const btnCount = await configureBtns.count();
+		console.log(`  -> 第三方认证接入配置按钮数量: ${btnCount}`);
+		ok(btnCount >= 5, '卡片中必须包含至少 5 个第三方认证接入配置按键');
 
-		// 检查高仿真预览按钮及其 CSS class
-		const previewBtn = adminPage.locator('.oauth-sso-card .epomail-display, .oauth-sso-card button.epomail-display');
-		await previewBtn.first().waitFor({ state: 'visible', timeout: 5000 });
-		ok(await previewBtn.first().isVisible(), '卡片中必须渲染高仿真预览按钮');
+		// 检查 GitHub / Google / Microsoft / Apple 等提供商条目存在且排版对齐
+		const cardText = await oauthCard.first().textContent();
+		ok(cardText.includes('GitHub'), '卡片中必须包含 GitHub 授权接入条目');
+		ok(cardText.includes('Google'), '卡片中必须包含 Google 授权接入条目');
+		ok(cardText.includes('Microsoft'), '卡片中必须包含 Microsoft 授权接入条目');
+		ok(cardText.includes('Apple'), '卡片中必须包含 Apple 授权接入条目');
 
-		const previewBtnClass = await previewBtn.first().getAttribute('class');
-		console.log(`  -> 预览按钮实测 class: ${previewBtnClass}`);
-		ok(previewBtnClass.includes('epomail-display'), '预览按钮必须包含 epomail-display 类');
-		ok(previewBtnClass.includes('rounded-xl'), '预览按钮必须包含 rounded-xl 类');
-		ok(previewBtnClass.includes('border'), '预览按钮必须包含 border 类');
+		// 打开配置模态弹窗并核验回调地址与配置字段
+		await configureBtns.first().click();
+		const configDialog = adminPage.locator('.oauth-config-dialog');
+		await configDialog.waitFor({ state: 'visible', timeout: 5000 });
+		ok(await configDialog.isVisible(), '点击配置必须成功弹出专属授权接入模态弹窗');
 
-		// 检查回调地址展示
-		const callbackUrlText = adminPage.locator('.oauth-sso-card code, .oauth-sso-card .callback-url-box');
+		const callbackUrlText = adminPage.locator('.oauth-config-dialog code');
 		const callbackContent = await callbackUrlText.first().textContent();
-		console.log(`  -> OAuth 回调地址: ${callbackContent.trim()}`);
-		ok(callbackContent.includes('/oauth/callback'), '卡片中必须展示规范的 OAuth 回调端点');
+		console.log(`  -> OAuth 模态弹窗内回调地址: ${callbackContent.trim()}`);
+		ok(callbackContent.includes('/oauth/callback'), '配置弹窗中必须展示规范的 OAuth 回调端点');
 
 		await adminBrowser.close();
 
