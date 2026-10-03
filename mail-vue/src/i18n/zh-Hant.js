@@ -2252,6 +2252,11 @@ totpModeAllDesc: '設定是否允許使用者使用TOTP，開啟後使用者可�
     auditModeLevel1: "全部模式 (Level 1)",
     auditModeLevel2: "隱私模式 (Level 2)",
     auditModeLevel3: "加密模式 (Level 3)",
+    auditBackToSettings: "返回系統設定",
+    auditViewExternalAppealDocs: "檢視使用者對外申訴頁面",
+    auditExternalAppealDesc: "使用者無需登入即可在 epomail-docs 提交申訴表單並自動採集設備環境指紋。資料接入本控制台，管理員比對後可一鍵放行或重設憑證。",
+    auditArchitectureTitle: "對外表單與風控流轉架構說明",
+    auditArchitectureDesc: "EpoCanvas 採用雙軌分離架構：未認證使用者透過 epomail-docs 靜態門戶提交申訴單並採集環境指紋，有效規避受阻帳號在主站的鑑權死循環；管理後台透過 D1 與 KV 彙整資料實施秒級放行。",
 };
 
 export default zhHant;

@@ -2252,6 +2252,11 @@ totpModeAllDesc: 'Instellen of gebruikers TOTP mogen gebruiken. Eenmaal ingescha
     auditModeLevel1: "Alle e-mailmodus (Niveau 1)",
     auditModeLevel2: "Privacymodus (Niveau 2)",
     auditModeLevel3: "Versleutelde modus (Niveau 3)",
+    auditBackToSettings: "Terug naar systeeminstellingen",
+    auditViewExternalAppealDocs: "Bekijk openbaar beroepsportaal",
+    auditExternalAppealDesc: "Gebruikers kunnen zonder inloggen een beroep indienen op epomail-docs, waarbij apparaatvingerafdrukken automatisch worden vastgelegd voor validatie in deze console.",
+    auditArchitectureTitle: "Architectuur van openbare formulieren en risicobeheer",
+    auditArchitectureDesc: "EpoCanvas hanteert een gescheiden architectuur: niet-ingelogde gebruikers dienen tickets en telemetrie in via het zelfstandige epomail-docs-portaal; beheerders beoordelen de gegevens in D1/KV voor directe vrijgave.",
 };
 
 export default nl;

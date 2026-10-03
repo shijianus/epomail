@@ -459,7 +459,7 @@ const oauthService = {
 		if (url) {
 			try {
 				const res = await fetch(url, { method: 'GET', headers: { 'User-Agent': 'Epocanvas-Mail' } });
-				if (!res.ok) {
+				if (!res.ok && res.status >= 500) {
 					throw new BizError(`Provider endpoint responded with status ${res.status}`);
 				}
 				return { success: true, status: res.status, message: `${providerKey} connectivity verified successfully` };

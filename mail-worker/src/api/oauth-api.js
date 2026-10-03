@@ -30,7 +30,22 @@ app.post('/oauth/:provider/login', async (c) => {
 
 // Admin only: test / verify provider configuration and network reachability
 app.post('/oauth/verify/:provider', async (c) => {
-	const user = userContext.getUser(c);
+	let user = userContext.getUser(c);
+	if (!user) {
+		const jwt = c.req.header('token') || c.req.header('jwt');
+		if (jwt) {
+			const jwtUtils = (await import('../utils/jwt-utils.js')).default;
+			const decoded = await jwtUtils.verifyToken(c, jwt);
+			if (decoded?.userId) {
+				const KvConst = (await import('../const/kv-const.js')).default;
+				const authInfo = await c.env.kv.get(KvConst.AUTH_INFO + decoded.userId, { type: 'json' });
+				if (authInfo?.user && authInfo.tokens?.includes(decoded.token)) {
+					user = authInfo.user;
+					c.set('user', user);
+				}
+			}
+		}
+	}
 	if (!user || !isAdminUser(c, user)) {
 		throw new BizError('Admin permission required to verify OAuth provider');
 	}

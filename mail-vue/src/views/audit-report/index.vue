@@ -7,6 +7,25 @@
     <el-scrollbar class="scroll" v-if="!firstLoading">
       <div class="scroll-body audit-scroll-body">
         
+        <!-- Breadcrumb Navigation Bar -->
+        <div class="audit-breadcrumb-strip">
+          <div class="breadcrumb-left">
+            <el-button link class="back-settings-btn" @click="goToSysSetting">
+              <Icon icon="fluent:arrow-left-20-filled" width="16" height="16" />
+              <span>{{ $t('auditBackToSettings') }}</span>
+            </el-button>
+            <span class="breadcrumb-sep">/</span>
+            <span class="breadcrumb-active">{{ $t('auditReport') }}</span>
+          </div>
+          <div class="breadcrumb-right">
+            <el-button link type="primary" size="small" class="docs-portal-btn" @click="openExternalAppealPortal">
+              <Icon icon="fluent:document-person-20-regular" width="15" height="15" />
+              <span>{{ $t('auditViewExternalAppealDocs') }}</span>
+              <Icon icon="fluent:arrow-up-right-16-regular" width="13" height="13" />
+            </el-button>
+          </div>
+        </div>
+
         <!-- Header Banner: Security Mode Status & Mode Simulator -->
         <div class="audit-header-banner" :class="'mode-' + activeMode">
           <div class="banner-left">
@@ -65,6 +84,9 @@
               <div class="kpi-label">{{ $t('auditTotalOps') }}</div>
               <div class="kpi-value">{{ filteredLogs.length }} <span class="kpi-unit">/ {{ allLogs.length }}</span></div>
               <div class="kpi-sub">{{ activeModeText }}</div>
+              <div class="kpi-progress-bar">
+                <div class="kpi-progress-fill ops-fill" :style="{ width: Math.min(100, Math.round((filteredLogs.length / (allLogs.length || 1)) * 100)) + '%' }"></div>
+              </div>
             </div>
           </div>
 
@@ -76,6 +98,9 @@
               <div class="kpi-label">{{ $t('auditMonitoredUsers') }}</div>
               <div class="kpi-value">{{ monitoredAccountsCount }}</div>
               <div class="kpi-sub">{{ bannedAccountsCount }} {{ $t('banned') }}</div>
+              <div class="kpi-progress-bar">
+                <div class="kpi-progress-fill risk-fill" :style="{ width: Math.min(100, Math.round((bannedAccountsCount / (monitoredAccountsCount || 1)) * 100)) + '%' }"></div>
+              </div>
             </div>
           </div>
 
@@ -84,9 +109,15 @@
               <Icon icon="fluent:person-feedback-24-regular" width="22" height="22" />
             </div>
             <div class="kpi-info">
-              <div class="kpi-label">{{ $t('auditPendingAppeals') }}</div>
+              <div class="kpi-label">
+                <span>{{ $t('auditPendingAppeals') }}</span>
+                <span v-if="pendingAppealsCount > 0" class="pulse-beacon"></span>
+              </div>
               <div class="kpi-value text-amber">{{ pendingAppealsCount }}</div>
               <div class="kpi-sub text-amber">{{ $t('auditInspectDetails') }}</div>
+              <div class="kpi-progress-bar">
+                <div class="kpi-progress-fill appeal-fill" style="width: 100%;"></div>
+              </div>
             </div>
           </div>
 
@@ -98,6 +129,12 @@
               <div class="kpi-label">{{ $t('auditDevicePoolUsage') }}</div>
               <div class="kpi-value">{{ settingForm.auditMaxIpPerAccount }} <span class="kpi-unit">IPs</span> / {{ settingForm.auditMaxDevicePerAccount }} <span class="kpi-unit">{{ $t('auditDeviceRegistered') }}</span></div>
               <div class="kpi-sub">{{ settingForm.auditPrioritizeNonCriticalClean ? $t('auditPrioritizeNonCriticalClean') : $t('auditAutoCleanOldest') }}</div>
+              <div class="kpi-slots-capsule">
+                <span class="slot-dot active" title="IP Slot 1">1</span>
+                <span class="slot-dot active" title="IP Slot 2">2</span>
+                <span class="slot-dot active" title="IP Slot 3">3</span>
+                <span class="slot-dot" :class="{ active: settingForm.auditMaxIpPerAccount > 3 }" title="Extra Slot 4">4</span>
+              </div>
             </div>
           </div>
         </div>
@@ -785,6 +822,54 @@
                 </div>
               </div>
 
+              <!-- Card 4: 对外表单与风控流转架构说明 -->
+              <div class="settings-card architecture-card">
+                <div class="card-title">
+                  <Icon icon="fluent:diagram-tree-20-regular" width="18" height="18" />
+                  <span>{{ $t('auditArchitectureTitle') }}</span>
+                </div>
+                <div class="card-content">
+                  <p class="arch-desc">{{ $t('auditArchitectureDesc') }}</p>
+                  <div class="arch-flow-diagram">
+                    <div class="flow-step">
+                      <div class="flow-step-icon">
+                        <Icon icon="fluent:person-support-20-regular" width="20" height="20" />
+                      </div>
+                      <div class="flow-step-text">
+                        <strong>epomail-docs</strong>
+                        <span>未登录用户对外申诉/核验</span>
+                      </div>
+                    </div>
+                    <div class="flow-arrow">➜</div>
+                    <div class="flow-step">
+                      <div class="flow-step-icon">
+                        <Icon icon="fluent:fingerprint-20-regular" width="20" height="20" />
+                      </div>
+                      <div class="flow-step-text">
+                        <strong>Cloudflare KV / D1</strong>
+                        <span>采集 SHA-256 指纹与 IP 网段</span>
+                      </div>
+                    </div>
+                    <div class="flow-arrow">➜</div>
+                    <div class="flow-step highlight">
+                      <div class="flow-step-icon">
+                        <Icon icon="fluent:shield-task-20-regular" width="20" height="20" />
+                      </div>
+                      <div class="flow-step-text">
+                        <strong>epocanvas-mail</strong>
+                        <span>站长风控控制台一键研判放行</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="arch-action-row">
+                    <el-button type="primary" size="small" plain @click="openExternalAppealPortal">
+                      <Icon icon="fluent:open-20-regular" width="14" height="14" style="margin-right: 4px;" />
+                      {{ $t('auditViewExternalAppealDocs') }} (docs.epocanvas.com)
+                    </el-button>
+                  </div>
+                </div>
+              </div>
+
             </div>
           </div>
         </div>
@@ -907,6 +992,21 @@
           </div>
         </div>
 
+        <!-- External Form Source Banner -->
+        <div class="drawer-external-portal-box">
+          <div class="depb-header">
+            <span class="depb-badge">
+              <Icon icon="fluent:globe-shield-20-regular" width="14" height="14" />
+              <span>epomail-docs 对外申诉接口</span>
+            </span>
+            <el-button link type="primary" size="small" @click="openExternalAppealPortal">
+              <span>{{ $t('auditViewExternalAppealDocs') }}</span>
+              <Icon icon="fluent:arrow-up-right-16-regular" width="13" height="13" />
+            </el-button>
+          </div>
+          <p class="depb-desc">{{ $t('auditExternalAppealDesc') }}</p>
+        </div>
+
         <!-- Multi-IP Pool Inspection -->
         <div class="active-ip-section">
           <div class="section-title">
@@ -977,16 +1077,37 @@
 
 <script setup>
 import { ref, computed, reactive, onMounted } from 'vue';
+import { useRouter, useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { Icon } from '@iconify/vue';
 import loading from '@/components/loading/index.vue';
 import { useSettingStore } from '@/store/setting.js';
 import { useUserStore } from '@/store/user.js';
+import { getOfficialLink } from '@/const/links-const.js';
 
+const router = useRouter();
+const route = useRoute();
 const { t } = useI18n();
 const settingStore = useSettingStore();
 const userStore = useUserStore();
+
+const goToSysSetting = () => {
+  const roleGroup = route.params.roleGroup || 'admin';
+  router.push(`/manage/${roleGroup}/system`);
+};
+
+const openExternalAppealPortal = () => {
+  const docsBase = getOfficialLink('docs', settingStore) || 'https://docs.epocanvas.com/epomail';
+  const lang = settingStore.settings?.lang || 'zh';
+  let prefix = '';
+  if (lang === 'zh-Hant') prefix = '/zh-tw';
+  else if (lang === 'en') prefix = '/en';
+  else if (lang === 'es') prefix = '/es';
+  else if (lang === 'fr') prefix = '/fr';
+  else if (lang === 'nl') prefix = '/nl';
+  window.open(`${docsBase}${prefix}/mail/appeal/`, '_blank');
+};
 
 const firstLoading = ref(true);
 const activeTab = ref('stream'); // 'stream' | 'risk' | 'policy'
@@ -2794,5 +2915,247 @@ onMounted(() => {
 }
 .font-mono {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+/* Breadcrumb Navigation Strip */
+.audit-breadcrumb-strip {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 6px 12px 6px;
+  font-size: 13px;
+}
+
+.breadcrumb-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.back-settings-btn {
+  color: var(--el-text-color-secondary) !important;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 !important;
+  transition: color 0.15s;
+}
+
+.back-settings-btn:hover {
+  color: var(--el-color-primary) !important;
+}
+
+.breadcrumb-sep {
+  color: var(--el-text-color-placeholder);
+  font-size: 12px;
+}
+
+.breadcrumb-active {
+  color: var(--el-text-color-primary);
+  font-weight: 600;
+}
+
+.docs-portal-btn {
+  font-size: 12px !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* KPI Mini Progress Bars */
+.kpi-progress-bar {
+  margin-top: 8px;
+  width: 100%;
+  height: 4px;
+  border-radius: 9999px;
+  background: rgba(125, 125, 125, 0.12);
+  overflow: hidden;
+}
+
+.kpi-progress-fill {
+  height: 100%;
+  border-radius: 9999px;
+  transition: width 0.3s ease;
+}
+
+.ops-fill {
+  background: linear-gradient(90deg, #6366f1, #3b82f6);
+}
+
+.risk-fill {
+  background: linear-gradient(90deg, #10b981, #06b6d4);
+}
+
+.appeal-fill {
+  background: linear-gradient(90deg, #f59e0b, #ea580c);
+}
+
+/* Pulse Beacon */
+.pulse-beacon {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #f59e0b;
+  margin-left: 6px;
+  box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7);
+  animation: beacon-pulse 1.8s infinite;
+}
+
+@keyframes beacon-pulse {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 7px rgba(245, 158, 11, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0);
+  }
+}
+
+/* Slot Capsules */
+.kpi-slots-capsule {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 8px;
+}
+
+.slot-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  background: rgba(125, 125, 125, 0.12);
+  color: var(--el-text-color-placeholder);
+  border: 1px solid transparent;
+  transition: all 0.2s;
+}
+
+.slot-dot.active {
+  background: rgba(99, 102, 241, 0.15);
+  color: #6366f1;
+  border-color: rgba(99, 102, 241, 0.3);
+}
+
+/* Drawer External Portal Box */
+.drawer-external-portal-box {
+  background: var(--el-fill-color-light);
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 16px;
+}
+
+.depb-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.depb-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+.depb-desc {
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--el-text-color-secondary);
+  margin: 0;
+}
+
+/* Architecture Card & Flow */
+.architecture-card {
+  margin-top: 18px;
+}
+
+.arch-desc {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--el-text-color-secondary);
+  margin-bottom: 16px;
+}
+
+.arch-flow-diagram {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--el-fill-color-light);
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.flow-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--el-bg-color);
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 8px;
+  flex: 1;
+  min-width: 170px;
+}
+
+.flow-step.highlight {
+  border-color: rgba(99, 102, 241, 0.4);
+  background: rgba(99, 102, 241, 0.05);
+}
+
+.flow-step-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: var(--el-color-primary-light-9);
+  color: var(--el-color-primary);
+  shrink: 0;
+}
+
+.flow-step-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.flow-step-text strong {
+  font-size: 12px;
+  color: var(--el-text-color-primary);
+}
+
+.flow-step-text span {
+  font-size: 11px;
+  color: var(--el-text-color-secondary);
+}
+
+.flow-arrow {
+  color: var(--el-text-color-placeholder);
+  font-size: 16px;
+  font-weight: bold;
+}
+
+.arch-action-row {
+  display: flex;
+  justify-content: flex-end;
 }
 </style>

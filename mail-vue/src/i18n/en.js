@@ -2252,6 +2252,11 @@ totpModeAllDesc: 'Configure whether users can use TOTP. When enabled, 2FA is ava
     auditModeLevel1: "All Mail Mode (Level 1)",
     auditModeLevel2: "Privacy Mode (Level 2)",
     auditModeLevel3: "Encrypted Mode (Level 3)",
+    auditBackToSettings: "Back to System Settings",
+    auditViewExternalAppealDocs: "View User Public Appeal Portal",
+    auditExternalAppealDesc: "Users can submit appeal forms on epomail-docs without authenticating, automatically capturing device fingerprints. Data synchronizes to this console for 1-click verification and release.",
+    auditArchitectureTitle: "Public Form & Risk Workflow Architecture",
+    auditArchitectureDesc: "EpoCanvas implements a dual-site architecture: unauthenticated users submit tickets and telemetry via the standalone epomail-docs portal, avoiding login lockouts on the main app; administrators review records in D1/KV for instant clearance.",
 };
 
 export default en;

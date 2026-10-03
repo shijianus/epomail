@@ -16,7 +16,8 @@ import {
   Smartphone,
   HelpCircle,
   ChevronRight,
-  ShieldAlert
+  ShieldAlert,
+  ExternalLink
 } from "lucide-react";
 import type { CanvasHandle } from "./CanvasBackground";
 import { cameraState } from "./cameraStore";
@@ -373,10 +374,24 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
   const [successMsg, setSuccessMsg] = useState("");
   const [stayInOrbit, setStayInOrbit] = useState(false);
   const [rememberDevice, setRememberDevice] = useState(false);
+  const [showForgotModal, setShowForgotModal] = useState(false);
 
   const otpInputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   const lang = useMemo(() => resolveAuthLang(), []);
+  const getAppealUrl = (targetEmail?: string) => {
+    let prefix = '';
+    if (lang === 'zh-Hant') prefix = '/zh-tw';
+    else if (lang === 'en') prefix = '/en';
+    else if (lang === 'es') prefix = '/es';
+    else if (lang === 'fr') prefix = '/fr';
+    else if (lang === 'nl') prefix = '/nl';
+    const base = `https://docs.epocanvas.com/epomail${prefix}/mail/appeal/`;
+    const params = new URLSearchParams();
+    params.set('type', 'password');
+    if (targetEmail) params.set('email', targetEmail);
+    return `${base}?${params.toString()}`;
+  };
   const t = useMemo(() => createT(lang), [lang]);
   const reduceMotion = !!useReducedMotion();
   // 主提交按钮的 hover 抬升反馈；reduced-motion 下只保留亮度变化，不做位移
@@ -1126,6 +1141,72 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
         document.body
       )}
 
+      {/* Forgot Password / External Appeal Portal Modal */}
+      {typeof document !== "undefined" && createPortal(
+        <AnimatePresence>
+          {showForgotModal && (
+            <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/65 backdrop-blur-md">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.94, y: 12 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.94, y: 12 }}
+                transition={{ duration: 0.2, ease: "easeOut" }}
+                className="relative w-full max-w-[440px] overflow-hidden rounded-2xl border border-[rgba(139,147,196,0.35)] bg-[#0c1024]/95 p-6 shadow-2xl backdrop-blur-xl text-left"
+              >
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500/25 to-cyan-500/25 border border-indigo-400/35 text-cyan-300">
+                    <ShieldAlert size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-semibold text-white tracking-wide">
+                      {tr('forgotPasswordModalTitle')}
+                    </h3>
+                    <p className="text-[12px] text-cyan-300/80">epomail-docs</p>
+                  </div>
+                </div>
+
+                <p className="text-[13px] leading-relaxed text-[#c7d2fe] mb-4">
+                  {tr('forgotPasswordModalDesc')}
+                </p>
+
+                {email && (
+                  <div className="mb-5 rounded-lg border border-[rgba(255,255,255,0.08)] bg-white/5 px-3 py-2 text-[12px] flex items-center justify-between">
+                    <span className="text-[var(--epo-muted)]">{tr('forgotPasswordModalTarget')}</span>
+                    <code className="text-cyan-300 font-mono font-medium">{email}</code>
+                  </div>
+                )}
+
+                <div className="flex flex-col gap-2.5">
+                  <a
+                    href={getAppealUrl(email)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex h-11 w-full items-center justify-center gap-2 rounded-xl text-[14px] font-medium text-white transition-all duration-200 hover:brightness-110 cursor-pointer shadow-lg"
+                    style={{
+                      background: "var(--epo-brand-gradient)",
+                      boxShadow: "0 4px 20px rgba(79,70,229,0.4)"
+                    }}
+                    onClick={() => setShowForgotModal(false)}
+                  >
+                    <span>{tr('forgotPasswordModalGo')}</span>
+                    <ExternalLink size={15} />
+                  </a>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowForgotModal(false)}
+                    className="flex h-10 w-full items-center justify-center rounded-xl border border-[rgba(255,255,255,0.12)] bg-transparent text-[13px] text-[var(--epo-muted)] hover:text-white hover:bg-white/5 transition-colors cursor-pointer"
+                  >
+                    {tr('forgotPasswordModalClose')}
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
+
       <motion.div
         layout
         transition={{
@@ -1226,12 +1307,12 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
                     {tr('stayInOrbit')}
                   </label>
                   <a
-                    href="#"
+                    href={getAppealUrl(email)}
                     onClick={(e) => {
                       e.preventDefault();
-                      setErrorMsg(tr('forgotPasswordHint'));
+                      setShowForgotModal(true);
                     }}
-                    className="text-[13px] transition-colors hover:text-[var(--epo-cyan-glow)]"
+                    className="text-[13px] transition-colors hover:text-[var(--epo-cyan-glow)] cursor-pointer"
                     style={{ color: "var(--epo-muted)" }}
                   >
                     {tr('forgotPassword')}

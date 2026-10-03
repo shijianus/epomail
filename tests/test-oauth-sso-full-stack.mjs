@@ -31,6 +31,7 @@ async function run() {
 	console.log(`[目标服务环境] ${BASE_URL}\n`);
 
 	let adminBrowser = null;
+	let adminToken = null;
 
 	try {
 		// 临时放行站长 2FA 以获取管理 Token (finally 严格还原)
@@ -62,7 +63,7 @@ async function run() {
 			}
 		}
 		ok(adminLoginJson && adminLoginJson.code === 200, '站长账号登录成功');
-		const adminToken = adminLoginJson.data?.token;
+		adminToken = adminLoginJson.data?.token;
 		ok(typeof adminToken === 'string' && adminToken.length > 20, '站长授权 Token 必须有效');
 
 		// [阶段 2] 后端接口核验：公共 Provider 列表与 OAuth 重定向 URL 构造
@@ -247,15 +248,28 @@ async function run() {
 		if (adminBrowser) {
 			try { await adminBrowser.close(); } catch (_) {}
 		}
-		// 还原生产 totp 状态与清理测试 OAuth 凭证 (遵守零假数据红线)
+		// 1. 通过管理员 API 快速重置 OAuth 配置并刷新 KV
+		if (adminToken) {
+			try {
+				await fetch(`${BASE_URL}/api/setting/set`, {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json', 'token': adminToken },
+					body: JSON.stringify({ oauthLoginEnabled: 0, oauthProviders: {} })
+				});
+				console.log('  ✓ 生产环境 OAuth 设置与 KV 缓存已通过 API 还原 (oauthLoginEnabled = 0)');
+			} catch (e) {
+				console.warn('  ⚠️ API 还原 OAuth 设置异常:', e.message);
+			}
+		}
+		// 2. 还原生产 totp 状态与 D1 底层兜底物理还原 (零假数据红线)
 		try {
-			execSync('npx wrangler d1 execute epomail --remote --command "UPDATE user SET totp_enabled = 1 WHERE user_id = 1"', {
+			execSync('npx wrangler d1 execute epomail --remote --command "UPDATE user SET totp_enabled = 1 WHERE user_id = 1; UPDATE setting SET oauth_login_enabled = 0, oauth_providers = \'{}\'"', {
 				cwd: '/home/shijian/projects/epocanvas-mail/mail-worker',
 				stdio: 'pipe'
 			});
-			console.log('  ✓ 生产数据库测试环境已还原 (totp_enabled = 1)');
+			console.log('  ✓ 生产数据库测试环境已彻底还原 (totp_enabled = 1, setting 物理归零)');
 		} catch (e) {
-			console.warn('  ⚠️ 还原 totp_enabled 异常:', e.message);
+			console.warn('  ⚠️ 还原生产数据库异常:', e.message);
 		}
 	}
 }

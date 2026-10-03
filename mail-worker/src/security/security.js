@@ -80,7 +80,8 @@ const requirePerms = [
 	'/setting/s3/test',
 	'/setting/db/test',
 	'/setting/storage/scan',
-	'/setting/storage/cleanup'
+	'/setting/storage/cleanup',
+	'/oauth/verify'
 ];
 
 const premKey = {
@@ -108,7 +109,8 @@ const premKey = {
 		'/setting/set', '/setting/setBackground','/setting/deleteBackground','/setting/setBlacklist',
 		'/admin/oauthApp/add', '/admin/oauthApp/update', '/admin/oauthApp/resetSecret', '/admin/oauthApp/status', '/admin/oauthApp/delete',
 		'/setting/sendWelcomeEmail', '/setting/sendGlobalEmail', '/setting/globalEmailConfig',
-		'/setting/ai/test', '/setting/ai/models', '/setting/s3/test', '/setting/db/test', '/setting/storage/scan', '/setting/storage/cleanup'
+		'/setting/ai/test', '/setting/ai/models', '/setting/s3/test', '/setting/db/test', '/setting/storage/scan', '/setting/storage/cleanup',
+		'/oauth/verify'
 	],
 	'analysis:query': ['/analysis/echarts'],
 	'reg-key:add': ['/regKey/add'],
@@ -124,7 +126,7 @@ app.use('*', async (c, next) => {
 		return path.startsWith(item);
 	});
 
-	if (index > -1) {
+	if (index > -1 && !path.startsWith('/oauth/verify')) {
 		return await next();
 	}
 

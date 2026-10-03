@@ -2252,6 +2252,11 @@ totpModeAllDesc: 'Configurar si los usuarios pueden usar TOTP. Al activarlo, la 
     auditModeLevel1: "Modo Todo el correo (Nivel 1)",
     auditModeLevel2: "Modo Privacidad (Nivel 2)",
     auditModeLevel3: "Modo Cifrado (Nivel 3)",
+    auditBackToSettings: "Volver a configuración del sistema",
+    auditViewExternalAppealDocs: "Ver portal público de apelación",
+    auditExternalAppealDesc: "Los usuarios pueden remitir apelaciones en epomail-docs sin iniciar sesión, registrando la huella del equipo. Los datos se sincronizan con este panel para su aprobación.",
+    auditArchitectureTitle: "Arquitectura de formularios públicos y control de riesgos",
+    auditArchitectureDesc: "EpoCanvas aplica una arquitectura dual: los usuarios no autenticados envían tickets y telemetría a través del portal independiente epomail-docs, evitando bloqueos circulares; los administradores resuelven las solicitudes desde este panel.",
 };
 
 export default es;
