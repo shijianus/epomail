@@ -86,6 +86,17 @@ const routers = {
                 name: 'oauth-app',
                 menu: true
             }
+        },
+        {
+            path: '/audit-report',
+            alias: ['/settings/audit', '/manage-audit'],
+            name: 'audit-report',
+            component: () => import('@/views/audit-report/index.vue'),
+            meta: {
+                title: 'auditReport',
+                name: 'audit-report',
+                menu: true
+            }
         }
     ],
     'reg-key:query': [{

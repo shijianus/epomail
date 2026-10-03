@@ -950,6 +950,120 @@
           </div>
 
 
+          <!-- Audit & Risk Control Policy Card -->
+          <div class="settings-card audit-policy-card">
+            <div class="card-title">{{ $t('auditReport') }}</div>
+            <div class="card-content">
+              <div class="setting-item">
+                <div>
+                  <span>{{ $t('auditMaxIpLimit') }}</span>
+                  <el-tooltip effect="dark" :content="$t('auditMaxIpLimitDesc')">
+                    <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+                  </el-tooltip>
+                </div>
+                <div>
+                  <el-input-number
+                    v-model="setting.auditMaxIpPerAccount"
+                    :min="1"
+                    :max="20"
+                    size="small"
+                    @change="(val) => changeField('auditMaxIpPerAccount', val)"
+                  />
+                </div>
+              </div>
+
+              <div class="setting-item">
+                <div>
+                  <span>{{ $t('auditMaxDeviceLimit') }}</span>
+                  <el-tooltip effect="dark" :content="$t('auditMaxDeviceLimitDesc')">
+                    <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+                  </el-tooltip>
+                </div>
+                <div>
+                  <el-input-number
+                    v-model="setting.auditMaxDevicePerAccount"
+                    :min="1"
+                    :max="20"
+                    size="small"
+                    @change="(val) => changeField('auditMaxDevicePerAccount', val)"
+                  />
+                </div>
+              </div>
+
+              <div class="setting-item">
+                <div>
+                  <span>{{ $t('auditAutoCleanOldest') }}</span>
+                  <el-tooltip effect="dark" :content="$t('auditAutoCleanOldestDesc')">
+                    <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+                  </el-tooltip>
+                </div>
+                <div>
+                  <el-switch
+                    v-model="setting.auditAutoCleanOldest"
+                    :active-value="1"
+                    :inactive-value="0"
+                    @change="(val) => changeField('auditAutoCleanOldest', val)"
+                  />
+                </div>
+              </div>
+
+              <div class="setting-item">
+                <div>
+                  <span>{{ $t('auditPrioritizeNonCriticalClean') }}</span>
+                  <el-tooltip effect="dark" :content="$t('auditPrioritizeNonCriticalCleanDesc')">
+                    <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+                  </el-tooltip>
+                </div>
+                <div>
+                  <el-switch
+                    v-model="setting.auditPrioritizeNonCriticalClean"
+                    :active-value="1"
+                    :inactive-value="0"
+                    @change="(val) => changeField('auditPrioritizeNonCriticalClean', val)"
+                  />
+                </div>
+              </div>
+
+              <div class="setting-item">
+                <div>
+                  <span>{{ $t('auditCriticalQuota') }}</span>
+                  <el-tooltip effect="dark" :content="$t('auditCriticalQuotaDesc')">
+                    <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+                  </el-tooltip>
+                </div>
+                <div>
+                  <el-input-number
+                    v-model="setting.auditCriticalQuota"
+                    :min="1"
+                    :max="10"
+                    size="small"
+                    @change="(val) => changeField('auditCriticalQuota', val)"
+                  />
+                </div>
+              </div>
+
+              <div class="setting-item">
+                <div>
+                  <span>{{ $t('auditReport') }}</span>
+                  <el-tooltip effect="dark" :content="$t('auditReportDesc')">
+                    <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+                  </el-tooltip>
+                </div>
+                <div class="forward">
+                  <el-button
+                    type="primary"
+                    size="small"
+                    plain
+                    @click="router.push(`/manage/${currentRoleSlug}/audit`)"
+                  >
+                    <Icon icon="fluent:shield-task-24-regular" width="16" height="16" style="margin-right: 4px; vertical-align: -2px;" />
+                    {{ $t('auditReport') }}
+                  </el-button>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div class="settings-card about">
             <div class="card-title">{{ $t('about') }}</div>
             <div class="card-content">
@@ -3410,6 +3524,8 @@ import {getTextWidth} from "@/utils/text.js";
 import {fileToBase64} from "@/utils/file-utils.js";
 import {formatDetailDate} from "@/utils/day.js";
 import {useI18n} from 'vue-i18n';
+import {useRouter} from 'vue-router';
+import {getRoleGroupSlug} from '@/utils/role-utils.js';
 import {ElMessageBox, ElMessage} from "element-plus";
 import { APP_VERSION } from "@/const/version.js";
 import { getOfficialLink } from "@/const/links-const.js";
@@ -3508,6 +3624,8 @@ const oauthRedirectUri = computed(() => {
   if (typeof window === 'undefined') return 'https://mail.epocanvas.com/api/oauth/callback';
   return `${window.location.origin}/api/oauth/callback`;
 });
+const router = useRouter();
+const currentRoleSlug = computed(() => getRoleGroupSlug(userStore.user || userStore.userInfo));
 
 function copyOauthRedirectUri() {
   if (typeof navigator !== 'undefined' && navigator.clipboard) {

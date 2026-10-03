@@ -107,6 +107,15 @@
                 >
                   <Icon icon="lucide:network" width="18" height="18" /> {{$t('categorySetting')}}
                 </router-link>
+
+                <router-link
+                  v-if="hasPerm('setting:query')"
+                  :to="`/manage/${currentRoleSlug}/audit`"
+                  class="settings-nav-item"
+                  :class="{active: isTabActive(['manage-audit', 'audit-report'])}"
+                >
+                  <Icon icon="fluent:shield-task-24-regular" width="18" height="18" /> {{$t('auditReport')}}
+                </router-link>
               </div>
             </template>
 
@@ -115,7 +124,7 @@
       </div>
       <div class="settings-content">
         <router-view class="main-view" v-slot="{ Component,route }">
-          <keep-alive :include="['sys-setting','user','role','analysis','reg-key','oauth-app','category-setting','manage-system','manage-users','manage-roles','manage-analysis','manage-reg-keys','manage-apps','manage-rules','manage-mail']">
+          <keep-alive :include="['sys-setting','user','role','analysis','reg-key','oauth-app','category-setting','manage-system','manage-users','manage-roles','manage-analysis','manage-reg-keys','manage-apps','manage-rules','manage-mail','manage-audit','audit-report']">
             <component :is="Component" :key="route.name"/>
           </keep-alive>
         </router-view>
@@ -178,7 +187,7 @@ const isSettingsMode = computed(() => {
          route.path.startsWith('/manage') ||
          route.path.startsWith('/admin') ||
          ['user-profile', 'profile', 'general-setting', 'profile-setting', 'setting', 'data-setting', 'label-setting', 'category-setting', 'analysis', 'user', 'all-email', 'role', 'reg-key', 'sys-setting', 'oauth-app',
-          'manage-analysis', 'manage-users', 'manage-mail', 'manage-roles', 'manage-reg-keys', 'manage-system', 'manage-apps', 'manage-rules'].includes(route.name)
+          'manage-analysis', 'manage-users', 'manage-mail', 'manage-roles', 'manage-reg-keys', 'manage-system', 'manage-apps', 'manage-rules', 'manage-audit', 'audit-report'].includes(route.name)
 })
 
 const currentRoleSlug = computed(() => {

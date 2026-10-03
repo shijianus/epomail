@@ -298,6 +298,19 @@ const routes = [
                     isManage: true,
                     menu: true
                 }
+            },
+            {
+                path: '/manage/:roleGroup/audit',
+                alias: ['/manage/:roleGroup/audit-report', '/manage/:roleGroup/risk', '/audit-report', '/audit', '/admin/audit', '/admin/audit-report', '/settings/audit'],
+                name: 'manage-audit',
+                component: () => import('@/views/audit-report/index.vue'),
+                meta: {
+                    title: 'auditReport',
+                    name: 'manage-audit',
+                    perm: 'setting:query',
+                    isManage: true,
+                    menu: true
+                }
             }
         ]
 
@@ -378,7 +391,7 @@ router.beforeEach(async (to, from, next) => {
         'manage', 'admin', 'moderator',
         'system-setting', 'sys-setting', 'all-users', 'role', 'roles',
         'reg-key', 'invite-code', 'analysis', 'oauth-apps', 'oauth-app', 'settings',
-        'category', 'category-setting'
+        'category', 'category-setting', 'audit', 'audit-report', 'risk'
     ];
     if (!token && to.name === 'profile' && protectedSystemPaths.includes(to.params.username?.toLowerCase())) {
         removeLoading();
@@ -397,7 +410,7 @@ router.beforeEach(async (to, from, next) => {
     const toPath = (to.path || '').toLowerCase();
     const isManageRoute = to.meta?.isManage || toPath.startsWith('/manage') || toPath.startsWith('/admin') || [
         'manage-root', 'manage-role-root', 'admin-root',
-        'manage-analysis', 'manage-users', 'manage-mail', 'manage-roles', 'manage-reg-keys', 'manage-system', 'manage-apps', 'manage-rules'
+        'manage-analysis', 'manage-users', 'manage-mail', 'manage-roles', 'manage-reg-keys', 'manage-system', 'manage-apps', 'manage-rules', 'manage-audit'
     ].includes(to.name);
 
     if (isManageRoute) {
