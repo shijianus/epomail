@@ -8,6 +8,18 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### EpomailDocs v5.9 独立审计轮：介绍与法律内容全量对码 + tamper-proof 固化提交号同步 (2026-10-04)
+*   **关联提交 (Git Commit)**: 见本轮 `REPORTS.md` 条目（主仓归档提交）；EpomailDocs 独立治理提交 `e34ce0270c42dc7b50f0add6f0a47310046cf37e` (Short: `e34ce02`)
+*   **部署环境 (Deployment)**: `本地全真栈核验（EpomailDocs build 67 页 / anchors 1416 / structure / laws 全量实跑）；线上发布未执行，待运营者执行 pnpm run deploy`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 独立审计：三路并行取证（66 页文档主张全量提取 / mail-worker+mail-vue 源码事实基线 / 六语言对称与 EpoCanvasDocs 格式对齐）+ 26 项定点对码，报告正文归档 `doc/epomaildocs-v59-independent-audit.md`
+    - [x] 【P1-D 治理修复】v5.9 轮漏做的 tamper-proof manifest 固化提交号同步：EpomailDocs `e34ce02` 仅更新 4 行元数据（a1c1e89→beb956a），66 篇文档 SHA-256 重新生成逐项比对零字节变化
+    - [x] 审计新发现 P1×4（TOTP 官方邮件三类无实现 / is:unread、is:starred 算子未实现 / 附件 10 个与 100MB 上限无依据 / manifest 流程缺陷已修）、P2×7、P3×5，全部附 file:line 证据与修复路线图（R1-R5）
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] EpomailDocs `pnpm build`：67 页 22.4s 零报错；`validate-anchors.cjs` 134 页/1416 锚点/0 断链；`check-structure.py` 六语言对称 100%；`verify-laws.py` 与底稿一致（exit 0）
+    - [x] `audit-public.mjs` 本机不可运行（硬编码 `/home/shijian/...` 绝对路径），已列为 P2-E 待相对路径化
+    - [x] 线上发布未变更（本轮为审计与完整性修复轮，无内容文本变更）；零假数据（审计全程只读取证，无测试数据写入）
+
 ### EpomailDocs v5.9 专案文档拆分扩充轮：功能指南/技术架构 + 真实产品截图 + 内容栏居中 (2026-10-03)
 *   **关联提交 (Git Commit)**: `8a60539d318eef618b84aa0db4e8a88672c4940d` (Short: `8a60539`)；EpomailDocs 独立提交 `beb956a1b50b5c4b94d3bbc9b9feba8ef774417a` (Short: `beb956a`，已推送 origin/main）
 *   **部署环境 (Deployment)**: `Cloudflare Pages epomail-docs 重新发布（master.epomail-docs.pages.dev，67 页）+ 本地全真栈演示实例（wrangler dev 127.0.0.1:8787，冷启动 init + 20 封演示邮件）`

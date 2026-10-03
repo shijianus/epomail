@@ -9,6 +9,21 @@
 
 ---
 
+### EpomailDocs v5.9 独立审计：介绍与法律内容全量对码与完整性核查 (2026-10-04)
+*   **关联提交 (Git Commit)**: 见主仓本轮归档提交（CHECKLIST.log 同名条目）；EpomailDocs 治理提交 `e34ce0270c42dc7b50f0add6f0a47310046cf37e` (Short: `e34ce02`)
+*   **专项文档索引 (Detailed Doc)**: `doc/epomaildocs-v59-independent-audit.md`
+*   **体检/审计范围与方法 (Scope & Methodology)**:
+    1. 范围与环境：EpomailDocs @ `beb956a`（v5.9，11 篇 × 6 语言 = 66 页）全量主张提取与逐项对码；事实基准为主仓 @ `26f6c3b`（559 提交）之 mail-worker / mail-vue 源码；EpoCanvasDocs 本地参照站格式对比。
+    2. 工具与脚本：三路并行只读取证 + 26 项定点对码；官方校验套件本机全量实跑（build 67 页零报错 / anchors 1416:0 / structure 对称 100% / laws exit 0；`audit-public.mjs` 因硬编码路径不可运行）。
+*   **核心发现与缺陷矩阵 (Key Findings & Matrix)**:
+    - **[P1·准确性/完整性]**: ①tamper-proof.md 官方邮件目录 5 类中 3 类（TOTP 开启通知/停用警告/重置警报）无源码实现（worker 官方投递仅欢迎邮件一条路径，`totp-service.js:111,362,672`）；②features.md 搜索算子 `is:unread`/`is:starred` 前后端均未实现（`email-service.js:107-111`、`store/email.js:87-97`），且 UI 快捷 chip 同步提供了这两个不生效算子；③features.md「单封至多 10 个附件/管理员单附件 100 MB」无实现依据（后端仅 `attachment_max_size_mb` 缺省 25MB 且仅约束公共存储用户）；④v5.9 轮漏做 tamper-proof manifest 固化提交号同步（`gitCommit` 停留 a1c1e89）——**本轮已修复（EpomailDocs `e34ce02`，文档哈希零变化）**。
+    - **[P2·一致性/维护]**: ①architecture.md 六语言共用未本地化共享图（本地化版本已存在且被 project.md 在用）；②project.md 提交链路滞后（声明截至 09-30/12 提交，现实 559/45）；③「双库物理隔离」主陈述 vs 托管实例单库运行（三 D1 绑定同 id）；④README.md 停更于 v5.4（8 篇 48 页口径）；⑤audit-public.mjs 硬编码绝对路径不可跨环境运行；⑥翻页卡 DOC_ICONS 缺 features/architecture 两新页；⑦check-structure 对称校验不含 en 图片数（en/features.md 5 图 vs 其余 6 图）。
+    - **[P3·次要/观察]**: 主密钥兜底常量未披露（`email-crypto-utils.js:10`）；30 分钟分析 cron 未提及；admin@epomail.bond 与 announcement@epocanvas.com 双域名并存宜注明；落地页为 meta-refresh 桩 vs canvas splash 范式；hreflang/自定义 404/aside 本地化等 canvas 家族增益未引入。
+    - **通过项**: 26 项定点对码全部与源码一致（含 MyMemory/Google 翻译备援、Google Fonts、90% 配额强删 `email-service.js:303-311`、四预置标签、20 位 Hash=15 字节 base64url、官方发信硬编码、六语言欢迎模板、六角色配额、四/三级存储链、PBKDF2/JWT/TOTP/OAuth/TG 全部时限参数、首提交 2bbb582 等，逐项 file:line 见专项文档第三节）；六语言结构/日期行/效力条款/条号零引用 100% 达标；v5.7 轮 P1（cf-ipcountry）证实已闭环。
+*   **治理修复与回归结果 (Fixes & Verification)**:
+    - 本轮为独立审计 + 单项完整性修复：EpomailDocs `e34ce02` 同步 manifest 固化提交号（66 篇 SHA-256 重新生成零字节变化，仅 4 行元数据），重建核验 67 页零报错/1416 锚点 0 断链；线上重新发布未执行（`pnpm run deploy` 待运营者确认）。
+    - 后续路线图（R1 文档准确性修订 ×6 语言 → R2 站点工具修补 → R3 产品侧三决策项 → R4 splash 首页等形态升级 → R5 manifest 提交号 CI 化等流程制度化）已列入专项文档第六节。
+
 ### EpomailDocs v5.7 独立复审：介绍与法律内容全量对码审计与发布状态核查 (2026-10-03)
 *   **关联提交 (Git Commit)**: `6cae7c3804450a899e20188a438543b9b7228997` (Short: `6cae7c3`)；审计对象 EpomailDocs @ `6478520`（v5.7，54 页 = 9 篇 × 6 语言），事实基准为主仓 @ `50c69e0`
 *   **体检/审计范围与方法 (Scope & Methodology)**:
