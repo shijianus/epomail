@@ -8,6 +8,32 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### 设定页单界面一体化呈现、URL身分组管理分流与Subagent公网视觉验收 (2026-10-03)
+*   **关联提交 (Git Commit)**: `42fecb961451dcb539cd42854bc63694e36c38b3` (Short: `42fecb9`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare Workers (https://mail.epocanvas.com)` (Version ID: `3f2c8994-efba-4aa9-beeb-15cd82a1476d`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 变更点 1 (前端UI单界面一体化保持)：
+        - 遵从用户最新指引“前端其他展示保持不变，该在一个界面就保持一个界面就行了”，彻底移除切页卡片与视图割裂设计；
+        - 在设定页单一侧边栏列表内自然融合双板块：上方直观呈现“设置”个人项（个资、常规、安全、资料、标签）；具备管理权限者在同侧边栏下方平滑延展“管理”板块（分析页、用户列表、权限控制、注册密钥、系统设置、应用管理、分类管理）；
+    - [x] 变更点 2 (URL层级严格区分与身分组动态绑定)：
+        - 个人设置 URL 严格锚定 `#settings/*`（如 `https://mail.epocanvas.com/mail/u/0/#settings/profile`）；
+        - 管理后台从 URL 层面显式区分并强绑定身分组 `#manage/:roleGroup/*`（如站长映射为 `#manage/admin/system`，协管者映射为 `#manage/moderator/*`）；
+        - 点击管理项后侧边栏完整保留，右侧主视窗平滑切换管理内容，URL 自动精准同步；点击个人设置项后平滑切回 `#settings/*`；
+    - [x] 变更点 3 (严格防越权与安全拦截)：
+        - 普通无权用户侧边栏绝不渲染“管理”板块标题及任何管理 DOM 节点；
+        - 普通用户若手动在浏览器地址栏输入 `#manage/admin/system` 等管理路由，在路由守卫层被坚决拦截、触发告警并安全回退至 `#settings/profile`；
+    - [x] 变更点 4 (Subagent 独立公网视觉验证验收体系)：
+        - 编写 Playwright 端到端公网实测套件 `tests/verify-subagent-settings-visual.mjs`，执行 15 项断言全绿；
+        - 部署至真实公网并产出三视角全景实录截图（`tests/verify_settings_normal_user.png`、`tests/verify_settings_unified_admin_sidebar.png`、`tests/verify_settings_unified_admin_manage_system.png`）；
+        - 调起独立 Visual Audit Subagent 针对公网全真视觉排版、激活态交互、防越权表现进行全面审查，获得正式准予交付 Sign-off。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：`mail-vue` vite build 通过 (耗时 13.02s)，产物零警告零报错；
+    - [x] 自动化测试套件：`tests/verify-subagent-settings-visual.mjs` 全绿 (15/15 断言通过)；
+    - [x] 独立 Subagent 视觉验收：Visual Audit Subagent 完成实图审计并批准交付 (Sign-Off Approved)；
+    - [x] 多语言对称闭环：6 语言字典 100% 绝对对称 (2134 keys)，字面量引用 0 缺失；
+    - [x] 生产公网部署：Cloudflare Workers 版本 `3f2c8994-efba-4aa9-beeb-15cd82a1476d` 现网就绪；
+    - [x] 零假数据残留：测试过程所有网络与会话隔离清理，无脏数据残留。
+
 ### 设定页「个人设置」与「管理控制台」物理分割及身分组URL强绑定防越权 (2026-10-02)
 *   **关联提交 (Git Commit)**: `27b1f32b1960dac6c71bbf0a39cac2ce1d9fc1a0` (Short: `27b1f32`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare Workers (https://mail.epocanvas.com)` (Version ID: `3d599d23-2ab0-4a10-a317-45d81bae2d5f`)
