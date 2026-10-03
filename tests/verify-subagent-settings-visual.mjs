@@ -138,8 +138,10 @@ async function run() {
 
     // 5. 点击「系统设置」，验证仍在同一个界面，同时 URL 变为 #manage/admin/system
     console.log('\n[步骤 5] 切换至管理控制台分页，验证界面不跳转/不割裂且URL精准对齐...');
+    await sysSettingLink.scrollIntoViewIfNeeded();
     await sysSettingLink.click();
-    await adminPage.waitForTimeout(2000);
+    await adminPage.waitForFunction(() => window.location.hash.includes('manage/admin/system'), { timeout: 8000 }).catch(() => {});
+    await adminPage.waitForTimeout(1000);
 
     const manageUrl = adminPage.url();
     console.log(`  点击系统设置后 URL: ${manageUrl}`);
