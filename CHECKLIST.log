@@ -8,6 +8,29 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### 分析页 (Analytics) 图表无法渲染故障修复与Subagent双模式公网视觉验收 (2026-10-03)
+*   **关联提交 (Git Commit)**: `a5acdb545d7afd70c2f52a2039194b00c67d7925` (Short: `a5acdb5`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare Workers (https://mail.epocanvas.com)` (Version ID: `bb685715-d1cf-4410-a336-0f3fdde5ac5a`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 变更点 1 (分析页路由判定与生命周期修复)：
+        - 彻底根治分析页因路由命名升级为 `manage-analysis` 后，内部遗留的 `route.name !== 'analysis'` 硬编码导致 `initPicture()` 提前退出的问题；
+        - 重构引入 `isAnalysisRoute()` 统一兼容判定，涵盖 `manage-analysis`、`analysis` 以及路径别名；
+        - 修复暗色模式切换监听器 `watch(() => uiStore.dark)`，确保主题切换时平滑触发 ECharts 动态重绘；
+    - [x] 变更点 2 (ECharts 初始化与图表防御强化)：
+        - 在六大图表初始化入口（发件人来源饼图、用户增长折线图、邮件吞吐柱状图、发信仪表盘等）补齐 DOM 元素存在性校验（`if (!dom) return`），彻底杜绝 `Initialize failed: invalid dom` 崩溃；
+        - 数据映射全面增加缺省防御（`(senderData.value || []).map(...)`、`|| 0`、`|| []`），防止空数据引发 TypeError；
+        - `onMounted` 增加 `.catch()` 异常捕获与 loading 状态兜底回退，杜绝网络异常或接口抖动导致的死循环卡顿；
+    - [x] 变更点 3 (Subagent 独立公网双模式视觉验收)：
+        - 编写 Playwright 公网端到端图表自动化核验套件 `tests/verify-analysis-visual.mjs`，12/12 断言全绿；
+        - 调起独立 Visual Auditor Subagent 对公网环境截图（`tests/verify_analysis_light_mode.png` 与 `tests/verify_analysis_dark_mode.png`）执行严格走查并获得批准交付（Sign-Off）。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：`mail-vue` vite build 通过 (耗时 12.41s)，产物零报错零告警；
+    - [x] 自动化测试套件：`tests/verify-analysis-visual.mjs` 全绿 (12/12 断言通过)；
+    - [x] 独立 Subagent 视觉验收：Analytics Visual Auditor Subagent 审核亮暗双模截图并批准交付 (Sign-Off Approved)；
+    - [x] 多语言对称闭环：6 语言字典 100% 绝对对称 (2134 keys)，字面量引用 0 缺失；
+    - [x] 生产公网部署：Cloudflare Workers 版本 `bb685715-d1cf-4410-a336-0f3fdde5ac5a` 现网就绪；
+    - [x] 零假数据残留：测试过程环境无脏数据残留。
+
 ### 设定页单界面一体化呈现、URL身分组管理分流与Subagent公网视觉验收 (2026-10-03)
 *   **关联提交 (Git Commit)**: `42fecb961451dcb539cd42854bc63694e36c38b3` (Short: `42fecb9`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare Workers (https://mail.epocanvas.com)` (Version ID: `3f2c8994-efba-4aa9-beeb-15cd82a1476d`)
