@@ -374,6 +374,91 @@ try {
     await ctx.close();
   }
 
+  // -------------------------------------------------------------
+  // Scenario 6: Mixed Configured vs Disabled/Unconfigured Providers
+  // 验证: 能打开的第三方登录一定是有配置且开启的！未配置或已关闭的 Provider 按钮呈现灰色且禁用！
+  // -------------------------------------------------------------
+  {
+    console.log('\n--- [Scenario 6] 状态联动与灰色禁用 (Google已配置开启 vs GitHub关闭 vs Microsoft未配置) ---');
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const page = await ctx.newPage();
+
+    let authorizeCalledFor = [];
+    await page.route('**/api/oauth/authorize/**', (route) => {
+      const url = route.request().url();
+      authorizeCalledFor.push(url);
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ code: 200, data: { url: 'https://accounts.google.com/o/oauth2/auth?mock=1' } })
+      });
+    });
+
+    await page.route('**/api/setting/websiteConfig', (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          code: 200,
+          data: {
+            title: 'EpoMail',
+            oauthLoginEnabled: 1,
+            oauthProviders: {
+              google: { enabled: 1, clientId: 'google-active-id' },
+              github: { enabled: 0, clientId: 'github-disabled-id' }, // 后台已关闭
+              microsoft: { enabled: 1, clientId: '' },               // 未填写 Client ID
+              apple: { enabled: 0 }                                   // 未配置
+            }
+          }
+        })
+      });
+    });
+
+    await page.goto(baseUrl, { waitUntil: 'networkidle' });
+    await page.waitForTimeout(800);
+
+    const states = await page.evaluate(() => {
+      const btns = Array.from(document.querySelectorAll('button.epomail-display:not([type="submit"])'));
+      return btns.map(b => {
+        const text = b.textContent || '';
+        const isGoogle = text.includes('Google');
+        const isGithub = text.includes('GitHub');
+        const isMicrosoft = text.includes('Microsoft');
+        const isApple = text.includes('Apple');
+        const isDisabled = b.hasAttribute('disabled') || b.getAttribute('aria-disabled') === 'true';
+        const isNotAllowed = b.className.includes('cursor-not-allowed') || window.getComputedStyle(b).cursor === 'not-allowed';
+        const isGrayscale = b.className.includes('grayscale');
+        const hasSoon = text.includes('即将上线') || text.includes('Soon');
+        return { text, isGoogle, isGithub, isMicrosoft, isApple, isDisabled, isNotAllowed, isGrayscale, hasSoon };
+      });
+    });
+
+    const googleBtn = states.find(s => s.isGoogle);
+    const githubBtn = states.find(s => s.isGithub);
+    const msBtn = states.find(s => s.isMicrosoft);
+    const appleBtn = states.find(s => s.isApple);
+
+    ok(googleBtn && !googleBtn.isDisabled && !googleBtn.isNotAllowed, '已配置开启的 Google 按钮处于正常激活状态 (无 disabled/可交互)');
+    ok(githubBtn && githubBtn.isDisabled && githubBtn.isNotAllowed && githubBtn.isGrayscale, '后台关闭的 GitHub 按钮呈现灰色禁用状态 (grayscale + cursor-not-allowed + disabled)');
+    ok(msBtn && msBtn.isDisabled && msBtn.isNotAllowed && msBtn.hasSoon, '未配 Client ID 的 Microsoft 按钮呈现灰色禁用且带 Soon 徽标');
+    ok(appleBtn && appleBtn.isDisabled && appleBtn.isNotAllowed && appleBtn.hasSoon, '未配置的 Apple 按钮呈现灰色禁用且带 Soon 徽标');
+
+    // Test clicking disabled button (GitHub) -> should NOT trigger /api/oauth/authorize/github
+    await page.click('button.epomail-display:has-text("GitHub")', { force: true });
+    await page.waitForTimeout(300);
+    ok(authorizeCalledFor.length === 0, '点击未配置/禁用的 GitHub 按钮不会发起 OAuth 授权请求');
+
+    // Test clicking active button (Google) -> should trigger /api/oauth/authorize/google
+    await page.click('button.epomail-display:has-text("Google")');
+    await page.waitForTimeout(300);
+    ok(authorizeCalledFor.some(u => u.includes('/api/oauth/authorize/google')), '点击已配置的 Google 按钮成功触发对应 Provider 授权流程');
+
+    await page.screenshot({ path: 'tests/audit_oauth_active_vs_disabled.png' });
+    console.log('  ✓ 状态自适应截图已保存至 tests/audit_oauth_active_vs_disabled.png');
+
+    await ctx.close();
+  }
+
   await browser.close();
 
   console.log(`\n============================================================`);

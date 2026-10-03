@@ -8,6 +8,30 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### 第三方登录配置状态双向联动、未配置项灰色禁用拦截与管理端匹配保障交付 (2026-10-03)
+*   **关联提交 (Git Commit)**: `PENDING_COMMIT_HASH` (Short: `PENDING_SHORT_HASH`)
+*   **部署环境 (Deployment)**: `本地全真栈 / 构建核验`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 变更点 1 (前端登录态严格区分：已配置激活 vs 未配置/已关闭灰色禁用与拦截):
+        - **已配置且开启的 Provider**: 呈现高保真品牌色与完整矢量 SVG 品牌图标，具备 `cursor-pointer`、`opacity: 0.95` 以及青色流光悬停微动效，点击正常发起 `/api/oauth/authorize/:provider` 授权请求；
+        - **未配置或后台已关闭的 Provider**: 严格呈现灰色禁用状态 (`cursor-not-allowed`、`grayscale`、`opacity: 0.40`、`disabled` 属性、`aria-disabled="true"` 并携带精致 `Soon` 徽标)；
+        - **点击严格拦截防御**: 点击灰色禁用按钮时，100% 阻止任何外部跳转与网络请求，并在界面友好提示对应多语言文案 `oauthNotConfigured` (此第三方登录方式尚未配置或已暂停服务)；
+    - [x] 变更点 2 (管理后台「启用第三方快捷登录」主开关与子提供商双向智能匹配与联动):
+        - 开启总开关时，智能检测下方子提供商的配置与启用状态：若尚未配置任何提供商或全部处于关闭状态，即时弹出友好提示引导管理员配置；
+        - 在系统设置卡片中为各 Provider 补充直观的状态标签 (`已启用` / `已关闭` / `未配置`) 与内联快捷开关 (`el-switch`)，支持站长一键启闭已配置的 Provider；
+        - 当站长配置并开启任意一个子提供商时，系统自动感知并同步开启主开关「启用第三方快捷登录」，彻底杜绝子项配置完成而主开关遗漏未开的断层问题；
+    - [x] 变更点 3 (六语言多语言字典对称与登录子应用统一闭环):
+        - 新增 `oauthNoProviderConfiguredWarning`、`oauthNoProviderEnabledWarning`、`oauthMasterSwitchAutoEnabled`、`oauthNotConfigured` 4 项核心词条，在 `zh`、`zh-Hant`、`en`、`es`、`fr`、`nl` 六语言字典中保持 100% 绝对对称；
+        - 登录子应用 `authLocale.ts` 同步维护对应 6 语言词条映射。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 登录子应用构建核验：`temp_login_ui` Vite 构建通过 (2.28s, 0 errors)；
+    - [x] 主应用构建核验：`mail-vue` Vite 构建通过 (13.18s, 0 errors)；
+    - [x] 产物同步：`scripts/copy-login-dist.mjs` 同步至 `mail-worker/dist/login` 完成；
+    - [x] 多语言对称核验：`i18n-symmetry.mjs` (2,290 键 100% 绝对对称)；
+    - [x] 专项全场景端到端测试：`tests/test-oauth-sso-buttons-verification.mjs` (31/31 断言全绿通过，覆盖 1~5 Provider 几何排布及混合状态下的激活 vs 灰色禁用/点击拦截专项验证)；
+    - [x] 登录全语言回归套件：`tests/verify-login-polish.mjs` (62/62 断言全绿通过)；
+    - [x] 视觉截图状态核验：`tests/audit_oauth_active_vs_disabled.png` 验证已激活（高亮）与已禁用（灰色）对比明确无误。
+
 ### 第三方认证与单点登录 1/2/3/4/5 Provider 奇偶自适应布局重塑、矢量品牌图标对齐与几何零溢出全真栈交付 (2026-10-03)
 *   **关联提交 (Git Commit)**: `753f6793dc63711d3706ce316c1332681309f6d4` (Short: `753f679`)
 *   **部署环境 (Deployment)**: `本地全真栈 / 构建核验`

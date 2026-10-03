@@ -321,54 +321,57 @@ function getOAuthProviderList(sysConfig?: any): OAuthProviderItem[] {
     parsed = customProviders;
   }
 
+  const isItemConfigured = (key: string) => {
+    const cfg = parsed[key];
+    if (!cfg) return false;
+    const hasClientId = Boolean(cfg.clientId && typeof cfg.clientId === 'string' && cfg.clientId.trim() !== '');
+    const isEnabled = cfg.enabled === 1 || cfg.enabled === true || cfg.enabled === undefined;
+    return hasClientId && isEnabled;
+  };
+
   const allSupported: OAuthProviderItem[] = [
     {
       key: 'google',
       name: 'Google',
       icon: <GoogleIcon className="w-4 h-4 shrink-0" />,
-      configured: Boolean(parsed.google?.clientId || (parsed.google?.enabled !== 0 && parsed.google?.enabled !== false && parsed.google?.clientId))
+      configured: isItemConfigured('google')
     },
     {
       key: 'github',
       name: 'GitHub',
       icon: <GithubIcon className="w-4 h-4 shrink-0 text-white" />,
-      configured: Boolean(parsed.github?.clientId || (parsed.github?.enabled !== 0 && parsed.github?.enabled !== false && parsed.github?.clientId))
+      configured: isItemConfigured('github')
     },
     {
       key: 'microsoft',
       name: 'Microsoft',
       icon: <MicrosoftIcon className="w-4 h-4 shrink-0" />,
-      configured: Boolean(parsed.microsoft?.clientId || (parsed.microsoft?.enabled !== 0 && parsed.microsoft?.enabled !== false && parsed.microsoft?.clientId))
+      configured: isItemConfigured('microsoft')
     },
     {
       key: 'apple',
       name: 'Apple',
       icon: <AppleIcon className="w-4 h-4 shrink-0 text-white" />,
-      configured: Boolean(parsed.apple?.clientId || (parsed.apple?.enabled !== 0 && parsed.apple?.enabled !== false && parsed.apple?.clientId))
+      configured: isItemConfigured('apple')
     },
     {
       key: 'custom',
-      name: parsed.custom?.name || 'Custom SSO',
+      name: (parsed.custom && parsed.custom.name) || 'Custom SSO',
       icon: <SsoIcon className="w-4 h-4 shrink-0 text-[#67e8f9]" />,
-      configured: Boolean(parsed.custom?.clientId || (parsed.custom?.enabled !== 0 && parsed.custom?.enabled !== false && parsed.custom?.clientId))
+      configured: isItemConfigured('custom')
     }
   ];
 
-  const hasExplicitConfig = Object.keys(parsed).some(k => {
-    const p = parsed[k];
-    return p && (p.enabled === 1 || p.enabled === true || (p.clientId && p.enabled !== 0 && p.enabled !== false));
-  });
+  const hasCustom = Boolean(parsed.custom?.clientId || parsed.custom?.name || parsed.custom?.enabled !== undefined);
 
-  if (hasExplicitConfig) {
-    const configuredList = allSupported.filter(p => {
-      const pConfig = parsed[p.key];
-      return pConfig && (pConfig.enabled === 1 || pConfig.enabled === true || (pConfig.clientId && pConfig.enabled !== 0 && pConfig.enabled !== false));
-    });
-    if (configuredList.length > 0) return configuredList;
+  // If parsed has specific keys (e.g. backend websiteConfig returns configured providers subset)
+  const configKeys = Object.keys(parsed).filter(k => allSupported.some(s => s.key === k));
+
+  if (configKeys.length > 0) {
+    return allSupported.filter(p => configKeys.includes(p.key));
   }
 
-  // 默认支持 4 大核心第三方登录 (Google, GitHub, Microsoft, Apple)
-  return allSupported.slice(0, 4);
+  return hasCustom ? allSupported : allSupported.slice(0, 4);
 }
 
 function generateSessionHash(): string {
@@ -605,6 +608,10 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
   }, [t, tr, canvasRef]);
 
   const handleOAuthProviderClick = async (provider: OAuthProviderItem) => {
+    if (!provider.configured) {
+      setErrorMsg(t('oauthNotConfigured') || tr('oauthComingSoon'));
+      return;
+    }
     setErrorMsg("");
     try {
       const origin = typeof window !== 'undefined' ? window.location.origin : '';
@@ -619,6 +626,103 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
     } catch (err: any) {
       setErrorMsg(err?.message || tr('oauthComingSoon'));
     }
+  };
+
+  const renderOAuthButton = (provider: OAuthProviderItem, extraClass: string = "", isHero: boolean = false) => {
+    const isConfigured = Boolean(provider.configured);
+
+    if (isHero) {
+      return (
+        <motion.button
+          key={provider.key}
+          type="button"
+          disabled={!isConfigured}
+          aria-disabled={!isConfigured}
+          title={isConfigured ? provider.name : `${provider.name} (${t('oauthSoon') || '未配置'})`}
+          onClick={(e) => {
+            if (!isConfigured) {
+              e.preventDefault();
+              e.stopPropagation();
+              setErrorMsg(t('oauthNotConfigured') || tr('oauthComingSoon'));
+              return;
+            }
+            handleOAuthProviderClick(provider);
+          }}
+          whileHover={isConfigured ? (reduceMotion ? { opacity: 1 } : { opacity: 1, y: -1.5, borderColor: "rgba(103,232,249,0.55)", background: "rgba(255,255,255,0.08)" }) : {}}
+          whileTap={isConfigured ? { scale: 0.98 } : {}}
+          transition={{ duration: 0.18, ease: "easeOut" }}
+          className={`epomail-display flex h-11 w-full items-center justify-between px-4 sm:px-5 rounded-xl border text-[13px] ${
+            isConfigured
+              ? 'transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#67e8f9]'
+              : 'cursor-not-allowed select-none opacity-40 grayscale'
+          } ${extraClass}`}
+          style={{
+            borderColor: isConfigured ? "rgba(139,147,196,0.28)" : "rgba(139,147,196,0.12)",
+            background: isConfigured ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.015)",
+            color: isConfigured ? "var(--epo-ink)" : "var(--epo-muted)",
+            opacity: isConfigured ? 0.95 : 0.40,
+          }}
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span className={isConfigured ? "shrink-0" : "shrink-0 grayscale opacity-60"}>{provider.icon}</span>
+            <span className="truncate font-medium">{provider.name}</span>
+            {!isConfigured && (
+              <span
+                className="rounded-full border px-1.5 py-px text-[9px] uppercase tracking-wider shrink-0"
+                style={{ borderColor: "rgba(139,147,196,0.25)", color: "var(--epo-muted)", background: "rgba(255,255,255,0.02)" }}
+              >
+                {t('oauthSoon')}
+              </span>
+            )}
+          </div>
+          <ArrowRight size={15} className={`shrink-0 ${isConfigured ? 'text-[var(--epo-muted)]' : 'text-white/20'}`} />
+        </motion.button>
+      );
+    }
+
+    return (
+      <motion.button
+        key={provider.key}
+        type="button"
+        disabled={!isConfigured}
+        aria-disabled={!isConfigured}
+        title={isConfigured ? provider.name : `${provider.name} (${t('oauthSoon') || '未配置'})`}
+        onClick={(e) => {
+          if (!isConfigured) {
+            e.preventDefault();
+            e.stopPropagation();
+            setErrorMsg(t('oauthNotConfigured') || tr('oauthComingSoon'));
+            return;
+          }
+          handleOAuthProviderClick(provider);
+        }}
+        whileHover={isConfigured ? (reduceMotion ? { opacity: 1 } : { opacity: 1, y: -1.5, borderColor: "rgba(103,232,249,0.55)", background: "rgba(255,255,255,0.08)" }) : {}}
+        whileTap={isConfigured ? { scale: 0.98 } : {}}
+        transition={{ duration: 0.18, ease: "easeOut" }}
+        className={`epomail-display flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-3 rounded-xl border text-[12px] sm:text-[13px] ${
+          isConfigured
+            ? 'transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#67e8f9]'
+            : 'cursor-not-allowed select-none opacity-40 grayscale'
+        } ${extraClass}`}
+        style={{
+          borderColor: isConfigured ? "rgba(139,147,196,0.28)" : "rgba(139,147,196,0.12)",
+          background: isConfigured ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.015)",
+          color: isConfigured ? "var(--epo-ink)" : "var(--epo-muted)",
+          opacity: isConfigured ? 0.95 : 0.40,
+        }}
+      >
+        <span className={isConfigured ? "shrink-0" : "shrink-0 grayscale opacity-60"}>{provider.icon}</span>
+        <span className="truncate">{provider.name}</span>
+        {!isConfigured && (
+          <span
+            className="rounded-full border px-1 sm:px-1.5 py-px text-[8.5px] sm:text-[9px] uppercase tracking-wider shrink-0"
+            style={{ borderColor: "rgba(139,147,196,0.25)", color: "var(--epo-muted)", background: "rgba(255,255,255,0.02)" }}
+          >
+            {t('oauthSoon')}
+          </span>
+        )}
+      </motion.button>
+    );
   };
 
   // 30s TOTP period countdown
@@ -1591,139 +1695,28 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
                     </div>
 
                     {/* Case 1: 1 Provider (Full-width Hero Capsule) */}
-                    {oauthProviderList.length === 1 && (
-                      <motion.button
-                        key={oauthProviderList[0].key}
-                        type="button"
-                        onClick={() => handleOAuthProviderClick(oauthProviderList[0])}
-                        whileHover={reduceMotion ? { opacity: 1 } : { opacity: 1, y: -1.5, borderColor: "rgba(103,232,249,0.5)", background: "rgba(255,255,255,0.08)" }}
-                        whileTap={{ scale: 0.98 }}
-                        transition={{ duration: 0.18, ease: "easeOut" }}
-                        className="epomail-display flex h-11 w-full items-center justify-between px-4 sm:px-5 rounded-xl border text-[13px] transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#67e8f9]"
-                        style={{
-                          borderColor: "rgba(139,147,196,0.25)",
-                          background: "rgba(255,255,255,0.04)",
-                          color: "var(--epo-ink)",
-                          opacity: 0.92,
-                        }}
-                      >
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          {oauthProviderList[0].icon}
-                          <span className="truncate font-medium">{oauthProviderList[0].name}</span>
-                          {!oauthProviderList[0].configured && (
-                            <span
-                              className="rounded-full border px-1.5 py-px text-[9px] uppercase tracking-wider shrink-0"
-                              style={{ borderColor: "rgba(139,147,196,0.35)", color: "var(--epo-muted)" }}
-                            >
-                              {t('oauthSoon')}
-                            </span>
-                          )}
-                        </div>
-                        <ArrowRight size={15} className="text-[var(--epo-muted)] shrink-0" />
-                      </motion.button>
-                    )}
+                    {oauthProviderList.length === 1 && renderOAuthButton(oauthProviderList[0], "", true)}
 
                     {/* Case 2: 2 Providers (1:1 Symmetric Twin Columns) */}
                     {oauthProviderList.length === 2 && (
                       <div className="grid grid-cols-2 gap-2.5 w-full">
-                        {oauthProviderList.map((provider) => (
-                          <motion.button
-                            key={provider.key}
-                            type="button"
-                            onClick={() => handleOAuthProviderClick(provider)}
-                            whileHover={reduceMotion ? { opacity: 1 } : { opacity: 1, y: -1.5, borderColor: "rgba(103,232,249,0.5)", background: "rgba(255,255,255,0.08)" }}
-                            whileTap={{ scale: 0.98 }}
-                            transition={{ duration: 0.18, ease: "easeOut" }}
-                            className="epomail-display flex h-11 items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-3 rounded-xl border text-[12px] sm:text-[13px] transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#67e8f9]"
-                            style={{
-                              borderColor: "rgba(139,147,196,0.25)",
-                              background: "rgba(255,255,255,0.04)",
-                              color: "var(--epo-ink)",
-                              opacity: 0.92,
-                            }}
-                          >
-                            {provider.icon}
-                            <span className="truncate">{provider.name}</span>
-                            {!provider.configured && (
-                              <span
-                                className="rounded-full border px-1 sm:px-1.5 py-px text-[8.5px] sm:text-[9px] uppercase tracking-wider shrink-0"
-                                style={{ borderColor: "rgba(139,147,196,0.35)", color: "var(--epo-muted)" }}
-                              >
-                                {t('oauthSoon')}
-                              </span>
-                            )}
-                          </motion.button>
-                        ))}
+                        {oauthProviderList.map((provider) => renderOAuthButton(provider, "h-11"))}
                       </div>
                     )}
 
                     {/* Case 3: 3 Providers (Desktop 3-Column / Mobile 1-Top + 2-Bottom) */}
                     {oauthProviderList.length === 3 && (
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-2.5 w-full">
-                        {oauthProviderList.map((provider, idx) => (
-                          <motion.button
-                            key={provider.key}
-                            type="button"
-                            onClick={() => handleOAuthProviderClick(provider)}
-                            whileHover={reduceMotion ? { opacity: 1 } : { opacity: 1, y: -1.5, borderColor: "rgba(103,232,249,0.5)", background: "rgba(255,255,255,0.08)" }}
-                            whileTap={{ scale: 0.98 }}
-                            transition={{ duration: 0.18, ease: "easeOut" }}
-                            className={`epomail-display flex h-11 items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-3 rounded-xl border text-[12px] sm:text-[13px] transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#67e8f9] ${
-                              idx === 0 ? 'col-span-2 sm:col-span-1' : 'col-span-1'
-                            }`}
-                            style={{
-                              borderColor: "rgba(139,147,196,0.25)",
-                              background: "rgba(255,255,255,0.04)",
-                              color: "var(--epo-ink)",
-                              opacity: 0.92,
-                            }}
-                          >
-                            {provider.icon}
-                            <span className="truncate">{provider.name}</span>
-                            {!provider.configured && (
-                              <span
-                                className="rounded-full border px-1 sm:px-1.5 py-px text-[8.5px] sm:text-[9px] uppercase tracking-wider shrink-0"
-                                style={{ borderColor: "rgba(139,147,196,0.35)", color: "var(--epo-muted)" }}
-                              >
-                                {t('oauthSoon')}
-                              </span>
-                            )}
-                          </motion.button>
-                        ))}
+                        {oauthProviderList.map((provider, idx) =>
+                          renderOAuthButton(provider, `h-11 ${idx === 0 ? 'col-span-2 sm:col-span-1' : 'col-span-1'}`)
+                        )}
                       </div>
                     )}
 
                     {/* Case 4: 4 Providers (2x2 Matrix) */}
                     {oauthProviderList.length === 4 && (
                       <div className="grid grid-cols-2 gap-2 sm:gap-2.5 w-full">
-                        {oauthProviderList.map((provider) => (
-                          <motion.button
-                            key={provider.key}
-                            type="button"
-                            onClick={() => handleOAuthProviderClick(provider)}
-                            whileHover={reduceMotion ? { opacity: 1 } : { opacity: 1, y: -1.5, borderColor: "rgba(103,232,249,0.5)", background: "rgba(255,255,255,0.08)" }}
-                            whileTap={{ scale: 0.98 }}
-                            transition={{ duration: 0.18, ease: "easeOut" }}
-                            className="epomail-display flex h-11 items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-3 rounded-xl border text-[12px] sm:text-[13px] transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#67e8f9]"
-                            style={{
-                              borderColor: "rgba(139,147,196,0.25)",
-                              background: "rgba(255,255,255,0.04)",
-                              color: "var(--epo-ink)",
-                              opacity: 0.92,
-                            }}
-                          >
-                            {provider.icon}
-                            <span className="truncate">{provider.name}</span>
-                            {!provider.configured && (
-                              <span
-                                className="rounded-full border px-1 sm:px-1.5 py-px text-[8.5px] sm:text-[9px] uppercase tracking-wider shrink-0"
-                                style={{ borderColor: "rgba(139,147,196,0.35)", color: "var(--epo-muted)" }}
-                              >
-                                {t('oauthSoon')}
-                              </span>
-                            )}
-                          </motion.button>
-                        ))}
+                        {oauthProviderList.map((provider) => renderOAuthButton(provider, "h-11"))}
                       </div>
                     )}
 
@@ -1733,34 +1726,7 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
                         {oauthProviderList.map((provider, idx) => {
                           const desktopSpan = idx < 3 ? 'sm:col-span-2' : 'sm:col-span-3';
                           const mobileSpan = oauthProviderList.length % 2 === 1 && idx === oauthProviderList.length - 1 ? 'col-span-2' : 'col-span-1';
-                          return (
-                            <motion.button
-                              key={provider.key}
-                              type="button"
-                              onClick={() => handleOAuthProviderClick(provider)}
-                              whileHover={reduceMotion ? { opacity: 1 } : { opacity: 1, y: -1.5, borderColor: "rgba(103,232,249,0.5)", background: "rgba(255,255,255,0.08)" }}
-                              whileTap={{ scale: 0.98 }}
-                              transition={{ duration: 0.18, ease: "easeOut" }}
-                              className={`epomail-display flex h-10 sm:h-11 items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-3 rounded-xl border text-[12px] sm:text-[13px] transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#67e8f9] ${mobileSpan} ${desktopSpan}`}
-                              style={{
-                                borderColor: "rgba(139,147,196,0.25)",
-                                background: "rgba(255,255,255,0.04)",
-                                color: "var(--epo-ink)",
-                                opacity: 0.92,
-                              }}
-                            >
-                              {provider.icon}
-                              <span className="truncate">{provider.name}</span>
-                              {!provider.configured && (
-                                <span
-                                  className="rounded-full border px-1 sm:px-1.5 py-px text-[8.5px] sm:text-[9px] uppercase tracking-wider shrink-0"
-                                  style={{ borderColor: "rgba(139,147,196,0.35)", color: "var(--epo-muted)" }}
-                                >
-                                  {t('oauthSoon')}
-                                </span>
-                              )}
-                            </motion.button>
-                          );
+                          return renderOAuthButton(provider, `h-10 sm:h-11 ${mobileSpan} ${desktopSpan}`);
                         })}
                       </div>
                     )}

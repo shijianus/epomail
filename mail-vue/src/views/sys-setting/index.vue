@@ -271,7 +271,7 @@
                 </div>
                 <div>
                   <el-switch
-                    @change="(val) => changeField('oauthLoginEnabled', val)"
+                    @change="(val) => handleOauthMasterSwitchChange(val)"
                     :active-value="1"
                     :inactive-value="0"
                     v-model="setting.oauthLoginEnabled"
@@ -279,7 +279,7 @@
                 </div>
               </div>
 
-              <!-- Providers Integration Items: 1 名称 + 1 Button (符合整体设置卡片规范) -->
+              <!-- Providers Integration Items: 1 名称 + 状态 Tag + 独立 Switch (如果已配置) + 1 Button (配置) -->
               <div 
                 v-for="provider in OAUTH_PROVIDERS_LIST" 
                 :key="provider.key" 
@@ -289,16 +289,43 @@
                   <Icon :icon="provider.icon" width="17" height="17" class="provider-icon" />
                   <span>{{ provider.key === 'custom' ? getCustomOauthTitle() : provider.label }}</span>
                   <el-tag 
-                    v-if="isOauthProviderConfigured(provider.key)" 
+                    v-if="isOauthProviderConfigured(provider.key) && isOauthProviderEnabled(provider.key)" 
                     size="small" 
                     type="success" 
+                    effect="light" 
+                    class="oauth-status-tag"
+                  >
+                    {{ $t('enabled') }}
+                  </el-tag>
+                  <el-tag 
+                    v-else-if="isOauthProviderConfigured(provider.key) && !isOauthProviderEnabled(provider.key)" 
+                    size="small" 
+                    type="info" 
                     effect="plain" 
                     class="oauth-status-tag"
                   >
-                    {{ $t('configured') }}
+                    {{ $t('disabled') }}
+                  </el-tag>
+                  <el-tag 
+                    v-else 
+                    size="small" 
+                    type="warning" 
+                    effect="plain" 
+                    class="oauth-status-tag"
+                  >
+                    {{ $t('notConfigured') }}
                   </el-tag>
                 </div>
-                <div>
+                <div class="oauth-row-actions" style="display: flex; align-items: center; gap: 10px;">
+                  <el-switch 
+                    v-if="isOauthProviderConfigured(provider.key)"
+                    :model-value="isOauthProviderEnabled(provider.key)"
+                    @change="(val) => toggleOauthProviderQuick(provider.key, val)"
+                    inline-prompt
+                    :active-text="$t('enabled')"
+                    :inactive-text="$t('disabled')"
+                    size="small"
+                  />
                   <el-button 
                     class="opt-button" 
                     size="small" 
@@ -3755,7 +3782,51 @@ function isOauthProviderConfigured(key) {
   const providers = getParsedOauthProviders();
   const cfg = providers[key];
   if (!cfg) return false;
-  return Boolean(cfg.clientId && (cfg.enabled === true || cfg.enabled === 1 || cfg.enabled === undefined));
+  return Boolean(cfg.clientId && typeof cfg.clientId === 'string' && cfg.clientId.trim() !== '');
+}
+
+function isOauthProviderEnabled(key) {
+  const providers = getParsedOauthProviders();
+  const cfg = providers[key];
+  if (!cfg || !cfg.clientId || typeof cfg.clientId !== 'string' || cfg.clientId.trim() === '') return false;
+  return cfg.enabled === true || cfg.enabled === 1 || cfg.enabled === undefined;
+}
+
+async function handleOauthMasterSwitchChange(val) {
+  await changeField('oauthLoginEnabled', val);
+  if (val === 1) {
+    const configuredCount = OAUTH_PROVIDERS_LIST.filter(p => isOauthProviderConfigured(p.key)).length;
+    const enabledCount = OAUTH_PROVIDERS_LIST.filter(p => isOauthProviderEnabled(p.key)).length;
+    if (configuredCount === 0) {
+      ElMessage.warning(t('oauthNoProviderConfiguredWarning'));
+    } else if (enabledCount === 0) {
+      ElMessage.warning(t('oauthNoProviderEnabledWarning'));
+    } else {
+      ElMessage.success(t('saveSuccessMsg'));
+    }
+  } else {
+    ElMessage.success(t('saveSuccessMsg'));
+  }
+}
+
+async function toggleOauthProviderQuick(providerKey, val) {
+  const providers = { ...getParsedOauthProviders() };
+  if (!providers[providerKey]) {
+    providers[providerKey] = { enabled: val, clientId: '' };
+  } else {
+    providers[providerKey] = { ...providers[providerKey], enabled: val };
+  }
+  setting.value.oauthProviders = providers;
+  await changeField('oauthProviders', providers);
+
+  // 开启单个已配置 Provider 时，如果主开关未开，自动同步开启主开关并提示
+  if (val && !setting.value.oauthLoginEnabled) {
+    setting.value.oauthLoginEnabled = 1;
+    await changeField('oauthLoginEnabled', 1);
+    ElMessage.info(t('oauthMasterSwitchAutoEnabled'));
+  } else {
+    ElMessage.success(t('saveSuccessMsg'));
+  }
 }
 
 function getCustomOauthTitle() {
@@ -3854,7 +3925,16 @@ async function saveOauthProviderConfig() {
 
   setting.value.oauthProviders = providers;
   await changeField('oauthProviders', providers);
-  ElMessage.success(t('saveSuccessMsg'));
+
+  // 保存启用状态且有 Client ID 时，若总开关关闭，自动同步开启总开关并告知
+  if (oauthForm.enabled && oauthForm.clientId?.trim() && !setting.value.oauthLoginEnabled) {
+    setting.value.oauthLoginEnabled = 1;
+    await changeField('oauthLoginEnabled', 1);
+    ElMessage.info(t('oauthMasterSwitchAutoEnabled'));
+  } else {
+    ElMessage.success(t('saveSuccessMsg'));
+  }
+
   oauthConfigDialogShow.value = false;
 }
 
