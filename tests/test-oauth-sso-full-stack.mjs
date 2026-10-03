@@ -219,6 +219,9 @@ async function run() {
 		await configModal.waitFor({ state: 'visible', timeout: 5000 });
 		ok(await configModal.isVisible(), '点击配置按钮必须成功调起专属配置模态弹窗');
 
+		// 等待 Element Plus 模态弹窗入场淡入动画 (0.3s) 完全就绪
+		await adminPage.waitForTimeout(600);
+
 		// 模态弹窗内必须包含 Client ID, Client Secret, 以及合规的回调地址展示
 		const clientIdInput = adminPage.locator('.oauth-config-dialog input[placeholder*="Client ID"]');
 		ok(await clientIdInput.first().isVisible(), '配置弹窗内必须包含 Client ID 录入字段');
@@ -275,7 +278,15 @@ async function run() {
 		// 点击自定义认证 (第 5 个接入配置按钮)
 		console.log('  -> 打开包含最多自定义字段的 Custom SSO 配置弹窗验证极限高度与零滑块...');
 		await configureBtns.nth(4).click();
-		await adminPage.waitForTimeout(400);
+		await adminPage.waitForTimeout(600);
+
+		// 截图留存供视觉与设计审查 (Custom SSO 极限形态弹窗)
+		await adminPage.screenshot({
+			path: '/home/shijian/projects/epocanvas-mail/tests/audit_oauth_sso_custom_modal.png',
+			fullPage: false
+		});
+		console.log('  -> Custom SSO 弹窗视觉审查截图已保存至 tests/audit_oauth_sso_custom_modal.png');
+
 		const customModalMetrics = await adminPage.evaluate(() => {
 			const dialog = document.querySelector('.oauth-config-dialog');
 			const body = document.querySelector('.oauth-config-dialog .el-dialog__body');
