@@ -125,6 +125,14 @@ async function run() {
     const addEmailBtn = emailSection.locator('button:has-text("添加电子邮箱"), button:has-text("Add Email Address")');
     ok(await addEmailBtn.isVisible(), '「添加电子邮箱」按钮清晰呈现');
 
+    // 验证位置：按钮在 email-row 右侧而非其下方
+    const firstEmailBox = await emailRows.first().boundingBox();
+    const btnBox = await addEmailBtn.boundingBox();
+    console.log(`  主 email-row 盒模型: x=${firstEmailBox.x.toFixed(1)}, y=${firstEmailBox.y.toFixed(1)}, w=${firstEmailBox.width.toFixed(1)}, h=${firstEmailBox.height.toFixed(1)}`);
+    console.log(`  addEmailBtn 盒模型: x=${btnBox.x.toFixed(1)}, y=${btnBox.y.toFixed(1)}, w=${btnBox.width.toFixed(1)}, h=${btnBox.height.toFixed(1)}`);
+    ok(btnBox.x >= firstEmailBox.x + firstEmailBox.width - 5, `按钮位于 email-row 右侧 (btnX: ${btnBox.x.toFixed(1)} >= rowRight: ${(firstEmailBox.x + firstEmailBox.width).toFixed(1)})`);
+    ok(Math.abs((btnBox.y + btnBox.height / 2) - (firstEmailBox.y + firstEmailBox.height / 2)) < 15, `按钮与 email-row 保持水平基线居中对齐并非下方折行 (中心Y差值: ${Math.abs((btnBox.y + btnBox.height / 2) - (firstEmailBox.y + firstEmailBox.height / 2)).toFixed(1)}px < 15px)`);
+
     // 点击「添加电子邮箱」弹出弹窗
     console.log('\n[步骤 5] 验证「添加电子邮箱」弹窗交互与实时校验...');
     await addEmailBtn.click();

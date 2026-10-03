@@ -78,17 +78,25 @@
       <div class="title">{{ $t('contactInfo') }}</div>
 
       <!-- 电子邮件 -->
-      <div class="item" id="email" style="align-items: flex-start;">
+      <div class="item" id="email" :style="{ alignItems: emailList.length > 0 ? 'flex-start' : 'center' }">
         <div>{{ $t('profileEmail') }}</div>
         <div class="emails-container">
-          <div class="email-list">
-            <!-- 账号主邮箱 (系统主身份，不可删除) -->
+          <!-- 账号主邮箱行 (右侧直接放置添加电子邮箱按钮) -->
+          <div class="email-primary-row">
             <div class="email-row">
               <Icon icon="lucide:mail" width="16" height="16" class="email-icon" />
               <span class="email-addr font-mono">{{ userStore.user.email }}</span>
               <el-tag size="small" type="primary" effect="plain" class="email-tag">{{ $t('profilePrimaryEmailTag') }}</el-tag>
             </div>
-            <!-- 其他自订添加的个人邮箱 -->
+            <!-- 添加电子邮箱按钮放在 email-row 右侧 -->
+            <el-button type="primary" size="small" class="add-email-btn" @click="openEmailModal">
+              <Icon icon="lucide:plus" width="14" height="14" style="margin-right: 4px;" />
+              {{ $t('addProfileEmail') }}
+            </el-button>
+          </div>
+
+          <!-- 其他自订添加的个人邮箱列表 -->
+          <div class="email-list" v-if="emailList.length > 0">
             <div v-for="(em, idx) in emailList" :key="em.id || idx" class="email-row">
               <Icon icon="lucide:mail" width="16" height="16" class="email-icon" />
               <span class="email-addr font-mono">{{ em.email }}</span>
@@ -97,13 +105,6 @@
                 <Icon icon="material-symbols:delete-outline-rounded" width="16" height="16" />
               </span>
             </div>
-          </div>
-          <!-- 添加电子邮箱按钮 -->
-          <div style="margin-top: 10px;">
-            <el-button type="primary" size="small" @click="openEmailModal">
-              <Icon icon="lucide:plus" width="14" height="14" style="margin-right: 4px;" />
-              {{ $t('addProfileEmail') }}
-            </el-button>
           </div>
         </div>
       </div>
@@ -1343,6 +1344,13 @@ onMounted(async () => {
     display: flex;
     flex-direction: column;
     gap: 8px;
+
+    .email-primary-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
 
     .email-list {
       display: flex;
