@@ -8,6 +8,34 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### 操作报告与风控管理控制台原生设计对齐、多模式自动呈现与独立长短链表单系统 (2026-10-03)
+*   **关联提交 (Git Commit)**: `2aca49037253d2e885422c9c0ad1352fa9e7d12c` (Short: `2aca490`)
+    - 联动提交 (epomail-docs): `ed500845a7d60611d279cf441e88849b1ca20970` (Short: `ed50084`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare Workers (https://mail.epocanvas.com)` (Version ID: `404fbcdf-82b7-45bc-ab1c-122ea81b0a41`) / `Cloudflare Pages (https://docs.epocanvas.com & https://epomail-docs.pages.dev)`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 变更点 1 (操作报告 UI 原生设计系统深度重构与一致性对齐)：
+        - 彻底重构 `audit-report/index.vue`，全面弃用外部杂色与浮夸视觉，完整采用 Epocanvas Mail 原生设计代币（`var(--el-bg-color)`、`var(--el-border-color)`、`var(--el-text-color-primary)`、卡片阴影与圆角）；
+        - 控制台与「系统设置」、「OAuth 与 SSO 应用」保持 100% 视觉统一度与交互语言连贯性；
+    - [x] 变更点 2 (安全等级自动驱动视图呈现，取消人工多余选择开关)：
+        - 坚决落实用户要求，彻底删除时间轴与表格的人工切换开关（View Toggle Button）；
+        - 模式自适应呈现：全部模式（Level 1）与隐私模式（Level 0）默认以**时序时间轴流水**（带完整时间帧与日期范围筛选）呈现；加密模式（Level 2 [E2EE]）严格自动切换为**纯 DB 数据表格**；
+        - 加密模式（Level 2）严格将所有时间戳彻底脱敏抹除（零时间戳列），并隐藏日期选择器，仅列出邮箱账户、操作、设备基线、环境池与风控状态；
+    - [x] 变更点 3 (风控管理 DB 表格工单追踪号与快捷研判放行/驳回)：
+        - Tab 2 风控研判 DB 表格增设「工单追踪号」(Ticket ID，如 `TKT-2026-XXXXX`) 列；
+        - 每行增设「放行」与「驳回」快捷操作按钮；
+        - 研判抽屉中实现双栏基准 vs 申诉环境指纹对比，并内嵌指向 `epomail-docs` 对外申诉接口的跳转链接；
+    - [x] 变更点 4 (从统一短链自动加载出专属长链 Hash URL 表单)：
+        - 实现统一短链入口（`https://docs.epocanvas.com/epomail/appeal/`），访问后自动计算高熵专属唯一会话 Hash，重定向扩展为独立长链（`.../appeal/form/#/f/f_<hash>?...`）；
+        - 表单 UI 采用 Google Forms / Microsoft Forms 极简卡片流设计，顶部具备专属 Accent 强调色饰条，自动本地执行 Canvas/WebGL SHA-256 硬件环境指纹存证，提交后展示带 Ticket ID 与待审核状态的官方回执卡；
+    - [x] 变更点 5 (六语言严格 100% 对称)：
+        - 同步更新 6 语言字典（zh, zh-Hant, en, es, fr, nl），键值对增至 2,259 条，静态审计三件套与全真栈测试 100% 通过。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：`mail-vue` Vite 构建通过 (12.55s, 0 errors)；
+    - [x] Cloudflare 部署：`mail-worker` 成功部署上线 (Version ID: `404fbcdf-82b7-45bc-ab1c-122ea81b0a41`)；
+    - [x] 静态多语言三件套：`i18n-symmetry.mjs` (2259 keys ALL SYMMETRIC), `i18n-audit.mjs` (0 缺失), `i18n-hardcoded.mjs` 零阻断；
+    - [x] 自动化端到端测试：`tests/verify-appeal-and-audit-integration.mjs` 在线全真栈 36/36 项断言全部一次性通过；
+    - [x] 零假数据残留：测试采用会话级动态验证与标准 API 鉴权，零临时脏数据写入。
+
 ### 操作报告与风控控制台 PM 美学重构与 epomail-docs 对外非认证申诉闭环 (2026-10-03)
 *   **关联提交 (Git Commit)**: `365b686e269b40fc5d611eb9eca3296a32f88c57` (Short: `365b686`)
     - 联动提交 (epomail-docs): `18749733cf852899450a8b981f33f07a7bc93f06` (Short: `1874973`)
