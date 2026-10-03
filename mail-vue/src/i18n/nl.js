@@ -2261,6 +2261,15 @@ totpModeAllDesc: 'Instellen of gebruikers TOTP mogen gebruiken. Eenmaal ingescha
     auditArchStepDocs: "Niet-geauthenticeerd publiek beroep & verificatie",
     auditArchStepCloud: "Verzamel SHA-256 vingerafdruk & IP-subnet",
     auditArchStepAdmin: "Beheerdersbeoordeling & vrijgave met één klik",
+    auditEncryptedTablePresentation: "DB Gegevenstabel (Tijdstempels gewist)",
+    auditTimelineStreamPresentation: "Tijdlijn (Volledige tijdstempels)",
+    auditTicketId: "Ticket-ID",
+    auditRejectAppeal: "Afwijzen",
+    auditMatchPerfect: "Vingerafdruk komt volledig overeen (Aanbevolen voor vrijgave)",
+    auditMatchHigh: "Hoge overeenkomst met referentie",
+    auditMatchMedium: "Matige omgevingsafwijking",
+    auditMatchConflict: "Ernstig vingerafdrukconflict (Vermoeden van misbruik)",
+    auditDefaultNoteApproved: "Apparaatvingerafdruk komt overeen met de basislijn; beoordeeld als legitieme roaming, goedgekeurd voor deblokkering.",
 };
 
 export default nl;

@@ -18,7 +18,7 @@
             <span class="breadcrumb-active">{{ $t('auditReport') }}</span>
           </div>
           <div class="breadcrumb-right">
-            <el-button link type="primary" size="small" class="docs-portal-btn" @click="openExternalAppealPortal">
+            <el-button link type="primary" size="small" class="docs-portal-btn" @click="openExternalAppealPortal('form')">
               <Icon icon="fluent:document-person-20-regular" width="15" height="15" />
               <span>{{ $t('auditViewExternalAppealDocs') }}</span>
               <Icon icon="fluent:arrow-up-right-16-regular" width="13" height="13" />
@@ -30,8 +30,8 @@
         <div class="audit-header-banner" :class="'mode-' + activeMode">
           <div class="banner-left">
             <div class="mode-badge-wrap">
-              <el-tag :type="currentModeMeta.tagType" size="large" effect="dark" class="mode-hero-badge">
-                <Icon :icon="currentModeMeta.icon" width="18" height="18" class="badge-icon" />
+              <el-tag :type="currentModeMeta.tagType" size="default" effect="dark" class="mode-hero-badge">
+                <Icon :icon="currentModeMeta.icon" width="16" height="16" class="badge-icon" />
                 {{ currentModeMeta.title }}
               </el-tag>
               <div class="header-title-text">
@@ -205,48 +205,25 @@
                   <el-option value="high" :label="$t('auditRiskLevelHigh')" />
                 </el-select>
 
-                <el-tooltip
-                  :disabled="activeMode !== 2"
-                  effect="dark"
-                  :content="$t('auditEncryptedModeNotice')"
-                >
-                  <el-date-picker
-                    v-model="filterDateRange"
-                    type="daterange"
-                    size="default"
-                    :disabled="activeMode === 2"
-                    :range-separator="$t('to')"
-                    :start-placeholder="$t('auditTimestampFull')"
-                    :end-placeholder="$t('auditTimestampFull')"
-                    class="date-picker-box"
-                  />
-                </el-tooltip>
+                <!-- Date picker is only shown when timestamps exist (Mode 1 & Mode 0) -->
+                <el-date-picker
+                  v-if="activeMode !== 2"
+                  v-model="filterDateRange"
+                  type="daterange"
+                  size="default"
+                  :range-separator="$t('to')"
+                  :start-placeholder="$t('auditTimestampFull')"
+                  :end-placeholder="$t('auditTimestampFull')"
+                  class="date-picker-box"
+                />
               </div>
 
               <div class="toolbar-right">
-                <!-- View Mode Toggle -->
-                <div class="view-mode-toggle">
-                  <button
-                    type="button"
-                    class="toggle-btn"
-                    :class="{ active: viewMode === 'timeline' }"
-                    @click="viewMode = 'timeline'"
-                    :title="$t('auditTimelineView')"
-                  >
-                    <Icon icon="fluent:timeline-20-filled" width="16" height="16" />
-                    <span>{{ $t('auditTimelineView') }}</span>
-                  </button>
-                  <button
-                    type="button"
-                    class="toggle-btn"
-                    :class="{ active: viewMode === 'table' }"
-                    @click="viewMode = 'table'"
-                    :title="$t('auditTableView')"
-                  >
-                    <Icon icon="fluent:table-20-filled" width="16" height="16" />
-                    <span>{{ $t('auditTableView') }}</span>
-                  </button>
-                </div>
+                <!-- Mode-Driven Automatic Presentation Tag (NO User Choice/Toggle) -->
+                <el-tag size="small" :type="activeMode === 2 ? 'warning' : 'primary'" effect="plain" class="presentation-mode-tag">
+                  <Icon :icon="activeMode === 2 ? 'fluent:table-20-filled' : 'fluent:timeline-20-filled'" width="14" height="14" style="margin-right: 4px; vertical-align: -2px;" />
+                  <span>{{ activeMode === 2 ? $t('auditEncryptedTablePresentation') : $t('auditTimelineStreamPresentation') }}</span>
+                </el-tag>
               </div>
             </div>
 
@@ -271,8 +248,8 @@
               <p class="empty-desc">{{ $t('noMoreData') }}</p>
             </div>
 
-            <!-- TIMELINE VIEW -->
-            <div v-else-if="viewMode === 'timeline'" class="timeline-container">
+            <!-- MODE 1 & 0: TIMELINE VIEW WITH FULL TIMESTAMPS -->
+            <div v-else-if="activeMode !== 2" class="timeline-container">
               <div
                 v-for="item in filteredLogs"
                 :key="item.id"
@@ -304,15 +281,7 @@
                     </div>
 
                     <div class="event-time-badge">
-                      <template v-if="item.securityMode === 2">
-                        <el-tag size="small" type="info" effect="plain" class="stripped-badge">
-                          <Icon icon="fluent:eye-off-16-regular" width="13" height="13" />
-                          {{ $t('auditTimestampStripped') }}
-                        </el-tag>
-                      </template>
-                      <template v-else>
-                        <span class="time-text">{{ item.timestamp }}</span>
-                      </template>
+                      <span class="time-text">{{ item.timestamp }}</span>
                     </div>
                   </div>
 
@@ -371,7 +340,7 @@
               </div>
             </div>
 
-            <!-- TABLE VIEW -->
+            <!-- MODE 2: ENCRYPTED MODE - PURE DB DATA TABLE (ZERO TIMESTAMPS) -->
             <div v-else class="table-container">
               <el-table
                 :data="filteredLogs"
@@ -379,21 +348,6 @@
                 row-class-name="audit-table-row"
                 class="audit-data-table"
               >
-                <!-- Time Column -->
-                <el-table-column :label="$t('auditTimestampFull')" min-width="170">
-                  <template #default="{ row }">
-                    <div v-if="row.securityMode === 2">
-                      <el-tag size="small" type="info" effect="plain">
-                        {{ $t('auditTimestampStripped') }}
-                      </el-tag>
-                    </div>
-                    <div v-else class="table-time-cell">
-                      <Icon icon="fluent:clock-16-regular" width="14" height="14" class="time-icon" />
-                      <span>{{ row.timestamp }}</span>
-                    </div>
-                  </template>
-                </el-table-column>
-
                 <!-- Email Column -->
                 <el-table-column :label="$t('userAccount')" min-width="210">
                   <template #default="{ row }">
@@ -422,8 +376,8 @@
                   </template>
                 </el-table-column>
 
-                <!-- Environment & IP Column -->
-                <el-table-column :label="$t('auditActiveEnvPool')" min-width="240">
+                <!-- Environment Baseline Column -->
+                <el-table-column :label="$t('auditRegisteredBaseline')" min-width="220">
                   <template #default="{ row }">
                     <div class="table-env-cell">
                       <div class="env-line">
@@ -435,8 +389,24 @@
                         <Icon :icon="getDeviceIcon(row.deviceType)" width="13" height="13" />
                         <span>{{ row.device }}</span>
                       </div>
+                      <div class="env-line fp">
+                        <span class="font-mono">FP: {{ row.fingerprint }}</span>
+                      </div>
+                    </div>
+                  </template>
+                </el-table-column>
+
+                <!-- Active Pool Column -->
+                <el-table-column :label="$t('auditActiveEnvPool')" min-width="220">
+                  <template #default="{ row }">
+                    <div class="table-env-cell">
+                      <div class="env-line">
+                        <Icon icon="lucide:network" width="13" height="13" />
+                        <span>{{ row.ip }}</span>
+                        <span class="geo-sub">({{ row.geo }})</span>
+                      </div>
                       <div v-if="row.isMultiIpConcurrent" class="concurrent-tag">
-                        {{ $t('auditMultiIpConcurrent') }}
+                        {{ $t('auditMultiIpConcurrent') }} ({{ row.activeIpCount }} IPs)
                       </div>
                     </div>
                   </template>
@@ -468,7 +438,7 @@
             </div>
           </div>
 
-          <!-- TAB 2: 风控研判与申诉管理 -->
+          <!-- TAB 2: 风控研判与申诉管理 (完整 DB 表格) -->
           <div v-show="activeTab === 'risk'" class="tab-panel risk-panel">
             <!-- Filter Bar for Appeals -->
             <div class="risk-toolbar">
@@ -504,8 +474,17 @@
                 row-class-name="risk-case-row"
                 class="risk-data-table"
               >
+                <!-- Ticket ID Column -->
+                <el-table-column :label="$t('auditTicketId')" width="160">
+                  <template #default="{ row }">
+                    <div class="ticket-id-cell font-mono">
+                      <span class="ticket-code">{{ row.ticketId || ('TKT-2026-' + row.id) }}</span>
+                    </div>
+                  </template>
+                </el-table-column>
+
                 <!-- Target Account -->
-                <el-table-column :label="$t('tabEmailAddress')" min-width="220">
+                <el-table-column :label="$t('tabEmailAddress')" min-width="210">
                   <template #default="{ row }">
                     <div class="account-cell">
                       <div class="account-avatar">{{ row.email.slice(0, 1).toUpperCase() }}</div>
@@ -542,7 +521,7 @@
                 </el-table-column>
 
                 <!-- Active Pool (Max 3 IPs & 3 Devices) -->
-                <el-table-column :label="$t('auditActiveEnvPool')" min-width="240">
+                <el-table-column :label="$t('auditActiveEnvPool')" min-width="230">
                   <template #default="{ row }">
                     <div class="active-pool-cell">
                       <div class="pool-header">
@@ -571,14 +550,21 @@
                   </template>
                 </el-table-column>
 
-                <!-- Appeal Statement -->
-                <el-table-column :label="$t('auditAppealReason')" min-width="230">
+                <!-- Appeal Statement & Docs Portal Link -->
+                <el-table-column :label="$t('auditAppealReason')" min-width="240">
                   <template #default="{ row }">
                     <div v-if="row.hasAppeal" class="appeal-statement-cell">
                       <div class="appeal-quote">“{{ row.appealReason }}”</div>
                       <div class="appeal-time muted">
                         <span v-if="activeMode === 2">{{ $t('auditTimestampStripped') }}</span>
                         <span v-else>{{ row.appealTime }}</span>
+                      </div>
+                      <div class="appeal-portal-link">
+                        <el-button link type="primary" size="small" @click="openExternalAppealPortal('form')">
+                          <Icon icon="fluent:document-person-16-regular" width="13" height="13" style="margin-right: 3px;" />
+                          <span>{{ $t('auditExternalPortalBadge') }}</span>
+                          <Icon icon="fluent:arrow-up-right-16-regular" width="12" height="12" style="margin-left: 2px;" />
+                        </el-button>
                       </div>
                     </div>
                     <div v-else class="text-muted">
@@ -605,7 +591,7 @@
                 </el-table-column>
 
                 <!-- Actions -->
-                <el-table-column :label="$t('action')" width="180" fixed="right">
+                <el-table-column :label="$t('action')" width="200" fixed="right">
                   <template #default="{ row }">
                     <div class="risk-actions-cell">
                       <el-button
@@ -624,6 +610,16 @@
                         @click="quickUnban(row)"
                       >
                         {{ $t('auditApproveUnban') }}
+                      </el-button>
+
+                      <el-button
+                        v-if="row.status === 'pending'"
+                        size="small"
+                        type="danger"
+                        plain
+                        @click="quickReject(row)"
+                      >
+                        {{ $t('auditRejectAppeal') }}
                       </el-button>
                     </div>
                   </template>
@@ -658,6 +654,7 @@
                       :disabled="activeMode !== 1"
                       :active-value="1"
                       :inactive-value="0"
+                      @change="handleSettingChange"
                     />
                   </div>
 
@@ -671,6 +668,7 @@
                       :disabled="activeMode !== 1"
                       :active-value="1"
                       :inactive-value="0"
+                      @change="handleSettingChange"
                     />
                   </div>
 
@@ -684,6 +682,7 @@
                       :disabled="activeMode !== 1"
                       :active-value="1"
                       :inactive-value="0"
+                      @change="handleSettingChange"
                     />
                   </div>
 
@@ -697,6 +696,7 @@
                       :disabled="activeMode !== 1"
                       :active-value="1"
                       :inactive-value="0"
+                      @change="handleSettingChange"
                     />
                   </div>
 
@@ -710,6 +710,7 @@
                       :disabled="activeMode !== 1"
                       :active-value="1"
                       :inactive-value="0"
+                      @change="handleSettingChange"
                     />
                   </div>
                 </div>
@@ -862,7 +863,7 @@
                     </div>
                   </div>
                   <div class="arch-action-row">
-                    <el-button type="primary" size="small" plain @click="openExternalAppealPortal">
+                    <el-button type="primary" size="small" plain @click="openExternalAppealPortal('form')">
                       <Icon icon="fluent:open-20-regular" width="14" height="14" style="margin-right: 4px;" />
                       {{ $t('auditViewExternalAppealDocs') }} (docs.epocanvas.com)
                     </el-button>
@@ -898,6 +899,9 @@
               </el-tag>
               <el-tag size="small" :type="currentModeMeta.tagType" effect="plain">
                 {{ currentModeMeta.title }}
+              </el-tag>
+              <el-tag v-if="selectedCase.ticketId" size="small" type="info" class="font-mono">
+                {{ selectedCase.ticketId }}
               </el-tag>
             </div>
           </div>
@@ -999,7 +1003,7 @@
               <Icon icon="fluent:globe-shield-20-regular" width="14" height="14" />
               <span>{{ $t('auditExternalPortalBadge') }}</span>
             </span>
-            <el-button link type="primary" size="small" @click="openExternalAppealPortal">
+            <el-button link type="primary" size="small" @click="openExternalAppealPortal('form')">
               <span>{{ $t('auditViewExternalAppealDocs') }}</span>
               <Icon icon="fluent:arrow-up-right-16-regular" width="13" height="13" />
             </el-button>
@@ -1097,21 +1101,24 @@ const goToSysSetting = () => {
   router.push(`/manage/${roleGroup}/system`);
 };
 
-const openExternalAppealPortal = () => {
+const openExternalAppealPortal = (type = 'form') => {
   const docsBase = getOfficialLink('docs', settingStore) || 'https://docs.epocanvas.com/epomail';
   const lang = settingStore.settings?.lang || 'zh';
-  let prefix = '';
-  if (lang === 'zh-Hant') prefix = '/zh-tw';
-  else if (lang === 'en') prefix = '/en';
-  else if (lang === 'es') prefix = '/es';
-  else if (lang === 'fr') prefix = '/fr';
-  else if (lang === 'nl') prefix = '/nl';
-  window.open(`${docsBase}${prefix}/mail/appeal/`, '_blank');
+  if (type === 'form') {
+    window.open(`${docsBase}/appeal/?lang=${lang}`, '_blank');
+  } else {
+    let prefix = '';
+    if (lang === 'zh-Hant') prefix = '/zh-tw';
+    else if (lang === 'en') prefix = '/en';
+    else if (lang === 'es') prefix = '/es';
+    else if (lang === 'fr') prefix = '/fr';
+    else if (lang === 'nl') prefix = '/nl';
+    window.open(`${docsBase}${prefix}/mail/appeal/`, '_blank');
+  }
 };
 
 const firstLoading = ref(true);
 const activeTab = ref('stream'); // 'stream' | 'risk' | 'policy'
-const viewMode = ref('timeline'); // 'timeline' | 'table'
 
 // Security Mode: 1: All Mail Mode (全部模式), 0: Privacy Mode (隐私模式), 2: Encrypted Mode (加密模式)
 const activeMode = ref(Number(settingStore.settings?.allMailMode ?? 1));
@@ -1371,6 +1378,8 @@ const allLogs = ref([
 const riskCases = ref([
   {
     id: 1,
+    ticketId: 'TKT-2026-CH78A9',
+    sessionHash: 'f_9c71a4f028d7b3e1',
     email: 'charlie@epocanvas.com',
     status: 'pending',
     hasAppeal: true,
@@ -1397,6 +1406,8 @@ const riskCases = ref([
   },
   {
     id: 2,
+    ticketId: 'TKT-2026-SP44B1',
+    sessionHash: 'f_e5d2c8b1a4f79021',
     email: 'spammer_attacker@bot.net',
     status: 'banned',
     hasAppeal: true,
@@ -1423,6 +1434,8 @@ const riskCases = ref([
   },
   {
     id: 3,
+    ticketId: 'TKT-2026-BO99X2',
+    sessionHash: 'f_1a2b3c4d5e6f7a8b',
     email: 'bob@epocanvas.com',
     status: 'probation',
     hasAppeal: false,
@@ -1444,6 +1457,8 @@ const riskCases = ref([
   },
   {
     id: 4,
+    ticketId: 'TKT-2026-AL11K5',
+    sessionHash: 'f_9988776655443322',
     email: 'alice@epocanvas.com',
     status: 'approved',
     hasAppeal: false,
@@ -1469,11 +1484,9 @@ const filteredLogs = computed(() => {
   return allLogs.value.filter(log => {
     // Mode compatibility check
     if (activeMode.value === 0 && log.category === 'mail') {
-      // In Privacy mode, mail operations are suppressed
       return false;
     }
     if (activeMode.value === 2 && !['account', 'security', 'appeal'].includes(log.category)) {
-      // In Encrypted mode, only essential lifecycle, bans, and appeals
       return false;
     }
 
@@ -1618,10 +1631,10 @@ function getScoreColorClass(score) {
 }
 
 function getMatchDesc(score) {
-  if (score >= 95) return '指纹完全吻合 (推荐放行)';
-  if (score >= 80) return '高相似度基准';
-  if (score >= 50) return '中度环境漂移';
-  return '指纹冲突严重 (疑似盗用)';
+  if (score >= 95) return t('auditMatchPerfect');
+  if (score >= 80) return t('auditMatchHigh');
+  if (score >= 50) return t('auditMatchMedium');
+  return t('auditMatchConflict');
 }
 
 function filterByEmail(email) {
@@ -1641,6 +1654,7 @@ function openAdjudicationDrawer(row) {
   if (!target) {
     target = {
       id: row.id,
+      ticketId: 'TKT-2026-' + (row.email.slice(0, 2).toUpperCase() + String(row.id).slice(-4)),
       email: row.email,
       status: row.riskLevel === 'high' ? 'banned' : 'approved',
       hasAppeal: !!row.appealId,
@@ -1664,7 +1678,7 @@ function openAdjudicationDrawer(row) {
   }
   selectedCase.value = target;
   decisionForm.action = target.status === 'banned' || target.status === 'pending' ? 'approve' : 'probation';
-  decisionForm.notes = target.matchScore >= 90 ? '设备指纹基线吻合，判定为本人出差环境漂移，予以解封放行。' : '';
+  decisionForm.notes = target.matchScore >= 90 ? t('auditDefaultNoteApproved') : '';
   adjudicationDrawerVisible.value = true;
 }
 
@@ -1685,6 +1699,62 @@ function quickUnban(row) {
   ).then(() => {
     row.status = 'approved';
     row.hasAppeal = false;
+    allLogs.value.unshift({
+      id: Date.now(),
+      email: row.email,
+      userRole: 'Administrator',
+      eventType: 'unbanned',
+      category: 'security',
+      actionText: `{${row.email}} 经管理员研判放行`,
+      detailText: '管理员执行快捷放行操作，解除封禁限制。',
+      ip: '127.0.0.1',
+      geo: 'Console Admin',
+      device: 'Admin Console Workstation',
+      deviceType: 'desktop',
+      fingerprint: 'fp_admin_master',
+      isRegIp: false,
+      isMultiIpConcurrent: false,
+      activeIpCount: 1,
+      timestamp: new Date().toISOString().replace('T', ' ').slice(0, 19),
+      securityMode: activeMode.value,
+      riskLevel: 'low'
+    });
+    ElMessage.success(t('auditActionSuccess'));
+  }).catch(() => {});
+}
+
+function quickReject(row) {
+  ElMessageBox.confirm(
+    `${t('auditRejectConfirm')}: ${row.email}`,
+    t('auditRejectAppeal'),
+    {
+      confirmButtonText: t('confirm'),
+      cancelButtonText: t('cancel'),
+      type: 'warning'
+    }
+  ).then(() => {
+    row.status = 'banned';
+    row.hasAppeal = false;
+    allLogs.value.unshift({
+      id: Date.now(),
+      email: row.email,
+      userRole: 'Administrator',
+      eventType: 'banned',
+      category: 'security',
+      actionText: `{${row.email}} 申诉被驳回`,
+      detailText: '管理员快速驳回解封申诉，维持封禁管控状态。',
+      ip: '127.0.0.1',
+      geo: 'Console Admin',
+      device: 'Admin Console Workstation',
+      deviceType: 'desktop',
+      fingerprint: 'fp_admin_master',
+      isRegIp: false,
+      isMultiIpConcurrent: false,
+      activeIpCount: 1,
+      timestamp: new Date().toISOString().replace('T', ' ').slice(0, 19),
+      securityMode: activeMode.value,
+      riskLevel: 'high'
+    });
     ElMessage.success(t('auditActionSuccess'));
   }).catch(() => {});
 }
@@ -1702,6 +1772,7 @@ function submitAdjudication() {
       selectedCase.value.status = 'probation';
     } else if (decisionForm.action === 'reject') {
       selectedCase.value.status = 'banned';
+      selectedCase.value.hasAppeal = false;
     }
 
     // Add audit entry for this decision
@@ -1776,54 +1847,93 @@ onMounted(() => {
 
 <style scoped lang="scss">
 .audit-page-container {
-  padding: 0;
   height: 100%;
-  display: flex;
-  flex-direction: column;
+  position: relative;
+  background: var(--extra-light-fill) !important;
 }
 
 .audit-scroll-body {
   padding: 20px 24px 48px;
-  max-width: 1380px;
+  max-width: 1400px;
   margin: 0 auto;
   width: 100%;
 }
 
-/* Header Banner */
+/* Breadcrumb Navigation Strip */
+.audit-breadcrumb-strip {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 18px;
+  margin-bottom: 16px;
+  background: var(--el-bg-color);
+  border: 1px solid var(--el-border-color);
+  border-radius: 8px;
+}
+
+.breadcrumb-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.back-settings-btn {
+  color: var(--el-text-color-secondary) !important;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 !important;
+  transition: color 0.15s;
+
+  &:hover {
+    color: var(--el-color-primary) !important;
+  }
+}
+
+.breadcrumb-sep {
+  color: var(--el-text-color-placeholder);
+  font-size: 12px;
+}
+
+.breadcrumb-active {
+  color: var(--el-text-color-primary);
+  font-weight: 600;
+  font-size: 13.5px;
+}
+
+.docs-portal-btn {
+  font-size: 12px !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Header Banner: Clean, elevated, matching sys-setting */
 .audit-header-banner {
-  padding: 22px 24px;
-  border-radius: 14px;
-  margin-bottom: 20px;
-  border: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.08));
-  background: var(--bg-elevated, #ffffff);
+  padding: 18px 20px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  border: 1px solid var(--el-border-color);
+  background: var(--el-bg-color);
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   flex-wrap: wrap;
   gap: 16px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02);
-
-  &.mode-1 {
-    border-left: 5px solid var(--accent-primary, #6366f1);
-  }
-  &.mode-0 {
-    border-left: 5px solid var(--success, #10b981);
-  }
-  &.mode-2 {
-    border-left: 5px solid var(--warning, #f59e0b);
-  }
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.02);
 }
 
 .banner-left {
   flex: 1;
-  min-width: 320px;
+  min-width: 300px;
 }
 
 .mode-badge-wrap {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 
 .mode-hero-badge {
@@ -1831,22 +1941,22 @@ onMounted(() => {
   align-items: center;
   gap: 6px;
   font-weight: 600;
-  letter-spacing: 0.3px;
-  border-radius: 8px;
-  padding: 6px 12px;
+  letter-spacing: 0.2px;
+  border-radius: 6px;
+  padding: 4px 10px;
 }
 
 .header-title-text {
   h1 {
-    font-size: 18px;
+    font-size: 17px;
     font-weight: 700;
-    color: var(--text-primary, #111827);
+    color: var(--el-text-color-primary);
     margin: 0;
     line-height: 1.3;
   }
   .header-subtitle {
     font-size: 12px;
-    color: var(--text-muted, #6b7280);
+    color: var(--el-text-color-secondary);
     margin: 2px 0 0 0;
   }
 }
@@ -1856,16 +1966,16 @@ onMounted(() => {
   align-items: center;
   gap: 8px;
   font-size: 12px;
-  color: var(--text-secondary, #374151);
-  background: var(--bg-hover, rgba(0, 0, 0, 0.03));
+  color: var(--el-text-color-regular);
+  background: var(--el-fill-color-light);
+  border: 1px solid var(--el-border-color-lighter);
   padding: 8px 12px;
-  border-radius: 8px;
-  margin-top: 8px;
-  line-height: 1.4;
+  border-radius: 6px;
+  line-height: 1.45;
 
   .notice-info-icon {
     flex-shrink: 0;
-    color: var(--accent-primary, #6366f1);
+    color: var(--el-color-primary);
   }
 }
 
@@ -1884,7 +1994,7 @@ onMounted(() => {
 
 .mode-switch-label {
   font-size: 12px;
-  color: var(--text-muted, #6b7280);
+  color: var(--el-text-color-secondary);
   font-weight: 500;
 }
 
@@ -1897,12 +2007,12 @@ onMounted(() => {
   gap: 8px;
 }
 
-/* KPI Grid */
+/* KPI Summary Cards Grid */
 .kpi-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 14px;
-  margin-bottom: 22px;
+  margin-bottom: 16px;
 
   @media (max-width: 1024px) {
     grid-template-columns: repeat(2, 1fr);
@@ -1913,10 +2023,10 @@ onMounted(() => {
 }
 
 .kpi-card {
-  padding: 16px;
-  border-radius: 12px;
-  background: var(--bg-elevated, #ffffff);
-  border: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.08));
+  padding: 14px 16px;
+  border-radius: 8px;
+  background: var(--el-bg-color);
+  border: 1px solid var(--el-border-color);
   display: flex;
   align-items: center;
   gap: 14px;
@@ -1924,41 +2034,39 @@ onMounted(() => {
   transition: all 0.2s ease;
 
   &:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
-    border-color: var(--accent-primary, #6366f1);
+    border-color: var(--el-color-primary);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
   }
 
   &.highlight-card {
-    background: linear-gradient(135deg, var(--bg-elevated, #ffffff), rgba(245, 158, 11, 0.05));
-    border-color: rgba(245, 158, 11, 0.3);
+    border-color: var(--el-color-warning);
   }
 }
 
 .kpi-icon-wrap {
-  width: 44px;
-  height: 44px;
-  border-radius: 10px;
+  width: 42px;
+  height: 42px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
 
   &.ops-icon {
-    background: rgba(99, 102, 241, 0.1);
-    color: #6366f1;
+    background: var(--el-color-primary-light-9);
+    color: var(--el-color-primary);
   }
   &.risk-icon {
-    background: rgba(239, 68, 68, 0.1);
-    color: #ef4444;
+    background: var(--el-color-danger-light-9);
+    color: var(--el-color-danger);
   }
   &.appeal-icon {
-    background: rgba(245, 158, 11, 0.12);
-    color: #f59e0b;
+    background: var(--el-color-warning-light-9);
+    color: var(--el-color-warning);
   }
   &.quota-icon {
-    background: rgba(16, 185, 129, 0.1);
-    color: #10b981;
+    background: var(--el-color-success-light-9);
+    color: var(--el-color-success);
   }
 }
 
@@ -1968,91 +2076,183 @@ onMounted(() => {
 }
 
 .kpi-label {
-  font-size: 11px;
+  font-size: 11.5px;
   font-weight: 600;
   text-transform: uppercase;
-  color: var(--text-muted, #6b7280);
-  letter-spacing: 0.5px;
+  color: var(--el-text-color-secondary);
+  letter-spacing: 0.3px;
+  display: flex;
+  align-items: center;
 }
 
 .kpi-value {
-  font-size: 20px;
+  font-size: 19px;
   font-weight: 700;
-  color: var(--text-primary, #111827);
+  color: var(--el-text-color-primary);
   line-height: 1.2;
-  margin: 2px 0;
+  margin: 3px 0 2px;
+  font-family: "Outfit", -apple-system, sans-serif;
 
   .kpi-unit {
     font-size: 12px;
     font-weight: 400;
-    color: var(--text-muted, #6b7280);
+    color: var(--el-text-color-placeholder);
   }
 
   &.text-amber {
-    color: #d97706;
+    color: var(--el-color-warning);
   }
 }
 
 .kpi-sub {
   font-size: 11px;
-  color: var(--text-secondary, #4b5563);
+  color: var(--el-text-color-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 
   &.text-amber {
-    color: #b45309;
+    color: var(--el-color-warning);
     font-weight: 600;
   }
 }
 
-/* Tabs & Navigation */
+.kpi-progress-bar {
+  margin-top: 6px;
+  width: 100%;
+  height: 3px;
+  border-radius: 3px;
+  background: var(--el-border-color-lighter);
+  overflow: hidden;
+}
+
+.kpi-progress-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.ops-fill {
+  background: var(--el-color-primary);
+}
+
+.risk-fill {
+  background: var(--el-color-danger);
+}
+
+.appeal-fill {
+  background: var(--el-color-warning);
+}
+
+.pulse-beacon {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--el-color-warning);
+  margin-left: 6px;
+  box-shadow: 0 0 0 0 rgba(230, 162, 60, 0.7);
+  animation: beacon-pulse 1.8s infinite;
+}
+
+@keyframes beacon-pulse {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(230, 162, 60, 0.7);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 6px rgba(230, 162, 60, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(230, 162, 60, 0);
+  }
+}
+
+.kpi-slots-capsule {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 6px;
+}
+
+.slot-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 17px;
+  height: 17px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  background: var(--el-fill-color-light);
+  color: var(--el-text-color-placeholder);
+  border: 1px solid var(--el-border-color-lighter);
+  transition: all 0.2s;
+
+  &.active {
+    background: var(--el-color-primary-light-9);
+    color: var(--el-color-primary);
+    border-color: var(--el-color-primary-light-5);
+  }
+}
+
+/* Workspace Container & Tabs */
+.audit-workspace-tabs {
+  background: var(--el-bg-color);
+  border: 1px solid var(--el-border-color);
+  border-radius: 8px;
+  padding: 18px 20px;
+}
+
 .tab-nav-bar {
   display: flex;
   align-items: center;
   gap: 8px;
-  border-bottom: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.08));
+  border-bottom: 1px solid var(--el-border-color-lighter);
   padding-bottom: 12px;
-  margin-bottom: 18px;
+  margin-bottom: 16px;
 }
 
 .tab-btn {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 16px;
-  border-radius: 8px;
+  padding: 7px 15px;
+  border-radius: 6px;
   font-size: 13px;
-  font-weight: 600;
-  color: var(--text-secondary, #4b5563);
+  font-weight: 500;
+  color: var(--el-text-color-regular);
   cursor: pointer;
   transition: all 0.15s ease;
   user-select: none;
 
   &:hover {
-    background: var(--bg-hover, rgba(0, 0, 0, 0.04));
-    color: var(--text-primary, #111827);
+    background: var(--el-fill-color-light);
+    color: var(--el-text-color-primary);
   }
 
   &.active {
-    background: var(--accent-muted, rgba(99, 102, 241, 0.1));
-    color: var(--accent-primary, #6366f1);
+    background: var(--el-color-primary-light-9);
+    color: var(--el-color-primary);
+    font-weight: 600;
   }
 }
 
 .tab-count-badge {
   font-size: 11px;
-  padding: 1px 7px;
+  padding: 1px 6px;
   border-radius: 10px;
-  background: var(--bg-hover, rgba(0, 0, 0, 0.08));
-  color: var(--text-muted, #6b7280);
+  background: var(--el-fill-color);
+  color: var(--el-text-color-secondary);
 }
 
 .tab-alert-badge {
   font-size: 11px;
-  padding: 1px 7px;
+  padding: 1px 6px;
   border-radius: 10px;
-  background: #f59e0b;
+  background: var(--el-color-warning);
   color: #ffffff;
   font-weight: 700;
 }
@@ -2091,38 +2291,11 @@ onMounted(() => {
   width: 240px;
 }
 
-/* View Mode Toggle */
-.view-mode-toggle {
-  display: flex;
-  background: var(--bg-hover, rgba(0, 0, 0, 0.05));
-  border-radius: 8px;
-  padding: 3px;
-  gap: 2px;
-}
-
-.toggle-btn {
+.presentation-mode-tag {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  border-radius: 6px;
-  border: none;
-  background: transparent;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-muted, #6b7280);
-  cursor: pointer;
-  transition: all 0.15s ease;
-
-  &:hover {
-    color: var(--text-primary, #111827);
-  }
-
-  &.active {
-    background: var(--bg-elevated, #ffffff);
-    color: var(--accent-primary, #6366f1);
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
-  }
+  font-weight: 500;
+  border-radius: 4px;
 }
 
 /* Mode Alert Bar */
@@ -2131,62 +2304,62 @@ onMounted(() => {
   align-items: center;
   gap: 10px;
   padding: 10px 14px;
-  border-radius: 8px;
+  border-radius: 6px;
   font-size: 12px;
   font-weight: 500;
   margin-bottom: 16px;
 
   &.encrypted-alert {
-    background: rgba(245, 158, 11, 0.1);
-    color: #b45309;
-    border: 1px solid rgba(245, 158, 11, 0.2);
+    background: var(--el-color-warning-light-9);
+    color: var(--el-color-warning-dark-2);
+    border: 1px solid var(--el-color-warning-light-5);
   }
   &.privacy-alert {
-    background: rgba(16, 185, 129, 0.1);
-    color: #065f46;
-    border: 1px solid rgba(16, 185, 129, 0.2);
+    background: var(--el-color-success-light-9);
+    color: var(--el-color-success-dark-2);
+    border: 1px solid var(--el-color-success-light-5);
   }
   &.allmail-alert {
-    background: rgba(99, 102, 241, 0.08);
-    color: #4338ca;
-    border: 1px solid rgba(99, 102, 241, 0.2);
+    background: var(--el-color-primary-light-9);
+    color: var(--el-color-primary-dark-2);
+    border: 1px solid var(--el-color-primary-light-5);
   }
 }
 
 /* Empty State */
 .empty-audit-state {
-  padding: 60px 20px;
+  padding: 50px 20px;
   text-align: center;
-  background: var(--bg-elevated, #ffffff);
-  border-radius: 12px;
-  border: 1px dashed var(--border-subtle, rgba(0, 0, 0, 0.1));
+  background: var(--el-fill-color-lighter);
+  border-radius: 8px;
+  border: 1px dashed var(--el-border-color);
 
   .empty-icon {
-    color: var(--text-muted, #9ca3af);
-    margin-bottom: 12px;
+    color: var(--el-text-color-placeholder);
+    margin-bottom: 10px;
   }
   .empty-title {
-    font-size: 15px;
+    font-size: 14px;
     font-weight: 600;
-    color: var(--text-primary, #111827);
+    color: var(--el-text-color-primary);
   }
   .empty-desc {
     font-size: 12px;
-    color: var(--text-muted, #6b7280);
+    color: var(--el-text-color-placeholder);
     margin-top: 4px;
   }
 }
 
-/* TIMELINE STYLES */
+/* Timeline Stream Presentation (Modes 1 & 0) */
 .timeline-container {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
 }
 
 .timeline-item-card {
   display: flex;
-  gap: 16px;
+  gap: 14px;
   position: relative;
 }
 
@@ -2194,12 +2367,12 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   align-items: center;
-  width: 32px;
+  width: 30px;
   flex-shrink: 0;
 
   .indicator-icon-wrap {
-    width: 32px;
-    height: 32px;
+    width: 30px;
+    height: 30px;
     border-radius: 50%;
     display: flex;
     align-items: center;
@@ -2207,43 +2380,42 @@ onMounted(() => {
     z-index: 2;
 
     &.cat-account {
-      background: rgba(99, 102, 241, 0.12);
-      color: #6366f1;
+      background: var(--el-color-primary-light-9);
+      color: var(--el-color-primary);
     }
     &.cat-mail {
-      background: rgba(6, 182, 212, 0.12);
-      color: #0891b2;
+      background: var(--el-color-primary-light-8);
+      color: var(--el-color-primary-dark-2);
     }
     &.cat-security {
-      background: rgba(239, 68, 68, 0.12);
-      color: #ef4444;
+      background: var(--el-color-danger-light-9);
+      color: var(--el-color-danger);
     }
     &.cat-appeal {
-      background: rgba(245, 158, 11, 0.15);
-      color: #f59e0b;
+      background: var(--el-color-warning-light-9);
+      color: var(--el-color-warning);
     }
   }
 
   .timeline-line {
     flex: 1;
     width: 2px;
-    background: var(--border-subtle, rgba(0, 0, 0, 0.08));
+    background: var(--el-border-color-lighter);
     margin-top: 4px;
   }
 }
 
 .timeline-content-card {
   flex: 1;
-  background: var(--bg-elevated, #ffffff);
-  border: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.08));
-  border-radius: 12px;
-  padding: 16px;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.03);
+  background: var(--el-bg-color);
+  border: 1px solid var(--el-border-color);
+  border-radius: 8px;
+  padding: 14px 16px;
   transition: all 0.2s ease;
 
   &:hover {
-    border-color: var(--accent-primary, #6366f1);
-    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.05);
+    border-color: var(--el-color-primary);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
   }
 }
 
@@ -2253,7 +2425,7 @@ onMounted(() => {
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 .event-headline {
@@ -2270,37 +2442,37 @@ onMounted(() => {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 12px;
   font-weight: 600;
-  color: var(--text-primary, #111827);
-  background: var(--bg-hover, rgba(0, 0, 0, 0.04));
-  padding: 2px 8px;
-  border-radius: 6px;
+  color: var(--el-text-color-primary);
+  background: var(--el-fill-color-light);
+  padding: 2px 7px;
+  border-radius: 4px;
   cursor: pointer;
 
   &:hover {
-    color: var(--accent-primary, #6366f1);
+    color: var(--el-color-primary);
   }
 }
 
 .event-action-text {
   font-size: 13px;
   font-weight: 600;
-  color: var(--text-primary, #111827);
+  color: var(--el-text-color-primary);
 }
 
 .event-time-badge {
   font-size: 12px;
-  color: var(--text-muted, #6b7280);
+  color: var(--el-text-color-secondary);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
 .content-card-body {
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 
   .event-detail-desc {
-    font-size: 13px;
-    color: var(--text-secondary, #374151);
-    line-height: 1.4;
-    margin-bottom: 10px;
+    font-size: 12.5px;
+    color: var(--el-text-color-regular);
+    line-height: 1.45;
+    margin-bottom: 8px;
   }
 }
 
@@ -2315,35 +2487,35 @@ onMounted(() => {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 3px 9px;
-  border-radius: 6px;
+  padding: 2px 8px;
+  border-radius: 4px;
   font-size: 11px;
   font-weight: 500;
-  background: var(--bg-hover, rgba(0, 0, 0, 0.04));
-  color: var(--text-secondary, #4b5563);
-  border: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.05));
+  background: var(--el-fill-color-light);
+  color: var(--el-text-color-regular);
+  border: 1px solid var(--el-border-color-lighter);
 
   .geo-badge {
-    color: var(--text-muted, #6b7280);
+    color: var(--el-text-color-placeholder);
   }
 
   .reg-tag {
-    background: rgba(16, 185, 129, 0.1);
-    color: #10b981;
+    background: var(--el-color-success-light-9);
+    color: var(--el-color-success);
     padding: 1px 4px;
-    border-radius: 4px;
+    border-radius: 3px;
     font-size: 10px;
   }
 
   .fp-tag {
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-    color: var(--text-muted, #6b7280);
+    color: var(--el-text-color-placeholder);
   }
 
   &.alert-pill {
-    background: rgba(239, 68, 68, 0.08);
-    color: #ef4444;
-    border-color: rgba(239, 68, 68, 0.2);
+    background: var(--el-color-danger-light-9);
+    color: var(--el-color-danger);
+    border-color: var(--el-color-danger-light-5);
     font-weight: 600;
   }
 }
@@ -2352,8 +2524,8 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-top: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.05));
-  padding-top: 10px;
+  border-top: 1px solid var(--el-border-color-lighter);
+  padding-top: 8px;
 }
 
 .footer-left {
@@ -2364,52 +2536,44 @@ onMounted(() => {
   .risk-label-tag {
     font-size: 11px;
     font-weight: 600;
-    padding: 2px 7px;
+    padding: 2px 6px;
     border-radius: 4px;
 
     &.risk-tag-normal {
-      background: var(--bg-hover, rgba(0, 0, 0, 0.05));
-      color: var(--text-muted, #6b7280);
+      background: var(--el-fill-color-light);
+      color: var(--el-text-color-secondary);
     }
     &.risk-tag-low {
-      background: rgba(16, 185, 129, 0.1);
-      color: #10b981;
+      background: var(--el-color-success-light-9);
+      color: var(--el-color-success);
     }
     &.risk-tag-medium {
-      background: rgba(245, 158, 11, 0.12);
-      color: #d97706;
+      background: var(--el-color-warning-light-9);
+      color: var(--el-color-warning);
     }
     &.risk-tag-high {
-      background: rgba(239, 68, 68, 0.12);
-      color: #ef4444;
+      background: var(--el-color-danger-light-9);
+      color: var(--el-color-danger);
     }
   }
 
   .mode-tag {
     font-size: 11px;
-    color: var(--text-muted, #6b7280);
+    color: var(--el-text-color-placeholder);
   }
 }
 
-/* TABLE STYLES */
+/* Pure DB Table Presentation (Mode 2) & Tab 2 Risk Table */
 .table-container, .risk-table-wrap {
-  background: var(--bg-elevated, #ffffff);
-  border-radius: 12px;
-  border: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.08));
+  background: var(--el-bg-color);
+  border-radius: 8px;
+  border: 1px solid var(--el-border-color);
   overflow: hidden;
 }
 
-.table-time-cell {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 12px;
-  color: var(--text-secondary, #374151);
-
-  .time-icon {
-    color: var(--text-muted, #6b7280);
-  }
+.audit-data-table, .risk-data-table {
+  --el-table-border-color: var(--el-border-color-lighter);
+  --el-table-header-bg-color: var(--el-fill-color-light);
 }
 
 .table-user-cell, .account-cell {
@@ -2420,9 +2584,9 @@ onMounted(() => {
   .user-avatar-initial, .account-avatar {
     width: 32px;
     height: 32px;
-    border-radius: 8px;
-    background: var(--accent-muted, rgba(99, 102, 241, 0.1));
-    color: var(--accent-primary, #6366f1);
+    border-radius: 6px;
+    background: var(--el-color-primary-light-9);
+    color: var(--el-color-primary);
     font-weight: 700;
     font-size: 13px;
     display: flex;
@@ -2434,12 +2598,40 @@ onMounted(() => {
   .email-address, .account-email {
     font-size: 13px;
     font-weight: 600;
-    color: var(--text-primary, #111827);
+    color: var(--el-text-color-primary);
   }
 
   .role-tag {
     font-size: 11px;
-    color: var(--text-muted, #6b7280);
+    color: var(--el-text-color-placeholder);
+  }
+
+  .account-tags {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 2px;
+  }
+
+  .appeal-badge {
+    font-size: 10px;
+    padding: 1px 5px;
+    border-radius: 3px;
+    background: var(--el-color-warning-light-9);
+    color: var(--el-color-warning);
+    font-weight: 600;
+  }
+}
+
+.ticket-id-cell {
+  .ticket-code {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--el-text-color-primary);
+    background: var(--el-fill-color-light);
+    border: 1px solid var(--el-border-color-lighter);
+    padding: 2px 6px;
+    border-radius: 4px;
   }
 }
 
@@ -2451,12 +2643,12 @@ onMounted(() => {
   .action-title {
     font-size: 13px;
     font-weight: 600;
-    color: var(--text-primary, #111827);
+    color: var(--el-text-color-primary);
   }
 
   .action-sub {
     font-size: 11px;
-    color: var(--text-muted, #6b7280);
+    color: var(--el-text-color-placeholder);
     margin-top: 2px;
   }
 }
@@ -2468,10 +2660,15 @@ onMounted(() => {
     display: flex;
     align-items: center;
     gap: 5px;
-    color: var(--text-primary, #111827);
+    color: var(--el-text-color-primary);
 
     &.muted {
-      color: var(--text-muted, #6b7280);
+      color: var(--el-text-color-secondary);
+      margin-top: 2px;
+    }
+    &.fp {
+      font-size: 11px;
+      color: var(--el-text-color-placeholder);
       margin-top: 2px;
     }
   }
@@ -2480,15 +2677,15 @@ onMounted(() => {
     display: inline-block;
     font-size: 10px;
     padding: 1px 5px;
-    border-radius: 4px;
-    background: rgba(239, 68, 68, 0.1);
-    color: #ef4444;
+    border-radius: 3px;
+    background: var(--el-color-danger-light-9);
+    color: var(--el-color-danger);
     font-weight: 600;
     margin-top: 3px;
   }
 }
 
-/* RISK TAB SPECIFICS */
+/* TAB 2 Specifics */
 .risk-toolbar {
   display: flex;
   justify-content: space-between;
@@ -2509,16 +2706,16 @@ onMounted(() => {
     display: flex;
     align-items: center;
     gap: 5px;
-    color: var(--text-primary, #111827);
+    color: var(--el-text-color-primary);
 
     &.muted {
-      color: var(--text-muted, #6b7280);
+      color: var(--el-text-color-secondary);
       margin-top: 2px;
     }
     &.fp {
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
       font-size: 11px;
-      color: var(--text-muted, #6b7280);
+      color: var(--el-text-color-placeholder);
       margin-top: 2px;
     }
   }
@@ -2529,7 +2726,7 @@ onMounted(() => {
     display: flex;
     justify-content: space-between;
     font-size: 10px;
-    color: var(--text-muted, #6b7280);
+    color: var(--el-text-color-placeholder);
     margin-bottom: 4px;
   }
 
@@ -2543,7 +2740,7 @@ onMounted(() => {
     display: flex;
     align-items: center;
     gap: 4px;
-    color: #ef4444;
+    color: var(--el-color-danger);
     font-size: 11px;
     font-weight: 600;
     margin-top: 4px;
@@ -2553,7 +2750,7 @@ onMounted(() => {
 .appeal-statement-cell {
   .appeal-quote {
     font-size: 12px;
-    color: var(--text-secondary, #374151);
+    color: var(--el-text-color-regular);
     line-height: 1.4;
     display: -webkit-box;
     -webkit-line-clamp: 2;
@@ -2563,8 +2760,12 @@ onMounted(() => {
 
   .appeal-time {
     font-size: 11px;
-    color: var(--text-muted, #6b7280);
+    color: var(--el-text-color-placeholder);
     margin-top: 2px;
+  }
+
+  .appeal-portal-link {
+    margin-top: 4px;
   }
 }
 
@@ -2581,7 +2782,7 @@ onMounted(() => {
 
     .score-desc {
       font-size: 11px;
-      color: var(--text-muted, #6b7280);
+      color: var(--el-text-color-placeholder);
     }
   }
 
@@ -2593,12 +2794,12 @@ onMounted(() => {
     margin-top: 3px;
 
     &.match {
-      background: rgba(16, 185, 129, 0.1);
-      color: #10b981;
+      background: var(--el-color-success-light-9);
+      color: var(--el-color-success);
     }
     &.mismatch {
-      background: rgba(239, 68, 68, 0.1);
-      color: #ef4444;
+      background: var(--el-color-danger-light-9);
+      color: var(--el-color-danger);
     }
   }
 }
@@ -2607,41 +2808,43 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 6px;
+  flex-wrap: wrap;
 }
 
-/* POLICY TAB STYLES */
+/* Policy Settings Tab (Tab 3) - Strictly matches sys-setting cards */
 .policy-panel {
   .card-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(2, 1fr);
     gap: 16px;
 
-    @media (max-width: 1024px) {
+    @media (max-width: 900px) {
       grid-template-columns: 1fr;
     }
   }
 }
 
 .settings-card {
-  background: var(--bg-elevated, #ffffff);
-  border-radius: 12px;
-  border: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.08));
-  padding: 20px;
+  background: var(--el-bg-color);
+  border-radius: 8px;
+  border: 1px solid var(--el-border-color);
+  overflow: hidden;
 
   .card-title {
-    font-size: 14px;
-    font-weight: 700;
-    color: var(--text-primary, #111827);
-    margin-bottom: 16px;
+    font-size: 14.5px;
+    font-weight: bold;
+    padding: 12px 18px;
+    border-bottom: 1px solid var(--el-border-color);
     display: flex;
     align-items: center;
     gap: 8px;
+    color: var(--el-text-color-primary);
   }
 
   .card-content {
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    padding: 0;
   }
 }
 
@@ -2650,19 +2853,24 @@ onMounted(() => {
   align-items: center;
   gap: 8px;
   font-size: 12px;
-  color: var(--text-secondary, #4b5563);
-  background: var(--bg-hover, rgba(0, 0, 0, 0.04));
-  padding: 8px 12px;
-  border-radius: 8px;
+  color: var(--el-text-color-regular);
+  background: var(--el-fill-color-light);
+  padding: 10px 18px;
+  border-bottom: 1px solid var(--el-border-color-lighter);
   line-height: 1.4;
-  margin-bottom: 6px;
 }
 
 .setting-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--el-border-color-lighter);
   gap: 12px;
+
+  &:last-child {
+    border-bottom: none;
+  }
 
   &.disabled {
     opacity: 0.5;
@@ -2675,13 +2883,13 @@ onMounted(() => {
     .item-title {
       display: block;
       font-size: 13px;
-      font-weight: 600;
-      color: var(--text-primary, #111827);
+      font-weight: 500;
+      color: var(--el-text-color-primary);
     }
     .item-desc {
       display: block;
       font-size: 11px;
-      color: var(--text-muted, #6b7280);
+      color: var(--el-text-color-placeholder);
       margin-top: 2px;
       line-height: 1.3;
     }
@@ -2689,11 +2897,11 @@ onMounted(() => {
 }
 
 .maintenance-action-box {
-  margin-top: 10px;
-  padding: 12px;
-  border-radius: 8px;
-  background: rgba(239, 68, 68, 0.04);
-  border: 1px dashed rgba(239, 68, 68, 0.2);
+  margin: 14px 18px;
+  padding: 12px 14px;
+  border-radius: 6px;
+  background: var(--el-color-danger-light-9);
+  border: 1px dashed var(--el-color-danger-light-5);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -2702,38 +2910,121 @@ onMounted(() => {
   .action-title {
     font-size: 13px;
     font-weight: 600;
-    color: var(--text-primary, #111827);
+    color: var(--el-color-danger);
   }
   .action-desc {
     font-size: 11px;
-    color: var(--text-muted, #6b7280);
+    color: var(--el-text-color-secondary);
     margin-top: 2px;
   }
 }
 
-/* DRAWER STYLES */
-.drawer-content {
-  padding: 0 8px 24px;
+.architecture-card {
+  grid-column: 1 / -1;
+
+  .card-content {
+    padding: 18px;
+  }
+}
+
+.arch-desc {
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--el-text-color-secondary);
+  margin-bottom: 14px;
+}
+
+.arch-flow-diagram {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: var(--el-fill-color-light);
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 8px;
+  padding: 14px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.flow-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--el-bg-color);
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 6px;
+  flex: 1;
+  min-width: 170px;
+}
+
+.flow-step.highlight {
+  border-color: var(--el-color-primary-light-5);
+  background: var(--el-color-primary-light-9);
+}
+
+.flow-step-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  background: var(--el-color-primary-light-8);
+  color: var(--el-color-primary);
+  flex-shrink: 0;
+}
+
+.flow-step-text {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+
+  strong {
+    font-size: 12px;
+    color: var(--el-text-color-primary);
+  }
+  span {
+    font-size: 11px;
+    color: var(--el-text-color-secondary);
+  }
+}
+
+.flow-arrow {
+  color: var(--el-text-color-placeholder);
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.arch-action-row {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* Adjudication Drawer */
+.drawer-content {
+  padding: 0 4px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
 .drawer-user-hero {
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 14px;
-  border-radius: 10px;
-  background: var(--bg-hover, rgba(0, 0, 0, 0.03));
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: var(--el-fill-color-light);
+  border: 1px solid var(--el-border-color-lighter);
 
   .hero-avatar {
-    width: 44px;
-    height: 44px;
-    border-radius: 10px;
-    background: var(--accent-primary, #6366f1);
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    background: var(--el-color-primary);
     color: #ffffff;
-    font-size: 18px;
+    font-size: 16px;
     font-weight: 700;
     display: flex;
     align-items: center;
@@ -2741,9 +3032,9 @@ onMounted(() => {
   }
 
   .hero-email {
-    font-size: 15px;
+    font-size: 14px;
     font-weight: 700;
-    color: var(--text-primary, #111827);
+    color: var(--el-text-color-primary);
   }
 
   .hero-badges {
@@ -2762,24 +3053,24 @@ onMounted(() => {
 
 .comparison-card {
   padding: 12px;
-  border-radius: 10px;
-  background: var(--bg-elevated, #ffffff);
-  border: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.08));
+  border-radius: 8px;
+  background: var(--el-bg-color);
+  border: 1px solid var(--el-border-color);
 
   .card-header {
     display: flex;
     align-items: center;
     gap: 6px;
     font-size: 12px;
-    font-weight: 700;
-    color: var(--text-primary, #111827);
-    margin-bottom: 10px;
+    font-weight: 600;
+    color: var(--el-text-color-primary);
+    margin-bottom: 8px;
   }
 
   .card-rows {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 5px;
   }
 
   .c-row {
@@ -2788,46 +3079,46 @@ onMounted(() => {
     font-size: 11px;
 
     .label {
-      color: var(--text-muted, #6b7280);
+      color: var(--el-text-color-secondary);
     }
     .val {
       font-weight: 600;
-      color: var(--text-primary, #111827);
+      color: var(--el-text-color-primary);
     }
   }
 }
 
 .match-summary-box {
-  padding: 12px 14px;
-  border-radius: 10px;
-  background: rgba(16, 185, 129, 0.08);
-  border: 1px solid rgba(16, 185, 129, 0.2);
+  padding: 10px 14px;
+  border-radius: 6px;
+  background: var(--el-color-success-light-9);
+  border: 1px solid var(--el-color-success-light-5);
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
 
   .match-score-big {
-    font-size: 24px;
+    font-size: 22px;
     font-weight: 800;
   }
 
   .match-title {
-    font-size: 13px;
+    font-size: 12.5px;
     font-weight: 700;
   }
   .match-sub {
     font-size: 11px;
-    color: var(--text-muted, #6b7280);
+    color: var(--el-text-color-secondary);
     margin-top: 2px;
   }
 
   &.text-warning {
-    background: rgba(245, 158, 11, 0.08);
-    border-color: rgba(245, 158, 11, 0.2);
+    background: var(--el-color-warning-light-9);
+    border-color: var(--el-color-warning-light-5);
   }
   &.text-danger {
-    background: rgba(239, 68, 68, 0.08);
-    border-color: rgba(239, 68, 68, 0.2);
+    background: var(--el-color-danger-light-9);
+    border-color: var(--el-color-danger-light-5);
   }
 }
 
@@ -2835,26 +3126,56 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--text-primary, #111827);
-  margin-bottom: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+  margin-bottom: 6px;
 }
 
 .appeal-statement-bubble {
-  padding: 12px 14px;
-  border-radius: 8px;
-  background: var(--bg-hover, rgba(0, 0, 0, 0.03));
-  border-left: 3px solid var(--accent-primary, #6366f1);
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: var(--el-fill-color-light);
+  border-left: 3px solid var(--el-color-primary);
   font-size: 12px;
   line-height: 1.5;
-  color: var(--text-secondary, #374151);
+  color: var(--el-text-color-regular);
 
   .bubble-meta {
-    margin-top: 6px;
+    margin-top: 4px;
     font-size: 11px;
-    color: var(--text-muted, #6b7280);
+    color: var(--el-text-color-placeholder);
   }
+}
+
+.drawer-external-portal-box {
+  background: var(--el-fill-color-light);
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+
+.depb-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.depb-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+.depb-desc {
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--el-text-color-secondary);
+  margin: 0;
 }
 
 .ip-list-chips {
@@ -2867,16 +3188,16 @@ onMounted(() => {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 4px 10px;
-  border-radius: 6px;
+  padding: 3px 8px;
+  border-radius: 4px;
   font-size: 11px;
-  background: var(--bg-hover, rgba(0, 0, 0, 0.04));
-  border: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.08));
+  background: var(--el-fill-color-light);
+  border: 1px solid var(--el-border-color-lighter);
 
   &.current {
-    border-color: var(--accent-primary, #6366f1);
-    color: var(--accent-primary, #6366f1);
-    background: var(--accent-muted, rgba(99, 102, 241, 0.08));
+    border-color: var(--el-color-primary-light-5);
+    color: var(--el-color-primary);
+    background: var(--el-color-primary-light-9);
     font-weight: 600;
   }
 }
@@ -2884,278 +3205,28 @@ onMounted(() => {
 .decision-panel {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  border-top: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.08));
-  padding-top: 16px;
-}
-
-.decision-radio-group {
-  margin-bottom: 4px;
-}
-
-.purge-checkbox-row {
-  margin-top: 4px;
+  gap: 10px;
+  border-top: 1px solid var(--el-border-color-lighter);
+  padding-top: 14px;
 }
 
 .drawer-actions {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
-  margin-top: 12px;
+  margin-top: 10px;
 }
 
 .text-success {
-  color: #10b981 !important;
+  color: var(--el-color-success) !important;
 }
 .text-warning {
-  color: #f59e0b !important;
+  color: var(--el-color-warning) !important;
 }
 .text-danger {
-  color: #ef4444 !important;
+  color: var(--el-color-danger) !important;
 }
 .font-mono {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-}
-
-/* Breadcrumb Navigation Strip */
-.audit-breadcrumb-strip {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 4px 6px 12px 6px;
-  font-size: 13px;
-}
-
-.breadcrumb-left {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.back-settings-btn {
-  color: var(--el-text-color-secondary) !important;
-  font-weight: 500;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 0 !important;
-  transition: color 0.15s;
-}
-
-.back-settings-btn:hover {
-  color: var(--el-color-primary) !important;
-}
-
-.breadcrumb-sep {
-  color: var(--el-text-color-placeholder);
-  font-size: 12px;
-}
-
-.breadcrumb-active {
-  color: var(--el-text-color-primary);
-  font-weight: 600;
-}
-
-.docs-portal-btn {
-  font-size: 12px !important;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-
-/* KPI Mini Progress Bars */
-.kpi-progress-bar {
-  margin-top: 8px;
-  width: 100%;
-  height: 4px;
-  border-radius: 9999px;
-  background: rgba(125, 125, 125, 0.12);
-  overflow: hidden;
-}
-
-.kpi-progress-fill {
-  height: 100%;
-  border-radius: 9999px;
-  transition: width 0.3s ease;
-}
-
-.ops-fill {
-  background: linear-gradient(90deg, #6366f1, #3b82f6);
-}
-
-.risk-fill {
-  background: linear-gradient(90deg, #10b981, #06b6d4);
-}
-
-.appeal-fill {
-  background: linear-gradient(90deg, #f59e0b, #ea580c);
-}
-
-/* Pulse Beacon */
-.pulse-beacon {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #f59e0b;
-  margin-left: 6px;
-  box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7);
-  animation: beacon-pulse 1.8s infinite;
-}
-
-@keyframes beacon-pulse {
-  0% {
-    transform: scale(0.95);
-    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7);
-  }
-  70% {
-    transform: scale(1);
-    box-shadow: 0 0 0 7px rgba(245, 158, 11, 0);
-  }
-  100% {
-    transform: scale(0.95);
-    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0);
-  }
-}
-
-/* Slot Capsules */
-.kpi-slots-capsule {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  margin-top: 8px;
-}
-
-.slot-dot {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  border-radius: 4px;
-  font-size: 10px;
-  font-weight: 700;
-  background: rgba(125, 125, 125, 0.12);
-  color: var(--el-text-color-placeholder);
-  border: 1px solid transparent;
-  transition: all 0.2s;
-}
-
-.slot-dot.active {
-  background: rgba(99, 102, 241, 0.15);
-  color: #6366f1;
-  border-color: rgba(99, 102, 241, 0.3);
-}
-
-/* Drawer External Portal Box */
-.drawer-external-portal-box {
-  background: var(--el-fill-color-light);
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 10px;
-  padding: 12px 14px;
-  margin-bottom: 16px;
-}
-
-.depb-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 6px;
-}
-
-.depb-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--el-text-color-primary);
-}
-
-.depb-desc {
-  font-size: 12px;
-  line-height: 1.55;
-  color: var(--el-text-color-secondary);
-  margin: 0;
-}
-
-/* Architecture Card & Flow */
-.architecture-card {
-  margin-top: 18px;
-}
-
-.arch-desc {
-  font-size: 13px;
-  line-height: 1.6;
-  color: var(--el-text-color-secondary);
-  margin-bottom: 16px;
-}
-
-.arch-flow-diagram {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  background: var(--el-fill-color-light);
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 12px;
-  padding: 16px;
-  margin-bottom: 16px;
-  flex-wrap: wrap;
-}
-
-.flow-step {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 12px;
-  background: var(--el-bg-color);
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 8px;
-  flex: 1;
-  min-width: 170px;
-}
-
-.flow-step.highlight {
-  border-color: rgba(99, 102, 241, 0.4);
-  background: rgba(99, 102, 241, 0.05);
-}
-
-.flow-step-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 8px;
-  background: var(--el-color-primary-light-9);
-  color: var(--el-color-primary);
-  shrink: 0;
-}
-
-.flow-step-text {
-  display: flex;
-  flex-direction: column;
-}
-
-.flow-step-text strong {
-  font-size: 12px;
-  color: var(--el-text-color-primary);
-}
-
-.flow-step-text span {
-  font-size: 11px;
-  color: var(--el-text-color-secondary);
-}
-
-.flow-arrow {
-  color: var(--el-text-color-placeholder);
-  font-size: 16px;
-  font-weight: bold;
-}
-
-.arch-action-row {
-  display: flex;
-  justify-content: flex-end;
 }
 </style>

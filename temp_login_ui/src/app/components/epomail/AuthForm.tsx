@@ -380,15 +380,16 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
 
   const lang = useMemo(() => resolveAuthLang(), []);
   const getAppealUrl = (targetEmail?: string) => {
-    let prefix = '';
-    if (lang === 'zh-Hant') prefix = '/zh-tw';
-    else if (lang === 'en') prefix = '/en';
-    else if (lang === 'es') prefix = '/es';
-    else if (lang === 'fr') prefix = '/fr';
-    else if (lang === 'nl') prefix = '/nl';
-    const base = `https://docs.epocanvas.com/epomail${prefix}/mail/appeal/`;
+    let langCode = 'zh';
+    if (lang === 'zh-Hant') langCode = 'zh-tw';
+    else if (lang === 'en') langCode = 'en';
+    else if (lang === 'es') langCode = 'es';
+    else if (lang === 'fr') langCode = 'fr';
+    else if (lang === 'nl') langCode = 'nl';
+    const base = 'https://docs.epocanvas.com/epomail/appeal/';
     const params = new URLSearchParams();
     params.set('type', 'password');
+    params.set('lang', langCode);
     if (targetEmail) params.set('email', targetEmail);
     return `${base}?${params.toString()}`;
   };

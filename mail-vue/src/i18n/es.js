@@ -2261,6 +2261,15 @@ totpModeAllDesc: 'Configurar si los usuarios pueden usar TOTP. Al activarlo, la 
     auditArchStepDocs: "Apelación y verificación pública sin autenticación",
     auditArchStepCloud: "Recopilar huella SHA-256 y subred IP",
     auditArchStepAdmin: "Adjudicación y liberación del administrador",
+    auditEncryptedTablePresentation: "Tabla DB (Marcas de tiempo omitidas)",
+    auditTimelineStreamPresentation: "Flujo cronológico (Marcas de tiempo completas)",
+    auditTicketId: "ID de ticket",
+    auditRejectAppeal: "Rechazar",
+    auditMatchPerfect: "Huella totalmente coincidente (Liberación recomendada)",
+    auditMatchHigh: "Referencia de alta similitud",
+    auditMatchMedium: "Deriva ambiental moderada",
+    auditMatchConflict: "Conflicto grave de huella (Posible suplantación)",
+    auditDefaultNoteApproved: "La huella coincide con la referencia; evaluado como itinerancia legítima, aprobado para desbloqueo.",
 };
 
 export default es;

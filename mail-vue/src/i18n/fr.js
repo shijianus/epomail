@@ -2261,6 +2261,15 @@ totpModeAllDesc: 'Définir si les utilisateurs peuvent utiliser TOTP. Lorsqu\'il
     auditArchStepDocs: "Recours et vérification publics sans authentification",
     auditArchStepCloud: "Collecter l'empreinte SHA-256 et le sous-réseau IP",
     auditArchStepAdmin: "Arbitrage et déblocage par l'administrateur",
+    auditEncryptedTablePresentation: "Tableau DB (Horodatages purgés)",
+    auditTimelineStreamPresentation: "Flux chronologique (Horodatage complet)",
+    auditTicketId: "Identifiant de ticket",
+    auditRejectAppeal: "Rejeter",
+    auditMatchPerfect: "Empreinte parfaitement concordante (Déblocage recommandé)",
+    auditMatchHigh: "Référence à haute similarité",
+    auditMatchMedium: "Dérive environnementale modérée",
+    auditMatchConflict: "Conflit d'empreinte sévère (Usurpation suspectée)",
+    auditDefaultNoteApproved: "L'empreinte correspond à la référence; évalué comme déplacement légitime, déblocage accordé.",
 };
 
 export default fr;

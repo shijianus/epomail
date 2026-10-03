@@ -2261,6 +2261,15 @@ totpModeAllDesc: '設定是否允許使用者使用TOTP，開啟後使用者可�
     auditArchStepDocs: "未登入使用者對外申訴/核驗",
     auditArchStepCloud: "採集 SHA-256 指紋與 IP 網段",
     auditArchStepAdmin: "站長風控控制台一鍵研判放行",
+    auditEncryptedTablePresentation: "純DB記錄表格 (時間戳已脫敏擦除)",
+    auditTimelineStreamPresentation: "時序時間軸流水 (完整時間戳)",
+    auditTicketId: "工單追蹤號",
+    auditRejectAppeal: "駁回",
+    auditMatchPerfect: "指紋完全吻合 (推薦放行)",
+    auditMatchHigh: "高相似度基準",
+    auditMatchMedium: "中度環境漂移",
+    auditMatchConflict: "指紋衝突嚴重 (疑似盜用)",
+    auditDefaultNoteApproved: "設備指紋基準吻合，判定為本人出差環境漂移，予以解封放行。",
 };
 
 export default zhHant;

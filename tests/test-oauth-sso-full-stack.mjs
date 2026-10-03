@@ -231,12 +231,73 @@ async function run() {
 		console.log(`  -> 弹窗内引导回调地址: ${callbackText.trim()}`);
 		ok(callbackText.includes('/api/oauth/callback/'), '配置弹窗内必须展示规范清晰的回调地址');
 
-		// 截图留存供视觉与设计审查
+		// 验证弹窗居中与零滑块准则 (Zero-Scrollbar & Center Alignment Verification)
+		const modalMetrics = await adminPage.evaluate(() => {
+			const dialog = document.querySelector('.oauth-config-dialog');
+			const body = document.querySelector('.oauth-config-dialog .el-dialog__body');
+			if (!dialog) return null;
+			const rect = dialog.getBoundingClientRect();
+			const viewportHeight = window.innerHeight;
+			const viewportWidth = window.innerWidth;
+			return {
+				width: rect.width,
+				height: rect.height,
+				top: rect.top,
+				bottom: rect.bottom,
+				viewportHeight,
+				viewportWidth,
+				isHorizontallyCentered: Math.abs((rect.left + rect.right) / 2 - viewportWidth / 2) < 20,
+				isVerticallyCentered: Math.abs((rect.top + rect.bottom) / 2 - viewportHeight / 2) < 60,
+				hasBodyScrollbar: body ? body.scrollHeight > body.clientHeight : false,
+				hasDialogScrollbar: dialog.scrollHeight > dialog.clientHeight + 2
+			};
+		});
+		ok(modalMetrics !== null, '成功提取弹窗几何度量数据');
+		console.log(`  -> 弹窗尺寸: 宽 ${Math.round(modalMetrics.width)}px, 高 ${Math.round(modalMetrics.height)}px, 视口高 ${modalMetrics.viewportHeight}px`);
+		ok(modalMetrics.width >= 600 && modalMetrics.width <= 720, `弹窗水平尺寸扩展至 640~700px (实测 ${Math.round(modalMetrics.width)}px)，杜绝挤压换行`);
+		ok(!modalMetrics.hasBodyScrollbar, '普通弹窗规范红线：弹窗内部绝对禁止出现纵向滚动滑块 (Body scrollbar = false)');
+		ok(!modalMetrics.hasDialogScrollbar, '普通弹窗规范红线：弹窗整体绝对禁止出现溢出滑块 (Dialog scrollbar = false)');
+		ok(modalMetrics.isVerticallyCentered, '弹窗全屏居中红线：弹窗必须保持视口垂直居中 (Vertically Centered)');
+		ok(modalMetrics.isHorizontallyCentered, '弹窗全屏居中红线：弹窗必须保持视口水平居中 (Horizontally Centered)');
+
+		// 截图留存供视觉与设计审查 (GitHub 弹窗)
 		await adminPage.screenshot({
 			path: '/home/shijian/projects/epocanvas-mail/tests/audit_oauth_sso_settings_card.png',
 			fullPage: false
 		});
-		console.log('  -> 视觉审查截图已保存至 tests/audit_oauth_sso_settings_card.png');
+		console.log('  -> GitHub 弹窗视觉审查截图已保存至 tests/audit_oauth_sso_settings_card.png');
+
+		// 关闭当前弹窗并打开 Custom SSO 配置弹窗（检验字段最多的极限形态）
+		const cancelBtn = adminPage.locator('.oauth-config-dialog .el-dialog__footer button').filter({ hasText: /取消|Cancel/ });
+		await cancelBtn.first().click();
+		await adminPage.waitForTimeout(400);
+
+		// 点击自定义认证 (第 5 个接入配置按钮)
+		console.log('  -> 打开包含最多自定义字段的 Custom SSO 配置弹窗验证极限高度与零滑块...');
+		await configureBtns.nth(4).click();
+		await adminPage.waitForTimeout(400);
+		const customModalMetrics = await adminPage.evaluate(() => {
+			const dialog = document.querySelector('.oauth-config-dialog');
+			const body = document.querySelector('.oauth-config-dialog .el-dialog__body');
+			if (!dialog) return null;
+			const rect = dialog.getBoundingClientRect();
+			const viewportHeight = window.innerHeight;
+			return {
+				width: rect.width,
+				height: rect.height,
+				top: rect.top,
+				viewportHeight,
+				hasBodyScrollbar: body ? body.scrollHeight > body.clientHeight : false,
+				hasDialogScrollbar: dialog.scrollHeight > dialog.clientHeight + 2,
+				isVerticallyCentered: Math.abs((rect.top + rect.bottom) / 2 - viewportHeight / 2) < 60
+			};
+		});
+		ok(customModalMetrics !== null, '成功提取 Custom SSO 弹窗几何度量');
+		console.log(`  -> Custom SSO 弹窗极限高度: ${Math.round(customModalMetrics.height)}px (视口高 ${customModalMetrics.viewportHeight}px)`);
+		ok(customModalMetrics.height < customModalMetrics.viewportHeight * 0.75, 'Custom SSO 极限字段总高度仍控制在视口 75% 以内，绝不拉伸溢出');
+		ok(!customModalMetrics.hasBodyScrollbar, 'Custom SSO 极限形态下内部亦绝对禁止出现滚动条 (Zero scrollbar)');
+		ok(!customModalMetrics.hasDialogScrollbar, 'Custom SSO 极限形态下弹窗外层亦无溢出滑块');
+		ok(customModalMetrics.isVerticallyCentered, 'Custom SSO 极限形态下依然保持精准垂直居中');
 
 		await adminBrowser.close();
 

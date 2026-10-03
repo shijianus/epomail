@@ -2261,6 +2261,15 @@ totpModeAllDesc: 'Configure whether users can use TOTP. When enabled, 2FA is ava
     auditArchStepDocs: "Unauthenticated Public Appeal & Verification",
     auditArchStepCloud: "Collect SHA-256 Fingerprint & IP Subnet",
     auditArchStepAdmin: "Master Adjudication & One-Click Release",
+    auditEncryptedTablePresentation: "DB Data Table (Timestamps Stripped)",
+    auditTimelineStreamPresentation: "Timeline Stream (Full Timestamps)",
+    auditTicketId: "Ticket ID",
+    auditRejectAppeal: "Reject",
+    auditMatchPerfect: "Fingerprint Fully Matched (Recommended Release)",
+    auditMatchHigh: "High Similarity Baseline",
+    auditMatchMedium: "Moderate Environment Drift",
+    auditMatchConflict: "Severe Fingerprint Conflict (Suspected Compromise)",
+    auditDefaultNoteApproved: "Device fingerprint baseline matches; assessed as legitimate roaming drift, approved for release.",
 };
 
 export default en;

@@ -2261,6 +2261,15 @@ totpModeAllDesc: '设置是否允许用户使用TOTP，开启后用户可以且�
     auditArchStepDocs: "未登录用户对外申诉/核验",
     auditArchStepCloud: "采集 SHA-256 指纹与 IP 网段",
     auditArchStepAdmin: "站长风控控制台一键研判放行",
+    auditEncryptedTablePresentation: "纯DB记录表格 (时间戳已脱敏擦除)",
+    auditTimelineStreamPresentation: "时序时间轴流水 (完整时间戳)",
+    auditTicketId: "工单追踪号",
+    auditRejectAppeal: "驳回",
+    auditMatchPerfect: "指纹完全吻合 (推荐放行)",
+    auditMatchHigh: "高相似度基准",
+    auditMatchMedium: "中度环境漂移",
+    auditMatchConflict: "指纹冲突严重 (疑似盗用)",
+    auditDefaultNoteApproved: "设备指纹基线吻合，判定为本人出差环境漂移，予以解封放行。",
 };
 
 export default zh;
