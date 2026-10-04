@@ -252,8 +252,8 @@
             </div>
           </div>
 
-          <!-- Third-Party Auth & SSO Settings Card (第三方认证与单点登录管理) -->
-          <div class="settings-card oauth-sso-card">
+          <!-- Third-Party Auth & SSO Settings Card (第三方认证与单点登录管理 - 底层特性开关控制) -->
+          <div v-if="ENABLE_OAUTH_INTEGRATION" class="settings-card oauth-sso-card">
             <div class="card-title">
               {{ $t('oauthAuthTitle') }}
               <el-tooltip effect="dark" :content="$t('oauthAuthDesc')">
@@ -3610,6 +3610,7 @@ import {getRoleGroupSlug} from '@/utils/role-utils.js';
 import {ElMessageBox, ElMessage} from "element-plus";
 import { APP_VERSION } from "@/const/version.js";
 import { getOfficialLink } from "@/const/links-const.js";
+import { ENABLE_OAUTH_INTEGRATION } from "@/const/feature-flags.js";
 
 defineOptions({
   name: 'sys-setting'

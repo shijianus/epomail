@@ -8,6 +8,28 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### 底层特性开关 (ENABLE_OAUTH_INTEGRATION) 默认关闭与隐藏第三方认证设置 (2026-10-04)
+*   **关联提交 (Git Commit)**: `PENDING_COMMIT_HASH` (Short: `PENDING`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com)` (Version ID: `7b9b1839-841a-46a0-b11d-ee6ab4c90b3a`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 变更点 1 (底层特性开关配置与默认关闭):
+        - 创建 `mail-vue/src/const/feature-flags.js`，定义底层常量 `export const ENABLE_OAUTH_INTEGRATION = false;`；
+        - 确保专案的纯净独立性与数据隐私，默认完全关闭第三方接入登录方式；
+    - [x] 变更点 2 (管理后台系统设置卡片完整受控隐藏):
+        - 在 `mail-vue/src/views/sys-setting/index.vue` 中引入 `ENABLE_OAUTH_INTEGRATION` 并将 `oauth-sso-card` 绑定 `v-if="ENABLE_OAUTH_INTEGRATION"`；
+        - 当 `ENABLE_OAUTH_INTEGRATION = false` 时，管理后台不再显式「第三方认证与单点登录」设置方框，彻底隐藏；
+        - 实际用户若需要，只需将底层开关修改为 `true` 即可立刻恢复使用；
+    - [x] 变更点 3 (全量构建与公网端到端自动化测试):
+        - 编写 `tests/test-feature-flag-oauth-hidden.mjs` 断言默认值与 DOM 受控条件；
+        - 编写 `tests/verify-feature-flag-oauth-live.mjs` 执行真实公网端到端自检；
+        - 重新构建 `mail-vue` 并成功部署至 Cloudflare Workers 生产环境 (`7b9b1839-841a-46a0-b11d-ee6ab4c90b3a`)。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 主应用构建核验：`mail-vue` Vite 构建通过 (16.76s, 0 errors)；
+    - [x] 特性开关断言测试：`tests/test-feature-flag-oauth-hidden.mjs` (100% 通过)；
+    - [x] 公网端到端验证：`tests/verify-feature-flag-oauth-live.mjs` (100% 通过)；
+    - [x] 公网生产部署核验：Cloudflare Worker 部署通过 (`7b9b1839-841a-46a0-b11d-ee6ab4c90b3a`)；
+    - [x] 零假数据残留：测试环境物理归零。
+
 ### 系统设置 (sys-setting) OAuth 配置弹窗视觉去灰底方框纯净化与输入内容完整合法性校验 (2026-10-04)
 *   **关联提交 (Git Commit)**: `a192b16bc8f32638ad0de1e5be452546afb04607` (Short: `a192b16`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com)` (Version ID: `ff87f8df-edac-43bb-9ca0-28b176cfcdfe`)
