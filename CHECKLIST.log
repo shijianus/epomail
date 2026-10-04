@@ -8,6 +8,31 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### 生产环境 100% 全真公网端到端视觉核验与零 Mock PM 验收签发 (2026-10-04)
+*   **关联提交 (Git Commit)**: `057f3aa86e30bc4f988c13c36cf42980ed86360c` (Short: `057f3aa`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com & epomail-docs.pages.dev)` (Worker Version ID: `d6501324-fce8-4e4c-946a-b6c0c1115424`, Docs Deployment: `https://epomail-docs.pages.dev`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 变更点 1 (100% 真实生产网络全链路核验 - 彻底杜绝本地 mock 拦截):
+        - 编写 `tests/verify-live-cf-production.mjs`，完全移除 `page.route` 拦截，全部直连 Cloudflare Worker、D1 数据库与 Pages 生产环境；
+    - [x] 变更点 2 (Webmail 登录页 ➔ 赛博有尊严找回密码引导弹窗 ➔ epomail-docs 独立对外表单):
+        - 实测 `https://mail.epocanvas.com/login/` 忘记密码弹窗，验证目标账号透传与跳转至独立文档站；
+    - [x] 变更点 3 (统一短链 ➔ 单一长链 Hash 扩展、Google/MS Forms 极简卡片流与 SHA-256 指纹采集):
+        - 实测 `https://epomail-docs.pages.dev/epomail/appeal/` 自动扩展为 `#/f/f_...` 单一长链，自动采集客户端 WebGL/Canvas 特征并计算 SHA-256 存证指纹，提交后生成 `TKT-2026-XXXXX` 回执卡；
+    - [x] 变更点 4 (用户列表与操作报告职责严格解耦、三安全模式自适应列与 4 类异常预警聚焦):
+        - 用户列表自适应全部模式 (收件+发件+存储空间)、隐私模式 (存储空间+垃圾邮件)、加密模式 (邮箱占用总空间+被检举次数+举报他人次数)；
+        - 操作报告聚焦 4 类预警 (审计、风控、封禁、申诉)，全部模式以时序流水呈现，加密模式以 5 列纯 DB 窄表呈现且时间戳物理擦除；
+    - [x] 变更点 5 (Tab 2 风控研判工作台与扩展抽屉双栏基线比对、98% 智能吻合度与 3-IP 池):
+        - 抽屉展示注册基线 vs 申诉环境双栏对称比对，呈现 98% 指纹匹配率、同 ISP 子网标识及处置批注；
+    - [x] 变更点 6 (子 Agent PM 全真视觉验收全绿通过):
+        - Principal PM UX Auditor 严格审阅全部 11 张公网真实截图，给出 100% PASS 签发放行。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 前端全量构建：`mail-vue` Vite 构建通过 (13.30s, 0 errors)；
+    - [x] 文档全量构建：`epomail-docs` Astro 构建通过 (61 routes, 0 errors)；
+    - [x] 多语言对称与审计：`i18n-symmetry.mjs` (2,301 键 100% 绝对对称)；
+    - [x] 公网全真端到端自动化套件：`tests/verify-live-cf-production.mjs` (29/29 项断言 100% 通过)；
+    - [x] 11 张全真生产截图：全量采集保存于 `tests/live_prod_01` 至 `tests/live_prod_11`；
+    - [x] 零假数据残留：测试临时用户已在远程 D1 数据库中物理删除 (`DELETE FROM user WHERE user_id = 9999`)。
+
 ### 系统设置 (sys-setting) OAuth 管理界面精益化去冗余与 UI/UX 规范 Skill 建立 (2026-10-03)
 *   **关联提交 (Git Commit)**: `cb9b40e2b69a1d5e91210c4d41ba6eaf7f5f7b96` (Short: `cb9b40e`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com)` (Version ID: `c32809ac-599a-4997-ac62-3356e491195f`)
