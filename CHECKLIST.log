@@ -9,7 +9,7 @@
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
 ### 系统设置 (sys-setting) OAuth 配置弹窗视觉去灰底方框纯净化与输入内容完整合法性校验 (2026-10-04)
-*   **关联提交 (Git Commit)**: `PENDING_COMMIT_HASH`
+*   **关联提交 (Git Commit)**: `a192b16bc8f32638ad0de1e5be452546afb04607` (Short: `a192b16`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com)` (Version ID: `ff87f8df-edac-43bb-9ca0-28b176cfcdfe`)
 *   **功能需求与变更清单 (Changes & Feature Alignment)**:
     - [x] 变更点 1 (弹窗主体视觉纯净化与彻底剔除灰底方框):
