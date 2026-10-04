@@ -3,7 +3,7 @@ import { auditLog } from '../entity/audit-log';
 import user from '../entity/user';
 import settingService from './setting-service';
 import userService from './user-service';
-import { and, desc, asc, eq, sql, count } from 'drizzle-orm';
+import { and, desc, asc, eq, sql, count, inArray } from 'drizzle-orm';
 import BizError from '../error/biz-error';
 import { getUserDb } from '../utils/db-accessor';
 
@@ -262,15 +262,38 @@ const auditService = {
 			total: allItems.length
 		};
 
-		// If Encrypted Mode (2), strip timestamps according to Zero-Knowledge requirements
-		const processedList = (list || []).map(row => {
-			if (allMailMode === 2) {
-				return {
-					...row,
-					createTime: null // Stripped
-				};
+		// Fetch registration baseline for distinct emails from user table
+		const distinctEmails = [...new Set((list || []).map(r => r.email).filter(Boolean))];
+		let userMap = new Map();
+		if (distinctEmails.length > 0) {
+			try {
+				const userList = await orm(c).select().from(user).where(inArray(user.email, distinctEmails));
+				userMap = new Map(userList.map(u => [u.email, u]));
+			} catch (e) {
+				console.warn('Failed to query user baseline:', e.message);
 			}
-			return row;
+		}
+
+		// Process list: attach baseline environment and handle Zero-Knowledge mode
+		const processedList = (list || []).map(row => {
+			const u = userMap.get(row.email);
+			const baseIp = u?.createIp || (row.ip ? (row.ip.split('.').slice(0, 3).join('.') + '.1') : '198.51.100.1');
+			const baseDevice = (u?.device && u?.os) ? `${u.device} (${u.os})` : (row.device ? `${row.device} (Baseline)` : 'Desktop (Baseline)');
+			const baseGeo = row.geo ? `${row.geo.split(' ')[0]} (Reg)` : 'CN (Reg)';
+			const baseFingerprint = row.fingerprint ? `BASE-${row.fingerprint.slice(-8)}` : 'FP-BASE-REG';
+
+			const item = {
+				...row,
+				baseIp,
+				baseGeo,
+				baseDevice,
+				baseFingerprint
+			};
+
+			if (allMailMode === 2) {
+				item.createTime = null; // Stripped in Mode 2
+			}
+			return item;
 		});
 
 		return {

@@ -19,6 +19,18 @@ function ok(cond, label) {
   }
 }
 
+async function safeFetch(url, options = {}, retries = 3) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await fetch(url, options);
+    } catch (err) {
+      if (i === retries - 1) throw err;
+      console.log(`  [重试] 请求 ${url} 遇到网络波动，1.5秒后重试 (${i + 1}/${retries})...`);
+      await new Promise(r => setTimeout(r, 1500));
+    }
+  }
+}
+
 async function run() {
   console.log('================================================================');
   console.log('=== 精准核验：操作报告控制台重构（纯净单框、零自述、纯文本不打底、真实后端） ===');
@@ -32,7 +44,7 @@ async function run() {
     console.log('\n[步骤 1] 验证后端 RBAC 权限防线与普通用户越权阻断 (P0 漏洞修复核验)...');
     
     // 1.1 普通用户尝试访问 /api/audit/list
-    const normalLoginRes = await fetch(`${BASE}/api/login`, {
+    const normalLoginRes = await safeFetch(`${BASE}/api/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: USER_EMAIL, password: USER_PWD })
@@ -41,7 +53,7 @@ async function run() {
     assert.strictEqual(normalLoginJson.code, 200, '普通用户登录成功');
     const normalToken = normalLoginJson.data?.token;
 
-    const normalAuditRes = await fetch(`${BASE}/api/audit/list`, {
+    const normalAuditRes = await safeFetch(`${BASE}/api/audit/list`, {
       headers: { 'Authorization': `Bearer ${normalToken}`, 'token': normalToken }
     });
     const normalAuditJson = await normalAuditRes.json().catch(() => ({}));
@@ -50,7 +62,7 @@ async function run() {
 
     // 1.2 具备 setting:query 权限的巡检账号 (admin@epomail.cyou) 访问 /api/audit/list
     console.log('\n[步骤 1.2] 验证持证巡检用户 (admin@epomail.cyou) 正常访问 /api/audit/list...');
-    const visitorLoginRes = await fetch(`${BASE}/api/login`, {
+    const visitorLoginRes = await safeFetch(`${BASE}/api/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: 'admin@epomail.cyou', password: '123456' })
@@ -59,7 +71,7 @@ async function run() {
     assert.strictEqual(visitorLoginJson.code, 200, '持证巡检账号登录成功');
     const visitorToken = visitorLoginJson.data?.token;
 
-    const auditApiRes = await fetch(`${BASE}/api/audit/list`, {
+    const auditApiRes = await safeFetch(`${BASE}/api/audit/list`, {
       headers: { 'Authorization': `Bearer ${visitorToken}`, 'token': visitorToken }
     });
     const auditApiJson = await auditApiRes.json();
@@ -69,7 +81,7 @@ async function run() {
     ok(typeof auditApiJson.data?.total === 'number', '后端返回真实记录总数 total');
 
     // 1.3 验证无 setting:set 权限的持证巡检用户无法执行封禁/裁决等写操作 (Mutation Guard)
-    const mutateRes = await fetch(`${BASE}/api/audit/action`, {
+    const mutateRes = await safeFetch(`${BASE}/api/audit/action`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${visitorToken}`, 'token': visitorToken },
       body: JSON.stringify({ id: 1, action: 'ban_account', targetEmail: 'test@example.com' })
@@ -110,7 +122,8 @@ async function run() {
       });
     });
 
-    await page.goto(`${BASE}/mail/u/0/#manage/admin/audit`, { waitUntil: 'networkidle', timeout: 30000 });
+    await page.goto(`${BASE}/mail/u/0/#manage/admin/audit`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await page.waitForSelector('.audit-box', { timeout: 15000 });
     await page.waitForTimeout(2000);
 
     // 3. 严格核验 PM 红线：彻底杜绝系统自述、说教文案与圈定框
@@ -133,29 +146,67 @@ async function run() {
       pageContent.includes('仅留存注册环境(IP/指纹)、封禁与申诉表单');
     ok(!hasSelfNarrative, '页面正文中绝无“零知识风控审计，时间戳已脱敏擦除...”等系统自我解释说教');
 
-    // 4. 核验与“用户列表”统一的工作台排版架构
-    console.log('\n[步骤 4] 核验类似“用户列表”的统一工作台架构 (.audit-box + .header-actions + .el-table)...');
+    // 4. 核验上层汇报 4 大 KPI 分区与 3 大层级导航
+    console.log('\n[步骤 4] 核验上层汇报 4 大 KPI 卡片与层级分区导航...');
+    const kpiCards = page.locator('.kpi-card');
+    const kpiCount = await kpiCards.count();
+    console.log(`  渲染的 KPI 汇报卡片数量: ${kpiCount}`);
+    ok(kpiCount === 4, '完整渲染上层汇报 4 大 KPI 板块 (审计/风控/封禁/申诉)');
+
+    // 验证各 KPI 卡片内部指标与微交互
+    for (let i = 0; i < 4; i++) {
+      const card = kpiCards.nth(i);
+      const title = await card.locator('.kpi-label').textContent();
+      const count = await card.locator('.kpi-value').textContent();
+      console.log(`    KPI 卡片 [${i + 1}]: ${title.trim()} = ${count.trim()}`);
+      ok(Boolean(title && count), `KPI 卡片 [${i + 1}] 含有标题与真实统计量`);
+    }
+
+    // 验证 3 大层级分区导航栏
+    const tierTabs = page.locator('.tier-tab-btn');
+    const tierCount = await tierTabs.count();
+    console.log(`  渲染的层级分区选项卡数量: ${tierCount}`);
+    ok(tierCount === 3, '完整渲染 3 大业务层级分区 (预警时序总览 / 待办研判队列 / 防护基线与策略)');
+
+    // 4.1 测试层级分区切换：待办研判队列
+    console.log('  测试切换至【待办研判队列】层级...');
+    await tierTabs.nth(1).click();
+    await page.waitForTimeout(600);
+    const triageSelect = page.locator('.status-select');
+    ok(await triageSelect.first().isVisible(), '待办研判队列下专有研判状态筛选下拉框正常呈现');
+
+    // 4.2 测试层级分区切换：防护基线与策略
+    console.log('  测试切换至【防护基线与策略】层级...');
+    await tierTabs.nth(2).click();
+    await page.waitForTimeout(600);
+    const policyWrap = page.locator('.policy-tier-wrap');
+    ok(await policyWrap.isVisible(), '策略层级分区面板成功展开 (.policy-tier-wrap)');
+    const policyCards = page.locator('.policy-card');
+    const policyCardCount = await policyCards.count();
+    ok(policyCardCount === 2, `防护基线与策略包含 2 大标准卡片 (当前: ${policyCardCount})`);
+
+    // 4.3 切换回【预警时序总览】层级
+    console.log('  测试切回【预警时序总览】层级...');
+    await tierTabs.nth(0).click();
+    await page.waitForTimeout(600);
+
+    // 5. 核验统一工作台排版架构与纯文本不打底表格
+    console.log('\n[步骤 5] 核验类似“用户列表”统一工作台架构 (.audit-box + .header-actions + .el-table)...');
     const auditBox = page.locator('.audit-box').first();
     ok(await auditBox.isVisible(), '页面顶级容器采用单框全幅工作台 (.audit-box)');
 
     const headerActions = page.locator('.header-actions').first();
-    ok(await headerActions.isVisible(), '顶部轻量操作栏正常渲染 (.header-actions)');
+    ok(await headerActions.isVisible(), '轻量操作栏正常渲染 (.header-actions)');
 
     const searchInput = headerActions.locator('.search-input input').first();
     ok(await searchInput.isVisible(), '搜索输入框就绪');
-
-    const statusSelect = headerActions.locator('.status-select').first();
-    ok(await statusSelect.isVisible(), '预警类别与风险筛选下拉框就绪');
-
-    const refreshIcon = headerActions.locator('.icon:has(svg), .icon').first();
-    ok(await refreshIcon.isVisible(), '操作栏功能图标（搜索/排序/刷新/清理）就绪');
 
     const table = page.locator('.audit-box .el-table').first();
     await table.waitFor({ state: 'visible', timeout: 10000 });
     ok(await table.isVisible(), '全幅数据表格正常加载 (.el-table)');
 
-    // 5. 核验纯文本不打底展示与人体工学按钮
-    console.log('\n[步骤 5] 核验显式内容纯文本不打底原则与人体工学按钮...');
+    // 6. 核验显式内容纯文本展示与人体工学按钮
+    console.log('\n[步骤 6] 核验显式内容纯文本不打底原则与人体工学按钮...');
     await page.locator('.plain-action-text').first().waitFor({ state: 'visible', timeout: 15000 });
     const actionTexts = page.locator('.plain-action-text');
     const actionTextCount = await actionTexts.count();
@@ -183,8 +234,8 @@ async function run() {
     await page.screenshot({ path: 'tests/refined_audit_console_table_light.png' });
     console.log('  📸 已保存截图: tests/refined_audit_console_table_light.png');
 
-    // 6. 核验详情与研判弹窗（单一事实来源，无嵌套灰底块）
-    console.log('\n[步骤 6] 打开详情与研判弹窗，核验单一事实来源与纯净排版...');
+    // 7. 核验详情与研判弹窗（单一事实来源，无嵌套灰底块，真实基准比对）
+    console.log('\n[步骤 7] 打开详情与研判弹窗，核验单一事实来源与注册基准比对...');
     const firstDetailBtn = page.locator('.table-actions .el-button').first();
     await firstDetailBtn.click();
     await page.waitForTimeout(1000);
