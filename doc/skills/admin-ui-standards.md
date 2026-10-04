@@ -18,7 +18,21 @@
 
 ### 3. 单一事实来源与弹窗无重复强调 (Single Source of Truth & Clean Modals)
 - **弹窗头部极简化**：配置弹窗（Modal / Dialog）头部（Header）仅展示模块图标与标题，**严禁在头部额外嵌入开启/关闭等状态标签（如 `oauth-dialog-header-right`）**。
-- **主体开关自解释**：弹窗主体内部已具备启用开关横幅（Switch Banner），开关本身的切换动画与高亮状态已完整表达当前启闭状态，禁止在多处重复标榜同一状态。
+- **主体开关自解释**：弹窗主体内部已具备启用开关行，开关本身的切换动画与高亮状态已完整表达当前启闭状态，禁止在多处重复标榜同一状态。
+
+### 4. 弹窗主体视觉纯净化与禁止伪独立灰底方框 (Prohibit Nested Grey Box Containers)
+- **拒绝过度装饰与方框孤岛**：严禁在弹窗主体（Dialog Body）内部专门新开额外的灰底、边框方框（如 `oauth-enable-banner`、`oauth-callback-compact-bar` 等灰底色块卡片）来刻意标识独立性。
+- **全站 UI 一致性**：弹窗内各区域（启用开关、输入网格、回调单行）应以纯净的行内排版、自然流式间距或极细底部分割线融入整体，与 Element Plus 及全站模态框规范保持一致，杜绝补丁式色块容器。
+
+### 5. 严格完备的输入内容合理性校验 (Strict & Comprehensive Input Validation)
+- **杜绝非法与垃圾数据**：表单提交前必须执行严格的格式与合法性前端检查，禁止随意乱填。
+  - `Client ID`：非空、禁止包含空格、长度合法 (3-256 字符)；
+  - `Client Secret`：非空、长度合法 (>= 6 字符)；
+  - `Tenant / 租户`：合法 GUID、域名或标准标识 (如 `common`)；
+  - `Apple Team ID / Key ID`：严格 10 位字母数字校验；
+  - `URL 端点 (Auth/Token/UserInfo)`：必须为有效的 `http://` 或 `https://` 网址；
+  - `自定义名称`：非空且限制合理字符长度 (2-40 字符)。
+- **保存时不强制连通性检查**：用户点击「保存」时只执行即时格式合法性校验，不强制发起异步网络连通性探测（保持快速响应），连通性测试保留为独立的按需触发操作。
 
 ---
 
@@ -36,7 +50,7 @@
     </el-tooltip>
   </div>
 
-  <!-- 右侧：统一右对齐纯图标按钮 + Tooltip 悬停解释 -->
+  <!-- 右侧：统一右对齐纯图标按钮 + Tooltip 解释 -->
   <div class="forward">
     <el-tooltip effect="dark" :content="$t('itemConfigure')">
       <el-button 
@@ -63,18 +77,30 @@
     </div>
   </template>
 
-  <!-- 主体：启用开关横幅 + 双列表单 + 单行集成栏 -->
+  <!-- 主体：启用开关纯净行 + 双列表单 + 单行集成栏 (零灰底色块) -->
   <div class="dialog-body">
-    <div class="enable-banner">
-      <div class="banner-label-group">
-        <span class="banner-title">{{ $t('enableItem') }}</span>
-        <span class="banner-desc">{{ activeMeta.name }}</span>
+    <!-- 纯净开关行 -->
+    <div class="enable-row-clean">
+      <div class="label-group">
+        <span class="title">{{ $t('enableItem') }}</span>
+        <span class="subtitle">({{ activeMeta.name }})</span>
       </div>
       <el-switch v-model="formData.enabled" />
     </div>
 
+    <!-- 表单字段网格 -->
     <div class="grid-form">
       <!-- 字段输入项 -->
+    </div>
+
+    <!-- 纯净单行说明与复制 -->
+    <div class="callback-row-clean">
+      <span class="label">{{ $t('callbackUrl') }}:</span>
+      <code>{{ callbackUrl }}</code>
+      <el-button size="small" text type="primary" @click="copyUrl">
+        <Icon icon="fluent:copy-20-regular" width="14" height="14" />
+        {{ $t('copy') }}
+      </el-button>
     </div>
   </div>
 </el-dialog>
@@ -89,4 +115,6 @@
 | **列表行状态展示** | 在行内同时渲染 `el-tag` 状态徽标 + `el-switch` 快速开关 + 文字按钮 | 仅保留模块名称与图标，右侧放置纯图标配置按钮，状态由弹窗内总览 |
 | **操作按钮设计** | 按钮内包含中文文本 `<span>接入配置</span>`，占用宽度且导致列表不对齐 | 纯图标按钮搭配 `el-tooltip` 悬停提示，轻量且排版 100% 对齐 |
 | **弹窗头部设计** | 在弹窗 Header 右侧额外添加 `el-tag` 显示启用/停用 | Header 保持极简纯标题，由主体内的 `el-switch` 承担唯一样式交互 |
-| **按钮对齐** | 各卡片按钮左浮动、分散对齐或居中对齐 | 统一使用 `.forward` 容器保持最右侧对齐 |
+| **弹窗容器设计** | 在弹窗 Body 中嵌套灰色背景卡片（如灰底 banner / 灰底集成条） | 采用纯净透明背景与自然排版，不额外画地为牢开辟灰底方框 |
+| **数据保存校验** | 允许用户任意乱填、空字符串直接提交入库，无格式防御 | 开启时进行完整严谨的正则与 URL 格式校验，拦截非法输入 |
+| **保存交互机制** | 点击保存时强制阻塞等待远程网络连通性探测耗时数秒 | 保存仅做快速格式校验，连通性测试提供独立可选按钮按需触发 |

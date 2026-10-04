@@ -8,6 +8,29 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### 系统设置 (sys-setting) OAuth 配置弹窗视觉去灰底方框纯净化与输入内容完整合法性校验 (2026-10-04)
+*   **关联提交 (Git Commit)**: `PENDING_COMMIT_HASH`
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com)` (Version ID: `ff87f8df-edac-43bb-9ca0-28b176cfcdfe`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 变更点 1 (弹窗主体视觉纯净化与彻底剔除灰底方框):
+        - 移除 `oauth-dialog-body` 内部专门新开的灰底色块方框（`oauth-enable-banner` 与 `oauth-callback-compact-bar`），消除伪独立卡片设计；
+        - 开关行以纯净行内 flex 布局 (`oauth-enable-row`) 融入表单，回调地址行以极简单行 (`oauth-callback-row`) 融入，与 Element Plus 及全站弹窗保持 100% 视觉一致性；
+    - [x] 变更点 2 (表单输入内容合理性与格式严格校验):
+        - 编写 `validateOauthForm` 与 `isValidHttpUrl` 校验器；
+        - 开启提供商时，严格校验 Client ID (非空、无空格、3-256字符)、Client Secret (非空、>=6字符)、Microsoft Tenant ID (合法标识/GUID/域名)、Apple Team ID & Key ID (10位字母数字)、自定义端点 Auth/Token/UserInfo URL (必须为有效 http/https 网址)；
+        - 保存时不强制进行耗时阻塞的网络连通性检查，仅做即时格式防守；
+    - [x] 变更点 3 (六语言字典对称补充):
+        - 在 `zh`、`zh-Hant`、`en`、`es`、`fr`、`nl` 中同步添加 11 个表单校验提示词条，保持 2,301 键 100% 绝对对称；
+    - [x] 变更点 4 (更新并固化 UI/UX 标准规范 Skill):
+        - 在 `.agent/skills/admin-ui-standards/SKILL.md` 与 `doc/skills/admin-ui-standards.md` 中补充 Rule 4（弹窗主体视觉纯净化与禁止伪独立灰底方框）与 Rule 5（严格完备的输入内容合理性校验）。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 主应用构建核验：`mail-vue` Vite 构建通过 (13.08s, 0 errors)；
+    - [x] 多语言对称核验：`i18n-symmetry.mjs` (2,301 键 100% 绝对对称)；
+    - [x] 静态与结构断言测试：`tests/test-sys-setting-oauth-ui-refactor.mjs` (7/7 项断言 100% 通过)；
+    - [x] 公网生产部署核验：Cloudflare Worker 部署通过 (`ff87f8df-edac-43bb-9ca0-28b176cfcdfe`)；
+    - [x] 公网生产全真回归测试：`tests/test-prod-oauth-3rules-live-e2e.mjs` (11/11 项断言 100% 通过)；
+    - [x] 零假数据残留：测试数据物理归零。
+
 ### 生产环境 100% 全真公网端到端视觉核验与零 Mock PM 验收签发 (2026-10-04)
 *   **关联提交 (Git Commit)**: `057f3aa86e30bc4f988c13c36cf42980ed86360c` (Short: `057f3aa`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com & epomail-docs.pages.dev)` (Worker Version ID: `d6501324-fce8-4e4c-946a-b6c0c1115424`, Docs Deployment: `https://epomail-docs.pages.dev`)

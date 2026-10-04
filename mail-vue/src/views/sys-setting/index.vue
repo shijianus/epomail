@@ -10343,22 +10343,8 @@ html.dark :deep(.oauth-config-dialog .el-input__inner) {
   color: #f3f4f6 !important;
 }
 
-html.dark .oauth-config-dialog .oauth-enable-banner,
-html.dark :deep(.oauth-config-dialog .oauth-enable-banner) {
-  background-color: #1f2937 !important;
-  border-color: #374151 !important;
-}
-
-html.dark .oauth-config-dialog .oauth-callback-compact-bar,
-html.dark :deep(.oauth-config-dialog .oauth-callback-compact-bar) {
-  background-color: #1f2937 !important;
-  border-color: #374151 !important;
-}
-
 html.dark .oauth-config-dialog .callback-code,
 html.dark :deep(.oauth-config-dialog .callback-code) {
-  background-color: #111827 !important;
-  border-color: #374151 !important;
-  color: #60a5fa !important;
+  color: #67e8f9 !important;
 }
 </style>
