@@ -643,55 +643,6 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
   const renderOAuthButton = (provider: OAuthProviderItem, extraClass: string = "", isHero: boolean = false) => {
     const isConfigured = Boolean(provider.configured);
 
-    if (isHero) {
-      return (
-        <motion.button
-          key={provider.key}
-          type="button"
-          disabled={!isConfigured}
-          aria-disabled={!isConfigured}
-          title={isConfigured ? provider.name : `${provider.name} (${t('oauthSoon') || '未配置'})`}
-          onClick={(e) => {
-            if (!isConfigured) {
-              e.preventDefault();
-              e.stopPropagation();
-              setErrorMsg(t('oauthNotConfigured') || tr('oauthComingSoon'));
-              return;
-            }
-            handleOAuthProviderClick(provider);
-          }}
-          whileHover={isConfigured ? (reduceMotion ? { opacity: 1 } : { opacity: 1, y: -1.5, borderColor: "rgba(103,232,249,0.55)", background: "rgba(255,255,255,0.08)" }) : {}}
-          whileTap={isConfigured ? { scale: 0.98 } : {}}
-          transition={{ duration: 0.18, ease: "easeOut" }}
-          className={`epomail-display flex h-11 w-full items-center justify-between px-4 sm:px-5 rounded-xl border text-[13px] ${
-            isConfigured
-              ? 'transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#67e8f9]'
-              : 'cursor-not-allowed select-none opacity-40 grayscale'
-          } ${extraClass}`}
-          style={{
-            borderColor: isConfigured ? "rgba(139,147,196,0.28)" : "rgba(139,147,196,0.12)",
-            background: isConfigured ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.015)",
-            color: isConfigured ? "var(--epo-ink)" : "var(--epo-muted)",
-            opacity: isConfigured ? 0.95 : 0.40,
-          }}
-        >
-          <div className="flex items-center gap-2.5 min-w-0">
-            <span className={isConfigured ? "shrink-0" : "shrink-0 grayscale opacity-60"}>{provider.icon}</span>
-            <span className="truncate font-medium">{provider.name}</span>
-            {!isConfigured && (
-              <span
-                className="rounded-full border px-1.5 py-px text-[9px] uppercase tracking-wider shrink-0"
-                style={{ borderColor: "rgba(139,147,196,0.25)", color: "var(--epo-muted)", background: "rgba(255,255,255,0.02)" }}
-              >
-                {t('oauthSoon')}
-              </span>
-            )}
-          </div>
-          <ArrowRight size={15} className={`shrink-0 ${isConfigured ? 'text-[var(--epo-muted)]' : 'text-white/20'}`} />
-        </motion.button>
-      );
-    }
-
     return (
       <motion.button
         key={provider.key}
@@ -711,7 +662,7 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
         whileHover={isConfigured ? (reduceMotion ? { opacity: 1 } : { opacity: 1, y: -1.5, borderColor: "rgba(103,232,249,0.55)", background: "rgba(255,255,255,0.08)" }) : {}}
         whileTap={isConfigured ? { scale: 0.98 } : {}}
         transition={{ duration: 0.18, ease: "easeOut" }}
-        className={`epomail-display flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-3 rounded-xl border text-[12px] sm:text-[13px] ${
+        className={`epomail-display flex ${isHero ? 'h-11 w-full' : ''} items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-3 rounded-xl border text-[12px] sm:text-[13px] ${
           isConfigured
             ? 'transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#67e8f9]'
             : 'cursor-not-allowed select-none opacity-40 grayscale'
@@ -724,7 +675,7 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
         }}
       >
         <span className={isConfigured ? "shrink-0" : "shrink-0 grayscale opacity-60"}>{provider.icon}</span>
-        <span className="truncate">{provider.name}</span>
+        <span className="truncate font-medium">{provider.name}</span>
         {!isConfigured && (
           <span
             className="rounded-full border px-1 sm:px-1.5 py-px text-[8.5px] sm:text-[9px] uppercase tracking-wider shrink-0"

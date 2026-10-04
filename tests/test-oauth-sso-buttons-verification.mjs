@@ -81,14 +81,16 @@ try {
       return {
         text: btn.textContent.trim(),
         hasSvg: !!btn.querySelector('svg'),
-        hasArrow: !!btn.querySelector('svg:last-child'),
+        svgCount: btn.querySelectorAll('svg').length,
+        isCentered: btn.className.includes('justify-center'),
         isFullWidth: btn.className.includes('w-full'),
         classes: btn.className
       };
     });
 
     ok(btnInfo && btnInfo.isFullWidth, '1 个 Provider 时渲染单列全宽 Hero 药丸按钮');
-    ok(btnInfo && btnInfo.hasSvg, '配有 Google 专属彩色矢量 SVG 图标');
+    ok(btnInfo && btnInfo.isCentered, '按钮内容 100% 水平垂直居中排布 (justify-center)');
+    ok(btnInfo && btnInfo.svgCount === 1, '右侧无额外 -> 箭头指示，仅保留品牌矢量 SVG 图标');
     ok(btnInfo && btnInfo.text.includes('Google'), '按钮包含 Google 名称文案');
 
     // Check desktop overflow

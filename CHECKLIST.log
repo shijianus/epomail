@@ -8,6 +8,28 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### 第三方快捷登录按钮统一居中排布与移除右侧箭头指示交互优化 (2026-10-03)
+*   **关联提交 (Git Commit)**: `71c342b2f372d9a0ecbd0d480a50c099e7125517` (Short: `71c342b`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com)` (Version ID: `224b5b9f-7c63-4bab-896e-35e21fb767d6`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 变更点 1 (全量第三方登录按钮内容 100% 水平垂直居中):
+        - 移除原先 1 个 Provider (Hero 单列药丸) 下的 `justify-between` 两端分散对齐与左对齐；
+        - 统一所有数量形态（1、2、3、4、5+ Provider）下的按钮排版为 `justify-center items-center gap-1.5 sm:gap-2`，确保品牌图标、文字名称与状态徽标视觉重心严格居中；
+    - [x] 变更点 2 (彻底移除右侧 `->` 箭头指示):
+        - 移除 Hero 单列按钮右侧点缀的 `<ArrowRight />` 箭头指示图标，消除多余的视觉干扰，使整体 UI 与 2/3/4/5 个按钮形态的极简轻奢暗黑风格完全统一；
+    - [x] 变更点 3 (全真栈自动化测试与生产回归验证):
+        - 更新 `tests/test-oauth-sso-buttons-verification.mjs` 断言：严格验证按钮具备 `justify-center` 居中类，且内部除 1 个品牌矢量 SVG 外无任何额外箭头 SVG；
+        - 重新构建 `temp_login_ui` 与 `mail-vue` 并完成公网生产部署 (`224b5b9f-7c63-4bab-896e-35e21fb767d6`)，运行公网全流程端到端回归核验全部通过。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 登录子应用构建核验：`temp_login_ui` Vite 构建通过 (2.36s, 0 errors)；
+    - [x] 主应用构建核验：`mail-vue` Vite 构建通过 (13.25s, 0 errors)；
+    - [x] 产物同步：`scripts/copy-login-dist.mjs` 同步至 `mail-worker/dist/login` 完成；
+    - [x] 多语言对称核验：`i18n-symmetry.mjs` (2,290 键 100% 绝对对称)；
+    - [x] 本地全场景端到端测试：`tests/test-oauth-sso-buttons-verification.mjs` (35/35 断言全绿通过，100% 通过率，居中与无箭头专项验证通过)；
+    - [x] 公网生产部署核验：Worker 部署至 Cloudflare 生产环境 (`224b5b9f-7c63-4bab-896e-35e21fb767d6`)；
+    - [x] 公网动态切换全真测试：`tests/test-prod-oauth-3rules-live-e2e.mjs` (11/11 项断言全绿通过)；
+    - [x] 零假数据残留：测试临时状态物理归零，TOTP 状态 100% 还原。
+
 ### 第三方快捷登录 3 大显式规则重塑（开启但空密钥=即将上线、开启且配齐=正常激活、未开启/关闭=彻底隐藏）与公网全量端到端交付 (2026-10-03)
 *   **关联提交 (Git Commit)**: `6e47ed05fde976d8bbd815101eabbb27069ff5f5` (Short: `6e47ed0`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com)` (Version ID: `ad76dd6d-fbbf-4add-b1ef-83d48b3a8b91`)
