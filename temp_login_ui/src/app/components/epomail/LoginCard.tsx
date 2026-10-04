@@ -36,6 +36,22 @@ export function LoginCard({ canvasRef, onSwitch, sysConfig }: LoginCardProps) {
     return () => window.removeEventListener("pointermove", onMove);
   }, [px, py, reduceMotion]);
 
+  const isAddAccount = typeof window !== 'undefined' && (
+    new URLSearchParams(window.location.search).get('action') === 'addAccount' ||
+    new URLSearchParams(window.location.search).get('addAccount') === 'true' ||
+    new URLSearchParams(window.location.search).get('addAccount') === '1'
+  );
+
+  const hasOauthButtons = useMemo(() => {
+    if (!sysConfig?.oauthLoginEnabled) return false;
+    let p = sysConfig?.oauthProviders;
+    if (typeof p === 'string') {
+      try { p = JSON.parse(p); } catch (_) { p = {}; }
+    }
+    if (!p || typeof p !== 'object') return false;
+    return Object.values(p).some((item: any) => item && (item.enabled === 1 || item.enabled === true));
+  }, [sysConfig]);
+
   return (
     <div
       className="relative z-10 flex min-h-full items-center justify-center px-5 py-10"
@@ -52,11 +68,11 @@ export function LoginCard({ canvasRef, onSwitch, sysConfig }: LoginCardProps) {
           y: reduceMotion ? 0 : translateY,
           transformStyle: "preserve-3d",
         }}
-        className="relative w-full max-w-[420px]"
+        className="relative w-full max-w-[480px] sm:w-[480px]"
       >
         {/* Acrylic prism block */}
         <div
-          className="relative overflow-hidden rounded-3xl p-8 sm:p-10"
+          className="relative overflow-hidden rounded-3xl p-8 sm:p-10 h-[620px] sm:h-[670px] min-h-[620px] sm:min-h-[670px] max-h-[620px] sm:max-h-[670px] flex flex-col justify-center box-border"
           style={{
             background:
               "linear-gradient(145deg, rgba(16,20,46,0.72), rgba(8,10,26,0.56))",
@@ -88,20 +104,43 @@ export function LoginCard({ canvasRef, onSwitch, sysConfig }: LoginCardProps) {
             }}
           />
 
-          <div className="relative">
+          <div className="relative flex-1 flex flex-col justify-center">
+            {/* Optional back button when adding account */}
+            {isAddAccount && (
+              <div className="absolute top-0 left-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (window.history.length > 1) {
+                      window.history.back();
+                    } else {
+                      window.location.href = '/mail/u/0/#inbox';
+                    }
+                  }}
+                  className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-indigo-400 hover:text-indigo-300 transition-colors cursor-pointer"
+                >
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="19" y1="12" x2="5" y2="12"></line>
+                    <polyline points="12 19 5 12 12 5"></polyline>
+                  </svg>
+                  <span>{tr('backToAccount')}</span>
+                </button>
+              </div>
+            )}
+
             {/* Brand header */}
-            <div className="mb-8 flex flex-col items-center text-center">
+            <div className={`flex flex-col items-center text-center ${hasOauthButtons ? 'mb-3 sm:mb-4' : 'mb-4 sm:mb-5'}`}>
               <img
                 src={`${import.meta.env.BASE_URL}logo.svg`}
                 alt="EpoMail Logo"
-                className="h-16 w-16"
+                className={hasOauthButtons ? "h-14 w-14 sm:h-16 sm:w-16" : "h-16 w-16"}
                 style={{
                   filter:
                     "drop-shadow(0 0 14px rgba(99,102,241,0.45)) drop-shadow(0 6px 18px rgba(124,58,237,0.35))",
                 }}
               />
               <h1
-                className="epomail-display mt-4"
+                className={`epomail-display ${hasOauthButtons ? 'mt-2.5 sm:mt-3' : 'mt-3.5'}`}
                 style={{
                   fontSize: "26px",
                   fontWeight: 600,
@@ -115,10 +154,10 @@ export function LoginCard({ canvasRef, onSwitch, sysConfig }: LoginCardProps) {
                 {sysConfig?.title || "EpoMail"}
               </h1>
               <p
-                className="mt-2 text-[13px]"
+                className="mt-1 text-[12.5px] sm:text-[13px]"
                 style={{ color: "var(--epo-muted)" }}
               >
-                {tr('loginSubtitle')}
+                {isAddAccount ? tr('addAccountSubtitle') : tr('loginSubtitle')}
               </p>
             </div>
 

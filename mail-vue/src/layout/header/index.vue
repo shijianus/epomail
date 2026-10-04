@@ -120,16 +120,18 @@
             <div class="am-item" @click="openSettings"><span>{{ $t('settings') }}</span></div>
             <div class="am-item logout" @click="clickLogout"><span>{{ $t('logOut') }}</span></div>
 
-            <!-- Footer: Horizontal, directly aligned with Gmail format -->
+            <!-- Footer: Legal links -->
             <div class="gac-footer">
+              <span class="gac-legal-item" @click.prevent="openProjectIntro">{{ $t('projectIntro') }}</span>
+              <span class="gac-legal-separator">·</span>
               <span class="gac-legal-item" @click.prevent="openPrivacyPolicy">{{ $t('privacyPolicy') }}</span>
               <span class="gac-legal-separator">·</span>
               <span class="gac-legal-item" @click.prevent="openTermsOfService">{{ $t('termsOfService') }}</span>
             </div>
           </div>
 
-          <!-- Multi-Account Mode (Admin Enabled): Gmail format with individual gac-ma-card -->
-          <div v-else class="user-details account-menu open gmail-account-card gac-multi-account-container" @mouseenter="clearCloseTimer" @mouseleave="startCloseTimer">
+          <!-- Multi-Account Mode (Admin Enabled) -->
+          <div v-else class="user-details account-menu open epo-account-card gac-multi-account-container" @mouseenter="clearCloseTimer" @mouseleave="startCloseTimer">
             <!-- Top Bar with Close X -->
             <div class="gac-top-bar">
               <div class="gac-top-spacer"></div>
@@ -166,7 +168,7 @@
               <!-- Other accounts (max 4, clicking switches to become primary account) -->
               <div 
                 v-for="acc in otherAccounts" 
-                :key="acc.accountId || acc.email"
+                :key="acc.isSession ? `session-${acc.u}` : (acc.accountId || acc.email)"
                 class="gac-ma-card other-account-card"
                 @click="switchAccount(acc)"
                 :title="$t('switchAccount')"
@@ -183,7 +185,7 @@
               </div>
 
               <!-- Vertical Add Account Card -->
-              <div class="gac-ma-card gac-ma-action-card add-account-card" @click="openAddAccountDialog">
+              <div class="gac-ma-card gac-ma-action-card add-account-card" @click="openAddAccount">
                 <div class="gac-action-icon">
                   <Icon icon="lucide:user-plus" width="16" height="16" />
                 </div>
@@ -225,8 +227,10 @@
               </div>
             </div>
 
-            <!-- Footer: Horizontal, directly aligned with Gmail format -->
+            <!-- Footer: Legal links -->
             <div class="gac-footer">
+              <span class="gac-legal-item" @click.prevent="openProjectIntro">{{ $t('projectIntro') }}</span>
+              <span class="gac-legal-separator">·</span>
               <span class="gac-legal-item" @click.prevent="openPrivacyPolicy">{{ $t('privacyPolicy') }}</span>
               <span class="gac-legal-separator">·</span>
               <span class="gac-legal-item" @click.prevent="openTermsOfService">{{ $t('termsOfService') }}</span>
@@ -284,12 +288,14 @@ import hanburger from '@/components/hamburger/index.vue'
 import {logout} from "@/request/login.js";
 import {updateProfile, getUserStorage} from "@/request/my.js";
 import {accountList} from "@/request/account.js";
+import {ElMessage} from "element-plus";
 import {Icon} from "@iconify/vue";
 import {useUiStore} from "@/store/ui.js";
 import {useUserStore} from "@/store/user.js";
 import {useAccountStore} from "@/store/account.js";
 import {useEmailStore} from "@/store/email.js";
 import {userDraftStore} from "@/store/draft.js";
+import {getRoleGroupSlug} from "@/utils/role-utils.js";
 
 function openAccountDetails() {
   if (userinfoRef.value && userinfoRef.value.handleClose) {
@@ -315,6 +321,7 @@ function openSettings() {
   }
   router.push('/settings/profile')
 }
+
 
 function highlightTextOnPage(keyword) {
   if (typeof CSS === 'undefined' || !CSS.highlights) return;
@@ -495,11 +502,13 @@ const storageFillWidth = computed(() => {
   return Math.min(98, Math.max(0, storageData.usedPercentage));
 });
 
-// Multi-account mode flag:
-// "当且仅当管理员设定支援多账户模式时，开源完全学习Gmail的这套添加账户的方框模式，直接完全学习Gmail的方式，默认关闭时保持当前的情况"
+// Multi-account mode flag
 const isMultiAccountEnabled = computed(() => {
   if (Number(settingStore.settings?.multiAccountEnabled) === 1) return true;
   try {
+    if (Number(localStorage.getItem('multiAccountEnabled')) === 1) {
+      return true;
+    }
     const raw = localStorage.getItem('setting');
     if (raw) {
       const parsed = JSON.parse(raw);
@@ -507,8 +516,12 @@ const isMultiAccountEnabled = computed(() => {
         return true;
       }
     }
-    if (Number(localStorage.getItem('multiAccountEnabled')) === 1) {
-      return true;
+    const sessionsRaw = localStorage.getItem('epo_sessions');
+    if (sessionsRaw) {
+      const sessions = JSON.parse(sessionsRaw);
+      if (Array.isArray(sessions) && sessions.length > 1) {
+        return true;
+      }
     }
   } catch (e) {}
   return false;
@@ -529,29 +542,82 @@ const otherAccounts = ref([]);
 
 async function loadOtherAccounts() {
   if (!isMultiAccountEnabled.value) return;
+  const others = [];
+  const currentEmail = (displayEmail.value || '').toLowerCase().trim();
+  let currentU = 0;
+  try {
+    const urlMatch = window.location.pathname.match(/\/mail\/u\/(\d+)/);
+    currentU = urlMatch ? parseInt(urlMatch[1], 10) : 0;
+    const raw = localStorage.getItem('epo_sessions');
+    if (raw) {
+      const sessions = JSON.parse(raw);
+      if (Array.isArray(sessions)) {
+        for (const s of sessions) {
+          if (s.u !== currentU && s.token && s.email) {
+            const sEmail = s.email.toLowerCase().trim();
+            if (sEmail !== currentEmail && !others.some(o => o.email.toLowerCase().trim() === sEmail)) {
+              others.push({
+                isSession: true,
+                u: s.u,
+                email: s.email,
+                name: s.name || s.email,
+                roleName: s.roleName || ''
+              });
+            }
+          }
+        }
+      }
+    }
+  } catch (e) {}
+
   try {
     const list = await accountList(0, 30);
     if (Array.isArray(list)) {
       const currId = accountStore.currentAccountId;
-      const currEmail = (displayEmail.value || '').toLowerCase().trim();
-      let filtered = list.filter(a => {
+      for (const a of list) {
         const isSameId = a.accountId && currId && a.accountId === currId;
-        const isSameEmail = a.email && currEmail && a.email.toLowerCase().trim() === currEmail;
-        return !isSameId && !isSameEmail;
-      });
-      // "界面最多可以容纳5个Gmail账户(超出的需要登出旧的采纳新加入)"
-      // 1 active account + max 4 other accounts = 5 total
-      if (filtered.length > 4) {
-        filtered = filtered.slice(0, 4);
+        const aEmail = (a.email || '').toLowerCase().trim();
+        if (!isSameId && aEmail && aEmail !== currentEmail && !others.some(o => o.email.toLowerCase().trim() === aEmail)) {
+          others.push({
+            isSession: false,
+            accountId: a.accountId,
+            email: a.email,
+            name: a.name || a.email
+          });
+        }
       }
-      otherAccounts.value = filtered;
     }
   } catch (err) {
     console.warn('Failed to load other accounts:', err);
   }
+
+  // Max 4 other accounts displayed (1 active account + max 4 other accounts = 5 total)
+  if (others.length > 4) {
+    otherAccounts.value = others.slice(0, 4);
+  } else {
+    otherAccounts.value = others;
+  }
 }
 
 function switchAccount(acc) {
+  closeDropdown();
+  if (acc.isSession) {
+    try {
+      const rawSessions = localStorage.getItem('epo_sessions');
+      if (rawSessions) {
+        const sessions = JSON.parse(rawSessions);
+        const targetS = sessions.find(s => s.u === acc.u);
+        if (targetS && targetS.token) {
+          localStorage.setItem('token', targetS.token);
+          if (targetS.email) {
+            localStorage.setItem('loginEmail', targetS.email);
+          }
+        }
+      }
+    } catch (_) {}
+    window.location.href = `/mail/u/${acc.u}/#inbox`;
+    return;
+  }
   accountStore.currentAccountId = acc.accountId;
   accountStore.currentAccount = acc;
   if (acc.email) {
@@ -561,7 +627,6 @@ function switchAccount(acc) {
       userStore.user.email = acc.email;
     }
   }
-  closeDropdown();
   loadOtherAccounts();
   ElMessage.success((t('switchAccount') || '切换账号') + ': ' + (acc.name || acc.email));
 }
@@ -591,29 +656,40 @@ function openStorageSettings() {
   setTimeout(triggerScroll, 1200);
 }
 
-function openAddAccountDialog() {
+function openAddAccount() {
   closeDropdown();
-  router.push('/settings/account');
+  if (Number(settingStore.settings?.addEmail) === 1) {
+    ElMessage.warning(t('adminDisabledAddEmail') || '管理员已暂停开放新增邮箱');
+    return;
+  }
+  let targetU = 1;
+  try {
+    const rawSessions = localStorage.getItem('epo_sessions');
+    const sessions = rawSessions ? JSON.parse(rawSessions) : [];
+    const existingUs = new Set(sessions.map(s => s.u));
+    while (existingUs.has(targetU)) {
+      targetU++;
+    }
+  } catch (_) {}
+  window.location.href = `/login/?action=addAccount&u=${targetU}`;
+}
+
+function openProjectIntro() {
+  closeDropdown();
+  const extUrl = settingStore.settings?.projectUrl || 'https://epomail-docs.pages.dev/epomail/en/mail/overview/';
+  window.open(extUrl, '_blank', 'noopener,noreferrer');
 }
 
 function openPrivacyPolicy() {
   closeDropdown();
-  const extUrl = settingStore.settings?.privacyUrl;
-  if (extUrl && typeof extUrl === 'string' && extUrl.startsWith('http')) {
-    window.open(extUrl, '_blank', 'noopener,noreferrer');
-  } else {
-    privacyDialogVisible.value = true;
-  }
+  const extUrl = settingStore.settings?.privacyUrl || 'https://epomail-docs.pages.dev/epomail/en/mail/privacy-policy/';
+  window.open(extUrl, '_blank', 'noopener,noreferrer');
 }
 
 function openTermsOfService() {
   closeDropdown();
-  const extUrl = settingStore.settings?.termsUrl;
-  if (extUrl && typeof extUrl === 'string' && extUrl.startsWith('http')) {
-    window.open(extUrl, '_blank', 'noopener,noreferrer');
-  } else {
-    termsDialogVisible.value = true;
-  }
+  const extUrl = settingStore.settings?.termsUrl || 'https://epomail-docs.pages.dev/epomail/en/mail/terms-of-service/';
+  window.open(extUrl, '_blank', 'noopener,noreferrer');
 }
 
 function onDropdownVisibleChange(visible) {
@@ -694,7 +770,15 @@ function triggerAllEmailSearch() {
 }
 
 const isSettingsMode = computed(() => {
-  return ['user-profile', 'profile', 'general-setting', 'profile-setting', 'setting', 'data-setting', 'label-setting', 'category-setting', 'sys-setting', 'analysis', 'user', 'all-email', 'role', 'reg-key'].includes(route.name)
+  const name = route.name;
+  const path = route.path || '';
+  if (path.startsWith('/manage') || path.startsWith('/admin') || path.startsWith('/settings')) return true;
+  return [
+    'user-profile', 'profile', 'general-setting', 'profile-setting', 'setting', 'data-setting', 'label-setting',
+    'manage-root', 'manage-role-root', 'admin-root',
+    'manage-analysis', 'manage-users', 'manage-mail', 'manage-roles', 'manage-reg-keys', 'manage-system', 'manage-apps', 'manage-rules',
+    'category-setting', 'analysis', 'user', 'all-email', 'role', 'reg-key', 'sys-setting', 'oauth-app'
+  ].includes(name);
 })
 
 const settingsMap = computed(() => [
@@ -750,29 +834,6 @@ const settingsMap = computed(() => [
     ]
   },
   {
-    route: 'sys-setting',
-    title: t('SystemSettings') || 'System Settings',
-    items: [
-      { text: t('websiteSetting') || 'Website Settings', id: 'websiteSetting' },
-      { text: t('loginDomain') || 'Login Domain', id: 'loginDomain' },
-      { text: t('regKey') || 'Registration Key', id: 'regKey' },
-      { text: t('addAccount') || 'Add Account', id: 'addAccount' },
-
-      { text: t('emailPrefix') || 'Email Prefix', id: 'emailPrefix' },
-      { text: t('customization') || 'Customization', id: 'customization' },
-      { text: t('emailSetting') || 'Email Settings', id: 'emailSetting' },
-      { text: t('autoRefresh') || 'Auto Refresh', id: 'autoRefresh' },
-      { text: t('storageSetting') || 'Storage Settings', id: 'storageSetting' }
-    ]
-  },
-  {
-    route: 'category-setting',
-    title: t('categorySetting') || 'Category Settings',
-    items: [
-      { text: t('categorySetting') || 'Categories', id: 'category' }
-    ]
-  },
-  {
     route: 'label-setting',
     title: t('labelSetting') || 'Label Settings',
     items: [
@@ -783,38 +844,75 @@ const settingsMap = computed(() => [
     ]
   },
   {
-    route: 'analysis',
+    route: 'manage-system',
+    perm: 'setting:query',
+    title: t('SystemSettings') || 'System Settings',
+    items: [
+      { text: t('websiteSetting') || 'Website Settings', id: 'websiteSetting' },
+      { text: t('loginDomain') || 'Login Domain', id: 'loginDomain' },
+      { text: t('regKey') || 'Registration Key', id: 'regKey' },
+      { text: t('addAccount') || 'Add Account', id: 'addAccount' },
+      { text: t('emailPrefix') || 'Email Prefix', id: 'emailPrefix' },
+      { text: t('customization') || 'Customization', id: 'customization' },
+      { text: t('emailSetting') || 'Email Settings', id: 'emailSetting' },
+      { text: t('autoRefresh') || 'Auto Refresh', id: 'autoRefresh' },
+      { text: t('storageSetting') || 'Storage Settings', id: 'storageSetting' }
+    ]
+  },
+  {
+    route: 'manage-rules',
+    perm: 'setting:query',
+    title: t('categorySetting') || 'Category Settings',
+    items: [
+      { text: t('categorySetting') || 'Categories', id: 'category' }
+    ]
+  },
+  {
+    route: 'manage-analysis',
+    perm: 'analysis:query',
     title: t('analytics') || 'Analytics',
     items: [
       { text: t('analytics') || 'Data Analytics', id: 'analysis' }
     ]
   },
   {
-    route: 'user',
+    route: 'manage-users',
+    perm: 'user:query',
     title: t('allUsers') || 'All Users',
     items: [
       { text: t('allUsers') || 'User Management', id: 'user' }
     ]
   },
   {
-    route: 'all-email',
+    route: 'manage-mail',
+    perm: 'all-email:query',
     title: t('allMail') || 'All Mail',
     items: [
       { text: t('allMail') || 'All Mail Management', id: 'all-email' }
     ]
   },
   {
-    route: 'role',
+    route: 'manage-roles',
+    perm: 'role:query',
     title: t('permissions') || 'Permissions',
     items: [
       { text: t('permissions') || 'Role Permissions', id: 'role' }
     ]
   },
   {
-    route: 'reg-key',
+    route: 'manage-reg-keys',
+    perm: 'reg-key:query',
     title: t('inviteCode') || 'Invite Code',
     items: [
       { text: t('inviteCode') || 'Registration Key', id: 'reg-key' }
+    ]
+  },
+  {
+    route: 'manage-apps',
+    perm: 'setting:query',
+    title: t('oauthApps') || 'OAuth Apps',
+    items: [
+      { text: t('oauthApps') || 'OAuth Apps Management', id: 'oauth-app' }
     ]
   }
 ])
@@ -858,7 +956,14 @@ const settingsSearchResults = computed(() => {
   const appPrefixMatch = cleanKeyword.match(/^(app:|oauth:|client:)\s*(.*)/i);
   const targetAppQuery = appPrefixMatch ? appPrefixMatch[2].trim() : '';
 
-  return settingsMap.value.map(group => {
+  // 严格基于当前用户实际权限进行前置安全过滤，未授权路由绝不向用户呈现，彻底杜绝 404
+  const accessibleGroups = settingsMap.value.filter(group => {
+    if (group.perm && !hasPerm(group.perm)) return false;
+    if (group.route === 'all-email' && Number(settingStore.settings?.allMailMode) === 2) return false;
+    return true;
+  });
+
+  return accessibleGroups.map(group => {
     const matchedItems = group.items.filter(item => {
       if (appPrefixMatch) {
         if (item.id === 'thirdPartyApps') {
@@ -915,8 +1020,19 @@ function highlightSetting(text) {
 
 function goToSetting(routeName, itemId) {
   searchFocus.value = false;
+  // 防御性校验：若路由未在当前应用上下文注册，绝不执行跳转，杜绝 404
+  if (!router.hasRoute(routeName)) {
+    ElMessage.warning(t('noPermAccountAdd') || '功能不可用或无权访问');
+    return;
+  }
+  const isManage = routeName.startsWith('manage-');
+  const roleGroup = getRoleGroupSlug(userStore.user);
+  const targetLocation = isManage
+    ? { name: routeName, params: { roleGroup }, hash: itemId ? `#${itemId}` : undefined }
+    : { name: routeName, hash: itemId ? `#${itemId}` : undefined };
+
   if (route.name !== routeName) {
-    router.push({ name: routeName, hash: itemId ? `#${itemId}` : undefined });
+    router.push(targetLocation);
     if (itemId) {
       setTimeout(() => {
         const el = document.getElementById(itemId);
@@ -1184,6 +1300,7 @@ function clickLogout() {
   const finalizeLogout = () => {
     localStorage.removeItem("token")
     localStorage.removeItem("ui")
+    localStorage.removeItem("epo_sessions")
     try {
       sessionStorage.clear()
     } catch (_) {}
@@ -1385,7 +1502,9 @@ function formatName(email) {
   background: rgba(239, 68, 68, 0.08);
 }
 
-/* Multi-Account Gmail Pattern */
+
+
+/* Multi-Account Container Pattern */
 .gac-multi-account-container {
   padding: 10px 14px 14px;
   display: flex;
@@ -1598,7 +1717,7 @@ function formatName(email) {
   box-shadow: 0 2px 8px rgba(99, 102, 241, 0.12);
 }
 
-/* Footer: Horizontal, directly aligned with Gmail format */
+/* Footer: Horizontal legal links */
 .gac-footer {
   border-top: 1px solid var(--border-subtle);
   background: var(--bg-subtle);
@@ -2004,6 +2123,7 @@ button.mobile-menu-btn {
   color: var(--text-muted);
   font-size: 14px;
 }
+
 </style>
 <style>
 ::highlight(search-highlight) {

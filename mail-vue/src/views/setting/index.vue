@@ -3,7 +3,7 @@
     <!-- Section 1: Account Security Information -->
     <div class="container">
       <div class="title">{{ $t('securitySetting') }}</div>
-      <div class="item">
+      <div class="item" id="username">
         <div>{{ $t('username') }}</div>
         <div>
           <span v-if="setNameShow" class="edit-name-input">
@@ -20,11 +20,11 @@
           </span>
         </div>
       </div>
-      <div class="item">
+      <div class="item" id="emailAccount">
         <div>{{ $t('emailAccount') }}</div>
         <div>{{ userStore.user.email }}</div>
       </div>
-      <div class="item">
+      <div class="item" id="password">
         <div>{{ $t('password') }}</div>
         <div style="display: flex; align-items: center; gap: 16px;">
           <el-button type="primary" @click="pwdShow = true">{{ $t('changePwdBtn') }}</el-button>
@@ -34,7 +34,7 @@
     </div>
 
     <!-- Section 2: Google-Style 2-Step Verification Center -->
-    <div class="container two-factor-center" v-if="totpStatus.globalEnabled">
+    <div class="container two-factor-center" id="totp" v-if="totpStatus.globalEnabled">
       <div class="title">{{ $t('twoFactorCenter') }}</div>
 
       <!-- Hero Status Banner -->
@@ -109,21 +109,41 @@
                 {{ $t('authenticatorAppDesc') }}
               </div>
             </div>
-            <div class="method-action">
+            <div class="method-action dual-actions">
+              <template v-if="totpStatus.totpConfigured">
+                <el-button
+                  size="default"
+                  plain
+                  :loading="totpLoading"
+                  @click="startTotpSetup"
+                >
+                  <Icon icon="fluent:arrow-sync-16-regular" width="14" height="14" style="margin-right: 4px;" />
+                  {{ $t('updateTotpBtn') }}
+                </el-button>
+                <el-button
+                  size="default"
+                  type="danger"
+                  plain
+                  @click="openDisableTotpModal"
+                >
+                  <Icon icon="lucide:trash-2" width="14" height="14" style="margin-right: 4px;" />
+                  {{ $t('deleteTotpBtn') }}
+                </el-button>
+              </template>
               <el-button
+                v-else
                 size="default"
-                :type="totpStatus.totpConfigured ? 'default' : 'primary'"
-                :plain="!totpStatus.totpConfigured"
+                type="primary"
                 :loading="totpLoading"
                 @click="startTotpSetup"
               >
-                {{ totpStatus.totpConfigured ? ($t('reconfigure')) : ($t('turnOn2FA')) }}
+                {{ $t('turnOn2FA') }}
               </el-button>
             </div>
           </div>
 
           <!-- Method 2: Backup Recovery Codes -->
-          <div class="method-item">
+          <div class="method-item" id="backupCodes">
             <div class="method-icon-box backup-icon-box">
               <Icon icon="fluent:password-24-regular" width="22" height="22" />
             </div>
@@ -163,7 +183,7 @@
           </div>
 
           <!-- Method 3: Passkeys & Security Keys (WebAuthn / FIDO2) -->
-          <div class="method-item passkey-section-item">
+          <div class="method-item passkey-section-item" id="passkeys">
             <div class="method-main-row">
               <div class="method-icon-box passkey-icon-box">
                 <Icon icon="fluent:shield-keyhole-24-regular" width="22" height="22" />
@@ -200,13 +220,67 @@
                 class="passkey-row"
               >
                 <div class="passkey-info">
-                  <Icon icon="fluent:usb-plug-20-regular" width="18" height="18" class="key-icon" />
+                  <Icon icon="fluent:laptop-shield-20-regular" width="20" height="20" class="key-icon" />
                   <div class="passkey-details">
-                    <span class="passkey-name">{{ key.name }}</span>
-                    <span class="passkey-date">{{ $t('tabRegisteredAt') }}: {{ formatDate(key.createdAt) }}</span>
+                    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                      <span class="passkey-name" style="font-weight: 600;">{{ key.name }}</span>
+                      <!-- Initial Device Badge -->
+                      <el-tag v-if="key.isInitialDevice" size="small" type="success" effect="plain" round>
+                        {{ $t('initialDeviceBadge') }}
+                      </el-tag>
+                      <!-- Status Badge -->
+                      <el-tag v-if="key.status === 'active'" size="small" type="success" effect="light" round>
+                        {{ $t('passkeyStatusActive') }}
+                      </el-tag>
+                      <el-tag v-else-if="key.status === 'pending_verification'" size="small" type="warning" effect="light" round>
+                        {{ $t('passkeyStatusTimelocked', { days: key.timelockRemainingDays }) }}
+                      </el-tag>
+                    </div>
+                    <div class="passkey-date" style="font-size: 12px; color: var(--el-text-color-secondary); margin-top: 3px;">
+                      <span>{{ $t('tabRegisteredAt') }}: {{ formatDate(key.createdAt) }}</span>
+                      <span v-if="key.verifiedAt && !key.isInitialDevice" style="margin-left: 12px;">{{ $t('passkeyApprovedAt') }}: {{ formatDate(key.verifiedAt) }}</span>
+                    </div>
                   </div>
                 </div>
-                <div class="passkey-actions">
+                <div class="passkey-actions" style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                  <!-- Test Button -->
+                  <el-button
+                    type="primary"
+                    text
+                    size="small"
+                    :loading="testingKeyId === key.id"
+                    @click="handleTestPasskey(key)"
+                  >
+                    <Icon icon="fluent:play-circle-16-regular" width="16" height="16" style="margin-right: 4px;" />
+                    {{ $t('testPasskeyBtn') }}
+                  </el-button>
+
+                  <!-- Approve via TOTP button if pending -->
+                  <el-button
+                    v-if="key.status === 'pending_verification' && totpStatus.totpConfigured"
+                    type="primary"
+                    size="small"
+                    plain
+                    @click="openApprovePasskeyModal(key)"
+                  >
+                    <Icon icon="fluent:shield-checkmark-16-regular" width="14" height="14" style="margin-right: 4px;" />
+                    {{ $t('approvePasskeyBtn') }}
+                  </el-button>
+
+                  <!-- Manually activate if 30 days timelock expired -->
+                  <el-button
+                    v-if="key.status === 'pending_verification' && key.canActivateNow"
+                    type="success"
+                    size="small"
+                    plain
+                    :loading="activatingKeyId === key.id"
+                    @click="handleActivateTimelock(key)"
+                  >
+                    <Icon icon="fluent:checkmark-circle-16-regular" width="14" height="14" style="margin-right: 4px;" />
+                    {{ $t('activatePasskeyNowBtn') }}
+                  </el-button>
+
+                  <!-- Delete Button -->
                   <el-button
                     type="danger"
                     text
@@ -227,7 +301,7 @@
     </div>
 
     <!-- Section 3: Account Deletion -->
-    <div class="container del-email" v-perm="'my:delete'">
+    <div class="container del-email" id="deleteUser" v-perm="'my:delete'">
       <div class="title">{{ $t('deleteUser') }}</div>
       <div class="del-msg">
         {{ $t('delAccountMsg') }}
@@ -470,16 +544,23 @@
       width="440px"
       destroy-on-close
     >
-      <div class="add-passkey-content">
+      <div class="add-passkey-content" style="display: flex; flex-direction: column; gap: 16px;">
         <div class="dialog-sub-desc">
           {{ $t('passkeysDesc') }}
         </div>
+
+        <div v-if="detectedPlatformName" class="platform-hint-box" style="background: rgba(59, 130, 246, 0.08); border-left: 3px solid #3b82f6; padding: 10px 12px; border-radius: 4px; font-size: 13px; color: var(--el-text-color-regular); line-height: 1.5; display: flex; align-items: center; gap: 8px;">
+          <Icon icon="fluent:laptop-shield-20-regular" width="18" height="18" style="color: #3b82f6; flex-shrink: 0;" />
+          <span>{{ $t('detectedPlatformPrefix') }}: <strong>{{ detectedPlatformName }}</strong> ({{ $t('saveToLocalDeviceHint') }})</span>
+        </div>
+
         <div class="key-name-field">
-          <span class="field-label">{{ $t('securityKeyName') }}</span>
+          <span class="field-label" style="display: block; font-size: 13px; font-weight: 500; margin-bottom: 6px;">{{ $t('securityKeyName') }}</span>
           <el-input
             v-model="newPasskeyName"
             :placeholder="$t('securityKeyNamePlaceholder')"
             maxlength="40"
+            autofocus
             @keyup.enter="handleCreatePasskey"
           />
         </div>
@@ -489,6 +570,35 @@
           <el-button @click="addPasskeyDialogVisible = false">{{ $t('cancel') }}</el-button>
           <el-button type="primary" :loading="passkeyLoading" @click="handleCreatePasskey">
             {{ $t('continue') }}
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
+
+    <!-- Approve Passkey via TOTP Modal -->
+    <el-dialog
+      v-model="approveDialogVisible"
+      :title="$t('approvePasskeyModalTitle')"
+      width="400px"
+      destroy-on-close
+    >
+      <div class="approve-modal-content" style="display: flex; flex-direction: column; gap: 14px;">
+        <div class="dialog-sub-desc">
+          {{ $t('approvePasskeyModalDesc') }}
+        </div>
+        <el-input
+          v-model="approveTotpCode"
+          maxlength="6"
+          :placeholder="$t('totpCodePlaceholder')"
+          autofocus
+          @keyup.enter="submitApprovePasskey"
+        />
+      </div>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="approveDialogVisible = false">{{ $t('cancel') }}</el-button>
+          <el-button type="primary" :loading="approveLoading" @click="submitApprovePasskey">
+            {{ $t('confirmApproveBtn') }}
           </el-button>
         </div>
       </template>
@@ -547,7 +657,12 @@ import {
   getPasskeySetup,
   registerPasskey,
   getPasskeyList,
-  deletePasskey
+  deletePasskey,
+  updateTotp,
+  approvePasskeyWithTotp,
+  activateTimelockedPasskey,
+  getPasskeyTestOptions,
+  verifyPasskeyTest
 } from "@/request/my.js";
 import { useUserStore } from "@/store/user.js";
 import { useSettingStore } from "@/store/setting.js";
@@ -617,6 +732,13 @@ const passkeyList = ref([])
 const addPasskeyDialogVisible = ref(false)
 const newPasskeyName = ref('')
 const passkeyLoading = ref(false)
+const detectedPlatformName = ref('')
+const testingKeyId = ref(null)
+const activatingKeyId = ref(null)
+const approveDialogVisible = ref(false)
+const approvingKey = ref(null)
+const approveTotpCode = ref('')
+const approveLoading = ref(false)
 
 const setupDialogVisible = ref(false)
 const setupStep = ref(1)
@@ -943,10 +1065,31 @@ function base64UrlToBuffer(base64url) {
   return bytes;
 }
 
+const detectPlatformDisplayName = () => {
+  const ua = (typeof navigator !== 'undefined' && navigator.userAgent) || '';
+  if (/Windows/i.test(ua)) return t('keyNameWindowsHello');
+  if (/Macintosh|Mac OS/i.test(ua)) return t('keyNameMacTouchId');
+  if (/iPhone|iPad/i.test(ua)) return t('keyNameAppleIos');
+  if (/Android/i.test(ua)) return t('keyNameAndroid');
+  if (/Linux/i.test(ua)) return t('keyNameLinux');
+  return t('saveToLocalDeviceHint') || t('keyNameDefault');
+};
+
+const detectDefaultKeyName = () => {
+  const ua = (typeof navigator !== 'undefined' && navigator.userAgent) || '';
+  if (/Windows/i.test(ua)) return t('keyNameWindowsHello');
+  if (/Macintosh|Mac OS/i.test(ua)) return t('keyNameMacTouchId');
+  if (/iPhone|iPad/i.test(ua)) return t('keyNameAppleIos');
+  if (/Android/i.test(ua)) return t('keyNameAndroid');
+  if (/Linux/i.test(ua)) return t('keyNameLinux');
+  return t('keyNameDefault');
+};
+
 const openAddPasskeyModal = () => {
-  newPasskeyName.value = '';
+  newPasskeyName.value = detectDefaultKeyName();
+  detectedPlatformName.value = detectPlatformDisplayName();
   addPasskeyDialogVisible.value = true;
-}
+};
 
 const handleCreatePasskey = async () => {
   if (!window.PublicKeyCredential) {
@@ -966,29 +1109,90 @@ const handleCreatePasskey = async () => {
     }
 
     const challengeBytes = base64UrlToBuffer(setupData.challenge);
-    const userIdBytes = new TextEncoder().encode(setupData.user.id);
-
-    const credential = await navigator.credentials.create({
-      publicKey: {
-        challenge: challengeBytes,
-        rp: setupData.rp,
-        user: {
-          id: userIdBytes,
-          name: setupData.user.name,
-          displayName: setupData.user.displayName
-        },
-        pubKeyCredParams: setupData.pubKeyCredParams || [
-          { type: 'public-key', alg: -7 },
-          { type: 'public-key', alg: -257 }
-        ],
-        authenticatorSelection: setupData.authenticatorSelection || {
-          userVerification: 'preferred',
-          residentKey: 'preferred'
-        },
-        timeout: setupData.timeout || 60000,
-        attestation: 'none'
+    let userIdBytes;
+    try {
+      userIdBytes = base64UrlToBuffer(setupData.user.id);
+      if (userIdBytes.length < 16) {
+        const padded = new Uint8Array(32);
+        padded.set(userIdBytes);
+        userIdBytes = padded;
       }
-    });
+    } catch (e) {
+      userIdBytes = new TextEncoder().encode(setupData.user.id || 'epomail_uid');
+      if (userIdBytes.length < 16) {
+        const padded = new Uint8Array(32);
+        padded.set(userIdBytes);
+        userIdBytes = padded;
+      }
+    }
+
+    const currentHost = window.location.hostname;
+    let effectiveRpId = setupData.rp?.id;
+    if (!effectiveRpId || (effectiveRpId !== currentHost && !currentHost.endsWith('.' + effectiveRpId))) {
+      effectiveRpId = currentHost;
+    }
+
+    const authSelection = {
+      residentKey: 'required',
+      requireResidentKey: true,
+      userVerification: 'required',
+      authenticatorAttachment: 'platform',
+      ...(setupData.authenticatorSelection || {})
+    };
+
+    let credential;
+    try {
+      // First attempt: create with backend-configured platform authenticator (saves to local device)
+      credential = await navigator.credentials.create({
+        publicKey: {
+          challenge: challengeBytes,
+          rp: {
+            name: setupData.rp?.name || 'EpoCanvas Mail',
+            id: effectiveRpId
+          },
+          user: {
+            id: userIdBytes,
+            name: setupData.user.name,
+            displayName: setupData.user.displayName
+          },
+          pubKeyCredParams: setupData.pubKeyCredParams || [
+            { type: 'public-key', alg: -7 },   // ES256
+            { type: 'public-key', alg: -257 }, // RS256
+            { type: 'public-key', alg: -37 },  // PS256 (Windows Hello)
+            { type: 'public-key', alg: -8 }    // Ed25519
+          ],
+          authenticatorSelection: authSelection,
+          timeout: setupData.timeout || 60000,
+          attestation: 'none'
+        }
+      });
+    } catch (createErr) {
+      // Graceful fallback: If platform attachment failed because machine has no local platform authenticator
+      if (authSelection.authenticatorAttachment === 'platform' && createErr.name === 'NotSupportedError') {
+        const fallbackAuthSelection = { ...authSelection };
+        delete fallbackAuthSelection.authenticatorAttachment;
+        credential = await navigator.credentials.create({
+          publicKey: {
+            challenge: challengeBytes,
+            rp: {
+              name: setupData.rp?.name || 'EpoCanvas Mail',
+              id: effectiveRpId
+            },
+            user: {
+              id: userIdBytes,
+              name: setupData.user.name,
+              displayName: setupData.user.displayName
+            },
+            pubKeyCredParams: setupData.pubKeyCredParams,
+            authenticatorSelection: fallbackAuthSelection,
+            timeout: setupData.timeout || 60000,
+            attestation: 'none'
+          }
+        });
+      } else {
+        throw createErr;
+      }
+    }
 
     if (!credential) {
       throw new Error('Passkey creation cancelled');
@@ -999,7 +1203,7 @@ const handleCreatePasskey = async () => {
     const credentialId = bufferToBase64Url(credential.rawId);
     const transports = credential.response.getTransports ? credential.response.getTransports() : [];
 
-    await registerPasskey({
+    const regResult = await registerPasskey({
       name: newPasskeyName.value || 'Security Key',
       credentialId,
       clientDataJSON,
@@ -1007,19 +1211,40 @@ const handleCreatePasskey = async () => {
       transports
     });
 
-    ElMessage({
-      message: t('passkeyRegisterSuccess') || 'Security key added successfully!',
-      type: 'success',
-      plain: true
-    });
+    if (regResult && regResult.status === 'pending_verification') {
+      ElMessage({
+        message: t('passkeyRegisterTimelockedNotice') || '通行密钥已创建！由于这是新设备，密钥已进入 30 天安全观察期，您可以通过已有身份验证器立即核准生效。',
+        type: 'warning',
+        duration: 5000,
+        plain: true
+      });
+    } else {
+      ElMessage({
+        message: t('passkeyRegisterSuccess') || '通行密钥添加成功！已保存在本地设备。',
+        type: 'success',
+        plain: true
+      });
+    }
 
     addPasskeyDialogVisible.value = false;
     await fetchTotpStatus();
     await fetchPasskeys();
   } catch (err) {
-    if (err.name !== 'NotAllowedError') {
+    if (err.name === 'NotAllowedError') {
       ElMessage({
-        message: err.message || 'Failed to register security key',
+        message: t('passkeyOperationCancelledOrNotAllowed') || '操作已取消或设备暂未就绪。请确认已设置系统 PIN/生物识别（如 Windows Hello）后重试。',
+        type: 'info',
+        plain: true
+      });
+    } else if (err.name === 'InvalidStateError') {
+      ElMessage({
+        message: t('passkeyAlreadyRegistered') || '该设备或安全密钥已在此账号注册，无需重复添加。',
+        type: 'warning',
+        plain: true
+      });
+    } else {
+      ElMessage({
+        message: err.message || t('passkeyRegisterFailed') || '安全密钥注册失败，请重试',
         type: 'error',
         plain: true
       });
@@ -1027,7 +1252,138 @@ const handleCreatePasskey = async () => {
   } finally {
     passkeyLoading.value = false;
   }
-}
+};
+
+const handleTestPasskey = async (key) => {
+  if (!window.PublicKeyCredential) {
+    ElMessage({
+      message: t('passkeyUnsupported') || 'WebAuthn is not supported in this browser',
+      type: 'warning',
+      plain: true
+    });
+    return;
+  }
+
+  testingKeyId.value = key.id;
+  try {
+    const res = await getPasskeyTestOptions(key.id);
+    if (!res || !res.challenge) {
+      throw new Error('Failed to obtain challenge');
+    }
+
+    const challengeBytes = base64UrlToBuffer(res.challenge);
+    const allowCreds = (res.allowCredentials || []).map(c => ({
+      id: base64UrlToBuffer(c.id),
+      type: 'public-key'
+    }));
+
+    const assertion = await navigator.credentials.get({
+      publicKey: {
+        challenge: challengeBytes,
+        rpId: res.rpId || window.location.hostname,
+        allowCredentials: allowCreds,
+        userVerification: 'preferred',
+        timeout: 60000
+      }
+    });
+
+    if (!assertion) {
+      throw new Error('Test cancelled');
+    }
+
+    const clientDataJSON = bufferToBase64Url(assertion.response.clientDataJSON);
+    const authenticatorData = bufferToBase64Url(assertion.response.authenticatorData);
+    const signature = bufferToBase64Url(assertion.response.signature);
+
+    await verifyPasskeyTest(key.id, {
+      clientDataJSON,
+      authenticatorData,
+      signature
+    });
+
+    ElMessage({
+      message: t('passkeyTestSuccess') || '通行密钥测试成功！当前设备签名有效且完全正常可用。',
+      type: 'success',
+      plain: true
+    });
+  } catch (err) {
+    if (err.name === 'NotAllowedError') {
+      ElMessage({
+        message: t('passkeyOperationCancelledOrNotAllowed') || '操作已取消或设备暂未就绪',
+        type: 'info',
+        plain: true
+      });
+    } else {
+      ElMessage({
+        message: err.message || t('passkeyTestFailed') || '通行密钥测试失败',
+        type: 'error',
+        plain: true
+      });
+    }
+  } finally {
+    testingKeyId.value = null;
+  }
+};
+
+const openApprovePasskeyModal = (key) => {
+  approvingKey.value = key;
+  approveTotpCode.value = '';
+  approveDialogVisible.value = true;
+};
+
+const submitApprovePasskey = async () => {
+  if (!approveTotpCode.value || approveTotpCode.value.trim().length !== 6) {
+    ElMessage({
+      message: t('totpCodePlaceholder'),
+      type: 'error',
+      plain: true
+    });
+    return;
+  }
+
+  approveLoading.value = true;
+  try {
+    await approvePasskeyWithTotp(approvingKey.value.id, approveTotpCode.value.trim());
+    ElMessage({
+      message: t('passkeyApprovedSuccess') || '通行密钥已通过身份验证器核准并立即生效！',
+      type: 'success',
+      plain: true
+    });
+    approveDialogVisible.value = false;
+    await fetchPasskeys();
+    await fetchTotpStatus();
+  } catch (err) {
+    ElMessage({
+      message: err.message || t('totpCodeInvalid'),
+      type: 'error',
+      plain: true
+    });
+  } finally {
+    approveLoading.value = false;
+  }
+};
+
+const handleActivateTimelock = async (key) => {
+  activatingKeyId.value = key.id;
+  try {
+    await activateTimelockedPasskey(key.id);
+    ElMessage({
+      message: t('passkeyActivatedSuccess') || '通行密钥已成功转正生效！',
+      type: 'success',
+      plain: true
+    });
+    await fetchPasskeys();
+    await fetchTotpStatus();
+  } catch (err) {
+    ElMessage({
+      message: err.message || '转正失败',
+      type: 'error',
+      plain: true
+    });
+  } finally {
+    activatingKeyId.value = null;
+  }
+};
 
 const confirmDeletePasskey = (key) => {
   ElMessageBox.confirm(
@@ -1056,7 +1412,7 @@ const confirmDeletePasskey = (key) => {
       });
     }
   });
-}
+};
 
 // ==========================================
 // Disable TOTP

@@ -11,6 +11,8 @@ import userContext from '../security/user-context.js';
 import userService from './user-service.js';
 import emailService from './email-service.js';
 import settingService from './setting-service.js';
+import securityNoticeService from './security-notice-service.js';
+import { SECURITY_EVENT_TYPES } from '../const/security-notice-templates.js';
 import { t } from '../i18n/i18n.js';
 import { Resend } from 'resend';
 import { v4 as uuidv4 } from 'uuid';
@@ -103,26 +105,7 @@ const totpService = {
 
 		// Deliver in-app security alert email
 		try {
-			const targetUser = await userService.selectById(c, userId);
-			if (targetUser) {
-				const acc = await mailOrm(c).select().from((await import('../entity/account')).default)
-					.where(eq((await import('../entity/account')).default.userId, userId)).get();
-				if (acc) {
-					await emailService.deliverWelcomeEmailToUser(c, userId, acc.accountId, targetUser.email, {
-						subject: '🛡️ [安全通知] 您的账号已成功开启两步验证 (2FA)',
-						text: `您好，您的 EpoCanvas Mail 账号 (${targetUser.email}) 已于 ${now} 成功启用了两步验证。除当前设备外，其他会话已自动下线。如非本人操作，请立即修改密码！`,
-						content: `<div style="font-family: sans-serif; padding: 20px; line-height: 1.6;">
-							<h2 style="color: #10b981;">🛡️ 您的账号已成功开启两步验证 (2FA)</h2>
-							<p>您好：</p>
-							<p>您的 EpoCanvas Mail 账号 <strong>${targetUser.email}</strong> 已于 <strong>${now}</strong> 成功启用了两步验证保护体系。</p>
-							<p style="color: #64748b;">为了保障账户安全，系统已自动注销该账号在其他设备上的登录会话。</p>
-							<hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;">
-							<p style="font-size: 12px; color: #94a3b8;">⚠️ 如非本人操作，请立即修改密码并联系系统管理员。</p>
-						</div>`,
-						isBroadcast: true
-					});
-				}
-			}
+			await securityNoticeService.sendNotice(c, userId, SECURITY_EVENT_TYPES.TOTP_ENABLED, {});
 		} catch (err) {
 			console.error('Failed to send 2FA enable notice:', err);
 		}
@@ -171,6 +154,7 @@ const totpService = {
 		}
 
 		const isEnabled = isGlobalEnabled && (userRow.totpEnabled === 1);
+		const nowTime = Date.now();
 
 		return {
 			globalEnabled: isGlobalEnabled,
@@ -178,11 +162,25 @@ const totpService = {
 			totpConfigured: isGlobalEnabled && !!userRow.totpSecret,
 			backupCodesRemaining: isGlobalEnabled ? remainingCount : 0,
 			securityKeysCount: isGlobalEnabled ? securityKeysList.length : 0,
-			securityKeys: isGlobalEnabled ? securityKeysList.map(k => ({
-				id: k.id,
-				name: k.name,
-				createdAt: k.createdAt
-			})) : [],
+			securityKeys: isGlobalEnabled ? securityKeysList.map(k => {
+				const status = k.status || 'active';
+				const timelockUntil = k.timelockUntil || null;
+				const timelockRemainingDays = (status === 'pending_verification' && timelockUntil)
+					? Math.max(0, Math.ceil((timelockUntil - nowTime) / (24 * 3600 * 1000)))
+					: 0;
+				const canActivateNow = (status === 'pending_verification' && timelockUntil && nowTime >= timelockUntil);
+				return {
+					id: k.id,
+					name: k.name,
+					createdAt: k.createdAt,
+					isInitialDevice: !!k.isInitialDevice,
+					status,
+					timelockUntil,
+					timelockRemainingDays,
+					canActivateNow,
+					verifiedAt: k.verifiedAt || null
+				};
+			}) : [],
 			createdAt: isGlobalEnabled ? (userRow.totpCreatedAt || null) : null
 		};
 	},
@@ -283,6 +281,12 @@ const totpService = {
 			totpBackupCodes: backupPayload
 		}).where(eq(user.userId, userId)).run();
 
+		try {
+			await securityNoticeService.sendNotice(c, userId, SECURITY_EVENT_TYPES.BACKUP_CODES_REGENERATED, {});
+		} catch (err) {
+			console.error('Failed to send backup codes notice:', err);
+		}
+
 		return {
 			backupCodes: rawCodes
 		};
@@ -355,22 +359,7 @@ const totpService = {
 
 		// Deliver in-app security alert email
 		try {
-			const acc = await mailOrm(c).select().from((await import('../entity/account')).default)
-				.where(eq((await import('../entity/account')).default.userId, userId)).get();
-			if (acc) {
-				const now = new Date().toISOString();
-				await emailService.deliverWelcomeEmailToUser(c, userId, acc.accountId, userRow.email, {
-					subject: '⚠️ [安全警告] 您的账号已停用两步验证 (2FA)',
-					text: `您好，您的 EpoCanvas Mail 账号 (${userRow.email}) 已于 ${now} 关闭了两步验证保护。如非本人操作，请立即登录并开启 2FA！`,
-					content: `<div style="font-family: sans-serif; padding: 20px; line-height: 1.6;">
-						<h2 style="color: #ef4444;">⚠️ 您的账号已停用两步验证 (2FA)</h2>
-						<p>您好：</p>
-						<p>您的 EpoCanvas Mail 账号 <strong>${userRow.email}</strong> 已于 <strong>${now}</strong> 关闭了两步验证保护。</p>
-						<p style="color: #b91c1c;">当前账户仅受单重密码保护，建议尽快重新开启两步验证以防范凭据泄露风险。</p>
-					</div>`,
-					isBroadcast: true
-				});
-			}
+			await securityNoticeService.sendNotice(c, userId, SECURITY_EVENT_TYPES.TOTP_DISABLED, {});
 		} catch (err) {
 			console.error('Failed to send 2FA disable notice:', err);
 		}
@@ -386,6 +375,7 @@ const totpService = {
 
 	/**
 	 * Generate WebAuthn registration challenge & options
+	 * Automatically scans client User-Agent and configures platform resident key for local storage
 	 */
 	async getPasskeyRegistrationOptions(c, userId, email) {
 		const isGlobalEnabled = await settingService.isTotpEnabled(c);
@@ -406,6 +396,41 @@ const totpService = {
 			{ expirationTtl: 300 }
 		);
 
+		// Scan User-Agent to determine client device capabilities and default name
+		const ua = c.req.header('user-agent') || '';
+		let os = 'other';
+		let suggestedName = '通行密钥';
+		let isPlatformDevice = false;
+
+		if (/Windows/i.test(ua)) {
+			os = 'windows';
+			suggestedName = 'Windows Hello (此电脑)';
+			isPlatformDevice = true;
+		} else if (/Macintosh|Mac OS/i.test(ua) && !/iPhone|iPad/i.test(ua)) {
+			os = 'macos';
+			suggestedName = 'Apple 钥匙串 (Mac)';
+			isPlatformDevice = true;
+		} else if (/iPhone|iPad/i.test(ua)) {
+			os = 'ios';
+			suggestedName = 'Apple 钥匙串 (iOS)';
+			isPlatformDevice = true;
+		} else if (/Android/i.test(ua)) {
+			os = 'android';
+			suggestedName = 'Android 凭据管理器';
+			isPlatformDevice = true;
+		} else if (/Linux/i.test(ua)) {
+			os = 'linux';
+			suggestedName = 'Linux 安全密钥';
+			isPlatformDevice = true;
+		}
+
+		// Generate standard 32-byte opaque user handle (W3C WebAuthn 16-64 bytes requirement for Windows Hello / TPM)
+		const userHandleDigest = await crypto.subtle.digest(
+			'SHA-256',
+			new TextEncoder().encode(`epomail_uid_${userId}`)
+		);
+		const userHandle = webauthnUtils.bufferToBase64Url(new Uint8Array(userHandleDigest));
+
 		return {
 			challenge,
 			rp: {
@@ -413,25 +438,41 @@ const totpService = {
 				id: c.req.header('host')?.split(':')[0] || 'localhost'
 			},
 			user: {
-				id: String(userId),
+				id: userHandle,
+				rawUserId: String(userId),
 				name: email,
 				displayName: email.split('@')[0] || email
 			},
 			pubKeyCredParams: [
-				{ type: 'public-key', alg: -7 },  // ES256
-				{ type: 'public-key', alg: -257 } // RS256
+				{ type: 'public-key', alg: -7 },   // ES256 (NIST P-256 with SHA-256)
+				{ type: 'public-key', alg: -257 }, // RS256 (RSASSA-PKCS1-v1_5 with SHA-256)
+				{ type: 'public-key', alg: -37 },  // PS256 (RSA-PSS with SHA-256) - preferred by Windows Hello TPM
+				{ type: 'public-key', alg: -8 },   // Ed25519 (EdDSA)
+				{ type: 'public-key', alg: -258 }, // RS384
+				{ type: 'public-key', alg: -259 }, // RS512
+				{ type: 'public-key', alg: -35 },  // ES384
+				{ type: 'public-key', alg: -36 }   // ES512
 			],
 			timeout: 60000,
 			attestation: 'none',
 			authenticatorSelection: {
-				userVerification: 'preferred',
-				residentKey: 'preferred'
+				authenticatorAttachment: isPlatformDevice ? 'platform' : undefined,
+				residentKey: 'required',
+				requireResidentKey: true,
+				userVerification: 'required'
+			},
+			deviceInfo: {
+				os,
+				suggestedName,
+				isPlatformDevice
 			}
 		};
 	},
 
 	/**
 	 * Complete Passkey / Security Key registration
+	 * Genesis/Initial device: activated immediately.
+	 * Subsequent new devices: put into 30-day security timelock pending TOTP approval or timelock expiry.
 	 */
 	async registerPasskey(c, userId, params) {
 		const isGlobalEnabled = await settingService.isTotpEnabled(c);
@@ -446,7 +487,7 @@ const totpService = {
 
 		const setupData = await c.env.kv.get(KvConst.WEBAUTHN_SETUP + userId, { type: 'json' });
 		if (!setupData || !setupData.challenge) {
-			throw new BizError('WebAuthn registration session expired, please retry');
+			throw new BizError(t('passkeyRegisterFailed') || 'WebAuthn registration session expired, please retry');
 		}
 
 		// Verify clientDataJSON challenge
@@ -474,30 +515,39 @@ const totpService = {
 
 		// Check duplicate credential ID
 		if (keys.some(k => k.credentialId === parsedAtt.credentialId)) {
-			throw new BizError('Security key already registered');
+			throw new BizError(t('passkeyAlreadyRegistered') || 'Security key already registered');
 		}
+
+		const isInitial = keys.length === 0;
+		const nowIso = new Date().toISOString();
+		const nowMs = Date.now();
+		const timelockDuration = 30 * 24 * 3600 * 1000; // 30 days in milliseconds
 
 		const newKey = {
 			id: uuidv4(),
-			name: (name || '').trim() || `Security Key ${keys.length + 1}`,
+			name: (name || '').trim() || (isInitial ? (t('initialDevicePasskeyName') || '初创设备通行密钥') : (t('defaultPasskeyName', { num: keys.length + 1 }) || `通行密钥 ${keys.length + 1}`)),
 			credentialId: parsedAtt.credentialId,
 			publicKeyJwk: parsedAtt.publicKeyJwk,
 			publicKeyRaw: parsedAtt.publicKeyRaw,
 			aaguid: parsedAtt.aaguid,
 			signCount: parsedAtt.signCount,
-			createdAt: new Date().toISOString()
+			createdAt: nowIso,
+			isInitialDevice: isInitial,
+			status: isInitial ? 'active' : 'pending_verification',
+			timelockUntil: isInitial ? null : (nowMs + timelockDuration),
+			verifiedAt: isInitial ? nowIso : null
 		};
 
 		keys.push(newKey);
 
-		// If user doesn't have 2FA enabled yet, activating a security key can enable 2FA
+		// If user doesn't have 2FA enabled yet, activating the genesis security key enables 2FA
 		const updates = {
 			securityKeys: JSON.stringify(keys)
 		};
 
 		if (userRow.totpEnabled === 0) {
 			updates.totpEnabled = 1;
-			updates.totpCreatedAt = new Date().toISOString();
+			updates.totpCreatedAt = nowIso;
 
 			// Generate initial backup codes if not present
 			if (!userRow.totpBackupCodes || userRow.totpBackupCodes === '[]') {
@@ -511,15 +561,26 @@ const totpService = {
 		// Cleanup KV challenge
 		await c.env.kv.delete(KvConst.WEBAUTHN_SETUP + userId);
 
+		try {
+			await securityNoticeService.sendNotice(c, userId, SECURITY_EVENT_TYPES.PASSKEY_ADDED, {
+				keyName: newKey.name
+			});
+		} catch (err) {
+			console.error('Failed to send passkey added notice:', err);
+		}
+
 		return {
 			id: newKey.id,
 			name: newKey.name,
-			createdAt: newKey.createdAt
+			createdAt: newKey.createdAt,
+			isInitialDevice: newKey.isInitialDevice,
+			status: newKey.status,
+			timelockUntil: newKey.timelockUntil
 		};
 	},
 
 	/**
-	 * List all registered passkeys / security keys for user
+	 * List all registered passkeys / security keys for user with timelock status
 	 */
 	async getPasskeys(c, userId) {
 		const userRow = await userService.selectById(c, userId);
@@ -530,14 +591,235 @@ const totpService = {
 				? JSON.parse(userRow.securityKeys)
 				: userRow.securityKeys;
 			if (!Array.isArray(keys)) return [];
-			return keys.map(k => ({
-				id: k.id,
-				name: k.name,
-				createdAt: k.createdAt
-			}));
+
+			const nowTime = Date.now();
+			return keys.map(k => {
+				const status = k.status || 'active';
+				const timelockUntil = k.timelockUntil || null;
+				const timelockRemainingDays = (status === 'pending_verification' && timelockUntil)
+					? Math.max(0, Math.ceil((timelockUntil - nowTime) / (24 * 3600 * 1000)))
+					: 0;
+				const canActivateNow = (status === 'pending_verification' && timelockUntil && nowTime >= timelockUntil);
+
+				return {
+					id: k.id,
+					name: k.name,
+					createdAt: k.createdAt,
+					isInitialDevice: !!k.isInitialDevice,
+					status,
+					timelockUntil,
+					timelockRemainingDays,
+					canActivateNow,
+					verifiedAt: k.verifiedAt || null
+				};
+			});
 		} catch (e) {
 			return [];
 		}
+	},
+
+	/**
+	 * Approve a pending passkey instantly using existing TOTP code
+	 */
+	async approvePasskeyWithTotp(c, userId, passkeyId, params) {
+		const userRow = await userService.selectById(c, userId);
+		if (!userRow) throw new BizError(t('notExistUser'));
+
+		if (userRow.totpEnabled !== 1 || !userRow.totpSecret) {
+			throw new BizError(t('totpNotConfiguredForApproval') || '当前账号尚未绑定 TOTP 身份验证器，无法直接核准，请等待 30 天观察期结束后手动转正');
+		}
+
+		const { code } = params || {};
+		if (!code) {
+			throw new BizError(t('totpCodeEmpty'));
+		}
+
+		const plainSecret = await totpUtils.decryptSecret(userRow.totpSecret, c.env);
+		const verifyResult = await totpUtils.verifyTOTP(plainSecret, code, 1);
+		if (!verifyResult.isValid) {
+			throw new BizError(t('totpCodeInvalid'));
+		}
+
+		let keys = [];
+		if (userRow.securityKeys) {
+			try {
+				keys = typeof userRow.securityKeys === 'string' ? JSON.parse(userRow.securityKeys) : userRow.securityKeys;
+				if (!Array.isArray(keys)) keys = [];
+			} catch (e) {
+				keys = [];
+			}
+		}
+
+		const targetKey = keys.find(k => k.id === passkeyId);
+		if (!targetKey) {
+			throw new BizError(t('passkeyNotFound') || '未找到指定的通行密钥');
+		}
+
+		targetKey.status = 'active';
+		targetKey.verifiedAt = new Date().toISOString();
+		targetKey.timelockUntil = null;
+
+		await orm(c).update(user).set({
+			securityKeys: JSON.stringify(keys)
+		}).where(eq(user.userId, userId)).run();
+
+		try {
+			await securityNoticeService.sendNotice(c, userId, SECURITY_EVENT_TYPES.PASSKEY_ADDED, {
+				keyName: targetKey.name
+			});
+		} catch (err) {}
+
+		return {
+			id: targetKey.id,
+			name: targetKey.name,
+			status: 'active',
+			verifiedAt: targetKey.verifiedAt
+		};
+	},
+
+	/**
+	 * Manually activate a timelocked passkey after 30 days observation period
+	 */
+	async activateTimelockedPasskey(c, userId, passkeyId) {
+		const userRow = await userService.selectById(c, userId);
+		if (!userRow) throw new BizError(t('notExistUser'));
+
+		let keys = [];
+		if (userRow.securityKeys) {
+			try {
+				keys = typeof userRow.securityKeys === 'string' ? JSON.parse(userRow.securityKeys) : userRow.securityKeys;
+				if (!Array.isArray(keys)) keys = [];
+			} catch (e) {
+				keys = [];
+			}
+		}
+
+		const targetKey = keys.find(k => k.id === passkeyId);
+		if (!targetKey) {
+			throw new BizError(t('passkeyNotFound') || '未找到指定的通行密钥');
+		}
+
+		if (targetKey.status === 'active') {
+			return { id: targetKey.id, name: targetKey.name, status: 'active' };
+		}
+
+		const now = Date.now();
+		if (!targetKey.timelockUntil || now < targetKey.timelockUntil) {
+			const remainingDays = targetKey.timelockUntil ? Math.max(1, Math.ceil((targetKey.timelockUntil - now) / (24 * 3600 * 1000))) : 30;
+			throw new BizError(t('passkeyTimelockActive', { days: remainingDays }) || `该通行密钥仍在安全时间锁观察期内，还需 ${remainingDays} 天方可手动转正。`);
+		}
+
+		targetKey.status = 'active';
+		targetKey.verifiedAt = new Date().toISOString();
+		targetKey.timelockUntil = null;
+
+		await orm(c).update(user).set({
+			securityKeys: JSON.stringify(keys)
+		}).where(eq(user.userId, userId)).run();
+
+		return {
+			id: targetKey.id,
+			name: targetKey.name,
+			status: 'active',
+			verifiedAt: targetKey.verifiedAt
+		};
+	},
+
+	/**
+	 * Generate challenge and options for testing an existing registered passkey
+	 */
+	async getPasskeyTestOptions(c, userId, passkeyId) {
+		const userRow = await userService.selectById(c, userId);
+		if (!userRow) throw new BizError(t('notExistUser'));
+
+		let keys = [];
+		if (userRow.securityKeys) {
+			try {
+				keys = typeof userRow.securityKeys === 'string' ? JSON.parse(userRow.securityKeys) : userRow.securityKeys;
+				if (!Array.isArray(keys)) keys = [];
+			} catch (e) {
+				keys = [];
+			}
+		}
+
+		const targetKey = keys.find(k => k.id === passkeyId);
+		if (!targetKey) {
+			throw new BizError(t('passkeyNotFound') || '未找到指定的通行密钥');
+		}
+
+		const challenge = webauthnUtils.generateChallenge();
+		await c.env.kv.put(
+			KvConst.WEBAUTHN_TEST + userId + ':' + passkeyId,
+			JSON.stringify({ challenge, passkeyId, createdAt: Date.now() }),
+			{ expirationTtl: 300 }
+		);
+
+		return {
+			challenge,
+			rpId: c.req.header('host')?.split(':')[0] || 'localhost',
+			allowCredentials: [{
+				id: targetKey.credentialId,
+				type: 'public-key'
+			}],
+			userVerification: 'preferred',
+			timeout: 60000
+		};
+	},
+
+	/**
+	 * Verify authentication assertion signature for passkey testing
+	 */
+	async verifyPasskeyTest(c, userId, passkeyId, params) {
+		const { clientDataJSON, authenticatorData, signature } = params || {};
+		if (!clientDataJSON || !authenticatorData || !signature) {
+			throw new BizError('Missing test signature payload');
+		}
+
+		const kvKey = KvConst.WEBAUTHN_TEST + userId + ':' + passkeyId;
+		const sessionData = await c.env.kv.get(kvKey, { type: 'json' });
+		if (!sessionData || !sessionData.challenge) {
+			throw new BizError(t('passkeyTestExpired') || '通行密钥测试会话已超时，请重试');
+		}
+
+		const clientData = webauthnUtils.parseClientData(clientDataJSON);
+		if (clientData.challenge !== sessionData.challenge) {
+			throw new BizError('WebAuthn test challenge mismatch');
+		}
+
+		const userRow = await userService.selectById(c, userId);
+		if (!userRow) throw new BizError(t('notExistUser'));
+
+		let keys = [];
+		if (userRow.securityKeys) {
+			try {
+				keys = typeof userRow.securityKeys === 'string' ? JSON.parse(userRow.securityKeys) : userRow.securityKeys;
+				if (!Array.isArray(keys)) keys = [];
+			} catch (e) {
+				keys = [];
+			}
+		}
+
+		const targetKey = keys.find(k => k.id === passkeyId);
+		if (!targetKey) throw new BizError(t('passkeyNotFound') || '未找到指定的通行密钥');
+
+		const isValidSig = await webauthnUtils.verifyAuthenticationSignature({
+			clientDataJSONBase64: clientDataJSON,
+			authenticatorDataBase64: authenticatorData,
+			signatureBase64: signature,
+			publicKeyJwk: targetKey.publicKeyJwk,
+			publicKeyRaw: targetKey.publicKeyRaw
+		});
+
+		if (!isValidSig) {
+			throw new BizError(t('passkeyTestFailed') || '通行密钥签名校验未通过');
+		}
+
+		await c.env.kv.delete(kvKey);
+		return {
+			success: true,
+			keyId: targetKey.id,
+			name: targetKey.name
+		};
 	},
 
 	/**
@@ -557,14 +839,33 @@ const totpService = {
 			}
 		}
 
+		const deletedKey = keys.find(k => k.id === passkeyId);
+		const deletedKeyName = deletedKey ? deletedKey.name : passkeyId;
+
 		const filtered = keys.filter(k => k.id !== passkeyId);
 		if (filtered.length === keys.length) {
-			throw new BizError('Security key not found');
+			throw new BizError(t('passkeyNotFound') || 'Security key not found');
 		}
 
-		await orm(c).update(user).set({
+		const updates = {
 			securityKeys: JSON.stringify(filtered)
-		}).where(eq(user.userId, userId)).run();
+		};
+
+		if (filtered.length === 0 && (!userRow.totpSecret || userRow.totpSecret === '')) {
+			updates.totpEnabled = 0;
+			updates.totpBackupCodes = '[]';
+			updates.totpCreatedAt = '';
+		}
+
+		await orm(c).update(user).set(updates).where(eq(user.userId, userId)).run();
+
+		try {
+			await securityNoticeService.sendNotice(c, userId, SECURITY_EVENT_TYPES.PASSKEY_DELETED, {
+				keyName: deletedKeyName
+			});
+		} catch (err) {
+			console.error('Failed to send passkey deleted notice:', err);
+		}
 
 		return true;
 	},
@@ -590,7 +891,7 @@ const totpService = {
 		}
 
 		const target = keys.find(k => k.id === passkeyId);
-		if (!target) throw new BizError('Security key not found');
+		if (!target) throw new BizError(t('passkeyNotFound') || 'Security key not found');
 
 		target.name = name;
 
@@ -599,6 +900,70 @@ const totpService = {
 		}).where(eq(user.userId, userId)).run();
 
 		return true;
+	},
+
+	/**
+	 * Re-bind / Update TOTP secret (requires current password and new OTP code)
+	 */
+	async updateTotp(c, userId, params) {
+		const { password, code } = params || {};
+		if (!password || !code) {
+			throw new BizError(t('totpDisableParamsEmpty'));
+		}
+
+		const userRow = await userService.selectById(c, userId);
+		if (!userRow) throw new BizError(t('notExistUser'));
+
+		const isPwdValid = await cryptoUtils.verifyPassword(password, userRow.salt, userRow.password);
+		if (!isPwdValid) throw new BizError(t('IncorrectPwd'));
+
+		const setupData = await c.env.kv.get(KvConst.TOTP_SETUP + userId, { type: 'json' });
+		if (!setupData || !setupData.rawSecret) {
+			throw new BizError(t('totpSetupExpired'));
+		}
+
+		const verifyResult = await totpUtils.verifyTOTP(setupData.rawSecret, code, 1);
+		if (!verifyResult.isValid) {
+			throw new BizError(t('totpCodeInvalid'));
+		}
+
+		const { rawCodes, hashedCodes, encryptedRaw } = await totpUtils.generateBackupCodes(10, c.env);
+		const encryptedSecret = await totpUtils.encryptSecret(setupData.rawSecret, c.env);
+		const now = new Date().toISOString();
+
+		const backupPayload = JSON.stringify({
+			hashedCodes,
+			encryptedRaw
+		});
+
+		await orm(c).update(user).set({
+			totpEnabled: 1,
+			totpSecret: encryptedSecret,
+			totpBackupCodes: backupPayload,
+			totpCreatedAt: now
+		}).where(eq(user.userId, userId)).run();
+
+		// Session revocation: except current session, invalidate all other sessions
+		const currentToken = await userContext.getToken(c);
+		const authInfo = await c.env.kv.get(KvConst.AUTH_INFO + userId, { type: 'json' });
+		if (authInfo) {
+			authInfo.tokens = currentToken ? [currentToken] : [];
+			if (authInfo.user) {
+				authInfo.user.totpEnabled = 1;
+				authInfo.user.totpCreatedAt = now;
+			}
+			await c.env.kv.put(KvConst.AUTH_INFO + userId, JSON.stringify(authInfo), { expirationTtl: constant.TOKEN_EXPIRE });
+		}
+
+		await c.env.kv.delete(KvConst.TOTP_SETUP + userId);
+
+		try {
+			await securityNoticeService.sendNotice(c, userId, SECURITY_EVENT_TYPES.TOTP_ENABLED, {});
+		} catch (err) {}
+
+		return {
+			backupCodes: rawCodes
+		};
 	},
 
 	/**
@@ -665,17 +1030,8 @@ const totpService = {
 				<p style="font-size: 13px; color: #64748b; margin-top: 24px;">⚠️ 如果您并未申请重置，说明您的账号可能存在安全风险，请立即联系管理员。</p>
 			</div>`;
 
-			// 1. In-app mailbox injection
-			const acc = await mailOrm(c).select().from((await import('../entity/account')).default)
-				.where(eq((await import('../entity/account')).default.userId, targetUserId)).get();
-			if (acc) {
-				await emailService.deliverWelcomeEmailToUser(c, targetUserId, acc.accountId, targetUser.email, {
-					subject: alertSubject,
-					text: alertText,
-					content: alertHtml,
-					isBroadcast: true
-				});
-			}
+			// 1. In-app mailbox injection via securityNoticeService
+			await securityNoticeService.sendNotice(c, targetUserId, SECURITY_EVENT_TYPES.TOTP_DISABLED, {});
 
 			// 2. Resend external mail dispatch if configured
 			if (settingData.resendTokens && typeof settingData.resendTokens === 'object') {

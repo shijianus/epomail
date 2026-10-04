@@ -51,8 +51,9 @@ const userService = {
 
         const ALLOWED_PROFILE_FIELDS = [
             'nickname', 'bio', 'avatarUrl', 'backgroundUrl', 'customLabels',
-            'signature', 'themeMode', 'personalForwarding', 'background',
-            'showStats', 'showTrend', 'showSources', 'lang'
+            'signature', 'themeMode', 'personalForwarding', 'personalTelegram', 'background',
+            'showStats', 'showTrend', 'showSources', 'lang',
+            'gender', 'genderCustom', 'birthday', 'phones', 'addresses', 'emails'
         ];
 
         const safeParams = {};
@@ -64,6 +65,67 @@ const userService = {
 
         if (safeParams.background && !safeParams.backgroundUrl) safeParams.backgroundUrl = safeParams.background;
         if (safeParams.backgroundUrl && !safeParams.background) safeParams.background = safeParams.backgroundUrl;
+
+        // Sanitize emails if present
+        if (safeParams.emails !== undefined) {
+            if (!Array.isArray(safeParams.emails)) {
+                safeParams.emails = [];
+            } else {
+                safeParams.emails = safeParams.emails
+                    .filter(item => item && typeof item.email === 'string' && verifyUtils.isEmail(item.email.trim()))
+                    .slice(0, 20)
+                    .map(item => ({
+                        id: String(item.id || ('email_' + Date.now())).slice(0, 50),
+                        email: item.email.trim().toLowerCase().slice(0, 100),
+                        label: ['work', 'personal', 'recovery', 'other'].includes(item.label) ? item.label : 'other',
+                        createdAt: typeof item.createdAt === 'string' ? item.createdAt.slice(0, 40) : new Date().toISOString()
+                    }));
+            }
+        }
+
+        // Sanitize phones if present
+        if (safeParams.phones !== undefined) {
+            if (!Array.isArray(safeParams.phones)) {
+                safeParams.phones = [];
+            } else {
+                safeParams.phones = safeParams.phones
+                    .filter(p => p && (typeof p.number === 'string' || typeof p.number === 'number'))
+                    .slice(0, 20)
+                    .map(p => ({
+                        id: String(p.id || ('phone_' + Date.now())).slice(0, 50),
+                        countryCode: String(p.countryCode || '').slice(0, 10),
+                        dialCode: String(p.dialCode || '').slice(0, 10),
+                        number: String(p.number || '').replace(/\D/g, '').slice(0, 25),
+                        formatted: String(p.formatted || '').slice(0, 50),
+                        label: ['mobile', 'work', 'home', 'other'].includes(p.label) ? p.label : 'mobile',
+                        createdAt: typeof p.createdAt === 'string' ? p.createdAt.slice(0, 40) : new Date().toISOString()
+                    }));
+            }
+        }
+
+        // Sanitize addresses if present
+        if (safeParams.addresses !== undefined) {
+            if (typeof safeParams.addresses !== 'object' || safeParams.addresses === null) {
+                safeParams.addresses = { home: '', work: '', other: '' };
+            } else {
+                const cleanAddr = {};
+                for (const k of ['home', 'work', 'other']) {
+                    cleanAddr[k] = typeof safeParams.addresses[k] === 'string' ? safeParams.addresses[k].slice(0, 300) : (safeParams.addresses[k] || '');
+                }
+                safeParams.addresses = cleanAddr;
+            }
+        }
+
+        // Sanitize gender, genderCustom, birthday if present
+        if (safeParams.gender !== undefined) {
+            safeParams.gender = ['male', 'female', 'prefer_not_to_say', 'custom'].includes(safeParams.gender) ? safeParams.gender : 'prefer_not_to_say';
+        }
+        if (safeParams.genderCustom !== undefined) {
+            safeParams.genderCustom = typeof safeParams.genderCustom === 'string' ? safeParams.genderCustom.slice(0, 50) : '';
+        }
+        if (safeParams.birthday !== undefined) {
+            safeParams.birthday = typeof safeParams.birthday === 'string' ? safeParams.birthday.slice(0, 20) : '';
+        }
 
         // Sanitize personalForwarding if present
         if (safeParams.personalForwarding && typeof safeParams.personalForwarding === 'object') {
@@ -85,6 +147,35 @@ const userService = {
 
         Object.assign(profile, safeParams);
         await c.env.kv.put('USER_PROFILE_' + userId, JSON.stringify(profile));
+
+        // Trigger security notices for forwarding / telegram bot changes
+        if (safeParams.personalForwarding !== undefined) {
+            try {
+                const securityNoticeService = (await import('./security-notice-service.js')).default;
+                const { SECURITY_EVENT_TYPES } = await import('../const/security-notice-templates.js');
+                await securityNoticeService.sendNotice(c, userId, SECURITY_EVENT_TYPES.FORWARDING_MODIFIED, {
+                    detail: safeParams.personalForwarding.enabled
+                        ? `Auto-forwarding enabled to: ${safeParams.personalForwarding.targets || 'None'}`
+                        : 'Auto-forwarding disabled'
+                });
+            } catch (e) {
+                console.error('Failed to send forwarding notice:', e);
+            }
+        }
+
+        if (safeParams.personalTelegram !== undefined) {
+            try {
+                const securityNoticeService = (await import('./security-notice-service.js')).default;
+                const { SECURITY_EVENT_TYPES } = await import('../const/security-notice-templates.js');
+                await securityNoticeService.sendNotice(c, userId, SECURITY_EVENT_TYPES.TELEGRAM_MODIFIED, {
+                    detail: safeParams.personalTelegram.enabled
+                        ? `Telegram Bot enabled (chatId: ${safeParams.personalTelegram.chatId ? '***' + String(safeParams.personalTelegram.chatId).slice(-4) : 'configured'})`
+                        : 'Telegram Bot disabled'
+                });
+            } catch (e) {
+                console.error('Failed to send telegram notice:', e);
+            }
+        }
 
         const authInfo = await c.env.kv.get(KvConst.AUTH_INFO + userId, { type: 'json' });
 		if (authInfo && authInfo.user) {
@@ -240,6 +331,7 @@ const userService = {
         user.genderCustom = profile.genderCustom || '';
         user.birthday = profile.birthday || '';
         user.phones = Array.isArray(profile.phones) ? profile.phones : [];
+        user.emails = Array.isArray(profile.emails) ? profile.emails : [];
         user.addresses = profile.addresses || { home: '', work: '', other: '' };
         user.passwordUpdatedAt = profile.passwordUpdatedAt || userRow.createTime || '';
         user.density = profile.density || 'default';
@@ -389,6 +481,14 @@ const userService = {
 		} catch (e) {
 			console.error('Failed to update password timestamp', e);
 		}
+
+		try {
+			const securityNoticeService = (await import('./security-notice-service.js')).default;
+			const { SECURITY_EVENT_TYPES } = await import('../const/security-notice-templates.js');
+			await securityNoticeService.sendNotice(c, userId, SECURITY_EVENT_TYPES.PASSWORD_CHANGED);
+		} catch (e) {
+			console.error('Failed to send password changed notice:', e);
+		}
 	},
 
 	selectByEmail(c, email) {
@@ -423,6 +523,13 @@ const userService = {
 	},
 
 	async delete(c, userId) {
+		try {
+			const securityNoticeService = (await import('./security-notice-service.js')).default;
+			const { SECURITY_EVENT_TYPES } = await import('../const/security-notice-templates.js');
+			await securityNoticeService.sendNotice(c, userId, SECURITY_EVENT_TYPES.ACCOUNT_DELETED);
+		} catch (e) {
+			console.error('Failed to send account deletion notice:', e);
+		}
 		await orm(c).update(user).set({ isDel: isDel.DELETE }).where(eq(user.userId, userId)).run();
 		await c.env.kv.delete(kvConst.AUTH_INFO + userId)
 	},
@@ -1048,6 +1155,16 @@ const userService = {
 			await c.env.kv.put(`API_TOKEN_${tokenStr}`, JSON.stringify({ userId, scopes: tokenObj.scopes, expiresAt: tokenObj.expiresAt }));
 		} catch (e) {}
 
+		try {
+			const securityNoticeService = (await import('./security-notice-service.js')).default;
+			const { SECURITY_EVENT_TYPES } = await import('../const/security-notice-templates.js');
+			await securityNoticeService.sendNotice(c, userId, SECURITY_EVENT_TYPES.PAT_CREATED, {
+				detail: `Token: ${tokenObj.name} (${expiresInDays ? expiresInDays + 'd' : 'never'})`
+			});
+		} catch (e) {
+			console.error('Failed to send PAT notice:', e);
+		}
+
 		return tokenObj;
 	},
 
@@ -1137,6 +1254,16 @@ const userService = {
 			SET byo_storage_enabled = 0, byo_storage_config = '{}' 
 			WHERE user_id = ?
 		`).bind(userId).run();
+
+		try {
+			const securityNoticeService = (await import('./security-notice-service.js')).default;
+			const { SECURITY_EVENT_TYPES } = await import('../const/security-notice-templates.js');
+			await securityNoticeService.sendNotice(c, userId, SECURITY_EVENT_TYPES.STORAGE_PURGED, {
+				detail: 'BYO Storage unlinked and reset to system default'
+			});
+		} catch (e) {
+			console.error('Failed to send storage purged notice:', e);
+		}
 
 		return {
 			ok: true,

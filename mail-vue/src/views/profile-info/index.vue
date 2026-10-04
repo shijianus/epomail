@@ -6,7 +6,7 @@
       <div class="title">{{ $t('basicInfo') }}</div>
 
       <!-- 个人资料照片 -->
-      <div class="item media-item">
+      <div class="item media-item" id="avatar">
         <div>{{ $t('profilePhoto') }}</div>
         <div class="image-preview-group">
           <el-avatar
@@ -34,7 +34,7 @@
       </div>
 
       <!-- 名称 / 昵称 -->
-      <div class="item">
+      <div class="item" id="nickname">
         <div>{{ $t('nickname') }}</div>
         <div>
           <span class="user-name">
@@ -47,7 +47,7 @@
       </div>
 
       <!-- 性别 -->
-      <div class="item">
+      <div class="item" id="gender">
         <div>{{ $t('gender') }}</div>
         <div>
           <span class="user-name">
@@ -60,7 +60,7 @@
       </div>
 
       <!-- 生日 -->
-      <div class="item">
+      <div class="item" id="birthday">
         <div>{{ $t('birthday') }}</div>
         <div>
           <span class="user-name">
@@ -77,16 +77,40 @@
     <div class="container">
       <div class="title">{{ $t('contactInfo') }}</div>
 
-      <!-- 电子邮件 (只读展示，不附带多余冗余提示) -->
-      <div class="item">
+      <!-- 电子邮件 -->
+      <div class="item" id="email" :style="{ alignItems: emailList.length > 0 ? 'flex-start' : 'center' }">
         <div>{{ $t('profileEmail') }}</div>
-        <div class="email-val-wrap">
-          <span class="font-mono" style="font-weight: 500;">{{ userStore.user.email }}</span>
+        <div class="emails-container">
+          <!-- 账号主邮箱行 (右侧直接放置添加电子邮箱按钮) -->
+          <div class="email-primary-row">
+            <div class="email-row">
+              <Icon icon="lucide:mail" width="16" height="16" class="email-icon" />
+              <span class="email-addr font-mono">{{ userStore.user.email }}</span>
+              <el-tag size="small" type="primary" effect="plain" class="email-tag">{{ $t('profilePrimaryEmailTag') }}</el-tag>
+            </div>
+            <!-- 添加电子邮箱按钮放在 email-row 右侧 -->
+            <el-button type="primary" size="small" class="add-email-btn" @click="openEmailModal">
+              <Icon icon="lucide:plus" width="14" height="14" style="margin-right: 4px;" />
+              {{ $t('addProfileEmail') }}
+            </el-button>
+          </div>
+
+          <!-- 其他自订添加的个人邮箱列表 -->
+          <div class="email-list" v-if="emailList.length > 0">
+            <div v-for="(em, idx) in emailList" :key="em.id || idx" class="email-row">
+              <Icon icon="lucide:mail" width="16" height="16" class="email-icon" />
+              <span class="email-addr font-mono">{{ em.email }}</span>
+              <el-tag size="small" effect="plain" class="email-tag">{{ formatEmailLabel(em.label) }}</el-tag>
+              <span class="del-btn" @click="deleteEmail(idx)" :title="$t('delete')">
+                <Icon icon="material-symbols:delete-outline-rounded" width="16" height="16" />
+              </span>
+            </div>
+          </div>
         </div>
       </div>
 
       <!-- 电话号码 -->
-      <div class="item" style="align-items: flex-start;">
+      <div class="item" id="phones" style="align-items: flex-start;">
         <div>{{ $t('phones') }}</div>
         <div class="phones-container">
           <div class="phone-list" v-if="phoneList.length > 0">
@@ -111,7 +135,7 @@
     </div>
 
     <!-- Section 3: 常用地址 -->
-    <div class="container">
+    <div class="container" id="addresses">
       <div class="title">{{ $t('addresses') }}</div>
 
       <!-- 住家地址 -->
@@ -285,7 +309,54 @@
       </template>
     </el-dialog>
 
-    <!-- MODAL 5: 添加电话号码弹窗 (ISO 3166-1 标准国家与号段) -->
+    <!-- MODAL 5: 添加电子邮箱弹窗 -->
+    <el-dialog v-model="emailDialogShow" :title="$t('addProfileEmail')" width="460px">
+      <div style="display: flex; flex-direction: column; gap: 16px; padding: 10px 0;">
+        <div>
+          <label style="display: block; font-size: 13px; font-weight: bold; margin-bottom: 6px;">
+            {{ $t('profileEmail') }}
+          </label>
+          <el-input
+            v-model="newEmailAddress"
+            :placeholder="$t('enterProfileEmailPlaceholder')"
+            clearable
+            class="phone-number-input"
+            @input="onEmailInput"
+            @keyup.enter="saveNewEmail"
+          >
+            <template #prefix>
+              <Icon icon="lucide:mail" width="16" height="16" style="color: var(--el-text-color-secondary); margin-right: 4px;" />
+            </template>
+          </el-input>
+
+          <!-- 校验反馈 -->
+          <div class="phone-validation-feedback" :class="{ 'is-error': emailValidationError, 'is-valid': emailValidationSuccess }" v-if="emailValidationError || emailValidationSuccess">
+            <span v-if="emailValidationError">⚠️ {{ emailValidationError }}</span>
+            <span v-else-if="emailValidationSuccess" style="color: #10b981;">{{ $t('formatCorrect') }}</span>
+          </div>
+        </div>
+
+        <div>
+          <label style="display: block; font-size: 13px; font-weight: bold; margin-bottom: 6px;">
+            {{ $t('profileEmailLabel') }}：
+          </label>
+          <el-select v-model="newEmailLabel" :fit-input-width="true" style="width: 100%;" class="custom-country-select">
+            <el-option :label="$t('profileEmailLabelPersonal')" value="personal" />
+            <el-option :label="$t('profileEmailLabelWork')" value="work" />
+            <el-option :label="$t('profileEmailLabelRecovery')" value="recovery" />
+            <el-option :label="$t('profileEmailLabelOther')" value="other" />
+          </el-select>
+        </div>
+      </div>
+      <template #footer>
+        <div style="display: flex; justify-content: flex-end; gap: 10px;">
+          <el-button @click="emailDialogShow = false">{{ $t('cancel') }}</el-button>
+          <el-button type="primary" :loading="emailLoading" @click="saveNewEmail">{{ $t('add') }}</el-button>
+        </div>
+      </template>
+    </el-dialog>
+
+    <!-- MODAL 6: 添加电话号码弹窗 (ISO 3166-1 标准国家与号段) -->
     <el-dialog v-model="phoneDialogShow" :title="$t('addPhone')" width="460px">
       <div style="display: flex; flex-direction: column; gap: 16px; padding: 10px 0;">
         <div>
@@ -528,6 +599,13 @@ const birthdayDialogShow = ref(false)
 const editBirthday = ref('')
 const birthdayLoading = ref(false)
 
+const emailDialogShow = ref(false)
+const newEmailAddress = ref('')
+const newEmailLabel = ref('personal')
+const emailValidationError = ref('')
+const emailValidationSuccess = ref(false)
+const emailLoading = ref(false)
+
 const phoneDialogShow = ref(false)
 const newPhoneCountry = ref('HK')
 const newPhoneNumber = ref('')
@@ -549,6 +627,13 @@ const addressForm = ref({
 })
 
 // Computed
+const emailList = computed(() => {
+  if (Array.isArray(userStore.user.emails)) {
+    return userStore.user.emails
+  }
+  return []
+})
+
 const phoneList = computed(() => {
   if (Array.isArray(userStore.user.phones)) {
     return userStore.user.phones
@@ -631,6 +716,13 @@ function formatPhoneLabel(label) {
   return t('phoneLabelOther')
 }
 
+function formatEmailLabel(label) {
+  if (label === 'personal') return t('profileEmailLabelPersonal')
+  if (label === 'work') return t('profileEmailLabelWork')
+  if (label === 'recovery') return t('profileEmailLabelRecovery')
+  return t('profileEmailLabelOther')
+}
+
 function getCountryFlag(code) {
   const c = COUNTRY_OPTIONS.find(item => item.code === code)
   return c ? c.flag : '📞'
@@ -667,6 +759,101 @@ function openGenderModal() {
 function openBirthdayModal() {
   editBirthday.value = userStore.user.birthday || ''
   birthdayDialogShow.value = true
+}
+
+function openEmailModal() {
+  newEmailAddress.value = ''
+  newEmailLabel.value = 'personal'
+  emailValidationError.value = ''
+  emailValidationSuccess.value = false
+  emailDialogShow.value = true
+}
+
+function onEmailInput(val) {
+  const trimmed = (val || '').trim()
+  if (!trimmed) {
+    emailValidationError.value = ''
+    emailValidationSuccess.value = false
+    return
+  }
+  const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/
+  if (!emailRegex.test(trimmed)) {
+    emailValidationError.value = t('profileInvalidEmailError')
+    emailValidationSuccess.value = false
+  } else {
+    const lower = trimmed.toLowerCase()
+    const primary = (userStore.user.email || '').toLowerCase()
+    const isDup = lower === primary || emailList.value.some(e => (e.email || '').toLowerCase() === lower)
+    if (isDup) {
+      emailValidationError.value = t('profileEmailExistsError')
+      emailValidationSuccess.value = false
+    } else {
+      emailValidationError.value = ''
+      emailValidationSuccess.value = true
+    }
+  }
+}
+
+async function saveNewEmail() {
+  const trimmed = (newEmailAddress.value || '').trim()
+  const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/
+  if (!trimmed || !emailRegex.test(trimmed)) {
+    emailValidationError.value = t('profileInvalidEmailError')
+    ElMessage.error(emailValidationError.value)
+    return
+  }
+
+  const lower = trimmed.toLowerCase()
+  const primary = (userStore.user.email || '').toLowerCase()
+  const isDup = lower === primary || emailList.value.some(e => (e.email || '').toLowerCase() === lower)
+  if (isDup) {
+    emailValidationError.value = t('profileEmailExistsError')
+    ElMessage.warning(t('profileEmailExistsError'))
+    return
+  }
+
+  emailLoading.value = true
+  try {
+    const newEntry = {
+      id: 'email_' + Date.now(),
+      email: lower,
+      label: newEmailLabel.value,
+      createdAt: new Date().toISOString()
+    }
+    const updatedEmails = [...emailList.value, newEntry]
+    await updateProfile({ emails: updatedEmails })
+    userStore.user.emails = updatedEmails
+    emailDialogShow.value = false
+    ElMessage.success(t('saveSuccessMsg'))
+  } catch (e) {
+    ElMessage.error(e.message || t('addFailed'))
+  } finally {
+    emailLoading.value = false
+  }
+}
+
+async function deleteEmail(index) {
+  const target = emailList.value[index]
+  if (!target) return
+
+  ElMessageBox.confirm(
+    t('delProfileEmailConfirm', { email: target.email }),
+    t('delete'),
+    {
+      confirmButtonText: t('confirm'),
+      cancelButtonText: t('cancel'),
+      type: 'warning'
+    }
+  ).then(async () => {
+    try {
+      const updatedEmails = emailList.value.filter((_, idx) => idx !== index)
+      await updateProfile({ emails: updatedEmails })
+      userStore.user.emails = updatedEmails
+      ElMessage.success(t('profileEmailRemoved'))
+    } catch (e) {
+      ElMessage.error(e.message || t('removeFailed'))
+    }
+  }).catch(() => {})
 }
 
 function openPhoneModal() {
@@ -1151,6 +1338,62 @@ onMounted(async () => {
     align-items: center;
     gap: 12px;
     flex-wrap: wrap;
+  }
+
+  .emails-container {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+
+    .email-primary-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .email-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .email-row {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 12px;
+      background: var(--bg-hover, rgba(0, 0, 0, 0.02));
+      border: 1px solid var(--border-subtle, #e2e8f0);
+      border-radius: 8px;
+      width: fit-content;
+
+      .email-icon {
+        color: var(--text-muted);
+        flex-shrink: 0;
+      }
+
+      .email-addr {
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--text-primary);
+      }
+
+      .email-tag {
+        font-size: 11px;
+      }
+
+      .del-btn {
+        color: var(--text-muted);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+
+        &:hover {
+          color: #ef4444;
+        }
+      }
+    }
   }
 
   .phones-container {

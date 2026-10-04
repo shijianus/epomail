@@ -204,7 +204,7 @@ const handleNav = (targetName, targetPath) => {
     if (route.params.mailHash || route.params.mailId) {
       emailStore.closeEmail();
     } else {
-      // Already on pure list: refresh email list (matching Gmail UX)
+      // Already on pure list: refresh email list
       const scrollInst = emailStore.emailScroll?.value || emailStore.emailScroll;
       if (scrollInst?.refreshList) {
         scrollInst.refreshList();

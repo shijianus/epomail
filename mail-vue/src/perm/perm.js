@@ -38,13 +38,8 @@ export function hasPerm(permKey) {
 
 
 export function permsToRouter(permKeys) {
-    const routerList = []
-    Object.keys(routers).forEach(perm => {
-        if (permKeys.includes(perm) || permKeys.includes('*')) {
-            routerList.push(...routers[perm])
-        }
-    })
-    return routerList;
+    // Management routes are statically configured with dynamic roleGroup bindings in router/index.js
+    return [];
 }
 
 const routers = {
@@ -89,6 +84,17 @@ const routers = {
             meta: {
                 title: 'oauthApps',
                 name: 'oauth-app',
+                menu: true
+            }
+        },
+        {
+            path: '/audit-report',
+            alias: ['/settings/audit', '/manage-audit'],
+            name: 'audit-report',
+            component: () => import('@/views/audit-report/index.vue'),
+            meta: {
+                title: 'auditReport',
+                name: 'audit-report',
                 menu: true
             }
         }

@@ -33,7 +33,9 @@ const settingService = {
 				{ name: 'global_email_config', sql: `ALTER TABLE setting ADD COLUMN global_email_config TEXT NOT NULL DEFAULT '{}';` },
 				{ name: 'multi_account_enabled', sql: `ALTER TABLE setting ADD COLUMN multi_account_enabled INTEGER NOT NULL DEFAULT 0;` },
 				{ name: 'terms_url', sql: `ALTER TABLE setting ADD COLUMN terms_url TEXT NOT NULL DEFAULT '';` },
-				{ name: 'privacy_url', sql: `ALTER TABLE setting ADD COLUMN privacy_url TEXT NOT NULL DEFAULT '';` }
+				{ name: 'privacy_url', sql: `ALTER TABLE setting ADD COLUMN privacy_url TEXT NOT NULL DEFAULT '';` },
+				{ name: 'oauth_login_enabled', sql: `ALTER TABLE setting ADD COLUMN oauth_login_enabled INTEGER NOT NULL DEFAULT 0;` },
+				{ name: 'oauth_providers', sql: `ALTER TABLE setting ADD COLUMN oauth_providers TEXT NOT NULL DEFAULT '{}';` }
 			];
 
 			let existingCols = new Set();
@@ -85,6 +87,13 @@ const settingService = {
 				settingRow.globalEmailConfig = JSON.parse(settingRow.globalEmailConfig);
 			} catch (e) {
 				settingRow.globalEmailConfig = {};
+			}
+		}
+		if (typeof settingRow.oauthProviders === 'string') {
+			try {
+				settingRow.oauthProviders = JSON.parse(settingRow.oauthProviders);
+			} catch (e) {
+				settingRow.oauthProviders = {};
 			}
 		}
 		c.set('setting', settingRow);
@@ -214,6 +223,15 @@ const settingService = {
 		setting.supportUrl = (c.env.SUPPORT_URL || 'https://blog.epocanvas.com/support').replace(/\/+$/, '');
 		setting.telegramLink = (c.env.TELEGRAM_LINK || 'https://t.me/epomail').replace(/\/+$/, '');
 		setting.githubLink = (c.env.GITHUB_LINK || 'https://github.com/shijianus/epomail').replace(/\/+$/, '');
+		setting.multiAccountEnabled = setting.multiAccountEnabled !== undefined && setting.multiAccountEnabled !== null ? Number(setting.multiAccountEnabled) : 0;
+		setting.termsUrl = setting.termsUrl || '';
+		setting.privacyUrl = setting.privacyUrl || '';
+		setting.oauthLoginEnabled = setting.oauthLoginEnabled !== undefined && setting.oauthLoginEnabled !== null ? Number(setting.oauthLoginEnabled) : 0;
+		if (typeof setting.oauthProviders === 'string') {
+			try { setting.oauthProviders = JSON.parse(setting.oauthProviders); } catch (e) { setting.oauthProviders = {}; }
+		} else if (!setting.oauthProviders) {
+			setting.oauthProviders = {};
+		}
 
 		const dbModeInfo = getDbModeInfo(c);
 		setting.isDual = dbModeInfo.isDual;
@@ -334,6 +352,14 @@ const settingService = {
 			params.globalEmailConfig = JSON.stringify(params.globalEmailConfig);
 		}
 
+		if (params.oauthLoginEnabled !== undefined) {
+			params.oauthLoginEnabled = Number(params.oauthLoginEnabled) === 1 ? 1 : 0;
+		}
+
+		if (params.oauthProviders && typeof params.oauthProviders === 'object') {
+			params.oauthProviders = JSON.stringify(params.oauthProviders);
+		}
+
 		if (params.allMailMode !== undefined) {
 			const m = Number(params.allMailMode);
 			params.allMailMode = [0, 1, 2].includes(m) ? m : 0;
@@ -427,6 +453,10 @@ const settingService = {
 			delete params.aiApiKey;
 		}
 
+		if (params.multiAccountEnabled !== undefined) {
+			params.multiAccountEnabled = (Number(params.multiAccountEnabled) === 1 || params.multiAccountEnabled === true) ? 1 : 0;
+		}
+
 		params.resendTokens = JSON.stringify(resendTokens);
 
 		// Whitelist only valid DB columns in setting table
@@ -451,7 +481,9 @@ const settingService = {
 			'userByoStorage', 'defaultStorageQuotaMb', 'storageProvider',
 			'externalDbEnabled', 'externalDbProvider', 'externalDbEndpoint',
 			'externalDbToken', 'externalDbName', 'externalDbTarget',
-			'attachmentPolicy', 'attachmentMaxSizeMb', 'attachmentCascadeDelete'
+			'attachmentPolicy', 'attachmentMaxSizeMb', 'attachmentCascadeDelete',
+			'multiAccountEnabled', 'termsUrl', 'privacyUrl',
+			'oauthLoginEnabled', 'oauthProviders'
 		];
 
 		const updateData = {};
@@ -810,7 +842,33 @@ const settingService = {
 			githubLink: (c.env.GITHUB_LINK || settingRow.githubLink || 'https://github.com/shijianus/epomail').replace(/\/+$/, ''),
 			multiAccountEnabled: settingRow.multiAccountEnabled ?? 0,
 			termsUrl: settingRow.termsUrl || '',
-			privacyUrl: settingRow.privacyUrl || ''
+			privacyUrl: settingRow.privacyUrl || '',
+			oauthLoginEnabled: settingRow.oauthLoginEnabled ?? 0,
+			oauthProviders: (() => {
+				let p = settingRow.oauthProviders;
+				if (typeof p === 'string') {
+					try { p = JSON.parse(p); } catch (_) { p = {}; }
+				} else if (!p || typeof p !== 'object') {
+					p = {};
+				}
+				const sanitized = {};
+				for (const [k, v] of Object.entries(p)) {
+					if (v && typeof v === 'object') {
+						const hasClientId = Boolean(v.clientId && typeof v.clientId === 'string' && v.clientId.trim() !== '');
+						const hasClientSecret = Boolean(v.clientSecret && typeof v.clientSecret === 'string' && v.clientSecret.trim() !== '');
+						const isAppleConfigured = k === 'apple' && hasClientId && (hasClientSecret || Boolean(v.teamId && v.keyId));
+						const isConfigured = (hasClientId && hasClientSecret) || isAppleConfigured ? 1 : 0;
+						sanitized[k] = {
+							enabled: (v.enabled === 1 || v.enabled === true) ? 1 : 0,
+							configured: isConfigured,
+							clientId: v.clientId || '',
+							name: v.name || '',
+							tenant: v.tenant || ''
+						};
+					}
+				}
+				return sanitized;
+			})()
 		};
 	},
 

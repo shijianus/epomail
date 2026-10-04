@@ -1,13 +1,13 @@
 /**
- * Gmail-style Router History for Vue Router 4
+ * Multi-Account Router History for Vue Router 4
  *
- * Implements Gmail's exact URL architecture:
+ * Implements URL architecture:
  * 1. Account prefix isolation: /mail/u/:userIndex/ (default: /mail/u/0/)
  * 2. Hash fragment view routing: #inbox, #inbox/<mailHash>, #sent, #starred...
  * 3. Browser Back / Forward & deep link synchronization
  */
 
-export function createGmailHistory(defaultAccountIdx = 0) {
+export function createAccountHistory(defaultAccountIdx = 0) {
     const getAccountBase = () => {
         if (typeof window === 'undefined') return `/mail/u/${defaultAccountIdx}/`;
         const m = window.location.pathname.match(/\/mail\/u\/(\d+)/);
@@ -53,7 +53,7 @@ export function createGmailHistory(defaultAccountIdx = 0) {
             try {
                 cb(to, from, info);
             } catch (err) {
-                console.error('[gmail-history] listener error:', err);
+                console.error('[account-history] listener error:', err);
             }
         });
     };
@@ -130,4 +130,5 @@ export function createGmailHistory(defaultAccountIdx = 0) {
     };
 }
 
-export default createGmailHistory;
+export const createGmailHistory = createAccountHistory;
+export default createAccountHistory;

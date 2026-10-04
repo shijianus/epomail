@@ -63,3 +63,7 @@ export function testAiSetting(params) {
 export function fetchAiModels(params) {
     return http.post('/setting/ai/models', params)
 }
+
+export function verifyOauthProvider(provider, params) {
+    return http.post(`/oauth/verify/${provider}`, params)
+}

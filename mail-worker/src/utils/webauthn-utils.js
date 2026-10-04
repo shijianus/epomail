@@ -23,6 +23,11 @@ export function decodeCBOR(buffer) {
 			length = (data[offset++] << 8) | data[offset++];
 		} else if (additionalInfo === 26) {
 			length = ((data[offset++] << 24) | (data[offset++] << 16) | (data[offset++] << 8) | data[offset++]) >>> 0;
+		} else if (additionalInfo === 27) {
+			const hi = ((data[offset++] << 24) | (data[offset++] << 16) | (data[offset++] << 8) | data[offset++]) >>> 0;
+			const lo = ((data[offset++] << 24) | (data[offset++] << 16) | (data[offset++] << 8) | data[offset++]) >>> 0;
+			const big = (BigInt(hi) << 32n) | BigInt(lo);
+			length = big <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(big) : big;
 		} else {
 			throw new Error(`Unsupported CBOR additional info: ${additionalInfo}`);
 		}
@@ -36,15 +41,17 @@ export function decodeCBOR(buffer) {
 			case 0: // unsigned integer
 				return length;
 			case 1: // negative integer
-				return -1 - length;
+				return typeof length === 'bigint' ? -1n - length : -1 - length;
 			case 2: { // byte string
-				const bytes = data.slice(offset, offset + length);
-				offset += length;
+				const len = Number(length);
+				const bytes = data.slice(offset, offset + len);
+				offset += len;
 				return bytes;
 			}
 			case 3: { // text string
-				const textBytes = data.slice(offset, offset + length);
-				offset += length;
+				const len = Number(length);
+				const textBytes = data.slice(offset, offset + len);
+				offset += len;
 				return new TextDecoder().decode(textBytes);
 			}
 			case 4: { // array
@@ -63,6 +70,8 @@ export function decodeCBOR(buffer) {
 				}
 				return map;
 			}
+			case 6: // semantic tag (unwrap and return tagged item)
+				return decodeItem();
 			case 7: // simple / float
 				if (length === 20) return false;
 				if (length === 21) return true;
@@ -189,13 +198,15 @@ export const webauthnUtils = {
 			rawPoint.set(x, 1);
 			rawPoint.set(y, 1 + x.length);
 			publicKeyRaw = this.bufferToBase64Url(rawPoint);
-		} else if (kty === 3 && alg === -257) {
-			// RSA RS256
+		} else if (kty === 3) {
+			// RSA algorithms: -257 (RS256), -37 (PS256), -258 (RS384), -259 (RS512)
 			const n = coseKey[-1];
 			const e = coseKey[-2];
+			const isPss = alg === -37;
+			const jwkAlg = isPss ? 'PS256' : (alg === -258 ? 'RS384' : (alg === -259 ? 'RS512' : 'RS256'));
 			publicKeyJwk = {
 				kty: 'RSA',
-				alg: 'RS256',
+				alg: jwkAlg,
 				n: this.bufferToBase64Url(n),
 				e: this.bufferToBase64Url(e),
 				ext: true
@@ -262,6 +273,24 @@ export const webauthnUtils = {
 				signedData
 			);
 		} else if (publicKeyJwk && publicKeyJwk.kty === 'RSA') {
+			if (publicKeyJwk.alg === 'PS256') {
+				cryptoKey = await crypto.subtle.importKey(
+					'jwk',
+					publicKeyJwk,
+					{ name: 'RSA-PSS', hash: { name: 'SHA-256' } },
+					false,
+					['verify']
+				);
+
+				return await crypto.subtle.verify(
+					{ name: 'RSA-PSS', saltLength: 32 },
+					cryptoKey,
+					sigBytes,
+					signedData
+				);
+			}
+
+			// Default RSASSA-PKCS1-v1_5
 			cryptoKey = await crypto.subtle.importKey(
 				'jwk',
 				publicKeyJwk,

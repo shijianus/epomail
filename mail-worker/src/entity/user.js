@@ -1,6 +1,6 @@
 import { sqliteTable, text, integer} from 'drizzle-orm/sqlite-core';
 import { sql } from 'drizzle-orm';
-import { getDefaultUserLabelsString } from '../const/default-labels';
+import { getDefaultUserLabelsString } from '../const/default-labels.js';
 
 const user = sqliteTable('user', {
 	userId: integer('user_id').primaryKey({ autoIncrement: true }),

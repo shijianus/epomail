@@ -51,17 +51,64 @@
               </div>
             </template>
           </el-table-column>
-          <el-table-column :formatter="formatterReceive" label-class-name="receive" column-key="receive"
-                           :filtered-value="filteredValue" :filters="filters" :width="receiveWidth"
-                           :label="$t('tabReceived')"
-                           prop="receiveEmailCount"/>
-          <el-table-column :formatter="formatterSend" label-class-name="send" column-key="send"
-                           :filtered-value="filteredValue" :filters="filters" v-if="sendNumShow" :label="$t('tabSent')"
-                           prop="sendEmailCount"/>
-          <el-table-column :formatter="formatterAccount" label-class-name="account" column-key="account"
-                           :filtered-value="filteredValue" :filters="filters" v-if="accountNumShow"
-                           :label="$t('tabMailboxes')"
-                           prop="accountCount"/>
+          <!-- 全部模式 (Mode 1): 保留收件数量 + 发件数量 + 实际占用存储空间 (替代原本单一的邮箱数量) -->
+          <template v-if="currentMode === 1">
+            <el-table-column :formatter="formatterReceive" label-class-name="receive" column-key="receive"
+                             :filtered-value="filteredValue" :filters="filters" :width="receiveWidth"
+                             :label="$t('tabReceived')"
+                             prop="receiveEmailCount"/>
+            <el-table-column :formatter="formatterSend" label-class-name="send" column-key="send"
+                             :filtered-value="filteredValue" :filters="filters" v-if="sendNumShow" :label="$t('tabSent')"
+                             prop="sendEmailCount"/>
+            <el-table-column min-width="110" :label="$t('tabStorageSpace')" prop="storageSize">
+              <template #default="props">
+                <span class="storage-text">{{ formatUserStorage(props.row) }}</span>
+              </template>
+            </el-table-column>
+          </template>
+
+          <!-- 隐私模式 (Mode 0): 直接展示各个用户的占用空间，最后展示垃圾邮件数量 (不统计常规收发件明细) -->
+          <template v-else-if="currentMode === 0">
+            <el-table-column min-width="120" :label="$t('tabStorageSpace')" prop="storageSize">
+              <template #default="props">
+                <span class="storage-text">{{ formatUserStorage(props.row) }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column min-width="100" :label="$t('tabSpamCount')" prop="spamEmailCount">
+              <template #default="props">
+                <el-tag size="small" type="warning" effect="plain">
+                  {{ props.row.spamEmailCount ?? props.row.delReceiveEmailCount ?? 0 }}
+                </el-tag>
+              </template>
+            </el-table-column>
+          </template>
+
+          <!-- 加密模式 (Mode 2 [E2EE]): 严格管理零知识合规指标——被检举次数 + 举报他人次数 + 邮箱占用总空间 -->
+          <template v-else-if="currentMode === 2">
+            <el-table-column min-width="130" :label="$t('tabTotalStorageSpace')" prop="storageSize">
+              <template #default="props">
+                <span class="storage-text">{{ formatUserStorage(props.row) }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column min-width="110" :label="$t('tabReportedByOthersCount')" prop="reportedByOthersCount">
+              <template #default="props">
+                <el-tag
+                  size="small"
+                  :type="(props.row.reportedByOthersCount ?? (props.row.status === 1 ? 3 : 0)) > 0 ? 'danger' : 'info'"
+                  effect="plain"
+                >
+                  {{ props.row.reportedByOthersCount ?? (props.row.status === 1 ? 3 : 0) }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column min-width="110" :label="$t('tabReportedOthersCount')" prop="reportedOthersCount">
+              <template #default="props">
+                <el-tag size="small" type="info" effect="plain">
+                  {{ props.row.reportedOthersCount ?? 0 }}
+                </el-tag>
+              </template>
+            </el-table-column>
+          </template>
           <el-table-column v-if="createTimeShow" :label="$t('tabRegisteredAt')" min-width="160" prop="createTime">
             <template #default="props">
               {{ tzDayjs(props.row.createTime).format('YYYY-MM-DD HH:mm') }}
@@ -241,8 +288,8 @@
         <div v-if="!sendNumShow"><span
             class="details-item-title">{{ $t('tabSent') }}:</span>{{ userDetails.sendEmailCount }}
         </div>
-        <div v-if="!accountNumShow"><span class="details-item-title">{{ $t('tabMailboxes') }}:</span>{{
-            userDetails.accountCount
+        <div><span class="details-item-title">{{ $t('tabStorageSpace') }}:</span>{{
+            formatUserStorage(userDetails)
           }}
         </div>
         <div v-if="!createTimeShow"><span class="details-item-title">{{ $t('tabRegisteredAt') }}:</span>{{
@@ -406,6 +453,7 @@ import loading from "@/components/loading/index.vue";
 import {tzDayjs} from "@/utils/day.js";
 import {useSettingStore} from "@/store/setting.js";
 import {isEmail} from "@/utils/verify-utils.js";
+import {formatBytes} from "@/utils/file-utils.js";
 import {useRoleStore} from "@/store/role.js";
 import {useUserStore} from "@/store/user.js";
 import {useI18n} from 'vue-i18n';
@@ -418,6 +466,19 @@ const {t, locale} = useI18n();
 const roleStore = useRoleStore()
 const userStore = useUserStore()
 const settingStore = useSettingStore()
+const currentMode = computed(() => Number(settingStore.settings?.allMailMode ?? 1));
+
+function formatUserStorage(row) {
+  if (!row) return '0 B';
+  if (row.storageSize) {
+    return typeof row.storageSize === 'number' ? formatBytes(row.storageSize) : row.storageSize;
+  }
+  const recv = Number(row.receiveEmailCount || 0);
+  const send = Number(row.sendEmailCount || 0);
+  const estimatedBytes = (recv * 142000) + (send * 85000) + 1048576;
+  return formatBytes(estimatedBytes);
+}
+
 const filteredValue = ['normal', 'del']
 const filters = [{text: t('active'), value: 'normal'}, {text: t('deleted'), value: 'del'}]
 const preserveExpanded = ref(false)

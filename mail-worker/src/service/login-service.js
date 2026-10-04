@@ -24,6 +24,8 @@ import webauthnUtils from '../utils/webauthn-utils.js';
 import orm from '../entity/orm.js';
 import user from '../entity/user.js';
 import { eq } from 'drizzle-orm';
+import riskService from './risk-service.js';
+import deviceTrustService from './device-trust-service.js';
 
 function getSafeSessionUser(userRow) {
 	if (!userRow) return null;
@@ -270,7 +272,19 @@ const loginService = {
 			try {
 				let latest = await c.env.kv.get(failKey);
 				let current = latest ? parseInt(latest) : 0;
-				await c.env.kv.put(failKey, (current + 1).toString(), { expirationTtl: 12 * 60 * 60 });
+				const nextCount = current + 1;
+				await c.env.kv.put(failKey, nextCount.toString(), { expirationTtl: 12 * 60 * 60 });
+				if (nextCount >= 5 && userRow && userRow.userId) {
+					try {
+						const securityNoticeService = (await import('./security-notice-service.js')).default;
+						const { SECURITY_EVENT_TYPES } = await import('../const/security-notice-templates.js');
+						await securityNoticeService.sendNotice(c, userRow.userId, SECURITY_EVENT_TYPES.ACCOUNT_LOCKED, {
+							detail: '12 hours lockdown (5 consecutive failed attempts)'
+						});
+					} catch (e) {
+						console.error('Failed to send account locked notice:', e);
+					}
+				}
 			} catch {}
 		};
 
@@ -334,33 +348,84 @@ const loginService = {
 			}
 		}
 
-		if (isGlobalTotpEnabled && (userRow.totpEnabled === 1 || securityKeysList.length > 0)) {
-			const tempToken = 'totp_tmp_' + uuidv4().replace(/-/g, '');
-			const passkeyChallenge = webauthnUtils.generateChallenge();
+		// Only active passkeys can be used for login (pending_verification under timelock are excluded)
+		const activePasskeys = securityKeysList.filter(k => k.status !== 'pending_verification');
 
-			await c.env.kv.put(
-				KvConst.TOTP_PENDING + tempToken,
-				JSON.stringify({
-					userId: userRow.userId,
-					email: userRow.email,
-					attempts: 0,
-					passkeyChallenge,
-					needsPasswordUpgrade: isLegacy ? password : null,
-					createdAt: Date.now()
-				}),
-				{ expirationTtl: 300 } // 5 minutes TTL
+		const hasActiveTotp = userRow.totpEnabled === 1 && !!userRow.totpSecret;
+		const hasActivePasskey = activePasskeys.length > 0;
+
+		const deviceTag = params.deviceTag || (typeof c.req.header === 'function' ? c.req.header('x-device-tag') : '') || '';
+		const trustedDeviceToken = params.trustedDeviceToken || (typeof c.req.header === 'function' ? c.req.header('x-device-trust') : '') || '';
+
+		let sessionTrustEpoch = null;
+		let sessionMaxEpoch = null;
+
+		if (isGlobalTotpEnabled && (hasActiveTotp || hasActivePasskey)) {
+			// Evaluate autonomous black-box device trust state
+			const trustEval = await deviceTrustService.evaluateTrust(
+				c,
+				userRow.userId,
+				deviceTag,
+				trustedDeviceToken,
+				params.secPayload || {}
 			);
 
-			return {
-				mfaRequired: true,
-				tempToken,
-				authType: 'totp',
-				email: userRow.email,
-				hasTotp: !!userRow.totpSecret,
-				hasPasskeys: securityKeysList.length > 0,
-				passkeys: securityKeysList.map(k => ({ id: k.credentialId, type: 'public-key' })),
-				passkeyChallenge
-			};
+			if (trustEval.canBypass2FA) {
+				// Trusted device 30-day grace bypass is active!
+				sessionTrustEpoch = trustEval.trustEpoch;
+				sessionMaxEpoch = trustEval.maxSessionEpoch;
+			} else {
+				const tempToken = 'totp_tmp_' + uuidv4().replace(/-/g, '');
+				const passkeyChallenge = webauthnUtils.generateChallenge();
+
+				// Evaluate black-box risk model
+				const riskAssessment = await riskService.evaluateRisk(c, userRow, params.secPayload || {});
+
+				let backupCodesRemaining = 0;
+				if (userRow.totpBackupCodes) {
+					try {
+						const parsed = typeof userRow.totpBackupCodes === 'string' ? JSON.parse(userRow.totpBackupCodes) : userRow.totpBackupCodes;
+						if (Array.isArray(parsed)) {
+							backupCodesRemaining = parsed.filter(i => i.used === 0).length;
+						} else if (parsed && Array.isArray(parsed.hashedCodes)) {
+							backupCodesRemaining = parsed.hashedCodes.filter(i => i.used === 0).length;
+						}
+					} catch (e) {}
+				}
+
+				await c.env.kv.put(
+					KvConst.TOTP_PENDING + tempToken,
+					JSON.stringify({
+						userId: userRow.userId,
+						email: userRow.email,
+						attempts: 0,
+						passkeyChallenge,
+						needsPasswordUpgrade: isLegacy ? password : null,
+						stepUpRequired: riskAssessment.stepUpRequired,
+						riskScore: riskAssessment.riskScore,
+						step: 1,
+						verifiedFactors: [],
+						deviceTag,
+						createdAt: Date.now()
+					}),
+					{ expirationTtl: 300 } // 5 minutes TTL
+				);
+
+				return {
+					mfaRequired: true,
+					tempToken,
+					authType: 'totp',
+					email: userRow.email,
+					hasTotp: !!userRow.totpSecret,
+					hasPasskeys: activePasskeys.length > 0,
+					hasBackupCodes: backupCodesRemaining > 0,
+					passkeys: activePasskeys.map(k => ({ id: k.credentialId, type: 'public-key' })),
+					passkeyChallenge,
+					stepUpRequired: riskAssessment.stepUpRequired,
+					step: 1,
+					riskFlags: riskAssessment.clientFlags
+				};
+			}
 		}
 
 		// Clear fail count on success
@@ -406,6 +471,11 @@ const loginService = {
 
 		}
 
+		if (sessionMaxEpoch) {
+			authInfo.trustEpoch = sessionTrustEpoch;
+			authInfo.maxSessionEpoch = sessionMaxEpoch;
+		}
+
 		await userService.updateUserInfo(c, userRow.userId);
 
 		try {
@@ -415,12 +485,30 @@ const loginService = {
 			console.warn('Failed to ensure welcome email on login:', e.message);
 		}
 
+		try {
+			const securityNoticeService = (await import('./security-notice-service.js')).default;
+			await securityNoticeService.checkAndTriggerLoginEnvironmentNotice(c, userRow.userId, userRow.email);
+		} catch (e) {
+			console.warn('Failed to check login environment notice:', e.message);
+		}
+
 		await c.env.kv.put(KvConst.AUTH_INFO + userRow.userId, JSON.stringify(authInfo), { expirationTtl: constant.TOKEN_EXPIRE });
 		return { token: jwt, email: activeLoginEmail, userId: userRow.userId };
 	},
 
 	async verifyTotpLogin(c, params) {
-		const { tempToken, code, isBackupCode = false, isPasskey = false, credentialId, clientDataJSON, authenticatorData, signature } = params;
+		const {
+			tempToken,
+			code,
+			isBackupCode = false,
+			isPasskey = false,
+			credentialId,
+			clientDataJSON,
+			authenticatorData,
+			signature,
+			rememberDevice = false,
+			deviceTag
+		} = params;
 
 		if (!tempToken) {
 			throw new BizError(t('totpCodeEmpty'));
@@ -473,6 +561,12 @@ const loginService = {
 			throw new BizError(t('isBanUser'));
 		}
 
+		const factorType = isPasskey ? 'passkey' : (isBackupCode ? 'backup_code' : 'totp');
+
+		if (pendingData.step === 2 && Array.isArray(pendingData.verifiedFactors) && pendingData.verifiedFactors.includes(factorType)) {
+			throw new BizError(t('stepUpDifferentFactorRequired'));
+		}
+
 		if (isPasskey) {
 			// Verify WebAuthn / Passkey signature
 			if (!credentialId || !clientDataJSON || !authenticatorData || !signature) {
@@ -499,6 +593,11 @@ const loginService = {
 			if (!targetKey) {
 				await incrementAccountFail();
 				throw new BizError('Unrecognized security key');
+			}
+
+			if (targetKey.status === 'pending_verification') {
+				await incrementAccountFail();
+				throw new BizError(t('passkeyTimelockedNotice') || '该通行密钥处于安全观察期中，尚未激活生效，暂无法用于登录');
 			}
 
 			const isValidSig = await webauthnUtils.verifyAuthenticationSignature({
@@ -546,7 +645,61 @@ const loginService = {
 			await c.env.kv.put(replayKey, '1', { expirationTtl: 60 });
 		}
 
-		// Verification passed: consume temporary token
+		// Check Step-Up (二验) decision: If step-up required and step 1 just completed
+		if (pendingData.stepUpRequired && (!pendingData.step || pendingData.step === 1)) {
+			let remainingBackupCount = 0;
+			if (userRow.totpBackupCodes) {
+				try {
+					const parsed = typeof userRow.totpBackupCodes === 'string' ? JSON.parse(userRow.totpBackupCodes) : userRow.totpBackupCodes;
+					if (Array.isArray(parsed)) remainingBackupCount = parsed.filter(i => i.used === 0).length;
+					else if (parsed && Array.isArray(parsed.hashedCodes)) remainingBackupCount = parsed.hashedCodes.filter(i => i.used === 0).length;
+				} catch (e) {}
+			}
+
+			let userKeys = [];
+			if (userRow.securityKeys) {
+				try {
+					userKeys = typeof userRow.securityKeys === 'string' ? JSON.parse(userRow.securityKeys) : userRow.securityKeys;
+					if (!Array.isArray(userKeys)) userKeys = [];
+				} catch (e) {}
+			}
+
+			const activeUserKeys = userKeys.filter(k => k.status !== 'pending_verification');
+
+			const availableFactors = [];
+			if (userRow.totpSecret) availableFactors.push('totp');
+			if (activeUserKeys.length > 0) availableFactors.push('passkey');
+			if (remainingBackupCount > 0) availableFactors.push('backup_code');
+
+			const remainingFactors = availableFactors.filter(f => f !== factorType);
+
+			if (remainingFactors.length > 0) {
+				// Transition to Step 2
+				pendingData.step = 2;
+				pendingData.verifiedFactors = [factorType];
+				const nextPasskeyChallenge = webauthnUtils.generateChallenge();
+				pendingData.passkeyChallenge = nextPasskeyChallenge;
+
+				await c.env.kv.put(pendingKey, JSON.stringify(pendingData), { expirationTtl: 300 });
+
+				return {
+					stepUpRequired: true,
+					step: 2,
+					tempToken,
+					verifiedFactor: factorType,
+					remainingFactors,
+					hasTotp: !!userRow.totpSecret,
+					hasPasskeys: userKeys.length > 0,
+					hasBackupCodes: remainingBackupCount > 0,
+					passkeys: userKeys.map(k => ({ id: k.credentialId, type: 'public-key' })),
+					passkeyChallenge: nextPasskeyChallenge,
+					email: userRow.email,
+					message: t('stepUpAbnormalNotice')
+				};
+			}
+		}
+
+		// Verification fully passed: consume temporary token
 		await c.env.kv.delete(pendingKey);
 
 		// Clear login fail rate limit
@@ -568,6 +721,21 @@ const loginService = {
 			token: uuid 
 		});
 
+		// Issue trusted device token if rememberDevice was requested
+		let issuedTrustToken = null;
+		let sessionTrustEpoch = null;
+		let sessionMaxEpoch = null;
+
+		const effectiveDeviceTag = deviceTag || pendingData.deviceTag || (typeof c.req.header === 'function' ? c.req.header('x-device-tag') : '') || '';
+		if (rememberDevice && effectiveDeviceTag) {
+			const trustResult = await deviceTrustService.issueTrust(c, userRow.userId, effectiveDeviceTag);
+			if (trustResult) {
+				issuedTrustToken = trustResult.trustedDeviceToken;
+				sessionTrustEpoch = trustResult.trustEpoch;
+				sessionMaxEpoch = trustResult.maxSessionEpoch;
+			}
+		}
+
 		let authInfo = await c.env.kv.get(KvConst.AUTH_INFO + userRow.userId, { type: 'json' });
 
 		if (authInfo && (authInfo.user.email === userRow.email)) {
@@ -583,6 +751,11 @@ const loginService = {
 			};
 		}
 
+		if (sessionMaxEpoch) {
+			authInfo.trustEpoch = sessionTrustEpoch;
+			authInfo.maxSessionEpoch = sessionMaxEpoch;
+		}
+
 		await userService.updateUserInfo(c, userRow.userId);
 
 		try {
@@ -592,8 +765,15 @@ const loginService = {
 			console.warn('Failed to ensure welcome email on TOTP login:', e.message);
 		}
 
+		try {
+			const securityNoticeService = (await import('./security-notice-service.js')).default;
+			await securityNoticeService.checkAndTriggerLoginEnvironmentNotice(c, userRow.userId, userRow.email);
+		} catch (e) {
+			console.warn('Failed to check login environment notice on TOTP login:', e.message);
+		}
+
 		await c.env.kv.put(KvConst.AUTH_INFO + userRow.userId, JSON.stringify(authInfo), { expirationTtl: constant.TOKEN_EXPIRE });
-		return { token: jwt, email: activeLoginEmail, userId: userRow.userId };
+		return { token: jwt, email: activeLoginEmail, userId: userRow.userId, trustedDeviceToken: issuedTrustToken };
 	},
 
 	async logout(c, userId) {

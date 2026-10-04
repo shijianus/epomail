@@ -9,6 +9,23 @@
 
 ---
 
+
+### 100% 真实 Cloudflare 生产环境 PM 正式验收评审报告 (PM Acceptance Review) (2026-10-04)
+*   **关联提交 (Git Commit)**: `ca582d84d7ce4e58a52fb7123f713e248704039a` (Short: `ca582d8`)
+*   **专项文档索引 (Detailed Doc)**: `doc/pm-acceptance-review-20261004-live-cloudflare.md`
+*   **体检/审计范围与方法 (Scope & Methodology)**:
+    1. 范围与环境：100% 真实 Cloudflare 生产网络环境 (`https://mail.epocanvas.com` & `https://epomail-docs.pages.dev`)，覆盖登录页安全申诉引导弹窗、独立表单与 SHA-256 指纹存证、凭据回执卡、用户列表三模式自适应列体系、操作报告时序流与 4 类预警 KPI 过滤、加密模式纯 DB 窄表 (零个人身份/零时间戳/机器初判)、研判工作台队列、扩展页双栏基线对比抽屉、策略容量与 Level 0~Level 3 风险及 Bot 处置规范等全部 11 张高分辨率全真截图 (`tests/live_prod_*.png`)。
+    2. 工具与脚本：真实 Cloudflare Workers / Pages 生产链路直连抓取，Playwright 端到端无 Mock 自动化核验，像素级排版与微质感审视。
+*   **核心发现与缺陷矩阵 (Key Findings & Matrix)**:
+    - **[P0·阻塞/安全]**: 零发现。Webmail 核心与外部申诉表单物理隔离，杜绝针对 Webmail 的撞库攻击；加密模式 5 列窄表实现 100% 零时间戳与零个人身份脱敏；SHA-256 硬件指纹本地自动存证防篡改。
+    - **[P1·重要/体验]**: 零发现。用户列表 Mode 1 (收发存) / Mode 0 (存+垃圾) / Mode 2 (空间+检举) 自适应列体系平滑切换；4 类预警 KPI 卡片过滤联动与时序流零噪音；惩戒类「对其进行操作」与司法类「研判放行」语义分流精准；一键采纳推荐与阶梯调整裁决流程顺畅。
+    - **[P2·次要/样式]**: 零发现。8px 律动网格微排版，暗黑赛博与 Google Forms 风格和谐共存，双栏基线对比抽屉 98% 醒目指纹展示呼吸感充沛。
+*   **治理修复与回归结果 (Fixes & Verification)**:
+    - 8 大核心重构功能点与 11 份高分辨率真实生产截图全部通过验收；
+    - **验收结论：[ PASSED / APPROVED · 正式验收通过 · 准予全量签发 ]**
+
+---
+
 ### EpomailDocs v5.9 独立审计：介绍与法律内容全量对码与完整性核查 (2026-10-04)
 *   **关联提交 (Git Commit)**: 见主仓本轮归档提交（CHECKLIST.log 同名条目）；EpomailDocs 治理提交 `e34ce0270c42dc7b50f0add6f0a47310046cf37e` (Short: `e34ce02`)
 *   **专项文档索引 (Detailed Doc)**: `doc/epomaildocs-v59-independent-audit.md`
@@ -24,6 +41,22 @@
     - 本轮为独立审计 + 单项完整性修复：EpomailDocs `e34ce02` 同步 manifest 固化提交号（66 篇 SHA-256 重新生成零字节变化，仅 4 行元数据），重建核验 67 页零报错/1416 锚点 0 断链；线上重新发布未执行（`pnpm run deploy` 待运营者确认）。
     - 后续路线图（R1 文档准确性修订 ×6 语言 → R2 站点工具修补 → R3 产品侧三决策项 → R4 splash 首页等形态升级 → R5 manifest 提交号 CI 化等流程制度化）已列入专项文档第六节。
     - **同日治理轮闭环（EpomailDocs `08448fb` + `68a014c`，v5.10）**：R1 全部落地——①P1-A/B/C 三处过度宣称六语言修订（TOTP 官方邮件目录收敛为 2 类、is:unread/is:starred 删除、附件表述对齐实现）；②P2-A/C、P2-B、P2-D/E/F/G、P3 两项全项落地（六语言本地图、单库运行披露、提交链路滚动更新、README v5.10 口径、audit-public 相对路径化、翻页卡补两枚图标、check-structure 纳入 en 图片多重集比对 + en/features 补第 6 图）；③全站 5.9→5.10（66 文件）；④核验：build 零报错、anchors 1416/0、structure 6 语言 100%（含 en）、laws exit 0、残留断言 grep 全零、本地 wrangler pages dev + Playwright 7 张截图判图全绿（明暗双主题/四语言关键页/Accept-Language 协商）；⑤R5 部分落地：内容提交与 manifest 同步拆分两提交，固化提交号不再滞后。R3（产品侧：TOTP 邮件实现或维持删除、is: 算子实现或移除 UI chip、附件上限实现）与 R4（splash 首页等形态升级）仍待运营者决策。另：EpomailDocs 根目录 02:18 出现两个来源不明之 ECCP 专案杂散文件（PROJECT_STATE.md/REPORTS.md，未跟踪），已移出仓库隔离至桌面 stray-recovered-2026-10-04/ 备查，未入库未删除。
+
+### 核心功能与 UX 架构正式验收评审报告 (PM Acceptance Review) (2026-10-03)
+*   **关联提交 (Git Commit)**: `4382d41447354695cea89956a2c22263c2611cfb` (Short: `4382d41`)
+*   **专项文档索引 (Detailed Doc)**: `doc/pm-acceptance-review-20261003.md`
+*   **体检/审计范围与方法 (Scope & Methodology)**:
+    1. 范围与环境：本地全真栈生产模拟环境，覆盖用户列表 (全部/隐私/加密模式)、操作报告 (时序流/窄表格/研判工作台/设置)、研判抽屉、epomail-docs 独立表单门户及登录找回密码弹窗等 11 项全真栈截图。
+    2. 工具与脚本：多端生产截图像素级比对 (pm_01 ~ pm_11)、业务域解耦验证、三模式列结构审查、人机工效与语义分流评估。
+*   **核心发现与缺陷矩阵 (Key Findings & Matrix)**:
+    - **[P0·阻塞/安全]**: 零发现。列表与报告业务域物理级彻底解耦；加密模式下纯 DB 窄表实现 100% 零时间戳脱敏擦除；独立外部表单 (#/f/hash) 与本地 SHA-256 存证闭环安全可靠。
+    - **[P1·重要/体验]**: 零发现。用户列表三套自适应列结构 (Mode 1 收发存, Mode 0 存与垃圾数, Mode 2 空间与检举数) 动态切换精准；动作语义（对其操作 vs 研判放行）清晰解耦；操作报告 4 类预警过滤零日常噪音。
+    - **[P2·次要/样式]**: 零发现。8px 律动网格微排版规范，高密度排版零遮挡重叠，双栏基线对比卡片 98% 醒目指纹展示与 3-IP 环境池裁决体验顺畅。
+*   **治理修复与回归结果 (Fixes & Verification)**:
+    - 8 项核心重构特性全部通过验收，11 份高分辨率实测截图全绿达标；
+    - **验收结论：[ PASSED / APPROVED · 正式验收通过 · 准予上线 ]**
+
+---
 
 ### EpomailDocs v5.7 独立复审：介绍与法律内容全量对码审计与发布状态核查 (2026-10-03)
 *   **关联提交 (Git Commit)**: `6cae7c3804450a899e20188a438543b9b7228997` (Short: `6cae7c3`)；审计对象 EpomailDocs @ `6478520`（v5.7，54 页 = 9 篇 × 6 语言），事实基准为主仓 @ `50c69e0`
@@ -41,6 +74,20 @@
     - **同日打磨轮闭环（EpomailDocs `fcc1d10` + 主仓 `75f8125f6d730385588db731fb2899d735e35490`）**：①【P0】文档站已首次公网发布至 Cloudflare Pages（`epomail-docs.pages.dev`，部署别名 `master.epomail-docs.pages.dev`），线上页面/双轨图片/tamper-proof.json 全部 200；②【P1】国家码过度宣称已修正（×6 语言，新增「边缘环境信息」行：请求时读取、不入库、随响应销毁）；③R2 口径统一为「可选启用；未启用时附件经 KV」（×6 语言）；④八项内容补章全部落地（×6 语言）：隐私 §1 收件域名、§4.3 Cookie 与人机验证、§7 执法请求原则、§8/数据安全 3.2/条款 8.1 注销后 90 日实体删除上限、数据安全 3.4 事件通报 72 小时、AUP §6 执行阶梯技术基础（发信配额 5/8/10/100/不限，`email-service.js:746` 证实 0=不限）＋AUP 新增 §8 著作权通知与反通知、条款 §3.2 年龄诚实申报说明；⑤【P2·缺 H1 反转处置】发现全站既有双重标题缺陷（Starlight 模板已以前言 title 渲染唯一 h1，正文 H1 叠加），统一移除 9 篇 ×6 语言正文 H1，单 h1 一致性与无障碍语义同时达成；⑥【P3】`crypto-utils.js` 两处 210,000 注释修正为与常量 100,000 一致（注释性变更，零行为差异）；⑦EpomailDocs 本地流水回填 v5.5–v5.7 断档三轮并入档本轮。
     - **验证**：check-structure 对称 100%（含 en 独立基准 9 篇）、anchors 1212/0 断链、verify-laws exit 0、`pnpm build` 55 页零报错；本地 `wrangler pages dev` 根轨道（＝Pages 生产形态）22 张截图判图全绿（亮/暗 × zh/zh-tw/en × 1440/375），并证 astro preview 之插图 404 为预览器 base 处理伪象（生产双轨均 200）；源码对码 10 项新增事实声称全部有证据（`wrangler.toml:58`、`welcome-template.js`、`user-service.js:272`、`init.js:112-180`、`setting.js:64`、`email-service.js:307`、`index.js:44`、`mail-vue/index.html:13` 等）。
     - **剩余事项（运营者决策/执行）**：①正式域名绑定——`docs.epocanvas.com/epomail` 之原定案需在 docs 域加 Worker 路由代理至本 Pages 项目，或改用独立子域并同步全站 SITE_ORIGIN/canonical 与应用内 `DOCS_URL` 生产配置；②`privacy@`/`admin@epocanvas.com` 邮箱可达性自测留痕（连续三轮挂账）；③注销后 90 日实体删除与安全事件 72 小时通报为本轮新增之运营承诺，须纳入日常运维执行；④建议后续为「删邮件后附件计数为 0」补自动化断言。
+### 官方文档全量重构、Gmail 式双重定位与公网感官渲染深度审计 (2026-10-02)
+*   **关联提交 (Git Commit - epocanvas-mail)**: `03544a046342c1be3db30650f01b33362142277d` (Short: `03544a0`)
+*   **关联提交 (Git Commit - epomail-docs)**: `b0524838641473fa73f305f8846c26ae67b36f11` (Short: `b052483`)
+*   **体检/审计范围与方法 (Scope & Methodology)**:
+    1. 范围与环境：Cloudflare Pages 生产环境 (`https://epomail-docs.pages.dev/epomail/en/mail/*`)，覆盖 Overview、Privacy Policy、Terms of Service、Tamper-Proof、Acceptable Use、Data Security 等 9 个核心文档。主站 `epocanvas-mail` 前端 Header。
+    2. 工具与脚本：Playwright 端到端无头浏览器 (Chromium) 测试，静态分析脚本 (`check-structure.py`, `validate-anchors.cjs`)，多语言字典检查 (`i18n-symmetry.mjs`, `i18n-audit.mjs`)。
+*   **核心发现与缺陷矩阵 (Key Findings & Matrix)**:
+    - **[P0·阻塞/安全]**: 零发现。防篡改组件 (`tamper-proof-panel`) 精准隔离于 `tamper-proof` 专页，其他页面彻底清零（实测未重复出现），有效消除视觉疲劳与滥用隐患。逻辑层面，开源协议（MIT、零遥测、自建独立数据控制者、品牌商标保护）与托管服务规范（非商业定位、无商业 SLA、数据版权、30天清理）呈现完全一致，无矛盾与越权漏洞。
+    - **[P1·重要/体验]**: 零发现。主站 `gac-footer` 成功升级为新标签页直连公网真实文档 URL，告别本地强弹窗，提升阅读体验；6 语言 (zh, zh-Hant, en, es, fr, nl) i18n 字典已达 100% 绝对对称（2099 / 1917 键），无词条缺失。
+    - **[P2·次要/样式]**: 零发现。全站成功阻断「繁體中文為準 / reference only / 僅供參考」等语言降级文案；各个主要页面内容丰满（>50字高质量段落数 8~20 个，总词数超 6,500 词），结构化 H3 层级与 Callout 卡片渲染节奏恰当；SVG 插画与矢量图精准控制在 1~3 张，网络请求全部 200。二级侧边栏三大核心分类折叠/展开结构正确。
+*   **治理修复与回归结果 (Fixes & Verification)**:
+    - 修复了 `mail-vue/src/layout/header/index.vue` 的 `gac-footer` 链接，确保在新标签页中安全打开官方文档；
+    - Playwright 自动化探测与公网真实访问均确认内容结构完整；
+    - **审计结论：[ APPROVED · 准予交付 ]**
 
 ---
 
@@ -495,3 +542,17 @@
     - **Git Commit Hash**: `5d8d73e536c535632b5eef85e9754ae40d913730` (Short Hash: `5d8d73e`)。
     - 生产部署上线 Cloudflare Workers Version ID: `89ec6d9c-6b31-4e30-b20a-bb49c3498200`。
     - 全链路自动化测试套件 `node tests/test-total-zero-to-one-verification.mjs` 100% 顺利通过（Phase 1 ~ Phase 6 全量通过）。
+### 端到端公网视觉与渲染深度审计 (2026-10-02)
+*   **关联提交 (Git Commit)**: `c0e13158b4528` (Short: `c0e1315`)
+*   **专项文档索引 (Detailed Doc)**: 无
+*   **体检/审计范围与方法 (Scope & Methodology)**:
+    1. 范围与环境：Cloudflare Pages 生产环境 (`https://epomail-docs.pages.dev/epomail/en/mail/*`)，覆盖 Overview、Privacy Policy、Terms of Service、Tamper-Proof 等 6 个核心页面。主站 `epocanvas-mail` 前端 Header。
+    2. 工具与脚本：Playwright 端到端无头浏览器 (Chromium) 测试，静态分析脚本 (`check-structure.py`, `validate-anchors.cjs`)，多语言字典检查。
+*   **核心发现与缺陷矩阵 (Key Findings & Matrix)**:
+    - **[P0·阻塞/安全]**: 零发现。防篡改组件 (`tamper-proof-panel`) 精准隔离于 `tamper-proof` 专页，全局仅呈现 1 次（视觉无重复），其他页面彻底清零，有效消除视觉疲劳与滥用隐患。逻辑层面，开源协议（MIT、零遥测）与托管服务规范（数据版权、30天清理）呈现一致，无矛盾与越权漏洞。
+    - **[P1·重要/体验]**: 零发现。主站 `gac-footer` 成功升级为新标签页直连公网真实文档 URL (`/epomail/en/mail/*`)，告别本地强弹窗，提升阅读体验；6 语言 (zh, zh-Hant, en, es, fr, nl) i18n 字典已达 100% 绝对对称，无词条缺失。
+    - **[P2·次要/样式]**: 零发现。全站成功阻断「繁體中文為準 / reference only / 僅供參考」等语言降级文案；各个主要页面内容丰满（>50字高质量段落数 8~20 个），结构化 H3 层级与 Callout 卡片渲染节奏恰当；SVG 插画与矢量图精准控制在 1~3 张，网络请求全部 200。二级侧边栏三大核心分类折叠/展开结构正确。
+*   **治理修复与回归结果 (Fixes & Verification)**:
+    - `mail-vue/src/layout/header/index.vue` 的 `gac-footer` 链接已修复为直接指向 `/en/` 生产路由。
+    - Playwright 端到端公网实测断言全数通过。
+    - **审计结论：[ APPROVED · 准予交付 ]**

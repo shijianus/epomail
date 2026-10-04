@@ -252,6 +252,58 @@
             </div>
           </div>
 
+          <!-- Third-Party Auth & SSO Settings Card (第三方认证与单点登录管理 - 底层特性开关控制) -->
+          <div v-if="ENABLE_OAUTH_INTEGRATION" class="settings-card oauth-sso-card">
+            <div class="card-title">
+              {{ $t('oauthAuthTitle') }}
+              <el-tooltip effect="dark" :content="$t('oauthAuthDesc')">
+                <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+              </el-tooltip>
+            </div>
+            <div class="card-content">
+              <!-- Switch: 启用第三方登录 -->
+              <div class="setting-item">
+                <div class="title-item">
+                  <span>{{ $t('oauthLoginSwitch') }}</span>
+                  <el-tooltip effect="dark" :content="$t('oauthLoginSwitchDesc')">
+                    <Icon class="warning" icon="fe:warning" width="16" height="16"/>
+                  </el-tooltip>
+                </div>
+                <div>
+                  <el-switch
+                    @change="(val) => handleOauthMasterSwitchChange(val)"
+                    :active-value="1"
+                    :inactive-value="0"
+                    v-model="setting.oauthLoginEnabled"
+                  />
+                </div>
+              </div>
+
+              <!-- Providers Integration Items: 纯净单行 (图标 + 提供商名称 + 右对齐纯图标配置按钮) -->
+              <div 
+                v-for="provider in OAUTH_PROVIDERS_LIST" 
+                :key="provider.key" 
+                class="setting-item oauth-provider-row"
+              >
+                <div class="title-item">
+                  <Icon :icon="provider.icon" width="17" height="17" class="provider-icon" />
+                  <span>{{ provider.key === 'custom' ? getCustomOauthTitle() : provider.label }}</span>
+                </div>
+                <div class="forward">
+                  <el-tooltip effect="dark" :content="$t('oauthConfigure')">
+                    <el-button 
+                      class="opt-button" 
+                      size="small" 
+                      type="primary" 
+                      @click="openOauthProviderModal(provider.key)"
+                    >
+                      <Icon icon="fluent:settings-48-regular" width="18" height="18" />
+                    </el-button>
+                  </el-tooltip>
+                </div>
+              </div>
+            </div>
+          </div>
 
           <!-- Storage & Core Database Hub Card (存储与核心数据库管理) -->
           <div class="settings-card storage-db-card">
@@ -823,6 +875,132 @@
             </div>
           </div>
 
+
+          <!-- Audit & Risk Control Policy Card -->
+          <div class="settings-card audit-policy-card">
+            <div class="card-title">{{ $t('auditReport') }}</div>
+            <div class="card-content">
+              <div class="setting-item">
+                <div>
+                  <span>{{ $t('auditMaxIpLimit') }}</span>
+                  <el-tooltip effect="dark" :content="$t('auditMaxIpLimitDesc')">
+                    <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+                  </el-tooltip>
+                </div>
+                <div>
+                  <el-input-number
+                    v-model="setting.auditMaxIpPerAccount"
+                    :min="1"
+                    :max="20"
+                    size="small"
+                    @change="(val) => changeField('auditMaxIpPerAccount', val)"
+                  />
+                </div>
+              </div>
+
+              <div class="setting-item">
+                <div>
+                  <span>{{ $t('auditMaxDeviceLimit') }}</span>
+                  <el-tooltip effect="dark" :content="$t('auditMaxDeviceLimitDesc')">
+                    <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+                  </el-tooltip>
+                </div>
+                <div>
+                  <el-input-number
+                    v-model="setting.auditMaxDevicePerAccount"
+                    :min="1"
+                    :max="20"
+                    size="small"
+                    @change="(val) => changeField('auditMaxDevicePerAccount', val)"
+                  />
+                </div>
+              </div>
+
+              <div class="setting-item">
+                <div>
+                  <span>{{ $t('auditAutoCleanOldest') }}</span>
+                  <el-tooltip effect="dark" :content="$t('auditAutoCleanOldestDesc')">
+                    <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+                  </el-tooltip>
+                </div>
+                <div>
+                  <el-switch
+                    v-model="setting.auditAutoCleanOldest"
+                    :active-value="1"
+                    :inactive-value="0"
+                    @change="(val) => changeField('auditAutoCleanOldest', val)"
+                  />
+                </div>
+              </div>
+
+              <div class="setting-item">
+                <div>
+                  <span>{{ $t('auditPrioritizeNonCriticalClean') }}</span>
+                  <el-tooltip effect="dark" :content="$t('auditPrioritizeNonCriticalCleanDesc')">
+                    <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+                  </el-tooltip>
+                </div>
+                <div>
+                  <el-switch
+                    v-model="setting.auditPrioritizeNonCriticalClean"
+                    :active-value="1"
+                    :inactive-value="0"
+                    @change="(val) => changeField('auditPrioritizeNonCriticalClean', val)"
+                  />
+                </div>
+              </div>
+
+              <div class="setting-item">
+                <div>
+                  <span>{{ $t('auditCriticalQuota') }}</span>
+                  <el-tooltip effect="dark" :content="$t('auditCriticalQuotaDesc')">
+                    <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+                  </el-tooltip>
+                </div>
+                <div>
+                  <el-input-number
+                    v-model="setting.auditCriticalQuota"
+                    :min="1"
+                    :max="10"
+                    size="small"
+                    @change="(val) => changeField('auditCriticalQuota', val)"
+                  />
+                </div>
+              </div>
+
+              <div class="setting-item">
+                <div>
+                  <span>{{ $t('auditReport') }}</span>
+                  <el-tooltip effect="dark" :content="$t('auditReportDesc')">
+                    <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+                  </el-tooltip>
+                </div>
+                <div class="forward">
+                  <span>{{ $t('auditReport') }}</span>
+                  <el-button
+                    type="primary"
+                    size="small"
+                    class="opt-button"
+                    :title="$t('auditReportDesc')"
+                    @click="openAuditReport"
+                  >
+                    <Icon icon="fluent:shield-task-24-regular" width="18" height="18"/>
+                  </el-button>
+                </div>
+              </div>
+              <div style="margin-top: 10px; display: flex; justify-content: flex-end;">
+                <el-button
+                  type="primary"
+                  size="small"
+                  plain
+                  @click="openAuditReport"
+                >
+                  <Icon icon="fluent:shield-task-24-regular" width="16" height="16" style="margin-right: 4px; vertical-align: -2px;" />
+                  {{ $t('auditReport') }} ({{ $t('auditTabStream') }} / {{ $t('auditTabRisk') }})
+                </el-button>
+              </div>
+            </div>
+          </div>
 
           <div class="settings-card about">
             <div class="card-title">{{ $t('about') }}</div>
@@ -3257,13 +3435,156 @@
         </template>
       </el-dialog>
 
+      <!-- Third-Party OAuth Provider Configuration Modal -->
+      <el-dialog
+        v-model="oauthConfigDialogShow"
+        class="oauth-config-dialog"
+        width="680px"
+        align-center
+        destroy-on-close
+      >
+        <template #header>
+          <div class="oauth-dialog-header">
+            <div class="oauth-dialog-header-left">
+              <Icon :icon="activeOauthProviderMeta.icon" width="22" height="22" class="oauth-header-icon" />
+              <span class="oauth-dialog-title">
+                {{ activeOauthProviderMeta.name }} {{ $t('oauthModalTitle') }}
+              </span>
+            </div>
+          </div>
+        </template>
+        <div class="oauth-dialog-body">
+          <!-- 启用开关行 (纯净无灰底方框) -->
+          <div class="oauth-enable-row">
+            <div class="enable-label-wrap">
+              <span class="enable-title">{{ $t('oauthEnableProvider') }}</span>
+              <span class="enable-subtitle">({{ activeOauthProviderMeta.name }} SSO)</span>
+            </div>
+            <el-switch v-model="oauthForm.enabled" />
+          </div>
+
+          <!-- 双列响应式网格表单 (2-Column Grid Form) -->
+          <div class="oauth-grid-form">
+            <!-- Custom: Provider Name & Scope -->
+            <template v-if="activeOauthProviderKey === 'custom'">
+              <div class="grid-field">
+                <div class="field-label">{{ $t('oauthCustomName') }} <span class="required-star">*</span></div>
+                <el-input v-model="oauthForm.name" placeholder="e.g. Enterprise SSO" clearable />
+              </div>
+              <div class="grid-field">
+                <div class="field-label">{{ $t('oauthScope') }}</div>
+                <el-input v-model="oauthForm.scope" placeholder="openid email profile" clearable />
+              </div>
+            </template>
+
+            <!-- Client ID (All Providers) -->
+            <div class="grid-field">
+              <div class="field-label">
+                {{ $t('oauthClientId') }} <span class="required-star">*</span>
+              </div>
+              <el-input v-model="oauthForm.clientId" placeholder="Client ID / App ID" clearable />
+            </div>
+
+            <!-- Client Secret (All Providers) -->
+            <div class="grid-field">
+              <div class="field-label">
+                {{ $t('oauthClientSecret') }} <span v-if="activeOauthProviderKey !== 'apple'" class="required-star">*</span>
+              </div>
+              <el-input v-model="oauthForm.clientSecret" type="password" show-password placeholder="Client Secret / App Secret" clearable />
+            </div>
+
+            <!-- Microsoft: Tenant & Scope -->
+            <template v-if="activeOauthProviderKey === 'microsoft'">
+              <div class="grid-field">
+                <div class="field-label">{{ $t('oauthTenant') }}</div>
+                <el-input v-model="oauthForm.tenant" placeholder="common / organizations / consumers" clearable />
+              </div>
+              <div class="grid-field">
+                <div class="field-label">{{ $t('oauthScope') }}</div>
+                <el-input v-model="oauthForm.scope" placeholder="openid email profile" clearable />
+              </div>
+            </template>
+
+            <!-- Apple: Team ID & Key ID -->
+            <template v-if="activeOauthProviderKey === 'apple'">
+              <div class="grid-field">
+                <div class="field-label">{{ $t('oauthTeamId') }} <span class="required-star">*</span></div>
+                <el-input v-model="oauthForm.teamId" placeholder="10-character Team ID" clearable />
+              </div>
+              <div class="grid-field">
+                <div class="field-label">{{ $t('oauthKeyId') }} <span class="required-star">*</span></div>
+                <el-input v-model="oauthForm.keyId" placeholder="10-character Key ID" clearable />
+              </div>
+            </template>
+
+            <!-- Custom: Auth URL & Token URL -->
+            <template v-if="activeOauthProviderKey === 'custom'">
+              <div class="grid-field">
+                <div class="field-label">
+                  {{ $t('oauthAuthUrl') }} <span class="required-star">*</span>
+                </div>
+                <el-input v-model="oauthForm.authUrl" placeholder="https://sso.example.com/oauth/authorize" clearable />
+              </div>
+              <div class="grid-field">
+                <div class="field-label">
+                  {{ $t('oauthTokenUrl') }} <span class="required-star">*</span>
+                </div>
+                <el-input v-model="oauthForm.tokenUrl" placeholder="https://sso.example.com/oauth/token" clearable />
+              </div>
+              <div class="grid-field col-span-2">
+                <div class="field-label">
+                  {{ $t('oauthUserInfoUrl') }} <span class="required-star">*</span>
+                </div>
+                <el-input v-model="oauthForm.userInfoUrl" placeholder="https://sso.example.com/oauth/userinfo" clearable />
+              </div>
+            </template>
+          </div>
+
+          <!-- 回调地址单行 (纯净无灰底方框) -->
+          <div class="oauth-callback-row">
+            <div class="callback-label-group">
+              <span class="callback-label">{{ $t('oauthCallbackUrl') }}:</span>
+              <code class="callback-code" :title="currentProviderCallbackUrl">{{ currentProviderCallbackUrl }}</code>
+            </div>
+            <el-tooltip :content="$t('oauthCallbackTip')" placement="top">
+              <el-button size="small" text type="primary" class="copy-callback-btn" @click="copyOauthRedirectUri">
+                <Icon icon="fluent:copy-20-regular" width="14" height="14" style="margin-right: 4px;" />
+                <span>{{ $t('copy') }}</span>
+              </el-button>
+            </el-tooltip>
+          </div>
+        </div>
+        <template #footer>
+          <div class="dialog-footer" style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <el-button
+                class="opt-btn-inline"
+                size="default"
+                :loading="testingOauth"
+                :disabled="!oauthForm.clientId"
+                @click="handleTestOauthProvider"
+              >
+                <Icon icon="fluent:flash-checkmark-24-filled" width="14" height="14" style="margin-right: 4px;" />
+                {{ $t('oauthTestConnectivity') }}
+              </el-button>
+            </div>
+            <div style="display: flex; gap: 10px;">
+              <el-button @click="oauthConfigDialogShow = false">{{ $t('cancel') }}</el-button>
+              <el-button type="primary" :loading="settingLoading" @click="saveOauthProviderConfig">
+                {{ $t('save') }}
+              </el-button>
+            </div>
+          </div>
+        </template>
+      </el-dialog>
+
     </el-scrollbar>
   </div>
 </template>
 
 <script setup>
 import {computed, defineOptions, nextTick, onMounted, onUnmounted, reactive, ref, watch} from "vue";
-import {deleteBackground, setBackground, setBlackList, settingQuery, settingSet, sendWelcomeEmail, sendGlobalEmail, getGlobalEmailConfig, testS3Setting, getDbStatus, testDbSetting, scanStorage, cleanupStorage, testAiSetting, fetchAiModels} from "@/request/setting.js";
+import {deleteBackground, setBackground, setBlackList, settingQuery, settingSet, sendWelcomeEmail, sendGlobalEmail, getGlobalEmailConfig, testS3Setting, getDbStatus, testDbSetting, scanStorage, cleanupStorage, testAiSetting, fetchAiModels, verifyOauthProvider} from "@/request/setting.js";
 import { roleRoleList } from "@/request/role.js";
 import { WELCOME_TEMPLATES, getWelcomeTemplate, DEFAULT_WELCOME_SUBJECT, DEFAULT_WELCOME_CONTENT } from "@/const/welcome-templates.js";
 import { getAnnouncementTemplate } from "@/const/announcement-templates.js";
@@ -3284,9 +3605,12 @@ import {getTextWidth} from "@/utils/text.js";
 import {fileToBase64} from "@/utils/file-utils.js";
 import {formatDetailDate} from "@/utils/day.js";
 import {useI18n} from 'vue-i18n';
+import {useRouter} from 'vue-router';
+import {getRoleGroupSlug} from '@/utils/role-utils.js';
 import {ElMessageBox, ElMessage} from "element-plus";
 import { APP_VERSION } from "@/const/version.js";
 import { getOfficialLink } from "@/const/links-const.js";
+import { ENABLE_OAUTH_INTEGRATION } from "@/const/feature-flags.js";
 
 defineOptions({
   name: 'sys-setting'
@@ -3377,6 +3701,320 @@ const settingStore = useSettingStore();
 const uiStore = useUiStore();
 const {settings: setting} = storeToRefs(settingStore);
 const activeUiTab = ref('dynamic')
+const OAUTH_PROVIDERS_LIST = [
+  { key: 'github', label: 'GitHub', icon: 'mdi:github' },
+  { key: 'google', label: 'Google', icon: 'logos:google-icon' },
+  { key: 'microsoft', label: 'Microsoft', icon: 'logos:microsoft-icon' },
+  { key: 'apple', label: 'Apple', icon: 'ic:baseline-apple' },
+  { key: 'custom', label: 'Custom', icon: 'fluent:shield-keyhole-20-filled' }
+];
+
+const oauthConfigDialogShow = ref(false);
+const activeOauthProviderKey = ref('github');
+const testingOauth = ref(false);
+
+const oauthForm = reactive({
+  enabled: true,
+  clientId: '',
+  clientSecret: '',
+  tenant: 'common',
+  teamId: '',
+  keyId: '',
+  name: '',
+  authUrl: '',
+  tokenUrl: '',
+  userInfoUrl: '',
+  scope: 'openid email profile'
+});
+
+function getParsedOauthProviders() {
+  let providers = setting.value?.oauthProviders;
+  if (typeof providers === 'string') {
+    try { providers = JSON.parse(providers); } catch (_) { providers = {}; }
+  } else if (!providers || typeof providers !== 'object') {
+    providers = {};
+  }
+  return providers;
+}
+
+function isOauthProviderConfigured(key) {
+  const providers = getParsedOauthProviders();
+  const cfg = providers[key];
+  if (!cfg) return false;
+  return Boolean(cfg.clientId && typeof cfg.clientId === 'string' && cfg.clientId.trim() !== '');
+}
+
+function isOauthProviderEnabled(key) {
+  const providers = getParsedOauthProviders();
+  const cfg = providers[key];
+  if (!cfg) return false;
+  return cfg.enabled === true || cfg.enabled === 1;
+}
+
+async function handleOauthMasterSwitchChange(val) {
+  await changeField('oauthLoginEnabled', val);
+  if (val === 1) {
+    const configuredCount = OAUTH_PROVIDERS_LIST.filter(p => isOauthProviderConfigured(p.key)).length;
+    const enabledCount = OAUTH_PROVIDERS_LIST.filter(p => isOauthProviderEnabled(p.key)).length;
+    if (configuredCount === 0) {
+      ElMessage.warning(t('oauthNoProviderConfiguredWarning'));
+    } else if (enabledCount === 0) {
+      ElMessage.warning(t('oauthNoProviderEnabledWarning'));
+    } else {
+      ElMessage.success(t('saveSuccessMsg'));
+    }
+  } else {
+    ElMessage.success(t('saveSuccessMsg'));
+  }
+}
+
+async function toggleOauthProviderQuick(providerKey, val) {
+  const providers = { ...getParsedOauthProviders() };
+  if (!providers[providerKey]) {
+    providers[providerKey] = { enabled: val, clientId: '' };
+  } else {
+    providers[providerKey] = { ...providers[providerKey], enabled: val };
+  }
+  setting.value.oauthProviders = providers;
+  await changeField('oauthProviders', providers);
+
+  // 开启单个已配置 Provider 时，如果主开关未开，自动同步开启主开关并提示
+  if (val && !setting.value.oauthLoginEnabled) {
+    setting.value.oauthLoginEnabled = 1;
+    await changeField('oauthLoginEnabled', 1);
+    ElMessage.info(t('oauthMasterSwitchAutoEnabled'));
+  } else {
+    ElMessage.success(t('saveSuccessMsg'));
+  }
+}
+
+function getCustomOauthTitle() {
+  const providers = getParsedOauthProviders();
+  if (providers.custom?.name) {
+    return providers.custom.name;
+  }
+  return t('oauthCustomTitle') || 'Custom SSO';
+}
+
+const activeOauthProviderMeta = computed(() => {
+  const item = OAUTH_PROVIDERS_LIST.find(p => p.key === activeOauthProviderKey.value);
+  if (!item) return { key: 'github', name: 'GitHub', icon: 'mdi:github' };
+  if (item.key === 'custom') {
+    return { key: 'custom', name: getCustomOauthTitle(), icon: item.icon };
+  }
+  return { key: item.key, name: item.label, icon: item.icon };
+});
+
+const currentProviderCallbackUrl = computed(() => {
+  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://mail.epocanvas.com';
+  return `${origin}/api/oauth/callback/${activeOauthProviderKey.value}`;
+});
+
+function openOauthProviderModal(providerKey) {
+  activeOauthProviderKey.value = providerKey;
+  const providers = getParsedOauthProviders();
+  const cfg = providers[providerKey] || {};
+
+  oauthForm.enabled = cfg.enabled !== false && cfg.enabled !== 0;
+  oauthForm.clientId = cfg.clientId || '';
+  oauthForm.clientSecret = cfg.clientSecret || '';
+  oauthForm.tenant = cfg.tenant || 'common';
+  oauthForm.teamId = cfg.teamId || '';
+  oauthForm.keyId = cfg.keyId || '';
+  oauthForm.name = cfg.name || '';
+  oauthForm.authUrl = cfg.authUrl || '';
+  oauthForm.tokenUrl = cfg.tokenUrl || '';
+  oauthForm.userInfoUrl = cfg.userInfoUrl || '';
+  oauthForm.scope = cfg.scope || (providerKey === 'github' ? 'read:user user:email' : (providerKey === 'apple' ? 'name email' : 'openid email profile'));
+
+  oauthConfigDialogShow.value = true;
+}
+
+function copyOauthRedirectUri() {
+  if (typeof navigator !== 'undefined' && navigator.clipboard) {
+    navigator.clipboard.writeText(currentProviderCallbackUrl.value).then(() => {
+      ElMessage.success(t('copySuccess') || 'Copied');
+    }).catch(() => {
+      ElMessage.info(currentProviderCallbackUrl.value);
+    });
+  }
+}
+
+function isValidHttpUrl(str) {
+  if (!str || typeof str !== 'string') return false;
+  try {
+    const url = new URL(str);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch (_) {
+    return false;
+  }
+}
+
+function validateOauthForm(providerKey, form) {
+  const isEnabled = form.enabled === true || form.enabled === 1;
+
+  if (isEnabled) {
+    const clientId = form.clientId?.trim() || '';
+    if (!clientId || clientId.length < 3) {
+      ElMessage.warning(t('oauthClientIdRequired'));
+      return false;
+    }
+    if (clientId.length > 256 || /\s/.test(clientId)) {
+      ElMessage.warning(t('oauthClientIdInvalid'));
+      return false;
+    }
+
+    if (providerKey !== 'apple') {
+      const clientSecret = form.clientSecret?.trim() || '';
+      if (!clientSecret || clientSecret.length < 6) {
+        ElMessage.warning(t('oauthClientSecretRequired'));
+        return false;
+      }
+      if (clientSecret.length > 512 || /^\s+$/.test(clientSecret)) {
+        ElMessage.warning(t('oauthClientSecretInvalid'));
+        return false;
+      }
+    }
+
+    if (providerKey === 'microsoft') {
+      const tenant = form.tenant?.trim() || 'common';
+      if (!/^[a-zA-Z0-9.\-_]{1,128}$/.test(tenant)) {
+        ElMessage.warning(t('oauthTenantFormatError'));
+        return false;
+      }
+    }
+
+    if (providerKey === 'apple') {
+      const teamId = form.teamId?.trim() || '';
+      const keyId = form.keyId?.trim() || '';
+      if (!teamId || !/^[A-Za-z0-9]{10}$/.test(teamId)) {
+        ElMessage.warning(t('oauthAppleTeamIdInvalid'));
+        return false;
+      }
+      if (!keyId || !/^[A-Za-z0-9]{10}$/.test(keyId)) {
+        ElMessage.warning(t('oauthAppleKeyIdInvalid'));
+        return false;
+      }
+    }
+
+    if (providerKey === 'custom') {
+      const name = form.name?.trim() || '';
+      if (!name || name.length < 2 || name.length > 40) {
+        ElMessage.warning(t('oauthCustomNameRequired'));
+        return false;
+      }
+      if (!isValidHttpUrl(form.authUrl?.trim())) {
+        ElMessage.warning(t('oauthAuthUrlInvalid'));
+        return false;
+      }
+      if (!isValidHttpUrl(form.tokenUrl?.trim())) {
+        ElMessage.warning(t('oauthTokenUrlInvalid'));
+        return false;
+      }
+      if (!isValidHttpUrl(form.userInfoUrl?.trim())) {
+        ElMessage.warning(t('oauthUserInfoUrlInvalid'));
+        return false;
+      }
+    }
+  } else {
+    // 禁用模式下，如果填写了自定义端点但格式明显错误，予以拦截提示以防乱填
+    if (providerKey === 'custom') {
+      if (form.authUrl?.trim() && !isValidHttpUrl(form.authUrl.trim())) {
+        ElMessage.warning(t('oauthAuthUrlInvalid'));
+        return false;
+      }
+      if (form.tokenUrl?.trim() && !isValidHttpUrl(form.tokenUrl.trim())) {
+        ElMessage.warning(t('oauthTokenUrlInvalid'));
+        return false;
+      }
+      if (form.userInfoUrl?.trim() && !isValidHttpUrl(form.userInfoUrl.trim())) {
+        ElMessage.warning(t('oauthUserInfoUrlInvalid'));
+        return false;
+      }
+    }
+    if (providerKey === 'apple') {
+      if (form.teamId?.trim() && !/^[A-Za-z0-9]{10}$/.test(form.teamId.trim())) {
+        ElMessage.warning(t('oauthAppleTeamIdInvalid'));
+        return false;
+      }
+      if (form.keyId?.trim() && !/^[A-Za-z0-9]{10}$/.test(form.keyId.trim())) {
+        ElMessage.warning(t('oauthAppleKeyIdInvalid'));
+        return false;
+      }
+    }
+  }
+
+  return true;
+}
+
+async function handleTestOauthProvider() {
+  if (!oauthForm.clientId) {
+    ElMessage.warning(t('oauthClientIdRequired'));
+    return;
+  }
+  if (!validateOauthForm(activeOauthProviderKey.value, oauthForm)) {
+    return;
+  }
+  testingOauth.value = true;
+  try {
+    const res = await verifyOauthProvider(activeOauthProviderKey.value, {
+      ...oauthForm
+    });
+    if (res?.data?.success) {
+      ElMessage.success(t('oauthTestSuccess') || 'Connection verified');
+    } else {
+      ElMessage.warning(res?.data?.message || t('oauthTestFailed') || 'Verification failed');
+    }
+  } catch (err) {
+    ElMessage.error(err.message || t('oauthTestFailed') || 'Test failed');
+  } finally {
+    testingOauth.value = false;
+  }
+}
+
+async function saveOauthProviderConfig() {
+  if (!validateOauthForm(activeOauthProviderKey.value, oauthForm)) {
+    return;
+  }
+
+  const providers = { ...getParsedOauthProviders() };
+  providers[activeOauthProviderKey.value] = {
+    enabled: oauthForm.enabled,
+    clientId: oauthForm.clientId?.trim() || '',
+    clientSecret: oauthForm.clientSecret?.trim() || '',
+    tenant: oauthForm.tenant?.trim() || 'common',
+    teamId: oauthForm.teamId?.trim() || '',
+    keyId: oauthForm.keyId?.trim() || '',
+    name: oauthForm.name?.trim() || '',
+    authUrl: oauthForm.authUrl?.trim() || '',
+    tokenUrl: oauthForm.tokenUrl?.trim() || '',
+    userInfoUrl: oauthForm.userInfoUrl?.trim() || '',
+    scope: oauthForm.scope?.trim() || ''
+  };
+
+  setting.value.oauthProviders = providers;
+  await changeField('oauthProviders', providers);
+
+  // 保存开启状态时，若总开关关闭，自动同步开启总开关并告知
+  if (oauthForm.enabled && !setting.value.oauthLoginEnabled) {
+    setting.value.oauthLoginEnabled = 1;
+    await changeField('oauthLoginEnabled', 1);
+    ElMessage.info(t('oauthMasterSwitchAutoEnabled'));
+  } else {
+    ElMessage.success(t('saveSuccessMsg'));
+  }
+
+  oauthConfigDialogShow.value = false;
+}
+
+const router = useRouter();
+const currentRoleSlug = computed(() => getRoleGroupSlug(userStore.user || userStore.userInfo) || 'admin');
+
+function openAuditReport() {
+  const roleSlug = currentRoleSlug.value || 'admin';
+  router.push(`/manage/${roleSlug}/audit`);
+}
+
 const editTitle = ref('')
 const settingLoading = ref(false)
 const clearS3Loading = ref(false)
@@ -5655,6 +6293,9 @@ function changeField(key, value) {
   if (!settingReady.value) return
   setting.value[key] = value
   settingStore.settings = { ...settingStore.settings, [key]: value }
+  if (key === 'multiAccountEnabled') {
+    localStorage.setItem('multiAccountEnabled', String(value));
+  }
   editSetting({[key]: value}, false)
 }
 
@@ -5824,6 +6465,9 @@ function editSetting(settingForm, refreshStatus = true, closeAiDialog = false) {
   settingSet(settingForm).then(() => {
     settingLoading.value = false
     settingStore.settings = { ...settingStore.settings, ...setting.value, ...settingForm }
+    if (settingForm.multiAccountEnabled !== undefined) {
+      localStorage.setItem('multiAccountEnabled', String(settingForm.multiAccountEnabled));
+    }
     ElMessage({
       message: t('saveSuccessMsg'),
       type: "success",
@@ -5964,6 +6608,161 @@ function editSetting(settingForm, refreshStatus = true, closeAiDialog = false) {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.oauth-sso-card {
+  .oauth-provider-row {
+    .title-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+
+      .provider-icon {
+        flex-shrink: 0;
+      }
+    }
+  }
+}
+
+.oauth-config-dialog {
+  .oauth-dialog-header {
+    display: flex;
+    align-items: center;
+    width: 100%;
+
+    .oauth-dialog-header-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+
+      .oauth-header-icon {
+        flex-shrink: 0;
+      }
+
+      .oauth-dialog-title {
+        font-size: 16px;
+        font-weight: 600;
+        color: var(--el-text-color-primary);
+      }
+    }
+  }
+
+  .oauth-dialog-body {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 4px 0 0 0;
+
+    .oauth-enable-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--el-border-color-lighter);
+
+      .enable-label-wrap {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+
+        .enable-title {
+          font-size: 14px;
+          font-weight: 600;
+          color: var(--el-text-color-primary);
+        }
+
+        .enable-subtitle {
+          font-size: 12px;
+          color: var(--el-text-color-secondary);
+        }
+      }
+    }
+
+    .oauth-grid-form {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px 16px;
+
+      .grid-field {
+        display: flex;
+        flex-direction: column;
+
+        &.col-span-2 {
+          grid-column: span 2;
+        }
+
+        .field-label {
+          font-size: 13px;
+          font-weight: 500;
+          margin-bottom: 6px;
+          color: var(--el-text-color-regular);
+          display: flex;
+          align-items: center;
+          gap: 4px;
+
+          .required-star {
+            color: var(--el-color-danger);
+            font-weight: bold;
+          }
+        }
+      }
+    }
+
+    .oauth-callback-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: 4px;
+      gap: 12px;
+
+      .callback-label-group {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+        overflow: hidden;
+
+        .callback-label {
+          font-size: 12px;
+          font-weight: 500;
+          color: var(--el-text-color-regular);
+          white-space: nowrap;
+          flex-shrink: 0;
+        }
+
+        .callback-code {
+          font-size: 12px;
+          color: var(--el-color-primary);
+          font-family: var(--font-mono, monospace);
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+      }
+
+      .copy-callback-btn {
+        flex-shrink: 0;
+        padding: 4px 8px;
+      }
+    }
+  }
+}
+
+@media (max-width: 580px) {
+  .oauth-config-dialog .oauth-dialog-body .oauth-grid-form {
+    grid-template-columns: 1fr !important;
+    .grid-field.col-span-2 {
+      grid-column: span 1 !important;
+    }
+  }
+  .oauth-config-dialog .oauth-dialog-body .oauth-callback-row {
+    flex-direction: column;
+    align-items: flex-start !important;
+    gap: 6px !important;
+    .copy-callback-btn {
+      align-self: flex-end;
+    }
+  }
 }
 
 .help-icon {
@@ -6194,7 +6993,7 @@ function editSetting(settingForm, refreshStatus = true, closeAiDialog = false) {
 }
 
 
-:deep(.el-dialog:not(.storage-config-dialog):not(.db-domains-dialog):not(.storage-scan-dialog):not(.s3-config-dialog):not(.db-config-dialog):not(.attachment-rule-dialog):not(.welcome-dialog-canvas):not(.notice-popup):not(.auth-prompt-dialog):not(.resend-table):not(.ai-hub-dialog)) {
+:deep(.el-dialog:not(.storage-config-dialog):not(.db-domains-dialog):not(.storage-scan-dialog):not(.s3-config-dialog):not(.db-config-dialog):not(.attachment-rule-dialog):not(.welcome-dialog-canvas):not(.notice-popup):not(.auth-prompt-dialog):not(.resend-table):not(.ai-hub-dialog):not(.oauth-config-dialog)) {
   width: 400px !important;
   @media (max-width: 440px) {
     width: calc(100% - 40px) !important;
@@ -9418,5 +10217,135 @@ html.dark .welcome-dialog-canvas .el-dialog__body {
 html.dark .welcome-dialog-canvas .el-dialog__footer {
   background: #111827 !important;
   border-top-color: #374151 !important;
+}
+
+/* ==========================================================================
+   Epomail OAuth & SSO Config Modal Dedicated Responsive Styling
+   - Prohibits scrollbars/sliders (zero-scrollbar enforcement)
+   - Expanded 680px canvas allows 2-column grid layout, preventing vertical overflow
+   - Strictly centered in viewport
+   - Full dark-mode parity
+   ========================================================================== */
+.el-dialog.oauth-config-dialog,
+:deep(.el-dialog.oauth-config-dialog),
+.oauth-config-dialog.el-dialog {
+  width: min(680px, calc(100vw - 32px)) !important;
+  max-width: min(680px, calc(100vw - 32px)) !important;
+  background-color: #ffffff !important;
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 14px !important;
+  box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.35) !important;
+  opacity: 1 !important;
+  overflow: hidden !important;
+  margin: auto !important;
+}
+
+.oauth-config-dialog .el-dialog__header,
+:deep(.oauth-config-dialog .el-dialog__header) {
+  background-color: #ffffff !important;
+  background: #ffffff !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+  padding: 16px 22px !important;
+  margin-right: 0 !important;
+  border-top-left-radius: 14px !important;
+  border-top-right-radius: 14px !important;
+}
+
+.oauth-config-dialog .el-dialog__title,
+:deep(.oauth-config-dialog .el-dialog__title) {
+  color: var(--el-text-color-primary, #0f172a) !important;
+  font-weight: 700 !important;
+  font-size: 16px !important;
+}
+
+.oauth-config-dialog .el-dialog__body,
+:deep(.oauth-config-dialog .el-dialog__body) {
+  background-color: #ffffff !important;
+  background: #ffffff !important;
+  padding: 18px 22px !important;
+  overflow: hidden !important;
+  overflow-y: visible !important;
+  max-height: none !important;
+  height: auto !important;
+}
+
+.oauth-config-dialog .el-dialog__footer,
+:deep(.oauth-config-dialog .el-dialog__footer) {
+  background-color: #ffffff !important;
+  background: #ffffff !important;
+  border-top: 1px solid #e2e8f0 !important;
+  padding: 14px 22px !important;
+  border-bottom-left-radius: 14px !important;
+  border-bottom-right-radius: 14px !important;
+}
+
+/* ZERO-SCROLLBAR ENFORCEMENT FOR OAUTH CONFIG DIALOG */
+.oauth-config-dialog ::-webkit-scrollbar,
+.oauth-config-dialog .el-dialog__body::-webkit-scrollbar,
+:deep(.oauth-config-dialog ::-webkit-scrollbar),
+:deep(.oauth-config-dialog .el-dialog__body::-webkit-scrollbar) {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+.oauth-config-dialog,
+.oauth-config-dialog .el-dialog__body,
+:deep(.oauth-config-dialog),
+:deep(.oauth-config-dialog .el-dialog__body) {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+/* HTML.DARK STRICT OVERRIDES FOR OAUTH CONFIG DIALOG */
+html.dark .el-dialog.oauth-config-dialog,
+html.dark :deep(.el-dialog.oauth-config-dialog),
+html.dark .oauth-config-dialog.el-dialog {
+  background-color: #111827 !important;
+  background: #111827 !important;
+  border-color: #374151 !important;
+  color: #f3f4f6 !important;
+}
+
+html.dark .oauth-config-dialog .el-dialog__header,
+html.dark :deep(.oauth-config-dialog .el-dialog__header) {
+  background-color: #111827 !important;
+  background: #111827 !important;
+  border-bottom-color: #374151 !important;
+}
+
+html.dark .oauth-config-dialog .el-dialog__title,
+html.dark :deep(.oauth-config-dialog .el-dialog__title) {
+  color: #f3f4f6 !important;
+}
+
+html.dark .oauth-config-dialog .el-dialog__body,
+html.dark :deep(.oauth-config-dialog .el-dialog__body) {
+  background-color: #111827 !important;
+  background: #111827 !important;
+  color: #e5e7eb !important;
+}
+
+html.dark .oauth-config-dialog .el-dialog__footer,
+html.dark :deep(.oauth-config-dialog .el-dialog__footer) {
+  background-color: #111827 !important;
+  background: #111827 !important;
+  border-top-color: #374151 !important;
+}
+
+html.dark .oauth-config-dialog .el-input__wrapper,
+html.dark :deep(.oauth-config-dialog .el-input__wrapper) {
+  background-color: #1f2937 !important;
+  box-shadow: 0 0 0 1px #374151 inset !important;
+}
+
+html.dark .oauth-config-dialog .el-input__inner,
+html.dark :deep(.oauth-config-dialog .el-input__inner) {
+  color: #f3f4f6 !important;
+}
+
+html.dark .oauth-config-dialog .callback-code,
+html.dark :deep(.oauth-config-dialog .callback-code) {
+  color: #67e8f9 !important;
 }
 </style>

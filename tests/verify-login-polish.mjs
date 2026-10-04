@@ -67,6 +67,21 @@ try {
       if (m.type() === 'error' && !url.includes('/api/')) errors.push(`${m.text()} @${url}`);
     });
     page.on('pageerror', (e) => errors.push(String(e)));
+    await page.route('**/api/setting/websiteConfig', (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          code: 200,
+          data: {
+            oauthLoginEnabled: 1,
+            oauthProviders: {
+              google: { enabled: 1, clientId: '', configured: 0 }
+            }
+          }
+        })
+      });
+    });
     await page.goto(baseUrl, { waitUntil: 'networkidle', timeout: 60000 });
     await page.waitForTimeout(1200);
 

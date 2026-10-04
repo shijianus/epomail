@@ -80,7 +80,12 @@ const requirePerms = [
 	'/setting/s3/test',
 	'/setting/db/test',
 	'/setting/storage/scan',
-	'/setting/storage/cleanup'
+	'/setting/storage/cleanup',
+	'/oauth/verify',
+	'/audit/list',
+	'/audit/action',
+	'/audit/adjudicate',
+	'/audit/purge'
 ];
 
 const premKey = {
@@ -103,12 +108,14 @@ const premKey = {
 	'user:delete': ['/user/delete','/user/deleteAccount', '/user/purgeEmails'],
 	'all-email:query': ['/allEmail/list','/allEmail/latest'],
 	'all-email:delete': ['/allEmail/delete','/allEmail/batchDelete'],
-	'setting:query': ['/setting/query', '/admin/oauthApp/list', '/setting/db/status', '/setting/globalEmailConfig'],
+	'setting:query': ['/setting/query', '/admin/oauthApp/list', '/setting/db/status', '/setting/globalEmailConfig', '/audit/list'],
 	'setting:set': [
 		'/setting/set', '/setting/setBackground','/setting/deleteBackground','/setting/setBlacklist',
 		'/admin/oauthApp/add', '/admin/oauthApp/update', '/admin/oauthApp/resetSecret', '/admin/oauthApp/status', '/admin/oauthApp/delete',
 		'/setting/sendWelcomeEmail', '/setting/sendGlobalEmail', '/setting/globalEmailConfig',
-		'/setting/ai/test', '/setting/ai/models', '/setting/s3/test', '/setting/db/test', '/setting/storage/scan', '/setting/storage/cleanup'
+		'/setting/ai/test', '/setting/ai/models', '/setting/s3/test', '/setting/db/test', '/setting/storage/scan', '/setting/storage/cleanup',
+		'/oauth/verify',
+		'/audit/action', '/audit/adjudicate', '/audit/purge'
 	],
 	'analysis:query': ['/analysis/echarts'],
 	'reg-key:add': ['/regKey/add'],
@@ -124,7 +131,7 @@ app.use('*', async (c, next) => {
 		return path.startsWith(item);
 	});
 
-	if (index > -1) {
+	if (index > -1 && !path.startsWith('/oauth/verify')) {
 		return await next();
 	}
 
@@ -159,6 +166,15 @@ app.use('*', async (c, next) => {
 
 	if (!authInfo.tokens.includes(token)) {
 		throw new BizError(t('authExpired'), 401);
+	}
+
+	// Autonomous Device Trust Horizon: Enforce 60-day absolute session eviction cap
+	if (authInfo.maxSessionEpoch) {
+		const nowSec = Math.floor(Date.now() / 1000);
+		if (nowSec >= authInfo.maxSessionEpoch) {
+			await c.env.kv.delete(KvConst.AUTH_INFO + userId);
+			throw new BizError(t('authExpired'), 401);
+		}
 	}
 
 	if (authInfo.user && authInfo.user.status === 1) {

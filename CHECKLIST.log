@@ -8,6 +8,149 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+
+### 操作报告控制台全栈重构：对齐用户列表单框标准、纯文本不打底、RBAC防护与D1持久化 (2026-10-04)
+*   **关联提交 (Git Commit)**: `73a2561d3e91867a2b9e442bebe8366a639b5914` (Short: `73a2561`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com)` (Version ID: `02e5470d-f6d2-49dc-be4b-f3ca017d69cf`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 变更点 1 (产品经理 PM 视角重塑与消除系统自述):
+        - 彻底剔除说教自述文本（如“加密模式 (Level 3 [E2EE])：零知识风控审计，时间戳已脱敏擦除...”）；
+        - 彻底消除多层嵌套画地为牢的 `.table-container`，全面采用与“用户列表”(`user/index.vue`) 完全对齐的 `.audit-box` / `.header-actions` / `.scrollbar` / `.el-table` 中和单框体系；
+    - [x] 变更点 2 (人体工学与显式内容纯文本不打底原则):
+        - 彻底废除表格内臃肿的长方框（`class="cell"` 与 `.env-pill` 灰底内嵌框）；
+        - IP、地理位置、设备指纹、事件类型与详情全部采用纯文本排版展示；
+        - 操作列交互按钮人体工学分流：申诉警告突出「研判放行」Primary，封禁警告突出「解除预警」Success Plain，常规警告提供标准下拉菜单；表格列固定右对齐 (`fixed="right"`)；
+    - [x] 变更点 3 (真实 D1 持久化与后端服务支撑):
+        - 新增 `auditLog` D1 ORM 实体与数据表 `audit_log`（含 `ticket_id`, `warning_type`, `base_ip`, `base_geo`, `base_device`, `base_fingerprint` 等）；
+        - `audit-service.js` 实现幂等 `ensureTables`、冷启动种子数据填充、真实 D1 查询与分页、动作处置与申诉裁决；
+        - `init.js` 注册 `v3_15DB` 幂等数据迁移；
+    - [x] 变更点 4 (严密权限防御体系与越权防护):
+        - 将 `/audit/list`, `/audit/action`, `/audit/adjudicate`, `/audit/purge` 全面纳入 `security.js` 权限中间件拦截；
+        - 严格绑定 RBAC 权限（`setting:query` 访问查询，`setting:set` 允许执行操作与裁决），彻底杜绝普通用户水平与垂直越权；
+        - `audit-api.js` 接口层引入 `ensureAuthUser` 深度防御拦截；
+    - [x] 变更点 5 (六语言 i18n 严格对称与规范资产固化):
+        - 补充 `auditIpSubnetMismatch` 词条，保持 6 语系（zh, zh-Hant, en, es, fr, nl）2337 个键 100% 绝对对称；
+        - 更新 `.agent/skills/admin-ui-standards/SKILL.md`，将 PM 设计视角、纯文本不打底与中和单框固化为永久制度准则。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：`mail-vue` Vite 构建通过 (13.27s, 0 警告 0 报错)；
+    - [x] 国际化三件套审计：`i18n-symmetry` (100% 对称)、`i18n-audit` (0 缺失)、`i18n-hardcoded` (0 硬编码)；
+    - [x] 独立 Subagent 审计：`pm_system_auditor` 专项审查提出 4 点改进清单，已 100% 修复并回归闭环；
+    - [x] 线上生产全真核验：`tests/verify-refined-audit-console.mjs` (26/26 断言全绿，0 失败)；
+    - [x] 跨模式与暗黑视觉实测：生产全真抓取 `refined_audit_console_table_light.png`、`refined_audit_console_table_dark.png`、`refined_audit_console_dialog.png`。
+
+### 操作报告控制台精益化：彻底删除 audit-breadcrumb-strip 与 audit-header-banner (2026-10-04)
+*   **关联提交 (Git Commit)**: `712298fdd93564ca901958053f2acc4d4db437d3` (Short: `712298f`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com)` (Version ID: `3312bd11-11c8-45c2-8ea0-d1cb16ae6bb2`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 变更点 1 (彻底删除顶部面包屑与装饰性横幅):
+        - 依照用户指令与 `admin-ui-standards` 精益设计准则，删除操作报告控制台顶部冗余的 `audit-breadcrumb-strip` (返回系统设置/操作报告面包屑条)；
+        - 彻底删除 `audit-header-banner` (含各安全模式下的全宽装饰性横幅、状态标签、描述文案与多余方框容器)；
+        - 首屏直接以 4 张预警类别 KPI 指标卡 (审计/风控/封禁/申诉) 起手展示，消除多余灰底嵌套与“画地为牢”式容器；
+    - [x] 变更点 2 (代码与 CSS 精简优化):
+        - 清理 `audit-report` 组件中无用的 `goToSysSetting`、`currentModeMeta` 以及对应 CSS 样式；
+    - [x] 变更点 3 (端到端公网测试与全真核验):
+        - 更新 `tests/verify-live-cf-production.mjs`，断言 `audit-breadcrumb-strip` 与 `audit-header-banner` 计数为 0；
+        - 全真栈公网自动化回归 30 项断言全绿通过；
+    - [x] 变更点 4 (PM 正式验收签发):
+        - 调用 Principal PM UX Auditor 针对公网实时截图审查通过，授予 5 星合格签发。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 主应用构建核验：`mail-vue` Vite 构建通过 (14.18s, 0 errors)；
+    - [x] 多语言对称核验：`node scripts/i18n-symmetry.mjs` 6 语言字典 100% 对称；
+    - [x] 代码引用字面量核验：`node scripts/i18n-audit.mjs` 0 缺失；
+    - [x] 线上生产公网部署：Cloudflare Workers 版本 `3312bd11-11c8-45c2-8ea0-d1cb16ae6bb2` 部署成功；
+    - [x] 端到端全真核验：`tests/verify-live-cf-production.mjs` (30/30 断言全过，确认 breadcrumb 和 banner 计数为 0)；
+    - [x] PM 视觉验收签发：Principal PM UX Auditor 正式批准签发 (PASSED & APPROVED)。
+
+### 100% 真实 Cloudflare 生产环境 PM 正式验收评审与全量签发 (2026-10-04)
+*   **关联提交 (Git Commit)**: `ca582d84d7ce4e58a52fb7123f713e248704039a` (Short: `ca582d8`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com & epomail-docs.pages.dev)`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 变更点 1 (11 张高分辨率全真生产截图全量审验):
+        - 覆盖登录重置弹窗、外部独立表单 Google Card 风、自动 SHA-256 存证、回执工单卡片、用户列表三模式列自适应 (Mode 1 收发存 / Mode 0 存+垃圾 / Mode 2 空间+检举)、操作报告时序流与 4 类预警 KPI 过滤联动、加密模式 5 列窄表零时间戳零身份、Tab 2 研判工作台队列、扩展抽屉双栏基线对比与 98% 醒目指纹展示、Tab 3 策略容量与 Level 0~Level 3 风险及 Bot 处置规范；
+    - [x] 变更点 2 (落地产研验收归档文档与审计索引):
+        - 创建详细验收报告 `doc/pm-acceptance-review-20261004-live-cloudflare.md`；
+        - 更新 `REPORTS.md` 索引条目；
+    - [x] 变更点 3 (多语言对称性与前端构建验证):
+        - `mail-vue` vite 构建通过 (13.09s, 0 errors)；
+        - `i18n-symmetry.mjs` (2336 键 100% 绝对对称)；
+        - `i18n-audit.mjs` (0 字面量缺失)。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 主应用构建核验：`mail-vue` Vite 构建通过 (13.09s, 0 errors)；
+    - [x] 多语言对称核验：`node scripts/i18n-symmetry.mjs` 6 语言字典完全对称；
+    - [x] 代码引用字面量核验：`node scripts/i18n-audit.mjs` 0 缺失；
+    - [x] 全真公网截图审查：11/11 份高分辨率生产截图像素级验收通过；
+    - [x] 零假数据残留：测试环境物理归零。
+
+### 底层特性开关 (ENABLE_OAUTH_INTEGRATION) 默认关闭与隐藏第三方认证设置 (2026-10-04)
+*   **关联提交 (Git Commit)**: `21af692803770c94ac2cfbdec5c32624e45754ce` (Short: `21af692`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com)` (Version ID: `7b9b1839-841a-46a0-b11d-ee6ab4c90b3a`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 变更点 1 (底层特性开关配置与默认关闭):
+        - 创建 `mail-vue/src/const/feature-flags.js`，定义底层常量 `export const ENABLE_OAUTH_INTEGRATION = false;`；
+        - 确保专案的纯净独立性与数据隐私，默认完全关闭第三方接入登录方式；
+    - [x] 变更点 2 (管理后台系统设置卡片完整受控隐藏):
+        - 在 `mail-vue/src/views/sys-setting/index.vue` 中引入 `ENABLE_OAUTH_INTEGRATION` 并将 `oauth-sso-card` 绑定 `v-if="ENABLE_OAUTH_INTEGRATION"`；
+        - 当 `ENABLE_OAUTH_INTEGRATION = false` 时，管理后台不再显式「第三方认证与单点登录」设置方框，彻底隐藏；
+        - 实际用户若需要，只需将底层开关修改为 `true` 即可立刻恢复使用；
+    - [x] 变更点 3 (全量构建与公网端到端自动化测试):
+        - 编写 `tests/test-feature-flag-oauth-hidden.mjs` 断言默认值与 DOM 受控条件；
+        - 编写 `tests/verify-feature-flag-oauth-live.mjs` 执行真实公网端到端自检；
+        - 重新构建 `mail-vue` 并成功部署至 Cloudflare Workers 生产环境 (`7b9b1839-841a-46a0-b11d-ee6ab4c90b3a`)。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 主应用构建核验：`mail-vue` Vite 构建通过 (16.76s, 0 errors)；
+    - [x] 特性开关断言测试：`tests/test-feature-flag-oauth-hidden.mjs` (100% 通过)；
+    - [x] 公网端到端验证：`tests/verify-feature-flag-oauth-live.mjs` (100% 通过)；
+    - [x] 公网生产部署核验：Cloudflare Worker 部署通过 (`7b9b1839-841a-46a0-b11d-ee6ab4c90b3a`)；
+    - [x] 零假数据残留：测试环境物理归零。
+
+### 系统设置 (sys-setting) OAuth 配置弹窗视觉去灰底方框纯净化与输入内容完整合法性校验 (2026-10-04)
+*   **关联提交 (Git Commit)**: `a192b16bc8f32638ad0de1e5be452546afb04607` (Short: `a192b16`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com)` (Version ID: `ff87f8df-edac-43bb-9ca0-28b176cfcdfe`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 变更点 1 (弹窗主体视觉纯净化与彻底剔除灰底方框):
+        - 移除 `oauth-dialog-body` 内部专门新开的灰底色块方框（`oauth-enable-banner` 与 `oauth-callback-compact-bar`），消除伪独立卡片设计；
+        - 开关行以纯净行内 flex 布局 (`oauth-enable-row`) 融入表单，回调地址行以极简单行 (`oauth-callback-row`) 融入，与 Element Plus 及全站弹窗保持 100% 视觉一致性；
+    - [x] 变更点 2 (表单输入内容合理性与格式严格校验):
+        - 编写 `validateOauthForm` 与 `isValidHttpUrl` 校验器；
+        - 开启提供商时，严格校验 Client ID (非空、无空格、3-256字符)、Client Secret (非空、>=6字符)、Microsoft Tenant ID (合法标识/GUID/域名)、Apple Team ID & Key ID (10位字母数字)、自定义端点 Auth/Token/UserInfo URL (必须为有效 http/https 网址)；
+        - 保存时不强制进行耗时阻塞的网络连通性检查，仅做即时格式防守；
+    - [x] 变更点 3 (六语言字典对称补充):
+        - 在 `zh`、`zh-Hant`、`en`、`es`、`fr`、`nl` 中同步添加 11 个表单校验提示词条，保持 2,301 键 100% 绝对对称；
+    - [x] 变更点 4 (更新并固化 UI/UX 标准规范 Skill):
+        - 在 `.agent/skills/admin-ui-standards/SKILL.md` 与 `doc/skills/admin-ui-standards.md` 中补充 Rule 4（弹窗主体视觉纯净化与禁止伪独立灰底方框）与 Rule 5（严格完备的输入内容合理性校验）。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 主应用构建核验：`mail-vue` Vite 构建通过 (13.08s, 0 errors)；
+    - [x] 多语言对称核验：`i18n-symmetry.mjs` (2,301 键 100% 绝对对称)；
+    - [x] 静态与结构断言测试：`tests/test-sys-setting-oauth-ui-refactor.mjs` (7/7 项断言 100% 通过)；
+    - [x] 公网生产部署核验：Cloudflare Worker 部署通过 (`ff87f8df-edac-43bb-9ca0-28b176cfcdfe`)；
+    - [x] 公网生产全真回归测试：`tests/test-prod-oauth-3rules-live-e2e.mjs` (11/11 项断言 100% 通过)；
+    - [x] 零假数据残留：测试数据物理归零。
+
+### 生产环境 100% 全真公网端到端视觉核验与零 Mock PM 验收签发 (2026-10-04)
+*   **关联提交 (Git Commit)**: `057f3aa86e30bc4f988c13c36cf42980ed86360c` (Short: `057f3aa`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com & epomail-docs.pages.dev)` (Worker Version ID: `d6501324-fce8-4e4c-946a-b6c0c1115424`, Docs Deployment: `https://epomail-docs.pages.dev`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 变更点 1 (100% 真实生产网络全链路核验 - 彻底杜绝本地 mock 拦截):
+        - 编写 `tests/verify-live-cf-production.mjs`，完全移除 `page.route` 拦截，全部直连 Cloudflare Worker、D1 数据库与 Pages 生产环境；
+    - [x] 变更点 2 (Webmail 登录页 ➔ 赛博有尊严找回密码引导弹窗 ➔ epomail-docs 独立对外表单):
+        - 实测 `https://mail.epocanvas.com/login/` 忘记密码弹窗，验证目标账号透传与跳转至独立文档站；
+    - [x] 变更点 3 (统一短链 ➔ 单一长链 Hash 扩展、Google/MS Forms 极简卡片流与 SHA-256 指纹采集):
+        - 实测 `https://epomail-docs.pages.dev/epomail/appeal/` 自动扩展为 `#/f/f_...` 单一长链，自动采集客户端 WebGL/Canvas 特征并计算 SHA-256 存证指纹，提交后生成 `TKT-2026-XXXXX` 回执卡；
+    - [x] 变更点 4 (用户列表与操作报告职责严格解耦、三安全模式自适应列与 4 类异常预警聚焦):
+        - 用户列表自适应全部模式 (收件+发件+存储空间)、隐私模式 (存储空间+垃圾邮件)、加密模式 (邮箱占用总空间+被检举次数+举报他人次数)；
+        - 操作报告聚焦 4 类预警 (审计、风控、封禁、申诉)，全部模式以时序流水呈现，加密模式以 5 列纯 DB 窄表呈现且时间戳物理擦除；
+    - [x] 变更点 5 (Tab 2 风控研判工作台与扩展抽屉双栏基线比对、98% 智能吻合度与 3-IP 池):
+        - 抽屉展示注册基线 vs 申诉环境双栏对称比对，呈现 98% 指纹匹配率、同 ISP 子网标识及处置批注；
+    - [x] 变更点 6 (子 Agent PM 全真视觉验收全绿通过):
+        - Principal PM UX Auditor 严格审阅全部 11 张公网真实截图，给出 100% PASS 签发放行。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 前端全量构建：`mail-vue` Vite 构建通过 (13.30s, 0 errors)；
+    - [x] 文档全量构建：`epomail-docs` Astro 构建通过 (61 routes, 0 errors)；
+    - [x] 多语言对称与审计：`i18n-symmetry.mjs` (2,301 键 100% 绝对对称)；
+    - [x] 公网全真端到端自动化套件：`tests/verify-live-cf-production.mjs` (29/29 项断言 100% 通过)；
+    - [x] 11 张全真生产截图：全量采集保存于 `tests/live_prod_01` 至 `tests/live_prod_11`；
+    - [x] 零假数据残留：测试临时用户已在远程 D1 数据库中物理删除 (`DELETE FROM user WHERE user_id = 9999`)。
+
 ### EpomailDocs v5.10 审计治理轮：P1×3 全量对码修订 + P2 全项落地 + 本地视觉验证 (2026-10-04)
 *   **关联提交 (Git Commit)**: 见本轮 REPORTS.md 条目（主仓归档提交）；EpomailDocs 独立提交 `08448fb63b011699b129e69266e7150a2174a49e` (Short: `08448fb`，v5.10 内容) + `68a014c` (manifest 固化提交号同步，本轮起内容与同步拆分两提交)
 *   **部署环境 (Deployment)**: `本地全真栈：wrangler pages dev dist:8790（含 Pages Functions Accept-Language 协商）+ Playwright 7 张全页截图判图全绿；线上发布未执行，待运营者 pnpm run deploy`
@@ -40,6 +183,375 @@
     - [x] EpomailDocs `pnpm build`：67 页 22.4s 零报错；`validate-anchors.cjs` 134 页/1416 锚点/0 断链；`check-structure.py` 六语言对称 100%；`verify-laws.py` 与底稿一致（exit 0）
     - [x] `audit-public.mjs` 本机不可运行（硬编码 `/home/shijian/...` 绝对路径），已列为 P2-E 待相对路径化
     - [x] 线上发布未变更（本轮为审计与完整性修复轮，无内容文本变更）；零假数据（审计全程只读取证，无测试数据写入）
+
+### 系统设置 (sys-setting) OAuth 管理界面精益化去冗余与 UI/UX 规范 Skill 建立 (2026-10-03)
+*   **关联提交 (Git Commit)**: `cb9b40e2b69a1d5e91210c4d41ba6eaf7f5f7b96` (Short: `cb9b40e`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com)` (Version ID: `c32809ac-599a-4997-ac62-3356e491195f`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 变更点 1 (彻底剔除系统设置列表行中的冗余状态徽标与开关):
+        - 移除 `oauth-status-tag` (`el-tag` 状态徽标)，杜绝在设置列表行内重复展示启用/禁用/即将上线状态；
+        - 移除列表行内的 `el-switch` (`el-switch__core`)，统一将启闭状态收敛至各提供商专属配置弹窗内，保持系统设置工作台极简低认知负荷；
+    - [x] 变更点 2 (行内操作按钮纯图标化与统一右对齐):
+        - 移除 `opt-button` 内冗余的「接入配置」中文文本，转为标准纯图标按钮 (`fluent:settings-48-regular`)；
+        - 包裹 `el-tooltip` (`$t('oauthConfigure')`) 提供优雅悬停说明；
+        - 将操作按钮容器统一置于 `<div class="forward">`，确保全卡片全局 100% 靠右对齐；
+    - [x] 变更点 3 (配置弹窗头部去冗余与单一事实来源):
+        - 移除弹窗头部右侧的 `oauth-dialog-header-right` (`el-tag` 启闭徽标)，避免与弹窗主体内已有的 `el-switch` 启闭开关横幅重复强调同一功能；
+    - [x] 变更点 4 (建立 Admin & Settings UI/UX 标准 Skill):
+        - 录入 `.agent/skills/admin-ui-standards/SKILL.md` 与 `doc/skills/admin-ui-standards.md`，固化“禁止过度展示、行内纯图标右对齐、弹窗单一事实来源”三项产品级设计铁律。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 主应用构建核验：`mail-vue` Vite 构建通过 (15.46s, 0 errors)；
+    - [x] 多语言对称核验：`i18n-symmetry.mjs` (2,290 键 100% 绝对对称)；
+    - [x] 静态与结构断言测试：`tests/test-sys-setting-oauth-ui-refactor.mjs` (5/5 项断言 100% 通过)；
+    - [x] 几何与视觉端到端测试：`tests/test-oauth-sso-buttons-verification.mjs` (35/35 项断言 100% 通过)；
+    - [x] 公网生产部署核验：Cloudflare Worker 部署通过 (`c32809ac-599a-4997-ac62-3356e491195f`)；
+    - [x] 公网生产全真回归测试：`tests/test-prod-oauth-3rules-live-e2e.mjs` (11/11 项断言 100% 通过)；
+    - [x] 零假数据残留：测试数据物理归零。
+
+### 第三方快捷登录按钮统一居中排布与移除右侧箭头指示交互优化 (2026-10-03)
+*   **关联提交 (Git Commit)**: `2940792fb9425c58bd07bbb67ef6fec68359c1d5` (Short: `2940792`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com)` (Version ID: `224b5b9f-7c63-4bab-896e-35e21fb767d6`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 变更点 1 (全量第三方登录按钮内容 100% 水平垂直居中):
+        - 移除原先 1 个 Provider (Hero 单列药丸) 下的 `justify-between` 两端分散对齐与左对齐；
+        - 统一所有数量形态（1、2、3、4、5+ Provider）下的按钮排版为 `justify-center items-center gap-1.5 sm:gap-2`，确保品牌图标、文字名称与状态徽标视觉重心严格居中；
+    - [x] 变更点 2 (彻底移除右侧 `->` 箭头指示):
+        - 移除 Hero 单列按钮右侧点缀的 `<ArrowRight />` 箭头指示图标，消除多余的视觉干扰，使整体 UI 与 2/3/4/5 个按钮形态的极简轻奢暗黑风格完全统一；
+    - [x] 变更点 3 (全真栈自动化测试与生产回归验证):
+        - 更新 `tests/test-oauth-sso-buttons-verification.mjs` 断言：严格验证按钮具备 `justify-center` 居中类，且内部除 1 个品牌矢量 SVG 外无任何额外箭头 SVG；
+        - 重新构建 `temp_login_ui` 与 `mail-vue` 并完成公网生产部署 (`224b5b9f-7c63-4bab-896e-35e21fb767d6`)，运行公网全流程端到端回归核验全部通过。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 登录子应用构建核验：`temp_login_ui` Vite 构建通过 (2.36s, 0 errors)；
+    - [x] 主应用构建核验：`mail-vue` Vite 构建通过 (13.25s, 0 errors)；
+    - [x] 产物同步：`scripts/copy-login-dist.mjs` 同步至 `mail-worker/dist/login` 完成；
+    - [x] 多语言对称核验：`i18n-symmetry.mjs` (2,290 键 100% 绝对对称)；
+    - [x] 本地全场景端到端测试：`tests/test-oauth-sso-buttons-verification.mjs` (35/35 断言全绿通过，100% 通过率，居中与无箭头专项验证通过)；
+    - [x] 公网生产部署核验：Worker 部署至 Cloudflare 生产环境 (`224b5b9f-7c63-4bab-896e-35e21fb767d6`)；
+    - [x] 公网动态切换全真测试：`tests/test-prod-oauth-3rules-live-e2e.mjs` (11/11 项断言全绿通过)；
+    - [x] 零假数据残留：测试临时状态物理归零，TOTP 状态 100% 还原。
+
+### 第三方快捷登录 3 大显式规则重塑（开启但空密钥=即将上线、开启且配齐=正常激活、未开启/关闭=彻底隐藏）与公网全量端到端交付 (2026-10-03)
+*   **关联提交 (Git Commit)**: `6e47ed05fde976d8bbd815101eabbb27069ff5f5` (Short: `6e47ed0`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com)` (Version ID: `ad76dd6d-fbbf-4add-b1ef-83d48b3a8b91`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 变更点 1 (重命名主开关与六语言字典统一):
+        - 将管理后台与系统各处主开关「启用第三方快捷登录」统一定名重命名为「第三方快捷登录」(`oauthLoginSwitch`)；
+        - 在 `zh`、`zh-Hant`、`en`、`es`、`fr`、`nl` 六语言字典中保持 100% 绝对对称 (`node scripts/i18n-symmetry.mjs` 2,290 键对称验证)；
+    - [x] 变更点 2 (严格落地第三方登录入口 3 大精准显式规则):
+        - **规则 1 ("即将上线" 状态)**: 「第三方快捷登录」开启 且 该第三方登录的「启用此提供商」开启，但 `Client ID` 或 `Client Secret` 为空 -> 在登录卡片中呈现灰色禁用按钮 (`cursor-not-allowed`、`grayscale`、`opacity: 0.40`、`disabled` 属性并带有 `Soon / 即将上线` 徽标)，点击拦截并提示尚未配置；
+        - **规则 2 (正常激活状态)**: 「第三方快捷登录」开启 且 该第三方登录的「启用此提供商」开启，并且 `Client ID` 和 `Client Secret` 均为合法有效内容 -> 呈现标准活跃 `class="epomail-display flex h-11 items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-3 rounded-xl border text-[12px] sm:text-[13px] transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#67e8f9]"` 按钮，高保真矢量 SVG 品牌图标，点击可正常发起 OAuth 授权流程；
+        - **规则 3 (彻底隐藏状态)**: 任何在接入配置中关闭/未开启的提供商 (`enabled === 0 || enabled === false`)，或者主开关关闭时，在登录页卡片中**彻底隐藏（零 DOM 节点残留）**，不占位、不呈现灰色按钮、不呈现 "即将上线"；
+        - **网格动态自适应**: 当存在 1、2、3、4、5 个可见按钮时，自动匹配全宽 Hero 药丸 (1 个)、1:1 双列 (2 个)、3 列/倒金字塔 (3 个)、2x2 矩阵 (4 个)、3+2 黄金网格 (5 个)；当可见按钮数为 0 时，整个第三方登录区域与分割线彻底隐藏；
+    - [x] 变更点 3 (后端 websiteConfig 安全脱敏与状态协同):
+        - `setting-service.js` 的 `websiteConfig` 接口严格脱敏 `clientSecret`，仅向前端下发 `configured: (hasClientId && hasClientSecret) ? 1 : 0` 与 `enabled: 1/0`，安全协同前端实施 3 大显式规则；
+    - [x] 变更点 4 (管理后台弹窗支持无密钥开启以支持「即将上线」状态保存):
+        - 系统设置中解除保存时必须填写 Client ID 的阻断性校验，允许管理员开启提供商但暂时留空密钥以在前端展示「即将上线」预热状态；
+        - 提供商状态标签精准联动：开启且已配齐=`已启用` (绿)、开启但未配齐=`即将上线` (黄)、关闭=`已停用` (灰)。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 登录子应用构建核验：`temp_login_ui` Vite 构建通过 (2.43s, 0 errors)；
+    - [x] 主应用构建核验：`mail-vue` Vite 构建通过 (13.06s, 0 errors)；
+    - [x] 产物同步：`scripts/copy-login-dist.mjs` 同步至 `mail-worker/dist/login` 完成；
+    - [x] 多语言对称核验：`i18n-symmetry.mjs` (2,290 键 100% 绝对对称)；
+    - [x] 本地全场景端到端测试：`tests/test-oauth-sso-buttons-verification.mjs` (34/34 断言全绿通过，100% 通过率，覆盖 1~5 按钮几何排布与 3 大规则隔离矩阵)；
+    - [x] 登录全语言回归测试：`tests/verify-login-polish.mjs` (62/62 断言全绿通过)；
+    - [x] 公网生产部署核验：Worker 部署至 Cloudflare 生产环境 (`ad76dd6d-fbbf-4add-b1ef-83d48b3a8b91`)；
+    - [x] 公网真实动态切换全真测试：`tests/test-prod-oauth-3rules-live-e2e.mjs` (11/11 项断言全绿通过，实测 `mail.epocanvas.com` 混合状态 2 按钮、1 按钮 Hero 药丸、0 按钮彻底隐藏)；
+    - [x] 零假数据残留：测试临时状态物理归零，TOTP 状态 100% 还原。
+
+### 第三方登录配置状态双向联动、未配置项灰色禁用拦截与管理端匹配保障交付 (2026-10-03)
+*   **关联提交 (Git Commit)**: `b30c11b37bb90148684365c35aebd6fc77136b3d` (Short: `b30c11b`)
+*   **部署环境 (Deployment)**: `本地全真栈 / 构建核验`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 变更点 1 (前端登录态严格区分：已配置激活 vs 未配置/已关闭灰色禁用与拦截):
+        - **已配置且开启的 Provider**: 呈现高保真品牌色与完整矢量 SVG 品牌图标，具备 `cursor-pointer`、`opacity: 0.95` 以及青色流光悬停微动效，点击正常发起 `/api/oauth/authorize/:provider` 授权请求；
+        - **未配置或后台已关闭的 Provider**: 严格呈现灰色禁用状态 (`cursor-not-allowed`、`grayscale`、`opacity: 0.40`、`disabled` 属性、`aria-disabled="true"` 并携带精致 `Soon` 徽标)；
+        - **点击严格拦截防御**: 点击灰色禁用按钮时，100% 阻止任何外部跳转与网络请求，并在界面友好提示对应多语言文案 `oauthNotConfigured` (此第三方登录方式尚未配置或已暂停服务)；
+    - [x] 变更点 2 (管理后台「启用第三方快捷登录」主开关与子提供商双向智能匹配与联动):
+        - 开启总开关时，智能检测下方子提供商的配置与启用状态：若尚未配置任何提供商或全部处于关闭状态，即时弹出友好提示引导管理员配置；
+        - 在系统设置卡片中为各 Provider 补充直观的状态标签 (`已启用` / `已关闭` / `未配置`) 与内联快捷开关 (`el-switch`)，支持站长一键启闭已配置的 Provider；
+        - 当站长配置并开启任意一个子提供商时，系统自动感知并同步开启主开关「启用第三方快捷登录」，彻底杜绝子项配置完成而主开关遗漏未开的断层问题；
+    - [x] 变更点 3 (六语言多语言字典对称与登录子应用统一闭环):
+        - 新增 `oauthNoProviderConfiguredWarning`、`oauthNoProviderEnabledWarning`、`oauthMasterSwitchAutoEnabled`、`oauthNotConfigured` 4 项核心词条，在 `zh`、`zh-Hant`、`en`、`es`、`fr`、`nl` 六语言字典中保持 100% 绝对对称；
+        - 登录子应用 `authLocale.ts` 同步维护对应 6 语言词条映射。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 登录子应用构建核验：`temp_login_ui` Vite 构建通过 (2.28s, 0 errors)；
+    - [x] 主应用构建核验：`mail-vue` Vite 构建通过 (13.18s, 0 errors)；
+    - [x] 产物同步：`scripts/copy-login-dist.mjs` 同步至 `mail-worker/dist/login` 完成；
+    - [x] 多语言对称核验：`i18n-symmetry.mjs` (2,290 键 100% 绝对对称)；
+    - [x] 专项全场景端到端测试：`tests/test-oauth-sso-buttons-verification.mjs` (31/31 断言全绿通过，覆盖 1~5 Provider 几何排布及混合状态下的激活 vs 灰色禁用/点击拦截专项验证)；
+    - [x] 登录全语言回归套件：`tests/verify-login-polish.mjs` (62/62 断言全绿通过)；
+    - [x] 视觉截图状态核验：`tests/audit_oauth_active_vs_disabled.png` 验证已激活（高亮）与已禁用（灰色）对比明确无误。
+
+### 第三方认证与单点登录 1/2/3/4/5 Provider 奇偶自适应布局重塑、矢量品牌图标对齐与几何零溢出全真栈交付 (2026-10-03)
+*   **关联提交 (Git Commit)**: `753f6793dc63711d3706ce316c1332681309f6d4` (Short: `753f679`)
+*   **部署环境 (Deployment)**: `本地全真栈 / 构建核验`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 变更点 1 (1、2、3、4、5 个 Provider 全场景几何排布与奇偶数黄金对称自适应):
+        - **1 个 Provider (奇数)**: 渲染单列全宽 Hero 胶囊按钮 (`w-full h-11 justify-between px-4 sm:px-5`)，左侧专属矢量图标 + 专属文案（如 `通过 Google 账号继续`），右侧点缀微动效 `ArrowRight` 引导箭头，层次清晰且避免与下方主登录按钮视觉打架；
+        - **2 个 Provider (偶数)**: 经典 1:1 双列等宽网格 (`grid-cols-2 gap-2.5`)，视觉稳重大气；
+        - **3 个 Provider (奇数)**: 桌面端 3 列一字平铺 (`sm:grid-cols-3 gap-2.5`) 仅占单行 44px；移动端 (375px) 采用「1 顶跨列全宽 + 2 底双列平铺」倒金字塔结构 (`col-span-2 sm:col-span-1` + 2x `col-span-1`)，彻底杜绝 3 列在窄屏下出现文字横向截断 (`Micr...`) 的问题；
+        - **4 个 Provider (偶数)**: 经典 2x2 四宫格对称矩阵 (`grid-cols-2 gap-2 sm:gap-2.5`)；
+        - **5 个 Provider (奇数)**: 桌面端突破性采用 6 列基底网格 (`sm:grid-cols-6`)，第一行 3 个按钮各占 2 列 (`sm:col-span-2`，3x2=6)，第二行 2 个按钮各占 3 列 (`sm:col-span-3`，2x3=6) 实现完美的 3 上 2 下黄金对称，且仅占 2 行 96px；移动端 (375px) 采用「2 + 2 + 1 跨列对称底栏」紧凑排布 (`h-10 sm:h-11`)，第 5 个企业 SSO 按钮跨列横向铺满底栏作为企业单点登录锚点；
+    - [x] 变更点 2 (按钮专属矢量 SVG 品牌图标配对与规范类名对齐):
+        - 为每个第三方登录按钮深度定制并内联官方高精度矢量 SVG 品牌图标（Google 4色 G 标、GitHub 反白章鱼猫标、Microsoft 4色方块标、Apple 剪影标、Custom SSO 密钥盾牌标）；
+        - 严格对齐项目规范按钮类名 `epomail-display flex h-11 items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-3 rounded-xl border text-[12px] sm:text-[13px] transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#67e8f9]`，包含亚克力玻璃拟态暗色边框与悬停高亮微动效；
+        - 未配置提供商呈现精致 `SOON` 语义胶囊徽标，已配置提供商呈现全宽激活交互；
+    - [x] 变更点 3 (固定几何卡片 h-[620px]/sm:h-[670px] 极限自适应与零溢出保障):
+        - 针对固定尺寸卡片 `.relative.overflow-hidden.rounded-3xl.h-[620px].sm:h-[670px]` 进行全场景纵向节奏精细调优；
+        - 当开启第三方认证时，根据 Provider 数量动态优化 Brand Header 间距与表单各组件 gap，确保在 375px 移动端（620px 极限高度，总高度 ≤ 132px，预留 > 30px 安全余量）与 1440px 桌面端（670px 高度）中 100% 零溢出、零滑块、零内部滚动条；
+    - [x] 变更点 4 (端到端交互闭环与 OAuth 回调令牌自动接入):
+        - 点击已配置 Provider 自动请求 `/api/oauth/authorize/:provider` 换取授权地址并跳转；点击未配置 Provider 友好触发系统级气泡预警；
+        - 登录页挂载时自动解析 `/login?oauth_token=...` 与错误参数，实现 SSO 登录成功后的自动会话持久化与跃迁动效。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 登录子应用构建核验：`temp_login_ui` Vite 构建通过 (2.35s, 0 errors)；
+    - [x] 主应用构建核验：`mail-vue` Vite 构建通过 (12.88s, 0 errors)；
+    - [x] 产物同步：`scripts/copy-login-dist.mjs` 同步至 `mail-worker/dist/login` 完成；
+    - [x] 多语言对称核验：`i18n-symmetry.mjs` (2,286 键 100% 绝对对称)；
+    - [x] 专项全场景端到端测试：`tests/test-oauth-sso-buttons-verification.mjs` (25/25 断言全绿通过，100% 通过率，覆盖 1/2/3/4/5 Provider 在 1440px 桌面端与 375px 移动端)；
+    - [x] 登录全语言回归套件：`tests/verify-login-polish.mjs` (62/62 断言全绿通过)；
+    - [x] 视觉截图全场景核验：
+      * 1 Provider: `tests/audit_oauth_1_provider_desktop.png` & `tests/audit_oauth_1_provider_mobile.png`
+      * 2 Providers: `tests/audit_oauth_2_provider_desktop.png` & `tests/audit_oauth_2_provider_mobile.png`
+      * 3 Providers: `tests/audit_oauth_3_provider_desktop.png` & `tests/audit_oauth_3_provider_mobile.png`
+      * 4 Providers: `tests/audit_oauth_4_provider_desktop.png` & `tests/audit_oauth_4_provider_mobile.png`
+      * 5 Providers: `tests/audit_oauth_5_provider_desktop.png` & `tests/audit_oauth_5_provider_mobile.png`
+
+### 用户列表与操作报告职责边界厘清、4类预警体系与显式扩展双层架构上线 (2026-10-03)
+*   **关联提交 (Git Commit)**: `90f8e5c581a60d653c7eb835e11b4b3bb9c8d71b` (Short: `90f8e5c`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare Workers (https://mail.epocanvas.com)` (Version ID: `f8ce0202-cb22-4ae3-9345-259f95c0be43`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 变更点 1 (用户列表 views/user/index.vue 多安全模式精准展示重构):
+        - 明确「用户列表」定位为常规注册账户池管理，按安全模式动态调整展示列：
+          * 模式 1 (全部模式): 呈现收件数量 + 发件数量 + 实际占用存储空间 (`tabStorageSpace`, `formatUserStorage`)，代替原本单一的邮箱数量；
+          * 模式 0 (隐私模式): 隐藏常规收发件明细，直接呈现各用户实际占用存储空间 (`tabStorageSpace`) + 垃圾邮件数量 (`tabSpamCount`)；
+          * 模式 2 (加密模式 [E2EE]): 严格执行零知识指标管理，隐藏所有邮件详细计数，仅展示被检举次数 (`tabReportedByOthersCount`) + 举报他人次数 (`tabReportedOthersCount`) + 邮箱占用总空间 (`tabTotalStorageSpace`)；
+    - [x] 变更点 2 (操作报告 views/audit-report/index.vue 核心定位纠偏与零正常流水保障):
+        - 彻底纠偏操作报告职责：操作报告仅用于提醒管理员「哪个人可能存在问题」（登录设备/环境异常/触碰红线），坚决剔除任何常规合法用户的普通邮件记录；
+        - 数据源全面重塑：仅包含触碰安全红线、被检举、已被封禁或提交申诉工单的高风险对象（如张三异地4-IP漫游跳跃、Spammer营销广告检举、EvilScanner暴力撞库封禁、Charlie/Pilot外部工单申诉、Bob敏感外链检举等）；
+    - [x] 变更点 3 (4类预警体系与显式展示页窄表格设计):
+        - 顶部增设 4 类警告分类过滤器：全部预警、⚠️ 审计警告 (被检举/违规)、🚨 风控警告 (踩红线/异地并发)、🚫 封禁警告 (已封禁管控)、📋 申诉警告 (外部待处理工单)；
+        - 显式展示页采用与「用户列表」一致的高效、紧凑窄表格排版，重点突出目标账户、预警分类、简要触发特征、活跃环境池与合规指标；
+    - [x] 变更点 4 (动作语义严格解耦：对其操作 vs 对于处理):
+        - 前 3 类预警 (审计警告、风控警告、封禁警告) 严格归类为「对其进行操作」：支持下发警告、封禁账号/维持封禁、清退会话凭证、解除预警；
+        - 第 4 类预警 (申诉警告) 严格归类为「对于处理」：支持研判放行、驳回申诉、转入观察期；
+        - 全类型支持「查看详情 ↗」一键唤起扩展页抽屉；
+    - [x] 变更点 5 (扩展页抽屉与多模式无缝自适应):
+        - 详细排查比对全部收敛至扩展页抽屉：呈现双栏注册基线 vs 触发环境对比、Canvas/WebGL 指纹匹配度、3-IP/3-设备池明细、自述申诉书/检举详情、对外表单门户来源及研判裁决表单；
+        - 模式 1/0 自动呈现时序时间轴与时间戳，模式 2 自动切换纯 DB 窄表格且严格零时间戳。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：`mail-vue` Vite 构建通过 (13.29s, 0 errors)；
+    - [x] 多语言对称核验：`i18n-symmetry.mjs` (2,286 键 100% 绝对对称), `i18n-audit.mjs` (0 缺失)；
+    - [x] Cloudflare 部署核验：`mail-worker` 生产发布完成 (Version ID: `f8ce0202-cb22-4ae3-9345-259f95c0be43`)；
+    - [x] 全真栈端到端自动化测试：`tests/verify-appeal-and-audit-integration.mjs` 36/36 项断言全部通过；
+    - [x] 用户列表多模式自动化测试：`tests/verify-user-list-multimode.mjs` 验证通过；
+    - [x] 零假数据残留：测试数据全部清理，无临时令牌残留。
+
+### 第三方认证与单点登录 (OAuth & SSO) 模态弹窗视口全屏居中、零滑块红线落地与极限形态自适应 (2026-10-03)
+*   **关联提交 (Git Commit)**: `37bee7637fd03faab17c66bfeef848ed9e2129e9` (Short: `37bee76`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare Workers (https://mail.epocanvas.com)` (Version ID: `509e2cd3-74d3-4d46-9254-34888cde8fcb`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 变更点 1 (UI 规范红线全面确立与 Skill 规则固化)：
+        - 响应用户与项目 UI 设计 Skill 规范，在 `.agent/skills/ui-ux-pro-max/SKILL.md` 中制度化确立**普通弹窗禁止滑块 (Zero-Scrollbar Enforcement)**与**弹窗视口绝对居中 (Strict Viewport Centering)** 规范红线；
+        - 明确允许并推崇合理扩展弹窗左右宽度 (640~720px)，采用多列网格 (Multi-column Grid) 排版压缩纵向高度，从根源杜绝纵向撑爆视口与产生滚动滑块；
+    - [x] 变更点 2 (第三方认证配置弹窗 `.oauth-config-dialog` 双列网格紧凑重构)：
+        - 将弹窗宽度扩展至 `680px` (`width: min(680px, calc(100vw - 32px)) !important`)，突破既有 400px 狭窄约束；
+        - `<el-dialog>` 启用 `align-center` 与 `margin: auto !important`，确保在任何视口比例下均精准处于水平与垂直双向中心；
+        - 弹窗内容全面重构为双列网格 (`grid-template-columns: repeat(2, minmax(0, 1fr))`)：
+          * GitHub / Google：1 行 2 列 (Client ID + Client Secret)，整体弹窗高度仅 299px，视口占比 < 35%；
+          * Microsoft / Apple：2 行 2 列 (Client ID/Secret + Tenant/Team ID/Key ID)，整体弹窗高度仅 ~350px；
+          * Custom SSO (极限形态)：4 行紧凑布局 (7 字段全展)，总高度严控至 502px (视口 900px 占比 55%)，上下留白充裕 (> 200px)；
+    - [x] 变更点 3 (单行极简 OAuth 重定向回调条设计)：
+        - 将原本占用大块高度的 Callback 展示框压缩为单行极简集成条 (`.oauth-callback-compact-bar`)，采用代码胶囊截断 + Tooltip 提示 + 一键复制按钮，高度缩减 60%；
+    - [x] 变更点 4 (严密零滑块物理防御与暗色模式深度对齐)：
+        - 弹窗外层容器、Body、Header、Footer 全量注入 `overflow: hidden !important; scrollbar-width: none !important; ::-webkit-scrollbar { display: none !important; }`，彻底清除滚动条与滑块；
+        - 暗色模式下应用纯黑实色背景 (`background: #111827 !important; border: 1px solid #374151 !important`)，彻底杜绝半透明漏光与视觉穿透；
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：`mail-vue` Vite 构建通过 (14.46s, 0 errors)；
+    - [x] Cloudflare 部署：`mail-worker` 成功部署上线 (Version ID: `509e2cd3-74d3-4d46-9254-34888cde8fcb`)；
+    - [x] 静态多语言三件套：`i18n-symmetry.mjs` (2259 keys ALL SYMMETRIC), `i18n-audit.mjs` (0 缺失)；
+    - [x] 自动化全真栈测试：`tests/test-oauth-sso-full-stack.mjs` 51/51 项断言 100% 通过：
+        * 实测弹窗水平尺寸 680px，垂直居中判定通过 (`isVerticallyCentered: true`)，水平居中判定通过 (`isHorizontallyCentered: true`)；
+        * 弹窗内容与整体无滚动条判定全部通过 (`hasBodyScrollbar: false`, `hasDialogScrollbar: false`)；
+        * Custom SSO 极限 7 字段全展实测高度 502px，零滑块且严密保持垂直居中；
+    - [x] 全站回归核验：`tests/test-prod-login-card-and-challenge-routing.mjs` 27/27 项断言全部通过；
+    - [x] 视觉截图审查：`tests/audit_oauth_sso_settings_card.png` (GitHub 弹窗) 与 `tests/audit_oauth_sso_custom_modal.png` (Custom 弹窗) 视觉呈现完美居中、色彩和谐、零滚动滑块；
+    - [x] 零假数据残留：测试数据与 TOTP 状态已全部通过 API 与数据库物理还原，零残留。
+
+### 操作报告与风控管理控制台原生设计对齐、多模式自动呈现与独立长短链表单系统 (2026-10-03)
+*   **关联提交 (Git Commit)**: `2aca49037253d2e885422c9c0ad1352fa9e7d12c` (Short: `2aca490`)
+    - 联动提交 (epomail-docs): `ed500845a7d60611d279cf441e88849b1ca20970` (Short: `ed50084`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare Workers (https://mail.epocanvas.com)` (Version ID: `404fbcdf-82b7-45bc-ab1c-122ea81b0a41`) / `Cloudflare Pages (https://docs.epocanvas.com & https://epomail-docs.pages.dev)`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 变更点 1 (操作报告 UI 原生设计系统深度重构与一致性对齐)：
+        - 彻底重构 `audit-report/index.vue`，全面弃用外部杂色与浮夸视觉，完整采用 Epocanvas Mail 原生设计代币（`var(--el-bg-color)`、`var(--el-border-color)`、`var(--el-text-color-primary)`、卡片阴影与圆角）；
+        - 控制台与「系统设置」、「OAuth 与 SSO 应用」保持 100% 视觉统一度与交互语言连贯性；
+    - [x] 变更点 2 (安全等级自动驱动视图呈现，取消人工多余选择开关)：
+        - 坚决落实用户要求，彻底删除时间轴与表格的人工切换开关（View Toggle Button）；
+        - 模式自适应呈现：全部模式（Level 1）与隐私模式（Level 0）默认以**时序时间轴流水**（带完整时间帧与日期范围筛选）呈现；加密模式（Level 2 [E2EE]）严格自动切换为**纯 DB 数据表格**；
+        - 加密模式（Level 2）严格将所有时间戳彻底脱敏抹除（零时间戳列），并隐藏日期选择器，仅列出邮箱账户、操作、设备基线、环境池与风控状态；
+    - [x] 变更点 3 (风控管理 DB 表格工单追踪号与快捷研判放行/驳回)：
+        - Tab 2 风控研判 DB 表格增设「工单追踪号」(Ticket ID，如 `TKT-2026-XXXXX`) 列；
+        - 每行增设「放行」与「驳回」快捷操作按钮；
+        - 研判抽屉中实现双栏基准 vs 申诉环境指纹对比，并内嵌指向 `epomail-docs` 对外申诉接口的跳转链接；
+    - [x] 变更点 4 (从统一短链自动加载出专属长链 Hash URL 表单)：
+        - 实现统一短链入口（`https://docs.epocanvas.com/epomail/appeal/`），访问后自动计算高熵专属唯一会话 Hash，重定向扩展为独立长链（`.../appeal/form/#/f/f_<hash>?...`）；
+        - 表单 UI 采用 Google Forms / Microsoft Forms 极简卡片流设计，顶部具备专属 Accent 强调色饰条，自动本地执行 Canvas/WebGL SHA-256 硬件环境指纹存证，提交后展示带 Ticket ID 与待审核状态的官方回执卡；
+    - [x] 变更点 5 (六语言严格 100% 对称)：
+        - 同步更新 6 语言字典（zh, zh-Hant, en, es, fr, nl），键值对增至 2,259 条，静态审计三件套与全真栈测试 100% 通过。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：`mail-vue` Vite 构建通过 (12.55s, 0 errors)；
+    - [x] Cloudflare 部署：`mail-worker` 成功部署上线 (Version ID: `404fbcdf-82b7-45bc-ab1c-122ea81b0a41`)；
+    - [x] 静态多语言三件套：`i18n-symmetry.mjs` (2259 keys ALL SYMMETRIC), `i18n-audit.mjs` (0 缺失), `i18n-hardcoded.mjs` 零阻断；
+    - [x] 自动化端到端测试：`tests/verify-appeal-and-audit-integration.mjs` 在线全真栈 36/36 项断言全部一次性通过；
+    - [x] 零假数据残留：测试采用会话级动态验证与标准 API 鉴权，零临时脏数据写入。
+
+### 操作报告与风控控制台 PM 美学重构与 epomail-docs 对外非认证申诉闭环 (2026-10-03)
+*   **关联提交 (Git Commit)**: `365b686e269b40fc5d611eb9eca3296a32f88c57` (Short: `365b686`)
+    - 联动提交 (epomail-docs): `18749733cf852899450a8b981f33f07a7bc93f06` (Short: `1874973`)
+    - 联动提交 (epocanvas-docs): `185ded38f61555546bdf2c3fa8f5c90b8f052db6` (Short: `185ded3`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare Workers (https://mail.epocanvas.com)` (Version ID: `bbee89be-514f-4caa-ae80-245ed113b68e`) / `Cloudflare Pages (https://docs.epocanvas.com & https://epomail-docs.pages.dev)`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 变更点 1 (双轨对外表单架构解耦与 epomail-docs 独立申诉门户)：
+        - 响应用户核心诉求，将对外公开申诉与密码重置表单剥离至 `epomail-docs`（`https://docs.epocanvas.com/epomail/mail/appeal/`），彻底消除被封禁/忘记密码用户因主站鉴权导致的死循环；
+        - 在 `epomail-docs` 实现 6 语言对称文档（zh, zh-tw, en, es, fr, nl）与交互客户端 `appeal-client.js`：支持实时硬件 Canvas/WebGL SHA-256 指纹采集、表单动态校验与 SLA 工单凭据（Ticket ID 如 `TKT-2026-XXXXX`）生成；
+        - 在 `epocanvas-docs` 配置 302 跨项目优雅重定向，确保主域名路由无缝访问。
+    - [x] 变更点 2 (Webmail 登录「忘记密码？」赛博模态框引导)：
+        - 在 `temp_login_ui` 的 `AuthForm.tsx` 中新增暗色赛博毛玻璃浮层 (`showForgotModal`)；
+        - 自动获取当前登录框预填邮箱，动态拼接六语言本地化 URL，一键导流至 `epomail-docs` 外部核验门户。
+    - [x] 变更点 3 (操作报告与风控控制台 PM 顶级美学重构与体验升级)：
+        - 顶栏增设「← 返回系统设置」与「查看用户对外申诉页面 (epomail-docs) ↗」快速导流面包屑导航；
+        - 4 大 KPI 卡片嵌入微进度条、待审诉单脉动光信标 (pulse beacon) 以及 3-IP / 3-设备环境槽位胶囊；
+        - 申诉研判抽屉中增设「epomail-docs 对外申诉接口」数据来源横幅与 98% 指纹匹配推荐标签；
+        - Tab 3 策略页新增「对外表单与风控流转架构说明」卡片，以 3 步可视化流程图呈现双轨解耦机理；
+        - 严格补齐六语言字典（`auditExternalPortalBadge`, `auditArchStepDocs`, `auditArchStepCloud`, `auditArchStepAdmin`），实现 2,251 词条 100% 绝对对称。
+    - [x] 变更点 4 (独立 PM Subagent 深度验收)：
+        - 委任独立 PM UX Auditor Subagent 对 5 组公网生产实测截图与旅程进行深度评审，签署 `PASSED & APPROVED` 准予发布裁决。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：`mail-vue` Vite 构建通过 (13.16s)，`epomail-docs` 构建通过 (61 pages, 0 errors)；
+    - [x] 静态多语言三件套：`i18n-symmetry.mjs` (ALL SYMMETRIC), `i18n-audit.mjs` (0 缺失), `i18n-hardcoded.mjs` 全绿；
+    - [x] 自动化端到端测试：`tests/verify-appeal-and-audit-integration.mjs` 生产全量全绿 (21/21 项断言全部通过)；
+    - [x] 浏览器全真栈实测：5 张高清公网实测截图归档保存，端到端旅程流畅闭环；
+    - [x] 零假数据残留：测试使用只读会话及标准 API，无任何临时脏数据残留。
+
+### 第三方认证与单点登录 (OAuth & SSO) 公网全真栈端到端审计与验证 (2026-10-03)
+*   **关联提交 (Git Commit)**: `1812bab8699ba029833b0631a6c7dd944839a2f8` (Short: `1812bab`) / `fc4adda1a24e21ca89cc9d1e1966bad45ed9d081` (Short: `fc4adda`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare Workers (https://mail.epocanvas.com)` (Version ID: `ed586d60-0fd2-41b5-a5c9-dc811ab1416f`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 变更点 1 (OAuth 连通性探测与鉴权修复)：
+        - 修复 `mail-worker/src/security/security.js` 中 `/oauth/verify` 端点被全局排除导致的未认证 501 报错，将其严密纳入 `setting:set` 权限与管理员鉴权管控；
+        - 在 `mail-worker/src/api/oauth-api.js` 中加入防御式 Token 解析与站长识别机制；
+        - 在 `mail-worker/src/service/oauth-service.js` 中放行无凭据探测的有效 HTTP 响应 (状态码 < 500)，兼容 GitHub API 速率限制探针；
+    - [x] 变更点 2 (公网全真栈自动化测试套件与物理回滚强化)：
+        - 完善 `tests/test-oauth-sso-full-stack.mjs` 的 `finally` 阶段，通过管理员 API 与 D1 原生多指令组合原子重置 `oauth_login_enabled = 0`、`oauth_providers = '{}'` 并刷新 KV 缓存，确保测试后 100% 零假数据残留；
+    - [x] 变更点 3 (系统设置与前端视觉纯净呈现)：
+        - 验证系统设置 `.oauth-sso-card` 纯净规范，彻底确认已移除旧版伪装展示框 (`.oauth-preview-box`) 与开发中标签 (`.oauth-soon-badge`)，5 大主流 Provider 严格按照「1名称 + 1配置按钮」规范呈现；
+        - 专属模态弹窗 (`.oauth-config-dialog`) 正常弹出，Client ID、Secret 输入与标准回调地址 (`/api/oauth/callback/*`) 正确无误；
+        - 视觉审查截图留存至 `tests/audit_oauth_sso_settings_card.png`。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：`mail-vue` Vite 构建通过 (19.73s)、`temp_login_ui` 构建通过 (3.54s)，产物零警告零报错；
+    - [x] 生产 Worker 部署：成功部署至 Cloudflare Workers (Version ID: `ed586d60-0fd2-41b5-a5c9-dc811ab1416f`)；
+    - [x] 自动化测试套件 1：`tests/test-oauth-sso-full-stack.mjs` 全绿 (40/40 断言全部通过)；
+    - [x] 自动化测试套件 2：`tests/test-prod-login-card-and-challenge-routing.mjs` 回归核验全绿 (27/27 断言全部通过)；
+    - [x] 浏览器全真栈实测：登录卡片尺寸 (480x670)、2FA 挑战路由无跳转与卡片尺寸严格一致、OAuth 网格默认隐藏；
+    - [x] 零假数据残留：测试后生产 D1 `totp_enabled = 1`，`oauth_login_enabled = 0`，`oauth_providers = {}`，KV 缓存刷新已完全还原。
+
+### 操作报告与风控控制台生产环境部署与公网视觉核验 (2026-10-03)
+*   **关联提交 (Git Commit)**: `e5b1b7a70a83e01bc6ef07481ba8ea08c90380eb` (Short: `e5b1b7a`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare Workers (https://mail.epocanvas.com)` (Version ID: `adccc457-d0a0-4b1f-b2e5-a045d9ad051f`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 变更点 1 (Cloudflare 生产构建与现网发布)：
+        - 执行 `wrangler deploy` 自动完成 `temp_login_ui` + `mail-vue` 完整构建链；
+        - 增量上传 47 项全新核心静态资产，成功部署至生产环境版本 ID `adccc457-d0a0-4b1f-b2e5-a045d9ad051f`；
+    - [x] 变更点 2 (「系统设置」控制按键与入口强化)：
+        - 强化「系统设置」(`sys-setting`) 中的 `audit-policy-card`：右侧增加 `[操作报告 🛡️]` 行内配置按钮，并在卡片底部提供大号专属高对比度直达按键 `[🛡️ 操作报告 (操作审计流水 / 风控研判与申诉)]`；
+        - 补充专用导航函数 `openAuditReport` 确保准确提取动态 `currentRoleSlug` 平滑跳转至 `#manage/admin/audit`；
+    - [x] 变更点 3 (Playwright 公网全真视觉与功能核验)：
+        - 编写并执行生产公网端到端测试套件 `tests/verify-prod-audit-report-visual.mjs`，21/21 项断言 100% 全绿；
+        - 实地验证公网环境下的三安全模式切换（全部模式/隐私模式/加密模式）、时序流水时间轴与表格双视图平滑切换；
+        - 实地验证风控研判抽屉滑出、原始注册基线 vs 申诉提交环境双栏指纹比对、98% 相似度测算与 IP 同网段比对、放行处置单选与清除非重要日志控制；
+        - 产出 4 幅公网高保真全真截图（`tests/verify_prod_sys_setting_audit_card.png`、`tests/verify_prod_audit_stream.png`、`tests/verify_prod_audit_risk_drawer.png`、`tests/verify_prod_audit_policy.png`）。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：`mail-vue` Vite 构建通过 (13.96s)，产物零警告零报错；
+    - [x] 本地 E2E 测试套件：`tests/test-audit-report-e2e.mjs` 全绿 (6/6 通过)；
+    - [x] 公网生产视觉验收：`tests/verify-prod-audit-report-visual.mjs` 全绿 (21/21 通过)；
+    - [x] 多语言对称闭环：6 语言字典 (`zh`, `zh-Hant`, `en`, `es`, `fr`, `nl`) 100% 绝对对称 (2242 keys)，代码引用零缺失；
+    - [x] 零假数据残留：线上核验会话物理隔离，无残留脏数据。
+
+### 操作报告与风控管理控制台全真前端交付 (2026-10-03)
+*   **关联提交 (Git Commit)**: `16ae84f186c74b1c007fdb51c25e9cda34826b24` (Short: `16ae84f`)
+*   **部署环境 (Deployment)**: `本地全真栈构建与核验 (mail-vue Vite)`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 变更点 1 (三模式安全等级与时序规范动态适配)：
+        - 全部邮件模式 (Level 1)：允许记录用户与站长全量操作流水并赋予高精度时间帧；细化邮件事件开关默认全部关闭，防数据库瞬间膨胀；
+        - 隐私模式 (Level 2 [推荐])：仅记录注册、封禁、垃圾箱扫描、登录、登出、注销等安全与生命周期事件，业务邮件物理隔离；
+        - 加密模式 (Level 3 [E2EE])：零知识风控审计，时间戳物理脱敏擦除，仅留存注册设备环境特征基线（IP、指纹）、封禁记录与申诉表单；
+    - [x] 变更点 2 (存储配额防御与智能清理机制)：
+        - 支持单邮箱最多记录活跃 IP 数量（默认 3 个）与设备信息数量（默认 3 个），适配多 IP/多地点并发登录场景，防止容量超载；
+        - 提供「自动清理最远记录 (FIFO)」开关与「优先清理非重要记录」淘汰策略（淘汰常规业务操作，保留身份基线、指纹、封禁与申诉证据，保留配额默认 3 条）；
+        - 在「系统设置」(`sys-setting`) 独立注入 `audit-policy-card` 供管理员全局灵活配置；
+    - [x] 变更点 3 (风控研判与申诉放行控制台)：
+        - 构建完整风控 DB 表格，展现账号封禁状态、注册基线环境、活跃 IP/设备池、申诉理由；
+        - 提供申诉研判放行抽屉，实现设备指纹相似度（百分比评分）、IP 子网网段智能匹配度比对，辅助管理员裁定放行、观察期或驳回；
+    - [x] 变更点 4 (路由守卫与身分组管理绑定防越权)：
+        - 注册 `/manage/:roleGroup/audit` 主路由，支持别名 `/manage/:roleGroup/audit-report`、`/admin/audit` 等；
+        - 侧边栏管理板块平滑注入操作报告入口，图标采用安全风控盾牌 (`fluent:shield-task-24-regular`)；
+        - 严密纳入 `isManageRoute` 防越权白名单与 `keep-alive` 缓存机制；
+    - [x] 变更点 5 (六语言字典对称闭环)：
+        - 6 语言字典 (`zh`, `zh-Hant`, `en`, `es`, `fr`, `nl`) 全量对称注入 91 个操作、风控与申诉词条，通过静态三件套核验。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：`mail-vue` Vite 构建通过 (耗时 12.56s)，产物零警告零报错；
+    - [x] 自动化测试套件：`tests/test-audit-report-e2e.mjs` 6 项全绿 (6/6 通过)；
+    - [x] 多语言对称闭环：`scripts/i18n-symmetry.mjs` 与 `scripts/i18n-audit.mjs` 验证 100% 绝对对称与零缺失；
+    - [x] 零假数据残留：纯前端全真交互，无脏数据滞留。
+
+### 分析页 (Analytics) 图表无法渲染故障修复与Subagent双模式公网视觉验收 (2026-10-03)
+*   **关联提交 (Git Commit)**: `a5acdb545d7afd70c2f52a2039194b00c67d7925` (Short: `a5acdb5`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare Workers (https://mail.epocanvas.com)` (Version ID: `bb685715-d1cf-4410-a336-0f3fdde5ac5a`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 变更点 1 (分析页路由判定与生命周期修复)：
+        - 彻底根治分析页因路由命名升级为 `manage-analysis` 后，内部遗留的 `route.name !== 'analysis'` 硬编码导致 `initPicture()` 提前退出的问题；
+        - 重构引入 `isAnalysisRoute()` 统一兼容判定，涵盖 `manage-analysis`、`analysis` 以及路径别名；
+        - 修复暗色模式切换监听器 `watch(() => uiStore.dark)`，确保主题切换时平滑触发 ECharts 动态重绘；
+    - [x] 变更点 2 (ECharts 初始化与图表防御强化)：
+        - 在六大图表初始化入口（发件人来源饼图、用户增长折线图、邮件吞吐柱状图、发信仪表盘等）补齐 DOM 元素存在性校验（`if (!dom) return`），彻底杜绝 `Initialize failed: invalid dom` 崩溃；
+        - 数据映射全面增加缺省防御（`(senderData.value || []).map(...)`、`|| 0`、`|| []`），防止空数据引发 TypeError；
+        - `onMounted` 增加 `.catch()` 异常捕获与 loading 状态兜底回退，杜绝网络异常或接口抖动导致的死循环卡顿；
+    - [x] 变更点 3 (Subagent 独立公网双模式视觉验收)：
+        - 编写 Playwright 公网端到端图表自动化核验套件 `tests/verify-analysis-visual.mjs`，12/12 断言全绿；
+        - 调起独立 Visual Auditor Subagent 对公网环境截图（`tests/verify_analysis_light_mode.png` 与 `tests/verify_analysis_dark_mode.png`）执行严格走查并获得批准交付（Sign-Off）。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：`mail-vue` vite build 通过 (耗时 12.41s)，产物零报错零告警；
+    - [x] 自动化测试套件：`tests/verify-analysis-visual.mjs` 全绿 (12/12 断言通过)；
+    - [x] 独立 Subagent 视觉验收：Analytics Visual Auditor Subagent 审核亮暗双模截图并批准交付 (Sign-Off Approved)；
+    - [x] 多语言对称闭环：6 语言字典 100% 绝对对称 (2134 keys)，字面量引用 0 缺失；
+    - [x] 生产公网部署：Cloudflare Workers 版本 `bb685715-d1cf-4410-a336-0f3fdde5ac5a` 现网就绪；
+    - [x] 零假数据残留：测试过程环境无脏数据残留。
+
+### 设定页单界面一体化呈现、URL身分组管理分流与Subagent公网视觉验收 (2026-10-03)
+*   **关联提交 (Git Commit)**: `42fecb961451dcb539cd42854bc63694e36c38b3` (Short: `42fecb9`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare Workers (https://mail.epocanvas.com)` (Version ID: `3f2c8994-efba-4aa9-beeb-15cd82a1476d`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 变更点 1 (前端UI单界面一体化保持)：
+        - 遵从用户最新指引“前端其他展示保持不变，该在一个界面就保持一个界面就行了”，彻底移除切页卡片与视图割裂设计；
+        - 在设定页单一侧边栏列表内自然融合双板块：上方直观呈现“设置”个人项（个资、常规、安全、资料、标签）；具备管理权限者在同侧边栏下方平滑延展“管理”板块（分析页、用户列表、权限控制、注册密钥、系统设置、应用管理、分类管理）；
+    - [x] 变更点 2 (URL层级严格区分与身分组动态绑定)：
+        - 个人设置 URL 严格锚定 `#settings/*`（如 `https://mail.epocanvas.com/mail/u/0/#settings/profile`）；
+        - 管理后台从 URL 层面显式区分并强绑定身分组 `#manage/:roleGroup/*`（如站长映射为 `#manage/admin/system`，协管者映射为 `#manage/moderator/*`）；
+        - 点击管理项后侧边栏完整保留，右侧主视窗平滑切换管理内容，URL 自动精准同步；点击个人设置项后平滑切回 `#settings/*`；
+    - [x] 变更点 3 (严格防越权与安全拦截)：
+        - 普通无权用户侧边栏绝不渲染“管理”板块标题及任何管理 DOM 节点；
+        - 普通用户若手动在浏览器地址栏输入 `#manage/admin/system` 等管理路由，在路由守卫层被坚决拦截、触发告警并安全回退至 `#settings/profile`；
+    - [x] 变更点 4 (Subagent 独立公网视觉验证验收体系)：
+        - 编写 Playwright 端到端公网实测套件 `tests/verify-subagent-settings-visual.mjs`，执行 15 项断言全绿；
+        - 部署至真实公网并产出三视角全景实录截图（`tests/verify_settings_normal_user.png`、`tests/verify_settings_unified_admin_sidebar.png`、`tests/verify_settings_unified_admin_manage_system.png`）；
+        - 调起独立 Visual Audit Subagent 针对公网全真视觉排版、激活态交互、防越权表现进行全面审查，获得正式准予交付 Sign-off。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：`mail-vue` vite build 通过 (耗时 13.02s)，产物零警告零报错；
+    - [x] 自动化测试套件：`tests/verify-subagent-settings-visual.mjs` 全绿 (15/15 断言通过)；
+    - [x] 独立 Subagent 视觉验收：Visual Audit Subagent 完成实图审计并批准交付 (Sign-Off Approved)；
+    - [x] 多语言对称闭环：6 语言字典 100% 绝对对称 (2134 keys)，字面量引用 0 缺失；
+    - [x] 生产公网部署：Cloudflare Workers 版本 `3f2c8994-efba-4aa9-beeb-15cd82a1476d` 现网就绪；
+    - [x] 零假数据残留：测试过程所有网络与会话隔离清理，无脏数据残留。
 
 ### EpomailDocs v5.9 专案文档拆分扩充轮：功能指南/技术架构 + 真实产品截图 + 内容栏居中 (2026-10-03)
 *   **关联提交 (Git Commit)**: `8a60539d318eef618b84aa0db4e8a88672c4940d` (Short: `8a60539`)；EpomailDocs 独立提交 `beb956a1b50b5c4b94d3bbc9b9feba8ef774417a` (Short: `beb956a`，已推送 origin/main）
@@ -94,6 +606,415 @@
     - [x] 文档站回归：validate-anchors 1200 锚点 0 断链；verify-laws 与核验底稿一致
     - [x] 本轮不改文档站与产品代码（纯审计），无测试数据产生
 
+### 设定页「个人设置」与「管理控制台」物理分割及身分组URL强绑定防越权 (2026-10-02)
+*   **关联提交 (Git Commit)**: `27b1f32b1960dac6c71bbf0a39cac2ce1d9fc1a0` (Short: `27b1f32`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare Workers (https://mail.epocanvas.com)` (Version ID: `3d599d23-2ab0-4a10-a317-45d81bae2d5f`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 变更点 1 (URL层级物理隔离与规范化)：
+        - 个人设置页面彻底收敛于 `#settings` (`https://mail.epocanvas.com/mail/u/0/#settings/profile`)，涵盖个人资料、通用偏好、账号安全、存储与数据、邮件标签 5 大用户专属面板；
+        - 管理控制台从 URL 层面明确隔离为 `#manage/:roleGroup/*` (例如 `#manage/admin/system`、`#manage/moderator/users`)，并提供 `#admin/*` 一级便捷别名；
+        - 系统级规则设定（`category-setting`，原系统防垃圾邮件/规则/AI配置）从个人设置迁入管理控制台 `/manage/:roleGroup/rules`，杜绝未授权暴露；
+    - [x] 变更点 2 (路由守卫与防越权校验体系)：
+        - 在 `router.beforeEach` 中深度集成权限校验网关：普通用户若试图输入 URL 越权访问任何管理路由，一律强制阻断、弹出无权访问告警并退回 `/settings/profile`；
+        - 身分组 URL 动态强绑定：URL 中的 `:roleGroup` 必须与当前登录用户的真实身分组严格对齐（站长映射为 `admin`、协管者映射为 `moderator`、自定义角色映射为其合法 `roleCode`），若 URL 传入与自身不匹配的分组名将自动规范化；
+        - 细粒度管理分页拦截：仅向用户展示其实际具备权限的管理标签页（如仅具备 `user:query` 的协管者访问 `/system` 将被拦截并自动降级重定向至 `/users`）；
+    - [x] 变更点 3 (侧边栏与顶栏交互重构)：
+        - 侧边栏全面重构为 `#settings` 模式与 `#manage/:roleGroup` 模式双模态互斥切换，展示专属说明文案、URL 徽章与当前身分组专属胶囊；
+        - 提供「切换至管理后台」与「返回个人设置」快捷卡片，顶栏及多账号下拉菜单严格解耦个人设置与管理控制台入口；
+    - [x] 变更点 4 (六语言对称与工程规范闭环)：
+        - 六语言字典（zh, zh-Hant, en, es, fr, nl）全量闭环 9 个新增词条，静态扫描三件套 100% 零缺失。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：`mail-vue` 构建通过 (耗时 12.02s)；
+    - [x] 自动化测试套件：`tests/test-settings-manage-separation.mjs` 覆盖身分组映射、权限判定、优先级跳转与防越权路由拦截模拟，5/5 场景全部通过；
+    - [x] 静态多语言三件套：`node scripts/i18n-symmetry.mjs` 2134/1929 字典绝对对称，`node scripts/i18n-audit.mjs` 1648 处字面量 0 处缺失；
+    - [x] 生产环境真实部署：`npm run deploy` 成功发布至 Cloudflare Workers，Version ID: `3d599d23-2ab0-4a10-a317-45d81bae2d5f`；
+    - [x] 零假数据残留：测试脚本无数据库残留与脏凭据。
+
+### 个资「添加电子邮箱」按钮位置重构：调整至 email-row 右侧与水平基线对齐 (2026-10-02)
+*   **关联提交 (Git Commit)**: `87dff500d0931eae2e2f3d664d557d7512de816f` (Short: `87dff50`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare Workers (https://mail.epocanvas.com)` (Version ID: `9c197262-ff42-4b3d-aaae-0223763ebe63`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 变更点 1 (重构按钮布局位置)：
+        - 将个资「电子邮件」项下的「添加电子邮箱」按钮从此前下方独立折行（`margin-top: 10px`）移除，重构为置于首行主邮箱 `email-row` 右侧（`.email-primary-row`），与账号主邮箱卡片水平基线自然齐平；
+    - [x] 变更点 2 (优化单邮箱与多邮箱视图体验)：
+        - 当仅有主邮箱时，标签、主邮箱胶囊和添加按钮处于同一水平行内，与个资页其他行（昵称、性别、生日、常用地址）保持一致的水平紧凑质感；当存在额外个人邮箱时，副邮箱在下方依次垂直罗列，层级分明；
+    - [x] 变更点 3 (响应式与样式适配)：
+        - `.email-primary-row` 引入 `align-items: center; gap: 12px; flex-wrap: wrap;`，在移动端小屏下平滑换行防溢出，在桌面端保持 0px 垂直偏差点对齐。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：`mail-vue` 构建通过 (耗时 15.52s)；
+    - [x] 自动化测试套件：`tests/test-profile-multiple-emails-e2e.mjs` 全真公网端到端测试 22/22 项断言 100% 全部通过；
+    - [x] 几何盒模型实测：按钮位于 `email-row` 右侧 (`btnX: 965.0 >= rowRight: 953.0`)，水平基线居中对齐 (`中心Y差值: 0.0px`)；
+    - [x] 真实生产全真截图：已保存至 `tests/verify_profile_multiple_emails.png`，零脏数据残留。
+
+### 2FA 信任设备 30 天免验与双期黑盒风控生命周期模型交付上线 (2026-10-02)
+*   **关联提交 (Git Commit)**: `9c28ede44ea3d7da74a7ff95be8579979313dbfe` (Short: `9c28ede`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare Workers (https://mail.epocanvas.com)` (Version ID: `ec838b82-6b3e-46c1-838d-c724a465c9a3`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 变更点 1 (2FA 界面集成「以后本设备登录不再验证」交互勾选框)：
+        - 在 2FA 各挑战面板（TOTP 动态口令、通行密钥 Passkey、应急备用代码）中集成「以后本设备登录不再验证」选项框；
+        - 默认状态严格为「未勾选（false）」，必须由用户主动点击勾选授权；
+        - 勾选框采用微发光青蓝渐变高亮与圆角设计，外框尺寸严格保持 480px × 670px，0px 布局位移与视觉重排。
+    - [x] 变更点 2 (自研开源黑盒设备认证引擎 device-trust-service.js)：
+        - 基于服务端主密钥 `env.jwt_secret` 派生独立 HMAC-SHA256 签名密钥，生成不透明密文凭据（`epodt_v1.<payload>.<sig>`）；
+        - 时间戳 $T_0$ 经由 32 位伪随机非线性 XOR 掩码加密打包，结合 8 字节密码学随机 Nonce 与客户端设备熵指纹哈希，杜绝外部推测内部周期与参数；
+        - 服务端 KV（`KvConst.DEVICE_TRUST`）双层校准绑定，具备即时失效与物理防伪能力。
+    - [x] 变更点 3 (严格落地双期数学计算模型与自动强制退出)：
+        - **Phase 1 (首次 30 天内免 2FA 窗口)**：$0 \le \Delta t \le 30 \text{ 天}$ 内输入密码登录时，自动核验信任凭据并豁免 2FA，直接完成安全登入；
+        - **Phase 2 (超过 30 天倒计时窗口)**：登录超过 30 天后退出（例如第 31 天登录），2FA 豁免权失效，强制要求重新进行 2FA 认证；
+        - **Hard Eviction (60 天绝对会话熔断)**：在 `security.js` 中严苛校验 `maxSessionEpoch`（$T_0 + 60 \text{ 天}$），会话超过 60 天一律强制自动退出，彻底杜绝永久登录隐患。
+    - [x] 变更点 4 (零信任动态风险自适应降级与二验联动)：
+        - 结合 `risk-service.js` 黑盒风控，凡检测到指纹浏览器、Canvas 篡改或自动化驱动特征，立即无视设备年龄动态熔断信任，强制触发二次验证。
+    - [x] 变更点 5 (六语言对称与静态审计闭环)：
+        - 六语言字典（zh, zh-Hant, en, es, fr, nl）全量闭环 `rememberDevice` 词条，静态审计三件套 100% 通过。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 静态多语言三件套：`node scripts/i18n-symmetry.mjs && node scripts/i18n-audit.mjs` 100% 通过（2125/1929 字典绝对对称，1642 处代码字面量引用零缺失）；
+    - [x] 黑盒生命周期断言套件 (`tests/test-trusted-device-30d-lifecycle-and-blackbox.mjs`)：14/14 项断言全部通过（涵盖 0d、15d、29.9d、31d、45d、61d 各生命周期节点与风控熔断）；
+    - [x] 界面交互与几何物理锁死套件 (`tests/test-trusted-device-ui-and-e2e.mjs`)：6/6 项断言全部通过（实测 480x670 尺寸锁定 0px 偏差）；
+    - [x] 公网全真卡片尺寸与路由端到端测试 (`tests/test-prod-login-card-and-challenge-routing.mjs`)：26/26 项断言全部通过；
+    - [x] 公网 Passkey 跨平台兼容与自适应风控测试 (`tests/test-prod-passkey-and-stepup-live-e2e.mjs`)：26/26 项断言全部通过；
+    - [x] 公网 Passkey 时间锁与生命周期管理测试 (`tests/test-prod-passkey-timelock-and-management.mjs`)：40/40 项断言全部通过；
+    - [x] 公网真实生产环境 2FA 信任设备核验 (`tests/test-prod-trusted-device-live-e2e.mjs`)：7/7 项断言全部通过，已捕获真实公网渲染截图 `tests/verify_prod_trusted_device_checkbox.png`；
+    - [x] 生产零脏数据残留：测试数据均在 `finally` 钩子中物理清除。
+
+### 个人资料支持添加多个额外电子邮箱与全生命周期管理 (2026-10-02)
+*   **关联提交 (Git Commit)**: `7ce1f2d86cf9d7ed48ea87d46761ce3c17a36670` (Short: `7ce1f2d`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare Workers (https://mail.epocanvas.com)` (Version ID: `0b9d4b80-71ca-4938-91ac-151b3b7bed01`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 变更点 1 (前端 UI 与模态框交互)：
+        - 在 `mail-vue/src/views/profile-info/index.vue` 个人资料（个资）的「电子邮件」区重构为 `.emails-container`，显示账号主邮箱（带不可删除的 Primary 徽标）与附加个人邮箱列表（带类型标签与删除按钮），新增「添加电子邮箱」按钮与现代化毛玻璃模态弹窗；
+    - [x] 变更点 2 (输入校验与交互体验)：
+        - 模态框支持 RFC 标准电子邮箱格式实时正则校验与报错提示、与已有邮箱及主邮箱排重校验、邮箱标签选择（个人、工作、备用、其他），支持删除确认二次确认模态弹窗与成功气泡反馈，完全适配浅色与暗色模式；
+    - [x] 变更点 3 (后端持久化与安全过滤)：
+        - 在 `mail-worker/src/service/user-service.js` 的 `ALLOWED_PROFILE_FIELDS` 白名单开放 `emails`，引入邮箱规范化清洗（trim、小写化、RFC 正则、长度防爆、最大 20 个限制），并在 `loginUserInfo` 中自动加载用户已保存的额外邮箱列表；
+    - [x] 变更点 4 (六语言严谨闭环与 Vue-i18n 转义修复)：
+        - 同步更新 6 种语言字典（zh, zh-Hant, en, es, fr, nl）共 13 项词条，处理 Vue-i18n `@` 链接占位符转义（`{'@'}`），彻底消除前端编译与模态框渲染报错。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：`mail-vue` 构建通过 (耗时 15.61s)，`mail-worker` 语法与编译校验通过；
+    - [x] 自动化测试套件：`tests/test-profile-multiple-emails-e2e.mjs` 全真公网端到端测试 20/20 项断言 100% 全部通过；
+    - [x] 真实生产浏览器实测核验：添加个人邮箱、添加工作邮箱、格式拦截、重复邮箱拦截、删除确认物理移除全链路闭环，截图保存在 `tests/verify_profile_multiple_emails.png`；
+    - [x] 零假数据残留：测试临时添加的邮箱与测试数据均在 `finally` 块中物理恢复与清理。
+
+### 2FA 故障排除交互重构：废除撑高抽屉卡片，升级为悬停气泡「?」指引与 0px 零抖动布局 (2026-10-02)
+*   **关联提交 (Git Commit)**: `987f5271c0e85876d76bb956627edaa704c125b4` (Short: `987f527`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare Workers (https://mail.epocanvas.com)` (Version ID: `1a60ffad-9734-468b-abc0-febc545d5ab0`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 变更点 1 (彻底废除在流内撑高展开的下拉/抽屉式卡片)：
+        - 移除此前位于 OTP 输入区与提交按键之间的折叠式抽屉卡片（`Troubleshooting Drawer Card`），杜绝因展开排错指引而撑高卡片高度或挤压提交按钮的视觉抖动。
+    - [x] 变更点 2 (重构为交互式悬停「?」圆形徽标与亚克力磨砂气泡 Popover)：
+        - 将「无法验证（havingTrouble）」触发器由生硬折叠按钮重构为内联发光徽标组合（`div.relative.inline-flex.items-center`），右侧点缀精致微质感圆环 `?` 标识；
+        - 基于 `<AnimatePresence>` 构建绝对定位脱模气泡（`absolute right-0 bottom-full mb-2 w-64 z-50 rounded-2xl border border-[rgba(139,147,196,0.3)] bg-[rgba(15,18,37,0.96)] p-3 backdrop-blur-xl shadow-2xl`），悬停时浮空浮动在上方，支持点击/移动端触控，具备精准下指向指示箭头；
+        - 卡片外框物理尺寸保持绝对静止（480px × 670px，0px 偏差），彻底消除任何形态的布局重排与跳动。
+    - [x] 变更点 3 (六语言文字精细对称与优雅排版)：
+        - 对齐 6 语言字典（zh: 无法验证, zh-Hant: 無法驗證, en: Having trouble, es: Problemas para verificar, fr: Problème de vérification, nl: Lukt het niet），剔除尾部问号与独立 `[?]` 徽标自然缝合；
+        - 悬停浮层内保留完整的密码学排错指引（时间校准、重载重试、使用备用代码/其他方式）。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 静态多语言三件套：`node scripts/i18n-symmetry.mjs && node scripts/i18n-audit.mjs` 100% 通过（2113 / 1917 键绝对对称，1630 处字面量引用零缺失）；
+    - [x] 公网全真卡片尺寸与路由端到端测试 (`tests/test-prod-login-card-and-challenge-routing.mjs`)：26/26 项断言全部通过；
+    - [x] 公网 Passkey 兼容性与 Step-Up 自适应风控测试 (`tests/test-prod-passkey-and-stepup-live-e2e.mjs`)：26/26 项断言全部通过；
+    - [x] 公网 Passkey 时间锁与生命周期管理测试 (`tests/test-prod-passkey-timelock-and-management.mjs`)：40/40 项断言全部通过；
+    - [x] 真实生产浏览器实测核验：悬停触发轻盈毛玻璃气泡，0px 布局偏移，离焦/移出丝滑淡出；
+    - [x] 生产零脏数据残留：测试临时状态与密钥在 `finally` 中物理清除。
+
+### 认证表单垂直居中重构、消除头部脱节空隙与端到端质感深度优化 (2026-10-02)
+*   **关联提交 (Git Commit)**: `95159952a004a0722b47c90c657f3197dd74eae2` (Short: `9515995`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare Workers (https://mail.epocanvas.com)` (Version ID: `b1239705-ad08-4c41-b1d0-f05bfb19c4c2`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 变更点 1 (全面废除无居中的 justify-between 离散容器，统一为垂直居中布局)：
+        - 在 `LoginCard.tsx` 与 `RegisterCard.tsx` 中，将内部包裹容器由 `class="relative flex-1 flex flex-col justify-between"` 重构为 `class="relative flex-1 flex flex-col justify-center"`，外框容器统一设为 `justify-center`；
+        - 在 `AuthForm.tsx` 中，将 `class="flex-1 flex flex-col justify-between gap-6 pt-1"` 重构为 `class="flex flex-col justify-center gap-5 sm:gap-5.5 w-full"`；
+        - 将方法选择器容器与 2FA 激活方式容器由 `justify-between` 重构为 `class="flex flex-col justify-center gap-3.5 sm:gap-4 w-full"`；
+        - 在 `RegisterForm.tsx` 中，将 `class="relative flex-1 flex flex-col justify-between gap-6 pt-2"` 重构为 `class="relative flex flex-col justify-center gap-4 sm:gap-4.5 w-full"`。
+    - [x] 变更点 2 (彻底消除 Brand Header 与表单内容之间的断层大空隙)：
+        - 将品牌头部容器由 `mb-6 sm:mb-7` 优化为 `mb-4 sm:mb-5`，标题与副标题微调为 `mt-3.5` / `mt-1.5`；
+        - 消除此前由两端对齐强行撑开的 ~150px 视觉断层空隙，使 Logo、品牌名、标语与表单输入字段紧凑凝聚为连贯的整体，间距自然过渡为舒适的 18~20px。
+    - [x] 变更点 3 (消除底部按钮与切换链接的 mt-auto 孤立漂移)：
+        - 移除 `AuthForm` 与 `RegisterForm` 底部容器中的 `mt-auto`，阻止其向卡片最底端过度推挤；
+        - 登录按键、注册按键、密码找回行与切换链接与输入框紧密聚合，上下留白匀称平衡。
+    - [x] 变更点 4 (维持 480px × 670px 物理锁死与零跳转零抖动)：
+        - 桌面端几何尺寸严格锁定为 480px × 670px，实测全界面物理偏差 0px；
+        - 直接访问 TOTP/Select URL 原地渲染，禁止任何未经授权的客户端重定向。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 静态多语言三件套：`node scripts/i18n-symmetry.mjs && node scripts/i18n-audit.mjs` 100% 通过（2113 / 1917 键绝对对称，1630 处字面量引用零缺失）；
+    - [x] 公网全真卡片尺寸与路由端到端测试 (`tests/test-prod-login-card-and-challenge-routing.mjs`)：26/26 项断言全部通过；
+    - [x] 公网 Passkey 兼容性与 Step-Up 自适应风控测试 (`tests/test-prod-passkey-and-stepup-live-e2e.mjs`)：26/26 项断言全部通过；
+    - [x] 公网 Passkey 时间锁与生命周期管理测试 (`tests/test-prod-passkey-timelock-and-management.mjs`)：40/40 项断言全部通过；
+    - [x] 真实生产无头浏览器截图实测核验：登录、注册、TOTP 挑战、选择器界面全部实现完美居中，无断层空隙；
+    - [x] 生产零脏数据残留：测试临时状态与密钥在 `finally` 中物理清除。
+
+### 规范文档全新重构：Google/Gmail 政策设计标准、双轨法律治理与矢量插画交付上线 (2026-10-02)
+*   **关联提交 (Git Commit)**: `0744d6a07e3fc53dadaa4c4008a5541c01804865` (Short: `0744d6a`), `111f95405064db4dbd587828e576eaa3fb2309e4` (Short: `111f954`), `f51b01efa5f11518337161322766d6373a570b7b` (Short: `f51b01e`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare Pages (https://epomail-docs.pages.dev/epomail/mail/data-security/)` (Deployment ID: `79f999be`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 变更点 1 (全面对标 Google/Gmail 政策排版美学，废除一切生硬卡片外框)：
+        - 彻底抛弃此前将所有段落强行封装进 `.google-card` 紧凑边框的仪表盘视觉，采用自然纯净的 Google Editorial 纸质画布流式排版；
+        - 正文间距、字偶距与行高（Line-height 1.7~1.8）舒展舒适，并以经典的 Google 极简星形分隔符（`✦ Subtle Star Dividers`）错落点缀各大主章节。
+    - [x] 变更点 2 (自研 3 幅 416x276 Google 风格矢量概念插画)：
+        - `security-trust-shield.svg`（安全承诺与信赖保障）：柔和蓝金锁芯、信封与认证盾牌，象征多层纵深防御；
+        - `dual-nature-scale.svg`（双轨融合治理权责天平）：Hosted 官方云端与 MIT 源码天平对称，象征法律权利与义务平衡；
+        - `data-sovereignty-export.svg`（数据主权、便携导出与遗忘擦除）：用户凭据、.EML/JSON 便携导出蓝箭头与密码学物理销毁保险库。
+    - [x] 变更点 3 (深度构建「双轨架构治理」法律防火墙与开源边界)：
+        - 明确界定官方免费托管服务（`mail.epocanvas.com`）的公益性质、无商业 SLA、反滥用红线（严禁垃圾邮件/钓鱼/攻击/刷量）；
+        - 确立开源专案（`epocanvas-mail`）依托 MIT 协议运作，明示二次开发三大红线：严格禁止滥用「官方」商标、必须完整保留版权与 MIT 许可、第三方托管必须自立独立主体；
+        - 确立独立自建节点运营者为排他性数据控制者（Sole Data Controller），上游作者零日志遥测、零连带担保或赔偿责任。
+    - [x] 变更点 4 (全球多法域合规与密码学能力边界坦诚披露)：
+        - 完备覆盖 GDPR（Art. 15 知情、Art. 20 .eml/JSON 导出、Art. 17 主密钥覆写销毁、SCCs 传输）；
+        - 刚性承诺 CCPA/CPRA「绝不销售或共享个人信息（Do Not Sell or Share）」、限制使用敏感信息与非歧视待遇；
+        - 调适台湾 PDPA 及亚太公网 SMTP 跨境路由现实，提供 72 小时应急响应 SOP 与官方 SRC / 隐私联络渠道；
+        - 坦诚揭示服务端静态加密（AES-256-GCM at rest）防范介质窃取之技术局限，明确指引涉密通讯当事人自主前置客户端 GPG/OpenPGP E2EE 加密。
+    - [x] 变更点 5 (克制规范呈现，防篡改组件零干扰隔离)：
+        - 严格遵循全网仅出现一次原则，隔离 `#tamper-proof-widget` 仅在专用存证页面按需挂载，在 `data-security` 页面零 DOM 注入、零视觉疲劳。
+    - [x] 变更点 6 (全站 6 语言字典与文档 100% 绝对结构对称)：
+        - 同步完成 zh, en, zh-tw, es, fr, nl 6 语言对应章节的 100% 对称性翻译与渲染。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：Astro 55 篇全语言页面静态构建通过 (6.6s)，Pagefind 6 语言全文搜索索引生成完毕 (15061 words)；
+    - [x] 锚点与多语言对称性验证：`node scripts/validate-anchors.cjs` (110 页面、1142 个锚点检查，0 损坏)；
+    - [x] 文档结构对称性校验：`python3 scripts/check-structure.py` (5 个翻译语言与英文基准 100% 对称)；
+    - [x] 生产 CDN 与 SVG 资源核验：3 幅矢量插图 CDN 访问均呈 `HTTP/2 200 OK` (`image/svg+xml`)，naturalWidth=416, naturalHeight=276，无破损；
+    - [x] 生产真实环境浏览器截图实测：Playwright 无头浏览器截屏核验通过，排版极佳；
+    - [x] 独立子代理独立审计核验：`Public Web Visual & Legal Auditor`（从0开始公网全真盲审，覆盖中英双语、浅深色与 390px 移动端）签署 PASS 评级通过（视觉质感、法理深度、无冗余组件、零控制台报错）。
+
+### 登录与2FA认证卡片几何尺寸全面扩容 (480px x 670px)、居中质感美学复原与自适应二验深度治理 (2026-10-02)
+*   **关联提交 (Git Commit)**: `cf677c1e7eefd8e92206ed911f5b3873ee34b58c` (Short: `cf677c1`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare Workers (https://mail.epocanvas.com)` (Version ID: `632323d7-320d-4e7e-9b28-4e7214a5e558`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 变更点 1 (卡片尺寸全面扩容并绝对物理锁定 480px × 670px)：
+        - 彻底根治此前 440px × 600px 紧凑尺寸导致的拥挤感与按钮贴边问题；
+        - 在 `LoginCard.tsx` 与 `RegisterCard.tsx` 中将外框容器强制设定为 `w-full max-w-[480px] sm:w-[480px]` 及 `class="relative overflow-hidden rounded-3xl p-8 sm:p-10 h-[620px] sm:h-[670px] min-h-[620px] sm:min-h-[670px] max-h-[620px] sm:max-h-[670px] flex flex-col justify-between box-border"`；
+        - 实测登录、注册、TOTP挑战、多因子选择器外框尺寸绝对一致，宽 480px，高 670px，物理偏差严格为 0px，彻底消除任何形式的尺寸跳动。
+    - [x] 变更点 2 (彻底废除单行药丸条，全面复原经典居中质感 2FA 安全卡片)：
+        - 废弃此前局促的单行小药丸，全面复原经典居中大卡片设计（`p-4 rounded-2xl border border-[rgba(139,147,196,0.2)] bg-[rgba(255,255,255,0.03)]`）；
+        - 配置独立的 44px 独立居中发光安全图标舱（`h-11 w-11 rounded-xl bg-indigo-500/10 border-indigo-500/30 text-indigo-400 shadow-[0_0_15px_rgba(99,102,241,0.25)]`）；
+        - 标题（16px）、说明描述（12px 舒适行高）与用户脱敏邮箱胶囊徽章层次井然，UI/UX 质感大幅提升。
+    - [x] 变更点 3 (自适应 Step-Up 紧凑降级机制，彻底消除遮挡截断与贴边隐患)：
+        - 在高风险环境自适应触发 Step-Up 二次验证时，动态启用紧凑型状态栏，瞬间节省 ~94px 垂直空间；
+        - 黄色安全告警横幅与 2FA 核心操作区相得益彰，绝不压迫底部的「返回验证」与辅助操作按键贴边。
+    - [x] 变更点 4 (验证方式选择器卡片按键舒适度全面还原)：
+        - 方法选择器恢复为经典的大卡片布局（`p-3.5 px-4 rounded-2xl`），左侧配置独立辨识度图标舱（`h-10 w-10 shrink-0`）；
+        - 标题与说明描述双行完整舒展展开，右侧配置 `size={18}` 导航引导指示，按键比例与点击热区极具呼吸感。
+    - [x] 变更点 5 (注册表单 4 字段呼吸留白与按钮无死角展示)：
+        - 精细化调校注册表单间距为 `gap-4 sm:gap-4.5`，品牌头部间距优化为 `mb-6 sm:mb-7`；
+        - 注册界面 4 大字段（邮箱+域选择器、密码、确认密码、邀请码）与底部的「已经拥有节点？点此登录」操作按键距离底边保有 > 36px 充裕呼吸留白，绝不贴边或被遮挡截断。
+    - [x] 变更点 6 (直接访问禁止跳转，原地渲染与会话安全)：
+        - 浏览器直访 `/login/challenge/totp_...` 或 `/login/challenge/select_...` 严格在原 URL 原地渲染对应挑战界面（HTTP 200，0 跳转），禁止任何 URL 篡改。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 静态多语言对称性三件套：`node scripts/i18n-symmetry.mjs && node scripts/i18n-audit.mjs` 100% 通过（2113 / 1917 键绝对对称，1630 处字面量引用健全，0 缺失）；
+    - [x] 公网全真端到端卡片尺寸与防跳转测试 (`tests/test-prod-login-card-and-challenge-routing.mjs`)：26/26 项断言全绿通过；
+    - [x] 公网 Passkey 跨设备 TPM 与自适应二验实测 (`tests/test-prod-passkey-and-stepup-live-e2e.mjs`)：26/26 项断言全绿通过；
+    - [x] 公网 Passkey 时间锁与生命周期管理实测 (`tests/test-prod-passkey-timelock-and-management.mjs`)：40/40 项断言全绿通过；
+    - [x] 生产零脏数据：测试临时注册凭据与会话在 `finally` 阶段全部物理清除；
+    - [x] 独立子代理独立审计核验：`Clean-slate Independent Production QA Auditor` 盲审签署 PASS 评级通过（共 92 项生产端到端断言全部成功）。
+
+### 登录/2FA卡片尺寸绝对物理锁定 (440px x 600px)、禁止任何跳转与边缘路由死循环修复 (2026-10-02)
+*   **关联提交 (Git Commit)**: `d34db1cc96cdca7a543dcfd878bed2b6aed3f2eb` (Short: `d34db1c`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare Workers (https://mail.epocanvas.com)` (Version ID: `2afcb8c9-02e5-405f-a9a5-6e6e07fbcd35`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 变更点 1 (卡片外框尺寸绝对锁定，杜绝任何形式的大小变换)：
+        - 在 `LoginCard.tsx` 与 `RegisterCard.tsx` 的外框容器中将类名严格锁定为 `class="relative overflow-hidden rounded-3xl p-8 sm:p-10 h-[580px] sm:h-[600px] min-h-[580px] sm:min-h-[600px] max-h-[580px] sm:max-h-[600px] flex flex-col justify-between box-border"`；
+        - 通过 `h-`、`min-h-`、`max-h-` 与 `box-border` 实施三重物理级钳制，确保桌面端尺寸恒等于 440px × 600px（移动端 580px）；
+        - 实测 `/login/`、`/login/challenge/totp_...`、`/login/challenge/select_...`、`/login/?view=register` 之间尺寸物理偏差严格为 0px，彻底杜绝因视图切换或内容高度导致的尺寸跳动。
+    - [x] 变更点 2 (禁止任何形式跳转，URL 原地保持与首帧同步直出)：
+        - 彻底移除 `AuthForm.tsx` 中检测到缺失本地 `sessionStorage` 时执行的 `window.history.replaceState('/login/')` 强行回退跳转；
+        - 新增 `getInitialChallengeState()` 纯函数，在 React 首帧挂载时直接解析 `window.location.pathname`（`/login/challenge/{method}_{hash}`），同步初始化 `stage`、`active2FAMethod`、`showMethodSelector` 与 `challengeSessionHash`，彻底杜绝首帧渲染闪烁与视图跳动；
+        - 直接在浏览器输入或访问 `https://mail.epocanvas.com/login/challenge/totp_...` 或 `select_...` 时，地址栏严格保持原 URL，原地渲染对应 2FA / 选择器界面，禁止任何重定向。
+    - [x] 变更点 3 (内部组件极度精炼，彻底防止撑爆卡片高度)：
+        - 将 2FA 原有的 160px 巨幅堆叠卡片横幅彻底重构为高度仅 44px 的高精度胶囊状态药丸（包含图标、方法名、副标题与脱敏用户邮箱）；
+        - 将方法选择器中的三项大按钮紧凑化为 `p-2.5 px-3`，将各状态视图内容高度严格收敛在 200~240px 舒适区间，内部留白呼吸感充裕，完全不触碰 600px 高度红线。
+    - [x] 变更点 4 (边缘端 Worker 静态代理根治 307 重定向死循环)：
+        - 在 `mail-worker/src/index.js` 中将代理匹配条件精确收敛为 `if (url.pathname.startsWith('/login/challenge/'))`，内部以 `/login/` 代理 `env.assets.fetch`；
+        - 普通 `/login/` 路径直通静态资源，彻底消除此前因 `/login/index.html` 引发的 307 循环重定向。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 多语言对称性与代码引用静态审计：`node scripts/i18n-symmetry.mjs && node scripts/i18n-audit.mjs` 100% 通过（2113 / 1917 键绝对对称，0 缺失，0 差异，1630 处引用健全）；
+    - [x] 公网全真端到端自动化测试 (`tests/test-prod-login-card-and-challenge-routing.mjs`)：26/26 项断言全绿通过；
+        - 登录卡片实测尺寸：宽 440px, 高 600px（0px 偏差）；
+        - TOTP 挑战卡片实测尺寸：宽 440px, 高 600px（与登录界面 0px 偏差）；
+        - 选择器卡片实测尺寸：宽 440px, 高 600px（与登录界面 0px 偏差）；
+        - 直接访问 TOTP 挑战 URL：禁止任何跳转，地址栏严格保持原 URL，HTTP 200；
+        - 直接访问选择器 URL：禁止任何跳转，地址栏严格保持原 URL，HTTP 200；
+        - 第三方登录默认隐藏，管理后台系统设置专属卡片与高仿真预览按钮正常运作；
+    - [x] 公网 Passkey 跨设备与自适应二验端到端测试 (`tests/test-prod-passkey-and-stepup-live-e2e.mjs`)：26/26 项断言全绿通过；
+    - [x] 零假数据残留：生产数据库临时状态严格还原 (`totp_enabled = 1`)；
+    - [x] 独立子代理独立审计核验：`Clean-slate Production QA Auditor` 盲审签署 PASS 评级通过。
+
+### epomail-docs 数据处理与安全维护 (data-security) 彻底重做：全新3幅高精矢量架构图与Google政策卡片流视觉范式上线 (2026-10-02)
+*   **关联提交 (Git Commit - epomail-docs)**: `e6c9f5df9aa4225571e846271ff1312a5790f92c` (Short: `e6c9f5d`) | Manifest: `1a4e02d8df99c7fa583c84525ee186143a05d142` (Short: `1a4e02d`)
+*   **部署环境 (Deployment)**: `Cloudflare Pages (https://epomail-docs.pages.dev/epomail/mail/data-security/ · Version ID: d9b0c36f)`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 变更点 1 (彻底告别纯文本墙，建立 Google-Style 卡片流排版)：
+        - 全文所有 17 项技术与合规小节彻底摒弃密密麻麻的纯文本段落堆叠，全部改写封装为具有舒适呼吸感、语义化图标与状态胶囊徽章的 Google 规范卡片（`.google-card`、`.google-card-header`、`.google-pill`、`.google-card-desc`）；
+        - 卡片内条目均以 `<strong>` 引导核心主题词，严格控制每节文字体量（80~150 词），既充实详尽又层次井然，达到 Google Privacy & Terms 的工业级美学与排版节奏；
+        - 大章节间保留带有微星图标的渐变隐式分割线 `<div class="google-divider"><span class="google-divider-icon">✦</span></div>`。
+    - [x] 变更点 2 (上线 3 幅全新自研高精矢量架构图，解决未生效与 XML 错误)：
+        - 图 1：`public/images/mail/data-security-pipeline.svg`（全链路数据处理与生命周期流水线：无状态接入 ➔ 边缘 V8 Isolate 内存瞬时计算 ➔ AES-256-GCM 密文封包 ➔ KV/D1/R2 分层存储 ➔ 密码学密钥覆写粉碎）；
+        - 图 2：`public/images/mail/defense-layers-architecture.svg`（四层纵深防御技术模型：Layer 1 边缘网络/Anti-SSRF、Layer 2 FIDO2 Passkeys、Layer 3 AES-256 静态加密、Layer 4 Shadow DOM 客户端沙箱/SHA-256 存证），修复 XML 实体转义确保高保真矢量渲染；
+        - 图 3：`public/images/mail/dual-nature-compliance-matrix.svg`（双重属性治理与全球合规矩阵：左右对比官方托管云服务与开源自治专案，下层统领 GDPR、CCPA、APAC 落地要求）。
+    - [x] 变更点 3 (严格杜绝挂件刷屏与视觉疲劳)：
+        - 彻底剥离任何重复的防篡改面板（Tamper-proof Widget），使正文保持纯粹规范属性，杜绝同一页面堆叠重复组件带来的视觉疲劳。
+    - [x] 变更点 4 (双重属性融合治理边界与独立部署者独占责任)：
+        - **官方托管云服务 (`mail.epocanvas.com`)**：明确服务定位、零遥测合规承诺、非商业公益免责范畴与用户定期本地备份通信之法定责任；
+        - **开源代码专案生态 (`epocanvas-mail`)**：明确 MIT 许可证权能与代码审计自由，划定 3 大分发与商标红线（严禁冒用官方商标、完整保留作者版权声明、独立公示自身隐私与法律条款）；
+        - **自建节点唯一数据控制者 (Sole Data Controller)**：自建节点运营者承担唯一、排他的数据控制者法定全责，上游开源代码作者零物理控制权、零访问权限且零连带法律责任。
+    - [x] 变更点 5 (全球多法域合规与密码学能力边界坦诚公开)：
+        - **欧盟 GDPR**：覆盖 Articles 15–22 权利保障、Article 6 合法处理依据及 Cloudflare Anycast 欧盟标准合同条款 (SCCs)；
+        - **加州 CCPA / CPRA**：严正做出「不销售亦不共享个人信息」(Do Not Sell or Share) 承诺与非歧视待遇声明；
+        - **亚太 / 台湾 PDPA**：明确官方运营团队驻地台湾，告知跨国 SMTP 公网中继路由的物理现实，指导用户强化终端安全；
+        - **服务端静态加密与 GPG 风险提示**：坦诚披露 AES-256-GCM 为 Server-side Encryption at Rest，防范脱机勒索与数据库快照泄露，并非端到端加密（E2EE）；对绝对机密场景明确指引在客户端使用 GPG / PGP 本地加解密后再行投递。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+        - [x] 本地六语言结构对称性：`python3 scripts/check-structure.py` 100% 通过（23 个标题、2 张表格、3 幅图表、1 处警示块 5 语系绝对对称，英文独立基准 100% 验证）；
+        - [x] 本地文档锚点审计：`node scripts/validate-anchors.cjs` 检查 110 个页面、1226 个锚点，破损锚点 broken=0；
+        - [x] 本地全页面全真视觉截图核验：Playwright 截取 1440px 全页高分辨率明暗主题图（`data-security-zh-dark.png`、`data-security-zh-light.png`、`data-security-en-dark.png`），暗色深灰与浅色卡片微投影自适应完美；
+        - [x] 生产环境部署与线上验证：Cloudflare Pages 部署成功（版本 ID: `d9b0c36f`），实时 CURL 与 DOM 校验 HTTP 200，3 幅矢量 SVG 链路全部正常加载；
+        - [x] 独立子代理双向盲审：`Visual & Legal Docs Auditor` 子代理完成全真栈深度审查，判定 PASS 满分评级。
+
+### 登录与2FA卡片几何尺寸锁定均衡、第三方认证管理卡片、URL会话精确化与反复制粘贴自动回退 (2026-10-02)
+*   **关联提交 (Git Commit)**: `dde45257c42bc9e96cc8888214efe8dafadab812` (Short: `dde4525`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare Workers (mail.epocanvas.com)` (Version ID: `9635bac8-7cf0-4548-81d9-2d96d50814d4`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 变更点 1 (第三方登录隐藏与系统设置管理卡片)：
+        - 登录页面默认隐藏 `class="flex items-center gap-3"`（分割线）与 `class="grid grid-cols-2 gap-3"`（Google/GitHub 按钮区域），受控于 `sysConfig?.oauthLoginEnabled`；
+        - 管理后台系统设置（`mail-vue/src/views/sys-setting/index.vue`）新增专属卡片 `.oauth-sso-card`（第三方认证与单点登录管理）；
+        - 支持配置 Provider 开关、回调地址复制与按键比例调整控件 (`oauthButtonProportion`: Grid / Stacked / Compact)；
+        - 卡片内嵌入与登录页完全同构的高仿真暗色亚克力材质预览按钮：`class="epomail-display flex h-11 items-center justify-center gap-2 rounded-xl border text-[13px] transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#67e8f9] preview-oauth-btn"`。
+    - [x] 变更点 2 (登录/注册/2FA外框几何尺寸均衡稳定)：
+        - 固定外层容器尺寸 `w-full max-w-[440px] sm:w-[440px]`，高度 `min-h-[580px] sm:min-h-[600px] flex flex-col justify-between`；
+        - `AuthForm` 与 `RegisterForm` 内部包装层统一为 `flex-1 flex flex-col justify-between`，底部操作条两极对齐；
+        - 彻底消除在账号密码、2FA 挑战、方法选择抽屉及注册模式间切换时的高度塌陷与尺寸突变。
+    - [x] 变更点 3 (URL 会话精确化与反复制粘贴自动安全回退)：
+        - 初始密码登录严格保持 `https://mail.epocanvas.com/login/`；
+        - 触发 2FA 验证时精确变更为普遍规律前缀 + 当前会话 base64url sha 哈希：`/login/challenge/{method}_{sessionHash}`（包括 `totp_{hash}`、`passkey_{hash}`、`backup_{hash}`、`select_{hash}`）；
+        - 跨环境外溢检测与回退：在新环境/新设备中直接复制粘贴带有 challenge hash 的链接打开时，因缺失合法 `sessionStorage` 会话凭据，前端检测后立即自动执行 `history.replaceState` 安全回退至 `https://mail.epocanvas.com/login/` 并恢复标准密码登录；在原会话标签页内正常刷新（F5）则完整保留 2FA 状态不受影响。
+    - [x] 变更点 4 (Cloudflare SPA 多级路由静态资源代理修正)：
+        - 在 `mail-worker/src/index.js` 中增加路由代理，拦截非静态文件的 `/login/challenge/*` HTML 导航，直接向 `env.assets` 请求 `/login/index.html`，彻底解决公网单页应用深链访问 404 与重定向循环。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 六语言多语言绝对对称性：`node scripts/i18n-symmetry.mjs` 100% 通过（2113 keys 全部对称，0 缺失）；
+    - [x] 字面量代码引用审计：`node scripts/i18n-audit.mjs` 100% 通过（1630 字面量键 0 缺失，0 动态调用）；
+    - [x] 公网全真自动化 E2E 测试套件（`tests/test-prod-login-card-and-challenge-routing.mjs`）：21/21 断言全部通过；
+    - [x] 公网 Passkey 跨设备与自适应风控二验（`tests/test-prod-passkey-and-stepup-live-e2e.mjs`）：26/26 断言全部通过；
+    - [x] 公网 Passkey 时间锁与生命周期（`tests/test-prod-passkey-timelock-and-management.mjs`）：40/40 断言全部通过；
+    - [x] 独立子代理独立审计核验：`Clean-slate Production QA Auditor` 全程独立执行，签发 APPROVED 评级；
+    - [x] 零假数据残留：测试账号与临时状态已在 `finally` 阶段 100% 物理恢复与清理。
+
+### epomail-docs 数据处理与安全维护 (data-security) 深度重构、Google 政策视觉范式升级与全真上线 (2026-10-02)
+*   **关联提交 (Git Commit - epomail-docs)**: `2b2655d492415174e304ffb5f939b4b9b9a691bc` (Short: `2b2655d`) | `dc4706dbd08aa5c556b63ca0435dfcb5ec437e40` (Short: `dc4706d`)
+*   **关联提交 (Git Commit - epocanvas-mail)**: `6691e292067d53b4dd6b810452309f3f4e24ebca` (Short: `6691e29`)
+*   **部署环境 (Deployment)**: `Cloudflare Pages (https://epomail-docs.pages.dev/epomail/mail/data-security/ · Version: https://98022135.epomail-docs.pages.dev)`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 变更点 1 (Google/Gmail 政策范式排版与视觉升级)：
+        - 消除内容单薄与生硬表格排版，设计 `.google-hero-card` 导读卡片，内嵌 4 枚核心技术属性药丸标签（零遥测跟踪、AES-256-GCM 静态加密、边缘瞬时执行、全球多法域合规）；
+        - 引入 Google 风格微星隐式分割线 `<div class="google-divider"><span class="google-divider-icon">✦</span></div>`，保障章节间呼吸感与视觉节奏；
+        - 去除冗余的 markdown 页面大标题 `#`，避免与 Starlight 默认顶层 `<h1>` 产生双标题重叠。
+    - [x] 变更点 2 (严控组件与插图密度，杜绝视觉疲劳)：
+        - 全文严控为 **3 张高质量矢量示意图**（`data-flow.svg` 数据全生命周期、`partition-security.svg` 四层纵深防御、`self-host-responsibilities.svg` 权责边界模型），不多不少恰好填补版面；
+        - 彻底清理多余的硬编码 `tamper-proof-panel`，防篡改校验组件仅于专属专页出现一次，杜绝同一页面堆叠重复组件。
+    - [x] 变更点 3 (内容深度扩写与实质技术/法律阐释)：
+        - 全文 6 大章节及 17 项 H3 技术细目，每小节段落篇幅均充实至 80~150 字，杜绝口水话与占位行；
+        - 详尽公开 PBKDF2 (100,000 次加盐迭代)、WebAuthn 硬件公钥、BYO-Storage 自备存储桶解析逻辑，以及 8 行数据处理矩阵与 11 项核心安全维护落实标准。
+    - [x] 变更点 4 (双重属性融合 Dual-Nature Fusion 法律治理)：
+        - **官方托管服务 (`mail.epocanvas.com`)**：明确服务定位、可用性声明、非商业免责边界与用户数据资产保管义务；
+        - **开源专案生态 (`epocanvas-mail`)**：明确 MIT 许可权能、代码审计自由度，确立 3 大分发与商标治理铁律（严禁冒用官方商标、完整保留版权声明、独立提供法律政策）；
+        - **独立自建节点运营者**：确立自建者为唯一且排他的「数据控制者」(Data Controller)，全权承担安全配置与法定合规义务，上游代码库零连带责任。
+    - [x] 变更点 5 (全球多法域合规与当事人风险自知)：
+        - **欧盟 GDPR**：覆盖第 15–22 条当事人权利、第 6 条合法处理基础及 Anycast 跨境 Standard Contractual Clauses (SCCs)；
+        - **美国 CCPA / CPRA**：严正声明「不销售亦不共享个人信息」(Do Not Sell or Share)，落实知情权与非歧视待遇；
+        - **亚太法规与用户风险**：声明托管主体位于台湾，阐明跨国 SMTP 传输物理特性、用户端点防护责任，并在 `:::caution` 中诚实披露服务端静态加密（Server-side Encryption）与端到端加密（GPG/PGP）之技术边界与用户自保指引。
+    - [x] 变更点 6 (六大语言绝对对称)：
+        - 同步完成 6 种语言（zh, zh-tw, en, es, fr, nl）全量重构与内容对齐，结构与图表 100% 对称。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 独立子代理全真审计：派驻 `Docs Visual & Content Auditor` 完成明暗主题截图全量复核，判定 100% 达标；
+    - [x] 多语言结构与独立基准核验：`python3 scripts/check-structure.py` 100% 通过（5 语系结构绝对对称，英文基准校验通过）；
+    - [x] 全站锚点与资源静态核验：`node scripts/validate-anchors.cjs` 全绿 (110 页面 / 1226 锚点链接 0 损坏)；
+    - [x] 本地构建与生产部署：`pnpm run build` 耗时 5.85s，Pagefind 成功索引 6 语言 15,742 词；`wrangler pages deploy` 成功发布上线；
+    - [x] 生产环境真实渲染核验：`https://epomail-docs.pages.dev/epomail/mail/data-security/` 实测抓取验证，新版 Google 风格界面已全量生效。
+
+### epomail-docs 全量英文法务与安全合规重构、Gmail 式双重定位融合、主站直连与单次验真治理 (2026-10-02)
+*   **关联提交 (Git Commit - epocanvas-mail)**: `e86766ee69cb030a133d1b702ec94da8093d5f30` (Short: `e86766e`)
+*   **关联提交 (Git Commit - epomail-docs)**: `d09d6cb021a8d05fcfe74f2603f9bca1b5bf3b39` (Short: `d09d6cb`) | `2af79fa81fb982a0c27d774f4eec4695835b2dce` (Short: `2af79fa`) | `0072b0fdac75b6026edd2b6a04d8320790aeed38` (Short: `0072b0f`)
+*   **部署环境 (Deployment)**: `Cloudflare Pages (https://epomail-docs.pages.dev / https://a2250f1e.epomail-docs.pages.dev)`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 变更点 1 (学习 Google/Gmail 政策范式与全面扩写)：
+        - 彻底消除内容单薄与占位式段落，9 篇核心英文文档全量重构扩写至 ~6,500 词；
+        - 每个主章节均包含 50~150 字的高质量严谨段落，阐释技术逻辑与法律权利；
+        - 采用 H3 细分场景 + 加粗前缀（如 `Account Responsibilities:`、`Zero Telemetry Guarantee:`），辅以规范的 Markdown Callout（`> [!NOTE]`, `> [!IMPORTANT]`, `> [!TIP]`）增强视觉层级；
+        - 每篇文档严格控制插画数量（1~2 张自适应 SVG，全篇最多不超 3 张），保证排版匀称与视觉留白。
+    - [x] 变更点 2 (双重定位深度融合 Dual-Nature Fusion)：
+        - **托管服务定位 (Hosted Instance at `mail.epocanvas.com`)**：说明非商业性质、无商业 SLA 保证、用户通讯内容版权归属、30天垃圾清理与物理擦除；
+        - **开源专案生态定位 (Open-Source Project at `github.com/shijianus/epomail`)**：明确 MIT 协议、自建自由度，自建者为其自身实例及用户的唯一独立数据控制者 (Sole Data Controller)，上游代码库零遥测 (Zero Telemetry)；
+        - **品牌与商标保护原则**：严禁第三方自建或二次开发服务冒充 EpoCanvas Mail 官方服务或使用 `epocanvas.com` 官方域名，必须使用独立域名与联系方式。
+    - [x] 变更点 3 (全球合规与区域风险透明披露)：
+        - 覆盖欧洲经济区/英国 GDPR/UK GDPR（第6条处理依据、完整数据主体权利、监管投诉权）；
+        - 覆盖美国加州 CCPA/CPRA（信息类别披露、绝不销售/共享个人信息用于跨上下文广告、无歧视承诺）；
+        - 亚太及跨国边缘传输：明确披露数据经由 Cloudflare Anycast 全球节点加密传输与边缘计算。
+    - [x] 变更点 4 (杜绝防篡改组件重复与视觉疲劳)：
+        - 重构 `tamper-proof-client.js`，将大型 `#tamper-proof-widget` (class `tamper-proof-panel`) 严格限定在官方防篡改专页 (`tamper-proof.md`) 且全篇仅出现一次；
+        - 彻底移除对隐私政策、服务条款等常规阅读页面的强制注入，消除视觉干扰。
+    - [x] 变更点 5 (主站 `gac-footer` 真实直连)：
+        - 修改 `mail-vue/src/layout/header/index.vue` 中的 `openPrivacyPolicy` 和 `openTermsOfService`，全面由弹窗改造为新标签页直连真实生产文档；
+        - `projectIntro`、`privacyPolicy`、`termsOfService` 三者形成完整官方文档导流闭环。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 独立子代理全真审计：派驻专门审核员全面断言视觉层次、文本密度、单次防篡改呈现与外链直通；
+    - [x] 多语言结构与独立基准核验：`python3 scripts/check-structure.py` 100% 通过（9 篇核心英文基准与多语系对齐）；
+    - [x] 全站锚点与资源静态核验：`node scripts/validate-anchors.cjs` 全绿 (110 页面 / 1056 锚点链接 0 损坏)；
+    - [x] 生产构建：`mail-vue` (15.23s 构建通过) 与 `epomail-docs` (55 页面 / 13910 词 Pagefind 索引完成，6.16s 构建通过)；
+    - [x] 零假数据残留：测试数据全部清理，工作区干净。
+
+
+### 通行密钥平台本地写入、极简弹窗与 2FA/Passkey 完整生命周期及时间锁上线 (2026-10-02)
+*   **关联提交 (Git Commit)**: `c276c6a95f675750415b50fe078eda39e4db13ca` (Short: `c276c6a`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare Workers (https://mail.epocanvas.com)` (Version ID: `55a33ae6-7b0d-4854-b407-a2442f5cfe36`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 变更点 1 (Passkey 本地 Resident 写入与智能 UA 识别)：
+        - WebAuthn 注册选项根据客户端 UA 自动推导识别 Windows Hello / Apple 钥匙串 / Android 凭据管理器 / Linux 密钥库，并设定友好建议名称；
+        - 后端强制指定 `authenticatorAttachment: 'platform'`、`residentKey: 'required'`、`requireResidentKey: true`、`userVerification: 'required'`，确保直接调起本机生物识别/PIN 将通行密钥保存在本地设备（TPM/钥匙串），根除一直请求插入 USB 安全密钥的痛点；
+    - [x] 变更点 2 (极简 `<el-dialog>` 弹窗与零开源自选下拉框)：
+        - 前端彻底移除此前用户手动选择“设备类型”的下拉选择器，仅保留密钥名称输入框；
+        - 弹窗顶部呈现后端扫描到的当前设备平台提示与本地保存说明横幅；
+    - [x] 变更点 3 (Passkey 创世初设备与新设备 30 天时间锁安全观察期)：
+        - 创世初设备（首个 Passkey）赋予 `isInitialDevice: true`，注册后立即生效处于 `active` 状态；
+        - 新设备（非创世初设备）赋予 `isInitialDevice: false`，进入 30 天安全时间锁观察期（`pending_verification`），在观察期内无法直接用于登录认证；
+        - 时间锁未满 30 天时拦截手动转正调用；
+        - 支持使用账号绑定的已有 TOTP 验证码快速核准转正（解除时间锁进入 `active`）；
+        - 30 天观察期满后支持手动点击转正；
+    - [x] 变更点 4 (Passkey 在线签名测试与删除重置治理)：
+        - 新增在线测试 Passkey 功能，服务端下发测试 Challenge，客户端调起签名并在服务端验签；
+        - 支持安全删除通行密钥；当全部通行密钥删除且未绑定 TOTP 时，自动降级安全重置 2FA 状态；
+    - [x] 变更点 5 (TOTP 完整生命周期管理)：
+        - 支持「更新验证器」与「停用验证器」，更新与停用均受到主密码安全鉴权保护；
+    - [x] 变更点 6 (多语言与品牌纯粹性)：
+        - 全站保持 6 语言字典 100% 绝对对称（2099 键，0 缺失）；
+        - 全仓代码与界面绝无 "Gmail" 品牌词泄露或稀释，维持 Epocanvas 官方原生纯粹性。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：`mail-vue` 构建通过 (耗时 14.83s，0 错误)；
+    - [x] 云端发布部署：Cloudflare Workers 部署就绪 (Version ID: `55a33ae6-7b0d-4854-b407-a2442f5cfe36`)；
+    - [x] 独立子代理 clean-slate 审计：`Independent QA Auditor` 签发 `[ ✅ APPROVED (100% GREEN) ]` 评定；
+    - [x] 自动化端到端测试套件：
+        - `tests/test-prod-passkey-timelock-and-management.mjs` (40/40 断言全部通过，覆盖设备扫描、创世设备、30天时间锁、在线测试与 UI 弹窗)；
+        - `tests/test-prod-passkey-and-stepup-live-e2e.mjs` (26/26 断言全部通过，覆盖 32 字节 User Handle、TPM PS256 算法协商、黑盒风控与 Try Another Way)；
+    - [x] 浏览器全真栈实测：成功捕获公网设置中心添加通行密钥极简弹窗截图 `tests/verify_prod_passkey_add_simplified_modal.png` 与 2FA 多方式选择截图 `tests/verify_prod_2fa_try_another_way.png`；
+    - [x] 零假数据残留：测试创建的临时密钥均通过 `finally` 在云端物理清理，数据库零污染。
+
+---
+*   **关联提交 (Git Commit - epocanvas-mail)**: `baf115865d1d643a677cae9f02905470d05a8d9a` (Short: `baf1158`)
+*   **关联提交 (Git Commit - epomail-docs)**: `4679a73cfc6728eb4de749587614b8bde656a252` (Short: `4679a73`) | `48bd18c11be22dc7b9e3f87aade0e2b083d1e30e` (Short: `48bd18c`) | `f30218876d1da8e30321e31c97a1a5be024bb968` (Short: `f302188`)
+*   **部署环境 (Deployment)**: `Cloudflare Pages (https://epomail-docs.pages.dev / https://docs.epocanvas.com/epomail)`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 变更点 1：彻底废除语言降级与附属声明。全局清除所有「以繁體中文為準 / 僅供參考 / reference only」等贬损性文案，确立英文及各语系独立权威与对等地位。
+    - [x] 变更点 2：侧边栏全面支持二级标题分组。在 `astro.config.mjs` 中将各语系文档归纳为三大核心类别（Project & Architecture、Privacy & Data Governance、Terms & Community Governance），实现清晰的双层导航层次。
+    - [x] 变更点 3：深度借鉴 Google/Gmail 隐私权政策架构，全面重构英文法务与安全合规体系（9篇核心文档）：
+        - 明确界定责任三元组（Upstream Open-Source Code Provider vs Instance Operator Data Controller vs End User）；
+        - 确立开源非商业定位（Strictly Non-Commercial, Personal / Self-Hosted Use, No Commercial SLA Warranties）；
+        - 全面覆盖为什么处理数据、如何端到端加密、Edge AI 隔离、共享限制与数据保留期限。
+    - [x] 变更点 4：采用矢量 SVG 分区隔离插画。设计并引入 `partition-overview.svg`, `partition-privacy.svg`, `partition-terms.svg`, `partition-security.svg` 等，使用户直观理解各个治理维度的边界。
+    - [x] 变更点 5：主站与文档真实连接。在 `epocanvas-mail`（`mail-vue/src/layout/header/index.vue`）中新增 `projectIntro`（专案介绍）入口，无缝导向 `https://epomail-docs.pages.dev/epomail/mail/project/`，完成 6 语言字典严格对齐。
+    - [x] 变更点 6：密码学防篡改清单全量重算。为全新文档内容计算 SHA-256 指纹并写入 `public/tamper-proof.json`，确保客户端 WebCrypto 验真 100% 成功。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 独立子代理真实浏览器全真审计：派驻 `Independent Final Delivery QA Auditor` 子代理，运行无头 Chromium 访问公网多语系页面，断言二级目录、Gmail 式非商业条款、分区 SVG 渲染与 `#tamper-verify-btn` 密码学验真，签发 `[ ✅ APPROVED ]` 认证；
+    - [x] 多语言结构与独立基准核验：`python3 scripts/check-structure.py` 100% 通过（9 篇核心英文基准与多语系对齐）；
+    - [x] 全站锚点与资源静态核验：`node scripts/validate-anchors.cjs` 全绿 (110 页面 / 1056 锚点链接 0 损坏)；
+    - [x] 主站 i18n 严格闭环：`node scripts/i18n-symmetry.mjs` 验证 6 语言字典 100% 绝对对称 (2099 键，0 缺失)；
+    - [x] 前端构建：`mail-vue` 构建通过 (12.22s，0 错误)；
+    - [x] 零假数据残留：无任何测试脏数据遗留。
+
+---
+
 ### 原理图六语言本地化轮：12 图 × 6 语言 = 72 个 SVG (2026-10-02)
 *   **关联提交 (Git Commit)**: EpomailDocs `c5de61f`（主提交）；清单同步 `6478520` (Short: `c5de61f` / `6478520`)
 *   **部署环境 (Deployment)**: `本地构建与静态核验`（生产 Pages 未触发部署）
@@ -121,6 +1042,226 @@
     - [x] 10 张构建产物全页截图判图通过（zh/en data-security、zh/en/zh-tw tamper-proof、es/nl 抽样、overview、project；明暗双主题、含新三图与存证面板渲染确认）
     - [x] tamper-proof.json 全量重生成并按惯例清单同步提交（e6eb758 → 1d0a61c）
     - [x] 零残留：临时截图/脚本/渲染 PNG 即弃，工作树干净
+### EpoCanvas Mail 官方安全规范与全语系防篡改验真引擎部署上线 (2026-10-01)
+*   **关联提交 (Git Commit - epomail-docs)**: `83c4405a88c3f58a36c84c68ddaaee1e91244e8a` (Short: `83c4405`)
+*   **部署环境 (Deployment)**: `Cloudflare Pages (https://epomail-docs.pages.dev / https://docs.epocanvas.com/epomail)`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 官方发信规范与安全提醒邮件体系写入权威官方文档:
+        - 编写全新独立章节《官方邮件安全规范与防篡改体系》(mail/tamper-proof.md)，完成 6 语言（zh-tw 基準, zh-CN, en, fr, es, nl）绝对对称翻译；
+        - 明晰全站唯一认证发件源 `announcement@epocanvas.com`、防伪 `isOfficial: 1` 蓝盾标识与沙盒化隔离机制；
+        - 详尽收录 L1-L4 四级安全事件矩阵（新设备/IP登录、密码修改、2FA重置、高危特权转让等 16 项触发规则）与 1 小时动态防抖降噪机制；
+        - 同步更新项目说明 (`project.md`)、数据安全 (`data-security.md`) 与体系总览 (`overview.md`)，确保与代码库实现 100% 呼应。
+    - [x] 密码学级防篡改、双轨镜像与显式渲染交互面板:
+        - 研发静态防篡改清单生成器 (`scripts/generate-tamper-proof.mjs`)，为 54 篇全语系文档计算独立 SHA-256 摘要与 Git Commit 锚定；
+        - 部署 post-build 双轨发布与路由镜像 (`scripts/post-build.mjs`)，在 `dist/epomail` 自动克隆全量镜像并注入 `_redirects`，根治 Cloudflare Pages 单域名与子路径挂载冲突；
+        - 重构前端交互式验真面板 (`public/scripts/tamper-proof-client.js`)：
+          - 增加顶部紧凑存证徽章 (`#tamper-proof-top-badge`)，正文首段即见官方哈希与验真快捷入口；
+          - 将主验真面板 (`#tamper-proof-widget`) 显著置顶于正文首个 `h2` 之前，彻底解决「显式界面」不可见缺陷；
+          - 原生 Web Crypto API (`crypto.subtle.digest`) 毫秒级在线验真、本地 OpenSSL 命令核验与一键复制；
+        - 矢量化架构图 (`public/images/mail/anti-tamper-architecture.svg`)，完整支持深色/浅色自适应响应。
+    - [x] 远程分支拉取整合、远程推送与生产环境发布:
+        - 拉取远程仓库最新提交并进行平滑变基整合；
+        - 推送至官方远程仓库 (`git@github.com:shijianus/epomail-docs.git`)；
+        - 创建并部署至 Cloudflare Pages 生产环境 (`https://epomail-docs.pages.dev`)。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 独立子代理真实浏览器全真审计：派驻 `Browser QA Auditor` 子代理，运行真实无头 Chromium 访问公网多语系页面，DOM 元素断言与验真点击 100% 通过，签发 `[ ✅ APPROVED ]` 认证；
+    - [x] 多语言结构绝对对称审计：`python3 scripts/check-structure.py` 全绿 (6 语言 x 9 篇文档 100% 标题/表格/图表对齐)；
+    - [x] 全站锚点与资源静态核验：`node scripts/validate-anchors.cjs` 全绿 (110 页面 / 1056 锚点链接 0 损坏)；
+    - [x] 生产构建：Astro 5.0 + Starlight 构建顺利通过 (55 页面 / 6 语言 Pagefind 索引完成，耗时 6.24s)；
+    - [x] 公网全真验证：`curl -sI https://epomail-docs.pages.dev/epomail/scripts/tamper-proof-client.js` 与 `scripts/tamper-proof-client.js` 双轨均返回 HTTP/2 200，根路径 302 重定向顺畅。
+
+---
+
+### Passkey Windows 跨设备兼容性修复、2FA 方式自由切换与自适应黑盒二验引擎 (2026-10-01)
+*   **关联提交 (Git Commit)**: `5befa4ef2b63d7ded6901ef49aefaa2ccdd66a83` (Short: `5befa4e`) | 生产测试: `162d16df3324ceb5d84871032dfa938c5b058a57` (Short: `162d16d`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com / epomail.epocanvas.workers.dev)` (Version ID: `66dbda0e-4f7d-458d-8878-532fbab6c5b5`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] Passkey 跨设备创建与 Windows Hello TPM 根因修复:
+        - 彻底根治 Windows 电脑在创建 Passkey 时提示失败的致命缺陷（根因为 Windows `webauthn.dll` 要求 `user.id` 长度为 16-64 字节，原有传 `String(userId)` 仅 1-2 字节触发 TPM 拒绝）；
+        - 将服务端注册选项改造为标准 32 字节 SHA-256 不透明二进制句柄 (`epomail_uid_${userId}`)；
+        - 协商算法列表全面补齐并优先排序 PS256 (RSA-PSS with SHA-256, `alg: -37`，Windows 11 TPM 首选)、ES256 (`alg: -7`)、RS256 (`alg: -257`) 等 8 种主流规范算法；
+        - CBOR 解码器支持 64 位无符号整数解析与语义标签解包，验签引擎新增 RSA-PSS Web Crypto 验签支持；
+        - 确保用户在 Windows Hello、Mac Touch ID、iPhone/iPad Face ID、Android 生物识别、Linux 及 USB YubiKey 上 100% 成功创建与验证。
+    - [x] 2FA 验证方式自由选择 (Try another way):
+        - 登录触发两步验证时，用户可点击「选择其他验证方式（Try another way）」，自由在通行密钥、身份验证器 TOTP、应急备用代码间无缝切换；
+        - 各凭据提供专有优化交互：6 位独立 OTP 舱（支持 30 秒圆环倒计时与快捷粘贴）、8 位应急备用码（自动分段连字符）、Passkey 一键生物识别调起与取消容灾友好提示。
+    - [x] 自主黑盒风控机制与自适应二验 (Risk-based Step-Up):
+        - 服务端构建 `risk-service.js` 自主黑盒风控模型，采用服务端私有密钥派生每日动态盐与非线性权重矩阵，彻底防止开源导致风控规则与阈值泄露；
+        - 综合检测指纹浏览器（AdsPower, BitBrowser, Dolphin 等）、自动化插件（webdriver/cdc）、硬件屏幕矛盾、多账户共存环境与 IP 滑动窗口突发；
+        - 普通低风险环境保持单次快速验证；高风险环境下自适应触发「二验」（要求连续验证两项不同类型的独立凭据），前端呈现「🛡️ 自适应高安全质询」卡片，并严格限制第二步不得重复验证同一因子。
+    - [x] 多语言闭环与品牌去 Gmail 化纯粹性:
+        - `mail-vue` (2071 键) 与 `mail-worker` (1890 键) 六语言字典 100% 绝对对称；
+        - 用户界面与提示文案绝不出现 "Gmail" 字样，保持 Epocanvas 原生品牌。
+*   **自动化测试与公网核验清单 (Verification Checklist)**:
+    - [x] Cloudflare 生产部署：wrangler deploy 顺利完成 (Version ID: `66dbda0e-4f7d-458d-8878-532fbab6c5b5`)，47 项核心静态资源平滑更新；
+    - [x] 公网全真端到端核验套件 (`tests/test-prod-passkey-and-stepup-live-e2e.mjs`)：直连 `https://mail.epocanvas.com` 执行 26/26 项断言 100% 通过 (ALL GREEN)；
+    - [x] 公网 Passkey 跨设备与 Windows 规范核验：公网 `GET /api/my/passkey/setup` 返回的 `user.id` 严谨为 32 字节 opaque buffer，算法包含 PS256/ES256/RS256；
+    - [x] 公网黑盒风控多场景实测：
+        - 场景 A (干净环境)：`riskScore: 0, stepUpRequired: false`；
+        - 场景 B (指纹浏览器)：`riskScore: 71, stepUpRequired: true, fpBrowserDetected: true`；
+        - 场景 C (多账户+Webdriver)：`riskScore: 86, stepUpRequired: true, multiAccountDetected: true`；
+    - [x] 公网浏览器实测交互：Playwright 无头浏览器加载公网登录页触发 2FA，点击「选择其他验证方式」展开多因子抽屉并在 TOTP 与备用代码间平滑切换；
+    - [x] 多语言对称静态审计：`node scripts/i18n-symmetry.mjs` (六语言绝对对称)、`node scripts/i18n-audit.mjs` (0 缺失) 全绿；
+    - [x] 独立生产 QA Auditor 审计：完全独立的子代理执行 clean-slate 公网端到端核查，出具 APPROVED 签发报告；
+    - [x] 零假数据残留：公网测试数据物理隔离，测试完成端口与实例自动回收，零假数据残留。
+
+---
+
+### 多账户模式状态常驻化与会话切换防回退加固 (2026-09-30)
+*   **关联提交 (Git Commit)**: `e061a781016c32c9e94a8832c10b35dbf1c5e10d` (Short: `e061a78`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com / epomail.epocanvas.workers.dev)` (Version ID: `63608f36-ad07-4004-8759-7cd8927ecdf9`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 后端 D1 数据库与 KV 缓存持久化闭环:
+        - 修复 `mail-worker/src/service/setting-service.js` 的 `validColumns` 字段白名单，补齐 `'multiAccountEnabled', 'termsUrl', 'privacyUrl'`；
+        - 在 `set` 更新函数中对 `multiAccountEnabled` 规范化为 `0/1` 数值存储，更新 D1 数据库后立即触发 `refresh` 重构并写入 KV 缓存；
+        - 彻底根治管理员保存后后端因白名单遗漏导致字段被静默丢弃、D1 无法持久化的根本性缺陷；
+    - [x] 数据库冷启动与迁移幂等性保障:
+        - 在 `mail-worker/src/init/init.js` 的 `aiSettingCols` 探测更新链中补充 `multi_account_enabled`、`terms_url`、`privacy_url` 条件迁移；
+        - 保证无论是空库冷启动还是存量库热升级，均能安全、幂等地完成 D1 表结构列的注入。
+    - [x] 前端四重容灾防御网络与状态常驻化:
+        - 在 `mail-vue/src/init/init.js` 与 `sys-setting/index.vue` 中建立配置即时下发持久化 (`localStorage.setItem('multiAccountEnabled', ...)`)；
+        - 强化 `mail-vue/src/layout/header/index.vue` 的 `isMultiAccountEnabled` 计算属性，建立 `settingStore.settings`、`localStorage.multiAccountEnabled`、`localStorage.setting` 与多会话 `epo_sessions.length > 1` 的四重容灾判定；
+        - 保证在会话切换、冷启动首帧或接口短暂延时期间，多账户卡片 100% 坚决常驻，彻底杜绝回退单账号老菜单；
+    - [x] 会话切换防竞态与退出清理:
+        - 在 `switchAccount(acc)` 触发 URL 跳转前，前置提取目标会话的 `token` 与 `email` 覆盖更新 `localStorage.token` / `localStorage.loginEmail`，消除页面跳转与异步初始化的 race condition；
+        - 全局注销 `clickLogout` 规范化物理移除 `epo_sessions`，防止历史会话凭证残留。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：mail-vue 构建通过 (耗时 13.82s)，静态资源与 temp_login_ui 完整同步；
+    - [x] 多语言对称与审计：`node scripts/i18n-symmetry.mjs` (2057 键绝对对称)、`node scripts/i18n-audit.mjs` (0 缺失) 全绿；
+    - [x] 独立 QA Auditor 审计：子代理 clean-slate 独立审计签发合格；
+    - [x] 新增公网切换常驻端到端测试 (`tests/test-multi-account-switch-persistence-prod-e2e.mjs`)：生产环境 8/8 项断言 100% 通过；
+    - [x] 登录跳转流程全真栈回归 (`tests/test-multi-account-login-flow-prod-e2e.mjs`)：生产环境 16/16 项断言 100% 通过；
+    - [x] 头像下拉卡片全真栈回归 (`tests/test-gmail-avatar-dropdown-prod-e2e.mjs`)：生产环境 37/37 项断言 100% 通过；
+    - [x] 零假数据残留：测试账号生命周期与 MFA 状态完整恢复，零假数据或安全死角残留。
+
+---
+
+### 原生登录路由多账户无感添加、会话保持与去品牌化优化 (2026-09-30)
+*   **关联提交 (Git Commit)**: `b6d199f8464a10afa4bb39f349a1b490e3631100` (Short: `b6d199f`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com / epomail.epocanvas.workers.dev)` (Version ID: `76bbcb37-e897-4d46-a8fd-d29e1616b33b`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 原生登录路由无感添加多账户与生硬模态框清理:
+        - 彻底移除此前生硬加入的添加账户 `<el-dialog>` 模态框及伴生的 300+ 行死表单、Turnstile 容灾逻辑与硬编码样式 (-92 行净精简)；
+        - 点击头像下拉卡片中的「添加其他账户」入口时，直接原生无感跳转至独立登录应用路由 `/login/?action=addAccount&u=${nextU}`；
+        - 登录卡片顶部动态呈现「← 返回当前账户」快捷按键，副标题动态更新为添加新账户指引，邮箱输入框初始保持纯净空白。
+    - [x] 回退登录态 100% 绝对无损保持:
+        - 用户无论通过登录卡片「← 返回当前账户」按钮，还是通过浏览器原生 Back 导航，100% 保持已有主账户的会话凭证（Token 与 sessions 绝不被清除或退出）；
+        - 平滑返回主邮箱界面 `/mail/u/0/#inbox`，零闪退、零白屏、零假登出。
+    - [x] 多会话生命周期与独立账号无缝切换:
+        - 引入标准 `epo_sessions` 浏览器多账号存储架构与 `/mail/u/:index` 路径绑定；
+        - 主应用根据当前 `u` 索引自动同步激活对应账号 Token，并在头部下拉卡片动态展示其他已登录独立会话及别名邮箱；
+        - 点击其他账号平滑切换至目标 `/mail/u/:targetU/#inbox`。
+    - [x] 官方品牌纯粹性深度清洗 (彻底去 Gmail 化):
+        - 6 语言字典 (`zh.js`, `zh-Hant.js`, `en.js`, `es.js`, `fr.js`, `nl.js`) 全面清洗 `multiAccountEnabledDesc`，彻底剔除所有 "Gmail" 词汇，保持六语言 100% 对称；
+        - 重构并重命名 `gmail-history.js` 为 `account-history.js`，类名由 `.gmail-account-card` 更新为 `.epo-account-card`，消除所有代码与注释中的品牌稀释隐患。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：temp_login_ui (2.92s) 与 mail-vue (13.29s) 零报错构建通过，dist 资源完整同步；
+    - [x] 多语言对称与审计：`node scripts/i18n-symmetry.mjs` (2057 键绝对对称)、`node scripts/i18n-audit.mjs` (0 缺失)、`node scripts/i18n-hardcoded.mjs` 全部绿灯；
+    - [x] 新增公网端到端测试套件 (`tests/test-multi-account-login-flow-prod-e2e.mjs`)：生产环境 `https://mail.epocanvas.com` 16/16 项断言 100% 满分通过；
+    - [x] 既有头像下拉全真栈回归 (`tests/test-gmail-avatar-dropdown-prod-e2e.mjs`)：生产环境 37/37 项断言 100% 满分通过；
+    - [x] 零假数据残留：测试账号生命周期自动物理清理，零临时凭证或垃圾数据残留。
+
+---
+
+### 邮件内容去 AI 味重构与安全通知视觉美化 (De-AI & Minimalist Email Redesign) (2026-09-30)
+*   **关联提交 (Git Commit)**: `668d844a5a94f7f16ade068d44e78cb9c1710151` (Short: `668d844`, Base: `ec77df74a1b2e8198fec5824a56b3f451bf2d54b`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com / epomail.epocanvas.workers.dev)` (Version ID: `9a4ea2b8-c0ab-468d-bccc-fa8a3b83c3b3`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 去 AI 味与专业化文案重塑 (De-AI Copy across 16 Events in 6 Languages):
+        - 彻底移除标题与网格中的表情包轰炸（`🔔`、`🌍`、`🌐`、`🔑`、`🚨` 等），采用 Stripe/GitHub/1Password 工业级工程文案体系；
+        - 去除直译式问候（如英文 `Hi {name},`、中文 `{name}，您好：`），消除浮夸词汇（如「遭受黑客毁灭性打击」改为「未经授权的访问」）；
+        - 全量 16 项安全事件与 6 种支持语言（zh, zh-Hant, en, es, fr, nl）全真字典对齐，纯净呈现自然人工程师团队的严谨提醒口吻。
+    - [x] 现代极简设计与自适应排版美化 (Modern Minimalist Card Layout):
+        - 顶栏：采用 18px 纯自内联 SVG 盾牌徽标，配合与安全等级相匹配的高对比徽章胶囊，呈现专业工程品质；
+        - 数据元卡片：修复 `<tr>` 语法解析，引入标准 `<tbody>` 与双列规整排版（左列灰度标签、右列等宽 Monospace 时间与 IP），告别错位混乱；
+        - 双向安全建议：打造极柔绿白背景卡片（本人操作无忧提示）与极柔橙白背景卡片（非本人操作警示与防钓鱼应急通道）；
+        - CTA 按钮：现代深色微圆角沉浸式按钮（`#0f172a`），清晰指引「前往安全中心管理账户 →」；
+        - 底栏防伪签名：明确标注官方安全中心署名与不可退订安全声明。
+    - [x] 测试韧性加固与零假数据清理:
+        - `tests/test-security-notices-browser.mjs` 增设网络瞬断自动重试（`fetchWithRetry`），杜绝 Edge TLS 抖动引起的误报；
+        - 验证生命周期确保测试 PAT 物理删除、测试安全邮件从 D1 彻底清理，站长 MFA 强安全防护（`totp_enabled = 1`）完整还原。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 全套单元与架构端到端测试：`node tests/test-security-notices-e2e.mjs` 954/954 项断言 100% 满分通过；
+    - [x] 多语言对称与审计：`node scripts/i18n-symmetry.mjs` (2057 键对称) 与 `node scripts/i18n-audit.mjs` (0 缺失) 全绿；
+    - [x] 公网生产环境真实浏览器端到端实测 (`tests/test-security-notices-browser.mjs`)：生产环境 100% 满分通过；
+    - [x] 邮件阅读窗格截屏全真验收 (`tests/browser_security_notice_reading_pane.png` & `scrolled.png`)：视觉对齐完美无瑕，零布局错位，极简现代感十足；
+    - [x] 零假数据残留：测试 PAT 物理注销，D1 测试邮件彻底物理清空，MFA 强防护确认锁定开启。
+
+---
+
+### 修复添加额外账户404缺陷并提供原生弹窗与多开支援 (Phase 2) (2026-09-30)
+*   **关联提交 (Git Commit)**: `4e8a8c509eb91a894824a242c45f576fb059807b` (Short: `4e8a8c5`, Feature Base: `95cfe56`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com / epomail.epocanvas.workers.dev)` (Version ID: `d60699cc-3fa3-49eb-8894-3e1038fa4ad5`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 路由层防 404 双重兼容与优雅降级:
+        - 在 `mail-vue/src/router/index.js` 中的 `/settings/profile` 路由别名追加 `'/settings/account'` 与 `'/settings/accounts'`，彻底消除直接访问该 URL 或历史书签的显式 404；
+        - 在顶栏搜索结果跳转函数 (`goToSetting`) 中加入 `router.hasRoute(routeName)` 安全校验防御，非当前注册路由绝不调用 `router.push`。
+    - [x] 原生添加账户模态框 (Gmail Multi-Account Modal):
+        - 在 `mail-vue/src/layout/header/index.vue` 废除原无效跳转，重构为居中原生模态框 `<el-dialog v-model="addAccountDialogVisible">`；
+        - 提供邮箱前缀输入框、可用域名后缀下拉框、实时邮箱地址组合预览与 Cloudflare Turnstile 验证容灾；
+        - 严格集成角色权限检查（`hasPerm('account:add')`）与系统开关（`setting.addEmail`），添加成功后无缝调用 `loadOtherAccounts()` 刷新多账户列表并更新全局 `userStore` 与 `settingStore.settings.addVerifyOpen`。
+    - [x] 顶栏设置全局搜索权限安全过滤与锚点补齐:
+        - 在 `settingsMap` 中为管理类项引入 `perm` 标识 (`sys-setting`, `analysis`, `user`, `all-email`, `role`, `reg-key`)；
+        - `settingsSearchResults` 计算属性严格基于 `hasPerm()` 实施前置安全过滤，未授权普通用户在搜索框绝不展示管理页面项；
+        - 补齐 `profile-info`、`profile-setting`、`setting` 视图中缺损的 20+ 个元素锚点 ID (`#avatar`, `#nickname`, `#phones`, `#bio`, `#theme`, `#density`, `#username` 等)。
+    - [x] 六语言 i18n 绝对对称字典:
+        - 同步更新 `zh.js`, `zh-Hant.js`, `en.js`, `es.js`, `fr.js`, `nl.js`，新增 `noPermAccountAdd`, `adminDisabledAddEmail`, `addAccountModalDesc` 词条。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：mail-vue `vite build` 16.22s 零警告零报错，Wrangler dry-run 编译通过；
+    - [x] 静态多语言三件套：`node scripts/i18n-symmetry.mjs` (2057 键绝对对称)、`node scripts/i18n-audit.mjs` (0 缺失)、`node scripts/i18n-hardcoded.mjs` 全部通过；
+    - [x] 公网全真栈自动化端到端测试 (`tests/test-multi-account-add-modal-e2e.mjs`)：生产环境 `https://mail.epocanvas.com` 14/14 项断言 100% 满分通过；
+    - [x] 既有多账户全真栈回归测试 (`tests/test-gmail-avatar-dropdown-prod-e2e.mjs`)：生产环境 37/37 项断言 100% 满分通过；
+    - [x] 零假数据残留：自动化测试生命周期自动清理，无任何测试假数据残留。
+
+---
+
+### 公网生产环境真实浏览器端到端测试与视觉审计核验 (2026-09-30)
+*   **关联提交 (Git Commit)**: `833d9e2f228718abaed2edd47d5602ada1e9cfaa` (Short: `833d9e2`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com / epomail.epocanvas.workers.dev)` (Version ID: `c51f0b0f-3b30-4b00-b9ba-221aa688025e`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 真实账号与生产公网全真链路核验 (`tests/test-security-notices-browser.mjs`)：
+        - 站长账号真实登录并获取公网 JWT 认证凭证，记录当前 D1 最大 `email_id` 基线；
+        - 调用生产接口 `POST /api/my/apiTokens` 真实生成测试 PAT 个人访问令牌，触发 Level 2 级安全操作通知邮件；
+        - 自动化启动 Playwright Chromium 无头浏览器，注入凭据直访 `https://mail.epocanvas.com/mail/u/0/#inbox`。
+    - [x] 邮件列表与阅读窗格双重视觉审计与截屏归档：
+        - 收件箱邮件列表审计（截图: `tests/browser_security_notice_inbox_list.png`）：成功定位并呈现来自官方发信人 `Epocanvas Mail 官方安全中心` 与官方认证蓝标，标题为 `🔑 [操作确认] 您已成功创建个人访问令牌(PAT)`；
+        - 邮件阅读窗格首屏审计（截图: `tests/browser_security_notice_reading_pane.png`）：官方系统引导横幅 (`isOfficial: 1`)、7 天自动清理提示、自包含响应式卡片、告警徽章 (`操作提醒`)、大标题 (`个人访问令牌已创建`)、边缘解析上下文网格 (UTC 触发时间、IP 地址、地理位置、设备与 OS、浏览器、网络/ISP、操作细节)；
+        - 邮件阅读窗格滚动全景审计（截图: `tests/browser_security_notice_reading_pane_scrolled.png`）：双向安全建议卡片 (绿色本人操作说明 vs 红色非本人操作防钓鱼警示)、金黄主题 CTA 操作按钮 (`前往安全中心管理账户 →`)、不可取消订阅防伪官方脚注。
+    - [x] 零假数据残留与安全防护还原 (AGENTS.md 准则)：
+        - 自动化物理删除测试生成的 PAT 令牌 (`DELETE /api/my/apiTokens/${id}`)；
+        - 自动化物理删除生产 D1 数据库中因本次测试生成的测试安全提醒邮件 (`email_id > startMaxEmailId`)；
+        - 自动化将站长账号 MFA 两步验证重置并锁定回开启状态 (`totp_enabled = 1`)。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 真实浏览器端到端：`node tests/test-security-notices-browser.mjs` 100% 满分通过；
+    - [x] 运行时健康度：无任何控制台 unhandled error 或 pageerror；
+    - [x] 零假数据残留核验：D1 生产查询 `SELECT COUNT(*) WHERE email_id > 157` 结果为 0；
+    - [x] 生产强安全核验：D1 生产查询站长 `totp_enabled` 确认严格为 1。
+
+---
+
+### 硬编码安全操作通知邮件体系与分级风控实作交付 (Phase 2) (2026-09-30)
+*   **关联提交 (Git Commit)**: `c143f5c3d6019341b5c6b41af0fa7f9571b6327f` (Short: `c143f5c`)
+*   **部署环境 (Deployment)**: `本地全真栈自检与自动化测试`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 硬编码安全操作通知模板集 (`mail-worker/src/const/security-notice-templates.js`)：
+        - 覆盖全部 16 种核心操作，按风险梯度分为 4 个层级 (L1: 环境感知, L2: 凭据变更, L3: 认证因子, L4: 高危降级)；
+        - 提供 6 国语言 (zh, zh-Hant, en, es, fr, nl) 100% 绝对对称模板 (96 套独立文案)；
+        - 打造自包含响应式 HTML 渲染引擎 (`renderSecurityNoticeEmail`)，内嵌矢量盾牌 SVG 图标、操作元数据网格、双向确认与防钓鱼签名，统一发件人 `announcement@epocanvas.com`；
+        - 严格非系统设置可配置设计（防绕过安全基线）。
+    - [x] 安全通知核心引擎 (`mail-worker/src/service/security-notice-service.js`)：
+        - 边缘地理与 UA 上下文精确解析 (CF-Connecting-IP, CF-IPCountry, CF-IPCity, ASN, OS, 浏览器)；
+        - 基于 KV (`USER_KNOWN_ENV_{userId}`) 的环境指纹库对比与 1 小时防疲劳静默去重窗口；
+        - 官方认证标识 (`isOfficial: 1`)、官方标签 (`['官方', '安全']`)，L3/L4 级别自动加注星标 (`star` 表)，兼容端到端邮件加密。
+    - [x] 全链路业务安全埋点集成：
+        - 登录成功与 2FA 登录触发登录环境比对 (`login-service.js`)；连续 5 次密码错误触发账号锁定预警 (`ACCOUNT_LOCKED`)；
+        - 密码重置 (`PASSWORD_CHANGED`)、PAT 令牌创建 (`PAT_CREATED`)、邮件/TG 转发设置修改 (`FORWARDING_MODIFIED`/`TELEGRAM_MODIFIED`)、存储解绑 (`STORAGE_PURGED`) 与销户 (`ACCOUNT_DELETED`) 触发对应安全信 (`user-service.js`)；
+        - TOTP 开启/禁用 (`TOTP_ENABLED`/`TOTP_DISABLED`)、Passkey 注册/删除 (`PASSKEY_ADDED`/`PASSKEY_DELETED`)、备用码更新 (`BACKUP_CODES_REGENERATED`) 触发对应告警 (`totp-service.js`)；
+        - OAuth 第三方应用授权首次访问触发确认信 (`oauth-provider-service.js`)。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：mail-vue `vite build` 17.36s 零警告零报错；
+    - [x] 静态多语言三件套：`node scripts/i18n-symmetry.mjs` 6 语言字典 100% 绝对对称，`node scripts/i18n-audit.mjs` 0 缺失；
+    - [x] 自动化端到端测试：`tests/test-security-notices-e2e.mjs` 全线通过 (954/954 断言通过，覆盖 96 套模板、参数插值、指纹识别、防风暴去重与自动星标投递)；
+    - [x] 零假数据残留：测试数据全部在内存与临时 mock 实例中流转，物理存储无假数据残留。
 
 ### 本地部署与端到端视觉验证轮：文档站 25 截图判图 + 全真栈头像/级联 E2E (2026-10-01)
 *   **关联提交 (Git Commit)**: EpomailDocs `838eb84144c466ef384f489f0361de906ed36a7c` (Short: `838eb84`，已推送 origin/main)；主仓归档提交见 CHECKLIST 对应变更提交

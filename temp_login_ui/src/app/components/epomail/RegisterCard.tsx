@@ -52,11 +52,11 @@ export function RegisterCard({ canvasRef, onSwitch, sysConfig }: RegisterCardPro
           y: reduceMotion ? 0 : translateY,
           transformStyle: "preserve-3d",
         }}
-        className="relative w-full max-w-[420px]"
+        className="relative w-full max-w-[480px] sm:w-[480px]"
       >
         {/* Acrylic prism block */}
         <div
-          className="relative overflow-hidden rounded-3xl p-8 sm:p-10"
+          className="relative overflow-hidden rounded-3xl p-8 sm:p-10 h-[620px] sm:h-[670px] min-h-[620px] sm:min-h-[670px] max-h-[620px] sm:max-h-[670px] flex flex-col justify-center box-border"
           style={{
             background:
               "linear-gradient(145deg, rgba(16,20,46,0.72), rgba(8,10,26,0.56))",
@@ -88,9 +88,9 @@ export function RegisterCard({ canvasRef, onSwitch, sysConfig }: RegisterCardPro
             }}
           />
 
-          <div className="relative">
+          <div className="relative flex-1 flex flex-col justify-center">
             {/* Brand header */}
-            <div className="mb-8 flex flex-col items-center text-center">
+            <div className="mb-4 sm:mb-5 flex flex-col items-center text-center">
               <img
                 src={`${import.meta.env.BASE_URL}logo.svg`}
                 alt="EpoMail Logo"
@@ -101,7 +101,7 @@ export function RegisterCard({ canvasRef, onSwitch, sysConfig }: RegisterCardPro
                 }}
               />
               <h1
-                className="epomail-display mt-4"
+                className="epomail-display mt-3.5"
                 style={{
                   fontSize: "26px",
                   fontWeight: 600,
@@ -115,7 +115,7 @@ export function RegisterCard({ canvasRef, onSwitch, sysConfig }: RegisterCardPro
                 {sysConfig?.title || "EpoMail"}
               </h1>
               <p
-                className="mt-2 text-[13px]"
+                className="mt-1.5 text-[13px]"
                 style={{ color: "var(--epo-muted)" }}
               >
                 {tr('registerSubtitle')}

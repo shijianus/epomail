@@ -31,6 +31,11 @@ export default {
 			 return await kvObjService.toObjResp( { env }, url.pathname.substring(1));
 		 }
 
+		if (url.pathname.startsWith('/login/challenge/')) {
+			const loginReq = new Request(new URL('/login/' + url.search, req.url), req);
+			return env.assets.fetch(loginReq);
+		}
+
 		return env.assets.fetch(req);
 	},
 	email: email,

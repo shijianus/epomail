@@ -1,11 +1,12 @@
 <template>
   <div class="main-box-hide">
     
-    <!-- Settings Layout -->
+    <!-- Settings & Manage Layout -->
     <div v-if="isSettingsMode" class="settings-layout">
       <div class="settings-sidebar">
         <el-scrollbar>
           <div class="settings-sidebar-content">
+
             <div class="settings-title" @click="router.push({name: 'email'})">
               <Icon icon="lucide:arrow-left" width="18" height="18" />
               <span>{{$t('backToMail')}}</span>
@@ -13,65 +14,117 @@
             
             <div class="nav-section-title">{{$t('tabSetting')}}</div>
             <div class="settings-nav-group">
-            <router-link :to="{name: 'user-profile'}" class="settings-nav-item" :class="{active: route.name === 'user-profile' || route.name === 'profile'}">
-              <Icon icon="fluent:person-20-regular" width="20" height="20" /> {{$t('profile')}}
-            </router-link>
-            <router-link :to="{name: 'general-setting'}" class="settings-nav-item" :class="{active: route.name === 'general-setting' || route.name === 'profile-setting'}">
-              <Icon icon="fluent:settings-48-regular" width="20" height="20" /> {{$t('general')}}
-            </router-link>
-            <router-link :to="{name: 'setting'}" class="settings-nav-item" :class="{active: route.name === 'setting'}">
-              <Icon icon="fluent:shield-checkmark-20-regular" width="20" height="20" /> {{$t('security')}}
-            </router-link>
-            <router-link :to="{name: 'data-setting'}" class="settings-nav-item" :class="{active: route.name === 'data-setting'}">
-              <Icon icon="fluent:database-person-20-regular" width="20" height="20" /> {{$t('data')}}
-            </router-link>
-            <router-link :to="{name: 'label-setting'}" class="settings-nav-item" :class="{active: route.name === 'label-setting'}">
-              <Icon icon="lucide:tags" width="20" height="20" /> {{$t('labels')}}
-            </router-link>
+              <router-link :to="{name: 'user-profile'}" class="settings-nav-item" :class="{active: route.name === 'user-profile' || route.name === 'profile'}">
+                <Icon icon="fluent:person-20-regular" width="20" height="20" /> {{$t('profile')}}
+              </router-link>
+              <router-link :to="{name: 'general-setting'}" class="settings-nav-item" :class="{active: route.name === 'general-setting' || route.name === 'profile-setting'}">
+                <Icon icon="fluent:settings-48-regular" width="20" height="20" /> {{$t('general')}}
+              </router-link>
+              <router-link :to="{name: 'setting'}" class="settings-nav-item" :class="{active: route.name === 'setting'}">
+                <Icon icon="fluent:shield-checkmark-20-regular" width="20" height="20" /> {{$t('security')}}
+              </router-link>
+              <router-link :to="{name: 'data-setting'}" class="settings-nav-item" :class="{active: route.name === 'data-setting'}">
+                <Icon icon="fluent:database-person-20-regular" width="20" height="20" /> {{$t('data')}}
+              </router-link>
+              <router-link :to="{name: 'label-setting'}" class="settings-nav-item" :class="{active: route.name === 'label-setting'}">
+                <Icon icon="lucide:tags" width="20" height="20" /> {{$t('labels')}}
+              </router-link>
             </div>
 
-            <template v-if="hasPerm(['all-email:query','user:query','role:query','setting:query','analysis:query','reg-key:query'])">
+            <template v-if="hasManagePerm">
               <div class="nav-section-title" style="margin-top: 24px;">{{$t('manage')}}</div>
               
-              <router-link v-if="hasPerm('analysis:query')" :to="{name: 'analysis'}" class="settings-nav-item" :class="{active: route.name === 'analysis'}">
-                <Icon icon="fluent:data-pie-20-regular" width="20" height="20" /> {{$t('analytics')}}
-              </router-link>
-              
-              <router-link v-if="hasPerm('user:query')" :to="{name: 'user'}" class="settings-nav-item" :class="{active: route.name === 'user'}">
-                <Icon icon="si:user-alt-2-line" width="18" height="18" /> {{$t('allUsers')}}
-              </router-link>
+              <div class="settings-nav-group">
+                <router-link
+                  v-if="hasPerm('analysis:query')"
+                  :to="`/manage/${currentRoleSlug}/analysis`"
+                  class="settings-nav-item"
+                  :class="{active: isTabActive(['manage-analysis', 'analysis'])}"
+                >
+                  <Icon icon="fluent:data-pie-20-regular" width="20" height="20" /> {{$t('analytics')}}
+                </router-link>
 
-              <router-link v-if="hasPerm('all-email:query') && Number(settingStore.settings?.allMailMode) !== 2" :to="{name: 'all-email'}" class="settings-nav-item" :class="{active: route.name === 'all-email'}">
-                <Icon :icon="Number(settingStore.settings?.allMailMode) === 1 ? 'fluent:mail-list-28-regular' : 'fluent:mail-alert-28-regular'" width="20" height="20" />
-                {{ Number(settingStore.settings?.allMailMode) === 1 ? $t('allMail') : ($t('spamAdminPartition') || $t('spam')) }}
-              </router-link>
+                <router-link
+                  v-if="hasPerm('user:query')"
+                  :to="`/manage/${currentRoleSlug}/users`"
+                  class="settings-nav-item"
+                  :class="{active: isTabActive(['manage-users', 'user'])}"
+                >
+                  <Icon icon="si:user-alt-2-line" width="18" height="18" /> {{$t('allUsers')}}
+                </router-link>
 
-              <router-link v-if="hasPerm('role:query')" :to="{name: 'role'}" class="settings-nav-item" :class="{active: route.name === 'role'}">
-                <Icon icon="fluent:lock-closed-16-regular" width="20" height="20" /> {{$t('permissions')}}
-              </router-link>
+                <router-link
+                  v-if="hasPerm('all-email:query') && Number(settingStore.settings?.allMailMode) !== 2"
+                  :to="`/manage/${currentRoleSlug}/mail`"
+                  class="settings-nav-item"
+                  :class="{active: isTabActive(['manage-mail', 'all-email'])}"
+                >
+                  <Icon :icon="Number(settingStore.settings?.allMailMode) === 1 ? 'fluent:mail-list-28-regular' : 'fluent:mail-alert-28-regular'" width="20" height="20" />
+                  {{ Number(settingStore.settings?.allMailMode) === 1 ? $t('allMail') : ($t('spamAdminPartition') || $t('spam')) }}
+                </router-link>
 
-              <router-link v-if="hasPerm('reg-key:query')" :to="{name: 'reg-key'}" class="settings-nav-item" :class="{active: route.name === 'reg-key'}">
-                <Icon icon="fluent:fingerprint-20-filled" width="20" height="20" /> {{$t('inviteCode')}}
-              </router-link>
+                <router-link
+                  v-if="hasPerm('role:query')"
+                  :to="`/manage/${currentRoleSlug}/roles`"
+                  class="settings-nav-item"
+                  :class="{active: isTabActive(['manage-roles', 'role'])}"
+                >
+                  <Icon icon="fluent:lock-closed-16-regular" width="20" height="20" /> {{$t('permissions')}}
+                </router-link>
 
-              <router-link v-if="hasPerm('setting:query')" :to="{name: 'sys-setting'}" class="settings-nav-item" :class="{active: route.name === 'sys-setting'}">
-                <Icon icon="eos-icons:system-ok-outlined" width="18" height="18" /> {{$t('SystemSettings')}}
-              </router-link>
+                <router-link
+                  v-if="hasPerm('reg-key:query')"
+                  :to="`/manage/${currentRoleSlug}/reg-keys`"
+                  class="settings-nav-item"
+                  :class="{active: isTabActive(['manage-reg-keys', 'reg-key'])}"
+                >
+                  <Icon icon="fluent:fingerprint-20-filled" width="20" height="20" /> {{$t('inviteCode')}}
+                </router-link>
 
-              <router-link v-if="hasPerm('setting:query')" :to="{name: 'oauth-app'}" class="settings-nav-item" :class="{active: route.name === 'oauth-app'}">
-                <Icon icon="fluent:apps-24-regular" width="18" height="18" /> {{$t('oauthApps')}}
-              </router-link>
+                <router-link
+                  v-if="hasPerm('setting:query')"
+                  :to="`/manage/${currentRoleSlug}/system`"
+                  class="settings-nav-item"
+                  :class="{active: isTabActive(['manage-system', 'sys-setting'])}"
+                >
+                  <Icon icon="eos-icons:system-ok-outlined" width="18" height="18" /> {{$t('SystemSettings')}}
+                </router-link>
 
-              <router-link :to="{name: 'category-setting'}" class="settings-nav-item" :class="{active: route.name === 'category-setting'}">
-                <Icon icon="lucide:network" width="18" height="18" /> {{$t('categorySetting')}}
-              </router-link>
+                <router-link
+                  v-if="hasPerm('setting:query')"
+                  :to="`/manage/${currentRoleSlug}/apps`"
+                  class="settings-nav-item"
+                  :class="{active: isTabActive(['manage-apps', 'oauth-app'])}"
+                >
+                  <Icon icon="fluent:apps-24-regular" width="18" height="18" /> {{$t('oauthApps')}}
+                </router-link>
+
+                <router-link
+                  v-if="hasPerm('setting:query')"
+                  :to="`/manage/${currentRoleSlug}/rules`"
+                  class="settings-nav-item"
+                  :class="{active: isTabActive(['manage-rules', 'category-setting'])}"
+                >
+                  <Icon icon="lucide:network" width="18" height="18" /> {{$t('categorySetting')}}
+                </router-link>
+
+                <router-link
+                  v-if="hasPerm('setting:query')"
+                  :to="`/manage/${currentRoleSlug}/audit`"
+                  class="settings-nav-item"
+                  :class="{active: isTabActive(['manage-audit', 'audit-report'])}"
+                >
+                  <Icon icon="fluent:shield-task-24-regular" width="18" height="18" /> {{$t('auditReport')}}
+                </router-link>
+              </div>
             </template>
+
           </div>
         </el-scrollbar>
       </div>
       <div class="settings-content">
         <router-view class="main-view" v-slot="{ Component,route }">
-          <keep-alive :include="['sys-setting','user','role','analysis','reg-key','oauth-app']">
+          <keep-alive :include="['sys-setting','user','role','analysis','reg-key','oauth-app','category-setting','manage-system','manage-users','manage-roles','manage-analysis','manage-reg-keys','manage-apps','manage-rules','manage-mail','manage-audit','audit-report']">
             <component :is="Component" :key="route.name"/>
           </keep-alive>
         </router-view>
@@ -107,6 +160,7 @@ import ContentComponent from '@/views/content/index.vue'
 import {useUiStore} from "@/store/ui.js";
 import {useEmailStore} from "@/store/email.js";
 import {useSettingStore} from "@/store/setting.js";
+import {useUserStore} from "@/store/user.js";
 import {computed, onBeforeUnmount, onMounted, watch} from "vue";
 import { useRoute } from 'vue-router'
 import { hasPerm } from "@/perm/perm.js"
@@ -114,11 +168,13 @@ import { Icon } from "@iconify/vue"
 import router from "@/router/index.js"
 import { getWallpaperCssById } from '@/utils/theme-presets.js'
 import { emailGet } from '@/request/email.js'
+import { getRoleGroupSlug, getRoleGroupName, hasAnyManagePermission, getFirstAllowedManageTab } from '@/utils/role-utils.js'
 
 
 const settingStore = useSettingStore()
 const uiStore = useUiStore();
 const emailStore = useEmailStore();
+const userStore = useUserStore();
 const route = useRoute()
 let  innerWidth =  window.innerWidth
 
@@ -127,8 +183,24 @@ let elNotification = null
 const isMobileView = computed(() => window.innerWidth < 768)
 
 const isSettingsMode = computed(() => {
-  return ['user-profile', 'profile', 'general-setting', 'profile-setting', 'setting', 'data-setting', 'label-setting', 'category-setting', 'analysis', 'user', 'all-email', 'role', 'reg-key', 'sys-setting', 'oauth-app'].includes(route.name)
+  return route.path.startsWith('/settings') ||
+         route.path.startsWith('/manage') ||
+         route.path.startsWith('/admin') ||
+         ['user-profile', 'profile', 'general-setting', 'profile-setting', 'setting', 'data-setting', 'label-setting', 'category-setting', 'analysis', 'user', 'all-email', 'role', 'reg-key', 'sys-setting', 'oauth-app',
+          'manage-analysis', 'manage-users', 'manage-mail', 'manage-roles', 'manage-reg-keys', 'manage-system', 'manage-apps', 'manage-rules', 'manage-audit', 'audit-report'].includes(route.name)
 })
+
+const currentRoleSlug = computed(() => {
+  return getRoleGroupSlug(userStore.user || userStore.userInfo)
+})
+
+const hasManagePerm = computed(() => {
+  return hasAnyManagePermission(userStore.user || userStore.userInfo)
+})
+
+function isTabActive(names) {
+  return names.includes(route.name)
+}
 
 const showReadingPane = computed(() => {
   const mailRoutes = ['email','all-email','send','star','draft','user-all-email','snoozed','spam','trash']

@@ -1,0 +1,398 @@
+import { userOrm as orm } from '../entity/orm';
+import { auditLog } from '../entity/audit-log';
+import user from '../entity/user';
+import settingService from './setting-service';
+import userService from './user-service';
+import { and, desc, asc, eq, sql, count } from 'drizzle-orm';
+import BizError from '../error/biz-error';
+import { getUserDb } from '../utils/db-accessor';
+
+const auditService = {
+	/**
+	 * Ensure audit_log table and indexes exist in D1
+	 */
+	async ensureTables(c) {
+		try {
+			const userDb = getUserDb(c) || c?.env?.db;
+			if (!userDb) return;
+
+			await userDb.prepare(`
+				CREATE TABLE IF NOT EXISTS audit_log (
+					id INTEGER PRIMARY KEY AUTOINCREMENT,
+					ticket_id TEXT,
+					user_id INTEGER,
+					email TEXT NOT NULL,
+					warning_type TEXT NOT NULL,
+					event_type TEXT NOT NULL,
+					category TEXT NOT NULL,
+					action_text TEXT NOT NULL,
+					detail_text TEXT,
+					ip TEXT,
+					geo TEXT,
+					device TEXT,
+					device_type TEXT DEFAULT 'desktop',
+					fingerprint TEXT,
+					base_ip TEXT,
+					base_geo TEXT,
+					base_device TEXT,
+					base_fingerprint TEXT,
+					is_reg_ip INTEGER DEFAULT 0,
+					is_multi_ip INTEGER DEFAULT 0,
+					active_ip_count INTEGER DEFAULT 1,
+					reported_by_others INTEGER DEFAULT 0,
+					risk_level TEXT DEFAULT 'normal',
+					priority TEXT DEFAULT 'P2',
+					status TEXT DEFAULT 'active',
+					recommended_action TEXT,
+					match_score INTEGER DEFAULT 0,
+					subnet_match INTEGER DEFAULT 0,
+					appeal_reason TEXT,
+					create_time DATETIME DEFAULT CURRENT_TIMESTAMP
+				);
+			`).run();
+
+			// Idempotent migration for existing audit_log tables
+			const baselineCols = [
+				{ name: 'base_ip', sql: `ALTER TABLE audit_log ADD COLUMN base_ip TEXT;` },
+				{ name: 'base_geo', sql: `ALTER TABLE audit_log ADD COLUMN base_geo TEXT;` },
+				{ name: 'base_device', sql: `ALTER TABLE audit_log ADD COLUMN base_device TEXT;` },
+				{ name: 'base_fingerprint', sql: `ALTER TABLE audit_log ADD COLUMN base_fingerprint TEXT;` }
+			];
+			for (const col of baselineCols) {
+				try {
+					const colInfo = await userDb.prepare(`SELECT * FROM pragma_table_info('audit_log') WHERE name = ? LIMIT 1`).bind(col.name).first();
+					if (!colInfo) {
+						await userDb.prepare(col.sql).run();
+					}
+				} catch (err) {
+					console.warn(`跳过 audit_log 列 ${col.name}:`, err.message);
+				}
+			}
+
+			await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_audit_log_email ON audit_log(email);`).run();
+			await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_audit_log_warning_type ON audit_log(warning_type);`).run();
+		} catch (e) {
+			console.warn('ensureTables warning:', e.message);
+		}
+	},
+
+	/**
+	 * Seed initial baseline records if the audit_log table is empty
+	 */
+	async seedBaselineIfEmpty(c) {
+		await this.ensureTables(c);
+		try {
+			const existing = await orm(c).select({ total: count() }).from(auditLog).get();
+			if (existing && existing.total > 0) {
+				return;
+			}
+			const initialRecords = [
+				{
+					ticketId: 'TKT-2026-ZS88K1',
+					email: 'zhangsan@epocanvas.com',
+					warningType: 'risk',
+					eventType: 'risk_spike',
+					category: 'security',
+					actionText: '{zhangsan@epocanvas.com} 触发异地多IP跨国漫游跳跃',
+					detailText: '检测到 4-IP 并发跨国跳跃 (Seoul + Tokyo + Frankfurt)，触碰高频风控红线，需重点关注。',
+					ip: '192.0.2.145',
+					geo: 'Seoul, KR',
+					device: 'Chrome 128 / macOS 14.6',
+					deviceType: 'desktop',
+					fingerprint: 'fp_a98e21',
+					isRegIp: 0,
+					isMultiIp: 1,
+					activeIpCount: 4,
+					reportedByOthers: 1,
+					riskLevel: 'high',
+					priority: 'P1',
+					status: 'active',
+					recommendedAction: 'temp_ban_24h',
+					matchScore: 35,
+					subnetMatch: 0,
+					appealReason: null
+				},
+				{
+					ticketId: 'TKT-2026-SP44B1',
+					email: 'spammer_bulk@partner.org',
+					warningType: 'audit',
+					eventType: 'reported_spam',
+					category: 'account',
+					actionText: '{spammer_bulk@partner.org} 被 4 名用户检举商业广告',
+					detailText: '短时间内向多位站内用户大量投递未经许可的营销外链，违规检举成立，需进行管控操作。',
+					ip: '45.33.32.156',
+					geo: 'Fremont, US',
+					device: 'HeadlessChrome / Linux',
+					deviceType: 'desktop',
+					fingerprint: 'fp_bot_001',
+					isRegIp: 0,
+					isMultiIp: 0,
+					activeIpCount: 1,
+					reportedByOthers: 4,
+					riskLevel: 'high',
+					priority: 'P1',
+					status: 'active',
+					recommendedAction: 'permanent_ban',
+					matchScore: 10,
+					subnetMatch: 0,
+					appealReason: null
+				},
+				{
+					ticketId: 'TKT-2026-BD9901',
+					email: 'compromised_bot@malicious.xyz',
+					warningType: 'ban',
+					eventType: 'auto_ban',
+					category: 'security',
+					actionText: '{compromised_bot@malicious.xyz} 触碰发信频率熔断阈值被系统自动封禁',
+					detailText: '5分钟内尝试发送超50封含黑名单外部URL的垃圾邮件，命中反垃圾死规则触发系统阻断。',
+					ip: '198.51.100.88',
+					geo: 'Amsterdam, NL',
+					device: 'Python-Requests / Unknown',
+					deviceType: 'desktop',
+					fingerprint: 'fp_crawl_92',
+					isRegIp: 0,
+					isMultiIp: 0,
+					activeIpCount: 1,
+					reportedByOthers: 0,
+					riskLevel: 'high',
+					priority: 'P0',
+					status: 'banned',
+					recommendedAction: 'blacklist_ip',
+					matchScore: 0,
+					subnetMatch: 0,
+					appealReason: null
+				},
+				{
+					ticketId: 'TKT-2026-AP77X2',
+					email: 'pilot-recovery@epocanvas.com',
+					warningType: 'appeal',
+					eventType: 'appeal_submitted',
+					category: 'appeal',
+					actionText: '{pilot-recovery@epocanvas.com} 提交工单申诉解除风控封禁',
+					detailText: '用户通过外部申诉通道提交表单：“由于出差使用移动漫游热点，触发多地IP跳跃风控误封，特申请核验基准指纹解封”。',
+					ip: '116.228.89.24',
+					geo: 'Shanghai, CN (Roaming)',
+					device: 'Edge 128 / Windows 11',
+					deviceType: 'desktop',
+					fingerprint: 'fp_pilot_77a',
+					baseIp: '116.228.89.1',
+					baseGeo: 'Shanghai, CN (Broadband)',
+					baseDevice: 'Edge 126 / Windows 11',
+					baseFingerprint: 'fp_pilot_77a',
+					isRegIp: 1,
+					isMultiIp: 1,
+					activeIpCount: 2,
+					reportedByOthers: 0,
+					riskLevel: 'medium',
+					priority: 'P1',
+					status: 'pending',
+					recommendedAction: 'approve_appeal',
+					matchScore: 92,
+					subnetMatch: 1,
+					appealReason: '由于近期出差在公共漫游网络产生多IP并发跳跃，导致被风控阻断。特提交指纹基准申请解除封禁。'
+				}
+			];
+
+			for (const r of initialRecords) {
+				await orm(c).insert(auditLog).values(r).run();
+			}
+		} catch (e) {
+			console.warn('seedBaselineIfEmpty warning:', e.message);
+		}
+	},
+
+	/**
+	 * Query audit log list with filters & mode adaptation
+	 */
+	async list(c, params) {
+		await this.ensureTables(c);
+		let { num = 1, size = 15, email, warningType, category, riskLevel, status, timeSort = 0 } = params;
+		size = Math.min(Number(size) || 15, 50);
+		num = Math.max(Number(num) || 1, 1);
+		const offset = (num - 1) * size;
+
+		const conditions = [];
+
+		if (email) {
+			conditions.push(sql`${auditLog.email} COLLATE NOCASE LIKE ${'%' + email + '%'}`);
+		}
+		if (warningType && warningType !== 'all') {
+			conditions.push(eq(auditLog.warningType, warningType));
+		}
+		if (category && category !== 'all') {
+			conditions.push(eq(auditLog.category, category));
+		}
+		if (riskLevel && riskLevel !== 'all') {
+			conditions.push(eq(auditLog.riskLevel, riskLevel));
+		}
+		if (status && status !== 'all') {
+			conditions.push(eq(auditLog.status, status));
+		}
+
+		const query = orm(c).select().from(auditLog);
+		if (conditions.length > 0) {
+			query.where(and(...conditions));
+		}
+
+		if (Number(timeSort) === 1) {
+			query.orderBy(asc(auditLog.id));
+		} else {
+			query.orderBy(desc(auditLog.id));
+		}
+
+		const list = await query.limit(size).offset(offset);
+
+		const { total } = await orm(c)
+			.select({ total: count() })
+			.from(auditLog)
+			.where(conditions.length > 0 ? and(...conditions) : undefined)
+			.get();
+
+		// Check mode: allMailMode (1: All, 0: Privacy, 2: Encrypted E2EE)
+		const settings = await settingService.get(c);
+		const allMailMode = Number(settings?.allMailMode ?? 1);
+
+		// Compute metrics counts
+		const allItems = await orm(c).select({ warningType: auditLog.warningType }).from(auditLog);
+		const counts = {
+			audit: allItems.filter(i => i.warningType === 'audit').length,
+			risk: allItems.filter(i => i.warningType === 'risk').length,
+			ban: allItems.filter(i => i.warningType === 'ban').length,
+			appeal: allItems.filter(i => i.warningType === 'appeal').length,
+			total: allItems.length
+		};
+
+		// If Encrypted Mode (2), strip timestamps according to Zero-Knowledge requirements
+		const processedList = (list || []).map(row => {
+			if (allMailMode === 2) {
+				return {
+					...row,
+					createTime: null // Stripped
+				};
+			}
+			return row;
+		});
+
+		return {
+			list: processedList,
+			total: total || 0,
+			counts,
+			mode: allMailMode
+		};
+	},
+
+	/**
+	 * Insert a new audit log
+	 */
+	async record(c, data) {
+		return await orm(c).insert(auditLog).values({
+			ticketId: data.ticketId || ('TKT-' + Date.now().toString(36).toUpperCase()),
+			userId: data.userId || null,
+			email: data.email,
+			warningType: data.warningType || 'audit',
+			eventType: data.eventType || 'generic',
+			category: data.category || 'security',
+			actionText: data.actionText,
+			detailText: data.detailText || '',
+			ip: data.ip || '',
+			geo: data.geo || '',
+			device: data.device || '',
+			deviceType: data.deviceType || 'desktop',
+			fingerprint: data.fingerprint || '',
+			isRegIp: data.isRegIp ? 1 : 0,
+			isMultiIp: data.isMultiIp ? 1 : 0,
+			activeIpCount: data.activeIpCount || 1,
+			reportedByOthers: data.reportedByOthers || 0,
+			riskLevel: data.riskLevel || 'normal',
+			priority: data.priority || 'P2',
+			status: data.status || 'active',
+			recommendedAction: data.recommendedAction || null,
+			matchScore: data.matchScore || 0,
+			subnetMatch: data.subnetMatch ? 1 : 0,
+			appealReason: data.appealReason || null
+		}).run();
+	},
+
+	/**
+	 * Perform operation action on target
+	 */
+	async takeAction(c, { id, action, targetEmail }) {
+		const targetLog = await orm(c).select().from(auditLog).where(eq(auditLog.id, id)).get();
+		if (!targetLog) {
+			throw new BizError('日志记录不存在', 404);
+		}
+
+		const email = targetEmail || targetLog.email;
+		const targetUser = await orm(c).select().from(user).where(eq(user.email, email)).get();
+
+		if (action === 'ban_account' || action === 'maintain_ban') {
+			if (targetUser) {
+				await userService.setStatus(c, { userId: targetUser.userId, status: 1 });
+			}
+			await orm(c).update(auditLog).set({ status: 'banned' }).where(eq(auditLog.id, id)).run();
+		} else if (action === 'dismiss_alert' || action === 'unban' || action === 'approve_appeal') {
+			if (targetUser) {
+				await userService.setStatus(c, { userId: targetUser.userId, status: 0 });
+			}
+			await orm(c).update(auditLog).set({ status: 'resolved' }).where(eq(auditLog.id, id)).run();
+		} else if (action === 'reject_appeal') {
+			await orm(c).update(auditLog).set({ status: 'rejected' }).where(eq(auditLog.id, id)).run();
+		} else if (action === 'delete') {
+			await orm(c).delete(auditLog).where(eq(auditLog.id, id)).run();
+		}
+
+		return { success: true };
+	},
+
+	/**
+	 * Adjudicate appeal
+	 */
+	async adjudicate(c, { id, action, notes, purgeOnRelease }) {
+		const targetLog = await orm(c).select().from(auditLog).where(eq(auditLog.id, id)).get();
+		if (!targetLog) {
+			throw new BizError('申诉记录不存在', 404);
+		}
+
+		const targetUser = await orm(c).select().from(user).where(eq(user.email, targetLog.email)).get();
+
+		if (action === 'approve' || action === 'probation') {
+			if (targetUser) {
+				await userService.setStatus(c, { userId: targetUser.userId, status: 0 });
+			}
+			await orm(c).update(auditLog).set({
+				status: 'resolved',
+				detailText: (targetLog.detailText || '') + (notes ? `\n[人工研判备注]: ${notes}` : '')
+			}).where(eq(auditLog.id, id)).run();
+
+			if (purgeOnRelease) {
+				// Purge non-critical warning logs for this email
+				await orm(c).delete(auditLog).where(and(
+					eq(auditLog.email, targetLog.email),
+					eq(auditLog.warningType, 'audit')
+				)).run();
+			}
+		} else if (action === 'reject') {
+			await orm(c).update(auditLog).set({
+				status: 'rejected',
+				detailText: (targetLog.detailText || '') + (notes ? `\n[驳回理由]: ${notes}` : '')
+			}).where(eq(auditLog.id, id)).run();
+		}
+
+		return { success: true };
+	},
+
+	/**
+	 * Purge non-critical historical logs
+	 */
+	async purgeNonCritical(c) {
+		await orm(c).delete(auditLog).where(
+			and(
+				eq(auditLog.warningType, 'audit'),
+				eq(auditLog.riskLevel, 'normal')
+			)
+		).run();
+		return { success: true };
+	}
+};
+
+export default auditService;
