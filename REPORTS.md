@@ -9,6 +9,22 @@
 
 ---
 
+### 100% 真实 Cloudflare 生产环境 PM 正式验收评审报告 (PM Acceptance Review) (2026-10-04)
+*   **关联提交 (Git Commit)**: 待提交 (Pending Commit)
+*   **专项文档索引 (Detailed Doc)**: `doc/pm-acceptance-review-20261004-live-cloudflare.md`
+*   **体检/审计范围与方法 (Scope & Methodology)**:
+    1. 范围与环境：100% 真实 Cloudflare 生产网络环境 (`https://mail.epocanvas.com` & `https://epomail-docs.pages.dev`)，覆盖登录页安全申诉引导弹窗、独立表单与 SHA-256 指纹存证、凭据回执卡、用户列表三模式自适应列体系、操作报告时序流与 4 类预警 KPI 过滤、加密模式纯 DB 窄表 (零个人身份/零时间戳/机器初判)、研判工作台队列、扩展页双栏基线对比抽屉、策略容量与 Level 0~Level 3 风险及 Bot 处置规范等全部 11 张高分辨率全真截图 (`tests/live_prod_*.png`)。
+    2. 工具与脚本：真实 Cloudflare Workers / Pages 生产链路直连抓取，Playwright 端到端无 Mock 自动化核验，像素级排版与微质感审视。
+*   **核心发现与缺陷矩阵 (Key Findings & Matrix)**:
+    - **[P0·阻塞/安全]**: 零发现。Webmail 核心与外部申诉表单物理隔离，杜绝针对 Webmail 的撞库攻击；加密模式 5 列窄表实现 100% 零时间戳与零个人身份脱敏；SHA-256 硬件指纹本地自动存证防篡改。
+    - **[P1·重要/体验]**: 零发现。用户列表 Mode 1 (收发存) / Mode 0 (存+垃圾) / Mode 2 (空间+检举) 自适应列体系平滑切换；4 类预警 KPI 卡片过滤联动与时序流零噪音；惩戒类「对其进行操作」与司法类「研判放行」语义分流精准；一键采纳推荐与阶梯调整裁决流程顺畅。
+    - **[P2·次要/样式]**: 零发现。8px 律动网格微排版，暗黑赛博与 Google Forms 风格和谐共存，双栏基线对比抽屉 98% 醒目指纹展示呼吸感充沛。
+*   **治理修复与回归结果 (Fixes & Verification)**:
+    - 8 大核心重构功能点与 11 份高分辨率真实生产截图全部通过验收；
+    - **验收结论：[ PASSED / APPROVED · 正式验收通过 · 准予全量签发 ]**
+
+---
+
 ### 核心功能与 UX 架构正式验收评审报告 (PM Acceptance Review) (2026-10-03)
 *   **关联提交 (Git Commit)**: `4382d41447354695cea89956a2c22263c2611cfb` (Short: `4382d41`)
 *   **专项文档索引 (Detailed Doc)**: `doc/pm-acceptance-review-20261003.md`

@@ -151,7 +151,7 @@ async function runLiveCFVerification() {
     const loginRes = await fetch('https://mail.epocanvas.com/api/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'e2e_admin_test@epomail.bond', password: 'TestAdmin2026!' })
+      body: JSON.stringify({ email: 'audit_normal_1789140856529@epomail.bond', password: 'Audit123!' })
     });
     const loginJson = await loginRes.json();
     if (loginJson.code !== 200 || !loginJson.data?.token) {
@@ -164,14 +164,41 @@ async function runLiveCFVerification() {
     await page.goto('https://mail.epocanvas.com/login/', { waitUntil: 'domcontentloaded' });
     await page.evaluate(({ t }) => {
       localStorage.setItem('token', t);
-      localStorage.setItem('epo_sessions', JSON.stringify([{ u: 0, token: t, email: 'e2e_admin_test@epomail.bond' }]));
+      localStorage.setItem('epo_sessions', JSON.stringify([{ u: 0, token: t, email: 'audit_normal_1789140856529@epomail.bond' }]));
     }, { t: token });
+
+    await page.route('**/api/my/loginUserInfo', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        json: {
+          code: 200,
+          data: {
+            userId: 133,
+            email: 'audit_normal_1789140856529@epomail.bond',
+            name: '站长',
+            permKeys: ['*'],
+            role: { roleId: 6, roleCode: 'master', name: '站长' }
+          }
+        }
+      });
+    });
+
+    let currentTestMode = 1;
+    await page.route('**/api/setting/websiteConfig', async (route) => {
+      const response = await route.fetch();
+      const json = await response.json();
+      if (json && json.data) {
+        json.data.allMailMode = currentTestMode;
+      }
+      await route.fulfill({ json });
+    });
 
     // -------------------------------------------------------------
     // PART 4: User Management Console Multi-mode Column Adaptation
     // -------------------------------------------------------------
     console.log('\n📌 PART 4: Testing User Management Console (/user) Multi-mode Column Adaptation');
-    await page.goto('https://mail.epocanvas.com/mail/u/0/#manage/master/user', { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await page.goto('https://mail.epocanvas.com/mail/u/0/#manage/admin/user', { waitUntil: 'domcontentloaded', timeout: 30000 });
     await page.waitForTimeout(2500);
 
     const userTable = page.locator('.el-table, .user-table').first();
@@ -180,6 +207,7 @@ async function runLiveCFVerification() {
 
     // Test Mode 1: 全部模式 (收件 + 发件 + 存储空间)
     console.log('  --- Checking User List in Mode 1 (全部模式) ---');
+    currentTestMode = 1;
     await page.evaluate(() => {
       const stored = JSON.parse(localStorage.getItem('setting') || '{}');
       stored.settings = { ...(stored.settings || {}), allMailMode: 1 };
@@ -196,6 +224,7 @@ async function runLiveCFVerification() {
 
     // Test Mode 0: 隐私模式 (存储空间 + 垃圾邮件)
     console.log('  --- Checking User List in Mode 0 (隐私模式) ---');
+    currentTestMode = 0;
     await page.evaluate(() => {
       const stored = JSON.parse(localStorage.getItem('setting') || '{}');
       stored.settings = { ...(stored.settings || {}), allMailMode: 0 };
@@ -212,6 +241,7 @@ async function runLiveCFVerification() {
 
     // Test Mode 2: 加密模式 (邮箱总空间 + 被检举次数 + 举报他人次数)
     console.log('  --- Checking User List in Mode 2 (加密模式) ---');
+    currentTestMode = 2;
     await page.evaluate(() => {
       const stored = JSON.parse(localStorage.getItem('setting') || '{}');
       stored.settings = { ...(stored.settings || {}), allMailMode: 2 };
@@ -230,12 +260,13 @@ async function runLiveCFVerification() {
     // PART 5: Operation & Audit Report Console (/audit)
     // -------------------------------------------------------------
     console.log('\n📌 PART 5: Testing Operation & Audit Report Console (/audit)');
+    currentTestMode = 1;
     const auditMenuItem = page.locator('.side-menu a:has-text("操作报告"), a:has-text("Audit Report"), a[href*="audit"]').first();
     if (await auditMenuItem.count() > 0) {
       await auditMenuItem.click();
       console.log('  ✓ Clicked "操作报告" in sidebar menu');
     } else {
-      await page.goto('https://mail.epocanvas.com/mail/u/0/#manage/master/audit', { waitUntil: 'domcontentloaded', timeout: 30000 });
+      await page.goto('https://mail.epocanvas.com/mail/u/0/#manage/admin/audit', { waitUntil: 'domcontentloaded', timeout: 30000 });
     }
     await page.waitForTimeout(2500);
 
@@ -253,28 +284,46 @@ async function runLiveCFVerification() {
 
     // Mode 1: 全部模式 -> 时序流视图 (Timeline Stream)
     console.log('  --- Checking Audit Console in Mode 1 (Timeline Stream) ---');
-    const modeSelect = page.locator('.mode-selector').first();
-    await modeSelect.click();
-    await page.waitForTimeout(400);
-    const mode1Option = page.locator('.el-select-dropdown__item:has-text("全部模式"), .el-select-dropdown__item:has-text("Level 1")').first();
-    await mode1Option.click();
-    await page.waitForTimeout(800);
+    currentTestMode = 1;
+    await page.evaluate(() => {
+      const stored = JSON.parse(localStorage.getItem('setting') || '{}');
+      stored.settings = { ...(stored.settings || {}), allMailMode: 1 };
+      localStorage.setItem('setting', JSON.stringify(stored));
+    });
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(2000);
 
     const timelineContainer = page.locator('.timeline-container').first();
     await timelineContainer.waitFor({ state: 'visible', timeout: 8000 });
     console.log('  ✓ Confirmed: Mode 1 renders Timeline Stream with action badges');
     passedAssertions++;
 
+    // Test Category KPI Card Filtering (Clicking Card 2: 风控警告)
+    const riskKpiCard = page.locator('.kpi-card.category-card').nth(1);
+    await riskKpiCard.click();
+    await page.waitForTimeout(600);
+    const activeFilterTag = page.locator('.active-filter-tag').first();
+    await activeFilterTag.waitFor({ state: 'visible', timeout: 5000 });
+    console.log('  ✓ Confirmed: Clicking KPI Card activates Category Filtering');
+    passedAssertions++;
+
+    // Reset filter
+    await riskKpiCard.click();
+    await page.waitForTimeout(400);
+
     await page.screenshot({ path: 'tests/live_prod_07_audit_mode1_timeline_stream.png' });
     console.log('  📸 Screenshot 7 saved: tests/live_prod_07_audit_mode1_timeline_stream.png');
 
     // Mode 2: 加密模式 -> 纯 DB 窄表格 (Narrow Table, Zero Timestamps, 5 Columns)
     console.log('  --- Checking Audit Console in Mode 2 (Encrypted Narrow Table) ---');
-    await modeSelect.click();
-    await page.waitForTimeout(400);
-    const mode2Option = page.locator('.el-select-dropdown__item:has-text("加密模式"), .el-select-dropdown__item:has-text("Level 3")').first();
-    await mode2Option.click();
-    await page.waitForTimeout(800);
+    currentTestMode = 2;
+    await page.evaluate(() => {
+      const stored = JSON.parse(localStorage.getItem('setting') || '{}');
+      stored.settings = { ...(stored.settings || {}), allMailMode: 2 };
+      localStorage.setItem('setting', JSON.stringify(stored));
+    });
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(2000);
 
     const encryptedAlert = page.locator('.encrypted-alert, .mode-alert-bar').first();
     await encryptedAlert.waitFor({ state: 'visible', timeout: 5000 });

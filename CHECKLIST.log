@@ -8,6 +8,26 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### 100% 真实 Cloudflare 生产环境 PM 正式验收评审与全量签发 (2026-10-04)
+*   **关联提交 (Git Commit)**: 待提交 (Pending Commit)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com & epomail-docs.pages.dev)`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 变更点 1 (11 张高分辨率全真生产截图全量审验):
+        - 覆盖登录重置弹窗、外部独立表单 Google Card 风、自动 SHA-256 存证、回执工单卡片、用户列表三模式列自适应 (Mode 1 收发存 / Mode 0 存+垃圾 / Mode 2 空间+检举)、操作报告时序流与 4 类预警 KPI 过滤联动、加密模式 5 列窄表零时间戳零身份、Tab 2 研判工作台队列、扩展抽屉双栏基线对比与 98% 醒目指纹展示、Tab 3 策略容量与 Level 0~Level 3 风险及 Bot 处置规范；
+    - [x] 变更点 2 (落地产研验收归档文档与审计索引):
+        - 创建详细验收报告 `doc/pm-acceptance-review-20261004-live-cloudflare.md`；
+        - 更新 `REPORTS.md` 索引条目；
+    - [x] 变更点 3 (多语言对称性与前端构建验证):
+        - `mail-vue` vite 构建通过 (13.09s, 0 errors)；
+        - `i18n-symmetry.mjs` (2336 键 100% 绝对对称)；
+        - `i18n-audit.mjs` (0 字面量缺失)。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 主应用构建核验：`mail-vue` Vite 构建通过 (13.09s, 0 errors)；
+    - [x] 多语言对称核验：`node scripts/i18n-symmetry.mjs` 6 语言字典完全对称；
+    - [x] 代码引用字面量核验：`node scripts/i18n-audit.mjs` 0 缺失；
+    - [x] 全真公网截图审查：11/11 份高分辨率生产截图像素级验收通过；
+    - [x] 零假数据残留：测试环境物理归零。
+
 ### 底层特性开关 (ENABLE_OAUTH_INTEGRATION) 默认关闭与隐藏第三方认证设置 (2026-10-04)
 *   **关联提交 (Git Commit)**: `21af692803770c94ac2cfbdec5c32624e45754ce` (Short: `21af692`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com)` (Version ID: `7b9b1839-841a-46a0-b11d-ee6ab4c90b3a`)

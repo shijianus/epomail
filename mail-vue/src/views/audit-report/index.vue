@@ -26,7 +26,7 @@
           </div>
         </div>
 
-        <!-- Header Banner: Security Mode Status & Mode Simulator -->
+        <!-- Header Banner: Security Mode Status -->
         <div class="audit-header-banner" :class="'mode-' + activeMode">
           <div class="banner-left">
             <div class="mode-badge-wrap">
@@ -46,21 +46,6 @@
           </div>
 
           <div class="banner-right">
-            <!-- Mode Switcher & Tools -->
-            <div class="mode-switch-box">
-              <div class="mode-switch-label">{{ $t('auditSimulateMode') }}</div>
-              <el-select
-                v-model="activeMode"
-                size="small"
-                class="mode-selector"
-                :popper-append-to-body="false"
-              >
-                <el-option :value="1" :label="$t('auditModeLevel1')" />
-                <el-option :value="0" :label="$t('auditModeLevel2')" />
-                <el-option :value="2" :label="$t('auditModeLevel3')" />
-              </el-select>
-            </div>
-
             <div class="banner-actions">
               <el-button size="small" type="primary" plain @click="refreshData">
                 <Icon icon="fluent:arrow-sync-20-regular" width="15" height="15" />
@@ -74,66 +59,93 @@
           </div>
         </div>
 
-        <!-- KPI Metrics Grid (Preserves exact assertions) -->
+        <!-- KPI Metrics Grid (Directly maps to the 4 Warning Categories) -->
         <div class="kpi-grid">
-          <div class="kpi-card" @click="activeTab = 'stream'">
+          <!-- Card 1: 审计警告 -->
+          <div
+            class="kpi-card category-card"
+            :class="{ 'card-active': filterWarningType === 'audit' }"
+            @click="selectWarningFilter('audit')"
+          >
             <div class="kpi-icon-wrap ops-icon">
-              <Icon icon="fluent:document-bullet-list-clock-24-regular" width="22" height="22" />
-            </div>
-            <div class="kpi-info">
-              <div class="kpi-label">{{ $t('auditTotalOps') }}</div>
-              <div class="kpi-value">{{ filteredLogs.length }} <span class="kpi-unit">/ {{ allLogs.length }}</span></div>
-              <div class="kpi-sub">{{ activeModeText }}</div>
-              <div class="kpi-progress-bar">
-                <div class="kpi-progress-fill ops-fill" :style="{ width: Math.min(100, Math.round((filteredLogs.length / (allLogs.length || 1)) * 100)) + '%' }"></div>
-              </div>
-            </div>
-          </div>
-
-          <div class="kpi-card" @click="activeTab = 'risk'">
-            <div class="kpi-icon-wrap risk-icon">
-              <Icon icon="fluent:shield-alert-20-regular" width="22" height="22" />
-            </div>
-            <div class="kpi-info">
-              <div class="kpi-label">{{ $t('auditMonitoredUsers') }}</div>
-              <div class="kpi-value">{{ monitoredAccountsCount }}</div>
-              <div class="kpi-sub">{{ bannedAccountsCount }} {{ $t('banned') }}</div>
-              <div class="kpi-progress-bar">
-                <div class="kpi-progress-fill risk-fill" :style="{ width: Math.min(100, Math.round((bannedAccountsCount / (monitoredAccountsCount || 1)) * 100)) + '%' }"></div>
-              </div>
-            </div>
-          </div>
-
-          <div class="kpi-card highlight-card" @click="activeTab = 'risk'">
-            <div class="kpi-icon-wrap appeal-icon">
-              <Icon icon="fluent:person-feedback-24-regular" width="22" height="22" />
+              <Icon icon="fluent:shield-question-20-filled" width="22" height="22" />
             </div>
             <div class="kpi-info">
               <div class="kpi-label">
-                <span>{{ $t('auditPendingAppeals') }}</span>
-                <span v-if="pendingAppealsCount > 0" class="pulse-beacon"></span>
+                <span>{{ $t('auditTypeAuditWarning') }}</span>
+                <span v-if="filterWarningType === 'audit'" class="active-dot"></span>
               </div>
-              <div class="kpi-value text-amber">{{ pendingAppealsCount }}</div>
-              <div class="kpi-sub text-amber">{{ $t('auditInspectDetails') }}</div>
+              <div class="kpi-value">{{ countAuditWarnings }} <span class="kpi-unit">/ {{ allLogs.length }}</span></div>
+              <div class="kpi-sub">{{ $t('auditTypeAuditWarningDesc') }}</div>
               <div class="kpi-progress-bar">
-                <div class="kpi-progress-fill appeal-fill" style="width: 100%;"></div>
+                <div class="kpi-progress-fill ops-fill" :style="{ width: Math.min(100, Math.round((countAuditWarnings / (allLogs.length || 1)) * 100)) + '%' }"></div>
               </div>
             </div>
           </div>
 
-          <div class="kpi-card" @click="activeTab = 'policy'">
-            <div class="kpi-icon-wrap quota-icon">
-              <Icon icon="fluent:database-person-20-regular" width="22" height="22" />
+          <!-- Card 2: 风控警告 -->
+          <div
+            class="kpi-card category-card"
+            :class="{ 'card-active': filterWarningType === 'risk' }"
+            @click="selectWarningFilter('risk')"
+          >
+            <div class="kpi-icon-wrap risk-icon">
+              <Icon icon="fluent:alert-urgent-20-filled" width="22" height="22" />
             </div>
             <div class="kpi-info">
-              <div class="kpi-label">{{ $t('auditDevicePoolUsage') }}</div>
-              <div class="kpi-value">{{ settingForm.auditMaxIpPerAccount }} <span class="kpi-unit">IPs</span> / {{ settingForm.auditMaxDevicePerAccount }} <span class="kpi-unit">{{ $t('auditDeviceRegistered') }}</span></div>
-              <div class="kpi-sub">{{ settingForm.auditPrioritizeNonCriticalClean ? $t('auditPrioritizeNonCriticalClean') : $t('auditAutoCleanOldest') }}</div>
-              <div class="kpi-slots-capsule">
-                <span class="slot-dot active" title="IP Slot 1">1</span>
-                <span class="slot-dot active" title="IP Slot 2">2</span>
-                <span class="slot-dot active" title="IP Slot 3">3</span>
-                <span class="slot-dot" :class="{ active: settingForm.auditMaxIpPerAccount > 3 }" title="Extra Slot 4">4</span>
+              <div class="kpi-label">
+                <span>{{ $t('auditTypeRiskWarning') }}</span>
+                <span v-if="filterWarningType === 'risk'" class="active-dot"></span>
+              </div>
+              <div class="kpi-value text-danger">{{ countRiskWarnings }} <span class="kpi-unit">/ {{ allLogs.length }}</span></div>
+              <div class="kpi-sub">{{ $t('auditTypeRiskWarningDesc') }}</div>
+              <div class="kpi-progress-bar">
+                <div class="kpi-progress-fill risk-fill" :style="{ width: Math.min(100, Math.round((countRiskWarnings / (allLogs.length || 1)) * 100)) + '%' }"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Card 3: 封禁警告 -->
+          <div
+            class="kpi-card category-card"
+            :class="{ 'card-active': filterWarningType === 'ban' }"
+            @click="selectWarningFilter('ban')"
+          >
+            <div class="kpi-icon-wrap ban-icon">
+              <Icon icon="fluent:prohibited-20-filled" width="22" height="22" />
+            </div>
+            <div class="kpi-info">
+              <div class="kpi-label">
+                <span>{{ $t('auditTypeBanWarning') }}</span>
+                <span v-if="filterWarningType === 'ban'" class="active-dot"></span>
+              </div>
+              <div class="kpi-value text-muted">{{ countBanWarnings }} <span class="kpi-unit">/ {{ allLogs.length }}</span></div>
+              <div class="kpi-sub">{{ $t('auditTypeBanWarningDesc') }}</div>
+              <div class="kpi-progress-bar">
+                <div class="kpi-progress-fill ban-fill" :style="{ width: Math.min(100, Math.round((countBanWarnings / (allLogs.length || 1)) * 100)) + '%' }"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Card 4: 申诉警告 -->
+          <div
+            class="kpi-card category-card highlight-card"
+            :class="{ 'card-active': filterWarningType === 'appeal' }"
+            @click="selectWarningFilter('appeal')"
+          >
+            <div class="kpi-icon-wrap appeal-icon">
+              <Icon icon="fluent:document-person-20-filled" width="22" height="22" />
+            </div>
+            <div class="kpi-info">
+              <div class="kpi-label">
+                <span>{{ $t('auditTypeAppealWarning') }}</span>
+                <span v-if="countAppealWarnings > 0" class="pulse-beacon"></span>
+                <span v-if="filterWarningType === 'appeal'" class="active-dot"></span>
+              </div>
+              <div class="kpi-value text-amber">{{ countAppealWarnings }} <span class="kpi-unit">/ {{ allLogs.length }}</span></div>
+              <div class="kpi-sub text-amber">{{ $t('auditTypeAppealWarningDesc') }}</div>
+              <div class="kpi-progress-bar">
+                <div class="kpi-progress-fill appeal-fill" :style="{ width: Math.min(100, Math.round((countAppealWarnings / (allLogs.length || 1)) * 100)) + '%' }"></div>
               </div>
             </div>
           </div>
@@ -175,70 +187,21 @@
           <!-- TAB 1: 异常预警中心与时序流 (Operation Alerts & Stream) -->
           <div v-show="activeTab === 'stream'" class="tab-panel stream-panel">
             
-            <!-- 4 Warning Categories Focus Filter Bar -->
-            <div class="warning-category-filter-bar">
-              <div class="warning-filter-pills">
-                <div
-                  class="warning-filter-pill"
-                  :class="{ active: filterWarningType === 'all' }"
-                  @click="filterWarningType = 'all'"
-                >
-                  <Icon icon="fluent:apps-list-detail-20-regular" width="16" height="16" />
-                  <span>{{ $t('auditTypeAllAlerts') }}</span>
-                  <span class="pill-count">{{ countAllWarnings }}</span>
-                </div>
-
-                <div
-                  class="warning-filter-pill pill-audit"
-                  :class="{ active: filterWarningType === 'audit' }"
-                  @click="filterWarningType = 'audit'"
-                >
-                  <Icon icon="fluent:shield-question-20-filled" width="16" height="16" />
-                  <span>{{ $t('auditTypeAuditWarning') }}</span>
-                  <span class="pill-count">{{ countAuditWarnings }}</span>
-                </div>
-
-                <div
-                  class="warning-filter-pill pill-risk"
-                  :class="{ active: filterWarningType === 'risk' }"
-                  @click="filterWarningType = 'risk'"
-                >
-                  <Icon icon="fluent:alert-urgent-20-filled" width="16" height="16" />
-                  <span>{{ $t('auditTypeRiskWarning') }}</span>
-                  <span class="pill-count">{{ countRiskWarnings }}</span>
-                </div>
-
-                <div
-                  class="warning-filter-pill pill-ban"
-                  :class="{ active: filterWarningType === 'ban' }"
-                  @click="filterWarningType = 'ban'"
-                >
-                  <Icon icon="fluent:prohibited-20-filled" width="16" height="16" />
-                  <span>{{ $t('auditTypeBanWarning') }}</span>
-                  <span class="pill-count">{{ countBanWarnings }}</span>
-                </div>
-
-                <div
-                  class="warning-filter-pill pill-appeal"
-                  :class="{ active: filterWarningType === 'appeal' }"
-                  @click="filterWarningType = 'appeal'"
-                >
-                  <Icon icon="fluent:document-person-20-filled" width="16" height="16" />
-                  <span>{{ $t('auditTypeAppealWarning') }}</span>
-                  <span class="pill-count" :class="{ 'has-appeal': countAppealWarnings > 0 }">{{ countAppealWarnings }}</span>
-                </div>
-              </div>
-
-              <!-- Clear Distinction Note: Abnormal Users Only -->
-              <div class="abnormal-scope-note">
-                <Icon icon="fluent:info-16-regular" width="15" height="15" />
-                <span>{{ $t('auditOnlyAbnormalUsersNote') }}</span>
-              </div>
-            </div>
-
             <!-- Filter Toolbar -->
             <div class="stream-toolbar">
               <div class="toolbar-left">
+                <!-- Active warning filter pill tag if selected -->
+                <el-tag
+                  v-if="filterWarningType !== 'all'"
+                  closable
+                  size="default"
+                  :type="getWarningMeta(filterWarningType).tagType"
+                  @close="filterWarningType = 'all'"
+                  class="active-filter-tag"
+                >
+                  <Icon :icon="getWarningMeta(filterWarningType).icon" width="13" height="13" style="margin-right: 4px; vertical-align: -2px;" />
+                  <span>{{ getWarningMeta(filterWarningType).label }}</span>
+                </el-tag>
                 <el-input
                   v-model="searchKeyword"
                   size="default"
@@ -481,177 +444,120 @@
                 row-class-name="audit-table-row"
                 class="audit-data-table"
               >
-                <!-- Column 1: Target Account -->
-                <el-table-column :label="$t('userAccount')" width="190">
+                <!-- Column 1: 影响面与身分组 (De-identified Scope & Group) -->
+                <el-table-column :label="$t('auditGroupAndScope')" width="190">
                   <template #default="{ row }">
-                    <div class="table-user-cell">
-                      <div class="user-avatar-initial">{{ row.email.slice(0, 1).toUpperCase() }}</div>
-                      <div class="user-details">
-                        <div class="email-address">{{ row.email }}</div>
-                        <div class="account-sub-tags">
-                          <span class="role-tag">{{ row.userRole || 'User' }}</span>
-                          <el-tag size="small" :type="getWarningMeta(row.warningType).tagType" effect="dark" class="mini-warning-tag">
-                            {{ getWarningMeta(row.warningType).label }}
-                          </el-tag>
-                        </div>
-                      </div>
-                    </div>
-                  </template>
-                </el-table-column>
-
-                <!-- Column 2: 预警说明与触发特征 (Narrow & Informative) -->
-                <el-table-column :label="$t('auditAlertExplanation')" min-width="220">
-                  <template #default="{ row }">
-                    <div class="table-alert-cell">
-                      <div class="alert-feature-header">
-                        <span v-if="row.ticketId" class="alert-ticket-tag font-mono">{{ row.ticketId }}</span>
-                        <span class="action-headline-text">{{ row.actionText }}</span>
-                      </div>
-                      <div class="alert-desc-sub">{{ row.detailText }}</div>
-                    </div>
-                  </template>
-                </el-table-column>
-
-                <!-- Column 3: Active Pool & Environment (ZERO Timestamps) -->
-                <el-table-column :label="$t('auditActiveEnvPool')" width="190">
-                  <template #default="{ row }">
-                    <div class="table-env-cell">
-                      <div class="env-line">
-                        <Icon icon="lucide:network" width="13" height="13" />
-                        <span class="font-mono">{{ row.ip }}</span>
-                        <span class="geo-sub">({{ row.geo }})</span>
-                      </div>
-                      <div class="env-line muted">
-                        <Icon :icon="getDeviceIcon(row.deviceType)" width="13" height="13" />
-                        <span>{{ row.device }}</span>
-                      </div>
-                      <div v-if="row.isMultiIpConcurrent" class="concurrent-tag">
-                        {{ $t('auditMultiIpConcurrent') }} ({{ row.activeIpCount }} IPs)
-                      </div>
-                    </div>
-                  </template>
-                </el-table-column>
-
-                <!-- Column 4: Compliance & Storage Space -->
-                <el-table-column :label="$t('tabTotalStorageSpace')" width="170">
-                  <template #default="{ row }">
-                    <div class="compliance-storage-cell">
-                      <div class="storage-row">
-                        <span class="c-label">{{ $t('tabStorageSpace') }}:</span>
-                        <span class="c-val font-mono">{{ formatUserStorage(row) }}</span>
-                      </div>
-                      <div class="reports-row">
-                        <span class="c-label">{{ $t('tabReportedByOthersCount') }}:</span>
-                        <el-tag size="small" :type="row.reportedByOthersCount > 0 ? 'danger' : 'info'" effect="plain">
-                          {{ row.reportedByOthersCount || 0 }}
+                    <div class="table-scope-cell">
+                      <div class="scope-group-row">
+                        <span class="user-role-badge">{{ row.userRole || '普通用户 LV.1' }}</span>
+                        <el-tag size="small" :type="getWarningMeta(row.warningType).tagType" effect="dark" class="mini-warning-tag">
+                          {{ getWarningMeta(row.warningType).label }}
                         </el-tag>
-                        <span class="c-label" style="margin-left: 6px;">{{ $t('tabReportedOthersCount') }}:</span>
-                        <span class="c-val-sub">{{ row.reportedOthersCount || 0 }}</span>
+                      </div>
+                      <div class="scope-footprint-row">
+                        <span class="scope-label">{{ $t('tabStorageSpace') }}:</span>
+                        <span class="scope-val font-mono">{{ formatUserStorage(row) }}</span>
+                        <span class="scope-sep">|</span>
+                        <span class="scope-mailboxes font-mono">1 {{ $t('tabMailboxes') }}</span>
+                      </div>
+                      <div v-if="row.reportedByOthersCount > 0" class="scope-report-badge">
+                        <span>{{ $t('tabReportedByOthersCount') }}: {{ row.reportedByOthersCount }}</span>
                       </div>
                     </div>
                   </template>
                 </el-table-column>
 
-                <!-- Column 5: Operations & Actions (Distinguishing Operate vs Handle) -->
-                <el-table-column :label="$t('tabSetting')" width="230">
+                <!-- Column 2: 处理优先级 (Priority) -->
+                <el-table-column :label="$t('auditPriority')" width="105">
                   <template #default="{ row }">
-                    <div class="table-actions-cell">
-                      <!-- 前 3 类 (审计/风控/封禁): 对其进行操作 -->
-                      <template v-if="row.warningType !== 'appeal'">
-                        <div class="cell-action-category-label">
-                          <span class="action-kind-pill">{{ $t('auditOperateTarget') }}</span>
-                          <el-button
-                            size="small"
-                            type="primary"
-                            link
-                            class="cell-detail-link"
-                            @click="openAdjudicationDrawer(row)"
-                          >
-                            <span>{{ $t('auditViewDetails') }}</span>
-                            <Icon icon="fluent:arrow-up-right-16-regular" width="12" height="12" />
-                          </el-button>
-                        </div>
-                        <div class="cell-action-btns">
-                          <el-button
-                            v-if="row.warningType === 'ban'"
-                            size="small"
-                            type="success"
-                            plain
-                            @click="quickUnban(row)"
-                          >
-                            {{ $t('auditActionDismissAlert') }}
-                          </el-button>
-                          <el-button
-                            v-if="row.warningType === 'ban'"
-                            size="small"
-                            type="info"
-                            plain
-                            @click="handleWarningAction('maintain_ban', row)"
-                          >
-                            {{ $t('auditActionMaintainBan') }}
-                          </el-button>
-                          <el-button
-                            v-if="row.warningType !== 'ban'"
-                            size="small"
-                            type="warning"
-                            plain
-                            @click="handleWarningAction('issue_warning', row)"
-                          >
-                            {{ $t('auditActionIssueWarning') }}
-                          </el-button>
-                          <el-button
-                            v-if="row.warningType !== 'ban'"
-                            size="small"
-                            type="danger"
-                            plain
-                            @click="handleWarningAction('ban_account', row)"
-                          >
-                            {{ $t('auditActionBanAccount') }}
-                          </el-button>
-                          <el-button
-                            size="small"
-                            type="info"
-                            plain
-                            @click="handleWarningAction('purge_session', row)"
-                          >
-                            {{ $t('auditActionPurgeSession') }}
-                          </el-button>
-                        </div>
-                      </template>
+                    <div class="table-priority-cell">
+                      <el-tag
+                        size="default"
+                        :type="getPriorityTagType(row.priority)"
+                        effect="dark"
+                        class="priority-tag"
+                      >
+                        {{ getPriorityLabel(row.priority) }}
+                      </el-tag>
+                    </div>
+                  </template>
+                </el-table-column>
 
-                      <!-- 第 4 类 (申诉警告): 对于处理 -->
-                      <template v-else>
-                        <div class="cell-action-category-label text-primary">
-                          <span class="action-kind-pill appeal-kind">{{ $t('auditHandleAdjudication') }}</span>
-                          <el-button
-                            size="small"
-                            type="primary"
-                            link
-                            class="cell-detail-link"
-                            @click="openAdjudicationDrawer(row)"
-                          >
-                            <span>{{ $t('auditViewDetails') }}</span>
-                            <Icon icon="fluent:arrow-up-right-16-regular" width="12" height="12" />
+                <!-- Column 3: 风险等级与死规则判定 (Risk Level & Heuristic Rules) -->
+                <el-table-column :label="$t('auditRuleEvaluation')" min-width="250">
+                  <template #default="{ row }">
+                    <div class="table-rule-cell">
+                      <div class="rule-header-row">
+                        <span class="rule-level-tag" :class="'level-' + (row.ruleLevel || 'Level 1').toLowerCase().replace(' ', '')">
+                          {{ row.ruleLevel || 'Level 1' }}
+                        </span>
+                        <span class="rule-code-badge font-mono">{{ row.ruleCode || 'RULE_SPAM_BOUNCE' }}</span>
+                        <span class="preliminary-hint">({{ $t('auditMachinePreliminary') }})</span>
+                      </div>
+                      <div class="rule-desc-text">
+                        {{ row.ruleDesc || row.detailText }}
+                      </div>
+                    </div>
+                  </template>
+                </el-table-column>
+
+                <!-- Column 4: 推荐处置方案 (Recommended Action) -->
+                <el-table-column :label="$t('auditRecommendedAction')" width="170">
+                  <template #default="{ row }">
+                    <div class="table-recommend-cell">
+                      <div class="recommend-pill" :class="'action-' + row.recommendedAction">
+                        <Icon icon="fluent:bot-sparkle-20-filled" width="14" height="14" class="rec-icon" />
+                        <span>{{ getRecommendedActionText(row.recommendedAction) }}</span>
+                      </div>
+                    </div>
+                  </template>
+                </el-table-column>
+
+                <!-- Column 5: 人工裁决操作 (Human Adjudication Actions) -->
+                <el-table-column :label="$t('auditHumanAdjudication')" width="220" fixed="right">
+                  <template #default="{ row }">
+                    <div class="table-adjudication-cell">
+                      <div class="adjudication-btns-row">
+                        <el-button
+                          size="small"
+                          type="primary"
+                          class="adopt-btn"
+                          @click="adoptRecommendation(row)"
+                        >
+                          {{ $t('auditAdoptRecommendation') }}
+                        </el-button>
+
+                        <el-dropdown trigger="click" @command="(cmd) => handleAdjustAction(cmd, row)">
+                          <el-button size="small" type="default" plain class="adjust-dropdown-btn">
+                            <span>{{ $t('auditAdjustAction') }}</span>
+                            <Icon icon="fluent:chevron-down-12-regular" width="12" height="12" style="margin-left: 2px;" />
                           </el-button>
-                        </div>
-                        <div class="cell-action-btns">
-                          <el-button
-                            size="small"
-                            type="primary"
-                            @click="openAdjudicationDrawer(row)"
-                          >
-                            {{ $t('auditActionAdjudicateRelease') }}
-                          </el-button>
-                          <el-button
-                            size="small"
-                            type="danger"
-                            plain
-                            @click="quickReject(row)"
-                          >
-                            {{ $t('auditActionRejectAppeal') }}
-                          </el-button>
-                        </div>
-                      </template>
+                          <template #dropdown>
+                            <el-dropdown-menu class="adjust-action-menu">
+                              <el-dropdown-item command="temp_ban_24h">{{ $t('auditActionTempBan24h') }}</el-dropdown-item>
+                              <el-dropdown-item command="temp_ban_7d">{{ $t('auditActionTempBan7d') }}</el-dropdown-item>
+                              <el-dropdown-item command="permanent_ban" divided class="danger-item">{{ $t('auditActionPermanentBan') }}</el-dropdown-item>
+                              <el-dropdown-item command="blacklist_ip" class="danger-item">{{ $t('auditActionBlacklistIp') }}</el-dropdown-item>
+                              <el-dropdown-item command="probation_pass" divided>{{ $t('auditActionProbationPass') }}</el-dropdown-item>
+                              <el-dropdown-item command="reset_creds">{{ $t('auditActionResetCredsOnly') }}</el-dropdown-item>
+                              <el-dropdown-item v-if="row.warningType === 'appeal'" command="reject_appeal" divided class="danger-item">{{ $t('auditActionRejectAppeal') }}</el-dropdown-item>
+                            </el-dropdown-menu>
+                          </template>
+                        </el-dropdown>
+                      </div>
+
+                      <div class="adjudication-sub-link">
+                        <el-button
+                          size="small"
+                          type="primary"
+                          link
+                          class="drawer-link-btn"
+                          @click="openAdjudicationDrawer(row)"
+                        >
+                          <span>{{ $t('auditExtendedDrawer') }}</span>
+                          <Icon icon="fluent:arrow-up-right-16-regular" width="12" height="12" />
+                        </el-button>
+                      </div>
                     </div>
                   </template>
                 </el-table-column>
@@ -1092,6 +998,62 @@
                 </div>
               </div>
 
+              <!-- Card 5: 风险分级与处置准则规范 (Risk Classification Heuristics & Bot Specs) -->
+              <div class="settings-card risk-spec-card">
+                <div class="card-title">
+                  <Icon icon="fluent:book-compass-20-regular" width="18" height="18" />
+                  <span>{{ $t('auditSpecTitle') }}</span>
+                </div>
+                <div class="card-content">
+                  <p class="arch-desc">{{ $t('auditSpecDesc') }}</p>
+
+                  <div class="spec-levels-list">
+                    <!-- Level 0 -->
+                    <div class="spec-level-box level-0-box">
+                      <div class="spec-header">
+                        <span class="level-badge level-0-badge">Level 0</span>
+                        <strong class="spec-heading">{{ $t('auditLevel0Title') }}</strong>
+                        <el-tag size="small" type="success" effect="plain" class="auto-badge">
+                          <Icon icon="fluent:bot-sparkle-16-regular" width="13" height="13" style="margin-right: 3px;" />
+                          48h 机器全自动放行 (免人工)
+                        </el-tag>
+                      </div>
+                      <p class="spec-body">{{ $t('auditLevel0Desc') }}</p>
+                    </div>
+
+                    <!-- Level 1 -->
+                    <div class="spec-level-box level-1-box">
+                      <div class="spec-header">
+                        <span class="level-badge level-1-badge">Level 1</span>
+                        <strong class="spec-heading">{{ $t('auditLevel1Title') }}</strong>
+                        <span class="spec-rec-badge">{{ $t('auditRecommendedAction') }}: {{ $t('auditActionTempBan24h') }}</span>
+                      </div>
+                      <p class="spec-body">{{ $t('auditLevel1Desc') }}</p>
+                    </div>
+
+                    <!-- Level 2 -->
+                    <div class="spec-level-box level-2-box">
+                      <div class="spec-header">
+                        <span class="level-badge level-2-badge">Level 2</span>
+                        <strong class="spec-heading">{{ $t('auditLevel2Title') }}</strong>
+                        <span class="spec-rec-badge">{{ $t('auditRecommendedAction') }}: {{ $t('auditActionTempBan7d') }}</span>
+                      </div>
+                      <p class="spec-body">{{ $t('auditLevel2Desc') }}</p>
+                    </div>
+
+                    <!-- Level 3 -->
+                    <div class="spec-level-box level-3-box">
+                      <div class="spec-header">
+                        <span class="level-badge level-3-badge">Level 3</span>
+                        <strong class="spec-heading">{{ $t('auditLevel3Title') }}</strong>
+                        <span class="spec-rec-badge danger">{{ $t('auditRecommendedAction') }}: {{ $t('auditActionPermanentBan') }} / {{ $t('auditActionBlacklistIp') }}</span>
+                      </div>
+                      <p class="spec-body">{{ $t('auditLevel3Desc') }}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
             </div>
           </div>
         </div>
@@ -1343,7 +1305,7 @@ const firstLoading = ref(true);
 const activeTab = ref('stream'); // 'stream' | 'risk' | 'policy'
 
 // Security Mode: 1: All Mail Mode (全部模式), 0: Privacy Mode (隐私模式), 2: Encrypted Mode (加密模式)
-const activeMode = ref(Number(settingStore.settings?.allMailMode ?? 1));
+const activeMode = computed(() => Number(settingStore.settings?.allMailMode ?? 1));
 
 // Filter States
 const filterWarningType = ref('all'); // 'all' | 'audit' | 'risk' | 'ban' | 'appeal'
@@ -1492,7 +1454,12 @@ const allLogs = ref([
     timestamp: '2026-10-03 01:10:45',
     securityMode: 1,
     riskLevel: 'high',
-    status: 'monitored'
+    status: 'monitored',
+    priority: 'P1',
+    ruleLevel: 'Level 2',
+    ruleCode: 'RULE_MULTI_IP_JUMP',
+    ruleDesc: '检测到 4-IP 并发跨国跳跃 (Seoul + Tokyo + Frankfurt)',
+    recommendedAction: 'temp_ban_24h'
   },
   {
     id: 102,
@@ -1518,7 +1485,12 @@ const allLogs = ref([
     timestamp: '2026-10-02 23:45:10',
     securityMode: 1,
     riskLevel: 'high',
-    status: 'monitored'
+    status: 'monitored',
+    priority: 'P2',
+    ruleLevel: 'Level 1',
+    ruleCode: 'RULE_SPAM_BOUNCE',
+    ruleDesc: '短时间内群发未授权营销推广，退信率偏高且被检举',
+    recommendedAction: 'temp_ban_24h'
   },
   {
     id: 103,
@@ -1544,7 +1516,12 @@ const allLogs = ref([
     timestamp: '2026-10-02 18:30:00',
     securityMode: 2,
     riskLevel: 'high',
-    status: 'banned'
+    status: 'banned',
+    priority: 'P0',
+    ruleLevel: 'Level 3',
+    ruleCode: 'RULE_AUTH_BRUTE_FORCE',
+    ruleDesc: '单日异地高频撞库暴力破解，触碰系统安全红线',
+    recommendedAction: 'permanent_ban'
   },
   {
     id: 104,
@@ -1571,7 +1548,12 @@ const allLogs = ref([
     securityMode: 2,
     riskLevel: 'medium',
     status: 'pending',
-    appealId: 201
+    appealId: 201,
+    priority: 'P2',
+    ruleLevel: 'Level 2',
+    ruleCode: 'RULE_MULTI_IP_JUMP',
+    ruleDesc: '酒店公共 WiFi 并发跳跃，设备指纹吻合 98%',
+    recommendedAction: 'probation_pass'
   },
   {
     id: 105,
@@ -1598,7 +1580,12 @@ const allLogs = ref([
     securityMode: 1,
     riskLevel: 'medium',
     status: 'pending',
-    appealId: 202
+    appealId: 202,
+    priority: 'P3',
+    ruleLevel: 'Level 1',
+    ruleCode: 'RULE_HIGH_FREQ_BOT',
+    ruleDesc: '忘失第二重凭据，已在 epomail-docs 提交环境核验',
+    recommendedAction: 'reset_creds'
   },
   {
     id: 106,
@@ -1624,7 +1611,12 @@ const allLogs = ref([
     timestamp: '2026-10-02 14:02:11',
     securityMode: 0,
     riskLevel: 'medium',
-    status: 'monitored'
+    status: 'monitored',
+    priority: 'P2',
+    ruleLevel: 'Level 1',
+    ruleCode: 'RULE_SPAM_BOUNCE',
+    ruleDesc: '发送带有未备案短链邮件，被收件人标记检举',
+    recommendedAction: 'temp_ban_24h'
   },
   {
     id: 107,
@@ -1650,7 +1642,12 @@ const allLogs = ref([
     timestamp: '2026-10-02 11:15:40',
     securityMode: 2,
     riskLevel: 'high',
-    status: 'banned'
+    status: 'banned',
+    priority: 'P0',
+    ruleLevel: 'Level 3',
+    ruleCode: 'RULE_MALICIOUS_ATTACHMENT',
+    ruleDesc: '异构设备大量投递未知附件，系统判定失陷防爆',
+    recommendedAction: 'permanent_ban'
   }
 ]);
 
@@ -1936,6 +1933,90 @@ function refreshData() {
     firstLoading.value = false;
     ElMessage.success(t('syncSuccess'));
   }, 400);
+}
+
+// Toggle Warning Filter from KPI Cards
+function selectWarningFilter(type) {
+  if (filterWarningType.value === type) {
+    filterWarningType.value = 'all';
+  } else {
+    filterWarningType.value = type;
+    activeTab.value = 'stream';
+  }
+}
+
+// Mode 2 Table Priority Tag Type
+function getPriorityTagType(priority) {
+  switch (priority) {
+    case 'P0': return 'danger';
+    case 'P1': return 'warning';
+    case 'P2': return 'info';
+    case 'P3': return 'primary';
+    default: return 'info';
+  }
+}
+
+// Mode 2 Table Priority Label
+function getPriorityLabel(priority) {
+  switch (priority) {
+    case 'P0': return t('auditPriorityP0');
+    case 'P1': return t('auditPriorityP1');
+    case 'P2': return t('auditPriorityP2');
+    case 'P3': return t('auditPriorityP3');
+    default: return priority || 'P3';
+  }
+}
+
+// Mode 2 Table Recommended Action Text
+function getRecommendedActionText(action) {
+  switch (action) {
+    case 'temp_ban_24h': return t('auditActionTempBan24h');
+    case 'temp_ban_7d': return t('auditActionTempBan7d');
+    case 'permanent_ban': return t('auditActionPermanentBan');
+    case 'blacklist_ip': return t('auditActionBlacklistIp');
+    case 'probation_pass': return t('auditActionProbationPass');
+    case 'reset_creds': return t('auditActionResetCredsOnly');
+    case 'auto_pass_48h': return t('auditActionAutoPass48h');
+    default: return action;
+  }
+}
+
+// Mode 2: Adopt Machine Recommendation with 1 Click
+function adoptRecommendation(row) {
+  const actionText = getRecommendedActionText(row.recommendedAction);
+  ElMessageBox.confirm(
+    `${t('auditAdoptRecommendation')}: [${actionText}]？`,
+    t('confirm'),
+    {
+      confirmButtonText: t('confirm'),
+      cancelButtonText: t('cancel'),
+      type: 'warning'
+    }
+  ).then(() => {
+    if (['permanent_ban', 'temp_ban_24h', 'temp_ban_7d'].includes(row.recommendedAction)) {
+      row.status = 'banned';
+      row.warningType = 'ban';
+    } else if (['probation_pass', 'auto_pass_48h'].includes(row.recommendedAction)) {
+      row.status = 'approved';
+      row.hasAppeal = false;
+    }
+    ElMessage.success(`${t('auditAdoptRecommendation')}: ${actionText}`);
+  }).catch(() => {});
+}
+
+// Mode 2: Adjust Action via Dropdown
+function handleAdjustAction(cmd, row) {
+  const actionText = getRecommendedActionText(cmd);
+  if (['permanent_ban', 'temp_ban_24h', 'temp_ban_7d', 'blacklist_ip'].includes(cmd)) {
+    row.status = 'banned';
+    row.warningType = 'ban';
+  } else if (['probation_pass'].includes(cmd)) {
+    row.status = 'probation';
+  } else if (cmd === 'reject_appeal') {
+    row.status = 'banned';
+    row.hasAppeal = false;
+  }
+  ElMessage.success(`${t('auditAdjustAction')}: ${actionText}`);
 }
 
 // Open Adjudication Drawer (Expanded View)
@@ -2378,7 +2459,7 @@ onMounted(() => {
   align-items: center;
   gap: 14px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 
   &:hover {
     border-color: var(--el-color-primary);
@@ -2387,6 +2468,29 @@ onMounted(() => {
 
   &.highlight-card {
     border-color: var(--el-color-warning);
+  }
+
+  &.category-card {
+    position: relative;
+
+    &.card-active {
+      border-color: var(--el-color-primary) !important;
+      background: var(--el-color-primary-light-9) !important;
+      box-shadow: 0 0 0 1px var(--el-color-primary), 0 3px 12px rgba(64, 158, 255, 0.12);
+
+      .kpi-label {
+        color: var(--el-color-primary) !important;
+        font-weight: 600;
+      }
+    }
+
+    .active-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--el-color-primary);
+      display: inline-block;
+    }
   }
 }
 
@@ -2406,6 +2510,10 @@ onMounted(() => {
   &.risk-icon {
     background: var(--el-color-danger-light-9);
     color: var(--el-color-danger);
+  }
+  &.ban-icon {
+    background: var(--el-fill-color);
+    color: var(--el-text-color-secondary);
   }
   &.appeal-icon {
     background: var(--el-color-warning-light-9);
@@ -2485,6 +2593,7 @@ onMounted(() => {
 
   &.ops-fill { background: var(--el-color-primary); }
   &.risk-fill { background: var(--el-color-danger); }
+  &.ban-fill { background: var(--el-text-color-placeholder); }
   &.appeal-fill { background: var(--el-color-warning); }
 }
 
@@ -2576,101 +2685,11 @@ onMounted(() => {
   font-weight: 700;
 }
 
-/* 4 Warning Categories Focus Filter Bar */
-.warning-category-filter-bar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin-bottom: 14px;
-  padding: 10px 14px;
-  background: var(--el-bg-color);
-  border: 1px solid var(--el-border-color);
-  border-radius: 8px;
-}
-
-.warning-filter-pills {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.warning-filter-pill {
+.active-filter-tag {
+  font-weight: 600;
+  border-radius: 4px;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  border-radius: 6px;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  border: 1px solid var(--el-border-color-lighter);
-  background: var(--el-fill-color-blank);
-  color: var(--el-text-color-regular);
-  transition: all 0.15s ease;
-
-  &:hover {
-    border-color: var(--el-color-primary);
-    color: var(--el-color-primary);
-  }
-
-  &.active {
-    background: var(--el-color-primary);
-    border-color: var(--el-color-primary);
-    color: #fff;
-
-    .pill-count {
-      background: rgba(255, 255, 255, 0.25);
-      color: #fff;
-    }
-  }
-
-  &.pill-audit.active {
-    background: #e6a23c;
-    border-color: #e6a23c;
-  }
-
-  &.pill-risk.active {
-    background: #f56c6c;
-    border-color: #f56c6c;
-  }
-
-  &.pill-ban.active {
-    background: #909399;
-    border-color: #909399;
-  }
-
-  &.pill-appeal.active {
-    background: #409eff;
-    border-color: #409eff;
-  }
-
-  .pill-count {
-    padding: 1px 6px;
-    border-radius: 10px;
-    font-size: 11px;
-    background: var(--el-fill-color);
-    color: var(--el-text-color-secondary);
-    font-weight: 600;
-
-    &.has-appeal {
-      background: var(--el-color-danger);
-      color: #fff;
-    }
-  }
-}
-
-.abnormal-scope-note {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-  background: var(--el-fill-color-light);
-  padding: 5px 10px;
-  border-radius: 4px;
 }
 
 /* Stream Toolbar */
@@ -3742,8 +3761,289 @@ onMounted(() => {
   justify-content: flex-end;
   gap: 10px;
 }
-</style>
-`;
 
-fs.writeFileSync(targetFile, fileContent, 'utf8');
-console.log('✓ Successfully written full update to mail-vue/src/views/audit-report/index.vue');
+/* Mode 2 5-Column Pure DB Narrow Table Styling */
+.table-scope-cell {
+  .scope-group-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 3px;
+  }
+
+  .user-role-badge {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--el-text-color-primary);
+  }
+
+  .scope-footprint-row {
+    font-size: 11.5px;
+    color: var(--el-text-color-secondary);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .scope-label {
+    color: var(--el-text-color-placeholder);
+    font-size: 11px;
+  }
+
+  .scope-val {
+    font-weight: 600;
+    color: var(--el-text-color-regular);
+  }
+
+  .scope-sep {
+    color: var(--el-border-color);
+    margin: 0 2px;
+  }
+
+  .scope-mailboxes {
+    font-size: 11px;
+    color: var(--el-text-color-placeholder);
+  }
+
+  .scope-report-badge {
+    font-size: 10px;
+    color: var(--el-color-danger);
+    background: var(--el-color-danger-light-9);
+    padding: 1px 4px;
+    border-radius: 2px;
+    display: inline-block;
+    margin-top: 3px;
+  }
+}
+
+.table-priority-cell {
+  .priority-tag {
+    font-weight: 700;
+    font-size: 11px;
+    border-radius: 4px;
+    letter-spacing: 0.3px;
+  }
+}
+
+.table-rule-cell {
+  .rule-header-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 3px;
+    flex-wrap: wrap;
+  }
+
+  .rule-level-tag {
+    font-size: 10.5px;
+    font-weight: 700;
+    padding: 1px 5px;
+    border-radius: 3px;
+
+    &.level-level1 {
+      background: var(--el-color-info-light-9);
+      color: var(--el-color-info-dark-2);
+      border: 1px solid var(--el-color-info-light-5);
+    }
+    &.level-level2 {
+      background: var(--el-color-warning-light-9);
+      color: var(--el-color-warning-dark-2);
+      border: 1px solid var(--el-color-warning-light-5);
+    }
+    &.level-level3 {
+      background: var(--el-color-danger-light-9);
+      color: var(--el-color-danger-dark-2);
+      border: 1px solid var(--el-color-danger-light-5);
+    }
+  }
+
+  .rule-code-badge {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--el-color-primary);
+    background: var(--el-color-primary-light-9);
+    padding: 1px 5px;
+    border-radius: 3px;
+  }
+
+  .preliminary-hint {
+    font-size: 10px;
+    color: var(--el-text-color-placeholder);
+  }
+
+  .rule-desc-text {
+    font-size: 12px;
+    color: var(--el-text-color-regular);
+    line-height: 1.4;
+  }
+}
+
+.table-recommend-cell {
+  .recommend-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11.5px;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 4px;
+    background: var(--el-fill-color-light);
+    border: 1px solid var(--el-border-color-lighter);
+    color: var(--el-text-color-primary);
+
+    .rec-icon {
+      color: var(--el-color-primary);
+      flex-shrink: 0;
+    }
+
+    &.action-permanent_ban {
+      background: var(--el-color-danger-light-9);
+      border-color: var(--el-color-danger-light-5);
+      color: var(--el-color-danger-dark-2);
+
+      .rec-icon { color: var(--el-color-danger); }
+    }
+
+    &.action-temp_ban_24h, &.action-temp_ban_7d {
+      background: var(--el-color-warning-light-9);
+      border-color: var(--el-color-warning-light-5);
+      color: var(--el-color-warning-dark-2);
+
+      .rec-icon { color: var(--el-color-warning); }
+    }
+
+    &.action-probation_pass, &.action-auto_pass_48h {
+      background: var(--el-color-success-light-9);
+      border-color: var(--el-color-success-light-5);
+      color: var(--el-color-success-dark-2);
+
+      .rec-icon { color: var(--el-color-success); }
+    }
+  }
+}
+
+.table-adjudication-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+
+  .adjudication-btns-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+
+    .adopt-btn {
+      font-weight: 600;
+      padding: 3px 8px;
+      height: 26px;
+      font-size: 11.5px;
+    }
+
+    .adjust-dropdown-btn {
+      padding: 3px 6px;
+      height: 26px;
+      font-size: 11px;
+    }
+  }
+
+  .adjudication-sub-link {
+    .drawer-link-btn {
+      padding: 0;
+      height: auto;
+      font-size: 11px;
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+    }
+  }
+}
+
+.adjust-action-menu {
+  .danger-item {
+    color: var(--el-color-danger) !important;
+  }
+}
+
+/* Tab 3 Risk Classification Heuristics & Bot Specs */
+.risk-spec-card {
+  grid-column: 1 / -1;
+
+  .spec-levels-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 14px;
+  }
+
+  .spec-level-box {
+    padding: 12px 14px;
+    border-radius: 6px;
+    border: 1px solid var(--el-border-color-lighter);
+    background: var(--el-fill-color-blank);
+
+    &.level-0-box {
+      border-left: 4px solid var(--el-color-success);
+    }
+    &.level-1-box {
+      border-left: 4px solid var(--el-color-info);
+    }
+    &.level-2-box {
+      border-left: 4px solid var(--el-color-warning);
+    }
+    &.level-3-box {
+      border-left: 4px solid var(--el-color-danger);
+    }
+  }
+
+  .spec-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 6px;
+    flex-wrap: wrap;
+  }
+
+  .level-badge {
+    font-size: 10.5px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: #fff;
+
+    &.level-0-badge { background: #67c23a; }
+    &.level-1-badge { background: #909399; }
+    &.level-2-badge { background: #e6a23c; }
+    &.level-3-badge { background: #f56c6c; }
+  }
+
+  .spec-heading {
+    font-size: 13.5px;
+    color: var(--el-text-color-primary);
+  }
+
+  .auto-badge {
+    font-weight: 600;
+    font-size: 11px;
+  }
+
+  .spec-rec-badge {
+    font-size: 11px;
+    color: var(--el-text-color-secondary);
+    background: var(--el-fill-color);
+    padding: 1px 6px;
+    border-radius: 4px;
+
+    &.danger {
+      color: var(--el-color-danger);
+      background: var(--el-color-danger-light-9);
+    }
+  }
+
+  .spec-body {
+    font-size: 12.5px;
+    color: var(--el-text-color-regular);
+    line-height: 1.5;
+    margin: 0;
+  }
+}
+</style>
