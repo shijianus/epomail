@@ -9,7 +9,7 @@
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
 ### 第三方快捷登录 3 大显式规则重塑（开启但空密钥=即将上线、开启且配齐=正常激活、未开启/关闭=彻底隐藏）与公网全量端到端交付 (2026-10-03)
-*   **关联提交 (Git Commit)**: `8cf1e2a6259ca76f9b38bad4626ce54183554e46` (Short: `8cf1e2a`)
+*   **关联提交 (Git Commit)**: `6e47ed05fde976d8bbd815101eabbb27069ff5f5` (Short: `6e47ed0`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com)` (Version ID: `ad76dd6d-fbbf-4add-b1ef-83d48b3a8b91`)
 *   **功能需求与变更清单 (Changes & Feature Alignment)**:
     - [x] 变更点 1 (重命名主开关与六语言字典统一):
