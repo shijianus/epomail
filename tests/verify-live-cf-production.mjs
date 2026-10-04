@@ -23,7 +23,7 @@ async function runLiveCFVerification() {
     // PART 1: Webmail Login Page & Forgot Password Modal
     // -------------------------------------------------------------
     console.log('📌 PART 1: Testing Webmail Login UI & Forgot Password Guidance Modal');
-    await page.goto('https://mail.epocanvas.com/login/', { waitUntil: 'networkidle', timeout: 30000 });
+    await page.goto('https://mail.epocanvas.com/login/', { waitUntil: 'domcontentloaded', timeout: 30000 });
     await page.waitForTimeout(2000);
 
     const emailInput = page.locator('input[type="email"], input#email, input[name="email"], input[placeholder*="@"], input[placeholder*="坐标"]').first();
@@ -71,7 +71,7 @@ async function runLiveCFVerification() {
     // -------------------------------------------------------------
     console.log('\n📌 PART 2: Testing epomail-docs External Appeal Portal (Unified Short Link -> Unique Hash URL)');
     const shortLink = 'https://epomail-docs.pages.dev/epomail/appeal/?type=password&email=pilot-recovery%40epocanvas.com';
-    await page.goto(shortLink, { waitUntil: 'networkidle', timeout: 30000 });
+    await page.goto(shortLink, { waitUntil: 'domcontentloaded', timeout: 30000 });
     await page.waitForTimeout(2000);
 
     const expandedUrl = page.url();
@@ -171,8 +171,8 @@ async function runLiveCFVerification() {
     // PART 4: User Management Console Multi-mode Column Adaptation
     // -------------------------------------------------------------
     console.log('\n📌 PART 4: Testing User Management Console (/user) Multi-mode Column Adaptation');
-    await page.goto('https://mail.epocanvas.com/mail/u/0/#manage/master/user', { waitUntil: 'networkidle', timeout: 30000 });
-    await page.waitForTimeout(2000);
+    await page.goto('https://mail.epocanvas.com/mail/u/0/#manage/master/user', { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await page.waitForTimeout(2500);
 
     const userTable = page.locator('.el-table, .user-table').first();
     await userTable.waitFor({ state: 'visible', timeout: 10000 });
@@ -185,8 +185,8 @@ async function runLiveCFVerification() {
       stored.settings = { ...(stored.settings || {}), allMailMode: 1 };
       localStorage.setItem('setting', JSON.stringify(stored));
     });
-    await page.reload({ waitUntil: 'networkidle' });
-    await page.waitForTimeout(1500);
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(2000);
 
     const tableHeaderMode1 = await page.locator('.el-table__header').textContent();
     console.log(`  ✓ Mode 1 Headers: ${tableHeaderMode1.replace(/\s+/g, ' ').trim()}`);
@@ -201,8 +201,8 @@ async function runLiveCFVerification() {
       stored.settings = { ...(stored.settings || {}), allMailMode: 0 };
       localStorage.setItem('setting', JSON.stringify(stored));
     });
-    await page.reload({ waitUntil: 'networkidle' });
-    await page.waitForTimeout(1500);
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(2000);
 
     const tableHeaderMode0 = await page.locator('.el-table__header').textContent();
     console.log(`  ✓ Mode 0 Headers: ${tableHeaderMode0.replace(/\s+/g, ' ').trim()}`);
@@ -217,8 +217,8 @@ async function runLiveCFVerification() {
       stored.settings = { ...(stored.settings || {}), allMailMode: 2 };
       localStorage.setItem('setting', JSON.stringify(stored));
     });
-    await page.reload({ waitUntil: 'networkidle' });
-    await page.waitForTimeout(1500);
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(2000);
 
     const tableHeaderMode2 = await page.locator('.el-table__header').textContent();
     console.log(`  ✓ Mode 2 Headers: ${tableHeaderMode2.replace(/\s+/g, ' ').trim()}`);
@@ -230,13 +230,13 @@ async function runLiveCFVerification() {
     // PART 5: Operation & Audit Report Console (/audit)
     // -------------------------------------------------------------
     console.log('\n📌 PART 5: Testing Operation & Audit Report Console (/audit)');
-    // Click "操作报告" in the left sidebar menu directly
+    // Click "操作报告" in sidebar menu
     const auditMenuItem = page.locator('.side-menu a:has-text("操作报告"), a:has-text("Audit Report"), a[href*="audit"]').first();
     if (await auditMenuItem.count() > 0) {
       await auditMenuItem.click();
       console.log('  ✓ Clicked "操作报告" in sidebar menu');
     } else {
-      await page.goto('https://mail.epocanvas.com/mail/u/0/#manage/master/audit', { waitUntil: 'networkidle', timeout: 30000 });
+      await page.goto('https://mail.epocanvas.com/mail/u/0/#manage/master/audit', { waitUntil: 'domcontentloaded', timeout: 30000 });
     }
     await page.waitForTimeout(2500);
 
