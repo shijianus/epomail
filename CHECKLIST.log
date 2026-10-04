@@ -8,6 +8,30 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### 系统设置 (sys-setting) OAuth 管理界面精益化去冗余与 UI/UX 规范 Skill 建立 (2026-10-03)
+*   **关联提交 (Git Commit)**: `PENDING_COMMIT_HASH`
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com)` (Version ID: `c32809ac-599a-4997-ac62-3356e491195f`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 变更点 1 (彻底剔除系统设置列表行中的冗余状态徽标与开关):
+        - 移除 `oauth-status-tag` (`el-tag` 状态徽标)，杜绝在设置列表行内重复展示启用/禁用/即将上线状态；
+        - 移除列表行内的 `el-switch` (`el-switch__core`)，统一将启闭状态收敛至各提供商专属配置弹窗内，保持系统设置工作台极简低认知负荷；
+    - [x] 变更点 2 (行内操作按钮纯图标化与统一右对齐):
+        - 移除 `opt-button` 内冗余的「接入配置」中文文本，转为标准纯图标按钮 (`fluent:settings-48-regular`)；
+        - 包裹 `el-tooltip` (`$t('oauthConfigure')`) 提供优雅悬停说明；
+        - 将操作按钮容器统一置于 `<div class="forward">`，确保全卡片全局 100% 靠右对齐；
+    - [x] 变更点 3 (配置弹窗头部去冗余与单一事实来源):
+        - 移除弹窗头部右侧的 `oauth-dialog-header-right` (`el-tag` 启闭徽标)，避免与弹窗主体内已有的 `el-switch` 启闭开关横幅重复强调同一功能；
+    - [x] 变更点 4 (建立 Admin & Settings UI/UX 标准 Skill):
+        - 录入 `.agent/skills/admin-ui-standards/SKILL.md` 与 `doc/skills/admin-ui-standards.md`，固化“禁止过度展示、行内纯图标右对齐、弹窗单一事实来源”三项产品级设计铁律。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 主应用构建核验：`mail-vue` Vite 构建通过 (15.46s, 0 errors)；
+    - [x] 多语言对称核验：`i18n-symmetry.mjs` (2,290 键 100% 绝对对称)；
+    - [x] 静态与结构断言测试：`tests/test-sys-setting-oauth-ui-refactor.mjs` (5/5 项断言 100% 通过)；
+    - [x] 几何与视觉端到端测试：`tests/test-oauth-sso-buttons-verification.mjs` (35/35 项断言 100% 通过)；
+    - [x] 公网生产部署核验：Cloudflare Worker 部署通过 (`c32809ac-599a-4997-ac62-3356e491195f`)；
+    - [x] 公网生产全真回归测试：`tests/test-prod-oauth-3rules-live-e2e.mjs` (11/11 项断言 100% 通过)；
+    - [x] 零假数据残留：测试数据物理归零。
+
 ### 第三方快捷登录按钮统一居中排布与移除右侧箭头指示交互优化 (2026-10-03)
 *   **关联提交 (Git Commit)**: `2940792fb9425c58bd07bbb67ef6fec68359c1d5` (Short: `2940792`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com)` (Version ID: `224b5b9f-7c63-4bab-896e-35e21fb767d6`)

@@ -279,7 +279,7 @@
                 </div>
               </div>
 
-              <!-- Providers Integration Items: 1 名称 + 状态 Tag + 独立 Switch (如果已配置) + 1 Button (配置) -->
+              <!-- Providers Integration Items: 纯净单行 (图标 + 提供商名称 + 右对齐纯图标配置按钮) -->
               <div 
                 v-for="provider in OAUTH_PROVIDERS_LIST" 
                 :key="provider.key" 
@@ -288,61 +288,18 @@
                 <div class="title-item">
                   <Icon :icon="provider.icon" width="17" height="17" class="provider-icon" />
                   <span>{{ provider.key === 'custom' ? getCustomOauthTitle() : provider.label }}</span>
-                  <el-tag 
-                    v-if="isOauthProviderEnabled(provider.key) && isOauthProviderConfigured(provider.key)" 
-                    size="small" 
-                    type="success" 
-                    effect="light" 
-                    class="oauth-status-tag"
-                  >
-                    {{ $t('enabled') }}
-                  </el-tag>
-                  <el-tag 
-                    v-else-if="isOauthProviderEnabled(provider.key) && !isOauthProviderConfigured(provider.key)" 
-                    size="small" 
-                    type="warning" 
-                    effect="plain" 
-                    class="oauth-status-tag"
-                  >
-                    {{ $t('oauthSoon') }}
-                  </el-tag>
-                  <el-tag 
-                    v-else-if="!isOauthProviderEnabled(provider.key) && isOauthProviderConfigured(provider.key)" 
-                    size="small" 
-                    type="info" 
-                    effect="plain" 
-                    class="oauth-status-tag"
-                  >
-                    {{ $t('disabled') }}
-                  </el-tag>
-                  <el-tag 
-                    v-else 
-                    size="small" 
-                    type="info" 
-                    effect="plain" 
-                    class="oauth-status-tag"
-                  >
-                    {{ $t('disabled') }}
-                  </el-tag>
                 </div>
-                <div class="oauth-row-actions" style="display: flex; align-items: center; gap: 10px;">
-                  <el-switch 
-                    :model-value="isOauthProviderEnabled(provider.key)"
-                    @change="(val) => toggleOauthProviderQuick(provider.key, val)"
-                    inline-prompt
-                    :active-text="$t('enabled')"
-                    :inactive-text="$t('disabled')"
-                    size="small"
-                  />
-                  <el-button 
-                    class="opt-button" 
-                    size="small" 
-                    type="primary" 
-                    @click="openOauthProviderModal(provider.key)"
-                  >
-                    <Icon icon="fluent:settings-20-regular" width="14" height="14" style="margin-right: 4px;" />
-                    <span>{{ $t('oauthConfigure') }}</span>
-                  </el-button>
+                <div class="forward">
+                  <el-tooltip effect="dark" :content="$t('oauthConfigure')">
+                    <el-button 
+                      class="opt-button" 
+                      size="small" 
+                      type="primary" 
+                      @click="openOauthProviderModal(provider.key)"
+                    >
+                      <Icon icon="fluent:settings-48-regular" width="18" height="18" />
+                    </el-button>
+                  </el-tooltip>
                 </div>
               </div>
             </div>
@@ -3494,11 +3451,6 @@
                 {{ activeOauthProviderMeta.name }} {{ $t('oauthModalTitle') }}
               </span>
             </div>
-            <div class="oauth-dialog-header-right">
-              <el-tag size="small" :type="oauthForm.enabled ? 'success' : 'info'" effect="plain">
-                {{ oauthForm.enabled ? $t('enabled') : $t('disabled') }}
-              </el-tag>
-            </div>
           </div>
         </template>
         <div class="oauth-dialog-body">
@@ -6555,15 +6507,6 @@ function editSetting(settingForm, refreshStatus = true, closeAiDialog = false) {
       .provider-icon {
         flex-shrink: 0;
       }
-
-      .oauth-status-tag {
-        font-size: 11px;
-        padding: 0 6px;
-        height: 20px;
-        line-height: 18px;
-        border-radius: 4px;
-        margin-left: 2px;
-      }
     }
   }
 }
@@ -6572,9 +6515,7 @@ function editSetting(settingForm, refreshStatus = true, closeAiDialog = false) {
   .oauth-dialog-header {
     display: flex;
     align-items: center;
-    justify-content: space-between;
     width: 100%;
-    padding-right: 28px;
 
     .oauth-dialog-header-left {
       display: flex;
@@ -6590,10 +6531,6 @@ function editSetting(settingForm, refreshStatus = true, closeAiDialog = false) {
         font-weight: 600;
         color: var(--el-text-color-primary);
       }
-    }
-
-    .oauth-dialog-header-right {
-      flex-shrink: 0;
     }
   }
 
