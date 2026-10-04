@@ -9,7 +9,7 @@
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
 ### 系统设置 (sys-setting) OAuth 管理界面精益化去冗余与 UI/UX 规范 Skill 建立 (2026-10-03)
-*   **关联提交 (Git Commit)**: `PENDING_COMMIT_HASH`
+*   **关联提交 (Git Commit)**: `cb9b40e2b69a1d5e91210c4d41ba6eaf7f5f7b96` (Short: `cb9b40e`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com)` (Version ID: `c32809ac-599a-4997-ac62-3356e491195f`)
 *   **功能需求与变更清单 (Changes & Feature Alignment)**:
     - [x] 变更点 1 (彻底剔除系统设置列表行中的冗余状态徽标与开关):
