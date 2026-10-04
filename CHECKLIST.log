@@ -8,6 +8,34 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### 第三方快捷登录 3 大显式规则重塑（开启但空密钥=即将上线、开启且配齐=正常激活、未开启/关闭=彻底隐藏）与公网全量端到端交付 (2026-10-03)
+*   **关联提交 (Git Commit)**: `8cf1e2a6259ca76f9b38bad4626ce54183554e46` (Short: `8cf1e2a`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com)` (Version ID: `ad76dd6d-fbbf-4add-b1ef-83d48b3a8b91`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 变更点 1 (重命名主开关与六语言字典统一):
+        - 将管理后台与系统各处主开关「启用第三方快捷登录」统一定名重命名为「第三方快捷登录」(`oauthLoginSwitch`)；
+        - 在 `zh`、`zh-Hant`、`en`、`es`、`fr`、`nl` 六语言字典中保持 100% 绝对对称 (`node scripts/i18n-symmetry.mjs` 2,290 键对称验证)；
+    - [x] 变更点 2 (严格落地第三方登录入口 3 大精准显式规则):
+        - **规则 1 ("即将上线" 状态)**: 「第三方快捷登录」开启 且 该第三方登录的「启用此提供商」开启，但 `Client ID` 或 `Client Secret` 为空 -> 在登录卡片中呈现灰色禁用按钮 (`cursor-not-allowed`、`grayscale`、`opacity: 0.40`、`disabled` 属性并带有 `Soon / 即将上线` 徽标)，点击拦截并提示尚未配置；
+        - **规则 2 (正常激活状态)**: 「第三方快捷登录」开启 且 该第三方登录的「启用此提供商」开启，并且 `Client ID` 和 `Client Secret` 均为合法有效内容 -> 呈现标准活跃 `class="epomail-display flex h-11 items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-3 rounded-xl border text-[12px] sm:text-[13px] transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#67e8f9]"` 按钮，高保真矢量 SVG 品牌图标，点击可正常发起 OAuth 授权流程；
+        - **规则 3 (彻底隐藏状态)**: 任何在接入配置中关闭/未开启的提供商 (`enabled === 0 || enabled === false`)，或者主开关关闭时，在登录页卡片中**彻底隐藏（零 DOM 节点残留）**，不占位、不呈现灰色按钮、不呈现 "即将上线"；
+        - **网格动态自适应**: 当存在 1、2、3、4、5 个可见按钮时，自动匹配全宽 Hero 药丸 (1 个)、1:1 双列 (2 个)、3 列/倒金字塔 (3 个)、2x2 矩阵 (4 个)、3+2 黄金网格 (5 个)；当可见按钮数为 0 时，整个第三方登录区域与分割线彻底隐藏；
+    - [x] 变更点 3 (后端 websiteConfig 安全脱敏与状态协同):
+        - `setting-service.js` 的 `websiteConfig` 接口严格脱敏 `clientSecret`，仅向前端下发 `configured: (hasClientId && hasClientSecret) ? 1 : 0` 与 `enabled: 1/0`，安全协同前端实施 3 大显式规则；
+    - [x] 变更点 4 (管理后台弹窗支持无密钥开启以支持「即将上线」状态保存):
+        - 系统设置中解除保存时必须填写 Client ID 的阻断性校验，允许管理员开启提供商但暂时留空密钥以在前端展示「即将上线」预热状态；
+        - 提供商状态标签精准联动：开启且已配齐=`已启用` (绿)、开启但未配齐=`即将上线` (黄)、关闭=`已停用` (灰)。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 登录子应用构建核验：`temp_login_ui` Vite 构建通过 (2.43s, 0 errors)；
+    - [x] 主应用构建核验：`mail-vue` Vite 构建通过 (13.06s, 0 errors)；
+    - [x] 产物同步：`scripts/copy-login-dist.mjs` 同步至 `mail-worker/dist/login` 完成；
+    - [x] 多语言对称核验：`i18n-symmetry.mjs` (2,290 键 100% 绝对对称)；
+    - [x] 本地全场景端到端测试：`tests/test-oauth-sso-buttons-verification.mjs` (34/34 断言全绿通过，100% 通过率，覆盖 1~5 按钮几何排布与 3 大规则隔离矩阵)；
+    - [x] 登录全语言回归测试：`tests/verify-login-polish.mjs` (62/62 断言全绿通过)；
+    - [x] 公网生产部署核验：Worker 部署至 Cloudflare 生产环境 (`ad76dd6d-fbbf-4add-b1ef-83d48b3a8b91`)；
+    - [x] 公网真实动态切换全真测试：`tests/test-prod-oauth-3rules-live-e2e.mjs` (11/11 项断言全绿通过，实测 `mail.epocanvas.com` 混合状态 2 按钮、1 按钮 Hero 药丸、0 按钮彻底隐藏)；
+    - [x] 零假数据残留：测试临时状态物理归零，TOTP 状态 100% 还原。
+
 ### 第三方登录配置状态双向联动、未配置项灰色禁用拦截与管理端匹配保障交付 (2026-10-03)
 *   **关联提交 (Git Commit)**: `b30c11b37bb90148684365c35aebd6fc77136b3d` (Short: `b30c11b`)
 *   **部署环境 (Deployment)**: `本地全真栈 / 构建核验`

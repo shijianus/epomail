@@ -313,6 +313,11 @@ interface OAuthProviderItem {
 }
 
 function getOAuthProviderList(sysConfig?: any): OAuthProviderItem[] {
+  // If master switch "第三方快捷登录" is disabled, return empty list immediately
+  if (!sysConfig?.oauthLoginEnabled) {
+    return [];
+  }
+
   const customProviders = sysConfig?.oauthProviders;
   let parsed: Record<string, any> = {};
   if (typeof customProviders === 'string') {
@@ -321,57 +326,64 @@ function getOAuthProviderList(sysConfig?: any): OAuthProviderItem[] {
     parsed = customProviders;
   }
 
-  const isItemConfigured = (key: string) => {
-    const cfg = parsed[key];
-    if (!cfg) return false;
-    const hasClientId = Boolean(cfg.clientId && typeof cfg.clientId === 'string' && cfg.clientId.trim() !== '');
-    const isEnabled = cfg.enabled === 1 || cfg.enabled === true || cfg.enabled === undefined;
-    return hasClientId && isEnabled;
-  };
-
-  const allSupported: OAuthProviderItem[] = [
+  const allSupportedMeta: { key: string; name: string; icon: React.ReactNode }[] = [
     {
       key: 'google',
       name: 'Google',
-      icon: <GoogleIcon className="w-4 h-4 shrink-0" />,
-      configured: isItemConfigured('google')
+      icon: <GoogleIcon className="w-4 h-4 shrink-0" />
     },
     {
       key: 'github',
       name: 'GitHub',
-      icon: <GithubIcon className="w-4 h-4 shrink-0 text-white" />,
-      configured: isItemConfigured('github')
+      icon: <GithubIcon className="w-4 h-4 shrink-0 text-white" />
     },
     {
       key: 'microsoft',
       name: 'Microsoft',
-      icon: <MicrosoftIcon className="w-4 h-4 shrink-0" />,
-      configured: isItemConfigured('microsoft')
+      icon: <MicrosoftIcon className="w-4 h-4 shrink-0" />
     },
     {
       key: 'apple',
       name: 'Apple',
-      icon: <AppleIcon className="w-4 h-4 shrink-0 text-white" />,
-      configured: isItemConfigured('apple')
+      icon: <AppleIcon className="w-4 h-4 shrink-0 text-white" />
     },
     {
       key: 'custom',
       name: (parsed.custom && parsed.custom.name) || 'Custom SSO',
-      icon: <SsoIcon className="w-4 h-4 shrink-0 text-[#67e8f9]" />,
-      configured: isItemConfigured('custom')
+      icon: <SsoIcon className="w-4 h-4 shrink-0 text-[#67e8f9]" />
     }
   ];
 
-  const hasCustom = Boolean(parsed.custom?.clientId || parsed.custom?.name || parsed.custom?.enabled !== undefined);
+  const result: OAuthProviderItem[] = [];
 
-  // If parsed has specific keys (e.g. backend websiteConfig returns configured providers subset)
-  const configKeys = Object.keys(parsed).filter(k => allSupported.some(s => s.key === k));
+  for (const meta of allSupportedMeta) {
+    const cfg = parsed[meta.key];
+    if (!cfg) continue;
 
-  if (configKeys.length > 0) {
-    return allSupported.filter(p => configKeys.includes(p.key));
+    // Rule 3: Provider must be explicitly opened ("启用此提供商" 开启)
+    const isEnabled = cfg.enabled === 1 || cfg.enabled === true;
+    if (!isEnabled) {
+      // Disabled in backend settings -> completely hidden, do NOT render in grid
+      continue;
+    }
+
+    // Rule 1 & 2: Check if credentials (Client ID and Client Secret) are configured
+    const hasClientId = Boolean(cfg.clientId && typeof cfg.clientId === 'string' && cfg.clientId.trim() !== '');
+    const isConfigured = Boolean(
+      cfg.configured === 1 ||
+      cfg.configured === true ||
+      (cfg.configured !== 0 && hasClientId)
+    );
+
+    result.push({
+      key: meta.key,
+      name: meta.key === 'custom' && cfg.name ? cfg.name : meta.name,
+      icon: meta.icon,
+      configured: isConfigured
+    });
   }
 
-  return hasCustom ? allSupported : allSupported.slice(0, 4);
+  return result;
 }
 
 function generateSessionHash(): string {
@@ -1543,9 +1555,9 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
               exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -12, filter: "blur(4px)" }}
               transition={reduceMotion ? { duration: 0 } : { duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
               onSubmit={handlePasswordSubmit}
-              className={`flex flex-col justify-center ${sysConfig?.oauthLoginEnabled ? 'gap-3 sm:gap-3.5' : 'gap-5 sm:gap-5.5'} w-full`}
+              className={`flex flex-col justify-center ${oauthProviderList.length > 0 ? 'gap-3 sm:gap-3.5' : 'gap-5 sm:gap-5.5'} w-full`}
             >
-              <div className={`flex flex-col ${sysConfig?.oauthLoginEnabled ? 'gap-3 sm:gap-3.5' : 'gap-4 sm:gap-4.5'}`}>
+              <div className={`flex flex-col ${oauthProviderList.length > 0 ? 'gap-3 sm:gap-3.5' : 'gap-4 sm:gap-4.5'}`}>
                 <FloatingField
                   id="epo-email"
                   type="email"
@@ -1683,7 +1695,7 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
                 </motion.button>
               </div>
 
-              <div className={`${sysConfig?.oauthLoginEnabled ? 'pt-1' : 'pt-2'} flex flex-col gap-2`}>
+              <div className={`${oauthProviderList.length > 0 ? 'pt-1' : 'pt-2'} flex flex-col gap-2`}>
                 {sysConfig?.oauthLoginEnabled && oauthProviderList.length > 0 ? (
                   <div className="flex flex-col gap-2.5">
                     <div className="flex items-center gap-2.5">

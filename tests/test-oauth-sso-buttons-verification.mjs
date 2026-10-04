@@ -375,11 +375,13 @@ try {
   }
 
   // -------------------------------------------------------------
-  // Scenario 6: Mixed Configured vs Disabled/Unconfigured Providers
-  // 验证: 能打开的第三方登录一定是有配置且开启的！未配置或已关闭的 Provider 按钮呈现灰色且禁用！
+  // Scenario 6: Strict 3-Rule Matrix Verification
+  // 规则 1: 启用此提供商=开, 密钥为空 -> 呈现灰色 "即将上线" (Soon)
+  // 规则 2: 启用此提供商=开, 密钥有效 -> 呈现正常激活 epomail-display 按钮
+  // 规则 3: 启用此提供商=关 或 主开关=关 -> 彻底隐藏 (零 DOM 节点)
   // -------------------------------------------------------------
   {
-    console.log('\n--- [Scenario 6] 状态联动与灰色禁用 (Google已配置开启 vs GitHub关闭 vs Microsoft未配置) ---');
+    console.log('\n--- [Scenario 6] 严格三规则矩阵验证 (Google激活 vs Microsoft即将上线 vs GitHub/Apple彻底隐藏) ---');
     const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
     const page = await ctx.newPage();
 
@@ -404,10 +406,10 @@ try {
             title: 'EpoMail',
             oauthLoginEnabled: 1,
             oauthProviders: {
-              google: { enabled: 1, clientId: 'google-active-id' },
-              github: { enabled: 0, clientId: 'github-disabled-id' }, // 后台已关闭
-              microsoft: { enabled: 1, clientId: '' },               // 未填写 Client ID
-              apple: { enabled: 0 }                                   // 未配置
+              google: { enabled: 1, clientId: 'google-active-id', configured: 1 }, // 规则 2: 开启且有配置 -> 正常激活
+              microsoft: { enabled: 1, clientId: '', configured: 0 },              // 规则 1: 开启但无配置 -> 即将上线
+              github: { enabled: 0, clientId: 'github-disabled-id' },              // 规则 3: 关闭 -> 彻底隐藏
+              apple: { enabled: 0 }                                                 // 规则 3: 关闭 -> 彻底隐藏
             }
           }
         })
@@ -434,27 +436,68 @@ try {
     });
 
     const googleBtn = states.find(s => s.isGoogle);
-    const githubBtn = states.find(s => s.isGithub);
     const msBtn = states.find(s => s.isMicrosoft);
+    const githubBtn = states.find(s => s.isGithub);
     const appleBtn = states.find(s => s.isApple);
 
-    ok(googleBtn && !googleBtn.isDisabled && !googleBtn.isNotAllowed, '已配置开启的 Google 按钮处于正常激活状态 (无 disabled/可交互)');
-    ok(githubBtn && githubBtn.isDisabled && githubBtn.isNotAllowed && githubBtn.isGrayscale, '后台关闭的 GitHub 按钮呈现灰色禁用状态 (grayscale + cursor-not-allowed + disabled)');
-    ok(msBtn && msBtn.isDisabled && msBtn.isNotAllowed && msBtn.hasSoon, '未配 Client ID 的 Microsoft 按钮呈现灰色禁用且带 Soon 徽标');
-    ok(appleBtn && appleBtn.isDisabled && appleBtn.isNotAllowed && appleBtn.hasSoon, '未配置的 Apple 按钮呈现灰色禁用且带 Soon 徽标');
+    ok(states.length === 2, `总渲染按钮数为 2 (仅包含开启的 Google 与 Microsoft)，实际: ${states.length}`);
+    ok(googleBtn && !googleBtn.isDisabled && !googleBtn.isNotAllowed, '【规则 2】已开启且配置合法的 Google 按钮处于正常激活状态 (可交互、光标 pointer)');
+    ok(msBtn && msBtn.isDisabled && msBtn.isNotAllowed && msBtn.hasSoon, '【规则 1】已开启但未配密钥的 Microsoft 按钮呈现灰色禁用且带 Soon / 即将上线 徽标');
+    ok(!githubBtn, '【规则 3】后台关闭的 GitHub 按钮被彻底隐藏 (DOM 零节点残留)');
+    ok(!appleBtn, '【规则 3】后台未开启的 Apple 按钮被彻底隐藏 (DOM 零节点残留)');
 
-    // Test clicking disabled button (GitHub) -> should NOT trigger /api/oauth/authorize/github
-    await page.click('button.epomail-display:has-text("GitHub")', { force: true });
+    // Test clicking disabled button (Microsoft) -> should NOT trigger OAuth
+    await page.click('button.epomail-display:has-text("Microsoft")', { force: true });
     await page.waitForTimeout(300);
-    ok(authorizeCalledFor.length === 0, '点击未配置/禁用的 GitHub 按钮不会发起 OAuth 授权请求');
+    ok(authorizeCalledFor.length === 0, '点击【即将上线】的 Microsoft 按钮不会发起 OAuth 授权请求');
 
     // Test clicking active button (Google) -> should trigger /api/oauth/authorize/google
     await page.click('button.epomail-display:has-text("Google")');
     await page.waitForTimeout(300);
-    ok(authorizeCalledFor.some(u => u.includes('/api/oauth/authorize/google')), '点击已配置的 Google 按钮成功触发对应 Provider 授权流程');
+    ok(authorizeCalledFor.some(u => u.includes('/api/oauth/authorize/google')), '点击【正常激活】的 Google 按钮成功触发对应 Provider 授权流程');
 
     await page.screenshot({ path: 'tests/audit_oauth_active_vs_disabled.png' });
     console.log('  ✓ 状态自适应截图已保存至 tests/audit_oauth_active_vs_disabled.png');
+
+    await ctx.close();
+  }
+
+  // -------------------------------------------------------------
+  // Scenario 7: All Closed / Master Switch OFF
+  // 验证: 当主开关关闭或全部提供商关闭时，第三方登录区域彻底隐藏
+  // -------------------------------------------------------------
+  {
+    console.log('\n--- [Scenario 7] 全关闭与主开关停用 (第三方快捷登录区域彻底隐藏) ---');
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const page = await ctx.newPage();
+
+    await page.route('**/api/setting/websiteConfig', (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          code: 200,
+          data: {
+            title: 'EpoMail',
+            oauthLoginEnabled: 0,
+            oauthProviders: {
+              google: { enabled: 1, clientId: 'google-id' }
+            }
+          }
+        })
+      });
+    });
+
+    await page.goto(baseUrl, { waitUntil: 'networkidle' });
+    await page.waitForTimeout(800);
+
+    const btnCount = await page.evaluate(() => document.querySelectorAll('button.epomail-display:not([type="submit"])').length);
+    ok(btnCount === 0, '主开关关闭时，第三方登录按钮总数为 0');
+
+    const hasDivider = await page.evaluate(() => {
+      return Array.from(document.querySelectorAll('span')).some(s => s.textContent.includes('OR CONTINUE WITH') || s.textContent.includes('或使用以下方式登录'));
+    });
+    ok(!hasDivider, '主开关关闭时，分割线与提示文案彻底隐藏');
 
     await ctx.close();
   }

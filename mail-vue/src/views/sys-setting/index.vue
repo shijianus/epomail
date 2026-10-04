@@ -289,7 +289,7 @@
                   <Icon :icon="provider.icon" width="17" height="17" class="provider-icon" />
                   <span>{{ provider.key === 'custom' ? getCustomOauthTitle() : provider.label }}</span>
                   <el-tag 
-                    v-if="isOauthProviderConfigured(provider.key) && isOauthProviderEnabled(provider.key)" 
+                    v-if="isOauthProviderEnabled(provider.key) && isOauthProviderConfigured(provider.key)" 
                     size="small" 
                     type="success" 
                     effect="light" 
@@ -298,7 +298,16 @@
                     {{ $t('enabled') }}
                   </el-tag>
                   <el-tag 
-                    v-else-if="isOauthProviderConfigured(provider.key) && !isOauthProviderEnabled(provider.key)" 
+                    v-else-if="isOauthProviderEnabled(provider.key) && !isOauthProviderConfigured(provider.key)" 
+                    size="small" 
+                    type="warning" 
+                    effect="plain" 
+                    class="oauth-status-tag"
+                  >
+                    {{ $t('oauthSoon') }}
+                  </el-tag>
+                  <el-tag 
+                    v-else-if="!isOauthProviderEnabled(provider.key) && isOauthProviderConfigured(provider.key)" 
                     size="small" 
                     type="info" 
                     effect="plain" 
@@ -309,16 +318,15 @@
                   <el-tag 
                     v-else 
                     size="small" 
-                    type="warning" 
+                    type="info" 
                     effect="plain" 
                     class="oauth-status-tag"
                   >
-                    {{ $t('notConfigured') }}
+                    {{ $t('disabled') }}
                   </el-tag>
                 </div>
                 <div class="oauth-row-actions" style="display: flex; align-items: center; gap: 10px;">
                   <el-switch 
-                    v-if="isOauthProviderConfigured(provider.key)"
                     :model-value="isOauthProviderEnabled(provider.key)"
                     @change="(val) => toggleOauthProviderQuick(provider.key, val)"
                     inline-prompt
@@ -3788,8 +3796,8 @@ function isOauthProviderConfigured(key) {
 function isOauthProviderEnabled(key) {
   const providers = getParsedOauthProviders();
   const cfg = providers[key];
-  if (!cfg || !cfg.clientId || typeof cfg.clientId !== 'string' || cfg.clientId.trim() === '') return false;
-  return cfg.enabled === true || cfg.enabled === 1 || cfg.enabled === undefined;
+  if (!cfg) return false;
+  return cfg.enabled === true || cfg.enabled === 1;
 }
 
 async function handleOauthMasterSwitchChange(val) {
@@ -3904,10 +3912,6 @@ async function handleTestOauthProvider() {
 }
 
 async function saveOauthProviderConfig() {
-  if (oauthForm.enabled && !oauthForm.clientId) {
-    ElMessage.warning(t('oauthClientId') || 'Client ID is required');
-    return;
-  }
   const providers = { ...getParsedOauthProviders() };
   providers[activeOauthProviderKey.value] = {
     enabled: oauthForm.enabled,
@@ -3926,8 +3930,8 @@ async function saveOauthProviderConfig() {
   setting.value.oauthProviders = providers;
   await changeField('oauthProviders', providers);
 
-  // 保存启用状态且有 Client ID 时，若总开关关闭，自动同步开启总开关并告知
-  if (oauthForm.enabled && oauthForm.clientId?.trim() && !setting.value.oauthLoginEnabled) {
+  // 保存开启状态时，若总开关关闭，自动同步开启总开关并告知
+  if (oauthForm.enabled && !setting.value.oauthLoginEnabled) {
     setting.value.oauthLoginEnabled = 1;
     await changeField('oauthLoginEnabled', 1);
     ElMessage.info(t('oauthMasterSwitchAutoEnabled'));

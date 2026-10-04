@@ -71,7 +71,15 @@ try {
       route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ code: 200, data: { oauthLoginEnabled: 1 } })
+        body: JSON.stringify({
+          code: 200,
+          data: {
+            oauthLoginEnabled: 1,
+            oauthProviders: {
+              google: { enabled: 1, clientId: '', configured: 0 }
+            }
+          }
+        })
       });
     });
     await page.goto(baseUrl, { waitUntil: 'networkidle', timeout: 60000 });

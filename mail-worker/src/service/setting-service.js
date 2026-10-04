@@ -854,11 +854,16 @@ const settingService = {
 				const sanitized = {};
 				for (const [k, v] of Object.entries(p)) {
 					if (v && typeof v === 'object') {
+						const hasClientId = Boolean(v.clientId && typeof v.clientId === 'string' && v.clientId.trim() !== '');
+						const hasClientSecret = Boolean(v.clientSecret && typeof v.clientSecret === 'string' && v.clientSecret.trim() !== '');
+						const isAppleConfigured = k === 'apple' && hasClientId && (hasClientSecret || Boolean(v.teamId && v.keyId));
+						const isConfigured = (hasClientId && hasClientSecret) || isAppleConfigured ? 1 : 0;
 						sanitized[k] = {
-							enabled: v.enabled,
-							clientId: v.clientId,
-							name: v.name,
-							tenant: v.tenant
+							enabled: (v.enabled === 1 || v.enabled === true) ? 1 : 0,
+							configured: isConfigured,
+							clientId: v.clientId || '',
+							name: v.name || '',
+							tenant: v.tenant || ''
 						};
 					}
 				}
