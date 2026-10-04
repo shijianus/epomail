@@ -9,7 +9,7 @@
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
 ### 底层特性开关 (ENABLE_OAUTH_INTEGRATION) 默认关闭与隐藏第三方认证设置 (2026-10-04)
-*   **关联提交 (Git Commit)**: `PENDING_COMMIT_HASH` (Short: `PENDING`)
+*   **关联提交 (Git Commit)**: `21af692803770c94ac2cfbdec5c32624e45754ce` (Short: `21af692`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com)` (Version ID: `7b9b1839-841a-46a0-b11d-ee6ab4c90b3a`)
 *   **功能需求与变更清单 (Changes & Feature Alignment)**:
     - [x] 变更点 1 (底层特性开关配置与默认关闭):
