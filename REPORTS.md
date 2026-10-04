@@ -10,7 +10,7 @@
 ---
 
 ### 100% 真实 Cloudflare 生产环境 PM 正式验收评审报告 (PM Acceptance Review) (2026-10-04)
-*   **关联提交 (Git Commit)**: 待提交 (Pending Commit)
+*   **关联提交 (Git Commit)**: `ca582d84d7ce4e58a52fb7123f713e248704039a` (Short: `ca582d8`)
 *   **专项文档索引 (Detailed Doc)**: `doc/pm-acceptance-review-20261004-live-cloudflare.md`
 *   **体检/审计范围与方法 (Scope & Methodology)**:
     1. 范围与环境：100% 真实 Cloudflare 生产网络环境 (`https://mail.epocanvas.com` & `https://epomail-docs.pages.dev`)，覆盖登录页安全申诉引导弹窗、独立表单与 SHA-256 指纹存证、凭据回执卡、用户列表三模式自适应列体系、操作报告时序流与 4 类预警 KPI 过滤、加密模式纯 DB 窄表 (零个人身份/零时间戳/机器初判)、研判工作台队列、扩展页双栏基线对比抽屉、策略容量与 Level 0~Level 3 风险及 Bot 处置规范等全部 11 张高分辨率全真截图 (`tests/live_prod_*.png`)。

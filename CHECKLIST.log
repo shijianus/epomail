@@ -9,7 +9,7 @@
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
 ### 100% 真实 Cloudflare 生产环境 PM 正式验收评审与全量签发 (2026-10-04)
-*   **关联提交 (Git Commit)**: 待提交 (Pending Commit)
+*   **关联提交 (Git Commit)**: `ca582d84d7ce4e58a52fb7123f713e248704039a` (Short: `ca582d8`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com & epomail-docs.pages.dev)`
 *   **功能需求与变更清单 (Changes & Feature Alignment)**:
     - [x] 变更点 1 (11 张高分辨率全真生产截图全量审验):
