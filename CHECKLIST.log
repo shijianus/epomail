@@ -9,6 +9,22 @@
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
 
+### EpomailDocs v5.11 专案介绍扩充轮：运行模式/设置指南两新页 ×6 语言 + 真实产品截图 + 全站 5.11 (2026-10-05)
+*   **关联提交 (Git Commit)**: EpomailDocs 独立提交 `ff4e93f` (Short: `ff4e93f`，v5.11 内容) + `c597fca` (manifest 固化提交号同步，本轮起内容与同步拆分两提交)；两提交已推送 origin/main；主仓归档提交见本条目对应变更提交
+*   **部署环境 (Deployment)**: `本地全真栈：mail-worker wrangler dev 127.0.0.1:8787（冷启动 init 播种 6 角色 + seed-demo 20 封演示邮件 + 多账户快速切换开启）作为截图源；EpomailDocs wrangler pages dev dist:8790（含 Pages Functions Accept-Language 协商）全页判图；线上发布未执行，待运营者 pnpm run deploy`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 反馈①（先拉取最新版）：主仓同步 origin/master（远端审计控制台/OAuth/PM 验收流水 9 提交并入，CHECKLIST/REPORTS 冲突按日期时间线精确合并归位）
+    - [x] 反馈②（专案介绍板块·不同模式）：新增《运行模式》modes.md ×6 语言——部署形态（托管/自部署）、邮件模式三档隐私等级（管理端可见性矩阵/强制两步验证/全局推送锁定/审计时间戳剥离）、六身份分组与配额表（参观者/普通用户/LV.0/LV.1/协管者/站长 + 博客等级联动）、登录与两步验证（TOTP/备用恢复码/Passkey/信任设备双周期/第三方快捷登录三态规则）、多账户模式（会话隔离 /mail/u/N/）、界面语言与显示模式——全部事实经 mail-worker/mail-vue 源码逐项对码
+    - [x] 反馈③（专案介绍板块·不同设置）：新增《设置指南》settings.md ×6 语言——个人设置五分区逐项导览（个资/常规/安全/资料/标签）、管理控制台九分区职责表、系统设置 11 配置卡清单、操作报告四类预警矩阵（审计/风控/封禁/申诉）
+    - [x] 反馈④（真实数据截图不空盘）：9 张真实产品截图入 ui 资产——邮件模式三档下拉展开、权限控制页六角色表、两步验证中心、多账户头像菜单、登录页第三方「即将上线」灰显态、个资/常规/资料页、操作报告四类预警；数据全部来自本地演示实例真实运行画面
+    - [x] 反馈⑤（i18n 六语言闭环）：两新页 zh/zh-tw/en/es/fr/nl 结构 1:1（标题/表格行列/图/图注逐一对应）；侧栏「专案与架构」组新增两入口（SIDEBAR_I18N 六语言标签）；check-structure DOCS 11→13；project/features/architecture 相关文档表 ×6 语言各增两行互链；全站版本 5.10→5.11（78 文件，生效日期 2026-10-05）
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：mail-vue vite build 零警告零报错（47.8s，拉取后含 OAuth 特性开关等新代码）；EpomailDocs build 79 页零报错（67→79）
+    - [x] 自动化核验：anchors 1620/0 断链；check-structure 13 文档 ×6 语言 100% 结构对称（zh-tw 正式版基准）
+    - [x] 浏览器全真栈实测：9 张全页渲染判图全绿（zh/zh-tw/en ×modes+settings、fr/es/nl 抽样、暗色主题抽查），内容栏居中、表格不溢出、产品截图清晰、语言无串页；控制台/网络错误 CLEAN
+    - [x] tamper-proof.json 全量重生成并按惯例清单同步提交（68a014c → c597fca 固化 ff4e93f）
+    - [x] 零假数据残留：演示数据仅存本地 .wrangler/state（gitignored），不入库不进生产；判图截图不入库（screenshots/ ignored）；EpomailDocs 工作树干净
+
 ### 操作报告控制台全栈重构：对齐用户列表单框标准、纯文本不打底、RBAC防护与D1持久化 (2026-10-04)
 *   **关联提交 (Git Commit)**: `73a2561d3e91867a2b9e442bebe8366a639b5914` (Short: `73a2561`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com)` (Version ID: `02e5470d-f6d2-49dc-be4b-f3ca017d69cf`)
