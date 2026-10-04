@@ -9,6 +9,21 @@
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
 
+### EpomailDocs v5.12 专案介绍精度治理轮：六语言全量对码修订 + 提交链路刷新 (2026-10-05)
+*   **关联提交 (Git Commit)**: EpomailDocs 独立提交 `8da882cfab09c07ffb66d363f949ef5598bfb780` (Short: `8da882c`，v5.12 内容) + `4188b98` (manifest 固化 8da882c)；两提交已推送 origin/master 与 origin/main；主仓归档提交见本条目对应变更提交
+*   **部署环境 (Deployment)**: `本地全真栈：EpomailDocs wrangler pages dev dist:8790（含 Pages Functions Accept-Language 协商，部署前清理 4321/4399/8790 三端口历史遗留僵尸 wrangler 栈后单实例运行）全页判图；线上发布未执行，待运营者 pnpm run deploy`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 反馈①（先拉取最新版）：主仓核验与 origin/master 零落后（HEAD 661 提交，含远端审计控制台重构 `73a2561`、OAuth 特性开关 `21af692`）；EpomailDocs 同步至 v5.11（c597fca）
+    - [x] 反馈②（独立对码审计）：20 项文档事实断言逐条对码 mail-worker/mail-vue 当前源码，查出 6 处 v5.11 偏差——站长存储配额出厂实播 1024 MB 而非无上限（init.js:183，权限控制页标示「无限制」）；信任设备真实触发为 2FA 步骤「以后本设备登录不再验证」（rememberDevice → login-service.js:729-739），登录页「保持轨道连接」勾选纯装饰不上送；翻译目标语言实际 15（阅读页）/16（个人默认）而非 17；Linux DO 登录在登录 UI 与 getPublicProviders 均无入口（仅后端 env 残留）；6 张系统设置配置卡名与实际标题不符；project.md 提交计数与里程碑滞后（逾 560/逾 45 → 实际 661/49，v5.10/v5.11 未收录）
+    - [x] 反馈③（修复 ×6 语言）：modes.md 站长行/图注/播种说明/信任设备措辞/Linux DO 句移除；settings.md 语言数 17→16 与 6 卡名对齐应用实际标题（个性化设置、AI 智能引擎与大模型接入、用户资料控制、Turnstile 人机验证、网站公告、操作报告）；features.md Linux DO 条目移除（privacy-policy/sub-processors/terms-of-service 的条件式披露按披露性质保留）；project.md 统计刷新（逾 660/逾 50，截至 2026-10-05）+ 里程碑第 14 阶段（v5.10/v5.11 与审计控制台重构）+ 主仓锚点链追加 21af692/73a2561/596e7c1 + 文档仓锚点链追加 68a014c/08448fb/ff4e93f/c597fca
+    - [x] 反馈④（i18n 六语言闭环）：78 文件结构 1:1 修订（zh/zh-tw/en/es/fr/nl），全站版本 5.11→5.12（生效日期 2026-10-05）；scripts/apply-v512-accuracy.py 每条替换断言恰好命中 1 次，78 文件全部命中
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：pnpm build 79 页零报错（26.66s，含 tamper-proof 清单重生成与 post-build 双轨镜像）
+    - [x] 自动化核验：validate-anchors 1620/0 断链；check-structure 13 文档 ×6 语言 100% 结构对称（zh-tw 正式版基准）；verify-laws 退出码 0
+    - [x] 浏览器全真栈实测：12 张全页截图控制台/网络错误 CLEAN；元素级判图——里程碑第 14 阶段行 ×6 语言渲染正确、暗色里程碑全表 14 行正常、身份分组表站长行 1024 MB（zh/en）、配置卡表新卡名（zh/en）、信任设备新措辞（zh/en）、features 第 9 节无 Linux DO；六语言 served HTML 均含 5.12 版本行与全部 7 个新锚点 40 位 Hash
+    - [x] tamper-proof.json 全量重生成并固化 8da882c（`4188b98` 同步提交），78 篇文档清单一致
+    - [x] 零假数据残留：本轮未运行 epomail 实例（沿用 v5.11 真实截图资产，未新增产品截图）；判图截图不入库（screenshots/ ignored）；EpomailDocs 工作树仅余先于本轮存在的无关杂散文件（PROJECT_STATE.md/REPORTS.md，保持未跟踪未纳入提交）
+
 ### EpomailDocs v5.11 专案介绍扩充轮：运行模式/设置指南两新页 ×6 语言 + 真实产品截图 + 全站 5.11 (2026-10-05)
 *   **关联提交 (Git Commit)**: EpomailDocs 独立提交 `ff4e93f` (Short: `ff4e93f`，v5.11 内容) + `c597fca` (manifest 固化提交号同步，本轮起内容与同步拆分两提交)；两提交已推送 origin/main；主仓归档提交见本条目对应变更提交
 *   **部署环境 (Deployment)**: `本地全真栈：mail-worker wrangler dev 127.0.0.1:8787（冷启动 init 播种 6 角色 + seed-demo 20 封演示邮件 + 多账户快速切换开启）作为截图源；EpomailDocs wrangler pages dev dist:8790（含 Pages Functions Accept-Language 协商）全页判图；线上发布未执行，待运营者 pnpm run deploy`
