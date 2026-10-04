@@ -7,58 +7,6 @@
     <el-scrollbar class="scroll" v-if="!firstLoading">
       <div class="scroll-body audit-scroll-body">
         
-        <!-- Breadcrumb Navigation Bar -->
-        <div class="audit-breadcrumb-strip">
-          <div class="breadcrumb-left">
-            <el-button link class="back-settings-btn" @click="goToSysSetting">
-              <Icon icon="fluent:arrow-left-20-filled" width="16" height="16" />
-              <span>{{ $t('auditBackToSettings') }}</span>
-            </el-button>
-            <span class="breadcrumb-sep">/</span>
-            <span class="breadcrumb-active">{{ $t('auditReport') }}</span>
-          </div>
-          <div class="breadcrumb-right">
-            <el-button link type="primary" size="small" class="docs-portal-btn" @click="openExternalAppealPortal('form')">
-              <Icon icon="fluent:document-person-20-regular" width="15" height="15" />
-              <span>{{ $t('auditViewExternalAppealDocs') }}</span>
-              <Icon icon="fluent:arrow-up-right-16-regular" width="13" height="13" />
-            </el-button>
-          </div>
-        </div>
-
-        <!-- Header Banner: Security Mode Status -->
-        <div class="audit-header-banner" :class="'mode-' + activeMode">
-          <div class="banner-left">
-            <div class="mode-badge-wrap">
-              <el-tag :type="currentModeMeta.tagType" size="default" effect="dark" class="mode-hero-badge">
-                <Icon :icon="currentModeMeta.icon" width="16" height="16" class="badge-icon" />
-                {{ currentModeMeta.title }}
-              </el-tag>
-              <div class="header-title-text">
-                <h1>{{ $t('auditReport') }}</h1>
-                <p class="header-subtitle">{{ $t('auditReportDesc') }}</p>
-              </div>
-            </div>
-            <div class="mode-notice-card">
-              <Icon icon="fluent:info-20-filled" width="16" height="16" class="notice-info-icon" />
-              <span>{{ currentModeMeta.notice }}</span>
-            </div>
-          </div>
-
-          <div class="banner-right">
-            <div class="banner-actions">
-              <el-button size="small" type="primary" plain @click="refreshData">
-                <Icon icon="fluent:arrow-sync-20-regular" width="15" height="15" />
-                <span>{{ $t('refresh') }}</span>
-              </el-button>
-              <el-button size="small" @click="activeTab = 'policy'">
-                <Icon icon="lucide:settings" width="15" height="15" />
-                <span>{{ $t('auditTabPolicy') }}</span>
-              </el-button>
-            </div>
-          </div>
-        </div>
-
         <!-- KPI Metrics Grid (Directly maps to the 4 Warning Categories) -->
         <div class="kpi-grid">
           <!-- Card 1: 审计警告 -->
@@ -1280,11 +1228,6 @@ const { t } = useI18n();
 const settingStore = useSettingStore();
 const userStore = useUserStore();
 
-const goToSysSetting = () => {
-  const roleGroup = route.params.roleGroup || 'admin';
-  router.push(`/manage/${roleGroup}/system`);
-};
-
 const openExternalAppealPortal = (type = 'form') => {
   const docsBase = getOfficialLink('docs', settingStore) || 'https://docs.epocanvas.com/epomail';
   const lang = settingStore.settings?.lang || 'zh';
@@ -1341,36 +1284,6 @@ const settingForm = reactive({
   auditCriticalQuota: Number(settingStore.settings?.auditCriticalQuota ?? 3),
   auditAutoCleanOldest: Number(settingStore.settings?.auditAutoCleanOldest ?? 1),
   auditPrioritizeNonCriticalClean: Number(settingStore.settings?.auditPrioritizeNonCriticalClean ?? 1)
-});
-
-// Mode metadata computed
-const currentModeMeta = computed(() => {
-  if (activeMode.value === 1) {
-    return {
-      title: t('auditModeLevel1'),
-      tagType: 'primary',
-      icon: 'fluent:mail-list-28-regular',
-      notice: t('auditAllMailModeNotice')
-    };
-  } else if (activeMode.value === 0) {
-    return {
-      title: t('auditModeLevel2'),
-      tagType: 'success',
-      icon: 'fluent:shield-checkmark-20-filled',
-      notice: t('auditPrivacyModeNotice')
-    };
-  } else {
-    return {
-      title: t('auditModeLevel3'),
-      tagType: 'warning',
-      icon: 'fluent:shield-lock-24-filled',
-      notice: t('auditEncryptedModeNotice')
-    };
-  }
-});
-
-const activeModeText = computed(() => {
-  return currentModeMeta.value.title;
 });
 
 // Helper for formatting storage bytes
@@ -2285,154 +2198,6 @@ onMounted(() => {
   max-width: 1400px;
   margin: 0 auto;
   width: 100%;
-}
-
-/* Breadcrumb Navigation Strip */
-.audit-breadcrumb-strip {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 10px 18px;
-  margin-bottom: 16px;
-  background: var(--el-bg-color);
-  border: 1px solid var(--el-border-color);
-  border-radius: 8px;
-}
-
-.breadcrumb-left {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.back-settings-btn {
-  color: var(--el-text-color-secondary) !important;
-  font-weight: 500;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 0 !important;
-  transition: color 0.15s;
-
-  &:hover {
-    color: var(--el-color-primary) !important;
-  }
-}
-
-.breadcrumb-sep {
-  color: var(--el-text-color-placeholder);
-  font-size: 12px;
-}
-
-.breadcrumb-active {
-  color: var(--el-text-color-primary);
-  font-weight: 600;
-  font-size: 13.5px;
-}
-
-.docs-portal-btn {
-  font-size: 12px !important;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-
-/* Header Banner: Clean, elevated */
-.audit-header-banner {
-  padding: 18px 20px;
-  border-radius: 8px;
-  margin-bottom: 16px;
-  border: 1px solid var(--el-border-color);
-  background: var(--el-bg-color);
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  flex-wrap: wrap;
-  gap: 16px;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.02);
-}
-
-.banner-left {
-  flex: 1;
-  min-width: 300px;
-}
-
-.mode-badge-wrap {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 10px;
-}
-
-.mode-hero-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-weight: 600;
-  letter-spacing: 0.2px;
-  border-radius: 6px;
-  padding: 4px 10px;
-}
-
-.header-title-text {
-  h1 {
-    font-size: 17px;
-    font-weight: 700;
-    color: var(--el-text-color-primary);
-    margin: 0;
-    line-height: 1.3;
-  }
-  .header-subtitle {
-    font-size: 12px;
-    color: var(--el-text-color-secondary);
-    margin: 2px 0 0 0;
-  }
-}
-
-.mode-notice-card {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  color: var(--el-text-color-regular);
-  background: var(--el-fill-color-light);
-  border: 1px solid var(--el-border-color-lighter);
-  padding: 8px 12px;
-  border-radius: 6px;
-  line-height: 1.45;
-
-  .notice-info-icon {
-    flex-shrink: 0;
-    color: var(--el-color-primary);
-  }
-}
-
-.banner-right {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 12px;
-}
-
-.mode-switch-box {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.mode-switch-label {
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-  font-weight: 500;
-}
-
-.mode-selector {
-  width: 190px;
-}
-
-.banner-actions {
-  display: flex;
-  gap: 8px;
 }
 
 /* KPI Summary Cards Grid */

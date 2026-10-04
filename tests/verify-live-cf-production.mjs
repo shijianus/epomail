@@ -270,11 +270,13 @@ async function runLiveCFVerification() {
     }
     await page.waitForTimeout(2500);
 
-    // Verify breadcrumb button
-    const backBtn = page.locator('.back-settings-btn, button:has-text("返回系统设置"), button:has-text("Back to Settings")').first();
-    await backBtn.waitFor({ state: 'visible', timeout: 10000 });
-    console.log('  ✓ Verified breadcrumb button "返回系统设置" is visible');
-    passedAssertions++;
+    // Verify breadcrumb strip and header banner are eliminated
+    const breadcrumbStrip = page.locator('.audit-breadcrumb-strip');
+    const headerBanner = page.locator('.audit-header-banner');
+    if (await breadcrumbStrip.count() === 0 && await headerBanner.count() === 0) {
+      console.log('  ✓ Confirmed: audit-breadcrumb-strip and audit-header-banner are completely eliminated!');
+      passedAssertions++;
+    }
 
     // Verify KPI metrics cards
     const kpiCards = page.locator('.kpi-card');
