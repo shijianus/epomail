@@ -9,7 +9,7 @@
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
 ### 第三方快捷登录按钮统一居中排布与移除右侧箭头指示交互优化 (2026-10-03)
-*   **关联提交 (Git Commit)**: `71c342b2f372d9a0ecbd0d480a50c099e7125517` (Short: `71c342b`)
+*   **关联提交 (Git Commit)**: `2940792fb9425c58bd07bbb67ef6fec68359c1d5` (Short: `2940792`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com)` (Version ID: `224b5b9f-7c63-4bab-896e-35e21fb767d6`)
 *   **功能需求与变更清单 (Changes & Feature Alignment)**:
     - [x] 变更点 1 (全量第三方登录按钮内容 100% 水平垂直居中):
