@@ -2214,6 +2214,7 @@ totpModeAllDesc: 'Configurar si los usuarios pueden usar TOTP. Al activarlo, la 
     auditAppealEnv: "Entorno de envío de apelación",
     auditDeviceFingerprintMatch: "Coincidencia de huella de dispositivo",
     auditIpSubnetMatch: "Coincidencia de subred IP",
+    auditIpSubnetMismatch: "Desajuste de subred IP",
     auditAppealReason: "Declaración del usuario en apelación",
     auditAdjudicationNotes: "Notas de resolución del administrador",
     auditAdjudicationPlaceholder: "Escriba la justificación para archivar en la BD de control de riesgos...",

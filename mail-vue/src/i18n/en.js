@@ -2214,6 +2214,7 @@ totpModeAllDesc: 'Configure whether users can use TOTP. When enabled, 2FA is ava
     auditAppealEnv: "Appeal Submission Environment",
     auditDeviceFingerprintMatch: "Device Fingerprint Match",
     auditIpSubnetMatch: "IP Subnet Match",
+    auditIpSubnetMismatch: "IP Subnet Mismatch",
     auditAppealReason: "User Appeal Statement",
     auditAdjudicationNotes: "Admin Adjudication Notes",
     auditAdjudicationPlaceholder: "Enter justification for approval or rejection to be stored in risk control DB...",

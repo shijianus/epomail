@@ -2214,6 +2214,7 @@ totpModeAllDesc: 'Instellen of gebruikers TOTP mogen gebruiken. Eenmaal ingescha
     auditAppealEnv: "Omgeving van ingediend bezwaar",
     auditDeviceFingerprintMatch: "Overeenkomst apparaatvingerafdruk",
     auditIpSubnetMatch: "IP-subnetovereenkomst",
+    auditIpSubnetMismatch: "IP-subnet niet overeenkomend",
     auditAppealReason: "Verklaring van gebruiker bij bezwaar",
     auditAdjudicationNotes: "Beoordelingsnotities van beheerder",
     auditAdjudicationPlaceholder: "Voer de motivatie in om op te slaan in de risicobeheersdatabase...",

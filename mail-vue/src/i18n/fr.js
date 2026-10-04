@@ -2214,6 +2214,7 @@ totpModeAllDesc: 'Définir si les utilisateurs peuvent utiliser TOTP. Lorsqu\'il
     auditAppealEnv: "Environnement de soumission du recours",
     auditDeviceFingerprintMatch: "Correspondance d'empreinte d'appareil",
     auditIpSubnetMatch: "Correspondance de sous-réseau IP",
+    auditIpSubnetMismatch: "Sous-réseau IP non concordant",
     auditAppealReason: "Déclaration de l'utilisateur dans le recours",
     auditAdjudicationNotes: "Notes d'arbitrage de l'administrateur",
     auditAdjudicationPlaceholder: "Saisissez le motif à consigner dans la base de données des risques...",

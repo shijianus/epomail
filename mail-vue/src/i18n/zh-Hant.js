@@ -2214,6 +2214,7 @@ totpModeAllDesc: '設定是否允許使用者使用TOTP，開啟後使用者可�
     auditAppealEnv: "本次申訴提交環境",
     auditDeviceFingerprintMatch: "裝置指紋匹配度",
     auditIpSubnetMatch: "IP 子網匹配",
+    auditIpSubnetMismatch: "IP 子網不匹配",
     auditAppealReason: "申訴說明與事實陳述",
     auditAdjudicationNotes: "管理員研判批注",
     auditAdjudicationPlaceholder: "填寫放行或駁回依據，將存檔至風控處置DB表...",

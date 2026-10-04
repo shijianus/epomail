@@ -44,6 +44,7 @@ const dbInit = {
 		await this.v3_12DB(c);
 		await this.v3_13DB(c);
 		await this.v3_14DB(c);
+		await this.v3_15DB(c);
 		await settingService.refresh(c);
 		return c.text('success');
 	},
@@ -242,6 +243,47 @@ const dbInit = {
 			`).run();
 		} catch (e) {
 			console.warn('visitor user:query cleanup warning:', e.message);
+		}
+	},
+
+	async v3_15DB(c) {
+		const userDb = getUserDb(c);
+		try {
+			await userDb.prepare(`
+				CREATE TABLE IF NOT EXISTS audit_log (
+					id INTEGER PRIMARY KEY AUTOINCREMENT,
+					ticket_id TEXT,
+					user_id INTEGER,
+					email TEXT NOT NULL,
+					warning_type TEXT NOT NULL,
+					event_type TEXT NOT NULL,
+					category TEXT NOT NULL,
+					action_text TEXT NOT NULL,
+					detail_text TEXT,
+					ip TEXT,
+					geo TEXT,
+					device TEXT,
+					device_type TEXT DEFAULT 'desktop',
+					fingerprint TEXT,
+					is_reg_ip INTEGER DEFAULT 0,
+					is_multi_ip INTEGER DEFAULT 0,
+					active_ip_count INTEGER DEFAULT 1,
+					reported_by_others INTEGER DEFAULT 0,
+					risk_level TEXT DEFAULT 'normal',
+					priority TEXT DEFAULT 'P2',
+					status TEXT DEFAULT 'active',
+					recommended_action TEXT,
+					match_score INTEGER DEFAULT 0,
+					subnet_match INTEGER DEFAULT 0,
+					appeal_reason TEXT,
+					create_time DATETIME DEFAULT CURRENT_TIMESTAMP
+				)
+			`).run();
+
+			await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_audit_log_email ON audit_log(email)`).run();
+			await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_audit_log_warning_type ON audit_log(warning_type)`).run();
+		} catch (e) {
+			console.warn('v3_15DB audit_log migration warning:', e.message);
 		}
 	},
 
@@ -1221,6 +1263,37 @@ const dbInit = {
 		} catch (e) {
 			console.warn(e);
 		}
+
+		await userDb.prepare(`
+			CREATE TABLE IF NOT EXISTS audit_log (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				ticket_id TEXT,
+				user_id INTEGER,
+				email TEXT NOT NULL,
+				warning_type TEXT NOT NULL,
+				event_type TEXT NOT NULL,
+				category TEXT NOT NULL,
+				action_text TEXT NOT NULL,
+				detail_text TEXT,
+				ip TEXT,
+				geo TEXT,
+				device TEXT,
+				device_type TEXT DEFAULT 'desktop',
+				fingerprint TEXT,
+				is_reg_ip INTEGER DEFAULT 0,
+				is_multi_ip INTEGER DEFAULT 0,
+				active_ip_count INTEGER DEFAULT 1,
+				reported_by_others INTEGER DEFAULT 0,
+				risk_level TEXT DEFAULT 'normal',
+				priority TEXT DEFAULT 'P2',
+				status TEXT DEFAULT 'active',
+				recommended_action TEXT,
+				match_score INTEGER DEFAULT 0,
+				subnet_match INTEGER DEFAULT 0,
+				appeal_reason TEXT,
+				create_time DATETIME DEFAULT CURRENT_TIMESTAMP
+			)
+		`).run();
 	},
 
 	async receiveEmailToRecipient(c) {
