@@ -8,6 +8,29 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### 操作报告控制台精益化：彻底删除 audit-breadcrumb-strip 与 audit-header-banner (2026-10-04)
+*   **关联提交 (Git Commit)**: `712298fdd93564ca901958053f2acc4d4db437d3` (Short: `712298f`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com)` (Version ID: `3312bd11-11c8-45c2-8ea0-d1cb16ae6bb2`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 变更点 1 (彻底删除顶部面包屑与装饰性横幅):
+        - 依照用户指令与 `admin-ui-standards` 精益设计准则，删除操作报告控制台顶部冗余的 `audit-breadcrumb-strip` (返回系统设置/操作报告面包屑条)；
+        - 彻底删除 `audit-header-banner` (含各安全模式下的全宽装饰性横幅、状态标签、描述文案与多余方框容器)；
+        - 首屏直接以 4 张预警类别 KPI 指标卡 (审计/风控/封禁/申诉) 起手展示，消除多余灰底嵌套与“画地为牢”式容器；
+    - [x] 变更点 2 (代码与 CSS 精简优化):
+        - 清理 `audit-report` 组件中无用的 `goToSysSetting`、`currentModeMeta` 以及对应 CSS 样式；
+    - [x] 变更点 3 (端到端公网测试与全真核验):
+        - 更新 `tests/verify-live-cf-production.mjs`，断言 `audit-breadcrumb-strip` 与 `audit-header-banner` 计数为 0；
+        - 全真栈公网自动化回归 30 项断言全绿通过；
+    - [x] 变更点 4 (PM 正式验收签发):
+        - 调用 Principal PM UX Auditor 针对公网实时截图审查通过，授予 5 星合格签发。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 主应用构建核验：`mail-vue` Vite 构建通过 (14.18s, 0 errors)；
+    - [x] 多语言对称核验：`node scripts/i18n-symmetry.mjs` 6 语言字典 100% 对称；
+    - [x] 代码引用字面量核验：`node scripts/i18n-audit.mjs` 0 缺失；
+    - [x] 线上生产公网部署：Cloudflare Workers 版本 `3312bd11-11c8-45c2-8ea0-d1cb16ae6bb2` 部署成功；
+    - [x] 端到端全真核验：`tests/verify-live-cf-production.mjs` (30/30 断言全过，确认 breadcrumb 和 banner 计数为 0)；
+    - [x] PM 视觉验收签发：Principal PM UX Auditor 正式批准签发 (PASSED & APPROVED)。
+
 ### 100% 真实 Cloudflare 生产环境 PM 正式验收评审与全量签发 (2026-10-04)
 *   **关联提交 (Git Commit)**: `ca582d84d7ce4e58a52fb7123f713e248704039a` (Short: `ca582d8`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com & epomail-docs.pages.dev)`
