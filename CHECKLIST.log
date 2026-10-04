@@ -8,6 +8,35 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### 操作报告控制台纵深业务升级：上层4大KPI汇报卡片、3大业务层级导航与基准双向比对 (2026-10-04)
+*   **关联提交 (Git Commit)**: `e20a9422f26794fde5ff7f0f81bd9eee502f1b27` (Short: `e20a942`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com)` (Version ID: `0e3f7932-f391-4423-a64c-b374bd0c8d3d`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 变更点 1 (保留上层汇报 4 大 KPI 分区):
+        - 完整呈现 4 个核心汇报卡片（审计警告 / 风控警告 / 封禁警告 / 申诉警告）；
+        - 卡片集成实时统计数值（分子/分母 `summaryCounts`）、各类别专属动态微图标与进度条；
+        - 支持点击卡片与底部数据表格筛选联动，带来直观的高管视角概览体验。
+    - [x] 变更点 2 (向下延伸专属业务层级分区导航):
+        - 在 KPI 卡片与表格之间构建 3 大业务层级切换体系（预警时序总览 / 待办研判队列 / 防护基线与策略）；
+        - 「预警时序总览」承载全部预警类别筛选与时序流；
+        - 「待办研判队列」精准收敛至待办裁决流，操作栏动态切换为研判状态下拉筛选（待审申诉/已封禁/已解封/已驳回）；
+        - 「防护基线与策略」展开两张标准化策略基准卡片（邮件安全模式策略与风险分级初判基准），业务纵深分明。
+    - [x] 变更点 3 (对齐“用户列表”统一工作台规范且保持领域差异化):
+        - 采用 `.audit-box` + `.header-actions` + `.el-table` + 分页器单框统一设计，与用户管理保持视觉节奏一致；
+        - 保留审计专属的 IP/Geo/Device/FP 环境网络字段与研判放行交互，杜绝千篇一律的机械复刻；
+        - 显式内容纯文本不打底，表头预留充裕宽度（状态列 110px，操作列 150px），六语言无截断。
+    - [x] 变更点 4 (真实 D1 注册环境基准比对):
+        - 后端 `audit-service.js` 接入 `user` 表真实注册基线，动态提取 `createIp`、`device`、`os` 等构建对比基准；
+        - 研判弹窗内真实呈现「注册基准」vs「当前/申诉环境」对比，彻底解决相同字段绑定的展示缺陷。
+    - [x] 变更点 5 (技能与规范资产同步固化):
+        - `.agent/skills/admin-ui-standards/SKILL.md` 新增“控制台纵深业务层次规范 (Management Console Hierarchy: KPIs + Tiers + Data Grid)”。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：`mail-vue` Vite 构建通过 (13.74s, 0 警告 0 报错)；
+    - [x] 多语言对称核验：6 种官方语言 2337 词条 100% 绝对对称，无未包裹硬编码；
+    - [x] 生产全真栈自动化测试：`node tests/verify-refined-audit-console.mjs` 针对 `https://mail.epocanvas.com` 执行，33/33 项断言全部通过（0 失败）；
+    - [x] 真实生产截图留证：已更新并持久化至 `tests/refined_audit_console_table_light.png`、`tests/refined_audit_console_table_dark.png`、`tests/refined_audit_console_dialog.png`；
+    - [x] 零假数据残留：数据库与 KV 中零临时凭据或脏数据残留。
+
 ### 操作报告控制台全栈重构：对齐用户列表单框标准、纯文本不打底、RBAC防护与D1持久化 (2026-10-04)
 *   **关联提交 (Git Commit)**: `73a2561d3e91867a2b9e442bebe8366a639b5914` (Short: `73a2561`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com)` (Version ID: `02e5470d-f6d2-49dc-be4b-f3ca017d69cf`)
