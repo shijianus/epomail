@@ -8,6 +8,35 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### 操作报告控制台全栈重构：对齐用户列表单框标准、纯文本不打底、RBAC防护与D1持久化 (2026-10-04)
+*   **关联提交 (Git Commit)**: `73a2561d3e91867a2b9e442bebe8366a639b5914` (Short: `73a2561`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com)` (Version ID: `02e5470d-f6d2-49dc-be4b-f3ca017d69cf`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 变更点 1 (产品经理 PM 视角重塑与消除系统自述):
+        - 彻底剔除说教自述文本（如“加密模式 (Level 3 [E2EE])：零知识风控审计，时间戳已脱敏擦除...”）；
+        - 彻底消除多层嵌套画地为牢的 `.table-container`，全面采用与“用户列表”(`user/index.vue`) 完全对齐的 `.audit-box` / `.header-actions` / `.scrollbar` / `.el-table` 中和单框体系；
+    - [x] 变更点 2 (人体工学与显式内容纯文本不打底原则):
+        - 彻底废除表格内臃肿的长方框（`class="cell"` 与 `.env-pill` 灰底内嵌框）；
+        - IP、地理位置、设备指纹、事件类型与详情全部采用纯文本排版展示；
+        - 操作列交互按钮人体工学分流：申诉警告突出「研判放行」Primary，封禁警告突出「解除预警」Success Plain，常规警告提供标准下拉菜单；表格列固定右对齐 (`fixed="right"`)；
+    - [x] 变更点 3 (真实 D1 持久化与后端服务支撑):
+        - 新增 `auditLog` D1 ORM 实体与数据表 `audit_log`（含 `ticket_id`, `warning_type`, `base_ip`, `base_geo`, `base_device`, `base_fingerprint` 等）；
+        - `audit-service.js` 实现幂等 `ensureTables`、冷启动种子数据填充、真实 D1 查询与分页、动作处置与申诉裁决；
+        - `init.js` 注册 `v3_15DB` 幂等数据迁移；
+    - [x] 变更点 4 (严密权限防御体系与越权防护):
+        - 将 `/audit/list`, `/audit/action`, `/audit/adjudicate`, `/audit/purge` 全面纳入 `security.js` 权限中间件拦截；
+        - 严格绑定 RBAC 权限（`setting:query` 访问查询，`setting:set` 允许执行操作与裁决），彻底杜绝普通用户水平与垂直越权；
+        - `audit-api.js` 接口层引入 `ensureAuthUser` 深度防御拦截；
+    - [x] 变更点 5 (六语言 i18n 严格对称与规范资产固化):
+        - 补充 `auditIpSubnetMismatch` 词条，保持 6 语系（zh, zh-Hant, en, es, fr, nl）2337 个键 100% 绝对对称；
+        - 更新 `.agent/skills/admin-ui-standards/SKILL.md`，将 PM 设计视角、纯文本不打底与中和单框固化为永久制度准则。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：`mail-vue` Vite 构建通过 (13.27s, 0 警告 0 报错)；
+    - [x] 国际化三件套审计：`i18n-symmetry` (100% 对称)、`i18n-audit` (0 缺失)、`i18n-hardcoded` (0 硬编码)；
+    - [x] 独立 Subagent 审计：`pm_system_auditor` 专项审查提出 4 点改进清单，已 100% 修复并回归闭环；
+    - [x] 线上生产全真核验：`tests/verify-refined-audit-console.mjs` (26/26 断言全绿，0 失败)；
+    - [x] 跨模式与暗黑视觉实测：生产全真抓取 `refined_audit_console_table_light.png`、`refined_audit_console_table_dark.png`、`refined_audit_console_dialog.png`。
+
 ### 操作报告控制台精益化：彻底删除 audit-breadcrumb-strip 与 audit-header-banner (2026-10-04)
 *   **关联提交 (Git Commit)**: `712298fdd93564ca901958053f2acc4d4db437d3` (Short: `712298f`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com)` (Version ID: `3312bd11-11c8-45c2-8ea0-d1cb16ae6bb2`)
