@@ -3454,11 +3454,11 @@
           </div>
         </template>
         <div class="oauth-dialog-body">
-          <!-- 启用开关状态横幅 -->
-          <div class="oauth-enable-banner">
-            <div class="banner-label-group">
-              <span class="banner-title">{{ $t('oauthEnableProvider') }}</span>
-              <span class="banner-desc">{{ activeOauthProviderMeta.name }} SSO</span>
+          <!-- 启用开关行 (纯净无灰底方框) -->
+          <div class="oauth-enable-row">
+            <div class="enable-label-wrap">
+              <span class="enable-title">{{ $t('oauthEnableProvider') }}</span>
+              <span class="enable-subtitle">({{ activeOauthProviderMeta.name }} SSO)</span>
             </div>
             <el-switch v-model="oauthForm.enabled" />
           </div>
@@ -3468,7 +3468,7 @@
             <!-- Custom: Provider Name & Scope -->
             <template v-if="activeOauthProviderKey === 'custom'">
               <div class="grid-field">
-                <div class="field-label">{{ $t('oauthCustomName') }}</div>
+                <div class="field-label">{{ $t('oauthCustomName') }} <span class="required-star">*</span></div>
                 <el-input v-model="oauthForm.name" placeholder="e.g. Enterprise SSO" clearable />
               </div>
               <div class="grid-field">
@@ -3508,11 +3508,11 @@
             <!-- Apple: Team ID & Key ID -->
             <template v-if="activeOauthProviderKey === 'apple'">
               <div class="grid-field">
-                <div class="field-label">{{ $t('oauthTeamId') }}</div>
+                <div class="field-label">{{ $t('oauthTeamId') }} <span class="required-star">*</span></div>
                 <el-input v-model="oauthForm.teamId" placeholder="10-character Team ID" clearable />
               </div>
               <div class="grid-field">
-                <div class="field-label">{{ $t('oauthKeyId') }}</div>
+                <div class="field-label">{{ $t('oauthKeyId') }} <span class="required-star">*</span></div>
                 <el-input v-model="oauthForm.keyId" placeholder="10-character Key ID" clearable />
               </div>
             </template>
@@ -3540,20 +3540,18 @@
             </template>
           </div>
 
-          <!-- Redirect URI display & copy (单行极简集成条) -->
-          <div class="oauth-callback-compact-bar">
+          <!-- 回调地址单行 (纯净无灰底方框) -->
+          <div class="oauth-callback-row">
             <div class="callback-label-group">
               <span class="callback-label">{{ $t('oauthCallbackUrl') }}:</span>
               <code class="callback-code" :title="currentProviderCallbackUrl">{{ currentProviderCallbackUrl }}</code>
             </div>
-            <div class="callback-actions">
-              <el-tooltip :content="$t('oauthCallbackTip')" placement="top">
-                <el-button size="small" text type="primary" class="copy-callback-btn" @click="copyOauthRedirectUri">
-                  <Icon icon="fluent:copy-20-regular" width="14" height="14" style="margin-right: 4px;" />
-                  <span>{{ $t('copy') }}</span>
-                </el-button>
-              </el-tooltip>
-            </div>
+            <el-tooltip :content="$t('oauthCallbackTip')" placement="top">
+              <el-button size="small" text type="primary" class="copy-callback-btn" @click="copyOauthRedirectUri">
+                <Icon icon="fluent:copy-20-regular" width="14" height="14" style="margin-right: 4px;" />
+                <span>{{ $t('copy') }}</span>
+              </el-button>
+            </el-tooltip>
           </div>
         </div>
         <template #footer>
@@ -3841,9 +3839,119 @@ function copyOauthRedirectUri() {
   }
 }
 
+function isValidHttpUrl(str) {
+  if (!str || typeof str !== 'string') return false;
+  try {
+    const url = new URL(str);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch (_) {
+    return false;
+  }
+}
+
+function validateOauthForm(providerKey, form) {
+  const isEnabled = form.enabled === true || form.enabled === 1;
+
+  if (isEnabled) {
+    const clientId = form.clientId?.trim() || '';
+    if (!clientId || clientId.length < 3) {
+      ElMessage.warning(t('oauthClientIdRequired'));
+      return false;
+    }
+    if (clientId.length > 256 || /\s/.test(clientId)) {
+      ElMessage.warning(t('oauthClientIdInvalid'));
+      return false;
+    }
+
+    if (providerKey !== 'apple') {
+      const clientSecret = form.clientSecret?.trim() || '';
+      if (!clientSecret || clientSecret.length < 6) {
+        ElMessage.warning(t('oauthClientSecretRequired'));
+        return false;
+      }
+      if (clientSecret.length > 512 || /^\s+$/.test(clientSecret)) {
+        ElMessage.warning(t('oauthClientSecretInvalid'));
+        return false;
+      }
+    }
+
+    if (providerKey === 'microsoft') {
+      const tenant = form.tenant?.trim() || 'common';
+      if (!/^[a-zA-Z0-9.\-_]{1,128}$/.test(tenant)) {
+        ElMessage.warning(t('oauthTenantFormatError'));
+        return false;
+      }
+    }
+
+    if (providerKey === 'apple') {
+      const teamId = form.teamId?.trim() || '';
+      const keyId = form.keyId?.trim() || '';
+      if (!teamId || !/^[A-Za-z0-9]{10}$/.test(teamId)) {
+        ElMessage.warning(t('oauthAppleTeamIdInvalid'));
+        return false;
+      }
+      if (!keyId || !/^[A-Za-z0-9]{10}$/.test(keyId)) {
+        ElMessage.warning(t('oauthAppleKeyIdInvalid'));
+        return false;
+      }
+    }
+
+    if (providerKey === 'custom') {
+      const name = form.name?.trim() || '';
+      if (!name || name.length < 2 || name.length > 40) {
+        ElMessage.warning(t('oauthCustomNameRequired'));
+        return false;
+      }
+      if (!isValidHttpUrl(form.authUrl?.trim())) {
+        ElMessage.warning(t('oauthAuthUrlInvalid'));
+        return false;
+      }
+      if (!isValidHttpUrl(form.tokenUrl?.trim())) {
+        ElMessage.warning(t('oauthTokenUrlInvalid'));
+        return false;
+      }
+      if (!isValidHttpUrl(form.userInfoUrl?.trim())) {
+        ElMessage.warning(t('oauthUserInfoUrlInvalid'));
+        return false;
+      }
+    }
+  } else {
+    // 禁用模式下，如果填写了自定义端点但格式明显错误，予以拦截提示以防乱填
+    if (providerKey === 'custom') {
+      if (form.authUrl?.trim() && !isValidHttpUrl(form.authUrl.trim())) {
+        ElMessage.warning(t('oauthAuthUrlInvalid'));
+        return false;
+      }
+      if (form.tokenUrl?.trim() && !isValidHttpUrl(form.tokenUrl.trim())) {
+        ElMessage.warning(t('oauthTokenUrlInvalid'));
+        return false;
+      }
+      if (form.userInfoUrl?.trim() && !isValidHttpUrl(form.userInfoUrl.trim())) {
+        ElMessage.warning(t('oauthUserInfoUrlInvalid'));
+        return false;
+      }
+    }
+    if (providerKey === 'apple') {
+      if (form.teamId?.trim() && !/^[A-Za-z0-9]{10}$/.test(form.teamId.trim())) {
+        ElMessage.warning(t('oauthAppleTeamIdInvalid'));
+        return false;
+      }
+      if (form.keyId?.trim() && !/^[A-Za-z0-9]{10}$/.test(form.keyId.trim())) {
+        ElMessage.warning(t('oauthAppleKeyIdInvalid'));
+        return false;
+      }
+    }
+  }
+
+  return true;
+}
+
 async function handleTestOauthProvider() {
   if (!oauthForm.clientId) {
-    ElMessage.warning(t('oauthClientId') || 'Client ID is required');
+    ElMessage.warning(t('oauthClientIdRequired'));
+    return;
+  }
+  if (!validateOauthForm(activeOauthProviderKey.value, oauthForm)) {
     return;
   }
   testingOauth.value = true;
@@ -3864,6 +3972,10 @@ async function handleTestOauthProvider() {
 }
 
 async function saveOauthProviderConfig() {
+  if (!validateOauthForm(activeOauthProviderKey.value, oauthForm)) {
+    return;
+  }
+
   const providers = { ...getParsedOauthProviders() };
   providers[activeOauthProviderKey.value] = {
     enabled: oauthForm.enabled,
@@ -6537,30 +6649,28 @@ function editSetting(settingForm, refreshStatus = true, closeAiDialog = false) {
   .oauth-dialog-body {
     display: flex;
     flex-direction: column;
-    gap: 12px;
-    padding: 0;
+    gap: 16px;
+    padding: 4px 0 0 0;
 
-    .oauth-enable-banner {
+    .oauth-enable-row {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 10px 14px;
-      border-radius: 8px;
-      background: var(--el-fill-color-light);
-      border: 1px solid var(--el-border-color-lighter);
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--el-border-color-lighter);
 
-      .banner-label-group {
+      .enable-label-wrap {
         display: flex;
         align-items: center;
         gap: 8px;
 
-        .banner-title {
-          font-size: 13.5px;
+        .enable-title {
+          font-size: 14px;
           font-weight: 600;
           color: var(--el-text-color-primary);
         }
 
-        .banner-desc {
+        .enable-subtitle {
           font-size: 12px;
           color: var(--el-text-color-secondary);
         }
@@ -6570,7 +6680,7 @@ function editSetting(settingForm, refreshStatus = true, closeAiDialog = false) {
     .oauth-grid-form {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 12px 14px;
+      gap: 14px 16px;
 
       .grid-field {
         display: flex;
@@ -6581,39 +6691,39 @@ function editSetting(settingForm, refreshStatus = true, closeAiDialog = false) {
         }
 
         .field-label {
-          font-size: 12.5px;
+          font-size: 13px;
           font-weight: 500;
-          margin-bottom: 5px;
+          margin-bottom: 6px;
           color: var(--el-text-color-regular);
+          display: flex;
+          align-items: center;
+          gap: 4px;
 
           .required-star {
             color: var(--el-color-danger);
-            margin-left: 2px;
+            font-weight: bold;
           }
         }
       }
     }
 
-    .oauth-callback-compact-bar {
+    .oauth-callback-row {
       display: flex;
-      align-items: center;
       justify-content: space-between;
-      gap: 10px;
-      padding: 8px 12px;
-      border-radius: 8px;
-      background: var(--el-fill-color-light);
-      border: 1px solid var(--el-border-color-lighter);
+      align-items: center;
+      padding-top: 4px;
+      gap: 12px;
 
       .callback-label-group {
         display: flex;
         align-items: center;
         gap: 8px;
         min-width: 0;
-        flex: 1;
+        overflow: hidden;
 
         .callback-label {
           font-size: 12px;
-          font-weight: 600;
+          font-weight: 500;
           color: var(--el-text-color-regular);
           white-space: nowrap;
           flex-shrink: 0;
@@ -6621,28 +6731,17 @@ function editSetting(settingForm, refreshStatus = true, closeAiDialog = false) {
 
         .callback-code {
           font-size: 12px;
-          font-family: var(--font-mono, monospace);
           color: var(--el-color-primary);
-          background: var(--el-bg-color);
-          padding: 2px 6px;
-          border-radius: 4px;
-          border: 1px solid var(--el-border-color-light);
+          font-family: var(--font-mono, monospace);
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
-          min-width: 0;
-          flex: 1;
         }
       }
 
-      .callback-actions {
+      .copy-callback-btn {
         flex-shrink: 0;
-
-        .copy-callback-btn {
-          padding: 4px 8px;
-          height: 26px;
-          font-size: 12px;
-        }
+        padding: 4px 8px;
       }
     }
   }
@@ -6655,11 +6754,11 @@ function editSetting(settingForm, refreshStatus = true, closeAiDialog = false) {
       grid-column: span 1 !important;
     }
   }
-  .oauth-config-dialog .oauth-dialog-body .oauth-callback-compact-bar {
+  .oauth-config-dialog .oauth-dialog-body .oauth-callback-row {
     flex-direction: column;
     align-items: flex-start !important;
-    gap: 8px !important;
-    .callback-actions {
+    gap: 6px !important;
+    .copy-callback-btn {
       align-self: flex-end;
     }
   }

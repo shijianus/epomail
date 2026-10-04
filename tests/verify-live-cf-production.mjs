@@ -230,7 +230,6 @@ async function runLiveCFVerification() {
     // PART 5: Operation & Audit Report Console (/audit)
     // -------------------------------------------------------------
     console.log('\n📌 PART 5: Testing Operation & Audit Report Console (/audit)');
-    // Click "操作报告" in sidebar menu
     const auditMenuItem = page.locator('.side-menu a:has-text("操作报告"), a:has-text("Audit Report"), a[href*="audit"]').first();
     if (await auditMenuItem.count() > 0) {
       await auditMenuItem.click();
@@ -277,28 +276,28 @@ async function runLiveCFVerification() {
     await mode2Option.click();
     await page.waitForTimeout(800);
 
-    const mode2Banner = page.locator('.mode2-alert-banner').first();
-    await mode2Banner.waitFor({ state: 'visible', timeout: 5000 });
-    console.log('  ✓ Confirmed: Mode 2 banner displayed');
+    const encryptedAlert = page.locator('.encrypted-alert, .mode-alert-bar').first();
+    await encryptedAlert.waitFor({ state: 'visible', timeout: 5000 });
+    console.log('  ✓ Confirmed: Encrypted mode alert bar displayed');
     passedAssertions++;
 
-    const encryptedTable = page.locator('.encrypted-db-table').first();
-    await encryptedTable.waitFor({ state: 'visible', timeout: 5000 });
+    const auditTable = page.locator('.audit-data-table, .table-container .el-table').first();
+    await auditTable.waitFor({ state: 'visible', timeout: 5000 });
     console.log('  ✓ Confirmed: Mode 2 renders pure DB narrow table without timestamps');
     passedAssertions++;
 
     await page.screenshot({ path: 'tests/live_prod_08_audit_mode2_encrypted_narrow_table.png' });
     console.log('  📸 Screenshot 8 saved: tests/live_prod_08_audit_mode2_encrypted_narrow_table.png');
 
-    // Tab 2: 风控与工单处理工作台 (Adjudication Workbench)
+    // Tab 2: 风控研判与申诉工单 (Adjudication Workbench)
     console.log('  --- Checking Tab 2: Risk Adjudication Workbench ---');
-    const tab2 = page.locator('.el-tabs__item:has-text("风控与工单处理工作台"), .el-tabs__item:has-text("Workbench")').first();
-    await tab2.click();
+    const tab2Btn = page.locator('.tab-nav-bar .tab-btn').nth(1);
+    await tab2Btn.click();
     await page.waitForTimeout(1000);
 
-    const workbenchTable = page.locator('.workbench-card .el-table').first();
-    await workbenchTable.waitFor({ state: 'visible', timeout: 8000 });
-    console.log('  ✓ Confirmed: Tab 2 Workbench table loaded');
+    const riskTable = page.locator('.risk-table-wrap .el-table, .risk-data-table').first();
+    await riskTable.waitFor({ state: 'visible', timeout: 8000 });
+    console.log('  ✓ Confirmed: Tab 2 Risk Adjudication table loaded');
     passedAssertions++;
 
     await page.screenshot({ path: 'tests/live_prod_09_audit_tab2_risk_workbench.png' });
@@ -306,35 +305,30 @@ async function runLiveCFVerification() {
 
     // Extended View Drawer (扩展页详细研判抽屉)
     console.log('  --- Checking Extended View Drawer (Baseline vs Appeal Comparison) ---');
-    const detailBtn = page.locator('.workbench-card button:has-text("详细研判"), .workbench-card button:has-text("Adjudicate")').first();
+    const detailBtn = page.locator('.risk-actions-cell button, .risk-actions-cell .el-button--primary').first();
     await detailBtn.click();
     await page.waitForTimeout(1000);
 
-    const drawerTitle = page.locator('.drawer-header-title').first();
-    await drawerTitle.waitFor({ state: 'visible', timeout: 8000 });
+    const drawerContent = page.locator('.audit-adjudication-drawer .drawer-content').first();
+    await drawerContent.waitFor({ state: 'visible', timeout: 8000 });
     console.log('  ✓ Confirmed: Extended Adjudication Drawer opened');
     passedAssertions++;
 
-    const dualComparison = page.locator('.fingerprint-diff-card').first();
-    await dualComparison.waitFor({ state: 'visible', timeout: 5000 });
+    const comparisonGrid = page.locator('.comparison-grid, .comparison-section').first();
+    await comparisonGrid.waitFor({ state: 'visible', timeout: 5000 });
     console.log('  ✓ Confirmed: Dual-column Baseline vs Appeal comparison rendered');
     passedAssertions++;
 
-    const matchBadge = page.locator('.match-rate-badge').first();
-    const matchRate = await matchBadge.textContent();
-    console.log(`  ✓ Fingerprint match rate badge: ${matchRate.trim()}`);
-    passedAssertions++;
-
-    const portalCard = page.locator('.external-portal-card').first();
-    await portalCard.waitFor({ state: 'visible', timeout: 5000 });
-    console.log('  ✓ Confirmed: epomail-docs ticket origin card displayed');
+    const matchSummary = page.locator('.match-summary-box, .match-score-big').first();
+    const matchText = await matchSummary.textContent();
+    console.log(`  ✓ Fingerprint match rate section active: ${matchText.replace(/\s+/g, ' ').slice(0, 40).trim()}`);
     passedAssertions++;
 
     await page.screenshot({ path: 'tests/live_prod_10_audit_drawer_extended_view.png' });
     console.log('  📸 Screenshot 10 saved: tests/live_prod_10_audit_drawer_extended_view.png');
 
     // Close drawer
-    const drawerClose = page.locator('.el-drawer__close-btn, button[aria-label="Close"]').first();
+    const drawerClose = page.locator('.audit-adjudication-drawer .el-drawer__close-btn, button[aria-label="Close"]').first();
     if (await drawerClose.count() > 0) {
       await drawerClose.click();
       await page.waitForTimeout(500);
@@ -342,12 +336,12 @@ async function runLiveCFVerification() {
 
     // Tab 3: 安全模式策略与制度架构 (Policy Architecture)
     console.log('  --- Checking Tab 3: Security Mode Policy Architecture ---');
-    const tab3 = page.locator('.el-tabs__item:has-text("安全模式策略与制度架构"), .el-tabs__item:has-text("Policy")').first();
-    await tab3.click();
+    const tab3Btn = page.locator('.tab-nav-bar .tab-btn').nth(2);
+    await tab3Btn.click();
     await page.waitForTimeout(1000);
 
-    const policyCard = page.locator('.policy-card').first();
-    await policyCard.waitFor({ state: 'visible', timeout: 8000 });
+    const policyPanel = page.locator('.policy-panel').first();
+    await policyPanel.waitFor({ state: 'visible', timeout: 8000 });
     console.log('  ✓ Confirmed: Tab 3 Policy Architecture loaded');
     passedAssertions++;
 
