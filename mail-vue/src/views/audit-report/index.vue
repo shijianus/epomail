@@ -24,18 +24,7 @@
                 <span class="stat-pending">{{ summaryCounts.categories.audit.pending }}</span>
                 <span class="stat-unit">/ {{ summaryCounts.categories.audit.total }}</span>
               </div>
-              <div class="kpi-data-meta">
-                <span>{{ $t('auditPendingData') }}: {{ summaryCounts.categories.audit.pending }}</span>
-                <span class="meta-sep">·</span>
-                <span>{{ $t('auditTotalData') }}: {{ summaryCounts.categories.audit.total }}</span>
-              </div>
               <div class="kpi-desc kpi-sub" :title="$t('auditCaseTypeRoutineDesc')">{{ $t('auditCaseTypeRoutineDesc') }}</div>
-              <div class="kpi-progress-bar">
-                <div
-                  class="kpi-progress-fill fill-routine"
-                  :style="{ width: calcPercent(summaryCounts.categories.audit.pending, summaryCounts.categories.audit.total) + '%' }"
-                ></div>
-              </div>
             </div>
           </div>
 
@@ -57,18 +46,7 @@
                 <span class="stat-pending">{{ summaryCounts.categories.risk.pending }}</span>
                 <span class="stat-unit">/ {{ summaryCounts.categories.risk.total }}</span>
               </div>
-              <div class="kpi-data-meta">
-                <span>{{ $t('auditPendingData') }}: {{ summaryCounts.categories.risk.pending }}</span>
-                <span class="meta-sep">·</span>
-                <span>{{ $t('auditTotalData') }}: {{ summaryCounts.categories.risk.total }}</span>
-              </div>
               <div class="kpi-desc kpi-sub" :title="$t('auditCaseTypeThreatDesc')">{{ $t('auditCaseTypeThreatDesc') }}</div>
-              <div class="kpi-progress-bar">
-                <div
-                  class="kpi-progress-fill fill-threat"
-                  :style="{ width: calcPercent(summaryCounts.categories.risk.pending, summaryCounts.categories.risk.total) + '%' }"
-                ></div>
-              </div>
             </div>
           </div>
 
@@ -90,18 +68,7 @@
                 <span class="stat-pending">{{ summaryCounts.categories.appeal.pending }}</span>
                 <span class="stat-unit">/ {{ summaryCounts.categories.appeal.total }}</span>
               </div>
-              <div class="kpi-data-meta">
-                <span>{{ $t('auditPendingData') }}: {{ summaryCounts.categories.appeal.pending }}</span>
-                <span class="meta-sep">·</span>
-                <span>{{ $t('auditTotalData') }}: {{ summaryCounts.categories.appeal.total }}</span>
-              </div>
               <div class="kpi-desc kpi-sub" :title="$t('auditCaseTypeAppealDesc')">{{ $t('auditCaseTypeAppealDesc') }}</div>
-              <div class="kpi-progress-bar">
-                <div
-                  class="kpi-progress-fill fill-appeal"
-                  :style="{ width: calcPercent(summaryCounts.categories.appeal.pending, summaryCounts.categories.appeal.total) + '%' }"
-                ></div>
-              </div>
             </div>
           </div>
 
@@ -123,18 +90,7 @@
                 <span class="stat-pending">{{ summaryCounts.categories.ban.pending }}</span>
                 <span class="stat-unit">/ {{ summaryCounts.categories.ban.total }}</span>
               </div>
-              <div class="kpi-data-meta">
-                <span>{{ $t('auditPendingData') }}: {{ summaryCounts.categories.ban.pending }}</span>
-                <span class="meta-sep">·</span>
-                <span>{{ $t('auditTotalData') }}: {{ summaryCounts.categories.ban.total }}</span>
-              </div>
               <div class="kpi-desc kpi-sub" :title="$t('auditCaseTypeSanctionDesc')">{{ $t('auditCaseTypeSanctionDesc') }}</div>
-              <div class="kpi-progress-bar">
-                <div
-                  class="kpi-progress-fill fill-sanction"
-                  :style="{ width: calcPercent(summaryCounts.categories.ban.pending, summaryCounts.categories.ban.total) + '%' }"
-                ></div>
-              </div>
             </div>
           </div>
         </div>
@@ -276,7 +232,7 @@
                 </el-table-column>
 
                 <!-- 封禁时间 -->
-                <el-table-column :label="$t('auditColBanTime')" width="160">
+                <el-table-column :label="$t('auditColBanTime')" width="145">
                   <template #default="{ row }">
                     <span class="plain-time font-mono">
                       {{ (row.banTime || row.createTime) ? tzDayjs(row.banTime || row.createTime).format('YYYY-MM-DD HH:mm') : '-' }}
@@ -285,7 +241,7 @@
                 </el-table-column>
 
                 <!-- 最后处理时间 -->
-                <el-table-column :label="$t('auditColLastProcessTime')" width="160">
+                <el-table-column :label="$t('auditColLastProcessTime')" width="145">
                   <template #default="{ row }">
                     <span class="plain-time font-mono">
                       {{ (row.resolvedTime || row.banTime || row.createTime) ? tzDayjs(row.resolvedTime || row.banTime || row.createTime).format('YYYY-MM-DD HH:mm') : '-' }}
@@ -294,14 +250,14 @@
                 </el-table-column>
 
                 <!-- 封禁原因 -->
-                <el-table-column :label="$t('auditColBanReason')" min-width="220" show-overflow-tooltip>
+                <el-table-column :label="$t('auditColBanReason')" min-width="180" show-overflow-tooltip>
                   <template #default="{ row }">
                     <span class="ban-reason-text">{{ row.banReason || row.actionText || '-' }}</span>
                   </template>
                 </el-table-column>
 
                 <!-- 当前状态 (已封禁 / 已解禁·移出黑名单) -->
-                <el-table-column :label="$t('auditCurrentStatus')" width="160">
+                <el-table-column :label="$t('auditCurrentStatus')" width="135">
                   <template #default="{ row }">
                     <el-tag v-if="row.status === 'unbanned'" size="small" type="success" effect="plain">
                       {{ $t('auditStatusUnbannedRecord') }}
@@ -313,7 +269,7 @@
                 </el-table-column>
 
                 <!-- 详情 (纯查看，只读档案) -->
-                <el-table-column :label="$t('auditDetailColumn')" width="110" align="right" fixed="right">
+                <el-table-column :label="$t('auditDetailColumn')" width="115" align="right">
                   <template #default="{ row }">
                     <el-tooltip effect="dark" :content="$t('auditBtnViewDossier')" placement="top">
                       <el-button
@@ -342,9 +298,6 @@
                       <span v-if="isCaseClosed(row.status)" class="subject-resolved font-mono">
                         ({{ row.email }})
                       </span>
-                      <el-tag v-else size="small" type="info" effect="plain" class="masked-status-tag">
-                        {{ $t('auditCaseStatusInAudit') }}
-                      </el-tag>
                       <!-- 细分来源与检举徽标 -->
                       <template v-if="isRiskType(row)">
                         <el-tag v-if="row.isInternal === 1" size="small" type="warning" effect="plain" class="audit-sub-tag">
@@ -369,7 +322,7 @@
                   </template>
                 </el-table-column>
 
-                <!-- 初级阶段判定等级 / 威胁评估 (常规审查显式LV0~LV3，异常威胁不显式LV) -->
+                <!-- 风险判定与触发依据 (常规审查显式LV0~LV3，异常威胁不显式LV) -->
                 <el-table-column :label="$t('auditRobotRiskAssessment')" min-width="190">
                   <template #default="{ row }">
                     <div class="robot-risk-cell">
@@ -416,7 +369,7 @@
                 </el-table-column>
 
                 <!-- 当前审计状态 -->
-                <el-table-column :label="$t('auditCurrentStatus')" width="140">
+                <el-table-column :label="$t('auditCurrentStatus')" width="120">
                   <template #default="{ row }">
                     <el-tag size="small" :type="getStatusTagType(row.status)">
                       {{ getStatusLabel(row.status) }}
@@ -425,7 +378,7 @@
                 </el-table-column>
 
                 <!-- 启案时间 / 检举时间 -->
-                <el-table-column :label="$t('auditInitiatedAt')" width="160" prop="createTime">
+                <el-table-column :label="$t('auditInitiatedAt')" width="145" prop="createTime">
                   <template #default="{ row }">
                     <span class="plain-time font-mono">
                       {{ row.createTime ? tzDayjs(row.createTime).format('YYYY-MM-DD HH:mm') : '-' }}
@@ -434,7 +387,7 @@
                 </el-table-column>
 
                 <!-- 结案时间 / 更新时间 -->
-                <el-table-column :label="$t('auditResolvedAt')" width="160" prop="resolvedTime">
+                <el-table-column :label="$t('auditResolvedAt')" width="145" prop="resolvedTime">
                   <template #default="{ row }">
                     <span class="plain-time font-mono">
                       {{ row.resolvedTime ? tzDayjs(row.resolvedTime).format('YYYY-MM-DD HH:mm') : '-' }}
@@ -443,7 +396,7 @@
                 </el-table-column>
 
                 <!-- 详情审计 -->
-                <el-table-column :label="$t('auditDetailColumn')" width="125" align="right" fixed="right">
+                <el-table-column :label="$t('auditDetailColumn')" width="115" align="right">
                   <template #default="{ row }">
                     <el-tooltip effect="dark" :content="$t('auditReviewCaseTooltip')" placement="top">
                       <el-button
@@ -567,7 +520,7 @@
         <div class="dossier-card">
           <div class="section-title">
             <Icon icon="fluent:bot-20-regular" width="18" height="18" />
-            <span>{{ $t('auditRuleSanctionRef') }} (风险初判)</span>
+            <span>{{ $t('auditRuleSanctionRef') }}</span>
           </div>
 
           <div class="robot-rule-box">
@@ -592,7 +545,7 @@
           </div>
         </div>
 
-        <!-- Google 式多维信任上下文证据画像 (四维信任交叉验证) -->
+        <!-- 多维可信研判凭据画像 -->
         <div class="dossier-card">
           <div class="section-title">
             <Icon icon="fluent:chart-multiple-20-regular" width="18" height="18" />
@@ -612,10 +565,26 @@
                 <span>{{ $t('auditContextAuth') }}</span>
               </div>
               <div class="pillar-items">
-                <div class="item-row"><span class="k">{{ $t('auditField2fa') }}:</span> <span class="v">{{ $t('audit2faProtected') }}</span></div>
-                <div class="item-row"><span class="k">{{ $t('auditFieldCredHealth') }}:</span> <span class="v">{{ $t('auditCredNotLeaked') }}</span></div>
-                <div class="item-row"><span class="k">{{ $t('auditFieldChallengeHistory') }}:</span> <span class="v">{{ $t('auditNoPasswordLock') }}</span></div>
-                <div class="item-row"><span class="k">{{ $t('auditFieldSessionState') }}:</span> <span class="v">{{ $t('auditOauthIsolated') }}</span></div>
+                <div class="item-row">
+                  <span class="k">{{ $t('auditField2fa') }}:</span>
+                  <span class="v">{{ selectedRow.status === 'banned' ? $t('auditStatusBannedActive') : $t('audit2faProtected') }}</span>
+                </div>
+                <div class="item-row">
+                  <span class="k">{{ $t('auditFieldCredHealth') }}:</span>
+                  <span class="v" :class="{ 'text-danger': isRiskType(selectedRow) || isBanType(selectedRow) }">
+                    {{ (isRiskType(selectedRow) || isBanType(selectedRow)) ? $t('auditCredCompromised') : $t('auditCredNotLeaked') }}
+                  </span>
+                </div>
+                <div class="item-row">
+                  <span class="k">{{ $t('auditFieldChallengeHistory') }}:</span>
+                  <span class="v" :class="{ 'text-danger': isBanType(selectedRow) }">
+                    {{ isBanType(selectedRow) ? $t('auditStatusBannedActive') : $t('auditNoPasswordLock') }}
+                  </span>
+                </div>
+                <div class="item-row">
+                  <span class="k">{{ $t('auditFieldSessionState') }}:</span>
+                  <span class="v">{{ selectedRow.status === 'banned' ? $t('auditStatusBannedActive') : $t('auditOauthIsolated') }}</span>
+                </div>
               </div>
             </div>
 
@@ -626,10 +595,30 @@
                 <span>{{ $t('auditContextBehavior') }}</span>
               </div>
               <div class="pillar-items">
-                <div class="item-row"><span class="k">{{ $t('auditFieldUserReports') }}:</span> <span class="v" :class="{ 'text-danger': selectedRow.reportedByOthers > 0 }">{{ $t('auditReportsCount', { count: selectedRow.reportedByOthers || 0 }) }}</span></div>
-                <div class="item-row"><span class="k">{{ $t('auditFieldSendRate') }}:</span> <span class="v">{{ $t('auditSendRateNormal') }}</span></div>
-                <div class="item-row"><span class="k">{{ $t('auditFieldBounceRate') }}:</span> <span class="v">{{ $t('auditBounceRateHealthy') }}</span></div>
-                <div class="item-row"><span class="k">{{ $t('auditFieldReputation') }}:</span> <span class="v font-medium text-primary">{{ $t('auditReputationGood') }}</span></div>
+                <div class="item-row">
+                  <span class="k">{{ $t('auditFieldUserReports') }}:</span>
+                  <span class="v" :class="{ 'text-danger': (selectedRow.reportedByOthers || 0) > 0 }">
+                    {{ (selectedRow.reportedByOthers || 0) > 0 ? $t('auditReportsCount', { count: selectedRow.reportedByOthers }) : $t('auditNoReports') }}
+                  </span>
+                </div>
+                <div class="item-row">
+                  <span class="k">{{ $t('auditFieldSendRate') }}:</span>
+                  <span class="v" :class="{ 'text-danger': isRiskType(selectedRow) }">
+                    {{ isRiskType(selectedRow) ? $t('auditSendRateSpike') : $t('auditSendRateNormal') }}
+                  </span>
+                </div>
+                <div class="item-row">
+                  <span class="k">{{ $t('auditFieldBounceRate') }}:</span>
+                  <span class="v" :class="{ 'text-danger': isRiskType(selectedRow) }">
+                    {{ isRiskType(selectedRow) ? $t('auditBounceRateHigh') : $t('auditBounceRateHealthy') }}
+                  </span>
+                </div>
+                <div class="item-row">
+                  <span class="k">{{ $t('auditFieldReputation') }}:</span>
+                  <span class="v font-medium" :class="getReputationClass(selectedRow)">
+                    {{ getReputationLabel(selectedRow) }}
+                  </span>
+                </div>
               </div>
             </div>
 
@@ -924,6 +913,22 @@ function getCategoryLabel(category) {
     case 'other': return t('reportCatOther');
     default: return category || t('reportCatOther');
   }
+}
+
+function getReputationClass(row) {
+  if (!row) return 'text-primary';
+  if (isBanType(row) || row.status === 'banned') return 'text-danger';
+  if (isRiskType(row) || (row.reportedByOthers || 0) > 0) return 'text-danger';
+  if (isAppealType(row)) return 'text-warning';
+  return 'text-primary';
+}
+
+function getReputationLabel(row) {
+  if (!row) return t('auditReputationGood');
+  if (isBanType(row) || row.status === 'banned') return t('auditReputationBanned');
+  if (isRiskType(row) || (row.reportedByOthers || 0) > 0) return t('auditReputationCritical');
+  if (isAppealType(row)) return t('auditReputationAppeal');
+  return t('auditReputationGood');
 }
 
 function getRobotRiskTagType(priority) {
@@ -1253,45 +1258,14 @@ onUnmounted(() => {
   }
 }
 
-.kpi-data-meta {
-  font-size: 11px;
-  color: var(--el-text-color-secondary);
-  margin-top: 2px;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-
-  .meta-sep {
-    color: var(--el-text-color-placeholder);
-  }
-}
-
 .kpi-desc {
-  font-size: 11px;
-  color: var(--el-text-color-placeholder);
-  margin-top: 2px;
+  font-size: 11.5px;
+  color: var(--el-text-color-secondary);
+  margin-top: 4px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.kpi-progress-bar {
-  height: 3px;
-  border-radius: 2px;
-  background: var(--el-fill-color-light);
-  margin-top: 6px;
-  overflow: hidden;
-}
-
-.kpi-progress-fill {
-  height: 100%;
-  border-radius: 2px;
-  transition: width 0.3s ease;
-
-  &.fill-routine { background: var(--el-color-primary); }
-  &.fill-threat { background: var(--el-color-danger); }
-  &.fill-appeal { background: var(--el-color-warning); }
-  &.fill-sanction { background: var(--el-text-color-placeholder); }
+  line-height: 1.3;
 }
 
 /* 2. 工作台单一外框 (杜绝嵌套二层脱节方框，直接让表格承载) */
@@ -1591,8 +1565,12 @@ onUnmounted(() => {
 
 .evidence-pillars {
   display: grid;
-  grid-template-columns: 1fr;
-  gap: 10px;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+
+  @media (max-width: 600px) {
+    grid-template-columns: 1fr;
+  }
 }
 
 .pillar-box {
@@ -1622,11 +1600,12 @@ onUnmounted(() => {
 
       .k {
         color: var(--el-text-color-secondary);
-        width: 70px;
+        width: 65px;
         flex-shrink: 0;
       }
       .v {
         color: var(--el-text-color-primary);
+        word-break: break-all;
       }
     }
   }
