@@ -47,6 +47,11 @@ const auditService = {
 					match_score INTEGER DEFAULT 0,
 					subnet_match INTEGER DEFAULT 0,
 					appeal_reason TEXT,
+					ban_reason TEXT,
+					ban_time DATETIME,
+					is_internal INTEGER DEFAULT 0,
+					report_category TEXT,
+					report_reason TEXT,
 					resolved_time DATETIME,
 					create_time DATETIME DEFAULT CURRENT_TIMESTAMP
 				);
@@ -58,7 +63,12 @@ const auditService = {
 				{ name: 'base_geo', sql: `ALTER TABLE audit_log ADD COLUMN base_geo TEXT;` },
 				{ name: 'base_device', sql: `ALTER TABLE audit_log ADD COLUMN base_device TEXT;` },
 				{ name: 'base_fingerprint', sql: `ALTER TABLE audit_log ADD COLUMN base_fingerprint TEXT;` },
-				{ name: 'resolved_time', sql: `ALTER TABLE audit_log ADD COLUMN resolved_time TEXT;` }
+				{ name: 'resolved_time', sql: `ALTER TABLE audit_log ADD COLUMN resolved_time TEXT;` },
+				{ name: 'ban_reason', sql: `ALTER TABLE audit_log ADD COLUMN ban_reason TEXT;` },
+				{ name: 'ban_time', sql: `ALTER TABLE audit_log ADD COLUMN ban_time TEXT;` },
+				{ name: 'is_internal', sql: `ALTER TABLE audit_log ADD COLUMN is_internal INTEGER DEFAULT 0;` },
+				{ name: 'report_category', sql: `ALTER TABLE audit_log ADD COLUMN report_category TEXT;` },
+				{ name: 'report_reason', sql: `ALTER TABLE audit_log ADD COLUMN report_reason TEXT;` }
 			];
 			for (const col of baselineCols) {
 				try {
@@ -89,14 +99,205 @@ const auditService = {
 				return;
 			}
 			const initialRecords = [
+				// --- 1. 常规审查 (Routine Reviews - warningType: 'audit', LV0~LV3 自动审查) ---
 				{
-					ticketId: 'TKT-2026-ZS88K1',
+					ticketId: 'REV-2026-LV102',
+					email: 'tester_audited@epocanvas.com',
+					warningType: 'audit',
+					eventType: 'ip_roaming_routine',
+					category: 'security',
+					actionText: '{tester_audited@epocanvas.com} 常规多网/多地IP漫游跳跃 (LV1)',
+					detailText: '常规多网多地IP跳跃审查 (Tokyo + Osaka)。对账户及社群无重大危害，评定为 LV1·轻微跳跃，常规例行排查。',
+					ip: '104.28.19.44',
+					geo: 'Tokyo, JP',
+					device: 'Safari 17 / macOS',
+					deviceType: 'desktop',
+					fingerprint: 'fp_safe_991',
+					baseIp: '104.28.19.1',
+					baseGeo: 'Tokyo, JP',
+					baseDevice: 'Safari 17 / macOS',
+					baseFingerprint: 'fp_safe_991',
+					isRegIp: 1,
+					isMultiIp: 0,
+					activeIpCount: 1,
+					reportedByOthers: 0,
+					riskLevel: 'normal',
+					priority: 'LV1',
+					status: 'active',
+					recommendedAction: 'archive_routine',
+					matchScore: 98,
+					subnetMatch: 1,
+					appealReason: null
+				},
+				{
+					ticketId: 'REV-2026-LV209',
+					email: 'guest_expired@visitor.org',
+					warningType: 'audit',
+					eventType: 'bot_probe_routine',
+					category: 'account',
+					actionText: '{guest_expired@visitor.org} 疑似低频人机请求特征 (LV2)',
+					detailText: '低频接口探测特征，判定为自动化爬取。对平台伤害有限，评定为 LV2·疑似人机。超过72小时无异常，系统已超时自动封存归档。',
+					ip: '198.51.100.22',
+					geo: 'London, GB',
+					device: 'Curl / Linux',
+					deviceType: 'desktop',
+					fingerprint: 'fp_probe_11',
+					isRegIp: 0,
+					isMultiIp: 0,
+					activeIpCount: 1,
+					reportedByOthers: 0,
+					riskLevel: 'normal',
+					priority: 'LV2',
+					status: 'expired',
+					recommendedAction: 'archive_routine',
+					matchScore: 20,
+					subnetMatch: 0,
+					appealReason: null,
+					resolvedTime: '2026-10-01T12:00:00Z'
+				},
+				{
+					ticketId: 'REV-2026-LV001',
+					email: 'health_sample@monitor.epocanvas.com',
+					warningType: 'audit',
+					eventType: 'baseline_sample',
+					category: 'security',
+					actionText: '{health_sample@monitor.epocanvas.com} 例行基线合规采样 (LV0)',
+					detailText: '系统安全基线例行微弱偏差采样，无危害，审查完毕已快速封存归档。',
+					ip: '104.28.10.12',
+					geo: 'Singapore, SG',
+					device: 'HealthMonitor / Linux',
+					deviceType: 'desktop',
+					fingerprint: 'fp_health_01',
+					isRegIp: 1,
+					isMultiIp: 0,
+					activeIpCount: 1,
+					reportedByOthers: 0,
+					riskLevel: 'normal',
+					priority: 'LV0',
+					status: 'resolved',
+					recommendedAction: 'archive_routine',
+					matchScore: 100,
+					subnetMatch: 1,
+					appealReason: null,
+					resolvedTime: '2026-10-03T16:20:00Z'
+				},
+				{
+					ticketId: 'REV-2026-LV305',
+					email: 'roaming_user@epocanvas.com',
+					warningType: 'audit',
+					eventType: 'device_shift_routine',
+					category: 'account',
+					actionText: '{roaming_user@epocanvas.com} 非关键环境指纹偏移 (LV3)',
+					detailText: '检测到非关键系统配置与指纹弱匹配，列入常规观察清单。管理员无需主动干预，等待过期封存。',
+					ip: '203.0.113.88',
+					geo: 'Seoul, KR',
+					device: 'Edge 128 / Windows',
+					deviceType: 'desktop',
+					fingerprint: 'fp_roam_882',
+					isRegIp: 0,
+					isMultiIp: 1,
+					activeIpCount: 2,
+					reportedByOthers: 0,
+					riskLevel: 'medium',
+					priority: 'LV3',
+					status: 'active',
+					recommendedAction: 'archive_routine',
+					matchScore: 68,
+					subnetMatch: 0,
+					appealReason: null
+				},
+
+				// --- 2. 异常威胁 (Anomalous Threats - warningType: 'risk', 无 LV 概念，管理员核心管理) ---
+				{
+					ticketId: 'THR-2026-REP012',
+					email: 'phishing_scam@external-fake.xyz',
+					warningType: 'risk',
+					eventType: 'user_reported',
+					category: 'security',
+					actionText: '{phishing_scam@external-fake.xyz} 外部邮件被 12 名用户检举诈骗与传销推广',
+					detailText: '外部邮件发件人。大量向站内用户投递虚假传销与欺诈外链，短时间内先后被 12 位收件人举报。按举报频次给予最高权重，推荐管理员立即将其加入系统全局黑名单。',
+					ip: '45.33.32.156',
+					geo: 'Fremont, US',
+					device: 'HeadlessChrome / Linux',
+					deviceType: 'desktop',
+					fingerprint: 'fp_bot_001',
+					isRegIp: 0,
+					isMultiIp: 0,
+					activeIpCount: 1,
+					reportedByOthers: 12,
+					isInternal: 0,
+					reportCategory: 'fraud',
+					reportReason: '传销投资与虚假外链',
+					riskLevel: 'high',
+					priority: 'CRITICAL',
+					status: 'active',
+					recommendedAction: 'blacklist_sender',
+					matchScore: 10,
+					subnetMatch: 0,
+					appealReason: null
+				},
+				{
+					ticketId: 'THR-2026-REP005',
+					email: 'internal_spammer@epocanvas.com',
+					warningType: 'risk',
+					eventType: 'user_reported',
+					category: 'security',
+					actionText: '{internal_spammer@epocanvas.com} 站内账号被 5 名用户检举垃圾推广',
+					detailText: '站内注册用户利用内部通讯群发垃圾广告与拉群信息，被 5 位收件人举报核实。推荐管理员对该站内账号执行限制发信（禁言）或注销账户。',
+					ip: '114.119.160.88',
+					geo: 'Beijing, CN',
+					device: 'Firefox 129 / Linux',
+					deviceType: 'desktop',
+					fingerprint: 'fp_int_spm_9',
+					isRegIp: 1,
+					isMultiIp: 0,
+					activeIpCount: 1,
+					reportedByOthers: 5,
+					isInternal: 1,
+					reportCategory: 'spam',
+					reportReason: '站内群发商业广告',
+					riskLevel: 'high',
+					priority: 'HIGH',
+					status: 'active',
+					recommendedAction: 'mute_account',
+					matchScore: 80,
+					subnetMatch: 1,
+					appealReason: null
+				},
+				{
+					ticketId: 'THR-2026-MULTI99',
+					email: 'syndicate_cluster@farm.net',
+					warningType: 'risk',
+					eventType: 'multi_account_detected',
+					category: 'security',
+					actionText: '{syndicate_cluster@farm.net} 检测到多账户关联滥用 (同一IP/设备指纹)',
+					detailText: '严重违反一人一户底线！同一设备指纹 (fp_syndicate_99) 与相同 IP 聚合操纵 8 个注册账户，属于多账户群控违规，触发异常威胁红线。',
+					ip: '198.51.100.99',
+					geo: 'Hong Kong, HK',
+					device: 'Chrome 128 / Windows 10',
+					deviceType: 'desktop',
+					fingerprint: 'fp_syndicate_99',
+					isRegIp: 0,
+					isMultiIp: 1,
+					activeIpCount: 8,
+					reportedByOthers: 2,
+					isInternal: 1,
+					riskLevel: 'high',
+					priority: 'CRITICAL',
+					status: 'active',
+					recommendedAction: 'ban_account',
+					matchScore: 15,
+					subnetMatch: 0,
+					appealReason: null
+				},
+				{
+					ticketId: 'THR-2026-ZS88K1',
 					email: 'zhangsan@epocanvas.com',
 					warningType: 'risk',
 					eventType: 'risk_spike',
 					category: 'security',
-					actionText: '{zhangsan@epocanvas.com} 触发异地多IP跨国漫游跳跃',
-					detailText: '检测到 4-IP 并发跨国跳跃 (Seoul + Tokyo + Frankfurt)，触碰高频风控红线，需重点关注。',
+					actionText: '{zhangsan@epocanvas.com} 触发异地多IP跨国并发跳跃',
+					detailText: '检测到 4-IP 并发跨国跳跃 (Seoul + Tokyo + Frankfurt)，触碰高频异常风控红线，需重点关注处置。',
 					ip: '192.0.2.145',
 					geo: 'Seoul, KR',
 					device: 'Chrome 128 / macOS 14.6',
@@ -107,66 +308,17 @@ const auditService = {
 					activeIpCount: 4,
 					reportedByOthers: 1,
 					riskLevel: 'high',
-					priority: 'P1',
+					priority: 'CRITICAL',
 					status: 'active',
 					recommendedAction: 'temp_ban_24h',
 					matchScore: 35,
 					subnetMatch: 0,
 					appealReason: null
 				},
+
+				// --- 3. 争议申诉 (Dispute Appeals - warningType: 'appeal', 提前至第 3 位，主要通过表单提交表格人工复核) ---
 				{
-					ticketId: 'TKT-2026-SP44B1',
-					email: 'spammer_bulk@partner.org',
-					warningType: 'audit',
-					eventType: 'reported_spam',
-					category: 'account',
-					actionText: '{spammer_bulk@partner.org} 被 4 名用户检举商业广告',
-					detailText: '短时间内向多位站内用户大量投递未经许可的营销外链，违规检举成立，需进行管控操作。',
-					ip: '45.33.32.156',
-					geo: 'Fremont, US',
-					device: 'HeadlessChrome / Linux',
-					deviceType: 'desktop',
-					fingerprint: 'fp_bot_001',
-					isRegIp: 0,
-					isMultiIp: 0,
-					activeIpCount: 1,
-					reportedByOthers: 4,
-					riskLevel: 'high',
-					priority: 'P1',
-					status: 'active',
-					recommendedAction: 'permanent_ban',
-					matchScore: 10,
-					subnetMatch: 0,
-					appealReason: null
-				},
-				{
-					ticketId: 'TKT-2026-BD9901',
-					email: 'compromised_bot@malicious.xyz',
-					warningType: 'ban',
-					eventType: 'auto_ban',
-					category: 'security',
-					actionText: '{compromised_bot@malicious.xyz} 触碰发信频率熔断阈值被系统自动封禁',
-					detailText: '5分钟内尝试发送超50封含黑名单外部URL的垃圾邮件，命中反垃圾死规则触发系统阻断。',
-					ip: '198.51.100.88',
-					geo: 'Amsterdam, NL',
-					device: 'Python-Requests / Unknown',
-					deviceType: 'desktop',
-					fingerprint: 'fp_crawl_92',
-					isRegIp: 0,
-					isMultiIp: 0,
-					activeIpCount: 1,
-					reportedByOthers: 0,
-					riskLevel: 'high',
-					priority: 'P0',
-					status: 'banned',
-					recommendedAction: 'blacklist_ip',
-					matchScore: 0,
-					subnetMatch: 0,
-					appealReason: null,
-					resolvedTime: '2026-10-02T08:15:00Z'
-				},
-				{
-					ticketId: 'TKT-2026-AP77X2',
+					ticketId: 'APL-2026-AP77X2',
 					email: 'pilot-recovery@epocanvas.com',
 					warningType: 'appeal',
 					eventType: 'appeal_submitted',
@@ -196,60 +348,116 @@ const auditService = {
 					resolvedTime: null
 				},
 				{
-					ticketId: 'TKT-2026-CL33A8',
-					email: 'tester_audited@epocanvas.com',
-					warningType: 'audit',
-					eventType: 'compliance_audit',
-					category: 'security',
-					actionText: '{tester_audited@epocanvas.com} 例行行为基线审查完毕并结案',
-					detailText: '机器人初筛识别为海外访问轻度偏离，经研判确认为合规多因素设备，已结案归档。',
-					ip: '104.28.19.44',
-					geo: 'Tokyo, JP',
-					device: 'Safari 17 / macOS',
+					ticketId: 'APL-2026-AP0039',
+					email: 'spammer_appealed@malicious.xyz',
+					warningType: 'appeal',
+					eventType: 'appeal_submitted',
+					category: 'appeal',
+					actionText: '{spammer_appealed@malicious.xyz} 提交解封申诉但被驳回',
+					detailText: '用户提交申诉表单：“请求解封账号，发信为业务正常通知”。经与多名用户检举证据比对核实属于恶意营销，管理员已驳回申诉，维持封禁。',
+					ip: '198.51.100.44',
+					geo: 'Dallas, US',
+					device: 'Chrome 127 / Linux',
 					deviceType: 'desktop',
-					fingerprint: 'fp_safe_991',
-					baseIp: '104.28.19.1',
-					baseGeo: 'Tokyo, JP',
-					baseDevice: 'Safari 17 / macOS',
-					baseFingerprint: 'fp_safe_991',
-					isRegIp: 1,
+					fingerprint: 'fp_fake_dallas',
+					isRegIp: 0,
 					isMultiIp: 0,
 					activeIpCount: 1,
-					reportedByOthers: 0,
-					riskLevel: 'normal',
-					priority: 'P2',
-					status: 'resolved',
-					recommendedAction: 'resolve',
-					matchScore: 98,
-					subnetMatch: 1,
-					appealReason: null,
-					resolvedTime: '2026-10-03T16:20:00Z'
+					reportedByOthers: 3,
+					riskLevel: 'high',
+					priority: 'P0',
+					status: 'rejected',
+					recommendedAction: 'reject_appeal',
+					matchScore: 12,
+					subnetMatch: 0,
+					appealReason: '请求解封账号，发信为业务正常通知。',
+					resolvedTime: '2026-10-04T12:00:00Z'
 				},
+
+				// --- 4. 封禁管控 (Sanction Archive - warningType: 'ban', 放在最后，纯展示与记录台账) ---
 				{
-					ticketId: 'TKT-2026-EX99B2',
-					email: 'guest_expired@visitor.org',
-					warningType: 'risk',
-					eventType: 'probe_attempt',
-					category: 'account',
-					actionText: '{guest_expired@visitor.org} 匿名探测频次超限预警已过期',
-					detailText: '低频未认证探测事件，超72小时无后续异常行为，预警已自动过期失效。',
-					ip: '198.51.100.22',
-					geo: 'London, GB',
-					device: 'Curl / Linux',
+					ticketId: 'BAN-2026-BD9901',
+					email: 'compromised_bot@malicious.xyz',
+					warningType: 'ban',
+					eventType: 'auto_ban',
+					category: 'security',
+					actionText: '{compromised_bot@malicious.xyz} 触碰发信频率熔断阈值被系统自动封禁',
+					detailText: '5分钟内尝试发送超50封含黑名单外部URL的垃圾邮件，命中反垃圾死规则触发系统阻断，执行永久封禁。',
+					banReason: '发信频率熔断且包含恶意链接',
+					banTime: '2026-10-02 08:15:00',
+					resolvedTime: '2026-10-02 08:15:00',
+					ip: '198.51.100.88',
+					geo: 'Amsterdam, NL',
+					device: 'Python-Requests / Unknown',
 					deviceType: 'desktop',
-					fingerprint: 'fp_probe_11',
+					fingerprint: 'fp_crawl_92',
 					isRegIp: 0,
 					isMultiIp: 0,
 					activeIpCount: 1,
 					reportedByOthers: 0,
-					riskLevel: 'normal',
-					priority: 'P2',
-					status: 'expired',
-					recommendedAction: 'dismiss_alert',
-					matchScore: 20,
+					riskLevel: 'high',
+					priority: 'CRITICAL',
+					status: 'banned',
+					recommendedAction: 'blacklist_ip',
+					matchScore: 0,
 					subnetMatch: 0,
-					appealReason: null,
-					resolvedTime: '2026-10-01T12:00:00Z'
+					appealReason: null
+				},
+				{
+					ticketId: 'BAN-2026-UN0021',
+					email: 'unbanned_user@epocanvas.com',
+					warningType: 'ban',
+					eventType: 'credential_tamper_ban',
+					category: 'security',
+					actionText: '{unbanned_user@epocanvas.com} 账号密保异动封禁，申诉核实为本人出差换机，已解禁',
+					detailText: '新环境首次登录立即重置二次验证与密码，触发防买卖黑产阻断。后经独立申诉工单核验初始注册基准通过，管理员于 2026-10-04 人工放行解禁并移出黑名单，台账永久保留供审计追溯。',
+					banReason: '新设备/陌生环境立刻更改账户密保 (怀疑账号买卖黑产)',
+					banTime: '2026-09-28 10:00:00',
+					resolvedTime: '2026-10-04 14:30:00',
+					ip: '116.228.89.24',
+					geo: 'Shanghai, CN',
+					device: 'Edge 128 / Windows 11',
+					deviceType: 'desktop',
+					fingerprint: 'fp_pilot_77a',
+					isRegIp: 1,
+					isMultiIp: 1,
+					activeIpCount: 1,
+					reportedByOthers: 0,
+					riskLevel: 'normal',
+					priority: 'HIGH',
+					status: 'unbanned', // 已解禁 / 已移出黑名单，记录依然保留！
+					recommendedAction: 'none',
+					matchScore: 92,
+					subnetMatch: 1,
+					appealReason: '出差换新笔记本电脑，登入后重置密保被误判。'
+				},
+				{
+					ticketId: 'BAN-2026-MA8802',
+					email: 'syndicate_cluster@farm.net',
+					warningType: 'ban',
+					eventType: 'multi_account_ban',
+					category: 'security',
+					actionText: '{syndicate_cluster@farm.net} 关联账户违规一人多号被系统执行全量封禁',
+					detailText: '排查确认与 8 个关联邮箱共享同一设备指纹与注册 IP，严重违反一人一户服务条款底线，对该账号组全部执行永久封禁。',
+					banReason: '一人多号 (同一IP与设备指纹操纵多个账号，违反服务条款)',
+					banTime: '2026-10-01 11:20:00',
+					resolvedTime: '2026-10-01 11:20:00',
+					ip: '198.51.100.99',
+					geo: 'Hong Kong, HK',
+					device: 'Chrome 128 / Windows 10',
+					deviceType: 'desktop',
+					fingerprint: 'fp_syndicate_99',
+					isRegIp: 0,
+					isMultiIp: 1,
+					activeIpCount: 8,
+					reportedByOthers: 2,
+					riskLevel: 'high',
+					priority: 'CRITICAL',
+					status: 'banned',
+					recommendedAction: 'none',
+					matchScore: 15,
+					subnetMatch: 0,
+					appealReason: null
 				}
 			];
 
@@ -291,7 +499,11 @@ const auditService = {
 		}
 
 		if (warningType && warningType !== 'all') {
-			conditions.push(eq(auditLog.warningType, warningType));
+			if (warningType === 'ban') {
+				conditions.push(sql`(${auditLog.warningType} = 'ban' OR ${auditLog.status} IN ('banned', 'unbanned'))`);
+			} else {
+				conditions.push(eq(auditLog.warningType, warningType));
+			}
 		}
 		if (category && category !== 'all') {
 			conditions.push(eq(auditLog.category, category));
@@ -305,7 +517,7 @@ const auditService = {
 			if (lifecycle === 'pending' || lifecycle === 'active') {
 				conditions.push(sql`${auditLog.status} IN ('active', 'pending')`);
 			} else if (lifecycle === 'resolved' || lifecycle === 'closed') {
-				conditions.push(sql`${auditLog.status} IN ('resolved', 'banned', 'rejected', 'expired')`);
+				conditions.push(sql`${auditLog.status} IN ('resolved', 'banned', 'unbanned', 'rejected', 'expired')`);
 			}
 		}
 
@@ -316,6 +528,9 @@ const auditService = {
 
 		if (Number(timeSort) === 1) {
 			query.orderBy(asc(auditLog.id));
+		} else if (warningType === 'risk') {
+			// 异常威胁：被他人举报从高到低排名，保障高频检举重点置顶处置
+			query.orderBy(desc(auditLog.reportedByOthers), desc(auditLog.id));
 		} else {
 			query.orderBy(desc(auditLog.id));
 		}
@@ -339,31 +554,31 @@ const auditService = {
 
 		const auditItems = allItems.filter(i => i.warningType === 'audit');
 		const riskItems = allItems.filter(i => i.warningType === 'risk');
-		const banItems = allItems.filter(i => i.warningType === 'ban');
 		const appealItems = allItems.filter(i => i.warningType === 'appeal');
+		const banItems = allItems.filter(i => i.warningType === 'ban' || i.status === 'banned' || i.status === 'unbanned');
 
 		const auditPending = auditItems.filter(i => isPending(i.status)).length;
 		const riskPending = riskItems.filter(i => isPending(i.status)).length;
-		const banPending = banItems.filter(i => isPending(i.status) || i.status === 'banned').length;
 		const appealPending = appealItems.filter(i => isPending(i.status)).length;
-		const totalPending = allItems.filter(i => isPending(i.status)).length;
+		const banActive = banItems.filter(i => i.status === 'banned').length;
+		const totalPending = auditPending + riskPending + appealPending;
 
 		const counts = {
 			audit: auditPending,
 			auditTotal: auditItems.length,
 			risk: riskPending,
 			riskTotal: riskItems.length,
-			ban: banPending,
-			banTotal: banItems.length,
 			appeal: appealPending,
 			appealTotal: appealItems.length,
+			ban: banActive,
+			banTotal: banItems.length,
 			total: totalPending,
 			allTotal: allItems.length,
 			categories: {
 				audit: { pending: auditPending, total: auditItems.length },
 				risk: { pending: riskPending, total: riskItems.length },
-				ban: { pending: banPending, total: banItems.length },
 				appeal: { pending: appealPending, total: appealItems.length },
+				ban: { pending: banActive, total: banItems.length },
 				total: { pending: totalPending, total: allItems.length }
 			}
 		};
@@ -393,7 +608,8 @@ const auditService = {
 				baseIp,
 				baseGeo,
 				baseDevice,
-				baseFingerprint
+				baseFingerprint,
+				banTime: row.banTime || (row.status === 'banned' ? row.createTime : null)
 			};
 
 			if (allMailMode === 2) {
@@ -439,6 +655,11 @@ const auditService = {
 			matchScore: data.matchScore || 0,
 			subnetMatch: data.subnetMatch ? 1 : 0,
 			appealReason: data.appealReason || null,
+			banReason: data.banReason || null,
+			banTime: data.banTime || null,
+			isInternal: data.isInternal ? 1 : 0,
+			reportCategory: data.reportCategory || null,
+			reportReason: data.reportReason || null,
 			resolvedTime: data.resolvedTime || null
 		}).run();
 	},
@@ -465,7 +686,73 @@ const auditService = {
 				resolvedTime: nowIso,
 				detailText: (targetLog.detailText || '') + (notes ? `\n[处置结果]: ${notes}` : '')
 			}).where(eq(auditLog.id, id)).run();
-		} else if (action === 'dismiss_alert' || action === 'unban' || action === 'approve_appeal') {
+
+			// 同步在封禁管控台账中保留/生成记录
+			const existingBan = await orm(c).select().from(auditLog).where(
+				and(eq(auditLog.email, email), eq(auditLog.warningType, 'ban'))
+			).get();
+			if (!existingBan) {
+				await orm(c).insert(auditLog).values({
+					ticketId: 'BAN-' + Date.now().toString(36).toUpperCase(),
+					email: email,
+					warningType: 'ban',
+					eventType: targetLog.eventType || 'admin_ban',
+					category: 'security',
+					actionText: `{${email}} 经管理员审核处置生效封禁`,
+					detailText: notes || targetLog.detailText || '管理员人工裁决封禁',
+					banReason: targetLog.actionText || '触犯系统风控与安全红线',
+					banTime: nowIso,
+					resolvedTime: nowIso,
+					status: 'banned',
+					riskLevel: 'high',
+					priority: 'CRITICAL'
+				}).run();
+			} else {
+				await orm(c).update(auditLog).set({
+					status: 'banned',
+					resolvedTime: nowIso,
+					detailText: (existingBan.detailText || '') + (notes ? `\n[处置更新]: ${notes}` : '')
+				}).where(eq(auditLog.id, existingBan.id)).run();
+			}
+		} else if (action === 'blacklist_sender') {
+			// 外部邮件拉入系统黑名单
+			await orm(c).update(auditLog).set({
+				status: 'resolved',
+				resolvedTime: nowIso,
+				detailText: (targetLog.detailText || '') + `\n[处置结果]: 管理员已手动将该外部发信地址加入系统全局黑名单拦截 (${notes || '核查属实拉黑'})`
+			}).where(eq(auditLog.id, id)).run();
+
+			// 封禁台账留痕
+			await orm(c).insert(auditLog).values({
+				ticketId: 'BAN-' + Date.now().toString(36).toUpperCase(),
+				email: targetLog.email,
+				warningType: 'ban',
+				eventType: 'external_blacklist',
+				category: 'security',
+				actionText: `{${targetLog.email}} 外部来信被检举核实，已加入系统全局黑名单`,
+				detailText: `处置发件人: ${targetLog.email}。检举次数: ${targetLog.reportedByOthers || 1}。处置说明: ${notes || '管理员核查属实，拉入全局黑名单拦截'}`,
+				banReason: `外部邮件被他人检举 (${targetLog.reportCategory || '违规'}，累计检举 ${targetLog.reportedByOthers || 1} 次)`,
+				banTime: nowIso,
+				resolvedTime: nowIso,
+				status: 'banned',
+				riskLevel: 'high',
+				priority: 'CRITICAL'
+			}).run();
+		} else if (action === 'mute_account') {
+			// 内部邮件发件人禁言/发信限制
+			await orm(c).update(auditLog).set({
+				status: 'resolved',
+				resolvedTime: nowIso,
+				detailText: (targetLog.detailText || '') + `\n[处置结果]: 站内违规用户已限制发信权限（禁言） (${notes || '检举违规处置'})`
+			}).where(eq(auditLog.id, id)).run();
+		} else if (action === 'archive_routine' || action === 'dismiss_alert') {
+			// 常规审查一键封存归档
+			await orm(c).update(auditLog).set({
+				status: 'expired',
+				resolvedTime: nowIso,
+				detailText: (targetLog.detailText || '') + `\n[封存说明]: 常规审查事项已封存归档 (${notes || '例行审查完毕'})`
+			}).where(eq(auditLog.id, id)).run();
+		} else if (action === 'unban' || action === 'approve_appeal') {
 			if (targetUser) {
 				await userService.setStatus(c, { userId: targetUser.userId, status: 0 });
 			}
@@ -474,6 +761,13 @@ const auditService = {
 				resolvedTime: nowIso,
 				detailText: (targetLog.detailText || '') + (notes ? `\n[放行说明]: ${notes}` : '')
 			}).where(eq(auditLog.id, id)).run();
+
+			// 同步更新封禁管控台账中状态为 unbanned (已解禁/已移出黑名单)，记录依然保留！
+			await orm(c).update(auditLog).set({
+				status: 'unbanned',
+				resolvedTime: nowIso,
+				detailText: sql`${auditLog.detailText} || ${'\n[解禁说明]: 申诉复核通过，已移出黑名单恢复正常 (' + (notes || '正常放行') + ')'}`
+			}).where(and(eq(auditLog.email, email), eq(auditLog.warningType, 'ban'))).run();
 		} else if (action === 'reject_appeal') {
 			await orm(c).update(auditLog).set({
 				status: 'rejected',
@@ -510,6 +804,13 @@ const auditService = {
 				resolvedTime: nowIso,
 				detailText: (targetLog.detailText || '') + (notes ? `\n[人工研判备注]: ${notes}` : '')
 			}).where(eq(auditLog.id, id)).run();
+
+			// 同步更新封禁管控台账中状态为 unbanned (已解禁/已移出黑名单)，记录依然保留！
+			await orm(c).update(auditLog).set({
+				status: 'unbanned',
+				resolvedTime: nowIso,
+				detailText: sql`${auditLog.detailText} || ${'\n[解禁说明]: 申诉复核通过，已移出黑名单恢复正常 (' + (notes || '正常放行') + ')'}`
+			}).where(and(eq(auditLog.email, targetLog.email), eq(auditLog.warningType, 'ban'))).run();
 
 			if (purgeOnRelease) {
 				// Purge non-critical warning logs for this email

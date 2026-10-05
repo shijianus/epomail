@@ -782,6 +782,56 @@
       </template>
     </el-dialog>
 
+    <!-- 举报邮件专业弹窗 (Anomalous Threat Reporting Modal) -->
+    <el-dialog
+      v-model="reportDialogVisible"
+      :title="$t('reportEmailDialogTitle')"
+      width="480px"
+      class="report-dialog"
+      append-to-body
+      destroy-on-close
+    >
+      <div class="report-dialog-body">
+        <div class="report-dialog-desc">
+          <Icon icon="fluent:shield-alert-20-regular" width="18" height="18" style="color: var(--el-color-danger); margin-right: 6px; flex-shrink: 0;" />
+          <span>{{ $t('reportEmailDialogDesc') }}</span>
+        </div>
+
+        <el-form :model="reportForm" label-position="top" style="margin-top: 14px;">
+          <el-form-item :label="$t('reportReasonCategory')">
+            <el-radio-group v-model="reportForm.category" class="report-radio-group">
+              <el-radio value="fraud">{{ $t('reportCatFraud') }}</el-radio>
+              <el-radio value="mlm">{{ $t('reportCatMlm') }}</el-radio>
+              <el-radio value="phishing">{{ $t('reportCatPhishing') }}</el-radio>
+              <el-radio value="spam">{{ $t('reportCatSpam') }}</el-radio>
+              <el-radio value="other">{{ $t('reportCatOther') }}</el-radio>
+            </el-radio-group>
+          </el-form-item>
+
+          <el-form-item :label="$t('reportReasonDetail')">
+            <el-input
+              v-model="reportForm.reason"
+              type="textarea"
+              :rows="3"
+              maxlength="200"
+              show-word-limit
+              :placeholder="$t('reportEmailReasonPlaceholder')"
+            />
+          </el-form-item>
+        </el-form>
+      </div>
+
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="reportDialogVisible = false">{{ $t('cancel') }}</el-button>
+          <el-button type="danger" :loading="isReportingSpam" @click="submitReportSpam">
+            <Icon icon="fluent:shield-dismiss-20-regular" width="16" height="16" style="margin-right: 4px;" />
+            {{ $t('reportConfirmBtn') }}
+          </el-button>
+        </span>
+      </template>
+    </el-dialog>
+
     <el-image-viewer
         v-if="showPreview"
         :url-list="srcList"
@@ -1343,30 +1393,41 @@ const handleDelete = () => {
   })
 }
 
+const reportDialogVisible = ref(false);
+const isReportingSpam = ref(false);
+const reportForm = reactive({
+  category: 'spam',
+  reason: ''
+});
+
 const handleReportSpam = () => {
-  ElMessageBox.confirm(
-    t('reportSpamConfirm'),
-    t('reportSpam'),
-    {
-      confirmButtonText: t('confirm'),
-      cancelButtonText: t('cancel'),
-      type: 'warning'
-    }
-  ).then(() => {
-    emailReportSpam([email.emailId]).then(() => {
-      ElMessage({
-        message: t('reportSpamSuccess'),
-        type: 'success',
-        plain: true,
-      });
-      emailStore.deleteIds = [email.emailId];
-      emailStore.refreshSidebarStats();
-      emailStore.contentData.email = null;
-    }).catch(err => {
-      console.error(err);
-      ElMessage.error(t('operateFailedRetry'));
+  reportForm.category = 'spam';
+  reportForm.reason = '';
+  reportDialogVisible.value = true;
+};
+
+const submitReportSpam = async () => {
+  isReportingSpam.value = true;
+  try {
+    await emailReportSpam([email.emailId], {
+      reportCategory: reportForm.category,
+      reportReason: reportForm.reason
     });
-  });
+    ElMessage({
+      message: t('reportSpamSuccess'),
+      type: 'success',
+      plain: true,
+    });
+    reportDialogVisible.value = false;
+    emailStore.deleteIds = [email.emailId];
+    emailStore.refreshSidebarStats();
+    emailStore.contentData.email = null;
+  } catch (err) {
+    console.error(err);
+    ElMessage.error(t('operateFailedRetry'));
+  } finally {
+    isReportingSpam.value = false;
+  }
 };
 
 const handleToggleRead = () => {
@@ -3167,5 +3228,22 @@ const handleReportNotSpam = (emailId) => {
       }
     }
   }
+}
+
+.report-dialog-desc {
+  display: flex;
+  align-items: center;
+  font-size: 13px;
+  color: var(--el-text-color-secondary);
+  line-height: 1.5;
+  background: var(--el-fill-color-light);
+  padding: 10px 12px;
+  border-radius: 6px;
+}
+.report-radio-group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
 }
 </style>

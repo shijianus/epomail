@@ -31,6 +31,11 @@ export const auditLog = sqliteTable('audit_log', {
 	matchScore: integer('match_score').default(0),
 	subnetMatch: integer('subnet_match').default(0),
 	appealReason: text('appeal_reason'),
+	banReason: text('ban_reason'),
+	banTime: text('ban_time'),
+	isInternal: integer('is_internal').default(0),
+	reportCategory: text('report_category'),
+	reportReason: text('report_reason'),
 	resolvedTime: text('resolved_time'),
 	createTime: text('create_time').notNull().default(sql`CURRENT_TIMESTAMP`)
 });

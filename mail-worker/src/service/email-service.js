@@ -1,5 +1,7 @@
 import { mailOrm as orm, userOrm } from '../entity/orm';
 import email from '../entity/email';
+import { auditLog } from '../entity/audit-log';
+import auditService from './audit-service';
 import { attConst, emailConst, isDel, settingConst } from '../const/entity-const';
 import { and, desc, eq, gt, inArray, lt, count, asc, sql, ne, or, like, lte, gte } from 'drizzle-orm';
 import { star } from '../entity/star';
@@ -459,7 +461,7 @@ const emailService = {
 	},
 
 	async reportSpam(c, params, userId) {
-		const { emailIds } = params;
+		const { emailIds, reportCategory, reportReason } = params;
 		const emailIdList = Array.isArray(emailIds) ? emailIds.map(Number) : String(emailIds).split(',').map(Number);
 		if (emailIdList.length === 0) return;
 
@@ -487,84 +489,154 @@ const emailService = {
 
 		// 3. Update user's personal customLabels
 		const userRow = await userOrm(c).select().from(user).where(eq(user.userId, userId)).get();
-		if (!userRow) return;
-
-		let customLabels = userRow.customLabels;
-		let labelsObj = [];
-		try {
-			const parsed = JSON.parse(customLabels || '[]');
-			if (Array.isArray(parsed)) {
-				labelsObj = parsed;
-			} else if (parsed && typeof parsed === 'object') {
-				if (Array.isArray(parsed.allLabels)) labelsObj = parsed.allLabels;
-				else if (Array.isArray(parsed.customLabels)) labelsObj = parsed.customLabels;
+		if (userRow) {
+			let customLabels = userRow.customLabels;
+			let labelsObj = [];
+			try {
+				const parsed = JSON.parse(customLabels || '[]');
+				if (Array.isArray(parsed)) {
+					labelsObj = parsed;
+				} else if (parsed && typeof parsed === 'object') {
+					if (Array.isArray(parsed.allLabels)) labelsObj = parsed.allLabels;
+					else if (Array.isArray(parsed.customLabels)) labelsObj = parsed.customLabels;
+				}
+			} catch (e) {
+				labelsObj = [];
 			}
-		} catch (e) {
-			labelsObj = [];
-		}
 
-		// If present in 信任名单, remove from it
-		const whitelistLabel = labelsObj.find(l => l.name === '信任名单');
-		if (whitelistLabel && whitelistLabel.rules?.[0]?.condition) {
-			const cond = whitelistLabel.rules[0].condition;
-			const wSenders = cond.value ? cond.value.split(',').map(s => s.trim().toLowerCase()) : [];
-			const filtered = wSenders.filter(s => !senders.includes(s));
-			cond.value = filtered.join(',');
-		}
+			// If present in 信任名单, remove from it
+			const whitelistLabel = labelsObj.find(l => l.name === '信任名单');
+			if (whitelistLabel && whitelistLabel.rules?.[0]?.condition) {
+				const cond = whitelistLabel.rules[0].condition;
+				const wSenders = cond.value ? cond.value.split(',').map(s => s.trim().toLowerCase()) : [];
+				const filtered = wSenders.filter(s => !senders.includes(s));
+				cond.value = filtered.join(',');
+			}
 
-		// Find or create user's personal blacklist / spam filter rule
-		let blacklistLabel = labelsObj.find(l => l.name === '黑名单' || l.name === '个人拦截');
-		if (!blacklistLabel) {
-			blacklistLabel = {
-				id: Date.now().toString(),
-				name: '黑名单',
-				color: '#ef4444',
-				icon: 'fluent:shield-dismiss-20-regular',
-				listVis: false,
-				actions: { targetFolder: 'spam', priority: 1, stopProcessing: true },
-				rules: [{
+			// Find or create user's personal blacklist / spam filter rule
+			let blacklistLabel = labelsObj.find(l => l.name === '黑名单' || l.name === '个人拦截');
+			if (!blacklistLabel) {
+				blacklistLabel = {
+					id: Date.now().toString(),
+					name: '黑名单',
+					color: '#ef4444',
+					icon: 'fluent:shield-dismiss-20-regular',
+					listVis: false,
+					actions: { targetFolder: 'spam', priority: 1, stopProcessing: true },
+					rules: [{
+						id: Date.now().toString() + 'r',
+						condition: { type: 'sender_is', value: '' },
+						exception: { type: 'none', value: '' }
+					}]
+				};
+				labelsObj.push(blacklistLabel);
+			}
+
+			if (!blacklistLabel.rules || blacklistLabel.rules.length === 0) {
+				blacklistLabel.rules = [{
 					id: Date.now().toString() + 'r',
 					condition: { type: 'sender_is', value: '' },
 					exception: { type: 'none', value: '' }
-				}]
-			};
-			labelsObj.push(blacklistLabel);
-		}
+				}];
+			}
+			if (!blacklistLabel.actions) {
+				blacklistLabel.actions = { targetFolder: 'spam', priority: 1, stopProcessing: true };
+			} else {
+				blacklistLabel.actions.targetFolder = 'spam';
+				blacklistLabel.actions.priority = 1;
+				blacklistLabel.actions.stopProcessing = true;
+			}
 
-		if (!blacklistLabel.rules || blacklistLabel.rules.length === 0) {
-			blacklistLabel.rules = [{
-				id: Date.now().toString() + 'r',
-				condition: { type: 'sender_is', value: '' },
-				exception: { type: 'none', value: '' }
-			}];
-		}
-		if (!blacklistLabel.actions) {
-			blacklistLabel.actions = { targetFolder: 'spam', priority: 1, stopProcessing: true };
-		} else {
-			blacklistLabel.actions.targetFolder = 'spam';
-			blacklistLabel.actions.priority = 1;
-			blacklistLabel.actions.stopProcessing = true;
-		}
+			const bCond = blacklistLabel.rules[0].condition;
+			const existingBlackSenders = bCond.value ? bCond.value.split(',').map(s => s.trim().toLowerCase()).filter(Boolean) : [];
+			let updated = false;
+			for (const s of senders) {
+				if (!existingBlackSenders.includes(s)) {
+					existingBlackSenders.push(s);
+					updated = true;
+				}
+			}
 
-		const bCond = blacklistLabel.rules[0].condition;
-		const existingBlackSenders = bCond.value ? bCond.value.split(',').map(s => s.trim().toLowerCase()).filter(Boolean) : [];
-		let updated = false;
-		for (const s of senders) {
-			if (!existingBlackSenders.includes(s)) {
-				existingBlackSenders.push(s);
-				updated = true;
+			if (updated) {
+				bCond.value = existingBlackSenders.join(',');
+				const serialized = JSON.stringify(labelsObj);
+				await userOrm(c).update(user).set({ customLabels: serialized }).where(eq(user.userId, userId)).run();
+				const authInfo = await c.env.kv.get(kvConst.AUTH_INFO + userId, { type: 'json' });
+				if (authInfo && authInfo.user) {
+					authInfo.user.customLabels = serialized;
+					await c.env.kv.put(kvConst.AUTH_INFO + userId, JSON.stringify(authInfo), { expirationTtl: 60 * 60 * 24 * 7 });
+				}
 			}
 		}
 
-		if (updated) {
-			bCond.value = existingBlackSenders.join(',');
-			const serialized = JSON.stringify(labelsObj);
-			await userOrm(c).update(user).set({ customLabels: serialized }).where(eq(user.userId, userId)).run();
-			const authInfo = await c.env.kv.get(kvConst.AUTH_INFO + userId, { type: 'json' });
-			if (authInfo && authInfo.user) {
-				authInfo.user.customLabels = serialized;
-				await c.env.kv.put(kvConst.AUTH_INFO + userId, JSON.stringify(authInfo), { expirationTtl: 60 * 60 * 24 * 7 });
+		// 4. Report to Admin Audit Center as Anomalous Threat (异常威胁)
+		try {
+			await auditService.ensureTables(c);
+			for (const cleanSender of senders) {
+				// Check whether sender is an internal user
+				const internalUser = await userOrm(c).select().from(user).where(eq(user.email, cleanSender)).get();
+				const isInternal = !!internalUser ? 1 : 0;
+
+				// Check if there is an active/pending report for this sender in audit_log
+				const existingReport = await userOrm(c).select().from(auditLog).where(
+					and(
+						eq(auditLog.email, cleanSender),
+						eq(auditLog.warningType, 'risk'),
+						sql`${auditLog.status} IN ('active', 'pending')`
+					)
+				).get();
+
+				const categoryLabel = reportCategory || 'spam';
+				const appendNote = `[${new Date().toISOString().slice(0, 16)}] 用户检举: ${categoryLabel}${reportReason ? ` (${reportReason})` : ''}`;
+
+				if (existingReport) {
+					// Aggregation within same active cycle: increment count and raise priority
+					const newCount = (existingReport.reportedByOthers || 0) + 1;
+					await userOrm(c).update(auditLog).set({
+						reportedByOthers: newCount,
+						priority: 'CRITICAL', // Higher weight
+						riskLevel: 'high',
+						detailText: (existingReport.detailText ? existingReport.detailText + '\n' : '') + appendNote
+					}).where(eq(auditLog.id, existingReport.id)).run();
+				} else {
+					// Historical count across closed/expired/banned records
+					const histRow = await userOrm(c).select({ count: count() }).from(auditLog).where(
+						and(
+							eq(auditLog.email, cleanSender),
+							eq(auditLog.eventType, 'user_reported')
+						)
+					).get();
+					const historyReports = (histRow?.count || 0);
+					const initialCount = historyReports + 1;
+
+					await userOrm(c).insert(auditLog).values({
+						ticketId: 'THR-' + Date.now().toString(36).toUpperCase(),
+						email: cleanSender,
+						warningType: 'risk',
+						eventType: 'user_reported',
+						category: 'security',
+						actionText: isInternal
+							? `{${cleanSender}} 站内用户被举报违规 (${categoryLabel})`
+							: `{${cleanSender}} 外部邮件被站内用户检举 (${categoryLabel})`,
+						detailText: `检举类别: ${categoryLabel}。描述: ${reportReason || '用户举报该邮件'}。主体类型: ${isInternal ? '站内注册用户 (内部邮件)' : '外部发信地址 (外部邮件)'}。` + (historyReports > 0 ? ` [历史累计举报 ${initialCount} 次]` : ''),
+						ip: internalUser?.createIp || '',
+						geo: '',
+						device: internalUser?.device || 'Mail-Client',
+						deviceType: 'desktop',
+						fingerprint: '',
+						isInternal,
+						reportCategory: categoryLabel,
+						reportReason: reportReason || '',
+						reportedByOthers: initialCount,
+						priority: initialCount >= 3 ? 'CRITICAL' : 'HIGH',
+						riskLevel: 'high',
+						status: 'active',
+						recommendedAction: isInternal ? 'mute_account' : 'blacklist_sender'
+					}).run();
+				}
 			}
+		} catch (auditErr) {
+			console.warn('reportSpam audit_log report failed:', auditErr.message);
 		}
 	},
 

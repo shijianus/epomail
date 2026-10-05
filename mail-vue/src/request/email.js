@@ -24,8 +24,12 @@ export function emailReportNotSpam(emailIds) {
     return http.put('/email/reportNotSpam', {emailIds})
 }
 
-export function emailReportSpam(emailIds) {
-    return http.put('/email/reportSpam', {emailIds})
+export function emailReportSpam(emailIds, options = {}) {
+    return http.put('/email/reportSpam', {
+        emailIds,
+        reportCategory: options.reportCategory,
+        reportReason: options.reportReason
+    });
 }
 
 export function emailSetLabels(emailId, labels) {
