@@ -45,6 +45,7 @@ const dbInit = {
 		await this.v3_13DB(c);
 		await this.v3_14DB(c);
 		await this.v3_15DB(c);
+		await this.v3_16DB(c);
 		await settingService.refresh(c);
 		return c.text('success');
 	},
@@ -243,6 +244,33 @@ const dbInit = {
 			`).run();
 		} catch (e) {
 			console.warn('visitor user:query cleanup warning:', e.message);
+		}
+	},
+
+	// v3_16DB：补齐 setting 表缺失列——用户资料控制（TG 推送/邮件转发/API 支援）、
+	// 欢迎邮件多语言模板、全域邮件配置与 OAuth 登录开关。此前列仅在部分存量库中存在，
+	// 全新冷启动（仅凭 /api/init）会因缺列导致 /setting/set 写入失败，故按红线补幂等迁移。
+	async v3_16DB(c) {
+		const userDb = getUserDb(c);
+		const missingSettingCols = [
+			{ name: 'welcome_templates', sql: `ALTER TABLE setting ADD COLUMN welcome_templates TEXT NOT NULL DEFAULT '{}';` },
+			{ name: 'welcome_lang', sql: `ALTER TABLE setting ADD COLUMN welcome_lang TEXT NOT NULL DEFAULT 'zh';` },
+			{ name: 'global_email_config', sql: `ALTER TABLE setting ADD COLUMN global_email_config TEXT NOT NULL DEFAULT '{}';` },
+			{ name: 'user_tg_forward', sql: `ALTER TABLE setting ADD COLUMN user_tg_forward INTEGER NOT NULL DEFAULT 1;` },
+			{ name: 'user_email_forward', sql: `ALTER TABLE setting ADD COLUMN user_email_forward INTEGER NOT NULL DEFAULT 1;` },
+			{ name: 'user_api_support', sql: `ALTER TABLE setting ADD COLUMN user_api_support INTEGER NOT NULL DEFAULT 1;` },
+			{ name: 'oauth_login_enabled', sql: `ALTER TABLE setting ADD COLUMN oauth_login_enabled INTEGER NOT NULL DEFAULT 0;` },
+			{ name: 'oauth_providers', sql: `ALTER TABLE setting ADD COLUMN oauth_providers TEXT NOT NULL DEFAULT '{}';` }
+		];
+		for (const col of missingSettingCols) {
+			try {
+				const colInfo = await userDb.prepare(`SELECT * FROM pragma_table_info('setting') WHERE name = ? limit 1`).bind(col.name).first();
+				if (!colInfo) {
+					await userDb.prepare(col.sql).run();
+				}
+			} catch (e) {
+				console.warn(`v3_16DB 跳过 setting 字段 ${col.name}：${e.message}`);
+			}
 		}
 	},
 

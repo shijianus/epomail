@@ -456,7 +456,7 @@ defineOptions({
 
 const settingStore = useSettingStore()
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 const SAMPLE_APP_SEED_DESC = 'EpoCanvas / shijianus 博客原生集成示例应用（官方内置示例，站长可随时修改或直接删除）';
 function localizedAppDesc(desc) {
@@ -668,9 +668,12 @@ function openCreateDialog() {
   appDialogShow.value = true
 }
 
+// 开发接入教程：指向文档站《开放平台与 API 接入》（按界面语言选择文档目录，zh 为文档站根语言无前缀）
 function openBlogTutorial() {
-  const url = getOfficialLink('blog', settingStore)
-  window.open(url, '_blank')
+  const l = String(locale.value || 'zh')
+  const prefix = (l === 'zh' || l === 'zh-CN') ? '' : (l === 'zh-Hant' || l === 'zh-TW') ? 'zh-tw' : l
+  const base = getOfficialLink('docs', settingStore).replace(/\/$/, '')
+  window.open(`${base}/${prefix ? prefix + '/' : ''}mail/api/`, '_blank')
 }
 
 function openEditDialog(app) {
