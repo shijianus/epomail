@@ -9,6 +9,21 @@
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
 
+### EpomailDocs v5.16 图解全覆盖轮：90 张本地化实拍截图 + 隐藏式下拉图解 ×12 页 ×6 语言 (2026-10-06)
+*   **关联提交 (Git Commit)**: EpomailDocs 独立提交 `82af565` (Short: `82af565`，v5.16 内容) + `bf02050` (manifest 固化 82af565)；两提交已推送 origin/master 与 origin/main；主仓归档提交见本条目对应变更提交
+*   **部署环境 (Deployment)**: `本地全真栈：mail-worker wrangler dev 8787 --local（六语言 profile 切换实拍）作为截图源；EpomailDocs wrangler pages dev dist:8790 判图；线上发布未执行，待运营者 pnpm run deploy`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 反馈①（每板块有图、浏览器实拍）：新增本地化产品截图 90 张——6 语言 × 15 界面（视图/邮件详情/写信/标签/个资/常规/资料/分析页/用户列表/全库审查/权限控制/注册密钥/系统设置/分类管理/操作报告），全部经浏览器实拍本地演示实例；zh 入 images/mail/ui/，其余语言入 images/mail/<lang>/ui/，沿用站点多语言图片路径惯例
+    - [x] 反馈②（标注说明具体怎么用）：系统设置/资料/个资/常规/标签五界面实拍注入 ①②③… 编号标注（对准配置卡标题等锚点），文内编号步骤与图上标注一一对应；其余界面以编号步骤图解标注
+    - [x] 反馈③（隐藏式下拉框）：12 个界面页在相关文档前插入 <details> 隐藏式图解——默认折叠不撑长页面，展开后为该语言的实拍截图 + 编号使用步骤；六语言全部同步
+    - [x] 反馈④（图片多语言）：截图按界面语言实拍（profile lang 切换 zh/zh-Hant/en/es/fr/nl），文档按语言引用本语言截图，路径惯例与既有本地化原理图一致
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：pnpm build 205 页零报错（26.85s）
+    - [x] 自动化核验：validate-anchors 410 页 3324/0 断链；check-structure 34 篇 ×6 语言 100% 对称（图多重集含新图逐一匹配）；verify-laws 退出码 0；tamper-proof 固化 82af565
+    - [x] 浏览器实测：details 展开实测——summary 点击展开、图 naturalWidth 2880 加载成功、编号步骤呈现；五语言图解由代理逐一过结构校验后合流
+    - [x] 过程修复：wrangler dev 误入 remote 模式改 --local；dev 服务器静态清单因 dist 原地重建过期导致截图空白——重启后重拍；写信弹层不响应 Esc 改为整页刷新复位
+    - [x] 零假数据残留：截图全部来自本地演示实例真实运行画面（seed-demo 数据 + 管理界面真实表单值）；判图截图不入库
+
 ### EpomailDocs v5.15 每界面一页轮：12 个界面详解页 ×6 语言 + 侧栏八组 34 项 (2026-10-06)
 *   **关联提交 (Git Commit)**: EpomailDocs 独立提交 `472ebc32d8c0a10d4f721037a794643086a6a6c8` (Short: `472ebc3`，v5.15 内容) + `14d3d23` (manifest 固化 472ebc3)；两提交已推送 origin/master 与 origin/main；主仓归档提交见本条目对应变更提交
 *   **部署环境 (Deployment)**: `本地全真栈：EpomailDocs wrangler pages dev dist:8790（205 页）全页判图；本轮无应用侧代码改动；线上发布未执行，待运营者 pnpm run deploy`
