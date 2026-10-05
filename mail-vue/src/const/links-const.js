@@ -8,7 +8,7 @@
 export const DEFAULT_OFFICIAL_LINKS = {
   blog: 'https://blog.epocanvas.com',
   docs: 'https://docs.epocanvas.com/epomail',
-  support: 'https://blog.epocanvas.com/support',
+  support: 'https://docs.epocanvas.com/epomail/service-scope/',
   telegram: 'https://t.me/epomail',
   github: 'https://github.com/shijianus/epomail',
   releases: 'https://github.com/shijianus/epomail/releases'
