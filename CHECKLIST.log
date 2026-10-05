@@ -9,6 +9,23 @@
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
 
+### EpomailDocs v5.13 专案介绍双线扩充轮：六新页 ×6 语言 + 应用外链迁移 + 全站 5.13 (2026-10-05)
+*   **关联提交 (Git Commit)**: EpomailDocs 独立提交 `039becc` (Short: `039becc`，v5.13 内容) + `ae3da8b` (manifest 固化 039becc)；两提交已推送 origin/master 与 origin/main；主仓应用侧变更 `af79e31`；主仓归档提交见本条目对应变更提交
+*   **部署环境 (Deployment)**: `本地全真栈：EpomailDocs wrangler pages dev dist:8790（115 页）全页判图；应用侧仅改链接缺省值，mail-vue 构建验证未部署生产；线上发布未执行，待运营者 pnpm run deploy`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 反馈①（双受众架构）：按「专案推广（了解专案/自部署/学习使用）」与「专案服务（服务范围/隐私法律/功能实现）」双线组织——站点不设可见分区，以总览页新增「两条阅读路线」段与全站互链交融；法律板块拆分出《开源与自行部署法律》（专案开源使用线），与既有服务法律文档（专案服务线）并列
+    - [x] 反馈②（每一 URL 的界面）：新增《界面与路由总览》×6 语言——/mail/u/N/#view 混合路由全表（主界面九视图、设置五分区、管理九分区含权限键）、写信弹层三触发、界面骨架四区、登录面六流程（注册码三模式/邀请码参数/申诉门户参数）、OAuth 授权页/公开个人主页/404/PWA，逐项经 router/index.js 与 layout 源码对码
+    - [x] 反馈③（搜索变量完整参考）：新增《搜索与规则参考》×6 语言——十个字段算子、八个范围与精确度旗标（global:/is:sent/is:spam/is:trash/is:draft/hl:off/exact:true/case:true）、高亮与摘录行为、管理端 $ 检索（$sender/$user/$to/$subject + 状态 token + 中文别名 + \$ 转义 + 右键生成）、设置页检索（all:/global:/app:/oauth:/client: + Tab 补全）、分类规则九条件（明确标注 UI 提供但引擎未实装的 at_least/at_most/before/after/message_header_includes，防止误配）、priority/stopProcessing、系统内置启发式与站点治理
+    - [x] 反馈④（开发需求展示）：新增《部署指南》《开发指南》×6 语言——前置条件/三步部署/初始化引导链/密钥体系/邮件收发与系统邮件（含欢迎邮件相对路径 CTA 行为说明）/存储选型/演示实例/升级回滚；仓库结构/本地环境/测试巡检/六语言纪律/迁移纪律/五步 SOP/文档站开发/贡献通道
+    - [x] 反馈⑤（占位外链落位）：应用侧 `af79e31`——账户菜单页脚三链接回退域名由 epomail-docs.pages.dev 旧域迁至 docs.epocanvas.com 并按界面语言选择文档目录（替代硬编码 /en/）；系统设置「关于」卡技术支持缺省链接由 blog 迁至文档站《服务范围与支持》；《服务范围与支持》页明列应用内官方链接缺省指向与站长覆写机制
+    - [x] 反馈⑥（i18n 六语言闭环）：六新页 zh/zh-tw/en/es/fr/nl（zh-tw 正式版本人翻译、es/fr/nl 经术语约束代理翻译后全量过结构校验）；既有五页相关文档表 +2/+6/+2/+2 行与段落互链 ×6 语言；侧栏三组重组（专案与架构 10 项、隐私与数据保护 4 项、服务条款与合规 5 项）；全站版本 5.12→5.13（114 文件）
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：EpomailDocs pnpm build 115 页零报错（23.28s）；mail-vue vite build 零警告零报错（39.54s）；mail-worker wrangler deploy --dry-run 试编译通过
+    - [x] 自动化核验：validate-anchors 230 页 2268/0 断链；check-structure 19 篇 ×6 语言 100% 结构对称（zh-tw 正式版基准）；verify-laws 退出码 0；tamper-proof 清单固化 039becc（114 篇文档）
+    - [x] 浏览器全真栈实测：13 张全页 + 4 张元素裁片判图，控制台/网络错误 CLEAN——路由表代码 token 折行缺陷经 custom.css 行内代码不折行规则修复并复验；暗色主题、es/fr/nl 抽样、侧栏三组、分页卡流转全部通过
+    - [x] YAML frontmatter 修复：fr/nl open-source 的 title/description 含冒号加双引号，构建恢复绿色
+    - [x] 零假数据残留：本轮未运行 epomail 实例（截图沿用既有真实演示实例资产）；判图截图不入库（screenshots/ ignored）；EpomailDocs 工作树仅余先于本轮存在的无关杂散文件（PROJECT_STATE.md/REPORTS.md，保持未跟踪）
+
 ### EpomailDocs v5.12 专案介绍精度治理轮：六语言全量对码修订 + 提交链路刷新 (2026-10-05)
 *   **关联提交 (Git Commit)**: EpomailDocs 独立提交 `8da882cfab09c07ffb66d363f949ef5598bfb780` (Short: `8da882c`，v5.12 内容) + `4188b98` (manifest 固化 8da882c)；两提交已推送 origin/master 与 origin/main；主仓归档提交见本条目对应变更提交
 *   **部署环境 (Deployment)**: `本地全真栈：EpomailDocs wrangler pages dev dist:8790（含 Pages Functions Accept-Language 协商，部署前清理 4321/4399/8790 三端口历史遗留僵尸 wrangler 栈后单实例运行）全页判图；线上发布未执行，待运营者 pnpm run deploy`
