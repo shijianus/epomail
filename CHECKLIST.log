@@ -9,6 +9,23 @@
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
 
+### EpomailDocs v5.14 文档深化与导航重构轮：OAuth 接入教程等三新页 ×6 语言 + 六意图侧栏 + 冷启动 P1 修复 (2026-10-06)
+*   **关联提交 (Git Commit)**: EpomailDocs 独立提交 `6b4d7fe` (Short: `6b4d7fe`，v5.14 内容) + `0aedc7c` (manifest 固化 6b4d7fe)；两提交已推送 origin/master 与 origin/main；主仓 `a7ac1b2`（v3_16DB 冷启动修复 + OAuth 教程按钮指向文档站）；主仓归档提交见本条目对应变更提交
+*   **部署环境 (Deployment)**: `本地全真栈：mail-worker wrangler dev 8787（wipe 冷启动 → /api/init 播种 → seed-demo 20 封 → 开用户资料控制开关，兼作冷启动修复验证与截图源）；EpomailDocs wrangler pages dev dist:8790（133 页）全页判图；线上发布未执行，待运营者 pnpm run deploy`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 反馈①（分级细化）：侧栏由 3 个大组重组为 6 个意图命名组（产品与总览 2 / 使用指南 7 / 自部署与开发 3 / 技术与信任 2 / 隐私与数据保护 4 / 条款与合规 4，共 22 项），一级标题即用户意图、二级标题即具体门类；组名与条目 ×6 语言对称
+    - [x] 反馈②（OAuth 开放平台接入教程落地）：新增《开放平台与 API 接入》api.md ×6 语言——注册字段表（epo_live_/epo_sec_ 一次性凭据与重置）、四端点总览、五步接入流程 + cURL 示例、PKCE/client_secret 双模式、scope 语义表、用户授权与即时撤销、PAT 现状诚实 note——全部经 oauth-app-service/oauth-provider-api 源码对码；应用侧「开发接入教程」按钮同步改指本教程（`a7ac1b2`）
+    - [x] 反馈③（普通用户难懂界面逐步化）：新增《帐号安全设置指南》security.md 与《通知与转发指南》notify.md ×6 语言——2FA 三步开启/恢复码/通行密钥 30 天时效锁/step-up 异常环境二验；Telegram 私有机器人五步绑定/推送偏好/自动转发触发类型与 [Fwd] 前缀，均逐步编号说明
+    - [x] 反馈④（事实纠偏 ×6）：features 个人 API 令牌改为接入指南链接（对码证实 PAT 签发接口已建但无消费端点与前端入口）；settings 转发说明改指新指南并更正「用户资料控制」卡名（对码证实智能规则档当前按全部邮件处理、保留原件选项未生效）；interface 资料分区行移除 API 访问
+    - [x] 反馈⑤（真实截图补齐）：新摄 ui-oauth-apps.png（端点条/示例应用/集成代码）与 ui-notify-forward.png（邮件与消息转发区）入库 public/images/mail/ui/，截图源为本地演示实例真实运行画面
+    - [x] 反馈⑥（冷启动 P1 修复，对码副产品）：发现 setting 表 8 列（user_tg_forward/user_email_forward/user_api_support/oauth_login_enabled/oauth_providers/welcome_templates/welcome_lang/global_email_config）从未被建表与迁移覆盖，全新部署保存开关必报 D1 no such column——新增 v3_16DB 幂等迁移（`a7ac1b2`），本地 wipe 冷启动端到端验证 init success → 登录 → 开关写入 200
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：EpomailDocs pnpm build 133 页零报错（27.53s）；mail-vue vite build 零警告零报错（43.44s）
+    - [x] 自动化核验：validate-anchors 266 页 2520/0 断链；check-structure 22 篇 ×6 语言 100% 结构对称；verify-laws 退出码 0；tamper-proof 固化 6b4d7fe（132 篇文档）
+    - [x] 浏览器全真栈实测：10 张全页 + 3 裁片判图控制台/网络错误 CLEAN——api/security/notify 全页与暗色、es/fr/nl 抽样、六组侧栏、分页流转全部通过
+    - [x] 冷启动链路实测：wipe → /api/init success → admin 登录 → 用户资料控制开关 200（修复前该链路 D1_ERROR 必现）
+    - [x] 零假数据残留：演示数据仅存本地 .wrangler/state（gitignored）；判图截图不入库；EpomailDocs 工作树干净（杂散 PROJECT_STATE.md/REPORTS.md 保持未跟踪）
+
 ### EpomailDocs v5.13 专案介绍双线扩充轮：六新页 ×6 语言 + 应用外链迁移 + 全站 5.13 (2026-10-05)
 *   **关联提交 (Git Commit)**: EpomailDocs 独立提交 `039becc` (Short: `039becc`，v5.13 内容) + `ae3da8b` (manifest 固化 039becc)；两提交已推送 origin/master 与 origin/main；主仓应用侧变更 `af79e31`；主仓归档提交见本条目对应变更提交
 *   **部署环境 (Deployment)**: `本地全真栈：EpomailDocs wrangler pages dev dist:8790（115 页）全页判图；应用侧仅改链接缺省值，mail-vue 构建验证未部署生产；线上发布未执行，待运营者 pnpm run deploy`
