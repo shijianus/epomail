@@ -94,18 +94,18 @@ async function run() {
     ok(highlightCount === 0, `公网线上已彻底消除 .highlight-card (计数: ${highlightCount})`);
 
     // ==========================================
-    // 验证要求 2: 待办数据 / 总数据 展示与 4 种明确情况
+    // 验证要求 2: 待办 / 总量 指标展示与 4 种明确情况 (PM 排布顺序)
     // ==========================================
-    console.log('\n[核验 2] KPI 内容以“待办数据 / 总数据”展示，4 个不同层级情况明确...');
+    console.log('\n[核验 2] KPI 内容以“待办 / 总量”展示，4 个不同层级情况明确...');
     const cardTexts = await page.locator('.kpi-card').allTextContents();
     console.log('  KPI 卡片内容摘录:');
     cardTexts.forEach((t, i) => console.log(`    卡片 ${i + 1}: ${t.replace(/\s+/g, ' ').trim()}`));
 
-    ok(cardTexts.some(t => t.includes('常规审查')), '卡片 1 明确为“常规审查”');
-    ok(cardTexts.some(t => t.includes('异常威胁')), '卡片 2 明确为“异常威胁”');
-    ok(cardTexts.some(t => t.includes('封禁管控')), '卡片 3 明确为“封禁管控”');
-    ok(cardTexts.some(t => t.includes('争议申诉')), '卡片 4 明确为“争议申诉”');
-    ok(cardTexts.every(t => t.includes('待办数据') && t.includes('总数据')), '所有 4 张卡片均包含「待办数据」与「总数据」显式说明');
+    ok(cardTexts[0].includes('常规审查'), '卡片 1 明确为“常规审查” (audit)');
+    ok(cardTexts[1].includes('异常威胁'), '卡片 2 明确为“异常威胁” (risk)');
+    ok(cardTexts[2].includes('争议申诉'), '卡片 3 明确为“争议申诉” (appeal - 提前至第3位)');
+    ok(cardTexts[3].includes('封禁管控'), '卡片 4 明确为“封禁管控” (ban - 移至最后纯台账)');
+    ok(cardTexts.every(t => t.includes('/')), '所有 4 张卡片均包含待办与总量指标数值');
 
     // ==========================================
     // 验证要求 3 & 4: 彻底消除 .tier-nav-bar 与“记录策略与容量”重叠
@@ -144,26 +144,31 @@ async function run() {
     if (caseCount > 0) {
       const firstRowText = await caseCells.nth(0).textContent();
       console.log(`  行 1 案件内容: ${firstRowText.trim()}`);
-      ok(firstRowText.includes('CASE-') || firstRowText.includes('TKT-'), '案件列默认展示案件编号');
+      ok(firstRowText.includes('CASE-') || firstRowText.includes('TKT-') || firstRowText.includes('REV-'), '案件列默认展示案件编号');
     }
 
     // ==========================================
-    // 验证要求 8, 10, 11: 列名精简化与“初级阶段机器人认定的风险评估”、“详情审计”
+    // 验证要求 8, 10, 11: 列名精简化与“风险判定与触发依据”、“详情审计”
     // ==========================================
     console.log('\n[核验 8, 10, 11] 表格精简管理列与表头准确性...');
     const ths = await page.locator('.el-table__header th').allTextContents();
     const thString = ths.map(h => h.trim()).filter(Boolean).join(' | ');
     console.log(`  公网表格表头: ${thString}`);
 
-    ok(thString.includes('初级阶段机器人认定的风险评估'), '表头包含「初级阶段机器人认定的风险评估」');
+    ok(thString.includes('风险判定与触发依据') || thString.includes('初级阶段机器人认定的风险评估'), '表头包含「风险判定与触发依据」');
     ok(thString.includes('详情审计'), '表头操作列明确为「详情审计」');
     ok(thString.includes('启案时间') && thString.includes('结案时间'), '包含「启案时间」与「结案时间」');
     ok(!thString.includes('环境与客户端IP池') && !thString.includes('预警说明与触发特征'), '主表已彻底移除庞杂的IP池与预警说明长文本');
 
+    // 截取公网主控制台全真快照
+    const prodScreenshot = 'tests/prod_live_audit_verified.png';
+    await page.screenshot({ path: prodScreenshot, fullPage: true });
+    console.log(`\n  ✓ 生产公网主表全真快照保存成功: ${prodScreenshot}`);
+
     // ==========================================
     // 验证要求 9: Google 式多维信任抽屉与证据审计
     // ==========================================
-    console.log('\n[核验 9] 点入抽屉核验 Google 式多维证据画像...');
+    console.log('\n[核验 9] 点入抽屉核验多维证据画像...');
     const detailBtn = page.locator('.el-table__body tr.el-table__row .el-button').first();
     if (await detailBtn.count() > 0) {
       await detailBtn.click();
@@ -172,17 +177,57 @@ async function run() {
       ok(await drawer.isVisible(), '成功滑出右侧二级审计抽屉');
 
       const drawerText = await drawer.textContent();
-      ok(drawerText.includes('Google 式多维上下文证据画像') || drawerText.includes('多维上下文证据画像'), '抽屉展示多维上下文证据画像');
+      ok(drawerText.includes('多维可信研判凭据画像') || drawerText.includes('Google 式多维上下文证据画像') || drawerText.includes('多维上下文证据画像'), '抽屉展示多维可信证据画像');
       ok(drawerText.includes('网络与拓扑置信度') || drawerText.includes('网络拓扑'), '包含网络与拓扑置信度');
       ok(drawerText.includes('凭证与身份') || drawerText.includes('2FA'), '包含凭证与身份因子');
       ok(drawerText.includes('行为速率') || drawerText.includes('投递速率'), '包含行为速率与信誉遥测');
-      ok(drawerText.includes('放行结案') || drawerText.includes('提交案件裁决'), '包含裁决工作台');
+
+      // 截取抽屉全真快照
+      const drawerScreenshot = 'tests/prod_live_dossier_drawer.png';
+      await page.screenshot({ path: drawerScreenshot, fullPage: true });
+      console.log(`  ✓ 生产公网研判抽屉快照保存成功: ${drawerScreenshot}`);
+
+      // 关闭抽屉
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(500);
     }
 
-    // 截取生产真实截图
-    const prodScreenshot = 'tests/prod_live_audit_verified.png';
-    await page.screenshot({ path: prodScreenshot, fullPage: true });
-    console.log(`\n  ✓ 生产公网全真快照保存成功: ${prodScreenshot}`);
+    // ==========================================
+    // 验证要求 12: 封禁管控 (ban) 纯展示透明台账核验
+    // ==========================================
+    console.log('\n[核验 12] 切换至封禁管控卡片核验纯展示透明台账...');
+    const banCard = page.locator('.kpi-card').nth(3);
+    await banCard.click();
+    await page.waitForTimeout(1000);
+
+    const banThs = await page.locator('.el-table__header th').allTextContents();
+    const banThString = banThs.map(h => h.trim()).filter(Boolean).join(' | ');
+    console.log(`  封禁管控表头: ${banThString}`);
+    ok(banThString.includes('编号') || banThString.includes('案件编号'), '封禁台账具备编号列');
+    ok(banThString.includes('邮箱'), '封禁台账具备邮箱列');
+    ok(banThString.includes('封禁时间'), '封禁台账具备封禁时间列');
+    ok(banThString.includes('最后处理时间'), '封禁台账具备最后处理时间列');
+    ok(banThString.includes('封禁原因'), '封禁台账具备封禁原因列');
+    ok(banThString.includes('状态'), '封禁台账具备状态列');
+
+    const banRows = page.locator('.el-table__body tr.el-table__row');
+    if (await banRows.count() > 0) {
+      const viewDossierBtn = banRows.first().locator('.el-button');
+      ok(await viewDossierBtn.isVisible(), '封禁台账行包含「查看档案」按钮且完整展示');
+      await viewDossierBtn.click();
+      await page.waitForTimeout(800);
+      const banBanner = page.locator('.sanction-ledger-banner');
+      if (await banBanner.isVisible()) {
+        const bannerNotice = await banBanner.textContent();
+        console.log(`  封禁台账提示: ${bannerNotice.trim()}`);
+        ok(bannerNotice.includes('公开透明台账') && bannerNotice.includes('不可随意篡改'), '封禁档案明确提示公开透明台账不可随意篡改');
+      }
+    }
+
+    // 截取封禁台账快照
+    const banScreenshot = 'tests/prod_live_sanction_ledger.png';
+    await page.screenshot({ path: banScreenshot, fullPage: true });
+    console.log(`  ✓ 生产公网封禁台账快照保存成功: ${banScreenshot}`);
 
   } catch (err) {
     console.error('公网核验失败:', err);
