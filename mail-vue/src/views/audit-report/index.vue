@@ -2,116 +2,136 @@
   <div class="audit-box">
     <!-- 主体全幅可滚动区域 -->
     <el-scrollbar ref="scrollbarRef" class="scrollbar">
-      <div class="audit-workspace-body">
+      <div class="audit-page-container">
 
-        <!-- 1. 顶部汇报分区 4 板块 (The 4 Upper Reporting KPI Blocks - 统一 UI 与 待办/总数据展示) -->
+        <!-- 1. 顶部汇报分区 4 板块：彻底统一 UI 视觉与结构，无异化样式，以 待办数据/总数据 清晰呈现 -->
         <div class="kpi-grid">
-          <!-- Card 1: 行为基线初筛 -->
+          <!-- 情况 1: 常规审查 (例行基线偏差排查) -->
           <div
-            class="kpi-card category-card"
-            :class="{ 'card-active': params.warningType === 'audit' }"
+            class="kpi-card"
+            :class="{ 'kpi-card-active': params.warningType === 'audit' }"
             @click="selectWarningFilter('audit')"
           >
-            <div class="kpi-icon-wrap ops-icon">
+            <div class="kpi-icon-wrap icon-routine">
               <Icon icon="fluent:shield-task-20-filled" width="22" height="22" />
             </div>
-            <div class="kpi-info">
-              <div class="kpi-label">
-                <span>{{ $t('auditTypeRoutineScreening') }}</span>
-                <span v-if="params.warningType === 'audit'" class="active-dot"></span>
+            <div class="kpi-content">
+              <div class="kpi-header">
+                <span class="kpi-title">{{ $t('auditCaseTypeRoutine') }}</span>
+                <span v-if="params.warningType === 'audit'" class="kpi-active-dot"></span>
               </div>
-              <div class="kpi-value font-mono">
-                {{ summaryCounts.categories.audit.pending }}
-                <span class="kpi-unit">/ {{ summaryCounts.categories.audit.total }}</span>
+              <div class="kpi-data-stat kpi-value font-mono">
+                <span class="stat-pending">{{ summaryCounts.categories.audit.pending }}</span>
+                <span class="stat-unit">/ {{ summaryCounts.categories.audit.total }}</span>
               </div>
-              <div class="kpi-sub">{{ $t('auditTypeRoutineScreeningDesc') }}</div>
+              <div class="kpi-data-meta">
+                <span>{{ $t('auditPendingData') }}: {{ summaryCounts.categories.audit.pending }}</span>
+                <span class="meta-sep">·</span>
+                <span>{{ $t('auditTotalData') }}: {{ summaryCounts.categories.audit.total }}</span>
+              </div>
+              <div class="kpi-desc kpi-sub" :title="$t('auditCaseTypeRoutineDesc')">{{ $t('auditCaseTypeRoutineDesc') }}</div>
               <div class="kpi-progress-bar">
                 <div
-                  class="kpi-progress-fill ops-fill"
+                  class="kpi-progress-fill fill-routine"
                   :style="{ width: calcPercent(summaryCounts.categories.audit.pending, summaryCounts.categories.audit.total) + '%' }"
                 ></div>
               </div>
             </div>
           </div>
 
-          <!-- Card 2: 高危风险研判 -->
+          <!-- 情况 2: 异常威胁 (触碰安全红线与高频异常) -->
           <div
-            class="kpi-card category-card"
-            :class="{ 'card-active': params.warningType === 'risk' }"
+            class="kpi-card"
+            :class="{ 'kpi-card-active': params.warningType === 'risk' }"
             @click="selectWarningFilter('risk')"
           >
-            <div class="kpi-icon-wrap risk-icon">
+            <div class="kpi-icon-wrap icon-threat">
               <Icon icon="fluent:alert-urgent-20-filled" width="22" height="22" />
             </div>
-            <div class="kpi-info">
-              <div class="kpi-label">
-                <span>{{ $t('auditTypeThreatInterception') }}</span>
-                <span v-if="params.warningType === 'risk'" class="active-dot"></span>
+            <div class="kpi-content">
+              <div class="kpi-header">
+                <span class="kpi-title">{{ $t('auditCaseTypeThreat') }}</span>
+                <span v-if="params.warningType === 'risk'" class="kpi-active-dot"></span>
               </div>
-              <div class="kpi-value font-mono">
-                {{ summaryCounts.categories.risk.pending }}
-                <span class="kpi-unit">/ {{ summaryCounts.categories.risk.total }}</span>
+              <div class="kpi-data-stat kpi-value font-mono">
+                <span class="stat-pending">{{ summaryCounts.categories.risk.pending }}</span>
+                <span class="stat-unit">/ {{ summaryCounts.categories.risk.total }}</span>
               </div>
-              <div class="kpi-sub">{{ $t('auditTypeThreatInterceptionDesc') }}</div>
+              <div class="kpi-data-meta">
+                <span>{{ $t('auditPendingData') }}: {{ summaryCounts.categories.risk.pending }}</span>
+                <span class="meta-sep">·</span>
+                <span>{{ $t('auditTotalData') }}: {{ summaryCounts.categories.risk.total }}</span>
+              </div>
+              <div class="kpi-desc kpi-sub" :title="$t('auditCaseTypeThreatDesc')">{{ $t('auditCaseTypeThreatDesc') }}</div>
               <div class="kpi-progress-bar">
                 <div
-                  class="kpi-progress-fill risk-fill"
+                  class="kpi-progress-fill fill-threat"
                   :style="{ width: calcPercent(summaryCounts.categories.risk.pending, summaryCounts.categories.risk.total) + '%' }"
                 ></div>
               </div>
             </div>
           </div>
 
-          <!-- Card 3: 封禁惩戒执行 -->
+          <!-- 情况 3: 封禁管控 (硬性策略处置生效中) -->
           <div
-            class="kpi-card category-card"
-            :class="{ 'card-active': params.warningType === 'ban' }"
+            class="kpi-card"
+            :class="{ 'kpi-card-active': params.warningType === 'ban' }"
             @click="selectWarningFilter('ban')"
           >
-            <div class="kpi-icon-wrap ban-icon">
+            <div class="kpi-icon-wrap icon-sanction">
               <Icon icon="fluent:prohibited-20-filled" width="22" height="22" />
             </div>
-            <div class="kpi-info">
-              <div class="kpi-label">
-                <span>{{ $t('auditTypeSanctionEnforcement') }}</span>
-                <span v-if="params.warningType === 'ban'" class="active-dot"></span>
+            <div class="kpi-content">
+              <div class="kpi-header">
+                <span class="kpi-title">{{ $t('auditCaseTypeSanction') }}</span>
+                <span v-if="params.warningType === 'ban'" class="kpi-active-dot"></span>
               </div>
-              <div class="kpi-value font-mono">
-                {{ summaryCounts.categories.ban.pending }}
-                <span class="kpi-unit">/ {{ summaryCounts.categories.ban.total }}</span>
+              <div class="kpi-data-stat kpi-value font-mono">
+                <span class="stat-pending">{{ summaryCounts.categories.ban.pending }}</span>
+                <span class="stat-unit">/ {{ summaryCounts.categories.ban.total }}</span>
               </div>
-              <div class="kpi-sub">{{ $t('auditTypeSanctionEnforcementDesc') }}</div>
+              <div class="kpi-data-meta">
+                <span>{{ $t('auditPendingData') }}: {{ summaryCounts.categories.ban.pending }}</span>
+                <span class="meta-sep">·</span>
+                <span>{{ $t('auditTotalData') }}: {{ summaryCounts.categories.ban.total }}</span>
+              </div>
+              <div class="kpi-desc kpi-sub" :title="$t('auditCaseTypeSanctionDesc')">{{ $t('auditCaseTypeSanctionDesc') }}</div>
               <div class="kpi-progress-bar">
                 <div
-                  class="kpi-progress-fill ban-fill"
+                  class="kpi-progress-fill fill-sanction"
                   :style="{ width: calcPercent(summaryCounts.categories.ban.pending, summaryCounts.categories.ban.total) + '%' }"
                 ></div>
               </div>
             </div>
           </div>
 
-          <!-- Card 4: 申诉复核裁决 (统一 UI 设计，展示 待办/总数据) -->
+          <!-- 情况 4: 争议申诉 (封禁争议提交人工复核 - 彻底统一 UI，严禁 highlight-card 异化) -->
           <div
-            class="kpi-card category-card"
-            :class="{ 'card-active': params.warningType === 'appeal' }"
+            class="kpi-card"
+            :class="{ 'kpi-card-active': params.warningType === 'appeal' }"
             @click="selectWarningFilter('appeal')"
           >
-            <div class="kpi-icon-wrap appeal-icon">
+            <div class="kpi-icon-wrap icon-appeal">
               <Icon icon="fluent:document-person-20-filled" width="22" height="22" />
             </div>
-            <div class="kpi-info">
-              <div class="kpi-label">
-                <span>{{ $t('auditTypeAppealReview') }}</span>
-                <span v-if="params.warningType === 'appeal'" class="active-dot"></span>
+            <div class="kpi-content">
+              <div class="kpi-header">
+                <span class="kpi-title">{{ $t('auditCaseTypeAppeal') }}</span>
+                <span v-if="params.warningType === 'appeal'" class="kpi-active-dot"></span>
               </div>
-              <div class="kpi-value font-mono">
-                {{ summaryCounts.categories.appeal.pending }}
-                <span class="kpi-unit">/ {{ summaryCounts.categories.appeal.total }}</span>
+              <div class="kpi-data-stat kpi-value font-mono">
+                <span class="stat-pending">{{ summaryCounts.categories.appeal.pending }}</span>
+                <span class="stat-unit">/ {{ summaryCounts.categories.appeal.total }}</span>
               </div>
-              <div class="kpi-sub">{{ $t('auditTypeAppealReviewDesc') }}</div>
+              <div class="kpi-data-meta">
+                <span>{{ $t('auditPendingData') }}: {{ summaryCounts.categories.appeal.pending }}</span>
+                <span class="meta-sep">·</span>
+                <span>{{ $t('auditTotalData') }}: {{ summaryCounts.categories.appeal.total }}</span>
+              </div>
+              <div class="kpi-desc kpi-sub" :title="$t('auditCaseTypeAppealDesc')">{{ $t('auditCaseTypeAppealDesc') }}</div>
               <div class="kpi-progress-bar">
                 <div
-                  class="kpi-progress-fill appeal-fill"
+                  class="kpi-progress-fill fill-appeal"
                   :style="{ width: calcPercent(summaryCounts.categories.appeal.pending, summaryCounts.categories.appeal.total) + '%' }"
                 ></div>
               </div>
@@ -119,49 +139,11 @@
           </div>
         </div>
 
-        <!-- 2. 案件生命周期流转分区 (去除与 KPI 重叠内容及策略文档，聚焦管理流转) -->
-        <div class="tier-nav-container">
-          <div class="tier-nav-bar">
-            <!-- 阶段 1: 全部案件 -->
-            <div
-              class="tier-tab-btn"
-              :class="{ active: params.lifecycle === 'all' }"
-              @click="switchLifecycle('all')"
-            >
-              <Icon icon="fluent:apps-list-detail-20-regular" width="17" height="17" />
-              <span>{{ $t('auditLifecycleAll') }}</span>
-              <span class="tier-badge">{{ summaryCounts.allTotal }}</span>
-            </div>
-
-            <!-- 阶段 2: 正在审计 (待办) -->
-            <div
-              class="tier-tab-btn"
-              :class="{ active: params.lifecycle === 'pending' }"
-              @click="switchLifecycle('pending')"
-            >
-              <Icon icon="fluent:timer-16-regular" width="17" height="17" />
-              <span>{{ $t('auditLifecyclePending') }}</span>
-              <span class="tier-badge alert-badge">{{ summaryCounts.totalPending }}</span>
-            </div>
-
-            <!-- 阶段 3: 已结案 (归档) -->
-            <div
-              class="tier-tab-btn"
-              :class="{ active: params.lifecycle === 'resolved' }"
-              @click="switchLifecycle('resolved')"
-            >
-              <Icon icon="fluent:checkmark-circle-20-regular" width="17" height="17" />
-              <span>{{ $t('auditLifecycleResolved') }}</span>
-              <span class="tier-badge">{{ Math.max(0, summaryCounts.allTotal - summaryCounts.totalPending) }}</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- 3. 工作台统合容器 (Single Container: 严禁二层方框，外部直接作为表格外框) -->
-        <div class="audit-workbench">
-          <!-- 顶部轻量操作栏 (全部控件与 Button 左对齐，结合 topbar-search) -->
+        <!-- 2. 工作台单一外框 (单一事实载体：禁止二层方框，操作栏与表格一体化) -->
+        <div class="audit-workbench audit-workbench-container">
+          <!-- 顶部操作栏 (统一左对齐，与 topbar-search 深度结合，支持参数搜索) -->
           <div class="header-actions">
-            <!-- 搜索框：与 topbar-search 双向结合，默认搜索案件编号与关键字 -->
+            <!-- 搜索框：与整体 topbar-search 联动，默认等同全局搜索，支持配合 ticket: / email: / ip: 全量参数 -->
             <div class="search">
               <el-input
                 v-model="localKeyword"
@@ -170,10 +152,14 @@
                 clearable
                 @input="handleLocalSearchInput"
                 @keyup.enter="search"
-              />
+              >
+                <template #prefix>
+                  <Icon icon="lucide:search" width="14" height="14" class="search-prefix-icon" />
+                </template>
+              </el-input>
             </div>
 
-            <!-- 预警类别筛选 (4 个明确情况) -->
+            <!-- 4 种明确情况筛选下拉 -->
             <el-select
               v-model="params.warningType"
               class="status-select"
@@ -181,17 +167,17 @@
               @change="search"
             >
               <el-option value="all" :label="$t('auditTypeAllAlerts')" />
-              <el-option value="audit" :label="$t('auditTypeRoutineScreening')" />
-              <el-option value="risk" :label="$t('auditTypeThreatInterception')" />
-              <el-option value="ban" :label="$t('auditTypeSanctionEnforcement')" />
-              <el-option value="appeal" :label="$t('auditTypeAppealReview')" />
+              <el-option value="audit" :label="$t('auditCaseTypeRoutine')" />
+              <el-option value="risk" :label="$t('auditCaseTypeThreat')" />
+              <el-option value="ban" :label="$t('auditCaseTypeSanction')" />
+              <el-option value="appeal" :label="$t('auditCaseTypeAppeal')" />
             </el-select>
 
-            <!-- 机器人风险初判评估筛选 -->
+            <!-- 初级阶段机器人认定的风险评估筛选 -->
             <el-select
               v-model="params.riskLevel"
               class="status-select"
-              :style="`width: ${locale === 'en' ? 140 : 115}px`"
+              :style="`width: ${locale === 'en' ? 140 : 120}px`"
               @change="search"
             >
               <el-option value="all" :label="$t('all')" />
@@ -208,46 +194,58 @@
               @change="search"
             >
               <el-option value="all" :label="$t('all')" />
-              <el-option value="active" :label="$t('auditStatusInAudit')" />
-              <el-option value="pending" :label="$t('auditStatusPendingTriage')" />
-              <el-option value="resolved" :label="$t('auditStatusResolved')" />
-              <el-option value="banned" :label="$t('auditStatusEnforced')" />
-              <el-option value="expired" :label="$t('auditStatusExpired')" />
+              <el-option value="active" :label="$t('auditCaseStatusInAudit')" />
+              <el-option value="pending" :label="$t('auditCaseStatusPending')" />
+              <el-option value="resolved" :label="$t('auditCaseStatusResolved')" />
+              <el-option value="banned" :label="$t('auditCaseStatusEnforced')" />
+              <el-option value="expired" :label="$t('auditCaseStatusExpired')" />
             </el-select>
 
-            <!-- 左对齐辅助操作图标集 (统一左侧排布) -->
-            <div class="actions-left-icons">
+            <!-- 操作按钮集：统一严格左对齐排布 -->
+            <div class="actions-left-buttons actions-left-icons">
+              <!-- 执行检索 -->
               <el-tooltip effect="dark" :content="$t('search')" placement="top">
-                <Icon class="action-icon" icon="iconoir:search" @click="search" width="19" height="19" />
+                <el-button class="action-btn-item action-icon" circle size="small" @click="search">
+                  <Icon icon="iconoir:search" width="16" height="16" />
+                </el-button>
               </el-tooltip>
 
+              <!-- 时间排序切换 -->
               <el-tooltip effect="dark" :content="params.timeSort === 1 ? $t('auditSortAsc') : $t('auditSortDesc')" placement="top">
-                <Icon
-                  class="action-icon"
-                  @click="changeTimeSort"
-                  :icon="params.timeSort === 1 ? 'material-symbols-light:timer-arrow-down-outline' : 'material-symbols-light:timer-arrow-up-outline'"
-                  width="26"
-                  height="26"
-                />
+                <el-button class="action-btn-item action-icon" circle size="small" @click="changeTimeSort">
+                  <Icon
+                    :icon="params.timeSort === 1 ? 'material-symbols-light:timer-arrow-down-outline' : 'material-symbols-light:timer-arrow-up-outline'"
+                    width="18"
+                    height="18"
+                  />
+                </el-button>
               </el-tooltip>
 
+              <!-- 刷新列表 -->
               <el-tooltip effect="dark" :content="$t('refresh')" placement="top">
-                <Icon class="action-icon" icon="ion:reload" width="18" height="18" @click="refresh" />
+                <el-button class="action-btn-item action-icon" circle size="small" @click="refresh">
+                  <Icon icon="ion:reload" width="15" height="15" />
+                </el-button>
               </el-tooltip>
 
+              <!-- 清理历史日志 -->
               <el-tooltip effect="dark" :content="$t('auditClearHistorical')" placement="top">
-                <Icon class="action-icon" icon="fluent:broom-sparkle-16-regular" width="18" height="18" @click="handlePurge" />
+                <el-button class="action-btn-item action-icon" circle size="small" @click="handlePurge">
+                  <Icon icon="fluent:broom-sparkle-16-regular" width="16" height="16" />
+                </el-button>
               </el-tooltip>
 
-              <!-- 独立外链至 epomail-docs 安全规则文档 (彻底分离管理与文档说明) -->
+              <!-- 安全规则文档外链 (彻底分离管理与文档展示) -->
               <el-tooltip effect="dark" :content="$t('auditDocsTitle')" placement="top">
-                <Icon class="action-icon" icon="fluent:book-question-mark-20-regular" width="18" height="18" @click="openDocs" />
+                <el-button class="action-btn-item action-icon" circle size="small" @click="openDocs">
+                  <Icon icon="fluent:book-question-mark-20-regular" width="16" height="16" />
+                </el-button>
               </el-tooltip>
             </div>
           </div>
 
-          <!-- 4. 核心管理表格 (直接作为外框承载：去除冗余的二次嵌套 box) -->
-          <div class="table-flow-area">
+          <!-- 3. 核心管理表格 (直接作为外框边界，杜绝二层嵌套方框) -->
+          <div class="table-area">
             <div class="loading" :class="tableLoading ? 'loading-show' : 'loading-hide'" :style="first ? 'background: transparent' : ''">
               <loading />
             </div>
@@ -258,26 +256,26 @@
               ref="tableRef"
               :empty-text="first ? '' : $t('auditEmptyLogs')"
             >
-              <!-- 案件编号 / 审计对象 (默认仅显示编号保护中立隐私，结案后显示结案名称) -->
+              <!-- 案件编号 / 审计对象 (未结案严格隐藏邮箱只显编号保护中立客观；结案后才显式名称) -->
               <el-table-column :label="$t('auditCaseNoSubject')" min-width="190">
                 <template #default="{ row }">
                   <div class="case-id-cell">
                     <span class="case-ticket-badge font-mono" @click="openAuditDrawer(row)">
                       {{ row.ticketId || ('CASE-' + String(row.id).padStart(6, '0')) }}
                     </span>
-                    <!-- 未结案时隐藏真实邮箱，显示脱敏标记；结案后显示结案对象 -->
+                    <!-- 结案后才显式名称；未结案隐藏邮箱仅显正在审计 -->
                     <span v-if="isCaseClosed(row.status)" class="subject-resolved font-mono">
                       ({{ row.email }})
                     </span>
-                    <el-tag v-else size="small" type="info" effect="plain" class="masked-tag">
-                      {{ $t('auditStatusInAudit') }}
+                    <el-tag v-else size="small" type="info" effect="plain" class="masked-status-tag">
+                      {{ $t('auditCaseStatusInAudit') }}
                     </el-tag>
                   </div>
                 </template>
               </el-table-column>
 
-              <!-- 机器人风险初判评估 (依既定规则制定，取代庞杂的安全审计等级) -->
-              <el-table-column :label="$t('auditRobotRiskAssessment')" width="145">
+              <!-- 初级阶段机器人认定的风险评估 (依照既定规则制定，取代庞杂的安全审计等级) -->
+              <el-table-column :label="$t('auditRobotRiskAssessment')" min-width="180">
                 <template #default="{ row }">
                   <div class="robot-risk-cell">
                     <el-tag size="small" :type="getRobotRiskTagType(row.priority)" effect="light">
@@ -288,8 +286,8 @@
                 </template>
               </el-table-column>
 
-              <!-- 当前审计状态 (正在审计、待办研判、已结案、已过期、已处置) -->
-              <el-table-column :label="$t('auditCurrentStatus')" width="125">
+              <!-- 当前审计状态 (正在审计、待办研判、已结案、已处置、已过期) -->
+              <el-table-column :label="$t('auditCurrentStatus')" width="130">
                 <template #default="{ row }">
                   <el-tag size="small" :type="getStatusTagType(row.status)">
                     {{ getStatusLabel(row.status) }}
@@ -315,17 +313,19 @@
                 </template>
               </el-table-column>
 
-              <!-- 详情与审计入口 (严格禁止未查看证据直接裁决，引导点入抽屉审计) -->
-              <el-table-column :label="$t('auditCaseAudit')" width="125" align="right" fixed="right">
+              <!-- 详情审计 (表头明确为“详情审计”，要求管理员点入查看完整证据后再裁决，严格禁止无证据直接裁决) -->
+              <el-table-column :label="$t('auditDetailColumn')" width="130" align="right" fixed="right">
                 <template #default="{ row }">
-                  <el-button
-                    size="small"
-                    type="primary"
-                    @click="openAuditDrawer(row)"
-                  >
-                    <Icon icon="fluent:document-search-20-regular" width="14" height="14" style="margin-right: 4px;" />
-                    <span>{{ $t('auditReviewCase') }}</span>
-                  </el-button>
+                  <el-tooltip effect="dark" :content="$t('auditReviewCaseTooltip')" placement="top">
+                    <el-button
+                      size="small"
+                      type="primary"
+                      @click="openAuditDrawer(row)"
+                    >
+                      <Icon icon="fluent:document-search-20-regular" width="15" height="15" style="margin-right: 4px;" />
+                      <span>{{ $t('auditReviewCase') }}</span>
+                    </el-button>
+                  </el-tooltip>
                 </template>
               </el-table-column>
             </el-table>
@@ -348,7 +348,7 @@
       </div>
     </el-scrollbar>
 
-    <!-- 5. 案件全宗档案与安全研判侧边抽屉 (二级显式：Google 式多维上下文证据画像与结案裁决工作台) -->
+    <!-- 4. 案件全宗档案与安全研判侧边抽屉 (二级显式：Google 式多维上下文证据画像与结案裁决工作台) -->
     <el-drawer
       v-model="drawerVisible"
       size="620px"
@@ -401,7 +401,7 @@
           </div>
         </div>
 
-        <!-- 机器初筛规则依据与触发特征 -->
+        <!-- 机器初筛规则依据与依照规则制定的惩罚程度 -->
         <div class="dossier-card">
           <div class="section-title">
             <Icon icon="fluent:bot-20-regular" width="18" height="18" />
@@ -414,7 +414,7 @@
           </div>
         </div>
 
-        <!-- Google 式多维上下文证据画像 (拒绝仅凭易变的 IP/指纹猜测，引入多维交叉验证) -->
+        <!-- Google 式多维上下文证据画像 (拒绝仅凭易变 IP/指纹猜测，引入四维信任交叉验证) -->
         <div class="dossier-card">
           <div class="section-title">
             <Icon icon="fluent:chart-multiple-20-regular" width="18" height="18" />
@@ -427,7 +427,35 @@
           </div>
 
           <div class="evidence-pillars">
-            <!-- 维度 1: 网络与拓扑置信度 -->
+            <!-- 维度 1: 凭证与身份因子健全度 -->
+            <div class="pillar-box">
+              <div class="pillar-header">
+                <Icon icon="fluent:key-multiple-20-regular" width="16" height="16" />
+                <span>{{ $t('auditContextAuth') }}</span>
+              </div>
+              <div class="pillar-items">
+                <div class="item-row"><span class="k">{{ $t('auditField2fa') }}:</span> <span class="v">{{ $t('audit2faProtected') }}</span></div>
+                <div class="item-row"><span class="k">{{ $t('auditFieldCredHealth') }}:</span> <span class="v">{{ $t('auditCredNotLeaked') }}</span></div>
+                <div class="item-row"><span class="k">{{ $t('auditFieldChallengeHistory') }}:</span> <span class="v">{{ $t('auditNoPasswordLock') }}</span></div>
+                <div class="item-row"><span class="k">{{ $t('auditFieldSessionState') }}:</span> <span class="v">{{ $t('auditOauthIsolated') }}</span></div>
+              </div>
+            </div>
+
+            <!-- 维度 2: 行为速率与信誉遥测 -->
+            <div class="pillar-box">
+              <div class="pillar-header">
+                <Icon icon="fluent:pulse-20-regular" width="16" height="16" />
+                <span>{{ $t('auditContextBehavior') }}</span>
+              </div>
+              <div class="pillar-items">
+                <div class="item-row"><span class="k">{{ $t('auditFieldUserReports') }}:</span> <span class="v" :class="{ 'text-danger': selectedRow.reportedByOthers > 0 }">{{ $t('auditReportsCount', { count: selectedRow.reportedByOthers }) }}</span></div>
+                <div class="item-row"><span class="k">{{ $t('auditFieldSendRate') }}:</span> <span class="v">{{ $t('auditSendRateNormal') }}</span></div>
+                <div class="item-row"><span class="k">{{ $t('auditFieldBounceRate') }}:</span> <span class="v">{{ $t('auditBounceRateHealthy') }}</span></div>
+                <div class="item-row"><span class="k">{{ $t('auditFieldReputation') }}:</span> <span class="v font-medium text-primary">{{ $t('auditReputationGood') }}</span></div>
+              </div>
+            </div>
+
+            <!-- 维度 3: 网络与拓扑置信度 -->
             <div class="pillar-box">
               <div class="pillar-header">
                 <Icon icon="fluent:globe-location-20-regular" width="16" height="16" />
@@ -442,35 +470,7 @@
               </div>
             </div>
 
-            <!-- 维度 2: 凭证与身份因子挑战 -->
-            <div class="pillar-box">
-              <div class="pillar-header">
-                <Icon icon="fluent:key-multiple-20-regular" width="16" height="16" />
-                <span>{{ $t('auditContextAuth') }}</span>
-              </div>
-              <div class="pillar-items">
-                <div class="item-row"><span class="k">{{ $t('auditField2fa') }}:</span> <span class="v">{{ $t('audit2faProtected') }}</span></div>
-                <div class="item-row"><span class="k">{{ $t('auditFieldCredHealth') }}:</span> <span class="v">{{ $t('auditCredNotLeaked') }}</span></div>
-                <div class="item-row"><span class="k">{{ $t('auditFieldChallengeHistory') }}:</span> <span class="v">{{ $t('auditNoPasswordLock') }}</span></div>
-                <div class="item-row"><span class="k">{{ $t('auditFieldSessionState') }}:</span> <span class="v">{{ $t('auditOauthIsolated') }}</span></div>
-              </div>
-            </div>
-
-            <!-- 维度 3: 行为速率与信誉遥测 -->
-            <div class="pillar-box">
-              <div class="pillar-header">
-                <Icon icon="fluent:pulse-20-regular" width="16" height="16" />
-                <span>{{ $t('auditContextBehavior') }}</span>
-              </div>
-              <div class="pillar-items">
-                <div class="item-row"><span class="k">{{ $t('auditFieldUserReports') }}:</span> <span class="v" :class="{ 'text-danger': selectedRow.reportedByOthers > 0 }">{{ $t('auditReportsCount', { count: selectedRow.reportedByOthers }) }}</span></div>
-                <div class="item-row"><span class="k">{{ $t('auditFieldSendRate') }}:</span> <span class="v">{{ $t('auditSendRateNormal') }}</span></div>
-                <div class="item-row"><span class="k">{{ $t('auditFieldBounceRate') }}:</span> <span class="v">{{ $t('auditBounceRateHealthy') }}</span></div>
-                <div class="item-row"><span class="k">{{ $t('auditFieldReputation') }}:</span> <span class="v font-medium text-primary">{{ $t('auditReputationGood') }}</span></div>
-              </div>
-            </div>
-
-            <!-- 维度 4: 设备指纹与会话连续性 (客观辅助，非孤立参考) -->
+            <!-- 维度 4: 设备指纹与会话连续性 (客观辅助，非孤立猜测) -->
             <div class="pillar-box">
               <div class="pillar-header">
                 <Icon icon="fluent:desktop-pulse-20-regular" width="16" height="16" />
@@ -565,7 +565,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, watch, onMounted } from 'vue';
+import { ref, reactive, watch, onMounted, onUnmounted } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { Icon } from '@iconify/vue';
@@ -592,7 +592,7 @@ const total = ref(0);
 // 本地搜索关键字，与顶栏 topbar-search 双向结合
 const localKeyword = ref('');
 
-// 4 Upper Reporting KPI metrics (待办/总数据结构)
+// 4 大情况 KPI 数据结构 (待办数据 / 总数据)
 const summaryCounts = reactive({
   totalPending: 0,
   allTotal: 0,
@@ -609,7 +609,6 @@ const params = reactive({
   warningType: 'all',
   riskLevel: 'all',
   status: 'all',
-  lifecycle: 'all', // 'all' | 'pending' | 'resolved'
   timeSort: 0,
   num: 1,
   size: 15
@@ -639,6 +638,13 @@ function handleLocalSearchInput(val) {
   }
 }
 
+function handleGlobalTopSearch(e) {
+  const kw = (e?.detail ?? emailStore.searchKeyword ?? '').trim();
+  localKeyword.value = kw;
+  params.keyword = kw;
+  search();
+}
+
 function calcPercent(pending, tot) {
   const totalVal = tot || 1;
   const val = pending || 0;
@@ -651,11 +657,6 @@ function selectWarningFilter(type) {
   } else {
     params.warningType = type;
   }
-  search();
-}
-
-function switchLifecycle(stage) {
-  params.lifecycle = stage;
   search();
 }
 
@@ -710,12 +711,12 @@ function getStatusTagType(status) {
 
 function getStatusLabel(status) {
   switch (status) {
-    case 'active': return t('auditStatusInAudit');
-    case 'pending': return t('auditStatusPendingTriage');
-    case 'resolved': return t('auditStatusResolved');
-    case 'banned': return t('auditStatusEnforced');
+    case 'active': return t('auditCaseStatusInAudit');
+    case 'pending': return t('auditCaseStatusPending');
+    case 'resolved': return t('auditCaseStatusResolved');
+    case 'banned': return t('auditCaseStatusEnforced');
     case 'rejected': return t('auditAppealStatusRejected');
-    case 'expired': return t('auditStatusExpired');
+    case 'expired': return t('auditCaseStatusExpired');
     default: return status || t('unknown');
   }
 }
@@ -829,7 +830,12 @@ onMounted(() => {
     localKeyword.value = emailStore.searchKeyword.trim();
     params.keyword = localKeyword.value;
   }
+  window.addEventListener('manage-audit-search', handleGlobalTopSearch);
   fetchAuditList();
+});
+
+onUnmounted(() => {
+  window.removeEventListener('manage-audit-search', handleGlobalTopSearch);
 });
 </script>
 
@@ -847,11 +853,11 @@ onMounted(() => {
   overflow-y: auto;
 }
 
-.audit-workspace-body {
+.audit-page-container {
   padding: 16px 20px 24px 20px;
 }
 
-/* 1. 顶部汇报 4 板块：彻底统一 UI 规范 */
+/* 1. 顶部汇报 4 板块：彻底统一 UI 规范，无特殊 highlight-card 异化 */
 .kpi-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -872,8 +878,8 @@ onMounted(() => {
   background: var(--el-bg-color);
   border: 1px solid var(--el-border-color);
   display: flex;
-  align-items: center;
-  gap: 14px;
+  align-items: flex-start;
+  gap: 12px;
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   user-select: none;
@@ -883,85 +889,104 @@ onMounted(() => {
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
   }
 
-  &.category-card {
-    position: relative;
+  &.kpi-card-active {
+    border-color: var(--el-color-primary) !important;
+    background: var(--el-color-primary-light-9) !important;
+    box-shadow: 0 0 0 1px var(--el-color-primary), 0 3px 12px rgba(64, 158, 255, 0.12);
 
-    &.card-active {
-      border-color: var(--el-color-primary) !important;
-      background: var(--el-color-primary-light-9) !important;
-      box-shadow: 0 0 0 1px var(--el-color-primary), 0 3px 12px rgba(64, 158, 255, 0.12);
-
-      .kpi-label {
-        color: var(--el-color-primary) !important;
-        font-weight: 600;
-      }
-    }
-
-    .active-dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background: var(--el-color-primary);
-      display: inline-block;
+    .kpi-title {
+      color: var(--el-color-primary) !important;
+      font-weight: 600;
     }
   }
 }
 
 .kpi-icon-wrap {
-  width: 42px;
-  height: 42px;
+  width: 40px;
+  height: 40px;
   border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  margin-top: 2px;
 
-  &.ops-icon {
+  &.icon-routine {
     background: var(--el-color-primary-light-9);
     color: var(--el-color-primary);
   }
-  &.risk-icon {
+  &.icon-threat {
     background: var(--el-color-danger-light-9);
     color: var(--el-color-danger);
   }
-  &.ban-icon {
+  &.icon-sanction {
     background: var(--el-fill-color);
     color: var(--el-text-color-secondary);
   }
-  &.appeal-icon {
+  &.icon-appeal {
     background: var(--el-color-warning-light-9);
     color: var(--el-color-warning);
   }
 }
 
-.kpi-info {
+.kpi-content {
   flex: 1;
   min-width: 0;
 }
 
-.kpi-label {
-  font-size: 12.5px;
-  color: var(--el-text-color-secondary);
-  margin-bottom: 2px;
+.kpi-header {
   display: flex;
   align-items: center;
   gap: 6px;
+  margin-bottom: 2px;
 }
 
-.kpi-value {
+.kpi-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--el-text-color-regular);
+}
+
+.kpi-active-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--el-color-primary);
+  display: inline-block;
+}
+
+/* 待办数据 / 总数据 结构明确呈现 */
+.kpi-data-stat {
   font-size: 20px;
   font-weight: 700;
   color: var(--el-text-color-primary);
   line-height: 1.2;
+
+  .stat-pending {
+    color: var(--el-text-color-primary);
+  }
+  .stat-unit {
+    font-size: 13px;
+    font-weight: normal;
+    color: var(--el-text-color-secondary);
+    margin-left: 2px;
+  }
 }
 
-.kpi-unit {
-  font-size: 12px;
-  font-weight: normal;
+.kpi-data-meta {
+  font-size: 11px;
   color: var(--el-text-color-secondary);
+  margin-top: 2px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+
+  .meta-sep {
+    color: var(--el-text-color-placeholder);
+  }
 }
 
-.kpi-sub {
+.kpi-desc {
   font-size: 11px;
   color: var(--el-text-color-placeholder);
   margin-top: 2px;
@@ -971,7 +996,7 @@ onMounted(() => {
 }
 
 .kpi-progress-bar {
-  height: 4px;
+  height: 3px;
   border-radius: 2px;
   background: var(--el-fill-color-light);
   margin-top: 6px;
@@ -983,82 +1008,21 @@ onMounted(() => {
   border-radius: 2px;
   transition: width 0.3s ease;
 
-  &.ops-fill { background: var(--el-color-primary); }
-  &.risk-fill { background: var(--el-color-danger); }
-  &.ban-fill { background: var(--el-text-color-placeholder); }
-  &.appeal-fill { background: var(--el-color-warning); }
+  &.fill-routine { background: var(--el-color-primary); }
+  &.fill-threat { background: var(--el-color-danger); }
+  &.fill-sanction { background: var(--el-text-color-placeholder); }
+  &.fill-appeal { background: var(--el-color-warning); }
 }
 
-/* 2. 案件流转分区 (去除重叠内容) */
-.tier-nav-container {
-  margin-bottom: 12px;
-}
-
-.tier-nav-bar {
-  display: flex;
-  gap: 8px;
-  border-bottom: 1px solid var(--el-border-color);
-  padding-bottom: 2px;
-}
-
-.tier-tab-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
-  font-size: 13.5px;
-  font-weight: 500;
-  color: var(--el-text-color-secondary);
-  border-radius: 6px 6px 0 0;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  position: relative;
-  user-select: none;
-
-  &:hover {
-    color: var(--el-color-primary);
-  }
-
-  &.active {
-    color: var(--el-color-primary);
-    font-weight: 600;
-
-    &::after {
-      content: '';
-      position: absolute;
-      bottom: -3px;
-      left: 0;
-      right: 0;
-      height: 2px;
-      background: var(--el-color-primary);
-      border-radius: 2px;
-    }
-  }
-}
-
-.tier-badge {
-  font-size: 11px;
-  background: var(--el-fill-color);
-  padding: 1px 6px;
-  border-radius: 10px;
-  font-weight: 600;
-  color: var(--el-text-color-regular);
-
-  &.alert-badge {
-    background: var(--el-color-primary);
-    color: #fff;
-  }
-}
-
-/* 3. 统合工作台容器 (单一外框规范，杜绝二层脱节嵌套) */
-.audit-workbench {
+/* 2. 工作台单一外框 (杜绝嵌套二层脱节方框，直接让表格承载) */
+.audit-workbench-container {
   border: 1px solid var(--el-border-color);
   border-radius: 6px;
   background: var(--el-bg-color);
   overflow: hidden;
 }
 
-/* 顶部操作栏：统一左对齐排布 */
+/* 顶部操作栏：统一严格左对齐排布 */
 .header-actions {
   padding: 8px 12px;
   display: flex;
@@ -1068,10 +1032,9 @@ onMounted(() => {
   flex-wrap: wrap;
   background: var(--el-bg-color);
   border-bottom: 1px solid var(--el-border-color-lighter);
-  font-size: 18px;
 
   .search-input {
-    width: min(240px, calc(100vw - 140px));
+    width: min(260px, calc(100vw - 120px));
   }
 
   .search {
@@ -1080,30 +1043,45 @@ onMounted(() => {
     }
   }
 
-  .status-select {
-    :deep(.el-select__wrapper) { min-height: 28px; }
+  .search-prefix-icon {
+    color: var(--el-text-color-placeholder);
+    margin-right: 4px;
   }
 
-  .actions-left-icons {
+  .status-select {
+    :deep(.el-select__wrapper) {
+      min-height: 28px;
+    }
+  }
+
+  .actions-left-buttons {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
   }
 
-  .action-icon {
-    cursor: pointer;
+  .action-btn-item {
     color: var(--el-text-color-regular);
-    transition: color 0.2s;
+    border-color: var(--el-border-color-lighter);
+    background: transparent;
+    transition: all 0.2s;
+
     &:hover {
       color: var(--el-color-primary);
+      border-color: var(--el-color-primary);
+      background: var(--el-color-primary-light-9);
     }
   }
 }
 
-/* 4. 表格区 */
-.table-flow-area {
+/* 3. 核心管理表格 (零脱节，直接作为外框铺满) */
+.table-area {
   position: relative;
   background: var(--el-bg-color);
+
+  :deep(.el-table) {
+    --el-table-header-bg-color: var(--el-fill-color-light);
+  }
 }
 
 .loading {
@@ -1155,9 +1133,9 @@ onMounted(() => {
     white-space: nowrap;
   }
 
-  .masked-tag {
+  .masked-status-tag {
     font-size: 11px;
-    padding: 0 4px;
+    padding: 0 5px;
     height: 20px;
     line-height: 20px;
   }
@@ -1172,6 +1150,8 @@ onMounted(() => {
     font-size: 10.5px;
     color: var(--el-text-color-placeholder);
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 }
 
@@ -1188,7 +1168,7 @@ onMounted(() => {
   border-top: 1px solid var(--el-border-color-lighter);
 }
 
-/* 5. 侧边抽屉样式 (Google 式安全研判工作台) */
+/* 4. 侧边抽屉样式 (Google 式安全研判工作台) */
 .audit-drawer-container {
   :deep(.el-drawer__body) {
     padding: 16px 20px 24px 20px;
@@ -1276,6 +1256,7 @@ onMounted(() => {
     font-size: 12.5px;
     font-weight: 600;
     color: var(--el-text-color-regular);
+    line-height: 1.4;
   }
   .rule-action-log {
     font-size: 13px;

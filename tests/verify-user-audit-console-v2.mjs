@@ -303,12 +303,11 @@ async function run() {
     ok(cardDescriptions.length === 4, '4 个层级均具备明确的业务与风险场景说明');
 
     // ==========================================
-    // Requirement 3: Case Lifecycle partition vs KPI
+    // Requirement 3: Partition optimization vs KPI redundancy
     // ==========================================
-    console.log('\n[核验要求 3] 分区优化：以“全部案件 / 正在审计 / 已结案”治理生命周期...');
-    const lifecycleTabs = page.locator('.tier-tab-btn');
-    const tabCount = await lifecycleTabs.count();
-    ok(tabCount === 3, `生命周期分区呈现 3 个清晰阶段按钮 (数量: ${tabCount})`);
+    console.log('\n[核验要求 3] 分区优化：彻底移除与 KPI 功能重叠的 .tier-nav-bar，直连一体化工作台...');
+    const tierNavCount = await page.locator('.tier-nav-bar, .tier-tab-btn').count();
+    ok(tierNavCount === 0, `彻底消除与 KPI 重叠的 .tier-nav-bar 冗余标签 (.tier-tab-btn 计数: ${tierNavCount})`);
 
     // ==========================================
     // Requirement 4: Management vs Documentation separation
@@ -369,19 +368,13 @@ async function run() {
     ok(row1Subject.includes('CASE-20261004-9812'), '未结案案件仅展示案件编号 ticketId');
     ok(!row1Subject.includes('attacker_x@suspicious.org'), '未结案案件严格隐匿用户邮箱，杜绝调查偏见');
 
-    // Switch to resolved cases tab
-    await lifecycleTabs.nth(2).click(); // '已结案'
-    await page.waitForTimeout(500);
-    const resolvedRows = await page.locator('.el-table__body tr.el-table__row').count();
-    if (resolvedRows > 0) {
-      const resolvedSubject = await page.locator('.el-table__body tr.el-table__row').nth(0).locator('.case-id-cell').textContent();
+    // Test resolved cases display via status select dropdown or resolved rows
+    const resolvedRow = page.locator('.el-table__body tr.el-table__row', { hasText: 'CASE-20261003-3319' });
+    if (await resolvedRow.count() > 0) {
+      const resolvedSubject = await resolvedRow.locator('.case-id-cell').textContent();
       console.log(`  已结案案件展示内容: ${resolvedSubject.trim()}`);
-      ok(resolvedSubject.includes('CASE-20261003-3319') || resolvedSubject.includes('closed_account'), '已结案案件展示结案主体标识与编号');
+      ok(resolvedSubject.includes('CASE-20261003-3319') && resolvedSubject.includes('closed_account'), '已结案案件展示结案主体标识与编号');
     }
-
-    // Switch back to '全部案件'
-    await lifecycleTabs.nth(0).click();
-    await page.waitForTimeout(500);
 
     // ==========================================
     // Requirement 8: Simple table metadata & Secondary display in right drawer
