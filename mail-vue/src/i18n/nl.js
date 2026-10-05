@@ -2361,7 +2361,7 @@ totpModeAllDesc: 'Instellen of gebruikers TOTP mogen gebruiken. Eenmaal ingescha
     auditStatusNotStarted: "Niet Gestart",
     auditStatusEnforced: "Sanctie Actief",
     auditSearchCasesPlaceholder: "Zoek op dossiernr., onderwerp of trefwoord...",
-    auditRobotRiskAssessment: "Geautomatiseerde Risicobeoordeling",
+    auditRobotRiskAssessment: "Initiële risicobeoordeling door robot",
     auditRobotRiskDesc: "Initiële geautomatiseerde risicoschatting door regels; sancties vastgesteld volgens beleid",
     auditCaseDossier: "Dossieroverzicht & Veiligheidsuitspraak",
     auditDossierDesc: "Multidimensionale contextuele bewijsketen · Geïnspireerd op Google-beveiliging",

@@ -2361,7 +2361,7 @@ totpModeAllDesc: 'Configurar si los usuarios pueden usar TOTP. Al activarlo, la 
     auditStatusNotStarted: "No Iniciado",
     auditStatusEnforced: "Sanción Aplicada",
     auditSearchCasesPlaceholder: "Buscar por Nº de caso, sujeto o palabra clave...",
-    auditRobotRiskAssessment: "Evaluación de Riesgo Automatizada",
+    auditRobotRiskAssessment: "Evaluación inicial de riesgo por robot",
     auditRobotRiskDesc: "Evaluación inicial automatizada por motor de reglas; sanciones fijadas según política",
     auditCaseDossier: "Expediente del Caso y Adjudicación",
     auditDossierDesc: "Cadena de evidencia contextual multidimensional · Estilo de Seguridad Google",

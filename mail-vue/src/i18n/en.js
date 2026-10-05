@@ -2361,7 +2361,7 @@ totpModeAllDesc: 'Configure whether users can use TOTP. When enabled, 2FA is ava
     auditStatusNotStarted: "Not Started",
     auditStatusEnforced: "Sanction Enforced",
     auditSearchCasesPlaceholder: "Search by case ID, subject, or keyword...",
-    auditRobotRiskAssessment: "Automated Risk Assessment",
+    auditRobotRiskAssessment: "Initial Robot Risk Assessment",
     auditRobotRiskDesc: "Preliminary automated risk rating by rule engine; sanctions strictly governed by policy",
     auditCaseDossier: "Case Dossier & Security Adjudication",
     auditDossierDesc: "Multi-dimensional contextual trust chain · Inspired by Google Security Investigation",

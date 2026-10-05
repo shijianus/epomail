@@ -266,6 +266,7 @@ const auditService = {
 	 */
 	async list(c, params) {
 		await this.ensureTables(c);
+		await this.seedBaselineIfEmpty(c);
 		let { num = 1, size = 15, email, keyword, warningType, category, riskLevel, status, lifecycle, timeSort = 0 } = params;
 		size = Math.min(Number(size) || 15, 50);
 		num = Math.max(Number(num) || 1, 1);

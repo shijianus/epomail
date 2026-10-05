@@ -2361,7 +2361,7 @@ totpModeAllDesc: '设置是否允许用户使用TOTP，开启后用户可以且�
     auditStatusNotStarted: "未开始",
     auditStatusEnforced: "惩戒生效中",
     auditSearchCasesPlaceholder: "搜索案件编号、主体或关键字...",
-    auditRobotRiskAssessment: "机器人风险初判",
+    auditRobotRiskAssessment: "初级阶段机器人认定的风险评估",
     auditRobotRiskDesc: "初级阶段规则机器人认定的风险评估，对应的惩罚程度完全依照既定规则制定",
     auditCaseDossier: "案件全宗档案与安全研判",
     auditDossierDesc: "多维上下文信任证据链 · 依照 Google 安全研判体系",
