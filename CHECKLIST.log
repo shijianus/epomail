@@ -8,6 +8,22 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### 审计控制台精益版本上线 Cloudflare 生产环境与公网全真视觉核验 (2026-10-05)
+*   **关联提交 (Git Commit)**: `5eb4644a8677c72ae96ba1812a64c4c898c6b758` (Short: `5eb4644`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com)` (Version ID: `6f09c920-c460-42e4-a221-353b415c5506`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] Cloudflare 全量部署成功：前端静态资源与 Worker 后端代码全量部署上线 (Version ID: `6f09c920-c460-42e4-a221-353b415c5506`)；
+    - [x] 顶部 KPI 卡片去戏剧化上线：线上 4 张卡片结构纯净，大字号指标 `待办 / 总量` 呈现，彻底移除假进度条与重复自述；
+    - [x] 表格操作列与排版去遮挡：线上主表移除 fixed=right 伪固定列遮挡阴影，封禁台账 7 列宽度人体工学重构，“查看档案”按钮 100% 完整展示；
+    - [x] 动态多维信任遥测上线：线上研判抽屉按威胁与申诉状态动态注入真实风险积分（如申诉 72 分、高危 18 分、封禁 0 分），四维凭据矩阵 2x2 并列网格呈现；
+    - [x] 封禁管控纯展示透明台账核验：线上封禁台账严格承载公开透明证据存档，明确不可随意篡改声明，抽屉内零破坏性裁决操作；
+    - [x] 6 语言多语言字典对称保障：线上 6 语言无任何缺失，无未包裹硬编码。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] Cloudflare 部署核验：`npx wrangler deploy` 执行成功，Worker 启动耗时 70ms，版本 ID `6f09c920-c460-42e4-a221-353b415c5506`；
+    - [x] 生产公网端到端回归套件：`node tests/verify-prod-audit-v2.mjs` (31/31 断言全绿通过)；
+    - [x] 生产公网视觉核验：快照 `tests/prod_live_audit_verified.png`、`tests/prod_live_dossier_drawer.png`、`tests/prod_live_sanction_ledger.png` 经视觉检查完美对齐设计准则；
+    - [x] 零假数据残留：生产环境数据完全保持原样，无临时数据残留。
+
 ### 审计控制台公网企业级精益打磨与多维可信证据链去戏剧化 (2026-10-05)
 *   **关联提交 (Git Commit)**: `b1a0115b0167a5cfedf10995389fa758dd2aebda` (Short: `b1a0115`)
 *   **部署环境 (Deployment)**: `本地全真栈 / 构建产物 (mail-worker/dist) 完整核验`
