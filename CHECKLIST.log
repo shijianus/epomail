@@ -9,6 +9,20 @@
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
 
+### EpomailDocs v5.15 每界面一页轮：12 个界面详解页 ×6 语言 + 侧栏八组 34 项 (2026-10-06)
+*   **关联提交 (Git Commit)**: EpomailDocs 独立提交 `472ebc32d8c0a10d4f721037a794643086a6a6c8` (Short: `472ebc3`，v5.15 内容) + `14d3d23` (manifest 固化 472ebc3)；两提交已推送 origin/master 与 origin/main；主仓归档提交见本条目对应变更提交
+*   **部署环境 (Deployment)**: `本地全真栈：EpomailDocs wrangler pages dev dist:8790（205 页）全页判图；本轮无应用侧代码改动；线上发布未执行，待运营者 pnpm run deploy`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 反馈①（每界面一页）：管理控制台九界面逐一独立成页 ×6 语言——《分析页》《用户列表》《全库邮件审查》《权限控制》《注册密钥》《系统设置配置卡详解》（十一卡逐卡一节）《分类管理》《操作报告》，应用管理即上轮《开放平台与 API 接入》；全部经 router/视图/worker 源码对码
+    - [x] 反馈②（用户侧界面补全）：《邮箱界面与邮件详情》（八视图/详情动作五组/写信弹层 17 项工具/会话排版）、《标签与分类管理》（外观/出厂四标签/规则构建器/统计复核）、《个资与常规设置》（个资三卡/常规五分组）、《数据导出与存储》（三类导出/个人对象存储接入）×6 语言
+    - [x] 反馈③（导航分级）：侧栏由 6 组重组为 8 组 34 项——新增「管理控制台」独立成组（9 项），邮箱使用/个人设置各自成组；一级即意图、二级即界面门类；组名与条目 ×6 语言
+    - [x] 反馈④（i18n 六语言闭环）：12 新页 zh/zh-tw/en/es/fr/nl（zh-tw 正式版经台湾术语约束代理翻译并全量过结构校验）；全站版本 5.14→5.15（132 文件）
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：pnpm build 205 页零报错（30.11s）；astro.config 注入撇号导致的一次语法错误已改双引号字符串修复并 node --check 验证
+    - [x] 自动化核验：validate-anchors 410 页 3324/0 断链；check-structure 34 篇 ×6 语言 100% 结构对称；verify-laws 退出码 0；tamper-proof 固化 472ebc3（132 篇文档）
+    - [x] 浏览器全真栈实测：8 张全页 + 暗色判图控制台/网络错误 CLEAN——zh-system（12 节逐卡）、zh-audit、zh-mailbox、en-roles、fr-review、nl-users、es-labels、zh-tw-analysis 与八组侧栏全部通过
+    - [x] 零假数据残留：本轮无应用侧改动、未运行 epomail 实例；判图截图不入库；工作树干净（杂散文件保持未跟踪）
+
 ### EpomailDocs v5.14 文档深化与导航重构轮：OAuth 接入教程等三新页 ×6 语言 + 六意图侧栏 + 冷启动 P1 修复 (2026-10-06)
 *   **关联提交 (Git Commit)**: EpomailDocs 独立提交 `6b4d7fe` (Short: `6b4d7fe`，v5.14 内容) + `0aedc7c` (manifest 固化 6b4d7fe)；两提交已推送 origin/master 与 origin/main；主仓 `a7ac1b2`（v3_16DB 冷启动修复 + OAuth 教程按钮指向文档站）；主仓归档提交见本条目对应变更提交
 *   **部署环境 (Deployment)**: `本地全真栈：mail-worker wrangler dev 8787（wipe 冷启动 → /api/init 播种 → seed-demo 20 封 → 开用户资料控制开关，兼作冷启动修复验证与截图源）；EpomailDocs wrangler pages dev dist:8790（133 页）全页判图；线上发布未执行，待运营者 pnpm run deploy`
