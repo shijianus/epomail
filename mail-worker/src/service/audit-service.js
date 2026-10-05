@@ -47,6 +47,7 @@ const auditService = {
 					match_score INTEGER DEFAULT 0,
 					subnet_match INTEGER DEFAULT 0,
 					appeal_reason TEXT,
+					resolved_time DATETIME,
 					create_time DATETIME DEFAULT CURRENT_TIMESTAMP
 				);
 			`).run();
@@ -56,7 +57,8 @@ const auditService = {
 				{ name: 'base_ip', sql: `ALTER TABLE audit_log ADD COLUMN base_ip TEXT;` },
 				{ name: 'base_geo', sql: `ALTER TABLE audit_log ADD COLUMN base_geo TEXT;` },
 				{ name: 'base_device', sql: `ALTER TABLE audit_log ADD COLUMN base_device TEXT;` },
-				{ name: 'base_fingerprint', sql: `ALTER TABLE audit_log ADD COLUMN base_fingerprint TEXT;` }
+				{ name: 'base_fingerprint', sql: `ALTER TABLE audit_log ADD COLUMN base_fingerprint TEXT;` },
+				{ name: 'resolved_time', sql: `ALTER TABLE audit_log ADD COLUMN resolved_time TEXT;` }
 			];
 			for (const col of baselineCols) {
 				try {
@@ -160,7 +162,8 @@ const auditService = {
 					recommendedAction: 'blacklist_ip',
 					matchScore: 0,
 					subnetMatch: 0,
-					appealReason: null
+					appealReason: null,
+					resolvedTime: '2026-10-02T08:15:00Z'
 				},
 				{
 					ticketId: 'TKT-2026-AP77X2',
@@ -189,7 +192,64 @@ const auditService = {
 					recommendedAction: 'approve_appeal',
 					matchScore: 92,
 					subnetMatch: 1,
-					appealReason: '由于近期出差在公共漫游网络产生多IP并发跳跃，导致被风控阻断。特提交指纹基准申请解除封禁。'
+					appealReason: '由于近期出差在公共漫游网络产生多IP并发跳跃，导致被风控阻断。特提交指纹基准申请解除封禁。',
+					resolvedTime: null
+				},
+				{
+					ticketId: 'TKT-2026-CL33A8',
+					email: 'tester_audited@epocanvas.com',
+					warningType: 'audit',
+					eventType: 'compliance_audit',
+					category: 'security',
+					actionText: '{tester_audited@epocanvas.com} 例行行为基线审查完毕并结案',
+					detailText: '机器人初筛识别为海外访问轻度偏离，经研判确认为合规多因素设备，已结案归档。',
+					ip: '104.28.19.44',
+					geo: 'Tokyo, JP',
+					device: 'Safari 17 / macOS',
+					deviceType: 'desktop',
+					fingerprint: 'fp_safe_991',
+					baseIp: '104.28.19.1',
+					baseGeo: 'Tokyo, JP',
+					baseDevice: 'Safari 17 / macOS',
+					baseFingerprint: 'fp_safe_991',
+					isRegIp: 1,
+					isMultiIp: 0,
+					activeIpCount: 1,
+					reportedByOthers: 0,
+					riskLevel: 'normal',
+					priority: 'P2',
+					status: 'resolved',
+					recommendedAction: 'resolve',
+					matchScore: 98,
+					subnetMatch: 1,
+					appealReason: null,
+					resolvedTime: '2026-10-03T16:20:00Z'
+				},
+				{
+					ticketId: 'TKT-2026-EX99B2',
+					email: 'guest_expired@visitor.org',
+					warningType: 'risk',
+					eventType: 'probe_attempt',
+					category: 'account',
+					actionText: '{guest_expired@visitor.org} 匿名探测频次超限预警已过期',
+					detailText: '低频未认证探测事件，超72小时无后续异常行为，预警已自动过期失效。',
+					ip: '198.51.100.22',
+					geo: 'London, GB',
+					device: 'Curl / Linux',
+					deviceType: 'desktop',
+					fingerprint: 'fp_probe_11',
+					isRegIp: 0,
+					isMultiIp: 0,
+					activeIpCount: 1,
+					reportedByOthers: 0,
+					riskLevel: 'normal',
+					priority: 'P2',
+					status: 'expired',
+					recommendedAction: 'dismiss_alert',
+					matchScore: 20,
+					subnetMatch: 0,
+					appealReason: null,
+					resolvedTime: '2026-10-01T12:00:00Z'
 				}
 			];
 
@@ -206,16 +266,29 @@ const auditService = {
 	 */
 	async list(c, params) {
 		await this.ensureTables(c);
-		let { num = 1, size = 15, email, warningType, category, riskLevel, status, timeSort = 0 } = params;
+		let { num = 1, size = 15, email, keyword, warningType, category, riskLevel, status, lifecycle, timeSort = 0 } = params;
 		size = Math.min(Number(size) || 15, 50);
 		num = Math.max(Number(num) || 1, 1);
 		const offset = (num - 1) * size;
 
 		const conditions = [];
 
-		if (email) {
-			conditions.push(sql`${auditLog.email} COLLATE NOCASE LIKE ${'%' + email + '%'}`);
+		const searchKw = (keyword || email || '').trim();
+		if (searchKw) {
+			if (/^ticket:/i.test(searchKw)) {
+				const term = searchKw.replace(/^ticket:/i, '').trim();
+				conditions.push(sql`${auditLog.ticketId} COLLATE NOCASE LIKE ${'%' + term + '%'}`);
+			} else if (/^email:/i.test(searchKw)) {
+				const term = searchKw.replace(/^email:/i, '').trim();
+				conditions.push(sql`${auditLog.email} COLLATE NOCASE LIKE ${'%' + term + '%'}`);
+			} else if (/^ip:/i.test(searchKw)) {
+				const term = searchKw.replace(/^ip:/i, '').trim();
+				conditions.push(sql`${auditLog.ip} LIKE ${'%' + term + '%'}`);
+			} else {
+				conditions.push(sql`(${auditLog.ticketId} COLLATE NOCASE LIKE ${'%' + searchKw + '%'} OR ${auditLog.email} COLLATE NOCASE LIKE ${'%' + searchKw + '%'} OR ${auditLog.ip} LIKE ${'%' + searchKw + '%'} OR ${auditLog.actionText} COLLATE NOCASE LIKE ${'%' + searchKw + '%'})`);
+			}
 		}
+
 		if (warningType && warningType !== 'all') {
 			conditions.push(eq(auditLog.warningType, warningType));
 		}
@@ -227,6 +300,12 @@ const auditService = {
 		}
 		if (status && status !== 'all') {
 			conditions.push(eq(auditLog.status, status));
+		} else if (lifecycle && lifecycle !== 'all') {
+			if (lifecycle === 'pending' || lifecycle === 'active') {
+				conditions.push(sql`${auditLog.status} IN ('active', 'pending')`);
+			} else if (lifecycle === 'resolved' || lifecycle === 'closed') {
+				conditions.push(sql`${auditLog.status} IN ('resolved', 'banned', 'rejected', 'expired')`);
+			}
 		}
 
 		const query = orm(c).select().from(auditLog);
@@ -253,13 +332,39 @@ const auditService = {
 		const allMailMode = Number(settings?.allMailMode ?? 1);
 
 		// Compute metrics counts
-		const allItems = await orm(c).select({ warningType: auditLog.warningType }).from(auditLog);
+		const allItems = await orm(c).select({ warningType: auditLog.warningType, status: auditLog.status }).from(auditLog);
+
+		const isPending = (s) => s === 'pending' || s === 'active';
+
+		const auditItems = allItems.filter(i => i.warningType === 'audit');
+		const riskItems = allItems.filter(i => i.warningType === 'risk');
+		const banItems = allItems.filter(i => i.warningType === 'ban');
+		const appealItems = allItems.filter(i => i.warningType === 'appeal');
+
+		const auditPending = auditItems.filter(i => isPending(i.status)).length;
+		const riskPending = riskItems.filter(i => isPending(i.status)).length;
+		const banPending = banItems.filter(i => isPending(i.status) || i.status === 'banned').length;
+		const appealPending = appealItems.filter(i => isPending(i.status)).length;
+		const totalPending = allItems.filter(i => isPending(i.status)).length;
+
 		const counts = {
-			audit: allItems.filter(i => i.warningType === 'audit').length,
-			risk: allItems.filter(i => i.warningType === 'risk').length,
-			ban: allItems.filter(i => i.warningType === 'ban').length,
-			appeal: allItems.filter(i => i.warningType === 'appeal').length,
-			total: allItems.length
+			audit: auditPending,
+			auditTotal: auditItems.length,
+			risk: riskPending,
+			riskTotal: riskItems.length,
+			ban: banPending,
+			banTotal: banItems.length,
+			appeal: appealPending,
+			appealTotal: appealItems.length,
+			total: totalPending,
+			allTotal: allItems.length,
+			categories: {
+				audit: { pending: auditPending, total: auditItems.length },
+				risk: { pending: riskPending, total: riskItems.length },
+				ban: { pending: banPending, total: banItems.length },
+				appeal: { pending: appealPending, total: appealItems.length },
+				total: { pending: totalPending, total: allItems.length }
+			}
 		};
 
 		// Fetch registration baseline for distinct emails from user table
@@ -332,14 +437,15 @@ const auditService = {
 			recommendedAction: data.recommendedAction || null,
 			matchScore: data.matchScore || 0,
 			subnetMatch: data.subnetMatch ? 1 : 0,
-			appealReason: data.appealReason || null
+			appealReason: data.appealReason || null,
+			resolvedTime: data.resolvedTime || null
 		}).run();
 	},
 
 	/**
 	 * Perform operation action on target
 	 */
-	async takeAction(c, { id, action, targetEmail }) {
+	async takeAction(c, { id, action, targetEmail, notes }) {
 		const targetLog = await orm(c).select().from(auditLog).where(eq(auditLog.id, id)).get();
 		if (!targetLog) {
 			throw new BizError('日志记录不存在', 404);
@@ -347,19 +453,32 @@ const auditService = {
 
 		const email = targetEmail || targetLog.email;
 		const targetUser = await orm(c).select().from(user).where(eq(user.email, email)).get();
+		const nowIso = new Date().toISOString();
 
 		if (action === 'ban_account' || action === 'maintain_ban') {
 			if (targetUser) {
 				await userService.setStatus(c, { userId: targetUser.userId, status: 1 });
 			}
-			await orm(c).update(auditLog).set({ status: 'banned' }).where(eq(auditLog.id, id)).run();
+			await orm(c).update(auditLog).set({
+				status: 'banned',
+				resolvedTime: nowIso,
+				detailText: (targetLog.detailText || '') + (notes ? `\n[处置结果]: ${notes}` : '')
+			}).where(eq(auditLog.id, id)).run();
 		} else if (action === 'dismiss_alert' || action === 'unban' || action === 'approve_appeal') {
 			if (targetUser) {
 				await userService.setStatus(c, { userId: targetUser.userId, status: 0 });
 			}
-			await orm(c).update(auditLog).set({ status: 'resolved' }).where(eq(auditLog.id, id)).run();
+			await orm(c).update(auditLog).set({
+				status: 'resolved',
+				resolvedTime: nowIso,
+				detailText: (targetLog.detailText || '') + (notes ? `\n[放行说明]: ${notes}` : '')
+			}).where(eq(auditLog.id, id)).run();
 		} else if (action === 'reject_appeal') {
-			await orm(c).update(auditLog).set({ status: 'rejected' }).where(eq(auditLog.id, id)).run();
+			await orm(c).update(auditLog).set({
+				status: 'rejected',
+				resolvedTime: nowIso,
+				detailText: (targetLog.detailText || '') + (notes ? `\n[驳回理由]: ${notes}` : '')
+			}).where(eq(auditLog.id, id)).run();
 		} else if (action === 'delete') {
 			await orm(c).delete(auditLog).where(eq(auditLog.id, id)).run();
 		}
@@ -370,20 +489,24 @@ const auditService = {
 	/**
 	 * Adjudicate appeal
 	 */
-	async adjudicate(c, { id, action, notes, purgeOnRelease }) {
+	async adjudicate(c, body) {
+		const { id, action, decision, notes, purgeOnRelease } = body;
+		const actionType = action || decision;
 		const targetLog = await orm(c).select().from(auditLog).where(eq(auditLog.id, id)).get();
 		if (!targetLog) {
 			throw new BizError('申诉记录不存在', 404);
 		}
 
 		const targetUser = await orm(c).select().from(user).where(eq(user.email, targetLog.email)).get();
+		const nowIso = new Date().toISOString();
 
-		if (action === 'approve' || action === 'probation') {
+		if (actionType === 'approve' || actionType === 'probation' || actionType === 'whitelist') {
 			if (targetUser) {
 				await userService.setStatus(c, { userId: targetUser.userId, status: 0 });
 			}
 			await orm(c).update(auditLog).set({
 				status: 'resolved',
+				resolvedTime: nowIso,
 				detailText: (targetLog.detailText || '') + (notes ? `\n[人工研判备注]: ${notes}` : '')
 			}).where(eq(auditLog.id, id)).run();
 
@@ -394,10 +517,11 @@ const auditService = {
 					eq(auditLog.warningType, 'audit')
 				)).run();
 			}
-		} else if (action === 'reject') {
+		} else if (actionType === 'reject' || actionType === 'banned') {
 			await orm(c).update(auditLog).set({
-				status: 'rejected',
-				detailText: (targetLog.detailText || '') + (notes ? `\n[驳回理由]: ${notes}` : '')
+				status: actionType === 'banned' ? 'banned' : 'rejected',
+				resolvedTime: nowIso,
+				detailText: (targetLog.detailText || '') + (notes ? `\n[驳回/处置理由]: ${notes}` : '')
 			}).where(eq(auditLog.id, id)).run();
 		}
 

@@ -276,6 +276,7 @@ const dbInit = {
 					match_score INTEGER DEFAULT 0,
 					subnet_match INTEGER DEFAULT 0,
 					appeal_reason TEXT,
+					resolved_time DATETIME,
 					create_time DATETIME DEFAULT CURRENT_TIMESTAMP
 				)
 			`).run();
@@ -1291,6 +1292,7 @@ const dbInit = {
 				match_score INTEGER DEFAULT 0,
 				subnet_match INTEGER DEFAULT 0,
 				appeal_reason TEXT,
+				resolved_time DATETIME,
 				create_time DATETIME DEFAULT CURRENT_TIMESTAMP
 			)
 		`).run();
