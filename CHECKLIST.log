@@ -9,6 +9,18 @@
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
 
+### EpomailDocs v5.16b 界面截图人为标注轮：高亮框+编号+文字标签 ×16 界面 ×6 语言 (2026-10-07)
+*   **关联提交 (Git Commit)**: EpomailDocs 独立提交 `29a32a7` (Short: `29a32a7`) + `34c1a7a` (manifest 固化 29a32a7)；两提交已推送 origin/master 与 origin/main；主仓归档提交见本条目对应变更提交
+*   **部署环境 (Deployment)**: `本地全真栈：mail-worker wrangler dev 8787 --local 实拍；EpomailDocs wrangler pages dev dist:8790 判图；线上发布未执行，待运营者 pnpm run deploy`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 反馈①（图片要有人为标注）：新增标注版截图 72 张（12 界面 × 6 语言，<slug>-guide.png）——实拍时注入高亮描边框（锁定关键区域）+ 编号徽章 + 文字标签，标签文本取自界面自身可见文案、随界面语言自动本地化
+    - [x] 反馈②（不仅展示更要解释）：12 个界面页 ×6 语言的图注升级为「标注：1. … 2. …」编号解释行，与图上标签一一对应；mailbox/data/roles/audit 四页的共享旧图同步换为各语言标注版
+    - [x] 过程修复：标注清理选择器类名错误导致标注跨页累积（叠罗汉）——修正后逐页仅保留自身标注并全量重拍
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：pnpm build 205 页零报错；validate-anchors 410 页 3324/0 断链；check-structure 34 篇 ×6 语言 100% 对称
+    - [x] 浏览器实测：system 页标注图加载成功（naturalWidth 2880）、图注解释行呈现；高亮框/徽章/文字标签三要素齐备
+    - [x] 零假数据残留：标注截图全部来自本地演示实例真实运行画面；判图截图不入库
+
 ### EpomailDocs v5.16a 每页内联配图轮：8 页页首大图 + 全站内容图精修 (2026-10-06)
 *   **关联提交 (Git Commit)**: EpomailDocs 独立提交 `29b00c2` (Short: `29b00c2`) + `7cecd1b` (manifest 固化 29b00c2)；两提交已推送 origin/master 与 origin/main；主仓归档提交见本条目对应变更提交
 *   **部署环境 (Deployment)**: `本地全真栈：EpomailDocs wrangler pages dev dist:8790 判图；线上发布未执行，待运营者 pnpm run deploy`
