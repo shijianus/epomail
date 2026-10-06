@@ -9,6 +9,18 @@
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
 
+### EpomailDocs v5.16c 专案介绍线标注覆盖轮：七界面标注版 ×6 语言，页首图全量换装 (2026-10-07)
+*   **关联提交 (Git Commit)**: EpomailDocs 独立提交 `6d1af70` (Short: `6d1af70`) + `ef6a83e` (manifest 固化 6d1af70)；两提交已推送 origin/master 与 origin/main；主仓归档提交见本条目对应变更提交
+*   **部署环境 (Deployment)**: `本地全真栈：mail-worker wrangler dev 8787 --local 实拍；EpomailDocs wrangler pages dev dist:8790 判图；线上发布未执行，待运营者 pnpm run deploy`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 反馈（专案介绍线大量配图未标注）：新增标注版截图 42 张（7 界面 × 6 语言）——写信弹层（工具栏+写信入口）、搜索（检索框+命中列表）、邮件模式（网站设置卡+模式下拉）、登录面（双输入框）、两步验证中心（三种第二验证）、OAuth 应用管理（四端点+应用卡）、通知转发（导出卡+转发标题）
+    - [x] 反馈（页首图全量换装）：界面总览/功能指南/搜索参考/运行模式（四图）/设置指南（四图）/帐号安全/通知转发/API 接入八页 ×6 语言页首图全部换为标注版，并插入「标注：1. … 2. …」解释行图注
+    - [x] 过程修复：v516c 脚本缺 hash 导航行导致四界面拍到收件箱（根因级缺陷）——补导航并按 DOM 探测修正选择器（.method-item/.endpoint-chip/.app-card/.export-card/.website-card）后全量重拍
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：pnpm build 205 页零报错；validate-anchors 410 页 3324/0 断链；check-structure 34 篇 ×6 语言 100% 对称；verify-laws 退出码 0
+    - [x] 浏览器实测：modes 页四张标注图（mode/roles/login/twofa-guide）加载成功、图上高亮框+编号+文字标签齐备
+    - [x] 零假数据残留：标注截图全部来自本地演示实例真实运行画面；判图截图不入库
+
 ### EpomailDocs v5.16b 界面截图人为标注轮：高亮框+编号+文字标签 ×16 界面 ×6 语言 (2026-10-07)
 *   **关联提交 (Git Commit)**: EpomailDocs 独立提交 `29a32a7` (Short: `29a32a7`) + `34c1a7a` (manifest 固化 29a32a7)；两提交已推送 origin/master 与 origin/main；主仓归档提交见本条目对应变更提交
 *   **部署环境 (Deployment)**: `本地全真栈：mail-worker wrangler dev 8787 --local 实拍；EpomailDocs wrangler pages dev dist:8790 判图；线上发布未执行，待运营者 pnpm run deploy`
