@@ -1,0 +1,1166 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>邮箱封禁管控 - 管理工作台</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eff6ff',
+              500: '#3b82f6',
+              600: '#2563eb',
+              700: '#1d4ed8',
+            },
+            dark: {
+              bg: '#090d16',
+              surface: '#0f172a',
+              card: '#131d33',
+              border: '#1e293b',
+              hover: '#1a2642'
+            }
+          },
+          fontFamily: {
+            sans: ['-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto', '"Helvetica Neue"', 'Arial', 'sans-serif'],
+            mono: ['"JetBrains Mono"', '"Fira Code"', 'ui-monospace', 'monospace']
+          }
+        }
+      }
+    }
+  </script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    /* 自定义美化滚动条与微交互 */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #090d16;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #1e293b;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #334155;
+    }
+    .custom-tooltip {
+      visibility: hidden;
+      opacity: 0;
+      transition: opacity 0.15s ease-in-out;
+    }
+    .has-tooltip:hover .custom-tooltip {
+      visibility: visible;
+      opacity: 1;
+    }
+  </style>
+</head>
+<body class="bg-dark-bg text-slate-100 min-h-screen font-sans antialiased selection:bg-blue-600 selection:text-white">
+
+  <!-- 页面主容器 (宽屏自适应企业工作台) -->
+  <div class="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+
+    <!-- ==========================================
+         页面顶栏：标题与轻量说明 (产品经理视角，低认知负荷)
+         ========================================== -->
+    <header class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-dark-border/60">
+      <div class="space-y-1">
+        <div class="flex items-center gap-3">
+          <div class="p-2 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20">
+            <i data-lucide="shield-alert" class="w-5 h-5"></i>
+          </div>
+          <h1 class="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+            邮箱封禁管控
+            <span class="text-xs px-2 py-0.5 rounded-full font-mono font-medium bg-rose-500/10 text-rose-400 border border-rose-500/20">
+              Live Control
+            </span>
+          </h1>
+        </div>
+        <p class="text-xs text-slate-400 pl-11">
+          管控全站高危、恶意与异常外发邮件主体，提供实时熔断处置、人工复核与快速解封流水
+        </p>
+      </div>
+      
+      <!-- 快捷全局功能 -->
+      <div class="flex items-center gap-2.5">
+        <button onclick="openManualBanModal()" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-500 active:bg-blue-700 rounded-lg shadow-sm shadow-blue-900/40 transition">
+          <i data-lucide="user-x" class="w-3.5 h-3.5"></i>
+          <span>手工添加封禁</span>
+        </button>
+        <button onclick="exportData()" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-300 bg-dark-card hover:bg-dark-hover active:bg-dark-border border border-dark-border rounded-lg transition">
+          <i data-lucide="download" class="w-3.5 h-3.5"></i>
+          <span>导出列表</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- ========================================================
+         1. 顶部统计卡片精简与重构 (4 个真正有用的指标卡片，支持联动筛选)
+         【对接提示】可从后端 /api/audit/stat 统计接口实时绑定数据
+         ======================================================== -->
+    <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" id="kpiCardsContainer">
+      
+      <!-- 卡片 1: 生效中封禁 (默认高亮选中态) -->
+      <div onclick="selectKpiFilter('banned')" id="card-banned"
+        class="kpi-card cursor-pointer relative p-4 rounded-xl bg-dark-card border border-blue-500/60 ring-1 ring-blue-500/50 shadow-lg shadow-blue-950/20 transition-all hover:translate-y-[-1px]">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-medium text-slate-400">生效中封禁</span>
+          <span class="p-1.5 rounded-lg bg-rose-500/10 text-rose-400 border border-rose-500/20">
+            <i data-lucide="ban" class="w-4 h-4"></i>
+          </span>
+        </div>
+        <div class="mt-3 flex items-baseline gap-2">
+          <span class="text-2xl font-bold font-mono tracking-tight text-white" id="stat-banned-count">2</span>
+          <span class="text-xs font-medium text-rose-400 flex items-center">
+            <i data-lucide="activity" class="w-3 h-3 mr-0.5 inline"></i> 阻断中
+          </span>
+        </div>
+        <p class="mt-2 text-xs text-slate-400 truncate">策略生效中，阻断一切外发行为</p>
+        <!-- 激活指示小圆点 -->
+        <span class="kpi-dot absolute top-3 right-3 w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse"></span>
+      </div>
+
+      <!-- 卡片 2: 今日新增 -->
+      <div onclick="selectKpiFilter('today')" id="card-today"
+        class="kpi-card cursor-pointer relative p-4 rounded-xl bg-dark-card border border-dark-border transition-all hover:border-slate-600 hover:translate-y-[-1px]">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-medium text-slate-400">今日新增</span>
+          <span class="p-1.5 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20">
+            <i data-lucide="user-plus" class="w-4 h-4"></i>
+          </span>
+        </div>
+        <div class="mt-3 flex items-baseline gap-2">
+          <span class="text-2xl font-bold font-mono tracking-tight text-white" id="stat-today-count">2</span>
+          <span class="text-xs text-slate-400">近 24 小时</span>
+        </div>
+        <p class="mt-2 text-xs text-slate-400 truncate">高频频率熔断与异常检测触发</p>
+        <span class="kpi-dot hidden absolute top-3 right-3 w-1.5 h-1.5 rounded-full bg-blue-400"></span>
+      </div>
+
+      <!-- 卡片 3: 待人工复核 -->
+      <div onclick="selectKpiFilter('pending')" id="card-pending"
+        class="kpi-card cursor-pointer relative p-4 rounded-xl bg-dark-card border border-dark-border transition-all hover:border-slate-600 hover:translate-y-[-1px]">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-medium text-slate-400">待人工复核</span>
+          <span class="p-1.5 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20">
+            <i data-lucide="clock" class="w-4 h-4"></i>
+          </span>
+        </div>
+        <div class="mt-3 flex items-baseline gap-2">
+          <span class="text-2xl font-bold font-mono tracking-tight text-white" id="stat-pending-count">1</span>
+          <span class="text-xs font-medium text-amber-400">待运营处理</span>
+        </div>
+        <p class="mt-2 text-xs text-slate-400 truncate">用户申诉争议与灰名单待研判</p>
+        <span class="kpi-dot hidden absolute top-3 right-3 w-1.5 h-1.5 rounded-full bg-blue-400"></span>
+      </div>
+
+      <!-- 卡片 4: 高风险邮箱 -->
+      <div onclick="selectKpiFilter('highrisk')" id="card-highrisk"
+        class="kpi-card cursor-pointer relative p-4 rounded-xl bg-dark-card border border-dark-border transition-all hover:border-slate-600 hover:translate-y-[-1px]">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-medium text-slate-400">高风险邮箱</span>
+          <span class="p-1.5 rounded-lg bg-red-500/10 text-red-400 border border-red-500/20">
+            <i data-lucide="alert-triangle" class="w-4 h-4"></i>
+          </span>
+        </div>
+        <div class="mt-3 flex items-baseline gap-2">
+          <span class="text-2xl font-bold font-mono tracking-tight text-white" id="stat-highrisk-count">2</span>
+          <span class="text-xs text-slate-400">已列入观察</span>
+        </div>
+        <p class="mt-2 text-xs text-slate-400 truncate">涉嫌撞库、群发垃圾与恶意信誉</p>
+        <span class="kpi-dot hidden absolute top-3 right-3 w-1.5 h-1.5 rounded-full bg-blue-400"></span>
+      </div>
+
+    </section>
+
+    <!-- ========================================================
+         2. 筛选栏优化 (紧凑布局，搜索框、状态、时间、风险等级与操作按钮)
+         ======================================================== -->
+    <section class="bg-dark-card border border-dark-border rounded-xl p-3.5 space-y-3">
+      <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+        
+        <!-- 左侧输入与下拉条件组合 -->
+        <div class="flex flex-wrap items-center gap-2.5 flex-1">
+          
+          <!-- 搜索框 (占位符按要求优化，支持快捷回车与清空) -->
+          <div class="relative min-w-[260px] sm:w-72">
+            <i data-lucide="search" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+            <input 
+              id="filterKeyword" 
+              type="text" 
+              placeholder="搜索邮箱、案件编号或关键字..."
+              onkeyup="if(event.key === 'Enter') handleSearch()"
+              class="w-full bg-dark-bg/80 border border-dark-border focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-xs text-white rounded-lg pl-9 pr-8 py-2 placeholder-slate-500 transition outline-none"
+            />
+            <button onclick="clearKeyword()" id="clearKeywordBtn" class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white">
+              <i data-lucide="x" class="w-3.5 h-3.5"></i>
+            </button>
+          </div>
+
+          <!-- 下拉 1: 状态筛选 (全部 / 生效中 / 已解封 / 待复核) -->
+          <div class="w-32">
+            <select id="filterStatus" onchange="handleSearch()" class="w-full bg-dark-bg/80 border border-dark-border focus:border-blue-500 text-xs text-slate-200 rounded-lg px-2.5 py-2 outline-none cursor-pointer transition">
+              <option value="all">状态：全部</option>
+              <option value="banned">生效中</option>
+              <option value="pending">待复核</option>
+              <option value="unbanned">已解封</option>
+              <option value="watching">观察中</option>
+            </select>
+          </div>
+
+          <!-- 下拉 2: 时间范围 (全部 / 今日 / 近7天 / 近30天) -->
+          <div class="w-32">
+            <select id="filterTimeRange" onchange="handleSearch()" class="w-full bg-dark-bg/80 border border-dark-border focus:border-blue-500 text-xs text-slate-200 rounded-lg px-2.5 py-2 outline-none cursor-pointer transition">
+              <option value="all">时间：全部</option>
+              <option value="today">今日</option>
+              <option value="7days">近 7 天</option>
+              <option value="30days">近 30 天</option>
+            </select>
+          </div>
+
+          <!-- 下拉 3: 风险等级 (全部 / 高 / 中 / 低) -->
+          <div class="w-32">
+            <select id="filterRiskLevel" onchange="handleSearch()" class="w-full bg-dark-bg/80 border border-dark-border focus:border-blue-500 text-xs text-slate-200 rounded-lg px-2.5 py-2 outline-none cursor-pointer transition">
+              <option value="all">风险：全部</option>
+              <option value="high">高风险</option>
+              <option value="medium">中风险</option>
+              <option value="low">低风险</option>
+            </select>
+          </div>
+
+        </div>
+
+        <!-- 右侧动作按钮组 (搜索、刷新、重置，紧凑图标/文字) -->
+        <div class="flex items-center gap-2 self-end lg:self-auto">
+          <!-- 搜索按钮 -->
+          <button onclick="handleSearch()" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-500 active:bg-blue-700 rounded-lg transition shadow-sm">
+            <i data-lucide="search" class="w-3.5 h-3.5"></i>
+            <span>搜索</span>
+          </button>
+
+          <!-- 刷新按钮 -->
+          <button onclick="handleRefresh()" title="刷新数据" class="p-2 text-slate-300 hover:text-white bg-dark-bg hover:bg-dark-border border border-dark-border rounded-lg transition">
+            <i data-lucide="refresh-cw" id="refreshIcon" class="w-3.5 h-3.5"></i>
+          </button>
+
+          <!-- 重置按钮 -->
+          <button onclick="handleReset()" title="重置筛选条件" class="p-2 text-slate-300 hover:text-white bg-dark-bg hover:bg-dark-border border border-dark-border rounded-lg transition">
+            <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+          </button>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ========================================================
+         3. 表格列重构 (主列为邮箱，醒目状态标签，纯文本不打底，人体工学操作)
+         ======================================================== -->
+    <section class="bg-dark-card border border-dark-border rounded-xl overflow-hidden shadow-xl">
+      <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse table-auto" id="bannedTable">
+          <thead>
+            <tr class="border-b border-dark-border bg-dark-surface/90 text-xs font-semibold text-slate-400 whitespace-nowrap">
+              <!-- 列 1: 邮箱 (主列) -->
+              <th scope="col" class="py-3.5 px-4 w-[230px]">邮箱账号</th>
+              <!-- 列 2: 当前状态 -->
+              <th scope="col" class="py-3.5 px-3 w-[125px]">当前状态</th>
+              <!-- 列 3: 封禁原因 (截断 + Tooltip) -->
+              <th scope="col" class="py-3.5 px-3 min-w-[200px]">封禁原因 / 触发规则</th>
+              <!-- 列 4: 封禁时间 -->
+              <th scope="col" class="py-3.5 px-3 w-[130px]">封禁时间</th>
+              <!-- 列 5: 最后处理时间 -->
+              <th scope="col" class="py-3.5 px-3 w-[130px]">最后处理时间</th>
+              <!-- 列 6: 处理人 / 负责人 (新增列) -->
+              <th scope="col" class="py-3.5 px-3 w-[135px]">处理人 / 负责人</th>
+              <!-- 列 7: 操作 (右对齐按钮组) -->
+              <th scope="col" class="py-3.5 px-4 w-[200px] text-right">快捷操作</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-dark-border/60 text-xs text-slate-200" id="tableBody">
+            <!-- 由 renderTable() 动态渲染，以下预设初始结构与模拟数据 -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- ========================================================
+           5. 底部保留分页信息 (如要求：共 X 条，15条/页)
+           ======================================================== -->
+      <footer class="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 border-t border-dark-border bg-dark-surface/60 text-xs text-slate-400">
+        <div class="flex items-center gap-2">
+          <span>共 <strong class="text-slate-200 font-mono" id="paginationTotal">5</strong> 条数据</span>
+          <span class="text-slate-600">|</span>
+          <span class="text-slate-400">15 条/页</span>
+        </div>
+        <div class="flex items-center gap-1.5 font-mono">
+          <button class="px-2.5 py-1 text-slate-500 hover:text-slate-300 bg-dark-bg border border-dark-border rounded cursor-not-allowed" disabled>
+            <i data-lucide="chevron-left" class="w-3.5 h-3.5"></i>
+          </button>
+          <button class="px-3 py-1 bg-blue-600 text-white font-semibold rounded shadow-sm">1</button>
+          <button class="px-2.5 py-1 text-slate-500 hover:text-slate-300 bg-dark-bg border border-dark-border rounded cursor-not-allowed" disabled>
+            <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
+          </button>
+        </div>
+      </footer>
+    </section>
+
+  </div>
+
+  <!-- ========================================================
+       4. 侧边抽屉：案件与封禁详情 (Side Drawer)
+       ======================================================== -->
+  <div id="drawerOverlay" onclick="closeDrawer()" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 hidden transition-opacity"></div>
+  <aside id="detailDrawer" class="fixed top-0 right-0 h-full w-full sm:w-[480px] bg-dark-surface border-l border-dark-border z-50 transform translate-x-full transition-transform duration-300 flex flex-col shadow-2xl">
+    <!-- 抽屉头部 -->
+    <div class="p-4 border-b border-dark-border flex items-center justify-between bg-dark-card/50">
+      <div class="flex items-center gap-2">
+        <div class="p-1.5 rounded-lg bg-blue-500/10 text-blue-400">
+          <i data-lucide="file-text" class="w-4 h-4"></i>
+        </div>
+        <span class="font-bold text-sm text-white">封禁管控档案详情</span>
+      </div>
+      <button onclick="closeDrawer()" class="p-1 rounded-md text-slate-400 hover:text-white hover:bg-dark-border transition">
+        <i data-lucide="x" class="w-4 h-4"></i>
+      </button>
+    </div>
+
+    <!-- 抽屉主体 -->
+    <div class="p-5 flex-1 overflow-y-auto space-y-5 text-xs" id="drawerBody">
+      <!-- 动态插入内容 -->
+    </div>
+
+    <!-- 抽屉底栏动作 -->
+    <div class="p-4 border-t border-dark-border bg-dark-card/60 flex items-center justify-end gap-2.5" id="drawerFooter">
+      <button onclick="closeDrawer()" class="px-3 py-1.5 text-xs text-slate-300 bg-dark-bg hover:bg-dark-border border border-dark-border rounded-lg transition">关闭</button>
+      <button id="drawerPrimaryAction" class="px-3 py-1.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-500 rounded-lg transition">执行快速处置</button>
+    </div>
+  </aside>
+
+  <!-- ========================================================
+       轻量确认与备注弹窗 (Modal)
+       ======================================================== -->
+  <div id="actionModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-dark-surface border border-dark-border rounded-xl w-full max-w-md p-5 space-y-4 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-dark-border pb-3">
+        <h3 class="text-sm font-semibold text-white flex items-center gap-2" id="modalTitle">操作提示</h3>
+        <button onclick="closeModal()" class="text-slate-400 hover:text-white">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+      <div id="modalContent" class="text-xs text-slate-300 space-y-3">
+        <!-- 弹窗表单或提示 -->
+      </div>
+      <div class="flex justify-end gap-2 pt-2">
+        <button onclick="closeModal()" class="px-3 py-1.5 text-xs text-slate-300 bg-dark-bg border border-dark-border rounded-lg hover:bg-dark-border transition">取消</button>
+        <button id="modalConfirmBtn" class="px-3 py-1.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-500 rounded-lg transition">确认</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 轻量 Toast 提示 -->
+  <div id="toast" class="fixed bottom-6 right-6 z-50 transform translate-y-10 opacity-0 transition-all duration-300 pointer-events-none flex items-center gap-2 px-3.5 py-2.5 rounded-lg text-xs font-medium bg-dark-card border border-dark-border text-white shadow-xl">
+    <i data-lucide="info" id="toastIcon" class="w-4 h-4 text-blue-400"></i>
+    <span id="toastMsg">通知信息</span>
+  </div>
+
+  <!-- ========================================================
+       核心脚本：数据源、筛选逻辑、视图渲染与交互绑定
+       【提示】以下 mockData 为预置数据，真实对接时从后端 API 拉取
+       ======================================================== -->
+  <script>
+    // 1. 模拟数据集 (至少 3-5 条真实感业务数据)
+    let mockData = [
+      {
+        id: 1,
+        ticketId: 'TKT-2026-BD9901',
+        email: 'compromised_bot@malicious.xyz',
+        status: 'banned', // banned | pending | unbanned | watching
+        statusLabel: '生效中-已封禁',
+        riskLevel: 'high', // high | medium | low
+        riskLabel: '高风险',
+        banReason: '{compromised_bot@malicious.xyz} 触碰发信频率熔断阈值(120封/分)被系统自动封禁，外发异常流量超标',
+        banTime: '2026-10-04 17:35',
+        lastProcessTime: '2026-10-04 17:35',
+        operator: '系统自动 / rule-burst',
+        operatorRole: '防刷网关',
+        notes: '检测到来自多国代理节点的异常并发外发，触发高危阻断策略。',
+        history: [
+          { time: '2026-10-04 17:34', text: '发信速率达到 120封/分，远超白名单基线' },
+          { time: '2026-10-04 17:35', text: '策略拦截器触发，强制踢出登录并封禁发件权限' }
+        ]
+      },
+      {
+        id: 2,
+        ticketId: 'TKT-2026-AF8823',
+        email: 'suspicious_sender@temp-domain.com',
+        status: 'pending',
+        statusLabel: '待人工复核',
+        riskLevel: 'medium',
+        riskLabel: '中风险',
+        banReason: '异地 IP 突发投递大量非标营销邮件，用户已提交工单申请人工复核与解封',
+        banTime: '2026-10-05 09:12',
+        lastProcessTime: '2026-10-06 14:20',
+        operator: '安全运营 / SecOps-02',
+        operatorRole: '风控专员',
+        notes: '用户申诉称系合法推广活动，正在核验工单资质与 SPF 记录。',
+        history: [
+          { time: '2026-10-05 09:12', text: '灰名单算法标记，暂时受限' },
+          { time: '2026-10-06 10:30', text: '收到用户争议申诉表单' },
+          { time: '2026-10-06 14:20', text: '转入人工队列待裁决' }
+        ]
+      },
+      {
+        id: 3,
+        ticketId: 'TKT-2026-CK7712',
+        email: 'marketing_ops@partner-corp.io',
+        status: 'unbanned',
+        statusLabel: '已解封',
+        riskLevel: 'low',
+        riskLabel: '低风险',
+        banReason: '企业合作伙伴邮件误触发临时限流规则，经运维人工确认资质后全量解除限制',
+        banTime: '2026-10-02 11:05',
+        lastProcessTime: '2026-10-02 15:30',
+        operator: '李主管 / admin-lead',
+        operatorRole: '主站长',
+        notes: '已核查企业组织认证，配置发信 SPF 豁免白名单。',
+        history: [
+          { time: '2026-10-02 11:05', text: '触发临时发信限流' },
+          { time: '2026-10-02 15:30', text: '审核通过，已人工解封并恢复服务' }
+        ]
+      },
+      {
+        id: 4,
+        ticketId: 'TKT-2026-DX6645',
+        email: 'spammer_bulk_892@crawler-hub.net',
+        status: 'banned',
+        statusLabel: '生效中-已封禁',
+        riskLevel: 'high',
+        riskLabel: '高风险',
+        banReason: '撞库生成虚拟别名，持续向外域发送钓鱼测试木马载荷，命中全球黑名单情报',
+        banTime: '2026-10-06 20:45',
+        lastProcessTime: '2026-10-06 20:45',
+        operator: '风控引擎 / anti-spam',
+        operatorRole: '威胁情报',
+        notes: '已永久阻断入站与出站，同步上报信誉评级。',
+        history: [
+          { time: '2026-10-06 20:44', text: '捕获特征签名匹配恶意钓鱼样本' },
+          { time: '2026-10-06 20:45', text: '自动硬性处置生效，账号冻结' }
+        ]
+      },
+      {
+        id: 5,
+        ticketId: 'TKT-2026-EB5590',
+        email: 'dev_testing_notify@internal-cloud.cc',
+        status: 'watching',
+        statusLabel: '观察中',
+        riskLevel: 'low',
+        riskLabel: '低风险',
+        banReason: '内部测试环境定时巡检脚本突发大批通知，流量轻微偏移，纳入 48h 观察队列',
+        banTime: '2026-10-07 08:10',
+        lastProcessTime: '2026-10-07 08:30',
+        operator: '巡检运维 / Ops-Dev',
+        operatorRole: 'SRE 工程师',
+        notes: '未实施阻断，仅做发件频率限速告警与基线采集。',
+        history: [
+          { time: '2026-10-07 08:10', text: '监控探测到突发 80 封/分调用' },
+          { time: '2026-10-07 08:30', text: '已联系对应团队负责人并标记观察' }
+        ]
+      }
+    ];
+
+    // 当前活动筛选状态
+    let currentFilter = {
+      keyword: '',
+      status: 'all',
+      timeRange: 'all',
+      riskLevel: 'all',
+      kpiActive: 'banned'
+    };
+
+    // 2. 状态标签渲染器 (严格按照规范色彩与层级，醒目标签 + 图标)
+    function renderStatusBadge(status) {
+      switch (status) {
+        case 'banned':
+          return `
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-rose-500/10 text-rose-400 border border-rose-500/20">
+              <span class="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></span>
+              生效中-已封禁
+            </span>`;
+        case 'pending':
+          return `
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20">
+              <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+              待复核
+            </span>`;
+        case 'unbanned':
+          return `
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+              已解封
+            </span>`;
+        case 'watching':
+        default:
+          return `
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-slate-500/10 text-slate-300 border border-slate-500/20">
+              <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+              观察中
+            </span>`;
+      }
+    }
+
+    // 风险等级微标签
+    function renderRiskBadge(level) {
+      if (level === 'high') {
+        return `<span class="px-1.5 py-0.5 rounded text-[10px] font-medium whitespace-nowrap shrink-0 bg-rose-950/80 text-rose-400 border border-rose-800/40">高风险</span>`;
+      } else if (level === 'medium') {
+        return `<span class="px-1.5 py-0.5 rounded text-[10px] font-medium whitespace-nowrap shrink-0 bg-amber-950/80 text-amber-400 border border-amber-800/40">中风险</span>`;
+      }
+      return `<span class="px-1.5 py-0.5 rounded text-[10px] font-medium whitespace-nowrap shrink-0 bg-slate-800 text-slate-400 border border-slate-700/40">低风险</span>`;
+    }
+
+    // 动态同步顶部 KPI 卡片数值
+    function updateKpiStats() {
+      const bannedCount = mockData.filter(d => d.status === 'banned').length;
+      const todayCount = mockData.filter(d => d.banTime.startsWith('2026-10-06') || d.banTime.startsWith('2026-10-07')).length;
+      const pendingCount = mockData.filter(d => d.status === 'pending').length;
+      const highRiskCount = mockData.filter(d => d.riskLevel === 'high').length;
+
+      const elBanned = document.getElementById('stat-banned-count');
+      const elToday = document.getElementById('stat-today-count');
+      const elPending = document.getElementById('stat-pending-count');
+      const elHighRisk = document.getElementById('stat-highrisk-count');
+
+      if (elBanned) elBanned.innerText = bannedCount;
+      if (elToday) elToday.innerText = todayCount;
+      if (elPending) elPending.innerText = pendingCount;
+      if (elHighRisk) elHighRisk.innerText = highRiskCount;
+    }
+
+    // 3. 表格渲染主函数 (基于重构后的列顺序与优先级)
+    function renderTable() {
+      updateKpiStats();
+      const tbody = document.getElementById('tableBody');
+      const filtered = getFilteredData();
+      
+      // 更新分页总数显示
+      document.getElementById('paginationTotal').innerText = filtered.length;
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="7" class="py-12 text-center text-slate-500 text-xs">
+              <div class="flex flex-col items-center justify-center gap-2">
+                <i data-lucide="inbox" class="w-8 h-8 stroke-1 text-slate-600"></i>
+                <span>未查询到匹配的邮箱封禁管控记录</span>
+              </div>
+            </td>
+          </tr>
+        `;
+        lucide.createIcons();
+        return;
+      }
+
+      tbody.innerHTML = filtered.map(row => {
+        const isBanned = row.status === 'banned';
+        return `
+          <tr class="hover:bg-dark-hover/70 transition-colors group">
+            
+            <!-- 列 1: 邮箱 (主列，加粗高亮，支持点击，副标题展示案件编号) -->
+            <td class="py-4 px-4 align-middle">
+              <div class="flex flex-col gap-1">
+                <div class="flex items-center gap-2">
+                  <a href="javascript:void(0)" onclick="openDetailDrawer(${row.id})" 
+                     class="font-mono font-semibold text-slate-100 hover:text-blue-400 transition-colors text-xs flex items-center gap-1.5">
+                    ${row.email}
+                    <i data-lucide="external-link" class="w-3 h-3 text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity"></i>
+                  </a>
+                  ${renderRiskBadge(row.riskLevel)}
+                </div>
+                <!-- 案件编号弱化至邮箱正下方次要位置 -->
+                <div class="flex items-center gap-1.5 text-[11px] text-slate-500 font-mono">
+                  <span>编号: ${row.ticketId}</span>
+                  <button onclick="copyToClipboard('${row.email}', '邮箱账号已复制')" title="复制邮箱" class="hover:text-slate-300">
+                    <i data-lucide="copy" class="w-2.5 h-2.5"></i>
+                  </button>
+                </div>
+              </div>
+            </td>
+
+            <!-- 列 2: 当前状态 (醒目彩色标签) -->
+            <td class="py-4 px-3 align-middle whitespace-nowrap">
+              ${renderStatusBadge(row.status)}
+            </td>
+
+            <!-- 列 3: 封禁原因 (截断显示，hover 显示完整 Tooltip) -->
+            <td class="py-4 px-3 align-middle">
+              <div class="relative has-tooltip max-w-[220px]">
+                <p class="truncate text-slate-300 font-sans cursor-help">
+                  ${row.banReason}
+                </p>
+                <!-- 自定义浮层 Tooltip -->
+                <div class="custom-tooltip absolute z-30 left-0 -top-8 w-72 p-2 rounded-lg bg-slate-900 border border-slate-700 text-[11px] text-slate-200 shadow-xl pointer-events-none">
+                  ${row.banReason}
+                </div>
+              </div>
+            </td>
+
+            <!-- 列 4: 封禁时间 -->
+            <td class="py-4 px-3 align-middle whitespace-nowrap font-mono text-slate-400 text-[11px]">
+              ${row.banTime}
+            </td>
+
+            <!-- 列 5: 最后处理时间 -->
+            <td class="py-4 px-3 align-middle whitespace-nowrap font-mono text-slate-400 text-[11px]">
+              ${row.lastProcessTime}
+            </td>
+
+            <!-- 列 6: 处理人 / 负责人 (新增列) -->
+            <td class="py-4 px-3 align-middle whitespace-nowrap">
+              <div class="flex items-center gap-2">
+                <div class="w-6 h-6 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-[10px] text-slate-300 font-medium shrink-0">
+                  ${row.operator.charAt(0)}
+                </div>
+                <div class="flex flex-col">
+                  <span class="text-slate-200 text-xs font-medium">${row.operator}</span>
+                  <span class="text-[10px] text-slate-500">${row.operatorRole}</span>
+                </div>
+              </div>
+            </td>
+
+            <!-- 列 7: 操作 (更实用的按钮组：解封、延期、备注、查看详情) -->
+            <td class="py-4 px-4 align-middle whitespace-nowrap text-right">
+              <div class="inline-flex items-center justify-end gap-1.5">
+                
+                <!-- 解封 / 重新封禁快捷按钮 -->
+                ${isBanned ? `
+                  <button onclick="handleUnban(${row.id})" class="px-2 py-1 text-xs font-medium text-emerald-400 hover:text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 rounded-md transition flex items-center gap-1">
+                    <i data-lucide="unlock" class="w-3 h-3"></i>
+                    <span>解封</span>
+                  </button>
+                ` : `
+                  <button onclick="handleReban(${row.id})" class="px-2 py-1 text-xs font-medium text-rose-400 hover:text-rose-300 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 rounded-md transition flex items-center gap-1">
+                    <i data-lucide="lock" class="w-3 h-3"></i>
+                    <span>封禁</span>
+                  </button>
+                `}
+
+                <!-- 延期 -->
+                <button onclick="handleExtend(${row.id})" title="调整/延期管控期限" class="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-dark-hover border border-dark-border/60 rounded-md transition">
+                  <i data-lucide="calendar-plus" class="w-3.5 h-3.5"></i>
+                </button>
+
+                <!-- 备注 -->
+                <button onclick="handleNote(${row.id})" title="追加审核备注" class="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-dark-hover border border-dark-border/60 rounded-md transition">
+                  <i data-lucide="message-square" class="w-3.5 h-3.5"></i>
+                </button>
+
+                <!-- 查看详情 (打开右侧抽屉) -->
+                <button onclick="openDetailDrawer(${row.id})" class="px-2 py-1 text-xs text-slate-300 hover:text-white bg-dark-bg hover:bg-dark-border border border-dark-border rounded-md transition flex items-center gap-1">
+                  <span>详情</span>
+                  <i data-lucide="chevron-right" class="w-3 h-3"></i>
+                </button>
+
+              </div>
+            </td>
+
+          </tr>
+        `;
+      }).join('');
+
+      // 重新生成图标
+      lucide.createIcons();
+    }
+
+    // 4. 数据筛选过滤引擎
+    function getFilteredData() {
+      return mockData.filter(item => {
+        // 关键字过滤
+        if (currentFilter.keyword) {
+          const kw = currentFilter.keyword.toLowerCase();
+          const matchEmail = item.email.toLowerCase().includes(kw);
+          const matchTicket = item.ticketId.toLowerCase().includes(kw);
+          const matchReason = item.banReason.toLowerCase().includes(kw);
+          const matchOperator = item.operator.toLowerCase().includes(kw);
+          if (!matchEmail && !matchTicket && !matchReason && !matchOperator) return false;
+        }
+
+        // 状态过滤
+        if (currentFilter.status !== 'all') {
+          if (item.status !== currentFilter.status) return false;
+        }
+
+        // 风险等级过滤
+        if (currentFilter.riskLevel !== 'all') {
+          if (item.riskLevel !== currentFilter.riskLevel) return false;
+        }
+
+        // 时间过滤 (模拟简单日期匹配)
+        if (currentFilter.timeRange === 'today') {
+          if (!item.banTime.startsWith('2026-10-07') && !item.banTime.startsWith('2026-10-06')) {
+            // 宽泛匹配 24h
+            return false;
+          }
+        }
+
+        return true;
+      });
+    }
+
+    // 5. 顶部统计卡片高亮与联动逻辑
+    function selectKpiFilter(type) {
+      currentFilter.kpiActive = type;
+      
+      // 更新卡片视觉高亮
+      document.querySelectorAll('.kpi-card').forEach(card => {
+        card.classList.remove('border-blue-500/60', 'ring-1', 'ring-blue-500/50', 'shadow-blue-950/20');
+        card.classList.add('border-dark-border');
+        card.querySelector('.kpi-dot')?.classList.add('hidden');
+      });
+
+      const activeCard = document.getElementById(`card-${type}`);
+      if (activeCard) {
+        activeCard.classList.remove('border-dark-border');
+        activeCard.classList.add('border-blue-500/60', 'ring-1', 'ring-blue-500/50', 'shadow-blue-950/20');
+        activeCard.querySelector('.kpi-dot')?.classList.remove('hidden');
+      }
+
+      // 联动下拉框
+      const statusSelect = document.getElementById('filterStatus');
+      const riskSelect = document.getElementById('filterRiskLevel');
+      const timeSelect = document.getElementById('filterTimeRange');
+
+      if (type === 'banned') {
+        statusSelect.value = 'banned';
+        currentFilter.status = 'banned';
+      } else if (type === 'pending') {
+        statusSelect.value = 'pending';
+        currentFilter.status = 'pending';
+      } else if (type === 'highrisk') {
+        riskSelect.value = 'high';
+        currentFilter.riskLevel = 'high';
+      } else if (type === 'today') {
+        timeSelect.value = 'today';
+        currentFilter.timeRange = 'today';
+      }
+
+      renderTable();
+      showToast(`已切换至「${type}」卡片过滤模式`);
+    }
+
+    // 6. 筛选栏事件响应
+    function handleSearch() {
+      currentFilter.keyword = document.getElementById('filterKeyword').value.trim();
+      currentFilter.status = document.getElementById('filterStatus').value;
+      currentFilter.timeRange = document.getElementById('filterTimeRange').value;
+      currentFilter.riskLevel = document.getElementById('filterRiskLevel').value;
+
+      // 清空按钮显示控制
+      const clearBtn = document.getElementById('clearKeywordBtn');
+      if (currentFilter.keyword) {
+        clearBtn.classList.remove('hidden');
+      } else {
+        clearBtn.classList.add('hidden');
+      }
+
+      renderTable();
+    }
+
+    function clearKeyword() {
+      document.getElementById('filterKeyword').value = '';
+      handleSearch();
+    }
+
+    function handleReset() {
+      document.getElementById('filterKeyword').value = '';
+      document.getElementById('filterStatus').value = 'all';
+      document.getElementById('filterTimeRange').value = 'all';
+      document.getElementById('filterRiskLevel').value = 'all';
+      document.getElementById('clearKeywordBtn').classList.add('hidden');
+
+      currentFilter = {
+        keyword: '',
+        status: 'all',
+        timeRange: 'all',
+        riskLevel: 'all',
+        kpiActive: null
+      };
+
+      // 清除卡片强制高亮
+      document.querySelectorAll('.kpi-card').forEach(card => {
+        card.classList.remove('border-blue-500/60', 'ring-1', 'ring-blue-500/50', 'shadow-blue-950/20');
+        card.classList.add('border-dark-border');
+        card.querySelector('.kpi-dot')?.classList.add('hidden');
+      });
+
+      renderTable();
+      showToast('筛选条件已重置');
+    }
+
+    function handleRefresh() {
+      const icon = document.getElementById('refreshIcon');
+      icon.classList.add('animate-spin');
+      setTimeout(() => {
+        icon.classList.remove('animate-spin');
+        renderTable();
+        showToast('数据已刷新');
+      }, 500);
+    }
+
+    // 7. 快捷操作处理：解封、封禁、延期、备注
+    function handleUnban(id) {
+      const target = mockData.find(item => item.id === id);
+      if (!target) return;
+
+      openModal({
+        title: '确认解除邮箱封禁',
+        content: `
+          <div class="space-y-3">
+            <p>确定要对邮箱 <strong class="text-white font-mono">${target.email}</strong> 立即解除管控吗？</p>
+            <div class="p-2.5 rounded-lg bg-dark-bg border border-dark-border text-slate-400 text-[11px]">
+              解封后该账号将恢复正常的 SMTP/API 发件能力，请确保已核验其合规性。
+            </div>
+            <div>
+              <label class="block text-slate-400 mb-1">解封依据与备注：</label>
+              <textarea id="modalUnbanReason" class="w-full bg-dark-bg border border-dark-border rounded-lg p-2 text-xs text-white outline-none focus:border-blue-500" placeholder="例如：经人工核实申诉无误，解除误拦截"></textarea>
+            </div>
+          </div>
+        `,
+        confirmText: '确认解封',
+        confirmClass: 'bg-emerald-600 hover:bg-emerald-500',
+        onConfirm: () => {
+          target.status = 'unbanned';
+          target.statusLabel = '已解封';
+          target.lastProcessTime = '刚刚 (2026-10-07 09:30)';
+          target.operator = '管理员 / 当前操作员';
+          closeModal();
+          renderTable();
+          showToast(`已成功解封 ${target.email}`, 'check-circle');
+        }
+      });
+    }
+
+    function handleReban(id) {
+      const target = mockData.find(item => item.id === id);
+      if (!target) return;
+
+      openModal({
+        title: '重新恢复封禁处置',
+        content: `
+          <div class="space-y-3">
+            <p>确定对 <strong class="text-white font-mono">${target.email}</strong> 重新执行生效中封禁？</p>
+            <textarea id="modalRebanReason" class="w-full bg-dark-bg border border-dark-border rounded-lg p-2 text-xs text-white outline-none focus:border-blue-500" placeholder="填写入库封禁原因..."></textarea>
+          </div>
+        `,
+        confirmText: '立即生效',
+        confirmClass: 'bg-rose-600 hover:bg-rose-500',
+        onConfirm: () => {
+          target.status = 'banned';
+          target.statusLabel = '生效中-已封禁';
+          target.lastProcessTime = '刚刚 (2026-10-07 09:30)';
+          closeModal();
+          renderTable();
+          showToast(`已重新封禁 ${target.email}`, 'alert-circle');
+        }
+      });
+    }
+
+    function handleExtend(id) {
+      const target = mockData.find(item => item.id === id);
+      if (!target) return;
+
+      openModal({
+        title: '管控期限延期与调整',
+        content: `
+          <div class="space-y-3">
+            <p>为目标账号 <strong class="text-white font-mono">${target.email}</strong> 延长管控/观察周期：</p>
+            <div>
+              <select id="modalExtendDays" class="w-full bg-dark-bg border border-dark-border rounded-lg p-2 text-xs text-white outline-none focus:border-blue-500">
+                <option value="7">延长 7 天</option>
+                <option value="30">延长 30 天</option>
+                <option value="90">延长 90 天</option>
+                <option value="permanent">永久硬性管控</option>
+              </select>
+            </div>
+          </div>
+        `,
+        confirmText: '提交延期',
+        confirmClass: 'bg-blue-600 hover:bg-blue-500',
+        onConfirm: () => {
+          closeModal();
+          showToast('延期策略已成功同步生效');
+        }
+      });
+    }
+
+    function handleNote(id) {
+      const target = mockData.find(item => item.id === id);
+      if (!target) return;
+
+      openModal({
+        title: '追加案件审计备注',
+        content: `
+          <div class="space-y-2">
+            <p class="text-slate-400">针对 <strong class="text-slate-200">${target.email}</strong> 记录工作备忘：</p>
+            <textarea id="modalNoteText" rows="3" class="w-full bg-dark-bg border border-dark-border rounded-lg p-2 text-xs text-white outline-none focus:border-blue-500" placeholder="输入审计备注内容...">${target.notes || ''}</textarea>
+          </div>
+        `,
+        confirmText: '保存备注',
+        confirmClass: 'bg-blue-600 hover:bg-blue-500',
+        onConfirm: () => {
+          const text = document.getElementById('modalNoteText').value;
+          target.notes = text;
+          closeModal();
+          showToast('备注已保存');
+        }
+      });
+    }
+
+    function openManualBanModal() {
+      openModal({
+        title: '手工添加邮箱封禁',
+        content: `
+          <div class="space-y-3">
+            <div>
+              <label class="block text-slate-400 mb-1">目标邮箱地址 *</label>
+              <input type="email" id="modalInputEmail" class="w-full bg-dark-bg border border-dark-border rounded-lg p-2 text-xs text-white outline-none focus:border-blue-500" placeholder="name@domain.com" />
+            </div>
+            <div>
+              <label class="block text-slate-400 mb-1">封禁原因 / 处置说明 *</label>
+              <textarea id="modalInputReason" rows="2" class="w-full bg-dark-bg border border-dark-border rounded-lg p-2 text-xs text-white outline-none focus:border-blue-500" placeholder="说明封禁依据与违规特征..."></textarea>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block text-slate-400 mb-1">风险定级</label>
+                <select id="modalInputRisk" class="w-full bg-dark-bg border border-dark-border rounded-lg p-2 text-xs text-white outline-none">
+                  <option value="high">高风险 (P0)</option>
+                  <option value="medium">中风险 (P1)</option>
+                  <option value="low">低风险 (P2)</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-slate-400 mb-1">处置模式</label>
+                <select id="modalInputMode" class="w-full bg-dark-bg border border-dark-border rounded-lg p-2 text-xs text-white outline-none">
+                  <option value="banned">立即阻断外发</option>
+                  <option value="watching">列入观察队列</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        `,
+        confirmText: '确认添加并生效',
+        confirmClass: 'bg-blue-600 hover:bg-blue-500',
+        onConfirm: () => {
+          const email = document.getElementById('modalInputEmail').value.trim();
+          const reason = document.getElementById('modalInputReason').value.trim();
+          const risk = document.getElementById('modalInputRisk').value;
+          const mode = document.getElementById('modalInputMode').value;
+
+          if (!email || !reason) {
+            alert('请完整填写邮箱与封禁原因');
+            return;
+          }
+
+          mockData.unshift({
+            id: Date.now(),
+            ticketId: 'TKT-2026-MAN' + Math.floor(1000 + Math.random() * 9000),
+            email: email,
+            status: mode,
+            statusLabel: mode === 'banned' ? '生效中-已封禁' : '观察中',
+            riskLevel: risk,
+            riskLabel: risk === 'high' ? '高风险' : (risk === 'medium' ? '中风险' : '低风险'),
+            banReason: reason,
+            banTime: '2026-10-07 09:30',
+            lastProcessTime: '2026-10-07 09:30',
+            operator: '管理员 / 当前登录用户',
+            operatorRole: '安全运维',
+            notes: '人工手工添加',
+            history: [{ time: '2026-10-07 09:30', text: '人工手工添加封禁管控' }]
+          });
+
+          closeModal();
+          renderTable();
+          showToast(`已成功录入封禁: ${email}`);
+        }
+      });
+    }
+
+    // 8. 侧边抽屉逻辑 (查看详情)
+    function openDetailDrawer(id) {
+      const item = mockData.find(row => row.id === id);
+      if (!item) return;
+
+      const drawer = document.getElementById('detailDrawer');
+      const overlay = document.getElementById('drawerOverlay');
+      const body = document.getElementById('drawerBody');
+
+      body.innerHTML = `
+        <!-- 核心状态卡片 -->
+        <div class="p-4 rounded-xl bg-dark-card border border-dark-border space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="font-mono text-slate-400">案件编号: ${item.ticketId}</span>
+            ${renderStatusBadge(item.status)}
+          </div>
+          <div class="space-y-1">
+            <span class="text-slate-400 text-[11px]">审计对象 (邮箱账号)</span>
+            <div class="font-mono font-bold text-sm text-white flex items-center justify-between">
+              <span>${item.email}</span>
+              <button onclick="copyToClipboard('${item.email}', '邮箱已复制')" class="text-slate-400 hover:text-white">
+                <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+              </button>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 pt-1">
+            <span class="text-[11px] text-slate-400">风险等级：</span>
+            ${renderRiskBadge(item.riskLevel)}
+          </div>
+        </div>
+
+        <!-- 详细规则与原因 -->
+        <div class="space-y-1.5">
+          <label class="text-slate-400 font-medium">封禁原因与规则特征</label>
+          <div class="p-3 rounded-lg bg-dark-bg border border-dark-border text-slate-200 leading-relaxed font-sans">
+            ${item.banReason}
+          </div>
+        </div>
+
+        <!-- 关键时间与负责人元数据 -->
+        <div class="grid grid-cols-2 gap-3">
+          <div class="p-3 rounded-lg bg-dark-card border border-dark-border space-y-1">
+            <span class="text-slate-500 text-[10px]">首次封禁时间</span>
+            <div class="font-mono text-slate-300 font-medium">${item.banTime}</div>
+          </div>
+          <div class="p-3 rounded-lg bg-dark-card border border-dark-border space-y-1">
+            <span class="text-slate-500 text-[10px]">最后处理时间</span>
+            <div class="font-mono text-slate-300 font-medium">${item.lastProcessTime}</div>
+          </div>
+          <div class="p-3 rounded-lg bg-dark-card border border-dark-border space-y-1">
+            <span class="text-slate-500 text-[10px]">当前处理人</span>
+            <div class="text-slate-300 font-medium">${item.operator}</div>
+          </div>
+          <div class="p-3 rounded-lg bg-dark-card border border-dark-border space-y-1">
+            <span class="text-slate-500 text-[10px]">处置角色</span>
+            <div class="text-slate-300 font-medium">${item.operatorRole}</div>
+          </div>
+        </div>
+
+        <!-- 内部审计备忘 -->
+        <div class="space-y-1.5">
+          <div class="flex items-center justify-between">
+            <label class="text-slate-400 font-medium">内部备忘录</label>
+            <button onclick="handleNote(${item.id})" class="text-[11px] text-blue-400 hover:text-blue-300">编辑</button>
+          </div>
+          <div class="p-3 rounded-lg bg-dark-bg border border-dark-border text-slate-300">
+            ${item.notes || '暂无备忘信息'}
+          </div>
+        </div>
+
+        <!-- 处理时间线 -->
+        <div class="space-y-2">
+          <label class="text-slate-400 font-medium">流转时间线</label>
+          <div class="border-l-2 border-dark-border pl-3 space-y-3 py-1">
+            ${(item.history || []).map(h => `
+              <div class="relative">
+                <span class="absolute -left-[19px] top-1 w-2 h-2 rounded-full bg-blue-500 ring-2 ring-dark-surface"></span>
+                <div class="font-mono text-[10px] text-slate-500">${h.time}</div>
+                <div class="text-slate-300 mt-0.5">${h.text}</div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `;
+
+      // 绑定底栏主按钮
+      const primaryBtn = document.getElementById('drawerPrimaryAction');
+      if (item.status === 'banned') {
+        primaryBtn.className = 'px-3 py-1.5 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg transition';
+        primaryBtn.innerText = '立即解除封禁';
+        primaryBtn.onclick = () => { closeDrawer(); handleUnban(item.id); };
+      } else {
+        primaryBtn.className = 'px-3 py-1.5 text-xs font-medium text-white bg-rose-600 hover:bg-rose-500 rounded-lg transition';
+        primaryBtn.innerText = '重新封禁该邮箱';
+        primaryBtn.onclick = () => { closeDrawer(); handleReban(item.id); };
+      }
+
+      overlay.classList.remove('hidden');
+      drawer.classList.remove('translate-x-full');
+      lucide.createIcons();
+    }
+
+    function closeDrawer() {
+      const drawer = document.getElementById('detailDrawer');
+      const overlay = document.getElementById('drawerOverlay');
+      drawer.classList.add('translate-x-full');
+      overlay.classList.add('hidden');
+    }
+
+    // 9. 通用 Modal 逻辑
+    let currentModalConfirm = null;
+    function openModal({ title, content, confirmText = '确认', confirmClass = 'bg-blue-600 hover:bg-blue-500', onConfirm }) {
+      document.getElementById('modalTitle').innerText = title;
+      document.getElementById('modalContent').innerHTML = content;
+      const btn = document.getElementById('modalConfirmBtn');
+      btn.innerText = confirmText;
+      btn.className = `px-3 py-1.5 text-xs font-medium text-white rounded-lg transition ${confirmClass}`;
+      currentModalConfirm = onConfirm;
+      btn.onclick = () => { if (currentModalConfirm) currentModalConfirm(); };
+      document.getElementById('actionModal').classList.remove('hidden');
+    }
+
+    function closeModal() {
+      document.getElementById('actionModal').classList.add('hidden');
+      currentModalConfirm = null;
+    }
+
+    // 10. 辅助函数：剪贴板复制、Toast 与导出
+    function copyToClipboard(text, message) {
+      navigator.clipboard.writeText(text).then(() => {
+        showToast(message || '已成功复制到剪贴板', 'check');
+      }).catch(() => {
+        showToast('复制失败，请手动选取', 'alert-circle');
+      });
+    }
+
+    function showToast(message, icon = 'info') {
+      const toast = document.getElementById('toast');
+      const toastMsg = document.getElementById('toastMsg');
+      const toastIcon = document.getElementById('toastIcon');
+
+      toastMsg.innerText = message;
+      toastIcon.setAttribute('data-lucide', icon);
+      lucide.createIcons();
+
+      toast.classList.remove('translate-y-10', 'opacity-0');
+      toast.classList.add('translate-y-0', 'opacity-100');
+
+      setTimeout(() => {
+        toast.classList.remove('translate-y-0', 'opacity-100');
+        toast.classList.add('translate-y-10', 'opacity-0');
+      }, 2500);
+    }
+
+    function exportData() {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(mockData, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", `email_ban_export_${Date.now()}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+      showToast('封禁管控数据已导出为 JSON 文件', 'download');
+    }
+
+    // 初始化页面渲染
+    window.addEventListener('DOMContentLoaded', () => {
+      lucide.createIcons();
+      renderTable();
+    });
+  </script>
+</body>
+</html>
