@@ -8,7 +8,7 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 ### 邮箱封禁管控后台工作台 UI/UX 完整重构与原型落地 (2026-10-07)
-*   **关联提交 (Git Commit)**: `a645f6c78af960f1c3100a6f9ebc6bcfd11de08e` (Short: `a645f6c`)
+*   **关联提交 (Git Commit)**: `b4ed2fc6bb6fcfb0be55af0c8d9f3a4a26f6b424` (Short: `b4ed2fc`)
 *   **部署环境 (Deployment)**: `本地全真栈 / 独立高保真交互原型 (email_ban_management.html)`
 *   **功能需求与变更清单 (Changes & Feature Alignment)**:
     - [x] 顶部统计卡片精简与重构：精简为 4 个真正有用的指标卡片（生效中封禁、今日新增、待人工复核、高风险邮箱），数字与说明简洁清晰，支持点击联动过滤，当前选中卡片保持显著蓝色光晕与高亮；
