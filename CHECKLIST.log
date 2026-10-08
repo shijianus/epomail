@@ -8,7 +8,7 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 ### 邮箱封禁管控后台生产全量改造、Cloudflare部署与Subagent端到端核验 (2026-10-08)
-*   **关联提交 (Git Commit)**: `PENDING_COMMIT_HASH` (Short: `PENDING_SHORT`)
+*   **关联提交 (Git Commit)**: `82001352b603e6d5c4dcc00dee2c5b4cb8f0a8f4` (Short: `8200135`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com)` (Version ID: `f74181d2-1f62-4566-9573-d89b8835ef9d`)
 *   **功能需求与变更清单 (Changes & Feature Alignment)**:
     - [x] 顶部 4 个统计卡片精简与重构：精简为邮箱管理实用指标（生效中封禁、今日新增、待人工复核、高风险邮箱），数字与说明精炼，默认蓝色边框高亮（.kpi-card-active），点击联动筛选；
