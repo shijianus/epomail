@@ -7,7 +7,32 @@
 > 制度规范与工作流指引请见 [AGENTS.md](file:///home/shijian/projects/epocanvas-mail/AGENTS.md)。
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
-### 邮箱封禁管控后台生产全量改造、Cloudflare部署与Subagent端到端核验 (2026-10-08)
+
+### 邮箱封禁管控后台用词统一、信息层级精炼与抽屉Accordion优化 (2026-10-08)
+*   **关联提交 (Git Commit)**: `64bb68e3f8a9535fcc061acdbf3035b78eab901c` (Short: `64bb68e`)
+*   **部署环境 (Deployment)**: `本地全真栈 / 独立高保真交互原型 (email_ban_management.html)`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 用词全面统一：
+      - 状态标签统一格式：`生效中 · 已封禁`、`已解禁 · 移出黑名单`、`待复核`、`观察中`（所有「生效中已封禁」均统一添加间隔中点）；
+      - 风险等级统一：高风险统一为 `高风险 · 已管控`；
+      - 抽屉标题统一：重命名为 `封禁台账 · 存证（只读）`；
+      - 抽屉分区块统一：`风险研判与处置依据`、`多维风险画像`；
+      - KPI 说明文字精简：生效中封禁 → `策略生效中 · 阻断全部外发`、今日新增 → `近24小时新增处置`、待人工复核 → `申诉待复核`、高风险邮箱 → `撞库/黑名单探测`；
+    - [x] 表格信息层级微调：
+      - 用户邮箱列加粗高亮为主列；案件编号字号缩小至 10px、对比度弱化 (opacity 0.65) 作为次要辅助信息；
+      - 操作列层级：`解封` / `重新封禁` 保持文字按钮；`延期`、`备注` 精简为圆形图标按钮并配置 hover tooltip 提示；`查看详情` 保持文字按钮；
+    - [x] 侧边抽屉 Accordion 优化：
+      - 「多维风险画像」下四个维度（凭证挑战、设备指纹、行为速率、网络拓扑）改为折叠面板（`el-collapse`），默认展开前两个（凭证与身份挑战因子、设备指纹与会话连续性），后两个折叠收起，彻底解决一屏信息过载；
+      - 「风险研判与处置依据」区域保留显式红色警示文案 (`.text-danger`)；
+      - 抽屉底部主操作按钮（解封 / 重新封禁）与表格行内完全一致并联动即时响应；
+    - [x] 0 条记录空状态文案统一：无匹配结果时标准提示 `当前筛选条件下暂无封禁记录`；
+    - [x] 六语言多语言字典 100% 对称闭环：zh, zh-Hant, en, es, fr, nl 六语字典 2514 键绝对对称，代码 0 硬编码。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 前端构建核验：mail-vue `vite build` 成功（耗时 13.71s，0 警告 0 报错）；
+    - [x] 多语言三件套静态审计：`i18n-symmetry.mjs` (2514键 100% 对称通过)、`i18n-audit.mjs` (0 缺失通过)、`i18n-hardcoded.mjs` (views/audit-report/index.vue 0 未包裹硬编码通过)；
+    - [x] 全真栈自动化端到端测试：`tests/verify-ban-management-unified-terms.mjs` 24/24 项断言全部通过；
+    - [x] 高保真截图生成与留档：`tests/audit_unified_drawer_verified.png`（抽屉与 Accordion 展开态）、`tests/audit_unified_main_empty_verified.png`（空状态视图）；
+    - [x] 原型同步：`email_ban_management.html` 100% 同步用词与操作按钮。
 *   **关联提交 (Git Commit)**: `82001352b603e6d5c4dcc00dee2c5b4cb8f0a8f4` (Short: `8200135`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com)` (Version ID: `f74181d2-1f62-4566-9573-d89b8835ef9d`)
 *   **功能需求与变更清单 (Changes & Feature Alignment)**:
