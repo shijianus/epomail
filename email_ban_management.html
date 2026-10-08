@@ -123,7 +123,7 @@
             <i data-lucide="activity" class="w-3 h-3 mr-0.5 inline"></i> 阻断中
           </span>
         </div>
-        <p class="mt-2 text-xs text-slate-400 truncate">策略生效中，阻断一切外发行为</p>
+        <p class="mt-2 text-xs text-slate-400 truncate">策略生效中 · 阻断全部外发</p>
         <!-- 激活指示小圆点 -->
         <span class="kpi-dot absolute top-3 right-3 w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse"></span>
       </div>
@@ -141,7 +141,7 @@
           <span class="text-2xl font-bold font-mono tracking-tight text-white" id="stat-today-count">2</span>
           <span class="text-xs text-slate-400">近 24 小时</span>
         </div>
-        <p class="mt-2 text-xs text-slate-400 truncate">高频频率熔断与异常检测触发</p>
+        <p class="mt-2 text-xs text-slate-400 truncate">近24小时新增处置</p>
         <span class="kpi-dot hidden absolute top-3 right-3 w-1.5 h-1.5 rounded-full bg-blue-400"></span>
       </div>
 
@@ -158,7 +158,7 @@
           <span class="text-2xl font-bold font-mono tracking-tight text-white" id="stat-pending-count">1</span>
           <span class="text-xs font-medium text-amber-400">待运营处理</span>
         </div>
-        <p class="mt-2 text-xs text-slate-400 truncate">用户申诉争议与灰名单待研判</p>
+        <p class="mt-2 text-xs text-slate-400 truncate">申诉待复核</p>
         <span class="kpi-dot hidden absolute top-3 right-3 w-1.5 h-1.5 rounded-full bg-blue-400"></span>
       </div>
 
@@ -175,7 +175,7 @@
           <span class="text-2xl font-bold font-mono tracking-tight text-white" id="stat-highrisk-count">2</span>
           <span class="text-xs text-slate-400">已列入观察</span>
         </div>
-        <p class="mt-2 text-xs text-slate-400 truncate">涉嫌撞库、群发垃圾与恶意信誉</p>
+        <p class="mt-2 text-xs text-slate-400 truncate">撞库/黑名单探测</p>
         <span class="kpi-dot hidden absolute top-3 right-3 w-1.5 h-1.5 rounded-full bg-blue-400"></span>
       </div>
 
@@ -324,7 +324,7 @@
         <div class="p-1.5 rounded-lg bg-blue-500/10 text-blue-400">
           <i data-lucide="file-text" class="w-4 h-4"></i>
         </div>
-        <span class="font-bold text-sm text-white">封禁管控档案详情</span>
+        <span class="font-bold text-sm text-white">封禁台账 · 存证（只读）</span>
       </div>
       <button onclick="closeDrawer()" class="p-1 rounded-md text-slate-400 hover:text-white hover:bg-dark-border transition">
         <i data-lucide="x" class="w-4 h-4"></i>
@@ -382,9 +382,9 @@
         ticketId: 'TKT-2026-BD9901',
         email: 'compromised_bot@malicious.xyz',
         status: 'banned', // banned | pending | unbanned | watching
-        statusLabel: '生效中-已封禁',
+        statusLabel: '生效中 · 已封禁',
         riskLevel: 'high', // high | medium | low
-        riskLabel: '高风险',
+        riskLabel: '高风险 · 已管控',
         banReason: '{compromised_bot@malicious.xyz} 触碰发信频率熔断阈值(120封/分)被系统自动封禁，外发异常流量超标',
         banTime: '2026-10-04 17:35',
         lastProcessTime: '2026-10-04 17:35',
@@ -401,7 +401,7 @@
         ticketId: 'TKT-2026-AF8823',
         email: 'suspicious_sender@temp-domain.com',
         status: 'pending',
-        statusLabel: '待人工复核',
+        statusLabel: '待复核',
         riskLevel: 'medium',
         riskLabel: '中风险',
         banReason: '异地 IP 突发投递大量非标营销邮件，用户已提交工单申请人工复核与解封',
@@ -421,7 +421,7 @@
         ticketId: 'TKT-2026-CK7712',
         email: 'marketing_ops@partner-corp.io',
         status: 'unbanned',
-        statusLabel: '已解封',
+        statusLabel: '已解禁 · 移出黑名单',
         riskLevel: 'low',
         riskLabel: '低风险',
         banReason: '企业合作伙伴邮件误触发临时限流规则，经运维人工确认资质后全量解除限制',
@@ -440,9 +440,9 @@
         ticketId: 'TKT-2026-DX6645',
         email: 'spammer_bulk_892@crawler-hub.net',
         status: 'banned',
-        statusLabel: '生效中-已封禁',
+        statusLabel: '生效中 · 已封禁',
         riskLevel: 'high',
-        riskLabel: '高风险',
+        riskLabel: '高风险 · 已管控',
         banReason: '撞库生成虚拟别名，持续向外域发送钓鱼测试木马载荷，命中全球黑名单情报',
         banTime: '2026-10-06 20:45',
         lastProcessTime: '2026-10-06 20:45',
@@ -491,7 +491,7 @@
           return `
             <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-rose-500/10 text-rose-400 border border-rose-500/20">
               <span class="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></span>
-              生效中-已封禁
+              生效中 · 已封禁
             </span>`;
         case 'pending':
           return `
@@ -503,7 +503,7 @@
           return `
             <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
               <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-              已解封
+              已解禁 · 移出黑名单
             </span>`;
         case 'watching':
         default:
@@ -518,7 +518,7 @@
     // 风险等级微标签
     function renderRiskBadge(level) {
       if (level === 'high') {
-        return `<span class="px-1.5 py-0.5 rounded text-[10px] font-medium whitespace-nowrap shrink-0 bg-rose-950/80 text-rose-400 border border-rose-800/40">高风险</span>`;
+        return `<span class="px-1.5 py-0.5 rounded text-[10px] font-medium whitespace-nowrap shrink-0 bg-rose-950/80 text-rose-400 border border-rose-800/40">高风险 · 已管控</span>`;
       } else if (level === 'medium') {
         return `<span class="px-1.5 py-0.5 rounded text-[10px] font-medium whitespace-nowrap shrink-0 bg-amber-950/80 text-amber-400 border border-amber-800/40">中风险</span>`;
       }
@@ -558,7 +558,7 @@
             <td colspan="7" class="py-12 text-center text-slate-500 text-xs">
               <div class="flex flex-col items-center justify-center gap-2">
                 <i data-lucide="inbox" class="w-8 h-8 stroke-1 text-slate-600"></i>
-                <span>未查询到匹配的邮箱封禁管控记录</span>
+                <span>当前筛选条件下暂无封禁记录</span>
               </div>
             </td>
           </tr>
@@ -647,7 +647,7 @@
                 ` : `
                   <button onclick="handleReban(${row.id})" class="px-2 py-1 text-xs font-medium text-rose-400 hover:text-rose-300 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 rounded-md transition flex items-center gap-1">
                     <i data-lucide="lock" class="w-3 h-3"></i>
-                    <span>封禁</span>
+                    <span>重新封禁</span>
                   </button>
                 `}
 
@@ -1076,15 +1076,15 @@
         </div>
       `;
 
-      // 绑定底栏主按钮
+      // 绑定底栏主按钮 (与表格行内完全一致：解封 / 重新封禁)
       const primaryBtn = document.getElementById('drawerPrimaryAction');
       if (item.status === 'banned') {
         primaryBtn.className = 'px-3 py-1.5 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg transition';
-        primaryBtn.innerText = '立即解除封禁';
+        primaryBtn.innerText = '解封';
         primaryBtn.onclick = () => { closeDrawer(); handleUnban(item.id); };
       } else {
         primaryBtn.className = 'px-3 py-1.5 text-xs font-medium text-white bg-rose-600 hover:bg-rose-500 rounded-lg transition';
-        primaryBtn.innerText = '重新封禁该邮箱';
+        primaryBtn.innerText = '重新封禁';
         primaryBtn.onclick = () => { closeDrawer(); handleReban(item.id); };
       }
 

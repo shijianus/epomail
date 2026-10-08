@@ -213,7 +213,7 @@
               ref="tableRef"
               :empty-text="first ? '' : $t('auditEmptyLogs')"
             >
-              <!-- 列 1: 邮箱 (主列，加粗，可点击) -->
+              <!-- 【层级优化】列 1: 邮箱 (主列加粗，案件编号字号再缩小、对比度降低，弱化为次要信息) -->
               <el-table-column :label="$t('tabEmailAddress')" min-width="230">
                 <template #default="{ row }">
                   <div class="email-cell">
@@ -221,23 +221,24 @@
                       <span class="subject-email font-mono clickable-email" @click="openAuditDrawer(row)">
                         {{ row.email }}
                       </span>
+                      <!-- 【用词统一】高风险标签统一为「高风险 · 已管控」 -->
                       <el-tag size="small" :type="getRiskTagType(row.riskLevel || row.priority)" effect="plain" class="audit-sub-tag">
                         {{ getRiskLabel(row.riskLevel || row.priority) }}
                       </el-tag>
                     </div>
-                    <!-- 案件编号弱化至下方次要位置 -->
+                    <!-- 【层级优化】案件编号弱化至下方次要位置 -->
                     <div class="ticket-sub font-mono">
                       <span class="ticket-text">{{ row.ticketId || ('BAN-' + String(row.id).padStart(6, '0')) }}</span>
                       <span class="copy-sub-btn" :title="$t('copy')" @click.stop="copyText(row.email)">
-                        <Icon icon="fluent:copy-16-regular" width="12" height="12" />
+                        <Icon icon="fluent:copy-16-regular" width="11" height="11" />
                       </span>
                     </div>
                   </div>
                 </template>
               </el-table-column>
 
-              <!-- 列 2: 当前状态 (醒目彩色标签 + 图标) -->
-              <el-table-column :label="$t('auditCurrentStatus')" width="145">
+              <!-- 【用词统一】列 2: 当前状态 (醒目彩色标签 + 图标，状态标签统一中点格式) -->
+              <el-table-column :label="$t('auditCurrentStatus')" width="170">
                 <template #default="{ row }">
                   <el-tag v-if="row.status === 'banned'" size="small" type="danger" effect="plain" class="status-tag-with-icon">
                     <Icon icon="fluent:prohibited-16-regular" width="14" height="14" class="status-tag-icon" />
@@ -283,7 +284,7 @@
                 </template>
               </el-table-column>
 
-              <!-- 列 6: 处理人 / 负责人 (新增列) -->
+              <!-- 列 6: 处理人 / 负责人 -->
               <el-table-column :label="$t('auditColOperator')" width="155">
                 <template #default="{ row }">
                   <div class="operator-cell">
@@ -298,11 +299,11 @@
                 </template>
               </el-table-column>
 
-              <!-- 列 7: 操作 (更实用的按钮组：解封、延期、备注、查看详情) -->
-              <el-table-column :label="$t('action')" width="230" align="right">
+              <!-- 【层级优化】列 7: 操作 (解封/重新封禁保持文字按钮；延期、备注改为图标按钮带Tooltip；查看详情保持文字按钮) -->
+              <el-table-column :label="$t('action')" width="235" align="right">
                 <template #default="{ row }">
                   <div class="table-actions-group">
-                    <!-- 解封 / 封禁快捷切换 -->
+                    <!-- 【用词统一】解封 / 重新封禁快捷切换 (保持文字按钮) -->
                     <el-button
                       v-if="row.status === 'banned'"
                       size="small"
@@ -326,7 +327,7 @@
                       <span>{{ $t('auditBtnReban') }}</span>
                     </el-button>
 
-                    <!-- 延期 -->
+                    <!-- 【层级优化】延期：纯图标按钮（带 hover tooltip） -->
                     <el-tooltip effect="dark" :content="$t('auditBtnExtend')" placement="top">
                       <el-button
                         size="small"
@@ -338,7 +339,7 @@
                       </el-button>
                     </el-tooltip>
 
-                    <!-- 备注 -->
+                    <!-- 【层级优化】备注：纯图标按钮（带 hover tooltip） -->
                     <el-tooltip effect="dark" :content="$t('auditBtnNote')" placement="top">
                       <el-button
                         size="small"
@@ -350,19 +351,17 @@
                       </el-button>
                     </el-tooltip>
 
-                    <!-- 查看详情 (打开侧边抽屉) -->
-                    <el-tooltip effect="dark" :content="$t('auditBtnViewDetails')" placement="top">
-                      <el-button
-                        size="small"
-                        type="primary"
-                        plain
-                        class="action-btn-compact"
-                        @click="openAuditDrawer(row)"
-                      >
-                        <span>{{ $t('auditBtnViewDetails') }}</span>
-                        <Icon icon="fluent:chevron-right-16-regular" width="13" height="13" style="margin-left: 2px;" />
-                      </el-button>
-                    </el-tooltip>
+                    <!-- 【层级优化】查看详情：保持文字按钮 -->
+                    <el-button
+                      size="small"
+                      type="primary"
+                      plain
+                      class="action-btn-compact"
+                      @click="openAuditDrawer(row)"
+                    >
+                      <span>{{ $t('auditBtnViewDetails') }}</span>
+                      <Icon icon="fluent:chevron-right-16-regular" width="13" height="13" style="margin-left: 2px;" />
+                    </el-button>
                   </div>
                 </template>
               </el-table-column>
@@ -471,7 +470,7 @@
           </div>
         </div>
 
-        <!-- 初判规则依据与处置基准 -->
+        <!-- 【用词统一】初判规则依据与处置基准 -> 风险研判与处置依据 -->
         <div class="dossier-card">
           <div class="section-title">
             <Icon icon="fluent:bot-20-regular" width="18" height="18" />
@@ -484,8 +483,8 @@
               “{{ selectedRow.appealReason }}”
             </div>
 
-            <!-- 封禁管控原因 -->
-            <div v-if="isBanType(selectedRow)" class="rule-rule-text text-danger">
+            <!-- 【层级优化】保留红色警示文案：突出封禁管控原因与触发规则 -->
+            <div v-if="selectedRow.banReason || (isBanType(selectedRow) && selectedRow.actionText)" class="rule-rule-text text-danger">
               {{ selectedRow.banReason || selectedRow.actionText }}
             </div>
 
@@ -495,13 +494,13 @@
               <span>{{ selectedRow.reportReason || selectedRow.actionText }}</span>
             </div>
 
-            <div class="rule-action-log">{{ selectedRow.actionText }}</div>
+            <div v-if="selectedRow.actionText && selectedRow.actionText !== selectedRow.banReason" class="rule-action-log">{{ selectedRow.actionText }}</div>
             <div v-if="selectedRow.detailText" class="rule-detail-log">{{ selectedRow.detailText }}</div>
           </div>
         </div>
 
-        <!-- 多维可信研判凭据画像 -->
-        <div class="dossier-card">
+        <!-- 【用词统一 & 层级优化】多维风险画像 (改为可折叠 Accordion，默认展开前两个：凭证与身份挑战因子、设备指纹与会话连续性) -->
+        <div class="dossier-card evidence-accordion-card">
           <div class="section-title">
             <Icon icon="fluent:chart-multiple-20-regular" width="18" height="18" />
             <span>{{ $t('auditGoogleTrustContext') }}</span>
@@ -512,13 +511,15 @@
             <span>{{ $t('auditEvidenceReviewNotice') }}</span>
           </div>
 
-          <div class="evidence-pillars">
-            <!-- 维度 1: 凭证与身份因子健全度 -->
-            <div class="pillar-box">
-              <div class="pillar-header">
-                <Icon icon="fluent:key-multiple-20-regular" width="16" height="16" />
-                <span>{{ $t('auditContextAuth') }}</span>
-              </div>
+          <el-collapse v-model="activeAccordions" class="evidence-collapse">
+            <!-- 维度 1: 凭证与身份挑战因子 (默认展开) -->
+            <el-collapse-item name="auth">
+              <template #title>
+                <div class="accordion-header">
+                  <Icon icon="fluent:key-multiple-20-regular" width="16" height="16" class="accordion-icon" />
+                  <span class="accordion-title">{{ $t('auditContextAuth') }}</span>
+                </div>
+              </template>
               <div class="pillar-items">
                 <div class="item-row">
                   <span class="k">{{ $t('auditField2fa') }}:</span>
@@ -541,14 +542,32 @@
                   <span class="v">{{ selectedRow.status === 'banned' ? $t('auditStatusBannedActive') : $t('auditOauthIsolated') }}</span>
                 </div>
               </div>
-            </div>
+            </el-collapse-item>
 
-            <!-- 维度 2: 行为速率与检举遥测 -->
-            <div class="pillar-box">
-              <div class="pillar-header">
-                <Icon icon="fluent:pulse-20-regular" width="16" height="16" />
-                <span>{{ $t('auditContextBehavior') }}</span>
+            <!-- 维度 2: 设备指纹与会话连续性 (默认展开) -->
+            <el-collapse-item name="device">
+              <template #title>
+                <div class="accordion-header">
+                  <Icon icon="fluent:desktop-pulse-20-regular" width="16" height="16" class="accordion-icon" />
+                  <span class="accordion-title">{{ $t('auditContextDevice') }}</span>
+                </div>
+              </template>
+              <div class="pillar-items">
+                <div class="item-row"><span class="k">{{ $t('auditFieldClient') }}:</span> <span class="v">{{ selectedRow.device || '-' }}</span></div>
+                <div class="item-row"><span class="k">{{ $t('auditFieldBaseDevice') }}:</span> <span class="v">{{ selectedRow.baseDevice || '-' }}</span></div>
+                <div class="item-row"><span class="k">{{ $t('auditFieldFingerprint') }}:</span> <span class="v font-mono">{{ selectedRow.fingerprint || '-' }}</span></div>
+                <div class="item-row"><span class="k">{{ $t('auditFieldSimilarity') }}:</span> <span class="v font-mono">{{ selectedRow.matchScore || 85 }}% ({{ $t('auditAuxiliaryNotice') }})</span></div>
               </div>
+            </el-collapse-item>
+
+            <!-- 维度 3: 行为速率与检举遥测 (默认折叠) -->
+            <el-collapse-item name="behavior">
+              <template #title>
+                <div class="accordion-header">
+                  <Icon icon="fluent:pulse-20-regular" width="16" height="16" class="accordion-icon" />
+                  <span class="accordion-title">{{ $t('auditContextBehavior') }}</span>
+                </div>
+              </template>
               <div class="pillar-items">
                 <div class="item-row">
                   <span class="k">{{ $t('auditFieldUserReports') }}:</span>
@@ -575,14 +594,16 @@
                   </span>
                 </div>
               </div>
-            </div>
+            </el-collapse-item>
 
-            <!-- 维度 3: 网络与拓扑置信度 -->
-            <div class="pillar-box">
-              <div class="pillar-header">
-                <Icon icon="fluent:globe-location-20-regular" width="16" height="16" />
-                <span>{{ $t('auditContextNetwork') }}</span>
-              </div>
+            <!-- 维度 4: 网络与拓扑置信度 (默认折叠) -->
+            <el-collapse-item name="network">
+              <template #title>
+                <div class="accordion-header">
+                  <Icon icon="fluent:globe-location-20-regular" width="16" height="16" class="accordion-icon" />
+                  <span class="accordion-title">{{ $t('auditContextNetwork') }}</span>
+                </div>
+              </template>
               <div class="pillar-items">
                 <div class="item-row"><span class="k">{{ $t('auditFieldTriggerIp') }}:</span> <span class="v font-mono">{{ selectedRow.ip || '-' }}</span></div>
                 <div class="item-row"><span class="k">{{ $t('auditFieldBaseIp') }}:</span> <span class="v font-mono">{{ selectedRow.baseIp || '-' }}</span></div>
@@ -590,22 +611,8 @@
                 <div class="item-row"><span class="k">{{ $t('auditFieldSubnetMatch') }}:</span> <span class="v">{{ selectedRow.subnetMatch ? $t('auditSubnetMatchGood') : $t('auditSubnetRoaming') }}</span></div>
                 <div class="item-row"><span class="k">{{ $t('auditFieldConcurrentNet') }}:</span> <span class="v" :class="{ 'text-danger': selectedRow.isMultiIp === 1 }">{{ selectedRow.isMultiIp === 1 ? $t('auditBurstConcurrent', { count: selectedRow.activeIpCount }) : $t('auditSingleSessionNormal') }}</span></div>
               </div>
-            </div>
-
-            <!-- 维度 4: 设备指纹与会话连续性 -->
-            <div class="pillar-box">
-              <div class="pillar-header">
-                <Icon icon="fluent:desktop-pulse-20-regular" width="16" height="16" />
-                <span>{{ $t('auditContextDevice') }}</span>
-              </div>
-              <div class="pillar-items">
-                <div class="item-row"><span class="k">{{ $t('auditFieldClient') }}:</span> <span class="v">{{ selectedRow.device || '-' }}</span></div>
-                <div class="item-row"><span class="k">{{ $t('auditFieldBaseDevice') }}:</span> <span class="v">{{ selectedRow.baseDevice || '-' }}</span></div>
-                <div class="item-row"><span class="k">{{ $t('auditFieldFingerprint') }}:</span> <span class="v font-mono">{{ selectedRow.fingerprint || '-' }}</span></div>
-                <div class="item-row"><span class="k">{{ $t('auditFieldSimilarity') }}:</span> <span class="v font-mono">{{ selectedRow.matchScore || 85 }}% ({{ $t('auditAuxiliaryNotice') }})</span></div>
-              </div>
-            </div>
-          </div>
+            </el-collapse-item>
+          </el-collapse>
         </div>
 
         <!-- 4. 裁决工作台 / 封禁台账存单留痕 -->
@@ -719,6 +726,32 @@
           </template>
         </div>
       </div>
+
+      <!-- 【用词统一 & 层级优化】抽屉底部主操作栏 (用词与表格行内完全一致：解封 / 重新封禁) -->
+      <template #footer>
+        <div class="drawer-footer-actions">
+          <el-button @click="drawerVisible = false">{{ $t('close') }}</el-button>
+          <!-- 【用词统一】解封 / 重新封禁 -->
+          <el-button
+            v-if="selectedRow && selectedRow.status === 'banned'"
+            type="success"
+            :loading="actionLoading"
+            @click="handleQuickToggleBan(selectedRow)"
+          >
+            <Icon icon="fluent:lock-open-16-regular" width="14" height="14" style="margin-right: 4px;" />
+            <span>{{ $t('auditBtnUnban') }}</span>
+          </el-button>
+          <el-button
+            v-else-if="selectedRow"
+            type="danger"
+            :loading="actionLoading"
+            @click="handleQuickToggleBan(selectedRow)"
+          >
+            <Icon icon="fluent:prohibited-16-regular" width="14" height="14" style="margin-right: 4px;" />
+            <span>{{ $t('auditBtnReban') }}</span>
+          </el-button>
+        </div>
+      </template>
     </el-drawer>
   </div>
 </template>
@@ -786,6 +819,9 @@ const drawerVisible = ref(false);
 const selectedRow = ref(null);
 const decisionNotes = ref('');
 const actionLoading = ref(false);
+
+// 【层级优化】多维风险画像折叠面板：默认展开前两个（凭证与身份挑战因子、设备指纹与会话连续性）
+const activeAccordions = ref(['auth', 'device']);
 
 // 同步顶栏 topbar-search 活跃检索至本页面
 watch(() => emailStore.searchKeyword, (val) => {
@@ -928,6 +964,9 @@ async function handleQuickToggleBan(row) {
       notes: isBanned ? `${t('auditBtnUnban')} (${row.email})` : `${t('auditBtnReban')} (${row.email})`
     });
     ElMessage.success(t('auditActionSuccess') || t('saveSuccessMsg'));
+    if (selectedRow.value && (selectedRow.value.id === row.id || selectedRow.value.email === row.email)) {
+      selectedRow.value.status = isBanned ? 'unbanned' : 'banned';
+    }
     fetchAuditList();
   } catch (e) {
     if (e !== 'cancel') console.error(e);
@@ -1021,6 +1060,7 @@ function isAppealType(row) {
 function isBanType(row) {
   if (!row) return false;
   return row.warningType === 'ban' || (row.category === 'ban' && row.status === 'banned') ||
+    row.status === 'banned' || row.status === 'unbanned' ||
     ['auto_ban', 'multi_account_ban', 'credential_tamper_ban', 'external_blacklist', 'admin_ban'].includes(row.eventType);
 }
 
@@ -1531,16 +1571,19 @@ onUnmounted(() => {
   }
 }
 
+/* 【层级优化】案件编号字号再缩小、对比度降低，真正弱化为次要信息 */
 .ticket-sub {
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 11px;
+  gap: 4px;
+  font-size: 10px;
   color: var(--el-text-color-placeholder);
+  opacity: 0.65;
+  line-height: 1.2;
 
   .ticket-text {
-    font-size: 11px;
-    letter-spacing: 0.2px;
+    font-size: 10px;
+    letter-spacing: 0.15px;
   }
 }
 
@@ -1548,7 +1591,7 @@ onUnmounted(() => {
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  opacity: 0.6;
+  opacity: 0.5;
   transition: opacity 0.15s ease, color 0.15s ease;
   &:hover {
     opacity: 1;
@@ -1856,52 +1899,91 @@ html.dark .kpi-card.kpi-card-active {
   margin-bottom: 12px;
 }
 
-.evidence-pillars {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
+/* 【层级优化】多维风险画像折叠 Accordion 样式 */
+.evidence-collapse {
+  border: none;
+  --el-collapse-border-color: var(--el-border-color-lighter);
+  --el-collapse-header-bg-color: transparent;
+  --el-collapse-content-bg-color: transparent;
 
-  @media (max-width: 600px) {
-    grid-template-columns: 1fr;
+  :deep(.el-collapse-item) {
+    margin-bottom: 8px;
+    border: 1px solid var(--el-border-color-lighter);
+    border-radius: 6px;
+    overflow: hidden;
+    background: var(--el-fill-color-blank);
+
+    &:last-child {
+      margin-bottom: 0;
+    }
   }
-}
 
-.pillar-box {
-  border: 1px solid var(--el-border-color-extra-light);
-  border-radius: 6px;
-  padding: 10px 12px;
+  :deep(.el-collapse-item__header) {
+    padding: 0 12px;
+    height: 38px;
+    line-height: 38px;
+    border-bottom: 1px solid transparent;
+    transition: all 0.2s ease;
 
-  .pillar-header {
+    &.is-active {
+      border-bottom-color: var(--el-border-color-lighter);
+      background: var(--el-fill-color-light);
+    }
+  }
+
+  :deep(.el-collapse-item__wrap) {
+    border-bottom: none;
+    background: transparent;
+  }
+
+  :deep(.el-collapse-item__content) {
+    padding: 10px 12px;
+  }
+
+  .accordion-header {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
+  }
+
+  .accordion-icon {
+    color: var(--el-color-primary);
+  }
+
+  .accordion-title {
     font-size: 12.5px;
     font-weight: 600;
     color: var(--el-text-color-regular);
-    margin-bottom: 8px;
   }
+}
 
-  .pillar-items {
+.pillar-items {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+
+  .item-row {
     display: flex;
-    flex-direction: column;
-    gap: 4px;
+    font-size: 12px;
+    line-height: 1.45;
 
-    .item-row {
-      display: flex;
-      font-size: 12px;
-      line-height: 1.4;
-
-      .k {
-        color: var(--el-text-color-secondary);
-        width: 65px;
-        flex-shrink: 0;
-      }
-      .v {
-        color: var(--el-text-color-primary);
-        word-break: break-all;
-      }
+    .k {
+      color: var(--el-text-color-secondary);
+      width: 75px;
+      flex-shrink: 0;
+    }
+    .v {
+      color: var(--el-text-color-primary);
+      word-break: break-all;
     }
   }
+}
+
+.drawer-footer-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
 }
 
 .appeal-statement-quote {
