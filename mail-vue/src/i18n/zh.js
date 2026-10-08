@@ -2525,6 +2525,15 @@ totpModeAllDesc: '设置是否允许用户使用TOTP，开启后用户可以且�
     auditOperatorRoleAdmin: "安全审计员",
     auditPromptDaysInvalid: "请输入有效天数 (1-365)",
     auditDecisionNotesPlaceholder: "请输入审核/处置备注说明...",
+    auditCompareActualTitle: "当前账号实际证据值",
+    auditCompareBaselineTitle: "系统基准 / 正常值 / 风险阈值",
+    auditCompareIpAccounts: "同一IP关联账号数",
+    auditCompareIpAccountsThreshold: "≤ 1 个 (独立账号基准)",
+    auditCompareDeviceThreshold: "≥ 80% (受信设备基线)",
+    auditCompareReportsThreshold: "0 次 (无违规投诉)",
+    auditCompareSendRateThreshold: "≤ 20 封/分 (正常频次)",
+    auditCompareBounceRateThreshold: "≤ 5% (健康退信基准)",
+    auditCompareCredThreshold: "健康无泄露 / 凭证有效",
 };
 
 export default zh;

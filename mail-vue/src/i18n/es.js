@@ -2525,6 +2525,15 @@ totpModeAllDesc: 'Configurar si los usuarios pueden usar TOTP. Al activarlo, la 
     auditOperatorRoleAdmin: "Auditor de seguridad",
     auditPromptDaysInvalid: "Introduzca un número de días válido (1-365)",
     auditDecisionNotesPlaceholder: "Ingrese notas de auditoría o resolución...",
+    auditCompareActualTitle: "Valores de evidencia de la cuenta",
+    auditCompareBaselineTitle: "Línea base del sistema / Normal / Umbral de riesgo",
+    auditCompareIpAccounts: "Cuentas en la misma IP",
+    auditCompareIpAccountsThreshold: "≤ 1 (Cuenta independiente)",
+    auditCompareDeviceThreshold: "≥ 80% (Línea de dispositivo de confianza)",
+    auditCompareReportsThreshold: "0 (Sin denuncias)",
+    auditCompareSendRateThreshold: "≤ 20 msgs/min (Frecuencia normal)",
+    auditCompareBounceRateThreshold: "≤ 5% (Línea de rebote saludable)",
+    auditCompareCredThreshold: "Saludable / Sin filtraciones",
 };
 
 export default es;

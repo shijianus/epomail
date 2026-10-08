@@ -2525,6 +2525,15 @@ totpModeAllDesc: '設定是否允許使用者使用TOTP，開啟後使用者可�
     auditOperatorRoleAdmin: "安全審計員",
     auditPromptDaysInvalid: "請輸入有效天數 (1-365)",
     auditDecisionNotesPlaceholder: "請輸入審核/處置備註說明...",
+    auditCompareActualTitle: "當前帳號實際證據值",
+    auditCompareBaselineTitle: "系統基準 / 正常值 / 風險閾值",
+    auditCompareIpAccounts: "同一IP關聯帳號數",
+    auditCompareIpAccountsThreshold: "≤ 1 個 (獨立帳號基準)",
+    auditCompareDeviceThreshold: "≥ 80% (受信設備基線)",
+    auditCompareReportsThreshold: "0 次 (無違規投訴)",
+    auditCompareSendRateThreshold: "≤ 20 封/分 (正常頻次)",
+    auditCompareBounceRateThreshold: "≤ 5% (健康退信基準)",
+    auditCompareCredThreshold: "健康無洩漏 / 憑證有效",
 };
 
 export default zhHant;

@@ -2525,6 +2525,15 @@ totpModeAllDesc: 'Instellen of gebruikers TOTP mogen gebruiken. Eenmaal ingescha
     auditOperatorRoleAdmin: "Beveiligingsauditor",
     auditPromptDaysInvalid: "Voer een geldig aantal dagen in (1-365)",
     auditDecisionNotesPlaceholder: "Voer audit- of beschikkingsnotities in...",
+    auditCompareActualTitle: "Huidige bewijswaarden van account",
+    auditCompareBaselineTitle: "Systeembasislijn / Normaal / Risicodrempel",
+    auditCompareIpAccounts: "Accounts op hetzelfde IP",
+    auditCompareIpAccountsThreshold: "≤ 1 (Onafhankelijk account)",
+    auditCompareDeviceThreshold: "≥ 80% (Vertrouwd apparaat)",
+    auditCompareReportsThreshold: "0 (Geen klachten)",
+    auditCompareSendRateThreshold: "≤ 20 berichten/min (Normale frequentie)",
+    auditCompareBounceRateThreshold: "≤ 5% (Gezonde bounce-basislijn)",
+    auditCompareCredThreshold: "Gezond / Geen datalek",
 };
 
 export default nl;

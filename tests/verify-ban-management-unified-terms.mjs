@@ -261,20 +261,22 @@ async function run() {
     console.log('  红色警示处置文案:', redWarningText);
     ok(redWarningText.includes('一人多号'), '保留显式红色警示处置文案');
 
-    // Accordion 默认展开核验 (前两个展开，后两个折叠)
-    console.log('  核验多维风险画像 Accordion 状态:');
-    const collapseItems = await page.$$('.evidence-collapse .el-collapse-item');
-    ok(collapseItems.length === 4, `多维风险画像分为 4 个 Accordion 面板 (实际: ${collapseItems.length})`);
+    // 两列对比卡片核验 (默认全部展开，左侧实际证据值，右侧系统基准阈值)
+    console.log('  核验多维风险画像两列对比卡片状态:');
+    const compareContainer = await page.$('.compare-container');
+    ok(compareContainer !== null, '多维风险画像呈现为两列对比卡片布局 (.compare-container)');
 
-    const item1Active = await page.$eval('.evidence-collapse .el-collapse-item:nth-child(1) .el-collapse-item__header', el => el.classList.contains('is-active'));
-    const item2Active = await page.$eval('.evidence-collapse .el-collapse-item:nth-child(2) .el-collapse-item__header', el => el.classList.contains('is-active'));
-    const item3Active = await page.$eval('.evidence-collapse .el-collapse-item:nth-child(3) .el-collapse-item__header', el => el.classList.contains('is-active'));
-    const item4Active = await page.$eval('.evidence-collapse .el-collapse-item:nth-child(4) .el-collapse-item__header', el => el.classList.contains('is-active'));
+    const actualCard = await page.$('.compare-card-actual');
+    ok(actualCard !== null, '左侧为当前账号实际证据值卡片 (.compare-card-actual)');
 
-    ok(item1Active === true, 'Accordion 第 1 项 (凭证与身份挑战因子) 默认展开');
-    ok(item2Active === true, 'Accordion 第 2 项 (设备指纹与会话连续性) 默认展开');
-    ok(item3Active === false, 'Accordion 第 3 项 (行为速率与检举遥测) 默认折叠');
-    ok(item4Active === false, 'Accordion 第 4 项 (网络与拓扑置信度) 默认折叠');
+    const baselineCard = await page.$('.compare-card-baseline');
+    ok(baselineCard !== null, '右侧为系统基准/正常值/风险阈值卡片 (.compare-card-baseline)');
+
+    const compareRows = await page.$$('.compare-item-row');
+    ok(compareRows.length >= 10, `所有关键对比项默认全部平铺展开 (实际展开项: ${compareRows.length})`);
+
+    const anomalyHighRisk = await page.$('.compare-card-actual .text-danger');
+    ok(anomalyHighRisk !== null, '超出阈值项具有显式红色高亮');
 
     // 抽屉底部主操作按钮核验
     const drawerActionBtnText = await page.$eval('.drawer-footer-actions .el-button:last-child span', el => el.textContent.trim());

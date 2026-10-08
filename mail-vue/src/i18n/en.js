@@ -2525,6 +2525,15 @@ totpModeAllDesc: 'Configure whether users can use TOTP. When enabled, 2FA is ava
     auditOperatorRoleAdmin: "Security Auditor",
     auditPromptDaysInvalid: "Please enter a valid number of days (1-365)",
     auditDecisionNotesPlaceholder: "Enter audit or disposition notes...",
+    auditCompareActualTitle: "Current Account Evidence Values",
+    auditCompareBaselineTitle: "System Baseline / Normal / Risk Threshold",
+    auditCompareIpAccounts: "Accounts on Same IP",
+    auditCompareIpAccountsThreshold: "≤ 1 (Independent Account)",
+    auditCompareDeviceThreshold: "≥ 80% (Trusted Device Baseline)",
+    auditCompareReportsThreshold: "0 (No Complaints)",
+    auditCompareSendRateThreshold: "≤ 20 msgs/min (Normal Frequency)",
+    auditCompareBounceRateThreshold: "≤ 5% (Healthy Bounce Baseline)",
+    auditCompareCredThreshold: "Healthy / No Compromise",
 };
 
 export default en;

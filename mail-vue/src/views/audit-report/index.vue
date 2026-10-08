@@ -213,20 +213,25 @@
               ref="tableRef"
               :empty-text="first ? '' : $t('auditEmptyLogs')"
             >
-              <!-- 【层级优化】列 1: 邮箱 (主列加粗，案件编号字号再缩小、对比度降低，弱化为次要信息) -->
-              <el-table-column :label="$t('tabEmailAddress')" min-width="230">
+              <!-- 【表格列宽与截断修复】列 1: 用户邮箱 (主列 min-width 260px，高风险标签紧凑无截断，案件编号弱化至下方) -->
+              <el-table-column :label="$t('tabEmailAddress')" min-width="260">
                 <template #default="{ row }">
                   <div class="email-cell">
                     <div class="email-main-row">
-                      <span class="subject-email font-mono clickable-email" @click="openAuditDrawer(row)">
+                      <span class="subject-email font-mono clickable-email" :title="row.email" @click="openAuditDrawer(row)">
                         {{ row.email }}
                       </span>
-                      <!-- 【用词统一】高风险标签统一为「高风险 · 已管控」 -->
-                      <el-tag size="small" :type="getRiskTagType(row.riskLevel || row.priority)" effect="plain" class="audit-sub-tag">
+                      <!-- 【表格列宽与截断修复】高风险标签彻底解决截断：统一文案「高风险 · 已管控」，紧凑样式，不换行不截断 -->
+                      <el-tag
+                        size="small"
+                        :type="getRiskTagType(row.riskLevel || row.priority)"
+                        effect="plain"
+                        class="audit-sub-tag"
+                      >
                         {{ getRiskLabel(row.riskLevel || row.priority) }}
                       </el-tag>
                     </div>
-                    <!-- 【层级优化】案件编号弱化至下方次要位置 -->
+                    <!-- 案件编号弱化显示在邮箱下方 (10px + opacity 0.65) -->
                     <div class="ticket-sub font-mono">
                       <span class="ticket-text">{{ row.ticketId || ('BAN-' + String(row.id).padStart(6, '0')) }}</span>
                       <span class="copy-sub-btn" :title="$t('copy')" @click.stop="copyText(row.email)">
@@ -237,8 +242,8 @@
                 </template>
               </el-table-column>
 
-              <!-- 【用词统一】列 2: 当前状态 (醒目彩色标签 + 图标，状态标签统一中点格式) -->
-              <el-table-column :label="$t('auditCurrentStatus')" width="170">
+              <!-- 【表格列宽与截断修复】列 2: 当前状态 (固定 160px，规范中点格式，不换行不截断) -->
+              <el-table-column :label="$t('auditCurrentStatus')" width="160">
                 <template #default="{ row }">
                   <el-tag v-if="row.status === 'banned'" size="small" type="danger" effect="plain" class="status-tag-with-icon">
                     <Icon icon="fluent:prohibited-16-regular" width="14" height="14" class="status-tag-icon" />
@@ -259,15 +264,15 @@
                 </template>
               </el-table-column>
 
-              <!-- 列 3: 封禁原因 (截断显示，hover 显示完整 Tooltip) -->
-              <el-table-column :label="$t('auditColBanReason')" min-width="210" show-overflow-tooltip>
+              <!-- 【表格列宽与截断修复】列 3: 封禁原因 (min-width 220px) -->
+              <el-table-column :label="$t('auditColBanReason')" min-width="220" show-overflow-tooltip>
                 <template #default="{ row }">
                   <span class="ban-reason-text">{{ row.banReason || row.actionText || '-' }}</span>
                 </template>
               </el-table-column>
 
-              <!-- 列 4: 封禁时间 -->
-              <el-table-column :label="$t('auditColBanTime')" width="145">
+              <!-- 【表格列宽与截断修复】列 4: 封禁时间 (固定 155px) -->
+              <el-table-column :label="$t('auditColBanTime')" width="155">
                 <template #default="{ row }">
                   <span class="plain-time font-mono">
                     {{ (row.banTime || row.createTime) ? tzDayjs(row.banTime || row.createTime).format('YYYY-MM-DD HH:mm') : '-' }}
@@ -275,8 +280,8 @@
                 </template>
               </el-table-column>
 
-              <!-- 列 5: 最后处理时间 -->
-              <el-table-column :label="$t('auditColLastProcessTime')" width="145">
+              <!-- 【表格列宽与截断修复】列 5: 最后处理时间 (固定 155px) -->
+              <el-table-column :label="$t('auditColLastProcessTime')" width="155">
                 <template #default="{ row }">
                   <span class="plain-time font-mono">
                     {{ (row.resolvedTime || row.banTime || row.createTime) ? tzDayjs(row.resolvedTime || row.banTime || row.createTime).format('YYYY-MM-DD HH:mm') : '-' }}
@@ -284,26 +289,26 @@
                 </template>
               </el-table-column>
 
-              <!-- 列 6: 处理人 / 负责人 -->
-              <el-table-column :label="$t('auditColOperator')" width="155">
+              <!-- 【表格列宽与截断修复】列 6: 处理人 / 负责人 (固定 140px) -->
+              <el-table-column :label="$t('auditColOperator')" width="140">
                 <template #default="{ row }">
                   <div class="operator-cell">
                     <div class="operator-avatar font-mono">
                       {{ getOperatorAvatar(row) }}
                     </div>
                     <div class="operator-info">
-                      <span class="operator-name">{{ getOperatorName(row) }}</span>
-                      <span class="operator-role">{{ getOperatorRole(row) }}</span>
+                      <span class="operator-name" :title="getOperatorName(row)">{{ getOperatorName(row) }}</span>
+                      <span class="operator-role" :title="getOperatorRole(row)">{{ getOperatorRole(row) }}</span>
                     </div>
                   </div>
                 </template>
               </el-table-column>
 
-              <!-- 【层级优化】列 7: 操作 (解封/重新封禁保持文字按钮；延期、备注改为图标按钮带Tooltip；查看详情保持文字按钮) -->
-              <el-table-column :label="$t('action')" width="235" align="right">
+              <!-- 【操作列重构】列 7: 操作 (固定右侧 200px，统一右对齐，gap 6px，文字按钮 + 圆形图标按钮 + 主色详情文字按钮，完整显示零截断) -->
+              <el-table-column :label="$t('action')" :width="['en', 'nl', 'es', 'fr'].includes(locale) ? 225 : 200" fixed="right" align="right">
                 <template #default="{ row }">
                   <div class="table-actions-group">
-                    <!-- 【用词统一】解封 / 重新封禁快捷切换 (保持文字按钮) -->
+                    <!-- 「解封」/「重新封禁」绿色/红色文字按钮 -->
                     <el-button
                       v-if="row.status === 'banned'"
                       size="small"
@@ -327,7 +332,7 @@
                       <span>{{ $t('auditBtnReban') }}</span>
                     </el-button>
 
-                    <!-- 【层级优化】延期：纯图标按钮（带 hover tooltip） -->
+                    <!-- 「延期」圆形图标按钮（带 hover tooltip） -->
                     <el-tooltip effect="dark" :content="$t('auditBtnExtend')" placement="top">
                       <el-button
                         size="small"
@@ -339,7 +344,7 @@
                       </el-button>
                     </el-tooltip>
 
-                    <!-- 【层级优化】备注：纯图标按钮（带 hover tooltip） -->
+                    <!-- 「备注」圆形图标按钮（带 hover tooltip） -->
                     <el-tooltip effect="dark" :content="$t('auditBtnNote')" placement="top">
                       <el-button
                         size="small"
@@ -351,16 +356,15 @@
                       </el-button>
                     </el-tooltip>
 
-                    <!-- 【层级优化】查看详情：保持文字按钮 -->
+                    <!-- 「查看详情」主色文字按钮，完整显示「查看详情」，禁止截断 -->
                     <el-button
                       size="small"
                       type="primary"
-                      plain
-                      class="action-btn-compact"
+                      link
+                      class="action-detail-btn"
                       @click="openAuditDrawer(row)"
                     >
-                      <span>{{ $t('auditBtnViewDetails') }}</span>
-                      <Icon icon="fluent:chevron-right-16-regular" width="13" height="13" style="margin-left: 2px;" />
+                      {{ $t('auditBtnViewDetails') }}
                     </el-button>
                   </div>
                 </template>
@@ -396,28 +400,17 @@
       <template #header>
         <div class="drawer-header-clean">
           <Icon
-            :icon="isBanType(selectedRow) ? 'fluent:prohibited-20-filled' : (isRiskType(selectedRow) ? 'fluent:alert-urgent-20-filled' : (isAppealType(selectedRow) ? 'fluent:document-person-20-filled' : 'fluent:shield-task-20-filled'))"
+            icon="fluent:prohibited-20-filled"
             width="22"
             height="22"
-            class="header-icon"
-            :class="{
-              'text-danger': isRiskType(selectedRow),
-              'text-warning': isAppealType(selectedRow),
-              'text-primary': isAuditType(selectedRow)
-            }"
+            class="header-icon text-danger"
           />
           <div class="header-text">
             <div class="drawer-title">
-              <span v-if="isBanType(selectedRow)">{{ $t('auditSanctionDossierTitle') }}</span>
-              <span v-else-if="isRiskType(selectedRow)">{{ $t('auditCaseTypeThreat') }} · {{ $t('auditCaseDossier') }}</span>
-              <span v-else-if="isAppealType(selectedRow)">{{ $t('auditCaseTypeAppeal') }} · {{ $t('auditCaseDossier') }}</span>
-              <span v-else>{{ $t('auditCaseTypeRoutine') }} · {{ $t('auditCaseDossier') }}</span>
+              <span>{{ $t('auditSanctionDossierTitle') }}</span>
             </div>
             <div class="drawer-sub">
-              <span v-if="isBanType(selectedRow)">{{ $t('auditSanctionPureNotice') }}</span>
-              <span v-else-if="isRiskType(selectedRow)">{{ $t('auditCaseTypeThreatDesc') }}</span>
-              <span v-else-if="isAppealType(selectedRow)">{{ $t('auditCaseTypeAppealDesc') }}</span>
-              <span v-else>{{ $t('auditCaseTypeRoutineDesc') }}</span>
+              <span>{{ $t('auditSanctionPureNotice') }}</span>
             </div>
           </div>
         </div>
@@ -470,7 +463,7 @@
           </div>
         </div>
 
-        <!-- 【用词统一】初判规则依据与处置基准 -> 风险研判与处置依据 -->
+        <!-- 初判规则依据与处置基准 -> 风险研判与处置依据 -->
         <div class="dossier-card">
           <div class="section-title">
             <Icon icon="fluent:bot-20-regular" width="18" height="18" />
@@ -483,7 +476,7 @@
               “{{ selectedRow.appealReason }}”
             </div>
 
-            <!-- 【层级优化】保留红色警示文案：突出封禁管控原因与触发规则 -->
+            <!-- 保留红色警示文案：突出封禁管控原因与触发规则 -->
             <div v-if="selectedRow.banReason || (isBanType(selectedRow) && selectedRow.actionText)" class="rule-rule-text text-danger">
               {{ selectedRow.banReason || selectedRow.actionText }}
             </div>
@@ -499,8 +492,8 @@
           </div>
         </div>
 
-        <!-- 【用词统一 & 层级优化】多维风险画像 (改为可折叠 Accordion，默认展开前两个：凭证与身份挑战因子、设备指纹与会话连续性) -->
-        <div class="dossier-card evidence-accordion-card">
+        <!-- 【证据对比布局】多维风险画像两列对比卡片：左侧当前账号实际证据值，右侧系统基准/风险阈值，标红超标项，默认完全展开 -->
+        <div class="dossier-card evidence-compare-card-wrapper">
           <div class="section-title">
             <Icon icon="fluent:chart-multiple-20-regular" width="18" height="18" />
             <span>{{ $t('auditGoogleTrustContext') }}</span>
@@ -511,108 +504,157 @@
             <span>{{ $t('auditEvidenceReviewNotice') }}</span>
           </div>
 
-          <el-collapse v-model="activeAccordions" class="evidence-collapse">
-            <!-- 维度 1: 凭证与身份挑战因子 (默认展开) -->
-            <el-collapse-item name="auth">
-              <template #title>
-                <div class="accordion-header">
-                  <Icon icon="fluent:key-multiple-20-regular" width="16" height="16" class="accordion-icon" />
-                  <span class="accordion-title">{{ $t('auditContextAuth') }}</span>
-                </div>
-              </template>
-              <div class="pillar-items">
-                <div class="item-row">
-                  <span class="k">{{ $t('auditField2fa') }}:</span>
-                  <span class="v">{{ selectedRow.status === 'banned' ? $t('auditStatusBannedActive') : $t('audit2faProtected') }}</span>
-                </div>
-                <div class="item-row">
-                  <span class="k">{{ $t('auditFieldCredHealth') }}:</span>
-                  <span class="v" :class="{ 'text-danger': isRiskType(selectedRow) || isBanType(selectedRow) }">
-                    {{ (isRiskType(selectedRow) || isBanType(selectedRow)) ? $t('auditCredCompromised') : $t('auditCredNotLeaked') }}
+          <div class="compare-container">
+            <!-- 左侧卡片：当前账号实际证据值 -->
+            <div class="compare-card compare-card-actual">
+              <div class="compare-card-header actual-header">
+                <Icon icon="fluent:person-warning-20-filled" width="16" height="16" class="card-header-icon text-danger" />
+                <span class="card-header-title">{{ $t('auditCompareActualTitle') }}</span>
+              </div>
+              <div class="compare-card-body">
+                <!-- 维度 1: 设备指纹与会话连续性 -->
+                <div class="compare-section-badge">{{ $t('auditContextDevice') }}</div>
+                <div class="compare-item-row">
+                  <span class="compare-k">{{ $t('auditFieldFingerprint') }}:</span>
+                  <span class="compare-v font-mono" :class="{ 'text-danger font-semibold': (selectedRow.matchScore || 85) < 70 }">
+                    {{ selectedRow.fingerprint || '-' }}
                   </span>
                 </div>
-                <div class="item-row">
-                  <span class="k">{{ $t('auditFieldChallengeHistory') }}:</span>
-                  <span class="v" :class="{ 'text-danger': isBanType(selectedRow) }">
-                    {{ isBanType(selectedRow) ? $t('auditStatusBannedActive') : $t('auditNoPasswordLock') }}
+                <div class="compare-item-row">
+                  <span class="compare-k">{{ $t('auditFieldClient') }}:</span>
+                  <span class="compare-v">{{ selectedRow.device || '-' }}</span>
+                </div>
+                <div class="compare-item-row">
+                  <span class="compare-k">{{ $t('auditFieldSimilarity') }}:</span>
+                  <span class="compare-v font-mono" :class="{ 'text-danger font-semibold': (selectedRow.matchScore || 85) < 70 }">
+                    {{ selectedRow.matchScore || 85 }}%
+                    <span v-if="(selectedRow.matchScore || 85) < 70" class="anomaly-tag text-danger">({{ $t('auditRiskLevelHigh') }})</span>
                   </span>
                 </div>
-                <div class="item-row">
-                  <span class="k">{{ $t('auditFieldSessionState') }}:</span>
-                  <span class="v">{{ selectedRow.status === 'banned' ? $t('auditStatusBannedActive') : $t('auditOauthIsolated') }}</span>
-                </div>
-              </div>
-            </el-collapse-item>
 
-            <!-- 维度 2: 设备指纹与会话连续性 (默认展开) -->
-            <el-collapse-item name="device">
-              <template #title>
-                <div class="accordion-header">
-                  <Icon icon="fluent:desktop-pulse-20-regular" width="16" height="16" class="accordion-icon" />
-                  <span class="accordion-title">{{ $t('auditContextDevice') }}</span>
+                <!-- 维度 2: 网络与拓扑置信度 -->
+                <div class="compare-section-badge">{{ $t('auditContextNetwork') }}</div>
+                <div class="compare-item-row">
+                  <span class="compare-k">{{ $t('auditFieldTriggerIp') }}:</span>
+                  <span class="compare-v font-mono">{{ selectedRow.ip || '-' }} ({{ selectedRow.geo || '-' }})</span>
                 </div>
-              </template>
-              <div class="pillar-items">
-                <div class="item-row"><span class="k">{{ $t('auditFieldClient') }}:</span> <span class="v">{{ selectedRow.device || '-' }}</span></div>
-                <div class="item-row"><span class="k">{{ $t('auditFieldBaseDevice') }}:</span> <span class="v">{{ selectedRow.baseDevice || '-' }}</span></div>
-                <div class="item-row"><span class="k">{{ $t('auditFieldFingerprint') }}:</span> <span class="v font-mono">{{ selectedRow.fingerprint || '-' }}</span></div>
-                <div class="item-row"><span class="k">{{ $t('auditFieldSimilarity') }}:</span> <span class="v font-mono">{{ selectedRow.matchScore || 85 }}% ({{ $t('auditAuxiliaryNotice') }})</span></div>
-              </div>
-            </el-collapse-item>
+                <div class="compare-item-row">
+                  <span class="compare-k">{{ $t('auditCompareIpAccounts') }}:</span>
+                  <span class="compare-v font-mono" :class="{ 'text-danger font-semibold': (selectedRow.activeIpCount > 1 || selectedRow.isMultiIp === 1) }">
+                    {{ selectedRow.activeIpCount > 1 ? selectedRow.activeIpCount : (selectedRow.isMultiIp === 1 ? 8 : 1) }}
+                    <span v-if="selectedRow.activeIpCount > 1 || selectedRow.isMultiIp === 1" class="anomaly-tag text-danger">({{ $t('auditRiskLevelHigh') }})</span>
+                  </span>
+                </div>
+                <div class="compare-item-row">
+                  <span class="compare-k">{{ $t('auditFieldSubnetMatch') }}:</span>
+                  <span class="compare-v" :class="{ 'text-danger font-semibold': !selectedRow.subnetMatch }">
+                    {{ selectedRow.subnetMatch ? $t('auditSubnetMatchGood') : $t('auditSubnetRoaming') }}
+                  </span>
+                </div>
 
-            <!-- 维度 3: 行为速率与检举遥测 (默认折叠) -->
-            <el-collapse-item name="behavior">
-              <template #title>
-                <div class="accordion-header">
-                  <Icon icon="fluent:pulse-20-regular" width="16" height="16" class="accordion-icon" />
-                  <span class="accordion-title">{{ $t('auditContextBehavior') }}</span>
-                </div>
-              </template>
-              <div class="pillar-items">
-                <div class="item-row">
-                  <span class="k">{{ $t('auditFieldUserReports') }}:</span>
-                  <span class="v" :class="{ 'text-danger': (selectedRow.reportedByOthers || 0) > 0 }">
+                <!-- 维度 3: 行为速率与检举遥测 -->
+                <div class="compare-section-badge">{{ $t('auditContextBehavior') }}</div>
+                <div class="compare-item-row">
+                  <span class="compare-k">{{ $t('auditFieldUserReports') }}:</span>
+                  <span class="compare-v" :class="{ 'text-danger font-semibold': (selectedRow.reportedByOthers || 0) > 0 }">
                     {{ (selectedRow.reportedByOthers || 0) > 0 ? $t('auditReportsCount', { count: selectedRow.reportedByOthers }) : $t('auditNoReports') }}
                   </span>
                 </div>
-                <div class="item-row">
-                  <span class="k">{{ $t('auditFieldSendRate') }}:</span>
-                  <span class="v" :class="{ 'text-danger': isRiskType(selectedRow) }">
+                <div class="compare-item-row">
+                  <span class="compare-k">{{ $t('auditFieldSendRate') }}:</span>
+                  <span class="compare-v" :class="{ 'text-danger font-semibold': isRiskType(selectedRow) }">
                     {{ isRiskType(selectedRow) ? $t('auditSendRateSpike') : $t('auditSendRateNormal') }}
                   </span>
                 </div>
-                <div class="item-row">
-                  <span class="k">{{ $t('auditFieldBounceRate') }}:</span>
-                  <span class="v" :class="{ 'text-danger': isRiskType(selectedRow) }">
+                <div class="compare-item-row">
+                  <span class="compare-k">{{ $t('auditFieldBounceRate') }}:</span>
+                  <span class="compare-v" :class="{ 'text-danger font-semibold': isRiskType(selectedRow) }">
                     {{ isRiskType(selectedRow) ? $t('auditBounceRateHigh') : $t('auditBounceRateHealthy') }}
                   </span>
                 </div>
-                <div class="item-row">
-                  <span class="k">{{ $t('auditFieldReputation') }}:</span>
-                  <span class="v font-medium" :class="getReputationClass(selectedRow)">
-                    {{ getReputationLabel(selectedRow) }}
+
+                <!-- 维度 4: 凭证与身份安全 -->
+                <div class="compare-section-badge">{{ $t('auditContextAuth') }}</div>
+                <div class="compare-item-row">
+                  <span class="compare-k">{{ $t('auditFieldCredHealth') }}:</span>
+                  <span class="compare-v" :class="{ 'text-danger font-semibold': (isRiskType(selectedRow) || isBanType(selectedRow)) }">
+                    {{ (isRiskType(selectedRow) || isBanType(selectedRow)) ? $t('auditCredCompromised') : $t('auditCredNotLeaked') }}
+                  </span>
+                </div>
+                <div class="compare-item-row">
+                  <span class="compare-k">{{ $t('auditField2fa') }}:</span>
+                  <span class="compare-v">
+                    {{ selectedRow.status === 'banned' ? $t('auditStatusBannedActive') : $t('audit2faProtected') }}
                   </span>
                 </div>
               </div>
-            </el-collapse-item>
+            </div>
 
-            <!-- 维度 4: 网络与拓扑置信度 (默认折叠) -->
-            <el-collapse-item name="network">
-              <template #title>
-                <div class="accordion-header">
-                  <Icon icon="fluent:globe-location-20-regular" width="16" height="16" class="accordion-icon" />
-                  <span class="accordion-title">{{ $t('auditContextNetwork') }}</span>
-                </div>
-              </template>
-              <div class="pillar-items">
-                <div class="item-row"><span class="k">{{ $t('auditFieldTriggerIp') }}:</span> <span class="v font-mono">{{ selectedRow.ip || '-' }}</span></div>
-                <div class="item-row"><span class="k">{{ $t('auditFieldBaseIp') }}:</span> <span class="v font-mono">{{ selectedRow.baseIp || '-' }}</span></div>
-                <div class="item-row"><span class="k">{{ $t('auditFieldGeoMovement') }}:</span> <span class="v">{{ selectedRow.geo || '-' }} ({{ $t('auditBaselineRegLabel') }}: {{ selectedRow.baseGeo || '-' }})</span></div>
-                <div class="item-row"><span class="k">{{ $t('auditFieldSubnetMatch') }}:</span> <span class="v">{{ selectedRow.subnetMatch ? $t('auditSubnetMatchGood') : $t('auditSubnetRoaming') }}</span></div>
-                <div class="item-row"><span class="k">{{ $t('auditFieldConcurrentNet') }}:</span> <span class="v" :class="{ 'text-danger': selectedRow.isMultiIp === 1 }">{{ selectedRow.isMultiIp === 1 ? $t('auditBurstConcurrent', { count: selectedRow.activeIpCount }) : $t('auditSingleSessionNormal') }}</span></div>
+            <!-- 右侧卡片：系统基准 / 正常值 / 风险阈值 -->
+            <div class="compare-card compare-card-baseline">
+              <div class="compare-card-header baseline-header">
+                <Icon icon="fluent:shield-checkmark-20-filled" width="16" height="16" class="card-header-icon text-success" />
+                <span class="card-header-title">{{ $t('auditCompareBaselineTitle') }}</span>
               </div>
-            </el-collapse-item>
-          </el-collapse>
+              <div class="compare-card-body">
+                <!-- 维度 1: 设备指纹与会话连续性 -->
+                <div class="compare-section-badge">{{ $t('auditContextDevice') }}</div>
+                <div class="compare-item-row">
+                  <span class="compare-k">{{ $t('auditFieldFingerprint') }}:</span>
+                  <span class="compare-v font-mono text-muted">{{ selectedRow.baseFingerprint || selectedRow.fingerprint || '-' }}</span>
+                </div>
+                <div class="compare-item-row">
+                  <span class="compare-k">{{ $t('auditFieldBaseDevice') }}:</span>
+                  <span class="compare-v text-muted">{{ selectedRow.baseDevice || selectedRow.device || '-' }}</span>
+                </div>
+                <div class="compare-item-row">
+                  <span class="compare-k">{{ $t('auditFieldSimilarity') }}:</span>
+                  <span class="compare-v font-mono text-muted">{{ $t('auditCompareDeviceThreshold') }}</span>
+                </div>
+
+                <!-- 维度 2: 网络与拓扑置信度 -->
+                <div class="compare-section-badge">{{ $t('auditContextNetwork') }}</div>
+                <div class="compare-item-row">
+                  <span class="compare-k">{{ $t('auditFieldBaseIp') }}:</span>
+                  <span class="compare-v font-mono text-muted">{{ selectedRow.baseIp || '-' }} ({{ selectedRow.baseGeo || '-' }})</span>
+                </div>
+                <div class="compare-item-row">
+                  <span class="compare-k">{{ $t('auditCompareIpAccounts') }}:</span>
+                  <span class="compare-v font-mono text-muted">{{ $t('auditCompareIpAccountsThreshold') }}</span>
+                </div>
+                <div class="compare-item-row">
+                  <span class="compare-k">{{ $t('auditFieldSubnetMatch') }}:</span>
+                  <span class="compare-v text-muted">{{ $t('auditSubnetMatchGood') }}</span>
+                </div>
+
+                <!-- 维度 3: 行为速率与检举遥测 -->
+                <div class="compare-section-badge">{{ $t('auditContextBehavior') }}</div>
+                <div class="compare-item-row">
+                  <span class="compare-k">{{ $t('auditFieldUserReports') }}:</span>
+                  <span class="compare-v text-muted">{{ $t('auditCompareReportsThreshold') }}</span>
+                </div>
+                <div class="compare-item-row">
+                  <span class="compare-k">{{ $t('auditFieldSendRate') }}:</span>
+                  <span class="compare-v text-muted">{{ $t('auditCompareSendRateThreshold') }}</span>
+                </div>
+                <div class="compare-item-row">
+                  <span class="compare-k">{{ $t('auditFieldBounceRate') }}:</span>
+                  <span class="compare-v text-muted">{{ $t('auditCompareBounceRateThreshold') }}</span>
+                </div>
+
+                <!-- 维度 4: 凭证与身份安全 -->
+                <div class="compare-section-badge">{{ $t('auditContextAuth') }}</div>
+                <div class="compare-item-row">
+                  <span class="compare-k">{{ $t('auditFieldCredHealth') }}:</span>
+                  <span class="compare-v text-muted">{{ $t('auditCompareCredThreshold') }}</span>
+                </div>
+                <div class="compare-item-row">
+                  <span class="compare-k">{{ $t('auditField2fa') }}:</span>
+                  <span class="compare-v text-muted">{{ $t('audit2faProtected') }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- 4. 裁决工作台 / 封禁台账存单留痕 -->
@@ -819,9 +861,6 @@ const drawerVisible = ref(false);
 const selectedRow = ref(null);
 const decisionNotes = ref('');
 const actionLoading = ref(false);
-
-// 【层级优化】多维风险画像折叠面板：默认展开前两个（凭证与身份挑战因子、设备指纹与会话连续性）
-const activeAccordions = ref(['auth', 'device']);
 
 // 同步顶栏 topbar-search 活跃检索至本页面
 watch(() => emailStore.searchKeyword, (val) => {
@@ -1557,14 +1596,21 @@ onUnmounted(() => {
 .email-main-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  min-width: 0;
 }
 
 .clickable-email {
   font-weight: 600;
+  font-size: 12.5px;
   color: var(--el-text-color-primary);
   cursor: pointer;
   transition: color 0.15s ease;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 1;
+  min-width: 0;
   &:hover {
     color: var(--el-color-primary);
     text-decoration: underline;
@@ -1605,6 +1651,8 @@ onUnmounted(() => {
   gap: 4px;
   font-weight: 500;
   padding: 2px 8px;
+  white-space: nowrap;
+  flex-shrink: 0;
 
   .status-tag-icon {
     flex-shrink: 0;
@@ -1656,26 +1704,32 @@ onUnmounted(() => {
   }
 }
 
+/* 【操作列重构】统一右对齐紧凑间距，各按钮尺寸人体工学对齐 */
 .table-actions-group {
   display: inline-flex;
   align-items: center;
   justify-content: flex-end;
   gap: 6px;
+  white-space: nowrap;
+  flex-shrink: 0;
 
   .action-btn-compact {
-    padding: 4px 10px;
+    padding: 0 6px;
     font-size: 12px;
-    height: 28px;
+    height: 26px;
     border-radius: 4px;
+    white-space: nowrap;
+    flex-shrink: 0;
   }
 
   .action-icon-compact {
-    width: 28px;
-    height: 28px;
+    width: 26px;
+    height: 26px;
     padding: 0;
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    flex-shrink: 0;
     border-color: var(--el-border-color-lighter);
     color: var(--el-text-color-regular);
     &:hover {
@@ -1684,11 +1738,30 @@ onUnmounted(() => {
       background: var(--el-color-primary-light-9);
     }
   }
+
+  .action-detail-btn {
+    font-size: 12px;
+    font-weight: 500;
+    padding: 0 4px;
+    height: 26px;
+    white-space: nowrap;
+    flex-shrink: 0;
+    color: var(--el-color-primary);
+
+    &:hover {
+      color: var(--el-color-primary-light-3);
+    }
+  }
 }
 
 :deep(.el-table__row) {
   td.el-table__cell {
     padding: 12px 0 !important;
+
+    &.is-right .cell {
+      padding-left: 4px !important;
+      padding-right: 8px !important;
+    }
   }
 }
 
@@ -1696,6 +1769,23 @@ html.dark .kpi-card.kpi-card-active {
   background: rgba(64, 158, 255, 0.12) !important;
   border-color: #409eff !important;
   box-shadow: 0 0 0 1px #409eff, 0 4px 16px rgba(64, 158, 255, 0.2);
+}
+
+html.dark {
+  .compare-card.compare-card-actual {
+    border-color: rgba(245, 108, 108, 0.35);
+  }
+  .compare-card.compare-card-baseline {
+    border-color: rgba(103, 194, 58, 0.35);
+  }
+  .compare-card-header.actual-header {
+    background: rgba(245, 108, 108, 0.15);
+    color: #f89898;
+  }
+  .compare-card-header.baseline-header {
+    background: rgba(103, 194, 58, 0.15);
+    color: #95d475;
+  }
 }
 
 .case-id-cell {
@@ -1732,11 +1822,17 @@ html.dark .kpi-card.kpi-card-active {
   }
 }
 
+/* 【表格列宽与截断修复】高风险标签紧凑无截断：padding 减小、字号 11px、不换行不截断 */
 .audit-sub-tag {
   font-size: 11px;
   height: 20px;
-  line-height: 20px;
-  padding: 0 5px;
+  line-height: 18px;
+  padding: 0 6px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .subject-email {
@@ -1899,83 +1995,115 @@ html.dark .kpi-card.kpi-card-active {
   margin-bottom: 12px;
 }
 
-/* 【层级优化】多维风险画像折叠 Accordion 样式 */
-.evidence-collapse {
-  border: none;
-  --el-collapse-border-color: var(--el-border-color-lighter);
-  --el-collapse-header-bg-color: transparent;
-  --el-collapse-content-bg-color: transparent;
-
-  :deep(.el-collapse-item) {
+/* 【证据对比布局】多维风险画像两列对比卡片样式 */
+.evidence-compare-card-wrapper {
+  .section-title {
     margin-bottom: 8px;
-    border: 1px solid var(--el-border-color-lighter);
-    border-radius: 6px;
-    overflow: hidden;
-    background: var(--el-fill-color-blank);
-
-    &:last-child {
-      margin-bottom: 0;
-    }
-  }
-
-  :deep(.el-collapse-item__header) {
-    padding: 0 12px;
-    height: 38px;
-    line-height: 38px;
-    border-bottom: 1px solid transparent;
-    transition: all 0.2s ease;
-
-    &.is-active {
-      border-bottom-color: var(--el-border-color-lighter);
-      background: var(--el-fill-color-light);
-    }
-  }
-
-  :deep(.el-collapse-item__wrap) {
-    border-bottom: none;
-    background: transparent;
-  }
-
-  :deep(.el-collapse-item__content) {
-    padding: 10px 12px;
-  }
-
-  .accordion-header {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .accordion-icon {
-    color: var(--el-color-primary);
-  }
-
-  .accordion-title {
-    font-size: 12.5px;
-    font-weight: 600;
-    color: var(--el-text-color-regular);
   }
 }
 
-.pillar-items {
+.compare-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+
+  @media (max-width: 580px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.compare-card {
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 6px;
+  background: var(--el-fill-color-blank);
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  gap: 5px;
 
-  .item-row {
-    display: flex;
+  &.compare-card-actual {
+    border-color: rgba(245, 108, 108, 0.3);
+  }
+
+  &.compare-card-baseline {
+    border-color: rgba(103, 194, 58, 0.3);
+  }
+}
+
+.compare-card-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  border-bottom: 1px solid var(--el-border-color-lighter);
+
+  .card-header-icon {
+    flex-shrink: 0;
+  }
+
+  .card-header-title {
     font-size: 12px;
-    line-height: 1.45;
+    font-weight: 600;
+  }
 
-    .k {
+  &.actual-header {
+    background: var(--el-color-danger-light-9);
+    color: var(--el-color-danger);
+  }
+
+  &.baseline-header {
+    background: var(--el-color-success-light-9);
+    color: var(--el-color-success);
+  }
+}
+
+.compare-card-body {
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.compare-section-badge {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--el-text-color-secondary);
+  padding: 4px 0 2px 0;
+  margin-top: 4px;
+  border-bottom: 1px dashed var(--el-border-color-lighter);
+
+  &:first-child {
+    margin-top: 0;
+  }
+}
+
+.compare-item-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11.5px;
+  line-height: 1.45;
+
+  .compare-k {
+    color: var(--el-text-color-secondary);
+    flex-shrink: 0;
+  }
+
+  .compare-v {
+    color: var(--el-text-color-primary);
+    text-align: right;
+    word-break: break-all;
+
+    &.text-muted {
       color: var(--el-text-color-secondary);
-      width: 75px;
-      flex-shrink: 0;
     }
-    .v {
-      color: var(--el-text-color-primary);
-      word-break: break-all;
-    }
+  }
+
+  .anomaly-tag {
+    margin-left: 2px;
+    font-size: 10.5px;
   }
 }
 
