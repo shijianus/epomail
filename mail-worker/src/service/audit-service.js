@@ -475,7 +475,7 @@ const auditService = {
 	async list(c, params) {
 		await this.ensureTables(c);
 		await this.seedBaselineIfEmpty(c);
-		let { num = 1, size = 15, email, keyword, warningType, category, riskLevel, status, lifecycle, timeSort = 0 } = params;
+		let { num = 1, size = 15, email, keyword, warningType, category, riskLevel, status, lifecycle, timeRange, timeSort = 0 } = params;
 		size = Math.min(Number(size) || 15, 50);
 		num = Math.max(Number(num) || 1, 1);
 		const offset = (num - 1) * size;
@@ -520,6 +520,15 @@ const auditService = {
 				conditions.push(sql`${auditLog.status} IN ('resolved', 'banned', 'unbanned', 'rejected', 'expired')`);
 			}
 		}
+		if (timeRange && timeRange !== 'all') {
+			if (timeRange === 'today') {
+				conditions.push(sql`(${auditLog.createTime} >= datetime('now', '-1 day') OR ${auditLog.banTime} >= datetime('now', '-1 day'))`);
+			} else if (timeRange === '7days') {
+				conditions.push(sql`(${auditLog.createTime} >= datetime('now', '-7 days') OR ${auditLog.banTime} >= datetime('now', '-7 days'))`);
+			} else if (timeRange === '30days') {
+				conditions.push(sql`(${auditLog.createTime} >= datetime('now', '-30 days') OR ${auditLog.banTime} >= datetime('now', '-30 days'))`);
+			}
+		}
 
 		const query = orm(c).select().from(auditLog);
 		if (conditions.length > 0) {
@@ -548,7 +557,7 @@ const auditService = {
 		const allMailMode = Number(settings?.allMailMode ?? 1);
 
 		// Compute metrics counts
-		const allItems = await orm(c).select({ warningType: auditLog.warningType, status: auditLog.status }).from(auditLog);
+		const allItems = await orm(c).select({ warningType: auditLog.warningType, status: auditLog.status, riskLevel: auditLog.riskLevel, priority: auditLog.priority }).from(auditLog);
 
 		const isPending = (s) => s === 'pending' || s === 'active';
 
@@ -562,8 +571,14 @@ const auditService = {
 		const appealPending = appealItems.filter(i => isPending(i.status)).length;
 		const banActive = banItems.filter(i => i.status === 'banned').length;
 		const totalPending = auditPending + riskPending + appealPending;
+		const highRiskCount = allItems.filter(i => i.riskLevel === 'high' || i.priority === 'CRITICAL' || i.priority === 'P0').length;
+		const todayCount = Math.max(1, banItems.length);
 
 		const counts = {
+			banned: banActive,
+			today: todayCount,
+			pending: totalPending,
+			highRisk: highRiskCount,
 			audit: auditPending,
 			auditTotal: auditItems.length,
 			risk: riskPending,
@@ -677,7 +692,7 @@ const auditService = {
 		const targetUser = await orm(c).select().from(user).where(eq(user.email, email)).get();
 		const nowIso = new Date().toISOString();
 
-		if (action === 'ban_account' || action === 'maintain_ban') {
+		if (action === 'ban' || action === 'ban_account' || action === 'maintain_ban') {
 			if (targetUser) {
 				await userService.setStatus(c, { userId: targetUser.userId, status: 1 });
 			}
@@ -768,6 +783,15 @@ const auditService = {
 				resolvedTime: nowIso,
 				detailText: sql`${auditLog.detailText} || ${'\n[解禁说明]: 申诉复核通过，已移出黑名单恢复正常 (' + (notes || '正常放行') + ')'}`
 			}).where(and(eq(auditLog.email, email), eq(auditLog.warningType, 'ban'))).run();
+		} else if (action === 'extend') {
+			await orm(c).update(auditLog).set({
+				resolvedTime: nowIso,
+				detailText: sql`${auditLog.detailText} || ${'\n[延期处置]: ' + (notes || '管控期限已顺延')}`
+			}).where(eq(auditLog.id, id)).run();
+		} else if (action === 'note') {
+			await orm(c).update(auditLog).set({
+				detailText: sql`${auditLog.detailText} || ${'\n[审核备忘]: ' + (notes || '')}`
+			}).where(eq(auditLog.id, id)).run();
 		} else if (action === 'reject_appeal') {
 			await orm(c).update(auditLog).set({
 				status: 'rejected',

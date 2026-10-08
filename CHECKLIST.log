@@ -7,6 +7,24 @@
 > 制度规范与工作流指引请见 [AGENTS.md](file:///home/shijian/projects/epocanvas-mail/AGENTS.md)。
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
+### 邮箱封禁管控后台生产全量改造、Cloudflare部署与Subagent端到端核验 (2026-10-08)
+*   **关联提交 (Git Commit)**: `PENDING_COMMIT_HASH` (Short: `PENDING_SHORT`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com)` (Version ID: `f74181d2-1f62-4566-9573-d89b8835ef9d`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 顶部 4 个统计卡片精简与重构：精简为邮箱管理实用指标（生效中封禁、今日新增、待人工复核、高风险邮箱），数字与说明精炼，默认蓝色边框高亮（.kpi-card-active），点击联动筛选；
+    - [x] 筛选栏紧凑优化：搜索框占位符更新为「搜索邮箱、案件编号或关键字...」，简化为 3 个实用下拉（状态：全部/生效中/已解禁/待复核/观察中、时间：全部/今日/近7天/近30天、风险：全部/高/中/低），保留搜索、刷新、重置、排序等紧凑图标按钮；
+    - [x] 表格列重构（邮箱主列化）：列顺序重构为 邮箱（主列加粗可点击，副标题弱化案件编号与一键复制）、当前状态（彩色标签+图标：红=生效中-已封禁，绿=已解封，橙=待复核，灰=观察中）、封禁原因（截断显示+hover完整Tooltip）、封禁时间、最后处理时间、处理人/负责人（头像+姓名+角色）、操作（右对齐实用按钮组）；
+    - [x] 状态与操作体验提升：每一行集成快捷操作按钮组（解封/封禁切换、延期弹窗、备注弹窗、查看详情），点击查看详情或点击邮箱平滑唤出右侧详情抽屉；
+    - [x] 视觉与细节打磨：保持高对比度深色主题，Element Plus 表格行高舒适增加（padding: 12px 0），底部分页保留「共 X 条 | 15条/页」；
+    - [x] 六语言多语言字典 100% 对称闭环：同步维护 zh, zh-Hant, en, es, fr, nl 六语字典（各 2514 键绝对一致，0 缺失，0 硬编码）；
+    - [x] Cloudflare 线上部署成功：通过 wrangler 全量构建与部署（Worker 启动耗时 67ms，版本 ID f74181d2-1f62-4566-9573-d89b8835ef9d）。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 前端构建核验：mail-vue 构建成功（耗时 12.60s，0 警告 0 报错）；
+    - [x] 静态 i18n 三件套审计：`i18n-symmetry.mjs` (2514键 100% 对称通过)、`i18n-audit.mjs` (0 缺失通过)、`i18n-hardcoded.mjs` (纯净通过)；
+    - [x] Subagent 独立全量审计核验：调用独立合规审计员 Subagent 运行 `tests/verify-cf-email-ban-audit.mjs` 对公网真实生产环境执行端到端核验，25/25 项断言全部绿灯通过；
+    - [x] 生产公网高清视觉留档：截屏生成 `cf_live_main_audit.png`（主页面工作台）与 `cf_live_drawer_audit.png`（详情抽屉），排版与视觉品质完备；
+    - [x] 零假数据残留：数据库已播种合规代表性台账，测试脚本安全无残留。
+
 ### 邮箱封禁管控后台工作台 UI/UX 完整重构与原型落地 (2026-10-07)
 *   **关联提交 (Git Commit)**: `b4ed2fc6bb6fcfb0be55af0c8d9f3a4a26f6b424` (Short: `b4ed2fc`)
 *   **部署环境 (Deployment)**: `本地全真栈 / 独立高保真交互原型 (email_ban_management.html)`
