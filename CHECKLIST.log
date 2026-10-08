@@ -8,12 +8,12 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
-### 邮箱封禁管控后台用词统一、信息层级精炼与抽屉Accordion优化 (2026-10-08)
+### 邮箱封禁管控后台用词统一与抽屉Accordion优化 · Cloudflare公网生产部署与Subagent全量核验 (2026-10-08)
 *   **关联提交 (Git Commit)**: `64bb68e3f8a9535fcc061acdbf3035b78eab901c` (Short: `64bb68e`)
-*   **部署环境 (Deployment)**: `本地全真栈 / 独立高保真交互原型 (email_ban_management.html)`
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com)` (Version ID: `59fe745f-b30d-44d8-a346-a239f5b3504b`, Startup: `73ms`)
 *   **功能需求与变更清单 (Changes & Feature Alignment)**:
     - [x] 用词全面统一：
-      - 状态标签统一格式：`生效中 · 已封禁`、`已解禁 · 移出黑名单`、`待复核`、`观察中`（所有「生效中已封禁」均统一添加间隔中点）；
+      - 状态标签统一格式：`生效中 · 已封禁`、`已解禁 · 移出黑名单`、`待复核`、`观察中`（所有「生效中已封禁」均统一添加规范中点）；
       - 风险等级统一：高风险统一为 `高风险 · 已管控`；
       - 抽屉标题统一：重命名为 `封禁台账 · 存证（只读）`；
       - 抽屉分区块统一：`风险研判与处置依据`、`多维风险画像`；
@@ -26,12 +26,14 @@
       - 「风险研判与处置依据」区域保留显式红色警示文案 (`.text-danger`)；
       - 抽屉底部主操作按钮（解封 / 重新封禁）与表格行内完全一致并联动即时响应；
     - [x] 0 条记录空状态文案统一：无匹配结果时标准提示 `当前筛选条件下暂无封禁记录`；
-    - [x] 六语言多语言字典 100% 对称闭环：zh, zh-Hant, en, es, fr, nl 六语字典 2514 键绝对对称，代码 0 硬编码。
+    - [x] 六语言多语言字典 100% 对称闭环：zh, zh-Hant, en, es, fr, nl 六语字典 2514 键绝对对称，代码 0 硬编码；
+    - [x] Cloudflare 生产部署上线：通过 wrangler 全量构建与部署（Worker 启动耗时 73ms，版本 ID `59fe745f-b30d-44d8-a346-a239f5b3504b`）。
 *   **自动化测试与核验清单 (Verification Checklist)**:
-    - [x] 前端构建核验：mail-vue `vite build` 成功（耗时 13.71s，0 警告 0 报错）；
+    - [x] 前端构建核验：mail-vue `vite build` 成功（耗时 13.58s，0 警告 0 报错）；
     - [x] 多语言三件套静态审计：`i18n-symmetry.mjs` (2514键 100% 对称通过)、`i18n-audit.mjs` (0 缺失通过)、`i18n-hardcoded.mjs` (views/audit-report/index.vue 0 未包裹硬编码通过)；
-    - [x] 全真栈自动化端到端测试：`tests/verify-ban-management-unified-terms.mjs` 24/24 项断言全部通过；
-    - [x] 高保真截图生成与留档：`tests/audit_unified_drawer_verified.png`（抽屉与 Accordion 展开态）、`tests/audit_unified_main_empty_verified.png`（空状态视图）；
+    - [x] 本地全真栈自动化端到端测试：`tests/verify-ban-management-unified-terms.mjs` 24/24 项断言全部通过；
+    - [x] **Subagent 独立全量审计核验 (Compliance Auditor)**：调用独立合规审计员 Subagent 运行 `tests/verify-cf-ban-management-subagent.mjs` 对 Cloudflare 公网真实生产环境 (`https://mail.epocanvas.com`) 执行端到端实测，**26/26 项断言全部绿灯通过**；
+    - [x] 公网真实高保真截图生成与留档：`tests/cf_live_drawer_verified.png`（线上抽屉与 Accordion 展开态）、`tests/cf_live_main_empty_verified.png`（线上空状态视图）；
     - [x] 原型同步：`email_ban_management.html` 100% 同步用词与操作按钮。
 *   **关联提交 (Git Commit)**: `82001352b603e6d5c4dcc00dee2c5b4cb8f0a8f4` (Short: `8200135`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com)` (Version ID: `f74181d2-1f62-4566-9573-d89b8835ef9d`)
