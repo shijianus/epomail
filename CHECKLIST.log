@@ -7,6 +7,48 @@
 > 制度规范与工作流指引请见 [AGENTS.md](file:///home/shijian/projects/epocanvas-mail/AGENTS.md)。
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
+### 邮箱封禁管控后台 UI 彻底修复 · 列宽优化、零截断、操作列重构与两列对比证据卡片 (2026-10-08)
+*   **关联提交 (Git Commit)**: `1b21869685191d798c0331405388d392ad84c5e2` (Short: `1b21869`)
+*   **部署环境 (Deployment)**: `本地全真栈 / 构建核验 (mail-worker/dist)`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 表格列宽重新分配彻底解决局促：
+      - 用户邮箱：`min-width 260px`（主列，邮箱名加粗且支持长文本优雅收尾，副标题弱化案件编号 10px + opacity 0.65）；
+      - 当前状态：`width 160px`（规范中点格式，不换行不截断）；
+      - 封禁原因：`min-width 220px`（截断显示 + hover 显示完整 Tooltip）；
+      - 封禁时间：`width 155px`；
+      - 最后处理时间：`width 155px`；
+      - 处理人/负责人：`width 140px`；
+      - 操作：`width 200px`（桌面端固定右侧，多语言自适应宽度）；
+    - [x] 高风险标签彻底解决截断：
+      - 标签文案统一为「高风险 · 已管控」；
+      - 紧凑 tag 样式（padding 0 6px、字号 11px、line-height 18px、不换行、flex-shrink 0）；
+      - 标签置于邮箱同一行右侧，零省略号、零问号，文字 100% 完整显示；
+    - [x] 操作列重构彻底解决拥挤：
+      - 「解封」/「重新封禁」保持绿色/红色文字按钮（height 26px，padding 0 6px）；
+      - 「延期」「备注」采用圆形图标按钮（26px x 26px，带 hover tooltip）；
+      - 「查看详情」改为主色文字按钮（type="primary" link，完整显示「查看详情」，禁止截断）；
+      - 按钮之间 gap 控制在 6px 左右，整体严格右对齐；
+    - [x] 侧边抽屉「多维风险画像」彻底废除 Accordion，改为 Scheme A 两列对比卡片：
+      - 左侧卡片：当前账号实际证据值（设备指纹、网络与IP拓扑、行为速率遥测、凭证与身份）；
+      - 右侧卡片：系统基准 / 正常值 / 风险阈值（基准指纹、注册IP、独立账号基准、发信/退信健康线）；
+      - 超出阈值项（如同一IP关联账号数 > 1、相似度偏低、异网漫游、违规投诉）显式红色高亮警示（text-danger font-semibold）；
+      - 所有关键对比项默认全部平铺展开，无多层折叠；
+      - 抽屉标题统一为「封禁台账 · 存证（只读）」，底部主按钮与行内保持「解封」/「重新封禁」一致；
+    - [x] 多语言 i18n 严格闭环：
+      - 六语言（zh, zh-Hant, en, es, fr, nl）字典保持 2523 键 100% 绝对对称，零未包裹硬编码。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 前端构建核验：mail-vue `vite build` 成功（耗时 14.01s，0 警告 0 报错）；
+    - [x] 多语言静态审计三件套：
+      - `node scripts/i18n-symmetry.mjs` (2523 键绝对对称通过)；
+      - `node scripts/i18n-audit.mjs` (0 缺失引用通过)；
+      - `node scripts/i18n-hardcoded.mjs` (views/audit-report/index.vue 0 未包裹硬编码通过)；
+    - [x] 本地全真栈端到端自动化测试：`tests/verify-ban-management-unified-terms.mjs` 24/24 项全绿通过；
+    - [x] 表格列宽、度量与零截断专项实测：`tests/verify-ban-table-columns-truncation.mjs` 15/15 项全绿通过；
+      - 高风险标签度量：scrollWidth == clientWidth (83px == 83px)，零截断；
+      - 查看详情按钮度量：scrollWidth == clientWidth (56px == 56px)，零截断；
+      - 操作列单元格宽度：200px 严格对齐，4 个按钮无重叠无溢出；
+      - 两列对比卡片：实测数据与基准阈值一一对应，红标警示生效；
+    - [x] 零假数据残留：测试临时 Mock 数据物理清理。
 
 ### 邮箱封禁管控后台用词统一与抽屉Accordion优化 · Cloudflare公网生产部署与Subagent全量核验 (2026-10-08)
 *   **关联提交 (Git Commit)**: `64bb68e3f8a9535fcc061acdbf3035b78eab901c` (Short: `64bb68e`)
