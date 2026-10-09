@@ -7,6 +7,30 @@
 > 制度规范与工作流指引请见 [AGENTS.md](file:///home/shijian/projects/epocanvas-mail/AGENTS.md)。
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
+### 安全审计控制台第三轮版面优化与中间空白治理 (2026-10-09)
+*   **关联提交 (Git Commit)**: `64732a06033a0ec2a4214ac11fdfaa2dcaefe028` (Short: `64732a0`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com)` (Version ID: `9a8147dd-aa0a-45f0-88ae-e9678a47bc9c`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 工单编号列删除重复检举徽标：
+      - 彻底移除 `#10001`+ 编号后面的 `tag-compact` 检举徽标（避免与后续「报警原因」列信息重复产生视觉冗余）；
+      - 优化工单编号列宽为 80px，使编号高亮且紧凑居左对齐。
+    - [x] 表格中间新增高价值审计字段治理空白浪费：
+      - 新增「触发网络」列（宽 160px）：展示触发威胁/风险的来源 IP（等宽代码字体显示）及归属国家/城市徽标 (`.network-cell`)；
+      - 新增「终端设备」列（宽 145px）：根据 Client User-Agent 智能渲染终端类型语义化图标（桌面 Windows/Linux、Mac、移动端 iOS/Android、自动化脚本/Bot）及 User-Agent 气泡提示 (`.device-cell`)；
+      - 充分利用原来中间约 400px 的空白区域，使威胁、申诉与风险表格信息密度达到 SOC/SIEM 级安全工作台标准，且在 1440px/1080p 屏幕下无需横向滚动条。
+    - [x] 导出 CSV 字段对齐：
+      - 同步更新 `handleExportCsv`，新增「触发网络 IP/归属地」与「终端设备」两项数据字段导出。
+    - [x] 6 语言 i18n 绝对对称字典建设：
+      - 补齐新增词条 `auditColTriggerNetwork` 与 `auditColClientDevice`（zh, zh-Hant, en, es, fr, nl 保持 100% 绝对对称）。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：`npm --prefix mail-vue run build` 构建零报错通过 (耗时 13.29s)；
+    - [x] i18n 静态对称性核验：`node scripts/i18n-symmetry.mjs` 6 语言 2583 键绝对对称通过；
+    - [x] i18n 缺失引用核验：`node scripts/i18n-audit.mjs` 零缺失引用通过；
+    - [x] 本地自动化单元测试：`node tests/verify-audit-ui-optimization.mjs` 16 项全断言通过；
+    - [x] Cloudflare 生产环境全真 E2E 核验：`node tests/verify-cf-production-audit-ui.mjs` 36 项断言全部通过，三场景完整截图已保存：
+      - `tests/cf_production_threat_verified.png` (滥用威胁)
+      - `tests/cf_production_appeal_verified.png` (申诉审计)
+      - `tests/cf_production_record_verified.png` (操作记录)
 
 ### 安全审计控制台第二轮 UI/UX 深度打磨与 Cloudflare 生产环境全真验证 (2026-10-09)
 *   **关联提交 (Git Commit)**: `e0449c8eac1a6992e6b7e30ee281e6d0520ed65e` (Short: `e0449c8`)
