@@ -7,6 +7,44 @@
 > 制度规范与工作流指引请见 [AGENTS.md](file:///home/shijian/projects/epocanvas-mail/AGENTS.md)。
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
+
+### 邮箱封禁管控后台 4 层 KPI 汇报架构重构与精益美化 · Cloudflare 生产环境上线全量核验 (2026-10-08)
+*   **关联提交 (Git Commit)**: `43a423bafdec1c9cca6bfabf734616bd20c1180e` (Short: `43a423b`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com)` (Version ID: `31458121-3ad6-49ca-9059-808a0dcef0bc`, Startup: `101ms`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 4 层 KPI 说明严格分界与架构重构：
+      1. 威胁邮箱：展示所有 LV3 以上威胁账户，包含一人多号、严重举报等（副标题「一人多号 · 严重举报」）；
+      2. 待审计邮箱：所有 LV0~LV3 邮箱，包含接发垃圾邮件、多次跳 IP 登录等（副标题「垃圾邮件 · 异地跳IP」）；
+      3. 申诉邮箱：通过填写符合表格对于已做出的判决进行申诉的邮箱（副标题「判决申诉 · 表单复核」）；
+      4. 操作记录：所有以上邮箱最终处理后（包括封禁、解禁等操作更新）、过期后等（副标题「封禁解禁 · 归档更新」）；
+    - [x] 说明文案对称规范：
+      - 标题统一 4 字符；副标题统一 8 字符对称（中点隔开）；
+      - Tooltip 提示完整呈现用户要求的字面级业务研判口径；
+    - [x] 彻底移除 `.kpi-active-dot`：
+      - 删除所有红/蓝状态小圆点，消除视觉冗余；
+    - [x] 美化 `.kpi-card` 与 `.kpi-card-active` 设计：
+      - 告别生硬粗边框，引入现代化 SaaS 微发光指示条（3px 顶部伪元素）与浮动阴影（translateY -2px）；
+      - 专属 4 色安全体系变量：威胁（#ef4444）、待审计（#f59e0b）、申诉（#6366f1）、操作记录（#10b981）；
+      - 适配暗色模式深层次柔光与微透明背景；
+    - [x] 替换操作态图标（调用 Iconify / Fluent 真实动作语义图标）：
+      - 威胁邮箱：`fluent:shield-dismiss-20-filled` (高危阻断)；
+      - 待审计邮箱：`fluent:clipboard-search-20-filled` (线索排查)；
+      - 申诉邮箱：`fluent:person-feedback-20-filled` (表单申诉)；
+      - 操作记录：`fluent:history-20-filled` (流水审计)；
+    - [x] 多语言严格对称：
+      - 6 语言字典（zh, zh-Hant, en, es, fr, nl）全量增补 12 个 KPI 键集，100% 绝对对称。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 前端构建核验：mail-vue 构建成功（耗时 13.13s，0 警告 0 报错）；
+    - [x] 多语言静态审计三件套通过：
+      - `node scripts/i18n-symmetry.mjs` (2535 键 100% 绝对对称通过)；
+      - `node scripts/i18n-audit.mjs` (0 缺失引用通过)；
+      - `node scripts/i18n-hardcoded.mjs` (views/audit-report/index.vue 0 未包裹硬编码通过)；
+    - [x] Cloudflare 生产环境真实上线：`npm run deploy --prefix mail-worker` (Version ID: `31458121-3ad6-49ca-9059-808a0dcef0bc`)；
+    - [x] 公网真实生产环境自动化验收测试：`tests/verify-cf-production-ban-ui.mjs` 31/31 项全绿：
+      - 真实生产主表与 4 层 KPI 卡片视图截图：`tests/cf_live_prod_table_verified.png`；
+      - 真实生产抽屉证据两列对比截图：`tests/cf_live_prod_drawer_compare_verified.png`；
+    - [x] 零假数据残留：已验证物理数据安全。
+
 ### 邮箱封禁管控后台 UI 彻底修复 · 操作列边距重置、零截断及 Cloudflare 生产环境全量核验上线 (2026-10-08)
 *   **关联提交 (Git Commit)**: `0605e46ddae208933b91c015b6ea9399eb6d6c29` (Short: `0605e46`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com)` (Version ID: `14aac37c-0eec-4e5f-894e-d62c36ad8f81`, Startup: `63ms`)
