@@ -169,10 +169,10 @@
               @selection-change="handleSelectionChange"
             >
               <!-- 0. 多选列 -->
-              <el-table-column type="selection" width="46" align="center" />
+              <el-table-column type="selection" width="40" align="center" />
 
               <!-- 列 1: 工单编号 (直接改为#开头的编号，附带邮箱与复制) -->
-              <el-table-column :label="$t('auditColTicketNo')" min-width="230">
+              <el-table-column :label="$t('auditColTicketNo')" min-width="170">
                 <template #default="{ row }">
                   <div class="ticket-cell">
                     <div class="ticket-row-top">
@@ -202,7 +202,7 @@
               </el-table-column>
 
               <!-- 列 2: 当前状态 (说明当前的实际状态，表头集成状态筛选) -->
-              <el-table-column width="170">
+              <el-table-column width="135">
                 <template #header>
                   <div class="col-filter-header">
                     <span>{{ $t('auditCurrentStatus') }}</span>
@@ -241,7 +241,7 @@
               </el-table-column>
 
               <!-- 列 3: 报警原因 / 风险等级 (表头集成风险筛选，滥用威胁显示原因，申诉审计显示风险等级LV0~LV3) -->
-              <el-table-column min-width="190">
+              <el-table-column min-width="135">
                 <template #header>
                   <div class="col-filter-header">
                     <span>{{ activeKpi === 'threat' ? $t('auditColAlarmReason') : (activeKpi === 'appeal' ? $t('auditRiskLevel') : `${$t('auditColAlarmReason')} / ${$t('auditRiskLevel')}`) }}</span>
@@ -292,7 +292,7 @@
               </el-table-column>
 
               <!-- 列 4: 处理时间 (指的是报警时间，表头集成时间筛选) -->
-              <el-table-column width="165">
+              <el-table-column width="140">
                 <template #header>
                   <div class="col-filter-header">
                     <span>{{ $t('auditColProcessTime') }}</span>
@@ -327,7 +327,7 @@
               </el-table-column>
 
               <!-- 列 5: 到期时间 (对于滥用威胁不存在) -->
-              <el-table-column :label="$t('auditColExpireTime')" width="145">
+              <el-table-column :label="$t('auditColExpireTime')" width="105">
                 <template #default="{ row }">
                   <span v-if="activeKpi === 'threat' || row.status === 'banned' || row.warningType === 'ban'" class="plain-dash-text font-mono">
                     -
@@ -341,8 +341,8 @@
                 </template>
               </el-table-column>
 
-              <!-- 列 6: 负责人 (固定 140px) -->
-              <el-table-column :label="$t('auditColAssignee')" width="140">
+              <!-- 列 6: 负责人 -->
+              <el-table-column :label="$t('auditColAssignee')" width="120">
                 <template #default="{ row }">
                   <div class="operator-cell">
                     <div class="operator-avatar font-mono">
@@ -356,8 +356,8 @@
                 </template>
               </el-table-column>
 
-              <!-- 列 7: 操作 (固定右侧 200px/230px，统一右对齐，纯图标 + 紧凑按钮) -->
-              <el-table-column :label="$t('action')" :width="['en', 'nl', 'es', 'fr'].includes(locale) ? 230 : 200" fixed="right" align="right">
+              <!-- 列 7: 操作 (统一右对齐，纯图标 + 紧凑按钮) -->
+              <el-table-column :label="$t('action')" :width="['en', 'nl', 'es', 'fr'].includes(locale) ? 195 : 175" align="right">
                 <template #default="{ row }">
                   <div class="table-actions-group">
                     <!-- 「解封」/「重新封禁」快捷按钮 -->
@@ -1984,7 +1984,7 @@ onUnmounted(() => {
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      max-width: 220px;
+      max-width: 165px;
 
       &:hover {
         color: var(--el-color-primary);
