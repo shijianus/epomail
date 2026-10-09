@@ -4,89 +4,93 @@
     <el-scrollbar ref="scrollbarRef" class="scrollbar">
       <div class="audit-page-container">
 
-        <!-- 1. 顶部汇报分区 4 板块：精简为邮箱管理实用指标 -->
+        <!-- 1. 顶部汇报分区 4 板块：严格 4 层分界与操作态图标 -->
         <div class="kpi-grid">
-          <!-- 卡片 1: 生效中封禁 -->
+          <!-- 卡片 1: 威胁邮箱 (展示所有 LV3 以上威胁账户：1人多号、被举报等) -->
           <div
-            class="kpi-card"
-            :class="{ 'kpi-card-active': activeKpi === 'banned' || params.status === 'banned' }"
-            @click="selectKpiFilter('banned')"
-          >
-            <div class="kpi-icon-wrap icon-sanction">
-              <Icon icon="fluent:prohibited-20-filled" width="22" height="22" />
-            </div>
-            <div class="kpi-content">
-              <div class="kpi-header">
-                <span class="kpi-title">{{ $t('auditKpiActiveBans') }}</span>
-                <span v-if="activeKpi === 'banned' || params.status === 'banned'" class="kpi-active-dot"></span>
-              </div>
-              <div class="kpi-data-stat kpi-value font-mono">
-                <span class="stat-pending">{{ summaryCounts.banned }}</span>
-              </div>
-              <div class="kpi-desc kpi-sub" :title="$t('auditKpiActiveBansDesc')">{{ $t('auditKpiActiveBansDesc') }}</div>
-            </div>
-          </div>
-
-          <!-- 卡片 2: 今日新增 -->
-          <div
-            class="kpi-card"
-            :class="{ 'kpi-card-active': activeKpi === 'today' || params.timeRange === 'today' }"
-            @click="selectKpiFilter('today')"
-          >
-            <div class="kpi-icon-wrap icon-routine">
-              <Icon icon="fluent:person-add-20-filled" width="22" height="22" />
-            </div>
-            <div class="kpi-content">
-              <div class="kpi-header">
-                <span class="kpi-title">{{ $t('auditKpiTodayAdded') }}</span>
-                <span v-if="activeKpi === 'today' || params.timeRange === 'today'" class="kpi-active-dot"></span>
-              </div>
-              <div class="kpi-data-stat kpi-value font-mono">
-                <span class="stat-pending">{{ summaryCounts.today }}</span>
-              </div>
-              <div class="kpi-desc kpi-sub" :title="$t('auditKpiTodayAddedDesc')">{{ $t('auditKpiTodayAddedDesc') }}</div>
-            </div>
-          </div>
-
-          <!-- 卡片 3: 待人工复核 -->
-          <div
-            class="kpi-card"
-            :class="{ 'kpi-card-active': activeKpi === 'pending' || params.status === 'pending' }"
-            @click="selectKpiFilter('pending')"
-          >
-            <div class="kpi-icon-wrap icon-appeal">
-              <Icon icon="fluent:document-person-20-filled" width="22" height="22" />
-            </div>
-            <div class="kpi-content">
-              <div class="kpi-header">
-                <span class="kpi-title">{{ $t('auditKpiPendingReview') }}</span>
-                <span v-if="activeKpi === 'pending' || params.status === 'pending'" class="kpi-active-dot"></span>
-              </div>
-              <div class="kpi-data-stat kpi-value font-mono">
-                <span class="stat-pending">{{ summaryCounts.pending }}</span>
-              </div>
-              <div class="kpi-desc kpi-sub" :title="$t('auditKpiPendingReviewDesc')">{{ $t('auditKpiPendingReviewDesc') }}</div>
-            </div>
-          </div>
-
-          <!-- 卡片 4: 高风险邮箱 -->
-          <div
-            class="kpi-card"
-            :class="{ 'kpi-card-active': activeKpi === 'highrisk' || params.riskLevel === 'high' }"
-            @click="selectKpiFilter('highrisk')"
+            class="kpi-card kpi-threat"
+            :class="{ 'kpi-card-active': activeKpi === 'threat' || (params.riskLevel === 'high' && activeKpi !== 'all') }"
+            @click="selectKpiFilter('threat')"
           >
             <div class="kpi-icon-wrap icon-threat">
-              <Icon icon="fluent:alert-urgent-20-filled" width="22" height="22" />
+              <Icon icon="fluent:shield-dismiss-20-filled" width="22" height="22" />
             </div>
             <div class="kpi-content">
               <div class="kpi-header">
-                <span class="kpi-title">{{ $t('auditKpiHighRisk') }}</span>
-                <span v-if="activeKpi === 'highrisk' || params.riskLevel === 'high'" class="kpi-active-dot"></span>
+                <span class="kpi-title">{{ $t('auditKpiThreatEmail') }}</span>
               </div>
               <div class="kpi-data-stat kpi-value font-mono">
-                <span class="stat-pending">{{ summaryCounts.highRisk }}</span>
+                <span class="stat-number stat-danger">{{ summaryCounts.threat }}</span>
               </div>
-              <div class="kpi-desc kpi-sub" :title="$t('auditKpiHighRiskDesc')">{{ $t('auditKpiHighRiskDesc') }}</div>
+              <div class="kpi-desc kpi-sub" :title="$t('auditKpiThreatEmailDesc')">
+                {{ $t('auditKpiThreatEmailSub') }}
+              </div>
+            </div>
+          </div>
+
+          <!-- 卡片 2: 待审计邮箱 (所有 LV0~LV3 邮箱：接发垃圾邮件、多次跳IP登录等) -->
+          <div
+            class="kpi-card kpi-audit"
+            :class="{ 'kpi-card-active': activeKpi === 'audit' || (params.warningType === 'audit' && activeKpi !== 'all') }"
+            @click="selectKpiFilter('audit')"
+          >
+            <div class="kpi-icon-wrap icon-audit">
+              <Icon icon="fluent:clipboard-search-20-filled" width="22" height="22" />
+            </div>
+            <div class="kpi-content">
+              <div class="kpi-header">
+                <span class="kpi-title">{{ $t('auditKpiAuditEmail') }}</span>
+              </div>
+              <div class="kpi-data-stat kpi-value font-mono">
+                <span class="stat-number stat-warning">{{ summaryCounts.audit }}</span>
+              </div>
+              <div class="kpi-desc kpi-sub" :title="$t('auditKpiAuditEmailDesc')">
+                {{ $t('auditKpiAuditEmailSub') }}
+              </div>
+            </div>
+          </div>
+
+          <!-- 卡片 3: 申诉邮箱 (通过填写符合表格对于已做出的判决的邮箱进行申诉的邮箱) -->
+          <div
+            class="kpi-card kpi-appeal"
+            :class="{ 'kpi-card-active': activeKpi === 'appeal' || (params.warningType === 'appeal' && activeKpi !== 'all') }"
+            @click="selectKpiFilter('appeal')"
+          >
+            <div class="kpi-icon-wrap icon-appeal">
+              <Icon icon="fluent:person-feedback-20-filled" width="22" height="22" />
+            </div>
+            <div class="kpi-content">
+              <div class="kpi-header">
+                <span class="kpi-title">{{ $t('auditKpiAppealEmail') }}</span>
+              </div>
+              <div class="kpi-data-stat kpi-value font-mono">
+                <span class="stat-number stat-primary">{{ summaryCounts.appeal }}</span>
+              </div>
+              <div class="kpi-desc kpi-sub" :title="$t('auditKpiAppealEmailDesc')">
+                {{ $t('auditKpiAppealEmailSub') }}
+              </div>
+            </div>
+          </div>
+
+          <!-- 卡片 4: 操作记录 (所有以上邮箱最终处理后(包括封禁、解禁等操作的更新)、过期后(不符合要求)等等) -->
+          <div
+            class="kpi-card kpi-record"
+            :class="{ 'kpi-card-active': activeKpi === 'record' || (params.warningType === 'ban' && activeKpi !== 'all') }"
+            @click="selectKpiFilter('record')"
+          >
+            <div class="kpi-icon-wrap icon-record">
+              <Icon icon="fluent:history-20-filled" width="22" height="22" />
+            </div>
+            <div class="kpi-content">
+              <div class="kpi-header">
+                <span class="kpi-title">{{ $t('auditKpiActionRecord') }}</span>
+              </div>
+              <div class="kpi-data-stat kpi-value font-mono">
+                <span class="stat-number stat-success">{{ summaryCounts.record }}</span>
+              </div>
+              <div class="kpi-desc kpi-sub" :title="$t('auditKpiActionRecordDesc')">
+                {{ $t('auditKpiActionRecordSub') }}
+              </div>
             </div>
           </div>
         </div>
@@ -826,8 +830,12 @@ const total = ref(0);
 // 本地搜索关键字，与顶栏 topbar-search 双向结合
 const localKeyword = ref('');
 
-// 4 大情况 KPI 数据结构 (邮箱封禁管控实用指标)
+// 4 大情况 KPI 数据结构 (严格 4 层分界：威胁邮箱 / 待审计邮箱 / 申诉邮箱 / 操作记录)
 const summaryCounts = reactive({
+  threat: 0,
+  audit: 0,
+  appeal: 0,
+  record: 0,
   banned: 0,
   today: 0,
   pending: 0,
@@ -842,14 +850,14 @@ const summaryCounts = reactive({
   }
 });
 
-// 当前选中的 KPI 卡片 (默认高亮选中生效中封禁)
-const activeKpi = ref('banned');
+// 当前选中的 KPI 卡片 (默认高亮选中威胁邮箱)
+const activeKpi = ref('threat');
 
 const params = reactive({
   keyword: '',
   warningType: 'all',
-  riskLevel: 'all',
-  status: 'banned',
+  riskLevel: 'high',
+  status: 'all',
   timeRange: 'all',
   timeSort: 0,
   num: 1,
@@ -896,27 +904,33 @@ function calcPercent(pending, tot) {
 function selectKpiFilter(type) {
   if (activeKpi.value === type) {
     activeKpi.value = 'all';
+    params.warningType = 'all';
+    params.riskLevel = 'all';
     params.status = 'all';
     params.timeRange = 'all';
-    params.riskLevel = 'all';
   } else {
     activeKpi.value = type;
-    if (type === 'banned') {
-      params.status = 'banned';
-      params.timeRange = 'all';
-      params.riskLevel = 'all';
-    } else if (type === 'today') {
-      params.status = 'all';
-      params.timeRange = 'today';
-      params.riskLevel = 'all';
-    } else if (type === 'pending') {
-      params.status = 'pending';
-      params.timeRange = 'all';
-      params.riskLevel = 'all';
-    } else if (type === 'highrisk') {
-      params.status = 'all';
-      params.timeRange = 'all';
+    params.timeRange = 'all';
+    if (type === 'threat' || type === 'highrisk') {
+      // 1. 威胁邮箱：展示所有LV3以上的威胁账户，主要包含1人多号、被举报等
       params.riskLevel = 'high';
+      params.warningType = 'all';
+      params.status = 'all';
+    } else if (type === 'audit') {
+      // 2. 待审计邮箱：所有LV0~LV3的邮箱，主要包括接发垃圾邮件、多次跳IP登录等等
+      params.warningType = 'audit';
+      params.riskLevel = 'all';
+      params.status = 'all';
+    } else if (type === 'appeal' || type === 'pending') {
+      // 3. 申诉邮箱：通过填写符合表格对于已做出的判决的邮箱进行申诉的邮箱
+      params.warningType = 'appeal';
+      params.riskLevel = 'all';
+      params.status = 'all';
+    } else if (type === 'record' || type === 'banned') {
+      // 4. 操作记录：所有以上邮箱最终处理后(包括封禁、解禁等操作的更新)、过期后(不符合要求)等等
+      params.warningType = 'ban';
+      params.riskLevel = 'all';
+      params.status = 'all';
     }
   }
   search();
@@ -1210,10 +1224,22 @@ async function fetchAuditList() {
     logs.value = data.list || [];
     total.value = data.total || 0;
     if (data.counts) {
-      summaryCounts.banned = data.counts.banned ?? data.counts.ban ?? logs.value.filter(l => l.status === 'banned').length;
-      summaryCounts.today = data.counts.today ?? Math.max(1, summaryCounts.banned);
-      summaryCounts.pending = data.counts.pending ?? data.counts.total ?? logs.value.filter(l => l.status === 'pending' || l.status === 'active').length;
-      summaryCounts.highRisk = data.counts.highRisk ?? logs.value.filter(l => l.riskLevel === 'high' || l.priority === 'CRITICAL' || l.priority === 'P0').length;
+      summaryCounts.threat = data.counts.highRisk ?? data.counts.riskTotal ?? (data.counts.categories?.risk?.total ?? 0);
+      summaryCounts.audit = data.counts.auditTotal ?? data.counts.audit ?? (data.counts.categories?.audit?.total ?? 0);
+      summaryCounts.appeal = data.counts.appealTotal ?? data.counts.appeal ?? (data.counts.categories?.appeal?.total ?? 0);
+      summaryCounts.record = data.counts.banTotal ?? data.counts.banned ?? (data.counts.categories?.ban?.total ?? 0);
+
+      if (summaryCounts.threat === 0 && logs.value.length > 0) {
+        summaryCounts.threat = logs.value.filter(l => l.riskLevel === 'high' || l.priority === 'CRITICAL' || l.priority === 'P0').length;
+      }
+      if (summaryCounts.record === 0 && logs.value.length > 0) {
+        summaryCounts.record = logs.value.filter(l => l.warningType === 'ban' || l.status === 'banned' || l.status === 'unbanned').length;
+      }
+
+      summaryCounts.banned = data.counts.banned ?? summaryCounts.record;
+      summaryCounts.today = data.counts.today ?? Math.max(1, summaryCounts.record);
+      summaryCounts.pending = data.counts.pending ?? summaryCounts.audit;
+      summaryCounts.highRisk = data.counts.highRisk ?? summaryCounts.threat;
       if (data.counts.categories) {
         summaryCounts.categories.audit = data.counts.categories.audit || { pending: 0, total: 0 };
         summaryCounts.categories.risk = data.counts.categories.risk || { pending: 0, total: 0 };
@@ -1230,10 +1256,14 @@ async function fetchAuditList() {
         summaryCounts.allTotal = data.counts.total ?? (data.total || 0);
       }
     } else {
-      summaryCounts.banned = logs.value.filter(l => l.status === 'banned').length;
-      summaryCounts.today = Math.max(1, summaryCounts.banned);
-      summaryCounts.pending = logs.value.filter(l => l.status === 'pending' || l.status === 'active').length;
-      summaryCounts.highRisk = logs.value.filter(l => l.riskLevel === 'high' || l.priority === 'CRITICAL' || l.priority === 'P0').length;
+      summaryCounts.threat = logs.value.filter(l => l.riskLevel === 'high' || l.priority === 'CRITICAL' || l.priority === 'P0').length;
+      summaryCounts.audit = logs.value.filter(l => l.warningType === 'audit').length;
+      summaryCounts.appeal = logs.value.filter(l => l.warningType === 'appeal').length;
+      summaryCounts.record = logs.value.filter(l => l.warningType === 'ban' || l.status === 'banned' || l.status === 'unbanned').length;
+      summaryCounts.banned = summaryCounts.record;
+      summaryCounts.today = Math.max(1, summaryCounts.record);
+      summaryCounts.pending = summaryCounts.audit;
+      summaryCounts.highRisk = summaryCounts.threat;
     }
   } catch (e) {
     console.error('fetchAuditList error:', e);
@@ -1366,7 +1396,7 @@ onUnmounted(() => {
   padding: 16px 20px 24px 20px;
 }
 
-/* 1. 顶部汇报 4 板块：彻底统一 UI 规范 */
+/* 1. 顶部汇报 4 板块：精益美化与专属安全色彩体系 */
 .kpi-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -1382,114 +1412,163 @@ onUnmounted(() => {
 }
 
 .kpi-card {
-  padding: 14px 16px;
-  border-radius: 8px;
+  position: relative;
+  overflow: hidden;
+  padding: 16px 18px;
+  border-radius: 12px;
   background: var(--el-bg-color);
-  border: 1px solid var(--el-border-color);
+  border: 1px solid var(--el-border-color-lighter);
   display: flex;
   align-items: flex-start;
-  gap: 12px;
+  gap: 14px;
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
   user-select: none;
 
+  /* 顶部微发光指示条 */
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: var(--kpi-theme-color, var(--el-color-primary));
+    opacity: 0;
+    transform: scaleX(0.7);
+    transition: opacity 0.22s ease, transform 0.22s ease;
+  }
+
   &:hover {
-    border-color: var(--el-color-primary);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    border-color: var(--el-border-color);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px -6px rgba(0, 0, 0, 0.08), 0 2px 6px -1px rgba(0, 0, 0, 0.04);
   }
 
   &.kpi-card-active {
-    border-color: var(--el-color-primary) !important;
-    background: var(--el-color-primary-light-9) !important;
-    box-shadow: 0 0 0 1px var(--el-color-primary), 0 3px 12px rgba(64, 158, 255, 0.12);
+    border-color: var(--kpi-theme-color) !important;
+    background: var(--kpi-theme-bg) !important;
+    box-shadow: 0 6px 20px -4px var(--kpi-theme-glow) !important;
+    transform: translateY(-2px);
+
+    &::before {
+      opacity: 1;
+      transform: scaleX(1);
+    }
 
     .kpi-title {
-      color: var(--el-color-primary) !important;
+      color: var(--kpi-theme-color) !important;
       font-weight: 600;
+    }
+  }
+
+  /* 专属 4 大分类视觉主题 (威胁 / 待审计 / 申诉 / 操作记录) */
+  &.kpi-threat {
+    --kpi-theme-color: #ef4444;
+    --kpi-theme-bg: rgba(239, 68, 68, 0.04);
+    --kpi-theme-glow: rgba(239, 68, 68, 0.16);
+
+    .kpi-icon-wrap {
+      background: rgba(239, 68, 68, 0.1);
+      color: #ef4444;
+    }
+  }
+
+  &.kpi-audit {
+    --kpi-theme-color: #f59e0b;
+    --kpi-theme-bg: rgba(245, 158, 11, 0.04);
+    --kpi-theme-glow: rgba(245, 158, 11, 0.16);
+
+    .kpi-icon-wrap {
+      background: rgba(245, 158, 11, 0.1);
+      color: #f59e0b;
+    }
+  }
+
+  &.kpi-appeal {
+    --kpi-theme-color: #6366f1;
+    --kpi-theme-bg: rgba(99, 102, 241, 0.04);
+    --kpi-theme-glow: rgba(99, 102, 241, 0.16);
+
+    .kpi-icon-wrap {
+      background: rgba(99, 102, 241, 0.1);
+      color: #6366f1;
+    }
+  }
+
+  &.kpi-record {
+    --kpi-theme-color: #10b981;
+    --kpi-theme-bg: rgba(16, 185, 129, 0.04);
+    --kpi-theme-glow: rgba(16, 185, 129, 0.16);
+
+    .kpi-icon-wrap {
+      background: rgba(16, 185, 129, 0.1);
+      color: #10b981;
     }
   }
 }
 
 .kpi-icon-wrap {
-  width: 40px;
-  height: 40px;
-  border-radius: 8px;
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  margin-top: 2px;
+  transition: transform 0.2s ease;
+}
 
-  &.icon-routine {
-    background: var(--el-color-primary-light-9);
-    color: var(--el-color-primary);
-  }
-  &.icon-threat {
-    background: var(--el-color-danger-light-9);
-    color: var(--el-color-danger);
-  }
-  &.icon-appeal {
-    background: var(--el-color-warning-light-9);
-    color: var(--el-color-warning);
-  }
-  &.icon-sanction {
-    background: var(--el-fill-color);
-    color: var(--el-text-color-secondary);
-  }
+.kpi-card:hover .kpi-icon-wrap {
+  transform: scale(1.05);
 }
 
 .kpi-content {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .kpi-header {
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin-bottom: 2px;
+  margin-bottom: 4px;
 }
 
 .kpi-title {
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 13.5px;
+  font-weight: 500;
   color: var(--el-text-color-regular);
+  line-height: 1.3;
+  transition: color 0.18s ease;
 }
 
-.kpi-active-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--el-color-primary);
-  display: inline-block;
-}
-
-/* 待办数据 / 总数据 结构明确呈现 */
 .kpi-data-stat {
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--el-text-color-primary);
-  line-height: 1.2;
+  margin-bottom: 4px;
+  line-height: 1.1;
 
-  .stat-pending {
+  .stat-number {
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
     color: var(--el-text-color-primary);
-  }
-  .stat-unit {
-    font-size: 13px;
-    font-weight: normal;
-    color: var(--el-text-color-secondary);
-    margin-left: 2px;
+
+    &.stat-danger { color: #ef4444; }
+    &.stat-warning { color: #f59e0b; }
+    &.stat-primary { color: #6366f1; }
+    &.stat-success { color: #10b981; }
   }
 }
 
 .kpi-desc {
   font-size: 11.5px;
   color: var(--el-text-color-secondary);
-  margin-top: 4px;
+  line-height: 1.35;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  line-height: 1.3;
+  letter-spacing: 0.1px;
 }
 
 /* 2. 工作台单一外框 (杜绝嵌套二层脱节方框，直接让表格承载) */
@@ -1793,10 +1872,25 @@ onUnmounted(() => {
   }
 }
 
-html.dark .kpi-card.kpi-card-active {
-  background: rgba(64, 158, 255, 0.12) !important;
-  border-color: #409eff !important;
-  box-shadow: 0 0 0 1px #409eff, 0 4px 16px rgba(64, 158, 255, 0.2);
+html.dark {
+  .kpi-card {
+    &.kpi-threat {
+      --kpi-theme-bg: rgba(239, 68, 68, 0.12);
+      --kpi-theme-glow: rgba(239, 68, 68, 0.28);
+    }
+    &.kpi-audit {
+      --kpi-theme-bg: rgba(245, 158, 11, 0.12);
+      --kpi-theme-glow: rgba(245, 158, 11, 0.28);
+    }
+    &.kpi-appeal {
+      --kpi-theme-bg: rgba(99, 102, 241, 0.14);
+      --kpi-theme-glow: rgba(99, 102, 241, 0.28);
+    }
+    &.kpi-record {
+      --kpi-theme-bg: rgba(16, 185, 129, 0.12);
+      --kpi-theme-glow: rgba(16, 185, 129, 0.28);
+    }
+  }
 }
 
 html.dark {

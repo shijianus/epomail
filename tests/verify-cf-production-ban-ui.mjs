@@ -60,6 +60,40 @@ async function run() {
     await page.waitForSelector('.kpi-card', { timeout: 25000 });
     await page.waitForTimeout(2500);
 
+    // [核验 0] 4 层 KPI 汇报卡片全新架构与精益设计核验
+    console.log('\n[核验 0] 4 层 KPI 汇报卡片全新架构与精益设计核验:');
+    const kpiCards = await page.$$eval('.kpi-card', cards => cards.map(c => {
+      const title = c.querySelector('.kpi-title')?.textContent?.trim() || '';
+      const sub = c.querySelector('.kpi-sub')?.textContent?.trim() || '';
+      const icon = c.querySelector('.kpi-icon-wrap .iconify')?.getAttribute('data-icon') || 
+                   c.querySelector('.kpi-icon-wrap iconify-icon')?.getAttribute('icon') || '';
+      const hasClassThreat = c.classList.contains('kpi-threat');
+      const hasClassAudit = c.classList.contains('kpi-audit');
+      const hasClassAppeal = c.classList.contains('kpi-appeal');
+      const hasClassRecord = c.classList.contains('kpi-record');
+      const isActive = c.classList.contains('kpi-card-active');
+      return { title, sub, icon, hasClassThreat, hasClassAudit, hasClassAppeal, hasClassRecord, isActive };
+    }));
+
+    console.log('  KPI 卡片渲染列表:', kpiCards);
+    ok(kpiCards.length === 4, `KPI 卡片数量严格为 4 张 (实际: ${kpiCards.length})`);
+    
+    const titles = kpiCards.map(k => k.title);
+    ok(titles.includes('威胁邮箱'), '包含「威胁邮箱」');
+    ok(titles.includes('待审计邮箱'), '包含「待审计邮箱」');
+    ok(titles.includes('申诉邮箱'), '包含「申诉邮箱」');
+    ok(titles.includes('操作记录'), '包含「操作记录」');
+
+    const subs = kpiCards.map(k => k.sub);
+    ok(subs.includes('一人多号 · 严重举报'), '包含副标题「一人多号 · 严重举报」');
+    ok(subs.includes('垃圾邮件 · 异地跳IP'), '包含副标题「垃圾邮件 · 异地跳IP」');
+    ok(subs.includes('判决申诉 · 表单复核'), '包含副标题「判决申诉 · 表单复核」');
+    ok(subs.includes('封禁解禁 · 归档更新'), '包含副标题「封禁解禁 · 归档更新」');
+
+    // 核验 kpi-active-dot 已被彻底删除
+    const dotCount = await page.$$eval('.kpi-active-dot', dots => dots.length);
+    ok(dotCount === 0, `kpi-active-dot 已经彻底移除 (实际残留: ${dotCount})`);
+
     // 检查是否有数据行，如果当前筛选下为 0，点击重置或切换为全部
     let rowCount = await page.$$eval('.el-table__row', trs => trs.length);
     if (rowCount === 0) {
