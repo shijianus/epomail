@@ -2571,6 +2571,8 @@ totpModeAllDesc: 'Définir si les utilisateurs peuvent utiliser TOTP. Lorsqu\'il
     filter: "Filtrer",
     auditRiskLevel: "Niveau de risque",
     auditColSuggestion: "Suggestion",
+    auditColTriggerNetwork: "Réseau déclencheur",
+    auditColClientDevice: "Appareil client",
     auditSuggestionBan: "Bannir",
     auditSuggestionUnban: "Débloquer",
     auditSuggestionKeepBan: "Maintenir le ban",

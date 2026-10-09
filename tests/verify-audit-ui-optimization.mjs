@@ -97,7 +97,7 @@ console.log('  ✓ 默认表格行彻底移除邮箱名称干扰，仅保留于�
 console.log('[第二轮 3] 当前状态列边框删除，纯 icon+文字水平对齐，缩短间距...');
 assert.ok(vueContent.includes('class="status-clean-item"'), '采用 status-clean-item 无边框容器');
 assert.ok(vueContent.includes('status-icon-inline') && vueContent.includes('status-text-inline'), '采用纯 icon+文字水平对齐');
-assert.ok(vueContent.includes('width="145"'), '状态列宽度适度优化至 145px 以消除文字截断');
+assert.ok(vueContent.includes('width="140"'), '状态列宽度适度优化至 140px 以消除文字截断');
 console.log('  ✓ 当前状态边框已清除，文字与 icon 完美水平对齐并缩短间距\n');
 
 // 7.4 时间格式 mm/dd/yy hh:ss
@@ -140,6 +140,20 @@ assert.ok(vueContent.includes("if (activeKpi.value === 'threat') return false;")
 assert.ok(vueContent.includes('return !!row.expireTime;'), '仅有到期时间的工单支持延期');
 console.log('  ✓ 全 Tab 均具备处理建议，到期时间与延期权限严格按规则约束\n');
 
+// 8. 第三轮优化：删除冗余检举 tag，中间补充「触发网络」与「终端设备」
+console.log('=== 第三轮空白利用与冗余消除核验 ===');
+console.log('[第三轮 1] 工单编号列删除重复的 tag-compact 检举徽标...');
+assert.ok(!tableColumnTicketMatch[0].includes('tag-compact'), '工单编号列彻底移除重复的 tag-compact 徽标');
+console.log('  ✓ 工单编号列已彻底移除冗余的 tag-compact 检举徽标\n');
+
+console.log('[第三轮 2] 中间充分补充显式内容（触发网络与终端设备），杜绝空白浪费...');
+assert.ok(vueContent.includes('$t(\'auditColTriggerNetwork\')'), '包含触发网络列');
+assert.ok(vueContent.includes('$t(\'auditColClientDevice\')'), '包含终端设备列');
+assert.ok(vueContent.includes('network-cell'), '包含 network-cell 样式类');
+assert.ok(vueContent.includes('device-cell'), '包含 device-cell 样式类');
+assert.ok(vueContent.includes('getDeviceIcon(row)'), '包含 getDeviceIcon 终端解析逻辑');
+console.log('  ✓ 中间成功加入「触发网络」与「终端设备」两大核心审计列，完美利用中间版面\n');
+
 console.log('================================================================');
-console.log('=== 第一轮 6 项 + 第二轮 8 项优化需求全量断言通过！ ===');
+console.log('=== 第一轮 6 项 + 第二轮 8 项 + 第三轮 2 项优化需求全量断言通过！ ===');
 console.log('================================================================\n');

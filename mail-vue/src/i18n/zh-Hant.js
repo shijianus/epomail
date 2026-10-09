@@ -2571,6 +2571,8 @@ totpModeAllDesc: '設定是否允許使用者使用TOTP，開啟後使用者可�
     filter: "篩選",
     auditRiskLevel: "風險等級",
     auditColSuggestion: "處理建議",
+    auditColTriggerNetwork: "觸發網絡",
+    auditColClientDevice: "終端設備",
     auditSuggestionBan: "建議封禁",
     auditSuggestionUnban: "建議解禁",
     auditSuggestionKeepBan: "維持封禁",

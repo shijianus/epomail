@@ -2571,6 +2571,8 @@ totpModeAllDesc: 'Configure whether users can use TOTP. When enabled, 2FA is ava
     filter: "Filter",
     auditRiskLevel: "Risk Level",
     auditColSuggestion: "Suggestion",
+    auditColTriggerNetwork: "Trigger Network",
+    auditColClientDevice: "Client Device",
     auditSuggestionBan: "Ban",
     auditSuggestionUnban: "Unban",
     auditSuggestionKeepBan: "Keep Banned",

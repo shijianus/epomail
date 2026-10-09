@@ -169,28 +169,19 @@
               <!-- 0. 多选列 -->
               <el-table-column type="selection" width="40" align="center" />
 
-              <!-- 列 1: 工单编号 (无邮箱干扰，仅显示 #编号 与 举报徽标) -->
-              <el-table-column :label="$t('auditColTicketNo')" width="95">
+              <!-- 列 1: 工单编号 (无邮箱与重复徽标干扰，仅显示简洁 #编号) -->
+              <el-table-column :label="$t('auditColTicketNo')" width="80">
                 <template #default="{ row }">
                   <div class="ticket-cell">
                     <span class="ticket-id font-mono font-medium clickable-ticket" @click="openAuditDrawer(row)">
                       {{ formatTicketNo(row) }}
                     </span>
-                    <el-tag
-                      v-if="row.reportedByOthers && row.reportedByOthers > 0"
-                      size="small"
-                      type="danger"
-                      effect="plain"
-                      class="tag-compact"
-                    >
-                      {{ $t('auditReportBadgeCount', { count: row.reportedByOthers }) }}
-                    </el-tag>
                   </div>
                 </template>
               </el-table-column>
 
               <!-- 列 2: 当前状态 (无边框，纯icon+文字说明水平对齐，缩短与工单编号距离) -->
-              <el-table-column width="145">
+              <el-table-column width="140">
                 <template #header>
                   <div class="col-filter-header">
                     <span>{{ $t('auditCurrentStatus') }}</span>
@@ -229,7 +220,7 @@
               </el-table-column>
 
               <!-- 列 3: 报警原因 / 风险等级 (表头集成风险筛选，滥用威胁显示原因，申诉审计显示风险等级LV0~LV3) -->
-              <el-table-column min-width="135">
+              <el-table-column min-width="120">
                 <template #header>
                   <div class="col-filter-header">
                     <span>{{ activeKpi === 'threat' ? $t('auditColAlarmReason') : (activeKpi === 'appeal' ? $t('auditRiskLevel') : `${$t('auditColAlarmReason')} / ${$t('auditRiskLevel')}`) }}</span>
@@ -279,8 +270,28 @@
                 </template>
               </el-table-column>
 
-              <!-- 列 4: 处理时间 (格式 mm/dd/yy hh:ss，表头集成时间筛选与排序箭头) -->
-              <el-table-column width="145">
+              <!-- 列 4: 触发网络 (展示 IP 归属与物理地理位置，填补中间空白) -->
+              <el-table-column :label="$t('auditColTriggerNetwork')" width="160">
+                <template #default="{ row }">
+                  <div class="network-cell font-mono">
+                    <span class="network-ip font-medium">{{ row.ip || '-' }}</span>
+                    <span v-if="row.geo" class="network-geo text-muted" :title="row.geo">({{ row.geo }})</span>
+                  </div>
+                </template>
+              </el-table-column>
+
+              <!-- 列 5: 终端设备 (展示客户端环境与系统特征，填补中间空白) -->
+              <el-table-column :label="$t('auditColClientDevice')" width="145" show-overflow-tooltip>
+                <template #default="{ row }">
+                  <div class="device-cell" :title="row.device || '-'">
+                    <Icon :icon="getDeviceIcon(row)" width="14" height="14" class="device-icon" />
+                    <span class="device-text">{{ row.device || '-' }}</span>
+                  </div>
+                </template>
+              </el-table-column>
+
+              <!-- 列 6: 处理时间 (格式 mm/dd/yy hh:ss，表头集成时间筛选与排序箭头) -->
+              <el-table-column width="135">
                 <template #header>
                   <div class="col-filter-header">
                     <span>{{ $t('auditColProcessTime') }}</span>
@@ -1079,6 +1090,20 @@ function formatTableTime(time) {
   return tzDayjs(time).format('MM/DD/YY HH:mm');
 }
 
+function getDeviceIcon(row) {
+  const dev = (row?.device || '').toLowerCase();
+  if (dev.includes('curl') || dev.includes('bot') || dev.includes('terminal') || dev.includes('monitor') || dev.includes('headless')) {
+    return 'fluent:terminal-16-regular';
+  }
+  if (dev.includes('phone') || dev.includes('ios') || dev.includes('android') || dev.includes('mobile')) {
+    return 'fluent:phone-16-regular';
+  }
+  if (dev.includes('mac') || dev.includes('laptop')) {
+    return 'fluent:laptop-16-regular';
+  }
+  return 'fluent:desktop-16-regular';
+}
+
 function getHandlingSuggestion(row) {
   if (!row) return { text: '-', type: 'info' };
   if (row.suggestion) {
@@ -1321,6 +1346,8 @@ function handleExportCsv() {
     t('tabEmailAddress'),
     t('auditCurrentStatus'),
     t('auditColAlarmReason'),
+    t('auditColTriggerNetwork'),
+    t('auditColClientDevice'),
     t('auditColProcessTime'),
     t('auditColSuggestion'),
     t('auditColExpireTime'),
@@ -1328,11 +1355,14 @@ function handleExportCsv() {
   ];
   const csvRows = [headers.join(',')];
   for (const row of logs.value) {
+    const networkVal = row.ip ? `${row.ip}${row.geo ? ` (${row.geo})` : ''}` : '-';
     const rowValues = [
       formatTicketNo(row),
       `"${row.email || ''}"`,
       `"${getStatusLabel(row.status)}"`,
       `"${getSimpleAlarmReason(row)}"`,
+      `"${networkVal}"`,
+      `"${row.device || '-'}"`,
       `"${formatTableTime(row.banTime || row.createTime)}"`,
       `"${getHandlingSuggestion(row).text}"`,
       `"${row.expireTime ? formatTableTime(row.expireTime) : '-'}"`,
@@ -2187,6 +2217,49 @@ onUnmounted(() => {
 .plain-dash-text {
   color: var(--el-text-color-placeholder);
   font-size: 13px;
+}
+
+.network-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  white-space: nowrap;
+  line-height: 1.3;
+
+  .network-ip {
+    color: var(--el-text-color-primary);
+    font-weight: 500;
+  }
+
+  .network-geo {
+    color: var(--el-text-color-secondary);
+    font-size: 11px;
+    opacity: 0.85;
+  }
+}
+
+.device-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--el-text-color-regular);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 140px;
+
+  .device-icon {
+    flex-shrink: 0;
+    color: var(--el-text-color-placeholder);
+  }
+
+  .device-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 }
 
 /* 3. 核心管理表格 (零脱节，直接作为外框铺满) */

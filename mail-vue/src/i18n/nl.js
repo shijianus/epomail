@@ -2571,6 +2571,8 @@ totpModeAllDesc: 'Instellen of gebruikers TOTP mogen gebruiken. Eenmaal ingescha
     filter: "Filteren",
     auditRiskLevel: "Risiconiveau",
     auditColSuggestion: "Suggestie",
+    auditColTriggerNetwork: "Trigger netwerk",
+    auditColClientDevice: "Clientapparaat",
     auditSuggestionBan: "Blokkeren",
     auditSuggestionUnban: "Deblokkeren",
     auditSuggestionKeepBan: "Blokkade behouden",
