@@ -304,8 +304,8 @@
                 </template>
               </el-table-column>
 
-              <!-- 【操作列重构】列 7: 操作 (固定右侧 200px，统一右对齐，gap 6px，文字按钮 + 圆形图标按钮 + 主色详情文字按钮，完整显示零截断) -->
-              <el-table-column :label="$t('action')" :width="['en', 'nl', 'es', 'fr'].includes(locale) ? 225 : 200" fixed="right" align="right">
+              <!-- 【操作列重构】列 7: 操作 (固定右侧 210px/240px，统一右对齐，gap 6px，文字按钮 + 圆形图标按钮 + 主色详情文字按钮，完整显示零截断) -->
+              <el-table-column :label="$t('action')" :width="['en', 'nl', 'es', 'fr'].includes(locale) ? 240 : 210" fixed="right" align="right">
                 <template #default="{ row }">
                   <div class="table-actions-group">
                     <!-- 「解封」/「重新封禁」绿色/红色文字按钮 -->
@@ -1704,7 +1704,7 @@ onUnmounted(() => {
   }
 }
 
-/* 【操作列重构】统一右对齐紧凑间距，各按钮尺寸人体工学对齐 */
+/* 【操作列重构】统一右对齐紧凑间距，各按钮尺寸人体工学对齐，彻底消除 margin-left 冗余与截断 */
 .table-actions-group {
   display: inline-flex;
   align-items: center;
@@ -1713,6 +1713,18 @@ onUnmounted(() => {
   white-space: nowrap;
   flex-shrink: 0;
 
+  :deep(.el-button),
+  .el-button {
+    margin: 0 !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+  }
+
+  :deep(.el-button + .el-button),
+  .el-button + .el-button {
+    margin-left: 0 !important;
+  }
+
   .action-btn-compact {
     padding: 0 6px;
     font-size: 12px;
@@ -1720,6 +1732,7 @@ onUnmounted(() => {
     border-radius: 4px;
     white-space: nowrap;
     flex-shrink: 0;
+    margin: 0 !important;
   }
 
   .action-icon-compact {
@@ -1732,6 +1745,7 @@ onUnmounted(() => {
     flex-shrink: 0;
     border-color: var(--el-border-color-lighter);
     color: var(--el-text-color-regular);
+    margin: 0 !important;
     &:hover {
       color: var(--el-color-primary);
       border-color: var(--el-color-primary-light-7);
@@ -1747,10 +1761,20 @@ onUnmounted(() => {
     white-space: nowrap;
     flex-shrink: 0;
     color: var(--el-color-primary);
+    margin: 0 !important;
 
     &:hover {
       color: var(--el-color-primary-light-3);
     }
+  }
+}
+
+:deep(.el-table) {
+  td.el-table__cell.is-right .cell,
+  th.el-table__cell.is-right .cell {
+    padding-left: 4px !important;
+    padding-right: 8px !important;
+    overflow: visible !important;
   }
 }
 
@@ -1761,6 +1785,10 @@ onUnmounted(() => {
     &.is-right .cell {
       padding-left: 4px !important;
       padding-right: 8px !important;
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      overflow: visible !important;
     }
   }
 }
