@@ -6,7 +6,7 @@
 
         <!-- 1. 顶部汇报分区 4 板块：严格 4 层分界与操作态图标 -->
         <div class="kpi-grid">
-          <!-- 卡片 1: 威胁邮箱 (展示所有 LV3 以上威胁账户：1人多号、被举报等) -->
+          <!-- 卡片 1: 滥用威胁 (展示所有 LV3 以上威胁账户：1人多号、被举报等) -->
           <div
             class="kpi-card kpi-threat"
             :class="{ 'kpi-card-active': activeKpi === 'threat' || (params.riskLevel === 'high' && activeKpi !== 'all') }"
@@ -28,29 +28,7 @@
             </div>
           </div>
 
-          <!-- 卡片 2: 待审计邮箱 (所有 LV0~LV3 邮箱：接发垃圾邮件、多次跳IP登录等) -->
-          <div
-            class="kpi-card kpi-audit"
-            :class="{ 'kpi-card-active': activeKpi === 'audit' || (params.warningType === 'audit' && activeKpi !== 'all') }"
-            @click="selectKpiFilter('audit')"
-          >
-            <div class="kpi-icon-wrap icon-audit">
-              <Icon icon="fluent:clipboard-search-20-filled" width="22" height="22" />
-            </div>
-            <div class="kpi-content">
-              <div class="kpi-header">
-                <span class="kpi-title">{{ $t('auditKpiAuditEmail') }}</span>
-              </div>
-              <div class="kpi-data-stat kpi-value font-mono">
-                <span class="stat-number stat-warning">{{ summaryCounts.audit }}</span>
-              </div>
-              <div class="kpi-desc kpi-sub" :title="$t('auditKpiAuditEmailDesc')">
-                {{ $t('auditKpiAuditEmailSub') }}
-              </div>
-            </div>
-          </div>
-
-          <!-- 卡片 3: 申诉邮箱 (通过填写符合表格对于已做出的判决的邮箱进行申诉的邮箱) -->
+          <!-- 卡片 2: 申诉审计 (通过填写符合表格对于已做出的判决的邮箱进行申诉的邮箱) -->
           <div
             class="kpi-card kpi-appeal"
             :class="{ 'kpi-card-active': activeKpi === 'appeal' || (params.warningType === 'appeal' && activeKpi !== 'all') }"
@@ -68,6 +46,28 @@
               </div>
               <div class="kpi-desc kpi-sub" :title="$t('auditKpiAppealEmailDesc')">
                 {{ $t('auditKpiAppealEmailSub') }}
+              </div>
+            </div>
+          </div>
+
+          <!-- 卡片 3: 风险管理 (所有 LV0~LV3 邮箱：接发垃圾邮件、多次跳IP登录等) -->
+          <div
+            class="kpi-card kpi-audit"
+            :class="{ 'kpi-card-active': activeKpi === 'audit' || (params.warningType === 'audit' && activeKpi !== 'all') }"
+            @click="selectKpiFilter('audit')"
+          >
+            <div class="kpi-icon-wrap icon-audit">
+              <Icon icon="fluent:clipboard-search-20-filled" width="22" height="22" />
+            </div>
+            <div class="kpi-content">
+              <div class="kpi-header">
+                <span class="kpi-title">{{ $t('auditKpiAuditEmail') }}</span>
+              </div>
+              <div class="kpi-data-stat kpi-value font-mono">
+                <span class="stat-number stat-warning">{{ summaryCounts.audit }}</span>
+              </div>
+              <div class="kpi-desc kpi-sub" :title="$t('auditKpiAuditEmailDesc')">
+                {{ $t('auditKpiAuditEmailSub') }}
               </div>
             </div>
           </div>
@@ -97,112 +97,62 @@
 
         <!-- 2. 工作台单一外框 (单一事实载体：操作栏与表格一体化) -->
         <div class="audit-workbench audit-workbench-container">
-          <!-- 顶部操作栏 -->
+          <!-- 顶部操作栏 (学习用户列表风格：纯图标交互、删除冗余输入框、支持批量操作) -->
           <div class="header-actions">
-            <!-- 搜索框 -->
-            <div class="search">
-              <el-input
-                v-model="localKeyword"
-                class="search-input"
-                :placeholder="$t('auditSearchCasesPlaceholder')"
-                clearable
-                @input="handleLocalSearchInput"
-                @keyup.enter="search"
-              >
-                <template #prefix>
-                  <Icon icon="lucide:search" width="14" height="14" class="search-prefix-icon" />
-                </template>
-              </el-input>
-            </div>
+            <!-- 时间排序切换 -->
+            <el-tooltip effect="dark" :content="params.timeSort === 1 ? $t('auditSortAsc') : $t('auditSortDesc')" placement="top">
+              <Icon
+                class="icon"
+                :icon="params.timeSort === 1 ? 'material-symbols-light:timer-arrow-down-outline' : 'material-symbols-light:timer-arrow-up-outline'"
+                width="28"
+                height="28"
+                @click="changeTimeSort"
+              />
+            </el-tooltip>
 
-            <!-- 下拉 1: 状态筛选 (全部 / 生效中 / 已解封 / 待复核 / 观察中) -->
-            <el-select
-              v-model="params.status"
-              class="status-select"
-              :style="`width: ${locale === 'en' ? 145 : 125}px`"
-              @change="search"
-            >
-              <el-option value="all" :label="$t('all')" />
-              <el-option value="banned" :label="$t('auditStatusBannedActive')" />
-              <el-option value="unbanned" :label="$t('auditStatusUnbannedRecord')" />
-              <el-option value="pending" :label="$t('auditCaseStatusPending')" />
-              <el-option value="watching" :label="$t('auditStatusWatching')" />
-            </el-select>
+            <!-- 刷新列表 -->
+            <el-tooltip effect="dark" :content="$t('refresh')" placement="top">
+              <Icon class="icon" icon="ion:reload" width="18" height="18" @click="refresh" />
+            </el-tooltip>
 
-            <!-- 下拉 2: 时间范围 (全部 / 今日 / 近7天 / 近30天) -->
-            <el-select
-              v-model="params.timeRange"
-              class="status-select"
-              :style="`width: ${locale === 'en' ? 140 : 120}px`"
-              @change="search"
-            >
-              <el-option value="all" :label="$t('all')" />
-              <el-option value="today" :label="$t('auditTimeToday')" />
-              <el-option value="7days" :label="$t('auditTime7Days')" />
-              <el-option value="30days" :label="$t('auditTime30Days')" />
-            </el-select>
+            <!-- 重置筛选 -->
+            <el-tooltip effect="dark" :content="$t('reset')" placement="top">
+              <Icon class="icon" icon="fluent:arrow-rotate-clockwise-20-regular" width="18" height="18" @click="handleReset" />
+            </el-tooltip>
 
-            <!-- 下拉 3: 风险等级 (全部 / 高 / 中 / 低) -->
-            <el-select
-              v-model="params.riskLevel"
-              class="status-select"
-              :style="`width: ${locale === 'en' ? 140 : 120}px`"
-              @change="search"
-            >
-              <el-option value="all" :label="$t('all')" />
-              <el-option value="high" :label="$t('auditRiskLevelHigh')" />
-              <el-option value="medium" :label="$t('auditRiskLevelMedium')" />
-              <el-option value="normal" :label="$t('auditRiskLevelLow')" />
-            </el-select>
+            <!-- 导出审计数据 (CSV) -->
+            <el-tooltip effect="dark" :content="$t('auditExportLogs')" placement="top">
+              <Icon class="icon" icon="fluent:arrow-download-20-regular" width="19" height="19" @click="handleExportCsv" />
+            </el-tooltip>
 
-            <!-- 操作按钮集：统一紧凑排布 -->
-            <div class="actions-left-buttons actions-left-icons">
-              <!-- 执行检索 -->
-              <el-tooltip effect="dark" :content="$t('search')" placement="top">
-                <el-button class="action-btn-item action-icon" circle size="small" @click="search">
-                  <Icon icon="iconoir:search" width="16" height="16" />
+            <!-- 清理历史日志 -->
+            <el-tooltip effect="dark" :content="$t('auditClearHistorical')" placement="top">
+              <Icon class="icon" icon="fluent:broom-sparkle-16-regular" width="18" height="18" @click="handlePurge" />
+            </el-tooltip>
+
+            <!-- 安全规则文档外链 -->
+            <el-tooltip effect="dark" :content="$t('auditDocsTitle')" placement="top">
+              <Icon class="icon" icon="fluent:book-question-mark-20-regular" width="18" height="18" @click="openDocs" />
+            </el-tooltip>
+
+            <!-- 多选批量操作组 (选中有项时优雅显示) -->
+            <transition name="fade">
+              <div v-if="selectedRows.length > 0" class="batch-actions-wrap">
+                <span class="batch-selected-count">{{ $t('auditSelectedCount', { count: selectedRows.length }) }}</span>
+                <el-button size="small" type="success" plain @click="handleBatchUnban">
+                  <Icon icon="fluent:lock-open-16-regular" width="14" height="14" style="margin-right: 3px;" />
+                  {{ $t('auditBatchUnban') }}
                 </el-button>
-              </el-tooltip>
-
-              <!-- 刷新列表 -->
-              <el-tooltip effect="dark" :content="$t('refresh')" placement="top">
-                <el-button class="action-btn-item action-icon" circle size="small" @click="refresh">
-                  <Icon icon="ion:reload" width="15" height="15" />
+                <el-button size="small" type="danger" plain @click="handleBatchBan">
+                  <Icon icon="fluent:prohibited-16-regular" width="14" height="14" style="margin-right: 3px;" />
+                  {{ $t('auditBatchBan') }}
                 </el-button>
-              </el-tooltip>
-
-              <!-- 重置条件 -->
-              <el-tooltip effect="dark" :content="$t('reset')" placement="top">
-                <el-button class="action-btn-item action-icon" circle size="small" @click="handleReset">
-                  <Icon icon="fluent:arrow-rotate-clockwise-20-regular" width="16" height="16" />
+                <el-button size="small" type="danger" link @click="handleBatchDelete">
+                  <Icon icon="fluent:delete-16-regular" width="14" height="14" style="margin-right: 3px;" />
+                  {{ $t('auditBatchDelete') }}
                 </el-button>
-              </el-tooltip>
-
-              <!-- 时间排序切换 -->
-              <el-tooltip effect="dark" :content="params.timeSort === 1 ? $t('auditSortAsc') : $t('auditSortDesc')" placement="top">
-                <el-button class="action-btn-item action-icon" circle size="small" @click="changeTimeSort">
-                  <Icon
-                    :icon="params.timeSort === 1 ? 'material-symbols-light:timer-arrow-down-outline' : 'material-symbols-light:timer-arrow-up-outline'"
-                    width="18"
-                    height="18"
-                  />
-                </el-button>
-              </el-tooltip>
-
-              <!-- 清理历史日志 -->
-              <el-tooltip effect="dark" :content="$t('auditClearHistorical')" placement="top">
-                <el-button class="action-btn-item action-icon" circle size="small" @click="handlePurge">
-                  <Icon icon="fluent:broom-sparkle-16-regular" width="16" height="16" />
-                </el-button>
-              </el-tooltip>
-
-              <!-- 安全规则文档外链 -->
-              <el-tooltip effect="dark" :content="$t('auditDocsTitle')" placement="top">
-                <el-button class="action-btn-item action-icon" circle size="small" @click="openDocs">
-                  <Icon icon="fluent:book-question-mark-20-regular" width="16" height="16" />
-                </el-button>
-              </el-tooltip>
-            </div>
+              </div>
+            </transition>
           </div>
 
           <!-- 3. 核心数据表格 (单一容器铺满) -->
@@ -216,67 +166,159 @@
               style="width: 100%;"
               ref="tableRef"
               :empty-text="first ? '' : $t('auditEmptyLogs')"
+              @selection-change="handleSelectionChange"
             >
-              <!-- 【表格列宽与截断修复】列 1: 用户邮箱 (主列 min-width 260px，高风险标签紧凑无截断，案件编号弱化至下方) -->
-              <el-table-column :label="$t('tabEmailAddress')" min-width="260">
+              <!-- 0. 多选列 -->
+              <el-table-column type="selection" width="46" align="center" />
+
+              <!-- 列 1: 工单编号 (直接改为#开头的编号，附带邮箱与复制) -->
+              <el-table-column :label="$t('auditColTicketNo')" min-width="230">
                 <template #default="{ row }">
-                  <div class="email-cell">
-                    <div class="email-main-row">
-                      <span class="subject-email font-mono clickable-email" :title="row.email" @click="openAuditDrawer(row)">
-                        {{ row.email }}
+                  <div class="ticket-cell">
+                    <div class="ticket-row-top">
+                      <span class="ticket-id font-mono font-medium clickable-ticket" @click="openAuditDrawer(row)">
+                        {{ formatTicketNo(row) }}
                       </span>
-                      <!-- 【表格列宽与截断修复】高风险标签彻底解决截断：统一文案「高风险 · 已管控」，紧凑样式，不换行不截断 -->
                       <el-tag
+                        v-if="row.reportedByOthers && row.reportedByOthers > 0"
                         size="small"
-                        :type="getRiskTagType(row.riskLevel || row.priority)"
+                        type="danger"
                         effect="plain"
-                        class="audit-sub-tag"
+                        class="tag-compact"
                       >
-                        {{ getRiskLabel(row.riskLevel || row.priority) }}
+                        {{ $t('auditReportBadgeCount', { count: row.reportedByOthers }) }}
                       </el-tag>
                     </div>
-                    <!-- 案件编号弱化显示在邮箱下方 (10px + opacity 0.65) -->
-                    <div class="ticket-sub font-mono">
-                      <span class="ticket-text">{{ row.ticketId || ('BAN-' + String(row.id).padStart(6, '0')) }}</span>
-                      <span class="copy-sub-btn" :title="$t('copy')" @click.stop="copyText(row.email)">
-                        <Icon icon="fluent:copy-16-regular" width="11" height="11" />
+                    <div class="ticket-email-wrap">
+                      <span class="ticket-email font-mono" :title="row.email" @click="openAuditDrawer(row)">
+                        {{ row.email }}
+                      </span>
+                      <span class="copy-ticket-btn" :title="$t('copy')" @click.stop="copyText(row.email)">
+                        <Icon icon="fluent:copy-16-regular" width="12" height="12" />
                       </span>
                     </div>
                   </div>
                 </template>
               </el-table-column>
 
-              <!-- 【表格列宽与截断修复】列 2: 当前状态 (固定 160px，规范中点格式，不换行不截断) -->
-              <el-table-column :label="$t('auditCurrentStatus')" width="160">
+              <!-- 列 2: 当前状态 (说明当前的实际状态，表头集成状态筛选) -->
+              <el-table-column width="170">
+                <template #header>
+                  <div class="col-filter-header">
+                    <span>{{ $t('auditCurrentStatus') }}</span>
+                    <el-dropdown trigger="click" @command="handleStatusFilterCommand">
+                      <span class="filter-trigger" :class="{ 'filter-active': params.status !== 'all' }" :title="$t('filter')">
+                        <Icon icon="fluent:filter-16-regular" width="13" height="13" />
+                      </span>
+                      <template #dropdown>
+                        <el-dropdown-menu>
+                          <el-dropdown-item command="all" :class="{ 'is-selected': params.status === 'all' }">
+                            {{ $t('auditAllStatus') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="banned" :class="{ 'is-selected': params.status === 'banned' }">
+                            {{ $t('auditStatusBannedActive') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="pending" :class="{ 'is-selected': params.status === 'pending' }">
+                            {{ $t('auditCaseStatusPending') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="unbanned" :class="{ 'is-selected': params.status === 'unbanned' }">
+                            {{ $t('auditStatusUnbannedRecord') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="watching" :class="{ 'is-selected': params.status === 'watching' }">
+                            {{ $t('auditStatusWatching') }}
+                          </el-dropdown-item>
+                        </el-dropdown-menu>
+                      </template>
+                    </el-dropdown>
+                  </div>
+                </template>
                 <template #default="{ row }">
-                  <el-tag v-if="row.status === 'banned'" size="small" type="danger" effect="plain" class="status-tag-with-icon">
-                    <Icon icon="fluent:prohibited-16-regular" width="14" height="14" class="status-tag-icon" />
-                    <span>{{ $t('auditStatusBannedActive') }}</span>
-                  </el-tag>
-                  <el-tag v-else-if="row.status === 'pending' || row.status === 'active'" size="small" type="warning" effect="plain" class="status-tag-with-icon">
-                    <Icon icon="fluent:clock-16-regular" width="14" height="14" class="status-tag-icon" />
-                    <span>{{ $t('auditCaseStatusPending') }}</span>
-                  </el-tag>
-                  <el-tag v-else-if="row.status === 'unbanned' || row.status === 'resolved'" size="small" type="success" effect="plain" class="status-tag-with-icon">
-                    <Icon icon="fluent:checkmark-circle-16-regular" width="14" height="14" class="status-tag-icon" />
-                    <span>{{ $t('auditStatusUnbannedRecord') }}</span>
-                  </el-tag>
-                  <el-tag v-else size="small" type="info" effect="plain" class="status-tag-with-icon">
-                    <Icon icon="fluent:eye-16-regular" width="14" height="14" class="status-tag-icon" />
-                    <span>{{ $t('auditStatusWatching') }}</span>
+                  <el-tag :type="getStatusTagType(row.status)" size="small" effect="plain" class="status-tag-with-icon">
+                    <Icon :icon="getStatusIcon(row.status)" width="13" height="13" class="status-tag-icon" />
+                    <span>{{ getStatusLabel(row.status) }}</span>
                   </el-tag>
                 </template>
               </el-table-column>
 
-              <!-- 【表格列宽与截断修复】列 3: 封禁原因 (min-width 220px) -->
-              <el-table-column :label="$t('auditColBanReason')" min-width="220" show-overflow-tooltip>
+              <!-- 列 3: 报警原因 / 风险等级 (表头集成风险筛选，滥用威胁显示原因，申诉审计显示风险等级LV0~LV3) -->
+              <el-table-column min-width="190">
+                <template #header>
+                  <div class="col-filter-header">
+                    <span>{{ activeKpi === 'threat' ? $t('auditColAlarmReason') : (activeKpi === 'appeal' ? $t('auditRiskLevel') : `${$t('auditColAlarmReason')} / ${$t('auditRiskLevel')}`) }}</span>
+                    <el-dropdown trigger="click" @command="handleRiskFilterCommand">
+                      <span class="filter-trigger" :class="{ 'filter-active': params.riskLevel !== 'all' }" :title="$t('filter')">
+                        <Icon icon="fluent:filter-16-regular" width="13" height="13" />
+                      </span>
+                      <template #dropdown>
+                        <el-dropdown-menu>
+                          <el-dropdown-item command="all" :class="{ 'is-selected': params.riskLevel === 'all' }">
+                            {{ $t('auditAllRiskLevel') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="high" :class="{ 'is-selected': params.riskLevel === 'high' }">
+                            LV3 · {{ $t('auditRiskLevelHigh') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="medium" :class="{ 'is-selected': params.riskLevel === 'medium' }">
+                            LV2 · {{ $t('auditRiskLevelMedium') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="normal" :class="{ 'is-selected': params.riskLevel === 'normal' }">
+                            LV1 · {{ $t('auditRiskLevelLow') }}
+                          </el-dropdown-item>
+                        </el-dropdown-menu>
+                      </template>
+                    </el-dropdown>
+                  </div>
+                </template>
                 <template #default="{ row }">
-                  <span class="ban-reason-text">{{ row.banReason || row.actionText || '-' }}</span>
+                  <!-- 申诉审计：显示风险等级 LV0~LV3 -->
+                  <template v-if="activeKpi === 'appeal'">
+                    <el-tag size="small" :type="getRiskTagType(row.priority || row.riskLevel)" effect="plain">
+                      {{ getAppealRiskLevel(row) }}
+                    </el-tag>
+                  </template>
+                  <!-- 滥用威胁：只显示简单的报警原因，如一人多号、多次检举等 -->
+                  <template v-else-if="activeKpi === 'threat'">
+                    <span class="plain-reason-text">{{ getSimpleAlarmReason(row) }}</span>
+                  </template>
+                  <!-- 其他（风险管理/操作记录）：综合显示原因与等级 -->
+                  <template v-else>
+                    <div class="hybrid-reason-cell">
+                      <span class="plain-reason-text">{{ getSimpleAlarmReason(row) }}</span>
+                      <el-tag v-if="row.priority || (row.riskLevel && row.riskLevel !== 'normal')" size="small" :type="getRiskTagType(row.priority || row.riskLevel)" effect="plain" class="tag-compact">
+                        {{ getAppealRiskLevel(row) }}
+                      </el-tag>
+                    </div>
+                  </template>
                 </template>
               </el-table-column>
 
-              <!-- 【表格列宽与截断修复】列 4: 封禁时间 (固定 155px) -->
-              <el-table-column :label="$t('auditColBanTime')" width="155">
+              <!-- 列 4: 处理时间 (指的是报警时间，表头集成时间筛选) -->
+              <el-table-column width="165">
+                <template #header>
+                  <div class="col-filter-header">
+                    <span>{{ $t('auditColProcessTime') }}</span>
+                    <el-dropdown trigger="click" @command="handleTimeFilterCommand">
+                      <span class="filter-trigger" :class="{ 'filter-active': params.timeRange !== 'all' }" :title="$t('filter')">
+                        <Icon icon="fluent:filter-16-regular" width="13" height="13" />
+                      </span>
+                      <template #dropdown>
+                        <el-dropdown-menu>
+                          <el-dropdown-item command="all" :class="{ 'is-selected': params.timeRange === 'all' }">
+                            {{ $t('auditAllProcessTime') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="today" :class="{ 'is-selected': params.timeRange === 'today' }">
+                            {{ $t('auditTimeToday') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="7days" :class="{ 'is-selected': params.timeRange === '7days' }">
+                            {{ $t('auditTime7Days') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="30days" :class="{ 'is-selected': params.timeRange === '30days' }">
+                            {{ $t('auditTime30Days') }}
+                          </el-dropdown-item>
+                        </el-dropdown-menu>
+                      </template>
+                    </el-dropdown>
+                  </div>
+                </template>
                 <template #default="{ row }">
                   <span class="plain-time font-mono">
                     {{ (row.banTime || row.createTime) ? tzDayjs(row.banTime || row.createTime).format('YYYY-MM-DD HH:mm') : '-' }}
@@ -284,17 +326,23 @@
                 </template>
               </el-table-column>
 
-              <!-- 【表格列宽与截断修复】列 5: 最后处理时间 (固定 155px) -->
-              <el-table-column :label="$t('auditColLastProcessTime')" width="155">
+              <!-- 列 5: 到期时间 (对于滥用威胁不存在) -->
+              <el-table-column :label="$t('auditColExpireTime')" width="145">
                 <template #default="{ row }">
-                  <span class="plain-time font-mono">
-                    {{ (row.resolvedTime || row.banTime || row.createTime) ? tzDayjs(row.resolvedTime || row.banTime || row.createTime).format('YYYY-MM-DD HH:mm') : '-' }}
+                  <span v-if="activeKpi === 'threat' || row.status === 'banned' || row.warningType === 'ban'" class="plain-dash-text font-mono">
+                    -
+                  </span>
+                  <span v-else-if="row.expireTime" class="plain-time font-mono">
+                    {{ tzDayjs(row.expireTime).format('YYYY-MM-DD HH:mm') }}
+                  </span>
+                  <span v-else class="plain-dash-text font-mono">
+                    -
                   </span>
                 </template>
               </el-table-column>
 
-              <!-- 【表格列宽与截断修复】列 6: 处理人 / 负责人 (固定 140px) -->
-              <el-table-column :label="$t('auditColOperator')" width="140">
+              <!-- 列 6: 负责人 (固定 140px) -->
+              <el-table-column :label="$t('auditColAssignee')" width="140">
                 <template #default="{ row }">
                   <div class="operator-cell">
                     <div class="operator-avatar font-mono">
@@ -308,11 +356,11 @@
                 </template>
               </el-table-column>
 
-              <!-- 【操作列重构】列 7: 操作 (固定右侧 210px/240px，统一右对齐，gap 6px，文字按钮 + 圆形图标按钮 + 主色详情文字按钮，完整显示零截断) -->
-              <el-table-column :label="$t('action')" :width="['en', 'nl', 'es', 'fr'].includes(locale) ? 240 : 210" fixed="right" align="right">
+              <!-- 列 7: 操作 (固定右侧 200px/230px，统一右对齐，纯图标 + 紧凑按钮) -->
+              <el-table-column :label="$t('action')" :width="['en', 'nl', 'es', 'fr'].includes(locale) ? 230 : 200" fixed="right" align="right">
                 <template #default="{ row }">
                   <div class="table-actions-group">
-                    <!-- 「解封」/「重新封禁」绿色/红色文字按钮 -->
+                    <!-- 「解封」/「重新封禁」快捷按钮 -->
                     <el-button
                       v-if="row.status === 'banned'"
                       size="small"
@@ -336,7 +384,7 @@
                       <span>{{ $t('auditBtnReban') }}</span>
                     </el-button>
 
-                    <!-- 「延期」圆形图标按钮（带 hover tooltip） -->
+                    <!-- 「延期」圆形图标按钮 -->
                     <el-tooltip effect="dark" :content="$t('auditBtnExtend')" placement="top">
                       <el-button
                         size="small"
@@ -348,7 +396,7 @@
                       </el-button>
                     </el-tooltip>
 
-                    <!-- 「备注」圆形图标按钮（带 hover tooltip） -->
+                    <!-- 「备注」圆形图标按钮 -->
                     <el-tooltip effect="dark" :content="$t('auditBtnNote')" placement="top">
                       <el-button
                         size="small"
@@ -360,7 +408,7 @@
                       </el-button>
                     </el-tooltip>
 
-                    <!-- 「查看详情」主色文字按钮，完整显示「查看详情」，禁止截断 -->
+                    <!-- 「查看详情」主色文字按钮 -->
                     <el-button
                       size="small"
                       type="primary"
@@ -375,16 +423,30 @@
               </el-table-column>
             </el-table>
 
-            <!-- 统一底部分页 -->
-            <div class="pagination">
+            <!-- 统一底部分页 (完全对齐用户列表规范与响应式) -->
+            <div class="pagination" v-if="total > 10">
               <el-pagination
-                v-model:current-page="params.num"
-                v-model:page-size="params.size"
-                :page-sizes="[10, 15, 20, 50]"
-                layout="total, sizes, prev, pager, next, jumper"
+                :size="pageSize"
+                :current-page="params.num"
+                :page-size="params.size"
+                :pager-count="pagerCount"
+                :page-sizes="[10, 15, 20, 25, 30, 50]"
+                background
+                :layout="layout"
                 :total="total"
                 @size-change="handleSizeChange"
                 @current-change="handleCurrentChange"
+              />
+              <el-pagination
+                v-if="phonePageShow"
+                :size="pageSize"
+                :current-page="params.num"
+                :page-size="params.size"
+                :pager-count="pagerCount"
+                :page-sizes="[10, 15, 20, 25, 30, 50]"
+                background
+                layout="sizes, total"
+                :total="total"
               />
             </div>
           </div>
@@ -826,6 +888,21 @@ const first = ref(true);
 const scrollbarRef = ref(null);
 const logs = ref([]);
 const total = ref(0);
+const selectedRows = ref([]);
+
+// 响应式分页状态 (完全对齐用户列表规范)
+const layout = ref('prev, pager, next, sizes, total');
+const pageSize = ref('');
+const pagerCount = ref(10);
+const phonePageShow = ref(false);
+
+function handleResize() {
+  const width = window.innerWidth;
+  phonePageShow.value = width < 768;
+  pagerCount.value = width < 768 ? 7 : 11;
+  layout.value = width < 768 ? 'pager' : 'prev, pager, next, sizes, total';
+  pageSize.value = width < 380 ? 'small' : '';
+}
 
 // 本地搜索关键字，与顶栏 topbar-search 双向结合
 const localKeyword = ref('');
@@ -912,18 +989,18 @@ function selectKpiFilter(type) {
     activeKpi.value = type;
     params.timeRange = 'all';
     if (type === 'threat' || type === 'highrisk') {
-      // 1. 威胁邮箱：展示所有LV3以上的威胁账户，主要包含1人多号、被举报等
+      // 1. 滥用威胁：展示所有LV3以上的威胁账户，主要包含1人多号、被举报等
       params.riskLevel = 'high';
       params.warningType = 'all';
       params.status = 'all';
-    } else if (type === 'audit') {
-      // 2. 待审计邮箱：所有LV0~LV3的邮箱，主要包括接发垃圾邮件、多次跳IP登录等等
-      params.warningType = 'audit';
+    } else if (type === 'appeal' || type === 'pending') {
+      // 2. 申诉审计：通过填写符合表格对于已做出的判决的邮箱进行申诉的邮箱
+      params.warningType = 'appeal';
       params.riskLevel = 'all';
       params.status = 'all';
-    } else if (type === 'appeal' || type === 'pending') {
-      // 3. 申诉邮箱：通过填写符合表格对于已做出的判决的邮箱进行申诉的邮箱
-      params.warningType = 'appeal';
+    } else if (type === 'audit') {
+      // 3. 风险管理：所有LV0~LV3的邮箱，主要包括接发垃圾邮件、多次跳IP登录等等
+      params.warningType = 'audit';
       params.riskLevel = 'all';
       params.status = 'all';
     } else if (type === 'record' || type === 'banned') {
@@ -952,8 +1029,232 @@ function handleReset() {
   params.timeRange = 'all';
   params.riskLevel = 'all';
   params.warningType = 'all';
+  params.timeSort = 0;
   activeKpi.value = 'all';
   search();
+}
+
+function formatTicketNo(row) {
+  if (!row) return '#-';
+  if (row.id) return `#${10000 + Number(row.id)}`;
+  if (row.ticketId) {
+    const digits = row.ticketId.replace(/\D/g, '');
+    return `#${digits || '10001'}`;
+  }
+  return '#10001';
+}
+
+function getSimpleAlarmReason(row) {
+  if (!row) return '-';
+  if (row.reportedByOthers && row.reportedByOthers > 0) {
+    return `${t('auditReasonUserReported')} (${row.reportedByOthers})`;
+  }
+  if (row.eventType === 'multi_account_ban' || row.eventType === 'multi_account_detected' || (row.banReason && row.banReason.includes('一人多号'))) {
+    return t('auditReasonMultiAccount');
+  }
+  if (row.eventType === 'auto_ban' || (row.banReason && (row.banReason.includes('频率') || row.banReason.includes('超频')))) {
+    return t('auditReasonRateLimit');
+  }
+  if (row.eventType === 'credential_tamper_ban' || (row.banReason && (row.banReason.includes('密保') || row.banReason.includes('换机')))) {
+    return t('auditReasonCredentialAnomaly');
+  }
+  if (row.eventType === 'ip_roaming_routine' || (row.actionText && row.actionText.includes('漫游'))) {
+    return t('auditReasonRoaming');
+  }
+  if (row.banReason) {
+    return row.banReason.split(/[（(，,]/)[0].trim() || row.banReason;
+  }
+  if (row.reportCategory) {
+    return getCategoryLabel(row.reportCategory);
+  }
+  if (row.actionText) {
+    const clean = row.actionText.replace(/\{[^}]+\}\s*/, '');
+    return clean.split(/[（(，,]/)[0].trim() || clean;
+  }
+  return '-';
+}
+
+function getAppealRiskLevel(row) {
+  const p = (row?.priority || '').toUpperCase();
+  if (['P0', 'CRITICAL', 'LV3'].includes(p) || row?.riskLevel === 'high') return 'LV3 · ' + t('auditRiskLevelHigh');
+  if (['P1', 'LV2'].includes(p) || row?.riskLevel === 'medium') return 'LV2 · ' + t('auditRiskLevelMedium');
+  if (['P2', 'LV1'].includes(p) || row?.riskLevel === 'low') return 'LV1 · ' + t('auditRiskLevelLow');
+  return 'LV0 · ' + t('auditRiskLevelNormal');
+}
+
+function getStatusIcon(status) {
+  switch (status) {
+    case 'banned': return 'fluent:prohibited-16-regular';
+    case 'pending':
+    case 'active': return 'fluent:clock-16-regular';
+    case 'resolved':
+    case 'unbanned': return 'fluent:checkmark-circle-16-regular';
+    case 'rejected': return 'fluent:dismiss-circle-16-regular';
+    case 'expired': return 'fluent:timer-16-regular';
+    default: return 'fluent:eye-16-regular';
+  }
+}
+
+function handleStatusFilterCommand(cmd) {
+  params.status = cmd;
+  search();
+}
+
+function handleRiskFilterCommand(cmd) {
+  params.riskLevel = cmd;
+  search();
+}
+
+function handleTimeFilterCommand(cmd) {
+  params.timeRange = cmd;
+  search();
+}
+
+function handleSelectionChange(rows) {
+  selectedRows.value = rows || [];
+}
+
+async function handleBatchUnban() {
+  if (!selectedRows.value.length) return;
+  try {
+    await ElMessageBox.confirm(
+      t('auditBatchUnbanConfirm', { count: selectedRows.value.length }),
+      t('auditBatchUnban'),
+      {
+        confirmButtonText: t('auditBatchUnban'),
+        cancelButtonText: t('cancel'),
+        type: 'success'
+      }
+    );
+    actionLoading.value = true;
+    for (const row of selectedRows.value) {
+      try {
+        await auditAction({
+          id: row.id,
+          action: 'unban',
+          targetEmail: row.email,
+          notes: `${t('auditBatchUnban')} (${row.email})`
+        });
+      } catch (err) {
+        console.error(err);
+      }
+    }
+    ElMessage.success(t('auditActionSuccess') || t('saveSuccessMsg'));
+    selectedRows.value = [];
+    fetchAuditList();
+  } catch (e) {
+    if (e !== 'cancel') console.error(e);
+  } finally {
+    actionLoading.value = false;
+  }
+}
+
+async function handleBatchBan() {
+  if (!selectedRows.value.length) return;
+  try {
+    await ElMessageBox.confirm(
+      t('auditBatchBanConfirm', { count: selectedRows.value.length }),
+      t('auditBatchBan'),
+      {
+        confirmButtonText: t('auditBatchBan'),
+        cancelButtonText: t('cancel'),
+        type: 'warning'
+      }
+    );
+    actionLoading.value = true;
+    for (const row of selectedRows.value) {
+      try {
+        await auditAction({
+          id: row.id,
+          action: 'ban',
+          targetEmail: row.email,
+          notes: `${t('auditBatchBan')} (${row.email})`
+        });
+      } catch (err) {
+        console.error(err);
+      }
+    }
+    ElMessage.success(t('auditActionSuccess') || t('saveSuccessMsg'));
+    selectedRows.value = [];
+    fetchAuditList();
+  } catch (e) {
+    if (e !== 'cancel') console.error(e);
+  } finally {
+    actionLoading.value = false;
+  }
+}
+
+async function handleBatchDelete() {
+  if (!selectedRows.value.length) return;
+  try {
+    await ElMessageBox.confirm(
+      t('auditBatchDeleteConfirm', { count: selectedRows.value.length }),
+      t('auditBatchDelete'),
+      {
+        confirmButtonText: t('auditBatchDelete'),
+        cancelButtonText: t('cancel'),
+        type: 'danger'
+      }
+    );
+    actionLoading.value = true;
+    for (const row of selectedRows.value) {
+      try {
+        await auditAction({
+          id: row.id,
+          action: 'delete',
+          targetEmail: row.email
+        });
+      } catch (err) {
+        console.error(err);
+      }
+    }
+    ElMessage.success(t('auditActionSuccess') || t('saveSuccessMsg'));
+    selectedRows.value = [];
+    fetchAuditList();
+  } catch (e) {
+    if (e !== 'cancel') console.error(e);
+  } finally {
+    actionLoading.value = false;
+  }
+}
+
+function handleExportCsv() {
+  if (!logs.value || logs.value.length === 0) {
+    ElMessage.info(t('auditEmptyLogs') || '无数据可导出');
+    return;
+  }
+  const headers = [
+    t('auditColTicketNo'),
+    t('tabEmailAddress'),
+    t('auditCurrentStatus'),
+    t('auditColAlarmReason'),
+    t('auditColProcessTime'),
+    t('auditColExpireTime'),
+    t('auditColAssignee')
+  ];
+  const csvRows = [headers.join(',')];
+  for (const row of logs.value) {
+    const rowValues = [
+      formatTicketNo(row),
+      `"${row.email || ''}"`,
+      `"${getStatusLabel(row.status)}"`,
+      `"${getSimpleAlarmReason(row)}"`,
+      `"${(row.banTime || row.createTime) ? tzDayjs(row.banTime || row.createTime).format('YYYY-MM-DD HH:mm') : ''}"`,
+      `"${row.expireTime ? tzDayjs(row.expireTime).format('YYYY-MM-DD HH:mm') : '-'}"`,
+      `"${getOperatorName(row)}"`
+    ];
+    csvRows.push(rowValues.join(','));
+  }
+  const blob = new Blob(['\uFEFF' + csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', `audit_logs_${tzDayjs().format('YYYYMMDD_HHmmss')}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+  ElMessage.success(t('copySuccessMsg') || '导出成功');
 }
 
 function copyText(text) {
@@ -1365,6 +1666,8 @@ async function handlePurge() {
 }
 
 onMounted(() => {
+  handleResize();
+  window.addEventListener('resize', handleResize);
   if (emailStore.searchKeyword) {
     localKeyword.value = emailStore.searchKeyword.trim();
     params.keyword = localKeyword.value;
@@ -1374,6 +1677,7 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+  window.removeEventListener('resize', handleResize);
   window.removeEventListener('manage-audit-search', handleGlobalTopSearch);
 });
 </script>
@@ -1579,56 +1883,151 @@ onUnmounted(() => {
   overflow: hidden;
 }
 
-/* 顶部操作栏：统一严格左对齐排布 */
+/* 顶部操作栏：学习用户列表标准操作栏风格 (纯图标排布，支持多选批量) */
 .header-actions {
-  padding: 8px 12px;
+  padding: 9px 15px;
   display: flex;
-  justify-content: flex-start;
-  align-items: center;
-  gap: 10px;
+  gap: 15px;
   flex-wrap: wrap;
+  align-items: center;
+  box-shadow: var(--header-actions-border);
+  font-size: 18px;
   background: var(--el-bg-color);
-  border-bottom: 1px solid var(--el-border-color-lighter);
 
-  .search-input {
-    width: min(260px, calc(100vw - 120px));
-  }
+  .icon {
+    cursor: pointer;
+    color: var(--el-text-color-regular);
+    transition: color 0.15s, transform 0.15s;
 
-  .search {
-    :deep(.el-input__wrapper) {
-      height: 28px;
+    &:hover {
+      color: var(--el-color-primary);
+      transform: translateY(-1px);
     }
   }
 
-  .search-prefix-icon {
-    color: var(--el-text-color-placeholder);
-    margin-right: 4px;
-  }
-
-  .status-select {
-    :deep(.el-select__wrapper) {
-      min-height: 28px;
-    }
-  }
-
-  .actions-left-buttons {
+  .batch-actions-wrap {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-  }
+    gap: 10px;
+    margin-left: 8px;
+    padding-left: 14px;
+    border-left: 1px solid var(--el-border-color-lighter);
 
-  .action-btn-item {
-    color: var(--el-text-color-regular);
-    border-color: var(--el-border-color-lighter);
-    background: transparent;
+    .batch-selected-count {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--el-color-primary);
+    }
+  }
+}
+
+.col-filter-header {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+
+  .filter-trigger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+    cursor: pointer;
+    color: var(--el-text-color-placeholder);
     transition: all 0.2s;
 
     &:hover {
       color: var(--el-color-primary);
-      border-color: var(--el-color-primary);
-      background: var(--el-color-primary-light-9);
+      background: var(--el-fill-color-light);
+    }
+
+    &.filter-active {
+      color: #fff;
+      background: var(--el-color-primary);
     }
   }
+}
+
+.ticket-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  justify-content: center;
+
+  .ticket-row-top {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+
+    .ticket-id {
+      font-weight: 600;
+      font-size: 13px;
+      color: var(--el-color-primary);
+      cursor: pointer;
+
+      &:hover {
+        text-decoration: underline;
+      }
+    }
+  }
+
+  .ticket-email-wrap {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+
+    .ticket-email {
+      font-size: 12px;
+      color: var(--el-text-color-secondary);
+      cursor: pointer;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 220px;
+
+      &:hover {
+        color: var(--el-color-primary);
+      }
+    }
+
+    .copy-ticket-btn {
+      display: inline-flex;
+      align-items: center;
+      cursor: pointer;
+      color: var(--el-text-color-placeholder);
+      transition: color 0.15s;
+
+      &:hover {
+        color: var(--el-color-primary);
+      }
+    }
+  }
+}
+
+.plain-reason-text {
+  font-size: 12.5px;
+  color: var(--el-text-color-regular);
+  line-height: 1.4;
+}
+
+.hybrid-reason-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.tag-compact {
+  font-size: 11px;
+  height: 20px;
+  line-height: 18px;
+  padding: 0 5px;
+}
+
+.plain-dash-text {
+  color: var(--el-text-color-placeholder);
+  font-size: 13px;
 }
 
 /* 3. 核心管理表格 (零脱节，直接作为外框铺满) */
@@ -1991,11 +2390,21 @@ html.dark {
 }
 
 .pagination {
+  margin-top: 15px;
+  margin-bottom: 20px;
+  padding-right: 30px;
+  width: 100%;
   display: flex;
-  justify-content: flex-end;
-  padding: 10px 16px;
-  background: var(--el-bg-color);
-  border-top: 1px solid var(--el-border-color-lighter);
+  flex-direction: column;
+  justify-content: end;
+  gap: 10px;
+  @media (max-width: 767px) {
+    padding-right: 10px;
+  }
+
+  .el-pagination {
+    align-self: end;
+  }
 }
 
 /* 4. 侧边抽屉样式 (Google 式安全研判工作台) */
