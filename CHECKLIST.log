@@ -8,6 +8,29 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### 安全审计控制台 UI 部署 Cloudflare 生产环境 (mail.epocanvas.com) 与全量视觉检视核验 (2026-10-09)
+*   **关联提交 (Git Commit)**: `df573d74ee21a3b054801ec1d49cc320d134c348` (Short: `df573d7`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com)` (Version ID: `ba450509-a7f0-41b6-8ffb-4ba86f906878`, Startup: `68ms`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] Cloudflare 生产环境全量发布：
+      - 前端构建打包产物全量上传并部署至 Cloudflare Workers (`ba450509-a7f0-41b6-8ffb-4ba86f906878`)；
+    - [x] 表格 7 大列宽度排版与右侧遮挡彻底根治：
+      - 重新分配列宽基准（工单编号 170px、状态 135px、原因/等级 135px、处理时间 140px、到期时间 105px、负责人 120px、操作 175px/195px）；
+      - 移除 `fixed="right"` 脱节遮挡层，彻底消除「到期时间」文字截断与「负责人」列被掩盖的问题；
+      - 在 1440px 桌面视口下所有 7 大列自适应完整铺展，零横向滚动条；
+    - [x] 线上全真检视与视觉截图比对：
+      - 滥用威胁视口核验截图：`tests/cf_production_threat_verified.png`；
+      - 申诉审计视口核验截图：`tests/cf_production_appeal_verified.png`；
+      - 操作记录视口核验截图：`tests/cf_production_record_verified.png`。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：mail-vue 构建通过 (耗时 12.43s，0 警告 0 报错)；
+    - [x] 公网生产环境端到端检视套件：`tests/verify-cf-production-audit-ui.mjs` 全绿 (22/22 断言全过)；
+    - [x] 本地全真测试套件：`tests/verify-audit-ui-optimization.mjs` 全绿 (6/6 验收项通过)；
+    - [x] 多语言对称与审计：
+      - `node scripts/i18n-symmetry.mjs` (2559 键全 6 语言字典 100% 绝对对称通过)；
+      - `node scripts/i18n-audit.mjs` (0 缺失引用通过)；
+    - [x] 零假数据残留：数据源为公网真实 API，无任何测试假数据残留。
+
 ### 安全审计与封禁管控后台 UI/UX 深度精益优化 · KPI重排重命名/表头集成筛选/多选与分页对齐 (2026-10-09)
 *   **关联提交 (Git Commit)**: `0dcef2099e716bce9daa9334a85ce78bf691f14e` (Short: `0dcef20`)
 *   **部署环境 (Deployment)**: `本地全真栈 / 生产 Cloudflare (mail.epocanvas.com)`
