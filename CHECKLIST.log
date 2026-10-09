@@ -7,6 +7,45 @@
 > 制度规范与工作流指引请见 [AGENTS.md](file:///home/shijian/projects/epocanvas-mail/AGENTS.md)。
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
+### 邮箱封禁管控后台 UI 彻底修复 · 操作列边距重置、零截断及 Cloudflare 生产环境全量核验上线 (2026-10-08)
+*   **关联提交 (Git Commit)**: `0605e46ddae208933b91c015b6ea9399eb6d6c29` (Short: `0605e46`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com)` (Version ID: `14aac37c-0eec-4e5f-894e-d62c36ad8f81`, Startup: `63ms`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 表格列宽与截断彻底根治：
+      - 用户邮箱：`min-width 260px`（邮箱名加粗收尾，副级案件编号 10px + opacity 0.65）；
+      - 当前状态：`width 160px`（规范中点格式，不换行不截断）；
+      - 封禁原因：`min-width 220px`；
+      - 封禁时间：`width 155px`；
+      - 最后处理时间：`width 155px`；
+      - 处理人/负责人：`width 140px`；
+      - 操作：微调分配为 `210px`（中文及繁体）/ `240px`（英/荷/西/法），固定右侧；
+    - [x] 高风险标签彻底解决截断：
+      - 统一文案「高风险 · 已管控」，使用紧凑 tag 样式（padding 0 6px、字号 11px、flex-shrink 0、white-space nowrap）；
+      - 线上实测 scrollWidth 83px == clientWidth 83px，无问号、无截断中点；
+    - [x] 操作列重构与边距消除（彻底根治「查看详」截断）：
+      - 根治 Element Plus 默认 `.el-button + .el-button { margin-left: 12px }` 导致的 36px 冗余边距；
+      - 强制设置 `.table-actions-group` 所有按钮 `margin: 0 !important; margin-left: 0 !important;`；
+      - 按钮之间使用统一 `gap: 6px` 控制间距，整体右对齐；
+      - 设置右侧单元格 `overflow: visible !important;` 杜绝像素舍入截断；
+      - 「查看详情」完整显示，线上实测 scrollWidth 56px == clientWidth 56px，零截断；
+    - [x] 侧边抽屉「多维风险画像」重构为 Scheme A 两列对比卡片：
+      - 左侧「当前账号实际证据值」vs 右侧「系统基准 / 正常值 / 风险阈值」；
+      - 默认平铺展开全部 22 项对比指标，废除 Accordion 折叠；
+      - 异常超标项（如同一IP关联账号数 > 1）显式红色高亮警示；
+      - 抽屉标题统一为「封禁台账 · 存证（只读）」，底部主按钮与行内「解封」/「重新封禁」严格一致。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 前端构建核验：mail-vue 构建成功（耗时 12.90s，0 警告 0 报错）；
+    - [x] 多语言静态审计三件套通过：
+      - `node scripts/i18n-symmetry.mjs` (2523 键 100% 绝对对称通过)；
+      - `node scripts/i18n-audit.mjs` (0 缺失引用通过)；
+      - `node scripts/i18n-hardcoded.mjs` (views/audit-report/index.vue 0 未包裹硬编码通过)；
+    - [x] 本地全真栈专项测试：`tests/verify-ban-table-columns-truncation.mjs` 15/15 项全绿；
+    - [x] Cloudflare 生产环境真实上线：`npm run deploy --prefix mail-worker` (Version ID: `14aac37c-0eec-4e5f-894e-d62c36ad8f81`)；
+    - [x] 公网真实生产环境自动化验收测试：`tests/verify-cf-production-ban-ui.mjs` 21/21 项全绿：
+      - 真实生产主表截图：`tests/cf_live_prod_table_verified.png`；
+      - 真实生产抽屉对比截图：`tests/cf_live_prod_drawer_compare_verified.png`；
+    - [x] 零假数据残留：已验证物理数据安全。
+
 ### 邮箱封禁管控后台 UI 彻底修复 · 列宽优化、零截断、操作列重构与两列对比证据卡片 (2026-10-08)
 *   **关联提交 (Git Commit)**: `1b21869685191d798c0331405388d392ad84c5e2` (Short: `1b21869`)
 *   **部署环境 (Deployment)**: `本地全真栈 / 构建核验 (mail-worker/dist)`
