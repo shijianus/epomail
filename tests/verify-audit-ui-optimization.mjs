@@ -37,7 +37,7 @@ assert.ok(vueContent.includes('formatTicketNo(row)'), '工单编号直接调用 
 assert.ok(vueContent.includes('getSimpleAlarmReason(row)'), '针对滥用威胁展示简明报警原因 (如一人多号、多次检举等)');
 assert.ok(vueContent.includes('getAppealRiskLevel(row)'), '针对申诉审计展示风险等级 (LV0~LV3)');
 assert.ok(vueContent.includes(':label="$t(\'auditColProcessTime\')"') || vueContent.includes('$t(\'auditColProcessTime\')'), '包含「处理时间」(报警时间) 列');
-assert.ok(vueContent.includes(':label="$t(\'auditColExpireTime\')"'), '包含「到期时间」列');
+assert.ok(vueContent.includes('$t(\'auditColExpireTime\')'), '包含「到期时间」列');
 assert.ok(vueContent.includes(':label="$t(\'auditColAssignee\')"'), '包含「负责人」列');
 assert.ok(vueContent.includes(':label="$t(\'action\')"'), '包含「操作」列');
 console.log('  ✓ 表格 7 大列定义完全符合需求，# 工单编号与动态原因/等级就位\n');
@@ -77,6 +77,69 @@ assert.ok(vueContent.includes('phonePageShow'), '支持手机端端自适应 siz
 assert.ok(vueContent.includes('margin-top: 15px;\n  margin-bottom: 20px;\n  padding-right: 30px;'), '分页 CSS 边距与对齐规范 100% 学习用户列表');
 console.log('  ✓ 分页完全对齐用户列表规范，去除过大尺寸，自适应布局极佳\n');
 
+// 7. 第二轮优化 8 项核验
+console.log('=== 第二轮精细化打磨 8 项需求核验 ===');
+
+// 7.1 时间排序移至列头箭头
+console.log('[第二轮 1] 时间排序集成至列头箭头，header-actions 移除时间排序图标...');
+assert.ok(vueContent.includes('header-action-trigger') && vueContent.includes('changeTimeSort'), '表头包含排序箭头触点');
+console.log('  ✓ 时间排序已成功集成至表头列箭头\n');
+
+// 7.2 默认表格行不展示邮箱名称
+console.log('[第二轮 2] 默认表格行不展示邮箱名称，仅在详情抽屉中呈现...');
+const tableColumnTicketMatch = vueContent.match(/<el-table-column :label="\$t\('auditColTicketNo'\)"[\s\S]*?<\/el-table-column>/);
+assert.ok(tableColumnTicketMatch, '找到工单编号列定义');
+assert.ok(!tableColumnTicketMatch[0].includes('ticket-email-wrap'), '表格行中无 ticket-email-wrap 邮箱展示');
+assert.ok(vueContent.includes('selectedRow.email'), '抽屉扩展界面保留邮箱完整展示');
+console.log('  ✓ 默认表格行彻底移除邮箱名称干扰，仅保留于扩展抽屉中\n');
+
+// 7.3 当前状态列无边框，icon+文字水平对齐，缩短间距
+console.log('[第二轮 3] 当前状态列边框删除，纯 icon+文字水平对齐，缩短间距...');
+assert.ok(vueContent.includes('class="status-clean-item"'), '采用 status-clean-item 无边框容器');
+assert.ok(vueContent.includes('status-icon-inline') && vueContent.includes('status-text-inline'), '采用纯 icon+文字水平对齐');
+assert.ok(vueContent.includes('width="145"'), '状态列宽度适度优化至 145px 以消除文字截断');
+console.log('  ✓ 当前状态边框已清除，文字与 icon 完美水平对齐并缩短间距\n');
+
+// 7.4 时间格式 mm/dd/yy hh:ss
+console.log('[第二轮 4] 时间格式统一定制为 MM/DD/YY HH:mm...');
+assert.ok(vueContent.includes("tzDayjs(time).format('MM/DD/YY HH:mm')"), '定义 formatTableTime 格式化为 MM/DD/YY HH:mm');
+assert.ok(vueContent.includes('formatTableTime(row.banTime || row.createTime)'), '处理时间采用 formatTableTime');
+assert.ok(vueContent.includes('formatTableTime(row.expireTime)'), '到期时间采用 formatTableTime');
+console.log('  ✓ 表格所有时间展示均统一格式为 MM/DD/YY HH:mm\n');
+
+// 7.5 负责人只展示名称且点击可查看详情
+console.log('[第二轮 5] 负责人只展示名称，点击可进入账户详情...');
+assert.ok(vueContent.includes('operator-name-link'), '负责人为纯名称点击链接');
+assert.ok(vueContent.includes('handleViewOperator(row)'), '点击负责人触发 handleViewOperator');
+assert.ok(vueContent.includes('operatorDialogVisible'), '包含负责人账户详情弹窗');
+assert.ok(vueContent.includes('goToUserManagement'), '支持跳转至用户管理');
+console.log('  ✓ 负责人列为纯名称展示，点击无缝唤出账户详情弹窗\n');
+
+// 7.6 行内仅保留「查看详情」，操作整合入抽屉，支持批量延期
+console.log('[第二轮 6] 操作列仅保留「查看详情」，延期/备注/解禁整合入抽屉，header-actions 支持批量延期...');
+const actionColMatch = vueContent.match(/<el-table-column :label="\$t\('action'\)"[\s\S]*?<\/el-table-column>/);
+assert.ok(actionColMatch, '找到操作列定义');
+assert.ok(actionColMatch[0].includes('action-detail-btn'), '操作列保留查看详情按钮');
+assert.ok(!actionColMatch[0].includes('action-btn-compact'), '操作列彻底移除行内 action-btn-compact');
+assert.ok(vueContent.includes('handleBatchExtend'), '支持批量延期');
+assert.ok(vueContent.includes('handleOpenExtend'), '抽屉内整合延期');
+assert.ok(vueContent.includes('handleOpenNote'), '抽屉内整合备注');
+console.log('  ✓ 行内多余按钮已清除，操作完整下沉至查看详情中，并支持批量延期\n');
+
+// 7.7 滥用威胁无到期时间，展示处理建议
+console.log('[第二轮 7] 滥用威胁 Tab 无到期时间，替换为处理建议...');
+assert.ok(vueContent.includes("v-if=\"activeKpi !== 'threat'\"") && vueContent.includes("$t('auditColExpireTime')"), '滥用威胁下隐藏到期时间');
+assert.ok(vueContent.includes('auditColSuggestion'), '包含处理建议列');
+assert.ok(vueContent.includes('getHandlingSuggestion'), '包含动态处理建议计算');
+console.log('  ✓ 滥用威胁中已彻底移除到期时间，替换为语义化处理建议\n');
+
+// 7.8 其他 Tab 保留到期时间并加入处理建议，且仅具有到期时间的工单可延期
+console.log('[第二轮 8] 申诉/风险/记录 Tab 保留到期时间与处理建议，仅有到期时间工单可延期...');
+assert.ok(vueContent.includes('canExtendRow'), '具备 canExtendRow 检查');
+assert.ok(vueContent.includes("if (activeKpi.value === 'threat') return false;"), '滥用威胁严格禁止延期');
+assert.ok(vueContent.includes('return !!row.expireTime;'), '仅有到期时间的工单支持延期');
+console.log('  ✓ 全 Tab 均具备处理建议，到期时间与延期权限严格按规则约束\n');
+
 console.log('================================================================');
-console.log('=== 所有 6 项优化需求全量断言通过！ ===');
+console.log('=== 第一轮 6 项 + 第二轮 8 项优化需求全量断言通过！ ===');
 console.log('================================================================\n');

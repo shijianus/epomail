@@ -97,17 +97,11 @@
 
         <!-- 2. 工作台单一外框 (单一事实载体：操作栏与表格一体化) -->
         <div class="audit-workbench audit-workbench-container">
-          <!-- 顶部操作栏 (学习用户列表风格：纯图标交互、删除冗余输入框、支持批量操作) -->
+          <!-- 顶部操作栏 (学习用户列表风格：纯图标交互、删除冗余输入框、支持批量操作与批量延期) -->
           <div class="header-actions">
-            <!-- 时间排序切换 -->
-            <el-tooltip effect="dark" :content="params.timeSort === 1 ? $t('auditSortAsc') : $t('auditSortDesc')" placement="top">
-              <Icon
-                class="icon"
-                :icon="params.timeSort === 1 ? 'material-symbols-light:timer-arrow-down-outline' : 'material-symbols-light:timer-arrow-up-outline'"
-                width="28"
-                height="28"
-                @click="changeTimeSort"
-              />
+            <!-- 批量延期 (快捷操作) -->
+            <el-tooltip effect="dark" :content="$t('auditBatchExtend')" placement="top">
+              <Icon class="icon" icon="fluent:calendar-clock-20-regular" width="20" height="20" @click="handleBatchExtend" />
             </el-tooltip>
 
             <!-- 刷新列表 -->
@@ -147,6 +141,10 @@
                   <Icon icon="fluent:prohibited-16-regular" width="14" height="14" style="margin-right: 3px;" />
                   {{ $t('auditBatchBan') }}
                 </el-button>
+                <el-button size="small" type="primary" plain @click="handleBatchExtend">
+                  <Icon icon="fluent:calendar-clock-20-regular" width="14" height="14" style="margin-right: 3px;" />
+                  {{ $t('auditBatchExtend') }}
+                </el-button>
                 <el-button size="small" type="danger" link @click="handleBatchDelete">
                   <Icon icon="fluent:delete-16-regular" width="14" height="14" style="margin-right: 3px;" />
                   {{ $t('auditBatchDelete') }}
@@ -171,38 +169,28 @@
               <!-- 0. 多选列 -->
               <el-table-column type="selection" width="40" align="center" />
 
-              <!-- 列 1: 工单编号 (直接改为#开头的编号，附带邮箱与复制) -->
-              <el-table-column :label="$t('auditColTicketNo')" min-width="170">
+              <!-- 列 1: 工单编号 (无邮箱干扰，仅显示 #编号 与 举报徽标) -->
+              <el-table-column :label="$t('auditColTicketNo')" width="95">
                 <template #default="{ row }">
                   <div class="ticket-cell">
-                    <div class="ticket-row-top">
-                      <span class="ticket-id font-mono font-medium clickable-ticket" @click="openAuditDrawer(row)">
-                        {{ formatTicketNo(row) }}
-                      </span>
-                      <el-tag
-                        v-if="row.reportedByOthers && row.reportedByOthers > 0"
-                        size="small"
-                        type="danger"
-                        effect="plain"
-                        class="tag-compact"
-                      >
-                        {{ $t('auditReportBadgeCount', { count: row.reportedByOthers }) }}
-                      </el-tag>
-                    </div>
-                    <div class="ticket-email-wrap">
-                      <span class="ticket-email font-mono" :title="row.email" @click="openAuditDrawer(row)">
-                        {{ row.email }}
-                      </span>
-                      <span class="copy-ticket-btn" :title="$t('copy')" @click.stop="copyText(row.email)">
-                        <Icon icon="fluent:copy-16-regular" width="12" height="12" />
-                      </span>
-                    </div>
+                    <span class="ticket-id font-mono font-medium clickable-ticket" @click="openAuditDrawer(row)">
+                      {{ formatTicketNo(row) }}
+                    </span>
+                    <el-tag
+                      v-if="row.reportedByOthers && row.reportedByOthers > 0"
+                      size="small"
+                      type="danger"
+                      effect="plain"
+                      class="tag-compact"
+                    >
+                      {{ $t('auditReportBadgeCount', { count: row.reportedByOthers }) }}
+                    </el-tag>
                   </div>
                 </template>
               </el-table-column>
 
-              <!-- 列 2: 当前状态 (说明当前的实际状态，表头集成状态筛选) -->
-              <el-table-column width="135">
+              <!-- 列 2: 当前状态 (无边框，纯icon+文字说明水平对齐，缩短与工单编号距离) -->
+              <el-table-column width="145">
                 <template #header>
                   <div class="col-filter-header">
                     <span>{{ $t('auditCurrentStatus') }}</span>
@@ -233,10 +221,10 @@
                   </div>
                 </template>
                 <template #default="{ row }">
-                  <el-tag :type="getStatusTagType(row.status)" size="small" effect="plain" class="status-tag-with-icon">
-                    <Icon :icon="getStatusIcon(row.status)" width="13" height="13" class="status-tag-icon" />
-                    <span>{{ getStatusLabel(row.status) }}</span>
-                  </el-tag>
+                  <div class="status-clean-item" :class="`status-${row.status}`" :title="getStatusLabel(row.status)">
+                    <Icon :icon="getStatusIcon(row.status)" width="14" height="14" class="status-icon-inline" />
+                    <span class="status-text-inline">{{ getStatusLabel(row.status) }}</span>
+                  </div>
                 </template>
               </el-table-column>
 
@@ -291,11 +279,15 @@
                 </template>
               </el-table-column>
 
-              <!-- 列 4: 处理时间 (指的是报警时间，表头集成时间筛选) -->
-              <el-table-column width="140">
+              <!-- 列 4: 处理时间 (格式 mm/dd/yy hh:ss，表头集成时间筛选与排序箭头) -->
+              <el-table-column width="145">
                 <template #header>
                   <div class="col-filter-header">
                     <span>{{ $t('auditColProcessTime') }}</span>
+                    <!-- 时间排序箭头 -->
+                    <span class="header-action-trigger" :class="{ 'sort-active': params.timeSort !== 0 }" :title="params.timeSort === 1 ? $t('auditSortAsc') : $t('auditSortDesc')" @click.stop="changeTimeSort">
+                      <Icon :icon="params.timeSort === 1 ? 'fluent:arrow-up-16-regular' : (params.timeSort === 2 ? 'fluent:arrow-down-16-regular' : 'fluent:arrow-sort-16-regular')" width="13" height="13" />
+                    </span>
                     <el-dropdown trigger="click" @command="handleTimeFilterCommand">
                       <span class="filter-trigger" :class="{ 'filter-active': params.timeRange !== 'all' }" :title="$t('filter')">
                         <Icon icon="fluent:filter-16-regular" width="13" height="13" />
@@ -321,19 +313,41 @@
                 </template>
                 <template #default="{ row }">
                   <span class="plain-time font-mono">
-                    {{ (row.banTime || row.createTime) ? tzDayjs(row.banTime || row.createTime).format('YYYY-MM-DD HH:mm') : '-' }}
+                    {{ formatTableTime(row.banTime || row.createTime) }}
                   </span>
                 </template>
               </el-table-column>
 
-              <!-- 列 5: 到期时间 (对于滥用威胁不存在) -->
-              <el-table-column :label="$t('auditColExpireTime')" width="105">
+              <!-- 列 5: 处理建议 (包括封禁、解禁、暂禁dd天等等；全 Tab 均展示) -->
+              <el-table-column :label="$t('auditColSuggestion')" width="115">
                 <template #default="{ row }">
-                  <span v-if="activeKpi === 'threat' || row.status === 'banned' || row.warningType === 'ban'" class="plain-dash-text font-mono">
-                    -
-                  </span>
-                  <span v-else-if="row.expireTime" class="plain-time font-mono">
-                    {{ tzDayjs(row.expireTime).format('YYYY-MM-DD HH:mm') }}
+                  <div class="suggestion-tag-cell">
+                    <el-tag
+                      size="small"
+                      :type="getHandlingSuggestion(row).type"
+                      effect="plain"
+                      class="suggestion-tag"
+                    >
+                      {{ getHandlingSuggestion(row).text }}
+                    </el-tag>
+                  </div>
+                </template>
+              </el-table-column>
+
+              <!-- 列 6: 到期时间 (滥用威胁中无到期时间；其他 Tab 保留并使用 mm/dd/yy hh:ss 格式与排序箭头) -->
+              <el-table-column v-if="activeKpi !== 'threat'" width="135">
+                <template #header>
+                  <div class="col-filter-header">
+                    <span>{{ $t('auditColExpireTime') }}</span>
+                    <!-- 到期时间排序箭头 -->
+                    <span class="header-action-trigger" :class="{ 'sort-active': params.timeSort !== 0 }" :title="params.timeSort === 1 ? $t('auditSortAsc') : $t('auditSortDesc')" @click.stop="changeTimeSort">
+                      <Icon :icon="params.timeSort === 1 ? 'fluent:arrow-up-16-regular' : (params.timeSort === 2 ? 'fluent:arrow-down-16-regular' : 'fluent:arrow-sort-16-regular')" width="13" height="13" />
+                    </span>
+                  </div>
+                </template>
+                <template #default="{ row }">
+                  <span v-if="row.expireTime" class="plain-time font-mono">
+                    {{ formatTableTime(row.expireTime) }}
                   </span>
                   <span v-else class="plain-dash-text font-mono">
                     -
@@ -341,84 +355,27 @@
                 </template>
               </el-table-column>
 
-              <!-- 列 6: 负责人 -->
-              <el-table-column :label="$t('auditColAssignee')" width="120">
+              <!-- 列 7: 负责人 (只展示名称，点击可进入账户详情) -->
+              <el-table-column :label="$t('auditColAssignee')" width="105">
                 <template #default="{ row }">
-                  <div class="operator-cell">
-                    <div class="operator-avatar font-mono">
-                      {{ getOperatorAvatar(row) }}
-                    </div>
-                    <div class="operator-info">
-                      <span class="operator-name" :title="getOperatorName(row)">{{ getOperatorName(row) }}</span>
-                      <span class="operator-role" :title="getOperatorRole(row)">{{ getOperatorRole(row) }}</span>
-                    </div>
-                  </div>
+                  <span class="operator-name-link font-medium" :title="getOperatorName(row)" @click.stop="handleViewOperator(row)">
+                    {{ getOperatorName(row) }}
+                  </span>
                 </template>
               </el-table-column>
 
-              <!-- 列 7: 操作 (统一右对齐，纯图标 + 紧凑按钮) -->
-              <el-table-column :label="$t('action')" :width="['en', 'nl', 'es', 'fr'].includes(locale) ? 195 : 175" align="right">
+              <!-- 列 8: 操作 (只保留查看详情，解封/封禁/延期/备注均整合入详情中) -->
+              <el-table-column :label="$t('action')" width="95" align="right">
                 <template #default="{ row }">
-                  <div class="table-actions-group">
-                    <!-- 「解封」/「重新封禁」快捷按钮 -->
-                    <el-button
-                      v-if="row.status === 'banned'"
-                      size="small"
-                      type="success"
-                      plain
-                      class="action-btn-compact"
-                      @click="handleQuickToggleBan(row)"
-                    >
-                      <Icon icon="fluent:lock-open-16-regular" width="13" height="13" style="margin-right: 2px;" />
-                      <span>{{ $t('auditBtnUnban') }}</span>
-                    </el-button>
-                    <el-button
-                      v-else
-                      size="small"
-                      type="danger"
-                      plain
-                      class="action-btn-compact"
-                      @click="handleQuickToggleBan(row)"
-                    >
-                      <Icon icon="fluent:prohibited-16-regular" width="13" height="13" style="margin-right: 2px;" />
-                      <span>{{ $t('auditBtnReban') }}</span>
-                    </el-button>
-
-                    <!-- 「延期」圆形图标按钮 -->
-                    <el-tooltip effect="dark" :content="$t('auditBtnExtend')" placement="top">
-                      <el-button
-                        size="small"
-                        circle
-                        class="action-icon-compact"
-                        @click="handleOpenExtend(row)"
-                      >
-                        <Icon icon="fluent:calendar-clock-20-regular" width="14" height="14" />
-                      </el-button>
-                    </el-tooltip>
-
-                    <!-- 「备注」圆形图标按钮 -->
-                    <el-tooltip effect="dark" :content="$t('auditBtnNote')" placement="top">
-                      <el-button
-                        size="small"
-                        circle
-                        class="action-icon-compact"
-                        @click="handleOpenNote(row)"
-                      >
-                        <Icon icon="fluent:note-edit-20-regular" width="14" height="14" />
-                      </el-button>
-                    </el-tooltip>
-
-                    <!-- 「查看详情」主色文字按钮 -->
-                    <el-button
-                      size="small"
-                      type="primary"
-                      link
-                      class="action-detail-btn"
-                      @click="openAuditDrawer(row)"
-                    >
-                      {{ $t('auditBtnViewDetails') }}
-                    </el-button>
-                  </div>
+                  <el-button
+                    size="small"
+                    type="primary"
+                    link
+                    class="action-detail-btn"
+                    @click="openAuditDrawer(row)"
+                  >
+                    {{ $t('auditBtnViewDetails') }}
+                  </el-button>
                 </template>
               </el-table-column>
             </el-table>
@@ -839,6 +796,31 @@
       <template #footer>
         <div class="drawer-footer-actions">
           <el-button @click="drawerVisible = false">{{ $t('close') }}</el-button>
+
+          <!-- 延期 (仅对具有到期时间的工单展示) -->
+          <el-button
+            v-if="canExtendRow(selectedRow)"
+            type="primary"
+            plain
+            :loading="actionLoading"
+            @click="handleOpenExtend(selectedRow)"
+          >
+            <Icon icon="fluent:calendar-clock-20-regular" width="14" height="14" style="margin-right: 4px;" />
+            <span>{{ $t('auditBtnExtend') }}</span>
+          </el-button>
+
+          <!-- 备注 -->
+          <el-button
+            v-if="selectedRow"
+            type="info"
+            plain
+            :loading="actionLoading"
+            @click="handleOpenNote(selectedRow)"
+          >
+            <Icon icon="fluent:note-edit-20-regular" width="14" height="14" style="margin-right: 4px;" />
+            <span>{{ $t('auditBtnNote') }}</span>
+          </el-button>
+
           <!-- 【用词统一】解封 / 重新封禁 -->
           <el-button
             v-if="selectedRow && selectedRow.status === 'banned'"
@@ -861,11 +843,56 @@
         </div>
       </template>
     </el-drawer>
+
+    <!-- 5. 负责人账户详情弹窗 -->
+    <el-dialog
+      v-model="operatorDialogVisible"
+      :title="$t('auditOperatorAccountDetails')"
+      width="440px"
+      append-to-body
+      destroy-on-close
+      class="operator-account-dialog"
+    >
+      <div v-if="currentOperator" class="operator-dialog-body">
+        <div class="operator-profile-card">
+          <div class="operator-dialog-avatar">
+            {{ currentOperator.avatar }}
+          </div>
+          <div class="operator-dialog-title">
+            <span class="operator-dialog-name">{{ currentOperator.name }}</span>
+            <span class="operator-dialog-role-badge">{{ currentOperator.role }}</span>
+          </div>
+        </div>
+        <div class="operator-info-list">
+          <div class="operator-info-item">
+            <span class="info-label">{{ $t('auditOperatorAccount') }}</span>
+            <span class="info-val font-mono">{{ currentOperator.email }}</span>
+          </div>
+          <div class="operator-info-item">
+            <span class="info-label">{{ $t('auditOperatorType') }}</span>
+            <span class="info-val">{{ currentOperator.typeLabel }}</span>
+          </div>
+          <div class="operator-info-item">
+            <span class="info-label">{{ $t('auditCurrentStatus') }}</span>
+            <span class="info-val" style="color: #10b981;">{{ $t('normal') }}</span>
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="operatorDialogVisible = false">{{ $t('close') }}</el-button>
+          <el-button type="primary" @click="goToUserManagement">
+            {{ $t('auditGoToUserList') }}
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, watch, onMounted, onUnmounted } from 'vue';
+import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { Icon } from '@iconify/vue';
@@ -879,6 +906,7 @@ defineOptions({
   name: 'audit-report'
 });
 
+const router = useRouter();
 const { t, locale } = useI18n();
 const settingStore = useSettingStore();
 const emailStore = useEmailStore();
@@ -889,6 +917,8 @@ const scrollbarRef = ref(null);
 const logs = ref([]);
 const total = ref(0);
 const selectedRows = ref([]);
+const operatorDialogVisible = ref(false);
+const currentOperator = ref(null);
 
 // 响应式分页状态 (完全对齐用户列表规范)
 const layout = ref('prev, pager, next, sizes, total');
@@ -1042,6 +1072,69 @@ function formatTicketNo(row) {
     return `#${digits || '10001'}`;
   }
   return '#10001';
+}
+
+function formatTableTime(time) {
+  if (!time) return '-';
+  return tzDayjs(time).format('MM/DD/YY HH:mm');
+}
+
+function getHandlingSuggestion(row) {
+  if (!row) return { text: '-', type: 'info' };
+  if (row.suggestion) {
+    return { text: row.suggestion, type: 'warning' };
+  }
+  // 1. 滥用威胁 (threat)
+  if (activeKpi.value === 'threat' || row.warningType === 'ban') {
+    if (row.status === 'unbanned') {
+      return { text: t('auditSuggestionUnban'), type: 'success' };
+    }
+    if (row.reportedByOthers && row.reportedByOthers >= 3) {
+      return { text: t('auditSuggestionPermanentBan'), type: 'danger' };
+    }
+    if (row.status === 'banned') {
+      return { text: t('auditSuggestionKeepBan'), type: 'danger' };
+    }
+    return { text: t('auditSuggestionBan'), type: 'danger' };
+  }
+
+  // 2. 申诉审计 (appeal)
+  if (activeKpi.value === 'appeal' || row.warningType === 'appeal') {
+    if (row.status === 'unbanned' || row.status === 'resolved') {
+      return { text: t('auditSuggestionUnban'), type: 'success' };
+    }
+    const p = (row?.priority || '').toUpperCase();
+    if (['P0', 'CRITICAL', 'LV3'].includes(p) || row?.riskLevel === 'high') {
+      return { text: t('auditSuggestionTempBan30'), type: 'danger' };
+    }
+    if (['P1', 'LV2'].includes(p) || row?.riskLevel === 'medium') {
+      return { text: t('auditSuggestionTempBan15'), type: 'warning' };
+    }
+    return { text: t('auditSuggestionTempBan7'), type: 'warning' };
+  }
+
+  // 3. 风险管理 (audit) 与 操作记录 (record)
+  if (row.status === 'unbanned') {
+    return { text: t('auditSuggestionUnban'), type: 'success' };
+  }
+  if (row.status === 'watching') {
+    return { text: t('auditSuggestionWatch'), type: 'info' };
+  }
+  if (row.priority === 'P0' || row.riskLevel === 'high') {
+    return { text: t('auditSuggestionTempBan30'), type: 'danger' };
+  }
+  if (row.priority === 'P1' || row.riskLevel === 'medium') {
+    return { text: t('auditSuggestionTempBan7'), type: 'warning' };
+  }
+  return { text: t('auditSuggestionTempBan3'), type: 'warning' };
+}
+
+function canExtendRow(row) {
+  if (!row) return false;
+  // 滥用威胁没有到期时间，不支持延期
+  if (activeKpi.value === 'threat') return false;
+  // 有到期时间的才能延时
+  return !!row.expireTime;
 }
 
 function getSimpleAlarmReason(row) {
@@ -1229,6 +1322,7 @@ function handleExportCsv() {
     t('auditCurrentStatus'),
     t('auditColAlarmReason'),
     t('auditColProcessTime'),
+    t('auditColSuggestion'),
     t('auditColExpireTime'),
     t('auditColAssignee')
   ];
@@ -1239,8 +1333,9 @@ function handleExportCsv() {
       `"${row.email || ''}"`,
       `"${getStatusLabel(row.status)}"`,
       `"${getSimpleAlarmReason(row)}"`,
-      `"${(row.banTime || row.createTime) ? tzDayjs(row.banTime || row.createTime).format('YYYY-MM-DD HH:mm') : ''}"`,
-      `"${row.expireTime ? tzDayjs(row.expireTime).format('YYYY-MM-DD HH:mm') : '-'}"`,
+      `"${formatTableTime(row.banTime || row.createTime)}"`,
+      `"${getHandlingSuggestion(row).text}"`,
+      `"${row.expireTime ? formatTableTime(row.expireTime) : '-'}"`,
       `"${getOperatorName(row)}"`
     ];
     csvRows.push(rowValues.join(','));
@@ -1330,6 +1425,10 @@ async function handleQuickToggleBan(row) {
 }
 
 async function handleOpenExtend(row) {
+  if (!canExtendRow(row)) {
+    ElMessage.warning(t('auditExtendOnlyWithExpireTime'));
+    return;
+  }
   try {
     const { value } = await ElMessageBox.prompt(
       `${t('auditExtendDialogTitle')} (${row.email})`,
@@ -1360,6 +1459,83 @@ async function handleOpenExtend(row) {
   } finally {
     actionLoading.value = false;
   }
+}
+
+async function handleBatchExtend() {
+  if (!selectedRows.value.length) {
+    ElMessage.warning(t('auditBatchSelectRequired') || '请先勾选需要延期的工单');
+    return;
+  }
+  const extendableRows = selectedRows.value.filter(r => canExtendRow(r));
+  if (!extendableRows.length) {
+    ElMessage.warning(t('auditExtendOnlyWithExpireTime'));
+    return;
+  }
+  try {
+    const { value } = await ElMessageBox.prompt(
+      t('auditBatchExtendPrompt', { count: extendableRows.length }),
+      t('auditBatchExtendTitle'),
+      {
+        confirmButtonText: t('confirm'),
+        cancelButtonText: t('cancel'),
+        inputValue: '7',
+        inputPattern: /^[1-9]\d*$/,
+        inputErrorMessage: t('auditPromptDaysInvalid'),
+        inputPlaceholder: '7'
+      }
+    );
+    if (value) {
+      const days = Number(value);
+      actionLoading.value = true;
+      for (const row of extendableRows) {
+        try {
+          const base = row.expireTime ? tzDayjs(row.expireTime) : tzDayjs();
+          const newExpire = base.add(days, 'day').toISOString();
+          await auditAction({
+            id: row.id,
+            action: 'extend',
+            targetEmail: row.email,
+            extendDays: days,
+            expireTime: newExpire,
+            notes: `批量延期: ${days}d`
+          });
+          row.expireTime = newExpire;
+        } catch (err) {
+          console.error(err);
+        }
+      }
+      ElMessage.success(t('auditBatchExtendSuccess', { count: extendableRows.length, days }));
+      selectedRows.value = [];
+      fetchAuditList();
+    }
+  } catch (e) {
+    if (e !== 'cancel') console.error(e);
+  } finally {
+    actionLoading.value = false;
+  }
+}
+
+function handleViewOperator(row) {
+  const name = getOperatorName(row);
+  const isSys = row?.status === 'banned' || name.toLowerCase().includes('bot') || name.toLowerCase().includes('system');
+  currentOperator.value = {
+    name,
+    avatar: getOperatorAvatar(row),
+    role: getOperatorRole(row),
+    email: row?.operatorEmail || (isSys ? 'system-daemon@epocanvas.com' : 'security-admin@epomail.cyou'),
+    typeLabel: isSys ? t('auditOperatorTypeSystem') : t('auditOperatorTypeHuman'),
+    id: row?.operatorId || 'ADM-01'
+  };
+  operatorDialogVisible.value = true;
+}
+
+function goToUserManagement() {
+  operatorDialogVisible.value = false;
+  router.push('/manage/admin/users').catch(() => {
+    router.push('/manage/moderator/users').catch(() => {
+      router.push('/all-users').catch(() => {});
+    });
+  });
 }
 
 async function handleOpenNote(row) {
@@ -1924,7 +2100,29 @@ onUnmounted(() => {
 .col-filter-header {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
+
+  .header-action-trigger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 3px;
+    cursor: pointer;
+    color: var(--el-text-color-placeholder);
+    transition: all 0.2s;
+
+    &:hover {
+      color: var(--el-color-primary);
+      background: var(--el-fill-color-light);
+    }
+
+    &.sort-active {
+      color: var(--el-color-primary);
+      font-weight: bold;
+    }
+  }
 
   .filter-trigger {
     display: inline-flex;
@@ -1950,57 +2148,18 @@ onUnmounted(() => {
 }
 
 .ticket-cell {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  justify-content: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 
-  .ticket-row-top {
-    display: flex;
-    align-items: center;
-    gap: 6px;
+  .ticket-id {
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--el-color-primary);
+    cursor: pointer;
 
-    .ticket-id {
-      font-weight: 600;
-      font-size: 13px;
-      color: var(--el-color-primary);
-      cursor: pointer;
-
-      &:hover {
-        text-decoration: underline;
-      }
-    }
-  }
-
-  .ticket-email-wrap {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-
-    .ticket-email {
-      font-size: 12px;
-      color: var(--el-text-color-secondary);
-      cursor: pointer;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      max-width: 165px;
-
-      &:hover {
-        color: var(--el-color-primary);
-      }
-    }
-
-    .copy-ticket-btn {
-      display: inline-flex;
-      align-items: center;
-      cursor: pointer;
-      color: var(--el-text-color-placeholder);
-      transition: color 0.15s;
-
-      &:hover {
-        color: var(--el-color-primary);
-      }
+    &:hover {
+      text-decoration: underline;
     }
   }
 }
@@ -2123,62 +2282,62 @@ onUnmounted(() => {
   }
 }
 
-.status-tag-with-icon {
+.status-clean-item {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
+  font-size: 12.5px;
   font-weight: 500;
-  padding: 2px 8px;
   white-space: nowrap;
-  flex-shrink: 0;
+  line-height: 1.2;
 
-  .status-tag-icon {
+  .status-icon-inline {
     flex-shrink: 0;
   }
-}
 
-.operator-cell {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.operator-avatar {
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  background: var(--el-fill-color-darker);
-  color: var(--el-text-color-secondary);
-  font-size: 11px;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  border: 1px solid var(--el-border-color);
-}
-
-.operator-info {
-  display: flex;
-  flex-direction: column;
-  line-height: 1.25;
-  min-width: 0;
-
-  .operator-name {
-    font-size: 12px;
-    font-weight: 500;
-    color: var(--el-text-color-primary);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+  &.status-banned {
+    color: var(--el-color-danger);
   }
+  &.status-pending {
+    color: var(--el-color-warning);
+  }
+  &.status-unbanned,
+  &.status-resolved {
+    color: var(--el-color-success);
+  }
+  &.status-watching {
+    color: var(--el-color-primary);
+  }
+}
 
-  .operator-role {
-    font-size: 11px;
-    color: var(--el-text-color-placeholder);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+.suggestion-tag-cell {
+  display: flex;
+  align-items: center;
+}
+
+.suggestion-tag {
+  font-size: 11.5px;
+  font-weight: 500;
+  height: 22px;
+  line-height: 20px;
+  padding: 0 6px;
+  border-radius: 4px;
+}
+
+.operator-name-link {
+  font-size: 12.5px;
+  color: var(--el-color-primary);
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: inline-block;
+  max-width: 95px;
+  transition: color 0.15s;
+
+  &:hover {
+    color: var(--el-color-primary-light-3);
+    text-decoration: underline;
   }
 }
 
@@ -2699,6 +2858,69 @@ html.dark {
     display: flex;
     flex-wrap: wrap;
     gap: 10px;
+  }
+}
+
+.operator-account-dialog {
+  .operator-dialog-body {
+    padding: 10px 0;
+  }
+  .operator-profile-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    border-radius: 8px;
+    background: var(--el-fill-color-lighter);
+    margin-bottom: 16px;
+  }
+  .operator-dialog-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--el-color-primary-light-8);
+    color: var(--el-color-primary);
+    font-weight: 600;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .operator-dialog-title {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .operator-dialog-name {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--el-text-color-primary);
+  }
+  .operator-dialog-role-badge {
+    font-size: 11px;
+    color: var(--el-text-color-secondary);
+  }
+  .operator-info-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 0 4px;
+  }
+  .operator-info-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 13px;
+    border-bottom: 1px dashed var(--el-border-color-lighter);
+    padding-bottom: 8px;
+
+    .info-label {
+      color: var(--el-text-color-secondary);
+    }
+    .info-val {
+      color: var(--el-text-color-primary);
+      font-weight: 500;
+    }
   }
 }
 </style>

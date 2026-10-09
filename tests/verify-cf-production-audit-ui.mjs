@@ -112,7 +112,8 @@ async function run() {
     const hasStatus = headers.some(h => h.includes('当前状态'));
     const hasAlarmOrRisk = headers.some(h => h.includes('报警原因') || h.includes('风险等级'));
     const hasProcessTime = headers.some(h => h.includes('处理时间'));
-    const hasExpireTime = headers.some(h => h.includes('到期时间'));
+    const hasSuggestion = headers.some(h => h.includes('处理建议'));
+    const hasExpireTimeInThreat = headers.some(h => h.includes('到期时间'));
     const hasAssignee = headers.some(h => h.includes('负责人'));
     const hasAction = headers.some(h => h.includes('操作'));
 
@@ -120,14 +121,17 @@ async function run() {
     ok(hasStatus, '包含「当前状态」表头列');
     ok(hasAlarmOrRisk, '包含「报警原因」/「风险等级」表头列');
     ok(hasProcessTime, '包含「处理时间」表头列');
-    ok(hasExpireTime, '包含「到期时间」表头列');
+    ok(hasSuggestion, '包含「处理建议」表头列 (全 Tab 均展示建议)');
+    ok(!hasExpireTimeInThreat, '滥用威胁 Tab 下已成功移除「到期时间」列');
     ok(hasAssignee, '包含「负责人」表头列');
     ok(hasAction, '包含「操作」表头列');
 
-    // [检视 4] 表头下沉筛选器与明确文案说明
-    console.log('\n[检视 4] 表头集成筛选器核验:');
+    // [检视 4] 表头下沉筛选器与排序列箭头
+    console.log('\n[检视 4] 表头集成筛选器与排序列箭头核验:');
     const filterTriggers = await page.$$('.col-filter-header .filter-trigger');
+    const sortTriggers = await page.$$('.col-filter-header .header-action-trigger');
     ok(filterTriggers.length >= 2, `表头成功集成筛选器下拉触点 (实际触点数: ${filterTriggers.length})`);
+    ok(sortTriggers.length >= 1, `表头成功集成时间排序列箭头触点 (实际触点数: ${sortTriggers.length})`);
 
     // 点击状态筛选并检查下拉菜单内容
     if (filterTriggers.length > 0) {
@@ -143,31 +147,42 @@ async function run() {
       await page.waitForTimeout(400);
     }
 
-    // 点击时间筛选并检查下拉菜单内容
-    if (filterTriggers.length >= 3) {
-      await filterTriggers[2].click();
+    // [检视 5] 第二轮精益 UI 规范验证 (无邮箱干扰、无行内按钮、无边框状态、负责人弹窗)
+    console.log('\n[检视 5] 第二轮精益 UI 细节核验:');
+    const emailWrapCount = await page.$$eval('.el-table__body-wrapper .ticket-email-wrap', els => els.length);
+    ok(emailWrapCount === 0, `表格行内无 ticket-email-wrap 干扰 (实际: ${emailWrapCount})`);
+
+    const compactActionCount = await page.$$eval('.el-table__body-wrapper .action-btn-compact', els => els.length);
+    ok(compactActionCount === 0, `表格行内彻底移除 action-btn-compact (实际: ${compactActionCount})`);
+
+    const detailBtnCount = await page.$$eval('.el-table__body-wrapper .action-detail-btn', els => els.length);
+    ok(detailBtnCount >= 1, `表格操作列保留唯一的 action-detail-btn 查看详情 (实际: ${detailBtnCount})`);
+
+    const statusCleanCount = await page.$$eval('.status-clean-item', els => els.length);
+    ok(statusCleanCount >= 1, `当前状态采用无边框水平对齐 status-clean-item (实际: ${statusCleanCount})`);
+
+    const operatorLinks = await page.$$('.operator-name-link');
+    ok(operatorLinks.length >= 1, `负责人列为纯名称点击链接 (实际: ${operatorLinks.length})`);
+    if (operatorLinks.length > 0) {
+      await operatorLinks[0].click();
       await page.waitForTimeout(600);
-      const timeMenuItems = await page.$$eval('.el-dropdown-menu__item', items => 
-        items.map(it => it.textContent?.trim()).filter(Boolean)
-      );
-      console.log('  时间筛选下拉菜单预览:', timeMenuItems);
-      const hasAllTime = timeMenuItems.some(it => it.includes('全部处理时间'));
-      ok(hasAllTime, '时间筛选下拉菜单包含明确说明「全部处理时间」');
-      await page.keyboard.press('Escape');
+      const dialogVisible = await page.$('.operator-account-dialog');
+      ok(!!dialogVisible, '点击负责人纯名称成功弹出「负责人账户详情」对话框');
+      const closeBtn = await page.$('.operator-account-dialog .el-dialog__headerbtn, .operator-account-dialog .dialog-footer button');
+      if (closeBtn) await closeBtn.click();
       await page.waitForTimeout(400);
     }
 
-    // [检视 5] header-actions 精简实用图标与多选
-    console.log('\n[检视 5] header-actions 操作栏核验:');
+    // [检视 6] header-actions 精简实用图标与批量延期
+    console.log('\n[检视 6] header-actions 操作栏核验:');
     const actionIcons = await page.$$eval('.header-actions .icon', icons => icons.length);
     console.log('  header-actions 内纯图标操作集数量:', actionIcons);
     ok(actionIcons >= 5, `header-actions 包含精益纯图标操作集 (实际: ${actionIcons} 个图标)`);
 
-    // [检视 6] 分页组件规范对齐
-    console.log('\n[检视 6] 分页规范核验:');
+    // [检视 7] 分页组件规范对齐
+    console.log('\n[检视 7] 分页规范核验:');
     const tableWrap = await page.$('.table-area');
     ok(!!tableWrap, '表格与分页统一在 table-area 内紧凑布局');
-    // 检查分页是否遵从没有冗长 jumper
     const jumperExists = await page.$('.pagination .el-pagination__jump');
     ok(!jumperExists, '分页组件已对齐用户列表规范，零冗长 jumper 元素');
 
@@ -176,17 +191,22 @@ async function run() {
     await page.screenshot({ path: 'tests/cf_production_threat_verified.png', fullPage: true });
     console.log('  ✓ 滥用威胁视口截图已保存至: tests/cf_production_threat_verified.png');
 
-    // 截图 2: 切换至「申诉审计」Tab
+    // 截图 2: 切换至「申诉审计」Tab 并验证到期时间与建议
     const appealCard = await page.$('.kpi-appeal');
     if (appealCard) {
       await appealCard.click();
-      await page.waitForTimeout(2000);
+      await page.waitForSelector('.table-area .loading-hide', { timeout: 10000 }).catch(() => {});
+      await page.waitForTimeout(1500);
       const appealHeaders = await page.$$eval('.el-table__header th .cell', cells => 
         cells.map(c => c.textContent?.trim().replace(/\s+/g, ' '))
       );
       console.log('  申诉审计 Tab 表头列文本:', appealHeaders);
       const hasRiskCol = appealHeaders.some(h => h.includes('风险等级'));
+      const hasAppealExpire = appealHeaders.some(h => h.includes('到期时间'));
+      const hasAppealSuggest = appealHeaders.some(h => h.includes('处理建议'));
       ok(hasRiskCol, '申诉审计 Tab 表头自适应呈现「风险等级」列');
+      ok(hasAppealExpire, '申诉审计 Tab 表头保留「到期时间」列');
+      ok(hasAppealSuggest, '申诉审计 Tab 表头保留「处理建议」列');
       await page.screenshot({ path: 'tests/cf_production_appeal_verified.png', fullPage: false });
       console.log('  ✓ 申诉审计视口截图已保存至: tests/cf_production_appeal_verified.png');
     }
@@ -195,7 +215,8 @@ async function run() {
     const recordCard = await page.$('.kpi-record');
     if (recordCard) {
       await recordCard.click();
-      await page.waitForTimeout(2000);
+      await page.waitForSelector('.table-area .loading-hide', { timeout: 10000 }).catch(() => {});
+      await page.waitForTimeout(1500);
       await page.screenshot({ path: 'tests/cf_production_record_verified.png', fullPage: false });
       console.log('  ✓ 操作记录视口截图已保存至: tests/cf_production_record_verified.png');
     }
