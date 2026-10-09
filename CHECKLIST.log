@@ -8,6 +8,49 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### 安全审计控制台第二轮 UI/UX 深度打磨与 Cloudflare 生产环境全真验证 (2026-10-09)
+*   **关联提交 (Git Commit)**: `e0449c8eac1a6992e6b7e30ee281e6d0520ed65e` (Short: `e0449c8`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com)` (Version ID: `6ec8cd27-81de-4be3-97d7-c9a7b35dcdf8`, Startup: `68ms`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 表头时间排序集成：
+      - 彻底移除 `header-actions` 内独立时间排序图标；
+      - 在「处理时间」与「到期时间」列头添加内置排序交互箭头触点 (`.header-action-trigger`)，支持正序/倒序无缝切换；
+    - [x] 表格默认行去除邮箱干扰：
+      - 表格默认行移除邮箱名称 (`.ticket-email-wrap`)，仅展示醒目工单编号 `#10001`+ 与检举次数徽标；
+      - 邮箱完整地址、发信详情与关联上下文完整保留在抽屉详情界面 (`audit-drawer`)；
+    - [x] 当前状态列去边框与紧凑水平对齐：
+      - 移除 `el-tag` 边框，重构为 `.status-clean-item` 纯语义化图标 + 状态文本水平对齐；
+      - 优化列宽至 145px，缩短与工单编号横向间隙，彻底杜绝状态文本截断与空间浪费；
+    - [x] 统一时间呈现规范：
+      - 表格所有时间字段（处理时间、到期时间）统一格式化为 `MM/DD/YY HH:mm`（基于 `tzDayjs` 时区感知解析）；
+    - [x] 负责人列纯名称与账户详情抽屉交互：
+      - 负责人列纯化为名称展示 (`.operator-name-link`)，去除多余头像干扰；
+      - 点击负责人名称无缝弹出「负责人账户详情」对话框 (`.operator-account-dialog`)，支持展示类型/角色并一键跳转至用户管理；
+    - [x] 行内操作精简与详情集成：
+      - 表格操作列仅保留「查看详情」纯链接按钮 (`action-detail-btn`)，彻底移除行内操作按钮；
+      - 延期、备注、解封/重新封禁等全量操作无缝整合至详情抽屉底部操作栏；
+      - 在 `header-actions` 与批量操作栏中新增「批量延期」(`auditBatchExtend`) 快捷入口；
+    - [x] 滥用威胁 Tab 移除到期时间并引入「处理建议」：
+      - 滥用威胁 Tab 无固定到期概念，移除「到期时间」列，替换为语义化「处理建议」列（如：维持封禁、永久封禁、建议封禁、建议解禁）；
+    - [x] 全 Tab 处理建议覆盖与到期延期权限守卫：
+      - 所有 Tab 均引入动态「处理建议」（暂禁30天、暂禁15天、暂禁7天、暂禁3天、持续观察等）；
+      - 严格校验延期条件：仅具有到期时间的工单支持延期，滥用威胁及无到期时间记录严格阻断延期；
+    - [x] 6 语言 i18n 绝对对称字典建设：
+      - 补齐 22 个新增/修改多语言词条（zh, zh-Hant, en, es, fr, nl 保持 100% 绝对对称）。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：mail-vue 构建通过 (耗时 12.37s，0 警告 0 报错)；
+    - [x] Cloudflare 生产环境全量发布：版本 ID `6ec8cd27-81de-4be3-97d7-c9a7b35dcdf8` 部署成功；
+    - [x] 本地全真测试套件：`tests/verify-audit-ui-optimization.mjs` 14/14 项验收全过；
+    - [x] 公网生产环境端到端检视套件：`tests/verify-cf-production-audit-ui.mjs` 31/31 项全绿通过；
+    - [x] 多语言对称与审计验证：
+      - `node scripts/i18n-symmetry.mjs` (2581 键全 6 语言字典 100% 绝对对称通过)；
+      - `node scripts/i18n-audit.mjs` (0 缺失引用通过)；
+    - [x] 视觉截图实测比对：
+      - 滥用威胁视图：`tests/cf_production_threat_verified.png`；
+      - 申诉审计视图：`tests/cf_production_appeal_verified.png`；
+      - 操作记录视图：`tests/cf_production_record_verified.png`；
+    - [x] 零假数据残留：数据基于公网真实 API，无临时数据残留。
+
 ### 安全审计控制台 UI 部署 Cloudflare 生产环境 (mail.epocanvas.com) 与全量视觉检视核验 (2026-10-09)
 *   **关联提交 (Git Commit)**: `df573d74ee21a3b054801ec1d49cc320d134c348` (Short: `df573d7`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com)` (Version ID: `ba450509-a7f0-41b6-8ffb-4ba86f906878`, Startup: `68ms`)
