@@ -2644,6 +2644,14 @@ totpModeAllDesc: 'Instellen of gebruikers TOTP mogen gebruiken. Eenmaal ingescha
     abuseCopiedSuccess: "Gekopieerd naar klembord",
     abuseAssignPrompt: "Voer naam van verantwoordelijke in:",
     abuseAssignSuccess: "Verantwoordelijke succesvol toegewezen",
+    abuseDossierEvidenceTitle: "Overtredingsbewijs en Bewaring",
+    abuseDossierReasonCode: "Redencode",
+    abuseDossierRetention: "Bewaring van Bewijs",
+    abuseDossierClusterId: "Cluster-ID",
+    abuseDossierEvidenceSummary: "Bewijssamenvatting",
+    abuseDossierTimelineTitle: "Levenscyclus van Ticket",
+    abuseFilterUnassigned: "Niet toegewezen (-)",
+    abuseBatchAccounts: "{count} accounts",
 };
 
 export default nl;

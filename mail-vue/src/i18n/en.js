@@ -2644,6 +2644,14 @@ totpModeAllDesc: 'Configure whether users can use TOTP. When enabled, 2FA is ava
     abuseCopiedSuccess: "Copied to clipboard",
     abuseAssignPrompt: "Enter assignee name:",
     abuseAssignSuccess: "Operator assigned successfully",
+    abuseDossierEvidenceTitle: "Violation Evidence & Retention",
+    abuseDossierReasonCode: "Reason Code",
+    abuseDossierRetention: "Evidence Retention",
+    abuseDossierClusterId: "Cluster ID",
+    abuseDossierEvidenceSummary: "Evidence Summary",
+    abuseDossierTimelineTitle: "Ticket Lifecycle Timeline",
+    abuseFilterUnassigned: "Unassigned (-)",
+    abuseBatchAccounts: "{count} accounts",
 };
 
 export default en;

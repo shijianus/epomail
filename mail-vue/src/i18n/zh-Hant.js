@@ -2644,6 +2644,14 @@ totpModeAllDesc: '設定是否允許使用者使用TOTP，開啟後使用者可�
     abuseCopiedSuccess: "已複製到剪貼板",
     abuseAssignPrompt: "請輸入分配的負責人名稱：",
     abuseAssignSuccess: "已成功分配負責人",
+    abuseDossierEvidenceTitle: "違規事實與處置證據留存",
+    abuseDossierReasonCode: "原因代碼 (Reason Code)",
+    abuseDossierRetention: "證據保留期限",
+    abuseDossierClusterId: "集群標識 (Cluster ID)",
+    abuseDossierEvidenceSummary: "證據摘要",
+    abuseDossierTimelineTitle: "工單全週期事件時間線",
+    abuseFilterUnassigned: "未分配 (-)",
+    abuseBatchAccounts: "{count} 賬戶",
 };
 
 export default zhHant;

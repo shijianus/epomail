@@ -22,12 +22,12 @@
               <div class="kpi-data-stat kpi-value font-mono kpi-split-stat">
                 <span class="split-part split-pending">
                   <span class="split-label">{{ $t('abuseStatusPending') }}</span>
-                  <span class="stat-number stat-warning">{{ summaryCounts.threatPending || 0 }}</span>
+                  <span class="stat-number stat-warning"> {{ summaryCounts.threatPending || 0 }}</span>
                 </span>
                 <span class="split-sep">/</span>
                 <span class="split-part split-banned">
                   <span class="split-label">{{ $t('abuseStatusBanned') }}</span>
-                  <span class="stat-number stat-danger">{{ summaryCounts.threatBanned || 0 }}</span>
+                  <span class="stat-number stat-danger"> {{ summaryCounts.threatBanned || 0 }}</span>
                 </span>
               </div>
               <div class="kpi-desc kpi-sub" :title="$t('auditKpiThreatEmailDesc')">
@@ -308,7 +308,7 @@
                                 {{ $t('auditTime30Days') }}
                               </el-dropdown-item>
                               <el-dropdown-item divided command="assignee:unassigned" :class="{ 'is-selected': params.assignee === 'unassigned' }">
-                                未分配 (-)
+                                {{ $t('abuseFilterUnassigned') }}
                               </el-dropdown-item>
                               <el-dropdown-item command="assignee:admin" :class="{ 'is-selected': params.assignee === 'admin' }">
                                 Admin
@@ -906,30 +906,30 @@
         <div v-if="selectedRow && (activeKpi === 'threat' || selectedRow.reasonCode || selectedRow.timeline)" class="dossier-card abuse-evidence-card">
           <div class="section-title">
             <Icon icon="fluent:shield-keyhole-20-regular" width="18" height="18" />
-            <span>违规事实与处置证据留存</span>
+            <span>{{ $t('abuseDossierEvidenceTitle') }}</span>
           </div>
           <div class="abuse-detail-meta-grid">
             <div class="meta-item">
-              <span class="meta-label">原因代码 (Reason Code):</span>
+              <span class="meta-label">{{ $t('abuseDossierReasonCode') }}:</span>
               <span class="meta-val font-mono font-semibold">{{ selectedRow.reasonCode || 'RULE_PATTERN_MATCH' }}</span>
             </div>
             <div class="meta-item">
-              <span class="meta-label">证据保留期限:</span>
+              <span class="meta-label">{{ $t('abuseDossierRetention') }}:</span>
               <span class="meta-val">{{ $t('abuseEvidenceRemainingDays', { days: selectedRow.evidenceExpiresDays ?? 180 }) }}</span>
             </div>
             <div class="meta-item" v-if="selectedRow.clusterId">
-              <span class="meta-label">集群标识 (Cluster ID):</span>
+              <span class="meta-label">{{ $t('abuseDossierClusterId') }}:</span>
               <span class="meta-val font-mono">{{ selectedRow.clusterId }}</span>
             </div>
             <div class="meta-item" v-if="selectedRow.evidenceSummary">
-              <span class="meta-label">证据摘要:</span>
+              <span class="meta-label">{{ $t('abuseDossierEvidenceSummary') }}:</span>
               <span class="meta-val">{{ selectedRow.evidenceSummary }}</span>
             </div>
           </div>
 
           <!-- 时间线 -->
           <div class="timeline-section" v-if="selectedRow.timeline && selectedRow.timeline.length">
-            <div class="timeline-title">工单全周期事件时间线</div>
+            <div class="timeline-title">{{ $t('abuseDossierTimelineTitle') }}</div>
             <div class="timeline-list">
               <div v-for="(tItem, idx) in selectedRow.timeline" :key="idx" class="timeline-row">
                 <span class="timeline-dot"></span>
@@ -1330,7 +1330,7 @@
           </div>
           <div class="batch-body">
             <el-tag size="small" type="info">{{ b.reason }}</el-tag>
-            <span class="batch-count">{{ b.count }} 账户</span>
+            <span class="batch-count">{{ $t('abuseBatchAccounts', { count: b.count }) }}</span>
           </div>
         </div>
       </div>

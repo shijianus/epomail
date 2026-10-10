@@ -2644,6 +2644,14 @@ totpModeAllDesc: 'Configurar si los usuarios pueden usar TOTP. Al activarlo, la 
     abuseCopiedSuccess: "Copiado al portapapeles",
     abuseAssignPrompt: "Ingrese el nombre del responsable:",
     abuseAssignSuccess: "Responsable asignado correctamente",
+    abuseDossierEvidenceTitle: "Evidencia de Infracción y Retención",
+    abuseDossierReasonCode: "Código de Motivo",
+    abuseDossierRetention: "Retención de Evidencia",
+    abuseDossierClusterId: "ID de Clúster",
+    abuseDossierEvidenceSummary: "Resumen de Evidencia",
+    abuseDossierTimelineTitle: "Cronología de Vida del Ticket",
+    abuseFilterUnassigned: "Sin asignar (-)",
+    abuseBatchAccounts: "{count} cuentas",
 };
 
 export default es;
