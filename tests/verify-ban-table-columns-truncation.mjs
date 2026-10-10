@@ -174,9 +174,9 @@ async function run() {
     await page.goto(`http://127.0.0.1:${PORT}/mail/u/0/#manage/admin/audit`, { waitUntil: 'networkidle', timeout: 30000 });
     await page.waitForTimeout(3000);
 
-    // 1. 状态标签截断检测
-    console.log('\n[检测 1] 状态标签截断与文本完整性检测:');
-    const riskTagInfo = await page.$eval('.abuse-table-row:nth-child(1) .abuse-status-badge', el => {
+    // 1. 高风险标签截断检测
+    console.log('\n[检测 1] 高风险标签截断与文本完整性检测:');
+    const riskTagInfo = await page.$eval('.el-table__row:nth-child(1) .audit-sub-tag', el => {
       return {
         text: el.textContent.trim(),
         scrollWidth: el.scrollWidth,
@@ -184,13 +184,15 @@ async function run() {
         offsetWidth: el.offsetWidth
       };
     });
-    console.log('  状态标签度量:', riskTagInfo);
-    ok(riskTagInfo.text === '已封禁', `状态标签文本完整为「已封禁」 (实际: ${riskTagInfo.text})`);
+    console.log('  高风险标签度量:', riskTagInfo);
+    ok(riskTagInfo.text === '高风险 · 已管控', `高风险标签文本完整为「高风险 · 已管控」 (实际: ${riskTagInfo.text})`);
+    ok(!riskTagInfo.text.includes('?'), '无问号字符');
+    ok(!riskTagInfo.text.endsWith('·'), '无结尾截断中点');
     ok(riskTagInfo.scrollWidth <= riskTagInfo.clientWidth + 1, `标签内部零内容溢出 (scrollWidth: ${riskTagInfo.scrollWidth}, clientWidth: ${riskTagInfo.clientWidth})`);
 
-    // 2. 「详情」按钮截断检测
-    console.log('\n[检测 2] 「详情」按钮文本完整性与零截断检测:');
-    const detailBtnInfo = await page.$eval('.abuse-table-row:nth-child(1) .action-detail-btn', el => {
+    // 2. 「查看详情」按钮截断检测
+    console.log('\n[检测 2] 「查看详情」按钮文本完整性与零截断检测:');
+    const detailBtnInfo = await page.$eval('.el-table__row:nth-child(1) .action-detail-btn', el => {
       return {
         text: el.textContent.trim(),
         scrollWidth: el.scrollWidth,
@@ -198,28 +200,29 @@ async function run() {
         offsetWidth: el.offsetWidth
       };
     });
-    console.log('  详情按钮度量:', detailBtnInfo);
-    ok(detailBtnInfo.text === '详情' || detailBtnInfo.text === '查看详情', `按钮文本完整为「详情」 (实际: ${detailBtnInfo.text})`);
+    console.log('  查看详情按钮度量:', detailBtnInfo);
+    ok(detailBtnInfo.text === '查看详情', `按钮文本完整为「查看详情」 (实际: ${detailBtnInfo.text})`);
     ok(detailBtnInfo.scrollWidth <= detailBtnInfo.clientWidth + 1, `按钮零文字截断 (scrollWidth: ${detailBtnInfo.scrollWidth}, clientWidth: ${detailBtnInfo.clientWidth})`);
 
     // 3. 操作列排布与按钮间距检测
-    console.log('\n[检测 3] 操作列排布与按钮间距检测:');
-    const actionCellBox = await page.$eval('.abuse-table-row:nth-child(1) td.col-opt', el => {
+    console.log('\n[检测 3] 操作列按钮间距与右对齐检测:');
+    const actionCellBox = await page.$eval('.el-table__row:nth-child(1) td.is-right', el => {
       const rect = el.getBoundingClientRect();
       return { width: rect.width, height: rect.height };
     });
     console.log('  操作列单元格尺寸:', actionCellBox);
-    ok(actionCellBox.width >= 60, `操作列宽满足设定 (实际: ${actionCellBox.width}px >= 60px)`);
+    ok(actionCellBox.width >= 200, `操作列宽满足设定 (实际: ${actionCellBox.width}px >= 200px)`);
 
-    const actionButtons = await page.$$eval('.abuse-table-row:nth-child(1) .abuse-opt-wrap .el-button', els => {
+    const actionButtons = await page.$$eval('.el-table__row:nth-child(1) .table-actions-group .el-button', els => {
       return els.map(e => {
         const r = e.getBoundingClientRect();
         return { text: e.textContent.trim(), width: r.width, height: r.height };
       });
     });
     console.log('  操作按钮详细尺寸:', actionButtons);
-    ok(actionButtons.length >= 1, `操作列包含详情按钮 (实际: ${actionButtons.length})`);
-    ok(actionButtons[0].text === '详情' || actionButtons[0].text === '查看详情', '详情按钮完整显示');
+    ok(actionButtons.length === 4, `操作列包含全部 4 个按钮 (实际: ${actionButtons.length})`);
+    ok(actionButtons[0].text === '解封', '解封按钮完整显示');
+    ok(actionButtons[3].text === '查看详情', '查看详情按钮完整显示');
 
     // 截图表格主视图
     await page.screenshot({ path: 'tests/verify_table_columns_fixed.png' });
@@ -227,7 +230,7 @@ async function run() {
 
     // 4. 侧边抽屉两列对比卡片实测
     console.log('\n[检测 4] 侧边抽屉两列对比证据卡片结构与警示实测:');
-    await page.click('.abuse-table-row:nth-child(1) .action-detail-btn');
+    await page.click('.el-table__row:nth-child(1) .action-detail-btn');
     await page.waitForTimeout(1000);
 
     const actualCardTitle = await page.$eval('.compare-card-actual .card-header-title', el => el.textContent.trim());

@@ -8,6 +8,30 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### 滥用威胁工单列表修改回退与生产环境还原 (2026-10-10)
+*   **关联提交 (Git Commit)**: `fca75f27ea31806b11280d0e8b7df124f000095f` (Short: `fca75f2`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com)`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 文件状态严格回退至任务前基准（commit 3fc758a）：
+      - 撤销 `mail-vue/src/views/audit-report/index.vue` 本次改动，恢复方案一标准处置决策列集（多选/工单编号/当前状态/违规分类/报警原因与风险等级/处理建议/处理时间/到期时间/负责人/操作）；
+      - 撤销 `mail-worker/src/service/audit-service.js` 与 `mail-worker/src/entity/audit-log.js` 本次改动；
+      - 撤销 `mail-vue/src/i18n/` 六语言字典（zh, zh-Hant, en, es, fr, nl）本次改动，字典键集严格还原为 2593 键；
+      - 清理本次任务生成的临时截图与测试脚本（`doc/validation/abuse-table/`、`tests/verify-abuse-table-polish.mjs`、`tests/verify-cf-production-abuse-table.mjs`）；
+      - 保持 Git Commit 严格单向向前发展，杜绝任何历史回退或 reset 操作。
+    - [x] 本地全真栈自检与自动化回归验证：
+      - 前端 `mail-vue` 构建核验 0 警告 0 报错通过 (13.44s)；
+      - i18n 静态对称三件套 100% 绝对对称通过（2593 键全部对称）；
+      - 历史测试回归套件 `node tests/verify-audit-ui-optimization.mjs` 16 项全断言通过。
+    - [x] 生产环境正式部署与还原：
+      - 执行 `wrangler deploy` 重新发布构建产物至 Cloudflare 生产环境；
+      - 登录 `mail.epocanvas.com` 进行线上全真检视，确认界面与数据接口正常还原。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：`mail-vue` Vite 构建通过 (13.44s)；
+    - [x] 多语言对称核验：6 语言 2593 键 100% 绝对对称通过；
+    - [x] 单元与集成测试：`node tests/verify-audit-ui-optimization.mjs` 16 项全通过；
+    - [x] 生产环境部署核验：`wrangler deploy` 成功发布至 Cloudflare 生产环境；
+    - [x] 零假数据残留：数据库与 KV 中零临时凭据或脏数据残留。
+
 ### 滥用威胁工单列表 Cloudflare 生产环境正式上线与公网全真检视 (2026-10-10)
 *   **关联提交 (Git Commit)**: `15bdcf7f5cc53036798c3174159f882329b9dc20` (Short: `15bdcf7`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com)` (Version ID: `dcc1cf80-ad3f-4060-b462-08d3d1ee9d31`, Startup: `57ms`)
