@@ -7,6 +7,36 @@
 > 制度规范与工作流指引请见 [AGENTS.md](file:///home/shijian/projects/epocanvas-mail/AGENTS.md)。
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
+
+### 安全审计控制台方案一标准化列集落地与 punishments.md 架构对齐 (2026-10-10)
+*   **关联提交 (Git Commit)**: `c4073c55d7f02e16a3776000669ce3ab000ff386` (Short: `c4073c5`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com)` (Version ID: `eb265576-057a-4ef3-b9cb-44eeab47430d`, Startup: `61ms`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 对齐 punishments.md 架构准则，彻底清除底层网络与设备指纹列：
+      - 依据 punishments.md 原则 4 与第 6.3 节“不因网络/UA 类型定罪”底线，移除主表格中的「触发网络」与「终端设备」列；
+      - 杜绝长篇大论与低价值技术遥测，回归业务流转与确定性决策。
+    - [x] 落地方案一（标准处置决策列集）：
+      - 完整构建核心执行管道：`多选 (40px)` ➔ `工单编号 (80px)` ➔ `当前状态 (130px)` ➔ `违规分类 (105px)` ➔ `报警原因/风险等级 (min 125px)` ➔ `处理建议 (110px)` ➔ `处理时间 (135px)` ➔ `[到期时间 (135px)]` ➔ `负责人 (95px)` ➔ `查看详情 (80px)`；
+      - 中间单元格内容严格收敛为 2~4 个字的精炼词条（如：外发滥用/账户安全/内容合规/配额规避；投诉超标/退信超标/一人多号；限制外发/账号暂停/维持封禁/建议解禁）；
+      - 纯文本显式呈现，字体字号统一（12.5px~13px），无打底方框，水平对齐极具呼吸感与规整美感。
+    - [x] 4 大 Tab 自适应流转：
+      - 滥用威胁 Tab：彻底隐藏到期时间（不可延期），处理建议展示限制外发/账号暂停/永久封禁；
+      - 申诉审计 Tab：报警原因自适应为「风险等级」(LV0~LV3)，保留到期时间与批量延期入口；
+      - 风险管理 Tab：展示轻量处置动作（限速退避/持续观察/例行归档），保留观察期 TTL；
+      - 操作记录 Tab：展示终局判定与历史规则时限。
+    - [x] 导出 CSV 与 6 语言 i18n 绝对对称字典建设：
+      - 同步更新 `handleExportCsv`，导出字段与方案一列集 100% 对齐；
+      - 补齐 10 个新增多语言词条（zh, zh-Hant, en, es, fr, nl 保持 100% 绝对对称，2593 键全部校验通过）。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：`npm --prefix mail-vue run build` 零报错通过 (耗时 14.50s)；
+    - [x] i18n 静态对称性核验：`node scripts/i18n-symmetry.mjs` 6 语言 2593 键绝对对称通过，0 差异；
+    - [x] i18n 缺失引用核验：`node scripts/i18n-audit.mjs` 零缺失引用通过；
+    - [x] 本地自动化单元测试：`node tests/verify-audit-ui-optimization.mjs` 16 项全断言通过；
+    - [x] Cloudflare 生产环境全真 E2E 核验：`node tests/verify-cf-production-audit-ui.mjs` 34 项线上断言全部通过，三场景最新截图已落盘：
+      - `tests/cf_production_threat_verified.png` (滥用威胁)
+      - `tests/cf_production_appeal_verified.png` (申诉审计)
+      - `tests/cf_production_record_verified.png` (操作记录)
+
 ### 安全审计控制台第三轮版面优化与中间空白治理 (2026-10-09)
 *   **关联提交 (Git Commit)**: `64732a06033a0ec2a4214ac11fdfaa2dcaefe028` (Short: `64732a0`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com)` (Version ID: `9a8147dd-aa0a-45f0-88ae-e9678a47bc9c`)
