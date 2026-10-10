@@ -9,8 +9,8 @@
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
 ### 滥用威胁工单列表修改回退与生产环境还原 (2026-10-10)
-*   **关联提交 (Git Commit)**: `fca75f27ea31806b11280d0e8b7df124f000095f` (Short: `fca75f2`)
-*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com)`
+*   **关联提交 (Git Commit)**: `6af08b5e0f25433658ec450ddcb95a8c8db42a78` (Short: `6af08b5`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com)` (Version ID: `309a85e8-ed0d-4a38-be33-42e34c897572`, Startup: `73ms`)
 *   **功能需求与变更清单 (Changes & Feature Alignment)**:
     - [x] 文件状态严格回退至任务前基准（commit 3fc758a）：
       - 撤销 `mail-vue/src/views/audit-report/index.vue` 本次改动，恢复方案一标准处置决策列集（多选/工单编号/当前状态/违规分类/报警原因与风险等级/处理建议/处理时间/到期时间/负责人/操作）；
@@ -23,13 +23,14 @@
       - i18n 静态对称三件套 100% 绝对对称通过（2593 键全部对称）；
       - 历史测试回归套件 `node tests/verify-audit-ui-optimization.mjs` 16 项全断言通过。
     - [x] 生产环境正式部署与还原：
-      - 执行 `wrangler deploy` 重新发布构建产物至 Cloudflare 生产环境；
-      - 登录 `mail.epocanvas.com` 进行线上全真检视，确认界面与数据接口正常还原。
+      - 执行 `wrangler deploy` 重新发布构建产物至 Cloudflare 生产环境 (Version ID: `309a85e8-ed0d-4a38-be33-42e34c897572`)；
+      - 登录 `mail.epocanvas.com` 执行 `node tests/verify-cf-production-audit-ui.mjs` 线上全真检视，34 项全绿通过，确认界面与数据接口正常还原。
 *   **自动化测试与核验清单 (Verification Checklist)**:
     - [x] 本地构建核验：`mail-vue` Vite 构建通过 (13.44s)；
     - [x] 多语言对称核验：6 语言 2593 键 100% 绝对对称通过；
     - [x] 单元与集成测试：`node tests/verify-audit-ui-optimization.mjs` 16 项全通过；
-    - [x] 生产环境部署核验：`wrangler deploy` 成功发布至 Cloudflare 生产环境；
+    - [x] 生产环境部署核验：`wrangler deploy` 成功发布至 Cloudflare 生产环境 (Version ID: `309a85e8-ed0d-4a38-be33-42e34c897572`)；
+    - [x] 线上全真检视：`node tests/verify-cf-production-audit-ui.mjs` 在 `mail.epocanvas.com` 实测 34/34 断言全绿通过；
     - [x] 零假数据残留：数据库与 KV 中零临时凭据或脏数据残留。
 
 ### 滥用威胁工单列表 Cloudflare 生产环境正式上线与公网全真检视 (2026-10-10)
