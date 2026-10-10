@@ -267,23 +267,29 @@
                         <span class="header-action-trigger" :class="{ 'sort-active': params.timeSort !== 0 }" :title="params.timeSort === 1 ? $t('auditSortAsc') : $t('auditSortDesc')" @click.stop="changeTimeSort">
                           <Icon :icon="params.timeSort === 1 ? 'fluent:arrow-up-16-regular' : (params.timeSort === 2 ? 'fluent:arrow-down-16-regular' : 'fluent:arrow-sort-16-regular')" width="13" height="13" />
                         </span>
-                        <el-dropdown trigger="click" @command="handleTimeFilterCommand">
-                          <span class="filter-trigger" :class="{ 'filter-active': params.timeRange !== 'all' }" :title="$t('filter')">
+                        <el-dropdown trigger="click" @command="handleActionFilterCommand">
+                          <span class="filter-trigger" :class="{ 'filter-active': params.timeRange !== 'all' || (params.assignee && params.assignee !== 'all') }" :title="$t('filter')">
                             <Icon icon="fluent:filter-16-regular" width="13" height="13" />
                           </span>
                           <template #dropdown>
                             <el-dropdown-menu>
-                              <el-dropdown-item command="all" :class="{ 'is-selected': params.timeRange === 'all' }">
+                              <el-dropdown-item command="time:all" :class="{ 'is-selected': params.timeRange === 'all' && (!params.assignee || params.assignee === 'all') }">
                                 {{ $t('auditAllProcessTime') }}
                               </el-dropdown-item>
-                              <el-dropdown-item command="today" :class="{ 'is-selected': params.timeRange === 'today' }">
+                              <el-dropdown-item command="time:today" :class="{ 'is-selected': params.timeRange === 'today' }">
                                 {{ $t('auditTimeToday') }}
                               </el-dropdown-item>
-                              <el-dropdown-item command="7days" :class="{ 'is-selected': params.timeRange === '7days' }">
+                              <el-dropdown-item command="time:7days" :class="{ 'is-selected': params.timeRange === '7days' }">
                                 {{ $t('auditTime7Days') }}
                               </el-dropdown-item>
-                              <el-dropdown-item command="30days" :class="{ 'is-selected': params.timeRange === '30days' }">
+                              <el-dropdown-item command="time:30days" :class="{ 'is-selected': params.timeRange === '30days' }">
                                 {{ $t('auditTime30Days') }}
+                              </el-dropdown-item>
+                              <el-dropdown-item divided command="assignee:unassigned" :class="{ 'is-selected': params.assignee === 'unassigned' }">
+                                未分配 (-)
+                              </el-dropdown-item>
+                              <el-dropdown-item command="assignee:admin" :class="{ 'is-selected': params.assignee === 'admin' }">
+                                Admin
                               </el-dropdown-item>
                             </el-dropdown-menu>
                           </template>
@@ -1333,6 +1339,8 @@ const params = reactive({
   warningType: 'all',
   riskLevel: 'high',
   status: 'all',
+  category: 'all',
+  assignee: 'all',
   timeRange: 'all',
   timeSort: 0,
   num: 1,
@@ -1424,6 +1432,8 @@ function handleReset() {
   localKeyword.value = '';
   params.keyword = '';
   params.status = 'all';
+  params.category = 'all';
+  params.assignee = 'all';
   params.timeRange = 'all';
   params.riskLevel = 'all';
   params.warningType = 'all';
@@ -1615,6 +1625,15 @@ function handleRiskFilterCommand(cmd) {
 
 function handleTimeFilterCommand(cmd) {
   params.timeRange = cmd;
+  search();
+}
+
+function handleActionFilterCommand(cmd) {
+  if (cmd.startsWith('time:')) {
+    params.timeRange = cmd.replace('time:', '');
+  } else if (cmd.startsWith('assignee:')) {
+    params.assignee = cmd.replace('assignee:', '');
+  }
   search();
 }
 

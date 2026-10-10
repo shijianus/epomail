@@ -489,7 +489,7 @@ const auditService = {
 	async list(c, params) {
 		await this.ensureTables(c);
 		await this.seedBaselineIfEmpty(c);
-		let { num = 1, size = 15, email, keyword, warningType, category, riskLevel, status, lifecycle, timeRange, timeSort = 0 } = params;
+		let { num = 1, size = 15, email, keyword, warningType, category, riskLevel, status, lifecycle, timeRange, timeSort = 0, assignee } = params;
 		size = Math.min(Number(size) || 15, 50);
 		num = Math.max(Number(num) || 1, 1);
 		const offset = (num - 1) * size;
@@ -541,6 +541,14 @@ const auditService = {
 				conditions.push(sql`(${auditLog.createTime} >= datetime('now', '-7 days') OR ${auditLog.banTime} >= datetime('now', '-7 days'))`);
 			} else if (timeRange === '30days') {
 				conditions.push(sql`(${auditLog.createTime} >= datetime('now', '-30 days') OR ${auditLog.banTime} >= datetime('now', '-30 days'))`);
+			}
+		}
+
+		if (assignee && assignee !== 'all') {
+			if (assignee === 'unassigned') {
+				conditions.push(sql`(${auditLog.assignee} IS NULL OR ${auditLog.assignee} = '' OR ${auditLog.assignee} = '-')`);
+			} else {
+				conditions.push(sql`${auditLog.assignee} COLLATE NOCASE LIKE ${'%' + assignee + '%'}`);
 			}
 		}
 
