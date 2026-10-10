@@ -110,22 +110,20 @@ async function run() {
 
     const hasTicketNo = headers.some(h => h.includes('工单编号'));
     const hasStatus = headers.some(h => h.includes('当前状态'));
+    const hasCategory = headers.some(h => h.includes('违规分类'));
     const hasAlarmOrRisk = headers.some(h => h.includes('报警原因') || h.includes('风险等级'));
-    const hasNetwork = headers.some(h => h.includes('触发网络'));
-    const hasDevice = headers.some(h => h.includes('终端设备'));
-    const hasProcessTime = headers.some(h => h.includes('处理时间'));
     const hasSuggestion = headers.some(h => h.includes('处理建议'));
+    const hasProcessTime = headers.some(h => h.includes('处理时间'));
     const hasExpireTimeInThreat = headers.some(h => h.includes('到期时间'));
     const hasAssignee = headers.some(h => h.includes('负责人'));
     const hasAction = headers.some(h => h.includes('操作'));
 
     ok(hasTicketNo, '包含「工单编号」表头列');
     ok(hasStatus, '包含「当前状态」表头列');
+    ok(hasCategory, '包含「违规分类」表头列 (对齐 punishments.md §5 规范)');
     ok(hasAlarmOrRisk, '包含「报警原因」/「风险等级」表头列');
-    ok(hasNetwork, '包含「触发网络」表头列 (填补中间空白，显示 IP 与归属地)');
-    ok(hasDevice, '包含「终端设备」表头列 (填补中间空白，显示客户端特征)');
-    ok(hasProcessTime, '包含「处理时间」表头列');
     ok(hasSuggestion, '包含「处理建议」表头列 (全 Tab 均展示建议)');
+    ok(hasProcessTime, '包含「处理时间」表头列');
     ok(!hasExpireTimeInThreat, '滥用威胁 Tab 下已成功移除「到期时间」列');
     ok(hasAssignee, '包含「负责人」表头列');
     ok(hasAction, '包含「操作」表头列');
@@ -151,16 +149,13 @@ async function run() {
       await page.waitForTimeout(400);
     }
 
-    // [检视 5] 第三轮精益 UI 规范验证 (冗余徽标消除、中间信息丰富度、无邮箱干扰、无行内按钮、无边框状态)
-    console.log('\n[检视 5] 第三轮精益 UI 细节核验:');
+    // [检视 5] 第四轮精益 UI 规范验证 (冗余徽标消除、违规分类呈现、无邮箱干扰、无行内按钮、无边框状态)
+    console.log('\n[检视 5] 第四轮精益 UI 细节核验:');
     const tagCompactCount = await page.$$eval('.ticket-cell .tag-compact', els => els.length);
     ok(tagCompactCount === 0, `工单编号后已彻底移除重复 tag-compact 检举徽标 (实际: ${tagCompactCount})`);
 
-    const networkCellCount = await page.$$eval('.network-cell', els => els.length);
-    ok(networkCellCount >= 1, `中间显式呈现触发网络 IP 与归属地 (实际渲染: ${networkCellCount} 行)`);
-
-    const deviceCellCount = await page.$$eval('.device-cell', els => els.length);
-    ok(deviceCellCount >= 1, `中间显式呈现终端设备与客户端环境 (实际渲染: ${deviceCellCount} 行)`);
+    const categoryCellCount = await page.$$eval('.category-cell', els => els.length);
+    ok(categoryCellCount >= 1, `中间显式呈现违规分类 (实际渲染: ${categoryCellCount} 行)`);
 
     const emailWrapCount = await page.$$eval('.el-table__body-wrapper .ticket-email-wrap', els => els.length);
     ok(emailWrapCount === 0, `表格行内无 ticket-email-wrap 干扰 (实际: ${emailWrapCount})`);

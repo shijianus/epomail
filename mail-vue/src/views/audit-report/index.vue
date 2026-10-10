@@ -219,8 +219,17 @@
                 </template>
               </el-table-column>
 
-              <!-- 列 3: 报警原因 / 风险等级 (表头集成风险筛选，滥用威胁显示原因，申诉审计显示风险等级LV0~LV3) -->
-              <el-table-column min-width="120">
+              <!-- 列 3: 违规分类 (对应 punishments.md §5 分类：外发滥用 / 账户安全 / 内容合规 / 配额规避 / 申诉复核 / 例行巡检) -->
+              <el-table-column :label="$t('auditColViolationCategory')" width="105">
+                <template #default="{ row }">
+                  <div class="category-cell">
+                    <span class="plain-category-text">{{ getViolationCategory(row).text }}</span>
+                  </div>
+                </template>
+              </el-table-column>
+
+              <!-- 列 4: 报警原因 / 风险等级 (表头集成风险筛选，滥用威胁显示原因，申诉审计显示风险等级LV0~LV3) -->
+              <el-table-column min-width="125">
                 <template #header>
                   <div class="col-filter-header">
                     <span>{{ activeKpi === 'threat' ? $t('auditColAlarmReason') : (activeKpi === 'appeal' ? $t('auditRiskLevel') : `${$t('auditColAlarmReason')} / ${$t('auditRiskLevel')}`) }}</span>
@@ -270,22 +279,18 @@
                 </template>
               </el-table-column>
 
-              <!-- 列 4: 触发网络 (展示 IP 归属与物理地理位置，填补中间空白) -->
-              <el-table-column :label="$t('auditColTriggerNetwork')" width="160">
+              <!-- 列 5: 处理建议 (包括限制外发、账号暂停、维持封禁、建议解禁、暂禁dd天等等；全 Tab 均展示) -->
+              <el-table-column :label="$t('auditColSuggestion')" width="110">
                 <template #default="{ row }">
-                  <div class="network-cell font-mono">
-                    <span class="network-ip font-medium">{{ row.ip || '-' }}</span>
-                    <span v-if="row.geo" class="network-geo text-muted" :title="row.geo">({{ row.geo }})</span>
-                  </div>
-                </template>
-              </el-table-column>
-
-              <!-- 列 5: 终端设备 (展示客户端环境与系统特征，填补中间空白) -->
-              <el-table-column :label="$t('auditColClientDevice')" width="145" show-overflow-tooltip>
-                <template #default="{ row }">
-                  <div class="device-cell" :title="row.device || '-'">
-                    <Icon :icon="getDeviceIcon(row)" width="14" height="14" class="device-icon" />
-                    <span class="device-text">{{ row.device || '-' }}</span>
+                  <div class="suggestion-tag-cell">
+                    <el-tag
+                      size="small"
+                      :type="getHandlingSuggestion(row).type"
+                      effect="plain"
+                      class="suggestion-tag"
+                    >
+                      {{ getHandlingSuggestion(row).text }}
+                    </el-tag>
                   </div>
                 </template>
               </el-table-column>
@@ -329,23 +334,7 @@
                 </template>
               </el-table-column>
 
-              <!-- 列 5: 处理建议 (包括封禁、解禁、暂禁dd天等等；全 Tab 均展示) -->
-              <el-table-column :label="$t('auditColSuggestion')" width="115">
-                <template #default="{ row }">
-                  <div class="suggestion-tag-cell">
-                    <el-tag
-                      size="small"
-                      :type="getHandlingSuggestion(row).type"
-                      effect="plain"
-                      class="suggestion-tag"
-                    >
-                      {{ getHandlingSuggestion(row).text }}
-                    </el-tag>
-                  </div>
-                </template>
-              </el-table-column>
-
-              <!-- 列 6: 到期时间 (滥用威胁中无到期时间；其他 Tab 保留并使用 mm/dd/yy hh:ss 格式与排序箭头) -->
+              <!-- 列 7: 到期时间 (滥用威胁中无到期时间；其他 Tab 保留并使用 mm/dd/yy hh:ss 格式与排序箭头) -->
               <el-table-column v-if="activeKpi !== 'threat'" width="135">
                 <template #header>
                   <div class="col-filter-header">
@@ -366,8 +355,8 @@
                 </template>
               </el-table-column>
 
-              <!-- 列 7: 负责人 (只展示名称，点击可进入账户详情) -->
-              <el-table-column :label="$t('auditColAssignee')" width="105">
+              <!-- 列 8: 负责人 (只展示名称，点击可进入账户详情) -->
+              <el-table-column :label="$t('auditColAssignee')" width="95">
                 <template #default="{ row }">
                   <span class="operator-name-link font-medium" :title="getOperatorName(row)" @click.stop="handleViewOperator(row)">
                     {{ getOperatorName(row) }}
@@ -375,8 +364,8 @@
                 </template>
               </el-table-column>
 
-              <!-- 列 8: 操作 (只保留查看详情，解封/封禁/延期/备注均整合入详情中) -->
-              <el-table-column :label="$t('action')" width="95" align="right">
+              <!-- 列 9: 操作 (只保留查看详情，解封/封禁/延期/备注均整合入详情中) -->
+              <el-table-column :label="$t('action')" width="80" align="right">
                 <template #default="{ row }">
                   <el-button
                     size="small"
@@ -1090,18 +1079,36 @@ function formatTableTime(time) {
   return tzDayjs(time).format('MM/DD/YY HH:mm');
 }
 
-function getDeviceIcon(row) {
-  const dev = (row?.device || '').toLowerCase();
-  if (dev.includes('curl') || dev.includes('bot') || dev.includes('terminal') || dev.includes('monitor') || dev.includes('headless')) {
-    return 'fluent:terminal-16-regular';
+function getViolationCategory(row) {
+  if (!row) return { text: '-', type: 'info' };
+  // 1. 申诉审计 / 申诉工单
+  if (activeKpi.value === 'appeal' || row.warningType === 'appeal' || row.category === 'appeal' || row.eventType?.includes('appeal')) {
+    return { text: t('auditCatAppeal'), type: 'warning' };
   }
-  if (dev.includes('phone') || dev.includes('ios') || dev.includes('android') || dev.includes('mobile')) {
-    return 'fluent:phone-16-regular';
+  // 2. 一人多号 / 配额规避
+  if (row.eventType === 'multi_account_ban' || row.eventType === 'multi_account_detected' || (row.banReason && row.banReason.includes('一人多号')) || (row.actionText && row.actionText.includes('一人多号'))) {
+    return { text: t('auditCatQuota'), type: 'danger' };
   }
-  if (dev.includes('mac') || dev.includes('laptop')) {
-    return 'fluent:laptop-16-regular';
+  // 3. 内容安全 / 钓鱼诈骗
+  if (row.reportCategory === 'fraud' || row.reportCategory === 'phishing' || row.reportCategory === 'mlm' || (row.banReason && (row.banReason.includes('恶意链接') || row.banReason.includes('钓鱼'))) || (row.actionText && (row.actionText.includes('外链') || row.actionText.includes('诈骗')))) {
+    return { text: t('auditCatContent'), type: 'danger' };
   }
-  return 'fluent:desktop-16-regular';
+  // 4. 外发滥用 / 垃圾发信
+  if (row.category === 'outbound' || row.reportCategory === 'spam' || (row.banReason && row.banReason.includes('发信')) || (row.actionText && (row.actionText.includes('发信') || row.actionText.includes('垃圾') || row.actionText.includes('群发')))) {
+    return { text: t('auditCatOutbound'), type: 'danger' };
+  }
+  // 5. 账户安全 / 密保异动 / 暴力破解
+  if (row.category === 'account' || row.eventType === 'credential_tamper_ban' || (row.banReason && row.banReason.includes('密保')) || (row.actionText && row.actionText.includes('密保'))) {
+    return { text: t('auditCatAccount'), type: 'warning' };
+  }
+  // 6. 例行巡检 / 基线采样 / 异地跳跃
+  if (row.warningType === 'audit' || row.eventType?.includes('routine') || row.eventType?.includes('sample') || row.eventType?.includes('baseline')) {
+    return { text: t('auditCatRoutine'), type: 'info' };
+  }
+  if (row.category === 'security') {
+    return { text: t('auditCatOutbound'), type: 'danger' };
+  }
+  return { text: t('auditCatOutbound'), type: 'info' };
 }
 
 function getHandlingSuggestion(row) {
@@ -1120,6 +1127,15 @@ function getHandlingSuggestion(row) {
     if (row.status === 'banned') {
       return { text: t('auditSuggestionKeepBan'), type: 'danger' };
     }
+    if (row.eventType === 'multi_account_detected' || row.eventType === 'multi_account_ban') {
+      return { text: t('auditSuggestionSuspendAccount'), type: 'danger' };
+    }
+    if (row.recommendedAction === 'blacklist_sender' || row.reportCategory === 'fraud') {
+      return { text: t('auditSuggestionPermanentBan'), type: 'danger' };
+    }
+    if (row.recommendedAction === 'mute_account' || row.reportCategory === 'spam') {
+      return { text: t('auditSuggestionRestrictedOutbound'), type: 'warning' };
+    }
     return { text: t('auditSuggestionBan'), type: 'danger' };
   }
 
@@ -1127,6 +1143,9 @@ function getHandlingSuggestion(row) {
   if (activeKpi.value === 'appeal' || row.warningType === 'appeal') {
     if (row.status === 'unbanned' || row.status === 'resolved') {
       return { text: t('auditSuggestionUnban'), type: 'success' };
+    }
+    if (row.status === 'rejected') {
+      return { text: t('auditSuggestionKeepBan'), type: 'danger' };
     }
     const p = (row?.priority || '').toUpperCase();
     if (['P0', 'CRITICAL', 'LV3'].includes(p) || row?.riskLevel === 'high') {
@@ -1141,6 +1160,9 @@ function getHandlingSuggestion(row) {
   // 3. 风险管理 (audit) 与 操作记录 (record)
   if (row.status === 'unbanned') {
     return { text: t('auditSuggestionUnban'), type: 'success' };
+  }
+  if (row.recommendedAction === 'archive_routine' || row.status === 'expired' || row.status === 'resolved') {
+    return { text: t('auditSuggestionArchiveRoutine'), type: 'info' };
   }
   if (row.status === 'watching') {
     return { text: t('auditSuggestionWatch'), type: 'info' };
@@ -1345,26 +1367,23 @@ function handleExportCsv() {
     t('auditColTicketNo'),
     t('tabEmailAddress'),
     t('auditCurrentStatus'),
+    t('auditColViolationCategory'),
     t('auditColAlarmReason'),
-    t('auditColTriggerNetwork'),
-    t('auditColClientDevice'),
-    t('auditColProcessTime'),
     t('auditColSuggestion'),
+    t('auditColProcessTime'),
     t('auditColExpireTime'),
     t('auditColAssignee')
   ];
   const csvRows = [headers.join(',')];
   for (const row of logs.value) {
-    const networkVal = row.ip ? `${row.ip}${row.geo ? ` (${row.geo})` : ''}` : '-';
     const rowValues = [
       formatTicketNo(row),
       `"${row.email || ''}"`,
       `"${getStatusLabel(row.status)}"`,
+      `"${getViolationCategory(row).text}"`,
       `"${getSimpleAlarmReason(row)}"`,
-      `"${networkVal}"`,
-      `"${row.device || '-'}"`,
-      `"${formatTableTime(row.banTime || row.createTime)}"`,
       `"${getHandlingSuggestion(row).text}"`,
+      `"${formatTableTime(row.banTime || row.createTime)}"`,
       `"${row.expireTime ? formatTableTime(row.expireTime) : '-'}"`,
       `"${getOperatorName(row)}"`
     ];
@@ -2219,46 +2238,16 @@ onUnmounted(() => {
   font-size: 13px;
 }
 
-.network-cell {
+.category-cell {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  font-size: 12px;
+  font-size: 12.5px;
+  line-height: 1.4;
   white-space: nowrap;
-  line-height: 1.3;
 
-  .network-ip {
-    color: var(--el-text-color-primary);
-    font-weight: 500;
-  }
-
-  .network-geo {
-    color: var(--el-text-color-secondary);
-    font-size: 11px;
-    opacity: 0.85;
-  }
-}
-
-.device-cell {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 12px;
-  color: var(--el-text-color-regular);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 140px;
-
-  .device-icon {
-    flex-shrink: 0;
-    color: var(--el-text-color-placeholder);
-  }
-
-  .device-text {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+  .plain-category-text {
+    color: var(--el-text-color-regular);
+    letter-spacing: 0.2px;
   }
 }
 
