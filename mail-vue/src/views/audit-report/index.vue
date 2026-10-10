@@ -19,8 +19,16 @@
               <div class="kpi-header">
                 <span class="kpi-title">{{ $t('auditKpiThreatEmail') }}</span>
               </div>
-              <div class="kpi-data-stat kpi-value font-mono">
-                <span class="stat-number stat-danger">{{ summaryCounts.threat }}</span>
+              <div class="kpi-data-stat kpi-value font-mono kpi-split-stat">
+                <span class="split-part split-pending">
+                  <span class="split-label">{{ $t('abuseStatusPending') }}</span>
+                  <span class="stat-number stat-warning">{{ summaryCounts.threatPending || 0 }}</span>
+                </span>
+                <span class="split-sep">/</span>
+                <span class="split-part split-banned">
+                  <span class="split-label">{{ $t('abuseStatusBanned') }}</span>
+                  <span class="stat-number stat-danger">{{ summaryCounts.threatBanned || 0 }}</span>
+                </span>
               </div>
               <div class="kpi-desc kpi-sub" :title="$t('auditKpiThreatEmailDesc')">
                 {{ $t('auditKpiThreatEmailSub') }}
@@ -93,6 +101,12 @@
               </div>
             </div>
           </div>
+        </div>
+
+        <!-- 熔断状态条: 当 Global Circuit Breaker 处于 TRIPPED 时展示 -->
+        <div v-if="activeKpi === 'threat' && (circuitBreaker.tripped || circuitBreaker.status === 'TRIPPED')" class="circuit-breaker-banner">
+          <Icon icon="fluent:flash-warning-20-filled" width="18" height="18" class="cb-icon" />
+          <span class="cb-text">{{ $t('abuseCircuitBannerText') }}</span>
         </div>
 
         <!-- 2. 工作台单一外框 (单一事实载体：操作栏与表格一体化) -->
@@ -178,6 +192,14 @@
 
             <!-- 当 activeKpi === 'threat' 时展示专门的 7 列滥用威胁工作台 -->
             <div v-if="activeKpi === 'threat'" class="abuse-table-wrapper">
+              <!-- 自动折叠计数条 (AUTO_PURGE_AND_TOMBSTONE) -->
+              <div v-if="autoPurgedCount > 0" class="auto-purged-banner" @click="purgedBatchesDialogVisible = true">
+                <Icon icon="fluent:archive-arrow-back-16-regular" width="15" height="15" class="purged-banner-icon" />
+                <span class="purged-banner-text">{{ $t('abuseAutoPurgedCount', { count: autoPurgedCount }) }}</span>
+                <span class="purged-banner-tip">({{ $t('auditBtnViewDetails') }})</span>
+                <Icon icon="fluent:chevron-right-16-regular" width="13" height="13" class="purged-banner-arrow" />
+              </div>
+
               <table class="abuse-table">
                 <colgroup>
                   <col style="width: 40px;" />
@@ -880,6 +902,45 @@
           </div>
         </div>
 
+        <!-- 滥用违规事实、证据留存与流转时间线 (punishments.md 第 7 章与第 15 章) -->
+        <div v-if="selectedRow && (activeKpi === 'threat' || selectedRow.reasonCode || selectedRow.timeline)" class="dossier-card abuse-evidence-card">
+          <div class="section-title">
+            <Icon icon="fluent:shield-keyhole-20-regular" width="18" height="18" />
+            <span>违规事实与处置证据留存</span>
+          </div>
+          <div class="abuse-detail-meta-grid">
+            <div class="meta-item">
+              <span class="meta-label">原因代码 (Reason Code):</span>
+              <span class="meta-val font-mono font-semibold">{{ selectedRow.reasonCode || 'RULE_PATTERN_MATCH' }}</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">证据保留期限:</span>
+              <span class="meta-val">{{ $t('abuseEvidenceRemainingDays', { days: selectedRow.evidenceExpiresDays ?? 180 }) }}</span>
+            </div>
+            <div class="meta-item" v-if="selectedRow.clusterId">
+              <span class="meta-label">集群标识 (Cluster ID):</span>
+              <span class="meta-val font-mono">{{ selectedRow.clusterId }}</span>
+            </div>
+            <div class="meta-item" v-if="selectedRow.evidenceSummary">
+              <span class="meta-label">证据摘要:</span>
+              <span class="meta-val">{{ selectedRow.evidenceSummary }}</span>
+            </div>
+          </div>
+
+          <!-- 时间线 -->
+          <div class="timeline-section" v-if="selectedRow.timeline && selectedRow.timeline.length">
+            <div class="timeline-title">工单全周期事件时间线</div>
+            <div class="timeline-list">
+              <div v-for="(tItem, idx) in selectedRow.timeline" :key="idx" class="timeline-row">
+                <span class="timeline-dot"></span>
+                <span class="timeline-time font-mono">{{ tItem.time ? tzDayjs(tItem.time).format('YYYY-MM-DD HH:mm:ss') : '-' }}</span>
+                <span class="timeline-event">{{ tItem.event }}</span>
+                <span class="timeline-actor">({{ tItem.actor }})</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- 【证据对比布局】多维风险画像两列对比卡片：左侧当前账号实际证据值，右侧系统基准/风险阈值，标红超标项，默认完全展开 -->
         <div class="dossier-card evidence-compare-card-wrapper">
           <div class="section-title">
@@ -1249,6 +1310,33 @@
           <el-button type="primary" @click="goToUserManagement">
             {{ $t('auditGoToUserList') }}
           </el-button>
+        </div>
+      </template>
+    </el-dialog>
+
+    <!-- 6. 自动折叠批次只读明细弹窗 (AUTO_PURGE_AND_TOMBSTONE) -->
+    <el-dialog
+      v-model="purgedBatchesDialogVisible"
+      :title="$t('abuseAutoPurgedTitle')"
+      width="560px"
+      append-to-body
+      destroy-on-close
+    >
+      <div class="purged-batches-container">
+        <div v-for="b in autoPurgedBatches" :key="b.id" class="purged-batch-card">
+          <div class="batch-header">
+            <span class="batch-id font-mono font-medium">{{ b.id }}</span>
+            <span class="batch-time font-mono">{{ b.time }}</span>
+          </div>
+          <div class="batch-body">
+            <el-tag size="small" type="info">{{ b.reason }}</el-tag>
+            <span class="batch-count">{{ b.count }} 账户</span>
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="purgedBatchesDialogVisible = false">{{ $t('close') }}</el-button>
         </div>
       </template>
     </el-dialog>
@@ -4177,6 +4265,206 @@ html.dark {
       color: var(--el-text-color-primary);
       font-weight: 500;
     }
+  }
+}
+
+/* 顶部卡片待审/已封禁拆分展示 */
+.kpi-split-stat {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 15px;
+
+  .split-part {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 3px;
+  }
+
+  .split-label {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--el-text-color-secondary);
+  }
+
+  .stat-number {
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+  }
+
+  .split-sep {
+    font-size: 14px;
+    color: var(--el-text-color-placeholder);
+    margin: 0 1px;
+  }
+}
+
+/* 熔断状态条 */
+.circuit-breaker-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  border-radius: 6px;
+  margin-bottom: 12px;
+  color: #d97706;
+  font-size: 13px;
+  font-weight: 600;
+
+  .cb-icon {
+    flex-shrink: 0;
+    color: #d97706;
+  }
+
+  .cb-text {
+    line-height: 1.4;
+  }
+}
+
+/* 自动折叠批次状态条 */
+.auto-purged-banner {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: var(--el-fill-color-light);
+  border-bottom: 1px solid var(--el-border-color-lighter);
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+
+  &:hover {
+    color: var(--el-color-primary);
+    background: var(--el-fill-color);
+  }
+
+  .purged-banner-icon {
+    color: var(--el-color-primary);
+  }
+
+  .purged-banner-tip {
+    font-size: 11px;
+    color: var(--el-text-color-placeholder);
+  }
+
+  .purged-banner-arrow {
+    margin-left: auto;
+    color: var(--el-text-color-placeholder);
+  }
+}
+
+.purged-batches-container {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.purged-batch-card {
+  padding: 10px 14px;
+  border-radius: 6px;
+  background: var(--el-fill-color-lighter);
+  border: 1px solid var(--el-border-color-lighter);
+
+  .batch-header {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12.5px;
+    margin-bottom: 6px;
+  }
+
+  .batch-id {
+    color: var(--el-color-primary);
+  }
+
+  .batch-time {
+    color: var(--el-text-color-secondary);
+  }
+
+  .batch-body {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+    color: var(--el-text-color-regular);
+  }
+}
+
+/* 抽屉滥用违规事实与时间线 */
+.abuse-detail-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--el-fill-color-lighter);
+  border-radius: 6px;
+  margin-bottom: 12px;
+
+  .meta-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .meta-label {
+    font-size: 11px;
+    color: var(--el-text-color-secondary);
+  }
+
+  .meta-val {
+    font-size: 12.5px;
+    color: var(--el-text-color-primary);
+  }
+}
+
+.timeline-section {
+  padding: 10px 14px;
+  background: var(--el-fill-color-light);
+  border-radius: 6px;
+
+  .timeline-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--el-text-color-regular);
+    margin-bottom: 8px;
+  }
+
+  .timeline-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .timeline-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11.5px;
+    color: var(--el-text-color-secondary);
+  }
+
+  .timeline-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--el-color-primary);
+    flex-shrink: 0;
+  }
+
+  .timeline-time {
+    color: var(--el-text-color-placeholder);
+  }
+
+  .timeline-event {
+    color: var(--el-text-color-primary);
+    font-weight: 500;
+  }
+
+  .timeline-actor {
+    color: var(--el-text-color-secondary);
   }
 }
 </style>
