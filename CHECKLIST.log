@@ -8,6 +8,61 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### 滥用威胁工单列表重构、列集收敛与全真响应式断言 (2026-10-10)
+*   **关联提交 (Git Commit)**:
+    - 阶段 6 (断言实测): `d3add39570550aa038c81aa8d3f3773c12db0cb3` (Short: `d3add39`)
+    - 阶段 5 (统计与熔断): `11eab8926ac47267b8da3f5598b14de9ea210e1a` (Short: `11eab89`)
+    - 阶段 4 (响应式卡片): `c17a8d324602cfbc4158eb0e37987ec0a52dd96a` (Short: `c17a8d3`)
+    - 阶段 3 (状态分类处理): `c60c2550580fef0dc157e8bb2e65a5528f6cf767` (Short: `c60c255`)
+    - 阶段 2 (对象列换行): `3eb2fd5a6a9d679732d7850763703068d8afc45a` (Short: `3eb2fd5`)
+    - 阶段 1 (7列固定宽度): `99a8c023983a10fdae5734fc3d3afe1ed1440fcb` (Short: `99a8c02`)
+*   **部署环境 (Deployment)**: `本地全真栈 (开发分支 fix/abuse-table-columns，未部署生产)`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 目标列集（7 列）重构并固定宽度 (`table-layout: fixed` 与 `<colgroup>` 控制)：
+      - 选择 (40px) ➔ 编号 (72px, `#10005` 等宽字体) ➔ 对象 (`clamp(180px, 22%, 260px)`) ➔ 状态 (96px) ➔ 分类 (弹性, 最小 190px) ➔ 处理 (120px) ➔ 操作 (64px, 详情+下拉菜单)；
+      - 彻底移除旧有独立列「处理建议」「负责人」「处理时间」「等级」「期限」，合并入「处理」列；
+      - 表头文字严格 ≤ 3 个汉字，排序/筛选图标紧凑内置不撑开列宽。
+    - [x] 对象列智能断行、分级显示与集群展开：
+      - 结构拆分为 `<span class="mail-local">` + `<span class="mail-at">@&#8203;</span>` + `<span class="mail-domain">`，在 `@` 与每个 `.` 后插入零宽空格 `\u200B`；
+      - 长度三级阶梯样式：≤ 80 字符（正常 13px，最多 3 行）、> 80 字符（12px，最多 4 行）、> 160 字符（11px 紧凑行高并打上「长地址」徽标）；
+      - 支持中文与 IDN 域名，复制按钮悬停提供 Unicode 与 Punycode（通过原生 `URL.hostname` 零额外依赖转换）；
+      - 集群工单展示「N 个账号」徽章，点击行内展开子账号列表，遵循同等断行规则且支持逐账号精确勾选。
+    - [x] 状态词表、分类证据摘要与处理列：
+      - 状态词表精简：待审（琥珀色）、已封禁（红色）、已解除（绿色）、熔断暂扣（待审 + 熔断 tag），彻底清除「生效中·已封禁」等旧合并写法；
+      - 分类 5 大固定词表（协议违规、一人多号、账户倒手、外发滥用、配额规避），第 2 行证据摘要 ≤ 14 汉字带来源前缀（用户举报 N 人、FBL 回传 N 件、系统规则命中）；
+      - 处理列两行呈现：第 1 行建议/结论（建议封禁/维持封禁/申诉通过/熔断暂扣），第 2 行处理时间与负责人（`MM/DD HH:mm 负责人` 或 `需人工` 或 `-`）。
+    - [x] 响应式无横向滚动卡片布局：
+      - ≥ 861px 使用 7 列表格；≤ 860px 自动降级为纵向单列卡片视图，隐藏 `thead` 与 `colgroup`，字段前缀 `data-label` 小标签；
+      - 在 1440、1024、860、768、375 全部分辨率下，`scrollWidth <= clientWidth` 绝对无横向滚动条，无省略号截断（零 `text-overflow: ellipsis`、零 `line-clamp`、零 `...`/`…`）。
+    - [x] 统计卡片拆分与设计文档增强项：
+      - 「滥用威胁」KPI 卡片展示「待审 N / 已封禁 M」，副标题高度严格限制 2 行；
+      - 全局熔断状态条：TRIPPED 时显式横幅「熔断中:新违规仅暂扣,不封禁账号」；
+      - 自动折叠计数条：「今日已自动折叠 N 个批次」及只读明细弹窗；
+      - 详情抽屉完整展示：原因代码、180 天证据留存倒计时、证据摘要与全生命周期事件流转时间线。
+    - [x] 多语言对称字典与后端服务健壮性：
+      - 新增多语言词条 47 处，zh, zh-Hant, en, es, fr, nl 六语言字典保持 100% 绝对对称（2641 键全部通过静态校验）；
+      - 后端 `auditService` 与 D1 表结构幂等兼容，旧数据缺失字段缺省安全防御。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 前端构建核验：`npm --prefix mail-vue run build` 耗时 13.58s 零警告零报错通过；
+    - [x] 多语言对称核验：`node scripts/i18n-symmetry.mjs` 6 语言 2641 键 100% 绝对对称通过；
+    - [x] 多语言代码引用核验：`node scripts/i18n-audit.mjs` 零缺失引用通过；
+    - [x] 历史审计回归核验：`node tests/verify-audit-ui-optimization.mjs` 16 项全断言通过；
+    - [x] 历史封禁回归核验：`node tests/verify-ban-table-columns-truncation.mjs` 12 项全断言通过；
+    - [x] 阶段 6 专项全真断言与截图验证：`node tests/verify-abuse-table-polish.mjs` 32 项断言全部绿灯通过：
+      - 1440px / 1024px / 860px / 768px / 375px 5 大视口横向滚动度量：全部 `scrollWidth <= clientWidth` (0 溢出)；
+      - 全尺寸 DOM 计算样式核验：0 个 `text-overflow: ellipsis`，0 个 `line-clamp`，0 个 `...` 或 `…` 省略号；
+      - 桌面表格单元格尺寸核验：所有单元格 `scrollHeight <= clientHeight + 2`，零裁切；
+      - 滥用板块语义隔离核验：零出现「期限」「等级」「E1~E4」「LV1~LV3」「TTL」禁用词；
+      - 自动折叠批次弹窗交互：3 个批次卡片正确弹出渲染；
+      - 全局熔断状态条交互：正确挂载并渲染暂扣文案；
+      - KPI 统计拆分度量：待审 4 / 已封禁 2 格式解析精确。
+    - [x] 5 大标准视口截图落盘：
+      - `doc/validation/abuse-table/abuse_table_1440px.png` (桌面超宽，200KB)
+      - `doc/validation/abuse-table/abuse_table_1024px.png` (桌面标准，147KB)
+      - `doc/validation/abuse-table/abuse_table_860px.png` (临界平板卡片切换点，106KB)
+      - `doc/validation/abuse-table/abuse_table_768px.png` (平板坚屏卡片，105KB)
+      - `doc/validation/abuse-table/abuse_table_375px.png` (手机超窄屏卡片，55KB)
+
 ### 安全审计控制台方案一标准化列集落地与 punishments.md 架构对齐 (2026-10-10)
 *   **关联提交 (Git Commit)**: `c4073c55d7f02e16a3776000669ce3ab000ff386` (Short: `c4073c5`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com)` (Version ID: `eb265576-057a-4ef3-b9cb-44eeab47430d`, Startup: `61ms`)
