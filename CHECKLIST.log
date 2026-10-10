@@ -8,6 +8,39 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### 安全审计控制台 11 大新列集重构与全表格居中对齐规范落地 (2026-10-10)
+*   **关联提交 (Git Commit)**: `b76e819441bc191c47530b9fc479ecc2f6013b57` (Short: `b76e819`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com)` (Version ID: `795a698b-4200-4f43-a0ff-ae2dc7083e4e`, Startup: `75ms`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 表格列集全面重构为指定的 11 大核心列（顺序严格一致）：
+      1. `工单编号`: 严格遵循 `#` 开头不超过 6 位大写字母与数字规范（例如 `#AK1789`、`#ZS88K1`、`#BD9901`）；
+      2. `身分组`: 集成身份等级筛选（P0~P4 影响程度等级：核心站长 P0、运维协管 P1、组织成员 P2、正式用户 P3、临时访客 P4），支持表头下拉多态筛选；
+      3. `违规分类`: 说明当前的实际违规内容（如一人多号、配额规避、钓鱼诈骗、外发滥用等）；
+      4. `报警原因`: 说明是如何被检查到的（如指纹关联、发信激增、关键词命中等）；
+      5. `报警次数`: 同类收敛聚合计算，直接计算在一个表格中，高频预警徽标醒目呈现；
+      6. `当前状态`: 纯 icon + 文字水平精简对齐状态徽章；
+      7. `处理建议`: 智能处置建议 Tag；
+      8. `处理时间`: 统一样式时间戳，集成表头排序与范围筛选；
+      9. `负责人`: 纯名称点击链接，无缝唤出「负责人账户详情」对话框；
+      10. `拍案管理`: 明确界定执行最终有效裁决的法定主体（站长终裁、策略引擎、申诉仲裁组、安全主管、例行归档），与操作负责人明确区分；
+      11. `操作`: 单一纯粹的「查看详情」按钮，唤出审计决策抽屉。
+    - [x] 全表格居中对齐规范落地 (解决操作列原右对齐问题)：
+      - 所有 11 列及多选列统一显式声明 `align="center"`；
+      - 内部单元格容器（`.ticket-cell`, `.identity-cell`, `.alarm-count-cell`, `.reason-cell`, `.category-cell`, `.status-clean-item`, `.suggestion-tag-cell`, `.operator-cell`, `.authority-cell`, `.action-cell`）统一配置 `display: inline-flex; justify-content: center; width: 100%; text-align: center;`，确保表头与单元格完全居中对齐；
+      - 操作列彻底废除 `justify-content: flex-end`，居中对齐彻底消除视觉偏斜。
+    - [x] 6 语言字典对称性保障：
+      - 六语言（zh, zh-Hant, en, es, fr, nl）全量同步 26 个新字段字典，`i18n-symmetry.mjs` 与 `i18n-audit.mjs` 静态断言 100% 绝对对称通过。
+    - [x] Cloudflare 生产环境正式部署与线上实测：
+      - 前端 `mail-vue` 构建通过 (12.49s)，生产 Worker 发布成功 (Version ID: `795a698b-4200-4f43-a0ff-ae2dc7083e4e`)；
+      - 运行 `node tests/verify-cf-production-audit-ui.mjs` 在生产公网 `https://mail.epocanvas.com` 上 34 项全真断言 100% 全绿通过。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：`mail-vue` Vite 构建通过 (12.49s)；
+    - [x] 多语言对称核验：6 语言 2619 键 100% 绝对对称无缺失；
+    - [x] 本地单元测试：`node tests/verify-audit-ui-optimization.mjs` 16 项全通过；
+    - [x] 生产环境部署核验：`wrangler deploy` 成功发布至 Cloudflare 生产环境 (Version ID: `795a698b-4200-4f43-a0ff-ae2dc7083e4e`)；
+    - [x] 线上全真检视：`node tests/verify-cf-production-audit-ui.mjs` 在 `mail.epocanvas.com` 实测 34/34 断言全绿通过；
+    - [x] 零假数据残留：数据库与 KV 中零临时凭据或脏数据残留。
+
 ### 滥用威胁工单列表修改回退与生产环境还原 (2026-10-10)
 *   **关联提交 (Git Commit)**: `6af08b5e0f25433658ec450ddcb95a8c8db42a78` (Short: `6af08b5`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com)` (Version ID: `309a85e8-ed0d-4a38-be33-42e34c897572`, Startup: `73ms`)
