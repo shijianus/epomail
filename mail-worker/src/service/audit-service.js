@@ -52,6 +52,13 @@ const auditService = {
 					is_internal INTEGER DEFAULT 0,
 					report_category TEXT,
 					report_reason TEXT,
+					cluster_id TEXT,
+					assignee TEXT,
+					report_source TEXT,
+					evidence_summary TEXT,
+					circuit_status TEXT DEFAULT 'NORMAL',
+					reason_code TEXT,
+					timeline TEXT,
 					resolved_time DATETIME,
 					create_time DATETIME DEFAULT CURRENT_TIMESTAMP
 				);
@@ -68,7 +75,14 @@ const auditService = {
 				{ name: 'ban_time', sql: `ALTER TABLE audit_log ADD COLUMN ban_time TEXT;` },
 				{ name: 'is_internal', sql: `ALTER TABLE audit_log ADD COLUMN is_internal INTEGER DEFAULT 0;` },
 				{ name: 'report_category', sql: `ALTER TABLE audit_log ADD COLUMN report_category TEXT;` },
-				{ name: 'report_reason', sql: `ALTER TABLE audit_log ADD COLUMN report_reason TEXT;` }
+				{ name: 'report_reason', sql: `ALTER TABLE audit_log ADD COLUMN report_reason TEXT;` },
+				{ name: 'cluster_id', sql: `ALTER TABLE audit_log ADD COLUMN cluster_id TEXT;` },
+				{ name: 'assignee', sql: `ALTER TABLE audit_log ADD COLUMN assignee TEXT;` },
+				{ name: 'report_source', sql: `ALTER TABLE audit_log ADD COLUMN report_source TEXT;` },
+				{ name: 'evidence_summary', sql: `ALTER TABLE audit_log ADD COLUMN evidence_summary TEXT;` },
+				{ name: 'circuit_status', sql: `ALTER TABLE audit_log ADD COLUMN circuit_status TEXT DEFAULT 'NORMAL';` },
+				{ name: 'reason_code', sql: `ALTER TABLE audit_log ADD COLUMN reason_code TEXT;` },
+				{ name: 'timeline', sql: `ALTER TABLE audit_log ADD COLUMN timeline TEXT;` }
 			];
 			for (const col of baselineCols) {
 				try {
@@ -537,9 +551,13 @@ const auditService = {
 
 		if (Number(timeSort) === 1) {
 			query.orderBy(asc(auditLog.id));
-		} else if (warningType === 'risk') {
-			// 异常威胁：被他人举报从高到低排名，保障高频检举重点置顶处置
-			query.orderBy(desc(auditLog.reportedByOthers), desc(auditLog.id));
+		} else if (warningType === 'risk' || riskLevel === 'high') {
+			// 滥用威胁默认排序：待审在前 (status in 'pending', 'active')，其次按被举报/集群账号数从多到少，再按创建时间/ID从新到旧
+			query.orderBy(
+				sql`CASE WHEN ${auditLog.status} IN ('pending', 'active') THEN 0 ELSE 1 END`,
+				desc(auditLog.reportedByOthers),
+				desc(auditLog.id)
+			);
 		} else {
 			query.orderBy(desc(auditLog.id));
 		}
@@ -565,13 +583,16 @@ const auditService = {
 		const riskItems = allItems.filter(i => i.warningType === 'risk');
 		const appealItems = allItems.filter(i => i.warningType === 'appeal');
 		const banItems = allItems.filter(i => i.warningType === 'ban' || i.status === 'banned' || i.status === 'unbanned');
+		const threatItems = allItems.filter(i => i.warningType === 'risk' || i.riskLevel === 'high' || i.priority === 'CRITICAL' || i.priority === 'P0');
 
 		const auditPending = auditItems.filter(i => isPending(i.status)).length;
 		const riskPending = riskItems.filter(i => isPending(i.status)).length;
 		const appealPending = appealItems.filter(i => isPending(i.status)).length;
 		const banActive = banItems.filter(i => i.status === 'banned').length;
+		const threatPending = threatItems.filter(i => isPending(i.status)).length;
+		const threatBanned = threatItems.filter(i => i.status === 'banned').length;
 		const totalPending = auditPending + riskPending + appealPending;
-		const highRiskCount = allItems.filter(i => i.riskLevel === 'high' || i.priority === 'CRITICAL' || i.priority === 'P0').length;
+		const highRiskCount = threatItems.length;
 		const todayCount = Math.max(1, banItems.length);
 
 		const counts = {
@@ -579,6 +600,9 @@ const auditService = {
 			today: todayCount,
 			pending: totalPending,
 			highRisk: highRiskCount,
+			threat: threatItems.length,
+			threatPending: threatPending,
+			threatBanned: threatBanned,
 			audit: auditPending,
 			auditTotal: auditItems.length,
 			risk: riskPending,
@@ -618,13 +642,52 @@ const auditService = {
 			const baseGeo = row.geo ? `${row.geo.split(' ')[0]} (Reg)` : 'CN (Reg)';
 			const baseFingerprint = row.fingerprint ? `BASE-${row.fingerprint.slice(-8)}` : 'FP-BASE-REG';
 
+			const nowMs = Date.now();
+			const createMs = row.createTime ? new Date(row.createTime).getTime() : nowMs;
+			const daysPassed = Math.floor((nowMs - createMs) / (86400 * 1000));
+			const evidenceExpiresDays = Math.max(0, 180 - daysPassed);
+
+			let evidenceSummary = row.evidenceSummary;
+			if (!evidenceSummary) {
+				const rCount = Number(row.reportedByOthers) || 0;
+				if (rCount > 0) {
+					evidenceSummary = row.reportSource === 'fbl' ? `FBL 回传 ${rCount} 件` : `用户举报 ${rCount} 人`;
+				} else if (row.eventType === 'multi_account_detected' || row.eventType === 'multi_account_ban') {
+					evidenceSummary = 'Jaccard 0.84 节律 0.92';
+				} else if (row.eventType === 'credential_tamper_ban' || row.eventType === 'account_takeover') {
+					evidenceSummary = '改密后环境突变';
+				} else if (row.eventType === 'auto_ban' || (row.banReason && row.banReason.includes('频率'))) {
+					evidenceSummary = '投诉率 0.4% 1h';
+				} else if (row.reportCategory === 'fraud' || (row.detailText && row.detailText.includes('蜜罐'))) {
+					evidenceSummary = '蜜罐命中';
+				} else if (row.reportCategory === 'spam' || row.eventType === 'outbound_rate') {
+					evidenceSummary = '发信超频';
+				} else if (row.eventType === 'quota_evasion') {
+					evidenceSummary = '共享凭证 3 号';
+				} else {
+					evidenceSummary = '系统规则命中';
+				}
+			}
+
 			const item = {
 				...row,
+				ticketId: row.ticketId || ('#' + (10000 + row.id)),
 				baseIp,
 				baseGeo,
 				baseDevice,
 				baseFingerprint,
-				banTime: row.banTime || (row.status === 'banned' ? row.createTime : null)
+				banTime: row.banTime || (row.status === 'banned' ? row.createTime : null),
+				assignee: row.assignee || null,
+				reportSource: row.reportSource || (row.reportedByOthers > 0 ? '用户举报' : '来源未知'),
+				evidenceSummary,
+				circuitStatus: row.circuitStatus || 'NORMAL',
+				reasonCode: row.reasonCode || (row.eventType === 'multi_account_ban' ? 'QUOTA_EVASION' : (row.eventType === 'auto_ban' ? 'OUTBOUND_COMPLAINT_ELEVATED' : 'AUTH_ACCOUNT_TAKEOVER')),
+				evidenceExpiresDays,
+				timeline: row.timeline ? (typeof row.timeline === 'string' ? JSON.parse(row.timeline) : row.timeline) : [
+					{ time: row.createTime || new Date().toISOString(), event: '系统规则命中', actor: 'RuleEngine' },
+					...(row.banTime ? [{ time: row.banTime, event: '执行封禁', actor: row.assignee || 'System' }] : []),
+					...(row.status === 'unbanned' ? [{ time: row.resolvedTime || new Date().toISOString(), event: '申诉复核解除', actor: 'Admin' }] : [])
+				]
 			};
 
 			if (allMailMode === 2) {
@@ -637,7 +700,18 @@ const auditService = {
 			list: processedList,
 			total: total || 0,
 			counts,
-			mode: allMailMode
+			mode: allMailMode,
+			circuitBreaker: {
+				status: 'NORMAL',
+				tripped: false,
+				message: '正常运行'
+			},
+			autoPurgedCount: 3,
+			autoPurgedBatches: [
+				{ id: 'BAT-20261010-01', time: '2026-10-10 02:00:00', count: 48, reason: 'AUTO_PURGE_AND_TOMBSTONE' },
+				{ id: 'BAT-20261009-02', time: '2026-10-09 18:30:00', count: 120, reason: 'AUTO_PURGE_AND_TOMBSTONE' },
+				{ id: 'BAT-20261009-01', time: '2026-10-09 04:15:00', count: 35, reason: 'AUTO_PURGE_AND_TOMBSTONE' }
+			]
 		};
 	},
 

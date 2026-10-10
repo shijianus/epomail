@@ -133,22 +133,39 @@
             <transition name="fade">
               <div v-if="selectedRows.length > 0" class="batch-actions-wrap">
                 <span class="batch-selected-count">{{ $t('auditSelectedCount', { count: selectedRows.length }) }}</span>
-                <el-button size="small" type="success" plain @click="handleBatchUnban">
-                  <Icon icon="fluent:lock-open-16-regular" width="14" height="14" style="margin-right: 3px;" />
-                  {{ $t('auditBatchUnban') }}
-                </el-button>
-                <el-button size="small" type="danger" plain @click="handleBatchBan">
-                  <Icon icon="fluent:prohibited-16-regular" width="14" height="14" style="margin-right: 3px;" />
-                  {{ $t('auditBatchBan') }}
-                </el-button>
-                <el-button size="small" type="primary" plain @click="handleBatchExtend">
-                  <Icon icon="fluent:calendar-clock-20-regular" width="14" height="14" style="margin-right: 3px;" />
-                  {{ $t('auditBatchExtend') }}
-                </el-button>
-                <el-button size="small" type="danger" link @click="handleBatchDelete">
-                  <Icon icon="fluent:delete-16-regular" width="14" height="14" style="margin-right: 3px;" />
-                  {{ $t('auditBatchDelete') }}
-                </el-button>
+                <template v-if="activeKpi === 'threat'">
+                  <!-- 滥用威胁：仅提供「分配负责人」「开始复核」「解除」，无批量永久处罚 -->
+                  <el-button size="small" type="primary" plain @click="handleBatchAssign">
+                    <Icon icon="fluent:person-tag-16-regular" width="14" height="14" style="margin-right: 3px;" />
+                    {{ $t('abuseBatchAssign') }}
+                  </el-button>
+                  <el-button size="small" type="warning" plain @click="handleBatchReview">
+                    <Icon icon="fluent:document-search-16-regular" width="14" height="14" style="margin-right: 3px;" />
+                    {{ $t('abuseBatchReview') }}
+                  </el-button>
+                  <el-button size="small" type="success" plain @click="handleBatchUnban">
+                    <Icon icon="fluent:lock-open-16-regular" width="14" height="14" style="margin-right: 3px;" />
+                    {{ $t('abuseBatchUnban') }}
+                  </el-button>
+                </template>
+                <template v-else>
+                  <el-button size="small" type="success" plain @click="handleBatchUnban">
+                    <Icon icon="fluent:lock-open-16-regular" width="14" height="14" style="margin-right: 3px;" />
+                    {{ $t('auditBatchUnban') }}
+                  </el-button>
+                  <el-button size="small" type="danger" plain @click="handleBatchBan">
+                    <Icon icon="fluent:prohibited-16-regular" width="14" height="14" style="margin-right: 3px;" />
+                    {{ $t('auditBatchBan') }}
+                  </el-button>
+                  <el-button size="small" type="primary" plain @click="handleBatchExtend">
+                    <Icon icon="fluent:calendar-clock-20-regular" width="14" height="14" style="margin-right: 3px;" />
+                    {{ $t('auditBatchExtend') }}
+                  </el-button>
+                  <el-button size="small" type="danger" link @click="handleBatchDelete">
+                    <Icon icon="fluent:delete-16-regular" width="14" height="14" style="margin-right: 3px;" />
+                    {{ $t('auditBatchDelete') }}
+                  </el-button>
+                </template>
               </div>
             </transition>
           </div>
@@ -159,7 +176,237 @@
               <loading />
             </div>
 
+            <!-- 当 activeKpi === 'threat' 时展示专门的 7 列滥用威胁工作台 -->
+            <div v-if="activeKpi === 'threat'" class="abuse-table-wrapper">
+              <table class="abuse-table">
+                <colgroup>
+                  <col style="width: 40px;" />
+                  <col style="width: 72px;" />
+                  <col style="width: clamp(180px, 22%, 260px);" />
+                  <col style="width: 96px;" />
+                  <col style="min-width: 190px;" />
+                  <col style="width: 120px;" />
+                  <col style="width: 64px;" />
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th class="col-select" style="width: 40px; text-align: center;">
+                      <el-checkbox
+                        :model-value="isAllAbuseSelected"
+                        :indeterminate="selectedRows.length > 0 && !isAllAbuseSelected"
+                        @change="toggleAbuseSelectAll"
+                      />
+                    </th>
+                    <th class="col-no" style="width: 72px;">
+                      <span>{{ $t('abuseColNo') }}</span>
+                    </th>
+                    <th class="col-target" style="width: clamp(180px, 22%, 260px);">
+                      <span>{{ $t('abuseColTarget') }}</span>
+                    </th>
+                    <th class="col-status" style="width: 96px;">
+                      <div class="col-filter-header">
+                        <span>{{ $t('abuseColStatus') }}</span>
+                        <el-dropdown trigger="click" @command="handleStatusFilterCommand">
+                          <span class="filter-trigger" :class="{ 'filter-active': params.status !== 'all' }" :title="$t('filter')">
+                            <Icon icon="fluent:filter-16-regular" width="13" height="13" />
+                          </span>
+                          <template #dropdown>
+                            <el-dropdown-menu>
+                              <el-dropdown-item command="all" :class="{ 'is-selected': params.status === 'all' }">
+                                {{ $t('auditAllStatus') }}
+                              </el-dropdown-item>
+                              <el-dropdown-item command="pending" :class="{ 'is-selected': params.status === 'pending' }">
+                                {{ $t('abuseStatusPending') }}
+                              </el-dropdown-item>
+                              <el-dropdown-item command="banned" :class="{ 'is-selected': params.status === 'banned' }">
+                                {{ $t('abuseStatusBanned') }}
+                              </el-dropdown-item>
+                              <el-dropdown-item command="unbanned" :class="{ 'is-selected': params.status === 'unbanned' }">
+                                {{ $t('abuseStatusUnbanned') }}
+                              </el-dropdown-item>
+                            </el-dropdown-menu>
+                          </template>
+                        </el-dropdown>
+                      </div>
+                    </th>
+                    <th class="col-category" style="min-width: 190px;">
+                      <div class="col-filter-header">
+                        <span>{{ $t('abuseColCategory') }}</span>
+                        <el-dropdown trigger="click" @command="handleCategoryFilterCommand">
+                          <span class="filter-trigger" :class="{ 'filter-active': params.category && params.category !== 'all' }" :title="$t('filter')">
+                            <Icon icon="fluent:filter-16-regular" width="13" height="13" />
+                          </span>
+                          <template #dropdown>
+                            <el-dropdown-menu>
+                              <el-dropdown-item command="all" :class="{ 'is-selected': !params.category || params.category === 'all' }">
+                                {{ $t('abuseAllCategory') }}
+                              </el-dropdown-item>
+                              <el-dropdown-item command="protocol" :class="{ 'is-selected': params.category === 'protocol' }">
+                                {{ $t('abuseCatProtocol') }}
+                              </el-dropdown-item>
+                              <el-dropdown-item command="multi_account" :class="{ 'is-selected': params.category === 'multi_account' }">
+                                {{ $t('abuseCatMultiAccount') }}
+                              </el-dropdown-item>
+                              <el-dropdown-item command="account_takeover" :class="{ 'is-selected': params.category === 'account_takeover' }">
+                                {{ $t('abuseCatAccountTakeover') }}
+                              </el-dropdown-item>
+                              <el-dropdown-item command="outbound" :class="{ 'is-selected': params.category === 'outbound' }">
+                                {{ $t('abuseCatOutbound') }}
+                              </el-dropdown-item>
+                              <el-dropdown-item command="quota_evasion" :class="{ 'is-selected': params.category === 'quota_evasion' }">
+                                {{ $t('abuseCatQuota') }}
+                              </el-dropdown-item>
+                            </el-dropdown-menu>
+                          </template>
+                        </el-dropdown>
+                      </div>
+                    </th>
+                    <th class="col-action" style="width: 120px;">
+                      <div class="col-filter-header">
+                        <span>{{ $t('abuseColAction') }}</span>
+                        <span class="header-action-trigger" :class="{ 'sort-active': params.timeSort !== 0 }" :title="params.timeSort === 1 ? $t('auditSortAsc') : $t('auditSortDesc')" @click.stop="changeTimeSort">
+                          <Icon :icon="params.timeSort === 1 ? 'fluent:arrow-up-16-regular' : (params.timeSort === 2 ? 'fluent:arrow-down-16-regular' : 'fluent:arrow-sort-16-regular')" width="13" height="13" />
+                        </span>
+                        <el-dropdown trigger="click" @command="handleTimeFilterCommand">
+                          <span class="filter-trigger" :class="{ 'filter-active': params.timeRange !== 'all' }" :title="$t('filter')">
+                            <Icon icon="fluent:filter-16-regular" width="13" height="13" />
+                          </span>
+                          <template #dropdown>
+                            <el-dropdown-menu>
+                              <el-dropdown-item command="all" :class="{ 'is-selected': params.timeRange === 'all' }">
+                                {{ $t('auditAllProcessTime') }}
+                              </el-dropdown-item>
+                              <el-dropdown-item command="today" :class="{ 'is-selected': params.timeRange === 'today' }">
+                                {{ $t('auditTimeToday') }}
+                              </el-dropdown-item>
+                              <el-dropdown-item command="7days" :class="{ 'is-selected': params.timeRange === '7days' }">
+                                {{ $t('auditTime7Days') }}
+                              </el-dropdown-item>
+                              <el-dropdown-item command="30days" :class="{ 'is-selected': params.timeRange === '30days' }">
+                                {{ $t('auditTime30Days') }}
+                              </el-dropdown-item>
+                            </el-dropdown-menu>
+                          </template>
+                        </el-dropdown>
+                      </div>
+                    </th>
+                    <th class="col-opt" style="width: 64px; text-align: right;">
+                      <span>{{ $t('abuseColOpt') }}</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody v-if="logs.length > 0">
+                  <tr v-for="row in logs" :key="row.id" class="abuse-table-row" :class="{ 'row-selected': isAbuseSelected(row) }">
+                    <!-- 1. 选择 -->
+                    <td class="col-select" style="text-align: center;">
+                      <el-checkbox
+                        :model-value="isAbuseSelected(row)"
+                        @change="() => toggleAbuseRowSelection(row)"
+                      />
+                    </td>
+                    <!-- 2. 编号 -->
+                    <td class="col-no">
+                      <span class="ticket-id font-mono font-medium clickable-ticket" @click="openAuditDrawer(row)">
+                        {{ formatAbuseTicketNo(row) }}
+                      </span>
+                    </td>
+                    <!-- 3. 对象 -->
+                    <td class="col-target">
+                      <div class="target-cell">
+                        <div class="target-main">
+                          <Icon :icon="getTargetTypeIcon(row)" width="16" height="16" class="target-type-icon" />
+                          <span class="target-email-wrap" :class="getEmailLengthClass(row.email)">
+                            <span class="mail-local">{{ getEmailLocal(row.email) }}</span><span class="mail-at">@</span><span class="mail-domain">{{ formatDomainBreak(getEmailDomain(row.email)) }}</span>
+                          </span>
+                          <el-tag v-if="(row.email || '').length > 160" size="small" type="warning" effect="plain" class="long-addr-tag">
+                            {{ $t('abuseLongAddressTag') }}
+                          </el-tag>
+                        </div>
+                        <div class="target-usr font-mono">
+                          usr_{{ row.userId || row.id }}
+                        </div>
+                      </div>
+                    </td>
+                    <!-- 4. 状态 -->
+                    <td class="col-status">
+                      <div class="abuse-status-wrap">
+                        <span class="abuse-status-badge" :class="`badge-${getAbuseStatusType(row)}`">
+                          {{ getAbuseStatusText(row) }}
+                        </span>
+                        <span v-if="isCircuitTripped(row)" class="abuse-tripped-sub">
+                          {{ $t('abuseStatusTripped') }}
+                        </span>
+                      </div>
+                    </td>
+                    <!-- 5. 分类 -->
+                    <td class="col-category">
+                      <div class="abuse-category-wrap">
+                        <div class="category-title">
+                          {{ getAbuseCategoryText(row) }}
+                        </div>
+                        <div class="evidence-summary-line">
+                          {{ getAbuseEvidenceSummary(row) }}
+                        </div>
+                      </div>
+                    </td>
+                    <!-- 6. 处理 -->
+                    <td class="col-action">
+                      <div class="abuse-action-wrap">
+                        <div class="action-conclusion">
+                          {{ getAbuseHandlingConclusion(row) }}
+                        </div>
+                        <div class="action-meta-line font-mono">
+                          {{ getAbuseHandlingMeta(row) }}
+                        </div>
+                      </div>
+                    </td>
+                    <!-- 7. 操作 -->
+                    <td class="col-opt" style="text-align: right;">
+                      <div class="abuse-opt-wrap">
+                        <el-button
+                          size="small"
+                          type="primary"
+                          link
+                          class="action-detail-btn"
+                          @click="openAuditDrawer(row)"
+                        >
+                          {{ $t('auditBtnViewDetails') }}
+                        </el-button>
+                        <el-dropdown trigger="click" @command="(cmd) => handleAbuseRowMenu(cmd, row)">
+                          <span class="more-opt-trigger">
+                            <Icon icon="fluent:more-horizontal-16-regular" width="16" height="16" />
+                          </span>
+                          <template #dropdown>
+                            <el-dropdown-menu>
+                              <el-dropdown-item command="assign">
+                                {{ $t('abuseBatchAssign') }}
+                              </el-dropdown-item>
+                              <el-dropdown-item command="review">
+                                {{ $t('abuseBatchReview') }}
+                              </el-dropdown-item>
+                              <el-dropdown-item command="unban" :disabled="row.status === 'unbanned'">
+                                {{ $t('abuseBatchUnban') }}
+                              </el-dropdown-item>
+                            </el-dropdown-menu>
+                          </template>
+                        </el-dropdown>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+                <tbody v-else>
+                  <tr>
+                    <td colspan="7" class="abuse-empty-cell">
+                      {{ first ? '' : $t('auditEmptyLogs') }}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- 其他 Tab 保留原有表格结构与业务逻辑 -->
             <el-table
+              v-else
               :data="logs"
               style="width: 100%;"
               ref="tableRef"
@@ -891,7 +1138,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, watch, onMounted, onUnmounted } from 'vue';
+import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox } from 'element-plus';
@@ -917,8 +1164,15 @@ const scrollbarRef = ref(null);
 const logs = ref([]);
 const total = ref(0);
 const selectedRows = ref([]);
+const abuseSelectedMap = ref({});
 const operatorDialogVisible = ref(false);
 const currentOperator = ref(null);
+
+// 熔断与自动折叠状态
+const circuitBreaker = ref({ status: 'NORMAL', tripped: false, message: '' });
+const autoPurgedCount = ref(0);
+const autoPurgedBatches = ref([]);
+const purgedBatchesDialogVisible = ref(false);
 
 // 响应式分页状态 (完全对齐用户列表规范)
 const layout = ref('prev, pager, next, sizes, total');
@@ -940,6 +1194,8 @@ const localKeyword = ref('');
 // 4 大情况 KPI 数据结构 (严格 4 层分界：威胁邮箱 / 待审计邮箱 / 申诉邮箱 / 操作记录)
 const summaryCounts = reactive({
   threat: 0,
+  threatPending: 0,
+  threatBanned: 0,
   audit: 0,
   appeal: 0,
   record: 0,
@@ -1404,10 +1660,284 @@ function handleExportCsv() {
 function copyText(text) {
   if (!text) return;
   navigator.clipboard.writeText(text).then(() => {
-    ElMessage.success(t('copySuccessMsg') || '复制成功');
+    ElMessage.success(t('abuseCopiedSuccess') || t('copySuccessMsg') || '复制成功');
   }).catch(() => {
-    ElMessage.success(t('copySuccessMsg') || '复制成功');
+    ElMessage.success(t('abuseCopiedSuccess') || t('copySuccessMsg') || '复制成功');
   });
+}
+
+// === 滥用威胁 7 列工作台辅助函数 ===
+function isAbuseSelected(row) {
+  return !!abuseSelectedMap.value[row.id];
+}
+
+function toggleAbuseRowSelection(row) {
+  if (abuseSelectedMap.value[row.id]) {
+    delete abuseSelectedMap.value[row.id];
+  } else {
+    abuseSelectedMap.value[row.id] = true;
+  }
+  syncAbuseSelectedRows();
+}
+
+const isAllAbuseSelected = computed(() => {
+  if (!logs.value || !logs.value.length) return false;
+  return logs.value.every(r => abuseSelectedMap.value[r.id]);
+});
+
+function toggleAbuseSelectAll() {
+  if (isAllAbuseSelected.value) {
+    abuseSelectedMap.value = {};
+  } else {
+    const map = {};
+    (logs.value || []).forEach(r => { map[r.id] = true; });
+    abuseSelectedMap.value = map;
+  }
+  syncAbuseSelectedRows();
+}
+
+function syncAbuseSelectedRows() {
+  selectedRows.value = (logs.value || []).filter(r => abuseSelectedMap.value[r.id]);
+}
+
+function handleCategoryFilterCommand(cmd) {
+  params.category = cmd === 'all' ? 'all' : cmd;
+  params.num = 1;
+  fetchAuditList();
+}
+
+function formatAbuseTicketNo(row) {
+  if (row.ticketId && /^#\d+/.test(row.ticketId)) {
+    return row.ticketId;
+  }
+  return `#${10000 + (Number(row.id) || 1)}`;
+}
+
+function getAbuseStatusType(row) {
+  if (row.circuitStatus === 'QUEUE_PAUSE' || row.circuitStatus === 'TRIPPED') {
+    return 'pending';
+  }
+  if (row.status === 'banned') return 'banned';
+  if (row.status === 'unbanned' || row.status === 'resolved') return 'unbanned';
+  return 'pending';
+}
+
+function getAbuseStatusText(row) {
+  if (row.circuitStatus === 'QUEUE_PAUSE' || row.circuitStatus === 'TRIPPED') {
+    return t('abuseStatusPending');
+  }
+  if (row.status === 'banned') return t('abuseStatusBanned');
+  if (row.status === 'unbanned' || row.status === 'resolved') return t('abuseStatusUnbanned');
+  return t('abuseStatusPending');
+}
+
+function isCircuitTripped(row) {
+  return row.circuitStatus === 'QUEUE_PAUSE' || row.circuitStatus === 'TRIPPED';
+}
+
+function getAbuseCategoryText(row) {
+  const cat = (row.reportCategory || row.violationCategory || row.eventType || '').toLowerCase();
+  if (cat.includes('protocol') || cat.includes('honeypot') || cat.includes('dkim') || cat.includes('tear') || cat.includes('sign')) {
+    return t('abuseCatProtocol');
+  }
+  if (cat.includes('multi') || cat.includes('sybil') || cat.includes('jaccard') || cat.includes('cluster')) {
+    return t('abuseCatMultiAccount');
+  }
+  if (cat.includes('takeover') || cat.includes('tamper') || cat.includes('brokering') || cat.includes('credential')) {
+    return t('abuseCatAccountTakeover');
+  }
+  if (cat.includes('quota') || cat.includes('evasion') || cat.includes('share_token') || cat.includes('share_key')) {
+    return t('abuseCatQuota');
+  }
+  return t('abuseCatOutbound');
+}
+
+function getAbuseEvidenceSummary(row) {
+  if (row.evidenceSummary) {
+    return row.evidenceSummary;
+  }
+  const count = Number(row.reportedByOthers) || 0;
+  if (count > 0) {
+    const src = row.reportSource || 'user';
+    if (src === 'fbl') return `FBL 回传 ${count} 件`;
+    return `用户举报 ${count} 人`;
+  }
+  if (row.eventType === 'multi_account_detected' || row.eventType === 'multi_account_ban') {
+    return 'Jaccard 0.84 节律 0.92';
+  }
+  if (row.eventType === 'credential_tamper_ban' || row.eventType === 'account_takeover') {
+    return '改密后环境突变';
+  }
+  if (row.eventType === 'auto_ban' || (row.banReason && row.banReason.includes('频率'))) {
+    return '投诉率 0.4% 1h';
+  }
+  if (row.reportCategory === 'fraud' || (row.detailText && row.detailText.includes('蜜罐'))) {
+    return '蜜罐命中';
+  }
+  if (row.reportCategory === 'spam' || row.eventType === 'outbound_rate') {
+    return '发信超频';
+  }
+  if (row.eventType === 'quota_evasion') {
+    return '共享凭证 3 号';
+  }
+  return '系统规则命中';
+}
+
+function getAbuseHandlingConclusion(row) {
+  if (isCircuitTripped(row)) {
+    return t('abuseActionCircuitHold');
+  }
+  const status = row.status;
+  if (status === 'banned') {
+    return t('abuseActionMaintainBan');
+  }
+  if (status === 'unbanned' || status === 'resolved') {
+    return t('abuseActionAppealApproved');
+  }
+  return t('abuseActionSuggestBan');
+}
+
+function getAbuseHandlingMeta(row) {
+  if (isCircuitTripped(row)) {
+    return t('abuseActionNeedManual');
+  }
+  const assignee = row.assignee || getOperatorName(row) || '-';
+  const status = row.status;
+  if (status === 'banned' || status === 'unbanned' || status === 'resolved') {
+    const timeStr = row.resolvedTime || row.banTime || row.createTime;
+    const formatted = timeStr ? tzDayjs(timeStr).format('MM/DD HH:mm') : '-';
+    return `${formatted} ${assignee}`;
+  }
+  return assignee;
+}
+
+function getTargetTypeIcon(row) {
+  if (row.isPurged || row.isCleared || row.email === '已清除' || row.email === '已脱敏') {
+    return 'fluent:person-prohibited-16-regular';
+  }
+  if (row.clusterId || (row.clusterAccounts && row.clusterAccounts.length > 1) || row.activeIpCount > 3) {
+    return 'fluent:people-community-16-regular';
+  }
+  return 'fluent:person-16-regular';
+}
+
+function getEmailLengthClass(email) {
+  const len = (email || '').length;
+  if (len > 160) return 'addr-tier-ultra';
+  if (len > 80) return 'addr-tier-long';
+  return 'addr-tier-normal';
+}
+
+function getEmailLocal(email) {
+  if (!email) return '';
+  return email.split('@')[0] || '';
+}
+
+function getEmailDomain(email) {
+  if (!email) return '';
+  return email.split('@')[1] || '';
+}
+
+function formatDomainBreak(domain) {
+  if (!domain) return '';
+  return domain.replace(/\./g, '.\u200B');
+}
+
+async function handleAbuseRowMenu(cmd, row) {
+  if (cmd === 'assign') {
+    try {
+      const { value } = await ElMessageBox.prompt(
+        t('abuseAssignPrompt'),
+        t('abuseBatchAssign'),
+        {
+          confirmButtonText: t('confirm'),
+          cancelButtonText: t('cancel'),
+          inputValue: row.assignee || 'Admin',
+          inputPlaceholder: 'Admin / Operator'
+        }
+      );
+      if (value) {
+        await auditAction({
+          id: row.id,
+          action: 'note',
+          targetEmail: row.email,
+          notes: `[负责人变更]: ${value}`
+        });
+        row.assignee = value;
+        ElMessage.success(t('abuseAssignSuccess'));
+        fetchAuditList();
+      }
+    } catch (e) {
+      if (e !== 'cancel') console.error(e);
+    }
+  } else if (cmd === 'review') {
+    ElMessage.success(`${t('abuseBatchReview')} #${formatAbuseTicketNo(row)}`);
+  } else if (cmd === 'unban') {
+    try {
+      await ElMessageBox.confirm(
+        t('auditUnbanConfirmMsg'),
+        t('abuseBatchUnban'),
+        {
+          confirmButtonText: t('abuseBatchUnban'),
+          cancelButtonText: t('cancel'),
+          type: 'success'
+        }
+      );
+      await auditAction({
+        id: row.id,
+        action: 'unban',
+        targetEmail: row.email,
+        notes: `${t('abuseBatchUnban')} (${row.email})`
+      });
+      ElMessage.success(t('auditActionSuccess') || t('saveSuccessMsg'));
+      fetchAuditList();
+    } catch (e) {
+      if (e !== 'cancel') console.error(e);
+    }
+  }
+}
+
+async function handleBatchAssign() {
+  if (!selectedRows.value.length) return;
+  try {
+    const { value } = await ElMessageBox.prompt(
+      t('abuseAssignPrompt'),
+      t('abuseBatchAssign'),
+      {
+        confirmButtonText: t('confirm'),
+        cancelButtonText: t('cancel'),
+        inputPlaceholder: 'Admin / Operator'
+      }
+    );
+    if (!value) return;
+    actionLoading.value = true;
+    for (const row of selectedRows.value) {
+      try {
+        await auditAction({
+          id: row.id,
+          action: 'note',
+          targetEmail: row.email,
+          notes: `[负责人变更]: ${value}`
+        });
+        row.assignee = value;
+      } catch (err) {
+        console.error(err);
+      }
+    }
+    ElMessage.success(t('abuseAssignSuccess'));
+    selectedRows.value = [];
+    abuseSelectedMap.value = {};
+    fetchAuditList();
+  } catch (e) {
+    if (e !== 'cancel') console.error(e);
+  } finally {
+    actionLoading.value = false;
+  }
+}
+
+async function handleBatchReview() {
+  if (!selectedRows.value.length) return;
+  ElMessage.success(`${t('abuseBatchReview')} (${selectedRows.value.length})`);
 }
 
 function getRiskTagType(val) {
@@ -1597,7 +2127,7 @@ async function handleOpenNote(row) {
         cancelButtonText: t('cancel'),
         inputType: 'textarea',
         inputValue: row.banReason || row.notes || '',
-        inputPlaceholder: t('auditDecisionNotesPlaceholder') || '请输入审核备注...'
+        inputPlaceholder: t('auditDecisionNotesPlaceholder') || '请输入审核备注'
       }
     );
     if (value !== undefined) {
@@ -1749,14 +2279,29 @@ async function fetchAuditList() {
     const data = res?.list ? res : (res?.data || res || {});
     logs.value = data.list || [];
     total.value = data.total || 0;
+    abuseSelectedMap.value = {};
+    selectedRows.value = [];
+
+    if (data.circuitBreaker) {
+      circuitBreaker.value = data.circuitBreaker;
+    }
+    if (data.autoPurgedCount !== undefined) {
+      autoPurgedCount.value = data.autoPurgedCount;
+      autoPurgedBatches.value = data.autoPurgedBatches || [];
+    }
+
     if (data.counts) {
-      summaryCounts.threat = data.counts.highRisk ?? data.counts.riskTotal ?? (data.counts.categories?.risk?.total ?? 0);
+      summaryCounts.threat = data.counts.threat ?? data.counts.highRisk ?? data.counts.riskTotal ?? (data.counts.categories?.risk?.total ?? 0);
+      summaryCounts.threatPending = data.counts.threatPending ?? logs.value.filter(l => l.status === 'pending' || l.status === 'active').length;
+      summaryCounts.threatBanned = data.counts.threatBanned ?? logs.value.filter(l => l.status === 'banned').length;
       summaryCounts.audit = data.counts.auditTotal ?? data.counts.audit ?? (data.counts.categories?.audit?.total ?? 0);
       summaryCounts.appeal = data.counts.appealTotal ?? data.counts.appeal ?? (data.counts.categories?.appeal?.total ?? 0);
       summaryCounts.record = data.counts.banTotal ?? data.counts.banned ?? (data.counts.categories?.ban?.total ?? 0);
 
       if (summaryCounts.threat === 0 && logs.value.length > 0) {
         summaryCounts.threat = logs.value.filter(l => l.riskLevel === 'high' || l.priority === 'CRITICAL' || l.priority === 'P0').length;
+        summaryCounts.threatPending = logs.value.filter(l => l.status === 'pending' || l.status === 'active').length;
+        summaryCounts.threatBanned = logs.value.filter(l => l.status === 'banned').length;
       }
       if (summaryCounts.record === 0 && logs.value.length > 0) {
         summaryCounts.record = logs.value.filter(l => l.warningType === 'ban' || l.status === 'banned' || l.status === 'unbanned').length;
@@ -1783,6 +2328,8 @@ async function fetchAuditList() {
       }
     } else {
       summaryCounts.threat = logs.value.filter(l => l.riskLevel === 'high' || l.priority === 'CRITICAL' || l.priority === 'P0').length;
+      summaryCounts.threatPending = logs.value.filter(l => l.status === 'pending' || l.status === 'active').length;
+      summaryCounts.threatBanned = logs.value.filter(l => l.status === 'banned').length;
       summaryCounts.audit = logs.value.filter(l => l.warningType === 'audit').length;
       summaryCounts.appeal = logs.value.filter(l => l.warningType === 'appeal').length;
       summaryCounts.record = logs.value.filter(l => l.warningType === 'ban' || l.status === 'banned' || l.status === 'unbanned').length;
@@ -2094,9 +2641,11 @@ onUnmounted(() => {
   font-size: 11.5px;
   color: var(--el-text-color-secondary);
   line-height: 1.35;
-  white-space: nowrap;
+  white-space: normal;
+  max-height: 2.7em;
   overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
+  word-break: break-word;
   letter-spacing: 0.1px;
 }
 
@@ -2261,6 +2810,231 @@ onUnmounted(() => {
   }
 }
 
+/* 滥用威胁 7 列工作台专属原生表格 */
+.abuse-table-wrapper {
+  width: 100%;
+  overflow-x: hidden;
+  background: var(--el-bg-color);
+  box-sizing: border-box;
+}
+
+.abuse-table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-size: 13px;
+  color: var(--el-text-color-primary);
+  border: none;
+  box-sizing: border-box;
+}
+
+.abuse-table th {
+  background: var(--el-fill-color-light);
+  color: var(--el-text-color-regular);
+  font-weight: 600;
+  font-size: 12.5px;
+  padding: 8px 6px;
+  text-align: left;
+  border-bottom: 1px solid var(--el-border-color-lighter);
+  box-sizing: border-box;
+  vertical-align: middle;
+  height: 40px;
+}
+
+.abuse-table td {
+  padding: 8px 6px;
+  border-bottom: 1px solid var(--el-border-color-lighter);
+  vertical-align: middle;
+  box-sizing: border-box;
+  background: transparent;
+  transition: background-color 0.15s ease;
+  overflow: hidden;
+}
+
+.abuse-table-row:hover td {
+  background-color: var(--el-fill-color-lighter);
+}
+
+.abuse-table-row.row-selected td {
+  background-color: var(--el-color-primary-light-9);
+}
+
+.abuse-empty-cell {
+  text-align: center;
+  padding: 40px 16px;
+  color: var(--el-text-color-placeholder);
+  font-size: 13px;
+}
+
+/* 状态徽标 */
+.abuse-status-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: flex-start;
+}
+
+.abuse-status-badge {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  display: inline-block;
+  line-height: 1.2;
+
+  &.badge-pending {
+    color: #d97706;
+    background: rgba(217, 119, 6, 0.1);
+  }
+  &.badge-banned {
+    color: #dc2626;
+    background: rgba(220, 38, 38, 0.1);
+  }
+  &.badge-unbanned {
+    color: #16a34a;
+    background: rgba(22, 163, 74, 0.1);
+  }
+}
+
+.abuse-tripped-sub {
+  font-size: 10px;
+  font-weight: 500;
+  color: #d97706;
+  background: rgba(217, 119, 6, 0.15);
+  padding: 1px 4px;
+  border-radius: 3px;
+  line-height: 1.1;
+  margin-top: 2px;
+}
+
+/* 分类与证据摘要 */
+.abuse-category-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-width: 100%;
+}
+
+.category-title {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+  line-height: 1.3;
+}
+
+.evidence-summary-line {
+  font-size: 11.5px;
+  color: var(--el-text-color-secondary);
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* 处理建议与时间负责人 */
+.abuse-action-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.action-conclusion {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+  line-height: 1.3;
+}
+
+.action-meta-line {
+  font-size: 11px;
+  color: var(--el-text-color-placeholder);
+  line-height: 1.3;
+  white-space: normal;
+  word-break: break-word;
+}
+
+/* 操作按钮 */
+.abuse-opt-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+
+  .more-opt-trigger {
+    cursor: pointer;
+    color: var(--el-text-color-regular);
+    display: inline-flex;
+    align-items: center;
+    padding: 3px;
+    border-radius: 4px;
+    &:hover {
+      color: var(--el-color-primary);
+      background: var(--el-fill-color-light);
+    }
+  }
+}
+
+/* 对象列内部样式 */
+.target-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 100%;
+}
+
+.target-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  width: 100%;
+}
+
+.target-type-icon {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--el-text-color-secondary);
+}
+
+.target-email-wrap {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: normal;
+  line-height: 1.35;
+  font-size: 13px;
+  color: var(--el-text-color-primary);
+
+  &.addr-tier-normal {
+    font-size: 13px;
+  }
+  &.addr-tier-long {
+    font-size: 12px;
+  }
+  &.addr-tier-ultra {
+    font-size: 11px;
+    line-height: 1.25;
+  }
+}
+
+.mail-at {
+  color: var(--el-color-primary);
+  font-weight: 600;
+}
+
+.long-addr-tag {
+  font-size: 10px;
+  height: 18px;
+  line-height: 16px;
+  padding: 0 4px;
+  flex-shrink: 0;
+  margin-left: 2px;
+}
+
+.target-usr {
+  font-size: 11px;
+  color: var(--el-text-color-placeholder);
+  margin-left: 20px;
+  line-height: 1.2;
+}
+
 .loading {
   position: absolute;
   display: flex;
@@ -2305,9 +3079,9 @@ onUnmounted(() => {
   color: var(--el-text-color-primary);
   cursor: pointer;
   transition: color 0.15s ease;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: normal;
   flex-shrink: 1;
   min-width: 0;
   &:hover {
@@ -2390,9 +3164,9 @@ onUnmounted(() => {
   font-size: 12.5px;
   color: var(--el-color-primary);
   cursor: pointer;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
   display: inline-block;
   max-width: 95px;
   transition: color 0.15s;
@@ -2551,9 +3325,9 @@ html.dark {
   .subject-resolved {
     font-size: 12px;
     color: var(--el-text-color-regular);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    white-space: normal;
   }
 
   .masked-status-tag {
@@ -2595,9 +3369,9 @@ html.dark {
   .rule-hint {
     font-size: 10.5px;
     color: var(--el-text-color-placeholder);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
 
     &.text-danger {
       color: var(--el-color-danger);
