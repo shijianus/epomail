@@ -169,8 +169,8 @@
               <!-- 0. 多选列 -->
               <el-table-column type="selection" width="40" align="center" />
 
-              <!-- 列 1: 工单编号 (无邮箱与重复徽标干扰，仅显示简洁 #编号) -->
-              <el-table-column :label="$t('auditColTicketNo')" width="80">
+              <!-- 列 1: 工单编号 (#开头的不超过6个字符(包含大写字母和数字)的集合，例如#AK1789) -->
+              <el-table-column :label="$t('auditColTicketNo')" width="85" align="center">
                 <template #default="{ row }">
                   <div class="ticket-cell">
                     <span class="ticket-id font-mono font-medium clickable-ticket" @click="openAuditDrawer(row)">
@@ -180,8 +180,114 @@
                 </template>
               </el-table-column>
 
-              <!-- 列 2: 当前状态 (无边框，纯icon+文字说明水平对齐，缩短与工单编号距离) -->
-              <el-table-column width="140">
+              <!-- 列 2: 身分组 (通过身份等级筛选不同的影响程度 P0~P4) -->
+              <el-table-column width="120" align="center">
+                <template #header>
+                  <div class="col-filter-header">
+                    <span>{{ $t('auditColIdentityGroup') }}</span>
+                    <el-dropdown trigger="click" @command="handleIdentityFilterCommand">
+                      <span class="filter-trigger" :class="{ 'filter-active': params.identityGroup !== 'all' }" :title="$t('filter')">
+                        <Icon icon="fluent:filter-16-regular" width="13" height="13" />
+                      </span>
+                      <template #dropdown>
+                        <el-dropdown-menu>
+                          <el-dropdown-item command="all" :class="{ 'is-selected': params.identityGroup === 'all' }">
+                            {{ $t('auditAllIdentities') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="master" :class="{ 'is-selected': params.identityGroup === 'master' }">
+                            {{ $t('auditIdentityMaster') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="admin" :class="{ 'is-selected': params.identityGroup === 'admin' }">
+                            {{ $t('auditIdentityAdmin') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="member" :class="{ 'is-selected': params.identityGroup === 'member' }">
+                            {{ $t('auditIdentityMember') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="user" :class="{ 'is-selected': params.identityGroup === 'user' }">
+                            {{ $t('auditIdentityUser') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="guest" :class="{ 'is-selected': params.identityGroup === 'guest' }">
+                            {{ $t('auditIdentityGuest') }}
+                          </el-dropdown-item>
+                        </el-dropdown-menu>
+                      </template>
+                    </el-dropdown>
+                  </div>
+                </template>
+                <template #default="{ row }">
+                  <div class="identity-cell">
+                    <el-tag
+                      size="small"
+                      :type="getIdentityMeta(row).tagType"
+                      effect="plain"
+                      class="identity-tag"
+                      :title="getIdentityMeta(row).impactDesc"
+                    >
+                      {{ getIdentityMeta(row).label }}
+                    </el-tag>
+                  </div>
+                </template>
+              </el-table-column>
+
+              <!-- 列 3: 违规分类 (说明当前的实际违规内容) -->
+              <el-table-column :label="$t('auditColViolationCategory')" width="100" align="center">
+                <template #default="{ row }">
+                  <div class="category-cell">
+                    <span class="plain-category-text">{{ getViolationCategory(row).text }}</span>
+                  </div>
+                </template>
+              </el-table-column>
+
+              <!-- 列 4: 报警原因 (说明是如何被检查到的) -->
+              <el-table-column min-width="135" align="center">
+                <template #header>
+                  <div class="col-filter-header">
+                    <span>{{ $t('auditColAlarmReason') }}</span>
+                    <el-dropdown trigger="click" @command="handleRiskFilterCommand">
+                      <span class="filter-trigger" :class="{ 'filter-active': params.riskLevel !== 'all' }" :title="$t('filter')">
+                        <Icon icon="fluent:filter-16-regular" width="13" height="13" />
+                      </span>
+                      <template #dropdown>
+                        <el-dropdown-menu>
+                          <el-dropdown-item command="all" :class="{ 'is-selected': params.riskLevel === 'all' }">
+                            {{ $t('auditAllRiskLevel') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="high" :class="{ 'is-selected': params.riskLevel === 'high' }">
+                            LV3 · {{ $t('auditRiskLevelHigh') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="medium" :class="{ 'is-selected': params.riskLevel === 'medium' }">
+                            LV2 · {{ $t('auditRiskLevelMedium') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="normal" :class="{ 'is-selected': params.riskLevel === 'normal' }">
+                            LV1 · {{ $t('auditRiskLevelLow') }}
+                          </el-dropdown-item>
+                        </el-dropdown-menu>
+                      </template>
+                    </el-dropdown>
+                  </div>
+                </template>
+                <template #default="{ row }">
+                  <div class="reason-cell">
+                    <span class="plain-reason-text" :title="row.banReason || row.actionText">
+                      {{ getSimpleAlarmReason(row) }}
+                    </span>
+                  </div>
+                </template>
+              </el-table-column>
+
+              <!-- 列 5: 报警次数 (由于同类收敛，所以报警次数也被直接计算在一个表格中) -->
+              <el-table-column :label="$t('auditColAlarmCount')" width="90" align="center">
+                <template #default="{ row }">
+                  <div class="alarm-count-cell">
+                    <span class="alarm-count-badge font-mono" :class="{ 'alarm-count-high': getAlarmCount(row) > 3 }">
+                      {{ getAlarmCount(row) }} {{ $t('auditTimesUnit') }}
+                    </span>
+                  </div>
+                </template>
+              </el-table-column>
+
+              <!-- 列 6: 当前状态 -->
+              <el-table-column width="125" align="center">
                 <template #header>
                   <div class="col-filter-header">
                     <span>{{ $t('auditCurrentStatus') }}</span>
@@ -219,68 +325,8 @@
                 </template>
               </el-table-column>
 
-              <!-- 列 3: 违规分类 (对应 punishments.md §5 分类：外发滥用 / 账户安全 / 内容合规 / 配额规避 / 申诉复核 / 例行巡检) -->
-              <el-table-column :label="$t('auditColViolationCategory')" width="105">
-                <template #default="{ row }">
-                  <div class="category-cell">
-                    <span class="plain-category-text">{{ getViolationCategory(row).text }}</span>
-                  </div>
-                </template>
-              </el-table-column>
-
-              <!-- 列 4: 报警原因 / 风险等级 (表头集成风险筛选，滥用威胁显示原因，申诉审计显示风险等级LV0~LV3) -->
-              <el-table-column min-width="125">
-                <template #header>
-                  <div class="col-filter-header">
-                    <span>{{ activeKpi === 'threat' ? $t('auditColAlarmReason') : (activeKpi === 'appeal' ? $t('auditRiskLevel') : `${$t('auditColAlarmReason')} / ${$t('auditRiskLevel')}`) }}</span>
-                    <el-dropdown trigger="click" @command="handleRiskFilterCommand">
-                      <span class="filter-trigger" :class="{ 'filter-active': params.riskLevel !== 'all' }" :title="$t('filter')">
-                        <Icon icon="fluent:filter-16-regular" width="13" height="13" />
-                      </span>
-                      <template #dropdown>
-                        <el-dropdown-menu>
-                          <el-dropdown-item command="all" :class="{ 'is-selected': params.riskLevel === 'all' }">
-                            {{ $t('auditAllRiskLevel') }}
-                          </el-dropdown-item>
-                          <el-dropdown-item command="high" :class="{ 'is-selected': params.riskLevel === 'high' }">
-                            LV3 · {{ $t('auditRiskLevelHigh') }}
-                          </el-dropdown-item>
-                          <el-dropdown-item command="medium" :class="{ 'is-selected': params.riskLevel === 'medium' }">
-                            LV2 · {{ $t('auditRiskLevelMedium') }}
-                          </el-dropdown-item>
-                          <el-dropdown-item command="normal" :class="{ 'is-selected': params.riskLevel === 'normal' }">
-                            LV1 · {{ $t('auditRiskLevelLow') }}
-                          </el-dropdown-item>
-                        </el-dropdown-menu>
-                      </template>
-                    </el-dropdown>
-                  </div>
-                </template>
-                <template #default="{ row }">
-                  <!-- 申诉审计：显示风险等级 LV0~LV3 -->
-                  <template v-if="activeKpi === 'appeal'">
-                    <el-tag size="small" :type="getRiskTagType(row.priority || row.riskLevel)" effect="plain">
-                      {{ getAppealRiskLevel(row) }}
-                    </el-tag>
-                  </template>
-                  <!-- 滥用威胁：只显示简单的报警原因，如一人多号、多次检举等 -->
-                  <template v-else-if="activeKpi === 'threat'">
-                    <span class="plain-reason-text">{{ getSimpleAlarmReason(row) }}</span>
-                  </template>
-                  <!-- 其他（风险管理/操作记录）：综合显示原因与等级 -->
-                  <template v-else>
-                    <div class="hybrid-reason-cell">
-                      <span class="plain-reason-text">{{ getSimpleAlarmReason(row) }}</span>
-                      <el-tag v-if="row.priority || (row.riskLevel && row.riskLevel !== 'normal')" size="small" :type="getRiskTagType(row.priority || row.riskLevel)" effect="plain" class="tag-compact">
-                        {{ getAppealRiskLevel(row) }}
-                      </el-tag>
-                    </div>
-                  </template>
-                </template>
-              </el-table-column>
-
-              <!-- 列 5: 处理建议 (包括限制外发、账号暂停、维持封禁、建议解禁、暂禁dd天等等；全 Tab 均展示) -->
-              <el-table-column :label="$t('auditColSuggestion')" width="110">
+              <!-- 列 7: 处理建议 -->
+              <el-table-column :label="$t('auditColSuggestion')" width="105" align="center">
                 <template #default="{ row }">
                   <div class="suggestion-tag-cell">
                     <el-tag
@@ -295,8 +341,8 @@
                 </template>
               </el-table-column>
 
-              <!-- 列 6: 处理时间 (格式 mm/dd/yy hh:ss，表头集成时间筛选与排序箭头) -->
-              <el-table-column width="135">
+              <!-- 列 8: 处理时间 -->
+              <el-table-column width="135" align="center">
                 <template #header>
                   <div class="col-filter-header">
                     <span>{{ $t('auditColProcessTime') }}</span>
@@ -334,48 +380,46 @@
                 </template>
               </el-table-column>
 
-              <!-- 列 7: 到期时间 (滥用威胁中无到期时间；其他 Tab 保留并使用 mm/dd/yy hh:ss 格式与排序箭头) -->
-              <el-table-column v-if="activeKpi !== 'threat'" width="135">
-                <template #header>
-                  <div class="col-filter-header">
-                    <span>{{ $t('auditColExpireTime') }}</span>
-                    <!-- 到期时间排序箭头 -->
-                    <span class="header-action-trigger" :class="{ 'sort-active': params.timeSort !== 0 }" :title="params.timeSort === 1 ? $t('auditSortAsc') : $t('auditSortDesc')" @click.stop="changeTimeSort">
-                      <Icon :icon="params.timeSort === 1 ? 'fluent:arrow-up-16-regular' : (params.timeSort === 2 ? 'fluent:arrow-down-16-regular' : 'fluent:arrow-sort-16-regular')" width="13" height="13" />
+              <!-- 列 9: 负责人 (只展示名称，点击可进入账户详情) -->
+              <el-table-column :label="$t('auditColAssignee')" width="95" align="center">
+                <template #default="{ row }">
+                  <div class="operator-cell">
+                    <span class="operator-name-link font-medium" :title="getOperatorName(row)" @click.stop="handleViewOperator(row)">
+                      {{ getOperatorName(row) }}
                     </span>
                   </div>
                 </template>
+              </el-table-column>
+
+              <!-- 列 10: 拍案管理 (区别于"负责人"，最终的实际决定权说明) -->
+              <el-table-column :label="$t('auditColFinalAuthority')" width="110" align="center">
                 <template #default="{ row }">
-                  <span v-if="row.expireTime" class="plain-time font-mono">
-                    {{ formatTableTime(row.expireTime) }}
-                  </span>
-                  <span v-else class="plain-dash-text font-mono">
-                    -
-                  </span>
+                  <div class="authority-cell">
+                    <span
+                      class="authority-badge"
+                      :class="getDecisionAuthority(row).className"
+                      :title="getDecisionAuthority(row).tooltip"
+                    >
+                      {{ getDecisionAuthority(row).label }}
+                    </span>
+                  </div>
                 </template>
               </el-table-column>
 
-              <!-- 列 8: 负责人 (只展示名称，点击可进入账户详情) -->
-              <el-table-column :label="$t('auditColAssignee')" width="95">
+              <!-- 列 11: 操作 (居中布局，解决原右对齐问题) -->
+              <el-table-column :label="$t('action')" width="80" align="center">
                 <template #default="{ row }">
-                  <span class="operator-name-link font-medium" :title="getOperatorName(row)" @click.stop="handleViewOperator(row)">
-                    {{ getOperatorName(row) }}
-                  </span>
-                </template>
-              </el-table-column>
-
-              <!-- 列 9: 操作 (只保留查看详情，解封/封禁/延期/备注均整合入详情中) -->
-              <el-table-column :label="$t('action')" width="80" align="right">
-                <template #default="{ row }">
-                  <el-button
-                    size="small"
-                    type="primary"
-                    link
-                    class="action-detail-btn"
-                    @click="openAuditDrawer(row)"
-                  >
-                    {{ $t('auditBtnViewDetails') }}
-                  </el-button>
+                  <div class="action-cell">
+                    <el-button
+                      size="small"
+                      type="primary"
+                      link
+                      class="action-detail-btn"
+                      @click="openAuditDrawer(row)"
+                    >
+                      {{ $t('auditBtnViewDetails') }}
+                    </el-button>
+                  </div>
                 </template>
               </el-table-column>
             </el-table>
@@ -965,6 +1009,7 @@ const params = reactive({
   warningType: 'all',
   riskLevel: 'high',
   status: 'all',
+  identityGroup: 'all',
   timeRange: 'all',
   timeSort: 0,
   num: 1,
@@ -1052,10 +1097,17 @@ function selectWarningFilter(type) {
   search();
 }
 
+function handleIdentityFilterCommand(command) {
+  params.identityGroup = command;
+  params.num = 1;
+  search();
+}
+
 function handleReset() {
   localKeyword.value = '';
   params.keyword = '';
   params.status = 'all';
+  params.identityGroup = 'all';
   params.timeRange = 'all';
   params.riskLevel = 'all';
   params.warningType = 'all';
@@ -1065,13 +1117,133 @@ function handleReset() {
 }
 
 function formatTicketNo(row) {
-  if (!row) return '#-';
-  if (row.id) return `#${10000 + Number(row.id)}`;
-  if (row.ticketId) {
-    const digits = row.ticketId.replace(/\D/g, '');
-    return `#${digits || '10001'}`;
+  if (!row) return '#AK1789';
+  if (row.ticketNo && typeof row.ticketNo === 'string' && row.ticketNo.startsWith('#')) {
+    const code = row.ticketNo.slice(1).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+    return '#' + (code || 'AK1789');
   }
-  return '#10001';
+  if (row.ticketCode && typeof row.ticketCode === 'string') {
+    const code = row.ticketCode.replace(/^#/, '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+    return '#' + (code || 'AK1789');
+  }
+  if (row.ticketId && typeof row.ticketId === 'string') {
+    const parts = row.ticketId.split('-');
+    const code = parts[parts.length - 1].toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (code.length >= 4 && code.length <= 6) {
+      return '#' + code;
+    }
+    if (code.length > 6) {
+      return '#' + code.slice(-6);
+    }
+    if (code.length > 0) {
+      return '#' + code.padStart(6, '0');
+    }
+  }
+  if (row.id) {
+    const num = (1780 + Number(row.id)) % 10000;
+    return `#AK${String(num).padStart(4, '0')}`;
+  }
+  return '#AK1789';
+}
+
+function getAlarmCount(row) {
+  if (!row) return 1;
+  if (typeof row.alarmCount === 'number') return row.alarmCount;
+  if (row.reportedByOthers && row.reportedByOthers > 0) return row.reportedByOthers;
+  if (row.isMultiIp) return row.activeIpCount || 3;
+  if (row.eventType === 'multi_account_ban') return 2;
+  if (row.eventType === 'auto_ban') return 4;
+  return 1;
+}
+
+function getIdentityMeta(row) {
+  if (!row) return { label: t('auditIdentityUser'), tagType: 'info', impact: 'P3', impactDesc: t('auditImpactStandard') };
+  const grp = row.identityGroup || '';
+  const email = (row.email || '').toLowerCase();
+
+  if (grp === 'master' || email.includes('admin@') || email.includes('master@') || row.operatorRole === 'master') {
+    return {
+      label: t('auditIdentityMaster'),
+      tagType: 'danger',
+      impact: 'P0',
+      impactDesc: t('auditImpactCritical')
+    };
+  }
+  if (grp === 'admin' || email.includes('secadmin') || email.includes('moderator')) {
+    return {
+      label: t('auditIdentityAdmin'),
+      tagType: 'warning',
+      impact: 'P1',
+      impactDesc: t('auditImpactHigh')
+    };
+  }
+  if (grp === 'member' || email.endsWith('@epocanvas.com') || row.isInternal === 1) {
+    return {
+      label: t('auditIdentityMember'),
+      tagType: 'primary',
+      impact: 'P2',
+      impactDesc: t('auditImpactMedium')
+    };
+  }
+  if (grp === 'vip' || email.includes('vip')) {
+    return {
+      label: t('auditIdentityVip'),
+      tagType: 'warning',
+      impact: 'P2',
+      impactDesc: t('auditImpactMedium')
+    };
+  }
+  if (grp === 'user' || email.endsWith('.org') || email.endsWith('.net')) {
+    return {
+      label: t('auditIdentityUser'),
+      tagType: 'info',
+      impact: 'P3',
+      impactDesc: t('auditImpactStandard')
+    };
+  }
+  return {
+    label: t('auditIdentityGuest'),
+    tagType: '',
+    impact: 'P4',
+    impactDesc: t('auditImpactLow')
+  };
+}
+
+function getDecisionAuthority(row) {
+  if (!row) return { label: t('auditAuthorityAuto'), className: 'authority-auto', tooltip: t('auditAuthorityAutoDesc') };
+  if (row.finalAuthority === 'master' || row.status === 'banned' || row.priority === 'CRITICAL' || row.priority === 'P0') {
+    return {
+      label: t('auditAuthorityMaster'),
+      className: 'authority-master',
+      tooltip: t('auditAuthorityMasterDesc')
+    };
+  }
+  if (row.finalAuthority === 'policy' || row.eventType === 'auto_ban' || row.eventType === 'bot_probe_routine' || (row.banReason && row.banReason.includes('熔断'))) {
+    return {
+      label: t('auditAuthorityPolicy'),
+      className: 'authority-policy',
+      tooltip: t('auditAuthorityPolicyDesc')
+    };
+  }
+  if (row.finalAuthority === 'board' || row.warningType === 'appeal') {
+    return {
+      label: t('auditAuthorityBoard'),
+      className: 'authority-board',
+      tooltip: t('auditAuthorityBoardDesc')
+    };
+  }
+  if (row.finalAuthority === 'lead' || row.status === 'unbanned' || row.eventType === 'credential_tamper_ban') {
+    return {
+      label: t('auditAuthorityLead'),
+      className: 'authority-lead',
+      tooltip: t('auditAuthorityLeadDesc')
+    };
+  }
+  return {
+    label: t('auditAuthorityAuto'),
+    className: 'authority-auto',
+    tooltip: t('auditAuthorityAutoDesc')
+  };
 }
 
 function formatTableTime(time) {
@@ -1365,27 +1537,29 @@ function handleExportCsv() {
   }
   const headers = [
     t('auditColTicketNo'),
-    t('tabEmailAddress'),
-    t('auditCurrentStatus'),
+    t('auditColIdentityGroup'),
     t('auditColViolationCategory'),
     t('auditColAlarmReason'),
+    t('auditColAlarmCount'),
+    t('auditCurrentStatus'),
     t('auditColSuggestion'),
     t('auditColProcessTime'),
-    t('auditColExpireTime'),
-    t('auditColAssignee')
+    t('auditColAssignee'),
+    t('auditColFinalAuthority')
   ];
   const csvRows = [headers.join(',')];
   for (const row of logs.value) {
     const rowValues = [
       formatTicketNo(row),
-      `"${row.email || ''}"`,
-      `"${getStatusLabel(row.status)}"`,
+      `"${getIdentityMeta(row).label}"`,
       `"${getViolationCategory(row).text}"`,
       `"${getSimpleAlarmReason(row)}"`,
+      `"${getAlarmCount(row)}${t('auditTimesUnit')}"`,
+      `"${getStatusLabel(row.status)}"`,
       `"${getHandlingSuggestion(row).text}"`,
       `"${formatTableTime(row.banTime || row.createTime)}"`,
-      `"${row.expireTime ? formatTableTime(row.expireTime) : '-'}"`,
-      `"${getOperatorName(row)}"`
+      `"${getOperatorName(row)}"`,
+      `"${getDecisionAuthority(row).label}"`
     ];
     csvRows.push(rowValues.join(','));
   }
@@ -2149,7 +2323,10 @@ onUnmounted(() => {
 .col-filter-header {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 5px;
+  width: 100%;
+  text-align: center;
 
   .header-action-trigger {
     display: inline-flex;
@@ -2199,6 +2376,8 @@ onUnmounted(() => {
 .ticket-cell {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  width: 100%;
   gap: 6px;
 
   .ticket-id {
@@ -2213,6 +2392,122 @@ onUnmounted(() => {
   }
 }
 
+.identity-cell {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+
+  .identity-tag {
+    font-size: 11px;
+    height: 20px;
+    line-height: 18px;
+    padding: 0 6px;
+    border-radius: 4px;
+    font-weight: 500;
+  }
+}
+
+.alarm-count-cell {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+
+  .alarm-count-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1px 6px;
+    border-radius: 10px;
+    font-size: 11px;
+    line-height: 16px;
+    background: var(--el-fill-color-light);
+    color: var(--el-text-color-regular);
+    border: 1px solid var(--el-border-color-lighter);
+    font-variant-numeric: tabular-nums;
+
+    &.alarm-count-high {
+      background: rgba(239, 68, 68, 0.08);
+      color: var(--el-color-danger);
+      border-color: rgba(239, 68, 68, 0.25);
+      font-weight: 600;
+    }
+  }
+}
+
+.reason-cell {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  text-align: center;
+}
+
+.operator-cell {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+
+.authority-cell {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+
+  .authority-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-weight: 500;
+    white-space: nowrap;
+    letter-spacing: 0.2px;
+
+    &.authority-master {
+      color: var(--el-color-danger);
+      background: rgba(239, 68, 68, 0.08);
+      border: 1px solid rgba(239, 68, 68, 0.2);
+    }
+
+    &.authority-policy {
+      color: var(--el-color-warning);
+      background: rgba(245, 158, 11, 0.08);
+      border: 1px solid rgba(245, 158, 11, 0.2);
+    }
+
+    &.authority-board {
+      color: var(--el-color-primary);
+      background: rgba(99, 102, 241, 0.08);
+      border: 1px solid rgba(99, 102, 241, 0.2);
+    }
+
+    &.authority-lead {
+      color: var(--el-color-success);
+      background: rgba(16, 185, 129, 0.08);
+      border: 1px solid rgba(16, 185, 129, 0.2);
+    }
+
+    &.authority-auto {
+      color: var(--el-text-color-secondary);
+      background: var(--el-fill-color-light);
+      border: 1px solid var(--el-border-color-lighter);
+    }
+  }
+}
+
+.action-cell {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  text-align: center;
+}
+
 .plain-reason-text {
   font-size: 12.5px;
   color: var(--el-text-color-regular);
@@ -2222,6 +2517,7 @@ onUnmounted(() => {
 .hybrid-reason-cell {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
   flex-wrap: wrap;
 }
@@ -2241,6 +2537,8 @@ onUnmounted(() => {
 .category-cell {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  width: 100%;
   font-size: 12.5px;
   line-height: 1.4;
   white-space: nowrap;
@@ -2347,6 +2645,7 @@ onUnmounted(() => {
 .status-clean-item {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 5px;
   font-size: 12.5px;
   font-weight: 500;
@@ -2375,6 +2674,8 @@ onUnmounted(() => {
 .suggestion-tag-cell {
   display: flex;
   align-items: center;
+  justify-content: center;
+  width: 100%;
 }
 
 .suggestion-tag {
@@ -2403,11 +2704,11 @@ onUnmounted(() => {
   }
 }
 
-/* 【操作列重构】统一右对齐紧凑间距，各按钮尺寸人体工学对齐，彻底消除 margin-left 冗余与截断 */
+/* 【操作列居中优化】统一居中对齐与紧凑间距，各按钮尺寸人体工学对齐，彻底消除 margin-left 冗余与截断 */
 .table-actions-group {
   display: inline-flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: center;
   gap: 6px;
   white-space: nowrap;
   flex-shrink: 0;

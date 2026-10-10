@@ -98,8 +98,8 @@ async function run() {
     const headerInputCount = await page.$$eval('.header-actions .el-input__wrapper', els => els.length);
     ok(headerInputCount === 0, `header-actions 内已彻底删除本地 el-input__wrapper (实际残留: ${headerInputCount})`);
 
-    // [检视 3] 表格列字段与定制
-    console.log('\n[检视 3] 表格字段结构核验:');
+    // [检视 3] 表格 11 大新列集结构与居中核验
+    console.log('\n[检视 3] 表格 11 大新列集结构与居中核验:');
     const headers = await page.$$eval('.el-table__header th .cell', cells => 
       cells.map(c => c.textContent?.trim().replace(/\s+/g, ' '))
     );
@@ -109,65 +109,80 @@ async function run() {
     ok(!!hasSelection, '包含选择列 (Checkbox 支持多选)');
 
     const hasTicketNo = headers.some(h => h.includes('工单编号'));
-    const hasStatus = headers.some(h => h.includes('当前状态'));
+    const hasIdentityGroup = headers.some(h => h.includes('身分组'));
     const hasCategory = headers.some(h => h.includes('违规分类'));
-    const hasAlarmOrRisk = headers.some(h => h.includes('报警原因') || h.includes('风险等级'));
+    const hasAlarm = headers.some(h => h.includes('报警原因'));
+    const hasAlarmCount = headers.some(h => h.includes('报警次数'));
+    const hasStatus = headers.some(h => h.includes('当前状态'));
     const hasSuggestion = headers.some(h => h.includes('处理建议'));
     const hasProcessTime = headers.some(h => h.includes('处理时间'));
-    const hasExpireTimeInThreat = headers.some(h => h.includes('到期时间'));
     const hasAssignee = headers.some(h => h.includes('负责人'));
+    const hasFinalAuthority = headers.some(h => h.includes('拍案管理'));
     const hasAction = headers.some(h => h.includes('操作'));
 
     ok(hasTicketNo, '包含「工单编号」表头列');
+    ok(hasIdentityGroup, '包含「身分组」表头列');
+    ok(hasCategory, '包含「违规分类」表头列');
+    ok(hasAlarm, '包含「报警原因」表头列');
+    ok(hasAlarmCount, '包含「报警次数」表头列');
     ok(hasStatus, '包含「当前状态」表头列');
-    ok(hasCategory, '包含「违规分类」表头列 (对齐 punishments.md §5 规范)');
-    ok(hasAlarmOrRisk, '包含「报警原因」/「风险等级」表头列');
-    ok(hasSuggestion, '包含「处理建议」表头列 (全 Tab 均展示建议)');
+    ok(hasSuggestion, '包含「处理建议」表头列');
     ok(hasProcessTime, '包含「处理时间」表头列');
-    ok(!hasExpireTimeInThreat, '滥用威胁 Tab 下已成功移除「到期时间」列');
     ok(hasAssignee, '包含「负责人」表头列');
+    ok(hasFinalAuthority, '包含「拍案管理」表头列');
     ok(hasAction, '包含「操作」表头列');
+
+    // 核验表格列全居中
+    const rightAlignedCols = await page.$$eval('.el-table__header th.is-right, .el-table__body td.is-right', els => els.length);
+    ok(rightAlignedCols === 0, `表格内已彻底消除 is-right 右对齐列 (实际右对齐数: ${rightAlignedCols})`);
+
+    const centerAlignedHeaders = await page.$$eval('.el-table__header th.is-center', els => els.length);
+    ok(centerAlignedHeaders >= 11, `全部 11 列及多选列均显式声明 is-center 居中对齐 (实际居中表头数: ${centerAlignedHeaders})`);
 
     // [检视 4] 表头下沉筛选器与排序列箭头
     console.log('\n[检视 4] 表头集成筛选器与排序列箭头核验:');
     const filterTriggers = await page.$$('.col-filter-header .filter-trigger');
     const sortTriggers = await page.$$('.col-filter-header .header-action-trigger');
-    ok(filterTriggers.length >= 2, `表头成功集成筛选器下拉触点 (实际触点数: ${filterTriggers.length})`);
+    ok(filterTriggers.length >= 3, `表头成功集成筛选器下拉触点 (实际触点数: ${filterTriggers.length})`);
     ok(sortTriggers.length >= 1, `表头成功集成时间排序列箭头触点 (实际触点数: ${sortTriggers.length})`);
 
-    // 点击状态筛选并检查下拉菜单内容
+    // 点击身分组筛选并检查下拉菜单内容
     if (filterTriggers.length > 0) {
       await filterTriggers[0].click();
       await page.waitForTimeout(600);
       const menuItems = await page.$$eval('.el-dropdown-menu__item', items => 
         items.map(it => it.textContent?.trim()).filter(Boolean)
       );
-      console.log('  状态筛选下拉菜单预览:', menuItems);
-      const hasAllStatus = menuItems.some(it => it.includes('全部状态'));
-      ok(hasAllStatus, '状态筛选下拉菜单包含明确说明「全部状态」');
+      console.log('  身分组筛选下拉菜单预览:', menuItems);
+      const hasAllIdentities = menuItems.some(it => it.includes('全部身分'));
+      ok(hasAllIdentities, '身分组筛选下拉菜单包含明确说明「全部身分」');
       await page.keyboard.press('Escape');
       await page.waitForTimeout(400);
     }
 
-    // [检视 5] 第四轮精益 UI 规范验证 (冗余徽标消除、违规分类呈现、无邮箱干扰、无行内按钮、无边框状态)
-    console.log('\n[检视 5] 第四轮精益 UI 细节核验:');
-    const tagCompactCount = await page.$$eval('.ticket-cell .tag-compact', els => els.length);
-    ok(tagCompactCount === 0, `工单编号后已彻底移除重复 tag-compact 检举徽标 (实际: ${tagCompactCount})`);
+    // [检视 5] 11 列核心数据格式与业务组件核验
+    console.log('\n[检视 5] 11 列核心数据格式与业务组件核验:');
+    // 1. 工单编号格式验证 (# 开头不超过6个字符，如 #AK1789)
+    const ticketIds = await page.$$eval('.ticket-cell .ticket-id', els => els.map(e => e.textContent?.trim()));
+    console.log('  渲染工单编号样本:', ticketIds.slice(0, 5));
+    const allValidTicketIds = ticketIds.every(id => /^#[A-Z0-9]{4,6}$/.test(id));
+    ok(allValidTicketIds, `工单编号均符合 #开头不超过6位大写字母与数字规范 (例如 #AK1789)`);
 
-    const categoryCellCount = await page.$$eval('.category-cell', els => els.length);
-    ok(categoryCellCount >= 1, `中间显式呈现违规分类 (实际渲染: ${categoryCellCount} 行)`);
+    // 2. 身分组呈现
+    const identityTags = await page.$$eval('.identity-cell .identity-tag', els => els.map(e => e.textContent?.trim()));
+    ok(identityTags.length >= 1, `身分组正常渲染 (渲染数: ${identityTags.length}, 样本: ${identityTags[0]})`);
 
-    const emailWrapCount = await page.$$eval('.el-table__body-wrapper .ticket-email-wrap', els => els.length);
-    ok(emailWrapCount === 0, `表格行内无 ticket-email-wrap 干扰 (实际: ${emailWrapCount})`);
+    // 3. 报警次数呈现
+    const alarmCounts = await page.$$eval('.alarm-count-cell .alarm-count-badge', els => els.map(e => e.textContent?.trim()));
+    ok(alarmCounts.length >= 1, `报警次数正常渲染且带单位 (渲染数: ${alarmCounts.length}, 样本: ${alarmCounts[0]})`);
 
-    const compactActionCount = await page.$$eval('.el-table__body-wrapper .action-btn-compact', els => els.length);
-    ok(compactActionCount === 0, `表格行内彻底移除 action-btn-compact (实际: ${compactActionCount})`);
+    // 4. 拍案管理呈现
+    const authorities = await page.$$eval('.authority-cell .authority-badge', els => els.map(e => e.textContent?.trim()));
+    ok(authorities.length >= 1, `拍案管理最终裁决权正常渲染 (渲染数: ${authorities.length}, 样本: ${authorities[0]})`);
 
-    const detailBtnCount = await page.$$eval('.el-table__body-wrapper .action-detail-btn', els => els.length);
-    ok(detailBtnCount >= 1, `表格操作列保留唯一的 action-detail-btn 查看详情 (实际: ${detailBtnCount})`);
-
-    const statusCleanCount = await page.$$eval('.status-clean-item', els => els.length);
-    ok(statusCleanCount >= 1, `当前状态采用无边框水平对齐 status-clean-item (实际: ${statusCleanCount})`);
+    // 5. 操作列居中呈现唯一的 action-detail-btn
+    const detailBtnCount = await page.$$eval('.action-cell .action-detail-btn', els => els.length);
+    ok(detailBtnCount >= 1, `表格操作列在居中容器内呈现查看详情 (实际: ${detailBtnCount})`);
 
     const operatorLinks = await page.$$('.operator-name-link');
     ok(operatorLinks.length >= 1, `负责人列为纯名称点击链接 (实际: ${operatorLinks.length})`);
@@ -181,7 +196,7 @@ async function run() {
       await page.waitForTimeout(400);
     }
 
-    // [检视 6] header-actions 精简实用图标与批量延期
+    // [检视 6] header-actions 精简实用图标
     console.log('\n[检视 6] header-actions 操作栏核验:');
     const actionIcons = await page.$$eval('.header-actions .icon', icons => icons.length);
     console.log('  header-actions 内纯图标操作集数量:', actionIcons);
@@ -194,32 +209,22 @@ async function run() {
     const jumperExists = await page.$('.pagination .el-pagination__jump');
     ok(!jumperExists, '分页组件已对齐用户列表规范，零冗长 jumper 元素');
 
-    // 截图 1: 滥用威胁默认主视图
+    // 步骤 4: 视口截图
     console.log('\n[步骤 4] 截取公网生产环境完整视口截图...');
     await page.screenshot({ path: 'tests/cf_production_threat_verified.png', fullPage: true });
     console.log('  ✓ 滥用威胁视口截图已保存至: tests/cf_production_threat_verified.png');
 
-    // 截图 2: 切换至「申诉审计」Tab 并验证到期时间与建议
+    // 申诉审计 Tab 切换截图
     const appealCard = await page.$('.kpi-appeal');
     if (appealCard) {
       await appealCard.click();
       await page.waitForSelector('.table-area .loading-hide', { timeout: 10000 }).catch(() => {});
       await page.waitForTimeout(1500);
-      const appealHeaders = await page.$$eval('.el-table__header th .cell', cells => 
-        cells.map(c => c.textContent?.trim().replace(/\s+/g, ' '))
-      );
-      console.log('  申诉审计 Tab 表头列文本:', appealHeaders);
-      const hasRiskCol = appealHeaders.some(h => h.includes('风险等级'));
-      const hasAppealExpire = appealHeaders.some(h => h.includes('到期时间'));
-      const hasAppealSuggest = appealHeaders.some(h => h.includes('处理建议'));
-      ok(hasRiskCol, '申诉审计 Tab 表头自适应呈现「风险等级」列');
-      ok(hasAppealExpire, '申诉审计 Tab 表头保留「到期时间」列');
-      ok(hasAppealSuggest, '申诉审计 Tab 表头保留「处理建议」列');
       await page.screenshot({ path: 'tests/cf_production_appeal_verified.png', fullPage: false });
       console.log('  ✓ 申诉审计视口截图已保存至: tests/cf_production_appeal_verified.png');
     }
 
-    // 截图 3: 切换至「操作记录」Tab
+    // 操作记录 Tab 切换截图
     const recordCard = await page.$('.kpi-record');
     if (recordCard) {
       await recordCard.click();

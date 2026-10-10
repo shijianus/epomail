@@ -475,7 +475,7 @@ const auditService = {
 	async list(c, params) {
 		await this.ensureTables(c);
 		await this.seedBaselineIfEmpty(c);
-		let { num = 1, size = 15, email, keyword, warningType, category, riskLevel, status, lifecycle, timeRange, timeSort = 0 } = params;
+		let { num = 1, size = 15, email, keyword, warningType, category, riskLevel, status, lifecycle, timeRange, identityGroup, timeSort = 0 } = params;
 		size = Math.min(Number(size) || 15, 50);
 		num = Math.max(Number(num) || 1, 1);
 		const offset = (num - 1) * size;
@@ -611,12 +611,75 @@ const auditService = {
 		}
 
 		// Process list: attach baseline environment and handle Zero-Knowledge mode
-		const processedList = (list || []).map(row => {
+		let processedList = (list || []).map(row => {
 			const u = userMap.get(row.email);
 			const baseIp = u?.createIp || (row.ip ? (row.ip.split('.').slice(0, 3).join('.') + '.1') : '198.51.100.1');
 			const baseDevice = (u?.device && u?.os) ? `${u.device} (${u.os})` : (row.device ? `${row.device} (Baseline)` : 'Desktop (Baseline)');
 			const baseGeo = row.geo ? `${row.geo.split(' ')[0]} (Reg)` : 'CN (Reg)';
 			const baseFingerprint = row.fingerprint ? `BASE-${row.fingerprint.slice(-8)}` : 'FP-BASE-REG';
+
+			// 1. 规范化工单编号 (# 开头的不超过 6 个字符的集合，例如 #AK1789)
+			let ticketNo = '#AK1789';
+			if (row.ticketId) {
+				const parts = row.ticketId.split('-');
+				const code = parts[parts.length - 1].toUpperCase().replace(/[^A-Z0-9]/g, '');
+				ticketNo = '#' + (code.length > 6 ? code.slice(-6) : code);
+			} else if (row.id) {
+				ticketNo = `#AK${String((1780 + Number(row.id)) % 10000).padStart(4, '0')}`;
+			}
+
+			// 2. 身分组 (通过身份等级判断不同影响程度 P0~P4)
+			let identityGroup = 'user';
+			let identityLevel = 'P3';
+			let identityImpact = '标准影响';
+			const lowerEmail = (row.email || '').toLowerCase();
+			if (lowerEmail.includes('admin') || lowerEmail.includes('master') || row.operatorRole === 'master') {
+				identityGroup = 'master';
+				identityLevel = 'P0';
+				identityImpact = '极高影响';
+			} else if (lowerEmail.includes('secadmin') || lowerEmail.includes('moderator')) {
+				identityGroup = 'admin';
+				identityLevel = 'P1';
+				identityImpact = '高影响';
+			} else if (lowerEmail.endsWith('@epocanvas.com') || row.isInternal === 1) {
+				identityGroup = 'member';
+				identityLevel = 'P2';
+				identityImpact = '中影响';
+			} else if (lowerEmail.includes('vip')) {
+				identityGroup = 'vip';
+				identityLevel = 'P2';
+				identityImpact = '中影响';
+			} else if (lowerEmail.endsWith('.org') || lowerEmail.endsWith('.net')) {
+				identityGroup = 'user';
+				identityLevel = 'P3';
+				identityImpact = '标准影响';
+			} else {
+				identityGroup = 'guest';
+				identityLevel = 'P4';
+				identityImpact = '边缘影响';
+			}
+
+			// 3. 报警次数 (同类收敛聚合计数)
+			const alarmCount = row.reportedByOthers > 0
+				? row.reportedByOthers
+				: (row.isMultiIp ? (row.activeIpCount || 3) : (row.eventType === 'multi_account_ban' ? 2 : (row.eventType === 'auto_ban' ? 4 : 1)));
+
+			// 4. 拍案管理 (最终实际决定权说明：站长终裁 / 策略引擎 / 申诉仲裁组 / 安全主管 / 例行自动)
+			let finalAuthority = 'auto';
+			let finalAuthorityDesc = '基线巡检无风险，系统生命周期自动归档';
+			if (row.warningType === 'ban' || row.status === 'banned' || row.priority === 'CRITICAL' || row.priority === 'P0') {
+				finalAuthority = 'master';
+				finalAuthorityDesc = '具备全网不可撤销封禁与永久纪律权限 (站长直接拍案)';
+			} else if (row.eventType === 'auto_ban' || row.eventType === 'bot_probe_routine' || (row.banReason && row.banReason.includes('熔断'))) {
+				finalAuthority = 'policy';
+				finalAuthorityDesc = '触碰硬性规则或提供商熔断阈值 (引擎自动终裁)';
+			} else if (row.warningType === 'appeal') {
+				finalAuthority = 'board';
+				finalAuthorityDesc = '用户争议申诉核准或驳回最终决定权 (安全仲裁组)';
+			} else if (row.status === 'unbanned' || row.eventType === 'credential_tamper_ban') {
+				finalAuthority = 'lead';
+				finalAuthorityDesc = '协管人工复核批准解封或维持观察 (主管级拍案)';
+			}
 
 			const item = {
 				...row,
@@ -624,6 +687,13 @@ const auditService = {
 				baseGeo,
 				baseDevice,
 				baseFingerprint,
+				ticketNo,
+				identityGroup,
+				identityLevel,
+				identityImpact,
+				alarmCount,
+				finalAuthority,
+				finalAuthorityDesc,
 				banTime: row.banTime || (row.status === 'banned' ? row.createTime : null)
 			};
 
@@ -633,9 +703,13 @@ const auditService = {
 			return item;
 		});
 
+		if (identityGroup && identityGroup !== 'all') {
+			processedList = processedList.filter(item => item.identityGroup === identityGroup);
+		}
+
 		return {
 			list: processedList,
-			total: total || 0,
+			total: (identityGroup && identityGroup !== 'all') ? processedList.length : (total || 0),
 			counts,
 			mode: allMailMode
 		};
