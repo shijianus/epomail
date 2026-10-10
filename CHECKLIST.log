@@ -9,6 +9,20 @@
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
 
+### EpomailDocs v5.17/v5.18 分区含义标注与隐藏式图解全覆盖轮：36 处隐藏式下拉 ×6 语言，深说明对齐 (2026-10-10)
+*   **关联提交 (Git Commit)**: EpomailDocs 独立提交 `f3325f2` (Short: `f3325f2`) + `1ca8c0c` (manifest 固化 f3325f2)；两提交已推送 origin/master 与 origin/main；主仓归档提交见本条目对应变更提交
+*   **部署环境 (Deployment)**: `本地：EpomailDocs astro preview dist:8790 六语言判图；线上发布未执行，待运营者 pnpm run deploy`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 反馈①（标注必须说明分区含义而非复读标题）：v5.17 重拍 20 界面 ×6 语言标注版截图——标签不再抓取界面自身文案（v516b/c 的截断/错抓/空标签瑕疵根因），改为按语言撰写的分区含义短语；新增 general-guide 标注图 ×6 语言并入设置指南
+    - [x] 反馈②（详细说明不得粗略带过）：99 个图解分区 ×6 语言全部升级为「含义+用法」级深说明——v5.18 深化 zh/en 29 条对照文本，重译 fr/nl 21 条薄译（长度比对审计硬旗标清零），es/zh-tw 全深无需改动
+    - [x] 反馈③（补齐隐藏式下拉框）：每张配图后插入 `<details>` 隐藏式图解 ×36 处/语言 ×6 语言——summary 点题（图解／Walkthrough／Guide visuel／Guía visual／Visuele handleiding + 破折号副题）、导语点出分区分工、编号条目与图上徽章一一对应；专案介绍线 interface/features/modes/settings/api 等此前「有图无下拉」页面全部补齐，旧「标注：1.…」复读行全站移除（156 行/语言）
+    - [x] 新增「文档站介绍」页 ×6 语言并加入侧栏产品与总览组；全站版本 5.16→5.17（210 文件，残留清零）
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：pnpm build 211 页零报错（26.9s）；validate-anchors 422 页 3492/0 断链；check-structure 34 篇 ×6 语言 100% 对称；tamper-proof 固化 f3325f2
+    - [x] 浏览器实测：17 页六语言抽样判图（折叠/展开双态）——details 点击展开正常、编号条目与图上徽章一一对应、details 后表格渲染完整（无 HTML 块吞噬）、0 控制台错误、0 HTTP ≥400
+    - [x] 零假数据残留：标注图全部为本地演示实例真实运行画面；判图截图仅本地留档（screenshots/v518）不入库
+
+
 ### EpomailDocs v5.16c 专案介绍线标注覆盖轮：七界面标注版 ×6 语言，页首图全量换装 (2026-10-07)
 *   **关联提交 (Git Commit)**: EpomailDocs 独立提交 `6d1af70` (Short: `6d1af70`) + `ef6a83e` (manifest 固化 6d1af70)；两提交已推送 origin/master 与 origin/main；主仓归档提交见本条目对应变更提交
 *   **部署环境 (Deployment)**: `本地全真栈：mail-worker wrangler dev 8787 --local 实拍；EpomailDocs wrangler pages dev dist:8790 判图；线上发布未执行，待运营者 pnpm run deploy`
