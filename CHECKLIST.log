@@ -8,6 +8,27 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### 滥用威胁工单列表 Cloudflare 生产环境正式上线与公网全真检视 (2026-10-10)
+*   **关联提交 (Git Commit)**: `15bdcf7f5cc53036798c3174159f882329b9dc20` (Short: `15bdcf7`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com)` (Version ID: `dcc1cf80-ad3f-4060-b462-08d3d1ee9d31`, Startup: `57ms`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 全网生产环境上线发布：
+      - 前端 `mail-vue` 构建产物打包上传，Cloudflare Worker 脚本及静态 Assets 同步部署 (48 个更新静态资源上传，2048 模块编译通过)；
+      - Worker 启动延迟保持 57ms 极致水准，全局 D1/KV 依赖正常注入；
+      - Git 提交主干合并并成功推送到 GitHub 远端仓库 (`git push origin master`)。
+    - [x] 生产环境真实端到端核验通过：
+      - 管理员真实凭据登录 `https://mail.epocanvas.com`，进入 `/mail/u/0/#manage/admin/audit`；
+      - 真实验证「滥用威胁」4 大 KPI 卡片重排与「待审 2 / 已封禁 2」拆分统计高亮渲染；
+      - 真实验证 7 大固定列（选择、编号、对象、状态、分类、处理、操作）在公网真实数据下列宽无跳动；
+      - 真实验证 1440px 桌面端与 375px 移动端零横向滚动 (`scrollWidth <= clientWidth`)，零省略号，零文本裁切；
+      - 真实验证公网全生命周期 Tab 切换平滑（申诉审计 ➔ 滥用威胁联动丝滑）。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 生产部署执行：`wrangler deploy` 成功发布 (Version ID: `dcc1cf80-ad3f-4060-b462-08d3d1ee9d31`)；
+    - [x] 生产公网 E2E 实测套件：`node tests/verify-cf-production-abuse-table.mjs` 19/19 项断言全部绿灯通过；
+    - [x] 生产公网实景截图留存：
+      - `doc/validation/abuse-table/live_cf_production_1440px.png` (桌面 1440px 公网真实全景)
+      - `doc/validation/abuse-table/live_cf_production_375px.png` (移动 375px 公网真实卡片流)
+
 ### 滥用威胁工单列表重构、列集收敛与全真响应式断言 (2026-10-10)
 *   **关联提交 (Git Commit)**:
     - 阶段 6 (断言实测): `d3add39570550aa038c81aa8d3f3773c12db0cb3` (Short: `d3add39`)
