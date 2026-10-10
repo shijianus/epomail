@@ -2685,6 +2685,12 @@ onUnmounted(() => {
 
 .audit-page-container {
   padding: 16px 20px 24px 20px;
+  max-width: 100%;
+  box-sizing: border-box;
+
+  @media (max-width: 600px) {
+    padding: 12px 10px 20px 10px;
+  }
 }
 
 /* 1. 顶部汇报 4 板块：精益美化与专属安全色彩体系 */
@@ -3079,6 +3085,122 @@ onUnmounted(() => {
   padding: 40px 16px;
   color: var(--el-text-color-placeholder);
   font-size: 13px;
+}
+
+/* 响应式卡片布局：容器宽度 <= 860px 时从表格平滑切换为卡片 */
+@media (max-width: 860px) {
+  .abuse-table-wrapper {
+    background: transparent;
+    padding: 8px;
+  }
+
+  .abuse-table {
+    display: block;
+    width: 100%;
+    border: none;
+  }
+
+  .abuse-table colgroup,
+  .abuse-table thead {
+    display: none !important;
+  }
+
+  .abuse-table tbody {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+  }
+
+  .abuse-table-row {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    background: var(--el-bg-color);
+    border: 1px solid var(--el-border-color-lighter);
+    border-radius: 8px;
+    padding: 12px 14px;
+    box-sizing: border-box;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+    transition: all 0.2s ease;
+
+    &.row-selected {
+      border-color: var(--el-color-primary);
+      background: var(--el-color-primary-light-9);
+    }
+
+    &.abuse-child-row {
+      margin-left: 12px;
+      width: calc(100% - 12px);
+      border-left: 3px solid var(--el-color-primary);
+      background: var(--el-fill-color-lighter);
+    }
+  }
+
+  .abuse-table td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100% !important;
+    padding: 6px 0 !important;
+    border-bottom: 1px dashed var(--el-border-color-lighter);
+    border-top: none;
+    border-left: none;
+    border-right: none;
+    background: transparent !important;
+    overflow: visible;
+
+    &:last-child {
+      border-bottom: none;
+      padding-top: 8px !important;
+      padding-bottom: 0 !important;
+    }
+
+    &::before {
+      content: attr(data-label);
+      font-size: 11.5px;
+      font-weight: 600;
+      color: var(--el-text-color-secondary);
+      flex-shrink: 0;
+      margin-right: 12px;
+    }
+
+    &.col-select {
+      justify-content: flex-start;
+      border-bottom: 1px solid var(--el-border-color-lighter);
+      padding-bottom: 8px !important;
+      margin-bottom: 4px;
+
+      &::before {
+        display: none;
+      }
+    }
+
+    &.col-target,
+    &.col-category,
+    &.col-action {
+      align-items: flex-start;
+
+      .target-cell,
+      .abuse-category-wrap,
+      .abuse-action-wrap {
+        text-align: right;
+        align-items: flex-end;
+        max-width: calc(100% - 60px);
+      }
+
+      .target-main {
+        justify-content: flex-end;
+      }
+    }
+
+    &.col-opt {
+      justify-content: flex-end;
+      &::before {
+        display: none;
+      }
+    }
+  }
 }
 
 /* 状态徽标 */
