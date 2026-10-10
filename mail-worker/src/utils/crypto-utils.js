@@ -32,7 +32,7 @@ const saltHashUtils = {
 	},
 
 	/**
-	 * Compute modern PBKDF2-HMAC-SHA256 hash (210,000 iterations)
+	 * Compute modern PBKDF2-HMAC-SHA256 hash (PBKDF2_ITERATIONS, currently 100,000)
 	 */
 	async hashPassword(password) {
 		const salt = this.generateSalt();
@@ -42,7 +42,7 @@ const saltHashUtils = {
 
 	/**
 	 * Generate PBKDF2-HMAC-SHA256 password hash string
-	 * Format: pbkdf2:210000:<base64Hash>
+	 * Format: pbkdf2:<PBKDF2_ITERATIONS>:<base64Hash>
 	 */
 	async genHashPassword(password, salt) {
 		const keyMaterial = await crypto.subtle.importKey(

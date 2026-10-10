@@ -549,6 +549,136 @@
     - [x] 真实生产截图留证：已更新并持久化至 `tests/refined_audit_console_table_light.png`、`tests/refined_audit_console_table_dark.png`、`tests/refined_audit_console_dialog.png`；
     - [x] 零假数据残留：数据库与 KV 中零临时凭据或脏数据残留。
 
+### EpomailDocs v5.16c 专案介绍线标注覆盖轮：七界面标注版 ×6 语言，页首图全量换装 (2026-10-07)
+*   **关联提交 (Git Commit)**: EpomailDocs 独立提交 `6d1af70` (Short: `6d1af70`) + `ef6a83e` (manifest 固化 6d1af70)；两提交已推送 origin/master 与 origin/main；主仓归档提交见本条目对应变更提交
+*   **部署环境 (Deployment)**: `本地全真栈：mail-worker wrangler dev 8787 --local 实拍；EpomailDocs wrangler pages dev dist:8790 判图；线上发布未执行，待运营者 pnpm run deploy`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 反馈（专案介绍线大量配图未标注）：新增标注版截图 42 张（7 界面 × 6 语言）——写信弹层（工具栏+写信入口）、搜索（检索框+命中列表）、邮件模式（网站设置卡+模式下拉）、登录面（双输入框）、两步验证中心（三种第二验证）、OAuth 应用管理（四端点+应用卡）、通知转发（导出卡+转发标题）
+    - [x] 反馈（页首图全量换装）：界面总览/功能指南/搜索参考/运行模式（四图）/设置指南（四图）/帐号安全/通知转发/API 接入八页 ×6 语言页首图全部换为标注版，并插入「标注：1. … 2. …」解释行图注
+    - [x] 过程修复：v516c 脚本缺 hash 导航行导致四界面拍到收件箱（根因级缺陷）——补导航并按 DOM 探测修正选择器（.method-item/.endpoint-chip/.app-card/.export-card/.website-card）后全量重拍
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：pnpm build 205 页零报错；validate-anchors 410 页 3324/0 断链；check-structure 34 篇 ×6 语言 100% 对称；verify-laws 退出码 0
+    - [x] 浏览器实测：modes 页四张标注图（mode/roles/login/twofa-guide）加载成功、图上高亮框+编号+文字标签齐备
+    - [x] 零假数据残留：标注截图全部来自本地演示实例真实运行画面；判图截图不入库
+
+### EpomailDocs v5.16b 界面截图人为标注轮：高亮框+编号+文字标签 ×16 界面 ×6 语言 (2026-10-07)
+*   **关联提交 (Git Commit)**: EpomailDocs 独立提交 `29a32a7` (Short: `29a32a7`) + `34c1a7a` (manifest 固化 29a32a7)；两提交已推送 origin/master 与 origin/main；主仓归档提交见本条目对应变更提交
+*   **部署环境 (Deployment)**: `本地全真栈：mail-worker wrangler dev 8787 --local 实拍；EpomailDocs wrangler pages dev dist:8790 判图；线上发布未执行，待运营者 pnpm run deploy`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 反馈①（图片要有人为标注）：新增标注版截图 72 张（12 界面 × 6 语言，<slug>-guide.png）——实拍时注入高亮描边框（锁定关键区域）+ 编号徽章 + 文字标签，标签文本取自界面自身可见文案、随界面语言自动本地化
+    - [x] 反馈②（不仅展示更要解释）：12 个界面页 ×6 语言的图注升级为「标注：1. … 2. …」编号解释行，与图上标签一一对应；mailbox/data/roles/audit 四页的共享旧图同步换为各语言标注版
+    - [x] 过程修复：标注清理选择器类名错误导致标注跨页累积（叠罗汉）——修正后逐页仅保留自身标注并全量重拍
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：pnpm build 205 页零报错；validate-anchors 410 页 3324/0 断链；check-structure 34 篇 ×6 语言 100% 对称
+    - [x] 浏览器实测：system 页标注图加载成功（naturalWidth 2880）、图注解释行呈现；高亮框/徽章/文字标签三要素齐备
+    - [x] 零假数据残留：标注截图全部来自本地演示实例真实运行画面；判图截图不入库
+
+### EpomailDocs v5.16a 每页内联配图轮：8 页页首大图 + 全站内容图精修 (2026-10-06)
+*   **关联提交 (Git Commit)**: EpomailDocs 独立提交 `29b00c2` (Short: `29b00c2`) + `7cecd1b` (manifest 固化 29b00c2)；两提交已推送 origin/master 与 origin/main；主仓归档提交见本条目对应变更提交
+*   **部署环境 (Deployment)**: `本地全真栈：EpomailDocs wrangler pages dev dist:8790 判图；线上发布未执行，待运营者 pnpm run deploy`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 反馈（功能解释必须配图）：labels/preferences/analysis/users/review/regkeys/system/category 八页 ×6 语言把本地化实拍截图由折叠块提升为页首内联大图 + 图注——此前仅折叠可见导致页面观感无图；details 折叠块保留编号步骤、移除重复图片
+    - [x] 反馈（要求精美）：custom.css 内容图统一精修——圆角 12px + 细描边 + 浅投影，与界面质感一致
+    - [x] 全站版本 5.15→5.16（204 文件）
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：pnpm build 205 页零报错；validate-anchors 410 页 3324/0 断链；check-structure 34 篇 ×6 语言 100% 对称（图多重集含提升后的内联图逐一匹配）
+    - [x] 浏览器实测：labels 页渲染实测——内联图 src=/images/mail/ui/labels.png 加载成功、圆角描边样式生效
+    - [x] 零假数据残留：配图全部为本地演示实例浏览器实拍；判图截图不入库
+
+### EpomailDocs v5.16 图解全覆盖轮：90 张本地化实拍截图 + 隐藏式下拉图解 ×12 页 ×6 语言 (2026-10-06)
+*   **关联提交 (Git Commit)**: EpomailDocs 独立提交 `82af565` (Short: `82af565`，v5.16 内容) + `bf02050` (manifest 固化 82af565)；两提交已推送 origin/master 与 origin/main；主仓归档提交见本条目对应变更提交
+*   **部署环境 (Deployment)**: `本地全真栈：mail-worker wrangler dev 8787 --local（六语言 profile 切换实拍）作为截图源；EpomailDocs wrangler pages dev dist:8790 判图；线上发布未执行，待运营者 pnpm run deploy`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 反馈①（每板块有图、浏览器实拍）：新增本地化产品截图 90 张——6 语言 × 15 界面（视图/邮件详情/写信/标签/个资/常规/资料/分析页/用户列表/全库审查/权限控制/注册密钥/系统设置/分类管理/操作报告），全部经浏览器实拍本地演示实例；zh 入 images/mail/ui/，其余语言入 images/mail/<lang>/ui/，沿用站点多语言图片路径惯例
+    - [x] 反馈②（标注说明具体怎么用）：系统设置/资料/个资/常规/标签五界面实拍注入 ①②③… 编号标注（对准配置卡标题等锚点），文内编号步骤与图上标注一一对应；其余界面以编号步骤图解标注
+    - [x] 反馈③（隐藏式下拉框）：12 个界面页在相关文档前插入 <details> 隐藏式图解——默认折叠不撑长页面，展开后为该语言的实拍截图 + 编号使用步骤；六语言全部同步
+    - [x] 反馈④（图片多语言）：截图按界面语言实拍（profile lang 切换 zh/zh-Hant/en/es/fr/nl），文档按语言引用本语言截图，路径惯例与既有本地化原理图一致
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：pnpm build 205 页零报错（26.85s）
+    - [x] 自动化核验：validate-anchors 410 页 3324/0 断链；check-structure 34 篇 ×6 语言 100% 对称（图多重集含新图逐一匹配）；verify-laws 退出码 0；tamper-proof 固化 82af565
+    - [x] 浏览器实测：details 展开实测——summary 点击展开、图 naturalWidth 2880 加载成功、编号步骤呈现；五语言图解由代理逐一过结构校验后合流
+    - [x] 过程修复：wrangler dev 误入 remote 模式改 --local；dev 服务器静态清单因 dist 原地重建过期导致截图空白——重启后重拍；写信弹层不响应 Esc 改为整页刷新复位
+    - [x] 零假数据残留：截图全部来自本地演示实例真实运行画面（seed-demo 数据 + 管理界面真实表单值）；判图截图不入库
+
+### EpomailDocs v5.15 每界面一页轮：12 个界面详解页 ×6 语言 + 侧栏八组 34 项 (2026-10-06)
+*   **关联提交 (Git Commit)**: EpomailDocs 独立提交 `472ebc32d8c0a10d4f721037a794643086a6a6c8` (Short: `472ebc3`，v5.15 内容) + `14d3d23` (manifest 固化 472ebc3)；两提交已推送 origin/master 与 origin/main；主仓归档提交见本条目对应变更提交
+*   **部署环境 (Deployment)**: `本地全真栈：EpomailDocs wrangler pages dev dist:8790（205 页）全页判图；本轮无应用侧代码改动；线上发布未执行，待运营者 pnpm run deploy`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 反馈①（每界面一页）：管理控制台九界面逐一独立成页 ×6 语言——《分析页》《用户列表》《全库邮件审查》《权限控制》《注册密钥》《系统设置配置卡详解》（十一卡逐卡一节）《分类管理》《操作报告》，应用管理即上轮《开放平台与 API 接入》；全部经 router/视图/worker 源码对码
+    - [x] 反馈②（用户侧界面补全）：《邮箱界面与邮件详情》（八视图/详情动作五组/写信弹层 17 项工具/会话排版）、《标签与分类管理》（外观/出厂四标签/规则构建器/统计复核）、《个资与常规设置》（个资三卡/常规五分组）、《数据导出与存储》（三类导出/个人对象存储接入）×6 语言
+    - [x] 反馈③（导航分级）：侧栏由 6 组重组为 8 组 34 项——新增「管理控制台」独立成组（9 项），邮箱使用/个人设置各自成组；一级即意图、二级即界面门类；组名与条目 ×6 语言
+    - [x] 反馈④（i18n 六语言闭环）：12 新页 zh/zh-tw/en/es/fr/nl（zh-tw 正式版经台湾术语约束代理翻译并全量过结构校验）；全站版本 5.14→5.15（132 文件）
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：pnpm build 205 页零报错（30.11s）；astro.config 注入撇号导致的一次语法错误已改双引号字符串修复并 node --check 验证
+    - [x] 自动化核验：validate-anchors 410 页 3324/0 断链；check-structure 34 篇 ×6 语言 100% 结构对称；verify-laws 退出码 0；tamper-proof 固化 472ebc3（132 篇文档）
+    - [x] 浏览器全真栈实测：8 张全页 + 暗色判图控制台/网络错误 CLEAN——zh-system（12 节逐卡）、zh-audit、zh-mailbox、en-roles、fr-review、nl-users、es-labels、zh-tw-analysis 与八组侧栏全部通过
+    - [x] 零假数据残留：本轮无应用侧改动、未运行 epomail 实例；判图截图不入库；工作树干净（杂散文件保持未跟踪）
+
+### EpomailDocs v5.14 文档深化与导航重构轮：OAuth 接入教程等三新页 ×6 语言 + 六意图侧栏 + 冷启动 P1 修复 (2026-10-06)
+*   **关联提交 (Git Commit)**: EpomailDocs 独立提交 `6b4d7fe` (Short: `6b4d7fe`，v5.14 内容) + `0aedc7c` (manifest 固化 6b4d7fe)；两提交已推送 origin/master 与 origin/main；主仓 `a7ac1b2`（v3_16DB 冷启动修复 + OAuth 教程按钮指向文档站）；主仓归档提交见本条目对应变更提交
+*   **部署环境 (Deployment)**: `本地全真栈：mail-worker wrangler dev 8787（wipe 冷启动 → /api/init 播种 → seed-demo 20 封 → 开用户资料控制开关，兼作冷启动修复验证与截图源）；EpomailDocs wrangler pages dev dist:8790（133 页）全页判图；线上发布未执行，待运营者 pnpm run deploy`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 反馈①（分级细化）：侧栏由 3 个大组重组为 6 个意图命名组（产品与总览 2 / 使用指南 7 / 自部署与开发 3 / 技术与信任 2 / 隐私与数据保护 4 / 条款与合规 4，共 22 项），一级标题即用户意图、二级标题即具体门类；组名与条目 ×6 语言对称
+    - [x] 反馈②（OAuth 开放平台接入教程落地）：新增《开放平台与 API 接入》api.md ×6 语言——注册字段表（epo_live_/epo_sec_ 一次性凭据与重置）、四端点总览、五步接入流程 + cURL 示例、PKCE/client_secret 双模式、scope 语义表、用户授权与即时撤销、PAT 现状诚实 note——全部经 oauth-app-service/oauth-provider-api 源码对码；应用侧「开发接入教程」按钮同步改指本教程（`a7ac1b2`）
+    - [x] 反馈③（普通用户难懂界面逐步化）：新增《帐号安全设置指南》security.md 与《通知与转发指南》notify.md ×6 语言——2FA 三步开启/恢复码/通行密钥 30 天时效锁/step-up 异常环境二验；Telegram 私有机器人五步绑定/推送偏好/自动转发触发类型与 [Fwd] 前缀，均逐步编号说明
+    - [x] 反馈④（事实纠偏 ×6）：features 个人 API 令牌改为接入指南链接（对码证实 PAT 签发接口已建但无消费端点与前端入口）；settings 转发说明改指新指南并更正「用户资料控制」卡名（对码证实智能规则档当前按全部邮件处理、保留原件选项未生效）；interface 资料分区行移除 API 访问
+    - [x] 反馈⑤（真实截图补齐）：新摄 ui-oauth-apps.png（端点条/示例应用/集成代码）与 ui-notify-forward.png（邮件与消息转发区）入库 public/images/mail/ui/，截图源为本地演示实例真实运行画面
+    - [x] 反馈⑥（冷启动 P1 修复，对码副产品）：发现 setting 表 8 列（user_tg_forward/user_email_forward/user_api_support/oauth_login_enabled/oauth_providers/welcome_templates/welcome_lang/global_email_config）从未被建表与迁移覆盖，全新部署保存开关必报 D1 no such column——新增 v3_16DB 幂等迁移（`a7ac1b2`），本地 wipe 冷启动端到端验证 init success → 登录 → 开关写入 200
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：EpomailDocs pnpm build 133 页零报错（27.53s）；mail-vue vite build 零警告零报错（43.44s）
+    - [x] 自动化核验：validate-anchors 266 页 2520/0 断链；check-structure 22 篇 ×6 语言 100% 结构对称；verify-laws 退出码 0；tamper-proof 固化 6b4d7fe（132 篇文档）
+    - [x] 浏览器全真栈实测：10 张全页 + 3 裁片判图控制台/网络错误 CLEAN——api/security/notify 全页与暗色、es/fr/nl 抽样、六组侧栏、分页流转全部通过
+    - [x] 冷启动链路实测：wipe → /api/init success → admin 登录 → 用户资料控制开关 200（修复前该链路 D1_ERROR 必现）
+    - [x] 零假数据残留：演示数据仅存本地 .wrangler/state（gitignored）；判图截图不入库；EpomailDocs 工作树干净（杂散 PROJECT_STATE.md/REPORTS.md 保持未跟踪）
+
+### EpomailDocs v5.13 专案介绍双线扩充轮：六新页 ×6 语言 + 应用外链迁移 + 全站 5.13 (2026-10-05)
+*   **关联提交 (Git Commit)**: EpomailDocs 独立提交 `039becc` (Short: `039becc`，v5.13 内容) + `ae3da8b` (manifest 固化 039becc)；两提交已推送 origin/master 与 origin/main；主仓应用侧变更 `af79e31`；主仓归档提交见本条目对应变更提交
+*   **部署环境 (Deployment)**: `本地全真栈：EpomailDocs wrangler pages dev dist:8790（115 页）全页判图；应用侧仅改链接缺省值，mail-vue 构建验证未部署生产；线上发布未执行，待运营者 pnpm run deploy`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 反馈①（双受众架构）：按「专案推广（了解专案/自部署/学习使用）」与「专案服务（服务范围/隐私法律/功能实现）」双线组织——站点不设可见分区，以总览页新增「两条阅读路线」段与全站互链交融；法律板块拆分出《开源与自行部署法律》（专案开源使用线），与既有服务法律文档（专案服务线）并列
+    - [x] 反馈②（每一 URL 的界面）：新增《界面与路由总览》×6 语言——/mail/u/N/#view 混合路由全表（主界面九视图、设置五分区、管理九分区含权限键）、写信弹层三触发、界面骨架四区、登录面六流程（注册码三模式/邀请码参数/申诉门户参数）、OAuth 授权页/公开个人主页/404/PWA，逐项经 router/index.js 与 layout 源码对码
+    - [x] 反馈③（搜索变量完整参考）：新增《搜索与规则参考》×6 语言——十个字段算子、八个范围与精确度旗标（global:/is:sent/is:spam/is:trash/is:draft/hl:off/exact:true/case:true）、高亮与摘录行为、管理端 $ 检索（$sender/$user/$to/$subject + 状态 token + 中文别名 + \$ 转义 + 右键生成）、设置页检索（all:/global:/app:/oauth:/client: + Tab 补全）、分类规则九条件（明确标注 UI 提供但引擎未实装的 at_least/at_most/before/after/message_header_includes，防止误配）、priority/stopProcessing、系统内置启发式与站点治理
+    - [x] 反馈④（开发需求展示）：新增《部署指南》《开发指南》×6 语言——前置条件/三步部署/初始化引导链/密钥体系/邮件收发与系统邮件（含欢迎邮件相对路径 CTA 行为说明）/存储选型/演示实例/升级回滚；仓库结构/本地环境/测试巡检/六语言纪律/迁移纪律/五步 SOP/文档站开发/贡献通道
+    - [x] 反馈⑤（占位外链落位）：应用侧 `af79e31`——账户菜单页脚三链接回退域名由 epomail-docs.pages.dev 旧域迁至 docs.epocanvas.com 并按界面语言选择文档目录（替代硬编码 /en/）；系统设置「关于」卡技术支持缺省链接由 blog 迁至文档站《服务范围与支持》；《服务范围与支持》页明列应用内官方链接缺省指向与站长覆写机制
+    - [x] 反馈⑥（i18n 六语言闭环）：六新页 zh/zh-tw/en/es/fr/nl（zh-tw 正式版本人翻译、es/fr/nl 经术语约束代理翻译后全量过结构校验）；既有五页相关文档表 +2/+6/+2/+2 行与段落互链 ×6 语言；侧栏三组重组（专案与架构 10 项、隐私与数据保护 4 项、服务条款与合规 5 项）；全站版本 5.12→5.13（114 文件）
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：EpomailDocs pnpm build 115 页零报错（23.28s）；mail-vue vite build 零警告零报错（39.54s）；mail-worker wrangler deploy --dry-run 试编译通过
+    - [x] 自动化核验：validate-anchors 230 页 2268/0 断链；check-structure 19 篇 ×6 语言 100% 结构对称（zh-tw 正式版基准）；verify-laws 退出码 0；tamper-proof 清单固化 039becc（114 篇文档）
+    - [x] 浏览器全真栈实测：13 张全页 + 4 张元素裁片判图，控制台/网络错误 CLEAN——路由表代码 token 折行缺陷经 custom.css 行内代码不折行规则修复并复验；暗色主题、es/fr/nl 抽样、侧栏三组、分页卡流转全部通过
+    - [x] YAML frontmatter 修复：fr/nl open-source 的 title/description 含冒号加双引号，构建恢复绿色
+    - [x] 零假数据残留：本轮未运行 epomail 实例（截图沿用既有真实演示实例资产）；判图截图不入库（screenshots/ ignored）；EpomailDocs 工作树仅余先于本轮存在的无关杂散文件（PROJECT_STATE.md/REPORTS.md，保持未跟踪）
+
+### EpomailDocs v5.12 专案介绍精度治理轮：六语言全量对码修订 + 提交链路刷新 (2026-10-05)
+*   **关联提交 (Git Commit)**: EpomailDocs 独立提交 `8da882cfab09c07ffb66d363f949ef5598bfb780` (Short: `8da882c`，v5.12 内容) + `4188b98` (manifest 固化 8da882c)；两提交已推送 origin/master 与 origin/main；主仓归档提交见本条目对应变更提交
+*   **部署环境 (Deployment)**: `本地全真栈：EpomailDocs wrangler pages dev dist:8790（含 Pages Functions Accept-Language 协商，部署前清理 4321/4399/8790 三端口历史遗留僵尸 wrangler 栈后单实例运行）全页判图；线上发布未执行，待运营者 pnpm run deploy`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 反馈①（先拉取最新版）：主仓核验与 origin/master 零落后（HEAD 661 提交，含远端审计控制台重构 `73a2561`、OAuth 特性开关 `21af692`）；EpomailDocs 同步至 v5.11（c597fca）
+    - [x] 反馈②（独立对码审计）：20 项文档事实断言逐条对码 mail-worker/mail-vue 当前源码，查出 6 处 v5.11 偏差——站长存储配额出厂实播 1024 MB 而非无上限（init.js:183，权限控制页标示「无限制」）；信任设备真实触发为 2FA 步骤「以后本设备登录不再验证」（rememberDevice → login-service.js:729-739），登录页「保持轨道连接」勾选纯装饰不上送；翻译目标语言实际 15（阅读页）/16（个人默认）而非 17；Linux DO 登录在登录 UI 与 getPublicProviders 均无入口（仅后端 env 残留）；6 张系统设置配置卡名与实际标题不符；project.md 提交计数与里程碑滞后（逾 560/逾 45 → 实际 661/49，v5.10/v5.11 未收录）
+    - [x] 反馈③（修复 ×6 语言）：modes.md 站长行/图注/播种说明/信任设备措辞/Linux DO 句移除；settings.md 语言数 17→16 与 6 卡名对齐应用实际标题（个性化设置、AI 智能引擎与大模型接入、用户资料控制、Turnstile 人机验证、网站公告、操作报告）；features.md Linux DO 条目移除（privacy-policy/sub-processors/terms-of-service 的条件式披露按披露性质保留）；project.md 统计刷新（逾 660/逾 50，截至 2026-10-05）+ 里程碑第 14 阶段（v5.10/v5.11 与审计控制台重构）+ 主仓锚点链追加 21af692/73a2561/596e7c1 + 文档仓锚点链追加 68a014c/08448fb/ff4e93f/c597fca
+    - [x] 反馈④（i18n 六语言闭环）：78 文件结构 1:1 修订（zh/zh-tw/en/es/fr/nl），全站版本 5.11→5.12（生效日期 2026-10-05）；scripts/apply-v512-accuracy.py 每条替换断言恰好命中 1 次，78 文件全部命中
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：pnpm build 79 页零报错（26.66s，含 tamper-proof 清单重生成与 post-build 双轨镜像）
+    - [x] 自动化核验：validate-anchors 1620/0 断链；check-structure 13 文档 ×6 语言 100% 结构对称（zh-tw 正式版基准）；verify-laws 退出码 0
+    - [x] 浏览器全真栈实测：12 张全页截图控制台/网络错误 CLEAN；元素级判图——里程碑第 14 阶段行 ×6 语言渲染正确、暗色里程碑全表 14 行正常、身份分组表站长行 1024 MB（zh/en）、配置卡表新卡名（zh/en）、信任设备新措辞（zh/en）、features 第 9 节无 Linux DO；六语言 served HTML 均含 5.12 版本行与全部 7 个新锚点 40 位 Hash
+    - [x] tamper-proof.json 全量重生成并固化 8da882c（`4188b98` 同步提交），78 篇文档清单一致
+    - [x] 零假数据残留：本轮未运行 epomail 实例（沿用 v5.11 真实截图资产，未新增产品截图）；判图截图不入库（screenshots/ ignored）；EpomailDocs 工作树仅余先于本轮存在的无关杂散文件（PROJECT_STATE.md/REPORTS.md，保持未跟踪未纳入提交）
+
+### EpomailDocs v5.11 专案介绍扩充轮：运行模式/设置指南两新页 ×6 语言 + 真实产品截图 + 全站 5.11 (2026-10-05)
+*   **关联提交 (Git Commit)**: EpomailDocs 独立提交 `ff4e93f` (Short: `ff4e93f`，v5.11 内容) + `c597fca` (manifest 固化提交号同步，本轮起内容与同步拆分两提交)；两提交已推送 origin/main；主仓归档提交见本条目对应变更提交
+*   **部署环境 (Deployment)**: `本地全真栈：mail-worker wrangler dev 127.0.0.1:8787（冷启动 init 播种 6 角色 + seed-demo 20 封演示邮件 + 多账户快速切换开启）作为截图源；EpomailDocs wrangler pages dev dist:8790（含 Pages Functions Accept-Language 协商）全页判图；线上发布未执行，待运营者 pnpm run deploy`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 反馈①（先拉取最新版）：主仓同步 origin/master（远端审计控制台/OAuth/PM 验收流水 9 提交并入，CHECKLIST/REPORTS 冲突按日期时间线精确合并归位）
+    - [x] 反馈②（专案介绍板块·不同模式）：新增《运行模式》modes.md ×6 语言——部署形态（托管/自部署）、邮件模式三档隐私等级（管理端可见性矩阵/强制两步验证/全局推送锁定/审计时间戳剥离）、六身份分组与配额表（参观者/普通用户/LV.0/LV.1/协管者/站长 + 博客等级联动）、登录与两步验证（TOTP/备用恢复码/Passkey/信任设备双周期/第三方快捷登录三态规则）、多账户模式（会话隔离 /mail/u/N/）、界面语言与显示模式——全部事实经 mail-worker/mail-vue 源码逐项对码
+    - [x] 反馈③（专案介绍板块·不同设置）：新增《设置指南》settings.md ×6 语言——个人设置五分区逐项导览（个资/常规/安全/资料/标签）、管理控制台九分区职责表、系统设置 11 配置卡清单、操作报告四类预警矩阵（审计/风控/封禁/申诉）
+    - [x] 反馈④（真实数据截图不空盘）：9 张真实产品截图入 ui 资产——邮件模式三档下拉展开、权限控制页六角色表、两步验证中心、多账户头像菜单、登录页第三方「即将上线」灰显态、个资/常规/资料页、操作报告四类预警；数据全部来自本地演示实例真实运行画面
+    - [x] 反馈⑤（i18n 六语言闭环）：两新页 zh/zh-tw/en/es/fr/nl 结构 1:1（标题/表格行列/图/图注逐一对应）；侧栏「专案与架构」组新增两入口（SIDEBAR_I18N 六语言标签）；check-structure DOCS 11→13；project/features/architecture 相关文档表 ×6 语言各增两行互链；全站版本 5.10→5.11（78 文件，生效日期 2026-10-05）
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：mail-vue vite build 零警告零报错（47.8s，拉取后含 OAuth 特性开关等新代码）；EpomailDocs build 79 页零报错（67→79）
+    - [x] 自动化核验：anchors 1620/0 断链；check-structure 13 文档 ×6 语言 100% 结构对称（zh-tw 正式版基准）
+    - [x] 浏览器全真栈实测：9 张全页渲染判图全绿（zh/zh-tw/en ×modes+settings、fr/es/nl 抽样、暗色主题抽查），内容栏居中、表格不溢出、产品截图清晰、语言无串页；控制台/网络错误 CLEAN
+    - [x] tamper-proof.json 全量重生成并按惯例清单同步提交（68a014c → c597fca 固化 ff4e93f）
+    - [x] 零假数据残留：演示数据仅存本地 .wrangler/state（gitignored），不入库不进生产；判图截图不入库（screenshots/ ignored）；EpomailDocs 工作树干净
+
 ### 操作报告控制台全栈重构：对齐用户列表单框标准、纯文本不打底、RBAC防护与D1持久化 (2026-10-04)
 *   **关联提交 (Git Commit)**: `73a2561d3e91867a2b9e442bebe8366a639b5914` (Short: `73a2561`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com)` (Version ID: `02e5470d-f6d2-49dc-be4b-f3ca017d69cf`)
@@ -690,6 +820,39 @@
     - [x] 公网全真端到端自动化套件：`tests/verify-live-cf-production.mjs` (29/29 项断言 100% 通过)；
     - [x] 11 张全真生产截图：全量采集保存于 `tests/live_prod_01` 至 `tests/live_prod_11`；
     - [x] 零假数据残留：测试临时用户已在远程 D1 数据库中物理删除 (`DELETE FROM user WHERE user_id = 9999`)。
+
+### EpomailDocs v5.10 审计治理轮：P1×3 全量对码修订 + P2 全项落地 + 本地视觉验证 (2026-10-04)
+*   **关联提交 (Git Commit)**: 见本轮 REPORTS.md 条目（主仓归档提交）；EpomailDocs 独立提交 `08448fb63b011699b129e69266e7150a2174a49e` (Short: `08448fb`，v5.10 内容) + `68a014c` (manifest 固化提交号同步，本轮起内容与同步拆分两提交)
+*   **部署环境 (Deployment)**: `本地全真栈：wrangler pages dev dist:8790（含 Pages Functions Accept-Language 协商）+ Playwright 7 张全页截图判图全绿；线上发布未执行，待运营者 pnpm run deploy`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] P1-A tamper-proof.md（×6）：官方邮件目录移除三类无源码实现之 TOTP 通知邮件，官方发信身份收敛为「欢迎邮件与全域公告」
+    - [x] P1-B features.md（×6）：搜索语法表 is: 行删去 is:unread/is:starred（前后端均无解析）
+    - [x] P1-C features.md（×6）：附件表述改为与实现一致（能力依角色开启；单附件上限依实例设置缺省 25 MB，仅约束公共存储用户）
+    - [x] P2-A architecture.md（×6）：页首架构图改指各自本地化 /images/mail/<locale>/project-architecture.svg；P2-C 补「托管实例当前即以单库运行」；P3 定时任务补每 30 分钟分析缓存刷新
+    - [x] P3 data-security.md（×6）：补主密钥兜底披露（未配置环境变量将退化为内置缺省密钥，应经初始化门禁配置）
+    - [x] P2-B project.md（×6）：提交链路滚动更新至 2026-10-04（主仓逾 560/本站逾 45），里程碑表增第 13 阶段，锚点链 +4/+9 行
+    - [x] P2-D README.md：11 篇 66 页 v5.10 口径 + 配图清单补全；P2-E audit-public.mjs 相对路径化；P2-F 翻页卡补 features/architecture 两枚图标；P2-G check-structure.py 纳入 en（图片比对改多重集，容忍 hero 语言优先顺序），en/features.md 补第 6 图
+    - [x] 全站版本 5.9 → 5.10（66 文件，2026-10-04）；新增 scripts/v510-visual-check.mjs 视觉验证脚本
+    - [x] 意外发现处置：两个 ECCP 专案杂散文件（PROJECT_STATE.md/REPORTS.md，共 10,856 行，02:18 出现于 EpomailDocs 根、来源不明）已移出仓库隔离至桌面 stray-recovered-2026-10-04/，未删除可复核
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] EpomailDocs build 67 页零报错（两次：内容轮后 + manifest 同步轮后）
+    - [x] check-structure.py 6 语言对称 100%（en 首次纳入，图片多重集比对）；validate-anchors.cjs 134 页/1416 锚点/0 断链；verify-laws.py exit 0
+    - [x] 残留断言 grep 全零：is:unread/is:starred/附件 10 个/管理员 100 MB/TOTP 目录三行在全站 66 文件 0 命中
+    - [x] 逻辑内容验证：修订句均与源码逐点对码（附件上限 storage-quota-service.js:236-277、cron index.js:37-49、密钥兜底 email-crypto-utils.js:9-10、单库运行 wrangler.toml:13-28 + db-accessor.js:19-31）
+    - [x] 视觉验证（本地部署）：zh/zh-tw/en/nl 四语关键页 + 暗色主题 + Accept-Language 协商（zh-TW → /epomail/zh-tw/mail/overview/）7 张判图全绿；控制台/网络错误 0；本地图、翻页卡新图标、2 行官方邮件目录表均确认在案
+    - [x] 零假数据：全程未写入任何测试数据；manifest 66 篇 SHA-256 与内容一致（固化提交号 08448fb）
+
+### EpomailDocs v5.9 独立审计轮：介绍与法律内容全量对码 + tamper-proof 固化提交号同步 (2026-10-04)
+*   **关联提交 (Git Commit)**: 见本轮 `REPORTS.md` 条目（主仓归档提交）；EpomailDocs 独立治理提交 `e34ce0270c42dc7b50f0add6f0a47310046cf37e` (Short: `e34ce02`)
+*   **部署环境 (Deployment)**: `本地全真栈核验（EpomailDocs build 67 页 / anchors 1416 / structure / laws 全量实跑）；线上发布未执行，待运营者执行 pnpm run deploy`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 独立审计：三路并行取证（66 页文档主张全量提取 / mail-worker+mail-vue 源码事实基线 / 六语言对称与 EpoCanvasDocs 格式对齐）+ 26 项定点对码，报告正文归档 `doc/epomaildocs-v59-independent-audit.md`
+    - [x] 【P1-D 治理修复】v5.9 轮漏做的 tamper-proof manifest 固化提交号同步：EpomailDocs `e34ce02` 仅更新 4 行元数据（a1c1e89→beb956a），66 篇文档 SHA-256 重新生成逐项比对零字节变化
+    - [x] 审计新发现 P1×4（TOTP 官方邮件三类无实现 / is:unread、is:starred 算子未实现 / 附件 10 个与 100MB 上限无依据 / manifest 流程缺陷已修）、P2×7、P3×5，全部附 file:line 证据与修复路线图（R1-R5）
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] EpomailDocs `pnpm build`：67 页 22.4s 零报错；`validate-anchors.cjs` 134 页/1416 锚点/0 断链；`check-structure.py` 六语言对称 100%；`verify-laws.py` 与底稿一致（exit 0）
+    - [x] `audit-public.mjs` 本机不可运行（硬编码 `/home/shijian/...` 绝对路径），已列为 P2-E 待相对路径化
+    - [x] 线上发布未变更（本轮为审计与完整性修复轮，无内容文本变更）；零假数据（审计全程只读取证，无测试数据写入）
 
 ### 系统设置 (sys-setting) OAuth 管理界面精益化去冗余与 UI/UX 规范 Skill 建立 (2026-10-03)
 *   **关联提交 (Git Commit)**: `cb9b40e2b69a1d5e91210c4d41ba6eaf7f5f7b96` (Short: `cb9b40e`)
@@ -1059,6 +1222,59 @@
     - [x] 多语言对称闭环：6 语言字典 100% 绝对对称 (2134 keys)，字面量引用 0 缺失；
     - [x] 生产公网部署：Cloudflare Workers 版本 `3f2c8994-efba-4aa9-beeb-15cd82a1476d` 现网就绪；
     - [x] 零假数据残留：测试过程所有网络与会话隔离清理，无脏数据残留。
+
+### EpomailDocs v5.9 专案文档拆分扩充轮：功能指南/技术架构 + 真实产品截图 + 内容栏居中 (2026-10-03)
+*   **关联提交 (Git Commit)**: `8a60539d318eef618b84aa0db4e8a88672c4940d` (Short: `8a60539`)；EpomailDocs 独立提交 `beb956a1b50b5c4b94d3bbc9b9feba8ef774417a` (Short: `beb956a`，已推送 origin/main）
+*   **部署环境 (Deployment)**: `Cloudflare Pages epomail-docs 重新发布（master.epomail-docs.pages.dev，67 页）+ 本地全真栈演示实例（wrangler dev 127.0.0.1:8787，冷启动 init + 20 封演示邮件）`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 反馈①（表格居中根治）：Playwright 祖先链取证锁定 `.content-panel > .sl-container`（Starlight margin-inline 回退在本环境解析为 auto/0，宽视口内容栏右贴目录）；custom.css 显式居中，1728/1920/2560 三档实测 gapL=gapR 对称
+    - [x] 反馈②（专案拆分扩充）：新增功能指南（11 节）与技术架构（9 节）×6 语言；project.md §2/§3/§5 压缩为概览互链（节号不变）；侧栏两入口；check-structure DOCS 9→11；全站版本 5.8→5.9（66 文件）
+    - [x] 反馈③（本地部署 + 漂亮数据 + 多语言截图）：mail-vue 构建并入 worker 资产；冷启动 `/api/init` 播种 6 角色；`mail-worker/scripts/seed-demo.py` 生成 20 封演示邮件（官方公告/工作/社群/订阅/推销/验证码/已发送/垃圾/回收站/延后，含星标）经 D1 本地执行；16 张 Playwright 截图（6 语种×亮暗×移动端，服务端 profile 语言驱动）+ 8 张精选入文档站 ui 资产
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：EpomailDocs build 67 页零报错；anchors 1416/0 断链；check-structure 对称 100%（en 基准 11 篇）；verify-laws exit 0
+    - [x] 翻译双代理自查：结构 1:1（features 11 H2 / architecture 9 H2）、表格行数一致、数字零增删、内链语言前缀、术语对齐既有语料
+    - [x] 浏览器全真栈实测：演示实例登录 API 与 UI 登录态注入验证；收件箱/详情/搜索/写信/多语言/暗色截图判图全绿；新页判图全绿；1920 内容栏居中确认
+    - [x] 线上验证：features/architecture 双语 200、5.9 版本行、ui 资产 200、Accept-Language 协商正常
+    - [x] 零假数据残留：演示数据仅存本地 `.wrangler/state`（gitignored），不入库不进生产；删除该目录即完全清除
+
+### EpomailDocs v5.8 视觉与入口打磨轮：翻页卡图标/表格居中/语言协商 (2026-10-03)
+*   **关联提交 (Git Commit)**: `4cf8014279669dbc67ff54ceb47239044c943ac8` (Short: `4cf8014`)；EpomailDocs 独立提交 `a1c1e89c4e8b85579346304df3d5b37d197b68db` (Short: `a1c1e89`，已推送 origin/main）
+*   **部署环境 (Deployment)**: `Cloudflare Pages epomail-docs 重新发布（Pages Functions 首次上线，master.epomail-docs.pages.dev）`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 反馈①（alt 随被选择语言）：取证确认 en/fr/es/nl 构建 alt/图注本已 100% 本地化；真缺口为入口恒落简中——新增 Pages Functions 三路由按 Accept-Language 协商（zh-Hant→zh-tw、en/fr/es/nl 直配、缺省简中），浏览器所选语言自此决定落地语言与全部 alt/配图
+    - [x] 反馈②（表格居中）：Playwright 实测坐实 1920 视口下 Starlight fit-content 使表格贴左；custom.css margin 改 auto，截图确认对称居中
+    - [x] 反馈③（翻页卡图标）：覆写 Starlight Pagination，9 篇文档各配专属几何图标（主题色描边+强调色细节）；修复 SVG 表达式转义泄漏
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：EpomailDocs build 55 页零报错；anchors 1212/0 断链；check-structure 对称 100%；verify-laws exit 0
+    - [x] 本地协商实测 8 例全绿（root 与 /mail/* 双入口 × 6 语种权重场景，含尾斜杠保留）
+    - [x] 浏览器全真栈实测：翻页卡特写判图（zh 亮/暗、en、fr、375 移动端）、1920 表格居中、en 页英文 alt 全部通过
+    - [x] 线上验证：302 协商全对、en 页 doc-icon 与英文 alt、线上 CSS 与本地哈希一致
+    - [x] 零假数据残留：无测试数据产生；本地预览进程已清理
+
+### EpomailDocs v5.8 打磨轮：审计问题全项治理 + 首次公网发布 (2026-10-03)
+*   **关联提交 (Git Commit)**: `75f8125f6d730385588db731fb2899d735e35490` (Short: `75f8125`)；EpomailDocs 独立提交 `fcc1d10f9616b905e1c6b89ccb4e6f8ac953c476` (Short: `fcc1d10`)
+*   **部署环境 (Deployment)**: `Cloudflare Pages — epomail-docs（https://master.epomail-docs.pages.dev，首次公网发布）`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] P1 治理（×6 语言）：data-security 处理矩阵移除「边缘国家/地区码」入库声称（`user-service.js:272` 证实仅运行时读取），新增「边缘环境信息」行（不入库、随响应销毁）
+    - [x] P2 治理（×6 语言）：sub-processors R2 改「可选启用；未启用时附件经 KV存储」；全站移除正文 H1（Starlight 前言 title 为唯一 h1，修复既有双重标题）；legal-reference §9.1 对齐；EpomailDocs 本地流水回填 v5.5–v5.7
+    - [x] 八项补章（×6 语言）：收件域名披露、Cookie 与人机验证、执法请求原则、注销后 90 日实体删除上限（隐私/数据安全/条款三处一致）、事件通报 72 小时、AUP 执行阶梯技术基础（配额 5/8/10/100/不限）、AUP 新增 §8 著作权通知与反通知、条款 §3.2 年龄诚实申报说明
+    - [x] P3（主仓）：`crypto-utils.js` 两处 210,000 注释修正为 100,000（零行为差异）
+    - [x] P0：`wrangler pages deploy dist --project-name epomail-docs` 首次发布成功，修正误入提交的 `.wrangler/` 产物并补 gitignore
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：EpomailDocs `pnpm build` 55 页 19.7s 零报错；check-structure 对称 100%（含 en 基准）；anchors 1212/0 断链；verify-laws exit 0
+    - [x] 源码对码：10 项新增事实声称全部有源码证据（域名/官方发信/国家码/配额/垃圾 7 日/90% 清理/每日重置/Turnstile/无统计脚本/JWT localStorage）
+    - [x] 浏览器全真栈实测：wrangler pages dev 根轨道（＝Pages 生产形态）22 张截图判图全绿（亮/暗 × zh/zh-tw/en × 1440/375）；线上 master.epomail-docs.pages.dev 页面/图片/manifest 全 200、内容 5.8、单 h1
+    - [x] 零假数据残留：误提交的 `.wrangler/` 本地产物已移除并 gitignore；测试数据零产生
+
+### EpomailDocs v5.7 独立复审归档：全量对码审计与发布状态核查 (2026-10-03)
+*   **关联提交 (Git Commit)**: `6cae7c3804450a899e20188a438543b9b7228997` (Short: `6cae7c3`)；审计对象 EpomailDocs @ `6478520`（v5.7），事实基准主仓 @ `50c69e0`
+*   **部署环境 (Deployment)**: 纯审计轮，未部署；线上探测 docs.epocanvas.com（/epomail 仍 404）+ mail.epocanvas.com
+*   **变更清单**:
+    - [x] 54 页法律/介绍文档逐篇清点与 10 项新增定点对码（国家码入库、R2 绑定、OAuth 7200s、会话上限 10、Google Fonts、Shadow DOM/DOMPurify、announcement@ 官方发信、不可变快照投递、TG 7 日链接、AI 6000/1000 字符与用量 KV 60 日）
+    - [x] 审计报告全文归档至 REPORTS.md 置顶条目（P0 发布缺位 / P1 国家码过度宣称 / P2×4 / P3 代码注释）
+*   **核验清单**:
+    - [x] 文档站回归：validate-anchors 1200 锚点 0 断链；verify-laws 与核验底稿一致
+    - [x] 本轮不改文档站与产品代码（纯审计），无测试数据产生
 
 ### 设定页「个人设置」与「管理控制台」物理分割及身分组URL强绑定防越权 (2026-10-02)
 *   **关联提交 (Git Commit)**: `27b1f32b1960dac6c71bbf0a39cac2ce1d9fc1a0` (Short: `27b1f32`)
@@ -1469,6 +1685,33 @@
 
 ---
 
+### 原理图六语言本地化轮：12 图 × 6 语言 = 72 个 SVG (2026-10-02)
+*   **关联提交 (Git Commit)**: EpomailDocs `c5de61f`（主提交）；清单同步 `6478520` (Short: `c5de61f` / `6478520`)
+*   **部署环境 (Deployment)**: `本地构建与静态核验`（生产 Pages 未触发部署）
+*   **变更清单**:
+    - [x] 12 张原理图全量六语言本地化：根路径（简中）+ zh-tw/en/fr/es/nl 各一套，每种语言的文档配该语言的图（含 aria-label 与图内全部文字）
+    - [x] 新增 scripts/generate-figures.mjs 单源生成器（builders ×2 + 文案字典 ×2）：72 个 SVG 由一处字典驱动，杜绝 72 文件手工同步
+    - [x] 30 个非简中文档图片引用加语言前缀；check-structure.py 图片比对归一化（剥语言前缀后比对），对称校验逻辑保持有效
+    - [x] fr/nl 长文案按容器宽度逐行校准（法文责任边界第三行、法文盾牌底行两处溢出修正）；渲染抽检 12 张无溢出
+*   **核验清单**:
+    - [x] pnpm build 55 页零报错；validate-anchors 1200 锚点 0 断链；check-structure 六语言对称 100%；verify-laws exit 0
+    - [x] 页面级截图确认 zh/fr 图内文字随语言渲染（data-security 纵深防御图、overview 架构图）
+    - [x] tamper-proof.json 重生成并同步提交；临时渲染脚本与截图即弃，工作树干净
+
+### 法律文档站 v5.7 去幻觉与六语言深度整合轮 (2026-10-02)
+*   **关联提交 (Git Commit)**: EpomailDocs `e6eb758`（主提交，内容见其 Commit Message 全文）；清单同步 `1d0a61c` (Short: `e6eb758` / `1d0a61c`)
+*   **部署环境 (Deployment)**: `本地构建与静态核验`（生产 Pages 未触发部署）
+*   **变更清单**:
+    - [x] 源码事实校准（对照 mail-worker/mail-vue 逐项核实 20 组技术承诺）：移除 tamper-proof 幻觉『16 类 L1-L4 通知矩阵/事件码/指纹库/1h 静默/isOfficial 403 阻断』（源码零实现），改以真实系统邮件目录（欢迎/全域公告/TOTP 开启·停用·管理员重置共 5 类）替代；移除『销毁主密钥密码学灭失』『纳秒级物理销毁』『数分钟阻断 IP』『立即轮换密钥』『HSTS 预加载』『Secure Enclave 永久固化』『PGP 签名』『DNSSEC』『浏览器内 Web Crypto 计算』等无实现或绝对化声明；data-security 加密语义按源码改写（实例级主密钥 HKDF-SHA256 派生、逐用户盐、逐记录 IV、三模式加密语义、附件不在范围）；处理矩阵剔除虚构 ASN/城市/15 组指纹/90 日轮换行
+    - [x] en 九篇按 zh 结构 1:1 全量重译：清除幻觉（Level 16 协议、SPF/DKIM/DMARC 全量校验、iframe 沙箱、$100 上限与 14 岁门槛幻觉、错用配图），补齐 NCII/AI 告知/第三方清单 §2-7/提交链路等缺失章节
+    - [x] 六语言整合：统一效力条款（繁中（台湾）版为正式版本、其余为对照译本，依 tw-legal-writing 制度；overview 效力顺序同步），消除 es/nl 与 zh/en/fr 两种互相矛盾的效力声明；版本头统一 2026-10-02｜5.7（移除『归档版本』残留）；nl instance→instantie/familien→families、es llave de paso→llave de acceso 等术语治理
+    - [x] 配图治理：data-security 三张涂鸦风插图重绘为扁平信息图（四层纵深防御/双轨治理/数据自主控制，浅暗双主题、416×276 保持嵌入不变）；anti-tamper-architecture 改英文微标签并修正失实标签；删除 8 张零引用死图
+*   **核验清单**:
+    - [x] pnpm build 55 页零报错（generate-tamper-proof + astro build + post-build 双轨镜像）
+    - [x] validate-anchors 110 页 1200 锚点 0 断链；check-structure 六语言结构对称 100%（en 9 篇基准通过）；verify-laws exit 0
+    - [x] 10 张构建产物全页截图判图通过（zh/en data-security、zh/en/zh-tw tamper-proof、es/nl 抽样、overview、project；明暗双主题、含新三图与存证面板渲染确认）
+    - [x] tamper-proof.json 全量重生成并按惯例清单同步提交（e6eb758 → 1d0a61c）
+    - [x] 零残留：临时截图/脚本/渲染 PNG 即弃，工作树干净
 ### EpoCanvas Mail 官方安全规范与全语系防篡改验真引擎部署上线 (2026-10-01)
 *   **关联提交 (Git Commit - epomail-docs)**: `83c4405a88c3f58a36c84c68ddaaee1e91244e8a` (Short: `83c4405`)
 *   **部署环境 (Deployment)**: `Cloudflare Pages (https://epomail-docs.pages.dev / https://docs.epocanvas.com/epomail)`

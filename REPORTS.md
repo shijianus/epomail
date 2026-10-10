@@ -9,6 +9,7 @@
 
 ---
 
+
 ### 100% 真实 Cloudflare 生产环境 PM 正式验收评审报告 (PM Acceptance Review) (2026-10-04)
 *   **关联提交 (Git Commit)**: `ca582d84d7ce4e58a52fb7123f713e248704039a` (Short: `ca582d8`)
 *   **专项文档索引 (Detailed Doc)**: `doc/pm-acceptance-review-20261004-live-cloudflare.md`
@@ -24,6 +25,22 @@
     - **验收结论：[ PASSED / APPROVED · 正式验收通过 · 准予全量签发 ]**
 
 ---
+
+### EpomailDocs v5.9 独立审计：介绍与法律内容全量对码与完整性核查 (2026-10-04)
+*   **关联提交 (Git Commit)**: 见主仓本轮归档提交（CHECKLIST.log 同名条目）；EpomailDocs 治理提交 `e34ce0270c42dc7b50f0add6f0a47310046cf37e` (Short: `e34ce02`)
+*   **专项文档索引 (Detailed Doc)**: `doc/epomaildocs-v59-independent-audit.md`
+*   **体检/审计范围与方法 (Scope & Methodology)**:
+    1. 范围与环境：EpomailDocs @ `beb956a`（v5.9，11 篇 × 6 语言 = 66 页）全量主张提取与逐项对码；事实基准为主仓 @ `26f6c3b`（559 提交）之 mail-worker / mail-vue 源码；EpoCanvasDocs 本地参照站格式对比。
+    2. 工具与脚本：三路并行只读取证 + 26 项定点对码；官方校验套件本机全量实跑（build 67 页零报错 / anchors 1416:0 / structure 对称 100% / laws exit 0；`audit-public.mjs` 因硬编码路径不可运行）。
+*   **核心发现与缺陷矩阵 (Key Findings & Matrix)**:
+    - **[P1·准确性/完整性]**: ①tamper-proof.md 官方邮件目录 5 类中 3 类（TOTP 开启通知/停用警告/重置警报）无源码实现（worker 官方投递仅欢迎邮件一条路径，`totp-service.js:111,362,672`）；②features.md 搜索算子 `is:unread`/`is:starred` 前后端均未实现（`email-service.js:107-111`、`store/email.js:87-97`），且 UI 快捷 chip 同步提供了这两个不生效算子；③features.md「单封至多 10 个附件/管理员单附件 100 MB」无实现依据（后端仅 `attachment_max_size_mb` 缺省 25MB 且仅约束公共存储用户）；④v5.9 轮漏做 tamper-proof manifest 固化提交号同步（`gitCommit` 停留 a1c1e89）——**本轮已修复（EpomailDocs `e34ce02`，文档哈希零变化）**。
+    - **[P2·一致性/维护]**: ①architecture.md 六语言共用未本地化共享图（本地化版本已存在且被 project.md 在用）；②project.md 提交链路滞后（声明截至 09-30/12 提交，现实 559/45）；③「双库物理隔离」主陈述 vs 托管实例单库运行（三 D1 绑定同 id）；④README.md 停更于 v5.4（8 篇 48 页口径）；⑤audit-public.mjs 硬编码绝对路径不可跨环境运行；⑥翻页卡 DOC_ICONS 缺 features/architecture 两新页；⑦check-structure 对称校验不含 en 图片数（en/features.md 5 图 vs 其余 6 图）。
+    - **[P3·次要/观察]**: 主密钥兜底常量未披露（`email-crypto-utils.js:10`）；30 分钟分析 cron 未提及；admin@epomail.bond 与 announcement@epocanvas.com 双域名并存宜注明；落地页为 meta-refresh 桩 vs canvas splash 范式；hreflang/自定义 404/aside 本地化等 canvas 家族增益未引入。
+    - **通过项**: 26 项定点对码全部与源码一致（含 MyMemory/Google 翻译备援、Google Fonts、90% 配额强删 `email-service.js:303-311`、四预置标签、20 位 Hash=15 字节 base64url、官方发信硬编码、六语言欢迎模板、六角色配额、四/三级存储链、PBKDF2/JWT/TOTP/OAuth/TG 全部时限参数、首提交 2bbb582 等，逐项 file:line 见专项文档第三节）；六语言结构/日期行/效力条款/条号零引用 100% 达标；v5.7 轮 P1（cf-ipcountry）证实已闭环。
+*   **治理修复与回归结果 (Fixes & Verification)**:
+    - 本轮为独立审计 + 单项完整性修复：EpomailDocs `e34ce02` 同步 manifest 固化提交号（66 篇 SHA-256 重新生成零字节变化，仅 4 行元数据），重建核验 67 页零报错/1416 锚点 0 断链；线上重新发布未执行（`pnpm run deploy` 待运营者确认）。
+    - 后续路线图（R1 文档准确性修订 ×6 语言 → R2 站点工具修补 → R3 产品侧三决策项 → R4 splash 首页等形态升级 → R5 manifest 提交号 CI 化等流程制度化）已列入专项文档第六节。
+    - **同日治理轮闭环（EpomailDocs `08448fb` + `68a014c`，v5.10）**：R1 全部落地——①P1-A/B/C 三处过度宣称六语言修订（TOTP 官方邮件目录收敛为 2 类、is:unread/is:starred 删除、附件表述对齐实现）；②P2-A/C、P2-B、P2-D/E/F/G、P3 两项全项落地（六语言本地图、单库运行披露、提交链路滚动更新、README v5.10 口径、audit-public 相对路径化、翻页卡补两枚图标、check-structure 纳入 en 图片多重集比对 + en/features 补第 6 图）；③全站 5.9→5.10（66 文件）；④核验：build 零报错、anchors 1416/0、structure 6 语言 100%（含 en）、laws exit 0、残留断言 grep 全零、本地 wrangler pages dev + Playwright 7 张截图判图全绿（明暗双主题/四语言关键页/Accept-Language 协商）；⑤R5 部分落地：内容提交与 manifest 同步拆分两提交，固化提交号不再滞后。R3（产品侧：TOTP 邮件实现或维持删除、is: 算子实现或移除 UI chip、附件上限实现）与 R4（splash 首页等形态升级）仍待运营者决策。另：EpomailDocs 根目录 02:18 出现两个来源不明之 ECCP 专案杂散文件（PROJECT_STATE.md/REPORTS.md，未跟踪），已移出仓库隔离至桌面 stray-recovered-2026-10-04/ 备查，未入库未删除。
 
 ### 核心功能与 UX 架构正式验收评审报告 (PM Acceptance Review) (2026-10-03)
 *   **关联提交 (Git Commit)**: `4382d41447354695cea89956a2c22263c2611cfb` (Short: `4382d41`)
@@ -41,6 +58,22 @@
 
 ---
 
+### EpomailDocs v5.7 独立复审：介绍与法律内容全量对码审计与发布状态核查 (2026-10-03)
+*   **关联提交 (Git Commit)**: `6cae7c3804450a899e20188a438543b9b7228997` (Short: `6cae7c3`)；审计对象 EpomailDocs @ `6478520`（v5.7，54 页 = 9 篇 × 6 语言），事实基准为主仓 @ `50c69e0`
+*   **体检/审计范围与方法 (Scope & Methodology)**:
+    1. 范围与环境：EpomailDocs 全部 54 页逐篇清点（结构/版本行/效力条款/六语言对称）；mail-worker / mail-vue / EpomailDocs 工程配置源码级逐点取证；docs.epocanvas.com 与 mail.epocanvas.com 线上状态探测。
+    2. 工具与脚本：三路并行审计（文档站清点 / 源码事实基线 / EpoCanvasDocs 格式参照）+ 10 项新增定点对码 + `validate-anchors.cjs`（1200 锚点）+ `verify-laws.py`（法条底稿）回归。
+*   **核心发现与缺陷矩阵 (Key Findings & Matrix)**:
+    - **[P0·发布/阻塞]**: 法律文档站至今无有效公网部署——`https://docs.epocanvas.com/epomail/mail/overview/` 实测 404（根路径由 EpoCanvasDocs 占用）。v5.3 已定案发布形态且本轮确认 `dist/` 构建产物、`robots.txt`、`_redirects`、tamper-proof manifest 全部就绪，但线上不可达：应用内法务文档默认链接（`DOCS_URL` 缺省 `docs.epocanvas.com/epomail`）、tamper-proof.md 宣称之权威源站均为死链。这是 v5.2 轮 P0-1 的延续，连续两轮未闭环。
+    - **[P1·准确性/过度宣称]**: `data-security.md:70`（六语言同构）处理矩阵「网络与设备资料」行将「来自边缘请求之国家/地区码」列为 D1 存储、留存「至帐号实体删除为止」。源码核实：`user` 表无国家/地区列（`mail-worker/src/entity/user.js`），`cf-ipcountry` 仅运行时读取回传前端用于电话区号预选（`user-service.js:272`；`mail-vue/src/utils/phone-validator.js:161`），不入库。声明收集范围大于实际，须六语言同步修订（改为「请求时读取、不入库」或自存储列移除）。
+    - **[P2·次要]**: 四项——①`sub-processors.md:24` Cloudflare 行无条件列出对象存储（R2），而生产 `wrangler.toml:34-36` R2 绑定注释未启用、附件缺省落 KV（`kv-obj-service.js`；`data-security.md:72`「缺省 KV」表述正确，两处口径不一）；②EpomailDocs 本地 `CHECKLIST.log` 停更于 v5.4/2026-10-01，v5.5–v5.7 三轮仅记主仓流水，站内流水断档；③`data-security.md` 与 `project.md` 两篇六语言缺 H1 标题，与其余 7 篇不一致；④`legal-reference.md` §9.1 自订「法规名称仅保留两处」，但 `data-security.md:128` 亦出现 GDPR/CCPA/CPRA 名称（不带条号，低风险）。
+    - **[P3·代码注释]**: `mail-worker/src/utils/crypto-utils.js:35` 注释写 210,000 迭代与实现常量 100,000 不符（文档声称 100,000 与实现一致，无需改文档，注释须修）。
+    - **通过项**: v5.2 轮 P0-2（实体删除接入附件级联，现为分块 CHUNK=50 实现 `email-service.js:1854-1868`）与 P1-1（头像 `AVATAR_UPLOAD_URL` 可配、硬编码图床移除）治理持续有效；40+ 项高错误风险主张复核全部与源码一致——AES-256-GCM 四字段白名单与三模式语义、HKDF 派生按用户加盐、PBKDF2 100,000、TOTP AES-256-GCM/备用码 SHA-256、JWT 30 日/KV 会话/同帐号上限 10（`login-service.js:391,574`）、OAuth 令牌 7200 秒（`oauth-provider-service.js:258`）、验证码提取前 6,000 字符（`ai-service.js:51`）、翻译备援首 1,000 字符（`ai-service.js:621`）、AI 用量 KV 60 日（`ai-service.js:26`）、Telegram 7 日阅读链接（`telegram-service.js:57,146`）、回收站 7 日/垃圾 7 日/官方邮件 `welcomeExpireDays` 缺省 7 日/90% 配额清理、官方发信 `announcement@`/`admin@` 与 isOfficial（`email-service.js:273`）、不可变快照投递（`email-service.js:1430`）、Shadow DOM + DOMPurify 白名单消毒（`shadow-html/index.vue`）、tamper-proof.json 构建期生成 + 客户端挂载（`astro.config.mjs:114-122`）、Google Fonts（`mail-vue/index.html:10-12`）、`document.cookie` 全仓 0 命中、LinuxDO trust_level、首提交 2026-07-21/MIT；结构 9 篇 × 6 语言 H2 完全对称、版本行 54/54 统一「2026-10-02｜版本 5.7」；条号引用全站 0 命中（符合 v5.0 去条号立场）；72 处图片引用 0 缺失；内链 slug 全部存在；EpoCanvasDocs 家族格式对齐（frontmatter 极简、语言前缀 `zh-tw`、图内文字本地化回退机制一致；版本行/效力条款为法务站合理偏差）。
+*   **治理修复与回归结果 (Fixes & Verification)**:
+    - 本轮为纯审计（不改文档站与产品代码）；`validate-anchors.cjs` 1200 锚点 0 断链、`verify-laws.py` 与核验底稿一致。
+    - **同日打磨轮闭环（EpomailDocs `fcc1d10` + 主仓 `75f8125f6d730385588db731fb2899d735e35490`）**：①【P0】文档站已首次公网发布至 Cloudflare Pages（`epomail-docs.pages.dev`，部署别名 `master.epomail-docs.pages.dev`），线上页面/双轨图片/tamper-proof.json 全部 200；②【P1】国家码过度宣称已修正（×6 语言，新增「边缘环境信息」行：请求时读取、不入库、随响应销毁）；③R2 口径统一为「可选启用；未启用时附件经 KV」（×6 语言）；④八项内容补章全部落地（×6 语言）：隐私 §1 收件域名、§4.3 Cookie 与人机验证、§7 执法请求原则、§8/数据安全 3.2/条款 8.1 注销后 90 日实体删除上限、数据安全 3.4 事件通报 72 小时、AUP §6 执行阶梯技术基础（发信配额 5/8/10/100/不限，`email-service.js:746` 证实 0=不限）＋AUP 新增 §8 著作权通知与反通知、条款 §3.2 年龄诚实申报说明；⑤【P2·缺 H1 反转处置】发现全站既有双重标题缺陷（Starlight 模板已以前言 title 渲染唯一 h1，正文 H1 叠加），统一移除 9 篇 ×6 语言正文 H1，单 h1 一致性与无障碍语义同时达成；⑥【P3】`crypto-utils.js` 两处 210,000 注释修正为与常量 100,000 一致（注释性变更，零行为差异）；⑦EpomailDocs 本地流水回填 v5.5–v5.7 断档三轮并入档本轮。
+    - **验证**：check-structure 对称 100%（含 en 独立基准 9 篇）、anchors 1212/0 断链、verify-laws exit 0、`pnpm build` 55 页零报错；本地 `wrangler pages dev` 根轨道（＝Pages 生产形态）22 张截图判图全绿（亮/暗 × zh/zh-tw/en × 1440/375），并证 astro preview 之插图 404 为预览器 base 处理伪象（生产双轨均 200）；源码对码 10 项新增事实声称全部有证据（`wrangler.toml:58`、`welcome-template.js`、`user-service.js:272`、`init.js:112-180`、`setting.js:64`、`email-service.js:307`、`index.js:44`、`mail-vue/index.html:13` 等）。
+    - **剩余事项（运营者决策/执行）**：①正式域名绑定——`docs.epocanvas.com/epomail` 之原定案需在 docs 域加 Worker 路由代理至本 Pages 项目，或改用独立子域并同步全站 SITE_ORIGIN/canonical 与应用内 `DOCS_URL` 生产配置；②`privacy@`/`admin@epocanvas.com` 邮箱可达性自测留痕（连续三轮挂账）；③注销后 90 日实体删除与安全事件 72 小时通报为本轮新增之运营承诺，须纳入日常运维执行；④建议后续为「删邮件后附件计数为 0」补自动化断言。
 ### 官方文档全量重构、Gmail 式双重定位与公网感官渲染深度审计 (2026-10-02)
 *   **关联提交 (Git Commit - epocanvas-mail)**: `03544a046342c1be3db30650f01b33362142277d` (Short: `03544a0`)
 *   **关联提交 (Git Commit - epomail-docs)**: `b0524838641473fa73f305f8846c26ae67b36f11` (Short: `b052483`)

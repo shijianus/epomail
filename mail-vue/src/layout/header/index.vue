@@ -377,7 +377,7 @@ import {hasPerm} from "@/perm/perm.js"
 import {useI18n} from "vue-i18n";
 import {setExtend} from "@/utils/day.js"
 
-const {t} = useI18n();
+const {t, locale} = useI18n();
 const route = useRoute();
 const settingStore = useSettingStore();
 const userStore = useUserStore();
@@ -674,21 +674,28 @@ function openAddAccount() {
   window.location.href = `/login/?action=addAccount&u=${targetU}`;
 }
 
+// 账户外链回退：指向文档站生产域，并按当前界面语言选择文档语言目录（zh 为文档站根语言，无前缀）
+function docsPageUrl(path) {
+  const l = String(locale.value || 'zh');
+  const prefix = (l === 'zh' || l === 'zh-CN') ? '' : (l === 'zh-Hant' || l === 'zh-TW') ? 'zh-tw' : l;
+  return `https://docs.epocanvas.com/epomail/${prefix ? prefix + '/' : ''}${path}`;
+}
+
 function openProjectIntro() {
   closeDropdown();
-  const extUrl = settingStore.settings?.projectUrl || 'https://epomail-docs.pages.dev/epomail/en/mail/overview/';
+  const extUrl = settingStore.settings?.projectUrl || docsPageUrl('mail/overview/');
   window.open(extUrl, '_blank', 'noopener,noreferrer');
 }
 
 function openPrivacyPolicy() {
   closeDropdown();
-  const extUrl = settingStore.settings?.privacyUrl || 'https://epomail-docs.pages.dev/epomail/en/mail/privacy-policy/';
+  const extUrl = settingStore.settings?.privacyUrl || docsPageUrl('mail/privacy-policy/');
   window.open(extUrl, '_blank', 'noopener,noreferrer');
 }
 
 function openTermsOfService() {
   closeDropdown();
-  const extUrl = settingStore.settings?.termsUrl || 'https://epomail-docs.pages.dev/epomail/en/mail/terms-of-service/';
+  const extUrl = settingStore.settings?.termsUrl || docsPageUrl('mail/terms-of-service/');
   window.open(extUrl, '_blank', 'noopener,noreferrer');
 }
 
