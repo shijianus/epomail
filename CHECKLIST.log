@@ -8,6 +8,33 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### 安全审计控制台 4 大板块专属差异化列集深度重构与定制 (2026-10-10)
+*   **关联提交 (Git Commit)**: `327109ec4834b9981228b7293d39e3a47d7051f7` (Short: `327109e`)
+*   **部署环境 (Deployment)**: `本地全真栈 / 生产 Cloudflare (mail.epocanvas.com)`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 4 大板块专属差异化列集全面解耦与定制（严禁套用统一列集）：
+      - **滥用威胁 (`threat`)**：遵循最小修改原则，完整保持基准 11 大核心列集（工单编号、身分组、违规分类、报警原因、报警次数、当前状态、处理建议、处理时间、负责人、拍案管理、操作）；
+      - **申诉审计 (`appeal`)**：删除单一冗余的「报警原因」列；在「处理时间」后新增「过期时间」列（显示表单失效时间戳，并附带 `已过期` 状态标识）；
+      - **风险管理 (`audit`)**：将「违规分类」改为粗略「违规等级」（直接展示 `LV3 · 高风险`、`LV2 · 中风险`、`LV1 · 低风险`、`LV0 · 正常`，并支持表头下拉多态筛选）；在「处理时间」后新增「截止期限」列（展示到期时间戳并标明过期说明，如 `已过期`、`剩 X 天`、`永久管控`）；
+      - **操作记录 (`record`)**：删除审计诊断专属的「报警原因」、「报警次数」与「处理建议」列；新增「更新次数」、「最后更新」（时间）与「申诉次数」定制列；
+    - [x] 后端服务层契约与计算字段扩展 (`audit-service.js`)：
+      - 列表返回动态计算补充 `expireTime`、`deadline`、`updateCount`、`lastUpdated`、`appealCount`；
+      - 完善 `violationLevel` 条件过滤与粗略等级识别；
+    - [x] 前端组件与样式层精益规范 (`mail-vue/src/views/audit-report/index.vue`)：
+      - 引入 `currentSection` 计算属性，彻底解耦并独立定义 4 个板块专属的 `<el-table-column>`，分配唯一 `:key`；
+      - 严格保持 `:label` 首位兼容既有测试与响应式动态列渲染；
+      - 遵循 `admin-ui-standards`，新增 `.level-cell`, `.expire-cell`, `.deadline-cell`, `.plain-update-count`, `.plain-appeal-count`，纯文本展示无冗余标签边框；
+    - [x] 6 语言 i18n 绝对对称闭环：
+      - 6 语言字典（`zh`, `zh-Hant`, `en`, `es`, `fr`, `nl`）同步补充 `auditColViolationLevel`, `auditColDeadline`, `auditColUpdateCount`, `auditColLastUpdated`, `auditColAppealCount`, `auditDeadlineExpired`, `auditDeadlinePermanent`, `auditDeadlineDaysLeft`, `auditDeadlineHoursLeft`, `auditExpiredBadge`, `auditAllViolationLevels`, `auditLevelLv3`~`auditLevelLv0` 等全部键名，`i18n-symmetry.mjs` 验证 2650 keys 100% 绝对对称；
+    - [x] 自动化测试套件与全真栈保障：
+      - 新建 `tests/verify-audit-section-columns.mjs`，包含 6 大专项核验与全量断言通过；既有 `tests/verify-audit-ui-optimization.mjs` 19 项断言全绿通过；
+      - 前端 `mail-vue` Vite 构建零报错通过 (耗时 13.21s)。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：`mail-vue` Vite 构建通过 (13.21s)；
+    - [x] 多语言对称核验：6 语言 2650 键 100% 绝对对称 (`ALL SYMMETRIC`)；
+    - [x] 本地回归测试：`tests/verify-audit-section-columns.mjs` 6 大专项 100% 通过；`tests/verify-audit-ui-optimization.mjs` 19 项全绿通过；
+    - [x] 零假数据残留：测试脚本无脏数据写入或已自动清理。
+
 ### 安全审计控制台全面纯文本无边框化、9列筛选扩展与拍案管理留名规范 (2026-10-10)
 *   **关联提交 (Git Commit)**: `8fe7f3624a0205fadc5bc0c817e1484368ab3b31` (Short: `8fe7f36`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com)` (Version ID: `6c3a8633-ee57-4f5e-98af-c14de6c521ef`, Startup: `63ms`)
