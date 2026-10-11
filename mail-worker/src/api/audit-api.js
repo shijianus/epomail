@@ -42,3 +42,17 @@ app.post('/audit/purge', async (c) => {
 	return c.json(result.ok(data));
 });
 
+app.get('/audit/circuit-breaker', async (c) => {
+	ensureAuthUser(c);
+	const data = await auditService.getCircuitBreaker(c);
+	return c.json(result.ok(data));
+});
+
+app.post('/audit/circuit-breaker', async (c) => {
+	ensureAuthUser(c);
+	const body = await c.req.json();
+	const data = await auditService.setCircuitBreaker(c, body);
+	return c.json(result.ok(data));
+});
+
+

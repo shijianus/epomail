@@ -2,6 +2,7 @@ import BizError from '../error/biz-error';
 import accountService from './account-service';
 import { userOrm as orm, mailOrm } from '../entity/orm';
 import user from '../entity/user';
+import account from '../entity/account';
 import { and, asc, count, desc, eq, inArray, sql } from 'drizzle-orm';
 import { emailConst, isDel, roleConst, userConst } from '../const/entity-const';
 import { email } from '../entity/email';
@@ -547,16 +548,178 @@ const userService = {
 		if (userIds.includes(1)) {
 			throw new BizError('系统超级管理员（User 1）禁止物理删除！', 403);
 		}
-		userIds = userIds.filter(id => id !== 1 && id !== 9);
+		userIds = userIds.filter(id => id !== 1);
 		if (userIds.length === 0) return;
+
+		// 1. 在物理删除 D1 数据前，提取所有待删除用户的核心标识符（主邮箱、别名邮箱、用户名）
+		let usersToDelete = [];
+		let accountsToDelete = [];
+		try {
+			usersToDelete = await orm(c)
+				.select({ userId: user.userId, email: user.email })
+				.from(user)
+				.where(inArray(user.userId, userIds))
+				.all();
+		} catch (e) {}
+
+		try {
+			accountsToDelete = await orm(c)
+				.select({ accountId: account.accountId, userId: account.userId, email: account.email, name: account.name })
+				.from(account)
+				.where(inArray(account.userId, userIds))
+				.all();
+		} catch (e) {}
+
+		const identifiers = new Set();
+		for (const u of usersToDelete) {
+			if (u.email) {
+				identifiers.add(u.email.trim());
+				identifiers.add(u.email.trim().toLowerCase());
+			}
+		}
+		for (const a of accountsToDelete) {
+			if (a.email) {
+				identifiers.add(a.email.trim());
+				identifiers.add(a.email.trim().toLowerCase());
+			}
+			if (a.name) {
+				identifiers.add(a.name.trim());
+				identifiers.add(a.name.trim().toLowerCase());
+			}
+		}
+
+		// 2. 统计这批待删用户今日的发件数量，用于精准扣减当日全局发送配额计数器
+		const dateStr = dayjs().format('YYYY-MM-DD');
+		let sentTodayCount = 0;
+		try {
+			const todayStart = dayjs().startOf('day').toISOString();
+			const sentRows = await mailOrm(c)
+				.select({ emailId: email.emailId })
+				.from(email)
+				.where(and(
+					inArray(email.userId, userIds),
+					eq(email.type, emailConst.type.SEND),
+					sql`${email.createTime} >= ${todayStart}`
+				))
+				.all();
+			sentTodayCount = sentRows ? sentRows.length : 0;
+		} catch (e) {}
+
+		// 3. 级联清理 USER_PROFILE_ 中的 API Tokens（PAT 授权）
+		if (c.env?.kv) {
+			for (const id of userIds) {
+				try {
+					const profileStr = await c.env.kv.get('USER_PROFILE_' + id);
+					if (profileStr) {
+						const profile = typeof profileStr === 'string' ? JSON.parse(profileStr) : profileStr;
+						if (Array.isArray(profile.apiTokens)) {
+							for (const t of profile.apiTokens) {
+								if (t?.token) {
+									await c.env.kv.delete(`API_TOKEN_${t.token}`).catch(() => {});
+								}
+							}
+						}
+					}
+				} catch (e) {}
+			}
+		}
+
+		// 4. 执行 D1 物理删除
 		await accountService.physicsDeleteByUserIds(c, userIds);
 		await oauthService.deleteByUserIds(c, userIds);
 		await orm(c).delete(user).where(inArray(user.userId, userIds)).run();
-		for (const id of userIds) {
+
+		// 5. 扣减并清理 send_day_count 当日发件统计键
+		if (c.env?.kv && sentTodayCount > 0) {
 			try {
-				await c.env.kv.delete(KvConst.AUTH_INFO + id);
-				await c.env.kv.delete('USER_PROFILE_' + id);
+				const daySendTotalStr = await c.env.kv.get(KvConst.SEND_DAY_COUNT + dateStr);
+				if (daySendTotalStr !== null && daySendTotalStr !== undefined) {
+					const currentTotal = Number(daySendTotalStr) || 0;
+					const newTotal = currentTotal - sentTodayCount;
+					if (newTotal <= 0) {
+						await c.env.kv.delete(KvConst.SEND_DAY_COUNT + dateStr);
+					} else {
+						await c.env.kv.put(KvConst.SEND_DAY_COUNT + dateStr, JSON.stringify(newTotal), { expirationTtl: 60 * 60 * 24 });
+					}
+				}
 			} catch (e) {}
+		}
+
+		// 6. 彻底清扫 KV 关联的所有用户专属键与孤儿缓存
+		if (c.env?.kv) {
+			for (const id of userIds) {
+				try {
+					await c.env.kv.delete(KvConst.AUTH_INFO + id);
+					await c.env.kv.delete('USER_PROFILE_' + id);
+					await c.env.kv.delete('HAS_WELCOME_' + id);
+					await c.env.kv.delete('USER_KNOWN_ENV_' + id);
+					await c.env.kv.delete(KvConst.TOTP_SETUP + id);
+					if (KvConst.WEBAUTHN_SETUP) await c.env.kv.delete(KvConst.WEBAUTHN_SETUP + id);
+					if (KvConst.WEBAUTHN_TEST) await c.env.kv.delete(KvConst.WEBAUTHN_TEST + id);
+				} catch (e) {}
+			}
+
+			// 清理所有相关邮箱和用户名的登录失败/临时锁定计数键
+			for (const identifier of identifiers) {
+				try {
+					await c.env.kv.delete(KvConst.LOGIN_FAIL + identifier);
+				} catch (e) {}
+			}
+
+			// 风控 IP 聚集计数器：从 risk_ip_acc 中清洗掉已删除用户，若某 IP 账号列表已空则物理回收该键
+			try {
+				const ipListResult = await c.env.kv.list({ prefix: KvConst.RISK_IP_ACCOUNTS || 'risk_ip_acc:', limit: 100 });
+				if (ipListResult && Array.isArray(ipListResult.keys)) {
+					for (const k of ipListResult.keys) {
+						try {
+							const raw = await c.env.kv.get(k.name);
+							if (raw) {
+								let uids = typeof raw === 'string' ? JSON.parse(raw) : raw;
+								if (Array.isArray(uids)) {
+									const remaining = uids.filter(uid => !userIds.includes(Number(uid)));
+									if (remaining.length === 0) {
+										await c.env.kv.delete(k.name);
+									} else if (remaining.length !== uids.length) {
+										await c.env.kv.put(k.name, JSON.stringify(remaining), { expirationTtl: 7200 });
+									}
+								}
+							}
+						} catch (e) {}
+					}
+				}
+			} catch (e) {}
+
+			// 设备信任设备记录清理 (dev_trust:${deviceHash}:${userId})
+			try {
+				const devKeys = await c.env.kv.list({ prefix: KvConst.DEVICE_TRUST || 'dev_trust:', limit: 100 });
+				if (devKeys?.keys) {
+					for (const dk of devKeys.keys) {
+						const parts = dk.name.split(':');
+						const targetUid = Number(parts[parts.length - 1]);
+						if (userIds.includes(targetUid)) {
+							await c.env.kv.delete(dk.name).catch(() => {});
+						}
+					}
+				}
+			} catch (e) {}
+
+			// 授权撤销与全员邮件标记清理
+			for (const id of userIds) {
+				try {
+					const grantKeys = await c.env.kv.list({ prefix: `REVOKED_GRANT_${id}_`, limit: 50 });
+					if (grantKeys?.keys) {
+						for (const rk of grantKeys.keys) {
+							await c.env.kv.delete(rk.name).catch(() => {});
+						}
+					}
+					const globalEmailKeys = await c.env.kv.list({ prefix: `HAS_GLOBAL_EMAIL_${id}_`, limit: 50 });
+					if (globalEmailKeys?.keys) {
+						for (const gk of globalEmailKeys.keys) {
+							await c.env.kv.delete(gk.name).catch(() => {});
+						}
+					}
+				} catch (e) {}
+			}
 		}
 	},
 

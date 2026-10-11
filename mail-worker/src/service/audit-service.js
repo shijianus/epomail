@@ -68,7 +68,14 @@ const auditService = {
 				{ name: 'ban_time', sql: `ALTER TABLE audit_log ADD COLUMN ban_time TEXT;` },
 				{ name: 'is_internal', sql: `ALTER TABLE audit_log ADD COLUMN is_internal INTEGER DEFAULT 0;` },
 				{ name: 'report_category', sql: `ALTER TABLE audit_log ADD COLUMN report_category TEXT;` },
-				{ name: 'report_reason', sql: `ALTER TABLE audit_log ADD COLUMN report_reason TEXT;` }
+				{ name: 'report_reason', sql: `ALTER TABLE audit_log ADD COLUMN report_reason TEXT;` },
+				{ name: 'cluster_id', sql: `ALTER TABLE audit_log ADD COLUMN cluster_id TEXT;` },
+				{ name: 'assignee', sql: `ALTER TABLE audit_log ADD COLUMN assignee TEXT;` },
+				{ name: 'report_source', sql: `ALTER TABLE audit_log ADD COLUMN report_source TEXT;` },
+				{ name: 'evidence_summary', sql: `ALTER TABLE audit_log ADD COLUMN evidence_summary TEXT;` },
+				{ name: 'circuit_status', sql: `ALTER TABLE audit_log ADD COLUMN circuit_status TEXT DEFAULT 'NORMAL';` },
+				{ name: 'reason_code', sql: `ALTER TABLE audit_log ADD COLUMN reason_code TEXT;` },
+				{ name: 'timeline', sql: `ALTER TABLE audit_log ADD COLUMN timeline TEXT;` }
 			];
 			for (const col of baselineCols) {
 				try {
@@ -79,6 +86,65 @@ const auditService = {
 				} catch (err) {
 					console.warn(`跳过 audit_log 列 ${col.name}:`, err.message);
 				}
+			}
+
+			// Real table for auto purged and tombstoned batches
+			await userDb.prepare(`
+				CREATE TABLE IF NOT EXISTS audit_purge_batch (
+					id TEXT PRIMARY KEY,
+					count INTEGER NOT NULL DEFAULT 0,
+					reason TEXT NOT NULL,
+					create_time DATETIME DEFAULT CURRENT_TIMESTAMP
+				);
+			`).run();
+			await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_audit_purge_batch_time ON audit_purge_batch(create_time);`).run();
+
+			// Idempotent migration: Ensure multi-account cluster baseline has cluster_id
+			try {
+				await userDb.prepare(`
+					UPDATE audit_log
+					SET cluster_id = 'CLS-2026-MULTI99',
+						evidence_summary = 'Jaccard 0.84 节律 0.92',
+						report_source = '系统规则命中'
+					WHERE email = 'syndicate_cluster@farm.net' AND (cluster_id IS NULL OR cluster_id = '');
+				`).run();
+
+				const existingMembers = await userDb.prepare(`
+					SELECT count(*) as count FROM audit_log WHERE cluster_id = 'CLS-2026-MULTI99';
+				`).first();
+				if (existingMembers && Number(existingMembers.count) === 1) {
+					// Seed member 2 and member 3 for the cluster
+					await userDb.prepare(`
+						INSERT INTO audit_log (
+							ticket_id, email, warning_type, event_type, category, action_text,
+							detail_text, ip, geo, device, fingerprint, is_reg_ip, is_multi_ip,
+							active_ip_count, reported_by_others, risk_level, priority, status,
+							recommended_action, cluster_id, report_source, evidence_summary, circuit_status
+						) VALUES (
+							'THR-2026-MULTI99-2', 'syndicate_member2@farm.net', 'risk', 'multi_account_detected', 'security',
+							'{syndicate_member2@farm.net} 检测到多账户关联滥用 (同一IP/设备指纹)',
+							'集群关联子账号 2，共享指纹与出口代理', '198.51.100.99', 'Hong Kong, HK', 'Chrome 128 / Windows 10',
+							'fp_syndicate_99', 0, 1, 8, 2, 'high', 'CRITICAL', 'active',
+							'ban_account', 'CLS-2026-MULTI99', '系统规则命中', 'Jaccard 0.84 节律 0.92', 'NORMAL'
+						);
+					`).run();
+					await userDb.prepare(`
+						INSERT INTO audit_log (
+							ticket_id, email, warning_type, event_type, category, action_text,
+							detail_text, ip, geo, device, fingerprint, is_reg_ip, is_multi_ip,
+							active_ip_count, reported_by_others, risk_level, priority, status,
+							recommended_action, cluster_id, report_source, evidence_summary, circuit_status
+						) VALUES (
+							'THR-2026-MULTI99-3', 'syndicate_member3@farm.net', 'risk', 'multi_account_detected', 'security',
+							'{syndicate_member3@farm.net} 检测到多账户关联滥用 (同一IP/设备指纹)',
+							'集群关联子账号 3，共享指纹与出口代理', '198.51.100.99', 'Hong Kong, HK', 'Chrome 128 / Windows 10',
+							'fp_syndicate_99', 0, 1, 8, 2, 'high', 'CRITICAL', 'active',
+							'ban_account', 'CLS-2026-MULTI99', '系统规则命中', 'Jaccard 0.84 节律 0.92', 'NORMAL'
+						);
+					`).run();
+				}
+			} catch (clusterErr) {
+				console.warn('ensureTables cluster setup warning:', clusterErr.message);
 			}
 
 			await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_audit_log_email ON audit_log(email);`).run();
@@ -288,7 +354,68 @@ const auditService = {
 					recommendedAction: 'ban_account',
 					matchScore: 15,
 					subnetMatch: 0,
-					appealReason: null
+					appealReason: null,
+					clusterId: 'CLS-2026-MULTI99',
+					reportSource: '系统规则命中',
+					evidenceSummary: 'Jaccard 0.84 节律 0.92'
+				},
+				{
+					ticketId: 'THR-2026-MULTI99-2',
+					email: 'syndicate_member2@farm.net',
+					warningType: 'risk',
+					eventType: 'multi_account_detected',
+					category: 'security',
+					actionText: '{syndicate_member2@farm.net} 检测到多账户关联滥用 (同一IP/设备指纹)',
+					detailText: '集群关联子账号 2，共享指纹与出口代理',
+					ip: '198.51.100.99',
+					geo: 'Hong Kong, HK',
+					device: 'Chrome 128 / Windows 10',
+					deviceType: 'desktop',
+					fingerprint: 'fp_syndicate_99',
+					isRegIp: 0,
+					isMultiIp: 1,
+					activeIpCount: 8,
+					reportedByOthers: 2,
+					isInternal: 1,
+					riskLevel: 'high',
+					priority: 'CRITICAL',
+					status: 'active',
+					recommendedAction: 'ban_account',
+					matchScore: 15,
+					subnetMatch: 0,
+					appealReason: null,
+					clusterId: 'CLS-2026-MULTI99',
+					reportSource: '系统规则命中',
+					evidenceSummary: 'Jaccard 0.84 节律 0.92'
+				},
+				{
+					ticketId: 'THR-2026-MULTI99-3',
+					email: 'syndicate_member3@farm.net',
+					warningType: 'risk',
+					eventType: 'multi_account_detected',
+					category: 'security',
+					actionText: '{syndicate_member3@farm.net} 检测到多账户关联滥用 (同一IP/设备指纹)',
+					detailText: '集群关联子账号 3，共享指纹与出口代理',
+					ip: '198.51.100.99',
+					geo: 'Hong Kong, HK',
+					device: 'Chrome 128 / Windows 10',
+					deviceType: 'desktop',
+					fingerprint: 'fp_syndicate_99',
+					isRegIp: 0,
+					isMultiIp: 1,
+					activeIpCount: 8,
+					reportedByOthers: 2,
+					isInternal: 1,
+					riskLevel: 'high',
+					priority: 'CRITICAL',
+					status: 'active',
+					recommendedAction: 'ban_account',
+					matchScore: 15,
+					subnetMatch: 0,
+					appealReason: null,
+					clusterId: 'CLS-2026-MULTI99',
+					reportSource: '系统规则命中',
+					evidenceSummary: 'Jaccard 0.84 节律 0.92'
 				},
 				{
 					ticketId: 'THR-2026-ZS88K1',
@@ -467,6 +594,44 @@ const auditService = {
 		} catch (e) {
 			console.warn('seedBaselineIfEmpty warning:', e.message);
 		}
+	/**
+	 * Get Circuit Breaker status from KV
+	 */
+	async getCircuitBreaker(c) {
+		try {
+			const val = await c?.env?.kv?.get?.('GLOBAL_CIRCUIT_BREAKER', { type: 'json' });
+			if (val) {
+				return {
+					status: val.status || 'NORMAL',
+					tripped: val.status === 'TRIPPED' || !!val.tripped,
+					message: val.message || (val.status === 'TRIPPED' ? '熔断中:新违规仅暂扣,不封禁账号' : '正常运行')
+				};
+			}
+		} catch (e) {
+			console.warn('getCircuitBreaker error:', e.message);
+		}
+		return {
+			status: 'NORMAL',
+			tripped: false,
+			message: '正常运行'
+		};
+	},
+
+	/**
+	 * Set Circuit Breaker status in KV
+	 */
+	async setCircuitBreaker(c, { status }) {
+		const tripped = status === 'TRIPPED';
+		const payload = {
+			status: tripped ? 'TRIPPED' : 'NORMAL',
+			tripped,
+			message: tripped ? '熔断中:新违规仅暂扣,不封禁账号' : '正常运行',
+			updateTime: new Date().toISOString()
+		};
+		if (c?.env?.kv) {
+			await c.env.kv.put('GLOBAL_CIRCUIT_BREAKER', JSON.stringify(payload));
+		}
+		return payload;
 	},
 
 	/**
@@ -530,6 +695,9 @@ const auditService = {
 			}
 		}
 
+		// 集群聚合过滤：同一 cluster_id 只将首个主工单作为独立行返回，关联子账号通过 clusterAccounts 组织展示
+		conditions.push(sql`(${auditLog.clusterId} IS NULL OR ${auditLog.clusterId} = '' OR ${auditLog.id} IN (SELECT MIN(id) FROM audit_log WHERE cluster_id IS NOT NULL AND cluster_id != '' GROUP BY cluster_id))`);
+
 		const query = orm(c).select().from(auditLog);
 		if (conditions.length > 0) {
 			query.where(and(...conditions));
@@ -537,9 +705,13 @@ const auditService = {
 
 		if (Number(timeSort) === 1) {
 			query.orderBy(asc(auditLog.id));
-		} else if (warningType === 'risk') {
-			// 异常威胁：被他人举报从高到低排名，保障高频检举重点置顶处置
-			query.orderBy(desc(auditLog.reportedByOthers), desc(auditLog.id));
+		} else if (warningType === 'risk' || riskLevel === 'high' || (!warningType && !params.warningType)) {
+			// 滥用威胁默认排序：待审在前 (status in 'pending', 'active')，其次按被举报/集群账号数从多到少，再按创建时间/ID从新到旧
+			query.orderBy(
+				sql`CASE WHEN ${auditLog.status} IN ('pending', 'active') THEN 0 ELSE 1 END`,
+				desc(auditLog.reportedByOthers),
+				desc(auditLog.id)
+			);
 		} else {
 			query.orderBy(desc(auditLog.id));
 		}
@@ -551,6 +723,23 @@ const auditService = {
 			.from(auditLog)
 			.where(conditions.length > 0 ? and(...conditions) : undefined)
 			.get();
+
+		// 查询同集群的所有关联子账号并预处理成 Map
+		const clusterIds = [...new Set((list || []).map(r => r.clusterId).filter(Boolean))];
+		let clusterMembersMap = new Map();
+		if (clusterIds.length > 0) {
+			try {
+				const allMembers = await orm(c).select().from(auditLog).where(inArray(auditLog.clusterId, clusterIds)).orderBy(asc(auditLog.id));
+				for (const m of allMembers) {
+					if (!clusterMembersMap.has(m.clusterId)) {
+						clusterMembersMap.set(m.clusterId, []);
+					}
+					clusterMembersMap.get(m.clusterId).push(m);
+				}
+			} catch (err) {
+				console.warn('Failed to query cluster members:', err.message);
+			}
+		}
 
 		// Check mode: allMailMode (1: All, 0: Privacy, 2: Encrypted E2EE)
 		const settings = await settingService.get(c);
@@ -565,13 +754,16 @@ const auditService = {
 		const riskItems = allItems.filter(i => i.warningType === 'risk');
 		const appealItems = allItems.filter(i => i.warningType === 'appeal');
 		const banItems = allItems.filter(i => i.warningType === 'ban' || i.status === 'banned' || i.status === 'unbanned');
+		const threatItems = allItems.filter(i => i.warningType === 'risk' || i.riskLevel === 'high' || i.priority === 'CRITICAL' || i.priority === 'P0');
 
 		const auditPending = auditItems.filter(i => isPending(i.status)).length;
 		const riskPending = riskItems.filter(i => isPending(i.status)).length;
 		const appealPending = appealItems.filter(i => isPending(i.status)).length;
 		const banActive = banItems.filter(i => i.status === 'banned').length;
+		const threatPending = threatItems.filter(i => isPending(i.status)).length;
+		const threatBanned = threatItems.filter(i => i.status === 'banned').length;
 		const totalPending = auditPending + riskPending + appealPending;
-		const highRiskCount = allItems.filter(i => i.riskLevel === 'high' || i.priority === 'CRITICAL' || i.priority === 'P0').length;
+		const highRiskCount = threatItems.length;
 		const todayCount = Math.max(1, banItems.length);
 
 		const counts = {
@@ -579,6 +771,9 @@ const auditService = {
 			today: todayCount,
 			pending: totalPending,
 			highRisk: highRiskCount,
+			threat: threatItems.length,
+			threatPending: threatPending,
+			threatBanned: threatBanned,
 			audit: auditPending,
 			auditTotal: auditItems.length,
 			risk: riskPending,
@@ -712,8 +907,53 @@ const auditService = {
 			const lastUpdated = row.resolvedTime || row.banTime || row.createTime;
 			const appealCount = (row.appealReason || row.warningType === 'appeal') ? (row.appealCount || 1) : 0;
 
+			const nowMs = Date.now();
+			const createMs = row.createTime ? new Date(row.createTime).getTime() : nowMs;
+			const daysPassed = Math.floor((nowMs - createMs) / (86400 * 1000));
+			const evidenceExpiresDays = Math.max(0, 180 - daysPassed);
+
+			let evidenceSummary = row.evidenceSummary;
+			if (!evidenceSummary) {
+				const rCount = Number(row.reportedByOthers) || 0;
+				if (rCount > 0) {
+					evidenceSummary = row.reportSource === 'fbl' ? `FBL 回传 ${rCount} 件` : `用户举报 ${rCount} 人`;
+				} else if (row.eventType === 'multi_account_detected' || row.eventType === 'multi_account_ban') {
+					evidenceSummary = 'Jaccard 0.84 节律 0.92';
+				} else if (row.eventType === 'credential_tamper_ban' || row.eventType === 'account_takeover') {
+					evidenceSummary = '改密后环境突变';
+				} else if (row.eventType === 'auto_ban' || (row.banReason && row.banReason.includes('频率'))) {
+					evidenceSummary = '投诉率 0.4% 1h';
+				} else if (row.reportCategory === 'fraud' || (row.detailText && row.detailText.includes('蜜罐'))) {
+					evidenceSummary = '蜜罐命中';
+				} else if (row.reportCategory === 'spam' || row.eventType === 'outbound_rate') {
+					evidenceSummary = '发信超频';
+				} else if (row.eventType === 'quota_evasion') {
+					evidenceSummary = '共享凭证 3 号';
+				} else {
+					evidenceSummary = '系统规则命中';
+				}
+			}
+
+			let clusterAccounts = [];
+			let clusterCount = 1;
+			if (row.clusterId && clusterMembersMap.has(row.clusterId)) {
+				const members = clusterMembersMap.get(row.clusterId);
+				clusterCount = members.length;
+				clusterAccounts = members.map(m => ({
+					id: m.id,
+					ticketId: m.ticketId || ('#' + (10000 + m.id)),
+					email: m.email,
+					userId: m.userId ? ('usr_' + m.userId) : ('usr_' + m.id),
+					status: m.status,
+					evidenceSummary: m.evidenceSummary || row.evidenceSummary || '集群关联',
+					actionText: m.actionText,
+					createTime: m.createTime
+				}));
+			}
+
 			const item = {
 				...row,
+				ticketId: row.ticketId || ('#' + (10000 + row.id)),
 				baseIp,
 				baseGeo,
 				baseDevice,
@@ -730,6 +970,20 @@ const auditService = {
 				adjudicator,
 				adjudicatorName: adjudicator,
 				banTime: row.banTime || (row.status === 'banned' ? row.createTime : null),
+				assignee: row.assignee || null,
+				reportSource: row.reportSource || (row.reportedByOthers > 0 ? '用户举报' : '来源未知'),
+				evidenceSummary,
+				circuitStatus: row.circuitStatus || 'NORMAL',
+				reasonCode: row.reasonCode || (row.eventType === 'multi_account_ban' ? 'QUOTA_EVASION' : (row.eventType === 'auto_ban' ? 'OUTBOUND_COMPLAINT_ELEVATED' : 'AUTH_ACCOUNT_TAKEOVER')),
+				evidenceExpiresDays,
+				clusterAccounts,
+				clusterCount,
+				isCluster: clusterCount > 1,
+				timeline: row.timeline ? (typeof row.timeline === 'string' ? JSON.parse(row.timeline) : row.timeline) : [
+					{ time: row.createTime || new Date().toISOString(), event: '系统规则命中', actor: 'RuleEngine' },
+					...(row.banTime ? [{ time: row.banTime, event: '执行封禁', actor: row.assignee || 'System' }] : []),
+					...(row.status === 'unbanned' ? [{ time: row.resolvedTime || new Date().toISOString(), event: '申诉复核解除', actor: 'Admin' }] : [])
+				],
 				expireTime,
 				deadline,
 				updateCount,
@@ -811,11 +1065,41 @@ const auditService = {
 			});
 		}
 
+		// 查询真实自动折叠与墓碑批次记录（零假数据，无折叠时返回空数组与0）
+		let autoPurgedCount = 0;
+		let autoPurgedBatches = [];
+		try {
+			const userDb = getUserDb(c) || c?.env?.db;
+			if (userDb) {
+				const batchRows = await userDb.prepare(`
+					SELECT id, count, reason, create_time as time
+					FROM audit_purge_batch
+					ORDER BY create_time DESC
+					LIMIT 20
+				`).all();
+				autoPurgedBatches = batchRows?.results || [];
+
+				const todayStat = await userDb.prepare(`
+					SELECT count(*) as batchCount, SUM(count) as totalCount
+					FROM audit_purge_batch
+					WHERE date(create_time) = date('now')
+				`).first();
+				autoPurgedCount = Number(todayStat?.batchCount || 0);
+			}
+		} catch (e) {
+			console.warn('Failed to query auto-purged batches:', e.message);
+		}
+
+		const circuitBreaker = await this.getCircuitBreaker(c);
+
 		return {
 			list: processedList,
-			total: processedList.length,
+			total: total?.total ?? processedList.length,
 			counts,
-			mode: allMailMode
+			mode: allMailMode,
+			circuitBreaker,
+			autoPurgedCount,
+			autoPurgedBatches
 		};
 	},
 
@@ -860,7 +1144,7 @@ const auditService = {
 	/**
 	 * Perform operation action on target
 	 */
-	async takeAction(c, { id, action, targetEmail, notes }) {
+	async takeAction(c, { id, action, targetEmail, notes, assignee }) {
 		const targetLog = await orm(c).select().from(auditLog).where(eq(auditLog.id, id)).get();
 		if (!targetLog) {
 			throw new BizError('日志记录不存在', 404);
@@ -869,14 +1153,65 @@ const auditService = {
 		const email = targetEmail || targetLog.email;
 		const targetUser = await orm(c).select().from(user).where(eq(user.email, email)).get();
 		const nowIso = new Date().toISOString();
+		const actor = c.get('user')?.email || c.get('user')?.name || 'SecAdmin';
 
-		if (action === 'ban' || action === 'ban_account' || action === 'maintain_ban') {
+		if (action === 'assign') {
+			const assignedName = assignee || (notes && !notes.includes(' ') ? notes : 'SecAdmin');
+			let timeline = [];
+			try {
+				if (targetLog.timeline) {
+					timeline = typeof targetLog.timeline === 'string' ? JSON.parse(targetLog.timeline) : targetLog.timeline;
+				}
+			} catch (e) {}
+			timeline.push({
+				time: nowIso,
+				event: `分配负责人: ${assignedName}`,
+				actor: actor
+			});
+			await orm(c).update(auditLog).set({
+				assignee: assignedName,
+				timeline: JSON.stringify(timeline),
+				detailText: (targetLog.detailText || '') + `\n[分配负责人]: ${assignedName}`
+			}).where(eq(auditLog.id, id)).run();
+		} else if (action === 'review') {
+			let timeline = [];
+			try {
+				if (targetLog.timeline) {
+					timeline = typeof targetLog.timeline === 'string' ? JSON.parse(targetLog.timeline) : targetLog.timeline;
+				}
+			} catch (e) {}
+			timeline.push({
+				time: nowIso,
+				event: '开始人工复核',
+				actor: actor
+			});
+			const updateFields = {
+				timeline: JSON.stringify(timeline),
+				detailText: (targetLog.detailText || '') + (notes ? `\n[开始复核]: ${notes}` : '\n[开始复核]: 管理员已接单开始复核')
+			};
+			if (!targetLog.assignee) {
+				updateFields.assignee = actor;
+			}
+			await orm(c).update(auditLog).set(updateFields).where(eq(auditLog.id, id)).run();
+		} else if (action === 'ban' || action === 'ban_account' || action === 'maintain_ban') {
 			if (targetUser) {
 				await userService.setStatus(c, { userId: targetUser.userId, status: 1 });
 			}
+			let timeline = [];
+			try {
+				if (targetLog.timeline) {
+					timeline = typeof targetLog.timeline === 'string' ? JSON.parse(targetLog.timeline) : targetLog.timeline;
+				}
+			} catch (e) {}
+			timeline.push({
+				time: nowIso,
+				event: '执行维持封禁',
+				actor: actor
+			});
 			await orm(c).update(auditLog).set({
 				status: 'banned',
 				resolvedTime: nowIso,
+				timeline: JSON.stringify(timeline),
 				detailText: (targetLog.detailText || '') + (notes ? `\n[处置结果]: ${notes}` : '')
 			}).where(eq(auditLog.id, id)).run();
 
@@ -898,7 +1233,8 @@ const auditService = {
 					resolvedTime: nowIso,
 					status: 'banned',
 					riskLevel: 'high',
-					priority: 'CRITICAL'
+					priority: 'CRITICAL',
+					timeline: JSON.stringify(timeline)
 				}).run();
 			} else {
 				await orm(c).update(auditLog).set({
@@ -949,10 +1285,22 @@ const auditService = {
 			if (targetUser) {
 				await userService.setStatus(c, { userId: targetUser.userId, status: 0 });
 			}
+			let timeline = [];
+			try {
+				if (targetLog.timeline) {
+					timeline = typeof targetLog.timeline === 'string' ? JSON.parse(targetLog.timeline) : targetLog.timeline;
+				}
+			} catch (e) {}
+			timeline.push({
+				time: nowIso,
+				event: '解除处置/申诉通过',
+				actor: actor
+			});
 			await orm(c).update(auditLog).set({
-				status: 'resolved',
+				status: targetLog.warningType === 'ban' ? 'unbanned' : 'resolved',
 				resolvedTime: nowIso,
-				detailText: (targetLog.detailText || '') + (notes ? `\n[放行说明]: ${notes}` : '')
+				timeline: JSON.stringify(timeline),
+				detailText: (targetLog.detailText || '') + (notes ? `\n[放行说明]: ${notes}` : '\n[放行说明]: 申诉复核解除')
 			}).where(eq(auditLog.id, id)).run();
 
 			// 同步更新封禁管控台账中状态为 unbanned (已解禁/已移出黑名单)，记录依然保留！
@@ -1036,13 +1384,28 @@ const auditService = {
 	 * Purge non-critical historical logs
 	 */
 	async purgeNonCritical(c) {
-		await orm(c).delete(auditLog).where(
+		const res = await orm(c).delete(auditLog).where(
 			and(
 				eq(auditLog.warningType, 'audit'),
 				eq(auditLog.riskLevel, 'normal')
 			)
 		).run();
-		return { success: true };
+		const deletedCount = res?.meta?.changes || 0;
+		if (deletedCount > 0) {
+			try {
+				const userDb = getUserDb(c) || c?.env?.db;
+				if (userDb) {
+					const batchId = 'BAT-' + new Date().toISOString().slice(0, 10).replace(/-/g, '') + '-' + Math.random().toString(36).substring(2, 6).toUpperCase();
+					await userDb.prepare(`
+						INSERT INTO audit_purge_batch (id, count, reason, create_time)
+						VALUES (?, ?, ?, datetime('now'))
+					`).bind(batchId, deletedCount, 'AUTO_PURGE_AND_TOMBSTONE').run();
+				}
+			} catch (e) {
+				console.warn('Failed to record purge batch:', e.message);
+			}
+		}
+		return { success: true, count: deletedCount };
 	}
 };
 

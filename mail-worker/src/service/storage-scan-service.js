@@ -2,6 +2,8 @@ import { getUserDb, getMailDb, isDualDbMode } from '../utils/db-accessor';
 import settingService from './setting-service';
 import s3Service from './s3-service';
 import r2Service from './r2-service';
+import user from '../entity/user';
+import { eq } from 'drizzle-orm';
 
 const storageScanService = {
 	/**
@@ -224,6 +226,35 @@ const storageScanService = {
 					await Promise.all(listResult.keys.map(k => c.env.kv.delete(k.name)));
 					cleanedCount += listResult.keys.length;
 				}
+
+				// 深度清理历史孤儿键：检查 HAS_WELCOME_ 与 USER_KNOWN_ENV_ 是否存在对应 D1 用户
+				const welcomeList = await c.env.kv.list({ prefix: 'HAS_WELCOME_', limit: 200 });
+				if (welcomeList?.keys?.length) {
+					for (const k of welcomeList.keys) {
+						const uid = Number(k.name.replace('HAS_WELCOME_', ''));
+						if (uid) {
+							const exists = await getUserDb(c).select({ userId: user.userId }).from(user).where(eq(user.userId, uid)).get();
+							if (!exists) {
+								await c.env.kv.delete(k.name);
+								cleanedCount++;
+							}
+						}
+					}
+				}
+
+				const envList = await c.env.kv.list({ prefix: 'USER_KNOWN_ENV_', limit: 200 });
+				if (envList?.keys?.length) {
+					for (const k of envList.keys) {
+						const uid = Number(k.name.replace('USER_KNOWN_ENV_', ''));
+						if (uid) {
+							const exists = await getUserDb(c).select({ userId: user.userId }).from(user).where(eq(user.userId, uid)).get();
+							if (!exists) {
+								await c.env.kv.delete(k.name);
+								cleanedCount++;
+							}
+						}
+					}
+				}
 			} catch (e) {
 				console.warn('Storage cleanup error:', e.message);
 			}
@@ -233,7 +264,7 @@ const storageScanService = {
 			ok: true,
 			cleanedCount,
 			durationMs: Date.now() - startTime,
-			message: `存储空间安全清理完成，共回收 ${cleanedCount} 个临时缓存键。`
+			message: `存储空间安全清理完成，共回收 ${cleanedCount} 个临时与孤儿缓存键。`
 		};
 	}
 };

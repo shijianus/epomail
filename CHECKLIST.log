@@ -7,6 +7,66 @@
 > 制度规范与工作流指引请见 [AGENTS.md](file:///home/shijian/projects/epocanvas-mail/AGENTS.md)。
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
+### 用户物理删除 (physicsDelete) 深度清理 KV 孤儿键与 User 9 漏洞修复 (2026-10-11)
+*   **关联提交 (Git Commit)**: `5d06b0118edea7a1517d81f65a3be7e1c008fefa` (Short: `5d06b01`)
+*   **部署环境 (Deployment)**: `本地全真栈 (fix/abuse-table-columns 分支)`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 修复 User 9 静默跳过漏洞：彻底移除 `user-service.js` 中历史残留的 `id !== 9` 硬编码过滤，保障 User ID 9 与任意合法非超管用户在物理删除时 D1 与 KV 数据完整销毁，彻底消除 `auth-uid:9` 孤儿会话键遗留；超级管理员 User 1 保持 403 严格防误删拦截；
+    - [x] 元数据前置提取与锁定计数清扫：在执行 D1 级联物理删除前，预先从 D1 查询提取所有待删用户的 `email` 以及名下关联信箱的 `email` 和 `name`；规范化大小写后深度清理所有 `login_fail:{email}`、`login_fail:{alias}` 与 `login_fail:{username}` 锁定计数键，杜绝删除用户后同邮箱重新注册继承 12h 暴力锁定状态的隐患；
+    - [x] 欢迎邮件与环境指纹基线清扫：补齐清扫所有待删用户的 `HAS_WELCOME_{id}` 欢迎邮件已读/生成标记，以及 `USER_KNOWN_ENV_{id}` 180 天长效环境指纹基线，杜绝隐私与衍生缓存残留；
+    - [x] 当日发信量精准扣减：在物理删除前统计待删用户当日发送的邮件数量（`type=1` 且当天创建），精准扣减全局 `send_day_count:{date}` 计数器；若扣减后当日总发信量归零则物理回收该键，实现测试发信衍生键自动闭环，同时维护生产全局配额统计准确性；
+    - [x] 风控 IP 聚集计数器清洗：扫描 `risk_ip_acc:` 前缀键，将已物理删除的用户 ID 从聚集列表中剔除；若某 IP 下的全部关联账号均已被删除，则直接物理回收该 `risk_ip_acc:{ip}` 键；
+    - [x] 设备信任、PAT Token 与 OAuth 撤销全链条清理：联动清理 `USER_PROFILE_{id}` 解析出的 `API_TOKEN_*` 个人访问令牌、`dev_trust:*:{id}` 设备信任记录、`REVOKED_GRANT_{id}_*` 授权撤销键及 `HAS_GLOBAL_EMAIL_{id}_*` 广播邮件标记；
+    - [x] 存储扫描自愈与单信箱删除联动：`account-service.js` 单独物理删除别名信箱时联动清理该信箱的 `login_fail` 键；`storage-scan-service.js:cleanup` 增加对无主 `HAS_WELCOME_` 与 `USER_KNOWN_ENV_` 孤儿键的自愈清理兜底能力。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 自动化端到端测试：`tests/test-physics-delete-kv-cleanup-e2e.mjs` 32/32 项全绿通过 (覆盖 23 个实测孤儿衍生键注入与 100% 清扫回收)；
+    - [x] 关联附件级联删除测试：`tests/test-attachment-cascade-deletion.mjs` 21/21 项断言全绿通过；
+    - [x] 安全操作通知测试套件：`tests/test-security-notices-e2e.mjs` 954/954 项全绿通过；
+    - [x] 多语言对称核验：`node scripts/i18n-symmetry.mjs` 验证 6 语言字典 100% 绝对对称；
+    - [x] 前端构建核验：`mail-vue` Vite 构建通过 (耗时 21.47s，零报错)；
+    - [x] 零假数据残留：删除后实测 KV 与 D1 达成绝对零残留。
+
+### 「滥用威胁」清除假数据与集群聚合操作真实持久化架构落地 (2026-10-10)
+*   **关联提交 (Git Commit)**: `e4558907ae04171b0996243a6ddcbf4cfaf1456d` (Short: `e455890`), `b001b9736de9f7522b79cea8c9ad875857a5e950` (Short: `b001b97`)
+*   **部署环境 (Deployment)**: `本地全真栈 (fix/abuse-table-columns 分支)`
+*   **功能需求与架构闭环清单 (Changes & Architectural Alignment)**:
+    - [x] 零假数据全面治理：彻底移除前端与后端服务中硬编码的假数据与假批次 (`autoPurgedCount: 3`、`BAT-20261010-01` 等写死假数据)，新建 D1 `audit_purge_batch` 真实折叠批次表并建立索引，无折叠批次时返回空数组与 0，弹窗呈现规范空状态；
+    - [x] 底层真实集群聚合架构落地：在 D1 SQL 条件中自动收敛同 `cluster_id` 的记录，仅将首个主工单作为独立顶级行返回；同集群关联子账号从 D1 真实查询并组织为 `clusterAccounts`，在前端支持行内展开折叠、逐子账号勾选、一键连坐与精准豁免；
+    - [x] 全流程操作真持久化落库：后端 `audit-service.js` 扩展支持 `assign` (分配负责人) 与 `review` (开始复核) 动作，操作完整写入 D1 `audit_log` 字段、管理员留名及 `timeline` 时间线追踪；前端单行及批量「分配负责人」「开始复核」「解除」均真实调用 `/api/audit/action` 并在落库后自动刷新列表；
+    - [x] 全局熔断状态动态化：后端通过 KV `GLOBAL_CIRCUIT_BREAKER` 真实读取熔断状态并新增管理接口，前端熔断条由真实状态响应，杜绝静态伪熔断；
+    - [x] 6 语言 i18n 绝对对称与零未包裹文本：新增 `abuseReasonCodeLabel`, `abuseEvidenceRetentionLabel`, `abuseLifecycleTimelineTitle`, `abuseEmptyAutoPurged` 词条，`i18n-symmetry.mjs` 核验 2694 键 100% 绝对对称，消除详情抽屉内残留硬编码。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：`mail-vue` Vite 构建通过 (耗时 13.16s，零报错)；
+    - [x] 多语言对称核验：`node scripts/i18n-symmetry.mjs` 验证 6 语言 2694 keys 100% 绝对对称 (`ALL SYMMETRIC`)；
+    - [x] 静态与硬编码审计：`node scripts/i18n-hardcoded.mjs` 审核通过；
+    - [x] 列集与排版核验：`tests/verify-audit-section-columns.mjs` 6 大专项 100% 通过；`tests/verify-audit-ui-optimization.mjs` 19 项全绿通过；
+    - [x] 全真断言与截图套件：`tests/verify-abuse-table-polish.mjs` 5 大分辨率全量 50 项断言 100% 通过并完成最新截图验证；
+    - [x] 零假数据残留：数据库与 KV 状态全面由真实数据驱动，无假数据残留。
+
+### 「滥用威胁」工单列表列集重构与交互优化 (2026-10-10)
+*   **关联提交 (Git Commit)**:
+    - 阶段 1: `3be10b0` (`refactor(abuse): 重构列集为 7 列并固定列宽`)
+    - 阶段 2: `65e9df5` (`feat(abuse): 对象列邮箱换行与长地址分级显示`)
+    - 阶段 3: `3661877` (`feat(abuse): 状态词表、分类证据摘要与处理列`)
+    - 阶段 4: `db4d771` (`feat(abuse): 响应式卡片布局`)
+    - 阶段 5: `72894c4` (`feat(abuse): 统计卡片拆分与熔断状态条`)
+    - 阶段 6: `c0c7fd9` (`test(abuse): 截图与断言验证`)
+*   **部署环境 (Deployment)**: `本地全真栈 (fix/abuse-table-columns 分支)`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 目标列集 (7 列) 锁定与布局：原生 `<table>` + `<colgroup>` + `table-layout: fixed`，严格锁定选择(40px)、编号(72px)、对象(`clamp(180px, 22%, 260px)`)、状态(96px)、分类(min 190px)、处理(120px)、操作(64px)；表头文字 ≤ 3 汉字，操作列包含「详情」与「⋯」下拉菜单；
+    - [x] 状态词表与视觉呈现：待审(琥珀色)、已封禁(红色)、已解除(绿色)、熔断暂扣(主标签待审 + 第 2 行小标签熔断)；彻底消除旧式「生效中·已封禁」合并写法；
+    - [x] 分类与证据摘要：固定 5 类（协议违规、一人多号、账户倒手、外发滥用、配额规避），摘要由后端按模板生成（≤ 14 汉字，带来源说明）；
+    - [x] 对象列换行与分级显示：邮箱在 `@` 和域名 `.` 后插入零宽空格 (`\u200B`) 优先断行；80/160 字符分级与「长地址」徽标；悬停展示复制图标（支持 Unicode 与 IDN Punycode 备选）；集群工单「N 个账号」行内展开子账号与逐账号精准勾选；已清除账号显示「已清除」+ `usr_ID`；
+    - [x] 处理列整合双行展示：第 1 行建议/结论（建议封禁/维持封禁/申诉通过/熔断暂扣），第 2 行处理时间与负责人（未处理显示 `-`）；
+    - [x] 响应式卡片布局 (≤ 860px)：隐藏 `<thead>` 与 `<colgroup>`，切换为纵向字段卡片；全断点 (1440, 1024, 860, 768, 375) 无横向滚动条，零省略号，零单元格内容裁切；
+    - [x] 统计卡片拆分与熔断增强：顶部滥用威胁卡片拆分为「待审 N / 已封禁 M」；支持 Global Circuit Breaker 处于 TRIPPED 时的顶部熔断状态条；支持自动折叠批次入口与明细弹窗；批量操作仅开放「分配负责人」「开始复核」「解除」；详情抽屉展示完整原因码、证据链、时间线与 180 天留存期；
+    - [x] 6 语言 i18n 绝对对称：补充 40 个 `abuse*` 词条，`i18n-symmetry.mjs` 测试 2690 keys 100% 绝对对称。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：`mail-vue` Vite 构建通过 (15.15s)；
+    - [x] 多语言对称核验：6 语言 2690 键 100% 绝对对称 (`ALL SYMMETRIC`)；
+    - [x] 本地回归测试：`tests/verify-audit-section-columns.mjs` 6 大专项 100% 通过；`tests/verify-audit-ui-optimization.mjs` 19 项全绿通过；
+    - [x] 全真断言与截图套件：`tests/verify-abuse-table-polish.mjs` 覆盖 7 种测试数据、5 种屏幕尺寸全量 50 项断言通过并生成截图至 `doc/validation/abuse-table/`；
+    - [x] 零假数据残留：Mock/Fixture 数据隔离，数据库零脏数据。
 
 ### 风控系统冷启动全真栈复测（危险操作模拟 × Admin 处置 × 操作报告板块 · 暴露 user-id9 静默不可删缺陷） (2026-10-11)
 *   **关联提交 (Git Commit)**: `7d9bee33db85d44a1b18f055d60cbe16a1a351f4` (Short: `7d9bee3`)
