@@ -9,7 +9,7 @@
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
 ### 风控系统冷启动全真栈复测（危险操作模拟 × Admin 处置 × 操作报告板块 · 暴露 user-id9 静默不可删缺陷） (2026-10-11)
-*   **关联提交 (Git Commit)**: `待回填` (Short: `待回填`)
+*   **关联提交 (Git Commit)**: `7d9bee33db85d44a1b18f055d60cbe16a1a351f4` (Short: `7d9bee3`)
 *   **部署环境 (Deployment)**: `本地全真栈 (wrangler dev + D1 + KV @127.0.0.1:8787)`，workerd 与 CF Workers 生产同运行时；本次为 **清空 .wrangler/state 冷启动**（原状态已备份至 `.wrangler/state.bak-20261011-193024-riskctl`），仅凭 `/api/init/<jwt_secret>` 端到端完成 6 标准角色播种 + 双管理员初始化（冷启动引导链红线验证通过）
 *   **功能需求与变更清单 (Changes & Feature Alignment)**:
     - [x] 纯测试任务，**零代码修改**：`git fetch origin` 确认远端无新提交（`master..origin/master` 为空），无需合并；本地领先 5 提交未推送（遵嘱本次不推送远端）；
