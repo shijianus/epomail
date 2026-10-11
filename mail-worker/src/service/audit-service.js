@@ -594,6 +594,8 @@ const auditService = {
 		} catch (e) {
 			console.warn('seedBaselineIfEmpty warning:', e.message);
 		}
+	},
+
 	/**
 	 * Get Circuit Breaker status from KV
 	 */
