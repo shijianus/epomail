@@ -9,7 +9,7 @@
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
 ### 风控系统全真栈端到端专项测试（危险操作模拟 × Admin 处置 × 操作报告板块可用性） (2026-10-11)
-*   **关联提交 (Git Commit)**: `389ad5bb2cec2ea3bdd iteration placeholder` (Short: `<待回填>`)
+*   **关联提交 (Git Commit)**: `0c8c9301b9d382870a0da86a6c8734fb0969a4de` (Short: `0c8c930`)
 *   **部署环境 (Deployment)**: `本地全真栈 (wrangler dev + D1 + KV @127.0.0.1:8787)`，基线代码 origin/master a67feed 合并后构建
 *   **功能需求与变更清单 (Changes & Feature Alignment)**:
     - [x] 拉取远端 origin/master (d843967..a67feed，共 47 个安全审计控制台相关提交) 并与本地合并，合并无冲突（本次未做任何远端推送）；
