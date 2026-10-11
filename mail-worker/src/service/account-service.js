@@ -12,6 +12,7 @@ import turnstileService from './turnstile-service';
 import roleService from './role-service';
 import { t } from '../i18n/i18n';
 import verifyRecordService from './verify-record-service';
+import KvConst from '../const/kv-const';
 
 const accountService = {
 
@@ -284,8 +285,26 @@ const accountService = {
 		if (aid === 1) {
 			throw new BizError('系统主站长信箱（Account 1）禁止物理删除！', 403);
 		}
+		let targetAcc = null;
+		try {
+			targetAcc = await orm(c).select().from(account).where(eq(account.accountId, aid)).get();
+		} catch (e) {}
+
 		await emailService.physicsDeleteByAccountId(c, aid);
 		await orm(c).delete(account).where(eq(account.accountId, aid)).run();
+
+		if (targetAcc && c.env?.kv) {
+			try {
+				if (targetAcc.email) {
+					await c.env.kv.delete(KvConst.LOGIN_FAIL + targetAcc.email.trim().toLowerCase()).catch(() => {});
+					await c.env.kv.delete(KvConst.LOGIN_FAIL + targetAcc.email.trim()).catch(() => {});
+				}
+				if (targetAcc.name) {
+					await c.env.kv.delete(KvConst.LOGIN_FAIL + targetAcc.name.trim().toLowerCase()).catch(() => {});
+					await c.env.kv.delete(KvConst.LOGIN_FAIL + targetAcc.name.trim()).catch(() => {});
+				}
+			} catch (e) {}
+		}
 	},
 
 	async setAllReceive(c, params, userId) {
