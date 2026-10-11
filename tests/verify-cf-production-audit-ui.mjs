@@ -143,7 +143,7 @@ async function run() {
     console.log('\n[检视 4] 表头集成筛选器与排序列箭头核验:');
     const filterTriggers = await page.$$('.col-filter-header .filter-trigger');
     const sortTriggers = await page.$$('.col-filter-header .header-action-trigger');
-    ok(filterTriggers.length >= 3, `表头成功集成筛选器下拉触点 (实际触点数: ${filterTriggers.length})`);
+    ok(filterTriggers.length >= 8, `表头成功集成 9 大列筛选器下拉触点 (实际触点数: ${filterTriggers.length})`);
     ok(sortTriggers.length >= 1, `表头成功集成时间排序列箭头触点 (实际触点数: ${sortTriggers.length})`);
 
     // 点击身分组筛选并检查下拉菜单内容
@@ -168,29 +168,31 @@ async function run() {
     const allValidTicketIds = ticketIds.every(id => /^#[A-Z0-9]{4,6}$/.test(id));
     ok(allValidTicketIds, `工单编号均符合 #开头不超过6位大写字母与数字规范 (例如 #AK1789)`);
 
-    // 2. 身分组呈现
-    const identityTags = await page.$$eval('.identity-cell .identity-tag', els => els.map(e => e.textContent?.trim()));
-    ok(identityTags.length >= 1, `身分组正常渲染 (渲染数: ${identityTags.length}, 样本: ${identityTags[0]})`);
+    // 2. 身分组呈现 (纯文本无边框)
+    const identityTexts = await page.$$eval('.identity-cell .plain-identity-text', els => els.map(e => e.textContent?.trim()));
+    ok(identityTexts.length >= 1, `身分组采用纯文本无边框正常渲染 (渲染数: ${identityTexts.length}, 样本: ${identityTexts[0]})`);
 
-    // 3. 报警次数呈现
-    const alarmCounts = await page.$$eval('.alarm-count-cell .alarm-count-badge', els => els.map(e => e.textContent?.trim()));
-    ok(alarmCounts.length >= 1, `报警次数正常渲染且带单位 (渲染数: ${alarmCounts.length}, 样本: ${alarmCounts[0]})`);
+    // 3. 报警次数呈现 (纯文本无边框)
+    const alarmCounts = await page.$$eval('.alarm-count-cell .plain-alarm-count', els => els.map(e => e.textContent?.trim()));
+    ok(alarmCounts.length >= 1, `报警次数采用纯文本无边框正常渲染且带单位 (渲染数: ${alarmCounts.length}, 样本: ${alarmCounts[0]})`);
 
-    // 4. 拍案管理呈现
-    const authorities = await page.$$eval('.authority-cell .authority-badge', els => els.map(e => e.textContent?.trim()));
-    ok(authorities.length >= 1, `拍案管理最终裁决权正常渲染 (渲染数: ${authorities.length}, 样本: ${authorities[0]})`);
+    // 4. 处理建议呈现 (纯文本无边框)
+    const suggestionTexts = await page.$$eval('.suggestion-cell .plain-suggestion-text', els => els.map(e => e.textContent?.trim()));
+    ok(suggestionTexts.length >= 1, `处理建议采用纯文本无边框正常渲染 (渲染数: ${suggestionTexts.length}, 样本: ${suggestionTexts[0]})`);
 
-    // 5. 操作列居中呈现唯一的 action-detail-btn
+    // 5. 拍案管理呈现 (与负责人格式一致，直接写管理员名称并允许点击到用户详情)
+    const operatorLinks = await page.$$('.operator-name-link');
+    ok(operatorLinks.length >= 2, `负责人与拍案管理均渲染为管理员纯名称链接 (实际总数: ${operatorLinks.length})`);
+
+    // 6. 操作列居中呈现唯一的 action-detail-btn
     const detailBtnCount = await page.$$eval('.action-cell .action-detail-btn', els => els.length);
     ok(detailBtnCount >= 1, `表格操作列在居中容器内呈现查看详情 (实际: ${detailBtnCount})`);
 
-    const operatorLinks = await page.$$('.operator-name-link');
-    ok(operatorLinks.length >= 1, `负责人列为纯名称点击链接 (实际: ${operatorLinks.length})`);
     if (operatorLinks.length > 0) {
       await operatorLinks[0].click();
       await page.waitForTimeout(600);
       const dialogVisible = await page.$('.operator-account-dialog');
-      ok(!!dialogVisible, '点击负责人纯名称成功弹出「负责人账户详情」对话框');
+      ok(!!dialogVisible, '点击管理员纯名称成功弹出「负责人账户详情」对话框');
       const closeBtn = await page.$('.operator-account-dialog .el-dialog__headerbtn, .operator-account-dialog .dialog-footer button');
       if (closeBtn) await closeBtn.click();
       await page.waitForTimeout(400);

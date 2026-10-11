@@ -2630,6 +2630,22 @@ totpModeAllDesc: 'Configure whether users can use TOTP. When enabled, 2FA is ava
     auditAuthorityLeadDesc: "Moderator manual review approved unban or watch state (Lead sign-off)",
     auditAuthorityAuto: "Auto Archival",
     auditAuthorityAutoDesc: "Baseline routine check with zero risk, system lifecycle auto archival",
+    auditAllViolationCategories: "All Violation Categories",
+    auditAllAlarmReasons: "All Alarm Reasons",
+    auditAllAlarmCounts: "All Alarm Counts",
+    auditAllSuggestions: "All Suggestions",
+    auditAllAssignees: "All Assignees",
+    auditAllAdjudicators: "All Adjudicators",
+    auditAlarmCount1: "1 Time (Initial)",
+    auditAlarmCount2to3: "2-3 Times (Occasional)",
+    auditAlarmCount4Plus: "4+ Times (Frequent)",
+    auditAssigneeAdmin: "SecAdmin (Security Lead)",
+    auditAssigneeSystem: "System Bot (Automated)",
+    auditAssigneeMaster: "Master (Root Admin)",
+    auditAdjudicatorMaster: "Master (Root Admin)",
+    auditAdjudicatorAdmin: "SecAdmin (Security Lead)",
+    auditAdjudicatorSystem: "System Bot (Policy Engine)",
+    auditOperatorRoleMaster: "Root Administrator",
 };
 
 export default en;

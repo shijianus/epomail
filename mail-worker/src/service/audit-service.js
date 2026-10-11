@@ -475,7 +475,7 @@ const auditService = {
 	async list(c, params) {
 		await this.ensureTables(c);
 		await this.seedBaselineIfEmpty(c);
-		let { num = 1, size = 15, email, keyword, warningType, category, riskLevel, status, lifecycle, timeRange, identityGroup, timeSort = 0 } = params;
+		let { num = 1, size = 15, email, keyword, warningType, category, riskLevel, status, lifecycle, timeRange, identityGroup, alarmReason, alarmCountRange, suggestion, assignee, adjudicator: adjudicatorFilter, timeSort = 0 } = params;
 		size = Math.min(Number(size) || 15, 50);
 		num = Math.max(Number(num) || 1, 1);
 		const offset = (num - 1) * size;
@@ -664,7 +664,10 @@ const auditService = {
 				? row.reportedByOthers
 				: (row.isMultiIp ? (row.activeIpCount || 3) : (row.eventType === 'multi_account_ban' ? 2 : (row.eventType === 'auto_ban' ? 4 : 1)));
 
-			// 4. 拍案管理 (最终实际决定权说明：站长终裁 / 策略引擎 / 申诉仲裁组 / 安全主管 / 例行自动)
+			// 4. 负责人与拍案管理 (对最后管理员的留名记录，大部分时候拍案管理就是负责人)
+			const operator = row.operator || (row.status === 'banned' ? 'System Bot' : 'SecAdmin');
+			const adjudicator = row.adjudicator || row.operator || (row.status === 'banned' ? 'System Bot' : (row.status === 'unbanned' ? 'Master' : 'SecAdmin'));
+
 			let finalAuthority = 'auto';
 			let finalAuthorityDesc = '基线巡检无风险，系统生命周期自动归档';
 			if (row.warningType === 'ban' || row.status === 'banned' || row.priority === 'CRITICAL' || row.priority === 'P0') {
@@ -694,6 +697,10 @@ const auditService = {
 				alarmCount,
 				finalAuthority,
 				finalAuthorityDesc,
+				operator,
+				operatorName: operator,
+				adjudicator,
+				adjudicatorName: adjudicator,
 				banTime: row.banTime || (row.status === 'banned' ? row.createTime : null)
 			};
 
@@ -703,13 +710,66 @@ const auditService = {
 			return item;
 		});
 
+		// 复合筛选条件匹配
 		if (identityGroup && identityGroup !== 'all') {
 			processedList = processedList.filter(item => item.identityGroup === identityGroup);
+		}
+		if (category && category !== 'all') {
+			processedList = processedList.filter(item => {
+				if (category === 'quota') return item.eventType?.includes('multi_account') || item.banReason?.includes('一人多号');
+				if (category === 'appeal') return item.warningType === 'appeal' || item.category === 'appeal';
+				if (category === 'content') return item.reportCategory === 'phishing' || item.reportCategory === 'fraud';
+				if (category === 'outbound') return item.category === 'outbound' || item.reportCategory === 'spam';
+				if (category === 'account') return item.category === 'account' || item.eventType === 'credential_tamper_ban';
+				if (category === 'routine') return item.warningType === 'audit' || item.eventType?.includes('routine');
+				return item.category === category;
+			});
+		}
+		if (alarmReason && alarmReason !== 'all') {
+			processedList = processedList.filter(item => {
+				if (alarmReason === 'multi_account') return item.eventType?.includes('multi_account') || item.banReason?.includes('一人多号');
+				if (alarmReason === 'user_reported') return item.reportedByOthers > 0;
+				if (alarmReason === 'rate_limit') return item.eventType?.includes('auto_ban') || item.banReason?.includes('频率');
+				if (alarmReason === 'credential') return item.eventType?.includes('credential') || item.banReason?.includes('密保');
+				if (alarmReason === 'roaming') return item.eventType?.includes('roaming') || item.actionText?.includes('漫游');
+				return true;
+			});
+		}
+		if (alarmCountRange && alarmCountRange !== 'all') {
+			processedList = processedList.filter(item => {
+				const c = item.alarmCount || 1;
+				if (alarmCountRange === '1') return c === 1;
+				if (alarmCountRange === '2-3') return c >= 2 && c <= 3;
+				if (alarmCountRange === '4+') return c >= 4;
+				return true;
+			});
+		}
+		if (suggestion && suggestion !== 'all') {
+			processedList = processedList.filter(item => {
+				if (suggestion === 'ban') return item.status === 'banned' || item.recommendedAction === 'ban_account';
+				if (suggestion === 'unban') return item.status === 'unbanned' || item.recommendedAction === 'approve_appeal';
+				if (suggestion === 'watch') return item.status === 'watching';
+				if (suggestion === 'keep') return item.status === 'rejected' || item.status === 'banned';
+				if (suggestion === 'archive') return item.status === 'expired' || item.status === 'resolved';
+				return true;
+			});
+		}
+		if (assignee && assignee !== 'all') {
+			processedList = processedList.filter(item => {
+				const op = (item.operator || '').toLowerCase();
+				return op.includes(assignee.toLowerCase());
+			});
+		}
+		if (adjudicatorFilter && adjudicatorFilter !== 'all') {
+			processedList = processedList.filter(item => {
+				const adj = (item.adjudicator || '').toLowerCase();
+				return adj.includes(adjudicatorFilter.toLowerCase());
+			});
 		}
 
 		return {
 			list: processedList,
-			total: (identityGroup && identityGroup !== 'all') ? processedList.length : (total || 0),
+			total: processedList.length,
 			counts,
 			mode: allMailMode
 		};

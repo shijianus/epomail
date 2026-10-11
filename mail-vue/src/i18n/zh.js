@@ -2630,6 +2630,22 @@ totpModeAllDesc: '设置是否允许用户使用TOTP，开启后用户可以且�
     auditAuthorityLeadDesc: "协管人工复核批准解封或维持观察 (主管级拍案)",
     auditAuthorityAuto: "例行归档",
     auditAuthorityAutoDesc: "基线巡检无风险，系统生命周期自动归档",
+    auditAllViolationCategories: "全部违规分类",
+    auditAllAlarmReasons: "全部报警原因",
+    auditAllAlarmCounts: "全部报警次数",
+    auditAllSuggestions: "全部处理建议",
+    auditAllAssignees: "全部负责人",
+    auditAllAdjudicators: "全部拍案者",
+    auditAlarmCount1: "1 次 (首次)",
+    auditAlarmCount2to3: "2~3 次 (偶发)",
+    auditAlarmCount4Plus: "4 次及以上 (高频)",
+    auditAssigneeAdmin: "SecAdmin (安全主管)",
+    auditAssigneeSystem: "System Bot (系统机器人)",
+    auditAssigneeMaster: "Master (核心站长)",
+    auditAdjudicatorMaster: "Master (核心站长)",
+    auditAdjudicatorAdmin: "SecAdmin (安全主管)",
+    auditAdjudicatorSystem: "System Bot (策略引擎)",
+    auditOperatorRoleMaster: "系统核心站长 (Root Administrator)",
 };
 
 export default zh;

@@ -181,7 +181,7 @@
               </el-table-column>
 
               <!-- 列 2: 身分组 (通过身份等级筛选不同的影响程度 P0~P4) -->
-              <el-table-column width="120" align="center">
+              <el-table-column width="115" align="center">
                 <template #header>
                   <div class="col-filter-header">
                     <span>{{ $t('auditColIdentityGroup') }}</span>
@@ -216,21 +216,50 @@
                 </template>
                 <template #default="{ row }">
                   <div class="identity-cell">
-                    <el-tag
-                      size="small"
-                      :type="getIdentityMeta(row).tagType"
-                      effect="plain"
-                      class="identity-tag"
-                      :title="getIdentityMeta(row).impactDesc"
-                    >
+                    <span class="plain-identity-text" :title="getIdentityMeta(row).impactDesc">
                       {{ getIdentityMeta(row).label }}
-                    </el-tag>
+                    </span>
                   </div>
                 </template>
               </el-table-column>
 
               <!-- 列 3: 违规分类 (说明当前的实际违规内容) -->
-              <el-table-column :label="$t('auditColViolationCategory')" width="100" align="center">
+              <el-table-column width="115" align="center">
+                <template #header>
+                  <div class="col-filter-header">
+                    <span>{{ $t('auditColViolationCategory') }}</span>
+                    <el-dropdown trigger="click" @command="handleCategoryFilterCommand">
+                      <span class="filter-trigger" :class="{ 'filter-active': params.category !== 'all' }" :title="$t('filter')">
+                        <Icon icon="fluent:filter-16-regular" width="13" height="13" />
+                      </span>
+                      <template #dropdown>
+                        <el-dropdown-menu>
+                          <el-dropdown-item command="all" :class="{ 'is-selected': params.category === 'all' }">
+                            {{ $t('auditAllViolationCategories') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="quota" :class="{ 'is-selected': params.category === 'quota' }">
+                            {{ $t('auditCatQuota') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="outbound" :class="{ 'is-selected': params.category === 'outbound' }">
+                            {{ $t('auditCatOutbound') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="content" :class="{ 'is-selected': params.category === 'content' }">
+                            {{ $t('auditCatContent') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="account" :class="{ 'is-selected': params.category === 'account' }">
+                            {{ $t('auditCatAccount') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="routine" :class="{ 'is-selected': params.category === 'routine' }">
+                            {{ $t('auditCatRoutine') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="appeal" :class="{ 'is-selected': params.category === 'appeal' }">
+                            {{ $t('auditCatAppeal') }}
+                          </el-dropdown-item>
+                        </el-dropdown-menu>
+                      </template>
+                    </el-dropdown>
+                  </div>
+                </template>
                 <template #default="{ row }">
                   <div class="category-cell">
                     <span class="plain-category-text">{{ getViolationCategory(row).text }}</span>
@@ -243,23 +272,29 @@
                 <template #header>
                   <div class="col-filter-header">
                     <span>{{ $t('auditColAlarmReason') }}</span>
-                    <el-dropdown trigger="click" @command="handleRiskFilterCommand">
-                      <span class="filter-trigger" :class="{ 'filter-active': params.riskLevel !== 'all' }" :title="$t('filter')">
+                    <el-dropdown trigger="click" @command="handleReasonFilterCommand">
+                      <span class="filter-trigger" :class="{ 'filter-active': params.alarmReason !== 'all' }" :title="$t('filter')">
                         <Icon icon="fluent:filter-16-regular" width="13" height="13" />
                       </span>
                       <template #dropdown>
                         <el-dropdown-menu>
-                          <el-dropdown-item command="all" :class="{ 'is-selected': params.riskLevel === 'all' }">
-                            {{ $t('auditAllRiskLevel') }}
+                          <el-dropdown-item command="all" :class="{ 'is-selected': params.alarmReason === 'all' }">
+                            {{ $t('auditAllAlarmReasons') }}
                           </el-dropdown-item>
-                          <el-dropdown-item command="high" :class="{ 'is-selected': params.riskLevel === 'high' }">
-                            LV3 · {{ $t('auditRiskLevelHigh') }}
+                          <el-dropdown-item command="multi_account" :class="{ 'is-selected': params.alarmReason === 'multi_account' }">
+                            {{ $t('auditReasonMultiAccount') }}
                           </el-dropdown-item>
-                          <el-dropdown-item command="medium" :class="{ 'is-selected': params.riskLevel === 'medium' }">
-                            LV2 · {{ $t('auditRiskLevelMedium') }}
+                          <el-dropdown-item command="user_reported" :class="{ 'is-selected': params.alarmReason === 'user_reported' }">
+                            {{ $t('auditReasonUserReported') }}
                           </el-dropdown-item>
-                          <el-dropdown-item command="normal" :class="{ 'is-selected': params.riskLevel === 'normal' }">
-                            LV1 · {{ $t('auditRiskLevelLow') }}
+                          <el-dropdown-item command="rate_limit" :class="{ 'is-selected': params.alarmReason === 'rate_limit' }">
+                            {{ $t('auditReasonRateLimit') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="credential" :class="{ 'is-selected': params.alarmReason === 'credential' }">
+                            {{ $t('auditReasonCredentialAnomaly') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="roaming" :class="{ 'is-selected': params.alarmReason === 'roaming' }">
+                            {{ $t('auditReasonRoaming') }}
                           </el-dropdown-item>
                         </el-dropdown-menu>
                       </template>
@@ -276,10 +311,36 @@
               </el-table-column>
 
               <!-- 列 5: 报警次数 (由于同类收敛，所以报警次数也被直接计算在一个表格中) -->
-              <el-table-column :label="$t('auditColAlarmCount')" width="90" align="center">
+              <el-table-column width="105" align="center">
+                <template #header>
+                  <div class="col-filter-header">
+                    <span>{{ $t('auditColAlarmCount') }}</span>
+                    <el-dropdown trigger="click" @command="handleAlarmCountFilterCommand">
+                      <span class="filter-trigger" :class="{ 'filter-active': params.alarmCountRange !== 'all' }" :title="$t('filter')">
+                        <Icon icon="fluent:filter-16-regular" width="13" height="13" />
+                      </span>
+                      <template #dropdown>
+                        <el-dropdown-menu>
+                          <el-dropdown-item command="all" :class="{ 'is-selected': params.alarmCountRange === 'all' }">
+                            {{ $t('auditAllAlarmCounts') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="1" :class="{ 'is-selected': params.alarmCountRange === '1' }">
+                            {{ $t('auditAlarmCount1') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="2-3" :class="{ 'is-selected': params.alarmCountRange === '2-3' }">
+                            {{ $t('auditAlarmCount2to3') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="4+" :class="{ 'is-selected': params.alarmCountRange === '4+' }">
+                            {{ $t('auditAlarmCount4Plus') }}
+                          </el-dropdown-item>
+                        </el-dropdown-menu>
+                      </template>
+                    </el-dropdown>
+                  </div>
+                </template>
                 <template #default="{ row }">
                   <div class="alarm-count-cell">
-                    <span class="alarm-count-badge font-mono" :class="{ 'alarm-count-high': getAlarmCount(row) > 3 }">
+                    <span class="plain-alarm-count font-mono" :class="{ 'alarm-count-high': getAlarmCount(row) > 3 }">
                       {{ getAlarmCount(row) }} {{ $t('auditTimesUnit') }}
                     </span>
                   </div>
@@ -326,17 +387,44 @@
               </el-table-column>
 
               <!-- 列 7: 处理建议 -->
-              <el-table-column :label="$t('auditColSuggestion')" width="105" align="center">
+              <el-table-column width="115" align="center">
+                <template #header>
+                  <div class="col-filter-header">
+                    <span>{{ $t('auditColSuggestion') }}</span>
+                    <el-dropdown trigger="click" @command="handleSuggestionFilterCommand">
+                      <span class="filter-trigger" :class="{ 'filter-active': params.suggestion !== 'all' }" :title="$t('filter')">
+                        <Icon icon="fluent:filter-16-regular" width="13" height="13" />
+                      </span>
+                      <template #dropdown>
+                        <el-dropdown-menu>
+                          <el-dropdown-item command="all" :class="{ 'is-selected': params.suggestion === 'all' }">
+                            {{ $t('auditAllSuggestions') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="ban" :class="{ 'is-selected': params.suggestion === 'ban' }">
+                            {{ $t('auditSuggestionBan') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="unban" :class="{ 'is-selected': params.suggestion === 'unban' }">
+                            {{ $t('auditSuggestionUnban') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="watch" :class="{ 'is-selected': params.suggestion === 'watch' }">
+                            {{ $t('auditSuggestionWatch') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="keep" :class="{ 'is-selected': params.suggestion === 'keep' }">
+                            {{ $t('auditSuggestionKeepBan') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="archive" :class="{ 'is-selected': params.suggestion === 'archive' }">
+                            {{ $t('auditSuggestionArchiveRoutine') }}
+                          </el-dropdown-item>
+                        </el-dropdown-menu>
+                      </template>
+                    </el-dropdown>
+                  </div>
+                </template>
                 <template #default="{ row }">
-                  <div class="suggestion-tag-cell">
-                    <el-tag
-                      size="small"
-                      :type="getHandlingSuggestion(row).type"
-                      effect="plain"
-                      class="suggestion-tag"
-                    >
+                  <div class="suggestion-cell">
+                    <span class="plain-suggestion-text" :class="`suggestion-${getHandlingSuggestion(row).type}`">
                       {{ getHandlingSuggestion(row).text }}
-                    </el-tag>
+                    </span>
                   </div>
                 </template>
               </el-table-column>
@@ -380,8 +468,34 @@
                 </template>
               </el-table-column>
 
-              <!-- 列 9: 负责人 (只展示名称，点击可进入账户详情) -->
-              <el-table-column :label="$t('auditColAssignee')" width="95" align="center">
+              <!-- 列 9: 负责人 (直接写管理员名称并允许点击到用户详情) -->
+              <el-table-column width="105" align="center">
+                <template #header>
+                  <div class="col-filter-header">
+                    <span>{{ $t('auditColAssignee') }}</span>
+                    <el-dropdown trigger="click" @command="handleAssigneeFilterCommand">
+                      <span class="filter-trigger" :class="{ 'filter-active': params.assignee !== 'all' }" :title="$t('filter')">
+                        <Icon icon="fluent:filter-16-regular" width="13" height="13" />
+                      </span>
+                      <template #dropdown>
+                        <el-dropdown-menu>
+                          <el-dropdown-item command="all" :class="{ 'is-selected': params.assignee === 'all' }">
+                            {{ $t('auditAllAssignees') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="secadmin" :class="{ 'is-selected': params.assignee === 'secadmin' }">
+                            {{ $t('auditAssigneeAdmin') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="system" :class="{ 'is-selected': params.assignee === 'system' }">
+                            {{ $t('auditAssigneeSystem') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="master" :class="{ 'is-selected': params.assignee === 'master' }">
+                            {{ $t('auditAssigneeMaster') }}
+                          </el-dropdown-item>
+                        </el-dropdown-menu>
+                      </template>
+                    </el-dropdown>
+                  </div>
+                </template>
                 <template #default="{ row }">
                   <div class="operator-cell">
                     <span class="operator-name-link font-medium" :title="getOperatorName(row)" @click.stop="handleViewOperator(row)">
@@ -391,16 +505,38 @@
                 </template>
               </el-table-column>
 
-              <!-- 列 10: 拍案管理 (区别于"负责人"，最终的实际决定权说明) -->
-              <el-table-column :label="$t('auditColFinalAuthority')" width="110" align="center">
+              <!-- 列 10: 拍案管理 (对最后管理员留名记录，格式与负责人一致，直接写名称并允许点击到用户详情) -->
+              <el-table-column width="105" align="center">
+                <template #header>
+                  <div class="col-filter-header">
+                    <span>{{ $t('auditColFinalAuthority') }}</span>
+                    <el-dropdown trigger="click" @command="handleAdjudicatorFilterCommand">
+                      <span class="filter-trigger" :class="{ 'filter-active': params.adjudicator !== 'all' }" :title="$t('filter')">
+                        <Icon icon="fluent:filter-16-regular" width="13" height="13" />
+                      </span>
+                      <template #dropdown>
+                        <el-dropdown-menu>
+                          <el-dropdown-item command="all" :class="{ 'is-selected': params.adjudicator === 'all' }">
+                            {{ $t('auditAllAdjudicators') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="secadmin" :class="{ 'is-selected': params.adjudicator === 'secadmin' }">
+                            {{ $t('auditAdjudicatorAdmin') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="system" :class="{ 'is-selected': params.adjudicator === 'system' }">
+                            {{ $t('auditAdjudicatorSystem') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="master" :class="{ 'is-selected': params.adjudicator === 'master' }">
+                            {{ $t('auditAdjudicatorMaster') }}
+                          </el-dropdown-item>
+                        </el-dropdown-menu>
+                      </template>
+                    </el-dropdown>
+                  </div>
+                </template>
                 <template #default="{ row }">
-                  <div class="authority-cell">
-                    <span
-                      class="authority-badge"
-                      :class="getDecisionAuthority(row).className"
-                      :title="getDecisionAuthority(row).tooltip"
-                    >
-                      {{ getDecisionAuthority(row).label }}
+                  <div class="operator-cell">
+                    <span class="operator-name-link font-medium" :title="getAdjudicatorName(row)" @click.stop="handleViewAdjudicator(row)">
+                      {{ getAdjudicatorName(row) }}
                     </span>
                   </div>
                 </template>
@@ -1007,9 +1143,15 @@ const activeKpi = ref('threat');
 const params = reactive({
   keyword: '',
   warningType: 'all',
-  riskLevel: 'high',
+  riskLevel: 'all',
   status: 'all',
   identityGroup: 'all',
+  category: 'all',
+  alarmReason: 'all',
+  alarmCountRange: 'all',
+  suggestion: 'all',
+  assignee: 'all',
+  adjudicator: 'all',
   timeRange: 'all',
   timeSort: 0,
   num: 1,
@@ -1103,11 +1245,53 @@ function handleIdentityFilterCommand(command) {
   search();
 }
 
+function handleCategoryFilterCommand(command) {
+  params.category = command;
+  params.num = 1;
+  search();
+}
+
+function handleReasonFilterCommand(command) {
+  params.alarmReason = command;
+  params.num = 1;
+  search();
+}
+
+function handleAlarmCountFilterCommand(command) {
+  params.alarmCountRange = command;
+  params.num = 1;
+  search();
+}
+
+function handleSuggestionFilterCommand(command) {
+  params.suggestion = command;
+  params.num = 1;
+  search();
+}
+
+function handleAssigneeFilterCommand(command) {
+  params.assignee = command;
+  params.num = 1;
+  search();
+}
+
+function handleAdjudicatorFilterCommand(command) {
+  params.adjudicator = command;
+  params.num = 1;
+  search();
+}
+
 function handleReset() {
   localKeyword.value = '';
   params.keyword = '';
   params.status = 'all';
   params.identityGroup = 'all';
+  params.category = 'all';
+  params.alarmReason = 'all';
+  params.alarmCountRange = 'all';
+  params.suggestion = 'all';
+  params.assignee = 'all';
+  params.adjudicator = 'all';
   params.timeRange = 'all';
   params.riskLevel = 'all';
   params.warningType = 'all';
@@ -1559,7 +1743,7 @@ function handleExportCsv() {
       `"${getHandlingSuggestion(row).text}"`,
       `"${formatTableTime(row.banTime || row.createTime)}"`,
       `"${getOperatorName(row)}"`,
-      `"${getDecisionAuthority(row).label}"`
+      `"${getAdjudicatorName(row)}"`
     ];
     csvRows.push(rowValues.join(','));
   }
@@ -1615,6 +1799,14 @@ function getOperatorName(row) {
 function getOperatorRole(row) {
   if (row?.operatorRole) return row.operatorRole;
   return row?.status === 'banned' ? t('auditOperatorRoleSystem') : t('auditOperatorRoleAdmin');
+}
+
+function getAdjudicatorName(row) {
+  if (!row) return 'SecAdmin';
+  if (row.adjudicatorName) return row.adjudicatorName;
+  if (row.adjudicator) return row.adjudicator;
+  // 大部分时候拍案管理就是负责人
+  return getOperatorName(row);
 }
 
 async function handleQuickToggleBan(row) {
@@ -1748,6 +1940,21 @@ function handleViewOperator(row) {
     email: row?.operatorEmail || (isSys ? 'system-daemon@epocanvas.com' : 'security-admin@epomail.cyou'),
     typeLabel: isSys ? t('auditOperatorTypeSystem') : t('auditOperatorTypeHuman'),
     id: row?.operatorId || 'ADM-01'
+  };
+  operatorDialogVisible.value = true;
+}
+
+function handleViewAdjudicator(row) {
+  const name = getAdjudicatorName(row);
+  const isSys = name.toLowerCase().includes('bot') || name.toLowerCase().includes('system') || name.toLowerCase().includes('engine');
+  const isMaster = name === 'Master' || row?.finalAuthority === 'master';
+  currentOperator.value = {
+    name,
+    avatar: name.slice(0, 2).toUpperCase(),
+    role: isSys ? t('auditOperatorRoleSystem') : (isMaster ? t('auditOperatorRoleMaster') : t('auditOperatorRoleAdmin')),
+    email: row?.adjudicatorEmail || (isSys ? 'system-daemon@epocanvas.com' : (isMaster ? 'master@epocanvas.com' : 'security-admin@epomail.cyou')),
+    typeLabel: isSys ? t('auditOperatorTypeSystem') : t('auditOperatorTypeHuman'),
+    id: row?.adjudicatorId || 'ADM-01'
   };
   operatorDialogVisible.value = true;
 }
@@ -2397,14 +2604,16 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   width: 100%;
+  text-align: center;
 
-  .identity-tag {
-    font-size: 11px;
-    height: 20px;
-    line-height: 18px;
-    padding: 0 6px;
-    border-radius: 4px;
+  .plain-identity-text {
+    font-size: 12.5px;
+    color: var(--el-text-color-regular);
+    line-height: 1.4;
+    white-space: nowrap;
     font-weight: 500;
+    border: none !important;
+    background: transparent !important;
   }
 }
 
@@ -2413,24 +2622,19 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   width: 100%;
+  text-align: center;
 
-  .alarm-count-badge {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 1px 6px;
-    border-radius: 10px;
-    font-size: 11px;
-    line-height: 16px;
-    background: var(--el-fill-color-light);
+  .plain-alarm-count {
+    font-size: 12.5px;
     color: var(--el-text-color-regular);
-    border: 1px solid var(--el-border-color-lighter);
+    line-height: 1.4;
+    font-weight: 500;
+    border: none !important;
+    background: transparent !important;
     font-variant-numeric: tabular-nums;
 
     &.alarm-count-high {
-      background: rgba(239, 68, 68, 0.08);
       color: var(--el-color-danger);
-      border-color: rgba(239, 68, 68, 0.25);
       font-weight: 600;
     }
   }
@@ -2449,53 +2653,36 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   width: 100%;
+  text-align: center;
 }
 
-.authority-cell {
+.suggestion-cell {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 100%;
+  text-align: center;
 
-  .authority-badge {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 11px;
-    padding: 1px 6px;
-    border-radius: 4px;
+  .plain-suggestion-text {
+    font-size: 12.5px;
+    color: var(--el-text-color-regular);
+    line-height: 1.4;
     font-weight: 500;
+    border: none !important;
+    background: transparent !important;
     white-space: nowrap;
-    letter-spacing: 0.2px;
 
-    &.authority-master {
+    &.suggestion-danger {
       color: var(--el-color-danger);
-      background: rgba(239, 68, 68, 0.08);
-      border: 1px solid rgba(239, 68, 68, 0.2);
     }
-
-    &.authority-policy {
+    &.suggestion-warning {
       color: var(--el-color-warning);
-      background: rgba(245, 158, 11, 0.08);
-      border: 1px solid rgba(245, 158, 11, 0.2);
     }
-
-    &.authority-board {
-      color: var(--el-color-primary);
-      background: rgba(99, 102, 241, 0.08);
-      border: 1px solid rgba(99, 102, 241, 0.2);
-    }
-
-    &.authority-lead {
+    &.suggestion-success {
       color: var(--el-color-success);
-      background: rgba(16, 185, 129, 0.08);
-      border: 1px solid rgba(16, 185, 129, 0.2);
     }
-
-    &.authority-auto {
+    &.suggestion-info {
       color: var(--el-text-color-secondary);
-      background: var(--el-fill-color-light);
-      border: 1px solid var(--el-border-color-lighter);
     }
   }
 }
@@ -2549,13 +2736,45 @@ onUnmounted(() => {
   }
 }
 
-/* 3. 核心管理表格 (零脱节，直接作为外框铺满) */
+/* 3. 核心管理表格 (零脱节，直接作为外框铺满，纯文本无内框) */
 .table-area {
   position: relative;
   background: var(--el-bg-color);
 
   :deep(.el-table) {
     --el-table-header-bg-color: var(--el-fill-color-light);
+    --el-table-border: none;
+    --el-table-border-color: transparent;
+    border: none !important;
+
+    &::before,
+    &::after {
+      display: none !important;
+    }
+  }
+
+  :deep(.el-table__inner-wrapper::before) {
+    display: none !important;
+  }
+
+  :deep(.el-table td.el-table__cell),
+  :deep(.el-table th.el-table__cell) {
+    border: none !important;
+    border-right: none !important;
+    border-left: none !important;
+    border-top: none !important;
+    border-bottom: 1px solid var(--el-border-color-extra-light) !important;
+  }
+
+  /* 彻底删除所有单元格（包括 column_3, column_6, column_11 等）的实际边框与多余阴影 */
+  :deep(.el-table .el-table__cell) {
+    border-left: none !important;
+    border-right: none !important;
+    box-shadow: none !important;
+  }
+
+  :deep(.el-table__header-wrapper th.el-table__cell) {
+    border-bottom: 1px solid var(--el-border-color-lighter) !important;
   }
 }
 
@@ -2671,21 +2890,6 @@ onUnmounted(() => {
   }
 }
 
-.suggestion-tag-cell {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-}
-
-.suggestion-tag {
-  font-size: 11.5px;
-  font-weight: 500;
-  height: 22px;
-  line-height: 20px;
-  padding: 0 6px;
-  border-radius: 4px;
-}
 
 .operator-name-link {
   font-size: 12.5px;

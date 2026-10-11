@@ -2630,6 +2630,22 @@ totpModeAllDesc: 'Configurar si los usuarios pueden usar TOTP. Al activarlo, la 
     auditAuthorityLeadDesc: "Revisión manual aprobó desbloqueo u observación (Aprobación de supervisor)",
     auditAuthorityAuto: "Archivo automático",
     auditAuthorityAutoDesc: "Verificación rutinaria sin riesgo, archivo automático del sistema",
+    auditAllViolationCategories: "Todas las categorías",
+    auditAllAlarmReasons: "Todos los motivos",
+    auditAllAlarmCounts: "Todas las frecuencias",
+    auditAllSuggestions: "Todas las sugerencias",
+    auditAllAssignees: "Todos los responsables",
+    auditAllAdjudicators: "Todos los árbitros",
+    auditAlarmCount1: "1 vez (Inicial)",
+    auditAlarmCount2to3: "2~3 veces (Ocasional)",
+    auditAlarmCount4Plus: "4+ veces (Frecuente)",
+    auditAssigneeAdmin: "SecAdmin (Líder de seguridad)",
+    auditAssigneeSystem: "System Bot (Automatizado)",
+    auditAssigneeMaster: "Master (Administrador raíz)",
+    auditAdjudicatorMaster: "Master (Administrador raíz)",
+    auditAdjudicatorAdmin: "SecAdmin (Líder de seguridad)",
+    auditAdjudicatorSystem: "System Bot (Motor de políticas)",
+    auditOperatorRoleMaster: "Administrador raíz",
 };
 
 export default es;

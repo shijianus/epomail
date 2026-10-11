@@ -2630,6 +2630,22 @@ totpModeAllDesc: 'Instellen of gebruikers TOTP mogen gebruiken. Eenmaal ingescha
     auditAuthorityLeadDesc: "Handmatige controle goedgekeurd voor deblokkering of observatie (Leidersbesluit)",
     auditAuthorityAuto: "Automatische archivering",
     auditAuthorityAutoDesc: "Routinematige controle zonder risico, automatische systeemarchivering",
+    auditAllViolationCategories: "Alle categorieën",
+    auditAllAlarmReasons: "Alle alarmredenen",
+    auditAllAlarmCounts: "Alle aantallen",
+    auditAllSuggestions: "Alle suggesties",
+    auditAllAssignees: "Alle verantwoordelijken",
+    auditAllAdjudicators: "Alle beslissers",
+    auditAlarmCount1: "1 keer (Eerste)",
+    auditAlarmCount2to3: "2~3 keer (Af en toe)",
+    auditAlarmCount4Plus: "4+ keer (Vaak)",
+    auditAssigneeAdmin: "SecAdmin (Beveiligingsleider)",
+    auditAssigneeSystem: "System Bot (Geautomatiseerd)",
+    auditAssigneeMaster: "Master (Hoofdbeheerder)",
+    auditAdjudicatorMaster: "Master (Hoofdbeheerder)",
+    auditAdjudicatorAdmin: "SecAdmin (Beveiligingsleider)",
+    auditAdjudicatorSystem: "System Bot (Beleidsmotor)",
+    auditOperatorRoleMaster: "Hoofdbeheerder",
 };
 
 export default nl;

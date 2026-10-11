@@ -39,14 +39,14 @@ assert.ok(vueContent.includes('$t(\'auditColAlarmCount\')'), '包含「报警次
 assert.ok(vueContent.includes('$t(\'auditCurrentStatus\')'), '包含「当前状态」列');
 assert.ok(vueContent.includes('$t(\'auditColSuggestion\')'), '包含「处理建议」列');
 assert.ok(vueContent.includes('$t(\'auditColProcessTime\')'), '包含「处理时间」列');
-assert.ok(vueContent.includes(':label="$t(\'auditColAssignee\')"'), '包含「负责人」列');
+assert.ok(vueContent.includes('$t(\'auditColAssignee\')'), '包含「负责人」列');
 assert.ok(vueContent.includes('$t(\'auditColFinalAuthority\')'), '包含「拍案管理」列');
 assert.ok(vueContent.includes(':label="$t(\'action\')"'), '包含「操作」列');
 assert.ok(vueContent.includes('formatTicketNo(row)'), '工单编号直接调用 # 格式化函数');
 assert.ok(vueContent.includes('getSimpleAlarmReason(row)'), '展示简明报警原因');
 assert.ok(vueContent.includes('getAlarmCount(row)'), '展示同类收敛报警次数');
 assert.ok(vueContent.includes('getIdentityMeta(row)'), '展示身分组与影响程度');
-assert.ok(vueContent.includes('getDecisionAuthority(row)'), '展示拍案管理决定权说明');
+assert.ok(vueContent.includes('getAdjudicatorName(row)'), '展示拍案管理最后管理员留名记录');
 console.log('  ✓ 表格 11 大列定义完全符合需求，# 工单编号/身分组/拍案管理就位\n');
 
 // 3. 消除与 topbar-search 冲突的 el-input__wrapper
@@ -158,6 +158,48 @@ assert.ok(!vueContent.includes('$t(\'auditColTriggerNetwork\')'), '主表格中�
 assert.ok(!vueContent.includes('$t(\'auditColClientDevice\')'), '主表格中已彻底移除终端设备指纹列');
 console.log('  ✓ 表格成功落地「违规分类」，完全对齐 punishments.md 架构规范，杜绝长文本与底层指纹\n');
 
+// 9. 第五轮：全表格无边框纯文本、9列筛选扩展与拍案管理留名
+console.log('=== 第五轮 无边框纯文本、9列筛选扩展与拍案管理留名核验 ===');
+
+console.log('[第五轮 1] 全表格纯文本无边框排版核验 (彻底消除 el-tag 与各类边框徽标)...');
+assert.ok(vueContent.includes('plain-identity-text'), '身分组采用 plain-identity-text 纯文本');
+assert.ok(vueContent.includes('plain-alarm-count'), '报警次数采用 plain-alarm-count 纯文本');
+assert.ok(vueContent.includes('plain-suggestion-text'), '处理建议采用 plain-suggestion-text 纯文本');
+assert.ok(!vueContent.includes('class="identity-tag"'), '彻底清除 identity-tag 边框标签');
+assert.ok(!vueContent.includes('class="alarm-count-badge"'), '彻底清除 alarm-count-badge 边框徽标');
+assert.ok(!vueContent.includes('class="suggestion-tag"'), '彻底清除 suggestion-tag 边框标签');
+assert.ok(!vueContent.includes('class="authority-badge"'), '彻底清除 authority-badge 边框徽标');
+assert.ok(vueContent.includes('--el-table-border: none'), '表格全局声明无边框');
+assert.ok(vueContent.includes('border: none !important'), '表格单元格声明 border: none');
+console.log('  ✓ 全表格各列数据已全部切换为无边框纯文本呈现，单元格边框与标签外框全部消除\n');
+
+console.log('[第五轮 2] 拍案管理与负责人格式 100% 相同 (管理员留名、点击打开详情)...');
+assert.ok(vueContent.includes('getAdjudicatorName'), '具备 getAdjudicatorName 管理员留名计算');
+assert.ok(vueContent.includes('handleViewAdjudicator'), '具备 handleViewAdjudicator 点击查看详情能力');
+const authorityColMatch = vueContent.match(/<!-- 列 10: 拍案管理[\s\S]*?<\/el-table-column>/);
+assert.ok(authorityColMatch, '找到拍案管理列');
+assert.ok(authorityColMatch[0].includes('operator-cell'), '拍案管理采用与负责人相同的 operator-cell 容器');
+assert.ok(authorityColMatch[0].includes('operator-name-link font-medium'), '拍案管理采用与负责人相同的 operator-name-link');
+console.log('  ✓ 拍案管理格式与负责人完全一致，直接呈现管理员留名且支持点击查看用户详情\n');
+
+console.log('[第五轮 3] 9 大列全量扩展筛选 Button (除工单编号与操作)...');
+assert.ok(vueContent.includes('handleIdentityFilterCommand'), '身分组具备筛选功能');
+assert.ok(vueContent.includes('handleCategoryFilterCommand'), '违规分类具备筛选功能');
+assert.ok(vueContent.includes('handleReasonFilterCommand'), '报警原因具备筛选功能');
+assert.ok(vueContent.includes('handleAlarmCountFilterCommand'), '报警次数具备筛选功能');
+assert.ok(vueContent.includes('handleStatusFilterCommand'), '当前状态具备筛选功能');
+assert.ok(vueContent.includes('handleSuggestionFilterCommand'), '处理建议具备筛选功能');
+assert.ok(vueContent.includes('handleTimeFilterCommand'), '处理时间具备筛选功能');
+assert.ok(vueContent.includes('handleAssigneeFilterCommand'), '负责人具备筛选功能');
+assert.ok(vueContent.includes('handleAdjudicatorFilterCommand'), '拍案管理具备筛选功能');
+
+// 确认工单编号和操作没有 filter-trigger
+const ticketColMatch = vueContent.match(/<!-- 列 1: 工单编号[\s\S]*?<\/el-table-column>/);
+assert.ok(ticketColMatch && !ticketColMatch[0].includes('filter-trigger'), '工单编号列不包含筛选 trigger');
+const finalActionColMatch = vueContent.match(/<!-- 列 11: 操作[\s\S]*?<\/el-table-column>/);
+assert.ok(finalActionColMatch && !finalActionColMatch[0].includes('filter-trigger'), '操作列不包含筛选 trigger');
+console.log('  ✓ 除工单编号与操作外，其余 9 大列均已成功扩展列头筛选 Button\n');
+
 console.log('================================================================');
-console.log('=== 11 大新列集定义、全居中对齐与业务规范全量断言通过！ ===');
+console.log('=== 11 大新列集定义、纯文本无边框、9列筛选扩展与全居中全量断言通过！ ===');
 console.log('================================================================\n');
