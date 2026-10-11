@@ -7,6 +7,22 @@
 > 制度规范与工作流指引请见 [AGENTS.md](file:///home/shijian/projects/epocanvas-mail/AGENTS.md)。
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
+### 「滥用威胁」清除假数据与集群聚合操作真实持久化架构落地 (2026-10-10)
+*   **关联提交 (Git Commit)**: `e4558907ae04171b0996243a6ddcbf4cfaf1456d` (Short: `e455890`), `b001b9736de9f7522b79cea8c9ad875857a5e950` (Short: `b001b97`)
+*   **部署环境 (Deployment)**: `本地全真栈 (fix/abuse-table-columns 分支)`
+*   **功能需求与架构闭环清单 (Changes & Architectural Alignment)**:
+    - [x] 零假数据全面治理：彻底移除前端与后端服务中硬编码的假数据与假批次 (`autoPurgedCount: 3`、`BAT-20261010-01` 等写死假数据)，新建 D1 `audit_purge_batch` 真实折叠批次表并建立索引，无折叠批次时返回空数组与 0，弹窗呈现规范空状态；
+    - [x] 底层真实集群聚合架构落地：在 D1 SQL 条件中自动收敛同 `cluster_id` 的记录，仅将首个主工单作为独立顶级行返回；同集群关联子账号从 D1 真实查询并组织为 `clusterAccounts`，在前端支持行内展开折叠、逐子账号勾选、一键连坐与精准豁免；
+    - [x] 全流程操作真持久化落库：后端 `audit-service.js` 扩展支持 `assign` (分配负责人) 与 `review` (开始复核) 动作，操作完整写入 D1 `audit_log` 字段、管理员留名及 `timeline` 时间线追踪；前端单行及批量「分配负责人」「开始复核」「解除」均真实调用 `/api/audit/action` 并在落库后自动刷新列表；
+    - [x] 全局熔断状态动态化：后端通过 KV `GLOBAL_CIRCUIT_BREAKER` 真实读取熔断状态并新增管理接口，前端熔断条由真实状态响应，杜绝静态伪熔断；
+    - [x] 6 语言 i18n 绝对对称与零未包裹文本：新增 `abuseReasonCodeLabel`, `abuseEvidenceRetentionLabel`, `abuseLifecycleTimelineTitle`, `abuseEmptyAutoPurged` 词条，`i18n-symmetry.mjs` 核验 2694 键 100% 绝对对称，消除详情抽屉内残留硬编码。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：`mail-vue` Vite 构建通过 (耗时 13.16s，零报错)；
+    - [x] 多语言对称核验：`node scripts/i18n-symmetry.mjs` 验证 6 语言 2694 keys 100% 绝对对称 (`ALL SYMMETRIC`)；
+    - [x] 静态与硬编码审计：`node scripts/i18n-hardcoded.mjs` 审核通过；
+    - [x] 列集与排版核验：`tests/verify-audit-section-columns.mjs` 6 大专项 100% 通过；`tests/verify-audit-ui-optimization.mjs` 19 项全绿通过；
+    - [x] 全真断言与截图套件：`tests/verify-abuse-table-polish.mjs` 5 大分辨率全量 50 项断言 100% 通过并完成最新截图验证；
+    - [x] 零假数据残留：数据库与 KV 状态全面由真实数据驱动，无假数据残留。
 
 ### 「滥用威胁」工单列表列集重构与交互优化 (2026-10-10)
 *   **关联提交 (Git Commit)**:
