@@ -9,21 +9,18 @@ console.log('===================================================================
 const vuePath = path.resolve('mail-vue/src/views/audit-report/index.vue');
 const vueContent = fs.readFileSync(vuePath, 'utf8');
 
-// 1. 验证板块 1: 滥用威胁 (threat) - 保持基准不变 (最小修改原则)
-console.log('[验收 1: 滥用威胁 (threat)] 保持基准列集不变...');
+// 1. 验证板块 1: 滥用威胁 (threat) - 专属 7 列固定列宽工作台
+console.log('[验收 1: 滥用威胁 (threat)] 验证 7 列固定列宽工作台...');
 assert.ok(vueContent.includes("currentSection === 'threat'"), '支持 threat 板块专属列集判断');
-assert.ok(vueContent.includes('key="threat-col-ticket"'), 'threat 具备工单编号列');
-assert.ok(vueContent.includes('key="threat-col-identity"'), 'threat 具备身分组列');
-assert.ok(vueContent.includes('key="threat-col-category"'), 'threat 具备违规分类列');
-assert.ok(vueContent.includes('key="threat-col-reason"'), 'threat 具备报警原因列');
-assert.ok(vueContent.includes('key="threat-col-alarm-count"'), 'threat 具备报警次数列');
-assert.ok(vueContent.includes('key="threat-col-status"'), 'threat 具备当前状态列');
-assert.ok(vueContent.includes('key="threat-col-suggestion"'), 'threat 具备处理建议列');
-assert.ok(vueContent.includes('key="threat-col-process-time"'), 'threat 具备处理时间列');
-assert.ok(vueContent.includes('key="threat-col-assignee"'), 'threat 具备负责人列');
-assert.ok(vueContent.includes('key="threat-col-authority"'), 'threat 具备拍案管理列');
-assert.ok(vueContent.includes('key="threat-col-action"'), 'threat 具备操作列');
-console.log('  ✓ 滥用威胁 (threat) 保持原始基准 11 列不变\n');
+assert.ok(vueContent.includes('class="abuse-table-wrapper"'), 'threat 具备专属表格容器');
+assert.ok(vueContent.includes('class="col-select"'), 'threat 具备选择列 (40px)');
+assert.ok(vueContent.includes('class="col-no"'), 'threat 具备编号列 (72px)');
+assert.ok(vueContent.includes('class="col-target"'), 'threat 具备对象列 (clamp 180~260px)');
+assert.ok(vueContent.includes('class="col-status"'), 'threat 具备状态列 (96px)');
+assert.ok(vueContent.includes('class="col-cat"'), 'threat 具备分类列 (min 190px)');
+assert.ok(vueContent.includes('class="col-action"'), 'threat 具备处理列 (120px)');
+assert.ok(vueContent.includes('class="col-opt"'), 'threat 具备操作列 (64px)');
+console.log('  ✓ 滥用威胁 (threat) 专属 7 列固定列宽规范落地\n');
 
 // 2. 验证板块 2: 申诉审计 (appeal)
 console.log('[验收 2: 申诉审计 (appeal)] 验证删除报警原因，在处理时间后面添加过期时间...');

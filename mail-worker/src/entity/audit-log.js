@@ -36,6 +36,13 @@ export const auditLog = sqliteTable('audit_log', {
 	isInternal: integer('is_internal').default(0),
 	reportCategory: text('report_category'),
 	reportReason: text('report_reason'),
+	clusterId: text('cluster_id'),
+	assignee: text('assignee'),
+	reportSource: text('report_source'),
+	evidenceSummary: text('evidence_summary'),
+	circuitStatus: text('circuit_status').default('NORMAL'),
+	reasonCode: text('reason_code'),
+	timeline: text('timeline'),
 	resolvedTime: text('resolved_time'),
 	createTime: text('create_time').notNull().default(sql`CURRENT_TIMESTAMP`)
 });
