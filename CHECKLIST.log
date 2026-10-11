@@ -8,6 +8,37 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### 安全审计控制台全面纯文本无边框化、9列筛选扩展与拍案管理留名规范 (2026-10-10)
+*   **关联提交 (Git Commit)**: `8fe7f3624a0205fadc5bc0c817e1484368ab3b31` (Short: `8fe7f36`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com)` (Version ID: `6c3a8633-ee57-4f5e-98af-c14de6c521ef`, Startup: `63ms`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 表格全面纯文本化与消除边框（严格对齐设计规范）：
+      - 彻底移除 `class="el-table_1_column_3 is-center el-table__cell"`（身分组）、`class="el-table_1_column_6 is-center el-table__cell"`（报警次数）、`class="el-table_1_column_11 is-center el-table__cell"`（拍案管理）等列的所有 `<el-tag>` 标签边框与徽标方框；
+      - 全表格单元格采用纯文本元素渲染（`.plain-identity-text`、`.plain-alarm-count`、`.plain-suggestion-text`），仅保留优雅的文字色阶；
+      - 深度消除 Element Plus 内部单元格边框：注入 `--el-table-border: none` 与 `:deep(.el-table .el-table__cell) { border: none !important; border-left: none !important; border-right: none !important; box-shadow: none !important; }`，消除各列竖向及边框视觉干扰。
+    - [x] 拍案管理格式 100% 对齐负责人（管理员真实留名与用户详情交互）：
+      - 拍案管理由原权限类别调整为最终管理员留名记录，与负责人呈现格式保持 100% 一致；
+      - 直接呈现管理员纯名称（如 `SecAdmin`、`Master`、`System Bot`），支持点击无缝唤出「负责人账户详情」对话框；
+      - 默认逻辑紧密对齐业务场景：大部分情况下拍案管理即负责人，支持独立留名与详情追踪。
+    - [x] 列头筛选下拉选单扩展至 9 大核心列（除工单编号与操作）：
+      - 表头筛选触点全面扩展：身分组、违规分类、报警原因、报警次数、当前状态、处理建议、处理时间、负责人、拍案管理 9 大列统一配置表头筛选下拉菜单与高亮指示器；
+      - 工单编号与操作列专注业务展示与交互，保持纯净无筛选触点；
+      - 筛选选单选项包含全部重置选项与明确说明（如「全部违规分类」「全部报警原因」「全部报警次数」「全部处理建议」「全部拍案者」）。
+    - [x] 全表格居中对齐与精致排版：
+      - 11 大核心列及选择列全部统一 `align="center"` 与单元格居中流式排版，操作列纯粹展示居中「查看详情」纯文本图标按钮。
+    - [x] 6 语言 i18n 绝对对称保障：
+      - 六语言（zh, zh-Hant, en, es, fr, nl）全量同步 16 个新增多语言词条（字典总计 2635 键），静态审计 `i18n-symmetry.mjs` 与 `i18n-audit.mjs` 100% 通过。
+    - [x] Cloudflare 生产环境正式发布与全真栈回归验证：
+      - 前端 `mail-vue` Vite 构建通过 (16.28s)，生产 Worker 部署成功 (Version ID: `6c3a8633-ee57-4f5e-98af-c14de6c521ef`)；
+      - 运行 `node tests/verify-cf-production-audit-ui.mjs` 在生产公网 `https://mail.epocanvas.com` 上 34 项全真断言 100% 全绿通过。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：`mail-vue` Vite 构建通过 (16.28s)；
+    - [x] 多语言对称核验：6 语言 2635 键 100% 绝对对称无缺失；
+    - [x] 本地单元测试：`node tests/verify-audit-ui-optimization.mjs` 19 项全通过；
+    - [x] 生产环境部署核验：`wrangler deploy` 成功发布至 Cloudflare 生产环境 (Version ID: `6c3a8633-ee57-4f5e-98af-c14de6c521ef`)；
+    - [x] 线上全真检视：`node tests/verify-cf-production-audit-ui.mjs` 在 `mail.epocanvas.com` 实测 34/34 断言全绿通过；
+    - [x] 零假数据残留：数据库与 KV 中零临时凭据或脏数据残留。
+
 ### 安全审计控制台 11 大新列集重构与全表格居中对齐规范落地 (2026-10-10)
 *   **关联提交 (Git Commit)**: `b76e819441bc191c47530b9fc479ecc2f6013b57` (Short: `b76e819`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com)` (Version ID: `795a698b-4200-4f43-a0ff-ae2dc7083e4e`, Startup: `75ms`)
