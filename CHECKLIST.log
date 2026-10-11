@@ -7,6 +7,28 @@
 > 制度规范与工作流指引请见 [AGENTS.md](file:///home/shijian/projects/epocanvas-mail/AGENTS.md)。
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
+### 风控系统冷启动全真栈深度复测 · 合并 fix/abuse-table-columns 后全链路验证 (2026-10-12)
+*   **关联提交 (Git Commit)**: `53cd474` (本地合并 fix/abuse-table-columns, 未 push), `b415c38` (P0 编译阻断最小修复, 未 push)
+*   **部署环境 (Deployment)**: `本地全真栈 (wrangler dev @8787 · workerd 真实运行时模拟 CF 部署 · D1+KV 本地真库 · .wrangler/state 清空冷启动)`
+*   **任务性质与变更清单 (Changes & Feature Alignment)**:
+    - [x] 纯测试任务（按用户指示不修行为类 bug）：拉取远端 — master 与 origin/master 0/0 同步；远端最新工作位于未合并分支 `fix/abuse-table-columns` (12 commits, 较 master 新) → 本地合并为 `53cd474`，按要求未做任何 push；
+    - [x] P0 编译阻断最小修复 `b415c38`：分支 tip 的 `audit-service.js` 在 `seedBaselineIfEmpty` catch 块闭合后缺失方法级 `}` 与对象字面量分隔 `,`（auditService 顶层为对象字面量），esbuild 解析失败导致 worker 无法编译启动、风控/操作报告全链路不可用；仅补 2 行语法元素，零逻辑改动；
+    - [x] 本次发现的全部行为类缺陷仅记录不修（见下方红灯清单）。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 构建核验：`mail-vue` vite build 通过 (42.08s, 零报错)；worker `wrangler deploy --dry-run` 编译通过 (Total Upload 5495.59 KiB, b415c38 后)；
+    - [x] 冷启动引导链：state 清空 → wrangler dev → `GET /api/init/<jwt_secret>` → 6 角色播种 + 主站长创建 (user_id=2) → admin 登录 200，端到端成功；
+    - [x] 风控 E2E 主套件 `tests/test-risk-control-fullstack-e2e.mjs`：**54/55** — Phase A 危险操作模拟 (5 次暴破→12h 锁定、指纹浏览器/Webdriver 黑盒评分→Step-Up 强制二验、同 IP 多账户聚集)、Phase B 滥用链路 (垃圾邮件投递→检举→聚合升级 CRITICAL→外部申诉落库)、Phase C Admin 处置/操作报告 (四板块计数、ticket:/ip: 定向搜索、mute/blacklist/ban/note/extend/adjudicate approve/reject/purge、封禁台账 banned→unbanned、越权 403/未认证 401) 全绿；Phase D 测试用户 8 个物理删除；
+    - [x] 浏览器 UI 实测：`tests/verify-abuse-table-polish.mjs` **50/50** 全绿 + 5 分辨率截图留档 (1440/1024/860/768/375：零横向滚动、零单元格裁切、零省略号、KPI 拆分卡片、熔断状态条、折叠批次条)；旧套件 `verify-audit-ui-browser-e2e.mjs` U1/U2 绿 (工作台路由可达、KPI 渲染)；
+    - [x] physicsDelete 清理套件 `tests/test-physics-delete-kv-cleanup-e2e.mjs`：**32/32** — 上一轮在 master 暴露并挂起的 User 9 静默不可删缺陷实证已修复 (`id !== 9` 硬编码移除 + 23 个实测孤儿键含 `auth-uid:9` 全量清扫、KV 归零)；
+    - [x] i18n 三件套：symmetry 1929 keys × 6 语言 ALL SYMMETRIC；audit 1971 字面量键 0 缺失；hardcoded 退出码 0 (331 行均为注释/公告模板/非 UI 文本)；`verify-audit-section-columns.mjs` 4 大板块专属列集 100% 通过；
+    - [x] 零假数据残留终验：D1 `users_total=2` (纯种子)、`rkctl=0`、`audit_log=15` (纯种子基线)、孤儿 email/account=0；KV 测试衍生键 (`send_day_count:2026-10-12`、`login_fail:rkctloyte_*`、`login_fail:rkres_sndx`) 已物理清除，终态 10 键全为系统/种子/管理员合法键；测试临时脚本已删。
+*   **红灯与缺陷记录 (仅记录未修)**:
+    - **[P1·产品缺陷·真栈复现]** physicsDelete「当日发信量精准扣减」为死代码：`user-service.js:592-606` 以 `dayjs().startOf('day').toISOString()` (ISO-T 格式) 与 `email.create_time` (实体定义 `CURRENT_TIMESTAMP` → `YYYY-MM-DD HH:MM:SS` 空格分隔 UTC 文本) 做字典序比较，空格(0x20) < 'T'(0x54) 永不命中 → `sentTodayCount` 恒 0（叠加 UTC 存储 vs 本地日界时区错配）；真栈实证：计数器 2 →(发 1 封)→ 3 →(物理删除发信用户)→ 3 未扣减 (期望 2)；配套 32/32 套件该场景为 mockEnv 内存模拟（测试内复制扣减逻辑自跑），测不到真栈行为；
+    - **[P1·测试债]** 主套件 D2-1 断言硬编码旧种子基线 13，分支扩充种子 (新增 `THR-2026-MULTI99-2/-3` 集群子账号工单) 后实际为 15；实查 15 条全为种子工单、零测试残留，产品行为正确，属断言未随基线同步；
+    - **[P2·测试债]** 旧浏览器套件 `verify-audit-ui-browser-e2e.mjs` U3-U8 选择器仍针对旧版 Element Plus 表格 (`.el-table__row`)，新 UI 已重构为原生 7 列 `<table>`（FATAL 截图自证表格数据渲染完整、板块可用）；新 UI 已由 `verify-abuse-table-polish.mjs` 全量覆盖；
+    - **[P2·安全观察]** `wrangler-dev.toml` `[dev] ip="0.0.0.0"` 将本地栈暴露于网络；测试期间观测到 3 笔非本套件来源的人工式失败登录计数 (`login_fail:admin@bond` / `admin@cyou` / `admin@epomail.bond`, 各=1, 12h TTL 自净)，属真实外部尝试非测试注入，已保留未删并在此披露；
+    - **[P2·测试卫生]** 主套件 D1-2 的"删除后登录验证"步骤会在 KV 自动留下 `login_fail:{被删邮箱}=1` 计数 (系统对失败登录的正常记账)，套件 finally 未清扫该自产键，本次已手动清除。
+
 ### 用户物理删除 (physicsDelete) 深度清理 KV 孤儿键与 User 9 漏洞修复 (2026-10-11)
 *   **关联提交 (Git Commit)**: `5d06b0118edea7a1517d81f65a3be7e1c008fefa` (Short: `5d06b01`)
 *   **部署环境 (Deployment)**: `本地全真栈 (fix/abuse-table-columns 分支)`
