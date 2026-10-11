@@ -2701,6 +2701,10 @@ totpModeAllDesc: '设置是否允许用户使用TOTP，开启后用户可以且�
     abuseCopiedSuccess: "已复制到剪贴板",
     abuseAssignPrompt: "请输入分配的负责人名称：",
     abuseAssignSuccess: "已成功分配负责人",
+    abuseReasonCodeLabel: "原因码",
+    abuseEvidenceRetentionLabel: "证据留存",
+    abuseLifecycleTimelineTitle: "处置与证据全周期时间线",
+    abuseEmptyAutoPurged: "今日无自动折叠批次",
 };
 
 export default zh;

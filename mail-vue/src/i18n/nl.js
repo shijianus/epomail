@@ -2701,6 +2701,10 @@ totpModeAllDesc: 'Instellen of gebruikers TOTP mogen gebruiken. Eenmaal ingescha
     abuseCopiedSuccess: "Gekopieerd naar klembord",
     abuseAssignPrompt: "Voer naam van verantwoordelijke in:",
     abuseAssignSuccess: "Verantwoordelijke succesvol toegewezen",
+    abuseReasonCodeLabel: "Redencode",
+    abuseEvidenceRetentionLabel: "Bewaring van bewijs",
+    abuseLifecycleTimelineTitle: "Volledige levenscyclustijdlijn van sancties en bewijs",
+    abuseEmptyAutoPurged: "Geen automatisch opgeschoonde batches vandaag",
 };
 
 export default nl;

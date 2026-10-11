@@ -1755,11 +1755,11 @@
               </span>
             </div>
             <div class="grid-item" v-if="selectedRow.reasonCode">
-              <span class="label">原因码:</span>
+              <span class="label">{{ $t('abuseReasonCodeLabel') }}:</span>
               <span class="val font-mono text-danger font-semibold">{{ selectedRow.reasonCode }}</span>
             </div>
             <div class="grid-item" v-if="selectedRow.evidenceExpiresDays !== undefined">
-              <span class="label">证据留存:</span>
+              <span class="label">{{ $t('abuseEvidenceRetentionLabel') }}:</span>
               <span class="val font-mono">{{ $t('abuseEvidenceRemainingDays', { days: selectedRow.evidenceExpiresDays }) }}</span>
             </div>
           </div>
@@ -1798,7 +1798,7 @@
         <div class="dossier-card" v-if="selectedRow.timeline && selectedRow.timeline.length">
           <div class="section-title">
             <Icon icon="fluent:history-20-regular" width="18" height="18" />
-            <span>处置与证据全周期时间线</span>
+            <span>{{ $t('abuseLifecycleTimelineTitle') }}</span>
           </div>
           <div class="abuse-timeline-list">
             <div v-for="(item, idx) in selectedRow.timeline" :key="idx" class="timeline-row">
@@ -2190,18 +2190,19 @@
       append-to-body
       destroy-on-close
     >
-      <div class="purged-batches-list">
+      <div v-if="autoPurgedBatches && autoPurgedBatches.length > 0" class="purged-batches-list">
         <div v-for="b in autoPurgedBatches" :key="b.id" class="purged-batch-item">
           <div class="batch-header">
             <span class="batch-id font-mono">{{ b.id }}</span>
             <span class="batch-time">{{ b.time }}</span>
           </div>
           <div class="batch-meta">
-            <span class="batch-count">{{ b.count }} 个账号</span>
+            <span class="batch-count">{{ $t('abuseClusterAccountCount', { count: b.count }) }}</span>
             <span class="batch-reason font-mono">{{ b.reason }}</span>
           </div>
         </div>
       </div>
+      <el-empty v-else :description="$t('abuseEmptyAutoPurged')" />
       <template #footer>
         <div class="dialog-footer">
           <el-button @click="showAutoPurgedDialog = false">{{ $t('close') }}</el-button>
@@ -2280,15 +2281,11 @@ const summaryCounts = reactive({
   }
 });
 
-// 熔断与自动折叠状态
+// 熔断与自动折叠状态 (真实 D1/KV 驱动，零假数据)
 const circuitBreakerTripped = ref(false);
 const showAutoPurgedDialog = ref(false);
-const autoPurgedCount = ref(3);
-const autoPurgedBatches = ref([
-  { id: 'BAT-20261010-01', time: '2026-10-10 02:00:00', count: 48, reason: 'AUTO_PURGE_AND_TOMBSTONE' },
-  { id: 'BAT-20261009-02', time: '2026-10-09 18:30:00', count: 120, reason: 'AUTO_PURGE_AND_TOMBSTONE' },
-  { id: 'BAT-20261009-01', time: '2026-10-09 04:15:00', count: 35, reason: 'AUTO_PURGE_AND_TOMBSTONE' }
-]);
+const autoPurgedCount = ref(0);
+const autoPurgedBatches = ref([]);
 
 // 当前选中的 KPI 卡片 (默认高亮选中威胁邮箱)
 const activeKpi = ref('threat');
@@ -3066,9 +3063,47 @@ function formatAbuseActionSub(row) {
   return assignee;
 }
 
+function getSelectedThreatTargets() {
+  const targets = [];
+  for (const row of selectedRows.value) {
+    targets.push({ id: row.id, email: row.email, row });
+    if (row.clusterAccounts && row.clusterAccounts.length) {
+      for (const sub of row.clusterAccounts) {
+        if (!targets.some(t => t.id === sub.id)) {
+          targets.push({ id: sub.id, email: sub.email, row: sub });
+        }
+      }
+    }
+  }
+  for (const [key, isSelected] of Object.entries(abuseChildSelectedMap.value)) {
+    if (isSelected) {
+      const [parentId, childId] = key.split('_');
+      const parent = (logs.value || []).find(l => String(l.id) === String(parentId));
+      if (parent && parent.clusterAccounts) {
+        const child = parent.clusterAccounts.find(c => String(c.id || c.email) === String(childId));
+        if (child && !targets.some(t => t.id === child.id)) {
+          targets.push({ id: child.id, email: child.email, row: child });
+        }
+      }
+    }
+  }
+  return targets;
+}
+
 async function handleRowMoreCommand(cmd, row) {
   if (cmd === 'review') {
-    ElMessage.info(`${t('abuseBatchReview')}: ${formatAbuseTicketNo(row)}`);
+    try {
+      await auditAction({
+        id: row.id,
+        action: 'review',
+        targetEmail: row.email,
+        notes: t('abuseBatchReview')
+      });
+      ElMessage.success(`${t('abuseBatchReview')}成功`);
+      fetchAuditList();
+    } catch (e) {
+      console.error(e);
+    }
   } else if (cmd === 'assign') {
     try {
       const { value } = await ElMessageBox.prompt(t('abuseAssignPrompt'), t('abuseBatchAssign'), {
@@ -3076,9 +3111,16 @@ async function handleRowMoreCommand(cmd, row) {
         cancelButtonText: t('cancel'),
         inputValue: row.assignee || ''
       });
-      if (value !== undefined) {
-        row.assignee = value;
+      if (value !== undefined && value.trim()) {
+        await auditAction({
+          id: row.id,
+          action: 'assign',
+          assignee: value.trim(),
+          targetEmail: row.email,
+          notes: `${t('abuseBatchAssign')}: ${value.trim()}`
+        });
         ElMessage.success(t('abuseAssignSuccess'));
+        fetchAuditList();
       }
     } catch (e) {}
   } else if (cmd === 'unban') {
@@ -3110,10 +3152,11 @@ function handleSelectionChange(rows) {
 }
 
 async function handleBatchUnban() {
-  if (!selectedRows.value.length) return;
+  const targets = currentSection.value === 'threat' ? getSelectedThreatTargets() : selectedRows.value.map(r => ({ id: r.id, email: r.email }));
+  if (!targets.length) return;
   try {
     await ElMessageBox.confirm(
-      t('auditBatchUnbanConfirm', { count: selectedRows.value.length }),
+      t('auditBatchUnbanConfirm', { count: targets.length }),
       t('auditBatchUnban'),
       {
         confirmButtonText: t('auditBatchUnban'),
@@ -3122,13 +3165,13 @@ async function handleBatchUnban() {
       }
     );
     actionLoading.value = true;
-    for (const row of selectedRows.value) {
+    for (const tRow of targets) {
       try {
         await auditAction({
-          id: row.id,
+          id: tRow.id,
           action: 'unban',
-          targetEmail: row.email,
-          notes: `${t('auditBatchUnban')} (${row.email})`
+          targetEmail: tRow.email,
+          notes: `${t('auditBatchUnban')} (${tRow.email})`
         });
       } catch (err) {
         console.error(err);
@@ -3136,6 +3179,8 @@ async function handleBatchUnban() {
     }
     ElMessage.success(t('auditActionSuccess') || t('saveSuccessMsg'));
     selectedRows.value = [];
+    abuseChildSelectedMap.value = {};
+    abuseSelectedMap.value = {};
     fetchAuditList();
   } catch (e) {
     if (e !== 'cancel') console.error(e);
@@ -3180,22 +3225,75 @@ async function handleBatchBan() {
 }
 
 async function handleBatchAssign() {
-  if (!selectedRows.value.length) return;
+  const targets = currentSection.value === 'threat' ? getSelectedThreatTargets() : selectedRows.value.map(r => ({ id: r.id, email: r.email }));
+  if (!targets.length) return;
   try {
     const { value } = await ElMessageBox.prompt(t('abuseAssignPrompt'), t('abuseBatchAssign'), {
       confirmButtonText: t('confirm'),
       cancelButtonText: t('cancel')
     });
-    if (value !== undefined) {
-      selectedRows.value.forEach(r => { r.assignee = value; });
+    if (value !== undefined && value.trim()) {
+      actionLoading.value = true;
+      for (const tRow of targets) {
+        try {
+          await auditAction({
+            id: tRow.id,
+            action: 'assign',
+            assignee: value.trim(),
+            targetEmail: tRow.email,
+            notes: `${t('abuseBatchAssign')}: ${value.trim()}`
+          });
+        } catch (err) {
+          console.error(err);
+        }
+      }
       ElMessage.success(t('abuseAssignSuccess'));
+      selectedRows.value = [];
+      abuseChildSelectedMap.value = {};
+      abuseSelectedMap.value = {};
+      fetchAuditList();
     }
-  } catch (e) {}
+  } catch (e) {} finally {
+    actionLoading.value = false;
+  }
 }
 
-function handleBatchReview() {
-  if (!selectedRows.value.length) return;
-  ElMessage.success(`${t('abuseBatchReview')}: ${selectedRows.value.length} 条工单`);
+async function handleBatchReview() {
+  const targets = currentSection.value === 'threat' ? getSelectedThreatTargets() : selectedRows.value.map(r => ({ id: r.id, email: r.email }));
+  if (!targets.length) return;
+  try {
+    await ElMessageBox.confirm(
+      `确认开始复核选中的 ${targets.length} 条工单记录？`,
+      t('abuseBatchReview'),
+      {
+        confirmButtonText: t('abuseBatchReview'),
+        cancelButtonText: t('cancel'),
+        type: 'warning'
+      }
+    );
+    actionLoading.value = true;
+    for (const tRow of targets) {
+      try {
+        await auditAction({
+          id: tRow.id,
+          action: 'review',
+          targetEmail: tRow.email,
+          notes: t('abuseBatchReview')
+        });
+      } catch (err) {
+        console.error(err);
+      }
+    }
+    ElMessage.success(`${t('abuseBatchReview')}成功`);
+    selectedRows.value = [];
+    abuseChildSelectedMap.value = {};
+    abuseSelectedMap.value = {};
+    fetchAuditList();
+  } catch (e) {
+    if (e !== 'cancel') console.error(e);
+  } finally {
+    actionLoading.value = false;
+  }
 }
 
 async function handleBatchDelete() {

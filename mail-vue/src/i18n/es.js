@@ -2701,6 +2701,10 @@ totpModeAllDesc: 'Configurar si los usuarios pueden usar TOTP. Al activarlo, la 
     abuseCopiedSuccess: "Copiado al portapapeles",
     abuseAssignPrompt: "Ingrese el nombre del responsable:",
     abuseAssignSuccess: "Responsable asignado correctamente",
+    abuseReasonCodeLabel: "Código de motivo",
+    abuseEvidenceRetentionLabel: "Retención de pruebas",
+    abuseLifecycleTimelineTitle: "Cronología completa del ciclo de vida de sanciones y pruebas",
+    abuseEmptyAutoPurged: "No hay lotes purgados automáticamente hoy",
 };
 
 export default es;

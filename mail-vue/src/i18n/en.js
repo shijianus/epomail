@@ -2701,6 +2701,10 @@ totpModeAllDesc: 'Configure whether users can use TOTP. When enabled, 2FA is ava
     abuseCopiedSuccess: "Copied to clipboard",
     abuseAssignPrompt: "Enter assignee name:",
     abuseAssignSuccess: "Operator assigned successfully",
+    abuseReasonCodeLabel: "Reason Code",
+    abuseEvidenceRetentionLabel: "Evidence Retention",
+    abuseLifecycleTimelineTitle: "Enforcement & Evidence Full Lifecycle Timeline",
+    abuseEmptyAutoPurged: "No auto-purged batches today",
 };
 
 export default en;

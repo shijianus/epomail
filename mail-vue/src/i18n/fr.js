@@ -2701,6 +2701,10 @@ totpModeAllDesc: 'Définir si les utilisateurs peuvent utiliser TOTP. Lorsqu\'il
     abuseCopiedSuccess: "Copié dans le presse-papiers",
     abuseAssignPrompt: "Entrez le nom du responsable :",
     abuseAssignSuccess: "Responsable assigné avec succès",
+    abuseReasonCodeLabel: "Code de motif",
+    abuseEvidenceRetentionLabel: "Conservation des preuves",
+    abuseLifecycleTimelineTitle: "Chronologie du cycle de vie complet des sanctions et preuves",
+    abuseEmptyAutoPurged: "Aucun lot purgé automatiquement aujourd'hui",
 };
 
 export default fr;
