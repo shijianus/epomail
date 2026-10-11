@@ -366,8 +366,13 @@
                       </td>
                       <!-- 4. 状态 -->
                       <td class="col-status" :data-label="$t('abuseColStatus')">
-                        <div class="status-badge" :class="`status-${row.status}`">
-                          {{ getStatusLabel(row.status) }}
+                        <div class="status-cell">
+                          <div class="status-badge" :class="getAbuseStatusInfo(row).cls">
+                            {{ getAbuseStatusInfo(row).main }}
+                          </div>
+                          <div v-if="getAbuseStatusInfo(row).sub" class="status-sub-badge badge-tripped">
+                            {{ getAbuseStatusInfo(row).sub }}
+                          </div>
                         </div>
                       </td>
                       <!-- 5. 分类 -->
@@ -461,8 +466,13 @@
                           </div>
                         </td>
                         <td class="col-status" :data-label="$t('abuseColStatus')">
-                          <div class="status-badge" :class="`status-${sub.status || row.status}`">
-                            {{ getStatusLabel(sub.status || row.status) }}
+                          <div class="status-cell">
+                            <div class="status-badge" :class="getAbuseStatusInfo(sub.status ? sub : row).cls">
+                              {{ getAbuseStatusInfo(sub.status ? sub : row).main }}
+                            </div>
+                            <div v-if="getAbuseStatusInfo(sub.status ? sub : row).sub" class="status-sub-badge badge-tripped">
+                              {{ getAbuseStatusInfo(sub.status ? sub : row).sub }}
+                            </div>
                           </div>
                         </td>
                         <td class="col-cat" :data-label="$t('abuseColCategory')">
@@ -2904,6 +2914,35 @@ function getAbuseCategoryName(row) {
   return t('abuseCatOutbound');
 }
 
+function getAbuseStatusInfo(row) {
+  if (row.circuitStatus === 'QUEUE_PAUSE' || row.circuitStatus === 'TRIPPED') {
+    return {
+      main: t('abuseStatusPending'),
+      sub: t('abuseStatusTripped'),
+      cls: 'status-pending'
+    };
+  }
+  if (row.status === 'banned') {
+    return {
+      main: t('abuseStatusBanned'),
+      sub: null,
+      cls: 'status-banned'
+    };
+  }
+  if (row.status === 'unbanned' || row.status === 'resolved') {
+    return {
+      main: t('abuseStatusUnbanned'),
+      sub: null,
+      cls: 'status-unbanned'
+    };
+  }
+  return {
+    main: t('abuseStatusPending'),
+    sub: null,
+    cls: 'status-pending'
+  };
+}
+
 function getAbuseActionLabel(row) {
   const status = row.status;
   if (status === 'banned') return t('abuseActionMaintainBan');
@@ -2916,7 +2955,7 @@ function formatAbuseActionSub(row) {
   if (row.circuitStatus === 'QUEUE_PAUSE' || row.circuitStatus === 'TRIPPED') {
     return t('abuseActionNeedManual');
   }
-  const assignee = row.assignee || getOperatorName(row) || '-';
+  const assignee = row.assignee || '-';
   const status = row.status;
   if (status === 'banned' || status === 'unbanned' || status === 'resolved') {
     const timeStr = row.resolvedTime || row.banTime || row.createTime;
@@ -4444,6 +4483,13 @@ onUnmounted(() => {
   }
 }
 
+.status-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  align-items: flex-start;
+}
+
 .status-badge {
   font-size: 12px;
   font-weight: 600;
@@ -4468,6 +4514,16 @@ onUnmounted(() => {
     color: #16a34a;
     background: rgba(22, 163, 74, 0.1);
   }
+}
+
+.status-sub-badge.badge-tripped {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 4px;
+  border-radius: 3px;
+  color: #d97706;
+  background: rgba(217, 119, 6, 0.15);
+  line-height: 1.2;
 }
 
 .cat-cell {
