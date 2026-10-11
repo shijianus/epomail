@@ -276,73 +276,217 @@
                   </tr>
                 </thead>
                 <tbody v-if="logs.length > 0">
-                  <tr
-                    v-for="row in logs"
-                    :key="row.id"
-                    class="abuse-table-row"
-                    :class="{ 'row-selected': isAbuseSelected(row) }"
-                  >
-                    <!-- 1. 选择 -->
-                    <td class="col-select" :data-label="$t('abuseColSelect')" style="text-align: center;">
-                      <el-checkbox
-                        :model-value="isAbuseSelected(row)"
-                        @change="() => toggleAbuseRowSelection(row)"
-                      />
-                    </td>
-                    <!-- 2. 编号 -->
-                    <td class="col-no" :data-label="$t('abuseColNo')">
-                      <span class="ticket-id font-mono font-medium clickable-ticket" @click="openAuditDrawer(row)">
-                        {{ formatAbuseTicketNo(row) }}
-                      </span>
-                    </td>
-                    <!-- 3. 对象 -->
-                    <td class="col-target" :data-label="$t('abuseColTarget')">
-                      <div class="target-container">
-                        <span class="target-email">{{ row.email }}</span>
-                        <span class="target-userid font-mono">{{ row.userId ? `usr_${row.userId}` : `usr_${row.id}` }}</span>
-                      </div>
-                    </td>
-                    <!-- 4. 状态 -->
-                    <td class="col-status" :data-label="$t('abuseColStatus')">
-                      <div class="status-badge" :class="`status-${row.status}`">
-                        {{ getStatusLabel(row.status) }}
-                      </div>
-                    </td>
-                    <!-- 5. 分类 -->
-                    <td class="col-cat" :data-label="$t('abuseColCategory')">
-                      <div class="cat-cell">
-                        <span class="cat-title">{{ getAbuseCategoryName(row) }}</span>
-                        <span class="cat-summary">{{ row.evidenceSummary || row.actionText }}</span>
-                      </div>
-                    </td>
-                    <!-- 6. 处理 -->
-                    <td class="col-action" :data-label="$t('abuseColAction')">
-                      <div class="action-cell">
-                        <span class="action-top">{{ getAbuseActionLabel(row) }}</span>
-                        <span class="action-sub">{{ formatAbuseActionSub(row) }}</span>
-                      </div>
-                    </td>
-                    <!-- 7. 操作 -->
-                    <td class="col-opt" :data-label="$t('abuseColOpt')">
-                      <div class="opt-cell">
-                        <el-button size="small" type="primary" link @click="openAuditDrawer(row)" class="opt-btn-details">
-                          {{ $t('auditBtnViewDetails') }}
-                        </el-button>
-                        <el-dropdown trigger="click" @command="(cmd) => handleRowMoreCommand(cmd, row)">
-                          <span class="opt-more-btn" :title="$t('more')">
-                            <Icon icon="fluent:more-horizontal-16-regular" width="14" height="14" />
-                          </span>
-                          <template #dropdown>
-                            <el-dropdown-menu>
-                              <el-dropdown-item command="review">{{ $t('abuseBatchReview') }}</el-dropdown-item>
-                              <el-dropdown-item command="assign">{{ $t('abuseBatchAssign') }}</el-dropdown-item>
-                              <el-dropdown-item command="unban" :disabled="row.status === 'unbanned'">{{ $t('abuseBatchUnban') }}</el-dropdown-item>
-                            </el-dropdown-menu>
-                          </template>
-                        </el-dropdown>
-                      </div>
-                    </td>
-                  </tr>
+                  <template v-for="row in logs" :key="row.id">
+                    <tr
+                      class="abuse-table-row"
+                      :class="{ 'row-selected': isAbuseSelected(row) }"
+                    >
+                      <!-- 1. 选择 -->
+                      <td class="col-select" :data-label="$t('abuseColSelect')" style="text-align: center;">
+                        <el-checkbox
+                          :model-value="isAbuseSelected(row)"
+                          @change="() => toggleAbuseRowSelection(row)"
+                        />
+                      </td>
+                      <!-- 2. 编号 -->
+                      <td class="col-no" :data-label="$t('abuseColNo')">
+                        <span class="ticket-id font-mono font-medium clickable-ticket" @click="openAuditDrawer(row)">
+                          {{ formatAbuseTicketNo(row) }}
+                        </span>
+                      </td>
+                      <!-- 3. 对象 -->
+                      <td class="col-target" :data-label="$t('abuseColTarget')">
+                        <div class="target-container">
+                          <!-- 邮箱第一行 -->
+                          <div class="target-email-row" :class="getMailLengthClass(row.email)">
+                            <!-- 类型图标 (固定 16px) -->
+                            <span class="target-type-icon-wrap" :title="isClearedAccount(row) ? $t('abuseClearedAccount') : (isClusterRow(row) ? $t('abuseCatMultiAccount') : '')">
+                              <Icon v-if="isClearedAccount(row)" icon="fluent:delete-dismiss-16-regular" width="16" height="16" class="type-icon icon-cleared" />
+                              <Icon v-else-if="isClusterRow(row)" icon="fluent:people-community-16-regular" width="16" height="16" class="type-icon icon-cluster" />
+                              <Icon v-else icon="fluent:person-16-regular" width="16" height="16" class="type-icon icon-single" />
+                            </span>
+
+                            <!-- 已清除账号 -->
+                            <template v-if="isClearedAccount(row)">
+                              <span class="cleared-label">{{ $t('abuseClearedAccount') }}</span>
+                            </template>
+
+                            <!-- 普通 / 集群账号 -->
+                            <template v-else>
+                              <!-- 集群工单展开折叠徽标 -->
+                              <span
+                                v-if="isClusterRow(row)"
+                                class="cluster-badge"
+                                @click.stop="toggleClusterExpand(row)"
+                                :title="$t('abuseCatMultiAccount')"
+                              >
+                                {{ $t('abuseClusterAccountCount', { count: getClusterCount(row) }) }}
+                                <Icon :icon="isClusterExpanded(row) ? 'fluent:chevron-up-12-regular' : 'fluent:chevron-down-12-regular'" width="12" height="12" />
+                              </span>
+
+                              <!-- 邮箱文本 (带零宽空格) -->
+                              <span class="target-email font-mono">
+                                <span class="mail-local">{{ formatMailLocal(row.email) }}</span>
+                                <span class="mail-at">@&#8203;</span>
+                                <span class="mail-domain">{{ formatMailDomain(row.email) }}</span>
+                              </span>
+
+                              <!-- >160 字符长地址徽标 -->
+                              <span v-if="row.email && row.email.length > 160" class="long-addr-tag">
+                                {{ $t('abuseLongAddressTag') }}
+                              </span>
+
+                              <!-- 悬停复制图标 -->
+                              <span class="copy-actions">
+                                <span class="copy-icon-btn" :title="$t('abuseCopyEmail')" @click.stop="copyEmailUnicode(row.email)">
+                                  <Icon icon="fluent:copy-16-regular" width="13" height="13" />
+                                </span>
+                                <span
+                                  v-if="hasIdnDomain(row.email)"
+                                  class="copy-icon-btn puny-btn"
+                                  :title="$t('abuseCopyPunycode')"
+                                  @click.stop="copyEmailPunycode(row.email)"
+                                >
+                                  <Icon icon="fluent:globe-16-regular" width="13" height="13" />
+                                </span>
+                              </span>
+                            </template>
+                          </div>
+
+                          <!-- usr_ID 底部行 -->
+                          <div class="target-userid-row">
+                            <span class="target-userid font-mono">{{ formatUserId(row) }}</span>
+                            <span class="copy-actions">
+                              <span class="copy-icon-btn" :title="$t('abuseCopyUserId')" @click.stop="copyTextRaw(formatUserId(row), $t('abuseCopiedSuccess'))">
+                                <Icon icon="fluent:copy-16-regular" width="12" height="12" />
+                              </span>
+                            </span>
+                          </div>
+                        </div>
+                      </td>
+                      <!-- 4. 状态 -->
+                      <td class="col-status" :data-label="$t('abuseColStatus')">
+                        <div class="status-badge" :class="`status-${row.status}`">
+                          {{ getStatusLabel(row.status) }}
+                        </div>
+                      </td>
+                      <!-- 5. 分类 -->
+                      <td class="col-cat" :data-label="$t('abuseColCategory')">
+                        <div class="cat-cell">
+                          <span class="cat-title">{{ getAbuseCategoryName(row) }}</span>
+                          <span class="cat-summary">{{ row.evidenceSummary || row.actionText }}</span>
+                        </div>
+                      </td>
+                      <!-- 6. 处理 -->
+                      <td class="col-action" :data-label="$t('abuseColAction')">
+                        <div class="action-cell">
+                          <span class="action-top">{{ getAbuseActionLabel(row) }}</span>
+                          <span class="action-sub">{{ formatAbuseActionSub(row) }}</span>
+                        </div>
+                      </td>
+                      <!-- 7. 操作 -->
+                      <td class="col-opt" :data-label="$t('abuseColOpt')">
+                        <div class="opt-cell">
+                          <el-button size="small" type="primary" link @click="openAuditDrawer(row)" class="opt-btn-details">
+                            {{ $t('auditBtnViewDetails') }}
+                          </el-button>
+                          <el-dropdown trigger="click" @command="(cmd) => handleRowMoreCommand(cmd, row)">
+                            <span class="opt-more-btn" :title="$t('more')">
+                              <Icon icon="fluent:more-horizontal-16-regular" width="14" height="14" />
+                            </span>
+                            <template #dropdown>
+                              <el-dropdown-menu>
+                                <el-dropdown-item command="review">{{ $t('abuseBatchReview') }}</el-dropdown-item>
+                                <el-dropdown-item command="assign">{{ $t('abuseBatchAssign') }}</el-dropdown-item>
+                                <el-dropdown-item command="unban" :disabled="row.status === 'unbanned'">{{ $t('abuseBatchUnban') }}</el-dropdown-item>
+                              </el-dropdown-menu>
+                            </template>
+                          </el-dropdown>
+                        </div>
+                      </td>
+                    </tr>
+
+                    <!-- 集群子账号展开行 -->
+                    <template v-if="isClusterRow(row) && isClusterExpanded(row)">
+                      <tr
+                        v-for="sub in row.clusterAccounts"
+                        :key="sub.id || sub.email"
+                        class="abuse-cluster-child-row"
+                      >
+                        <td class="col-select" :data-label="$t('abuseColSelect')" style="text-align: center;">
+                          <el-checkbox
+                            :model-value="isChildSelected(row, sub)"
+                            @change="() => toggleChildSelection(row, sub)"
+                          />
+                        </td>
+                        <td class="col-no" :data-label="$t('abuseColNo')">
+                          <span class="child-sub-no font-mono">{{ formatAbuseTicketNo(row) }}-{{ sub.id || 1 }}</span>
+                        </td>
+                        <td class="col-target" :data-label="$t('abuseColTarget')">
+                          <div class="target-container child-target">
+                            <div class="target-email-row" :class="getMailLengthClass(sub.email)">
+                              <span class="target-type-icon-wrap">
+                                <Icon icon="fluent:arrow-enter-down-16-regular" width="14" height="14" class="type-icon icon-child" />
+                              </span>
+                              <span class="target-email font-mono">
+                                <span class="mail-local">{{ formatMailLocal(sub.email) }}</span>
+                                <span class="mail-at">@&#8203;</span>
+                                <span class="mail-domain">{{ formatMailDomain(sub.email) }}</span>
+                              </span>
+                              <span v-if="sub.email && sub.email.length > 160" class="long-addr-tag">
+                                {{ $t('abuseLongAddressTag') }}
+                              </span>
+                              <span class="copy-actions">
+                                <span class="copy-icon-btn" :title="$t('abuseCopyEmail')" @click.stop="copyEmailUnicode(sub.email)">
+                                  <Icon icon="fluent:copy-16-regular" width="13" height="13" />
+                                </span>
+                                <span
+                                  v-if="hasIdnDomain(sub.email)"
+                                  class="copy-icon-btn puny-btn"
+                                  :title="$t('abuseCopyPunycode')"
+                                  @click.stop="copyEmailPunycode(sub.email)"
+                                >
+                                  <Icon icon="fluent:globe-16-regular" width="13" height="13" />
+                                </span>
+                              </span>
+                            </div>
+                            <div class="target-userid-row">
+                              <span class="target-userid font-mono">{{ formatUserId(sub) }}</span>
+                              <span class="copy-actions">
+                                <span class="copy-icon-btn" :title="$t('abuseCopyUserId')" @click.stop="copyTextRaw(formatUserId(sub), $t('abuseCopiedSuccess'))">
+                                  <Icon icon="fluent:copy-16-regular" width="12" height="12" />
+                                </span>
+                              </span>
+                            </div>
+                          </div>
+                        </td>
+                        <td class="col-status" :data-label="$t('abuseColStatus')">
+                          <div class="status-badge" :class="`status-${sub.status || row.status}`">
+                            {{ getStatusLabel(sub.status || row.status) }}
+                          </div>
+                        </td>
+                        <td class="col-cat" :data-label="$t('abuseColCategory')">
+                          <div class="cat-cell">
+                            <span class="cat-title">{{ getAbuseCategoryName(row) }}</span>
+                            <span class="cat-summary">{{ sub.evidenceSummary || row.evidenceSummary || '集群关联' }}</span>
+                          </div>
+                        </td>
+                        <td class="col-action" :data-label="$t('abuseColAction')">
+                          <div class="action-cell">
+                            <span class="action-top">{{ getAbuseActionLabel(sub.status ? sub : row) }}</span>
+                            <span class="action-sub">{{ formatAbuseActionSub(sub.status ? sub : row) }}</span>
+                          </div>
+                        </td>
+                        <td class="col-opt" :data-label="$t('abuseColOpt')">
+                          <div class="opt-cell">
+                            <el-button size="small" type="primary" link @click="openAuditDrawer(sub)" class="opt-btn-details">
+                              {{ $t('auditBtnViewDetails') }}
+                            </el-button>
+                          </div>
+                        </td>
+                      </tr>
+                    </template>
+                  </template>
                 </tbody>
                 <tbody v-else>
                   <tr>
@@ -2640,6 +2784,109 @@ function formatAbuseTicketNo(row) {
   return `#${10000 + (Number(row.id) || 1)}`;
 }
 
+// --- 滥用威胁对象列与集群子账号辅助函数 ---
+const expandedClusterMap = ref({});
+const abuseChildSelectedMap = ref({});
+
+function isClusterRow(row) {
+  return !!((row.clusterAccounts && row.clusterAccounts.length > 1) || (Number(row.clusterCount) > 1));
+}
+
+function getClusterCount(row) {
+  if (row.clusterAccounts && row.clusterAccounts.length) {
+    return row.clusterAccounts.length;
+  }
+  return Number(row.clusterCount) || 1;
+}
+
+function isClusterExpanded(row) {
+  return !!expandedClusterMap.value[row.id];
+}
+
+function toggleClusterExpand(row) {
+  expandedClusterMap.value[row.id] = !expandedClusterMap.value[row.id];
+}
+
+function isChildSelected(row, child) {
+  const key = `${row.id}_${child.id || child.email}`;
+  return !!abuseChildSelectedMap.value[key];
+}
+
+function toggleChildSelection(row, child) {
+  const key = `${row.id}_${child.id || child.email}`;
+  if (abuseChildSelectedMap.value[key]) {
+    delete abuseChildSelectedMap.value[key];
+  } else {
+    abuseChildSelectedMap.value[key] = true;
+  }
+}
+
+function isClearedAccount(row) {
+  return !!(row.isCleared || row.status === 'cleared' || !row.email || row.email === '[cleared]');
+}
+
+function formatMailLocal(email) {
+  if (!email || !email.includes('@')) return email || '';
+  return email.split('@')[0];
+}
+
+function formatMailDomain(email) {
+  if (!email || !email.includes('@')) return '';
+  const domain = email.slice(email.indexOf('@') + 1);
+  return domain.replace(/\./g, '.\u200B');
+}
+
+function getMailLengthClass(email) {
+  if (!email) return 'len-normal';
+  const len = email.length;
+  if (len > 160) return 'len-long';
+  if (len > 80) return 'len-medium';
+  return 'len-normal';
+}
+
+function hasIdnDomain(email) {
+  if (!email || !email.includes('@')) return false;
+  const domain = email.split('@')[1];
+  return /[^\u0000-\u007F]/.test(domain);
+}
+
+function getPunycodeEmail(email) {
+  if (!email || !email.includes('@')) return email || '';
+  const [local, domain] = email.split('@');
+  try {
+    const punyDomain = new URL('http://' + domain).hostname;
+    return `${local}@${punyDomain}`;
+  } catch (e) {
+    return email;
+  }
+}
+
+async function copyTextRaw(text, msg) {
+  if (!text) return;
+  try {
+    await navigator.clipboard.writeText(text);
+    ElMessage.success(msg || t('abuseCopiedSuccess'));
+  } catch (e) {
+    ElMessage.info(text);
+  }
+}
+
+async function copyEmailUnicode(email) {
+  await copyTextRaw(email, t('abuseCopiedSuccess'));
+}
+
+async function copyEmailPunycode(email) {
+  const puny = getPunycodeEmail(email);
+  await copyTextRaw(puny, t('abuseCopiedSuccess') + ' (Punycode)');
+}
+
+function formatUserId(row) {
+  if (row.userId) {
+    return String(row.userId).startsWith('usr_') ? String(row.userId) : `usr_${row.userId}`;
+  }
+  return `usr_${row.id}`;
+}
+
 function getAbuseCategoryName(row) {
   const cat = (row.reportCategory || row.violationCategory || row.eventType || '').toLowerCase();
   if (cat.includes('protocol') || cat.includes('honeypot') || cat.includes('dkim') || cat.includes('tear') || cat.includes('sign')) {
@@ -4030,18 +4277,170 @@ onUnmounted(() => {
 .target-container {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
+  overflow: hidden;
+  max-width: 100%;
+}
 
-  .target-email {
-    font-size: 13px;
-    line-height: 1.35;
-    word-break: break-word;
-    overflow-wrap: anywhere;
+.target-email-row {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 4px;
+  max-width: 100%;
+  position: relative;
+}
+
+.target-type-icon-wrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.type-icon {
+  width: 16px;
+  height: 16px;
+
+  &.icon-single {
+    color: var(--el-text-color-regular);
+  }
+  &.icon-cluster {
+    color: var(--el-color-primary);
+  }
+  &.icon-cleared {
+    color: var(--el-text-color-placeholder);
+  }
+  &.icon-child {
+    color: var(--el-text-color-secondary);
+  }
+}
+
+.cleared-label {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  font-style: italic;
+}
+
+.cluster-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 11px;
+  padding: 1px 5px;
+  background: var(--el-color-primary-light-9);
+  color: var(--el-color-primary);
+  border-radius: 3px;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  user-select: none;
+  font-weight: 500;
+  line-height: 1.2;
+
+  &:hover {
+    background: var(--el-color-primary-light-8);
+  }
+}
+
+.target-email {
+  line-height: 1.35;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  color: var(--el-text-color-primary);
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.len-normal .target-email {
+  font-size: 13px;
+}
+
+.len-medium .target-email {
+  font-size: 12px;
+}
+
+.len-long .target-email {
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.long-addr-tag {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10px;
+  padding: 1px 4px;
+  background: var(--el-color-warning-light-9);
+  color: var(--el-color-warning);
+  border-radius: 2px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  line-height: 1.2;
+  font-weight: 600;
+}
+
+.copy-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  flex-shrink: 0;
+}
+
+.target-email-row:hover .copy-actions,
+.target-userid-row:hover .copy-actions {
+  opacity: 1;
+}
+
+.copy-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--el-text-color-placeholder);
+  border-radius: 3px;
+  padding: 1px;
+  transition: color 0.15s;
+
+  &:hover {
+    color: var(--el-color-primary);
+  }
+}
+
+.target-userid-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  position: relative;
+}
+
+.target-userid {
+  font-size: 11px;
+  color: var(--el-text-color-placeholder);
+  letter-spacing: 0.3px;
+}
+
+.abuse-cluster-child-row {
+  background: var(--el-fill-color-extra-light);
+
+  td {
+    border-top: 1px dashed var(--el-border-color-lighter);
+    padding: 6px 6px;
   }
 
-  .target-userid {
-    font-size: 11px;
+  .child-sub-no {
+    font-size: 11.5px;
     color: var(--el-text-color-secondary);
+    padding-left: 6px;
+  }
+
+  .child-target {
+    padding-left: 8px;
   }
 }
 
