@@ -9,6 +9,21 @@
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
 
+### EpomailDocs v5.19 快速上手页新增轮：两条路径最短操作序列 ×6 语言与阅读路线接入 (2026-10-11)
+*   **关联提交 (Git Commit)**: EpomailDocs 独立提交 `379c012` (Short: `379c012`) + `29fb2e8` (manifest 固化 379c012)；两提交已推送 origin/master 与 origin/main；主仓归档提交见本条目对应变更提交
+*   **部署环境 (Deployment)**: `本地：EpomailDocs astro preview 4321 六语言浏览器实测；线上发布未执行，待运营者 pnpm run deploy`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 反馈（完整介绍文档、辅助开源用户了解专案并宣传如何使用）：新增「快速上手」页 ×6 语言——路径 A 托管实例十分钟（注册→身份分组→收第一封信（欢迎邮件+验证码提取）→发第一封信→自动整理→两步验证→Telegram 推送→数据导出八步）与路径 B 自部署三十分钟（前置核对→三命令部署→/api/init 初始化→密钥注入→Email Routing 收件→投递通道发件→四项收发核验→数据控制者地位确认八步）；注册事实经 mail-worker login-service.js 源码逐行核验（注册码三模式/默认分组/密码 6–30 位/注册即投欢迎邮件/`?code=` 直达），其余为既有已核验页交叉引用，零臆造
+    - [x] Google 内容设计范式对齐：开头一段直接说明本页是什么与两条路径怎么选；可枚举事实表格化（选择路径对照表）；每步加粗扫读锚点 + 深链专页；配图沿用六语言本地化 dual-nature-scale.svg 承担真实信息结构（零新截图，无应用代码改动）
+    - [x] 侧栏「产品与总览」组新增「快速上手」（六语言标签 + OverriddenPagination 专属几何图标）；check-structure.py 纳入 introduction 与 quickstart（DOCS 36 篇）
+    - [x] 阅读路线接入 ×6 语言：introduction §2.1 表格行与路线一、overview §3 路线句、project §10 相关文档表
+    - [x] 全站版本 5.17→5.19、生效日期 2026-10-11 同步（216 文件，残留清零）
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：pnpm build 217 页零报错（32.8s）；validate-anchors 434 页 3552/0 断链；check-structure 36 篇 ×6 语言 100% 对称；verify-laws 退出码 0；tamper-proof 固化 379c012
+    - [x] 浏览器实测：六语言 /mail/quickstart/ 全部 HTTP 200、侧栏六语言标签齐备；zh 暗色首屏（标题/版本行/双轨图/图注链接/对照表）与步骤区（代码块高亮/加粗锚点/内联代码）渲染正常；en 浅色首屏本地化配图微标签渲染正常；zh/en 翻页卡（上一页专案介绍/下一页服务范围与支持）正确
+    - [x] 零假数据残留：本页无截图新增、无测试数据写入；判图截图不入库
+
+
 ### EpomailDocs v5.17/v5.18 分区含义标注与隐藏式图解全覆盖轮：36 处隐藏式下拉 ×6 语言，深说明对齐 (2026-10-10)
 *   **关联提交 (Git Commit)**: EpomailDocs 独立提交 `f3325f2` (Short: `f3325f2`) + `1ca8c0c` (manifest 固化 f3325f2)；两提交已推送 origin/master 与 origin/main；主仓归档提交见本条目对应变更提交
 *   **部署环境 (Deployment)**: `本地：EpomailDocs astro preview dist:8790 六语言判图；线上发布未执行，待运营者 pnpm run deploy`
