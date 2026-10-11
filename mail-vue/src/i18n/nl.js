@@ -2646,6 +2646,21 @@ totpModeAllDesc: 'Instellen of gebruikers TOTP mogen gebruiken. Eenmaal ingescha
     auditAdjudicatorAdmin: "SecAdmin (Beveiligingsleider)",
     auditAdjudicatorSystem: "System Bot (Beleidsmotor)",
     auditOperatorRoleMaster: "Hoofdbeheerder",
+    auditColViolationLevel: "Overtredingsniveau",
+    auditColDeadline: "Deadline",
+    auditColUpdateCount: "Aantal updates",
+    auditColLastUpdated: "Laatst bijgewerkt",
+    auditColAppealCount: "Aantal beroepen",
+    auditDeadlineExpired: "Verlopen",
+    auditDeadlinePermanent: "Permanente controle",
+    auditDeadlineDaysLeft: "Nog {days} dagen",
+    auditDeadlineHoursLeft: "Nog {hours} uur",
+    auditExpiredBadge: "Verlopen",
+    auditAllViolationLevels: "Alle niveaus",
+    auditLevelLv3: "LV3 · Hoog risico",
+    auditLevelLv2: "LV2 · Gemiddeld risico",
+    auditLevelLv1: "LV1 · Laag risico",
+    auditLevelLv0: "LV0 · Normaal",
 };
 
 export default nl;

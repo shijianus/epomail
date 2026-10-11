@@ -2646,6 +2646,21 @@ totpModeAllDesc: 'Configure whether users can use TOTP. When enabled, 2FA is ava
     auditAdjudicatorAdmin: "SecAdmin (Security Lead)",
     auditAdjudicatorSystem: "System Bot (Policy Engine)",
     auditOperatorRoleMaster: "Root Administrator",
+    auditColViolationLevel: "Violation Level",
+    auditColDeadline: "Deadline",
+    auditColUpdateCount: "Update Count",
+    auditColLastUpdated: "Last Updated",
+    auditColAppealCount: "Appeal Count",
+    auditDeadlineExpired: "Expired",
+    auditDeadlinePermanent: "Permanent",
+    auditDeadlineDaysLeft: "{days}d left",
+    auditDeadlineHoursLeft: "{hours}h left",
+    auditExpiredBadge: "Expired",
+    auditAllViolationLevels: "All Levels",
+    auditLevelLv3: "LV3 · High Risk",
+    auditLevelLv2: "LV2 · Medium Risk",
+    auditLevelLv1: "LV1 · Low Risk",
+    auditLevelLv0: "LV0 · Normal",
 };
 
 export default en;

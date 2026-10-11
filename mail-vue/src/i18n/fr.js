@@ -2646,6 +2646,21 @@ totpModeAllDesc: 'Définir si les utilisateurs peuvent utiliser TOTP. Lorsqu\'il
     auditAdjudicatorAdmin: "SecAdmin (Resp. Sécurité)",
     auditAdjudicatorSystem: "System Bot (Moteur de règles)",
     auditOperatorRoleMaster: "Administrateur racine",
+    auditColViolationLevel: "Niveau d'infraction",
+    auditColDeadline: "Date limite",
+    auditColUpdateCount: "Nombre de mises à jour",
+    auditColLastUpdated: "Dernière mise à jour",
+    auditColAppealCount: "Nombre d'appels",
+    auditDeadlineExpired: "Expiré",
+    auditDeadlinePermanent: "Contrôle permanent",
+    auditDeadlineDaysLeft: "{days} j restants",
+    auditDeadlineHoursLeft: "{hours} h restantes",
+    auditExpiredBadge: "Expiré",
+    auditAllViolationLevels: "Tous les niveaux",
+    auditLevelLv3: "LV3 · Risque élevé",
+    auditLevelLv2: "LV2 · Risque moyen",
+    auditLevelLv1: "LV1 · Risque faible",
+    auditLevelLv0: "LV0 · Normal",
 };
 
 export default fr;

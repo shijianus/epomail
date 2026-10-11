@@ -475,7 +475,7 @@ const auditService = {
 	async list(c, params) {
 		await this.ensureTables(c);
 		await this.seedBaselineIfEmpty(c);
-		let { num = 1, size = 15, email, keyword, warningType, category, riskLevel, status, lifecycle, timeRange, identityGroup, alarmReason, alarmCountRange, suggestion, assignee, adjudicator: adjudicatorFilter, timeSort = 0 } = params;
+		let { num = 1, size = 15, email, keyword, warningType, category, violationLevel, riskLevel, status, lifecycle, timeRange, identityGroup, alarmReason, alarmCountRange, suggestion, assignee, adjudicator: adjudicatorFilter, timeSort = 0 } = params;
 		size = Math.min(Number(size) || 15, 50);
 		num = Math.max(Number(num) || 1, 1);
 		const offset = (num - 1) * size;
@@ -684,6 +684,34 @@ const auditService = {
 				finalAuthorityDesc = '协管人工复核批准解封或维持观察 (主管级拍案)';
 			}
 
+			// 计算过期时间与截止期限 (支持申诉表单过期与风险管控截止期限)
+			let expireTime = row.expireTime || null;
+			let deadline = row.deadline || null;
+			const createdTs = row.createTime ? new Date(row.createTime).getTime() : Date.now();
+			if (!expireTime) {
+				if (row.warningType === 'appeal') {
+					// 申诉表单通常 7 天过期
+					expireTime = new Date(createdTs + 7 * 86400000).toISOString();
+				} else if (row.warningType === 'audit' || row.warningType === 'risk') {
+					// 风险管理管控期限：按风险等级
+					const days = (row.riskLevel === 'high' || row.priority === 'P0') ? 30 : ((row.riskLevel === 'medium' || row.priority === 'P1') ? 14 : 7);
+					deadline = new Date(createdTs + days * 86400000).toISOString();
+					expireTime = deadline;
+				}
+			} else if (!deadline) {
+				deadline = expireTime;
+			}
+
+			// 计算操作更新记录 (更新次数、最后更新时间、申诉次数)
+			let extraOps = 0;
+			if (row.detailText) {
+				const matches = row.detailText.match(/\[(放行说明|延期处置|解禁说明|审核备忘|驳回理由|更新)\]/g);
+				if (matches) extraOps = matches.length;
+			}
+			const updateCount = Math.max(1, 1 + extraOps);
+			const lastUpdated = row.resolvedTime || row.banTime || row.createTime;
+			const appealCount = (row.appealReason || row.warningType === 'appeal') ? (row.appealCount || 1) : 0;
+
 			const item = {
 				...row,
 				baseIp,
@@ -701,7 +729,12 @@ const auditService = {
 				operatorName: operator,
 				adjudicator,
 				adjudicatorName: adjudicator,
-				banTime: row.banTime || (row.status === 'banned' ? row.createTime : null)
+				banTime: row.banTime || (row.status === 'banned' ? row.createTime : null),
+				expireTime,
+				deadline,
+				updateCount,
+				lastUpdated,
+				appealCount
 			};
 
 			if (allMailMode === 2) {
@@ -723,6 +756,17 @@ const auditService = {
 				if (category === 'account') return item.category === 'account' || item.eventType === 'credential_tamper_ban';
 				if (category === 'routine') return item.warningType === 'audit' || item.eventType?.includes('routine');
 				return item.category === category;
+			});
+		}
+		if (violationLevel && violationLevel !== 'all') {
+			processedList = processedList.filter(item => {
+				const p = (item.priority || '').toUpperCase();
+				const r = (item.riskLevel || '').toLowerCase();
+				if (violationLevel === 'lv3') return ['P0', 'CRITICAL', 'LV3'].includes(p) || r === 'high';
+				if (violationLevel === 'lv2') return ['P1', 'LV2'].includes(p) || r === 'medium';
+				if (violationLevel === 'lv1') return ['P2', 'LV1'].includes(p) || r === 'low';
+				if (violationLevel === 'lv0') return ['P3', 'LV0'].includes(p) || r === 'normal';
+				return true;
 			});
 		}
 		if (alarmReason && alarmReason !== 'all') {
