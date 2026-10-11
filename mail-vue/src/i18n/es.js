@@ -2705,6 +2705,7 @@ totpModeAllDesc: 'Configurar si los usuarios pueden usar TOTP. Al activarlo, la 
     abuseEvidenceRetentionLabel: "Retención de pruebas",
     abuseLifecycleTimelineTitle: "Cronología completa del ciclo de vida de sanciones y pruebas",
     abuseEmptyAutoPurged: "No hay lotes purgados automáticamente hoy",
+    abuseBatchReviewConfirm: "¿Está seguro de que desea revisar los {count} ticket(s) seleccionados?",
 };
 
 export default es;

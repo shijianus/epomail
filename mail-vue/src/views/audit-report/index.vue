@@ -3099,7 +3099,7 @@ async function handleRowMoreCommand(cmd, row) {
         targetEmail: row.email,
         notes: t('abuseBatchReview')
       });
-      ElMessage.success(`${t('abuseBatchReview')}成功`);
+      ElMessage.success(t('auditActionSuccess') || t('saveSuccessMsg'));
       fetchAuditList();
     } catch (e) {
       console.error(e);
@@ -3126,7 +3126,7 @@ async function handleRowMoreCommand(cmd, row) {
   } else if (cmd === 'unban') {
     try {
       await ElMessageBox.confirm(
-        t('auditConfirmUnbanUser', { email: row.email }),
+        `${t('auditUnbanConfirmMsg')} (${row.email})`,
         t('abuseBatchUnban'),
         { confirmButtonText: t('abuseBatchUnban'), cancelButtonText: t('cancel'), type: 'warning' }
       );
@@ -3263,7 +3263,7 @@ async function handleBatchReview() {
   if (!targets.length) return;
   try {
     await ElMessageBox.confirm(
-      `确认开始复核选中的 ${targets.length} 条工单记录？`,
+      t('abuseBatchReviewConfirm', { count: targets.length }),
       t('abuseBatchReview'),
       {
         confirmButtonText: t('abuseBatchReview'),
@@ -3284,7 +3284,7 @@ async function handleBatchReview() {
         console.error(err);
       }
     }
-    ElMessage.success(`${t('abuseBatchReview')}成功`);
+    ElMessage.success(t('auditActionSuccess') || t('saveSuccessMsg'));
     selectedRows.value = [];
     abuseChildSelectedMap.value = {};
     abuseSelectedMap.value = {};

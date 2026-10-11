@@ -2705,6 +2705,7 @@ totpModeAllDesc: 'Configure whether users can use TOTP. When enabled, 2FA is ava
     abuseEvidenceRetentionLabel: "Evidence Retention",
     abuseLifecycleTimelineTitle: "Enforcement & Evidence Full Lifecycle Timeline",
     abuseEmptyAutoPurged: "No auto-purged batches today",
+    abuseBatchReviewConfirm: "Are you sure you want to review the selected {count} ticket(s)?",
 };
 
 export default en;

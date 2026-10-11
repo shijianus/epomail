@@ -2705,6 +2705,7 @@ totpModeAllDesc: 'Instellen of gebruikers TOTP mogen gebruiken. Eenmaal ingescha
     abuseEvidenceRetentionLabel: "Bewaring van bewijs",
     abuseLifecycleTimelineTitle: "Volledige levenscyclustijdlijn van sancties en bewijs",
     abuseEmptyAutoPurged: "Geen automatisch opgeschoonde batches vandaag",
+    abuseBatchReviewConfirm: "Weet u zeker dat u de geselecteerde {count} ticket(s) wilt beoordelen?",
 };
 
 export default nl;

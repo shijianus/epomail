@@ -2705,6 +2705,7 @@ totpModeAllDesc: 'Définir si les utilisateurs peuvent utiliser TOTP. Lorsqu\'il
     abuseEvidenceRetentionLabel: "Conservation des preuves",
     abuseLifecycleTimelineTitle: "Chronologie du cycle de vie complet des sanctions et preuves",
     abuseEmptyAutoPurged: "Aucun lot purgé automatiquement aujourd'hui",
+    abuseBatchReviewConfirm: "Voulez-vous vraiment examiner les {count} ticket(s) sélectionné(s) ?",
 };
 
 export default fr;

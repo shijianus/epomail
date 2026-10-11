@@ -2705,6 +2705,7 @@ totpModeAllDesc: '设置是否允许用户使用TOTP，开启后用户可以且�
     abuseEvidenceRetentionLabel: "证据留存",
     abuseLifecycleTimelineTitle: "处置与证据全周期时间线",
     abuseEmptyAutoPurged: "今日无自动折叠批次",
+    abuseBatchReviewConfirm: "确定开始复核选中的 {count} 条工单记录？",
 };
 
 export default zh;
