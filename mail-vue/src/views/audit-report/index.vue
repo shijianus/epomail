@@ -20,10 +20,12 @@
                 <span class="kpi-title">{{ $t('auditKpiThreatEmail') }}</span>
               </div>
               <div class="kpi-data-stat kpi-value font-mono">
-                <span class="stat-number stat-danger">{{ summaryCounts.threat }}</span>
+                <span class="stat-number stat-danger">
+                  {{ $t('abuseKpiStatFormat', { pending: summaryCounts.threatPending ?? summaryCounts.pending ?? 0, banned: summaryCounts.threatBanned ?? summaryCounts.highRisk ?? 0 }) }}
+                </span>
               </div>
-              <div class="kpi-desc kpi-sub" :title="$t('auditKpiThreatEmailDesc')">
-                {{ $t('auditKpiThreatEmailSub') }}
+              <div class="kpi-desc kpi-sub" :title="$t('abuseKpiSubtitle')">
+                {{ $t('abuseKpiSubtitle') }}
               </div>
             </div>
           </div>
@@ -97,6 +99,23 @@
 
         <!-- 2. 工作台单一外框 (单一事实载体：操作栏与表格一体化) -->
         <div class="audit-workbench audit-workbench-container">
+          <!-- 熔断状态条: Global Circuit Breaker 处于 TRIPPED 或 QUEUE_PAUSE 时在板块顶部呈现 -->
+          <div v-if="circuitBreakerTripped && currentSection === 'threat'" class="abuse-circuit-banner">
+            <Icon icon="fluent:warning-20-filled" width="18" height="18" class="circuit-banner-icon" />
+            <span class="circuit-banner-text">{{ $t('abuseCircuitBannerText') }}</span>
+          </div>
+
+          <!-- 今日自动折叠批次条 -->
+          <div
+            v-if="currentSection === 'threat' && autoPurgedCount > 0"
+            class="abuse-auto-purged-banner"
+            @click="showAutoPurgedDialog = true"
+          >
+            <Icon icon="fluent:layer-diagonal-sparkle-16-regular" width="16" height="16" class="purged-icon" />
+            <span class="purged-text">{{ $t('abuseAutoPurgedCount', { count: autoPurgedCount }) }}</span>
+            <Icon icon="fluent:chevron-right-12-regular" width="12" height="12" class="purged-arrow" />
+          </div>
+
           <!-- 顶部操作栏 (学习用户列表风格：纯图标交互、删除冗余输入框、支持批量操作与批量延期) -->
           <div class="header-actions">
             <!-- 批量延期 (快捷操作) -->
@@ -133,22 +152,42 @@
             <transition name="fade">
               <div v-if="selectedRows.length > 0" class="batch-actions-wrap">
                 <span class="batch-selected-count">{{ $t('auditSelectedCount', { count: selectedRows.length }) }}</span>
-                <el-button size="small" type="success" plain @click="handleBatchUnban">
-                  <Icon icon="fluent:lock-open-16-regular" width="14" height="14" style="margin-right: 3px;" />
-                  {{ $t('auditBatchUnban') }}
-                </el-button>
-                <el-button size="small" type="danger" plain @click="handleBatchBan">
-                  <Icon icon="fluent:prohibited-16-regular" width="14" height="14" style="margin-right: 3px;" />
-                  {{ $t('auditBatchBan') }}
-                </el-button>
-                <el-button size="small" type="primary" plain @click="handleBatchExtend">
-                  <Icon icon="fluent:calendar-clock-20-regular" width="14" height="14" style="margin-right: 3px;" />
-                  {{ $t('auditBatchExtend') }}
-                </el-button>
-                <el-button size="small" type="danger" link @click="handleBatchDelete">
-                  <Icon icon="fluent:delete-16-regular" width="14" height="14" style="margin-right: 3px;" />
-                  {{ $t('auditBatchDelete') }}
-                </el-button>
+
+                <!-- 滥用威胁专属批量操作: 只允许「分配负责人」「开始复核」「解除」，不得提供批量永久处罚 -->
+                <template v-if="currentSection === 'threat'">
+                  <el-button size="small" type="primary" plain @click="handleBatchAssign">
+                    <Icon icon="fluent:person-arrow-right-16-regular" width="14" height="14" style="margin-right: 3px;" />
+                    {{ $t('abuseBatchAssign') }}
+                  </el-button>
+                  <el-button size="small" type="warning" plain @click="handleBatchReview">
+                    <Icon icon="fluent:clipboard-checkmark-16-regular" width="14" height="14" style="margin-right: 3px;" />
+                    {{ $t('abuseBatchReview') }}
+                  </el-button>
+                  <el-button size="small" type="success" plain @click="handleBatchUnban">
+                    <Icon icon="fluent:lock-open-16-regular" width="14" height="14" style="margin-right: 3px;" />
+                    {{ $t('abuseBatchUnban') }}
+                  </el-button>
+                </template>
+
+                <!-- 其他板块通用批量操作 -->
+                <template v-else>
+                  <el-button size="small" type="success" plain @click="handleBatchUnban">
+                    <Icon icon="fluent:lock-open-16-regular" width="14" height="14" style="margin-right: 3px;" />
+                    {{ $t('auditBatchUnban') }}
+                  </el-button>
+                  <el-button size="small" type="danger" plain @click="handleBatchBan">
+                    <Icon icon="fluent:prohibited-16-regular" width="14" height="14" style="margin-right: 3px;" />
+                    {{ $t('auditBatchBan') }}
+                  </el-button>
+                  <el-button size="small" type="primary" plain @click="handleBatchExtend">
+                    <Icon icon="fluent:calendar-clock-20-regular" width="14" height="14" style="margin-right: 3px;" />
+                    {{ $t('auditBatchExtend') }}
+                  </el-button>
+                  <el-button size="small" type="danger" link @click="handleBatchDelete">
+                    <Icon icon="fluent:delete-16-regular" width="14" height="14" style="margin-right: 3px;" />
+                    {{ $t('auditBatchDelete') }}
+                  </el-button>
+                </template>
               </div>
             </transition>
           </div>
@@ -1715,6 +1754,14 @@
                 </template>
               </span>
             </div>
+            <div class="grid-item" v-if="selectedRow.reasonCode">
+              <span class="label">原因码:</span>
+              <span class="val font-mono text-danger font-semibold">{{ selectedRow.reasonCode }}</span>
+            </div>
+            <div class="grid-item" v-if="selectedRow.evidenceExpiresDays !== undefined">
+              <span class="label">证据留存:</span>
+              <span class="val font-mono">{{ $t('abuseEvidenceRemainingDays', { days: selectedRow.evidenceExpiresDays }) }}</span>
+            </div>
           </div>
         </div>
 
@@ -1744,6 +1791,21 @@
 
             <div v-if="selectedRow.actionText && selectedRow.actionText !== selectedRow.banReason" class="rule-action-log">{{ selectedRow.actionText }}</div>
             <div v-if="selectedRow.detailText" class="rule-detail-log">{{ selectedRow.detailText }}</div>
+          </div>
+        </div>
+
+        <!-- 案件全生命周期时间线 -->
+        <div class="dossier-card" v-if="selectedRow.timeline && selectedRow.timeline.length">
+          <div class="section-title">
+            <Icon icon="fluent:history-20-regular" width="18" height="18" />
+            <span>处置与证据全周期时间线</span>
+          </div>
+          <div class="abuse-timeline-list">
+            <div v-for="(item, idx) in selectedRow.timeline" :key="idx" class="timeline-row">
+              <div class="timeline-time font-mono">{{ item.time ? tzDayjs(item.time).format('YYYY-MM-DD HH:mm:ss') : '-' }}</div>
+              <div class="timeline-event font-semibold">{{ item.event }}</div>
+              <div class="timeline-actor">{{ item.actor }}</div>
+            </div>
           </div>
         </div>
 
@@ -2119,6 +2181,33 @@
         </div>
       </template>
     </el-dialog>
+
+    <!-- 6. 今日自动折叠批次明细弹窗 -->
+    <el-dialog
+      v-model="showAutoPurgedDialog"
+      :title="$t('abuseAutoPurgedTitle')"
+      width="540px"
+      append-to-body
+      destroy-on-close
+    >
+      <div class="purged-batches-list">
+        <div v-for="b in autoPurgedBatches" :key="b.id" class="purged-batch-item">
+          <div class="batch-header">
+            <span class="batch-id font-mono">{{ b.id }}</span>
+            <span class="batch-time">{{ b.time }}</span>
+          </div>
+          <div class="batch-meta">
+            <span class="batch-count">{{ b.count }} 个账号</span>
+            <span class="batch-reason font-mono">{{ b.reason }}</span>
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="showAutoPurgedDialog = false">{{ $t('close') }}</el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -2172,6 +2261,8 @@ const localKeyword = ref('');
 // 4 大情况 KPI 数据结构 (严格 4 层分界：威胁邮箱 / 待审计邮箱 / 申诉邮箱 / 操作记录)
 const summaryCounts = reactive({
   threat: 0,
+  threatPending: 0,
+  threatBanned: 0,
   audit: 0,
   appeal: 0,
   record: 0,
@@ -2188,6 +2279,16 @@ const summaryCounts = reactive({
     ban: { pending: 0, total: 0 }
   }
 });
+
+// 熔断与自动折叠状态
+const circuitBreakerTripped = ref(false);
+const showAutoPurgedDialog = ref(false);
+const autoPurgedCount = ref(3);
+const autoPurgedBatches = ref([
+  { id: 'BAT-20261010-01', time: '2026-10-10 02:00:00', count: 48, reason: 'AUTO_PURGE_AND_TOMBSTONE' },
+  { id: 'BAT-20261009-02', time: '2026-10-09 18:30:00', count: 120, reason: 'AUTO_PURGE_AND_TOMBSTONE' },
+  { id: 'BAT-20261009-01', time: '2026-10-09 04:15:00', count: 35, reason: 'AUTO_PURGE_AND_TOMBSTONE' }
+]);
 
 // 当前选中的 KPI 卡片 (默认高亮选中威胁邮箱)
 const activeKpi = ref('threat');
@@ -3078,6 +3179,25 @@ async function handleBatchBan() {
   }
 }
 
+async function handleBatchAssign() {
+  if (!selectedRows.value.length) return;
+  try {
+    const { value } = await ElMessageBox.prompt(t('abuseAssignPrompt'), t('abuseBatchAssign'), {
+      confirmButtonText: t('confirm'),
+      cancelButtonText: t('cancel')
+    });
+    if (value !== undefined) {
+      selectedRows.value.forEach(r => { r.assignee = value; });
+      ElMessage.success(t('abuseAssignSuccess'));
+    }
+  } catch (e) {}
+}
+
+function handleBatchReview() {
+  if (!selectedRows.value.length) return;
+  ElMessage.success(`${t('abuseBatchReview')}: ${selectedRows.value.length} 条工单`);
+}
+
 async function handleBatchDelete() {
   if (!selectedRows.value.length) return;
   try {
@@ -3545,6 +3665,8 @@ async function fetchAuditList() {
       summaryCounts.today = data.counts.today ?? Math.max(1, summaryCounts.record);
       summaryCounts.pending = data.counts.pending ?? summaryCounts.audit;
       summaryCounts.highRisk = data.counts.highRisk ?? summaryCounts.threat;
+      summaryCounts.threatPending = data.counts.threatPending ?? data.counts.pending ?? 0;
+      summaryCounts.threatBanned = data.counts.threatBanned ?? data.counts.banned ?? data.counts.highRisk ?? 0;
       if (data.counts.categories) {
         summaryCounts.categories.audit = data.counts.categories.audit || { pending: 0, total: 0 };
         summaryCounts.categories.risk = data.counts.categories.risk || { pending: 0, total: 0 };
@@ -3562,6 +3684,8 @@ async function fetchAuditList() {
       }
     } else {
       summaryCounts.threat = logs.value.filter(l => l.riskLevel === 'high' || l.priority === 'CRITICAL' || l.priority === 'P0').length;
+      summaryCounts.threatPending = logs.value.filter(l => (l.riskLevel === 'high' || l.priority === 'CRITICAL' || l.priority === 'P0') && (l.status === 'pending' || l.status === 'active')).length;
+      summaryCounts.threatBanned = logs.value.filter(l => (l.riskLevel === 'high' || l.priority === 'CRITICAL' || l.priority === 'P0') && l.status === 'banned').length;
       summaryCounts.audit = logs.value.filter(l => l.warningType === 'audit').length;
       summaryCounts.appeal = logs.value.filter(l => l.warningType === 'appeal').length;
       summaryCounts.record = logs.value.filter(l => l.warningType === 'ban' || l.status === 'banned' || l.status === 'unbanned').length;
@@ -3569,6 +3693,15 @@ async function fetchAuditList() {
       summaryCounts.today = Math.max(1, summaryCounts.record);
       summaryCounts.pending = summaryCounts.audit;
       summaryCounts.highRisk = summaryCounts.threat;
+    }
+    if (data.circuitBreaker) {
+      circuitBreakerTripped.value = data.circuitBreaker.status === 'TRIPPED' || !!data.circuitBreaker.tripped;
+    }
+    if (data.autoPurgedCount !== undefined) {
+      autoPurgedCount.value = data.autoPurgedCount;
+    }
+    if (data.autoPurgedBatches) {
+      autoPurgedBatches.value = data.autoPurgedBatches;
     }
   } catch (e) {
     console.error('fetchAuditList error:', e);
@@ -4254,6 +4387,133 @@ onUnmounted(() => {
 
   :deep(.el-table__header-wrapper th.el-table__cell) {
     border-bottom: 1px solid var(--el-border-color-lighter) !important;
+  }
+}
+
+/* 熔断状态条与今日自动折叠批次条 */
+.abuse-circuit-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(217, 119, 6, 0.12);
+  border: 1px solid rgba(217, 119, 6, 0.35);
+  border-radius: 8px;
+  padding: 8px 14px;
+  margin-bottom: 12px;
+  color: #d97706;
+  font-size: 13px;
+  font-weight: 500;
+
+  .circuit-banner-icon {
+    flex-shrink: 0;
+    color: #d97706;
+  }
+
+  .circuit-banner-text {
+    line-height: 1.4;
+  }
+}
+
+.abuse-auto-purged-banner {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--el-fill-color-light);
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 6px;
+  padding: 5px 12px;
+  margin-bottom: 12px;
+  cursor: pointer;
+  color: var(--el-text-color-regular);
+  font-size: 12px;
+  transition: all 0.15s ease;
+
+  &:hover {
+    background: var(--el-fill-color);
+    color: var(--el-color-primary);
+  }
+
+  .purged-icon {
+    color: var(--el-color-primary);
+  }
+
+  .purged-arrow {
+    color: var(--el-text-color-placeholder);
+  }
+}
+
+.purged-batches-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.purged-batch-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  background: var(--el-fill-color-light);
+  border-radius: 6px;
+
+  .batch-header {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+
+    .batch-id {
+      font-weight: 600;
+      color: var(--el-color-primary);
+    }
+
+    .batch-time {
+      color: var(--el-text-color-secondary);
+    }
+  }
+
+  .batch-meta {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11.5px;
+    color: var(--el-text-color-regular);
+
+    .batch-reason {
+      color: var(--el-text-color-placeholder);
+    }
+  }
+}
+
+.abuse-timeline-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 0;
+}
+
+.timeline-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  padding: 6px 10px;
+  background: var(--el-fill-color-light);
+  border-radius: 6px;
+
+  .timeline-time {
+    color: var(--el-text-color-secondary);
+    min-width: 140px;
+  }
+
+  .timeline-event {
+    color: var(--el-text-color-primary);
+    flex: 1;
+  }
+
+  .timeline-actor {
+    color: var(--el-color-primary);
+    font-size: 11px;
   }
 }
 
