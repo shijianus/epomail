@@ -8,6 +8,27 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### 风控系统冷启动全真栈复测（危险操作模拟 × Admin 处置 × 操作报告板块 · 暴露 user-id9 静默不可删缺陷） (2026-10-11)
+*   **关联提交 (Git Commit)**: `待回填` (Short: `待回填`)
+*   **部署环境 (Deployment)**: `本地全真栈 (wrangler dev + D1 + KV @127.0.0.1:8787)`，workerd 与 CF Workers 生产同运行时；本次为 **清空 .wrangler/state 冷启动**（原状态已备份至 `.wrangler/state.bak-20261011-193024-riskctl`），仅凭 `/api/init/<jwt_secret>` 端到端完成 6 标准角色播种 + 双管理员初始化（冷启动引导链红线验证通过）
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 纯测试任务，**零代码修改**：`git fetch origin` 确认远端无新提交（`master..origin/master` 为空），无需合并；本地领先 5 提交未推送（遵嘱本次不推送远端）；
+    - [x] mail-vue release 重建并部署至 `mail-worker/dist`（wrangler assets 绑定伺服，与生产部署同构）；
+    - [x] 复用 `tests/test-risk-control-fullstack-e2e.mjs` (55 断言) 与 `tests/verify-audit-ui-browser-e2e.mjs` (18 断言) 在最新代码上完整复测；
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：mail-vue `vite build --mode release` 通过 (23.90s，零警告零报错；仅 browserslist 数据时效提示)；
+    - [x] 风控 API 全真栈测试：`tests/test-risk-control-fullstack-e2e.mjs` **54/55 绿，1 红**：
+      - 绿：暴力破解 5 次锁定/锁定后正确密码亦拒 ✓；黑盒风控评分（正常 0 分 vs 指纹浏览器+自动化 100 分）✓；Step-Up 强制二验 step=2 不同因子 ✓；同 IP 第 4 账户多账户聚集检测 ✓；2 次检举聚合 reportedByOthers=2 + priority 升级 CRITICAL ✓；管理员处置 mute/blacklist/archive/note/extend/ban/adjudicate approve+purge/reject/purge 全链路生效 ✓；封禁后登录 403 语义拒绝（"该账户已被封禁"）✓；申诉放行解封 + 台账 unbanned 同步 ✓；普通用户 /audit/* 403、未认证 401 ✓；操作报告四板块计数/搜索语法 (ticket:/ip:)/等级筛选 ✓；
+      - **红 (D1-2)**：物理删除后 U.spammer 仍可登录成功（code=200）——根因见观察项 P1；
+    - [x] 操作报告板块浏览器 UI 实测：`tests/verify-audit-ui-browser-e2e.mjs` **18/18 全绿**（工作台路由/标题、KPI 四板块卡片、13 行工单表格、ticket: 定向搜索精确过滤、三板块切换过滤、申诉研判抽屉环境比对（注册基线 vs 申诉设备）与处置按钮（放行结案/条件放行/驳回申诉/标记误报）、零前端运行时异常）；
+    - [x] i18n 静态审计三件套：`i18n-symmetry` 六语言 1929 键 ALL SYMMETRIC / `i18n-audit` exit 0 字面量零缺失 / `i18n-hardcoded` exit 0（329 suspicious 均为注释与 6 语言邮件模板设计性内容，非回归）；
+    - [x] 零假数据残留：D1 测试用户/账户/邮件物理清零 (residue=0)、audit_log 种子基线 13 条完整还原、KV 测试衍生键 24 个手工清除（仅余 6 个种子/管理员合法键）、二进制层 rkctl 残留 0 文件；
+*   **测试观察项 (Observations, 未修复 — 按需求仅测试不修码)**:
+    - **[P1·缺陷] `user-service.js:550` 硬编码 `userIds.filter(id => id !== 1 && id !== 9)` 导致 user_id=9 静默不可删除**：物理删除接口跳过 id=9 但仍返回 200（对比 user 1 会显式抛 403）。该保护由 a1a002a 引入，属环境数据写死进代码——任何部署中主键恰为 9 的普通用户均不可删且无任何报错。本轮冷启动下 U.spammer 恰好分配 user_id=9 而触发（上轮 0c8c930 未冷启动未暴露，缺陷呈潜伏性/数据依赖性）。连带影响：删除接口以入参计数回报"删除 8 个"，实际仅删 7 个，调用方无法感知部分跳过；
+    - **[P2] `/user/delete` KV 清理不完整**：仅删除 `AUTH_INFO_{id}` 与 `USER_PROFILE_{id}`，遗留 `HAS_WELCOME_{id}`、`USER_KNOWN_ENV_{id}`、`login_fail:{email}` 孤儿键（本轮实测遗留 22 个孤儿键 + auth-uid:9 + risk_ip_acc 计数器，均已手工清除）；
+    - [P2] 封禁用户登录返回业务码 501（BizError 默认码）+ "该账户已被封禁"，语义上 403 更贴切（与上轮观察一致，未变化）；
+    - [P2] 风控引擎 secPayload 指纹入参仅服务端就绪，前端采集端尚未接线（与 rule_engine_roadmap.md 路线一致，未变化）；
+
 ### 风控系统全真栈端到端专项测试（危险操作模拟 × Admin 处置 × 操作报告板块可用性） (2026-10-11)
 *   **关联提交 (Git Commit)**: `0c8c9301b9d382870a0da86a6c8734fb0969a4de` (Short: `0c8c930`)
 *   **部署环境 (Deployment)**: `本地全真栈 (wrangler dev + D1 + KV @127.0.0.1:8787)`，基线代码 origin/master a67feed 合并后构建
