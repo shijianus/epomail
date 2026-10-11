@@ -7,6 +7,29 @@
 > 制度规范与工作流指引请见 [AGENTS.md](file:///home/shijian/projects/epocanvas-mail/AGENTS.md)。
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
+### 风控系统 master 聚合基线全真栈完整复测 · 危险操作模拟 + admin UI 处置 + 操作报告板块可用性 (2026-10-12)
+*   **关联提交 (Git Commit)**: `57693e5` (被测代码基线 HEAD, 本地领先 origin/master 15 commits 未 push), 本条目自身为纯文档提交 (Hash 见置顶汇报)
+*   **部署环境 (Deployment)**: `本地全真栈 (wrangler dev @8787 · workerd 真实运行时模拟 CF 部署 · D1+KV 本地真库 · .wrangler/state 全清冷启动 → /api/init 播种)`
+*   **任务性质与变更清单 (Changes & Feature Alignment)**:
+    - [x] 纯测试任务（按用户指示零修 bug、零 push）：fetch 后 `master..origin/master` 为空 — 远端无新推送，merge 为 no-op ("Already up to date")；本地领先远端 15 commits 已向用户置顶披露；`temp_login_ui/pnpm-lock.yaml` 为既有工作区改动（依赖解析差异，与本任务无关）保持原样；
+    - [x] 新增可复用实栈探测脚本 `tests/verify-live-stack-ui-probe.mjs`（真浏览器 × 真后端：React 登录页 → JWT 会话 → /audit 真实 D1 数据渲染 → UI 处置落库 → finally 物理清理）；
+    - [x] 本轮发现的全部行为类缺陷仅记录不修（见下方红灯清单）。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 构建核验：`mail-vue` vite build 通过 (22.25s, 零报错)；worker `wrangler deploy --dry-run` 编译通过 (KV/D1/Assets 绑定齐备)；
+    - [x] 冷启动引导链：state 全清 → wrangler dev → `GET /api/init/<jwt_secret>` = success → admin 登录 code 200 (user_id=2)，端到端成功；
+    - [x] 风控 E2E 主套件 `tests/test-risk-control-fullstack-e2e.mjs`：**54/55** (日志 `tests/riskctl-e2e-run-013932.log`) — Phase A 危险操作模拟 (5 次暴破→12h 锁定、自动化/指纹浏览器黑盒评分 riskScore 100→Step-Up 强制二验、同 IP 4 账户聚集检测)、Phase B 滥用链路 (垃圾邮件投递 2/2→检举→reportedByOthers=2 聚合升级 CRITICAL→外部申诉落库)、Phase C admin 处置/操作报告 (四板块计数、ticket:/ip: 定向搜索、mute/blacklist/ban/note/extend/adjudicate approve+reject/purge、封禁台账 banned→unbanned、越权 403/未认证 401) 全绿；Phase D 测试用户 8 个物理删除；
+    - [x] 浏览器 Mock UI 套件 `tests/verify-abuse-table-polish.mjs`：**50/50** 全绿 + 5 分辨率截图留档 (1440/1024/860/768/375 零横向滚动、零裁切、零省略号)；
+    - [x] 真浏览器 × 真后端实栈探测 `tests/verify-live-stack-ui-probe.mjs`：**34/35** (日志 `tests/live-ui-probe-run-*.log`) — React 登录页真实登录 → /audit 四 KPI 卡片 (滥用威胁/申诉审计/风险管理/操作记录) + 7 列威胁工作台 + 种子数据渲染 → 顶栏搜索命中本轮检举产生的真实工单 (#45PY6J) → admin 经行内 ⋯ 菜单执行「开始复核」→ API 反查三重落库证据 (detailText [开始复核] / assignee=admin@example.com / timeline 开始人工复核) → 详情抽屉时间线可见处置留痕 → 375px 零横向滚动；截图 5 张存档 `doc/validation/audit-live/`；
+    - [x] physicsDelete 清理套件 `tests/test-physics-delete-kv-cleanup-e2e.mjs`：**32/32** (23 个实测孤儿键 100% 清扫、KV 归零)；
+    - [x] i18n 三件套：symmetry 1929 keys × 6 语言 ALL SYMMETRIC；audit 1971 字面量键 0 缺失、dynamic 0；hardcoded 退出码 0；
+    - [x] 零假数据残留终验：D1 `users=2 / accounts=2 / emails=2 / audit_log=15` (纯种子基线)、rkctl/ui 测试残留用户 0；KV 终态 6 键全为系统/种子/管理员合法键 (`HAS_WELCOME_2` / `USER_KNOWN_ENV_2` / `auth-uid:2` / `oauth_app_seeded_v2` / `roles_seeded_v2` / `setting:`)；主套件 D1-2 自产的 `login_fail:rkctlyfpp_spam@...` 残留键已手动物理清除。
+*   **红灯与缺陷记录 (仅记录未修)**:
+    - **[P1·产品缺陷·本轮双重复现]** physicsDelete「当日发信量精准扣减」实测失效：干净预态 (键不存在=0) → 发送 1 封 → `send_day_count:2026-10-12`=1 → 物理删除发送者 → **仍=1** (期望精准扣减至 0)；主套件侧亦观测到 2 →(删发送者)→ 2 未扣减。根因与上轮记录一致 (`user-service.js:592-606` 以 `dayjs().startOf('day').toISOString()` 的 ISO-T 格式与 `email.create_time` 的空格分隔文本做字典序比较，UTC+8 时区当地零点起 16 小时内 `yyyy-MM-dd HH` 与 `yyyy-MM-ddTHH` 日期段相等时空格(0x20) < 'T'(0x54) 永不命中 → sentTodayCount 恒 0)；本轮 UTC+8 01:53 时段正处于必然复现窗口，证据链完整 (预态/发送后/删除后三点采样)；
+    - **[P1·测试债·沿用]** 主套件 D2-1 断言硬编码旧种子基线 13，实际种子基线 15；实查清理后 15 条全为种子工单 (REV×4/THR×6/APL×3/BAN×3, rkctl 残留 0)，产品行为正确，属断言未随基线同步；
+    - **[P2·观察·新发现]** 顶栏搜索联想路径存在跨用户解密噪音：`email-service.js:2351` 对候选邮件主题逐条 `decryptText`，管理员/全局范围搜索时以本人密钥解密他人密文必然 AES-GCM 鉴权失败 (本轮观测 21 次 `[email-crypto] Decryption error`，与逐键输入联想请求相关)；功能无害 (send 均为 200、密文被安全过滤、无明文泄漏、无崩溃)，仅 console.error 日志噪音，建议后续根因排查 (范围收敛或改用密文不可过滤策略)；
+    - **[P2·安全观察·沿用]** `wrangler-dev.toml` `[dev] ip="0.0.0.0"` 仍将本地栈暴露于局域网；本轮测试期间 KV 未观测到上轮出现的外部失败登录键 (login_fail:admin@bond 等未再现)；
+    - **[P2·测试卫生·已闭环]** 主套件 D1-2「删除后登录验证」会在 KV 留下 `login_fail:{被删邮箱}` 计数键 (系统对失败登录的正常记账)，套件 finally 未清扫；本轮已手动清除该自产键并计入终验。
+
 ### 风控系统冷启动全真栈深度复测 · 合并 fix/abuse-table-columns 后全链路验证 (2026-10-12)
 *   **关联提交 (Git Commit)**: `53cd474` (本地合并 fix/abuse-table-columns, 未 push), `b415c38` (P0 编译阻断最小修复, 未 push)
 *   **部署环境 (Deployment)**: `本地全真栈 (wrangler dev @8787 · workerd 真实运行时模拟 CF 部署 · D1+KV 本地真库 · .wrangler/state 清空冷启动)`
