@@ -8,6 +8,31 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### 风控系统全真栈端到端专项测试（危险操作模拟 × Admin 处置 × 操作报告板块可用性） (2026-10-11)
+*   **关联提交 (Git Commit)**: `389ad5bb2cec2ea3bdd iteration placeholder` (Short: `<待回填>`)
+*   **部署环境 (Deployment)**: `本地全真栈 (wrangler dev + D1 + KV @127.0.0.1:8787)`，基线代码 origin/master a67feed 合并后构建
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 拉取远端 origin/master (d843967..a67feed，共 47 个安全审计控制台相关提交) 并与本地合并，合并无冲突（本次未做任何远端推送）；
+    - [x] 新增 `tests/test-risk-control-fullstack-e2e.mjs`：风控系统 API 层全真栈端到端测试（55 项断言，覆盖暴力破解锁定/黑盒风控评分/Step-Up 强制二验/检举聚合/封禁台账/申诉研判/越权拦截 7 大链路）；
+    - [x] 新增 `tests/verify-audit-ui-browser-e2e.mjs`：操作报告板块浏览器 UI 实测（18 项断言，Playwright + 真实 admin token + 真实后端响应）；
+    - [x] 全部测试具备 `finally` 自动物理清理机制（测试用户物理删除 + audit_log 种子基线还原 + RunTag 零残留核验）；
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：mail-vue `vite build` 通过 (50.25s，零警告零报错)；
+    - [x] 风控 API 全真栈测试：`tests/test-risk-control-fullstack-e2e.mjs` 55/55 全绿：
+      - 暴力破解：连续 5 次错误密码 → 第 6 次（正确密码）被临时锁定拦截 ✓
+      - 黑盒风控引擎：正常环境风险分 0~27 不触发二验；指纹浏览器+自动化+硬件异常风险分 100 → 强制 Step-Up 二验（step=2 不同因子）✓
+      - 同 IP 第 4 账户登录 → 多账户聚集检测命中 ✓
+      - 站内垃圾邮件检举：2 次检举聚合 reportedByOthers=2、priority 升级 CRITICAL ✓
+      - 管理员处置：mute_account / blacklist_sender / archive_routine / note / extend / ban / adjudicate approve+purge / reject / purge 全链路生效，封禁台账留痕与 unbanned 状态同步正确 ✓
+      - 越权拦截：普通用户访问 /audit/* → 403；未认证 → 401 ✓
+    - [x] 操作报告 UI 浏览器实测：`tests/verify-audit-ui-browser-e2e.mjs` 18/18 全绿（KPI 四板块卡片、工单表格、ticket: 定向搜索、板块切换过滤、申诉研判抽屉环境比对与处置按钮、零前端运行时异常）；
+    - [x] i18n 静态审计三件套：`i18n-symmetry` 六语言全对称 / `i18n-audit` 字面量引用零缺失 / `i18n-hardcoded` 通过；
+    - [x] 零假数据残留：8 个测试用户物理删除（HTTP 200）、测试工单全部清理、种子基线 13 条完整还原；
+*   **测试观察项 (Observations, 未修复 — 按需求仅测试不修码)**:
+    - [P2] 封禁用户登录返回业务码 501 + "该账户已被封禁"（BizError 默认码），语义上 403 更贴切，前端按 code 分支时需留意；
+    - [P2] 本地 dev 库曾残留旧版种子工单（TKT- 前缀 4 条，与当前种子 REV-/THR-/APL-/BAN- 前缀不符），测试前已重置并由现行代码重新播种 13 条；
+    - [P2] 风控引擎 secPayload 指纹入参目前仅服务端就绪（login 透传），前端采集端尚未接线（与 rule_engine_roadmap.md 路线一致）；
+
 ### 安全审计控制台 4 大板块专属差异化列集深度重构与定制 (2026-10-10)
 *   **关联提交 (Git Commit)**: `327109ec4834b9981228b7293d39e3a47d7051f7` (Short: `327109e`)
 *   **部署环境 (Deployment)**: `本地全真栈 / 生产 Cloudflare (mail.epocanvas.com)`
