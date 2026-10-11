@@ -301,9 +301,13 @@ const dbInit = {
 					priority TEXT DEFAULT 'P2',
 					status TEXT DEFAULT 'active',
 					recommended_action TEXT,
-					match_score INTEGER DEFAULT 0,
-					subnet_match INTEGER DEFAULT 0,
 					appeal_reason TEXT,
+					ban_reason TEXT,
+					ban_time DATETIME,
+					is_internal INTEGER DEFAULT 0,
+					report_category TEXT,
+					report_reason TEXT,
+					resolved_time DATETIME,
 					create_time DATETIME DEFAULT CURRENT_TIMESTAMP
 				)
 			`).run();
@@ -1319,6 +1323,12 @@ const dbInit = {
 				match_score INTEGER DEFAULT 0,
 				subnet_match INTEGER DEFAULT 0,
 				appeal_reason TEXT,
+				ban_reason TEXT,
+				ban_time DATETIME,
+				is_internal INTEGER DEFAULT 0,
+				report_category TEXT,
+				report_reason TEXT,
+				resolved_time DATETIME,
 				create_time DATETIME DEFAULT CURRENT_TIMESTAMP
 			)
 		`).run();

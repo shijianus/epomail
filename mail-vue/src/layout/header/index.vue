@@ -17,7 +17,7 @@
         <span class="search-icon" @click="handleSearch" :title="$t('search') || 'Search'">
           <Icon icon="lucide:search" width="18" height="18"/>
         </span>
-        <input ref="searchInputRef" type="text" :placeholder="isSettingsMode && route.name !== 'all-email' ? (route.name === 'data-setting' ? $t('searchSettingsOrApps') : $t('searchSettings')) : route.name === 'all-email' ? $t('searchAllMail') : $t('searchMail')" v-model="emailStore.searchKeyword" @input="handleSearchInput" @keyup.enter="handleSearch" @keydown.tab.prevent="handleTabComplete" @focus="searchFocus = true" @blur="onSearchBlur" />
+        <input ref="searchInputRef" type="text" :placeholder="isSettingsMode && route.name !== 'all-email' ? (route.name === 'manage-audit' ? $t('auditSearchCasesPlaceholder') : (route.name === 'data-setting' ? $t('searchSettingsOrApps') : $t('searchSettings'))) : route.name === 'all-email' ? $t('searchAllMail') : $t('searchMail')" v-model="emailStore.searchKeyword" @input="handleSearchInput" @keyup.enter="handleSearch" @keydown.tab.prevent="handleTabComplete" @focus="searchFocus = true" @blur="onSearchBlur" />
         <span class="clear-icon" v-show="emailStore.searchKeyword" @mousedown.prevent @click.stop="clearSearch" :title="$t('clear')">
           <Icon icon="lucide:x" width="15" height="15"/>
         </span>
@@ -34,7 +34,7 @@
         </div>
 
         <!-- Dropdown for Settings Search -->
-        <div v-else-if="isSettingsMode && route.name !== 'all-email' && emailStore.searchKeyword.trim() && searchFocus" class="settings-search-dropdown">
+        <div v-else-if="isSettingsMode && route.name !== 'all-email' && route.name !== 'manage-audit' && emailStore.searchKeyword.trim() && searchFocus" class="settings-search-dropdown">
            <div v-for="group in settingsSearchResults" :key="group.route" class="settings-search-group">
              <div class="settings-search-title">{{ group.title }}</div>
              <div class="settings-search-item" v-for="item in group.items" :key="item.text" @mousedown.prevent="goToSetting(group.route, item.id)">
@@ -1087,6 +1087,10 @@ const localizedRoleName = computed(() => {
 })
 
 function handleSearch() {
+  if (route.name === 'manage-audit') {
+    window.dispatchEvent(new CustomEvent('manage-audit-search', { detail: emailStore.searchKeyword }));
+    return;
+  }
   if (isSettingsMode.value && route.name !== 'all-email') {
     return;
   }

@@ -8,6 +8,683 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### 安全审计控制台 4 大板块专属差异化列集深度重构与定制 (2026-10-10)
+*   **关联提交 (Git Commit)**: `327109ec4834b9981228b7293d39e3a47d7051f7` (Short: `327109e`)
+*   **部署环境 (Deployment)**: `本地全真栈 / 生产 Cloudflare (mail.epocanvas.com)`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 4 大板块专属差异化列集全面解耦与定制（严禁套用统一列集）：
+      - **滥用威胁 (`threat`)**：遵循最小修改原则，完整保持基准 11 大核心列集（工单编号、身分组、违规分类、报警原因、报警次数、当前状态、处理建议、处理时间、负责人、拍案管理、操作）；
+      - **申诉审计 (`appeal`)**：删除单一冗余的「报警原因」列；在「处理时间」后新增「过期时间」列（显示表单失效时间戳，并附带 `已过期` 状态标识）；
+      - **风险管理 (`audit`)**：将「违规分类」改为粗略「违规等级」（直接展示 `LV3 · 高风险`、`LV2 · 中风险`、`LV1 · 低风险`、`LV0 · 正常`，并支持表头下拉多态筛选）；在「处理时间」后新增「截止期限」列（展示到期时间戳并标明过期说明，如 `已过期`、`剩 X 天`、`永久管控`）；
+      - **操作记录 (`record`)**：删除审计诊断专属的「报警原因」、「报警次数」与「处理建议」列；新增「更新次数」、「最后更新」（时间）与「申诉次数」定制列；
+    - [x] 后端服务层契约与计算字段扩展 (`audit-service.js`)：
+      - 列表返回动态计算补充 `expireTime`、`deadline`、`updateCount`、`lastUpdated`、`appealCount`；
+      - 完善 `violationLevel` 条件过滤与粗略等级识别；
+    - [x] 前端组件与样式层精益规范 (`mail-vue/src/views/audit-report/index.vue`)：
+      - 引入 `currentSection` 计算属性，彻底解耦并独立定义 4 个板块专属的 `<el-table-column>`，分配唯一 `:key`；
+      - 严格保持 `:label` 首位兼容既有测试与响应式动态列渲染；
+      - 遵循 `admin-ui-standards`，新增 `.level-cell`, `.expire-cell`, `.deadline-cell`, `.plain-update-count`, `.plain-appeal-count`，纯文本展示无冗余标签边框；
+    - [x] 6 语言 i18n 绝对对称闭环：
+      - 6 语言字典（`zh`, `zh-Hant`, `en`, `es`, `fr`, `nl`）同步补充 `auditColViolationLevel`, `auditColDeadline`, `auditColUpdateCount`, `auditColLastUpdated`, `auditColAppealCount`, `auditDeadlineExpired`, `auditDeadlinePermanent`, `auditDeadlineDaysLeft`, `auditDeadlineHoursLeft`, `auditExpiredBadge`, `auditAllViolationLevels`, `auditLevelLv3`~`auditLevelLv0` 等全部键名，`i18n-symmetry.mjs` 验证 2650 keys 100% 绝对对称；
+    - [x] 自动化测试套件与全真栈保障：
+      - 新建 `tests/verify-audit-section-columns.mjs`，包含 6 大专项核验与全量断言通过；既有 `tests/verify-audit-ui-optimization.mjs` 19 项断言全绿通过；
+      - 前端 `mail-vue` Vite 构建零报错通过 (耗时 13.21s)。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：`mail-vue` Vite 构建通过 (13.21s)；
+    - [x] 多语言对称核验：6 语言 2650 键 100% 绝对对称 (`ALL SYMMETRIC`)；
+    - [x] 本地回归测试：`tests/verify-audit-section-columns.mjs` 6 大专项 100% 通过；`tests/verify-audit-ui-optimization.mjs` 19 项全绿通过；
+    - [x] 零假数据残留：测试脚本无脏数据写入或已自动清理。
+
+### 安全审计控制台全面纯文本无边框化、9列筛选扩展与拍案管理留名规范 (2026-10-10)
+*   **关联提交 (Git Commit)**: `8fe7f3624a0205fadc5bc0c817e1484368ab3b31` (Short: `8fe7f36`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com)` (Version ID: `6c3a8633-ee57-4f5e-98af-c14de6c521ef`, Startup: `63ms`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 表格全面纯文本化与消除边框（严格对齐设计规范）：
+      - 彻底移除 `class="el-table_1_column_3 is-center el-table__cell"`（身分组）、`class="el-table_1_column_6 is-center el-table__cell"`（报警次数）、`class="el-table_1_column_11 is-center el-table__cell"`（拍案管理）等列的所有 `<el-tag>` 标签边框与徽标方框；
+      - 全表格单元格采用纯文本元素渲染（`.plain-identity-text`、`.plain-alarm-count`、`.plain-suggestion-text`），仅保留优雅的文字色阶；
+      - 深度消除 Element Plus 内部单元格边框：注入 `--el-table-border: none` 与 `:deep(.el-table .el-table__cell) { border: none !important; border-left: none !important; border-right: none !important; box-shadow: none !important; }`，消除各列竖向及边框视觉干扰。
+    - [x] 拍案管理格式 100% 对齐负责人（管理员真实留名与用户详情交互）：
+      - 拍案管理由原权限类别调整为最终管理员留名记录，与负责人呈现格式保持 100% 一致；
+      - 直接呈现管理员纯名称（如 `SecAdmin`、`Master`、`System Bot`），支持点击无缝唤出「负责人账户详情」对话框；
+      - 默认逻辑紧密对齐业务场景：大部分情况下拍案管理即负责人，支持独立留名与详情追踪。
+    - [x] 列头筛选下拉选单扩展至 9 大核心列（除工单编号与操作）：
+      - 表头筛选触点全面扩展：身分组、违规分类、报警原因、报警次数、当前状态、处理建议、处理时间、负责人、拍案管理 9 大列统一配置表头筛选下拉菜单与高亮指示器；
+      - 工单编号与操作列专注业务展示与交互，保持纯净无筛选触点；
+      - 筛选选单选项包含全部重置选项与明确说明（如「全部违规分类」「全部报警原因」「全部报警次数」「全部处理建议」「全部拍案者」）。
+    - [x] 全表格居中对齐与精致排版：
+      - 11 大核心列及选择列全部统一 `align="center"` 与单元格居中流式排版，操作列纯粹展示居中「查看详情」纯文本图标按钮。
+    - [x] 6 语言 i18n 绝对对称保障：
+      - 六语言（zh, zh-Hant, en, es, fr, nl）全量同步 16 个新增多语言词条（字典总计 2635 键），静态审计 `i18n-symmetry.mjs` 与 `i18n-audit.mjs` 100% 通过。
+    - [x] Cloudflare 生产环境正式发布与全真栈回归验证：
+      - 前端 `mail-vue` Vite 构建通过 (16.28s)，生产 Worker 部署成功 (Version ID: `6c3a8633-ee57-4f5e-98af-c14de6c521ef`)；
+      - 运行 `node tests/verify-cf-production-audit-ui.mjs` 在生产公网 `https://mail.epocanvas.com` 上 34 项全真断言 100% 全绿通过。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：`mail-vue` Vite 构建通过 (16.28s)；
+    - [x] 多语言对称核验：6 语言 2635 键 100% 绝对对称无缺失；
+    - [x] 本地单元测试：`node tests/verify-audit-ui-optimization.mjs` 19 项全通过；
+    - [x] 生产环境部署核验：`wrangler deploy` 成功发布至 Cloudflare 生产环境 (Version ID: `6c3a8633-ee57-4f5e-98af-c14de6c521ef`)；
+    - [x] 线上全真检视：`node tests/verify-cf-production-audit-ui.mjs` 在 `mail.epocanvas.com` 实测 34/34 断言全绿通过；
+    - [x] 零假数据残留：数据库与 KV 中零临时凭据或脏数据残留。
+
+### 安全审计控制台 11 大新列集重构与全表格居中对齐规范落地 (2026-10-10)
+*   **关联提交 (Git Commit)**: `b76e819441bc191c47530b9fc479ecc2f6013b57` (Short: `b76e819`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com)` (Version ID: `795a698b-4200-4f43-a0ff-ae2dc7083e4e`, Startup: `75ms`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 表格列集全面重构为指定的 11 大核心列（顺序严格一致）：
+      1. `工单编号`: 严格遵循 `#` 开头不超过 6 位大写字母与数字规范（例如 `#AK1789`、`#ZS88K1`、`#BD9901`）；
+      2. `身分组`: 集成身份等级筛选（P0~P4 影响程度等级：核心站长 P0、运维协管 P1、组织成员 P2、正式用户 P3、临时访客 P4），支持表头下拉多态筛选；
+      3. `违规分类`: 说明当前的实际违规内容（如一人多号、配额规避、钓鱼诈骗、外发滥用等）；
+      4. `报警原因`: 说明是如何被检查到的（如指纹关联、发信激增、关键词命中等）；
+      5. `报警次数`: 同类收敛聚合计算，直接计算在一个表格中，高频预警徽标醒目呈现；
+      6. `当前状态`: 纯 icon + 文字水平精简对齐状态徽章；
+      7. `处理建议`: 智能处置建议 Tag；
+      8. `处理时间`: 统一样式时间戳，集成表头排序与范围筛选；
+      9. `负责人`: 纯名称点击链接，无缝唤出「负责人账户详情」对话框；
+      10. `拍案管理`: 明确界定执行最终有效裁决的法定主体（站长终裁、策略引擎、申诉仲裁组、安全主管、例行归档），与操作负责人明确区分；
+      11. `操作`: 单一纯粹的「查看详情」按钮，唤出审计决策抽屉。
+    - [x] 全表格居中对齐规范落地 (解决操作列原右对齐问题)：
+      - 所有 11 列及多选列统一显式声明 `align="center"`；
+      - 内部单元格容器（`.ticket-cell`, `.identity-cell`, `.alarm-count-cell`, `.reason-cell`, `.category-cell`, `.status-clean-item`, `.suggestion-tag-cell`, `.operator-cell`, `.authority-cell`, `.action-cell`）统一配置 `display: inline-flex; justify-content: center; width: 100%; text-align: center;`，确保表头与单元格完全居中对齐；
+      - 操作列彻底废除 `justify-content: flex-end`，居中对齐彻底消除视觉偏斜。
+    - [x] 6 语言字典对称性保障：
+      - 六语言（zh, zh-Hant, en, es, fr, nl）全量同步 26 个新字段字典，`i18n-symmetry.mjs` 与 `i18n-audit.mjs` 静态断言 100% 绝对对称通过。
+    - [x] Cloudflare 生产环境正式部署与线上实测：
+      - 前端 `mail-vue` 构建通过 (12.49s)，生产 Worker 发布成功 (Version ID: `795a698b-4200-4f43-a0ff-ae2dc7083e4e`)；
+      - 运行 `node tests/verify-cf-production-audit-ui.mjs` 在生产公网 `https://mail.epocanvas.com` 上 34 项全真断言 100% 全绿通过。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：`mail-vue` Vite 构建通过 (12.49s)；
+    - [x] 多语言对称核验：6 语言 2619 键 100% 绝对对称无缺失；
+    - [x] 本地单元测试：`node tests/verify-audit-ui-optimization.mjs` 16 项全通过；
+    - [x] 生产环境部署核验：`wrangler deploy` 成功发布至 Cloudflare 生产环境 (Version ID: `795a698b-4200-4f43-a0ff-ae2dc7083e4e`)；
+    - [x] 线上全真检视：`node tests/verify-cf-production-audit-ui.mjs` 在 `mail.epocanvas.com` 实测 34/34 断言全绿通过；
+    - [x] 零假数据残留：数据库与 KV 中零临时凭据或脏数据残留。
+
+### 滥用威胁工单列表修改回退与生产环境还原 (2026-10-10)
+*   **关联提交 (Git Commit)**: `6af08b5e0f25433658ec450ddcb95a8c8db42a78` (Short: `6af08b5`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com)` (Version ID: `309a85e8-ed0d-4a38-be33-42e34c897572`, Startup: `73ms`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 文件状态严格回退至任务前基准（commit 3fc758a）：
+      - 撤销 `mail-vue/src/views/audit-report/index.vue` 本次改动，恢复方案一标准处置决策列集（多选/工单编号/当前状态/违规分类/报警原因与风险等级/处理建议/处理时间/到期时间/负责人/操作）；
+      - 撤销 `mail-worker/src/service/audit-service.js` 与 `mail-worker/src/entity/audit-log.js` 本次改动；
+      - 撤销 `mail-vue/src/i18n/` 六语言字典（zh, zh-Hant, en, es, fr, nl）本次改动，字典键集严格还原为 2593 键；
+      - 清理本次任务生成的临时截图与测试脚本（`doc/validation/abuse-table/`、`tests/verify-abuse-table-polish.mjs`、`tests/verify-cf-production-abuse-table.mjs`）；
+      - 保持 Git Commit 严格单向向前发展，杜绝任何历史回退或 reset 操作。
+    - [x] 本地全真栈自检与自动化回归验证：
+      - 前端 `mail-vue` 构建核验 0 警告 0 报错通过 (13.44s)；
+      - i18n 静态对称三件套 100% 绝对对称通过（2593 键全部对称）；
+      - 历史测试回归套件 `node tests/verify-audit-ui-optimization.mjs` 16 项全断言通过。
+    - [x] 生产环境正式部署与还原：
+      - 执行 `wrangler deploy` 重新发布构建产物至 Cloudflare 生产环境 (Version ID: `309a85e8-ed0d-4a38-be33-42e34c897572`)；
+      - 登录 `mail.epocanvas.com` 执行 `node tests/verify-cf-production-audit-ui.mjs` 线上全真检视，34 项全绿通过，确认界面与数据接口正常还原。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：`mail-vue` Vite 构建通过 (13.44s)；
+    - [x] 多语言对称核验：6 语言 2593 键 100% 绝对对称通过；
+    - [x] 单元与集成测试：`node tests/verify-audit-ui-optimization.mjs` 16 项全通过；
+    - [x] 生产环境部署核验：`wrangler deploy` 成功发布至 Cloudflare 生产环境 (Version ID: `309a85e8-ed0d-4a38-be33-42e34c897572`)；
+    - [x] 线上全真检视：`node tests/verify-cf-production-audit-ui.mjs` 在 `mail.epocanvas.com` 实测 34/34 断言全绿通过；
+    - [x] 零假数据残留：数据库与 KV 中零临时凭据或脏数据残留。
+
+### 滥用威胁工单列表 Cloudflare 生产环境正式上线与公网全真检视 (2026-10-10)
+*   **关联提交 (Git Commit)**: `15bdcf7f5cc53036798c3174159f882329b9dc20` (Short: `15bdcf7`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com)` (Version ID: `dcc1cf80-ad3f-4060-b462-08d3d1ee9d31`, Startup: `57ms`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 全网生产环境上线发布：
+      - 前端 `mail-vue` 构建产物打包上传，Cloudflare Worker 脚本及静态 Assets 同步部署 (48 个更新静态资源上传，2048 模块编译通过)；
+      - Worker 启动延迟保持 57ms 极致水准，全局 D1/KV 依赖正常注入；
+      - Git 提交主干合并并成功推送到 GitHub 远端仓库 (`git push origin master`)。
+    - [x] 生产环境真实端到端核验通过：
+      - 管理员真实凭据登录 `https://mail.epocanvas.com`，进入 `/mail/u/0/#manage/admin/audit`；
+      - 真实验证「滥用威胁」4 大 KPI 卡片重排与「待审 2 / 已封禁 2」拆分统计高亮渲染；
+      - 真实验证 7 大固定列（选择、编号、对象、状态、分类、处理、操作）在公网真实数据下列宽无跳动；
+      - 真实验证 1440px 桌面端与 375px 移动端零横向滚动 (`scrollWidth <= clientWidth`)，零省略号，零文本裁切；
+      - 真实验证公网全生命周期 Tab 切换平滑（申诉审计 ➔ 滥用威胁联动丝滑）。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 生产部署执行：`wrangler deploy` 成功发布 (Version ID: `dcc1cf80-ad3f-4060-b462-08d3d1ee9d31`)；
+    - [x] 生产公网 E2E 实测套件：`node tests/verify-cf-production-abuse-table.mjs` 19/19 项断言全部绿灯通过；
+    - [x] 生产公网实景截图留存：
+      - `doc/validation/abuse-table/live_cf_production_1440px.png` (桌面 1440px 公网真实全景)
+      - `doc/validation/abuse-table/live_cf_production_375px.png` (移动 375px 公网真实卡片流)
+
+### 滥用威胁工单列表重构、列集收敛与全真响应式断言 (2026-10-10)
+*   **关联提交 (Git Commit)**:
+    - 阶段 6 (断言实测): `d3add39570550aa038c81aa8d3f3773c12db0cb3` (Short: `d3add39`)
+    - 阶段 5 (统计与熔断): `11eab8926ac47267b8da3f5598b14de9ea210e1a` (Short: `11eab89`)
+    - 阶段 4 (响应式卡片): `c17a8d324602cfbc4158eb0e37987ec0a52dd96a` (Short: `c17a8d3`)
+    - 阶段 3 (状态分类处理): `c60c2550580fef0dc157e8bb2e65a5528f6cf767` (Short: `c60c255`)
+    - 阶段 2 (对象列换行): `3eb2fd5a6a9d679732d7850763703068d8afc45a` (Short: `3eb2fd5`)
+    - 阶段 1 (7列固定宽度): `99a8c023983a10fdae5734fc3d3afe1ed1440fcb` (Short: `99a8c02`)
+*   **部署环境 (Deployment)**: `本地全真栈 (开发分支 fix/abuse-table-columns，未部署生产)`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 目标列集（7 列）重构并固定宽度 (`table-layout: fixed` 与 `<colgroup>` 控制)：
+      - 选择 (40px) ➔ 编号 (72px, `#10005` 等宽字体) ➔ 对象 (`clamp(180px, 22%, 260px)`) ➔ 状态 (96px) ➔ 分类 (弹性, 最小 190px) ➔ 处理 (120px) ➔ 操作 (64px, 详情+下拉菜单)；
+      - 彻底移除旧有独立列「处理建议」「负责人」「处理时间」「等级」「期限」，合并入「处理」列；
+      - 表头文字严格 ≤ 3 个汉字，排序/筛选图标紧凑内置不撑开列宽。
+    - [x] 对象列智能断行、分级显示与集群展开：
+      - 结构拆分为 `<span class="mail-local">` + `<span class="mail-at">@&#8203;</span>` + `<span class="mail-domain">`，在 `@` 与每个 `.` 后插入零宽空格 `\u200B`；
+      - 长度三级阶梯样式：≤ 80 字符（正常 13px，最多 3 行）、> 80 字符（12px，最多 4 行）、> 160 字符（11px 紧凑行高并打上「长地址」徽标）；
+      - 支持中文与 IDN 域名，复制按钮悬停提供 Unicode 与 Punycode（通过原生 `URL.hostname` 零额外依赖转换）；
+      - 集群工单展示「N 个账号」徽章，点击行内展开子账号列表，遵循同等断行规则且支持逐账号精确勾选。
+    - [x] 状态词表、分类证据摘要与处理列：
+      - 状态词表精简：待审（琥珀色）、已封禁（红色）、已解除（绿色）、熔断暂扣（待审 + 熔断 tag），彻底清除「生效中·已封禁」等旧合并写法；
+      - 分类 5 大固定词表（协议违规、一人多号、账户倒手、外发滥用、配额规避），第 2 行证据摘要 ≤ 14 汉字带来源前缀（用户举报 N 人、FBL 回传 N 件、系统规则命中）；
+      - 处理列两行呈现：第 1 行建议/结论（建议封禁/维持封禁/申诉通过/熔断暂扣），第 2 行处理时间与负责人（`MM/DD HH:mm 负责人` 或 `需人工` 或 `-`）。
+    - [x] 响应式无横向滚动卡片布局：
+      - ≥ 861px 使用 7 列表格；≤ 860px 自动降级为纵向单列卡片视图，隐藏 `thead` 与 `colgroup`，字段前缀 `data-label` 小标签；
+      - 在 1440、1024、860、768、375 全部分辨率下，`scrollWidth <= clientWidth` 绝对无横向滚动条，无省略号截断（零 `text-overflow: ellipsis`、零 `line-clamp`、零 `...`/`…`）。
+    - [x] 统计卡片拆分与设计文档增强项：
+      - 「滥用威胁」KPI 卡片展示「待审 N / 已封禁 M」，副标题高度严格限制 2 行；
+      - 全局熔断状态条：TRIPPED 时显式横幅「熔断中:新违规仅暂扣,不封禁账号」；
+      - 自动折叠计数条：「今日已自动折叠 N 个批次」及只读明细弹窗；
+      - 详情抽屉完整展示：原因代码、180 天证据留存倒计时、证据摘要与全生命周期事件流转时间线。
+    - [x] 多语言对称字典与后端服务健壮性：
+      - 新增多语言词条 47 处，zh, zh-Hant, en, es, fr, nl 六语言字典保持 100% 绝对对称（2641 键全部通过静态校验）；
+      - 后端 `auditService` 与 D1 表结构幂等兼容，旧数据缺失字段缺省安全防御。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 前端构建核验：`npm --prefix mail-vue run build` 耗时 13.58s 零警告零报错通过；
+    - [x] 多语言对称核验：`node scripts/i18n-symmetry.mjs` 6 语言 2641 键 100% 绝对对称通过；
+    - [x] 多语言代码引用核验：`node scripts/i18n-audit.mjs` 零缺失引用通过；
+    - [x] 历史审计回归核验：`node tests/verify-audit-ui-optimization.mjs` 16 项全断言通过；
+    - [x] 历史封禁回归核验：`node tests/verify-ban-table-columns-truncation.mjs` 12 项全断言通过；
+    - [x] 阶段 6 专项全真断言与截图验证：`node tests/verify-abuse-table-polish.mjs` 32 项断言全部绿灯通过：
+      - 1440px / 1024px / 860px / 768px / 375px 5 大视口横向滚动度量：全部 `scrollWidth <= clientWidth` (0 溢出)；
+      - 全尺寸 DOM 计算样式核验：0 个 `text-overflow: ellipsis`，0 个 `line-clamp`，0 个 `...` 或 `…` 省略号；
+      - 桌面表格单元格尺寸核验：所有单元格 `scrollHeight <= clientHeight + 2`，零裁切；
+      - 滥用板块语义隔离核验：零出现「期限」「等级」「E1~E4」「LV1~LV3」「TTL」禁用词；
+      - 自动折叠批次弹窗交互：3 个批次卡片正确弹出渲染；
+      - 全局熔断状态条交互：正确挂载并渲染暂扣文案；
+      - KPI 统计拆分度量：待审 4 / 已封禁 2 格式解析精确。
+    - [x] 5 大标准视口截图落盘：
+      - `doc/validation/abuse-table/abuse_table_1440px.png` (桌面超宽，200KB)
+      - `doc/validation/abuse-table/abuse_table_1024px.png` (桌面标准，147KB)
+      - `doc/validation/abuse-table/abuse_table_860px.png` (临界平板卡片切换点，106KB)
+      - `doc/validation/abuse-table/abuse_table_768px.png` (平板坚屏卡片，105KB)
+      - `doc/validation/abuse-table/abuse_table_375px.png` (手机超窄屏卡片，55KB)
+
+### 安全审计控制台方案一标准化列集落地与 punishments.md 架构对齐 (2026-10-10)
+*   **关联提交 (Git Commit)**: `c4073c55d7f02e16a3776000669ce3ab000ff386` (Short: `c4073c5`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com)` (Version ID: `eb265576-057a-4ef3-b9cb-44eeab47430d`, Startup: `61ms`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 对齐 punishments.md 架构准则，彻底清除底层网络与设备指纹列：
+      - 依据 punishments.md 原则 4 与第 6.3 节“不因网络/UA 类型定罪”底线，移除主表格中的「触发网络」与「终端设备」列；
+      - 杜绝长篇大论与低价值技术遥测，回归业务流转与确定性决策。
+    - [x] 落地方案一（标准处置决策列集）：
+      - 完整构建核心执行管道：`多选 (40px)` ➔ `工单编号 (80px)` ➔ `当前状态 (130px)` ➔ `违规分类 (105px)` ➔ `报警原因/风险等级 (min 125px)` ➔ `处理建议 (110px)` ➔ `处理时间 (135px)` ➔ `[到期时间 (135px)]` ➔ `负责人 (95px)` ➔ `查看详情 (80px)`；
+      - 中间单元格内容严格收敛为 2~4 个字的精炼词条（如：外发滥用/账户安全/内容合规/配额规避；投诉超标/退信超标/一人多号；限制外发/账号暂停/维持封禁/建议解禁）；
+      - 纯文本显式呈现，字体字号统一（12.5px~13px），无打底方框，水平对齐极具呼吸感与规整美感。
+    - [x] 4 大 Tab 自适应流转：
+      - 滥用威胁 Tab：彻底隐藏到期时间（不可延期），处理建议展示限制外发/账号暂停/永久封禁；
+      - 申诉审计 Tab：报警原因自适应为「风险等级」(LV0~LV3)，保留到期时间与批量延期入口；
+      - 风险管理 Tab：展示轻量处置动作（限速退避/持续观察/例行归档），保留观察期 TTL；
+      - 操作记录 Tab：展示终局判定与历史规则时限。
+    - [x] 导出 CSV 与 6 语言 i18n 绝对对称字典建设：
+      - 同步更新 `handleExportCsv`，导出字段与方案一列集 100% 对齐；
+      - 补齐 10 个新增多语言词条（zh, zh-Hant, en, es, fr, nl 保持 100% 绝对对称，2593 键全部校验通过）。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：`npm --prefix mail-vue run build` 零报错通过 (耗时 14.50s)；
+    - [x] i18n 静态对称性核验：`node scripts/i18n-symmetry.mjs` 6 语言 2593 键绝对对称通过，0 差异；
+    - [x] i18n 缺失引用核验：`node scripts/i18n-audit.mjs` 零缺失引用通过；
+    - [x] 本地自动化单元测试：`node tests/verify-audit-ui-optimization.mjs` 16 项全断言通过；
+    - [x] Cloudflare 生产环境全真 E2E 核验：`node tests/verify-cf-production-audit-ui.mjs` 34 项线上断言全部通过，三场景最新截图已落盘：
+      - `tests/cf_production_threat_verified.png` (滥用威胁)
+      - `tests/cf_production_appeal_verified.png` (申诉审计)
+      - `tests/cf_production_record_verified.png` (操作记录)
+
+### 安全审计控制台第三轮版面优化与中间空白治理 (2026-10-09)
+*   **关联提交 (Git Commit)**: `64732a06033a0ec2a4214ac11fdfaa2dcaefe028` (Short: `64732a0`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com)` (Version ID: `9a8147dd-aa0a-45f0-88ae-e9678a47bc9c`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 工单编号列删除重复检举徽标：
+      - 彻底移除 `#10001`+ 编号后面的 `tag-compact` 检举徽标（避免与后续「报警原因」列信息重复产生视觉冗余）；
+      - 优化工单编号列宽为 80px，使编号高亮且紧凑居左对齐。
+    - [x] 表格中间新增高价值审计字段治理空白浪费：
+      - 新增「触发网络」列（宽 160px）：展示触发威胁/风险的来源 IP（等宽代码字体显示）及归属国家/城市徽标 (`.network-cell`)；
+      - 新增「终端设备」列（宽 145px）：根据 Client User-Agent 智能渲染终端类型语义化图标（桌面 Windows/Linux、Mac、移动端 iOS/Android、自动化脚本/Bot）及 User-Agent 气泡提示 (`.device-cell`)；
+      - 充分利用原来中间约 400px 的空白区域，使威胁、申诉与风险表格信息密度达到 SOC/SIEM 级安全工作台标准，且在 1440px/1080p 屏幕下无需横向滚动条。
+    - [x] 导出 CSV 字段对齐：
+      - 同步更新 `handleExportCsv`，新增「触发网络 IP/归属地」与「终端设备」两项数据字段导出。
+    - [x] 6 语言 i18n 绝对对称字典建设：
+      - 补齐新增词条 `auditColTriggerNetwork` 与 `auditColClientDevice`（zh, zh-Hant, en, es, fr, nl 保持 100% 绝对对称）。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：`npm --prefix mail-vue run build` 构建零报错通过 (耗时 13.29s)；
+    - [x] i18n 静态对称性核验：`node scripts/i18n-symmetry.mjs` 6 语言 2583 键绝对对称通过；
+    - [x] i18n 缺失引用核验：`node scripts/i18n-audit.mjs` 零缺失引用通过；
+    - [x] 本地自动化单元测试：`node tests/verify-audit-ui-optimization.mjs` 16 项全断言通过；
+    - [x] Cloudflare 生产环境全真 E2E 核验：`node tests/verify-cf-production-audit-ui.mjs` 36 项断言全部通过，三场景完整截图已保存：
+      - `tests/cf_production_threat_verified.png` (滥用威胁)
+      - `tests/cf_production_appeal_verified.png` (申诉审计)
+      - `tests/cf_production_record_verified.png` (操作记录)
+
+### 安全审计控制台第二轮 UI/UX 深度打磨与 Cloudflare 生产环境全真验证 (2026-10-09)
+*   **关联提交 (Git Commit)**: `e0449c8eac1a6992e6b7e30ee281e6d0520ed65e` (Short: `e0449c8`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com)` (Version ID: `6ec8cd27-81de-4be3-97d7-c9a7b35dcdf8`, Startup: `68ms`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 表头时间排序集成：
+      - 彻底移除 `header-actions` 内独立时间排序图标；
+      - 在「处理时间」与「到期时间」列头添加内置排序交互箭头触点 (`.header-action-trigger`)，支持正序/倒序无缝切换；
+    - [x] 表格默认行去除邮箱干扰：
+      - 表格默认行移除邮箱名称 (`.ticket-email-wrap`)，仅展示醒目工单编号 `#10001`+ 与检举次数徽标；
+      - 邮箱完整地址、发信详情与关联上下文完整保留在抽屉详情界面 (`audit-drawer`)；
+    - [x] 当前状态列去边框与紧凑水平对齐：
+      - 移除 `el-tag` 边框，重构为 `.status-clean-item` 纯语义化图标 + 状态文本水平对齐；
+      - 优化列宽至 145px，缩短与工单编号横向间隙，彻底杜绝状态文本截断与空间浪费；
+    - [x] 统一时间呈现规范：
+      - 表格所有时间字段（处理时间、到期时间）统一格式化为 `MM/DD/YY HH:mm`（基于 `tzDayjs` 时区感知解析）；
+    - [x] 负责人列纯名称与账户详情抽屉交互：
+      - 负责人列纯化为名称展示 (`.operator-name-link`)，去除多余头像干扰；
+      - 点击负责人名称无缝弹出「负责人账户详情」对话框 (`.operator-account-dialog`)，支持展示类型/角色并一键跳转至用户管理；
+    - [x] 行内操作精简与详情集成：
+      - 表格操作列仅保留「查看详情」纯链接按钮 (`action-detail-btn`)，彻底移除行内操作按钮；
+      - 延期、备注、解封/重新封禁等全量操作无缝整合至详情抽屉底部操作栏；
+      - 在 `header-actions` 与批量操作栏中新增「批量延期」(`auditBatchExtend`) 快捷入口；
+    - [x] 滥用威胁 Tab 移除到期时间并引入「处理建议」：
+      - 滥用威胁 Tab 无固定到期概念，移除「到期时间」列，替换为语义化「处理建议」列（如：维持封禁、永久封禁、建议封禁、建议解禁）；
+    - [x] 全 Tab 处理建议覆盖与到期延期权限守卫：
+      - 所有 Tab 均引入动态「处理建议」（暂禁30天、暂禁15天、暂禁7天、暂禁3天、持续观察等）；
+      - 严格校验延期条件：仅具有到期时间的工单支持延期，滥用威胁及无到期时间记录严格阻断延期；
+    - [x] 6 语言 i18n 绝对对称字典建设：
+      - 补齐 22 个新增/修改多语言词条（zh, zh-Hant, en, es, fr, nl 保持 100% 绝对对称）。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：mail-vue 构建通过 (耗时 12.37s，0 警告 0 报错)；
+    - [x] Cloudflare 生产环境全量发布：版本 ID `6ec8cd27-81de-4be3-97d7-c9a7b35dcdf8` 部署成功；
+    - [x] 本地全真测试套件：`tests/verify-audit-ui-optimization.mjs` 14/14 项验收全过；
+    - [x] 公网生产环境端到端检视套件：`tests/verify-cf-production-audit-ui.mjs` 31/31 项全绿通过；
+    - [x] 多语言对称与审计验证：
+      - `node scripts/i18n-symmetry.mjs` (2581 键全 6 语言字典 100% 绝对对称通过)；
+      - `node scripts/i18n-audit.mjs` (0 缺失引用通过)；
+    - [x] 视觉截图实测比对：
+      - 滥用威胁视图：`tests/cf_production_threat_verified.png`；
+      - 申诉审计视图：`tests/cf_production_appeal_verified.png`；
+      - 操作记录视图：`tests/cf_production_record_verified.png`；
+    - [x] 零假数据残留：数据基于公网真实 API，无临时数据残留。
+
+### 安全审计控制台 UI 部署 Cloudflare 生产环境 (mail.epocanvas.com) 与全量视觉检视核验 (2026-10-09)
+*   **关联提交 (Git Commit)**: `df573d74ee21a3b054801ec1d49cc320d134c348` (Short: `df573d7`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com)` (Version ID: `ba450509-a7f0-41b6-8ffb-4ba86f906878`, Startup: `68ms`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] Cloudflare 生产环境全量发布：
+      - 前端构建打包产物全量上传并部署至 Cloudflare Workers (`ba450509-a7f0-41b6-8ffb-4ba86f906878`)；
+    - [x] 表格 7 大列宽度排版与右侧遮挡彻底根治：
+      - 重新分配列宽基准（工单编号 170px、状态 135px、原因/等级 135px、处理时间 140px、到期时间 105px、负责人 120px、操作 175px/195px）；
+      - 移除 `fixed="right"` 脱节遮挡层，彻底消除「到期时间」文字截断与「负责人」列被掩盖的问题；
+      - 在 1440px 桌面视口下所有 7 大列自适应完整铺展，零横向滚动条；
+    - [x] 线上全真检视与视觉截图比对：
+      - 滥用威胁视口核验截图：`tests/cf_production_threat_verified.png`；
+      - 申诉审计视口核验截图：`tests/cf_production_appeal_verified.png`；
+      - 操作记录视口核验截图：`tests/cf_production_record_verified.png`。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：mail-vue 构建通过 (耗时 12.43s，0 警告 0 报错)；
+    - [x] 公网生产环境端到端检视套件：`tests/verify-cf-production-audit-ui.mjs` 全绿 (22/22 断言全过)；
+    - [x] 本地全真测试套件：`tests/verify-audit-ui-optimization.mjs` 全绿 (6/6 验收项通过)；
+    - [x] 多语言对称与审计：
+      - `node scripts/i18n-symmetry.mjs` (2559 键全 6 语言字典 100% 绝对对称通过)；
+      - `node scripts/i18n-audit.mjs` (0 缺失引用通过)；
+    - [x] 零假数据残留：数据源为公网真实 API，无任何测试假数据残留。
+
+### 安全审计与封禁管控后台 UI/UX 深度精益优化 · KPI重排重命名/表头集成筛选/多选与分页对齐 (2026-10-09)
+*   **关联提交 (Git Commit)**: `0dcef2099e716bce9daa9334a85ce78bf691f14e` (Short: `0dcef20`)
+*   **部署环境 (Deployment)**: `本地全真栈 / 生产 Cloudflare (mail.epocanvas.com)`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] class="kpi-grid" 重排与重命名：
+      1. 滥用威胁 (threat)：聚焦严重违规威胁账户与即时处置；
+      2. 申诉审计 (appeal)：专用于复核申诉工单与风险降级评定；
+      3. 风险管理 (audit)：覆盖全域多维度安全风险与线索研判；
+      4. 操作记录 (record)：追溯全量处理审计流水与归档记录；
+    - [x] 表格字段重构与工单编号优化：
+      - 「工单编号」：采用 `#10001`+ 醒目格式展示，保留用户账户快捷复制与查看链路；
+      - 「当前状态」：直观呈现封禁、待审、申诉、已解封等语义化状态；
+      - 「报警原因」/「风险等级」：依据 Tab 动态切换，滥用威胁显示简明成因（如「一人多号」「多次检举」等），申诉审计显示 LV0~LV3 风险等级；
+      - 「处理时间」：格式化报警/触发处理时间；
+      - 「到期时间」：滥用威胁等永久措施显示「-」占位符，申诉审计按期显示；
+      - 「负责人」：显示经办人员头像与姓名；
+      - 「操作」：精简行内纯图标操作集（解封/封禁、延期、备忘、详情），符合右对齐精益设计准则；
+    - [x] 消除本地搜索框与顶栏 topbar-search 冲突：
+      - 彻底移除 `header-actions` 内冲突的 `el-input__wrapper`，统一由顶栏主搜监听 `emailStore.searchKeyword` 与广播事件驱动；
+    - [x] 筛选集中下沉至表头 (el-table__header-wrapper)：
+      - 将「状态筛选」「处理时间筛选」「风险等级筛选」整合至表头列下拉浮层中；
+      - 下拉选单统一明确标注「全部状态」「全部处理时间」「全部风险等级」等具象说明；
+    - [x] header-actions 精简化与批量操作赋能：
+      - 移除无用冗余按钮，保留时间排序、刷新、重置、清理历史、规则指引等实用纯图标操作；
+      - 新增支持勾选多选行批量解封、批量封禁、批量删除，并提供审计日志 CSV 导出功能；
+    - [x] 分页组件布局对齐「用户列表」：
+      - 移除过大的 jumper 控件，统一采用 `prev, pager, next, sizes, total` 紧凑尺寸与自适应右对齐响应式排版。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：mail-vue 构建通过 (耗时 13.21s，0 警告 0 报错)；
+    - [x] 自动化测试套件：`tests/verify-audit-ui-optimization.mjs` 全绿 (6/6 验收项断言通过)；
+    - [x] 多语言对称与审计：
+      - `node scripts/i18n-symmetry.mjs` (2559 键全 6 语言字典 100% 绝对对称通过)；
+      - `node scripts/i18n-audit.mjs` (0 缺失引用通过)；
+      - `node scripts/i18n-hardcoded.mjs` (0 用户可见文本硬编码)；
+    - [x] 零假数据残留：纯前端视图与数据层模型优化，无后端临时假数据残留。
+
+### 邮箱封禁管控后台 4 层 KPI 汇报架构重构与精益美化 · Cloudflare 生产环境上线全量核验 (2026-10-08)
+*   **关联提交 (Git Commit)**: `43a423bafdec1c9cca6bfabf734616bd20c1180e` (Short: `43a423b`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com)` (Version ID: `31458121-3ad6-49ca-9059-808a0dcef0bc`, Startup: `101ms`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 4 层 KPI 说明严格分界与架构重构：
+      1. 威胁邮箱：展示所有 LV3 以上威胁账户，包含一人多号、严重举报等（副标题「一人多号 · 严重举报」）；
+      2. 待审计邮箱：所有 LV0~LV3 邮箱，包含接发垃圾邮件、多次跳 IP 登录等（副标题「垃圾邮件 · 异地跳IP」）；
+      3. 申诉邮箱：通过填写符合表格对于已做出的判决进行申诉的邮箱（副标题「判决申诉 · 表单复核」）；
+      4. 操作记录：所有以上邮箱最终处理后（包括封禁、解禁等操作更新）、过期后等（副标题「封禁解禁 · 归档更新」）；
+    - [x] 说明文案对称规范：
+      - 标题统一 4 字符；副标题统一 8 字符对称（中点隔开）；
+      - Tooltip 提示完整呈现用户要求的字面级业务研判口径；
+    - [x] 彻底移除 `.kpi-active-dot`：
+      - 删除所有红/蓝状态小圆点，消除视觉冗余；
+    - [x] 美化 `.kpi-card` 与 `.kpi-card-active` 设计：
+      - 告别生硬粗边框，引入现代化 SaaS 微发光指示条（3px 顶部伪元素）与浮动阴影（translateY -2px）；
+      - 专属 4 色安全体系变量：威胁（#ef4444）、待审计（#f59e0b）、申诉（#6366f1）、操作记录（#10b981）；
+      - 适配暗色模式深层次柔光与微透明背景；
+    - [x] 替换操作态图标（调用 Iconify / Fluent 真实动作语义图标）：
+      - 威胁邮箱：`fluent:shield-dismiss-20-filled` (高危阻断)；
+      - 待审计邮箱：`fluent:clipboard-search-20-filled` (线索排查)；
+      - 申诉邮箱：`fluent:person-feedback-20-filled` (表单申诉)；
+      - 操作记录：`fluent:history-20-filled` (流水审计)；
+    - [x] 多语言严格对称：
+      - 6 语言字典（zh, zh-Hant, en, es, fr, nl）全量增补 12 个 KPI 键集，100% 绝对对称。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 前端构建核验：mail-vue 构建成功（耗时 13.13s，0 警告 0 报错）；
+    - [x] 多语言静态审计三件套通过：
+      - `node scripts/i18n-symmetry.mjs` (2535 键 100% 绝对对称通过)；
+      - `node scripts/i18n-audit.mjs` (0 缺失引用通过)；
+      - `node scripts/i18n-hardcoded.mjs` (views/audit-report/index.vue 0 未包裹硬编码通过)；
+    - [x] Cloudflare 生产环境真实上线：`npm run deploy --prefix mail-worker` (Version ID: `31458121-3ad6-49ca-9059-808a0dcef0bc`)；
+    - [x] 公网真实生产环境自动化验收测试：`tests/verify-cf-production-ban-ui.mjs` 31/31 项全绿：
+      - 真实生产主表与 4 层 KPI 卡片视图截图：`tests/cf_live_prod_table_verified.png`；
+      - 真实生产抽屉证据两列对比截图：`tests/cf_live_prod_drawer_compare_verified.png`；
+    - [x] 零假数据残留：已验证物理数据安全。
+
+### 邮箱封禁管控后台 UI 彻底修复 · 操作列边距重置、零截断及 Cloudflare 生产环境全量核验上线 (2026-10-08)
+*   **关联提交 (Git Commit)**: `0605e46ddae208933b91c015b6ea9399eb6d6c29` (Short: `0605e46`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com)` (Version ID: `14aac37c-0eec-4e5f-894e-d62c36ad8f81`, Startup: `63ms`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 表格列宽与截断彻底根治：
+      - 用户邮箱：`min-width 260px`（邮箱名加粗收尾，副级案件编号 10px + opacity 0.65）；
+      - 当前状态：`width 160px`（规范中点格式，不换行不截断）；
+      - 封禁原因：`min-width 220px`；
+      - 封禁时间：`width 155px`；
+      - 最后处理时间：`width 155px`；
+      - 处理人/负责人：`width 140px`；
+      - 操作：微调分配为 `210px`（中文及繁体）/ `240px`（英/荷/西/法），固定右侧；
+    - [x] 高风险标签彻底解决截断：
+      - 统一文案「高风险 · 已管控」，使用紧凑 tag 样式（padding 0 6px、字号 11px、flex-shrink 0、white-space nowrap）；
+      - 线上实测 scrollWidth 83px == clientWidth 83px，无问号、无截断中点；
+    - [x] 操作列重构与边距消除（彻底根治「查看详」截断）：
+      - 根治 Element Plus 默认 `.el-button + .el-button { margin-left: 12px }` 导致的 36px 冗余边距；
+      - 强制设置 `.table-actions-group` 所有按钮 `margin: 0 !important; margin-left: 0 !important;`；
+      - 按钮之间使用统一 `gap: 6px` 控制间距，整体右对齐；
+      - 设置右侧单元格 `overflow: visible !important;` 杜绝像素舍入截断；
+      - 「查看详情」完整显示，线上实测 scrollWidth 56px == clientWidth 56px，零截断；
+    - [x] 侧边抽屉「多维风险画像」重构为 Scheme A 两列对比卡片：
+      - 左侧「当前账号实际证据值」vs 右侧「系统基准 / 正常值 / 风险阈值」；
+      - 默认平铺展开全部 22 项对比指标，废除 Accordion 折叠；
+      - 异常超标项（如同一IP关联账号数 > 1）显式红色高亮警示；
+      - 抽屉标题统一为「封禁台账 · 存证（只读）」，底部主按钮与行内「解封」/「重新封禁」严格一致。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 前端构建核验：mail-vue 构建成功（耗时 12.90s，0 警告 0 报错）；
+    - [x] 多语言静态审计三件套通过：
+      - `node scripts/i18n-symmetry.mjs` (2523 键 100% 绝对对称通过)；
+      - `node scripts/i18n-audit.mjs` (0 缺失引用通过)；
+      - `node scripts/i18n-hardcoded.mjs` (views/audit-report/index.vue 0 未包裹硬编码通过)；
+    - [x] 本地全真栈专项测试：`tests/verify-ban-table-columns-truncation.mjs` 15/15 项全绿；
+    - [x] Cloudflare 生产环境真实上线：`npm run deploy --prefix mail-worker` (Version ID: `14aac37c-0eec-4e5f-894e-d62c36ad8f81`)；
+    - [x] 公网真实生产环境自动化验收测试：`tests/verify-cf-production-ban-ui.mjs` 21/21 项全绿：
+      - 真实生产主表截图：`tests/cf_live_prod_table_verified.png`；
+      - 真实生产抽屉对比截图：`tests/cf_live_prod_drawer_compare_verified.png`；
+    - [x] 零假数据残留：已验证物理数据安全。
+
+### 邮箱封禁管控后台 UI 彻底修复 · 列宽优化、零截断、操作列重构与两列对比证据卡片 (2026-10-08)
+*   **关联提交 (Git Commit)**: `1b21869685191d798c0331405388d392ad84c5e2` (Short: `1b21869`)
+*   **部署环境 (Deployment)**: `本地全真栈 / 构建核验 (mail-worker/dist)`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 表格列宽重新分配彻底解决局促：
+      - 用户邮箱：`min-width 260px`（主列，邮箱名加粗且支持长文本优雅收尾，副标题弱化案件编号 10px + opacity 0.65）；
+      - 当前状态：`width 160px`（规范中点格式，不换行不截断）；
+      - 封禁原因：`min-width 220px`（截断显示 + hover 显示完整 Tooltip）；
+      - 封禁时间：`width 155px`；
+      - 最后处理时间：`width 155px`；
+      - 处理人/负责人：`width 140px`；
+      - 操作：`width 200px`（桌面端固定右侧，多语言自适应宽度）；
+    - [x] 高风险标签彻底解决截断：
+      - 标签文案统一为「高风险 · 已管控」；
+      - 紧凑 tag 样式（padding 0 6px、字号 11px、line-height 18px、不换行、flex-shrink 0）；
+      - 标签置于邮箱同一行右侧，零省略号、零问号，文字 100% 完整显示；
+    - [x] 操作列重构彻底解决拥挤：
+      - 「解封」/「重新封禁」保持绿色/红色文字按钮（height 26px，padding 0 6px）；
+      - 「延期」「备注」采用圆形图标按钮（26px x 26px，带 hover tooltip）；
+      - 「查看详情」改为主色文字按钮（type="primary" link，完整显示「查看详情」，禁止截断）；
+      - 按钮之间 gap 控制在 6px 左右，整体严格右对齐；
+    - [x] 侧边抽屉「多维风险画像」彻底废除 Accordion，改为 Scheme A 两列对比卡片：
+      - 左侧卡片：当前账号实际证据值（设备指纹、网络与IP拓扑、行为速率遥测、凭证与身份）；
+      - 右侧卡片：系统基准 / 正常值 / 风险阈值（基准指纹、注册IP、独立账号基准、发信/退信健康线）；
+      - 超出阈值项（如同一IP关联账号数 > 1、相似度偏低、异网漫游、违规投诉）显式红色高亮警示（text-danger font-semibold）；
+      - 所有关键对比项默认全部平铺展开，无多层折叠；
+      - 抽屉标题统一为「封禁台账 · 存证（只读）」，底部主按钮与行内保持「解封」/「重新封禁」一致；
+    - [x] 多语言 i18n 严格闭环：
+      - 六语言（zh, zh-Hant, en, es, fr, nl）字典保持 2523 键 100% 绝对对称，零未包裹硬编码。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 前端构建核验：mail-vue `vite build` 成功（耗时 14.01s，0 警告 0 报错）；
+    - [x] 多语言静态审计三件套：
+      - `node scripts/i18n-symmetry.mjs` (2523 键绝对对称通过)；
+      - `node scripts/i18n-audit.mjs` (0 缺失引用通过)；
+      - `node scripts/i18n-hardcoded.mjs` (views/audit-report/index.vue 0 未包裹硬编码通过)；
+    - [x] 本地全真栈端到端自动化测试：`tests/verify-ban-management-unified-terms.mjs` 24/24 项全绿通过；
+    - [x] 表格列宽、度量与零截断专项实测：`tests/verify-ban-table-columns-truncation.mjs` 15/15 项全绿通过；
+      - 高风险标签度量：scrollWidth == clientWidth (83px == 83px)，零截断；
+      - 查看详情按钮度量：scrollWidth == clientWidth (56px == 56px)，零截断；
+      - 操作列单元格宽度：200px 严格对齐，4 个按钮无重叠无溢出；
+      - 两列对比卡片：实测数据与基准阈值一一对应，红标警示生效；
+    - [x] 零假数据残留：测试临时 Mock 数据物理清理。
+
+### 邮箱封禁管控后台用词统一与抽屉Accordion优化 · Cloudflare公网生产部署与Subagent全量核验 (2026-10-08)
+*   **关联提交 (Git Commit)**: `64bb68e3f8a9535fcc061acdbf3035b78eab901c` (Short: `64bb68e`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com)` (Version ID: `59fe745f-b30d-44d8-a346-a239f5b3504b`, Startup: `73ms`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 用词全面统一：
+      - 状态标签统一格式：`生效中 · 已封禁`、`已解禁 · 移出黑名单`、`待复核`、`观察中`（所有「生效中已封禁」均统一添加规范中点）；
+      - 风险等级统一：高风险统一为 `高风险 · 已管控`；
+      - 抽屉标题统一：重命名为 `封禁台账 · 存证（只读）`；
+      - 抽屉分区块统一：`风险研判与处置依据`、`多维风险画像`；
+      - KPI 说明文字精简：生效中封禁 → `策略生效中 · 阻断全部外发`、今日新增 → `近24小时新增处置`、待人工复核 → `申诉待复核`、高风险邮箱 → `撞库/黑名单探测`；
+    - [x] 表格信息层级微调：
+      - 用户邮箱列加粗高亮为主列；案件编号字号缩小至 10px、对比度弱化 (opacity 0.65) 作为次要辅助信息；
+      - 操作列层级：`解封` / `重新封禁` 保持文字按钮；`延期`、`备注` 精简为圆形图标按钮并配置 hover tooltip 提示；`查看详情` 保持文字按钮；
+    - [x] 侧边抽屉 Accordion 优化：
+      - 「多维风险画像」下四个维度（凭证挑战、设备指纹、行为速率、网络拓扑）改为折叠面板（`el-collapse`），默认展开前两个（凭证与身份挑战因子、设备指纹与会话连续性），后两个折叠收起，彻底解决一屏信息过载；
+      - 「风险研判与处置依据」区域保留显式红色警示文案 (`.text-danger`)；
+      - 抽屉底部主操作按钮（解封 / 重新封禁）与表格行内完全一致并联动即时响应；
+    - [x] 0 条记录空状态文案统一：无匹配结果时标准提示 `当前筛选条件下暂无封禁记录`；
+    - [x] 六语言多语言字典 100% 对称闭环：zh, zh-Hant, en, es, fr, nl 六语字典 2514 键绝对对称，代码 0 硬编码；
+    - [x] Cloudflare 生产部署上线：通过 wrangler 全量构建与部署（Worker 启动耗时 73ms，版本 ID `59fe745f-b30d-44d8-a346-a239f5b3504b`）。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 前端构建核验：mail-vue `vite build` 成功（耗时 13.58s，0 警告 0 报错）；
+    - [x] 多语言三件套静态审计：`i18n-symmetry.mjs` (2514键 100% 对称通过)、`i18n-audit.mjs` (0 缺失通过)、`i18n-hardcoded.mjs` (views/audit-report/index.vue 0 未包裹硬编码通过)；
+    - [x] 本地全真栈自动化端到端测试：`tests/verify-ban-management-unified-terms.mjs` 24/24 项断言全部通过；
+    - [x] **Subagent 独立全量审计核验 (Compliance Auditor)**：调用独立合规审计员 Subagent 运行 `tests/verify-cf-ban-management-subagent.mjs` 对 Cloudflare 公网真实生产环境 (`https://mail.epocanvas.com`) 执行端到端实测，**26/26 项断言全部绿灯通过**；
+    - [x] 公网真实高保真截图生成与留档：`tests/cf_live_drawer_verified.png`（线上抽屉与 Accordion 展开态）、`tests/cf_live_main_empty_verified.png`（线上空状态视图）；
+    - [x] 原型同步：`email_ban_management.html` 100% 同步用词与操作按钮。
+*   **关联提交 (Git Commit)**: `82001352b603e6d5c4dcc00dee2c5b4cb8f0a8f4` (Short: `8200135`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com)` (Version ID: `f74181d2-1f62-4566-9573-d89b8835ef9d`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 顶部 4 个统计卡片精简与重构：精简为邮箱管理实用指标（生效中封禁、今日新增、待人工复核、高风险邮箱），数字与说明精炼，默认蓝色边框高亮（.kpi-card-active），点击联动筛选；
+    - [x] 筛选栏紧凑优化：搜索框占位符更新为「搜索邮箱、案件编号或关键字...」，简化为 3 个实用下拉（状态：全部/生效中/已解禁/待复核/观察中、时间：全部/今日/近7天/近30天、风险：全部/高/中/低），保留搜索、刷新、重置、排序等紧凑图标按钮；
+    - [x] 表格列重构（邮箱主列化）：列顺序重构为 邮箱（主列加粗可点击，副标题弱化案件编号与一键复制）、当前状态（彩色标签+图标：红=生效中-已封禁，绿=已解封，橙=待复核，灰=观察中）、封禁原因（截断显示+hover完整Tooltip）、封禁时间、最后处理时间、处理人/负责人（头像+姓名+角色）、操作（右对齐实用按钮组）；
+    - [x] 状态与操作体验提升：每一行集成快捷操作按钮组（解封/封禁切换、延期弹窗、备注弹窗、查看详情），点击查看详情或点击邮箱平滑唤出右侧详情抽屉；
+    - [x] 视觉与细节打磨：保持高对比度深色主题，Element Plus 表格行高舒适增加（padding: 12px 0），底部分页保留「共 X 条 | 15条/页」；
+    - [x] 六语言多语言字典 100% 对称闭环：同步维护 zh, zh-Hant, en, es, fr, nl 六语字典（各 2514 键绝对一致，0 缺失，0 硬编码）；
+    - [x] Cloudflare 线上部署成功：通过 wrangler 全量构建与部署（Worker 启动耗时 67ms，版本 ID f74181d2-1f62-4566-9573-d89b8835ef9d）。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 前端构建核验：mail-vue 构建成功（耗时 12.60s，0 警告 0 报错）；
+    - [x] 静态 i18n 三件套审计：`i18n-symmetry.mjs` (2514键 100% 对称通过)、`i18n-audit.mjs` (0 缺失通过)、`i18n-hardcoded.mjs` (纯净通过)；
+    - [x] Subagent 独立全量审计核验：调用独立合规审计员 Subagent 运行 `tests/verify-cf-email-ban-audit.mjs` 对公网真实生产环境执行端到端核验，25/25 项断言全部绿灯通过；
+    - [x] 生产公网高清视觉留档：截屏生成 `cf_live_main_audit.png`（主页面工作台）与 `cf_live_drawer_audit.png`（详情抽屉），排版与视觉品质完备；
+    - [x] 零假数据残留：数据库已播种合规代表性台账，测试脚本安全无残留。
+
+### 邮箱封禁管控后台工作台 UI/UX 完整重构与原型落地 (2026-10-07)
+*   **关联提交 (Git Commit)**: `b4ed2fc6bb6fcfb0be55af0c8d9f3a4a26f6b424` (Short: `b4ed2fc`)
+*   **部署环境 (Deployment)**: `本地全真栈 / 独立高保真交互原型 (email_ban_management.html)`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 顶部统计卡片精简与重构：精简为 4 个真正有用的指标卡片（生效中封禁、今日新增、待人工复核、高风险邮箱），数字与说明简洁清晰，支持点击联动过滤，当前选中卡片保持显著蓝色光晕与高亮；
+    - [x] 筛选栏紧凑优化：搜索框占位符统一为「搜索邮箱、案件编号或关键字...」，下拉筛选精简为 3 个实用项（状态：全部/生效中/已解封/待复核/观察中、时间：全部/今日/近7天/近30天、风险：全部/高/中/低），保留搜索、刷新、重置按钮；
+    - [x] 表格列重构（邮箱主列化）：重构列顺序为 邮箱（主列加粗可点击，副标题弱化案件编号）、当前状态（彩色标签+状态圆点）、封禁原因（截断显示+悬停完整 Tooltip）、封禁时间、最后处理时间、处理人/负责人（新增列）、快捷操作（行内右对齐按钮组）；
+    - [x] 状态与操作体验提升：语义化色彩标签（红=生效中-已封禁，橙=待复核，绿=已解封，灰=观察中），行内集成快捷解封/封禁、延期、备注与查看详情抽屉；
+    - [x] 视觉与细节打磨：保持高对比度深色主题（OLED 友好夜间色调），表格行高舒适，预置 5 条真实感模拟数据与完备流转时间线；
+    - [x] 侧边详情抽屉（Side Drawer）：点击详情平滑滑出抽屉，承载完整案件编号、审计对象、风险等级、封禁规则、时间线与快速处置面板；
+    - [x] 底部标准分页：保留「共 5 条数据 | 15 条/页」分页导航。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：mail-vue 构建成功 (耗时 13.88s, 0 警告 0 报错)；
+    - [x] Playwright 真实渲染与截屏验收：`email_ban_preview_1440.png` 与 `email_ban_drawer_open.png` 经视觉检查完美对齐设计规范与人体工学；
+    - [x] 零假数据残留：测试数据局限于原型独立模拟集，无任何数据库或生产残留。
+
+### 审计控制台精益版本上线 Cloudflare 生产环境与公网全真视觉核验 (2026-10-05)
+*   **关联提交 (Git Commit)**: `5eb4644a8677c72ae96ba1812a64c4c898c6b758` (Short: `5eb4644`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com)` (Version ID: `6f09c920-c460-42e4-a221-353b415c5506`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] Cloudflare 全量部署成功：前端静态资源与 Worker 后端代码全量部署上线 (Version ID: `6f09c920-c460-42e4-a221-353b415c5506`)；
+    - [x] 顶部 KPI 卡片去戏剧化上线：线上 4 张卡片结构纯净，大字号指标 `待办 / 总量` 呈现，彻底移除假进度条与重复自述；
+    - [x] 表格操作列与排版去遮挡：线上主表移除 fixed=right 伪固定列遮挡阴影，封禁台账 7 列宽度人体工学重构，“查看档案”按钮 100% 完整展示；
+    - [x] 动态多维信任遥测上线：线上研判抽屉按威胁与申诉状态动态注入真实风险积分（如申诉 72 分、高危 18 分、封禁 0 分），四维凭据矩阵 2x2 并列网格呈现；
+    - [x] 封禁管控纯展示透明台账核验：线上封禁台账严格承载公开透明证据存档，明确不可随意篡改声明，抽屉内零破坏性裁决操作；
+    - [x] 6 语言多语言字典对称保障：线上 6 语言无任何缺失，无未包裹硬编码。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] Cloudflare 部署核验：`npx wrangler deploy` 执行成功，Worker 启动耗时 70ms，版本 ID `6f09c920-c460-42e4-a221-353b415c5506`；
+    - [x] 生产公网端到端回归套件：`node tests/verify-prod-audit-v2.mjs` (31/31 断言全绿通过)；
+    - [x] 生产公网视觉核验：快照 `tests/prod_live_audit_verified.png`、`tests/prod_live_dossier_drawer.png`、`tests/prod_live_sanction_ledger.png` 经视觉检查完美对齐设计准则；
+    - [x] 零假数据残留：生产环境数据完全保持原样，无临时数据残留。
+
+### 审计控制台公网企业级精益打磨与多维可信证据链去戏剧化 (2026-10-05)
+*   **关联提交 (Git Commit)**: `b1a0115b0167a5cfedf10995389fa758dd2aebda` (Short: `b1a0115`)
+*   **部署环境 (Deployment)**: `本地全真栈 / 构建产物 (mail-worker/dist) 完整核验`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 去系统自述与去戏剧化：移除 KPI 卡片冗余的“待办数据: X · 总数据: Y”重复文字，彻底拔除装饰性 3px 伪进度条，还原本真卡片呼吸感；
+    - [x] 消除表格行内徽标通胀：移除未结案编号旁冗余的“正在审计”标签，与右侧状态列保持单一事实来源，避免单行双重状态堆叠；
+    - [x] 表头列名精细化与严肃大厂化：将 14 字符的“初级阶段机器人认定的风险评估”精简为专业企业级“风险判定与触发依据”；
+    - [x] 列宽比例人体工学重构与消除视口遮挡：移除 fixed=right 伪固定列遮挡阴影，精细重配封禁台账 7 列宽度，确保 1440 桌面视口下全列完整呈现，“查看档案”按钮 100% 完整展示绝无“查...”截断；
+    - [x] 抽屉证据链动态遥测落地：废除所有账户千篇一律硬编码“信誉良好 85 分”的虚假呈现，依据威胁等级、检举频次与账号状态动态注入真实风险积分、速率激增与退信遥测；
+    - [x] 证据矩阵 2x2 网格化收敛：抽屉四维凭据重构为 2x2 响应式并列矩阵，解决单列过长需深度纵向滚动问题，操作裁决按钮直观可见；
+    - [x] 六语言多语言字典 100% 对称闭环：同步补充与优化 6 语言字典（2484 键绝对一致）。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：mail-vue 构建成功 (耗时 14.39s, 0 警告 0 报错)；
+    - [x] 多语言对称静态审计：`scripts/i18n-symmetry.mjs` (2484 键 100% 对称通过)；
+    - [x] 代码引用静态审计：`scripts/i18n-audit.mjs` (0 缺失 0 动态引用)；
+    - [x] 硬编码静态扫描：`scripts/i18n-hardcoded.mjs` (模板纯净 0 未包裹)；
+    - [x] 11 项风控审计全真栈测试：`tests/verify-user-audit-console-v2.mjs` (25/25 断言全绿通过)；
+    - [x] PM 业务规范端到端回归套件：`tests/test-audit-pm-standards-e2e.mjs` (26/26 断言全绿通过)；
+    - [x] 高清视觉公网验收快照留档：`tests/audit_visual_polished_01_all.png` 至 `04_ban_ledger.png` (视觉核验通过)；
+    - [x] 零假数据残留：测试数据全部自清理完毕。
+
+### 审计与风控控制台全量对齐 PM 业务架构规范与邮件举报联动闭环 (2026-10-05)
+*   **关联提交 (Git Commit)**: `aed84aa9148a46393eda2b9d4ddc129b415c0612` (Short: `aed84aa`)
+*   **部署环境 (Deployment)**: `本地全真栈 / 构建产物 (mail-worker/dist) 完整核验`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 常规审查 (Routine Reviews - audit): 完整涵盖 LV0~LV3 自动审核体系（LV0 例行采样、LV1 轻微跳跃、LV2 疑似人机、LV3 持续观察），对账户及社群伤害极小，管得少且支持超时自动封存与一键封存归档；
+    - [x] 异常威胁 (Anomalous Threats - risk): 严禁显示任何 LV0~LV3 等级，直接标定为高危「异常威胁 · 严重破坏」，作为管理员核心日常工作台；
+    - [x] 异常威胁·多账户管控: 严厉打击同一 IP/同一设备指纹/合成身份等一人多号违规（服务条款 ToS 6 语言同步补齐 1 人 1 户红线条款），支持一键全量封禁；
+    - [x] 异常威胁·被他人举报从高到低排序: 列表按检举次数降序排列置顶高危威胁；邮件阅读页集成交互式检举弹窗（诈骗、传销、虚假信息、垃圾等），被检举邮件自动封存至垃圾箱；外部邮件一键加入全局黑名单，内部用户支持禁言与注销；同一发件人活跃周期内多次举报聚合累加权重，已处理归档不重开但历史次数累积以维持高权重；
+    - [x] 争议申诉 (Dispute Appeals - appeal): 提前至第 3 位，提供表单化用户陈述审核；同意解禁后同步联动更新封禁管控台账为「已解禁·移出黑名单」；
+    - [x] 封禁管控 (Sanction Archive - ban): 调整至最后（第 4 位），定位为纯展示与公开透明审计台账；表格规范包含：编号、邮箱、封禁时间、最后处理时间、封禁原因、当前状态（已封禁 / 已解禁·移出黑名单）与详情；解禁账号记录永久保留且抽屉为只读档案零篡改；
+    - [x] UI/UX 精益规范对齐: 遵循 admin-ui-standards，彻底消除冗余灰底框与药丸框，操作按钮统一纯图标化右对齐并配 Tooltip。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：mail-vue Vite 构建通过 (耗时 12.97s, 0 警告 0 报错)；
+    - [x] Cloudflare Worker 试编译与类型生成：wrangler types 成功生成 (Exit code 0)；
+    - [x] 六语言多语言字典绝对闭环：`scripts/i18n-symmetry.mjs` (2477 键 100% 对称)；
+    - [x] 代码字面量引用审计：`scripts/i18n-audit.mjs` (0 缺失 0 动态引用)；
+    - [x] 全真栈自动化回归测试：`tests/verify-user-audit-console-v2.mjs` 25/25 断言全绿通过；
+    - [x] 专项 PM 标准 E2E 测试套件：`tests/test-audit-pm-standards-e2e.mjs` 26/26 断言全绿通过；
+    - [x] 文档服务条款同步：`epomail-docs` 6 种语言 ToS 均已同步一人一户禁止多账户条款 (Commit `4b02d46`)；
+    - [x] 零假数据残留：测试数据均在隔离层或自清理。
+
+### 安全审计控制台正式上线 Cloudflare 生产环境与 100% 公网全真核验 (2026-10-05)
+*   **关联提交 (Git Commit)**: `e6c6beda52fc03963c56c49ce90c17f3ad723ebc` (Short: `e6c6bed`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com)` (Version ID: `03484ff9-f7b6-4035-9894-ef2f56085878`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 要求 1 (统一 KPI 卡片 UI): 生产环境彻底消除 `.highlight-card` 与呼吸灯异化样式，4 大 KPI 卡片尺寸、边框、结构 100% 对称；
+    - [x] 要求 2 (待办数据 / 总数据与 4 种明确情况): 生产环境清晰呈现「待办数据: X · 总数据: Y」及大字号数值，4 大卡片明确划分为具体风控业务情况（常规审查、异常威胁、封禁管控、争议申诉）；
+    - [x] 要求 3 (消除重叠与优化分区): 生产环境彻底移除与 KPI 重叠的 `.tier-nav-bar` 标签栏，直连一体化单框工作台；
+    - [x] 要求 4 (管理与展示分离): 生产环境彻底剥离「记录策略与容量」说教式卡片，转由操作栏官方安全规则文档外链承载；
+    - [x] 要求 5 (操作栏按钮严格左对齐与顶栏搜索联动): `.header-actions` 所有按钮、下拉框、图标按钮严格左对齐；顶栏整体搜索默认直接过滤审计案件，输入框支持 `ticket:` / `email:` / `ip:` 全量参数；
+    - [x] 要求 6 (单框工作台彻底消除二层方框): 彻底消除 `.table-wrap` 二层脱节方框，主表格直接作为外部方框平铺铺满；
+    - [x] 要求 7 (案件编号中立与用户邮箱脱敏保护): 未结案案件严格隐匿用户邮箱，仅展示案件编号（如 `TKT-2026-AP77X2`）与「正在审计」；结案后才显式展示结案对象主体与编号；
+    - [x] 要求 8 (主表精简与证据二级抽屉收敛): 生产环境主表移除臃肿的环境 IP 池与大段预警说明长文本，精简为编号、初判评估、状态、启案/结案时间与详情审计；所有详尽证据全部收敛至右侧边抽屉；
+    - [x] 要求 9 (Google 式 Trust & Safety 多维信任凭据体系): 右侧抽屉内建立身份凭证健全度、行为速率与信誉、网络拓扑关联及设备环境辅助的四维交叉验证体系，拒绝孤立猜测易变的 IP 与指纹；
+    - [x] 要求 10 (初级阶段机器人认定的风险评估与规则体系): 表头严格对齐为「初级阶段机器人认定的风险评估」，严格依照制定的安全规则呈现 P0/P1/P2 惩戒级别；
+    - [x] 要求 11 (要求用户审计与详情入口): 表头明确为「详情审计」，按钮明确为「审阅案件」，引导并要求管理员先在抽屉内核验完整证据链后方可执行裁决。
+*   **自动化测试与公网核验清单 (Verification Checklist)**:
+    - [x] 生产公网部署：通过 `npx wrangler deploy` 成功发布至 Cloudflare 生产环境 (Version ID: `03484ff9-f7b6-4035-9894-ef2f56085878`)；
+    - [x] 六语言多语言绝对闭环：`scripts/i18n-symmetry.mjs` (2443 键 100% 对称)、`scripts/i18n-audit.mjs` (0 缺失 0 动态引用)；
+    - [x] 公网全真自动化回归：`tests/verify-prod-audit-v2.mjs` 直连 `https://mail.epocanvas.com` 生产环境，24/24 项断言全绿通过；
+    - [x] 生产公网全真截图：截取公网生产真实高分辨率快照并留证至 `tests/prod_live_audit_verified.png`。
+
+### 安全审计控制台深度优化：全面落实 11 项精益标准与 Google 式多维信任画像 (2026-10-05)
+*   **关联提交 (Git Commit)**: `19d55ef6e6625a87b97c85443b60a9cefe058185` (Short: `19d55ef`)
+*   **部署环境 (Deployment)**: `本地全真栈 / 构建产物 (mail-worker/dist) 完整核验`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 要求 1 (统一 KPI 卡片 UI): 彻底统一 4 大 KPI 卡片 UI，消除 highlight-card 等异化样式，4 张卡片结构尺寸与样式 100% 对称；
+    - [x] 要求 2 (待办数据 / 总数据与 4 种明确情况): 内容展示结构统一为「待办数据 / 总数据」，4 大卡片分为明确的风控业务情况（常规审查、异常威胁、封禁管控、争议申诉），不再使用含糊的警告说辞；
+    - [x] 要求 3 (优化分区消除重叠): 彻底移除与 KPI 功能重叠的 .tier-nav-bar 标签栏，直连一体化工作台，消除多层分区冗余；
+    - [x] 要求 4 (管理与展示分离): 界面彻底剥离展示型「记录策略与容量」板块，转由操作栏官方安全规则文档外链承载，彻底分离管理和展示职能；
+    - [x] 要求 5 (操作按钮左对齐与搜索深度结合): header-actions 所有操作按钮与下拉框严格左对齐；将顶栏整体搜索 (topbar-search) 与审计搜索无缝结合（排除全局设置跳转下拉，默认直接搜索案件列表），操作栏搜索框支持 ticket: / email: / ip: 全量参数语法；
+    - [x] 要求 6 (单框工作台彻底消除二层脱节): 彻底消除嵌套的二层方框 (.table-wrap)，主表格直接作为工作台外框平铺铺满，消除被圈定感；
+    - [x] 要求 7 (案件编号中立与用户邮箱脱敏保护): 未结案案件严格隐匿用户邮箱，仅展示案件编号 ticketId 与正在审计状态，杜绝调查偏见；结案后才显式展示结案对象主体与编号；
+    - [x] 要求 8 (主表精简与证据二级抽屉收敛): 主表移除臃肿的环境IP池与大段触发特征长文本，精简为案件编号、初判评估、状态、启案时间、结案时间及详情操作；所有详尽证据收敛至右侧边抽屉；
+    - [x] 要求 9 (Google 式 Trust & Safety 多维信任凭据体系): 右侧抽屉内建立身份凭证健全度、行为速率与信誉、网络拓扑关联及设备环境辅助的四维交叉验证体系，拒绝孤立猜测易变的 IP 与指纹；
+    - [x] 要求 10 (初级阶段机器人认定的风险评估与规则体系): 表头明确为「初级阶段机器人认定的风险评估」，严格依照制定的安全规则呈现 P0/P1/P2 惩戒级别；
+    - [x] 要求 11 (要求用户审计与详情入口): 表头由「操作」明确为「详情审计」，按钮明确为「审阅案件」，引导并要求管理员先在抽屉内核验完整证据链后方可执行裁决。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：`mail-vue` Vite 构建通过 (耗时 12.80s, 0 警告 0 报错)；
+    - [x] 六语言多语言绝对闭环：`scripts/i18n-symmetry.mjs` (2443 键 100% 对称)、`scripts/i18n-audit.mjs` (0 缺失 0 动态引用)；
+    - [x] 全真栈自动化测试：`tests/verify-user-audit-console-v2.mjs` 覆盖全部 11 项要求，25/25 断言全绿；
+    - [x] 视觉截图留证：已截取全景全真快照保存至 `tests/verify_audit_optimization_complete.png`；
+
+### 风控与安全审计控制台深度优化：落实 11 项精益治理标准 (2026-10-04)
+*   **关联提交 (Git Commit)**: `57fc8248ce659fca4045e5f630b3e393bd991615` (Short: `57fc824`)
+*   **部署环境 (Deployment)**: `本地全真栈 / 构建产物 (dist) 完整核验`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 要求 1 (统一 KPI 卡片 UI): 消除申诉卡片的异化样式 (.highlight-card / pulse-beacon)，4 大卡片共享高度一致的视觉风格与交互反馈；
+    - [x] 要求 2 (KPI 指标重构与情况明确): 统一展示格式为「待办数据 / 总数据」，并明确 4 大层级场景：行为基线初筛、高危风险研判、封禁惩戒执行、申诉复核裁决；
+    - [x] 要求 3 (流转分区消除重叠): 优化分区为清晰的案件流转生命周期（全部案件 / 正在审计待办 / 已结案归档），彻底消除与上方 KPI 卡片的功能重叠；
+    - [x] 要求 4 (管理与展示分离): 界面彻底剥离「记录策略与容量」文档式卡片，转由操作栏官方安全规则文档与申诉指引外链承载；
+    - [x] 要求 5 (操作按钮左对齐与搜索集成): 工具栏按钮与输入框全量左对齐；搜索框与全局 topbar-search 深度双向联动，默认支持案件编号与关键字检索，并支持高级参数；
+    - [x] 要求 6 (单框工作台消除二层脱节): 彻底移除脱节的 `.table-wrap` 二次嵌套方框，直接以工作台主表格作为外部方框；
+    - [x] 要求 7 (案件编号中立与用户邮箱脱敏保护): 未结案案件严格隐匿用户邮箱，仅展示案件编号 ticketId，杜绝调查偏见；仅在结案归档后显式展示结案对象主体；
+    - [x] 要求 8 (主表精简与二级抽屉展示): 移除臃肿冗余列（环境IP池、预警说明长文本），保留核心管理字段（编号、机器人初判、状态、启案/结案时间、案件审计）；
+    - [x] 要求 9 (Google 式 Trust & Safety 多维信任凭据体系): 右侧抽屉内杜绝孤立猜测 IP/指纹，提供网络拓扑、身份挑战因子、行为速率及信誉积分多维交叉验证；
+    - [x] 要求 10 (机器人风险初判评估与规则体系): 将安全审计等级重构为「机器人风险初判」，严格依据防滥用规则（P0/P1/P2）制定处置基线；
+    - [x] 要求 11 (强制审计裁决工作流): 操作列规范为「案件审计/详情」，引导审计员「进入审计」/「审阅案件」并在审阅完整证据链后执行裁决。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：`mail-vue` Vite 构建通过 (耗时 14.67s, 0 警告 0 报错)；
+    - [x] 六语言多语言绝对闭环：`scripts/i18n-symmetry.mjs` (2425 键 100% 对称)、`scripts/i18n-audit.mjs` (0 缺失 0 动态引用)；
+    - [x] 全真栈自动化测试：`tests/verify-user-audit-console-v2.mjs` 覆盖全部 11 项要求，25/25 断言全绿；
+    - [x] 视觉截图留证：已截取全景全真快照保存至 `tests/verify_audit_optimization_complete.png`；
+    - [x] 零假数据残留：数据库与状态物理隔离，测试服务优雅关闭。
+
+### 操作报告控制台纵深业务升级：上层4大KPI汇报卡片、3大业务层级导航与基准双向比对 (2026-10-04)
+*   **关联提交 (Git Commit)**: `e20a9422f26794fde5ff7f0f81bd9eee502f1b27` (Short: `e20a942`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com)` (Version ID: `0e3f7932-f391-4423-a64c-b374bd0c8d3d`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 变更点 1 (保留上层汇报 4 大 KPI 分区):
+        - 完整呈现 4 个核心汇报卡片（审计警告 / 风控警告 / 封禁警告 / 申诉警告）；
+        - 卡片集成实时统计数值（分子/分母 `summaryCounts`）、各类别专属动态微图标与进度条；
+        - 支持点击卡片与底部数据表格筛选联动，带来直观的高管视角概览体验。
+    - [x] 变更点 2 (向下延伸专属业务层级分区导航):
+        - 在 KPI 卡片与表格之间构建 3 大业务层级切换体系（预警时序总览 / 待办研判队列 / 防护基线与策略）；
+        - 「预警时序总览」承载全部预警类别筛选与时序流；
+        - 「待办研判队列」精准收敛至待办裁决流，操作栏动态切换为研判状态下拉筛选（待审申诉/已封禁/已解封/已驳回）；
+        - 「防护基线与策略」展开两张标准化策略基准卡片（邮件安全模式策略与风险分级初判基准），业务纵深分明。
+    - [x] 变更点 3 (对齐“用户列表”统一工作台规范且保持领域差异化):
+        - 采用 `.audit-box` + `.header-actions` + `.el-table` + 分页器单框统一设计，与用户管理保持视觉节奏一致；
+        - 保留审计专属的 IP/Geo/Device/FP 环境网络字段与研判放行交互，杜绝千篇一律的机械复刻；
+        - 显式内容纯文本不打底，表头预留充裕宽度（状态列 110px，操作列 150px），六语言无截断。
+    - [x] 变更点 4 (真实 D1 注册环境基准比对):
+        - 后端 `audit-service.js` 接入 `user` 表真实注册基线，动态提取 `createIp`、`device`、`os` 等构建对比基准；
+        - 研判弹窗内真实呈现「注册基准」vs「当前/申诉环境」对比，彻底解决相同字段绑定的展示缺陷。
+    - [x] 变更点 5 (技能与规范资产同步固化):
+        - `.agent/skills/admin-ui-standards/SKILL.md` 新增“控制台纵深业务层次规范 (Management Console Hierarchy: KPIs + Tiers + Data Grid)”。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：`mail-vue` Vite 构建通过 (13.74s, 0 警告 0 报错)；
+    - [x] 多语言对称核验：6 种官方语言 2337 词条 100% 绝对对称，无未包裹硬编码；
+    - [x] 生产全真栈自动化测试：`node tests/verify-refined-audit-console.mjs` 针对 `https://mail.epocanvas.com` 执行，33/33 项断言全部通过（0 失败）；
+    - [x] 真实生产截图留证：已更新并持久化至 `tests/refined_audit_console_table_light.png`、`tests/refined_audit_console_table_dark.png`、`tests/refined_audit_console_dialog.png`；
+    - [x] 零假数据残留：数据库与 KV 中零临时凭据或脏数据残留。
 
 ### EpomailDocs v5.19 快速上手页新增轮：两条路径最短操作序列 ×6 语言与阅读路线接入 (2026-10-11)
 *   **关联提交 (Git Commit)**: EpomailDocs 独立提交 `379c012` (Short: `379c012`) + `29fb2e8` (manifest 固化 379c012)；两提交已推送 origin/master 与 origin/main；主仓归档提交见本条目对应变更提交
