@@ -129,7 +129,7 @@ const emailCryptoUtils = {
 
 			return decoder.decode(decryptedBuffer);
 		} catch (err) {
-			console.error('[email-crypto] Decryption error:', err);
+			// 在解密遇到非本用户私钥密文、旧格式或损坏密文时安全降级返回原始字符串，由业务层做空值/过滤处理，避免刷屏噪音
 			return cipherText;
 		}
 	},

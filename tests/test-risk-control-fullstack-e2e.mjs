@@ -457,13 +457,19 @@ VALUES ('${appealId}', '${U.spammer}', 'appeal', 'appeal_submitted', 'appeal', '
 				ok(del.json?.code === 200, `D1-1 测试用户物理删除 (${ids.length} 个, code=${del.json?.code})`);
 				const gone = await loginPwd(U.spammer, PWD);
 				ok(gone.json?.code !== 200 || gone.json?.data?.mfaRequired, 'D1-2 已删用户登录失败 (物理删除生效)');
+				// 清理 D1-2 验证自产的 login_fail 键，杜绝测试卫生残留
+				try {
+					execSync(`npx wrangler kv key delete --binding kv "login_fail:${U.spammer}" --local --config wrangler-dev.toml`, {
+						cwd: WORKER_DIR, stdio: 'pipe'
+					});
+				} catch (e) {}
 			}
 
-			// D2 清空风控测试期间产生的全部工单并还原种子基线 (audit_log 在空表时自动重新播种)
+			// D2 清空风控测试期间产生的全部工单并还原种子基线 (audit_log 在空表时自动重新播种 15 条基线)
 			d1Exec('DELETE FROM audit_log;');
 			const remainProbe = await api('POST', '/audit/list', { token: cleanup.adminToken, body: { num: 1, size: 5 } });
 			const remainCount = (remainProbe.json?.data?.counts?.allTotal ?? 0);
-			ok(remainCount === 13, `D2-1 测试工单已物理清理且种子基线完整还原 (allTotal=${remainCount}, RunTag=${RUN_TAG} 零残留)`);
+			ok(remainCount === 15, `D2-1 测试工单已物理清理且种子基线完整还原 (allTotal=${remainCount}/15, RunTag=${RUN_TAG} 零残留)`);
 		} catch (cleanErr) {
 			fail++;
 			failures.push('[CLEANUP] ' + cleanErr.message);

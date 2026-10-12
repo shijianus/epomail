@@ -933,6 +933,7 @@ const emailService = {
 		emailData.type = emailConst.type.SEND;
 		emailData.userId = userId;
 		emailData.resendEmailId = data?.id || null;
+		emailData.createTime = new Date().toISOString();
 
 		const recipient = [];
 
@@ -981,9 +982,9 @@ const emailService = {
 		const attList = await attService.selectByEmailIds(c, [emailResult.emailId]);
 		emailResult.attList = attList;
 
-		//如果全是站内接收方，直接写入数据库
+		//如果全是站内接收方，直接写入数据库（传入未加密明文数据由 HandleOnSiteEmail 统一使用收件人私钥加密）
 		if (allInternal) {
-			await this.HandleOnSiteEmail(c, receiveEmail, emailResult, attList);
+			await this.HandleOnSiteEmail(c, receiveEmail, { ...emailData, emailId: emailResult.emailId }, attList);
 		}
 
 		const dateStr = dayjs().format('YYYY-MM-DD');
@@ -2348,7 +2349,14 @@ const emailService = {
 			if (userId) {
 				const cryptoKey = await emailCryptoUtils.getUserEmailCryptoKey(c.env, userId);
 				const decryptedSubjects = await Promise.all(list.map(async item => {
-					return await emailCryptoUtils.decryptText(item.value, cryptoKey);
+					try {
+						const dec = await emailCryptoUtils.decryptText(item.value, cryptoKey);
+						// 若解密结果依然是密文前缀，说明属于其他用户密文或解密未成功，予以安全剔除
+						if (typeof dec === 'string' && dec.startsWith('enc:v1:')) return null;
+						return dec;
+					} catch {
+						return null;
+					}
 				}));
 				results = [...new Set(decryptedSubjects.filter(v => v && v.toLowerCase().includes(query.toLowerCase())))].slice(0, 15);
 			} else {

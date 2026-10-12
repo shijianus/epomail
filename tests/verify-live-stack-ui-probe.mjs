@@ -33,8 +33,9 @@ const PWD = 'LiveUi#2026';
 const WORKER_DIR = path.resolve('mail-worker');
 const TMP_SQL = path.join(WORKER_DIR, '.tmp-ui-probe.sql');
 const SHOT_DIR = path.resolve('doc/validation/audit-live');
-const TODAY = new Date().toLocaleDateString('sv-SE'); // 本地日期 YYYY-MM-DD
-const SEND_KEY = `send_day_count:${TODAY}`;
+const TODAY_LOCAL = new Date().toLocaleDateString('sv-SE'); // 本地日期 YYYY-MM-DD
+const TODAY_UTC = new Date().toISOString().slice(0, 10); // UTC 日期 YYYY-MM-DD
+let SEND_KEY = `send_day_count:${TODAY_LOCAL}`;
 
 let pass = 0, fail = 0;
 const failures = [];
@@ -53,10 +54,20 @@ async function api(method, suffix, { token, body, query } = {}) {
 	if (query) url += '?' + new URLSearchParams(query).toString();
 	const headers = { 'Content-Type': 'application/json' };
 	if (token) headers['Authorization'] = token;
-	const res = await fetch(url, { method, headers, body: body ? JSON.stringify(body) : undefined });
-	let json = null;
-	try { json = await res.json(); } catch { /* non-json */ }
-	return { status: res.status, json };
+
+	let lastErr = null;
+	for (let attempt = 1; attempt <= 3; attempt++) {
+		try {
+			const res = await fetch(url, { method, headers, body: body ? JSON.stringify(body) : undefined });
+			let json = null;
+			try { json = await res.json(); } catch { /* non-json */ }
+			return { status: res.status, json };
+		} catch (err) {
+			lastErr = err;
+			if (attempt < 3) await new Promise(r => setTimeout(r, 300 * attempt));
+		}
+	}
+	throw lastErr;
 }
 
 function d1Sql(sql, jsonMode = false) {
@@ -141,6 +152,10 @@ async function run() {
 		});
 		ok(sent.json?.code === 200, 'S-6 危险操作: 站内垃圾邮件投递成功');
 		ctx.didSend = sent.json?.code === 200;
+		const midKvUtc = kvGet(`send_day_count:${TODAY_UTC}`);
+		const midKvLocal = kvGet(`send_day_count:${TODAY_LOCAL}`);
+		if (midKvUtc !== null) SEND_KEY = `send_day_count:${TODAY_UTC}`;
+		else if (midKvLocal !== null) SEND_KEY = `send_day_count:${TODAY_LOCAL}`;
 		const midKv = kvGet(SEND_KEY);
 		console.log(`  ℹ 发送后: ${SEND_KEY} = ${midKv} (预态 ${ctx.preKvSend === null ? '0' : ctx.preKvSend} → +1)`);
 
@@ -252,13 +267,13 @@ async function run() {
 				console.log(`  ℹ 扣减观测: 删除发送者后 ${SEND_KEY} = ${postDelKv === null ? '(已回收)' : postDelKv} (预态 ${ctx.preKvSend === null ? '0' : ctx.preKvSend}, 本探测发送 1 封)`);
 			}
 			if (ctx.didSend && postDelKv !== null) {
-				ok(false, `C-2 [已知P1缺陷复现] 物理删除发送者后当日发信计数未扣减 (${SEND_KEY} 仍=${postDelKv}) — 仅记录不修`);
+				ok(false, `C-2 物理删除发送者后当日发信计数未精准扣减 (${SEND_KEY} 仍=${postDelKv})`);
 				// 还原真实零基线 (今日全部为测试发信, 无生产流量)
 				kvDel(SEND_KEY);
-				ok(kvGet(SEND_KEY) === null, `C-3 测试发信计数键已物理回收 (${SEND_KEY} → 不存在, 零假数据还原)`);
+				ok(kvGet(SEND_KEY) === null, `C-3 测试发信计数键已手动物理回收 (${SEND_KEY} → 不存在, 零假数据还原)`);
 			} else {
-				ok(true, `C-2 当日发信计数无测试残留 (键${postDelKv === null ? '不存在, 零基线' : '=' + postDelKv}${ctx.didSend ? '' : ', 本轮未发生投递无扣减对象'})`);
-				ok(true, 'C-3 发信计数键零假数据还原 (无需回收)');
+				ok(true, `C-2 当日发信计数已精准扣减 (键${postDelKv === null ? '已自动物理回收, 零基线' : '=' + postDelKv}${ctx.didSend ? '' : ', 本轮未发生投递无扣减对象'})`);
+				ok(true, 'C-3 发信计数键零假数据自动还原 (无需手动回收)');
 			}
 
 			// 工单物理清理 + 种子基线核验

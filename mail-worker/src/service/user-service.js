@@ -592,18 +592,35 @@ const userService = {
 		const dateStr = dayjs().format('YYYY-MM-DD');
 		let sentTodayCount = 0;
 		try {
-			const todayStart = dayjs().startOf('day').toISOString();
+			const todayStartIso = dayjs().startOf('day').toISOString();
+			const todayStartMs = dayjs().startOf('day').valueOf();
+			const todayEndMs = dayjs().endOf('day').valueOf();
+
+			// 优先使用 SQLite datetime() 规范化比较候选发件
 			const sentRows = await mailOrm(c)
-				.select({ emailId: email.emailId })
+				.select({ emailId: email.emailId, createTime: email.createTime })
 				.from(email)
 				.where(and(
 					inArray(email.userId, userIds),
 					eq(email.type, emailConst.type.SEND),
-					sql`${email.createTime} >= ${todayStart}`
+					sql`datetime(${email.createTime}) >= datetime(${todayStartIso})`
 				))
 				.all();
-			sentTodayCount = sentRows ? sentRows.length : 0;
-		} catch (e) {}
+
+			if (Array.isArray(sentRows)) {
+				// 内存多格式鲁棒校验：兼顾 ISO 字符串与 SQLite CURRENT_TIMESTAMP（UTC 空格格式）
+				sentTodayCount = sentRows.filter(r => {
+					if (!r.createTime) return true;
+					const raw = String(r.createTime).trim();
+					const isoFormatted = raw.includes(' ') && !raw.includes('T') ? raw.replace(' ', 'T') + (raw.endsWith('Z') ? '' : 'Z') : raw;
+					const ts = new Date(isoFormatted).getTime();
+					if (isNaN(ts)) return true;
+					return ts >= todayStartMs && ts <= todayEndMs;
+				}).length;
+			}
+		} catch (e) {
+			console.warn('[user-service] Failed to count sentTodayCount:', e);
+		}
 
 		// 3. 级联清理 USER_PROFILE_ 中的 API Tokens（PAT 授权）
 		if (c.env?.kv) {

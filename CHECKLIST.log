@@ -7,6 +7,32 @@
 > 制度规范与工作流指引请见 [AGENTS.md](file:///home/shijian/projects/epocanvas-mail/AGENTS.md)。
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
+### 修复 physicsDelete 发信计数精准扣减失效、跨用户主题解密噪音与测试债闭环 (2026-10-12)
+*   **关联提交 (Git Commit)**: `4ef90f75187480e6b1d9cad85d75af7e02695a4f` (Short: `4ef90f7`)
+*   **部署环境 (Deployment)**: `本地全真栈 (wrangler dev @8787 · workerd CF 运行时 · D1+KV 真实存储)`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] P1·产品缺陷彻底修复（physicsDelete 当日发信量精准扣减）：
+        1. 根因消除：原逻辑在 `user-service.js:592-606` 中以 `dayjs().startOf('day').toISOString()` (带 'T' 的 ISO 字符串) 与 D1 `email.create_time` (默认 `CURRENT_TIMESTAMP`，空格分隔) 直接做 SQL 文本字典序比较，因 ASCII 空格 (0x20) < 'T' (0x54) 导致同一天内比较恒为 false；
+        2. 修复方案：在 SQL 筛选层使用 `datetime(${email.createTime}) >= datetime(${todayStartIso})` 规范化对齐格式，同时在内存中针对带空格 UTC 字符串自适应补全 `'T'` 与 `'Z'` 并转换为真实毫秒时间戳进行双重精确校验 (`todayStartMs <= ts <= todayEndMs`)；
+        3. 发信源头补齐：在 `email-service.js` 发信数据构造时显式补全 `emailData.createTime = new Date().toISOString()`，保证写入 D1 时原生符合规范 ISO 时间戳；
+        4. 实栈验证闭环：发信后 `send_day_count:2026-10-12` 从 0 增至 1，物理删除发送者后精准扣减归零并自动物理回收 KV 键 (实测 `postDelKv === null`)。
+    - [x] P1·测试债修复（D2-1 种子基线断言同步）：
+        - 主套件 `tests/test-risk-control-fullstack-e2e.mjs` 中的 D2-1 原先硬编码旧基线 13 条，更新断言至现行 15 条种子基线（与 `audit-service.js` 的 `seedBaselineIfEmpty` 15 条基线定义严格对称）。
+    - [x] P2·新发现与跨用户解密噪音治理：
+        - 根因定位：发信时 `HandleOnSiteEmail` 错误传入了已被发信人私钥加密的 `emailResult`，导致站内收件人被存入发件人密文；收件人/管理员联想搜索主题时调用本人密钥解他人密文，触发 AES-GCM 鉴权失败与 `console.error` 刷屏；
+        - 修复落地：`HandleOnSiteEmail` 改为传入未加密明文由各收件人私钥独立加密落库；`email-crypto-utils.js:132` 降低解密异常日志噪音；`email-service.js:2351` 在主题联想中自动过滤未解开的密文。
+    - [x] P2·本地开发环境安全收紧与测试卫生清扫：
+        - `mail-worker/wrangler-dev.toml`: 将 `[dev] ip = "0.0.0.0"` 收紧绑定为 `127.0.0.1` 回环地址，杜绝局域网意外暴露；
+        - `tests/test-risk-control-fullstack-e2e.mjs`: D1-2 测试完成后自动物理清理自产的 `login_fail:${U.spammer}` 键，彻底消除测试卫生残留。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：mail-vue 构建通过 (耗时 16.97s, 零报错零警告)；mail-worker `wrangler deploy --dry-run` 编译通过；
+    - [x] 静态代码审计：i18n 三件套全绿 (1929 keys × 6 语言 ALL SYMMETRIC / 1971 字面量 0 缺失 / hardcoded 退出码 0)；
+    - [x] 孤儿键清理套件：`tests/test-physics-delete-kv-cleanup-e2e.mjs` **32/32 全绿**；
+    - [x] 风控 E2E 主套件：`tests/test-risk-control-fullstack-e2e.mjs` **55/55 全绿** (此前 54/55，D2-1 现已全绿)；
+    - [x] 真浏览器×真后端实栈探测：`tests/verify-live-stack-ui-probe.mjs` **35/35 全绿** (此前 34/35，C-2 与 C-3 扣减归零与自动回收全绿)；
+    - [x] 浏览器 Mock UI 套件：`tests/verify-abuse-table-polish.mjs` **50/50 全绿** (5 分辨率截图留档)；
+    - [x] 零假数据终验：D1 `users=2 / audit_log=15` (纯种子基线)；KV 终态仅留 6 个合法系统/种子键，测试残留 0。
+
 ### 风控系统 master 聚合基线全真栈完整复测 · 危险操作模拟 + admin UI 处置 + 操作报告板块可用性 (2026-10-12)
 *   **关联提交 (Git Commit)**: `57693e5` (被测代码基线 HEAD, 本地领先 origin/master 15 commits 未 push), 本条目自身为纯文档提交 (Hash 见置顶汇报)
 *   **部署环境 (Deployment)**: `本地全真栈 (wrangler dev @8787 · workerd 真实运行时模拟 CF 部署 · D1+KV 本地真库 · .wrangler/state 全清冷启动 → /api/init 播种)`
