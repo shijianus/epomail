@@ -9,11 +9,11 @@
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
 ### 合并远端基线 (36b8182) 后风控系统全真栈完整复测 · 危险操作模拟 + admin 处置 + 操作报告板块可用性验证 (2026-10-14)
-*   **关联提交 (Git Commit)**: 合并提交 `7245ef4`（本归档提交 Hash 见置顶汇报）
+*   **关联提交 (Git Commit)**: 合并提交 `7245ef4d8243fac92f230ae8dbb66aedd3973648` (Short: `7245ef4`) / 测试归档提交 `1aa05335d3a57e3e72901ac7e35ba256cb481b6a` (Short: `1aa0533`) / 推送记录提交见置顶汇报
 *   **部署环境 (Deployment)**: `本地全真栈模拟 Cloudflare 部署 (wrangler dev @127.0.0.1:8787 · workerd CF 运行时 · D1+KV 本地真库 · .wrangler/state 全清冷启动 → /api/init 播种)`
 *   **功能需求与变更清单 (Changes & Feature Alignment)**:
-    - [x] 远端拉取与合并：`git fetch origin --prune` 发现远端新增 `d9f5e50`/`36b8182`，`git merge origin/master` 产生合并提交 `7245ef4`（本地 ahead 2 / behind 0，按要求零推送远端）；
-    - [x] 冲突治理：`CHECKLIST.log` 文本冲突按逆序时间线保留双方全部条目并恢复远端 `d9f5e50` 误删的 physicsDelete 标题行；8 个 validation PNG 二进制冲突取远端；本地未提交竞争性 `audit-service.js` 改法 stash 存底 (`stash@{0}`) 后采用远端官方修复；
+    - [x] 远端拉取与合并：`git fetch origin --prune` 发现远端新增 `d9f5e50`/`36b8182`，`git merge origin/master` 产生合并提交 `7245ef4`；测试与归档完成后经用户授权执行完整推送，`origin/master` 已更新至 `1aa0533`（本地与远端严格同步，0 ahead / 0 behind）；
+    - [x] 冲突治理：`CHECKLIST.log` 文本冲突按逆序时间线保留双方全部条目并恢复远端 `d9f5e50` 误删的 physicsDelete 标题行；8 个 validation PNG 二进制冲突取远端；本地未提交竞争性 `audit-service.js` 改法 stash 存底 (`stash@{0}` = `cc7167f1`) 后采用远端官方修复；该 stash 后续经用户授权固化为纯记录提交 `6a4aacc`，以 rebase 方式挂接当前 master 并推送至独立归档分支 `archive/superseded-wip-audit-clusterfix`（标注禁止合并回 master），master 代码树保持远端官方版本零改动（`audit-service.js` blob `f6a4eed` 与 `d9f5e50` 逐字节一致，我的 3 个提交对 `mail-worker/src`/`mail-vue/src` 零改动）；
     - [x] 上轮 P1 缺陷根治复核（DB/API/UI 三层）：`BAN-2026-MA8802` 的 `cluster_id=NULL`、非 risk 污染 0 条、Tab 1 集群「3 个账号」展开 3 行无重复、Tab 4 KPI=3 与表格 3 行对齐；
     - [x] 危险操作模拟：真浏览器对一次性账户 5 次错误密码 → `code=501`，第 6 次正确密码 → `code=501 連續錯誤次數過多，賬號已臨時鎖定`；主套件 Phase A 覆盖指纹浏览器 `riskScore=100` Step-Up 与同 IP 聚集检测；
     - [x] admin 处置与操作报告可用性：主套件 Phase C 全处置矩阵（禁言/拉黑/归档/备忘/延期/封禁/申诉放行/驳回/清理/越权拦截）+ 深挖套件复核/封禁/放行/驳回 + 时间线 actor 记名，全部留痕可溯。
