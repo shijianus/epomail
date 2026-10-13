@@ -9,6 +9,35 @@
 
 ---
 
+### 合并远端基线 (36b8182) 后风控系统全真栈完整复测与「显示工单号不可检索」缺陷专项审计 (2026-10-14)
+*   **关联提交 (Git Commit)**: 见置顶汇报 (合并提交 `7245ef4` + 本归档提交)
+*   **专项文档索引 (Detailed Doc)**: 本报告直接正文归档于此；UI 证据截图见 `doc/validation/operation-report-deep/01_operation_record_tab_1440.png` 与 `02_operation_record_search_hit_1440.png`
+*   **体检/审计范围与方法 (Scope & Methodology)**:
+    1. 范围与环境：`git fetch + merge origin/master` 合并远端 `d9f5e50`/`36b8182` 后的本地全真栈 (`wrangler dev @127.0.0.1:8787` · workerd CF 运行时 · D1+KV 本地真库 · `.wrangler/state` 全清冷启动 → `/api/init` 播种)，模拟 Cloudflare 部署 (`wrangler deploy --dry-run` 从仓库根目录调用)；
+    2. 工具与脚本：构建 `node ./build.mjs` + `wrangler deploy --dry-run`；i18n 三件套；`tests/test-risk-control-fullstack-e2e.mjs`、`tests/verify-cluster-and-action-record-fix.mjs`、`tests/verify-audit-ui-browser-e2e.mjs`、`tests/test-physics-delete-kv-cleanup-e2e.mjs`、`tests/verify-live-stack-ui-probe.mjs`、`tests/verify-abuse-table-polish.mjs`、`tests/verify-audit-section-columns.mjs`、`tests/verify-audit-ui-optimization.mjs`、`tests/test-operation-report-deep-dive.mjs`；真浏览器 (in-app Browser `evaluate_script` + Playwright) 暴破模拟与 UI 取证；D1/KV 底层逐表逐键终验。
+*   **核心发现与缺陷矩阵 (Key Findings & Matrix)**:
+    - **[P0·阻塞/安全]**: 零发现。合并后核心链路（冷启动播种、登录、2FA/Step-Up、暴破锁定、发信、检举聚合、封禁/解封、物理删除）零中断零回退。
+    - **[P1·重要/体验]**: 零发现。上轮报告的 P1（`ensureTables` 集群迁移 SQL 污染封禁台账）在合并基线上经 DB/API/UI 三层复核确认已根治：`BAN-2026-MA8802` 的 `cluster_id` 为 `NULL`、非 risk 行污染 0 条、Tab 1 集群徽标「3 个账号」展开 3 行无重复、Tab 4 KPI=3 与表格 3 行严格对齐。
+    - **[P2·重要/体验·本轮新发现] 操作报告顶栏搜索无法按界面显示的工单短号 (`#XXXXXX`) 检索，导致管理员复制所见编号搜索恒为 0 结果**:
+        1. 现象：Tab 4「操作记录」表格工单编号列显示 `#6WFWET`/`#MA8802` 形态短号（截图 01），将该短号原样填入顶栏搜索框后表格渲染「当前筛选条件下暂无封禁记录」（截图 02），而 KPI 卡片仍显示 5 条；
+        2. API 复现（与板块无关）：`keyword="#MA8802"` → `total=0`；`keyword="MA8802"` → `total=1`；`keyword="ticket:BAN-2026-MA8802"` → `total=1`；`keyword=<email>` → `total=1`；
+        3. 根因：`mail-worker/src/service/audit-service.js:659-672` 将 `searchKw` 原样用于 `LIKE '%kw%'` 匹配 `ticket_id/email/ip/action_text`，而库中 `ticket_id` 存储形态为 `BAN-2026-MA8802`（永不含 `#`）；显示用短号 `ticketNo` 由 `audit-service.js:831-837` 以 `'#' + code.slice(-6)` 派生，属纯展示字段；前端 `mail-vue/src/views/audit-report/index.vue:2337` 搜索入参仅做 `.trim()`，未剥离 `#`；
+        4. 影响面：四板块通用；不阻断业务（去 `#` 或加 `ticket:` 前缀可命中），但构成「所见不可搜」的体验断裂，并直接导致 `tests/test-operation-report-deep-dive.mjs` 的 `4.4-1`/`4.5-1` 两项断言红灯（`4.5-1` 为 `4.4-1` 的级联：搜不到行→行内详情按钮不存在）。
+    - **[P3·次要/语义] `/api/init/<secret>` 门禁对错误密钥返回 HTTP 200**（响应体为 `❌ JWT secret mismatch`，逻辑拦截正确）：拒绝语义应由 401/403 承载，便于网关与监控识别探测行为。非安全漏洞（密钥校验本身有效）。
+    - **[P3·工程观察]** `wrangler d1 execute --local` 对 compound SELECT 项数存在上限（>3 项 UNION 报 `too many terms in compound SELECT`），测试脚本需拆分语句；属工具链约束，非产品缺陷。
+*   **治理修复与回归结果 (Fixes & Verification)**:
+    - 本轮按用户指示**只测不修**，上述 P2/P3 仅记录不改动代码；
+    - 合并冲突治理：`CHECKLIST.log` 文本冲突按逆序时间线保留双方全部条目，并修复远端 `d9f5e50` 引入的文档回归（该提交插入新条目时误删「### 修复 physicsDelete … (2026-10-12)」标题行，已恢复）；8 个 validation PNG 二进制冲突统一取远端版本；本地未提交的竞争性 `audit-service.js` 改法已 stash 存底 (`stash@{0}`)，工作树采用远端官方修复；
+    - 自动化套件结果：`test-risk-control-fullstack-e2e.mjs` **55/55**、`verify-live-stack-ui-probe.mjs` **35/35**、`test-physics-delete-kv-cleanup-e2e.mjs` **32/32**、`verify-abuse-table-polish.mjs` **50/50**、`verify-audit-ui-browser-e2e.mjs` **18/18**、`verify-cluster-and-action-record-fix.mjs` 全绿、`verify-audit-section-columns.mjs` 6/6、`verify-audit-ui-optimization.mjs` 全绿、i18n 三件套全绿 (exit 0)、`test-operation-report-deep-dive.mjs` **54/56**（2 项红灯即上述 P2 缺陷的直接暴露）；
+    - 真浏览器危险操作实测：对一次性账户连续 5 次错误密码均 `code=501`，第 6 次**正确密码**被 `code=501 連續錯誤次數過多，賬號已臨時鎖定` 拦截，暴破防御生效；
+    - 零假数据终验：D1 `users=2 / accounts=2 / emails=2 (均为 announcement@epocanvas.com 官方系统信) / audit_log=15`；KV 仅 6 个合法系统键，暴破产生的 `login_fail:` 锁定键随 `physicsDelete` 自动回收，测试残留 0。
+*   **后续路线图 (Roadmap)**:
+    1. [P2] 搜索归一化：在 `audit-service.js` 检索层剥离前导 `#`（或将 `ticketNo` 纳入可检索字段），使「所见即可搜」；
+    2. [P3] `/api/init` 错误密钥改返 401/403；
+    3. [P3] 测试脚本拆分 compound SELECT 以适配 `wrangler d1 execute` 上限。
+
+---
+
 ### 操作报告集群污染修复与全真栈无副作用深度稽核报告 (Sanity & Regression Audit) (2026-10-13)
 *   **关联提交 (Git Commit)**: `d9f5e50546099cf35852ad666430e153a5a085ca` (Short: `d9f5e50`)
 *   **专项文档索引 (Detailed Doc)**: 本报告直接正文归档于此

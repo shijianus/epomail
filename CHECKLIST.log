@@ -8,6 +8,26 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### 合并远端基线 (36b8182) 后风控系统全真栈完整复测 · 危险操作模拟 + admin 处置 + 操作报告板块可用性验证 (2026-10-14)
+*   **关联提交 (Git Commit)**: 合并提交 `7245ef4`（本归档提交 Hash 见置顶汇报）
+*   **部署环境 (Deployment)**: `本地全真栈模拟 Cloudflare 部署 (wrangler dev @127.0.0.1:8787 · workerd CF 运行时 · D1+KV 本地真库 · .wrangler/state 全清冷启动 → /api/init 播种)`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 远端拉取与合并：`git fetch origin --prune` 发现远端新增 `d9f5e50`/`36b8182`，`git merge origin/master` 产生合并提交 `7245ef4`（本地 ahead 2 / behind 0，按要求零推送远端）；
+    - [x] 冲突治理：`CHECKLIST.log` 文本冲突按逆序时间线保留双方全部条目并恢复远端 `d9f5e50` 误删的 physicsDelete 标题行；8 个 validation PNG 二进制冲突取远端；本地未提交竞争性 `audit-service.js` 改法 stash 存底 (`stash@{0}`) 后采用远端官方修复；
+    - [x] 上轮 P1 缺陷根治复核（DB/API/UI 三层）：`BAN-2026-MA8802` 的 `cluster_id=NULL`、非 risk 污染 0 条、Tab 1 集群「3 个账号」展开 3 行无重复、Tab 4 KPI=3 与表格 3 行对齐；
+    - [x] 危险操作模拟：真浏览器对一次性账户 5 次错误密码 → `code=501`，第 6 次正确密码 → `code=501 連續錯誤次數過多，賬號已臨時鎖定`；主套件 Phase A 覆盖指纹浏览器 `riskScore=100` Step-Up 与同 IP 聚集检测；
+    - [x] admin 处置与操作报告可用性：主套件 Phase C 全处置矩阵（禁言/拉黑/归档/备忘/延期/封禁/申诉放行/驳回/清理/越权拦截）+ 深挖套件复核/封禁/放行/驳回 + 时间线 actor 记名，全部留痕可溯。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建与 CF 部署干跑：仓库根目录 `node ./build.mjs` exit 0 (mail-vue vite build 43.12s)；根目录 `wrangler deploy --dry-run --config mail-worker/wrangler.toml` exit 0 (435 静态资产, Total Upload 5497.39 KiB / gzip 1077.19 KiB, KV/D1×3/AI/Assets 绑定齐备)；
+    - [x] 冷启动引导链：清空 `.wrangler/state` → `wrangler dev` → `GET /api/init/<jwt_secret>` 200 success → 6 角色 + 主站长 (`admin@example.com`, user_id=2) + 账户播种；错误密钥负控返回 `❌ JWT secret mismatch`；
+    - [x] 静态审计：i18n 三件套 exit 0 (mail-vue 2695 keys × 6 语言 / mail-worker 1929 keys × 6 语言 ALL SYMMETRIC；1971 字面量 0 缺失)；`verify-audit-section-columns.mjs` 6/6；`verify-audit-ui-optimization.mjs` 全绿 (Windows CRLF 兼容修复验证)；
+    - [x] 全真栈套件：`test-risk-control-fullstack-e2e.mjs` **55/55** (RunTag rkctl8nc9)、`verify-live-stack-ui-probe.mjs` **35/35**、`test-physics-delete-kv-cleanup-e2e.mjs` **32/32**、`verify-abuse-table-polish.mjs` **50/50**、`verify-audit-ui-browser-e2e.mjs` **18/18**、`verify-cluster-and-action-record-fix.mjs` 全绿；
+    - [x] 深挖套件：`test-operation-report-deep-dive.mjs` **54/56** — 2 项红灯 (`4.4-1`/`4.5-1`) 根因为新发现 P2 缺陷「显示工单短号 `#XXXXXX` 不可检索」(详见 REPORTS.md 置顶审计)，非阻断；
+    - [x] 零假数据残留终验：D1 `users=2 / accounts=2 / emails=2 (官方系统信) / audit_log=15`；KV 仅 6 个合法系统键，暴破 `login_fail:` 键随 physicsDelete 自动回收，测试残留 0。
+*   **新发现缺陷记录 (按指示仅记录未修改代码)**:
+    - **[P2] 操作报告顶栏搜索无法按界面显示的工单短号检索**：根因 `audit-service.js:659-672` LIKE 匹配不含 `#` 的 `ticket_id`，短号由 `audit-service.js:831-837` 纯展示派生，前端 `index.vue:2337` 仅 trim；API 复现 `#MA8802`→0 / `MA8802`→1；UI 截图存证 `doc/validation/operation-report-deep/01/02_*.png`；
+    - **[P3] `/api/init` 错误密钥返回 HTTP 200**（应为 401/403，逻辑拦截正确，非安全漏洞）。
+
 ### 修复 ensureTables 集群污染与操作记录折叠遗漏、静态测试跨平台 CRLF 兼容与构建工作目录鲁棒化 (2026-10-13)
 *   **关联提交 (Git Commit)**: `d9f5e50546099cf35852ad666430e153a5a085ca` (Short: `d9f5e50`)
 *   **部署环境 (Deployment)**: `本地全真栈 (wrangler dev @8787 · workerd CF 运行时 · D1+KV 真实存储)`
