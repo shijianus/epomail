@@ -48,7 +48,7 @@ const TMP_SQL = path.join(WORKER_DIR, '.tmp-e2e-risk.sql');
 
 let pass = 0, fail = 0;
 const failures = [];
-const cleanup = { userIds: [], auditEmails: [], adminToken: null };
+const cleanup = { userIds: [], auditEmails: [], adminToken: null, totpTokens: [] };
 
 function ok(cond, label) {
 	if (cond) { pass++; console.log('  ✓ ' + label); }
@@ -159,7 +159,12 @@ async function register(email) {
 	assert.strictEqual(r.json?.code, 200, `register ${email} failed: ${JSON.stringify(r.json)}`);
 }
 async function loginPwd(email, password, secPayload) {
-	return api('POST', '/login', { body: { email, password, secPayload } });
+	const res = await api('POST', '/login', { body: { email, password, secPayload } });
+	const tok = res?.json?.data?.tempToken || res?.json?.data?.totpToken;
+	if (tok) {
+		cleanup.totpTokens.push(tok);
+	}
+	return res;
 }
 async function enrollTotp(email) {
 	const l = await loginPwd(email, PWD);
@@ -463,10 +468,33 @@ VALUES ('${appealId}', '${U.spammer}', 'appeal', 'appeal_submitted', 'appeal', '
 						cwd: WORKER_DIR, stdio: 'pipe'
 					});
 				} catch (e) {}
+
+				// 清理测试期间产生的 totp_pending 与 totp_replay 临时键
+				for (const tok of cleanup.totpTokens) {
+					try {
+						execSync(`npx wrangler kv key delete --binding kv "totp_pending:${tok}" --local --config wrangler-dev.toml`, {
+							cwd: WORKER_DIR, stdio: 'pipe'
+						});
+					} catch (e) {}
+				}
+				for (const uid of ids) {
+					try {
+						const replayOut = execSync(`npx wrangler kv key list --binding kv --prefix "totp_replay:${uid}:" --local --config wrangler-dev.toml`, {
+							cwd: WORKER_DIR, stdio: 'pipe', encoding: 'utf8'
+						});
+						const parsed = JSON.parse(replayOut.slice(replayOut.indexOf('[')));
+						for (const k of parsed) {
+							execSync(`npx wrangler kv key delete --binding kv "${k.name}" --local --config wrangler-dev.toml`, {
+								cwd: WORKER_DIR, stdio: 'pipe'
+							});
+						}
+					} catch (e) {}
+				}
 			}
 
-			// D2 清空风控测试期间产生的全部工单并还原种子基线 (audit_log 在空表时自动重新播种 15 条基线)
+			// D2 清空风控测试期间产生的全部工单与批次并还原种子基线 (audit_log 在空表时自动重新播种 15 条基线)
 			d1Exec('DELETE FROM audit_log;');
+			d1Exec('DELETE FROM audit_purge_batch;');
 			const remainProbe = await api('POST', '/audit/list', { token: cleanup.adminToken, body: { num: 1, size: 5 } });
 			const remainCount = (remainProbe.json?.data?.counts?.allTotal ?? 0);
 			ok(remainCount === 15, `D2-1 测试工单已物理清理且种子基线完整还原 (allTotal=${remainCount}/15, RunTag=${RUN_TAG} 零残留)`);

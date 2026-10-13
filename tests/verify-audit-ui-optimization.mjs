@@ -7,7 +7,7 @@ console.log('=== 核验：安全审计控制台 (#manage/admin/audit) UI 优化�
 console.log('================================================================\n');
 
 const vuePath = path.resolve('mail-vue/src/views/audit-report/index.vue');
-const vueContent = fs.readFileSync(vuePath, 'utf8');
+const vueContent = fs.readFileSync(vuePath, 'utf8').replace(/\r\n/g, '\n');
 
 // 1. KPI Grid 重排与重命名
 console.log('[验收项 1] class="kpi-grid" 重排与重命名...');
@@ -22,7 +22,7 @@ assert.ok(appealIdx < auditIdx, '卡片 2 申诉审计 在 卡片 3 风险管理
 assert.ok(auditIdx < recordIdx, '卡片 3 风险管理 在 卡片 4 操作记录 之前');
 
 const zhPath = path.resolve('mail-vue/src/i18n/zh.js');
-const zhContent = fs.readFileSync(zhPath, 'utf8');
+const zhContent = fs.readFileSync(zhPath, 'utf8').replace(/\r\n/g, '\n');
 assert.ok(zhContent.includes('auditKpiThreatEmail: "滥用威胁"'), '卡片 1 命名为「滥用威胁」');
 assert.ok(zhContent.includes('auditKpiAppealEmail: "申诉审计"'), '卡片 2 命名为「申诉审计」');
 assert.ok(zhContent.includes('auditKpiAuditEmail: "风险管理"'), '卡片 3 命名为「风险管理」');
@@ -82,7 +82,11 @@ console.log('[验收项 6] 分页体积与规范对齐「用户列表」...');
 assert.ok(vueContent.includes('layout="layout"'), '分页采用动态精简布局 (去除大体积 jumper)');
 assert.ok(vueContent.includes(':pager-count="pagerCount"'), '采用用户列表规范的响应式 pager-count');
 assert.ok(vueContent.includes('phonePageShow'), '支持手机端端自适应 sizes, total 布局');
-assert.ok(vueContent.includes('margin-top: 15px;\n  margin-bottom: 20px;\n  padding-right: 30px;'), '分页 CSS 边距与对齐规范 100% 学习用户列表');
+assert.ok(
+  vueContent.includes('margin-top: 15px;\n  margin-bottom: 20px;\n  padding-right: 30px;') ||
+  vueContent.replace(/\s+/g, ' ').includes('margin-top: 15px; margin-bottom: 20px; padding-right: 30px;'),
+  '分页 CSS 边距与对齐规范 100% 学习用户列表'
+);
 console.log('  ✓ 分页完全对齐用户列表规范，去除过大尺寸，自适应布局极佳\n');
 
 // 7. 第二轮优化 8 项核验

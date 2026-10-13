@@ -99,18 +99,25 @@ const auditService = {
 			`).run();
 			await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_audit_purge_batch_time ON audit_purge_batch(create_time);`).run();
 
-			// Idempotent migration: Ensure multi-account cluster baseline has cluster_id
+			// Idempotent migration: Ensure multi-account cluster baseline has cluster_id (only for risk abuse tickets)
 			try {
 				await userDb.prepare(`
 					UPDATE audit_log
 					SET cluster_id = 'CLS-2026-MULTI99',
 						evidence_summary = 'Jaccard 0.84 节律 0.92',
 						report_source = '系统规则命中'
-					WHERE email = 'syndicate_cluster@farm.net' AND (cluster_id IS NULL OR cluster_id = '');
+					WHERE email = 'syndicate_cluster@farm.net' AND warning_type = 'risk' AND (cluster_id IS NULL OR cluster_id = '');
+				`).run();
+
+				// 幂等自愈：将因历史无限定更新导致误写了 cluster_id 的非 risk 工单（如 ban 台账）清除 cluster_id
+				await userDb.prepare(`
+					UPDATE audit_log
+					SET cluster_id = NULL
+					WHERE warning_type != 'risk' AND cluster_id = 'CLS-2026-MULTI99';
 				`).run();
 
 				const existingMembers = await userDb.prepare(`
-					SELECT count(*) as count FROM audit_log WHERE cluster_id = 'CLS-2026-MULTI99';
+					SELECT count(*) as count FROM audit_log WHERE cluster_id = 'CLS-2026-MULTI99' AND warning_type = 'risk';
 				`).first();
 				if (existingMembers && Number(existingMembers.count) === 1) {
 					// Seed member 2 and member 3 for the cluster
@@ -697,8 +704,8 @@ const auditService = {
 			}
 		}
 
-		// 集群聚合过滤：同一 cluster_id 只将首个主工单作为独立行返回，关联子账号通过 clusterAccounts 组织展示
-		conditions.push(sql`(${auditLog.clusterId} IS NULL OR ${auditLog.clusterId} = '' OR ${auditLog.id} IN (SELECT MIN(id) FROM audit_log WHERE cluster_id IS NOT NULL AND cluster_id != '' GROUP BY cluster_id))`);
+		// 集群聚合过滤：同一 cluster_id 在同 warning_type 下只将首个主工单作为独立行返回，关联子账号通过 clusterAccounts 组织展示
+		conditions.push(sql`(${auditLog.clusterId} IS NULL OR ${auditLog.clusterId} = '' OR ${auditLog.id} IN (SELECT MIN(id) FROM audit_log WHERE cluster_id IS NOT NULL AND cluster_id != '' GROUP BY cluster_id, warning_type))`);
 
 		const query = orm(c).select().from(auditLog);
 		if (conditions.length > 0) {
@@ -726,12 +733,17 @@ const auditService = {
 			.where(conditions.length > 0 ? and(...conditions) : undefined)
 			.get();
 
-		// 查询同集群的所有关联子账号并预处理成 Map
+		// 查询同集群的所有关联子账号并预处理成 Map (严格限定同一 warningType 为 risk)
 		const clusterIds = [...new Set((list || []).map(r => r.clusterId).filter(Boolean))];
 		let clusterMembersMap = new Map();
 		if (clusterIds.length > 0) {
 			try {
-				const allMembers = await orm(c).select().from(auditLog).where(inArray(auditLog.clusterId, clusterIds)).orderBy(asc(auditLog.id));
+				const allMembers = await orm(c).select().from(auditLog).where(
+					and(
+						inArray(auditLog.clusterId, clusterIds),
+						eq(auditLog.warningType, 'risk')
+					)
+				).orderBy(asc(auditLog.id));
 				for (const m of allMembers) {
 					if (!clusterMembersMap.has(m.clusterId)) {
 						clusterMembersMap.set(m.clusterId, []);
@@ -938,7 +950,7 @@ const auditService = {
 
 			let clusterAccounts = [];
 			let clusterCount = 1;
-			if (row.clusterId && clusterMembersMap.has(row.clusterId)) {
+			if (row.warningType === 'risk' && row.clusterId && clusterMembersMap.has(row.clusterId)) {
 				const members = clusterMembersMap.get(row.clusterId);
 				clusterCount = members.length;
 				clusterAccounts = members.map(m => ({

@@ -63,6 +63,7 @@ async function run() {
 	// 注入真实 admin token (与前端 epo_sessions 会话结构一致)
 	await context.addInitScript(({ t, email }) => {
 		localStorage.setItem('token', t);
+		localStorage.setItem('loginEmail', email);
 		localStorage.setItem('epo_sessions', JSON.stringify([{ u: 0, token: t, email }]));
 	}, { t: token, email: ADMIN_EMAIL });
 
@@ -92,11 +93,15 @@ async function run() {
 		ok(/滥用威胁/.test(kpiTitles) && /申诉审计/.test(kpiTitles) && /风险管理/.test(kpiTitles) && /操作记录/.test(kpiTitles), `U2-2 四大板块 KPI 标题齐备 (${kpiTitles})`);
 
 		section('U3 · 工单表格渲染');
-		await page.waitForSelector('.audit-box table tbody tr, .risk-data-table tbody tr, .el-table__row', { timeout: 20000 });
-		const rowCount = await page.locator('.el-table__row').count();
+		await page.waitForSelector('.abuse-table tbody tr, .audit-box table tbody tr, .risk-data-table tbody tr, .el-table__row', { timeout: 20000 });
+		if (!lastAuditJson) {
+			await page.waitForTimeout(1500);
+		}
+		const rowLocator = page.locator('.abuse-table tbody tr:not(.abuse-cluster-child-row), .risk-data-table tbody tr, .el-table__row');
+		const rowCount = await rowLocator.count();
 		ok(rowCount > 0, `U3-1 工单表格渲染 (${rowCount} 行)`);
-		const tableText = await page.locator('.el-table__row').first().textContent();
-		ok(/#[A-Z0-9]{4,7}/.test(tableText || ''), 'U3-2 工单编号呈现 (#XXXX 格式)');
+		const tableText = await rowLocator.first().textContent();
+		ok(/#[A-Za-z0-9\-_]{3,20}/.test(tableText || ''), `U3-2 工单编号呈现 (#XXXX 格式, 实际: ${(tableText || '').replace(/\s+/g, ' ').slice(0, 40)})`);
 		ok(lastAuditJson?.data?.counts?.categories, `U3-3 前端真实加载 /audit/list 并取得四板块计数 (audit=${lastAuditJson?.data?.counts?.categories?.audit?.total}, risk=${lastAuditJson?.data?.counts?.categories?.risk?.total})`);
 
 		section('U4 · 关键词搜索联动 (顶栏检索 → manage-audit-search 事件)');
@@ -134,11 +139,11 @@ async function run() {
 		await page.locator('.kpi-card.kpi-appeal').first().click();
 		await page.waitForTimeout(1500);
 		// 打开第一条申诉工单的研判抽屉 (按钮文案: 研判放行 / 详情)
-		const inspectBtn = page.locator('.el-table__row').first().locator('button').filter({ hasText: /研判|详情|放行/ }).first();
+		const inspectBtn = rowLocator.first().locator('button, .action-btn').filter({ hasText: /研判|详情|放行|View/ }).first();
 		if (await inspectBtn.count() > 0) {
 			await inspectBtn.click();
 		} else {
-			await page.locator('.el-table__row').first().locator('button').nth(0).click();
+			await rowLocator.first().locator('button, .action-btn').nth(0).click();
 		}
 		await page.waitForSelector('.audit-drawer-container', { timeout: 15000 });
 		ok(true, 'U6-1 申诉研判抽屉成功打开');

@@ -673,6 +673,14 @@ const userService = {
 					await c.env.kv.delete(KvConst.TOTP_SETUP + id);
 					if (KvConst.WEBAUTHN_SETUP) await c.env.kv.delete(KvConst.WEBAUTHN_SETUP + id);
 					if (KvConst.WEBAUTHN_TEST) await c.env.kv.delete(KvConst.WEBAUTHN_TEST + id);
+					try {
+						const replayKeys = await c.env.kv.list({ prefix: (KvConst.TOTP_REPLAY || 'totp_replay:') + id + ':', limit: 50 });
+						if (replayKeys?.keys) {
+							for (const rk of replayKeys.keys) {
+								await c.env.kv.delete(rk.name).catch(() => {});
+							}
+						}
+					} catch (e) {}
 				} catch (e) {}
 			}
 
