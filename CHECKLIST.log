@@ -9,7 +9,7 @@
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
 ### 修复 ensureTables 集群污染与操作记录折叠遗漏、静态测试跨平台 CRLF 兼容与构建工作目录鲁棒化 (2026-10-13)
-*   **关联提交 (Git Commit)**: `8733a59fed7c6eaa617ae042090b8363fdea5cb7` (Short: `8733a59`)
+*   **关联提交 (Git Commit)**: `d9f5e50546099cf35852ad666430e153a5a085ca` (Short: `d9f5e50`)
 *   **部署环境 (Deployment)**: `本地全真栈 (wrangler dev @8787 · workerd CF 运行时 · D1+KV 真实存储)`
 *   **功能需求与变更清单 (Changes & Feature Alignment)**:
     - [x] 🔴 P1·核心逻辑缺陷修复（集群迁移污染与折叠过滤遗漏）：

@@ -9,6 +9,40 @@
 
 ---
 
+### 操作报告集群污染修复与全真栈无副作用深度稽核报告 (Sanity & Regression Audit) (2026-10-13)
+*   **关联提交 (Git Commit)**: `d9f5e50546099cf35852ad666430e153a5a085ca` (Short: `d9f5e50`)
+*   **专项文档索引 (Detailed Doc)**: 本报告直接正文归档于此
+*   **体检/审计范围与方法 (Scope & Methodology)**:
+    1. 范围与环境：本地全真栈环境 (`wrangler dev @8787` · workerd CF 运行时 · D1+KV 真实存储)，覆盖项目全量构建（根目录与子目录双向调用）、静态多语言 i18n 闭环、数据库冷启动幂等性、操作报告 4 大板块数据完整性、风控全链路全真栈端到端业务与清理机制。
+    2. 工具与脚本：
+       - 构建套件：`node ./build.mjs`，`wrangler deploy --dry-run`；
+       - 多语言审计三件套：`scripts/i18n-symmetry.mjs`，`scripts/i18n-audit.mjs`，`scripts/i18n-hardcoded.mjs`；
+       - 自动化全真栈套件：`tests/verify-cluster-and-action-record-fix.mjs` (真机专项)，`tests/verify-audit-ui-browser-e2e.mjs` (UI E2E)，`tests/verify-audit-section-columns.mjs` (列集定义)，`tests/verify-audit-ui-optimization.mjs` (优化规范)，`tests/verify-abuse-table-polish.mjs` (5尺寸响应式)，`tests/test-physics-delete-kv-cleanup-e2e.mjs` (物理删除与清理)，`tests/verify-live-stack-ui-probe.mjs` (真浏览器真后端探测)，`tests/test-risk-control-fullstack-e2e.mjs` (风控全链路核心套件)；
+       - 数据终验工具：本地 SQLite3 针对 D1 与 KV 底层文件逐表逐键物理核验。
+*   **核心发现与缺陷矩阵 (Key Findings & Matrix)**:
+    - **[P0·阻塞/安全]**: 零发现 (Zero Defects)。系统核心业务链路（注册、登录、2FA、发信、收信、物理删除）零中断、零回退、零坏味道。
+    - **[P1·重要/体验]**: 零发现 (Zero Defects)。
+        1. Tab 1「滥用威胁」集群展开主账号重复展示问题彻底消除：徽标明确显示「3 个账号」，展开子账号为 3 个唯一成员，无多余行；
+        2. Tab 4「操作记录」表格遗漏问题彻底根治：`BAN-2026-MA8802` (`id=54`) 完美归队，表格实际渲染 3 行，与 KPI 卡片数值（3）100% 对齐；
+        3. SQL 改动隔离性优良：`GROUP BY cluster_id, warning_type` 在 SQLite/D1 底层引擎下执行毫秒级响应，其他板块（appeal / audit）零干扰。
+    - **[P2·次要/工程]**: 零发现 (Zero Defects)。
+        1. 静态测试脚本 `tests/verify-audit-ui-optimization.mjs` 读入换行符已彻底规范化为 LF，消除了 Windows CRLF 导致的多行字面量匹配脆弱性；
+        2. 构建系统解耦：`mail-worker/wrangler.toml` 采用统一入口 `node ./build.mjs`，根目录与子目录执行 `wrangler deploy --dry-run` 均 100% 成功。
+*   **治理修复与回归结果 (Fixes & Verification)**:
+    - 全部 8 大自动化测试套件 **100% 全绿通过**：
+      1. `tests/verify-cluster-and-action-record-fix.mjs`：专项实栈断言全部通过；
+      2. `tests/verify-audit-ui-browser-e2e.mjs`：**18/18 全绿**；
+      3. `tests/verify-audit-section-columns.mjs`：四大板块列集规范全绿；
+      4. `tests/verify-audit-ui-optimization.mjs`：11 大列优化全绿；
+      5. `tests/verify-abuse-table-polish.mjs`：**50/50 全绿**（1440/1024/860/768/375px 五分辨率自适应零截断）；
+      6. `tests/test-physics-delete-kv-cleanup-e2e.mjs`：**32/32 全绿**；
+      7. `tests/verify-live-stack-ui-probe.mjs`：**35/35 全绿**；
+      8. `tests/test-risk-control-fullstack-e2e.mjs`：**55/55 全绿**。
+    - 多语言 i18n 严格闭环：6 语言 1929 词条绝对对称，1971 代码引用零缺失，硬编码扫描通过。
+    - 零假数据终验：D1 数据库终态严格保持 `{"users":2,"accounts":2,"emails":2,"audit_log":15,"purge_batches":0}`，KV 终态严格保留 6 个合法系统与站长键，测试衍生键 0 残留。
+    - **稽核结论：[ PASSED / ZERO REGRESSION · 稽核通过 · 无任何新引入问题与副作用 ]**
+
+---
 
 ### 100% 真实 Cloudflare 生产环境 PM 正式验收评审报告 (PM Acceptance Review) (2026-10-04)
 *   **关联提交 (Git Commit)**: `ca582d84d7ce4e58a52fb7123f713e248704039a` (Short: `ca582d8`)
