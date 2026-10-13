@@ -7,7 +7,35 @@
 > 制度规范与工作流指引请见 [AGENTS.md](file:///home/shijian/projects/epocanvas-mail/AGENTS.md)。
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
-### 修复 physicsDelete 发信计数精准扣减失效、跨用户主题解密噪音与测试债闭环 (2026-10-12)
+
+### 修复 ensureTables 集群污染与操作记录折叠遗漏、静态测试跨平台 CRLF 兼容与构建工作目录鲁棒化 (2026-10-13)
+*   **关联提交 (Git Commit)**: `8733a59fed7c6eaa617ae042090b8363fdea5cb7` (Short: `8733a59`)
+*   **部署环境 (Deployment)**: `本地全真栈 (wrangler dev @8787 · workerd CF 运行时 · D1+KV 真实存储)`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 🔴 P1·核心逻辑缺陷修复（集群迁移污染与折叠过滤遗漏）：
+        1. 根因消除：在 `audit-service.js:104-118` 的 `ensureTables` 幂等升级 SQL 中追加 `warning_type = 'risk'` 约束，阻止将封禁台账记录 `BAN-2026-MA8802` (`id=54`) 误打上 `cluster_id = 'CLS-2026-MULTI99'`；
+        2. 存量幂等自愈：在 `ensureTables` 中增加自愈逻辑，清除因历史无限定更新导致被误写了 `cluster_id` 的非 risk 工单（`UPDATE audit_log SET cluster_id = NULL WHERE warning_type != 'risk' AND cluster_id = 'CLS-2026-MULTI99'`）；
+        3. SQL 折叠子查询隔离：将 `audit-service.js:701` 的集群折叠条件重构为按 `warning_type` 隔离（`GROUP BY cluster_id, warning_type`），确保不同板块/分类下的同名集群或同 ID 不被跨板块错误折叠，操作记录 Tab 4 完美渲染 3 行，与 KPI 卡片数值 100% 对齐；
+        4. 集群成员查询与组织防污染：在查询 `allMembers` 时严格限定 `warning_type = 'risk'`，并在组装 `clusterAccounts` 时限定 `row.warningType === 'risk'`，彻底根除 Tab 1「滥用威胁」集群展开时的重复账号问题，徽标精准呈现「3 个账号」，子行渲染 3 行无重复。
+    - [x] 🟡 P2·静态测试脚本跨平台 CRLF 兼容性修复：
+        - `tests/verify-audit-ui-optimization.mjs`: 文件读取统一步进 `.replace(/\r\n/g, '\n')` 规范化，消除 Windows 环境下因行尾换行符 CRLF 导致的字面量断言失败，并在分页边距断言中加入空白容差兜底。
+    - [x] 🟡 P2·生产构建配置工作目录自适应与鲁棒化：
+        - 新增统一跨平台构建脚本 `scripts/build-prod.mjs`，通过 `import.meta.url` 精确定位项目根目录绝对路径；
+        - 新增根目录及 `mail-worker` 转发入口 `build.mjs`，在 `mail-worker/wrangler.toml` 中配置 `command = "node ./build.mjs"`，彻底解耦调用者当前工作目录，支持在仓库根目录（`--config mail-worker/wrangler.toml`）或 `mail-worker/` 目录下无差别执行 `wrangler deploy --dry-run`。
+    - [x] 🟢 测试套件与全真栈验证增强：
+        - 编写专属专项自动化回归脚本 `tests/verify-cluster-and-action-record-fix.mjs`（Playwright 真浏览器 E2E 真实实测），覆盖 Tab 1 集群展开去重校验与 Tab 4 操作记录行数对齐；
+        - 完善 `tests/verify-audit-ui-browser-e2e.mjs`，支持 `abuse-table` 与 `el-table` 双表格渲染引擎。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：mail-vue 与 temp_login_ui 生产构建通过 (耗时 13.89s，静态产物拷贝完整)；
+    - [x] 跨目录 Dry-Run 构建：根目录下 `./mail-worker/node_modules/.bin/wrangler deploy --dry-run --config mail-worker/wrangler.toml` 成功退出码 0；
+    - [x] 专项集群与操作记录测试：`tests/verify-cluster-and-action-record-fix.mjs` 全绿 (3 账号去重 + 3 行操作记录严格对齐)；
+    - [x] 浏览器全真栈 E2E 测试：`tests/verify-audit-ui-browser-e2e.mjs` **18/18 全绿**；
+    - [x] UI 优化规范核验：`tests/verify-audit-ui-optimization.mjs` 全绿；
+    - [x] 板块列集定制核验：`tests/verify-audit-section-columns.mjs` 全绿；
+    - [x] 滥用威胁多分辨率测试：`tests/verify-abuse-table-polish.mjs` **50/50 全绿** (5 尺寸截图零横向滚动、零裁切)；
+    - [x] 静态代码审计：i18n 三件套（对称性 1929 词条、代码审计 1971 引用、硬编码扫描）全绿；
+    - [x] 零假数据终验：D1 数据库终态 `{"users":2,"accounts":2,"emails":2,"audit_log":15,"purge_batches":0}`，KV 命名空间 6 个系统/站长合法键，测试残留 0。
+
 *   **关联提交 (Git Commit)**: `4ef90f75187480e6b1d9cad85d75af7e02695a4f` (Short: `4ef90f7`)
 *   **部署环境 (Deployment)**: `本地全真栈 (wrangler dev @8787 · workerd CF 运行时 · D1+KV 真实存储)`
 *   **功能需求与变更清单 (Changes & Feature Alignment)**:
