@@ -99,28 +99,29 @@ const auditService = {
 			`).run();
 			await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_audit_purge_batch_time ON audit_purge_batch(create_time);`).run();
 
-			// Idempotent migration: Ensure multi-account cluster baseline has cluster_id (only for risk abuse tickets)
-			try {
-				await userDb.prepare(`
-					UPDATE audit_log
-					SET cluster_id = 'CLS-2026-MULTI99',
-						evidence_summary = 'Jaccard 0.84 节律 0.92',
-						report_source = '系统规则命中'
-					WHERE email = 'syndicate_cluster@farm.net' AND warning_type = 'risk' AND (cluster_id IS NULL OR cluster_id = '');
-				`).run();
+				// Idempotent migration: Ensure multi-account cluster baseline has cluster_id (strictly scoped to risk threats)
+				try {
+					await userDb.prepare(`
+						UPDATE audit_log
+						SET cluster_id = 'CLS-2026-MULTI99',
+							evidence_summary = 'Jaccard 0.84 节律 0.92',
+							report_source = '系统规则命中'
+						WHERE (ticket_id = 'THR-2026-MULTI99' OR (warning_type = 'risk' AND email = 'syndicate_cluster@farm.net'))
+						  AND (cluster_id IS NULL OR cluster_id = '');
+					`).run();
 
-				// 幂等自愈：将因历史无限定更新导致误写了 cluster_id 的非 risk 工单（如 ban 台账）清除 cluster_id
-				await userDb.prepare(`
-					UPDATE audit_log
-					SET cluster_id = NULL
-					WHERE warning_type != 'risk' AND cluster_id = 'CLS-2026-MULTI99';
-				`).run();
+					// Data hygiene: Clean up any accidental cluster_id pollution on ban records
+					await userDb.prepare(`
+						UPDATE audit_log
+						SET cluster_id = NULL
+						WHERE ticket_id = 'BAN-2026-MA8802' OR (warning_type = 'ban' AND cluster_id = 'CLS-2026-MULTI99');
+					`).run();
 
-				const existingMembers = await userDb.prepare(`
-					SELECT count(*) as count FROM audit_log WHERE cluster_id = 'CLS-2026-MULTI99' AND warning_type = 'risk';
-				`).first();
-				if (existingMembers && Number(existingMembers.count) === 1) {
-					// Seed member 2 and member 3 for the cluster
+					const existingMembers = await userDb.prepare(`
+						SELECT count(*) as count FROM audit_log WHERE cluster_id = 'CLS-2026-MULTI99' AND warning_type = 'risk';
+					`).first();
+					if (existingMembers && Number(existingMembers.count) === 1) {
+						// Seed member 2 and member 3 for the cluster
 					await userDb.prepare(`
 						INSERT INTO audit_log (
 							ticket_id, email, warning_type, event_type, category, action_text,
@@ -704,56 +705,84 @@ const auditService = {
 			}
 		}
 
-		// 集群聚合过滤：同一 cluster_id 在同 warning_type 下只将首个主工单作为独立行返回，关联子账号通过 clusterAccounts 组织展示
-		conditions.push(sql`(${auditLog.clusterId} IS NULL OR ${auditLog.clusterId} = '' OR ${auditLog.id} IN (SELECT MIN(id) FROM audit_log WHERE cluster_id IS NOT NULL AND cluster_id != '' GROUP BY cluster_id, warning_type))`);
-
-		const query = orm(c).select().from(auditLog);
-		if (conditions.length > 0) {
-			query.where(and(...conditions));
-		}
-
-		if (Number(timeSort) === 1) {
-			query.orderBy(asc(auditLog.id));
-		} else if (warningType === 'risk' || riskLevel === 'high' || (!warningType && !params.warningType)) {
-			// 滥用威胁默认排序：待审在前 (status in 'pending', 'active')，其次按被举报/集群账号数从多到少，再按创建时间/ID从新到旧
-			query.orderBy(
-				sql`CASE WHEN ${auditLog.status} IN ('pending', 'active') THEN 0 ELSE 1 END`,
-				desc(auditLog.reportedByOthers),
-				desc(auditLog.id)
-			);
-		} else {
-			query.orderBy(desc(auditLog.id));
-		}
-
-		const list = await query.limit(size).offset(offset);
-
-		const { total } = await orm(c)
-			.select({ total: count() })
-			.from(auditLog)
-			.where(conditions.length > 0 ? and(...conditions) : undefined)
-			.get();
-
-		// 查询同集群的所有关联子账号并预处理成 Map (严格限定同一 warningType 为 risk)
-		const clusterIds = [...new Set((list || []).map(r => r.clusterId).filter(Boolean))];
-		let clusterMembersMap = new Map();
-		if (clusterIds.length > 0) {
-			try {
-				const allMembers = await orm(c).select().from(auditLog).where(
-					and(
-						inArray(auditLog.clusterId, clusterIds),
-						eq(auditLog.warningType, 'risk')
-					)
-				).orderBy(asc(auditLog.id));
-				for (const m of allMembers) {
-					if (!clusterMembersMap.has(m.clusterId)) {
-						clusterMembersMap.set(m.clusterId, []);
-					}
-					clusterMembersMap.get(m.clusterId).push(m);
+			// 集群聚合过滤：同一 cluster_id 在当前 warning_type 作用域下只将首个主工单作为独立行返回，关联子账号通过 clusterAccounts 组织展示
+			if (warningType && warningType !== 'all') {
+				if (warningType === 'ban') {
+					conditions.push(sql`(${auditLog.clusterId} IS NULL OR ${auditLog.clusterId} = '' OR ${auditLog.id} IN (
+						SELECT MIN(id) FROM audit_log
+						WHERE cluster_id IS NOT NULL AND cluster_id != '' AND (warning_type = 'ban' OR status IN ('banned', 'unbanned'))
+						GROUP BY cluster_id
+					))`);
+				} else {
+					conditions.push(sql`(${auditLog.clusterId} IS NULL OR ${auditLog.clusterId} = '' OR ${auditLog.id} IN (
+						SELECT MIN(id) FROM audit_log
+						WHERE cluster_id IS NOT NULL AND cluster_id != '' AND warning_type = ${warningType}
+						GROUP BY cluster_id
+					))`);
 				}
-			} catch (err) {
-				console.warn('Failed to query cluster members:', err.message);
+			} else {
+				conditions.push(sql`(${auditLog.clusterId} IS NULL OR ${auditLog.clusterId} = '' OR ${auditLog.id} IN (
+					SELECT MIN(id) FROM audit_log
+					WHERE cluster_id IS NOT NULL AND cluster_id != ''
+					GROUP BY cluster_id, warning_type
+				))`);
 			}
-		}
+
+			const query = orm(c).select().from(auditLog);
+			if (conditions.length > 0) {
+				query.where(and(...conditions));
+			}
+
+			if (Number(timeSort) === 1) {
+				query.orderBy(asc(auditLog.id));
+			} else if (warningType === 'risk' || riskLevel === 'high' || (!warningType && !params.warningType)) {
+				// 滥用威胁默认排序：待审在前 (status in 'pending', 'active')，其次按被举报/集群账号数从多到少，再按创建时间/ID从新到旧
+				query.orderBy(
+					sql`CASE WHEN ${auditLog.status} IN ('pending', 'active') THEN 0 ELSE 1 END`,
+					desc(auditLog.reportedByOthers),
+					desc(auditLog.id)
+				);
+			} else {
+				query.orderBy(desc(auditLog.id));
+			}
+
+			const list = await query.limit(size).offset(offset);
+
+			const { total } = await orm(c)
+				.select({ total: count() })
+				.from(auditLog)
+				.where(conditions.length > 0 ? and(...conditions) : undefined)
+				.get();
+
+			// 查询同集群的所有关联子账号并预处理成 Map (按 cluster_id 及 warning_type 分组，确保子账号列表严格同板块同账号无重复)
+			const clusterIds = [...new Set((list || []).map(r => r.clusterId).filter(Boolean))];
+			let clusterMembersMap = new Map();
+			if (clusterIds.length > 0) {
+				try {
+					const allMembers = await orm(c).select().from(auditLog).where(inArray(auditLog.clusterId, clusterIds)).orderBy(asc(auditLog.id));
+					for (const m of allMembers) {
+						const key = `${m.clusterId}_${m.warningType || 'risk'}`;
+						if (!clusterMembersMap.has(key)) {
+							clusterMembersMap.set(key, []);
+						}
+						const group = clusterMembersMap.get(key);
+						if (!group.some(existing => existing.id === m.id || existing.email === m.email)) {
+							group.push(m);
+						}
+
+						// 同时兜底保持纯 clusterId 键
+						if (!clusterMembersMap.has(m.clusterId)) {
+							clusterMembersMap.set(m.clusterId, []);
+						}
+						const fallbackGroup = clusterMembersMap.get(m.clusterId);
+						if (!fallbackGroup.some(existing => existing.id === m.id || existing.email === m.email)) {
+							fallbackGroup.push(m);
+						}
+					}
+				} catch (err) {
+					console.warn('Failed to query cluster members:', err.message);
+				}
+			}
 
 		// Check mode: allMailMode (1: All, 0: Privacy, 2: Encrypted E2EE)
 		const settings = await settingService.get(c);
@@ -948,22 +977,25 @@ const auditService = {
 				}
 			}
 
-			let clusterAccounts = [];
-			let clusterCount = 1;
-			if (row.warningType === 'risk' && row.clusterId && clusterMembersMap.has(row.clusterId)) {
-				const members = clusterMembersMap.get(row.clusterId);
-				clusterCount = members.length;
-				clusterAccounts = members.map(m => ({
-					id: m.id,
-					ticketId: m.ticketId || ('#' + (10000 + m.id)),
-					email: m.email,
-					userId: m.userId ? ('usr_' + m.userId) : ('usr_' + m.id),
-					status: m.status,
-					evidenceSummary: m.evidenceSummary || row.evidenceSummary || '集群关联',
-					actionText: m.actionText,
-					createTime: m.createTime
-				}));
-			}
+				let clusterAccounts = [];
+				let clusterCount = 1;
+				if (row.clusterId) {
+					const clusterKey = `${row.clusterId}_${row.warningType || 'risk'}`;
+					const members = clusterMembersMap.get(clusterKey) || clusterMembersMap.get(row.clusterId) || [];
+					if (members.length > 0) {
+						clusterCount = members.length;
+						clusterAccounts = members.map(m => ({
+							id: m.id,
+							ticketId: m.ticketId || ('#' + (10000 + m.id)),
+							email: m.email,
+							userId: m.userId ? ('usr_' + m.userId) : ('usr_' + m.id),
+							status: m.status,
+							evidenceSummary: m.evidenceSummary || row.evidenceSummary || '集群关联',
+							actionText: m.actionText,
+							createTime: m.createTime
+						}));
+					}
+				}
 
 			const item = {
 				...row,
