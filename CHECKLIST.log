@@ -7,6 +7,33 @@
 > 制度规范与工作流指引请见 [AGENTS.md](file:///home/shijian/projects/epocanvas-mail/AGENTS.md)。
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
+
+### 风控系统与「操作报告」板块远端最新基线 (410b42d) 全真栈完整验收测试 (2026-10-13)
+*   **关联提交 (Git Commit)**: `410b42d71a04174cf4c49cb6bd165ebd64aae803` (Short: `410b42d`, 远端 `origin/master` 最新被测基线; 本条目归档提交 Hash 见置顶汇报)
+*   **部署环境 (Deployment)**: `本地全真栈模拟 Cloudflare 部署 (wrangler dev @127.0.0.1:8787 · workerd CF 运行时 · D1+KV 本地真库 · .wrangler/state 全清冷启动 → /api/init 播种)`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 远端拉取与合并：`git fetch --all --prune && git merge origin/master` 返回 `Already up to date`，本地 `master` 与 `origin/master` 严格对齐于 `410b42d` (0 ahead / 0 behind)，按要求零修代码、零推送远端；
+    - [x] 上轮红灯修复回归全绿验证：
+        1. `physicsDelete` 当日发信量精准扣减 (`user-service.js` SQLite `datetime()` 规范化 + 内存双校验)：实栈探测预态 `(不存在)` → 发送 1 封后 `send_day_count:2026-10-13 = 1` → 物理删除发送者后自动精准扣减归零并物理回收 KV 键 (`C-2` / `C-3` 全绿)；
+        2. 站内信明文入参独立加密与跨用户主题联想解密噪音治理：全流程 `wrangler dev` 控制台 `[email-crypto] Decryption error` 出现 **0 次** (上轮 21 次)；
+        3. 本地回环地址收紧：`wrangler-dev.toml` 实测绑定 `Ready on http://127.0.0.1:8787`；
+        4. 主套件 D2-1 基线断言 (15/15) 与 D1-2 自产 `login_fail` 键自动清理闭环。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建与 CF 部署干跑：`mail-vue` Vite 构建通过 (耗时 40.89s, 2577 modules, 零报错) 并同步 React 登录页至 `mail-worker/dist/login`；`wrangler deploy --dry-run --config mail-worker/wrangler-dev.toml` 通过 (读取 435 个静态资产文件，Total Upload 5496.60 KiB / gzip 1076.96 KiB，KV/D1/Assets 绑定齐备)；
+    - [x] 冷启动引导链：清空 `.wrangler/state` → 启动 `wrangler dev` → `GET /api/init/<jwt_secret>` 返回 `200 success` → 6 个标准角色 (`custom`, `visitor`, `user_lv0`, `user_lv1`, `moderator`, `master`) 播种与主站长 (`admin@example.com`, `user_id=2`) 创建成功 → 种子基线 15 条工单自动初始化；
+    - [x] 静态审计与孤儿键套件：`i18n-symmetry.mjs` (mail-vue 2695 keys × 6 语言 / mail-worker 1929 keys × 6 语言 `ALL SYMMETRIC`)、`i18n-audit.mjs` (1971 字面量 0 缺失, dynamic 0)、`i18n-hardcoded.mjs` (退出码 0)；`verify-audit-section-columns.mjs` (6/6 全绿)；`test-physics-delete-kv-cleanup-e2e.mjs` (**32/32 全绿**)；
+    - [x] 风控系统全真栈 E2E 主套件：`tests/test-risk-control-fullstack-e2e.mjs` **55/55 全绿** (RunTag: `rkctleaep`) — 覆盖 Phase A 危险操作模拟 (5 次暴破→第 6 次正确密码被 12h 锁定拦截、指纹浏览器/自动化环境 `riskScore=100` 触发 Step-Up 二验、同 IP 第 4 账户聚集检测)、Phase B 滥用链路 (站内垃圾邮件投递 2/2 → 两次检举聚合 `reportedByOthers=2` 自动升级 `CRITICAL` → 外部申诉工单落库)、Phase C 管理员「操作报告」全板块处置 (四板块计数、`ticket:`/`ip:`/`lv3` 筛选、`mute_account`、`blacklist_sender`、`archive_routine`/`note`/`extend`、`ban` 封禁生效与登录 501 拦截、`adjudicate approve` 解封恢复登录与台账 `unbanned`、`adjudicate reject`、`/audit/purge`、普通用户 403 / 未认证 401 拦截)、Phase D 物理清理与 15 条基线还原；
+    - [x] 真浏览器 × 真后端实栈 UI 探测：`tests/verify-live-stack-ui-probe.mjs` **35/35 全绿** (RunTag: `uifqad`) — React 登录页真实登录 → `/audit` 侧栏入口与 4 KPI 卡片 (`滥用威胁`/`申诉审计`/`风险管理`/`操作记录`) + 7 列威胁工作台 → 顶栏搜索命中本轮真实检举工单 (`#6BG6O6`) → Admin 行内菜单执行「开始复核」并经 API 反查三重落库 (`detailText` `[开始复核]`、`assignee=admin@example.com`、`timeline` `开始人工复核`) → 详情抽屉与 375px 移动端零横向滚动 → 5 张实栈截图存档 `doc/validation/audit-live/`；
+    - [x] 多分辨率 UI 套件与四板块深度交互探测：`tests/verify-abuse-table-polish.mjs` **50/50 全绿** (1440/1024/860/768/375 五尺寸零横向滚动、零省略号、零裁切)；实栈四 KPI 标签页切换与专属列集/批量操作栏 (`分配负责人`/`开始复核`/`解除` vs `批量解封`/`批量封禁`/`批量延期`/`批量删除`) 验证通过，`pageerror = 0`；
+    - [x] 零假数据残留终验：D1 `users=2 / accounts=2 / emails=2 / audit_log=15 / purge_batches=0` (纯种子态)；KV 终态仅保留 6 个合法系统/种子键 (`HAS_WELCOME_2`, `USER_KNOWN_ENV_2`, `auth-uid:2`, `oauth_app_seeded_v2`, `roles_seeded_v2`, `setting:`)，测试衍生键 0 残留。
+*   **新发现缺陷与测试债记录 (按指示仅记录未修改代码)**:
+    - **[P1·新发现产品缺陷·实栈复现] `ensureTables` 集群迁移 SQL 误伤封禁台账记录导致「集群展开重复」与「操作记录板块少 1 行」**:
+        1. 根因位置：`mail-worker/src/service/audit-service.js:104-110` 在每次调用 `ensureTables(c)` 时执行 `UPDATE audit_log SET cluster_id = 'CLS-2026-MULTI99', ... WHERE email = 'syndicate_cluster@farm.net' AND (cluster_id IS NULL OR cluster_id = '')`，未限定 `AND warning_type = 'risk'` (或 `AND ticket_id = 'THR-2026-MULTI99'`)；
+        2. 触发链路：首次 `seedBaselineIfEmpty` 播种时，`THR-2026-MULTI99` (`warning_type='risk'`) 带 `cluster_id='CLS-2026-MULTI99'`，而封禁台账 `BAN-2026-MA8802` (`warning_type='ban'`, 同邮箱 `syndicate_cluster@farm.net`) 的 `cluster_id` 为 `NULL`；紧接着第二次触发 `ensureTables` 时，上述 `UPDATE` 将 `BAN-2026-MA8802` 也打上了 `cluster_id = 'CLS-2026-MULTI99'`；
+        3. 实栈现象 A（滥用威胁集群展开重复）：`THR-2026-MULTI99` 的集群徽标从预期的 `3 个账号` 变成 `4 个账号`，展开子行后 `syndicate_cluster@farm.net` 出现两次（分别对应 `risk` 工单与 `ban` 台账）；
+        4. 实栈现象 B（操作记录板块表格漏显）：`audit-service.js:701` 的集群收敛条件 `id IN (SELECT MIN(id) FROM audit_log WHERE cluster_id IS NOT NULL ... GROUP BY cluster_id)` 为全局子查询（未带当前 `warning_type` 过滤条件），因 `CLS-2026-MULTI99` 的全局 `MIN(id)` 落在 `warning_type='risk'` 的 `THR-2026-MULTI99` 上，导致切换到第 4 板块「操作记录」(`warning_type='ban'`) 时，`BAN-2026-MA8802` 被子查询过滤隐藏（KPI 卡片显示 `3`，表格实际仅渲染 `2` 行：`BAN-2026-BD9901` 与 `BAN-2026-UN0021`）。
+    - **[P2·测试脚本跨平台兼容观察]** 旧静态脚本 `tests/verify-audit-ui-optimization.mjs:85` 使用 LF (`\n`) 多行字符串字面量匹配 `mail-vue/src/views/audit-report/index.vue` 样式块，在 Windows CRLF (`\r\n`) 检出环境下触发断言失败（前 5 项验收通过，第 6 项因换行符差异失败）；以及 `mail-worker/wrangler.toml` 的 `[build] command` 使用相对路径 `../temp_login_ui`，须在 `mail-worker/` 目录下执行。
+
 ### 修复 physicsDelete 发信计数精准扣减失效、跨用户主题解密噪音与测试债闭环 (2026-10-12)
 *   **关联提交 (Git Commit)**: `4ef90f75187480e6b1d9cad85d75af7e02695a4f` (Short: `4ef90f7`)
 *   **部署环境 (Deployment)**: `本地全真栈 (wrangler dev @8787 · workerd CF 运行时 · D1+KV 真实存储)`
