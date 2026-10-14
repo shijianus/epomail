@@ -8,6 +8,41 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### 操作报告 4 大板块与默认总表专属差异化列集定制及严格隔离 (2026-10-14)
+*   **关联提交 (Git Commit)**: `d0561a9766ad6098c7a15d5db4ce602726ba7588` (Short: `d0561a9`)
+*   **部署环境 (Deployment)**: `本地全真栈 (wrangler dev @8787 · workerd CF 运行时 · D1+KV 真实存储)`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 申诉审计 (appeal):
+        1. 删除「报警原因」列 (`appeal-col-reason`)；
+        2. 将「报警次数」重构为「同类申诉次数」(`appeal-col-same-category-appeal-count`)，按相同违规分类统计历史申诉频次；
+        3. 将「处理时间」更新为「申请时间」(`appeal-col-apply-time`)；
+        4. 在申请时间后新增「死局时间」列 (`appeal-col-deadlock-time`)，基于 30 天终裁冷静期精准倒计时并标记已死局；
+        5. 违规分类筛选下拉隔离：仅包含 quota, outbound, content, account（剔除例行巡检与申诉复核）。
+    - [x] 风险管理 (audit):
+        1. 将「违规分类」升级为「违规等级」(`audit-col-violation-level`)，精细化呈现 LV0~LV3；
+        2. 将「处理时间」更新为「报警时间」(`audit-col-alarm-time`)；
+        3. 在报警时间后新增「过期时间」列 (`audit-col-expire-time`)，呈现管控时效倒计时；
+        4. 严格隔离一人多号：报警原因筛选下拉已彻底剔除 multi_account（一人多号归属滥用威胁管控）。
+    - [x] 操作记录 (record):
+        1. 删除「处理建议」列 (`record-col-suggestion`)；
+        2. 在「处理时间」后新增「死局时间」列 (`record-col-deadlock-time`)，列顺序严格保障 处理时间 -> 死局时间 -> 负责人。
+    - [x] 默认列集 (currentSection === 'all'):
+        1. 默认无卡片选中时，展示全局唯一整合表；
+        2. 删除「报警次数」与「处理建议」；
+        3. 将「违规分类」升级为「违规等级」(`default-col-violation-level`)，涵盖 LV0~LV3 与 Threat (滥用威胁)；
+        4. 在「处理时间」后新增「死局时间」列；
+        5. 包含全量筛选条件，不删减任何筛选维度；
+        6. 前后端协同去重：4 大部分整合后按账号/工单唯一性去重，每条记录仅出现 1 次。
+    - [x] 6 语言 i18n 严格对称：
+        - 新增 `auditColSameCategoryAppealCount`, `auditColApplyTime`, `auditColAlarmTime`, `auditColDeadlockTime`, `auditLevelThreat`, `auditDeadlocked`, `auditDeadlockDaysLeft`, `auditDeadlockHoursLeft`, `auditAllSameCategoryAppealCounts` 词条，zh, zh-Hant, en, es, fr, nl 六语 100% 对称。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：mail-vue 生产构建通过 (22.07s，零报错零警告)；
+    - [x] 差异化列集专项断言：`tests/verify-audit-section-columns.mjs` 全绿；
+    - [x] 多语言对称静态审计：`scripts/i18n-symmetry.mjs` (2704 keys) 100% 绝对对称；
+    - [x] 代码引用零缺失审计：`scripts/i18n-audit.mjs` 0 缺失；
+    - [x] 用户可见文本硬编码扫描：`scripts/i18n-hardcoded.mjs` 通过；
+    - [x] 零假数据残留：数据纯净，无临时脏数据。
+
 ### 修复 ensureTables 集群污染与操作记录折叠遗漏、静态测试跨平台 CRLF 兼容与构建工作目录鲁棒化 (2026-10-13)
 *   **关联提交 (Git Commit)**: `d9f5e50546099cf35852ad666430e153a5a085ca` (Short: `d9f5e50`)
 *   **部署环境 (Deployment)**: `本地全真栈 (wrangler dev @8787 · workerd CF 运行时 · D1+KV 真实存储)`
