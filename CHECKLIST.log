@@ -8,6 +8,21 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### 前向推进还原代码至基准版本 36b8182 与 17 文件变更闭环 (2026-10-14)
+*   **关联提交 (Git Commit)**: `a204bcbb6e2c9152e9f8a28629e02ff993a9b997` (Short: `a204bcb`)
+*   **部署环境 (Deployment)**: `本地全真栈 / 代码基准对齐`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 核心文件按要求前向回退至基准位点 36b8182，Commit 历史保持前向推进：
+        1. 前端视图回退 (mail-vue/src/views/audit-report/index.vue): +57, -530 行，移除实验性 4 大板块定制列集与非标表头，恢复 36b8182 原生操作报告基准布局；
+        2. 后端逻辑回退 (mail-worker/src/service/audit-service.js): +1, -41 行，清除动态死局时间与违规等级实验过滤，恢复稳定字段输出；
+        3. 多语言字典回退 (mail-vue/src/i18n/*.js): 六语言各 -9 行，严格对称保持 2695 键；
+        4. 测试与验证清理: 移除 tests/audit-cf-screenshot-inspection.mjs (-136行)，恢复 tests/verify-audit-section-columns.mjs (+58, -115行)，物理移除 5 张临时截图资产；
+    - [x] 代码库整体变更统计：17 个文件发生变动，+116 行，-994 行，净减少 878 行冗余变更；
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：mail-vue 与 temp_login_ui 构建顺利通过 (耗时 13.81s，Exit Code 0)；
+    - [x] 多语言对称性审计：node scripts/i18n-symmetry.mjs 六语言绝对对称 (mail-vue: 2695 keys, mail-worker: 1929 keys)；
+    - [x] 零假数据残留与 Git 工作区干净：git status 验证通过。
+
 ### 修复 ensureTables 集群污染与操作记录折叠遗漏、静态测试跨平台 CRLF 兼容与构建工作目录鲁棒化 (2026-10-13)
 *   **关联提交 (Git Commit)**: `d9f5e50546099cf35852ad666430e153a5a085ca` (Short: `d9f5e50`)
 *   **部署环境 (Deployment)**: `本地全真栈 (wrangler dev @8787 · workerd CF 运行时 · D1+KV 真实存储)`
