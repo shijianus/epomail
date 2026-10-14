@@ -9,7 +9,7 @@
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
 ### 滥用威胁板块对齐 punishments.md 决策规范与全站画风一致性重构 (2026-10-14)
-*   **关联提交 (Git Commit)**: `cccbe7e306861198d9d7855bcd37b8e53f5c0342` (Short: `cccbe7e`)
+*   **关联提交 (Git Commit)**: `820c5f6af310b8a86676beb28b8b6033185d54f0` (Short: `820c5f6`)
 *   **部署环境 (Deployment)**: `本地全真栈 (wrangler dev @8787 · workerd CF 运行时 · D1+KV 真实存储)`
 *   **功能需求与变更清单 (Changes & Feature Alignment)**:
     - [x] 文件层次基准还原：严格基于 `7abce31` 文件层次基准状态，确保除「滥用威胁」以外的任何地方、任何 UI/逻辑零改动；
