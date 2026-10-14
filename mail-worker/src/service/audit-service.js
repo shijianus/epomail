@@ -893,6 +893,19 @@ const auditService = {
 				finalAuthorityDesc = '协管人工复核批准解封或维持观察 (主管级拍案)';
 			}
 
+			// 计算死局时间 (Deadlock Time: 30天冷静期/最终终裁期限，支持申诉与操作记录死局)
+			let deadlockTime = row.deadlockTime || row.deadline || null;
+			if (!deadlockTime) {
+				const baseTs = row.banTime ? new Date(row.banTime).getTime() : createdTs;
+				deadlockTime = new Date(baseTs + 30 * 86400000).toISOString();
+			}
+
+			// 计算同类申诉次数 (记录的是相同的问题申诉了多少次，主要包含相同违规分类的申诉)
+			let sameCategoryAppealCount = 1;
+			if (row.warningType === 'appeal') {
+				sameCategoryAppealCount = row.appealCount || (row.reportedByOthers > 0 ? row.reportedByOthers : 1);
+			}
+
 			// 计算过期时间与截止期限 (支持申诉表单过期与风险管控截止期限)
 			let expireTime = row.expireTime || null;
 			let deadline = row.deadline || null;
@@ -1000,6 +1013,8 @@ const auditService = {
 				],
 				expireTime,
 				deadline,
+				deadlockTime,
+				sameCategoryAppealCount,
 				updateCount,
 				lastUpdated,
 				appealCount
@@ -1010,6 +1025,27 @@ const auditService = {
 			}
 			return item;
 		});
+
+		// 默认无选择板块时：整合 4 个部分内容，按账号唯一性去重，每条只能出现 1 次
+		if (!warningType || warningType === 'all') {
+			const seenEmails = new Set();
+			const dedupedList = [];
+			// 优先级高的（威胁高危/待审工单）优先保留
+			const sortedForDedup = [...processedList].sort((a, b) => {
+				const aPri = (a.riskLevel === 'high' || a.priority === 'CRITICAL' || a.priority === 'P0') ? 2 : (a.status === 'pending' || a.status === 'active' ? 1 : 0);
+				const bPri = (b.riskLevel === 'high' || b.priority === 'CRITICAL' || b.priority === 'P0') ? 2 : (b.status === 'pending' || b.status === 'active' ? 1 : 0);
+				if (aPri !== bPri) return bPri - aPri;
+				return (b.id || 0) - (a.id || 0);
+			});
+			for (const item of sortedForDedup) {
+				const key = (item.email || item.ticketId || item.id).toLowerCase();
+				if (!seenEmails.has(key)) {
+					seenEmails.add(key);
+					dedupedList.push(item);
+				}
+			}
+			processedList = dedupedList;
+		}
 
 		// 复合筛选条件匹配
 		if (identityGroup && identityGroup !== 'all') {
@@ -1030,6 +1066,9 @@ const auditService = {
 			processedList = processedList.filter(item => {
 				const p = (item.priority || '').toUpperCase();
 				const r = (item.riskLevel || '').toLowerCase();
+				if (violationLevel === 'threat') {
+					return item.warningType === 'risk' || r === 'high' || ['P0', 'CRITICAL'].includes(p) || !!item.clusterId;
+				}
 				if (violationLevel === 'lv3') return ['P0', 'CRITICAL', 'LV3'].includes(p) || r === 'high';
 				if (violationLevel === 'lv2') return ['P1', 'LV2'].includes(p) || r === 'medium';
 				if (violationLevel === 'lv1') return ['P2', 'LV1'].includes(p) || r === 'low';

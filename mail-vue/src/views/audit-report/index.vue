@@ -9,7 +9,7 @@
           <!-- 卡片 1: 滥用威胁 (展示所有 LV3 以上威胁账户：1人多号、被举报等) -->
           <div
             class="kpi-card kpi-threat"
-            :class="{ 'kpi-card-active': activeKpi === 'threat' || (params.riskLevel === 'high' && activeKpi !== 'all') }"
+            :class="{ 'kpi-card-active': activeKpi === 'threat' }"
             @click="selectKpiFilter('threat')"
           >
             <div class="kpi-icon-wrap icon-threat">
@@ -33,7 +33,7 @@
           <!-- 卡片 2: 申诉审计 (通过填写符合表格对于已做出的判决的邮箱进行申诉的邮箱) -->
           <div
             class="kpi-card kpi-appeal"
-            :class="{ 'kpi-card-active': activeKpi === 'appeal' || (params.warningType === 'appeal' && activeKpi !== 'all') }"
+            :class="{ 'kpi-card-active': activeKpi === 'appeal' }"
             @click="selectKpiFilter('appeal')"
           >
             <div class="kpi-icon-wrap icon-appeal">
@@ -55,7 +55,7 @@
           <!-- 卡片 3: 风险管理 (所有 LV0~LV3 邮箱：接发垃圾邮件、多次跳IP登录等) -->
           <div
             class="kpi-card kpi-audit"
-            :class="{ 'kpi-card-active': activeKpi === 'audit' || (params.warningType === 'audit' && activeKpi !== 'all') }"
+            :class="{ 'kpi-card-active': activeKpi === 'audit' }"
             @click="selectKpiFilter('audit')"
           >
             <div class="kpi-icon-wrap icon-audit">
@@ -77,7 +77,7 @@
           <!-- 卡片 4: 操作记录 (所有以上邮箱最终处理后(包括封禁、解禁等操作的更新)、过期后(不符合要求)等等) -->
           <div
             class="kpi-card kpi-record"
-            :class="{ 'kpi-card-active': activeKpi === 'record' || (params.warningType === 'ban' && activeKpi !== 'all') }"
+            :class="{ 'kpi-card-active': activeKpi === 'record' }"
             @click="selectKpiFilter('record')"
           >
             <div class="kpi-icon-wrap icon-record">
@@ -618,7 +618,7 @@
                 </template>
               </el-table-column>
 
-              <!-- 列 3: 违规分类 -->
+              <!-- 列 3: 违规分类 (申诉审计隔离：只包含被申诉违规分类，无例行巡检与申诉复核) -->
               <el-table-column v-if="currentSection === 'appeal'" width="115" align="center" key="appeal-col-category">
                 <template #header>
                   <div class="col-filter-header">
@@ -644,12 +644,6 @@
                           <el-dropdown-item command="account" :class="{ 'is-selected': params.category === 'account' }">
                             {{ $t('auditCatAccount') }}
                           </el-dropdown-item>
-                          <el-dropdown-item command="routine" :class="{ 'is-selected': params.category === 'routine' }">
-                            {{ $t('auditCatRoutine') }}
-                          </el-dropdown-item>
-                          <el-dropdown-item command="appeal" :class="{ 'is-selected': params.category === 'appeal' }">
-                            {{ $t('auditCatAppeal') }}
-                          </el-dropdown-item>
                         </el-dropdown-menu>
                       </template>
                     </el-dropdown>
@@ -662,19 +656,19 @@
                 </template>
               </el-table-column>
 
-              <!-- 列 4: 报警次数 (说明: 申诉审计中已删除"报警原因"，直接展示"报警次数") -->
-              <el-table-column v-if="currentSection === 'appeal'" width="105" align="center" key="appeal-col-alarm-count">
+              <!-- 列 4: 同类申诉次数 (变更: "报警次数"改为"同类申诉次数"，记录相同违规分类申诉次数) -->
+              <el-table-column v-if="currentSection === 'appeal'" width="120" align="center" key="appeal-col-same-category-appeal-count">
                 <template #header>
                   <div class="col-filter-header">
-                    <span>{{ $t('auditColAlarmCount') }}</span>
-                    <el-dropdown trigger="click" @command="handleAlarmCountFilterCommand">
+                    <span>{{ $t('auditColSameCategoryAppealCount') }}</span>
+                    <el-dropdown trigger="click" @command="handleSameCategoryAppealCountFilterCommand">
                       <span class="filter-trigger" :class="{ 'filter-active': params.alarmCountRange !== 'all' }" :title="$t('filter')">
                         <Icon icon="fluent:filter-16-regular" width="13" height="13" />
                       </span>
                       <template #dropdown>
                         <el-dropdown-menu>
                           <el-dropdown-item command="all" :class="{ 'is-selected': params.alarmCountRange === 'all' }">
-                            {{ $t('auditAllAlarmCounts') }}
+                            {{ $t('auditAllSameCategoryAppealCounts') }}
                           </el-dropdown-item>
                           <el-dropdown-item command="1" :class="{ 'is-selected': params.alarmCountRange === '1' }">
                             {{ $t('auditAlarmCount1') }}
@@ -692,8 +686,8 @@
                 </template>
                 <template #default="{ row }">
                   <div class="alarm-count-cell">
-                    <span class="plain-alarm-count font-mono" :class="{ 'alarm-count-high': getAlarmCount(row) > 3 }">
-                      {{ getAlarmCount(row) }} {{ $t('auditTimesUnit') }}
+                    <span class="plain-alarm-count font-mono" :class="{ 'alarm-count-high': getSameCategoryAppealCount(row) > 3 }">
+                      {{ getSameCategoryAppealCount(row) }} {{ $t('auditTimesUnit') }}
                     </span>
                   </div>
                 </template>
@@ -721,9 +715,6 @@
                           </el-dropdown-item>
                           <el-dropdown-item command="unbanned" :class="{ 'is-selected': params.status === 'unbanned' }">
                             {{ $t('auditStatusUnbannedRecord') }}
-                          </el-dropdown-item>
-                          <el-dropdown-item command="watching" :class="{ 'is-selected': params.status === 'watching' }">
-                            {{ $t('auditStatusWatching') }}
                           </el-dropdown-item>
                         </el-dropdown-menu>
                       </template>
@@ -764,9 +755,6 @@
                           <el-dropdown-item command="keep" :class="{ 'is-selected': params.suggestion === 'keep' }">
                             {{ $t('auditSuggestionKeepBan') }}
                           </el-dropdown-item>
-                          <el-dropdown-item command="archive" :class="{ 'is-selected': params.suggestion === 'archive' }">
-                            {{ $t('auditSuggestionArchiveRoutine') }}
-                          </el-dropdown-item>
                         </el-dropdown-menu>
                       </template>
                     </el-dropdown>
@@ -781,11 +769,11 @@
                 </template>
               </el-table-column>
 
-              <!-- 列 7: 处理时间 -->
-              <el-table-column v-if="currentSection === 'appeal'" width="135" align="center" key="appeal-col-process-time">
+              <!-- 列 7: 申请时间 (变更: "处理时间"改为"申请时间") -->
+              <el-table-column v-if="currentSection === 'appeal'" width="135" align="center" key="appeal-col-apply-time">
                 <template #header>
                   <div class="col-filter-header">
-                    <span>{{ $t('auditColProcessTime') }}</span>
+                    <span>{{ $t('auditColApplyTime') }}</span>
                     <!-- 时间排序箭头 -->
                     <span class="header-action-trigger" :class="{ 'sort-active': params.timeSort !== 0 }" :title="params.timeSort === 1 ? $t('auditSortAsc') : $t('auditSortDesc')" @click.stop="changeTimeSort">
                       <Icon :icon="params.timeSort === 1 ? 'fluent:arrow-up-16-regular' : (params.timeSort === 2 ? 'fluent:arrow-down-16-regular' : 'fluent:arrow-sort-16-regular')" width="13" height="13" />
@@ -815,24 +803,25 @@
                 </template>
                 <template #default="{ row }">
                   <span class="plain-time font-mono">
-                    {{ formatTableTime(row.banTime || row.createTime) }}
+                    {{ formatTableTime(row.applyTime || row.createTime) }}
                   </span>
                 </template>
               </el-table-column>
 
-              <!-- 列 8: 过期时间 (新增列: 在处理时间后面添加，因为申诉表单是可用过期的) -->
-              <el-table-column v-if="currentSection === 'appeal'" width="135" align="center" key="appeal-col-expire-time">
+              <!-- 列 8: 死局时间 (变更: 在申请时间后面添加死局时间列) -->
+              <el-table-column v-if="currentSection === 'appeal'" width="135" align="center" key="appeal-col-deadlock-time">
                 <template #header>
                   <div class="col-filter-header">
-                    <span>{{ $t('auditColExpireTime') }}</span>
+                    <span>{{ $t('auditColDeadlockTime') }}</span>
                   </div>
                 </template>
                 <template #default="{ row }">
-                  <div class="expire-cell">
-                    <span class="plain-time font-mono" :class="{ 'time-expired': isAppealExpired(row) }">
-                      {{ formatTableTime(getAppealExpireTime(row)) }}
+                  <div class="deadlock-cell">
+                    <span class="plain-time font-mono" :class="{ 'time-expired': isDeadlocked(row) }">
+                      {{ getDeadlockInfo(row).time }}
                     </span>
-                    <span v-if="isAppealExpired(row)" class="expire-tag-expired">({{ $t('auditExpiredBadge') }})</span>
+                    <span v-if="isDeadlocked(row)" class="expire-tag-expired">({{ $t('auditDeadlocked') }})</span>
+                    <span v-else class="deadlock-tag-desc">({{ getDeadlockInfo(row).desc }})</span>
                   </div>
                 </template>
               </el-table-column>
@@ -1041,9 +1030,6 @@
                           <el-dropdown-item command="all" :class="{ 'is-selected': params.alarmReason === 'all' }">
                             {{ $t('auditAllAlarmReasons') }}
                           </el-dropdown-item>
-                          <el-dropdown-item command="multi_account" :class="{ 'is-selected': params.alarmReason === 'multi_account' }">
-                            {{ $t('auditReasonMultiAccount') }}
-                          </el-dropdown-item>
                           <el-dropdown-item command="user_reported" :class="{ 'is-selected': params.alarmReason === 'user_reported' }">
                             {{ $t('auditReasonUserReported') }}
                           </el-dropdown-item>
@@ -1189,11 +1175,11 @@
                 </template>
               </el-table-column>
 
-              <!-- 列 8: 处理时间 -->
-              <el-table-column v-if="currentSection === 'audit'" width="135" align="center" key="audit-col-process-time">
+              <!-- 列 8: 报警时间 (变更: "处理时间"改为"报警时间") -->
+              <el-table-column v-if="currentSection === 'audit'" width="135" align="center" key="audit-col-alarm-time">
                 <template #header>
                   <div class="col-filter-header">
-                    <span>{{ $t('auditColProcessTime') }}</span>
+                    <span>{{ $t('auditColAlarmTime') }}</span>
                     <!-- 时间排序箭头 -->
                     <span class="header-action-trigger" :class="{ 'sort-active': params.timeSort !== 0 }" :title="params.timeSort === 1 ? $t('auditSortAsc') : $t('auditSortDesc')" @click.stop="changeTimeSort">
                       <Icon :icon="params.timeSort === 1 ? 'fluent:arrow-up-16-regular' : (params.timeSort === 2 ? 'fluent:arrow-down-16-regular' : 'fluent:arrow-sort-16-regular')" width="13" height="13" />
@@ -1223,16 +1209,16 @@
                 </template>
                 <template #default="{ row }">
                   <span class="plain-time font-mono">
-                    {{ formatTableTime(row.banTime || row.createTime) }}
+                    {{ formatTableTime(row.alarmTime || row.createTime) }}
                   </span>
                 </template>
               </el-table-column>
 
-              <!-- 列 9: 截止期限 (变更: 在处理时间后面增加截止期限的过期说明) -->
-              <el-table-column v-if="currentSection === 'audit'" width="145" align="center" key="audit-col-deadline">
+              <!-- 列 9: 过期时间 (变更: 在报警时间后面添加过期时间) -->
+              <el-table-column v-if="currentSection === 'audit'" width="145" align="center" key="audit-col-expire-time">
                 <template #header>
                   <div class="col-filter-header">
-                    <span>{{ $t('auditColDeadline') }}</span>
+                    <span>{{ $t('auditColExpireTime') }}</span>
                   </div>
                 </template>
                 <template #default="{ row }">
@@ -1559,7 +1545,25 @@
                 </template>
               </el-table-column>
 
-              <!-- 列 9: 负责人 -->
+              <!-- 列 9: 死局时间 (变更: 在处理时间后面添加死局时间列) -->
+              <el-table-column v-if="currentSection === 'record'" width="135" align="center" key="record-col-deadlock-time">
+                <template #header>
+                  <div class="col-filter-header">
+                    <span>{{ $t('auditColDeadlockTime') }}</span>
+                  </div>
+                </template>
+                <template #default="{ row }">
+                  <div class="deadlock-cell">
+                    <span class="plain-time font-mono" :class="{ 'time-expired': isDeadlocked(row) }">
+                      {{ getDeadlockInfo(row).time }}
+                    </span>
+                    <span v-if="isDeadlocked(row)" class="expire-tag-expired">({{ $t('auditDeadlocked') }})</span>
+                    <span v-else class="deadlock-tag-desc">({{ getDeadlockInfo(row).desc }})</span>
+                  </div>
+                </template>
+              </el-table-column>
+
+              <!-- 列 10: 负责人 -->
               <el-table-column v-if="currentSection === 'record'" width="105" align="center" key="record-col-assignee">
                 <template #header>
                   <div class="col-filter-header">
@@ -1635,6 +1639,344 @@
 
               <!-- 列 11: 操作 -->
               <el-table-column :label="$t('action')" v-if="currentSection === 'record'" width="80" align="center" key="record-col-action">
+                <template #default="{ row }">
+                  <div class="action-cell">
+                    <el-button
+                      size="small"
+                      type="primary"
+                      link
+                      class="action-detail-btn"
+                      @click="openAuditDrawer(row)"
+                    >
+                      {{ $t('auditBtnViewDetails') }}
+                    </el-button>
+                  </div>
+                </template>
+              </el-table-column>
+
+
+              <!-- ========================================================= -->
+              <!-- 板块 5 / 默认列集: 全量整合展示表 (all - 没有选择任何部分时) -->
+              <!-- 变更: 删除"报警次数""处理建议"；"违规分类"改为"违规等级"(含LV0~LV3及Threat)；在"处理时间"后添加"死局时间" -->
+              <!-- ========================================================= -->
+              <!-- 列 1: 工单编号 -->
+              <el-table-column :label="$t('auditColTicketNo')" v-if="currentSection === 'all'" width="85" align="center" key="default-col-ticket">
+                <template #default="{ row }">
+                  <div class="ticket-cell">
+                    <span class="ticket-id font-mono font-medium clickable-ticket" @click="openAuditDrawer(row)">
+                      {{ formatTicketNo(row) }}
+                    </span>
+                  </div>
+                </template>
+              </el-table-column>
+
+              <!-- 列 2: 身分组 -->
+              <el-table-column v-if="currentSection === 'all'" width="115" align="center" key="default-col-identity">
+                <template #header>
+                  <div class="col-filter-header">
+                    <span>{{ $t('auditColIdentityGroup') }}</span>
+                    <el-dropdown trigger="click" @command="handleIdentityFilterCommand">
+                      <span class="filter-trigger" :class="{ 'filter-active': params.identityGroup !== 'all' }" :title="$t('filter')">
+                        <Icon icon="fluent:filter-16-regular" width="13" height="13" />
+                      </span>
+                      <template #dropdown>
+                        <el-dropdown-menu>
+                          <el-dropdown-item command="all" :class="{ 'is-selected': params.identityGroup === 'all' }">
+                            {{ $t('auditAllIdentities') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="master" :class="{ 'is-selected': params.identityGroup === 'master' }">
+                            {{ $t('auditIdentityMaster') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="admin" :class="{ 'is-selected': params.identityGroup === 'admin' }">
+                            {{ $t('auditIdentityAdmin') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="member" :class="{ 'is-selected': params.identityGroup === 'member' }">
+                            {{ $t('auditIdentityMember') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="user" :class="{ 'is-selected': params.identityGroup === 'user' }">
+                            {{ $t('auditIdentityUser') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="guest" :class="{ 'is-selected': params.identityGroup === 'guest' }">
+                            {{ $t('auditIdentityGuest') }}
+                          </el-dropdown-item>
+                        </el-dropdown-menu>
+                      </template>
+                    </el-dropdown>
+                  </div>
+                </template>
+                <template #default="{ row }">
+                  <div class="identity-cell">
+                    <span class="plain-identity-text" :title="getIdentityMeta(row).impactDesc">
+                      {{ getIdentityMeta(row).label }}
+                    </span>
+                  </div>
+                </template>
+              </el-table-column>
+
+              <!-- 列 3: 违规等级 (默认表: 包含 LV0~LV3 以及 Threat[滥用威胁]) -->
+              <el-table-column v-if="currentSection === 'all'" width="135" align="center" key="default-col-violation-level">
+                <template #header>
+                  <div class="col-filter-header">
+                    <span>{{ $t('auditColViolationLevel') }}</span>
+                    <el-dropdown trigger="click" @command="handleViolationLevelFilterCommand">
+                      <span class="filter-trigger" :class="{ 'filter-active': params.violationLevel !== 'all' }" :title="$t('filter')">
+                        <Icon icon="fluent:filter-16-regular" width="13" height="13" />
+                      </span>
+                      <template #dropdown>
+                        <el-dropdown-menu>
+                          <el-dropdown-item command="all" :class="{ 'is-selected': params.violationLevel === 'all' }">
+                            {{ $t('auditAllViolationLevels') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="threat" :class="{ 'is-selected': params.violationLevel === 'threat' }">
+                            {{ $t('auditLevelThreat') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="lv3" :class="{ 'is-selected': params.violationLevel === 'lv3' }">
+                            {{ $t('auditLevelLv3') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="lv2" :class="{ 'is-selected': params.violationLevel === 'lv2' }">
+                            {{ $t('auditLevelLv2') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="lv1" :class="{ 'is-selected': params.violationLevel === 'lv1' }">
+                            {{ $t('auditLevelLv1') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="lv0" :class="{ 'is-selected': params.violationLevel === 'lv0' }">
+                            {{ $t('auditLevelLv0') }}
+                          </el-dropdown-item>
+                        </el-dropdown-menu>
+                      </template>
+                    </el-dropdown>
+                  </div>
+                </template>
+                <template #default="{ row }">
+                  <div class="level-cell">
+                    <span class="plain-level-text font-mono font-medium" :class="`level-${getDefaultViolationLevel(row).type}`">
+                      {{ getDefaultViolationLevel(row).text }}
+                    </span>
+                  </div>
+                </template>
+              </el-table-column>
+
+              <!-- 列 4: 报警原因 (默认表包含全部筛选条件) -->
+              <el-table-column v-if="currentSection === 'all'" min-width="135" align="center" key="default-col-reason">
+                <template #header>
+                  <div class="col-filter-header">
+                    <span>{{ $t('auditColAlarmReason') }}</span>
+                    <el-dropdown trigger="click" @command="handleReasonFilterCommand">
+                      <span class="filter-trigger" :class="{ 'filter-active': params.alarmReason !== 'all' }" :title="$t('filter')">
+                        <Icon icon="fluent:filter-16-regular" width="13" height="13" />
+                      </span>
+                      <template #dropdown>
+                        <el-dropdown-menu>
+                          <el-dropdown-item command="all" :class="{ 'is-selected': params.alarmReason === 'all' }">
+                            {{ $t('auditAllAlarmReasons') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="multi_account" :class="{ 'is-selected': params.alarmReason === 'multi_account' }">
+                            {{ $t('auditReasonMultiAccount') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="user_reported" :class="{ 'is-selected': params.alarmReason === 'user_reported' }">
+                            {{ $t('auditReasonUserReported') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="rate_limit" :class="{ 'is-selected': params.alarmReason === 'rate_limit' }">
+                            {{ $t('auditReasonRateLimit') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="credential" :class="{ 'is-selected': params.alarmReason === 'credential' }">
+                            {{ $t('auditReasonCredentialAnomaly') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="roaming" :class="{ 'is-selected': params.alarmReason === 'roaming' }">
+                            {{ $t('auditReasonRoaming') }}
+                          </el-dropdown-item>
+                        </el-dropdown-menu>
+                      </template>
+                    </el-dropdown>
+                  </div>
+                </template>
+                <template #default="{ row }">
+                  <div class="reason-cell">
+                    <span class="plain-reason-text" :title="row.banReason || row.actionText">
+                      {{ getSimpleAlarmReason(row) }}
+                    </span>
+                  </div>
+                </template>
+              </el-table-column>
+
+              <!-- 列 5: 当前状态 (包含全部状态筛选) -->
+              <el-table-column v-if="currentSection === 'all'" width="125" align="center" key="default-col-status">
+                <template #header>
+                  <div class="col-filter-header">
+                    <span>{{ $t('auditCurrentStatus') }}</span>
+                    <el-dropdown trigger="click" @command="handleStatusFilterCommand">
+                      <span class="filter-trigger" :class="{ 'filter-active': params.status !== 'all' }" :title="$t('filter')">
+                        <Icon icon="fluent:filter-16-regular" width="13" height="13" />
+                      </span>
+                      <template #dropdown>
+                        <el-dropdown-menu>
+                          <el-dropdown-item command="all" :class="{ 'is-selected': params.status === 'all' }">
+                            {{ $t('auditAllStatus') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="banned" :class="{ 'is-selected': params.status === 'banned' }">
+                            {{ $t('auditStatusBannedActive') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="pending" :class="{ 'is-selected': params.status === 'pending' }">
+                            {{ $t('auditCaseStatusPending') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="unbanned" :class="{ 'is-selected': params.status === 'unbanned' }">
+                            {{ $t('auditStatusUnbannedRecord') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="watching" :class="{ 'is-selected': params.status === 'watching' }">
+                            {{ $t('auditStatusWatching') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="expired" :class="{ 'is-selected': params.status === 'expired' }">
+                            {{ $t('auditCaseStatusExpired') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="rejected" :class="{ 'is-selected': params.status === 'rejected' }">
+                            {{ $t('auditStatusRejectedAppeal') }}
+                          </el-dropdown-item>
+                        </el-dropdown-menu>
+                      </template>
+                    </el-dropdown>
+                  </div>
+                </template>
+                <template #default="{ row }">
+                  <div class="status-clean-item" :class="`status-${row.status}`" :title="getStatusLabel(row.status)">
+                    <Icon :icon="getStatusIcon(row.status)" width="14" height="14" class="status-icon-inline" />
+                    <span class="status-text-inline">{{ getStatusLabel(row.status) }}</span>
+                  </div>
+                </template>
+              </el-table-column>
+
+              <!-- 列 6: 处理时间 -->
+              <el-table-column v-if="currentSection === 'all'" width="135" align="center" key="default-col-process-time">
+                <template #header>
+                  <div class="col-filter-header">
+                    <span>{{ $t('auditColProcessTime') }}</span>
+                    <!-- 时间排序箭头 -->
+                    <span class="header-action-trigger" :class="{ 'sort-active': params.timeSort !== 0 }" :title="params.timeSort === 1 ? $t('auditSortAsc') : $t('auditSortDesc')" @click.stop="changeTimeSort">
+                      <Icon :icon="params.timeSort === 1 ? 'fluent:arrow-up-16-regular' : (params.timeSort === 2 ? 'fluent:arrow-down-16-regular' : 'fluent:arrow-sort-16-regular')" width="13" height="13" />
+                    </span>
+                    <el-dropdown trigger="click" @command="handleTimeFilterCommand">
+                      <span class="filter-trigger" :class="{ 'filter-active': params.timeRange !== 'all' }" :title="$t('filter')">
+                        <Icon icon="fluent:filter-16-regular" width="13" height="13" />
+                      </span>
+                      <template #dropdown>
+                        <el-dropdown-menu>
+                          <el-dropdown-item command="all" :class="{ 'is-selected': params.timeRange === 'all' }">
+                            {{ $t('auditAllProcessTime') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="today" :class="{ 'is-selected': params.timeRange === 'today' }">
+                            {{ $t('auditTimeToday') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="7days" :class="{ 'is-selected': params.timeRange === '7days' }">
+                            {{ $t('auditTime7Days') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="30days" :class="{ 'is-selected': params.timeRange === '30days' }">
+                            {{ $t('auditTime30Days') }}
+                          </el-dropdown-item>
+                        </el-dropdown-menu>
+                      </template>
+                    </el-dropdown>
+                  </div>
+                </template>
+                <template #default="{ row }">
+                  <span class="plain-time font-mono">
+                    {{ formatTableTime(row.resolvedTime || row.banTime || row.createTime) }}
+                  </span>
+                </template>
+              </el-table-column>
+
+              <!-- 列 7: 死局时间 (变更: 在处理时间后面添加死局时间列) -->
+              <el-table-column v-if="currentSection === 'all'" width="135" align="center" key="default-col-deadlock-time">
+                <template #header>
+                  <div class="col-filter-header">
+                    <span>{{ $t('auditColDeadlockTime') }}</span>
+                  </div>
+                </template>
+                <template #default="{ row }">
+                  <div class="deadlock-cell">
+                    <span class="plain-time font-mono" :class="{ 'time-expired': isDeadlocked(row) }">
+                      {{ getDeadlockInfo(row).time }}
+                    </span>
+                    <span v-if="isDeadlocked(row)" class="expire-tag-expired">({{ $t('auditDeadlocked') }})</span>
+                    <span v-else class="deadlock-tag-desc">({{ getDeadlockInfo(row).desc }})</span>
+                  </div>
+                </template>
+              </el-table-column>
+
+              <!-- 列 8: 负责人 -->
+              <el-table-column v-if="currentSection === 'all'" width="105" align="center" key="default-col-assignee">
+                <template #header>
+                  <div class="col-filter-header">
+                    <span>{{ $t('auditColAssignee') }}</span>
+                    <el-dropdown trigger="click" @command="handleAssigneeFilterCommand">
+                      <span class="filter-trigger" :class="{ 'filter-active': params.assignee !== 'all' }" :title="$t('filter')">
+                        <Icon icon="fluent:filter-16-regular" width="13" height="13" />
+                      </span>
+                      <template #dropdown>
+                        <el-dropdown-menu>
+                          <el-dropdown-item command="all" :class="{ 'is-selected': params.assignee === 'all' }">
+                            {{ $t('auditAllAssignees') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="secadmin" :class="{ 'is-selected': params.assignee === 'secadmin' }">
+                            {{ $t('auditAssigneeAdmin') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="system" :class="{ 'is-selected': params.assignee === 'system' }">
+                            {{ $t('auditAssigneeSystem') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="master" :class="{ 'is-selected': params.assignee === 'master' }">
+                            {{ $t('auditAssigneeMaster') }}
+                          </el-dropdown-item>
+                        </el-dropdown-menu>
+                      </template>
+                    </el-dropdown>
+                  </div>
+                </template>
+                <template #default="{ row }">
+                  <div class="operator-cell">
+                    <span class="operator-name-link font-medium" :title="getOperatorName(row)" @click.stop="handleViewOperator(row)">
+                      {{ getOperatorName(row) }}
+                    </span>
+                  </div>
+                </template>
+              </el-table-column>
+
+              <!-- 列 9: 拍案管理 -->
+              <el-table-column v-if="currentSection === 'all'" width="105" align="center" key="default-col-authority">
+                <template #header>
+                  <div class="col-filter-header">
+                    <span>{{ $t('auditColFinalAuthority') }}</span>
+                    <el-dropdown trigger="click" @command="handleAdjudicatorFilterCommand">
+                      <span class="filter-trigger" :class="{ 'filter-active': params.adjudicator !== 'all' }" :title="$t('filter')">
+                        <Icon icon="fluent:filter-16-regular" width="13" height="13" />
+                      </span>
+                      <template #dropdown>
+                        <el-dropdown-menu>
+                          <el-dropdown-item command="all" :class="{ 'is-selected': params.adjudicator === 'all' }">
+                            {{ $t('auditAllAdjudicators') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="secadmin" :class="{ 'is-selected': params.adjudicator === 'secadmin' }">
+                            {{ $t('auditAdjudicatorAdmin') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="system" :class="{ 'is-selected': params.adjudicator === 'system' }">
+                            {{ $t('auditAdjudicatorSystem') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="master" :class="{ 'is-selected': params.adjudicator === 'master' }">
+                            {{ $t('auditAdjudicatorMaster') }}
+                          </el-dropdown-item>
+                        </el-dropdown-menu>
+                      </template>
+                    </el-dropdown>
+                  </div>
+                </template>
+                <template #default="{ row }">
+                  <div class="operator-cell">
+                    <span class="operator-name-link font-medium" :title="getAdjudicatorName(row)" @click.stop="handleViewAdjudicator(row)">
+                      {{ getAdjudicatorName(row) }}
+                    </span>
+                  </div>
+                </template>
+              </el-table-column>
+
+              <!-- 列 10: 操作 -->
+              <el-table-column :label="$t('action')" v-if="currentSection === 'all'" width="80" align="center" key="default-col-action">
                 <template #default="{ row }">
                   <div class="action-cell">
                     <el-button
@@ -2287,14 +2629,14 @@ const showAutoPurgedDialog = ref(false);
 const autoPurgedCount = ref(0);
 const autoPurgedBatches = ref([]);
 
-// 当前选中的 KPI 卡片 (默认高亮选中威胁邮箱)
-const activeKpi = ref('threat');
+// 当前选中的 KPI 卡片 (默认状态下没有选择任何部分)
+const activeKpi = ref('all');
 
 const currentSection = computed(() => {
   if (['threat', 'appeal', 'audit', 'record'].includes(activeKpi.value)) {
     return activeKpi.value;
   }
-  return 'threat';
+  return 'all';
 });
 
 const params = reactive({
@@ -2355,36 +2697,47 @@ function calcPercent(pending, tot) {
 
 function selectKpiFilter(type) {
   if (activeKpi.value === type) {
+    // 点击已激活卡片：取消选中，回退至没有选择任何部分的默认状态
     activeKpi.value = 'all';
     params.warningType = 'all';
     params.riskLevel = 'all';
     params.status = 'all';
     params.timeRange = 'all';
     params.violationLevel = 'all';
+    params.category = 'all';
+    params.alarmReason = 'all';
+    params.alarmCountRange = 'all';
+    params.suggestion = 'all';
+    params.assignee = 'all';
+    params.adjudicator = 'all';
   } else {
+    // 切换至指定板块：重置其他筛选条件，确保板块间内容与筛选互相隔离
     activeKpi.value = type;
+    params.status = 'all';
     params.timeRange = 'all';
     params.violationLevel = 'all';
+    params.category = 'all';
+    params.alarmReason = 'all';
+    params.alarmCountRange = 'all';
+    params.suggestion = 'all';
+    params.assignee = 'all';
+    params.adjudicator = 'all';
     if (type === 'threat' || type === 'highrisk') {
       // 1. 滥用威胁：展示所有LV3以上的威胁账户，主要包含1人多号、被举报等
       params.riskLevel = 'high';
-      params.warningType = 'all';
-      params.status = 'all';
+      params.warningType = 'risk';
     } else if (type === 'appeal' || type === 'pending') {
       // 2. 申诉审计：通过填写符合表格对于已做出的判决的邮箱进行申诉的邮箱
       params.warningType = 'appeal';
       params.riskLevel = 'all';
-      params.status = 'all';
     } else if (type === 'audit') {
       // 3. 风险管理：所有LV0~LV3的邮箱，主要包括接发垃圾邮件、多次跳IP登录等等
       params.warningType = 'audit';
       params.riskLevel = 'all';
-      params.status = 'all';
     } else if (type === 'record' || type === 'banned') {
       // 4. 操作记录：所有以上邮箱最终处理后(包括封禁、解禁等操作的更新)、过期后(不符合要求)等等
       params.warningType = 'ban';
       params.riskLevel = 'all';
-      params.status = 'all';
     }
   }
   search();
@@ -2619,7 +2972,94 @@ function getViolationLevel(row) {
   return { level: 'LV0', text: t('auditLevelLv0'), type: 'info' };
 }
 
-// 2. 申诉表单过期时间与是否过期 供申诉审计板块
+// 1.1 默认全量概览展示等级 (包含 LV0~LV3 与 Threat[滥用威胁])
+function getDefaultViolationLevel(row) {
+  if (!row) return { level: 'LV0', text: 'LV0 · ' + t('auditLevelLv0'), type: 'info' };
+  const isThreat = row.warningType === 'risk' || 
+                   row.riskLevel === 'high' || 
+                   ['P0', 'CRITICAL'].includes((row.priority || '').toUpperCase()) ||
+                   row.clusterId ||
+                   (row.reportedByOthers && row.reportedByOthers >= 3);
+  if (isThreat) {
+    return { level: 'Threat', text: 'Threat · ' + t('auditLevelThreat'), type: 'danger' };
+  }
+  return getViolationLevel(row);
+}
+
+// 2. 同类申诉次数 (记录的是相同的问题申诉了多少次，主要包含相同违规分类的申诉情况)
+function getSameCategoryAppealCount(row) {
+  if (!row) return 1;
+  if (typeof row.sameCategoryAppealCount === 'number' && row.sameCategoryAppealCount > 0) {
+    return row.sameCategoryAppealCount;
+  }
+  const rowCat = getViolationCategory(row).text;
+  const matchCount = (logs.value || []).filter(l => 
+    l.email && row.email && 
+    l.email.toLowerCase() === row.email.toLowerCase() && 
+    getViolationCategory(l).text === rowCat
+  ).length;
+  if (matchCount > 1) return matchCount;
+  if (row.appealCount && row.appealCount > 1) return row.appealCount;
+  return 1;
+}
+
+function handleSameCategoryAppealCountFilterCommand(command) {
+  params.alarmCountRange = command;
+  params.num = 1;
+  search();
+}
+
+// 3. 死局时间计算与死局状态辅助函数 (30天冷静期/最终终裁期限，申诉/记录/默认表专用)
+function getDeadlockTime(row) {
+  if (!row) return null;
+  if (row.deadlockTime) return row.deadlockTime;
+  if (row.deadline) return row.deadline;
+  const baseTime = row.banTime || row.resolvedTime || row.createTime;
+  if (baseTime) {
+    return tzDayjs(baseTime).add(30, 'day').toISOString();
+  }
+  return null;
+}
+
+function isDeadlocked(row) {
+  const dt = getDeadlockTime(row);
+  if (!dt) return false;
+  return tzDayjs(dt).isBefore(tzDayjs());
+}
+
+function getDeadlockInfo(row) {
+  if (!row) return { time: '-', desc: '-', isDeadlocked: false };
+  const dt = getDeadlockTime(row);
+  if (!dt) return { time: '-', desc: '-', isDeadlocked: false };
+  const now = tzDayjs();
+  const target = tzDayjs(dt);
+  const deadlocked = target.isBefore(now);
+  let desc = '';
+  if (deadlocked) {
+    desc = t('auditDeadlocked');
+  } else {
+    const diffDays = target.diff(now, 'day');
+    if (diffDays > 0) {
+      desc = t('auditDeadlockDaysLeft', { days: diffDays });
+    } else {
+      const diffHours = Math.max(1, target.diff(now, 'hour'));
+      desc = t('auditDeadlockHoursLeft', { hours: diffHours });
+    }
+  }
+  return {
+    time: formatTableTime(dt),
+    desc,
+    isDeadlocked: deadlocked
+  };
+}
+
+// 4. 风险管理过期时间辅助函数
+function getRiskExpireTime(row) {
+  if (!row) return null;
+  return row.expireTime || row.deadline || (row.createTime ? tzDayjs(row.createTime).add(14, 'day').toISOString() : null);
+}
+
+// 5. 申诉表单过期时间与是否过期
 function getAppealExpireTime(row) {
   if (!row) return null;
   if (row.expireTime) return row.expireTime;
@@ -2635,7 +3075,7 @@ function isAppealExpired(row) {
   return tzDayjs(exp).isBefore(tzDayjs());
 }
 
-// 3. 风险管控截止期限与过期说明 供风险管理板块
+// 6. 风险管控截止期限与过期说明 供风险管理板块
 function getRiskDeadlineInfo(row) {
   if (!row) return { time: '-', desc: '-', isExpired: false };
   const deadlineTime = row.deadline || row.expireTime || (row.createTime ? tzDayjs(row.createTime).add(14, 'day').toISOString() : null);
@@ -3744,7 +4184,21 @@ async function fetchAuditList() {
   try {
     const res = await auditList(params);
     const data = res?.list ? res : (res?.data || res || {});
-    logs.value = data.list || [];
+    const rawList = data.list || [];
+    if (currentSection.value === 'all') {
+      const seen = new Set();
+      const deduped = [];
+      for (const item of rawList) {
+        const key = (item.email || item.ticketId || item.id).toLowerCase();
+        if (!seen.has(key)) {
+          seen.add(key);
+          deduped.push(item);
+        }
+      }
+      logs.value = deduped;
+    } else {
+      logs.value = rawList;
+    }
     total.value = data.total || 0;
     if (data.counts) {
       summaryCounts.threat = data.counts.highRisk ?? data.counts.riskTotal ?? (data.counts.categories?.risk?.total ?? 0);
@@ -4413,6 +4867,25 @@ onUnmounted(() => {
     font-size: 11px;
     color: var(--el-color-danger);
     font-weight: 600;
+  }
+}
+
+.deadlock-cell {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+  text-align: center;
+
+  .time-expired {
+    color: var(--el-color-danger);
+    font-weight: 600;
+  }
+
+  .deadlock-tag-desc {
+    font-size: 11px;
+    color: var(--el-text-color-secondary);
   }
 }
 
