@@ -893,6 +893,8 @@ const auditService = {
 				finalAuthorityDesc = '协管人工复核批准解封或维持观察 (主管级拍案)';
 			}
 
+			const createdTs = row.createTime ? new Date(row.createTime).getTime() : Date.now();
+
 			// 计算死局时间 (Deadlock Time: 30天冷静期/最终终裁期限，支持申诉与操作记录死局)
 			let deadlockTime = row.deadlockTime || row.deadline || null;
 			if (!deadlockTime) {
@@ -909,7 +911,6 @@ const auditService = {
 			// 计算过期时间与截止期限 (支持申诉表单过期与风险管控截止期限)
 			let expireTime = row.expireTime || null;
 			let deadline = row.deadline || null;
-			const createdTs = row.createTime ? new Date(row.createTime).getTime() : Date.now();
 			if (!expireTime) {
 				if (row.warningType === 'appeal') {
 					// 申诉表单通常 7 天过期
