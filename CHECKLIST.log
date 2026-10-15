@@ -8,6 +8,30 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### 审计控制台 el-table__inner-wrapper 完整平铺与表头 el-dropdown 空间冲突治理 (2026-10-15)
+*   **关联提交 (Git Commit)**: `7bfe0d3f701ba7cdeef3eb2801132f0b42b2e469` (Short: `7bfe0d3`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com · Worker Version ID: d3908276-80fd-4302-b440-ad4aef34e631)`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 完整填充 `el-table__inner-wrapper` 并根除空白：彻底修复 Element Plus 在 `.el-scrollbar__view` 上注入行内内联样式导致其缩窄为 `inline-block` 诱发的右侧空白虚空，在 CSS 中显式声明 `display: block !important; width: 100% !important; min-width: 100% !important; box-sizing: border-box !important;`，配合 `.el-table__header` 与 `.el-table__body` `width: 100% !important;`，使表格元素 100% 严丝合缝贴合容器（实测 1058px 对 1058px，零缝隙）；
+    - [x] 表头 `el-dropdown` 与操作按钮空间冲突治理：
+        1. 针对表头筛选器，为 `.col-filter-header` 内的文本、`.el-dropdown` 触发器及排序按钮设置 `flex-shrink: 0`，统一 16px 精致方块触发器与 2px 微间隙，杜绝表头文字纵向折行与按钮重叠挤压；
+        2. 全板块列宽由固定锁定改为弹性自适应 `min-width` 体系（默认总表 `all` 设置 `min-width 84~122px`，操作列 `min-width 78px`）；
+        3. 彻底释放最右侧操作列空间，实测操作列宽分配为 79px ~ 85px，完美包裹 54px「查看详情」按钮，留有充裕呼吸空间，彻底消除边框冲突与截断；
+    - [x] 零横向滚动条全景铺满：在 1440x900 等标准分辨率下，总 `min-width` 略低于卡片可用内宽 23px ~ 92px，触发 Element Plus 响应式计算器将剩余像素按比例分配给各列，实现 `scrollWidth === clientWidth === 1058px`，全板块 100% 纯净展示且零横向滚动条；
+    - [x] 保持 6 语言 i18n 绝对对称（2711 keys 全对称、静态零缺失）。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地前端构建核验：`pnpm --filter mail-vue run build` 耗时 16.21s，零报错零警告；
+    - [x] Cloudflare 生产环境部署：上线成功至 `mail.epocanvas.com` (Version ID: `d3908276-80fd-4302-b440-ad4aef34e631`)；
+    - [x] 生产环境 Playwright 全真栈几何核验与实机截图 (`tests/audit-cf-screenshot-inspection.mjs`)：
+        1. `01_default_all_table.png` (默认总表): wrapper 1058px, view 1058px (display: block), 滚动条: 无, 操作列 82px (按钮 54px)；
+        2. `02_appeal_table.png` (申诉审计): wrapper 1058px, view 1058px (display: block), 滚动条: 无, 操作列 80px (按钮 54px)；
+        3. `03_risk_table.png` (风险管理): wrapper 1058px, view 1058px (display: block), 滚动条: 无, 操作列 80px (按钮 54px)；
+        4. `04_record_table.png` (操作记录): wrapper 1058px, view 1058px (display: block), 滚动条: 无, 操作列 79px (按钮 54px)；
+        5. `05_threat_table.png` (滥用威胁): wrapper 1058px, view 1058px (display: block), 滚动条: 无, 操作列 85px (按钮 54px)；
+    - [x] 静态多语言三件套审计：`i18n-symmetry.mjs` (2711 keys 绝对对称)、`i18n-audit.mjs` (代码字面量引用零缺失)、`i18n-hardcoded.mjs` (用户可见文本零未包裹硬编码)；
+    - [x] 差异化列集规范专项断言：`tests/verify-audit-section-columns.mjs` 7 大断言 100% 通过；
+    - [x] 零假数据残留：全真栈实测数据干净，无残留假数据。
+
 ### 审计控制台展示内容规范化与等距黄金列宽重构 (2026-10-15)
 *   **关联提交 (Git Commit)**: `deda1b5bba09f948098919025d1e827aab40fdf4` (Short: `deda1b5`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com · Worker Version ID: 690d64b7-df59-4275-9798-76e040b4ca7b)`
