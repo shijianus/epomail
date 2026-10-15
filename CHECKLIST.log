@@ -10,7 +10,7 @@
 
 ### 滥用威胁板块对齐 punishments.md 决策规范与全站画风一致性重构 (2026-10-14)
 *   **关联提交 (Git Commit)**: `820c5f6af310b8a86676beb28b8b6033185d54f0` (Short: `820c5f6`)
-*   **部署环境 (Deployment)**: `本地全真栈 (wrangler dev @8787 · workerd CF 运行时 · D1+KV 真实存储)`
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com · Version ID: f8342ade-e47e-4408-8d83-025b9d7b663d) / 本地全真栈 (wrangler dev)`
 *   **功能需求与变更清单 (Changes & Feature Alignment)**:
     - [x] 文件层次基准还原：严格基于 `7abce31` 文件层次基准状态，确保除「滥用威胁」以外的任何地方、任何 UI/逻辑零改动；
     - [x] 对齐 punishments.md 规范与画风统一重构：
@@ -21,6 +21,8 @@
         5. 违规分类对齐：违规分类字典与映射严格对齐 punishments.md 的 5 大核心违规类别（AUTH_ACCOUNT_TAKEOVER 账号接管、SYBIL_MULTI_ACCOUNT 一人多号、PROTOCOL_VIOLATION 协议违规、OUTBOUND_* 外发滥用、QUOTA_EVASION 配额规避）；
         6. 6 语言 i18n 绝对对称：同步更新 6 语言字典（zh, zh-Hant, en, es, fr, nl）中 `abuseColNo`, `abuseColTarget`, `abuseColStatus`, `abuseColCategory`, `abuseColAction`, `abuseKpiSubtitle`, `abuseStatusTripped`, `abuseCatAccountTakeover` 等词条，保持 2704 keys 100% 绝对对称。
 *   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] Cloudflare 生产部署：上线成功 (Version ID: `f8342ade-e47e-4408-8d83-025b9d7b663d`，域名 `mail.epocanvas.com` HTTP 200 正常提供服务)；
+    - [x] 生产环境全真截图审计：`tests/audit-cf-screenshot-inspection.mjs` 生产 5 大视图实机截图 100% 成功；
     - [x] 本地构建核验：mail-vue 生产构建通过 (13.50s，零报错零警告)；
     - [x] 多语言对称静态审计：`scripts/i18n-symmetry.mjs` (2704 keys) 100% 绝对对称；
     - [x] 代码引用零缺失审计：`scripts/i18n-audit.mjs` 0 缺失；
