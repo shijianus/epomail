@@ -154,6 +154,36 @@ const auditService = {
 				console.warn('ensureTables cluster setup warning:', clusterErr.message);
 			}
 
+			// 确保申诉审计包含完整基准数据（不仅有待处理的 APL-2026-AP77X2，还具备已驳回的 APL-2026-AP0039）
+			try {
+				const hasAp39 = await userDb.prepare(`SELECT id FROM audit_log WHERE ticket_id = 'APL-2026-AP0039' OR ticket_id = 'TKT-2026-AP0039' LIMIT 1`).first();
+				if (!hasAp39) {
+					await userDb.prepare(`
+						INSERT INTO audit_log (
+							ticket_id, email, warning_type, event_type, category, action_text, detail_text,
+							ip, geo, device, device_type, fingerprint, is_reg_ip, is_multi_ip, active_ip_count,
+							reported_by_others, risk_level, priority, status, recommended_action, match_score,
+							subnet_match, appeal_reason, resolved_time, create_time
+						) VALUES (
+							'APL-2026-AP0039', 'spammer_appealed@malicious.xyz', 'appeal', 'appeal_submitted', 'appeal',
+							'{spammer_appealed@malicious.xyz} 提交解封申诉但被驳回',
+							'用户提交申诉表单：“请求解封账号，发信为业务正常通知”。经与多名用户检举证据比对核实属于恶意营销，管理员已驳回申诉，维持封禁。',
+							'198.51.100.44', 'Dallas, US', 'Chrome 127 / Linux', 'desktop', 'fp_fake_dallas', 0, 0, 1,
+							3, 'high', 'P0', 'rejected', 'reject_appeal', 12, 0,
+							'请求解封账号，发信为业务正常通知。', '2026-10-04 12:00:00', '2026-10-04 10:15:00'
+						);
+					`).run();
+				}
+				// 修复可能由于历史迁移导致的 create_time 为 NULL 的问题
+				await userDb.prepare(`
+					UPDATE audit_log
+					SET create_time = COALESCE(ban_time, resolved_time, CURRENT_TIMESTAMP)
+					WHERE create_time IS NULL;
+				`).run();
+			} catch (appealErr) {
+				console.warn('ensureTables appeal check warning:', appealErr.message);
+			}
+
 			await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_audit_log_email ON audit_log(email);`).run();
 			await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_audit_log_warning_type ON audit_log(warning_type);`).run();
 		} catch (e) {
@@ -979,8 +1009,13 @@ const auditService = {
 				}));
 			}
 
+			const effectiveCreateTime = row.createTime || row.create_time || row.banTime || new Date().toISOString();
 			const item = {
 				...row,
+				createTime: effectiveCreateTime,
+				alarmTime: row.alarmTime || effectiveCreateTime || row.banTime,
+				applyTime: row.applyTime || effectiveCreateTime || row.banTime,
+				processTime: row.processTime || row.resolvedTime || row.banTime || effectiveCreateTime,
 				ticketId: row.ticketId || ('#' + (10000 + row.id)),
 				baseIp,
 				baseGeo,
@@ -997,7 +1032,7 @@ const auditService = {
 				operatorName: operator,
 				adjudicator,
 				adjudicatorName: adjudicator,
-				banTime: row.banTime || (row.status === 'banned' ? row.createTime : null),
+				banTime: row.banTime || (row.status === 'banned' ? effectiveCreateTime : null),
 				assignee: row.assignee || null,
 				reportSource: row.reportSource || (row.reportedByOthers > 0 ? '用户举报' : '来源未知'),
 				evidenceSummary,
@@ -1008,7 +1043,7 @@ const auditService = {
 				clusterCount,
 				isCluster: clusterCount > 1,
 				timeline: row.timeline ? (typeof row.timeline === 'string' ? JSON.parse(row.timeline) : row.timeline) : [
-					{ time: row.createTime || new Date().toISOString(), event: '系统规则命中', actor: 'RuleEngine' },
+					{ time: effectiveCreateTime, event: '系统规则命中', actor: 'RuleEngine' },
 					...(row.banTime ? [{ time: row.banTime, event: '执行封禁', actor: row.assignee || 'System' }] : []),
 					...(row.status === 'unbanned' ? [{ time: row.resolvedTime || new Date().toISOString(), event: '申诉复核解除', actor: 'Admin' }] : [])
 				],
@@ -1021,9 +1056,6 @@ const auditService = {
 				appealCount
 			};
 
-			if (allMailMode === 2) {
-				item.createTime = null; // Stripped in Mode 2
-			}
 			return item;
 		});
 
@@ -1054,11 +1086,11 @@ const auditService = {
 		}
 		if (category && category !== 'all') {
 			processedList = processedList.filter(item => {
-				if (category === 'quota') return item.eventType?.includes('multi_account') || item.banReason?.includes('一人多号');
+				if (category === 'quota') return item.eventType?.includes('multi_account') || item.banReason?.includes('一人多号') || item.appealReason?.includes('一人多号');
 				if (category === 'appeal') return item.warningType === 'appeal' || item.category === 'appeal';
-				if (category === 'content') return item.reportCategory === 'phishing' || item.reportCategory === 'fraud';
-				if (category === 'outbound') return item.category === 'outbound' || item.reportCategory === 'spam';
-				if (category === 'account') return item.category === 'account' || item.eventType === 'credential_tamper_ban';
+				if (category === 'content') return item.reportCategory === 'phishing' || item.reportCategory === 'fraud' || item.detailText?.includes('钓鱼') || item.detailText?.includes('诈骗');
+				if (category === 'outbound') return item.category === 'outbound' || item.reportCategory === 'spam' || item.detailText?.includes('发信') || item.detailText?.includes('营销');
+				if (category === 'account') return item.category === 'account' || item.eventType === 'credential_tamper_ban' || item.detailText?.includes('漫游') || item.detailText?.includes('多IP') || item.detailText?.includes('出差');
 				if (category === 'routine') return item.warningType === 'audit' || item.eventType?.includes('routine');
 				return item.category === category;
 			});
