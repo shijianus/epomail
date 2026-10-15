@@ -204,14 +204,14 @@
               @selection-change="handleSelectionChange"
             >
               <!-- 0. 多选列 -->
-              <el-table-column type="selection" width="34" align="center" key="col-selection" />
+              <el-table-column type="selection" width="36" align="center" key="col-selection" />
 
               <!-- ========================================================= -->
               <!-- 板块 1: 滥用威胁 (threat) -->
               <!-- 列集: 工单编号、身分组、违规内容、报警原因、报警次数、当前状态、报警时间、负责人、拍案管理、操作 -->
               <!-- ========================================================= -->
               <!-- 列 1: 工单编号 -->
-              <el-table-column :label="$t('auditColTicketNo')" v-if="currentSection === 'threat'" width="80" align="center" key="threat-col-ticket">
+              <el-table-column :label="$t('auditColTicketNo')" v-if="currentSection === 'threat'" min-width="82" align="center" key="threat-col-ticket">
                 <template #default="{ row }">
                   <div class="ticket-cell">
                     <span class="ticket-id font-mono font-medium clickable-ticket" @click="openAuditDrawer(row)">
@@ -222,7 +222,7 @@
               </el-table-column>
 
               <!-- 列 2: 身分组 -->
-              <el-table-column v-if="currentSection === 'threat'" width="90" align="center" key="threat-col-identity">
+              <el-table-column v-if="currentSection === 'threat'" min-width="88" align="center" key="threat-col-identity">
                 <template #header>
                   <div class="col-filter-header">
                     <span>{{ $t('auditColIdentityGroup') }}</span>
@@ -265,7 +265,7 @@
               </el-table-column>
 
               <!-- 列 3: 违规内容 -->
-              <el-table-column v-if="currentSection === 'threat'" width="116" align="center" key="threat-col-content">
+              <el-table-column v-if="currentSection === 'threat'" min-width="145" align="center" key="threat-col-content">
                 <template #header>
                   <div class="col-filter-header">
                     <span>{{ $t('auditColViolationContent') }}</span>
@@ -287,7 +287,7 @@
               </el-table-column>
 
               <!-- 列 4: 报警原因 -->
-              <el-table-column v-if="currentSection === 'threat'" width="80" align="center" key="threat-col-reason">
+              <el-table-column v-if="currentSection === 'threat'" min-width="86" align="center" key="threat-col-reason">
                 <template #header>
                   <div class="col-filter-header">
                     <span>{{ $t('auditColAlarmReason') }}</span>
@@ -330,7 +330,7 @@
               </el-table-column>
 
               <!-- 列 5: 报警次数 -->
-              <el-table-column v-if="currentSection === 'threat'" width="68" align="center" key="threat-col-alarm-count">
+              <el-table-column v-if="currentSection === 'threat'" min-width="78" align="center" key="threat-col-alarm-count">
                 <template #header>
                   <div class="col-filter-header">
                     <span>{{ $t('auditColAlarmCount') }}</span>
@@ -367,7 +367,7 @@
               </el-table-column>
 
               <!-- 列 6: 当前状态 -->
-              <el-table-column v-if="currentSection === 'threat'" width="80" align="center" key="threat-col-status">
+              <el-table-column v-if="currentSection === 'threat'" min-width="86" align="center" key="threat-col-status">
                 <template #header>
                   <div class="col-filter-header">
                     <span>{{ $t('auditCurrentStatus') }}</span>
@@ -403,7 +403,7 @@
               </el-table-column>
 
               <!-- 列 7: 报警时间 -->
-              <el-table-column v-if="currentSection === 'threat'" width="108" align="center" key="threat-col-alarm-time">
+              <el-table-column v-if="currentSection === 'threat'" min-width="118" align="center" key="threat-col-alarm-time">
                 <template #header>
                   <div class="col-filter-header">
                     <span>{{ $t('auditColAlarmTime') }}</span>
@@ -441,7 +441,7 @@
               </el-table-column>
 
               <!-- 列 8: 负责人 -->
-              <el-table-column v-if="currentSection === 'threat'" width="80" align="center" key="threat-col-assignee">
+              <el-table-column v-if="currentSection === 'threat'" min-width="86" align="center" key="threat-col-assignee">
                 <template #header>
                   <div class="col-filter-header">
                     <span>{{ $t('auditColAssignee') }}</span>
@@ -478,7 +478,7 @@
               </el-table-column>
 
               <!-- 列 9: 拍案管理 -->
-              <el-table-column v-if="currentSection === 'threat'" width="80" align="center" key="threat-col-authority">
+              <el-table-column v-if="currentSection === 'threat'" min-width="86" align="center" key="threat-col-authority">
                 <template #header>
                   <div class="col-filter-header">
                     <span>{{ $t('auditColFinalAuthority') }}</span>
@@ -515,7 +515,7 @@
               </el-table-column>
 
               <!-- 列 10: 操作 -->
-              <el-table-column :label="$t('action')" v-if="currentSection === 'threat'" width="72" align="center" key="threat-col-action">
+              <el-table-column :label="$t('action')" v-if="currentSection === 'threat'" min-width="78" align="center" key="threat-col-action">
                 <template #default="{ row }">
                   <div class="action-cell">
                     <el-button
@@ -537,7 +537,7 @@
               <!-- 变更: "报警原因"删除；在"处理时间"后面添加"过期时间" -->
               <!-- ========================================================= -->
               <!-- 列 1: 工单编号 -->
-              <el-table-column :label="$t('auditColTicketNo')" v-if="currentSection === 'appeal'" width="80" align="center" key="appeal-col-ticket">
+              <el-table-column :label="$t('auditColTicketNo')" v-if="currentSection === 'appeal'" min-width="82" align="center" key="appeal-col-ticket">
                 <template #default="{ row }">
                   <div class="ticket-cell">
                     <span class="ticket-id font-mono font-medium clickable-ticket" @click="openAuditDrawer(row)">
@@ -548,7 +548,7 @@
               </el-table-column>
 
               <!-- 列 2: 身分组 -->
-              <el-table-column v-if="currentSection === 'appeal'" width="90" align="center" key="appeal-col-identity">
+              <el-table-column v-if="currentSection === 'appeal'" min-width="88" align="center" key="appeal-col-identity">
                 <template #header>
                   <div class="col-filter-header">
                     <span>{{ $t('auditColIdentityGroup') }}</span>
@@ -591,7 +591,7 @@
               </el-table-column>
 
               <!-- 列 3: 违规分类 (申诉审计隔离：只包含被申诉违规分类，无例行巡检与申诉复核) -->
-              <el-table-column v-if="currentSection === 'appeal'" width="84" align="center" key="appeal-col-category">
+              <el-table-column v-if="currentSection === 'appeal'" min-width="86" align="center" key="appeal-col-category">
                 <template #header>
                   <div class="col-filter-header">
                     <span>{{ $t('auditColViolationCategory') }}</span>
@@ -629,7 +629,7 @@
               </el-table-column>
 
               <!-- 列 4: 同类申诉次数 (变更: "报警次数"改为"同类申诉次数"，记录相同违规分类申诉次数) -->
-              <el-table-column v-if="currentSection === 'appeal'" width="68" align="center" key="appeal-col-same-category-appeal-count">
+              <el-table-column v-if="currentSection === 'appeal'" min-width="78" align="center" key="appeal-col-same-category-appeal-count">
                 <template #header>
                   <div class="col-filter-header">
                     <span>{{ $t('auditColSameCategoryAppealCount') }}</span>
@@ -666,7 +666,7 @@
               </el-table-column>
 
               <!-- 列 5: 当前状态 -->
-              <el-table-column v-if="currentSection === 'appeal'" width="80" align="center" key="appeal-col-status">
+              <el-table-column v-if="currentSection === 'appeal'" min-width="86" align="center" key="appeal-col-status">
                 <template #header>
                   <div class="col-filter-header">
                     <span>{{ $t('auditCurrentStatus') }}</span>
@@ -702,7 +702,7 @@
               </el-table-column>
 
               <!-- 列 6: 处理建议 -->
-              <el-table-column v-if="currentSection === 'appeal'" width="80" align="center" key="appeal-col-suggestion">
+              <el-table-column v-if="currentSection === 'appeal'" min-width="86" align="center" key="appeal-col-suggestion">
                 <template #header>
                   <div class="col-filter-header">
                     <span>{{ $t('auditColSuggestion') }}</span>
@@ -742,7 +742,7 @@
               </el-table-column>
 
               <!-- 列 7: 申请时间 (变更: "处理时间"改为"申请时间") -->
-              <el-table-column v-if="currentSection === 'appeal'" width="108" align="center" key="appeal-col-apply-time">
+              <el-table-column v-if="currentSection === 'appeal'" min-width="118" align="center" key="appeal-col-apply-time">
                 <template #header>
                   <div class="col-filter-header">
                     <span>{{ $t('auditColApplyTime') }}</span>
@@ -781,7 +781,7 @@
               </el-table-column>
 
               <!-- 列 8: 死局时间 (变更: 在申请时间后面添加死局时间列) -->
-              <el-table-column v-if="currentSection === 'appeal'" width="110" align="center" key="appeal-col-deadlock-time">
+              <el-table-column v-if="currentSection === 'appeal'" min-width="118" align="center" key="appeal-col-deadlock-time">
                 <template #header>
                   <div class="col-filter-header">
                     <span>{{ $t('auditColDeadlockTime') }}</span>
@@ -799,7 +799,7 @@
               </el-table-column>
 
               <!-- 列 9: 负责人 -->
-              <el-table-column v-if="currentSection === 'appeal'" width="80" align="center" key="appeal-col-assignee">
+              <el-table-column v-if="currentSection === 'appeal'" min-width="86" align="center" key="appeal-col-assignee">
                 <template #header>
                   <div class="col-filter-header">
                     <span>{{ $t('auditColAssignee') }}</span>
@@ -836,7 +836,7 @@
               </el-table-column>
 
               <!-- 列 10: 拍案管理 -->
-              <el-table-column v-if="currentSection === 'appeal'" width="80" align="center" key="appeal-col-authority">
+              <el-table-column v-if="currentSection === 'appeal'" min-width="86" align="center" key="appeal-col-authority">
                 <template #header>
                   <div class="col-filter-header">
                     <span>{{ $t('auditColFinalAuthority') }}</span>
@@ -873,7 +873,7 @@
               </el-table-column>
 
               <!-- 列 11: 操作 -->
-              <el-table-column :label="$t('action')" v-if="currentSection === 'appeal'" width="72" align="center" key="appeal-col-action">
+              <el-table-column :label="$t('action')" v-if="currentSection === 'appeal'" min-width="78" align="center" key="appeal-col-action">
                 <template #default="{ row }">
                   <div class="action-cell">
                     <el-button
@@ -895,7 +895,7 @@
               <!-- 变更: "违规分类"改为"违规等级"(粗略等级)；在"处理时间"后面增加"截止期限"的过期说明 -->
               <!-- ========================================================= -->
               <!-- 列 1: 工单编号 -->
-              <el-table-column :label="$t('auditColTicketNo')" v-if="currentSection === 'audit'" width="80" align="center" key="audit-col-ticket">
+              <el-table-column :label="$t('auditColTicketNo')" v-if="currentSection === 'audit'" min-width="82" align="center" key="audit-col-ticket">
                 <template #default="{ row }">
                   <div class="ticket-cell">
                     <span class="ticket-id font-mono font-medium clickable-ticket" @click="openAuditDrawer(row)">
@@ -906,7 +906,7 @@
               </el-table-column>
 
               <!-- 列 2: 身分组 -->
-              <el-table-column v-if="currentSection === 'audit'" width="90" align="center" key="audit-col-identity">
+              <el-table-column v-if="currentSection === 'audit'" min-width="88" align="center" key="audit-col-identity">
                 <template #header>
                   <div class="col-filter-header">
                     <span>{{ $t('auditColIdentityGroup') }}</span>
@@ -949,7 +949,7 @@
               </el-table-column>
 
               <!-- 列 3: 违规等级 (变更: "违规分类"改为"违规等级"，直接说明粗略等级) -->
-              <el-table-column v-if="currentSection === 'audit'" width="84" align="center" key="audit-col-violation-level">
+              <el-table-column v-if="currentSection === 'audit'" min-width="90" align="center" key="audit-col-violation-level">
                 <template #header>
                   <div class="col-filter-header">
                     <span>{{ $t('auditColViolationLevel') }}</span>
@@ -989,7 +989,7 @@
               </el-table-column>
 
               <!-- 列 4: 报警原因 -->
-              <el-table-column v-if="currentSection === 'audit'" width="80" align="center" key="audit-col-reason">
+              <el-table-column v-if="currentSection === 'audit'" min-width="86" align="center" key="audit-col-reason">
                 <template #header>
                   <div class="col-filter-header">
                     <span>{{ $t('auditColAlarmReason') }}</span>
@@ -1029,7 +1029,7 @@
               </el-table-column>
 
               <!-- 列 5: 报警次数 -->
-              <el-table-column v-if="currentSection === 'audit'" width="68" align="center" key="audit-col-alarm-count">
+              <el-table-column v-if="currentSection === 'audit'" min-width="78" align="center" key="audit-col-alarm-count">
                 <template #header>
                   <div class="col-filter-header">
                     <span>{{ $t('auditColAlarmCount') }}</span>
@@ -1066,7 +1066,7 @@
               </el-table-column>
 
               <!-- 列 6: 当前状态 -->
-              <el-table-column v-if="currentSection === 'audit'" width="80" align="center" key="audit-col-status">
+              <el-table-column v-if="currentSection === 'audit'" min-width="86" align="center" key="audit-col-status">
                 <template #header>
                   <div class="col-filter-header">
                     <span>{{ $t('auditCurrentStatus') }}</span>
@@ -1105,7 +1105,7 @@
               </el-table-column>
 
               <!-- 列 7: 处理建议 -->
-              <el-table-column v-if="currentSection === 'audit'" width="80" align="center" key="audit-col-suggestion">
+              <el-table-column v-if="currentSection === 'audit'" min-width="86" align="center" key="audit-col-suggestion">
                 <template #header>
                   <div class="col-filter-header">
                     <span>{{ $t('auditColSuggestion') }}</span>
@@ -1148,7 +1148,7 @@
               </el-table-column>
 
               <!-- 列 8: 报警时间 (变更: "处理时间"改为"报警时间") -->
-              <el-table-column v-if="currentSection === 'audit'" width="108" align="center" key="audit-col-alarm-time">
+              <el-table-column v-if="currentSection === 'audit'" min-width="118" align="center" key="audit-col-alarm-time">
                 <template #header>
                   <div class="col-filter-header">
                     <span>{{ $t('auditColAlarmTime') }}</span>
@@ -1187,7 +1187,7 @@
               </el-table-column>
 
               <!-- 列 9: 过期时间 (变更: 在报警时间后面添加过期时间) -->
-              <el-table-column v-if="currentSection === 'audit'" width="110" align="center" key="audit-col-expire-time">
+              <el-table-column v-if="currentSection === 'audit'" min-width="112" align="center" key="audit-col-expire-time">
                 <template #header>
                   <div class="col-filter-header">
                     <span>{{ $t('auditColExpireTime') }}</span>
@@ -1204,7 +1204,7 @@
               </el-table-column>
 
               <!-- 列 10: 负责人 -->
-              <el-table-column v-if="currentSection === 'audit'" width="80" align="center" key="audit-col-assignee">
+              <el-table-column v-if="currentSection === 'audit'" min-width="86" align="center" key="audit-col-assignee">
                 <template #header>
                   <div class="col-filter-header">
                     <span>{{ $t('auditColAssignee') }}</span>
@@ -1243,7 +1243,7 @@
               
 
               <!-- 列 12: 操作 -->
-              <el-table-column :label="$t('action')" v-if="currentSection === 'audit'" width="72" align="center" key="audit-col-action">
+              <el-table-column :label="$t('action')" v-if="currentSection === 'audit'" min-width="78" align="center" key="audit-col-action">
                 <template #default="{ row }">
                   <div class="action-cell">
                     <el-button
@@ -1265,7 +1265,7 @@
               <!-- 变更: "报警原因"、"报警次数"、"处理建议"删除；添加"更新次数"、"最后更新"(时间)、"申诉次数" -->
               <!-- ========================================================= -->
               <!-- 列 1: 工单编号 -->
-              <el-table-column :label="$t('auditColTicketNo')" v-if="currentSection === 'record'" width="80" align="center" key="record-col-ticket">
+              <el-table-column :label="$t('auditColTicketNo')" v-if="currentSection === 'record'" min-width="80" align="center" key="record-col-ticket">
                 <template #default="{ row }">
                   <div class="ticket-cell">
                     <span class="ticket-id font-mono font-medium clickable-ticket" @click="openAuditDrawer(row)">
@@ -1276,7 +1276,7 @@
               </el-table-column>
 
               <!-- 列 2: 身分组 -->
-              <el-table-column v-if="currentSection === 'record'" width="90" align="center" key="record-col-identity">
+              <el-table-column v-if="currentSection === 'record'" min-width="86" align="center" key="record-col-identity">
                 <template #header>
                   <div class="col-filter-header">
                     <span>{{ $t('auditColIdentityGroup') }}</span>
@@ -1319,7 +1319,7 @@
               </el-table-column>
 
               <!-- 列 3: 违规分类 -->
-              <el-table-column v-if="currentSection === 'record'" width="84" align="center" key="record-col-category">
+              <el-table-column v-if="currentSection === 'record'" min-width="84" align="center" key="record-col-category">
                 <template #header>
                   <div class="col-filter-header">
                     <span>{{ $t('auditColViolationCategory') }}</span>
@@ -1363,7 +1363,7 @@
               </el-table-column>
 
               <!-- 列 4: 当前状态 -->
-              <el-table-column v-if="currentSection === 'record'" width="80" align="center" key="record-col-status">
+              <el-table-column v-if="currentSection === 'record'" min-width="84" align="center" key="record-col-status">
                 <template #header>
                   <div class="col-filter-header">
                     <span>{{ $t('auditCurrentStatus') }}</span>
@@ -1402,7 +1402,7 @@
               </el-table-column>
 
               <!-- 列 5: 更新次数 (新增列: 展示记录更新次数) -->
-              <el-table-column v-if="currentSection === 'record'" width="68" align="center" key="record-col-update-count">
+              <el-table-column v-if="currentSection === 'record'" min-width="78" align="center" key="record-col-update-count">
                 <template #header>
                   <div class="col-filter-header">
                     <span>{{ $t('auditColUpdateCount') }}</span>
@@ -1416,7 +1416,7 @@
               </el-table-column>
 
               <!-- 列 6: 最后更新 (新增列: 展示最后更新时间) -->
-              <el-table-column v-if="currentSection === 'record'" width="108" align="center" key="record-col-last-updated">
+              <el-table-column v-if="currentSection === 'record'" min-width="110" align="center" key="record-col-last-updated">
                 <template #header>
                   <div class="col-filter-header">
                     <span>{{ $t('auditColLastUpdated') }}</span>
@@ -1432,7 +1432,7 @@
               
 
               <!-- 列 8: 处理时间 -->
-              <el-table-column v-if="currentSection === 'record'" width="108" align="center" key="record-col-process-time">
+              <el-table-column v-if="currentSection === 'record'" min-width="116" align="center" key="record-col-process-time">
                 <template #header>
                   <div class="col-filter-header">
                     <span>{{ $t('auditColProcessTime') }}</span>
@@ -1471,7 +1471,7 @@
               </el-table-column>
 
               <!-- 列 9: 死局时间 (变更: 在处理时间后面添加死局时间列) -->
-              <el-table-column v-if="currentSection === 'record'" width="110" align="center" key="record-col-deadlock-time">
+              <el-table-column v-if="currentSection === 'record'" min-width="116" align="center" key="record-col-deadlock-time">
                 <template #header>
                   <div class="col-filter-header">
                     <span>{{ $t('auditColDeadlockTime') }}</span>
@@ -1489,7 +1489,7 @@
               </el-table-column>
 
               <!-- 列 10: 负责人 -->
-              <el-table-column v-if="currentSection === 'record'" width="80" align="center" key="record-col-assignee">
+              <el-table-column v-if="currentSection === 'record'" min-width="84" align="center" key="record-col-assignee">
                 <template #header>
                   <div class="col-filter-header">
                     <span>{{ $t('auditColAssignee') }}</span>
@@ -1526,7 +1526,7 @@
               </el-table-column>
 
               <!-- 列 10: 拍案管理 -->
-              <el-table-column v-if="currentSection === 'record'" width="80" align="center" key="record-col-authority">
+              <el-table-column v-if="currentSection === 'record'" min-width="84" align="center" key="record-col-authority">
                 <template #header>
                   <div class="col-filter-header">
                     <span>{{ $t('auditColFinalAuthority') }}</span>
@@ -1563,7 +1563,7 @@
               </el-table-column>
 
               <!-- 列 11: 操作 -->
-              <el-table-column :label="$t('action')" v-if="currentSection === 'record'" width="72" align="center" key="record-col-action">
+              <el-table-column :label="$t('action')" v-if="currentSection === 'record'" min-width="78" align="center" key="record-col-action">
                 <template #default="{ row }">
                   <div class="action-cell">
                     <el-button
@@ -1585,7 +1585,7 @@
               <!-- 变更: 删除"报警次数""处理建议"；"违规分类"改为"违规等级"(含LV0~LV3及Threat)；在"处理时间"后添加"死局时间" -->
               <!-- ========================================================= -->
               <!-- 列 1: 工单编号 -->
-              <el-table-column :label="$t('auditColTicketNo')" v-if="currentSection === 'all'" width="80" align="center" key="default-col-ticket">
+              <el-table-column :label="$t('auditColTicketNo')" v-if="currentSection === 'all'" min-width="84" align="center" key="default-col-ticket">
                 <template #default="{ row }">
                   <div class="ticket-cell">
                     <span class="ticket-id font-mono font-medium clickable-ticket" @click="openAuditDrawer(row)">
@@ -1596,7 +1596,7 @@
               </el-table-column>
 
               <!-- 列 2: 身分组 -->
-              <el-table-column v-if="currentSection === 'all'" width="90" align="center" key="default-col-identity">
+              <el-table-column v-if="currentSection === 'all'" min-width="90" align="center" key="default-col-identity">
                 <template #header>
                   <div class="col-filter-header">
                     <span>{{ $t('auditColIdentityGroup') }}</span>
@@ -1639,7 +1639,7 @@
               </el-table-column>
 
               <!-- 列 3: 违规等级 (默认表: 包含 LV0~LV3 以及 Threat[滥用威胁]) -->
-              <el-table-column v-if="currentSection === 'all'" width="84" align="center" key="default-col-violation-level">
+              <el-table-column v-if="currentSection === 'all'" min-width="122" align="center" key="default-col-violation-level">
                 <template #header>
                   <div class="col-filter-header">
                     <span>{{ $t('auditColViolationLevel') }}</span>
@@ -1682,7 +1682,7 @@
               </el-table-column>
 
               <!-- 列 4: 报警原因 (默认表包含全部筛选条件) -->
-              <el-table-column v-if="currentSection === 'all'" width="80" align="center" key="default-col-reason">
+              <el-table-column v-if="currentSection === 'all'" min-width="88" align="center" key="default-col-reason">
                 <template #header>
                   <div class="col-filter-header">
                     <span>{{ $t('auditColAlarmReason') }}</span>
@@ -1725,7 +1725,7 @@
               </el-table-column>
 
               <!-- 列 5: 当前状态 (包含全部状态筛选) -->
-              <el-table-column v-if="currentSection === 'all'" width="80" align="center" key="default-col-status">
+              <el-table-column v-if="currentSection === 'all'" min-width="88" align="center" key="default-col-status">
                 <template #header>
                   <div class="col-filter-header">
                     <span>{{ $t('auditCurrentStatus') }}</span>
@@ -1770,7 +1770,7 @@
               </el-table-column>
 
               <!-- 列 6: 处理时间 -->
-              <el-table-column v-if="currentSection === 'all'" width="108" align="center" key="default-col-process-time">
+              <el-table-column v-if="currentSection === 'all'" min-width="120" align="center" key="default-col-process-time">
                 <template #header>
                   <div class="col-filter-header">
                     <span>{{ $t('auditColProcessTime') }}</span>
@@ -1809,7 +1809,7 @@
               </el-table-column>
 
               <!-- 列 7: 死局时间 (变更: 在处理时间后面添加死局时间列) -->
-              <el-table-column v-if="currentSection === 'all'" width="110" align="center" key="default-col-deadlock-time">
+              <el-table-column v-if="currentSection === 'all'" min-width="120" align="center" key="default-col-deadlock-time">
                 <template #header>
                   <div class="col-filter-header">
                     <span>{{ $t('auditColDeadlockTime') }}</span>
@@ -1827,7 +1827,7 @@
               </el-table-column>
 
               <!-- 列 8: 负责人 -->
-              <el-table-column v-if="currentSection === 'all'" width="80" align="center" key="default-col-assignee">
+              <el-table-column v-if="currentSection === 'all'" min-width="88" align="center" key="default-col-assignee">
                 <template #header>
                   <div class="col-filter-header">
                     <span>{{ $t('auditColAssignee') }}</span>
@@ -1864,7 +1864,7 @@
               </el-table-column>
 
               <!-- 列 9: 拍案管理 -->
-              <el-table-column v-if="currentSection === 'all'" width="80" align="center" key="default-col-authority">
+              <el-table-column v-if="currentSection === 'all'" min-width="88" align="center" key="default-col-authority">
                 <template #header>
                   <div class="col-filter-header">
                     <span>{{ $t('auditColFinalAuthority') }}</span>
@@ -1901,7 +1901,7 @@
               </el-table-column>
 
               <!-- 列 10: 操作 -->
-              <el-table-column :label="$t('action')" v-if="currentSection === 'all'" width="72" align="center" key="default-col-action">
+              <el-table-column :label="$t('action')" v-if="currentSection === 'all'" min-width="78" align="center" key="default-col-action">
                 <template #default="{ row }">
                   <div class="action-cell">
                     <el-button
@@ -4633,7 +4633,7 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 3px;
+  gap: 2px;
   width: 100%;
   text-align: center;
   white-space: nowrap;
@@ -4641,18 +4641,28 @@ onUnmounted(() => {
   > span {
     white-space: nowrap;
     line-height: 1.2;
+    font-size: 13px;
+    flex-shrink: 0;
+  }
+
+  :deep(.el-dropdown) {
+    display: inline-flex;
+    align-items: center;
+    line-height: 1;
+    flex-shrink: 0;
   }
 
   .header-action-trigger {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 18px;
-    height: 18px;
+    width: 16px;
+    height: 16px;
     border-radius: 3px;
     cursor: pointer;
     color: var(--el-text-color-placeholder);
     transition: all 0.2s;
+    flex-shrink: 0;
 
     &:hover {
       color: var(--el-color-primary);
@@ -4669,12 +4679,13 @@ onUnmounted(() => {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 20px;
-    height: 20px;
-    border-radius: 4px;
+    width: 16px;
+    height: 16px;
+    border-radius: 3px;
     cursor: pointer;
     color: var(--el-text-color-placeholder);
     transition: all 0.2s;
+    flex-shrink: 0;
 
     &:hover {
       color: var(--el-color-primary);
@@ -5004,12 +5015,14 @@ onUnmounted(() => {
 .table-area {
   position: relative;
   background: var(--el-bg-color);
+  width: 100%;
 
   :deep(.el-table) {
     --el-table-header-bg-color: var(--el-fill-color-light);
     --el-table-border: none;
     --el-table-border-color: transparent;
     border: none !important;
+    width: 100% !important;
 
     &::before,
     &::after {
@@ -5017,8 +5030,38 @@ onUnmounted(() => {
     }
   }
 
-  :deep(.el-table__inner-wrapper::before) {
-    display: none !important;
+  :deep(.el-table__inner-wrapper) {
+    width: 100% !important;
+
+    &::before {
+      display: none !important;
+    }
+  }
+
+  :deep(.el-table__header-wrapper),
+  :deep(.el-table__body-wrapper) {
+    width: 100% !important;
+  }
+
+  :deep(.el-scrollbar) {
+    width: 100% !important;
+  }
+
+  :deep(.el-scrollbar__wrap) {
+    width: 100% !important;
+  }
+
+  :deep(.el-scrollbar__view) {
+    width: 100% !important;
+    min-width: 100% !important;
+    display: block !important;
+    box-sizing: border-box !important;
+  }
+
+  :deep(.el-table__header),
+  :deep(.el-table__body) {
+    width: 100% !important;
+    min-width: 100% !important;
   }
 
   :deep(.el-table td.el-table__cell),

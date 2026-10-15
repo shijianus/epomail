@@ -68,11 +68,46 @@ async function run() {
   await page.waitForSelector('.audit-box', { timeout: 15000 });
   await page.waitForTimeout(2000);
 
+  async function inspectTableGeometry(viewName) {
+    const geo = await page.evaluate(() => {
+      const wrapper = document.querySelector('.table-area .el-table__inner-wrapper');
+      const view = document.querySelector('.table-area .el-scrollbar__view');
+      const headerTable = document.querySelector('.table-area .el-table__header');
+      const bodyTable = document.querySelector('.table-area .el-table__body');
+      const scrollWrap = document.querySelector('.table-area .el-scrollbar__wrap');
+      const headers = Array.from(document.querySelectorAll('.table-area .el-table__header th')).map(th => ({
+        text: th.innerText.trim().replace(/\n/g, ' '),
+        width: th.getBoundingClientRect().width
+      }));
+      const lastActionCell = document.querySelector('.table-area .el-table__body tr td:last-child');
+      const actionBtn = lastActionCell?.querySelector('.action-detail-btn');
+      return {
+        wrapperWidth: wrapper ? wrapper.getBoundingClientRect().width : null,
+        viewWidth: view ? view.getBoundingClientRect().width : null,
+        viewDisplay: view ? window.getComputedStyle(view).display : null,
+        headerTableWidth: headerTable ? headerTable.getBoundingClientRect().width : null,
+        bodyTableWidth: bodyTable ? bodyTable.getBoundingClientRect().width : null,
+        scrollWrapScrollWidth: scrollWrap ? scrollWrap.scrollWidth : null,
+        scrollWrapClientWidth: scrollWrap ? scrollWrap.clientWidth : null,
+        hasHorizontalScroll: scrollWrap ? scrollWrap.scrollWidth > scrollWrap.clientWidth : false,
+        headers,
+        totalHeaderWidth: headers.reduce((acc, h) => acc + h.width, 0),
+        actionCellWidth: lastActionCell ? lastActionCell.getBoundingClientRect().width : null,
+        actionBtnWidth: actionBtn ? actionBtn.getBoundingClientRect().width : null
+      };
+    });
+    console.log(`  [几何核验 - ${viewName}]`);
+    console.log(`    wrapperWidth: ${geo.wrapperWidth}px, viewWidth: ${geo.viewWidth}px (display: ${geo.viewDisplay})`);
+    console.log(`    headerTable: ${geo.headerTableWidth}px, bodyTable: ${geo.bodyTableWidth}px`);
+    console.log(`    scrollWidth: ${geo.scrollWrapScrollWidth}px, clientWidth: ${geo.scrollWrapClientWidth}px -> 横向滚动条: ${geo.hasHorizontalScroll ? '⚠️ 有' : '✓ 无'}`);
+    console.log(`    列数: ${geo.headers.length}, 列宽总和: ${geo.totalHeaderWidth.toFixed(1)}px, 操作列宽: ${geo.actionCellWidth}px (按钮: ${geo.actionBtnWidth}px)`);
+    return geo;
+  }
+
   // 截图 1: 默认列集 (currentSection === 'all')
   console.log('[截图审计 1/5] 默认总表 (未选择任何部分)...');
   await page.waitForTimeout(1000);
-  const defaultHeaders = await page.locator('.el-table__header th').allInnerTexts();
-  console.log('  默认表格表头文本:', defaultHeaders.map(h => h.trim().replace(/\n/g, ' ')).filter(Boolean));
+  await inspectTableGeometry('默认总表 (all)');
   await page.screenshot({ path: path.join(SHOT_DIR, '01_default_all_table.png'), fullPage: false });
   console.log('  ✓ 已保存: 01_default_all_table.png\n');
 
@@ -83,8 +118,7 @@ async function run() {
     page.locator('.kpi-appeal').click()
   ]);
   await page.waitForTimeout(800);
-  const appealHeaders = await page.locator('.el-table__header th').allInnerTexts();
-  console.log('  申诉审计表头文本:', appealHeaders.map(h => h.trim().replace(/\n/g, ' ')).filter(Boolean));
+  await inspectTableGeometry('申诉审计 (appeal)');
   await page.screenshot({ path: path.join(SHOT_DIR, '02_appeal_table.png'), fullPage: false });
   console.log('  ✓ 已保存: 02_appeal_table.png\n');
 
@@ -95,8 +129,7 @@ async function run() {
     page.locator('.kpi-audit').click()
   ]);
   await page.waitForTimeout(800);
-  const auditHeaders = await page.locator('.el-table__header th').allInnerTexts();
-  console.log('  风险管理表头文本:', auditHeaders.map(h => h.trim().replace(/\n/g, ' ')).filter(Boolean));
+  await inspectTableGeometry('风险管理 (audit)');
   await page.screenshot({ path: path.join(SHOT_DIR, '03_risk_table.png'), fullPage: false });
   console.log('  ✓ 已保存: 03_risk_table.png\n');
 
@@ -107,8 +140,7 @@ async function run() {
     page.locator('.kpi-record').click()
   ]);
   await page.waitForTimeout(800);
-  const recordHeaders = await page.locator('.el-table__header th').allInnerTexts();
-  console.log('  操作记录表头文本:', recordHeaders.map(h => h.trim().replace(/\n/g, ' ')).filter(Boolean));
+  await inspectTableGeometry('操作记录 (record)');
   await page.screenshot({ path: path.join(SHOT_DIR, '04_record_table.png'), fullPage: false });
   console.log('  ✓ 已保存: 04_record_table.png\n');
 
@@ -119,8 +151,7 @@ async function run() {
     page.locator('.kpi-threat').click()
   ]);
   await page.waitForTimeout(800);
-  const threatHeaders = await page.locator('.el-table__header th').allInnerTexts();
-  console.log('  滥用威胁表头文本:', threatHeaders.map(h => h.trim().replace(/\n/g, ' ')).filter(Boolean));
+  await inspectTableGeometry('滥用威胁 (threat)');
   await page.screenshot({ path: path.join(SHOT_DIR, '05_threat_table.png'), fullPage: false });
   console.log('  ✓ 已保存: 05_threat_table.png\n');
 
