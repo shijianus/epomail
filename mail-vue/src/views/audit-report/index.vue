@@ -217,7 +217,7 @@
               <el-table-column :label="$t('auditColTicketNo')" v-if="currentSection === 'threat'" min-width="82" align="center" key="threat-col-ticket">
                 <template #default="{ row }">
                   <div class="ticket-cell">
-                    <span class="ticket-id font-mono font-medium clickable-ticket" @click="openAuditDrawer(row)">
+                    <span class="ticket-id font-mono font-medium clickable-ticket" :title="row.email" @click="openAuditDrawer(row)">
                       {{ formatAbuseTicketNo(row) }}
                     </span>
                   </div>
@@ -268,23 +268,17 @@
               </el-table-column>
 
               <!-- 列 3: 违规内容 -->
-              <el-table-column v-if="currentSection === 'threat'" min-width="145" align="center" key="threat-col-content">
+              <el-table-column v-if="currentSection === 'threat'" min-width="84" align="center" key="threat-col-content">
                 <template #header>
                   <div class="col-filter-header">
                     <span>{{ $t('auditColViolationContent') }}</span>
                   </div>
                 </template>
                 <template #default="{ row }">
-                  <div class="violation-content-cell">
-                    <div class="content-target font-mono" :title="row.email">
-                      {{ row.email }}
-                      <span v-if="row.clusterAccounts && row.clusterAccounts.length" class="cluster-inline-tag" :title="$t('abuseCatMultiAccount')">
-                        +{{ row.clusterAccounts.length }}
-                      </span>
-                    </div>
-                    <div v-if="getViolationContentSummary(row)" class="content-summary" :title="getViolationContentSummary(row)">
+                  <div class="content-cell reason-cell">
+                    <span class="plain-reason-text" :title="row.email ? (row.email + ' · ' + getViolationContentSummary(row)) : getViolationContentSummary(row)">
                       {{ getViolationContentSummary(row) }}
-                    </div>
+                    </span>
                   </div>
                 </template>
               </el-table-column>
@@ -784,7 +778,7 @@
               </el-table-column>
 
               <!-- 列 8: 死局时间 (变更: 在申请时间后面添加死局时间列) -->
-              <el-table-column v-if="currentSection === 'appeal'" min-width="118" align="center" key="appeal-col-deadlock-time">
+              <el-table-column v-if="currentSection === 'appeal'" min-width="108" align="center" key="appeal-col-deadlock-time">
                 <template #header>
                   <div class="col-filter-header">
                     <span>{{ $t('auditColDeadlockTime') }}</span>
@@ -792,11 +786,13 @@
                 </template>
                 <template #default="{ row }">
                   <div class="deadlock-cell">
-                    <span class="plain-time font-mono" :class="{ 'time-expired': isDeadlocked(row) }">
+                    <span
+                      class="plain-time font-mono"
+                      :class="{ 'time-expired': isDeadlocked(row) }"
+                      :title="getDeadlockInfo(row).desc"
+                    >
                       {{ getDeadlockInfo(row).time }}
                     </span>
-                    <span v-if="isDeadlocked(row)" class="expire-tag-expired">({{ $t('auditDeadlocked') }})</span>
-                    <span v-else class="deadlock-tag-desc">({{ getDeadlockInfo(row).desc }})</span>
                   </div>
                 </template>
               </el-table-column>
@@ -1474,7 +1470,7 @@
               </el-table-column>
 
               <!-- 列 9: 死局时间 (变更: 在处理时间后面添加死局时间列) -->
-              <el-table-column v-if="currentSection === 'record'" min-width="116" align="center" key="record-col-deadlock-time">
+              <el-table-column v-if="currentSection === 'record'" min-width="108" align="center" key="record-col-deadlock-time">
                 <template #header>
                   <div class="col-filter-header">
                     <span>{{ $t('auditColDeadlockTime') }}</span>
@@ -1482,11 +1478,13 @@
                 </template>
                 <template #default="{ row }">
                   <div class="deadlock-cell">
-                    <span class="plain-time font-mono" :class="{ 'time-expired': isDeadlocked(row) }">
+                    <span
+                      class="plain-time font-mono"
+                      :class="{ 'time-expired': isDeadlocked(row) }"
+                      :title="getDeadlockInfo(row).desc"
+                    >
                       {{ getDeadlockInfo(row).time }}
                     </span>
-                    <span v-if="isDeadlocked(row)" class="expire-tag-expired">({{ $t('auditDeadlocked') }})</span>
-                    <span v-else class="deadlock-tag-desc">({{ getDeadlockInfo(row).desc }})</span>
                   </div>
                 </template>
               </el-table-column>
@@ -1812,7 +1810,7 @@
               </el-table-column>
 
               <!-- 列 7: 死局时间 (变更: 在处理时间后面添加死局时间列) -->
-              <el-table-column v-if="currentSection === 'all'" min-width="120" align="center" key="default-col-deadlock-time">
+              <el-table-column v-if="currentSection === 'all'" min-width="108" align="center" key="default-col-deadlock-time">
                 <template #header>
                   <div class="col-filter-header">
                     <span>{{ $t('auditColDeadlockTime') }}</span>
@@ -1820,11 +1818,13 @@
                 </template>
                 <template #default="{ row }">
                   <div class="deadlock-cell">
-                    <span class="plain-time font-mono" :class="{ 'time-expired': isDeadlocked(row) }">
+                    <span
+                      class="plain-time font-mono"
+                      :class="{ 'time-expired': isDeadlocked(row) }"
+                      :title="getDeadlockInfo(row).desc"
+                    >
                       {{ getDeadlockInfo(row).time }}
                     </span>
-                    <span v-if="isDeadlocked(row)" class="expire-tag-expired">({{ $t('auditDeadlocked') }})</span>
-                    <span v-else class="deadlock-tag-desc">({{ getDeadlockInfo(row).desc }})</span>
                   </div>
                 </template>
               </el-table-column>

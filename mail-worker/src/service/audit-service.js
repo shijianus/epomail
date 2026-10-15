@@ -193,6 +193,18 @@ const auditService = {
 					SET evidence_summary = '一人多号'
 					WHERE evidence_summary LIKE '%Jaccard%';
 				`).run();
+
+				await userDb.prepare(`
+					UPDATE audit_log
+					SET action_text = REPLACE(REPLACE(REPLACE(action_text, '被 12 名用户检举', '遭受举报'), '被 5 名用户检举', '遭受举报'), '被 4 名用户检举', '遭受举报')
+					WHERE action_text LIKE '%被%用户检举%' OR action_text LIKE '%被%人举报%';
+				`).run();
+
+				await userDb.prepare(`
+					UPDATE audit_log
+					SET detail_text = REPLACE(REPLACE(detail_text, '先后被 12 位收件人举报', '遭受举报核实'), '被 5 位收件人举报核实', '遭受举报核实')
+					WHERE detail_text LIKE '%被%位收件人举报%';
+				`).run();
 			} catch (appealErr) {
 				console.warn('ensureTables appeal check warning:', appealErr.message);
 			}
@@ -330,8 +342,8 @@ const auditService = {
 					warningType: 'risk',
 					eventType: 'user_reported',
 					category: 'security',
-					actionText: '{phishing_scam@external-fake.xyz} 外部邮件被 12 名用户检举诈骗与传销推广',
-					detailText: '外部邮件发件人。大量向站内用户投递虚假传销与欺诈外链，短时间内先后被 12 位收件人举报。按举报频次给予最高权重，推荐管理员立即将其加入系统全局黑名单。',
+					actionText: '{phishing_scam@external-fake.xyz} 外部邮件遭受举报（欺诈载荷）',
+					detailText: '外部邮件发件人，遭受举报投递虚假传销与欺诈载荷。推荐管理员立即将其加入系统全局黑名单。',
 					ip: '45.33.32.156',
 					geo: 'Fremont, US',
 					device: 'HeadlessChrome / Linux',
@@ -358,8 +370,8 @@ const auditService = {
 					warningType: 'risk',
 					eventType: 'user_reported',
 					category: 'security',
-					actionText: '{internal_spammer@epocanvas.com} 站内账号被 5 名用户检举垃圾推广',
-					detailText: '站内注册用户利用内部通讯群发垃圾广告与拉群信息，被 5 位收件人举报核实。推荐管理员对该站内账号执行限制发信（禁言）或注销账户。',
+					actionText: '{internal_spammer@epocanvas.com} 站内账号遭受举报（垃圾推广）',
+					detailText: '站内注册用户利用内部通讯群发垃圾广告，遭受举报核实。推荐管理员对该账号执行限制发信或注销。',
 					ip: '114.119.160.88',
 					geo: 'Beijing, CN',
 					device: 'Firefox 129 / Linux',
@@ -1029,9 +1041,20 @@ const auditService = {
 				}));
 			}
 
+			let cleanActionText = row.actionText;
+			if (cleanActionText && (cleanActionText.includes('被') && (cleanActionText.includes('举报') || cleanActionText.includes('检举')))) {
+				cleanActionText = cleanActionText.replace(/被\s*\d+\s*[名位个]?(用户|收件人|人)?(检举|举报)/g, '遭受举报');
+			}
+			let cleanDetailText = row.detailText;
+			if (cleanDetailText && (cleanDetailText.includes('被') && (cleanDetailText.includes('举报') || cleanDetailText.includes('检举')))) {
+				cleanDetailText = cleanDetailText.replace(/被\s*\d+\s*[名位个]?(用户|收件人|人)?(检举|举报)/g, '遭受举报');
+			}
+
 			const effectiveCreateTime = row.createTime || row.create_time || row.banTime || new Date().toISOString();
 			const item = {
 				...row,
+				actionText: cleanActionText,
+				detailText: cleanDetailText,
 				createTime: effectiveCreateTime,
 				alarmTime: row.alarmTime || effectiveCreateTime || row.banTime,
 				applyTime: row.applyTime || effectiveCreateTime || row.banTime,
