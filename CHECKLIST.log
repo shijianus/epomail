@@ -8,6 +8,35 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### 操作报告控制台全量重构：列集同步、进度精简、无横滚无空缺平铺与申诉审计修复 (2026-10-15)
+*   **关联提交 (Git Commit)**: `b413aa4df692614186a3a98b2bb5f5da29ce0169` (Short: `b413aa4`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com · Version ID: e9094518-228b-481d-aa07-f553a69eaef0)`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] KPI 卡片精简：`kpi-card kpi-threat`「滥用威胁」仅保留类似 `"00/00"` 的两位进度数字（通过 `threatPendingDisplay` 与 `threatBannedDisplay` 实现），彻底删除封禁/处理文字说明；
+    - [x] 滥用威胁列集严格同步：将滥用威胁由独立原生表格整合进统一 `el-table`，严格按顺序配置 10 大列集：工单编号、身分组、违规内容、报警原因、报警次数、当前状态、报警时间、负责人、拍案管理、操作；
+    - [x] 确保无空缺、无滚动滑块、全屏平铺：各板块配置弹性自适应列（如 `违规内容` / `违规分类` / `报警原因` 设置 `min-width`），使表格 100% 优雅平铺填满容器，右侧零白边空缺，页面整体在标准桌面视口内完全展示且零横向滚动条；
+    - [x] 列集按需删减精益化：
+        1. 「风险管理」彻底删除「拍案管理」列；
+        2. 「操作记录」彻底删除「申诉次数」列；
+    - [x] 「申诉审计」截断缺漏修复与词条优化：
+        1. 修复申诉审计因硬编码列宽超过容器被右侧溢出隐藏导致负责人、拍案管理、操作列裁切缺失的问题；
+        2. 6 语言 i18n 字典（zh, zh-Hant, en, es, fr, nl）将 `auditColSameCategoryAppealCount` 统一由「同类申诉次数」简化为「申诉次数」，不加多余冗词；
+    - [x] 最小修复原则：其它板块与列集严格保持稳定，无任何非必要变动；
+    - [x] 表头防折行强化：为 `.col-filter-header` 和 `th.el-table__cell .cell` 增加 `white-space: nowrap` 与紧凑内边距，彻底杜绝表头文字纵向堆叠折行。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] Cloudflare 生产环境部署：成功上线至 `mail.epocanvas.com` (Version ID: `e9094518-228b-481d-aa07-f553a69eaef0`)；
+    - [x] 生产环境 Playwright 5 大实机全景截图验收 (`tests/audit-cf-screenshot-inspection.mjs`)：
+        1. `01_default_all_table.png`：默认总表 10 大列完整平铺无横滚，表头单行整洁；
+        2. `02_appeal_table.png`：申诉审计 11 大列完整清晰，负责人/拍案管理/操作正常展示无裁切，「申诉次数」单行排列；
+        3. `03_risk_table.png`：风险管理已去除「拍案管理」列，右侧平铺无空缺无横滚；
+        4. `04_record_table.png`：操作记录已去除「申诉次数」列，右侧平铺无空缺无横滚；
+        5. `05_threat_table.png`：滥用威胁严格呈现要求的 10 大列集，KPI 卡片显示纯数字进度 `02/02`；
+    - [x] 前端工程构建核验：`pnpm --filter mail-vue run build` 耗时 14.12s，零报错零警告；
+    - [x] 多语言对称性静态审计：`node scripts/i18n-symmetry.mjs` 2705 keys 全部绝对对称；
+    - [x] 代码引用零缺失审计：`node scripts/i18n-audit.mjs` 全仓零缺失；
+    - [x] 差异化列集规范专项断言：`node tests/verify-audit-section-columns.mjs` 7 大专项断言 100% 通过；
+    - [x] 零假数据残留：测试与探测干净还原，零测试数据残留。
+
 ### 滥用威胁板块对齐 punishments.md 决策规范与全站画风一致性重构 (2026-10-14)
 *   **关联提交 (Git Commit)**: `820c5f6af310b8a86676beb28b8b6033185d54f0` (Short: `820c5f6`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com · Version ID: f8342ade-e47e-4408-8d83-025b9d7b663d) / 本地全真栈 (wrangler dev)`
