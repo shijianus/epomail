@@ -119,7 +119,7 @@ async function run() {
     page.locator('.kpi-threat').click()
   ]);
   await page.waitForTimeout(800);
-  const threatHeaders = await page.locator('.abuse-table th').allInnerTexts();
+  const threatHeaders = await page.locator('.el-table__header th').allInnerTexts();
   console.log('  滥用威胁表头文本:', threatHeaders.map(h => h.trim().replace(/\n/g, ' ')).filter(Boolean));
   await page.screenshot({ path: path.join(SHOT_DIR, '05_threat_table.png'), fullPage: false });
   console.log('  ✓ 已保存: 05_threat_table.png\n');

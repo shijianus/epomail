@@ -9,29 +9,56 @@ console.log('===================================================================
 const vuePath = path.resolve('mail-vue/src/views/audit-report/index.vue');
 const vueContent = fs.readFileSync(vuePath, 'utf8');
 
-// 1. 验证板块 1: 滥用威胁 (threat) - 专属 7 列固定列宽工作台
-console.log('[验收 1: 滥用威胁 (threat)] 验证 7 列固定列宽工作台...');
+// 1. 验证板块 1: 滥用威胁 (threat) - 10 列对齐列集工作台与 "00/00" 进度卡片
+console.log('[验收 1: 滥用威胁 (threat)] 验证 10 列对齐列集与 00/00 进度...');
 assert.ok(vueContent.includes("currentSection === 'threat'"), '支持 threat 板块专属列集判断');
-assert.ok(vueContent.includes('class="abuse-table-wrapper"'), 'threat 具备专属表格容器');
-assert.ok(vueContent.includes('class="col-select"'), 'threat 具备选择列 (40px)');
-assert.ok(vueContent.includes('class="col-no"'), 'threat 具备编号列 (72px)');
-assert.ok(vueContent.includes('class="col-target"'), 'threat 具备对象列 (clamp 180~260px)');
-assert.ok(vueContent.includes('class="col-status"'), 'threat 具备状态列 (96px)');
-assert.ok(vueContent.includes('class="col-cat"'), 'threat 具备分类列 (min 190px)');
-assert.ok(vueContent.includes('class="col-action"'), 'threat 具备处理列 (120px)');
-assert.ok(vueContent.includes('class="col-opt"'), 'threat 具备操作列 (64px)');
-console.log('  ✓ 滥用威胁 (threat) 专属 7 列固定列宽规范落地\n');
+assert.ok(vueContent.includes('key="threat-col-ticket"'), 'threat 具备工单编号列');
+assert.ok(vueContent.includes('key="threat-col-identity"'), 'threat 具备身分组列');
+assert.ok(vueContent.includes('key="threat-col-content"'), 'threat 具备违规内容列');
+assert.ok(vueContent.includes('key="threat-col-reason"'), 'threat 具备报警原因列');
+assert.ok(vueContent.includes('key="threat-col-alarm-count"'), 'threat 具备报警次数列');
+assert.ok(vueContent.includes('key="threat-col-status"'), 'threat 具备当前状态列');
+assert.ok(vueContent.includes('key="threat-col-alarm-time"'), 'threat 具备报警时间列');
+assert.ok(vueContent.includes('key="threat-col-assignee"'), 'threat 具备负责人列');
+assert.ok(vueContent.includes('key="threat-col-authority"'), 'threat 具备拍案管理列');
+assert.ok(vueContent.includes('key="threat-col-action"'), 'threat 具备操作列');
+
+// 验证 threat 列顺序: 工单编号 -> 身分组 -> 违规内容 -> 报警原因 -> 报警次数 -> 当前状态 -> 报警时间 -> 负责人 -> 拍案管理 -> 操作
+const threatTicketIdx = vueContent.indexOf('key="threat-col-ticket"');
+const threatIdentityIdx = vueContent.indexOf('key="threat-col-identity"');
+const threatContentIdx = vueContent.indexOf('key="threat-col-content"');
+const threatReasonIdx = vueContent.indexOf('key="threat-col-reason"');
+const threatAlarmCountIdx = vueContent.indexOf('key="threat-col-alarm-count"');
+const threatStatusIdx = vueContent.indexOf('key="threat-col-status"');
+const threatAlarmTimeIdx = vueContent.indexOf('key="threat-col-alarm-time"');
+const threatAssigneeIdx = vueContent.indexOf('key="threat-col-assignee"');
+const threatAuthorityIdx = vueContent.indexOf('key="threat-col-authority"');
+const threatActionIdx = vueContent.indexOf('key="threat-col-action"');
+
+assert.ok(threatTicketIdx < threatIdentityIdx, '工单编号位于身分组之前');
+assert.ok(threatIdentityIdx < threatContentIdx, '身分组位于违规内容之前');
+assert.ok(threatContentIdx < threatReasonIdx, '违规内容位于报警原因之前');
+assert.ok(threatReasonIdx < threatAlarmCountIdx, '报警原因位于报警次数之前');
+assert.ok(threatAlarmCountIdx < threatStatusIdx, '报警次数位于当前状态之前');
+assert.ok(threatStatusIdx < threatAlarmTimeIdx, '当前状态位于报警时间之前');
+assert.ok(threatAlarmTimeIdx < threatAssigneeIdx, '报警时间位于负责人之前');
+assert.ok(threatAssigneeIdx < threatAuthorityIdx, '负责人位于拍案管理之前');
+assert.ok(threatAuthorityIdx < threatActionIdx, '拍案管理位于操作之前');
+
+// 验证 KPI 卡片 1 的 00/00 进度
+assert.ok(vueContent.includes('threatPendingDisplay') && vueContent.includes('threatBannedDisplay'), '具备两位数 00/00 进度补零格式化逻辑');
+console.log('  ✓ 滥用威胁 (threat) 10 列严格对齐，KPI 卡片 00/00 进度规范落地\n');
 
 // 2. 验证板块 2: 申诉审计 (appeal)
-// 要求: 删除"报警原因"，将"报警次数"改为"同类申诉次数"，将"处理时间"改为"申请时间"，在后面添加"死局时间"
-console.log('[验收 2: 申诉审计 (appeal)] 验证列集定制与死局时间...');
+// 要求: 删除"报警原因"，将"报警次数"改为"申诉次数"，将"处理时间"改为"申请时间"，在后面添加"死局时间"
+console.log('[验收 2: 申诉审计 (appeal)] 验证列集定制、申诉次数与死局时间...');
 assert.ok(vueContent.includes("currentSection === 'appeal'"), '支持 appeal 板块专属列集判断');
 assert.ok(vueContent.includes('key="appeal-col-ticket"'), 'appeal 具备工单编号列');
 assert.ok(vueContent.includes('key="appeal-col-identity"'), 'appeal 具备身分组列');
 assert.ok(vueContent.includes('key="appeal-col-category"'), 'appeal 具备违规分类列');
 assert.ok(!vueContent.includes('key="appeal-col-reason"'), 'appeal 已删除报警原因列');
 assert.ok(!vueContent.includes('key="appeal-col-alarm-count"'), 'appeal 已不使用通用报警次数列');
-assert.ok(vueContent.includes('key="appeal-col-same-category-appeal-count"'), 'appeal 具备同类申诉次数列');
+assert.ok(vueContent.includes('key="appeal-col-same-category-appeal-count"'), 'appeal 具备申诉次数列');
 assert.ok(vueContent.includes('key="appeal-col-status"'), 'appeal 具备当前状态列');
 assert.ok(vueContent.includes('key="appeal-col-suggestion"'), 'appeal 具备处理建议列');
 assert.ok(!vueContent.includes('key="appeal-col-process-time"'), 'appeal 已将处理时间改为申请时间');
@@ -50,11 +77,11 @@ assert.ok(appealDeadlockIdx < appealAssigneeIdx, '死局时间必须位于负责
 assert.ok(vueContent.includes('getSameCategoryAppealCount'), '具备同类申诉次数获取逻辑');
 assert.ok(vueContent.includes('getDeadlockInfo'), '具备死局时间计算逻辑');
 assert.ok(vueContent.includes('isDeadlocked'), '具备死局判断逻辑');
-console.log('  ✓ 申诉审计 (appeal) 报警原因已删除，报警次数改为同类申诉次数，申请时间后添加死局时间\n');
+console.log('  ✓ 申诉审计 (appeal) 报警原因已删除，已改用申诉次数，申请时间后添加死局时间\n');
 
 // 3. 验证板块 3: 风险管理 (audit)
-// 要求: 将"违规分类"改为"违规等级"(展示LV0~LV3)、"处理时间"改为"报警时间"，在其后面添加"过期时间"；隔离"一人多号"
-console.log('[验收 3: 风险管理 (audit)] 验证违规等级、报警时间、过期时间与隔离...');
+// 要求: 将"违规分类"改为"违规等级"(展示LV0~LV3)、"处理时间"改为"报警时间"，在其后面添加"过期时间"；删除"拍案管理"列；隔离"一人多号"
+console.log('[验收 3: 风险管理 (audit)] 验证违规等级、报警时间、过期时间、删除拍案管理与隔离...');
 assert.ok(vueContent.includes("currentSection === 'audit'"), '支持 audit 板块专属列集判断');
 assert.ok(vueContent.includes('key="audit-col-ticket"'), 'audit 具备工单编号列');
 assert.ok(vueContent.includes('key="audit-col-identity"'), 'audit 具备身分组列');
@@ -69,26 +96,28 @@ assert.ok(!vueContent.includes('key="audit-col-process-time"'), 'audit 已将处
 assert.ok(vueContent.includes('key="audit-col-alarm-time"'), 'audit 具备报警时间列');
 assert.ok(vueContent.includes('key="audit-col-expire-time"'), 'audit 具备过期时间列');
 assert.ok(vueContent.includes('key="audit-col-assignee"'), 'audit 具备负责人列');
-assert.ok(vueContent.includes('key="audit-col-authority"'), 'audit 具备拍案管理列');
+assert.ok(!vueContent.includes('key="audit-col-authority"'), 'audit 已按要求彻底删除拍案管理列');
 assert.ok(vueContent.includes('key="audit-col-action"'), 'audit 具备操作列');
 
-// 验证 audit 列顺序：报警时间 -> 过期时间 -> 负责人
+// 验证 audit 列顺序：报警时间 -> 过期时间 -> 负责人 -> 操作
 const auditAlarmIdx = vueContent.indexOf('key="audit-col-alarm-time"');
 const auditExpireIdx = vueContent.indexOf('key="audit-col-expire-time"');
 const auditAssigneeIdx = vueContent.indexOf('key="audit-col-assignee"');
+const auditActionIdx = vueContent.indexOf('key="audit-col-action"');
 assert.ok(auditAlarmIdx < auditExpireIdx, '过期时间必须位于报警时间之后');
 assert.ok(auditExpireIdx < auditAssigneeIdx, '过期时间必须位于负责人之前');
+assert.ok(auditAssigneeIdx < auditActionIdx, '负责人必须位于操作之前');
 
 // 验证 audit 报警原因下拉不包含 multi_account (一人多号属于滥用威胁，做严格隔离)
 const auditReasonStart = vueContent.indexOf('key="audit-col-reason"');
 const auditReasonEnd = vueContent.indexOf('key="audit-col-alarm-count"');
 const auditReasonBlock = vueContent.slice(auditReasonStart, auditReasonEnd);
 assert.ok(!auditReasonBlock.includes('command="multi_account"'), '风险管理报警原因筛选下拉已剔除一人多号(隔离至滥用威胁)');
-console.log('  ✓ 风险管理 (audit) 违规分类改为违规等级，报警时间后添加过期时间，严格隔离一人多号\n');
+console.log('  ✓ 风险管理 (audit) 违规分类改为违规等级，报警时间后添加过期时间，拍案管理列已成功删除\n');
 
 // 4. 验证板块 4: 操作记录 (record)
-// 要求: 删除"处理建议"，在"处理时间"添加"死局时间"
-console.log('[验收 4: 操作记录 (record)] 验证删除处理建议，在处理时间后添加死局时间...');
+// 要求: 删除"处理建议"，在"处理时间"添加"死局时间"，删除"申诉次数"
+console.log('[验收 4: 操作记录 (record)] 验证删除处理建议与申诉次数，在处理时间后添加死局时间...');
 assert.ok(vueContent.includes("currentSection === 'record'"), '支持 record 板块专属列集判断');
 assert.ok(vueContent.includes('key="record-col-ticket"'), 'record 具备工单编号列');
 assert.ok(vueContent.includes('key="record-col-identity"'), 'record 具备身分组列');
@@ -99,7 +128,7 @@ assert.ok(!vueContent.includes('key="record-col-suggestion"'), 'record 已删除
 assert.ok(vueContent.includes('key="record-col-status"'), 'record 具备当前状态列');
 assert.ok(vueContent.includes('key="record-col-update-count"'), 'record 具备更新次数列');
 assert.ok(vueContent.includes('key="record-col-last-updated"'), 'record 具备最后更新列');
-assert.ok(vueContent.includes('key="record-col-appeal-count"'), 'record 具备申诉次数列');
+assert.ok(!vueContent.includes('key="record-col-appeal-count"'), 'record 已按要求彻底删除申诉次数列');
 assert.ok(vueContent.includes('key="record-col-process-time"'), 'record 具备处理时间列');
 assert.ok(vueContent.includes('key="record-col-deadlock-time"'), 'record 具备死局时间列');
 assert.ok(vueContent.includes('key="record-col-assignee"'), 'record 具备负责人列');
@@ -112,7 +141,7 @@ const recordDeadlockIdx = vueContent.indexOf('key="record-col-deadlock-time"');
 const recordAssigneeIdx = vueContent.indexOf('key="record-col-assignee"');
 assert.ok(recordProcessIdx < recordDeadlockIdx, '死局时间必须位于处理时间之后');
 assert.ok(recordDeadlockIdx < recordAssigneeIdx, '死局时间必须位于负责人之前');
-console.log('  ✓ 操作记录 (record) 处理建议已删除，处理时间后已添加死局时间列\n');
+console.log('  ✓ 操作记录 (record) 处理建议与申诉次数已删除，处理时间后已添加死局时间列\n');
 
 // 5. 验证默认列集 (currentSection === 'all')
 // 要求: 删除"报警次数""处理建议"，将"违规分类"改为"违规等级"(包含LV0~LV3以及Threat)，在"处理时间"后添加"死局时间"，包含全部筛选条件，统一每条只能出现1次(整合去重)
@@ -159,6 +188,7 @@ console.log('[验收 6: 多语言词条体系] 验证 6 语言对称且覆盖全
 const languages = ['zh', 'zh-Hant', 'en', 'es', 'fr', 'nl'];
 const requiredKeys = [
   'auditColSameCategoryAppealCount',
+  'auditColViolationContent',
   'auditColApplyTime',
   'auditColAlarmTime',
   'auditColDeadlockTime',
@@ -171,7 +201,8 @@ const requiredKeys = [
   'auditColExpireTime',
   'auditColUpdateCount',
   'auditColLastUpdated',
-  'auditColAppealCount'
+  'auditColAppealCount',
+  'abuseKpiStatFormat'
 ];
 
 for (const lang of languages) {
