@@ -8,6 +8,32 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### 审计控制台违规内容去邮箱堆叠与死局时间纯净时间戳重构 (2026-10-15)
+*   **关联提交 (Git Commit)**: `76f510d0fdcda734003a7a1a8b1c46f80603e1e6` (Short: `76f510d`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com · Worker Version ID: 39cea049-9fde-4814-996d-4c9c4e47fd53)`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 「违规内容」彻底根除长文本邮箱堆叠：
+        1. 移除滥用威胁表格第三列「违规内容」中残留的 `row.email` 与 `+3` 堆叠行，彻底杜绝出现 `spammer_appealed@malicious.xyz` 等冗长字段；
+        2. 违规内容单元格仅显式展示极简标准归类短语（「遭受举报」、「一人多号」、「发信超频」、「密保异动」等），严格契合 punishments.md 规范与极简设计；
+        3. 目标邮箱归位至首列工单编号的 `:title` 悬停提示与右侧详情抽屉；
+    - [x] 「死局时间」彻底根除括号说明短语堆叠：
+        1. 移除申诉审计、操作记录与默认总表中死局时间单元格行内嵌入的 `(距成死局剩 X 天)` 与 `(已成死局)` 等冗余长说明；
+        2. 单元格统一展示为标准时间戳 `MM/DD/YY HH:mm`（如 `11/03/26 02:15`），死局状态通过过期红色高亮呈现，详细倒计时与死局说明归位至 `:title` 悬停提示；
+    - [x] 后端自愈与数据脱敏强化 (`mail-worker/src/service/audit-service.js`)：
+        1. 在 `ensureTables()` 中追加针对 `action_text` 和 `detail_text` 的 SQL 自愈清洗，将任何「被 X 名用户检举」清洗为「遭受举报」；
+        2. 在服务层 `list()` 中追加动态正则清洗逻辑，确保任何来源的检举文案一律去敏感化；
+    - [x] 6 语言 i18n 严格闭环（2713 keys 绝对对称、代码引用零缺失）。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地前端构建核验：`pnpm --filter mail-vue run build` 耗时 13.65s，零报错零警告；
+    - [x] Cloudflare 生产环境部署：上线成功至 `mail.epocanvas.com` (Worker Version ID: `39cea049-9fde-4814-996d-4c9c4e47fd53`)；
+    - [x] 自动化列集与逻辑测试：`tests/verify-audit-section-columns.mjs` 7 大断言 100% 通过；
+    - [x] 生产环境 Playwright 全真栈截图核验 (`tests/audit-cf-screenshot-inspection.mjs`)：
+        1. `05_threat_table.png` (滥用威胁): 「违规内容」列纯净展示「遭受举报」与「发信超频」，零长文本邮箱；
+        2. `01_default_all_table.png` (默认总表): 「死局时间」列纯净展示 `11/03/26 02:15`，零括号说明短语；
+        3. `02_appeal_table.png` (申诉审计): 「死局时间」列纯净展示 `11/03/26 02:15`；
+        4. `04_record_table.png` (操作记录): 「死局时间」列纯净展示 `11/03/26 02:15`；
+    - [x] 零假数据残留：测试数据全部清理，零假数据残留。
+
 ### 审计控制台违规内容极简去敏规范与滥用威胁真实 KPI 计数落地 (2026-10-15)
 *   **关联提交 (Git Commit)**: `b3db791270b8f865f377605ba569928689f2b2bd` (Short: `b3db791`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com · Worker Version ID: 670da5a1-e532-4cb0-9e02-fe87ece52e93)`
