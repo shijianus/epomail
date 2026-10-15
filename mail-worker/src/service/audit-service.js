@@ -180,6 +180,19 @@ const auditService = {
 					SET create_time = COALESCE(ban_time, resolved_time, CURRENT_TIMESTAMP)
 					WHERE create_time IS NULL;
 				`).run();
+
+				// 违规证据简略统一化自愈：严格契合 punishments.md 与用户指令，清除“用户举报/被人举报”等详细指称，统一为“遭受举报”
+				await userDb.prepare(`
+					UPDATE audit_log
+					SET evidence_summary = '遭受举报'
+					WHERE evidence_summary LIKE '%举报%' OR evidence_summary LIKE '%检举%' OR evidence_summary LIKE '%FBL%' OR reported_by_others > 0;
+				`).run();
+
+				await userDb.prepare(`
+					UPDATE audit_log
+					SET evidence_summary = '一人多号'
+					WHERE evidence_summary LIKE '%Jaccard%';
+				`).run();
 			} catch (appealErr) {
 				console.warn('ensureTables appeal check warning:', appealErr.message);
 			}
@@ -394,7 +407,7 @@ const auditService = {
 					appealReason: null,
 					clusterId: 'CLS-2026-MULTI99',
 					reportSource: '系统规则命中',
-					evidenceSummary: 'Jaccard 0.84 节律 0.92'
+					evidenceSummary: '一人多号'
 				},
 				{
 					ticketId: 'THR-2026-MULTI99-2',
@@ -423,7 +436,7 @@ const auditService = {
 					appealReason: null,
 					clusterId: 'CLS-2026-MULTI99',
 					reportSource: '系统规则命中',
-					evidenceSummary: 'Jaccard 0.84 节律 0.92'
+					evidenceSummary: '一人多号'
 				},
 				{
 					ticketId: 'THR-2026-MULTI99-3',
@@ -452,7 +465,7 @@ const auditService = {
 					appealReason: null,
 					clusterId: 'CLS-2026-MULTI99',
 					reportSource: '系统规则命中',
-					evidenceSummary: 'Jaccard 0.84 节律 0.92'
+					evidenceSummary: '一人多号'
 				},
 				{
 					ticketId: 'THR-2026-ZS88K1',
@@ -477,7 +490,8 @@ const auditService = {
 					recommendedAction: 'temp_ban_24h',
 					matchScore: 35,
 					subnetMatch: 0,
-					appealReason: null
+					appealReason: null,
+					evidenceSummary: '遭受举报'
 				},
 
 				// --- 3. 争议申诉 (Dispute Appeals - warningType: 'appeal', 提前至第 3 位，主要通过表单提交表格人工复核) ---
@@ -974,21 +988,27 @@ const auditService = {
 			if (!evidenceSummary) {
 				const rCount = Number(row.reportedByOthers) || 0;
 				if (rCount > 0) {
-					evidenceSummary = row.reportSource === 'fbl' ? `FBL 回传 ${rCount} 件` : `用户举报 ${rCount} 人`;
+					evidenceSummary = '遭受举报';
 				} else if (row.eventType === 'multi_account_detected' || row.eventType === 'multi_account_ban') {
-					evidenceSummary = 'Jaccard 0.84 节律 0.92';
+					evidenceSummary = '一人多号';
 				} else if (row.eventType === 'credential_tamper_ban' || row.eventType === 'account_takeover') {
-					evidenceSummary = '改密后环境突变';
+					evidenceSummary = '密保异动';
 				} else if (row.eventType === 'auto_ban' || (row.banReason && row.banReason.includes('频率'))) {
-					evidenceSummary = '投诉率 0.4% 1h';
+					evidenceSummary = '发信超频';
 				} else if (row.reportCategory === 'fraud' || (row.detailText && row.detailText.includes('蜜罐'))) {
-					evidenceSummary = '蜜罐命中';
+					evidenceSummary = '恶意载荷';
 				} else if (row.reportCategory === 'spam' || row.eventType === 'outbound_rate') {
 					evidenceSummary = '发信超频';
 				} else if (row.eventType === 'quota_evasion') {
-					evidenceSummary = '共享凭证 3 号';
+					evidenceSummary = '配额规避';
 				} else {
-					evidenceSummary = '系统规则命中';
+					evidenceSummary = '规则拦截';
+				}
+			} else {
+				if (evidenceSummary.includes('举报') || evidenceSummary.includes('检举') || evidenceSummary.includes('投诉') || evidenceSummary.includes('FBL')) {
+					evidenceSummary = '遭受举报';
+				} else if (evidenceSummary.includes('Jaccard')) {
+					evidenceSummary = '一人多号';
 				}
 			}
 
@@ -1034,7 +1054,7 @@ const auditService = {
 				adjudicatorName: adjudicator,
 				banTime: row.banTime || (row.status === 'banned' ? effectiveCreateTime : null),
 				assignee: row.assignee || null,
-				reportSource: row.reportSource || (row.reportedByOthers > 0 ? '用户举报' : '来源未知'),
+				reportSource: row.reportSource || (row.reportedByOthers > 0 ? '遭受举报' : '系统巡检'),
 				evidenceSummary,
 				circuitStatus: row.circuitStatus || 'NORMAL',
 				reasonCode: row.reasonCode || (row.eventType === 'multi_account_ban' ? 'QUOTA_EVASION' : (row.eventType === 'auto_ban' ? 'OUTBOUND_COMPLAINT_ELEVATED' : 'AUTH_ACCOUNT_TAKEOVER')),

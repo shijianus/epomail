@@ -21,8 +21,11 @@
               </div>
               <div class="kpi-data-stat kpi-value font-mono">
                 <span class="stat-number stat-danger">
-                  {{ $t('abuseKpiStatFormat', { pending: threatPendingDisplay, banned: threatBannedDisplay }) }}
+                  {{ summaryCounts.threat }}
                 </span>
+              </div>
+              <div class="kpi-desc kpi-sub" :title="$t('auditKpiThreatEmailDesc')">
+                {{ $t('auditKpiThreatEmailSub') }}
               </div>
             </div>
           </div>
@@ -279,8 +282,8 @@
                         +{{ row.clusterAccounts.length }}
                       </span>
                     </div>
-                    <div v-if="row.evidenceSummary || row.actionText || row.banReason" class="content-summary" :title="row.evidenceSummary || row.actionText || row.banReason">
-                      {{ row.evidenceSummary || row.actionText || row.banReason }}
+                    <div v-if="getViolationContentSummary(row)" class="content-summary" :title="getViolationContentSummary(row)">
+                      {{ getViolationContentSummary(row) }}
                     </div>
                   </div>
                 </template>
@@ -3264,6 +3267,93 @@ function getSimpleAlarmReason(row) {
   }
 
   return '-';
+}
+
+function getViolationContentSummary(row) {
+  if (!row) return '';
+
+  // 1. 严格契合 punishments.md 与用户指令：禁止说明谁举报了、禁止说被人举报甚至被某人举报，直接简洁展示“遭受举报”
+  if (
+    (row.reportedByOthers && row.reportedByOthers > 0) ||
+    row.reportSource === 'fbl' ||
+    (row.evidenceSummary && (row.evidenceSummary.includes('举报') || row.evidenceSummary.includes('检举') || row.evidenceSummary.includes('投诉') || row.evidenceSummary.includes('FBL'))) ||
+    (row.actionText && (row.actionText.includes('举报') || row.actionText.includes('检举') || row.actionText.includes('投诉'))) ||
+    (row.banReason && (row.banReason.includes('举报') || row.banReason.includes('检举') || row.banReason.includes('投诉')))
+  ) {
+    return t('auditContentReported');
+  }
+
+  // 2. 一人多号 / 配额规避 / 关联集群 (punishments.md 5.2 / 6.5)
+  if (
+    row.eventType === 'multi_account_ban' ||
+    row.eventType === 'multi_account_detected' ||
+    row.reasonCode === 'QUOTA_EVASION' ||
+    (row.clusterAccounts && row.clusterAccounts.length > 0) ||
+    (row.evidenceSummary && (row.evidenceSummary.includes('Jaccard') || row.evidenceSummary.includes('一人多号') || row.evidenceSummary.includes('集群'))) ||
+    (row.actionText && (row.actionText.includes('一人多号') || row.actionText.includes('多账户'))) ||
+    (row.banReason && row.banReason.includes('一人多号'))
+  ) {
+    return t('auditReasonMultiAccount');
+  }
+
+  // 3. 密保异动 / 账号接管 / 凭证篡改 (punishments.md 5.2)
+  if (
+    row.eventType === 'credential_tamper_ban' ||
+    row.reasonCode === 'AUTH_ACCOUNT_TAKEOVER' ||
+    (row.evidenceSummary && (row.evidenceSummary.includes('改密') || row.evidenceSummary.includes('密保'))) ||
+    (row.banReason && (row.banReason.includes('密保') || row.banReason.includes('凭证') || row.banReason.includes('篡改') || row.banReason.includes('盗号')))
+  ) {
+    return t('auditReasonCredentialAnomaly');
+  }
+
+  // 4. 发信超频 / 自动化速率超限 (punishments.md 5.1 / 5.2)
+  if (
+    row.eventType === 'auto_ban' ||
+    row.reasonCode === 'AUTH_AUTOMATION_RATE' ||
+    row.eventType === 'outbound_rate' ||
+    (row.evidenceSummary && row.evidenceSummary.includes('超频')) ||
+    (row.banReason && (row.banReason.includes('频率') || row.banReason.includes('超频') || row.banReason.includes('速率')))
+  ) {
+    return t('auditReasonRateLimit');
+  }
+
+  // 5. 异地漫游 (punishments.md 5.4)
+  if (
+    row.eventType === 'ip_roaming_routine' ||
+    row.eventType === 'risk_spike' ||
+    (row.actionText && (row.actionText.includes('跳跃') || row.actionText.includes('漫游'))) ||
+    (row.banReason && row.banReason.includes('漫游'))
+  ) {
+    return t('auditReasonRoaming');
+  }
+
+  // 6. 恶意载荷 / 恶意木马 / 钓鱼诈骗 (punishments.md 5.1 / 5.3)
+  if (
+    row.reasonCode === 'OUTBOUND_MALWARE' ||
+    row.reportCategory === 'malware' ||
+    row.reportCategory === 'fraud' ||
+    (row.evidenceSummary && (row.evidenceSummary.includes('蜜罐') || row.evidenceSummary.includes('恶意'))) ||
+    (row.banReason && (row.banReason.includes('恶意') || row.banReason.includes('木马') || row.banReason.includes('钓鱼')))
+  ) {
+    return t('auditReasonMalware');
+  }
+
+  // 7. 退信超标 (punishments.md 5.1)
+  if (row.reasonCode === 'OUTBOUND_BOUNCE_ELEVATED' || (row.banReason && row.banReason.includes('退信'))) {
+    return t('auditReasonBounce');
+  }
+
+  // 8. 兜底提取短语，严格清洗“用户举报/被人举报/被某人举报”等词汇
+  const raw = row.evidenceSummary || row.actionText || row.banReason || '';
+  if (raw) {
+    if (raw.includes('举报') || raw.includes('检举') || raw.includes('投诉')) {
+      return t('auditContentReported');
+    }
+    const clean = raw.split(/[（(，,：:\s]/)[0].trim();
+    if (clean) return clean.slice(0, 8);
+  }
+
+  return t('auditReasonSystemRule');
 }
 
 function getAppealRiskLevel(row) {

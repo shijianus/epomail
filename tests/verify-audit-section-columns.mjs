@@ -45,9 +45,10 @@ assert.ok(threatAlarmTimeIdx < threatAssigneeIdx, '报警时间位于负责人�
 assert.ok(threatAssigneeIdx < threatAuthorityIdx, '负责人位于拍案管理之前');
 assert.ok(threatAuthorityIdx < threatActionIdx, '拍案管理位于操作之前');
 
-// 验证 KPI 卡片 1 的 00/00 进度
-assert.ok(vueContent.includes('threatPendingDisplay') && vueContent.includes('threatBannedDisplay'), '具备两位数 00/00 进度补零格式化逻辑');
-console.log('  ✓ 滥用威胁 (threat) 10 列严格对齐，KPI 卡片 00/00 进度规范落地\n');
+// 验证 KPI 卡片 1 的真实数据同步（非硬编码 00/00，直接展示原始整数）与违规内容简洁说明
+assert.ok(vueContent.includes('summaryCounts.threat'), '滥用威胁 KPI 卡片直接展示真实处理数据 summaryCounts.threat');
+assert.ok(vueContent.includes('getViolationContentSummary'), '违规内容通过 getViolationContentSummary 统一简洁处理');
+console.log('  ✓ 滥用威胁 (threat) 10 列严格对齐，KPI 卡片真实数据同步与违规内容显式简洁\n');
 
 // 2. 验证板块 2: 申诉审计 (appeal)
 // 要求: 删除"报警原因"，将"报警次数"改为"申诉次数"，将"处理时间"改为"申请时间"，在后面添加"死局时间"
