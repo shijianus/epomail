@@ -8,6 +8,32 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### 审计控制台违规内容极简去敏规范与滥用威胁真实 KPI 计数落地 (2026-10-15)
+*   **关联提交 (Git Commit)**: `b3db791270b8f865f377605ba569928689f2b2bd` (Short: `b3db791`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com · Worker Version ID: 670da5a1-e532-4cb0-9e02-fe87ece52e93)`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 违规内容极简与去敏感规范（严格契合 punishments.md 第 13/14 节）：
+        1. 严禁详细说明举报人身份与具体人数（如“用户举报 1 人”、“被某人举报”等），统一收敛并显式简洁展示为「遭受举报」；
+        2. 全面规整违规内容归类语义：一人多号（原 Jaccard 算法细节等去敏感）、密保异动、发信超频、恶意载荷、配额规避、异地漫游、规则拦截；
+        3. 前端封装 `getViolationContentSummary(row)` 进行双重防御与去敏兜底，杜绝反规避与隐私细节外泄；
+    - [x] 滥用威胁 KPI 卡片展示真实处理数据：
+        1. 彻底废弃 `00/00` 或 `02/02` 这类双位数补零进度，改为直接展示真实处理计数 `<span class="stat-number stat-danger">{{ summaryCounts.threat }}</span>`（实机展示 `5`，不再展示 `02` 而是直接 `2` 或 `5`）；
+        2. KPI 结构与样式与另外 3 张卡片（申诉审计、风险管理、操作记录）100% 保持一致，并在数字下方标准配备说明小字 `<div class="kpi-desc kpi-sub">{{ $t('auditKpiThreatEmailSub') }}</div>`（“一人多号 · 遭受举报”）；
+    - [x] 后端数据自愈与契约规范 (`mail-worker/src/service/audit-service.js`)：
+        1. 在 `ensureTables()` 中执行 D1 幂等自愈 SQL，将历史 `evidence_summary` 中包含“举报/检举/投诉/FBL”以及“Jaccard”的数据统一清洗为“遭受举报”与“一人多号”；
+        2. 种子数据与服务层 `list()` 默认证据生成逻辑严格清洗，默认 `reportSource` 统一规整为“遭受举报”与“系统巡检”；
+    - [x] 6 语言 i18n 严格闭环：
+        1. 6 语言字典（zh, zh-Hant, en, es, fr, nl）新增 `auditContentReported` 与 `auditReasonSystemRule`，更新 `auditKpiThreatEmailSub`；
+        2. 静态审计三件套（symmetry 2713 keys 绝对对称、audit 零缺失、hardcoded 零暴露）100% 通过。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地前端构建核验：`pnpm --filter mail-vue run build` 耗时 14.04s，零报错零警告；
+    - [x] Cloudflare 生产环境部署：上线成功至 `mail.epocanvas.com` (Worker Version ID: `670da5a1-e532-4cb0-9e02-fe87ece52e93`)；
+    - [x] 差异化列集规范与真实 KPI 自动化测试：`tests/verify-audit-section-columns.mjs` 7 大断言 100% 通过；
+    - [x] 生产环境 Playwright 实机截图核验 (`tests/audit-cf-screenshot-inspection.mjs`)：
+        1. `05_threat_table.png` (滥用威胁): KPI 卡片展示真实纯数字 `5`，下方附「一人多号 · 遭受举报」，首行违规内容展示极简「遭受举报」，1058px 平铺零横向滚动条；
+        2. `01_default_all_table.png` (默认总表): 顶部 KPI 卡片同步展示纯数字 `5`，10 列完美排布；
+    - [x] 零假数据残留：实测数据干净，无临时假数据残留。
+
 ### 审计控制台 el-table__inner-wrapper 完整平铺与表头 el-dropdown 空间冲突治理 (2026-10-15)
 *   **关联提交 (Git Commit)**: `7bfe0d3f701ba7cdeef3eb2801132f0b42b2e469` (Short: `7bfe0d3`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com · Worker Version ID: d3908276-80fd-4302-b440-ad4aef34e631)`
