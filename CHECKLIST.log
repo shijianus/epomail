@@ -7,6 +7,30 @@
 > 制度规范与工作流指引请见 [AGENTS.md](file:///home/shijian/projects/epocanvas-mail/AGENTS.md)。
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
+### 申诉审计板块专属死局时间天数格式化与默认全量表详细时间隔离保障 (2026-10-16)
+*   **关联提交 (Git Commit)**: `bc6bb14044b0a9ff4c5dbb05e94e76ec9e6a1a47` (Short: `bc6bb14`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com · Worker Version ID: 8c0a93b1-e36d-46a8-9516-eccf5c270c68)`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 「申诉审计」专属死局时间列集格式化重构：
+        1. 专属于 `currentSection === 'appeal'` 的「死局时间」（`appeal-col-deadlock-time`）显式调用 `formatAppealDeadlockDays(row)`；
+        2. 基于冷静期/终裁死局计算剩余天数，实时格式化为 `*天`（如 `18 天`）或 `已成死局`（已过期）；
+        3. 单元格悬浮属性（`:title`）绑定 `getDeadlockInfo(row).time`，保留精确时间戳（如 `11/03/26 01:35`），审计溯源 100% 完备；
+    - [x] 严格隔离防污染（其余板块与默认情况保留原本详细时间）：
+        1. 默认全量总表（`currentSection === 'all'`）的「死局时间」（`default-col-deadlock-time`）严格保留原本详细日期时间戳展示（`getDeadlockInfo(row).time`，如 `11/14/26 17:52`、`11/03/26 01:35`），严禁被格式化为天数；
+        2. 确保**仅有**「申诉审计」板块按特殊格式显式为 `*天`；
+    - [x] 国际化对称闭环：
+        1. 严格复用现有 6 语言 i18n 字典词条（`auditDirectDays`, `auditDirectDaySingle`, `auditDeadlocked`），实现 zh, zh-Hant, en, es, fr, nl 100% 绝对对称；
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：mail-vue `vite build` 15.88s 通过，零报错零警告；
+    - [x] 多语言对称审计：`node scripts/i18n-symmetry.mjs` 2715 键 100% 对称；
+    - [x] 单元测试套件：`node tests/verify-appeal-deadlock-days.mjs` 4 大断言 100% 通过；
+    - [x] Cloudflare 生产部署：上线成功至 `mail.epocanvas.com` (Worker Version ID: `8c0a93b1-e36d-46a8-9516-eccf5c270c68`)；
+    - [x] 生产环境 Playwright 全真栈实测 (`tests/verify-appeal-deadlock-days-live.mjs`)：
+        1. 访问默认全量总表：实测断言死局时间列 7 条数据全部保留完整时间戳（如 `11/14/26 17:52`、`11/03/26 01:35`），绝无单纯 `*天` 格式污染；
+        2. 切换至「申诉审计」板块：实测断言死局时间成功显式为 `18 天`，且 Title 悬浮提示完整时间戳；
+        3. 生产实测现场截图已存留 (`tests/verify_default_deadlock_time_live.png`, `tests/verify_appeal_deadlock_days_live.png`)；
+    - [x] 零假数据残留：测试数据全部清理，零假数据残留。
+
 ### 安全审计与治理链路全链路优化（待处置与已结案全量归档严格分流）(2026-10-16)
 *   **关联提交 (Git Commit)**: `be1bec72019ddf2e2ec4bf09ad500a28ad599a65` (Short: `be1bec7`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com · Worker Version ID: 028e03db-e952-4496-a62e-e2e538bad63e)`
