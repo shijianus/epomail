@@ -205,6 +205,7 @@
               ref="tableRef"
               :empty-text="first ? '' : $t('auditEmptyLogs')"
               @selection-change="handleSelectionChange"
+              @row-click="handleTableRowClick"
             >
               <!-- 0. 多选列 -->
               <el-table-column type="selection" width="36" align="center" key="col-selection" />
@@ -3440,6 +3441,18 @@ function handleTimeFilterCommand(cmd) {
 
 function handleSelectionChange(rows) {
   selectedRows.value = rows || [];
+}
+
+function handleTableRowClick(row, column, event) {
+  const target = event?.target;
+  if (target) {
+    if (target.closest('.el-checkbox') || target.closest('.el-button') || target.closest('.el-dropdown') || target.closest('button')) {
+      return;
+    }
+  }
+  if (row) {
+    openAuditDrawer(row);
+  }
 }
 
 async function handleBatchUnban() {

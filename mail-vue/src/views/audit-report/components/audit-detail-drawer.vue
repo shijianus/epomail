@@ -4,7 +4,7 @@
     :size="drawerSize"
     direction="rtl"
     destroy-on-close
-    class="audit-drawer-container"
+    class="audit-detail-drawer audit-drawer-container"
     :show-close="false"
     @opened="handleDrawerOpened"
   >
