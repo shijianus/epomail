@@ -7,6 +7,31 @@
 > 制度规范与工作流指引请见 [AGENTS.md](file:///home/shijian/projects/epocanvas-mail/AGENTS.md)。
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
+### 安全审计与治理链路全链路优化（待处置与已结案全量归档严格分流）(2026-10-16)
+*   **关联提交 (Git Commit)**: `be1bec72019ddf2e2ec4bf09ad500a28ad599a65` (Short: `be1bec7`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com · Worker Version ID: 028e03db-e952-4496-a62e-e2e538bad63e)`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 前序待处置三大板块彻底纯净化：
+        1. 「滥用威胁」（warningType: risk）：仅展示活动待审威胁（`status NOT IN ('banned', 'unbanned', 'resolved', 'rejected', 'expired')`），彻底排除已封禁/已解除/已结案/已驳回/已过期记录；同集群主案聚合呈现；
+        2. 「申诉审计」（warningType: appeal）：仅展示待人工复核申诉（`status = 'pending'`），所有已驳回（rejected）与已解封申诉自动移出；
+        3. 「风险管理」（warningType: audit）：仅展示处于 14 天审计期限内的活动待审工单（`status IN ('active', 'pending')` 且未超时自然过期），凡超时归档或例行封存的工单自动移出；
+    - [x] 「操作记录」板块汇聚全平台所有已结案与过期记录：
+        1. 统一收拢所有警告类型下已封禁（banned）、已解除（unbanned）、已结案（resolved）、已驳回（rejected）以及已过期（expired）的工单台账；
+        2. 单元格状态精准呈现：`已封禁`（红/danger）、`已解除`（绿/success）、`已结案`（绿/success）、`已驳回`（灰/info）、`已过期`（灰/info）；
+        3. 操作记录当前状态筛选下拉框全面对齐所有终态（全部、已封禁、已解除、已结案、已驳回、已过期）；
+    - [x] 指标统计与展示数据 100% 绝对拉齐：
+        1. 4 大 KPI 卡片（滥用威胁、申诉审计、风险管理、操作记录）与表格实际展示行数 100% 对应；
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：mail-vue `vite build` 通过 (耗时 13.95s)，零报错零警告；
+    - [x] 多语言对称审计：`node scripts/i18n-symmetry.mjs` 2715 键 100% 对称闭环；
+    - [x] 静态代码审计：`node scripts/i18n-audit.mjs` 零缺失；
+    - [x] Cloudflare 生产部署：上线成功至 `mail.epocanvas.com` (Worker Version ID: `028e03db-e952-4496-a62e-e2e538bad63e`)；
+    - [x] 生产环境 Playwright 全真栈端到端自动化测试 (`tests/verify-pipeline-segregation-live.mjs`)：
+        1. 后端 API 各生命周期分流验证通过：滥用威胁、申诉审计、风险管理零已处理记录，操作记录涵盖全量已结案记录；
+        2. 4 大 KPI 卡片数值与表格行数严格断言绝对一致（滥用威胁 2、申诉审计 1、风险管理 1、操作记录 4）；
+        3. 操作记录中状态标签实测渲染：行 1 为 `已驳回`，行 2 为 `已解除`，行 3 为 `已封禁`，行 4 为 `已封禁`；
+        4. 4 大板块全量截图已保存留档 (`tests/verify_tab_1_threat.png`, `tests/verify_tab_2_appeal.png`, `tests/verify_tab_3_audit.png`, `tests/verify_tab_4_record.png`, `tests/verify_pipeline_segregation_live.png`)；
+    - [x] 零假数据残留：测试数据全部清理，零假数据残留。
 
 ### 操作记录板块列集优化（违规等级前置与死局时间移除）(2026-10-16)
 *   **关联提交 (Git Commit)**: `6800cce40bddf6963b81cc392709b66b62895b41` (Short: `6800cce`)
