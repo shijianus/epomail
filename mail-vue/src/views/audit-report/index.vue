@@ -1463,14 +1463,17 @@
                           <el-dropdown-item command="banned" :class="{ 'is-selected': params.status === 'banned' }">
                             {{ $t('auditStatusBannedActive') }}
                           </el-dropdown-item>
-                          <el-dropdown-item command="pending" :class="{ 'is-selected': params.status === 'pending' }">
-                            {{ $t('auditCaseStatusPending') }}
-                          </el-dropdown-item>
                           <el-dropdown-item command="unbanned" :class="{ 'is-selected': params.status === 'unbanned' }">
                             {{ $t('auditStatusUnbannedRecord') }}
                           </el-dropdown-item>
-                          <el-dropdown-item command="watching" :class="{ 'is-selected': params.status === 'watching' }">
-                            {{ $t('auditStatusWatching') }}
+                          <el-dropdown-item command="resolved" :class="{ 'is-selected': params.status === 'resolved' }">
+                            {{ $t('auditCaseStatusResolved') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="rejected" :class="{ 'is-selected': params.status === 'rejected' }">
+                            {{ $t('auditAppealStatusRejected') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="expired" :class="{ 'is-selected': params.status === 'expired' }">
+                            {{ $t('auditCaseStatusExpired') }}
                           </el-dropdown-item>
                         </el-dropdown-menu>
                       </template>
@@ -6014,6 +6017,10 @@ onUnmounted(() => {
   }
   &.status-watching {
     color: var(--el-color-primary);
+  }
+  &.status-rejected,
+  &.status-expired {
+    color: var(--el-text-color-secondary, #909399);
   }
 }
 

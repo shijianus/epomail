@@ -750,8 +750,14 @@ const auditService = {
 		}
 
 		if (warningType && warningType !== 'all') {
-			if (warningType === 'ban') {
-				conditions.push(sql`(${auditLog.warningType} = 'ban' OR ${auditLog.status} IN ('banned', 'unbanned'))`);
+			if (warningType === 'ban' || warningType === 'record') {
+				conditions.push(sql`(${auditLog.warningType} = 'ban' OR ${auditLog.status} IN ('banned', 'unbanned', 'resolved', 'rejected', 'expired') OR (${auditLog.warningType} = 'audit' AND ${auditLog.createTime} < datetime('now', '-14 days') AND (${auditLog.detailText} IS NULL OR ${auditLog.detailText} NOT LIKE '%[延期处置]%')) )`);
+			} else if (warningType === 'risk' || warningType === 'threat') {
+				conditions.push(sql`(${auditLog.warningType} = 'risk' AND ${auditLog.status} NOT IN ('banned', 'unbanned', 'resolved', 'rejected', 'expired'))`);
+			} else if (warningType === 'appeal') {
+				conditions.push(sql`(${auditLog.warningType} = 'appeal' AND ${auditLog.status} = 'pending')`);
+			} else if (warningType === 'audit') {
+				conditions.push(sql`(${auditLog.warningType} = 'audit' AND ${auditLog.status} IN ('active', 'pending') AND (${auditLog.createTime} >= datetime('now', '-14 days') OR ${auditLog.detailText} LIKE '%[延期处置]%'))`);
 			} else {
 				conditions.push(eq(auditLog.warningType, warningType));
 			}
@@ -763,12 +769,16 @@ const auditService = {
 			conditions.push(eq(auditLog.riskLevel, riskLevel));
 		}
 		if (status && status !== 'all') {
-			conditions.push(eq(auditLog.status, status));
+			if (status === 'expired') {
+				conditions.push(sql`(${auditLog.status} = 'expired' OR (${auditLog.warningType} = 'audit' AND ${auditLog.status} IN ('active', 'pending') AND ${auditLog.createTime} < datetime('now', '-14 days') AND (${auditLog.detailText} IS NULL OR ${auditLog.detailText} NOT LIKE '%[延期处置]%')) )`);
+			} else {
+				conditions.push(eq(auditLog.status, status));
+			}
 		} else if (lifecycle && lifecycle !== 'all') {
 			if (lifecycle === 'pending' || lifecycle === 'active') {
 				conditions.push(sql`${auditLog.status} IN ('active', 'pending')`);
 			} else if (lifecycle === 'resolved' || lifecycle === 'closed') {
-				conditions.push(sql`${auditLog.status} IN ('resolved', 'banned', 'unbanned', 'rejected', 'expired')`);
+				conditions.push(sql`(${auditLog.status} IN ('resolved', 'banned', 'unbanned', 'rejected', 'expired') OR (${auditLog.warningType} = 'audit' AND ${auditLog.createTime} < datetime('now', '-14 days') AND (${auditLog.detailText} IS NULL OR ${auditLog.detailText} NOT LIKE '%[延期处置]%')) )`);
 			}
 		}
 		if (timeRange && timeRange !== 'all') {
@@ -816,7 +826,9 @@ const auditService = {
 				status: auditLog.status,
 				riskLevel: auditLog.riskLevel,
 				priority: auditLog.priority,
-				clusterId: auditLog.clusterId
+				clusterId: auditLog.clusterId,
+				detailText: auditLog.detailText,
+				createTime: auditLog.createTime
 			}).from(auditLog),
 			settingService.get(c),
 			this.getCircuitBreaker(c)
@@ -849,17 +861,22 @@ const auditService = {
 		// Check mode: allMailMode (1: All, 0: Privacy, 2: Encrypted E2EE)
 		const allMailMode = Number(settings?.allMailMode ?? 1);
 
-		// Compute metrics counts (严格按真实业务与集群聚合度拉齐)
-		const isPending = (s) => s === 'pending' || s === 'active';
+		// Compute metrics counts (严格按真实业务与治理闭环拉齐：待处理与已结案严格分流)
+		const isClosedStatus = (s) => ['banned', 'unbanned', 'resolved', 'rejected', 'expired'].includes(s);
 
-		const auditItems = allItems.filter(i => i.warningType === 'audit');
-		const riskItems = allItems.filter(i => i.warningType === 'risk');
-		const appealItems = allItems.filter(i => i.warningType === 'appeal');
-		const banItems = allItems.filter(i => i.warningType === 'ban' || i.status === 'banned' || i.status === 'unbanned');
+		const isAuditExpired = (item) => {
+			if (item.status === 'expired') return true;
+			if (item.detailText && item.detailText.includes('[延期处置]')) return false;
+			if (!item.createTime) return false;
+			const createTs = new Date(item.createTime).getTime();
+			return (Date.now() - createTs) >= 14 * 86400000;
+		};
 
-		// 滥用威胁卡片指标：同集群账号聚合为 1 个威胁主案，与表格显式展示行数 100% 绝对对齐
+		// 1. 滥用威胁卡片指标：同集群账号聚合为 1 个威胁主案，仅统计真正活动待审案件，与表格显式展示行数 100% 绝对对齐
 		const seenClusters = new Set();
-		const threatDistinctItems = riskItems.filter(i => {
+		const threatActiveDistinct = allItems.filter(i => {
+			if (i.warningType !== 'risk') return false;
+			if (isClosedStatus(i.status)) return false;
 			if (i.clusterId) {
 				if (seenClusters.has(i.clusterId)) return false;
 				seenClusters.add(i.clusterId);
@@ -867,40 +884,51 @@ const auditService = {
 			}
 			return true;
 		});
+		const threatCount = threatActiveDistinct.length;
 
-		const auditPending = auditItems.filter(i => isPending(i.status)).length;
-		const riskPending = threatDistinctItems.filter(i => isPending(i.status)).length;
-		const appealPending = appealItems.filter(i => isPending(i.status)).length;
-		const banActive = banItems.filter(i => i.status === 'banned').length;
-		const threatPending = riskPending;
-		const threatBanned = threatDistinctItems.filter(i => i.status === 'banned').length;
-		const totalPending = auditPending + riskPending + appealPending;
-		const threatCount = threatDistinctItems.length;
-		const todayCount = Math.max(1, banItems.length);
+		// 2. 申诉审计卡片指标：仅统计待复核申诉 (status = 'pending')
+		const appealPendingItems = allItems.filter(i => i.warningType === 'appeal' && i.status === 'pending');
+		const appealCount = appealPendingItems.length;
+
+		// 3. 风险管理卡片指标：仅统计处于 14 天审计期限内且待审的工单 (未解决、未过期)
+		const auditActiveItems = allItems.filter(i => i.warningType === 'audit' && (i.status === 'active' || i.status === 'pending') && !isAuditExpired(i));
+		const auditCount = auditActiveItems.length;
+
+		// 4. 操作记录卡片指标：汇聚全平台所有已处理、已驳回、已封禁、已解禁、已过期案件
+		const recordItems = allItems.filter(i => {
+			if (i.warningType === 'ban') return true;
+			if (isClosedStatus(i.status)) return true;
+			if (i.warningType === 'audit' && isAuditExpired(i)) return true;
+			return false;
+		});
+		const recordCount = recordItems.length;
+		const banActive = recordItems.filter(i => i.status === 'banned').length;
+		const totalPending = threatCount + appealCount + auditCount;
 
 		const counts = {
 			banned: banActive,
-			today: todayCount,
+			today: recordCount,
 			pending: totalPending,
 			highRisk: threatCount,
 			threat: threatCount,
-			threatPending: threatPending,
-			threatBanned: threatBanned,
-			audit: auditPending,
-			auditTotal: auditItems.length,
+			threatPending: threatCount,
+			threatBanned: banActive,
+			audit: auditCount,
+			auditTotal: auditCount,
 			risk: threatCount,
 			riskTotal: threatCount,
-			appeal: appealPending,
-			appealTotal: appealItems.length,
-			ban: banActive,
-			banTotal: banItems.length,
+			appeal: appealCount,
+			appealTotal: appealCount,
+			ban: recordCount,
+			banTotal: recordCount,
+			record: recordCount,
 			total: totalPending,
 			allTotal: allItems.length,
 			categories: {
-				audit: { pending: auditPending, total: auditItems.length },
-				risk: { pending: threatPending, total: threatCount },
-				appeal: { pending: appealPending, total: appealItems.length },
-				ban: { pending: banActive, total: banItems.length },
+				audit: { pending: auditCount, total: auditCount },
+				risk: { pending: threatCount, total: threatCount },
+				appeal: { pending: appealCount, total: appealCount },
+				ban: { pending: recordCount, total: recordCount },
 				total: { pending: totalPending, total: allItems.length }
 			}
 		};
@@ -924,6 +952,13 @@ const auditService = {
 			const baseDevice = (u?.device && u?.os) ? `${u.device} (${u.os})` : (row.device ? `${row.device} (Baseline)` : 'Desktop (Baseline)');
 			const baseGeo = row.geo ? `${row.geo.split(' ')[0]} (Reg)` : 'CN (Reg)';
 			const baseFingerprint = row.fingerprint ? `BASE-${row.fingerprint.slice(-8)}` : 'FP-BASE-REG';
+
+			// 若工单属于 audit 且由于超时自然过期，确保 status 字段规范标识为 'expired'
+			if (row.warningType === 'audit' && row.status !== 'resolved') {
+				if (row.status === 'expired' || isAuditExpired(row)) {
+					row.status = 'expired';
+				}
+			}
 
 			// 1. 规范化工单编号 (# 开头的不超过 6 个字符的集合，例如 #AK1789)
 			let ticketNo = '#AK1789';
