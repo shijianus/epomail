@@ -1359,7 +1359,50 @@
                 </template>
               </el-table-column>
 
-              <!-- 列 3: 违规分类 -->
+              <!-- 列 3: 违规等级 (变更: 在违规分类前面添加违规等级) -->
+              <el-table-column v-if="currentSection === 'record'" min-width="96" align="center" key="record-col-violation-level">
+                <template #header>
+                  <div class="col-filter-header">
+                    <span>{{ $t('auditColViolationLevel') }}</span>
+                    <el-dropdown trigger="click" @command="handleViolationLevelFilterCommand">
+                      <span class="filter-trigger" :class="{ 'filter-active': params.violationLevel !== 'all' }" :title="$t('filter')">
+                        <Icon icon="fluent:filter-16-regular" width="13" height="13" />
+                      </span>
+                      <template #dropdown>
+                        <el-dropdown-menu>
+                          <el-dropdown-item command="all" :class="{ 'is-selected': params.violationLevel === 'all' }">
+                            {{ $t('auditAllViolationLevels') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="threat" :class="{ 'is-selected': params.violationLevel === 'threat' }">
+                            {{ $t('auditLevelThreat') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="lv3" :class="{ 'is-selected': params.violationLevel === 'lv3' }">
+                            {{ $t('auditLevelLv3') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="lv2" :class="{ 'is-selected': params.violationLevel === 'lv2' }">
+                            {{ $t('auditLevelLv2') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="lv1" :class="{ 'is-selected': params.violationLevel === 'lv1' }">
+                            {{ $t('auditLevelLv1') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="lv0" :class="{ 'is-selected': params.violationLevel === 'lv0' }">
+                            {{ $t('auditLevelLv0') }}
+                          </el-dropdown-item>
+                        </el-dropdown-menu>
+                      </template>
+                    </el-dropdown>
+                  </div>
+                </template>
+                <template #default="{ row }">
+                  <div class="level-cell">
+                    <span class="plain-level-text font-mono font-medium" :class="`level-${getDefaultViolationLevel(row).type}`">
+                      {{ getDefaultViolationLevel(row).text }}
+                    </span>
+                  </div>
+                </template>
+              </el-table-column>
+
+              <!-- 列 4: 违规分类 -->
               <el-table-column v-if="currentSection === 'record'" min-width="84" align="center" key="record-col-category">
                 <template #header>
                   <div class="col-filter-header">
@@ -1511,27 +1554,7 @@
                 </template>
               </el-table-column>
 
-              <!-- 列 9: 死局时间 (变更: 在处理时间后面添加死局时间列) -->
-              <el-table-column v-if="currentSection === 'record'" min-width="108" align="center" key="record-col-deadlock-time">
-                <template #header>
-                  <div class="col-filter-header">
-                    <span>{{ $t('auditColDeadlockTime') }}</span>
-                  </div>
-                </template>
-                <template #default="{ row }">
-                  <div class="deadlock-cell">
-                    <span
-                      class="plain-time font-mono"
-                      :class="{ 'time-expired': isDeadlocked(row) }"
-                      :title="getDeadlockInfo(row).desc"
-                    >
-                      {{ getDeadlockInfo(row).time }}
-                    </span>
-                  </div>
-                </template>
-              </el-table-column>
-
-              <!-- 列 10: 负责人 -->
+              <!-- 列 9: 负责人 -->
               <el-table-column v-if="currentSection === 'record'" min-width="84" align="center" key="record-col-assignee">
                 <template #header>
                   <div class="col-filter-header">

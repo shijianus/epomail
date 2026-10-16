@@ -127,11 +127,12 @@ assert.ok(vueContent.includes('diffDays <= 0') && vueContent.includes('auditDead
 console.log('  ✓ 风险管理 (audit) 过期时间已重构为直接天数，并实现 >=10天绿色、5~10天橙色、<5天红色、<=0展示已过期\n');
 
 // 4. 验证板块 4: 操作记录 (record)
-// 要求: 删除"处理建议"，在"处理时间"添加"死局时间"，删除"申诉次数"
-console.log('[验收 4: 操作记录 (record)] 验证删除处理建议与申诉次数，在处理时间后添加死局时间...');
+// 要求: 删除"死局时间"，在"违规分类"前面添加"违规等级"
+console.log('[验收 4: 操作记录 (record)] 验证在违规分类前添加违规等级，并彻底删除死局时间...');
 assert.ok(vueContent.includes("currentSection === 'record'"), '支持 record 板块专属列集判断');
 assert.ok(vueContent.includes('key="record-col-ticket"'), 'record 具备工单编号列');
 assert.ok(vueContent.includes('key="record-col-identity"'), 'record 具备身分组列');
+assert.ok(vueContent.includes('key="record-col-violation-level"'), 'record 具备违规等级列');
 assert.ok(vueContent.includes('key="record-col-category"'), 'record 具备违规分类列');
 assert.ok(!vueContent.includes('key="record-col-reason"'), 'record 已删除报警原因列');
 assert.ok(!vueContent.includes('key="record-col-alarm-count"'), 'record 已删除报警次数列');
@@ -141,18 +142,21 @@ assert.ok(vueContent.includes('key="record-col-update-count"'), 'record 具备�
 assert.ok(vueContent.includes('key="record-col-last-updated"'), 'record 具备最后更新列');
 assert.ok(!vueContent.includes('key="record-col-appeal-count"'), 'record 已按要求彻底删除申诉次数列');
 assert.ok(vueContent.includes('key="record-col-process-time"'), 'record 具备处理时间列');
-assert.ok(vueContent.includes('key="record-col-deadlock-time"'), 'record 具备死局时间列');
+assert.ok(!vueContent.includes('key="record-col-deadlock-time"'), 'record 已按要求彻底删除死局时间列');
 assert.ok(vueContent.includes('key="record-col-assignee"'), 'record 具备负责人列');
 assert.ok(vueContent.includes('key="record-col-authority"'), 'record 具备拍案管理列');
 assert.ok(vueContent.includes('key="record-col-action"'), 'record 具备操作列');
 
-// 验证 record 列顺序：处理时间 -> 死局时间 -> 负责人
+// 验证 record 列顺序：身分组 -> 违规等级 -> 违规分类，处理时间 -> 负责人 (死局时间已移除)
+const recordIdentityIdx = vueContent.indexOf('key="record-col-identity"');
+const recordViolationLevelIdx = vueContent.indexOf('key="record-col-violation-level"');
+const recordCategoryIdx = vueContent.indexOf('key="record-col-category"');
 const recordProcessIdx = vueContent.indexOf('key="record-col-process-time"');
-const recordDeadlockIdx = vueContent.indexOf('key="record-col-deadlock-time"');
 const recordAssigneeIdx = vueContent.indexOf('key="record-col-assignee"');
-assert.ok(recordProcessIdx < recordDeadlockIdx, '死局时间必须位于处理时间之后');
-assert.ok(recordDeadlockIdx < recordAssigneeIdx, '死局时间必须位于负责人之前');
-console.log('  ✓ 操作记录 (record) 处理建议与申诉次数已删除，处理时间后已添加死局时间列\n');
+assert.ok(recordIdentityIdx < recordViolationLevelIdx, '违规等级必须位于身分组之后');
+assert.ok(recordViolationLevelIdx < recordCategoryIdx, '违规等级必须位于违规分类之前');
+assert.ok(recordProcessIdx < recordAssigneeIdx, '负责人必须位于处理时间之后 (死局时间已删除)');
+console.log('  ✓ 操作记录 (record) 违规分类前已添加违规等级列，死局时间已成功删除\n');
 
 // 5. 验证默认列集 (currentSection === 'all')
 // 要求: 删除"报警次数""处理建议"，将"违规分类"改为"违规等级"(包含LV0~LV3以及Threat)，在"处理时间"后添加"死局时间"，包含全部筛选条件，统一每条只能出现1次(整合去重)
