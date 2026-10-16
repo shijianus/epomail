@@ -2673,6 +2673,8 @@ totpModeAllDesc: 'Configure whether users can use TOTP. When enabled, 2FA is ava
     auditDeadlinePermanent: "Permanent",
     auditDeadlineDaysLeft: "{days}d left",
     auditDeadlineHoursLeft: "{hours}h left",
+    auditDirectDays: "{days} days",
+    auditDirectDaySingle: "1 day",
     auditExpiredBadge: "Expired",
     auditAllViolationLevels: "All Levels",
     auditLevelLv3: "LV3 · High Risk",

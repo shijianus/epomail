@@ -1009,12 +1009,21 @@ const auditService = {
 			// 计算过期时间与截止期限 (支持申诉表单过期与风险管控截止期限)
 			let expireTime = row.expireTime || null;
 			let deadline = row.deadline || null;
-			if (!expireTime) {
+			if (row.warningType === 'audit') {
+				// 风险管理业务准则：一般在发现后 14 天内完成审计
+				const baseTs = row.alarmTime ? new Date(row.alarmTime).getTime() : (row.createTime ? new Date(row.createTime).getTime() : createdTs);
+				if (row.detailText && row.detailText.includes('[延期处置]') && (row.deadline || row.expireTime)) {
+					deadline = row.deadline || row.expireTime;
+				} else {
+					deadline = new Date(baseTs + 14 * 86400000).toISOString();
+				}
+				expireTime = deadline;
+			} else if (!expireTime) {
 				if (row.warningType === 'appeal') {
 					// 申诉表单通常 7 天过期
 					expireTime = new Date(createdTs + 7 * 86400000).toISOString();
-				} else if (row.warningType === 'audit' || row.warningType === 'risk') {
-					// 风险管理管控期限：按风险等级
+				} else if (row.warningType === 'risk') {
+					// 滥用威胁管控期限：按风险等级
 					const days = (row.riskLevel === 'high' || row.priority === 'P0') ? 30 : ((row.riskLevel === 'medium' || row.priority === 'P1') ? 14 : 7);
 					deadline = new Date(createdTs + days * 86400000).toISOString();
 					expireTime = deadline;

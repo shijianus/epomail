@@ -117,7 +117,14 @@ const auditReasonStart = vueContent.indexOf('key="audit-col-reason"');
 const auditReasonEnd = vueContent.indexOf('key="audit-col-alarm-count"');
 const auditReasonBlock = vueContent.slice(auditReasonStart, auditReasonEnd);
 assert.ok(!auditReasonBlock.includes('command="multi_account"'), '风险管理报警原因筛选下拉已剔除一人多号(隔离至滥用威胁)');
-console.log('  ✓ 风险管理 (audit) 违规分类改为违规等级，报警时间后添加过期时间，拍案管理列已成功删除\n');
+
+// 验证风险管理过期时间直接展示天数与颜色 (>=10天绿色，5~10天橙色，<5天红色，<=0已过期)
+assert.ok(vueContent.includes('expire-days-cell'), 'audit 过期时间采用 expire-days-cell');
+assert.ok(vueContent.includes('plain-expire-days'), 'audit 过期时间采用 plain-expire-days 纯文本展示');
+assert.ok(vueContent.includes('expire-green') && vueContent.includes('expire-orange') && vueContent.includes('expire-red'), '支持绿色、橙色、红色三档色彩');
+assert.ok(vueContent.includes('diffDays >= 10') && vueContent.includes('diffDays >= 5'), '具备 >=10天绿色、5~10天橙色、<5天红色逻辑');
+assert.ok(vueContent.includes('diffDays <= 0') && vueContent.includes('auditDeadlineExpired'), '具备 <=0 天展示已过期逻辑');
+console.log('  ✓ 风险管理 (audit) 过期时间已重构为直接天数，并实现 >=10天绿色、5~10天橙色、<5天红色、<=0展示已过期\n');
 
 // 4. 验证板块 4: 操作记录 (record)
 // 要求: 删除"处理建议"，在"处理时间"添加"死局时间"，删除"申诉次数"

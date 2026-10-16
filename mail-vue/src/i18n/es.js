@@ -2673,6 +2673,8 @@ totpModeAllDesc: 'Configurar si los usuarios pueden usar TOTP. Al activarlo, la 
     auditDeadlinePermanent: "Control permanente",
     auditDeadlineDaysLeft: "Quedan {days} días",
     auditDeadlineHoursLeft: "Quedan {hours} horas",
+    auditDirectDays: "{days} días",
+    auditDirectDaySingle: "1 día",
     auditExpiredBadge: "Vencido",
     auditAllViolationLevels: "Todos los niveles",
     auditLevelLv3: "LV3 · Alto riesgo",

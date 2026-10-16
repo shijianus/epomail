@@ -1225,19 +1225,21 @@
                 </template>
               </el-table-column>
 
-              <!-- 列 9: 过期时间 (变更: 在报警时间后面添加过期时间) -->
-              <el-table-column v-if="currentSection === 'audit'" min-width="112" align="center" key="audit-col-expire-time">
+              <!-- 列 9: 过期时间 (直接展示天数与颜色状态：>=10天绿色，5~10天橙色，<5天红色，<=0已过期) -->
+              <el-table-column v-if="currentSection === 'audit'" min-width="96" align="center" key="audit-col-expire-time">
                 <template #header>
                   <div class="col-filter-header">
                     <span>{{ $t('auditColExpireTime') }}</span>
                   </div>
                 </template>
                 <template #default="{ row }">
-                  <div class="deadline-cell">
-                    <div class="plain-time font-mono">{{ getRiskDeadlineInfo(row).time }}</div>
-                    <div class="plain-deadline-desc" :class="getRiskDeadlineInfo(row).isExpired ? 'desc-expired' : 'desc-active'">
-                      {{ getRiskDeadlineInfo(row).desc }}
-                    </div>
+                  <div class="expire-days-cell" :title="getRiskDeadlineInfo(row).fullTime">
+                    <span
+                      class="plain-expire-days font-mono"
+                      :class="`expire-${getRiskDeadlineInfo(row).color}`"
+                    >
+                      {{ getRiskDeadlineInfo(row).text }}
+                    </span>
                   </div>
                 </template>
               </el-table-column>
@@ -3053,31 +3055,92 @@ function isAppealExpired(row) {
 }
 
 // 6. 风险管控截止期限与过期说明 供风险管理板块
+// 业务准则：一般在发现后 14 天内完成审计
+// - 10 天及以上：展示绿色 (green)
+// - 5 ~ 10 天：展示橙色 (orange)
+// - 5 天以下：展示红色 (red)
+// - 0 及以下：展示“已过期” (expired/red)
 function getRiskDeadlineInfo(row) {
-  if (!row) return { time: '-', desc: '-', isExpired: false };
-  const deadlineTime = row.deadline || row.expireTime || (row.createTime ? tzDayjs(row.createTime).add(14, 'day').toISOString() : null);
-  if (!deadlineTime) {
-    return { time: '-', desc: t('auditDeadlinePermanent'), isExpired: false };
+  if (!row) {
+    return {
+      text: '-',
+      desc: '-',
+      color: 'default',
+      days: 0,
+      time: '-',
+      fullTime: '-',
+      isExpired: false
+    };
   }
+
+  // 1. 发现时间 (报警时间、创建时间或封禁时间)
+  const baseTime = row.alarmTime || row.createTime || row.banTime;
+
+  // 2. 截止期限：若手动延期处置则使用 row.deadline / row.expireTime，
+  // 否则按“发现后 14 天内完成审计”基准计算
+  let deadlineTime = null;
+  if (row.detailText && row.detailText.includes('[延期处置]') && (row.deadline || row.expireTime)) {
+    deadlineTime = row.deadline || row.expireTime;
+  } else if (baseTime) {
+    deadlineTime = tzDayjs(baseTime).add(14, 'day').toISOString();
+  } else if (row.deadline || row.expireTime) {
+    deadlineTime = row.deadline || row.expireTime;
+  }
+
+  if (!deadlineTime) {
+    return {
+      text: t('auditDeadlinePermanent'),
+      desc: t('auditDeadlinePermanent'),
+      color: 'green',
+      days: 999,
+      time: '-',
+      fullTime: '-',
+      isExpired: false
+    };
+  }
+
   const now = tzDayjs();
   const target = tzDayjs(deadlineTime);
-  const isExpired = target.isBefore(now);
-  let desc = '';
-  if (isExpired) {
-    desc = t('auditDeadlineExpired');
-  } else {
-    const diffHours = target.diff(now, 'hour');
-    if (diffHours < 24) {
-      desc = t('auditDeadlineHoursLeft', { hours: Math.max(1, diffHours) });
-    } else {
-      const diffDays = target.diff(now, 'day');
-      desc = t('auditDeadlineDaysLeft', { days: Math.max(1, diffDays) });
-    }
+  const diffMs = target.diff(now);
+  const diffDays = Math.ceil(diffMs / (24 * 3600 * 1000));
+  const fullTime = formatTableTime(deadlineTime);
+
+  // 0 及以下展示“已过期”
+  if (diffMs <= 0 || diffDays <= 0) {
+    const expiredText = t('auditDeadlineExpired');
+    return {
+      text: expiredText,
+      desc: expiredText,
+      color: 'red',
+      days: diffDays,
+      time: fullTime,
+      fullTime,
+      isExpired: true
+    };
   }
+
+  // 天数文本格式化 (1天单数 / 多天复数)
+  const text = diffDays === 1 ? t('auditDirectDaySingle') : t('auditDirectDays', { days: diffDays });
+
+  // 颜色分类规则：
+  // 10天及以上展示绿色；5~10天展示橙色；5天以下展示红色
+  let color = 'red';
+  if (diffDays >= 10) {
+    color = 'green';
+  } else if (diffDays >= 5) {
+    color = 'orange';
+  } else {
+    color = 'red';
+  }
+
   return {
-    time: formatTableTime(deadlineTime),
-    desc,
-    isExpired
+    text,
+    desc: text,
+    color,
+    days: diffDays,
+    time: fullTime,
+    fullTime,
+    isExpired: false
   };
 }
 
@@ -5108,6 +5171,36 @@ onUnmounted(() => {
     color: var(--el-color-danger);
     font-weight: 600;
     white-space: nowrap;
+  }
+}
+
+.expire-days-cell {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  width: 100%;
+
+  .plain-expire-days {
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.4;
+    font-variant-numeric: tabular-nums;
+    border: none !important;
+    background: transparent !important;
+
+    &.expire-green,
+    &.expire-success {
+      color: var(--el-color-success, #10b981);
+    }
+    &.expire-orange,
+    &.expire-warning {
+      color: var(--el-color-warning, #f59e0b);
+    }
+    &.expire-red,
+    &.expire-danger {
+      color: var(--el-color-danger, #ef4444);
+    }
   }
 }
 

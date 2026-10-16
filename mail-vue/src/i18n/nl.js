@@ -2673,6 +2673,8 @@ totpModeAllDesc: 'Instellen of gebruikers TOTP mogen gebruiken. Eenmaal ingescha
     auditDeadlinePermanent: "Permanente controle",
     auditDeadlineDaysLeft: "Nog {days} dagen",
     auditDeadlineHoursLeft: "Nog {hours} uur",
+    auditDirectDays: "{days} dagen",
+    auditDirectDaySingle: "1 dag",
     auditExpiredBadge: "Verlopen",
     auditAllViolationLevels: "Alle niveaus",
     auditLevelLv3: "LV3 · Hoog risico",

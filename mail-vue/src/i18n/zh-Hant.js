@@ -2673,6 +2673,8 @@ totpModeAllDesc: '設定是否允許使用者使用TOTP，開啟後使用者可�
     auditDeadlinePermanent: "永久管控",
     auditDeadlineDaysLeft: "剩 {days} 天",
     auditDeadlineHoursLeft: "剩 {hours} 小時",
+    auditDirectDays: "{days} 天",
+    auditDirectDaySingle: "1 天",
     auditExpiredBadge: "已過期",
     auditAllViolationLevels: "全部等級",
     auditLevelLv3: "LV3 · 高風險",
