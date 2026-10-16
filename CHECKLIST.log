@@ -8,6 +8,28 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### 操作报告抽屉四变体 Cloudflare 生产部署与大厂级全真栈视觉核验 (2026-10-16)
+*   **关联提交 (Git Commit)**: `5dedb4e5c31f8c54a86babed8c63003708104a74` (Short: `5dedb4e`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com · Worker Version ID: aa4d2453-ccc6-420c-90e4-a2233f345b3b)`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] Cloudflare 生产环境真实上线：
+        1. 成功执行 `wrangler deploy` 发布 45 个新增/变更静态资产，Worker 启动耗时 75ms；
+        2. 生产环境全真栈绑定齐备：KV、D1 (USER_DB / MAIL_DB / db)、AI、Assets 均已在线稳定就绪；
+    - [x] 表格行内交互闭环增强：
+        1. 在核心表格 `<el-table>` 落地 `@row-click="handleTableRowClick"`，支持列表行任意位置轻击快速唤起抽屉（智能排除复选框与行内独立按钮），全面对齐大厂交互直觉；
+        2. 统一抽屉容器选择器 `.audit-detail-drawer` 与 `.audit-drawer-container`；
+    - [x] 生产环境 Playwright 高精度视觉核验（全变体与共用档案模块）：
+        1. 变体 1「滥用威胁」视觉实测：头部风险徽标、V1 视角标签、12 字段案件概要网格、集群账号管控表、双泳道时间线与裁决工作台（`visual_v1_threat_top.png` / `visual_v1_threat_decision.png`）；
+        2. 变体 2「封禁存证」视觉实测：90 天历史裁决分布多色占比条（维持 68% / 暂禁 16% / 放行 12% / 误报 4%）与 4 列不可篡改证据链（`visual_v2_evidence_chain.png`）；
+        3. 变体 3「风险管理」视觉实测：综合风险评分大数字（88/100）、主驱动因素分析、同群组基线/自身30天/风险阈值对比进度条与超阈/阈内徽标（`visual_v3_risk_profile.png`）；
+        4. 变体 4「操作记录」视觉实测：防篡改公开台账绿色安全盾横幅，严格隐藏裁决输入区与所有修改动作，底部仅保留单一「关闭」按钮（`visual_v4_readonly_ledger.png`）；
+        5. 处置依据与全周期时间线细节实测：4 层处置依据卡片（6 种前缀标记日志解析）、机器自动泳道（紫色）vs 人工与用户泳道（橙色）（`visual_basis_and_logs.png` / `visual_dual_swimlane_timeline.png`）；
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 公网全真栈视觉测试套件：`node tests/verify-drawer-visual-live.mjs` 100% 通过；
+    - [x] 本地与生产前端构建核验：mail-vue `vite build` 17.34s 完成，零警告零报错；
+    - [x] 多语言绝对对称：`node scripts/i18n-symmetry.mjs` 2788 键 100% 对称；
+    - [x] 零假数据残留：测试账号与生产环境无任何假数据残留。
+
 ### 操作报告右侧扩展抽屉四种变体与共用档案模块库全量交付 (2026-10-16)
 *   **关联提交 (Git Commit)**: `5e6ba87f2dbefa7dfdda2963937349d069227ba8` (Short: `5e6ba87`)
 *   **部署环境 (Deployment)**: `本地全真栈 / 构建核验 (mail-vue)`
