@@ -8,6 +8,37 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### 风险管理过期时间直显天数与四阶色彩梯度交付 (2026-10-16)
+*   **关联提交 (Git Commit)**: `ad6757ddd3750526696ce7dee3ffa18bd5f240a9` (Short: `ad6757d`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com · Worker Version ID: 5ebe491f-d464-426e-8d8a-9e0281e323d3)`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 「风险管理」过期时间全面重构为直接天数展示：
+        1. 根治原先显示冗长日期时间戳与双行堆叠问题，按业务准则统一直接展示剩余天数（如 `14 天`、`10 天`、`5 天`、`2 天`、`1 天`）或 `已过期`；
+        2. 保留精确截止时间戳作为鼠标悬浮 Tooltip 提示（`title`），兼顾极简排版与精准审计溯源；
+    - [x] 落地 14 天审计期限与严格四阶色彩梯度显式：
+        1. 业务基准对齐：风险管理常规案件统一在发现后 14 天内完成审计（`baseTime = alarmTime || createTime || banTime` + 14天），支持人工延期（`[延期处置]`）记录顺延；
+        2. **10 天及以上**：展示绿色（`expire-green` / `#10b981` / `var(--el-color-success)`）；
+        3. **5 ~ 10 天**：展示橙色（`expire-orange` / `#f59e0b` / `var(--el-color-warning)`）；
+        4. **5 天以下**：展示红色（`expire-red` / `#ef4444` / `var(--el-color-danger)`）；
+        5. **0 及以下**：展示纯文本「已过期」（`expire-red` / 红色加重警示）；
+    - [x] 后端服务契约对齐与多语言 100% 对称：
+        1. `audit-service.js` 统一 `warningType === 'audit'` 的截止期限默认按 14 天精准派发；
+        2. 6 语言（zh, zh-Hant, en, es, fr, nl）同步补充 `auditDirectDays` 与 `auditDirectDaySingle`，2715 键 100% 绝对对称；
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地前端构建核验：`pnpm --filter mail-vue run build` 耗时 15.54s，零报错零警告；
+    - [x] 多语言绝对对称审计：`node scripts/i18n-symmetry.mjs` 2715 键 100% 对称闭环；
+    - [x] 逻辑与单元测试套件：
+        1. `tests/verify-audit-section-columns.mjs` 7 大断言 100% 通过（验证包含 direct days、expire-days-cell、三档颜色与<=0过期逻辑）；
+        2. `tests/verify-audit-expire-days.mjs` 全部 4 阶梯次测试用例 100% 通过（覆盖 14天/10天绿色、9天/5天橙色、4天/1天红色、0天/-6天已过期）；
+    - [x] Cloudflare 生产环境部署：Worker Version ID `5ebe491f-d464-426e-8d8a-9e0281e323d3`；
+    - [x] 生产环境 Playwright 全真栈实测 (`tests/verify-audit-expire-live.mjs`)：
+        1. 成功登录生产并切换至「风险管理」板块；
+        2. 表头第 9 列严格包含「过期时间」；
+        3. 单元格采用 `expire-days-cell` 与 `plain-expire-days`，实测渲染文本为 `2 天`，样式类名精准携带 `expire-red`（2 < 5 触发红色警示）；
+        4. Tooltip 悬浮完整携带截止时间戳；
+        5. 实测截图已存留于 `tests/verify_audit_expire_live.png`；
+    - [x] 零假数据残留：测试数据全部清理，零假数据残留。
+
 ### 滥用威胁真实数据量对齐、极速加载深度优化与处理建议列集交付 (2026-10-15)
 *   **关联提交 (Git Commit)**: `ba1cd3dcf4bece247ab6516a01934a2c8c46da4d` (Short: `ba1cd3d`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com · Worker Version ID: 102c0c8f-5410-47cc-b9c4-5a1f9cbd626a)`
