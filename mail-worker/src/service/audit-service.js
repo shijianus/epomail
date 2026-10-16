@@ -7,11 +7,14 @@ import { and, desc, asc, eq, sql, count, inArray } from 'drizzle-orm';
 import BizError from '../error/biz-error';
 import { getUserDb } from '../utils/db-accessor';
 
+let tablesEnsured = false;
+
 const auditService = {
 	/**
 	 * Ensure audit_log table and indexes exist in D1
 	 */
 	async ensureTables(c) {
+		if (tablesEnsured) return;
 		try {
 			const userDb = getUserDb(c) || c?.env?.db;
 			if (!userDb) return;
@@ -57,7 +60,7 @@ const auditService = {
 				);
 			`).run();
 
-			// Idempotent migration for existing audit_log tables
+			// Idempotent migration for existing audit_log tables (single PRAGMA query for speed)
 			const baselineCols = [
 				{ name: 'base_ip', sql: `ALTER TABLE audit_log ADD COLUMN base_ip TEXT;` },
 				{ name: 'base_geo', sql: `ALTER TABLE audit_log ADD COLUMN base_geo TEXT;` },
@@ -77,14 +80,15 @@ const auditService = {
 				{ name: 'reason_code', sql: `ALTER TABLE audit_log ADD COLUMN reason_code TEXT;` },
 				{ name: 'timeline', sql: `ALTER TABLE audit_log ADD COLUMN timeline TEXT;` }
 			];
+			const tableInfo = await userDb.prepare(`PRAGMA table_info('audit_log')`).all();
+			const existingCols = new Set((tableInfo?.results || []).map(r => r.name));
 			for (const col of baselineCols) {
-				try {
-					const colInfo = await userDb.prepare(`SELECT * FROM pragma_table_info('audit_log') WHERE name = ? LIMIT 1`).bind(col.name).first();
-					if (!colInfo) {
+				if (!existingCols.has(col.name)) {
+					try {
 						await userDb.prepare(col.sql).run();
+					} catch (err) {
+						console.warn(`跳过 audit_log 列 ${col.name}:`, err.message);
 					}
-				} catch (err) {
-					console.warn(`跳过 audit_log 列 ${col.name}:`, err.message);
 				}
 			}
 
@@ -101,13 +105,25 @@ const auditService = {
 
 			// Idempotent migration: Ensure multi-account cluster baseline has cluster_id (only for risk abuse tickets)
 			try {
-				await userDb.prepare(`
-					UPDATE audit_log
-					SET cluster_id = 'CLS-2026-MULTI99',
-						evidence_summary = 'Jaccard 0.84 节律 0.92',
-						report_source = '系统规则命中'
-					WHERE email = 'syndicate_cluster@farm.net' AND warning_type = 'risk' AND (cluster_id IS NULL OR cluster_id = '');
-				`).run();
+				// 确保存在 THR-2026-MULTI99 主威胁工单
+				const hasThr99 = await userDb.prepare(`SELECT id FROM audit_log WHERE ticket_id = 'THR-2026-MULTI99' LIMIT 1`).first();
+				if (!hasThr99) {
+					await userDb.prepare(`
+						INSERT INTO audit_log (
+							ticket_id, email, warning_type, event_type, category, action_text,
+							detail_text, ip, geo, device, fingerprint, is_reg_ip, is_multi_ip,
+							active_ip_count, reported_by_others, risk_level, priority, status,
+							recommended_action, cluster_id, report_source, evidence_summary, circuit_status
+						) VALUES (
+							'THR-2026-MULTI99', 'syndicate_cluster@farm.net', 'risk', 'multi_account_detected', 'security',
+							'{syndicate_cluster@farm.net} 检测到多账户关联滥用 (同一IP/设备指纹)',
+							'严重违反一人一户底线！同一设备指纹 (fp_syndicate_99) 与相同 IP 聚合操纵 8 个注册账户，属于多账户群控违规，触发异常威胁红线。',
+							'198.51.100.99', 'Hong Kong, HK', 'Chrome 128 / Windows 10',
+							'fp_syndicate_99', 0, 1, 8, 2, 'high', 'CRITICAL', 'active',
+							'ban_account', 'CLS-2026-MULTI99', '系统规则命中', '一人多号', 'NORMAL'
+						);
+					`).run();
+				}
 
 				// 幂等自愈：将因历史无限定更新导致误写了 cluster_id 的非 risk 工单（如 ban 台账）清除 cluster_id
 				await userDb.prepare(`
@@ -116,11 +132,8 @@ const auditService = {
 					WHERE warning_type != 'risk' AND cluster_id = 'CLS-2026-MULTI99';
 				`).run();
 
-				const existingMembers = await userDb.prepare(`
-					SELECT count(*) as count FROM audit_log WHERE cluster_id = 'CLS-2026-MULTI99' AND warning_type = 'risk';
-				`).first();
-				if (existingMembers && Number(existingMembers.count) === 1) {
-					// Seed member 2 and member 3 for the cluster
+				const hasMember2 = await userDb.prepare(`SELECT id FROM audit_log WHERE ticket_id = 'THR-2026-MULTI99-2' LIMIT 1`).first();
+				if (!hasMember2) {
 					await userDb.prepare(`
 						INSERT INTO audit_log (
 							ticket_id, email, warning_type, event_type, category, action_text,
@@ -132,9 +145,13 @@ const auditService = {
 							'{syndicate_member2@farm.net} 检测到多账户关联滥用 (同一IP/设备指纹)',
 							'集群关联子账号 2，共享指纹与出口代理', '198.51.100.99', 'Hong Kong, HK', 'Chrome 128 / Windows 10',
 							'fp_syndicate_99', 0, 1, 8, 2, 'high', 'CRITICAL', 'active',
-							'ban_account', 'CLS-2026-MULTI99', '系统规则命中', 'Jaccard 0.84 节律 0.92', 'NORMAL'
+							'ban_account', 'CLS-2026-MULTI99', '系统规则命中', '一人多号', 'NORMAL'
 						);
 					`).run();
+				}
+
+				const hasMember3 = await userDb.prepare(`SELECT id FROM audit_log WHERE ticket_id = 'THR-2026-MULTI99-3' LIMIT 1`).first();
+				if (!hasMember3) {
 					await userDb.prepare(`
 						INSERT INTO audit_log (
 							ticket_id, email, warning_type, event_type, category, action_text,
@@ -146,7 +163,7 @@ const auditService = {
 							'{syndicate_member3@farm.net} 检测到多账户关联滥用 (同一IP/设备指纹)',
 							'集群关联子账号 3，共享指纹与出口代理', '198.51.100.99', 'Hong Kong, HK', 'Chrome 128 / Windows 10',
 							'fp_syndicate_99', 0, 1, 8, 2, 'high', 'CRITICAL', 'active',
-							'ban_account', 'CLS-2026-MULTI99', '系统规则命中', 'Jaccard 0.84 节律 0.92', 'NORMAL'
+							'ban_account', 'CLS-2026-MULTI99', '系统规则命中', '一人多号', 'NORMAL'
 						);
 					`).run();
 				}
@@ -191,7 +208,7 @@ const auditService = {
 				await userDb.prepare(`
 					UPDATE audit_log
 					SET evidence_summary = '一人多号'
-					WHERE evidence_summary LIKE '%Jaccard%';
+					WHERE evidence_summary LIKE '%Jaccard%' OR email = 'syndicate_cluster@farm.net' OR cluster_id = 'CLS-2026-MULTI99' OR event_type LIKE '%multi_account%';
 				`).run();
 
 				await userDb.prepare(`
@@ -211,6 +228,7 @@ const auditService = {
 
 			await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_audit_log_email ON audit_log(email);`).run();
 			await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_audit_log_warning_type ON audit_log(warning_type);`).run();
+			tablesEnsured = true;
 		} catch (e) {
 			console.warn('ensureTables warning:', e.message);
 		}
@@ -703,8 +721,11 @@ const auditService = {
 	 * Query audit log list with filters & mode adaptation
 	 */
 	async list(c, params) {
-		await this.ensureTables(c);
-		await this.seedBaselineIfEmpty(c);
+		if (!tablesEnsured) {
+			await this.ensureTables(c);
+			await this.seedBaselineIfEmpty(c);
+			tablesEnsured = true;
+		}
 		let { num = 1, size = 15, email, keyword, warningType, category, violationLevel, riskLevel, status, lifecycle, timeRange, identityGroup, alarmReason, alarmCountRange, suggestion, assignee, adjudicator: adjudicatorFilter, timeSort = 0 } = params;
 		size = Math.min(Number(size) || 15, 50);
 		num = Math.max(Number(num) || 1, 1);
@@ -781,13 +802,27 @@ const auditService = {
 			query.orderBy(desc(auditLog.id));
 		}
 
-		const list = await query.limit(size).offset(offset);
+		// 并行执行独立查询以深度优化加载速度 (Promise.all 毫秒级极速响应)
+		const [list, countRes, allItems, settings, circuitBreaker] = await Promise.all([
+			query.limit(size).offset(offset),
+			orm(c)
+				.select({ total: count() })
+				.from(auditLog)
+				.where(conditions.length > 0 ? and(...conditions) : undefined)
+				.get(),
+			orm(c).select({
+				id: auditLog.id,
+				warningType: auditLog.warningType,
+				status: auditLog.status,
+				riskLevel: auditLog.riskLevel,
+				priority: auditLog.priority,
+				clusterId: auditLog.clusterId
+			}).from(auditLog),
+			settingService.get(c),
+			this.getCircuitBreaker(c)
+		]);
 
-		const { total } = await orm(c)
-			.select({ total: count() })
-			.from(auditLog)
-			.where(conditions.length > 0 ? and(...conditions) : undefined)
-			.get();
+		const total = countRes?.total || 0;
 
 		// 查询同集群的所有关联子账号并预处理成 Map (严格限定同一 warningType 为 risk)
 		const clusterIds = [...new Set((list || []).map(r => r.clusterId).filter(Boolean))];
@@ -812,42 +847,49 @@ const auditService = {
 		}
 
 		// Check mode: allMailMode (1: All, 0: Privacy, 2: Encrypted E2EE)
-		const settings = await settingService.get(c);
 		const allMailMode = Number(settings?.allMailMode ?? 1);
 
-		// Compute metrics counts
-		const allItems = await orm(c).select({ warningType: auditLog.warningType, status: auditLog.status, riskLevel: auditLog.riskLevel, priority: auditLog.priority }).from(auditLog);
-
+		// Compute metrics counts (严格按真实业务与集群聚合度拉齐)
 		const isPending = (s) => s === 'pending' || s === 'active';
 
 		const auditItems = allItems.filter(i => i.warningType === 'audit');
 		const riskItems = allItems.filter(i => i.warningType === 'risk');
 		const appealItems = allItems.filter(i => i.warningType === 'appeal');
 		const banItems = allItems.filter(i => i.warningType === 'ban' || i.status === 'banned' || i.status === 'unbanned');
-		const threatItems = allItems.filter(i => i.warningType === 'risk' || i.riskLevel === 'high' || i.priority === 'CRITICAL' || i.priority === 'P0');
+
+		// 滥用威胁卡片指标：同集群账号聚合为 1 个威胁主案，与表格显式展示行数 100% 绝对对齐
+		const seenClusters = new Set();
+		const threatDistinctItems = riskItems.filter(i => {
+			if (i.clusterId) {
+				if (seenClusters.has(i.clusterId)) return false;
+				seenClusters.add(i.clusterId);
+				return true;
+			}
+			return true;
+		});
 
 		const auditPending = auditItems.filter(i => isPending(i.status)).length;
-		const riskPending = riskItems.filter(i => isPending(i.status)).length;
+		const riskPending = threatDistinctItems.filter(i => isPending(i.status)).length;
 		const appealPending = appealItems.filter(i => isPending(i.status)).length;
 		const banActive = banItems.filter(i => i.status === 'banned').length;
-		const threatPending = threatItems.filter(i => isPending(i.status)).length;
-		const threatBanned = threatItems.filter(i => i.status === 'banned').length;
+		const threatPending = riskPending;
+		const threatBanned = threatDistinctItems.filter(i => i.status === 'banned').length;
 		const totalPending = auditPending + riskPending + appealPending;
-		const highRiskCount = threatItems.length;
+		const threatCount = threatDistinctItems.length;
 		const todayCount = Math.max(1, banItems.length);
 
 		const counts = {
 			banned: banActive,
 			today: todayCount,
 			pending: totalPending,
-			highRisk: highRiskCount,
-			threat: threatItems.length,
+			highRisk: threatCount,
+			threat: threatCount,
 			threatPending: threatPending,
 			threatBanned: threatBanned,
 			audit: auditPending,
 			auditTotal: auditItems.length,
-			risk: riskPending,
-			riskTotal: riskItems.length,
+			risk: threatCount,
+			riskTotal: threatCount,
 			appeal: appealPending,
 			appealTotal: appealItems.length,
 			ban: banActive,
@@ -856,7 +898,7 @@ const auditService = {
 			allTotal: allItems.length,
 			categories: {
 				audit: { pending: auditPending, total: auditItems.length },
-				risk: { pending: riskPending, total: riskItems.length },
+				risk: { pending: threatPending, total: threatCount },
 				appeal: { pending: appealPending, total: appealItems.length },
 				ban: { pending: banActive, total: banItems.length },
 				total: { pending: totalPending, total: allItems.length }
@@ -1219,11 +1261,9 @@ const auditService = {
 			console.warn('Failed to query auto-purged batches:', e.message);
 		}
 
-		const circuitBreaker = await this.getCircuitBreaker(c);
-
 		return {
 			list: processedList,
-			total: total?.total ?? processedList.length,
+			total: total ?? processedList.length,
 			counts,
 			mode: allMailMode,
 			circuitBreaker,

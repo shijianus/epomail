@@ -399,7 +399,47 @@
                 </template>
               </el-table-column>
 
-              <!-- 列 7: 报警时间 -->
+              <!-- 列 7: 处理建议 (位于当前状态之后) -->
+              <el-table-column v-if="currentSection === 'threat'" min-width="84" align="center" key="threat-col-suggestion">
+                <template #header>
+                  <div class="col-filter-header">
+                    <span>{{ $t('auditColSuggestion') }}</span>
+                    <el-dropdown trigger="click" @command="handleSuggestionFilterCommand">
+                      <span class="filter-trigger" :class="{ 'filter-active': params.suggestion !== 'all' }" :title="$t('filter')">
+                        <Icon icon="fluent:filter-16-regular" width="13" height="13" />
+                      </span>
+                      <template #dropdown>
+                        <el-dropdown-menu>
+                          <el-dropdown-item command="all" :class="{ 'is-selected': params.suggestion === 'all' }">
+                            {{ $t('auditAllSuggestions') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="ban" :class="{ 'is-selected': params.suggestion === 'ban' }">
+                            {{ $t('auditSuggestionBan') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="unban" :class="{ 'is-selected': params.suggestion === 'unban' }">
+                            {{ $t('auditSuggestionUnban') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="watch" :class="{ 'is-selected': params.suggestion === 'watch' }">
+                            {{ $t('auditSuggestionWatch') }}
+                          </el-dropdown-item>
+                          <el-dropdown-item command="keep" :class="{ 'is-selected': params.suggestion === 'keep' }">
+                            {{ $t('auditSuggestionKeepBan') }}
+                          </el-dropdown-item>
+                        </el-dropdown-menu>
+                      </template>
+                    </el-dropdown>
+                  </div>
+                </template>
+                <template #default="{ row }">
+                  <div class="suggestion-cell">
+                    <span class="plain-suggestion-text" :class="`suggestion-${getHandlingSuggestion(row).type}`">
+                      {{ getHandlingSuggestion(row).text }}
+                    </span>
+                  </div>
+                </template>
+              </el-table-column>
+
+              <!-- 列 8: 报警时间 -->
               <el-table-column v-if="currentSection === 'threat'" min-width="118" align="center" key="threat-col-alarm-time">
                 <template #header>
                   <div class="col-filter-header">
@@ -2661,7 +2701,7 @@ function selectKpiFilter(type) {
     params.adjudicator = 'all';
     if (type === 'threat' || type === 'highrisk') {
       // 1. 滥用威胁：展示所有LV3以上的威胁账户，主要包含1人多号、被举报等
-      params.riskLevel = 'high';
+      params.riskLevel = 'all';
       params.warningType = 'risk';
     } else if (type === 'appeal' || type === 'pending') {
       // 2. 申诉审计：通过填写符合表格对于已做出的判决的邮箱进行申诉的邮箱
@@ -3272,18 +3312,7 @@ function getSimpleAlarmReason(row) {
 function getViolationContentSummary(row) {
   if (!row) return '';
 
-  // 1. 严格契合 punishments.md 与用户指令：禁止说明谁举报了、禁止说被人举报甚至被某人举报，直接简洁展示“遭受举报”
-  if (
-    (row.reportedByOthers && row.reportedByOthers > 0) ||
-    row.reportSource === 'fbl' ||
-    (row.evidenceSummary && (row.evidenceSummary.includes('举报') || row.evidenceSummary.includes('检举') || row.evidenceSummary.includes('投诉') || row.evidenceSummary.includes('FBL'))) ||
-    (row.actionText && (row.actionText.includes('举报') || row.actionText.includes('检举') || row.actionText.includes('投诉'))) ||
-    (row.banReason && (row.banReason.includes('举报') || row.banReason.includes('检举') || row.banReason.includes('投诉')))
-  ) {
-    return t('auditContentReported');
-  }
-
-  // 2. 一人多号 / 配额规避 / 关联集群 (punishments.md 5.2 / 6.5)
+  // 1. 一人多号 / 配额规避 / 关联集群 (punishments.md 5.2 / 6.5)
   if (
     row.eventType === 'multi_account_ban' ||
     row.eventType === 'multi_account_detected' ||
@@ -3294,6 +3323,17 @@ function getViolationContentSummary(row) {
     (row.banReason && row.banReason.includes('一人多号'))
   ) {
     return t('auditReasonMultiAccount');
+  }
+
+  // 2. 严格契合 punishments.md 与用户指令：禁止说明谁举报了、禁止说被人举报甚至被某人举报，直接简洁展示“遭受举报”
+  if (
+    (row.reportedByOthers && row.reportedByOthers > 0) ||
+    row.reportSource === 'fbl' ||
+    (row.evidenceSummary && (row.evidenceSummary.includes('举报') || row.evidenceSummary.includes('检举') || row.evidenceSummary.includes('投诉') || row.evidenceSummary.includes('FBL'))) ||
+    (row.actionText && (row.actionText.includes('举报') || row.actionText.includes('检举') || row.actionText.includes('投诉'))) ||
+    (row.banReason && (row.banReason.includes('举报') || row.banReason.includes('检举') || row.banReason.includes('投诉')))
+  ) {
+    return t('auditContentReported');
   }
 
   // 3. 密保异动 / 账号接管 / 凭证篡改 (punishments.md 5.2)
@@ -4310,16 +4350,16 @@ async function fetchAuditList() {
     }
     total.value = data.total || 0;
     if (data.counts) {
-      summaryCounts.threat = data.counts.highRisk ?? data.counts.riskTotal ?? (data.counts.categories?.risk?.total ?? 0);
+      summaryCounts.threat = data.counts.threat ?? data.counts.riskTotal ?? data.counts.risk ?? (data.counts.categories?.risk?.total ?? 0);
       summaryCounts.audit = data.counts.auditTotal ?? data.counts.audit ?? (data.counts.categories?.audit?.total ?? 0);
       summaryCounts.appeal = data.counts.appealTotal ?? data.counts.appeal ?? (data.counts.categories?.appeal?.total ?? 0);
       summaryCounts.record = data.counts.banTotal ?? data.counts.banned ?? (data.counts.categories?.ban?.total ?? 0);
 
-      if (summaryCounts.threat === 0 && logs.value.length > 0) {
-        summaryCounts.threat = logs.value.filter(l => l.riskLevel === 'high' || l.priority === 'CRITICAL' || l.priority === 'P0').length;
+      if (summaryCounts.threat === 0 && logs.value.length > 0 && currentSection.value === 'threat') {
+        summaryCounts.threat = logs.value.length;
       }
-      if (summaryCounts.record === 0 && logs.value.length > 0) {
-        summaryCounts.record = logs.value.filter(l => l.warningType === 'ban' || l.status === 'banned' || l.status === 'unbanned').length;
+      if (summaryCounts.record === 0 && logs.value.length > 0 && currentSection.value === 'record') {
+        summaryCounts.record = logs.value.length;
       }
 
       summaryCounts.banned = data.counts.banned ?? summaryCounts.record;
@@ -4344,9 +4384,9 @@ async function fetchAuditList() {
         summaryCounts.allTotal = data.counts.total ?? (data.total || 0);
       }
     } else {
-      summaryCounts.threat = logs.value.filter(l => l.riskLevel === 'high' || l.priority === 'CRITICAL' || l.priority === 'P0').length;
-      summaryCounts.threatPending = logs.value.filter(l => (l.riskLevel === 'high' || l.priority === 'CRITICAL' || l.priority === 'P0') && (l.status === 'pending' || l.status === 'active')).length;
-      summaryCounts.threatBanned = logs.value.filter(l => (l.riskLevel === 'high' || l.priority === 'CRITICAL' || l.priority === 'P0') && l.status === 'banned').length;
+      summaryCounts.threat = logs.value.filter(l => l.warningType === 'risk').length;
+      summaryCounts.threatPending = logs.value.filter(l => l.warningType === 'risk' && (l.status === 'pending' || l.status === 'active')).length;
+      summaryCounts.threatBanned = logs.value.filter(l => l.warningType === 'risk' && l.status === 'banned').length;
       summaryCounts.audit = logs.value.filter(l => l.warningType === 'audit').length;
       summaryCounts.appeal = logs.value.filter(l => l.warningType === 'appeal').length;
       summaryCounts.record = logs.value.filter(l => l.warningType === 'ban' || l.status === 'banned' || l.status === 'unbanned').length;

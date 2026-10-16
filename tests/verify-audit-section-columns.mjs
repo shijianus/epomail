@@ -9,8 +9,8 @@ console.log('===================================================================
 const vuePath = path.resolve('mail-vue/src/views/audit-report/index.vue');
 const vueContent = fs.readFileSync(vuePath, 'utf8');
 
-// 1. 验证板块 1: 滥用威胁 (threat) - 10 列对齐列集工作台与 "00/00" 进度卡片
-console.log('[验收 1: 滥用威胁 (threat)] 验证 10 列对齐列集与 00/00 进度...');
+// 1. 验证板块 1: 滥用威胁 (threat) - 11 列对齐列集工作台（在当前状态后添加处理建议）与真实处理数据卡片
+console.log('[验收 1: 滥用威胁 (threat)] 验证 11 列对齐列集（包含处理建议）与真实数据...');
 assert.ok(vueContent.includes("currentSection === 'threat'"), '支持 threat 板块专属列集判断');
 assert.ok(vueContent.includes('key="threat-col-ticket"'), 'threat 具备工单编号列');
 assert.ok(vueContent.includes('key="threat-col-identity"'), 'threat 具备身分组列');
@@ -18,18 +18,20 @@ assert.ok(vueContent.includes('key="threat-col-content"'), 'threat 具备违规�
 assert.ok(vueContent.includes('key="threat-col-reason"'), 'threat 具备报警原因列');
 assert.ok(vueContent.includes('key="threat-col-alarm-count"'), 'threat 具备报警次数列');
 assert.ok(vueContent.includes('key="threat-col-status"'), 'threat 具备当前状态列');
+assert.ok(vueContent.includes('key="threat-col-suggestion"'), 'threat 具备处理建议列');
 assert.ok(vueContent.includes('key="threat-col-alarm-time"'), 'threat 具备报警时间列');
 assert.ok(vueContent.includes('key="threat-col-assignee"'), 'threat 具备负责人列');
 assert.ok(vueContent.includes('key="threat-col-authority"'), 'threat 具备拍案管理列');
 assert.ok(vueContent.includes('key="threat-col-action"'), 'threat 具备操作列');
 
-// 验证 threat 列顺序: 工单编号 -> 身分组 -> 违规内容 -> 报警原因 -> 报警次数 -> 当前状态 -> 报警时间 -> 负责人 -> 拍案管理 -> 操作
+// 验证 threat 列顺序: 工单编号 -> 身分组 -> 违规内容 -> 报警原因 -> 报警次数 -> 当前状态 -> 处理建议 -> 报警时间 -> 负责人 -> 拍案管理 -> 操作
 const threatTicketIdx = vueContent.indexOf('key="threat-col-ticket"');
 const threatIdentityIdx = vueContent.indexOf('key="threat-col-identity"');
 const threatContentIdx = vueContent.indexOf('key="threat-col-content"');
 const threatReasonIdx = vueContent.indexOf('key="threat-col-reason"');
 const threatAlarmCountIdx = vueContent.indexOf('key="threat-col-alarm-count"');
 const threatStatusIdx = vueContent.indexOf('key="threat-col-status"');
+const threatSuggestionIdx = vueContent.indexOf('key="threat-col-suggestion"');
 const threatAlarmTimeIdx = vueContent.indexOf('key="threat-col-alarm-time"');
 const threatAssigneeIdx = vueContent.indexOf('key="threat-col-assignee"');
 const threatAuthorityIdx = vueContent.indexOf('key="threat-col-authority"');
@@ -40,7 +42,8 @@ assert.ok(threatIdentityIdx < threatContentIdx, '身分组位于违规内容之�
 assert.ok(threatContentIdx < threatReasonIdx, '违规内容位于报警原因之前');
 assert.ok(threatReasonIdx < threatAlarmCountIdx, '报警原因位于报警次数之前');
 assert.ok(threatAlarmCountIdx < threatStatusIdx, '报警次数位于当前状态之前');
-assert.ok(threatStatusIdx < threatAlarmTimeIdx, '当前状态位于报警时间之前');
+assert.ok(threatStatusIdx < threatSuggestionIdx, '当前状态位于处理建议之前');
+assert.ok(threatSuggestionIdx < threatAlarmTimeIdx, '处理建议位于报警时间之前');
 assert.ok(threatAlarmTimeIdx < threatAssigneeIdx, '报警时间位于负责人之前');
 assert.ok(threatAssigneeIdx < threatAuthorityIdx, '负责人位于拍案管理之前');
 assert.ok(threatAuthorityIdx < threatActionIdx, '拍案管理位于操作之前');
@@ -48,7 +51,7 @@ assert.ok(threatAuthorityIdx < threatActionIdx, '拍案管理位于操作之前'
 // 验证 KPI 卡片 1 的真实数据同步（非硬编码 00/00，直接展示原始整数）与违规内容简洁说明
 assert.ok(vueContent.includes('summaryCounts.threat'), '滥用威胁 KPI 卡片直接展示真实处理数据 summaryCounts.threat');
 assert.ok(vueContent.includes('getViolationContentSummary'), '违规内容通过 getViolationContentSummary 统一简洁处理');
-console.log('  ✓ 滥用威胁 (threat) 10 列严格对齐，KPI 卡片真实数据同步与违规内容显式简洁\n');
+console.log('  ✓ 滥用威胁 (threat) 11 列严格对齐（含处理建议列），KPI 卡片真实数据同步与违规内容显式简洁\n');
 
 // 2. 验证板块 2: 申诉审计 (appeal)
 // 要求: 删除"报警原因"，将"报警次数"改为"申诉次数"，将"处理时间"改为"申请时间"，在后面添加"死局时间"

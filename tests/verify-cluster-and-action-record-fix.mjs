@@ -6,8 +6,8 @@ import assert from 'node:assert';
 import { chromium } from 'playwright';
 
 const BASE = process.env.E2E_BASE || 'http://127.0.0.1:8787';
-const ADMIN_EMAIL = 'admin@example.com';
-const ADMIN_PWD = '123456';
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@example.com';
+const ADMIN_PWD = process.env.ADMIN_PWD || '123456';
 
 async function getAdminToken() {
 	const res = await fetch(BASE + '/api/login', {
