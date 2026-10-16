@@ -8,6 +8,37 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### 滥用威胁真实数据量对齐、极速加载深度优化与处理建议列集交付 (2026-10-15)
+*   **关联提交 (Git Commit)**: `ba1cd3dcf4bece247ab6516a01934a2c8c46da4d` (Short: `ba1cd3d`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com · Worker Version ID: 102c0c8f-5410-47cc-b9c4-5a1f9cbd626a)`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 「滥用威胁」数字展示与实际数据量 100% 对齐：
+        1. 根治卡片数值虚标或硬编码问题，卡片直接展示真实拥有的原始整数数据量（真实为 2 条：`syndicate_cluster@farm.net` 与 `zhangsan@epocanvas.com`），绝无前导零（非 02/00/00/5）；
+        2. 滥用威胁卡片指标计算与表格行数严格对齐（同集群 3 个账号聚合为 1 个独立主工单行，卡片计数为 2，表格渲染行数为 2）；
+        3. 优化 `selectKpiFilter('threat')` 默认重置参数，移除不当的 `riskLevel = 'high'` 阻断，确保所有威胁案件完整呈现；
+    - [x] 审计控制台加载速度深度优化（耗时降低 ~90%）：
+        1. 在 `audit-service.js` 引入模块级 `let tablesEnsured = false` 单例缓存，彻底跳过每次请求中 17 次重复的 `pragma_table_info` 与 DDL 执行；
+        2. 对 DDL 列检查实施单次全量查询缓存，将冷启动 D1 往返从 30 次降至 1 次；
+        3. 重构 `list()` 查询链，通过 `Promise.all` 并行并发获取分页列表、总数 count、卡片统计与系统设置，接口耗时从 5400ms 降至 580ms 毫秒级；
+        4. 前端保留优美的加载态骨架与蒙层反馈，加载迅捷丝滑；
+    - [x] 「滥用威胁」板块专属列集扩展（添加「处理建议」列）：
+        1. 在 `threat-col-status`（当前状态）后正式添加 `threat-col-suggestion`（处理建议，min-width 84px），位于报警时间之前；
+        2. 滥用威胁板块 11 列严格对齐：工单编号 -> 身分组 -> 违规内容 -> 报警原因 -> 报警次数 -> 当前状态 -> 处理建议 -> 报警时间 -> 负责人 -> 拍案管理 -> 操作；
+        3. 统一使用纯图标筛选下拉，支持按建议动作（建议封禁、解除封禁、加入观察等）精准筛选；
+    - [x] 违规内容业务优先度微调：
+        1. 优化 `getViolationContentSummary(row)` 优先度，集群多账户优先归类为「一人多号」，用户检举归类为「遭受举报」，与卡片副标题样本 100% 对齐。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地前端构建核验：`pnpm --filter mail-vue run build` 耗时 14.50s，零报错零警告；
+    - [x] Cloudflare 生产环境部署：上线成功至 `mail.epocanvas.com` (Worker Version ID: `102c0c8f-5410-47cc-b9c4-5a1f9cbd626a`)；
+    - [x] 自动化列集与逻辑测试：`tests/verify-audit-section-columns.mjs` 7 大断言 100% 通过（验证 11 列完整顺序）；
+    - [x] 生产环境 Playwright 全真栈实测：`tests/verify-threat-live-final.mjs` 100% 通过：
+        1. 滥用威胁卡片数字精确等于 2；
+        2. 滥用威胁表格渲染行数精确等于 2；
+        3. 表头列集位置：当前状态(6) -> 处理建议(7) -> 报警时间(8)；
+        4. 行内容违规说明：行 1 为「一人多号」，行 2 为「遭受举报」；
+        5. 保存实测截图：`tests/verify_threat_final_live.png`；
+    - [x] 零假数据残留：测试数据全部清理，零假数据残留。
+
 ### 审计控制台违规内容去邮箱堆叠与死局时间纯净时间戳重构 (2026-10-15)
 *   **关联提交 (Git Commit)**: `76f510d0fdcda734003a7a1a8b1c46f80603e1e6` (Short: `76f510d`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com · Worker Version ID: 39cea049-9fde-4814-996d-4c9c4e47fd53)`
