@@ -2020,460 +2020,20 @@
       </div>
     </el-scrollbar>
 
-    <!-- 4. 案件档案与安全研判侧边抽屉 -->
-    <el-drawer
+    <!-- 4. 案件档案与安全研判侧边抽屉 (四种变体一体化抽屉组件) -->
+    <AuditDetailDrawer
       v-model="drawerVisible"
-      size="620px"
-      direction="rtl"
-      destroy-on-close
-      class="audit-drawer-container"
-    >
-      <template #header>
-        <div class="drawer-header-clean">
-          <Icon
-            icon="fluent:prohibited-20-filled"
-            width="22"
-            height="22"
-            class="header-icon text-danger"
-          />
-          <div class="header-text">
-            <div class="drawer-title">
-              <span>{{ $t('auditSanctionDossierTitle') }}</span>
-            </div>
-            <div class="drawer-sub">
-              <span>{{ $t('auditSanctionPureNotice') }}</span>
-            </div>
-          </div>
-        </div>
-      </template>
-
-      <div v-if="selectedRow" class="drawer-body-content">
-        <!-- 案件全宗基本概要 -->
-        <div class="dossier-card summary-card">
-          <div class="dossier-grid">
-            <div class="grid-item">
-              <span class="label">{{ $t('auditCaseNoSubject') }}:</span>
-              <span class="val font-mono font-medium">{{ selectedRow.ticketId || ('CASE-' + String(selectedRow.id).padStart(6, '0')) }}</span>
-            </div>
-            <div class="grid-item">
-              <span class="label">{{ $t('auditCurrentStatus') }}:</span>
-              <el-tag size="small" :type="getStatusTagType(selectedRow.status)">
-                {{ getStatusLabel(selectedRow.status) }}
-              </el-tag>
-            </div>
-            <div class="grid-item">
-              <span class="label">{{ $t('tabEmailAddress') }}:</span>
-              <span class="val font-mono">{{ selectedRow.email }}</span>
-            </div>
-            <div class="grid-item">
-              <span class="label">{{ isBanType(selectedRow) ? $t('auditColBanTime') : $t('auditInitiatedAt') }}:</span>
-              <span class="val font-mono">{{ (selectedRow.banTime || selectedRow.createTime) ? tzDayjs(selectedRow.banTime || selectedRow.createTime).format('YYYY-MM-DD HH:mm') : '-' }}</span>
-            </div>
-            <div class="grid-item">
-              <span class="label">{{ isBanType(selectedRow) ? $t('auditColLastProcessTime') : $t('auditResolvedAt') }}:</span>
-              <span class="val font-mono">{{ (selectedRow.resolvedTime || selectedRow.banTime || selectedRow.createTime) ? tzDayjs(selectedRow.resolvedTime || selectedRow.banTime || selectedRow.createTime).format('YYYY-MM-DD HH:mm') : '-' }}</span>
-            </div>
-            <div class="grid-item">
-              <span class="label">{{ $t('reportReasonCategory') }}:</span>
-              <span class="val font-medium">
-                <template v-if="isRiskType(selectedRow)">
-                  <span class="text-danger">{{ $t('auditThreatCriticalTag') }}</span>
-                  <span v-if="selectedRow.reportedByOthers > 0"> ({{ $t('auditReportBadgeCount', { count: selectedRow.reportedByOthers }) }})</span>
-                </template>
-                <template v-else-if="isAuditType(selectedRow)">
-                  <span>{{ getRoutineLevelLabel(selectedRow.priority) }}</span>
-                </template>
-                <template v-else-if="isAppealType(selectedRow)">
-                  <span class="text-warning">{{ $t('auditCaseTypeAppeal') }}</span>
-                </template>
-                <template v-else>
-                  <span>{{ $t('auditCaseTypeSanction') }}</span>
-                </template>
-              </span>
-            </div>
-            <div class="grid-item" v-if="selectedRow.reasonCode">
-              <span class="label">{{ $t('abuseReasonCodeLabel') }}:</span>
-              <span class="val font-mono text-danger font-semibold">{{ selectedRow.reasonCode }}</span>
-            </div>
-            <div class="grid-item" v-if="selectedRow.evidenceExpiresDays !== undefined">
-              <span class="label">{{ $t('abuseEvidenceRetentionLabel') }}:</span>
-              <span class="val font-mono">{{ $t('abuseEvidenceRemainingDays', { days: selectedRow.evidenceExpiresDays }) }}</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- 初判规则依据与处置基准 -> 风险研判与处置依据 -->
-        <div class="dossier-card">
-          <div class="section-title">
-            <Icon icon="fluent:bot-20-regular" width="18" height="18" />
-            <span>{{ $t('auditRuleSanctionRef') }}</span>
-          </div>
-
-          <div class="robot-rule-box">
-            <!-- 申诉理由陈述 -->
-            <div v-if="selectedRow.appealReason" class="appeal-statement-quote">
-              “{{ selectedRow.appealReason }}”
-            </div>
-
-            <!-- 保留红色警示文案：突出封禁管控原因与触发规则 -->
-            <div v-if="selectedRow.banReason || (isBanType(selectedRow) && selectedRow.actionText)" class="rule-rule-text text-danger">
-              {{ selectedRow.banReason || selectedRow.actionText }}
-            </div>
-
-            <!-- 检举详细分类说明 -->
-            <div v-if="isRiskType(selectedRow) && selectedRow.reportCategory" class="rule-rule-text">
-              <el-tag size="small" type="danger" effect="plain" style="margin-right: 6px;">{{ getCategoryLabel(selectedRow.reportCategory) }}</el-tag>
-              <span>{{ selectedRow.reportReason || selectedRow.actionText }}</span>
-            </div>
-
-            <div v-if="selectedRow.actionText && selectedRow.actionText !== selectedRow.banReason" class="rule-action-log">{{ selectedRow.actionText }}</div>
-            <div v-if="selectedRow.detailText" class="rule-detail-log">{{ selectedRow.detailText }}</div>
-          </div>
-        </div>
-
-        <!-- 案件全生命周期时间线 -->
-        <div class="dossier-card" v-if="selectedRow.timeline && selectedRow.timeline.length">
-          <div class="section-title">
-            <Icon icon="fluent:history-20-regular" width="18" height="18" />
-            <span>{{ $t('abuseLifecycleTimelineTitle') }}</span>
-          </div>
-          <div class="abuse-timeline-list">
-            <div v-for="(item, idx) in selectedRow.timeline" :key="idx" class="timeline-row">
-              <div class="timeline-time font-mono">{{ item.time ? tzDayjs(item.time).format('YYYY-MM-DD HH:mm:ss') : '-' }}</div>
-              <div class="timeline-event font-semibold">{{ item.event }}</div>
-              <div class="timeline-actor">{{ item.actor }}</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 【证据对比布局】多维风险画像两列对比卡片：左侧当前账号实际证据值，右侧系统基准/风险阈值，标红超标项，默认完全展开 -->
-        <div class="dossier-card evidence-compare-card-wrapper">
-          <div class="section-title">
-            <Icon icon="fluent:chart-multiple-20-regular" width="18" height="18" />
-            <span>{{ $t('auditGoogleTrustContext') }}</span>
-          </div>
-
-          <div class="evidence-notice">
-            <Icon icon="fluent:info-16-regular" width="16" height="16" />
-            <span>{{ $t('auditEvidenceReviewNotice') }}</span>
-          </div>
-
-          <div class="compare-container">
-            <!-- 左侧卡片：当前账号实际证据值 -->
-            <div class="compare-card compare-card-actual">
-              <div class="compare-card-header actual-header">
-                <Icon icon="fluent:person-warning-20-filled" width="16" height="16" class="card-header-icon text-danger" />
-                <span class="card-header-title">{{ $t('auditCompareActualTitle') }}</span>
-              </div>
-              <div class="compare-card-body">
-                <!-- 维度 1: 设备指纹与会话连续性 -->
-                <div class="compare-section-badge">{{ $t('auditContextDevice') }}</div>
-                <div class="compare-item-row">
-                  <span class="compare-k">{{ $t('auditFieldFingerprint') }}:</span>
-                  <span class="compare-v font-mono" :class="{ 'text-danger font-semibold': (selectedRow.matchScore || 85) < 70 }">
-                    {{ selectedRow.fingerprint || '-' }}
-                  </span>
-                </div>
-                <div class="compare-item-row">
-                  <span class="compare-k">{{ $t('auditFieldClient') }}:</span>
-                  <span class="compare-v">{{ selectedRow.device || '-' }}</span>
-                </div>
-                <div class="compare-item-row">
-                  <span class="compare-k">{{ $t('auditFieldSimilarity') }}:</span>
-                  <span class="compare-v font-mono" :class="{ 'text-danger font-semibold': (selectedRow.matchScore || 85) < 70 }">
-                    {{ selectedRow.matchScore || 85 }}%
-                    <span v-if="(selectedRow.matchScore || 85) < 70" class="anomaly-tag text-danger">({{ $t('auditRiskLevelHigh') }})</span>
-                  </span>
-                </div>
-
-                <!-- 维度 2: 网络与拓扑置信度 -->
-                <div class="compare-section-badge">{{ $t('auditContextNetwork') }}</div>
-                <div class="compare-item-row">
-                  <span class="compare-k">{{ $t('auditFieldTriggerIp') }}:</span>
-                  <span class="compare-v font-mono">{{ selectedRow.ip || '-' }} ({{ selectedRow.geo || '-' }})</span>
-                </div>
-                <div class="compare-item-row">
-                  <span class="compare-k">{{ $t('auditCompareIpAccounts') }}:</span>
-                  <span class="compare-v font-mono" :class="{ 'text-danger font-semibold': (selectedRow.activeIpCount > 1 || selectedRow.isMultiIp === 1) }">
-                    {{ selectedRow.activeIpCount > 1 ? selectedRow.activeIpCount : (selectedRow.isMultiIp === 1 ? 8 : 1) }}
-                    <span v-if="selectedRow.activeIpCount > 1 || selectedRow.isMultiIp === 1" class="anomaly-tag text-danger">({{ $t('auditRiskLevelHigh') }})</span>
-                  </span>
-                </div>
-                <div class="compare-item-row">
-                  <span class="compare-k">{{ $t('auditFieldSubnetMatch') }}:</span>
-                  <span class="compare-v" :class="{ 'text-danger font-semibold': !selectedRow.subnetMatch }">
-                    {{ selectedRow.subnetMatch ? $t('auditSubnetMatchGood') : $t('auditSubnetRoaming') }}
-                  </span>
-                </div>
-
-                <!-- 维度 3: 行为速率与检举遥测 -->
-                <div class="compare-section-badge">{{ $t('auditContextBehavior') }}</div>
-                <div class="compare-item-row">
-                  <span class="compare-k">{{ $t('auditFieldUserReports') }}:</span>
-                  <span class="compare-v" :class="{ 'text-danger font-semibold': (selectedRow.reportedByOthers || 0) > 0 }">
-                    {{ (selectedRow.reportedByOthers || 0) > 0 ? $t('auditReportsCount', { count: selectedRow.reportedByOthers }) : $t('auditNoReports') }}
-                  </span>
-                </div>
-                <div class="compare-item-row">
-                  <span class="compare-k">{{ $t('auditFieldSendRate') }}:</span>
-                  <span class="compare-v" :class="{ 'text-danger font-semibold': isRiskType(selectedRow) }">
-                    {{ isRiskType(selectedRow) ? $t('auditSendRateSpike') : $t('auditSendRateNormal') }}
-                  </span>
-                </div>
-                <div class="compare-item-row">
-                  <span class="compare-k">{{ $t('auditFieldBounceRate') }}:</span>
-                  <span class="compare-v" :class="{ 'text-danger font-semibold': isRiskType(selectedRow) }">
-                    {{ isRiskType(selectedRow) ? $t('auditBounceRateHigh') : $t('auditBounceRateHealthy') }}
-                  </span>
-                </div>
-
-                <!-- 维度 4: 凭证与身份安全 -->
-                <div class="compare-section-badge">{{ $t('auditContextAuth') }}</div>
-                <div class="compare-item-row">
-                  <span class="compare-k">{{ $t('auditFieldCredHealth') }}:</span>
-                  <span class="compare-v" :class="{ 'text-danger font-semibold': (isRiskType(selectedRow) || isBanType(selectedRow)) }">
-                    {{ (isRiskType(selectedRow) || isBanType(selectedRow)) ? $t('auditCredCompromised') : $t('auditCredNotLeaked') }}
-                  </span>
-                </div>
-                <div class="compare-item-row">
-                  <span class="compare-k">{{ $t('auditField2fa') }}:</span>
-                  <span class="compare-v">
-                    {{ selectedRow.status === 'banned' ? $t('auditStatusBannedActive') : $t('audit2faProtected') }}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <!-- 右侧卡片：系统基准 / 正常值 / 风险阈值 -->
-            <div class="compare-card compare-card-baseline">
-              <div class="compare-card-header baseline-header">
-                <Icon icon="fluent:shield-checkmark-20-filled" width="16" height="16" class="card-header-icon text-success" />
-                <span class="card-header-title">{{ $t('auditCompareBaselineTitle') }}</span>
-              </div>
-              <div class="compare-card-body">
-                <!-- 维度 1: 设备指纹与会话连续性 -->
-                <div class="compare-section-badge">{{ $t('auditContextDevice') }}</div>
-                <div class="compare-item-row">
-                  <span class="compare-k">{{ $t('auditFieldFingerprint') }}:</span>
-                  <span class="compare-v font-mono text-muted">{{ selectedRow.baseFingerprint || selectedRow.fingerprint || '-' }}</span>
-                </div>
-                <div class="compare-item-row">
-                  <span class="compare-k">{{ $t('auditFieldBaseDevice') }}:</span>
-                  <span class="compare-v text-muted">{{ selectedRow.baseDevice || selectedRow.device || '-' }}</span>
-                </div>
-                <div class="compare-item-row">
-                  <span class="compare-k">{{ $t('auditFieldSimilarity') }}:</span>
-                  <span class="compare-v font-mono text-muted">{{ $t('auditCompareDeviceThreshold') }}</span>
-                </div>
-
-                <!-- 维度 2: 网络与拓扑置信度 -->
-                <div class="compare-section-badge">{{ $t('auditContextNetwork') }}</div>
-                <div class="compare-item-row">
-                  <span class="compare-k">{{ $t('auditFieldBaseIp') }}:</span>
-                  <span class="compare-v font-mono text-muted">{{ selectedRow.baseIp || '-' }} ({{ selectedRow.baseGeo || '-' }})</span>
-                </div>
-                <div class="compare-item-row">
-                  <span class="compare-k">{{ $t('auditCompareIpAccounts') }}:</span>
-                  <span class="compare-v font-mono text-muted">{{ $t('auditCompareIpAccountsThreshold') }}</span>
-                </div>
-                <div class="compare-item-row">
-                  <span class="compare-k">{{ $t('auditFieldSubnetMatch') }}:</span>
-                  <span class="compare-v text-muted">{{ $t('auditSubnetMatchGood') }}</span>
-                </div>
-
-                <!-- 维度 3: 行为速率与检举遥测 -->
-                <div class="compare-section-badge">{{ $t('auditContextBehavior') }}</div>
-                <div class="compare-item-row">
-                  <span class="compare-k">{{ $t('auditFieldUserReports') }}:</span>
-                  <span class="compare-v text-muted">{{ $t('auditCompareReportsThreshold') }}</span>
-                </div>
-                <div class="compare-item-row">
-                  <span class="compare-k">{{ $t('auditFieldSendRate') }}:</span>
-                  <span class="compare-v text-muted">{{ $t('auditCompareSendRateThreshold') }}</span>
-                </div>
-                <div class="compare-item-row">
-                  <span class="compare-k">{{ $t('auditFieldBounceRate') }}:</span>
-                  <span class="compare-v text-muted">{{ $t('auditCompareBounceRateThreshold') }}</span>
-                </div>
-
-                <!-- 维度 4: 凭证与身份安全 -->
-                <div class="compare-section-badge">{{ $t('auditContextAuth') }}</div>
-                <div class="compare-item-row">
-                  <span class="compare-k">{{ $t('auditFieldCredHealth') }}:</span>
-                  <span class="compare-v text-muted">{{ $t('auditCompareCredThreshold') }}</span>
-                </div>
-                <div class="compare-item-row">
-                  <span class="compare-k">{{ $t('auditField2fa') }}:</span>
-                  <span class="compare-v text-muted">{{ $t('audit2faProtected') }}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 4. 裁决工作台 / 封禁台账存单留痕 -->
-        <div class="dossier-card adjudication-workbench-card">
-          <!-- 情况 A: 封禁管控为纯展示台账，严禁任意篡改与删除 -->
-          <template v-if="isBanType(selectedRow)">
-            <div class="sanction-ledger-banner">
-              <Icon icon="fluent:shield-checkmark-20-filled" width="20" height="20" class="banner-icon" />
-              <span>{{ $t('auditSanctionPureNotice') }}</span>
-            </div>
-            <div v-if="selectedRow.status === 'unbanned'" class="unbanned-archive-badge">
-              <Icon icon="fluent:checkmark-circle-16-regular" width="16" height="16" />
-              <span>{{ $t('auditStatusUnbannedRecord') }}</span>
-            </div>
-          </template>
-
-          <!-- 情况 B: 异常威胁、争议申诉与常规审查的人体工学裁决工作台 -->
-          <template v-else>
-            <div class="section-title">
-              <Icon icon="fluent:gavel-20-regular" width="18" height="18" />
-              <span>{{ $t('auditAdjudicateAction') }}</span>
-            </div>
-
-            <div class="decision-input-group">
-              <div class="input-title">{{ $t('auditAdjudicationNotes') }}:</div>
-              <el-input
-                v-model="decisionNotes"
-                type="textarea"
-                :rows="2"
-                :placeholder="$t('auditAdjudicationPlaceholder')"
-              />
-            </div>
-
-            <div class="adjudication-actions">
-              <!-- 1. 外部邮件举报专属操作：加入系统黑名单 -->
-              <el-button
-                v-if="isRiskType(selectedRow) && !selectedRow.isInternal"
-                type="danger"
-                :loading="actionLoading"
-                @click="handleAction('blacklist_sender')"
-              >
-                <Icon icon="fluent:prohibited-20-regular" width="16" height="16" style="margin-right: 4px;" />
-                <span>{{ $t('auditBtnBlacklistSender') }}</span>
-              </el-button>
-
-              <!-- 2. 内部用户举报专属操作：限制发信 (禁言) -->
-              <el-button
-                v-if="isRiskType(selectedRow) && selectedRow.isInternal === 1"
-                type="warning"
-                :loading="actionLoading"
-                @click="handleAction('mute_account')"
-              >
-                <Icon icon="fluent:speaker-mute-20-regular" width="16" height="16" style="margin-right: 4px;" />
-                <span>{{ $t('auditBtnMuteAccount') }}</span>
-              </el-button>
-
-              <!-- 3. 常规审查专属：封存归档 -->
-              <el-button
-                v-if="isAuditType(selectedRow)"
-                type="primary"
-                :loading="actionLoading"
-                @click="handleAction('archive_routine')"
-              >
-                <Icon icon="fluent:archive-20-regular" width="16" height="16" style="margin-right: 4px;" />
-                <span>{{ $t('auditBtnArchiveRoutine') }}</span>
-              </el-button>
-
-              <!-- 4. 放行结案 -->
-              <el-button
-                type="success"
-                :loading="actionLoading"
-                @click="handleVerdict('approve')"
-              >
-                <Icon icon="fluent:checkmark-circle-20-regular" width="16" height="16" style="margin-right: 4px;" />
-                <span>{{ $t('auditAdjudicateApprove') }}</span>
-              </el-button>
-
-              <!-- 5. 条件放行：强制下次 MFA 凭证挑战 -->
-              <el-button
-                type="primary"
-                plain
-                :loading="actionLoading"
-                @click="handleVerdict('probation')"
-              >
-                <Icon icon="fluent:key-reset-20-regular" width="16" height="16" style="margin-right: 4px;" />
-                <span>{{ $t('auditAdjudicateApproveWithChallenge') }}</span>
-              </el-button>
-
-              <!-- 6. 驳回申诉 / 维持封禁 -->
-              <el-button
-                type="danger"
-                plain
-                :loading="actionLoading"
-                @click="isRiskType(selectedRow) ? handleAction('ban_account') : handleVerdict('reject')"
-              >
-                <Icon icon="fluent:dismiss-circle-20-regular" width="16" height="16" style="margin-right: 4px;" />
-                <span>{{ $t('auditAdjudicateReject') }}</span>
-              </el-button>
-
-              <!-- 7. 标记误报加入白名单 -->
-              <el-button
-                type="info"
-                plain
-                :loading="actionLoading"
-                @click="handleVerdict('whitelist')"
-              >
-                <Icon icon="fluent:shield-dismiss-20-regular" width="16" height="16" style="margin-right: 4px;" />
-                <span>{{ $t('auditAdjudicateWhitelist') }}</span>
-              </el-button>
-            </div>
-          </template>
-        </div>
-      </div>
-
-      <!-- 【用词统一 & 层级优化】抽屉底部主操作栏 (用词与表格行内完全一致：解封 / 重新封禁) -->
-      <template #footer>
-        <div class="drawer-footer-actions">
-          <el-button @click="drawerVisible = false">{{ $t('close') }}</el-button>
-
-          <!-- 延期 (仅对具有到期时间的工单展示) -->
-          <el-button
-            v-if="canExtendRow(selectedRow)"
-            type="primary"
-            plain
-            :loading="actionLoading"
-            @click="handleOpenExtend(selectedRow)"
-          >
-            <Icon icon="fluent:calendar-clock-20-regular" width="14" height="14" style="margin-right: 4px;" />
-            <span>{{ $t('auditBtnExtend') }}</span>
-          </el-button>
-
-          <!-- 备注 -->
-          <el-button
-            v-if="selectedRow"
-            type="info"
-            plain
-            :loading="actionLoading"
-            @click="handleOpenNote(selectedRow)"
-          >
-            <Icon icon="fluent:note-edit-20-regular" width="14" height="14" style="margin-right: 4px;" />
-            <span>{{ $t('auditBtnNote') }}</span>
-          </el-button>
-
-          <!-- 【用词统一】解封 / 重新封禁 -->
-          <el-button
-            v-if="selectedRow && selectedRow.status === 'banned'"
-            type="success"
-            :loading="actionLoading"
-            @click="handleQuickToggleBan(selectedRow)"
-          >
-            <Icon icon="fluent:lock-open-16-regular" width="14" height="14" style="margin-right: 4px;" />
-            <span>{{ $t('auditBtnUnban') }}</span>
-          </el-button>
-          <el-button
-            v-else-if="selectedRow"
-            type="danger"
-            :loading="actionLoading"
-            @click="handleQuickToggleBan(selectedRow)"
-          >
-            <Icon icon="fluent:prohibited-16-regular" width="14" height="14" style="margin-right: 4px;" />
-            <span>{{ $t('auditBtnReban') }}</span>
-          </el-button>
-        </div>
-      </template>
-    </el-drawer>
+      :selected-row="selectedRow"
+      :section="currentSection"
+      :action-loading="actionLoading"
+      @action="handleAction"
+      @verdict="handleVerdict"
+      @extend="handleOpenExtend"
+      @note="handleOpenNote"
+      @toggle-ban="handleQuickToggleBan"
+      @open-operator="handleViewOperator"
+      @refresh="fetchAuditList"
+    />
 
     <!-- 5. 负责人账户详情弹窗 -->
     <el-dialog
@@ -2560,6 +2120,7 @@ import { tzDayjs } from '@/utils/day.js';
 import { useSettingStore } from '@/store/setting.js';
 import { useEmailStore } from '@/store/email.js';
 import { auditList, auditAction, auditAdjudicate, auditPurge } from '@/request/audit.js';
+import AuditDetailDrawer from './components/audit-detail-drawer.vue';
 
 defineOptions({
   name: 'audit-report'
@@ -4562,6 +4123,7 @@ async function fetchAuditList() {
   } finally {
     tableLoading.value = false;
     first.value = false;
+    checkDeepLinkOnLoad();
   }
 }
 
@@ -4601,14 +4163,14 @@ function openDocs() {
   window.open(docUrl, '_blank', 'noopener,noreferrer');
 }
 
-async function handleAction(action) {
+async function handleAction(action, customNotes) {
   actionLoading.value = true;
   try {
     await auditAction({
       id: selectedRow.value.id,
       action,
       targetEmail: selectedRow.value.email,
-      notes: decisionNotes.value
+      notes: customNotes !== undefined ? customNotes : decisionNotes.value
     });
     ElMessage.success(t('auditActionSuccess') || t('saveSuccessMsg'));
     drawerVisible.value = false;
@@ -4620,7 +4182,7 @@ async function handleAction(action) {
   }
 }
 
-async function handleVerdict(decision) {
+async function handleVerdict(decision, customNotes) {
   actionLoading.value = true;
   try {
     await auditAdjudicate({
@@ -4628,7 +4190,7 @@ async function handleVerdict(decision) {
       ticketId: selectedRow.value.ticketId,
       decision,
       action: decision,
-      notes: decisionNotes.value,
+      notes: customNotes !== undefined ? customNotes : decisionNotes.value,
       email: selectedRow.value.email
     });
     ElMessage.success(t('auditActionSuccess') || t('saveSuccessMsg'));
@@ -4638,6 +4200,60 @@ async function handleVerdict(decision) {
     console.error(e);
   } finally {
     actionLoading.value = false;
+  }
+}
+
+function checkDeepLinkOnLoad() {
+  try {
+    const hash = window.location.hash || '';
+    const searchParams = new URLSearchParams(window.location.search);
+    let targetCase = searchParams.get('case');
+    if (!targetCase && hash.includes('case=')) {
+      const match = hash.match(/case=([^:&]+)/);
+      if (match) targetCase = match[1];
+    } else if (!targetCase && hash.startsWith('#') && hash.length > 2) {
+      targetCase = hash.slice(1).split(':')[0];
+    }
+    if (targetCase && logs.value && logs.value.length > 0) {
+      const cleanCase = targetCase.toLowerCase().replace(/^#/, '');
+      const found = logs.value.find(l => {
+        const tId = String(l.ticketId || '').toLowerCase().replace(/^#/, '');
+        const idStr = String(l.id || '').toLowerCase();
+        const em = String(l.email || '').toLowerCase();
+        return tId === cleanCase || idStr === cleanCase || em === cleanCase;
+      });
+      if (found) {
+        openAuditDrawer(found);
+      }
+    }
+  } catch (e) {}
+}
+
+const activeRowIndex = ref(-1);
+
+function handleGlobalKeydown(e) {
+  const targetTag = e.target?.tagName?.toLowerCase();
+  if (targetTag === 'input' || targetTag === 'textarea') return;
+
+  if (e.key === 'Escape') {
+    if (drawerVisible.value) {
+      drawerVisible.value = false;
+      e.preventDefault();
+    }
+    return;
+  }
+
+  if (!drawerVisible.value && logs.value.length > 0) {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      activeRowIndex.value = Math.min(logs.value.length - 1, activeRowIndex.value + 1);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      activeRowIndex.value = Math.max(0, activeRowIndex.value - 1);
+    } else if (e.key === 'Enter' && activeRowIndex.value >= 0 && activeRowIndex.value < logs.value.length) {
+      e.preventDefault();
+      openAuditDrawer(logs.value[activeRowIndex.value]);
+    }
   }
 }
 
@@ -4659,6 +4275,7 @@ async function handlePurge() {
 onMounted(() => {
   handleResize();
   window.addEventListener('resize', handleResize);
+  window.addEventListener('keydown', handleGlobalKeydown);
   if (emailStore.searchKeyword) {
     localKeyword.value = emailStore.searchKeyword.trim();
     params.keyword = localKeyword.value;
@@ -4669,6 +4286,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize);
+  window.removeEventListener('keydown', handleGlobalKeydown);
   window.removeEventListener('manage-audit-search', handleGlobalTopSearch);
 });
 </script>
