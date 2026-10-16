@@ -7,6 +7,31 @@
 > 制度规范与工作流指引请见 [AGENTS.md](file:///home/shijian/projects/epocanvas-mail/AGENTS.md)。
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
+### 申诉审计死局时间全面同步“风险管理”阶梯色彩与视觉体系 (2026-10-16)
+*   **关联提交 (Git Commit)**: `4832f01bb749ef2436d3fe1fca7e4b9beae9bbd9` (Short: `4832f01`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com · Worker Version ID: 2e39f8e1-b80d-4ddb-ba69-c53eaa63a719)`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 「申诉审计」死局时间单元格色彩与排版全面学习并对齐「风险管理」：
+        1. 采用 `expire-days-cell` 与 `plain-expire-days font-mono` 居中、等宽加粗排版；
+        2. 动态色彩阶梯规则严格对齐：
+           - 剩余天数 >= 10 天：绿色展示（`expire-green` / `--el-color-success` / `#10b981`）；
+           - 5 <= 剩余天数 < 10 天：橙色预警（`expire-orange` / `--el-color-warning` / `#f59e0b`）；
+           - 剩余天数 < 5 天：红色紧急（`expire-red` / `--el-color-danger` / `#ef4444`）；
+           - 剩余天数 <= 0 天（已死局）：标红呈现 `已成死局`（`expire-red`）；
+        3. 单元格悬浮提示（`:title`）严格保留原本完整时间戳（如 `11/03/26 01:35`），审计溯源绝对完备；
+    - [x] 严格隔离防污染（默认全量总表保留原样）：
+        1. 默认全量总表（`currentSection === 'all'`）的「死局时间」严格保留完整详细日期时间戳展示（`getDeadlockInfo(row).time`），未受任何天数或阶梯色彩污染；
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：mail-vue `vite build` 15.52s 通过，零报错零警告；
+    - [x] 多语言对称审计：`node scripts/i18n-symmetry.mjs` 2715 键 100% 对称；
+    - [x] 单元测试套件：`node tests/verify-appeal-deadlock-days.mjs` 4 大断言 100% 通过（覆盖 >=10天绿、5~10天橙、<5天红、<=0死局红）；
+    - [x] Cloudflare 生产部署：上线成功至 `mail.epocanvas.com` (Worker Version ID: `2e39f8e1-b80d-4ddb-ba69-c53eaa63a719`)；
+    - [x] 生产环境 Playwright 全真栈实测 (`tests/verify-appeal-deadlock-days-live.mjs`)：
+        1. 默认全量总表实测：死局时间 7 条数据全量保留完整详细时间戳（如 `11/14/26 17:52`、`11/03/26 01:35`）；
+        2. 申诉审计板块实测：死局时间实测显示 `18 天`，类名实测包含 `expire-green` 呈现阶梯绿，Title 悬浮提示完整时间戳 `11/03/26 01:35`；
+        3. 生产实测现场截图已存留 (`tests/verify_default_deadlock_time_live.png`, `tests/verify_appeal_deadlock_days_live.png`)；
+    - [x] 零假数据残留：测试数据全部清理，零假数据残留。
+
 ### 申诉审计板块专属死局时间天数格式化与默认全量表详细时间隔离保障 (2026-10-16)
 *   **关联提交 (Git Commit)**: `bc6bb14044b0a9ff4c5dbb05e94e76ec9e6a1a47` (Short: `bc6bb14`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com · Worker Version ID: 8c0a93b1-e36d-46a8-9516-eccf5c270c68)`
