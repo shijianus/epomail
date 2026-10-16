@@ -8,6 +8,29 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### 操作记录板块列集优化（违规等级前置与死局时间移除）(2026-10-16)
+*   **关联提交 (Git Commit)**: `6800cce40bddf6963b81cc392709b66b62895b41` (Short: `6800cce`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com · Worker Version ID: 9d68052c-b9b5-4f70-876a-90dd7a78176f)`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 「操作记录」板块列集结构重构：
+        1. 在「违规分类」（`record-col-category`）前面正式添加「违规等级」（`record-col-violation-level`，min-width 96px），支持纯图标下拉快速筛选（Threat、LV3、LV2、LV1、LV0）；
+        2. 全面删除原「死局时间」（`record-col-deadlock-time`）列，避免历史归档台账产生不适用的冷静期/死局倒计时歧义；
+        3. 操作记录板块 11 列严格排布顺序：工单编号 -> 身分组 -> 违规等级 -> 违规分类 -> 当前状态 -> 更新次数 -> 最后更新 -> 处理时间 -> 负责人 -> 拍案管理 -> 操作；
+    - [x] 数据绑定与全覆盖支持：
+        1. 采用 `getDefaultViolationLevel(row)` 精准呈现等级标签（滥用威胁展示 `Threat · 滥用威胁`，常规审计展示 `LV0~LV3`）；
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地前端构建核验：`pnpm --filter mail-vue run build` 耗时 14.80s，零报错零警告；
+    - [x] 多语言对称审计：`node scripts/i18n-symmetry.mjs` 2715 键 100% 对称；
+    - [x] 单元测试套件：`node tests/verify-audit-section-columns.mjs` 7 大断言 100% 全部通过（验证违规等级位于身分组与违规分类之间，死局时间已彻底删除）；
+    - [x] Cloudflare 生产部署：上线成功至 `mail.epocanvas.com` (Worker Version ID: `9d68052c-b9b5-4f70-876a-90dd7a78176f`)；
+    - [x] 生产环境 Playwright 全真栈实测 (`tests/verify-record-columns-live.mjs`)：
+        1. 成功登录生产并切换至「操作记录」板块；
+        2. 表头严格断言已不含「死局时间」；
+        3. 表头列索引严格断言「违规等级」[3] 位于「违规分类」[4] 之前；
+        4. 真实数据行实测渲染：行 1 为 `LV0 · 正常`，行 2 为 `Threat · 滥用威胁`，行 3 为 `Threat · 滥用威胁`；
+        5. 实测截图已存留于 `tests/verify_record_columns_live.png`；
+    - [x] 零假数据残留：测试数据全部清理，零假数据残留。
+
 ### 风险管理过期时间直显天数与四阶色彩梯度交付 (2026-10-16)
 *   **关联提交 (Git Commit)**: `ad6757ddd3750526696ce7dee3ffa18bd5f240a9` (Short: `ad6757d`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com · Worker Version ID: 5ebe491f-d464-426e-8d8a-9e0281e323d3)`
