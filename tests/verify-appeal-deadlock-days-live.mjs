@@ -114,8 +114,10 @@ async function run() {
       for (let i = 0; i < appealSpanCount; i++) {
         const span = appealDeadlockSpans.nth(i);
         const text = (await span.innerText()).trim();
-        const title = await span.getAttribute('title');
-        console.log(`  - 申诉审计行 ${i + 1}: 显示文本 = "${text}", Title 悬浮完整时间 = "${title}"`);
+        const parentCell = page.locator('.table-area tbody tr .deadlock-cell').nth(i);
+        const title = (await span.getAttribute('title')) || (await parentCell.getAttribute('title'));
+        const className = await span.getAttribute('class');
+        console.log(`  - 申诉审计行 ${i + 1}: 显示文本 = "${text}", 类名 = "${className}", Title 悬浮完整时间 = "${title}"`);
 
         // 必须为 "* 天" / "*天" / "已成死局" 或 "-"
         if (text !== '-') {
@@ -125,9 +127,14 @@ async function run() {
           );
           // title 属性必须包含完整时间戳
           assert.ok(title && title.length > 5, `申诉审计死局时间 hover 必须保留详细时间戳，当前 title="${title}"`);
+          // 必须同步“风险管理”的阶梯色彩 (expire-green / expire-orange / expire-red)
+          assert.ok(
+            className.includes('expire-green') || className.includes('expire-orange') || className.includes('expire-red'),
+            `申诉审计死局时间必须具有风险管理的阶梯色彩类名 (expire-green/orange/red)，当前类名: "${className}"`
+          );
         }
       }
-      console.log('  ✓ 申诉审计死局时间成功显式为 "*天" 格式，且 hover 具备完整时间戳！');
+      console.log('  ✓ 申诉审计死局时间成功显式为 "*天" 格式，阶梯色彩类名生效，且 hover 具备完整时间戳！');
     }
 
     await page.screenshot({ path: 'tests/verify_appeal_deadlock_days_live.png', fullPage: true });

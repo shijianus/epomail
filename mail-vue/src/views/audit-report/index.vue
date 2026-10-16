@@ -825,11 +825,10 @@
                   </div>
                 </template>
                 <template #default="{ row }">
-                  <div class="deadlock-cell">
+                  <div class="expire-days-cell deadlock-cell" :title="getDeadlockInfo(row).time">
                     <span
-                      class="plain-time font-mono"
-                      :class="{ 'time-expired': isDeadlocked(row) }"
-                      :title="getDeadlockInfo(row).time"
+                      class="plain-expire-days plain-time font-mono"
+                      :class="`expire-${getAppealDeadlockInfo(row).color}`"
                     >
                       {{ formatAppealDeadlockDays(row) }}
                     </span>
@@ -3058,19 +3057,69 @@ function getDeadlockInfo(row) {
   };
 }
 
-// 3.1 申诉审计死局时间格式化为 "*天" (特殊规则：仅限申诉审计板块显式为 *天，其余默认情况保留原本详细时间)
-function formatAppealDeadlockDays(row) {
-  if (!row) return '-';
+// 3.1 申诉审计死局信息与天数格式化 (特殊规则：仅限申诉审计板块显式为 *天 并同步“风险管理”颜色设计，其余默认情况保留原本详细时间)
+function getAppealDeadlockInfo(row) {
+  if (!row) {
+    return {
+      text: '-',
+      color: '',
+      days: 0,
+      fullTime: '-',
+      isExpired: false
+    };
+  }
   const dt = getDeadlockTime(row);
-  if (!dt) return '-';
+  if (!dt) {
+    return {
+      text: '-',
+      color: '',
+      days: 0,
+      fullTime: '-',
+      isExpired: false
+    };
+  }
   const now = tzDayjs();
   const target = tzDayjs(dt);
   const diffMs = target.diff(now);
   const diffDays = Math.ceil(diffMs / (24 * 3600 * 1000));
+  const fullTime = formatTableTime(dt);
+
+  // 0 及以下展示“已成死局” (标红)
   if (diffMs <= 0 || diffDays <= 0) {
-    return t('auditDeadlocked') || '已成死局';
+    return {
+      text: t('auditDeadlocked') || '已成死局',
+      color: 'red',
+      days: diffDays,
+      fullTime,
+      isExpired: true
+    };
   }
-  return diffDays === 1 ? t('auditDirectDaySingle') : t('auditDirectDays', { days: diffDays });
+
+  // 天数文本格式化 (1天单数 / 多天复数)
+  const text = diffDays === 1 ? t('auditDirectDaySingle') : t('auditDirectDays', { days: diffDays });
+
+  // 颜色分类规则 (严格同步“风险管理”颜色设计)：
+  // 10天及以上展示绿色；5~10天展示橙色；5天以下展示红色；0及以下展示已成死局(红)
+  let color = 'red';
+  if (diffDays >= 10) {
+    color = 'green';
+  } else if (diffDays >= 5) {
+    color = 'orange';
+  } else {
+    color = 'red';
+  }
+
+  return {
+    text,
+    color,
+    days: diffDays,
+    fullTime,
+    isExpired: false
+  };
+}
+
+function formatAppealDeadlockDays(row) {
+  return getAppealDeadlockInfo(row).text;
 }
 
 // 4. 风险管理过期时间辅助函数
@@ -5194,6 +5243,19 @@ onUnmounted(() => {
   .plain-time {
     font-size: 11.5px;
     white-space: nowrap;
+
+    &.expire-green,
+    &.expire-success {
+      color: var(--el-color-success, #10b981);
+    }
+    &.expire-orange,
+    &.expire-warning {
+      color: var(--el-color-warning, #f59e0b);
+    }
+    &.expire-red,
+    &.expire-danger {
+      color: var(--el-color-danger, #ef4444);
+    }
   }
 
   .time-expired {
