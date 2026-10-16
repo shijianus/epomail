@@ -7,6 +7,20 @@
 > 制度规范与工作流指引请见 [AGENTS.md](file:///home/shijian/projects/epocanvas-mail/AGENTS.md)。
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
+### 远端基线合流与全量代码推送（以本地当前状态为基准保全零改动）(2026-10-16)
+*   **关联提交 (Git Commit)**: `121526d1163462615ef2a5ba8a8349258284ea46` (Short: `121526d`)
+*   **部署环境 (Deployment)**: `GitHub 远端仓库推送 (git@github.com:shijianus/epomail.git · branch: master)`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 远端分叉拉取与合流治理：
+        1. `git fetch origin master` 识别远端包含 4 个历史归档提交（`d843177`、`1aa0533`、`7245ef4`、`329e81e`）；
+        2. 严格按用户指示「以本地当前状态为标准」，采用 `-X ours` 策略平滑合并远端分叉；
+        3. 严格保障本地核心业务代码零改动、零回退、零配置污染：
+           - `mail-vue/` 与 `mail-worker/` 核心代码 100% 保持本地最新完成态；
+           - 31 个已固化并登记到 CHECKLIST.log 的里程碑 Commit Hash 绝对完整保全；
+    - [x] 自动化测试验证与远端完整推送：
+        1. 静态与单元断言核验：`node scripts/i18n-symmetry.mjs` (2715 keys 100% 对称)、`verify-appeal-deadlock-days.mjs` (4/4)、`verify-audit-section-columns.mjs` (7/7) 100% 通过；
+        2. 成功执行 `git push origin master`，远端更新至 `121526d`，本地与远端分支严格对齐 (0 ahead / 0 behind)。
+
 ### 申诉审计死局时间全面同步“风险管理”阶梯色彩与视觉体系 (2026-10-16)
 *   **关联提交 (Git Commit)**: `4832f01bb749ef2436d3fe1fca7e4b9beae9bbd9` (Short: `4832f01`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com · Worker Version ID: 2e39f8e1-b80d-4ddb-ba69-c53eaa63a719)`
