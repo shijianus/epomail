@@ -829,9 +829,9 @@
                     <span
                       class="plain-time font-mono"
                       :class="{ 'time-expired': isDeadlocked(row) }"
-                      :title="getDeadlockInfo(row).desc"
+                      :title="getDeadlockInfo(row).time"
                     >
-                      {{ getDeadlockInfo(row).time }}
+                      {{ formatAppealDeadlockDays(row) }}
                     </span>
                   </div>
                 </template>
@@ -3056,6 +3056,21 @@ function getDeadlockInfo(row) {
     desc,
     isDeadlocked: deadlocked
   };
+}
+
+// 3.1 申诉审计死局时间格式化为 "*天" (特殊规则：仅限申诉审计板块显式为 *天，其余默认情况保留原本详细时间)
+function formatAppealDeadlockDays(row) {
+  if (!row) return '-';
+  const dt = getDeadlockTime(row);
+  if (!dt) return '-';
+  const now = tzDayjs();
+  const target = tzDayjs(dt);
+  const diffMs = target.diff(now);
+  const diffDays = Math.ceil(diffMs / (24 * 3600 * 1000));
+  if (diffMs <= 0 || diffDays <= 0) {
+    return t('auditDeadlocked') || '已成死局';
+  }
+  return diffDays === 1 ? t('auditDirectDaySingle') : t('auditDirectDays', { days: diffDays });
 }
 
 // 4. 风险管理过期时间辅助函数
