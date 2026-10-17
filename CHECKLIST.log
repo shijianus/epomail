@@ -8,6 +8,50 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### pre-commit 密钥扫描非法正则修复与钩子纳入版本控制 (2026-10-16)
+*   **关联提交 (Git Commit)**: `affd7e8c970a6922ffefd71c19af81bd508ebc38` (Short: `affd7e8`)
+*   **部署环境 (Deployment)**: `仓库工程配置 (不涉及生产部署)`
+*   **背景 (Context)**:
+    执行 `a3e94c6` 提交时，钩子输出 `fatal: invalid regex: Invalid range end` 却仍打印「✅ Pre-commit check passed」，
+    暴露 AGENTS.md《密钥与凭证安全体系》红线所依赖的内容级拦截实际处于**失败即放行 (fail-open)** 状态。
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] **根因定位**：`.git/hooks/pre-commit` 第 23 行 `git diff --cached -G"..."` 与第 27 行 `grep -E "^\+.*(...)"`
+        的 Google API Key 字符类写作 `[0-9A-Za-z-_]`，其中 `z-_` 为降序区间 (z=122 → _=95)，属非法 POSIX 区间。
+        `git diff` 因此 fatal 并 exit 128 → `diff_content` 恒为空 → 第 25 行 `if [ -n "$diff_content" ]` 整块被跳过 →
+        直接落到第 37 行输出「通过」。**Resend (`re_`) / OpenAI (`sk-`) / Google (`AIza`) / Telegram 令牌的内容级拦截自始从未生效**，
+        仅第 6 行的文件名级检查在运行；
+    - [x] **正则修正**：两处字符类连字符移至末尾 → `AIza[0-9A-Za-z_-]{35}`；
+    - [x] **钩子纳入版本控制**：原钩子仅存于 `.git/hooks/` 未受追踪，修复无法留存与共享。
+        新增受控副本 `.githooks/pre-commit`（mode `100755` 可执行），并设 `core.hooksPath=.githooks` 使其生效；
+    - [x] **规避 `core.hooksPath` 整目录接管副作用**：该项配置会使 `.git/hooks/` 下的 Qoder AI 代码追踪器钩子一并失效。
+        已将 `post-commit` / `post-checkout` 同步迁入 `.githooks/` 保持追踪器可用；
+        因二者内含本机绝对路径 (`/home/shijian/projects/privchat-synapse/qoderclicn`)，通过 `.gitignore` 显式排除，严禁入库。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] **正则可解析性**：`git diff --cached -G"<修正后正则>"` 由 `fatal` / exit 128 转为 exit 0；
+    - [x] **阳性对照 (拦截能力)**：暂存含 OpenAI 形态假密钥（`sk-` 前缀 + 28 位假字符，此处按截断写法记录以免自身触发扫描）
+        的文件后执行**真实** `git commit`，
+        钩子 exit 1 成功拦截，未产生任何提交，HEAD 保持 `60504aa` 不变；测试文件已即时 `git restore --staged` 并物理删除，零残留；
+    - [x] **接管确认**：设置 `core.hooksPath` 后重跑阳性对照，拦截依然生效，证明钩子已由 `.githooks/` 提供而非 `.git/hooks/`；
+    - [x] **阴性对照**：`affd7e8` 本次提交自身即为无密钥变更，顺利通过修好的钩子，输出中**已不再出现** `fatal: invalid regex`；
+    - [x] **入库内容核验**：`git show :.githooks/pre-commit` 确认第 23/27 行均为修正版；`git ls-files -s` 确认可执行位 `100755`；
+    - [x] **暂存范围核验**：`git diff --cached --name-status` 仅 2 个文件（`A .githooks/pre-commit`、`M .gitignore`）；
+        `git check-ignore -v` 确认 `.githooks/post-commit` 与 `.githooks/post-checkout` 已被 `.gitignore:61-62` 命中排除；
+    - [x] **历史提交回扫 (非破坏性)**：以修正后规则回扫 `a3e94c6` 与 `60504aa`，
+        敏感文件名 0 处、新增行密钥命中 0 处，合并范围 `3b704ba..HEAD` 亦为 0；
+        证实二者本就该放行，**无需为重写而重写**，已登记哈希全部保持有效；
+    - [x] 零假数据残留：阳性对照假密钥文件已物理删除，工作区 `git status` 干净。
+*   **遗留与建议 (Outstanding)**:
+    - [ ] 钩子仍为 fail-open 设计：若 `git diff` 因任何原因异常退出，`diff_content` 为空即判定通过。
+        正则已修正，但同类静默失效仍可能复发。建议后续改为显式检查 `git diff` 退出码、异常时 fail-closed（本次未擅自扩大范围）；
+    - [ ] `core.hooksPath` 为**本仓库局部配置**，不随 clone 传播。其他协作者检出后需自行执行
+        `git config core.hooksPath .githooks` 方能启用扫描，建议在 README 或初始化脚本中补一行引导；
+    - [ ] **扫描无文档豁免机制（本次已实测触发）**：本条目初稿为记录阳性对照而写入了完整的假密钥字面量，
+        结果该 docs 提交被修好的钩子以 exit 1 拦下（`sk-[a-zA-Z0-9]{24,}` 无法区分真实密钥与文档记述）。
+        已通过改写为截断记法解决，未使用 `--no-verify` 绕过。这反向证明了拦截能力确实恢复；
+        但也说明后续在文档/测试中记述密钥形态时需一律采用截断写法，或为钩子引入路径豁免（如 `*.log`、`tests/**`）；
+    - [ ] 前序遗留事项（浏览器全真栈实测未执行、生产仍运行 `5dedb4e` 旧构建、两个既有失败套件、六语言硬编码收口）
+        详见下方 `a3e94c6` 条目，本次未涉及。
+
 ### 操作报告抽屉四变体设计素材复核：伪造取证数据清除与变体读写权限结构修正 (2026-10-16)
 *   **关联提交 (Git Commit)**: `a3e94c6e5c9e26ce30b79d97e9519cfbebf4cf56` (Short: `a3e94c6`)
 *   **部署环境 (Deployment)**: `本地构建核验 (mail-vue) · 尚未部署生产`
@@ -61,12 +105,11 @@
         该串在 `5e6ba87` 抽出抽屉组件时已迁至子组件，属陈旧断言待更新；
         `verify-appeal-and-audit-integration.mjs` 为打生产 `mail.epocanvas.com` 的 Playwright 登录测试，需线上凭证与运行中服务；
     - [ ] 素材 §一.7 要求的六语言硬编码收口 (抽屉内 39 处未包裹中文字面量) 未纳入本次范围，待专项处理；
-    - [ ] **`.git/hooks/pre-commit` 密钥内容扫描失败即放行 (安全控制失效)**：
+    - [x] **`.git/hooks/pre-commit` 密钥内容扫描失败即放行 (安全控制失效)** —— 已于 `affd7e8` 修复闭合，详见下方独立条目：
         钩子 `-G` 正则含非法字符区间 `[0-9A-Za-z-_]` (`z-_` 为降序区间)，`git diff` 返回 `fatal: invalid regex: Invalid range end`
         并 exit 128，致 `diff_content` 恒为空、整段 API Key 内容扫描被跳过，钩子仍打印「✅ Pre-commit check passed」。
         即 Resend/OpenAI/Google/Telegram 令牌的内容级拦截自始未生效，仅文件名级检查有效。
-        修复方式：字符类连字符移至末尾 `[0-9A-Za-z_-]` (已实测修正后 exit 0)。因该钩子为 `.git/` 本地未追踪配置，
-        且启用后可能开始拦截历史可提交的变更，**待确认后再修**。
+        修复方式：字符类连字符移至末尾 `[0-9A-Za-z_-]` (已实测修正后 exit 0)。
 
 ### 操作报告抽屉四变体 Cloudflare 生产部署与大厂级全真栈视觉核验 (2026-10-16)
 *   **关联提交 (Git Commit)**: `5dedb4e5c31f8c54a86babed8c63003708104a74` (Short: `5dedb4e`)
