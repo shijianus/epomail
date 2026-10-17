@@ -139,7 +139,7 @@
         <div class="section-title">
           <div class="title-left">
             <Icon icon="fluent:document-text-20-regular" width="18" height="18" />
-            <span>{{ activeVariant === 2 ? $t('auditChipSummary') : $t('auditChipSummary') }}</span>
+            <span>{{ chapterLabels.summary }}</span>
           </div>
           <span class="section-badge font-mono">#01-OVERVIEW</span>
         </div>
@@ -315,7 +315,7 @@
         <div class="section-title">
           <div class="title-left">
             <Icon icon="fluent:shield-task-20-regular" width="18" height="18" />
-            <span>{{ activeVariant === 2 ? $t('auditChipBasis') : $t('auditChipBasis') }}</span>
+            <span>{{ chapterLabels.basis }}</span>
           </div>
           <span class="section-badge font-mono">#02-GROUNDS</span>
         </div>
@@ -451,6 +451,11 @@
             </div>
           </div>
         </div>
+
+        <div v-if="timelineIsSynthetic" class="placeholder-sample-notice">
+          <Icon icon="fluent:info-16-regular" width="13" height="13" />
+          <span>{{ $t('auditPlaceholderSampleNotice') }}</span>
+        </div>
       </section>
 
       <!-- 模块 E: 多维风险画像 (条件渲染：综合风险分 + 4 维度得分条 + 基准带指标) -->
@@ -481,7 +486,7 @@
               <span class="driver-text font-medium text-danger">{{ riskProfileData.mainDriver }}</span>
             </div>
             <div class="driver-desc text-muted">
-              {{ $t('auditRiskTelemetryNotice') }}
+              {{ $t('auditPlaceholderSampleNotice') }}
             </div>
           </div>
         </div>
@@ -632,6 +637,11 @@
             <Icon icon="fluent:lightbulb-16-regular" width="16" height="16" class="advisory-icon" />
             <span class="advisory-text">{{ similarCasesData.advisoryText }}</span>
           </div>
+
+          <div class="placeholder-sample-notice">
+            <Icon icon="fluent:info-16-regular" width="13" height="13" />
+            <span>{{ $t('auditPlaceholderSampleNotice') }}</span>
+          </div>
         </div>
       </section>
 
@@ -646,7 +656,7 @@
             <Icon icon="fluent:link-multiple-20-regular" width="18" height="18" />
             <span>{{ $t('auditChainTitle') }}</span>
           </div>
-          <span class="font-mono text-muted">IMMUTABLE_CHAIN_V2</span>
+          <span class="font-mono text-muted">{{ $t('auditMaskedAggregatedData') }}</span>
         </div>
 
         <div class="evidence-chain-table">
@@ -677,6 +687,11 @@
             </div>
           </div>
         </div>
+
+        <div class="placeholder-sample-notice">
+          <Icon icon="fluent:info-16-regular" width="13" height="13" />
+          <span>{{ $t('auditPlaceholderSampleNotice') }}</span>
+        </div>
       </section>
 
       <!-- 模块 H: 裁决工作台 (变体 1、变体 2、变体 3 专用：纯只读变体 4 绝对不出现) -->
@@ -688,7 +703,7 @@
         <div class="section-title">
           <div class="title-left">
             <Icon icon="fluent:gavel-20-regular" width="18" height="18" />
-            <span>{{ activeVariant === 2 ? $t('auditChipDecision') : $t('auditAdjudicateAction') }}</span>
+            <span>{{ chapterLabels.decision }}</span>
           </div>
           <span class="section-badge font-mono">#DECISION_ENGINE</span>
         </div>
@@ -797,9 +812,9 @@
         </div>
       </section>
 
-      <!-- 模块 I: 只读台账横幅 (变体 4 及变体 2 存证专用) -->
+      <!-- 模块 I: 只读台账横幅 (变体 4 纯只读台账专用) -->
       <section
-        v-if="activeVariant === 4 || activeVariant === 2"
+        v-if="activeVariant === 4"
         id="chapter-ledger"
         class="dossier-card readonly-ledger-card anchor-section"
       >
@@ -1255,16 +1270,26 @@ function openOperatorDialog() {
   emit('openOperator', props.selectedRow);
 }
 
+// 章节标题随变体切换 (变体 2 存证视角: 案件信息 / 风险研判 / 提交裁决)
+const chapterLabels = computed(() => {
+  const isEvidenceVariant = activeVariant.value === 2;
+  return {
+    summary: isEvidenceVariant ? t('auditV2ChipSummary') : t('auditChipSummary'),
+    basis: isEvidenceVariant ? t('auditV2ChipBasis') : t('auditChipBasis'),
+    decision: isEvidenceVariant ? t('auditV2ChipDecision') : t('auditAdjudicateAction')
+  };
+});
+
 // 章节动态计算
 const availableChapters = computed(() => {
   const list = [];
-  list.push({ id: 'summary', label: t('auditChipSummary'), icon: 'fluent:document-text-16-regular' });
+  list.push({ id: 'summary', label: chapterLabels.value.summary, icon: 'fluent:document-text-16-regular' });
   
   if (clusterAccountsList.value && clusterAccountsList.value.length > 0) {
     list.push({ id: 'cluster', label: t('auditChipCluster'), icon: 'fluent:people-community-16-regular' });
   }
 
-  list.push({ id: 'basis', label: t('auditChipBasis'), icon: 'fluent:shield-task-16-regular' });
+  list.push({ id: 'basis', label: chapterLabels.value.basis, icon: 'fluent:shield-task-16-regular' });
   list.push({ id: 'timeline', label: t('auditChipTimeline'), icon: 'fluent:timeline-16-regular' });
 
   if (riskProfileData.value) {
@@ -1277,10 +1302,10 @@ const availableChapters = computed(() => {
   }
 
   if (isAdjudicationAvailable.value) {
-    list.push({ id: 'decision', label: t('auditChipDecision'), icon: 'fluent:gavel-16-regular' });
+    list.push({ id: 'decision', label: chapterLabels.value.decision, icon: 'fluent:gavel-16-regular' });
   }
 
-  if (activeVariant.value === 4 || activeVariant.value === 2) {
+  if (activeVariant.value === 4) {
     list.push({ id: 'ledger', label: t('auditChipLedger'), icon: 'fluent:book-database-16-regular' });
   }
 
@@ -1313,21 +1338,8 @@ function handleBodyScroll() {
 
 // 模块 B: 集群关联账号数据
 const clusterAccountsList = computed(() => {
-  const r = props.selectedRow;
-  if (!r) return [];
-  if (r.clusterAccounts && r.clusterAccounts.length) {
-    return r.clusterAccounts;
-  }
-  if (r.clusterId || r.isCluster) {
-    // 自动结构化关联账号，确保零假空洞
-    return [
-      { id: r.id, email: r.email, userId: rawUserId.value, status: r.status, evidenceSummary: '主案归属账号' },
-      { id: r.id + 1, email: 'syndicate_node2@farm.net', userId: 'usr_99201', status: 'banned', evidenceSummary: '同一指纹 & 同一子网 IP' },
-      { id: r.id + 2, email: 'syndicate_node3@farm.net', userId: 'usr_99202', status: 'banned', evidenceSummary: '同一指纹 & 同一子网 IP' },
-      { id: r.id + 3, email: 'syndicate_node4@farm.net', userId: 'usr_99203', status: 'banned', evidenceSummary: '同一指纹 & 同一子网 IP' }
-    ];
-  }
-  return [];
+  const accounts = props.selectedRow?.clusterAccounts;
+  return Array.isArray(accounts) ? accounts : [];
 });
 
 // 模块 C: 处置依据细节
@@ -1344,9 +1356,7 @@ const evidenceSummaryText = computed(() => {
 });
 
 const evidenceDigestHash = computed(() => {
-  const r = props.selectedRow;
-  if (!r) return '';
-  return `SHA256:${(r.id ? String(r.id * 179234).padStart(8, '0') : '8f29d1') + 'e4b9'}`;
+  return props.selectedRow?.evidenceHash || '';
 });
 
 const actionBadgeText = computed(() => {
@@ -1399,8 +1409,8 @@ const timelineNodes = computed(() => {
         title: item.event || item.title || '状态流转记录',
         description: item.desc || item.actionText || '',
         transition: item.transition || null,
-        duration: item.duration || (idx > 0 ? `+${idx * 15}m` : '+0m'),
-        hash: item.hash || (idx === 1 ? 'SHA256:8a7f20e4b9...c31d' : null),
+        duration: item.duration || null,
+        hash: item.hash || null,
         isLatest: idx === r.timeline.length - 1
       };
     });
@@ -1416,8 +1426,8 @@ const timelineNodes = computed(() => {
       title: '基线规则初判命中',
       description: `系统自动化探针命中规则 ${r.reasonCode || 'QUOTA_EVASION'}，生成风控研判工单。`,
       transition: { from: 'init', to: 'pending' },
-      duration: '+0m',
-      hash: 'SHA256:3f8e9102ab...7c1a',
+      duration: null,
+      hash: null,
       isLatest: false
     },
     {
@@ -1428,23 +1438,23 @@ const timelineNodes = computed(() => {
       title: '执行管控动作',
       description: r.banReason || '触碰策略红线，外发通道实施阻断',
       transition: { from: 'pending', to: 'banned' },
-      duration: '+3m',
-      hash: 'SHA256:7a1e4905cd...9e2b',
+      duration: null,
+      hash: null,
       isLatest: r.status === 'banned' && !r.appealReason
     }
   ];
 
   if (r.appealReason) {
     nodes.push({
-      formattedTime: formatTime(tzDayjs(cTime).add(4, 'hour').toISOString()),
+      formattedTime: formatTime(r.lastUpdated || r.banTime || cTime),
       actor: 'User (Complainant)',
       lane: 'human',
       icon: 'fluent:person-feedback-16-regular',
       title: '提交争议复核申请',
       description: `申诉附言：“${r.appealReason}”`,
       transition: { from: 'banned', to: 'appealing' },
-      duration: '+4h',
-      hash: 'SHA256:9c2d1840ef...1b4f',
+      duration: null,
+      hash: null,
       isLatest: false
     });
   }
@@ -1458,8 +1468,8 @@ const timelineNodes = computed(() => {
       title: '申诉复核通过 · 批准解封',
       description: '完成凭证合规核验，移除黑名单并恢复服务。',
       transition: { from: 'appealing', to: 'unbanned' },
-      duration: '+2h',
-      hash: 'SHA256:1a8c4391ea...5d70',
+      duration: null,
+      hash: null,
       isLatest: true
     });
   } else {
@@ -1471,13 +1481,18 @@ const timelineNodes = computed(() => {
       title: '当前研判队列',
       description: '等待安全主管最终裁决或例行归档。',
       transition: null,
-      duration: '+15m',
+      duration: null,
       hash: null,
       isLatest: true
     });
   }
 
   return nodes;
+});
+
+// 后端未提供 timeline 时前端会派生示意节点，此时必须显式披露为占位样本
+const timelineIsSynthetic = computed(() => {
+  return !(props.selectedRow?.timeline?.length > 0);
 });
 
 // 模块 E: 多维风险画像数据
@@ -1683,7 +1698,8 @@ async function confirmAndExecuteVerdict(decisionKey, decisionLabel) {
 const canExtend = computed(() => {
   const r = props.selectedRow;
   if (!r) return false;
-  return activeVariant.value !== 1 && !!(r.expireTime || r.deadline);
+  const deadline = r.deadline || r.expireTime || r.deadlockTime;
+  return !!deadline && new Date(deadline).getTime() > Date.now();
 });
 
 // 深链定位支持 (URL hash 携带: #case=CASE-ID:CHAPTER-ID)
@@ -2048,6 +2064,20 @@ function handleDrawerOpened() {
       color: var(--el-text-color-secondary);
     }
   }
+}
+
+.placeholder-sample-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 12px;
+  padding: 8px 10px;
+  border-left: 2px solid var(--el-color-warning);
+  background: var(--el-fill-color-lighter);
+  border-radius: 4px;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--el-text-color-secondary);
 }
 
 /* 模块 A: 12 字段两列网格 */
