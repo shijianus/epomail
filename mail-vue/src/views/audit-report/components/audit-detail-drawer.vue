@@ -142,7 +142,9 @@
           <!-- 8. 原因码 -->
           <div class="grid-field">
             <span class="field-k">{{ $t('abuseReasonCodeLabel') }}:</span>
-            <span class="field-v font-mono font-medium reason-code-highlight">{{ selectedRow.reasonCode || 'RULE_INTERCEPT_STANDARD' }}</span>
+            <div class="field-v">
+              <span class="font-mono font-medium reason-code-highlight">{{ selectedRow.reasonCode || 'RULE_INTERCEPT_STANDARD' }}</span>
+            </div>
           </div>
 
           <!-- 9. 报警次数 (条件渲染) -->
@@ -2383,7 +2385,7 @@ function handleDrawerOpened() {
   }
 }
 
-/* 正文滚动区与卡片浮起立体层次 */
+/* 正文滚动区 */
 .drawer-scroll-body {
   flex: 1;
   min-height: 0;
@@ -2391,23 +2393,16 @@ function handleDrawerOpened() {
   padding: 16px 20px 24px 20px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 16px;
   scroll-behavior: smooth;
-  background: var(--el-bg-color-page, #f8fafc);
 }
 
 /* 通用档案卡片 */
 .dossier-card {
   border: 1px solid var(--el-border-color-lighter);
-  border-radius: 10px;
-  padding: 16px 18px;
-  background: var(--el-bg-color, #ffffff);
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.03), 0 1px 2px -1px rgba(0, 0, 0, 0.03);
-  transition: border-color 0.2s, box-shadow 0.2s;
-
-  &:hover {
-    border-color: var(--el-border-color);
-  }
+  border-radius: 8px;
+  padding: 14px 16px;
+  background: var(--el-bg-color);
 
   .section-title {
     display: flex;
@@ -2416,8 +2411,8 @@ function handleDrawerOpened() {
     font-size: 13.5px;
     font-weight: 600;
     color: var(--el-text-color-primary);
-    margin-bottom: 14px;
-    padding-bottom: 9px;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
     border-bottom: 1px solid var(--el-border-color-lighter);
 
     .title-left {
@@ -2442,14 +2437,9 @@ function handleDrawerOpened() {
     }
 
     .section-badge {
-      font-size: 10px;
+      font-size: 11px;
       font-weight: 500;
       color: var(--el-text-color-secondary);
-      background: var(--el-fill-color-light);
-      padding: 1px 6px;
-      border-radius: 4px;
-      border: 1px solid var(--el-border-color-lighter);
-      letter-spacing: 0.5px;
     }
   }
 }
@@ -2479,6 +2469,9 @@ function handleDrawerOpened() {
       margin-right: 8px;
       flex-shrink: 0;
       text-align: left;
+      font-size: 12px;
+      font-weight: 500;
+      letter-spacing: 0.1px;
     }
 
     .field-v {
@@ -2511,12 +2504,14 @@ function handleDrawerOpened() {
 .reason-code-highlight {
   display: inline-flex;
   align-items: center;
-  padding: 1px 6px;
+  padding: 2px 7px;
   border-radius: 4px;
-  background: rgba(239, 68, 68, 0.08);
+  background: rgba(239, 68, 68, 0.06);
   color: var(--el-color-danger);
-  border: 1px solid rgba(239, 68, 68, 0.2);
-  font-size: 11.5px;
+  border: 1px solid rgba(239, 68, 68, 0.18);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: -0.2px;
   width: fit-content;
 }
 
@@ -2524,17 +2519,19 @@ function handleDrawerOpened() {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   border-radius: 4px;
   border: none;
   background: transparent;
   color: var(--el-text-color-secondary);
   cursor: pointer;
   flex-shrink: 0;
-  transition: all 0.2s;
+  opacity: 0.7;
+  transition: all 0.15s ease;
 
   &:hover {
+    opacity: 1;
     background: var(--el-fill-color);
     color: var(--el-color-primary);
   }
@@ -2544,20 +2541,22 @@ function handleDrawerOpened() {
 .cluster-accounts-table {
   display: flex;
   flex-direction: column;
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 8px;
+  border: 1px solid var(--el-border-color);
+  border-radius: 6px;
   overflow: hidden;
   font-size: 12px;
+  background: var(--el-fill-color-blank);
 
   .cluster-header-row {
     display: grid;
     grid-template-columns: 140px minmax(170px, 1.8fr) minmax(90px, 1.1fr) 72px minmax(130px, 1.5fr);
     column-gap: 10px;
-    padding: 9px 12px;
-    background: var(--el-fill-color-light);
+    padding: 8px 12px;
+    background: var(--el-fill-color);
     font-weight: 600;
+    font-size: 11.5px;
     color: var(--el-text-color-secondary);
-    border-bottom: 1px solid var(--el-border-color-lighter);
+    border-bottom: 1px solid var(--el-border-color);
   }
 
   .cluster-data-row {
@@ -2583,9 +2582,18 @@ function handleDrawerOpened() {
 
     .col-idx {
       font-size: 11px;
+      font-weight: 600;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+      display: inline-flex;
+      align-items: center;
+      width: fit-content;
+      padding: 1px 6px;
+      border-radius: 4px;
+      background: rgba(239, 68, 68, 0.06);
+      color: var(--el-color-danger);
+      border: 1px solid rgba(239, 68, 68, 0.15);
     }
 
     .col-email {
@@ -2593,6 +2601,7 @@ function handleDrawerOpened() {
       align-items: center;
       gap: 4px;
       overflow: hidden;
+      color: var(--el-text-color-primary);
 
       > span {
         min-width: 0;
@@ -2625,6 +2634,7 @@ function handleDrawerOpened() {
       text-overflow: ellipsis;
       white-space: nowrap;
       font-size: 11.5px;
+      color: var(--el-text-color-regular);
     }
   }
 
@@ -2645,7 +2655,7 @@ function handleDrawerOpened() {
 .disposition-nested-card {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
 .basis-chain-card {
@@ -2653,9 +2663,10 @@ function handleDrawerOpened() {
   flex-direction: column;
   gap: 8px;
   padding: 12px 14px;
-  border-radius: 8px;
-  background: var(--el-fill-color-light);
-  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 6px;
+  background: rgba(239, 68, 68, 0.02);
+  border: 1px solid rgba(239, 68, 68, 0.18);
+  border-left: 3px solid var(--el-color-danger);
 
   .basis-chain-row {
     display: flex;
@@ -2676,6 +2687,7 @@ function handleDrawerOpened() {
       color: var(--el-text-color-primary);
 
       .chain-main-text {
+        font-weight: 500;
         color: var(--el-text-color-primary);
       }
       .chain-sub-text {
@@ -2689,10 +2701,10 @@ function handleDrawerOpened() {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 12px 14px;
-  border-radius: 8px;
+  padding: 10px 14px;
+  border-radius: 6px;
   background: var(--el-fill-color-blank);
-  border: 1px solid var(--el-border-color-lighter);
+  border: 1px solid var(--el-border-color);
 
   .record-box-header {
     display: flex;
@@ -2701,7 +2713,7 @@ function handleDrawerOpened() {
     font-size: 11.5px;
     font-weight: 600;
     color: var(--el-text-color-secondary);
-    padding-bottom: 8px;
+    padding-bottom: 7px;
     border-bottom: 1px solid var(--el-border-color-lighter);
   }
 
@@ -2722,6 +2734,7 @@ function handleDrawerOpened() {
         font-size: 10.5px;
         height: 19px;
         padding: 0 5px;
+        border-radius: 3px;
       }
 
       .record-text {
@@ -2740,91 +2753,57 @@ function handleDrawerOpened() {
 }
 
 .swimlane-column-headers {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 28px minmax(0, 1fr);
   align-items: center;
-  gap: 10px;
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 600;
 
   .swimlane-header {
-    display: inline-flex;
+    display: flex;
     align-items: center;
     gap: 6px;
-    padding: 3px 10px;
-    border-radius: 9999px;
+    padding: 6px 12px;
+    border-radius: 4px;
     background: var(--el-fill-color-light);
 
     &.machine-header {
+      grid-column: 1;
       color: var(--el-color-primary);
-      border: 1px solid rgba(59, 130, 246, 0.15);
     }
     &.human-header {
+      grid-column: 3;
       color: var(--el-color-warning);
-      border: 1px solid rgba(245, 158, 11, 0.15);
     }
   }
 
   .swimlane-header-spacer {
-    display: none;
+    grid-column: 2;
   }
 }
 
 .swimlane-grid-track {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  position: relative;
-  padding-left: 32px;
-
-  /* 垂直贯通时间线 */
-  &::before {
-    content: '';
-    position: absolute;
-    top: 14px;
-    bottom: 20px;
-    left: 12px;
-    width: 2px;
-    background: var(--el-border-color-lighter);
-    z-index: 1;
-  }
+  gap: 10px;
 
   .swimlane-row {
-    display: flex;
-    align-items: stretch;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 28px minmax(0, 1fr);
+    align-items: center;
     position: relative;
-    width: 100%;
 
-    /* 隐藏对立侧空白占位单元格，不再虚耗 50% 宽度 */
     .swimlane-cell {
       min-width: 0;
-      width: 100%;
-
-      &:has(.swimlane-placeholder),
-      &.machine-cell:empty,
-      &.human-cell:empty {
-        display: none !important;
-      }
-
-      .swimlane-placeholder {
-        display: none !important;
-      }
 
       .swimlane-card {
-        width: 100%;
-        box-sizing: border-box;
-        padding: 12px 14px;
-        border-radius: 8px;
+        padding: 10px 12px;
+        border-radius: 6px;
         border: 1px solid var(--el-border-color-lighter);
         background: var(--el-fill-color-blank);
         display: flex;
         flex-direction: column;
-        gap: 6px;
-        transition: all 0.2s;
-
-        &:hover {
-          border-color: var(--el-border-color);
-          box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
-        }
+        gap: 5px;
 
         &.machine-card {
           border-left: 3px solid var(--el-color-primary);
@@ -2835,7 +2814,6 @@ function handleDrawerOpened() {
         &.card-latest {
           border-color: rgba(239, 68, 68, 0.45);
           background: rgba(239, 68, 68, 0.02);
-          box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.15);
         }
 
         .card-top-row {
@@ -2868,7 +2846,7 @@ function handleDrawerOpened() {
           .latest-tag {
             font-size: 10px;
             height: 18px;
-            padding: 0 5px;
+            padding: 0 4px;
             margin-left: auto;
           }
         }
@@ -2876,8 +2854,8 @@ function handleDrawerOpened() {
         .card-title-row {
           display: flex;
           align-items: center;
-          gap: 7px;
-          font-size: 13px;
+          gap: 6px;
+          font-size: 12.5px;
 
           .node-num-badge {
             display: inline-flex;
@@ -2897,9 +2875,9 @@ function handleDrawerOpened() {
         }
 
         .card-desc {
-          font-size: 12.5px;
+          font-size: 12px;
           color: var(--el-text-color-regular);
-          line-height: 1.5;
+          line-height: 1.45;
         }
 
         .card-footer-row {
@@ -2953,25 +2931,36 @@ function handleDrawerOpened() {
           }
         }
       }
+
+      /* 空白单元格完全透明留白，禁止放置侧边多余时间线 */
+      .swimlane-placeholder {
+        min-height: 1px;
+      }
     }
 
-    /* 唯一居中时间线节点锚点，整齐靠左中轴对齐 */
+    /* 唯一居中时间线中轴，垂直贯通 */
     .swimlane-axis {
-      position: absolute;
-      left: -32px;
-      top: 10px;
-      width: 24px;
-      height: 24px;
       display: flex;
       align-items: center;
       justify-content: center;
-      z-index: 2;
+      position: relative;
+      height: 100%;
 
       &::before {
-        display: none;
+        content: '';
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 50%;
+        width: 2px;
+        transform: translateX(-50%);
+        background: var(--el-border-color-lighter);
+        z-index: 1;
       }
 
       .axis-dot {
+        position: relative;
+        z-index: 2;
         width: 22px;
         height: 22px;
         border-radius: 50%;
@@ -2991,6 +2980,21 @@ function handleDrawerOpened() {
           color: var(--el-color-warning);
           background: rgba(245, 158, 11, 0.1);
         }
+      }
+    }
+  }
+
+  @media (max-width: 580px) {
+    .swimlane-column-headers {
+      display: none;
+    }
+    .swimlane-row {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      .swimlane-axis,
+      .swimlane-placeholder {
+        display: none;
       }
     }
   }
@@ -3161,17 +3165,18 @@ function handleDrawerOpened() {
 .risk-indicators-unified-box {
   display: flex;
   flex-direction: column;
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 8px;
+  border: 1px solid var(--el-border-color);
+  border-radius: 6px;
   overflow: hidden;
+  background: var(--el-fill-color-blank);
 
   .gauge-legend-bar {
     display: flex;
     align-items: center;
     gap: 14px;
-    padding: 7px 12px;
-    background: var(--el-fill-color-light);
-    border-bottom: 1px solid var(--el-border-color-lighter);
+    padding: 7px 14px;
+    background: var(--el-fill-color);
+    border-bottom: 1px solid var(--el-border-color);
     font-size: 11px;
     color: var(--el-text-color-secondary);
     flex-wrap: wrap;
@@ -3183,7 +3188,7 @@ function handleDrawerOpened() {
 
       .legend-color-box {
         width: 12px;
-        height: 4px;
+        height: 3px;
         border-radius: 2px;
         &.base-cohort { background: var(--el-color-primary); }
         &.base-self { background: var(--el-color-warning); }
@@ -3200,7 +3205,7 @@ function handleDrawerOpened() {
       display: grid;
       grid-template-columns: minmax(0, 1.1fr) minmax(240px, 280px);
       gap: 14px;
-      padding: 9px 14px;
+      padding: 10px 14px;
       border-bottom: 1px solid var(--el-border-color-lighter);
       align-items: center;
       transition: background 0.15s ease;
@@ -3232,31 +3237,33 @@ function handleDrawerOpened() {
           row-gap: 2px;
 
           .metric-name {
-            font-size: 12px;
+            font-size: 12.5px;
+            font-weight: 500;
             color: var(--el-text-color-primary);
           }
           .metric-rule-box {
             display: inline-flex;
             align-items: center;
-            padding: 0 4px;
+            padding: 1px 5px;
             border-radius: 3px;
             background: var(--el-fill-color-light);
             border: 1px solid var(--el-border-color-lighter);
-            font-size: 10px;
+            font-size: 10.5px;
             white-space: nowrap;
           }
         }
 
         .metric-probe-notes {
           font-size: 10.5px;
-          line-height: 1.3;
+          line-height: 1.35;
+          color: var(--el-text-color-secondary);
         }
       }
 
       .metric-data-col {
         display: flex;
         flex-direction: column;
-        gap: 5px;
+        gap: 4px;
 
         .metric-val-row {
           display: flex;
@@ -3264,7 +3271,8 @@ function handleDrawerOpened() {
           justify-content: space-between;
 
           .metric-val {
-            font-size: 12px;
+            font-size: 12.5px;
+            font-weight: 600;
             color: var(--el-text-color-primary);
           }
           .threshold-tag {
@@ -3404,7 +3412,7 @@ function handleDrawerOpened() {
       align-items: center;
       justify-content: center;
       padding: 10px 8px;
-      border-radius: 8px;
+      border-radius: 6px;
       background: var(--el-fill-color-blank);
       border: 1px solid var(--el-border-color-lighter);
       gap: 4px;
@@ -3431,8 +3439,8 @@ function handleDrawerOpened() {
       }
 
       .stat-percent {
-        font-size: 16px;
-        font-weight: 600;
+        font-size: 17px;
+        font-weight: 700;
         font-variant-numeric: tabular-nums;
         color: var(--el-text-color-primary);
         line-height: 1.2;
@@ -3449,15 +3457,14 @@ function handleDrawerOpened() {
   .consistency-advisory-box {
     display: flex;
     align-items: stretch;
-    background: rgba(59, 130, 246, 0.04);
-    border-radius: 8px;
+    background: rgba(59, 130, 246, 0.03);
+    border-radius: 6px;
     overflow: hidden;
     border: 1px solid rgba(59, 130, 246, 0.15);
+    border-left: 3px solid var(--el-color-primary);
 
     .advisory-bar-indicator {
-      width: 3px;
-      background: var(--el-color-primary);
-      flex-shrink: 0;
+      display: none;
     }
 
     .advisory-content-wrap {
@@ -3478,11 +3485,11 @@ function handleDrawerOpened() {
   .chain-card-row {
     display: flex;
     flex-direction: column;
-    padding: 12px 14px;
-    border-radius: 8px;
+    padding: 11px 14px;
+    border-radius: 6px;
     background: var(--el-fill-color-blank);
     border: 1px solid var(--el-border-color-lighter);
-    gap: 8px;
+    gap: 7px;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 
@@ -3620,7 +3627,7 @@ function handleDrawerOpened() {
           font-size: 11px;
           color: var(--el-text-color-secondary);
           cursor: pointer;
-          transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+          transition: all 0.15s ease;
           user-select: none;
 
           &:hover {
@@ -3651,7 +3658,7 @@ function handleDrawerOpened() {
       padding: 8px 12px;
       font-size: 12.5px;
       font-weight: 500;
-      border-radius: 8px;
+      border-radius: 6px;
       line-height: 1.35;
       transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 
@@ -3669,7 +3676,7 @@ function handleDrawerOpened() {
   align-items: center;
   gap: 12px;
   padding: 12px 16px;
-  border-radius: 8px;
+  border-radius: 6px;
   background: var(--el-fill-color-light);
   border: 1px solid var(--el-border-color-lighter);
   border-left: 3px solid var(--el-color-success);
@@ -3774,7 +3781,6 @@ function handleDrawerOpened() {
     flex-direction: column;
     padding: 0;
     overflow: hidden;
-    background: var(--el-bg-color-page, #f8fafc);
   }
 
   > .el-drawer__footer {
@@ -3806,30 +3812,40 @@ html.dark {
     .dossier-card {
       background: #161b22;
       border-color: #30363d;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
-
-      &:hover {
-        border-color: #484f58;
-      }
     }
 
     .chain-card-row,
     .swimlane-card,
-    .stat-col-box {
+    .stat-col-box,
+    .judgment-path-record-box,
+    .risk-indicators-unified-box,
+    .cluster-accounts-table {
       background: #161b22;
       border-color: #30363d;
     }
 
-    .cluster-preview-table {
-      background: #161b22;
-      border-color: #30363d;
-
-      .table-header-row {
+    .cluster-accounts-table {
+      .cluster-header-row {
         background: #1c2128;
         border-bottom-color: #30363d;
       }
 
-      .table-data-row {
+      .cluster-data-row {
+        border-bottom-color: #21262d;
+
+        &:hover {
+          background: #1c2128;
+        }
+      }
+    }
+
+    .risk-indicators-unified-box {
+      .gauge-legend-bar {
+        background: #1c2128;
+        border-bottom-color: #30363d;
+      }
+
+      .metric-card-row {
         border-bottom-color: #21262d;
 
         &:hover {
