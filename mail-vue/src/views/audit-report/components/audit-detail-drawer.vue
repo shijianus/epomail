@@ -5,6 +5,7 @@
     direction="rtl"
     destroy-on-close
     class="audit-detail-drawer audit-drawer-container"
+    :class="variantThemeClass"
     :show-close="false"
     @opened="handleDrawerOpened"
   >
@@ -141,7 +142,7 @@
           <!-- 8. 原因码 -->
           <div class="grid-field">
             <span class="field-k">{{ $t('abuseReasonCodeLabel') }}:</span>
-            <span class="field-v font-mono text-danger font-semibold">{{ selectedRow.reasonCode || 'RULE_INTERCEPT_STANDARD' }}</span>
+            <span class="field-v font-mono font-medium reason-code-highlight">{{ selectedRow.reasonCode || 'RULE_INTERCEPT_STANDARD' }}</span>
           </div>
 
           <!-- 9. 报警次数 (条件渲染) -->
@@ -427,7 +428,7 @@
             </div>
 
             <!-- 2. 中间：主驱动维度置于方格与维度列表之间，多行输出缩减左右间距 -->
-            <div class="risk-driver-2line-box">
+            <div class="risk-driver-2line-box risk-driver-bar-centered">
               <div class="driver-prefix-line">{{ $t('auditRiskMainDriver') }}:</div>
               <div class="driver-highlight-line text-danger font-medium">
                 {{ currentRiskProfile.mainDriver }}
@@ -492,7 +493,7 @@
                     <el-tag
                       size="small"
                       :type="metric.isOverThreshold ? 'danger' : 'success'"
-                      effect="dark"
+                      effect="plain"
                       class="threshold-tag"
                     >
                       {{ metric.isOverThreshold ? $t('auditRiskThresholdOver') : $t('auditRiskThresholdWithin') }}
@@ -800,10 +801,11 @@
             <span>{{ $t('auditBtnNote') }}</span>
           </el-button>
 
-          <!-- 解封 / 重新封禁 -->
+          <!-- 解封 / 重新封禁 (以更纯净的 plain 模式避免喧宾夺主) -->
           <el-button
             v-if="selectedRow.status === 'banned'"
             type="success"
+            plain
             :loading="actionLoading"
             @click="emit('toggleBan', selectedRow)"
           >
@@ -813,6 +815,7 @@
           <el-button
             v-else
             type="danger"
+            plain
             :loading="actionLoading"
             @click="emit('toggleBan', selectedRow)"
           >
@@ -2233,8 +2236,7 @@ function handleDrawerOpened() {
 .drawer-header-shell {
   display: flex;
   flex-direction: column;
-  padding: 16px 20px 10px 20px;
-  border-bottom: 1px solid var(--el-border-color-lighter);
+  padding: 16px 20px 12px 20px;
   background: var(--el-bg-color);
   width: 100%;
   min-width: 0;
@@ -2263,7 +2265,7 @@ function handleDrawerOpened() {
   justify-content: center;
   width: 38px;
   height: 38px;
-  border-radius: 8px;
+  border-radius: 9px;
   flex-shrink: 0;
 
   &.theme-threat {
@@ -2330,32 +2332,38 @@ function handleDrawerOpened() {
   }
 }
 
-/* 章节锚点 Chip 组 (极致紧凑不折行无横向滑块) */
+/* 章节锚点 Chip 组 (支持横向滑动，主题动态变色) */
 .chapter-chips-bar {
   display: flex;
   align-items: center;
-  gap: 4px;
-  overflow: hidden;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
   flex-wrap: nowrap;
-  margin-top: 8px;
+  margin-top: 10px;
   padding-bottom: 2px;
   width: 100%;
   box-sizing: border-box;
 
+  &::-webkit-scrollbar {
+    display: none;
+  }
+
   .chapter-chip {
     display: inline-flex;
     align-items: center;
-    gap: 3px;
-    padding: 2px 7px;
-    border-radius: 12px;
+    gap: 4px;
+    padding: 3px 10px;
+    border-radius: 9999px;
     font-size: 11.5px;
     color: var(--el-text-color-regular);
     background: var(--el-fill-color-light);
     cursor: pointer;
     white-space: nowrap;
     flex-shrink: 0;
-    transition: all 0.2s;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     user-select: none;
+    border: 1px solid transparent;
 
     &:hover {
       background: var(--el-fill-color);
@@ -2363,9 +2371,10 @@ function handleDrawerOpened() {
     }
 
     &.chip-active {
-      background: var(--el-color-primary);
+      background: var(--drawer-accent-color, var(--el-color-primary));
       color: #fff;
       font-weight: 500;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
     }
 
     .chip-icon {
@@ -2374,7 +2383,7 @@ function handleDrawerOpened() {
   }
 }
 
-/* 正文滚动区 */
+/* 正文滚动区与卡片浮起立体层次 */
 .drawer-scroll-body {
   flex: 1;
   min-height: 0;
@@ -2382,16 +2391,23 @@ function handleDrawerOpened() {
   padding: 16px 20px 24px 20px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
   scroll-behavior: smooth;
+  background: var(--el-bg-color-page, #f8fafc);
 }
 
 /* 通用档案卡片 */
 .dossier-card {
   border: 1px solid var(--el-border-color-lighter);
-  border-radius: 8px;
-  padding: 14px 16px;
-  background: var(--el-bg-color);
+  border-radius: 10px;
+  padding: 16px 18px;
+  background: var(--el-bg-color, #ffffff);
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.03), 0 1px 2px -1px rgba(0, 0, 0, 0.03);
+  transition: border-color 0.2s, box-shadow 0.2s;
+
+  &:hover {
+    border-color: var(--el-border-color);
+  }
 
   .section-title {
     display: flex;
@@ -2400,8 +2416,8 @@ function handleDrawerOpened() {
     font-size: 13.5px;
     font-weight: 600;
     color: var(--el-text-color-primary);
-    margin-bottom: 12px;
-    padding-bottom: 8px;
+    margin-bottom: 14px;
+    padding-bottom: 9px;
     border-bottom: 1px solid var(--el-border-color-lighter);
 
     .title-left {
@@ -2426,9 +2442,14 @@ function handleDrawerOpened() {
     }
 
     .section-badge {
-      font-size: 11px;
+      font-size: 10px;
       font-weight: 500;
       color: var(--el-text-color-secondary);
+      background: var(--el-fill-color-light);
+      padding: 1px 6px;
+      border-radius: 4px;
+      border: 1px solid var(--el-border-color-lighter);
+      letter-spacing: 0.5px;
     }
   }
 }
@@ -2436,7 +2457,7 @@ function handleDrawerOpened() {
 /* 模块 A: 案件概要两列网格 (左右等距对称排版) */
 .dossier-grid-12 {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px 24px;
   align-items: center;
 
@@ -2453,8 +2474,8 @@ function handleDrawerOpened() {
 
     .field-k {
       color: var(--el-text-color-secondary);
-      width: 72px;
-      min-width: 72px;
+      width: 76px;
+      min-width: 76px;
       margin-right: 8px;
       flex-shrink: 0;
       text-align: left;
@@ -2487,6 +2508,18 @@ function handleDrawerOpened() {
   }
 }
 
+.reason-code-highlight {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(239, 68, 68, 0.08);
+  color: var(--el-color-danger);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  font-size: 11.5px;
+  width: fit-content;
+}
+
 .inline-copy-btn {
   display: inline-flex;
   align-items: center;
@@ -2512,15 +2545,15 @@ function handleDrawerOpened() {
   display: flex;
   flex-direction: column;
   border: 1px solid var(--el-border-color-lighter);
-  border-radius: 6px;
+  border-radius: 8px;
   overflow: hidden;
   font-size: 12px;
 
   .cluster-header-row {
     display: grid;
-    grid-template-columns: 130px minmax(0, 1.5fr) minmax(0, 1.2fr) 76px minmax(0, 1.4fr);
-    column-gap: 8px;
-    padding: 8px 10px;
+    grid-template-columns: 140px minmax(170px, 1.8fr) minmax(90px, 1.1fr) 72px minmax(130px, 1.5fr);
+    column-gap: 10px;
+    padding: 9px 12px;
     background: var(--el-fill-color-light);
     font-weight: 600;
     color: var(--el-text-color-secondary);
@@ -2529,11 +2562,16 @@ function handleDrawerOpened() {
 
   .cluster-data-row {
     display: grid;
-    grid-template-columns: 130px minmax(0, 1.5fr) minmax(0, 1.2fr) 76px minmax(0, 1.4fr);
-    column-gap: 8px;
-    padding: 8px 10px;
+    grid-template-columns: 140px minmax(170px, 1.8fr) minmax(90px, 1.1fr) 72px minmax(130px, 1.5fr);
+    column-gap: 10px;
+    padding: 9px 12px;
     align-items: center;
     border-bottom: 1px solid var(--el-border-color-lighter);
+    transition: background 0.15s ease;
+
+    &:hover {
+      background: var(--el-fill-color-light);
+    }
 
     &:last-child {
       border-bottom: none;
@@ -2614,8 +2652,8 @@ function handleDrawerOpened() {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 10px 12px;
-  border-radius: 6px;
+  padding: 12px 14px;
+  border-radius: 8px;
   background: var(--el-fill-color-light);
   border: 1px solid var(--el-border-color-lighter);
 
@@ -2651,8 +2689,8 @@ function handleDrawerOpened() {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 10px 12px;
-  border-radius: 6px;
+  padding: 12px 14px;
+  border-radius: 8px;
   background: var(--el-fill-color-blank);
   border: 1px solid var(--el-border-color-lighter);
 
@@ -2660,11 +2698,11 @@ function handleDrawerOpened() {
     display: flex;
     align-items: center;
     gap: 6px;
-    font-size: 11px;
+    font-size: 11.5px;
     font-weight: 600;
     color: var(--el-text-color-secondary);
-    padding-bottom: 6px;
-    border-bottom: 1px dashed var(--el-border-color-lighter);
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--el-border-color-lighter);
   }
 
   .record-list {
@@ -2694,7 +2732,7 @@ function handleDrawerOpened() {
   }
 }
 
-/* 模块 D: 处置与存证全周期时间线 (时间线居中唯一中轴，两侧完全独立) */
+/* 模块 D: 处置与存证全周期时间线 (单轴贯通流，消除 50% 虚白与孤字换行) */
 .dual-swimlane-container {
   display: flex;
   flex-direction: column;
@@ -2702,57 +2740,91 @@ function handleDrawerOpened() {
 }
 
 .swimlane-column-headers {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 28px minmax(0, 1fr);
+  display: flex;
   align-items: center;
-  font-size: 12px;
+  gap: 10px;
+  font-size: 11.5px;
   font-weight: 600;
 
   .swimlane-header {
-    display: flex;
+    display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 6px 12px;
-    border-radius: 4px;
+    padding: 3px 10px;
+    border-radius: 9999px;
     background: var(--el-fill-color-light);
 
     &.machine-header {
-      grid-column: 1;
       color: var(--el-color-primary);
+      border: 1px solid rgba(59, 130, 246, 0.15);
     }
     &.human-header {
-      grid-column: 3;
       color: var(--el-color-warning);
+      border: 1px solid rgba(245, 158, 11, 0.15);
     }
   }
 
   .swimlane-header-spacer {
-    grid-column: 2;
+    display: none;
   }
 }
 
 .swimlane-grid-track {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
+  position: relative;
+  padding-left: 32px;
+
+  /* 垂直贯通时间线 */
+  &::before {
+    content: '';
+    position: absolute;
+    top: 14px;
+    bottom: 20px;
+    left: 12px;
+    width: 2px;
+    background: var(--el-border-color-lighter);
+    z-index: 1;
+  }
 
   .swimlane-row {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 28px minmax(0, 1fr);
-    align-items: center;
+    display: flex;
+    align-items: stretch;
     position: relative;
+    width: 100%;
 
+    /* 隐藏对立侧空白占位单元格，不再虚耗 50% 宽度 */
     .swimlane-cell {
       min-width: 0;
+      width: 100%;
+
+      &:has(.swimlane-placeholder),
+      &.machine-cell:empty,
+      &.human-cell:empty {
+        display: none !important;
+      }
+
+      .swimlane-placeholder {
+        display: none !important;
+      }
 
       .swimlane-card {
-        padding: 10px 12px;
-        border-radius: 6px;
+        width: 100%;
+        box-sizing: border-box;
+        padding: 12px 14px;
+        border-radius: 8px;
         border: 1px solid var(--el-border-color-lighter);
         background: var(--el-fill-color-blank);
         display: flex;
         flex-direction: column;
-        gap: 5px;
+        gap: 6px;
+        transition: all 0.2s;
+
+        &:hover {
+          border-color: var(--el-border-color);
+          box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+        }
 
         &.machine-card {
           border-left: 3px solid var(--el-color-primary);
@@ -2763,6 +2835,7 @@ function handleDrawerOpened() {
         &.card-latest {
           border-color: rgba(239, 68, 68, 0.45);
           background: rgba(239, 68, 68, 0.02);
+          box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.15);
         }
 
         .card-top-row {
@@ -2795,7 +2868,7 @@ function handleDrawerOpened() {
           .latest-tag {
             font-size: 10px;
             height: 18px;
-            padding: 0 4px;
+            padding: 0 5px;
             margin-left: auto;
           }
         }
@@ -2803,8 +2876,8 @@ function handleDrawerOpened() {
         .card-title-row {
           display: flex;
           align-items: center;
-          gap: 6px;
-          font-size: 12.5px;
+          gap: 7px;
+          font-size: 13px;
 
           .node-num-badge {
             display: inline-flex;
@@ -2824,9 +2897,9 @@ function handleDrawerOpened() {
         }
 
         .card-desc {
-          font-size: 12px;
+          font-size: 12.5px;
           color: var(--el-text-color-regular);
-          line-height: 1.45;
+          line-height: 1.5;
         }
 
         .card-footer-row {
@@ -2880,36 +2953,25 @@ function handleDrawerOpened() {
           }
         }
       }
-
-      /* 空白单元格完全透明留白，禁止放置侧边多余时间线 */
-      .swimlane-placeholder {
-        min-height: 1px;
-      }
     }
 
-    /* 唯一居中时间线中轴，垂直贯通 */
+    /* 唯一居中时间线节点锚点，整齐靠左中轴对齐 */
     .swimlane-axis {
+      position: absolute;
+      left: -32px;
+      top: 10px;
+      width: 24px;
+      height: 24px;
       display: flex;
       align-items: center;
       justify-content: center;
-      position: relative;
-      height: 100%;
+      z-index: 2;
 
       &::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        bottom: 0;
-        left: 50%;
-        width: 2px;
-        transform: translateX(-50%);
-        background: var(--el-border-color-lighter);
-        z-index: 1;
+        display: none;
       }
 
       .axis-dot {
-        position: relative;
-        z-index: 2;
         width: 22px;
         height: 22px;
         border-radius: 50%;
@@ -2932,36 +2994,21 @@ function handleDrawerOpened() {
       }
     }
   }
-
-  @media (max-width: 580px) {
-    .swimlane-column-headers {
-      display: none;
-    }
-    .swimlane-row {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      .swimlane-axis,
-      .swimlane-placeholder {
-        display: none;
-      }
-    }
-  }
 }
 
 /* 模块 E: 多维风险画像 */
 .risk-profile-unified-card {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
 }
 
 .risk-top-grid {
   display: grid;
-  grid-template-columns: 88px 125px 1fr;
-  gap: 14px;
+  grid-template-columns: 88px minmax(130px, 160px) 1fr;
+  gap: 16px;
   align-items: center;
-  height: 88px;
+  min-height: 88px;
 
   @media (max-width: 600px) {
     grid-template-columns: 1fr;
@@ -2980,7 +3027,7 @@ function handleDrawerOpened() {
   width: 88px;
   height: 88px;
   aspect-ratio: 1 / 1;
-  border-radius: 8px;
+  border-radius: 10px;
   background: var(--el-fill-color-light);
   display: flex;
   flex-direction: column;
@@ -2990,7 +3037,7 @@ function handleDrawerOpened() {
   box-sizing: border-box;
 
   .score-number {
-    font-size: 30px;
+    font-size: 32px;
     font-weight: 700;
     line-height: 1;
   }
@@ -3002,29 +3049,31 @@ function handleDrawerOpened() {
 
   &.score-danger {
     color: var(--el-color-danger);
-    border: 1px solid rgba(239, 68, 68, 0.35);
+    background: rgba(239, 68, 68, 0.06);
+    border: 1px solid rgba(239, 68, 68, 0.25);
   }
   &.score-warning {
     color: var(--el-color-warning);
-    border: 1px solid rgba(245, 158, 11, 0.35);
+    background: rgba(245, 158, 11, 0.06);
+    border: 1px solid rgba(245, 158, 11, 0.25);
   }
   &.score-success {
     color: var(--el-color-success);
-    border: 1px solid rgba(16, 185, 129, 0.35);
+    background: rgba(16, 185, 129, 0.06);
+    border: 1px solid rgba(16, 185, 129, 0.25);
   }
 }
 
-/* 主驱动维度：无方框纯净排版，与左侧方格及右侧列表完全对齐居中 */
-.risk-driver-2line-box {
+/* 主驱动维度：自然居中与左侧方格及右侧列表对齐 */
+.risk-driver-2line-box,
+.risk-driver-bar-centered {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 3px;
-  height: 88px;
+  gap: 4px;
   padding: 0;
   background: transparent;
   border: none;
-  width: 125px;
   box-sizing: border-box;
 
   .driver-prefix-line {
@@ -3035,20 +3084,19 @@ function handleDrawerOpened() {
   }
 
   .driver-highlight-line {
-    font-size: 11px;
-    line-height: 1.35;
+    font-size: 11.5px;
+    line-height: 1.4;
     word-break: break-word;
     white-space: normal;
   }
 }
 
-/* 右侧多维风险维度条列表：一行放 2 个 (2 列 2 行网格)，与前两项完全等高对齐 */
+/* 右侧多维风险维度条列表 */
 .risk-dimensions-list {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   grid-template-rows: repeat(2, 1fr);
   gap: 8px 14px;
-  height: 88px;
   min-width: 0;
   flex: 1;
   box-sizing: border-box;
@@ -3096,12 +3144,12 @@ function handleDrawerOpened() {
         width: 100%;
       }
       :deep(.el-progress-bar__outer) {
-        height: 5px !important;
-        border-radius: 3px;
+        height: 6px !important;
+        border-radius: 9999px;
         background: var(--el-fill-color-light);
       }
       :deep(.el-progress-bar__inner) {
-        border-radius: 3px;
+        border-radius: 9999px;
       }
     }
   }
@@ -3111,27 +3159,27 @@ function handleDrawerOpened() {
   display: flex;
   flex-direction: column;
   border: 1px solid var(--el-border-color-lighter);
-  border-radius: 6px;
+  border-radius: 8px;
   overflow: hidden;
 
   .gauge-legend-bar {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 6px 10px;
+    gap: 14px;
+    padding: 7px 12px;
     background: var(--el-fill-color-light);
     border-bottom: 1px solid var(--el-border-color-lighter);
-    font-size: 10.5px;
+    font-size: 11px;
     color: var(--el-text-color-secondary);
     flex-wrap: wrap;
 
     .legend-pill {
       display: flex;
       align-items: center;
-      gap: 4px;
+      gap: 5px;
 
       .legend-color-box {
-        width: 10px;
+        width: 12px;
         height: 4px;
         border-radius: 2px;
         &.base-cohort { background: var(--el-color-primary); }
@@ -3149,9 +3197,14 @@ function handleDrawerOpened() {
       display: grid;
       grid-template-columns: minmax(0, 1.1fr) minmax(240px, 280px);
       gap: 14px;
-      padding: 8px 12px;
+      padding: 9px 14px;
       border-bottom: 1px solid var(--el-border-color-lighter);
       align-items: center;
+      transition: background 0.15s ease;
+
+      &:hover {
+        background: var(--el-fill-color-light);
+      }
 
       &:last-child {
         border-bottom: none;
@@ -3172,11 +3225,11 @@ function handleDrawerOpened() {
           display: flex;
           align-items: baseline;
           flex-wrap: wrap;
-          column-gap: 5px;
-          row-gap: 1px;
+          column-gap: 6px;
+          row-gap: 2px;
 
           .metric-name {
-            font-size: 11.5px;
+            font-size: 12px;
             color: var(--el-text-color-primary);
           }
           .metric-rule-box {
@@ -3192,8 +3245,8 @@ function handleDrawerOpened() {
         }
 
         .metric-probe-notes {
-          font-size: 10px;
-          line-height: 1.25;
+          font-size: 10.5px;
+          line-height: 1.3;
         }
       }
 
@@ -3212,13 +3265,12 @@ function handleDrawerOpened() {
             color: var(--el-text-color-primary);
           }
           .threshold-tag {
-            font-size: 10px;
-            height: 17px;
-            padding: 0 4px;
+            font-size: 10.5px;
+            height: 18px;
+            padding: 0 5px;
           }
         }
 
-        /* 恢复 gauge-bar-wrapper 与 gauge-fill 自然适度宽度，不被 190px 挤压 */
         .gauge-bar-wrapper {
           display: flex;
           flex-direction: column;
@@ -3227,18 +3279,18 @@ function handleDrawerOpened() {
 
           .gauge-track {
             position: relative;
-            height: 7px;
+            height: 6px;
             background: var(--el-fill-color-light);
-            border-radius: 4px;
+            border-radius: 9999px;
             overflow: hidden;
 
             .gauge-fill {
               height: 100%;
               background: var(--el-color-primary);
-              border-radius: 4px;
+              border-radius: 9999px;
               transition: width 0.3s;
               &.fill-over {
-                background: var(--el-color-danger);
+                background: linear-gradient(90deg, #f87171, #ef4444);
               }
             }
 
@@ -3288,16 +3340,16 @@ function handleDrawerOpened() {
     justify-content: space-between;
     font-size: 12px;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: 8px;
 
     .header-reason-box {
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      padding: 2px 8px;
-      border-radius: 4px;
+      padding: 3px 8px;
+      border-radius: 6px;
       background: rgba(239, 68, 68, 0.08);
-      border: 1px solid rgba(239, 68, 68, 0.2);
+      border: 1px solid rgba(239, 68, 68, 0.18);
       font-size: 11.5px;
 
       .reason-prefix {
@@ -3306,7 +3358,14 @@ function handleDrawerOpened() {
       }
       .reason-code-val {
         color: var(--el-color-danger);
+        font-weight: 600;
+        font-family: var(--el-font-family-monospace, monospace);
       }
+    }
+
+    .distribution-meta {
+      font-size: 11.5px;
+      color: var(--el-text-color-secondary);
     }
 
     .meta-separator {
@@ -3316,14 +3375,14 @@ function handleDrawerOpened() {
 
   .stacked-distribution-bar {
     display: flex;
-    height: 12px;
-    border-radius: 6px;
+    height: 8px;
+    border-radius: 9999px;
     overflow: hidden;
-    background: var(--el-fill-color-light);
+    background: var(--el-fill-color);
 
     .dist-segment {
       height: 100%;
-      transition: width 0.3s;
+      transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
   }
 
@@ -3340,33 +3399,46 @@ function handleDrawerOpened() {
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding: 8px 6px;
-      border-radius: 6px;
-      background: var(--el-fill-color-light);
+      justify-content: center;
+      padding: 10px 8px;
+      border-radius: 8px;
+      background: var(--el-fill-color-blank);
       border: 1px solid var(--el-border-color-lighter);
-      gap: 2px;
+      gap: 4px;
+      transition: border-color 0.2s, box-shadow 0.2s;
+
+      &:hover {
+        border-color: var(--el-border-color);
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+      }
 
       .stat-name-row {
         display: flex;
         align-items: center;
-        gap: 5px;
+        gap: 6px;
         font-size: 11.5px;
         color: var(--el-text-color-secondary);
 
         .color-dot {
-          width: 8px;
-          height: 8px;
+          width: 7px;
+          height: 7px;
           border-radius: 50%;
+          flex-shrink: 0;
         }
       }
 
       .stat-percent {
-        font-size: 15px;
+        font-size: 16px;
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
         color: var(--el-text-color-primary);
+        line-height: 1.2;
       }
 
       .stat-count {
         font-size: 11px;
+        color: var(--el-text-color-placeholder);
+        font-variant-numeric: tabular-nums;
       }
     }
   }
@@ -3374,21 +3446,21 @@ function handleDrawerOpened() {
   .consistency-advisory-box {
     display: flex;
     align-items: stretch;
-    background: var(--el-fill-color-light);
-    border-radius: 6px;
+    background: rgba(59, 130, 246, 0.04);
+    border-radius: 8px;
     overflow: hidden;
-    border: 1px solid var(--el-border-color-lighter);
+    border: 1px solid rgba(59, 130, 246, 0.15);
 
     .advisory-bar-indicator {
-      width: 4px;
+      width: 3px;
       background: var(--el-color-primary);
       flex-shrink: 0;
     }
 
     .advisory-content-wrap {
-      padding: 8px 12px;
+      padding: 10px 14px;
       font-size: 12px;
-      line-height: 1.5;
+      line-height: 1.6;
       color: var(--el-text-color-regular);
     }
   }
@@ -3403,11 +3475,18 @@ function handleDrawerOpened() {
   .chain-card-row {
     display: flex;
     flex-direction: column;
-    padding: 10px 12px;
-    border-radius: 6px;
+    padding: 12px 14px;
+    border-radius: 8px;
     background: var(--el-fill-color-blank);
     border: 1px solid var(--el-border-color-lighter);
-    gap: 6px;
+    gap: 8px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+
+    &:hover {
+      border-color: var(--el-border-color);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+    }
 
     .chain-header-line {
       display: flex;
@@ -3418,30 +3497,34 @@ function handleDrawerOpened() {
       .evidence-id-title {
         display: flex;
         align-items: center;
-        gap: 6px;
+        gap: 8px;
         font-size: 12.5px;
+        font-weight: 500;
         color: var(--el-text-color-primary);
 
         .ev-code-box {
           display: inline-flex;
           align-items: center;
-          padding: 1px 6px;
+          padding: 2px 8px;
           border-radius: 4px;
           background: rgba(59, 130, 246, 0.08);
           color: var(--el-color-primary);
           border: 1px solid rgba(59, 130, 246, 0.2);
+          font-family: var(--el-font-family-monospace, monospace);
           font-size: 11px;
+          font-weight: 600;
         }
       }
 
       .evidence-rule-box {
         display: inline-flex;
         align-items: center;
-        padding: 1px 6px;
+        padding: 2px 8px;
         border-radius: 4px;
         background: rgba(239, 68, 68, 0.08);
         border: 1px solid rgba(239, 68, 68, 0.2);
-        font-size: 10.5px;
+        font-size: 11px;
+        font-weight: 500;
       }
     }
 
@@ -3449,13 +3532,13 @@ function handleDrawerOpened() {
       display: flex;
       align-items: center;
       gap: 8px;
-      font-size: 11.5px;
+      font-size: 12px;
       flex-wrap: wrap;
 
       .flow-step-box {
         display: inline-flex;
         align-items: center;
-        padding: 1px 6px;
+        padding: 2px 8px;
         border-radius: 4px;
         background: var(--el-fill-color-light);
         border: 1px solid var(--el-border-color-lighter);
@@ -3465,30 +3548,35 @@ function handleDrawerOpened() {
       }
 
       .flow-arrow {
-        color: var(--el-text-color-secondary);
+        color: var(--el-text-color-placeholder);
+        display: inline-flex;
+        align-items: center;
       }
 
       .flow-hash-pill {
         display: inline-flex;
         align-items: center;
-        gap: 3px;
-        padding: 1px 6px;
+        gap: 4px;
+        padding: 2px 8px;
         border-radius: 4px;
         background: var(--el-fill-color-light);
         border: 1px solid var(--el-border-color-lighter);
         color: var(--el-text-color-secondary);
         cursor: pointer;
+        font-family: var(--el-font-family-monospace, monospace);
         font-size: 11px;
-        transition: all 0.2s;
+        transition: all 0.15s ease;
 
         &:hover {
           color: var(--el-color-primary);
-          border-color: var(--el-color-primary);
+          border-color: var(--el-color-primary-light-5);
+          background: var(--el-color-primary-light-9);
         }
       }
 
       .flow-judgement-text {
         color: var(--el-text-color-regular);
+        font-size: 12px;
       }
     }
   }
@@ -3499,7 +3587,7 @@ function handleDrawerOpened() {
   .decision-input-group {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 8px;
     margin-bottom: 14px;
 
     .decision-input-header {
@@ -3511,6 +3599,7 @@ function handleDrawerOpened() {
 
       .input-title {
         font-size: 12.5px;
+        font-weight: 500;
         color: var(--el-text-color-primary);
       }
 
@@ -3523,16 +3612,18 @@ function handleDrawerOpened() {
         .preset-chip {
           border: 1px solid var(--el-border-color-lighter);
           background: var(--el-fill-color-light);
-          padding: 2px 7px;
-          border-radius: 10px;
-          font-size: 10.5px;
+          padding: 2px 8px;
+          border-radius: 9999px;
+          font-size: 11px;
           color: var(--el-text-color-secondary);
           cursor: pointer;
-          transition: all 0.2s;
+          transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+          user-select: none;
 
           &:hover {
             border-color: var(--el-color-primary);
             color: var(--el-color-primary);
+            background: var(--el-color-primary-light-9);
           }
         }
       }
@@ -3542,7 +3633,7 @@ function handleDrawerOpened() {
   .adjudication-actions-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
+    gap: 10px;
 
     @media (max-width: 580px) {
       grid-template-columns: 1fr;
@@ -3552,11 +3643,19 @@ function handleDrawerOpened() {
       width: 100%;
       margin-left: 0;
       justify-content: center;
-      white-space: normal;
-      height: auto;
-      min-height: 32px;
-      padding: 6px 10px;
+      height: 38px;
+      min-height: 38px;
+      padding: 8px 12px;
+      font-size: 12.5px;
+      font-weight: 500;
+      border-radius: 8px;
       line-height: 1.35;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+
+      .el-icon {
+        margin-right: 6px;
+        font-size: 14px;
+      }
     }
   }
 }
@@ -3566,27 +3665,31 @@ function handleDrawerOpened() {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 14px;
-  border-radius: 6px;
+  padding: 12px 16px;
+  border-radius: 8px;
   background: var(--el-fill-color-light);
   border: 1px solid var(--el-border-color-lighter);
+  border-left: 3px solid var(--el-color-success);
 
   .banner-icon {
     color: var(--el-color-success);
     flex-shrink: 0;
+    font-size: 20px;
   }
 
   .banner-text-box {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 3px;
 
     .banner-title {
-      font-size: 12.5px;
+      font-size: 13px;
+      font-weight: 500;
       color: var(--el-text-color-primary);
     }
     .banner-sub {
-      font-size: 11px;
+      font-size: 11.5px;
+      color: var(--el-text-color-secondary);
     }
   }
 }
@@ -3609,6 +3712,14 @@ function handleDrawerOpened() {
   flex-wrap: wrap;
   gap: 10px;
 
+  :deep(.el-button) {
+    height: 34px;
+    padding: 7px 16px;
+    border-radius: 6px;
+    font-size: 12.5px;
+    font-weight: 500;
+  }
+
   @media (max-width: 768px) {
     gap: 8px;
 
@@ -3628,10 +3739,29 @@ function handleDrawerOpened() {
   overflow: hidden;
   background: var(--el-bg-color);
 
+  /* Variant-aware accent tokens */
+  &.theme-threat {
+    --drawer-accent-color: var(--el-color-danger, #ef4444);
+    --drawer-accent-light: rgba(239, 68, 68, 0.08);
+  }
+  &.theme-appeal {
+    --drawer-accent-color: var(--el-color-warning, #f59e0b);
+    --drawer-accent-light: rgba(245, 158, 11, 0.08);
+  }
+  &.theme-audit {
+    --drawer-accent-color: var(--el-color-primary, #3b82f6);
+    --drawer-accent-light: rgba(59, 130, 246, 0.08);
+  }
+  &.theme-record {
+    --drawer-accent-color: var(--el-color-info, #64748b);
+    --drawer-accent-light: rgba(100, 116, 139, 0.08);
+  }
+
   > .el-drawer__header {
     flex-shrink: 0;
     margin-bottom: 0;
     padding: 0;
+    border-bottom: 1px solid var(--el-border-color-lighter);
   }
 
   > .el-drawer__body {
@@ -3641,6 +3771,7 @@ function handleDrawerOpened() {
     flex-direction: column;
     padding: 0;
     overflow: hidden;
+    background: var(--el-bg-color-page, #f8fafc);
   }
 
   > .el-drawer__footer {
@@ -3648,6 +3779,65 @@ function handleDrawerOpened() {
     padding: 12px 20px;
     border-top: 1px solid var(--el-border-color-lighter);
     background: var(--el-bg-color);
+  }
+}
+
+/* Dark mode theme alignment */
+html.dark {
+  .audit-detail-drawer.audit-drawer-container {
+    background: #0d1117;
+
+    > .el-drawer__body {
+      background: #090d13;
+    }
+
+    > .el-drawer__footer {
+      background: #0d1117;
+      border-top-color: #30363d;
+    }
+
+    .drawer-header-shell {
+      background: #0d1117;
+    }
+
+    .dossier-card {
+      background: #161b22;
+      border-color: #30363d;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+
+      &:hover {
+        border-color: #484f58;
+      }
+    }
+
+    .chain-card-row,
+    .swimlane-card,
+    .stat-col-box {
+      background: #161b22;
+      border-color: #30363d;
+    }
+
+    .cluster-preview-table {
+      background: #161b22;
+      border-color: #30363d;
+
+      .table-header-row {
+        background: #1c2128;
+        border-bottom-color: #30363d;
+      }
+
+      .table-data-row {
+        border-bottom-color: #21262d;
+
+        &:hover {
+          background: #1c2128;
+        }
+      }
+    }
+
+    .gauge-track {
+      background: #21262d;
+    }
   }
 }
 </style>
