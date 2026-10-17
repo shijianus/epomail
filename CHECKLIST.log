@@ -8,6 +8,66 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### 操作报告抽屉四变体设计素材复核：伪造取证数据清除与变体读写权限结构修正 (2026-10-16)
+*   **关联提交 (Git Commit)**: `a3e94c6e5c9e26ce30b79d97e9519cfbebf4cf56` (Short: `a3e94c6`)
+*   **部署环境 (Deployment)**: `本地构建核验 (mail-vue) · 尚未部署生产`
+*   **背景 (Context)**:
+    以「操作报告右侧扩展边栏四变体」设计素材为基准，对 `5e6ba87` / `5dedb4e` 已交付实现做逐条一致性复核。
+    发现既有静态断言套件为纯字符串匹配，可检出「组件/类名是否存在」但无法检出「数据是否真实、权限结构是否正确」，
+    导致下列语义级缺陷全部漏网并已随 `5dedb4e` 上线生产。
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] **[P0] 零假数据红线违规清除**：
+        1. `clusterAccountsList` 原在 `clusterId`/`isCluster` 命中时凭空派生 3 个关联账号
+           (`syndicate_node2~4@farm.net` / `usr_99201~99203`)，并渲染为「随主账号一并管控」的真实列表且附一键复制，
+           裁决者可对根本不存在的账号执行管控。改为仅取后端真实 `clusterAccounts`
+           (`mail-worker/src/service/audit-service.js:1113-1118` 已由 DB `members` 构建)，无数据即空数组，回归纯条件渲染；
+        2. 移除全部臆造 SHA256：`evidenceDigestHash` 原由 `r.id * 179234` 推导伪哈希，
+           而 `audit_log` 表 (`mail-worker/src/entity/audit-log.js`) 根本无任何哈希列；改为仅回传 `evidenceHash`，缺省不渲染；
+        3. 时间线兜底节点移除伪造哈希与按序号递增的伪造耗时 (`+0m`/`+3m`/`+4h`/`+2h`/`+15m`)；
+           申诉节点时间由臆造的 `createTime + 4h` 改用真实 `lastUpdated`/`banTime` 锚定。
+    - [x] **[P1] 变体读写权限矩阵对齐**：
+        1. 只读台账横幅 (模块 I) 原在变体 2 与变体 4 同时渲染。变体 2 属可裁决可写回变体，
+           挂 `IMMUTABLE_AUDIT_LOG · 防篡改公开台账` 与其自身四枚裁决按钮自相矛盾；收紧为变体 4 专属 (章节 + 锚点 chip 同步)；
+        2. `canExtend` 原为 `activeVariant !== 1`，恰好排除了变体 1，与素材「三个可写变体底部栏均含延期」相反；
+           改为对 V1/V2/V3 一致生效，并以截止期限尚未过期 (`deadline`/`expireTime`/`deadlockTime` > now) 为条件。
+    - [x] **[P1] 占位样本诚实披露 (对齐素材 §一.7)**：
+        1. 新增 `auditPlaceholderSampleNotice`，在多维风险画像 / 相似案例参照 / 证据链溯源三个
+           **完全无后端数据源** 的模块统一披露「脱敏聚合占位样本，尚未接入后端取证数据源，不得作为裁决依据」；
+        2. 移除误导性 `auditRiskTelemetryNotice` (谎称指标「由 Sentinel 引擎脱敏聚合分析生成」，实为前端常量)
+           与 `IMMUTABLE_CHAIN_V2` 徽标 (对硬编码数组宣称防篡改)，六语言死键一并清除；
+        3. 新增 `timelineIsSynthetic`，后端未供 `timeline` 而对派生节点走兜底时显式披露。
+    - [x] **[P1] 变体 2 章节名变体化落地**：
+        `:142` / `:318` 两处 `activeVariant === 2 ? $t(X) : $t(X)` 两分支同值，
+        「案件信息 / 风险研判 / 提交裁决」重命名自交付起从未生效。抽出 `chapterLabels` 统一驱动，
+        章节 chip 与正文标题不再各说一套 (顺带修复 chip 用 `auditChipDecision`、标题用 `auditAdjudicateAction` 的长期不一致)。
+    - [x] **测试资产补强**：
+        `tests/verify-audit-drawer-variants.mjs` 新增「验收 5」共 48 项**反向断言**，覆盖伪造账号/伪哈希/伪耗时禁令、
+        台账横幅变体隔离、延期条件、空操作三元表达式禁令、占位披露词条与六语言死键清除。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：mail-vue `vite build` 14.25s 通过，零报错零警告；
+    - [x] 自动化测试套件：`tests/verify-audit-drawer-variants.mjs` 237 项断言 100% 全绿 (exit 0)；
+    - [x] **反向有效性验证 (防空转)**：以修复前 `HEAD` 版本 (`git show HEAD:...`) 回放 11 项结构断言，
+        其中 10 项在旧代码上失败、空操作三元表达式断言实测旧代码命中 2 处 (`L142`/`L318`) 而新代码 0 处，确认断言具备真实检出力；
+    - [x] 多语言绝对对称：`node scripts/i18n-symmetry.mjs` mail-vue 2791 键 / mail-worker 1929 键六语言 100% 对称 (+4 新增 −1 废弃)；
+    - [x] 代码引用零缺失：`node scripts/i18n-audit.mjs` 0 missing keys、0 non-literal `t()` usages；
+    - [x] 关联静态套件回归：`verify-audit-section-columns` / `verify-appeal-deadlock-days` / `verify-audit-expire-days` 全绿；
+    - [x] 悬空引用清零：全仓扫描 `auditRiskTelemetryNotice` / `IMMUTABLE_CHAIN_V2` / `syndicate_node` 仅余测试文件中的反向断言；
+    - [x] 零假数据残留：本次为**移除**假数据，未新增任何数据库/KV 持久化数据。
+*   **未完成与遗留事项 (Outstanding)**:
+    - [ ] **浏览器全真栈实测未执行**：本环境未初始化本地全真栈 (无 `.wrangler/state`、无 `.dev.vars`)，
+        无法按红线 §4 做 UI 实测。本次仅有构建级与静态断言级验证，**视觉与交互回归待补**；
+    - [ ] **生产未部署**：生产 `mail.epocanvas.com` 仍运行 `5dedb4e` 旧构建，上述 P0 伪造集群账号在线上依然可见，待授权后部署；
+    - [ ] 两个**既有**失败套件 (非本次引入)：`verify-audit-ui-optimization.mjs` 断言 `index.vue` 含 `selectedRow.email`，
+        该串在 `5e6ba87` 抽出抽屉组件时已迁至子组件，属陈旧断言待更新；
+        `verify-appeal-and-audit-integration.mjs` 为打生产 `mail.epocanvas.com` 的 Playwright 登录测试，需线上凭证与运行中服务；
+    - [ ] 素材 §一.7 要求的六语言硬编码收口 (抽屉内 39 处未包裹中文字面量) 未纳入本次范围，待专项处理；
+    - [ ] **`.git/hooks/pre-commit` 密钥内容扫描失败即放行 (安全控制失效)**：
+        钩子 `-G` 正则含非法字符区间 `[0-9A-Za-z-_]` (`z-_` 为降序区间)，`git diff` 返回 `fatal: invalid regex: Invalid range end`
+        并 exit 128，致 `diff_content` 恒为空、整段 API Key 内容扫描被跳过，钩子仍打印「✅ Pre-commit check passed」。
+        即 Resend/OpenAI/Google/Telegram 令牌的内容级拦截自始未生效，仅文件名级检查有效。
+        修复方式：字符类连字符移至末尾 `[0-9A-Za-z_-]` (已实测修正后 exit 0)。因该钩子为 `.git/` 本地未追踪配置，
+        且启用后可能开始拦截历史可提交的变更，**待确认后再修**。
+
 ### 操作报告抽屉四变体 Cloudflare 生产部署与大厂级全真栈视觉核验 (2026-10-16)
 *   **关联提交 (Git Commit)**: `5dedb4e5c31f8c54a86babed8c63003708104a74` (Short: `5dedb4e`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com · Worker Version ID: aa4d2453-ccc6-420c-90e4-a2233f345b3b)`
