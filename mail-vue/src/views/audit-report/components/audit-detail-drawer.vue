@@ -434,7 +434,7 @@
               </div>
             </div>
 
-            <!-- 3. 右侧：多维风险维度条列表 (缩短 el-progress-bar__inner 进度条长度) -->
+            <!-- 3. 右侧：多维风险维度条列表 (一行放2个，2列2行与左侧完全对齐) -->
             <div class="risk-dimensions-list">
               <div
                 v-for="dim in currentRiskProfile.dimensions"
@@ -442,7 +442,7 @@
                 class="dimension-row"
               >
                 <div class="dim-label-row">
-                  <span class="dim-name font-medium">{{ dim.name }}</span>
+                  <span class="dim-name font-medium" :title="dim.name">{{ dim.name }}</span>
                   <div class="dim-meta font-mono">
                     <span class="dim-score" :class="getScoreColorClass(dim.score)">{{ dim.score }}分</span>
                     <span class="dim-weight text-muted">(权重: {{ dim.weight }}%)</span>
@@ -2958,13 +2958,21 @@ function handleDrawerOpened() {
 
 .risk-top-grid {
   display: grid;
-  grid-template-columns: 88px minmax(130px, 160px) 1fr;
-  gap: 12px;
-  align-items: stretch;
+  grid-template-columns: 88px 125px 1fr;
+  gap: 14px;
+  align-items: center;
+  height: 88px;
 
   @media (max-width: 600px) {
     grid-template-columns: 1fr;
     justify-items: center;
+    height: auto;
+
+    .composite-score-square,
+    .risk-driver-2line-box,
+    .risk-dimensions-list {
+      height: auto;
+    }
   }
 }
 
@@ -2979,6 +2987,7 @@ function handleDrawerOpened() {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  box-sizing: border-box;
 
   .score-number {
     font-size: 30px;
@@ -3005,18 +3014,17 @@ function handleDrawerOpened() {
   }
 }
 
-/* 主驱动维度：放置在分数方格与维度列表之间，多行输出缩减水平间距 */
+/* 主驱动维度：无方框纯净排版，与左侧方格及右侧列表完全对齐居中 */
 .risk-driver-2line-box {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 4px;
-  padding: 8px 10px;
-  border-radius: 6px;
-  background: var(--el-fill-color-light);
-  border: 1px solid var(--el-border-color-lighter);
-  min-width: 130px;
-  max-width: 170px;
+  gap: 3px;
+  height: 88px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  width: 125px;
   box-sizing: border-box;
 
   .driver-prefix-line {
@@ -3027,46 +3035,65 @@ function handleDrawerOpened() {
   }
 
   .driver-highlight-line {
-    font-size: 11.5px;
-    line-height: 1.45;
+    font-size: 11px;
+    line-height: 1.35;
     word-break: break-word;
     white-space: normal;
   }
 }
 
-/* 右侧多维风险维度条列表：显式缩短 el-progress-bar__inner 长度 */
+/* 右侧多维风险维度条列表：一行放 2 个 (2 列 2 行网格)，与前两项完全等高对齐 */
 .risk-dimensions-list {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  grid-template-rows: repeat(2, 1fr);
+  gap: 8px 14px;
+  height: 88px;
   min-width: 0;
   flex: 1;
+  box-sizing: border-box;
 
   .dimension-row {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    justify-content: center;
+    gap: 3px;
+    min-width: 0;
 
     .dim-label-row {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      font-size: 11.5px;
+      font-size: 11px;
+      gap: 4px;
+
+      .dim-name {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
 
       .dim-meta {
-        font-size: 10.5px;
+        font-size: 9.5px;
         display: flex;
         align-items: center;
-        gap: 5px;
+        gap: 3px;
+        white-space: nowrap;
+        flex-shrink: 0;
+
+        .dim-score {
+          font-weight: 600;
+        }
       }
     }
 
     .dim-progress-wrap {
       display: flex;
       align-items: center;
+      width: 100%;
 
       :deep(.el-progress) {
-        width: 140px; /* 显式缩短 el-progress 与 el-progress-bar__inner 轨道长度 */
+        width: 100%;
       }
       :deep(.el-progress-bar__outer) {
         height: 5px !important;

@@ -162,17 +162,60 @@ async function run() {
     assert.ok(driverPrefix.includes('主驱动维度'), '第一行为主驱动维度前缀');
     assert.ok(driverVal.length > 0, '第二行为主驱动维度详情');
 
-    // 验证 3 栏并列布局与驱动位置居中 (score-square -> driver-2line-box -> dimensions-list)
+    // 1. 验证 risk-driver-2line-box 无方框包裹 (无 border / 无独立背景方框)
+    const driverBoxStyles = await driverBox.evaluate(node => {
+      const cs = window.getComputedStyle(node);
+      return {
+        borderWidth: cs.borderWidth,
+        borderStyle: cs.borderStyle,
+        backgroundColor: cs.backgroundColor
+      };
+    });
+    console.log('    - risk-driver-2line-box 计算样式:', driverBoxStyles);
+    assert.ok(driverBoxStyles.borderStyle === 'none' || driverBoxStyles.borderWidth === '0px', '主驱动维度绝不可带边框方框');
+    assert.ok(driverBoxStyles.backgroundColor === 'rgba(0, 0, 0, 0)' || driverBoxStyles.backgroundColor === 'transparent', '主驱动维度必须透明背景，不可有灰底方框');
+
+    // 2. 验证 3 栏并列布局与驱动位置居中 (score-square -> driver-2line-box -> dimensions-list)
     const topGridChildren = await riskCard.locator('.risk-top-grid > *').evaluateAll(nodes => nodes.map(n => n.className));
     console.log('    - risk-top-grid direct children:', topGridChildren);
     assert.ok(topGridChildren[0].includes('composite-score-square'), '第1栏必须为正方形综合分');
     assert.ok(topGridChildren[1].includes('risk-driver-2line-box'), '第2栏(居中)必须为主驱动维度');
     assert.ok(topGridChildren[2].includes('risk-dimensions-list'), '第3栏必须为多维进度列表');
 
-    // 验证 el-progress 宽度紧凑约束 (el-progress-bar__inner 缩短)
-    const dimProgressWidth = await riskCard.locator('.dim-progress-wrap .el-progress').first().evaluate(node => node.getBoundingClientRect().width);
-    console.log(`    - 维度进度条宽度: ${dimProgressWidth}px (应 <= 160px，解决拉伸问题)`);
-    assert.ok(dimProgressWidth <= 160, `el-progress 宽度 (${dimProgressWidth}px) 必须紧凑 (<= 160px)`);
+    // 3. 验证 risk-dimensions-list 一行放 2 个 (2 列 2 行网格)
+    const dimRows = riskCard.locator('.risk-dimensions-list .dimension-row');
+    const dimCount = await dimRows.count();
+    assert.strictEqual(dimCount, 4, '必须包含 4 个维度');
+    const dimRects = await dimRows.evaluateAll(nodes => nodes.map(n => {
+      const r = n.getBoundingClientRect();
+      return { top: Math.round(r.top), left: Math.round(r.left), width: Math.round(r.width), height: Math.round(r.height) };
+    }));
+    console.log('    - 4 个维度单元格位置:', dimRects);
+    // 第一行 2 个 item 的 top 必须对齐 (误差 <= 2px)
+    assert.ok(Math.abs(dimRects[0].top - dimRects[1].top) <= 2, '前两个维度项必须在同一行 (一行放2个)');
+    // 第二行 2 个 item 的 top 必须对齐 (误差 <= 2px)
+    assert.ok(Math.abs(dimRects[2].top - dimRects[3].top) <= 2, '后两个维度项必须在第二行 (一行放2个)');
+    // 第一行与第二行必须错开
+    assert.ok(dimRects[2].top > dimRects[0].top, '第二行必须位于第一行下方');
+
+    // 验证维度名称未被省略截断
+    const dimNames = await riskCard.locator('.risk-dimensions-list .dim-name').allTextContents();
+    console.log('    - 4 个维度显示名称:', dimNames);
+    for (const name of dimNames) {
+      assert.ok(!name.includes('...') && !name.includes('…'), `维度名「${name}」不可被截断`);
+    }
+
+    // 4. 验证 composite-score-square、risk-driver-2line-box、risk-dimensions-list 完全对齐 (top, bottom, height 完美对齐)
+    const alignmentBoxes = await riskCard.locator('.risk-top-grid > *').evaluateAll(nodes => nodes.map(n => {
+      const r = n.getBoundingClientRect();
+      return { top: Math.round(r.top), bottom: Math.round(r.bottom), height: Math.round(r.height) };
+    }));
+    console.log('    - 3 栏对齐测量:', alignmentBoxes);
+    assert.ok(Math.abs(alignmentBoxes[0].top - alignmentBoxes[1].top) <= 2, '综合分方格与主驱动顶部必须完全对齐');
+    assert.ok(Math.abs(alignmentBoxes[0].top - alignmentBoxes[2].top) <= 2, '综合分方格与维度列表顶部必须完全对齐');
+    assert.ok(Math.abs(alignmentBoxes[0].bottom - alignmentBoxes[1].bottom) <= 2, '综合分方格与主驱动底部必须完全对齐');
+    assert.ok(Math.abs(alignmentBoxes[0].bottom - alignmentBoxes[2].bottom) <= 2, '综合分方格与维度列表底部必须完全对齐');
+    assert.ok(Math.abs(alignmentBoxes[0].height - alignmentBoxes[2].height) <= 2, '3 栏高度必须完全对齐等高');
 
     const metricsCount = await riskCard.locator('.metric-card-row').count();
     const gaugeCount = await riskCard.locator('.gauge-bar-wrapper').count();
@@ -181,7 +224,7 @@ async function run() {
     assert.ok(metricsCount >= 6, '风险画像必须包含丰富指标');
     assert.strictEqual(metricsCount, gaugeCount, '100% 的指标必须全部具备进度条，严禁突兀缺失进度条');
     assert.strictEqual(nonNumericCount, 0, '严禁存在非数值无进度条的突兀分支');
-    console.log('    ✓ 多维风险画像正方体、3栏居中驱动、el-progress紧凑化及100%统一进度条核验通过');
+    console.log('    ✓ 多维风险画像正方体、无框驱动、一行2个维度网格及3栏完全对齐核验通过');
 
     // 4.7 相似案例处置参照核验 (无中括号纯结构化徽章)
     console.log('  - 验证相似案例处置参照...');
