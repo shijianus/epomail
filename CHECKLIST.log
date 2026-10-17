@@ -8,6 +8,62 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### 操作报告右侧抽屉四变体 UI 治理：外壳样式失配根因修复与响应式打磨 (2026-10-16)
+*   **关联提交 (Git Commit)**: `75dbbecb0fb50204c0e99238201deaf22f4aa557` (Short: `75dbbec`)
+*   **部署环境 (Deployment)**: `本地可视化实测 (临时 vite dev harness + Playwright) · 尚未部署生产`
+*   **作用范围 (Scope)**:
+    仅针对「操作报告 → 查看详情」右侧扩展抽屉 `.audit-detail-drawer`（V1 滥用威胁 / V2 封禁存证 /
+    V3 风险管理 / V4 操作记录 四变体）做前端视觉与响应式治理，未新增后端字段或接口调用。
+*   **核心发现与根因 (Root Causes)**:
+    - **[根因 1 · 图标]** 抽屉引用 54 个 `fluent` 图标，**43 个不在 `src/icons/index.js` 离线包内**
+      （`index.vue` 另缺 23 个），运行时回落 `api.iconify.design` 实时拉取，实测单图标 **5.8s**——
+      即打开抽屉后所有图标位长时间空白再突然弹出。图标包注释自称「杜绝任何外部 API 网络延迟与缺失」，
+      实际抽屉这批图标是后加的、从未重新生成。以官方 `scripts/build-icons.mjs` 重生成，离线条目 **311 → 408**。
+      另查出 **4 个图标名在 fluent 集合中根本不存在**（API 返回 `not_found`），属上一版臆造，
+      会在 UI 留下永久空白坑，已换真实名：`clock-history-16-regular`→`history-16-regular`、
+      `chat-quote-20-regular`→`text-quote-16-regular`、`key-reset-16-regular`→`key-16-regular`、
+      `timeline-16-regular`→`timeline-20-regular`（与时间线章节标题统一）。
+    - **[根因 2 · 布局]** scoped 块内 `.audit-drawer-container { :deep(...) }` 的**全部外壳覆盖永久失配**：
+      `el-drawer` 及 `__header/__body/__footer` 由 Element Plus 渲染并经 Teleport 挂到 body，
+      不携带本组件 `data-v` 属性（实测 `.el-drawer` 与 `.el-drawer__body` 的 scope 属性均为空）。
+      计算样式实测 `.el-drawer__body` 仍是 EP 默认 `display:block / overflow:auto`，而非所写的
+      `display:flex / overflow:hidden`。后果：整条 flex 链落空，真正滚动的是祖先 `.el-drawer__body`
+      （h=565 / scrollH=2689），而挂着 `@scroll` 监听的 `.drawer-scroll-body` 高度恒等于内容高度、
+      **永不滚动**——章节锚点 chip 的激活态高亮因此从不更新。已将外壳覆盖迁至文件末尾非 scoped 块
+      （以唯一类名 `.audit-detail-drawer` 限定，不污染全局），并补 `min-height:0` 接通滚动链。
+*   **布局与观感修复 (Fixes，均由自动溢出扫描定位到具体像素)**:
+    - [x] 头部外壳缺 `min-width:0/box-sizing`，按子项 min-content 撑破 720px 抽屉（V2 六枚徽标行实测 **+78px**）
+    - [x] 定位副标题单行 ellipsis + 写死 `max-width:440px`，把 V2/V4 整句定位文案裁成不可读半截（实测 **+84px**）；改两行截断
+    - [x] 集群关联账号表 grid 硬编码 `36px/1fr/100px/80px/130px`，80px 列塞不下「生效中 · 已封禁」，
+        标签被截断并与邻列文字**直接重叠**；改 `minmax(0,…)` 可收缩栅格 + 省略号 + `:title` 兜底，窄屏转堆叠卡片
+    - [x] 证据链溯源表 4 固定列合计 430px+，375px 屏实测溢出 **+153px**；窄屏转堆叠
+    - [x] 风险画像指标行 180px 窄列内指标名与 `[SEC-…]` 规则号同行争抢，出现
+        「设备指纹相似/度」「[SEC-BOUNCE-/RATE]」断词；放宽至 208px 并禁止规则号内部断行
+    - [x] 裁决按钮原 `flex-wrap` 按内容宽度排布致三行参差、末行孤悬；改等宽两列栅格，并抵消 EP 默认相邻按钮左边距
+    - [x] 底部动作栏无 `flex-wrap` 且组件内仅有 580px 断点，而 `drawerSize` 在 768px 即切 `100vw`；
+        手机端**「关闭」按钮被挤出可视区**（功能性缺陷）；断点对齐 768px 并转 2×2 栅格
+    - [x] 过程中一度把移动端 media query 写在基础规则之前，同特异度下后者胜出而**全部失效**，已修正顺序并加注释说明
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：mail-vue `vite build` 14.48s 通过，零报错零警告
+    - [x] 多语言绝对对称：`scripts/i18n-symmetry.mjs` 六语言全对称（mail-vue 2791 / mail-worker 1929 键）
+    - [x] 代码引用零缺失：`scripts/i18n-audit.mjs` 0 missing、0 non-literal
+    - [x] 抽屉套件：`tests/verify-audit-drawer-variants.mjs` 237 断言全绿；
+        `verify-audit-section-columns` / `verify-appeal-deadlock-days` / `verify-audit-expire-days` 全绿
+    - [x] **Playwright 自动溢出扫描**（`scrollWidth > clientWidth` 且未开滚动）：
+        修复前桌面 V1/V2 各 1~3 处、移动端 7 处；修复后 **1440 与 375 双宽度 × 四变体全部 0 处**
+    - [x] 图标空渲染计数：四变体 svg 55/61/49/42 个，空渲染 **0**
+    - [x] 逐屏截图人工复核：四变体 × 明暗双主题 × 桌面/移动，共 60+ 张
+    - [x] 占位样本披露 `.placeholder-sample-notice` 明暗双主题均正常渲染（V2 命中 2 处）
+    - [x] 零假数据与临时资产清理：本地全真栈未初始化（无 `.wrangler/state` 与 `.dev.vars`），
+        故以**临时** vite dev harness 挂载真实抽屉组件与四组样本行实测；
+        harness（`devdrawer.html`、`devharness/`）与 4 个截图脚本已在提交前物理删除，
+        `git status` 确认工作区仅余 2 个预期改动文件，仓库零残留。
+*   **遗留事项 (Outstanding)**:
+    - [ ] **生产未部署**：`mail.epocanvas.com` 仍运行 `5dedb4e` 旧构建，上述图标缺失与外壳失配在线上依然存在；
+    - [ ] `index.vue:5980` 亦有一处 `:deep(.el-drawer__body)`，疑为抽屉抽出后同样失配的陈旧规则，本次未动；
+    - [ ] 抽屉内仍有 39 处未包裹 i18n 的中文字面量（如 `MFA挑战中`、`${days} 天 (WORM 防篡改标准)`、
+        时间线与风险维度文案），属六语言收口专项，未纳入本次最小修改范围。
+
 ### pre-commit 密钥扫描非法正则修复与钩子纳入版本控制 (2026-10-16)
 *   **关联提交 (Git Commit)**: `affd7e8c970a6922ffefd71c19af81bd508ebc38` (Short: `affd7e8`)
 *   **部署环境 (Deployment)**: `仓库工程配置 (不涉及生产部署)`
