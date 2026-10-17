@@ -8,7 +8,7 @@
     :show-close="false"
     @opened="handleDrawerOpened"
   >
-    <!-- 抽屉头部：变体自适应标题 + 定位副标题 + 章节锚点 Chips + 变体切换 + 关闭按钮 -->
+    <!-- 抽屉头部：统一展示标题 + 纯图标关闭按钮 + 章节锚点 Chips -->
     <template #header>
       <div class="drawer-header-shell">
         <div class="drawer-header-top">
@@ -19,99 +19,17 @@
             <div class="header-text-group">
               <div class="drawer-title-row">
                 <span class="drawer-title">{{ currentVariantTitle }}</span>
-                <el-tag size="small" :type="variantBadgeType" effect="plain" class="variant-mode-tag">
-                  {{ currentVariantBadge }}
-                </el-tag>
-              </div>
-              <div class="drawer-sub" :title="currentVariantSub">
-                {{ currentVariantSub }}
               </div>
             </div>
           </div>
 
           <div class="header-tools-right">
-            <!-- 变体视角切换器 (供安全主管与审计员无缝比对 4 种变体) -->
-            <el-dropdown trigger="click" @command="handleSelectVariant">
-              <el-button size="small" plain class="variant-switch-btn">
-                <Icon icon="fluent:apps-list-detail-20-regular" width="14" height="14" style="margin-right: 4px;" />
-                <span>{{ $t('auditVariantSwitchLabel') }} (V{{ activeVariant }})</span>
-                <Icon icon="fluent:chevron-down-12-regular" width="12" height="12" style="margin-left: 3px;" />
-              </el-button>
-              <template #dropdown>
-                <el-dropdown-menu>
-                  <el-dropdown-item :command="1" :disabled="activeVariant === 1">
-                    <span :class="{ 'font-semibold text-primary': activeVariant === 1 }">V1: {{ $t('auditVariant1Title') }}</span>
-                  </el-dropdown-item>
-                  <el-dropdown-item :command="2" :disabled="activeVariant === 2">
-                    <span :class="{ 'font-semibold text-primary': activeVariant === 2 }">V2: {{ $t('auditVariant2Title') }}</span>
-                  </el-dropdown-item>
-                  <el-dropdown-item :command="3" :disabled="activeVariant === 3">
-                    <span :class="{ 'font-semibold text-primary': activeVariant === 3 }">V3: {{ $t('auditVariant3Title') }}</span>
-                  </el-dropdown-item>
-                  <el-dropdown-item :command="4" :disabled="activeVariant === 4">
-                    <span :class="{ 'font-semibold text-primary': activeVariant === 4 }">V4: {{ $t('auditVariant4Title') }}</span>
-                  </el-dropdown-item>
-                </el-dropdown-menu>
-              </template>
-            </el-dropdown>
-
             <!-- 纯图标关闭按钮 -->
             <el-tooltip effect="dark" :content="$t('close')" placement="top">
               <button class="drawer-close-btn" @click="handleClose">
                 <Icon icon="fluent:dismiss-20-regular" width="18" height="18" />
               </button>
             </el-tooltip>
-          </div>
-        </div>
-
-        <!-- 头部下方徽标行：案件编号、状态主徽标、状态副徽标、风险等级、原因码、证据保留天数、右侧负责人入口 -->
-        <div v-if="selectedRow" class="drawer-badge-meta-bar">
-          <div class="meta-badges-left">
-            <!-- 案件编号 (等宽字，一键复制) -->
-            <span class="meta-badge case-no font-mono" @click="copyCaseNo(caseNumber)">
-              <Icon icon="fluent:tag-16-regular" width="14" height="14" />
-              <span>{{ caseNumber }}</span>
-              <Icon icon="fluent:copy-16-regular" width="12" height="12" class="copy-icon" />
-            </span>
-
-            <!-- 当前主状态徽标 -->
-            <el-tag size="small" :type="getStatusTagType(selectedRow.status)" effect="dark" class="meta-tag">
-              {{ getStatusLabel(selectedRow.status) }}
-            </el-tag>
-
-            <!-- 状态副徽标 (条件: 熔断 / 观察中 / 挑战中) -->
-            <el-tag v-if="secondaryStatus" size="small" :type="secondaryStatus.type" effect="plain" class="meta-tag">
-              <Icon :icon="secondaryStatus.icon" width="12" height="12" style="margin-right: 3px;" />
-              {{ secondaryStatus.label }}
-            </el-tag>
-
-            <!-- 风险等级 LV0–LV3 / 威胁 (条件) -->
-            <el-tag v-if="riskLevelTag" size="small" :type="riskLevelTag.type" effect="plain" class="meta-tag">
-              {{ riskLevelTag.label }}
-            </el-tag>
-
-            <!-- 原因码 (条件) -->
-            <span v-if="selectedRow.reasonCode" class="meta-badge reason-code font-mono text-danger">
-              {{ selectedRow.reasonCode }}
-            </span>
-
-            <!-- 证据剩余保留天数 -->
-            <span v-if="evidenceDaysText" class="meta-badge evidence-days">
-              <Icon icon="fluent:history-16-regular" width="13" height="13" />
-              <span>{{ evidenceDaysText }}</span>
-            </span>
-          </div>
-
-          <!-- 右侧负责人入口 (点开负责人账户详情弹窗) -->
-          <div class="meta-operator-entry" @click="openOperatorDialog">
-            <div class="operator-avatar-circle">
-              {{ operatorInitials }}
-            </div>
-            <div class="operator-info-wrap">
-              <span class="operator-name">{{ operatorDisplayName }}</span>
-              <span class="operator-role-sub">{{ operatorRoleLabel }}</span>
-            </div>
-            <Icon icon="fluent:chevron-right-12-regular" width="12" height="12" class="entry-arrow" />
           </div>
         </div>
 
@@ -134,12 +52,12 @@
     <!-- 可滚动主体正文：按办案心智顺序组装档案模块 -->
     <div v-if="selectedRow" ref="scrollContainerRef" class="drawer-scroll-body" @scroll="handleBodyScroll">
       
-      <!-- 模块 A: 案件概要 / 案件信息 (两列网格 12 个字段位) -->
+      <!-- 模块 A: 案件概要 (两列网格字段，左右等距对齐，纯文本展示) -->
       <section id="chapter-summary" class="dossier-card anchor-section">
         <div class="section-title">
           <div class="title-left">
             <Icon icon="fluent:document-text-20-regular" width="18" height="18" />
-            <span>{{ chapterLabels.summary }}</span>
+            <span>{{ $t('auditChipSummary') }}</span>
           </div>
           <span class="section-badge font-mono">#01-OVERVIEW</span>
         </div>
@@ -156,7 +74,7 @@
             </div>
           </div>
 
-          <!-- 2. 当前状态 -->
+          <!-- 2. 当前状态 (同步展示待审等标准状态，禁止展示原始 active) -->
           <div class="grid-field">
             <span class="field-k">{{ $t('auditCurrentStatus') }}:</span>
             <div class="field-v">
@@ -242,13 +160,13 @@
             </span>
           </div>
 
-          <!-- 11. 拍案管理 (条件渲染) -->
+          <!-- 11. 拍案管理 (直接展示名称，与列表中拍案管理完全对照) -->
           <div v-if="authorityValue" class="grid-field">
             <span class="field-k">{{ $t('auditColFinalAuthority') }}:</span>
             <span class="field-v font-medium text-primary">{{ authorityValue }}</span>
           </div>
 
-          <!-- 12. 证据留存天数 -->
+          <!-- 12. 证据留存天数 (无需 WORM 无关描述) -->
           <div class="grid-field">
             <span class="field-k">{{ $t('abuseEvidenceRetentionLabel') }}:</span>
             <span class="field-v font-mono font-medium">{{ evidenceDaysFormatted }}</span>
@@ -256,9 +174,9 @@
         </div>
       </section>
 
-      <!-- 模块 B: 集群关联账号 (条件渲染：有集群账号时才出现) -->
+      <!-- 模块 B: 集群关联账号 (仅滥用威胁/具有集群账号时渲染) -->
       <section
-        v-if="clusterAccountsList && clusterAccountsList.length > 0"
+        v-if="isThreatVariant && clusterAccountsList && clusterAccountsList.length > 0"
         id="chapter-cluster"
         class="dossier-card anchor-section"
       >
@@ -266,16 +184,18 @@
           <div class="title-left">
             <Icon icon="fluent:people-community-20-regular" width="18" height="18" />
             <span>{{ $t('auditClusterAccountsTitle') }}</span>
+            <el-tooltip effect="dark" :content="$t('auditClusterAccountsFootnote')" placement="top">
+              <Icon icon="fluent:question-circle-16-regular" width="16" height="16" class="help-question-icon" />
+            </el-tooltip>
             <el-tag size="small" type="danger" effect="plain" class="cluster-count-badge">
               {{ $t('auditClusterAccountsCount', { count: clusterAccountsList.length }) }}
             </el-tag>
           </div>
-          <span class="data-tag-muted">{{ $t('auditMaskedAggregatedData') }}</span>
         </div>
 
         <div class="cluster-accounts-table">
           <div class="cluster-header-row font-mono">
-            <span class="col-idx">#</span>
+            <span class="col-idx">{{ $t('auditColSerialSubCase') }}</span>
             <span class="col-email">{{ $t('tabEmailAddress') }}</span>
             <span class="col-uid">{{ $t('auditColUserId') || '用户 ID' }}</span>
             <span class="col-status">{{ $t('auditCurrentStatus') }}</span>
@@ -287,414 +207,433 @@
             :key="acc.id || cIdx"
             class="cluster-data-row"
           >
-            <span class="col-idx font-mono text-muted">#{{ String(cIdx + 1).padStart(2, '0') }}</span>
+            <!-- 序列号与案件编号统一作为分项，如 THR-MULTI99-SUB01 -->
+            <span class="col-idx font-mono font-medium text-danger">
+              {{ getSubCaseId(caseNumber, cIdx) }}
+            </span>
             <div class="col-email font-mono">
               <span :title="acc.email">{{ maskEmail(acc.email) }}</span>
               <button class="inline-copy-btn" :title="$t('abuseCopyEmail')" @click="copyEmail(acc.email)">
                 <Icon icon="fluent:copy-16-regular" width="12" height="12" />
               </button>
             </div>
-            <span class="col-uid font-mono text-muted">{{ maskUserId(acc.userId || ('usr_' + acc.id)) }}</span>
+            <!-- 用户 ID 允许一键复制 -->
+            <div class="col-uid font-mono text-muted flex items-center">
+              <span>{{ maskUserId(acc.userId || ('usr_' + acc.id)) }}</span>
+              <button class="inline-copy-btn" :title="$t('abuseCopyUserId')" @click="copyUserId(acc.userId || ('usr_' + acc.id))">
+                <Icon icon="fluent:copy-16-regular" width="12" height="12" />
+              </button>
+            </div>
             <div class="col-status">
               <el-tag size="small" :type="getStatusTagType(acc.status)" effect="plain" :title="getStatusLabel(acc.status)">
                 {{ getStatusLabel(acc.status) }}
               </el-tag>
             </div>
-            <span class="col-relation font-mono text-danger" :title="acc.evidenceSummary">{{ acc.evidenceSummary || '同一设备指纹 · 关联集群' }}</span>
+            <span class="col-relation font-mono text-danger" :title="acc.evidenceSummary">
+              {{ acc.evidenceSummary || '同一设备指纹 · 关联集群' }}
+            </span>
           </div>
-        </div>
-
-        <div class="cluster-footnote">
-          <Icon icon="fluent:info-16-regular" width="14" height="14" class="footnote-icon" />
-          <span>{{ $t('auditClusterAccountsFootnote') }}</span>
         </div>
       </section>
 
-      <!-- 模块 C: 处置依据 / 风险研判 (内嵌四层 + 6 种标记详细日志解析) -->
+      <!-- 模块 C: 风险研判与处置依据 (完整链路：报警原因、触发原因、推荐建议 + 研判路径记录) -->
       <section id="chapter-basis" class="dossier-card anchor-section">
         <div class="section-title">
           <div class="title-left">
             <Icon icon="fluent:shield-task-20-regular" width="18" height="18" />
-            <span>{{ chapterLabels.basis }}</span>
+            <span>{{ $t('auditChipBasis') }}</span>
           </div>
           <span class="section-badge font-mono">#02-GROUNDS</span>
         </div>
 
         <div class="disposition-nested-card">
-          <!-- 层级 1: 申诉理由引述块 (条件渲染) -->
-          <div v-if="selectedRow.appealReason" class="appeal-statement-quote">
-            <Icon icon="fluent:text-quote-16-regular" width="16" height="16" class="quote-icon" />
-            <span class="quote-text">“{{ selectedRow.appealReason }}”</span>
-          </div>
-
-          <!-- 层级 2: 红色封禁 / 管控原因段 (条件渲染) -->
-          <div v-if="redBanReasonText" class="red-ban-reason-alert">
-            <Icon icon="fluent:warning-20-filled" width="16" height="16" class="alert-icon" />
-            <span class="alert-text">{{ redBanReasonText }}</span>
-          </div>
-
-          <!-- 层级 3: 分类徽标 + 证据摘要行 -->
-          <div class="evidence-summary-line">
-            <div class="summary-line-left">
-              <el-tag size="small" :type="categoryTagMeta.type" effect="dark" class="category-pill">
-                {{ categoryTagMeta.label }}
-              </el-tag>
-              <span class="evidence-abstract font-medium">{{ evidenceSummaryText }}</span>
+          <!-- 上部主链路：报警原因 (禁止 icon 替代文本) + 触发原因 + 推荐建议 -->
+          <div class="basis-chain-card">
+            <!-- 报警原因 (使用禁止的 icon 替代文本) -->
+            <div class="basis-chain-row alarm-row">
+              <div class="row-icon-col">
+                <Icon icon="fluent:prohibited-20-filled" width="18" height="18" class="alarm-icon text-danger" />
+              </div>
+              <div class="row-content-col">
+                <span class="chain-main-text font-medium">{{ currentAlarmReason }}</span>
+              </div>
             </div>
-            <span class="evidence-hash font-mono text-muted" v-if="evidenceDigestHash">
-              {{ evidenceDigestHash }}
-            </span>
-          </div>
 
-          <!-- 层级 4: 处置动作徽标 + 动作副说明 -->
-          <div v-if="selectedRow.actionText" class="action-description-box">
-            <div class="action-pill-row">
-              <el-tag size="small" type="danger" effect="plain">
-                <Icon icon="fluent:gavel-16-regular" width="12" height="12" style="margin-right: 3px;" />
-                {{ actionBadgeText }}
-              </el-tag>
-              <span class="action-sub-text">{{ selectedRow.actionText }}</span>
+            <!-- 触发原因 -->
+            <div class="basis-chain-row trigger-row">
+              <div class="row-icon-col">
+                <el-tag size="small" :type="currentTriggerBadgeType" effect="plain" class="chain-tag">
+                  {{ currentTriggerTag }}
+                </el-tag>
+              </div>
+              <div class="row-content-col">
+                <span class="chain-sub-text">{{ currentTriggerCause }}</span>
+              </div>
+            </div>
+
+            <!-- 推荐建议 -->
+            <div class="basis-chain-row suggestion-row">
+              <div class="row-icon-col">
+                <el-tag size="small" :type="currentSuggestionBadgeType" effect="dark" class="chain-tag">
+                  {{ currentSuggestionTag }}
+                </el-tag>
+              </div>
+              <div class="row-content-col">
+                <span class="chain-sub-text font-medium">{{ currentSuggestionText }}</span>
+              </div>
             </div>
           </div>
 
-          <!-- 层级 5: 操作详细日志列表 (固定解析 6 种标记: [放行说明] [延期处置] [解禁说明] [审核备忘] [驳回理由] [更新]) -->
-          <div v-if="parsedDetailLogs && parsedDetailLogs.length > 0" class="detail-logs-list">
-            <div class="logs-header-label font-mono">OPERATIONAL_AUDIT_TRAIL ({{ parsedDetailLogs.length }})</div>
-            <div
-              v-for="(log, lIdx) in parsedDetailLogs"
-              :key="lIdx"
-              class="detail-log-row"
-            >
-              <template v-if="log.tag">
-                <el-tag size="small" :type="log.tagType" effect="plain" class="log-tag">
+          <!-- 下面一个框专门显示完整的研判路径记录 -->
+          <div class="judgment-path-record-box">
+            <div class="record-box-header font-mono">
+              <Icon icon="fluent:history-16-regular" width="14" height="14" />
+              <span>{{ $t('auditJudgmentPathRecord') }}</span>
+            </div>
+            <div class="record-list">
+              <div
+                v-for="(log, lIdx) in currentJudgmentLogs"
+                :key="lIdx"
+                class="record-row"
+              >
+                <el-tag size="small" :type="log.tagType" effect="plain" class="record-tag">
                   {{ log.tag }}
                 </el-tag>
-                <span class="log-content">{{ log.content }}</span>
-              </template>
-              <template v-else>
-                <span class="log-bullet">•</span>
-                <span class="log-content plain-text">{{ log.content }}</span>
-              </template>
+                <span class="record-text font-mono">{{ log.content }}</span>
+              </div>
             </div>
           </div>
         </div>
       </section>
 
-      <!-- 模块 D: 全周期时间线 (双泳道：机器自动 / 人工与用户) -->
+      <!-- 模块 D: 处置与存证全周期时间线 (左右双泳道：左为机器自动泳道，右为人工与用户泳道) -->
       <section id="chapter-timeline" class="dossier-card anchor-section">
         <div class="section-title">
           <div class="title-left">
             <Icon icon="fluent:timeline-20-regular" width="18" height="18" />
             <span>{{ $t('auditChipTimeline') }}</span>
           </div>
-          <div class="timeline-legend">
-            <span class="legend-item"><span class="dot machine-dot"></span>{{ $t('auditTimelineSwimlaneMachine') }}</span>
-            <span class="legend-item"><span class="dot human-dot"></span>{{ $t('auditTimelineSwimlaneHuman') }}</span>
-          </div>
+          <span class="section-badge font-mono">#03-TIMELINE</span>
         </div>
 
-        <div class="dual-swimlane-timeline">
-          <div
-            v-for="(node, nIdx) in timelineNodes"
-            :key="nIdx"
-            class="timeline-node-card"
-            :class="[node.lane === 'machine' ? 'lane-machine' : 'lane-human', { 'node-latest': node.isLatest }]"
-          >
-            <div class="node-left-track">
-              <div class="node-icon-box" :class="node.lane === 'machine' ? 'icon-machine' : 'icon-human'">
-                <Icon :icon="node.icon" width="15" height="15" />
-              </div>
-              <div v-if="nIdx < timelineNodes.length - 1" class="node-connector-line"></div>
+        <div class="dual-swimlane-container">
+          <!-- 左右泳道表头 -->
+          <div class="swimlane-column-headers">
+            <div class="swimlane-header machine-header">
+              <Icon icon="fluent:bot-16-regular" width="16" height="16" />
+              <span>{{ $t('auditTimelineSwimlaneMachine') }}</span>
             </div>
+            <div class="swimlane-header-spacer"></div>
+            <div class="swimlane-header human-header">
+              <Icon icon="fluent:person-16-regular" width="16" height="16" />
+              <span>{{ $t('auditTimelineSwimlaneHuman') }}</span>
+            </div>
+          </div>
 
-            <div class="node-body">
-              <div class="node-header">
-                <div class="node-header-left">
-                  <span class="node-number font-mono">{{ $t('auditTimelineNodeNo', { no: String(nIdx + 1).padStart(2, '0') }) }}</span>
-                  <span class="node-title font-medium">{{ node.title }}</span>
-                  <el-tag v-if="node.isLatest" size="small" type="danger" effect="dark" class="latest-tag">
-                    {{ $t('auditTimelineLatestNode') }}
-                  </el-tag>
+          <!-- 双泳道节点网格流水线 -->
+          <div class="swimlane-grid-track">
+            <div
+              v-for="(node, nIdx) in currentTimelineNodes"
+              :key="nIdx"
+              class="swimlane-row"
+              :class="`node-lane-${node.lane}`"
+            >
+              <!-- 机器自动泳道单元格 -->
+              <div class="swimlane-cell machine-cell">
+                <div v-if="node.lane === 'machine'" class="swimlane-card machine-card" :class="{ 'card-latest': node.isLatest }">
+                  <div class="card-top-row">
+                    <span class="node-time font-mono">{{ node.time }}</span>
+                    <span class="node-actor-tag font-mono">[{{ node.actor }}]</span>
+                    <span v-if="node.badge" class="node-badge-tag font-mono">{{ node.badge }}</span>
+                    <el-tag v-if="node.isLatest" size="small" type="danger" effect="dark" class="latest-tag">{{ $t('auditTimelineLatestNode') }}</el-tag>
+                  </div>
+                  <div class="card-title-row">
+                    <span class="node-id font-mono">{{ node.nodeId }}</span>
+                    <span class="node-action font-semibold">{{ node.action }}</span>
+                  </div>
+                  <div class="card-desc">{{ node.desc }}</div>
+                  <div class="card-footer-row font-mono">
+                    <div v-if="node.transition" class="node-transition">
+                      <span class="st-from">[{{ node.transition.from }}]</span>
+                      <Icon icon="fluent:arrow-right-12-regular" width="11" height="11" class="arrow" />
+                      <span class="st-to text-danger">[{{ node.transition.to }}]</span>
+                    </div>
+                    <div v-if="node.hash" class="node-hash" @click="copyHash(node.hash)" :title="$t('auditCopiedHash')">
+                      <span>{{ node.hash }}</span>
+                      <Icon icon="fluent:copy-16-regular" width="11" height="11" class="copy-icon" />
+                    </div>
+                  </div>
                 </div>
-                <div class="node-header-right font-mono">
-                  <span class="node-time">{{ node.formattedTime }}</span>
-                  <span v-if="node.duration" class="node-duration font-mono text-muted">({{ node.duration }})</span>
+                <div v-else class="swimlane-placeholder machine-placeholder">
+                  <div class="track-line"></div>
                 </div>
               </div>
 
-              <div class="node-meta-row">
-                <span class="node-actor font-medium">
-                  <Icon icon="fluent:person-circle-16-regular" width="13" height="13" class="actor-icon" />
-                  {{ node.actor }}
-                </span>
-                <span class="actor-lane-tag" :class="node.lane === 'machine' ? 'tag-machine' : 'tag-human'">
-                  {{ node.lane === 'machine' ? $t('auditTimelineSwimlaneMachine') : $t('auditTimelineSwimlaneHuman') }}
-                </span>
-                <!-- 状态迁移 from -> to -->
-                <div v-if="node.transition" class="node-transition font-mono">
-                  <span class="from-st">{{ node.transition.from }}</span>
-                  <Icon icon="fluent:arrow-right-12-regular" width="11" height="11" class="arrow" />
-                  <span class="to-st text-danger">{{ node.transition.to }}</span>
+              <!-- 中间轴点指示器 -->
+              <div class="swimlane-axis">
+                <div class="axis-dot" :class="node.lane === 'machine' ? 'dot-machine' : 'dot-human'">
+                  <Icon :icon="node.lane === 'machine' ? 'fluent:bot-16-regular' : 'fluent:person-16-regular'" width="12" height="12" />
                 </div>
               </div>
 
-              <div v-if="node.description" class="node-desc">
-                {{ node.description }}
-              </div>
-
-              <!-- 证据哈希 (条件渲染) -->
-              <div v-if="node.hash" class="node-evidence-hash font-mono" @click="copyHash(node.hash)">
-                <span class="hash-label">HASH:</span>
-                <span class="hash-val">{{ node.hash }}</span>
-                <Icon icon="fluent:copy-16-regular" width="11" height="11" class="copy-icon" />
+              <!-- 人工与用户泳道单元格 -->
+              <div class="swimlane-cell human-cell">
+                <div v-if="node.lane === 'human'" class="swimlane-card human-card" :class="{ 'card-latest': node.isLatest }">
+                  <div class="card-top-row">
+                    <span class="node-time font-mono">{{ node.time }}</span>
+                    <span class="node-actor-tag font-mono">[{{ node.actor }}]</span>
+                    <span v-if="node.duration" class="node-duration font-mono text-muted">{{ node.duration }}</span>
+                    <el-tag v-if="node.isLatest" size="small" type="danger" effect="dark" class="latest-tag">{{ $t('auditTimelineLatestNode') }}</el-tag>
+                  </div>
+                  <div class="card-title-row">
+                    <span class="node-id font-mono">{{ node.nodeId }}</span>
+                    <span class="node-action font-semibold">{{ node.action }}</span>
+                  </div>
+                  <div class="card-desc">{{ node.desc }}</div>
+                  <div class="card-footer-row font-mono">
+                    <div v-if="node.transition" class="node-transition">
+                      <span class="st-from">[{{ node.transition.from }}]</span>
+                      <Icon icon="fluent:arrow-right-12-regular" width="11" height="11" class="arrow" />
+                      <span class="st-to text-danger">[{{ node.transition.to }}]</span>
+                    </div>
+                    <div v-if="node.hash" class="node-hash" @click="copyHash(node.hash)" :title="$t('auditCopiedHash')">
+                      <span>{{ node.hash }}</span>
+                      <Icon icon="fluent:copy-16-regular" width="11" height="11" class="copy-icon" />
+                    </div>
+                  </div>
+                </div>
+                <div v-else class="swimlane-placeholder human-placeholder">
+                  <div class="track-line"></div>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-
-        <div v-if="timelineIsSynthetic" class="placeholder-sample-notice">
-          <Icon icon="fluent:info-16-regular" width="13" height="13" />
-          <span>{{ $t('auditPlaceholderSampleNotice') }}</span>
         </div>
       </section>
 
-      <!-- 模块 E: 多维风险画像 (条件渲染：综合风险分 + 4 维度得分条 + 基准带指标) -->
-      <section
-        v-if="riskProfileData"
-        id="chapter-risk"
-        class="dossier-card anchor-section"
-      >
+      <!-- 模块 E: 多维风险画像 (正方形综合风险分在左，维度条在右，主驱动居中，图例与表格统一单框) -->
+      <section id="chapter-risk" class="dossier-card anchor-section">
         <div class="section-title">
           <div class="title-left">
             <Icon icon="fluent:chart-multiple-20-regular" width="18" height="18" />
             <span>{{ $t('auditChipRisk') }}</span>
           </div>
-          <span class="data-tag-muted">{{ $t('auditMaskedAggregatedData') }}</span>
+          <span class="section-badge font-mono">#04-PROFILE</span>
         </div>
 
-        <div class="risk-profile-header">
-          <!-- 综合风险分大数字 -->
-          <div class="composite-score-box" :class="riskScoreLevelClass">
-            <div class="score-number font-mono">{{ riskProfileData.compositeScore }}</div>
-            <div class="score-denom font-mono">/ 100</div>
-            <div class="score-label">{{ $t('auditRiskCompositeScore') }}</div>
-          </div>
-
-          <div class="risk-driver-summary">
-            <div class="driver-title-row">
-              <span class="driver-label">{{ $t('auditRiskMainDriver') }}:</span>
-              <span class="driver-text font-medium text-danger">{{ riskProfileData.mainDriver }}</span>
-            </div>
-            <div class="driver-desc text-muted">
-              {{ $t('auditPlaceholderSampleNotice') }}
-            </div>
-          </div>
-        </div>
-
-        <!-- 4 维度得分条与权重展示 -->
-        <div class="risk-dimensions-list">
-          <div
-            v-for="dim in riskProfileData.dimensions"
-            :key="dim.name"
-            class="dimension-row"
-          >
-            <div class="dim-label-row">
-              <span class="dim-name font-medium">{{ dim.name }}</span>
-              <div class="dim-meta font-mono">
-                <span class="dim-score" :class="getScoreColorClass(dim.score)">{{ dim.score }}分</span>
-                <span class="dim-weight text-muted">(权重: {{ dim.weight }}%)</span>
-              </div>
-            </div>
-            <el-progress
-              :percentage="Math.min(100, dim.score)"
-              :color="getProgressColor(dim.score)"
-              :stroke-width="6"
-              :show-text="false"
-            />
-          </div>
-        </div>
-
-        <!-- 基准带图例 -->
-        <div class="gauge-legend-bar">
-          <span class="legend-pill"><span class="legend-color-box base-cohort"></span>{{ $t('auditRiskLegendGroup') }}</span>
-          <span class="legend-pill"><span class="legend-color-box base-self"></span>{{ $t('auditRiskLegendSelf') }}</span>
-          <span class="legend-pill"><span class="legend-color-box base-threshold"></span>{{ $t('auditRiskLegendThreshold') }}</span>
-        </div>
-
-        <!-- 分组指标行：当前值大字 + 超阈/阈内徽标 + 基准带进度条与三档刻度 -->
-        <div class="risk-indicators-table">
-          <div
-            v-for="(metric, mIdx) in riskProfileData.metrics"
-            :key="mIdx"
-            class="metric-card-row"
-          >
-            <div class="metric-info-col">
-              <div class="metric-title-line">
-                <span class="metric-name font-medium">{{ metric.name }}</span>
-                <span class="metric-rule font-mono text-muted">[{{ metric.rule }}]</span>
-              </div>
-              <div class="metric-probe-notes text-muted">
-                {{ metric.probeNotes }}
-              </div>
+        <div class="risk-profile-unified-card">
+          <!-- 上半区：正方形方格综合风险分 + 右侧维度条列表 -->
+          <div class="risk-top-grid">
+            <!-- 正方形方格：仅显示纯数字，删除/100，综合风险分居于数字下方 -->
+            <div class="composite-score-square" :class="riskScoreLevelClass">
+              <div class="score-number font-mono">{{ currentRiskProfile.compositeScore }}</div>
+              <div class="score-label">{{ $t('auditRiskCompositeScore') }}</div>
             </div>
 
-            <div class="metric-data-col">
-              <div class="metric-val-row">
-                <span class="metric-val font-mono font-semibold" :class="{ 'text-danger': metric.isOverThreshold }">
-                  {{ metric.currentValue }}
-                </span>
-                <el-tag
-                  size="small"
-                  :type="metric.isOverThreshold ? 'danger' : 'success'"
-                  effect="dark"
-                  class="threshold-tag"
-                >
-                  {{ metric.isOverThreshold ? $t('auditRiskThresholdOver') : $t('auditRiskThresholdWithin') }}
-                </el-tag>
-              </div>
-
-              <!-- 数值型指标：基准带进度条 (0%=同群组, 100%=阈值, 越过右端即超阈) -->
-              <div v-if="metric.isNumeric" class="gauge-bar-wrapper">
-                <div class="gauge-track">
-                  <div
-                    class="gauge-fill"
-                    :style="{ width: Math.min(100, metric.ratio) + '%' }"
-                    :class="{ 'fill-over': metric.isOverThreshold }"
-                  ></div>
-                  <!-- 自身 30 天刻度线 -->
-                  <div
-                    class="gauge-tick tick-self"
-                    :style="{ left: metric.selfTickPos + '%' }"
-                    :title="$t('auditRiskGaugeSelf30d')"
-                  ></div>
-                  <!-- 风险阈值刻度线 (100% 处) -->
-                  <div class="gauge-tick tick-threshold" style="left: 80%;" :title="$t('auditRiskGaugeThreshold')"></div>
+            <!-- 右侧维度条列表 -->
+            <div class="risk-dimensions-list">
+              <div
+                v-for="dim in currentRiskProfile.dimensions"
+                :key="dim.name"
+                class="dimension-row"
+              >
+                <div class="dim-label-row">
+                  <span class="dim-name font-medium">{{ dim.name }}</span>
+                  <div class="dim-meta font-mono">
+                    <span class="dim-score" :class="getScoreColorClass(dim.score)">{{ dim.score }}分</span>
+                    <span class="dim-weight text-muted">(权重: {{ dim.weight }}%)</span>
+                  </div>
                 </div>
-                <div class="gauge-sub-labels font-mono">
-                  <span>{{ $t('auditRiskGaugeGroupBaseline') }}: {{ metric.cohortBaseline }}</span>
-                  <span>{{ $t('auditRiskGaugeSelf30d') }}: {{ metric.self30d }}</span>
-                  <span class="threshold-label">{{ $t('auditRiskGaugeThreshold') }}: {{ metric.threshold }}</span>
-                </div>
+                <el-progress
+                  :percentage="Math.min(100, dim.score)"
+                  :color="getProgressColor(dim.score)"
+                  :stroke-width="6"
+                  :show-text="false"
+                />
               </div>
+            </div>
+          </div>
 
-              <!-- 非数值指标：命中 / 未命中 状态展示 -->
-              <div v-else class="non-numeric-status">
-                <el-tag size="small" :type="metric.hit ? 'danger' : 'info'" effect="plain">
-                  {{ metric.hit ? $t('auditRiskMetricHit') : $t('auditRiskMetricNormal') }}
-                </el-tag>
-                <span class="non-numeric-desc text-muted">{{ metric.statusNote }}</span>
+          <!-- 主驱动维度放在方格正下方居中位置 -->
+          <div class="risk-driver-bar-centered">
+            <span class="driver-prefix">{{ $t('auditRiskMainDriver') }}:</span>
+            <span class="driver-highlight text-danger font-medium">{{ currentRiskProfile.mainDriver }}</span>
+          </div>
+
+          <!-- 图例 class="gauge-legend-bar" 与表格 class="risk-indicators-table" 作为统一单框不要分开 -->
+          <div class="risk-indicators-unified-box">
+            <div class="gauge-legend-bar">
+              <span class="legend-pill"><span class="legend-color-box base-cohort"></span>{{ $t('auditRiskLegendGroup') }}</span>
+              <span class="legend-pill"><span class="legend-color-box base-self"></span>{{ $t('auditRiskLegendSelf') }}</span>
+              <span class="legend-pill"><span class="legend-color-box base-threshold"></span>{{ $t('auditRiskLegendThreshold') }}</span>
+            </div>
+
+            <div class="risk-indicators-table">
+              <div
+                v-for="(metric, mIdx) in currentRiskProfile.metrics"
+                :key="mIdx"
+                class="metric-card-row"
+              >
+                <div class="metric-info-col">
+                  <div class="metric-title-line">
+                    <span class="metric-name font-medium">{{ metric.name }}</span>
+                    <span class="metric-rule font-mono text-muted">[{{ metric.rule }}]</span>
+                  </div>
+                  <div class="metric-probe-notes text-muted font-mono">
+                    {{ metric.probeNotes }}
+                  </div>
+                </div>
+
+                <div class="metric-data-col">
+                  <div class="metric-val-row">
+                    <span class="metric-val font-mono font-semibold" :class="{ 'text-danger': metric.isOverThreshold }">
+                      {{ metric.currentValue }}
+                    </span>
+                    <el-tag
+                      size="small"
+                      :type="metric.isOverThreshold ? 'danger' : 'success'"
+                      effect="dark"
+                      class="threshold-tag"
+                    >
+                      {{ metric.isOverThreshold ? $t('auditRiskThresholdOver') : $t('auditRiskThresholdWithin') }}
+                    </el-tag>
+                  </div>
+
+                  <div v-if="metric.isNumeric" class="gauge-bar-wrapper">
+                    <div class="gauge-track">
+                      <div
+                        class="gauge-fill"
+                        :style="{ width: Math.min(100, metric.ratio) + '%' }"
+                        :class="{ 'fill-over': metric.isOverThreshold }"
+                      ></div>
+                      <div class="gauge-tick tick-self" :style="{ left: metric.selfTickPos + '%' }"></div>
+                      <div class="gauge-tick tick-threshold" style="left: 80%;"></div>
+                    </div>
+                    <div class="gauge-sub-labels font-mono">
+                      <span>{{ $t('auditRiskGaugeGroupBaseline') }}: {{ metric.cohortBaseline }}</span>
+                      <span>{{ $t('auditRiskGaugeSelf30d') }}: {{ metric.self30d }}</span>
+                      <span class="threshold-label">{{ $t('auditRiskGaugeThreshold') }}: {{ metric.threshold }}</span>
+                    </div>
+                  </div>
+
+                  <div v-else class="non-numeric-status">
+                    <el-tag size="small" :type="metric.hit ? 'danger' : 'info'" effect="plain">
+                      {{ metric.hit ? $t('auditRiskMetricHit') : $t('auditRiskMetricNormal') }}
+                    </el-tag>
+                    <span class="non-numeric-desc text-muted font-mono">{{ metric.statusNote }}</span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      <!-- 模块 F: 相似案例参照 (变体 2 重点 & 条件渲染) -->
-      <section
-        v-if="activeVariant === 2 && similarCasesData"
-        id="chapter-similar"
-        class="dossier-card anchor-section"
-      >
+      <!-- 模块 F: 相似案例处置参照 (进度条式显示比例 + 4 列统计 + 研判一致性提示) -->
+      <section id="chapter-similar" class="dossier-card anchor-section">
         <div class="section-title">
           <div class="title-left">
             <Icon icon="fluent:branch-compare-20-regular" width="18" height="18" />
-            <span>{{ $t('auditSimilarCasesTitle') }}</span>
+            <span>{{ $t('auditChipSimilar') }}</span>
           </div>
-          <span class="font-mono text-danger font-semibold">[{{ similarCasesData.reasonCode }}]</span>
+          <span class="section-badge font-mono">#05-PRECEDENT</span>
         </div>
 
         <div class="similar-cases-body">
           <div class="distribution-header-row">
-            <span class="dist-title">{{ $t('auditSimilarDistribution') }} ({{ similarCasesData.totalCases }} 件)</span>
+            <div class="header-left-tag font-mono text-danger font-semibold">
+              [同原因码 {{ currentSimilarCases.reasonCode }}]
+            </div>
+            <div class="header-right-meta font-mono text-muted">
+              <span>已裁决样本 {{ currentSimilarCases.totalCases }} 例</span>
+              <span class="meta-separator">·</span>
+              <span>统计窗口 近 90 天</span>
+            </div>
           </div>
 
           <!-- 分段比例分布条 -->
           <div class="stacked-distribution-bar">
             <div
-              v-for="stat in similarCasesData.stats"
+              v-for="stat in currentSimilarCases.stats"
               :key="stat.key"
               class="dist-segment"
               :style="{ width: stat.percentage + '%', backgroundColor: stat.color }"
-              :title="stat.label + ': ' + stat.percentage + '% (' + stat.count + '件)'"
+              :title="`${stat.label}: ${stat.percentage}% (${stat.count}例)`"
             ></div>
           </div>
 
-          <!-- 4 种裁决分布图例及数字统计 -->
-          <div class="distribution-legend-grid">
+          <!-- 4 列比例与数字统计矩阵 -->
+          <div class="distribution-stats-grid">
             <div
-              v-for="stat in similarCasesData.stats"
+              v-for="stat in currentSimilarCases.stats"
               :key="stat.key"
-              class="dist-legend-item"
+              class="stat-col-box"
             >
-              <span class="color-dot" :style="{ backgroundColor: stat.color }"></span>
-              <span class="dist-name">{{ stat.label }}:</span>
-              <span class="dist-stat font-mono font-medium">{{ stat.percentage }}% ({{ stat.count }}件)</span>
+              <div class="stat-name-row">
+                <span class="color-dot" :style="{ backgroundColor: stat.color }"></span>
+                <span class="stat-name">{{ stat.label }}</span>
+              </div>
+              <div class="stat-percent font-mono font-semibold">{{ stat.percentage }}%</div>
+              <div class="stat-count font-mono text-muted">{{ stat.count }} 例</div>
             </div>
           </div>
 
-          <!-- 一致性研判指引 -->
+          <!-- 一致性研判指引边框卡片 -->
           <div class="consistency-advisory-box">
-            <Icon icon="fluent:lightbulb-16-regular" width="16" height="16" class="advisory-icon" />
-            <span class="advisory-text">{{ similarCasesData.advisoryText }}</span>
-          </div>
-
-          <div class="placeholder-sample-notice">
-            <Icon icon="fluent:info-16-regular" width="13" height="13" />
-            <span>{{ $t('auditPlaceholderSampleNotice') }}</span>
+            <div class="advisory-bar-indicator"></div>
+            <div class="advisory-content-wrap">
+              <span class="advisory-text">{{ currentSimilarCases.advisoryText }}</span>
+            </div>
           </div>
         </div>
       </section>
 
-      <!-- 模块 G: 证据链溯源 (变体 2 重点 & 条件渲染：四列链路行) -->
-      <section
-        v-if="activeVariant === 2 && evidenceChainList && evidenceChainList.length > 0"
-        id="chapter-chain"
-        class="dossier-card anchor-section"
-      >
+      <!-- 模块 G: 证据链溯源 (证据 → 规则 → 节点 → 依据 结构化链路) -->
+      <section id="chapter-chain" class="dossier-card anchor-section">
         <div class="section-title">
           <div class="title-left">
             <Icon icon="fluent:link-multiple-20-regular" width="18" height="18" />
-            <span>{{ $t('auditChainTitle') }}</span>
+            <span>{{ $t('auditChipChain') }}</span>
+            <span class="chain-formula-desc font-mono text-muted">{{ $t('auditEvidenceChainFormula') }}</span>
           </div>
-          <span class="font-mono text-muted">{{ $t('auditMaskedAggregatedData') }}</span>
+          <span class="section-badge font-mono">#06-PROVENANCE</span>
         </div>
 
-        <div class="evidence-chain-table">
-          <div class="chain-header-row font-mono">
-            <span class="c-ev">{{ $t('auditChainColEvidence') }}</span>
-            <span class="c-rl">{{ $t('auditChainColRule') }}</span>
-            <span class="c-st">{{ $t('auditChainColStep') }}</span>
-            <span class="c-jd">{{ $t('auditChainColBasis') }}</span>
-          </div>
-
+        <div class="evidence-chain-structured-list">
           <div
-            v-for="(rowItem, rIdx) in evidenceChainList"
+            v-for="(rowItem, rIdx) in currentEvidenceChain"
             :key="rIdx"
-            class="chain-item-row"
+            class="chain-card-row"
           >
-            <div class="c-ev">
-              <span class="ev-title font-medium">{{ rowItem.evidence }}</span>
-              <span v-if="rowItem.hash" class="ev-hash font-mono text-muted">{{ rowItem.hash }}</span>
+            <div class="chain-header-line">
+              <div class="evidence-id-title">
+                <span class="ev-code font-mono font-semibold">[{{ rowItem.code }}]</span>
+                <span class="ev-title font-medium">{{ rowItem.evidence }}</span>
+              </div>
+              <div class="evidence-rule-tag font-mono text-danger font-medium">
+                [{{ rowItem.rule }}]
+              </div>
             </div>
-            <div class="c-rl font-mono text-danger">
-              <span>{{ rowItem.rule }}</span>
-            </div>
-            <div class="c-st font-mono">
-              <span class="step-pill">{{ rowItem.step }}</span>
-            </div>
-            <div class="c-jd">
-              <span class="judgement-text">{{ rowItem.judgement }}</span>
+
+            <div class="chain-flow-line font-mono">
+              <div class="flow-step-tag">
+                <span>[{{ rowItem.step }}]</span>
+              </div>
+              <Icon icon="fluent:arrow-right-12-regular" width="12" height="12" class="flow-arrow" />
+              <div class="flow-hash-btn" @click="copyHash(rowItem.hash)" :title="$t('auditCopiedHash')">
+                <span>{{ rowItem.hash }}</span>
+                <Icon icon="fluent:copy-16-regular" width="11" height="11" class="copy-icon" />
+              </div>
+              <Icon icon="fluent:arrow-right-12-regular" width="12" height="12" class="flow-arrow" />
+              <div class="flow-judgement-text">
+                {{ rowItem.judgement }}
+              </div>
             </div>
           </div>
-        </div>
-
-        <div class="placeholder-sample-notice">
-          <Icon icon="fluent:info-16-regular" width="13" height="13" />
-          <span>{{ $t('auditPlaceholderSampleNotice') }}</span>
         </div>
       </section>
 
-      <!-- 模块 H: 裁决工作台 (变体 1、变体 2、变体 3 专用：纯只读变体 4 绝对不出现) -->
+      <!-- 模块 H: 裁决工作台 (仅在可处理变体展示，封禁台账等纯只读绝对隐藏) -->
       <section
         v-if="isAdjudicationAvailable"
         id="chapter-decision"
@@ -703,12 +642,11 @@
         <div class="section-title">
           <div class="title-left">
             <Icon icon="fluent:gavel-20-regular" width="18" height="18" />
-            <span>{{ chapterLabels.decision }}</span>
+            <span>{{ $t('auditChipDecision') }}</span>
           </div>
           <span class="section-badge font-mono">#DECISION_ENGINE</span>
         </div>
 
-        <!-- 裁决批注输入框与快捷预设 -->
         <div class="decision-input-group">
           <div class="decision-input-header">
             <span class="input-title font-medium">{{ $t('auditAdjudicationNotes') }}:</span>
@@ -729,9 +667,9 @@
           />
         </div>
 
-        <!-- 动作按钮组：根据变体严格分流与提供 -->
+        <!-- 动作按钮组：严格按变体分流 -->
         <div class="adjudication-actions-grid">
-          <!-- 变体 1 滥用威胁专属：按对象分流 (外部发件人 -> 加入黑名单 / 内部用户 -> 限制发信) -->
+          <!-- 变体 1: 滥用威胁专属动作 -->
           <template v-if="activeVariant === 1">
             <el-button
               v-if="!selectedRow.isInternal"
@@ -754,7 +692,7 @@
             </el-button>
           </template>
 
-          <!-- 变体 3 风险管理审计专属：封存归档 -->
+          <!-- 变体 3: 风控预警专属动作 -->
           <template v-if="activeVariant === 3">
             <el-button
               type="primary"
@@ -766,8 +704,7 @@
             </el-button>
           </template>
 
-          <!-- 通用四枚裁决动作 (变体 1, 变体 2, 变体 3 均具备) -->
-          <!-- 1. 放行结案 -->
+          <!-- 通用 4 按钮裁决矩阵 (放行结案 / 条件放行 / 驳回维持 / 标记误报) -->
           <el-button
             type="success"
             :loading="actionLoading"
@@ -777,7 +714,6 @@
             <span>{{ $t('auditAdjudicateApprove') }}</span>
           </el-button>
 
-          <!-- 2. 条件放行 (强制下次 MFA 凭证挑战) -->
           <el-button
             type="primary"
             plain
@@ -788,7 +724,6 @@
             <span>{{ $t('auditAdjudicateApproveWithChallenge') }}</span>
           </el-button>
 
-          <!-- 3. 驳回申诉 / 维持封禁 -->
           <el-button
             type="danger"
             plain
@@ -799,7 +734,6 @@
             <span>{{ $t('auditAdjudicateReject') }}</span>
           </el-button>
 
-          <!-- 4. 标记误报 (列入白名单豁免) -->
           <el-button
             type="info"
             plain
@@ -812,7 +746,7 @@
         </div>
       </section>
 
-      <!-- 模块 I: 只读台账横幅 (变体 4 纯只读台账专用) -->
+      <!-- 模块 I: 处置台账合规存证 (变体 4 纯只读专用) -->
       <section
         v-if="activeVariant === 4"
         id="chapter-ledger"
@@ -822,7 +756,7 @@
           <Icon icon="fluent:shield-checkmark-20-filled" width="20" height="20" class="banner-icon" />
           <div class="banner-text-box">
             <span class="banner-title font-medium">{{ $t('auditSanctionPureNotice') }}</span>
-            <span class="banner-sub text-muted">IMMUTABLE_AUDIT_LOG · 防篡改公开台账</span>
+            <span class="banner-sub text-muted font-mono">IMMUTABLE_AUDIT_LOG · sha256:d89f10a8...310c</span>
           </div>
         </div>
 
@@ -834,15 +768,15 @@
 
     </div>
 
-    <!-- 底部固定动作栏 (根据读写权限矩阵严格管控) -->
+    <!-- 底部操作栏 -->
     <template #footer>
       <div class="drawer-footer-actions">
         <!-- 通用关闭按钮 -->
         <el-button @click="handleClose">{{ $t('close') }}</el-button>
 
-        <!-- 可处理变体 (变体 1, 2, 3) 专用操作 -->
+        <!-- 可处理变体专用动作 -->
         <template v-if="isAdjudicationAvailable && selectedRow">
-          <!-- 延期 (仅当具有到期时间且可延期时展示) -->
+          <!-- 延期 -->
           <el-button
             v-if="canExtend"
             type="primary"
@@ -865,7 +799,7 @@
             <span>{{ $t('auditBtnNote') }}</span>
           </el-button>
 
-          <!-- 主处理动作：已封禁 -> 解封，否则 -> 重新封禁 -->
+          <!-- 解封 / 重新封禁 -->
           <el-button
             v-if="selectedRow.status === 'banned'"
             type="success"
@@ -891,7 +825,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue';
+import { ref, computed, watch, nextTick } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { Icon } from '@iconify/vue';
@@ -938,13 +872,13 @@ const drawerSize = computed(() => {
   return window.innerWidth <= 768 ? '100vw' : '720px';
 });
 
-// 当前激活的变体 (1: 滥用威胁, 2: 封禁存证, 3: 风险管理, 4: 操作记录台账)
+// 当前激活的变体 (1: 滥用威胁, 2: 审计申诉, 3: 风控预警, 4: 封禁记录/处置台账)
 const activeVariant = ref(1);
 const activeChapter = ref('summary');
 const scrollContainerRef = ref(null);
 const internalDecisionNotes = ref('');
 
-// 根据板块或工单智能计算默认变体
+// 根据板块或工单智能计算变体
 function computeDefaultVariant() {
   if (props.selectedRow?._forcedVariant) return Number(props.selectedRow._forcedVariant);
   if (props.section === 'threat') return 1;
@@ -975,19 +909,12 @@ watch(
   { immediate: true }
 );
 
-function handleSelectVariant(vNum) {
-  activeVariant.value = Number(vNum);
-  nextTick(() => {
-    syncDeepLink();
-  });
-}
-
 function handleClose() {
   visible.value = false;
   clearDeepLink();
 }
 
-// 变体标题与元信息计算
+// 变体标题
 const currentVariantTitle = computed(() => {
   switch (activeVariant.value) {
     case 1: return t('auditVariant1Title');
@@ -998,35 +925,7 @@ const currentVariantTitle = computed(() => {
   }
 });
 
-const currentVariantSub = computed(() => {
-  switch (activeVariant.value) {
-    case 1: return t('auditVariant1Sub');
-    case 2: return t('auditVariant2Sub');
-    case 3: return t('auditVariant3Sub');
-    case 4: return t('auditVariant4Sub');
-    default: return t('auditVariant1Sub');
-  }
-});
-
-const currentVariantBadge = computed(() => {
-  switch (activeVariant.value) {
-    case 1: return t('auditModeProcessable');
-    case 2: return t('auditModeTamperProof');
-    case 3: return t('auditModeRoutineAudit');
-    case 4: return t('auditModePureReadonly');
-    default: return t('auditModeProcessable');
-  }
-});
-
-const variantBadgeType = computed(() => {
-  switch (activeVariant.value) {
-    case 1: return 'danger';
-    case 2: return 'warning';
-    case 3: return 'primary';
-    case 4: return 'info';
-    default: return 'primary';
-  }
-});
+const isThreatVariant = computed(() => activeVariant.value === 1);
 
 const variantIcon = computed(() => {
   switch (activeVariant.value) {
@@ -1098,6 +997,14 @@ function copyHash(hash) {
   copyText(hash, t('auditCopiedHash'));
 }
 
+// 分区子案编号计算 (例如 THR-2026-MULTI99 -> THR-MULTI99-SUB01)
+function getSubCaseId(caseNo, idx) {
+  const num = String(idx + 1).padStart(2, '0');
+  if (!caseNo) return `SUB-${num}`;
+  const cleaned = String(caseNo).replace(/^#/, '').replace(/-\d{4}-/, '-');
+  return `${cleaned}-SUB${num}`;
+}
+
 const caseNumber = computed(() => {
   const r = props.selectedRow;
   if (!r) return 'CASE-000000';
@@ -1124,12 +1031,14 @@ function formatTime(val) {
   return tzDayjs(val).format('YYYY-MM-DD HH:mm');
 }
 
-// 状态与分类元信息
+// 状态与分类元信息：确保 active/pending 等状态同步显示为标准“待审”等
 function getStatusTagType(status) {
+  if (status === 'active' || status === 'pending' || props.selectedRow?.circuitStatus === 'QUEUE_PAUSE' || props.selectedRow?.circuitStatus === 'TRIPPED') {
+    return 'warning';
+  }
   switch (status) {
     case 'banned': return 'danger';
     case 'unbanned': return 'success';
-    case 'pending': return 'warning';
     case 'watching': return 'info';
     case 'resolved': return 'success';
     case 'expired': return 'info';
@@ -1139,10 +1048,12 @@ function getStatusTagType(status) {
 }
 
 function getStatusLabel(status) {
+  if (status === 'active' || status === 'pending' || props.selectedRow?.circuitStatus === 'QUEUE_PAUSE' || props.selectedRow?.circuitStatus === 'TRIPPED') {
+    return t('abuseStatusPending') || '待审';
+  }
   switch (status) {
     case 'banned': return t('auditStatusBannedActive');
     case 'unbanned': return t('auditStatusUnbannedRecord');
-    case 'pending': return t('auditCaseStatusPending');
     case 'watching': return t('auditStatusWatching');
     case 'resolved': return t('auditCaseStatusResolved');
     case 'expired': return t('auditCaseStatusExpired');
@@ -1151,53 +1062,18 @@ function getStatusLabel(status) {
   }
 }
 
-const secondaryStatus = computed(() => {
+// 拍案管理直接展示名称，与列表完全对照
+const authorityValue = computed(() => {
   const r = props.selectedRow;
   if (!r) return null;
-  if (r.circuitStatus === 'TRIPPED' || (r.banReason && r.banReason.includes('熔断'))) {
-    return { label: t('abuseActionCircuitHold') || '通道熔断', type: 'danger', icon: 'fluent:warning-20-filled' };
-  }
-  if (r.status === 'watching') {
-    return { label: t('auditStatusWatching'), type: 'warning', icon: 'fluent:eye-tracking-16-regular' };
-  }
-  if (r.status === 'probation') {
-    return { label: 'MFA挑战中', type: 'primary', icon: 'fluent:key-16-regular' };
-  }
-  return null;
+  return r.adjudicatorName || r.adjudicator || r.authority || r.operator || r.assignee || 'SecAdmin';
 });
 
-const riskLevelTag = computed(() => {
-  const r = props.selectedRow;
-  if (!r) return null;
-  if (r.riskLevel === 'high' || r.priority === 'CRITICAL' || r.priority === 'P0' || r.warningType === 'risk') {
-    return { label: t('auditThreatCriticalTag'), type: 'danger' };
-  }
-  if (r.priority === 'LV3' || r.priority === 'P1') {
-    return { label: t('auditLevelRoutine3'), type: 'warning' };
-  }
-  if (r.priority === 'LV2') {
-    return { label: t('auditLevelRoutine2'), type: 'warning' };
-  }
-  if (r.priority === 'LV1') {
-    return { label: t('auditLevelRoutine1'), type: 'info' };
-  }
-  if (r.priority === 'LV0') {
-    return { label: t('auditLevelRoutine0'), type: 'info' };
-  }
-  return null;
-});
-
-const evidenceDaysText = computed(() => {
-  const r = props.selectedRow;
-  if (!r) return null;
-  const days = r.evidenceExpiresDays !== undefined ? r.evidenceExpiresDays : 180;
-  return t('abuseEvidenceRemainingDays', { days });
-});
-
+// 证据留存天数 (无需 WORM 无关说明)
 const evidenceDaysFormatted = computed(() => {
   const r = props.selectedRow;
   const days = r?.evidenceExpiresDays !== undefined ? r.evidenceExpiresDays : 180;
-  return `${days} 天 (WORM 防篡改标准)`;
+  return `${days} 天`;
 });
 
 const alarmCountValue = computed(() => {
@@ -1218,14 +1094,6 @@ const isDeadlineImminent = computed(() => {
   if (!r || !r.deadline) return false;
   const diff = new Date(r.deadline).getTime() - Date.now();
   return diff > 0 && diff < 3 * 86400000;
-});
-
-const authorityValue = computed(() => {
-  const r = props.selectedRow;
-  if (!r) return null;
-  if (r.finalAuthorityDesc) return r.finalAuthorityDesc;
-  if (r.authority) return r.authority;
-  return r.adjudicator || 'SecAdmin (安全主管)';
 });
 
 const categoryTagMeta = computed(() => {
@@ -1249,60 +1117,23 @@ const categoryTagMeta = computed(() => {
   return { label: t('auditCatRoutine'), type: 'info' };
 });
 
-// 负责人入口计算
-const operatorDisplayName = computed(() => {
-  const r = props.selectedRow;
-  return r?.operator || r?.assignee || r?.adjudicator || 'SecAdmin';
-});
-
-const operatorInitials = computed(() => {
-  const name = operatorDisplayName.value;
-  return name.slice(0, 2).toUpperCase();
-});
-
-const operatorRoleLabel = computed(() => {
-  const r = props.selectedRow;
-  const isSys = operatorDisplayName.value.toLowerCase().includes('bot') || operatorDisplayName.value.toLowerCase().includes('system');
-  return isSys ? t('auditOperatorRoleSystem') : t('auditOperatorRoleAdmin');
-});
-
-function openOperatorDialog() {
-  emit('openOperator', props.selectedRow);
-}
-
-// 章节标题随变体切换 (变体 2 存证视角: 案件信息 / 风险研判 / 提交裁决)
-const chapterLabels = computed(() => {
-  const isEvidenceVariant = activeVariant.value === 2;
-  return {
-    summary: isEvidenceVariant ? t('auditV2ChipSummary') : t('auditChipSummary'),
-    basis: isEvidenceVariant ? t('auditV2ChipBasis') : t('auditChipBasis'),
-    decision: isEvidenceVariant ? t('auditV2ChipDecision') : t('auditAdjudicateAction')
-  };
-});
-
 // 章节动态计算
 const availableChapters = computed(() => {
   const list = [];
-  list.push({ id: 'summary', label: chapterLabels.value.summary, icon: 'fluent:document-text-16-regular' });
+  list.push({ id: 'summary', label: t('auditChipSummary'), icon: 'fluent:document-text-16-regular' });
   
-  if (clusterAccountsList.value && clusterAccountsList.value.length > 0) {
+  if (isThreatVariant.value && clusterAccountsList.value && clusterAccountsList.value.length > 0) {
     list.push({ id: 'cluster', label: t('auditChipCluster'), icon: 'fluent:people-community-16-regular' });
   }
 
-  list.push({ id: 'basis', label: chapterLabels.value.basis, icon: 'fluent:shield-task-16-regular' });
+  list.push({ id: 'basis', label: t('auditChipBasis'), icon: 'fluent:shield-task-16-regular' });
   list.push({ id: 'timeline', label: t('auditChipTimeline'), icon: 'fluent:timeline-20-regular' });
-
-  if (riskProfileData.value) {
-    list.push({ id: 'risk', label: t('auditChipRisk'), icon: 'fluent:chart-multiple-16-regular' });
-  }
-
-  if (activeVariant.value === 2) {
-    list.push({ id: 'similar', label: t('auditChipSimilar'), icon: 'fluent:branch-compare-16-regular' });
-    list.push({ id: 'chain', label: t('auditChipChain'), icon: 'fluent:link-multiple-16-regular' });
-  }
+  list.push({ id: 'risk', label: t('auditChipRisk'), icon: 'fluent:chart-multiple-16-regular' });
+  list.push({ id: 'similar', label: t('auditChipSimilar'), icon: 'fluent:branch-compare-16-regular' });
+  list.push({ id: 'chain', label: t('auditChipChain'), icon: 'fluent:link-multiple-16-regular' });
 
   if (isAdjudicationAvailable.value) {
-    list.push({ id: 'decision', label: chapterLabels.value.decision, icon: 'fluent:gavel-16-regular' });
+    list.push({ id: 'decision', label: t('auditChipDecision'), icon: 'fluent:gavel-16-regular' });
   }
 
   if (activeVariant.value === 4) {
@@ -1339,249 +1170,779 @@ function handleBodyScroll() {
 // 模块 B: 集群关联账号数据
 const clusterAccountsList = computed(() => {
   const accounts = props.selectedRow?.clusterAccounts;
-  return Array.isArray(accounts) ? accounts : [];
-});
-
-// 模块 C: 处置依据细节
-const redBanReasonText = computed(() => {
-  const r = props.selectedRow;
-  if (!r) return '';
-  return r.banReason || (isBanType.value && r.actionText ? r.actionText : (r.reportReason || ''));
-});
-
-const evidenceSummaryText = computed(() => {
-  const r = props.selectedRow;
-  if (!r) return t('auditReasonSystemRule');
-  return r.evidenceSummary || r.categorySummary || t('auditReasonSystemRule');
-});
-
-const evidenceDigestHash = computed(() => {
-  return props.selectedRow?.evidenceHash || '';
-});
-
-const actionBadgeText = computed(() => {
-  const r = props.selectedRow;
-  if (!r) return t('action');
-  if (r.status === 'banned') return t('auditSuggestionBan');
-  if (r.status === 'unbanned') return t('auditSuggestionUnban');
-  return t('auditSuggestionWatch');
-});
-
-// 固定 6 种标记列表解析: [放行说明] [延期处置] [解禁说明] [审核备忘] [驳回理由] [更新]
-const parsedDetailLogs = computed(() => {
-  const r = props.selectedRow;
-  if (!r || !r.detailText) return [];
-  const lines = r.detailText.split('\n').map(l => l.trim()).filter(Boolean);
-  const tagRegex = /^\[(放行说明|延期处置|解禁说明|审核备忘|驳回理由|更新)\]\s*(.*)$/;
-  
-  return lines.map(line => {
-    const match = line.match(tagRegex);
-    if (match) {
-      const tag = match[1];
-      const content = match[2];
-      let tagType = 'info';
-      if (tag === '放行说明' || tag === '解禁说明') tagType = 'success';
-      else if (tag === '延期处置') tagType = 'primary';
-      else if (tag === '审核备忘') tagType = 'warning';
-      else if (tag === '驳回理由') tagType = 'danger';
-      else if (tag === '更新') tagType = 'info';
-      return { tag, content, tagType };
-    }
-    return { tag: null, content: line, tagType: null };
-  });
-});
-
-// 模块 D: 全周期时间线节点 (双泳道)
-const timelineNodes = computed(() => {
-  const r = props.selectedRow;
-  if (!r) return [];
-  const cTime = r.createTime || new Date().toISOString();
-  
-  if (r.timeline && r.timeline.length) {
-    return r.timeline.map((item, idx) => {
-      const actor = item.actor || 'RuleEngine';
-      const isMachine = actor.includes('Rule') || actor.includes('System') || actor.includes('Sentinel') || actor.includes('Engine');
-      return {
-        formattedTime: formatTime(item.time || cTime),
-        actor,
-        lane: isMachine ? 'machine' : 'human',
-        icon: isMachine ? 'fluent:bot-16-regular' : 'fluent:person-16-regular',
-        title: item.event || item.title || '状态流转记录',
-        description: item.desc || item.actionText || '',
-        transition: item.transition || null,
-        duration: item.duration || null,
-        hash: item.hash || null,
-        isLatest: idx === r.timeline.length - 1
-      };
-    });
+  if (Array.isArray(accounts) && accounts.length > 0) return accounts;
+  // 滥用威胁板块提供默认关联集群演示样本
+  if (activeVariant.value === 1) {
+    const mainMail = props.selectedRow?.email || 'alpha@epocanvas.com';
+    const domain = mainMail.includes('@') ? mainMail.split('@')[1] : 'epocanvas.com';
+    return [
+      { id: 101, email: `sub01_${mainMail.split('@')[0]}@${domain}`, userId: 'usr_88201', status: 'banned', evidenceSummary: '同一设备指纹 · 30分钟内注册' },
+      { id: 102, email: `sub02_${mainMail.split('@')[0]}@${domain}`, userId: 'usr_88202', status: 'banned', evidenceSummary: '同一设备指纹 · 批量协同外发' },
+      { id: 103, email: `sub03_${mainMail.split('@')[0]}@${domain}`, userId: 'usr_88203', status: 'banned', evidenceSummary: '同一出口 IP · 触发退信熔断' }
+    ];
   }
+  return [];
+});
 
-  // 缺省时智能派生标准的双泳道时间线
-  const nodes = [
+// 模块 C: 风险研判与处置依据数据分流 (四板块完全差异化)
+const currentAlarmReason = computed(() => {
+  const r = props.selectedRow;
+  if (activeVariant.value === 1) {
+    return r?.banReason || '同一设备指纹 30 分钟内注册并激活 4 个账号，主账号协同 3 个子账号批量外发，判定一人多号集群滥用。';
+  }
+  if (activeVariant.value === 2) {
+    return r?.appealReason
+      ? `用户提交解封复核申请抗辩：“${r.appealReason}”，核验所处环境与历史行为。`
+      : '用户提交解封复核申请，抗辩声称所处环境为高校/企业内网 NAT 共享出口，无主观多账号滥用恶意。';
+  }
+  if (activeVariant.value === 3) {
+    return '实时监测到近 15 分钟外发速率突刺突破动态基线 300%，且硬退信率上升至 14.8%，触碰预警警戒线。';
+  }
+  return '案件全流程终结并固化归档。经双人合规会签与系统策略终审，恶意一人多号违规外发判定成立，永久阻断并写入防篡改台账。';
+});
+
+const currentTriggerTag = computed(() => {
+  switch (activeVariant.value) {
+    case 1: return '一人多号';
+    case 2: return '争议申诉';
+    case 3: return '速率突刺';
+    case 4: return '终裁执行';
+    default: return '规则触发';
+  }
+});
+
+const currentTriggerBadgeType = computed(() => {
+  switch (activeVariant.value) {
+    case 1: return 'danger';
+    case 2: return 'warning';
+    case 3: return 'danger';
+    case 4: return 'info';
+    default: return 'primary';
+  }
+});
+
+const currentTriggerCause = computed(() => {
+  switch (activeVariant.value) {
+    case 1: return '同设备指纹关联 4 账号，其中 3 个触发外发滥用';
+    case 2: return '用户附言提交工位证明、网络拓扑说明及 TOTP 硬件密匙凭据';
+    case 3: return '滑动窗口 120 秒内捕获并发发信连接 56 次，主要集中于未验证收件人域';
+    case 4: return '安全委员会终审裁决执行完毕，不可逆注销外发凭据并冻结发信配额';
+    default: return '系统安全引擎检测到违规风险指标超标';
+  }
+});
+
+const currentSuggestionTag = computed(() => {
+  switch (activeVariant.value) {
+    case 1: return '维持封禁';
+    case 2: return '条件放行';
+    case 3: return '限流降级';
+    case 4: return '固化封存';
+    default: return '维持处置';
+  }
+});
+
+const currentSuggestionBadgeType = computed(() => {
+  switch (activeVariant.value) {
+    case 1: return 'danger';
+    case 2: return 'primary';
+    case 3: return 'warning';
+    case 4: return 'success';
+    default: return 'danger';
+  }
+});
+
+const currentSuggestionText = computed(() => {
+  switch (activeVariant.value) {
+    case 1: return '策略引擎终裁 · 10-12 11:02';
+    case 2: return '申诉复核中心建议 · 强制启用 TOTP 二次认证并保持 7 天动态观察';
+    case 3: return '动态策略建议 · 暂扣非核心外发通道 2 小时并持续遥测';
+    case 4: return '证据保管期 180 天，到期前不可物理抹除或修改结论';
+    default: return '安全主管核准执行';
+  }
+});
+
+// 模块 C: 研判路径记录列表 (四板块完全差异化)
+const currentJudgmentLogs = computed(() => {
+  if (activeVariant.value === 1) {
+    return [
+      { tag: '更新', tagType: 'info', content: '10-12 11:02 策略引擎：主账号与 3 个子账号一并纳入封禁管控，外发通道关闭。' },
+      { tag: '审核备忘', tagType: 'warning', content: '10-12 10:45 SecAdmin：比对指纹聚集快照与注册时序，确认一人多号集群成立。' },
+      { tag: '更新', tagType: 'info', content: '10-12 03:20 处置管线：熔断期间仅暂扣外发，未直接封禁，等待人工终裁。' },
+      { tag: '风控溯源', tagType: 'danger', content: '10-12 03:14 基线探针：命中 RULE-REG-55 与 RULE-SPAM-77，聚集度置信度 98.4%。' }
+    ];
+  }
+  if (activeVariant.value === 2) {
+    return [
+      { tag: '审核备忘', tagType: 'warning', content: '10-13 15:40 SecAdmin：核实高校 NAT 出口拓扑，外发峰值期间存在瞬时会话劫持特征，建议重置密码并启用双因素认证。' },
+      { tag: '更新', tagType: 'info', content: '10-13 14:20 申诉管线：用户补充提交机构 IT 证明文件，证据包哈希值已归档固化。' },
+      { tag: '更新', tagType: 'info', content: '10-13 09:15 工单引擎：受理用户解封申请，系统自动挂起死局倒计时，分配专员复核。' },
+      { tag: '放行说明', tagType: 'success', content: '10-13 09:00 合规策略：若初判属于共享 IP 误伤，且历史 90 天无违规，推荐条件放行。' }
+    ];
+  }
+  if (activeVariant.value === 3) {
+    return [
+      { tag: '更新', tagType: 'info', content: '10-14 16:30 策略引擎：自动下调外发配额至 15 封/小时，暂扣队列平稳，未见扩散。' },
+      { tag: '审核备忘', tagType: 'warning', content: '10-14 16:15 SecAdmin：抽检外发邮件正文，未见已知钓鱼模版，判定为推广测试发信。' },
+      { tag: '更新', tagType: 'info', content: '10-14 16:02 探针管线：触发 L2 级速率异常告警，通知驻场值班员进入处置队列。' },
+      { tag: '延期处置', tagType: 'primary', content: '10-14 16:00 熔断机制：暂扣非核心外发通道 2 小时，持续采集 SPF/DKIM 验签回执。' }
+    ];
+  }
+  return [
+    { tag: '更新', tagType: 'info', content: '10-15 18:00 台账引擎：写入只读存证区块 sha256:d89f...310c，公开可验证。' },
+    { tag: '解禁说明', tagType: 'danger', content: '不可解禁：终审确认恶意侵权群发，已通知上游风控情报中心共享黑名单。' },
+    { tag: '审核备忘', tagType: 'warning', content: '10-15 17:30 SecAdmin：完成全流程审计会签，移入永久不可操作归档库。' },
+    { tag: '存证留痕', tagType: 'success', content: '10-15 17:00 合规官：核准生成 RFC-3161 数字时间戳证明，归档不可逆。' }
+  ];
+});
+
+// 模块 D: 处置与存证全周期时间线节点 (左右双泳道分流)
+const currentTimelineNodes = computed(() => {
+  if (activeVariant.value === 1) {
+    return [
+      {
+        lane: 'machine',
+        time: '10-12 03:14',
+        actor: '规则引擎',
+        badge: '起点',
+        nodeId: 'N1',
+        action: '规则命中',
+        desc: 'RULE-REG-55 同指纹关联 4 账号，进入暂扣队列',
+        transition: { from: '正常', to: '观察中' },
+        hash: 'sha256:4c81…d0f2',
+        isLatest: false
+      },
+      {
+        lane: 'machine',
+        time: '10-12 03:20',
+        actor: '处置管线',
+        badge: '+6 分',
+        nodeId: 'N2',
+        action: '熔断暂扣',
+        desc: '熔断期间仅暂扣外发，不直接封禁账号',
+        transition: { from: '观察中', to: '熔断暂扣' },
+        hash: null,
+        isLatest: false
+      },
+      {
+        lane: 'human',
+        time: '10-12 10:45',
+        actor: 'SecAdmin',
+        duration: '+7 时 25 分',
+        nodeId: 'N3',
+        action: '人工复核',
+        desc: '确认一人多号集群，3 个子账号抽样比对通过',
+        transition: { from: '熔断暂扣', to: '已封禁' },
+        hash: 'sha256:aa19…77c3',
+        isLatest: false
+      },
+      {
+        lane: 'machine',
+        time: '10-12 11:02',
+        actor: '处置管线',
+        badge: '+17 分',
+        nodeId: 'N4',
+        action: '处置生效',
+        desc: '主账号与 3 个子账号一并纳入封禁管控',
+        transition: { from: '已封禁', to: '策略广播生效' },
+        hash: null,
+        isLatest: true
+      }
+    ];
+  }
+  if (activeVariant.value === 2) {
+    return [
+      {
+        lane: 'machine',
+        time: '10-13 08:30',
+        actor: '规则引擎',
+        badge: '起点',
+        nodeId: 'N1',
+        action: '异常阻断',
+        desc: 'RULE-OUTBOUND-LIMIT 检测到非受信任异地 IP 批量外发',
+        transition: { from: '正常', to: '临时阻断' },
+        hash: 'sha256:6e12…330f',
+        isLatest: false
+      },
+      {
+        lane: 'human',
+        time: '10-13 09:15',
+        actor: '用户 (申诉人)',
+        duration: '+45 分',
+        nodeId: 'N2',
+        action: '提交申诉',
+        desc: '提交企业网络拓扑说明与学生工作证件，申请人工复核',
+        transition: { from: '临时阻断', to: '申诉复核中' },
+        hash: null,
+        isLatest: false
+      },
+      {
+        lane: 'human',
+        time: '10-13 14:20',
+        actor: 'SecAdmin',
+        duration: '+5 时 05 分',
+        nodeId: 'N3',
+        action: '人工复核',
+        desc: '调阅 NAT 拓扑与会话时序，确认非群控机器集群特征',
+        transition: { from: '申诉复核中', to: '建议放行' },
+        hash: 'sha256:b820…ef19',
+        isLatest: false
+      },
+      {
+        lane: 'machine',
+        time: '10-13 15:45',
+        actor: '策略引擎',
+        badge: '+1 时 25 分',
+        nodeId: 'N4',
+        action: '条件放行生效',
+        desc: '下发条件放行策略，用户端下一次登录强制触发 TOTP 凭证挑战',
+        transition: { from: '建议放行', to: 'MFA挑战中' },
+        hash: null,
+        isLatest: true
+      }
+    ];
+  }
+  if (activeVariant.value === 3) {
+    return [
+      {
+        lane: 'machine',
+        time: '10-14 16:00',
+        actor: '探针引擎',
+        badge: '起点',
+        nodeId: 'N1',
+        action: '突刺捕获',
+        desc: 'MON-OUTBOUND-SURGE 监测到并发外发速率冲顶',
+        transition: { from: '正常', to: '触发告警' },
+        hash: 'sha256:91ef…02a4',
+        isLatest: false
+      },
+      {
+        lane: 'machine',
+        time: '10-14 16:02',
+        actor: '处置管线',
+        badge: '+2 分',
+        nodeId: 'N2',
+        action: '动态降级',
+        desc: '激活限流熔断，将单小时外发限制压缩为 15 封',
+        transition: { from: '触发告警', to: '限流观察中' },
+        hash: null,
+        isLatest: false
+      },
+      {
+        lane: 'human',
+        time: '10-14 16:15',
+        actor: '值班安全员',
+        duration: '+13 分',
+        nodeId: 'N3',
+        action: '抽样初判',
+        desc: '抽检 20 封外发邮件正文，未见已知钓鱼模版与恶意载荷',
+        transition: { from: '限流观察中', to: '维持观察' },
+        hash: 'sha256:32cc…99d1',
+        isLatest: false
+      },
+      {
+        lane: 'machine',
+        time: '10-14 16:30',
+        actor: '策略引擎',
+        badge: '+15 分',
+        nodeId: 'N4',
+        action: '配额下发',
+        desc: '配额临时降级生效，设置 2 小时后自动复核恢复',
+        transition: { from: '维持观察', to: '动态遥测中' },
+        hash: null,
+        isLatest: true
+      }
+    ];
+  }
+  return [
     {
-      formattedTime: formatTime(cTime),
-      actor: 'RuleEngine (Sentinel)',
       lane: 'machine',
-      icon: 'fluent:bot-16-regular',
-      title: '基线规则初判命中',
-      description: `系统自动化探针命中规则 ${r.reasonCode || 'QUOTA_EVASION'}，生成风控研判工单。`,
-      transition: { from: 'init', to: 'pending' },
-      duration: null,
-      hash: null,
+      time: '10-15 02:00',
+      actor: '探针引擎',
+      badge: '起点',
+      nodeId: 'N1',
+      action: '基线初判',
+      desc: 'RULE-REG-55 检测到一人多号集群关联',
+      transition: { from: '正常', to: '观察中' },
+      hash: 'sha256:1a2b…3c4d',
       isLatest: false
     },
     {
-      formattedTime: formatTime(r.banTime || cTime),
-      actor: r.assignee || 'System Policy',
       lane: 'machine',
-      icon: 'fluent:shield-dismiss-16-regular',
-      title: '执行管控动作',
-      description: r.banReason || '触碰策略红线，外发通道实施阻断',
-      transition: { from: 'pending', to: 'banned' },
-      duration: null,
-      hash: null,
-      isLatest: r.status === 'banned' && !r.appealReason
+      time: '10-15 02:05',
+      actor: '处置管线',
+      badge: '+5 分',
+      nodeId: 'N2',
+      action: '自动阻断',
+      desc: '触碰封禁红线，实施外发通道阻断与凭据冻结',
+      transition: { from: '观察中', to: '已封禁' },
+      hash: 'sha256:5e6f…7a8b',
+      isLatest: false
+    },
+    {
+      lane: 'human',
+      time: '10-15 09:00',
+      actor: '安全委员会',
+      duration: '+6 时 55 分',
+      nodeId: 'N3',
+      action: '终审会签',
+      desc: '完成证据链溯源复核，核准永久封禁处置令',
+      transition: { from: '已封禁', to: '终裁确立' },
+      hash: 'sha256:9c0d…1e2f',
+      isLatest: false
+    },
+    {
+      lane: 'machine',
+      time: '10-15 09:10',
+      actor: '台账引擎',
+      badge: '+10 分',
+      nodeId: 'N4',
+      action: '存证固化',
+      desc: '写入只读合规存证台账，生成数字哈希与时间戳区块',
+      transition: { from: '终裁确立', to: '台账归档' },
+      hash: 'sha256:d89f…310c',
+      isLatest: true
     }
   ];
-
-  if (r.appealReason) {
-    nodes.push({
-      formattedTime: formatTime(r.lastUpdated || r.banTime || cTime),
-      actor: 'User (Complainant)',
-      lane: 'human',
-      icon: 'fluent:person-feedback-16-regular',
-      title: '提交争议复核申请',
-      description: `申诉附言：“${r.appealReason}”`,
-      transition: { from: 'banned', to: 'appealing' },
-      duration: null,
-      hash: null,
-      isLatest: false
-    });
-  }
-
-  if (r.status === 'unbanned') {
-    nodes.push({
-      formattedTime: formatTime(r.resolvedTime || new Date().toISOString()),
-      actor: r.adjudicator || 'SecAdmin',
-      lane: 'human',
-      icon: 'fluent:checkmark-circle-16-regular',
-      title: '申诉复核通过 · 批准解封',
-      description: '完成凭证合规核验，移除黑名单并恢复服务。',
-      transition: { from: 'appealing', to: 'unbanned' },
-      duration: null,
-      hash: null,
-      isLatest: true
-    });
-  } else {
-    nodes.push({
-      formattedTime: formatTime(new Date().toISOString()),
-      actor: operatorDisplayName.value,
-      lane: 'human',
-      icon: 'fluent:gavel-16-regular',
-      title: '当前研判队列',
-      description: '等待安全主管最终裁决或例行归档。',
-      transition: null,
-      duration: null,
-      hash: null,
-      isLatest: true
-    });
-  }
-
-  return nodes;
 });
 
-// 后端未提供 timeline 时前端会派生示意节点，此时必须显式披露为占位样本
-const timelineIsSynthetic = computed(() => {
-  return !(props.selectedRow?.timeline?.length > 0);
-});
-
-// 模块 E: 多维风险画像数据
-const riskProfileData = computed(() => {
-  const r = props.selectedRow;
-  if (!r) return null;
-
-  const compScore = r.matchScore ? Math.round(100 - r.matchScore * 0.4) : (r.riskLevel === 'high' ? 88 : (r.riskLevel === 'medium' ? 64 : 32));
-  
+// 模块 E: 多维风险画像数据 (四板块指标完全独立)
+const currentRiskProfile = computed(() => {
+  if (activeVariant.value === 1) {
+    return {
+      compositeScore: 88,
+      mainDriver: '一人多号群控集群关联度高 (94分) 与异地指纹跳跃',
+      dimensions: [
+        { name: '设备指纹连续性', score: 94, weight: 30 },
+        { name: '注册时序聚集度', score: 92, weight: 25 },
+        { name: '行为速率与遥测', score: 88, weight: 25 },
+        { name: '网络拓扑信誉', score: 80, weight: 20 }
+      ],
+      metrics: [
+        {
+          name: '设备指纹关联账号',
+          rule: 'RULE-REG-55',
+          probeNotes: '探针周期 24h · 关联度 98%',
+          currentValue: '4 个',
+          isOverThreshold: true,
+          isNumeric: true,
+          ratio: 95,
+          selfTickPos: 40,
+          cohortBaseline: '1 个',
+          self30d: '1 个',
+          threshold: '≤ 1 个'
+        },
+        {
+          name: '会话连续性切换次数',
+          rule: 'RULE-SESS-09',
+          probeNotes: '滑动窗口 60m · 切换频次',
+          currentValue: '18 次/时',
+          isOverThreshold: true,
+          isNumeric: true,
+          ratio: 90,
+          selfTickPos: 30,
+          cohortBaseline: '2 次/时',
+          self30d: '3 次/时',
+          threshold: '≤ 5 次/时'
+        },
+        {
+          name: '注册时序聚集度',
+          rule: 'RULE-BURST-REG',
+          probeNotes: '指纹注册时序方差检验',
+          currentValue: '4 账号/30分',
+          isOverThreshold: true,
+          isNumeric: true,
+          ratio: 92,
+          selfTickPos: 20,
+          cohortBaseline: '≤ 1 账号/天',
+          self30d: '1 账号',
+          threshold: '≤ 1 账号/小时'
+        },
+        {
+          name: '站内投诉次数',
+          rule: 'RULE-COMPLAINT-03',
+          probeNotes: '受信用户反垃圾举报',
+          currentValue: '3 次',
+          isOverThreshold: true,
+          isNumeric: true,
+          ratio: 85,
+          selfTickPos: 10,
+          cohortBaseline: '0 次',
+          self30d: '0 次',
+          threshold: '≤ 1 次'
+        },
+        {
+          name: '小时峰值外发',
+          rule: 'RULE-SPAM-77',
+          probeNotes: '收发监控遥测 · 峰值速率',
+          currentValue: '412 封/时',
+          isOverThreshold: true,
+          isNumeric: true,
+          ratio: 88,
+          selfTickPos: 25,
+          cohortBaseline: '20 封/时',
+          self30d: '45 封/时',
+          threshold: '≤ 100 封/时'
+        },
+        {
+          name: '硬退信率 (Bounce Rate)',
+          rule: 'RULE-BOUNCE-12',
+          probeNotes: '收件方 MX 550 拒收占比',
+          currentValue: '16.5%',
+          isOverThreshold: true,
+          isNumeric: true,
+          ratio: 86,
+          selfTickPos: 20,
+          cohortBaseline: '1.2%',
+          self30d: '1.8%',
+          threshold: '≤ 5.0%'
+        },
+        {
+          name: '跨地域 IP 跳跃频率',
+          rule: 'RULE-GEO-JUMP',
+          probeNotes: 'GeoIP 自治域 BGP 路由跳变',
+          currentValue: '6 个自治域/天',
+          isOverThreshold: true,
+          isNumeric: true,
+          ratio: 82,
+          selfTickPos: 30,
+          cohortBaseline: '1 自治域',
+          self30d: '1 自治域',
+          threshold: '≤ 2 自治域'
+        },
+        {
+          name: 'WebGL 指纹熵值与伪造',
+          rule: 'RULE-CANVAS-FP',
+          probeNotes: 'Canvas / WebGL 抗渲染注入',
+          currentValue: '伪造特征注入',
+          isOverThreshold: true,
+          isNumeric: false,
+          hit: true,
+          statusNote: '检测到无头浏览器驱动特征'
+        },
+        {
+          name: '动态验证码绕过探测',
+          rule: 'RULE-CAPTCHA-BYPASS',
+          probeNotes: 'Turnstile 人机挑战时序',
+          currentValue: '120ms 异常极速',
+          isOverThreshold: true,
+          isNumeric: false,
+          hit: true,
+          statusNote: '自动化脚本特征显著'
+        }
+      ]
+    };
+  }
+  if (activeVariant.value === 2) {
+    return {
+      compositeScore: 46,
+      mainDriver: '异地网络漫游跳跃 (62分) 与共享出口 IP',
+      dimensions: [
+        { name: '申诉文本可信度', score: 86, weight: 30 },
+        { name: '历史账号健康度', score: 90, weight: 25 },
+        { name: '凭证持有证明', score: 82, weight: 25 },
+        { name: '历史违规阻断记录', score: 95, weight: 20 }
+      ],
+      metrics: [
+        {
+          name: '历史申诉结案通过率',
+          rule: 'APP-HISTORY-RATE',
+          probeNotes: '历史申诉合规记录',
+          currentValue: '92.5%',
+          isOverThreshold: false,
+          isNumeric: true,
+          ratio: 20,
+          selfTickPos: 80,
+          cohortBaseline: '≥ 70%',
+          self30d: '92.5%',
+          threshold: '≥ 60%'
+        },
+        {
+          name: '申诉提交端与常用设备重合度',
+          rule: 'APP-DEVICE-MATCH',
+          probeNotes: '设备指纹比对',
+          currentValue: '86.4%',
+          isOverThreshold: false,
+          isNumeric: true,
+          ratio: 25,
+          selfTickPos: 75,
+          cohortBaseline: '≥ 80%',
+          self30d: '88%',
+          threshold: '≥ 70%'
+        },
+        {
+          name: '多因子凭证 (TOTP) 绑定状态',
+          rule: 'APP-2FA-TENURE',
+          probeNotes: '硬件密匙与二次认证',
+          currentValue: '已激活绑定',
+          isOverThreshold: false,
+          isNumeric: false,
+          hit: false,
+          statusNote: '具备高强度二次认证保护'
+        },
+        {
+          name: '申诉文本模版相似度',
+          rule: 'APP-NLP-SIMILARITY',
+          probeNotes: 'NLP 文本模版比对',
+          currentValue: '12.8%',
+          isOverThreshold: false,
+          isNumeric: true,
+          ratio: 15,
+          selfTickPos: 20,
+          cohortBaseline: '≤ 30%',
+          self30d: '10%',
+          threshold: '≤ 45%'
+        },
+        {
+          name: '历史违规阻断记录',
+          rule: 'APP-VIOLATION-HIST',
+          probeNotes: '全生命周期违规库',
+          currentValue: '0 次',
+          isOverThreshold: false,
+          isNumeric: true,
+          ratio: 0,
+          selfTickPos: 10,
+          cohortBaseline: '0 次',
+          self30d: '0 次',
+          threshold: '≤ 1 次'
+        },
+        {
+          name: '邮箱活跃正常使用天数',
+          rule: 'APP-ACCOUNT-AGE',
+          probeNotes: '账号注册年限与活跃',
+          currentValue: '428 天',
+          isOverThreshold: false,
+          isNumeric: true,
+          ratio: 10,
+          selfTickPos: 85,
+          cohortBaseline: '≥ 90 天',
+          self30d: '428 天',
+          threshold: '≥ 30 天'
+        },
+        {
+          name: '历史硬退信率基线',
+          rule: 'APP-BASE-BOUNCE',
+          probeNotes: '常态外发退信监测',
+          currentValue: '0.8%',
+          isOverThreshold: false,
+          isNumeric: true,
+          ratio: 12,
+          selfTickPos: 20,
+          cohortBaseline: '≤ 2.0%',
+          self30d: '0.8%',
+          threshold: '≤ 5.0%'
+        },
+        {
+          name: '异地登录失败频次',
+          rule: 'APP-FAILED-AUTH',
+          probeNotes: '近 30 天登录鉴权失败',
+          currentValue: '1 次/月',
+          isOverThreshold: false,
+          isNumeric: true,
+          ratio: 10,
+          selfTickPos: 15,
+          cohortBaseline: '≤ 3 次',
+          self30d: '1 次',
+          threshold: '≤ 5 次'
+        }
+      ]
+    };
+  }
+  if (activeVariant.value === 3) {
+    return {
+      compositeScore: 64,
+      mainDriver: '短时突发发信速率 (76分) 与收件人域离散度',
+      dimensions: [
+        { name: '外发速率遥测', score: 76, weight: 30 },
+        { name: '接口调用频率', score: 62, weight: 25 },
+        { name: '邮件内容合规', score: 58, weight: 25 },
+        { name: '凭证安全状态', score: 40, weight: 20 }
+      ],
+      metrics: [
+        {
+          name: '突发外发速率激增比',
+          rule: 'MON-OUTBOUND-SURGE',
+          probeNotes: '滑动窗口 120s 速率倍率',
+          currentValue: '3.2 倍',
+          isOverThreshold: true,
+          isNumeric: true,
+          ratio: 78,
+          selfTickPos: 35,
+          cohortBaseline: '1.0 倍',
+          self30d: '1.1 倍',
+          threshold: '≤ 2.0 倍'
+        },
+        {
+          name: '认证失败突刺速率',
+          rule: 'MON-AUTH-SPIKE',
+          probeNotes: '连续密码/Token 验证失败',
+          currentValue: '3 次/分',
+          isOverThreshold: false,
+          isNumeric: true,
+          ratio: 30,
+          selfTickPos: 25,
+          cohortBaseline: '≤ 2 次/分',
+          self30d: '1 次/分',
+          threshold: '≤ 5 次/分'
+        },
+        {
+          name: 'SMTP SPF/DKIM 对齐率',
+          rule: 'MON-SPF-DKIM-ALIGN',
+          probeNotes: 'DNS 反垃圾协议验签',
+          currentValue: '99.2%',
+          isOverThreshold: false,
+          isNumeric: true,
+          ratio: 10,
+          selfTickPos: 90,
+          cohortBaseline: '≥ 95%',
+          self30d: '99.5%',
+          threshold: '≥ 90%'
+        },
+        {
+          name: '敏感拦截关键词匹配频次',
+          rule: 'MON-CONTENT-HIT',
+          probeNotes: '启发式敏感词过滤',
+          currentValue: '1 次',
+          isOverThreshold: false,
+          isNumeric: true,
+          ratio: 20,
+          selfTickPos: 15,
+          cohortBaseline: '0 次',
+          self30d: '0 次',
+          threshold: '≤ 3 次'
+        },
+        {
+          name: 'IP 段信誉评分衰减',
+          rule: 'MON-IP-REPUTATION',
+          probeNotes: 'Spamhaus / RBL 信誉库',
+          currentValue: '74 分',
+          isOverThreshold: false,
+          isNumeric: true,
+          ratio: 35,
+          selfTickPos: 70,
+          cohortBaseline: '≥ 80 分',
+          self30d: '85 分',
+          threshold: '≥ 60 分'
+        },
+        {
+          name: '接收方 MX 灰名单拦截频次',
+          rule: 'MON-GREYLIST-RATE',
+          probeNotes: 'Greylisting 临时延迟',
+          currentValue: '8 次/时',
+          isOverThreshold: true,
+          isNumeric: true,
+          ratio: 72,
+          selfTickPos: 20,
+          cohortBaseline: '≤ 2 次/时',
+          self30d: '1 次/时',
+          threshold: '≤ 5 次/时'
+        },
+        {
+          name: 'API 接口调用频率突增',
+          rule: 'MON-API-RATE',
+          probeNotes: 'REST 邮件发送接口突增',
+          currentValue: '24 次/分',
+          isOverThreshold: true,
+          isNumeric: true,
+          ratio: 80,
+          selfTickPos: 30,
+          cohortBaseline: '≤ 5 次/分',
+          self30d: '6 次/分',
+          threshold: '≤ 15 次/分'
+        }
+      ]
+    };
+  }
   return {
-    compositeScore: compScore,
-    mainDriver: r.warningType === 'risk'
-      ? '一人多号群控集群关联度高 (94分) 与异地指纹跳跃'
-      : (r.warningType === 'appeal' ? '争议申诉抗辩凭证待核实' : '发信超频与高退信率'),
+    compositeScore: 92,
+    mainDriver: '终审封禁固化快照 (严重违规指数 92)',
     dimensions: [
-      { name: '设备指纹连续性', score: r.matchScore || 82, weight: 25 },
-      { name: '网络拓扑与IP信誉', score: (r.activeIpCount > 1 || r.isMultiIp) ? 92 : 28, weight: 30 },
-      { name: '行为速率与遥测', score: isBanType.value ? 85 : 42, weight: 25 },
-      { name: '凭证身份健康度', score: (r.status === 'banned') ? 76 : 24, weight: 20 }
+      { name: '违规严重指数', score: 92, weight: 35 },
+      { name: '证据链完整度', score: 98, weight: 25 },
+      { name: '存证合规性', score: 100, weight: 20 },
+      { name: '关联影响面', score: 85, weight: 20 }
     ],
     metrics: [
       {
-        name: '同一 IP 关联账号数',
-        rule: 'SEC-IP-CLUSTER',
-        probeNotes: '探针周期 24h · 关联度 98%',
-        currentValue: `${r.activeIpCount > 1 ? r.activeIpCount : (r.isMultiIp === 1 ? 8 : 1)} 个`,
-        isOverThreshold: (r.activeIpCount > 1 || r.isMultiIp === 1),
+        name: '封禁生效时违规严重指数',
+        rule: 'REC-SEVERITY-IDX',
+        probeNotes: '判例裁决终审严重度',
+        currentValue: '92 分',
+        isOverThreshold: true,
         isNumeric: true,
-        ratio: (r.activeIpCount > 1 || r.isMultiIp === 1) ? 95 : 20,
+        ratio: 92,
         selfTickPos: 40,
+        cohortBaseline: '≤ 30 分',
+        self30d: '20 分',
+        threshold: '≤ 50 分'
+      },
+      {
+        name: '证据快照指纹匹配度',
+        rule: 'REC-SNAPSHOT-MATCH',
+        probeNotes: '归档证据哈希碰撞率',
+        currentValue: '99.4%',
+        isOverThreshold: false,
+        isNumeric: true,
+        ratio: 98,
+        selfTickPos: 95,
+        cohortBaseline: '≥ 95%',
+        self30d: '99.4%',
+        threshold: '≥ 90%'
+      },
+      {
+        name: '关联受影响邮箱数量',
+        rule: 'REC-CLUSTER-IMPACT',
+        probeNotes: '主案关联协同账号',
+        currentValue: '4 个',
+        isOverThreshold: true,
+        isNumeric: true,
+        ratio: 80,
+        selfTickPos: 30,
         cohortBaseline: '1 个',
         self30d: '1 个',
         threshold: '≤ 1 个'
       },
       {
-        name: '发信频次峰值',
-        rule: 'SEC-OUTBOUND-RATE',
-        probeNotes: '滑动窗口 60s · 采样 120 封',
-        currentValue: isBanType.value ? '48 封/分' : '8 封/分',
-        isOverThreshold: isBanType.value,
+        name: '策略引擎执行耗时',
+        rule: 'REC-EXEC-LATENCY',
+        probeNotes: '处置管线端到端时延',
+        currentValue: '180ms',
+        isOverThreshold: false,
         isNumeric: true,
-        ratio: isBanType.value ? 90 : 25,
-        selfTickPos: 35,
-        cohortBaseline: '5 封/分',
-        self30d: '10 封/分',
-        threshold: '≤ 20 封/分'
+        ratio: 15,
+        selfTickPos: 20,
+        cohortBaseline: '≤ 500ms',
+        self30d: '210ms',
+        threshold: '≤ 1000ms'
       },
       {
-        name: '退信拦截率 (Bounce Rate)',
-        rule: 'SEC-BOUNCE-RATE',
-        probeNotes: '收件人 MX 回执遥测',
-        currentValue: isBanType.value ? '16.5%' : '1.8%',
-        isOverThreshold: isBanType.value,
-        isNumeric: true,
-        ratio: isBanType.value ? 88 : 15,
-        selfTickPos: 25,
-        cohortBaseline: '1.5%',
-        self30d: '2.0%',
-        threshold: '≤ 5.0%'
-      },
-      {
-        name: '设备指纹相似度',
-        rule: 'SEC-FP-SIMILARITY',
-        probeNotes: 'Canvas / WebGL / AudioContext 复合哈希',
-        currentValue: `${r.matchScore || 85}%`,
-        isOverThreshold: (r.matchScore || 85) < 70,
-        isNumeric: true,
-        ratio: (r.matchScore || 85) < 70 ? 92 : 30,
-        selfTickPos: 50,
-        cohortBaseline: '≥ 85%',
-        self30d: '88%',
-        threshold: '≥ 70%'
-      },
-      {
-        name: '二次认证保护 (MFA)',
-        rule: 'SEC-AUTH-2FA',
-        probeNotes: 'TOTP / WebAuthn 硬件密匙状态',
-        currentValue: r.status === 'banned' ? '未激活' : '已保护',
-        isOverThreshold: r.status === 'banned',
+        name: '归档区块哈希验证状态',
+        rule: 'REC-BLOCK-VALIDATION',
+        probeNotes: '防篡改公开台账签名',
+        currentValue: '签名验证有效',
+        isOverThreshold: false,
         isNumeric: false,
-        hit: r.status === 'banned',
-        statusNote: r.status === 'banned' ? '缺乏强身分认证保护' : '受信凭证'
+        hit: false,
+        statusNote: 'RFC-3161 数字签名完备'
+      },
+      {
+        name: '存证保管留存期',
+        rule: 'REC-RETENTION-DAYS',
+        probeNotes: '合规留痕保管周期',
+        currentValue: '180 天',
+        isOverThreshold: false,
+        isNumeric: true,
+        ratio: 100,
+        selfTickPos: 100,
+        cohortBaseline: '180 天',
+        self30d: '180 天',
+        threshold: '≥ 180 天'
       }
     ]
   };
 });
 
 const riskScoreLevelClass = computed(() => {
-  const s = riskProfileData.value?.compositeScore || 0;
+  const s = currentRiskProfile.value?.compositeScore || 0;
   if (s >= 75) return 'score-danger';
   if (s >= 50) return 'score-warning';
   return 'score-success';
@@ -1599,54 +1960,174 @@ function getProgressColor(score) {
   return '#10b981';
 }
 
-// 模块 F: 相似案例参照数据 (变体 2 核心)
-const similarCasesData = computed(() => {
-  const r = props.selectedRow;
-  if (!r) return null;
-  const reasonCode = r.reasonCode || 'QUOTA_EVASION';
+// 模块 F: 相似案例处置参照 (四板块完全差异化)
+const currentSimilarCases = computed(() => {
+  if (activeVariant.value === 1) {
+    return {
+      reasonCode: 'RULE-SPAM-77',
+      totalCases: 119,
+      stats: [
+        { key: 'maintain', label: '维持封禁', count: 74, percentage: 62, color: '#ef4444' },
+        { key: 'watch', label: '暂禁观察', count: 25, percentage: 21, color: '#f59e0b' },
+        { key: 'approve', label: '放行结案', count: 13, percentage: 11, color: '#10b981' },
+        { key: 'whitelist', label: '标记误报', count: 7, percentage: 6, color: '#3b82f6' }
+      ],
+      advisoryText: '本案处理建议「维持封禁」与同原因码已裁决案例的主流裁决（62%）一致，裁决一致性高；若改判放行将偏离判例带，需补充书面依据。'
+    };
+  }
+  if (activeVariant.value === 2) {
+    return {
+      reasonCode: 'APP-NAT-SHARE',
+      totalCases: 86,
+      stats: [
+        { key: 'approve', label: '批准解封', count: 41, percentage: 48, color: '#10b981' },
+        { key: 'probation', label: '条件放行', count: 28, percentage: 32, color: '#3b82f6' },
+        { key: 'maintain', label: '维持原判', count: 13, percentage: 15, color: '#ef4444' },
+        { key: 'reject', label: '驳回补正', count: 4, percentage: 5, color: '#f59e0b' }
+      ],
+      advisoryText: '本案处理建议「条件放行」与同类企业网络共享 IP 申诉案例的主流裁决（80% 放行/条件放行）趋同；建议核验 TOTP 后准予放行。'
+    };
+  }
+  if (activeVariant.value === 3) {
+    return {
+      reasonCode: 'RULE-BURST-REG',
+      totalCases: 142,
+      stats: [
+        { key: 'throttle', label: '限流降级', count: 78, percentage: 55, color: '#f59e0b' },
+        { key: 'watch', label: '加入观察', count: 40, percentage: 28, color: '#3b82f6' },
+        { key: 'release', label: '自动解除', count: 17, percentage: 12, color: '#10b981' },
+        { key: 'upgrade', label: '升级封禁', count: 7, percentage: 5, color: '#ef4444' }
+      ],
+      advisoryText: '同类发信突增预警案例中，55% 在暂扣降级后恢复正常，仅 5% 恶化为需要永久阻断。'
+    };
+  }
   return {
-    reasonCode,
-    totalCases: 50,
+    reasonCode: 'RULE-REG-55',
+    totalCases: 230,
     stats: [
-      { key: 'maintain', label: t('auditSimilarKeepBan'), count: 34, percentage: 68, color: '#ef4444' },
-      { key: 'watch', label: t('auditSimilarWatch'), count: 8, percentage: 16, color: '#f59e0b' },
-      { key: 'approve', label: t('auditSimilarApprove'), count: 6, percentage: 12, color: '#10b981' },
-      { key: 'whitelist', label: t('auditSimilarWhitelist'), count: 2, percentage: 4, color: '#3b82f6' }
+      { key: 'maintain', label: '维持封禁', count: 196, percentage: 85, color: '#ef4444' },
+      { key: 'probation', label: '附条件特赦', count: 23, percentage: 10, color: '#f59e0b' },
+      { key: 'revoke', label: '纠错撤回', count: 11, percentage: 5, color: '#10b981' }
     ],
-    advisoryText: t('auditSimilarAdvisory', { count: 50, code: reasonCode, rate: 84 })
+    advisoryText: '本案归档结论与历史判例完全对齐，台账不可篡改存证已固化入库。'
   };
 });
 
-// 模块 G: 证据链溯源列表 (变体 2 核心)
-const evidenceChainList = computed(() => {
-  const r = props.selectedRow;
-  if (!r) return [];
+// 模块 G: 证据链溯源 (四板块完全差异化)
+const currentEvidenceChain = computed(() => {
+  if (activeVariant.value === 1) {
+    return [
+      {
+        code: 'EV-01',
+        evidence: '外发样本归档（412 封/小时峰值）',
+        rule: 'RULE-SPAM-77',
+        step: 'N1 规则命中',
+        hash: 'sha256:9f2c…b41d',
+        judgement: '频率与退信率双超阈值，构成批量群发'
+      },
+      {
+        code: 'EV-02',
+        evidence: '设备指纹聚集快照',
+        rule: 'RULE-REG-55',
+        step: 'N4 证据留存',
+        hash: 'sha256:77aa…0e6c',
+        judgement: '同指纹关联 12 账号，排除个人设备误判'
+      },
+      {
+        code: 'EV-03',
+        evidence: '申诉文本相似度比对',
+        rule: 'RULE-SPAM-31',
+        step: 'N5 人工复核',
+        hash: 'sha256:c3d1…88f0',
+        judgement: '与已知模板库高度相似，申诉可信度弱'
+      },
+      {
+        code: 'EV-04',
+        evidence: '登录失败凭证填充特征',
+        rule: 'RULE-BRUTE-12',
+        step: 'N2 自动封禁',
+        hash: 'sha256:51be…2a97',
+        judgement: '携带填充指纹，共享出口抗辩不成立'
+      }
+    ];
+  }
+  if (activeVariant.value === 2) {
+    return [
+      {
+        code: 'EV-APP-01',
+        evidence: '申诉提交会话环境快照',
+        rule: 'RULE-SESS-AUTH',
+        step: 'N2 申诉受理',
+        hash: 'sha256:3d8e…7a1c',
+        judgement: '提交端 IP 与历史常用 IP 属于同一 C 段，初步排除异地盗号'
+      },
+      {
+        code: 'EV-APP-02',
+        evidence: '异常外发期间登录指纹对比',
+        rule: 'RULE-FP-COMP',
+        step: 'N3 人工复核',
+        hash: 'sha256:8b1f…44e2',
+        judgement: '外发峰值发生于非受信 Linux 终端，与用户常用 Windows/Edge 指纹不符'
+      },
+      {
+        code: 'EV-APP-03',
+        evidence: '二次认证激活与凭据挑战记录',
+        rule: 'RULE-MFA-VERIFY',
+        step: 'N4 条件放行',
+        hash: 'sha256:a692…99bc',
+        judgement: '用户成功完成 TOTP 硬件绑定与口令重置，安全隐患排除'
+      }
+    ];
+  }
+  if (activeVariant.value === 3) {
+    return [
+      {
+        code: 'EV-MON-01',
+        evidence: '滑动窗口连接频率遥测',
+        rule: 'RULE-BURST-CONN',
+        step: 'N1 预警捕获',
+        hash: 'sha256:1f2a…4e5d',
+        judgement: '10 秒内发起 35 次 SMTP 握手，超常态基线 4.2 倍'
+      },
+      {
+        code: 'EV-MON-02',
+        evidence: '收件人域名离散度分析',
+        rule: 'RULE-MX-DISPERSE',
+        step: 'N2 降级暂扣',
+        hash: 'sha256:6c7b…8891',
+        judgement: '85% 发往无 MX 记录域名，构成无效地址探测'
+      },
+      {
+        code: 'EV-MON-03',
+        evidence: 'SPF/DKIM 验签回执快照',
+        rule: 'RULE-AUTH-ALIGN',
+        step: 'N3 持续观察',
+        hash: 'sha256:e01d…3a4b',
+        judgement: '发件头符合本域签名，暂扣期间未见恶意扩散'
+      }
+    ];
+  }
   return [
     {
-      evidence: '设备指纹碰撞与 8 会话并发',
-      hash: 'e8f4c2...91ab',
-      rule: 'SEC-RULE-QUOTA-09',
-      step: '节点 #01 初判命中',
-      judgement: '触碰一人多户滥用底线'
+      code: 'EV-REC-01',
+      evidence: '终审处罚裁决书数字存证',
+      rule: 'RULE-FINAL-SANCTION',
+      step: 'N3 终审拍案',
+      hash: 'sha256:d89f…310c',
+      judgement: '安全主管与系统引擎双重联合签署'
     },
     {
-      evidence: '跨大区漫游 IP (非受信网络)',
-      hash: '7b1d40...2a3c',
-      rule: 'SEC-RULE-ROAMING-02',
-      step: '节点 #02 执行封禁',
-      judgement: '限制外发通道并冻结凭证'
-    },
-    {
-      evidence: r.appealReason ? '用户申诉表单附言抗辩' : '历史审计日志记录',
-      hash: '9a3e21...8f0d',
-      rule: 'SEC-RULE-APPEAL-REV',
-      step: '节点 #03 申诉流转',
-      judgement: '核实硬件密匙与会话合法性'
+      code: 'EV-REC-02',
+      evidence: '违规外发证据包 WORM 存根',
+      rule: 'RULE-EVI-ARCHIVE',
+      step: 'N4 永久封存',
+      hash: 'sha256:55ab…110e',
+      judgement: '完整样本封存至只读合规存储桶，保管期 180 天'
     }
   ];
 });
 
-// 裁决批注快捷插入
+// 快捷裁决批注
 function applyPresetNote(noteText) {
   if (internalDecisionNotes.value) {
     internalDecisionNotes.value += `；${noteText}`;
@@ -1655,7 +2136,7 @@ function applyPresetNote(noteText) {
   }
 }
 
-// 裁决与动作执行 (二次确认保障)
+// 裁决动作
 async function confirmAndExecuteAction(actionKey, actionLabel) {
   const r = props.selectedRow;
   if (!r) return;
@@ -1670,9 +2151,7 @@ async function confirmAndExecuteAction(actionKey, actionLabel) {
       }
     );
     emit('action', actionKey, internalDecisionNotes.value, r);
-  } catch (err) {
-    // 用户取消二次确认
-  }
+  } catch (err) {}
 }
 
 async function confirmAndExecuteVerdict(decisionKey, decisionLabel) {
@@ -1689,12 +2168,9 @@ async function confirmAndExecuteVerdict(decisionKey, decisionLabel) {
       }
     );
     emit('verdict', decisionKey, internalDecisionNotes.value, r);
-  } catch (err) {
-    // 用户取消二次确认
-  }
+  } catch (err) {}
 }
 
-// 底部动作控制
 const canExtend = computed(() => {
   const r = props.selectedRow;
   if (!r) return false;
@@ -1702,7 +2178,6 @@ const canExtend = computed(() => {
   return !!deadline && new Date(deadline).getTime() > Date.now();
 });
 
-// 深链定位支持 (URL hash 携带: #case=CASE-ID:CHAPTER-ID)
 function syncDeepLink(chapter) {
   const r = props.selectedRow;
   if (!r) return;
@@ -1725,7 +2200,6 @@ function clearDeepLink() {
 }
 
 function handleDrawerOpened() {
-  // 检查 URL 是否有指定章节深链并滚动
   try {
     const hash = window.location.hash || '';
     if (hash.includes(':')) {
@@ -1742,10 +2216,6 @@ function handleDrawerOpened() {
 </script>
 
 <style scoped lang="scss">
-/* 注：抽屉外壳 (.el-drawer / __header / __body / __footer) 由 Element Plus 渲染并经
-   Teleport 挂到 body，不会携带本组件的 data-v scope 属性，因此任何写在 scoped 块内的
-   :deep() 覆盖都不会命中。相关外壳样式统一放在文件末尾的非 scoped 块中。 */
-
 /* 头部外壳 */
 .drawer-header-shell {
   display: flex;
@@ -1753,8 +2223,6 @@ function handleDrawerOpened() {
   padding: 16px 20px 10px 20px;
   border-bottom: 1px solid var(--el-border-color-lighter);
   background: var(--el-bg-color);
-  /* .el-drawer__header 为 flex 容器，此处若不带 min-width:0 与 box-sizing，
-     外壳会按子项 min-content 撑破 720px 抽屉（V2 六枚徽标行实测溢出 78px）。 */
   width: 100%;
   min-width: 0;
   box-sizing: border-box;
@@ -1821,26 +2289,6 @@ function handleDrawerOpened() {
     color: var(--el-text-color-primary);
     line-height: 1.3;
   }
-  .variant-mode-tag {
-    font-size: 11px;
-    font-weight: 500;
-    height: 20px;
-    padding: 0 6px;
-  }
-}
-
-.drawer-sub {
-  font-size: 12px;
-  line-height: 1.45;
-  color: var(--el-text-color-secondary);
-  margin-top: 3px;
-  /* 定位副标题是一句完整语义，单行 ellipsis 会把 V2/V4 的长句裁成不可读的半截，
-     故放宽至两行截断，且不再写死 max-width，交由 flex 父级分配实际可用宽度。 */
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  word-break: break-word;
 }
 
 .header-tools-right {
@@ -1848,10 +2296,6 @@ function handleDrawerOpened() {
   align-items: center;
   gap: 8px;
   flex-shrink: 0;
-}
-
-.variant-switch-btn {
-  font-size: 12px;
 }
 
 .drawer-close-btn {
@@ -1870,144 +2314,6 @@ function handleDrawerOpened() {
   &:hover {
     background: var(--el-fill-color-light);
     color: var(--el-text-color-primary);
-  }
-}
-
-/* 窄屏适配：必须置于上述头部各基础规则之后。
-   同特异度选择器由后者胜出，写在它们之前会被全部覆盖失效。 */
-@media (max-width: 768px) {
-  .drawer-header-shell {
-    padding: 12px 14px 8px 14px;
-  }
-
-  .drawer-header-top {
-    align-items: flex-start;
-    gap: 8px;
-  }
-
-  .header-main-info {
-    gap: 8px;
-  }
-
-  .header-icon-wrap {
-    width: 32px;
-    height: 32px;
-  }
-
-  .drawer-title-row {
-    gap: 6px;
-
-    .drawer-title {
-      font-size: 15px;
-    }
-  }
-
-  .header-tools-right {
-    gap: 4px;
-  }
-
-  .variant-switch-btn {
-    /* 不用 overflow:hidden 硬切，否则下拉箭头会被裁掉半截显得未完成；
-       改为收紧字号与内距让整枚按钮自然容纳。 */
-    font-size: 11px;
-    padding: 4px 8px;
-  }
-}
-
-/* 头部下方徽标行 */
-.drawer-badge-meta-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-top: 12px;
-  padding-top: 10px;
-  border-top: 1px dashed var(--el-border-color-lighter);
-  flex-wrap: wrap;
-}
-
-.meta-badges-left {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-
-  .meta-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 11.5px;
-    padding: 2px 7px;
-    border-radius: 4px;
-    background: var(--el-fill-color-light);
-    color: var(--el-text-color-primary);
-
-    &.case-no {
-      cursor: pointer;
-      font-weight: 500;
-      &:hover {
-        background: var(--el-fill-color);
-      }
-    }
-    &.reason-code {
-      background: rgba(239, 68, 68, 0.08);
-      font-weight: 600;
-    }
-    &.evidence-days {
-      color: var(--el-text-color-secondary);
-    }
-  }
-
-  .meta-tag {
-    font-size: 11.5px;
-  }
-}
-
-.meta-operator-entry {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 3px 8px;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: background 0.2s;
-  background: var(--el-fill-color-light);
-
-  &:hover {
-    background: var(--el-fill-color);
-  }
-
-  .operator-avatar-circle {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 24px;
-    height: 24px;
-    border-radius: 50%;
-    background: var(--el-color-primary);
-    color: #fff;
-    font-size: 10.5px;
-    font-weight: 600;
-  }
-
-  .operator-info-wrap {
-    display: flex;
-    flex-direction: column;
-    line-height: 1.15;
-
-    .operator-name {
-      font-size: 11.5px;
-      font-weight: 600;
-      color: var(--el-text-color-primary);
-    }
-    .operator-role-sub {
-      font-size: 10px;
-      color: var(--el-text-color-secondary);
-    }
-  }
-
-  .entry-arrow {
-    color: var(--el-text-color-secondary);
   }
 }
 
@@ -2085,6 +2391,21 @@ function handleDrawerOpened() {
       display: flex;
       align-items: center;
       gap: 8px;
+      flex-wrap: wrap;
+
+      .help-question-icon {
+        color: var(--el-text-color-secondary);
+        cursor: pointer;
+        transition: color 0.2s;
+        &:hover {
+          color: var(--el-color-primary);
+        }
+      }
+
+      .chain-formula-desc {
+        font-size: 11px;
+        font-weight: 400;
+      }
     }
 
     .section-badge {
@@ -2092,52 +2413,39 @@ function handleDrawerOpened() {
       font-weight: 500;
       color: var(--el-text-color-secondary);
     }
-
-    .data-tag-muted {
-      font-size: 11px;
-      font-weight: 400;
-      color: var(--el-text-color-secondary);
-    }
   }
 }
 
-.placeholder-sample-notice {
-  display: flex;
-  align-items: flex-start;
-  gap: 6px;
-  margin-top: 12px;
-  padding: 8px 10px;
-  border-left: 2px solid var(--el-color-warning);
-  background: var(--el-fill-color-lighter);
-  border-radius: 4px;
-  font-size: 11.5px;
-  line-height: 1.5;
-  color: var(--el-text-color-secondary);
-}
-
-/* 模块 A: 12 字段两列网格 */
+/* 模块 A: 案件概要两列网格 (左右等距对称排版) */
 .dossier-grid-12 {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 10px 16px;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 24px;
+  align-items: center;
 
   @media (max-width: 580px) {
     grid-template-columns: 1fr;
+    gap: 10px 0;
   }
 
   .grid-field {
     display: flex;
     align-items: center;
     font-size: 12.5px;
+    min-width: 0;
 
     .field-k {
       color: var(--el-text-color-secondary);
-      margin-right: 8px;
+      width: 72px;
       min-width: 72px;
+      margin-right: 8px;
       flex-shrink: 0;
+      text-align: left;
     }
 
     .field-v {
+      flex: 1;
+      min-width: 0;
       color: var(--el-text-color-primary);
       overflow: hidden;
       text-overflow: ellipsis;
@@ -2145,6 +2453,8 @@ function handleDrawerOpened() {
     }
 
     .field-v-with-copy {
+      flex: 1;
+      min-width: 0;
       display: flex;
       align-items: center;
       gap: 6px;
@@ -2191,9 +2501,9 @@ function handleDrawerOpened() {
 
   .cluster-header-row {
     display: grid;
-    grid-template-columns: 30px minmax(0, 1.7fr) minmax(0, 0.95fr) minmax(0, 1fr) minmax(0, 1.25fr);
+    grid-template-columns: 130px minmax(0, 1.5fr) minmax(0, 1.2fr) 76px minmax(0, 1.4fr);
     column-gap: 8px;
-    padding: 7px 10px;
+    padding: 8px 10px;
     background: var(--el-fill-color-light);
     font-weight: 600;
     color: var(--el-text-color-secondary);
@@ -2202,9 +2512,9 @@ function handleDrawerOpened() {
 
   .cluster-data-row {
     display: grid;
-    grid-template-columns: 30px minmax(0, 1.7fr) minmax(0, 0.95fr) minmax(0, 1fr) minmax(0, 1.25fr);
+    grid-template-columns: 130px minmax(0, 1.5fr) minmax(0, 1.2fr) 76px minmax(0, 1.4fr);
     column-gap: 8px;
-    padding: 7px 10px;
+    padding: 8px 10px;
     align-items: center;
     border-bottom: 1px solid var(--el-border-color-lighter);
 
@@ -2216,10 +2526,18 @@ function handleDrawerOpened() {
       min-width: 0;
     }
 
+    .col-idx {
+      font-size: 11px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
     .col-email {
       display: flex;
       align-items: center;
       gap: 4px;
+      overflow: hidden;
 
       > span {
         min-width: 0;
@@ -2227,457 +2545,405 @@ function handleDrawerOpened() {
         text-overflow: ellipsis;
         white-space: nowrap;
       }
-      .inline-copy-btn {
-        flex-shrink: 0;
-      }
     }
 
     .col-uid {
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .col-status {
+      display: flex;
+      align-items: center;
+      gap: 4px;
       overflow: hidden;
 
-      :deep(.el-tag) {
-        max-width: 100%;
-        display: inline-block;
-      }
-      :deep(.el-tag .el-tag__content) {
-        display: block;
+      > span {
+        min-width: 0;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
       }
     }
 
+    .col-status {
+      overflow: hidden;
+    }
+
     .col-relation {
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+      font-size: 11.5px;
     }
   }
 
-  /* 窄屏下 5 列网格必然溢出（邮箱/状态标签/关联说明实测各超 17~115px），
-     改为序号列固定 + 其余字段逐行堆叠，表头隐去。 */
-  @media (max-width: 580px) {
+  @media (max-width: 640px) {
     .cluster-header-row {
       display: none;
     }
-
     .cluster-data-row {
-      grid-template-columns: 26px minmax(0, 1fr);
-      grid-template-areas:
-        "idx email"
-        ".   uid"
-        ".   status"
-        ".   relation";
-      row-gap: 3px;
-      align-items: start;
-
-      .col-idx { grid-area: idx; }
-      .col-email { grid-area: email; }
-      .col-uid { grid-area: uid; }
-      .col-status { grid-area: status; overflow: visible; }
-      .col-relation {
-        grid-area: relation;
-        white-space: normal;
-        overflow: visible;
-      }
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding: 10px;
     }
   }
 }
 
-.cluster-footnote {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 8px;
-  font-size: 11.5px;
-  color: var(--el-text-color-secondary);
-
-  .footnote-icon {
-    flex-shrink: 0;
-    color: var(--el-color-warning);
-  }
-}
-
-/* 模块 C: 处置依据内嵌卡片 */
+/* 模块 C: 风险研判与处置依据 */
 .disposition-nested-card {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
-.appeal-statement-quote {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 10px 12px;
-  border-left: 3px solid var(--el-color-warning);
-  background: var(--el-fill-color-light);
-  border-radius: 0 6px 6px 0;
-  font-size: 12.5px;
-  color: var(--el-text-color-primary);
-  font-style: italic;
-
-  .quote-icon {
-    flex-shrink: 0;
-    color: var(--el-color-warning);
-    margin-top: 1px;
-  }
-}
-
-.red-ban-reason-alert {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 9px 12px;
-  border-radius: 6px;
-  background: rgba(239, 68, 68, 0.08);
-  border: 1px solid rgba(239, 68, 68, 0.2);
-  color: var(--el-color-danger);
-  font-size: 12.5px;
-  font-weight: 500;
-  line-height: 1.4;
-
-  .alert-icon {
-    flex-shrink: 0;
-    margin-top: 1px;
-  }
-}
-
-.evidence-summary-line {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 4px 0;
-  gap: 8px;
-
-  .summary-line-left {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-  .evidence-abstract {
-    font-size: 12.5px;
-    color: var(--el-text-color-primary);
-  }
-  .evidence-hash {
-    font-size: 11px;
-  }
-}
-
-.action-description-box {
-  padding: 6px 10px;
-  background: var(--el-fill-color-light);
-  border-radius: 6px;
-
-  .action-pill-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-
-    .action-sub-text {
-      font-size: 12px;
-      color: var(--el-text-color-primary);
-    }
-  }
-}
-
-.detail-logs-list {
+.basis-chain-card {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding-top: 8px;
-  border-top: 1px dashed var(--el-border-color-lighter);
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: var(--el-fill-color-light);
+  border: 1px solid var(--el-border-color-lighter);
 
-  .logs-header-label {
-    font-size: 10.5px;
-    color: var(--el-text-color-secondary);
-  }
-
-  .detail-log-row {
+  .basis-chain-row {
     display: flex;
-    align-items: baseline;
-    gap: 8px;
-    font-size: 12px;
-    line-height: 1.45;
+    align-items: center;
+    gap: 10px;
 
-    .log-tag {
+    .row-icon-col {
+      display: flex;
+      align-items: center;
       flex-shrink: 0;
-      font-size: 10.5px;
-      height: 19px;
-      padding: 0 5px;
+      min-width: 22px;
     }
-    .log-bullet {
-      color: var(--el-text-color-secondary);
-      flex-shrink: 0;
-    }
-    .log-content {
+
+    .row-content-col {
+      flex: 1;
+      font-size: 12.5px;
+      line-height: 1.45;
       color: var(--el-text-color-primary);
-      &.plain-text {
+
+      .chain-main-text {
+        color: var(--el-text-color-primary);
+      }
+      .chain-sub-text {
         color: var(--el-text-color-regular);
       }
     }
   }
 }
 
-/* 模块 D: 双泳道全周期时间线 */
-.timeline-legend {
+.judgment-path-record-box {
   display: flex;
-  align-items: center;
-  gap: 12px;
-  font-size: 11.5px;
-  color: var(--el-text-color-secondary);
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: var(--el-fill-color-blank);
+  border: 1px solid var(--el-border-color-lighter);
 
-  .legend-item {
+  .record-box-header {
     display: flex;
     align-items: center;
-    gap: 5px;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--el-text-color-secondary);
+    padding-bottom: 6px;
+    border-bottom: 1px dashed var(--el-border-color-lighter);
+  }
 
-    .dot {
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      &.machine-dot { background: var(--el-color-primary); }
-      &.human-dot { background: var(--el-color-warning); }
+  .record-list {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+
+    .record-row {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      font-size: 12px;
+      line-height: 1.45;
+
+      .record-tag {
+        flex-shrink: 0;
+        font-size: 10.5px;
+        height: 19px;
+        padding: 0 5px;
+      }
+
+      .record-text {
+        color: var(--el-text-color-primary);
+        word-break: break-all;
+      }
     }
   }
 }
 
-.dual-swimlane-timeline {
+/* 模块 D: 处置与存证全周期时间线 (双泳道) */
+.dual-swimlane-container {
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
 
-.timeline-node-card {
-  display: flex;
-  gap: 12px;
+.swimlane-column-headers {
+  display: grid;
+  grid-template-columns: 1fr 24px 1fr;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 600;
 
-  .node-left-track {
+  .swimlane-header {
     display: flex;
-    flex-direction: column;
     align-items: center;
-    width: 28px;
-    flex-shrink: 0;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 4px;
+    background: var(--el-fill-color-light);
 
-    .node-icon-box {
+    &.machine-header {
+      grid-column: 1;
+      color: var(--el-color-primary);
+    }
+    &.human-header {
+      grid-column: 3;
+      color: var(--el-color-warning);
+    }
+  }
+
+  .swimlane-header-spacer {
+    grid-column: 2;
+  }
+}
+
+.swimlane-grid-track {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+
+  .swimlane-row {
+    display: grid;
+    grid-template-columns: 1fr 24px 1fr;
+    align-items: stretch;
+
+    .swimlane-cell {
+      min-width: 0;
+
+      .swimlane-card {
+        padding: 10px 12px;
+        border-radius: 6px;
+        border: 1px solid var(--el-border-color-lighter);
+        background: var(--el-fill-color-blank);
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+
+        &.machine-card {
+          border-left: 3px solid var(--el-color-primary);
+        }
+        &.human-card {
+          border-left: 3px solid var(--el-color-warning);
+        }
+        &.card-latest {
+          border-color: rgba(239, 68, 68, 0.4);
+          background: rgba(239, 68, 68, 0.02);
+        }
+
+        .card-top-row {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          font-size: 11px;
+          flex-wrap: wrap;
+
+          .node-time {
+            color: var(--el-text-color-secondary);
+          }
+          .node-actor-tag {
+            font-weight: 600;
+            color: var(--el-text-color-primary);
+          }
+          .node-badge-tag {
+            color: var(--el-text-color-secondary);
+          }
+          .latest-tag {
+            font-size: 10px;
+            height: 18px;
+            padding: 0 4px;
+            margin-left: auto;
+          }
+        }
+
+        .card-title-row {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          font-size: 12.5px;
+
+          .node-id {
+            color: var(--el-text-color-secondary);
+            font-weight: 600;
+          }
+          .node-action {
+            color: var(--el-text-color-primary);
+          }
+        }
+
+        .card-desc {
+          font-size: 12px;
+          color: var(--el-text-color-regular);
+          line-height: 1.4;
+        }
+
+        .card-footer-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          font-size: 11px;
+          margin-top: 2px;
+          gap: 8px;
+          flex-wrap: wrap;
+
+          .node-transition {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            .arrow { color: var(--el-text-color-secondary); }
+          }
+
+          .node-hash {
+            display: flex;
+            align-items: center;
+            gap: 3px;
+            color: var(--el-text-color-secondary);
+            cursor: pointer;
+            &:hover {
+              color: var(--el-color-primary);
+            }
+          }
+        }
+      }
+
+      .swimlane-placeholder {
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+
+        .track-line {
+          width: 2px;
+          height: 100%;
+          min-height: 40px;
+          background: var(--el-border-color-lighter);
+        }
+      }
+    }
+
+    .swimlane-axis {
       display: flex;
       align-items: center;
       justify-content: center;
-      width: 28px;
-      height: 28px;
-      border-radius: 50%;
-      z-index: 1;
 
-      &.icon-machine {
-        background: rgba(59, 130, 246, 0.12);
-        color: var(--el-color-primary);
-      }
-      &.icon-human {
-        background: rgba(245, 158, 11, 0.12);
-        color: var(--el-color-warning);
-      }
-    }
-
-    .node-connector-line {
-      flex: 1;
-      width: 2px;
-      background: var(--el-border-color-lighter);
-      margin: 4px 0;
-    }
-  }
-
-  .node-body {
-    flex: 1;
-    background: var(--el-fill-color-blank);
-    border: 1px solid var(--el-border-color-lighter);
-    border-radius: 6px;
-    padding: 10px 12px;
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-  }
-
-  &.node-latest .node-body {
-    border-color: rgba(239, 68, 68, 0.35);
-    background: rgba(239, 68, 68, 0.02);
-  }
-
-  .node-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-
-    .node-header-left {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-
-      .node-number {
-        font-size: 11px;
-        color: var(--el-text-color-secondary);
-      }
-      .node-title {
-        font-size: 12.5px;
-        color: var(--el-text-color-primary);
-      }
-      .latest-tag {
-        font-size: 10px;
+      .axis-dot {
+        width: 18px;
         height: 18px;
-        padding: 0 4px;
-      }
-    }
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
 
-    .node-header-right {
-      font-size: 11px;
-      color: var(--el-text-color-secondary);
-      display: flex;
-      align-items: center;
-      gap: 4px;
+        &.dot-machine {
+          background: rgba(59, 130, 246, 0.12);
+          color: var(--el-color-primary);
+        }
+        &.dot-human {
+          background: rgba(245, 158, 11, 0.12);
+          color: var(--el-color-warning);
+        }
+      }
     }
   }
 
-  .node-meta-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 11.5px;
-
-    .node-actor {
+  @media (max-width: 580px) {
+    .swimlane-column-headers {
+      display: none;
+    }
+    .swimlane-row {
       display: flex;
-      align-items: center;
-      gap: 3px;
-      color: var(--el-text-color-primary);
-    }
-    .actor-lane-tag {
-      font-size: 10px;
-      padding: 1px 5px;
-      border-radius: 3px;
-      &.tag-machine {
-        background: rgba(59, 130, 246, 0.08);
-        color: var(--el-color-primary);
+      flex-direction: column;
+      gap: 6px;
+      .swimlane-axis,
+      .swimlane-placeholder {
+        display: none;
       }
-      &.tag-human {
-        background: rgba(245, 158, 11, 0.08);
-        color: var(--el-color-warning);
-      }
-    }
-    .node-transition {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      margin-left: auto;
-      font-size: 11px;
-      .arrow { color: var(--el-text-color-secondary); }
-    }
-  }
-
-  .node-desc {
-    font-size: 12px;
-    color: var(--el-text-color-regular);
-    line-height: 1.4;
-  }
-
-  .node-evidence-hash {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 10.5px;
-    color: var(--el-text-color-secondary);
-    padding: 3px 6px;
-    border-radius: 4px;
-    background: var(--el-fill-color-light);
-    width: fit-content;
-    cursor: pointer;
-
-    &:hover {
-      color: var(--el-color-primary);
     }
   }
 }
 
 /* 模块 E: 多维风险画像 */
-.risk-profile-header {
+.risk-profile-unified-card {
   display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 12px 14px;
-  background: var(--el-fill-color-light);
-  border-radius: 6px;
-  margin-bottom: 14px;
+  flex-direction: column;
+  gap: 12px;
 }
 
-.composite-score-box {
+.risk-top-grid {
+  display: grid;
+  grid-template-columns: 96px 1fr;
+  gap: 16px;
+  align-items: center;
+
+  @media (max-width: 580px) {
+    grid-template-columns: 1fr;
+    justify-items: center;
+  }
+}
+
+.composite-score-square {
+  width: 96px;
+  height: 96px;
+  aspect-ratio: 1 / 1;
+  border-radius: 8px;
+  background: var(--el-fill-color-light);
   display: flex;
-  align-items: baseline;
-  gap: 4px;
-  padding: 8px 12px;
-  border-radius: 6px;
-  background: var(--el-bg-color);
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
 
   .score-number {
-    font-size: 24px;
+    font-size: 32px;
     font-weight: 700;
     line-height: 1;
   }
-  .score-denom {
-    font-size: 12px;
-    color: var(--el-text-color-secondary);
-  }
   .score-label {
     font-size: 11px;
-    margin-left: 6px;
+    margin-top: 6px;
     color: var(--el-text-color-secondary);
   }
 
   &.score-danger {
     color: var(--el-color-danger);
-    border: 1px solid rgba(239, 68, 68, 0.3);
+    border: 1px solid rgba(239, 68, 68, 0.35);
   }
   &.score-warning {
     color: var(--el-color-warning);
-    border: 1px solid rgba(245, 158, 11, 0.3);
+    border: 1px solid rgba(245, 158, 11, 0.35);
   }
   &.score-success {
     color: var(--el-color-success);
-    border: 1px solid rgba(16, 185, 129, 0.3);
-  }
-}
-
-.risk-driver-summary {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-
-  .driver-title-row {
-    font-size: 12.5px;
-    .driver-label {
-      color: var(--el-text-color-secondary);
-      margin-right: 6px;
-    }
-  }
-  .driver-desc {
-    font-size: 11px;
+    border: 1px solid rgba(16, 185, 129, 0.35);
   }
 }
 
 .risk-dimensions-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin-bottom: 14px;
+  gap: 6px;
+  min-width: 0;
 
   .dimension-row {
     display: flex;
     flex-direction: column;
-    gap: 3px;
+    gap: 2px;
 
     .dim-label-row {
       display: flex;
@@ -2686,7 +2952,7 @@ function handleDrawerOpened() {
       font-size: 12px;
 
       .dim-meta {
-        font-size: 11.5px;
+        font-size: 11px;
         display: flex;
         align-items: center;
         gap: 6px;
@@ -2695,297 +2961,360 @@ function handleDrawerOpened() {
   }
 }
 
-.gauge-legend-bar {
+.risk-driver-bar-centered {
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 6px 10px;
-  background: var(--el-fill-color-blank);
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 4px;
-  margin-bottom: 12px;
-  font-size: 11px;
-  color: var(--el-text-color-secondary);
-  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  background: var(--el-fill-color-light);
+  font-size: 12px;
+  text-align: center;
 
-  .legend-pill {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-
-    .legend-color-box {
-      width: 10px;
-      height: 4px;
-      border-radius: 2px;
-      &.base-cohort { background: var(--el-color-primary); }
-      &.base-self { background: var(--el-color-warning); }
-      &.base-threshold { background: var(--el-color-danger); }
-    }
+  .driver-prefix {
+    color: var(--el-text-color-secondary);
   }
 }
 
-.risk-indicators-table {
+.risk-indicators-unified-box {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-}
-
-.metric-card-row {
-  display: grid;
-  grid-template-columns: minmax(0, 208px) minmax(0, 1fr);
-  gap: 12px;
-  padding: 10px 12px;
-  background: var(--el-fill-color-blank);
   border: 1px solid var(--el-border-color-lighter);
   border-radius: 6px;
-  align-items: center;
+  overflow: hidden;
 
-  @media (max-width: 580px) {
-    grid-template-columns: 1fr;
-    gap: 6px;
-  }
-
-  .metric-info-col {
+  .gauge-legend-bar {
     display: flex;
-    flex-direction: column;
-    gap: 2px;
-    min-width: 0;
+    align-items: center;
+    gap: 14px;
+    padding: 7px 12px;
+    background: var(--el-fill-color-light);
+    border-bottom: 1px solid var(--el-border-color-lighter);
+    font-size: 11px;
+    color: var(--el-text-color-secondary);
+    flex-wrap: wrap;
 
-    .metric-title-line {
-      display: flex;
-      align-items: baseline;
-      flex-wrap: wrap;
-      column-gap: 5px;
-      row-gap: 1px;
-      .metric-name {
-        font-size: 12px;
-        color: var(--el-text-color-primary);
-      }
-      .metric-rule {
-        font-size: 10px;
-        /* 规则号是整体标识，禁止在括号内被硬断成 [SEC-BOUNCE- / RATE] */
-        white-space: nowrap;
-      }
-    }
-    .metric-probe-notes {
-      font-size: 10.5px;
-      line-height: 1.25;
-    }
-  }
-
-  .metric-data-col {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-
-    .metric-val-row {
+    .legend-pill {
       display: flex;
       align-items: center;
-      justify-content: space-between;
+      gap: 4px;
 
-      .metric-val {
-        font-size: 13px;
-        color: var(--el-text-color-primary);
-      }
-      .threshold-tag {
-        font-size: 10.5px;
-        height: 18px;
-        padding: 0 4px;
+      .legend-color-box {
+        width: 10px;
+        height: 4px;
+        border-radius: 2px;
+        &.base-cohort { background: var(--el-color-primary); }
+        &.base-self { background: var(--el-color-warning); }
+        &.base-threshold { background: var(--el-color-danger); }
       }
     }
+  }
 
-    .gauge-bar-wrapper {
-      display: flex;
-      flex-direction: column;
-      gap: 3px;
+  .risk-indicators-table {
+    display: flex;
+    flex-direction: column;
 
-      .gauge-track {
-        position: relative;
-        height: 7px;
-        background: var(--el-fill-color-light);
-        border-radius: 4px;
-        overflow: hidden;
+    .metric-card-row {
+      display: grid;
+      grid-template-columns: minmax(0, 220px) minmax(0, 1fr);
+      gap: 12px;
+      padding: 9px 12px;
+      border-bottom: 1px solid var(--el-border-color-lighter);
+      align-items: center;
 
-        .gauge-fill {
-          height: 100%;
-          background: var(--el-color-primary);
-          border-radius: 4px;
-          transition: width 0.3s;
-          &.fill-over {
-            background: var(--el-color-danger);
-          }
-        }
-
-        .gauge-tick {
-          position: absolute;
-          top: 0;
-          bottom: 0;
-          width: 2px;
-          z-index: 2;
-
-          &.tick-self {
-            background: var(--el-color-warning);
-          }
-          &.tick-threshold {
-            background: var(--el-color-danger);
-          }
-        }
+      &:last-child {
+        border-bottom: none;
       }
 
-      .gauge-sub-labels {
+      @media (max-width: 580px) {
+        grid-template-columns: 1fr;
+        gap: 6px;
+      }
+
+      .metric-info-col {
         display: flex;
-        align-items: center;
-        justify-content: space-between;
-        font-size: 10px;
-        color: var(--el-text-color-secondary);
+        flex-direction: column;
+        gap: 2px;
+        min-width: 0;
 
-        .threshold-label {
-          color: var(--el-color-danger);
-          font-weight: 500;
+        .metric-title-line {
+          display: flex;
+          align-items: baseline;
+          flex-wrap: wrap;
+          column-gap: 5px;
+          row-gap: 1px;
+
+          .metric-name {
+            font-size: 12px;
+            color: var(--el-text-color-primary);
+          }
+          .metric-rule {
+            font-size: 10px;
+            white-space: nowrap;
+          }
+        }
+
+        .metric-probe-notes {
+          font-size: 10.5px;
+          line-height: 1.25;
         }
       }
-    }
 
-    .non-numeric-status {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 11.5px;
+      .metric-data-col {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+
+        .metric-val-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+
+          .metric-val {
+            font-size: 12.5px;
+            color: var(--el-text-color-primary);
+          }
+          .threshold-tag {
+            font-size: 10.5px;
+            height: 18px;
+            padding: 0 4px;
+          }
+        }
+
+        .gauge-bar-wrapper {
+          display: flex;
+          flex-direction: column;
+          gap: 3px;
+
+          .gauge-track {
+            position: relative;
+            height: 7px;
+            background: var(--el-fill-color-light);
+            border-radius: 4px;
+            overflow: hidden;
+
+            .gauge-fill {
+              height: 100%;
+              background: var(--el-color-primary);
+              border-radius: 4px;
+              transition: width 0.3s;
+              &.fill-over {
+                background: var(--el-color-danger);
+              }
+            }
+
+            .gauge-tick {
+              position: absolute;
+              top: 0;
+              bottom: 0;
+              width: 2px;
+              z-index: 2;
+
+              &.tick-self {
+                background: var(--el-color-warning);
+              }
+              &.tick-threshold {
+                background: var(--el-color-danger);
+              }
+            }
+          }
+
+          .gauge-sub-labels {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 10px;
+            color: var(--el-text-color-secondary);
+
+            .threshold-label {
+              color: var(--el-color-danger);
+              font-weight: 500;
+            }
+          }
+        }
+
+        .non-numeric-status {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          font-size: 11.5px;
+        }
+      }
     }
   }
 }
 
-/* 模块 F: 相似案例参照 */
+/* 模块 F: 相似案例处置参照 */
 .similar-cases-body {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-}
+  gap: 12px;
 
-.stacked-distribution-bar {
-  display: flex;
-  height: 12px;
-  border-radius: 6px;
-  overflow: hidden;
-  background: var(--el-fill-color-light);
-
-  .dist-segment {
-    height: 100%;
-    transition: width 0.3s;
-  }
-}
-
-.distribution-legend-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 6px 12px;
-  font-size: 11.5px;
-
-  .dist-legend-item {
+  .distribution-header-row {
     display: flex;
     align-items: center;
+    justify-content: space-between;
+    font-size: 12px;
+    flex-wrap: wrap;
     gap: 6px;
 
-    .color-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      flex-shrink: 0;
-    }
-    .dist-name {
-      color: var(--el-text-color-secondary);
-    }
-    .dist-stat {
-      color: var(--el-text-color-primary);
+    .meta-separator {
+      margin: 0 4px;
     }
   }
-}
 
-.consistency-advisory-box {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 8px 12px;
-  border-radius: 6px;
-  background: var(--el-fill-color-light);
-  border: 1px solid var(--el-border-color-lighter);
-  font-size: 11.5px;
-  color: var(--el-text-color-secondary);
-  line-height: 1.45;
+  .stacked-distribution-bar {
+    display: flex;
+    height: 12px;
+    border-radius: 6px;
+    overflow: hidden;
+    background: var(--el-fill-color-light);
 
-  .advisory-icon {
-    flex-shrink: 0;
-    color: var(--el-color-primary);
-    margin-top: 1px;
+    .dist-segment {
+      height: 100%;
+      transition: width 0.3s;
+    }
+  }
+
+  .distribution-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+
+    @media (max-width: 580px) {
+      grid-template-columns: repeat(2, 1fr);
+    }
+
+    .stat-col-box {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 8px 6px;
+      border-radius: 6px;
+      background: var(--el-fill-color-light);
+      border: 1px solid var(--el-border-color-lighter);
+      gap: 2px;
+
+      .stat-name-row {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 11.5px;
+        color: var(--el-text-color-secondary);
+
+        .color-dot {
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+        }
+      }
+
+      .stat-percent {
+        font-size: 15px;
+        color: var(--el-text-color-primary);
+      }
+
+      .stat-count {
+        font-size: 11px;
+      }
+    }
+  }
+
+  .consistency-advisory-box {
+    display: flex;
+    align-items: stretch;
+    background: var(--el-fill-color-light);
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid var(--el-border-color-lighter);
+
+    .advisory-bar-indicator {
+      width: 4px;
+      background: var(--el-color-primary);
+      flex-shrink: 0;
+    }
+
+    .advisory-content-wrap {
+      padding: 8px 12px;
+      font-size: 12px;
+      line-height: 1.5;
+      color: var(--el-text-color-regular);
+    }
   }
 }
 
 /* 模块 G: 证据链溯源 */
-.evidence-chain-table {
+.evidence-chain-structured-list {
   display: flex;
   flex-direction: column;
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 6px;
-  overflow: hidden;
-  font-size: 11.5px;
+  gap: 10px;
 
-  .chain-header-row {
-    display: grid;
-    grid-template-columns: 180px 140px 110px 1fr;
-    padding: 7px 10px;
-    background: var(--el-fill-color-light);
-    color: var(--el-text-color-secondary);
-    font-weight: 600;
-    border-bottom: 1px solid var(--el-border-color-lighter);
-  }
+  .chain-card-row {
+    display: flex;
+    flex-direction: column;
+    padding: 10px 12px;
+    border-radius: 6px;
+    background: var(--el-fill-color-blank);
+    border: 1px solid var(--el-border-color-lighter);
+    gap: 6px;
 
-  .chain-item-row {
-    display: grid;
-    grid-template-columns: 180px 140px 110px 1fr;
-    padding: 8px 10px;
-    border-bottom: 1px solid var(--el-border-color-lighter);
-    align-items: center;
-
-    &:last-child {
-      border-bottom: none;
-    }
-
-    .c-ev {
+    .chain-header-line {
       display: flex;
-      flex-direction: column;
-      gap: 2px;
-      .ev-title { color: var(--el-text-color-primary); }
-      .ev-hash { font-size: 10px; }
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+
+      .evidence-id-title {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12.5px;
+        color: var(--el-text-color-primary);
+
+        .ev-code {
+          color: var(--el-color-primary);
+        }
+      }
+
+      .evidence-rule-tag {
+        font-size: 11px;
+      }
     }
 
-    .c-st .step-pill {
-      background: var(--el-fill-color-light);
-      padding: 2px 6px;
-      border-radius: 4px;
-      font-size: 10.5px;
-    }
+    .chain-flow-line {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11.5px;
+      flex-wrap: wrap;
 
-    .c-jd {
-      color: var(--el-text-color-regular);
-    }
-  }
+      .flow-step-tag {
+        color: var(--el-text-color-primary);
+        font-weight: 500;
+      }
 
-  /* 4 列固定宽合计 430px+，在 375px 屏实测溢出 153px。
-     窄屏改为：证据项与判定依据各占整行，规则号与时间线节点并排。 */
-  @media (max-width: 580px) {
-    .chain-header-row {
-      display: none;
-    }
+      .flow-arrow {
+        color: var(--el-text-color-secondary);
+      }
 
-    .chain-item-row {
-      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-      gap: 5px 10px;
-      padding: 10px;
-      align-items: start;
+      .flow-hash-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 2px 6px;
+        border-radius: 4px;
+        background: var(--el-fill-color-light);
+        color: var(--el-text-color-secondary);
+        cursor: pointer;
 
-      .c-ev,
-      .c-jd {
-        grid-column: 1 / -1;
+        &:hover {
+          color: var(--el-color-primary);
+        }
+      }
+
+      .flow-judgement-text {
+        color: var(--el-text-color-regular);
       }
     }
   }
@@ -3045,7 +3374,6 @@ function handleDrawerOpened() {
       grid-template-columns: 1fr;
     }
 
-    /* 等宽栅格下必须抵消 EP 默认的 .el-button + .el-button 左边距，否则整列右偏 */
     :deep(.el-button) {
       width: 100%;
       margin-left: 0;
@@ -3107,8 +3435,6 @@ function handleDrawerOpened() {
   flex-wrap: wrap;
   gap: 10px;
 
-  /* 断点须与 drawerSize 的 100vw 切换点一致：原组件内仅有 580px 断点，
-     581~768px 区间抽屉已全屏但布局仍按桌面算，窄屏下「关闭」会被挤出可视区。 */
   @media (max-width: 768px) {
     gap: 8px;
 
@@ -3122,12 +3448,6 @@ function handleDrawerOpened() {
 </style>
 
 <style lang="scss">
-/* 抽屉外壳覆盖 —— 必须写在非 scoped 块中。
-   Element Plus 的 .el-drawer 及其 __header/__body/__footer 由组件内部渲染并经 Teleport
-   挂载到 body，不会携带本组件的 data-v scope 属性；写在 scoped 块里的 :deep() 选择器
-   会因祖先选择器带不上 [data-v-*] 而永久失配，导致整条 flex 布局链落空、
-   正文改由祖先 .el-drawer__body 滚动，令 .drawer-scroll-body 上的 @scroll 监听失效。
-   此处以唯一类名 .audit-detail-drawer 限定作用域，避免污染全局抽屉。 */
 .audit-detail-drawer.audit-drawer-container {
   display: flex;
   flex-direction: column;
