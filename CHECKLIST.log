@@ -7,6 +7,27 @@
 > 制度规范与工作流指引请见 [AGENTS.md](file:///home/shijian/projects/epocanvas-mail/AGENTS.md)。
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
+### 多维风险画像主驱动去方框化、一行放2个维度网格与三栏完全对齐重构 (2026-10-17)
+*   **关联提交 (Git Commit)**: `ea466d5d2f87e356cb859013014ad27e4fc19bec` (Short: `ea466d5`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com · Worker Version ID: faa0687d-aedd-45d2-ad75-0904788071a6)`
+*   **回滚锚点 (Rollback Anchor)**: `b989248d-eb4b-4cd4-9de8-5aee0021b521` (对应提交 `e0bc9ab`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] **主驱动维度彻底去方框化**：清空 `class="risk-driver-2line-box"` 上的所有边框（`border: none; border-width: 0px`）与背景色（`background: transparent`），彻底告别灰色背景与边框包裹，恢复纯粹的字阶与多行自然折行排版；
+    - [x] **维度列表一行放 2 个 (2 列 2 行网格)**：将 `class="risk-dimensions-list"` 从单列纵向排列重构为 `grid-template-columns: repeat(2, 1fr); grid-template-rows: repeat(2, 1fr)` 紧凑网格，4 个维度均匀分布于两行中；
+    - [x] **三栏完全对齐 (Top / Bottom / Height 100% 严丝合缝)**：将 `class="composite-score-square score-danger"`、`class="risk-driver-2line-box"` 与 `class="risk-dimensions-list"` 统一绑定为 88px 等高，并通过 `align-items: center` 确保上边缘（Y 坐标差 0px）、下边缘（Y 坐标差 0px）及水平中轴线绝对齐平；
+    - [x] **字体微调与文本零截断保障**：优化中间驱动栏宽度（125px）与右侧维度单元格（176px），微调权重字体至 9.5px，保证「设备指纹连续性」、「注册时序聚集度」等 7 字维度名称 100% 完整显示，零省略号（`...`）截断；
+    - [x] **多语言静态审计三件套验证**：`node scripts/i18n-symmetry.mjs` (2807 keys 100% 对称)、`node scripts/i18n-audit.mjs` (0 缺失词条)。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] **Cloudflare 生产环境部署**：`pnpm --dir mail-worker exec wrangler deploy` 成功发布 45 个静态资源，Version ID: `faa0687d-aedd-45d2-ad75-0904788071a6`；
+    - [x] **自动化端到端测试套件强化**：在 `tests/verify-cf-production-drawer-redesign.mjs` 中追加：
+        1. 验证 `risk-driver-2line-box` 计算样式 `borderStyle === 'none'` 且 `backgroundColor === 'rgba(0, 0, 0, 0)'`；
+        2. 验证 `risk-dimensions-list` 单元格位置 `top[0] === top[1]` 与 `top[2] === top[3]`（同行 2 个维度严格水平对齐）；
+        3. 验证 4 个维度名称字面量不含 `...` 与 `…`；
+        4. 验证 3 栏对齐测量全部为 `{ top: 1681, bottom: 1769, height: 88 }`（高度与上下界完全对齐）；
+    - [x] **Cloudflare 生产公网全真栈 Playwright 视觉实测核验**：直连 `https://mail.epocanvas.com` 打开线上审计抽屉，核验高精度截图：
+        - `tests/prod_cf_redesign_v1_risk.png` (88x88 正方形分值、无方框主驱动文本、一行2个维度的2x2网格、三栏绝对等高完全对齐)
+    - [x] **零假数据残留**：使用线上脱敏真实管理员会话，零虚假数据与持久化测试痕迹残留。
+
 ### 多维风险画像 3 栏并列主驱动居中与维度进度条紧凑重构 (2026-10-17)
 *   **关联提交 (Git Commit)**: `e0bc9ab70ed39bed5b5af5c0f6e17a725477255a` (Short: `e0bc9ab`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com · Worker Version ID: b989248d-eb4b-4cd4-9de8-5aee0021b521)`
