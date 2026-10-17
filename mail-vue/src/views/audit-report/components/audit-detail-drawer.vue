@@ -97,7 +97,7 @@
 
             <!-- 证据剩余保留天数 -->
             <span v-if="evidenceDaysText" class="meta-badge evidence-days">
-              <Icon icon="fluent:clock-history-16-regular" width="13" height="13" />
+              <Icon icon="fluent:history-16-regular" width="13" height="13" />
               <span>{{ evidenceDaysText }}</span>
             </span>
           </div>
@@ -289,18 +289,18 @@
           >
             <span class="col-idx font-mono text-muted">#{{ String(cIdx + 1).padStart(2, '0') }}</span>
             <div class="col-email font-mono">
-              <span>{{ maskEmail(acc.email) }}</span>
+              <span :title="acc.email">{{ maskEmail(acc.email) }}</span>
               <button class="inline-copy-btn" :title="$t('abuseCopyEmail')" @click="copyEmail(acc.email)">
                 <Icon icon="fluent:copy-16-regular" width="12" height="12" />
               </button>
             </div>
             <span class="col-uid font-mono text-muted">{{ maskUserId(acc.userId || ('usr_' + acc.id)) }}</span>
             <div class="col-status">
-              <el-tag size="small" :type="getStatusTagType(acc.status)" effect="plain">
+              <el-tag size="small" :type="getStatusTagType(acc.status)" effect="plain" :title="getStatusLabel(acc.status)">
                 {{ getStatusLabel(acc.status) }}
               </el-tag>
             </div>
-            <span class="col-relation font-mono text-danger">{{ acc.evidenceSummary || '同一设备指纹 · 关联集群' }}</span>
+            <span class="col-relation font-mono text-danger" :title="acc.evidenceSummary">{{ acc.evidenceSummary || '同一设备指纹 · 关联集群' }}</span>
           </div>
         </div>
 
@@ -323,7 +323,7 @@
         <div class="disposition-nested-card">
           <!-- 层级 1: 申诉理由引述块 (条件渲染) -->
           <div v-if="selectedRow.appealReason" class="appeal-statement-quote">
-            <Icon icon="fluent:chat-quote-20-regular" width="16" height="16" class="quote-icon" />
+            <Icon icon="fluent:text-quote-16-regular" width="16" height="16" class="quote-icon" />
             <span class="quote-text">“{{ selectedRow.appealReason }}”</span>
           </div>
 
@@ -1161,7 +1161,7 @@ const secondaryStatus = computed(() => {
     return { label: t('auditStatusWatching'), type: 'warning', icon: 'fluent:eye-tracking-16-regular' };
   }
   if (r.status === 'probation') {
-    return { label: 'MFA挑战中', type: 'primary', icon: 'fluent:key-reset-16-regular' };
+    return { label: 'MFA挑战中', type: 'primary', icon: 'fluent:key-16-regular' };
   }
   return null;
 });
@@ -1290,7 +1290,7 @@ const availableChapters = computed(() => {
   }
 
   list.push({ id: 'basis', label: chapterLabels.value.basis, icon: 'fluent:shield-task-16-regular' });
-  list.push({ id: 'timeline', label: t('auditChipTimeline'), icon: 'fluent:timeline-16-regular' });
+  list.push({ id: 'timeline', label: t('auditChipTimeline'), icon: 'fluent:timeline-20-regular' });
 
   if (riskProfileData.value) {
     list.push({ id: 'risk', label: t('auditChipRisk'), icon: 'fluent:chart-multiple-16-regular' });
@@ -1742,26 +1742,9 @@ function handleDrawerOpened() {
 </script>
 
 <style scoped lang="scss">
-.audit-drawer-container {
-  :deep(.el-drawer) {
-    background: var(--el-bg-color);
-  }
-  :deep(.el-drawer__header) {
-    margin-bottom: 0;
-    padding: 0;
-  }
-  :deep(.el-drawer__body) {
-    padding: 0;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-  }
-  :deep(.el-drawer__footer) {
-    padding: 12px 20px;
-    border-top: 1px solid var(--el-border-color-lighter);
-    background: var(--el-bg-color);
-  }
-}
+/* 注：抽屉外壳 (.el-drawer / __header / __body / __footer) 由 Element Plus 渲染并经
+   Teleport 挂到 body，不会携带本组件的 data-v scope 属性，因此任何写在 scoped 块内的
+   :deep() 覆盖都不会命中。相关外壳样式统一放在文件末尾的非 scoped 块中。 */
 
 /* 头部外壳 */
 .drawer-header-shell {
@@ -1770,6 +1753,11 @@ function handleDrawerOpened() {
   padding: 16px 20px 10px 20px;
   border-bottom: 1px solid var(--el-border-color-lighter);
   background: var(--el-bg-color);
+  /* .el-drawer__header 为 flex 容器，此处若不带 min-width:0 与 box-sizing，
+     外壳会按子项 min-content 撑破 720px 抽屉（V2 六枚徽标行实测溢出 78px）。 */
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .drawer-header-top {
@@ -1777,6 +1765,7 @@ function handleDrawerOpened() {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  min-width: 0;
 }
 
 .header-main-info {
@@ -1842,12 +1831,16 @@ function handleDrawerOpened() {
 
 .drawer-sub {
   font-size: 12px;
+  line-height: 1.45;
   color: var(--el-text-color-secondary);
   margin-top: 3px;
-  white-space: nowrap;
+  /* 定位副标题是一句完整语义，单行 ellipsis 会把 V2/V4 的长句裁成不可读的半截，
+     故放宽至两行截断，且不再写死 max-width，交由 flex 父级分配实际可用宽度。 */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 440px;
+  word-break: break-word;
 }
 
 .header-tools-right {
@@ -1877,6 +1870,47 @@ function handleDrawerOpened() {
   &:hover {
     background: var(--el-fill-color-light);
     color: var(--el-text-color-primary);
+  }
+}
+
+/* 窄屏适配：必须置于上述头部各基础规则之后。
+   同特异度选择器由后者胜出，写在它们之前会被全部覆盖失效。 */
+@media (max-width: 768px) {
+  .drawer-header-shell {
+    padding: 12px 14px 8px 14px;
+  }
+
+  .drawer-header-top {
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .header-main-info {
+    gap: 8px;
+  }
+
+  .header-icon-wrap {
+    width: 32px;
+    height: 32px;
+  }
+
+  .drawer-title-row {
+    gap: 6px;
+
+    .drawer-title {
+      font-size: 15px;
+    }
+  }
+
+  .header-tools-right {
+    gap: 4px;
+  }
+
+  .variant-switch-btn {
+    /* 不用 overflow:hidden 硬切，否则下拉箭头会被裁掉半截显得未完成；
+       改为收紧字号与内距让整枚按钮自然容纳。 */
+    font-size: 11px;
+    padding: 4px 8px;
   }
 }
 
@@ -2020,6 +2054,7 @@ function handleDrawerOpened() {
 /* 正文滚动区 */
 .drawer-scroll-body {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: 16px 20px 24px 20px;
   display: flex;
@@ -2156,7 +2191,8 @@ function handleDrawerOpened() {
 
   .cluster-header-row {
     display: grid;
-    grid-template-columns: 36px 1fr 100px 80px 130px;
+    grid-template-columns: 30px minmax(0, 1.7fr) minmax(0, 0.95fr) minmax(0, 1fr) minmax(0, 1.25fr);
+    column-gap: 8px;
     padding: 7px 10px;
     background: var(--el-fill-color-light);
     font-weight: 600;
@@ -2166,7 +2202,8 @@ function handleDrawerOpened() {
 
   .cluster-data-row {
     display: grid;
-    grid-template-columns: 36px 1fr 100px 80px 130px;
+    grid-template-columns: 30px minmax(0, 1.7fr) minmax(0, 0.95fr) minmax(0, 1fr) minmax(0, 1.25fr);
+    column-gap: 8px;
     padding: 7px 10px;
     align-items: center;
     border-bottom: 1px solid var(--el-border-color-lighter);
@@ -2175,13 +2212,80 @@ function handleDrawerOpened() {
       border-bottom: none;
     }
 
+    > * {
+      min-width: 0;
+    }
+
     .col-email {
       display: flex;
       align-items: center;
       gap: 4px;
+
+      > span {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .inline-copy-btn {
+        flex-shrink: 0;
+      }
+    }
+
+    .col-uid {
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+    }
+
+    .col-status {
+      overflow: hidden;
+
+      :deep(.el-tag) {
+        max-width: 100%;
+        display: inline-block;
+      }
+      :deep(.el-tag .el-tag__content) {
+        display: block;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+    }
+
+    .col-relation {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  }
+
+  /* 窄屏下 5 列网格必然溢出（邮箱/状态标签/关联说明实测各超 17~115px），
+     改为序号列固定 + 其余字段逐行堆叠，表头隐去。 */
+  @media (max-width: 580px) {
+    .cluster-header-row {
+      display: none;
+    }
+
+    .cluster-data-row {
+      grid-template-columns: 26px minmax(0, 1fr);
+      grid-template-areas:
+        "idx email"
+        ".   uid"
+        ".   status"
+        ".   relation";
+      row-gap: 3px;
+      align-items: start;
+
+      .col-idx { grid-area: idx; }
+      .col-email { grid-area: email; }
+      .col-uid { grid-area: uid; }
+      .col-status { grid-area: status; overflow: visible; }
+      .col-relation {
+        grid-area: relation;
+        white-space: normal;
+        overflow: visible;
+      }
     }
   }
 }
@@ -2628,7 +2732,7 @@ function handleDrawerOpened() {
 
 .metric-card-row {
   display: grid;
-  grid-template-columns: 180px 1fr;
+  grid-template-columns: minmax(0, 208px) minmax(0, 1fr);
   gap: 12px;
   padding: 10px 12px;
   background: var(--el-fill-color-blank);
@@ -2645,22 +2749,27 @@ function handleDrawerOpened() {
     display: flex;
     flex-direction: column;
     gap: 2px;
+    min-width: 0;
 
     .metric-title-line {
       display: flex;
       align-items: baseline;
-      gap: 4px;
+      flex-wrap: wrap;
+      column-gap: 5px;
+      row-gap: 1px;
       .metric-name {
         font-size: 12px;
         color: var(--el-text-color-primary);
       }
       .metric-rule {
         font-size: 10px;
+        /* 规则号是整体标识，禁止在括号内被硬断成 [SEC-BOUNCE- / RATE] */
+        white-space: nowrap;
       }
     }
     .metric-probe-notes {
       font-size: 10.5px;
-      line-height: 1.2;
+      line-height: 1.25;
     }
   }
 
@@ -2860,6 +2969,26 @@ function handleDrawerOpened() {
       color: var(--el-text-color-regular);
     }
   }
+
+  /* 4 列固定宽合计 430px+，在 375px 屏实测溢出 153px。
+     窄屏改为：证据项与判定依据各占整行，规则号与时间线节点并排。 */
+  @media (max-width: 580px) {
+    .chain-header-row {
+      display: none;
+    }
+
+    .chain-item-row {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 5px 10px;
+      padding: 10px;
+      align-items: start;
+
+      .c-ev,
+      .c-jd {
+        grid-column: 1 / -1;
+      }
+    }
+  }
 }
 
 /* 模块 H: 裁决工作台 */
@@ -2908,10 +3037,25 @@ function handleDrawerOpened() {
   }
 
   .adjudication-actions-grid {
-    display: flex;
-    align-items: center;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
-    flex-wrap: wrap;
+
+    @media (max-width: 580px) {
+      grid-template-columns: 1fr;
+    }
+
+    /* 等宽栅格下必须抵消 EP 默认的 .el-button + .el-button 左边距，否则整列右偏 */
+    :deep(.el-button) {
+      width: 100%;
+      margin-left: 0;
+      justify-content: center;
+      white-space: normal;
+      height: auto;
+      min-height: 32px;
+      padding: 6px 10px;
+      line-height: 1.35;
+    }
   }
 }
 
@@ -2960,6 +3104,56 @@ function handleDrawerOpened() {
   display: flex;
   align-items: center;
   justify-content: flex-end;
+  flex-wrap: wrap;
   gap: 10px;
+
+  /* 断点须与 drawerSize 的 100vw 切换点一致：原组件内仅有 580px 断点，
+     581~768px 区间抽屉已全屏但布局仍按桌面算，窄屏下「关闭」会被挤出可视区。 */
+  @media (max-width: 768px) {
+    gap: 8px;
+
+    :deep(.el-button) {
+      flex: 1 1 calc(50% - 4px);
+      margin-left: 0;
+      justify-content: center;
+    }
+  }
+}
+</style>
+
+<style lang="scss">
+/* 抽屉外壳覆盖 —— 必须写在非 scoped 块中。
+   Element Plus 的 .el-drawer 及其 __header/__body/__footer 由组件内部渲染并经 Teleport
+   挂载到 body，不会携带本组件的 data-v scope 属性；写在 scoped 块里的 :deep() 选择器
+   会因祖先选择器带不上 [data-v-*] 而永久失配，导致整条 flex 布局链落空、
+   正文改由祖先 .el-drawer__body 滚动，令 .drawer-scroll-body 上的 @scroll 监听失效。
+   此处以唯一类名 .audit-detail-drawer 限定作用域，避免污染全局抽屉。 */
+.audit-detail-drawer.audit-drawer-container {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--el-bg-color);
+
+  > .el-drawer__header {
+    flex-shrink: 0;
+    margin-bottom: 0;
+    padding: 0;
+  }
+
+  > .el-drawer__body {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+    overflow: hidden;
+  }
+
+  > .el-drawer__footer {
+    flex-shrink: 0;
+    padding: 12px 20px;
+    border-top: 1px solid var(--el-border-color-lighter);
+    background: var(--el-bg-color);
+  }
 }
 </style>
