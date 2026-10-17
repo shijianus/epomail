@@ -8,6 +8,22 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### 本地最新版本 Cloudflare 生产环境发布上线 (2026-10-17)
+*   **关联提交 (Git Commit)**: `d2baf633ded57b6da3ca60300f5fba261e922871` (Short: `d2baf63`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com · Worker Version ID: 0d8ec28a-eafc-4271-bdb4-374fad0992c2)`
+*   **回滚锚点 (Rollback Anchor)**: `e20424a1-1c67-40fa-8267-24ea9cf6c2e4`（对应提交 `75dbbec`）
+*   **部署前置安全与干跑核验 (Pre-flight & Dry-run)**:
+    - [x] **本地最新版本状态确认**：确认本地处于 master 分支，领先 origin/master 7 个提交且工作区整洁；
+    - [x] **干跑验证**：`pnpm --dir mail-worker exec wrangler deploy --dry-run` 完整执行构建与资源索引，435 个静态资源准备就绪，绑定全数正常，exit 0；
+*   **生产构建与部署流水 (Deployment Execution)**:
+    - [x] **生产构建**：执行 `pnpm --dir mail-worker exec wrangler deploy`，触发 `node ./build.mjs`；
+        - `temp_login_ui` 构建完成；
+        - `mail-vue` vite 生产发布构建通过（耗时 15.69s），生成 PWA SW 与静态产物；
+        - `copy-login-dist` 成功同步至 `mail-worker/dist/login`；
+    - [x] **资源与 Worker 发布**：读取 435 个静态资源，Worker 启动耗时 59ms；KV、D1 (USER_DB / MAIL_DB / db)、AI、Assets 绑定全部就绪；
+    - [x] **生成版本**：Cloudflare 成功分配版本 ID `0d8ec28a-eafc-4271-bdb4-374fad0992c2`；
+    - [x] **生产在线健康探测**：`curl -Is https://mail.epocanvas.com` 返回 `HTTP/2 200`，公网入口正常响应。
+
 ### 抽屉四变体 UI 治理成果 Cloudflare 生产部署与公网真实数据核验 (2026-10-16)
 *   **关联提交 (Git Commit)**: `75dbbecb0fb50204c0e99238201deaf22f4aa557` (Short: `75dbbec`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com · Worker Version ID: e20424a1-1c67-40fa-8267-24ea9cf6c2e4)`
