@@ -7,9 +7,10 @@
 > 制度规范与工作流指引请见 [AGENTS.md](file:///home/shijian/projects/epocanvas-mail/AGENTS.md)。
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
-### 安全审计抽屉全宗档案 UI 全面重构与四变体业务差异化 (2026-10-17)
-*   **关联提交 (Git Commit)**: `7df3dfebefcc3333cfbf5c3233eb7b1dd5a77a6a` (Short: `7df3dfe`)
-*   **部署环境 (Deployment)**: `本地全真栈 / 构建产物已同步至 mail-worker/dist`
+### 安全审计抽屉全宗档案 UI 全面重构与 Cloudflare 生产环境发布上线 (2026-10-17)
+*   **关联提交 (Git Commit)**: `f1bcc5a07c08f430d43a6c9d81d283832d29b00e` (Short: `f1bcc5a`) & `7df3dfebefcc3333cfbf5c3233eb7b1dd5a77a6a` (Short: `7df3dfe`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com · Worker Version ID: 28aaf8d9-42bb-429e-b6bd-f344f4974dc2)`
+*   **回滚锚点 (Rollback Anchor)**: `0d8ec28a-eafc-4271-bdb4-374fad0992c2` (对应提交 `d2baf63`)
 *   **功能需求与变更清单 (Changes & Feature Alignment)**:
     - [x] 抽屉头部精简与纯净治理：彻底移除 `.drawer-badge-meta-bar`、`.variant-mode-tag` 与视角下拉菜单 `.el-dropdown`，移除冗余自述，标题严格为「案件全宗档案」与变体专属标题；
     - [x] 案件概要对齐与规范排版：「当前状态」消除原始 active 字段，精准映射为与主表格同步的「待审」；「拍案管理」直接展示执行人名称；「证据留存」剔除 WORM 无关标语；左右两列采用 `1fr 1fr` 等距网格排版，字段标签统一为「案件编号」；
@@ -21,16 +22,16 @@
     - [x] 四大业务变体（滥用威胁 / 申诉审计 / 风险管理 / 操作记录）全维度深度定制与差异化设计；
     - [x] 6 语言 i18n 严格闭环：6 种语言字典保持 2799 键 100% 绝对对称，零未翻译硬编码。
 *   **自动化测试与核验清单 (Verification Checklist)**:
-    - [x] 本地前端发布构建：`mail-vue` vite 构建通过（耗时 14.97s，产物同步至 `mail-worker/dist`）；
+    - [x] Cloudflare 生产部署：执行 `pnpm --dir mail-worker exec wrangler deploy`，45 个资产成功上传，Worker 启动耗时 61ms，版本 ID `28aaf8d9-42bb-429e-b6bd-f344f4974dc2` 正常激活；
     - [x] 静态代码与多语言审计：`node scripts/i18n-symmetry.mjs`（2799 keys 100% 对称）、`node scripts/i18n-audit.mjs`（零缺失词条）；
-    - [x] 全真栈自动化与 Playwright 视觉回归测试：`node tests/verify-drawer-redesign-visual.mjs` 全部通过，并完成 5 张全分辨率截图核验：
-        - `tests/visual_redesign_v1_threat.png` (变体 1 全景上部)
-        - `tests/visual_redesign_v1_timeline.png` (变体 1 双泳道时间线)
-        - `tests/visual_redesign_v1_risk.png` (变体 1 多维风险画像)
-        - `tests/visual_redesign_v1_bottom.png` (变体 1 相似案例与证据链溯源)
-        - `tests/visual_redesign_v2_appeal.png` (变体 2 申诉复核差异化档案)
-        - `tests/visual_redesign_v3_audit.png` (变体 3 风控预警差异化档案)
-        - `tests/visual_redesign_v4_record.png` (变体 4 处置台账差异化档案)
+    - [x] Cloudflare 生产公网全真栈 Playwright 视觉回归测试：`node tests/verify-cf-production-drawer-redesign.mjs` 直连 `https://mail.epocanvas.com` 全部通过，并完成 7 张线上全分辨率实测截图核验：
+        - `tests/prod_cf_redesign_v1_threat.png` (生产环境变体 1 全景上部)
+        - `tests/prod_cf_redesign_v1_timeline.png` (生产环境变体 1 双泳道时间线)
+        - `tests/prod_cf_redesign_v1_risk.png` (生产环境变体 1 多维风险画像)
+        - `tests/prod_cf_redesign_v1_bottom.png` (生产环境变体 1 相似案例与证据链溯源)
+        - `tests/prod_cf_redesign_v2_appeal.png` (生产环境变体 2 申诉复核差异化档案)
+        - `tests/prod_cf_redesign_v3_audit.png` (生产环境变体 3 风控预警差异化档案)
+        - `tests/prod_cf_redesign_v4_record.png` (生产环境变体 4 处置台账差异化档案)
     - [x] 零假数据残留：测试脚本使用脱敏测试数据，无数据库与 KV 数据残留。
 
 ### 本地最新版本 Cloudflare 生产环境发布上线 (2026-10-17)
