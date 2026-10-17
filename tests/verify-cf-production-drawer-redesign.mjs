@@ -130,44 +130,72 @@ async function run() {
     assert.strictEqual(logsBox, 1, '必须存在专属研判路径记录框');
     console.log('    ✓ 禁止图标与研判路径记录框正常');
 
-    // 4.5 左右双泳道时间线核验
-    console.log('  - 验证处置与存证全周期时间线左右双泳道...');
+    // 4.5 左右双泳道时间线核验 (时间线居中唯一，两侧绝无多余时间线，结构化边框徽章无中括号)
+    console.log('  - 验证处置与存证全周期时间线左右双泳道与居中唯一时间轴...');
     const timelineCard = drawer.locator('#chapter-timeline');
     const machineHeader = await timelineCard.locator('.machine-header').count();
     const humanHeader = await timelineCard.locator('.human-header').count();
     assert.strictEqual(machineHeader, 1, '必须具备机器自动泳道表头');
     assert.strictEqual(humanHeader, 1, '必须具备人工与用户泳道表头');
-    console.log('    ✓ 左右双泳道表头正常');
 
-    // 4.6 多维风险画像核验
+    const sideTrackLines = await timelineCard.locator('.swimlane-placeholder .track-line').count();
+    assert.strictEqual(sideTrackLines, 0, '两侧占位单元格绝不可有附加时间线 (时间线居中唯一)');
+    const centerAxisDots = await timelineCard.locator('.swimlane-axis .axis-dot').count();
+    assert.ok(centerAxisDots >= 4, '居中唯一时间轴中必须具备节点圆点');
+
+    const actorBoxText = await timelineCard.locator('.node-actor-box').first().textContent();
+    assert.ok(!actorBoxText.includes('[') && !actorBoxText.includes(']'), '时间线角色标签必须是徽章边框，严禁直接输出原始方括号');
+    console.log('    ✓ 左右双泳道表头、居中唯一时间轴及无括号徽章核验通过');
+
+    // 4.6 多维风险画像核验 (正方体分数、2行式主驱动维度置于上方、100%全量指标带进度条)
     console.log('  - 验证多维风险画像...');
     const riskCard = drawer.locator('#chapter-risk');
     const squareBox = await riskCard.locator('.composite-score-square').count();
     assert.strictEqual(squareBox, 1, '风险分必须为正方形方格');
     const denomCount = await riskCard.locator('.composite-score-square .score-denom').count();
     assert.strictEqual(denomCount, 0, '绝对不可包含 /100 后缀');
-    const mainDriver = (await riskCard.locator('.risk-driver-bar-centered').textContent()).trim();
-    assert.ok(mainDriver.includes('主驱动维度'), '主驱动维度必须居中展示');
-    const metricsCount = await riskCard.locator('.metric-card-row').count();
-    console.log(`    - 风险画像丰富指标数: ${metricsCount}`);
-    assert.ok(metricsCount >= 6, '风险画像必须包含丰富指标');
-    console.log('    ✓ 多维风险画像正方体与丰富指标项核验通过');
 
-    // 4.7 相似案例处置参照核验
+    const driverBox = riskCard.locator('.risk-driver-2line-box');
+    assert.strictEqual(await driverBox.count(), 1, '主驱动维度必须置于上方并采用2行结构');
+    const driverPrefix = (await driverBox.locator('.driver-prefix-line').textContent()).trim();
+    const driverVal = (await driverBox.locator('.driver-highlight-line').textContent()).trim();
+    assert.ok(driverPrefix.includes('主驱动维度'), '第一行为主驱动维度前缀');
+    assert.ok(driverVal.length > 0, '第二行为主驱动维度详情');
+
+    const metricsCount = await riskCard.locator('.metric-card-row').count();
+    const gaugeCount = await riskCard.locator('.gauge-bar-wrapper').count();
+    const nonNumericCount = await riskCard.locator('.non-numeric-status').count();
+    console.log(`    - 风险画像丰富指标数: ${metricsCount}, 进度条数: ${gaugeCount}, 无条数: ${nonNumericCount}`);
+    assert.ok(metricsCount >= 6, '风险画像必须包含丰富指标');
+    assert.strictEqual(metricsCount, gaugeCount, '100% 的指标必须全部具备进度条，严禁突兀缺失进度条');
+    assert.strictEqual(nonNumericCount, 0, '严禁存在非数值无进度条的突兀分支');
+    console.log('    ✓ 多维风险画像正方体、2行式主驱动及100%统一进度条核验通过');
+
+    // 4.7 相似案例处置参照核验 (无中括号纯结构化徽章)
     console.log('  - 验证相似案例处置参照...');
     const similarCard = drawer.locator('#chapter-similar');
     const stackedBar = await similarCard.locator('.stacked-distribution-bar').count();
     assert.strictEqual(stackedBar, 1, '必须包含多色堆叠进度条');
     const statsCols = await similarCard.locator('.stat-col-box').count();
     assert.strictEqual(statsCols, 4, '必须包含 4 列案例统计');
-    console.log('    ✓ 相似案例 4 色堆叠条与 4 列统计通过');
 
-    // 4.8 证据链溯源核验
+    const reasonBoxText = (await similarCard.locator('.header-reason-box').textContent()).trim();
+    assert.ok(!reasonBoxText.includes('[') && !reasonBoxText.includes(']'), '相似案例原因码绝不可含原始方括号');
+    console.log('    ✓ 相似案例 4 色堆叠条、4 列统计与纯净原因码徽章通过');
+
+    // 4.8 证据链溯源核验 (公式副标题彻底移除，代码徽章化)
     console.log('  - 验证证据链溯源...');
     const chainCard = drawer.locator('#chapter-chain');
+    const chainFormulaCount = await chainCard.locator('.chain-formula-desc').count();
+    assert.strictEqual(chainFormulaCount, 0, '指导性公式副标题（证据 → 规则 → 节点 → 依据）必须彻底移除');
+
     const chainItems = await chainCard.locator('.chain-card-row').count();
     console.log(`    - 证据链溯源卡片数: ${chainItems}`);
     assert.ok(chainItems >= 3, '证据链溯源卡片必须不少于 3 条');
+
+    const evCodeText = (await chainCard.locator('.ev-code-box').first().textContent()).trim();
+    assert.ok(!evCodeText.includes('[') && !evCodeText.includes(']'), '证据编号绝不可含原始方括号');
+    console.log('    ✓ 证据链溯源无公式副标题、卡片数与无括号徽章核验通过');
 
     // 截图保存 V1 各板块
     await page.screenshot({ path: 'tests/prod_cf_redesign_v1_threat.png', fullPage: false });

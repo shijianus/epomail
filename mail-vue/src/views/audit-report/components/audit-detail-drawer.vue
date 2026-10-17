@@ -57,7 +57,7 @@
         <div class="section-title">
           <div class="title-left">
             <Icon icon="fluent:document-text-20-regular" width="18" height="18" />
-            <span>{{ $t('auditChipSummary') }}</span>
+            <span>{{ $t('auditSectionOverview') }}</span>
           </div>
           <span class="section-badge font-mono">#01-OVERVIEW</span>
         </div>
@@ -241,7 +241,7 @@
         <div class="section-title">
           <div class="title-left">
             <Icon icon="fluent:shield-task-20-regular" width="18" height="18" />
-            <span>{{ $t('auditChipBasis') }}</span>
+            <span>{{ $t('auditSectionBasis') }}</span>
           </div>
           <span class="section-badge font-mono">#02-GROUNDS</span>
         </div>
@@ -306,12 +306,12 @@
         </div>
       </section>
 
-      <!-- 模块 D: 处置与存证全周期时间线 (左右双泳道：左为机器自动泳道，右为人工与用户泳道) -->
+      <!-- 模块 D: 处置与存证全周期时间线 (时间线居中，左右双泳道分流，无多余时间线，边框徽章化无中括号) -->
       <section id="chapter-timeline" class="dossier-card anchor-section">
         <div class="section-title">
           <div class="title-left">
             <Icon icon="fluent:timeline-20-regular" width="18" height="18" />
-            <span>{{ $t('auditChipTimeline') }}</span>
+            <span>{{ $t('auditSectionTimeline') }}</span>
           </div>
           <span class="section-badge font-mono">#03-TIMELINE</span>
         </div>
@@ -330,7 +330,7 @@
             </div>
           </div>
 
-          <!-- 双泳道节点网格流水线 -->
+          <!-- 双泳道节点网格流水线：仅中间轴线穿过，两侧完全留白无附加时间线 -->
           <div class="swimlane-grid-track">
             <div
               v-for="(node, nIdx) in currentTimelineNodes"
@@ -338,91 +338,87 @@
               class="swimlane-row"
               :class="`node-lane-${node.lane}`"
             >
-              <!-- 机器自动泳道单元格 -->
+              <!-- 机器自动泳道单元格 (仅机器节点渲染卡片，其余保持纯留白) -->
               <div class="swimlane-cell machine-cell">
                 <div v-if="node.lane === 'machine'" class="swimlane-card machine-card" :class="{ 'card-latest': node.isLatest }">
                   <div class="card-top-row">
                     <span class="node-time font-mono">{{ node.time }}</span>
-                    <span class="node-actor-tag font-mono">[{{ node.actor }}]</span>
+                    <span class="node-actor-box font-mono">{{ node.actor }}</span>
                     <span v-if="node.badge" class="node-badge-tag font-mono">{{ node.badge }}</span>
                     <el-tag v-if="node.isLatest" size="small" type="danger" effect="dark" class="latest-tag">{{ $t('auditTimelineLatestNode') }}</el-tag>
                   </div>
                   <div class="card-title-row">
-                    <span class="node-id font-mono">{{ node.nodeId }}</span>
+                    <span class="node-num-badge font-mono">{{ node.nodeId }}</span>
                     <span class="node-action font-semibold">{{ node.action }}</span>
                   </div>
                   <div class="card-desc">{{ node.desc }}</div>
                   <div class="card-footer-row font-mono">
                     <div v-if="node.transition" class="node-transition">
-                      <span class="st-from">[{{ node.transition.from }}]</span>
+                      <span class="st-box st-from">{{ node.transition.from }}</span>
                       <Icon icon="fluent:arrow-right-12-regular" width="11" height="11" class="arrow" />
-                      <span class="st-to text-danger">[{{ node.transition.to }}]</span>
+                      <span class="st-box st-to text-danger">{{ node.transition.to }}</span>
                     </div>
-                    <div v-if="node.hash" class="node-hash" @click="copyHash(node.hash)" :title="$t('auditCopiedHash')">
+                    <div v-if="node.hash" class="node-hash-pill" @click="copyHash(node.hash)" :title="$t('auditCopiedHash')">
                       <span>{{ node.hash }}</span>
                       <Icon icon="fluent:copy-16-regular" width="11" height="11" class="copy-icon" />
                     </div>
                   </div>
                 </div>
-                <div v-else class="swimlane-placeholder machine-placeholder">
-                  <div class="track-line"></div>
-                </div>
+                <div v-else class="swimlane-placeholder machine-placeholder"></div>
               </div>
 
-              <!-- 中间轴点指示器 -->
+              <!-- 居中唯一时间轴中轴线与节点锚点 -->
               <div class="swimlane-axis">
                 <div class="axis-dot" :class="node.lane === 'machine' ? 'dot-machine' : 'dot-human'">
                   <Icon :icon="node.lane === 'machine' ? 'fluent:bot-16-regular' : 'fluent:person-16-regular'" width="12" height="12" />
                 </div>
               </div>
 
-              <!-- 人工与用户泳道单元格 -->
+              <!-- 人工与用户泳道单元格 (仅人工节点渲染卡片，其余保持纯留白) -->
               <div class="swimlane-cell human-cell">
                 <div v-if="node.lane === 'human'" class="swimlane-card human-card" :class="{ 'card-latest': node.isLatest }">
                   <div class="card-top-row">
                     <span class="node-time font-mono">{{ node.time }}</span>
-                    <span class="node-actor-tag font-mono">[{{ node.actor }}]</span>
+                    <span class="node-actor-box font-mono">{{ node.actor }}</span>
                     <span v-if="node.duration" class="node-duration font-mono text-muted">{{ node.duration }}</span>
                     <el-tag v-if="node.isLatest" size="small" type="danger" effect="dark" class="latest-tag">{{ $t('auditTimelineLatestNode') }}</el-tag>
                   </div>
                   <div class="card-title-row">
-                    <span class="node-id font-mono">{{ node.nodeId }}</span>
+                    <span class="node-num-badge font-mono">{{ node.nodeId }}</span>
                     <span class="node-action font-semibold">{{ node.action }}</span>
                   </div>
                   <div class="card-desc">{{ node.desc }}</div>
                   <div class="card-footer-row font-mono">
                     <div v-if="node.transition" class="node-transition">
-                      <span class="st-from">[{{ node.transition.from }}]</span>
+                      <span class="st-box st-from">{{ node.transition.from }}</span>
                       <Icon icon="fluent:arrow-right-12-regular" width="11" height="11" class="arrow" />
-                      <span class="st-to text-danger">[{{ node.transition.to }}]</span>
+                      <span class="st-box st-to text-danger">{{ node.transition.to }}</span>
                     </div>
-                    <div v-if="node.hash" class="node-hash" @click="copyHash(node.hash)" :title="$t('auditCopiedHash')">
+                    <div v-if="node.hash" class="node-hash-pill" @click="copyHash(node.hash)" :title="$t('auditCopiedHash')">
                       <span>{{ node.hash }}</span>
                       <Icon icon="fluent:copy-16-regular" width="11" height="11" class="copy-icon" />
                     </div>
                   </div>
                 </div>
-                <div v-else class="swimlane-placeholder human-placeholder">
-                  <div class="track-line"></div>
-                </div>
+                <div v-else class="swimlane-placeholder human-placeholder"></div>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      <!-- 模块 E: 多维风险画像 (正方形综合风险分在左，维度条在右，主驱动居中，图例与表格统一单框) -->
+      <!-- 模块 E: 多维风险画像 (正方形综合风险分在左，右侧为紧凑维度条列表 + 2行式主驱动维度，图例与全量进度条表格统一单框) -->
       <section id="chapter-risk" class="dossier-card anchor-section">
         <div class="section-title">
           <div class="title-left">
             <Icon icon="fluent:chart-multiple-20-regular" width="18" height="18" />
-            <span>{{ $t('auditChipRisk') }}</span>
+            <span>{{ $t('auditSectionRisk') }}</span>
           </div>
           <span class="section-badge font-mono">#04-PROFILE</span>
         </div>
 
         <div class="risk-profile-unified-card">
-          <!-- 上半区：正方形方格综合风险分 + 右侧维度条列表 -->
+          <!-- 上半区：正方形方格综合风险分 + 右侧紧凑维度条列表与2行式主驱动 -->
           <div class="risk-top-grid">
             <!-- 正方形方格：仅显示纯数字，删除/100，综合风险分居于数字下方 -->
             <div class="composite-score-square" :class="riskScoreLevelClass">
@@ -430,37 +426,39 @@
               <div class="score-label">{{ $t('auditRiskCompositeScore') }}</div>
             </div>
 
-            <!-- 右侧维度条列表 -->
-            <div class="risk-dimensions-list">
-              <div
-                v-for="dim in currentRiskProfile.dimensions"
-                :key="dim.name"
-                class="dimension-row"
-              >
-                <div class="dim-label-row">
-                  <span class="dim-name font-medium">{{ dim.name }}</span>
-                  <div class="dim-meta font-mono">
-                    <span class="dim-score" :class="getScoreColorClass(dim.score)">{{ dim.score }}分</span>
-                    <span class="dim-weight text-muted">(权重: {{ dim.weight }}%)</span>
+            <!-- 右侧：紧凑维度条列表 + 2行式主驱动维度 (冒号前后隔开为2行) -->
+            <div class="risk-top-right-col">
+              <div class="risk-dimensions-list">
+                <div
+                  v-for="dim in currentRiskProfile.dimensions"
+                  :key="dim.name"
+                  class="dimension-row"
+                >
+                  <div class="dim-label-row">
+                    <span class="dim-name font-medium">{{ dim.name }}</span>
+                    <div class="dim-meta font-mono">
+                      <span class="dim-score" :class="getScoreColorClass(dim.score)">{{ dim.score }}分</span>
+                      <span class="dim-weight text-muted">(权重: {{ dim.weight }}%)</span>
+                    </div>
                   </div>
+                  <el-progress
+                    :percentage="Math.min(100, dim.score)"
+                    :color="getProgressColor(dim.score)"
+                    :stroke-width="4"
+                    :show-text="false"
+                  />
                 </div>
-                <el-progress
-                  :percentage="Math.min(100, dim.score)"
-                  :color="getProgressColor(dim.score)"
-                  :stroke-width="6"
-                  :show-text="false"
-                />
+              </div>
+
+              <!-- 主驱动维度置于上方右侧，冒号前后拆分为2行，节省纵向空间 -->
+              <div class="risk-driver-2line-box">
+                <div class="driver-prefix-line">{{ $t('auditRiskMainDriver') }}</div>
+                <div class="driver-highlight-line text-danger font-medium">{{ currentRiskProfile.mainDriver }}</div>
               </div>
             </div>
           </div>
 
-          <!-- 主驱动维度放在方格正下方居中位置 -->
-          <div class="risk-driver-bar-centered">
-            <span class="driver-prefix">{{ $t('auditRiskMainDriver') }}:</span>
-            <span class="driver-highlight text-danger font-medium">{{ currentRiskProfile.mainDriver }}</span>
-          </div>
-
-          <!-- 图例 class="gauge-legend-bar" 与表格 class="risk-indicators-table" 作为统一单框不要分开 -->
+          <!-- 图例 class="gauge-legend-bar" 与表格 class="risk-indicators-table" 作为统一单框，指标100%全量具备进度条 -->
           <div class="risk-indicators-unified-box">
             <div class="gauge-legend-bar">
               <span class="legend-pill"><span class="legend-color-box base-cohort"></span>{{ $t('auditRiskLegendGroup') }}</span>
@@ -477,7 +475,7 @@
                 <div class="metric-info-col">
                   <div class="metric-title-line">
                     <span class="metric-name font-medium">{{ metric.name }}</span>
-                    <span class="metric-rule font-mono text-muted">[{{ metric.rule }}]</span>
+                    <span class="metric-rule-box font-mono text-muted">{{ metric.rule }}</span>
                   </div>
                   <div class="metric-probe-notes text-muted font-mono">
                     {{ metric.probeNotes }}
@@ -499,7 +497,7 @@
                     </el-tag>
                   </div>
 
-                  <div v-if="metric.isNumeric" class="gauge-bar-wrapper">
+                  <div class="gauge-bar-wrapper">
                     <div class="gauge-track">
                       <div
                         class="gauge-fill"
@@ -515,13 +513,6 @@
                       <span class="threshold-label">{{ $t('auditRiskGaugeThreshold') }}: {{ metric.threshold }}</span>
                     </div>
                   </div>
-
-                  <div v-else class="non-numeric-status">
-                    <el-tag size="small" :type="metric.hit ? 'danger' : 'info'" effect="plain">
-                      {{ metric.hit ? $t('auditRiskMetricHit') : $t('auditRiskMetricNormal') }}
-                    </el-tag>
-                    <span class="non-numeric-desc text-muted font-mono">{{ metric.statusNote }}</span>
-                  </div>
                 </div>
               </div>
             </div>
@@ -529,20 +520,21 @@
         </div>
       </section>
 
-      <!-- 模块 F: 相似案例处置参照 (进度条式显示比例 + 4 列统计 + 研判一致性提示) -->
+      <!-- 模块 F: 相似案例处置参照 (进度条式显示比例 + 4 列统计 + 研判一致性提示，无中括号纯结构化徽章) -->
       <section id="chapter-similar" class="dossier-card anchor-section">
         <div class="section-title">
           <div class="title-left">
             <Icon icon="fluent:branch-compare-20-regular" width="18" height="18" />
-            <span>{{ $t('auditChipSimilar') }}</span>
+            <span>{{ $t('auditSectionSimilar') }}</span>
           </div>
           <span class="section-badge font-mono">#05-PRECEDENT</span>
         </div>
 
         <div class="similar-cases-body">
           <div class="distribution-header-row">
-            <div class="header-left-tag font-mono text-danger font-semibold">
-              [同原因码 {{ currentSimilarCases.reasonCode }}]
+            <div class="header-reason-box font-mono text-danger font-semibold">
+              <span class="reason-prefix">同原因码</span>
+              <span class="reason-code-val">{{ currentSimilarCases.reasonCode }}</span>
             </div>
             <div class="header-right-meta font-mono text-muted">
               <span>已裁决样本 {{ currentSimilarCases.totalCases }} 例</span>
@@ -588,13 +580,12 @@
         </div>
       </section>
 
-      <!-- 模块 G: 证据链溯源 (证据 → 规则 → 节点 → 依据 结构化链路) -->
+      <!-- 模块 G: 证据链溯源 (彻底移除公式副标题，代码/规则/步骤完全徽章化封装) -->
       <section id="chapter-chain" class="dossier-card anchor-section">
         <div class="section-title">
           <div class="title-left">
             <Icon icon="fluent:link-multiple-20-regular" width="18" height="18" />
-            <span>{{ $t('auditChipChain') }}</span>
-            <span class="chain-formula-desc font-mono text-muted">{{ $t('auditEvidenceChainFormula') }}</span>
+            <span>{{ $t('auditSectionChain') }}</span>
           </div>
           <span class="section-badge font-mono">#06-PROVENANCE</span>
         </div>
@@ -607,20 +598,20 @@
           >
             <div class="chain-header-line">
               <div class="evidence-id-title">
-                <span class="ev-code font-mono font-semibold">[{{ rowItem.code }}]</span>
+                <span class="ev-code-box font-mono font-semibold">{{ rowItem.code }}</span>
                 <span class="ev-title font-medium">{{ rowItem.evidence }}</span>
               </div>
-              <div class="evidence-rule-tag font-mono text-danger font-medium">
-                [{{ rowItem.rule }}]
+              <div class="evidence-rule-box font-mono text-danger font-medium">
+                {{ rowItem.rule }}
               </div>
             </div>
 
             <div class="chain-flow-line font-mono">
-              <div class="flow-step-tag">
-                <span>[{{ rowItem.step }}]</span>
+              <div class="flow-step-box">
+                <span>{{ rowItem.step }}</span>
               </div>
               <Icon icon="fluent:arrow-right-12-regular" width="12" height="12" class="flow-arrow" />
-              <div class="flow-hash-btn" @click="copyHash(rowItem.hash)" :title="$t('auditCopiedHash')">
+              <div class="flow-hash-pill" @click="copyHash(rowItem.hash)" :title="$t('auditCopiedHash')">
                 <span>{{ rowItem.hash }}</span>
                 <Icon icon="fluent:copy-16-regular" width="11" height="11" class="copy-icon" />
               </div>
@@ -642,7 +633,7 @@
         <div class="section-title">
           <div class="title-left">
             <Icon icon="fluent:gavel-20-regular" width="18" height="18" />
-            <span>{{ $t('auditChipDecision') }}</span>
+            <span>{{ $t('auditSectionDecision') }}</span>
           </div>
           <span class="section-badge font-mono">#DECISION_ENGINE</span>
         </div>
@@ -752,6 +743,14 @@
         id="chapter-ledger"
         class="dossier-card readonly-ledger-card anchor-section"
       >
+        <div class="section-title">
+          <div class="title-left">
+            <Icon icon="fluent:book-database-20-regular" width="18" height="18" />
+            <span>{{ $t('auditSectionLedger') }}</span>
+          </div>
+          <span class="section-badge font-mono">#07-LEDGER</span>
+        </div>
+
         <div class="sanction-ledger-banner">
           <Icon icon="fluent:shield-checkmark-20-filled" width="20" height="20" class="banner-icon" />
           <div class="banner-text-box">
@@ -869,7 +868,7 @@ const visible = computed({
 });
 
 const drawerSize = computed(() => {
-  return window.innerWidth <= 768 ? '100vw' : '720px';
+  return window.innerWidth <= 768 ? '100vw' : '640px';
 });
 
 // 当前激活的变体 (1: 滥用威胁, 2: 审计申诉, 3: 风控预警, 4: 封禁记录/处置台账)
@@ -1613,21 +1612,27 @@ const currentRiskProfile = computed(() => {
           name: 'WebGL 指纹熵值与伪造',
           rule: 'RULE-CANVAS-FP',
           probeNotes: 'Canvas / WebGL 抗渲染注入',
-          currentValue: '伪造特征注入',
+          currentValue: '98.5% (伪造注入)',
           isOverThreshold: true,
-          isNumeric: false,
-          hit: true,
-          statusNote: '检测到无头浏览器驱动特征'
+          isNumeric: true,
+          ratio: 98,
+          selfTickPos: 30,
+          cohortBaseline: '≤ 15%',
+          self30d: '12%',
+          threshold: '≤ 30%'
         },
         {
           name: '动态验证码绕过探测',
           rule: 'RULE-CAPTCHA-BYPASS',
           probeNotes: 'Turnstile 人机挑战时序',
-          currentValue: '120ms 异常极速',
+          currentValue: '120ms (异常极速)',
           isOverThreshold: true,
-          isNumeric: false,
-          hit: true,
-          statusNote: '自动化脚本特征显著'
+          isNumeric: true,
+          ratio: 95,
+          selfTickPos: 25,
+          cohortBaseline: '≥ 1500ms',
+          self30d: '1800ms',
+          threshold: '≥ 800ms'
         }
       ]
     };
@@ -1673,11 +1678,14 @@ const currentRiskProfile = computed(() => {
           name: '多因子凭证 (TOTP) 绑定状态',
           rule: 'APP-2FA-TENURE',
           probeNotes: '硬件密匙与二次认证',
-          currentValue: '已激活绑定',
+          currentValue: '100% (已激活绑定)',
           isOverThreshold: false,
-          isNumeric: false,
-          hit: false,
-          statusNote: '具备高强度二次认证保护'
+          isNumeric: true,
+          ratio: 100,
+          selfTickPos: 100,
+          cohortBaseline: '≥ 80%',
+          self30d: '100%',
+          threshold: '≥ 60%'
         },
         {
           name: '申诉文本模版相似度',
@@ -1918,11 +1926,14 @@ const currentRiskProfile = computed(() => {
         name: '归档区块哈希验证状态',
         rule: 'REC-BLOCK-VALIDATION',
         probeNotes: '防篡改公开台账签名',
-        currentValue: '签名验证有效',
+        currentValue: '100% (签名验证有效)',
         isOverThreshold: false,
-        isNumeric: false,
-        hit: false,
-        statusNote: 'RFC-3161 数字签名完备'
+        isNumeric: true,
+        ratio: 100,
+        selfTickPos: 100,
+        cohortBaseline: '100%',
+        self30d: '100%',
+        threshold: '100%'
       },
       {
         name: '存证保管留存期',
@@ -2317,30 +2328,30 @@ function handleDrawerOpened() {
   }
 }
 
-/* 章节锚点 Chip 组 */
+/* 章节锚点 Chip 组 (极致紧凑不折行无横向滑块) */
 .chapter-chips-bar {
   display: flex;
   align-items: center;
-  gap: 6px;
-  overflow-x: auto;
-  margin-top: 10px;
+  gap: 4px;
+  overflow: hidden;
+  flex-wrap: nowrap;
+  margin-top: 8px;
   padding-bottom: 2px;
-  scrollbar-width: none;
-  &::-webkit-scrollbar {
-    display: none;
-  }
+  width: 100%;
+  box-sizing: border-box;
 
   .chapter-chip {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    padding: 3px 10px;
-    border-radius: 14px;
-    font-size: 12px;
+    gap: 3px;
+    padding: 2px 7px;
+    border-radius: 12px;
+    font-size: 11.5px;
     color: var(--el-text-color-regular);
     background: var(--el-fill-color-light);
     cursor: pointer;
     white-space: nowrap;
+    flex-shrink: 0;
     transition: all 0.2s;
     user-select: none;
 
@@ -2353,6 +2364,10 @@ function handleDrawerOpened() {
       background: var(--el-color-primary);
       color: #fff;
       font-weight: 500;
+    }
+
+    .chip-icon {
+      flex-shrink: 0;
     }
   }
 }
@@ -2677,7 +2692,7 @@ function handleDrawerOpened() {
   }
 }
 
-/* 模块 D: 处置与存证全周期时间线 (双泳道) */
+/* 模块 D: 处置与存证全周期时间线 (时间线居中唯一中轴，两侧完全独立) */
 .dual-swimlane-container {
   display: flex;
   flex-direction: column;
@@ -2686,7 +2701,7 @@ function handleDrawerOpened() {
 
 .swimlane-column-headers {
   display: grid;
-  grid-template-columns: 1fr 24px 1fr;
+  grid-template-columns: minmax(0, 1fr) 28px minmax(0, 1fr);
   align-items: center;
   font-size: 12px;
   font-weight: 600;
@@ -2721,8 +2736,9 @@ function handleDrawerOpened() {
 
   .swimlane-row {
     display: grid;
-    grid-template-columns: 1fr 24px 1fr;
-    align-items: stretch;
+    grid-template-columns: minmax(0, 1fr) 28px minmax(0, 1fr);
+    align-items: center;
+    position: relative;
 
     .swimlane-cell {
       min-width: 0;
@@ -2743,7 +2759,7 @@ function handleDrawerOpened() {
           border-left: 3px solid var(--el-color-warning);
         }
         &.card-latest {
-          border-color: rgba(239, 68, 68, 0.4);
+          border-color: rgba(239, 68, 68, 0.45);
           background: rgba(239, 68, 68, 0.02);
         }
 
@@ -2757,11 +2773,21 @@ function handleDrawerOpened() {
           .node-time {
             color: var(--el-text-color-secondary);
           }
-          .node-actor-tag {
+          .node-actor-box {
             font-weight: 600;
             color: var(--el-text-color-primary);
+            padding: 1px 6px;
+            border-radius: 4px;
+            background: var(--el-fill-color-light);
+            border: 1px solid var(--el-border-color-lighter);
           }
           .node-badge-tag {
+            color: var(--el-text-color-secondary);
+            padding: 1px 5px;
+            border-radius: 4px;
+            background: var(--el-fill-color-lighter);
+          }
+          .node-duration {
             color: var(--el-text-color-secondary);
           }
           .latest-tag {
@@ -2778,9 +2804,17 @@ function handleDrawerOpened() {
           gap: 6px;
           font-size: 12.5px;
 
-          .node-id {
-            color: var(--el-text-color-secondary);
+          .node-num-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1px 6px;
+            border-radius: 4px;
+            background: var(--el-fill-color);
+            color: var(--el-text-color-primary);
             font-weight: 600;
+            font-size: 11px;
+            border: 1px solid var(--el-border-color-lighter);
           }
           .node-action {
             color: var(--el-text-color-primary);
@@ -2790,7 +2824,7 @@ function handleDrawerOpened() {
         .card-desc {
           font-size: 12px;
           color: var(--el-text-color-regular);
-          line-height: 1.4;
+          line-height: 1.45;
         }
 
         .card-footer-row {
@@ -2806,57 +2840,92 @@ function handleDrawerOpened() {
             display: flex;
             align-items: center;
             gap: 4px;
+
+            .st-box {
+              padding: 1px 6px;
+              border-radius: 4px;
+              background: var(--el-fill-color-light);
+              border: 1px solid var(--el-border-color-lighter);
+              color: var(--el-text-color-primary);
+
+              &.st-to {
+                color: var(--el-color-danger);
+                font-weight: 500;
+                background: rgba(239, 68, 68, 0.08);
+                border-color: rgba(239, 68, 68, 0.2);
+              }
+            }
+
             .arrow { color: var(--el-text-color-secondary); }
           }
 
-          .node-hash {
-            display: flex;
+          .node-hash-pill {
+            display: inline-flex;
             align-items: center;
             gap: 3px;
+            padding: 1px 6px;
+            border-radius: 4px;
+            background: var(--el-fill-color-light);
+            border: 1px solid var(--el-border-color-lighter);
             color: var(--el-text-color-secondary);
             cursor: pointer;
+            transition: all 0.2s;
+
             &:hover {
               color: var(--el-color-primary);
+              border-color: var(--el-color-primary);
             }
           }
         }
       }
 
+      /* 空白单元格完全透明留白，禁止放置侧边多余时间线 */
       .swimlane-placeholder {
-        height: 100%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-
-        .track-line {
-          width: 2px;
-          height: 100%;
-          min-height: 40px;
-          background: var(--el-border-color-lighter);
-        }
+        min-height: 1px;
       }
     }
 
+    /* 唯一居中时间线中轴，垂直贯通 */
     .swimlane-axis {
       display: flex;
       align-items: center;
       justify-content: center;
+      position: relative;
+      height: 100%;
+
+      &::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 50%;
+        width: 2px;
+        transform: translateX(-50%);
+        background: var(--el-border-color-lighter);
+        z-index: 1;
+      }
 
       .axis-dot {
-        width: 18px;
-        height: 18px;
+        position: relative;
+        z-index: 2;
+        width: 22px;
+        height: 22px;
         border-radius: 50%;
         display: flex;
         align-items: center;
         justify-content: center;
+        background: var(--el-bg-color);
+        box-shadow: 0 0 0 2px var(--el-border-color-light);
 
         &.dot-machine {
-          background: rgba(59, 130, 246, 0.12);
+          box-shadow: 0 0 0 2px var(--el-color-primary);
           color: var(--el-color-primary);
+          background: rgba(59, 130, 246, 0.1);
         }
         &.dot-human {
-          background: rgba(245, 158, 11, 0.12);
+          box-shadow: 0 0 0 2px var(--el-color-warning);
           color: var(--el-color-warning);
+          background: rgba(245, 158, 11, 0.1);
         }
       }
     }
@@ -2887,9 +2956,9 @@ function handleDrawerOpened() {
 
 .risk-top-grid {
   display: grid;
-  grid-template-columns: 96px 1fr;
-  gap: 16px;
-  align-items: center;
+  grid-template-columns: 88px 1fr;
+  gap: 14px;
+  align-items: flex-start;
 
   @media (max-width: 580px) {
     grid-template-columns: 1fr;
@@ -2898,8 +2967,8 @@ function handleDrawerOpened() {
 }
 
 .composite-score-square {
-  width: 96px;
-  height: 96px;
+  width: 88px;
+  height: 88px;
   aspect-ratio: 1 / 1;
   border-radius: 8px;
   background: var(--el-fill-color-light);
@@ -2910,13 +2979,13 @@ function handleDrawerOpened() {
   flex-shrink: 0;
 
   .score-number {
-    font-size: 32px;
+    font-size: 30px;
     font-weight: 700;
     line-height: 1;
   }
   .score-label {
-    font-size: 11px;
-    margin-top: 6px;
+    font-size: 10.5px;
+    margin-top: 5px;
     color: var(--el-text-color-secondary);
   }
 
@@ -2934,46 +3003,59 @@ function handleDrawerOpened() {
   }
 }
 
+.risk-top-right-col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
 .risk-dimensions-list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
   min-width: 0;
 
   .dimension-row {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 1px;
 
     .dim-label-row {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      font-size: 12px;
+      font-size: 11.5px;
 
       .dim-meta {
-        font-size: 11px;
+        font-size: 10.5px;
         display: flex;
         align-items: center;
-        gap: 6px;
+        gap: 5px;
       }
     }
   }
 }
 
-.risk-driver-bar-centered {
+.risk-driver-2line-box {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 6px 12px;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 10px;
   border-radius: 6px;
   background: var(--el-fill-color-light);
-  font-size: 12px;
-  text-align: center;
+  border: 1px solid var(--el-border-color-lighter);
+  font-size: 11.5px;
+  line-height: 1.35;
 
-  .driver-prefix {
+  .driver-prefix-line {
+    font-size: 10.5px;
     color: var(--el-text-color-secondary);
+    font-weight: 500;
+  }
+
+  .driver-highlight-line {
+    word-break: break-all;
   }
 }
 
@@ -2987,11 +3069,11 @@ function handleDrawerOpened() {
   .gauge-legend-bar {
     display: flex;
     align-items: center;
-    gap: 14px;
-    padding: 7px 12px;
+    gap: 12px;
+    padding: 6px 10px;
     background: var(--el-fill-color-light);
     border-bottom: 1px solid var(--el-border-color-lighter);
-    font-size: 11px;
+    font-size: 10.5px;
     color: var(--el-text-color-secondary);
     flex-wrap: wrap;
 
@@ -3017,9 +3099,9 @@ function handleDrawerOpened() {
 
     .metric-card-row {
       display: grid;
-      grid-template-columns: minmax(0, 220px) minmax(0, 1fr);
-      gap: 12px;
-      padding: 9px 12px;
+      grid-template-columns: minmax(0, 1.2fr) minmax(170px, 190px);
+      gap: 10px;
+      padding: 7px 10px;
       border-bottom: 1px solid var(--el-border-color-lighter);
       align-items: center;
 
@@ -3046,17 +3128,23 @@ function handleDrawerOpened() {
           row-gap: 1px;
 
           .metric-name {
-            font-size: 12px;
+            font-size: 11.5px;
             color: var(--el-text-color-primary);
           }
-          .metric-rule {
+          .metric-rule-box {
+            display: inline-flex;
+            align-items: center;
+            padding: 0 4px;
+            border-radius: 3px;
+            background: var(--el-fill-color-light);
+            border: 1px solid var(--el-border-color-lighter);
             font-size: 10px;
             white-space: nowrap;
           }
         }
 
         .metric-probe-notes {
-          font-size: 10.5px;
+          font-size: 10px;
           line-height: 1.25;
         }
       }
@@ -3064,7 +3152,7 @@ function handleDrawerOpened() {
       .metric-data-col {
         display: flex;
         flex-direction: column;
-        gap: 5px;
+        gap: 4px;
 
         .metric-val-row {
           display: flex;
@@ -3072,12 +3160,12 @@ function handleDrawerOpened() {
           justify-content: space-between;
 
           .metric-val {
-            font-size: 12.5px;
+            font-size: 12px;
             color: var(--el-text-color-primary);
           }
           .threshold-tag {
-            font-size: 10.5px;
-            height: 18px;
+            font-size: 10px;
+            height: 17px;
             padding: 0 4px;
           }
         }
@@ -3085,19 +3173,21 @@ function handleDrawerOpened() {
         .gauge-bar-wrapper {
           display: flex;
           flex-direction: column;
-          gap: 3px;
+          gap: 2px;
+          width: 100%;
+          max-width: 190px;
 
           .gauge-track {
             position: relative;
-            height: 7px;
+            height: 6px;
             background: var(--el-fill-color-light);
-            border-radius: 4px;
+            border-radius: 3px;
             overflow: hidden;
 
             .gauge-fill {
               height: 100%;
               background: var(--el-color-primary);
-              border-radius: 4px;
+              border-radius: 3px;
               transition: width 0.3s;
               &.fill-over {
                 background: var(--el-color-danger);
@@ -3124,7 +3214,7 @@ function handleDrawerOpened() {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            font-size: 10px;
+            font-size: 9.5px;
             color: var(--el-text-color-secondary);
 
             .threshold-label {
@@ -3132,13 +3222,6 @@ function handleDrawerOpened() {
               font-weight: 500;
             }
           }
-        }
-
-        .non-numeric-status {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          font-size: 11.5px;
         }
       }
     }
@@ -3158,6 +3241,25 @@ function handleDrawerOpened() {
     font-size: 12px;
     flex-wrap: wrap;
     gap: 6px;
+
+    .header-reason-box {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      background: rgba(239, 68, 68, 0.08);
+      border: 1px solid rgba(239, 68, 68, 0.2);
+      font-size: 11.5px;
+
+      .reason-prefix {
+        color: var(--el-text-color-secondary);
+        font-weight: 500;
+      }
+      .reason-code-val {
+        color: var(--el-color-danger);
+      }
+    }
 
     .meta-separator {
       margin: 0 4px;
@@ -3272,13 +3374,26 @@ function handleDrawerOpened() {
         font-size: 12.5px;
         color: var(--el-text-color-primary);
 
-        .ev-code {
+        .ev-code-box {
+          display: inline-flex;
+          align-items: center;
+          padding: 1px 6px;
+          border-radius: 4px;
+          background: rgba(59, 130, 246, 0.08);
           color: var(--el-color-primary);
+          border: 1px solid rgba(59, 130, 246, 0.2);
+          font-size: 11px;
         }
       }
 
-      .evidence-rule-tag {
-        font-size: 11px;
+      .evidence-rule-box {
+        display: inline-flex;
+        align-items: center;
+        padding: 1px 6px;
+        border-radius: 4px;
+        background: rgba(239, 68, 68, 0.08);
+        border: 1px solid rgba(239, 68, 68, 0.2);
+        font-size: 10.5px;
       }
     }
 
@@ -3289,27 +3404,38 @@ function handleDrawerOpened() {
       font-size: 11.5px;
       flex-wrap: wrap;
 
-      .flow-step-tag {
+      .flow-step-box {
+        display: inline-flex;
+        align-items: center;
+        padding: 1px 6px;
+        border-radius: 4px;
+        background: var(--el-fill-color-light);
+        border: 1px solid var(--el-border-color-lighter);
         color: var(--el-text-color-primary);
         font-weight: 500;
+        font-size: 11px;
       }
 
       .flow-arrow {
         color: var(--el-text-color-secondary);
       }
 
-      .flow-hash-btn {
+      .flow-hash-pill {
         display: inline-flex;
         align-items: center;
-        gap: 4px;
-        padding: 2px 6px;
+        gap: 3px;
+        padding: 1px 6px;
         border-radius: 4px;
         background: var(--el-fill-color-light);
+        border: 1px solid var(--el-border-color-lighter);
         color: var(--el-text-color-secondary);
         cursor: pointer;
+        font-size: 11px;
+        transition: all 0.2s;
 
         &:hover {
           color: var(--el-color-primary);
+          border-color: var(--el-color-primary);
         }
       }
 
