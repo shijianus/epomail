@@ -162,6 +162,18 @@ async function run() {
     assert.ok(driverPrefix.includes('主驱动维度'), '第一行为主驱动维度前缀');
     assert.ok(driverVal.length > 0, '第二行为主驱动维度详情');
 
+    // 验证 3 栏并列布局与驱动位置居中 (score-square -> driver-2line-box -> dimensions-list)
+    const topGridChildren = await riskCard.locator('.risk-top-grid > *').evaluateAll(nodes => nodes.map(n => n.className));
+    console.log('    - risk-top-grid direct children:', topGridChildren);
+    assert.ok(topGridChildren[0].includes('composite-score-square'), '第1栏必须为正方形综合分');
+    assert.ok(topGridChildren[1].includes('risk-driver-2line-box'), '第2栏(居中)必须为主驱动维度');
+    assert.ok(topGridChildren[2].includes('risk-dimensions-list'), '第3栏必须为多维进度列表');
+
+    // 验证 el-progress 宽度紧凑约束 (el-progress-bar__inner 缩短)
+    const dimProgressWidth = await riskCard.locator('.dim-progress-wrap .el-progress').first().evaluate(node => node.getBoundingClientRect().width);
+    console.log(`    - 维度进度条宽度: ${dimProgressWidth}px (应 <= 160px，解决拉伸问题)`);
+    assert.ok(dimProgressWidth <= 160, `el-progress 宽度 (${dimProgressWidth}px) 必须紧凑 (<= 160px)`);
+
     const metricsCount = await riskCard.locator('.metric-card-row').count();
     const gaugeCount = await riskCard.locator('.gauge-bar-wrapper').count();
     const nonNumericCount = await riskCard.locator('.non-numeric-status').count();
@@ -169,7 +181,7 @@ async function run() {
     assert.ok(metricsCount >= 6, '风险画像必须包含丰富指标');
     assert.strictEqual(metricsCount, gaugeCount, '100% 的指标必须全部具备进度条，严禁突兀缺失进度条');
     assert.strictEqual(nonNumericCount, 0, '严禁存在非数值无进度条的突兀分支');
-    console.log('    ✓ 多维风险画像正方体、2行式主驱动及100%统一进度条核验通过');
+    console.log('    ✓ 多维风险画像正方体、3栏居中驱动、el-progress紧凑化及100%统一进度条核验通过');
 
     // 4.7 相似案例处置参照核验 (无中括号纯结构化徽章)
     console.log('  - 验证相似案例处置参照...');

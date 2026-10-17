@@ -418,42 +418,44 @@
         </div>
 
         <div class="risk-profile-unified-card">
-          <!-- 上半区：正方形方格综合风险分 + 右侧紧凑维度条列表与2行式主驱动 -->
+          <!-- 上半区：正方形方格综合风险分 + 中间多行主驱动维度 + 右侧紧凑维度条列表(缩短进度条) -->
           <div class="risk-top-grid">
-            <!-- 正方形方格：仅显示纯数字，删除/100，综合风险分居于数字下方 -->
+            <!-- 1. 正方形方格综合风险分 -->
             <div class="composite-score-square" :class="riskScoreLevelClass">
               <div class="score-number font-mono">{{ currentRiskProfile.compositeScore }}</div>
               <div class="score-label">{{ $t('auditRiskCompositeScore') }}</div>
             </div>
 
-            <!-- 右侧：紧凑维度条列表 + 2行式主驱动维度 (冒号前后隔开为2行) -->
-            <div class="risk-top-right-col">
-              <div class="risk-dimensions-list">
-                <div
-                  v-for="dim in currentRiskProfile.dimensions"
-                  :key="dim.name"
-                  class="dimension-row"
-                >
-                  <div class="dim-label-row">
-                    <span class="dim-name font-medium">{{ dim.name }}</span>
-                    <div class="dim-meta font-mono">
-                      <span class="dim-score" :class="getScoreColorClass(dim.score)">{{ dim.score }}分</span>
-                      <span class="dim-weight text-muted">(权重: {{ dim.weight }}%)</span>
-                    </div>
+            <!-- 2. 中间：主驱动维度置于方格与维度列表之间，多行输出缩减左右间距 -->
+            <div class="risk-driver-2line-box">
+              <div class="driver-prefix-line">{{ $t('auditRiskMainDriver') }}:</div>
+              <div class="driver-highlight-line text-danger font-medium">
+                {{ currentRiskProfile.mainDriver }}
+              </div>
+            </div>
+
+            <!-- 3. 右侧：多维风险维度条列表 (缩短 el-progress-bar__inner 进度条长度) -->
+            <div class="risk-dimensions-list">
+              <div
+                v-for="dim in currentRiskProfile.dimensions"
+                :key="dim.name"
+                class="dimension-row"
+              >
+                <div class="dim-label-row">
+                  <span class="dim-name font-medium">{{ dim.name }}</span>
+                  <div class="dim-meta font-mono">
+                    <span class="dim-score" :class="getScoreColorClass(dim.score)">{{ dim.score }}分</span>
+                    <span class="dim-weight text-muted">(权重: {{ dim.weight }}%)</span>
                   </div>
+                </div>
+                <div class="dim-progress-wrap">
                   <el-progress
                     :percentage="Math.min(100, dim.score)"
                     :color="getProgressColor(dim.score)"
-                    :stroke-width="4"
+                    :stroke-width="5"
                     :show-text="false"
                   />
                 </div>
-              </div>
-
-              <!-- 主驱动维度置于上方右侧，冒号前后拆分为2行，节省纵向空间 -->
-              <div class="risk-driver-2line-box">
-                <div class="driver-prefix-line">{{ $t('auditRiskMainDriver') }}</div>
-                <div class="driver-highlight-line text-danger font-medium">{{ currentRiskProfile.mainDriver }}</div>
               </div>
             </div>
           </div>
@@ -868,7 +870,7 @@ const visible = computed({
 });
 
 const drawerSize = computed(() => {
-  return window.innerWidth <= 768 ? '100vw' : '640px';
+  return window.innerWidth <= 768 ? '100vw' : '680px';
 });
 
 // 当前激活的变体 (1: 滥用威胁, 2: 审计申诉, 3: 风控预警, 4: 封禁记录/处置台账)
@@ -2956,11 +2958,11 @@ function handleDrawerOpened() {
 
 .risk-top-grid {
   display: grid;
-  grid-template-columns: 88px 1fr;
-  gap: 14px;
-  align-items: flex-start;
+  grid-template-columns: 88px minmax(130px, 160px) 1fr;
+  gap: 12px;
+  align-items: stretch;
 
-  @media (max-width: 580px) {
+  @media (max-width: 600px) {
     grid-template-columns: 1fr;
     justify-items: center;
   }
@@ -3003,23 +3005,47 @@ function handleDrawerOpened() {
   }
 }
 
-.risk-top-right-col {
+/* 主驱动维度：放置在分数方格与维度列表之间，多行输出缩减水平间距 */
+.risk-driver-2line-box {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  min-width: 0;
+  justify-content: center;
+  gap: 4px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--el-fill-color-light);
+  border: 1px solid var(--el-border-color-lighter);
+  min-width: 130px;
+  max-width: 170px;
+  box-sizing: border-box;
+
+  .driver-prefix-line {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--el-text-color-secondary);
+    line-height: 1.3;
+  }
+
+  .driver-highlight-line {
+    font-size: 11.5px;
+    line-height: 1.45;
+    word-break: break-word;
+    white-space: normal;
+  }
 }
 
+/* 右侧多维风险维度条列表：显式缩短 el-progress-bar__inner 长度 */
 .risk-dimensions-list {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 5px;
   min-width: 0;
+  flex: 1;
 
   .dimension-row {
     display: flex;
     flex-direction: column;
-    gap: 1px;
+    gap: 2px;
 
     .dim-label-row {
       display: flex;
@@ -3034,28 +3060,23 @@ function handleDrawerOpened() {
         gap: 5px;
       }
     }
-  }
-}
 
-.risk-driver-2line-box {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 6px 10px;
-  border-radius: 6px;
-  background: var(--el-fill-color-light);
-  border: 1px solid var(--el-border-color-lighter);
-  font-size: 11.5px;
-  line-height: 1.35;
+    .dim-progress-wrap {
+      display: flex;
+      align-items: center;
 
-  .driver-prefix-line {
-    font-size: 10.5px;
-    color: var(--el-text-color-secondary);
-    font-weight: 500;
-  }
-
-  .driver-highlight-line {
-    word-break: break-all;
+      :deep(.el-progress) {
+        width: 140px; /* 显式缩短 el-progress 与 el-progress-bar__inner 轨道长度 */
+      }
+      :deep(.el-progress-bar__outer) {
+        height: 5px !important;
+        border-radius: 3px;
+        background: var(--el-fill-color-light);
+      }
+      :deep(.el-progress-bar__inner) {
+        border-radius: 3px;
+      }
+    }
   }
 }
 
@@ -3099,9 +3120,9 @@ function handleDrawerOpened() {
 
     .metric-card-row {
       display: grid;
-      grid-template-columns: minmax(0, 1.2fr) minmax(170px, 190px);
-      gap: 10px;
-      padding: 7px 10px;
+      grid-template-columns: minmax(0, 1.1fr) minmax(240px, 280px);
+      gap: 14px;
+      padding: 8px 12px;
       border-bottom: 1px solid var(--el-border-color-lighter);
       align-items: center;
 
@@ -3152,7 +3173,7 @@ function handleDrawerOpened() {
       .metric-data-col {
         display: flex;
         flex-direction: column;
-        gap: 4px;
+        gap: 5px;
 
         .metric-val-row {
           display: flex;
@@ -3170,24 +3191,24 @@ function handleDrawerOpened() {
           }
         }
 
+        /* 恢复 gauge-bar-wrapper 与 gauge-fill 自然适度宽度，不被 190px 挤压 */
         .gauge-bar-wrapper {
           display: flex;
           flex-direction: column;
-          gap: 2px;
+          gap: 3px;
           width: 100%;
-          max-width: 190px;
 
           .gauge-track {
             position: relative;
-            height: 6px;
+            height: 7px;
             background: var(--el-fill-color-light);
-            border-radius: 3px;
+            border-radius: 4px;
             overflow: hidden;
 
             .gauge-fill {
               height: 100%;
               background: var(--el-color-primary);
-              border-radius: 3px;
+              border-radius: 4px;
               transition: width 0.3s;
               &.fill-over {
                 background: var(--el-color-danger);
@@ -3214,7 +3235,7 @@ function handleDrawerOpened() {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            font-size: 9.5px;
+            font-size: 10px;
             color: var(--el-text-color-secondary);
 
             .threshold-label {
