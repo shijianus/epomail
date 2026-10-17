@@ -7,6 +7,31 @@
 > 制度规范与工作流指引请见 [AGENTS.md](file:///home/shijian/projects/epocanvas-mail/AGENTS.md)。
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
+### 安全审计抽屉全宗档案 UI 全面重构与四变体业务差异化 (2026-10-17)
+*   **关联提交 (Git Commit)**: `7df3dfebefcc3333cfbf5c3233eb7b1dd5a77a6a` (Short: `7df3dfe`)
+*   **部署环境 (Deployment)**: `本地全真栈 / 构建产物已同步至 mail-worker/dist`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 抽屉头部精简与纯净治理：彻底移除 `.drawer-badge-meta-bar`、`.variant-mode-tag` 与视角下拉菜单 `.el-dropdown`，移除冗余自述，标题严格为「案件全宗档案」与变体专属标题；
+    - [x] 案件概要对齐与规范排版：「当前状态」消除原始 active 字段，精准映射为与主表格同步的「待审」；「拍案管理」直接展示执行人名称；「证据留存」剔除 WORM 无关标语；左右两列采用 `1fr 1fr` 等距网格排版，字段标签统一为「案件编号」；
+    - [x] 集群关联账号全链路强化：移除脱敏聚合数据说明，管控广播说明收敛至标题旁 `?` Tooltip 悬浮提示；表格 `#` 列重命名为「序列号」，与主案统一为 `THR-MULTI99-SUB01` 规范分区；用户 ID 支持一键复制；
+    - [x] 风险研判与处置依据重塑：报警原因采用禁止 Icon 替代硬编码字样，结构化输出报警原因、触发原因与推荐建议；下方新增专属研判路径记录专用盒，完整呈现策略引擎与审计员研判链路；
+    - [x] 处置与存证全周期时间线：重构为左侧「机器自动泳道」与右侧「人工与用户泳道」，包含 N1 规则命中、N2 熔断暂扣、N3 人工复核、N4 处置生效（最新节点）及 SHA-256 存证哈希；
+    - [x] 多维风险画像正方体裁与丰富度扩充：综合风险分重构为正方形数值面板（去除 `/100`），「综合风险分」居中置于下方；主驱动维度居中紧贴面板底部；图例与遥测表格统一收敛至同一容器内；丰富指标项扩充至 9 大维度；
+    - [x] 新增相似案例处置参照与证据链溯源：包含多色堆叠比例进度条、4 列案例分布统计（维持封禁/暂禁观察/放行结案/标记误报）与判例带指引；证据链溯源严格遵循（证据 → 规则 → 节点 → 依据）全链路；
+    - [x] 四大业务变体（滥用威胁 / 申诉审计 / 风险管理 / 操作记录）全维度深度定制与差异化设计；
+    - [x] 6 语言 i18n 严格闭环：6 种语言字典保持 2799 键 100% 绝对对称，零未翻译硬编码。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地前端发布构建：`mail-vue` vite 构建通过（耗时 14.97s，产物同步至 `mail-worker/dist`）；
+    - [x] 静态代码与多语言审计：`node scripts/i18n-symmetry.mjs`（2799 keys 100% 对称）、`node scripts/i18n-audit.mjs`（零缺失词条）；
+    - [x] 全真栈自动化与 Playwright 视觉回归测试：`node tests/verify-drawer-redesign-visual.mjs` 全部通过，并完成 5 张全分辨率截图核验：
+        - `tests/visual_redesign_v1_threat.png` (变体 1 全景上部)
+        - `tests/visual_redesign_v1_timeline.png` (变体 1 双泳道时间线)
+        - `tests/visual_redesign_v1_risk.png` (变体 1 多维风险画像)
+        - `tests/visual_redesign_v1_bottom.png` (变体 1 相似案例与证据链溯源)
+        - `tests/visual_redesign_v2_appeal.png` (变体 2 申诉复核差异化档案)
+        - `tests/visual_redesign_v3_audit.png` (变体 3 风控预警差异化档案)
+        - `tests/visual_redesign_v4_record.png` (变体 4 处置台账差异化档案)
+    - [x] 零假数据残留：测试脚本使用脱敏测试数据，无数据库与 KV 数据残留。
 
 ### 本地最新版本 Cloudflare 生产环境发布上线 (2026-10-17)
 *   **关联提交 (Git Commit)**: `d2baf633ded57b6da3ca60300f5fba261e922871` (Short: `d2baf63`)
