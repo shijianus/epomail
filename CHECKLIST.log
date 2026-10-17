@@ -7,6 +7,25 @@
 > 制度规范与工作流指引请见 [AGENTS.md](file:///home/shijian/projects/epocanvas-mail/AGENTS.md)。
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
+### 多维风险画像 3 栏并列主驱动居中与维度进度条紧凑重构 (2026-10-17)
+*   **关联提交 (Git Commit)**: `e0bc9ab70ed39bed5b5af5c0f6e17a725477255a` (Short: `e0bc9ab`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com · Worker Version ID: b989248d-eb4b-4cd4-9de8-5aee0021b521)`
+*   **回滚锚点 (Rollback Anchor)**: `89f76fd9-a8d9-4c11-868e-8a4d17ae8e89` (对应提交 `af29f5f`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] **纠偏进度条缩短目标至 `el-progress-bar__inner`**：针对用户核心诉求，将缩短控制精准施加于 `class="risk-dimensions-list"` 内的 Element Plus 进度条轨道（`.dim-progress-wrap :deep(.el-progress) { width: 140px; }`），将原本横向占满 400px+ 的条身精简至 140px 紧凑长条，彻底解决拉伸疲劳；
+    - [x] **主驱动维度居中嵌入方格与列表之间 (3 栏并列)**：重构 `.risk-top-grid` 为 `grid-template-columns: 88px minmax(130px, 160px) 1fr` 3 栏并列结构，将 `class="risk-driver-2line-box"` 准确安插在 `class="composite-score-square"` 与 `class="risk-dimensions-list"` 正中间；
+    - [x] **主驱动高亮内容自然多行折行**：配置 `.driver-highlight-line` 为 `word-break: break-word; white-space: normal`，在 130px~160px 宽度内分为多行输出，完美填补两侧间距断层，形成紧密互锁的仪表盘视觉焦点；
+    - [x] **恢复遥测指标进度槽自然舒适呼吸感**：移除下方指标卡片对 `.gauge-bar-wrapper` 的 190px 挤压限制，将抽屉宽度适度校准为 680px，保证基线标线与阈值文字不发生重叠；
+    - [x] **多语言静态审计三件套验证**：`node scripts/i18n-symmetry.mjs` (2807 keys 100% 对称)、`node scripts/i18n-audit.mjs` (0 缺失词条)。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] **Cloudflare 生产环境部署**：`pnpm --dir mail-worker exec wrangler deploy` 成功发布 45 个静态资源，Version ID: `b989248d-eb4b-4cd4-9de8-5aee0021b521`；
+    - [x] **自动化端到端测试套件更新**：在 `tests/verify-cf-production-drawer-redesign.mjs` 中增加 3 栏直接子节点类型断言（`composite-score-square` -> `risk-driver-2line-box` -> `risk-dimensions-list`）与 `el-progress` 宽度 <= 160px 断言，测试 100% 全绿通过；
+    - [x] **Cloudflare 生产公网全真栈 Playwright 视觉实测核验**：直连 `https://mail.epocanvas.com` 打开线上审计抽屉，实测截取并核验多维度截图：
+        - `tests/prod_cf_redesign_v1_risk.png` (88x88 正方形分值、中间居中多行折行主驱动描述、右侧 140px 紧凑维度条、全量自然伸展指标槽)
+        - `tests/prod_cf_redesign_v1_timeline.png` (唯一居中时间轴、双泳道左右分明)
+        - `tests/prod_cf_redesign_v1_bottom.png` (四色相似案例堆叠图与纯净结构化证据链)
+    - [x] **零假数据残留**：使用线上脱敏真实管理员会话，零虚假数据与持久化测试痕迹残留。
+
 ### 安全审计抽屉 UI 规范深度优化与 Cloudflare 生产全真栈实测交付 (2026-10-17)
 *   **关联提交 (Git Commit)**: `af29f5fdb8984daf1267c6d20a342d512f22a437` (Short: `af29f5f`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com · Worker Version ID: 89f76fd9-a8d9-4c11-868e-8a4d17ae8e89)`
