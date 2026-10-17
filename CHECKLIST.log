@@ -7,6 +7,30 @@
 > 制度规范与工作流指引请见 [AGENTS.md](file:///home/shijian/projects/epocanvas-mail/AGENTS.md)。
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
+### 安全审计抽屉 UI 规范深度优化与 Cloudflare 生产全真栈实测交付 (2026-10-17)
+*   **关联提交 (Git Commit)**: `af29f5fdb8984daf1267c6d20a342d512f22a437` (Short: `af29f5f`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com · Worker Version ID: 89f76fd9-a8d9-4c11-868e-8a4d17ae8e89)`
+*   **回滚锚点 (Rollback Anchor)**: `28aaf8d9-42bb-429e-b6bd-f344f4974dc2` (对应提交 `fadf65c`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] **章节锚点 Chips 极致精简与单行无卷轴保证**：将 `class="chapter-chips-bar"` 各选项简写为 2 字语义（概要/集群/研判/时序/画像/案例/证据/裁决/台账），配置 `overflow: hidden; flex-wrap: nowrap`，彻底杜绝文本截断与横向滚动条；卡片内各级标题保持完整规范标题；
+    - [x] **处置与存证全周期时间线严格居中与去侧线化**：重构 `id="chapter-timeline"`，仅在中央轴线维护唯一垂直中轴线（`.swimlane-axis::before`）与状态节点指示器（机器/人工专属颜色），两侧占位格彻底纯白无多余时间线；将所有 Markdown 标示的 `[...]` 全面升级为结构化边框徽章（`node-actor-box`、`node-num-badge`、`st-box`、`node-hash-pill`），绝对杜绝代码中输出字面量中括号；
+    - [x] **证据链溯源标题公式清理**：彻底从 `#chapter-chain` 标题中移除指导性公式副标题 `（证据 → 规则 → 节点 → 依据）`，仅保留核心标题与模块徽章；
+    - [x] **多维风险画像紧凑化与主驱动 2 行化上移**：将 `主驱动维度` 上移整合至顶部评分区域右侧，冒号前后拆分为两行（第一行为前缀标签，第二行为具体驱动内容），大幅缩减纵向高度；维度条紧凑化（4px 细轨、3px 间距）；
+    - [x] **遥测指标 100% 全量统一进度条与抽屉宽度缩减**：消除所有非数值突兀状态，全量 9 大指标（包括 WebGL 指纹熵值、验证码极速探测、2FA 绑定率、区块有效性等）100% 具备标准化进度槽与阈值标线；抽屉横向宽度从 720px 缩减至 640px，进度条宽度固定至 190px，避免过长拉伸造成视觉疲劳；
+    - [x] **6 语言 i18n 绝对对称闭环**：2807 个词条严格对称，静态扫描三件套 0 错误。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] **Cloudflare 生产环境部署**：`pnpm --dir mail-worker exec wrangler deploy` 成功发布 45 个静态资源，Version ID: `89f76fd9-a8d9-4c11-868e-8a4d17ae8e89`；
+    - [x] **静态多语言对称性验证**：`node scripts/i18n-symmetry.mjs` (2807 keys 100% 对称)、`node scripts/i18n-audit.mjs` (0 缺失词条)；
+    - [x] **Cloudflare 生产公网全真栈 Playwright 自动化核验**：`node tests/verify-cf-production-drawer-redesign.mjs` 直连 `https://mail.epocanvas.com` 全绿通过，覆盖 4 大变体差异化 UI，核验 7 张线上全真栈高精度截图：
+        - `tests/prod_cf_redesign_v1_threat.png` (变体 1 单行无滑块 Chips、等距两列、? 悬浮)
+        - `tests/prod_cf_redesign_v1_timeline.png` (变体 1 居中单中轴时间线、两侧零多余时间线、边框徽章化无中括号)
+        - `tests/prod_cf_redesign_v1_risk.png` (变体 1 正方形分数面板、2 行式主驱动维度置顶、100% 全量进度条、640px 精致宽度)
+        - `tests/prod_cf_redesign_v1_bottom.png` (变体 1 无括号原因码徽章、4 色分段比例条、无公式纯净证据链)
+        - `tests/prod_cf_redesign_v2_appeal.png` (变体 2 申诉复核专属架构，绝对隔离集群卡片)
+        - `tests/prod_cf_redesign_v3_audit.png` (变体 3 风控预警专属档案)
+        - `tests/prod_cf_redesign_v4_record.png` (变体 4 处置台账不可篡改只读档案，绝对禁用裁决工作台)
+    - [x] **零假数据残留**：测试过程全部使用脱敏真实测试会话，无任何残留临时数据。
+
 ### 安全审计抽屉全宗档案 UI 全面重构与 Cloudflare 生产环境发布上线 (2026-10-17)
 *   **关联提交 (Git Commit)**: `f1bcc5a07c08f430d43a6c9d81d283832d29b00e` (Short: `f1bcc5a`) & `7df3dfebefcc3333cfbf5c3233eb7b1dd5a77a6a` (Short: `7df3dfe`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com · Worker Version ID: 28aaf8d9-42bb-429e-b6bd-f344f4974dc2)`
