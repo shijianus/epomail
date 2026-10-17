@@ -8,6 +8,53 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### 抽屉四变体 UI 治理成果 Cloudflare 生产部署与公网真实数据核验 (2026-10-16)
+*   **关联提交 (Git Commit)**: `75dbbecb0fb50204c0e99238201deaf22f4aa557` (Short: `75dbbec`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com · Worker Version ID: e20424a1-1c67-40fa-8267-24ea9cf6c2e4)`
+*   **回滚锚点 (Rollback Anchor)**: `aa4d2453-ccc6-420c-90e4-a2233f345b3b`（对应提交 `5dedb4e`，即上一版线上构建）
+*   **部署前置安全核查 (Pre-flight)**:
+    - [x] **确认本次仅推静态资产，不夹带后端变更**：`git diff --stat 5dedb4e..HEAD -- mail-worker/` 输出为空，
+        即上次部署至今 `mail-worker` 源码零改动；该区间 12 个变更文件全部为 `mail-vue/src`、文档、测试与 git 钩子。
+        因 `wrangler deploy` 会同时上传 Worker 代码与 assets，此项核查为必要前置；
+    - [x] `wrangler whoami` 确认账户与 API Token 有效；`wrangler deployments list` 确认线上当前版本与
+        CHECKLIST 历史记录一致后方执行部署。
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 生产构建：`pnpm --dir mail-vue run build`（`vite build --mode release` → `VITE_OUT_DIR=../mail-worker/dist`
+        → `scripts/copy-login-dist.mjs` 同步登录页产物），耗时 14.17s，零报错零警告；
+    - [x] 资产上传：45 个新增/变更资产上传成功，329 个未变资产命中缓存跳过（3.80s）；
+    - [x] Worker 启动耗时 121ms；绑定全数在线且未变：KV、D1 (USER_DB / MAIL_DB / db)、AI、Assets；
+    - [x] 主包体积变化：`index-*.js` 1,156.93 → 1,208.26 kB（gzip 388.77 → 404.16 kB），
+        增量为离线图标包 311 → 408 条所致，用于换取消除实测 5.8s 的 api.iconify.design 运行时拉取。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 公网生产视觉套件：`node tests/verify-drawer-visual-live.mjs` 全绿（登录 → 控制台 → 四变体逐一体检）；
+    - [x] **生产真实数据核验（非本地占位样本）**：
+        1. 变体 1「滥用威胁」：图标全数渲染无空洞；头部紧凑无溢出；集群关联账号 5 列不再重叠，
+           且展示的是后端真实关联账号（`THR-2026-MULTI99` 集群 3 个成员）——证实上一轮移除前端伪造兜底后
+           真实数据链路正常；「延期」按钮按未来截止期限（2026-11-14）正确出现；
+        2. 变体 2「封禁存证」：定位副标题两行完整可读（不再被单行 ellipsis 裁断）；章节 chips 已变体化为
+           「案件信息 / 风险研判」且**不再出现**「存证台账」；占位样本披露横幅正常渲染；
+        3. 变体 3「风险管理」：风险画像指标行无「设备指纹相似/度」式断词，基准带与超阈/阈内徽标清晰；
+        4. 变体 4「操作记录」：chips 以「存证台账」收尾且**无**「提交案件裁决」，底部动作栏**仅「关闭」一枚**，
+           绿色盾牌只读台账横幅正常——纯只读定位在生产环境结构成立；
+    - [x] 工作区零污染：`dist/` 与 `tests/*.png` 均在 `.gitignore` 内，部署后 `git status` 干净。
+*   **生产核验中新暴露的既有缺陷 (Newly Surfaced · Pre-existing)**:
+    - [ ] **深链 `#case=案件ID:章节ID` 在生产环境不可用**（与本次改动无关，本次未触碰 `syncDeepLink` 与路由）：
+        本应用为 **hash 模式路由**，实测三种 URL 形态：
+        `#case=THR-2026-MULTI99:risk` → 抽屉未打开，且 hash 被路由规范化为 `#audit-report` 或被清空；
+        `/audit-report?case=THR-2026-MULTI99` → **抽屉正常打开**；
+        根路径 `#case=...` → hash 被清空，未打开。
+        根因是**写入格式与可读格式自相矛盾**：抽屉 `syncDeepLink()` 主动把链接写成 `#case=ID:章节`，
+        而这恰好是自家 hash 路由会销毁的格式，导致应用生成的分享链接无法被自己二次解析。
+        `checkDeepLinkOnLoad()` 中 `searchParams.get('case')` 那条分支是可用路径；
+    - [ ] `tests/verify-drawer-visual-live.mjs` 步骤 9 为**假绿**：其夹具 `#case=appeal:risk` 用的是板块名而非
+        真实案件号（必然匹配失败），且该步只 `console.log` 不做 `assert`，故深链失效仍宣告「100% 全部通过」；
+    - [ ] 生产真实数据下当前状态渲染为英文 `active`，混在中文界面中——`getStatusLabel()` 的 switch 缺少
+        `active` 分支（DB 默认值即 `active`），属六语言收口专项的连带缺口。
+*   **遗留事项 (Outstanding)**:
+    - [ ] 深链格式与 hash 路由冲突的修复（涉及 URL 契约，需确认采用 `?case=` 查询参数还是路由内 hash）；
+    - [ ] 抽屉内 39 处未包裹 i18n 的中文字面量收口；
+    - [ ] `index.vue:5980` 疑似同类失效的 `:deep(.el-drawer__body)` 陈旧规则。
+
 ### 操作报告右侧抽屉四变体 UI 治理：外壳样式失配根因修复与响应式打磨 (2026-10-16)
 *   **关联提交 (Git Commit)**: `75dbbecb0fb50204c0e99238201deaf22f4aa557` (Short: `75dbbec`)
 *   **部署环境 (Deployment)**: `本地可视化实测 (临时 vite dev harness + Playwright) · 尚未部署生产`
