@@ -3005,10 +3005,10 @@ function handleDrawerOpened() {
 
 .risk-top-grid {
   display: grid;
-  grid-template-columns: 88px minmax(130px, 160px) 1fr;
-  gap: 16px;
+  grid-template-columns: 88px 125px 1fr;
+  gap: 14px;
   align-items: center;
-  min-height: 88px;
+  height: 88px;
 
   @media (max-width: 600px) {
     grid-template-columns: 1fr;
@@ -3070,7 +3070,9 @@ function handleDrawerOpened() {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 4px;
+  gap: 3px;
+  height: 88px;
+  width: 125px;
   padding: 0;
   background: transparent;
   border: none;
@@ -3084,8 +3086,8 @@ function handleDrawerOpened() {
   }
 
   .driver-highlight-line {
-    font-size: 11.5px;
-    line-height: 1.4;
+    font-size: 11px;
+    line-height: 1.35;
     word-break: break-word;
     white-space: normal;
   }
@@ -3097,6 +3099,7 @@ function handleDrawerOpened() {
   grid-template-columns: repeat(2, 1fr);
   grid-template-rows: repeat(2, 1fr);
   gap: 8px 14px;
+  height: 88px;
   min-width: 0;
   flex: 1;
   box-sizing: border-box;
