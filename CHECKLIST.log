@@ -8,6 +8,25 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### 审计抽屉结构还原与全模块精益UI重构 Cloudflare 生产部署上线 (2026-10-17)
+*   **关联提交 (Git Commit)**: `f6204b0707840bbb6deb555888854d76624c82e2` (Short: `f6204b0`)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com · Worker Version ID: 383932c2-c617-4de3-a99a-91507285ce2a)`
+*   **回滚锚点 (Rollback Anchor)**: `36ec706309fa060f2e83eba8ddd99c63c283e8da`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] **完全还原双泳道经典网格 (`dual-swimlane-container`)**：彻底恢复 3 栏左右分流泳道布局（左机器泳道、中 28px 轴线带贯通时间线与节点圆点、右人工泳道），保留纯留白单元格；
+    - [x] **完全还原原生档案单卡片体系 (`dossier-card`)**：移除外部多余灰底背景画布（恢复为原生 `var(--el-bg-color)`)，消除生硬重度阴影，保持经典自然平滑圆角卡片；
+    - [x] **模块 A (案件概要) 深度精雕**：修复原因码 (`reason-code-highlight`) 因 flex:1 被拉伸成全宽横条的瑕疵，封装进 `div.field-v` 实现文字自适应紧凑贴合；左右 12 字段对称整齐排版；
+    - [x] **模块 B (集群关联账号表格) 质感增强**：表头启用结构化底色 (`var(--el-fill-color)`) 与清晰边框 (`var(--el-border-color)`)，序列号规范为清爽淡红微胶囊，关联说明文字去暴戾红色回归正规文本；
+    - [x] **模块 C (风险依据与研判路径) 权威化**：报警原因增加警示红侧边警戒线，研判路径升级为微时序终端卡片；
+    - [x] **模块 E (多维风险画像 & 遥测指标) 精度对齐**：顶栏 3 栏 88px 绝对等高与 125px 主驱动绝对对齐保持 0px 误差；遥测指标表头图例与进度条刻度对比度显著提升；
+    - [x] **模块 F/G/H/I (判例、证据链、工作台、台账) 人体工学升级**：4 柱统计卡片响应式悬浮反馈、证据链哈希微胶囊复制、裁决工作台 38px 语义化按钮组；
+    - [x] **暗色模式全量适配**：为全部重构模块定制深色边界与背景变量，保证暗黑模式下的极佳视觉对比与舒适感。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] **本地构建核验**：`mail-vue` 的 `npm run build` 成功构建通过 (耗时 14.36s)，零警告零报错；
+    - [x] **Cloudflare 生产环境部署**：`pnpm --dir mail-worker exec wrangler deploy` 成功发布 45 个静态资源，Version ID: `383932c2-c617-4de3-a99a-91507285ce2a`；
+    - [x] **Cloudflare 生产公网端到端自动化测试套件**：`node tests/verify-cf-production-drawer-redesign.mjs` 100% 全绿，直连 `https://mail.epocanvas.com` 4 种真实变体抽屉全部通过；
+    - [x] **浏览器全真栈高精生产截图实测**：全量捕获 Cloudflare 生产公网 4 变体最新截图，核验通过。
+
 ### 审计详情抽屉视觉感官与排版体系精益重构与 Cloudflare 生产公网全真栈上线 (2026-10-17)
 *   **关联提交 (Git Commit)**: `36ec706309fa060f2e83eba8ddd99c63c283e8da` (Short: `36ec706`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com · Worker Version ID: dadc975c-8c67-4451-b3c9-3e26ef969aa3)`
