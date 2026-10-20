@@ -8,6 +8,22 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### 违规处罚、裁决与最终通知后端闭环与全链路落地 (2026-10-20)
+*   **关联提交 (Git Commit)**: `33c77009812c7917f66c3205ea45927c22a395b9` (Short: `33c7700`)
+*   **部署环境 (Deployment)**: `本地全真栈环境 (Local Full-Stack Verification)`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] **Phase A: 裁决引擎、D1 原子 Batch 与乐观锁并发控制**：在 `mail-worker/src/service/audit-service.js` 统一实现 CAS 乐观锁版本核验 (`version`)，优化幂等键检查顺序至结案检查之前以允许安全重放；将所有案件修改、多重封禁台账、状态迁移、审计流和通知 Outbox 封装进 D1 单批原子操作 (`userDb.batch`)；严格阻断未实现动作 (`mute`/`probation` 报 400 业务错误)；
+    - [x] **Phase B: 真实外发与入站权威状态拦截**：在 `mail-worker/src/service/email-service.js` 实现发信前 D1 权威核查，直接拦截封禁用户 (`user.status=1`)、封禁邮箱 (`account.status=1`) 及有效封禁案件 (`audit_log.status='banned'`)，统一抛出 403 阻断；在 `mail-worker/src/email/email.js` 普通入站中即时阻断投递至被封禁账号的普通信件，同时保持系统处置通知专用信箱投递通道；
+    - [x] **Phase C: 最终通知 Outbox 调度器、租约并发锁与 Webhook 去重**：在 `mail-worker/src/service/decision-notice-service.js` 实现批处理调度器 (`processOutboxBatch`)、租约并发锁、指数退避重试及管理员人工死信重试 (`retryOutboxTask`)；接入 Cron 定时触发与 Resend Webhook 幂等去重 (`wh_resend:<event_id>`) 及投递状态同步；
+    - [x] **Phase D: 受限登录、专用受限令牌与独立合规告知/申诉闭环**：在 `mail-worker/src/service/login-service.js` 验证密码通过后对被封禁账号签发 72 小时专用受限令牌 (`restrictedToken`)，绝不签发普通全权 JWT；在 `mail-worker/src/api/notice-api.js` 实现防 IDOR 的脱敏处置告知书读取与独立申诉受理端点；在前端提供无普通邮箱功能暴露的受限告知查阅与申诉界面 (`restricted-notice.vue`)；
+    - [x] **多语言严密闭环**：六种语言字典（zh, zh-Hant, en, es, fr, nl）全量新增 20 个处置告知书与申诉词条，实现 100% 绝对对称（各 3022 键，0 缺失）。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] **本地构建核验**：`mail-vue` 的 `npm run build` 成功构建通过 (耗时 14.14s)，零警告零报错；
+    - [x] **Worker 预编译核验**：`pnpm --dir mail-worker exec wrangler deploy --dry-run` 成功通过；
+    - [x] **裁决服务层全量自动化测试**：`tests/test-audit-service-backend.mjs` 14/14 测试项全部通过；
+    - [x] **后端闭环全量端到端测试**：`tests/test-adjudication-closedloop.mjs` 7/7 核心场景测试全部通过；
+    - [x] **多语言静态审计三件套**：`node scripts/i18n-symmetry.mjs` (3022 keys 100% 对称)、`node scripts/i18n-audit.mjs` (0 缺失词条)。
+
 ### 审计抽屉结构还原与全模块精益UI重构 Cloudflare 生产部署上线 (2026-10-17)
 *   **关联提交 (Git Commit)**: `f6204b0707840bbb6deb555888854d76624c82e2` (Short: `f6204b0`)
 *   **部署环境 (Deployment)**: `生产 Cloudflare (mail.epocanvas.com · Worker Version ID: 383932c2-c617-4de3-a99a-91507285ce2a)`
