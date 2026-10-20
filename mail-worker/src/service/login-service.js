@@ -23,9 +23,11 @@ import totpUtils from '../utils/totp-utils.js';
 import webauthnUtils from '../utils/webauthn-utils.js';
 import orm from '../entity/orm.js';
 import user from '../entity/user.js';
-import { eq } from 'drizzle-orm';
+import { auditLog } from '../entity/audit-log.js';
+import { eq, and, desc } from 'drizzle-orm';
 import riskService from './risk-service.js';
 import deviceTrustService from './device-trust-service.js';
+import decisionNoticeService from './decision-notice-service.js';
 
 function getSafeSessionUser(userRow) {
 	if (!userRow) return null;
@@ -322,10 +324,6 @@ const loginService = {
 			throw new BizError(t('isDelUser'));
 		}
 
-		if (userRow.status === userConst.status.BAN) {
-			throw new BizError(t('isBanUser'));
-		}
-
 		let isLegacy = false;
 		if (!noVerifyPwd) {
 			const checkResult = await cryptoUtils.verifyPasswordWithUpgrade(password, userRow.salt, userRow.password);
@@ -334,6 +332,36 @@ const loginService = {
 				throw new BizError(t('IncorrectPwd'));
 			}
 			isLegacy = checkResult.isLegacy;
+		}
+
+		// 受限用户安全通道：密码凭证核验通过后，若账号已被封禁管控，阻断常规发信与读信会话，签发专用受限通知凭证
+		if (userRow.status === userConst.status.BAN) {
+			let latestBan = null;
+			try {
+				latestBan = await orm(c).select().from(auditLog).where(
+					and(
+						eq(auditLog.email, userRow.email),
+						eq(auditLog.status, 'banned')
+					)
+				).orderBy(desc(auditLog.id)).limit(1).get();
+			} catch (_) {}
+
+			const restrictedToken = await decisionNoticeService.generateRestrictedToken(c, {
+				userId: userRow.userId,
+				caseId: latestBan?.id || null,
+				ticketId: latestBan?.ticketId || null,
+				email: userRow.email
+			});
+
+			return {
+				isRestricted: true,
+				restrictedToken,
+				user: {
+					email: userRow.email,
+					status: userRow.status
+				},
+				message: '账号已被系统管控限制，已提供受限处置通知与申诉入口'
+			};
 		}
 
 		// Check if TOTP 2FA or Security Key is enabled
@@ -557,9 +585,6 @@ const loginService = {
 		if (!userRow || userRow.isDel === isDel.DELETE) {
 			throw new BizError(t('isDelUser'));
 		}
-		if (userRow.status === userConst.status.BAN) {
-			throw new BizError(t('isBanUser'));
-		}
 
 		const factorType = isPasskey ? 'passkey' : (isBackupCode ? 'backup_code' : 'totp');
 
@@ -710,6 +735,36 @@ const loginService = {
 		// Lazy migration of legacy password if needed
 		if (pendingData.needsPasswordUpgrade) {
 			await this.lazyMigratePassword(c, userRow.userId, pendingData.needsPasswordUpgrade);
+		}
+
+		// 受限用户安全通道：2FA 核验通过后，若账号已被封禁管控，阻断常规发信与读信会话，签发专用受限通知凭证
+		if (userRow.status === userConst.status.BAN) {
+			let latestBan = null;
+			try {
+				latestBan = await orm(c).select().from(auditLog).where(
+					and(
+						eq(auditLog.email, userRow.email),
+						eq(auditLog.status, 'banned')
+					)
+				).orderBy(desc(auditLog.id)).limit(1).get();
+			} catch (_) {}
+
+			const restrictedToken = await decisionNoticeService.generateRestrictedToken(c, {
+				userId: userRow.userId,
+				caseId: latestBan?.id || null,
+				ticketId: latestBan?.ticketId || null,
+				email: userRow.email
+			});
+
+			return {
+				isRestricted: true,
+				restrictedToken,
+				user: {
+					email: userRow.email,
+					status: userRow.status
+				},
+				message: '账号已被系统管控限制，已提供受限处置通知与申诉入口'
+			};
 		}
 
 		// Generate formal session JWT

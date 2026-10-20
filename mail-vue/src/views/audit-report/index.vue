@@ -3,6 +3,50 @@
     <!-- 主体全幅可滚动区域 -->
     <el-scrollbar ref="scrollbarRef" class="scrollbar">
       <div class="audit-page-container">
+        <!-- 深链接案件状态提示条（明确区分：加载中 / 未找到 / 无权限 / 加载失败） -->
+        <el-alert
+          v-if="deepLinkState === 'loading' && deepLinkCaseId"
+          type="info"
+          show-icon
+          :closable="false"
+          class="deep-link-missing-banner deep-link-status-banner"
+          data-status="loading"
+          style="margin-bottom: 12px;"
+          :title="$t('auditCaseLoading', { caseId: deepLinkCaseId })"
+        />
+        <el-alert
+          v-else-if="missingCaseId && deepLinkState === 'unauthorized'"
+          type="error"
+          show-icon
+          closable
+          class="deep-link-missing-banner deep-link-status-banner"
+          data-status="unauthorized"
+          style="margin-bottom: 12px;"
+          :title="$t('auditCaseUnauthorized', { caseId: missingCaseId })"
+          @close="dismissMissingCaseBanner"
+        />
+        <el-alert
+          v-else-if="missingCaseId && deepLinkState === 'error'"
+          type="error"
+          show-icon
+          closable
+          class="deep-link-missing-banner deep-link-status-banner"
+          data-status="error"
+          style="margin-bottom: 12px;"
+          :title="$t('auditCaseLoadError', { caseId: missingCaseId })"
+          @close="dismissMissingCaseBanner"
+        />
+        <el-alert
+          v-else-if="missingCaseId"
+          type="warning"
+          show-icon
+          closable
+          class="deep-link-missing-banner deep-link-status-banner"
+          data-status="not_found"
+          style="margin-bottom: 12px;"
+          :title="$t('auditCaseNotFound', { caseId: missingCaseId })"
+          @close="dismissMissingCaseBanner"
+        />
 
         <!-- 1. 顶部汇报分区 4 板块：严格 4 层分界与操作态图标 -->
         <div class="kpi-grid">
@@ -2026,7 +2070,9 @@
       v-model="drawerVisible"
       :selected-row="selectedRow"
       :section="currentSection"
+      :initial-tab="drawerInitialTab"
       :action-loading="actionLoading"
+      @tab-change="(tab) => { drawerInitialTab = tab }"
       @action="handleAction"
       @verdict="handleVerdict"
       @extend="handleOpenExtend"
@@ -2111,7 +2157,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue';
+import { ref, reactive, computed, watch, onMounted, onUnmounted, onActivated, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox } from 'element-plus';
@@ -2121,6 +2167,7 @@ import { tzDayjs } from '@/utils/day.js';
 import { useSettingStore } from '@/store/setting.js';
 import { useEmailStore } from '@/store/email.js';
 import { auditList, auditAction, auditAdjudicate, auditPurge } from '@/request/audit.js';
+import { parseCaseDeepLink, normalizeCaseTab } from '@/router/account-history.js';
 import AuditDetailDrawer from './components/audit-detail-drawer.vue';
 
 defineOptions({
@@ -2227,8 +2274,40 @@ const params = reactive({
 // 抽屉详情与研判状态
 const drawerVisible = ref(false);
 const selectedRow = ref(null);
+const drawerInitialTab = ref('overview');
+const missingCaseId = ref('');
+const deepLinkCaseId = ref('');
+const deepLinkState = ref('idle'); // 'idle' | 'loading' | 'not_found' | 'unauthorized' | 'error'
+const lastListError = ref(null);
+let activeDeepLinkQuerySeq = 0;
+const isHandlingPopState = ref(false);
 const decisionNotes = ref('');
 const actionLoading = ref(false);
+
+watch(drawerVisible, (isOpen, wasOpen) => {
+  if (!isOpen && wasOpen && !isHandlingPopState.value) {
+    try {
+      const parsed = parseCaseDeepLink(window.location);
+      if (parsed.isCaseLink) {
+        const cleanUrl = `${window.location.pathname}#audit-report`;
+        window.history.pushState(window.history.state || {}, '', cleanUrl);
+      }
+    } catch (e) {}
+  }
+});
+
+function dismissMissingCaseBanner() {
+  missingCaseId.value = '';
+  deepLinkCaseId.value = '';
+  deepLinkState.value = 'idle';
+  try {
+    const parsed = parseCaseDeepLink(window.location);
+    if (parsed.isCaseLink) {
+      const cleanUrl = `${window.location.pathname}#audit-report`;
+      window.history.replaceState(window.history.state || {}, '', cleanUrl);
+    }
+  } catch (e) {}
+}
 
 // 同步顶栏 topbar-search 活跃检索至本页面
 watch(() => emailStore.searchKeyword, (val) => {
@@ -3446,7 +3525,14 @@ function handleSelectionChange(rows) {
 function handleTableRowClick(row, column, event) {
   const target = event?.target;
   if (target) {
-    if (target.closest('.el-checkbox') || target.closest('.el-button') || target.closest('.el-dropdown') || target.closest('button')) {
+    if (
+      target.closest('.el-checkbox') ||
+      target.closest('.el-button') ||
+      target.closest('.el-dropdown') ||
+      target.closest('.clickable-ticket') ||
+      target.closest('.action-detail-btn') ||
+      target.closest('button')
+    ) {
       return;
     }
   }
@@ -4057,6 +4143,14 @@ function getStatusFullLabel(status) {
 
 async function fetchAuditList() {
   tableLoading.value = true;
+  lastListError.value = null;
+  try {
+    const parsedOnStart = parseCaseDeepLink(window.location);
+    if (parsedOnStart.isCaseLink && !drawerVisible.value) {
+      deepLinkCaseId.value = parsedOnStart.caseId;
+      deepLinkState.value = 'loading';
+    }
+  } catch (_) {}
   try {
     const res = await auditList(params);
     const data = res?.list ? res : (res?.data || res || {});
@@ -4132,6 +4226,7 @@ async function fetchAuditList() {
       autoPurgedBatches.value = data.autoPurgedBatches;
     }
   } catch (e) {
+    lastListError.value = e;
     console.error('fetchAuditList error:', e);
   } finally {
     tableLoading.value = false;
@@ -4165,9 +4260,37 @@ function handleCurrentChange(num) {
   fetchAuditList();
 }
 
-function openAuditDrawer(row) {
+function openAuditDrawer(row, tab, options = {}) {
+  if (!row) return;
+  const fromDeepLink = !!options.fromDeepLink;
+  const resolvedTab = tab ? normalizeCaseTab(tab) : 'overview';
+  const cNo = row.ticketId || row.id;
+  const newHash = `#case=${cNo}:${resolvedTab}`;
+
+  missingCaseId.value = '';
+  deepLinkCaseId.value = '';
+  deepLinkState.value = 'idle';
+  drawerInitialTab.value = resolvedTab;
+
+  if (window.location.hash !== newHash) {
+    try {
+      const nextUrl = `${window.location.pathname}${window.location.search}${newHash}`;
+      if (fromDeepLink) {
+        window.history.replaceState(window.history.state || {}, '', nextUrl);
+      } else {
+        window.history.pushState(window.history.state || {}, '', nextUrl);
+      }
+    } catch (e) {}
+  }
+
+  const isSameOpenCase = drawerVisible.value && selectedRow.value && (
+    (selectedRow.value.id && selectedRow.value.id === row.id) ||
+    (selectedRow.value.ticketId && selectedRow.value.ticketId === row.ticketId)
+  );
   selectedRow.value = row;
-  decisionNotes.value = isAppealType(row) ? t('auditDefaultNoteApproved') : '';
+  if (!isSameOpenCase) {
+    decisionNotes.value = isAppealType(row) ? t('auditDefaultNoteApproved') : '';
+  }
   drawerVisible.value = true;
 }
 
@@ -4216,30 +4339,142 @@ async function handleVerdict(decision, customNotes) {
   }
 }
 
-function checkDeepLinkOnLoad() {
+function matchCaseRecord(l, cleanCase) {
+  if (!l || !cleanCase) return false;
+  const tId = String(l.ticketId || '').toLowerCase().replace(/^#/, '');
+  const idStr = String(l.id || '').toLowerCase();
+  const fmtTicket = formatTicketNo(l).toLowerCase().replace(/^#/, '');
+  const fmtAbuse = formatAbuseTicketNo(l).toLowerCase().replace(/^#/, '');
+  const wType = String(l.warningType || '').toLowerCase();
+  return tId === cleanCase || idStr === cleanCase || fmtTicket === cleanCase || fmtAbuse === cleanCase || wType === cleanCase;
+}
+
+function classifyDeepLinkError(err) {
+  const code = Number(err?.code || err?.status || err?.response?.status || err?.response?.data?.code || 0);
+  const msg = String(err?.message || err?.response?.data?.message || '').toLowerCase();
+  if (code === 401 || code === 403 || msg.includes('forbidden') || msg.includes('unauth') || msg.includes('无权')) {
+    return 'unauthorized';
+  }
+  return 'error';
+}
+
+async function checkDeepLinkOnLoad(options = { fromDeepLink: true }) {
   try {
-    const hash = window.location.hash || '';
-    const searchParams = new URLSearchParams(window.location.search);
-    let targetCase = searchParams.get('case');
-    if (!targetCase && hash.includes('case=')) {
-      const match = hash.match(/case=([^:&]+)/);
-      if (match) targetCase = match[1];
-    } else if (!targetCase && hash.startsWith('#') && hash.length > 2) {
-      targetCase = hash.slice(1).split(':')[0];
+    const parsed = parseCaseDeepLink(window.location);
+    if (!parsed.isCaseLink) {
+      missingCaseId.value = '';
+      deepLinkCaseId.value = '';
+      deepLinkState.value = 'idle';
+      return;
     }
-    if (targetCase && logs.value && logs.value.length > 0) {
-      const cleanCase = targetCase.toLowerCase().replace(/^#/, '');
-      const found = logs.value.find(l => {
-        const tId = String(l.ticketId || '').toLowerCase().replace(/^#/, '');
-        const idStr = String(l.id || '').toLowerCase();
-        const em = String(l.email || '').toLowerCase();
-        return tId === cleanCase || idStr === cleanCase || em === cleanCase;
+
+    const rawCaseId = parsed.caseId;
+    const cleanCase = rawCaseId.toLowerCase().replace(/^#/, '');
+    deepLinkCaseId.value = rawCaseId;
+
+    // 案件数据尚在加载中时，显示明确加载中状态并等待 fetchAuditList 完成后再恢复抽屉
+    if (tableLoading.value) {
+      deepLinkState.value = 'loading';
+      return;
+    }
+
+    const list = Array.isArray(logs.value) ? logs.value : [];
+    let found = list.find(l => matchCaseRecord(l, cleanCase));
+
+    // 若当前已打开的抽屉正是同一案件（例如用户在背景切换了列表筛选），优先保留并同步最新记录
+    if (!found && drawerVisible.value && selectedRow.value && matchCaseRecord(selectedRow.value, cleanCase)) {
+      found = selectedRow.value;
+    }
+
+    if (found) {
+      openAuditDrawer(found, parsed.rawTab || parsed.tab, { fromDeepLink: options.fromDeepLink !== false });
+      return;
+    }
+
+    // 当前页或当前筛选未命中时，绝不直接断定“不存在”，通过现有按工单/ID 检索能力跨页/跨筛选查询
+    const seq = ++activeDeepLinkQuerySeq;
+    deepLinkState.value = 'loading';
+
+    try {
+      const fallbackRes = await auditList({
+        keyword: `ticket:${rawCaseId}`,
+        warningType: 'all',
+        status: 'all',
+        num: 1,
+        size: 50
       });
-      if (found) {
-        openAuditDrawer(found);
+      if (seq !== activeDeepLinkQuerySeq) return;
+      const latestParsed = parseCaseDeepLink(window.location);
+      if (!latestParsed.isCaseLink || latestParsed.caseId !== rawCaseId) return;
+
+      const fbData = fallbackRes?.list ? fallbackRes : (fallbackRes?.data || fallbackRes || {});
+      const fbList = Array.isArray(fbData.list) ? fbData.list : [];
+      const matched = fbList.find(l => matchCaseRecord(l, cleanCase));
+
+      if (matched) {
+        openAuditDrawer(matched, latestParsed.rawTab || latestParsed.tab, { fromDeepLink: options.fromDeepLink !== false });
+        return;
       }
+
+      // 明确判定为“未找到”
+      if (drawerVisible.value) {
+        isHandlingPopState.value = true;
+        drawerVisible.value = false;
+        nextTick(() => {
+          isHandlingPopState.value = false;
+        });
+      }
+      selectedRow.value = null;
+      deepLinkState.value = 'not_found';
+      if (missingCaseId.value !== rawCaseId) {
+        missingCaseId.value = rawCaseId;
+        ElMessage.warning(t('auditCaseNotFound', { caseId: rawCaseId }));
+      }
+    } catch (queryErr) {
+      if (seq !== activeDeepLinkQuerySeq) return;
+      const latestParsed = parseCaseDeepLink(window.location);
+      if (!latestParsed.isCaseLink || latestParsed.caseId !== rawCaseId) return;
+
+      if (drawerVisible.value) {
+        isHandlingPopState.value = true;
+        drawerVisible.value = false;
+        nextTick(() => {
+          isHandlingPopState.value = false;
+        });
+      }
+      selectedRow.value = null;
+      const errStatus = classifyDeepLinkError(queryErr || lastListError.value);
+      deepLinkState.value = errStatus;
+      missingCaseId.value = rawCaseId;
     }
-  } catch (e) {}
+  } catch (e) {
+    console.warn('[checkDeepLinkOnLoad] error:', e);
+  }
+}
+
+function handlePopOrHashChange() {
+  const parsed = parseCaseDeepLink(window.location);
+  if (parsed.isCaseLink) {
+    isHandlingPopState.value = true;
+    try {
+      checkDeepLinkOnLoad({ fromDeepLink: true });
+    } finally {
+      nextTick(() => {
+        isHandlingPopState.value = false;
+      });
+    }
+  } else {
+    missingCaseId.value = '';
+    deepLinkCaseId.value = '';
+    deepLinkState.value = 'idle';
+    if (drawerVisible.value) {
+      isHandlingPopState.value = true;
+      drawerVisible.value = false;
+      nextTick(() => {
+        isHandlingPopState.value = false;
+      });
+    }
+  }
 }
 
 const activeRowIndex = ref(-1);
@@ -4249,6 +4484,14 @@ function handleGlobalKeydown(e) {
   if (targetTag === 'input' || targetTag === 'textarea') return;
 
   if (e.key === 'Escape') {
+    // 检查是否有任何更高层级的浮层 (例如用户通知预览 Dialog、标识 Popover、通用 MessageBox)
+    const hasActiveModal = !!document.querySelector(
+      '.notice-preview-dialog:not([style*="display: none"]), .account-identity-popover:not([style*="display: none"]), .el-dialog:not([style*="display: none"]), .el-message-box'
+    );
+    if (hasActiveModal) {
+      // 存在上层浮层，交给上层浮层自己退出，案件抽屉坚决保持打开
+      return;
+    }
     if (drawerVisible.value) {
       drawerVisible.value = false;
       e.preventDefault();
@@ -4289,6 +4532,8 @@ onMounted(() => {
   handleResize();
   window.addEventListener('resize', handleResize);
   window.addEventListener('keydown', handleGlobalKeydown);
+  window.addEventListener('hashchange', handlePopOrHashChange);
+  window.addEventListener('popstate', handlePopOrHashChange);
   if (emailStore.searchKeyword) {
     localKeyword.value = emailStore.searchKeyword.trim();
     params.keyword = localKeyword.value;
@@ -4297,9 +4542,15 @@ onMounted(() => {
   fetchAuditList();
 });
 
+onActivated(() => {
+  checkDeepLinkOnLoad({ fromDeepLink: true });
+});
+
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize);
   window.removeEventListener('keydown', handleGlobalKeydown);
+  window.removeEventListener('hashchange', handlePopOrHashChange);
+  window.removeEventListener('popstate', handlePopOrHashChange);
   window.removeEventListener('manage-audit-search', handleGlobalTopSearch);
 });
 </script>

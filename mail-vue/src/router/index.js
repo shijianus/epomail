@@ -1,5 +1,5 @@
 import {createRouter} from 'vue-router'
-import createAccountHistory from './account-history.js';
+import createAccountHistory, { parseCaseDeepLink } from './account-history.js';
 import NProgress from 'nprogress';
 import {useUiStore} from "@/store/ui.js";
 import {useSettingStore} from "@/store/setting.js";
@@ -325,12 +325,27 @@ const routes = [
         name: 'oauth-authorize',
         component: () => import('@/views/oauth/authorize.vue')
     },
+    {
+        path: '/notice/restricted',
+        name: 'restricted-notice',
+        component: () => import('@/views/notice/restricted-notice.vue'),
+        meta: {
+            title: 'restrictedNotice',
+            name: 'restricted-notice'
+        }
+    },
     // /test 仅开发模式注册，不暴露生产
     ...(import.meta.env.DEV ? [{
         path: '/test',
         name: 'test',
         component: () => import('@/views/test/index.vue')
     }] : []),
+    // 案件全宗档案深链接路由拦截：避免被贪婪匹配至 /:username (profile)
+    {
+        path: '/case=:caseParam(.*)',
+        name: 'case-deep-link-route',
+        redirect: () => '/audit-report'
+    },
     {
         path: '/:username',
         name: 'profile',
@@ -391,7 +406,7 @@ router.beforeEach(async (to, from, next) => {
         'manage', 'admin', 'moderator',
         'system-setting', 'sys-setting', 'all-users', 'role', 'roles',
         'reg-key', 'invite-code', 'analysis', 'oauth-apps', 'oauth-app', 'settings',
-        'category', 'category-setting', 'audit', 'audit-report', 'risk'
+        'category', 'category-setting', 'audit', 'audit-report', 'risk', 'case'
     ];
     if (!token && to.name === 'profile' && protectedSystemPaths.includes(to.params.username?.toLowerCase())) {
         removeLoading();
@@ -399,8 +414,24 @@ router.beforeEach(async (to, from, next) => {
         return;
     }
 
+    // 2.1 案件全宗档案深链接防误入 Profile：
+    // 若当前地址为案件上下文或 username 含 case=/等号，绝非个人资料页，立即转向审计管理中心
+    if (to.name === 'profile') {
+        const rawUsername = String(to.params.username || '');
+        const caseLink = parseCaseDeepLink();
+        if (caseLink.isCaseLink || rawUsername.includes('case=') || rawUsername.startsWith('case=') || rawUsername.includes('=')) {
+            if (token) {
+                next({ path: '/audit-report', replace: true });
+            } else {
+                removeLoading();
+                window.location.replace('/login/');
+            }
+            return;
+        }
+    }
+
     // 3. 无 token 且访问受保护的内部路由：立即硬重定向到登录页
-    if (!token && !['login', 'profile', 'oauth-authorize'].includes(to.name)) {
+    if (!token && !['login', 'profile', 'oauth-authorize', 'restricted-notice'].includes(to.name)) {
         removeLoading();
         window.location.replace('/login/');
         return;

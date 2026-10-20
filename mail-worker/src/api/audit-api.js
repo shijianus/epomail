@@ -1,6 +1,7 @@
 import app from '../hono/hono';
 import result from '../model/result';
 import auditService from '../service/audit-service';
+import decisionNoticeService from '../service/decision-notice-service';
 import BizError from '../error/biz-error';
 import { t } from '../i18n/i18n';
 
@@ -52,6 +53,27 @@ app.post('/audit/circuit-breaker', async (c) => {
 	ensureAuthUser(c);
 	const body = await c.req.json();
 	const data = await auditService.setCircuitBreaker(c, body);
+	return c.json(result.ok(data));
+});
+
+// 最终处置通知 Outbox 台账与运维管理
+app.get('/audit/outbox/list', async (c) => {
+	ensureAuthUser(c);
+	const query = c.req.query();
+	const data = await decisionNoticeService.listOutboxTasks(c, query);
+	return c.json(result.ok(data));
+});
+
+app.post('/audit/outbox/retry', async (c) => {
+	ensureAuthUser(c);
+	const body = await c.req.json();
+	const data = await decisionNoticeService.retryOutboxTask(c, body.taskId || body.task_id);
+	return c.json(result.ok(data));
+});
+
+app.post('/audit/outbox/process', async (c) => {
+	ensureAuthUser(c);
+	const data = await decisionNoticeService.processOutboxBatch(c, 20);
 	return c.json(result.ok(data));
 });
 

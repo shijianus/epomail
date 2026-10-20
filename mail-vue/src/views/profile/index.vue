@@ -205,11 +205,11 @@ const timezoneString = computed(() => {
 
 const profileData = ref({
     userInfo: {
-        account: username.value,
-        email: `${username.value}@epocanvas.com`,
+        account: '',
+        email: '',
         roleName: 'Unknown',
         joinTime: new Date().toISOString(),
-        avatarInitials: username.value.substring(0, 2).toUpperCase()
+        avatarInitials: ''
     },
     stats: {
         todaySent: 0,
@@ -344,7 +344,7 @@ const coverPhotoStyle = computed(() => {
 })
 
 watch(() => route.params.username, (newVal) => {
-  if (newVal) {
+  if (newVal && !String(newVal).includes('case=') && !String(newVal).includes('=')) {
     fetchProfile()
   }
 })
@@ -356,13 +356,21 @@ watch(() => userStore.user?.backgroundUrl, (newBg) => {
 })
 
 const fetchProfile = () => {
+    const raw = String(username.value || '');
+    if (!raw || raw.includes('case=') || raw.includes('=')) {
+        loading.value = false;
+        router.replace({ path: '/audit-report' });
+        return;
+    }
     loading.value = true
     getProfile(username.value).then(res => {
-        if (res) {
+        if (res && res.userInfo) {
             profileData.value = res
             if (isOwnProfile.value && userStore.user?.backgroundUrl !== undefined && userStore.user?.backgroundUrl !== '') {
                 profileData.value.userInfo.backgroundUrl = userStore.user.backgroundUrl
             }
+        } else {
+            router.replace({ name: '404' })
         }
     }).catch(err => {
         // 用户名不存在（如误将内部路径当作主页访问）时转入 404，避免渲染残缺的主页壳

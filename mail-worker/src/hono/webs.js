@@ -23,4 +23,5 @@ import '../api/oauth-api'
 import '../api/admin-oauth-app-api'
 import '../api/oauth-provider-api'
 import '../api/audit-api'
+import '../api/notice-api'
 export default app;

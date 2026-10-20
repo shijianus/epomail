@@ -21,7 +21,8 @@ const exclude = [
 	'/telegram',
 	'/oauth',
 	'/api/oauth',
-	'/.well-known'
+	'/.well-known',
+	'/notice/restricted'
 ];
 
 const requirePerms = [

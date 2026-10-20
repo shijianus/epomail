@@ -46,6 +46,7 @@ const dbInit = {
 		await this.v3_14DB(c);
 		await this.v3_15DB(c);
 		await this.v3_16DB(c);
+		await this.v3_17DB(c);
 		await settingService.refresh(c);
 		return c.text('success');
 	},
@@ -244,6 +245,96 @@ const dbInit = {
 			`).run();
 		} catch (e) {
 			console.warn('visitor user:query cleanup warning:', e.message);
+		}
+	},
+
+	// v3_17DB: 违规裁决闭环迁移：
+	// 1. 补齐 audit_log 全量决策与并发控制字段（version, idempotency_key, decision_id, original_decision_id 等）；
+	// 2. 建立 notification_outbox 最终通知发信与重试任务表；
+	// 3. 建立 audit_purge_batch 审计归档批次表。
+	async v3_17DB(c) {
+		const userDb = getUserDb(c);
+		const auditLogCols = [
+			{ name: 'base_ip', sql: `ALTER TABLE audit_log ADD COLUMN base_ip TEXT;` },
+			{ name: 'base_geo', sql: `ALTER TABLE audit_log ADD COLUMN base_geo TEXT;` },
+			{ name: 'base_device', sql: `ALTER TABLE audit_log ADD COLUMN base_device TEXT;` },
+			{ name: 'base_fingerprint', sql: `ALTER TABLE audit_log ADD COLUMN base_fingerprint TEXT;` },
+			{ name: 'resolved_time', sql: `ALTER TABLE audit_log ADD COLUMN resolved_time TEXT;` },
+			{ name: 'ban_reason', sql: `ALTER TABLE audit_log ADD COLUMN ban_reason TEXT;` },
+			{ name: 'ban_time', sql: `ALTER TABLE audit_log ADD COLUMN ban_time TEXT;` },
+			{ name: 'is_internal', sql: `ALTER TABLE audit_log ADD COLUMN is_internal INTEGER DEFAULT 0;` },
+			{ name: 'report_category', sql: `ALTER TABLE audit_log ADD COLUMN report_category TEXT;` },
+			{ name: 'report_reason', sql: `ALTER TABLE audit_log ADD COLUMN report_reason TEXT;` },
+			{ name: 'cluster_id', sql: `ALTER TABLE audit_log ADD COLUMN cluster_id TEXT;` },
+			{ name: 'assignee', sql: `ALTER TABLE audit_log ADD COLUMN assignee TEXT;` },
+			{ name: 'report_source', sql: `ALTER TABLE audit_log ADD COLUMN report_source TEXT;` },
+			{ name: 'evidence_summary', sql: `ALTER TABLE audit_log ADD COLUMN evidence_summary TEXT;` },
+			{ name: 'circuit_status', sql: `ALTER TABLE audit_log ADD COLUMN circuit_status TEXT DEFAULT 'NORMAL';` },
+			{ name: 'reason_code', sql: `ALTER TABLE audit_log ADD COLUMN reason_code TEXT;` },
+			{ name: 'timeline', sql: `ALTER TABLE audit_log ADD COLUMN timeline TEXT;` },
+			{ name: 'version', sql: `ALTER TABLE audit_log ADD COLUMN version INTEGER DEFAULT 1;` },
+			{ name: 'idempotency_key', sql: `ALTER TABLE audit_log ADD COLUMN idempotency_key TEXT;` },
+			{ name: 'decision_id', sql: `ALTER TABLE audit_log ADD COLUMN decision_id TEXT;` },
+			{ name: 'original_decision_id', sql: `ALTER TABLE audit_log ADD COLUMN original_decision_id TEXT;` }
+		];
+
+		const tableInfo = await userDb.prepare(`PRAGMA table_info('audit_log')`).all().catch(() => ({ results: [] }));
+		const existingCols = new Set((tableInfo?.results || []).map(r => r.name));
+		for (const col of auditLogCols) {
+			if (!existingCols.has(col.name)) {
+				try {
+					await userDb.prepare(col.sql).run();
+				} catch (err) {
+					console.warn(`v3_17DB 跳过 audit_log 列 ${col.name}:`, err.message);
+				}
+			}
+		}
+
+		try {
+			await userDb.prepare(`
+				CREATE TABLE IF NOT EXISTS notification_outbox (
+					id INTEGER PRIMARY KEY AUTOINCREMENT,
+					task_id TEXT NOT NULL UNIQUE,
+					case_id INTEGER,
+					ticket_id TEXT,
+					user_id INTEGER,
+					recipient TEXT NOT NULL,
+					channel TEXT NOT NULL DEFAULT 'internal',
+					template_code TEXT NOT NULL,
+					subject TEXT NOT NULL,
+					content TEXT NOT NULL,
+					reason_code TEXT,
+					status TEXT NOT NULL DEFAULT 'pending',
+					provider_message_id TEXT,
+					retry_count INTEGER NOT NULL DEFAULT 0,
+					max_retries INTEGER NOT NULL DEFAULT 5,
+					last_error TEXT,
+					next_retry_at TEXT,
+					delivered_at TEXT,
+					read_at TEXT,
+					create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+					update_time DATETIME DEFAULT CURRENT_TIMESTAMP
+				)
+			`).run();
+			await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_outbox_status_retry ON notification_outbox(status, next_retry_at)`).run();
+			await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_outbox_case_id ON notification_outbox(case_id)`).run();
+			await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_outbox_recipient ON notification_outbox(recipient)`).run();
+		} catch (err) {
+			console.warn('v3_17DB notification_outbox warning:', err.message);
+		}
+
+		try {
+			await userDb.prepare(`
+				CREATE TABLE IF NOT EXISTS audit_purge_batch (
+					id TEXT PRIMARY KEY,
+					count INTEGER NOT NULL DEFAULT 0,
+					reason TEXT NOT NULL,
+					create_time DATETIME DEFAULT CURRENT_TIMESTAMP
+				)
+			`).run();
+			await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_audit_purge_batch_time ON audit_purge_batch(create_time)`).run();
+		} catch (err) {
+			console.warn('v3_17DB audit_purge_batch warning:', err.message);
 		}
 	},
 
@@ -1312,6 +1403,10 @@ const dbInit = {
 				device TEXT,
 				device_type TEXT DEFAULT 'desktop',
 				fingerprint TEXT,
+				base_ip TEXT,
+				base_geo TEXT,
+				base_device TEXT,
+				base_fingerprint TEXT,
 				is_reg_ip INTEGER DEFAULT 0,
 				is_multi_ip INTEGER DEFAULT 0,
 				active_ip_count INTEGER DEFAULT 1,
@@ -1328,7 +1423,53 @@ const dbInit = {
 				is_internal INTEGER DEFAULT 0,
 				report_category TEXT,
 				report_reason TEXT,
+				cluster_id TEXT,
+				assignee TEXT,
+				report_source TEXT,
+				evidence_summary TEXT,
+				circuit_status TEXT DEFAULT 'NORMAL',
+				reason_code TEXT,
+				timeline TEXT,
 				resolved_time DATETIME,
+				version INTEGER DEFAULT 1,
+				idempotency_key TEXT,
+				decision_id TEXT,
+				original_decision_id TEXT,
+				create_time DATETIME DEFAULT CURRENT_TIMESTAMP
+			)
+		`).run();
+
+		await userDb.prepare(`
+			CREATE TABLE IF NOT EXISTS notification_outbox (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				task_id TEXT NOT NULL UNIQUE,
+				case_id INTEGER,
+				ticket_id TEXT,
+				user_id INTEGER,
+				recipient TEXT NOT NULL,
+				channel TEXT NOT NULL DEFAULT 'internal',
+				template_code TEXT NOT NULL,
+				subject TEXT NOT NULL,
+				content TEXT NOT NULL,
+				reason_code TEXT,
+				status TEXT NOT NULL DEFAULT 'pending',
+				provider_message_id TEXT,
+				retry_count INTEGER NOT NULL DEFAULT 0,
+				max_retries INTEGER NOT NULL DEFAULT 5,
+				last_error TEXT,
+				next_retry_at TEXT,
+				delivered_at TEXT,
+				read_at TEXT,
+				create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+				update_time DATETIME DEFAULT CURRENT_TIMESTAMP
+			)
+		`).run();
+
+		await userDb.prepare(`
+			CREATE TABLE IF NOT EXISTS audit_purge_batch (
+				id TEXT PRIMARY KEY,
+				count INTEGER NOT NULL DEFAULT 0,
+				reason TEXT NOT NULL,
 				create_time DATETIME DEFAULT CURRENT_TIMESTAMP
 			)
 		`).run();

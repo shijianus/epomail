@@ -139,7 +139,9 @@ export async function init() {
                 const isPublicProfile = pathname !== '/' && !['inbox', 'all', 'sent', 'drafts', 'starred', 'snoozed', 'spam', 'trash', 'message', 'settings', 'manage', 'admin', 'system-setting', 'sys-setting', 'all-users', 'role', 'roles', 'invite-code', 'reg-key', 'analysis', 'login'].some(p => pathname.toLowerCase().startsWith('/' + p));
 
                 if (!isOauth && !isPublicProfile) {
-                    window.location.replace('/login/?reason=expired');
+                    if (pathname !== '/login/' && !pathname.startsWith('/login')) {
+                        window.location.replace('/login/?reason=expired');
+                    }
                     return;
                 }
             }

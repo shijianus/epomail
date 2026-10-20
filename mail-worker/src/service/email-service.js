@@ -765,6 +765,15 @@ const emailService = {
 		}
 
 		const userRow = await userService.selectById(c, userId);
+		if (!userRow) {
+			throw new BizError(t('notExistUser') || '用户不存在', 404);
+		}
+
+		// 权威状态拦截：被限制/封禁用户严禁外发或站内发信 (权威 D1 来源防御)
+		if (Number(userRow.status) === 1) {
+			throw new BizError(t('isBanUser') || '账号已被系统安全管控限制，已暂停发信能力', 403);
+		}
+
 		const roleRow = await roleService.selectById(c, userRow.type);
 
 		// 计算邮件总大小限制
@@ -837,6 +846,28 @@ const emailService = {
 
 		if (accountRow.userId !== userId) {
 			throw new BizError(t('sendEmailNotCurUser'));
+		}
+
+		// 发信账号限制检查
+		if (Number(accountRow.status) === 1) {
+			throw new BizError('该发信邮箱已被系统安全策略限制使用', 403);
+		}
+
+		// 检查是否存在针对该邮箱或主账号的有效封禁管控案卷
+		let activeBan = null;
+		try {
+			activeBan = await orm(c).select().from(auditLog).where(
+				and(
+					eq(auditLog.email, accountRow.email),
+					eq(auditLog.warningType, 'ban'),
+					eq(auditLog.status, 'banned')
+				)
+			).get();
+		} catch (e) {
+			console.warn('Check active ban failed:', e?.message);
+		}
+		if (activeBan) {
+			throw new BizError('该发信地址当前处于安全封禁状态，无法外发邮件', 403);
 		}
 
 		if (!isSuperAdmin) {

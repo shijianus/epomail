@@ -3,6 +3,8 @@ import { auditLog } from '../entity/audit-log';
 import user from '../entity/user';
 import settingService from './setting-service';
 import userService from './user-service';
+import decisionNoticeService from './decision-notice-service.js';
+import KvConst from '../const/kv-const.js';
 import { and, desc, asc, eq, sql, count, inArray } from 'drizzle-orm';
 import BizError from '../error/biz-error';
 import { getUserDb } from '../utils/db-accessor';
@@ -78,7 +80,11 @@ const auditService = {
 				{ name: 'evidence_summary', sql: `ALTER TABLE audit_log ADD COLUMN evidence_summary TEXT;` },
 				{ name: 'circuit_status', sql: `ALTER TABLE audit_log ADD COLUMN circuit_status TEXT DEFAULT 'NORMAL';` },
 				{ name: 'reason_code', sql: `ALTER TABLE audit_log ADD COLUMN reason_code TEXT;` },
-				{ name: 'timeline', sql: `ALTER TABLE audit_log ADD COLUMN timeline TEXT;` }
+				{ name: 'timeline', sql: `ALTER TABLE audit_log ADD COLUMN timeline TEXT;` },
+				{ name: 'version', sql: `ALTER TABLE audit_log ADD COLUMN version INTEGER DEFAULT 1;` },
+				{ name: 'idempotency_key', sql: `ALTER TABLE audit_log ADD COLUMN idempotency_key TEXT;` },
+				{ name: 'decision_id', sql: `ALTER TABLE audit_log ADD COLUMN decision_id TEXT;` },
+				{ name: 'original_decision_id', sql: `ALTER TABLE audit_log ADD COLUMN original_decision_id TEXT;` }
 			];
 			const tableInfo = await userDb.prepare(`PRAGMA table_info('audit_log')`).all();
 			const existingCols = new Set((tableInfo?.results || []).map(r => r.name));
@@ -91,6 +97,34 @@ const auditService = {
 					}
 				}
 			}
+
+			// Real table for final notice outbox & retries
+			await userDb.prepare(`
+				CREATE TABLE IF NOT EXISTS notification_outbox (
+					id INTEGER PRIMARY KEY AUTOINCREMENT,
+					task_id TEXT NOT NULL UNIQUE,
+					case_id INTEGER,
+					ticket_id TEXT,
+					user_id INTEGER,
+					recipient TEXT NOT NULL,
+					channel TEXT NOT NULL DEFAULT 'internal',
+					template_code TEXT NOT NULL,
+					subject TEXT NOT NULL,
+					content TEXT NOT NULL,
+					reason_code TEXT,
+					status TEXT NOT NULL DEFAULT 'pending',
+					provider_message_id TEXT,
+					retry_count INTEGER NOT NULL DEFAULT 0,
+					max_retries INTEGER NOT NULL DEFAULT 5,
+					last_error TEXT,
+					next_retry_at TEXT,
+					delivered_at TEXT,
+					read_at TEXT,
+					create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+					update_time DATETIME DEFAULT CURRENT_TIMESTAMP
+				);
+			`).run();
+			await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_outbox_status_retry ON notification_outbox(status, next_retry_at);`).run();
 
 			// Real table for auto purged and tombstoned batches
 			await userDb.prepare(`
@@ -1545,52 +1579,443 @@ const auditService = {
 	},
 
 	/**
-	 * Adjudicate appeal
+	 * Adjudicate case / appeal with strict state, atomicity, concurrency, and idempotency guarantees
 	 */
 	async adjudicate(c, body) {
-		const { id, action, decision, notes, purgeOnRelease } = body;
+		const currentUser = c.get('user');
+		if (!currentUser) {
+			throw new BizError('未授权的管理员操作，请先登录', 401);
+		}
+
+		const { id, action, decision, notes, purgeOnRelease, version } = body;
 		const actionType = action || decision;
+		const idempotencyKey = body.idempotencyKey || body.idempotency_key;
+
+		// 明确拒绝底层尚未实现的能力，不伪造技术成功
+		if (['mute_account', 'probation'].includes(actionType)) {
+			throw new BizError('当前系统底层尚未接入该动作的实际执行能力 (mute/probation)', 400);
+		}
+
 		const targetLog = await orm(c).select().from(auditLog).where(eq(auditLog.id, id)).get();
 		if (!targetLog) {
-			throw new BizError('申诉记录不存在', 404);
+			throw new BizError('案件记录不存在', 404);
 		}
 
-		const targetUser = await orm(c).select().from(user).where(eq(user.email, targetLog.email)).get();
-		const nowIso = new Date().toISOString();
-
-		if (actionType === 'approve' || actionType === 'probation' || actionType === 'whitelist') {
-			if (targetUser) {
-				await userService.setStatus(c, { userId: targetUser.userId, status: 0 });
+		// 幂等性控制：同幂等键检查（置于结案检查前，保证安全重放）
+		if (idempotencyKey) {
+			const existingKeyRecord = await orm(c).select().from(auditLog).where(eq(auditLog.idempotencyKey, idempotencyKey)).get();
+			if (existingKeyRecord) {
+				if (Number(existingKeyRecord.id) === Number(id)) {
+					return {
+						success: true,
+						action: actionType,
+						decisionId: existingKeyRecord.decisionId,
+						replayed: true,
+						version: existingKeyRecord.version || 1
+					};
+				} else {
+					throw new BizError('幂等键冲突：同一幂等键不可用于不同案件或操作', 409);
+				}
 			}
-			await orm(c).update(auditLog).set({
-				status: 'resolved',
-				resolvedTime: nowIso,
-				detailText: (targetLog.detailText || '') + (notes ? `\n[人工研判备注]: ${notes}` : '')
-			}).where(eq(auditLog.id, id)).run();
+		}
 
-			// 同步更新封禁管控台账中状态为 unbanned (已解禁/已移出黑名单)，记录依然保留！
-			await orm(c).update(auditLog).set({
-				status: 'unbanned',
-				resolvedTime: nowIso,
-				detailText: sql`${auditLog.detailText} || ${'\n[解禁说明]: 申诉复核通过，已移出黑名单恢复正常 (' + (notes || '正常放行') + ')'}`
-			}).where(and(eq(auditLog.email, targetLog.email), eq(auditLog.warningType, 'ban'))).run();
+		// 检查案件是否已结案（只读审计记录防重入）
+		const isClosed = ['resolved', 'expired', 'rejected', 'unbanned'].includes(targetLog.status);
+		if (isClosed) {
+			throw new BizError('该案件已结案归档，属于系统只读审计记录，无法重复提交裁决', 400);
+		}
+
+		// 并发控制：乐观锁版本检查 (CAS)
+		if (version !== undefined && version !== null && targetLog.version !== undefined && targetLog.version !== null) {
+			if (Number(version) !== Number(targetLog.version)) {
+				throw new BizError('案件版本已过时，请刷新后重试', 409);
+			}
+		}
+
+		// 严格绑定目标账号，不信任客户端随意指定的任何外部主体字段
+		const targetUser = await orm(c).select().from(user).where(eq(user.email, targetLog.email)).get();
+
+		// 状态转换与业务场景合法性校验 (严防非法状态机跃迁)
+		const isAppealCase = targetLog.warningType === 'appeal' || Boolean(targetLog.appealReason);
+		if (['approve_appeal', 'approve', 'reject_appeal', 'reject'].includes(actionType) && !isAppealCase) {
+			throw new BizError('当前案件无待处理申诉，无法执行申诉裁决动作', 400);
+		}
+
+		const isCurrentlyBanned = targetLog.status === 'banned' || targetLog.warningType === 'ban';
+		if (['ban', 'ban_account', 'banned'].includes(actionType) && isCurrentlyBanned) {
+			throw new BizError('当前案件已处于封禁处置中，不可重复执行首次封禁裁决（复核处置请使用维持封禁或解封）', 400);
+		}
+
+		if (actionType === 'maintain_ban' && !isCurrentlyBanned) {
+			throw new BizError('当前案件未处于封禁状态，无法执行维持封禁', 400);
+		}
+
+		if (actionType === 'unban' && !isCurrentlyBanned) {
+			throw new BizError('当前案件未处于封禁处置中，无需执行解封', 400);
+		}
+
+		if (actionType === 'archive_routine' && targetLog.warningType !== 'audit') {
+			throw new BizError('常规封存归档动作仅适用于例行合规审查案件', 400);
+		}
+
+		if (actionType === 'blacklist_sender' && (targetLog.isInternal === 1 || Boolean(targetUser))) {
+			throw new BizError('外部拉黑动作仅适用于外部发件人，无法拉黑本地注册账号', 400);
+		}
+
+		if ((actionType === 'ban' || actionType === 'ban_account' || actionType === 'banned') && targetLog.isInternal === 0 && !targetUser) {
+			throw new BizError('站内账号封禁仅适用于本地注册用户，外部发件人请使用外部拉黑', 400);
+		}
+
+		const nowIso = new Date().toISOString();
+		const actor = currentUser?.email || currentUser?.name || 'SecAdmin';
+		const decisionId = 'DEC-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).substring(2, 6).toUpperCase();
+		const noticeTaskId = 'TSK-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).substring(2, 6).toUpperCase();
+
+		let timeline = [];
+		try {
+			if (targetLog.timeline) {
+				timeline = typeof targetLog.timeline === 'string' ? JSON.parse(targetLog.timeline) : targetLog.timeline;
+			}
+		} catch (e) {}
+
+		// 生成标准化、脱敏最终处置通知数据快照
+		const noticeSnapshot = decisionNoticeService.renderFinalNotice({
+			actionType,
+			targetLog,
+			targetUser,
+			caseNumber: targetLog.ticketId || (targetLog.id ? `#${targetLog.id}` : '#AK1789'),
+			reasonCode: targetLog.reasonCode,
+			publicReason: targetLog.reportCategory,
+			notes
+		});
+
+		const userDb = getUserDb(c) || c?.env?.db;
+		if (!userDb) {
+			throw new BizError('数据库连接不可用 (D1 unbound)', 500);
+		}
+
+		const stmts = [];
+		let targetNewStatus = 'resolved';
+		let targetNewDetailText = targetLog.detailText || '';
+		let isolationNotice = '';
+
+		// 1. 首次违规或处置复核中的封禁处置
+		if (actionType === 'ban' || actionType === 'ban_account' || actionType === 'banned') {
+			targetNewStatus = targetLog.warningType === 'ban' ? 'banned' : 'resolved';
+			targetNewDetailText += (notes ? `\n[处置结果]: ${notes}` : '\n[处置结果]: 管理员人工裁决封禁');
+			timeline.push({ time: nowIso, event: '执行封禁处置', actor });
+
+			if (targetUser) {
+				stmts.push(userDb.prepare(`UPDATE user SET status = 1 WHERE user_id = ?`).bind(targetUser.userId));
+			}
+
+			// 同步在封禁管控台账中保留/生成记录
+			const existingBan = await orm(c).select().from(auditLog).where(
+				and(eq(auditLog.email, targetLog.email), eq(auditLog.warningType, 'ban'))
+			).get();
+
+			if (!existingBan) {
+				stmts.push(userDb.prepare(`
+					INSERT INTO audit_log (
+						ticket_id, email, user_id, warning_type, event_type, category,
+						action_text, detail_text, ban_reason, ban_time, resolved_time,
+						status, risk_level, priority, timeline, decision_id, original_decision_id
+					) VALUES (?, ?, ?, 'ban', ?, 'security', ?, ?, ?, ?, ?, 'banned', 'high', 'CRITICAL', ?, ?, ?)
+				`).bind(
+					'BAN-' + Date.now().toString(36).toUpperCase(),
+					targetLog.email,
+					targetUser?.userId || null,
+					targetLog.eventType || 'admin_ban',
+					`{${targetLog.email}} 经管理员审核处置生效封禁`,
+					notes || targetLog.detailText || '管理员人工裁决封禁',
+					targetLog.actionText || '触犯系统风控与安全红线',
+					nowIso,
+					nowIso,
+					JSON.stringify(timeline),
+					decisionId,
+					targetLog.id
+				));
+			} else {
+				stmts.push(userDb.prepare(`
+					UPDATE audit_log 
+					SET status = 'banned', resolved_time = ?, detail_text = ?, decision_id = ?
+					WHERE id = ?
+				`).bind(
+					nowIso,
+					(existingBan.detailText || '') + (notes ? `\n[处置更新]: ${notes}` : ''),
+					decisionId,
+					existingBan.id
+				));
+			}
+		}
+
+		// 2. 首次裁决：排除嫌疑·不予处罚
+		else if (actionType === 'no_penalty' || actionType === 'dismiss') {
+			targetNewStatus = 'resolved';
+			targetNewDetailText += `\n[研判结果]: 经审查排除嫌疑，不予处罚 (${notes || '无违规证据'})`;
+			timeline.push({ time: nowIso, event: '排除嫌疑结案', actor });
+		}
+
+		// 3. 首次裁决：外部发件人加入全局黑名单
+		else if (actionType === 'blacklist_sender') {
+			targetNewStatus = 'resolved';
+			targetNewDetailText += `\n[处置结果]: 管理员已手动将该外部发信地址加入系统全局黑名单拦截 (${notes || '核查属实拉黑'})`;
+			timeline.push({ time: nowIso, event: '外部拉黑', actor });
+
+			stmts.push(userDb.prepare(`
+				INSERT INTO audit_log (
+					ticket_id, email, warning_type, event_type, category,
+					action_text, detail_text, ban_reason, ban_time, resolved_time,
+					status, risk_level, priority, timeline, decision_id, original_decision_id
+				) VALUES (?, ?, 'ban', 'external_blacklist', 'security', ?, ?, ?, ?, ?, 'banned', 'high', 'CRITICAL', ?, ?, ?)
+			`).bind(
+				'BAN-' + Date.now().toString(36).toUpperCase(),
+				targetLog.email,
+				`{${targetLog.email}} 外部来信被检举核实，已加入系统全局黑名单`,
+				`处置发件人: ${targetLog.email}。检举次数: ${targetLog.reportedByOthers || 1}。处置说明: ${notes || '管理员核查属实，拉入全局黑名单拦截'}`,
+				`外部邮件被他人检举 (${targetLog.reportCategory || '违规'}，累计检举 ${targetLog.reportedByOthers || 1} 次)`,
+				nowIso,
+				nowIso,
+				JSON.stringify(timeline),
+				decisionId,
+				targetLog.id
+			));
+		}
+
+		// 4. 首次裁决：常规基线合规审查归档
+		else if (actionType === 'archive_routine' || actionType === 'dismiss_alert') {
+			targetNewStatus = 'expired';
+			targetNewDetailText += `\n[封存说明]: 常规审查事项已封存归档 (${notes || '例行审查完毕'})`;
+			timeline.push({ time: nowIso, event: '例行封存归档', actor });
+		}
+
+		// 5. 既有处置复核：维持本案封禁处置
+		else if (actionType === 'maintain_ban') {
+			targetNewStatus = 'banned';
+			targetNewDetailText += (notes ? `\n[维持处置]: ${notes}` : '\n[维持处置]: 复核确认维持原封禁处置');
+			timeline.push({ time: nowIso, event: '执行维持封禁', actor });
+		}
+
+		// 6. 既有处置复核：解除本案封禁限制
+		else if (actionType === 'unban') {
+			const otherActiveBans = await orm(c).select().from(auditLog).where(
+				and(
+					eq(auditLog.email, targetLog.email),
+					eq(auditLog.status, 'banned'),
+					sql`${auditLog.id} != ${id}`
+				)
+			).all();
+
+			if (targetUser && otherActiveBans.length === 0) {
+				stmts.push(userDb.prepare(`UPDATE user SET status = 0 WHERE user_id = ?`).bind(targetUser.userId));
+			}
+
+			isolationNotice = otherActiveBans.length > 0
+				? `\n[系统安全提示]: 本案限制已解除；但该账号仍受其他 ${otherActiveBans.length} 起有效封禁案卷约束，系统全局保持封禁状态`
+				: '';
+
+			targetNewStatus = targetLog.warningType === 'ban' ? 'unbanned' : 'resolved';
+			targetNewDetailText += (notes ? `\n[解禁说明]: ${notes}` : '\n[解禁说明]: 复核放行解禁') + isolationNotice;
+			timeline.push({ time: nowIso, event: '解除封禁处置', actor });
+
+			if (otherActiveBans.length === 0) {
+				stmts.push(userDb.prepare(`
+					UPDATE audit_log 
+					SET status = 'unbanned', resolved_time = ?,
+						detail_text = detail_text || ?
+					WHERE email = ? AND warning_type = 'ban' AND status = 'banned'
+				`).bind(
+					nowIso,
+					'\n[解禁说明]: 复核通过已移出黑名单 (' + (notes || '正常放行') + ')',
+					targetLog.email
+				));
+			}
+		}
+
+		// 7. 用户申诉审核：申诉成立放行
+		else if (actionType === 'approve' || actionType === 'approve_appeal' || actionType === 'whitelist') {
+			const otherActiveBans = await orm(c).select().from(auditLog).where(
+				and(
+					eq(auditLog.email, targetLog.email),
+					eq(auditLog.status, 'banned'),
+					sql`${auditLog.id} != ${id}`
+				)
+			).all();
+
+			if (targetUser && otherActiveBans.length === 0) {
+				stmts.push(userDb.prepare(`UPDATE user SET status = 0 WHERE user_id = ?`).bind(targetUser.userId));
+			}
+
+			isolationNotice = otherActiveBans.length > 0
+				? `\n[系统安全提示]: 本案限制已解除；但该账号仍受其他 ${otherActiveBans.length} 起有效封禁案卷约束，系统全局保持封禁状态`
+				: '';
+
+			targetNewStatus = 'resolved';
+			targetNewDetailText += (notes ? `\n[申诉裁决]: ${notes}` : '\n[申诉裁决]: 申诉复核通过') + isolationNotice;
+			timeline.push({ time: nowIso, event: '申诉通过放行', actor });
+
+			if (otherActiveBans.length === 0) {
+				stmts.push(userDb.prepare(`
+					UPDATE audit_log 
+					SET status = 'unbanned', resolved_time = ?,
+						detail_text = detail_text || ?
+					WHERE email = ? AND warning_type = 'ban' AND status = 'banned'
+				`).bind(
+					nowIso,
+					'\n[解禁说明]: 申诉复核通过，已移出黑名单恢复正常 (' + (notes || '正常放行') + ')',
+					targetLog.email
+				));
+			}
 
 			if (purgeOnRelease) {
-				// Purge non-critical warning logs for this email
-				await orm(c).delete(auditLog).where(and(
-					eq(auditLog.email, targetLog.email),
-					eq(auditLog.warningType, 'audit')
-				)).run();
+				stmts.push(userDb.prepare(`
+					DELETE FROM audit_log 
+					WHERE email = ? AND warning_type = 'audit'
+				`).bind(targetLog.email));
 			}
-		} else if (actionType === 'reject' || actionType === 'banned') {
-			await orm(c).update(auditLog).set({
-				status: actionType === 'banned' ? 'banned' : 'rejected',
-				resolvedTime: nowIso,
-				detailText: (targetLog.detailText || '') + (notes ? `\n[驳回/处置理由]: ${notes}` : '')
-			}).where(eq(auditLog.id, id)).run();
 		}
 
-		return { success: true };
+		// 8. 用户申诉审核：驳回申诉
+		else if (actionType === 'reject' || actionType === 'reject_appeal') {
+			targetNewStatus = 'rejected';
+			targetNewDetailText += (notes ? `\n[驳回理由]: ${notes}` : '\n[驳回理由]: 申诉复核不成立，维持封禁');
+			timeline.push({ time: nowIso, event: '驳回申诉', actor });
+		}
+
+		else {
+			throw new BizError(`不支持的裁决动作: ${actionType}`, 400);
+		}
+
+		// 主案卷 CAS 条件更新（原子性第一句）
+		const updateCaseStmt = userDb.prepare(`
+			UPDATE audit_log 
+			SET status = ?, resolved_time = ?, timeline = ?, detail_text = ?,
+				version = coalesce(version, 1) + 1, decision_id = ?, idempotency_key = ?
+			WHERE id = ? AND status = ?
+		`).bind(
+			targetNewStatus,
+			nowIso,
+			JSON.stringify(timeline),
+			targetNewDetailText,
+			decisionId,
+			idempotencyKey || null,
+			id,
+			targetLog.status
+		);
+		stmts.unshift(updateCaseStmt);
+
+		// 最终通知写入 notification_outbox 任务（原子性同事务入库）
+		const channel = (targetLog.isInternal === 1 || Boolean(targetUser)) ? 'internal' : 'external';
+		const outboxStmt = decisionNoticeService.buildOutboxInsertStmt(userDb, {
+			taskId: noticeTaskId,
+			caseId: targetLog.id,
+			ticketId: targetLog.ticketId || `#${targetLog.id}`,
+			userId: targetUser?.userId || null,
+			recipient: targetLog.email,
+			templateCode: noticeSnapshot.templateCode,
+			subject: noticeSnapshot.subject,
+			content: noticeSnapshot.htmlContent,
+			reasonCode: targetLog.reasonCode,
+			channel
+		});
+		stmts.push(outboxStmt);
+
+		// 执行 D1 原子事务 Batch
+		let batchResults = [];
+		if (typeof userDb.batch === 'function') {
+			batchResults = await userDb.batch(stmts);
+		} else {
+			// Mock / fallback
+			for (const s of stmts) {
+				batchResults.push(await s.run());
+			}
+		}
+
+		// 校验 CAS 影响行数：若为 0 表明状态已被并发修改或过时
+		const caseUpdateResult = batchResults[0];
+		if (caseUpdateResult?.meta && caseUpdateResult.meta.changes === 0) {
+			throw new BizError('案件状态已被并发修改或版本过时，请刷新后重试', 409);
+		}
+
+		// ── 事务提交成功后的安全副作用处理 (Post-Transaction Side Effects) ──
+		let restrictedToken = null;
+
+		// A. 封禁动作：清除 KV 会话缓存，阻断旧会话，生成受限通知凭证
+		if (['ban', 'ban_account', 'banned'].includes(actionType)) {
+			if (targetUser && c?.env?.kv) {
+				try {
+					await c.env.kv.delete(KvConst.AUTH_INFO + targetUser.userId);
+				} catch (e) {
+					console.warn('Failed to evict user auth info KV:', e.message);
+				}
+			}
+
+			if (targetUser) {
+				try {
+					restrictedToken = await decisionNoticeService.generateRestrictedToken(c, {
+						userId: targetUser.userId,
+						caseId: targetLog.id,
+						ticketId: targetLog.ticketId,
+						email: targetLog.email
+					});
+				} catch (e) {
+					console.warn('Failed to generate restricted token:', e.message);
+				}
+			}
+		}
+
+		// B. 内部账号：将官方安全最终裁决通知直接送达其邮箱进行持久化
+		if (targetUser) {
+			try {
+				await decisionNoticeService.persistInternalNotice(c, {
+					targetUser,
+					recipient: targetLog.email,
+					subject: noticeSnapshot.subject,
+					htmlContent: noticeSnapshot.htmlContent,
+					textContent: noticeSnapshot.textContent
+				});
+			} catch (e) {
+				console.warn('Failed to persist internal notice to mailbox:', e.message);
+			}
+		}
+
+		// C. 外部拉黑：将恶意发信地址写入系统全局黑名单并刷新配置缓存
+		if (actionType === 'blacklist_sender') {
+			try {
+				const settingRow = await settingService.query(c);
+				let blackFromObj = { mode: 'blacklist', blacklist: [] };
+				if (settingRow?.blackFrom) {
+					try {
+						if (settingRow.blackFrom.startsWith('{')) {
+							blackFromObj = JSON.parse(settingRow.blackFrom);
+						} else {
+							blackFromObj.blacklist = settingRow.blackFrom.split(',').filter(Boolean);
+						}
+					} catch (_) {}
+				}
+				if (!blackFromObj.blacklist) blackFromObj.blacklist = [];
+				if (!blackFromObj.blacklist.includes(targetLog.email)) {
+					blackFromObj.blacklist.push(targetLog.email);
+					await settingService.setBlacklist(c, {
+						blackSubject: settingRow?.blackSubject || '',
+						blackContent: settingRow?.blackContent || '',
+						blackFrom: JSON.stringify(blackFromObj)
+					});
+				}
+			} catch (e) {
+				console.warn('Failed to synchronize setting.blackFrom for blacklist_sender:', e.message);
+			}
+		}
+
+		return {
+			success: true,
+			action: actionType,
+			decisionId,
+			noticeTaskId,
+			version: (targetLog.version || 1) + 1,
+			isRestricted: ['ban', 'ban_account', 'banned'].includes(actionType),
+			restrictedToken
+		};
 	},
 
 	/**

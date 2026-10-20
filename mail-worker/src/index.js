@@ -6,6 +6,7 @@ import emailService from './service/email-service';
 import kvObjService from './service/kv-obj-service';
 import oauthService from "./service/oauth-service";
 import analysisService from './service/analysis-service';
+import decisionNoticeService from './service/decision-notice-service';
 export default {
 	 async fetch(req, env, ctx) {
 
@@ -50,6 +51,7 @@ export default {
 		await emailService.completeReceiveAll({ env })
 		await emailService.clearTrashAndSpam({ env })
 		await oauthService.clearNoBindOathUser({ env })
+		await decisionNoticeService.processOutboxBatch({ env })
 		await analysisService.refreshEchartsCache({ env })
 	},
 };

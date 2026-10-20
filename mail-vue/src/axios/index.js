@@ -80,9 +80,15 @@ http.interceptors.response.use((res) => {
         return Promise.reject(error);
     }
 
-    if (error.status === 403) {
-        location.reload();
-        return;
+    if (error.status === 403 || error.response?.status === 403) {
+        ElMessage({
+            message: error.response?.data?.message || i18n.global.t('unauthorizedAccess') || '无权访问该资源',
+            type: 'warning',
+            plain: true,
+            grouping: true,
+            repeatNum: -4,
+        });
+        return Promise.reject(error);
     }
 
     const noMsg = error.config?.noMsg;

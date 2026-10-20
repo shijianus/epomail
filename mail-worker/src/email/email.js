@@ -96,6 +96,12 @@ export async function email(message, env, ctx) {
 
 		if (account && userRow.email !== env.admin) {
 
+			// 封禁账号入站拦截：被管控限制账号阻断接收普通外部/站内来信，防止滥用积压
+			if (Number(userRow.status) === 1) {
+				message.setReject('The recipient account has been suspended.');
+				return;
+			}
+
 			let { banEmail, availDomain } = await roleService.selectByUserId({ env: env }, account.userId);
 
 			if (!roleService.hasAvailDomainPerm(availDomain, message.to)) {
