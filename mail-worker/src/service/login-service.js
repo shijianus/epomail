@@ -334,36 +334,6 @@ const loginService = {
 			isLegacy = checkResult.isLegacy;
 		}
 
-		// 受限用户安全通道：密码凭证核验通过后，若账号已被封禁管控，阻断常规发信与读信会话，签发专用受限通知凭证
-		if (userRow.status === userConst.status.BAN) {
-			let latestBan = null;
-			try {
-				latestBan = await orm(c).select().from(auditLog).where(
-					and(
-						eq(auditLog.email, userRow.email),
-						eq(auditLog.status, 'banned')
-					)
-				).orderBy(desc(auditLog.id)).limit(1).get();
-			} catch (_) {}
-
-			const restrictedToken = await decisionNoticeService.generateRestrictedToken(c, {
-				userId: userRow.userId,
-				caseId: latestBan?.id || null,
-				ticketId: latestBan?.ticketId || null,
-				email: userRow.email
-			});
-
-			return {
-				isRestricted: true,
-				restrictedToken,
-				user: {
-					email: userRow.email,
-					status: userRow.status
-				},
-				message: '账号已被系统管控限制，已提供受限处置通知与申诉入口'
-			};
-		}
-
 		// Check if TOTP 2FA or Security Key is enabled
 		const isGlobalTotpEnabled = await settingService.isTotpEnabled(c);
 		let securityKeysList = [];
@@ -398,7 +368,10 @@ const loginService = {
 				params.secPayload || {}
 			);
 
-			if (trustEval.canBypass2FA) {
+			// 封禁账号必须强制完成真实二次认证，严禁通过可信设备免密绕过 2FA 签发受限凭据
+			const canBypass2FA = userRow.status === userConst.status.BAN ? false : trustEval.canBypass2FA;
+
+			if (canBypass2FA) {
 				// Trusted device 30-day grace bypass is active!
 				sessionTrustEpoch = trustEval.trustEpoch;
 				sessionMaxEpoch = trustEval.maxSessionEpoch;
@@ -454,6 +427,45 @@ const loginService = {
 					riskFlags: riskAssessment.clientFlags
 				};
 			}
+		}
+
+		// 受限用户安全通道：针对无 2FA 的账号（或完成 2FA 后），若账号已被封禁管控，阻断常规发信与读信会话，签发专用受限通知凭证
+		if (userRow.status === userConst.status.BAN) {
+			let latestBan = null;
+			try {
+				latestBan = await orm(c).select().from(auditLog).where(
+					and(
+						eq(auditLog.email, userRow.email),
+						eq(auditLog.status, 'banned')
+					)
+				).orderBy(desc(auditLog.id)).limit(1).get();
+			} catch (_) {}
+
+			const restrictedToken = await decisionNoticeService.generateRestrictedToken(c, {
+				userId: userRow.userId,
+				caseId: latestBan?.id || null,
+				ticketId: latestBan?.ticketId || null,
+				email: userRow.email
+			});
+
+			const exchangeCode = await decisionNoticeService.createOneTimeExchangeCode(c, {
+				restrictedToken,
+				user: {
+					email: userRow.email,
+					status: userRow.status
+				}
+			});
+
+			return {
+				isRestricted: true,
+				restrictedToken,
+				code: exchangeCode,
+				user: {
+					email: userRow.email,
+					status: userRow.status
+				},
+				message: '账号已被系统管控限制，已提供受限处置通知与申诉入口'
+			};
 		}
 
 		// Clear fail count on success
@@ -756,9 +768,18 @@ const loginService = {
 				email: userRow.email
 			});
 
+			const exchangeCode = await decisionNoticeService.createOneTimeExchangeCode(c, {
+				restrictedToken,
+				user: {
+					email: userRow.email,
+					status: userRow.status
+				}
+			});
+
 			return {
 				isRestricted: true,
 				restrictedToken,
+				code: exchangeCode,
 				user: {
 					email: userRow.email,
 					status: userRow.status

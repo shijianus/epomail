@@ -48,7 +48,7 @@ not_found_handling = "single-page-application"
 run_worker_first = true
 
 [triggers]
-crons = ["0 16 * * *"]	#每天晚上12点执行每日任务,刷新分析缓存
+crons = ["0 16 * * *", "*/5 * * * *"]	#每天夜间例行任务 + 每5分钟通知Outbox调度与租约检查
 
 
 [vars]
@@ -71,3 +71,69 @@ admin = "admin@epomail.bond"				#管理员的邮箱	示例: admin@example.com
 # 使用 node ./build.mjs 使得无论在仓库根目录（--config mail-worker/wrangler.toml）还是在 mail-worker/ 目录下调用 wrangler，
 # 均能无缝定位到统一构建流程并完成生产构建。
 command = "node ./build.mjs"
+
+# ======================================================================================
+# 独立预发布环境 (Staging Environment Configuration)
+# 调用方式示例 (等待用户授权后执行):
+#   pnpm --dir mail-worker exec wrangler deploy --env staging
+# ======================================================================================
+[env.staging]
+name = "epomail-staging"
+compatibility_date = "2025-06-04"
+keep_vars = true
+
+[env.staging.observability]
+enabled = true
+
+# --------------------------------------------------------------------------------------
+# Staging 独立 D1 数据库存储绑定 (严格物理隔离，禁止复用生产环境数据库)
+# --------------------------------------------------------------------------------------
+[[env.staging.d1_databases]]
+binding = "USER_DB"
+database_name = "epomail-staging-db"
+database_id = "PLACEHOLDER_STAGING_D1_DATABASE_ID"
+
+[[env.staging.d1_databases]]
+binding = "MAIL_DB"
+database_name = "epomail-staging-db"
+database_id = "PLACEHOLDER_STAGING_D1_DATABASE_ID"
+
+[[env.staging.d1_databases]]
+binding = "db"
+database_name = "epomail-staging-db"
+database_id = "PLACEHOLDER_STAGING_D1_DATABASE_ID"
+
+# --------------------------------------------------------------------------------------
+# Staging 独立 KV 命名空间绑定 (严格物理隔离，禁止复用生产环境KV命名空间)
+# --------------------------------------------------------------------------------------
+[[env.staging.kv_namespaces]]
+binding = "kv"
+id = "PLACEHOLDER_STAGING_KV_NAMESPACE_ID"
+
+# AI 绑定 (用于测试文本与规则智能研判)
+[env.staging.ai]
+binding = "ai"
+
+# 静态资源绑定 (前端构建产物 dist 目录托管)
+[env.staging.assets]
+binding = "assets"
+directory = "./dist"
+not_found_handling = "single-page-application"
+run_worker_first = true
+
+# 定时调度 (夜间清理 + 每 5 分钟 Outbox 调度与租约检查)
+[env.staging.triggers]
+crons = ["0 16 * * *", "*/5 * * * *"]
+
+# Staging 环境变量隔离配置
+[env.staging.vars]
+ENVIRONMENT = "staging"
+ALLOW_URL_INIT = "false"
+# 预发布域名与管理员配置（等待用户提供真实分配域名，使用显式占位符）
+domain = ["PLACEHOLDER_STAGING_DOMAIN"]
+admin = "admin@PLACEHOLDER_STAGING_DOMAIN"
+# 邮件外发总开关 (第一阶段默认关闭，严防任意真实外发)
+EMAIL_OUTBOUND_ENABLED = "false"
+# 官方测试白名单 (第二阶段启用)
+OUTBOUND_WHITELIST = "delivered@resend.dev,bounced@resend.dev,complained@resend.dev"
+

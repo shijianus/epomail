@@ -152,14 +152,35 @@ const noticeData = ref(null);
 const appealText = ref('');
 const submittingAppeal = ref(false);
 
-const getRestrictedToken = () => {
+const getRestrictedToken = async () => {
+  // 1. 若存在单次短时启动兑换码，立即兑换并清除 URL 地址栏参数
+  const queryCode = route.query.code;
+  if (queryCode && typeof queryCode === 'string') {
+    try {
+      const resp = await fetch('/api/notice/restricted/exchange', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: queryCode })
+      });
+      const data = await resp.json();
+      if (data.code === 200 && data.data?.restrictedToken) {
+        sessionStorage.setItem('epomail_restricted_token', data.data.restrictedToken);
+        router.replace({ path: '/notice/restricted', query: {} });
+        return data.data.restrictedToken;
+      }
+    } catch (_) {}
+  }
+
+  // 2. 兼容旧地址携带 token 并即刻从 URL 剥离
   const queryToken = route.query.token;
   if (queryToken && typeof queryToken === 'string') {
     try {
       sessionStorage.setItem('epomail_restricted_token', queryToken);
+      router.replace({ path: '/notice/restricted', query: {} });
     } catch (_) {}
     return queryToken;
   }
+
   try {
     return sessionStorage.getItem('epomail_restricted_token') || '';
   } catch (_) {
@@ -168,7 +189,7 @@ const getRestrictedToken = () => {
 };
 
 const fetchNotice = async () => {
-  const token = getRestrictedToken();
+  const token = await getRestrictedToken();
   if (!token) {
     error.value = t('auditRestrictedNoToken');
     loading.value = false;
@@ -176,7 +197,7 @@ const fetchNotice = async () => {
   }
 
   try {
-    const res = await fetch(`/api/notice/restricted/view?token=${encodeURIComponent(token)}`, {
+    const res = await fetch('/api/notice/restricted/view', {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`
@@ -194,19 +215,19 @@ const fetchNotice = async () => {
       error.value = body.message || t('auditRestrictedTokenInvalid');
     }
   } catch (err) {
-    error.value = t('auditRestrictedFetchError');
+    error.value = t('auditRestrictedNetworkError');
   } finally {
     loading.value = false;
   }
 };
 
 const handleSubmitAppeal = async () => {
-  const token = getRestrictedToken();
+  const token = await getRestrictedToken();
   if (!token || !appealText.value.trim()) return;
 
   submittingAppeal.value = true;
   try {
-    const res = await fetch(`/api/notice/restricted/appeal?token=${encodeURIComponent(token)}`, {
+    const res = await fetch('/api/notice/restricted/appeal', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

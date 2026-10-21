@@ -96,8 +96,33 @@ function createIsolatedDb() {
       next_retry_at TEXT,
       delivered_at TEXT,
       read_at TEXT,
+      claimant_id TEXT,
+      lease_expires_at TEXT,
+      lease_version INTEGER DEFAULT 0,
       create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
       update_time DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE audit_decision (
+      decision_id TEXT PRIMARY KEY,
+      case_id INTEGER NOT NULL,
+      expected_version INTEGER NOT NULL,
+      action_type TEXT NOT NULL,
+      actor TEXT NOT NULL,
+      idempotency_key TEXT UNIQUE,
+      payload_hash TEXT NOT NULL,
+      create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(case_id, expected_version)
+    );
+
+    CREATE TABLE webhook_event (
+      event_id TEXT PRIMARY KEY,
+      provider TEXT NOT NULL,
+      event_type TEXT NOT NULL,
+      resource_id TEXT,
+      payload TEXT,
+      status TEXT NOT NULL DEFAULT 'processed',
+      create_time DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE setting (
@@ -246,7 +271,7 @@ function createIsolatedDb() {
     async delete(key) { this._data.delete(key); }
   };
 
-  const createContext = (adminUser = { userId: 2, email: 'secadmin@epocanvas.com', name: 'SecAdmin' }) => {
+  const createContext = (adminUser = { userId: 1, email: 'secadmin@epocanvas.com', name: 'SecAdmin' }) => {
     const store = new Map();
     if (adminUser) store.set('user', adminUser);
     return {
@@ -254,7 +279,8 @@ function createIsolatedDb() {
       set(key, val) { store.set(key, val); },
       env: {
         db: d1,
-        kv: mockKv
+        kv: mockKv,
+        admin: adminUser?.email || 'secadmin@epocanvas.com'
       }
     };
   };
@@ -522,9 +548,9 @@ const isBizError = (err, code, msg) => {
   `);
 
   const cFailing = {
-    get(k) { return k === 'user' ? { userId: 2, email: 'secadmin@epocanvas.com' } : null; },
+    get(k) { return k === 'user' ? { userId: 1, email: 'secadmin@epocanvas.com' } : null; },
     set() {},
-    env: { db: failingD1, kv: mockKv }
+    env: { db: failingD1, kv: mockKv, admin: 'secadmin@epocanvas.com' }
   };
 
   await assert.rejects(
@@ -736,4 +762,110 @@ const isBizError = (err, code, msg) => {
   console.log('✅ Requirement 14 Passed: Restricted access token and internal mailbox notice reliably generated');
 }
 
-console.log('\n🎉 ALL 14 REAL BACKEND SERVICE LAYER ADJUDICATION TESTS PASSED PERFECTLY!\n');
+// --------------------------------------------------------------------------
+// 15. 并发交错仲裁冲突控制 (Concurrent Race Condition Between Opposing Decisions)
+// --------------------------------------------------------------------------
+{
+  const { rawDb, createContext } = createIsolatedDb();
+  const cAdmin1 = createContext({ userId: 1, email: 'admin1@epocanvas.com', name: 'Admin 1' });
+  const cAdmin2 = createContext({ userId: 2, email: 'admin2@epocanvas.com', name: 'Admin 2' });
+
+  rawDb.exec(`
+    INSERT INTO user (user_id, email, status) VALUES (95, 'race_target@epocanvas.com', 0);
+    INSERT INTO audit_log (id, ticket_id, email, warning_type, event_type, category, action_text, status, is_internal, version)
+    VALUES (95, 'THR-095', 'race_target@epocanvas.com', 'risk', 'spam', 'security', 'Spam', 'active', 1, 1);
+  `);
+
+  // 管理员 1 执行封禁决定 (version 1)
+  const res1 = await auditService.adjudicate(cAdmin1, { id: 95, action: 'ban_account', version: 1, notes: 'Admin 1 bans' });
+  assert.strictEqual(res1.success, true);
+
+  // 此时案件在 DB 中 version 已递增为 2，状态为 resolved (或 warningType 为 ban 的台账已建)
+  const caseAfterAdmin1 = rawDb.prepare('SELECT version, status FROM audit_log WHERE id = 95').get();
+  assert.strictEqual(caseAfterAdmin1.version, 2);
+
+  // 管理员 2 此时并发提交排除嫌疑 (仍手持过时的 version 1)
+  await assert.rejects(
+    async () => await auditService.adjudicate(cAdmin2, { id: 95, action: 'no_penalty', version: 1, notes: 'Admin 2 dismisses' }),
+    (err) => isBizError(err, 409, '过时') || isBizError(err, 409, '并发修改') || isBizError(err, 400, '只读')
+  );
+
+  // 验证竞争失败方 (Admin 2) 绝对没有产生任何副作用或外发通知
+  const outboxTasks = rawDb.prepare('SELECT count(*) as count FROM notification_outbox WHERE case_id = 95').get();
+  assert.strictEqual(outboxTasks.count, 1, 'Only exactly 1 task (from winner Admin 1) may exist');
+
+  const decisions = rawDb.prepare('SELECT count(*) as count FROM audit_decision WHERE case_id = 95').get();
+  assert.strictEqual(decisions.count, 1, 'Only winner decision recorded in ledger');
+
+  const userStatus = rawDb.prepare('SELECT status FROM user WHERE user_id = 95').get();
+  assert.strictEqual(userStatus.status, 1, 'User status must remain in winner state (banned)');
+
+  console.log('✅ Requirement 15 Passed: Concurrency race condition strictly governed; losing side leaves zero side-effects');
+}
+
+// --------------------------------------------------------------------------
+// 16. SQL 中途失败事务全批次原子回滚 (Atomic Rollback on Mid-Batch SQL Failure)
+// --------------------------------------------------------------------------
+{
+  const { rawDb, createContext, d1 } = createIsolatedDb();
+  const c = createContext();
+
+  rawDb.exec(`
+    INSERT INTO user (user_id, email, status) VALUES (96, 'rollback_test@epocanvas.com', 0);
+    INSERT INTO audit_log (id, ticket_id, email, warning_type, event_type, category, action_text, status, is_internal, version)
+    VALUES (96, 'THR-096', 'rollback_test@epocanvas.com', 'risk', 'spam', 'security', 'Spam', 'active', 1, 1);
+  `);
+
+  // 人为使 notification_outbox task_id 唯一约束冲突，模拟批次末尾 SQL 异常
+  rawDb.exec(`
+    INSERT INTO notification_outbox (task_id, recipient, template_code, subject, content)
+    VALUES ('PRE_EXISTING_TASK', 'someone@epocanvas.com', 'FIRST_BAN', 'Test', 'Test');
+  `);
+
+  // 原生 batch 遇到 SQL 错误时必须整体回滚
+  const originalPrepare = d1.prepare;
+  d1.prepare = function(sql) {
+    const bound = originalPrepare.call(this, sql);
+    if (sql.includes('INSERT INTO notification_outbox')) {
+      return {
+        ...bound,
+        bind(...params) {
+          const b = bound.bind(...params);
+          return {
+            ...b,
+            async run() {
+              // 触发强制唯一约束失败
+              throw new Error('UNIQUE constraint failed: notification_outbox.task_id');
+            }
+          };
+        }
+      };
+    }
+    return bound;
+  };
+
+  await assert.rejects(
+    async () => await auditService.adjudicate(c, { id: 96, action: 'ban_account' }),
+    (err) => err.message.includes('UNIQUE constraint failed')
+  );
+
+  // 恢复 prepare
+  d1.prepare = originalPrepare;
+
+  // 验证原案卷状态未被部分更新 (仍为 active，version 仍为 1)
+  const caseAfterFail = rawDb.prepare('SELECT status, version FROM audit_log WHERE id = 96').get();
+  assert.strictEqual(caseAfterFail.status, 'active', 'Case status must not be partially updated on failure');
+  assert.strictEqual(caseAfterFail.version, 1, 'Case version must not increment on failure');
+
+  // 验证用户状态没有被置为 1 (仍为 0)
+  const userAfterFail = rawDb.prepare('SELECT status FROM user WHERE user_id = 96').get();
+  assert.strictEqual(userAfterFail.status, 0, 'User status must not be modified on failure');
+
+  // 验证 audit_decision 台账没有残留
+  const decisionAfterFail = rawDb.prepare('SELECT count(*) as count FROM audit_decision WHERE case_id = 96').get();
+  assert.strictEqual(decisionAfterFail.count, 0, 'Decision record must be rolled back');
+
+  console.log('✅ Requirement 16 Passed: Mid-batch SQL failure cleanly rolls back the entire atomic batch');
+}
+
+console.log('\n🎉 ALL 16 REAL BACKEND SERVICE LAYER ADJUDICATION TESTS PASSED PERFECTLY!\n');

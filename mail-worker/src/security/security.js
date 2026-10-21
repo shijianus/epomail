@@ -156,6 +156,11 @@ app.use('*', async (c, next) => {
 		throw new BizError(t('authExpired'), 401);
 	}
 
+	// 严防凭据混用：受限处置通知专用凭据绝不可用于访问常规邮箱业务接口
+	if (result.purpose === 'restricted_notice') {
+		throw new BizError('受限通知凭证无权访问常规邮箱接口 (Restricted token cannot access regular APIs)', 403);
+	}
+
 	const { userId, token, loginEmail } = result;
 	if (loginEmail) {
 		c.set('loginEmail', loginEmail);

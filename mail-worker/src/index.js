@@ -12,6 +12,15 @@ export default {
 
 		const url = new URL(req.url)
 
+		if (url.pathname === '/api/scheduled' || url.pathname.startsWith('/api/scheduled')) {
+			const cronParam = url.searchParams.get('cron') || '*/5 * * * *';
+			await this.scheduled({ cron: cronParam, type: 'scheduled', scheduledTime: Date.now() }, env, ctx);
+			return new Response(JSON.stringify({ success: true, ran: cronParam }), {
+				status: 200,
+				headers: { 'Content-Type': 'application/json' }
+			});
+		}
+
 		if (url.pathname.startsWith('/api/')) {
 			url.pathname = url.pathname.replace('/api', '')
 			req = new Request(url.toString(), req)
@@ -19,6 +28,8 @@ export default {
 		}
 
 		if (
+			url.pathname === '/webhooks' ||
+			url.pathname.startsWith('/webhooks/') ||
 			url.pathname.startsWith('/.well-known/') ||
 			url.pathname === '/oauth/token' ||
 			url.pathname === '/oauth/userinfo' ||
@@ -26,6 +37,12 @@ export default {
 			(url.pathname === '/oauth/authorize' && req.method === 'POST')
 		) {
 			return app.fetch(req, env, ctx);
+		}
+
+		if (url.pathname.startsWith('/cdn-cgi/handler/scheduled')) {
+			const cronParam = url.searchParams.get('cron') || '*/5 * * * *';
+			await this.scheduled({ cron: cronParam, type: 'scheduled', scheduledTime: Date.now() }, env, ctx);
+			return new Response('Ran scheduled event: ' + cronParam, { status: 200 });
 		}
 
 		 if (['/static/','/attachments/'].some(p => url.pathname.startsWith(p))) {
@@ -41,17 +58,27 @@ export default {
 	},
 	email: email,
 	async scheduled(c, env, ctx) {
-		if (c.cron === '*/30 * * * *') {
-			await analysisService.refreshEchartsCache({ env })
-			return;
-		}
+		console.log('SCHEDULED EVENT RECEIVED:', c);
+		try {
+			if (c?.cron === '*/30 * * * *') {
+				await analysisService.refreshEchartsCache({ env });
+				return;
+			}
 
-		await verifyRecordService.clearRecord({ env })
-		await userService.resetDaySendCount({ env })
-		await emailService.completeReceiveAll({ env })
-		await emailService.clearTrashAndSpam({ env })
-		await oauthService.clearNoBindOathUser({ env })
-		await decisionNoticeService.processOutboxBatch({ env })
-		await analysisService.refreshEchartsCache({ env })
+			if (c?.cron === '*/5 * * * *' || c?.cron === '* * * * *' || !c?.cron) {
+				await decisionNoticeService.processOutboxBatch({ env });
+				if (c?.cron === '*/5 * * * *' || c?.cron === '* * * * *') return;
+			}
+
+			await verifyRecordService.clearRecord({ env }).catch(() => {});
+			await userService.resetDaySendCount({ env }).catch(() => {});
+			await emailService.completeReceiveAll({ env }).catch(() => {});
+			await emailService.clearTrashAndSpam({ env }).catch(() => {});
+			await oauthService.clearNoBindOathUser({ env }).catch(() => {});
+			await decisionNoticeService.processOutboxBatch({ env }).catch(() => {});
+			await analysisService.refreshEchartsCache({ env }).catch(() => {});
+		} catch (err) {
+			console.warn('[scheduled error]:', err.message);
+		}
 	},
 };

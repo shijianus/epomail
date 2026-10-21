@@ -8,6 +8,8 @@ import KvConst from '../const/kv-const.js';
 import { and, desc, asc, eq, sql, count, inArray } from 'drizzle-orm';
 import BizError from '../error/biz-error';
 import { getUserDb } from '../utils/db-accessor';
+import { isAdminUser } from '../utils/admin-utils';
+import permService from './perm-service';
 
 let tablesEnsured = false;
 
@@ -98,7 +100,7 @@ const auditService = {
 				}
 			}
 
-			// Real table for final notice outbox & retries
+			// Real table for final notice outbox & retries with distributed lease lock
 			await userDb.prepare(`
 				CREATE TABLE IF NOT EXISTS notification_outbox (
 					id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -120,11 +122,60 @@ const auditService = {
 					next_retry_at TEXT,
 					delivered_at TEXT,
 					read_at TEXT,
+					claimant_id TEXT,
+					lease_expires_at TEXT,
+					lease_version INTEGER DEFAULT 0,
 					create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
 					update_time DATETIME DEFAULT CURRENT_TIMESTAMP
 				);
 			`).run();
 			await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_outbox_status_retry ON notification_outbox(status, next_retry_at);`).run();
+
+			// Idempotent columns for notification_outbox
+			const outboxInfo = await userDb.prepare(`PRAGMA table_info('notification_outbox')`).all().catch(() => ({ results: [] }));
+			const existingOutboxCols = new Set((outboxInfo?.results || []).map(r => r.name));
+			const outboxLeaseCols = [
+				{ name: 'claimant_id', sql: `ALTER TABLE notification_outbox ADD COLUMN claimant_id TEXT;` },
+				{ name: 'lease_expires_at', sql: `ALTER TABLE notification_outbox ADD COLUMN lease_expires_at TEXT;` },
+				{ name: 'lease_version', sql: `ALTER TABLE notification_outbox ADD COLUMN lease_version INTEGER DEFAULT 0;` }
+			];
+			for (const col of outboxLeaseCols) {
+				if (!existingOutboxCols.has(col.name)) {
+					try {
+						await userDb.prepare(col.sql).run();
+					} catch (_) {}
+				}
+			}
+
+			// Atomic adjudication decision ledger for strict CAS and unique idempotency
+			await userDb.prepare(`
+				CREATE TABLE IF NOT EXISTS audit_decision (
+					decision_id TEXT PRIMARY KEY,
+					case_id INTEGER NOT NULL,
+					expected_version INTEGER NOT NULL,
+					action_type TEXT NOT NULL,
+					actor TEXT NOT NULL,
+					idempotency_key TEXT UNIQUE,
+					payload_hash TEXT NOT NULL,
+					create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+					UNIQUE(case_id, expected_version)
+				);
+			`).run();
+			await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_audit_decision_case ON audit_decision(case_id);`).run();
+			await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_audit_decision_idemp ON audit_decision(idempotency_key);`).run();
+
+			// Strict webhook event deduplication ledger
+			await userDb.prepare(`
+				CREATE TABLE IF NOT EXISTS webhook_event (
+					event_id TEXT PRIMARY KEY,
+					provider TEXT NOT NULL,
+					event_type TEXT NOT NULL,
+					resource_id TEXT,
+					payload TEXT,
+					status TEXT NOT NULL DEFAULT 'processed',
+					create_time DATETIME DEFAULT CURRENT_TIMESTAMP
+				);
+			`).run();
 
 			// Real table for auto purged and tombstoned batches
 			await userDb.prepare(`
@@ -1587,6 +1638,18 @@ const auditService = {
 			throw new BizError('未授权的管理员操作，请先登录', 401);
 		}
 
+		// 权限严格守门：必须具备管理员身份或 audit:adjudicate 明确权限
+		if (!isAdminUser(c, currentUser)) {
+			let permKeys = [];
+			try {
+				permKeys = await permService.userPermKeys(c, currentUser.userId);
+			} catch (_) {}
+			const hasPerm = permKeys.includes('*') || permKeys.includes('audit:adjudicate') || permKeys.includes('audit:*');
+			if (!hasPerm) {
+				throw new BizError('无权执行案件裁决操作 (需要 audit:adjudicate 权限)', 403);
+			}
+		}
+
 		const { id, action, decision, notes, purgeOnRelease, version } = body;
 		const actionType = action || decision;
 		const idempotencyKey = body.idempotencyKey || body.idempotency_key;
@@ -1601,8 +1664,43 @@ const auditService = {
 			throw new BizError('案件记录不存在', 404);
 		}
 
+		const userDb = getUserDb(c) || c?.env?.db;
+		if (!userDb) {
+			throw new BizError('数据库连接不可用 (D1 unbound)', 500);
+		}
+
+		// 计算本次裁决请求内容的密码学哈希摘要（防止同幂等键篡改不同业务请求内容）
+		const payloadStr = JSON.stringify({ id: Number(id), action: actionType, notes: (notes || '').trim() });
+		const encoder = new TextEncoder();
+		const hashBuf = await crypto.subtle.digest('SHA-256', encoder.encode(payloadStr));
+		const payloadHash = Array.from(new Uint8Array(hashBuf)).map(b => b.toString(16).padStart(2, '0')).join('');
+
 		// 幂等性控制：同幂等键检查（置于结案检查前，保证安全重放）
 		if (idempotencyKey) {
+			let existingDecision = null;
+			try {
+				existingDecision = await userDb.prepare(`
+					SELECT decision_id, case_id, action_type, payload_hash, create_time
+					FROM audit_decision
+					WHERE idempotency_key = ?
+				`).bind(idempotencyKey).first();
+			} catch (_) {}
+
+			if (existingDecision) {
+				if (existingDecision.payload_hash === payloadHash && Number(existingDecision.case_id) === Number(id)) {
+					return {
+						success: true,
+						action: existingDecision.action_type,
+						decisionId: existingDecision.decision_id,
+						replayed: true,
+						version: targetLog.version || 1
+					};
+				} else {
+					throw new BizError('幂等键冲突：同一幂等键不可用于不同案件或操作', 409);
+				}
+			}
+
+			// 兼容旧存量 audit_log.idempotency_key 字段
 			const existingKeyRecord = await orm(c).select().from(auditLog).where(eq(auditLog.idempotencyKey, idempotencyKey)).get();
 			if (existingKeyRecord) {
 				if (Number(existingKeyRecord.id) === Number(id)) {
@@ -1688,11 +1786,6 @@ const auditService = {
 			publicReason: targetLog.reportCategory,
 			notes
 		});
-
-		const userDb = getUserDb(c) || c?.env?.db;
-		if (!userDb) {
-			throw new BizError('数据库连接不可用 (D1 unbound)', 500);
-		}
 
 		const stmts = [];
 		let targetNewStatus = 'resolved';
@@ -1886,12 +1979,30 @@ const auditService = {
 			throw new BizError(`不支持的裁决动作: ${actionType}`, 400);
 		}
 
-		// 主案卷 CAS 条件更新（原子性第一句）
+		const expectedVersion = Number(targetLog.version || 1);
+
+		// 0. 登记决策台账与版本占位（原子性第一句：若 expected_version 已被并发事务抢占，则触发 UNIQUE 约束在 D1 级立即回滚全批次）
+		const decisionStmt = userDb.prepare(`
+			INSERT INTO audit_decision (
+				decision_id, case_id, expected_version, action_type, actor, idempotency_key, payload_hash
+			) VALUES (?, ?, ?, ?, ?, ?, ?)
+		`).bind(
+			decisionId,
+			targetLog.id,
+			expectedVersion,
+			actionType,
+			actor,
+			idempotencyKey || null,
+			payloadHash
+		);
+		stmts.unshift(decisionStmt);
+
+		// 1. 主案卷 CAS 条件更新（原子性第二句）
 		const updateCaseStmt = userDb.prepare(`
 			UPDATE audit_log 
 			SET status = ?, resolved_time = ?, timeline = ?, detail_text = ?,
 				version = coalesce(version, 1) + 1, decision_id = ?, idempotency_key = ?
-			WHERE id = ? AND status = ?
+			WHERE id = ? AND status = ? AND version = ?
 		`).bind(
 			targetNewStatus,
 			nowIso,
@@ -1900,9 +2011,10 @@ const auditService = {
 			decisionId,
 			idempotencyKey || null,
 			id,
-			targetLog.status
+			targetLog.status,
+			expectedVersion
 		);
-		stmts.unshift(updateCaseStmt);
+		stmts.splice(1, 0, updateCaseStmt);
 
 		// 最终通知写入 notification_outbox 任务（原子性同事务入库）
 		const channel = (targetLog.isInternal === 1 || Boolean(targetUser)) ? 'internal' : 'external';
@@ -1922,17 +2034,30 @@ const auditService = {
 
 		// 执行 D1 原子事务 Batch
 		let batchResults = [];
-		if (typeof userDb.batch === 'function') {
-			batchResults = await userDb.batch(stmts);
-		} else {
-			// Mock / fallback
-			for (const s of stmts) {
-				batchResults.push(await s.run());
+		try {
+			if (typeof userDb.batch === 'function') {
+				batchResults = await userDb.batch(stmts);
+			} else {
+				// Mock / fallback
+				for (const s of stmts) {
+					batchResults.push(await s.run());
+				}
 			}
+		} catch (batchErr) {
+			const errMsg = String(batchErr?.message || batchErr);
+			if (errMsg.includes('UNIQUE constraint failed') || errMsg.includes('constraint') || errMsg.includes('version mismatch') || errMsg.includes('Audit log version mismatch')) {
+				if (errMsg.includes('idempotency_key')) {
+					throw new BizError('幂等键冲突：同一幂等键不可用于不同案件或操作', 409);
+				}
+				if (errMsg.includes('case_id') || errMsg.includes('expected_version') || errMsg.includes('version mismatch') || errMsg.includes('Audit log version mismatch')) {
+					throw new BizError('案件状态已被并发修改或版本过时，请刷新后重试', 409);
+				}
+			}
+			throw batchErr;
 		}
 
-		// 校验 CAS 影响行数：若为 0 表明状态已被并发修改或过时
-		const caseUpdateResult = batchResults[0];
+		// 校验 CAS 影响行数：若案卷更新（第二句）影响 0 行表明状态已被并发修改
+		const caseUpdateResult = batchResults[1];
 		if (caseUpdateResult?.meta && caseUpdateResult.meta.changes === 0) {
 			throw new BizError('案件状态已被并发修改或版本过时，请刷新后重试', 409);
 		}

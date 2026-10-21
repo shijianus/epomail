@@ -6,3 +6,5 @@
 jwt_secret=<your-strong-random-secret>
 # TOTP 两步验证密钥加密主键 (建议 32 字节以上强随机字符串)
 totp_enc_key=<your-strong-random-totp-master-key>
+# Resend Webhook Svix 签名验证密钥 (格式: whsec_...)
+resend_webhook_secret=whsec_<your-svix-webhook-secret>

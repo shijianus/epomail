@@ -6,10 +6,30 @@ import { getDefaultUserLabelsString } from '../const/default-labels';
 
 const dbInit = {
 	async init(c) {
-		const secret = c.req.param('secret');
+		const authHeader = c.req.header('Authorization') || '';
+		const xInitSecret = c.req.header('X-Init-Secret') || '';
+		let secret = xInitSecret;
+		if (!secret && authHeader.startsWith('Bearer ')) {
+			secret = authHeader.substring(7).trim();
+		}
+		if (!secret && c.req.method === 'POST') {
+			try {
+				const body = await c.req.json().catch(() => ({}));
+				secret = body.secret || '';
+			} catch (_) {}
+		}
+		if (!secret) {
+			const urlSecret = c.req.param('secret');
+			if (urlSecret) {
+				if (c?.env?.ALLOW_URL_INIT === 'false' || c?.env?.ENVIRONMENT === 'staging') {
+					return c.text('❌ Passing initialization secret via URL is prohibited in this environment. Use POST /api/init with X-Init-Secret header.', 403);
+				}
+				secret = urlSecret;
+			}
+		}
 
-		if (secret !== c.env.jwt_secret) {
-			return c.text('❌ JWT secret mismatch');
+		if (!secret || secret !== c.env.jwt_secret) {
+			return c.text('❌ JWT secret mismatch', 401);
 		}
 
 		await this.intDB(c);
@@ -312,6 +332,9 @@ const dbInit = {
 					next_retry_at TEXT,
 					delivered_at TEXT,
 					read_at TEXT,
+					claimant_id TEXT,
+					lease_expires_at TEXT,
+					lease_version INTEGER DEFAULT 0,
 					create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
 					update_time DATETIME DEFAULT CURRENT_TIMESTAMP
 				)
@@ -319,8 +342,63 @@ const dbInit = {
 			await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_outbox_status_retry ON notification_outbox(status, next_retry_at)`).run();
 			await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_outbox_case_id ON notification_outbox(case_id)`).run();
 			await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_outbox_recipient ON notification_outbox(recipient)`).run();
+
+			// 幂等升级 notification_outbox 租约并发与故障恢复字段
+			const outboxInfo = await userDb.prepare(`PRAGMA table_info('notification_outbox')`).all().catch(() => ({ results: [] }));
+			const existingOutboxCols = new Set((outboxInfo?.results || []).map(r => r.name));
+			const outboxLeaseCols = [
+				{ name: 'claimant_id', sql: `ALTER TABLE notification_outbox ADD COLUMN claimant_id TEXT;` },
+				{ name: 'lease_expires_at', sql: `ALTER TABLE notification_outbox ADD COLUMN lease_expires_at TEXT;` },
+				{ name: 'lease_version', sql: `ALTER TABLE notification_outbox ADD COLUMN lease_version INTEGER DEFAULT 0;` }
+			];
+			for (const col of outboxLeaseCols) {
+				if (!existingOutboxCols.has(col.name)) {
+					try {
+						await userDb.prepare(col.sql).run();
+					} catch (e) {
+						console.warn(`v3_17DB 跳过 notification_outbox 列 ${col.name}:`, e.message);
+					}
+				}
+			}
 		} catch (err) {
 			console.warn('v3_17DB notification_outbox warning:', err.message);
+		}
+
+		try {
+			await userDb.prepare(`
+				CREATE TABLE IF NOT EXISTS audit_decision (
+					decision_id TEXT PRIMARY KEY,
+					case_id INTEGER NOT NULL,
+					expected_version INTEGER NOT NULL,
+					action_type TEXT NOT NULL,
+					actor TEXT NOT NULL,
+					idempotency_key TEXT UNIQUE,
+					payload_hash TEXT NOT NULL,
+					create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+					UNIQUE(case_id, expected_version)
+				)
+			`).run();
+			await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_audit_decision_case ON audit_decision(case_id)`).run();
+			await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_audit_decision_idemp ON audit_decision(idempotency_key)`).run();
+		} catch (err) {
+			console.warn('v3_17DB audit_decision warning:', err.message);
+		}
+
+		try {
+			await userDb.prepare(`
+				CREATE TABLE IF NOT EXISTS webhook_event (
+					event_id TEXT PRIMARY KEY,
+					provider TEXT NOT NULL,
+					event_type TEXT NOT NULL,
+					resource_id TEXT,
+					payload TEXT,
+					status TEXT NOT NULL DEFAULT 'processed',
+					create_time DATETIME DEFAULT CURRENT_TIMESTAMP
+				)
+			`).run();
+			await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_webhook_event_resource ON webhook_event(resource_id)`).run();
+		} catch (err) {
+			console.warn('v3_17DB webhook_event warning:', err.message);
 		}
 
 		try {
@@ -335,6 +413,41 @@ const dbInit = {
 			await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_audit_purge_batch_time ON audit_purge_batch(create_time)`).run();
 		} catch (err) {
 			console.warn('v3_17DB audit_purge_batch warning:', err.message);
+		}
+
+		try {
+			await userDb.prepare(`
+				CREATE TABLE IF NOT EXISTS one_time_exchange_code (
+					code_hash TEXT PRIMARY KEY,
+					user_id INTEGER NOT NULL,
+					email TEXT NOT NULL,
+					case_id TEXT,
+					token_payload TEXT NOT NULL,
+					consumed INTEGER NOT NULL DEFAULT 0,
+					expires_at INTEGER NOT NULL,
+					create_time DATETIME DEFAULT CURRENT_TIMESTAMP
+				)
+			`).run();
+			await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_exchange_code_expires ON one_time_exchange_code(expires_at)`).run();
+		} catch (err) {
+			console.warn('v3_17DB one_time_exchange_code warning:', err.message);
+		}
+
+		try {
+			await userDb.prepare(`
+				CREATE TRIGGER IF NOT EXISTS trg_audit_decision_version_guard
+				BEFORE INSERT ON audit_decision
+				BEGIN
+					SELECT CASE
+						WHEN (SELECT id FROM audit_log WHERE id = NEW.case_id) IS NULL
+						THEN RAISE(ABORT, 'Audit case not found')
+						WHEN (SELECT coalesce(version, 1) FROM audit_log WHERE id = NEW.case_id) != NEW.expected_version
+						THEN RAISE(ABORT, 'Audit log version mismatch: stale decision attempt')
+					END;
+				END;
+			`).run();
+		} catch (err) {
+			console.warn('v3_17DB trg_audit_decision_version_guard warning:', err.message);
 		}
 	},
 
@@ -1460,8 +1573,37 @@ const dbInit = {
 				next_retry_at TEXT,
 				delivered_at TEXT,
 				read_at TEXT,
+				claimant_id TEXT,
+				lease_expires_at TEXT,
+				lease_version INTEGER DEFAULT 0,
 				create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
 				update_time DATETIME DEFAULT CURRENT_TIMESTAMP
+			)
+		`).run();
+
+		await userDb.prepare(`
+			CREATE TABLE IF NOT EXISTS audit_decision (
+				decision_id TEXT PRIMARY KEY,
+				case_id INTEGER NOT NULL,
+				expected_version INTEGER NOT NULL,
+				action_type TEXT NOT NULL,
+				actor TEXT NOT NULL,
+				idempotency_key TEXT UNIQUE,
+				payload_hash TEXT NOT NULL,
+				create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+				UNIQUE(case_id, expected_version)
+			)
+		`).run();
+
+		await userDb.prepare(`
+			CREATE TABLE IF NOT EXISTS webhook_event (
+				event_id TEXT PRIMARY KEY,
+				provider TEXT NOT NULL,
+				event_type TEXT NOT NULL,
+				resource_id TEXT,
+				payload TEXT,
+				status TEXT NOT NULL DEFAULT 'processed',
+				create_time DATETIME DEFAULT CURRENT_TIMESTAMP
 			)
 		`).run();
 
@@ -1472,6 +1614,33 @@ const dbInit = {
 				reason TEXT NOT NULL,
 				create_time DATETIME DEFAULT CURRENT_TIMESTAMP
 			)
+		`).run();
+
+		await userDb.prepare(`
+			CREATE TABLE IF NOT EXISTS one_time_exchange_code (
+				code_hash TEXT PRIMARY KEY,
+				user_id INTEGER NOT NULL,
+				email TEXT NOT NULL,
+				case_id TEXT,
+				token_payload TEXT NOT NULL,
+				consumed INTEGER NOT NULL DEFAULT 0,
+				expires_at INTEGER NOT NULL,
+				create_time DATETIME DEFAULT CURRENT_TIMESTAMP
+			)
+		`).run();
+		await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_exchange_code_expires ON one_time_exchange_code(expires_at)`).run();
+
+		await userDb.prepare(`
+			CREATE TRIGGER IF NOT EXISTS trg_audit_decision_version_guard
+			BEFORE INSERT ON audit_decision
+			BEGIN
+				SELECT CASE
+					WHEN (SELECT id FROM audit_log WHERE id = NEW.case_id) IS NULL
+					THEN RAISE(ABORT, 'Audit case not found')
+					WHEN (SELECT coalesce(version, 1) FROM audit_log WHERE id = NEW.case_id) != NEW.expected_version
+					THEN RAISE(ABORT, 'Audit log version mismatch: stale decision attempt')
+				END;
+			END;
 		`).run();
 	},
 

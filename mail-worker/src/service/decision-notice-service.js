@@ -9,6 +9,9 @@ import emailCryptoUtils from '../utils/email-crypto-utils.js';
 import KvConst from '../const/kv-const.js';
 import jwtUtils from '../utils/jwt-utils.js';
 import BizError from '../error/biz-error.js';
+import { isAdminUser } from '../utils/admin-utils.js';
+import permService from './perm-service.js';
+import { getUserDb } from '../utils/db-accessor.js';
 
 export const DECISION_TEMPLATES = {
 	FIRST_BAN: {
@@ -311,25 +314,72 @@ const decisionNoticeService = {
 	/**
 	 * Generate a purpose-bound restricted notice token
 	 * Used strictly by restricted users to view their case final notice and file an appeal
-	 * Token expires in 72 hours, cannot be used for any general email or management API.
+	 * Token expires in 72 hours (punishments.md §4.2 / §6.2), cannot be used for any general email or management API.
 	 */
 	async generateRestrictedToken(c, { userId, caseId, ticketId, email }) {
 		if (!c?.env?.jwt_secret) {
 			c = { ...c, env: { ...(c?.env || {}), jwt_secret: c?.env?.jwt_secret || 'test_jwt_secret_dev_key' } };
 		}
+		const ttlSeconds = Number(c?.env?.RESTRICTED_TOKEN_TTL_SECONDS || (72 * 3600)); // 72h default per punishments.md §4.2 / §6.2
+		const jti = 'res_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
 		const payload = {
 			userId,
 			caseId,
 			ticketId,
 			email,
-			purpose: 'restricted_notice'
+			purpose: 'restricted_notice',
+			jti
 		};
-		const token = await jwtUtils.generateToken(c, payload, 72 * 3600);
+		const token = await jwtUtils.generateToken(c, payload, ttlSeconds);
 		return token;
 	},
 
 	/**
-	 * Verify a purpose-bound restricted notice token
+	 * Create a single-use short-lived exchange code for restricted session (TTL 60s)
+	 * Used to avoid passing long-lived replayable JWT in URL
+	 * Stored with SHA-256 hash in D1 for strictly atomic single-use consumption
+	 */
+	async createOneTimeExchangeCode(c, { restrictedToken, user, caseId }, ttlSeconds = 60) {
+		const rawCode = 'rec_' + (typeof crypto?.randomUUID === 'function' ? crypto.randomUUID().replace(/-/g, '') : Date.now().toString(36)) + '_' + Math.random().toString(36).slice(2, 10);
+		
+		const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(rawCode));
+		const codeHash = Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+		
+		const userDb = getUserDb(c) || c?.env?.db;
+		const nowSec = Math.floor(Date.now() / 1000);
+		const expiresAt = nowSec + ttlSeconds;
+		const payloadStr = JSON.stringify({ restrictedToken, user: user || null, caseId: caseId || null });
+
+		if (userDb) {
+			try {
+				await userDb.prepare(`
+					INSERT INTO one_time_exchange_code (code_hash, user_id, email, case_id, token_payload, consumed, expires_at)
+					VALUES (?, ?, ?, ?, ?, 0, ?)
+				`).bind(
+					codeHash,
+					user?.userId || user?.user_id || 0,
+					user?.email || '',
+					caseId ? String(caseId) : null,
+					payloadStr,
+					expiresAt
+				).run();
+			} catch (e) {
+				console.warn('Failed to persist one_time_exchange_code to D1:', e.message);
+			}
+		}
+
+		// 辅助 KV 兼容
+		if (c?.env?.kv) {
+			try {
+				await c.env.kv.put(`restricted_code:${rawCode}`, payloadStr, { expirationTtl: ttlSeconds });
+			} catch (_) {}
+		}
+
+		return rawCode;
+	},
+
+	/**
+	 * Verify a purpose-bound restricted notice token with revocation and unban checks
 	 */
 	async verifyRestrictedToken(c, token) {
 		if (!token) return null;
@@ -341,6 +391,22 @@ const decisionNoticeService = {
 			if (!decoded || decoded.purpose !== 'restricted_notice') {
 				return null;
 			}
+
+			// Revocation check via KV
+			if (c?.env?.kv && decoded.jti) {
+				const isRevoked = await c.env.kv.get(`revoked_restricted_token:${decoded.jti}`);
+				if (isRevoked) return null;
+			}
+
+			// Object status check: 若用户已被正式解封恢复正常，受限通道自动失效
+			const userDb = getUserDb(c) || c?.env?.db;
+			if (userDb && decoded.userId) {
+				const uRow = await userDb.prepare('SELECT status FROM user WHERE user_id = ?').bind(decoded.userId).first().catch(() => null);
+				if (uRow && Number(uRow.status) !== 1) {
+					return null;
+				}
+			}
+
 			return decoded;
 		} catch (_) {
 			return null;
@@ -349,11 +415,14 @@ const decisionNoticeService = {
 
 	/**
 	 * Process a batch of pending or retry-eligible notification outbox tasks
-	 * Uses optimistic lease locks to prevent multiple worker instances from duplicate deliveries
+	 * Uses true distributed optimistic lease locks (claimant, lease_expires_at, lease_version)
+	 * to prevent multiple worker instances from duplicate deliveries or stale overwrites.
 	 */
-	async processOutboxBatch(c, limit = 10) {
+	async processOutboxBatch(c, limit = 10, customClaimantId = null) {
 		const userDb = c?.env?.db || (c._mockOrm ? c._mockOrm : null);
 		if (!userDb) return { processed: 0, delivered: 0, failed: 0 };
+
+		const claimantId = customClaimantId || ('wrk_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8));
 
 		let eligibleTasks = [];
 		try {
@@ -361,6 +430,7 @@ const decisionNoticeService = {
 				SELECT * FROM notification_outbox
 				WHERE status = 'pending'
 				   OR (status = 'failed' AND retry_count < max_retries AND (next_retry_at IS NULL OR next_retry_at <= datetime('now')))
+				   OR (status = 'processing' AND lease_expires_at IS NOT NULL AND lease_expires_at < datetime('now'))
 				ORDER BY id ASC
 				LIMIT ?
 			`).bind(limit).all();
@@ -374,41 +444,92 @@ const decisionNoticeService = {
 		let failedCount = 0;
 
 		for (const task of eligibleTasks) {
-			// Optimistic locking lease: claim task
+			// Optimistic locking lease: claim task with worker identifier and 300-second lease expiry
+			const currentLeaseVersion = (Number(task.lease_version) || 0) + 1;
 			const leaseRes = await userDb.prepare(`
 				UPDATE notification_outbox
-				SET status = 'processing', update_time = datetime('now')
-				WHERE task_id = ? AND status IN ('pending', 'failed')
-			`).bind(task.task_id).run();
+				SET status = 'processing', claimant_id = ?, lease_expires_at = datetime('now', '+300 seconds'),
+				    lease_version = ?, update_time = datetime('now')
+				WHERE task_id = ?
+				  AND (
+				       status IN ('pending', 'failed')
+				       OR (status = 'processing' AND lease_expires_at IS NOT NULL AND lease_expires_at < datetime('now'))
+				  )
+			`).bind(claimantId, currentLeaseVersion, task.task_id).run();
 
 			const meta = leaseRes?.meta || leaseRes;
 			if (meta?.changes === 0) {
-				continue;
+				continue; // Lease acquired by another concurrent worker
+			}
+
+			// 检查案卷与用户最新状态：若已有更新的解封生效裁决（例如原案已解封恢复正常），旧封禁通知不得覆盖新裁决
+			if (task.case_id) {
+				const latestCase = await userDb.prepare('SELECT status, warning_type FROM audit_log WHERE id = ?').bind(task.case_id).first().catch(() => null);
+				if (latestCase) {
+					const isBanNotice = task.template_code && (task.template_code.includes('BAN') || task.template_code.includes('SUSPEND'));
+					if (isBanNotice) {
+						let isAlreadyUnbanned = latestCase.status === 'unbanned';
+						if (!isAlreadyUnbanned && task.user_id) {
+							const uRow = await userDb.prepare('SELECT status FROM user WHERE user_id = ?').bind(task.user_id).first().catch(() => null);
+							if (uRow && Number(uRow.status) === 0) {
+								isAlreadyUnbanned = true;
+							}
+						}
+						if (isAlreadyUnbanned) {
+							await userDb.prepare(`
+								UPDATE notification_outbox
+								SET status = 'cancelled', last_error = 'Superseded by newer case adjudication',
+								    claimant_id = NULL, lease_expires_at = NULL, update_time = datetime('now')
+								WHERE task_id = ? AND claimant_id = ? AND lease_version = ?
+							`).bind(task.task_id, claimantId, currentLeaseVersion).run();
+							continue;
+						}
+					}
+				}
 			}
 
 			try {
 				if (task.channel === 'internal') {
 					await userDb.prepare(`
 						UPDATE notification_outbox
-						SET status = 'delivered', delivered_at = datetime('now'), update_time = datetime('now')
-						WHERE task_id = ?
-					`).bind(task.task_id).run();
+						SET status = 'delivered', delivered_at = datetime('now'),
+						    claimant_id = NULL, lease_expires_at = NULL, update_time = datetime('now')
+						WHERE task_id = ? AND claimant_id = ? AND lease_version = ?
+					`).bind(task.task_id, claimantId, currentLeaseVersion).run();
 					deliveredCount++;
 				} else {
 					let sendSuccess = false;
 					let providerMsgId = null;
 					let sendError = null;
 
-					try {
-						const resendToken = c?.env?.resend_token;
-						if (resendToken) {
+					// 分级外发控制：默认关闭外发或严格白名单限制
+					const outboundEnabled = c?.env?.EMAIL_OUTBOUND_ENABLED !== 'false';
+					const isStaging = c?.env?.ENVIRONMENT === 'staging';
+
+					if (!outboundEnabled) {
+						sendError = 'External email outbound is disabled in this environment (EMAIL_OUTBOUND_ENABLED=false)';
+					} else if (isStaging) {
+						const officialResendSandbox = ['delivered@resend.dev', 'bounced@resend.dev', 'complained@resend.dev'];
+						const customWhitelist = (c?.env?.OUTBOUND_WHITELIST || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+						const allowedRecipients = new Set([...officialResendSandbox, ...customWhitelist]);
+						if (!allowedRecipients.has((task.recipient || '').toLowerCase())) {
+							sendError = `Staging recipient (${task.recipient}) not in outbound whitelist; external sending blocked.`;
+						}
+					}
+
+					const resendToken = c?.env?.resend_token;
+					if (!sendError && resendToken) {
+						try {
 							const { Resend } = await import('resend');
 							const resend = new Resend(resendToken);
 							const resp = await resend.emails.send({
 								from: 'EpoCanvas Mail Security <security@epocanvas.com>',
 								to: task.recipient,
 								subject: task.subject,
-								html: task.content
+								html: task.content,
+								headers: {
+									'X-Entity-Ref-ID': task.task_id
+								}
 							});
 							if (resp?.data?.id) {
 								sendSuccess = true;
@@ -416,20 +537,21 @@ const decisionNoticeService = {
 							} else if (resp?.error) {
 								sendError = resp.error.message;
 							}
-						} else {
-							sendSuccess = true;
-							providerMsgId = 'EXT-' + Date.now().toString(36).toUpperCase();
+						} catch (e) {
+							sendError = e.message;
 						}
-					} catch (e) {
-						sendError = e.message;
+					} else if (!sendError && !resendToken) {
+						// 严禁在提供商未配置时伪造发送成功！
+						sendError = 'External email provider not configured (missing resend_token)';
 					}
 
 					if (sendSuccess) {
 						await userDb.prepare(`
 							UPDATE notification_outbox
-							SET status = 'delivered', provider_message_id = ?, delivered_at = datetime('now'), update_time = datetime('now')
-							WHERE task_id = ?
-						`).bind(providerMsgId, task.task_id).run();
+							SET status = 'delivered', provider_message_id = ?, delivered_at = datetime('now'),
+							    claimant_id = NULL, lease_expires_at = NULL, update_time = datetime('now')
+							WHERE task_id = ? AND claimant_id = ? AND lease_version = ?
+						`).bind(providerMsgId, task.task_id, claimantId, currentLeaseVersion).run();
 						deliveredCount++;
 					} else {
 						const nextRetryCount = (task.retry_count || 0) + 1;
@@ -441,9 +563,11 @@ const decisionNoticeService = {
 							UPDATE notification_outbox
 							SET status = ?, retry_count = ?, last_error = ?,
 							    next_retry_at = datetime('now', '+' || ? || ' seconds'),
+							    claimant_id = NULL, lease_expires_at = NULL,
 							    update_time = datetime('now')
-							WHERE task_id = ?
-						`).bind(newStatus, nextRetryCount, sendError || 'Unknown external delivery error', backoffSec, task.task_id).run();
+							WHERE task_id = ? AND claimant_id = ? AND lease_version = ?
+							  AND status NOT IN ('delivered', 'complained', 'canceled')
+						`).bind(newStatus, nextRetryCount, sendError || 'Unknown external delivery error', backoffSec, task.task_id, claimantId, currentLeaseVersion).run();
 						failedCount++;
 					}
 				}
@@ -458,9 +582,11 @@ const decisionNoticeService = {
 					UPDATE notification_outbox
 					SET status = ?, retry_count = ?, last_error = ?,
 					    next_retry_at = datetime('now', '+' || ? || ' seconds'),
+					    claimant_id = NULL, lease_expires_at = NULL,
 					    update_time = datetime('now')
-					WHERE task_id = ?
-				`).bind(newStatus, nextRetryCount, taskErr.message, backoffSec, task.task_id).run();
+					WHERE task_id = ? AND claimant_id = ? AND lease_version = ?
+					  AND status NOT IN ('delivered', 'complained', 'canceled')
+				`).bind(newStatus, nextRetryCount, taskErr.message, backoffSec, task.task_id, claimantId, currentLeaseVersion).run();
 				failedCount++;
 			}
 		}
@@ -473,9 +599,18 @@ const decisionNoticeService = {
 	},
 
 	/**
-	 * Manually retry a failed or dead-letter outbox task
+	 * Manually retry a failed or dead-letter outbox task (Admin authorized)
 	 */
 	async retryOutboxTask(c, taskId) {
+		const currentUser = c?.get?.('user');
+		if (currentUser && !isAdminUser(c, currentUser)) {
+			let permKeys = [];
+			try { permKeys = await permService.userPermKeys(c, currentUser.userId); } catch (_) {}
+			if (!permKeys.includes('*') && !permKeys.includes('audit:adjudicate') && !permKeys.includes('audit:*')) {
+				throw new BizError('无权执行通知任务重试 (需要管理员权限)', 403);
+			}
+		}
+
 		const userDb = c?.env?.db || (c._mockOrm ? c._mockOrm : null);
 		if (!userDb) throw new BizError('Database unavailable', 500);
 
@@ -484,7 +619,8 @@ const decisionNoticeService = {
 
 		await userDb.prepare(`
 			UPDATE notification_outbox
-			SET status = 'pending', retry_count = 0, last_error = NULL, next_retry_at = NULL, update_time = datetime('now')
+			SET status = 'pending', retry_count = 0, last_error = NULL, next_retry_at = NULL,
+			    claimant_id = NULL, lease_expires_at = NULL, update_time = datetime('now')
 			WHERE task_id = ?
 		`).bind(taskId).run();
 

@@ -969,7 +969,7 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
       setStatus("success");
       setSuccessMsg(data.data.message || '账号已被限制，正在进入受限通知页面...');
       setTimeout(() => {
-        window.location.href = `/notice/restricted?token=${encodeURIComponent(data.data.restrictedToken)}`;
+        window.location.href = '/notice/restricted';
       }, 500);
       return;
     }

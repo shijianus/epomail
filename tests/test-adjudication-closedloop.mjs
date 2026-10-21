@@ -97,8 +97,33 @@ function createIsolatedEnvironment() {
       next_retry_at TEXT,
       delivered_at TEXT,
       read_at TEXT,
+      claimant_id TEXT,
+      lease_expires_at TEXT,
+      lease_version INTEGER DEFAULT 0,
       create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
       update_time DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE audit_decision (
+      decision_id TEXT PRIMARY KEY,
+      case_id INTEGER NOT NULL,
+      expected_version INTEGER NOT NULL,
+      action_type TEXT NOT NULL,
+      actor TEXT NOT NULL,
+      idempotency_key TEXT UNIQUE,
+      payload_hash TEXT NOT NULL,
+      create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(case_id, expected_version)
+    );
+
+    CREATE TABLE webhook_event (
+      event_id TEXT PRIMARY KEY,
+      provider TEXT NOT NULL,
+      event_type TEXT NOT NULL,
+      resource_id TEXT,
+      payload TEXT,
+      status TEXT NOT NULL DEFAULT 'processed',
+      create_time DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE user (
@@ -412,7 +437,7 @@ function isBizError(err, expectedCode, msgIncludes) {
 }
 
 // --------------------------------------------------------------------------
-// 12. 最终通知 Outbox 批处理、租约并发锁、退避与重试 (Outbox Processor)
+// 12. 最终通知 Outbox 批处理、分布式租约并发锁、退避与重试 (Outbox Processor)
 // --------------------------------------------------------------------------
 {
   const { rawDb, createContext } = createIsolatedEnvironment();
@@ -425,33 +450,55 @@ function isBizError(err, expectedCode, msgIncludes) {
       ('TSK-EXT-002', 402, 'external_user@thirdparty.com', 'external', 'FIRST_BAN', 'Notice 2', 'Content 2', 'pending', 0, 5);
   `);
 
-  // 12.1 执行第一批批处理
+  // 12.1 执行第一批批处理：内部信直投成功；外部未配置提供商安全失败（绝不伪造发送成功）
   const batchRes = await decisionNoticeService.processOutboxBatch(c, 10);
   assert.strictEqual(batchRes.processed, 2);
-  assert.strictEqual(batchRes.delivered, 2);
+  assert.strictEqual(batchRes.delivered, 1, 'Only internal channel delivers without external provider configured');
+  assert.strictEqual(batchRes.failed, 1, 'External channel must fail safely when resend_token is not configured');
 
   const task1 = rawDb.prepare("SELECT * FROM notification_outbox WHERE task_id = 'TSK-INT-001'").get();
   assert.strictEqual(task1.status, 'delivered');
   assert.ok(task1.delivered_at);
 
   const task2 = rawDb.prepare("SELECT * FROM notification_outbox WHERE task_id = 'TSK-EXT-002'").get();
-  assert.strictEqual(task2.status, 'delivered');
-  assert.ok(task2.provider_message_id);
+  assert.strictEqual(task2.status, 'failed');
+  assert.ok(task2.last_error.includes('provider not configured'), 'Must document unconfigured provider failure');
 
-  // 12.2 模拟死信与退避
+  // 12.2 租约并发锁与崩溃恢复验证
+  rawDb.exec(`
+    INSERT INTO notification_outbox (task_id, case_id, recipient, channel, template_code, subject, content, status, retry_count, max_retries)
+    VALUES ('TSK-LEASE-001', 404, 'lease_test@epocanvas.com', 'internal', 'FIRST_BAN', 'Notice', 'Content', 'pending', 0, 5);
+  `);
+
+  // Worker A 领取任务 (租约 300s, lease_version = 1)
+  const batchResA = await decisionNoticeService.processOutboxBatch(c, 10, 'Worker_A');
+  const taskLeased = rawDb.prepare("SELECT * FROM notification_outbox WHERE task_id = 'TSK-LEASE-001'").get();
+  assert.strictEqual(taskLeased.status, 'delivered', 'Internal task delivers and releases lease');
+
+  // 模拟 Worker A 领取后假死（设置 processing 状态且租约已过期）
+  rawDb.exec(`
+    INSERT INTO notification_outbox (task_id, case_id, recipient, channel, template_code, subject, content, status, claimant_id, lease_expires_at, lease_version, retry_count, max_retries)
+    VALUES ('TSK-EXPIRE-001', 405, 'expire_test@epocanvas.com', 'internal', 'FIRST_BAN', 'Notice', 'Content', 'processing', 'Worker_Stuck', datetime('now', '-60 seconds'), 1, 0, 5);
+  `);
+
+  // Worker B 应该成功回收已过期的 processing 任务
+  const batchResB = await decisionNoticeService.processOutboxBatch(c, 10, 'Worker_B');
+  const taskRecovered = rawDb.prepare("SELECT * FROM notification_outbox WHERE task_id = 'TSK-EXPIRE-001'").get();
+  assert.strictEqual(taskRecovered.status, 'delivered', 'Expired processing lease successfully recovered and delivered');
+
+  // 12.3 模拟人工重试
   rawDb.exec(`
     INSERT INTO notification_outbox (task_id, case_id, recipient, channel, template_code, subject, content, status, retry_count, max_retries)
     VALUES ('TSK-FAIL-003', 403, 'fail_user@example.com', 'external', 'FIRST_BAN', 'Fail Notice', 'Content', 'failed', 4, 5);
   `);
 
-  // 人工重试死信任务
   const retryRes = await decisionNoticeService.retryOutboxTask(c, 'TSK-FAIL-003');
   assert.strictEqual(retryRes.success, true);
   const retriedTask = rawDb.prepare("SELECT * FROM notification_outbox WHERE task_id = 'TSK-FAIL-003'").get();
   assert.strictEqual(retriedTask.status, 'pending');
   assert.strictEqual(retriedTask.retry_count, 0);
 
-  // 12.3 列表审计查询
+  // 12.4 列表审计查询
   const listRes = await decisionNoticeService.listOutboxTasks(c, { caseId: 401 });
   assert.strictEqual(listRes.total, 1);
   assert.strictEqual(listRes.list[0].task_id, 'TSK-INT-001');
@@ -460,11 +507,12 @@ function isBizError(err, expectedCode, msgIncludes) {
 }
 
 // --------------------------------------------------------------------------
-// 13. Webhook 幂等去重与 Outbox 投递状态同步 (Webhook Deduplication & Sync)
+// 13. Webhook 签名验签、去重与状态同步 (Webhook Signature, Deduplication & Sync)
 // --------------------------------------------------------------------------
 {
   const { rawDb, createContext } = createIsolatedEnvironment();
   const c = createContext();
+  c.env.resend_webhook_secret = 'whsec_TestWebhookSecretKey1234567890';
 
   rawDb.exec(`
     INSERT INTO notification_outbox (task_id, case_id, recipient, channel, template_code, subject, content, status, provider_message_id)
@@ -479,23 +527,81 @@ function isBizError(err, expectedCode, msgIncludes) {
     }
   };
 
-  // 第一次 Webhook 投递：同步 Outbox 状态为 delivered
-  const hookRes1 = await resendService.webhooks(c, webhookPayload);
+  const rawBody = JSON.stringify(webhookPayload);
+  const svixId = 'msg_svix_id_1001';
+  const svixTimestamp = Math.floor(Date.now() / 1000).toString();
+
+  // 13.1 验签失败：篡改 body 必须抛出 401
+  await assert.rejects(
+    async () => await resendService.verifyWebhookSignature({
+      secret: c.env.resend_webhook_secret,
+      svixId,
+      svixTimestamp,
+      svixSignature: 'v1,invalid_fake_signature_bytes==',
+      rawBody
+    }),
+    (err) => isBizError(err, 401, '核验失败')
+  );
+
+  // 13.2 缺少密钥必须抛出 500，严禁自动放行
+  await assert.rejects(
+    async () => await resendService.verifyWebhookSignature({
+      secret: '',
+      svixId,
+      svixTimestamp,
+      svixSignature: 'v1,some_sig',
+      rawBody
+    }),
+    (err) => isBizError(err, 500, '未配置')
+  );
+
+  // 13.3 正常签名生成与通过
+  const cleanSecret = c.env.resend_webhook_secret.substring(6);
+  const binaryKey = atob(cleanSecret);
+  const rawKey = new Uint8Array(binaryKey.length);
+  for (let i = 0; i < binaryKey.length; i++) {
+    rawKey[i] = binaryKey.charCodeAt(i);
+  }
+  const cryptoKey = await crypto.subtle.importKey(
+    'raw',
+    rawKey,
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  const signedPayload = new TextEncoder().encode(`${svixId}.${svixTimestamp}.${rawBody}`);
+  const sigBytes = await crypto.subtle.sign('HMAC', cryptoKey, signedPayload);
+  const validSvixSig = 'v1,' + btoa(String.fromCharCode(...new Uint8Array(sigBytes)));
+
+  const verifyPassed = await resendService.verifyWebhookSignature({
+    secret: c.env.resend_webhook_secret,
+    svixId,
+    svixTimestamp,
+    svixSignature: validSvixSig,
+    rawBody
+  });
+  assert.strictEqual(verifyPassed, true, 'Valid Svix signature must pass');
+
+  // 13.4 第一次 Webhook 投递：写入 webhook_event 表并同步 Outbox 状态为 delivered
+  const hookRes1 = await resendService.webhooks(c, webhookPayload, svixId);
   assert.strictEqual(hookRes1.success, true);
+
+  const eventRecord = rawDb.prepare("SELECT * FROM webhook_event WHERE event_id = ?").get(svixId);
+  assert.ok(eventRecord, 'Webhook event must be recorded in D1 ledger');
 
   const syncedTask = rawDb.prepare("SELECT * FROM notification_outbox WHERE task_id = 'TSK-WEBHOOK-001'").get();
   assert.strictEqual(syncedTask.status, 'delivered');
   assert.ok(syncedTask.delivered_at);
 
-  // 第二次以相同 Event ID 投递：触发幂等去重防重入
-  const hookRes2 = await resendService.webhooks(c, webhookPayload);
+  // 13.5 第二次以相同 Event ID 投递：触发 DB 级唯一键去重防重入
+  const hookRes2 = await resendService.webhooks(c, webhookPayload, svixId);
   assert.strictEqual(hookRes2.deduplicated, true);
 
-  console.log('✅ Requirement 13 Passed: Webhook event deduplication and outbox status synchronization succeed');
+  console.log('✅ Requirement 13 Passed: Webhook signature verification, deduplication and outbox status synchronization succeed');
 }
 
 // --------------------------------------------------------------------------
-// 14. 受限登录安全凭证签发 (Restricted Login Token)
+// 14. 受限登录安全凭证签发与 2FA 防越权隔离 (Restricted Login Token & 2FA Gating)
 // --------------------------------------------------------------------------
 {
   const { rawDb, createContext } = createIsolatedEnvironment();
@@ -505,27 +611,40 @@ function isBizError(err, expectedCode, msgIncludes) {
   const hashedPwd = await cryptoUtils.genHashPassword('CorrectPassword123!', salt);
 
   rawDb.exec(`
-    INSERT INTO user (user_id, email, password, salt, status) 
-    VALUES (105, 'restricted_login@epocanvas.com', '${hashedPwd}', '${salt}', 1);
+    INSERT INTO user (user_id, email, password, salt, status, totp_enabled, totp_secret) 
+    VALUES (105, 'restricted_login@epocanvas.com', '${hashedPwd}', '${salt}', 1, 0, '');
 
     INSERT INTO audit_log (id, ticket_id, email, warning_type, event_type, category, action_text, status)
     VALUES (601, 'CAS-601', 'restricted_login@epocanvas.com', 'ban', 'abuse', 'security', 'Banned', 'banned');
   `);
 
-  // 14.1 错误密码必须直接被拒绝，绝不签发任何凭证
+  // 14.1 错误密码必须直接被拒绝，绝不签发任何凭据
   await assert.rejects(
     async () => await loginService.login(c, { email: 'restricted_login@epocanvas.com', password: 'WrongPassword!' }),
     (err) => isBizError(err, null, '密码错误') || isBizError(err, null, 'IncorrectPwd')
   );
 
-  // 14.2 正确密码核验通过后，由于账号被封禁，安全签发受限凭证，绝不签发普通全权会话 JWT
+  // 14.2 正确密码核验通过后，无 2FA 的封禁账号签发受限凭证，绝不签发普通全权会话 JWT
   const loginRes = await loginService.login(c, { email: 'restricted_login@epocanvas.com', password: 'CorrectPassword123!' });
   assert.strictEqual(loginRes.isRestricted, true);
   assert.ok(loginRes.restrictedToken, 'Must issue restrictedToken');
   assert.strictEqual(loginRes.user.status, 1);
-  assert.strictEqual(loginRes.jwt, undefined, 'Must NEVER return general session JWT');
+  assert.strictEqual(loginRes.token, undefined, 'Must NEVER return general session JWT');
 
-  console.log('✅ Requirement 14 Passed: Password verification required before issuing scoped restrictedToken, zero general session leak');
+  // 14.3 启用 2FA 的封禁账号：仅凭正确密码绝对不能签发受限凭证，必须强制挑战 2FA
+  rawDb.exec(`
+    INSERT INTO user (user_id, email, password, salt, status, totp_enabled, totp_secret)
+    VALUES (106, 'banned_2fa@epocanvas.com', '${hashedPwd}', '${salt}', 1, 1, 'BASE32SECRET123');
+  `);
+
+  // 模拟全局开启 TOTP
+  c.env.kv.put('sys:setting', JSON.stringify({ totpEnabled: 1 }));
+
+  const login2FARes = await loginService.login(c, { email: 'banned_2fa@epocanvas.com', password: 'CorrectPassword123!' });
+  assert.strictEqual(login2FARes.mfaRequired, true, 'Must require MFA for 2FA-enabled banned account');
+  assert.strictEqual(login2FARes.restrictedToken, undefined, 'Must NOT issue restricted token before 2FA completed');
+
+  console.log('✅ Requirement 14 Passed: Password verification & 2FA strictly enforced before issuing scoped restrictedToken, zero general session leak');
 }
 
 // --------------------------------------------------------------------------
