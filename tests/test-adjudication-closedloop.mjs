@@ -512,7 +512,11 @@ function isBizError(err, expectedCode, msgIncludes) {
 {
   const { rawDb, createContext } = createIsolatedEnvironment();
   const c = createContext();
-  c.env.resend_webhook_secret = 'whsec_TestWebhookSecretKey1234567890';
+
+  // 运行时密码学安全生成合规的 Svix/Resend Webhook 签名密钥 (whsec_ + 32-byte Base64)
+  // 彻底杜绝静态固定测试凭据，严防扫描告警与凭据伪造
+  const dynamicRawBytes = crypto.getRandomValues(new Uint8Array(32));
+  c.env.resend_webhook_secret = 'whsec_' + btoa(String.fromCharCode(...dynamicRawBytes));
 
   rawDb.exec(`
     INSERT INTO notification_outbox (task_id, case_id, recipient, channel, template_code, subject, content, status, provider_message_id)
@@ -529,60 +533,105 @@ function isBizError(err, expectedCode, msgIncludes) {
 
   const rawBody = JSON.stringify(webhookPayload);
   const svixId = 'msg_svix_id_1001';
-  const svixTimestamp = Math.floor(Date.now() / 1000).toString();
+  const currentTimestamp = Math.floor(Date.now() / 1000).toString();
 
-  // 13.1 验签失败：篡改 body 必须抛出 401
+  // 辅助函数：根据密钥、svixId、时间戳和 rawBody 计算合法 HMAC-SHA256 签名 (真实密码学计算)
+  async function computeSvixSignature(secret, id, timestamp, payload) {
+    const cleanSecret = secret.startsWith('whsec_') ? secret.substring(6) : secret;
+    let rawKey;
+    try {
+      const binaryKey = atob(cleanSecret);
+      rawKey = new Uint8Array(binaryKey.length);
+      for (let i = 0; i < binaryKey.length; i++) {
+        rawKey[i] = binaryKey.charCodeAt(i);
+      }
+    } catch (_) {
+      rawKey = new TextEncoder().encode(cleanSecret);
+    }
+    const cryptoKey = await crypto.subtle.importKey(
+      'raw',
+      rawKey,
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['sign']
+    );
+    const signedPayload = new TextEncoder().encode(`${id}.${timestamp}.${payload}`);
+    const sigBytes = await crypto.subtle.sign('HMAC', cryptoKey, signedPayload);
+    return 'v1,' + btoa(String.fromCharCode(...new Uint8Array(sigBytes)));
+  }
+
+  // 13.1 错误签名拒绝：非法伪造签名必须抛出 401
   await assert.rejects(
     async () => await resendService.verifyWebhookSignature({
       secret: c.env.resend_webhook_secret,
       svixId,
-      svixTimestamp,
+      svixTimestamp: currentTimestamp,
       svixSignature: 'v1,invalid_fake_signature_bytes==',
       rawBody
     }),
     (err) => isBizError(err, 401, '核验失败')
   );
 
-  // 13.2 缺少密钥必须抛出 500，严禁自动放行
+  // 13.2 缺少密钥拒绝：未配置密钥必须抛出 500，严禁自动放行
   await assert.rejects(
     async () => await resendService.verifyWebhookSignature({
       secret: '',
       svixId,
-      svixTimestamp,
+      svixTimestamp: currentTimestamp,
       svixSignature: 'v1,some_sig',
       rawBody
     }),
     (err) => isBizError(err, 500, '未配置')
   );
 
-  // 13.3 正常签名生成与通过
-  const cleanSecret = c.env.resend_webhook_secret.substring(6);
-  const binaryKey = atob(cleanSecret);
-  const rawKey = new Uint8Array(binaryKey.length);
-  for (let i = 0; i < binaryKey.length; i++) {
-    rawKey[i] = binaryKey.charCodeAt(i);
-  }
-  const cryptoKey = await crypto.subtle.importKey(
-    'raw',
-    rawKey,
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign']
+  // 13.3 过期时间戳拒绝：使用旧时间戳针对当前有效密钥真实计算合法签名，依然必须因超过 300s 漂移抛出 400
+  const expiredTimestamp = (Math.floor(Date.now() / 1000) - 600).toString();
+  const expiredValidSignature = await computeSvixSignature(
+    c.env.resend_webhook_secret,
+    svixId,
+    expiredTimestamp,
+    rawBody
   );
-  const signedPayload = new TextEncoder().encode(`${svixId}.${svixTimestamp}.${rawBody}`);
-  const sigBytes = await crypto.subtle.sign('HMAC', cryptoKey, signedPayload);
-  const validSvixSig = 'v1,' + btoa(String.fromCharCode(...new Uint8Array(sigBytes)));
+  await assert.rejects(
+    async () => await resendService.verifyWebhookSignature({
+      secret: c.env.resend_webhook_secret,
+      svixId,
+      svixTimestamp: expiredTimestamp,
+      svixSignature: expiredValidSignature,
+      rawBody
+    }),
+    (err) => isBizError(err, 400, '已过期')
+  );
 
+  // 13.4 正常当前时间合法签名生成与通过
+  const validSvixSig = await computeSvixSignature(
+    c.env.resend_webhook_secret,
+    svixId,
+    currentTimestamp,
+    rawBody
+  );
   const verifyPassed = await resendService.verifyWebhookSignature({
     secret: c.env.resend_webhook_secret,
     svixId,
-    svixTimestamp,
+    svixTimestamp: currentTimestamp,
     svixSignature: validSvixSig,
     rawBody
   });
   assert.strictEqual(verifyPassed, true, 'Valid Svix signature must pass');
 
-  // 13.4 第一次 Webhook 投递：写入 webhook_event 表并同步 Outbox 状态为 delivered
+  // 13.5 篡改 Body 拒绝：合法签名与被篡改载荷匹配时必须抛出 401
+  await assert.rejects(
+    async () => await resendService.verifyWebhookSignature({
+      secret: c.env.resend_webhook_secret,
+      svixId,
+      svixTimestamp: currentTimestamp,
+      svixSignature: validSvixSig,
+      rawBody: rawBody + '{"tampered":true}'
+    }),
+    (err) => isBizError(err, 401, '核验失败')
+  );
+
+  // 13.6 第一次 Webhook 投递：写入 webhook_event 表并同步 Outbox 状态为 delivered
   const hookRes1 = await resendService.webhooks(c, webhookPayload, svixId);
   assert.strictEqual(hookRes1.success, true);
 
@@ -593,11 +642,11 @@ function isBizError(err, expectedCode, msgIncludes) {
   assert.strictEqual(syncedTask.status, 'delivered');
   assert.ok(syncedTask.delivered_at);
 
-  // 13.5 第二次以相同 Event ID 投递：触发 DB 级唯一键去重防重入
+  // 13.7 第二次以相同 Event ID 投递：触发 DB 级唯一键去重防重入
   const hookRes2 = await resendService.webhooks(c, webhookPayload, svixId);
   assert.strictEqual(hookRes2.deduplicated, true);
 
-  console.log('✅ Requirement 13 Passed: Webhook signature verification, deduplication and outbox status synchronization succeed');
+  console.log('✅ Requirement 13 Passed: Webhook signature verification, expired timestamp rejection, tamper defense, deduplication and outbox status synchronization succeed');
 }
 
 // --------------------------------------------------------------------------
