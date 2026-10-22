@@ -317,8 +317,8 @@ const decisionNoticeService = {
 	 * Token expires in 72 hours (punishments.md §4.2 / §6.2), cannot be used for any general email or management API.
 	 */
 	async generateRestrictedToken(c, { userId, caseId, ticketId, email }) {
-		if (!c?.env?.jwt_secret) {
-			c = { ...c, env: { ...(c?.env || {}), jwt_secret: c?.env?.jwt_secret || 'test_jwt_secret_dev_key' } };
+		if (!c?.env?.jwt_secret || typeof c.env.jwt_secret !== 'string' || !c.env.jwt_secret.trim()) {
+			throw new BizError('系统 JWT 密钥未配置 (Missing jwt_secret)', 500);
 		}
 		const ttlSeconds = Number(c?.env?.RESTRICTED_TOKEN_TTL_SECONDS || (72 * 3600)); // 72h default per punishments.md §4.2 / §6.2
 		const jti = 'res_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
@@ -384,8 +384,8 @@ const decisionNoticeService = {
 	async verifyRestrictedToken(c, token) {
 		if (!token) return null;
 		try {
-			if (!c?.env?.jwt_secret) {
-				c = { ...c, env: { ...(c?.env || {}), jwt_secret: c?.env?.jwt_secret || 'test_jwt_secret_dev_key' } };
+			if (!c?.env?.jwt_secret || typeof c.env.jwt_secret !== 'string' || !c.env.jwt_secret.trim()) {
+				return null;
 			}
 			const decoded = await jwtUtils.verifyToken(c, token);
 			if (!decoded || decoded.purpose !== 'restricted_notice') {

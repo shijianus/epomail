@@ -7,12 +7,43 @@ import kvObjService from './service/kv-obj-service';
 import oauthService from "./service/oauth-service";
 import analysisService from './service/analysis-service';
 import decisionNoticeService from './service/decision-notice-service';
+import jwtUtils from './utils/jwt-utils';
 export default {
 	 async fetch(req, env, ctx) {
 
 		const url = new URL(req.url)
 
 		if (url.pathname === '/api/scheduled' || url.pathname.startsWith('/api/scheduled')) {
+			if (req.method !== 'POST') {
+				return new Response(JSON.stringify({ code: 405, message: 'Method Not Allowed: Scheduled trigger requires POST' }), {
+					status: 405,
+					headers: { 'Content-Type': 'application/json' }
+				});
+			}
+
+			// 严格授权守门：必须提供合法的管理员凭证或系统安全密钥，严禁匿名触发
+			const secretHeader = req.headers.get('x-scheduled-secret') || req.headers.get('x-admin-secret');
+			const authHeader = req.headers.get('Authorization') || req.headers.get('authorization');
+			let isAuthorized = false;
+
+			if (env?.jwt_secret && secretHeader && secretHeader === env.jwt_secret) {
+				isAuthorized = true;
+			} else if (authHeader) {
+				try {
+					const payload = await jwtUtils.verifyToken({ env }, authHeader);
+					if (payload && (payload.user_type === 0 || payload.type === 0 || payload.role_id === 1 || payload.email?.includes('admin'))) {
+						isAuthorized = true;
+					}
+				} catch (_) {}
+			}
+
+			if (!isAuthorized) {
+				return new Response(JSON.stringify({ code: 401, message: '未授权的调度触发请求 (Unauthorized scheduled trigger)' }), {
+					status: 401,
+					headers: { 'Content-Type': 'application/json' }
+				});
+			}
+
 			const cronParam = url.searchParams.get('cron') || '*/5 * * * *';
 			await this.scheduled({ cron: cronParam, type: 'scheduled', scheduledTime: Date.now() }, env, ctx);
 			return new Response(JSON.stringify({ success: true, ran: cronParam }), {
@@ -40,6 +71,13 @@ export default {
 		}
 
 		if (url.pathname.startsWith('/cdn-cgi/handler/scheduled')) {
+			if (req.method !== 'POST') {
+				return new Response('Method Not Allowed', { status: 405 });
+			}
+			const secretHeader = req.headers.get('x-scheduled-secret') || req.headers.get('x-admin-secret');
+			if (!env?.jwt_secret || secretHeader !== env.jwt_secret) {
+				return new Response('Unauthorized', { status: 401 });
+			}
 			const cronParam = url.searchParams.get('cron') || '*/5 * * * *';
 			await this.scheduled({ cron: cronParam, type: 'scheduled', scheduledTime: Date.now() }, env, ctx);
 			return new Response('Ran scheduled event: ' + cronParam, { status: 200 });

@@ -47,7 +47,10 @@ const riskService = {
 	async evaluateRisk(c, userRow, secPayload = {}) {
 		const clientIp = getHeader(c, 'cf-connecting-ip') || getHeader(c, 'x-real-ip') || '127.0.0.1';
 		const userAgent = getHeader(c, 'user-agent') || '';
-		const secret = c.env.jwt_secret || 'epocanvas_fallback_secret_entropy_98234';
+		const secret = c.env?.jwt_secret;
+		if (!secret || typeof secret !== 'string' || !secret.trim()) {
+			throw new BizError('系统密钥未配置 (Missing jwt_secret)', 500);
+		}
 
 		// Dynamic UTC day string to rotate daily weights
 		const todayStr = new Date().toISOString().slice(0, 10);

@@ -60,7 +60,10 @@ const deviceTrustService = {
 	 * Compute deterministic device fingerprint hash
 	 */
 	async hashDevice(c, userId, deviceTag) {
-		const secret = c.env.jwt_secret || 'epocanvas_device_trust_secret_entropy';
+		const secret = c.env?.jwt_secret;
+		if (!secret || typeof secret !== 'string' || !secret.trim()) {
+			throw new Error('Missing jwt_secret for device trust');
+		}
 		const key = await getHmacKey(secret, 'device_entropy');
 		const cleanTag = (deviceTag || 'unknown_device').slice(0, 128);
 		const hash = await hmacSha256(key, `device:${userId}:${cleanTag}`);
@@ -72,7 +75,10 @@ const deviceTrustService = {
 	 */
 	async issueTrust(c, userId, deviceTag) {
 		if (!userId) return null;
-		const secret = c.env.jwt_secret || 'epocanvas_device_trust_secret_entropy';
+		const secret = c.env?.jwt_secret;
+		if (!secret || typeof secret !== 'string' || !secret.trim()) {
+			return null;
+		}
 		const nowSec = Math.floor(Date.now() / 1000);
 		const deviceHash = await this.hashDevice(c, userId, deviceTag);
 
@@ -164,7 +170,10 @@ const deviceTrustService = {
 			return { canBypass2FA: false, state: 0, reason: 'DEVICE_MISMATCH' };
 		}
 
-		const secret = c.env.jwt_secret || 'epocanvas_device_trust_secret_entropy';
+		const secret = c.env?.jwt_secret;
+		if (!secret || typeof secret !== 'string' || !secret.trim()) {
+			return { canBypass2FA: false, state: 0, reason: 'SECRET_NOT_CONFIGURED' };
+		}
 		const tokenKey = await getHmacKey(secret, 'device_token_v1');
 
 		// Unmask T0

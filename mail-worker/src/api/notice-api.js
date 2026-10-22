@@ -183,7 +183,7 @@ app.get('/notice/restricted/view', async (c) => {
 		).get();
 	}
 
-	if (!targetCase) {
+	if (!targetCase || targetCase.status !== 'banned') {
 		targetCase = await orm(c).select().from(auditLog).where(
 			and(
 				eq(auditLog.email, userEmail),
@@ -265,7 +265,7 @@ app.post('/notice/restricted/appeal', async (c) => {
 		).get();
 	}
 
-	if (!targetCase) {
+	if (!targetCase || targetCase.status !== 'banned') {
 		targetCase = await orm(c).select().from(auditLog).where(
 			and(
 				eq(auditLog.email, userEmail),

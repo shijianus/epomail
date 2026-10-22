@@ -200,11 +200,20 @@ async function runWorkerdRealIntegration() {
 
   // Step 10: 触发真实 workerd Scheduled Handler
   console.log('\n--- STEP 10: 触发真实 workerd Scheduled Cron 调度器 ---');
-  const cronRes = await fetch(`${BASE}/api/scheduled`);
+  // 匿名 GET 请求必须被严格拦截 (401 或 405)
+  const anonCronRes = await fetch(`${BASE}/api/scheduled`);
+  assert.ok([401, 403, 405].includes(anonCronRes.status), '匿名 GET 请求驱动调度任务必须被严格拦截 (401/405)');
+  console.log('  ✓ 匿名调度触发被安全拦截 (' + anonCronRes.status + ')');
+
+  // 携带合法密钥的 POST 请求方可驱动
+  const cronRes = await fetch(`${BASE}/api/scheduled`, {
+    method: 'POST',
+    headers: { 'x-scheduled-secret': DEV_SECRET }
+  });
   assert.strictEqual(cronRes.status, 200, 'workerd 定时任务成功触发');
   const cronData = await cronRes.json();
   assert.strictEqual(cronData.success, true);
-  console.log('  ✓ workerd Scheduled Handler 触发成功 (HTTP 200)');
+  console.log('  ✓ 具备合法凭据的 workerd Scheduled Handler 触发成功 (HTTP 200)');
 
   // Step 11: 管理员复核申诉与多重封禁安全隔离核验
   console.log('\n--- STEP 11: 管理员复核申诉与多重封禁安全隔离核验 ---');

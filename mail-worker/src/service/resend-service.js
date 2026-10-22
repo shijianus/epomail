@@ -67,10 +67,35 @@ const resendService = {
 		const eventId = svixId || body.id || (body.data?.email_id ? `${body.data.email_id}_${body.type}` : null);
 		const userDb = c?.env?.db || (c._mockOrm ? c._mockOrm : null);
 
-		// 1. 同步常规发信表状态 (非致命尝试)
-		try {
-			await emailService.updateEmailStatus(c, params);
-		} catch (_) {}
+		let emailStatus = emailConst.status.SENT;
+		let emailMessage = null;
+
+		if (body.type === 'email.delivered') {
+			emailStatus = emailConst.status.DELIVERED;
+		} else if (body.type === 'email.complained') {
+			emailStatus = emailConst.status.COMPLAINED;
+		} else if (body.type === 'email.bounced') {
+			emailStatus = emailConst.status.BOUNCED;
+			emailMessage = typeof body.data?.bounce === 'object' ? JSON.stringify(body.data.bounce) : String(body.data?.bounce || '');
+		} else if (body.type === 'email.delivery_delayed') {
+			emailStatus = emailConst.status.DELAYED;
+		} else if (body.type === 'email.failed') {
+			emailStatus = emailConst.status.FAILED;
+			emailMessage = body.data?.failed?.reason || 'Delivery failed';
+		}
+
+		const params = {
+			resendEmailId: body.data?.email_id,
+			status: emailStatus,
+			message: emailMessage
+		};
+
+		// 1. 同步常规发信表状态 (若匹配)
+		if (params.resendEmailId) {
+			try {
+				await emailService.updateEmailStatus(c, params);
+			} catch (_) {}
+		}
 
 		// 2. 数据库级强一致去重台账与 Outbox 状态机单批原子提交
 		// 严防“先标已处理、实际更新失败后永久漏处理”

@@ -108,12 +108,37 @@ function createIsolatedEnvironment() {
       decision_id TEXT PRIMARY KEY,
       case_id INTEGER NOT NULL,
       expected_version INTEGER NOT NULL,
+      expected_status TEXT,
       action_type TEXT NOT NULL,
       actor TEXT NOT NULL,
       idempotency_key TEXT UNIQUE,
       payload_hash TEXT NOT NULL,
       create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
       UNIQUE(case_id, expected_version)
+    );
+
+    CREATE TRIGGER IF NOT EXISTS trg_audit_decision_version_guard
+    BEFORE INSERT ON audit_decision
+    BEGIN
+      SELECT CASE
+        WHEN (SELECT id FROM audit_log WHERE id = NEW.case_id) IS NULL
+        THEN RAISE(ABORT, 'Audit case not found')
+        WHEN (SELECT coalesce(version, 1) FROM audit_log WHERE id = NEW.case_id) != NEW.expected_version
+        THEN RAISE(ABORT, 'Audit log version mismatch: stale decision attempt')
+        WHEN NEW.expected_status IS NOT NULL AND (SELECT status FROM audit_log WHERE id = NEW.case_id) != NEW.expected_status
+        THEN RAISE(ABORT, 'Audit log status mismatch: case state already changed')
+      END;
+    END;
+
+    CREATE TABLE IF NOT EXISTS one_time_exchange_code (
+      code_hash TEXT PRIMARY KEY,
+      user_id INTEGER NOT NULL,
+      email TEXT NOT NULL,
+      case_id TEXT,
+      token_payload TEXT NOT NULL,
+      consumed INTEGER NOT NULL DEFAULT 0,
+      expires_at INTEGER NOT NULL,
+      create_time DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE webhook_event (

@@ -153,6 +153,7 @@ const auditService = {
 					decision_id TEXT PRIMARY KEY,
 					case_id INTEGER NOT NULL,
 					expected_version INTEGER NOT NULL,
+					expected_status TEXT,
 					action_type TEXT NOT NULL,
 					actor TEXT NOT NULL,
 					idempotency_key TEXT UNIQUE,
@@ -161,6 +162,30 @@ const auditService = {
 					UNIQUE(case_id, expected_version)
 				);
 			`).run();
+			try {
+				const col = await userDb.prepare(`SELECT * FROM pragma_table_info('audit_decision') WHERE name = 'expected_status' LIMIT 1`).first();
+				if (!col) {
+					await userDb.prepare(`ALTER TABLE audit_decision ADD COLUMN expected_status TEXT;`).run();
+				}
+			} catch (_) {}
+
+			try {
+				await userDb.prepare(`DROP TRIGGER IF EXISTS trg_audit_decision_version_guard;`).run();
+				await userDb.prepare(`
+					CREATE TRIGGER IF NOT EXISTS trg_audit_decision_version_guard
+					BEFORE INSERT ON audit_decision
+					BEGIN
+						SELECT CASE
+							WHEN (SELECT id FROM audit_log WHERE id = NEW.case_id) IS NULL
+							THEN RAISE(ABORT, 'Audit case not found')
+							WHEN (SELECT coalesce(version, 1) FROM audit_log WHERE id = NEW.case_id) != NEW.expected_version
+							THEN RAISE(ABORT, 'Audit log version mismatch: stale decision attempt')
+							WHEN NEW.expected_status IS NOT NULL AND (SELECT status FROM audit_log WHERE id = NEW.case_id) != NEW.expected_status
+							THEN RAISE(ABORT, 'Audit log status mismatch: case state already changed')
+						END;
+					END;
+				`).run();
+			} catch (_) {}
 			await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_audit_decision_case ON audit_decision(case_id);`).run();
 			await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_audit_decision_idemp ON audit_decision(idempotency_key);`).run();
 
@@ -1442,14 +1467,43 @@ const auditService = {
 	/**
 	 * Perform operation action on target
 	 */
-	async takeAction(c, { id, action, targetEmail, notes, assignee }) {
+	async takeAction(c, body) {
+		const { id, action, targetEmail, notes, assignee } = body || {};
+
+		// 明确拒绝底层未实现的能力，不伪造技术成功
+		if (['mute_account', 'probation'].includes(action)) {
+			throw new BizError('当前系统底层尚未接入该动作的实际执行能力 (mute/probation)', 400);
+		}
+
+		// 严禁物理删除审计日志，必须保持审计链完整性
+		if (action === 'delete') {
+			throw new BizError('不支持物理删除审计案卷记录', 400);
+		}
+
 		const targetLog = await orm(c).select().from(auditLog).where(eq(auditLog.id, id)).get();
 		if (!targetLog) {
 			throw new BizError('日志记录不存在', 404);
 		}
 
-		const email = targetEmail || targetLog.email;
-		const targetUser = await orm(c).select().from(user).where(eq(user.email, email)).get();
+		// 盘点处罚与裁决类动作：全量委托受严格校验的 adjudicate 执行逻辑，杜绝任何安全与审计旁路
+		const adjudicationActions = [
+			'ban', 'ban_account', 'banned', 'maintain_ban',
+			'unban', 'approve', 'approve_appeal', 'whitelist',
+			'reject', 'reject_appeal',
+			'blacklist_sender', 'archive_routine', 'dismiss_alert', 'no_penalty', 'dismiss'
+		];
+		if (adjudicationActions.includes(action)) {
+			return await this.adjudicate(c, {
+				id,
+				action,
+				targetEmail,
+				notes,
+				assignee,
+				version: body?.version
+			});
+		}
+
+		// 合法非处罚性运维批注动作：assign, review, extend, note
 		const nowIso = new Date().toISOString();
 		const actor = c.get('user')?.email || c.get('user')?.name || 'SecAdmin';
 
@@ -1491,122 +1545,6 @@ const auditService = {
 				updateFields.assignee = actor;
 			}
 			await orm(c).update(auditLog).set(updateFields).where(eq(auditLog.id, id)).run();
-		} else if (action === 'ban' || action === 'ban_account' || action === 'maintain_ban') {
-			if (targetUser) {
-				await userService.setStatus(c, { userId: targetUser.userId, status: 1 });
-			}
-			let timeline = [];
-			try {
-				if (targetLog.timeline) {
-					timeline = typeof targetLog.timeline === 'string' ? JSON.parse(targetLog.timeline) : targetLog.timeline;
-				}
-			} catch (e) {}
-			timeline.push({
-				time: nowIso,
-				event: '执行维持封禁',
-				actor: actor
-			});
-			await orm(c).update(auditLog).set({
-				status: 'banned',
-				resolvedTime: nowIso,
-				timeline: JSON.stringify(timeline),
-				detailText: (targetLog.detailText || '') + (notes ? `\n[处置结果]: ${notes}` : '')
-			}).where(eq(auditLog.id, id)).run();
-
-			// 同步在封禁管控台账中保留/生成记录
-			const existingBan = await orm(c).select().from(auditLog).where(
-				and(eq(auditLog.email, email), eq(auditLog.warningType, 'ban'))
-			).get();
-			if (!existingBan) {
-				await orm(c).insert(auditLog).values({
-					ticketId: 'BAN-' + Date.now().toString(36).toUpperCase(),
-					email: email,
-					warningType: 'ban',
-					eventType: targetLog.eventType || 'admin_ban',
-					category: 'security',
-					actionText: `{${email}} 经管理员审核处置生效封禁`,
-					detailText: notes || targetLog.detailText || '管理员人工裁决封禁',
-					banReason: targetLog.actionText || '触犯系统风控与安全红线',
-					banTime: nowIso,
-					resolvedTime: nowIso,
-					status: 'banned',
-					riskLevel: 'high',
-					priority: 'CRITICAL',
-					timeline: JSON.stringify(timeline)
-				}).run();
-			} else {
-				await orm(c).update(auditLog).set({
-					status: 'banned',
-					resolvedTime: nowIso,
-					detailText: (existingBan.detailText || '') + (notes ? `\n[处置更新]: ${notes}` : '')
-				}).where(eq(auditLog.id, existingBan.id)).run();
-			}
-		} else if (action === 'blacklist_sender') {
-			// 外部邮件拉入系统黑名单
-			await orm(c).update(auditLog).set({
-				status: 'resolved',
-				resolvedTime: nowIso,
-				detailText: (targetLog.detailText || '') + `\n[处置结果]: 管理员已手动将该外部发信地址加入系统全局黑名单拦截 (${notes || '核查属实拉黑'})`
-			}).where(eq(auditLog.id, id)).run();
-
-			// 封禁台账留痕
-			await orm(c).insert(auditLog).values({
-				ticketId: 'BAN-' + Date.now().toString(36).toUpperCase(),
-				email: targetLog.email,
-				warningType: 'ban',
-				eventType: 'external_blacklist',
-				category: 'security',
-				actionText: `{${targetLog.email}} 外部来信被检举核实，已加入系统全局黑名单`,
-				detailText: `处置发件人: ${targetLog.email}。检举次数: ${targetLog.reportedByOthers || 1}。处置说明: ${notes || '管理员核查属实，拉入全局黑名单拦截'}`,
-				banReason: `外部邮件被他人检举 (${targetLog.reportCategory || '违规'}，累计检举 ${targetLog.reportedByOthers || 1} 次)`,
-				banTime: nowIso,
-				resolvedTime: nowIso,
-				status: 'banned',
-				riskLevel: 'high',
-				priority: 'CRITICAL'
-			}).run();
-		} else if (action === 'mute_account') {
-			// 内部邮件发件人禁言/发信限制
-			await orm(c).update(auditLog).set({
-				status: 'resolved',
-				resolvedTime: nowIso,
-				detailText: (targetLog.detailText || '') + `\n[处置结果]: 站内违规用户已限制发信权限（禁言） (${notes || '检举违规处置'})`
-			}).where(eq(auditLog.id, id)).run();
-		} else if (action === 'archive_routine' || action === 'dismiss_alert') {
-			// 常规审查一键封存归档
-			await orm(c).update(auditLog).set({
-				status: 'expired',
-				resolvedTime: nowIso,
-				detailText: (targetLog.detailText || '') + `\n[封存说明]: 常规审查事项已封存归档 (${notes || '例行审查完毕'})`
-			}).where(eq(auditLog.id, id)).run();
-		} else if (action === 'unban' || action === 'approve_appeal') {
-			if (targetUser) {
-				await userService.setStatus(c, { userId: targetUser.userId, status: 0 });
-			}
-			let timeline = [];
-			try {
-				if (targetLog.timeline) {
-					timeline = typeof targetLog.timeline === 'string' ? JSON.parse(targetLog.timeline) : targetLog.timeline;
-				}
-			} catch (e) {}
-			timeline.push({
-				time: nowIso,
-				event: '解除处置/申诉通过',
-				actor: actor
-			});
-			await orm(c).update(auditLog).set({
-				status: targetLog.warningType === 'ban' ? 'unbanned' : 'resolved',
-				resolvedTime: nowIso,
-				timeline: JSON.stringify(timeline),
-				detailText: (targetLog.detailText || '') + (notes ? `\n[放行说明]: ${notes}` : '\n[放行说明]: 申诉复核解除')
-			}).where(eq(auditLog.id, id)).run();
-
-			// 同步更新封禁管控台账中状态为 unbanned (已解禁/已移出黑名单)，记录依然保留！
-			await orm(c).update(auditLog).set({
-				status: 'unbanned',
-				resolvedTime: nowIso,
-				detailText: sql`${auditLog.detailText} || ${'\n[解禁说明]: 申诉复核通过，已移出黑名单恢复正常 (' + (notes || '正常放行') + ')'}`
-			}).where(and(eq(auditLog.email, email), eq(auditLog.warningType, 'ban'))).run();
 		} else if (action === 'extend') {
 			await orm(c).update(auditLog).set({
 				resolvedTime: nowIso,
@@ -1616,14 +1554,8 @@ const auditService = {
 			await orm(c).update(auditLog).set({
 				detailText: sql`${auditLog.detailText} || ${'\n[审核备忘]: ' + (notes || '')}`
 			}).where(eq(auditLog.id, id)).run();
-		} else if (action === 'reject_appeal') {
-			await orm(c).update(auditLog).set({
-				status: 'rejected',
-				resolvedTime: nowIso,
-				detailText: (targetLog.detailText || '') + (notes ? `\n[驳回理由]: ${notes}` : '')
-			}).where(eq(auditLog.id, id)).run();
-		} else if (action === 'delete') {
-			await orm(c).delete(auditLog).where(eq(auditLog.id, id)).run();
+		} else {
+			throw new BizError(`不支持的处置动作: ${action}`, 400);
 		}
 
 		return { success: true };
@@ -1718,8 +1650,9 @@ const auditService = {
 		}
 
 		// 检查案件是否已结案（只读审计记录防重入）
-		const isClosed = ['resolved', 'expired', 'rejected', 'unbanned'].includes(targetLog.status);
-		if (isClosed) {
+		// 有效封禁中的案卷或待解封复核不属于只读死锁状态，管理员可正式执行 unban 放行
+		const isClosed = ['resolved', 'expired', 'unbanned'].includes(targetLog.status);
+		if (isClosed && actionType !== 'unban') {
 			throw new BizError('该案件已结案归档，属于系统只读审计记录，无法重复提交裁决', 400);
 		}
 
@@ -1962,15 +1895,17 @@ const auditService = {
 
 			if (purgeOnRelease) {
 				stmts.push(userDb.prepare(`
-					DELETE FROM audit_log 
-					WHERE email = ? AND warning_type = 'audit'
-				`).bind(targetLog.email));
+					UPDATE audit_log
+					SET circuit_status = 'PURGED', status = 'resolved',
+					    detail_text = detail_text || ?
+					WHERE email = ? AND warning_type = 'audit' AND circuit_status != 'PURGED'
+				`).bind('\n[隐私清理]: 已根据放行归档政策执行非关键隐私脱敏', targetLog.email));
 			}
 		}
 
 		// 8. 用户申诉审核：驳回申诉
 		else if (actionType === 'reject' || actionType === 'reject_appeal') {
-			targetNewStatus = 'rejected';
+			targetNewStatus = targetLog.warningType === 'ban' ? 'banned' : 'rejected';
 			targetNewDetailText += (notes ? `\n[驳回理由]: ${notes}` : '\n[驳回理由]: 申诉复核不成立，维持封禁');
 			timeline.push({ time: nowIso, event: '驳回申诉', actor });
 		}
@@ -1981,15 +1916,16 @@ const auditService = {
 
 		const expectedVersion = Number(targetLog.version || 1);
 
-		// 0. 登记决策台账与版本占位（原子性第一句：若 expected_version 已被并发事务抢占，则触发 UNIQUE 约束在 D1 级立即回滚全批次）
+		// 0. 登记决策台账与版本占位（原子性第一句：若 expected_version 或 expected_status 已被并发事务抢占，则触发 UNIQUE 约束或 trigger 在 D1 级立即回滚全批次）
 		const decisionStmt = userDb.prepare(`
 			INSERT INTO audit_decision (
-				decision_id, case_id, expected_version, action_type, actor, idempotency_key, payload_hash
-			) VALUES (?, ?, ?, ?, ?, ?, ?)
+				decision_id, case_id, expected_version, expected_status, action_type, actor, idempotency_key, payload_hash
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 		`).bind(
 			decisionId,
 			targetLog.id,
 			expectedVersion,
+			targetLog.status,
 			actionType,
 			actor,
 			idempotencyKey || null,
@@ -2001,13 +1937,15 @@ const auditService = {
 		const updateCaseStmt = userDb.prepare(`
 			UPDATE audit_log 
 			SET status = ?, resolved_time = ?, timeline = ?, detail_text = ?,
-				version = coalesce(version, 1) + 1, decision_id = ?, idempotency_key = ?
+			    appeal_reason = CASE WHEN ? IN ('reject', 'reject_appeal', 'approve', 'approve_appeal') THEN NULL ELSE appeal_reason END,
+			    version = coalesce(version, 1) + 1, decision_id = ?, idempotency_key = ?
 			WHERE id = ? AND status = ? AND version = ?
 		`).bind(
 			targetNewStatus,
 			nowIso,
 			JSON.stringify(timeline),
 			targetNewDetailText,
+			actionType,
 			decisionId,
 			idempotencyKey || null,
 			id,
@@ -2045,11 +1983,11 @@ const auditService = {
 			}
 		} catch (batchErr) {
 			const errMsg = String(batchErr?.message || batchErr);
-			if (errMsg.includes('UNIQUE constraint failed') || errMsg.includes('constraint') || errMsg.includes('version mismatch') || errMsg.includes('Audit log version mismatch')) {
+			if (errMsg.includes('UNIQUE constraint failed') || errMsg.includes('constraint') || errMsg.includes('version mismatch') || errMsg.includes('Audit log version mismatch') || errMsg.includes('status mismatch') || errMsg.includes('Audit log status mismatch')) {
 				if (errMsg.includes('idempotency_key')) {
 					throw new BizError('幂等键冲突：同一幂等键不可用于不同案件或操作', 409);
 				}
-				if (errMsg.includes('case_id') || errMsg.includes('expected_version') || errMsg.includes('version mismatch') || errMsg.includes('Audit log version mismatch')) {
+				if (errMsg.includes('case_id') || errMsg.includes('expected_version') || errMsg.includes('version mismatch') || errMsg.includes('Audit log version mismatch') || errMsg.includes('status mismatch') || errMsg.includes('Audit log status mismatch')) {
 					throw new BizError('案件状态已被并发修改或版本过时，请刷新后重试', 409);
 				}
 			}

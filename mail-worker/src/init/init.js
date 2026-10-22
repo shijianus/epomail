@@ -80,7 +80,8 @@ const dbInit = {
 			{ name: 'allow_attachment', sql: `ALTER TABLE role ADD COLUMN allow_attachment INTEGER DEFAULT 0;` },
 			{ name: 'role_code', sql: `ALTER TABLE role ADD COLUMN role_code TEXT DEFAULT 'custom';` },
 			{ name: 'tag_text', sql: `ALTER TABLE role ADD COLUMN tag_text TEXT DEFAULT '';` },
-			{ name: 'tag_color', sql: `ALTER TABLE role ADD COLUMN tag_color TEXT DEFAULT '';` }
+			{ name: 'tag_color', sql: `ALTER TABLE role ADD COLUMN tag_color TEXT DEFAULT '';` },
+			{ name: 'ai_models', sql: `ALTER TABLE role ADD COLUMN ai_models TEXT DEFAULT '';` }
 		];
 
 		for (const col of roleColumns) {
@@ -370,6 +371,7 @@ const dbInit = {
 					decision_id TEXT PRIMARY KEY,
 					case_id INTEGER NOT NULL,
 					expected_version INTEGER NOT NULL,
+					expected_status TEXT,
 					action_type TEXT NOT NULL,
 					actor TEXT NOT NULL,
 					idempotency_key TEXT UNIQUE,
@@ -378,6 +380,12 @@ const dbInit = {
 					UNIQUE(case_id, expected_version)
 				)
 			`).run();
+			try {
+				const col = await userDb.prepare(`SELECT * FROM pragma_table_info('audit_decision') WHERE name = 'expected_status' LIMIT 1`).first();
+				if (!col) {
+					await userDb.prepare(`ALTER TABLE audit_decision ADD COLUMN expected_status TEXT;`).run();
+				}
+			} catch (_) {}
 			await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_audit_decision_case ON audit_decision(case_id)`).run();
 			await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_audit_decision_idemp ON audit_decision(idempotency_key)`).run();
 		} catch (err) {
@@ -434,6 +442,7 @@ const dbInit = {
 		}
 
 		try {
+			await userDb.prepare(`DROP TRIGGER IF EXISTS trg_audit_decision_version_guard;`).run();
 			await userDb.prepare(`
 				CREATE TRIGGER IF NOT EXISTS trg_audit_decision_version_guard
 				BEFORE INSERT ON audit_decision
@@ -443,6 +452,8 @@ const dbInit = {
 						THEN RAISE(ABORT, 'Audit case not found')
 						WHEN (SELECT coalesce(version, 1) FROM audit_log WHERE id = NEW.case_id) != NEW.expected_version
 						THEN RAISE(ABORT, 'Audit log version mismatch: stale decision attempt')
+						WHEN NEW.expected_status IS NOT NULL AND (SELECT status FROM audit_log WHERE id = NEW.case_id) != NEW.expected_status
+						THEN RAISE(ABORT, 'Audit log status mismatch: case state already changed')
 					END;
 				END;
 			`).run();
@@ -1350,7 +1361,13 @@ const dbInit = {
 					is_default INTEGER DEFAULT 0,
 					send_count INTEGER,
 					send_type TEXT NOT NULL DEFAULT 'count',
-					account_count INTEGER
+					account_count INTEGER,
+					storage_quota_mb INTEGER DEFAULT 5,
+					allow_attachment INTEGER DEFAULT 0,
+					role_code TEXT DEFAULT 'custom',
+					tag_text TEXT DEFAULT '',
+					tag_color TEXT DEFAULT '',
+					ai_models TEXT DEFAULT ''
 				)
 			`).run();
 
@@ -1586,6 +1603,7 @@ const dbInit = {
 				decision_id TEXT PRIMARY KEY,
 				case_id INTEGER NOT NULL,
 				expected_version INTEGER NOT NULL,
+				expected_status TEXT,
 				action_type TEXT NOT NULL,
 				actor TEXT NOT NULL,
 				idempotency_key TEXT UNIQUE,
@@ -1630,6 +1648,7 @@ const dbInit = {
 		`).run();
 		await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_exchange_code_expires ON one_time_exchange_code(expires_at)`).run();
 
+		await userDb.prepare(`DROP TRIGGER IF EXISTS trg_audit_decision_version_guard;`).run();
 		await userDb.prepare(`
 			CREATE TRIGGER IF NOT EXISTS trg_audit_decision_version_guard
 			BEFORE INSERT ON audit_decision
@@ -1639,6 +1658,8 @@ const dbInit = {
 					THEN RAISE(ABORT, 'Audit case not found')
 					WHEN (SELECT coalesce(version, 1) FROM audit_log WHERE id = NEW.case_id) != NEW.expected_version
 					THEN RAISE(ABORT, 'Audit log version mismatch: stale decision attempt')
+					WHEN NEW.expected_status IS NOT NULL AND (SELECT status FROM audit_log WHERE id = NEW.case_id) != NEW.expected_status
+					THEN RAISE(ABORT, 'Audit log status mismatch: case state already changed')
 				END;
 			END;
 		`).run();

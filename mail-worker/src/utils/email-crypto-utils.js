@@ -39,7 +39,10 @@ const emailCryptoUtils = {
 	 * Info binds the key specifically to email encryption for that user.
 	 */
 	async getUserEmailCryptoKey(env, userOrUserId, userSalt = null) {
-		const masterSecret = (env?.totp_enc_key || env?.jwt_secret || 'epomail-master-crypto-secret-key-32b').trim();
+		const masterSecret = (env?.totp_enc_key || env?.jwt_secret || '').trim();
+		if (!masterSecret) {
+			throw new Error('Missing encryption key: totp_enc_key or jwt_secret is required');
+		}
 
 		let uid = typeof userOrUserId === 'object' ? userOrUserId?.userId : userOrUserId;
 		let salt = typeof userOrUserId === 'object' ? userOrUserId?.salt : userSalt;

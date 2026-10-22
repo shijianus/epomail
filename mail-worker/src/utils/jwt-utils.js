@@ -33,9 +33,14 @@ const jwtUtils = {
 		const payloadStr = base64url(encoder.encode(JSON.stringify(fullPayload)));
 		const data = `${headerStr}.${payloadStr}`;
 
+		const secret = c?.env?.jwt_secret;
+		if (!secret || typeof secret !== 'string' || !secret.trim()) {
+			throw new Error('系统 JWT 密钥未配置 (Missing jwt_secret)');
+		}
+
 		const key = await crypto.subtle.importKey(
 			'raw',
-			encoder.encode(c.env.jwt_secret),
+			encoder.encode(secret),
 			{ name: 'HMAC', hash: 'SHA-256' },
 			false,
 			['sign']
@@ -55,10 +60,13 @@ const jwtUtils = {
 
 			if (!headerB64 || !payloadB64 || !signatureB64) return null;
 
+			const secret = c?.env?.jwt_secret;
+			if (!secret || typeof secret !== 'string' || !secret.trim()) return null;
+
 			const data = `${headerB64}.${payloadB64}`;
 			const key = await crypto.subtle.importKey(
 				'raw',
-				encoder.encode(c.env.jwt_secret),
+				encoder.encode(secret),
 				{ name: 'HMAC', hash: 'SHA-256' },
 				false,
 				['verify']
