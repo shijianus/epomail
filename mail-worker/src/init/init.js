@@ -450,10 +450,14 @@ const dbInit = {
 					SELECT CASE
 						WHEN (SELECT id FROM audit_log WHERE id = NEW.case_id) IS NULL
 						THEN RAISE(ABORT, 'Audit case not found')
-						WHEN NEW.expected_version IS NULL OR (SELECT coalesce(version, 1) FROM audit_log WHERE id = NEW.case_id) != NEW.expected_version
-						THEN RAISE(ABORT, 'Audit log version mismatch: stale decision attempt')
-						WHEN NEW.expected_status IS NULL OR TRIM(NEW.expected_status) = '' OR (SELECT status FROM audit_log WHERE id = NEW.case_id) IS NULL OR TRIM((SELECT status FROM audit_log WHERE id = NEW.case_id)) = '' OR (SELECT status FROM audit_log WHERE id = NEW.case_id) != NEW.expected_status
-						THEN RAISE(ABORT, 'Audit log status mismatch: case state changed or expected_status invalid')
+						WHEN NEW.expected_version IS NULL
+							OR (SELECT version FROM audit_log WHERE id = NEW.case_id) IS NULL
+							OR typeof((SELECT version FROM audit_log WHERE id = NEW.case_id)) != 'integer'
+							OR (SELECT version FROM audit_log WHERE id = NEW.case_id) < 1
+							OR (SELECT version FROM audit_log WHERE id = NEW.case_id) != NEW.expected_version
+						THEN RAISE(ABORT, 'Audit log version mismatch: stale or invalid case version')
+						WHEN NEW.expected_status IS NULL OR TRIM(NEW.expected_status) = '' OR (SELECT status FROM audit_log WHERE id = NEW.case_id) IS NULL OR TRIM((SELECT status FROM audit_log WHERE id = NEW.case_id)) = '' OR (SELECT status FROM audit_log WHERE id = NEW.case_id) != NEW.expected_status OR (SELECT status FROM audit_log WHERE id = NEW.case_id) NOT IN ('active', 'pending', 'banned', 'unbanned', 'resolved', 'rejected', 'expired')
+						THEN RAISE(ABORT, 'Audit log status mismatch: case state changed or status invalid')
 					END;
 				END;
 			`).run();
@@ -1656,10 +1660,14 @@ const dbInit = {
 				SELECT CASE
 					WHEN (SELECT id FROM audit_log WHERE id = NEW.case_id) IS NULL
 					THEN RAISE(ABORT, 'Audit case not found')
-					WHEN NEW.expected_version IS NULL OR (SELECT coalesce(version, 1) FROM audit_log WHERE id = NEW.case_id) != NEW.expected_version
-					THEN RAISE(ABORT, 'Audit log version mismatch: stale decision attempt')
-					WHEN NEW.expected_status IS NULL OR TRIM(NEW.expected_status) = '' OR (SELECT status FROM audit_log WHERE id = NEW.case_id) IS NULL OR TRIM((SELECT status FROM audit_log WHERE id = NEW.case_id)) = '' OR (SELECT status FROM audit_log WHERE id = NEW.case_id) != NEW.expected_status
-					THEN RAISE(ABORT, 'Audit log status mismatch: case state changed or expected_status invalid')
+					WHEN NEW.expected_version IS NULL
+						OR (SELECT version FROM audit_log WHERE id = NEW.case_id) IS NULL
+						OR typeof((SELECT version FROM audit_log WHERE id = NEW.case_id)) != 'integer'
+						OR (SELECT version FROM audit_log WHERE id = NEW.case_id) < 1
+						OR (SELECT version FROM audit_log WHERE id = NEW.case_id) != NEW.expected_version
+					THEN RAISE(ABORT, 'Audit log version mismatch: stale or invalid case version')
+					WHEN NEW.expected_status IS NULL OR TRIM(NEW.expected_status) = '' OR (SELECT status FROM audit_log WHERE id = NEW.case_id) IS NULL OR TRIM((SELECT status FROM audit_log WHERE id = NEW.case_id)) = '' OR (SELECT status FROM audit_log WHERE id = NEW.case_id) != NEW.expected_status OR (SELECT status FROM audit_log WHERE id = NEW.case_id) NOT IN ('active', 'pending', 'banned', 'unbanned', 'resolved', 'rejected', 'expired')
+					THEN RAISE(ABORT, 'Audit log status mismatch: case state changed or status invalid')
 				END;
 			END;
 		`).run();

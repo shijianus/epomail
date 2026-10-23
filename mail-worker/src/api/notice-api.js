@@ -4,9 +4,10 @@ import decisionNoticeService from '../service/decision-notice-service';
 import orm from '../entity/orm';
 import { auditLog } from '../entity/audit-log';
 import user from '../entity/user';
-import { eq, and, desc } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import BizError from '../error/biz-error';
 import { getUserDb } from '../utils/db-accessor';
+import { isPenaltyLinkedToCase } from '../utils/audit-case-link';
 
 async function sha256Hex(str) {
 	const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
@@ -98,6 +99,60 @@ async function verifyRestrictedSession(c) {
 	return decoded;
 }
 
+function parseBoundCaseId(value) {
+	if (typeof value === 'number') {
+		return Number.isSafeInteger(value) && value > 0 ? value : null;
+	}
+	if (typeof value !== 'string' || !/^[1-9]\d*$/.test(value)) return null;
+	const parsed = Number(value);
+	return Number.isSafeInteger(parsed) ? parsed : null;
+}
+
+// Resolve the case strictly from the signed credential. Request parameters are
+// never consulted; there is no "latest banned case" fallback. A source case
+// binds to its derived active penalty through the strict original_decision_id
+// relation.
+async function resolveRestrictedCase(c, decoded) {
+	const boundCaseId = parseBoundCaseId(decoded.caseId);
+	if (!boundCaseId) {
+		throw new BizError('受限凭据缺少有效的案件绑定，请重新认证', 401);
+	}
+	if (!decoded.email || typeof decoded.email !== 'string') {
+		throw new BizError('受限凭据缺少有效账号绑定，请重新认证', 401);
+	}
+
+	const boundCase = await orm(c).select().from(auditLog).where(
+		and(eq(auditLog.id, boundCaseId), eq(auditLog.email, decoded.email))
+	).get();
+	if (!boundCase) {
+		throw new BizError('受限凭据绑定的案件不存在或与账号不匹配，请重新认证', 404);
+	}
+	if (boundCase.userId !== null && boundCase.userId !== undefined
+		&& Number(boundCase.userId) !== Number(decoded.userId)) {
+		throw new BizError('受限凭据绑定的账号与案件不一致，请重新认证', 403);
+	}
+
+	let penaltyCase = null;
+	if (boundCase.status === 'banned') {
+		penaltyCase = boundCase;
+	} else {
+		const activeBans = await orm(c).select().from(auditLog).where(
+			and(
+				eq(auditLog.email, decoded.email),
+				eq(auditLog.warningType, 'ban'),
+				eq(auditLog.status, 'banned')
+			)
+		).all();
+		const linkedBans = activeBans.filter(banRow => isPenaltyLinkedToCase(banRow, boundCase.id));
+		if (linkedBans.length > 1) {
+			throw new BizError('绑定案件关联了多个有效处罚记录，请等待人工核对', 409);
+		}
+		penaltyCase = linkedBans[0] || null;
+	}
+
+	return { boundCase, penaltyCase };
+}
+
 // 0. 一次性短时安全兑换码受理端点 (TTL 60s, D1 CAS 原子单次消费，单次使用后立即标记销毁)
 app.post('/notice/restricted/exchange', async (c) => {
 	verifyCsrfOrigin(c);
@@ -167,80 +222,64 @@ app.post('/notice/restricted/exchange', async (c) => {
 // 1. 受限处置通知安全只读查阅 (严格防 IDOR、防敏感内部数据泄漏)
 app.get('/notice/restricted/view', async (c) => {
 	const decoded = await verifyRestrictedSession(c);
-	const { userId, caseId, email: userEmail } = decoded;
+	const { userId } = decoded;
 
 	c.header('Cache-Control', 'no-store, no-cache, must-revalidate, private');
 	c.header('Pragma', 'no-cache');
 
-	// 查询案件：严格按已验签凭证绑定的 caseId 或 email 查阅，杜绝 IDOR
-	let targetCase = null;
-	if (caseId) {
-		targetCase = await orm(c).select().from(auditLog).where(
-			and(
-				eq(auditLog.id, Number(caseId)),
-				eq(auditLog.email, userEmail)
-			)
-		).get();
-	}
-
-	if (!targetCase || targetCase.status !== 'banned') {
-		targetCase = await orm(c).select().from(auditLog).where(
-			and(
-				eq(auditLog.email, userEmail),
-				eq(auditLog.status, 'banned')
-			)
-		).orderBy(desc(auditLog.id)).limit(1).get();
-	}
-
-	if (!targetCase) {
+	const { boundCase, penaltyCase } = await resolveRestrictedCase(c, decoded);
+	if (!penaltyCase) {
 		return c.json(result.ok({
 			hasCase: false,
-			email: userEmail,
-			message: '未查询到针对该账号的有效处置案卷'
+			boundCaseId: boundCase.id,
+			caseId: null,
+			email: boundCase.email,
+			status: boundCase.status,
+			message: '绑定的案件当前没有生效中的处置记录'
 		}));
 	}
 
 	const targetUser = await orm(c).select().from(user).where(eq(user.userId, userId)).get();
 
 	// 生成安全脱敏通知快照 (不暴露任何内部指纹、内部备注、IP 或跨账号数据)
-	const actionType = targetCase.warningType === 'ban' ? 'ban_account' : 'dismiss_alert';
 	const noticeSnapshot = decisionNoticeService.renderFinalNotice({
-		actionType,
-		targetLog: targetCase,
+		actionType: 'ban_account',
+		targetLog: penaltyCase,
 		targetUser,
-		caseNumber: targetCase.ticketId || `#${targetCase.id}`,
-		reasonCode: targetCase.reasonCode || 'RULE-POLICY-SUSPEND',
-		publicReason: targetCase.reportCategory || '系统安全合规管控',
+		caseNumber: penaltyCase.ticketId || `#${penaltyCase.id}`,
+		reasonCode: penaltyCase.reasonCode ?? null,
+		publicReason: penaltyCase.reportCategory ?? null,
 		notes: null // 严格隐去内部管理员批注
 	});
 
 	return c.json(result.ok({
 		hasCase: true,
-		caseId: targetCase.id,
-		ticketId: targetCase.ticketId || `#${targetCase.id}`,
-		email: targetCase.email,
-		status: targetCase.status,
-		warningType: targetCase.warningType,
-		reasonCode: targetCase.reasonCode || 'RULE-POLICY-SUSPEND',
-		reportCategory: targetCase.reportCategory || '系统安全合规管控',
+		caseId: penaltyCase.id,
+		boundCaseId: boundCase.id,
+		ticketId: penaltyCase.ticketId ?? null,
+		email: penaltyCase.email,
+		status: penaltyCase.status,
+		warningType: penaltyCase.warningType,
+		reasonCode: penaltyCase.reasonCode ?? null,
+		reportCategory: penaltyCase.reportCategory ?? null,
 		subject: noticeSnapshot.subject,
 		htmlContent: noticeSnapshot.htmlContent,
 		textContent: noticeSnapshot.textContent,
 		effectiveCondition: noticeSnapshot.effectiveCondition,
 		affectedCapabilities: noticeSnapshot.affectedCapabilities,
 		appealInfo: noticeSnapshot.appealInfo,
-		hasExistingAppeal: Boolean(targetCase.appealReason),
-		appealReason: targetCase.appealReason || null,
-		circuitStatus: targetCase.circuitStatus || 'NORMAL',
-		createTime: targetCase.createTime,
-		banTime: targetCase.banTime || targetCase.createTime
+		hasExistingAppeal: Boolean(penaltyCase.appealReason),
+		appealReason: penaltyCase.appealReason || null,
+		circuitStatus: penaltyCase.circuitStatus ?? null,
+		createTime: penaltyCase.createTime ?? null,
+		banTime: penaltyCase.banTime ?? null
 	}));
 });
 
 // 2. 受限账号合法合规申诉提交 (速率受控、对象绑定、保持原处罚生效)
 app.post('/notice/restricted/appeal', async (c) => {
 	const decoded = await verifyRestrictedSession(c);
-	const { userId, caseId, email: userEmail } = decoded;
+	const { email: userEmail } = decoded;
 
 	c.header('Cache-Control', 'no-store, no-cache, must-revalidate, private');
 	c.header('Pragma', 'no-cache');
@@ -255,31 +294,9 @@ app.post('/notice/restricted/appeal', async (c) => {
 		throw new BizError('申诉说明过长（最多 2000 字符）', 400);
 	}
 
-	let targetCase = null;
-	if (caseId) {
-		targetCase = await orm(c).select().from(auditLog).where(
-			and(
-				eq(auditLog.id, Number(caseId)),
-				eq(auditLog.email, userEmail)
-			)
-		).get();
-	}
-
-	if (!targetCase || targetCase.status !== 'banned') {
-		targetCase = await orm(c).select().from(auditLog).where(
-			and(
-				eq(auditLog.email, userEmail),
-				eq(auditLog.status, 'banned')
-			)
-		).orderBy(desc(auditLog.id)).limit(1).get();
-	}
-
+	const { boundCase, penaltyCase: targetCase } = await resolveRestrictedCase(c, decoded);
 	if (!targetCase) {
-		throw new BizError('未找到待申诉的有效处置案件', 404);
-	}
-
-	if (targetCase.status !== 'banned') {
-		throw new BizError('该案件当前未处于封禁限制状态，无需重复提交解封申诉', 400);
+		throw new BizError('绑定的案件当前没有生效中的处置，无法提交解封申诉', 400);
 	}
 
 	// 严防重复申诉打扰：已有待审申诉时不可重复提交
@@ -292,6 +309,9 @@ app.post('/notice/restricted/appeal', async (c) => {
 	// 仅当案件已处于终局归档/数据清理阶段时方阻断申诉。
 	if (targetCase.status === 'deleted' || targetCase.status === 'purged' || targetCase.circuitStatus === 'PURGED') {
 		throw new BizError('案卷已进入终局数据归档清理阶段，无法再次申诉', 400);
+	}
+	if (!Number.isSafeInteger(targetCase.version) || targetCase.version < 1) {
+		throw new BizError('案卷版本缺失或损坏，暂无法提交申诉（需先修复历史数据版本）', 409);
 	}
 	const isDelayedAppeal = targetCase.banTime && !isNaN(new Date(targetCase.banTime).getTime()) && (Date.now() - new Date(targetCase.banTime).getTime() > 30 * 24 * 3600 * 1000);
 
@@ -308,7 +328,8 @@ app.post('/notice/restricted/appeal', async (c) => {
 	let timeline = [];
 	try {
 		if (targetCase.timeline) {
-			timeline = typeof targetCase.timeline === 'string' ? JSON.parse(targetCase.timeline) : targetCase.timeline;
+			const parsed = typeof targetCase.timeline === 'string' ? JSON.parse(targetCase.timeline) : targetCase.timeline;
+			if (Array.isArray(parsed)) timeline = parsed;
 		}
 	} catch (_) {}
 
@@ -319,20 +340,27 @@ app.post('/notice/restricted/appeal', async (c) => {
 		actor: `User (${userEmail})`
 	});
 
-	const userDb = c?.env?.db || (c._mockOrm ? c._mockOrm : null);
+	const userDb = getUserDb(c);
 	if (!userDb) throw new BizError('Database unavailable', 500);
 
 	// 严格保留原 circuit_status 与封禁处罚状态，严禁因提交申诉而篡改技术控制状态或解除封禁
-	await userDb.prepare(`
+	const updateRes = await userDb.prepare(`
 		UPDATE audit_log
 		SET appeal_reason = ?, timeline = ?,
-		    version = coalesce(version, 1) + 1
-		WHERE id = ? AND email = ?
+		    version = version + 1
+		WHERE id = ? AND email = ? AND status = 'banned'
+		  AND (appeal_reason IS NULL OR TRIM(appeal_reason) = '')
 	`).bind(appealReason, JSON.stringify(timeline), targetCase.id, userEmail).run();
+
+	const changes = updateRes?.meta?.changes ?? updateRes?.changes ?? 0;
+	if (changes !== 1) {
+		throw new BizError('案件状态已被并发修改，请刷新后重试', 409);
+	}
 
 	return c.json(result.ok({
 		success: true,
 		caseId: targetCase.id,
+		boundCaseId: boundCase.id,
 		message: '申诉材料已提交，合规团队将由独立管理员重新复核研判'
 	}));
 });

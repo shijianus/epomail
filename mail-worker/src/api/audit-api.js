@@ -32,7 +32,6 @@ const ensureAdminUser = async (c) => {
 
 const handleAuditList = async (c) => {
 	await ensureAdminUser(c);
-	await auditService.seedBaselineIfEmpty(c);
 	const query = c.req.method === 'GET' ? c.req.query() : (await c.req.json().catch(() => ({})));
 	const data = await auditService.list(c, query);
 	return c.json(result.ok(data));

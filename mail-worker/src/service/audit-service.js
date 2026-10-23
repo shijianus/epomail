@@ -10,8 +10,71 @@ import BizError from '../error/biz-error';
 import { getUserDb } from '../utils/db-accessor';
 import { isAdminUser } from '../utils/admin-utils';
 import permService from './perm-service';
+import { isPenaltyLinkedToCase } from '../utils/audit-case-link';
 
 let tablesEnsured = false;
+
+const KNOWN_CASE_STATUSES = new Set(['active', 'pending', 'banned', 'unbanned', 'resolved', 'rejected', 'expired']);
+const KNOWN_WARNING_TYPES = new Set(['audit', 'risk', 'ban', 'appeal']);
+const FIRST_DECISION_ACTIONS = new Set([
+	'ban', 'ban_account', 'banned',
+	'no_penalty', 'dismiss',
+	'blacklist_sender',
+	'archive_routine', 'dismiss_alert'
+]);
+const REVIEW_ACTIONS = new Set(['maintain_ban', 'unban']);
+const APPEAL_ACTIONS = new Set(['approve', 'approve_appeal', 'whitelist', 'reject', 'reject_appeal']);
+
+function assertValidCaseState(caseRow) {
+	if (!caseRow || typeof caseRow.warningType !== 'string' || !KNOWN_WARNING_TYPES.has(caseRow.warningType)) {
+		throw new BizError('案件类型损坏或不受支持，无法执行裁决写入', 409);
+	}
+	if (typeof caseRow.status !== 'string' || !KNOWN_CASE_STATUSES.has(caseRow.status)) {
+		throw new BizError('案件状态损坏或不是受支持的合法状态，无法执行裁决写入', 409);
+	}
+}
+
+function assertStoredCaseVersion(caseRow) {
+	if (!Number.isSafeInteger(caseRow.version) || caseRow.version < 1) {
+		throw new BizError('案件版本缺失或损坏，无法执行裁决写入（需先修复历史数据版本）', 409);
+	}
+	return caseRow.version;
+}
+
+function assertValidClientVersion(version) {
+	if (version === undefined || version === null) return;
+	if (!Number.isSafeInteger(version) || version < 1) {
+		throw new BizError('客户端传入的案件版本非法', 400);
+	}
+}
+
+async function selectBanRows(c, email, activeOnly = false) {
+	const userDb = getUserDb(c) || c?.env?.db;
+	const suffix = activeOnly ? " AND status = 'banned'" : '';
+	const result = await userDb.prepare(
+		`SELECT * FROM audit_log WHERE email = ? AND warning_type = 'ban'${suffix} ORDER BY id ASC`
+	).bind(email).all();
+	return result?.results || [];
+}
+
+function assertNoDuplicateLinkedBans(linkedRows) {
+	if (linkedRows.length > 1) {
+		throw new BizError('该源案件关联了多个处罚记录，存在关联歧义，请先人工核对后再执行裁决', 409);
+	}
+}
+
+function parseRecordedTimeline(value) {
+	if (value === null || value === undefined || value === '') return null;
+	if (Array.isArray(value)) return value;
+	if (typeof value !== 'string') return null;
+	try {
+		const parsed = JSON.parse(value);
+		return Array.isArray(parsed) ? parsed : null;
+	} catch (_) {
+		return null;
+	}
+}
+
 
 const auditService = {
 	/**
@@ -178,10 +241,14 @@ const auditService = {
 						SELECT CASE
 							WHEN (SELECT id FROM audit_log WHERE id = NEW.case_id) IS NULL
 							THEN RAISE(ABORT, 'Audit case not found')
-							WHEN NEW.expected_version IS NULL OR (SELECT coalesce(version, 1) FROM audit_log WHERE id = NEW.case_id) != NEW.expected_version
-							THEN RAISE(ABORT, 'Audit log version mismatch: stale decision attempt')
-							WHEN NEW.expected_status IS NULL OR TRIM(NEW.expected_status) = '' OR (SELECT status FROM audit_log WHERE id = NEW.case_id) IS NULL OR TRIM((SELECT status FROM audit_log WHERE id = NEW.case_id)) = '' OR (SELECT status FROM audit_log WHERE id = NEW.case_id) != NEW.expected_status
-							THEN RAISE(ABORT, 'Audit log status mismatch: case state changed or expected_status invalid')
+							WHEN NEW.expected_version IS NULL
+								OR (SELECT version FROM audit_log WHERE id = NEW.case_id) IS NULL
+								OR typeof((SELECT version FROM audit_log WHERE id = NEW.case_id)) != 'integer'
+								OR (SELECT version FROM audit_log WHERE id = NEW.case_id) < 1
+								OR (SELECT version FROM audit_log WHERE id = NEW.case_id) != NEW.expected_version
+							THEN RAISE(ABORT, 'Audit log version mismatch: stale or invalid case version')
+							WHEN NEW.expected_status IS NULL OR TRIM(NEW.expected_status) = '' OR (SELECT status FROM audit_log WHERE id = NEW.case_id) IS NULL OR TRIM((SELECT status FROM audit_log WHERE id = NEW.case_id)) = '' OR (SELECT status FROM audit_log WHERE id = NEW.case_id) != NEW.expected_status OR (SELECT status FROM audit_log WHERE id = NEW.case_id) NOT IN ('active', 'pending', 'banned', 'unbanned', 'resolved', 'rejected', 'expired')
+							THEN RAISE(ABORT, 'Audit log status mismatch: case state changed or status invalid')
 						END;
 					END;
 				`).run();
@@ -218,449 +285,6 @@ const auditService = {
 			tablesEnsured = true;
 		} catch (e) {
 			console.warn('ensureTables warning:', e.message);
-		}
-	},
-
-	/**
-	 * Seed initial baseline records if the audit_log table is empty
-	 */
-	async seedBaselineIfEmpty(c) {
-		await this.ensureTables(c);
-		try {
-			const existing = await orm(c).select({ total: count() }).from(auditLog).get();
-			if (existing && existing.total > 0) {
-				return;
-			}
-			const initialRecords = [
-				// --- 1. 常规审查 (Routine Reviews - warningType: 'audit', LV0~LV3 自动审查) ---
-				{
-					ticketId: 'REV-2026-LV102',
-					email: 'tester_audited@epocanvas.com',
-					warningType: 'audit',
-					eventType: 'ip_roaming_routine',
-					category: 'security',
-					actionText: '{tester_audited@epocanvas.com} 常规多网/多地IP漫游跳跃 (LV1)',
-					detailText: '常规多网多地IP跳跃审查 (Tokyo + Osaka)。对账户及社群无重大危害，评定为 LV1·轻微跳跃，常规例行排查。',
-					ip: '104.28.19.44',
-					geo: 'Tokyo, JP',
-					device: 'Safari 17 / macOS',
-					deviceType: 'desktop',
-					fingerprint: 'fp_safe_991',
-					baseIp: '104.28.19.1',
-					baseGeo: 'Tokyo, JP',
-					baseDevice: 'Safari 17 / macOS',
-					baseFingerprint: 'fp_safe_991',
-					isRegIp: 1,
-					isMultiIp: 0,
-					activeIpCount: 1,
-					reportedByOthers: 0,
-					riskLevel: 'normal',
-					priority: 'LV1',
-					status: 'active',
-					recommendedAction: 'archive_routine',
-					matchScore: 98,
-					subnetMatch: 1,
-					appealReason: null
-				},
-				{
-					ticketId: 'REV-2026-LV209',
-					email: 'guest_expired@visitor.org',
-					warningType: 'audit',
-					eventType: 'bot_probe_routine',
-					category: 'account',
-					actionText: '{guest_expired@visitor.org} 疑似低频人机请求特征 (LV2)',
-					detailText: '低频接口探测特征，判定为自动化爬取。对平台伤害有限，评定为 LV2·疑似人机。超过72小时无异常，系统已超时自动封存归档。',
-					ip: '198.51.100.22',
-					geo: 'London, GB',
-					device: 'Curl / Linux',
-					deviceType: 'desktop',
-					fingerprint: 'fp_probe_11',
-					isRegIp: 0,
-					isMultiIp: 0,
-					activeIpCount: 1,
-					reportedByOthers: 0,
-					riskLevel: 'normal',
-					priority: 'LV2',
-					status: 'expired',
-					recommendedAction: 'archive_routine',
-					matchScore: 20,
-					subnetMatch: 0,
-					appealReason: null,
-					resolvedTime: '2026-10-01T12:00:00Z'
-				},
-				{
-					ticketId: 'REV-2026-LV001',
-					email: 'health_sample@monitor.epocanvas.com',
-					warningType: 'audit',
-					eventType: 'baseline_sample',
-					category: 'security',
-					actionText: '{health_sample@monitor.epocanvas.com} 例行基线合规采样 (LV0)',
-					detailText: '系统安全基线例行微弱偏差采样，无危害，审查完毕已快速封存归档。',
-					ip: '104.28.10.12',
-					geo: 'Singapore, SG',
-					device: 'HealthMonitor / Linux',
-					deviceType: 'desktop',
-					fingerprint: 'fp_health_01',
-					isRegIp: 1,
-					isMultiIp: 0,
-					activeIpCount: 1,
-					reportedByOthers: 0,
-					riskLevel: 'normal',
-					priority: 'LV0',
-					status: 'resolved',
-					recommendedAction: 'archive_routine',
-					matchScore: 100,
-					subnetMatch: 1,
-					appealReason: null,
-					resolvedTime: '2026-10-03T16:20:00Z'
-				},
-				{
-					ticketId: 'REV-2026-LV305',
-					email: 'roaming_user@epocanvas.com',
-					warningType: 'audit',
-					eventType: 'device_shift_routine',
-					category: 'account',
-					actionText: '{roaming_user@epocanvas.com} 非关键环境指纹偏移 (LV3)',
-					detailText: '检测到非关键系统配置与指纹弱匹配，列入常规观察清单。管理员无需主动干预，等待过期封存。',
-					ip: '203.0.113.88',
-					geo: 'Seoul, KR',
-					device: 'Edge 128 / Windows',
-					deviceType: 'desktop',
-					fingerprint: 'fp_roam_882',
-					isRegIp: 0,
-					isMultiIp: 1,
-					activeIpCount: 2,
-					reportedByOthers: 0,
-					riskLevel: 'medium',
-					priority: 'LV3',
-					status: 'active',
-					recommendedAction: 'archive_routine',
-					matchScore: 68,
-					subnetMatch: 0,
-					appealReason: null
-				},
-
-				// --- 2. 异常威胁 (Anomalous Threats - warningType: 'risk', 无 LV 概念，管理员核心管理) ---
-				{
-					ticketId: 'THR-2026-REP012',
-					email: 'phishing_scam@external-fake.xyz',
-					warningType: 'risk',
-					eventType: 'user_reported',
-					category: 'security',
-					actionText: '{phishing_scam@external-fake.xyz} 外部邮件遭受举报（欺诈载荷）',
-					detailText: '外部邮件发件人，遭受举报投递虚假传销与欺诈载荷。推荐管理员立即将其加入系统全局黑名单。',
-					ip: '45.33.32.156',
-					geo: 'Fremont, US',
-					device: 'HeadlessChrome / Linux',
-					deviceType: 'desktop',
-					fingerprint: 'fp_bot_001',
-					isRegIp: 0,
-					isMultiIp: 0,
-					activeIpCount: 1,
-					reportedByOthers: 12,
-					isInternal: 0,
-					reportCategory: 'fraud',
-					reportReason: '传销投资与虚假外链',
-					riskLevel: 'high',
-					priority: 'CRITICAL',
-					status: 'active',
-					recommendedAction: 'blacklist_sender',
-					matchScore: 10,
-					subnetMatch: 0,
-					appealReason: null
-				},
-				{
-					ticketId: 'THR-2026-REP005',
-					email: 'internal_spammer@epocanvas.com',
-					warningType: 'risk',
-					eventType: 'user_reported',
-					category: 'security',
-					actionText: '{internal_spammer@epocanvas.com} 站内账号遭受举报（垃圾推广）',
-					detailText: '站内注册用户利用内部通讯群发垃圾广告，遭受举报核实。推荐管理员对该账号执行限制发信或注销。',
-					ip: '114.119.160.88',
-					geo: 'Beijing, CN',
-					device: 'Firefox 129 / Linux',
-					deviceType: 'desktop',
-					fingerprint: 'fp_int_spm_9',
-					isRegIp: 1,
-					isMultiIp: 0,
-					activeIpCount: 1,
-					reportedByOthers: 5,
-					isInternal: 1,
-					reportCategory: 'spam',
-					reportReason: '站内群发商业广告',
-					riskLevel: 'high',
-					priority: 'HIGH',
-					status: 'active',
-					recommendedAction: 'mute_account',
-					matchScore: 80,
-					subnetMatch: 1,
-					appealReason: null
-				},
-				{
-					ticketId: 'THR-2026-MULTI99',
-					email: 'syndicate_cluster@farm.net',
-					warningType: 'risk',
-					eventType: 'multi_account_detected',
-					category: 'security',
-					actionText: '{syndicate_cluster@farm.net} 检测到多账户关联滥用 (同一IP/设备指纹)',
-					detailText: '严重违反一人一户底线！同一设备指纹 (fp_syndicate_99) 与相同 IP 聚合操纵 8 个注册账户，属于多账户群控违规，触发异常威胁红线。',
-					ip: '198.51.100.99',
-					geo: 'Hong Kong, HK',
-					device: 'Chrome 128 / Windows 10',
-					deviceType: 'desktop',
-					fingerprint: 'fp_syndicate_99',
-					isRegIp: 0,
-					isMultiIp: 1,
-					activeIpCount: 8,
-					reportedByOthers: 2,
-					isInternal: 1,
-					riskLevel: 'high',
-					priority: 'CRITICAL',
-					status: 'active',
-					recommendedAction: 'ban_account',
-					matchScore: 15,
-					subnetMatch: 0,
-					appealReason: null,
-					clusterId: 'CLS-2026-MULTI99',
-					reportSource: '系统规则命中',
-					evidenceSummary: '一人多号'
-				},
-				{
-					ticketId: 'THR-2026-MULTI99-2',
-					email: 'syndicate_member2@farm.net',
-					warningType: 'risk',
-					eventType: 'multi_account_detected',
-					category: 'security',
-					actionText: '{syndicate_member2@farm.net} 检测到多账户关联滥用 (同一IP/设备指纹)',
-					detailText: '集群关联子账号 2，共享指纹与出口代理',
-					ip: '198.51.100.99',
-					geo: 'Hong Kong, HK',
-					device: 'Chrome 128 / Windows 10',
-					deviceType: 'desktop',
-					fingerprint: 'fp_syndicate_99',
-					isRegIp: 0,
-					isMultiIp: 1,
-					activeIpCount: 8,
-					reportedByOthers: 2,
-					isInternal: 1,
-					riskLevel: 'high',
-					priority: 'CRITICAL',
-					status: 'active',
-					recommendedAction: 'ban_account',
-					matchScore: 15,
-					subnetMatch: 0,
-					appealReason: null,
-					clusterId: 'CLS-2026-MULTI99',
-					reportSource: '系统规则命中',
-					evidenceSummary: '一人多号'
-				},
-				{
-					ticketId: 'THR-2026-MULTI99-3',
-					email: 'syndicate_member3@farm.net',
-					warningType: 'risk',
-					eventType: 'multi_account_detected',
-					category: 'security',
-					actionText: '{syndicate_member3@farm.net} 检测到多账户关联滥用 (同一IP/设备指纹)',
-					detailText: '集群关联子账号 3，共享指纹与出口代理',
-					ip: '198.51.100.99',
-					geo: 'Hong Kong, HK',
-					device: 'Chrome 128 / Windows 10',
-					deviceType: 'desktop',
-					fingerprint: 'fp_syndicate_99',
-					isRegIp: 0,
-					isMultiIp: 1,
-					activeIpCount: 8,
-					reportedByOthers: 2,
-					isInternal: 1,
-					riskLevel: 'high',
-					priority: 'CRITICAL',
-					status: 'active',
-					recommendedAction: 'ban_account',
-					matchScore: 15,
-					subnetMatch: 0,
-					appealReason: null,
-					clusterId: 'CLS-2026-MULTI99',
-					reportSource: '系统规则命中',
-					evidenceSummary: '一人多号'
-				},
-				{
-					ticketId: 'THR-2026-ZS88K1',
-					email: 'zhangsan@epocanvas.com',
-					warningType: 'risk',
-					eventType: 'risk_spike',
-					category: 'security',
-					actionText: '{zhangsan@epocanvas.com} 触发异地多IP跨国并发跳跃',
-					detailText: '检测到 4-IP 并发跨国跳跃 (Seoul + Tokyo + Frankfurt)，触碰高频异常风控红线，需重点关注处置。',
-					ip: '192.0.2.145',
-					geo: 'Seoul, KR',
-					device: 'Chrome 128 / macOS 14.6',
-					deviceType: 'desktop',
-					fingerprint: 'fp_a98e21',
-					isRegIp: 0,
-					isMultiIp: 1,
-					activeIpCount: 4,
-					reportedByOthers: 1,
-					riskLevel: 'high',
-					priority: 'CRITICAL',
-					status: 'active',
-					recommendedAction: 'temp_ban_24h',
-					matchScore: 35,
-					subnetMatch: 0,
-					appealReason: null,
-					evidenceSummary: '遭受举报'
-				},
-
-				// --- 3. 争议申诉 (Dispute Appeals - warningType: 'appeal', 提前至第 3 位，主要通过表单提交表格人工复核) ---
-				{
-					ticketId: 'APL-2026-AP77X2',
-					email: 'pilot-recovery@epocanvas.com',
-					warningType: 'appeal',
-					eventType: 'appeal_submitted',
-					category: 'appeal',
-					actionText: '{pilot-recovery@epocanvas.com} 提交工单申诉解除风控封禁',
-					detailText: '用户通过外部申诉通道提交表单：“由于出差使用移动漫游热点，触发多地IP跳跃风控误封，特申请核验基准指纹解封”。',
-					ip: '116.228.89.24',
-					geo: 'Shanghai, CN (Roaming)',
-					device: 'Edge 128 / Windows 11',
-					deviceType: 'desktop',
-					fingerprint: 'fp_pilot_77a',
-					baseIp: '116.228.89.1',
-					baseGeo: 'Shanghai, CN (Broadband)',
-					baseDevice: 'Edge 126 / Windows 11',
-					baseFingerprint: 'fp_pilot_77a',
-					isRegIp: 1,
-					isMultiIp: 1,
-					activeIpCount: 2,
-					reportedByOthers: 0,
-					riskLevel: 'medium',
-					priority: 'P1',
-					status: 'pending',
-					recommendedAction: 'approve_appeal',
-					matchScore: 92,
-					subnetMatch: 1,
-					appealReason: '由于近期出差在公共漫游网络产生多IP并发跳跃，导致被风控阻断。特提交指纹基准申请解除封禁。',
-					resolvedTime: null
-				},
-				{
-					ticketId: 'APL-2026-AP0039',
-					email: 'spammer_appealed@malicious.xyz',
-					warningType: 'appeal',
-					eventType: 'appeal_submitted',
-					category: 'appeal',
-					actionText: '{spammer_appealed@malicious.xyz} 提交解封申诉但被驳回',
-					detailText: '用户提交申诉表单：“请求解封账号，发信为业务正常通知”。经与多名用户检举证据比对核实属于恶意营销，管理员已驳回申诉，维持封禁。',
-					ip: '198.51.100.44',
-					geo: 'Dallas, US',
-					device: 'Chrome 127 / Linux',
-					deviceType: 'desktop',
-					fingerprint: 'fp_fake_dallas',
-					isRegIp: 0,
-					isMultiIp: 0,
-					activeIpCount: 1,
-					reportedByOthers: 3,
-					riskLevel: 'high',
-					priority: 'P0',
-					status: 'rejected',
-					recommendedAction: 'reject_appeal',
-					matchScore: 12,
-					subnetMatch: 0,
-					appealReason: '请求解封账号，发信为业务正常通知。',
-					resolvedTime: '2026-10-04T12:00:00Z'
-				},
-
-				// --- 4. 封禁管控 (Sanction Archive - warningType: 'ban', 放在最后，纯展示与记录台账) ---
-				{
-					ticketId: 'BAN-2026-BD9901',
-					email: 'compromised_bot@malicious.xyz',
-					warningType: 'ban',
-					eventType: 'auto_ban',
-					category: 'security',
-					actionText: '{compromised_bot@malicious.xyz} 触碰发信频率熔断阈值被系统自动封禁',
-					detailText: '5分钟内尝试发送超50封含黑名单外部URL的垃圾邮件，命中反垃圾死规则触发系统阻断，执行永久封禁。',
-					banReason: '发信频率熔断且包含恶意链接',
-					banTime: '2026-10-02 08:15:00',
-					resolvedTime: '2026-10-02 08:15:00',
-					ip: '198.51.100.88',
-					geo: 'Amsterdam, NL',
-					device: 'Python-Requests / Unknown',
-					deviceType: 'desktop',
-					fingerprint: 'fp_crawl_92',
-					isRegIp: 0,
-					isMultiIp: 0,
-					activeIpCount: 1,
-					reportedByOthers: 0,
-					riskLevel: 'high',
-					priority: 'CRITICAL',
-					status: 'banned',
-					recommendedAction: 'blacklist_ip',
-					matchScore: 0,
-					subnetMatch: 0,
-					appealReason: null
-				},
-				{
-					ticketId: 'BAN-2026-UN0021',
-					email: 'unbanned_user@epocanvas.com',
-					warningType: 'ban',
-					eventType: 'credential_tamper_ban',
-					category: 'security',
-					actionText: '{unbanned_user@epocanvas.com} 账号密保异动封禁，申诉核实为本人出差换机，已解禁',
-					detailText: '新环境首次登录立即重置二次验证与密码，触发防买卖黑产阻断。后经独立申诉工单核验初始注册基准通过，管理员于 2026-10-04 人工放行解禁并移出黑名单，台账永久保留供审计追溯。',
-					banReason: '新设备/陌生环境立刻更改账户密保 (怀疑账号买卖黑产)',
-					banTime: '2026-09-28 10:00:00',
-					resolvedTime: '2026-10-04 14:30:00',
-					ip: '116.228.89.24',
-					geo: 'Shanghai, CN',
-					device: 'Edge 128 / Windows 11',
-					deviceType: 'desktop',
-					fingerprint: 'fp_pilot_77a',
-					isRegIp: 1,
-					isMultiIp: 1,
-					activeIpCount: 1,
-					reportedByOthers: 0,
-					riskLevel: 'normal',
-					priority: 'HIGH',
-					status: 'unbanned', // 已解禁 / 已移出黑名单，记录依然保留！
-					recommendedAction: 'none',
-					matchScore: 92,
-					subnetMatch: 1,
-					appealReason: '出差换新笔记本电脑，登入后重置密保被误判。'
-				},
-				{
-					ticketId: 'BAN-2026-MA8802',
-					email: 'syndicate_cluster@farm.net',
-					warningType: 'ban',
-					eventType: 'multi_account_ban',
-					category: 'security',
-					actionText: '{syndicate_cluster@farm.net} 关联账户违规一人多号被系统执行全量封禁',
-					detailText: '排查确认与 8 个关联邮箱共享同一设备指纹与注册 IP，严重违反一人一户服务条款底线，对该账号组全部执行永久封禁。',
-					banReason: '一人多号 (同一IP与设备指纹操纵多个账号，违反服务条款)',
-					banTime: '2026-10-01 11:20:00',
-					resolvedTime: '2026-10-01 11:20:00',
-					ip: '198.51.100.99',
-					geo: 'Hong Kong, HK',
-					device: 'Chrome 128 / Windows 10',
-					deviceType: 'desktop',
-					fingerprint: 'fp_syndicate_99',
-					isRegIp: 0,
-					isMultiIp: 1,
-					activeIpCount: 8,
-					reportedByOthers: 2,
-					riskLevel: 'high',
-					priority: 'CRITICAL',
-					status: 'banned',
-					recommendedAction: 'none',
-					matchScore: 15,
-					subnetMatch: 0,
-					appealReason: null
-				}
-			];
-
-			for (const r of initialRecords) {
-				await orm(c).insert(auditLog).values(r).run();
-			}
-		} catch (e) {
-			console.warn('seedBaselineIfEmpty warning:', e.message);
 		}
 	},
 
@@ -919,25 +543,8 @@ const auditService = {
 			}
 		};
 
-		// Fetch registration baseline for distinct emails from user table
-		const distinctEmails = [...new Set((list || []).map(r => r.email).filter(Boolean))];
-		let userMap = new Map();
-		if (distinctEmails.length > 0) {
-			try {
-				const userList = await orm(c).select().from(user).where(inArray(user.email, distinctEmails));
-				userMap = new Map(userList.map(u => [u.email, u]));
-			} catch (e) {
-				console.warn('Failed to query user baseline:', e.message);
-			}
-		}
-
-		// Process list: attach baseline environment and handle Zero-Knowledge mode
+		// Process list: response fields must come from recorded case facts only.
 		let processedList = (list || []).map(row => {
-			const u = userMap.get(row.email);
-			const baseIp = u?.createIp || (row.ip ? (row.ip.split('.').slice(0, 3).join('.') + '.1') : '198.51.100.1');
-			const baseDevice = (u?.device && u?.os) ? `${u.device} (${u.os})` : (row.device ? `${row.device} (Baseline)` : 'Desktop (Baseline)');
-			const baseGeo = row.geo ? `${row.geo.split(' ')[0]} (Reg)` : 'CN (Reg)';
-			const baseFingerprint = row.fingerprint ? `BASE-${row.fingerprint.slice(-8)}` : 'FP-BASE-REG';
 
 			// 若工单属于 audit 且由于超时自然过期，确保 status 字段规范标识为 'expired'
 			if (row.warningType === 'audit' && row.status !== 'resolved') {
@@ -947,13 +554,11 @@ const auditService = {
 			}
 
 			// 1. 规范化工单编号 (# 开头的不超过 6 个字符的集合，例如 #AK1789)
-			let ticketNo = '#AK1789';
+			let ticketNo = null;
 			if (row.ticketId) {
 				const parts = row.ticketId.split('-');
 				const code = parts[parts.length - 1].toUpperCase().replace(/[^A-Z0-9]/g, '');
 				ticketNo = '#' + (code.length > 6 ? code.slice(-6) : code);
-			} else if (row.id) {
-				ticketNo = `#AK${String((1780 + Number(row.id)) % 10000).padStart(4, '0')}`;
 			}
 
 			// 2. 身分组 (通过身份等级判断不同影响程度 P0~P4)
@@ -987,14 +592,15 @@ const auditService = {
 				identityImpact = '边缘影响';
 			}
 
-			// 3. 报警次数 (同类收敛聚合计数)
-			const alarmCount = row.reportedByOthers > 0
-				? row.reportedByOthers
-				: (row.isMultiIp ? (row.activeIpCount || 3) : (row.eventType === 'multi_account_ban' ? 2 : (row.eventType === 'auto_ban' ? 4 : 1)));
+			// 3. 报警次数：仅使用数据库记录的举报次数，缺失时保持缺失
+			const alarmCount = row.reportedByOthers === null || row.reportedByOthers === undefined
+				? null
+				: Number(row.reportedByOthers);
 
-			// 4. 负责人与拍案管理 (对最后管理员的留名记录，大部分时候拍案管理就是负责人)
-			const operator = row.operator || (row.status === 'banned' ? 'System Bot' : 'SecAdmin');
-			const adjudicator = row.adjudicator || row.operator || (row.status === 'banned' ? 'System Bot' : (row.status === 'unbanned' ? 'Master' : 'SecAdmin'));
+			// 4. 负责人与拍案管理：仅使用数据库记录的实际负责人
+			const operator = row.assignee || null;
+			const adjudicator = row.assignee || null;
+
 
 			let finalAuthority = 'auto';
 			let finalAuthorityDesc = '基线巡检无风险，系统生命周期自动归档';
@@ -1012,19 +618,21 @@ const auditService = {
 				finalAuthorityDesc = '协管人工复核批准解封或维持观察 (主管级拍案)';
 			}
 
-			const createdTs = row.createTime ? new Date(row.createTime).getTime() : Date.now();
+			const createdTs = row.createTime ? new Date(row.createTime).getTime() : null;
 
 			// 计算死局时间 (Deadlock Time: 30天冷静期/最终终裁期限，支持申诉与操作记录死局)
 			let deadlockTime = row.deadlockTime || row.deadline || null;
-			if (!deadlockTime) {
+			if (!deadlockTime && Number.isFinite(createdTs)) {
 				const baseTs = row.banTime ? new Date(row.banTime).getTime() : createdTs;
-				deadlockTime = new Date(baseTs + 30 * 86400000).toISOString();
+				if (Number.isFinite(baseTs)) {
+					deadlockTime = new Date(baseTs + 30 * 86400000).toISOString();
+				}
 			}
 
 			// 计算同类申诉次数 (记录的是相同的问题申诉了多少次，主要包含相同违规分类的申诉)
-			let sameCategoryAppealCount = 1;
+			let sameCategoryAppealCount = 0;
 			if (row.warningType === 'appeal') {
-				sameCategoryAppealCount = row.appealCount || (row.reportedByOthers > 0 ? row.reportedByOthers : 1);
+				sameCategoryAppealCount = row.appealCount || 0;
 			}
 
 			// 计算过期时间与截止期限 (支持申诉表单过期与风险管控截止期限)
@@ -1032,14 +640,14 @@ const auditService = {
 			let deadline = row.deadline || null;
 			if (row.warningType === 'audit') {
 				// 风险管理业务准则：一般在发现后 14 天内完成审计
-				const baseTs = row.alarmTime ? new Date(row.alarmTime).getTime() : (row.createTime ? new Date(row.createTime).getTime() : createdTs);
+				const baseTs = row.alarmTime ? new Date(row.alarmTime).getTime() : createdTs;
 				if (row.detailText && row.detailText.includes('[延期处置]') && (row.deadline || row.expireTime)) {
 					deadline = row.deadline || row.expireTime;
-				} else {
+				} else if (Number.isFinite(baseTs)) {
 					deadline = new Date(baseTs + 14 * 86400000).toISOString();
 				}
 				expireTime = deadline;
-			} else if (!expireTime) {
+			} else if (!expireTime && Number.isFinite(createdTs)) {
 				if (row.warningType === 'appeal') {
 					// 申诉表单通常 7 天过期
 					expireTime = new Date(createdTs + 7 * 86400000).toISOString();
@@ -1064,31 +672,12 @@ const auditService = {
 			const appealCount = (row.appealReason || row.warningType === 'appeal') ? (row.appealCount || 1) : 0;
 
 			const nowMs = Date.now();
-			const createMs = row.createTime ? new Date(row.createTime).getTime() : nowMs;
-			const daysPassed = Math.floor((nowMs - createMs) / (86400 * 1000));
-			const evidenceExpiresDays = Math.max(0, 180 - daysPassed);
+			const createMs = Number.isFinite(createdTs) ? createdTs : null;
+			const evidenceExpiresDays = createMs === null
+				? null
+				: Math.max(0, 180 - Math.floor((nowMs - createMs) / (86400 * 1000)));
 
-			let evidenceSummary = row.evidenceSummary;
-			if (!evidenceSummary) {
-				const rCount = Number(row.reportedByOthers) || 0;
-				if (rCount > 0) {
-					evidenceSummary = '遭受举报';
-				} else if (row.eventType === 'multi_account_detected' || row.eventType === 'multi_account_ban') {
-					evidenceSummary = '一人多号';
-				} else if (row.eventType === 'credential_tamper_ban' || row.eventType === 'account_takeover') {
-					evidenceSummary = '密保异动';
-				} else if (row.eventType === 'auto_ban' || (row.banReason && row.banReason.includes('频率'))) {
-					evidenceSummary = '发信超频';
-				} else if (row.reportCategory === 'fraud' || (row.detailText && row.detailText.includes('蜜罐'))) {
-					evidenceSummary = '恶意载荷';
-				} else if (row.reportCategory === 'spam' || row.eventType === 'outbound_rate') {
-					evidenceSummary = '发信超频';
-				} else if (row.eventType === 'quota_evasion') {
-					evidenceSummary = '配额规避';
-				} else {
-					evidenceSummary = '规则拦截';
-				}
-			}
+			const evidenceSummary = row.evidenceSummary ?? null;
 
 			let clusterAccounts = [];
 			let clusterCount = 1;
@@ -1101,26 +690,26 @@ const auditService = {
 					email: m.email,
 					userId: m.userId ? ('usr_' + m.userId) : ('usr_' + m.id),
 					status: m.status,
-					evidenceSummary: m.evidenceSummary || row.evidenceSummary || '集群关联',
+					evidenceSummary: m.evidenceSummary ?? null,
 					actionText: m.actionText,
 					createTime: m.createTime
 				}));
 			}
 
-			const effectiveCreateTime = row.createTime || row.create_time || row.banTime || new Date().toISOString();
+			const recordedCreateTime = row.createTime ?? null;
 			const item = {
 				...row,
 				actionText: row.actionText,
 				detailText: row.detailText,
-				createTime: effectiveCreateTime,
-				alarmTime: row.alarmTime || effectiveCreateTime || row.banTime,
-				applyTime: row.applyTime || effectiveCreateTime || row.banTime,
-				processTime: row.processTime || row.resolvedTime || row.banTime || effectiveCreateTime,
-				ticketId: row.ticketId || ('#' + (10000 + row.id)),
-				baseIp,
-				baseGeo,
-				baseDevice,
-				baseFingerprint,
+				createTime: recordedCreateTime,
+				alarmTime: row.alarmTime ?? null,
+				applyTime: row.applyTime ?? null,
+				processTime: row.processTime ?? row.resolvedTime ?? null,
+				ticketId: row.ticketId ?? null,
+				baseIp: row.baseIp ?? null,
+				baseGeo: row.baseGeo ?? null,
+				baseDevice: row.baseDevice ?? null,
+				baseFingerprint: row.baseFingerprint ?? null,
 				ticketNo,
 				identityGroup,
 				identityLevel,
@@ -1132,21 +721,17 @@ const auditService = {
 				operatorName: operator,
 				adjudicator,
 				adjudicatorName: adjudicator,
-				banTime: row.banTime || (row.status === 'banned' ? effectiveCreateTime : null),
-				assignee: row.assignee || null,
-				reportSource: row.reportSource || (row.reportedByOthers > 0 ? '遭受举报' : '系统巡检'),
+				banTime: row.banTime ?? null,
+				assignee: row.assignee ?? null,
+				reportSource: row.reportSource ?? null,
 				evidenceSummary,
-				circuitStatus: row.circuitStatus || 'NORMAL',
-				reasonCode: row.reasonCode || (row.eventType === 'multi_account_ban' ? 'QUOTA_EVASION' : (row.eventType === 'auto_ban' ? 'OUTBOUND_COMPLAINT_ELEVATED' : 'AUTH_ACCOUNT_TAKEOVER')),
+				circuitStatus: row.circuitStatus ?? null,
+				reasonCode: row.reasonCode ?? null,
 				evidenceExpiresDays,
 				clusterAccounts,
 				clusterCount,
 				isCluster: clusterCount > 1,
-				timeline: row.timeline ? (typeof row.timeline === 'string' ? JSON.parse(row.timeline) : row.timeline) : [
-					{ time: effectiveCreateTime, event: '系统规则命中', actor: 'RuleEngine' },
-					...(row.banTime ? [{ time: row.banTime, event: '执行封禁', actor: row.assignee || 'System' }] : []),
-					...(row.status === 'unbanned' ? [{ time: row.resolvedTime || new Date().toISOString(), event: '申诉复核解除', actor: 'Admin' }] : [])
-				],
+				timeline: parseRecordedTimeline(row.timeline),
 				expireTime,
 				deadline,
 				deadlockTime,
@@ -1457,6 +1042,11 @@ const auditService = {
 			throw new BizError('案件记录不存在', 404);
 		}
 
+		// 状态、工作类型与版本必须在任何写入前通过统一校验。
+		// 不接受 NULL 版本，也不把 NULL 隐式当作 1，避免触发器与 CAS 使用不同语义。
+		assertValidCaseState(targetLog);
+		const expectedVersion = assertStoredCaseVersion(targetLog);
+
 		const userDb = getUserDb(c) || c?.env?.db;
 		if (!userDb) {
 			throw new BizError('数据库连接不可用 (D1 unbound)', 500);
@@ -1486,7 +1076,7 @@ const auditService = {
 						action: existingDecision.action_type,
 						decisionId: existingDecision.decision_id,
 						replayed: true,
-						version: targetLog.version || 1
+						version: expectedVersion
 					};
 				} else {
 					throw new BizError('幂等键冲突：同一幂等键不可用于不同案件或操作', 409);
@@ -1502,24 +1092,12 @@ const auditService = {
 						action: actionType,
 						decisionId: existingKeyRecord.decisionId,
 						replayed: true,
-						version: existingKeyRecord.version || 1
+						version: expectedVersion
 					};
 				} else {
 					throw new BizError('幂等键冲突：同一幂等键不可用于不同案件或操作', 409);
 				}
 			}
-		}
-
-		// 检查案件是否已结案（只读审计记录防重入）
-		// 有效封禁中的案卷或待解封复核不属于只读死锁状态，管理员可正式执行 unban 放行
-		const isClosed = ['resolved', 'expired', 'unbanned'].includes(targetLog.status);
-		if (isClosed && actionType !== 'unban') {
-			throw new BizError('该案件已结案归档，属于系统只读审计记录，无法重复提交裁决', 400);
-		}
-
-		// 校验服务端事实与必要状态前提：案件状态必须合法有效，严禁 NULL、空值或缺失
-		if (!targetLog.status || typeof targetLog.status !== 'string' || !targetLog.status.trim()) {
-			throw new BizError('案件数据状态损坏或缺失合法状态前提，无法执行裁决写入', 500);
 		}
 
 		// 若客户端显式提供了 expected_status，必须与服务端事实严格比对，严禁不可信客户端值伪造事实
@@ -1529,16 +1107,15 @@ const auditService = {
 			if (clientExpectedStatus === null || typeof clientExpectedStatus !== 'string' || !clientExpectedStatus.trim()) {
 				throw new BizError('客户端传入的 expected_status 非法或为空', 400);
 			}
-			if (clientExpectedStatus.trim() !== targetLog.status.trim()) {
+			if (clientExpectedStatus.trim() !== targetLog.status) {
 				throw new BizError('案件状态已被并发修改或状态不匹配，请刷新后重试', 409);
 			}
 		}
 
-		// 并发控制：乐观锁版本检查 (CAS)
-		if (version !== undefined && version !== null && targetLog.version !== undefined && targetLog.version !== null) {
-			if (Number(version) !== Number(targetLog.version)) {
-				throw new BizError('案件版本已过时，请刷新后重试', 409);
-			}
+		// 客户端版本只作为乐观锁断言，不能覆盖数据库真实版本
+		assertValidClientVersion(version);
+		if (version !== undefined && version !== null && version !== expectedVersion) {
+			throw new BizError('案件版本已过时，请刷新后重试', 409);
 		}
 
 		// 严格绑定目标账号，不信任客户端随意指定的任何外部主体字段
@@ -1546,25 +1123,31 @@ const auditService = {
 
 		// 状态转换与业务场景合法性校验 (严防非法状态机跃迁)
 		const isAppealCase = targetLog.warningType === 'appeal' || Boolean(targetLog.appealReason);
-		if (['approve_appeal', 'approve', 'reject_appeal', 'reject'].includes(actionType) && !isAppealCase) {
+		if (APPEAL_ACTIONS.has(actionType) && !isAppealCase) {
 			throw new BizError('当前案件无待处理申诉，无法执行申诉裁决动作', 400);
 		}
 
-		// 检查当前案卷自身或其派生处罚是否处于有效封禁中
+		// 检查当前案卷自身或其派生处罚是否处于有效封禁中。
+		// 关联判定使用严格数值规范化，兼容历史 "ID.0" 形式，但绝不接受脏字符串。
 		let activePenaltyRecord = null;
 		if (targetLog.warningType === 'ban' || targetLog.status === 'banned') {
 			activePenaltyRecord = targetLog.status === 'banned' ? targetLog : null;
 		} else {
-			activePenaltyRecord = await orm(c).select().from(auditLog).where(
-				and(
-					eq(auditLog.email, targetLog.email),
-					eq(auditLog.warningType, 'ban'),
-					eq(auditLog.status, 'banned'),
-					eq(auditLog.originalDecisionId, String(targetLog.id))
-				)
-			).get();
+			const activeBans = await selectBanRows(c, targetLog.email, true);
+			const linkedBans = activeBans.filter(banRow => isPenaltyLinkedToCase(banRow, targetLog.id));
+			assertNoDuplicateLinkedBans(linkedBans);
+			activePenaltyRecord = linkedBans[0] || null;
 		}
 		const isCurrentlyBanned = Boolean(activePenaltyRecord);
+
+		// 检查案件是否已结案（只读审计记录防重入）
+		// 有效封禁中的案卷、待解封复核，以及仍关联有效处罚的源案件的申诉复核不属于只读死锁状态
+		const isClosed = ['resolved', 'expired', 'unbanned'].includes(targetLog.status);
+		const appealReviewOnLivePenalty = APPEAL_ACTIONS.has(actionType) && isCurrentlyBanned;
+		if (isClosed && actionType !== 'unban' && !appealReviewOnLivePenalty) {
+			throw new BizError('该案件已结案归档，属于系统只读审计记录，无法重复提交裁决', 400);
+		}
+
 		if (['ban', 'ban_account', 'banned'].includes(actionType) && isCurrentlyBanned) {
 			throw new BizError('当前案件已处于封禁处置中，不可重复执行首次封禁裁决（复核处置请使用维持封禁或解封）', 400);
 		}
@@ -1587,6 +1170,22 @@ const auditService = {
 
 		if ((actionType === 'ban' || actionType === 'ban_account' || actionType === 'banned') && targetLog.isInternal === 0 && !targetUser) {
 			throw new BizError('站内账号封禁仅适用于本地注册用户，外部发件人请使用外部拉黑', 400);
+		}
+
+		// 统一动作/源状态矩阵：合法状态也必须匹配当前动作允许的源状态
+		if (FIRST_DECISION_ACTIONS.has(actionType) && !['active', 'pending'].includes(targetLog.status)) {
+			throw new BizError('当前案件状态不允许执行首次裁决', 409);
+		}
+		if (REVIEW_ACTIONS.has(actionType) && !['banned', 'active', 'pending', 'resolved'].includes(targetLog.status)) {
+			throw new BizError('当前案件状态不允许执行处置复核', 409);
+		}
+		if (APPEAL_ACTIONS.has(actionType)) {
+			const allowed = targetLog.warningType === 'appeal'
+				? ['active', 'pending']
+				: (targetLog.warningType === 'ban' ? ['banned'] : ['active', 'pending', 'resolved']);
+			if (!allowed.includes(targetLog.status)) {
+				throw new BizError('当前案件状态不允许执行申诉裁决', 409);
+			}
 		}
 
 		const nowIso = new Date().toISOString();
@@ -1628,18 +1227,10 @@ const auditService = {
 			}
 
 			// 多案隔离：处罚必须明确关联原案件与原决定，去重必须围绕特定案件/决定，绝不能按邮箱全局合并
-			let existingBanForThisCase = null;
-			if (targetLog.warningType === 'ban') {
-				existingBanForThisCase = targetLog;
-			} else {
-				existingBanForThisCase = await orm(c).select().from(auditLog).where(
-					and(
-						eq(auditLog.email, targetLog.email),
-						eq(auditLog.warningType, 'ban'),
-						eq(auditLog.originalDecisionId, String(targetLog.id))
-					)
-				).get();
-			}
+			const allBansForEmail = await selectBanRows(c, targetLog.email, false);
+			const linkedBansForThisCase = allBansForEmail.filter(banRow => isPenaltyLinkedToCase(banRow, targetLog.id));
+			assertNoDuplicateLinkedBans(linkedBansForThisCase);
+			const existingBanForThisCase = linkedBansForThisCase[0] || null;
 
 			if (!existingBanForThisCase) {
 				stmts.push(userDb.prepare(`
@@ -1669,7 +1260,7 @@ const auditService = {
 					WHERE id = ?
 				`).bind(
 					nowIso,
-					(existingBanForThisCase.detailText || '') + (notes ? `\n[处置更新]: ${notes}` : ''),
+					(existingBanForThisCase.detail_text || '') + (notes ? `\n[处置更新]: ${notes}` : ''),
 					decisionId,
 					existingBanForThisCase.id
 				));
@@ -1725,15 +1316,13 @@ const auditService = {
 
 		// 6. 既有处置复核：解除本案封禁限制
 		else if (actionType === 'unban') {
-			const thisPenaltyCaseId = String(targetLog.id);
-			const otherActiveBans = await orm(c).select().from(auditLog).where(
-				and(
-					eq(auditLog.email, targetLog.email),
-					eq(auditLog.status, 'banned'),
-					sql`${auditLog.id} != ${targetLog.id}`,
-					sql`coalesce(${auditLog.originalDecisionId}, '') != ${thisPenaltyCaseId}`
-				)
-			).all();
+			const activeBans = await selectBanRows(c, targetLog.email, true);
+			const linkedActiveBans = activeBans.filter(banRow => isPenaltyLinkedToCase(banRow, targetLog.id));
+			assertNoDuplicateLinkedBans(linkedActiveBans);
+			const otherActiveBans = activeBans.filter(banRow => !isPenaltyLinkedToCase(banRow, targetLog.id));
+			const releaseIds = targetLog.warningType !== 'ban' && targetLog.status !== 'banned'
+				? linkedActiveBans.map(banRow => banRow.id)
+				: [];
 
 			if (targetUser && otherActiveBans.length === 0) {
 				stmts.push(userDb.prepare(`UPDATE user SET status = 0 WHERE user_id = ?`).bind(targetUser.userId));
@@ -1747,32 +1336,30 @@ const auditService = {
 			targetNewDetailText += (notes ? `\n[解禁说明]: ${notes}` : '\n[解禁说明]: 复核放行解禁') + isolationNotice;
 			timeline.push({ time: nowIso, event: '解除封禁处置', actor });
 
-			if (targetLog.warningType !== 'ban') {
+			if (releaseIds.length > 0) {
+				const placeholders = releaseIds.map(() => '?').join(',');
 				stmts.push(userDb.prepare(`
 					UPDATE audit_log 
 					SET status = 'unbanned', resolved_time = ?,
 						detail_text = detail_text || ?
-					WHERE email = ? AND warning_type = 'ban' AND original_decision_id = ? AND status = 'banned'
+					WHERE id IN (${placeholders}) AND status = 'banned'
 				`).bind(
 					nowIso,
 					'\n[解禁说明]: 复核通过已解除本案关联处罚 (' + (notes || '正常放行') + ')',
-					targetLog.email,
-					thisPenaltyCaseId
+					...releaseIds
 				));
 			}
 		}
 
 		// 7. 用户申诉审核：申诉成立放行
 		else if (actionType === 'approve' || actionType === 'approve_appeal' || actionType === 'whitelist') {
-			const thisPenaltyCaseId = String(targetLog.id);
-			const otherActiveBans = await orm(c).select().from(auditLog).where(
-				and(
-					eq(auditLog.email, targetLog.email),
-					eq(auditLog.status, 'banned'),
-					sql`${auditLog.id} != ${targetLog.id}`,
-					sql`coalesce(${auditLog.originalDecisionId}, '') != ${thisPenaltyCaseId}`
-				)
-			).all();
+			const activeBans = await selectBanRows(c, targetLog.email, true);
+			const linkedActiveBans = activeBans.filter(banRow => isPenaltyLinkedToCase(banRow, targetLog.id));
+			assertNoDuplicateLinkedBans(linkedActiveBans);
+			const otherActiveBans = activeBans.filter(banRow => !isPenaltyLinkedToCase(banRow, targetLog.id));
+			const releaseIds = targetLog.warningType !== 'ban' && targetLog.status !== 'banned'
+				? linkedActiveBans.map(banRow => banRow.id)
+				: [];
 
 			if (targetUser && otherActiveBans.length === 0) {
 				stmts.push(userDb.prepare(`UPDATE user SET status = 0 WHERE user_id = ?`).bind(targetUser.userId));
@@ -1786,17 +1373,17 @@ const auditService = {
 			targetNewDetailText += (notes ? `\n[申诉裁决]: ${notes}` : '\n[申诉裁决]: 申诉复核通过') + isolationNotice;
 			timeline.push({ time: nowIso, event: '申诉通过放行', actor });
 
-			if (targetLog.warningType !== 'ban') {
+			if (releaseIds.length > 0) {
+				const placeholders = releaseIds.map(() => '?').join(',');
 				stmts.push(userDb.prepare(`
 					UPDATE audit_log 
 					SET status = 'unbanned', resolved_time = ?,
 						detail_text = detail_text || ?
-					WHERE email = ? AND warning_type = 'ban' AND original_decision_id = ? AND status = 'banned'
+					WHERE id IN (${placeholders}) AND status = 'banned'
 				`).bind(
 					nowIso,
 					'\n[解禁说明]: 申诉复核通过，已解除本案关联处罚 (' + (notes || '正常放行') + ')',
-					targetLog.email,
-					thisPenaltyCaseId
+					...releaseIds
 				));
 			}
 
@@ -1821,8 +1408,7 @@ const auditService = {
 			throw new BizError(`不支持的裁决动作: ${actionType}`, 400);
 		}
 
-		const expectedVersion = Number(targetLog.version || 1);
-		const expectedStatus = String(targetLog.status || '').trim();
+		const expectedStatus = targetLog.status;
 
 		// 0. 登记决策台账与版本占位（原子性第一句：若 expected_version 或 expected_status 已被并发事务抢占，则触发 UNIQUE 约束或 trigger 在 D1 级立即回滚全批次）
 		const decisionStmt = userDb.prepare(`
@@ -1846,7 +1432,7 @@ const auditService = {
 			UPDATE audit_log 
 			SET status = ?, resolved_time = ?, timeline = ?, detail_text = ?,
 			    appeal_reason = CASE WHEN ? IN ('reject', 'reject_appeal', 'approve', 'approve_appeal') THEN NULL ELSE appeal_reason END,
-			    version = coalesce(version, 1) + 1, decision_id = ?, idempotency_key = ?
+			    version = version + 1, decision_id = ?, idempotency_key = ?
 			WHERE id = ? AND status = ? AND version = ?
 		`).bind(
 			targetNewStatus,
@@ -1902,9 +1488,10 @@ const auditService = {
 			throw batchErr;
 		}
 
-		// 校验 CAS 影响行数：若案卷更新（第二句）影响 0 行表明状态已被并发修改
+		// 校验 CAS 影响行数：第二句必须恰好更新 1 行；触发器已使用与 CAS 完全一致的版本/状态前提，
+		// 任何不一致都会在 batch 内原子回滚，而不会在提交后才暴露为 409。
 		const caseUpdateResult = batchResults[1];
-		if (caseUpdateResult?.meta && caseUpdateResult.meta.changes === 0) {
+		if (caseUpdateResult?.meta && caseUpdateResult.meta.changes !== 1) {
 			throw new BizError('案件状态已被并发修改或版本过时，请刷新后重试', 409);
 		}
 
@@ -1983,7 +1570,7 @@ const auditService = {
 			action: actionType,
 			decisionId,
 			noticeTaskId,
-			version: (targetLog.version || 1) + 1,
+			version: expectedVersion + 1,
 			isRestricted: ['ban', 'ban_account', 'banned'].includes(actionType),
 			restrictedToken
 		};

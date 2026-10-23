@@ -111,16 +111,17 @@ const decisionNoticeService = {
 	 */
 	renderFinalNotice({ actionType, targetLog, targetUser, caseNumber, reasonCode, publicReason, notes }) {
 		const tpl = this.getTemplateMeta(actionType);
-		const cNo = caseNumber || targetLog?.ticketId || (targetLog?.id ? `#${targetLog.id}` : '#AK1789');
-		const code = reasonCode || targetLog?.reasonCode || 'POLICY_VIOLATION';
-		const reason = publicReason || targetLog?.reportCategory || '系统安全风控合规审查';
+		const cNo = caseNumber || targetLog?.ticketId || (targetLog?.id ? `#${targetLog.id}` : '未记录案件编号');
+		const code = reasonCode || targetLog?.reasonCode || null;
+		const reason = publicReason || targetLog?.reportCategory || null;
+		const basisText = [code, reason].filter(Boolean).join(' - ') || '未记录处置依据';
 		const subject = `【系统通知】${tpl.titleZh} (${cNo})`;
 		const recipient = targetLog?.email || targetUser?.email || '-';
 		const timestamp = new Date().toISOString().replace('T', ' ').substring(0, 19) + ' UTC';
 
 		let decisionDesc = '';
 		if (tpl.code === 'FIRST_BAN') {
-			decisionDesc = `经系统安全与合规团队研判，您的账号 (${recipient}) 因触犯系统风控规则 [${code} - ${reason}]，已被执行管控限制。`;
+			decisionDesc = `经系统安全与合规团队研判，您的账号 (${recipient}) 因触犯系统风控规则 [${basisText}]，已被执行管控限制。`;
 		} else if (tpl.code === 'DISMISS_NO_PENALTY') {
 			decisionDesc = `经安全团队合规复核，关于您的账号 (${recipient}) 的安全审查事项 (${cNo}) 已查实排除违规嫌疑，不予处罚。`;
 		} else if (tpl.code === 'BLACKLIST_EXTERNAL') {
@@ -145,7 +146,7 @@ const decisionNoticeService = {
 			`=== ${tpl.titleZh} ===`,
 			`案件编号: ${cNo}`,
 			`通知对象: ${recipient}`,
-			`处理依据: ${code} (${reason})`,
+			`处理依据: ${basisText}`,
 			`生效条件: ${tpl.effectiveZh}`,
 			`受影响范围: ${tpl.capabilityZh}`,
 			`时间戳: ${timestamp}`,
@@ -185,7 +186,7 @@ const decisionNoticeService = {
     <div class="body">
       <div class="meta-grid">
         <div class="meta-row"><span class="meta-label">案件编号:</span><span class="meta-val">${cNo}</span></div>
-        <div class="meta-row"><span class="meta-label">依据代码:</span><span class="meta-val">${code} (${reason})</span></div>
+        <div class="meta-row"><span class="meta-label">依据代码:</span><span class="meta-val">${basisText}</span></div>
         <div class="meta-row"><span class="meta-label">生效状态:</span><span class="meta-val">${tpl.effectiveZh}</span></div>
         <div class="meta-row"><span class="meta-label">能力影响:</span><span class="meta-val">${tpl.capabilityZh}</span></div>
         <div class="meta-row"><span class="meta-label">处理时间:</span><span class="meta-val">${timestamp}</span></div>
