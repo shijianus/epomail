@@ -178,10 +178,10 @@ const auditService = {
 						SELECT CASE
 							WHEN (SELECT id FROM audit_log WHERE id = NEW.case_id) IS NULL
 							THEN RAISE(ABORT, 'Audit case not found')
-							WHEN (SELECT coalesce(version, 1) FROM audit_log WHERE id = NEW.case_id) != NEW.expected_version
+							WHEN NEW.expected_version IS NULL OR (SELECT coalesce(version, 1) FROM audit_log WHERE id = NEW.case_id) != NEW.expected_version
 							THEN RAISE(ABORT, 'Audit log version mismatch: stale decision attempt')
-							WHEN NEW.expected_status IS NOT NULL AND (SELECT status FROM audit_log WHERE id = NEW.case_id) != NEW.expected_status
-							THEN RAISE(ABORT, 'Audit log status mismatch: case state already changed')
+							WHEN NEW.expected_status IS NULL OR TRIM(NEW.expected_status) = '' OR (SELECT status FROM audit_log WHERE id = NEW.case_id) IS NULL OR TRIM((SELECT status FROM audit_log WHERE id = NEW.case_id)) = '' OR (SELECT status FROM audit_log WHERE id = NEW.case_id) != NEW.expected_status
+							THEN RAISE(ABORT, 'Audit log status mismatch: case state changed or expected_status invalid')
 						END;
 					END;
 				`).run();
@@ -212,129 +212,6 @@ const auditService = {
 				);
 			`).run();
 			await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_audit_purge_batch_time ON audit_purge_batch(create_time);`).run();
-
-			// Idempotent migration: Ensure multi-account cluster baseline has cluster_id (only for risk abuse tickets)
-			try {
-				// 确保存在 THR-2026-MULTI99 主威胁工单
-				const hasThr99 = await userDb.prepare(`SELECT id FROM audit_log WHERE ticket_id = 'THR-2026-MULTI99' LIMIT 1`).first();
-				if (!hasThr99) {
-					await userDb.prepare(`
-						INSERT INTO audit_log (
-							ticket_id, email, warning_type, event_type, category, action_text,
-							detail_text, ip, geo, device, fingerprint, is_reg_ip, is_multi_ip,
-							active_ip_count, reported_by_others, risk_level, priority, status,
-							recommended_action, cluster_id, report_source, evidence_summary, circuit_status
-						) VALUES (
-							'THR-2026-MULTI99', 'syndicate_cluster@farm.net', 'risk', 'multi_account_detected', 'security',
-							'{syndicate_cluster@farm.net} 检测到多账户关联滥用 (同一IP/设备指纹)',
-							'严重违反一人一户底线！同一设备指纹 (fp_syndicate_99) 与相同 IP 聚合操纵 8 个注册账户，属于多账户群控违规，触发异常威胁红线。',
-							'198.51.100.99', 'Hong Kong, HK', 'Chrome 128 / Windows 10',
-							'fp_syndicate_99', 0, 1, 8, 2, 'high', 'CRITICAL', 'active',
-							'ban_account', 'CLS-2026-MULTI99', '系统规则命中', '一人多号', 'NORMAL'
-						);
-					`).run();
-				}
-
-				// 幂等自愈：将因历史无限定更新导致误写了 cluster_id 的非 risk 工单（如 ban 台账）清除 cluster_id
-				await userDb.prepare(`
-					UPDATE audit_log
-					SET cluster_id = NULL
-					WHERE warning_type != 'risk' AND cluster_id = 'CLS-2026-MULTI99';
-				`).run();
-
-				const hasMember2 = await userDb.prepare(`SELECT id FROM audit_log WHERE ticket_id = 'THR-2026-MULTI99-2' LIMIT 1`).first();
-				if (!hasMember2) {
-					await userDb.prepare(`
-						INSERT INTO audit_log (
-							ticket_id, email, warning_type, event_type, category, action_text,
-							detail_text, ip, geo, device, fingerprint, is_reg_ip, is_multi_ip,
-							active_ip_count, reported_by_others, risk_level, priority, status,
-							recommended_action, cluster_id, report_source, evidence_summary, circuit_status
-						) VALUES (
-							'THR-2026-MULTI99-2', 'syndicate_member2@farm.net', 'risk', 'multi_account_detected', 'security',
-							'{syndicate_member2@farm.net} 检测到多账户关联滥用 (同一IP/设备指纹)',
-							'集群关联子账号 2，共享指纹与出口代理', '198.51.100.99', 'Hong Kong, HK', 'Chrome 128 / Windows 10',
-							'fp_syndicate_99', 0, 1, 8, 2, 'high', 'CRITICAL', 'active',
-							'ban_account', 'CLS-2026-MULTI99', '系统规则命中', '一人多号', 'NORMAL'
-						);
-					`).run();
-				}
-
-				const hasMember3 = await userDb.prepare(`SELECT id FROM audit_log WHERE ticket_id = 'THR-2026-MULTI99-3' LIMIT 1`).first();
-				if (!hasMember3) {
-					await userDb.prepare(`
-						INSERT INTO audit_log (
-							ticket_id, email, warning_type, event_type, category, action_text,
-							detail_text, ip, geo, device, fingerprint, is_reg_ip, is_multi_ip,
-							active_ip_count, reported_by_others, risk_level, priority, status,
-							recommended_action, cluster_id, report_source, evidence_summary, circuit_status
-						) VALUES (
-							'THR-2026-MULTI99-3', 'syndicate_member3@farm.net', 'risk', 'multi_account_detected', 'security',
-							'{syndicate_member3@farm.net} 检测到多账户关联滥用 (同一IP/设备指纹)',
-							'集群关联子账号 3，共享指纹与出口代理', '198.51.100.99', 'Hong Kong, HK', 'Chrome 128 / Windows 10',
-							'fp_syndicate_99', 0, 1, 8, 2, 'high', 'CRITICAL', 'active',
-							'ban_account', 'CLS-2026-MULTI99', '系统规则命中', '一人多号', 'NORMAL'
-						);
-					`).run();
-				}
-			} catch (clusterErr) {
-				console.warn('ensureTables cluster setup warning:', clusterErr.message);
-			}
-
-			// 确保申诉审计包含完整基准数据（不仅有待处理的 APL-2026-AP77X2，还具备已驳回的 APL-2026-AP0039）
-			try {
-				const hasAp39 = await userDb.prepare(`SELECT id FROM audit_log WHERE ticket_id = 'APL-2026-AP0039' OR ticket_id = 'TKT-2026-AP0039' LIMIT 1`).first();
-				if (!hasAp39) {
-					await userDb.prepare(`
-						INSERT INTO audit_log (
-							ticket_id, email, warning_type, event_type, category, action_text, detail_text,
-							ip, geo, device, device_type, fingerprint, is_reg_ip, is_multi_ip, active_ip_count,
-							reported_by_others, risk_level, priority, status, recommended_action, match_score,
-							subnet_match, appeal_reason, resolved_time, create_time
-						) VALUES (
-							'APL-2026-AP0039', 'spammer_appealed@malicious.xyz', 'appeal', 'appeal_submitted', 'appeal',
-							'{spammer_appealed@malicious.xyz} 提交解封申诉但被驳回',
-							'用户提交申诉表单：“请求解封账号，发信为业务正常通知”。经与多名用户检举证据比对核实属于恶意营销，管理员已驳回申诉，维持封禁。',
-							'198.51.100.44', 'Dallas, US', 'Chrome 127 / Linux', 'desktop', 'fp_fake_dallas', 0, 0, 1,
-							3, 'high', 'P0', 'rejected', 'reject_appeal', 12, 0,
-							'请求解封账号，发信为业务正常通知。', '2026-10-04 12:00:00', '2026-10-04 10:15:00'
-						);
-					`).run();
-				}
-				// 修复可能由于历史迁移导致的 create_time 为 NULL 的问题
-				await userDb.prepare(`
-					UPDATE audit_log
-					SET create_time = COALESCE(ban_time, resolved_time, CURRENT_TIMESTAMP)
-					WHERE create_time IS NULL;
-				`).run();
-
-				// 违规证据简略统一化自愈：严格契合 punishments.md 与用户指令，清除“用户举报/被人举报”等详细指称，统一为“遭受举报”
-				await userDb.prepare(`
-					UPDATE audit_log
-					SET evidence_summary = '遭受举报'
-					WHERE evidence_summary LIKE '%举报%' OR evidence_summary LIKE '%检举%' OR evidence_summary LIKE '%FBL%' OR reported_by_others > 0;
-				`).run();
-
-				await userDb.prepare(`
-					UPDATE audit_log
-					SET evidence_summary = '一人多号'
-					WHERE evidence_summary LIKE '%Jaccard%' OR email = 'syndicate_cluster@farm.net' OR cluster_id = 'CLS-2026-MULTI99' OR event_type LIKE '%multi_account%';
-				`).run();
-
-				await userDb.prepare(`
-					UPDATE audit_log
-					SET action_text = REPLACE(REPLACE(REPLACE(action_text, '被 12 名用户检举', '遭受举报'), '被 5 名用户检举', '遭受举报'), '被 4 名用户检举', '遭受举报')
-					WHERE action_text LIKE '%被%用户检举%' OR action_text LIKE '%被%人举报%';
-				`).run();
-
-				await userDb.prepare(`
-					UPDATE audit_log
-					SET detail_text = REPLACE(REPLACE(detail_text, '先后被 12 位收件人举报', '遭受举报核实'), '被 5 位收件人举报核实', '遭受举报核实')
-					WHERE detail_text LIKE '%被%位收件人举报%';
-				`).run();
-			} catch (appealErr) {
-				console.warn('ensureTables appeal check warning:', appealErr.message);
-			}
 
 			await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_audit_log_email ON audit_log(email);`).run();
 			await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_audit_log_warning_type ON audit_log(warning_type);`).run();
@@ -833,7 +710,6 @@ const auditService = {
 	async list(c, params) {
 		if (!tablesEnsured) {
 			await this.ensureTables(c);
-			await this.seedBaselineIfEmpty(c);
 			tablesEnsured = true;
 		}
 		let { num = 1, size = 15, email, keyword, warningType, category, violationLevel, riskLevel, status, lifecycle, timeRange, identityGroup, alarmReason, alarmCountRange, suggestion, assignee, adjudicator: adjudicatorFilter, timeSort = 0 } = params;
@@ -1212,12 +1088,6 @@ const auditService = {
 				} else {
 					evidenceSummary = '规则拦截';
 				}
-			} else {
-				if (evidenceSummary.includes('举报') || evidenceSummary.includes('检举') || evidenceSummary.includes('投诉') || evidenceSummary.includes('FBL')) {
-					evidenceSummary = '遭受举报';
-				} else if (evidenceSummary.includes('Jaccard')) {
-					evidenceSummary = '一人多号';
-				}
 			}
 
 			let clusterAccounts = [];
@@ -1237,20 +1107,11 @@ const auditService = {
 				}));
 			}
 
-			let cleanActionText = row.actionText;
-			if (cleanActionText && (cleanActionText.includes('被') && (cleanActionText.includes('举报') || cleanActionText.includes('检举')))) {
-				cleanActionText = cleanActionText.replace(/被\s*\d+\s*[名位个]?(用户|收件人|人)?(检举|举报)/g, '遭受举报');
-			}
-			let cleanDetailText = row.detailText;
-			if (cleanDetailText && (cleanDetailText.includes('被') && (cleanDetailText.includes('举报') || cleanDetailText.includes('检举')))) {
-				cleanDetailText = cleanDetailText.replace(/被\s*\d+\s*[名位个]?(用户|收件人|人)?(检举|举报)/g, '遭受举报');
-			}
-
 			const effectiveCreateTime = row.createTime || row.create_time || row.banTime || new Date().toISOString();
 			const item = {
 				...row,
-				actionText: cleanActionText,
-				detailText: cleanDetailText,
+				actionText: row.actionText,
+				detailText: row.detailText,
 				createTime: effectiveCreateTime,
 				alarmTime: row.alarmTime || effectiveCreateTime || row.banTime,
 				applyTime: row.applyTime || effectiveCreateTime || row.banTime,
@@ -1656,6 +1517,23 @@ const auditService = {
 			throw new BizError('该案件已结案归档，属于系统只读审计记录，无法重复提交裁决', 400);
 		}
 
+		// 校验服务端事实与必要状态前提：案件状态必须合法有效，严禁 NULL、空值或缺失
+		if (!targetLog.status || typeof targetLog.status !== 'string' || !targetLog.status.trim()) {
+			throw new BizError('案件数据状态损坏或缺失合法状态前提，无法执行裁决写入', 500);
+		}
+
+		// 若客户端显式提供了 expected_status，必须与服务端事实严格比对，严禁不可信客户端值伪造事实
+		const hasClientExpectedStatus = 'expected_status' in body || 'expectedStatus' in body;
+		const clientExpectedStatus = 'expected_status' in body ? body.expected_status : body.expectedStatus;
+		if (hasClientExpectedStatus) {
+			if (clientExpectedStatus === null || typeof clientExpectedStatus !== 'string' || !clientExpectedStatus.trim()) {
+				throw new BizError('客户端传入的 expected_status 非法或为空', 400);
+			}
+			if (clientExpectedStatus.trim() !== targetLog.status.trim()) {
+				throw new BizError('案件状态已被并发修改或状态不匹配，请刷新后重试', 409);
+			}
+		}
+
 		// 并发控制：乐观锁版本检查 (CAS)
 		if (version !== undefined && version !== null && targetLog.version !== undefined && targetLog.version !== null) {
 			if (Number(version) !== Number(targetLog.version)) {
@@ -1672,7 +1550,21 @@ const auditService = {
 			throw new BizError('当前案件无待处理申诉，无法执行申诉裁决动作', 400);
 		}
 
-		const isCurrentlyBanned = targetLog.status === 'banned' || targetLog.warningType === 'ban';
+		// 检查当前案卷自身或其派生处罚是否处于有效封禁中
+		let activePenaltyRecord = null;
+		if (targetLog.warningType === 'ban' || targetLog.status === 'banned') {
+			activePenaltyRecord = targetLog.status === 'banned' ? targetLog : null;
+		} else {
+			activePenaltyRecord = await orm(c).select().from(auditLog).where(
+				and(
+					eq(auditLog.email, targetLog.email),
+					eq(auditLog.warningType, 'ban'),
+					eq(auditLog.status, 'banned'),
+					eq(auditLog.originalDecisionId, String(targetLog.id))
+				)
+			).get();
+		}
+		const isCurrentlyBanned = Boolean(activePenaltyRecord);
 		if (['ban', 'ban_account', 'banned'].includes(actionType) && isCurrentlyBanned) {
 			throw new BizError('当前案件已处于封禁处置中，不可重复执行首次封禁裁决（复核处置请使用维持封禁或解封）', 400);
 		}
@@ -1735,12 +1627,21 @@ const auditService = {
 				stmts.push(userDb.prepare(`UPDATE user SET status = 1 WHERE user_id = ?`).bind(targetUser.userId));
 			}
 
-			// 同步在封禁管控台账中保留/生成记录
-			const existingBan = await orm(c).select().from(auditLog).where(
-				and(eq(auditLog.email, targetLog.email), eq(auditLog.warningType, 'ban'))
-			).get();
+			// 多案隔离：处罚必须明确关联原案件与原决定，去重必须围绕特定案件/决定，绝不能按邮箱全局合并
+			let existingBanForThisCase = null;
+			if (targetLog.warningType === 'ban') {
+				existingBanForThisCase = targetLog;
+			} else {
+				existingBanForThisCase = await orm(c).select().from(auditLog).where(
+					and(
+						eq(auditLog.email, targetLog.email),
+						eq(auditLog.warningType, 'ban'),
+						eq(auditLog.originalDecisionId, String(targetLog.id))
+					)
+				).get();
+			}
 
-			if (!existingBan) {
+			if (!existingBanForThisCase) {
 				stmts.push(userDb.prepare(`
 					INSERT INTO audit_log (
 						ticket_id, email, user_id, warning_type, event_type, category,
@@ -1759,18 +1660,18 @@ const auditService = {
 					nowIso,
 					JSON.stringify(timeline),
 					decisionId,
-					targetLog.id
+					String(targetLog.id)
 				));
-			} else {
+			} else if (existingBanForThisCase.id !== targetLog.id) {
 				stmts.push(userDb.prepare(`
 					UPDATE audit_log 
 					SET status = 'banned', resolved_time = ?, detail_text = ?, decision_id = ?
 					WHERE id = ?
 				`).bind(
 					nowIso,
-					(existingBan.detailText || '') + (notes ? `\n[处置更新]: ${notes}` : ''),
+					(existingBanForThisCase.detailText || '') + (notes ? `\n[处置更新]: ${notes}` : ''),
 					decisionId,
-					existingBan.id
+					existingBanForThisCase.id
 				));
 			}
 		}
@@ -1804,7 +1705,7 @@ const auditService = {
 				nowIso,
 				JSON.stringify(timeline),
 				decisionId,
-				targetLog.id
+				String(targetLog.id)
 			));
 		}
 
@@ -1824,11 +1725,13 @@ const auditService = {
 
 		// 6. 既有处置复核：解除本案封禁限制
 		else if (actionType === 'unban') {
+			const thisPenaltyCaseId = String(targetLog.id);
 			const otherActiveBans = await orm(c).select().from(auditLog).where(
 				and(
 					eq(auditLog.email, targetLog.email),
 					eq(auditLog.status, 'banned'),
-					sql`${auditLog.id} != ${id}`
+					sql`${auditLog.id} != ${targetLog.id}`,
+					sql`coalesce(${auditLog.originalDecisionId}, '') != ${thisPenaltyCaseId}`
 				)
 			).all();
 
@@ -1844,27 +1747,30 @@ const auditService = {
 			targetNewDetailText += (notes ? `\n[解禁说明]: ${notes}` : '\n[解禁说明]: 复核放行解禁') + isolationNotice;
 			timeline.push({ time: nowIso, event: '解除封禁处置', actor });
 
-			if (otherActiveBans.length === 0) {
+			if (targetLog.warningType !== 'ban') {
 				stmts.push(userDb.prepare(`
 					UPDATE audit_log 
 					SET status = 'unbanned', resolved_time = ?,
 						detail_text = detail_text || ?
-					WHERE email = ? AND warning_type = 'ban' AND status = 'banned'
+					WHERE email = ? AND warning_type = 'ban' AND original_decision_id = ? AND status = 'banned'
 				`).bind(
 					nowIso,
-					'\n[解禁说明]: 复核通过已移出黑名单 (' + (notes || '正常放行') + ')',
-					targetLog.email
+					'\n[解禁说明]: 复核通过已解除本案关联处罚 (' + (notes || '正常放行') + ')',
+					targetLog.email,
+					thisPenaltyCaseId
 				));
 			}
 		}
 
 		// 7. 用户申诉审核：申诉成立放行
 		else if (actionType === 'approve' || actionType === 'approve_appeal' || actionType === 'whitelist') {
+			const thisPenaltyCaseId = String(targetLog.id);
 			const otherActiveBans = await orm(c).select().from(auditLog).where(
 				and(
 					eq(auditLog.email, targetLog.email),
 					eq(auditLog.status, 'banned'),
-					sql`${auditLog.id} != ${id}`
+					sql`${auditLog.id} != ${targetLog.id}`,
+					sql`coalesce(${auditLog.originalDecisionId}, '') != ${thisPenaltyCaseId}`
 				)
 			).all();
 
@@ -1880,16 +1786,17 @@ const auditService = {
 			targetNewDetailText += (notes ? `\n[申诉裁决]: ${notes}` : '\n[申诉裁决]: 申诉复核通过') + isolationNotice;
 			timeline.push({ time: nowIso, event: '申诉通过放行', actor });
 
-			if (otherActiveBans.length === 0) {
+			if (targetLog.warningType !== 'ban') {
 				stmts.push(userDb.prepare(`
 					UPDATE audit_log 
 					SET status = 'unbanned', resolved_time = ?,
 						detail_text = detail_text || ?
-					WHERE email = ? AND warning_type = 'ban' AND status = 'banned'
+					WHERE email = ? AND warning_type = 'ban' AND original_decision_id = ? AND status = 'banned'
 				`).bind(
 					nowIso,
-					'\n[解禁说明]: 申诉复核通过，已移出黑名单恢复正常 (' + (notes || '正常放行') + ')',
-					targetLog.email
+					'\n[解禁说明]: 申诉复核通过，已解除本案关联处罚 (' + (notes || '正常放行') + ')',
+					targetLog.email,
+					thisPenaltyCaseId
 				));
 			}
 
@@ -1915,6 +1822,7 @@ const auditService = {
 		}
 
 		const expectedVersion = Number(targetLog.version || 1);
+		const expectedStatus = String(targetLog.status || '').trim();
 
 		// 0. 登记决策台账与版本占位（原子性第一句：若 expected_version 或 expected_status 已被并发事务抢占，则触发 UNIQUE 约束或 trigger 在 D1 级立即回滚全批次）
 		const decisionStmt = userDb.prepare(`
@@ -1925,7 +1833,7 @@ const auditService = {
 			decisionId,
 			targetLog.id,
 			expectedVersion,
-			targetLog.status,
+			expectedStatus,
 			actionType,
 			actor,
 			idempotencyKey || null,

@@ -450,10 +450,10 @@ const dbInit = {
 					SELECT CASE
 						WHEN (SELECT id FROM audit_log WHERE id = NEW.case_id) IS NULL
 						THEN RAISE(ABORT, 'Audit case not found')
-						WHEN (SELECT coalesce(version, 1) FROM audit_log WHERE id = NEW.case_id) != NEW.expected_version
+						WHEN NEW.expected_version IS NULL OR (SELECT coalesce(version, 1) FROM audit_log WHERE id = NEW.case_id) != NEW.expected_version
 						THEN RAISE(ABORT, 'Audit log version mismatch: stale decision attempt')
-						WHEN NEW.expected_status IS NOT NULL AND (SELECT status FROM audit_log WHERE id = NEW.case_id) != NEW.expected_status
-						THEN RAISE(ABORT, 'Audit log status mismatch: case state already changed')
+						WHEN NEW.expected_status IS NULL OR TRIM(NEW.expected_status) = '' OR (SELECT status FROM audit_log WHERE id = NEW.case_id) IS NULL OR TRIM((SELECT status FROM audit_log WHERE id = NEW.case_id)) = '' OR (SELECT status FROM audit_log WHERE id = NEW.case_id) != NEW.expected_status
+						THEN RAISE(ABORT, 'Audit log status mismatch: case state changed or expected_status invalid')
 					END;
 				END;
 			`).run();
@@ -1656,10 +1656,10 @@ const dbInit = {
 				SELECT CASE
 					WHEN (SELECT id FROM audit_log WHERE id = NEW.case_id) IS NULL
 					THEN RAISE(ABORT, 'Audit case not found')
-					WHEN (SELECT coalesce(version, 1) FROM audit_log WHERE id = NEW.case_id) != NEW.expected_version
+					WHEN NEW.expected_version IS NULL OR (SELECT coalesce(version, 1) FROM audit_log WHERE id = NEW.case_id) != NEW.expected_version
 					THEN RAISE(ABORT, 'Audit log version mismatch: stale decision attempt')
-					WHEN NEW.expected_status IS NOT NULL AND (SELECT status FROM audit_log WHERE id = NEW.case_id) != NEW.expected_status
-					THEN RAISE(ABORT, 'Audit log status mismatch: case state already changed')
+					WHEN NEW.expected_status IS NULL OR TRIM(NEW.expected_status) = '' OR (SELECT status FROM audit_log WHERE id = NEW.case_id) IS NULL OR TRIM((SELECT status FROM audit_log WHERE id = NEW.case_id)) = '' OR (SELECT status FROM audit_log WHERE id = NEW.case_id) != NEW.expected_status
+					THEN RAISE(ABORT, 'Audit log status mismatch: case state changed or expected_status invalid')
 				END;
 			END;
 		`).run();
