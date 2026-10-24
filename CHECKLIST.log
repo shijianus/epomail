@@ -8,8 +8,21 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### 第二批候选固定与推送 review/abuse-backend-rc (2026-10-24)
+*   **关联提交 (Git Commit)**: `2c3b149855c5e8dd6c4d8c69ee3e9f9499a353c2` (Short: `2c3b149`)；本轮仅推送 `review/abuse-backend-rc`（快进 `a8862a2..2c3b149`），未推送 master、未强推、未合并、未部署
+*   **基线 (Baseline)**: `a8862a2935c96e61af8973bea57ee1078ba5caa9` (Short: `a8862a2`)
+*   **能力边界（用户确定）**:
+    - [x] `purgeOnRelease` 撤销为不可执行能力：显式请求在写入前 400 明确拒绝、零副作用；普通解封零清理、零虚假脱敏记录；未补写政策背书；
+    - [x] `/audit/purge` 保留为维护操作：仅删「已结案 + 超 180 天 + 未被有效处罚引用」的 audit/normal 行；申诉/决策/通知/清理台账永不清除。
+*   **核验清单 (Verification)**:
+    - [x] 受影响模块套件重跑（产品改动后）：test-batch2-fixes、test-audit-service-backend、test-glm-verification-repro、rc-abuse-blocking-repro、test-four-defects-repro、test-adjudication-closedloop、test-adjudication-engine、test-worker-adjudication-e2e、test-totp-backend-fixes 全部 exit 0；
+    - [x] 真实 workerd（冷启动库）：第一批 41/41、第二批 39/39、认证兼容 25/25（含耗时）；新装 6 角色 + audit_appeal/索引存在；a8862a2 升级库保留角色且补建 audit_appeal；
+    - [x] 精确暂存 31 文件（无 `.rc2-*` 证据目录、无 secrets/DB/日志/快照）；`git diff --cached --check` 干净；内置离线规则扫描 0 命中（**gitleaks 未安装，未执行，不冒充通过**）；历史凭据值在 31 个暂存文件中 0 命中；
+    - [x] 该分支 push 仅触发 secret-scanning CI（push review/**），无部署步骤（release 仅 `v*` tag）。
+*   **未完成项**: Mailjet 旧凭据远程轮换待 owner；Linux 构建未验证；生产管理员硬编码凭据已从代码移除，账号处置由 owner 确认。
+
 ### 收尾轮：生产请求事实修正 · live 显式 opt-in · 认证兼容性证据 · purge 边界收紧 (2026-10-24)
-*   **关联提交 (Git Commit)**: 本轮两批均按批次指令**未执行 commit**（工作区保留待候选批准）；基线 `a8862a2935c96e61af8973bea57ee1078ba5caa9` (Short: `a8862a2`)，分支 `review/abuse-backend-rc`
+*   **关联提交 (Git Commit)**: 本轮工作随后由候选提交 `2c3b149855c5e8dd6c4d8c69ee3e9f9499a353c2` 固定（Short: `2c3b149`）；基线 `a8862a2935c96e61af8973bea57ee1078ba5caa9` (Short: `a8862a2`)，分支 `review/abuse-backend-rc`
 *   **部署环境 (Deployment)**: `本地全真栈 (真实 workerd, 冷启动独立持久化目录)`；零生产请求（收尾轮核实后未再触生产）、零部署、零远程迁移
 *   **功能需求与变更清单 (Changes & Feature Alignment)**:
     - [x] **生产事实修正**：如实记录 test-global-2fa-e2e 曾真实请求生产一次登录（被拒，零状态变更），另两个 live 脚本未运行（详见证据 production-request-facts.md）；三个 live 脚本全部改造为显式 opt-in（默认 SKIP 零网络、双开关、无生产默认 URL、凭据环境变量化不落日志）；
@@ -25,7 +38,7 @@
 *   **证据 (Evidence)**: `D:/Users/Smart Kevin/rc-abuse-review-20261024/evidence/batch2-dev-fixes/`（新增 production-request-facts.md、purge-boundary.md、test-change-classification.md、module-suites/final2/、closeout workerd 摘要）
 
 ### 第二批修复：Mailjet 凭据处置 · 可复现构建 · 申诉追溯 · 真实 purge · legacy extend · Webhook 乱序 (2026-10-24)
-*   **关联提交 (Git Commit)**: 本轮按批次指令**未执行 commit**（工作区保留待独立候选复测后统一提交）；基线 `a8862a2935c96e61af8973bea57ee1078ba5caa9` (Short: `a8862a2`)，分支 `review/abuse-backend-rc`
+*   **关联提交 (Git Commit)**: `2c3b149855c5e8dd6c4d8c69ee3e9f9499a353c2` (Short: `2c3b149`)（本批工作于候选固定阶段统一提交）；基线 `a8862a2935c96e61af8973bea57ee1078ba5caa9` (Short: `a8862a2`)，分支 `review/abuse-backend-rc`
 *   **部署环境 (Deployment)**: `本地全真栈 (真实 workerd + 本地 D1/KV, 独立持久化目录)`；未部署、未迁移远程、未读取生产数据库
 *   **功能需求与变更清单 (Changes & Feature Alignment)**:
     - [x] **阶段0 Mailjet 可疑凭据**：`test-mailjet.js` 重写为零网络离线契约测试 + 显式四件套环境变量门控的联网冒烟（缺配置 exit 1，零兜底）；原 32-hex 凭据对自 2026-08-05 (a2217fd) 进入历史，判定为不可排除真实使用，轮换清单交 owner（见 REPORTS.md 同日专项与证据目录 mailjet-credential-triage.md，全程严格脱敏）；

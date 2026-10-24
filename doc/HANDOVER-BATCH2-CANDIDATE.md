@@ -1,6 +1,8 @@
 # 第二批候选交接文档（GLM 独立复测入口）
 
-> 分支：`review/abuse-backend-rc`　基线：`a8862a2935c96e61af8973bea57ee1078ba5caa9`
+> 候选代码提交：`2c3b149855c5e8dd6c4d8c69ee3e9f9499a353c2`（短 `2c3b149`）
+> 远端：`origin` = `github.com:shijianus/epomail.git`，分支 `review/abuse-backend-rc`
+> 基线：`a8862a2935c96e61af8973bea57ee1078ba5caa9`
 > 状态：**第二批开发侧测试通过，等待独立复测。不构成 staging 准入。**
 
 ## 1. 运行时版本（本机实测）
