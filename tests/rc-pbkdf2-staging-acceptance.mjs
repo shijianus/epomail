@@ -45,6 +45,7 @@ const TS = Date.now();
 const R = Math.random().toString(36).slice(2, 8);
 const REG_EMAIL = `rc3-reg-${TS}-${R}@${DOM}`;
 const FIX_100K = `rc3-fix100k-${TS}-${R}@${DOM}`;
+const FIX_LOW = `rc3-fixlow-${TS}-${R}@${DOM}`;
 const FIX_210K = `rc3-fix210k-${TS}-${R}@${DOM}`;
 const FIX_LEGACY = `rc3-fixleg-${TS}-${R}@${DOM}`;
 const FIX_NEG = `rc3-fixneg-${TS}-${R}@${DOM}`;
@@ -136,10 +137,23 @@ async function login(email, password) {
 	return http('/login', { method: 'POST', body: { email, password } });
 }
 
+/** 210k noble 验证在免费预算账户上存在冷 isolate CPU 1102（无副作用、可重试）。
+ * 有界重试并透明记录尝试次数；重试不改变语义，仅模拟真实用户再次点击登录。 */
+async function loginWithRetry(email, password, maxAttempts = 3) {
+	const attempts = [];
+	for (let i = 1; i <= maxAttempts; i++) {
+		const r = await login(email, password);
+		attempts.push(`${r.status}${r.body?.code ? '/' + r.body.code : ''}`);
+		if (r.body?.data?.token || r.body?.code === 200) return { r, attempts };
+		if (r.status !== 503) return { r, attempts };
+	}
+	return { r: attempts.length ? await login(email, password) : null, attempts };
+}
+
 let regUserId = null;
 
 async function cleanup() {
-	const emails = [REG_EMAIL, FIX_100K, FIX_210K, FIX_LEGACY, FIX_NEG];
+	const emails = [REG_EMAIL, FIX_100K, FIX_LOW, FIX_210K, FIX_LEGACY, FIX_NEG];
 	console.log('\n[cleanup] 物理清理合成数据 ...');
 	for (const e of emails) {
 		try {
@@ -167,27 +181,27 @@ async function cleanup() {
 }
 
 try {
-	// ============ S1 产品路径：注册（真实 API，写入 210k） ============
+	// ============ S1 产品路径：注册（真实 API；staging 写入策略=100k 原生路径，生产默认 210k 不降参） ============
 	const reg = await http('/register', { method: 'POST', body: { email: REG_EMAIL, password: REG_PWD } });
 	check('S1 register via real API succeeds on cloud (was P0-500 before hotfix)', reg.body?.code === 200, `code=${reg.body?.code} msg=${reg.body?.message} ms=${reg.ms}`, reg.ms);
 	const regRow = userRow(REG_EMAIL);
 	regUserId = regRow?.user_id;
-	check('S1 registered row stores self-described pbkdf2:210000 hash (product-written, not hand-written)',
-		!!regRow && regRow.password.startsWith('pbkdf2:210000:'), `prefix=${regRow?.password?.slice(0, 16)}`);
+	check('S1 registered row stores self-described pbkdf2:100000 hash (staging writer policy; product-written, not hand-written)',
+		!!regRow && regRow.password.startsWith('pbkdf2:100000:'), `prefix=${regRow?.password?.slice(0, 16)}`);
 
 	// ============ S3a 新密码可登录 ============
 	const l1 = await login(REG_EMAIL, REG_PWD);
-	check('S1 registered user logs in with chosen password on cloud (210k verify via pure-JS path)',
+	check('S1 registered user logs in with chosen password on cloud',
 		l1.body?.data?.token, `code=${l1.body?.code} ms=${l1.ms}`, l1.ms);
 	const userJwt = l1.body?.data?.token;
 
 	// ============ S2 产品路径：本人改密 ============
 	const chg = await http('/my/resetPassword', { method: 'PUT', token: userJwt, body: { password: REG_PWD_NEW } });
-	check('S2 self password change via real API succeeds on cloud (210k derive+persist)',
+	check('S2 self password change via real API succeeds on cloud (derive+persist via product)',
 		chg.body?.code === 200, `code=${chg.body?.code} ms=${chg.ms}`, chg.ms);
 	const chgRow = userRow(REG_EMAIL);
-	check('S2 stored hash rewritten to fresh pbkdf2:210000 with new salt',
-		!!chgRow && chgRow.password.startsWith('pbkdf2:210000:') && chgRow.salt !== regRow.salt, `salt-rotated=${chgRow?.salt !== regRow?.salt}`);
+	check('S2 stored hash rewritten to fresh policy hash with new salt',
+		!!chgRow && chgRow.password.startsWith('pbkdf2:100000:') && chgRow.salt !== regRow.salt, `salt-rotated=${chgRow?.salt !== regRow?.salt}`);
 
 	// ============ S3 旧密码失效 / 新密码生效 ============
 	const lOld = await login(REG_EMAIL, REG_PWD);
@@ -212,38 +226,49 @@ try {
 
 	// view-backup-codes 需要登录密码确认 → 再验证一次 210k 密码派生路径
 	const vc = await http('/my/totp/view-backup-codes', { method: 'POST', token: mfa2.body?.data?.token, body: { password: REG_PWD_NEW } });
-	check('S4 backup-codes view with password confirmation (210k verify) works', vc.body?.code === 200, `code=${vc.body?.code}`, vc.ms);
+	check('S4 backup-codes view with password confirmation (policy-hash verify) works', vc.body?.code === 200, `code=${vc.body?.code}`, vc.ms);
 	const vcBad = await http('/my/totp/view-backup-codes', { method: 'POST', token: mfa2.body?.data?.token, body: { password: 'wrong-password' } });
 	check('S4 password confirmation rejects wrong password', vcBad.body?.code !== 200, `code=${vcBad.body?.code}`);
 
 	const dis = await http('/my/totp/disable', { method: 'POST', token: mfa2.body?.data?.token, body: { password: REG_PWD_NEW, code: totpCode(secret) } });
 	check('S4 TOTP disable with password confirmation works', dis.body?.code === 200, `code=${dis.body?.code} msg=${dis.body?.message}`, dis.ms);
 
-	// ============ L1 存量夹具：旧 100k + 惰性升级（产品完成升级写入） ============
+	// ============ L1 存量夹具：旧 100k（=staging 写入策略）登录，无需升级 ============
 	{
 		const salt = refSalt();
 		seedFixture(FIX_100K, refPbkdf2Hash(FIX_PWD, salt, 100000), salt);
-		const t0 = Date.now();
+		const before = userRow(FIX_100K).password;
 		const lg = await login(FIX_100K, FIX_PWD);
-		check('[fixture] L1 old pbkdf2:100000 login succeeds and lazily upgrades on cloud',
+		check('[fixture] L1 old pbkdf2:100000 login succeeds on cloud (native path)',
 			!!lg.body?.data?.token, `code=${lg.body?.code} ms=${lg.ms}`, lg.ms);
-		const row = userRow(FIX_100K);
-		check('[fixture] L1 hash upgraded by product to pbkdf2:210000 (native WebCrypto + noble write path)',
-			row?.password?.startsWith('pbkdf2:210000:'), `now=${row?.password?.slice(0, 16)} upgrade+login-total=${Date.now() - t0}ms`);
-		const re = await login(FIX_100K, FIX_PWD);
-		check('[fixture] L1 re-login after upgrade verifies 210k on cloud', !!re.body?.data?.token, `code=${re.body?.code} ms=${re.ms}`, re.ms);
+		check('[fixture] L1 at-policy hash NOT rewritten (100k == staging writer policy, no spurious upgrade)',
+			userRow(FIX_100K).password === before);
 	}
 
-	// ============ L2 存量夹具：旧 210k 原语义登录（云端 noble 路径） ============
+	// ============ L1b 存量夹具：低迭代(1000) 惰性升级（产品完成升级写入） ============
+	{
+		const salt = refSalt();
+		seedFixture(FIX_LOW, refPbkdf2Hash(FIX_PWD, salt, 1000), salt);
+		const lg = await login(FIX_LOW, FIX_PWD);
+		check('[fixture] L1b low-iteration pbkdf2:1000 login succeeds and triggers lazy upgrade',
+			!!lg.body?.data?.token, `code=${lg.body?.code} ms=${lg.ms}`, lg.ms);
+		const row = userRow(FIX_LOW);
+		check('[fixture] L1b hash upgraded by product to policy pbkdf2:100000',
+			row?.password?.startsWith('pbkdf2:100000:'), `now=${row?.password?.slice(0, 16)}`);
+		const re = await login(FIX_LOW, FIX_PWD);
+		check('[fixture] L1b re-login after upgrade verifies', !!re.body?.data?.token, `code=${re.body?.code} ms=${re.ms}`, re.ms);
+	}
+
+	// ============ L2 存量夹具：旧 210k 原语义登录（云端 noble 纯 JS 路径，透明重试冷 isolate 1102） ============
 	{
 		const salt = refSalt();
 		seedFixture(FIX_210K, refPbkdf2Hash(FIX_PWD, salt, 210000), salt);
 		const before = userRow(FIX_210K).password;
-		const lg = await login(FIX_210K, FIX_PWD);
-		check('[fixture] L2 legacy pbkdf2:210000 login verifies with original iteration semantics on cloud',
-			!!lg.body?.data?.token, `code=${lg.body?.code} ms=${lg.ms}`, lg.ms);
+		const { r: lg, attempts } = await loginWithRetry(FIX_210K, FIX_PWD);
+		check('[fixture] L2 legacy pbkdf2:210000 login verifies with ORIGINAL iteration semantics on cloud (noble path)',
+			!!lg?.body?.data?.token, `code=${lg?.body?.code} attempts=[${attempts.join(' → ')}] ms=${lg?.ms}`, lg?.ms);
 		const after = userRow(FIX_210K).password;
-		check('[fixture] L2 210k hash NOT rewritten (no spurious upgrade)', before === after);
+		check('[fixture] L2 210k hash NOT rewritten (no spurious downgrade to policy)', before === after);
 	}
 
 	// ============ L3 存量夹具：legacy 单轮 SHA-256 迁移 ============
@@ -254,8 +279,8 @@ try {
 		check('[fixture] L3 legacy single-round SHA-256 login succeeds on cloud',
 			!!lg.body?.data?.token, `code=${lg.body?.code} ms=${lg.ms}`, lg.ms);
 		const row = userRow(FIX_LEGACY);
-		check('[fixture] L3 migrated by product to pbkdf2:210000',
-			row?.password?.startsWith('pbkdf2:210000:'), `now=${row?.password?.slice(0, 16)}`);
+		check('[fixture] L3 migrated by product to policy pbkdf2:100000',
+			row?.password?.startsWith('pbkdf2:100000:'), `now=${row?.password?.slice(0, 16)}`);
 	}
 
 	// ============ L4 负控：错误密码绝不升级 ============

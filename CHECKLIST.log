@@ -8,6 +8,33 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### 云端 PBKDF2 迭代上限 P0 热修复（Cloudflare Workers 兼容性）(2026-10-25)
+*   **关联提交 (Git Commit)**:
+    - 热修复主体: `959559968f4d06349c0c36f403de37a299754f3c` (Short: `9595599`)
+    - 写入策略开关增补: `1d142869cc4683cd361c73c957bfdb03c9519f32` (Short: `1d14286`)
+    - 本记录: 见本条目提交；仅推送 `review/abuse-backend-rc`（`0f39e4c..1d14286` 快进），未推 master、未强推、未 `--all`
+*   **实际根因 (Root Cause)**: Cloudflare Workers WebCrypto 对 PBKDF2 `deriveBits` 强制迭代上限 100000（`Pbkdf2 failed: iteration counts above 100000 are not supported (requested 210000)`）。本系统新密码与验证均为 210000 设计契约（`pbkdf2:<iterations>:<base64>` 自描述格式），导致注册、管理员建号、本人改密、管理员重置、惰性升级与一切 210k 存量哈希登录在云端全部 500；本地 workerd 不受限故长期未暴露。
+*   **修复架构（语义零变更）**:
+    - [x] `crypto-utils.js` 新增 `dispatchPbkdf2Sha256` 混合派发：迭代 ≤100000 走原生 WebCrypto；>100000 走 `@noble/hashes@1.8.0`（锁版本、审计成熟、纯 JS 零 WebCrypto 委托，dry-run bundle 校验真实打入 worker 产物）；
+    - [x] 严格保持原算法语义：password/salt 均按 UTF-8 原文字节（salt 为 base64 字符串原样编码、绝不先解码）、SHA-256、32 字节、Base64、自描述格式与惰性升级判定不变；
+    - [x] 迭代段解析收严为规范无前导零纯数字（拒绝 `210000abc` 等 parseInt 静默截断）；畸形/越界（<1000 / >840000）安全拒绝零派生；
+    - [x] 派生异常原样上抛：失败不落库、不伪称成功、不误报密码错误；惰性升级仅在旧密码验证成功后触发（`lazyMigratePassword` 失败仅记日志不阻断登录、不谎报已升级）；
+    - [x] 影响面全量收口核验：register / login / lazyMigrate / public-service.addUser / user-service.add / user-service.resetPassword（含 setPwd 管理员重置复用）/ totp-service 4 处密码确认 / init 预置 100k 引导哈希（既有机制不动，登录后可产品改密）。
+*   **写入策略开关（显式记录的 staging 兼容选择，不自动获得生产批准）**:
+    - [x] 云端实测：210k 纯 JS 派生在当前账户预算下可执行但不可靠——间隔 25s 单发登录 4/5 成功、三连派生第三发约 7 成失败、冷 isolate 快杀 ~456ms（1102 CPU 超限），属账户级 CPU 突发配额限制而非代码缺陷；
+    - [x] 新增 `PBKDF2_WRITER_ITERATIONS` env 开关：仅影响新密码写入与惰性升级目标，**验证兼容范围完全不变**（100k/210k/840k/legacy 全按存量参数验证）；未设置（生产默认）=210000 不降参；staging 显式设为 100000（原生 WebCrypto 快路径）；畸形/越界值一律回退 210000 绝不静默写弱哈希。
+*   **部署环境 (Deployment)**: 仅更新既有 staging `epomail-staging`（未动生产/生产 D1/Secrets/无关云资源）：Version `037acc99-fb5d-4f51-90ec-aaa3972fe978`（首次部署，绑定类型勘误重发 `b8a9ec53-07d2-4bc7-8706-f6e6d9f762d4`，终版 `15339ebb-d842-45ae-81aa-4a49c0bbe2a6`，对应候选 `1d14286`）；部署用临时配置 `mail-worker/wrangler-staging-real.toml`（本地未入库，绑定值与线上 API 快照逐项一致）；回退点：热修复前 v1 代码版本 `26207818-82ec-4679-bedb-8d58f9dedf9b` + v2/v3 secret 版本（`wrangler rollback epomail-staging` 可用）；外发 `EMAIL_OUTBOUND_ENABLED=false` 保持，终态 settings 快照核对（secrets jwt_secret/totp_enc_key 完整保留）。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地快测 `tests/test-pbkdf2-cloud-compat.mjs` 43/43：RFC 7914 §12 官方向量、noble/BoringSSL(WebCrypto)/OpenSSL(pbkdf2Sync) 三实现交叉逐位一致（100000/100001/210000/840000 × 3 salt）、salt 字节语义（base64 字符串原样 UTF-8）、非 ASCII 密码、12 类畸形哈希零派生拒绝、升级标记语义、写入策略开关 12 用例；
+    - [x] 本地真实 workerd e2e `tests/rc-auth-compat-workerd-e2e.mjs` 25/25（开关合入后复测，默认 210k 行为不变；210k 登录 ~1.9s、100k 登录+升级、错误密码绝不升级、legacy SHA-256 升级、畸形拒绝、TOTP era 迁移、备份码登录；期间 B2 首跑失败为测试机密钥 base64url 格式与夹具不一致的环境问题，非产品回归）；
+    - [x] 真实 staging 产品路径验收 `tests/rc-pbkdf2-staging-acceptance.mjs` 26/26（**产品写入路径零手工哈希**）：S1 注册（写入自描述哈希）→ S1 登录 → S2 本人改密 → S3 旧密失效/新密生效 → S4 2FA 全链（setup/enable/密码确认/mfa 登录/备份码查看含错误密码负控/disable）；存量夹具（可信参考实现生成、显式标记）：L1 旧 100k 登录且等策略不误改写、L1b 低迭代(1000)产品惰性升级至策略值并复登、**L2 旧 210k 按原迭代语义云端 noble 路径登录（首发 200，未降级改写）**、L3 legacy SHA-256 迁移、L4 错误密码绝不改写；合成数据 finally 物理清理（user/account/email/KV login_fail 零残留）；
+    - [x] staging 十项 smoke 10/10（`tests/rc-pbkdf2-staging-smoke.mjs` 单轮）：SPA/资产/init 门禁(403 URL 禁止)/未知用户 501/未授权 401/坏域名/弱密码/5 错锁定(第 6 次阻断)/响应头/2FA+外发关闭；
+    - [x] 前端 `build.mjs`（temp_login_ui + mail-vue）重建后部署，资产比对无变化（"No updated asset files to upload"）；worker 试编译 dry-run 通过且 noble 代码确认入包。
+*   **已知阻塞（如实呈报，不伪造）**:
+    - 验收项 1/3/6（master 初始密码产品修改 / 管理员 API 建号 / 管理员重置）需站长 JWT；staging 站长口令为前次 smoke 会话手工写入哈希的未知随机值（磁盘无凭据记录、jwt_secret 为只写 Secret、/api/init 无法重播、清库被红线禁止）——在不手工写哈希红线内无法取得站长会话。等价服务函数路径已由本地 workerd e2e 25/25 覆盖（同一 `hashPassword`/`setPwd`→`resetPassword` 代码路径），云端 210k/100k 写入能力由 S1/S2/L1b 证明。处置选项（待 owner 决策）：(a) 提供前次会话的 staging 站长口令或 jwt_secret 以正式重初始化；(b) 授权一次性受控的 staging 站长凭据修复（明确标记为环境修复而非产品验收）后补跑 1/3/6。
+    - **生产门禁（残留）**：本账户生产 Worker 与 staging 同预算，210k 纯 JS 写入存在冷 isolate 间歇 1102 风险（实测矩阵见上）。生产发布前必须决策：付费计划提升 CPU 预算（保持 210k 契约），或由 owner 显式批准生产写入策略值。本轮未获生产部署授权，未触碰生产。
+*   **本轮明确不修（后续任务）**: 管理抽屉 R1/R2 展示、一次性 code 的 URL 美化、其余 P2/P3、真实邮件提供商集成、外部邮件找回投递验证（产品无独立邮件验证码找回端点；`/api/user/setPwd`+`/api/my/resetPassword` 写入已验证，外部投递未验证）、staging 站长凭据恢复、`tests/test-pre-production-staging-acceptance.mjs` 的 `hono/webs` 扩展名缺失导致 Node 直跑不可用（候选 b9dc241 既有问题，与热修复无关）。
+
 ### 第二批候选固定与推送 review/abuse-backend-rc (2026-10-24)
 *   **关联提交 (Git Commit)**: `2c3b149855c5e8dd6c4d8c69ee3e9f9499a353c2` (Short: `2c3b149`)；本轮仅推送 `review/abuse-backend-rc`（快进 `a8862a2..2c3b149`），未推送 master、未强推、未合并、未部署
 *   **基线 (Baseline)**: `a8862a2935c96e61af8973bea57ee1078ba5caa9` (Short: `a8862a2`)
