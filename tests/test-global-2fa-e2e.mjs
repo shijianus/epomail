@@ -1,7 +1,21 @@
 import { chromium } from 'playwright';
 import assert from 'assert';
 
-const BASE = 'https://epomail.epocanvas.workers.dev';
+
+// ── Live 显式 opt-in 门禁（收尾轮加固）─────────────────────────────────
+// 默认零网络：未经显式确认绝不访问任何远程目标，绝不隐式回退到生产地址。
+// 需要：EPOMAIL_LIVE_E2E_TARGET=<完整目标基址> 且 EPOMAIL_LIVE_E2E_CONFIRM=yes
+// 凭据仅经环境变量注入，不写入源码，不打印到日志。
+const LIVE_TARGET = (process.env.EPOMAIL_LIVE_E2E_TARGET || '').trim();
+const LIVE_CONFIRM = (process.env.EPOMAIL_LIVE_E2E_CONFIRM || '').trim();
+if (LIVE_CONFIRM !== 'yes' || !LIVE_TARGET || !/^https:\/\//.test(LIVE_TARGET)) {
+  console.log('SKIP: live e2e 未显式开启（需要 EPOMAIL_LIVE_E2E_TARGET + EPOMAIL_LIVE_E2E_CONFIRM=yes）；本轮默认不访问任何远程目标。');
+  process.exit(0);
+}
+const BASE = LIVE_TARGET;
+// ─────────────────────────────────────────────────────────────────────
+
+const __LIVE_BASE__ = BASE;
 
 async function runLiveE2ETest() {
   console.log('🚀 Launching Live Cloudflare E2E Test on:', BASE);
@@ -17,7 +31,7 @@ async function runLiveE2ETest() {
     // Step 1: Login via API
     console.log('▶ Step 1: Logging in as admin...');
     const loginRes = await page.request.post(`${BASE}/api/login`, {
-      data: { email: 'admin@epomail.bond', password: '123456' },
+      data: { email: (process.env.EPOMAIL_LIVE_E2E_ADMIN_EMAIL || ''), password: (process.env.EPOMAIL_LIVE_E2E_ADMIN_PASSWORD || '') },
       headers: { 'Content-Type': 'application/json' }
     });
     const loginData = await loginRes.json();

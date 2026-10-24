@@ -1,6 +1,12 @@
 const encoder = new TextEncoder();
 
-const PBKDF2_ITERATIONS = 100000;
+// 210,000 为原始设计契约（tests/test-totp-security.mjs 固化）；哈希格式 pbkdf2:<iterations>:<hash>
+// 自描述迭代数，存量哈希验证兼容并在登录时自动升级。
+const PBKDF2_ITERATIONS = 210000;
+// 迭代参数安全边界（收尾轮加固）：畸形/异常迭代数直接拒绝验证且不执行派生，
+// 防止被植入的畸形哈希在登录路径上造成 CPU 耗尽；上限为当前设计值的 4 倍，兼顾未来升级余量。
+const PBKDF2_MIN_ITERATIONS = 1000;
+const PBKDF2_MAX_ITERATIONS = PBKDF2_ITERATIONS * 4;
 const PBKDF2_KEY_LEN = 256; // bits (32 bytes)
 
 function uint8ToBase64(bytes) {
@@ -93,40 +99,56 @@ const saltHashUtils = {
 			return { isValid: false, isLegacy: false };
 		}
 
-		// Check if storedHash uses PBKDF2 format
-		if (storedHash.startsWith('pbkdf2:')) {
-			const parts = storedHash.split(':');
-			const iterations = Math.min(parseInt(parts[1], 10) || PBKDF2_ITERATIONS, 100000);
-			const expectedBase64 = parts[2];
-
-			const keyMaterial = await crypto.subtle.importKey(
-				'raw',
-				encoder.encode(inputPassword),
-				'PBKDF2',
-				false,
-				['deriveBits']
-			);
-
-			const derivedBits = await crypto.subtle.deriveBits(
-				{
-					name: 'PBKDF2',
-					salt: encoder.encode(salt),
-					iterations: iterations,
-					hash: 'SHA-256'
-				},
-				keyMaterial,
-				PBKDF2_KEY_LEN
-			);
-
-			const derivedBase64 = uint8ToBase64(new Uint8Array(derivedBits));
-			const isValid = timingSafeEqual(derivedBase64, expectedBase64);
-			return { isValid, isLegacy: false };
+	// Check if storedHash uses PBKDF2 format
+	if (storedHash.startsWith('pbkdf2:')) {
+		const parts = storedHash.split(':');
+		if (parts.length < 3 || !parts[2]) {
+			// 畸形哈希（缺迭代段或缺摘要段）：安全拒绝，不派生
+			return { isValid: false, isLegacy: false, needsUpgrade: false, iterations: null };
 		}
+		// 迭代数自描述于哈希前缀；畸形（非整数）或异常（越界）一律安全拒绝，不静默代偿
+		const parsedIterations = Number.parseInt(parts[1], 10);
+		if (!Number.isSafeInteger(parsedIterations)
+			|| parsedIterations < PBKDF2_MIN_ITERATIONS
+			|| parsedIterations > PBKDF2_MAX_ITERATIONS) {
+			return { isValid: false, isLegacy: false, needsUpgrade: false, iterations: null };
+		}
+		const iterations = parsedIterations;
+		const expectedBase64 = parts[2];
 
-		// Fallback to legacy single-round SHA-256
-		const legacyHash = await this.genLegacyHashPassword(inputPassword, salt);
-		const isValid = timingSafeEqual(legacyHash, storedHash);
-		return { isValid, isLegacy: true };
+		const keyMaterial = await crypto.subtle.importKey(
+			'raw',
+			encoder.encode(inputPassword),
+			'PBKDF2',
+			false,
+			['deriveBits']
+		);
+
+		const derivedBits = await crypto.subtle.deriveBits(
+			{
+				name: 'PBKDF2',
+				salt: encoder.encode(salt),
+				iterations: iterations,
+				hash: 'SHA-256'
+			},
+			keyMaterial,
+			PBKDF2_KEY_LEN
+		);
+
+		const derivedBase64 = uint8ToBase64(new Uint8Array(derivedBits));
+		const isValid = timingSafeEqual(derivedBase64, expectedBase64);
+		return {
+			isValid,
+			isLegacy: false,
+			needsUpgrade: isValid && iterations < PBKDF2_ITERATIONS,
+			iterations
+		};
+	}
+
+	// Fallback to legacy single-round SHA-256
+	const legacyHash = await this.genLegacyHashPassword(inputPassword, salt);
+	const isValid = timingSafeEqual(legacyHash, storedHash);
+	return { isValid, isLegacy: true, needsUpgrade: isValid, iterations: null };
 	},
 
 	/**

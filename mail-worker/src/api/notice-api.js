@@ -1,13 +1,14 @@
 import app from '../hono/hono';
 import result from '../model/result';
 import decisionNoticeService from '../service/decision-notice-service';
+import auditService from '../service/audit-service';
 import orm from '../entity/orm';
 import { auditLog } from '../entity/audit-log';
 import user from '../entity/user';
 import { eq, and } from 'drizzle-orm';
 import BizError from '../error/biz-error';
 import { getUserDb } from '../utils/db-accessor';
-import { isPenaltyLinkedToCase } from '../utils/audit-case-link';
+import { isPenaltyLinkedToCase, normalizeCaseReference } from '../utils/audit-case-link';
 
 async function sha256Hex(str) {
 	const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
@@ -299,8 +300,21 @@ app.post('/notice/restricted/appeal', async (c) => {
 		throw new BizError('绑定的案件当前没有生效中的处置，无法提交解封申诉', 400);
 	}
 
-	// 严防重复申诉打扰：已有待审申诉时不可重复提交
-	if (targetCase.appealReason) {
+	const userDb = getUserDb(c);
+	if (!userDb) throw new BizError('Database unavailable', 500);
+
+	// 申诉台账与索引的幂等建表保障（audit_appeal 为本轮新增，冷启动时先行确保存在）
+	await auditService.ensureTables(c);
+
+	// 严防重复申诉打扰（第二轮修复）：双重去重 ——
+	// 1) 独立申诉台账 (audit_appeal) 中存在 pending 记录（含升级后各轮次）；
+	// 2) 旧版处罚行 appeal_reason 标记（升级前提交、台账未覆盖的历史数据）。
+	// 驳回后（标记清空且无 pending 记录）允许凭新证据再次提交，形成 R2/R3 新记录，
+	// 依据 punishments.md §13.3「申诉失败不得删除用户再次提交新证据的权利」。
+	const pendingAppealRow = await userDb.prepare(`
+		SELECT appeal_id, round FROM audit_appeal WHERE case_id = ? AND status = 'pending' LIMIT 1
+	`).bind(targetCase.id).first().catch(() => null);
+	if (pendingAppealRow || targetCase.appealReason) {
 		throw new BizError('当前申诉已在审核中，请勿重复提交', 400);
 	}
 
@@ -340,27 +354,85 @@ app.post('/notice/restricted/appeal', async (c) => {
 		actor: `User (${userEmail})`
 	});
 
-	const userDb = getUserDb(c);
-	if (!userDb) throw new BizError('Database unavailable', 500);
+	// 第二轮修复：申诉材料独立落账。单批原子事务内：
+	// 第一句 — 处罚行 CAS 写入申诉标记（version+1，沿用既有防并发契约）；
+	// 第二句 — 独立申诉台账 INSERT，以轮次 (round) 形成稳定记录身份，
+	//          并以 EXISTS 复核第一句确实生效，杜绝"台账有记录但案卷未标记"的孤儿记录。
+	// 同批失败整体回滚；并发重复提交由 UNIQUE(case_id, round) 拦截后整体回退。
+	const appealId = 'APL-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).substring(2, 6).toUpperCase();
+	const appealSourceCaseId = normalizeCaseReference(targetCase.originalDecisionId);
+	const appealDecisionId = targetCase.decisionId || null;
 
 	// 严格保留原 circuit_status 与封禁处罚状态，严禁因提交申诉而篡改技术控制状态或解除封禁
-	const updateRes = await userDb.prepare(`
-		UPDATE audit_log
-		SET appeal_reason = ?, timeline = ?,
-		    version = version + 1
-		WHERE id = ? AND email = ? AND status = 'banned'
-		  AND (appeal_reason IS NULL OR TRIM(appeal_reason) = '')
-	`).bind(appealReason, JSON.stringify(timeline), targetCase.id, userEmail).run();
+	const appealStmts = [
+		userDb.prepare(`
+			UPDATE audit_log
+			SET appeal_reason = ?, timeline = ?,
+			    version = version + 1
+			WHERE id = ? AND email = ? AND status = 'banned'
+			  AND (appeal_reason IS NULL OR TRIM(appeal_reason) = '')
+		`).bind(appealReason, JSON.stringify(timeline), targetCase.id, userEmail),
+		userDb.prepare(`
+			INSERT INTO audit_appeal (
+				appeal_id, case_id, source_case_id, decision_id, user_id, email, round,
+				content, status, create_time, update_time
+			)
+			SELECT ?, ?, ?, ?, ?, ?,
+			       COALESCE((SELECT MAX(round) FROM audit_appeal WHERE case_id = ?), 0) + 1,
+			       ?, 'pending', datetime('now'), datetime('now')
+			WHERE EXISTS (
+				SELECT 1 FROM audit_log
+				WHERE id = ? AND email = ? AND status = 'banned'
+				  AND appeal_reason IS NOT NULL AND TRIM(appeal_reason) != ''
+			)
+		`).bind(
+			appealId,
+			targetCase.id,
+			appealSourceCaseId ? Number(appealSourceCaseId) : null,
+			appealDecisionId,
+			decoded.userId || targetCase.userId || null,
+			userEmail,
+			targetCase.id,
+			appealReason,
+			targetCase.id,
+			userEmail
+		)
+	];
 
-	const changes = updateRes?.meta?.changes ?? updateRes?.changes ?? 0;
-	if (changes !== 1) {
+	let appealBatchResults = [];
+	try {
+		if (typeof userDb.batch === 'function') {
+			appealBatchResults = await userDb.batch(appealStmts);
+		} else {
+			for (const s of appealStmts) {
+				appealBatchResults.push(await s.run());
+			}
+		}
+	} catch (batchErr) {
+		const errMsg = String(batchErr?.message || batchErr);
+		if (errMsg.includes('UNIQUE constraint failed')) {
+			throw new BizError('申诉提交已被并发处理，请刷新后确认当前申诉状态', 409);
+		}
+		throw batchErr;
+	}
+
+	const markerChanges = appealBatchResults[0]?.meta?.changes ?? appealBatchResults[0]?.changes ?? 0;
+	const appealInsertChanges = appealBatchResults[1]?.meta?.changes ?? appealBatchResults[1]?.changes ?? 0;
+	if (markerChanges !== 1 || appealInsertChanges !== 1) {
 		throw new BizError('案件状态已被并发修改，请刷新后重试', 409);
 	}
+
+	// 读取落账后的真实轮次与稳定记录身份
+	const appealRecord = await userDb.prepare(`
+		SELECT appeal_id, round, create_time FROM audit_appeal WHERE appeal_id = ?
+	`).bind(appealId).first().catch(() => null);
 
 	return c.json(result.ok({
 		success: true,
 		caseId: targetCase.id,
 		boundCaseId: boundCase.id,
+		appealId: appealRecord?.appeal_id || appealId,
+		appealRound: appealRecord?.round || null,
 		message: '申诉材料已提交，合规团队将由独立管理员重新复核研判'
 	}));
 });

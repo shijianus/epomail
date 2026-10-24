@@ -8,6 +8,44 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### 收尾轮：生产请求事实修正 · live 显式 opt-in · 认证兼容性证据 · purge 边界收紧 (2026-10-24)
+*   **关联提交 (Git Commit)**: 本轮两批均按批次指令**未执行 commit**（工作区保留待候选批准）；基线 `a8862a2935c96e61af8973bea57ee1078ba5caa9` (Short: `a8862a2`)，分支 `review/abuse-backend-rc`
+*   **部署环境 (Deployment)**: `本地全真栈 (真实 workerd, 冷启动独立持久化目录)`；零生产请求（收尾轮核实后未再触生产）、零部署、零远程迁移
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] **生产事实修正**：如实记录 test-global-2fa-e2e 曾真实请求生产一次登录（被拒，零状态变更），另两个 live 脚本未运行（详见证据 production-request-facts.md）；三个 live 脚本全部改造为显式 opt-in（默认 SKIP 零网络、双开关、无生产默认 URL、凭据环境变量化不落日志）；
+    - [x] **认证兼容性（PBKDF2）**：畸形/异常迭代参数安全拒绝（不派生、不代偿）；旧 100000 次合成哈希验证成功后自动升级至 210000，错误密码绝不升级；legacy SHA-256 升级路径回归通过；
+    - [x] **认证兼容性（TOTP）**：恢复 fail-secure 不断回退；新增显式迁移机制 migrateLegacyTotpEncryption（现行 era 仅补 version=2 标记、legacy era 解封重加密、明文 era 补加密、缺 totp_enc_key 明确阻断、双钥不可解明确阻断）；新注册直接落 version=2；备份码登录与查看路径接入；
+    - [x] **purge 边界（用户确定）**：`purgeOnRelease` 缺少成文政策依据 → **不再作为可执行能力**：任何显式请求在写入前明确拒绝（400）、零副作用（不解封、不写决策/通知/清理记录、不改案卷）；普通解封零清理、零虚假「已脱敏/已清理」记录；独立 `/audit/purge` 保留为维护操作，收紧为「已结案 + 超 180 天保留期 + 未被有效处罚引用为源案件」，在办工单、保留期内记录、E 不变量关联链、audit_appeal/audit_decision/outbox 台账永不清除（见 doc/HANDOVER-BATCH2-CANDIDATE.md 与证据 purge-boundary.md）；
+    - [x] **Mailjet 独立待办**：代码已去固定凭据 ≠ 旧凭据失效；owner 轮换仍待完成，不访问提供商验证，不宣称生产凭据安全已确认。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 产品改动后全量重跑（非沿用旧结果）：模块套件 12 个 exit 0（final2 日志归档）；真机套件 stepup ALL GREEN、login-ui 8/8
+    - [x] 冷启动真实 workerd：rc-abuse-workerd-e2e 41/41、rc-abuse-batch2-workerd-e2e 31/31、rc-auth-compat-workerd-e2e 25/25（新增，含耗时：210k 登录 ~287ms、100k 登录+升级 ~428ms、legacy TOTP 迁移登录 ~348ms、畸形拒绝 ~28-46ms、备份码登录 ~290ms）
+    - [x] 测试变更分类归档（修产品 A1-A8 / 修 fixture B1-B3 / 改过时断言 C1-C4 / 禁跑 D）见 test-change-classification.md
+    - [x] 零假数据残留：auth-compat 合成用户物理清理归零；closeout 冷启动库 e2e 清理核验通过
+*   **证据 (Evidence)**: `D:/Users/Smart Kevin/rc-abuse-review-20261024/evidence/batch2-dev-fixes/`（新增 production-request-facts.md、purge-boundary.md、test-change-classification.md、module-suites/final2/、closeout workerd 摘要）
+
+### 第二批修复：Mailjet 凭据处置 · 可复现构建 · 申诉追溯 · 真实 purge · legacy extend · Webhook 乱序 (2026-10-24)
+*   **关联提交 (Git Commit)**: 本轮按批次指令**未执行 commit**（工作区保留待独立候选复测后统一提交）；基线 `a8862a2935c96e61af8973bea57ee1078ba5caa9` (Short: `a8862a2`)，分支 `review/abuse-backend-rc`
+*   **部署环境 (Deployment)**: `本地全真栈 (真实 workerd + 本地 D1/KV, 独立持久化目录)`；未部署、未迁移远程、未读取生产数据库
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] **阶段0 Mailjet 可疑凭据**：`test-mailjet.js` 重写为零网络离线契约测试 + 显式四件套环境变量门控的联网冒烟（缺配置 exit 1，零兜底）；原 32-hex 凭据对自 2026-08-05 (a2217fd) 进入历史，判定为不可排除真实使用，轮换清单交 owner（见 REPORTS.md 同日专项与证据目录 mailjet-credential-triage.md，全程严格脱敏）；
+    - [x] **阶段1 可复现构建**：`temp_login_ui` 移除冗余 `pnpm.overrides`（锁文件零改动）、`supportedArchitectures` 扩展 win32/musl、`wrangler.jsonc` 补 `assets.directory`；干净 clone `pnpm install --frozen-lockfile` + `vite build` + `wrangler deploy --dry-run` 全通（隔离目录双副本验证；Linux 未验证如实标注，Docker 引擎未能就绪）；
+    - [x] **阶段2 申诉材料可追溯**：新增 `audit_appeal` 独立台账（appeal_id/round/不可变 content/办理结果，UNIQUE(case_id,round) 并发防重），init.js 与 ensureTables 双建表；`/notice/restricted/appeal` 单批原子落账（CAS 标记 + EXISTS 复核），双重去重；裁决 approve/reject 只更新办理结果、原文永不抹除，旧数据原文原样回填（APL-BF 标记）；驳回后可 R2/R3 新记录（punishments.md §13.3）；boundCaseId 双命名空间语义已核实并保持冻结映射；
+    - [x] **阶段3 真实 purge 与事实分离**：`purgeOnRelease` 从"改状态+口头脱敏"改为字段级真实清理（ip/geo/device/fingerprint/base_*），范围收窄至本案及关联处罚行，生命周期 status 一律不改写，circuit_status 分离标记，真实批次台账 `RELEASE_OPTIN_FIELD_PURGE`；经核实该标志无任何配置/政策背书，通知文案中"放行归档政策"虚构表述已移除；**（候选固定阶段按用户决定进一步撤销该执行能力，见收尾轮条目）**；
+    - [x] **阶段4 legacy extend**：`/audit/action extend` 全量校验（仅 audit 类、仅 active/pending、存储版本+客户端版本双重 CAS、audit_decision 台账留痕），终态案件 409 拒绝、处罚案件 400 拒绝，不再伪造 resolved_time；
+    - [x] **阶段5 Webhook 乱序**：`updateEmailStatus` 改为基于 Resend 真实事件语义的源状态守卫投影（与 Outbox 状态机对齐），迟到 delivered 不再覆盖 bounced；矛盾/被拦截事实按事件键留痕于 message；KV 快速去重前置、webhook_event 台账权威去重；发送线程插入后按台账事实重放，迟到 SENT 写回受保护；
+    - [x] **扫描门禁范围**：CI push 使用 before..after 全提交范围（新分支回退整树）、PR 以 merge-base 覆盖全部新增提交；新增 `hardcoded-provider-api-keypair` 规则（对本次泄露形态定向防复发）；gitleaks 缺失显式声明不冒充通过；
+    - [x] **TOTP/UI 失败定性**：两处真实产品缺陷修复（`totp_enc_key` 缺失回退 jwt_secret 的 fail-secure 回归恢复；PBKDF2 迭代 210000→100000 无记录降级恢复且 verify 去除封顶）；两处测试按现行真实契约修正（drizzle 0.42 台架 raw()、logout 整键删除契约、passkey 优先 UI 路径）；两个打生产端点的 live 套件按红线禁跑并如实标记。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 干净 frozen 安装与构建：隔离目录双副本 `pnpm install --frozen-lockfile` 通过（锁文件零改动）；vite build / mail-worker dry-run / mail-vue release build 全零报错
+    - [x] 新增第二批套件：`tests/test-batch2-fixes.mjs` 10/10；`tests/rc-abuse-batch2-workerd-e2e.mjs` 31/31（真实 workerd）
+    - [x] 第一批冻结回归：A–F 反例 17/17、服务层 22/22、GLM 8/8、四缺陷/闭环/引擎/worker 级套件全绿；真实 workerd 41/41（新装库与升级库各一轮）
+    - [x] TOTP/UI 套件：backend-fixes、security、google-2fa-webauthn、global-disable-purge、2fa-stepup、login-ui 6 套件全绿
+    - [x] 新装/升级：冷启动 6 角色播种 ✓；a8862a2 基线库升级后角色/用户/决策台账完整保留、audit_appeal 幂等补建，71/71 e2e 全绿
+    - [x] 零假数据残留：两批 e2e 合成数据物理清理核验归零（HTTP 200，a/u/o/x 全 0）
+    - [x] 静态门禁：i18n 对称 100% / 引用零缺失 / 硬编码 421 行为基线既有（本轮零新增前端文案）；扫描器 --self-test 通过；证据副本 diff 脱敏后内置规则自扫零命中
+*   **证据 (Evidence)**: 仓库外 `D:/Users/Smart Kevin/rc-abuse-review-20261024/evidence/batch2-dev-fixes/`（模块套件输出、双库 e2e 摘要、构建日志、脱敏 diff、Mailjet 溯源档案）
+
 ### 违规处罚、裁决与最终通知后端闭环与全链路落地 (2026-10-20)
 *   **关联提交 (Git Commit)**: `33c77009812c7917f66c3205ea45927c22a395b9` (Short: `33c7700`)
 *   **部署环境 (Deployment)**: `本地全真栈环境 (Local Full-Stack Verification)`

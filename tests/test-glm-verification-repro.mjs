@@ -160,15 +160,21 @@ console.log('🧪 Starting Verification of GLM-Identified Backend Defect Fixes..
 }
 
 // -------------------------------------------------------------
-// Verification E: purgeOnRelease no longer physically deletes
+// Verification E: purgeOnRelease capability withdrawn (user decision)
+// 第一批冻结不变量继续保留：清理绝不物理删除案卷、绝不改写处罚事实。
+// 候选固定阶段按用户决定：该能力无成文政策依据 → 不再可执行，
+// 显式请求在写入前明确拒绝（零副作用）；普通放行零清理。
 // -------------------------------------------------------------
 {
-  console.log('\n--- 5. Verifying Fix E (purgeOnRelease audit trail preservation) ---');
+  console.log('\n--- 5. Verifying Fix E (purgeOnRelease capability boundary) ---');
   const auditSrc = fs.readFileSync('mail-worker/src/service/audit-service.js', 'utf8');
   assert.ok(!auditSrc.includes("DELETE FROM audit_log"), 'audit-service must NOT execute DELETE FROM audit_log on unban/release');
-  assert.ok(auditSrc.includes("circuit_status = 'PURGED'"), 'purgeOnRelease must mark circuit_status = PURGED');
-  assert.ok(auditSrc.includes("status = 'resolved'"), 'purgeOnRelease must mark status = resolved');
-  console.log('  ✅ Verified Fix E: purgeOnRelease preserves full audit trail without physical deletion.');
+  assert.ok(auditSrc.includes('暂不提供「放行即清理」能力'), 'explicit purgeOnRelease requests must be rejected with an accurate message');
+  assert.ok(!/circuit_status\s*=\s*'PURGED'/.test(auditSrc),
+    'no PURGED marker write may remain in adjudication (capability withdrawn, no false cleanup records)');
+  assert.ok(!/status\s*=\s*'resolved'[\s\S]{0,200}?circuit_status/i.test(auditSrc),
+    'release must NOT rewrite lifecycle status alongside a purge marker');
+  console.log('  ✅ Verified Fix E: purgeOnRelease rejected without side effects; audit trail and punishment facts never rewritten.');
 }
 
 // -------------------------------------------------------------
@@ -323,6 +329,33 @@ console.log('🧪 Starting Verification of GLM-Identified Backend Defect Fixes..
       lease_version INTEGER DEFAULT 0,
       create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
       update_time DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- 第二轮修复新增表（与生产 init.js / audit-service.ensureTables 定义一致）
+    CREATE TABLE audit_appeal (
+      appeal_id TEXT PRIMARY KEY,
+      case_id INTEGER NOT NULL,
+      source_case_id INTEGER,
+      decision_id TEXT,
+      user_id INTEGER,
+      email TEXT NOT NULL,
+      round INTEGER NOT NULL,
+      content TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      decision_action TEXT,
+      decision_notes TEXT,
+      decided_by TEXT,
+      decided_at TEXT,
+      create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+      update_time DATETIME,
+      UNIQUE(case_id, round)
+    );
+
+    CREATE TABLE audit_purge_batch (
+      id TEXT PRIMARY KEY,
+      count INTEGER NOT NULL DEFAULT 0,
+      reason TEXT NOT NULL,
+      create_time DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
     -- SQLite trigger guard to enforce atomic CAS inside statement 0 of batch
@@ -548,6 +581,34 @@ console.log('🧪 Starting Verification of GLM-Identified Backend Defect Fixes..
       create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
       update_time DATETIME DEFAULT CURRENT_TIMESTAMP
     );
+
+    -- 第二轮修复新增表（与生产 init.js / audit-service.ensureTables 定义一致）
+    CREATE TABLE audit_appeal (
+      appeal_id TEXT PRIMARY KEY,
+      case_id INTEGER NOT NULL,
+      source_case_id INTEGER,
+      decision_id TEXT,
+      user_id INTEGER,
+      email TEXT NOT NULL,
+      round INTEGER NOT NULL,
+      content TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      decision_action TEXT,
+      decision_notes TEXT,
+      decided_by TEXT,
+      decided_at TEXT,
+      create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+      update_time DATETIME,
+      UNIQUE(case_id, round)
+    );
+
+    CREATE TABLE audit_purge_batch (
+      id TEXT PRIMARY KEY,
+      count INTEGER NOT NULL DEFAULT 0,
+      reason TEXT NOT NULL,
+      create_time DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
     INSERT INTO user (user_id, email, status) VALUES (200, 'deadlock@epocanvas.com', 1);
     INSERT INTO audit_log (id, ticket_id, email, warning_type, event_type, category, action_text, status, version, appeal_reason)
     VALUES (200, 'BAN-200', 'deadlock@epocanvas.com', 'ban', 'admin_ban', 'security', 'Banned', 'banned', 1, 'Initial appeal request');

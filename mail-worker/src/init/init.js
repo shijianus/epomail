@@ -423,6 +423,35 @@ const dbInit = {
 			console.warn('v3_17DB audit_purge_batch warning:', err.message);
 		}
 
+		// 申诉材料独立台账（第二轮修复）：冷启动引导链同步建表，
+		// 与 audit-service.ensureTables 的幂等迁移定义保持完全一致
+		try {
+			await userDb.prepare(`
+				CREATE TABLE IF NOT EXISTS audit_appeal (
+					appeal_id TEXT PRIMARY KEY,
+					case_id INTEGER NOT NULL,
+					source_case_id INTEGER,
+					decision_id TEXT,
+					user_id INTEGER,
+					email TEXT NOT NULL,
+					round INTEGER NOT NULL,
+					content TEXT NOT NULL,
+					status TEXT NOT NULL DEFAULT 'pending',
+					decision_action TEXT,
+					decision_notes TEXT,
+					decided_by TEXT,
+					decided_at TEXT,
+					create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+					update_time DATETIME,
+					UNIQUE(case_id, round)
+				)
+			`).run();
+			await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_audit_appeal_case ON audit_appeal(case_id)`).run();
+			await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_audit_appeal_status ON audit_appeal(status)`).run();
+		} catch (err) {
+			console.warn('v3_17DB audit_appeal warning:', err.message);
+		}
+
 		try {
 			await userDb.prepare(`
 				CREATE TABLE IF NOT EXISTS one_time_exchange_code (

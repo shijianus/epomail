@@ -9,6 +9,23 @@
 
 ---
 
+### Mailjet 可疑凭据专项溯源审计与处置报告 (2026-10-24)
+*   **关联提交 (Git Commit)**: 本轮按批次指令未执行 commit（基线 `a8862a2935c96e61af8973bea57ee1078ba5caa9`，分支 `review/abuse-backend-rc`，处置代码在工作区待独立候选复测）
+*   **专项文档索引 (Detailed Doc)**: `D:/Users/Smart Kevin/rc-abuse-review-20261024/evidence/batch2-dev-fixes/secret-scan/mailjet-credential-triage.md`（严格脱敏档案，本报告为零原值摘要）
+*   **体检/审计范围与方法 (Scope & Methodology)**:
+    1. 范围与环境：`mail-worker/test-mailjet.js` 可疑真实形态 API Key/Secret 对（独立扫描发现）；本地离线溯源（git 历史追踪、全树运行时读值比对、本地配置面核对），全程未联网验证凭据、未读取生产数据。
+    2. 工具与脚本：git log/-S/show 历史追踪；运行时读值全树比对扫描（值不落命令行/输出）；既有扫描门禁规则审计。
+*   **核心发现与缺陷矩阵 (Key Findings & Matrix)**:
+    - **[P0·安全/泄露]**: test-mailjet.js 自 2026-08-05 (commit a2217fd) 起硬编码 32-hex apiKey/apiSecret 对并存在于全部后续可达历史；域名/收件人与 owner 强关联，**不能排除真实使用**（有效性未联网验证）；产品 Mailjet 凭据经数据库发信配置承载，该值对可能同刻录入过管理端配置。
+    - **[P1·门禁缺口]**: 既有内置扫描仅 whsec_ 单规则；独立复核 gitleaks 范围扫描输出 "no leaks found"（通用规则对该形态不敏感）——两者均属覆盖缺口而非通过证据；CI 仅比较 HEAD~1..HEAD，一次 push 多提交只查最后一个。
+    - **[P2·形态缺陷]**: 历史版本曾含更严重的硬编码默认密钥回退（83d0fec: `jwt_secret || 'default-epomail-totp-fallback-key-32b'`），后经无说明 backup 提交演化为 jwt_secret 回退（b721609），本轮一并按 fail-secure 契约修复。
+*   **治理修复与回归结果 (Fixes & Verification)**:
+    - test-mailjet.js 重写为零网络离线契约测试 + 显式四件套环境变量门控（缺配置 exit 1、零兜底），离线/缺配置双模式实测通过；
+    - 扫描门禁补强：新增 `hardcoded-provider-api-keypair` 内置规则（隔离正例可拦截本次泄露形态，--self-test 固化）；CI 改为 push before..after 全提交范围（新分支回退整树）/ PR merge-base 全范围；gitleaks 缺失显式声明不冒充通过；
+    - 未强推清历史、未自动关闭 GitHub 告警；**所有者轮换清单已交付**（撤销并重置该 Mailjet 密钥对、核查 Mailjet 侧活动日志、如曾录入管理端发信配置则同步更新）；
+    - 剩余未知如实记录：凭据当前有效性、是否曾被滥用未验证（禁止联网）；生产侧数据库同值核对未执行。
+
+
 ### 操作报告 4 大板块与默认总表专属差异化列集定制及严格隔离专项深度审计报告 (2026-10-14)
 *   **关联提交 (Git Commit)**: `d0561a9766ad6098c7a15d5db4ce602726ba7588` (Short: `d0561a9`)
 *   **专项文档索引 (Detailed Doc)**: 本报告直接正文归档于此

@@ -67,6 +67,16 @@ const resendService = {
 		const eventId = svixId || body.id || (body.data?.email_id ? `${body.data.email_id}_${body.type}` : null);
 		const userDb = c?.env?.db || (c._mockOrm ? c._mockOrm : null);
 
+		// 0. KV 快速去重（best-effort 短路；权威去重始终以 webhook_event 台账主键为准）
+		if (eventId && c?.env?.kv) {
+			try {
+				const seen = await c.env.kv.get(`wh_resend:${eventId}`);
+				if (seen) {
+					return { deduplicated: true, eventId };
+				}
+			} catch (_) {}
+		}
+
 		let emailStatus = emailConst.status.SENT;
 		let emailMessage = null;
 
@@ -87,10 +97,15 @@ const resendService = {
 		const params = {
 			resendEmailId: body.data?.email_id,
 			status: emailStatus,
-			message: emailMessage
+			message: emailMessage,
+			// 事件键控：事实追加以 eventId 去重，保证重复事件重放不产生重复事实行
+			eventId
 		};
 
-		// 1. 同步常规发信表状态 (若匹配)
+		// 1. 普通邮件记录的乱序安全投影（带源状态守卫，单调不回退、重放安全）。
+		// 投影与台账分属不同域写入（mail/user 双库模式下无法同批原子）：
+		// 投影先落地，若后续台账批次失败，提供商重试会再次进入本流程 ——
+		// 守卫使投影幂等（重复应用为零行变更），台账批次重试直至成功，整体收敛一致。
 		if (params.resendEmailId) {
 			try {
 				await emailService.updateEmailStatus(c, params);

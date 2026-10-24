@@ -10,7 +10,7 @@ import BizError from '../error/biz-error';
 import { getUserDb } from '../utils/db-accessor';
 import { isAdminUser } from '../utils/admin-utils';
 import permService from './perm-service';
-import { isPenaltyLinkedToCase } from '../utils/audit-case-link';
+import { isPenaltyLinkedToCase, normalizeCaseReference } from '../utils/audit-case-link';
 
 let tablesEnsured = false;
 
@@ -73,6 +73,54 @@ function parseRecordedTimeline(value) {
 	} catch (_) {
 		return null;
 	}
+}
+
+/**
+ * 申诉结果落账（第二轮修复）：在裁决原子批次内写入申诉台账办理结果。
+ * - 正常流程：/notice/restricted/appeal 提交时已建 pending 台账行，这里只更新办理结果；
+ * - 旧数据回填：升级前提交的申诉仅有处罚行 appeal_reason 标记，则先在同一原子批次内
+ *   将原文「原样」回填为台账行（不编造内容、不虚构提交时间），再写入办理结果；
+ * - 台账行的 content 字段一经写入永不被裁决修改，满足「驳回/批准不抹掉原材料」。
+ */
+function appendAppealOutcomeStmts(stmts, userDb, { caseId, targetLog, targetUser, outcome, actionType, notes, actor }) {
+	const nowIso = new Date().toISOString();
+	if (targetLog.appealReason && String(targetLog.appealReason).trim()) {
+		const sourceCaseId = normalizeCaseReference(targetLog.originalDecisionId);
+		stmts.push(userDb.prepare(`
+			INSERT INTO audit_appeal (
+				appeal_id, case_id, source_case_id, decision_id, user_id, email, round,
+				content, status, create_time, update_time
+			)
+			SELECT ?, ?, ?, ?, ?, ?,
+			       COALESCE((SELECT MAX(round) FROM audit_appeal WHERE case_id = ?), 0) + 1,
+			       ?, 'pending', datetime('now'), datetime('now')
+			WHERE NOT EXISTS (
+				SELECT 1 FROM audit_appeal WHERE case_id = ? AND status = 'pending'
+			)
+		`).bind(
+			'APL-BF-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).substring(2, 6).toUpperCase(),
+			Number(targetLog.id),
+			sourceCaseId ? Number(sourceCaseId) : null,
+			targetLog.decisionId || null,
+			targetUser?.userId || targetLog.userId || null,
+			targetLog.email,
+			Number(targetLog.id),
+			String(targetLog.appealReason),
+			Number(targetLog.id)
+		));
+	}
+	stmts.push(userDb.prepare(`
+		UPDATE audit_appeal
+		SET status = ?, decision_action = ?, decision_notes = ?, decided_by = ?, decided_at = ?, update_time = datetime('now')
+		WHERE case_id = ? AND status = 'pending'
+	`).bind(
+		outcome,
+		actionType,
+		notes ? String(notes) : null,
+		actor,
+		nowIso,
+		Number(caseId)
+	));
 }
 
 
@@ -268,6 +316,34 @@ const auditService = {
 					create_time DATETIME DEFAULT CURRENT_TIMESTAMP
 				);
 			`).run();
+
+			// 申诉材料独立台账（第二轮修复）：
+			// - 每次申诉提交都拥有独立稳定的 appeal_id 身份与轮次 (round: R1=1, R2=2...)
+			// - content 为不可变申诉原文；裁决只更新 status/decision_* 字段，绝不抹掉原材料
+			// - case_id 指向被申诉的处罚行 (audit_log.id, warning_type='ban', status='banned')
+			// - source_case_id / decision_id 保留原源案件与原处罚决定关联（经 original_decision_id 映射）
+			await userDb.prepare(`
+				CREATE TABLE IF NOT EXISTS audit_appeal (
+					appeal_id TEXT PRIMARY KEY,
+					case_id INTEGER NOT NULL,
+					source_case_id INTEGER,
+					decision_id TEXT,
+					user_id INTEGER,
+					email TEXT NOT NULL,
+					round INTEGER NOT NULL,
+					content TEXT NOT NULL,
+					status TEXT NOT NULL DEFAULT 'pending',
+					decision_action TEXT,
+					decision_notes TEXT,
+					decided_by TEXT,
+					decided_at TEXT,
+					create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+					update_time DATETIME,
+					UNIQUE(case_id, round)
+				);
+			`).run();
+			await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_audit_appeal_case ON audit_appeal(case_id);`).run();
+			await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_audit_appeal_status ON audit_appeal(status);`).run();
 
 			// Real table for auto purged and tombstoned batches
 			await userDb.prepare(`
@@ -470,6 +546,39 @@ const auditService = {
 
 		// Check mode: allMailMode (1: All, 0: Privacy, 2: Encrypted E2EE)
 		const allMailMode = Number(settings?.allMailMode ?? 1);
+
+		// 第二轮修复：批量附加独立申诉台账轮次 (R1/R2/R3... 可区分，含各轮办理结果)。
+		// 仅读取，不改写任何既有行语义；台账缺失（旧库未升级）时静默返回空数组。
+		const appealHistoryMap = new Map();
+		const listCaseIds = [...new Set((list || []).map(r => Number(r.id)).filter(v => Number.isSafeInteger(v) && v > 0))];
+		if (listCaseIds.length > 0) {
+			try {
+				const listUserDb = getUserDb(c) || c?.env?.db;
+				if (listUserDb) {
+					const appealPlaceholders = listCaseIds.map(() => '?').join(',');
+					const appealRows = await listUserDb.prepare(`
+						SELECT appeal_id, case_id, round, status, decision_action, create_time, decided_at
+						FROM audit_appeal
+						WHERE case_id IN (${appealPlaceholders})
+						ORDER BY case_id ASC, round ASC
+					`).bind(...listCaseIds).all();
+					for (const appealRow of (appealRows?.results || [])) {
+						const bucket = appealHistoryMap.get(Number(appealRow.case_id)) || [];
+						bucket.push({
+							appealId: appealRow.appeal_id,
+							round: appealRow.round,
+							status: appealRow.status,
+							decisionAction: appealRow.decision_action || null,
+							createTime: appealRow.create_time,
+							decidedAt: appealRow.decided_at || null
+						});
+						appealHistoryMap.set(Number(appealRow.case_id), bucket);
+					}
+				}
+			} catch (err) {
+				console.warn('Failed to query appeal history:', err.message);
+			}
+		}
 
 		// Compute metrics counts (严格按真实业务与治理闭环拉齐：待处理与已结案严格分流)
 		const isClosedStatus = (s) => ['banned', 'unbanned', 'resolved', 'rejected', 'expired'].includes(s);
@@ -738,7 +847,8 @@ const auditService = {
 				sameCategoryAppealCount,
 				updateCount,
 				lastUpdated,
-				appealCount
+				appealCount,
+				appealHistory: appealHistoryMap.get(Number(row.id)) || []
 			};
 
 			return item;
@@ -992,10 +1102,100 @@ const auditService = {
 			}
 			await orm(c).update(auditLog).set(updateFields).where(eq(auditLog.id, id)).run();
 		} else if (action === 'extend') {
-			await orm(c).update(auditLog).set({
-				resolvedTime: nowIso,
-				detailText: sql`${auditLog.detailText} || ${'\n[延期处置]: ' + (notes || '管控期限已顺延')}`
-			}).where(eq(auditLog.id, id)).run();
+			// 第二轮修复：legacy extend 曾可无类型/状态/版本校验改写任意案件（含终态），并伪造 resolved_time。
+			// 现按与裁决一致的校验与台账体系执行：
+			// 1) 对象与工作类型：仅例行合规审查工单 (warning_type='audit') 支持延期处置；
+			// 2) 状态：仅未结案的 active/pending 可延期；终态（banned/resolved/rejected/expired/unbanned）明确拒绝；
+			// 3) 版本：以存储版本做 CAS 提交，防并发改写，也杜绝无版本的隐式覆盖；
+			// 4) 留痕：写入 audit_decision 决策台账并追加 timeline 事件，真实追加 [延期处置] 事实，
+			//    不再伪造 resolved_time（resolved_time 只代表真实结案时间）；
+			// 5) 处罚/威胁案件不适用延期，也不得借延期给已确认滥用层增加自动到期。
+			if (targetLog.warningType !== 'audit') {
+				throw new BizError('延期处置仅适用于例行合规审查工单 (audit)，处罚与威胁案件不适用', 400);
+			}
+			assertValidCaseState(targetLog);
+			const extendVersion = assertStoredCaseVersion(targetLog);
+			if (!['active', 'pending'].includes(targetLog.status)) {
+				throw new BizError('该案件已结案或处于终态，属于只读审计记录，无法延期处置', 409);
+			}
+			// 客户端版本只作为乐观锁断言：显式携带的过期版本必须拒绝，与裁决路径语义一致
+			const clientExtendVersion = body?.version;
+			assertValidClientVersion(clientExtendVersion);
+			if (clientExtendVersion !== undefined && clientExtendVersion !== null && clientExtendVersion !== extendVersion) {
+				throw new BizError('案件版本已过时，请刷新后重试', 409);
+			}
+
+			const extendDb = getUserDb(c) || c?.env?.db;
+			if (!extendDb) {
+				throw new BizError('数据库连接不可用 (D1 unbound)', 500);
+			}
+
+			let extendTimeline = [];
+			try {
+				if (targetLog.timeline) {
+					extendTimeline = typeof targetLog.timeline === 'string' ? JSON.parse(targetLog.timeline) : targetLog.timeline;
+					if (!Array.isArray(extendTimeline)) extendTimeline = [];
+				}
+			} catch (e) {
+				extendTimeline = [];
+			}
+			extendTimeline.push({
+				time: nowIso,
+				event: `延期处置: ${notes || '管控期限已顺延'}`,
+				actor
+			});
+
+			const extendDecisionId = 'DEC-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).substring(2, 6).toUpperCase();
+			const extendPayloadStr = JSON.stringify({ id: Number(id), action: 'extend', notes: (notes || '').trim() });
+			const extendHashBuf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(extendPayloadStr));
+			const extendPayloadHash = Array.from(new Uint8Array(extendHashBuf)).map(b => b.toString(16).padStart(2, '0')).join('');
+
+			const extendStmts = [
+				extendDb.prepare(`
+					INSERT INTO audit_decision (
+						decision_id, case_id, expected_version, expected_status, action_type, actor, idempotency_key, payload_hash
+					) VALUES (?, ?, ?, ?, 'extend', ?, ?, ?)
+				`).bind(
+					extendDecisionId,
+					targetLog.id,
+					extendVersion,
+					targetLog.status,
+					actor,
+					(body?.idempotencyKey || body?.idempotency_key) || null,
+					extendPayloadHash
+				),
+				extendDb.prepare(`
+					UPDATE audit_log
+					SET version = version + 1, timeline = ?, detail_text = detail_text || ?
+					WHERE id = ? AND status IN ('active', 'pending') AND version = ?
+				`).bind(
+					JSON.stringify(extendTimeline),
+					'\n[延期处置]: ' + (notes || '管控期限已顺延'),
+					id,
+					extendVersion
+				)
+			];
+
+			try {
+				if (typeof extendDb.batch === 'function') {
+					await extendDb.batch(extendStmts);
+				} else {
+					for (const s of extendStmts) {
+						await s.run();
+					}
+				}
+			} catch (batchErr) {
+				const errMsg = String(batchErr?.message || batchErr);
+				if (errMsg.includes('idempotency_key')) {
+					throw new BizError('幂等键冲突：同一幂等键不可用于不同案件或操作', 409);
+				}
+				if (errMsg.includes('UNIQUE constraint failed') || errMsg.includes('version mismatch') || errMsg.includes('Audit log version mismatch') || errMsg.includes('status mismatch') || errMsg.includes('Audit log status mismatch')) {
+					throw new BizError('案件状态已被并发修改或版本过时，请刷新后重试', 409);
+				}
+				throw batchErr;
+			}
+
+			return { success: true, action: 'extend', decisionId: extendDecisionId, version: extendVersion + 1 };
 		} else if (action === 'note') {
 			await orm(c).update(auditLog).set({
 				detailText: sql`${auditLog.detailText} || ${'\n[审核备忘]: ' + (notes || '')}`
@@ -1032,6 +1232,15 @@ const auditService = {
 		const actionType = action || decision;
 		const idempotencyKey = body.idempotencyKey || body.idempotency_key;
 
+		// 【能力边界（用户确定）】「放行即清理」(purgeOnRelease) 当前不具备任何成文政策依据，
+		// 因此不作为可执行能力：任何显式请求都在写入前直接拒绝，绝不依据单个客户端布尔值
+		// 执行敏感数据清除。拒绝时零副作用 —— 此处位于所有落库与通知副作用之前，
+		// 不产生半完成的解封、决策台账、Outbox 或清理记录。
+		// 独立维护清理入口 POST /api/audit/purge 不受影响（见 purgeNonCritical 的保留期与引用保护）。
+		if (purgeOnRelease) {
+			throw new BizError('暂不提供「放行即清理」能力：该操作缺少明确的政策依据，本次未执行任何数据清理，也未改变案件状态。如需清理历史数据，请使用独立的维护清理接口（/audit/purge，按保留期与引用保护规则执行）', 400);
+		}
+
 		// 明确拒绝底层尚未实现的能力，不伪造技术成功
 		if (['mute_account', 'probation'].includes(actionType)) {
 			throw new BizError('当前系统底层尚未接入该动作的实际执行能力 (mute/probation)', 400);
@@ -1041,6 +1250,9 @@ const auditService = {
 		if (!targetLog) {
 			throw new BizError('案件记录不存在', 404);
 		}
+
+		// 申诉台账幂等建表保障（本轮新增 audit_appeal，裁决落账前确保存在）
+		await this.ensureTables(c);
 
 		// 状态、工作类型与版本必须在任何写入前通过统一校验。
 		// 不接受 NULL 版本，也不把 NULL 隐式当作 1，避免触发器与 CAS 使用不同语义。
@@ -1376,7 +1588,7 @@ const auditService = {
 			if (releaseIds.length > 0) {
 				const placeholders = releaseIds.map(() => '?').join(',');
 				stmts.push(userDb.prepare(`
-					UPDATE audit_log 
+					UPDATE audit_log
 					SET status = 'unbanned', resolved_time = ?,
 						detail_text = detail_text || ?
 					WHERE id IN (${placeholders}) AND status = 'banned'
@@ -1387,14 +1599,23 @@ const auditService = {
 				));
 			}
 
-			if (purgeOnRelease) {
-				stmts.push(userDb.prepare(`
-					UPDATE audit_log
-					SET circuit_status = 'PURGED', status = 'resolved',
-					    detail_text = detail_text || ?
-					WHERE email = ? AND warning_type = 'audit' AND circuit_status != 'PURGED'
-				`).bind('\n[隐私清理]: 已根据放行归档政策执行非关键隐私脱敏', targetLog.email));
-			}
+			// 申诉结果落账（第二轮修复）：批准申诉时同步更新独立申诉台账，
+			// 原申诉全文保留在 audit_appeal.content，绝不随裁决抹掉。
+			// 若案件仅存在旧版 appeal_reason 标记（升级前提交、无台账记录），先在同批事务内回填一条
+			// 台账记录（原文自 appeal_reason 原样回填，不编造任何内容），再写入办理结果。
+			appendAppealOutcomeStmts(stmts, userDb, {
+				caseId: targetLog.id,
+				targetLog,
+				targetUser,
+				outcome: 'approved',
+				actionType,
+				notes,
+				actor
+			});
+
+			// 注意：「放行即清理」(purgeOnRelease) 已按用户确定的能力边界整体撤销，
+			// 本分支只做放行本身，不执行任何隐私字段清理、不标记 PURGED、不写清理批次。
+			// 请求携带该标志时已在 adjudicate 入口处被明确拒绝（零副作用）。
 		}
 
 		// 8. 用户申诉审核：驳回申诉
@@ -1402,6 +1623,19 @@ const auditService = {
 			targetNewStatus = targetLog.warningType === 'ban' ? 'banned' : 'rejected';
 			targetNewDetailText += (notes ? `\n[驳回理由]: ${notes}` : '\n[驳回理由]: 申诉复核不成立，维持封禁');
 			timeline.push({ time: nowIso, event: '驳回申诉', actor });
+
+			// 申诉结果落账（第二轮修复）：驳回同样只更新台账办理结果，
+			// 原申诉全文保留在 audit_appeal.content；用户可凭新证据再次提交 (R2+)，
+			// 依据 punishments.md §13.3「申诉失败不得删除用户再次提交新证据的权利」。
+			appendAppealOutcomeStmts(stmts, userDb, {
+				caseId: targetLog.id,
+				targetLog,
+				targetUser,
+				outcome: 'rejected',
+				actionType,
+				notes,
+				actor
+			});
 		}
 
 		else {
@@ -1578,12 +1812,26 @@ const auditService = {
 
 	/**
 	 * Purge non-critical historical logs
+	 *
+	 * 【收尾轮最小限制】/audit/purge 的可删除范围收紧（punishments.md §15「决策事件保留 180 天」
+	 * 与「证据切片 30–180 天」保留政策的保守落地，不建设新归档框架）：
+	 *   (1) 仅例行合规审查工单 (warning_type='audit')；
+	 *   (2) 仅风险等级 normal；
+	 *   (3) 仅已结案状态 (resolved/expired/rejected) —— active/pending 在办工单一律保留；
+	 *   (4) 仅创建时间超过 180 天保留期的行；
+	 *   (5) 未被任何有效处罚引用为源案件的行 —— 保护受限凭据案件绑定 (E 不变量)、
+	 *       申诉记录 (audit_appeal) 与裁决台账 (audit_decision) 的关联链完整性。
+	 * audit_appeal / audit_decision / notification_outbox / audit_purge_batch 台账
+	 * 永不在本路径删除；普通解封 (unban/approve) 不触发本函数，与本路径无任何耦合。
 	 */
 	async purgeNonCritical(c) {
 		const res = await orm(c).delete(auditLog).where(
 			and(
 				eq(auditLog.warningType, 'audit'),
-				eq(auditLog.riskLevel, 'normal')
+				eq(auditLog.riskLevel, 'normal'),
+				inArray(auditLog.status, ['resolved', 'expired', 'rejected']),
+				sql`${auditLog.createTime} < datetime('now', '-180 days')`,
+				sql`NOT EXISTS (SELECT 1 FROM audit_log b WHERE b.warning_type = 'ban' AND b.status = 'banned' AND CAST(b.original_decision_id AS INTEGER) = ${auditLog.id})`
 			)
 		).run();
 		const deletedCount = res?.meta?.changes || 0;

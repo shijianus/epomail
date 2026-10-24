@@ -88,7 +88,9 @@ async function runTests() {
   // Test 5: Backup Codes with Reversible Encryption
   {
     console.log('▶ Test 5: Backup codes reversible encryption and verification');
-    const mockEnv = { jwt_secret: 'test-secret-key-32-chars-long!!' };
+    // 台架修复说明：getEncryptionKey 已恢复 fail-secure 契约（totp_enc_key 缺失即报错，
+    // 不再回退 jwt_secret），测试环境必须显式注入脱敏测试密钥
+    const mockEnv = { jwt_secret: 'test-secret-key-32-chars-long!!', totp_enc_key: 'test-totp-enc-key-for-webauthn-suite-only' };
     const { rawCodes, hashedCodes, encryptedRaw } = await totpUtils.generateBackupCodes(10, mockEnv);
 
     assert.strictEqual(rawCodes.length, 10);

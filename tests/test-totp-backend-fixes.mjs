@@ -98,6 +98,9 @@ function createMockKv() {
 }
 
 const mockKv = createMockKv();
+// 预置系统 setting KV 快照：drizzle 台架不承载真实 setting 表，
+// settingService.query 的 KV 命中路径使 getSetupInfo 可在纯 mock 下运行
+await mockKv.put('setting:', JSON.stringify({ allMailMode: 1 }));
 const testUserId = 999;
 const testEmail = 'user999@epomail.bond';
 const expectedCurrentToken = 'jwt-session-uuid-real-token-string';
@@ -125,12 +128,16 @@ const mockD1 = {
 			},
 			all: async () => ({ results: [] }),
 			get: async () => null,
-			values: async () => []
+			values: async () => [],
+			// drizzle-orm >= 0.42 的 D1PreparedQuery.values() 经由 stmt.raw() 取行，
+			// 真 D1 具备该方法；mock 台架补齐以匹配现行工具链契约
+			raw: async () => []
 		}),
 		run: async () => ({ success: true, meta: { changes: 1 } }),
 		all: async () => ({ results: [] }),
 		get: async () => null,
-		values: async () => []
+		values: async () => [],
+		raw: async () => []
 	})
 };
 
@@ -213,7 +220,14 @@ console.log('✅ Test 3b Passed: getStatus returns enabled=true and backupCodesR
 // Step 3c: Test logout() removes current token
 await loginService.logout(mockContext, testUserId);
 const authInfoAfterLogout = await mockKv.get(KvConst.AUTH_INFO + testUserId, { type: 'json' });
-assert.strictEqual(authInfoAfterLogout.tokens.length, 0, 'logout must remove current token from KV AUTH_INFO.tokens');
+// 契约修正说明：现行产品真实契约 (login-service.js logout) 为「移除当前 token；若已无剩余
+// 会话则整键物理删除，不在 KV 留空壳」。本场景 enableTotp 后仅剩当前会话一个 token，
+// 登出后整键应被删除；原断言要求保留空数组键，属于过时契约。
+assert(
+	authInfoAfterLogout === null ||
+	(Array.isArray(authInfoAfterLogout.tokens) && !authInfoAfterLogout.tokens.includes(expectedCurrentToken)),
+	'logout must remove the current token (whole KV entry deleted when no sessions remain)'
+);
 console.log('✅ Test 3c Passed: logout properly awaited userContext.getToken and removed token from KV.');
 
 // ==========================================
@@ -281,6 +295,179 @@ await assert.rejects(
 );
 
 console.log('✅ Test 4 Passed: TOTP 2FA verification failure triggers account-level lockout preventing tempToken bypass.');
+
+// ==========================================
+// 5. Legacy jwt_secret-era TOTP data: explicit migration contract
+//    （收尾轮新增：fail-secure 恢复后，回退 era 数据的显式解封迁移与阻断语义）
+// ==========================================
+console.log('\n[Test 5] Testing legacy jwt_secret-era TOTP data migration contract...');
+
+// 5.0 复刻历史回退派生（仅测试用）：与当年 getEncryptionKey 的 jwt_secret 分支逐位一致
+async function legacyDeriveKey(jwtSecret) {
+	const clean = String(jwtSecret).trim();
+	let keyBytes = null;
+	try {
+		const decoded = Buffer.from(clean, 'base64');
+		if (decoded.length === 32) keyBytes = new Uint8Array(decoded);
+	} catch (_) {}
+	if (!keyBytes) {
+		const h = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(clean));
+		keyBytes = new Uint8Array(h);
+	}
+	return crypto.subtle.importKey('raw', keyBytes, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+}
+async function legacyEncrypt(plain, jwtSecret) {
+	const key = await legacyDeriveKey(jwtSecret);
+	const iv = new Uint8Array(12);
+	crypto.getRandomValues(iv);
+	const buf = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, new TextEncoder().encode(plain));
+	return `${Buffer.from(iv).toString('base64')}:${Buffer.from(new Uint8Array(buf)).toString('base64')}`;
+}
+
+const LEGACY_JWT = 'legacy-era-jwt-secret-not-for-production';
+const TOTP_ENC = 'current-totp-enc-key-for-migration-tests';
+const plainTotpSecret = 'JBSWY3DPEHPK3PXP'; // 合成 base32 样本
+const plainBackupRaw = JSON.stringify(['BBBB-BBBB-CCCC', 'DDDD-DDDD-EEEE']);
+
+// 5.1 旧独立 totp_enc_key 加密数据：无需迁移即可解密（fail-secure 修复不影响正常 era）
+{
+	const normalEnc = await totpUtils.encryptSecret(plainTotpSecret, { totp_enc_key: TOTP_ENC });
+	const dec = await totpUtils.decryptSecret(normalEnc, { totp_enc_key: TOTP_ENC });
+	assert.strictEqual(dec, plainTotpSecret, 'standalone totp_enc_key-era data must decrypt under fail-secure contract');
+	console.log('  ✅ 5.1 standalone totp_enc_key-era data decrypts normally');
+}
+
+// 5.2 jwt_secret 回退 era 合成数据：显式迁移成功 → 以 totp_enc_key 重加密、version=2
+{
+	const legacySecret = await legacyEncrypt(plainTotpSecret, LEGACY_JWT);
+	const legacyRaw = await legacyEncrypt(plainBackupRaw, LEGACY_JWT);
+	const row = {
+		userId: 801,
+		totpSecret: legacySecret,
+		totpBackupCodes: JSON.stringify({ hashedCodes: [{ hash: 'h1', used: 0 }], encryptedRaw: legacyRaw }),
+		totpKeyVersion: 1
+	};
+	// 捕获 ORM 更新参数的轻量 DB 替身
+	let capturedUpdate = null;
+	const migDb = {
+		prepare: (sql) => ({
+			bind: (...p) => ({ run: async () => { if (/update/i.test(sql) && /user/i.test(sql)) capturedUpdate = p; return { success: true, meta: { changes: 1 } }; }, all: async () => ({ results: [] }), get: async () => null, values: async () => [], raw: async () => [] }),
+			run: async () => ({ success: true, meta: { changes: 1 } }),
+			all: async () => ({ results: [] }),
+			get: async () => null,
+			values: async () => [],
+			raw: async () => []
+		}),
+		batch: async (s) => { const o = []; for (const x of s) o.push(await x.run()); return o; }
+	};
+	const migEnv = { db: migDb, jwt_secret: LEGACY_JWT, totp_enc_key: TOTP_ENC };
+	const migC = { env: migEnv, get: () => null, set: () => {} };
+
+	const result = await totpService.migrateLegacyTotpEncryption(migC, row);
+	assert.strictEqual(result.ok, true, 'legacy-era migration must succeed');
+	assert.strictEqual(result.migrated, true);
+	assert.ok(capturedUpdate, 'migration must persist via ORM update');
+	// drizzle update 参数为平铺数组（顺序依实现），按行为断言：
+	// 存在版本值 2；存在解密回原文的 totpSecret；存在解密回原文的备份码 encryptedRaw
+	assert.ok(capturedUpdate.includes(2), 'totp_key_version must be bumped to 2');
+	const stringParams = capturedUpdate.filter(p => typeof p === 'string' && p.includes(':'));
+	let secretOk = false, backupOk = false, migratedSecretCipher = null;
+	for (const p of stringParams) {
+		try {
+			const dec = await totpUtils.decryptSecret(p, { totp_enc_key: TOTP_ENC });
+			if (dec === plainTotpSecret) { secretOk = true; migratedSecretCipher = p; }
+			continue;
+		} catch (_) {}
+		try {
+			const parsed = JSON.parse(p);
+			if (parsed && Array.isArray(parsed.hashedCodes) && parsed.encryptedRaw) {
+				const raw = await totpUtils.decryptSecret(parsed.encryptedRaw, { totp_enc_key: TOTP_ENC });
+				if (raw === plainBackupRaw) backupOk = true;
+			}
+		} catch (_) {}
+	}
+	assert.ok(secretOk, 'migrated secret must decrypt under totp_enc_key');
+	assert.ok(backupOk, 'migrated backup encryptedRaw must decrypt under totp_enc_key');
+	// 旧 jwt_secret 派生密钥不再能解密迁移后的 secret 密文（域隔离真实生效）
+	assert.ok(migratedSecretCipher, 'migrated secret ciphertext must be present in update params');
+	const legacyKey = await legacyDeriveKey(LEGACY_JWT);
+	const [ivB64, cB64] = migratedSecretCipher.split(':');
+	let oldKeyFails = false;
+	try {
+		await crypto.subtle.decrypt(
+			{ name: 'AES-GCM', iv: Buffer.from(ivB64, 'base64') },
+			legacyKey,
+			Buffer.from(cB64, 'base64'));
+	} catch (_) { oldKeyFails = true; }
+	assert.ok(oldKeyFails, 'migrated data must NOT be decryptable with the legacy jwt-era key');
+	console.log('  ✅ 5.2 jwt_secret-era data migrated explicitly (re-encrypted under totp_enc_key, version=2, domain isolation verified)');
+}
+
+// 5.3 明文 era（无 iv:cipher 结构）一并补加密
+{
+	const row = { userId: 802, totpSecret: plainTotpSecret, totpBackupCodes: '', totpKeyVersion: 1 };
+	let capturedUpdate = null;
+	const migDb = {
+		prepare: (sql) => ({
+			bind: (...p) => ({ run: async () => { if (/update/i.test(sql) && /user/i.test(sql)) capturedUpdate = p; return { success: true, meta: { changes: 1 } }; }, all: async () => ({ results: [] }), get: async () => null, values: async () => [], raw: async () => [] }),
+			run: async () => ({ success: true, meta: { changes: 1 } }), all: async () => ({ results: [] }), get: async () => null, values: async () => [], raw: async () => []
+		})
+	};
+	const migC = { env: { db: migDb, jwt_secret: LEGACY_JWT, totp_enc_key: TOTP_ENC }, get: () => null, set: () => {} };
+	const result = await totpService.migrateLegacyTotpEncryption(migC, row);
+	assert.strictEqual(result.ok, true);
+	assert.ok(capturedUpdate, 'migration must persist via ORM update');
+	let plaintextEraEncrypted = false;
+	for (const p of capturedUpdate) {
+		if (typeof p === 'string' && p.includes(':')) {
+			try {
+				const dec = await totpUtils.decryptSecret(p, { totp_enc_key: TOTP_ENC });
+				if (dec === plainTotpSecret) plaintextEraEncrypted = true;
+			} catch (_) {}
+		}
+	}
+	assert.ok(plaintextEraEncrypted, 'plaintext-era secret must be encrypted during migration');
+	assert.ok(capturedUpdate.includes(2), 'totp_key_version must be bumped to 2');
+	console.log('  ✅ 5.3 plaintext-era secret encrypted during migration');
+}
+
+// 5.4 阻断语义：totp_enc_key 缺失 → 明确阻断，绝不静默回退
+{
+	const legacySecret = await legacyEncrypt(plainTotpSecret, LEGACY_JWT);
+	const row = { userId: 803, totpSecret: legacySecret, totpBackupCodes: '', totpKeyVersion: 1 };
+	const migDb = { prepare: (sql) => ({ bind: () => ({ run: async () => ({ success: true, meta: { changes: 1 } }) }), run: async () => ({ success: true, meta: { changes: 1 } }), all: async () => ({ results: [] }), get: async () => null, values: async () => [], raw: async () => [] }) };
+	const migC = { env: { db: migDb, jwt_secret: LEGACY_JWT }, get: () => null, set: () => {} };
+	delete migC.env.totp_enc_key;
+	const result = await totpService.migrateLegacyTotpEncryption(migC, row);
+	assert.strictEqual(result.ok, false);
+	assert.strictEqual(result.reason, 'missing_totp_enc_key', 'missing totp_enc_key must block explicitly (no silent fallback)');
+	console.log('  ✅ 5.4 missing totp_enc_key blocks migration explicitly (no silent jwt fallback)');
+}
+
+// 5.5 阻断语义：两种密钥均无法解密 → undecryptable，不编造不放行
+{
+	const otherEraSecret = await legacyEncrypt(plainTotpSecret, 'a-completely-different-era-secret');
+	const row = { userId: 804, totpSecret: otherEraSecret, totpBackupCodes: '', totpKeyVersion: 1 };
+	const migDb = { prepare: (sql) => ({ bind: () => ({ run: async () => ({ success: true, meta: { changes: 1 } }) }), run: async () => ({ success: true, meta: { changes: 1 } }), all: async () => ({ results: [] }), get: async () => null, values: async () => [], raw: async () => [] }) };
+	const migC = { env: { db: migDb, jwt_secret: LEGACY_JWT, totp_enc_key: TOTP_ENC }, get: () => null, set: () => {} };
+	const result = await totpService.migrateLegacyTotpEncryption(migC, row);
+	assert.strictEqual(result.ok, false);
+	assert.strictEqual(result.reason, 'undecryptable', 'undecryptable data must be blocked accurately');
+	console.log('  ✅ 5.5 undecryptable data blocked accurately (no fabrication, no pass-through)');
+}
+
+// 5.6 版本闸门：key_version=2 的行不重复迁移
+{
+	const row = { userId: 805, totpSecret: 'whatever', totpBackupCodes: '', totpKeyVersion: 2 };
+	const migDb = { prepare: (sql) => ({ bind: () => ({ run: async () => ({ success: true, meta: { changes: 1 } }) }), run: async () => ({ success: true, meta: { changes: 1 } }), all: async () => ({ results: [] }), get: async () => null, values: async () => [], raw: async () => [] }) };
+	const migC = { env: { db: migDb, jwt_secret: LEGACY_JWT, totp_enc_key: TOTP_ENC }, get: () => null, set: () => {} };
+	const result = await totpService.migrateLegacyTotpEncryption(migC, row);
+	assert.strictEqual(result.ok, true);
+	assert.strictEqual(result.migrated, false, 'version=2 rows must not be re-migrated');
+	console.log('  ✅ 5.6 key_version=2 rows skipped (idempotent gate)');
+}
+
+console.log('✅ Test 5 Passed: legacy TOTP encryption migration contract verified.');
 
 // Restore original functions
 userService.selectById = originalSelectById;

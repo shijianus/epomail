@@ -141,6 +141,33 @@ function createIsolatedDb() {
       create_time DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
+    -- 第二轮修复新增表（与 mail-worker/src/service/audit-service.js ensureTables 生产定义一致）
+    CREATE TABLE audit_appeal (
+      appeal_id TEXT PRIMARY KEY,
+      case_id INTEGER NOT NULL,
+      source_case_id INTEGER,
+      decision_id TEXT,
+      user_id INTEGER,
+      email TEXT NOT NULL,
+      round INTEGER NOT NULL,
+      content TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      decision_action TEXT,
+      decision_notes TEXT,
+      decided_by TEXT,
+      decided_at TEXT,
+      create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+      update_time DATETIME,
+      UNIQUE(case_id, round)
+    );
+
+    CREATE TABLE audit_purge_batch (
+      id TEXT PRIMARY KEY,
+      count INTEGER NOT NULL DEFAULT 0,
+      reason TEXT NOT NULL,
+      create_time DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
     CREATE TABLE setting (
       register INTEGER DEFAULT 0,
       receive INTEGER DEFAULT 0,
@@ -986,7 +1013,10 @@ const isBizError = (err, code, msg) => {
 }
 
 // --------------------------------------------------------------------------
-// 20. F2: purgeOnRelease 不物理删除审计案卷记录
+// 20. F2: purgeOnRelease 能力边界（用户确定）
+//     第一批冻结不变量（清理绝不物理删除案卷、绝不改写处罚事实）继续保留。
+//     候选固定阶段按用户决定：该能力缺少成文政策依据，不再作为可执行能力 ——
+//     显式请求在写入前明确拒绝、零副作用；普通放行零清理、零虚假脱敏记录。
 // --------------------------------------------------------------------------
 {
   const { rawDb, createContext } = createIsolatedDb();
@@ -994,22 +1024,60 @@ const isBizError = (err, code, msg) => {
 
   rawDb.exec(`
     INSERT INTO user (user_id, email, status) VALUES (99, 'f2_test@epocanvas.com', 1);
-    INSERT INTO audit_log (id, ticket_id, email, warning_type, event_type, category, action_text, status, is_internal, version, appeal_reason)
-    VALUES (99, 'APP-099', 'f2_test@epocanvas.com', 'appeal', 'appeal', 'appeal', 'Appealed', 'active', 1, 1, 'Appeal justification');
-    INSERT INTO audit_log (id, ticket_id, email, warning_type, event_type, category, action_text, status, is_internal, version)
-    VALUES (199, 'AUD-199', 'f2_test@epocanvas.com', 'audit', 'routine', 'security', 'Audit Log', 'active', 1, 1);
+    INSERT INTO audit_log (id, ticket_id, email, warning_type, event_type, category, action_text, status, is_internal, version, appeal_reason, ip, geo, device, fingerprint)
+    VALUES (99, 'APP-099', 'f2_test@epocanvas.com', 'appeal', 'appeal', 'appeal', 'Appealed', 'active', 1, 1, 'Appeal justification', '203.0.113.9', 'CN', 'Chrome', 'fp-99');
+    INSERT INTO audit_log (id, ticket_id, email, warning_type, event_type, category, action_text, status, is_internal, version, ip, geo)
+    VALUES (199, 'AUD-199', 'f2_test@epocanvas.com', 'audit', 'routine', 'security', 'Audit Log', 'active', 1, 1, '203.0.113.199', 'CN');
   `);
 
-  // 审核通过并指定 purgeOnRelease
-  const adjRes = await auditService.adjudicate(c, { id: 99, action: 'approve_appeal', version: 1, purgeOnRelease: true });
+  const before = {
+    target: { ...rawDb.prepare('SELECT * FROM audit_log WHERE id = 99').get() },
+    unrelated: { ...rawDb.prepare('SELECT * FROM audit_log WHERE id = 199').get() },
+    decisions: rawDb.prepare('SELECT count(*) AS c FROM audit_decision').get().c,
+    outbox: rawDb.prepare('SELECT count(*) AS c FROM notification_outbox').get().c,
+    purgeBatches: rawDb.prepare('SELECT count(*) AS c FROM audit_purge_batch').get().c
+  };
+
+  // 20A: 显式请求 → 准确拒绝（不允许悄悄忽略后返回成功），且零副作用
+  await assert.rejects(
+    async () => await auditService.adjudicate(c, { id: 99, action: 'approve_appeal', version: 1, purgeOnRelease: true }),
+    (err) => (err.code === 400 || err.status === 400) && err.message.includes('暂不提供「放行即清理」能力')
+  );
+  assert.deepStrictEqual({ ...rawDb.prepare('SELECT * FROM audit_log WHERE id = 99').get() }, before.target,
+    'rejection must not alter the case (no release, no PURGED, no field purge)');
+  assert.deepStrictEqual({ ...rawDb.prepare('SELECT * FROM audit_log WHERE id = 199').get() }, before.unrelated,
+    'rejection must not touch unrelated cases');
+  assert.strictEqual(rawDb.prepare('SELECT count(*) AS c FROM audit_decision').get().c, before.decisions,
+    'rejection must not write a decision ledger row');
+  assert.strictEqual(rawDb.prepare('SELECT count(*) AS c FROM notification_outbox').get().c, before.outbox,
+    'rejection must not emit notice side effects');
+  assert.strictEqual(rawDb.prepare('SELECT count(*) AS c FROM audit_purge_batch').get().c, before.purgeBatches,
+    'rejection must not record purge batches');
+
+  // 20B: 普通放行（无该标志）→ 正常放行，零清理、零虚假脱敏记录，案卷仍在
+  const adjRes = await auditService.adjudicate(c, { id: 99, action: 'approve_appeal', version: 1 });
   assert.strictEqual(adjRes.success, true);
 
-  // 验证 audit 记录依然物理存在，仅做了脱敏或标记，绝对没有物理 DELETE 消失
-  const auditRow = rawDb.prepare('SELECT * FROM audit_log WHERE id = 199').get();
-  assert.ok(auditRow, 'Audit log must physically exist for traceability');
-  assert.strictEqual(auditRow.circuit_status, 'PURGED', 'Audit record marked as PURGED without deletion');
+  const appealCaseRow = rawDb.prepare('SELECT * FROM audit_log WHERE id = 99').get();
+  assert.ok(appealCaseRow, 'Appeal case must physically exist for traceability');
+  assert.strictEqual(appealCaseRow.status, 'resolved', 'case resolved by its own adjudication only');
+  assert.strictEqual(appealCaseRow.circuit_status, 'NORMAL', 'plain release must NOT mark PURGED');
+  assert.strictEqual(appealCaseRow.ip, '203.0.113.9', 'plain release must NOT delete identity fields');
+  assert.ok(!appealCaseRow.detail_text.includes('[隐私清理]'), 'no false cleanup note');
+  assert.ok(!appealCaseRow.detail_text.includes('已脱敏'), 'no fabricated desensitization claim');
 
-  console.log('✅ Requirement 20 Passed: purgeOnRelease preserves audit trail without physical deletion');
+  // 无关案件零波及
+  const auditRow = rawDb.prepare('SELECT * FROM audit_log WHERE id = 199').get();
+  assert.ok(auditRow, 'Unrelated audit log must physically exist for traceability');
+  assert.strictEqual(auditRow.circuit_status, 'NORMAL', 'Unrelated case must NOT be marked PURGED');
+  assert.strictEqual(auditRow.status, 'active', 'Unrelated case status NOT rewritten');
+  assert.strictEqual(auditRow.ip, '203.0.113.199', 'Unrelated case identity fields untouched');
+
+  // 不得凭空产生清理批次
+  assert.strictEqual(rawDb.prepare('SELECT count(*) AS c FROM audit_purge_batch').get().c, before.purgeBatches,
+    'plain release must not create purge batches');
+
+  console.log('✅ Requirement 20 Passed: purgeOnRelease rejected explicitly with zero side effects; plain release performs no cleanup and rewrites no punishment fact');
 }
 
 // --------------------------------------------------------------------------
