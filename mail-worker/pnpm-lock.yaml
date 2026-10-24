@@ -14,6 +14,9 @@ importers:
       '@cloudflare/vite-plugin':
         specifier: 1.6.0
         version: 1.6.0(rollup@4.50.0)(vite@6.3.5(@types/node@24.3.0))(workerd@1.20250310.0)(wrangler@4.90.0)
+      '@noble/hashes':
+        specifier: 1.8.0
+        version: 1.8.0
       dayjs:
         specifier: ^1.11.13
         version: 1.11.18
@@ -1097,6 +1100,10 @@ packages:
 
   '@mjackson/node-fetch-server@0.6.1':
     resolution: {integrity: sha512-9ZJnk/DJjt805uv5PPv11haJIW+HHf3YEEyVXv+8iLQxLD/iXA68FH220XoiTPBC4gCg5q+IMadDw8qPqlA5wg==}
+
+  '@noble/hashes@1.8.0':
+    resolution: {integrity: sha512-jCs9ldd7NwzpgXDIf6P3+NrHh9/sD6CQdxHyjQI+h/6rDNo88ypBxxz45UDuZHz9r3tNz7N/VInSVoVdtXEI4A==}
+    engines: {node: ^14.21.3 || >=16}
 
   '@poppinss/colors@4.1.5':
     resolution: {integrity: sha512-FvdDqtcRCtz6hThExcFOgW0cWX+xwSMWcRuQe5ZEb2m7cVQOAVZOIMt+/v9RxGiD9/OY16qJBXK4CVKWAPalBw==}
@@ -3498,6 +3505,8 @@ snapshots:
       '@jridgewell/sourcemap-codec': 1.5.5
 
   '@mjackson/node-fetch-server@0.6.1': {}
+
+  '@noble/hashes@1.8.0': {}
 
   '@poppinss/colors@4.1.5':
     dependencies:

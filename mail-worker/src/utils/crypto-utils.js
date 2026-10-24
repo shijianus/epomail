@@ -1,3 +1,6 @@
+import { pbkdf2 as noblePbkdf2 } from '@noble/hashes/pbkdf2.js';
+import { sha256 } from '@noble/hashes/sha256.js';
+
 const encoder = new TextEncoder();
 
 // 210,000 为原始设计契约（tests/test-totp-security.mjs 固化）；哈希格式 pbkdf2:<iterations>:<hash>
@@ -8,6 +11,36 @@ const PBKDF2_ITERATIONS = 210000;
 const PBKDF2_MIN_ITERATIONS = 1000;
 const PBKDF2_MAX_ITERATIONS = PBKDF2_ITERATIONS * 4;
 const PBKDF2_KEY_LEN = 256; // bits (32 bytes)
+// Cloudflare Workers 的 WebCrypto PBKDF2 硬上限："iteration counts above 100000 are not supported"。
+// 派生统一走 dispatchPbkdf2Sha256：≤上限用原生 WebCrypto（快）；>上限的合法存量参数（含本系统
+// 210000 契约值）改用 @noble/hashes 纯 JS 实现，算法语义与参考实现完全一致（交叉向量测试固化），
+// 严禁拆分迭代拼接、二次哈希或擅自降参换算。
+const WEBCRYPTO_PBKDF2_MAX_ITERATIONS = 100000;
+
+async function dispatchPbkdf2Sha256(passwordBytes, saltBytes, iterations) {
+	if (iterations <= WEBCRYPTO_PBKDF2_MAX_ITERATIONS) {
+		const keyMaterial = await crypto.subtle.importKey(
+			'raw',
+			passwordBytes,
+			'PBKDF2',
+			false,
+			['deriveBits']
+		);
+		const derivedBits = await crypto.subtle.deriveBits(
+			{
+				name: 'PBKDF2',
+				salt: saltBytes,
+				iterations: iterations,
+				hash: 'SHA-256'
+			},
+			keyMaterial,
+			PBKDF2_KEY_LEN
+		);
+		return new Uint8Array(derivedBits);
+	}
+	// workerd WebCrypto 拒绝的高迭代路径：@noble/hashes 1.8.0（纯 JS HMAC-SHA-256，无 WebCrypto 委托）
+	return noblePbkdf2(sha256, passwordBytes, saltBytes, { c: iterations, dkLen: PBKDF2_KEY_LEN / 8 });
+}
 
 function uint8ToBase64(bytes) {
 	let binary = '';
@@ -38,7 +71,7 @@ const saltHashUtils = {
 	},
 
 	/**
-	 * Compute modern PBKDF2-HMAC-SHA256 hash (PBKDF2_ITERATIONS, currently 100,000)
+	 * Compute modern PBKDF2-HMAC-SHA256 hash (PBKDF2_ITERATIONS, currently 210,000)
 	 */
 	async hashPassword(password) {
 		const salt = this.generateSalt();
@@ -51,26 +84,12 @@ const saltHashUtils = {
 	 * Format: pbkdf2:<PBKDF2_ITERATIONS>:<base64Hash>
 	 */
 	async genHashPassword(password, salt) {
-		const keyMaterial = await crypto.subtle.importKey(
-			'raw',
+		const derivedBytes = await dispatchPbkdf2Sha256(
 			encoder.encode(password),
-			'PBKDF2',
-			false,
-			['deriveBits']
+			encoder.encode(salt),
+			PBKDF2_ITERATIONS
 		);
-
-		const derivedBits = await crypto.subtle.deriveBits(
-			{
-				name: 'PBKDF2',
-				salt: encoder.encode(salt),
-				iterations: PBKDF2_ITERATIONS,
-				hash: 'SHA-256'
-			},
-			keyMaterial,
-			PBKDF2_KEY_LEN
-		);
-
-		const hashBase64 = uint8ToBase64(new Uint8Array(derivedBits));
+		const hashBase64 = uint8ToBase64(derivedBytes);
 		return `pbkdf2:${PBKDF2_ITERATIONS}:${hashBase64}`;
 	},
 
@@ -106,36 +125,26 @@ const saltHashUtils = {
 			// 畸形哈希（缺迭代段或缺摘要段）：安全拒绝，不派生
 			return { isValid: false, isLegacy: false, needsUpgrade: false, iterations: null };
 		}
-		// 迭代数自描述于哈希前缀；畸形（非整数）或异常（越界）一律安全拒绝，不静默代偿
-		const parsedIterations = Number.parseInt(parts[1], 10);
-		if (!Number.isSafeInteger(parsedIterations)
-			|| parsedIterations < PBKDF2_MIN_ITERATIONS
-			|| parsedIterations > PBKDF2_MAX_ITERATIONS) {
+		// 迭代数自描述于哈希前缀；仅接受规范无前导零的纯数字串
+		// （拒绝 "210000abc" 等 parseInt 会静默截断的脏参数与 "00210000" 等非规范形态），
+		// 畸形（非纯数字）或异常（越界）一律安全拒绝，不静默代偿
+		if (!/^(0|[1-9][0-9]{0,9})$/.test(parts[1])) {
 			return { isValid: false, isLegacy: false, needsUpgrade: false, iterations: null };
 		}
-		const iterations = parsedIterations;
+		const iterations = Number(parts[1]);
+		if (iterations < PBKDF2_MIN_ITERATIONS
+			|| iterations > PBKDF2_MAX_ITERATIONS) {
+			return { isValid: false, isLegacy: false, needsUpgrade: false, iterations: null };
+		}
 		const expectedBase64 = parts[2];
 
-		const keyMaterial = await crypto.subtle.importKey(
-			'raw',
+		const derivedBytes = await dispatchPbkdf2Sha256(
 			encoder.encode(inputPassword),
-			'PBKDF2',
-			false,
-			['deriveBits']
+			encoder.encode(salt),
+			iterations
 		);
 
-		const derivedBits = await crypto.subtle.deriveBits(
-			{
-				name: 'PBKDF2',
-				salt: encoder.encode(salt),
-				iterations: iterations,
-				hash: 'SHA-256'
-			},
-			keyMaterial,
-			PBKDF2_KEY_LEN
-		);
-
-		const derivedBase64 = uint8ToBase64(new Uint8Array(derivedBits));
+		const derivedBase64 = uint8ToBase64(derivedBytes);
 		const isValid = timingSafeEqual(derivedBase64, expectedBase64);
 		return {
 			isValid,
