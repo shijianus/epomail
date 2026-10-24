@@ -8,6 +8,40 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### 云端 PBKDF2 P0 收敛第二轮：状态修正、套餐/CPU 事实核实、管理员访问恢复与管理员产品验收补齐 (2026-10-25)
+*   **关联提交 (Git Commit)**: 本轮测试脚本与记录提交见本条目（热修复主体 `9595599`/`1d14286`/`8b96f0c` 不变）；**本轮无源码改动、无 staging 重部署**（Worker 保持 `15339ebb-d842-45ae-81aa-4a49c0bbe2a6`，配置与版本均无变化）；仅推送 `review/abuse-backend-rc`
+*   **状态修正（覆盖上一轮表述口径）**:
+    - 100k staging 新写入路径（注册/改密/重置/升级）通过——维持结论；
+    - 210k 验证数学兼容（与 BoringSSL/OpenSSL 逐位一致），但云端存在 1102（exceededCpu）事实，**不可称为已完全修复**：本轮 6/6 首达样本未复现，仅记"本轮样本未复现"，不构成可靠性保证；
+    - 上轮"26/26"仅为当时执行的子集通过；验收项 1/3/6（管理员路径）当时未执行，**本轮已补齐并全部通过（19/19 首达）**；
+    - 生产未获批准，本轮零生产操作。
+*   **套餐与 CPU 事实核实（只读）**:
+    - 账户订阅全部为 `free`（Cloudflare Free Plan，无 Workers Paid 条目）——**Free 套餐确认**；
+    - `epomail-staging` usage_model=standard，无 `limits.cpu_ms` 覆盖（Free 默认标称 10ms CPU，实际允许突发）；
+    - GraphQL `workersInvocationsAdaptive`（48h 窗口）：508 请求 / 16 错误，**全部 `status=exceededResources`**，错误页码 1102（Cloudflare 文档定义为 Worker exceeded CPU time）——**exceededCpu 确认，非内存**；CPU P50/P99 分位最高 1377.3ms；
+    - 处置（按授权边界）：Free → 不升级套餐、不创建付费服务、不自行调整 CPU 配置；210k 写入路径作为** owner 决策项**呈报（见下）；不再以重试掩盖。
+*   **staging 管理员访问恢复（B 项）**:
+    - 检查已知安全交接位置 `D:\epoverify-rc2\.staging-secrets.env`：存在且含 `ADMIN_PWD` 等 6 条目；**离线核验**（本地按存储哈希参数派生比对，零登录尝试、零锁定风险）与 staging 站长 user_id=2 现存哈希**匹配** → 有效凭据存在，**未执行任何恢复性写入**（授权的一次性恢复脚本未启用）；
+    - 站长 totp_enabled=0（无 2FA 遗失问题），status/is_del 正常；
+    - 验收中站长口令经产品 API 轮换：采用崩溃安全协议（先写 `ADMIN_PWD_NEXT` → 产品改密成功 → 原子晋升 `ADMIN_PWD`；失败则丢弃 NEXT、旧口令仍有效），任何时刻交接文件均保留有效口令；轮换事件脱敏注释写入交接文件，口令/哈希原文零记录、零打印；文件未入库。
+*   **管理员产品验收补齐（C 项，真实 API 首达无重试，`tests/rc-staging-admin-acceptance.mjs` 19/19）**:
+    - [x] 1 站长产品改密（PUT /api/my/resetPassword，1166ms 首达）；
+    - [x] 2 旧口令 501 拒绝 / 新口令 200（1385ms）；
+    - [x] 3 管理员建号（POST /api/user/add，写入产品生成 pbkdf2:100000 哈希，762ms）；
+    - [x] 4 新用户真实登录（1566ms）；
+    - [x] 5 管理员重置（PUT /api/user/setPwd，1532ms）；
+    - [x] 6 重置前口令失效（501）/ 重置后口令生效（1306ms）；
+    - [x] 7 回归：本人改密 ✓、2FA 链（setup/enable/mfa 挑战/totp 登录/disable）✓、封禁账号受限通道（用交接 SMOKE_A_PWD 首达命中 isRestricted=true，签发受限令牌而非常规会话）✓；
+    - [x] 合成数据物理清理零残留；首达结果存 `.rc3-evidence/admin-acceptance-first-attempts.json`（本地证据，含首次 HTTP/业务码/耗时，不含任何口令或哈希）。
+    - 外部邮件找回：产品无邮件验证码找回端点，本轮未新增；"管理员重置已验证 / 外部找回投递未验证"的区分维持。
+*   **有界可靠性采样（`tests/rc-staging-reliability-samples.mjs`，首达记录、无重试、非压力测试）**:
+    - 样本计划：R1 100k native 登录×6 / R2 210k noble 登录×6 / R3 低迭代(1000)升级×3 / R4 legacy 迁移×3 / R5 改密派生×3 / R6 连续操作(注册→登录→改密→登录)×2 轮；
+    - 结果：**30/30 首达 biz=200**；R2 210k noble 全部首达 200（1.9–2.8s）；R3/R4 全部完成升级/迁移写入；R6 背靠背 4 派生/轮 ×2 无 1102；
+    - 平台侧（采样窗口 ~50min，116 请求）：**0 exceededResources，全 success，CPU P99 max 948ms**；
+    - 口径：**本轮样本未复现 1102**；48h 窗口历史 16 次 exceededResources（含上轮勘误部署前后的调试突发）为既成事实，Free 套餐下 210k 写入可靠性**不关闭**；上轮 L2 的有界重试(≤3)不用于可靠性结论。
+*   **owner 唯一待决策项**: 210k 生产写入路径的运行预算——(a) 升级 Workers 付费计划（Standard $5/mo，默认 30s CPU，保持 210000 契约不变）后生产部署；(b) 显式批准生产 `PBKDF2_WRITER_ITERATIONS` 策略值（安全取舍，需明示）；(c) 接受 Free 套餐下 210k 写入的间歇 1102 风险（不建议）。其余工作（管理员路径、100k 写入、验证兼容、2FA/受限回归）已全部完成，不因该项阻塞。
+*   **本轮边界复核**: 零生产操作、零 Secret 变更、无新云资源、外发保持 false、临时部署配置未再变更（变量原生类型正确性维持）、凭据交接文件未入库未打印、既有 staging 数据（含封禁 smoke 账号、通知/申诉记录）未清除。
+
 ### 云端 PBKDF2 迭代上限 P0 热修复（Cloudflare Workers 兼容性）(2026-10-25)
 *   **关联提交 (Git Commit)**:
     - 热修复主体: `959559968f4d06349c0c36f403de37a299754f3c` (Short: `9595599`)
