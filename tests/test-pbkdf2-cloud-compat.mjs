@@ -167,6 +167,42 @@ async function main() {
 		assert.strictEqual((await saltHashUtils.verifyPasswordWithUpgrade('p', 's', null)).isValid, false);
 	});
 
+	// ---------- 8. 写入策略开关 PBKDF2_WRITER_ITERATIONS ----------
+	await check('writer policy: default (no env) keeps 210000 contract', async () => {
+		const { hash } = await saltHashUtils.hashPassword(PWD);
+		assert.ok(hash.startsWith('pbkdf2:210000:'));
+	});
+
+	await check('writer policy: env=100000 writes pbkdf2:100000 matching reference derivation', async () => {
+		const env = { PBKDF2_WRITER_ITERATIONS: '100000' };
+		const { salt, hash } = await saltHashUtils.hashPassword(PWD, env);
+		assert.ok(hash.startsWith('pbkdf2:100000:'));
+		const ref = refNodeCrypto(PWD, salt, 100000);
+		assert.strictEqual(hash, `pbkdf2:100000:${b64(ref)}`);
+		const ok = await saltHashUtils.verifyPasswordWithUpgrade(PWD, salt, hash, env);
+		assert.strictEqual(ok.isValid, true);
+	});
+
+	for (const bad of ['999', '210000abc', '00210000', '', ' ', 100000, null, true, '900000']) {
+		await check(`writer policy: invalid env value ${JSON.stringify(bad)} falls back to 210000`, async () => {
+			const { hash } = await saltHashUtils.hashPassword(PWD, { PBKDF2_WRITER_ITERATIONS: bad });
+			assert.ok(hash.startsWith('pbkdf2:210000:'), `got ${hash.slice(0, 16)}`);
+		});
+	}
+
+	await check('writer policy: lazy-upgrade target follows env (100k hash + 100k target => no rewrite)', async () => {
+		const salt = saltHashUtils.generateSalt();
+		const mk = async (it) => `pbkdf2:${it}:${b64(await refWebcrypto(PWD, salt, it))}`;
+		const stored100k = await mk(100000);
+		const withDefault = await saltHashUtils.verifyPasswordWithUpgrade(PWD, salt, stored100k);
+		assert.strictEqual(withDefault.needsUpgrade, true, 'default target 210k must flag 100k for upgrade');
+		const withEnv = await saltHashUtils.verifyPasswordWithUpgrade(PWD, salt, stored100k, { PBKDF2_WRITER_ITERATIONS: '100000' });
+		assert.strictEqual(withEnv.needsUpgrade, false, '100k target: already at policy, no rewrite');
+		const stored210k = await mk(210000);
+		const upFrom210 = await saltHashUtils.verifyPasswordWithUpgrade(PWD, salt, stored210k, { PBKDF2_WRITER_ITERATIONS: '400000' });
+		assert.strictEqual(upFrom210.needsUpgrade, true, 'higher target flags 210k for upgrade (bounded by 840000)');
+	});
+
 	console.log(`\n${failed.length === 0 ? 'ALL GREEN' : 'HAS FAILURES'}: ${passed} passed, ${failed.length} failed`);
 	if (failed.length > 0) process.exit(1);
 }

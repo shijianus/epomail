@@ -463,7 +463,7 @@ const userService = {
 		if (password.length < 6) {
 			throw new BizError(t('pwdMinLength'));
 		}
-		const { salt, hash } = await cryptoUtils.hashPassword(password);
+		const { salt, hash } = await cryptoUtils.hashPassword(password, c.env);
 		await orm(c).update(user).set({ password: hash, salt: salt }).where(eq(user.userId, userId)).run();
 
 		try {
@@ -1125,7 +1125,7 @@ const userService = {
 			throw new BizError(t('roleNotExist'));
 		}
 
-		const { salt, hash } = await saltHashUtils.hashPassword(password);
+		const { salt, hash } = await saltHashUtils.hashPassword(password, c.env);
 
 		const userId = await userService.insert(c, { email, password: hash, salt, type });
 

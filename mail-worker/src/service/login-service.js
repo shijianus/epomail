@@ -162,7 +162,7 @@ const loginService = {
 			}
 		}
 
-		const { salt, hash } = await saltHashUtils.hashPassword(password);
+		const { salt, hash } = await saltHashUtils.hashPassword(password, c.env);
 
 		const userId = await userService.insert(c, { email, regKeyId,password: hash, salt, type: type || defType });
 
@@ -247,7 +247,7 @@ const loginService = {
 
 	async lazyMigratePassword(c, userId, plainPassword) {
 		try {
-			const { salt, hash } = await cryptoUtils.hashPassword(plainPassword);
+			const { salt, hash } = await cryptoUtils.hashPassword(plainPassword, c.env);
 			await orm(c).update(user).set({ password: hash, salt }).where(eq(user.userId, userId)).run();
 		} catch (err) {
 			console.error('Lazy password migration failed:', err);
@@ -327,7 +327,7 @@ const loginService = {
 
 		let isLegacy = false;
 		if (!noVerifyPwd) {
-			const checkResult = await cryptoUtils.verifyPasswordWithUpgrade(password, userRow.salt, userRow.password);
+			const checkResult = await cryptoUtils.verifyPasswordWithUpgrade(password, userRow.salt, userRow.password, c.env);
 			if (!checkResult.isValid) {
 				await incrementFail();
 				throw new BizError(t('IncorrectPwd'));
