@@ -8,6 +8,40 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### 全仓库安全审计与凭据泄露修复 · /oss KV 越权 + OAuth/存储型 XSS + 历史密钥 (2026-10-25)
+*   **关联提交 (Git Commit)**: `de5d15077972c7c70778aea66777a6cd7a766857` (Short: `de5d150`); 审计归档提交见置顶汇报
+*   **部署环境 (Deployment)**: 本地 workerd 全真栈测试 (D1+KV) + `wrangler deploy --dry-run` + `vite build`；**未部署生产、未推送远端**
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 修复 `/api/oss/*` 可匿名读取任意 KV 键（`auth-uid:1` 站长会话、`setting:` 全站密钥）——对象 Key 仅允许 `attachments/`、`static/`，拒绝 `:`/`%`/`..`/控制字符；`/oss-url` 增加附件归属校验。
+    - [x] 修复 S3/B2 对象响应透传攻击者 Content-Type（存储型 XSS）：统一 `safeObjectHeaders`（仅被动图片 inline，其余 octet-stream+attachment+nosniff+CSP），附件下载改 Worker 代理。
+    - [x] 修复 OAuth Apple `id_token` 未验签（账号接管）：Apple JWKS RS256 + iss/aud/exp 校验；未验证邮箱禁止自动关联；`/oauth/bindUser` 增加一次性 bind token。
+    - [x] 修复 Resend Webhook 无验签：Svix HMAC + 5 分钟时间窗；未配置 `resend_webhook_secret` fail-closed。
+    - [x] RBAC 加固：非站长不得管理高权限用户/角色、不得授予超出自身权限或高危权限；禁止角色质量赋值、默认角色提权；审计封禁/解封补传操作者。
+    - [x] 设置/OAuth 应用 Secret 脱敏（`aiApiKey`/`clientSecret`/`privateKey`/`resendTokens` 等），保存时合并掩码，避免掩码覆盖真实值。
+    - [x] 密码修改必须验证 `currentPassword` 并撤销全部会话；登录未知用户/错误密码统一提示并做等价 PBKDF2；新增 IP 限速。
+    - [x] CORS 收敛（同源 + OAuth 端点白名单 + `CORS_ORIGINS`）、错误信息脱敏、API `no-store`。
+    - [x] 移除 `jwt/totp/email/hash/device/risk` 硬编码兜底密钥；`/init` 恒定时间比较 + POST `x-init-secret`；首次站长密码改由 `admin_initial_password` 注入，禁止固定 `123456`。
+    - [x] SSRF/上传/文件名校验、自定义 SVG 双重清洗、Telegram 分享页 CSP nonce；DOMPurify 升级。
+    - [x] Mailjet 测试改纯离线契约、缺失配置安全退出；108+ 测试脚本生产口令改环境变量；新增 `scripts/secret-scan.mjs`、`.secret-scan-baseline.json`、GitHub Actions 安全门禁。
+    - [x] 依赖升级：hono 4.13.13、drizzle-orm 0.45.4、DOMPurify 3.4.17、axios 1.20.0、AWS SDK/fast-xml-parser/uuid/form-data/lodash/vue 等；移除未使用 `@cloudflare/vite-plugin`。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 工作区 Secret 扫描：`node scripts/secret-scan.mjs` → 1135 files，0 命中。
+    - [x] 全历史 Secret 扫描：`node scripts/secret-scan.mjs --history --baseline .secret-scan-baseline.json` → 833 commits / 3565 blobs，仅基线内已知历史泄露。
+    - [x] Mailjet 契约：`node mail-worker/test-mailjet.js` 离线通过；`--live` 缺配置 exit 1。
+    - [x] Worker 安全测试：`npx vitest run` → **28/28 passed**（/oss KV 隔离、CORS、Webhook 验签、JWT/加密/RS256/对象头/SVG）。
+    - [x] Worker 打包：`wrangler deploy --dry-run` 成功 (gzip 1067.49 KiB)。
+    - [x] 前端构建：`mail-vue npm run build` 成功 (~1m55s)。
+    - [x] i18n 三件套：symmetry / audit / hardcoded 均 exit 0（新增 `tooManyRequests` 六语言对称）。
+    - [x] 依赖审计：worker `pnpm audit --prod` 0；mail-vue 1 moderate（ECharts 6.x 升级待评估）。
+    - [x] 零假数据残留：测试使用临时 KV/D1 状态，未写入生产；未发送真实邮件；未调用真实 Mailjet（仅离线 double）。
+*   **未执行/需人工处置 (Manual Follow-up)**:
+    - [ ] 轮换 Mailjet Key/Secret 并检查 Mailjet 调用日志；更新 `resendTokens`。
+    - [ ] 轮换 `jwt_secret`/`totp_enc_key`（历史已泄露），清理 `auth-uid:*`，评估邮件/TOTP 密文迁移。
+    - [ ] 改密/删除 `admin@epomail.bond`、`audit_normal_1789140856529@epomail.bond`、`admin@epomail.cyou`；确认 `e2e_admin_test@epomail.bond` 不存在。
+    - [ ] 部署后核验旧 OAuth 示例/图片应用 secret 已被启动迁移轮换；配置 `resend_webhook_secret`。
+    - [ ] 公共 Git 历史清污（`git filter-repo` + 强推 + 协作者重克隆），需明确授权；轮换不可由清污替代。
+
+
 ### 合并远端基线 (36b8182) 后风控系统全真栈完整复测 · 危险操作模拟 + admin 处置 + 操作报告板块可用性验证 (2026-10-14)
 *   **关联提交 (Git Commit)**: 合并提交 `7245ef4d8243fac92f230ae8dbb66aedd3973648` (Short: `7245ef4`) / 测试归档提交 `1aa05335d3a57e3e72901ac7e35ba256cb481b6a` (Short: `1aa0533`) / 推送记录提交见置顶汇报
 *   **部署环境 (Deployment)**: `本地全真栈模拟 Cloudflare 部署 (wrangler dev @127.0.0.1:8787 · workerd CF 运行时 · D1+KV 本地真库 · .wrangler/state 全清冷启动 → /api/init 播种)`
@@ -3979,7 +4013,7 @@
        - 默认示例精简：全局仅保留 1 个官方示例 App（`shijianus-blog`，指向 `blog.epocanvas.com`），清晰标注为示例应用；
        - 严格私密保密与随机化：彻底消除代码库中任何硬编码的生产 Secret；每个站长实例初始化或创建应用时，均由密码学安全随机生成器（`genSecureSecret(32)`）生成全新随机密钥；
        - 根除死循环复生：移除了此前按 `clientId` 查询缺失即自动向数据库回写默认 App 的自动复活逻辑，站长在后台执行删除操作后保持永久彻底删除；
-       - 历史脏数据与泄露令牌物理清理：在数据表初始化迁移中，自动删除历史遗留的 `epo_live_epocanvas_image`，并将旧的硬编码 `epo_sec_shijianus_blog_secret` 物理轮转为独立安全随机密钥。
+       - 历史脏数据与泄露令牌物理清理：在数据表初始化迁移中，自动删除历史遗留的 `epo_live_epocanvas_image`，并将旧的硬编码 `epo_sec_[REDACTED]` 物理轮转为独立安全随机密钥。
     3. **内置空角色层级可自由删除与持久移除 (Role Tier Deletion Persistence & Zero Resurrection)**:
        - 修复 `v3_13DB` 与 `role-service.js`：建立基于 KV 标记（`roles_seeded_v2`）的一次性播种机制，`user_lv0`（普通用户 LV.0）与 `user_lv1`（普通用户 LV.1）被站长删除后绝不再自动补充创建；
        - 并在角色弹窗中明确说明其为内置空选项，无需时机接入外部 blog。

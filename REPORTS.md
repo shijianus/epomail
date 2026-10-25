@@ -9,6 +9,27 @@
 
 ---
 
+### 全仓库安全审计、凭据泄露修复与二次验证 (2026-10-25)
+*   **关联提交 (Git Commit)**: `de5d15077972c7c70778aea66777a6cd7a766857` (Short: `de5d150`)
+*   **专项文档索引 (Detailed Doc)**: `doc/security-audit-2026-10-25.md`
+*   **体检/审计范围与方法 (Scope & Methodology)**:
+    1. 范围与环境：`mail-worker` 全 API/服务/实体/工具、`mail-vue` XSS sink、Wrangler 配置、`.gitignore`、GitHub Actions；全部本地分支/标签可达 Git 历史（833 commits / 3565 blobs）；同工作区独立仓库 `EpomailDocs` 只读旁路扫描。
+    2. 工具与脚本：自建 `scripts/secret-scan.mjs`（工作区 + 历史，指纹输出）、`git cat-file --batch` 全对象扫描、`vitest` + `@cloudflare/vitest-pool-workers`（真实 workerd + D1/KV，28 项）、`wrangler deploy --dry-run`、`vite build`、`pnpm audit --prod`、i18n 三件套、`git diff --check`。
+*   **核心发现与缺陷矩阵 (Key Findings & Matrix)**:
+    - **[P0·安全] `/api/oss/*` 任意 KV 键读取**：匿名可读 `auth-uid:1`（站长会话令牌）与 `setting:`（含第三方密钥）；已用对象 Key 前缀白名单修复并回归测试。
+    - **[P0·安全] Git 历史中的 Mailjet Key/Secret、JWT/TOTP 主密钥与测试口令**：当前代码已清除/脱敏；历史仍存在，必须轮换，历史清污方案见专项文档第七节。
+    - **[P0·安全] OAuth Apple `id_token` 未验签 + 匿名 `/oauth/bindUser`**：可造成账号接管/任意绑定；已改为 Apple JWKS RS256 验签、一次性 bind token。
+    - **[P0·安全] S3/B2 对象 Content-Type 绕过**：可形成存储型 XSS；已统一安全响应头并代理附件下载。
+    - **[P1·安全] 设置/OAuth 密钥泄露、RBAC 提权、Resend Webhook 伪造、密码修改不验旧密/不撤销会话、CORS 通配、错误信息回显、硬编码兜底密钥、SSRF/上传校验缺失、自定义 SVG XSS**：均已实际修复。
+    - **[P2·待处理] 账号锁定 DoS/KV 竞态、OAuth 登录绕过邮箱 TOTP、OAuth 回调 JWT 入 URL、附件 capability URL、SPA CSP、BYO S3 `/oss` 限制、ECharts moderate XSS**：已在专项文档列明状态与路线图。
+*   **治理修复与回归结果 (Fixes & Verification)**:
+    - `node scripts/secret-scan.mjs` 工作区 0 命中；`--history --baseline` 仅基线内已知历史泄露；`node mail-worker/test-mailjet.js` 离线通过、live 缺配置安全退出。
+    - Worker 测试 **28/28** 通过；`wrangler deploy --dry-run` 成功（gzip 1067.49 KiB）；`mail-vue` 构建成功；i18n 三件套全绿；worker 生产依赖 `pnpm audit --prod` **0**，mail-vue 剩余 1 moderate（ECharts）。
+    - **未执行**：生产凭据轮换、Mailjet/Cloudflare/Resend 后台日志核查、公共 Git 历史重写/强推、154 个浏览器 E2E 全量回归；原因与人工 Runbook 见专项文档。
+
+---
+
+
 ### 合并远端基线 (36b8182) 后风控系统全真栈完整复测与「显示工单号不可检索」缺陷专项审计 (2026-10-14)
 *   **关联提交 (Git Commit)**: 见置顶汇报 (合并提交 `7245ef4` + 本归档提交)
 *   **专项文档索引 (Detailed Doc)**: 本报告直接正文归档于此；UI 证据截图见 `doc/validation/operation-report-deep/01_operation_record_tab_1440.png` 与 `02_operation_record_search_hit_1440.png`
@@ -402,7 +423,7 @@
     5. **本地全真栈全新库核验**: 清空 `.wrangler/state` 后 `wrangler dev` + `/api/init` 走全新部署路径，实证全新部署引导链缺陷（见下）；随后手动播种标准角色引导站长，新增 `tests/verify-local-functional-20260919.mjs` 25 项 API 断言全通过（含临时用户 physicsDelete 零残留清理）；
     6. **浏览器级 UI 核验**: 新增 `tests/verify-local-ui-20260919.mjs`，本地与生产 mail.epocanvas.com 双端真实登录冒烟——收件箱渲染 ✓、写信默认发件人锁定当前信箱 ✓、en 模式 CJK 残留 0 ✓、zh-Hant 模式简体特有字 0 ✓（注：应用真实 locale 驱动为 `settingStore.lang`（localStorage `setting` 键），非 `ui.locale`）。
 *   **重大缺陷发现 (Critical Findings)**:
-    1. **[P0·安全] 生产 `wrangler.toml` 秘钥随公开 GitHub 仓库泄漏**: `jwt_secret = "123456"` 与 `totp_enc_key` 均为 git 追踪文件且仓库可匿名拉取，任何第三方可自行签发 User 1 站长合法 JWT 完全接管 mail.epocanvas.com，并可解密全站 TOTP 密钥；生产部署时必须改由 Secret/环境注入并立即轮换两密钥；
+    1. **[P0·安全] 生产 `wrangler.toml` 秘钥随公开 GitHub 仓库泄漏**: `jwt_secret = "<REDACTED-WEAK-6-CHAR-VALUE>"` 与 `totp_enc_key` 均为 git 追踪文件且仓库可匿名拉取，任何第三方可自行签发 User 1 站长合法 JWT 完全接管 mail.epocanvas.com，并可解密全站 TOTP 密钥；生产部署时必须改由 Secret/环境注入并立即轮换两密钥；
     2. **[P1·功能] 任意个人主页渲染空白**: `mail-vue/src/views/profile/index.vue:282` 的 `isOwnProfile` 计算属性引用 `accountStore` 但全文件未导入 `useAccountStore`（4215b15 重构引入），生产 `/admin` 实测页面正文空白（仅剩顶栏）并抛 `ReferenceError: accountStore is not defined`，所有公开主页均不可用，证据快照 `tests/verify_prod_admin_profile.png`；
     3. **[P0·全新部署引导链三重断裂]**（生产因历史库幸免，新装即坏死）: ① `v1_1DB` 先行插入遗留角色「普通用户」(custom)，致 `v3_13DB` 六标准角色播种守卫 `roleCount===0` 永不成立成死代码；② `email.labels` 与 `user.custom_labels` 两列在 drizzle entity 中声明但 CREATE TABLE 与全部 124 条 ADD COLUMN 迁移均未覆盖，邮件列表/注册/登录身份接口直接 500；③ `v3_14DB` 参观者 INSERT 引用不存在的 `user.update_time` 列报错，且主站长账号（`c.env.admin`）全链路只有 UPDATE 晋升无 INSERT、注册端又被 `adminReserved` 拦截，全新部署永远无法获得管理员；
     4. **[P2·i18n] zh-Hant 界面下系统标签呈现简体**: 数据库预置标签实体「待办」在 zh-Hant 模式未映射为「待辦」（label-i18n 仅覆盖非中文场景）。
