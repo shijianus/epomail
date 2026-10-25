@@ -25,6 +25,27 @@ const FIRST_DECISION_ACTIONS = new Set([
 const REVIEW_ACTIONS = new Set(['maintain_ban', 'unban']);
 const APPEAL_ACTIONS = new Set(['approve', 'approve_appeal', 'whitelist', 'reject', 'reject_appeal']);
 
+function desensitizeEmail(email) {
+	if (!email || typeof email !== 'string') return '***@***.***';
+	const parts = email.split('@');
+	if (parts.length !== 2) return '***';
+	const [name, domain] = parts;
+	if (name.length <= 2) return `${name[0]}***@${domain}`;
+	return `${name.slice(0, 2)}***${name.slice(-1)}@${domain}`;
+}
+
+function desensitizeIp(ip) {
+	if (!ip || typeof ip !== 'string') return '';
+	if (ip.includes('.')) {
+		const parts = ip.split('.');
+		if (parts.length === 4) return `${parts[0]}.${parts[1]}.*.*`;
+	} else if (ip.includes(':')) {
+		const parts = ip.split(':');
+		if (parts.length >= 2) return `${parts[0]}:${parts[1]}:****:****`;
+	}
+	return '***';
+}
+
 function assertValidCaseState(caseRow) {
 	if (!caseRow || typeof caseRow.warningType !== 'string' || !KNOWN_WARNING_TYPES.has(caseRow.warningType)) {
 		throw new BizError('案件类型损坏或不受支持，无法执行裁决写入', 409);
@@ -407,12 +428,16 @@ const auditService = {
 	/**
 	 * Query audit log list with filters & mode adaptation
 	 */
-	async list(c, params) {
+	async list(c, params, isVisitor = false) {
 		if (!tablesEnsured) {
 			await this.ensureTables(c);
 			tablesEnsured = true;
 		}
+		const visitorMode = Boolean(isVisitor || params?.isVisitor);
 		let { num = 1, size = 15, email, keyword, warningType, category, violationLevel, riskLevel, status, lifecycle, timeRange, identityGroup, alarmReason, alarmCountRange, suggestion, assignee, adjudicator: adjudicatorFilter, timeSort = 0 } = params;
+		if (visitorMode) {
+			warningType = 'record';
+		}
 		size = Math.min(Number(size) || 15, 50);
 		num = Math.max(Number(num) || 1, 1);
 		const offset = (num - 1) * size;
@@ -851,6 +876,22 @@ const auditService = {
 				appealHistory: appealHistoryMap.get(Number(row.id)) || []
 			};
 
+			if (visitorMode) {
+				item.email = desensitizeEmail(item.email);
+				item.ip = desensitizeIp(item.ip);
+				item.baseIp = '';
+				item.baseGeo = '';
+				item.baseDevice = '';
+				item.baseFingerprint = '';
+				item.fingerprint = '';
+				item.clusterAccounts = [];
+				item.clusterCount = 1;
+				item.isCluster = false;
+				if (item.detailText) {
+					item.detailText = item.detailText.replace(/\[审核备忘\]:[^\n]*/g, '').trim();
+				}
+			}
+
 			return item;
 		});
 
@@ -971,6 +1012,34 @@ const auditService = {
 			console.warn('Failed to query auto-purged batches:', e.message);
 		}
 
+		if (visitorMode) {
+			const recordCount = counts?.record || counts?.banned || processedList.length;
+			return {
+				list: processedList,
+				total: total ?? processedList.length,
+				counts: {
+					record: recordCount,
+					threat: 0,
+					audit: 0,
+					appeal: 0,
+					banned: recordCount,
+					today: Math.min(recordCount, 1),
+					pending: 0,
+					highRisk: 0,
+					categories: {
+						audit: { pending: 0, total: 0 },
+						risk: { pending: 0, total: 0 },
+						appeal: { pending: 0, total: 0 },
+						ban: { pending: 0, total: recordCount }
+					}
+				},
+				mode: allMailMode,
+				circuitBreaker: null,
+				autoPurgedCount: 0,
+				autoPurgedBatches: []
+			};
+		}
+
 		return {
 			list: processedList,
 			total: total ?? processedList.length,
@@ -986,6 +1055,13 @@ const auditService = {
 	 * Insert a new audit log
 	 */
 	async record(c, data) {
+		try {
+			const setting = await settingService.query(c).catch(() => ({}));
+			if (setting?.auditLogEnabled === 0) {
+				return { success: true, skipped: true, reason: 'audit_disabled' };
+			}
+		} catch (_) {}
+
 		return await orm(c).insert(auditLog).values({
 			ticketId: data.ticketId || ('TKT-' + Date.now().toString(36).toUpperCase()),
 			userId: data.userId || null,

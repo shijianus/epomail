@@ -2178,6 +2178,13 @@ totpModeAllDesc: 'Instellen of gebruikers TOTP mogen gebruiken. Eenmaal ingescha
     // --- 操作报告与风控管理 (Audit & Risk Reports) ---
     auditReport: "Bedieningsrapporten",
     auditReportDesc: "Auditstream voor gebruikers- en beheerdersbewerkingen, omgevingsbasislijnen en beslissingsconsole voor bezwaren",
+    auditLogEnabled: "Bewerkingslogboek en audit inschakelen",
+    auditLogEnabledDesc: "Hoofdschakelaar: indien ingeschakeld, worden beveiligingsevaluaties en auditlogboeken vastgelegd. Indien uitgeschakeld, worden er geen records opgeslagen.",
+    auditReportPublic: "Openbare auditrecords",
+    auditReportPublicDesc: "Bewerkingsauditing is actief en openbaar transparant. Bezoekers en gebruikers kunnen openbare auditrecords bekijken.",
+    auditReportNone: "Geen bewerkingsrapporten",
+    auditReportNoneDesc: "Bewerkingsauditing is momenteel uitgeschakeld; er worden geen openbare bewerkingsrapporten gegenereerd.",
+    auditVisitorTableNotice: "Openbare weergave van bewerkingsaudits. Om privacy en gegevensbeveiliging te beschermen zijn telemetriemetrics en details geanonimiseerd.",
     auditTabStream: "Auditlog-stream",
     auditTabRisk: "Risicobeheer & bezwaren",
     auditTabPolicy: "Beleid & opslag",

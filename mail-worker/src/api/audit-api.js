@@ -30,10 +30,26 @@ const ensureAdminUser = async (c) => {
 	return user;
 };
 
+const isAuditAdmin = async (c, user) => {
+	if (!user) return false;
+	if (isAdminUser(c, user)) return true;
+	let permKeys = [];
+	try {
+		permKeys = await permService.userPermKeys(c, user.userId);
+	} catch (_) {}
+	return permKeys.includes('*') || permKeys.includes('audit:adjudicate') || permKeys.includes('audit:*');
+};
+
 const handleAuditList = async (c) => {
-	await ensureAdminUser(c);
+	const user = ensureAuthUser(c);
+	const isAdmin = await isAuditAdmin(c, user);
 	const query = c.req.method === 'GET' ? c.req.query() : (await c.req.json().catch(() => ({})));
-	const data = await auditService.list(c, query);
+	if (!isAdmin) {
+		// 参观者/普通用户限制：仅允许查阅已处置结案的公开「操作记录」，严禁查看进行中的滥用威胁、申诉排队与深层风控
+		query.warningType = 'record';
+		query.isVisitor = true;
+	}
+	const data = await auditService.list(c, query, !isAdmin);
 	return c.json(result.ok(data));
 };
 app.get('/audit/list', handleAuditList);

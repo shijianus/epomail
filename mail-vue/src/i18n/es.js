@@ -2178,6 +2178,13 @@ totpModeAllDesc: 'Configurar si los usuarios pueden usar TOTP. Al activarlo, la 
     // --- 操作报告与风控管理 (Audit & Risk Reports) ---
     auditReport: "Informes de operaciones",
     auditReportDesc: "Registro de auditoría de operaciones de usuarios y administradores, líneas base de entorno y consola de apelaciones",
+    auditLogEnabled: "Habilitar registro y auditoría de operaciones",
+    auditLogEnabledDesc: "Interruptor maestro: cuando está habilitado, se registran las evaluaciones de seguridad y auditorías. Cuando está deshabilitado, el registro se detiene por completo.",
+    auditReportPublic: "Registros de auditoría públicos",
+    auditReportPublicDesc: "La auditoría de operaciones está activa y se divulga con transparencia. Visitantes y usuarios pueden consultar los resultados públicos.",
+    auditReportNone: "Sin informes de operaciones",
+    auditReportNoneDesc: "La auditoría de operaciones está deshabilitada actualmente; no se generan informes públicos de operaciones.",
+    auditVisitorTableNotice: "Vista pública de divulgación de auditoría de operaciones. Para proteger la privacidad, la telemetría y los detalles están redactados.",
     auditTabStream: "Flujo de auditoría",
     auditTabRisk: "Riesgo y apelaciones",
     auditTabPolicy: "Políticas y capacidad",

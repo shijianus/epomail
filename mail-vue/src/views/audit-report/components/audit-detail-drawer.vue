@@ -44,13 +44,13 @@
           </div>
         </div>
 
-        <!-- 4 个真正的内容 Tab 导航 -->
+        <!-- 内容 Tab 导航 -->
         <div class="drawer-tabs-wrapper">
           <el-tabs v-model="activeTab" class="drawer-clean-tabs" @tab-change="handleTabChange">
             <el-tab-pane name="overview" :label="$t('auditTabOverview')" />
-            <el-tab-pane name="investigation" :label="$t('auditTabInvestigation')" />
-            <el-tab-pane name="evidence" :label="$t('auditTabEvidence')" />
-            <el-tab-pane name="decision" :label="adjudicationContext.isReadOnly ? $t('auditTabLedger') : $t('auditTabDecision')" />
+            <el-tab-pane v-if="!isVisitor" name="investigation" :label="$t('auditTabInvestigation')" />
+            <el-tab-pane v-if="!isVisitor" name="evidence" :label="$t('auditTabEvidence')" />
+            <el-tab-pane name="decision" :label="(adjudicationContext.isReadOnly || isVisitor) ? $t('auditTabLedger') : $t('auditTabDecision')" />
           </el-tabs>
         </div>
       </div>
@@ -147,7 +147,7 @@
               <div class="field-v-with-copy font-mono">
                 <span class="masked-text" :title="maskedEmail">{{ maskedEmail }}</span>
                 <button
-                  v-if="!selectedRow.cleared"
+                  v-if="!isVisitor && !selectedRow.cleared"
                   class="inline-copy-btn"
                   :title="$t('abuseCopyEmail')"
                   @click="copyEmail(selectedRow.email)"
@@ -163,7 +163,7 @@
               <div class="field-v-with-copy font-mono">
                 <span class="masked-text" :title="maskedUserId">{{ maskedUserId }}</span>
                 <button
-                  v-if="!selectedRow.cleared"
+                  v-if="!isVisitor && !selectedRow.cleared"
                   class="inline-copy-btn"
                   :title="$t('abuseCopyUserId')"
                   @click="copyUserId(rawUserId)"
@@ -233,9 +233,9 @@
           </div>
         </section>
 
-        <!-- 集群关联账号 (仅滥用威胁/具有集群账号时渲染：逐账号纵向条目，取消横向表格) -->
+        <!-- 集群关联账号 (仅非参观者且具有集群账号时渲染：逐账号纵向条目，取消横向表格) -->
         <section
-          v-if="isThreatVariant && clusterAccountsList && clusterAccountsList.length > 0"
+          v-if="!isVisitor && isThreatVariant && clusterAccountsList && clusterAccountsList.length > 0"
           id="chapter-cluster"
           class="dossier-card"
         >
@@ -905,9 +905,9 @@
 
       <!-- 4. 裁决 Tab (裁决工作台 / 处置台账存证) -->
       <div v-show="activeTab === 'decision'" class="tab-pane-container">
-        <!-- 模块 H: 裁决工作台 (仅在可处理状态展示) -->
+        <!-- 模块 H: 裁决工作台 (仅在可处理状态展示，参观者仅呈现处置台账) -->
         <section
-          v-if="!adjudicationContext.isReadOnly"
+          v-if="!isVisitor && !adjudicationContext.isReadOnly"
           id="chapter-decision"
           class="dossier-card adjudication-workbench-card"
         >
@@ -1132,8 +1132,8 @@
           <el-button @click="handleClose">{{ $t('close') }}</el-button>
         </div>
 
-        <!-- 可处理变体专用动作 -->
-        <div class="footer-right">
+        <!-- 可处理变体专用动作 (仅管理员呈现操作按钮，参观者仅保留关闭) -->
+        <div class="footer-right" v-if="!isVisitor">
           <template v-if="selectedRow">
             <!-- 延期 -->
             <el-button
@@ -1262,12 +1262,30 @@ import { ElMessage, ElMessageBox } from 'element-plus';
 import { Icon } from '@iconify/vue';
 import { tzDayjs } from '@/utils/day.js';
 import { hasPerm } from '@/perm/perm.js';
+import { useUserStore } from '@/store/user.js';
 import { parseCaseDeepLink, normalizeCaseTab } from '@/router/account-history.js';
 import {
   evaluateAdjudicationContext,
   buildScenarioNotificationPreview,
   SCENARIO_TYPES
 } from '../utils/adjudication-engine.js';
+
+const userStore = useUserStore();
+const isVisitor = computed(() => {
+  const user = userStore.user;
+  if (!user) return true;
+  const roleCode = (user.role?.roleCode || user.role?.key || '').toLowerCase().trim();
+  const roleName = (user.role?.name || '').trim();
+  const permKeys = Array.isArray(user?.permKeys) ? user.permKeys : [];
+  if (roleCode === 'visitor' || roleName === '参观者') return true;
+  if (roleCode === 'master' || roleCode === 'admin' || roleName === '站长' || user.email === 'admin@epomail.bond' || permKeys.includes('*')) {
+    return false;
+  }
+  if (roleCode === 'moderator' || roleName.includes('协管') || roleName.includes('管理')) {
+    return false;
+  }
+  return true;
+});
 
 const props = defineProps({
   modelValue: {
@@ -1448,6 +1466,15 @@ watch(
     }
   },
   { immediate: true }
+);
+
+watch(
+  () => [visible.value, isVisitor.value],
+  ([v, vis]) => {
+    if (v && vis && ['investigation', 'evidence'].includes(activeTab.value)) {
+      activeTab.value = 'overview';
+    }
+  }
 );
 
 function handleTabChange(tabName) {

@@ -35,7 +35,13 @@ const settingService = {
 				{ name: 'terms_url', sql: `ALTER TABLE setting ADD COLUMN terms_url TEXT NOT NULL DEFAULT '';` },
 				{ name: 'privacy_url', sql: `ALTER TABLE setting ADD COLUMN privacy_url TEXT NOT NULL DEFAULT '';` },
 				{ name: 'oauth_login_enabled', sql: `ALTER TABLE setting ADD COLUMN oauth_login_enabled INTEGER NOT NULL DEFAULT 0;` },
-				{ name: 'oauth_providers', sql: `ALTER TABLE setting ADD COLUMN oauth_providers TEXT NOT NULL DEFAULT '{}';` }
+				{ name: 'oauth_providers', sql: `ALTER TABLE setting ADD COLUMN oauth_providers TEXT NOT NULL DEFAULT '{}';` },
+				{ name: 'audit_log_enabled', sql: `ALTER TABLE setting ADD COLUMN audit_log_enabled INTEGER NOT NULL DEFAULT 1;` },
+				{ name: 'audit_max_ip_per_account', sql: `ALTER TABLE setting ADD COLUMN audit_max_ip_per_account INTEGER NOT NULL DEFAULT 3;` },
+				{ name: 'audit_max_device_per_account', sql: `ALTER TABLE setting ADD COLUMN audit_max_device_per_account INTEGER NOT NULL DEFAULT 3;` },
+				{ name: 'audit_auto_clean_oldest', sql: `ALTER TABLE setting ADD COLUMN audit_auto_clean_oldest INTEGER NOT NULL DEFAULT 1;` },
+				{ name: 'audit_prioritize_non_critical_clean', sql: `ALTER TABLE setting ADD COLUMN audit_prioritize_non_critical_clean INTEGER NOT NULL DEFAULT 1;` },
+				{ name: 'audit_critical_quota', sql: `ALTER TABLE setting ADD COLUMN audit_critical_quota INTEGER NOT NULL DEFAULT 3;` }
 			];
 
 			let existingCols = new Set();
@@ -232,6 +238,13 @@ const settingService = {
 		} else if (!setting.oauthProviders) {
 			setting.oauthProviders = {};
 		}
+
+		setting.auditLogEnabled = setting.auditLogEnabled !== undefined && setting.auditLogEnabled !== null ? Number(setting.auditLogEnabled) : 1;
+		setting.auditMaxIpPerAccount = setting.auditMaxIpPerAccount !== undefined && setting.auditMaxIpPerAccount !== null ? Number(setting.auditMaxIpPerAccount) : 3;
+		setting.auditMaxDevicePerAccount = setting.auditMaxDevicePerAccount !== undefined && setting.auditMaxDevicePerAccount !== null ? Number(setting.auditMaxDevicePerAccount) : 3;
+		setting.auditAutoCleanOldest = setting.auditAutoCleanOldest !== undefined && setting.auditAutoCleanOldest !== null ? Number(setting.auditAutoCleanOldest) : 1;
+		setting.auditPrioritizeNonCriticalClean = setting.auditPrioritizeNonCriticalClean !== undefined && setting.auditPrioritizeNonCriticalClean !== null ? Number(setting.auditPrioritizeNonCriticalClean) : 1;
+		setting.auditCriticalQuota = setting.auditCriticalQuota !== undefined && setting.auditCriticalQuota !== null ? Number(setting.auditCriticalQuota) : 3;
 
 		const dbModeInfo = getDbModeInfo(c);
 		setting.isDual = dbModeInfo.isDual;
@@ -457,6 +470,25 @@ const settingService = {
 			params.multiAccountEnabled = (Number(params.multiAccountEnabled) === 1 || params.multiAccountEnabled === true) ? 1 : 0;
 		}
 
+		if (params.auditLogEnabled !== undefined) {
+			params.auditLogEnabled = Number(params.auditLogEnabled) === 0 ? 0 : 1;
+		}
+		if (params.auditMaxIpPerAccount !== undefined) {
+			params.auditMaxIpPerAccount = Number(params.auditMaxIpPerAccount) > 0 ? Number(params.auditMaxIpPerAccount) : 3;
+		}
+		if (params.auditMaxDevicePerAccount !== undefined) {
+			params.auditMaxDevicePerAccount = Number(params.auditMaxDevicePerAccount) > 0 ? Number(params.auditMaxDevicePerAccount) : 3;
+		}
+		if (params.auditAutoCleanOldest !== undefined) {
+			params.auditAutoCleanOldest = Number(params.auditAutoCleanOldest) === 0 ? 0 : 1;
+		}
+		if (params.auditPrioritizeNonCriticalClean !== undefined) {
+			params.auditPrioritizeNonCriticalClean = Number(params.auditPrioritizeNonCriticalClean) === 0 ? 0 : 1;
+		}
+		if (params.auditCriticalQuota !== undefined) {
+			params.auditCriticalQuota = Number(params.auditCriticalQuota) > 0 ? Number(params.auditCriticalQuota) : 3;
+		}
+
 		params.resendTokens = JSON.stringify(resendTokens);
 
 		// Whitelist only valid DB columns in setting table
@@ -483,7 +515,9 @@ const settingService = {
 			'externalDbToken', 'externalDbName', 'externalDbTarget',
 			'attachmentPolicy', 'attachmentMaxSizeMb', 'attachmentCascadeDelete',
 			'multiAccountEnabled', 'termsUrl', 'privacyUrl',
-			'oauthLoginEnabled', 'oauthProviders'
+			'oauthLoginEnabled', 'oauthProviders',
+			'auditLogEnabled', 'auditMaxIpPerAccount', 'auditMaxDevicePerAccount',
+			'auditAutoCleanOldest', 'auditPrioritizeNonCriticalClean', 'auditCriticalQuota'
 		];
 
 		const updateData = {};

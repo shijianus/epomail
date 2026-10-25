@@ -2178,6 +2178,13 @@ totpModeAllDesc: 'Configure whether users can use TOTP. When enabled, 2FA is ava
     // --- 操作报告与风控管理 (Audit & Risk Reports) ---
     auditReport: "Operation Reports",
     auditReportDesc: "User and admin operation audit stream, environment baselines, and appeal adjudication console",
+    auditLogEnabled: "Enable Operation Logging & Audit",
+    auditLogEnabledDesc: "Master switch: When enabled, security evaluations and audit logs are recorded. When disabled, logging is halted completely and no records are kept.",
+    auditReportPublic: "Public Audit Records",
+    auditReportPublicDesc: "Operation auditing is active and transparently disclosed. Visitors and users can inspect public audit records.",
+    auditReportNone: "No Operation Reports",
+    auditReportNoneDesc: "Operation auditing is currently disabled; no public operation reports are generated.",
+    auditVisitorTableNotice: "Public operation audit disclosure view. For strict privacy and data security, telemetry metrics and participant details are redacted.",
     auditTabStream: "Audit Log Stream",
     auditTabRisk: "Risk & Appeals",
     auditTabPolicy: "Policy & Storage",

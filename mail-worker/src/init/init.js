@@ -67,6 +67,7 @@ const dbInit = {
 		await this.v3_15DB(c);
 		await this.v3_16DB(c);
 		await this.v3_17DB(c);
+		await this.v3_18DB(c);
 		await settingService.refresh(c);
 		return c.text('success');
 	},
@@ -266,6 +267,31 @@ const dbInit = {
 			`).run();
 		} catch (e) {
 			console.warn('visitor user:query cleanup warning:', e.message);
+		}
+	},
+
+	// v3_18DB: 系统设置操作报告与IP风控持久化配置迁移
+	async v3_18DB(c) {
+		const userDb = getUserDb(c);
+		const settingCols = [
+			{ name: 'audit_log_enabled', sql: `ALTER TABLE setting ADD COLUMN audit_log_enabled INTEGER NOT NULL DEFAULT 1;` },
+			{ name: 'audit_max_ip_per_account', sql: `ALTER TABLE setting ADD COLUMN audit_max_ip_per_account INTEGER NOT NULL DEFAULT 3;` },
+			{ name: 'audit_max_device_per_account', sql: `ALTER TABLE setting ADD COLUMN audit_max_device_per_account INTEGER NOT NULL DEFAULT 3;` },
+			{ name: 'audit_auto_clean_oldest', sql: `ALTER TABLE setting ADD COLUMN audit_auto_clean_oldest INTEGER NOT NULL DEFAULT 1;` },
+			{ name: 'audit_prioritize_non_critical_clean', sql: `ALTER TABLE setting ADD COLUMN audit_prioritize_non_critical_clean INTEGER NOT NULL DEFAULT 1;` },
+			{ name: 'audit_critical_quota', sql: `ALTER TABLE setting ADD COLUMN audit_critical_quota INTEGER NOT NULL DEFAULT 3;` }
+		];
+
+		const tableInfo = await userDb.prepare(`PRAGMA table_info('setting')`).all().catch(() => ({ results: [] }));
+		const existingCols = new Set((tableInfo?.results || []).map(r => r.name));
+		for (const col of settingCols) {
+			if (!existingCols.has(col.name)) {
+				try {
+					await userDb.prepare(col.sql).run();
+				} catch (err) {
+					console.warn(`v3_18DB 跳过 setting 列 ${col.name}:`, err.message);
+				}
+			}
 		}
 	},
 
@@ -1534,7 +1560,13 @@ const dbInit = {
 				title TEXT NOT NULL,
 				auto_refresh INTEGER NOT NULL,
 				register_verify INTEGER NOT NULL,
-				add_email_verify INTEGER NOT NULL
+				add_email_verify INTEGER NOT NULL,
+				audit_log_enabled INTEGER DEFAULT 1,
+				audit_max_ip_per_account INTEGER DEFAULT 3,
+				audit_max_device_per_account INTEGER DEFAULT 3,
+				audit_auto_clean_oldest INTEGER DEFAULT 1,
+				audit_prioritize_non_critical_clean INTEGER DEFAULT 1,
+				audit_critical_quota INTEGER DEFAULT 3
 			)
 		`).run();
 

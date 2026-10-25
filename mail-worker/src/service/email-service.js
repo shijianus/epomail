@@ -572,8 +572,10 @@ const emailService = {
 
 		// 4. Report to Admin Audit Center as Anomalous Threat (异常威胁)
 		try {
-			await auditService.ensureTables(c);
-			for (const cleanSender of senders) {
+			const setting = await settingService.query(c).catch(() => ({}));
+			if (setting?.auditLogEnabled !== 0) {
+				await auditService.ensureTables(c);
+				for (const cleanSender of senders) {
 				// Check whether sender is an internal user
 				const internalUser = await userOrm(c).select().from(user).where(eq(user.email, cleanSender)).get();
 				const isInternal = !!internalUser ? 1 : 0;
@@ -636,6 +638,7 @@ const emailService = {
 					}).run();
 				}
 			}
+		}
 		} catch (auditErr) {
 			console.warn('reportSpam audit_log report failed:', auditErr.message);
 		}

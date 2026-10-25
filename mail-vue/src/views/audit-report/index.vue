@@ -48,8 +48,8 @@
           @close="dismissMissingCaseBanner"
         />
 
-        <!-- 1. 顶部汇报分区 4 板块：严格 4 层分界与操作态图标 -->
-        <div class="kpi-grid">
+        <!-- 1. 顶部汇报分区 4 板块：严格 4 层分界与操作态图标 (参观者仅公开操作记录表格，隐藏上方选框) -->
+        <div class="kpi-grid" v-if="!isVisitor">
           <!-- 卡片 1: 滥用威胁 (展示所有 LV3 以上威胁账户：1人多号、被举报等) -->
           <div
             class="kpi-card kpi-threat"
@@ -160,8 +160,8 @@
             <Icon icon="fluent:chevron-right-12-regular" width="12" height="12" class="purged-arrow" />
           </div>
 
-          <!-- 顶部操作栏 (学习用户列表风格：纯图标交互、删除冗余输入框、支持批量操作与批量延期) -->
-          <div class="header-actions">
+          <!-- 顶部操作栏 (学习用户列表风格：纯图标交互、删除冗余输入框、支持批量操作与批量延期，参观者展示极简公示信息栏) -->
+          <div class="header-actions" v-if="!isVisitor">
             <!-- 批量延期 (快捷操作) -->
             <el-tooltip effect="dark" :content="$t('auditBatchExtend')" placement="top">
               <Icon class="icon" icon="fluent:calendar-clock-20-regular" width="20" height="20" @click="handleBatchExtend" />
@@ -235,6 +235,16 @@
               </div>
             </transition>
           </div>
+          <div class="visitor-public-header" v-else>
+            <span class="visitor-notice-text">
+              <Icon icon="fluent:shield-task-20-regular" width="15" height="15" style="vertical-align: -2px; margin-right: 6px;" />
+              {{ $t('auditVisitorTableNotice') }}
+            </span>
+            <div style="flex: 1"></div>
+            <el-tooltip effect="dark" :content="$t('refresh')" placement="top">
+              <Icon class="icon visitor-refresh-icon" icon="ion:reload" width="16" height="16" @click="refresh" />
+            </el-tooltip>
+          </div>
 
           <!-- 3. 核心数据表格 (单一容器铺满) -->
           <div class="table-area">
@@ -251,8 +261,8 @@
               @selection-change="handleSelectionChange"
               @row-click="handleTableRowClick"
             >
-              <!-- 0. 多选列 -->
-              <el-table-column type="selection" width="36" align="center" key="col-selection" />
+              <!-- 0. 多选列 (仅管理员支持批量勾选) -->
+              <el-table-column type="selection" width="36" align="center" key="col-selection" v-if="!isVisitor" />
 
               <!-- ========================================================= -->
               <!-- 板块 1: 滥用威胁 (threat) -->
@@ -2166,6 +2176,7 @@ import loading from '@/components/loading/index.vue';
 import { tzDayjs } from '@/utils/day.js';
 import { useSettingStore } from '@/store/setting.js';
 import { useEmailStore } from '@/store/email.js';
+import { useUserStore } from '@/store/user.js';
 import { auditList, auditAction, auditAdjudicate, auditPurge } from '@/request/audit.js';
 import { parseCaseDeepLink, normalizeCaseTab } from '@/router/account-history.js';
 import AuditDetailDrawer from './components/audit-detail-drawer.vue';
@@ -2178,6 +2189,23 @@ const router = useRouter();
 const { t, locale } = useI18n();
 const settingStore = useSettingStore();
 const emailStore = useEmailStore();
+const userStore = useUserStore();
+
+const isVisitor = computed(() => {
+  const user = userStore.user;
+  if (!user) return true;
+  const roleCode = (user.role?.roleCode || user.role?.key || '').toLowerCase().trim();
+  const roleName = (user.role?.name || '').trim();
+  const permKeys = Array.isArray(user?.permKeys) ? user.permKeys : [];
+  if (roleCode === 'visitor' || roleName === '参观者') return true;
+  if (roleCode === 'master' || roleCode === 'admin' || roleName === '站长' || user.email === 'admin@epomail.bond' || permKeys.includes('*')) {
+    return false;
+  }
+  if (roleCode === 'moderator' || roleName.includes('协管') || roleName.includes('管理')) {
+    return false;
+  }
+  return true;
+});
 
 const tableLoading = ref(true);
 const first = ref(true);
@@ -2246,6 +2274,9 @@ const autoPurgedBatches = ref([]);
 const activeKpi = ref('all');
 
 const currentSection = computed(() => {
+  if (isVisitor.value) {
+    return 'record';
+  }
   if (['threat', 'appeal', 'audit', 'record'].includes(activeKpi.value)) {
     return activeKpi.value;
   }
@@ -2341,6 +2372,7 @@ function calcPercent(pending, tot) {
 }
 
 function selectKpiFilter(type) {
+  if (isVisitor.value) return;
   if (activeKpi.value === type) {
     // 点击已激活卡片：取消选中，回退至没有选择任何部分的默认状态
     activeKpi.value = 'all';
@@ -4144,6 +4176,12 @@ function getStatusFullLabel(status) {
 async function fetchAuditList() {
   tableLoading.value = true;
   lastListError.value = null;
+  if (isVisitor.value) {
+    params.warningType = 'record';
+    if (activeKpi.value !== 'record') {
+      activeKpi.value = 'record';
+    }
+  }
   try {
     const parsedOnStart = parseCaseDeepLink(window.location);
     if (parsedOnStart.isCaseLink && !drawerVisible.value) {
@@ -4754,6 +4792,35 @@ onUnmounted(() => {
   border-radius: 6px;
   background: var(--el-bg-color);
   overflow: hidden;
+}
+
+/* 参观者公开公示操作栏 */
+.visitor-public-header {
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  box-shadow: var(--header-actions-border);
+  background: var(--el-bg-color);
+  font-size: 12.5px;
+  color: var(--el-text-color-regular);
+
+  .visitor-notice-text {
+    display: inline-flex;
+    align-items: center;
+    color: var(--el-text-color-regular);
+    font-size: 12px;
+  }
+
+  .visitor-refresh-icon {
+    cursor: pointer;
+    color: var(--el-text-color-secondary);
+    transition: color 0.15s, transform 0.15s;
+
+    &:hover {
+      color: var(--el-color-primary);
+      transform: translateY(-1px);
+    }
+  }
 }
 
 /* 顶部操作栏：学习用户列表标准操作栏风格 (纯图标排布，支持多选批量) */

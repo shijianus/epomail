@@ -13,6 +13,12 @@
         <span>{{ currentMailModeConfig.title }}</span>
       </div>
     </el-tooltip>
+    <el-tooltip effect="dark" :content="auditStatusConfig.desc" placement="top">
+      <div class="audit-status-tag" :class="auditStatusConfig.tagClass">
+        <Icon :icon="auditStatusConfig.icon" width="12" height="12" />
+        <span>{{ auditStatusConfig.title }}</span>
+      </div>
+    </el-tooltip>
     <div class="status-text version-tag">{{ APP_VERSION_TAG }}</div>
   </div>
 </template>
@@ -56,6 +62,25 @@ const currentMailModeConfig = computed(() => {
       icon: 'fluent:shield-keyhole-20-filled',
       title: t('privacyMailModeStatus'),
       desc: t('privacyMailModeStatusDesc')
+    };
+  }
+});
+
+const auditStatusConfig = computed(() => {
+  const isEnabled = settingStore.settings?.auditLogEnabled !== 0;
+  if (isEnabled) {
+    return {
+      tagClass: 'audit-tag-public',
+      icon: 'fluent:shield-task-20-regular',
+      title: t('auditReportPublic'),
+      desc: t('auditReportPublicDesc')
+    };
+  } else {
+    return {
+      tagClass: 'audit-tag-none',
+      icon: 'fluent:shield-dismiss-20-regular',
+      title: t('auditReportNone'),
+      desc: t('auditReportNoneDesc')
     };
   }
 });
@@ -158,6 +183,7 @@ const unreadCount = computed(() => {
   cursor: default;
   user-select: none;
   transition: all 0.2s ease;
+  margin-right: 4px; /* 模式往左边移动一点 */
 
   &.mode-red {
     color: #ff4d4f;
@@ -175,6 +201,27 @@ const unreadCount = computed(() => {
     color: #52c41a;
     background: rgba(82, 196, 26, 0.1);
     border: 1px solid rgba(82, 196, 26, 0.25);
+  }
+}
+
+.audit-status-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10.5px;
+  font-weight: 500;
+  padding: 0 4px;
+  background: transparent;
+  cursor: default;
+  user-select: none;
+  transition: color 0.2s ease;
+
+  &.audit-tag-public {
+    color: #52c41a;
+  }
+
+  &.audit-tag-none {
+    color: #ff4d4f;
   }
 }
 

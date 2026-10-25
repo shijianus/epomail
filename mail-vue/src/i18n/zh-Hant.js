@@ -2178,6 +2178,13 @@ totpModeAllDesc: '設定是否允許使用者使用TOTP，開啟後使用者可�
     // --- 操作报告与风控管理 (Audit & Risk Reports) ---
     auditReport: "操作報告",
     auditReportDesc: "記錄使用者與管理員操作時序流水、環境基線及申訴研判放行控制台",
+    auditLogEnabled: "開啟操作記錄與審計",
+    auditLogEnabledDesc: "總開關：開啟後系統將記錄安全研判與操作審計；關閉後全站將徹底停用審計，不會進行任何記錄。",
+    auditReportPublic: "公示操作記錄",
+    auditReportPublicDesc: "系統已啟用並公示操作審計記錄，所有參觀者與使用者均可查閱公開審計結果。",
+    auditReportNone: "無操作報告",
+    auditReportNoneDesc: "當前系統未開啟操作審計記錄功能，未生成公開操作報告。",
+    auditVisitorTableNotice: "當前為公開操作記錄公示檢視。為嚴格保護隱私與資料安全，技術指標與涉事方詳細資訊已脫敏呈現。",
     auditTabStream: "操作審計流水",
     auditTabRisk: "風控研判與申訴",
     auditTabPolicy: "記錄策略與容量",
