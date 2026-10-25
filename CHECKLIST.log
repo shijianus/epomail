@@ -11,6 +11,25 @@
 
 ---
 
+### 远端 security/audit-2026-10-25 完整整合至 master 与双向同步 (2026-10-25)
+*   **关联提交 (Git Commit)**: 整合提交 `154b3cd998b3fbe5951680bf70d8a5717bb5d1eb` (Short: `154b3cd`)；受审整合基线 `065ddc2d953397ca437d0b4782cce2631c469f13` (Short: `065ddc2`)
+*   **部署环境 (Deployment)**: 本地仓库全分支核验 + GitHub 远端全量同步 (`git@github.com:shijianus/epomail.git`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 远端分支检出与追踪：检出 `origin/security/audit-2026-10-25`（包含 2026-10-25 全仓安全加固、RBAC 细粒度权限校验收口、Webhook 异步重试及 10 组交付级测试）。
+    - [x] 完整整合主干：将 `security/audit-2026-10-25`（`065ddc2`）完整合并整合至 `master` 主干，保证全仓代码、测试与文档基线绝对统一。
+    - [x] 本地全量构建与自检：前端 `mail-vue`（Vite + PWA）构建成功，后端 Worker 打包 dry-run 验证成功，全套多语言 i18n 六语言严格对称，安全测试套件 38/38 全部通过，凭据扫描 0 泄露。
+    - [x] 远端双向完全同步：将整合后的 `master` 优先推送到 `origin/master`，确保所有本地分支（`master`、`security/audit-2026-10-25`、`fix/abuse-table-columns`、`review/abuse-backend-rc`）与远端 100% 对应同步。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：`mail-vue` Vite 构建通过 (0 错误 0 告警)；`mail-worker` dry-run 打包通过。
+    - [x] 自动化测试套件：`mail-worker/test/*.spec.js` 4 files / 38 tests 全部通过 (vitest pool workers 真实 workerd + D1/KV)。
+    - [x] 多语言对称扫描：`node scripts/i18n-symmetry.mjs` (mail-vue 3029 keys, mail-worker 1930 keys 全部 6 语言对称)。
+    - [x] 凭据安全扫描：`node scripts/secret-scan.mjs` 扫描 1215 files，0 secrets found。
+    - [x] Git 同步一致性：`git status` clean，所有分支与远端完全对齐无分叉。
+
+
+
+---
+
 ### 安全候选 bf1a008 定向验收与三项交付缺陷修复 (2026-10-25)
 *   **关联提交 (Git Commit)**: `31915a753f1a2c3b079e8066151d703857bb336f` (Short: `31915a7`)
 *   **部署环境 (Deployment)**: 独立 worktree `D:/Users/Smart Kevin/epomail-acceptance-bf1a008`（detached `bf1a008`）；本地 workerd + D1 + KV；**未部署生产、未触碰 master、未推送其他分支**
