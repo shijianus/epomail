@@ -10,28 +10,31 @@
 
 ### 系统设置操作报告优化、IP风控DB持久化与参观者隐私最小化审计公示 (2026-10-25)
 *   **关联提交 (Git Commit)**: `5922b04e7791c0183bbfef5cef04aa3b783cbd39` (Short: `5922b04`)
-*   **部署环境 (Deployment)**: `本地全真栈 / 生产 Cloudflare (mail.epocanvas.com)`
+*   **部署环境 (Deployment)**: `生产 Cloudflare (epomail.epocanvas.workers.dev / mail.epocanvas.com · Worker Version ID: 98344619-aec7-4216-9b11-d91ee4487882)`
 *   **功能需求与变更清单 (Changes & Feature Alignment)**:
-    - [x] **系统设置操作报告优化**: 彻底删除跳转到其它界面的多余按钮与 router.push 逻辑，禁止任何系统设置卡片发生跨页面跳转。
+    - [x] **系统设置操作报告优化**: 彻底删除跳转到其它界面的多余按钮与 router.push 逻辑，删除 style="justify-content: flex-end" 容器与冗余跳转 button，禁止任何系统设置卡片发生跨页面跳转。
     - [x] **IP 风控 DB 数据填入与默认值**: 在 setting 表原生支持 audit_max_ip_per_account (3), audit_max_device_per_account (3), audit_auto_clean_oldest (1), audit_prioritize_non_critical_clean (1), audit_critical_quota (3)，并持久化至 D1 数据库。
     - [x] **审计与操作报告总开关**: 在系统设置中新增 auditLogEnabled 开关，关闭后全站停止写入任何审计日志与风控记录。
     - [x] **状态栏公示纯色徽章**: 在底部状态栏「模式徽章」右侧、版本号左侧新增无填充纯色提示，模式向左轻移，开启/公示状态为绿色（公示操作记录），关闭状态为红色（无操作报告）。
-    - [x] **参观者隐私最小化**: 参观者视角完全屏蔽「滥用威胁」「风险管理」「申诉审计」等管理员管理板块，上方选框彻底隐藏，仅公开已结案操作记录表格；详情抽屉隐藏敏感设备指纹、真实邮箱一键复制、关联集群账号与人工裁决执行表单。
+    - [x] **参观者隐私最小化与全员放行**: 路由拦截放行全员访问公开操作记录；参观者与普通用户视角完全屏蔽「滥用威胁」「风险管理」「申诉审计」等管理员管理板块，上方 4 组 KPI 选框彻底隐藏，仅公开已结案操作记录纯表格；详情抽屉隐藏敏感设备指纹、真实邮箱一键复制、关联集群账号与人工裁决执行表单。
     - [x] **服务端多重防御**: 后端 `/audit/list` 针对非管理员强制锁定 warningType='record' 并脱敏 IP 与邮箱、过滤审核备忘，裁决与操作接口严格阻断未授权访问。
     - [x] **多语言对称闭环**: 六国语言 (zh, zh-Hant, en, es, fr, nl) 100% 绝对对称，新增 7 个词条严格入库。
 *   **自动化测试与核验清单 (Verification Checklist)**:
     - [x] 专项自动化回归套件：`tests/test-audit-ui-and-settings.mjs` 5/5 项全部通过
     - [x] 全真栈端到端视觉检视与 UI 规范深度核验：`tests/test-visual-inspection.mjs` 31/31 项全部通过
-      - 场景 1: 系统设置「操作报告」卡片检视（开关、默认值 3/3/1/1/3、彻底杜绝跨页跳转按钮与链接）
-      - 场景 2: 状态栏公示提示（开启状态：无底色填充纯色、推荐绿色 #52c41a、模式向左偏移 4px）
-      - 场景 3: 状态栏无报告提示（关闭状态：无底色填充纯色、红色 #ff4d4f）
-      - 场景 4: 参观者控制台检视（隐藏上方 4 组 KPI 选框、隐藏批量操作与导出、隐藏勾选框、纯公开表格展示）
-      - 场景 5: 参观者详情抽屉检视（排除排查研判与证据链 Tab、隐藏邮箱复制、隐藏集群账号、隐藏裁决表单与操作按钮）
-      - 场景 6: 管理员控制台回归检视（完整保留 4 组 KPI 卡片、处置操作按钮与全功能裁决工作台）
-    - [x] 6 组视觉全真栈截屏留存：`tests/inspect_*.png`
+    - [x] **公网 Cloudflare 生产环境真实端到端核验**：`tests/verify-live-production-audit-ui.mjs` 19/19 项全部通过
+      - 步骤 4-5: 线上系统设置操作报告卡片已彻底删除 `style="justify-content: flex-end"` 容器与跳转按钮 (数量: 0)
+      - 步骤 6-7: 线上总开关 `auditLogEnabled` 与 3 组 IP 风控调节框已展示
+      - 步骤 8-9: 线上状态栏模式标签偏移 4px，纯色徽标展示「公示操作记录」，背景透明纯色
+      - 步骤 11-12: 线上普通用户/参观者访问 `/audit-report`，彻底隐藏上方 4 组 KPI 选框与管理按钮，隐藏复选框，成功呈现纯公开表格
+    - [x] **生产现场实测截图留存**：
+      - `tests/live_prod_sys_setting_audit_card.png` (系统设置卡片)
+      - `tests/live_prod_status_bar.png` (状态栏纯色提示)
+      - `tests/live_prod_full_sys_setting.png` (系统设置整页)
+      - `tests/live_prod_visitor_audit_table.png` (生产环境参观者纯表格视图)
     - [x] 多语言绝对对称检测：`node scripts/i18n-symmetry.mjs` 全绿通过 (3029 keys 绝对对称)
     - [x] 代码字面量引用审计：`node scripts/i18n-audit.mjs` 0 缺失
-    - [x] 前端全真栈生产构建：`mail-vue` Vite 构建通过 (2583 模块转换完成，耗时 27.55s)
+    - [x] 前端全真栈生产构建：`mail-vue` Vite 构建通过 (2583 模块转换完成，耗时 30.70s)
     - [x] 零假数据残留：测试代码零硬编码假数据，无泄漏风险
 
 ### EpoMail v1.2.0 稳定版正式发布与 Cloudflare 生产环境全量上线 (2026-10-25)

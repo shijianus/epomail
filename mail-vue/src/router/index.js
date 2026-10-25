@@ -462,9 +462,10 @@ router.beforeEach(async (to, from, next) => {
 
         const user = userStore.user;
         const canManage = hasAnyManagePermission(user);
+        const isPublicAuditRoute = to.name === 'manage-audit' || toPath.includes('/audit');
 
-        // 越权阻断：当前身份组完全无管理权限，立即拦截并重定向到个人设置中心
-        if (!canManage) {
+        // 越权阻断：当前身份组完全无管理权限，立即拦截并重定向到个人设置中心 (公开操作记录向全员开放公开表单)
+        if (!canManage && !isPublicAuditRoute) {
             ElMessage.error(i18n.global.t('unauthorizedAccess') || '越权访问拦截：无权访问该管理模块');
             next({ path: '/settings/profile', replace: true });
             return;
@@ -479,8 +480,12 @@ router.beforeEach(async (to, from, next) => {
             return;
         }
 
-        // 单项细分权限校验：若无此子页面权限，越权阻断并重定向至第一可用子项
+        // 单项细分权限校验：若无此子页面权限，越权阻断并重定向至第一可用子项 (公开操作记录向全员开放公开表单)
         if (to.meta?.perm && !hasPerm(to.meta.perm)) {
+            if (isPublicAuditRoute) {
+                next();
+                return;
+            }
             ElMessage.error(i18n.global.t('unauthorizedAccess') || '越权访问拦截：无权访问该管理模块');
             const firstTab = getFirstAllowedManageTab(user);
             next({ path: `/manage/${userRoleGroup}/${firstTab}`, replace: true });
@@ -490,6 +495,10 @@ router.beforeEach(async (to, from, next) => {
         // URL 角色分组绑定与防篡改：若 URL 中的 roleGroup 与当前用户实际身份组不一致，规范化重定向
         const targetRoleGroup = to.params.roleGroup;
         if (targetRoleGroup && targetRoleGroup !== userRoleGroup) {
+            if (isPublicAuditRoute) {
+                next({ path: '/audit-report', replace: true });
+                return;
+            }
             const tab = to.path.split('/').filter(Boolean).pop() || getFirstAllowedManageTab(user);
             next({ path: `/manage/${userRoleGroup}/${tab}`, replace: true });
             return;
