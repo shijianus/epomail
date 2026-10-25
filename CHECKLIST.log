@@ -11,6 +11,33 @@
 
 ---
 
+### 安全候选 bf1a008 定向验收与三项交付缺陷修复 (2026-10-25)
+*   **关联提交 (Git Commit)**: `31915a753f1a2c3b079e8066151d703857bb336f` (Short: `31915a7`)
+*   **部署环境 (Deployment)**: 独立 worktree `D:/Users/Smart Kevin/epomail-acceptance-bf1a008`（detached `bf1a008`）；本地 workerd + D1 + KV；**未部署生产、未触碰 master、未推送其他分支**
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 初始受审候选 `bf1a0089aaa0c9927aa3c3ec2b9da4cd5458bda2`；远端 `security/audit-2026-10-25` 用 `git ls-remote` 校验一致。
+    - [x] **P0 RBAC**：`/user/add` 原先未传操作者、未校验目标角色，仅持 `user:add` 的非管理员可创建 `type=master` 用户并登录访问管理员接口；现传入 `callerUserId` 并在写入前执行 `assertCanAssignRole`。
+    - [x] **P1 RBAC**：`/user/setType` 仅校验“可分配新角色”，未校验“可管理目标当前角色”，低权限者可降权高权限用户；现增加 `assertCanManageUser`。
+    - [x] **P1 Webhook**：`updateEmailStatus` 未 `await` D1 更新 Promise，投影异常无法回传且可能未落地；调用方又吞掉异常，导致事件已记台账但邮件状态永久漏更新。现改为真正 async/await，投影失败时向上抛错、台账保持未处理，提供商重试可收敛。
+    - [x] 新增 `mail-worker/test/security-delivery.spec.js`（10 项，真实 workerd+D1/KV）：RBAC 正反例、角色质量赋值、OAuth bind token 身份绑定/单次消费/拒绝重绑、Webhook 投影失败/重放/乱序/对象隔离。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 干净按锁文件安装：`mail-worker`、`mail-vue`、`temp_login_ui` 均 `pnpm install --frozen-lockfile` 成功。
+    - [x] 修复前同一回归集：`38` 项中 `3` 项失败，分别对应 `user/add`、`setType`、Webhook 投影异常（原始证据已存仓库外）。
+    - [x] 修复后同一回归集：`npx vitest run` → **4 files / 38 tests passed**。
+    - [x] Worker 打包：`wrangler deploy --dry-run --config wrangler-vitest.toml` 成功（5332.79 KiB / gzip 1100.00 KiB）。
+    - [x] 前端构建：`temp_login_ui`（Vite）+ `mail-vue`（Vite + PWA + copy-login-dist）均成功。
+    - [x] 定向探针：OSS/KV 隔离、跨用户附件/邮件详情、密码旧哈希迁移/改密会话失效、上传伪造类型、OAuth RS256/SSRF/Webhook 边界均按预期。
+    - [x] 工作区 Secret 扫描：`node scripts/secret-scan.mjs` → 1214 files，0 命中；暂存区扫描 0 命中（gitleaks 未安装，仅内置规则）。
+    - [x] 依赖审计：`mail-vue pnpm audit --prod` 仅 1 moderate（ECharts <6.1.0），按计划不盲目升级。
+*   **未执行/需人工处置 (Manual Follow-up)**:
+    - [ ] **基线冷启动阻断**：全新 D1 上 `POST /api/init` 在 `settingService.refresh` 失败（`setting` 表 100 列上限，实体 102 列，`oauth_login_enabled`/`oauth_providers` ALTER 被拒）；代码层对比 `3ba9e90` 同为 102 列，非本批引入，需独立 schema 方案。
+    - [ ] OAuth state/nonce 未实现服务端校验（现有 `exchangeCodeAndLogin` 只读取 code/id_token/redirectUri）；需浏览器会话绑定设计，本轮未扩展架构。
+    - [ ] `/api/oss/attachments/<content-hash>` 仍为公开 capability URL（邮件图片外链设计），仅凭 128-bit 内容哈希不可枚举；跨用户 `/oss-url` 已拒绝。
+    - [ ] 生产凭据轮换、历史清污、账号处置仍需 owner 单独授权与执行；本轮未访问生产 API、未发送真实邮件、未执行 Cloudflare 迁移/Secret 变更。
+    - [ ] 统一全仓渗透测试未执行，本轮仅为八组定向验收。
+
+---
+
 ### 全仓库安全审计与凭据泄露修复 · /oss KV 越权 + OAuth/存储型 XSS + 历史密钥 (2026-10-25)
 *   **关联提交 (Git Commit)**: `d23b70d150e7a6e3b8a1793a27253a6d1f6b8a55` (Short: `d23b70d`); 审计归档提交见置顶汇报
 *   **部署环境 (Deployment)**: 本地 workerd 全真栈测试 (D1+KV) + `wrangler deploy --dry-run` + `vite build`；**未部署生产、未推送远端**
