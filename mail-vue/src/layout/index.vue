@@ -57,12 +57,12 @@ const isMobile = ref(window.innerWidth < 1025)
 const isSettingsMode = computed(() => {
   const name = route.name;
   const path = route.path || '';
-  if (path.startsWith('/manage') || path.startsWith('/admin') || path.startsWith('/settings')) return true;
+  if (path.startsWith('/manage') || path.startsWith('/admin') || path.startsWith('/settings') || path.startsWith('/audit')) return true;
   return [
     'user-profile', 'profile', 'general-setting', 'profile-setting', 'setting', 'data-setting', 'label-setting',
     'manage-root', 'manage-role-root', 'admin-root',
-    'manage-analysis', 'manage-users', 'manage-mail', 'manage-roles', 'manage-reg-keys', 'manage-system', 'manage-apps', 'manage-rules',
-    'category-setting', 'analysis', 'user', 'all-email', 'role', 'reg-key', 'sys-setting', 'oauth-app'
+    'manage-analysis', 'manage-users', 'manage-mail', 'manage-roles', 'manage-reg-keys', 'manage-system', 'manage-apps', 'manage-rules', 'manage-audit',
+    'category-setting', 'analysis', 'user', 'all-email', 'role', 'reg-key', 'sys-setting', 'oauth-app', 'audit-report'
   ].includes(name);
 })
 

@@ -14,10 +14,30 @@ function timingSafeEqual(a, b) {
 
 const dbInit = {
 	async init(c) {
-		const provided = c.req.header('x-init-secret') || c.req.param('secret') || '';
-		const expected = c.env.init_secret || c.env.jwt_secret;
+		const authHeader = c.req.header('Authorization') || '';
+		const xInitSecret = c.req.header('X-Init-Secret') || '';
+		let secret = xInitSecret;
+		if (!secret && authHeader.startsWith('Bearer ')) {
+			secret = authHeader.substring(7).trim();
+		}
+		if (!secret && c.req.method === 'POST') {
+			try {
+				const body = await c.req.json().catch(() => ({}));
+				secret = body.secret || '';
+			} catch (_) {}
+		}
+		if (!secret) {
+			const urlSecret = c.req.param('secret');
+			if (urlSecret) {
+				if (c?.env?.ALLOW_URL_INIT === 'false' || c?.env?.ENVIRONMENT === 'staging') {
+					return c.text('❌ Passing initialization secret via URL is prohibited in this environment. Use POST /api/init with X-Init-Secret header.', 403);
+				}
+				secret = urlSecret;
+			}
+		}
 
-		if (!expected || !timingSafeEqual(provided, expected)) {
+		const expected = c.env.init_secret || c.env.jwt_secret;
+		if (!expected || !secret || !timingSafeEqual(secret, expected)) {
 			return c.text('❌ Forbidden', 403);
 		}
 
@@ -55,6 +75,8 @@ const dbInit = {
 		await this.v3_14DB(c);
 		await this.v3_15DB(c);
 		await this.v3_16DB(c);
+		await this.v3_17DB(c);
+		await this.v3_18DB(c);
 		await settingService.refresh(c);
 		const generatedAdminPassword = c.get('generatedAdminPassword');
 		if (generatedAdminPassword) {
@@ -72,7 +94,8 @@ const dbInit = {
 			{ name: 'allow_attachment', sql: `ALTER TABLE role ADD COLUMN allow_attachment INTEGER DEFAULT 0;` },
 			{ name: 'role_code', sql: `ALTER TABLE role ADD COLUMN role_code TEXT DEFAULT 'custom';` },
 			{ name: 'tag_text', sql: `ALTER TABLE role ADD COLUMN tag_text TEXT DEFAULT '';` },
-			{ name: 'tag_color', sql: `ALTER TABLE role ADD COLUMN tag_color TEXT DEFAULT '';` }
+			{ name: 'tag_color', sql: `ALTER TABLE role ADD COLUMN tag_color TEXT DEFAULT '';` },
+			{ name: 'ai_models', sql: `ALTER TABLE role ADD COLUMN ai_models TEXT DEFAULT '';` }
 		];
 
 		for (const col of roleColumns) {
@@ -257,6 +280,257 @@ const dbInit = {
 			`).run();
 		} catch (e) {
 			console.warn('visitor user:query cleanup warning:', e.message);
+		}
+	},
+
+	// v3_18DB: 系统设置操作报告与IP风控持久化配置迁移
+	async v3_18DB(c) {
+		const userDb = getUserDb(c);
+		const settingCols = [
+			{ name: 'audit_log_enabled', sql: `ALTER TABLE setting ADD COLUMN audit_log_enabled INTEGER NOT NULL DEFAULT 1;` },
+			{ name: 'audit_max_ip_per_account', sql: `ALTER TABLE setting ADD COLUMN audit_max_ip_per_account INTEGER NOT NULL DEFAULT 3;` },
+			{ name: 'audit_max_device_per_account', sql: `ALTER TABLE setting ADD COLUMN audit_max_device_per_account INTEGER NOT NULL DEFAULT 3;` },
+			{ name: 'audit_auto_clean_oldest', sql: `ALTER TABLE setting ADD COLUMN audit_auto_clean_oldest INTEGER NOT NULL DEFAULT 1;` },
+			{ name: 'audit_prioritize_non_critical_clean', sql: `ALTER TABLE setting ADD COLUMN audit_prioritize_non_critical_clean INTEGER NOT NULL DEFAULT 1;` },
+			{ name: 'audit_critical_quota', sql: `ALTER TABLE setting ADD COLUMN audit_critical_quota INTEGER NOT NULL DEFAULT 3;` }
+		];
+
+		const tableInfo = await userDb.prepare(`PRAGMA table_info('setting')`).all().catch(() => ({ results: [] }));
+		const existingCols = new Set((tableInfo?.results || []).map(r => r.name));
+		for (const col of settingCols) {
+			if (!existingCols.has(col.name)) {
+				try {
+					await userDb.prepare(col.sql).run();
+				} catch (err) {
+					console.warn(`v3_18DB 跳过 setting 列 ${col.name}:`, err.message);
+				}
+			}
+		}
+	},
+
+	// v3_17DB: 违规裁决闭环迁移：
+	// 1. 补齐 audit_log 全量决策与并发控制字段（version, idempotency_key, decision_id, original_decision_id 等）；
+	// 2. 建立 notification_outbox 最终通知发信与重试任务表；
+	// 3. 建立 audit_purge_batch 审计归档批次表。
+	async v3_17DB(c) {
+		const userDb = getUserDb(c);
+		const auditLogCols = [
+			{ name: 'base_ip', sql: `ALTER TABLE audit_log ADD COLUMN base_ip TEXT;` },
+			{ name: 'base_geo', sql: `ALTER TABLE audit_log ADD COLUMN base_geo TEXT;` },
+			{ name: 'base_device', sql: `ALTER TABLE audit_log ADD COLUMN base_device TEXT;` },
+			{ name: 'base_fingerprint', sql: `ALTER TABLE audit_log ADD COLUMN base_fingerprint TEXT;` },
+			{ name: 'resolved_time', sql: `ALTER TABLE audit_log ADD COLUMN resolved_time TEXT;` },
+			{ name: 'ban_reason', sql: `ALTER TABLE audit_log ADD COLUMN ban_reason TEXT;` },
+			{ name: 'ban_time', sql: `ALTER TABLE audit_log ADD COLUMN ban_time TEXT;` },
+			{ name: 'is_internal', sql: `ALTER TABLE audit_log ADD COLUMN is_internal INTEGER DEFAULT 0;` },
+			{ name: 'report_category', sql: `ALTER TABLE audit_log ADD COLUMN report_category TEXT;` },
+			{ name: 'report_reason', sql: `ALTER TABLE audit_log ADD COLUMN report_reason TEXT;` },
+			{ name: 'cluster_id', sql: `ALTER TABLE audit_log ADD COLUMN cluster_id TEXT;` },
+			{ name: 'assignee', sql: `ALTER TABLE audit_log ADD COLUMN assignee TEXT;` },
+			{ name: 'report_source', sql: `ALTER TABLE audit_log ADD COLUMN report_source TEXT;` },
+			{ name: 'evidence_summary', sql: `ALTER TABLE audit_log ADD COLUMN evidence_summary TEXT;` },
+			{ name: 'circuit_status', sql: `ALTER TABLE audit_log ADD COLUMN circuit_status TEXT DEFAULT 'NORMAL';` },
+			{ name: 'reason_code', sql: `ALTER TABLE audit_log ADD COLUMN reason_code TEXT;` },
+			{ name: 'timeline', sql: `ALTER TABLE audit_log ADD COLUMN timeline TEXT;` },
+			{ name: 'version', sql: `ALTER TABLE audit_log ADD COLUMN version INTEGER DEFAULT 1;` },
+			{ name: 'idempotency_key', sql: `ALTER TABLE audit_log ADD COLUMN idempotency_key TEXT;` },
+			{ name: 'decision_id', sql: `ALTER TABLE audit_log ADD COLUMN decision_id TEXT;` },
+			{ name: 'original_decision_id', sql: `ALTER TABLE audit_log ADD COLUMN original_decision_id TEXT;` }
+		];
+
+		const tableInfo = await userDb.prepare(`PRAGMA table_info('audit_log')`).all().catch(() => ({ results: [] }));
+		const existingCols = new Set((tableInfo?.results || []).map(r => r.name));
+		for (const col of auditLogCols) {
+			if (!existingCols.has(col.name)) {
+				try {
+					await userDb.prepare(col.sql).run();
+				} catch (err) {
+					console.warn(`v3_17DB 跳过 audit_log 列 ${col.name}:`, err.message);
+				}
+			}
+		}
+
+		try {
+			await userDb.prepare(`
+				CREATE TABLE IF NOT EXISTS notification_outbox (
+					id INTEGER PRIMARY KEY AUTOINCREMENT,
+					task_id TEXT NOT NULL UNIQUE,
+					case_id INTEGER,
+					ticket_id TEXT,
+					user_id INTEGER,
+					recipient TEXT NOT NULL,
+					channel TEXT NOT NULL DEFAULT 'internal',
+					template_code TEXT NOT NULL,
+					subject TEXT NOT NULL,
+					content TEXT NOT NULL,
+					reason_code TEXT,
+					status TEXT NOT NULL DEFAULT 'pending',
+					provider_message_id TEXT,
+					retry_count INTEGER NOT NULL DEFAULT 0,
+					max_retries INTEGER NOT NULL DEFAULT 5,
+					last_error TEXT,
+					next_retry_at TEXT,
+					delivered_at TEXT,
+					read_at TEXT,
+					claimant_id TEXT,
+					lease_expires_at TEXT,
+					lease_version INTEGER DEFAULT 0,
+					create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+					update_time DATETIME DEFAULT CURRENT_TIMESTAMP
+				)
+			`).run();
+			await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_outbox_status_retry ON notification_outbox(status, next_retry_at)`).run();
+			await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_outbox_case_id ON notification_outbox(case_id)`).run();
+			await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_outbox_recipient ON notification_outbox(recipient)`).run();
+
+			// 幂等升级 notification_outbox 租约并发与故障恢复字段
+			const outboxInfo = await userDb.prepare(`PRAGMA table_info('notification_outbox')`).all().catch(() => ({ results: [] }));
+			const existingOutboxCols = new Set((outboxInfo?.results || []).map(r => r.name));
+			const outboxLeaseCols = [
+				{ name: 'claimant_id', sql: `ALTER TABLE notification_outbox ADD COLUMN claimant_id TEXT;` },
+				{ name: 'lease_expires_at', sql: `ALTER TABLE notification_outbox ADD COLUMN lease_expires_at TEXT;` },
+				{ name: 'lease_version', sql: `ALTER TABLE notification_outbox ADD COLUMN lease_version INTEGER DEFAULT 0;` }
+			];
+			for (const col of outboxLeaseCols) {
+				if (!existingOutboxCols.has(col.name)) {
+					try {
+						await userDb.prepare(col.sql).run();
+					} catch (e) {
+						console.warn(`v3_17DB 跳过 notification_outbox 列 ${col.name}:`, e.message);
+					}
+				}
+			}
+		} catch (err) {
+			console.warn('v3_17DB notification_outbox warning:', err.message);
+		}
+
+		try {
+			await userDb.prepare(`
+				CREATE TABLE IF NOT EXISTS audit_decision (
+					decision_id TEXT PRIMARY KEY,
+					case_id INTEGER NOT NULL,
+					expected_version INTEGER NOT NULL,
+					expected_status TEXT,
+					action_type TEXT NOT NULL,
+					actor TEXT NOT NULL,
+					idempotency_key TEXT UNIQUE,
+					payload_hash TEXT NOT NULL,
+					create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+					UNIQUE(case_id, expected_version)
+				)
+			`).run();
+			try {
+				const col = await userDb.prepare(`SELECT * FROM pragma_table_info('audit_decision') WHERE name = 'expected_status' LIMIT 1`).first();
+				if (!col) {
+					await userDb.prepare(`ALTER TABLE audit_decision ADD COLUMN expected_status TEXT;`).run();
+				}
+			} catch (_) {}
+			await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_audit_decision_case ON audit_decision(case_id)`).run();
+			await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_audit_decision_idemp ON audit_decision(idempotency_key)`).run();
+		} catch (err) {
+			console.warn('v3_17DB audit_decision warning:', err.message);
+		}
+
+		try {
+			await userDb.prepare(`
+				CREATE TABLE IF NOT EXISTS webhook_event (
+					event_id TEXT PRIMARY KEY,
+					provider TEXT NOT NULL,
+					event_type TEXT NOT NULL,
+					resource_id TEXT,
+					payload TEXT,
+					status TEXT NOT NULL DEFAULT 'processed',
+					create_time DATETIME DEFAULT CURRENT_TIMESTAMP
+				)
+			`).run();
+			await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_webhook_event_resource ON webhook_event(resource_id)`).run();
+		} catch (err) {
+			console.warn('v3_17DB webhook_event warning:', err.message);
+		}
+
+		try {
+			await userDb.prepare(`
+				CREATE TABLE IF NOT EXISTS audit_purge_batch (
+					id TEXT PRIMARY KEY,
+					count INTEGER NOT NULL DEFAULT 0,
+					reason TEXT NOT NULL,
+					create_time DATETIME DEFAULT CURRENT_TIMESTAMP
+				)
+			`).run();
+			await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_audit_purge_batch_time ON audit_purge_batch(create_time)`).run();
+		} catch (err) {
+			console.warn('v3_17DB audit_purge_batch warning:', err.message);
+		}
+
+		// 申诉材料独立台账（第二轮修复）：冷启动引导链同步建表，
+		// 与 audit-service.ensureTables 的幂等迁移定义保持完全一致
+		try {
+			await userDb.prepare(`
+				CREATE TABLE IF NOT EXISTS audit_appeal (
+					appeal_id TEXT PRIMARY KEY,
+					case_id INTEGER NOT NULL,
+					source_case_id INTEGER,
+					decision_id TEXT,
+					user_id INTEGER,
+					email TEXT NOT NULL,
+					round INTEGER NOT NULL,
+					content TEXT NOT NULL,
+					status TEXT NOT NULL DEFAULT 'pending',
+					decision_action TEXT,
+					decision_notes TEXT,
+					decided_by TEXT,
+					decided_at TEXT,
+					create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+					update_time DATETIME,
+					UNIQUE(case_id, round)
+				)
+			`).run();
+			await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_audit_appeal_case ON audit_appeal(case_id)`).run();
+			await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_audit_appeal_status ON audit_appeal(status)`).run();
+		} catch (err) {
+			console.warn('v3_17DB audit_appeal warning:', err.message);
+		}
+
+		try {
+			await userDb.prepare(`
+				CREATE TABLE IF NOT EXISTS one_time_exchange_code (
+					code_hash TEXT PRIMARY KEY,
+					user_id INTEGER NOT NULL,
+					email TEXT NOT NULL,
+					case_id TEXT,
+					token_payload TEXT NOT NULL,
+					consumed INTEGER NOT NULL DEFAULT 0,
+					expires_at INTEGER NOT NULL,
+					create_time DATETIME DEFAULT CURRENT_TIMESTAMP
+				)
+			`).run();
+			await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_exchange_code_expires ON one_time_exchange_code(expires_at)`).run();
+		} catch (err) {
+			console.warn('v3_17DB one_time_exchange_code warning:', err.message);
+		}
+
+		try {
+			await userDb.prepare(`DROP TRIGGER IF EXISTS trg_audit_decision_version_guard;`).run();
+			await userDb.prepare(`
+				CREATE TRIGGER IF NOT EXISTS trg_audit_decision_version_guard
+				BEFORE INSERT ON audit_decision
+				BEGIN
+					SELECT CASE
+						WHEN (SELECT id FROM audit_log WHERE id = NEW.case_id) IS NULL
+						THEN RAISE(ABORT, 'Audit case not found')
+						WHEN NEW.expected_version IS NULL
+							OR (SELECT version FROM audit_log WHERE id = NEW.case_id) IS NULL
+							OR typeof((SELECT version FROM audit_log WHERE id = NEW.case_id)) != 'integer'
+							OR (SELECT version FROM audit_log WHERE id = NEW.case_id) < 1
+							OR (SELECT version FROM audit_log WHERE id = NEW.case_id) != NEW.expected_version
+						THEN RAISE(ABORT, 'Audit log version mismatch: stale or invalid case version')
+						WHEN NEW.expected_status IS NULL OR TRIM(NEW.expected_status) = '' OR (SELECT status FROM audit_log WHERE id = NEW.case_id) IS NULL OR TRIM((SELECT status FROM audit_log WHERE id = NEW.case_id)) = '' OR (SELECT status FROM audit_log WHERE id = NEW.case_id) != NEW.expected_status OR (SELECT status FROM audit_log WHERE id = NEW.case_id) NOT IN ('active', 'pending', 'banned', 'unbanned', 'resolved', 'rejected', 'expired')
+						THEN RAISE(ABORT, 'Audit log status mismatch: case state changed or status invalid')
+					END;
+				END;
+			`).run();
+		} catch (err) {
+			console.warn('v3_17DB trg_audit_decision_version_guard warning:', err.message);
 		}
 	},
 
@@ -1172,7 +1446,13 @@ const dbInit = {
 					is_default INTEGER DEFAULT 0,
 					send_count INTEGER,
 					send_type TEXT NOT NULL DEFAULT 'count',
-					account_count INTEGER
+					account_count INTEGER,
+					storage_quota_mb INTEGER DEFAULT 5,
+					allow_attachment INTEGER DEFAULT 0,
+					role_code TEXT DEFAULT 'custom',
+					tag_text TEXT DEFAULT '',
+					tag_color TEXT DEFAULT '',
+					ai_models TEXT DEFAULT ''
 				)
 			`).run();
 
@@ -1306,7 +1586,13 @@ const dbInit = {
 				title TEXT NOT NULL,
 				auto_refresh INTEGER NOT NULL,
 				register_verify INTEGER NOT NULL,
-				add_email_verify INTEGER NOT NULL
+				add_email_verify INTEGER NOT NULL,
+				audit_log_enabled INTEGER DEFAULT 1,
+				audit_max_ip_per_account INTEGER DEFAULT 3,
+				audit_max_device_per_account INTEGER DEFAULT 3,
+				audit_auto_clean_oldest INTEGER DEFAULT 1,
+				audit_prioritize_non_critical_clean INTEGER DEFAULT 1,
+				audit_critical_quota INTEGER DEFAULT 3
 			)
 		`).run();
 
@@ -1338,6 +1624,10 @@ const dbInit = {
 				device TEXT,
 				device_type TEXT DEFAULT 'desktop',
 				fingerprint TEXT,
+				base_ip TEXT,
+				base_geo TEXT,
+				base_device TEXT,
+				base_fingerprint TEXT,
 				is_reg_ip INTEGER DEFAULT 0,
 				is_multi_ip INTEGER DEFAULT 0,
 				active_ip_count INTEGER DEFAULT 1,
@@ -1354,9 +1644,119 @@ const dbInit = {
 				is_internal INTEGER DEFAULT 0,
 				report_category TEXT,
 				report_reason TEXT,
+				cluster_id TEXT,
+				assignee TEXT,
+				report_source TEXT,
+				evidence_summary TEXT,
+				circuit_status TEXT DEFAULT 'NORMAL',
+				reason_code TEXT,
+				timeline TEXT,
 				resolved_time DATETIME,
+				version INTEGER DEFAULT 1,
+				idempotency_key TEXT,
+				decision_id TEXT,
+				original_decision_id TEXT,
 				create_time DATETIME DEFAULT CURRENT_TIMESTAMP
 			)
+		`).run();
+
+		await userDb.prepare(`
+			CREATE TABLE IF NOT EXISTS notification_outbox (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				task_id TEXT NOT NULL UNIQUE,
+				case_id INTEGER,
+				ticket_id TEXT,
+				user_id INTEGER,
+				recipient TEXT NOT NULL,
+				channel TEXT NOT NULL DEFAULT 'internal',
+				template_code TEXT NOT NULL,
+				subject TEXT NOT NULL,
+				content TEXT NOT NULL,
+				reason_code TEXT,
+				status TEXT NOT NULL DEFAULT 'pending',
+				provider_message_id TEXT,
+				retry_count INTEGER NOT NULL DEFAULT 0,
+				max_retries INTEGER NOT NULL DEFAULT 5,
+				last_error TEXT,
+				next_retry_at TEXT,
+				delivered_at TEXT,
+				read_at TEXT,
+				claimant_id TEXT,
+				lease_expires_at TEXT,
+				lease_version INTEGER DEFAULT 0,
+				create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+				update_time DATETIME DEFAULT CURRENT_TIMESTAMP
+			)
+		`).run();
+
+		await userDb.prepare(`
+			CREATE TABLE IF NOT EXISTS audit_decision (
+				decision_id TEXT PRIMARY KEY,
+				case_id INTEGER NOT NULL,
+				expected_version INTEGER NOT NULL,
+				expected_status TEXT,
+				action_type TEXT NOT NULL,
+				actor TEXT NOT NULL,
+				idempotency_key TEXT UNIQUE,
+				payload_hash TEXT NOT NULL,
+				create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+				UNIQUE(case_id, expected_version)
+			)
+		`).run();
+
+		await userDb.prepare(`
+			CREATE TABLE IF NOT EXISTS webhook_event (
+				event_id TEXT PRIMARY KEY,
+				provider TEXT NOT NULL,
+				event_type TEXT NOT NULL,
+				resource_id TEXT,
+				payload TEXT,
+				status TEXT NOT NULL DEFAULT 'processed',
+				create_time DATETIME DEFAULT CURRENT_TIMESTAMP
+			)
+		`).run();
+
+		await userDb.prepare(`
+			CREATE TABLE IF NOT EXISTS audit_purge_batch (
+				id TEXT PRIMARY KEY,
+				count INTEGER NOT NULL DEFAULT 0,
+				reason TEXT NOT NULL,
+				create_time DATETIME DEFAULT CURRENT_TIMESTAMP
+			)
+		`).run();
+
+		await userDb.prepare(`
+			CREATE TABLE IF NOT EXISTS one_time_exchange_code (
+				code_hash TEXT PRIMARY KEY,
+				user_id INTEGER NOT NULL,
+				email TEXT NOT NULL,
+				case_id TEXT,
+				token_payload TEXT NOT NULL,
+				consumed INTEGER NOT NULL DEFAULT 0,
+				expires_at INTEGER NOT NULL,
+				create_time DATETIME DEFAULT CURRENT_TIMESTAMP
+			)
+		`).run();
+		await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_exchange_code_expires ON one_time_exchange_code(expires_at)`).run();
+
+		await userDb.prepare(`DROP TRIGGER IF EXISTS trg_audit_decision_version_guard;`).run();
+		await userDb.prepare(`
+			CREATE TRIGGER IF NOT EXISTS trg_audit_decision_version_guard
+			BEFORE INSERT ON audit_decision
+			BEGIN
+				SELECT CASE
+					WHEN (SELECT id FROM audit_log WHERE id = NEW.case_id) IS NULL
+					THEN RAISE(ABORT, 'Audit case not found')
+					WHEN NEW.expected_version IS NULL
+						OR (SELECT version FROM audit_log WHERE id = NEW.case_id) IS NULL
+						OR typeof((SELECT version FROM audit_log WHERE id = NEW.case_id)) != 'integer'
+						OR (SELECT version FROM audit_log WHERE id = NEW.case_id) < 1
+						OR (SELECT version FROM audit_log WHERE id = NEW.case_id) != NEW.expected_version
+					THEN RAISE(ABORT, 'Audit log version mismatch: stale or invalid case version')
+					WHEN NEW.expected_status IS NULL OR TRIM(NEW.expected_status) = '' OR (SELECT status FROM audit_log WHERE id = NEW.case_id) IS NULL OR TRIM((SELECT status FROM audit_log WHERE id = NEW.case_id)) = '' OR (SELECT status FROM audit_log WHERE id = NEW.case_id) != NEW.expected_status OR (SELECT status FROM audit_log WHERE id = NEW.case_id) NOT IN ('active', 'pending', 'banned', 'unbanned', 'resolved', 'rejected', 'expired')
+					THEN RAISE(ABORT, 'Audit log status mismatch: case state changed or status invalid')
+				END;
+			END;
 		`).run();
 	},
 

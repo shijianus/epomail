@@ -1,5 +1,5 @@
 import {createRouter} from 'vue-router'
-import createAccountHistory from './account-history.js';
+import createAccountHistory, { parseCaseDeepLink } from './account-history.js';
 import NProgress from 'nprogress';
 import {useUiStore} from "@/store/ui.js";
 import {useSettingStore} from "@/store/setting.js";
@@ -325,12 +325,27 @@ const routes = [
         name: 'oauth-authorize',
         component: () => import('@/views/oauth/authorize.vue')
     },
+    {
+        path: '/notice/restricted',
+        name: 'restricted-notice',
+        component: () => import('@/views/notice/restricted-notice.vue'),
+        meta: {
+            title: 'restrictedNotice',
+            name: 'restricted-notice'
+        }
+    },
     // /test 仅开发模式注册，不暴露生产
     ...(import.meta.env.DEV ? [{
         path: '/test',
         name: 'test',
         component: () => import('@/views/test/index.vue')
     }] : []),
+    // 案件全宗档案深链接路由拦截：避免被贪婪匹配至 /:username (profile)
+    {
+        path: '/case=:caseParam(.*)',
+        name: 'case-deep-link-route',
+        redirect: () => '/audit-report'
+    },
     {
         path: '/:username',
         name: 'profile',
@@ -391,7 +406,7 @@ router.beforeEach(async (to, from, next) => {
         'manage', 'admin', 'moderator',
         'system-setting', 'sys-setting', 'all-users', 'role', 'roles',
         'reg-key', 'invite-code', 'analysis', 'oauth-apps', 'oauth-app', 'settings',
-        'category', 'category-setting', 'audit', 'audit-report', 'risk'
+        'category', 'category-setting', 'audit', 'audit-report', 'risk', 'case'
     ];
     if (!token && to.name === 'profile' && protectedSystemPaths.includes(to.params.username?.toLowerCase())) {
         removeLoading();
@@ -399,8 +414,24 @@ router.beforeEach(async (to, from, next) => {
         return;
     }
 
+    // 2.1 案件全宗档案深链接防误入 Profile：
+    // 若当前地址为案件上下文或 username 含 case=/等号，绝非个人资料页，立即转向审计管理中心
+    if (to.name === 'profile') {
+        const rawUsername = String(to.params.username || '');
+        const caseLink = parseCaseDeepLink();
+        if (caseLink.isCaseLink || rawUsername.includes('case=') || rawUsername.startsWith('case=') || rawUsername.includes('=')) {
+            if (token) {
+                next({ path: '/audit-report', replace: true });
+            } else {
+                removeLoading();
+                window.location.replace('/login/');
+            }
+            return;
+        }
+    }
+
     // 3. 无 token 且访问受保护的内部路由：立即硬重定向到登录页
-    if (!token && !['login', 'profile', 'oauth-authorize'].includes(to.name)) {
+    if (!token && !['login', 'profile', 'oauth-authorize', 'restricted-notice'].includes(to.name)) {
         removeLoading();
         window.location.replace('/login/');
         return;
@@ -431,9 +462,10 @@ router.beforeEach(async (to, from, next) => {
 
         const user = userStore.user;
         const canManage = hasAnyManagePermission(user);
+        const isPublicAuditRoute = to.name === 'manage-audit' || toPath.includes('/audit');
 
-        // 越权阻断：当前身份组完全无管理权限，立即拦截并重定向到个人设置中心
-        if (!canManage) {
+        // 越权阻断：当前身份组完全无管理权限，立即拦截并重定向到个人设置中心 (公开操作记录向全员开放公开表单)
+        if (!canManage && !isPublicAuditRoute) {
             ElMessage.error(i18n.global.t('unauthorizedAccess') || '越权访问拦截：无权访问该管理模块');
             next({ path: '/settings/profile', replace: true });
             return;
@@ -448,8 +480,12 @@ router.beforeEach(async (to, from, next) => {
             return;
         }
 
-        // 单项细分权限校验：若无此子页面权限，越权阻断并重定向至第一可用子项
+        // 单项细分权限校验：若无此子页面权限，越权阻断并重定向至第一可用子项 (公开操作记录向全员开放公开表单)
         if (to.meta?.perm && !hasPerm(to.meta.perm)) {
+            if (isPublicAuditRoute) {
+                next();
+                return;
+            }
             ElMessage.error(i18n.global.t('unauthorizedAccess') || '越权访问拦截：无权访问该管理模块');
             const firstTab = getFirstAllowedManageTab(user);
             next({ path: `/manage/${userRoleGroup}/${firstTab}`, replace: true });
@@ -459,6 +495,10 @@ router.beforeEach(async (to, from, next) => {
         // URL 角色分组绑定与防篡改：若 URL 中的 roleGroup 与当前用户实际身份组不一致，规范化重定向
         const targetRoleGroup = to.params.roleGroup;
         if (targetRoleGroup && targetRoleGroup !== userRoleGroup) {
+            if (isPublicAuditRoute) {
+                next({ path: '/audit-report', replace: true });
+                return;
+            }
             const tab = to.path.split('/').filter(Boolean).pop() || getFirstAllowedManageTab(user);
             next({ path: `/manage/${userRoleGroup}/${tab}`, replace: true });
             return;

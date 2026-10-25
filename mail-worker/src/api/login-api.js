@@ -5,7 +5,7 @@ import userContext from '../security/user-context';
 
 app.post('/login', async (c) => {
 	const loginRes = await loginService.login(c, await c.req.json());
-	if (typeof loginRes === 'object' && loginRes.mfaRequired) {
+	if (typeof loginRes === 'object' && (loginRes.mfaRequired || loginRes.isRestricted)) {
 		return c.json(result.ok(loginRes));
 	}
 	if (typeof loginRes === 'object' && loginRes.token) {

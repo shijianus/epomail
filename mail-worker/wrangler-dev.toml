@@ -35,6 +35,9 @@ run_worker_first = true
 #name = "email"
 
 
+[triggers]
+crons = ["0 0 * * *", "*/5 * * * *"]
+
 [vars]
 DEV = "true"
 ai_model = ""

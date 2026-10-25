@@ -23,10 +23,13 @@ import totpUtils from '../utils/totp-utils.js';
 import webauthnUtils from '../utils/webauthn-utils.js';
 import orm from '../entity/orm.js';
 import user from '../entity/user.js';
-import { eq } from 'drizzle-orm';
+import { auditLog } from '../entity/audit-log.js';
+import { eq, and, desc } from 'drizzle-orm';
 import riskService from './risk-service.js';
 import deviceTrustService from './device-trust-service.js';
 import rateLimit from '../utils/rate-limit.js';
+import decisionNoticeService from './decision-notice-service.js';
+import totpService from './totp-service.js';
 
 function getSafeSessionUser(userRow) {
 	if (!userRow) return null;
@@ -164,7 +167,7 @@ const loginService = {
 			}
 		}
 
-		const { salt, hash } = await saltHashUtils.hashPassword(password);
+		const { salt, hash } = await saltHashUtils.hashPassword(password, c.env);
 
 		const userId = await userService.insert(c, { email, regKeyId,password: hash, salt, type: type || defType });
 
@@ -249,7 +252,7 @@ const loginService = {
 
 	async lazyMigratePassword(c, userId, plainPassword) {
 		try {
-			const { salt, hash } = await cryptoUtils.hashPassword(plainPassword);
+			const { salt, hash } = await cryptoUtils.hashPassword(plainPassword, c.env);
 			await orm(c).update(user).set({ password: hash, salt }).where(eq(user.userId, userId)).run();
 		} catch (err) {
 			console.error('Lazy password migration failed:', err);
@@ -337,18 +340,17 @@ const loginService = {
 			throw new BizError(t('IncorrectPwd'));
 		}
 
-		if (userRow.status === userConst.status.BAN) {
-			throw new BizError(t('isBanUser'));
-		}
-
 		let isLegacy = false;
 		if (!noVerifyPwd) {
-			const checkResult = await cryptoUtils.verifyPasswordWithUpgrade(inputPassword, userRow.salt, userRow.password);
+			const checkResult = await cryptoUtils.verifyPasswordWithUpgrade(inputPassword, userRow.salt, userRow.password, c.env);
 			if (!checkResult.isValid) {
 				await incrementFail();
 				throw new BizError(t('IncorrectPwd'));
 			}
-			isLegacy = checkResult.isLegacy;
+			// 收尾轮扩展：needsUpgrade 涵盖 legacy SHA-256 与低迭代 PBKDF2（如历史 100,000 次），
+			// 两者都在完整登录成功后经 lazyMigratePassword 重哈希至当前 PBKDF2_ITERATIONS（210,000）；
+			// needsUpgrade 仅在 isValid 时为 true，校验失败的请求永远不会触发升级。
+			isLegacy = checkResult.needsUpgrade === true;
 		}
 
 		// Check if TOTP 2FA or Security Key is enabled
@@ -385,7 +387,10 @@ const loginService = {
 				params.secPayload || {}
 			);
 
-			if (trustEval.canBypass2FA) {
+			// 封禁账号必须强制完成真实二次认证，严禁通过可信设备免密绕过 2FA 签发受限凭据
+			const canBypass2FA = userRow.status === userConst.status.BAN ? false : trustEval.canBypass2FA;
+
+			if (canBypass2FA) {
 				// Trusted device 30-day grace bypass is active!
 				sessionTrustEpoch = trustEval.trustEpoch;
 				sessionMaxEpoch = trustEval.maxSessionEpoch;
@@ -441,6 +446,45 @@ const loginService = {
 					riskFlags: riskAssessment.clientFlags
 				};
 			}
+		}
+
+		// 受限用户安全通道：针对无 2FA 的账号（或完成 2FA 后），若账号已被封禁管控，阻断常规发信与读信会话，签发专用受限通知凭证
+		if (userRow.status === userConst.status.BAN) {
+			let latestBan = null;
+			try {
+				latestBan = await orm(c).select().from(auditLog).where(
+					and(
+						eq(auditLog.email, userRow.email),
+						eq(auditLog.status, 'banned')
+					)
+				).orderBy(desc(auditLog.id)).limit(1).get();
+			} catch (_) {}
+
+			const restrictedToken = await decisionNoticeService.generateRestrictedToken(c, {
+				userId: userRow.userId,
+				caseId: latestBan?.id || null,
+				ticketId: latestBan?.ticketId || null,
+				email: userRow.email
+			});
+
+			const exchangeCode = await decisionNoticeService.createOneTimeExchangeCode(c, {
+				restrictedToken,
+				user: {
+					email: userRow.email,
+					status: userRow.status
+				}
+			});
+
+			return {
+				isRestricted: true,
+				restrictedToken,
+				code: exchangeCode,
+				user: {
+					email: userRow.email,
+					status: userRow.status
+				},
+				message: '账号已被系统管控限制，已提供受限处置通知与申诉入口'
+			};
 		}
 
 		// Clear fail count on success
@@ -570,12 +614,9 @@ const loginService = {
 		pendingData.attempts += 1;
 		await c.env.kv.put(pendingKey, JSON.stringify(pendingData), { expirationTtl: 300 });
 
-		const userRow = await userService.selectById(c, pendingData.userId);
+		let userRow = await userService.selectById(c, pendingData.userId);
 		if (!userRow || userRow.isDel === isDel.DELETE) {
 			throw new BizError(t('isDelUser'));
-		}
-		if (userRow.status === userConst.status.BAN) {
-			throw new BizError(t('isBanUser'));
 		}
 
 		const factorType = isPasskey ? 'passkey' : (isBackupCode ? 'backup_code' : 'totp');
@@ -644,6 +685,22 @@ const loginService = {
 			if (!userRow.totpSecret) {
 				throw new BizError(t('totpNotEnabled'));
 			}
+
+			// 显式迁移（收尾轮）：历史 jwt_secret 回退 era 加密数据先解封重加密；
+			// 阻断时给出准确原因，绝不静默回退到 jwt_secret 解密。
+			const migration = await totpService.migrateLegacyTotpEncryption(c, userRow);
+			if (!migration.ok) {
+				if (migration.reason === 'missing_totp_enc_key') {
+					throw new BizError('系统 TOTP 加密密钥未配置 (totp_enc_key missing)，2FA 验证暂时不可用，请联系管理员配置密钥', 500);
+				}
+				throw new BizError('2FA 凭据数据无法解密（历史密钥 era 数据损坏或不匹配），请联系管理员重置两步验证', 500);
+			}
+			if (migration.migrated) {
+				// 迁移可能重加密了数据：以最新持久化行继续验证（不改动原行对象，避免污染共享引用）
+				const freshRow = await userService.selectById(c, userRow.userId);
+				if (freshRow) userRow = freshRow;
+			}
+
 			const plainSecret = await totpUtils.decryptSecret(userRow.totpSecret, c.env);
 			const totpCheck = await totpUtils.verifyTOTP(plainSecret, code, 1);
 
@@ -727,6 +784,45 @@ const loginService = {
 		// Lazy migration of legacy password if needed
 		if (pendingData.needsPasswordUpgrade) {
 			await this.lazyMigratePassword(c, userRow.userId, pendingData.needsPasswordUpgrade);
+		}
+
+		// 受限用户安全通道：2FA 核验通过后，若账号已被封禁管控，阻断常规发信与读信会话，签发专用受限通知凭证
+		if (userRow.status === userConst.status.BAN) {
+			let latestBan = null;
+			try {
+				latestBan = await orm(c).select().from(auditLog).where(
+					and(
+						eq(auditLog.email, userRow.email),
+						eq(auditLog.status, 'banned')
+					)
+				).orderBy(desc(auditLog.id)).limit(1).get();
+			} catch (_) {}
+
+			const restrictedToken = await decisionNoticeService.generateRestrictedToken(c, {
+				userId: userRow.userId,
+				caseId: latestBan?.id || null,
+				ticketId: latestBan?.ticketId || null,
+				email: userRow.email
+			});
+
+			const exchangeCode = await decisionNoticeService.createOneTimeExchangeCode(c, {
+				restrictedToken,
+				user: {
+					email: userRow.email,
+					status: userRow.status
+				}
+			});
+
+			return {
+				isRestricted: true,
+				restrictedToken,
+				code: exchangeCode,
+				user: {
+					email: userRow.email,
+					status: userRow.status
+				},
+				message: '账号已被系统管控限制，已提供受限处置通知与申诉入口'
+			};
 		}
 
 		// Generate formal session JWT

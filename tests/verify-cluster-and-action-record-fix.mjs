@@ -6,8 +6,8 @@ import assert from 'node:assert';
 import { chromium } from 'playwright';
 
 const BASE = process.env.E2E_BASE || 'http://127.0.0.1:8787';
-const ADMIN_EMAIL = 'admin@example.com';
-const ADMIN_PWD = process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '';
+const ADMIN_EMAIL = process.env.EPOMAIL_LIVE_E2E_ADMIN_EMAIL || process.env.ADMIN_EMAIL || 'admin@example.com';
+const ADMIN_PWD = process.env.EPOMAIL_LIVE_E2E_ADMIN_PASSWORD || process.env.ADMIN_PWD || '';
 
 async function getAdminToken() {
 	const res = await fetch(BASE + '/api/login', {

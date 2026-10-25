@@ -9,6 +9,9 @@
 
 ---
 
+
+---
+
 ### 全仓库安全审计、凭据泄露修复与二次验证 (2026-10-25)
 *   **关联提交 (Git Commit)**: `de5d15077972c7c70778aea66777a6cd7a766857` (Short: `de5d150`)
 *   **专项文档索引 (Detailed Doc)**: `doc/security-audit-2026-10-25.md`
@@ -29,33 +32,51 @@
 
 ---
 
+---
 
-### 合并远端基线 (36b8182) 后风控系统全真栈完整复测与「显示工单号不可检索」缺陷专项审计 (2026-10-14)
-*   **关联提交 (Git Commit)**: 见置顶汇报 (合并提交 `7245ef4` + 本归档提交)
-*   **专项文档索引 (Detailed Doc)**: 本报告直接正文归档于此；UI 证据截图见 `doc/validation/operation-report-deep/01_operation_record_tab_1440.png` 与 `02_operation_record_search_hit_1440.png`
+### Mailjet 可疑凭据专项溯源审计与处置报告 (2026-10-24)
+*   **关联提交 (Git Commit)**: 本轮按批次指令未执行 commit（基线 `a8862a2935c96e61af8973bea57ee1078ba5caa9`，分支 `review/abuse-backend-rc`，处置代码在工作区待独立候选复测）
+*   **专项文档索引 (Detailed Doc)**: `D:/Users/Smart Kevin/rc-abuse-review-20261024/evidence/batch2-dev-fixes/secret-scan/mailjet-credential-triage.md`（严格脱敏档案，本报告为零原值摘要）
 *   **体检/审计范围与方法 (Scope & Methodology)**:
-    1. 范围与环境：`git fetch + merge origin/master` 合并远端 `d9f5e50`/`36b8182` 后的本地全真栈 (`wrangler dev @127.0.0.1:8787` · workerd CF 运行时 · D1+KV 本地真库 · `.wrangler/state` 全清冷启动 → `/api/init` 播种)，模拟 Cloudflare 部署 (`wrangler deploy --dry-run` 从仓库根目录调用)；
-    2. 工具与脚本：构建 `node ./build.mjs` + `wrangler deploy --dry-run`；i18n 三件套；`tests/test-risk-control-fullstack-e2e.mjs`、`tests/verify-cluster-and-action-record-fix.mjs`、`tests/verify-audit-ui-browser-e2e.mjs`、`tests/test-physics-delete-kv-cleanup-e2e.mjs`、`tests/verify-live-stack-ui-probe.mjs`、`tests/verify-abuse-table-polish.mjs`、`tests/verify-audit-section-columns.mjs`、`tests/verify-audit-ui-optimization.mjs`、`tests/test-operation-report-deep-dive.mjs`；真浏览器 (in-app Browser `evaluate_script` + Playwright) 暴破模拟与 UI 取证；D1/KV 底层逐表逐键终验。
+    1. 范围与环境：`mail-worker/test-mailjet.js` 可疑真实形态 API Key/Secret 对（独立扫描发现）；本地离线溯源（git 历史追踪、全树运行时读值比对、本地配置面核对），全程未联网验证凭据、未读取生产数据。
+    2. 工具与脚本：git log/-S/show 历史追踪；运行时读值全树比对扫描（值不落命令行/输出）；既有扫描门禁规则审计。
 *   **核心发现与缺陷矩阵 (Key Findings & Matrix)**:
-    - **[P0·阻塞/安全]**: 零发现。合并后核心链路（冷启动播种、登录、2FA/Step-Up、暴破锁定、发信、检举聚合、封禁/解封、物理删除）零中断零回退。
-    - **[P1·重要/体验]**: 零发现。上轮报告的 P1（`ensureTables` 集群迁移 SQL 污染封禁台账）在合并基线上经 DB/API/UI 三层复核确认已根治：`BAN-2026-MA8802` 的 `cluster_id` 为 `NULL`、非 risk 行污染 0 条、Tab 1 集群徽标「3 个账号」展开 3 行无重复、Tab 4 KPI=3 与表格 3 行严格对齐。
-    - **[P2·重要/体验·本轮新发现] 操作报告顶栏搜索无法按界面显示的工单短号 (`#XXXXXX`) 检索，导致管理员复制所见编号搜索恒为 0 结果**:
-        1. 现象：Tab 4「操作记录」表格工单编号列显示 `#6WFWET`/`#MA8802` 形态短号（截图 01），将该短号原样填入顶栏搜索框后表格渲染「当前筛选条件下暂无封禁记录」（截图 02），而 KPI 卡片仍显示 5 条；
-        2. API 复现（与板块无关）：`keyword="#MA8802"` → `total=0`；`keyword="MA8802"` → `total=1`；`keyword="ticket:BAN-2026-MA8802"` → `total=1`；`keyword=<email>` → `total=1`；
-        3. 根因：`mail-worker/src/service/audit-service.js:659-672` 将 `searchKw` 原样用于 `LIKE '%kw%'` 匹配 `ticket_id/email/ip/action_text`，而库中 `ticket_id` 存储形态为 `BAN-2026-MA8802`（永不含 `#`）；显示用短号 `ticketNo` 由 `audit-service.js:831-837` 以 `'#' + code.slice(-6)` 派生，属纯展示字段；前端 `mail-vue/src/views/audit-report/index.vue:2337` 搜索入参仅做 `.trim()`，未剥离 `#`；
-        4. 影响面：四板块通用；不阻断业务（去 `#` 或加 `ticket:` 前缀可命中），但构成「所见不可搜」的体验断裂，并直接导致 `tests/test-operation-report-deep-dive.mjs` 的 `4.4-1`/`4.5-1` 两项断言红灯（`4.5-1` 为 `4.4-1` 的级联：搜不到行→行内详情按钮不存在）。
-    - **[P3·次要/语义] `/api/init/<secret>` 门禁对错误密钥返回 HTTP 200**（响应体为 `❌ JWT secret mismatch`，逻辑拦截正确）：拒绝语义应由 401/403 承载，便于网关与监控识别探测行为。非安全漏洞（密钥校验本身有效）。
-    - **[P3·工程观察]** `wrangler d1 execute --local` 对 compound SELECT 项数存在上限（>3 项 UNION 报 `too many terms in compound SELECT`），测试脚本需拆分语句；属工具链约束，非产品缺陷。
+    - **[P0·安全/泄露]**: test-mailjet.js 自 2026-08-05 (commit a2217fd) 起硬编码 32-hex apiKey/apiSecret 对并存在于全部后续可达历史；域名/收件人与 owner 强关联，**不能排除真实使用**（有效性未联网验证）；产品 Mailjet 凭据经数据库发信配置承载，该值对可能同刻录入过管理端配置。
+    - **[P1·门禁缺口]**: 既有内置扫描仅 whsec_ 单规则；独立复核 gitleaks 范围扫描输出 "no leaks found"（通用规则对该形态不敏感）——两者均属覆盖缺口而非通过证据；CI 仅比较 HEAD~1..HEAD，一次 push 多提交只查最后一个。
+    - **[P2·形态缺陷]**: 历史版本曾含更严重的硬编码默认密钥回退（83d0fec: `jwt_secret || 'default-epomail-totp-fallback-key-32b'`），后经无说明 backup 提交演化为 jwt_secret 回退（b721609），本轮一并按 fail-secure 契约修复。
 *   **治理修复与回归结果 (Fixes & Verification)**:
-    - 本轮按用户指示**只测不修**，上述 P2/P3 仅记录不改动代码；
-    - 合并冲突治理：`CHECKLIST.log` 文本冲突按逆序时间线保留双方全部条目，并修复远端 `d9f5e50` 引入的文档回归（该提交插入新条目时误删「### 修复 physicsDelete … (2026-10-12)」标题行，已恢复）；8 个 validation PNG 二进制冲突统一取远端版本；本地未提交的竞争性 `audit-service.js` 改法已 stash 存底 (`stash@{0}`)，工作树采用远端官方修复；
-    - 自动化套件结果：`test-risk-control-fullstack-e2e.mjs` **55/55**、`verify-live-stack-ui-probe.mjs` **35/35**、`test-physics-delete-kv-cleanup-e2e.mjs` **32/32**、`verify-abuse-table-polish.mjs` **50/50**、`verify-audit-ui-browser-e2e.mjs` **18/18**、`verify-cluster-and-action-record-fix.mjs` 全绿、`verify-audit-section-columns.mjs` 6/6、`verify-audit-ui-optimization.mjs` 全绿、i18n 三件套全绿 (exit 0)、`test-operation-report-deep-dive.mjs` **54/56**（2 项红灯即上述 P2 缺陷的直接暴露）；
-    - 真浏览器危险操作实测：对一次性账户连续 5 次错误密码均 `code=501`，第 6 次**正确密码**被 `code=501 連續錯誤次數過多，賬號已臨時鎖定` 拦截，暴破防御生效；
-    - 零假数据终验：D1 `users=2 / accounts=2 / emails=2 (均为 announcement@epocanvas.com 官方系统信) / audit_log=15`；KV 仅 6 个合法系统键，暴破产生的 `login_fail:` 锁定键随 `physicsDelete` 自动回收，测试残留 0。
-*   **后续路线图 (Roadmap)**:
-    1. [P2] 搜索归一化：在 `audit-service.js` 检索层剥离前导 `#`（或将 `ticketNo` 纳入可检索字段），使「所见即可搜」；
-    2. [P3] `/api/init` 错误密钥改返 401/403；
-    3. [P3] 测试脚本拆分 compound SELECT 以适配 `wrangler d1 execute` 上限。
+    - test-mailjet.js 重写为零网络离线契约测试 + 显式四件套环境变量门控（缺配置 exit 1、零兜底），离线/缺配置双模式实测通过；
+    - 扫描门禁补强：新增 `hardcoded-provider-api-keypair` 内置规则（隔离正例可拦截本次泄露形态，--self-test 固化）；CI 改为 push before..after 全提交范围（新分支回退整树）/ PR merge-base 全范围；gitleaks 缺失显式声明不冒充通过；
+    - 未强推清历史、未自动关闭 GitHub 告警；**所有者轮换清单已交付**（撤销并重置该 Mailjet 密钥对、核查 Mailjet 侧活动日志、如曾录入管理端发信配置则同步更新）；
+    - 剩余未知如实记录：凭据当前有效性、是否曾被滥用未验证（禁止联网）；生产侧数据库同值核对未执行。
+
+
+### 操作报告 4 大板块与默认总表专属差异化列集定制及严格隔离专项深度审计报告 (2026-10-14)
+*   **关联提交 (Git Commit)**: `d0561a9766ad6098c7a15d5db4ce602726ba7588` (Short: `d0561a9`)
+*   **专项文档索引 (Detailed Doc)**: 本报告直接正文归档于此
+*   **体检/审计范围与方法 (Scope & Methodology)**:
+    1. 范围与环境：本地全真栈环境 (`mail-vue` + `mail-worker` 协同构建)，覆盖操作报告控制台 4 大独立板块（滥用威胁 threat、申诉审计 appeal、风险管理 audit、操作记录 record）与默认全局整合表（all）的列集定义、前后端数据契约、多维度隔离机制以及多语言国际化闭环。
+    2. 工具与脚本：
+       - 前端构建：`npm --prefix mail-vue run build`；
+       - 多语言审计三件套：`scripts/i18n-symmetry.mjs`，`scripts/i18n-audit.mjs`，`scripts/i18n-hardcoded.mjs`；
+       - 专属列集验证测试：`tests/verify-audit-section-columns.mjs`。
+*   **核心发现与缺陷矩阵 (Key Findings & Matrix)**:
+    - **[P0·阻塞/安全]**: 零缺陷 (Zero Defects)。
+        1. 参照 `punishments.md` 标准，严格切断不同安全板块间的数据越界与筛选混淆；
+        2. 滥用威胁板块与风险管理板块实现彻底隔离：一人多号（multi_account）归属于 Threat，风险管理原因下拉不再混入一人多号；申诉审计违规分类下拉仅限受申诉类别（quota, outbound, content, account），彻底排除例行巡检与申诉复核。
+    - **[P1·重要/体验]**: 治理完毕 (Resolved)。
+        1. 申诉审计：删除无关的「报警原因」列，将「报警次数」升级为「同类申诉次数」（统计历史同类违规申诉频次），「处理时间」更新为「申请时间」，并在申请时间后追加「死局时间」（30天终裁冷静期精准倒计时及已死局标识）；
+        2. 风险管理：「违规分类」升级为「违规等级」（直观呈现 LV0~LV3），「处理时间」更新为「报警时间」，并在报警时间后追加「过期时间」；
+        3. 操作记录：彻底剔除「处理建议」，在「处理时间」后追加「死局时间」，列序严格对齐；
+        4. 默认总表（all）：在未选择任何 KPI 卡片时展示全局唯一整体表，剔除「报警次数」与「处理建议」，「违规分类」展示为「违规等级」（覆盖 LV0~LV3 以及 Threat 滥用威胁），在「处理时间」后追加「死局时间」，全量保留所有筛选维度，并通过前后端协同算法实现全局跨板块记录排重（每条记录有且仅出现 1 次）。
+    - **[P2·次要/样式]**: 优化完毕 (Optimized)。
+        - 补齐 `.deadlock-cell` 与 `.deadlock-tag-desc` 样式体系，在明暗主题下完美呈现死局倒计时与超时预警色彩。
+*   **治理修复与回归结果 (Fixes & Verification)**:
+    - 差异化列集定制专项断言 `tests/verify-audit-section-columns.mjs` 全部通过；
+    - 前端 `vite build` 生产构建 22.07s 零报错零警告通过；
+    - 6 语言 i18n 字典（zh, zh-Hant, en, es, fr, nl）保持 2704 keys 绝对对称；
+    - 代码引用字面量 0 缺失，用户可见文本 0 未包裹硬编码；
+    - **审计结论：[ PASSED · 列集深度定制核验通过 · 隔离性与排重机制 100% 达成 ]**
 
 ---
 
@@ -423,7 +444,7 @@
     5. **本地全真栈全新库核验**: 清空 `.wrangler/state` 后 `wrangler dev` + `/api/init` 走全新部署路径，实证全新部署引导链缺陷（见下）；随后手动播种标准角色引导站长，新增 `tests/verify-local-functional-20260919.mjs` 25 项 API 断言全通过（含临时用户 physicsDelete 零残留清理）；
     6. **浏览器级 UI 核验**: 新增 `tests/verify-local-ui-20260919.mjs`，本地与生产 mail.epocanvas.com 双端真实登录冒烟——收件箱渲染 ✓、写信默认发件人锁定当前信箱 ✓、en 模式 CJK 残留 0 ✓、zh-Hant 模式简体特有字 0 ✓（注：应用真实 locale 驱动为 `settingStore.lang`（localStorage `setting` 键），非 `ui.locale`）。
 *   **重大缺陷发现 (Critical Findings)**:
-    1. **[P0·安全] 生产 `wrangler.toml` 秘钥随公开 GitHub 仓库泄漏**: `jwt_secret = "<REDACTED-WEAK-6-CHAR-VALUE>"` 与 `totp_enc_key` 均为 git 追踪文件且仓库可匿名拉取，任何第三方可自行签发 User 1 站长合法 JWT 完全接管 mail.epocanvas.com，并可解密全站 TOTP 密钥；生产部署时必须改由 Secret/环境注入并立即轮换两密钥；
+    1. **[P0·安全] 生产 `wrangler.toml` 秘钥随公开 GitHub 仓库泄漏**: `jwt_secret = "<REDACTED>"` 与 `totp_enc_key` 均为 git 追踪文件且仓库可匿名拉取，任何第三方可自行签发 User 1 站长合法 JWT 完全接管 mail.epocanvas.com，并可解密全站 TOTP 密钥；生产部署时必须改由 Secret/环境注入并立即轮换两密钥；
     2. **[P1·功能] 任意个人主页渲染空白**: `mail-vue/src/views/profile/index.vue:282` 的 `isOwnProfile` 计算属性引用 `accountStore` 但全文件未导入 `useAccountStore`（4215b15 重构引入），生产 `/admin` 实测页面正文空白（仅剩顶栏）并抛 `ReferenceError: accountStore is not defined`，所有公开主页均不可用，证据快照 `tests/verify_prod_admin_profile.png`；
     3. **[P0·全新部署引导链三重断裂]**（生产因历史库幸免，新装即坏死）: ① `v1_1DB` 先行插入遗留角色「普通用户」(custom)，致 `v3_13DB` 六标准角色播种守卫 `roleCount===0` 永不成立成死代码；② `email.labels` 与 `user.custom_labels` 两列在 drizzle entity 中声明但 CREATE TABLE 与全部 124 条 ADD COLUMN 迁移均未覆盖，邮件列表/注册/登录身份接口直接 500；③ `v3_14DB` 参观者 INSERT 引用不存在的 `user.update_time` 列报错，且主站长账号（`c.env.admin`）全链路只有 UPDATE 晋升无 INSERT、注册端又被 `adminReserved` 拦截，全新部署永远无法获得管理员；
     4. **[P2·i18n] zh-Hant 界面下系统标签呈现简体**: 数据库预置标签实体「待办」在 zh-Hant 模式未映射为「待辦」（label-i18n 仅覆盖非中文场景）。

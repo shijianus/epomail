@@ -172,6 +172,8 @@ const totpUtils = {
 	 * Derive 256-bit AES-GCM CryptoKey from environment secret (totp_enc_key)
 	 */
 	async getEncryptionKey(env) {
+		// Fail-secure 契约（tests/test-totp-backend-fixes.mjs 固化）：totp_enc_key 缺失时必须显式报错，
+		// 绝不回退 jwt_secret 或任何默认键 —— TOTP 加密主键与 JWT 签名密钥必须保持域隔离。
 		const rawKey = env?.totp_enc_key;
 		if (!rawKey || typeof rawKey !== 'string' || !rawKey.trim()) {
 			throw new Error('totp_enc_key is not configured, please run: wrangler secret put totp_enc_key');
@@ -201,6 +203,46 @@ const totpUtils = {
 			{ name: 'AES-GCM' },
 			false,
 			['encrypt', 'decrypt']
+		);
+	},
+
+	/**
+	 * 【仅限显式迁移解封使用】Legacy decap key derivation。
+	 *
+	 * 历史背景：getEncryptionKey 曾在 totp_enc_key 缺失时静默回退 jwt_secret（已于本轮按
+	 * fail-secure 契约移除）。该回退 era 加密的存量 TOTP 数据（totp_secret / 备份码
+	 * encryptedRaw）只能以 jwt_secret 派生密钥解密。本函数完整复刻当年回退派生逻辑，
+	 * 供 totp-service.migrateLegacyTotpEncryption 做一次性「解封 → 以 totp_enc_key 重加密 →
+	 * totp_key_version 升至 2」迁移使用。
+	 *
+	 * 红线：绝不用于新数据加密（encryptSecret 永远走 getEncryptionKey），
+	 * 绝不作为运行时静默回退；getEncryptionKey 的 fail-secure 契约不受影响。
+	 */
+	async getLegacyJwtDecapKey(env) {
+		const rawKey = env?.jwt_secret;
+		if (!rawKey || typeof rawKey !== 'string' || !rawKey.trim()) {
+			throw new Error('jwt_secret is not configured (legacy decap unavailable)');
+		}
+		const cleanKey = rawKey.trim();
+		let keyBytes;
+		try {
+			const decoded = base64ToUint8(cleanKey);
+			if (decoded.length === 32) {
+				keyBytes = decoded;
+			} else {
+				const hash = await crypto.subtle.digest('SHA-256', encoder.encode(cleanKey));
+				keyBytes = new Uint8Array(hash);
+			}
+		} catch (e) {
+			const hash = await crypto.subtle.digest('SHA-256', encoder.encode(cleanKey));
+			keyBytes = new Uint8Array(hash);
+		}
+		return await crypto.subtle.importKey(
+			'raw',
+			keyBytes,
+			{ name: 'AES-GCM' },
+			false,
+			['decrypt']
 		);
 	},
 

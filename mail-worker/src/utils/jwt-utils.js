@@ -42,6 +42,11 @@ const jwtUtils = {
 		const payloadStr = base64url(encoder.encode(JSON.stringify(fullPayload)));
 		const data = `${headerStr}.${payloadStr}`;
 
+		const secret = c?.env?.jwt_secret;
+		if (!secret || typeof secret !== 'string' || !secret.trim()) {
+			throw new Error('系统 JWT 密钥未配置 (Missing jwt_secret)');
+		}
+
 		const key = await crypto.subtle.importKey(
 			'raw',
 			encoder.encode(secret),

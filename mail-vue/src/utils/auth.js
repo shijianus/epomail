@@ -41,8 +41,6 @@ export function forceLogoutToLogin(message) {
   setTimeout(() => {
     if (window.location.pathname !== '/login/' && !window.location.pathname.startsWith('/login')) {
       window.location.replace(targetUrl);
-    } else {
-      window.location.replace('/login/?reason=expired');
     }
   }, 50);
 }

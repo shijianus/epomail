@@ -1,4 +1,5 @@
 import KvConst from '../const/kv-const.js';
+import BizError from '../error/biz-error.js';
 
 /**
  * Autonomous Black-box Risk Assessment & Step-Up Engine
@@ -47,9 +48,9 @@ const riskService = {
 	async evaluateRisk(c, userRow, secPayload = {}) {
 		const clientIp = getHeader(c, 'cf-connecting-ip') || getHeader(c, 'x-real-ip') || '127.0.0.1';
 		const userAgent = getHeader(c, 'user-agent') || '';
-		const secret = c.env.jwt_secret;
+		const secret = c.env?.jwt_secret;
 		if (!secret || typeof secret !== 'string' || !secret.trim()) {
-			throw new Error('jwt_secret is not configured; risk evaluation cannot proceed');
+			throw new BizError('系统密钥未配置 (Missing jwt_secret)', 500);
 		}
 
 		// Dynamic UTC day string to rotate daily weights

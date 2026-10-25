@@ -961,6 +961,19 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
   };
 
   const saveLoginSessionAndRedirect = (data: any, isTotp: boolean = false) => {
+    // 受限账号安全跳转：已被封禁账号仅发放受限通知与申诉凭证，引导前往受限通知页面
+    if (data.data?.isRestricted && data.data?.restrictedToken) {
+      try {
+        sessionStorage.setItem('epomail_restricted_token', data.data.restrictedToken);
+      } catch (_) {}
+      setStatus("success");
+      setSuccessMsg(data.data.message || '账号已被限制，正在进入受限通知页面...');
+      setTimeout(() => {
+        window.location.href = '/notice/restricted';
+      }, 500);
+      return;
+    }
+
     const token = data.data?.token || data.token;
     const activeEmail = data.data?.email || (email.includes('@') ? email.trim().toLowerCase() : '');
 

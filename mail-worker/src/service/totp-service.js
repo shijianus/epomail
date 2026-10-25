@@ -20,6 +20,117 @@ import rbacGuard from './rbac-guard-service.js';
 
 const totpService = {
 	/**
+	 * 【显式迁移机制（收尾轮新增）】历史 jwt_secret 回退 era 加密数据的一次性解封与重加密。
+	 *
+	 * 背景：getEncryptionKey 曾在 totp_enc_key 缺失时静默回退 jwt_secret（fail-secure 契约
+	 * 已于本轮恢复）。该 era 注册 2FA 的账号，其 totp_secret 与备份码 encryptedRaw 是以
+	 * jwt_secret 派生密钥加密的；恢复 fail-secure 后这些数据无法以 totp_enc_key 解密。
+	 *
+	 * 契约：
+	 * - 仅当 totp_key_version < 2 时执行一次；成功后置 version=2；
+	 * - 先以现行 totp_enc_key 解密试探：成功 → 数据本就是现行 era，仅补版本标记，不重加密；
+	 * - 现行解密失败 → 以 getLegacyJwtDecapKey 做 legacy 解封（仅解密用途，绝不用于新加密），
+	 *   成功后以现行密钥重加密并置 version=2；明文 era（无 iv:cipher 结构）一并补加密；
+	 * - totp_enc_key 未配置 → 明确阻断（reason='missing_totp_enc_key'），绝不回退；
+	 * - 两种密钥均无法解密 → 明确阻断（reason='undecryptable'），需管理员为该账号重置 2FA；
+	 *   绝不编造或放行不可解密数据。
+	 */
+	async migrateLegacyTotpEncryption(c, userRow) {
+		const version = Number(userRow.totpKeyVersion || 1);
+		if (version >= 2 || (!userRow.totpSecret && !userRow.totpBackupCodes)) {
+			return { ok: true, migrated: false };
+		}
+
+		try {
+			await totpUtils.getEncryptionKey(c.env);
+		} catch (e) {
+			return { ok: false, reason: 'missing_totp_enc_key', message: e.message };
+		}
+
+		const decapLegacy = async (encryptedStr) => {
+			if (!encryptedStr) return { plain: '', legacy: false };
+			if (!encryptedStr.includes(':')) {
+				// 明文 era：无需解密，直接视为 legacy 原文待补加密
+				return { plain: encryptedStr, legacy: true };
+			}
+			const [ivBase64, cipherBase64] = encryptedStr.split(':');
+			if (!ivBase64 || !cipherBase64) return { plain: '', legacy: true };
+			try {
+				const legacyKey = await totpUtils.getLegacyJwtDecapKey(c.env);
+				const iv = Uint8Array.from(atob(ivBase64), ch => ch.charCodeAt(0));
+				const ciphertext = Uint8Array.from(atob(cipherBase64), ch => ch.charCodeAt(0));
+				const buf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, legacyKey, ciphertext);
+				return { plain: new TextDecoder().decode(buf), legacy: true };
+			} catch (e) {
+				return { plain: '', legacy: true };
+			}
+		};
+
+		const decryptCurrent = async (encryptedStr) => {
+			try {
+				const plain = await totpUtils.decryptSecret(encryptedStr, c.env);
+				return plain || null;
+			} catch (e) {
+				return null;
+			}
+		};
+
+		let newSecret = null;
+		let newBackupJson = null;
+
+		if (userRow.totpSecret) {
+			// 1) 现行 era 数据（version=1 但实际以 totp_enc_key 加密）：解密成功即只补版本标记。
+			//    仅 iv:cipher 结构才做现行解密试探；明文 era（无 ':'）必须走重加密，不得原样保留。
+			let plain = null;
+			if (userRow.totpSecret.includes(':')) {
+				plain = await decryptCurrent(userRow.totpSecret);
+			}
+			if (plain) {
+				newSecret = userRow.totpSecret; // 已是现行密文，原样保留
+			} else {
+				// 2) legacy era：以 jwt 派生密钥解封后重加密
+				const dec = await decapLegacy(userRow.totpSecret);
+				if (!dec.plain) {
+					return { ok: false, reason: 'undecryptable', message: 'totp_secret 无法以任何已知密钥解密' };
+				}
+				newSecret = await totpUtils.encryptSecret(dec.plain, c.env);
+			}
+		}
+
+		if (userRow.totpBackupCodes) {
+			try {
+				const parsed = typeof userRow.totpBackupCodes === 'string'
+					? JSON.parse(userRow.totpBackupCodes)
+					: userRow.totpBackupCodes;
+				if (parsed && parsed.encryptedRaw) {
+					let plainRaw = await decryptCurrent(parsed.encryptedRaw);
+					if (!plainRaw) {
+						const dec = await decapLegacy(parsed.encryptedRaw);
+						if (!dec.plain) {
+							return { ok: false, reason: 'undecryptable', message: '备份码 encryptedRaw 无法解密' };
+						}
+						plainRaw = dec.plain;
+					}
+					// 现行 era 的 encryptedRaw 原样保留；legacy era 的以现行密钥重加密
+					const isCurrentEra = plainRaw === parsed.encryptedRaw;
+					const reEncrypted = isCurrentEra ? parsed.encryptedRaw : await totpUtils.encryptSecret(plainRaw, c.env);
+					newBackupJson = JSON.stringify({ hashedCodes: parsed.hashedCodes || [], encryptedRaw: reEncrypted });
+				}
+			} catch (e) {
+				// 备份码 JSON 损坏不阻塞 totp_secret 迁移；备份码按原样保留
+			}
+		}
+
+		const updateSet = { totpKeyVersion: 2 };
+		if (newSecret !== null) updateSet.totpSecret = newSecret;
+		if (newBackupJson !== null) updateSet.totpBackupCodes = newBackupJson;
+
+		await orm(c).update(user).set(updateSet).where(eq(user.userId, userRow.userId)).run();
+		console.warn(`[totp-migration] user ${userRow.userId} TOTP encryption state confirmed/migrated to totp_key_version=2`);
+		return { ok: true, migrated: true };
+	},
+
+	/**
 	 * Generate setup secret and URI for the current user (TOTP Authenticator)
 	 */
 	async getSetupInfo(c, userId, email) {
@@ -84,7 +195,9 @@ const totpService = {
 		await userService.updateTotpState(c, userId, {
 			totpEnabled: 1,
 			totpSecret: encryptedSecret,
-			totpKeyVersion: 1,
+			// version=2 表示「数据以 totp_enc_key（现行 fail-secure 契约）加密」；
+			// version=1 保留给历史 era 行（含 jwt_secret 回退 era）供显式迁移闸门识别
+			totpKeyVersion: 2,
 			totpBackupCodes: backupPayload,
 			totpCreatedAt: now
 		});
@@ -195,7 +308,7 @@ const totpService = {
 			throw new BizError(t('emptyPwdMsg'));
 		}
 
-		const userRow = await userService.selectById(c, userId);
+		let userRow = await userService.selectById(c, userId);
 		if (!userRow) {
 			throw new BizError(t('notExistUser'));
 		}
@@ -203,6 +316,22 @@ const totpService = {
 		const isPwdValid = await cryptoUtils.verifyPassword(password, userRow.salt, userRow.password);
 		if (!isPwdValid) {
 			throw new BizError(t('IncorrectPwd'));
+		}
+
+		// 显式迁移（收尾轮）：历史 jwt_secret 回退 era 的备份码 encryptedRaw 先解封重加密；
+		// 阻断时如实报错，绝不静默回退。
+		const migration = await this.migrateLegacyTotpEncryption(c, userRow);
+		if (!migration.ok) {
+			if (migration.reason === 'missing_totp_enc_key') {
+				throw new BizError('系统 TOTP 加密密钥未配置 (totp_enc_key missing)，备份码暂时无法查看，请联系管理员配置密钥', 500);
+			}
+			throw new BizError('备份码数据无法解密（历史密钥 era 数据损坏或不匹配），请联系管理员重置两步验证', 500);
+		}
+		if (migration.migrated) {
+			userRow = await userService.selectById(c, userId);
+			if (!userRow) {
+				throw new BizError(t('notExistUser'));
+			}
 		}
 
 		if (!userRow.totpBackupCodes) {

@@ -882,6 +882,23 @@
             <div class="card-content">
               <div class="setting-item">
                 <div>
+                  <span>{{ $t('auditLogEnabled') }}</span>
+                  <el-tooltip effect="dark" :content="$t('auditLogEnabledDesc')">
+                    <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+                  </el-tooltip>
+                </div>
+                <div>
+                  <el-switch
+                    v-model="setting.auditLogEnabled"
+                    :active-value="1"
+                    :inactive-value="0"
+                    @change="(val) => changeField('auditLogEnabled', val)"
+                  />
+                </div>
+              </div>
+
+              <div class="setting-item">
+                <div>
                   <span>{{ $t('auditMaxIpLimit') }}</span>
                   <el-tooltip effect="dark" :content="$t('auditMaxIpLimitDesc')">
                     <Icon class="warning" icon="fe:warning" width="18" height="18"/>
@@ -966,38 +983,6 @@
                     @change="(val) => changeField('auditCriticalQuota', val)"
                   />
                 </div>
-              </div>
-
-              <div class="setting-item">
-                <div>
-                  <span>{{ $t('auditReport') }}</span>
-                  <el-tooltip effect="dark" :content="$t('auditReportDesc')">
-                    <Icon class="warning" icon="fe:warning" width="18" height="18"/>
-                  </el-tooltip>
-                </div>
-                <div class="forward">
-                  <span>{{ $t('auditReport') }}</span>
-                  <el-button
-                    type="primary"
-                    size="small"
-                    class="opt-button"
-                    :title="$t('auditReportDesc')"
-                    @click="openAuditReport"
-                  >
-                    <Icon icon="fluent:shield-task-24-regular" width="18" height="18"/>
-                  </el-button>
-                </div>
-              </div>
-              <div style="margin-top: 10px; display: flex; justify-content: flex-end;">
-                <el-button
-                  type="primary"
-                  size="small"
-                  plain
-                  @click="openAuditReport"
-                >
-                  <Icon icon="fluent:shield-task-24-regular" width="16" height="16" style="margin-right: 4px; vertical-align: -2px;" />
-                  {{ $t('auditReport') }} ({{ $t('auditTabStream') }} / {{ $t('auditTabRisk') }})
-                </el-button>
               </div>
             </div>
           </div>
@@ -4009,11 +3994,6 @@ async function saveOauthProviderConfig() {
 
 const router = useRouter();
 const currentRoleSlug = computed(() => getRoleGroupSlug(userStore.user || userStore.userInfo) || 'admin');
-
-function openAuditReport() {
-  const roleSlug = currentRoleSlug.value || 'admin';
-  router.push(`/manage/${roleSlug}/audit`);
-}
 
 const editTitle = ref('')
 const settingLoading = ref(false)

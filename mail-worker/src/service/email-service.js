@@ -1,4 +1,5 @@
 import { mailOrm as orm, userOrm } from '../entity/orm';
+import { getUserDb } from '../utils/db-accessor';
 import email from '../entity/email';
 import { auditLog } from '../entity/audit-log';
 import auditService from './audit-service';
@@ -572,8 +573,10 @@ const emailService = {
 
 		// 4. Report to Admin Audit Center as Anomalous Threat (异常威胁)
 		try {
-			await auditService.ensureTables(c);
-			for (const cleanSender of senders) {
+			const setting = await settingService.query(c).catch(() => ({}));
+			if (setting?.auditLogEnabled !== 0) {
+				await auditService.ensureTables(c);
+				for (const cleanSender of senders) {
 				// Check whether sender is an internal user
 				const internalUser = await userOrm(c).select().from(user).where(eq(user.email, cleanSender)).get();
 				const isInternal = !!internalUser ? 1 : 0;
@@ -636,6 +639,7 @@ const emailService = {
 					}).run();
 				}
 			}
+		}
 		} catch (auditErr) {
 			console.warn('reportSpam audit_log report failed:', auditErr.message);
 		}
@@ -786,6 +790,15 @@ const emailService = {
 		}
 
 		const userRow = await userService.selectById(c, userId);
+		if (!userRow) {
+			throw new BizError(t('notExistUser') || '用户不存在', 404);
+		}
+
+		// 权威状态拦截：被限制/封禁用户严禁外发或站内发信 (权威 D1 来源防御)
+		if (Number(userRow.status) === 1) {
+			throw new BizError(t('isBanUser') || '账号已被系统安全管控限制，已暂停发信能力', 403);
+		}
+
 		const roleRow = await roleService.selectById(c, userRow.type);
 
 		// 计算邮件总大小限制
@@ -858,6 +871,28 @@ const emailService = {
 
 		if (accountRow.userId !== userId) {
 			throw new BizError(t('sendEmailNotCurUser'));
+		}
+
+		// 发信账号限制检查
+		if (Number(accountRow.status) === 1) {
+			throw new BizError('该发信邮箱已被系统安全策略限制使用', 403);
+		}
+
+		// 检查是否存在针对该邮箱或主账号的有效封禁管控案卷
+		let activeBan = null;
+		try {
+			activeBan = await orm(c).select().from(auditLog).where(
+				and(
+					eq(auditLog.email, accountRow.email),
+					eq(auditLog.warningType, 'ban'),
+					eq(auditLog.status, 'banned')
+				)
+			).get();
+		} catch (e) {
+			console.warn('Check active ban failed:', e?.message);
+		}
+		if (activeBan) {
+			throw new BizError('该发信地址当前处于安全封禁状态，无法外发邮件', 403);
 		}
 
 		if (!isSuperAdmin) {
@@ -983,6 +1018,14 @@ const emailService = {
 
 		//保存到数据库并返回结果
 		const emailResult = await orm(c).insert(email).values(dbEmailData).returning().get();
+
+		// 第二轮修复：发送线程迟到写回保护 —— 若提供商事件已先于本次 INSERT 落账
+		// (webhook_event 台账已有该邮件的事件)，按台账事实重新投影，避免初始 SENT 覆盖已确认事实
+		if (emailResult?.resendEmailId && !useCloudflareEmail) {
+			try {
+				await this.replayProviderEventsFromLedger(c, emailResult.resendEmailId);
+			} catch (_) {}
+		}
 
 		//保存内嵌附件
 		if (imageDataList.length > 0) {
@@ -1984,12 +2027,128 @@ const emailService = {
 		}
 	},
 
+	/**
+	 * 第二轮修复：普通 email 记录的提供商事件投影守卫。
+	 *
+	 * 旧实现 updateEmailStatus 无条件覆盖 status，迟到的 delivered 事件会覆盖已记录的 bounced，
+	 * 发送线程迟到的写回也可能回退已确认事实。
+	 *
+	 * 现行契约（基于 Resend 真实提供商事件语义，与 notification_outbox 状态机严格对齐，
+	 * 不引入"任意大小顺序"的单值排序）：
+	 * - sent/failed 只允许从在途状态 (RECEIVE/SAVING/SENT/DELAYED/NOONE) 落地，不得覆盖任何终态；
+	 * - delayed 只允许从在途状态落地；
+	 * - delivered 只允许从在途状态落地 —— 迟到的 delivered 不得覆盖 bounced/failed（原缺陷核心）；
+	 * - bounced 是终端负面事实，允许修正在途状态与 delivered（与 Outbox delivered→dead_letter 语义一致）；
+	 * - complained 是投递后滥用事实，除 canceled 外均可记录（与 Outbox 语义一致）；
+	 * - 被守卫拦截但属于新事实的事件（如 bounced/failed/complained 撞上已记录的不同终态），
+	 *   以时间戳事实行追加进 message，不覆盖既有事实，实现投递/退信/投诉事实分别留痕。
+	 */
 	updateEmailStatus(c, params) {
-		const { status, resendEmailId, message } = params;
-		return orm(c).update(email).set({
+		const { status, resendEmailId, message, eventId } = params;
+		const st = emailConst.status;
+		const terminalStates = [st.BOUNCED, st.FAILED, st.COMPLAINED, st.DELIVERED];
+		const inFlightStates = [st.RECEIVE, st.SAVING, st.SENT, st.DELAYED, st.NOONE];
+
+		const EVENT_TRANSITIONS = {
+			[emailConst.status.SENT]: { from: inFlightStates, fact: false },
+			[emailConst.status.DELAYED]: { from: [st.RECEIVE, st.SAVING, st.SENT, st.NOONE], fact: false },
+			[emailConst.status.DELIVERED]: { from: inFlightStates, fact: false },
+			[emailConst.status.BOUNCED]: { from: [...inFlightStates, st.DELIVERED], fact: true },
+			[emailConst.status.FAILED]: { from: inFlightStates, fact: true },
+			[emailConst.status.COMPLAINED]: { from: [...inFlightStates, ...terminalStates], fact: true }
+		};
+
+		const transition = EVENT_TRANSITIONS[status];
+		if (!transition || !resendEmailId) {
+			// 未知事件状态或不携带邮件标识：不落任何投影，交由调用方记录
+			return null;
+		}
+
+		const guarded = orm(c).update(email).set({
 			status: status,
-			message: message
-		}).where(eq(email.resendEmailId, resendEmailId)).returning().get();
+			...(message !== undefined && message !== null ? { message: message } : {})
+		}).where(
+			and(
+				eq(email.resendEmailId, resendEmailId),
+				inArray(email.status, transition.from)
+			)
+		).run();
+
+		const guardedResult = guarded;
+		// 守卫放行路径返回受影响行；被守卫拦截且属于新事实的事件，向 message 追加事实行留痕
+		const applyFactAppend = async () => {
+			const changes = guardedResult?.meta?.changes ?? guardedResult?.changes ?? 0;
+			if (changes > 0 || !transition.fact) {
+				return;
+			}
+			const factKey = eventId ? `provider-fact:${eventId}` : `provider-fact:${status}:${new Date().toISOString()}`;
+			const factLine = `[${factKey}] event status=${status}${message ? ' detail=' + String(message).slice(0, 500) : ''}`;
+			const existing = await orm(c).select({ emailId: email.emailId, message: email.message }).from(email)
+				.where(eq(email.resendEmailId, resendEmailId)).get();
+			if (!existing || (existing.message || '').includes(factKey)) {
+				return;
+			}
+			await orm(c).update(email).set({
+				message: (existing.message ? existing.message + '\n' : '') + factLine
+			}).where(eq(email.emailId, existing.emailId)).run();
+		};
+
+		// updateEmailStatus 在 webhook 处理链路中为 await 调用；保持异步事实追加完成后返回
+		return (async () => {
+			await applyFactAppend();
+			const changes = guardedResult?.meta?.changes ?? guardedResult?.changes ?? 0;
+			if (changes === 0) {
+				return null;
+			}
+			return await orm(c).select().from(email).where(eq(email.resendEmailId, resendEmailId)).get();
+		})();
+	},
+
+	/**
+	 * 第二轮修复：发送线程迟到写回保护。
+	 * 发信线程在 INSERT 普通邮件记录时携带初始 status=SENT；若提供商事件（bounced/failed/
+	 * delivered 等）已先一步落账于 webhook_event 台账，这里按台账已确认事实重新投影，
+	 * 避免"事件已处理 → 记录随后以 SENT 插入"造成的投影回退。
+	 * 以现有守卫投影（updateEmailStatus）执行，天然幂等且不覆盖更强事实。
+	 */
+	async replayProviderEventsFromLedger(c, resendEmailId) {
+		if (!resendEmailId) return null;
+		let eventRows = [];
+		try {
+			const userDb = getUserDb(c) || c?.env?.db;
+			if (!userDb) return null;
+			const result = await userDb.prepare(`
+				SELECT event_type FROM webhook_event
+				WHERE provider = 'resend' AND resource_id = ?
+				ORDER BY create_time ASC, event_id ASC
+			`).bind(resendEmailId).all();
+			eventRows = result?.results || [];
+		} catch (e) {
+			return null; // 台账不可用时保持原状，不做投机投影
+		}
+
+		const EVENT_TO_STATUS = {
+			'email.sent': emailConst.status.SENT,
+			'email.delivery_delayed': emailConst.status.DELAYED,
+			'email.delivered': emailConst.status.DELIVERED,
+			'email.bounced': emailConst.status.BOUNCED,
+			'email.failed': emailConst.status.FAILED,
+			'email.complained': emailConst.status.COMPLAINED
+		};
+
+		// 逐事件按台账顺序重放真实守卫投影（单调，不会回退）
+		for (const row of eventRows) {
+			const target = EVENT_TO_STATUS[row.event_type];
+			if (!target) continue;
+			try {
+				await this.updateEmailStatus(c, {
+					resendEmailId,
+					status: target,
+					message: row.event_type === 'email.bounced' ? 'Bounced (replayed from webhook ledger)' : null
+				});
+			} catch (_) {}
+		}
+		return eventRows.length;
 	},
 
 	async selectUserEmailCountList(c, userIds, type, del = isDel.NORMAL) {

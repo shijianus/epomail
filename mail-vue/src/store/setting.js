@@ -17,6 +17,7 @@ export const useSettingStore = defineStore('setting', {
             termsUrl: '',
             privacyUrl: '',
             // Audit Report & Risk Control Policy Settings
+            auditLogEnabled: 1,
             auditMaxIpPerAccount: 3,
             auditMaxDevicePerAccount: 3,
             auditCriticalQuota: 3,

@@ -1,8 +1,11 @@
 import app from '../hono/hono';
 import result from '../model/result';
 import auditService from '../service/audit-service';
+import decisionNoticeService from '../service/decision-notice-service';
 import BizError from '../error/biz-error';
 import { t } from '../i18n/i18n';
+import { isAdminUser } from '../utils/admin-utils';
+import permService from '../service/perm-service';
 
 const ensureAuthUser = (c) => {
 	const user = c.get('user');
@@ -12,46 +15,97 @@ const ensureAuthUser = (c) => {
 	return user;
 };
 
+const ensureAdminUser = async (c) => {
+	const user = ensureAuthUser(c);
+	if (!isAdminUser(c, user)) {
+		let permKeys = [];
+		try {
+			permKeys = await permService.userPermKeys(c, user.userId);
+		} catch (_) {}
+		const hasPerm = permKeys.includes('*') || permKeys.includes('audit:adjudicate') || permKeys.includes('audit:*');
+		if (!hasPerm) {
+			throw new BizError(t('unauthorized'), 403);
+		}
+	}
+	return user;
+};
+
+const isAuditAdmin = async (c, user) => {
+	if (!user) return false;
+	if (isAdminUser(c, user)) return true;
+	let permKeys = [];
+	try {
+		permKeys = await permService.userPermKeys(c, user.userId);
+	} catch (_) {}
+	return permKeys.includes('*') || permKeys.includes('audit:adjudicate') || permKeys.includes('audit:*');
+};
+
 const handleAuditList = async (c) => {
-	ensureAuthUser(c);
-	await auditService.seedBaselineIfEmpty(c);
+	const user = ensureAuthUser(c);
+	const isAdmin = await isAuditAdmin(c, user);
 	const query = c.req.method === 'GET' ? c.req.query() : (await c.req.json().catch(() => ({})));
-	const data = await auditService.list(c, query);
+	if (!isAdmin) {
+		// 参观者/普通用户限制：仅允许查阅已处置结案的公开「操作记录」，严禁查看进行中的滥用威胁、申诉排队与深层风控
+		query.warningType = 'record';
+		query.isVisitor = true;
+	}
+	const data = await auditService.list(c, query, !isAdmin);
 	return c.json(result.ok(data));
 };
 app.get('/audit/list', handleAuditList);
 app.post('/audit/list', handleAuditList);
 
 app.post('/audit/action', async (c) => {
-	ensureAuthUser(c);
+	await ensureAdminUser(c);
 	const body = await c.req.json();
 	const data = await auditService.takeAction(c, body);
 	return c.json(result.ok(data));
 });
 
 app.post('/audit/adjudicate', async (c) => {
-	ensureAuthUser(c);
+	await ensureAdminUser(c);
 	const body = await c.req.json();
 	const data = await auditService.adjudicate(c, body);
 	return c.json(result.ok(data));
 });
 
 app.post('/audit/purge', async (c) => {
-	ensureAuthUser(c);
+	await ensureAdminUser(c);
 	const data = await auditService.purgeNonCritical(c);
 	return c.json(result.ok(data));
 });
 
 app.get('/audit/circuit-breaker', async (c) => {
-	ensureAuthUser(c);
+	await ensureAdminUser(c);
 	const data = await auditService.getCircuitBreaker(c);
 	return c.json(result.ok(data));
 });
 
 app.post('/audit/circuit-breaker', async (c) => {
-	ensureAuthUser(c);
+	await ensureAdminUser(c);
 	const body = await c.req.json();
 	const data = await auditService.setCircuitBreaker(c, body);
+	return c.json(result.ok(data));
+});
+
+// 最终处置通知 Outbox 台账与运维管理
+app.get('/audit/outbox/list', async (c) => {
+	await ensureAdminUser(c);
+	const query = c.req.query();
+	const data = await decisionNoticeService.listOutboxTasks(c, query);
+	return c.json(result.ok(data));
+});
+
+app.post('/audit/outbox/retry', async (c) => {
+	await ensureAdminUser(c);
+	const body = await c.req.json();
+	const data = await decisionNoticeService.retryOutboxTask(c, body.taskId || body.task_id);
+	return c.json(result.ok(data));
+});
+
+app.post('/audit/outbox/process', async (c) => {
+	await ensureAdminUser(c);
+	const data = await decisionNoticeService.processOutboxBatch(c, 20);
 	return c.json(result.ok(data));
 });
 

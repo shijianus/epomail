@@ -1,0 +1,38 @@
+#!/bin/bash
+
+echo "Running pre-commit check for secrets..."
+
+# 1. Check for sensitive file names
+sensitive_files=$(git diff --cached --name-only | grep -E -i "(\.env.*|d1_output\.json|kv_setting\.json|secret.*\.json|credentials\.json)")
+
+if [ -n "$sensitive_files" ]; then
+    echo "================================================================="
+    echo "🛑 ERROR: Sensitive file detected in your commit!"
+    echo "The following files look like they might contain secrets:"
+    echo "$sensitive_files"
+    echo ""
+    echo "Please remove them using 'git restore --staged <file>' and ensure"
+    echo "they are added to your .gitignore file."
+    echo "================================================================="
+    exit 1
+fi
+
+# 2. Check for API keys in the added/modified code
+# Look through git diff for lines added (+) containing potential secrets.
+# We exclude the first column (+) in the regex or just grep the raw patch.
+diff_content=$(git diff --cached -G"(re_[a-zA-Z0-9]{24,}|sk-[a-zA-Z0-9]{24,}|AIza[0-9A-Za-z_-]{35}|[0-9]{8,10}:[a-zA-Z0-9_-]{35})")
+
+if [ -n "$diff_content" ]; then
+    # Double check if any added lines actually contain the patterns
+    if git diff --cached | grep -E "^\+.*(re_[a-zA-Z0-9]{24,}|sk-[a-zA-Z0-9]{24,}|AIza[0-9A-Za-z_-]{35}|[0-9]{8,10}:[a-zA-Z0-9_-]{35})" > /dev/null; then
+        echo "================================================================="
+        echo "🛑 ERROR: Potential API key or secret detected in the code!"
+        echo "Found pattern matching: Resend (re_...), OpenAI (sk-...), Google (AIza...), or Telegram token."
+        echo "Please remove these secrets from your code before committing."
+        echo "================================================================="
+        exit 1
+    fi
+fi
+
+echo "✅ Pre-commit check passed. No secrets found."
+exit 0

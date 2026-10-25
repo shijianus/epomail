@@ -485,19 +485,18 @@ const userService = {
 		if (typeof password !== 'string' || password.length < 6) {
 			throw new BizError(t('pwdMinLength'));
 		}
-
 		if (options.requireCurrent) {
 			const userRow = await orm(c).select().from(user).where(eq(user.userId, userId)).get();
 			if (!userRow) {
 				throw new BizError(t('notExistUser'));
 			}
-			const valid = await cryptoUtils.verifyPassword(currentPassword || '', userRow.salt, userRow.password);
-			if (!valid) {
+			const check = await cryptoUtils.verifyPasswordWithUpgrade(currentPassword || '', userRow.salt, userRow.password, c.env);
+			if (!check.isValid) {
 				throw new BizError(t('IncorrectPwd'), 403);
 			}
 		}
 
-		const { salt, hash } = await cryptoUtils.hashPassword(password);
+		const { salt, hash } = await cryptoUtils.hashPassword(password, c.env);
 		await orm(c).update(user).set({ password: hash, salt: salt }).where(eq(user.userId, userId)).run();
 
 		// Password changes invalidate every existing session. The user must log
@@ -1170,7 +1169,7 @@ const userService = {
 			throw new BizError(t('roleNotExist'));
 		}
 
-		const { salt, hash } = await saltHashUtils.hashPassword(password);
+		const { salt, hash } = await saltHashUtils.hashPassword(password, c.env);
 
 		const userId = await userService.insert(c, { email, password: hash, salt, type });
 

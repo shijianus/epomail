@@ -407,9 +407,13 @@ VALUES ('${appealId}', '${U.spammer}', 'appeal', 'appeal_submitted', 'appeal', '
 		const ledgerRow = (banLedger2.json?.data?.list || []).find(r => r.email === U.spammer && r.warningType === 'ban');
 		ok(!!ledgerRow && ledgerRow.status === 'banned', 'C4-3 封禁台账留痕 (永久保留供审计追溯)');
 
-		// C5 申诉研判放行 (approve + purgeOnRelease)
+		// C5 申诉研判放行（普通放行；purgeOnRelease 能力已按用户确定撤销）
 		const appealRow = appealRows[0];
-		const adjRes = await api('POST', '/audit/adjudicate', { token: adminToken, body: { id: appealRow.id, action: 'approve', notes: 'E2E: 指纹比对一致，予以放行', purgeOnRelease: true } });
+		// C5-0：显式请求「放行即清理」→ 明确拒绝且零副作用（先于放行验证）
+		const purgeReqRes = await api('POST', '/audit/adjudicate', { token: adminToken, body: { id: appealRow.id, action: 'approve', notes: 'E2E: 能力边界探测', purgeOnRelease: true } });
+		ok(purgeReqRes.json?.code === 400 && /暂不提供「放行即清理」能力/.test(purgeReqRes.json?.message || ''),
+			'C5-0 「放行即清理」显式请求被准确拒绝 (400, 零副作用)');
+		const adjRes = await api('POST', '/audit/adjudicate', { token: adminToken, body: { id: appealRow.id, action: 'approve', notes: 'E2E: 指纹比对一致，予以放行' } });
 		ok(adjRes.json?.code === 200, 'C5-1 申诉研判放行处置成功 (adjudicate approve)');
 		const restoredLogin = await loginPwd(U.spammer, PWD);
 		ok(restoredLogin.json?.code === 200 && !!restoredLogin.json?.data?.token, 'C5-2 放行后用户恢复登录能力 (解封生效)');
@@ -426,12 +430,14 @@ VALUES ('${appealId}', '${U.spammer}', 'appeal', 'appeal_submitted', 'appeal', '
 		const rejAfter = await api('POST', '/audit/list', { token: adminToken, body: { keyword: 'ticket:APL-2026-AP77X2' } });
 		ok(rejRes.json?.code === 200 && rejAfter.json?.data?.list?.[0]?.status === 'rejected', 'C6-1 申诉驳回维持封禁 (status=rejected)');
 
-		// C7 一键清理非关键历史
+		// C7 维护清理入口（按保留期与引用保护，不再无差别删除全部 normal 记录）
+		const beforePurgeRows = (await api('POST', '/audit/list', { token: adminToken, body: { warningType: 'audit', num: 1, size: 50 } })).json?.data?.list || [];
 		const purgeRes = await api('POST', '/audit/purge', { token: adminToken });
-		ok(purgeRes.json?.code === 200, 'C7-1 非关键历史清理接口可用 (/audit/purge)');
+		ok(purgeRes.json?.code === 200, 'C7-1 维护清理接口可用 (/audit/purge)');
 		const afterPurge = await api('POST', '/audit/list', { token: adminToken, body: { warningType: 'audit', num: 1, size: 50 } });
-		const purgedNormals = (afterPurge.json?.data?.list || []).filter(r => r.warningType === 'audit' && r.riskLevel === 'normal');
-		ok(purgedNormals.length === 0, 'C7-2 常规审查 (warningType=audit & riskLevel=normal) 记录已被清理');
+		const freshNormals = (afterPurge.json?.data?.list || []).filter(r => r.warningType === 'audit' && r.riskLevel === 'normal');
+		ok(freshNormals.length >= beforePurgeRows.filter(r => r.warningType === 'audit' && r.riskLevel === 'normal').length,
+			'C7-2 保留期内常规审查记录未被删除 (180 天保留期保护)');
 
 		// C8 越权与未认证拦截
 		await register(U.plain);

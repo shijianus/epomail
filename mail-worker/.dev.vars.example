@@ -10,7 +10,7 @@ totp_enc_key=<your-strong-random-totp-master-key>
 admin_initial_password=<your-strong-initial-admin-password>
 # 可选的独立初始化门禁密钥；不设置时回退到 jwt_secret。建议生产单独设置。
 init_secret=<your-strong-init-secret>
-# Resend / Svix Webhook 验签密钥（必须与 Resend Dashboard 中一致）
+# Resend / Svix Webhook 验签密钥（格式: whsec_...，必须与 Resend Dashboard 一致）
 resend_webhook_secret=<whsec_your_webhook_signing_secret>
 # 可选：允许跨域访问 API 的前端源（逗号分隔）。未设置时仅允许同源。
 CORS_ORIGINS=

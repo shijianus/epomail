@@ -61,3 +61,8 @@ tests/*.png
 
 # EpomailDocs 已独立为专用 git 仓库（禁止放回本仓库），见 EpomailDocs/README.md
 EpomailDocs/
+
+# Git hooks：pre-commit 为仓库共享的密钥扫描，纳入版本控制；
+# post-commit / post-checkout 为本机 Qoder AI 代码追踪器（内含本机绝对路径），严禁入库。
+.githooks/post-commit
+.githooks/post-checkout

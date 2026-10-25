@@ -1,0 +1,1141 @@
+/**
+ * 真实服务层裁决逻辑与安全边界自动化测试套件
+ * (Audit Service Backend Adjudication Test Suite)
+ * 
+ * 严格验证 10 项核心安全与状态流转要求：
+ * 1. 无权限请求拒绝 (401)
+ * 2. 非法阶段动作拒绝 (400 for illegal stage/action transitions)
+ * 3. 目标账号从真实案件绑定取得，不信任客户端随意指定
+ * 4. 不存在案件不写入 (404)
+ * 5. 合法动作只改变预期对象和预期字段
+ * 6. 重复提交不造成重复处罚和重复副作用 (只读审计记录防重入 / 幂等维护)
+ * 7. 状态已被其他管理员改变时，不覆盖为旧决定 (并发安全防御)
+ * 8. 数据库或审计写入失败时，不返回虚假的完整成功
+ * 9. 本案解除不会覆盖其他仍有效限制 (多重封禁隔离保护)
+ * 10. 明确拒绝底层尚未实现的能力 (mute/probation 显式 400 阻断)
+ * 
+ * 使用真实 SQLite + Drizzle-ORM 忠实 D1 替身与真实服务层 auditService.adjudicate 调用
+ */
+
+import assert from 'node:assert';
+import { DatabaseSync } from 'node:sqlite';
+import auditService from '../mail-worker/src/service/audit-service.js';
+import decisionNoticeService from '../mail-worker/src/service/decision-notice-service.js';
+import resendService from '../mail-worker/src/service/resend-service.js';
+
+console.log('🧪 Starting Real Backend Audit Service Adjudication Test Suite...\n');
+
+function createIsolatedDb() {
+  const rawDb = new DatabaseSync(':memory:');
+  rawDb.exec(`
+    CREATE TABLE audit_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      ticket_id TEXT,
+      user_id INTEGER,
+      email TEXT NOT NULL,
+      warning_type TEXT NOT NULL,
+      event_type TEXT NOT NULL,
+      category TEXT NOT NULL,
+      action_text TEXT NOT NULL,
+      detail_text TEXT,
+      ip TEXT,
+      geo TEXT,
+      device TEXT,
+      device_type TEXT DEFAULT 'desktop',
+      fingerprint TEXT,
+      base_ip TEXT,
+      base_geo TEXT,
+      base_device TEXT,
+      base_fingerprint TEXT,
+      is_reg_ip INTEGER DEFAULT 0,
+      is_multi_ip INTEGER DEFAULT 0,
+      active_ip_count INTEGER DEFAULT 1,
+      reported_by_others INTEGER DEFAULT 0,
+      risk_level TEXT DEFAULT 'normal',
+      priority TEXT DEFAULT 'P3',
+      status TEXT DEFAULT 'active',
+      recommended_action TEXT,
+      match_score INTEGER,
+      subnet_match INTEGER DEFAULT 0,
+      appeal_reason TEXT,
+      circuit_status TEXT DEFAULT 'NORMAL',
+      is_internal INTEGER DEFAULT 1,
+      report_category TEXT,
+      report_reason TEXT,
+      assignee TEXT,
+      reason_code TEXT,
+      report_source TEXT,
+      evidence_summary TEXT,
+      cluster_id TEXT,
+      ban_reason TEXT,
+      ban_time TEXT,
+      resolved_time TEXT,
+      timeline TEXT,
+      version INTEGER DEFAULT 1,
+      idempotency_key TEXT,
+      decision_id TEXT,
+      original_decision_id TEXT,
+      create_time TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE notification_outbox (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      task_id TEXT NOT NULL UNIQUE,
+      case_id INTEGER,
+      ticket_id TEXT,
+      user_id INTEGER,
+      recipient TEXT NOT NULL,
+      channel TEXT NOT NULL DEFAULT 'internal',
+      template_code TEXT NOT NULL,
+      subject TEXT NOT NULL,
+      content TEXT NOT NULL,
+      reason_code TEXT,
+      status TEXT NOT NULL DEFAULT 'pending',
+      provider_message_id TEXT,
+      retry_count INTEGER NOT NULL DEFAULT 0,
+      max_retries INTEGER NOT NULL DEFAULT 5,
+      last_error TEXT,
+      next_retry_at TEXT,
+      delivered_at TEXT,
+      read_at TEXT,
+      claimant_id TEXT,
+      lease_expires_at TEXT,
+      lease_version INTEGER DEFAULT 0,
+      create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+      update_time DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE audit_decision (
+      decision_id TEXT PRIMARY KEY,
+      case_id INTEGER NOT NULL,
+      expected_version INTEGER NOT NULL,
+      expected_status TEXT,
+      action_type TEXT NOT NULL,
+      actor TEXT NOT NULL,
+      idempotency_key TEXT UNIQUE,
+      payload_hash TEXT NOT NULL,
+      create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(case_id, expected_version)
+    );
+
+    CREATE TRIGGER IF NOT EXISTS trg_audit_decision_version_guard
+    BEFORE INSERT ON audit_decision
+    BEGIN
+      SELECT CASE
+        WHEN (SELECT id FROM audit_log WHERE id = NEW.case_id) IS NULL
+        THEN RAISE(ABORT, 'Audit case not found')
+        WHEN (SELECT coalesce(version, 1) FROM audit_log WHERE id = NEW.case_id) != NEW.expected_version
+        THEN RAISE(ABORT, 'Audit log version mismatch: stale decision attempt')
+        WHEN NEW.expected_status IS NOT NULL AND (SELECT status FROM audit_log WHERE id = NEW.case_id) != NEW.expected_status
+        THEN RAISE(ABORT, 'Audit log status mismatch: case state already changed')
+      END;
+    END;
+
+    CREATE TABLE webhook_event (
+      event_id TEXT PRIMARY KEY,
+      provider TEXT NOT NULL,
+      event_type TEXT NOT NULL,
+      resource_id TEXT,
+      payload TEXT,
+      status TEXT NOT NULL DEFAULT 'processed',
+      create_time DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- 第二轮修复新增表（与 mail-worker/src/service/audit-service.js ensureTables 生产定义一致）
+    CREATE TABLE audit_appeal (
+      appeal_id TEXT PRIMARY KEY,
+      case_id INTEGER NOT NULL,
+      source_case_id INTEGER,
+      decision_id TEXT,
+      user_id INTEGER,
+      email TEXT NOT NULL,
+      round INTEGER NOT NULL,
+      content TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      decision_action TEXT,
+      decision_notes TEXT,
+      decided_by TEXT,
+      decided_at TEXT,
+      create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+      update_time DATETIME,
+      UNIQUE(case_id, round)
+    );
+
+    CREATE TABLE audit_purge_batch (
+      id TEXT PRIMARY KEY,
+      count INTEGER NOT NULL DEFAULT 0,
+      reason TEXT NOT NULL,
+      create_time DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE setting (
+      register INTEGER DEFAULT 0,
+      receive INTEGER DEFAULT 0,
+      add_email INTEGER DEFAULT 0,
+      many_email INTEGER DEFAULT 0,
+      title TEXT DEFAULT 'EpoCanvas Mail',
+      auto_refresh INTEGER DEFAULT 0,
+      register_verify INTEGER DEFAULT 1,
+      add_email_verify INTEGER DEFAULT 1,
+      black_from TEXT DEFAULT ''
+    );
+    INSERT INTO setting (title, black_from) VALUES ('EpoCanvas Mail', '');
+
+    CREATE TABLE account (
+      account_id INTEGER PRIMARY KEY AUTOINCREMENT,
+      email TEXT NOT NULL,
+      name TEXT DEFAULT '',
+      status INTEGER DEFAULT 0,
+      latest_email_time TEXT,
+      create_time TEXT DEFAULT CURRENT_TIMESTAMP,
+      user_id INTEGER NOT NULL,
+      all_receive INTEGER DEFAULT 0,
+      sort INTEGER DEFAULT 0,
+      is_del INTEGER DEFAULT 0
+    );
+
+    CREATE TABLE email (
+      email_id INTEGER PRIMARY KEY AUTOINCREMENT,
+      send_email TEXT,
+      name TEXT,
+      account_id INTEGER NOT NULL,
+      user_id INTEGER NOT NULL,
+      subject TEXT,
+      content TEXT,
+      text TEXT,
+      labels TEXT DEFAULT '[]',
+      create_time TEXT DEFAULT CURRENT_TIMESTAMP,
+      is_del INTEGER DEFAULT 0,
+      to_email TEXT,
+      to_name TEXT,
+      recipient TEXT,
+      cc TEXT DEFAULT '[]',
+      bcc TEXT DEFAULT '[]',
+      in_reply_to TEXT,
+      relation TEXT,
+      message_id TEXT,
+      type INTEGER DEFAULT 1,
+      status INTEGER DEFAULT 0,
+      unread INTEGER DEFAULT 1,
+      is_spam INTEGER DEFAULT 0,
+      is_official INTEGER DEFAULT 0,
+      code TEXT DEFAULT '',
+      resend_email_id TEXT,
+      message TEXT,
+      snoozed_time TEXT,
+      snoozed_end_time TEXT
+    );
+
+    CREATE TABLE user (
+      user_id INTEGER PRIMARY KEY AUTOINCREMENT,
+      email TEXT NOT NULL,
+      type INTEGER DEFAULT 1 NOT NULL,
+      password TEXT DEFAULT '' NOT NULL,
+      salt TEXT DEFAULT '' NOT NULL,
+      status INTEGER DEFAULT 0 NOT NULL,
+      create_time TEXT DEFAULT CURRENT_TIMESTAMP,
+      active_time TEXT,
+      create_ip TEXT,
+      active_ip TEXT,
+      os TEXT,
+      browser TEXT,
+      device TEXT,
+      sort TEXT DEFAULT '0',
+      send_count TEXT DEFAULT '0',
+      reg_key_id INTEGER DEFAULT 0 NOT NULL,
+      is_del INTEGER DEFAULT 0 NOT NULL,
+      custom_labels TEXT DEFAULT '[]' NOT NULL,
+      totp_enabled INTEGER DEFAULT 0 NOT NULL,
+      totp_secret TEXT DEFAULT '' NOT NULL,
+      totp_key_version INTEGER DEFAULT 1 NOT NULL,
+      totp_backup_codes TEXT DEFAULT '[]' NOT NULL,
+      totp_created_at TEXT DEFAULT '' NOT NULL,
+      security_keys TEXT DEFAULT '[]' NOT NULL,
+      storage_quota_mb INTEGER DEFAULT 0 NOT NULL,
+      byo_storage_enabled INTEGER DEFAULT 0 NOT NULL,
+      byo_storage_config TEXT DEFAULT '{}' NOT NULL
+    );
+  `);
+
+  const d1 = {
+    prepare(sql) {
+      return {
+        _params: [],
+        bind(...params) {
+          const bound = { ...this };
+          bound._params = params;
+          return bound;
+        },
+        async run() {
+          const stmt = rawDb.prepare(sql);
+          const info = stmt.run(...this._params);
+          return { success: true, meta: { changes: info.changes, last_row_id: Number(info.lastInsertRowid) } };
+        },
+        async all() {
+          const stmt = rawDb.prepare(sql);
+          const rows = stmt.all(...this._params);
+          return { results: rows, success: true };
+        },
+        async first(col) {
+          const stmt = rawDb.prepare(sql);
+          const row = stmt.get(...this._params);
+          if (!row) return null;
+          if (col) return row[col];
+          return row;
+        },
+        async raw() {
+          const stmt = rawDb.prepare(sql);
+          const rows = stmt.all(...this._params);
+          return rows.map(r => Object.values(r));
+        }
+      };
+    },
+    async batch(statements) {
+      rawDb.exec('BEGIN TRANSACTION');
+      try {
+        const results = [];
+        for (const s of statements) {
+          const res = await s.run();
+          results.push(res);
+        }
+        rawDb.exec('COMMIT');
+        return results;
+      } catch (e) {
+        rawDb.exec('ROLLBACK');
+        throw e;
+      }
+    }
+  };
+
+  const mockKv = {
+    _data: new Map(),
+    async get(key) { return this._data.get(key) || null; },
+    async put(key, val) { this._data.set(key, val); },
+    async delete(key) { this._data.delete(key); }
+  };
+
+  const isolatedSecret = 'test_secret_' + crypto.randomUUID().replace(/-/g, '');
+
+  const createContext = (adminUser = { userId: 1, email: 'secadmin@epocanvas.com', name: 'SecAdmin' }, customEnv = {}) => {
+    const store = new Map();
+    if (adminUser) store.set('user', adminUser);
+    return {
+      get(key) { return store.get(key); },
+      set(key, val) { store.set(key, val); },
+      env: {
+        db: d1,
+        kv: mockKv,
+        admin: adminUser?.email || 'secadmin@epocanvas.com',
+        jwt_secret: isolatedSecret,
+        ...customEnv
+      }
+    };
+  };
+
+  return { rawDb, d1, mockKv, createContext };
+}
+
+const isBizError = (err, code, msg) => {
+  const matchesCode = (err.code === code || err.status === code);
+  const matchesMsg = !msg || (err.message && err.message.includes(msg));
+  return Boolean(matchesCode && matchesMsg);
+};
+
+// --------------------------------------------------------------------------
+// 1. 无权限请求拒绝 (401)
+// --------------------------------------------------------------------------
+{
+  const { createContext } = createIsolatedDb();
+  const cUnauth = createContext(null); // 无已登录管理员
+  let err = null;
+  try {
+    await auditService.adjudicate(cUnauth, { id: 1, action: 'ban_account' });
+  } catch (e) {
+    err = e;
+  }
+  assert.ok(err, 'Must throw error on unauthenticated request');
+  assert.strictEqual(err.code || err.status, 401, 'Must reject with 401');
+  assert.ok(err.message.includes('未授权') || err.message.includes('登录'), 'Error message must state unauthorized');
+  console.log('✅ Requirement 1 Passed: Unauthenticated request rejected with 401');
+}
+
+// --------------------------------------------------------------------------
+// 2. 非法阶段动作拒绝 (400 for illegal transitions)
+// --------------------------------------------------------------------------
+{
+  const { rawDb, createContext } = createIsolatedDb();
+  const c = createContext();
+
+  // 插入一个处于 active 的首次违规单 (非申诉单)
+  rawDb.exec(`
+    INSERT INTO user (user_id, email, status) VALUES (10, 'threat_01@epocanvas.com', 0);
+    INSERT INTO audit_log (id, ticket_id, email, warning_type, event_type, category, action_text, status, is_internal)
+    VALUES (1, 'THR-001', 'threat_01@epocanvas.com', 'risk', 'spam', 'security', 'Spamming', 'active', 1);
+  `);
+
+  // 2A: 非申诉案件提交申诉动作 (approve_appeal / reject)
+  await assert.rejects(
+    async () => await auditService.adjudicate(c, { id: 1, action: 'approve_appeal' }),
+    (err) => isBizError(err, 400, '无待处理申诉')
+  );
+  await assert.rejects(
+    async () => await auditService.adjudicate(c, { id: 1, action: 'reject' }),
+    (err) => isBizError(err, 400, '无待处理申诉')
+  );
+
+  // 2B: 未处于封禁状态的案件提交 maintain_ban 或 unban
+  await assert.rejects(
+    async () => await auditService.adjudicate(c, { id: 1, action: 'maintain_ban' }),
+    (err) => isBizError(err, 400, '未处于封禁状态')
+  );
+  await assert.rejects(
+    async () => await auditService.adjudicate(c, { id: 1, action: 'unban' }),
+    (err) => isBizError(err, 400, '未处于封禁处置中')
+  );
+
+  // 2C: 非例行合规审查案件提交 archive_routine
+  await assert.rejects(
+    async () => await auditService.adjudicate(c, { id: 1, action: 'archive_routine' }),
+    (err) => isBizError(err, 400, '例行合规审查')
+  );
+
+  // 2D: 外部拉黑动作尝试施加于站内用户
+  await assert.rejects(
+    async () => await auditService.adjudicate(c, { id: 1, action: 'blacklist_sender' }),
+    (err) => isBizError(err, 400, '外部发件人')
+  );
+
+  // 2E: 站内账号封禁动作尝试施加于外部发信人
+  rawDb.exec(`
+    INSERT INTO audit_log (id, ticket_id, email, warning_type, event_type, category, action_text, status, is_internal)
+    VALUES (2, 'EXT-001', 'spammer@outside.org', 'risk', 'phishing', 'security', 'Phishing email', 'active', 0);
+  `);
+  await assert.rejects(
+    async () => await auditService.adjudicate(c, { id: 2, action: 'ban_account' }),
+    (err) => isBizError(err, 400, '本地注册用户')
+  );
+
+  console.log('✅ Requirement 2 Passed: Illegal stage & cross-type action transitions strictly rejected with 400');
+}
+
+// --------------------------------------------------------------------------
+// 3. 目标账号从真实案件绑定取得，不信任客户端随意指定
+// --------------------------------------------------------------------------
+{
+  const { rawDb, createContext } = createIsolatedDb();
+  const c = createContext();
+
+  rawDb.exec(`
+    INSERT INTO user (user_id, email, status) VALUES (11, 'actual_culprit@epocanvas.com', 0);
+    INSERT INTO user (user_id, email, status) VALUES (12, 'innocent_bystander@epocanvas.com', 0);
+    INSERT INTO audit_log (id, ticket_id, email, warning_type, event_type, category, action_text, status, is_internal)
+    VALUES (3, 'THR-003', 'actual_culprit@epocanvas.com', 'risk', 'abuse', 'security', 'Abuse', 'active', 1);
+  `);
+
+  // 客户端恶意尝试传入篡改的 email 与 userId
+  await auditService.adjudicate(c, {
+    id: 3,
+    action: 'ban_account',
+    email: 'innocent_bystander@epocanvas.com',
+    userId: 12,
+    targetEmail: 'innocent_bystander@epocanvas.com'
+  });
+
+  const culprit = rawDb.prepare('SELECT status FROM user WHERE user_id = 11').get();
+  const bystander = rawDb.prepare('SELECT status FROM user WHERE user_id = 12').get();
+
+  assert.strictEqual(culprit.status, 1, 'Actual culprit must be banned (status = 1)');
+  assert.strictEqual(bystander.status, 0, 'Innocent bystander must NOT be affected (remains status = 0)');
+
+  console.log('✅ Requirement 3 Passed: Target identity derived strictly from case record, ignoring forged client params');
+}
+
+// --------------------------------------------------------------------------
+// 4. 不存在案件不写入 (404)
+// --------------------------------------------------------------------------
+{
+  const { createContext } = createIsolatedDb();
+  const c = createContext();
+
+  await assert.rejects(
+    async () => await auditService.adjudicate(c, { id: 999999, action: 'ban_account' }),
+    (err) => isBizError(err, 404, '案件记录不存在')
+  );
+
+  console.log('✅ Requirement 4 Passed: Non-existent case rejected with 404 without writes');
+}
+
+// --------------------------------------------------------------------------
+// 5. 合法动作只改变预期对象和预期字段
+// --------------------------------------------------------------------------
+{
+  const { rawDb, createContext } = createIsolatedDb();
+  const c = createContext();
+
+  rawDb.exec(`
+    INSERT INTO user (user_id, email, status) VALUES (20, 'target_user@epocanvas.com', 0);
+    INSERT INTO user (user_id, email, status) VALUES (21, 'untargeted_user@epocanvas.com', 0);
+    INSERT INTO audit_log (id, ticket_id, email, warning_type, event_type, category, action_text, status, is_internal)
+    VALUES (5, 'THR-005', 'target_user@epocanvas.com', 'risk', 'spam', 'security', 'Violation', 'active', 1);
+    INSERT INTO audit_log (id, ticket_id, email, warning_type, event_type, category, action_text, status, is_internal)
+    VALUES (6, 'THR-006', 'untargeted_user@epocanvas.com', 'risk', 'spam', 'security', 'Violation', 'active', 1);
+  `);
+
+  // 对案件 5 执行 no_penalty (排除嫌疑·不予处罚)
+  const res = await auditService.adjudicate(c, { id: 5, action: 'no_penalty', notes: '经核实属于误报' });
+  assert.strictEqual(res.success, true);
+
+  const log5 = rawDb.prepare('SELECT status, detail_text, resolved_time FROM audit_log WHERE id = 5').get();
+  assert.strictEqual(log5.status, 'resolved', 'Ticket 5 status should be resolved');
+  assert.ok(log5.detail_text.includes('误报'), 'Detail text should contain notes');
+  assert.ok(log5.resolved_time, 'Resolved time must be set');
+
+  // 用户状态绝不应该被误封
+  const user20 = rawDb.prepare('SELECT status FROM user WHERE user_id = 20').get();
+  assert.strictEqual(user20.status, 0, 'User 20 must remain active (status = 0)');
+
+  // 未涉及的案件 6 和用户 21 完全保持不变
+  const log6 = rawDb.prepare('SELECT status FROM audit_log WHERE id = 6').get();
+  assert.strictEqual(log6.status, 'active');
+  const user21 = rawDb.prepare('SELECT status FROM user WHERE user_id = 21').get();
+  assert.strictEqual(user21.status, 0);
+
+  console.log('✅ Requirement 5 Passed: Lawful actions only mutate expected records and expected columns');
+}
+
+// --------------------------------------------------------------------------
+// 6. 重复提交不造成重复处罚和重复副作用 (只读审计记录防重入)
+// --------------------------------------------------------------------------
+{
+  const { rawDb, createContext } = createIsolatedDb();
+  const c = createContext();
+
+  rawDb.exec(`
+    INSERT INTO user (user_id, email, status) VALUES (30, 'repeat_user@epocanvas.com', 0);
+    INSERT INTO audit_log (id, ticket_id, email, warning_type, event_type, category, action_text, status, is_internal)
+    VALUES (10, 'THR-010', 'repeat_user@epocanvas.com', 'risk', 'spam', 'security', 'Violation', 'active', 1);
+  `);
+
+  // 第一次提交封禁：成功
+  await auditService.adjudicate(c, { id: 10, action: 'ban_account', notes: 'First ban' });
+  const countAfterFirst = rawDb.prepare("SELECT count(*) as cnt FROM audit_log WHERE email = 'repeat_user@epocanvas.com' AND warning_type = 'ban'").get().cnt;
+  assert.strictEqual(countAfterFirst, 1, 'Exactly 1 ban record created');
+
+  // 第二次重复提交同一个案件：必须被只读审计记录拦截，不能重复执行或产生二次副作用
+  await assert.rejects(
+    async () => await auditService.adjudicate(c, { id: 10, action: 'ban_account', notes: 'Duplicate ban attempt' }),
+    (err) => isBizError(err, 400, '系统只读审计记录')
+  );
+
+  // 封禁记录数量保持 1，无重复增加
+  const countAfterSecond = rawDb.prepare("SELECT count(*) as cnt FROM audit_log WHERE email = 'repeat_user@epocanvas.com' AND warning_type = 'ban'").get().cnt;
+  assert.strictEqual(countAfterSecond, 1, 'Ban records count must not duplicate');
+
+  console.log('✅ Requirement 6 Passed: Resubmission blocked by read-only audit log protection, zero duplicate side-effects');
+}
+
+// --------------------------------------------------------------------------
+// 7. 状态已被其他管理员改变时，不覆盖为旧决定 (并发安全保护)
+// --------------------------------------------------------------------------
+{
+  const { rawDb, createContext } = createIsolatedDb();
+  const cAdmin1 = createContext({ userId: 2, email: 'admin1@epocanvas.com' });
+  const cAdmin2 = createContext({ userId: 3, email: 'admin2@epocanvas.com' });
+
+  rawDb.exec(`
+    INSERT INTO user (user_id, email, status) VALUES (40, 'concurrent@epocanvas.com', 0);
+    INSERT INTO audit_log (id, ticket_id, email, warning_type, event_type, category, action_text, status, is_internal)
+    VALUES (20, 'THR-020', 'concurrent@epocanvas.com', 'risk', 'spam', 'security', 'Violation', 'active', 1);
+  `);
+
+  // Admin 1 抢先裁决不予处罚并结案
+  await auditService.adjudicate(cAdmin1, { id: 20, action: 'no_penalty', notes: 'Admin 1 exonerated' });
+
+  // Admin 2 稍后尝试提交封禁：必须被阻断，不可覆盖为旧决定
+  await assert.rejects(
+    async () => await auditService.adjudicate(cAdmin2, { id: 20, action: 'ban_account', notes: 'Admin 2 tries to ban' }),
+    (err) => isBizError(err, 400, '系统只读审计记录')
+  );
+
+  const finalUser = rawDb.prepare('SELECT status FROM user WHERE user_id = 40').get();
+  assert.strictEqual(finalUser.status, 0, 'User must remain exonerated status 0');
+
+  console.log('✅ Requirement 7 Passed: Post-resolution state change attempts rejected, preventing overwrite races');
+}
+
+// --------------------------------------------------------------------------
+// 8. 数据库或审计写入失败时，不返回虚假的完整成功
+// --------------------------------------------------------------------------
+{
+  const { rawDb, d1, mockKv } = createIsolatedDb();
+  // 模拟数据库损坏/写入失败
+  const failingD1 = {
+    prepare(sql) {
+      if (sql.toLowerCase().includes('update') && sql.toLowerCase().includes('audit_log')) {
+        return {
+          bind() { return this; },
+          async run() { throw new Error('D1_STORAGE_WRITE_FAILURE: disk I/O error'); },
+          async all() { return { results: [], success: true }; },
+          async first() { return null; }
+        };
+      }
+      return d1.prepare(sql);
+    },
+    async batch(stmts) {
+      for (const s of stmts) {
+        await s.run();
+      }
+    }
+  };
+
+  rawDb.exec(`
+    INSERT INTO user (user_id, email, status) VALUES (50, 'fail_test@epocanvas.com', 0);
+    INSERT INTO audit_log (id, ticket_id, email, warning_type, event_type, category, action_text, status, is_internal)
+    VALUES (30, 'THR-030', 'fail_test@epocanvas.com', 'risk', 'spam', 'security', 'Violation', 'active', 1);
+  `);
+
+  const cFailing = {
+    get(k) { return k === 'user' ? { userId: 1, email: 'secadmin@epocanvas.com' } : null; },
+    set() {},
+    env: { db: failingD1, kv: mockKv, admin: 'secadmin@epocanvas.com' }
+  };
+
+  await assert.rejects(
+    async () => await auditService.adjudicate(cFailing, { id: 30, action: 'no_penalty' }),
+    (err) => err.message.includes('D1_STORAGE_WRITE_FAILURE'),
+    'Must propagate storage failure instead of returning fake { success: true }'
+  );
+
+  console.log('✅ Requirement 8 Passed: Storage failures propagate transparently without returning false success');
+}
+
+// --------------------------------------------------------------------------
+// 9. 本案解除不会覆盖其他仍有效限制 (多重封禁隔离防护)
+// --------------------------------------------------------------------------
+{
+  const { rawDb, createContext } = createIsolatedDb();
+  const c = createContext();
+
+  // 用户拥有两个独立的封禁案卷：Ticket 41 与 Ticket 42
+  rawDb.exec(`
+    INSERT INTO user (user_id, email, status) VALUES (60, 'multi_banned@epocanvas.com', 1);
+    INSERT INTO audit_log (id, ticket_id, email, warning_type, event_type, category, action_text, status, is_internal)
+    VALUES (41, 'BAN-CASE-01', 'multi_banned@epocanvas.com', 'ban', 'spam_outbound', 'security', 'Ban 1', 'banned', 1);
+    INSERT INTO audit_log (id, ticket_id, email, warning_type, event_type, category, action_text, status, is_internal)
+    VALUES (42, 'BAN-CASE-02', 'multi_banned@epocanvas.com', 'ban', 'credential_stuffing', 'security', 'Ban 2', 'banned', 1);
+  `);
+
+  // 管理员解除案卷 41 的限制
+  await auditService.adjudicate(c, { id: 41, action: 'unban', notes: 'Case 41 review cleared' });
+
+  // 关键验证：案卷 41 状态变为 unbanned
+  const log41 = rawDb.prepare('SELECT status, detail_text FROM audit_log WHERE id = 41').get();
+  assert.strictEqual(log41.status, 'unbanned', 'Case 41 is unbanned');
+  assert.ok(log41.detail_text.includes('系统安全提示') && log41.detail_text.includes('保持封禁状态'), 'Detail must warn about remaining bans');
+
+  // 关键红线：因为案卷 42 仍然处于 banned 状态，user.status 绝不能被全局重置为 0！
+  const user60Mid = rawDb.prepare('SELECT status FROM user WHERE user_id = 60').get();
+  assert.strictEqual(user60Mid.status, 1, 'User 60 must REMAIN banned (status = 1) due to active Case 42!');
+
+  // 管理员继续解除案卷 42 的限制
+  await auditService.adjudicate(c, { id: 42, action: 'unban', notes: 'Case 42 review cleared' });
+
+  // 此时无其他有效封禁案卷，user.status 正式安全恢复为 0 (正常)
+  const user60Final = rawDb.prepare('SELECT status FROM user WHERE user_id = 60').get();
+  assert.strictEqual(user60Final.status, 0, 'User 60 now securely restored to normal (status = 0)');
+
+  console.log('✅ Requirement 9 Passed: Multi-ban isolation strictly protects against premature global unbanning');
+}
+
+// --------------------------------------------------------------------------
+// 10. 明确拒绝底层尚未实现的能力 (mute/probation 显式 400 阻断)
+// --------------------------------------------------------------------------
+{
+  const { rawDb, createContext } = createIsolatedDb();
+  const c = createContext();
+
+  rawDb.exec(`
+    INSERT INTO user (user_id, email, status) VALUES (70, 'unsupported_test@epocanvas.com', 0);
+    INSERT INTO audit_log (id, ticket_id, email, warning_type, event_type, category, action_text, status, is_internal)
+    VALUES (51, 'THR-051', 'unsupported_test@epocanvas.com', 'risk', 'spam', 'security', 'Spam', 'active', 1);
+  `);
+
+  // 尝试执行禁言 (mute_account)
+  await assert.rejects(
+    async () => await auditService.adjudicate(c, { id: 51, action: 'mute_account' }),
+    (err) => isBizError(err, 400, '尚未接入该动作的实际执行能力 (mute/probation)')
+  );
+
+  // 尝试执行条件放行挑战 (probation)
+  await assert.rejects(
+    async () => await auditService.adjudicate(c, { id: 51, action: 'probation' }),
+    (err) => isBizError(err, 400, '尚未接入该动作的实际执行能力 (mute/probation)')
+  );
+
+  console.log('✅ Requirement 10 Passed: Unimplemented capabilities (mute & probation) explicitly rejected with 400');
+}
+
+// --------------------------------------------------------------------------
+// 11. 并发控制与乐观锁 (CAS Versioning): 过时版本或已被并发修改拒绝 (409)
+// --------------------------------------------------------------------------
+{
+  const { rawDb, createContext } = createIsolatedDb();
+  const c = createContext();
+
+  rawDb.exec(`
+    INSERT INTO user (user_id, email, status) VALUES (80, 'cas_test@epocanvas.com', 0);
+    INSERT INTO audit_log (id, ticket_id, email, warning_type, event_type, category, action_text, status, is_internal, version)
+    VALUES (60, 'THR-060', 'cas_test@epocanvas.com', 'risk', 'spam', 'security', 'Spam', 'active', 1, 2);
+  `);
+
+  // 客户端提交过时版本 (指定 version: 1，而数据库实际为 2)
+  await assert.rejects(
+    async () => await auditService.adjudicate(c, { id: 60, action: 'ban_account', version: 1 }),
+    (err) => isBizError(err, 409, '版本已过时')
+  );
+
+  // 提交匹配版本 (version: 2)：成功，且版本自增至 3
+  const res = await auditService.adjudicate(c, { id: 60, action: 'ban_account', version: 2 });
+  assert.strictEqual(res.success, true);
+  assert.strictEqual(res.version, 3);
+
+  const updatedLog = rawDb.prepare('SELECT version FROM audit_log WHERE id = 60').get();
+  assert.strictEqual(updatedLog.version, 3, 'Version must be incremented to 3');
+
+  console.log('✅ Requirement 11 Passed: CAS optimistic locking rejects stale versions with 409');
+}
+
+// --------------------------------------------------------------------------
+// 12. 幂等键防重放与冲突检测 (Idempotency Key): 相同操作安全重放，冲突操作抛出 409
+// --------------------------------------------------------------------------
+{
+  const { rawDb, createContext } = createIsolatedDb();
+  const c = createContext();
+
+  rawDb.exec(`
+    INSERT INTO user (user_id, email, status) VALUES (81, 'idempotent_test@epocanvas.com', 0);
+    INSERT INTO audit_log (id, ticket_id, email, warning_type, event_type, category, action_text, status, is_internal)
+    VALUES (70, 'THR-070', 'idempotent_test@epocanvas.com', 'risk', 'spam', 'security', 'Spam', 'active', 1);
+    INSERT INTO audit_log (id, ticket_id, email, warning_type, event_type, category, action_text, status, is_internal)
+    VALUES (71, 'THR-071', 'another_target@epocanvas.com', 'risk', 'spam', 'security', 'Spam', 'active', 1);
+  `);
+
+  const idemKey = 'IDEM-KEY-ALPHA-01';
+
+  // 第一次请求：正常执行并持久化 idempotency_key
+  const res1 = await auditService.adjudicate(c, { id: 70, action: 'ban_account', idempotencyKey: idemKey });
+  assert.strictEqual(res1.success, true);
+  assert.ok(res1.decisionId, 'Must return decisionId');
+
+  // 第二次使用完全相同的 idempotencyKey 针对案件 70：必须直接返回幂等成功，不产生二次处罚
+  const res2 = await auditService.adjudicate(c, { id: 70, action: 'ban_account', idempotencyKey: idemKey });
+  assert.strictEqual(res2.success, true);
+  assert.strictEqual(res2.replayed, true, 'Must indicate idempotent replay');
+  assert.strictEqual(res2.decisionId, res1.decisionId, 'Must return matching decisionId');
+
+  // 第三次使用相同的 idempotencyKey 尝试应用于不同案件 (71)：必须抛出 409 冲突！
+  await assert.rejects(
+    async () => await auditService.adjudicate(c, { id: 71, action: 'ban_account', idempotencyKey: idemKey }),
+    (err) => isBizError(err, 409, '幂等键冲突')
+  );
+
+  console.log('✅ Requirement 12 Passed: Idempotency deduplication replays safely and conflicts reject with 409');
+}
+
+// --------------------------------------------------------------------------
+// 13. 最终通知可靠 Outbox 事务入库 (Notification Outbox Persistence)
+// --------------------------------------------------------------------------
+{
+  const { rawDb, createContext } = createIsolatedDb();
+  const c = createContext();
+
+  rawDb.exec(`
+    INSERT INTO user (user_id, email, status) VALUES (82, 'outbox_test@epocanvas.com', 0);
+    INSERT INTO audit_log (id, ticket_id, email, warning_type, event_type, category, action_text, status, is_internal, reason_code)
+    VALUES (80, 'THR-080', 'outbox_test@epocanvas.com', 'risk', 'spam', 'security', 'Spam', 'active', 1, 'RULE-SPAM-CRITICAL');
+  `);
+
+  const res = await auditService.adjudicate(c, { id: 80, action: 'ban_account', notes: 'Outbox verification ban' });
+  assert.strictEqual(res.success, true);
+  assert.ok(res.noticeTaskId, 'Must return noticeTaskId');
+
+  // 验证 notification_outbox 中同事务写入了待发送任务
+  const outboxTask = rawDb.prepare('SELECT * FROM notification_outbox WHERE case_id = 80').get();
+  assert.ok(outboxTask, 'Outbox task must exist');
+  assert.strictEqual(outboxTask.task_id, res.noticeTaskId);
+  assert.strictEqual(outboxTask.template_code, 'FIRST_BAN');
+  assert.strictEqual(outboxTask.status, 'pending');
+  assert.strictEqual(outboxTask.reason_code, 'RULE-SPAM-CRITICAL');
+  assert.ok(outboxTask.subject.includes('THR-080') || outboxTask.subject.includes('违规处置'), 'Subject must be populated');
+  assert.ok(outboxTask.content.includes('EpoCanvas Mail'), 'Content must contain rendered template');
+
+  console.log('✅ Requirement 13 Passed: Final notice outbox entry reliably generated with sanitized snapshot');
+}
+
+// --------------------------------------------------------------------------
+// 14. 受限访问凭据生成与内部信箱通知留痕 (Restricted Token & Mailbox Notice)
+// --------------------------------------------------------------------------
+{
+  const { rawDb, createContext } = createIsolatedDb();
+  const c = createContext();
+
+  rawDb.exec(`
+    INSERT INTO user (user_id, email, status) VALUES (83, 'restricted_user@epocanvas.com', 0);
+    INSERT INTO account (account_id, email, user_id) VALUES (183, 'restricted_user@epocanvas.com', 83);
+    INSERT INTO audit_log (id, ticket_id, email, warning_type, event_type, category, action_text, status, is_internal)
+    VALUES (90, 'THR-090', 'restricted_user@epocanvas.com', 'risk', 'abuse', 'security', 'Abuse', 'active', 1);
+  `);
+
+  const res = await auditService.adjudicate(c, { id: 90, action: 'ban_account' });
+  assert.strictEqual(res.success, true);
+  assert.strictEqual(res.isRestricted, true, 'Result must indicate account is restricted');
+  assert.ok(res.restrictedToken, 'Must issue a restricted token for banned account');
+
+  // 验证 restrictedToken 仅能用于受限通知查阅用途
+  const importNoticeService = (await import('../mail-worker/src/service/decision-notice-service.js')).default;
+  const decoded = await importNoticeService.verifyRestrictedToken(c, res.restrictedToken);
+  assert.ok(decoded, 'Restricted token must be verifiable');
+  assert.strictEqual(decoded.userId, 83);
+  assert.strictEqual(decoded.caseId, 90);
+  assert.strictEqual(decoded.purpose, 'restricted_notice');
+
+  // 验证内部邮箱数据表中已安全留痕官方通知邮件
+  const savedMail = rawDb.prepare('SELECT * FROM email WHERE user_id = 83').get();
+  assert.ok(savedMail, 'Official notice email must be persisted in user mailbox');
+  assert.strictEqual(savedMail.send_email, 'announcement@epocanvas.com');
+  assert.ok(savedMail.labels.includes('官方'));
+  assert.ok(savedMail.labels.includes('裁决留痕'));
+
+  console.log('✅ Requirement 14 Passed: Restricted access token and internal mailbox notice reliably generated');
+}
+
+// --------------------------------------------------------------------------
+// 15. 并发交错仲裁冲突控制 (Concurrent Race Condition Between Opposing Decisions)
+// --------------------------------------------------------------------------
+{
+  const { rawDb, createContext } = createIsolatedDb();
+  const cAdmin1 = createContext({ userId: 1, email: 'admin1@epocanvas.com', name: 'Admin 1' });
+  const cAdmin2 = createContext({ userId: 2, email: 'admin2@epocanvas.com', name: 'Admin 2' });
+
+  rawDb.exec(`
+    INSERT INTO user (user_id, email, status) VALUES (95, 'race_target@epocanvas.com', 0);
+    INSERT INTO audit_log (id, ticket_id, email, warning_type, event_type, category, action_text, status, is_internal, version)
+    VALUES (95, 'THR-095', 'race_target@epocanvas.com', 'risk', 'spam', 'security', 'Spam', 'active', 1, 1);
+  `);
+
+  // 管理员 1 执行封禁决定 (version 1)
+  const res1 = await auditService.adjudicate(cAdmin1, { id: 95, action: 'ban_account', version: 1, notes: 'Admin 1 bans' });
+  assert.strictEqual(res1.success, true);
+
+  // 此时案件在 DB 中 version 已递增为 2，状态为 resolved (或 warningType 为 ban 的台账已建)
+  const caseAfterAdmin1 = rawDb.prepare('SELECT version, status FROM audit_log WHERE id = 95').get();
+  assert.strictEqual(caseAfterAdmin1.version, 2);
+
+  // 管理员 2 此时并发提交排除嫌疑 (仍手持过时的 version 1)
+  await assert.rejects(
+    async () => await auditService.adjudicate(cAdmin2, { id: 95, action: 'no_penalty', version: 1, notes: 'Admin 2 dismisses' }),
+    (err) => isBizError(err, 409, '过时') || isBizError(err, 409, '并发修改') || isBizError(err, 400, '只读')
+  );
+
+  // 验证竞争失败方 (Admin 2) 绝对没有产生任何副作用或外发通知
+  const outboxTasks = rawDb.prepare('SELECT count(*) as count FROM notification_outbox WHERE case_id = 95').get();
+  assert.strictEqual(outboxTasks.count, 1, 'Only exactly 1 task (from winner Admin 1) may exist');
+
+  const decisions = rawDb.prepare('SELECT count(*) as count FROM audit_decision WHERE case_id = 95').get();
+  assert.strictEqual(decisions.count, 1, 'Only winner decision recorded in ledger');
+
+  const userStatus = rawDb.prepare('SELECT status FROM user WHERE user_id = 95').get();
+  assert.strictEqual(userStatus.status, 1, 'User status must remain in winner state (banned)');
+
+  console.log('✅ Requirement 15 Passed: Concurrency race condition strictly governed; losing side leaves zero side-effects');
+}
+
+// --------------------------------------------------------------------------
+// 16. SQL 中途失败事务全批次原子回滚 (Atomic Rollback on Mid-Batch SQL Failure)
+// --------------------------------------------------------------------------
+{
+  const { rawDb, createContext, d1 } = createIsolatedDb();
+  const c = createContext();
+
+  rawDb.exec(`
+    INSERT INTO user (user_id, email, status) VALUES (96, 'rollback_test@epocanvas.com', 0);
+    INSERT INTO audit_log (id, ticket_id, email, warning_type, event_type, category, action_text, status, is_internal, version)
+    VALUES (96, 'THR-096', 'rollback_test@epocanvas.com', 'risk', 'spam', 'security', 'Spam', 'active', 1, 1);
+  `);
+
+  // 人为使 notification_outbox task_id 唯一约束冲突，模拟批次末尾 SQL 异常
+  rawDb.exec(`
+    INSERT INTO notification_outbox (task_id, recipient, template_code, subject, content)
+    VALUES ('PRE_EXISTING_TASK', 'someone@epocanvas.com', 'FIRST_BAN', 'Test', 'Test');
+  `);
+
+  // 原生 batch 遇到 SQL 错误时必须整体回滚
+  const originalPrepare = d1.prepare;
+  d1.prepare = function(sql) {
+    const bound = originalPrepare.call(this, sql);
+    if (sql.includes('INSERT INTO notification_outbox')) {
+      return {
+        ...bound,
+        bind(...params) {
+          const b = bound.bind(...params);
+          return {
+            ...b,
+            async run() {
+              // 触发强制唯一约束失败
+              throw new Error('UNIQUE constraint failed: notification_outbox.task_id');
+            }
+          };
+        }
+      };
+    }
+    return bound;
+  };
+
+  await assert.rejects(
+    async () => await auditService.adjudicate(c, { id: 96, action: 'ban_account' }),
+    (err) => err.message.includes('UNIQUE constraint failed')
+  );
+
+  // 恢复 prepare
+  d1.prepare = originalPrepare;
+
+  // 验证原案卷状态未被部分更新 (仍为 active，version 仍为 1)
+  const caseAfterFail = rawDb.prepare('SELECT status, version FROM audit_log WHERE id = 96').get();
+  assert.strictEqual(caseAfterFail.status, 'active', 'Case status must not be partially updated on failure');
+  assert.strictEqual(caseAfterFail.version, 1, 'Case version must not increment on failure');
+
+  // 验证用户状态没有被置为 1 (仍为 0)
+  const userAfterFail = rawDb.prepare('SELECT status FROM user WHERE user_id = 96').get();
+  assert.strictEqual(userAfterFail.status, 0, 'User status must not be modified on failure');
+
+  // 验证 audit_decision 台账没有残留
+  const decisionAfterFail = rawDb.prepare('SELECT count(*) as count FROM audit_decision WHERE case_id = 96').get();
+  assert.strictEqual(decisionAfterFail.count, 0, 'Decision record must be rolled back');
+
+  console.log('✅ Requirement 16 Passed: Mid-batch SQL failure cleanly rolls back the entire atomic batch');
+}
+
+// --------------------------------------------------------------------------
+// 17. F1: 并发交错 CAS 状态/版本失配原子触发器回滚与零幻影占位测试
+// --------------------------------------------------------------------------
+{
+  const { rawDb, createContext, d1 } = createIsolatedDb();
+  const c = createContext();
+
+  rawDb.exec(`
+    INSERT INTO user (user_id, email, status) VALUES (97, 'f1_test@epocanvas.com', 0);
+    INSERT INTO audit_log (id, ticket_id, email, warning_type, event_type, category, action_text, status, is_internal, version)
+    VALUES (97, 'THR-097', 'f1_test@epocanvas.com', 'risk', 'spam', 'security', 'Spam', 'active', 1, 1);
+  `);
+
+  // 模拟交错并发：在 batch 执行前，另一事务抢先改变了案卷状态或版本
+  const originalBatch = d1.batch;
+  d1.batch = async function(stmts) {
+    rawDb.exec(`UPDATE audit_log SET status = 'resolved' WHERE id = 97;`);
+    return await originalBatch.call(this, stmts);
+  };
+
+  await assert.rejects(
+    async () => await auditService.adjudicate(c, { id: 97, action: 'ban_account', version: 1 }),
+    (err) => isBizError(err, 409, '过时') || isBizError(err, 409, '并发修改')
+  );
+
+  // 恢复 batch
+  d1.batch = originalBatch;
+
+  // 验证关键不变量：失败方绝对没有任何副作用或幻影占位残留
+  const userAfter = rawDb.prepare('SELECT status FROM user WHERE user_id = 97').get();
+  assert.strictEqual(userAfter.status, 0, 'User status must not be altered to banned on CAS failure');
+
+  const decisionCount = rawDb.prepare('SELECT count(*) as count FROM audit_decision WHERE case_id = 97').get();
+  assert.strictEqual(decisionCount.count, 0, 'Zero phantom decision placeholder may remain in audit_decision');
+
+  const banRecordCount = rawDb.prepare("SELECT count(*) as count FROM audit_log WHERE email = 'f1_test@epocanvas.com' AND warning_type = 'ban'").get();
+  assert.strictEqual(banRecordCount.count, 0, 'Zero ban ledger records may be inserted on CAS failure');
+
+  const outboxCount = rawDb.prepare('SELECT count(*) as count FROM notification_outbox WHERE case_id = 97').get();
+  assert.strictEqual(outboxCount.count, 0, 'Zero outbox tasks may be queued on CAS failure');
+
+  console.log('✅ Requirement 17 Passed: F1 Interleaved CAS abort leaves zero side-effects and zero phantom placeholders');
+}
+
+// --------------------------------------------------------------------------
+// 18. 缺失或空白 jwt_secret 严格安全失败 (Fail Closed, Zero Public Key Fallbacks)
+// --------------------------------------------------------------------------
+{
+  const { createContext } = createIsolatedDb();
+  const cNoSecret = createContext(undefined, { jwt_secret: '' });
+
+  await assert.rejects(
+    async () => await decisionNoticeService.generateRestrictedToken(cNoSecret, { userId: 1, caseId: 1, email: 't@e.com' }),
+    (err) => err.message.includes('jwt_secret')
+  );
+
+  const verified = await decisionNoticeService.verifyRestrictedToken(cNoSecret, 'dummy.test.token');
+  assert.strictEqual(verified, null, 'verifyRestrictedToken must fail closed without secret');
+
+  console.log('✅ Requirement 18 Passed: Missing jwt_secret fails securely without public key fallbacks');
+}
+
+// --------------------------------------------------------------------------
+// 19. F3: 旧写入口 /audit/action 委托受检逻辑、阻断 mute 虚假成功与物理删除
+// --------------------------------------------------------------------------
+{
+  const { rawDb, createContext } = createIsolatedDb();
+  const c = createContext();
+
+  rawDb.exec(`
+    INSERT INTO user (user_id, email, status) VALUES (98, 'f3_test@epocanvas.com', 0);
+    INSERT INTO audit_log (id, ticket_id, email, warning_type, event_type, category, action_text, status, is_internal, version)
+    VALUES (98, 'THR-098', 'f3_test@epocanvas.com', 'risk', 'spam', 'security', 'Spam', 'active', 1, 1);
+  `);
+
+  // 1. mute_account 必须显式 400 阻断，不写虚假成功
+  await assert.rejects(
+    async () => await auditService.takeAction(c, { id: 98, action: 'mute_account' }),
+    (err) => isBizError(err, 400, 'mute/probation')
+  );
+
+  // 2. delete 必须显式 400 阻断，保护审计链
+  await assert.rejects(
+    async () => await auditService.takeAction(c, { id: 98, action: 'delete' }),
+    (err) => isBizError(err, 400, '物理删除')
+  );
+
+  // 3. 处罚动作 (ban_account) 委托同一受校验逻辑，执行 CAS 与单批原子提交
+  const banRes = await auditService.takeAction(c, { id: 98, action: 'ban_account', version: 1 });
+  assert.strictEqual(banRes.success, true);
+
+  const userAfter = rawDb.prepare('SELECT status FROM user WHERE user_id = 98').get();
+  assert.strictEqual(userAfter.status, 1, 'User must be banned via delegated adjudicate logic');
+
+  console.log('✅ Requirement 19 Passed: F3 legacy bypass eliminated, mute rejected with 400, delete blocked');
+}
+
+// --------------------------------------------------------------------------
+// 20. F2: purgeOnRelease 能力边界（用户确定）
+//     第一批冻结不变量（清理绝不物理删除案卷、绝不改写处罚事实）继续保留。
+//     候选固定阶段按用户决定：该能力缺少成文政策依据，不再作为可执行能力 ——
+//     显式请求在写入前明确拒绝、零副作用；普通放行零清理、零虚假脱敏记录。
+// --------------------------------------------------------------------------
+{
+  const { rawDb, createContext } = createIsolatedDb();
+  const c = createContext();
+
+  rawDb.exec(`
+    INSERT INTO user (user_id, email, status) VALUES (99, 'f2_test@epocanvas.com', 1);
+    INSERT INTO audit_log (id, ticket_id, email, warning_type, event_type, category, action_text, status, is_internal, version, appeal_reason, ip, geo, device, fingerprint)
+    VALUES (99, 'APP-099', 'f2_test@epocanvas.com', 'appeal', 'appeal', 'appeal', 'Appealed', 'active', 1, 1, 'Appeal justification', '203.0.113.9', 'CN', 'Chrome', 'fp-99');
+    INSERT INTO audit_log (id, ticket_id, email, warning_type, event_type, category, action_text, status, is_internal, version, ip, geo)
+    VALUES (199, 'AUD-199', 'f2_test@epocanvas.com', 'audit', 'routine', 'security', 'Audit Log', 'active', 1, 1, '203.0.113.199', 'CN');
+  `);
+
+  const before = {
+    target: { ...rawDb.prepare('SELECT * FROM audit_log WHERE id = 99').get() },
+    unrelated: { ...rawDb.prepare('SELECT * FROM audit_log WHERE id = 199').get() },
+    decisions: rawDb.prepare('SELECT count(*) AS c FROM audit_decision').get().c,
+    outbox: rawDb.prepare('SELECT count(*) AS c FROM notification_outbox').get().c,
+    purgeBatches: rawDb.prepare('SELECT count(*) AS c FROM audit_purge_batch').get().c
+  };
+
+  // 20A: 显式请求 → 准确拒绝（不允许悄悄忽略后返回成功），且零副作用
+  await assert.rejects(
+    async () => await auditService.adjudicate(c, { id: 99, action: 'approve_appeal', version: 1, purgeOnRelease: true }),
+    (err) => (err.code === 400 || err.status === 400) && err.message.includes('暂不提供「放行即清理」能力')
+  );
+  assert.deepStrictEqual({ ...rawDb.prepare('SELECT * FROM audit_log WHERE id = 99').get() }, before.target,
+    'rejection must not alter the case (no release, no PURGED, no field purge)');
+  assert.deepStrictEqual({ ...rawDb.prepare('SELECT * FROM audit_log WHERE id = 199').get() }, before.unrelated,
+    'rejection must not touch unrelated cases');
+  assert.strictEqual(rawDb.prepare('SELECT count(*) AS c FROM audit_decision').get().c, before.decisions,
+    'rejection must not write a decision ledger row');
+  assert.strictEqual(rawDb.prepare('SELECT count(*) AS c FROM notification_outbox').get().c, before.outbox,
+    'rejection must not emit notice side effects');
+  assert.strictEqual(rawDb.prepare('SELECT count(*) AS c FROM audit_purge_batch').get().c, before.purgeBatches,
+    'rejection must not record purge batches');
+
+  // 20B: 普通放行（无该标志）→ 正常放行，零清理、零虚假脱敏记录，案卷仍在
+  const adjRes = await auditService.adjudicate(c, { id: 99, action: 'approve_appeal', version: 1 });
+  assert.strictEqual(adjRes.success, true);
+
+  const appealCaseRow = rawDb.prepare('SELECT * FROM audit_log WHERE id = 99').get();
+  assert.ok(appealCaseRow, 'Appeal case must physically exist for traceability');
+  assert.strictEqual(appealCaseRow.status, 'resolved', 'case resolved by its own adjudication only');
+  assert.strictEqual(appealCaseRow.circuit_status, 'NORMAL', 'plain release must NOT mark PURGED');
+  assert.strictEqual(appealCaseRow.ip, '203.0.113.9', 'plain release must NOT delete identity fields');
+  assert.ok(!appealCaseRow.detail_text.includes('[隐私清理]'), 'no false cleanup note');
+  assert.ok(!appealCaseRow.detail_text.includes('已脱敏'), 'no fabricated desensitization claim');
+
+  // 无关案件零波及
+  const auditRow = rawDb.prepare('SELECT * FROM audit_log WHERE id = 199').get();
+  assert.ok(auditRow, 'Unrelated audit log must physically exist for traceability');
+  assert.strictEqual(auditRow.circuit_status, 'NORMAL', 'Unrelated case must NOT be marked PURGED');
+  assert.strictEqual(auditRow.status, 'active', 'Unrelated case status NOT rewritten');
+  assert.strictEqual(auditRow.ip, '203.0.113.199', 'Unrelated case identity fields untouched');
+
+  // 不得凭空产生清理批次
+  assert.strictEqual(rawDb.prepare('SELECT count(*) AS c FROM audit_purge_batch').get().c, before.purgeBatches,
+    'plain release must not create purge batches');
+
+  console.log('✅ Requirement 20 Passed: purgeOnRelease rejected explicitly with zero side effects; plain release performs no cleanup and rewrites no punishment fact');
+}
+
+// --------------------------------------------------------------------------
+// 21. F5: 申诉驳回不进入纠正死锁，管理员后续复核解封通道畅通
+// --------------------------------------------------------------------------
+{
+  const { rawDb, createContext } = createIsolatedDb();
+  const c = createContext();
+
+  rawDb.exec(`
+    INSERT INTO user (user_id, email, status) VALUES (101, 'f5_test@epocanvas.com', 1);
+    INSERT INTO audit_log (id, ticket_id, email, warning_type, event_type, category, action_text, status, is_internal, version, appeal_reason)
+    VALUES (101, 'BAN-101', 'f5_test@epocanvas.com', 'ban', 'admin_ban', 'security', 'Banned', 'banned', 1, 1, 'Mistaken identity');
+  `);
+
+  // 1. 管理员驳回申诉
+  const rejectRes = await auditService.adjudicate(c, { id: 101, action: 'reject_appeal', version: 1, notes: '证据不足驳回' });
+  assert.strictEqual(rejectRes.success, true);
+
+  // 2. 处罚依然有效（status 保持 banned）
+  const caseAfterReject = rawDb.prepare('SELECT status, appeal_reason FROM audit_log WHERE id = 101').get();
+  assert.strictEqual(caseAfterReject.status, 'banned', 'Punishment remains active in banned status');
+  assert.strictEqual(caseAfterReject.appeal_reason, null, 'Appeal reason cleared to allow fresh submission if new facts arise');
+
+  // 3. 出现新事实，管理员有正式入口执行复核解封 (unban)，绝不发生只读死锁
+  const unbanRes = await auditService.adjudicate(c, { id: 101, action: 'unban', version: 2, notes: '新证据证实无误解封' });
+  assert.strictEqual(unbanRes.success, true);
+
+  const userAfterUnban = rawDb.prepare('SELECT status FROM user WHERE user_id = 101').get();
+  assert.strictEqual(userAfterUnban.status, 0, 'User is successfully unbanned on formal admin review');
+
+  console.log('✅ Requirement 21 Passed: F5 appeal rejection deadlock resolved, formal unban accessible');
+}
+
+// --------------------------------------------------------------------------
+// 22. F4: Webhook 事件同步无 params 未定义回归
+// --------------------------------------------------------------------------
+{
+  const { rawDb, createContext } = createIsolatedDb();
+  const c = createContext();
+
+  rawDb.exec(`
+    INSERT INTO email (email_id, resend_email_id, status, account_id, user_id) VALUES (1, 're_webhook_test_01', 1, 1, 1);
+  `);
+
+  // Webhook 投递完成通知
+  const webhookRes = await resendService.webhooks(c, {
+    type: 'email.delivered',
+    data: { email_id: 're_webhook_test_01' }
+  }, 'svix_test_evt_99');
+
+  assert.strictEqual(webhookRes.success, true);
+
+  // 验证常规发件表 status 更新为 2 (DELIVERED)
+  const emailRow = rawDb.prepare("SELECT status FROM email WHERE resend_email_id = 're_webhook_test_01'").get();
+  assert.strictEqual(emailRow.status, 2, 'Email status must be updated to DELIVERED');
+
+  console.log('✅ Requirement 22 Passed: F4 Webhook properly updates email status without params ReferenceError');
+}
+
+console.log('\n🎉 ALL 22 REAL BACKEND SERVICE LAYER ADJUDICATION TESTS PASSED PERFECTLY!\n');

@@ -2,6 +2,9 @@ import app from '../hono/hono';
 import { dbInit } from '../init/init';
 
 async function initHandler(c) {
+	if (c.req.method === 'GET') {
+		c.header('Warning', '299 - "Passing secret in URL is deprecated. Use POST /api/init with X-Init-Secret header"');
+	}
 	try {
 		return await dbInit.init(c);
 	} catch (err) {
@@ -12,8 +15,5 @@ async function initHandler(c) {
 	}
 }
 
-// Prefer POST + x-init-secret header so the bootstrap secret never appears in
-// URLs, access logs or browser history. The GET form is retained for existing
-// deployment scripts but uses the same constant-time check.
 app.post('/init', initHandler);
 app.get('/init/:secret', initHandler);

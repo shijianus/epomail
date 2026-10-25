@@ -89,6 +89,19 @@ const distDir = path.resolve(__dirname, "../temp_login_ui/dist");
     assert.ok(passkeyBtn, "检测到已绑定 Passkey 时必须渲染通行密钥一键解锁入口");
     console.log("  ✓ 成功激活 Passkey / 安全密钥快捷验证通道");
 
+    // 契约修正说明（测试过时 → 依据现行真实契约修正）：现行登录 UI 在绑定 Passkey 时
+    // 默认呈现 Passkey 快捷验证视图；TOTP 六舱输入需经由「选择其他验证方式」入口切换到
+    // 「身份验证器动态验证码」后呈现。原测试直接断言 TOTP 六舱，属旧版默认视图契约。
+    console.log("\n[步骤 3.5] 经由方式选择器切换到身份验证器（现行真实契约路径）...");
+    const tryAnotherBtn = await page.waitForSelector("button:has-text('选择其他验证方式')", { timeout: 5000 });
+    assert.ok(tryAnotherBtn, "必须呈现「选择其他验证方式」入口");
+    await tryAnotherBtn.click();
+    const totpMethodBtn = await page.waitForSelector("button:has-text('身份验证器动态验证码')", { timeout: 5000 });
+    assert.ok(totpMethodBtn, "方式选择器必须呈现「身份验证器动态验证码」选项");
+    await totpMethodBtn.click();
+    await page.waitForSelector("input[inputmode='numeric']", { timeout: 5000 });
+    console.log("  ✓ 已切换到身份验证器视图，TOTP 输入舱呈现");
+
     // 4. 验证 6 位 OTP 输入框结构与原生属性
     console.log("\n[步骤 4] 审计 6 位 OTP 输入框与原生属性...");
     const otpInputs = await page.$$("input[inputmode='numeric']");
@@ -111,30 +124,42 @@ const distDir = path.resolve(__dirname, "../temp_login_ui/dist");
     assert.ok(periodSvg, "必须呈现动态口令 30 秒周期感知环");
     console.log("  ✓ 动态口令 30 秒周期环正常运转");
 
-    const helpBtn = await page.waitForSelector("button:has-text('无法验证？')", { timeout: 5000 });
-    assert.ok(helpBtn, "必须提供轻量「无法验证？」排查入口");
-    await helpBtn.click();
-    await page.waitForTimeout(300);
+    // 文案修正：现行 i18n havingTrouble = 「无法验证」（原「无法验证？」问号已移除）
+    // 交互契约修正：现行实现为「悬停展开悬浮解释卡」(mouseenter) + 点击 toggle。
+    // Playwright click 会先触发 mouseenter 再 toggle 导致卡片关闭，故按真实交互使用 hover。
+    const helpBtn = await page.waitForSelector("button:has-text('无法验证')", { timeout: 5000 });
+    assert.ok(helpBtn, "必须提供轻量「无法验证」排查入口");
+    await helpBtn.hover();
+    await page.waitForTimeout(400);
 
     const helpCard = await page.waitForSelector("text=两步验证排查建议", { timeout: 5000 });
     assert.ok(helpCard, "点击「无法验证？」必须平滑展开排查向导卡片");
     console.log("  ✓ 排查向导展开正常，包含时钟同步与备用代码自救提示");
 
-    // 6. 验证备用代码 3D 平滑翻转
-    console.log("\n[步骤 6] 验证应急备用代码 3D 翻转切换...");
-    const switchBackupBtn = await page.waitForSelector("button:has-text('使用应急备用代码登录')", { timeout: 5000 });
-    assert.ok(switchBackupBtn, "必须呈现切换至备用代码入口");
-    await switchBackupBtn.click();
-    await page.waitForTimeout(350);
+    // 6. 验证备用代码平滑切换
+    // 契约修正说明（测试过时 → 依据现行真实契约修正）：现行 UI 已将 TOTP/备用代码切换
+    // 收敛进「选择其他验证方式」方式选择器（useBackupCode/useTotpCode 内联切换按钮已移除）。
+    console.log("\n[步骤 6] 经由方式选择器切换应急备用代码并切回...");
+    const anotherWayBtn2 = await page.waitForSelector("button:has-text('选择其他验证方式')", { timeout: 5000 });
+    assert.ok(anotherWayBtn2, "必须呈现「选择其他验证方式」入口");
+    await anotherWayBtn2.click();
+    const backupMethodBtn = await page.waitForSelector("button:has-text('应急备用恢复代码')", { timeout: 5000 });
+    assert.ok(backupMethodBtn, "方式选择器必须呈现「应急备用恢复代码」选项");
+    await backupMethodBtn.click();
+    await page.waitForTimeout(400);
 
     const backupInput = await page.waitForSelector("#epo-backup-code", { timeout: 5000 });
     assert.ok(backupInput, "必须呈现应急备用代码输入框");
-    console.log("  ✓ 成功平滑翻转至应急备用代码输入形态");
+    console.log("  ✓ 成功切换至应急备用代码输入形态");
 
-    // 切换回动态验证码
-    const switchTotpBtn = await page.waitForSelector("button:has-text('使用验证器动态验证码')", { timeout: 5000 });
-    await switchTotpBtn.click();
-    await page.waitForTimeout(350);
+    // 经由方式选择器切回动态验证码
+    const anotherWayBtn3 = await page.waitForSelector("button:has-text('选择其他验证方式')", { timeout: 5000 });
+    await anotherWayBtn3.click();
+    const totpMethodBtn2 = await page.waitForSelector("button:has-text('身份验证器动态验证码')", { timeout: 5000 });
+    await totpMethodBtn2.click();
+    await page.waitForTimeout(400);
+    await page.waitForSelector("input[inputmode='numeric']", { timeout: 5000 });
+    console.log("  ✓ 成功经选择器切回身份验证器视图");
 
     // 7. 验证满 6 位自动触发提交与输错自动清空 / Shake
     console.log("\n[步骤 7] 验证满 6 位自动提交与错误物理排异联动...");

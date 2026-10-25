@@ -2,7 +2,7 @@
  * Mailjet 发信契约测试 (Mailjet send contract test)
  *
  * 历史背景：本文件曾硬编码一对真实形态的 Mailjet API Key/Secret（已于本轮移除，
- * 该凭据自 2026-08 起进入 git 历史，必须按泄露处置完成轮换，详见审计报告）。
+ * 该凭据自 2026-08 起进入 git 历史，必须按泄露处置完成轮换，详见本轮审计报告）。
  *
  * 现行契约：
  * 1. 默认 100% 离线运行（no-network double）：拦截 globalThis.fetch，仅校验

@@ -44,6 +44,10 @@ export const auditLog = sqliteTable('audit_log', {
 	reasonCode: text('reason_code'),
 	timeline: text('timeline'),
 	resolvedTime: text('resolved_time'),
+	version: integer('version').default(1),
+	idempotencyKey: text('idempotency_key'),
+	decisionId: text('decision_id'),
+	originalDecisionId: text('original_decision_id'),
 	createTime: text('create_time').notNull().default(sql`CURRENT_TIMESTAMP`)
 });
 
