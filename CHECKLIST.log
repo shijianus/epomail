@@ -8,6 +8,40 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### 隔离 staging 阶段交付归档（任务关闭记录，只读核实后记录，无源码/部署变更）(2026-10-25)
+
+> 本条目为阶段收口归档：无 commit/push/合并/生产部署/测试重跑/构建（按 owner 指令）。
+
+*   **版本信息（逐项只读核实，非照抄）**:
+    - 核验分支 `review/abuse-backend-rc` HEAD = `073166622039b862967198a5948c5f902335ec74`（本地=远端一致）；
+    - **实际产品代码所在提交**：`1d142869cc4683cd361c73c957bfdb03c9519f32`（staging 部署的产品代码顶端；`git show --stat` 核实其含 4 个 `mail-worker/src` 文件、基座 `959559968f4d06349c0c36f403de37a299754f3c` 含 crypto-utils）；`8b96f0c` 与 `0731666` 经核实为纯文档/测试提交（0 个 src 文件）；
+    - staging Worker 当前版本 = **v6 `15339ebb-d842-45ae-81aa-4a49c0bbe2a6`**（versions API 核实为最新 version_upload，2026-10-24T23:20:25Z；版本链 v1 `26207818`→v2/v3 secret→v4 `037acc99`→v5 `b8a9ec53` 勘误→v6）；
+    - 配置（settings API 实测）：`PBKDF2_WRITER_ITERATIONS="100000"`（显式记录的 staging 兼容选择，不自动获得生产批准）、`EMAIL_OUTBOUND_ENABLED="false"`、`ALLOW_URL_INIT="false"`、`ENVIRONMENT="staging"`、`domain=["staging-mail.example.com"]`、`admin="admin@staging-mail.example.com"`、`analysis_cache/orm_log` 为 JSON `false`（原生类型）；
+    - 实际资源绑定（与生产物理隔离，实测一致）：D1 `db/USER_DB/MAIL_DB` → `c3a49885-603e-4387-b4df-82a1117e963a`（epomail-staging-db）；KV → `c5a59d7cfc6a4091b792238ec569e315`；secrets `jwt_secret`/`totp_enc_key`（不可读，部署保留）；assets 绑定 ./dist；cron `0 16 * * *` + `*/5 * * * *`；账户 Free 套餐、usage_model=standard、无 cpu_ms 覆盖。
+*   **阶段状态（定稿口径）**: 隔离预发布已交付，管理员及普通用户密码产品路径验收完成；当前 Free 环境的 210k 可靠性仍有限制，生产未获授权。
+*   **准确事实记录**:
+    - 管理员有效凭据已在交接文件中找到（离线核验匹配，未执行任何恢复性写入）→ **不存在"待恢复管理员"阻塞**；
+    - 管理员口令已通过产品改密 API 完成轮换（崩溃安全 NEXT→晋升协议），新口令已回写交接文件；
+    - 管理员产品验收 19/19（首达、无重试、零手工哈希）通过；
+    - 可靠性采样 30/30 首达 biz=200 **仅表示本轮样本未复现** 1102，不构成保证；
+    - 48h 窗口历史 16 次 exceededResources(1102=exceededCpu) 为既成事实，**不因本轮零失败而被删除或改写**。
+*   **安全交接（不含任何明文；ACL 已于 2026-10-25 收窄并核实）**:
+    - 凭据文件：`D:\epoverify-rc2\.staging-secrets.env`；
+    - **实际访问权限（修正措辞，实测）**：原 DACL 为全继承宽松授权（Administrators/SYSTEM 全控、**Authenticated Users 可修改、普通 Users 可读取**——不能称为仅 owner 可访问）；本轮已收窄并核实：继承剥离（inheritance-off=True）、owner 不变（`Smart Kevin`，SID `S-1-5-21-2952657496-3680077074-1798366137-1001`）、仅余 3 条显式 ACE（owner/SYSTEM/Administrators 各 FullControl），owner 打开访问验证通过（仅句柄校验、未读内容）；**验证范围如实声明：未做其他真实用户账户的访问测试（本机无可用第二账户），不据此宣称绝对安全；Administrators 组成员仍可访问（按 owner 指示保留）**；
+    - 同用途临时凭据文件同步收窄（同样口径核验通过）：`D:\epoverify-rc2\.shot-code`（上轮 staging 验证会话的一次性凭据工件）、`rc-abuse-b6c7fb0\mail-worker\.dev.vars` 与主仓 `epomail\mail-worker\.dev.vars`（本地开发测试凭据；后者位于 OneDrive 目录，云同步以 owner 账户进行，本地 ACL 收窄不影响 owner 本人同步）；
+    - ACL 元数据备份（可恢复，仅 SDDL 账户/SID 串、零凭据内容）：`D:\epoverify-rc2\acl-backups\*.acl`（恢复命令 `icacls <dir> /restore <file>`）；未对目录树递归改权、未新建系统账户、未删除唯一凭据副本；
+    - 读取方式：仅 owner 以本机账户直接读取；内容含 `JWT/TOTP/ADMIN_PWD/VISITOR_PWD/SMOKE_A_PWD/SMOKE_B_PWD` 六项（本记录不复制值）；`ADMIN_PWD` 已于 2026-10-24T23:50:42Z 经产品 API 轮换（文件内含脱敏注释）；本条目及全部仓库记录均不含密码、JWT、TOTP 密钥或哈希原文。
+*   **生产接触措辞修正（如实口径）**:
+    - **本阶段（P0 热修复两轮交付与归档）没有任何生产变更**：未生产部署、未改生产 Secret、未触生产 D1/KV；
+    - 但**历史上确曾有一次被拒绝的生产登录请求**（`doc/HANDOVER-BATCH2-CANDIDATE.md` §8.4：test-global-2fa-e2e 触达生产登录端点、被拒绝、零状态变更）——**不得将历史表述为"从未接触生产"**；本阶段"零生产操作"仅指本阶段范围。
+*   **剩余事项（独立列出，均不属于"staging 未交付"）**:
+    - [ ] Free 环境密码写入策略与 210k 存量验证可靠性（owner 决策：接受现状/自托管迁移/其他非付费方案；本专案不以付费升级为完成标准）；
+    - [ ] Mailjet 旧凭据 owner 轮换（历史遗留，owner 自行处置）；
+    - [ ] 真实邮件提供商投递与 Webhook 故障恢复门禁（生产前必做，涉及外发开启决策）；
+    - [ ] 管理抽屉 R1/R2 材料实际渲染；
+    - [ ] 其他已知 P2/P3（含一次性 code URL 美化、`test-pre-production-staging-acceptance.mjs` 的 `hono/webs` 扩展名修复等）。
+*   **下一步开发任务清单（建议顺序）**: ① R1/R2 渲染与 P2/P3 清理；② 真实提供商投递链路（staging 白名单内验证后.Owner 决策外发）；③ Free 环境密码策略决策落地（如维持 100k 写入+210k 验证兼容现状，正式写入生产部署前检查单）；④ Mailjet 凭据轮换。
+
 ### 云端 PBKDF2 P0 收敛第二轮：状态修正、套餐/CPU 事实核实、管理员访问恢复与管理员产品验收补齐 (2026-10-25)
 *   **关联提交 (Git Commit)**: 本轮测试脚本与记录提交见本条目（热修复主体 `9595599`/`1d14286`/`8b96f0c` 不变）；**本轮无源码改动、无 staging 重部署**（Worker 保持 `15339ebb-d842-45ae-81aa-4a49c0bbe2a6`，配置与版本均无变化）；仅推送 `review/abuse-backend-rc`
 *   **状态修正（覆盖上一轮表述口径）**:
