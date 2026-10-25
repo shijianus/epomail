@@ -12,7 +12,7 @@
 ---
 
 ### 全仓库安全审计与凭据泄露修复 · /oss KV 越权 + OAuth/存储型 XSS + 历史密钥 (2026-10-25)
-*   **关联提交 (Git Commit)**: `511e00105c2e5bbf5c1ae559f84d5c5758dca7bb` (Short: `511e001`); 审计归档提交见置顶汇报
+*   **关联提交 (Git Commit)**: `d23b70d150e7a6e3b8a1793a27253a6d1f6b8a55` (Short: `d23b70d`); 审计归档提交见置顶汇报
 *   **部署环境 (Deployment)**: 本地 workerd 全真栈测试 (D1+KV) + `wrangler deploy --dry-run` + `vite build`；**未部署生产、未推送远端**
 *   **功能需求与变更清单 (Changes & Feature Alignment)**:
     - [x] 修复 `/api/oss/*` 可匿名读取任意 KV 键（`auth-uid:1` 站长会话、`setting:` 全站密钥）——对象 Key 仅允许 `attachments/`、`static/`，拒绝 `:`/`%`/`..`/控制字符；`/oss-url` 增加附件归属校验。

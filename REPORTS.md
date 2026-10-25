@@ -13,7 +13,7 @@
 ---
 
 ### 全仓库安全审计、凭据泄露修复与二次验证 (2026-10-25)
-*   **关联提交 (Git Commit)**: `511e00105c2e5bbf5c1ae559f84d5c5758dca7bb` (Short: `511e001`)
+*   **关联提交 (Git Commit)**: `d23b70d150e7a6e3b8a1793a27253a6d1f6b8a55` (Short: `d23b70d`)
 *   **专项文档索引 (Detailed Doc)**: `doc/security-audit-2026-10-25.md`
 *   **体检/审计范围与方法 (Scope & Methodology)**:
     1. 范围与环境：`mail-worker` 全 API/服务/实体/工具、`mail-vue` XSS sink、Wrangler 配置、`.gitignore`、GitHub Actions；全部本地分支/标签可达 Git 历史（841 commits / 3821 blobs）；同工作区独立仓库 `EpomailDocs` 只读旁路扫描。
