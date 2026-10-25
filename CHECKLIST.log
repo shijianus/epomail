@@ -11,6 +11,36 @@
 
 ---
 
+### 附件能力签名、OAuth 回调/绑定与 P1 注入/并发修复 (2026-10-26)
+*   **关联提交 (Git Commit)**: `8cd3bc83d0f643107925da392647a33904747f3a` (Short: `8cd3bc8`)
+*   **部署环境 (Deployment)**: 本地 workerd + D1/KV 隔离测试、双前端生产构建、Worker bundle dry-run；**未部署任何远程环境，未推送远端**
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 对象存储：`/oss/*`、`/attachments/*` 附件读取改为 HMAC 短时能力 URL； `/oss-url/*` 与 `POST /oss-url/batch` 按当前用户/管理员归属签发；静态头像/背景保持公开；私密对象 `private, no-store` + nosniff/CSP/CORP。
+    - [x] 内嵌图安全：`toImageUrlHtml`/`selectOneByKeys` 强制 `user_id` 过滤，阻断引用他人附件外发；前端打开/转发/回复/Telegram 分享页按需签名。
+    - [x] OAuth：服务端一次性 state + 浏览器 client state + OIDC nonce；Apple form_post POST 回调；JWKS 轮换重试；回调长期 JWT 改为 60s 单次交换码；MFA/受限账号结果正确透传。
+    - [x] 绑定/SSRF：bind proof 单次消费、已绑定身份拒绝；自定义 SSO 端点内网/元数据地址拦截。
+    - [x] P1：邀请码原子扣减与失败回补、角色校验 await；打印邮件/站内公告/受限通知/邮件摘要/资料 tooltip HTML 注入修复；ElMessage 502 改纯文本。
+    - [x] 测试体系：root 与 worker 增加 `test` / `test:unit` / `test:integration`；`deploy:test` 保持显式，普通测试不部署。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 全量 Worker 测试：`npm test` → **53/53 passed**，退出码 0（7 测试文件，真实 workerd + D1/KV）
+    - [x] 单元测试：`npm run test:unit` → **24/24 passed**，退出码 0
+    - [x] 集成测试：`npm run test:integration` → **29/29 passed**，退出码 0
+    - [x] 登录应用构建：`npm --prefix temp_login_ui run build` → 退出码 0（2011 modules，7.38s）
+    - [x] 前端构建：`npm --prefix mail-vue run build` → 退出码 0（2589 modules，21.77s）
+    - [x] Worker 打包：`npx wrangler deploy --dry-run --config wrangler-vitest.toml` → 退出码 0（gzip 1104.80 KiB）
+    - [x] i18n：symmetry 1930 keys / audit 2136 keys 0 缺失 / hardcoded 0 失败
+    - [x] 密钥扫描：`node scripts/secret-scan.mjs` → 1214 files，0 命中，退出码 0
+    - [x] `git diff --check` → 退出码 0
+    - [x] 零假数据残留：测试使用隔离 D1/KV 并在用例内清理；未写入生产、未发送真实邮件/OAuth 请求
+*   **未执行/需人工处置 (Manual Follow-up)**:
+    - [ ] 生产配置 `wrangler deploy --dry-run` 未完成：自定义 build 的 `pnpm install` 在本机挂起，已终止；未获得生产 bundle 结果
+    - [ ] Mailjet Key/Secret、`jwt_secret`、`totp_enc_key`/`email_enc_key` 轮换；清理 `auth-uid:*`；评估 TOTP/邮件密文迁移
+    - [ ] OAuth 示例应用 Secret 生产核验；测试/管理员账号口令重置或删除
+    - [ ] Git 历史清污（16 条已知基线）；需明确授权，未执行
+    - [ ] 真实 OAuth 提供商联调、生产/staging 部署与生产版本核对、浏览器全量 E2E
+
+---
+
 ### 远端 security/audit-2026-10-25 完整整合至 master 与双向同步 (2026-10-25)
 *   **关联提交 (Git Commit)**: 整合提交 `154b3cd998b3fbe5951680bf70d8a5717bb5d1eb` (Short: `154b3cd`)；受审整合基线 `065ddc2d953397ca437d0b4782cce2631c469f13` (Short: `065ddc2`)
 *   **部署环境 (Deployment)**: 本地仓库全分支核验 + GitHub 远端全量同步 (`git@github.com:shijianus/epomail.git`)

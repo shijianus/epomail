@@ -12,6 +12,34 @@
 
 ---
 
+### 附件能力签名、OAuth 回调/绑定与全仓 P1 复核专项审计 (2026-10-26)
+*   **关联提交 (Git Commit)**: `8cd3bc83d0f643107925da392647a33904747f3a` (Short: `8cd3bc8`)
+*   **专项文档索引 (Detailed Doc)**: `doc/security-audit-2026-10-26.md`
+*   **体检/审计范围与方法 (Scope & Methodology)**:
+    1. 范围与环境：基线 `bf1a008` / 修复后 `8cd3bc8`；`mail-worker` API/服务/工具、`mail-vue` HTML sink、独立登录应用 `temp_login_ui`、测试命令体系、依赖版本与历史泄露基线；本地 workerd + D1/KV 隔离测试，未部署、未联网调用真实 OAuth/邮件服务。
+    2. 工具与脚本：`vitest` + `@cloudflare/vitest-pool-workers`（7 文件 53 项）、`vite build` ×2、`wrangler deploy --dry-run`、i18n 三件套、`scripts/secret-scan.mjs`、`git diff --check`、`git merge-base`/历史差异核对。
+*   **核心发现与缺陷矩阵 (Key Findings & Matrix)**:
+    - **[P0·安全] 匿名附件读取**：`/api/oss/attachments/*` 与 `/attachments/*` 可匿名读取，仅靠内容哈希 Key；基线测试曾断言匿名 200。已改为 HMAC 短时能力 URL（300s/1h/Telegram 7d），`/oss-url/batch` 仅为本用户或管理员已索引对象签名；私密附件强制 `private, no-store` 与安全响应头。
+    - **[P0·安全] 跨用户内嵌图外发**：`toImageUrlHtml` 按 Key 查询未限 `user_id`，可在发件正文引用他人附件并嵌入外发邮件。已强制 owner 过滤并覆盖 `{{domain}}attachments/`、`attachments/`、`/oss/attachments/` 三种形式；新增回归。
+    - **[P0·安全] OAuth 回调长期 JWT 入 URL + 无 state/nonce**：已改为 60 秒单次交换码，服务端一次性 state（10min）+ 浏览器 client state + OIDC nonce；Apple `form_post` 增加 POST 回调；JWKS 轮换未命中强制刷新。
+    - **[P0·安全] 绑定与自定义 SSO**：bind proof 单次消费、已绑定拒绝；自定义 SSO auth/token/userinfo 端点拒绝内网/元数据地址。
+    - **[P1·安全] 前端 HTML 注入**：移除 502 ElMessage HTML 渲染；打印邮件、站内公告、受限通知、邮件摘要解析、资料 tooltip 全部改为转义/DOMPurify/textContent。
+    - **[P1·业务] 邀请码并发超发**：`consumeOne` 原子扣减 + 注册失败回补；修复角色校验缺失 `await`。
+    - **[P1·兼容] OAuth MFA/受限账号**：登录服务返回对象不再误当 JWT；MFA 挑战透传登录页，受限账号跳转受限通知。
+    - **[P2·剩余] 容量单位与并发**：已用容量为 SQLite 字符长度 + 附件字节，入站检查为 UTF-16 单元；check-then-insert 非原子；附件失败补偿和大邮件内存峰值未修复/未验证。
+    - **[P2·剩余] 公开桶模式**：显式配置 `r2Domain`/S3 `customDomain` 时附件仍按公开 URL 提供，属运营者选择，需确认。
+*   **治理修复与回归结果 (Fixes & Verification)**:
+    - `npm test` 退出 0：**53/53**；`test:unit` 24/24；`test:integration` 29/29（真实 workerd + D1/KV）。
+    - 登录应用构建 0（7.38s）；`mail-vue` 构建 0（21.77s）；worker bundle dry-run 0（gzip 1104.80 KiB）。生产配置 dry-run 因本机 `pnpm install` 挂起未完成，已如实记录，不冒充通过。
+    - i18n 对称 1930 keys / 引用 2136 keys 0 缺失 / 硬编码门禁 0 失败；工作树 secret scan 1214 文件 0 命中；`git diff --check` 0。
+*   **未执行/需人工处置 (Manual Follow-up)**:
+    - [ ] Mailjet Key/Secret、`jwt_secret`、`totp_enc_key`（及 `email_enc_key`）轮换；清理 `auth-uid:*`；评估 TOTP/邮件密文迁移。
+    - [ ] OAuth 示例应用 Secret 生产确认；测试/管理员账号口令重置或删除。
+    - [ ] Git 历史清污（16 条基线：2 Mailjet、2 OAuth sample、4 JWT/TOTP、8 测试口令）；未获授权，未执行强推。
+    - [ ] 真实 OAuth 提供商联调、生产/staging 部署、生产版本核对、浏览器全量 E2E。
+
+---
+
 ### 全仓库安全审计、凭据泄露修复与二次验证 (2026-10-25)
 *   **关联提交 (Git Commit)**: `d23b70d150e7a6e3b8a1793a27253a6d1f6b8a55` (Short: `d23b70d`)
 *   **专项文档索引 (Detailed Doc)**: `doc/security-audit-2026-10-25.md`
