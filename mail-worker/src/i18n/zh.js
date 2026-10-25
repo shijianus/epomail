@@ -1797,6 +1797,8 @@ const zh = {
     IncorrectPwd: '账户或密码错误',
     accountLimit: '可创建的信箱数量已达当前身份上限',
     accountLocked: '连续错误次数过多，账号已临时锁定',
+
+    tooManyRequests: '请求过于频繁，请稍后再试',
     addAccountDisabled: '当前系统未开放添加信箱',
     adminReserved: '该用户名为站长保留账号，无法注册',
     attLimit: '单封邮件附件数量超出上限',

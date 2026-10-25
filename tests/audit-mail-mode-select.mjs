@@ -13,7 +13,7 @@ import assert from 'node:assert';
 
   console.log('1. 登录 Admin 账号...');
   const loginRes = await page.request.post(BASE + '/api/login', {
-    data: { email: 'admin@epomail.bond', password: '123456' },
+    data: { email: 'admin@epomail.bond', password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
     headers: { 'Content-Type': 'application/json' }
   });
   const loginData = await loginRes.json();

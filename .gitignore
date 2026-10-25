@@ -35,6 +35,12 @@ mail-worker/.env
 mail-worker/d1_output.json
 mail-worker/kv_setting.json
 mail-worker/test-resend.js
+# Wrangler 生成的类型文件可能把 [vars] 真实值内联为字面量；禁止入库
+mail-worker/worker-configuration.d.ts
+# 本地测试/审计临时产物
+.vitest.out
+.audit-*.json
+.tmp-*
 
 # AI Assistant and Skills
 .agent/

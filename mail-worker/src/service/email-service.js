@@ -28,6 +28,7 @@ import emailCryptoUtils from '../utils/email-crypto-utils';
 import { DEFAULT_WELCOME_SUBJECT, DEFAULT_WELCOME_CONTENT, getWelcomeTemplate, getGlobalAnnouncementTemplate, getLocaleByLang, getSenderNameByLang, getUserFallbackNameByLang, formatDateByLang, normalizeLangKey } from '../const/welcome-template';
 import { isAdminEmail, isAdminUser } from '../utils/admin-utils';
 import hashUtils from '../utils/hash-utils';
+import verifyUtils from '../utils/verify-utils';
 
 const emailService = {
 
@@ -755,6 +756,26 @@ const emailService = {
 			attachments = [] //附件
 		} = params;
 
+		if (!Array.isArray(receiveEmail) || receiveEmail.length === 0 || receiveEmail.length > 100) {
+			throw new BizError('收件人列表无效 / Invalid recipient list');
+		}
+		for (const address of receiveEmail) {
+			if (typeof address !== 'string' || !verifyUtils.isEmail(address)) {
+				throw new BizError('收件人邮箱格式无效 / Invalid recipient address');
+			}
+		}
+		if (subject !== undefined && (typeof subject !== 'string' || subject.length > 998)) {
+			throw new BizError('邮件主题过长 / Email subject too long');
+		}
+		content = typeof content === 'string' ? content : '';
+		text = typeof text === 'string' ? text : '';
+		if (content.length > 5 * 1024 * 1024) {
+			throw new BizError('邮件正文过大 / Email body too large');
+		}
+		if (!Array.isArray(attachments) || attachments.length > 50) {
+			throw new BizError('附件数量无效 / Invalid attachment count');
+		}
+
 		const { resendTokens, r2Domain, send, domainList } = await settingService.query(c);
 
 		let { imageDataList, html } = await attService.toImageUrlHtml(c, content);
@@ -1064,9 +1085,13 @@ const emailService = {
 	},
 
 	async sendByMailjet(mailjetToken, params) {
-		const parts = mailjetToken.split(':');
+		const parts = String(mailjetToken || '').split(':');
 		const apiKey = parts[1];
 		const apiSecret = parts[2];
+
+		if (parts.length !== 3 || !apiKey || !apiSecret) {
+			throw new BizError('Mailjet 凭据配置无效 / Invalid Mailjet credential configuration');
+		}
 
 		const messages = [
 			{
@@ -1097,25 +1122,44 @@ const emailService = {
 			};
 		}
 
-		const response = await fetch('https://api.mailjet.com/v3.1/send', {
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json',
-				'Authorization': 'Basic ' + btoa(`${apiKey}:${apiSecret}`)
-			},
-			body: JSON.stringify({ Messages: messages })
-		});
-
-		const result = await response.json();
-		console.log('Mailjet response:', JSON.stringify(result));
-		
-		if (!response.ok) {
-			return { data: null, error: { message: JSON.stringify(result) } };
+		let response;
+		try {
+			response = await fetch('https://api.mailjet.com/v3.1/send', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					'Authorization': 'Basic ' + btoa(`${apiKey}:${apiSecret}`)
+				},
+				body: JSON.stringify({ Messages: messages }),
+				signal: AbortSignal.timeout(15000)
+			});
+		} catch (err) {
+			// 绝不回显请求头/凭据；仅保留可诊断的传输层错误类型
+			throw new BizError(`Mailjet 请求失败 / Mailjet request failed: ${err.name || 'network_error'}`);
 		}
-		
+
+		let result = {};
+		try {
+			result = await response.json();
+		} catch (err) {
+			result = {};
+		}
+
+		// 仅记录状态与消息数量，不记录收件人、正文或完整供应商响应
+		console.log(`Mailjet response status=${response.status} messages=${Array.isArray(result?.Messages) ? result.Messages.length : 0}`);
+
+		if (!response.ok) {
+			return { data: null, error: { message: `Mailjet 返回 HTTP ${response.status}` } };
+		}
+
+		const messageId = result?.Messages?.[0]?.To?.[0]?.MessageID;
+		if (!messageId) {
+			return { data: null, error: { message: 'Mailjet 未返回有效 MessageID' } };
+		}
+
 		return {
 			data: {
-				id: String(result.Messages[0].To[0].MessageID)
+				id: String(messageId)
 			},
 			error: null
 		};

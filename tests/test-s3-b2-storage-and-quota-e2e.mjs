@@ -102,7 +102,7 @@ import r2Service from "../mail-worker/src/service/r2-service.js";
     console.log("  -> 生产环境管理员登录...");
     const loginRes = await page.request.post(`${BASE}/api/login`, {
       headers: { "Content-Type": "application/json" },
-      data: { email: "admin@epomail.bond", password: "123456" }
+      data: { email: "admin@epomail.bond", password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' }
     });
     const loginData = await loginRes.json();
     assert.strictEqual(loginData.code, 200, "管理员登录必须返回 200: " + JSON.stringify(loginData));

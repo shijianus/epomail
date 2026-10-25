@@ -29,7 +29,7 @@ console.log(`=== 开始在真实生产环境 ${BASE} 执行 Playwright 视觉截
     // 1. 登录真实生产接口
     console.log(`[Step 1] 正在通过 API 登录生产环境 ${BASE}...`);
     const loginRes = await page.request.post(`${BASE}/api/login`, {
-      data: { email: 'admin@epomail.bond', password: '123456' },
+      data: { email: 'admin@epomail.bond', password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
       headers: { 'Content-Type': 'application/json' },
     });
     const loginJson = await loginRes.json();

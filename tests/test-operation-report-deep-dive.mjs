@@ -20,7 +20,7 @@ import path from 'node:path';
 const BASE = process.env.E2E_BASE || 'http://127.0.0.1:8787';
 const API = BASE + '/api';
 const ADMIN_EMAIL = 'admin@example.com';
-const ADMIN_PWD = '123456';
+const ADMIN_PWD = process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '';
 const RUN_TAG = 'opdeep' + Date.now().toString(36).slice(-4);
 
 const SPAMMER = `${RUN_TAG}_spammer@example.com`;

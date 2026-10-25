@@ -7,7 +7,7 @@ import { chromium } from 'playwright';
 
 const BASE = process.env.E2E_BASE || 'http://127.0.0.1:8787';
 const ADMIN_EMAIL = 'admin@example.com';
-const ADMIN_PWD = '123456';
+const ADMIN_PWD = process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '';
 
 async function getAdminToken() {
 	const res = await fetch(BASE + '/api/login', {

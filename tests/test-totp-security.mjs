@@ -26,7 +26,7 @@ if (otp !== '000000') {
 console.log(`✅ TOTP Generate & Verify test passed (Secret: ${secret}, OTP: ${otp})`);
 
 // 3. Test AES-256-GCM Encryption & Decryption
-const mockEnv = { totp_enc_key: 'dGVzdC1lbmMta2V5LTMyLWJ5dGVzLXJhbmRvbS1rZXk=' };
+const mockEnv = { totp_enc_key: 'test-totp-encryption-key-placeholder' };
 const encrypted = await totpUtils.encryptSecret(secret, mockEnv);
 assert(encrypted.includes(':'), 'Encrypted string should have IV:Cipher format');
 const decrypted = await totpUtils.decryptSecret(encrypted, mockEnv);

@@ -35,7 +35,7 @@ try {
 
   // 真实登录
   await emailInput.fill('admin@example.com');
-  await page.locator('input[type="password"]').first().fill('123456');
+  await page.locator('input[type="password"]').first().fill(process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '');
   await page.locator('button[type="submit"], button:has-text("登录"), button:has-text("Login"), button:has-text("Sign")').first().click();
   await page.waitForTimeout(4000);
 

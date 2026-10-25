@@ -1,13 +1,17 @@
 import { parseHTML } from 'linkedom';
 import domainUtils from '../utils/domain-uitls.js';
 
-export default function emailHtmlTemplate(html, domain) {
+export default function emailHtmlTemplate(html, domain, nonce = '') {
+
+	const safeNonce = /^[A-Za-z0-9_-]+$/.test(String(nonce)) ? String(nonce) : '';
 
 	const { document } = parseHTML(html);
-	document.querySelectorAll('script, iframe, object, embed, form, base, applet').forEach(el => el.remove());
+	document.querySelectorAll('script, iframe, object, embed, form, base, applet, link, meta').forEach(el => el.remove());
 	document.querySelectorAll('*').forEach(el => {
 		for (const attr of Array.from(el.attributes || [])) {
-			if (attr.name.toLowerCase().startsWith('on') || (attr.value && attr.value.toLowerCase().includes('javascript:'))) {
+			const name = attr.name.toLowerCase();
+			const value = String(attr.value || '').toLowerCase().replace(/[\s\u0000-\u001f]/g, '');
+			if (name.startsWith('on') || value.includes('javascript:') || value.includes('vbscript:') || value.startsWith('data:text/html')) {
 				el.removeAttribute(attr.name);
 			}
 		}
@@ -23,13 +27,14 @@ export default function emailHtmlTemplate(html, domain) {
 
 	html = html.replace(/{{domain}}/g, domainUtils.toOssDomain(domain) + '/');
 	const safeHtmlJson = JSON.stringify(html).replace(/</g, '\\u003C');
+	const scriptPolicy = safeNonce ? `script-src 'nonce-${safeNonce}'` : `script-src 'unsafe-inline'`;
 
 	return `<!DOCTYPE html>
 <html lang='en' >
 <head>
     <meta charset='UTF-8'>
     <meta name='viewport' content='width=device-width, initial-scale=1.0'>
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self' data: blob: https:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; object-src 'none';">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' data: blob: https:; style-src 'unsafe-inline'; ${scriptPolicy}; object-src 'none';">
     <style>
         * {
             box-sizing: border-box;
@@ -57,7 +62,7 @@ export default function emailHtmlTemplate(html, domain) {
         <div id='container' class='content-html'></div>
     </div>
 
-    <script>
+    <script${safeNonce ? ` nonce="${safeNonce}"` : ''}>
 
         function renderHTML(html) {
             const container = document.getElementById('container');

@@ -17,7 +17,7 @@ const { chromium } = require('playwright');
     const loginInputs = await page.locator('input').all();
     if (loginInputs.length >= 2) {
       await loginInputs[0].fill('admin'); // Only prefix is needed
-      await loginInputs[1].fill('Password123!');
+      await loginInputs[1].fill((process.env.EPOMAIL_E2E_TEST_PASSWORD || ''));
     }
     
     console.log('Submitting login form...');

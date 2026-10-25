@@ -12,11 +12,11 @@ import assert from "node:assert";
   const timestamp = Date.now();
 
   const testVisitorEmail = `visitor_${timestamp}@epomail.bond`;
-  const testVisitorPassword = "Password123!";
+  const testVisitorPassword = process.env.EPOMAIL_E2E_TEST_PASSWORD || '';
   let testVisitorUserId = null;
 
   const testNormalEmail = `normal_${timestamp}@epomail.bond`;
-  const testNormalPassword = "Password123!";
+  const testNormalPassword = process.env.EPOMAIL_E2E_TEST_PASSWORD || '';
   let testNormalUserId = null;
 
   try {
@@ -25,7 +25,7 @@ import assert from "node:assert";
     // --------------------------------------------------------------------------------------
     console.log("\n[步骤 1] 登录系统管理员并查询角色定义...");
     const loginRes = await page.request.post(BASE + "/api/login", {
-      data: { email: "admin@epomail.bond", password: "123456" },
+      data: { email: "admin@epomail.bond", password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
       headers: { "Content-Type": "application/json" }
     });
     const loginJson = await loginRes.json();

@@ -6,6 +6,7 @@ import userService from './user-service';
 import { and, desc, asc, eq, sql, count, inArray } from 'drizzle-orm';
 import BizError from '../error/biz-error';
 import { getUserDb } from '../utils/db-accessor';
+import userContext from '../security/user-context';
 
 const auditService = {
 	/**
@@ -1209,7 +1210,7 @@ const auditService = {
 			await orm(c).update(auditLog).set(updateFields).where(eq(auditLog.id, id)).run();
 		} else if (action === 'ban' || action === 'ban_account' || action === 'maintain_ban') {
 			if (targetUser) {
-				await userService.setStatus(c, { userId: targetUser.userId, status: 1 });
+				await userService.setStatus(c, { userId: targetUser.userId, status: 1 }, userContext.getUserId(c));
 			}
 			let timeline = [];
 			try {
@@ -1297,7 +1298,7 @@ const auditService = {
 			}).where(eq(auditLog.id, id)).run();
 		} else if (action === 'unban' || action === 'approve_appeal') {
 			if (targetUser) {
-				await userService.setStatus(c, { userId: targetUser.userId, status: 0 });
+				await userService.setStatus(c, { userId: targetUser.userId, status: 0 }, userContext.getUserId(c));
 			}
 			let timeline = [];
 			try {
@@ -1361,7 +1362,7 @@ const auditService = {
 
 		if (actionType === 'approve' || actionType === 'probation' || actionType === 'whitelist') {
 			if (targetUser) {
-				await userService.setStatus(c, { userId: targetUser.userId, status: 0 });
+				await userService.setStatus(c, { userId: targetUser.userId, status: 0 }, userContext.getUserId(c));
 			}
 			await orm(c).update(auditLog).set({
 				status: 'resolved',

@@ -13,6 +13,48 @@ import { isDualDbMode, getDbModeInfo } from '../utils/db-accessor';
 
 const settingService = {
 
+	maskSecret(value, keep = 6) {
+		if (!value) return null;
+		const text = String(value);
+		if (text.includes('******')) return text;
+		return text.length <= keep ? '******' : `${text.slice(0, keep)}******`;
+	},
+
+	sanitizeOAuthProviders(providers) {
+		if (typeof providers === 'string') {
+			try { providers = JSON.parse(providers); } catch (_) { providers = {}; }
+		}
+		if (!providers || typeof providers !== 'object') return {};
+		const sanitized = {};
+		for (const [key, value] of Object.entries(providers)) {
+			if (!value || typeof value !== 'object') continue;
+			const hasClientId = Boolean(value.clientId && String(value.clientId).trim());
+			const hasClientSecret = Boolean(value.clientSecret && String(value.clientSecret).trim());
+			const isAppleConfigured = key === 'apple' && hasClientId && (hasClientSecret || Boolean(value.teamId && value.keyId));
+			sanitized[key] = {
+				enabled: (value.enabled === 1 || value.enabled === true) ? 1 : 0,
+				configured: (hasClientId && hasClientSecret) || isAppleConfigured ? 1 : 0,
+				clientId: value.clientId || '',
+				// Keep a non-empty mask so the admin form can distinguish
+				// "configured" from "empty"; the save path merges the real
+				// secret when the incoming value is masked.
+				clientSecret: hasClientSecret ? '******' : '',
+				privateKey: value.privateKey ? '******' : '',
+				name: value.name || '',
+				tenant: value.tenant || '',
+				teamId: value.teamId || '',
+				keyId: value.keyId || '',
+				authUrl: value.authUrl || '',
+				tokenUrl: value.tokenUrl || '',
+				userInfoUrl: value.userInfoUrl || '',
+				scope: value.scope || '',
+				redirectUri: value.redirectUri || '',
+				callbackUrl: value.callbackUrl || ''
+			};
+		}
+		return sanitized;
+	},
+
 	async ensureSettingColumns(c) {
 		try {
 			const { getUserDb } = await import('../utils/db-accessor');
@@ -250,20 +292,29 @@ const settingService = {
 
 	async get(c, showSiteKey = false) {
 
-		const [settingRow, recordList] = await Promise.all([
+		const [cachedSetting, recordList] = await Promise.all([
 			await this.query(c),
 			verifyRecordService.selectListByIP(c)
 		]);
 
+		// Never mutate the cached settings object: other services in this
+		// request still need the real provider credentials.
+		const settingRow = {
+			...cachedSetting,
+			resendTokens: { ...(cachedSetting.resendTokens || {}) },
+			oauthProviders: this.sanitizeOAuthProviders(cachedSetting.oauthProviders)
+		};
 
 		if (!showSiteKey) {
 			settingRow.siteKey = settingRow.siteKey ? `${settingRow.siteKey.slice(0, 6)}******` : null;
 		}
 
 		settingRow.secretKey = settingRow.secretKey ? `${settingRow.secretKey.slice(0, 6)}******` : null;
+		settingRow.aiApiKey = settingRow.aiApiKey ? `${settingRow.aiApiKey.slice(0, 8)}******` : null;
 
 		Object.keys(settingRow.resendTokens).forEach(key => {
-			settingRow.resendTokens[key] = `${settingRow.resendTokens[key].slice(0, 12)}******`;
+			const value = String(settingRow.resendTokens[key] || '');
+			settingRow.resendTokens[key] = `${value.slice(0, 12)}******`;
 		});
 
 		settingRow.s3AccessKey = settingRow.s3AccessKey ? `${settingRow.s3AccessKey.slice(0, 12)}******` : null;
@@ -312,7 +363,16 @@ const settingService = {
 	},
 
 	async isTotpEnabled(c, preloadedSetting = null) {
-		const settingRow = preloadedSetting || (await this.query(c));
+		let settingRow = preloadedSetting;
+		if (!settingRow) {
+			try {
+				settingRow = await this.query(c);
+			} catch (_) {
+				// Fresh/partially initialized database: fall back to the KV
+				// global switch instead of failing the TOTP setup screen.
+				settingRow = {};
+			}
+		}
 		const mode = Number(settingRow.allMailMode);
 		if (mode === 0 || mode === 2) {
 			return true;
@@ -327,10 +387,22 @@ const settingService = {
 	async set(c, params) {
 		await this.ensureSettingColumns(c);
 		const settingData = await this.query(c);
-		let resendTokens = { ...settingData.resendTokens, ...params.resendTokens };
+		let resendTokens = { ...settingData.resendTokens, ...(params.resendTokens || {}) };
 		Object.keys(resendTokens).forEach(domain => {
+			const incoming = params.resendTokens?.[domain];
+			if (incoming && String(incoming).includes('******')) {
+				resendTokens[domain] = settingData.resendTokens?.[domain] || '';
+			}
 			if (!resendTokens[domain]) delete resendTokens[domain];
 		});
+
+		// Masked values returned by GET /setting/query must never overwrite the
+		// real secret that is still stored server-side.
+		for (const field of ['secretKey', 'siteKey', 's3AccessKey', 's3SecretKey', 'tgBotToken', 'externalDbToken', 'aiApiKey']) {
+			if (typeof params[field] === 'string' && params[field].includes('******')) {
+				delete params[field];
+			}
+		}
 
 		if (Array.isArray(params.emailPrefixFilter)) {
 			params.emailPrefixFilter = params.emailPrefixFilter.join(',');
@@ -357,7 +429,25 @@ const settingService = {
 		}
 
 		if (params.oauthProviders && typeof params.oauthProviders === 'object') {
-			params.oauthProviders = JSON.stringify(params.oauthProviders);
+			const currentProviders = (typeof settingData.oauthProviders === 'object' && settingData.oauthProviders) ? settingData.oauthProviders : {};
+			const incomingProviders = params.oauthProviders;
+			const mergedProviders = {};
+
+			for (const key of new Set([...Object.keys(currentProviders), ...Object.keys(incomingProviders)])) {
+				const previous = (currentProviders[key] && typeof currentProviders[key] === 'object') ? currentProviders[key] : {};
+				const incoming = (incomingProviders[key] && typeof incomingProviders[key] === 'object') ? incomingProviders[key] : {};
+				const merged = { ...previous, ...incoming };
+
+				for (const secretField of ['clientSecret', 'privateKey']) {
+					const nextValue = incoming[secretField];
+					if (!nextValue || String(nextValue).includes('******')) {
+						merged[secretField] = previous[secretField] || '';
+					}
+				}
+				mergedProviders[key] = merged;
+			}
+
+			params.oauthProviders = JSON.stringify(mergedProviders);
 		}
 
 		if (params.allMailMode !== undefined) {

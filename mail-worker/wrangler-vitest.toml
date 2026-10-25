@@ -1,0 +1,19 @@
+name = "epomail-unit-test"
+main = "src/index.js"
+compatibility_date = "2025-03-10"
+
+[[d1_databases]]
+binding = "db"
+database_name = "epomail-unit-test"
+database_id = "e65f099d-796d-4eaa-8dff-529b368b20db"
+
+[[kv_namespaces]]
+binding = "kv"
+id = "unit-test-kv-namespace"
+
+[vars]
+domain = ["example.com"]
+admin = "admin@example.com"
+jwt_secret = "test-jwt-secret-for-unit-tests"
+totp_enc_key = "test-totp-encryption-key-for-unit-tests"
+resend_webhook_secret = "whsec_test_only_not_a_real_secret"

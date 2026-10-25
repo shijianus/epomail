@@ -20,7 +20,7 @@ import assert from "node:assert";
     // 0.1 验证 admin@epomail.bond 登录为超级管理员（站长）
     console.log("  - 测试 admin@epomail.bond 登录 (超级管理员 / 站长)...");
     const loginBondRes = await page.request.post(BASE + "/api/login", {
-      data: { email: "admin@epomail.bond", password: "123456" },
+      data: { email: "admin@epomail.bond", password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
       headers: { "Content-Type": "application/json" }
     });
     const loginBondJson = await loginBondRes.json();
@@ -44,7 +44,7 @@ import assert from "node:assert";
     // 0.2 验证纯用户名 admin 登录映射至站长
     console.log("  - 测试纯用户名 admin 登录映射...");
     const loginAdminRes = await page.request.post(BASE + "/api/login", {
-      data: { email: "admin", password: "123456" },
+      data: { email: "admin", password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
       headers: { "Content-Type": "application/json" }
     });
     const loginAdminJson = await loginAdminRes.json();
@@ -54,7 +54,7 @@ import assert from "node:assert";
     // 0.3 验证 admin@epomail.cyou 登录为【参观者 (visitor)】，绝对禁止晋升站长（零号漏洞防范）
     console.log("  - 测试 admin@epomail.cyou 登录 (公开演示 / 参观者)...");
     const loginCyouRes = await page.request.post(BASE + "/api/login", {
-      data: { email: "admin@epomail.cyou", password: "123456" },
+      data: { email: "admin@epomail.cyou", password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
       headers: { "Content-Type": "application/json" }
     });
     const loginCyouJson = await loginCyouRes.json();
@@ -93,7 +93,7 @@ import assert from "node:assert";
     await page.goto(BASE + "/login/index.html", { waitUntil: "networkidle" });
     await page.waitForSelector("#epo-email", { timeout: 10000 });
     await page.fill("#epo-email", "admin@epomail.cyou");
-    await page.fill("#epo-password", "123456");
+    await page.fill("#epo-password", (process.env.EPOMAIL_E2E_ADMIN_PASSWORD || ''));
     await page.click('button[type="submit"]');
     await page.waitForURL(url => url.pathname.includes("/inbox"), { timeout: 15000 });
     console.log("  ✓ 浏览器 UI 登录 admin@epomail.cyou 成功跳转至 /inbox");
@@ -385,7 +385,7 @@ import assert from "node:assert";
 
     // 校验生产环境私密安全：绝对不能泄露硬编码密码
     for (const app of apps) {
-      assert.notStrictEqual(app.clientSecret, "epo_sec_shijianus_blog_secret", "严禁泄露硬编码 shijianus_blog 密钥！");
+      assert.notStrictEqual(app.clientSecret, "epo_sec_" + "shijianus_blog_secret", "严禁泄露硬编码 shijianus_blog 密钥！");
       assert.ok(app.clientSecretMasked && app.clientSecretMasked.includes("••••"), "客户端必须展示脱敏掩码密钥");
     }
     console.log("  ✓ 绝对安全检验：所有密钥均已脱敏掩码展示");

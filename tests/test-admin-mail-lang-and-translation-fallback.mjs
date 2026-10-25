@@ -6,7 +6,7 @@ import { getPredefinedTranslation as getClientPredefined } from '../mail-vue/src
 import { getPredefinedTranslation as getServerPredefined } from '../mail-worker/src/const/welcome-template.js';
 
 const BASE = process.env.BASE_URL || 'http://127.0.0.1:8787';
-const ADMIN = { email: 'admin@epomail.bond', password: '123456' };
+const ADMIN = { email: 'admin@epomail.bond', password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' };
 
 let passCount = 0;
 function ok(cond, msg) {
@@ -159,7 +159,7 @@ try {
   if (loginJson.code !== 200) {
     // 尝试备选密码或管理员邮箱
     loginRes = await page.request.post(BASE + '/api/login', {
-      data: { email: 'admin@example.com', password: '123456' },
+      data: { email: 'admin@example.com', password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
       headers: { 'Content-Type': 'application/json' }
     });
     loginJson = await loginRes.json();

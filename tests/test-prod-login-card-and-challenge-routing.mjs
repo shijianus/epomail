@@ -5,7 +5,7 @@ import { chromium } from 'playwright';
 
 const BASE_URL = process.env.TARGET_URL || 'https://mail.epocanvas.com';
 const ADMIN_EMAIL = 'admin@epomail.bond';
-const ADMIN_PWD = '123456';
+const ADMIN_PWD = process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '';
 
 console.log('========================================================================');
 console.log('=== 公网生产环境全真端到端核验：卡片尺寸均衡、OAuth隐藏与管理、2FA会话回退 ===');

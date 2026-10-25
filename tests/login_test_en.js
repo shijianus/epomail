@@ -21,9 +21,9 @@ const { chromium } = require('playwright');
     const inputs = await page.locator('input').all();
     if (inputs.length >= 2) {
       await inputs[0].fill('admin'); // The UI has @epomail.bond suffix usually
-      await inputs[1].fill('Password123!');
+      await inputs[1].fill((process.env.EPOMAIL_E2E_TEST_PASSWORD || ''));
       if (inputs.length >= 3) {
-        await inputs[2].fill('Password123!');
+        await inputs[2].fill((process.env.EPOMAIL_E2E_TEST_PASSWORD || ''));
       }
     }
     
@@ -40,7 +40,7 @@ const { chromium } = require('playwright');
     const loginInputs = await page.locator('input').all();
     if (loginInputs.length >= 2) {
       await loginInputs[0].fill('admin');
-      await loginInputs[1].fill('Password123!');
+      await loginInputs[1].fill((process.env.EPOMAIL_E2E_TEST_PASSWORD || ''));
     }
     await page.getByRole('button', { name: /Sign in/i }).click();
     await page.waitForTimeout(3000);

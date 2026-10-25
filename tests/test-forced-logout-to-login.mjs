@@ -22,7 +22,7 @@ import assert from "assert";
     // -----------------------------------------------------------------------------
     console.log("\n[测试 1] 获取真实站长 Token 并验证登录状态...");
     const loginRes = await page.request.post(BASE + "/api/login", {
-      data: { email: "admin@epomail.bond", password: "123456" },
+      data: { email: "admin@epomail.bond", password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
       headers: { "Content-Type": "application/json" }
     });
     const loginData = await loginRes.json();
@@ -135,7 +135,7 @@ import assert from "assert";
     await page.waitForSelector("#epo-email", { timeout: 10000 });
 
     await page.fill("#epo-email", "admin@epomail.bond");
-    await page.fill("#epo-password", "123456");
+    await page.fill("#epo-password", (process.env.EPOMAIL_E2E_ADMIN_PASSWORD || ''));
     await page.click('button[type="submit"]');
 
     // 等待跳转回收件箱

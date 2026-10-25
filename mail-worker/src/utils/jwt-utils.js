@@ -12,8 +12,17 @@ const base64urlDecode = (str) => {
 	return Uint8Array.from(atob(str), c => c.charCodeAt(0));
 };
 
+function requireJwtSecret(c) {
+	const secret = c?.env?.jwt_secret;
+	if (!secret || typeof secret !== 'string' || !secret.trim()) {
+		throw new Error('jwt_secret is not configured');
+	}
+	return secret.trim();
+}
+
 const jwtUtils = {
 	async generateToken(c, payload, expiresInSeconds) {
+		const secret = requireJwtSecret(c);
 		const header = {
 			alg: 'HS256',
 			typ: 'JWT'
@@ -35,7 +44,7 @@ const jwtUtils = {
 
 		const key = await crypto.subtle.importKey(
 			'raw',
-			encoder.encode(c.env.jwt_secret),
+			encoder.encode(secret),
 			{ name: 'HMAC', hash: 'SHA-256' },
 			false,
 			['sign']
@@ -49,16 +58,27 @@ const jwtUtils = {
 
 	async verifyToken(c, token) {
 		try {
+			const secret = requireJwtSecret(c);
 			if (!token) return null;
 			const cleanToken = typeof token === 'string' && token.startsWith('Bearer ') ? token.slice(7).trim() : (typeof token === 'string' ? token.trim() : '');
 			const [headerB64, payloadB64, signatureB64] = cleanToken.split('.');
 
 			if (!headerB64 || !payloadB64 || !signatureB64) return null;
 
+			// Reject non-HS256 headers explicitly. The signature below is always
+			// HMAC-SHA256, so this prevents algorithm-confusion style confusion.
+			let headerJson;
+			try {
+				headerJson = JSON.parse(decoder.decode(base64urlDecode(headerB64)));
+			} catch (e) {
+				return null;
+			}
+			if (!headerJson || headerJson.alg !== 'HS256') return null;
+
 			const data = `${headerB64}.${payloadB64}`;
 			const key = await crypto.subtle.importKey(
 				'raw',
-				encoder.encode(c.env.jwt_secret),
+				encoder.encode(secret),
 				{ name: 'HMAC', hash: 'SHA-256' },
 				false,
 				['verify']

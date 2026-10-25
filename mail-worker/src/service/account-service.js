@@ -13,6 +13,7 @@ import roleService from './role-service';
 import { t } from '../i18n/i18n';
 import verifyRecordService from './verify-record-service';
 import KvConst from '../const/kv-const';
+import rbacGuard from './rbac-guard-service.js';
 
 const accountService = {
 
@@ -289,6 +290,10 @@ const accountService = {
 		try {
 			targetAcc = await orm(c).select().from(account).where(eq(account.accountId, aid)).get();
 		} catch (e) {}
+
+		if (targetAcc?.userId) {
+			await rbacGuard.assertCanManageUser(c, callerUserId, targetAcc.userId);
+		}
 
 		await emailService.physicsDeleteByAccountId(c, aid);
 		await orm(c).delete(account).where(eq(account.accountId, aid)).run();

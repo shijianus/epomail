@@ -41,7 +41,7 @@ import { execSync } from 'node:child_process';
 
 const BASE = process.env.E2E_BASE || 'http://127.0.0.1:8787/api';
 const ADMIN_EMAIL = 'admin@example.com';
-const ADMIN_PWD = '123456';
+const ADMIN_PWD = process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '';
 const RUN_TAG = 'rkctl' + Date.now().toString(36).slice(-4); // 测试数据命名标签
 const WORKER_DIR = path.resolve('mail-worker');
 const TMP_SQL = path.join(WORKER_DIR, '.tmp-e2e-risk.sql');

@@ -72,7 +72,7 @@ const distDir = path.resolve(__dirname, "../temp_login_ui/dist");
     });
 
     await page.fill("#epo-email", "admin@epomail.bond");
-    await page.fill("#epo-password", "123456");
+    await page.fill("#epo-password", (process.env.EPOMAIL_E2E_ADMIN_PASSWORD || ''));
     await page.click('button[type="submit"]');
 
     // 3. 验证 TOTP 界面平滑进入

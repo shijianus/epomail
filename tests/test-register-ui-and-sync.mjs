@@ -132,7 +132,7 @@ async function run() {
     // 2. Scenario B: Password mismatch check
     console.log("Testing password mismatch client validation...");
     await page.locator("input#epo-email").fill("testuser");
-    await page.locator("input#epo-password").fill("Password123!");
+    await page.locator("input#epo-password").fill((process.env.EPOMAIL_E2E_TEST_PASSWORD || ''));
     await page.locator("input#epo-confirm-password").fill("Password999!");
     await page.locator("button[type=submit]").click();
     await page.waitForTimeout(500);
@@ -144,7 +144,7 @@ async function run() {
 
     // 3. Scenario C: Successful registration
     console.log("Testing successful registration submission...");
-    await page.locator("input#epo-confirm-password").fill("Password123!");
+    await page.locator("input#epo-confirm-password").fill((process.env.EPOMAIL_E2E_TEST_PASSWORD || ''));
     await page.locator("button[type=submit]").click();
     await page.waitForTimeout(2000);
     console.log("URL after successful registration (auto-switch to login):", page.url());

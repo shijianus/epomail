@@ -58,13 +58,19 @@ crons = ["0 16 * * *"]	#每天晚上12点执行每日任务,刷新分析缓存
 domain = ["epomail.bond","epomail.cyou"]				#邮件域名可可配置多个 示例: ["example1.com","example2.com"]
 admin = "admin@epomail.bond"				#管理员的邮箱	示例: admin@example.com
 #AVATAR_UPLOAD_URL = ""			#头像外部图床(可选)。不配置时头像落实例自有对象存储(KV)；配置示例: "https://img.example.com"
+#CORS_ORIGINS = ""			#允许跨域访问 API 的前端源(逗号分隔)。留空时仅允许同源；OAuth token/userinfo 端点始终允许第三方调用。
 
-# ⚠️ 安全约束：jwt_secret 与 totp_enc_key 属于机密变量，严禁写入本文件（本仓库为公开仓库，写入即泄漏）！
+# ⚠️ 安全约束：jwt_secret、totp_enc_key、admin_initial_password、init_secret、resend_webhook_secret、email_enc_key
+# 均属机密变量，严禁写入本文件（本仓库为公开仓库，写入即泄漏）！
 # 正确做法（Cloudflare Secrets，一次设置持久生效，部署不丢失）：
 #   npx wrangler secret put jwt_secret
 #   npx wrangler secret put totp_enc_key
+#   npx wrangler secret put admin_initial_password   # 首次 /init 创建站长账号时必需
+#   npx wrangler secret put init_secret              # 可选，不回退 jwt_secret
+#   npx wrangler secret put resend_webhook_secret    # 使用 Resend Webhook 时必需
+#   npx wrangler secret put email_enc_key            # 可选，建议与 totp_enc_key 分离
 # 本地开发请在 mail-worker/.dev.vars 中配置（已被 .gitignore 排除，不会入库），模板参见 .dev.vars.example。
-# 注意：/init/<secret> 初始化门禁使用的就是 jwt_secret 的值。
+# 注意：/init 初始化门禁优先使用 init_secret，未配置时回退 jwt_secret；推荐使用 POST + x-init-secret 请求头。
 
 [build]
 # 顺序约束：temp_login_ui 必须先于 mail-vue 构建（详见 scripts/build-prod.mjs）。

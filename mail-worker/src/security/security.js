@@ -124,28 +124,36 @@ const premKey = {
 	'reg-key:delete': ['/regKey/delete','/regKey/clearNotUse'],
 };
 
+/**
+ * Segment-aware prefix matching. `path.startsWith('/login')` would also match
+ * `/login-evil`; every exemption and permission lookup must use this helper.
+ */
+export function pathMatches(path, prefix) {
+	if (typeof path !== 'string' || typeof prefix !== 'string' || !prefix) return false;
+	if (prefix.endsWith('/')) return path.startsWith(prefix);
+	return path === prefix || path.startsWith(prefix + '/');
+}
+
 app.use('*', async (c, next) => {
 
 	const path = c.req.path;
 
-	const index = exclude.findIndex(item => {
-		return path.startsWith(item);
-	});
+	const isOauthVerify = pathMatches(path, '/oauth/verify');
+	const excluded = exclude.some(item => pathMatches(path, item));
 
-	if (index > -1 && !path.startsWith('/oauth/verify')) {
+	if (excluded && !isOauthVerify) {
 		return await next();
 	}
 
-	if (path.startsWith('/public')) {
+	if (pathMatches(path, '/public')) {
 
 		const userPublicToken = await c.env.kv.get(KvConst.PUBLIC_KEY);
 		const publicToken = c.req.header(constant.TOKEN_HEADER);
-		if (publicToken !== userPublicToken) {
+		if (!userPublicToken || publicToken !== userPublicToken) {
 			throw new BizError(t('publicTokenFail'), 401);
 		}
 		return await next();
 	}
-
 
 	const jwt = c.req.header(constant.TOKEN_HEADER) || c.req.header('token');
 
@@ -161,7 +169,7 @@ app.use('*', async (c, next) => {
 	}
 	const authInfo = await c.env.kv.get(KvConst.AUTH_INFO + userId, { type: 'json' });
 
-	if (!authInfo) {
+	if (!authInfo || !authInfo.user || !Array.isArray(authInfo.tokens)) {
 		throw new BizError(t('authExpired'), 401);
 	}
 
@@ -178,13 +186,16 @@ app.use('*', async (c, next) => {
 		}
 	}
 
-	if (authInfo.user && authInfo.user.status === 1) {
+	if (authInfo.user.isDel === 1) {
+		await c.env.kv.delete(KvConst.AUTH_INFO + userId);
+		throw new BizError(t('isDelUser'), 403);
+	}
+
+	if (authInfo.user.status === 1) {
 		throw new BizError(t('isBanUser'), 403);
 	}
 
-	const permIndex = requirePerms.findIndex(item => {
-		return path.startsWith(item);
-	});
+	const permIndex = requirePerms.findIndex(item => pathMatches(path, item));
 
 	if (permIndex > -1) {
 
@@ -192,9 +203,7 @@ app.use('*', async (c, next) => {
 
 		const userPaths = permKeyToPaths(permKeys);
 
-		const userPermIndex = userPaths.findIndex(item => {
-			return path.startsWith(item);
-		});
+		const userPermIndex = userPaths.findIndex(item => pathMatches(path, item));
 
 		if (userPermIndex === -1 && !isAdminUser(c, authInfo.user)) {
 			throw new BizError(t('unauthorized'), 403);
@@ -211,7 +220,7 @@ app.use('*', async (c, next) => {
 		await c.env.kv.put(KvConst.AUTH_INFO + userId, JSON.stringify(authInfo), { expirationTtl: constant.TOKEN_EXPIRE });
 	}
 
-	c.set('user',authInfo.user)
+	c.set('user', authInfo.user)
 
 	return await next();
 });

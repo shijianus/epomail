@@ -43,9 +43,9 @@ const attService = {
 			};
 
 			if (!attachment.contentId) {
-				metadate.contentDisposition = `attachment;filename=${attachment.filename}`;
+				metadate.contentDisposition = fileUtils.encodeContentDisposition(attachment.filename, 'attachment');
 			} else {
-				metadate.contentDisposition = `inline;filename=${attachment.filename}`;
+				metadate.contentDisposition = fileUtils.encodeContentDisposition(attachment.filename, 'inline');
 				metadate.cacheControl = `max-age=259200`;
 			}
 
@@ -195,7 +195,7 @@ const attService = {
 		for (let att of attList) {
 			await r2Service.putObj(c, att.key, att.buff, {
 				contentType: att.type,
-				contentDisposition: `attachment;filename=${att.filename}`
+				contentDisposition: fileUtils.encodeContentDisposition(att.filename, 'attachment')
 			}, userId);
 		}
 
@@ -214,7 +214,7 @@ const attService = {
 			await r2Service.putObj(c, attData.key, attData.buff, {
 				contentType: attData.mimeType,
 				cacheControl: `max-age=259200`,
-				contentDisposition: `inline;filename=${attData.filename}`
+				contentDisposition: fileUtils.encodeContentDisposition(attData.filename, 'inline')
 			}, userId);
 			delete attData.buff;
 		}
@@ -296,6 +296,14 @@ const attService = {
 			return []
 		}
 		return orm(c).select().from(att).where(inArray(att.key, keys)).orderBy(desc(att.attId)).groupBy(att.key).all();
+	},
+
+	async existsForUser(c, key, userId) {
+		if (!key || !userId) return false;
+		const row = await orm(c).select({ attId: att.attId }).from(att).where(
+			and(eq(att.key, key), eq(att.userId, userId))
+		).get();
+		return !!row;
 	}
 };
 

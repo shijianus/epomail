@@ -151,7 +151,7 @@ async function runLiveCFVerification() {
     const loginRes = await fetch('https://mail.epocanvas.com/api/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'audit_normal_1789140856529@epomail.bond', password: 'Audit123!' })
+      body: JSON.stringify({ email: 'audit_normal_1789140856529@epomail.bond', password: process.env.EPOMAIL_E2E_USER_PASSWORD || '' })
     });
     const loginJson = await loginRes.json();
     if (loginJson.code !== 200 || !loginJson.data?.token) {

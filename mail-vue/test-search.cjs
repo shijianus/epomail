@@ -9,7 +9,7 @@ const { chromium } = require('playwright');
   
   // Login
   await page.fill('input[type="text"]', 'admin@epomail.bond');
-  await page.fill('input[type="password"]', '123456');
+  await page.fill('input[type="password"]', process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '');
   await page.click('button:has-text("登录")');
   
   await page.waitForNavigation();

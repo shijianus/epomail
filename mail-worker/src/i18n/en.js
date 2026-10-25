@@ -1797,6 +1797,8 @@ const en = {
     IncorrectPwd: 'Incorrect email or password',
     accountLimit: 'Mailbox limit for your current role has been reached',
     accountLocked: 'Account temporarily locked due to too many failed attempts',
+
+    tooManyRequests: 'Too many requests, please try again later',
     addAccountDisabled: 'Adding mailboxes is currently disabled',
     adminReserved: 'This username is reserved for the site administrator',
     attLimit: 'Too many attachments in one email',

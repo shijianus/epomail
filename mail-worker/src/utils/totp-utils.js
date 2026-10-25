@@ -172,7 +172,7 @@ const totpUtils = {
 	 * Derive 256-bit AES-GCM CryptoKey from environment secret (totp_enc_key)
 	 */
 	async getEncryptionKey(env) {
-		const rawKey = env?.totp_enc_key || env?.jwt_secret;
+		const rawKey = env?.totp_enc_key;
 		if (!rawKey || typeof rawKey !== 'string' || !rawKey.trim()) {
 			throw new Error('totp_enc_key is not configured, please run: wrangler secret put totp_enc_key');
 		}

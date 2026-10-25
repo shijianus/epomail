@@ -17,7 +17,7 @@ async function runE2ETests() {
     // 1. Login via API
     console.log('▶ Step 1: Logging in via Cloudflare API...');
     const loginRes = await page.request.post(`${BASE}/api/login`, {
-      data: { email: 'admin@epomail.bond', password: '123456' },
+      data: { email: 'admin@epomail.bond', password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
       headers: { 'Content-Type': 'application/json' }
     });
     const loginData = await loginRes.json();

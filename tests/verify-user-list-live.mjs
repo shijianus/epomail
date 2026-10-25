@@ -4,7 +4,7 @@ import { execSync } from 'node:child_process';
 
 const BASE = 'https://mail.epocanvas.com';
 const USER_EMAIL = 'audit_normal_1789140856529@epomail.bond';
-const USER_PWD = 'Audit123!';
+const USER_PWD = process.env.EPOMAIL_E2E_USER_PASSWORD || '';
 
 async function run() {
   console.log('================================================================');

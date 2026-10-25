@@ -3,6 +3,7 @@ import settingService from './setting-service';
 import kvObjService from './kv-obj-service';
 import { getUserDb } from '../utils/db-accessor';
 import { detectProvider } from '../utils/s3-signer';
+import { normalizeObjectKey } from '../utils/object-key-utils.js';
 
 const r2Service = {
 
@@ -43,7 +44,14 @@ const r2Service = {
 		}
 
 		// 2. Check System-Level S3 / Backblaze B2 Storage
-		const setting = await settingService.query(c);
+		// Object reads must still work on a fresh/partially initialized D1:
+		// a missing setting table should fall back to KV rather than 500.
+		let setting = {};
+		try {
+			setting = await settingService.query(c);
+		} catch (_) {
+			setting = {};
+		}
 		const { bucket, endpoint, s3AccessKey, s3SecretKey, region, forcePathStyle, customDomain } = setting;
 
 		if (!!(bucket && endpoint && s3AccessKey && s3SecretKey)) {
@@ -87,37 +95,56 @@ const r2Service = {
 	},
 
 	async putObj(c, key, content, metadata = {}, userId = null) {
+		const safeKey = normalizeObjectKey(key);
+		if (!safeKey) {
+			throw new Error('Invalid storage object key');
+		}
 		const resolved = await this.resolveStorage(c, userId);
 
 		if (resolved.type === 'KV') {
-			await kvObjService.putObj(c, key, content, metadata);
+			await kvObjService.putObj(c, safeKey, content, metadata);
 		} else if (resolved.type === 'R2') {
-			await c.env.r2.put(key, content, {
+			await c.env.r2.put(safeKey, content, {
 				httpMetadata: { ...metadata }
 			});
 		} else if (resolved.type === 'S3' || resolved.type === 'USER_S3') {
-			await s3Service.putObj(c, key, content, metadata, resolved.config);
+			await s3Service.putObj(c, safeKey, content, metadata, resolved.config);
 		}
 	},
 
 	async getObj(c, key, userId = null) {
+		const safeKey = normalizeObjectKey(key);
+		if (!safeKey) {
+			return null;
+		}
 		const resolved = await this.resolveStorage(c, userId);
 
 		if (resolved.type === 'KV') {
-			return await kvObjService.getObj(c, key);
+			return await kvObjService.getObj(c, safeKey);
 		} else if (resolved.type === 'R2') {
-			return await c.env.r2.get(key);
+			return await c.env.r2.get(safeKey);
 		} else if (resolved.type === 'S3' || resolved.type === 'USER_S3') {
-			return await s3Service.getObj(c, key, resolved.config);
+			return await s3Service.getObj(c, safeKey, resolved.config);
 		}
 	},
 
 	async getDownloadUrl(c, key, filename = null, userId = null) {
+		const safeKey = normalizeObjectKey(key);
+		if (!safeKey) {
+			return null;
+		}
 		const resolved = await this.resolveStorage(c, userId);
+
+		// User-supplied attachments must always pass through the Worker's
+		// Content-Type/Disposition sanitizer. A direct S3/B2 presigned URL would
+		// serve the stored text/html + inline metadata unmodified.
+		if (safeKey.startsWith('attachments/')) {
+			return `/oss/${safeKey}`;
+		}
 
 		if (resolved.type === 'S3' || resolved.type === 'USER_S3') {
 			try {
-				const directUrl = await s3Service.getPresignedDownloadUrl(c, key, resolved.config, filename, 3600);
+				const directUrl = await s3Service.getPresignedDownloadUrl(c, safeKey, resolved.config, filename, 3600);
 				if (directUrl) return directUrl;
 			} catch (e) {
 				console.warn('Presigned download URL generation failed:', e.message);
@@ -125,18 +152,20 @@ const r2Service = {
 		}
 
 		// Fallback to Worker-proxied stream endpoint
-		return `/oss/${key}`;
+		return `/oss/${safeKey}`;
 	},
 
 	async delete(c, key, userId = null) {
+		const safeKey = normalizeObjectKey(key);
+		if (!safeKey) return;
 		const resolved = await this.resolveStorage(c, userId);
 
 		if (resolved.type === 'KV') {
-			await kvObjService.deleteObj(c, key);
+			await kvObjService.deleteObj(c, safeKey);
 		} else if (resolved.type === 'R2') {
-			await c.env.r2.delete(key);
+			await c.env.r2.delete(safeKey);
 		} else if (resolved.type === 'S3' || resolved.type === 'USER_S3') {
-			await s3Service.deleteObj(c, key, resolved.config);
+			await s3Service.deleteObj(c, safeKey, resolved.config);
 		}
 	}
 

@@ -38,6 +38,18 @@ function maskSecret(secret) {
 	return secret.substring(0, 8) + '••••••••' + secret.substring(secret.length - 4);
 }
 
+// SHA-256 of the legacy sample client secret that was committed to git.
+// The literal is intentionally not kept in source; only its digest is needed
+// to find and rotate the old row.
+const LEGACY_SAMPLE_SECRET_SHA256 = '1d88eceac29b5703dd4b4438ca450ca37f37b9186dc0894eae7b3ea02965e775';
+const LEGACY_IMAGE_SECRET_SHA256 = 'abe81f943fa5177a566b2b884f136891b355ef243ea4c077475919ebef111d17';
+const LEGACY_SECRET_HASHES = new Set([LEGACY_SAMPLE_SECRET_SHA256, LEGACY_IMAGE_SECRET_SHA256]);
+
+async function sha256Hex(value) {
+	const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
+	return Array.from(new Uint8Array(digest)).map(byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
 // 默认官方内置示例 App 模板（Client Secret 严格随机生成，保障私密安全，站长可自由删除或自接）
 export const SAMPLE_OAUTH_APP_TEMPLATE = {
 	name: 'shijianus-blog',
@@ -127,10 +139,12 @@ const oauthAppService = {
 
 			// 保留站长自建或关联的应用，杜绝硬编码删除；将历史硬编码 secret 转换为独立随机安全 secret
 			try {
-				const legacyApp = await userDb.prepare(`SELECT id FROM oauth_app WHERE client_secret = 'epo_sec_shijianus_blog_secret' LIMIT 1`).first();
-				if (legacyApp) {
+				const legacyRows = await userDb.prepare(`SELECT id, client_secret FROM oauth_app`).all();
+				for (const row of (legacyRows.results || [])) {
+					if (!row.client_secret) continue;
+					if (!LEGACY_SECRET_HASHES.has(await sha256Hex(row.client_secret))) continue;
 					const rotatedSecret = `epo_sec_${genSecureSecret(32)}`;
-					await userDb.prepare(`UPDATE oauth_app SET client_secret = ? WHERE id = ?`).bind(rotatedSecret, legacyApp.id).run();
+					await userDb.prepare(`UPDATE oauth_app SET client_secret = ? WHERE id = ?`).bind(rotatedSecret, row.id).run();
 				}
 			} catch (_) {}
 		} catch (e) {
@@ -141,10 +155,10 @@ const oauthAppService = {
 	async list(c) {
 		await this.ensureTables(c);
 		const rows = await orm(c).select().from(oauthApp).orderBy(desc(oauthApp.id)).all();
-		return rows.map(app => ({
+		return rows.map(({ clientSecret, ...app }) => ({
 			...app,
 			redirectUris: normalizeRedirectUris(app.redirectUris),
-			clientSecretMasked: maskSecret(app.clientSecret)
+			clientSecretMasked: maskSecret(clientSecret)
 		}));
 	},
 
@@ -256,10 +270,11 @@ const oauthAppService = {
 		}
 
 		const updated = await orm(c).update(oauthApp).set(updatePayload).where(eq(oauthApp.id, id)).returning().get();
+		const { clientSecret: updatedSecret, ...safeUpdated } = updated;
 		return {
-			...updated,
+			...safeUpdated,
 			redirectUris: normalizeRedirectUris(updated.redirectUris),
-			clientSecretMasked: maskSecret(updated.clientSecret)
+			clientSecretMasked: maskSecret(updatedSecret)
 		};
 	},
 
@@ -401,41 +416,9 @@ const oauthAppService = {
 			}
 		}
 
-		// 3. 检查全系统活跃应用，未关联且未撤销的自动同步补齐 (确保资安完全透明，消除隐形死角)
+		// 3. 仅信任数据库中真实存在的授权记录。未经过 authorize 流程的应用
+		// 不得因为“应用在线”就被自动视为已授权。
 		const now = new Date().toISOString();
-		for (const app of apps) {
-			if (Number(app.status) !== 1) continue;
-
-			// 检查是否被该用户显式撤销授权
-			let isRevoked = false;
-			try {
-				if (c?.env?.kv) {
-					const revokedFlag = await c.env.kv.get(`REVOKED_GRANT_${userId}_${app.clientId}`);
-					if (revokedFlag === '1') isRevoked = true;
-				}
-			} catch (_) {}
-
-			if (isRevoked) continue;
-
-			// 若尚未在 oauth_grant 中记录，自动持久化单条记录并登记至内存
-			if (!grantMap.has(app.clientId)) {
-				try {
-					const insertRes = await userDb.prepare(`
-						INSERT OR IGNORE INTO oauth_grant (user_id, client_id, scopes, created_at, updated_at)
-						VALUES (?, ?, ?, ?, ?)
-					`).bind(userId, app.clientId, app.scopes || 'openid profile email', app.createdAt || now, now).run();
-
-					grantMap.set(app.clientId, {
-						id: insertRes?.meta?.last_row_id || Date.now(),
-						userId,
-						clientId: app.clientId,
-						scopes: app.scopes || 'openid profile email',
-						createdAt: app.createdAt || now,
-						updatedAt: now
-					});
-				} catch (_) {}
-			}
-		}
 
 		// 4. 组装授权应用卡片数据 (每个 client_id 严格唯一)
 		const grants = [];

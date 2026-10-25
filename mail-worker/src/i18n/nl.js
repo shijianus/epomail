@@ -1797,6 +1797,8 @@ const nl = {
     IncorrectPwd: 'Onjuist e-mailadres of wachtwoord',
     accountLimit: 'De mailboxlimiet van je huidige rol is bereikt',
     accountLocked: 'Account tijdelijk geblokkeerd na te veel mislukte pogingen',
+
+    tooManyRequests: 'Te veel verzoeken, probeer het later opnieuw',
     addAccountDisabled: 'Het toevoegen van mailboxen is momenteel uitgeschakeld',
     adminReserved: 'Deze gebruikersnaam is gereserveerd voor de sitebeheerder',
     attLimit: 'Te veel bijlagen in één e-mail',

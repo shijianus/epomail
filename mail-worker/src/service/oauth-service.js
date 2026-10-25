@@ -6,6 +6,8 @@ import userService from "./user-service";
 import loginService from "./login-service";
 import cryptoUtils from "../utils/crypto-utils";
 import settingService from "./setting-service";
+import { verifyAppleIdToken } from "../utils/oauth-jwt-utils";
+import rateLimit from '../utils/rate-limit.js';
 
 const PROVIDER_METADATA = {
 	github: {
@@ -149,6 +151,8 @@ const oauthService = {
 	},
 
 	async exchangeCodeAndLogin(c, providerKey, params) {
+		await rateLimit.check(c, { scope: 'oauth-login', limit: 30, windowSeconds: 900 });
+
 		const { code, id_token, redirectUri } = params;
 		if (!code && !id_token) {
 			throw new BizError('Authorization code or ID token is required');
@@ -198,22 +202,21 @@ const oauthService = {
 			if (!userRes.ok) throw new BizError('Failed to fetch GitHub user profile');
 			const ghUser = await userRes.json();
 
-			let email = ghUser.email;
-			if (!email) {
-				try {
-					const emailsRes = await fetch('https://api.github.com/user/emails', {
-						headers: {
-							'Authorization': `Bearer ${accessToken}`,
-							'User-Agent': 'Epocanvas-Mail'
-						}
-					});
-					if (emailsRes.ok) {
-						const emails = await emailsRes.json();
-						const primary = emails.find(e => e.primary && e.verified) || emails[0];
-						if (primary) email = primary.email;
+			let email = '';
+			try {
+				const emailsRes = await fetch('https://api.github.com/user/emails', {
+					headers: {
+						'Authorization': `Bearer ${accessToken}`,
+						'User-Agent': 'Epocanvas-Mail'
 					}
-				} catch (_) {}
-			}
+				});
+				if (emailsRes.ok) {
+					const emails = await emailsRes.json();
+					const verified = Array.isArray(emails) ? emails.filter(e => e.verified) : [];
+					const primary = verified.find(e => e.primary) || verified[0];
+					if (primary) email = primary.email;
+				}
+			} catch (_) {}
 
 			userInfo = {
 				oauthUserId: `github:${ghUser.id}`,
@@ -248,13 +251,14 @@ const oauthService = {
 			});
 			if (!userRes.ok) throw new BizError('Failed to fetch Google user profile');
 			const gUser = await userRes.json();
+			const googleEmailVerified = gUser.email_verified === true || gUser.verified_email === true;
 
 			userInfo = {
 				oauthUserId: `google:${gUser.sub}`,
 				username: gUser.email ? gUser.email.split('@')[0] : `google_${gUser.sub}`,
 				name: gUser.name || gUser.given_name || 'Google User',
 				avatar: gUser.picture || '',
-				email: gUser.email || '',
+				email: googleEmailVerified ? (gUser.email || '') : '',
 				active: 1,
 				trustLevel: 1,
 				silenced: 0
@@ -291,46 +295,51 @@ const oauthService = {
 				username: msEmail ? msEmail.split('@')[0] : `ms_${msUser.id}`,
 				name: msUser.displayName || 'Microsoft User',
 				avatar: '',
-				email: msEmail,
+				// Microsoft Graph does not guarantee that `mail` is verified.
+				// Do not auto-link an existing Epomail account by an unverified
+				// address; the user can still bind after authenticating.
+				email: '',
 				active: 1,
 				trustLevel: 1,
 				silenced: 0
 			};
 		} else if (providerKey === 'apple') {
-			let appleSub = '';
-			let appleEmail = '';
-			if (id_token) {
-				try {
-					const parts = id_token.split('.');
-					if (parts.length >= 2) {
-						const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
-						appleSub = payload.sub;
-						appleEmail = payload.email || '';
-					}
-				} catch (_) {}
-			}
-			if (!appleSub && code && config.clientSecret) {
+			let claims = null;
+
+			if (code && config.clientSecret) {
 				const formBody = new URLSearchParams();
 				formBody.append('client_id', config.clientId);
 				formBody.append('client_secret', config.clientSecret);
 				formBody.append('code', code);
 				formBody.append('grant_type', 'authorization_code');
+				if (callbackUri) formBody.append('redirect_uri', callbackUri);
+
 				const tokenRes = await fetch(meta.tokenUrl, {
 					method: 'POST',
 					headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
 					body: formBody.toString()
 				});
-				if (tokenRes.ok) {
-					const tokenData = await tokenRes.json();
-					if (tokenData.id_token) {
-						const parts = tokenData.id_token.split('.');
-						const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
-						appleSub = payload.sub;
-						appleEmail = payload.email || appleEmail;
-					}
+				if (!tokenRes.ok) {
+					throw new BizError(`Apple token exchange failed: HTTP ${tokenRes.status}`);
 				}
+				const tokenData = await tokenRes.json();
+				if (!tokenData.id_token) {
+					throw new BizError('Apple token exchange did not return an id_token');
+				}
+				claims = await verifyAppleIdToken(c, tokenData.id_token, config.clientId);
+			} else if (id_token) {
+				// Never trust a client-supplied identity token without checking
+				// its RS256 signature, issuer and audience.
+				claims = await verifyAppleIdToken(c, id_token, config.clientId);
+			} else {
+				throw new BizError('Apple authorization requires a code or a verified id_token');
 			}
+
+			const appleSub = claims?.sub;
 			if (!appleSub) throw new BizError('Failed to extract Apple user identity');
+
+			const emailVerified = claims.email_verified === true || claims.email_verified === 'true';
+			const appleEmail = emailVerified ? (claims.email || '') : '';
 
 			userInfo = {
 				oauthUserId: `apple:${appleSub}`,
@@ -380,12 +389,13 @@ const oauthService = {
 			if (!rawId) throw new BizError('Custom user profile missing identifier (sub/id)');
 
 			const email = cUser.email || '';
+			const customEmailVerified = cUser.email_verified === true || cUser.email_verified === 'true';
 			userInfo = {
 				oauthUserId: `custom:${rawId}`,
 				username: cUser.preferred_username || cUser.username || (email ? email.split('@')[0] : `user_${rawId}`),
 				name: cUser.name || cUser.displayName || cUser.username || (config.name || 'SSO User'),
 				avatar: cUser.avatar || cUser.picture || '',
-				email: email,
+				email: customEmailVerified ? email : '',
 				active: 1,
 				trustLevel: 1,
 				silenced: 0
@@ -413,7 +423,16 @@ const oauthService = {
 		}
 
 		if (!userRow) {
-			return { userInfo: oauthRow, token: null };
+			// Prove possession of the completed OAuth flow before allowing an
+			// account to be created/bound. Without this one-time token any
+			// caller could submit a guessed oauthUserId.
+			const bindToken = `${crypto.randomUUID().replace(/-/g, '')}${crypto.randomUUID().replace(/-/g, '')}`;
+			await c.env.kv.put(
+				`oauth_bind:${bindToken}`,
+				JSON.stringify({ oauthUserId: oauthRow.oauthUserId, provider: providerKey, createdAt: Date.now() }),
+				{ expirationTtl: 600 }
+			);
+			return { userInfo: oauthRow, token: null, bindToken };
 		}
 
 		const jwtToken = await loginService.login(c, { email: userRow.email, password: null }, true);
@@ -473,9 +492,26 @@ const oauthService = {
 
 	async bindUser(c, params) {
 
-		const { email, oauthUserId, code } = params;
+		await rateLimit.check(c, { scope: 'oauth-bind', limit: 10, windowSeconds: 900 });
+
+		const { email, oauthUserId, code, bindToken } = params;
+
+		if (!bindToken || typeof bindToken !== 'string') {
+			throw new BizError('Missing OAuth bind proof; restart the OAuth login flow');
+		}
+
+		const bindKey = `oauth_bind:${bindToken}`;
+		const pendingBind = await c.env.kv.get(bindKey, { type: 'json' });
+		if (!pendingBind || pendingBind.oauthUserId !== oauthUserId) {
+			throw new BizError('Invalid or expired OAuth bind proof; restart the OAuth login flow');
+		}
+		// Single use: consume before creating the account.
+		await c.env.kv.delete(bindKey);
 
 		const oauthRow = await this.getById(c, oauthUserId);
+		if (!oauthRow) {
+			throw new BizError('OAuth identity not found');
+		}
 
 		let userRow = await userService.selectByIdIncludeDel(c, oauthRow.userId);
 
@@ -486,14 +522,19 @@ const oauthService = {
 		await loginService.register(c, { email, password: cryptoUtils.genRandomPwd(), code }, true);
 
 		userRow = await userService.selectByEmail(c, email);
+		if (!userRow) {
+			throw new BizError('Failed to create the local account');
+		}
 
-		orm(c).update(oauth).set({ userId: userRow.userId }).where(eq(oauth.oauthUserId, oauthUserId)).run();
+		await orm(c).update(oauth).set({ userId: userRow.userId }).where(eq(oauth.oauthUserId, oauthUserId)).run();
 		const jwtToken = await loginService.login(c, { email, password: null }, true);
 
 		return { userInfo: oauthRow, token: jwtToken}
 	},
 
 	async linuxDoLogin(c, params) {
+
+		await rateLimit.check(c, { scope: 'oauth-login', limit: 30, windowSeconds: 900 });
 
 		const { code } = params;
 
@@ -537,6 +578,10 @@ const oauthService = {
 		userInfo.trustLevel = userInfo.trust_level;
 		userInfo.avatar = userInfo.avatar_url;
 
+		// Never auto-link a local account from an unverified provider email.
+		const linuxEmailVerified = userInfo.email_verified === true || userInfo.email_verified === 'true';
+		if (!linuxEmailVerified) userInfo.email = '';
+
 		const  oauthRow = await this.saveUser(c, userInfo);
 		const userRow = await userService.selectByIdIncludeDel(c, oauthRow.userId);
 
@@ -555,7 +600,17 @@ const oauthService = {
 		if (!userInfoRow) {
 			return await orm(c).insert(oauth).values(userInfo).returning().get();
 		} else {
-			return await orm(c).update(oauth).set(userInfo).where(eq(oauth.oauthUserId, userInfo.oauthUserId)).returning().get();
+			// Providers such as Apple only return the email on the first
+			// authorization. Do not erase an already stored verified address
+			// when a later login omits it.
+			const updatePayload = { ...userInfo };
+			if (!updatePayload.email && userInfoRow.email) {
+				updatePayload.email = userInfoRow.email;
+			}
+			if (!updatePayload.username && userInfoRow.username) {
+				updatePayload.username = userInfoRow.username;
+			}
+			return await orm(c).update(oauth).set(updatePayload).where(eq(oauth.oauthUserId, userInfo.oauthUserId)).returning().get();
 		}
 
 	},

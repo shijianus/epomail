@@ -339,12 +339,11 @@ export async function email(message, env, ctx) {
 									try {
 										const forwardSubject = pfw.addPrefix ? `[Fwd] ${email.subject || emailRow.subject || ''}` : (email.subject || emailRow.subject || '');
 										await emailService.send({ env }, {
-											toEmail: target,
+											receiveEmail: [target],
 											subject: forwardSubject,
 											content: email.html || email.text || emailRow.content || '',
 											text: email.text || emailRow.text || '',
-											accountId: emailRow.accountId,
-											sendEmail: message.to
+											accountId: emailRow.accountId
 										}, emailRow.userId);
 									} catch (sendErr) {
 										console.error(`Personal CC Forwarding to ${target} failed:`, sendErr.message);

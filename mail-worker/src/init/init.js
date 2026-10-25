@@ -3,13 +3,22 @@ import emailUtils from '../utils/email-utils';
 import { emailConst } from "../const/entity-const";
 import { getUserDb, getMailDb } from '../utils/db-accessor';
 import { getDefaultUserLabelsString } from '../const/default-labels';
+import cryptoUtils from '../utils/crypto-utils';
+
+function timingSafeEqual(a, b) {
+	if (typeof a !== 'string' || typeof b !== 'string' || a.length !== b.length) return false;
+	let diff = 0;
+	for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+	return diff === 0;
+}
 
 const dbInit = {
 	async init(c) {
-		const secret = c.req.param('secret');
+		const provided = c.req.header('x-init-secret') || c.req.param('secret') || '';
+		const expected = c.env.init_secret || c.env.jwt_secret;
 
-		if (secret !== c.env.jwt_secret) {
-			return c.text('❌ JWT secret mismatch');
+		if (!expected || !timingSafeEqual(provided, expected)) {
+			return c.text('❌ Forbidden', 403);
 		}
 
 		await this.intDB(c);
@@ -47,6 +56,10 @@ const dbInit = {
 		await this.v3_15DB(c);
 		await this.v3_16DB(c);
 		await settingService.refresh(c);
+		const generatedAdminPassword = c.get('generatedAdminPassword');
+		if (generatedAdminPassword) {
+			return c.text(`success\nInitial admin password: ${generatedAdminPassword}\nChange it immediately after login.`);
+		}
 		return c.text('success');
 	},
 
@@ -412,17 +425,30 @@ const dbInit = {
 				let adminUser = await userDb.prepare(`SELECT user_id FROM user WHERE email = ?`).bind(c.env.admin).first();
 				if (!adminUser) {
 					// 全新部署引导：主站长账号不存在时直接创建（注册端 adminReserved 拦截站长邮箱，无法走注册路径）
-					// 初始密码为预设安全 PBKDF2 哈希的 123456，与演示参观者一致，站长登录后可在「个人设置->安全」修改
+					// 禁止使用固定默认密码。生产环境必须显式提供 admin_initial_password Secret；
+					// 本地开发在缺失时生成一次性随机密码，并仅在初始化响应中回显一次。
 					const masterRoleRow = await userDb.prepare(`SELECT role_id FROM role WHERE role_code = 'master' OR name = '站长' LIMIT 1`).first();
 					const masterRoleId = masterRoleRow ? masterRoleRow.role_id : 1;
-					const defHash = 'pbkdf2:100000:wYbOCP3rv6muivmiYwmd/oXXroIcxp7/VcB02M+Ac5w=';
-					const defSalt = 'ZmUlWbNgsFel3E0oxnPHcA==';
+
+					let initialPassword = (c.env.admin_initial_password || '').trim();
+					let generatedPassword = null;
+					if (!initialPassword || initialPassword.length < 8) {
+						if (c.env.dev || c.env.DEV) {
+							initialPassword = cryptoUtils.genRandomPwd(20);
+							generatedPassword = initialPassword;
+							c.set('generatedAdminPassword', generatedPassword);
+						} else {
+							throw new Error('admin_initial_password Secret is required (min 8 chars) before creating the site owner account');
+						}
+					}
+
+					const { salt, hash } = await cryptoUtils.hashPassword(initialPassword);
 					await userDb.prepare(`
 						INSERT INTO user (email, password, salt, type, status, is_del, create_time, update_time, custom_labels)
 						VALUES (?, ?, ?, ?, 0, 0, datetime('now'), datetime('now'), ?)
-					`).bind(c.env.admin, defHash, defSalt, masterRoleId, getDefaultUserLabelsString()).run();
+					`).bind(c.env.admin, hash, salt, masterRoleId, getDefaultUserLabelsString()).run();
 					adminUser = await userDb.prepare(`SELECT user_id FROM user WHERE email = ?`).bind(c.env.admin).first();
-					console.log(`[init] 已创建主站长账号 ${c.env.admin} (user_id=${adminUser?.user_id})，初始密码 123456，请登录后立即修改`);
+					console.log(`[init] 已创建主站长账号 ${c.env.admin} (user_id=${adminUser?.user_id})，初始凭据已按安全策略生成/注入`);
 				}
 				if (adminUser) {
 					// 若站长账号尚未晋升 master（历史遗留普通账号），此处兜底晋升

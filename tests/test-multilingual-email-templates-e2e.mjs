@@ -13,7 +13,7 @@ const require = createRequire(import.meta.url);
 
 const BASE = process.env.BASE_URL || 'https://epomail.epocanvas.workers.dev';
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@epomail.bond';
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '123456';
+const ADMIN_PASSWORD = process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '';
 
 let passCount = 0;
 function ok(cond, msg) {
@@ -216,14 +216,14 @@ if (process.env.RUN_DELIVERY_TESTS === '1') {
 
     const testEmail = `ml-tpl-${Date.now()}@epomail.bond`;
     const addRes = await (await pageC.request.post(BASE + '/api/user/add', {
-      data: { email: testEmail, password: 'Test123456', lang: 'fr', type: 1 },
+      data: { email: testEmail, password: (process.env.EPOMAIL_E2E_TEST_PASSWORD || ''), lang: 'fr', type: 1 },
       headers: { token: adminToken, Authorization: adminToken, 'Content-Type': 'application/json' }
     })).json();
     ok(addRes.code === 200, `创建测试用户 ${testEmail}`);
 
     // 测试用户登录并设置法语偏好
     const userLogin = await (await pageC.request.post(BASE + '/api/login', {
-      data: { email: testEmail, password: 'Test123456' },
+      data: { email: testEmail, password: (process.env.EPOMAIL_E2E_TEST_PASSWORD || '') },
       headers: { 'Content-Type': 'application/json' }
     })).json();
     const userToken = typeof userLogin.data === 'string' ? userLogin.data : userLogin.data?.token;

@@ -7,6 +7,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { and, asc, desc, eq, sql, like } from 'drizzle-orm';
 import totpUtils from '../utils/totp-utils';
 import cryptoUtils from '../utils/crypto-utils';
+import rateLimit from '../utils/rate-limit.js';
 import emailUtils from '../utils/email-utils';
 import roleService from './role-service';
 import verifyUtils from '../utils/verify-utils';
@@ -106,7 +107,7 @@ const publicService = {
 				throw new BizError(t('notEmailDomain'));
 			}
 
-			const { salt, hash } = await saltHashUtils.hashPassword(
+			const { salt, hash } = await cryptoUtils.hashPassword(
 				emailRow.password || cryptoUtils.genRandomPwd()
 			);
 
@@ -178,6 +179,8 @@ const publicService = {
 	},
 
 	async genToken(c, params) {
+
+		await rateLimit.check(c, { scope: 'public-token', limit: 10, windowSeconds: 900 });
 
 		await this.verifyUser(c, params);
 
@@ -277,7 +280,7 @@ const publicService = {
 			const { userId, token } = result;
 			const authInfo = await c.env.kv.get(KvConst.AUTH_INFO + userId, { type: 'json' });
 
-			if (!authInfo || !authInfo.tokens.includes(token)) {
+			if (!authInfo || !Array.isArray(authInfo.tokens) || !authInfo.tokens.includes(token)) {
 				throw new BizError(t('authExpired'), 401);
 			}
 

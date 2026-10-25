@@ -27,7 +27,7 @@ import assert from "assert";
     // -------------------------------------------------------------------------
     console.log("\n[Phase 1] 正在登录 Epomail 生产环境...");
     const loginRes = await page.request.post(BASE + "/api/login", {
-      data: { email: "admin@epomail.bond", password: "123456" },
+      data: { email: "admin@epomail.bond", password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
       headers: { "Content-Type": "application/json" }
     });
     const loginData = await loginRes.json();

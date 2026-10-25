@@ -29,7 +29,7 @@
         </div>
         <div class="label-pill-cell" style="padding-left: 8px;">
           <div class="label-pill" :style="{ '--pill-color': label.color || 'var(--accent-primary)' }">
-            <div v-if="(label.icon || '').startsWith('<svg')" v-html="label.icon" style="width: 18px; height: 18px; display: inline-flex; justify-content: center; align-items: center; fill: currentColor;"></div>
+            <div v-if="(label.icon || '').startsWith('<svg')" v-html="sanitizeSvgIcon(label.icon)" style="width: 18px; height: 18px; display: inline-flex; justify-content: center; align-items: center; fill: currentColor;"></div>
             <Icon v-else :icon="label.icon || 'ic:baseline-label'" width="18" />
             <span>{{ getLabelDisplayName(label.name || label, t) }}</span>
           </div>
@@ -97,7 +97,7 @@
                   :class="{ active: form.icon === svgStr }"
                   @click="form.icon = svgStr"
                   style="background-color: var(--bg-hover)">
-                  <div v-html="svgStr" style="width: 18px; height: 18px; display: flex; justify-content: center; align-items: center;" :style="{ color: form.icon === svgStr ? form.color : 'var(--text-secondary)', fill: 'currentColor' }"></div>
+                  <div v-html="sanitizeSvgIcon(svgStr)" style="width: 18px; height: 18px; display: flex; justify-content: center; align-items: center;" :style="{ color: form.icon === svgStr ? form.color : 'var(--text-secondary)', fill: 'currentColor' }"></div>
              </div>
              <div class="swatch" v-if="(uiStore.customSvgs || []).length < 5" @click="isSvgModalOpen = true" style="background-color: var(--bg-hover); border: 1px dashed var(--border-mid); cursor: pointer;" :title="$t('addCustomIcon')">
                 <Icon icon="lucide:plus" width="18" color="var(--text-secondary)" />
@@ -396,6 +396,7 @@ import { Icon } from '@iconify/vue'
 import { ElMessage } from 'element-plus'
 import { useI18n } from 'vue-i18n'
 import { getLabelDisplayName } from '@/utils/label-i18n.js'
+import { sanitizeSvgIcon } from '@/utils/sanitize-svg.js'
 
 const { t } = useI18n()
 const uiStore = useUiStore()
@@ -466,8 +467,8 @@ const isSvgModalOpen = ref(false)
 const customSvgInput = ref('')
 
 const saveCustomSvg = () => {
-  const val = customSvgInput.value.trim()
-  if (val.toLowerCase().startsWith('<svg')) {
+  const val = sanitizeSvgIcon(customSvgInput.value.trim())
+  if (val && val.toLowerCase().startsWith('<svg')) {
     if (!uiStore.customSvgs) {
       uiStore.customSvgs = []
     }

@@ -26,6 +26,7 @@ import user from '../entity/user.js';
 import { eq } from 'drizzle-orm';
 import riskService from './risk-service.js';
 import deviceTrustService from './device-trust-service.js';
+import rateLimit from '../utils/rate-limit.js';
 
 function getSafeSessionUser(userRow) {
 	if (!userRow) return null;
@@ -43,20 +44,24 @@ const loginService = {
 
 	async register(c, params, oauth = false) {
 
+		await rateLimit.check(c, { scope: 'register', limit: 20, windowSeconds: 3600 });
+
 		const { email, password, token, code } = params;
 
 		let { regKey, register, registerVerify, regVerifyCount, minEmailPrefix, emailPrefixFilter } = await settingService.query(c)
 
 		if (oauth) {
+			// The provider already verified the identity, so the local captcha
+			// challenge is unnecessary. Registration policy still applies:
+			// closing registration must also block OAuth account creation.
 			registerVerify = settingConst.registerVerify.CLOSE;
-			register = settingConst.register.OPEN;
 		}
 
 		if (register === settingConst.register.CLOSE) {
 			throw new BizError(t('regDisabled'));
 		}
 
-		if (!verifyUtils.isEmail(email)) {
+		if (typeof email !== 'string' || !verifyUtils.isEmail(email)) {
 			throw new BizError(t('notEmail'));
 		}
 
@@ -72,7 +77,7 @@ const loginService = {
 			throw new BizError(t('emailLengthLimit'));
 		}
 
-		if (password.length > 30) {
+		if (typeof password !== 'string' || password.length > 30) {
 			throw new BizError(t('pwdLengthLimit'));
 		}
 
@@ -253,10 +258,13 @@ const loginService = {
 
 	async login(c, params, noVerifyPwd = false) {
 
+		await rateLimit.check(c, { scope: 'login', limit: 30, windowSeconds: 900 });
+
 		const { email, password } = params;
 
-		const inputEmail = (email || '').trim().toLowerCase();
-		if ((!inputEmail || !password) && !noVerifyPwd) {
+		const inputEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
+		const inputPassword = typeof password === 'string' ? password : '';
+		if ((!inputEmail || !inputPassword) && !noVerifyPwd) {
 			throw new BizError(t('emailAndPwdEmpty'));
 		}
 
@@ -315,11 +323,18 @@ const loginService = {
 
 		if (!userRow) {
 			await incrementFail();
-			throw new BizError(t('notExistUser'));
+			// Perform a comparable PBKDF2 derivation so the response time does
+			// not reveal whether the account exists.
+			try {
+				await cryptoUtils.genHashPassword(inputPassword, 'epomail-timing-equalization-salt');
+			} catch (_) {}
+			throw new BizError(t('IncorrectPwd'));
 		}
 
 		if (userRow.isDel === isDel.DELETE) {
-			throw new BizError(t('isDelUser'));
+			// Same generic message as a wrong password to avoid account
+			// enumeration via the login endpoint.
+			throw new BizError(t('IncorrectPwd'));
 		}
 
 		if (userRow.status === userConst.status.BAN) {
@@ -328,7 +343,7 @@ const loginService = {
 
 		let isLegacy = false;
 		if (!noVerifyPwd) {
-			const checkResult = await cryptoUtils.verifyPasswordWithUpgrade(password, userRow.salt, userRow.password);
+			const checkResult = await cryptoUtils.verifyPasswordWithUpgrade(inputPassword, userRow.salt, userRow.password);
 			if (!checkResult.isValid) {
 				await incrementFail();
 				throw new BizError(t('IncorrectPwd'));
@@ -400,7 +415,7 @@ const loginService = {
 						email: userRow.email,
 						attempts: 0,
 						passkeyChallenge,
-						needsPasswordUpgrade: isLegacy ? password : null,
+						needsPasswordUpgrade: isLegacy ? inputPassword : null,
 						stepUpRequired: riskAssessment.stepUpRequired,
 						riskScore: riskAssessment.riskScore,
 						step: 1,
@@ -437,8 +452,8 @@ const loginService = {
 		}
 
 		// If legacy single-round SHA-256 hash was detected, upgrade to PBKDF2 lazily
-		if (isLegacy && password) {
-			await this.lazyMigratePassword(c, userRow.userId, password);
+		if (isLegacy && inputPassword) {
+			await this.lazyMigratePassword(c, userRow.userId, inputPassword);
 		}
 
 		const activeLoginEmail = inputEmail.includes('@') ? inputEmail : userRow.email;
@@ -497,6 +512,8 @@ const loginService = {
 	},
 
 	async verifyTotpLogin(c, params) {
+		await rateLimit.check(c, { scope: 'login-totp', limit: 30, windowSeconds: 900 });
+
 		const {
 			tempToken,
 			code,

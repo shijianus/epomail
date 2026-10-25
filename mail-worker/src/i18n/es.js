@@ -1797,6 +1797,8 @@ const es = {
     IncorrectPwd: 'Correo o contraseña incorrectos',
     accountLimit: 'Se alcanzó el límite de buzones de tu rol actual',
     accountLocked: 'Cuenta bloqueada temporalmente por demasiados intentos fallidos',
+
+    tooManyRequests: 'Demasiadas solicitudes, inténtalo de nuevo más tarde',
     addAccountDisabled: 'Agregar buzones está actualmente deshabilitado',
     adminReserved: 'Este nombre de usuario está reservado para el administrador del sitio',
     attLimit: 'Demasiados adjuntos en un solo correo',

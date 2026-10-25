@@ -60,7 +60,7 @@ app.put('/user/resetSendCount', async (c) => {
 });
 
 app.put('/user/restore', async (c) => {
-	await userService.restore(c, await c.req.json());
+	await userService.restore(c, await c.req.json(), userContext.getUserId(c));
 	return c.json(result.ok());
 });
 

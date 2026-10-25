@@ -1,7 +1,14 @@
+import { normalizeObjectKey } from '../utils/object-key-utils.js';
+import { safeObjectHeaders } from '../utils/object-response.js';
+
 const kvObjService = {
 
 	async putObj(c, key, content, metadata) {
-		await c.env.kv.put(key, content, { metadata: metadata });
+		const safeKey = normalizeObjectKey(key);
+		if (!safeKey) {
+			throw new Error('Invalid storage object key');
+		}
+		await c.env.kv.put(safeKey, content, { metadata: metadata });
 	},
 
 	async deleteObj(c, keys) {
@@ -14,37 +21,30 @@ const kvObjService = {
 			return;
 		}
 
-		await Promise.all(keys.map( key => c.env.kv.delete(key)));
+		await Promise.all(keys.map(key => {
+			const safeKey = normalizeObjectKey(key);
+			return safeKey ? c.env.kv.delete(safeKey) : null;
+		}));
 	},
 
 	async getObj(c, key) {
-		const obj = await c.env.kv.getWithMetadata(key, { type: "arrayBuffer"});
+		const safeKey = normalizeObjectKey(key);
+		if (!safeKey) {
+			return null;
+		}
+
+		const obj = await c.env.kv.getWithMetadata(safeKey, { type: "arrayBuffer"});
 		if (!obj.value) {
 			return null;
 		}
 
 		const rawType = (obj.metadata?.contentType || '').toLowerCase().trim();
-		const SAFE_INLINE_IMAGE_TYPES = [
-			'image/png', 'image/jpeg', 'image/jpg', 'image/gif',
-			'image/webp', 'image/avif', 'image/bmp', 'image/x-icon'
-		];
-
-		let finalType = 'application/octet-stream';
-		let finalDisposition = 'attachment';
-
-		if (SAFE_INLINE_IMAGE_TYPES.includes(rawType)) {
-			finalType = rawType;
-			finalDisposition = obj.metadata?.contentDisposition?.startsWith('inline') ? 'inline' : 'attachment';
-		}
-
 		return new Response(obj.value, {
-			headers: {
-				'Content-Type': finalType,
-				'Content-Disposition': finalDisposition,
-				'Cache-Control': obj.metadata?.cacheControl || 'public, max-age=86400',
-				'X-Content-Type-Options': 'nosniff',
-				'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; sandbox"
-			}
+			headers: safeObjectHeaders({
+				contentType: rawType,
+				contentDisposition: obj.metadata?.contentDisposition,
+				cacheControl: obj.metadata?.cacheControl
+			})
 		});
 	},
 

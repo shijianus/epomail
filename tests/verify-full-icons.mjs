@@ -26,7 +26,7 @@ async function verify() {
   // 1. 登录
   console.log("\n[步骤 1] 登录 Admin 账号...");
   const loginRes = await page.request.post(`${BASE_URL}/api/login`, {
-    data: { email: "admin@epomail.bond", password: "123456" },
+    data: { email: "admin@epomail.bond", password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
     headers: { "Content-Type": "application/json" }
   });
   const loginData = await loginRes.json();

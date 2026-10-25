@@ -2,7 +2,17 @@
 # 复制本文件为 .dev.vars 并填入真实值 (.dev.vars 已被 .gitignore 排除，不会提交到仓库)
 # wrangler dev 会自动加载 .dev.vars 中的变量注入 env.*
 #
-# JWT 签名密钥 (任意强随机字符串；同时也是 /init/<secret> 初始化门禁的值)
+# JWT 签名密钥 (任意强随机字符串；同时也是 /init/<secret> 初始化门禁的默认值)
 jwt_secret=<your-strong-random-secret>
 # TOTP 两步验证密钥加密主键 (建议 32 字节以上强随机字符串)
 totp_enc_key=<your-strong-random-totp-master-key>
+# 首次 /init 创建站长账号时使用；生产环境必须设置，禁用 123456 等默认口令
+admin_initial_password=<your-strong-initial-admin-password>
+# 可选的独立初始化门禁密钥；不设置时回退到 jwt_secret。建议生产单独设置。
+init_secret=<your-strong-init-secret>
+# Resend / Svix Webhook 验签密钥（必须与 Resend Dashboard 中一致）
+resend_webhook_secret=<whsec_your_webhook_signing_secret>
+# 可选：允许跨域访问 API 的前端源（逗号分隔）。未设置时仅允许同源。
+CORS_ORIGINS=
+# 可选：邮件静态加密主键；不设置时回退到 totp_enc_key
+email_enc_key=<your-optional-email-encryption-key>

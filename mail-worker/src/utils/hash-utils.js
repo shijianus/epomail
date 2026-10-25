@@ -28,7 +28,10 @@ function base64UrlToBuffer(str) {
 }
 
 async function getHmacKey(secret) {
-  const cleanSecret = (secret || 'epomail-default-hash-secret-key').trim();
+  const cleanSecret = typeof secret === 'string' ? secret.trim() : '';
+  if (!cleanSecret) {
+    throw new Error('jwt_secret is not configured; refusing to derive email hash key');
+  }
   return await crypto.subtle.importKey(
     'raw',
     encoder.encode(cleanSecret),

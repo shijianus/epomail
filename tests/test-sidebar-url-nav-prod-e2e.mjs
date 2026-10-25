@@ -4,7 +4,7 @@ import assert from 'assert';
 const PRIMARY_BASE = 'https://mail.epocanvas.com';
 const FALLBACK_BASE = 'https://epomail.epocanvas.workers.dev';
 const USER_EMAIL = 'audit_normal_1789140856529@epomail.bond';
-const USER_PWD = 'Audit123!';
+const USER_PWD = process.env.EPOMAIL_E2E_USER_PASSWORD || '';
 
 let pass = 0, fail = 0;
 const failures = [];

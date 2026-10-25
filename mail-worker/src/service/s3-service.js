@@ -18,6 +18,9 @@ const s3Service = {
 
 		const region = cfg.region || 'auto';
 		const endpoint = s3Signer.normalizeEndpoint(cfg.endpoint);
+		if (!isSafePublicUrl(endpoint)) {
+			throw new Error('存储 Endpoint 不合法或属于受限内网地址 / Unsafe storage endpoint');
+		}
 		const forcePathStyle = cfg.forcePathStyle === settingConst.forcePathStyle.OPEN || cfg.forcePathStyle === 1 || cfg.forcePathStyle === true;
 		const accessKeyId = cfg.s3AccessKey || cfg.accessKeyId || cfg.accessKey || '';
 		const secretAccessKey = cfg.s3SecretKey || cfg.secretAccessKey || cfg.secretKey || '';
@@ -129,6 +132,9 @@ const s3Service = {
 		const cfg = customConfig || (await settingService.query(c));
 		const bucket = cfg.bucket;
 		const endpoint = cfg.endpoint;
+		if (!isSafePublicUrl(s3Signer.normalizeEndpoint(endpoint))) {
+			throw new Error('存储 Endpoint 不合法或属于受限内网地址 / Unsafe storage endpoint');
+		}
 		const region = cfg.region || 'auto';
 		const accessKeyId = cfg.s3AccessKey || cfg.accessKeyId || cfg.accessKey;
 		const secretAccessKey = cfg.s3SecretKey || cfg.secretAccessKey || cfg.secretKey;

@@ -11,6 +11,8 @@ import verifyUtils from '../utils/verify-utils';
 import { t } from '../i18n/i18n.js';
 import emailUtils from '../utils/email-utils';
 import { getUserDb } from '../utils/db-accessor';
+import rbacGuard from './rbac-guard-service.js';
+import { isAdminUser } from '../utils/admin-utils';
 
 const roleService = {
 
@@ -224,10 +226,27 @@ const roleService = {
 	},
 
 	async add(c, params, userId) {
-		let { name, permIds = [], banEmail = [], availDomain = [], storageQuotaMb = 5, allowAttachment = 0, roleCode = 'custom', tagText = '', tagColor = '', aiModels = [] } = params;
+		let { name, permIds = [], banEmail = [], availDomain = [], storageQuotaMb = 5, allowAttachment = 0, tagText = '', tagColor = '', aiModels = [] } = params;
+		let { roleCode = 'custom', key = '', description = null, banEmailType = 0, sort = 0, sendCount = null, sendType = 'count', accountCount = null } = params;
+
+		permIds = Array.isArray(permIds) ? permIds : [];
+		banEmail = Array.isArray(banEmail) ? banEmail : [];
+		availDomain = Array.isArray(availDomain) ? availDomain : [];
 
 		if (!name) {
 			throw new BizError(t('emptyRoleName'));
+		}
+
+		const caller = await rbacGuard.assertCanGrantPermIds(c, userId, permIds);
+
+		if (['master', 'visitor'].includes(roleCode) || ['master', 'visitor'].includes(key) || ['站长', '参观者'].includes(name)) {
+			throw new BizError('系统保留角色代码/名称不可自建', 403);
+		}
+
+		// Non-admins may only create generic custom roles. This prevents a
+		// crafted roleCode/key from impersonating a system role in later checks.
+		if (!isAdminUser(c, caller)) {
+			roleCode = 'custom';
 		}
 
 		let roleRow = await orm(c).select().from(role).where(eq(role.name, name)).get();
@@ -245,10 +264,17 @@ const roleService = {
 		const aiModelsStr = Array.isArray(aiModels) ? aiModels.join(',') : (typeof aiModels === 'string' ? aiModels : '');
 
 		roleRow = await orm(c).insert(role).values({
-			...params,
-			isDefault: roleConst.isDefault.CLOSE,
+			name,
+			key: (typeof key === 'string' && key.trim()) ? key.trim().slice(0, 50) : roleCode,
+			description: typeof description === 'string' ? description.slice(0, 500) : null,
 			banEmail,
+			banEmailType: Number(banEmailType) || 0,
 			availDomain,
+			sort: Number(sort) || 0,
+			isDefault: roleConst.isDefault.CLOSE,
+			sendCount: sendCount === null || sendCount === undefined ? null : Number(sendCount),
+			sendType: typeof sendType === 'string' ? sendType : 'count',
+			accountCount: accountCount === null || accountCount === undefined ? null : Number(accountCount),
 			userId,
 			storageQuotaMb: Number(storageQuotaMb || 0),
 			allowAttachment: Number(allowAttachment || 0),
@@ -291,25 +317,48 @@ const roleService = {
 
 	async setRole(c, params, callerUserId) {
 		let { name, permIds = [], roleId, banEmail = [], availDomain = [], storageQuotaMb = 5, allowAttachment = 0, roleCode = 'custom', tagText = '', tagColor = '', aiModels = [] } = params;
+		let { key, description = null, banEmailType = 0, sort = 0, sendCount = null, sendType = 'count', accountCount = null } = params;
+
+		permIds = Array.isArray(permIds) ? permIds : [];
+		banEmail = Array.isArray(banEmail) ? banEmail : [];
+		availDomain = Array.isArray(availDomain) ? availDomain : [];
 
 		if (!name) {
 			throw new BizError(t('emptyRoleName'));
 		}
 
-		delete params.isDefault;
+		const targetRole = await this.selectById(c, roleId);
+		if (!targetRole) {
+			throw new BizError(t('notExist'));
+		}
 
-		if (callerUserId) {
-			const caller = await userService.selectById(c, callerUserId);
-			if (caller) {
-				if (caller.email !== c.env.admin) {
-					if (caller.type === Number(roleId)) {
-						throw new BizError('协管者/管理员无权修改自身所在分组的权限配置！', 403);
-					}
-					const targetRole = await this.selectById(c, roleId);
-					if (targetRole?.roleCode === 'master') {
-						throw new BizError('无权修改站长分组权限！', 403);
-					}
-				}
+		const caller = await rbacGuard.assertCanGrantPermIds(c, callerUserId, permIds);
+		const callerIsAdmin = isAdminUser(c, caller);
+
+		if (!callerIsAdmin) {
+			if (Number(caller.type) === Number(roleId)) {
+				throw new BizError('协管者/管理员无权修改自身所在分组的权限配置！', 403);
+			}
+			if (targetRole.roleCode === 'master' || targetRole.key === 'master') {
+				throw new BizError('无权修改站长分组权限！', 403);
+			}
+			if (['master', 'visitor'].includes(roleCode) || ['master', 'visitor'].includes(key)) {
+				throw new BizError('系统保留角色代码不可自建', 403);
+			}
+			// A non-admin cannot rename the system role code/key.
+			roleCode = targetRole.roleCode || 'custom';
+		} else {
+			if (['master', 'visitor'].includes(roleCode) && roleCode !== targetRole.roleCode) {
+				throw new BizError('系统保留角色代码不可自建', 403);
+			}
+			if (targetRole.roleCode === 'master' && roleCode !== 'master') {
+				throw new BizError('站长分组角色代码不可变更', 403);
+			}
+			if (targetRole.roleCode === 'visitor' && roleCode !== 'visitor') {
+				throw new BizError('参观者分组角色代码不可变更', 403);
+			}
+			if (['master', 'visitor'].includes(key) && key !== targetRole.key) {
+				throw new BizError('系统保留角色代码不可自建', 403);
 			}
 		}
 
@@ -322,20 +371,29 @@ const roleService = {
 		availDomain = availDomain.join(',');
 		const aiModelsStr = Array.isArray(aiModels) ? aiModels.join(',') : (typeof aiModels === 'string' ? aiModels : '');
 
-		await orm(c).update(role).set({
-			...params,
+		const updatePayload = {
+			name,
+			key: (typeof key === 'string' && key.trim()) ? key.trim().slice(0, 50) : targetRole.key,
+			description: typeof description === 'string' ? description.slice(0, 500) : targetRole.description,
 			banEmail,
+			banEmailType: Number(banEmailType) || 0,
 			availDomain,
+			sort: Number(sort) || 0,
+			sendCount: sendCount === null || sendCount === undefined ? null : Number(sendCount),
+			sendType: typeof sendType === 'string' ? sendType : 'count',
+			accountCount: accountCount === null || accountCount === undefined ? null : Number(accountCount),
 			storageQuotaMb: Number(storageQuotaMb || 0),
 			allowAttachment: Number(allowAttachment || 0),
 			roleCode: roleCode || 'custom',
 			tagText: tagText || '',
 			tagColor: tagColor || '',
 			aiModels: aiModelsStr
-		}).where(eq(role.roleId, roleId)).run();
+		};
 
-		const targetRole = await this.selectById(c, roleId);
-		if (targetRole?.roleCode === 'visitor' || targetRole?.key === 'visitor' || targetRole?.name === '参观者') {
+		await orm(c).update(role).set(updatePayload).where(eq(role.roleId, roleId)).run();
+
+		const updatedRole = await this.selectById(c, roleId);
+		if (updatedRole?.roleCode === 'visitor' || updatedRole?.key === 'visitor' || updatedRole?.name === '参观者') {
 			// 参观者严格禁止查看"用户列表" (user:query)
 			const userDb = getUserDb(c);
 			const userQueryPerm = await userDb.prepare(`SELECT perm_id FROM perm WHERE perm_key = 'user:query' LIMIT 1`).first();
@@ -369,12 +427,7 @@ const roleService = {
 		}
 
 		if (callerUserId) {
-			const caller = await userService.selectById(c, callerUserId);
-			if (caller) {
-				if (caller.email !== c.env.admin && caller.type === Number(roleId)) {
-					throw new BizError('协管者/管理员无权删除自身所在分组！', 403);
-				}
-			}
+			await rbacGuard.assertCanAssignRole(c, callerUserId, Number(roleId));
 		}
 
 		const defRoleRow = await orm(c).select().from(role).where(eq(role.isDefault, roleConst.isDefault.OPEN)).get();
@@ -392,10 +445,15 @@ const roleService = {
 		return await orm(c).select().from(role).where(eq(role.isDefault, roleConst.isDefault.OPEN)).get();
 	},
 
-	async setDefault(c, params) {
+	async setDefault(c, params, callerUserId) {
+		await rbacGuard.assertAdmin(c, callerUserId);
+
 		const roleRow = await orm(c).select().from(role).where(eq(role.roleId, params.roleId)).get();
 		if (!roleRow) {
 			throw new BizError(t('roleNotExist'));
+		}
+		if (roleRow.roleCode === 'master' || roleRow.key === 'master') {
+			throw new BizError('站长分组不可设为默认注册角色', 403);
 		}
 		await orm(c).update(role).set({ isDefault: 0 }).run();
 		await orm(c).update(role).set({ isDefault: 1 }).where(eq(role.roleId, params.roleId)).run();

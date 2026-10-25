@@ -4,7 +4,7 @@ import { execSync } from 'node:child_process';
 
 const BASE = 'https://mail.epocanvas.com';
 const ADMIN_EMAIL = 'admin@epomail.bond';
-const ADMIN_PWD = '123456';
+const ADMIN_PWD = process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '';
 
 async function fetchWithRetry(url, options, retries = 3, delay = 1000) {
   for (let i = 0; i < retries; i++) {

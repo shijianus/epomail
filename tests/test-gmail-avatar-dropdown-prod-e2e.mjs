@@ -3,7 +3,7 @@ import assert from 'assert';
 
 const BASE = process.env.TARGET_URL || 'https://mail.epocanvas.com';
 const USER_EMAIL = 'audit_normal_1789140856529@epomail.bond';
-const USER_PWD = 'Audit123!';
+const USER_PWD = process.env.EPOMAIL_E2E_USER_PASSWORD || '';
 
 let pass = 0, fail = 0;
 const failures = [];

@@ -1,11 +1,83 @@
+const IMAGE_EXTENSION_BY_MIME = {
+	'image/png': '.png',
+	'image/jpeg': '.jpg',
+	'image/gif': '.gif',
+	'image/webp': '.webp',
+	'image/bmp': '.bmp',
+	'image/x-icon': '.ico',
+	'image/avif': '.avif'
+};
+
+function sanitizeFilename(filename, fallback = 'file') {
+	let name = typeof filename === 'string' ? filename : '';
+	// Strip any path component, control characters and header delimiters.
+	name = name.replace(/\\/g, '/').split('/').pop() || '';
+	name = name.replace(/[\u0000-\u001f\u007f"<>|]/g, '').trim();
+	if (!name || name === '.' || name === '..') name = fallback;
+	if (name.length > 200) {
+		const dot = name.lastIndexOf('.');
+		const ext = dot > 0 ? name.slice(dot, dot + 11) : '';
+		name = name.slice(0, 200 - ext.length) + ext;
+	}
+	return name;
+}
+
+const DANGEROUS_EXTENSIONS = new Set(['.html', '.htm', '.xhtml', '.svg', '.xml', '.js', '.mjs', '.cjs', '.script']);
+
+function getSafeExtension(filename) {
+	const name = sanitizeFilename(filename, '');
+	const dot = name.lastIndexOf('.');
+	if (dot <= 0) return '';
+	const ext = name.slice(dot);
+	if (!/^\.[A-Za-z0-9]{1,10}$/.test(ext)) return '';
+	const lower = ext.toLowerCase();
+	return DANGEROUS_EXTENSIONS.has(lower) ? '' : lower;
+}
+
+function encodeContentDisposition(filename, disposition = 'attachment') {
+	const safe = sanitizeFilename(filename);
+	const ascii = safe.replace(/[^\x20-\x7e]/g, '_').replace(/["\\]/g, '_');
+	const encoded = encodeURIComponent(safe).replace(/[!'()*]/g, c => '%' + c.charCodeAt(0).toString(16).toUpperCase());
+	return `${disposition}; filename="${ascii}"; filename*=UTF-8''${encoded}`;
+}
+
+function detectImageMime(bytes) {
+	if (!bytes || bytes.byteLength < 12) return null;
+	const b = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+
+	if (b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47 && b[4] === 0x0d && b[5] === 0x0a && b[6] === 0x1a && b[7] === 0x0a) {
+		return 'image/png';
+	}
+	if (b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) {
+		return 'image/jpeg';
+	}
+	if (b[0] === 0x47 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x38) {
+		return 'image/gif';
+	}
+	if (b[0] === 0x42 && b[1] === 0x4d) {
+		return 'image/bmp';
+	}
+	if (b[0] === 0x00 && b[1] === 0x00 && b[2] === 0x01 && b[3] === 0x00) {
+		return 'image/x-icon';
+	}
+	if (b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46 && b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50) {
+		return 'image/webp';
+	}
+	if (b[4] === 0x66 && b[5] === 0x74 && b[6] === 0x79 && b[7] === 0x70) {
+		const brand = String.fromCharCode(b[8], b[9], b[10], b[11]);
+		if (brand === 'avif' || brand === 'avis') return 'image/avif';
+	}
+	return null;
+}
+
 const fileUtils = {
+	sanitizeFilename,
+	getSafeExtension,
+	encodeContentDisposition,
+	detectImageMime,
+
 	getExtFileName(filename) {
-		try {
-			const index = filename.lastIndexOf('.');
-			return index !== -1 ? filename.slice(index) : '';
-		} catch (e) {
-			return ''
-		}
+		return getSafeExtension(filename);
 	},
 
 	async getBuffHash(buff) {
@@ -59,11 +131,14 @@ const fileUtils = {
 
 		const blob = new Blob(byteArrays, { type: mimeType });
 
-		const filename = `${customFilename || `${type}_${Date.now()}`}.${ext}`;
+		const filename = sanitizeFilename(`${customFilename || `${type}_${Date.now()}`}.${ext}`);
 		return new File([blob], filename, { type: mimeType });
+	},
+
+	imageExtensionForMime(mimeType) {
+		return IMAGE_EXTENSION_BY_MIME[String(mimeType || '').toLowerCase()] || '';
 	}
 };
 
 
 export default fileUtils;
-

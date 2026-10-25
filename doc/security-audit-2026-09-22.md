@@ -303,7 +303,7 @@ $ git branch -a --contains 0d01966
 $ git ls-files --error-unmatch mail-worker/worker-configuration.d.ts   → TRACKED
 $ git check-ignore -v mail-worker/wrangler-action.toml                → 无命中（未忽略）
 $ git show HEAD:mail-worker/worker-configuration.d.ts
-  16:  jwt_secret: "123456";
+  16:  jwt_secret: "<REDACTED-WEAK-6-CHAR-VALUE>";
   17:  totp_enc_key: "local-dev-totp-enc-key-NOT-FOR-PROD";
   15:  admin: "admin@epomail.bond";
 ```

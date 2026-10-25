@@ -2,13 +2,18 @@ import totpUtils from '../src/utils/totp-utils.js';
 import saltHashUtils from '../src/utils/crypto-utils.js';
 import totpService from '../src/service/totp-service.js';
 import loginService from '../src/service/login-service.js';
+import userService from '../src/service/user-service.js';
 import userContext from '../src/security/user-context.js';
 import KvConst from '../src/const/kv-const.js';
 import constant from '../src/const/constant.js';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import assert from 'node:assert';
 
 describe('TOTP Backend Fixes & Security Audit Tests', () => {
+
+	afterEach(() => {
+		vi.restoreAllMocks();
+	});
 
 	it('1. getEncryptionKey throws explicit error when totp_enc_key is missing without fallback', async () => {
 		await expect(totpUtils.getEncryptionKey({})).rejects.toThrow('totp_enc_key is not configured');
@@ -90,6 +95,19 @@ describe('TOTP Backend Fixes & Security Audit Tests', () => {
 			return expectedCurrentToken;
 		});
 
+		// This unit test focuses on KV/session bookkeeping; the D1 update is
+		// covered by the integration suite.
+		vi.spyOn(userService, 'updateTotpState').mockResolvedValue();
+		vi.spyOn(userService, 'selectById').mockResolvedValue({
+			...mockUser,
+			totpEnabled: 1,
+			securityKeys: '[]',
+			totpBackupCodes: JSON.stringify({
+				hashedCodes: Array.from({ length: 10 }, () => ({ used: 0 })),
+				encryptedRaw: ''
+			})
+		});
+
 		// Setup initial AUTH_INFO in KV with multiple existing tokens
 		await mockKv.put(KvConst.AUTH_INFO + testUserId, JSON.stringify({
 			tokens: ['old-session-1', 'old-session-2', expectedCurrentToken],
@@ -121,7 +139,9 @@ describe('TOTP Backend Fixes & Security Audit Tests', () => {
 		// Step C: Logout removes the token from KV AUTH_INFO.tokens
 		await loginService.logout(mockContext, testUserId);
 		const authInfoAfterLogout = await mockKv.get(KvConst.AUTH_INFO + testUserId, { type: 'json' });
-		expect(authInfoAfterLogout.tokens.length).toBe(0);
+		// Logout deletes the whole AUTH_INFO record when the last session is
+		// removed; an empty token array is also acceptable.
+		expect(authInfoAfterLogout === null || authInfoAfterLogout.tokens.length === 0).toBe(true);
 	});
 
 	it('4. verifyTotpLogin enforces account-level fail lockout across multiple tempTokens', async () => {
@@ -159,6 +179,18 @@ describe('TOTP Backend Fixes & Security Audit Tests', () => {
 			get: (key) => key === 'user' ? { userId: testUserId, email: lockedEmail } : null,
 			set: () => {}
 		};
+
+		const encryptedTotpSecret = await totpUtils.encryptSecret('JBSWY3DPEE', mockContext.env);
+		vi.spyOn(userService, 'selectById').mockResolvedValue({
+			userId: testUserId,
+			email: lockedEmail,
+			status: 0,
+			isDel: 0,
+			totpEnabled: 1,
+			totpSecret: encryptedTotpSecret,
+			totpBackupCodes: '[]',
+			securityKeys: '[]'
+		});
 
 		const tempToken1 = 'totp_tmp_lockout_test_1';
 		await mockKv.put(KvConst.TOTP_PENDING + tempToken1, JSON.stringify({

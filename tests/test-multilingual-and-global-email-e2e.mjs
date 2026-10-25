@@ -25,7 +25,7 @@ import assert from 'assert';
     // Step 1: 登录管理账户
     console.log('\n[Checkpoint 1] 正在登录管理账户...');
     const loginRes = await page.request.post(BASE + '/api/login', {
-      data: { email: 'admin@epomail.bond', password: '123456' },
+      data: { email: 'admin@epomail.bond', password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
       headers: { 'Content-Type': 'application/json' }
     });
     const loginJson = await loginRes.json();

@@ -12,7 +12,7 @@ import assert from "node:assert";
   let testRoleId = null;
   let testRoleName = `E2E_Auditor_${Date.now()}`;
   let testUserEmail = `auditor_${Date.now()}@epomail.bond`;
-  let testUserPassword = "Password123!";
+  let testUserPassword = process.env.EPOMAIL_E2E_TEST_PASSWORD || '';
   let testUserId = null;
 
   try {
@@ -21,7 +21,7 @@ import assert from "node:assert";
     // --------------------------------------------------------------------------------------
     console.log("\n[步骤 1] 登录 Admin 账号...");
     const loginRes = await page.request.post(BASE + "/api/login", {
-      data: { email: "admin@epomail.bond", password: "123456" },
+      data: { email: "admin@epomail.bond", password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
       headers: { "Content-Type": "application/json" }
     });
     const loginJson = await loginRes.json();

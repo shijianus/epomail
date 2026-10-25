@@ -16,6 +16,7 @@ import { SECURITY_EVENT_TYPES } from '../const/security-notice-templates.js';
 import { t } from '../i18n/i18n.js';
 import { Resend } from 'resend';
 import { v4 as uuidv4 } from 'uuid';
+import rbacGuard from './rbac-guard-service.js';
 
 const totpService = {
 	/**
@@ -80,13 +81,13 @@ const totpService = {
 			encryptedRaw
 		});
 
-		await orm(c).update(user).set({
+		await userService.updateTotpState(c, userId, {
 			totpEnabled: 1,
 			totpSecret: encryptedSecret,
 			totpKeyVersion: 1,
 			totpBackupCodes: backupPayload,
 			totpCreatedAt: now
-		}).where(eq(user.userId, userId)).run();
+		});
 
 		// Session revocation: except current session, invalidate all other sessions
 		const currentToken = await userContext.getToken(c);
@@ -983,6 +984,8 @@ const totpService = {
 		if (targetUserId === 1 && Number(adminUserId) !== 1) {
 			throw new BizError('无权重置站长二步验证！', 403);
 		}
+
+		await rbacGuard.assertCanManageUser(c, adminUserId, targetUserId);
 
 		const now = new Date().toISOString();
 

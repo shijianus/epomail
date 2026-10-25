@@ -1,4 +1,9 @@
 {
+  "scripts": {
+    "security:scan": "node scripts/secret-scan.mjs",
+    "security:scan:history": "node scripts/secret-scan.mjs --history --baseline .secret-scan-baseline.json",
+    "test:worker": "npm --prefix mail-worker run test:unit"
+  },
   "devDependencies": {
     "playwright": "^1.63.0"
   }

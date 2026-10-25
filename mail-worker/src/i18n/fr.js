@@ -1797,6 +1797,8 @@ const fr = {
     IncorrectPwd: 'E-mail ou mot de passe incorrect',
     accountLimit: 'La limite de boîtes mail de votre rôle actuel est atteinte',
     accountLocked: 'Compte temporairement verrouillé après trop de tentatives échouées',
+
+    tooManyRequests: 'Trop de requêtes, veuillez réessayer plus tard',
     addAccountDisabled: 'L’ajout de boîtes mail est actuellement désactivé',
     adminReserved: 'Ce nom d’utilisateur est réservé à l’administrateur du site',
     attLimit: 'Trop de pièces jointes dans un seul e-mail',

@@ -70,7 +70,7 @@ const BASE_URL = 'https://epomail.epocanvas.workers.dev';
 
   await emailInput.waitFor({ state: 'visible', timeout: 5000 });
   await emailInput.fill('admin@epomail.bond');
-  await pwdInput.fill('123456');
+  await pwdInput.fill(process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '');
 
   console.log('提交登录表单...');
   await submitBtn.click();

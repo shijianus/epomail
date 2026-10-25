@@ -4,7 +4,7 @@ import { chromium } from 'playwright';
 
 const BASE_URL = process.env.TARGET_URL || 'https://mail.epocanvas.com';
 const USER_EMAIL = 'audit_normal_1789140856529@epomail.bond';
-const USER_PWD = 'Audit123!';
+const USER_PWD = process.env.EPOMAIL_E2E_USER_PASSWORD || '';
 
 console.log('========================================================================');
 console.log('=== 公网生产环境端到端验证：Passkey 写入、本地设备扫描与生命周期管理 ===');

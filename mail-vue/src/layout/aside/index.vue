@@ -94,7 +94,7 @@
           <template v-for="(label, idx) in uiStore.allLabels" :key="'lbl-'+idx">
             <div class="nav-item" role="button" tabindex="0" v-if="label.listVis !== false" :title="getLabelDisplayName(label.name || label, t)" @click="handleLabelClick(label)" :class="isLabelActive(label) ? 'active' : ''">
               <span class="nav-ic-wrap">
-                <div v-if="(label.icon || '').startsWith('<svg')" v-html="label.icon" style="width: 20px; height: 20px; display: inline-flex; justify-content: center; align-items: center; fill: currentColor;" :style="{ color: label.color || 'inherit' }"></div>
+                <div v-if="(label.icon || '').startsWith('<svg')" v-html="sanitizeSvgIcon(label.icon)" style="width: 20px; height: 20px; display: inline-flex; justify-content: center; align-items: center; fill: currentColor;" :style="{ color: label.color || 'inherit' }"></div>
                 <Icon v-else :icon="label.icon || 'ic:baseline-label'" width="20" height="20" :style="{ color: label.color || 'inherit' }" />
                 <template v-if="['推销', '推銷', 'Promotions', 'promotions'].includes(label.name || label)">
                   <div class="sidebar-gray-dot" v-if="getLabelStats(label.name).unread > 0 || getLabelStats(label.name).read > 0"></div>
@@ -142,6 +142,7 @@ import { ElMessage } from 'element-plus';
 import { computed, ref, onMounted, onBeforeUnmount } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { getLabelDisplayName } from '@/utils/label-i18n.js';
+import { sanitizeSvgIcon } from '@/utils/sanitize-svg.js';
 
 const { t } = useI18n();
 const settingStore = useSettingStore();

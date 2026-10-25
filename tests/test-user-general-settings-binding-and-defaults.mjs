@@ -11,12 +11,12 @@ import assert from "node:assert";
   let adminToken = null;
   const timestamp = Date.now();
   const userAEmail = `user_a_${timestamp}@epomail.bond`;
-  const userAPassword = "Password123!";
+  const userAPassword = process.env.EPOMAIL_E2E_TEST_PASSWORD || '';
   let userAId = null;
   let userAToken = null;
 
   const userBEmail = `user_b_${timestamp}@epomail.bond`;
-  const userBPassword = "Password123!";
+  const userBPassword = process.env.EPOMAIL_E2E_TEST_PASSWORD || '';
   let userBId = null;
   let userBToken = null;
 
@@ -26,7 +26,7 @@ import assert from "node:assert";
     // --------------------------------------------------------------------------------------
     console.log("\n[步骤 1] 登录 Admin 并创建测试用户 A 与用户 B...");
     const loginRes = await page.request.post(BASE + "/api/login", {
-      data: { email: "admin@epomail.bond", password: "123456" },
+      data: { email: "admin@epomail.bond", password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
       headers: { "Content-Type": "application/json" }
     });
     const loginJson = await loginRes.json();

@@ -46,7 +46,7 @@ async function safeCheck(section, label, fn) {
     console.log("§ 1  站长登录与身份验证");
 
     const loginBondRes = await page.request.post(`${API}/api/login`, {
-      data: { email: "admin@epomail.bond", password: "123456" },
+      data: { email: "admin@epomail.bond", password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
       headers: { "Content-Type": "application/json" }
     });
     const loginBondJson = await loginBondRes.json();
@@ -70,7 +70,7 @@ async function safeCheck(section, label, fn) {
 
     // 纯用户名登录
     const loginAdminRes = await page.request.post(`${API}/api/login`, {
-      data: { email: "admin", password: "123456" },
+      data: { email: "admin", password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
       headers: { "Content-Type": "application/json" }
     });
     const loginAdminJson = await loginAdminRes.json();
@@ -83,7 +83,7 @@ async function safeCheck(section, label, fn) {
     console.log("\n§ 2  参观者账号 admin@epomail.cyou 身份隔离");
 
     const loginCyouRes = await page.request.post(`${API}/api/login`, {
-      data: { email: "admin@epomail.cyou", password: "123456" },
+      data: { email: "admin@epomail.cyou", password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
       headers: { "Content-Type": "application/json" }
     });
     const loginCyouJson = await loginCyouRes.json();
@@ -137,7 +137,7 @@ async function safeCheck(section, label, fn) {
       if (visitorRole) {
         const testEmail = `audit_visitor_${ts}@epomail.bond`;
         const addRes = await page.request.post(`${API}/api/user/add`, {
-          data: { email: testEmail, password: "Audit123!", name: `AuditVisitor_${ts}`, type: visitorRole.roleId },
+          data: { email: testEmail, password: process.env.EPOMAIL_E2E_USER_PASSWORD || '', name: `AuditVisitor_${ts}`, type: visitorRole.roleId },
           headers: { Authorization: adminToken, "Content-Type": "application/json" }
         });
         const addJson = await addRes.json();
@@ -155,7 +155,7 @@ async function safeCheck(section, label, fn) {
 
           // 参观者登录查看邮件
           const vLoginRes = await page.request.post(`${API}/api/login`, {
-            data: { email: testEmail, password: "Audit123!" },
+            data: { email: testEmail, password: process.env.EPOMAIL_E2E_USER_PASSWORD || '' },
             headers: { "Content-Type": "application/json" }
           });
           const vLoginJson = await vLoginRes.json();
@@ -187,7 +187,7 @@ async function safeCheck(section, label, fn) {
       if (normalRole) {
         const testEmailN = `audit_normal_${ts}@epomail.bond`;
         const addNRes = await page.request.post(`${API}/api/user/add`, {
-          data: { email: testEmailN, password: "Audit123!", name: `AuditNormal_${ts}`, type: normalRole.roleId },
+          data: { email: testEmailN, password: process.env.EPOMAIL_E2E_USER_PASSWORD || '', name: `AuditNormal_${ts}`, type: normalRole.roleId },
           headers: { Authorization: adminToken, "Content-Type": "application/json" }
         });
         const addNJson = await addNRes.json();
@@ -203,7 +203,7 @@ async function safeCheck(section, label, fn) {
           if (newUserN) cleanupUserIds.push(newUserN.userId);
 
           const nLoginRes = await page.request.post(`${API}/api/login`, {
-            data: { email: testEmailN, password: "Audit123!" },
+            data: { email: testEmailN, password: process.env.EPOMAIL_E2E_USER_PASSWORD || '' },
             headers: { "Content-Type": "application/json" }
           });
           const nLoginJson = await nLoginRes.json();
@@ -299,7 +299,7 @@ async function safeCheck(section, label, fn) {
 
     // 5.3 参观者登录进入 inbox
     const visLoginRes2 = await page.request.post(`${API}/api/login`, {
-      data: { email: "admin@epomail.cyou", password: "123456" },
+      data: { email: "admin@epomail.cyou", password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
       headers: { "Content-Type": "application/json" }
     });
     const visLoginJson2 = await visLoginRes2.json();

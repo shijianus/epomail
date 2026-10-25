@@ -4,7 +4,16 @@ export default defineWorkersConfig({
 	test: {
 		poolOptions: {
 			workers: {
-				wrangler: { configPath: './wrangler.toml' },
+				// A dedicated test config avoids the production AI binding, which
+				// the installed workerd/miniflare version cannot resolve locally.
+				wrangler: { configPath: './wrangler-vitest.toml' },
+				miniflare: {
+					bindings: {
+						jwt_secret: 'test-jwt-secret-for-unit-tests',
+						totp_enc_key: 'test-totp-encryption-key-for-unit-tests',
+						resend_webhook_secret: 'whsec_test_only_not_a_real_secret'
+					}
+				}
 			},
 		},
 	},

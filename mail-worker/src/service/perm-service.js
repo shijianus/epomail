@@ -1,6 +1,6 @@
 import orm from '../entity/orm';
 import perm from '../entity/perm';
-import { eq, ne, and, asc } from 'drizzle-orm';
+import { eq, ne, and, asc, inArray } from 'drizzle-orm';
 import rolePerm from '../entity/role-perm';
 import user from '../entity/user';
 import role from '../entity/role';
@@ -39,7 +39,25 @@ const permService = {
 			.leftJoin(perm, eq(rolePerm.permId,perm.permId))
 			.where(and(eq(user.userId,userId),eq(perm.type,permConst.type.BUTTON)))
 			.all();
-		return userPerms.map(perm => perm.permKey);
+		return [...new Set(userPerms.map(perm => perm.permKey).filter(Boolean))];
+	},
+
+	async rolePermKeys(c, roleId) {
+		if (!roleId) return [];
+		const rows = await orm(c).select({ permKey: perm.permKey }).from(rolePerm)
+			.leftJoin(perm, eq(rolePerm.permId, perm.permId))
+			.where(and(eq(rolePerm.roleId, roleId), eq(perm.type, permConst.type.BUTTON)))
+			.all();
+		return [...new Set(rows.map(row => row.permKey).filter(Boolean))];
+	},
+
+	async permKeysByPermIds(c, permIds = []) {
+		const ids = [...new Set((Array.isArray(permIds) ? permIds : []).map(Number).filter(id => Number.isInteger(id) && id > 0))];
+		if (ids.length === 0) return [];
+		const rows = await orm(c).select({ permKey: perm.permKey }).from(perm)
+			.where(and(inArray(perm.permId, ids), eq(perm.type, permConst.type.BUTTON)))
+			.all();
+		return [...new Set(rows.map(row => row.permKey).filter(Boolean))];
 	}
 }
 

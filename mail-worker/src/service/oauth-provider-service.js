@@ -4,8 +4,23 @@ import userService from './user-service';
 import jwtUtils from '../utils/jwt-utils';
 import constant from '../const/constant';
 import KvConst from '../const/kv-const';
+import { isAdminUser } from '../utils/admin-utils';
 
 const encoder = new TextEncoder();
+
+function normalizeScopes(value) {
+	return String(value || '').split(/\s+/).map(item => item.trim()).filter(Boolean);
+}
+
+function assertScopesAllowed(app, requestedScope) {
+	const allowed = normalizeScopes(app.scopes);
+	if (allowed.length === 0) return;
+	const requested = normalizeScopes(requestedScope || 'openid profile email');
+	const invalid = requested.filter(scope => !allowed.includes(scope));
+	if (invalid.length > 0) {
+		throw new BizError(`invalid_scope: 请求了未授权的 scope (${invalid.join(', ')})`, 400);
+	}
+}
 
 function base64url(input) {
 	const str = btoa(String.fromCharCode(...new Uint8Array(input)));
@@ -47,6 +62,8 @@ const oauthProviderService = {
 			throw new BizError('未授权的回调地址 (redirect_uri mismatch)');
 		}
 
+		assertScopesAllowed(app, scope);
+
 		// 检查用户当前登录态
 		let currentUser = null;
 		const jwt = c.req.header(constant.TOKEN_HEADER) || c.req.header('Authorization')?.replace(/^Bearer\s+/i, '');
@@ -54,7 +71,7 @@ const oauthProviderService = {
 			const payload = await jwtUtils.verifyToken(c, jwt);
 			if (payload && payload.userId) {
 				const authInfo = await c.env.kv.get(KvConst.AUTH_INFO + payload.userId, { type: 'json' });
-				if (authInfo && authInfo.tokens && authInfo.tokens.includes(payload.token)) {
+				if (authInfo && Array.isArray(authInfo.tokens) && authInfo.tokens.includes(payload.token)) {
 					const userRow = await userService.selectById(c, payload.userId);
 					if (userRow && userRow.status === 0) {
 						currentUser = {
@@ -101,6 +118,8 @@ const oauthProviderService = {
 			throw new BizError('无效的 redirect_uri');
 		}
 
+		assertScopesAllowed(app, scope);
+
 		// 验证当前用户
 		const jwt = c.req.header(constant.TOKEN_HEADER) || c.req.header('Authorization')?.replace(/^Bearer\s+/i, '');
 		if (!jwt) {
@@ -113,7 +132,7 @@ const oauthProviderService = {
 		}
 
 		const authInfo = await c.env.kv.get(KvConst.AUTH_INFO + payload.userId, { type: 'json' });
-		if (!authInfo || !authInfo.tokens || !authInfo.tokens.includes(payload.token)) {
+		if (!authInfo || !Array.isArray(authInfo.tokens) || !authInfo.tokens.includes(payload.token)) {
 			throw new BizError('登录会话已过期，请重新登录', 401);
 		}
 
@@ -232,11 +251,7 @@ const oauthProviderService = {
 		const now = Math.floor(Date.now() / 1000);
 		const origin = new URL(c.req.url).origin;
 
-		const isAdmin = Boolean(
-			user.type === 0 ||
-			(c.env.admin && c.env.admin.toLowerCase() === (user.email || '').toLowerCase()) ||
-			(user.role && user.role.roleId === constant.ADMIN_ROLE?.roleId)
-		);
+		const isAdmin = isAdminUser(c, user);
 
 		// 1. Access Token (2小时有效)
 		const accessToken = await jwtUtils.generateToken(c, {
@@ -278,7 +293,7 @@ const oauthProviderService = {
 		}
 
 		const payload = await jwtUtils.verifyToken(c, tokenStr);
-		if (!payload || !payload.userId) {
+		if (!payload || !payload.userId || payload.typ !== 'oauth_access_token' || !payload.clientId) {
 			throw new BizError('无效或已过期的 Access Token', 401);
 		}
 
@@ -294,11 +309,7 @@ const oauthProviderService = {
 			}
 		}
 
-		const isAdmin = Boolean(
-			user.type === 0 ||
-			(c.env.admin && c.env.admin.toLowerCase() === (user.email || '').toLowerCase()) ||
-			(user.role && user.role.roleId === constant.ADMIN_ROLE?.roleId)
-		);
+		const isAdmin = isAdminUser(c, user);
 
 		return {
 			sub: String(user.userId),
@@ -319,7 +330,6 @@ const oauthProviderService = {
 			authorization_endpoint: `${origin}/oauth/authorize`,
 			token_endpoint: `${origin}/api/oauth/token`,
 			userinfo_endpoint: `${origin}/api/oauth/userinfo`,
-			jwks_uri: `${origin}/api/oauth/jwks`,
 			response_types_supported: ['code'],
 			subject_types_supported: ['public'],
 			id_token_signing_alg_values_supported: ['HS256'],

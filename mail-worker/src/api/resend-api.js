@@ -1,10 +1,23 @@
 import resendService from '../service/resend-service';
 import app from '../hono/hono';
-app.post('/webhooks',async (c) => {
+
+app.post('/webhooks', async (c) => {
 	try {
-		await resendService.webhooks(c, await c.req.json());
-		return c.text('success', 200)
+		const rawBody = await c.req.text();
+		await resendService.verifySignature(c, rawBody);
+
+		let body;
+		try {
+			body = JSON.parse(rawBody);
+		} catch (_) {
+			return c.text('invalid_payload', 400);
+		}
+
+		await resendService.webhooks(c, body);
+		return c.text('success', 200);
 	} catch (e) {
-		return  c.text(e.message, 500)
+		console.error('Resend webhook rejected:', e?.message || e);
+		const status = Number(e?.code);
+		return c.text('webhook_rejected', status >= 400 && status < 600 ? status : 500);
 	}
 })

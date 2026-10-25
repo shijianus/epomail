@@ -11,7 +11,7 @@ async function run() {
   const loginRes = await fetch(`${BASE}/api/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email: 'admin@epomail.bond', password: '123456' })
+    body: JSON.stringify({ email: 'admin@epomail.bond', password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' })
   });
   const loginData = await loginRes.json();
   console.log('登录结果:', loginData);

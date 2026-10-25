@@ -23,7 +23,7 @@ import assert from 'assert';
     // 1. 登录管理员账号
     console.log('\n[步骤 1] 登录账号 admin@epomail.bond 获取鉴权 Token...');
     const loginRes = await page.request.post(BASE + '/api/login', {
-      data: { email: 'admin@epomail.bond', password: '123456' },
+      data: { email: 'admin@epomail.bond', password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
       headers: { 'Content-Type': 'application/json' }
     });
     const loginData = await loginRes.json();

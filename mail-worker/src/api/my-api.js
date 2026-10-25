@@ -12,7 +12,11 @@ app.get('/my/loginUserInfo', async (c) => {
 });
 
 app.put('/my/resetPassword', async (c) => {
-	await userService.resetPassword(c, await c.req.json(), userContext.getUserId(c));
+	const body = await c.req.json();
+	await userService.resetPassword(c, body, userContext.getUserId(c), {
+		requireCurrent: true,
+		currentPassword: body?.currentPassword
+	});
 	return c.json(result.ok());
 });
 

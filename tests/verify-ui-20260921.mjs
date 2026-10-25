@@ -23,7 +23,7 @@ const BASE = 'http://127.0.0.1:8787';
 const TAG = process.argv[2] || 'before';
 const SHOT = (n) => `tests/ui21_${TAG}_${n}.png`;
 const ADMIN = 'admin@epomail.bond';
-const PWD = '123456';
+const PWD = process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '';
 const out = { tag: TAG, ts: new Date().toISOString(), checks: [] };
 let pass = 0, fail = 0;
 const fails = [];

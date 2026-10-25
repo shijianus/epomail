@@ -13,7 +13,7 @@ const BASE_URL = 'https://epomail.epocanvas.workers.dev';
 
   console.log('1. 登录 Cloudflare 生产环境并设置中文语言环境...');
   const res = await page.request.post(BASE_URL + '/api/login', {
-    data: { email: 'admin@epomail.bond', password: '123456' }
+    data: { email: 'admin@epomail.bond', password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' }
   });
   const token = (await res.json()).data?.token;
   if (!token) throw new Error('登录获取 token 失败');

@@ -1797,6 +1797,8 @@ const zhHant = {
     IncorrectPwd: '賬戶或密碼錯誤',
     accountLimit: '可建立的信箱數量已達目前身分上限',
     accountLocked: '連續錯誤次數過多，賬號已臨時鎖定',
+
+    tooManyRequests: '請求過於頻繁，請稍後再試',
     addAccountDisabled: '目前系統未開放新增信箱',
     adminReserved: '該使用者名稱為站長保留賬號，無法註冊',
     attLimit: '單封郵件附件數量超出上限',

@@ -22,7 +22,7 @@ import assert from "node:assert";
     
     // 登录站长
     const loginBondRes = await page.request.post(BASE + "/api/login", {
-      data: { email: "admin@epomail.bond", password: "123456" },
+      data: { email: "admin@epomail.bond", password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
       headers: { "Content-Type": "application/json" }
     });
     const loginBondJson = await loginBondRes.json();
@@ -86,7 +86,7 @@ import assert from "node:assert";
     
     // 登录参观者
     const loginCyouRes = await page.request.post(BASE + "/api/login", {
-      data: { email: "admin@epomail.cyou", password: "123456" },
+      data: { email: "admin@epomail.cyou", password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
       headers: { "Content-Type": "application/json" }
     });
     const loginCyouJson = await loginCyouRes.json();
@@ -134,7 +134,7 @@ import assert from "node:assert";
 
     console.log(`  - 先行者注册 ${pioneerEmail}，应享有纯简写用户名 '${pioneerPrefix}'...`);
     const regPioneerRes = await page.request.post(BASE + "/api/register", {
-      data: { email: pioneerEmail, password: "Password123!" },
+      data: { email: pioneerEmail, password: process.env.EPOMAIL_E2E_TEST_PASSWORD || '' },
       headers: { "Content-Type": "application/json" }
     });
     const regPioneerJson = await regPioneerRes.json();
@@ -142,7 +142,7 @@ import assert from "node:assert";
 
     // 先行者登录获取 Token
     const pioneerLoginRes = await page.request.post(BASE + "/api/login", {
-      data: { email: pioneerEmail, password: "Password123!" },
+      data: { email: pioneerEmail, password: process.env.EPOMAIL_E2E_TEST_PASSWORD || '' },
       headers: { "Content-Type": "application/json" }
     });
     const pioneerLoginJson = await pioneerLoginRes.json();
@@ -168,7 +168,7 @@ import assert from "node:assert";
 
     console.log(`  - 后续注册者在另一域名使用相同前缀 ${followerEmail}，用户名应被赋予全邮箱...`);
     const regFollowerRes = await page.request.post(BASE + "/api/register", {
-      data: { email: followerEmail, password: "Password123!" },
+      data: { email: followerEmail, password: process.env.EPOMAIL_E2E_TEST_PASSWORD || '' },
       headers: { "Content-Type": "application/json" }
     });
     const regFollowerJson = await regFollowerRes.json();
@@ -176,7 +176,7 @@ import assert from "node:assert";
 
     // 后续者登录获取 Token
     const followerLoginRes = await page.request.post(BASE + "/api/login", {
-      data: { email: followerEmail, password: "Password123!" },
+      data: { email: followerEmail, password: process.env.EPOMAIL_E2E_TEST_PASSWORD || '' },
       headers: { "Content-Type": "application/json" }
     });
     const followerLoginJson = await followerLoginRes.json();
@@ -245,7 +245,7 @@ import assert from "node:assert";
     await page.goto(BASE + "/login/index.html", { waitUntil: "networkidle" });
     await page.waitForSelector("#epo-email", { timeout: 10000 });
     await page.fill("#epo-email", "admin@epomail.cyou");
-    await page.fill("#epo-password", "123456");
+    await page.fill("#epo-password", (process.env.EPOMAIL_E2E_ADMIN_PASSWORD || ''));
     await page.click('button[type="submit"]');
     await page.waitForURL(url => url.pathname.includes("/inbox"), { timeout: 15000 });
     console.log("  ✓ 浏览器登录 admin@epomail.cyou 成功");
@@ -272,7 +272,7 @@ import assert from "node:assert";
     console.log("\n[6. 清理测试数据，恪守零残留准则]");
     if (pioneerUserId || followerUserId) {
       const loginBondRes = await page.request.post(BASE + "/api/login", {
-        data: { email: "admin@epomail.bond", password: "123456" },
+        data: { email: "admin@epomail.bond", password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
         headers: { "Content-Type": "application/json" }
       });
       const loginBondJson = await loginBondRes.json();

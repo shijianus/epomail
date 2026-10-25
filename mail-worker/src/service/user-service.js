@@ -27,16 +27,24 @@ import emailCryptoUtils from '../utils/email-crypto-utils';
 import { getDefaultUserLabelsString } from '../const/default-labels';
 import { isAdminEmail, isAdminUser } from '../utils/admin-utils';
 import verifyUtils from '../utils/verify-utils';
+import rbacGuard from './rbac-guard-service.js';
+import { sanitizeCustomLabels } from '../utils/svg-utils.js';
 
 const userService = {
 
 	async setCustomLabels(c, params, userId) {
 		const { customLabels } = params;
-		await orm(c).update(user).set({ customLabels }).where(eq(user.userId, userId));
+		let sanitizedLabels;
+		try {
+			sanitizedLabels = sanitizeCustomLabels(customLabels);
+		} catch (err) {
+			throw new BizError(err.message || 'Invalid custom labels');
+		}
+		await orm(c).update(user).set({ customLabels: sanitizedLabels }).where(eq(user.userId, userId));
 		
 		const authInfo = await c.env.kv.get(KvConst.AUTH_INFO + userId, { type: 'json' });
 		if (authInfo && authInfo.user) {
-			authInfo.user.customLabels = customLabels;
+			authInfo.user.customLabels = sanitizedLabels;
 			await c.env.kv.put(KvConst.AUTH_INFO + userId, JSON.stringify(authInfo), { expirationTtl: constant.TOKEN_EXPIRE });
 		}
 	},
@@ -61,6 +69,14 @@ const userService = {
         for (const key of ALLOWED_PROFILE_FIELDS) {
             if (params && params[key] !== undefined) {
                 safeParams[key] = params[key];
+            }
+        }
+
+        if (safeParams.customLabels !== undefined) {
+            try {
+                safeParams.customLabels = sanitizeCustomLabels(safeParams.customLabels);
+            } catch (err) {
+                throw new BizError(err.message || 'Invalid custom labels');
             }
         }
 
@@ -197,12 +213,22 @@ const userService = {
         const file = formData.get('file');
 
         if (!file) throw new BizError('No file');
+        if (typeof file === 'string' || !file.arrayBuffer) throw new BizError('No file');
+        if (file.size > 5 * 1024 * 1024) {
+            throw new BizError('Image too large (max 5MB)');
+        }
+
+        const arrayBuffer = await file.arrayBuffer();
+        const detectedMime = fileUtils.detectImageMime(arrayBuffer);
+        if (!detectedMime) {
+            throw new BizError('Only PNG/JPEG/GIF/WebP/BMP/ICO/AVIF images are accepted');
+        }
 
         // 运营者可经 AVATAR_UPLOAD_URL 指定外部图床；未配置时图片落实例自有对象存储（KV 兜底，写读同源）
         const externalHost = (c.env.AVATAR_UPLOAD_URL || '').trim().replace(/\/+$/, '');
         if (externalHost) {
             const newFormData = new FormData();
-            newFormData.append('file', file);
+            newFormData.append('file', file, fileUtils.sanitizeFilename(file.name, 'avatar'));
 
             const res = await fetch(`${externalHost}/upload`, {
                 method: 'POST',
@@ -226,14 +252,11 @@ const userService = {
             return url;
         }
 
-        if (file.size > 5 * 1024 * 1024) {
-            throw new BizError('Image too large (max 5MB)');
-        }
-        const arrayBuffer = await file.arrayBuffer();
         const buffHash = await fileUtils.getBuffHash(arrayBuffer);
-        const key = `static/avatar/${userId}/${buffHash}${fileUtils.getExtFileName(file.name)}`;
+        const ext = fileUtils.imageExtensionForMime(detectedMime);
+        const key = `static/avatar/${userId}/${buffHash}${ext}`;
         await kvObjService.putObj(c, key, arrayBuffer, {
-            contentType: file.type || 'image/png',
+            contentType: detectedMime,
             contentDisposition: 'inline',
             cacheControl: 'public, max-age=31536000, immutable'
         });
@@ -456,15 +479,30 @@ const userService = {
 	},
 
 
-	async resetPassword(c, params, userId) {
+	async resetPassword(c, params, userId, options = {}) {
+		const { password, currentPassword } = params;
 
-		const { password } = params;
-
-		if (password.length < 6) {
+		if (typeof password !== 'string' || password.length < 6) {
 			throw new BizError(t('pwdMinLength'));
 		}
+
+		if (options.requireCurrent) {
+			const userRow = await orm(c).select().from(user).where(eq(user.userId, userId)).get();
+			if (!userRow) {
+				throw new BizError(t('notExistUser'));
+			}
+			const valid = await cryptoUtils.verifyPassword(currentPassword || '', userRow.salt, userRow.password);
+			if (!valid) {
+				throw new BizError(t('IncorrectPwd'), 403);
+			}
+		}
+
 		const { salt, hash } = await cryptoUtils.hashPassword(password);
 		await orm(c).update(user).set({ password: hash, salt: salt }).where(eq(user.userId, userId)).run();
+
+		// Password changes invalidate every existing session. The user must log
+		// in again with the new credential.
+		await c.env.kv.delete(KvConst.AUTH_INFO + userId);
 
 		try {
 			let profile = {};
@@ -474,11 +512,6 @@ const userService = {
 			}
 			profile.passwordUpdatedAt = new Date().toISOString();
 			await c.env.kv.put('USER_PROFILE_' + userId, JSON.stringify(profile));
-			const authInfo = await c.env.kv.get(KvConst.AUTH_INFO + userId, { type: 'json' });
-			if (authInfo && authInfo.user) {
-				authInfo.user.passwordUpdatedAt = profile.passwordUpdatedAt;
-				await c.env.kv.put(KvConst.AUTH_INFO + userId, JSON.stringify(authInfo), { expirationTtl: constant.TOKEN_EXPIRE });
-			}
 		} catch (e) {
 			console.error('Failed to update password timestamp', e);
 		}
@@ -498,6 +531,10 @@ const userService = {
 				eq(user.email, email),
 				eq(user.isDel, isDel.NORMAL)))
 			.get();
+	},
+
+	async updateTotpState(c, userId, fields) {
+		await orm(c).update(user).set(fields).where(eq(user.userId, userId)).run();
 	},
 
 	async insert(c, params) {
@@ -550,6 +587,10 @@ const userService = {
 		}
 		userIds = userIds.filter(id => id !== 1);
 		if (userIds.length === 0) return;
+
+		for (const targetUserId of userIds) {
+			await rbacGuard.assertCanManageUser(c, callerUserId, targetUserId);
+		}
 
 		// 1. 在物理删除 D1 数据前，提取所有待删除用户的核心标识符（主邮箱、别名邮箱、用户名）
 		let usersToDelete = [];
@@ -912,6 +953,7 @@ const userService = {
 		if (Number(userId) === 1 && callerUserId && Number(callerUserId) !== 1) {
 			throw new BizError('仅站长本人可修改站长密码！', 403);
 		}
+		await rbacGuard.assertCanManageUser(c, callerUserId, Number(userId));
 		await this.resetPassword(c, { password }, userId);
 		await c.env.kv.delete(KvConst.AUTH_INFO + userId);
 	},
@@ -921,6 +963,7 @@ const userService = {
 		if (Number(userId) === 1) {
 			throw new BizError('系统超级管理员禁止停用或封禁！', 403);
 		}
+		await rbacGuard.assertCanManageUser(c, callerUserId, Number(userId));
 		await orm(c)
 			.update(user)
 			.set({ status })
@@ -934,6 +977,8 @@ const userService = {
 
 	async setType(c, params, callerUserId) {
 		const { type, userId } = params;
+
+		await rbacGuard.assertCanAssignRole(c, callerUserId, Number(type));
 
 		const roleRow = await roleService.selectById(c, type);
 		if (!roleRow) {
@@ -1160,8 +1205,9 @@ const userService = {
 		await orm(c).update(user).set({ sendCount: 0 }).where(eq(user.userId, params.userId)).run();
 	},
 
-	async restore(c, params) {
+	async restore(c, params, callerUserId) {
 		const { userId, type } = params
+		await rbacGuard.assertCanManageUser(c, callerUserId, Number(userId));
 		await orm(c)
 			.update(user)
 			.set({ isDel: isDel.NORMAL })
@@ -1206,6 +1252,8 @@ const userService = {
 		if (!userRow) {
 			throw new BizError(t('userNotExist'));
 		}
+
+		await rbacGuard.assertCanManageUser(c, callerUserId, uid);
 
 		if (userRow.type === 0 || isAdminUser(c, userRow) || uid === 1) {
 			throw new BizError('Cannot purge administrator emails', 403);

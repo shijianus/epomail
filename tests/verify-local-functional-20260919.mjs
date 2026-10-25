@@ -4,7 +4,7 @@
  * 遵循零假数据准则：临时用户在 finally 中物理删除。
  */
 const BASE = process.env.BASE_URL || 'http://127.0.0.1:8787';
-const ADMIN = { email: 'admin@example.com', password: '123456' };
+const ADMIN = { email: 'admin@example.com', password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' };
 
 let pass = 0, fail = 0;
 const failures = [];
@@ -103,13 +103,13 @@ try {
   const tempRegEmail = 'verify-temp-' + Date.now() + '@example.com';
   const reg = await api('/register', {
     method: 'POST',
-    body: { email: tempRegEmail, password: 'Temp123456' }
+    body: { email: tempRegEmail, password: process.env.EPOMAIL_E2E_TEST_PASSWORD || '' }
   });
   ok(reg.json?.code === 200, '开放注册受理 (code=' + reg.json?.code + ')');
 
   const regLogin = await api('/login', {
     method: 'POST',
-    body: { email: tempRegEmail, password: 'Temp123456' }
+    body: { email: tempRegEmail, password: process.env.EPOMAIL_E2E_TEST_PASSWORD || '' }
   });
   ok(regLogin.json?.code === 200, '临时用户登录');
   const tempToken = typeof regLogin.json?.data === 'string' ? regLogin.json.data : regLogin.json?.data?.token;
@@ -141,7 +141,7 @@ try {
 
   const adminReserved = await api('/register', {
     method: 'POST',
-    body: { email: 'admin@other.example.com', password: 'Temp123456' }
+    body: { email: 'admin@other.example.com', password: process.env.EPOMAIL_E2E_TEST_PASSWORD || '' }
   }).catch(() => ({ json: null }));
   ok(adminReserved.json?.code !== 200, '管理员保留字注册拦截 (code=' + adminReserved.json?.code + ')');
 

@@ -12,7 +12,7 @@ import { chromium } from 'playwright';
     // Step 1: Login
     console.log('Logging into https://epomail.epocanvas.workers.dev ...');
     const loginRes = await page.request.post(BASE + '/api/login', {
-      data: { email: 'admin@epomail.bond', password: '123456' },
+      data: { email: 'admin@epomail.bond', password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
       headers: { 'Content-Type': 'application/json' }
     });
     const loginData = await loginRes.json();

@@ -36,6 +36,7 @@ run_worker_first = true
 
 
 [vars]
+DEV = "true"
 ai_model = ""
 analysis_cache = false
 orm_log = false

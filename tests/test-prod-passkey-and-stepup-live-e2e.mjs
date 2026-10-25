@@ -4,7 +4,7 @@ import { chromium } from 'playwright';
 
 const BASE_URL = process.env.TARGET_URL || 'https://mail.epocanvas.com';
 const USER_EMAIL = 'audit_normal_1789140856529@epomail.bond';
-const USER_PWD = 'Audit123!';
+const USER_PWD = process.env.EPOMAIL_E2E_USER_PASSWORD || '';
 
 console.log('========================================================================');
 console.log('=== 公网生产环境全真端到端核验：Passkey 跨设备兼容、2FA 切换与二验 ===');
@@ -75,7 +75,7 @@ function ok(condition, message) {
 		headers: { 'Content-Type': 'application/json' },
 		body: JSON.stringify({
 			email: 'admin@epomail.bond',
-			password: '123456',
+			password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '',
 			secPayload: {
 				webdriver: false,
 				hasFpBrowserGlobals: false,
@@ -95,7 +95,7 @@ function ok(condition, message) {
 		headers: { 'Content-Type': 'application/json' },
 		body: JSON.stringify({
 			email: 'admin@epomail.bond',
-			password: '123456',
+			password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '',
 			secPayload: {
 				hasFpBrowserGlobals: true,
 				canvasTampered: true,
@@ -115,7 +115,7 @@ function ok(condition, message) {
 		headers: { 'Content-Type': 'application/json' },
 		body: JSON.stringify({
 			email: 'admin@epomail.bond',
-			password: '123456',
+			password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '',
 			secPayload: {
 				localSessionCount: 5,
 				webdriver: true
@@ -148,7 +148,7 @@ function ok(condition, message) {
 
 		// 2. 输入账号密码
 		await page.fill('#epo-email', 'admin@epomail.bond');
-		await page.fill('#epo-password', '123456');
+		await page.fill('#epo-password', (process.env.EPOMAIL_E2E_ADMIN_PASSWORD || ''));
 		await page.click('button[type="submit"]');
 
 		// 3. 等待 2FA 阶段平滑进入

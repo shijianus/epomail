@@ -158,7 +158,7 @@ import { getUserDb, getMailDb, isDualDbMode } from "../mail-worker/src/utils/db-
     // 2.2 管理员登录
     console.log("  -> 执行管理员登录...");
     const loginRes = await page.request.post(BASE + "/api/login", {
-      data: { email: "admin@epomail.bond", password: "123456" },
+      data: { email: "admin@epomail.bond", password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
       headers: { "Content-Type": "application/json" }
     });
     const loginData = await loginRes.json();
