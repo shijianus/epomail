@@ -121,7 +121,7 @@ async function legacyEncrypt(plain, jwtSecret) {
 
 const DEV_HASH = 'pbkdf2:100000:wYbOCP3rv6muivmiYwmd/oXXroIcxp7/VcB02M+Ac5w=';
 const DEV_SALT = 'ZmUlWbNgsFel3E0oxnPHcA==';
-const DEV_PWD = '123456';
+const DEV_PWD = (process.env.EPOMAIL_LIVE_E2E_ADMIN_PASSWORD || process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '');
 
 function seedUser(userId, email, passwordHash, salt, extra = {}) {
 	const cols = ['user_id', 'email', 'password', 'salt', 'type', 'status', 'is_del',

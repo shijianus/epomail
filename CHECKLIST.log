@@ -12,7 +12,7 @@
 ---
 
 ### 全仓库安全审计与凭据泄露修复 · /oss KV 越权 + OAuth/存储型 XSS + 历史密钥 (2026-10-25)
-*   **关联提交 (Git Commit)**: `de5d15077972c7c70778aea66777a6cd7a766857` (Short: `de5d150`); 审计归档提交见置顶汇报
+*   **关联提交 (Git Commit)**: `511e00105c2e5bbf5c1ae559f84d5c5758dca7bb` (Short: `511e001`); 审计归档提交见置顶汇报
 *   **部署环境 (Deployment)**: 本地 workerd 全真栈测试 (D1+KV) + `wrangler deploy --dry-run` + `vite build`；**未部署生产、未推送远端**
 *   **功能需求与变更清单 (Changes & Feature Alignment)**:
     - [x] 修复 `/api/oss/*` 可匿名读取任意 KV 键（`auth-uid:1` 站长会话、`setting:` 全站密钥）——对象 Key 仅允许 `attachments/`、`static/`，拒绝 `:`/`%`/`..`/控制字符；`/oss-url` 增加附件归属校验。
@@ -29,7 +29,7 @@
     - [x] 依赖升级：hono 4.13.13、drizzle-orm 0.45.4、DOMPurify 3.4.17、axios 1.20.0、AWS SDK/fast-xml-parser/uuid/form-data/lodash/vue 等；移除未使用 `@cloudflare/vite-plugin`。
 *   **自动化测试与核验清单 (Verification Checklist)**:
     - [x] 工作区 Secret 扫描：`node scripts/secret-scan.mjs` → 1135 files，0 命中。
-    - [x] 全历史 Secret 扫描：`node scripts/secret-scan.mjs --history --baseline .secret-scan-baseline.json` → 833 commits / 3565 blobs，仅基线内已知历史泄露。
+    - [x] 全历史 Secret 扫描：`node scripts/secret-scan.mjs --history --baseline .secret-scan-baseline.json` → 841 commits / 3821 blobs，仅基线内已知历史泄露。
     - [x] Mailjet 契约：`node mail-worker/test-mailjet.js` 离线通过；`--live` 缺配置 exit 1。
     - [x] Worker 安全测试：`npx vitest run` → **28/28 passed**（/oss KV 隔离、CORS、Webhook 验签、JWT/加密/RS256/对象头/SVG）。
     - [x] Worker 打包：`wrangler deploy --dry-run` 成功 (gzip 1067.49 KiB)。

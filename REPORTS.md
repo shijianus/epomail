@@ -13,10 +13,10 @@
 ---
 
 ### 全仓库安全审计、凭据泄露修复与二次验证 (2026-10-25)
-*   **关联提交 (Git Commit)**: `de5d15077972c7c70778aea66777a6cd7a766857` (Short: `de5d150`)
+*   **关联提交 (Git Commit)**: `511e00105c2e5bbf5c1ae559f84d5c5758dca7bb` (Short: `511e001`)
 *   **专项文档索引 (Detailed Doc)**: `doc/security-audit-2026-10-25.md`
 *   **体检/审计范围与方法 (Scope & Methodology)**:
-    1. 范围与环境：`mail-worker` 全 API/服务/实体/工具、`mail-vue` XSS sink、Wrangler 配置、`.gitignore`、GitHub Actions；全部本地分支/标签可达 Git 历史（833 commits / 3565 blobs）；同工作区独立仓库 `EpomailDocs` 只读旁路扫描。
+    1. 范围与环境：`mail-worker` 全 API/服务/实体/工具、`mail-vue` XSS sink、Wrangler 配置、`.gitignore`、GitHub Actions；全部本地分支/标签可达 Git 历史（841 commits / 3821 blobs）；同工作区独立仓库 `EpomailDocs` 只读旁路扫描。
     2. 工具与脚本：自建 `scripts/secret-scan.mjs`（工作区 + 历史，指纹输出）、`git cat-file --batch` 全对象扫描、`vitest` + `@cloudflare/vitest-pool-workers`（真实 workerd + D1/KV，28 项）、`wrangler deploy --dry-run`、`vite build`、`pnpm audit --prod`、i18n 三件套、`git diff --check`。
 *   **核心发现与缺陷矩阵 (Key Findings & Matrix)**:
     - **[P0·安全] `/api/oss/*` 任意 KV 键读取**：匿名可读 `auth-uid:1`（站长会话令牌）与 `setting:`（含第三方密钥）；已用对象 Key 前缀白名单修复并回归测试。

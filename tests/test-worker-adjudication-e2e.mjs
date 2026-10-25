@@ -206,7 +206,7 @@ async function run() {
   // 管理员登录获取 JWT
   const adminLoginRes = await makeRequest(env, '/api/login', {
     method: 'POST',
-    body: JSON.stringify({ email: 'admin@epomail.cyou', password: 'AdminSecret123!' })
+    body: JSON.stringify({ email: 'admin@epomail.cyou', password: (process.env.EPOMAIL_TEST_PASSWORD || process.env.EPOMAIL_E2E_TEST_PASSWORD || '') })
   });
   assert.strictEqual(adminLoginRes.status, 200);
   const adminToken = adminLoginRes.body.data.token;
@@ -216,7 +216,7 @@ async function run() {
   // 用户 A 登录获取合法普通 JWT 会话
   const userALoginRes = await makeRequest(env, '/api/login', {
     method: 'POST',
-    body: JSON.stringify({ email: 'target_user_a@epomail.cyou', password: 'UserSecret123!' })
+    body: JSON.stringify({ email: 'target_user_a@epomail.cyou', password: (process.env.EPOMAIL_TEST_PASSWORD || process.env.EPOMAIL_E2E_TEST_PASSWORD || '') })
   });
   assert.strictEqual(userALoginRes.status, 200);
   const userAOldToken = userALoginRes.body.data.token;
@@ -296,7 +296,7 @@ async function run() {
 
   const userBLoginRes = await makeRequest(env, '/api/login', {
     method: 'POST',
-    body: JSON.stringify({ email: 'target_user_b@epomail.cyou', password: 'UserSecret123!' })
+    body: JSON.stringify({ email: 'target_user_b@epomail.cyou', password: (process.env.EPOMAIL_TEST_PASSWORD || process.env.EPOMAIL_E2E_TEST_PASSWORD || '') })
   });
   assert.strictEqual(userBLoginRes.status, 200);
   assert.strictEqual(userBLoginRes.body.data.mfaRequired, true, 'Must challenge 2FA');
@@ -310,7 +310,7 @@ async function run() {
   console.log('\n--- STEP 6: 封禁账号登录后签发专用受限通知凭证与启动码 ---');
   const bannedLoginRes = await makeRequest(env, '/api/login', {
     method: 'POST',
-    body: JSON.stringify({ email: 'target_user_a@epomail.cyou', password: 'UserSecret123!' })
+    body: JSON.stringify({ email: 'target_user_a@epomail.cyou', password: (process.env.EPOMAIL_TEST_PASSWORD || process.env.EPOMAIL_E2E_TEST_PASSWORD || '') })
   });
   console.log('bannedLoginRes body:', bannedLoginRes.body);
   assert.strictEqual(bannedLoginRes.status, 200);

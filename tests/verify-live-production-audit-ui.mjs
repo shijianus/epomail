@@ -3,7 +3,7 @@ import assert from 'assert';
 
 const BASE = 'https://mail.epocanvas.com';
 const ADMIN_EMAIL = 'admin@epomail.cyou';
-const ADMIN_PWD = '123456';
+const ADMIN_PWD = (process.env.EPOMAIL_LIVE_E2E_ADMIN_PASSWORD || process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '');
 
 let passCount = 0;
 let failCount = 0;
@@ -157,7 +157,7 @@ async function run() {
     const userJson = await safeFetchJson(`${BASE}/api/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'audit_normal_1789140856529@epomail.bond', password: 'Audit123!' })
+      body: JSON.stringify({ email: 'audit_normal_1789140856529@epomail.bond', password: (process.env.EPOMAIL_LIVE_E2E_USER_PASSWORD || process.env.EPOMAIL_E2E_USER_PASSWORD || '') })
     });
     const userToken = userJson.data?.token;
     check(!!userToken, '获取普通用户生产 Token 成功');

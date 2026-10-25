@@ -74,7 +74,7 @@ const resendService = {
 		if (typeof rawBody !== 'string' || rawBody.length === 0) {
 			throw new BizError('Empty webhook body', 400);
 		}
-		return await this.verifyWebhookSignature({
+		await this.verifyWebhookSignature({
 			secret: c.env?.resend_webhook_secret || c.env?.RESEND_WEBHOOK_SECRET,
 			svixId: c.req.header('svix-id'),
 			svixTimestamp: c.req.header('svix-timestamp'),

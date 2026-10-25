@@ -15,7 +15,7 @@ import assert from 'node:assert';
 
 const BASE_URL = 'https://mail.epocanvas.com';
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@epomail.bond';
-const ADMIN_PWD = process.env.ADMIN_PWD || '123456';
+const ADMIN_PWD = process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '';
 
 let passed = 0;
 function ok(cond, msg, extra = '') {

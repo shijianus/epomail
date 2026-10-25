@@ -1,8 +1,8 @@
 # Epocanvas Mail 安全审计与修复报告（2026-10-25）
 
 > **审计性质**：以实际修复为目标的代码、配置、Git 历史与运行时安全审计。
-> **审计对象**：`shijianus/epomail` 本地工作副本（`master`，审计开始时工作区干净；审计过程中仅执行本地修复，未推送、未改写公共历史）。
-> **关联提交**：`de5d15077972c7c70778aea66777a6cd7a766857` (Short: `de5d150`)
+> **审计对象**：`shijianus/epomail` 本地工作副本（`master`；审计开始时为旧基线，随后合并最新远端 `origin/master` `3ba9e90`，最终代码包含远端新提交与本地修复）。
+> **关联提交**：`511e00105c2e5bbf5c1ae559f84d5c5758dca7bb` (Short: `511e001`)；审计归档提交见置顶汇报
 > **证据原则**：所有结论均来自实际代码、Git 对象、配置、构建或自动化测试；无法访问的服务商后台、远程未被抓取的分支与外部扫描结果均明确标注为“无法验证”。
 
 ---
@@ -12,7 +12,7 @@
 | 问题 | 结论 | 证据 |
 |---|---|---|
 | 当前代码是否仍有已报告的 Mailjet 凭据？ | **否**（已修复） | `mail-worker/test-mailjet.js` 已改为纯离线契约测试；工作区 Secret 扫描 0 命中 |
-| Git 历史是否仍含 Mailjet 凭据？ | **是**（历史不可变） | 提交 `a2217fd`、`9554b59` 含同一对 Key/Secret；`2c3b149` 仅在未合并分支移除 |
+| Git 历史是否仍含 Mailjet 凭据？ | **是**（历史不可变） | 提交 `a2217fd`、`9554b59` 含同一对 Key/Secret；最新远端 `2c3b149` 已从当前树移除，但历史对象仍可复原 |
 | 凭据是否已失效/已轮换？ | **无法验证，未执行** | 本环境无 Mailjet/Cloudflare 管理后台权限；必须人工轮换 |
 | 远程历史是否已清理？ | **否，未执行** | 未获授权重写历史；完整清污方案见第七节 |
 
@@ -48,7 +48,7 @@
 
 ### 2.3 覆盖边界
 
-- Git 历史覆盖：全部本地分支（含 `origin/*`）与标签可达的 **833 个提交、3565 个 blob**。
+- Git 历史覆盖：全部本地分支（含 `origin/*`）与标签可达的 **841 个提交、3821 个 blob**（合并最新远端后重新统计）。
 - **未覆盖**：不可达的 dangling objects、GitHub 服务端 Secret Scanning 结果、服务商后台日志、未被抓取到本地的远程引用、生产 D1/KV 实际数据。
 - `EpomailDocs` 是独立 Git 仓库（`shijianus/epomail-docs`），工作区内有用户未提交的图片修改；仅做只读扫描，未改动、未提交。
 
@@ -58,7 +58,7 @@
 
 ### 3.1 Mailjet（已报告问题，已修复当前代码）
 
-**当前代码**：`mail-worker/test-mailjet.js` 原含 32 位十六进制 API Key/Secret 且直接向 `api.mailjet.com/v3.1/send` 发信。现已替换为：
+**当前代码**：`mail-worker/test-mailjet.js` 原含 32 位十六进制 API Key/Secret 且直接向 `api.mailjet.com/v3.1/send` 发信。最新远端 `2c3b149` 已将其替换为离线契约测试；本轮审计逐行验证并保留该修复，同时补强产品侧 `sendByMailjet`：
 
 - 默认离线契约测试：拦截 `globalThis.fetch`，仅校验 URL、Basic 认证头与 v3.1 载荷结构，零网络请求。
 - 联网冒烟必须显式设置 `EPOMAIL_MAILJET_LIVE_TEST=1` 及四项测试环境变量；缺一即 `exit 1`，无任何默认值/历史值兜底。
@@ -69,7 +69,7 @@
 | 项 | 证据 |
 |---|---|
 | 引入提交 | `a2217fd`（及 `9554b59`） |
-| 移除提交 | `2c3b149`（位于 `review/abuse-backend-rc`，未合并到 `master`） |
+| 移除提交 | `2c3b149`（已合并到最新 `master`；仅移除当前树，历史对象仍保留） |
 | Key 指纹 | `sha256:ed306a6a65652b9d…` |
 | Secret 指纹 | `sha256:f7a38c85167092c2…` |
 | 当前 `master` 审计前状态 | 文件仍含同一对凭据（工作区干净，说明其在 HEAD 中） |
@@ -112,7 +112,7 @@
 审计发现大量测试脚本以明文写入 `admin@epomail.bond / 123456`、`audit_normal_1789140856529@epomail.bond / Audit123!` 等生产/演示账号口令，并直接请求 `https://mail.epocanvas.com` / `epomail.epocanvas.workers.dev`。
 
 **处置**：
-- 当前工作区 108+ 个脚本已改为 `process.env.EPOMAIL_E2E_*_PASSWORD` 注入；缺失时安全失败，不回退默认值。
+- 当前工作区 120+ 个脚本已改为 `process.env.EPOMAIL_LIVE_E2E_*` / `EPOMAIL_E2E_*` 注入；缺失时安全失败，不回退默认值。
 - 新增 `tests/README-E2E-CREDENTIALS.md`。
 - 新增 `known_test_credential` 扫描规则；历史命中记录在 `.secret-scan-baseline.json`。
 - `admin_initial_password` 成为首次 `/init` 创建站长的必需 Secret；生产缺失时初始化失败，**不再创建 `123456` 的站长**。
@@ -186,11 +186,14 @@
 - 角色新增/编辑改为显式字段白名单，禁止 `isDefault`、`userId`、`createTime`、`key`/`roleCode` 等质量赋值；保留角色代码不可自建/改码。
 - 审计后台的封禁/解封调用补传操作者 ID，避免内部调用绕过守卫。
 
-### 4.7 P1：Resend Webhook 无签名校验（已修复）
+### 4.7 P1：Resend Webhook 签名校验（最新远端已有基础实现，本轮补强）
 
-- `/webhooks` 原为公开匿名写接口，可伪造 `email.delivered/bounced/complained` 状态。
-- 修复：实现 Svix 签名校验（`svix-id` + `svix-timestamp` + `svix-signature`，HMAC-SHA256，5 分钟时间窗，恒定时间比较）；原始 body 验签后再 JSON 解析；未配置 `resend_webhook_secret` 时返回 503（fail-closed），签名错误 401，未知事件不改状态。
-- 新增单元测试覆盖有效/无效/过期签名。
+- 最新远端 `3fb1b16` 已加入 Svix 签名与时间窗校验；本轮保留其 `webhook_event` 去重/Outbox 逻辑，并补强：
+  - 未配置 `resend_webhook_secret` 时返回 **503 fail-closed**（原实现返回 500 并回显内部错误）；
+  - 签名比较改为**恒定时间**；缺失/过期签名统一 401；
+  - 原始 body 验签后再 JSON 解析；API 错误响应不再回显内部信息；
+  - 修复合并过程中发现的 `INSERT INTO webhook_event` 重复语句（会导致 webhook 事务语法错误）。
+- 单元测试覆盖有效/无效/过期签名；未配置 secret 的请求被拒绝。
 
 ### 4.8 P1：密码修改与会话撤销（已修复）
 
@@ -234,6 +237,14 @@
 - 移除未使用的 `@cloudflare/vite-plugin`（同时消除一批 dev-server 依赖）
 - `pnpm audit --prod`：worker **0**；mail-vue 剩余 **1 moderate（ECharts < 6.1.0 XSS）**，升级涉及图表主版本，暂列为待评估。
 
+### 4.13 合并最新远端时的额外修复
+
+最新远端 `3ba9e90` 引入了大量新功能与安全补丁。合并过程中额外发现并修复：
+
+- `resend-service.js` 的 `INSERT INTO webhook_event` 语句重复出现两次，会导致 Webhook 事务 SQL 语法错误；已删除重复行。
+- `risk-service.js` 在缺少 `jwt_secret` 时抛出 `BizError`，但文件未导入 `BizError`；已补 import，避免异常路径变成 `ReferenceError`。
+- 远端新增的 15 个 live/Workerd 测试脚本仍含 `123456` / `Audit123!` 等明文口令；已统一改为 `EPOMAIL_LIVE_E2E_*` / `EPOMAIL_E2E_*` 环境变量，并重新扫描通过。
+
 ---
 
 ## 五、待处理 / 无法验证 / 接受的风险
@@ -269,7 +280,7 @@
 | 项目 | 命令 | 结果 |
 |---|---|---|
 | 工作区 Secret 扫描 | `node scripts/secret-scan.mjs` | ✅ 1135 tracked files，0 命中 |
-| 全历史 Secret 扫描 | `node scripts/secret-scan.mjs --history --baseline .secret-scan-baseline.json` | ✅ 3565 blobs / 833 commits，仅基线内已知历史泄露 |
+| 全历史 Secret 扫描 | `node scripts/secret-scan.mjs --history --baseline .secret-scan-baseline.json` | ✅ 3821 blobs / 841 commits，仅基线内已知历史泄露 |
 | Mailjet 离线契约 | `node mail-worker/test-mailjet.js` | ✅ 零网络，请求构造一致 |
 | Mailjet live 缺配置 | `node mail-worker/test-mailjet.js --live` | ✅ exit 1，安全失败 |
 | Worker 安全测试 | `cd mail-worker && npx vitest run` | ✅ 3 files / **28 tests passed** |

@@ -101,7 +101,7 @@ async function adjudicate(id, action, version, notes, extra = {}) {
 // ---------------------------------------------------------------------------
 const init = await http('/api/init', { method: 'POST', headers: { 'X-Init-Secret': INIT_SECRET } });
 check('batch2 e2e init responds success', init.status === 200 && init.text === 'success', `${init.status} ${init.text.slice(0, 80)}`);
-const adminLogin = await http('/api/login', { method: 'POST', body: { email: 'admin@example.com', password: '123456' } });
+const adminLogin = await http('/api/login', { method: 'POST', body: { email: 'admin@example.com', password: (process.env.EPOMAIL_LIVE_E2E_ADMIN_PASSWORD || process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '') } });
 adminToken = adminLogin.body?.data?.token;
 check('batch2 e2e admin login', !!adminToken, `code=${adminLogin.body?.code}`);
 

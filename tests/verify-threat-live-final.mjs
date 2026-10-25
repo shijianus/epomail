@@ -3,7 +3,7 @@ import assert from 'node:assert';
 
 const BASE = 'https://mail.epocanvas.com';
 const ADMIN_EMAIL = 'admin@epomail.cyou';
-const ADMIN_PWD = '123456';
+const ADMIN_PWD = (process.env.EPOMAIL_LIVE_E2E_ADMIN_PASSWORD || process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '');
 
 async function test() {
   console.log('=== [E2E] 生产环境全真栈自动化终验 ===');

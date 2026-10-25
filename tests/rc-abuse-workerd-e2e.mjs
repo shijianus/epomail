@@ -81,7 +81,7 @@ const init = await http('/api/init', { method: 'POST', headers: { 'X-Init-Secret
 check('real workerd init responds success', init.status === 200 && init.text === 'success', `${init.status} ${init.text.slice(0, 80)}`);
 
 const adminLogin = await http('/api/login', {
-	method: 'POST', body: { email: 'admin@example.com', password: '123456' }
+	method: 'POST', body: { email: 'admin@example.com', password: (process.env.EPOMAIL_LIVE_E2E_ADMIN_PASSWORD || process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '') }
 });
 adminToken = adminLogin.body?.data?.token;
 check('admin login issues a real session token', !!adminToken, `http=${adminLogin.status} code=${adminLogin.body?.code}`);
@@ -90,7 +90,7 @@ check('admin login issues a real session token', !!adminToken, `http=${adminLogi
 d1Exec(`INSERT INTO user (user_id,email,password,salt,type,status,is_del)
 VALUES (9000,'rc-normal@example.com','pbkdf2:100000:wYbOCP3rv6muivmiYwmd/oXXroIcxp7/VcB02M+Ac5w=','ZmUlWbNgsFel3E0oxnPHcA==',1,0,0);`);
 const normalLogin = await http('/api/login', {
-	method: 'POST', body: { email: 'rc-normal@example.com', password: '123456' }
+	method: 'POST', body: { email: 'rc-normal@example.com', password: (process.env.EPOMAIL_LIVE_E2E_ADMIN_PASSWORD || process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '') }
 });
 const normalToken = normalLogin.body?.data?.token;
 check('normal user login issues a session token', !!normalToken, `code=${normalLogin.body?.code}`);
@@ -181,7 +181,7 @@ check('internal final notices are delivered by the scheduled outbox processor',
 	JSON.stringify(deliveredOutbox));
 
 const bannedLogin = await http('/api/login', {
-	method: 'POST', body: { email: 'rc-e2e@example.com', password: '123456' }
+	method: 'POST', body: { email: 'rc-e2e@example.com', password: (process.env.EPOMAIL_LIVE_E2E_ADMIN_PASSWORD || process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '') }
 });
 check('banned user login returns only the restricted notice channel',
 	bannedLogin.body?.data?.isRestricted === true && !!bannedLogin.body?.data?.restrictedToken && !!bannedLogin.body?.data?.code,

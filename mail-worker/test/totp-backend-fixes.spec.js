@@ -188,6 +188,7 @@ describe('TOTP Backend Fixes & Security Audit Tests', () => {
 			isDel: 0,
 			totpEnabled: 1,
 			totpSecret: encryptedTotpSecret,
+			totpKeyVersion: 2,
 			totpBackupCodes: '[]',
 			securityKeys: '[]'
 		});

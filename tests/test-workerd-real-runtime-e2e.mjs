@@ -80,7 +80,7 @@ async function runWorkerdRealIntegration() {
   if (!adminToken) {
     const defLogin = await req('/api/login', {
       method: 'POST',
-      body: { email: 'admin@example.com', password: '123456' }
+      body: { email: 'admin@example.com', password: (process.env.EPOMAIL_LIVE_E2E_ADMIN_PASSWORD || process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '') }
     });
     adminToken = defLogin.data?.data?.token;
   }
@@ -96,12 +96,12 @@ async function runWorkerdRealIntegration() {
   await req('/api/user/add', {
     method: 'POST',
     headers: { 'token': adminToken },
-    body: { email: testUserEmail, password: 'UserPass12345!', type: 2 }
+    body: { email: testUserEmail, password: (process.env.EPOMAIL_TEST_PASSWORD || process.env.EPOMAIL_E2E_TEST_PASSWORD || ''), type: 2 }
   });
 
   const userLoginRes = await req('/api/login', {
     method: 'POST',
-    body: { email: testUserEmail, password: 'UserPass12345!' }
+    body: { email: testUserEmail, password: (process.env.EPOMAIL_TEST_PASSWORD || process.env.EPOMAIL_E2E_TEST_PASSWORD || '') }
   });
   assert.strictEqual(userLoginRes.data?.code, 200, '测试用户正常登录成功');
   const userToken = userLoginRes.data?.data?.token;
@@ -145,7 +145,7 @@ async function runWorkerdRealIntegration() {
   console.log('\n--- STEP 6: 封禁账号登录下发受限凭据与一次性启动码 ---');
   const restrictedLoginRes = await req('/api/login', {
     method: 'POST',
-    body: { email: testUserEmail, password: 'UserPass12345!' }
+    body: { email: testUserEmail, password: (process.env.EPOMAIL_TEST_PASSWORD || process.env.EPOMAIL_E2E_TEST_PASSWORD || '') }
   });
   assert.strictEqual(restrictedLoginRes.data?.code, 200);
   assert.strictEqual(restrictedLoginRes.data?.data?.isRestricted, true, '必须标记受限会话');
@@ -193,7 +193,7 @@ async function runWorkerdRealIntegration() {
   // 验证申诉提交后原封禁状态绝对保持有效
   const checkStatusRes = await req('/api/login', {
     method: 'POST',
-    body: { email: testUserEmail, password: 'UserPass12345!' }
+    body: { email: testUserEmail, password: (process.env.EPOMAIL_TEST_PASSWORD || process.env.EPOMAIL_E2E_TEST_PASSWORD || '') }
   });
   assert.strictEqual(checkStatusRes.data?.data?.isRestricted, true, '申诉后原封禁处罚绝对保持有效');
   console.log('  ✓ 申诉提交成功，原处罚绝对保持有效 (isRestricted=true)');
@@ -255,7 +255,7 @@ async function runWorkerdRealIntegration() {
 
   const normalLoginRes = await req('/api/login', {
     method: 'POST',
-    body: { email: testUserEmail, password: 'UserPass12345!' }
+    body: { email: testUserEmail, password: (process.env.EPOMAIL_TEST_PASSWORD || process.env.EPOMAIL_E2E_TEST_PASSWORD || '') }
   });
   assert.strictEqual(normalLoginRes.data?.data?.isRestricted, undefined, '解禁后恢复普通全权登录');
   assert.ok(normalLoginRes.data?.data?.token, '重新签发全权业务 Token');

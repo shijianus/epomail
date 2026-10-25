@@ -19,7 +19,7 @@ async function run() {
   const loginRes = await fetch(`${BASE}/api/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email: 'admin@epomail.cyou', password: '123456' })
+    body: JSON.stringify({ email: 'admin@epomail.cyou', password: (process.env.EPOMAIL_LIVE_E2E_ADMIN_PASSWORD || process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '') })
   });
   const loginJson = await loginRes.json();
   if (loginJson.code !== 200 || !loginJson.data?.token) {
