@@ -48,7 +48,7 @@
 
 ### 2.3 覆盖边界
 
-- Git 历史覆盖：全部本地分支（含 `origin/*`）与标签可达的 **841 个提交、3821 个 blob**（合并最新远端后重新统计）。
+- Git 历史覆盖：全部本地分支（含 `origin/*`）与标签可达的 **843 个提交、3844 个 blob**（合并最新远端后重新统计）。
 - **未覆盖**：不可达的 dangling objects、GitHub 服务端 Secret Scanning 结果、服务商后台日志、未被抓取到本地的远程引用、生产 D1/KV 实际数据。
 - `EpomailDocs` 是独立 Git 仓库（`shijianus/epomail-docs`），工作区内有用户未提交的图片修改；仅做只读扫描，未改动、未提交。
 
@@ -280,7 +280,7 @@
 | 项目 | 命令 | 结果 |
 |---|---|---|
 | 工作区 Secret 扫描 | `node scripts/secret-scan.mjs` | ✅ 1135 tracked files，0 命中 |
-| 全历史 Secret 扫描 | `node scripts/secret-scan.mjs --history --baseline .secret-scan-baseline.json` | ✅ 3821 blobs / 841 commits，仅基线内已知历史泄露 |
+| 全历史 Secret 扫描 | `node scripts/secret-scan.mjs --history --baseline .secret-scan-baseline.json` | ✅ 3844 blobs / 843 commits，仅基线内已知历史泄露 |
 | Mailjet 离线契约 | `node mail-worker/test-mailjet.js` | ✅ 零网络，请求构造一致 |
 | Mailjet live 缺配置 | `node mail-worker/test-mailjet.js --live` | ✅ exit 1，安全失败 |
 | Worker 安全测试 | `cd mail-worker && npx vitest run` | ✅ 3 files / **28 tests passed** |
