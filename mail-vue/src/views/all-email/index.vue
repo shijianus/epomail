@@ -113,7 +113,7 @@
               </div>
               <div class="att-name" :title="att.filename">{{ att.filename }}</div>
               <div class="att-size">{{ formatBytes(att.size) }}</div>
-              <a :href="cvtR2Url(att.key)" download class="att-download" target="_blank">
+              <a :href="attachmentUrl(att)" download class="att-download" target="_blank">
                 <Icon icon="system-uicons:push-down" width="20" height="20"/>
               </a>
             </div>
@@ -146,8 +146,7 @@ import {useSettingStore} from "@/store/setting.js";
 import { useRoute } from 'vue-router';
 import {getIconByName} from "@/utils/icon-utils.js";
 import {formatBytes} from "@/utils/file-utils.js";
-import {cvtR2Url, toOssDomain} from "@/utils/convert.js";
-
+import {useAttachmentUrls} from "@/utils/attachment-urls.js";
 defineOptions({
   name: 'all-email'
 })
@@ -165,16 +164,11 @@ const clearLoading = ref(false)
 
 const showDetailDrawer = ref(false)
 const currentEmail = ref(null)
+const { formatImage, attachmentUrl } = useAttachmentUrls(() => currentEmail.value ? [currentEmail.value] : [])
 
 onMounted(() => {
   emailStore.emailScroll = sysEmailScroll.value;
 })
-
-const formatImage = (content) => {
-  content = content || '';
-  const domain = settingStore.settings?.r2Domain;
-  return content.replace(/{{domain}}/g, toOssDomain(domain) + '/');
-};
 
 const formatRecipient = (recipient) => {
   if (!recipient) return '';

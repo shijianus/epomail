@@ -2,7 +2,10 @@
   "scripts": {
     "security:scan": "node scripts/secret-scan.mjs",
     "security:scan:history": "node scripts/secret-scan.mjs --history --baseline .secret-scan-baseline.json",
-    "test:worker": "npm --prefix mail-worker run test:unit"
+    "test": "npm --prefix mail-worker test",
+    "test:unit": "npm --prefix mail-worker run test:unit",
+    "test:integration": "npm --prefix mail-worker run test:integration",
+    "test:worker": "npm --prefix mail-worker test"
   },
   "devDependencies": {
     "playwright": "^1.63.0"

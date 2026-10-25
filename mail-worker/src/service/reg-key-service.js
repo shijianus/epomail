@@ -1,6 +1,6 @@
 import orm from '../entity/orm';
 import regKey from '../entity/reg-key';
-import { inArray, like, eq, desc, sql, or } from 'drizzle-orm';
+import { inArray, like, eq, desc, sql, or, and, gt } from 'drizzle-orm';
 import roleService from './role-service';
 import BizError from '../error/biz-error';
 import { formatDetailDate, toUtc } from '../utils/date-uitil';
@@ -32,7 +32,7 @@ const regKeyService = {
 			throw new BizError(t('isExistRegKye'));
 		}
 
-		const roleRow = roleService.selectById(c, roleId);
+		const roleRow = await roleService.selectById(c, roleId);
 		if (!roleRow) {
 			throw new BizError(t('roleNotExist'));
 		}
@@ -116,6 +116,23 @@ const regKeyService = {
 			count: sql`${regKey.count}
 	  -
 	  ${count}`
+		}).where(eq(regKey.code, code)).run();
+	},
+
+	/**
+	 * Atomically reserve one registration slot. Returns false when the code is
+	 * exhausted, so concurrent registrations cannot over-redeem an invite.
+	 */
+	async consumeOne(c, code) {
+		const result = await orm(c).update(regKey).set({
+			count: sql`${regKey.count} - 1`
+		}).where(and(eq(regKey.code, code), gt(regKey.count, 0))).run();
+		return Number(result?.meta?.changes ?? result?.changes ?? 0) === 1;
+	},
+
+	async restoreOne(c, code) {
+		await orm(c).update(regKey).set({
+			count: sql`${regKey.count} + 1`
 		}).where(eq(regKey.code, code)).run();
 	},
 

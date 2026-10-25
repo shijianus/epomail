@@ -59,7 +59,8 @@ export async function verifyRs256Jwt(token, jwks, { issuer, audience, clockSkewS
 	const now = Math.floor(Date.now() / 1000);
 
 	if (!payload || typeof payload !== 'object') throw new Error('Malformed JWT payload');
-	if (payload.exp !== undefined && Number(payload.exp) + clockSkewSeconds < now) {
+	if (payload.exp === undefined) throw new Error('JWT missing expiry');
+	if (Number(payload.exp) + clockSkewSeconds < now) {
 		throw new Error('JWT expired');
 	}
 	if (payload.nbf !== undefined && Number(payload.nbf) - clockSkewSeconds > now) {
@@ -81,11 +82,13 @@ export async function verifyRs256Jwt(token, jwks, { issuer, audience, clockSkewS
 const APPLE_JWKS_KEY = 'apple_jwks_v1';
 const APPLE_JWKS_URL = 'https://appleid.apple.com/auth/keys';
 
-export async function getAppleJwks(c) {
-	try {
-		const cached = await c.env.kv.get(APPLE_JWKS_KEY, { type: 'json' });
-		if (cached && Array.isArray(cached.keys) && cached.keys.length > 0) return cached;
-	} catch (_) {}
+export async function getAppleJwks(c, { forceRefresh = false } = {}) {
+	if (!forceRefresh) {
+		try {
+			const cached = await c.env.kv.get(APPLE_JWKS_KEY, { type: 'json' });
+			if (cached && Array.isArray(cached.keys) && cached.keys.length > 0) return cached;
+		} catch (_) {}
+	}
 
 	const response = await fetch(APPLE_JWKS_URL, { signal: AbortSignal.timeout(5000) });
 	if (!response.ok) {
@@ -101,12 +104,32 @@ export async function getAppleJwks(c) {
 	return jwks;
 }
 
-export async function verifyAppleIdToken(c, idToken, clientId) {
-	const jwks = await getAppleJwks(c);
-	return verifyRs256Jwt(idToken, jwks, {
-		issuer: 'https://appleid.apple.com',
-		audience: clientId
-	});
+export async function verifyAppleIdToken(c, idToken, clientId, { nonce } = {}) {
+	let jwks = await getAppleJwks(c);
+	let payload;
+	try {
+		payload = await verifyRs256Jwt(idToken, jwks, {
+			issuer: 'https://appleid.apple.com',
+			audience: clientId
+		});
+	} catch (error) {
+		// Apple rotates signing keys; a cached JWKS without the presented kid
+		// must trigger exactly one forced refresh before rejecting the token.
+		if (!/signing key not found/i.test(error.message)) throw error;
+		jwks = await getAppleJwks(c, { forceRefresh: true });
+		payload = await verifyRs256Jwt(idToken, jwks, {
+			issuer: 'https://appleid.apple.com',
+			audience: clientId
+		});
+	}
+
+	if (nonce !== undefined && nonce !== null && nonce !== '') {
+		if (!payload.nonce || payload.nonce !== nonce) {
+			throw new Error('JWT nonce mismatch');
+		}
+	}
+
+	return payload;
 }
 
 export default { verifyRs256Jwt, getAppleJwks, verifyAppleIdToken };

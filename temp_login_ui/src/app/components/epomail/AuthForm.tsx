@@ -556,49 +556,95 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
 
   const oauthProviderList = useMemo(() => getOAuthProviderList(sysConfig), [sysConfig]);
 
-  // 处理 OAuth 重定向回跳与授权令牌提取 (如 /login?oauth_token=xxx 或 /login?error=xxx)
+  // 处理 OAuth 重定向回跳：只接受短时、单次使用的交换码，绝不从 URL 读取长期 JWT
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const params = new URLSearchParams(window.location.search);
-    const oauthToken = params.get('oauth_token');
+    const oauthCode = params.get('oauth_code');
     const oauthErr = params.get('error');
+    const returnedClientState = params.get('oauth_client_state') || '';
 
-    if (oauthToken) {
+    let expectedClientState = '';
+    try {
+      expectedClientState = sessionStorage.getItem('epo_oauth_state') || '';
+      sessionStorage.removeItem('epo_oauth_state');
+    } catch (_) {}
+
+    const storeSession = (oauthToken: string, uInfo: any) => {
+      const activeEmail = uInfo.email || uInfo.name || 'oauth_user';
+
+      let sessions: any[] = [];
+      try {
+        const raw = localStorage.getItem('epo_sessions');
+        if (raw) sessions = JSON.parse(raw) || [];
+      } catch (_) {}
+
+      const idx = sessions.findIndex(s => s.email === activeEmail);
+      if (idx >= 0) {
+        sessions[idx].token = oauthToken;
+        sessions[idx].name = uInfo.name || uInfo.nickname || activeEmail;
+      } else {
+        sessions.push({
+          u: sessions.length,
+          token: oauthToken,
+          email: activeEmail,
+          name: uInfo.name || uInfo.nickname || activeEmail
+        });
+      }
+
+      try {
+        localStorage.setItem('epo_sessions', JSON.stringify(sessions));
+        localStorage.setItem('token', oauthToken);
+        localStorage.setItem('loginEmail', activeEmail);
+      } catch (_) {}
+      syncLangToMainApp();
+    };
+
+    if (oauthCode) {
       window.history.replaceState({}, '', window.location.pathname);
+      // The code is only exchanged in the browser that started this OAuth
+      // flow; otherwise a crafted callback could log the victim into the
+      // attacker's mailbox (login CSRF).
+      if (returnedClientState !== expectedClientState) {
+        setErrorMsg(tr('opFailed'));
+        return;
+      }
       setStatus("warping");
-      fetch('/api/user/info', {
-        headers: { token: oauthToken }
+      fetch('/api/oauth/exchange', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: oauthCode })
       })
-        .then(r => (r.ok ? r.json() : null))
-        .then(res => {
-          const uInfo = (res && res.data) || {};
-          const activeEmail = uInfo.email || uInfo.name || 'oauth_user';
-
-          let sessions: any[] = [];
-          try {
-            const raw = localStorage.getItem('epo_sessions');
-            if (raw) sessions = JSON.parse(raw) || [];
-          } catch (_) {}
-
-          const idx = sessions.findIndex(s => s.email === activeEmail);
-          if (idx >= 0) {
-            sessions[idx].token = oauthToken;
-            sessions[idx].name = uInfo.name || uInfo.nickname || activeEmail;
-          } else {
-            sessions.push({
-              u: sessions.length,
-              token: oauthToken,
-              email: activeEmail,
-              name: uInfo.name || uInfo.nickname || activeEmail
-            });
+        .then(r => r.json())
+        .then(async res => {
+          if (!res || res.code !== 200 || !res.data) {
+            throw new Error('OAuth exchange failed');
           }
-
-          try {
-            localStorage.setItem('epo_sessions', JSON.stringify(sessions));
-            localStorage.setItem('token', oauthToken);
-            localStorage.setItem('loginEmail', activeEmail);
-          } catch (_) {}
-          syncLangToMainApp();
+          if (res.data.isRestricted && res.data.restrictedToken) {
+            try {
+              sessionStorage.setItem('epomail_restricted_token', res.data.restrictedToken);
+            } catch (_) {}
+            setStatus("success");
+            setSuccessMsg(res.data.message || tr('opFailed'));
+            setTimeout(() => {
+              window.location.href = '/notice/restricted';
+            }, 500);
+            return;
+          }
+          if (res.data.mfaRequired) {
+            beginMfaChallenge(res.data, res.data.email || '');
+            return;
+          }
+          if (!res.data.token) {
+            throw new Error('OAuth exchange failed');
+          }
+          const userRes = await fetch('/api/user/info', {
+            headers: { token: res.data.token }
+          }).then(r => r.json());
+          if (!userRes || userRes.code !== 200) {
+            throw new Error('OAuth session lookup failed');
+          }
+          storeSession(res.data.token, userRes.data || {});
 
           setStatus("success");
           cameraState.authSuccessOpacity = 1;
@@ -610,12 +656,14 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
             window.location.href = '/mail/u/0/#inbox';
           }, 600);
         })
-        .catch(err => {
+        .catch(() => {
           setStatus("idle");
-          setErrorMsg(err?.message || tr('opFailed'));
+          setErrorMsg(tr('opFailed'));
         });
     } else if (oauthErr) {
-      setErrorMsg(oauthErr === 'missing_code' ? tr('opFailed') : decodeURIComponent(oauthErr));
+      window.history.replaceState({}, '', window.location.pathname);
+      // Never render raw provider/query text: only a localized generic error.
+      setErrorMsg(tr('opFailed'));
     }
   }, [t, tr, canvasRef]);
 
@@ -628,7 +676,13 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
     try {
       const origin = typeof window !== 'undefined' ? window.location.origin : '';
       const redirectUri = `${origin}/api/oauth/callback/${provider.key}`;
-      const res = await fetch(`/api/oauth/authorize/${provider.key}?redirect_uri=${encodeURIComponent(redirectUri)}`);
+      const clientState = (typeof crypto !== 'undefined' && crypto.randomUUID)
+        ? crypto.randomUUID()
+        : `${Date.now()}_${Math.random().toString(36).slice(2)}`;
+      try {
+        sessionStorage.setItem('epo_oauth_state', clientState);
+      } catch (_) {}
+      const res = await fetch(`/api/oauth/authorize/${provider.key}?redirect_uri=${encodeURIComponent(redirectUri)}&state=${encodeURIComponent(clientState)}`);
       const data = await res.json().catch(() => null);
       if (data && data.code === 200 && data.data?.url) {
         window.location.href = data.data.url;
@@ -847,6 +901,78 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
     return rawMsg;
   };
 
+  const beginMfaChallenge = (payload: any, fallbackEmail: string) => {
+    const tToken = payload?.tempToken;
+    if (!tToken) {
+      setStatus("idle");
+      setErrorMsg(tr('opFailed'));
+      return;
+    }
+    const targetEmail = payload?.email || fallbackEmail;
+    const pks = payload?.passkeys || [];
+    const hasPk = Boolean(payload?.hasPasskeys || (pks && pks.length > 0));
+    const hasT = Boolean(payload?.hasTotp ?? true);
+    const hasBc = Boolean(payload?.hasBackupCodes ?? true);
+    const pkChallenge = payload?.passkeyChallenge || '';
+    const isStepUp = Boolean(payload?.stepUpRequired);
+    const rScore = Number(payload?.riskScore || 0);
+
+    const newHash = generateSessionHash();
+    setChallengeSessionHash(newHash);
+
+    setTempToken(tToken);
+    setMfaEmail(targetEmail);
+    setHasPasskeys(hasPk);
+    setPasskeysList(pks);
+    setPasskeyChallenge(pkChallenge);
+    setHasTotp(hasT);
+    setHasBackupCodes(hasBc);
+
+    setStage("totp");
+    setStatus("idle");
+    setTotpDigits(["", "", "", "", "", ""]);
+    setBackupCode("");
+    setIsBackupCode(false);
+    setShowHelp(false);
+    setErrorMsg("");
+    setStepUpActive(isStepUp);
+    setVerifiedFactors([]);
+    setShowMethodSelector(false);
+
+    let initialMethod: TwoFAMethod = "totp";
+    if (hasPk) {
+      initialMethod = "passkey";
+    } else if (hasT) {
+      initialMethod = "totp";
+    } else {
+      initialMethod = "backup_code";
+    }
+    setActive2FAMethod(initialMethod);
+
+    const sessionData = {
+      sessionHash: newHash,
+      tempToken: tToken,
+      email: targetEmail,
+      hasPasskeys: hasPk,
+      passkeysList: pks,
+      passkeyChallenge: pkChallenge,
+      hasTotp: hasT,
+      hasBackupCodes: hasBc,
+      createdAt: Date.now(),
+      stepUpRequired: isStepUp,
+      riskScore: rScore
+    };
+    try {
+      sessionStorage.setItem('epo_2fa_challenge_session', JSON.stringify(sessionData));
+    } catch (_) {}
+
+    const urlMethod = initialMethod === 'backup_code' ? 'backup' : initialMethod;
+    updateChallengeUrl(urlMethod, newHash);
+
+    cameraState.vzTarget = 1.35;
+    canvasRef.current?.pulse({ color: "cyan", strength: 2.2 });
+  };
+
   const handlePasswordSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (status !== "idle") return;
@@ -868,73 +994,7 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
       if (data.code === 200) {
         // Check if 2FA is required
         if (data.data?.mfaRequired || data.mfaRequired) {
-          const tToken = data.data?.tempToken || data.tempToken;
-          const targetEmail = data.data?.email || data.email || email;
-          const pks = data.data?.passkeys || data.passkeys || [];
-          const hasPk = Boolean(data.data?.hasPasskeys || (pks && pks.length > 0));
-          const hasT = Boolean(data.data?.hasTotp ?? true);
-          const hasBc = Boolean(data.data?.hasBackupCodes ?? true);
-          const pkChallenge = data.data?.passkeyChallenge || data.passkeyChallenge || '';
-          const isStepUp = Boolean(data.data?.stepUpRequired || data.stepUpRequired);
-          const rScore = Number(data.data?.riskScore || data.riskScore || 0);
-
-          const newHash = generateSessionHash();
-          setChallengeSessionHash(newHash);
-
-          setTempToken(tToken);
-          setMfaEmail(targetEmail);
-          setHasPasskeys(hasPk);
-          setPasskeysList(pks);
-          setPasskeyChallenge(pkChallenge);
-          setHasTotp(hasT);
-          setHasBackupCodes(hasBc);
-
-          setStage("totp");
-          setStatus("idle");
-          setTotpDigits(["", "", "", "", "", ""]);
-          setBackupCode("");
-          setIsBackupCode(false);
-          setShowHelp(false);
-          setErrorMsg("");
-          setStepUpActive(isStepUp);
-          setVerifiedFactors([]);
-          setShowMethodSelector(false);
-
-          let initialMethod: TwoFAMethod = "totp";
-          if (hasPk) {
-            initialMethod = "passkey";
-          } else if (hasT) {
-            initialMethod = "totp";
-          } else {
-            initialMethod = "backup_code";
-          }
-          setActive2FAMethod(initialMethod);
-
-          // 保存当前标签页的独立 2FA 会话数据（不同环境复制粘贴链接打开无此数据将自动回退）
-          const sessionData = {
-            sessionHash: newHash,
-            tempToken: tToken,
-            email: targetEmail,
-            hasPasskeys: hasPk,
-            passkeysList: pks,
-            passkeyChallenge: pkChallenge,
-            hasTotp: hasT,
-            hasBackupCodes: hasBc,
-            createdAt: Date.now(),
-            stepUpRequired: isStepUp,
-            riskScore: rScore
-          };
-          try {
-            sessionStorage.setItem('epo_2fa_challenge_session', JSON.stringify(sessionData));
-          } catch (_) {}
-
-          // 更新 URL 为普遍规律前缀 + base64url sha 会话标识
-          const urlMethod = initialMethod === 'backup_code' ? 'backup' : initialMethod;
-          updateChallengeUrl(urlMethod, newHash);
-
-          // 连续性星际巡航平滑降速与高能青光脉冲
-          cameraState.vzTarget = 1.35;
-          canvasRef.current?.pulse({ color: "cyan", strength: 2.2 });
+          beginMfaChallenge(data.data || data, email);
           return;
         }
 

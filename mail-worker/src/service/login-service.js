@@ -169,11 +169,29 @@ const loginService = {
 
 		const { salt, hash } = await saltHashUtils.hashPassword(password, c.env);
 
-		const userId = await userService.insert(c, { email, regKeyId,password: hash, salt, type: type || defType });
+		// Reserve the invite slot atomically before creating the account. A
+		// read-then-decrement flow lets concurrent registrations over-redeem
+		// the same code.
+		let reservedRegKey = false;
+		if (regKey !== settingConst.regKey.CLOSE && type) {
+			reservedRegKey = await regKeyService.consumeOne(c, code);
+			if (!reservedRegKey) {
+				throw new BizError(t('noRegKeyCount'));
+			}
+		}
 
-		const acc = await accountService.insert(c, { userId: userId, email, name: assignedName });
-
-		await userService.updateUserInfo(c, userId, true);
+		let userId;
+		let acc;
+		try {
+			userId = await userService.insert(c, { email, regKeyId, password: hash, salt, type: type || defType });
+			acc = await accountService.insert(c, { userId: userId, email, name: assignedName });
+			await userService.updateUserInfo(c, userId, true);
+		} catch (err) {
+			if (reservedRegKey) {
+				try { await regKeyService.restoreOne(c, code); } catch (_) {}
+			}
+			throw err;
+		}
 
 		try {
 			const emailService = (await import('./email-service')).default;
@@ -183,10 +201,6 @@ const loginService = {
 			}
 		} catch (err) {
 			console.error('Failed to deliver welcome email on register:', err);
-		}
-
-		if (regKey !== settingConst.regKey.CLOSE && type) {
-			await regKeyService.reduceCount(c, code, 1);
 		}
 
 		if (registerVerify === settingConst.registerVerify.COUNT && !regVerifyOpen) {

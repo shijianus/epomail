@@ -1,5 +1,6 @@
 import { env, SELF } from 'cloudflare:test';
 import { describe, it, expect, beforeEach } from 'vitest';
+import { buildSignedObjectUrl } from '../src/utils/object-token.js';
 
 describe('Public object storage isolation', () => {
 	beforeEach(async () => {
@@ -24,15 +25,59 @@ describe('Public object storage isolation', () => {
 		}
 	});
 
-	it('serves explicitly allow-listed object keys', async () => {
+	it('does not serve attachments without a capability signature', async () => {
 		await env.kv.put('attachments/test-secret.txt', 'hello attachment', {
 			metadata: { contentType: 'text/plain' }
 		});
 
-		const response = await SELF.fetch('http://example.com/api/oss/attachments/test-secret.txt');
+		const viaOss = await SELF.fetch('http://example.com/api/oss/attachments/test-secret.txt');
+		expect(viaOss.status).toBe(404);
+		expect(await viaOss.text()).not.toContain('hello attachment');
+
+		const viaDirect = await SELF.fetch('http://example.com/attachments/test-secret.txt');
+		expect(viaDirect.status).toBe(404);
+		expect(await viaDirect.text()).not.toContain('hello attachment');
+	});
+
+	it('serves explicitly allow-listed object keys through a signed capability', async () => {
+		await env.kv.put('attachments/test-secret.txt', 'hello attachment', {
+			metadata: { contentType: 'text/plain' }
+		});
+
+		const signedUrl = await buildSignedObjectUrl({ env }, 'attachments/test-secret.txt', { userId: 1, ttlSeconds: 60 });
+		const response = await SELF.fetch(`http://example.com/api${signedUrl}`);
 		expect(response.status).toBe(200);
 		expect(await response.text()).toBe('hello attachment');
 		expect(response.headers.get('X-Content-Type-Options')).toBe('nosniff');
+		expect(response.headers.get('Cache-Control')).toBe('no-store');
+	});
+
+	it('rejects tampered signatures, keys and expiry parameters', async () => {
+		await env.kv.put('attachments/test-secret.txt', 'hello attachment', {
+			metadata: { contentType: 'text/plain' }
+		});
+
+		const signedUrl = await buildSignedObjectUrl({ env }, 'attachments/test-secret.txt', { userId: 1, ttlSeconds: 60 });
+		const tamperedSignature = signedUrl.replace(/sig=[^&]+/, 'sig=AAAA');
+		const tamperedKey = signedUrl.replace('test-secret.txt', 'other-secret.txt');
+		const malformedExpiry = signedUrl.replace(/exp=\d+/, 'exp=99999999999999');
+
+		for (const url of [tamperedSignature, tamperedKey, malformedExpiry]) {
+			const response = await SELF.fetch(`http://example.com/api${url}`);
+			expect(response.status).toBe(404);
+			expect(await response.text()).not.toContain('hello attachment');
+		}
+	});
+
+	it('keeps static assets public without a signature', async () => {
+		await env.kv.put('static/avatar/1/avatar.png', 'avatar-bytes', {
+			metadata: { contentType: 'image/png', contentDisposition: 'inline' }
+		});
+
+		const response = await SELF.fetch('http://example.com/api/oss/static/avatar/1/avatar.png');
+		expect(response.status).toBe(200);
+		expect(await response.text()).toBe('avatar-bytes');
+		expect(response.headers.get('Content-Type')).toBe('image/png');
 	});
 
 	it('rejects traversal and encoded KV-style keys', async () => {
@@ -85,5 +130,97 @@ describe('Public API hardening', () => {
 			headers: { Origin: 'https://third-party.example' }
 		});
 		expect(oauth.headers.get('Access-Control-Allow-Origin')).toBe('*');
+	});
+
+	it('does not grant a cross-origin preflight by default', async () => {
+		const response = await SELF.fetch('http://example.com/api/email/list', {
+			method: 'OPTIONS',
+			headers: {
+				Origin: 'https://evil.example',
+				'Access-Control-Request-Method': 'GET',
+				'Access-Control-Request-Headers': 'authorization'
+			}
+		});
+		expect(response.headers.get('Access-Control-Allow-Origin')).toBeNull();
+	});
+});
+
+describe('OAuth public callback boundary', () => {
+	it('rejects a callback without a server-issued state before contacting the provider', async () => {
+		const missingCode = await SELF.fetch('http://example.com/api/oauth/callback/apple', { redirect: 'manual' });
+		expect(missingCode.status).toBe(302);
+		expect(missingCode.headers.get('Location')).toContain('oauth_missing_code');
+
+		const badState = await SELF.fetch('http://example.com/api/oauth/callback/apple?code=fake&state=guessed', { redirect: 'manual' });
+		expect(badState.status).toBe(302);
+		expect(badState.headers.get('Location')).toContain('oauth_state_invalid');
+	});
+
+	it('exchanges a short-lived login code once and never via the callback URL', async () => {
+		const code = 'short-lived-login-code';
+		await env.kv.put(`oauth_login_code:${code}`, JSON.stringify({
+			token: 'mailbox-jwt-value',
+			provider: 'apple',
+			userInfo: { oauthUserId: 'apple:user-1' },
+			createdAt: Date.now()
+		}), { expirationTtl: 60 });
+
+		const first = await SELF.fetch('http://example.com/api/oauth/exchange', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ code })
+		});
+		const firstBody = await first.json();
+		expect(firstBody.code).toBe(200);
+		expect(firstBody.data.token).toBe('mailbox-jwt-value');
+
+		const second = await SELF.fetch('http://example.com/api/oauth/exchange', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ code })
+		});
+		expect((await second.json()).code).toBe(401);
+	});
+
+	it('propagates an MFA challenge instead of issuing a session token', async () => {
+		const code = 'oauth-mfa-code';
+		await env.kv.put(`oauth_login_code:${code}`, JSON.stringify({
+			token: null,
+			mfa: {
+				mfaRequired: true,
+				tempToken: 'totp_tmp_oauth',
+				email: 'mfa@example.com',
+				hasTotp: true,
+				hasPasskeys: false
+			},
+			provider: 'apple',
+			userInfo: { oauthUserId: 'apple:user-1' },
+			createdAt: Date.now()
+		}), { expirationTtl: 60 });
+
+		const response = await SELF.fetch('http://example.com/api/oauth/exchange', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ code })
+		});
+		const body = await response.json();
+		expect(body.code).toBe(200);
+		expect(body.data.token).toBeUndefined();
+		expect(body.data.mfaRequired).toBe(true);
+		expect(body.data.tempToken).toBe('totp_tmp_oauth');
+	});
+
+	it('rejects an unregistered redirect_uri on the authorize endpoint', async () => {
+		await env.kv.put('setting:', JSON.stringify({
+			oauthProviders: { apple: { clientId: 'test-client-id', clientSecret: 'test-client-secret', enabled: 1 } }
+		}));
+		try {
+			const response = await SELF.fetch('http://example.com/api/oauth/authorize/apple?redirect_uri=https%3A%2F%2Fattacker.example%2Fcallback');
+			const body = await response.json();
+			expect(body.code).not.toBe(200);
+			expect(body.message).toContain('redirect_uri');
+		} finally {
+			await env.kv.delete('setting:');
+		}
 	});
 });

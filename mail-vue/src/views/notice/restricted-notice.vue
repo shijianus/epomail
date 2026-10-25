@@ -67,7 +67,7 @@
             <span>{{ $t('auditNoticeDocumentTitle') || '处置告知书正文' }}</span>
           </div>
 
-          <div v-if="noticeData.htmlContent" class="notice-html-wrapper" v-html="noticeData.htmlContent"></div>
+          <div v-if="noticeData.htmlContent" class="notice-html-wrapper" v-html="safeNoticeHtml"></div>
           <div v-else class="notice-text-content">
             <pre class="formatted-pre">{{ noticeData.textContent }}</pre>
           </div>
@@ -137,11 +137,12 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { ElMessage } from 'element-plus';
 import { Icon } from '@iconify/vue';
+import DOMPurify from 'dompurify';
 
 const route = useRoute();
 const { t } = useI18n();
@@ -149,6 +150,14 @@ const { t } = useI18n();
 const loading = ref(true);
 const error = ref('');
 const noticeData = ref(null);
+const safeNoticeHtml = computed(() => {
+  const html = noticeData.value?.htmlContent;
+  if (!html) return '';
+  return DOMPurify.sanitize(html, {
+    FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'form'],
+    FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover', 'onfocus']
+  });
+});
 const appealText = ref('');
 const submittingAppeal = ref(false);
 

@@ -14,6 +14,31 @@ import aiService from '../service/ai-service';
 import { applyRules } from './rule-engine';
 import kvConst from '../const/kv-const';
 
+/**
+ * Read and decode the raw SMTP payload incrementally. TextDecoder with
+ * { stream: true } preserves multi-byte characters split across chunks.
+ */
+export async function readRawEmail(message, maxLimitBytes, maxLimitMB) {
+	const reader = message.raw.getReader();
+	const decoder = new TextDecoder();
+	let content = '';
+	let totalBytes = 0;
+
+	while (true) {
+		const { done, value } = await reader.read();
+		if (done) break;
+		totalBytes += value ? value.byteLength : 0;
+		if (totalBytes > maxLimitBytes) {
+			try { await reader.cancel(); } catch (_) {}
+			message.setReject(`Email exceeds the maximum allowed size of ${maxLimitMB}MB`);
+			return { content: '', totalBytes, tooLarge: true };
+		}
+		content += decoder.decode(value, { stream: true });
+	}
+	content += decoder.decode();
+	return { content, totalBytes, tooLarge: false };
+}
+
 export async function email(message, env, ctx) {
 
 	try {
@@ -46,23 +71,11 @@ export async function email(message, env, ctx) {
 		// 收件大小限制
 		const maxLimitMB = (env.admin === message.to) ? 100 : 25;
 		const maxLimitBytes = maxLimitMB * 1024 * 1024;
-		const reader = message.raw.getReader();
-		const decoder = new TextDecoder();
-		let content = '';
-		let totalBytes = 0;
-
-		while (true) {
-			const { done, value } = await reader.read();
-			if (done) break;
-			totalBytes += value ? value.byteLength : 0;
-			if (totalBytes > maxLimitBytes) {
-				try { await reader.cancel(); } catch (_) {}
-				message.setReject(`Email exceeds the maximum allowed size of ${maxLimitMB}MB`);
-				return;
-			}
-			content += decoder.decode(value, { stream: true });
+		const raw = await readRawEmail(message, maxLimitBytes, maxLimitMB);
+		if (raw.tooLarge) {
+			return;
 		}
-		content += decoder.decode();
+		const content = raw.content;
 
 
 		const email = await PostalMime.parse(content);

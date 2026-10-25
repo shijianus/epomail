@@ -144,6 +144,21 @@ describe('Network and storage boundaries', () => {
 		expect(svg['Content-Type']).toBe('application/octet-stream');
 		expect(svg['Content-Disposition']).toBe('attachment');
 	});
+
+	it('never lets stored metadata make a private attachment publicly cacheable', () => {
+		const privateObj = safeObjectHeaders({
+			contentType: 'image/png',
+			contentDisposition: 'inline',
+			cacheControl: 'public, max-age=31536000, immutable',
+			isPublic: false
+		});
+		expect(privateObj['Cache-Control']).toBe('private, no-store');
+		expect(privateObj['Cross-Origin-Resource-Policy']).toBe('same-origin');
+
+		const publicObj = safeObjectHeaders({ contentType: 'image/png', isPublic: true });
+		expect(publicObj['Cache-Control']).toBe('public, max-age=86400');
+		expect(publicObj['Cross-Origin-Resource-Policy']).toBe('cross-origin');
+	});
 });
 
 describe('SVG and RS256 hardening', () => {

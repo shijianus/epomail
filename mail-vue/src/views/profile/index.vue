@@ -408,7 +408,7 @@ const showTooltip = (e, text, color) => {
   floatTooltip.value.style.display = 'block'
   floatTooltip.value.style.left = (e.clientX + 15) + 'px'
   floatTooltip.value.style.top = (e.clientY + 15) + 'px'
-  floatTooltip.value.innerHTML = text
+  floatTooltip.value.textContent = text
   floatTooltip.value.style.borderColor = color
   floatTooltip.value.style.color = color
 }
