@@ -8,6 +8,47 @@
 >
 > 每次开发/重构/修复上线后，请按时间倒序（最新置顶）追加至本文件。
 
+### EpoMail v1.2.0 稳定版正式发布与 Cloudflare 生产环境全量上线 (2026-10-25)
+*   **关联提交 (Git Commit)**: `f52aea6dfe1b9a6a34c789ff6d017a3b75e7bc5f` (Short: `f52aea6`)
+*   **发布标签 (Git Tag)**: `v1.2.0` (Stable Release)
+*   **部署环境 (Deployment)**: `生产 Cloudflare (epomail.epocanvas.workers.dev / mail.epocanvas.com · Worker Version ID: d6dc0ec7-8915-4ed2-b6be-35603d330be2)`
+*   **部署调度 (Cron Triggers)**: `0 16 * * *` (夜间例行清理与 Outbox 巡检) + `*/5 * * * *` (每 5 分钟通知 Outbox 投递与租约检查)
+*   **回滚锚点 (Rollback Anchor)**: `0d8ec28a-eafc-4271-bdb4-374fad0992c2`（上一生产发布版本）
+*   **版本功能与变更清单 (Changes & Feature Alignment)**:
+    - [x] **违规处罚、裁决引擎与处置通知全链路闭环**:
+        - 落地多案物理隔离，单案解封绝不提前释放其他生效案件处罚；受限凭据由签名凭证强绑定源案件，根除 IDOR 跨案越权。
+        - 服务层与 D1 触发器双重 CAS 乐观锁防篡改，NULL/非法状态/陈旧版本均原子级回滚拒绝，零副作用残留。
+        - 封禁用户签发专用 restrictedToken 与短时一次性兑换码（自毁机制），支持安全脱敏通知与合规在线申诉。
+        - Outbox 队列每 5 分钟定时调度与租约并发保护，Resend Webhook Svix 验签与乱序幂等状态机同步。
+    - [x] **UI 事实化与幻觉彻底清零 (Zero-Hallucination UI)**:
+        - 审计详情抽屉全面移除前端硬编码的伪造规则码、假集群账号、假哈希及伪造时间线。
+        - 100% 严格基于 D1 数据库记录真实数据呈现，缺失字段规范展示 `—`，杜绝任何假数据产生幻觉。
+    - [x] **PBKDF2 云端混合派发与 TOTP 物理域隔离**:
+        - 接入 `@noble/hashes` 解决 Cloudflare Workers WebCrypto 原生 100k 迭代限制，完全兼容存量 210,000 次自描述哈希验证。
+        - 支持 `PBKDF2_WRITER_ITERATIONS` 环境变量控制写入策略，平滑兼容低配置环境冷启动 CPU 预算。
+        - TOTP 强制独立 `totp_enc_key` 密匙物理隔离，零静默回退 `jwt_secret`，登录时自动平滑升级旧版密文至 `totp_key_version=2`。
+    - [x] **保留期保护与维护能力边界收敛**:
+        - 撤销无政策依据的 `purgeOnRelease`（写入前 400 明确拒绝，零副作用）。
+        - `/api/audit/purge` 维护接口仅允许清理 >180 天且未被生效处罚引用的 normal 审计记录，台账、申诉与通知记录永久保留。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] **Batch-2 综合回归套件**: `tests/test-batch2-fixes.mjs` 全绿通过 (11/11 阶段断言通过)
+    - [x] **服务端裁决全链路测试**: `tests/test-audit-service-backend.mjs` 全绿通过 (22/22 断言通过)
+    - [x] **阻断缺陷复现与守卫测试**: `tests/rc-abuse-blocking-repro.mjs` 全绿通过 (17/17 场景通过)
+    - [x] **阻断缺陷修复回归**: `tests/test-four-defects-repro.mjs` 全绿通过 (4/4 项通过)
+    - [x] **裁决闭环后端测试**: `tests/test-adjudication-closedloop.mjs` 全绿通过 (7/7 需求通过)
+    - [x] **GLM 复测阻断项回归**: `tests/test-glm-verification-repro.mjs` 全绿通过 (8/8 项通过)
+    - [x] **TOTP 安全与迁移测试**: `tests/test-totp-backend-fixes.mjs` 全绿通过 (5/5 大项通过)
+    - [x] **PBKDF2 云端兼容性套件**: `tests/test-pbkdf2-cloud-compat.mjs` 全绿通过 (43/43 断言通过)
+    - [x] **裁决工作台引擎测试**: `tests/test-adjudication-engine.mjs` 全绿通过 (10/10 项通过)
+    - [x] **Worker 真实 HTTP 链接 E2E**: `tests/test-worker-adjudication-e2e.mjs` 全绿通过 (13/13 步骤通过)
+    - [x] **前端无幻觉事实化 UI 烟测**: `tests/rc-abuse-ui-smoke.mjs` 全绿通过 (9/9 项通过，零虚构证据/零假账号/零伪造时间线)
+    - [x] **TOTP 登录高阶动效 E2E**: `tests/test-totp-login-ui-e2e.mjs` 全绿通过 (8/8 交互动效通过)
+    - [x] **多语言 i18n 六国语言对称门禁**: `mail-vue` (3022 keys) 与 `mail-worker` (1929 keys) 100% 绝对对称
+    - [x] **代码防泄漏门禁**: `scripts/scan-staged-secrets.mjs` 扫描 0 泄露
+    - [x] **Cloudflare 生产构建与发布**: Worker Version ID `d6dc0ec7-8915-4ed2-b6be-35603d330be2` 成功激活
+    - [x] **生产在线健康探测**: `https://epomail.epocanvas.workers.dev` 与 `https://mail.epocanvas.com` 均返回 `HTTP/2 200`
+
+
 ### 隔离 staging 阶段交付归档（任务关闭记录，只读核实后记录，无源码/部署变更）(2026-10-25)
 
 > 本条目为阶段收口归档：无 commit/push/合并/生产部署/测试重跑/构建（按 owner 指令）。
