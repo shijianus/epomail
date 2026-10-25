@@ -2043,7 +2043,7 @@ const emailService = {
 	 * - 被守卫拦截但属于新事实的事件（如 bounced/failed/complained 撞上已记录的不同终态），
 	 *   以时间戳事实行追加进 message，不覆盖既有事实，实现投递/退信/投诉事实分别留痕。
 	 */
-	updateEmailStatus(c, params) {
+	async updateEmailStatus(c, params) {
 		const { status, resendEmailId, message, eventId } = params;
 		const st = emailConst.status;
 		const terminalStates = [st.BOUNCED, st.FAILED, st.COMPLAINED, st.DELIVERED];
@@ -2064,7 +2064,7 @@ const emailService = {
 			return null;
 		}
 
-		const guarded = orm(c).update(email).set({
+		const guardedResult = await orm(c).update(email).set({
 			status: status,
 			...(message !== undefined && message !== null ? { message: message } : {})
 		}).where(
@@ -2074,34 +2074,25 @@ const emailService = {
 			)
 		).run();
 
-		const guardedResult = guarded;
+		const changes = guardedResult?.meta?.changes ?? guardedResult?.changes ?? 0;
+
 		// 守卫放行路径返回受影响行；被守卫拦截且属于新事实的事件，向 message 追加事实行留痕
-		const applyFactAppend = async () => {
-			const changes = guardedResult?.meta?.changes ?? guardedResult?.changes ?? 0;
-			if (changes > 0 || !transition.fact) {
-				return;
-			}
+		if (changes === 0 && transition.fact) {
 			const factKey = eventId ? `provider-fact:${eventId}` : `provider-fact:${status}:${new Date().toISOString()}`;
 			const factLine = `[${factKey}] event status=${status}${message ? ' detail=' + String(message).slice(0, 500) : ''}`;
 			const existing = await orm(c).select({ emailId: email.emailId, message: email.message }).from(email)
 				.where(eq(email.resendEmailId, resendEmailId)).get();
-			if (!existing || (existing.message || '').includes(factKey)) {
-				return;
+			if (existing && !(existing.message || '').includes(factKey)) {
+				await orm(c).update(email).set({
+					message: (existing.message ? existing.message + '\n' : '') + factLine
+				}).where(eq(email.emailId, existing.emailId)).run();
 			}
-			await orm(c).update(email).set({
-				message: (existing.message ? existing.message + '\n' : '') + factLine
-			}).where(eq(email.emailId, existing.emailId)).run();
-		};
+		}
 
-		// updateEmailStatus 在 webhook 处理链路中为 await 调用；保持异步事实追加完成后返回
-		return (async () => {
-			await applyFactAppend();
-			const changes = guardedResult?.meta?.changes ?? guardedResult?.changes ?? 0;
-			if (changes === 0) {
-				return null;
-			}
-			return await orm(c).select().from(email).where(eq(email.resendEmailId, resendEmailId)).get();
-		})();
+		if (changes === 0) {
+			return null;
+		}
+		return await orm(c).select().from(email).where(eq(email.resendEmailId, resendEmailId)).get();
 	},
 
 	/**

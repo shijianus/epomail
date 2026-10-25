@@ -129,9 +129,10 @@ const resendService = {
 		// 投影先落地，若后续台账批次失败，提供商重试会再次进入本流程 ——
 		// 守卫使投影幂等（重复应用为零行变更），台账批次重试直至成功，整体收敛一致。
 		if (params.resendEmailId) {
-			try {
-				await emailService.updateEmailStatus(c, params);
-			} catch (_) {}
+			// Projection failure must abort before the ledger row is written.
+			// Swallowing it would mark the event processed while the mailbox
+			// record stays stale; every provider retry would then be deduped.
+			await emailService.updateEmailStatus(c, params);
 		}
 
 		// 2. 数据库级强一致去重台账与 Outbox 状态机单批原子提交

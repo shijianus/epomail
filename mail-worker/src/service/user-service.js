@@ -977,6 +977,10 @@ const userService = {
 	async setType(c, params, callerUserId) {
 		const { type, userId } = params;
 
+		// Changing a role must also prove the caller may manage the target's
+		// current role; otherwise a lower-privileged caller could strip a
+		// higher-privileged account down to a role they can assign.
+		await rbacGuard.assertCanManageUser(c, callerUserId, Number(userId));
 		await rbacGuard.assertCanAssignRole(c, callerUserId, Number(type));
 
 		const roleRow = await roleService.selectById(c, type);
@@ -1128,7 +1132,7 @@ const userService = {
 			.run();
 	},
 
-	async add(c, params) {
+	async add(c, params, callerUserId) {
 
 		const { email, type, password } = params;
 
@@ -1139,6 +1143,16 @@ const userService = {
 		if (password.length < 6) {
 			throw new BizError(t('pwdMinLength'));
 		}
+
+		const role = await roleService.selectById(c, type);
+
+		if (!role) {
+			throw new BizError(t('roleNotExist'));
+		}
+
+		// Creating a user is also a role assignment. Without this guard a
+		// non-admin holding only user:add could mint a master-role account.
+		await rbacGuard.assertCanAssignRole(c, callerUserId, Number(type));
 
 		const localName = emailUtils.getName(email);
 		const adminName = c.env.admin ? emailUtils.getName(c.env.admin) : '';
@@ -1161,12 +1175,6 @@ const userService = {
 		let assignedName = localName;
 		if (existingNameRow) {
 			assignedName = email;
-		}
-
-		const role = await roleService.selectById(c, type);
-
-		if (!role) {
-			throw new BizError(t('roleNotExist'));
 		}
 
 		const { salt, hash } = await saltHashUtils.hashPassword(password, c.env);

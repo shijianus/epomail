@@ -50,7 +50,7 @@ app.get('/user/list', handleUserList);
 app.post('/user/list', handleUserList);
 
 app.post('/user/add', async (c) => {
-	await userService.add(c, await c.req.json());
+	await userService.add(c, await c.req.json(), userContext.getUserId(c));
 	return c.json(result.ok());
 });
 
