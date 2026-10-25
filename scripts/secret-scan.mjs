@@ -110,7 +110,7 @@ const RULES = [
 		name: 'known_test_credential',
 		regex: /(?:password|passwd|pwd)\s*[:=]\s*["']([^"']{4,})["']/gi,
 		secretGroup: 1,
-		validate: value => ['123456', 'Audit123!', 'AdminSecret123!', 'UserSecret123!', 'TestAdmin2026!', 'UserPass12345!', 'Password123!', 'Temp123456'].includes(value)
+		validate: value => new Set(['8d969eef6ecad3c2','841708e17ce8892b','5e8e95efa59278ed','b6d2b974fbe28586','b84de80337f4f5ee','44a9358212cbf842','a109e36947ad56de','90e2ff8b056d4cd1']).has(fingerprint(value))
 	}
 ];
 

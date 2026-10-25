@@ -23,7 +23,7 @@
     - [x] 设置/OAuth 应用 Secret 脱敏（`aiApiKey`/`clientSecret`/`privateKey`/`resendTokens` 等），保存时合并掩码，避免掩码覆盖真实值。
     - [x] 密码修改必须验证 `currentPassword` 并撤销全部会话；登录未知用户/错误密码统一提示并做等价 PBKDF2；新增 IP 限速。
     - [x] CORS 收敛（同源 + OAuth 端点白名单 + `CORS_ORIGINS`）、错误信息脱敏、API `no-store`。
-    - [x] 移除 `jwt/totp/email/hash/device/risk` 硬编码兜底密钥；`/init` 恒定时间比较 + POST `x-init-secret`；首次站长密码改由 `admin_initial_password` 注入，禁止固定 `123456`。
+    - [x] 移除 `jwt/totp/email/hash/device/risk` 硬编码兜底密钥；`/init` 恒定时间比较 + POST `x-init-secret`；首次站长密码改由 `admin_initial_password` 注入，禁止固定弱默认口令。
     - [x] SSRF/上传/文件名校验、自定义 SVG 双重清洗、Telegram 分享页 CSP nonce；DOMPurify 升级。
     - [x] Mailjet 测试改纯离线契约、缺失配置安全退出；108+ 测试脚本生产口令改环境变量；新增 `scripts/secret-scan.mjs`、`.secret-scan-baseline.json`、GitHub Actions 安全门禁。
     - [x] 依赖升级：hono 4.13.13、drizzle-orm 0.45.4、DOMPurify 3.4.17、axios 1.20.0、AWS SDK/fast-xml-parser/uuid/form-data/lodash/vue 等；移除未使用 `@cloudflare/vite-plugin`。

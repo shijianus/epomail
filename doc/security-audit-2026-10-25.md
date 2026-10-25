@@ -19,7 +19,7 @@
 **额外 P0 发现（比原报告更严重，均已修复代码层）**：
 
 1. `/api/oss/*` 未限制对象 Key 前缀，可匿名读取同一 KV 命名空间中的 `auth-uid:1`（站长会话令牌集合）与 `setting:`（全站设置，含第三方密钥）。已通过对象 Key 白名单修复并加入回归测试。
-2. Git 历史中曾提交真实强度的 `jwt_secret` / `totp_enc_key`，其中一组 `jwt_secret` 还是弱值 `123456`；取得历史即可伪造任意用户会话/解密 TOTP 密文。代码已移除字面量并改为 fail-closed，但**必须轮换密钥**。
+2. Git 历史中曾提交真实强度的 `jwt_secret` / `totp_enc_key`，其中一组 `jwt_secret` 还是六位弱默认值（指纹 `8d969eef6ecad3c2`）；取得历史即可伪造任意用户会话/解密 TOTP 密文。代码已移除字面量并改为 fail-closed，但**必须轮换密钥**。
 3. OAuth Apple 登录曾直接 base64 解码客户端提交的 `id_token`，未验签；结合邮箱自动关联可造成账号接管。已改为 Apple JWKS RS256 验签、issuer/audience/exp 校验。
 4. `/oauth/bindUser` 无任何“已完成 OAuth 流程”的证明，可被匿名调用猜测 `oauthUserId` 绑定邮箱。已改为一次性 bind token。
 5. S3/B2 对象读取直接返回 `Response`，绕过 Content-Type 安全归一化，可造成存储型 XSS；已统一走 `safeObjectHeaders`。
@@ -87,7 +87,7 @@
 | `totp_enc_key` | 35 | `5fd4b291b1d1e7e7` | `worker-configuration.d.ts` 多个提交 |
 | `totp_enc_key` | 38 | `d2aa2cb199d333b9` | `wrangler.toml` / `worker-configuration.d.ts` 多个提交 |
 
-其中 `123456` 作为 JWT 签名密钥意味着：任何读过历史的人都能伪造 `userId=1` 的站长令牌（若生产未轮换）。`worker-configuration.d.ts` 是 `wrangler types` 生成文件，已从 Git 追踪中移除并加入 `.gitignore`，防止未来再次把 `[vars]` 字面量入库。
+其中该六位弱默认值作为 JWT 签名密钥意味着：任何读过历史的人都能伪造 `userId=1` 的站长令牌（若生产未轮换）。`worker-configuration.d.ts` 是 `wrangler types` 生成文件，已从 Git 追踪中移除并加入 `.gitignore`，防止未来再次把 `[vars]` 字面量入库。
 
 **代码层修复**：
 - `jwt-utils` 缺少 `jwt_secret` 时 fail-closed，并显式拒绝非 `HS256` 头。
@@ -109,19 +109,19 @@
 
 ### 3.4 测试脚本中的生产账号口令（当前已清理，历史仍泄露）
 
-审计发现大量测试脚本以明文写入 `admin@epomail.bond / 123456`、`audit_normal_1789140856529@epomail.bond / Audit123!` 等生产/演示账号口令，并直接请求 `https://mail.epocanvas.com` / `epomail.epocanvas.workers.dev`。
+审计发现大量测试脚本以明文写入 `admin@epomail.bond / [REDACTED-WEAK-PASSWORD]`、`audit_normal_...@epomail.bond / [REDACTED-TEST-PASSWORD]` 等生产/演示账号口令，并直接请求 `https://mail.epocanvas.com` / `epomail.epocanvas.workers.dev`。
 
 **处置**：
 - 当前工作区 120+ 个脚本已改为 `process.env.EPOMAIL_LIVE_E2E_*` / `EPOMAIL_E2E_*` 注入；缺失时安全失败，不回退默认值。
 - 新增 `tests/README-E2E-CREDENTIALS.md`。
 - 新增 `known_test_credential` 扫描规则；历史命中记录在 `.secret-scan-baseline.json`。
-- `admin_initial_password` 成为首次 `/init` 创建站长的必需 Secret；生产缺失时初始化失败，**不再创建 `123456` 的站长**。
+- `admin_initial_password` 成为首次 `/init` 创建站长的必需 Secret；生产缺失时初始化失败，**不再创建固定弱默认口令的站长**。
 
 **必须人工处置**：
-- 确认/修改 `admin@epomail.bond` 口令；若仍为 `123456`，视为站长账号已泄露。
+- 确认/修改 `admin@epomail.bond` 口令；若仍为历史弱默认口令，视为站长账号已泄露。
 - 删除或强制改密 `audit_normal_1789140856529@epomail.bond`。
-- `admin@epomail.cyou` 演示参观者仍使用固定 `123456`（visitor 角色，无管理权限）；建议改密或删除。
-- 历史上还出现过 `e2e_admin_test@epomail.bond`、`AdminSecret123!`、`TestAdmin2026!` 等；应确认对应账号不存在。
+- `admin@epomail.cyou` 演示参观者仍使用固定弱默认口令（visitor 角色，无管理权限）；建议改密或删除。
+- 历史上还出现过 `e2e_admin_test@epomail.bond`、[REDACTED-TEST-PASSWORD] 等；应确认对应账号不存在。
 
 ---
 
@@ -243,7 +243,7 @@
 
 - `resend-service.js` 的 `INSERT INTO webhook_event` 语句重复出现两次，会导致 Webhook 事务 SQL 语法错误；已删除重复行。
 - `risk-service.js` 在缺少 `jwt_secret` 时抛出 `BizError`，但文件未导入 `BizError`；已补 import，避免异常路径变成 `ReferenceError`。
-- 远端新增的 15 个 live/Workerd 测试脚本仍含 `123456` / `Audit123!` 等明文口令；已统一改为 `EPOMAIL_LIVE_E2E_*` / `EPOMAIL_E2E_*` 环境变量，并重新扫描通过。
+- 远端新增的 15 个 live/Workerd 测试脚本仍含历史测试明文口令；已统一改为 `EPOMAIL_LIVE_E2E_*` / `EPOMAIL_E2E_*` 环境变量，并重新扫描通过。
 
 ---
 
@@ -255,7 +255,7 @@
 | P0 | `jwt_secret`/`totp_enc_key` 轮换 | **未执行** | 历史已泄露；需 `wrangler secret put`，清理 `auth-uid:*`，评估 TOTP/邮件密文迁移 |
 | P0 | 生产站长/测试账号口令 | **未执行** | `admin@epomail.bond`、`audit_normal_...`、`admin@epomail.cyou` 需改密/删除 |
 | P0 | 公共 Git 历史清理 | **未执行** | 未获授权；方案见第七节；轮换不可被历史清理替代 |
-| P1 | 默认演示参观者 `123456` | 待处理 | visitor 角色无管理权限，但仍是固定口令；建议改密/删除 |
+| P1 | 默认演示参观者（固定弱口令） | 待处理 | visitor 角色无管理权限，但仍是固定口令；建议改密/删除 |
 | P1 | OAuth 登录绕过邮箱 TOTP | 设计待决 | OAuth 已绑定用户直接 `noVerifyPwd` 登录，不触发邮箱 2FA；需产品决策是否强制二次验证 |
 | P1 | 账号锁定 DoS / KV 计数竞态 | 未修复 | 凭邮箱可 5 次错误锁定他人 12 小时；KV 读改写非原子；已加 IP 限速缓解，未根治 |
 | P1 | 注册码并发超发 | 未修复 | `reduceCount` 无 `count >= n` 原子守卫；并发注册可能超出次数 |
@@ -271,7 +271,7 @@
 | P2 | ECharts moderate XSS | 待评估 | 仅内部数据喂图；升级 6.x 需回归图表 |
 | — | 生产凭据有效性/调用日志 | **无法验证** | 无 Mailjet/Cloudflare/Resend 后台权限 |
 | — | 远程未被抓取分支/服务端 Secret Scanning | **无法验证** | 本地仅覆盖已 fetch 的 `origin/*` 与标签 |
-| — | `EpomailDocs` 独立仓库 | 只读扫描 | 工作区 8 个项目截图脚本仍含 `123456`，历史 1 处文档占位密钥；属独立仓库，未改动 |
+| — | `EpomailDocs` 独立仓库 | 只读扫描 | 工作区 8 个项目截图脚本仍含固定弱口令，历史 1 处文档占位密钥；属独立仓库，未改动 |
 
 ---
 

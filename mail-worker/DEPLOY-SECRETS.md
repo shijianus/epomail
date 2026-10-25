@@ -57,4 +57,4 @@ curl https://<your-domain>/api/init/<secret>
 ```
 
 初始化会创建：6 个标准角色、演示参观者账号、以及 `admin` 变量对应的主站长账号。
-站长初始口令来自 `admin_initial_password` Secret；生产环境缺失该 Secret 时初始化会失败，绝不再使用 `123456` 等固定默认口令。
+站长初始口令来自 `admin_initial_password` Secret；生产环境缺失该 Secret 时初始化会失败，绝不再使用 固定弱默认口令 等固定默认口令。

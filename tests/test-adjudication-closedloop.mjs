@@ -682,7 +682,8 @@ function isBizError(err, expectedCode, msgIncludes) {
   const c = createContext();
 
   const salt = 'testsalt123';
-  const hashedPwd = await cryptoUtils.genHashPassword('CorrectPassword123!', salt);
+  const restrictedTestPassword = process.env.EPOMAIL_TEST_PASSWORD || ('Test-' + Date.now() + '!Aa1');
+  const hashedPwd = await cryptoUtils.genHashPassword(restrictedTestPassword, salt);
 
   rawDb.exec(`
     INSERT INTO user (user_id, email, password, salt, status, totp_enabled, totp_secret) 
@@ -699,7 +700,7 @@ function isBizError(err, expectedCode, msgIncludes) {
   );
 
   // 14.2 正确密码核验通过后，无 2FA 的封禁账号签发受限凭证，绝不签发普通全权会话 JWT
-  const loginRes = await loginService.login(c, { email: 'restricted_login@epocanvas.com', password: 'CorrectPassword123!' });
+  const loginRes = await loginService.login(c, { email: 'restricted_login@epocanvas.com', password: restrictedTestPassword });
   assert.strictEqual(loginRes.isRestricted, true);
   assert.ok(loginRes.restrictedToken, 'Must issue restrictedToken');
   assert.strictEqual(loginRes.user.status, 1);
@@ -714,7 +715,7 @@ function isBizError(err, expectedCode, msgIncludes) {
   // 模拟全局开启 TOTP
   c.env.kv.put('sys:setting', JSON.stringify({ totpEnabled: 1 }));
 
-  const login2FARes = await loginService.login(c, { email: 'banned_2fa@epocanvas.com', password: 'CorrectPassword123!' });
+  const login2FARes = await loginService.login(c, { email: 'banned_2fa@epocanvas.com', password: restrictedTestPassword });
   assert.strictEqual(login2FARes.mfaRequired, true, 'Must require MFA for 2FA-enabled banned account');
   assert.strictEqual(login2FARes.restrictedToken, undefined, 'Must NOT issue restricted token before 2FA completed');
 

@@ -26,6 +26,6 @@ node tests/verify-live-cf-production.mjs
 
 - `admin@epomail.bond`（站长）——必须确认已修改初始口令并轮换。
 - `audit_normal_1789140856529@epomail.bond`（普通用户）——应删除或强制改密。
-- `admin@epomail.cyou`（演示参观者）——若仍使用 `123456`，应改密或删除。
+- `admin@epomail.cyou`（演示参观者）——若仍使用固定弱默认口令，应改密或删除。
 
 测试脚本只应操作专用、可回收的测试账号；创建型测试必须在 `finally` 中物理删除自己创建的账号与邮箱。

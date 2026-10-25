@@ -179,8 +179,9 @@ async function run() {
   // ------------------------------------------------------------------------
   console.log('\n--- STEP 2: 播种管理员与普通业务账号 ---');
   const salt = 'testsalt123';
-  const hashedAdminPwd = await cryptoUtils.genHashPassword('AdminSecret123!', salt);
-  const hashedUserPwd = await cryptoUtils.genHashPassword('UserSecret123!', salt);
+  const testAccountPassword = process.env.EPOMAIL_TEST_PASSWORD || process.env.EPOMAIL_E2E_TEST_PASSWORD || '';
+  const hashedAdminPwd = await cryptoUtils.genHashPassword(testAccountPassword, salt);
+  const hashedUserPwd = await cryptoUtils.genHashPassword(testAccountPassword, salt);
 
   // 更新 /api/init 初始化的管理员密码
   rawDb.exec(`
