@@ -27,7 +27,11 @@ function isPrivateIpv6(hostname) {
 	const inner = hostname.slice(1, -1).toLowerCase();
 	if (!inner) return true;
 	if (inner === '::' || inner === '::1') return true;
-	if (inner.startsWith('fe80:') || inner.startsWith('fec0:')) return true;
+	// fe80::/10 (link-local) and fec0::/10 (deprecated site-local) are never
+	// publicly routable; checking only the fe80:/fec0: prefixes would let
+	// fe90-febf and fed0-feff through.
+	const firstGroup = Number.parseInt(inner.split(':')[0], 16);
+	if (Number.isFinite(firstGroup) && (firstGroup & 0xff80) === 0xfe80) return true;
 	if (inner.startsWith('fc') || inner.startsWith('fd')) return true; // unique local
 	if (inner.startsWith('::ffff:')) {
 		const mapped = inner.slice('::ffff:'.length);

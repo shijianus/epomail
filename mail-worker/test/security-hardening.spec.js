@@ -101,6 +101,11 @@ describe('Network and storage boundaries', () => {
 			'http://169.254.169.254/latest/meta-data/',
 			'http://[::1]/',
 			'http://[::ffff:127.0.0.1]/',
+			'http://[fe90::1]/',
+			'http://[febf::1]/',
+			'http://[fec0::1]/',
+			'http://[fed0::1]/',
+			'http://[feff::1]/',
 			'http://metadata.google.internal/',
 			'https://user:pass@example.com/',
 			'file:///etc/passwd'
@@ -109,6 +114,7 @@ describe('Network and storage boundaries', () => {
 		}
 		expect(isSafePublicUrl('https://s3.us-west-004.backblazeb2.com')).toBe(true);
 		expect(isSafePublicUrl('https://example.com/path')).toBe(true);
+		expect(isSafePublicUrl('http://[2001:4860:4860::8888]/')).toBe(true);
 	});
 
 	it('only allows object keys under attachments/ or static/', () => {
