@@ -11,6 +11,36 @@
 
 ---
 
+### 复审阻断项定点修复：签名附件根路由 / setting 冷启动 / r2Domain 旁路 / OAuth 收口 (2026-10-27)
+*   **关联提交 (Git Commit)**: `4edb556531fb5105a4bd5255d03e10d63bad9be1` (Short: `4edb556`)；受审基线 `a9f0d1e5a8aa66213f7f3ad4cf7e29daccd513f5`，目标分支 `security/audit-2026-10-25`。
+*   **部署环境 (Deployment)**: 独立 worktree `D:/Users/Smart Kevin/epomail-accept-20261027`；本地 workerd + D1 + KV；**未部署生产、未访问生产 API/OAuth/邮件、未修改生产 Secret/数据库/桶权限**。
+*   **基线差异 (Baseline Delta)**: fetch 后远端 `security/audit-2026-10-25` 与基线 `a9f0d1e` 一致；无强制覆盖或静默换版。其他 worktree（含主仓 master 未提交改动与 `epomail-acceptance-bf1a008` 草稿）未触碰。
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] **签名 URL 断链**：新增 `object-serve-service.js`，Worker 根 `/oss/*`、`/static/*`、`/attachments/*` 与 Hono `/oss` 共用 Key 规范化、HMAC 能力校验、owner 解析和响应头/404 策略；签名 API 返回的 `/oss/...` 原样交给真实入口即可 200，无需 `/api`。
+    - [x] **setting 冷启动**：`setting` 基表从 102 列拆为 94 列 + `setting_ext` 8 列（OAuth 登录配置与 audit 策略）；`ensureSettingExtSchema` 幂等复制旧值并释放基表列；`settingService` 合并读取，保留字段、类型、默认值、权限与 API 形状。
+    - [x] **r2Domain 附件旁路**：`attachment-urls.js`、写邮件回复/转发、Telegram 分享页在 r2Domain 非空时仍签发 Worker 短时 URL；未授权附件占位符在模板中中和为需签名的 `/attachments/`，公开 static 保持公开。
+    - [x] **OAuth 普通/MFA/受限契约**：`splitLoginResult` 按真实 `loginService.login` 对象形状分流；回调与 `/oauth/exchange` 正确传递 `{token,email}` / `{mfaRequired,tempToken}` / `{isRestricted,restrictedToken}`，长期 JWT 不入 URL。
+    - [x] **本地 TOTP**：OAuth 身份通过后仍走真实 `loginService.login`，已启用 TOTP 的用户必须先完成本地挑战；未完成时 exchange 不返回 token。
+    - [x] **legacy LinuxDo**：无 state 的 `/oauth/linuxDo/login`（含 `/oauth/:provider/login` 的 linuxdo 命中）显式返回 410，强制走 authorize + callback；未保留无 state 绕行入口。
+    - [x] **新用户绑定前端闭环**：登录页识别 `#oauth_bind`，采集本站邮箱/邀请码后调用真实 `/api/oauth/bindUser`，走注册政策（邀请码/开关/域名），返回会话或 MFA；单次绑定证明消耗后可重放拒绝。
+    - [x] **一次性凭据原子化**：state、login exchange code、bind proof 改为 D1 存储 SHA-256 哈希，`DELETE ... RETURNING` 原子消费；覆盖并发、过期、错 kind/provider/subject 与重放。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 全量 worker 回归：`npx vitest run` → **7 files / 84 tests passed**（新增 `security-round2.spec.js` 16 项；既有 6 文件 68 项）。
+    - [x] 修复前失败证据（存仓库外 `epomail-round2-evidence-20261027/pre-fix-tests.log`）：根 `/oss` 无路由（`env.assets.fetch` undefined）、102 列 SELECT 被 D1 拒绝、真实 login 成功对象被判为 MFA、KV get+delete 并发双消费 2/2。
+    - [x] 正式冷启动（真实 workerd，全新独立 persist）：`POST /api/init` → `success`，重复 init → `success`；`setting` 94 列 / `setting_ext` 8 列，各 1 行；主站长登录 200；设置修改含 OAuth/audit 字段并读回成功，`oauthProviders.custom.clientSecret` 返回 `******`，公共 `/api/oauth/providers` 正常列出。
+    - [x] 旧库升级（100 列 setting、无 setting_ext、自定义 title/r2Domain/audit 值 + 原 admin user_id=2）：init → success；基表 94 列、扩展 8 列，audit 0/8/9 原值保留，title/r2Domain 保留，admin 登录 200。
+    - [x] 浏览器（真实本地 API/会话）：登录后从 `/api/oss-url/attachments/probe-inline.png` 取回 `/oss/...?...` 并原样打开 → `image/png`、160×100 真实渲染；下载 URL 在浏览器上下文 200、`application/octet-stream` + `attachment` + `private, no-store` + `nosniff`；邮件内嵌图 shadow DOM `src=/oss/...` 且 `naturalWidth=160`；回复引用内嵌图/下载链接均为 `/oss/...` 签名 URL；设置 `r2Domain=https://cdn.round2.test` 后重新加载仍全部走 `/oss/`，无 `cdn.round2.test/attachments` 请求。
+    - [x] 浏览器绑定闭环：`#oauth_bind` 表单渲染 → 输入 `browser-bind@example.com` + 邀请码 → 跳转 `/mail/u/0/#inbox`，localStorage 会话邮箱正确；D1 `oauth.user_id=3`、邀请码 count 5→4、bind proof 0 残留。
+    - [x] 前端构建：`temp_login_ui` 2011 modules / 7.32s；`mail-vue` release 23.59s（PWA + copy-login-dist 成功）。
+    - [x] 构建入口分离记录：测试配置 `wrangler deploy --dry-run --config wrangler-vitest.toml` → 5360.73 KiB / gzip 1107.74 KiB；生产配置 `wrangler deploy --dry-run --config wrangler.toml` → 同体积，含 custom build + 438 assets；均 `--dry-run` 退出，未部署。
+    - [x] 静态检查：`git diff --cached --check` 通过；`scripts/scan-staged-secrets.mjs` 暂存 0 命中；`scripts/secret-scan.mjs` 工作区 1220 files 0 命中；i18n symmetry/audit 通过（1930 keys 六语言对称）。
+*   **需 owner 处置的生产事项 (Owner-only Follow-up)**:
+    - [ ] 若历史生产桶/CDN 仍存在公开 ACL 或历史公开附件链接，本轮未修改生产桶权限/CDN，也未使既有公开对象失效；需 owner 将桶设为私有并按需清理历史对象/链接。
+    - [ ] 生产 Secret 轮换、KV `auth-uid:*` 清理、历史凭据清污与分支合并/部署均未执行，需 owner 单独授权。
+    - [ ] 本轮验收止于本地模拟 provider/本地 JWKS/合成账号；未调用真实 OAuth 提供商、未发送真实邮件、未运行 154 个无关浏览器 E2E。
+
+---
+
 ### IPv6 SSRF 边界补丁 (2026-10-27)
 *   **关联提交 (Git Commit)**: `73dfe3b2de449e3cdfa8f3db1f868d5417dc5aae` (Short: `73dfe3b`)
 *   **部署环境 (Deployment)**: 同上条本地 workerd + D1/KV；未部署生产。
