@@ -11,6 +11,16 @@
 
 ---
 
+### IPv6 SSRF 边界补丁 (2026-10-27)
+*   **关联提交 (Git Commit)**: `73dfe3b2de449e3cdfa8f3db1f868d5417dc5aae` (Short: `73dfe3b`)
+*   **部署环境 (Deployment)**: 同上条本地 workerd + D1/KV；未部署生产。
+*   **变更与验证 (Changes & Verification)**:
+    - [x] `isSafePublicUrl` 原先只按 `fe80:`/`fec0:` 前缀判断，抽查发现 `fe90::1`、`febf::1`、`fed0::1`、`feff::1` 被误判为公网；改为首组位掩码 `fe80::/9`，覆盖 `fe80::/10` link-local 与已弃用 `fec0::/10` site-local，并保留公网 `2001:4860:4860::8888` 放行。
+    - [x] 回归：worker `6 files / 68 tests passed`；`wrangler deploy --dry-run` 通过（5353.33 KiB / gzip 1104.88 KiB）；`git diff --cached --check` 与离线扫描 0 命中。
+    - [x] 该补丁由最终验收抽查发现并修复；主验收记录见下条 `89858ea`。最终远端 tip 由 `git ls-remote` 校验。
+
+---
+
 ### 安全分支最终定向验收与附件/OAuth 收口 (2026-10-27)
 *   **关联提交 (Git Commit)**: `89858ea4237cf09560249e61ea33149a0df2e3dc` (Short: `89858ea`)；交付文档提交见远端 `security/audit-2026-10-25` tip。
 *   **部署环境 (Deployment)**: 独立 worktree `D:/Users/Smart Kevin/epomail-accept-20261027`（detached `065ddc2`）；本地 workerd + D1 + KV；**未部署生产、未触碰 master、未访问生产 API/OAuth/Mailjet/Resend、未发送真实邮件**
