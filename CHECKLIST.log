@@ -11,6 +11,39 @@
 
 ---
 
+### 安全分支最终定向验收与附件/OAuth 收口 (2026-10-27)
+*   **关联提交 (Git Commit)**: `89858ea4237cf09560249e61ea33149a0df2e3dc` (Short: `89858ea`)；交付文档提交见远端 `security/audit-2026-10-25` tip。
+*   **部署环境 (Deployment)**: 独立 worktree `D:/Users/Smart Kevin/epomail-accept-20261027`（detached `065ddc2`）；本地 workerd + D1 + KV；**未部署生产、未触碰 master、未访问生产 API/OAuth/Mailjet/Resend、未发送真实邮件**
+*   **基线差异 (Baseline Delta)**:
+    - [x] 初始受审候选 `bf1a0089aaa0c9927aa3c3ec2b9da4cd5458bda2`；远端 `security/audit-2026-10-25` 实际头为 `065ddc2d953397ca437d0b4782cce2631c469f13`（含 `31915a7` RBAC/Webhook 收口与 `065ddc2` 核验流水），未静默换版；远端 `master` 为 `cde6e97`，本地 master `9654ea1` 三个未推送提交未合并。
+    - [x] 其他 worktree（含 `rc-abuse-b6c7fb0` 的 18 项未提交修改与 `epomail-acceptance-bf1a008` 的未提交草稿）未改动。
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] **对象存储 P0/P1**：`/oss`、`/attachments` 与 `/oss-url(/batch)` 统一 Key 前缀 + HMAC 短时能力签名；静态资源保持公开；附件响应强制 `private, no-store`、`nosniff`、CSP、CORP；发送/转发内嵌图片仅限本人附件；root `/static` 编码穿越返回 404。
+    - [x] **OAuth P0/P1**：授权发起生成服务端一次性 state 与 OIDC nonce；回调校验 state 并绑定发起浏览器（HttpOnly `epo_oauth_flow` cookie）；长期 JWT 不再入 URL，改为 60 秒单次交换码；补齐 Apple `form_post`；自定义 SSO 端点 fail-closed SSRF 校验；仅 verified 邮箱自动关联；直连 `/oauth/:provider/login` 强制 server-issued state。
+    - [x] **RBAC/设置 P1**：`role/set` 增加目标角色当前权限可管理性校验，阻止低权限角色编辑器削弱高权限角色；非站长 `setting/query` 继续掩码 AI/S3/Resend/OAuth/Telegram/DB secrets。
+    - [x] **会话语义**：改密必须校验当前密码并删除 `auth-uid:*` 全部会话；保留旧 SHA-256 哈希验证语义；受限通知凭证禁止访问常规邮箱接口；用户删除或解封后受限 token 立即失效。
+    - [x] **前端**：登录页适配 `oauth_code`/`oauth_state` 与 MFA/受限结果；附件 URL 走 `/oss-url/batch` 签名；同步加固通知/打印/邮件列表 HTML 输出。
+    - [x] **测试**：新增/扩充 OAuth state/nonce/flow 绑定、对象归属/签名/私密缓存、RBAC 目标角色、设置掩码、改密会话失效、旧哈希兼容、受限凭证；保留既有 `security-delivery`/Webhook 用例。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 基线 `065ddc2`：`pnpm test` 4 files / 38 tests passed。
+    - [x] 修复前同一回归集：6 files / 11 failed + 33 passed，覆盖对象签名缺失、`/oss-url/batch` 缺失、跨用户内嵌图片、私密缓存、OAuth state/nonce/SSRF 缺失（原始日志存仓库外：`D:/Users/Smart Kevin/epomail-accept-evidence-20261027/pre-fix-tests.log`）。
+    - [x] 移植既有 `8cd3bc8` 加固后：6 files / 59 tests passed。
+    - [x] 定向补强后最终：`pnpm test` **6 files / 68 tests passed**（workerd + D1/KV，隔离数据库，未联网调用真实提供商）。
+    - [x] Worker 打包：`wrangler deploy --dry-run --config wrangler-vitest.toml` 成功（5353.26 KiB / gzip 1104.85 KiB）。
+    - [x] 前端构建：`temp_login_ui`（2011 modules / 10.33s）+ `mail-vue`（37.82s，PWA + `copy-login-dist` 成功）。
+    - [x] 暂存区/推送范围扫描：`git diff --cached --check` 通过；`scan-staged-secrets` staged 0 命中、push range `065ddc2..89858ea` 0 命中；工作区 `secret-scan` 1220 files 0 命中（gitleaks 未安装，仅内置规则）。
+    - [x] 依赖安装：worker / mail-vue / temp_login_ui 均 `pnpm install --frozen-lockfile` 成功（temp_login_ui 离线复用 store）。
+*   **未执行/需人工处置 (Manual Follow-up)**:
+    - [ ] **冷启动阻断（既有）**：`setting` 实体 102 列，D1 结果集上限 100；全新 D1 上 `settingService.query` 仍报 `too many columns in result set`，影响 `/api/init`、设置与 OAuth 冷启动。该问题在 `065ddc2` 已记录，非本批引入；需独立 schema 拆分/迁移，本轮未扩展架构。
+    - [ ] **公开 r2Domain 残留**：若实例配置公开 `r2Domain`，前端仍使用旧直链 capability URL；URL 持有者在 TTL/永久范围内可读。Key 为 128-bit 内容哈希、不可枚举；建议将桶设为私有或强制 Worker 代理。
+    - [ ] **OAuth 设计残留**：OAuth 已绑定用户登录仍跳过邮箱 TOTP（审计 P1 设计待决）；legacy `/oauth/linuxDo/login` 未强制 state，建议弃用/迁移。
+    - [ ] **覆盖边界**：未使用真实 OAuth 提供商/JWKS 在线环境或浏览器全链路 E2E；未执行统一全仓渗透；未运行 154 个浏览器套件。
+    - [ ] **凭据**：当前扫描 0 命中不等于历史 Mailjet/JWT/TOTP/测试账号凭据失效；轮换、生产 KV `auth-uid:*` 清理、历史清污仍由 owner 单独授权，本轮未访问生产。
+    - [ ] **其他分支**：本地 master `9654ea1`（3 个未推送提交）未合并/未推送；`epomail-acceptance-bf1a008` 未提交草稿保持原样，现落后于远端新提交。
+*   **修复性质说明 (Attribution)**: 独立验收发现上述缺陷后，以仓库既有已提交加固 `8cd3bc83d0f643107925da392647a33904747f3a` 为基线移植到安全分支，保留 `31915a7` 并补充 flow 绑定、直连 state、角色管理、受限通知与静态 404 五项定向修复；自测通过，不宣称再次独立验证。
+
+---
+
 ### 安全候选 bf1a008 定向验收与三项交付缺陷修复 (2026-10-25)
 *   **关联提交 (Git Commit)**: `31915a753f1a2c3b079e8066151d703857bb336f` (Short: `31915a7`)
 *   **部署环境 (Deployment)**: 独立 worktree `D:/Users/Smart Kevin/epomail-acceptance-bf1a008`（detached `bf1a008`）；本地 workerd + D1 + KV；**未部署生产、未触碰 master、未推送其他分支**
