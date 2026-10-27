@@ -1460,7 +1460,7 @@ const emailService = {
 
 			r2domain = domainUtils.toOssDomain(r2domain)
 
-			if (src && src.startsWith(r2domain + '/')) {
+			if (r2domain && src && src.startsWith(r2domain + '/')) {
 				img.setAttribute('src', src.replace(r2domain + '/', '{{domain}}'));
 			}
 

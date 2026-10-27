@@ -39,10 +39,10 @@ const telegramService = {
 			if (emailRow.content) {
 				const { r2Domain } = await settingService.query(c);
 				let content = emailRow.content || '';
-				// Without a public object domain, inline images are served by the
-				// worker and need capabilities bound to the mailbox owner. The
+				// Private attachment images need capabilities bound to the
+				// mailbox owner regardless of the public r2Domain setting. The
 				// share page's own JWT is valid for seven days, so match that TTL.
-				if (!r2Domain && emailRow.userId) {
+				if (emailRow.userId) {
 					content = await attService.signContentAttachmentUrls(c, content, emailRow.userId, 7 * 24 * 3600);
 				}
 				return emailHtmlTemplate(content, r2Domain, nonce)

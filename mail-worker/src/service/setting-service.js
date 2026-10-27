@@ -1,5 +1,6 @@
 import KvConst from '../const/kv-const';
 import settingEntity from '../entity/setting';
+import settingExtEntity from '../entity/setting-ext';
 import orm from '../entity/orm';
 import {verifyRecordType} from '../const/entity-const';
 import fileUtils from '../utils/file-utils';
@@ -9,7 +10,15 @@ import BizError from '../error/biz-error';
 import {t} from '../i18n/i18n'
 import verifyRecordService from './verify-record-service';
 import userContext from '../security/user-context';
-import { isDualDbMode, getDbModeInfo } from '../utils/db-accessor';
+import { isDualDbMode, getDbModeInfo, getUserDb } from '../utils/db-accessor';
+import { ensureSettingExtSchema } from '../utils/setting-schema';
+
+// Fields stored in setting_ext; every other writable field stays in setting.
+const SETTING_EXT_KEYS = new Set([
+	'oauthLoginEnabled', 'oauthProviders',
+	'auditLogEnabled', 'auditMaxIpPerAccount', 'auditMaxDevicePerAccount',
+	'auditAutoCleanOldest', 'auditPrioritizeNonCriticalClean', 'auditCriticalQuota'
+]);
 
 const settingService = {
 
@@ -57,9 +66,9 @@ const settingService = {
 
 	async ensureSettingColumns(c) {
 		try {
-			const { getUserDb } = await import('../utils/db-accessor');
 			const userDb = getUserDb(c);
 			if (!userDb) return;
+			await ensureSettingExtSchema(userDb);
 			const settingCols = [
 				{ name: 'ai_api_key', sql: `ALTER TABLE setting ADD COLUMN ai_api_key TEXT NOT NULL DEFAULT '';` },
 				{ name: 'ai_api_url', sql: `ALTER TABLE setting ADD COLUMN ai_api_url TEXT NOT NULL DEFAULT '';` },
@@ -75,15 +84,7 @@ const settingService = {
 				{ name: 'global_email_config', sql: `ALTER TABLE setting ADD COLUMN global_email_config TEXT NOT NULL DEFAULT '{}';` },
 				{ name: 'multi_account_enabled', sql: `ALTER TABLE setting ADD COLUMN multi_account_enabled INTEGER NOT NULL DEFAULT 0;` },
 				{ name: 'terms_url', sql: `ALTER TABLE setting ADD COLUMN terms_url TEXT NOT NULL DEFAULT '';` },
-				{ name: 'privacy_url', sql: `ALTER TABLE setting ADD COLUMN privacy_url TEXT NOT NULL DEFAULT '';` },
-				{ name: 'oauth_login_enabled', sql: `ALTER TABLE setting ADD COLUMN oauth_login_enabled INTEGER NOT NULL DEFAULT 0;` },
-				{ name: 'oauth_providers', sql: `ALTER TABLE setting ADD COLUMN oauth_providers TEXT NOT NULL DEFAULT '{}';` },
-				{ name: 'audit_log_enabled', sql: `ALTER TABLE setting ADD COLUMN audit_log_enabled INTEGER NOT NULL DEFAULT 1;` },
-				{ name: 'audit_max_ip_per_account', sql: `ALTER TABLE setting ADD COLUMN audit_max_ip_per_account INTEGER NOT NULL DEFAULT 3;` },
-				{ name: 'audit_max_device_per_account', sql: `ALTER TABLE setting ADD COLUMN audit_max_device_per_account INTEGER NOT NULL DEFAULT 3;` },
-				{ name: 'audit_auto_clean_oldest', sql: `ALTER TABLE setting ADD COLUMN audit_auto_clean_oldest INTEGER NOT NULL DEFAULT 1;` },
-				{ name: 'audit_prioritize_non_critical_clean', sql: `ALTER TABLE setting ADD COLUMN audit_prioritize_non_critical_clean INTEGER NOT NULL DEFAULT 1;` },
-				{ name: 'audit_critical_quota', sql: `ALTER TABLE setting ADD COLUMN audit_critical_quota INTEGER NOT NULL DEFAULT 3;` }
+				{ name: 'privacy_url', sql: `ALTER TABLE setting ADD COLUMN privacy_url TEXT NOT NULL DEFAULT '';` }
 			];
 
 			let existingCols = new Set();
@@ -112,9 +113,21 @@ const settingService = {
 		}
 	},
 
+	async selectRow(c) {
+		const baseRow = await orm(c).select().from(settingEntity).get();
+		if (!baseRow) return null;
+		const extRow = await orm(c).select().from(settingExtEntity).get();
+		// Each SELECT stays under D1's 100-column result limit; the merged
+		// object preserves the pre-split field names for every caller.
+		return { ...baseRow, ...(extRow || {}) };
+	},
+
 	async refresh(c) {
 		await this.ensureSettingColumns(c);
-		const settingRow = await orm(c).select().from(settingEntity).get();
+		const settingRow = await this.selectRow(c);
+		if (!settingRow) {
+			throw new BizError('数据库未初始化 Database not initialized.');
+		}
 		settingRow.resendTokens = JSON.parse(settingRow.resendTokens);
 		if (typeof settingRow.authI18n === 'string') {
 			try {
@@ -158,10 +171,6 @@ const settingService = {
 
 		if (!settingVal) {
 			await this.ensureSettingColumns(c);
-			const settingRow = await orm(c).select().from(settingEntity).get();
-			if (!settingRow) {
-				throw new BizError('数据库未初始化 Database not initialized.');
-			}
 			await this.refresh(c);
 			settingVal = await c.env.kv.get(KvConst.SETTING, { type: 'json' });
 		}
@@ -617,8 +626,22 @@ const settingService = {
 			}
 		}
 
-		if (Object.keys(updateData).length > 0) {
-			await orm(c).update(settingEntity).set(updateData).run();
+		const baseData = {};
+		const extData = {};
+		for (const [key, value] of Object.entries(updateData)) {
+			if (SETTING_EXT_KEYS.has(key)) {
+				extData[key] = value;
+			} else {
+				baseData[key] = value;
+			}
+		}
+
+		if (Object.keys(baseData).length > 0) {
+			await orm(c).update(settingEntity).set(baseData).run();
+		}
+		if (Object.keys(extData).length > 0) {
+			await ensureSettingExtSchema(getUserDb(c));
+			await orm(c).update(settingExtEntity).set(extData).run();
 		}
 		await this.refresh(c);
 	},

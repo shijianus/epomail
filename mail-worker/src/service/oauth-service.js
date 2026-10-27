@@ -9,15 +9,13 @@ import settingService from "./setting-service";
 import { verifyAppleIdToken } from "../utils/oauth-jwt-utils";
 import rateLimit from '../utils/rate-limit.js';
 import { isSafePublicUrl } from '../utils/url-utils.js';
+import { consumeOAuthToken, issueOAuthToken } from './oauth-one-time-service.js';
 
-const OAUTH_STATE_PREFIX = 'oauth_state:';
-const OAUTH_LOGIN_CODE_PREFIX = 'oauth_login_code:';
-const OAUTH_BIND_PREFIX = 'oauth_bind:';
 const OAUTH_STATE_TTL_SECONDS = 600;
 const OAUTH_LOGIN_CODE_TTL_SECONDS = 60;
 const OAUTH_BIND_TTL_SECONDS = 600;
 
-function randomToken() {
+function randomNonce() {
 	return `${crypto.randomUUID().replace(/-/g, '')}${crypto.randomUUID().replace(/-/g, '')}`;
 }
 
@@ -54,12 +52,28 @@ function assertSafeCustomEndpoints(config) {
 }
 
 function splitLoginResult(loginResult) {
-	// loginService returns an object for MFA challenges and restricted-account
-	// notices; only a string is a mailbox JWT.
-	if (loginResult && typeof loginResult === 'object') {
+	// loginService.login returns a token object on success, an mfaRequired
+	// object for TOTP/passkey challenges, and an isRestricted object for
+	// banned accounts. Only the success shape may be handed out as a session.
+	if (typeof loginResult === 'string') {
+		return { token: loginResult || null };
+	}
+	if (!loginResult || typeof loginResult !== 'object') {
+		return { token: null };
+	}
+	if (loginResult.mfaRequired) {
 		return { token: null, mfa: loginResult };
 	}
-	return { token: loginResult };
+	if (loginResult.isRestricted) {
+		return { token: null, restricted: loginResult };
+	}
+	if (typeof loginResult.token === 'string' && loginResult.token) {
+		return {
+			token: loginResult.token,
+			email: loginResult.email || null
+		};
+	}
+	return { token: null };
 }
 
 const PROVIDER_METADATA = {
@@ -189,20 +203,20 @@ const oauthService = {
 		const scope = config.scope || meta?.defaultScope || 'openid email profile';
 
 		// Server-side state binds the callback to this browser flow. The nonce
-		// is additionally echoed by OIDC providers inside the id_token.
-		const stateToken = randomToken();
-		const nonce = randomToken();
-		await c.env.kv.put(
-			`${OAUTH_STATE_PREFIX}${stateToken}`,
-			JSON.stringify({
+		// is additionally echoed by OIDC providers inside the id_token. The
+		// state is stored in D1 so it can only be consumed by one callback.
+		const nonce = randomNonce();
+		const stateToken = await issueOAuthToken(c, {
+			kind: 'state',
+			provider: providerKey,
+			payload: {
 				provider: providerKey,
 				redirectUri: finalRedirectUri,
 				nonce,
-				clientState: typeof state === 'string' ? state : '',
-				createdAt: Date.now()
-			}),
-			{ expirationTtl: OAUTH_STATE_TTL_SECONDS }
-		);
+				clientState: typeof state === 'string' ? state : ''
+			},
+			ttlSeconds: OAUTH_STATE_TTL_SECONDS
+		});
 
 		const url = new URL(authUrl);
 		url.searchParams.set('client_id', config.clientId);
@@ -225,44 +239,40 @@ const oauthService = {
 		if (!state || typeof state !== 'string') {
 			throw new BizError('Missing OAuth state', 400);
 		}
-		const stateKey = `${OAUTH_STATE_PREFIX}${state}`;
-		const row = await c.env.kv.get(stateKey, { type: 'json' });
+		const row = await consumeOAuthToken(c, {
+			kind: 'state',
+			provider: providerKey,
+			token: state
+		});
 		if (!row || row.provider !== providerKey || !row.redirectUri) {
 			throw new BizError('Invalid or expired OAuth state', 400);
 		}
-		await c.env.kv.delete(stateKey);
 		return row;
 	},
 
-	async createLoginExchangeCode(c, { token = null, userInfo, provider, mfa = null }) {
-		if (!token && !mfa) throw new BizError('Missing OAuth login result');
-		const code = randomToken();
-		await c.env.kv.put(
-			`${OAUTH_LOGIN_CODE_PREFIX}${code}`,
-			JSON.stringify({
+	async createLoginExchangeCode(c, { token = null, userInfo, provider, mfa = null, restricted = null, email = null }) {
+		if (!token && !mfa && !restricted) throw new BizError('Missing OAuth login result');
+		return await issueOAuthToken(c, {
+			kind: 'login_code',
+			payload: {
 				token,
+				email,
 				mfa,
+				restricted,
 				provider,
-				userInfo,
-				createdAt: Date.now()
-			}),
-			{ expirationTtl: OAUTH_LOGIN_CODE_TTL_SECONDS }
-		);
-		return code;
+				userInfo
+			},
+			ttlSeconds: OAUTH_LOGIN_CODE_TTL_SECONDS
+		});
 	},
 
 	async consumeLoginExchangeCode(c, code) {
 		if (!code || typeof code !== 'string') {
 			throw new BizError('Missing OAuth login code', 401);
 		}
-		const codeKey = `${OAUTH_LOGIN_CODE_PREFIX}${code}`;
-		const row = await c.env.kv.get(codeKey, { type: 'json' });
-		if (!row || (!row.token && !row.mfa) || !row.createdAt) {
+		const row = await consumeOAuthToken(c, { kind: 'login_code', token: code });
+		if (!row || (!row.token && !row.mfa && !row.restricted)) {
 			throw new BizError('Invalid or expired OAuth login code', 401);
-		}
-		await c.env.kv.delete(codeKey);
-		if (Date.now() - Number(row.createdAt) > OAUTH_LOGIN_CODE_TTL_SECONDS * 1000) {
-			throw new BizError('Expired OAuth login code', 401);
 		}
 		return row;
 	},
@@ -544,12 +554,13 @@ const oauthService = {
 			// Prove possession of the completed OAuth flow before allowing an
 			// account to be created/bound. Without this one-time token any
 			// caller could submit a guessed oauthUserId.
-			const bindToken = randomToken();
-			await c.env.kv.put(
-				`${OAUTH_BIND_PREFIX}${bindToken}`,
-				JSON.stringify({ oauthUserId: oauthRow.oauthUserId, provider: providerKey, createdAt: Date.now() }),
-				{ expirationTtl: OAUTH_BIND_TTL_SECONDS }
-			);
+			const bindToken = await issueOAuthToken(c, {
+				kind: 'bind',
+				provider: providerKey,
+				subject: oauthRow.oauthUserId,
+				payload: { oauthUserId: oauthRow.oauthUserId, provider: providerKey },
+				ttlSeconds: OAUTH_BIND_TTL_SECONDS
+			});
 			return { userInfo: oauthRow, token: null, bindToken };
 		}
 
@@ -618,15 +629,20 @@ const oauthService = {
 		if (!bindToken || typeof bindToken !== 'string') {
 			throw new BizError('Missing OAuth bind proof; restart the OAuth login flow');
 		}
+		if (!provider || typeof provider !== 'string') {
+			throw new BizError('Missing OAuth provider for bind proof');
+		}
 
-		const bindKey = `${OAUTH_BIND_PREFIX}${bindToken}`;
-		const pendingBind = await c.env.kv.get(bindKey, { type: 'json' });
+		const pendingBind = await consumeOAuthToken(c, {
+			kind: 'bind',
+			provider,
+			subject: oauthUserId,
+			token: bindToken
+		});
 		if (!pendingBind || pendingBind.oauthUserId !== oauthUserId
-			|| (provider && pendingBind.provider !== provider)) {
+			|| pendingBind.provider !== provider) {
 			throw new BizError('Invalid or expired OAuth bind proof; restart the OAuth login flow');
 		}
-		// Single use: consume before creating the account.
-		await c.env.kv.delete(bindKey);
 
 		const oauthRow = await this.getById(c, oauthUserId);
 		if (!oauthRow) {
@@ -649,8 +665,13 @@ const oauthService = {
 			throw new BizError('Failed to create the local account');
 		}
 
-		await orm(c).update(oauth).set({ userId: userRow.userId }).where(eq(oauth.oauthUserId, oauthUserId)).run();
+		// Authenticate before committing the binding: login() also enforces
+		// TOTP and restricted-account handling, so a half-bound identity never
+		// points at an account the caller cannot actually enter.
 		const loginResult = await loginService.login(c, { email, password: null }, true);
+
+		await orm(c).update(oauth).set({ userId: userRow.userId }).where(eq(oauth.oauthUserId, oauthUserId)).run();
+		oauthRow.userId = userRow.userId;
 
 		return { userInfo: oauthRow, ...splitLoginResult(loginResult) }
 	},
@@ -659,7 +680,7 @@ const oauthService = {
 
 		await rateLimit.check(c, { scope: 'oauth-login', limit: 30, windowSeconds: 900 });
 
-		const { code } = params;
+		const { code, redirectUri } = params;
 
 		let token = '';
 		let userInfo = {}
@@ -668,7 +689,7 @@ const oauthService = {
 		reqParams.append('client_id', c.env.linuxdo_client_id)
 		reqParams.append('client_secret', c.env.linuxdo_client_secret)
 		reqParams.append('code', code)
-		reqParams.append('redirect_uri', c.env.linuxdo_callback_url)
+		reqParams.append('redirect_uri', redirectUri || c.env.linuxdo_callback_url)
 		reqParams.append('grant_type', 'authorization_code')
 
 		const tokenRes = await fetch("https://connect.linux.do/oauth2/token", {
@@ -709,7 +730,14 @@ const oauthService = {
 		const userRow = await userService.selectByIdIncludeDel(c, oauthRow.userId);
 
 		if (!userRow) {
-			return { userInfo: oauthRow, token: null }
+			const bindToken = await issueOAuthToken(c, {
+				kind: 'bind',
+				provider: 'linuxdo',
+				subject: oauthRow.oauthUserId,
+				payload: { oauthUserId: oauthRow.oauthUserId, provider: 'linuxdo' },
+				ttlSeconds: OAUTH_BIND_TTL_SECONDS
+			});
+			return { userInfo: oauthRow, token: null, bindToken }
 		}
 
 		const JwtToken = await loginService.login(c, { email: userRow.email, password: null }, true);

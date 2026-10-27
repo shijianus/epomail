@@ -46,9 +46,26 @@ interface AuthFormProps {
   sysConfig?: any;
 }
 
-type Stage = "password" | "totp";
+type Stage = "password" | "totp" | "bind";
 type Status = "idle" | "warping" | "success";
 export type TwoFAMethod = "totp" | "backup_code" | "passkey";
+
+type OAuthBindContext = {
+  bindToken: string;
+  oauthUserId: string;
+  provider: string;
+};
+
+function readOAuthBindContext(): OAuthBindContext | null {
+  if (typeof window === "undefined") return null;
+  const params = new URLSearchParams(window.location.search);
+  const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+  const bindToken = hash.get("oauth_bind") || "";
+  const oauthUserId = params.get("oauth_user_id") || "";
+  const provider = params.get("oauth_provider") || "";
+  if (!bindToken || !oauthUserId || !provider) return null;
+  return { bindToken, oauthUserId, provider };
+}
 
 // Client-side environment and fingerprint browser signature collector
 function collectSecPayload() {
@@ -492,7 +509,11 @@ function getInitialChallengeState() {
 
 export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
   const initial = useMemo(() => getInitialChallengeState(), []);
-  const [stage, setStage] = useState<Stage>(initial.stage);
+  const initialBind = useMemo(() => readOAuthBindContext(), []);
+  const [stage, setStage] = useState<Stage>(initialBind ? "bind" : initial.stage);
+  const [bindContext] = useState<OAuthBindContext | null>(initialBind);
+  const [bindEmail, setBindEmail] = useState("");
+  const [bindCode, setBindCode] = useState("");
   const [challengeSessionHash, setChallengeSessionHash] = useState<string>(initial.hash);
   const [email, setEmail] = useState(initial.storedSession?.email || "");
   const [password, setPassword] = useState("");
@@ -570,36 +591,6 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
       sessionStorage.removeItem('epo_oauth_state');
     } catch (_) {}
 
-    const storeSession = (oauthToken: string, uInfo: any) => {
-      const activeEmail = uInfo.email || uInfo.name || 'oauth_user';
-
-      let sessions: any[] = [];
-      try {
-        const raw = localStorage.getItem('epo_sessions');
-        if (raw) sessions = JSON.parse(raw) || [];
-      } catch (_) {}
-
-      const idx = sessions.findIndex(s => s.email === activeEmail);
-      if (idx >= 0) {
-        sessions[idx].token = oauthToken;
-        sessions[idx].name = uInfo.name || uInfo.nickname || activeEmail;
-      } else {
-        sessions.push({
-          u: sessions.length,
-          token: oauthToken,
-          email: activeEmail,
-          name: uInfo.name || uInfo.nickname || activeEmail
-        });
-      }
-
-      try {
-        localStorage.setItem('epo_sessions', JSON.stringify(sessions));
-        localStorage.setItem('token', oauthToken);
-        localStorage.setItem('loginEmail', activeEmail);
-      } catch (_) {}
-      syncLangToMainApp();
-    };
-
     if (oauthCode) {
       window.history.replaceState({}, '', window.location.pathname);
       // The code is only exchanged in the browser that started this OAuth
@@ -638,23 +629,13 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
           if (!res.data.token) {
             throw new Error('OAuth exchange failed');
           }
-          const userRes = await fetch('/api/user/info', {
-            headers: { token: res.data.token }
-          }).then(r => r.json());
-          if (!userRes || userRes.code !== 200) {
-            throw new Error('OAuth session lookup failed');
-          }
-          storeSession(res.data.token, userRes.data || {});
-
-          setStatus("success");
-          cameraState.authSuccessOpacity = 1;
-          setSuccessMsg(t('loginSuccess'));
-          canvasRef.current?.pulse({ strength: 2.2, color: "cyan" });
-          canvasRef.current?.burst({ strength: 2.5, color: "cyan" });
-
-          setTimeout(() => {
-            window.location.href = '/mail/u/0/#inbox';
-          }, 600);
+          saveLoginSessionAndRedirect({
+            data: {
+              token: res.data.token,
+              email: res.data.email || res.data.userInfo?.email || '',
+              name: res.data.userInfo?.name || res.data.userInfo?.nickname || ''
+            }
+          });
         })
         .catch(() => {
           setStatus("idle");
@@ -1128,6 +1109,73 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
     saveLoginSessionAndRedirect(data, true);
   };
 
+  const handleBindSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (status !== "idle" || !bindContext) return;
+
+    const targetEmail = bindEmail.trim();
+    if (!targetEmail) {
+      setErrorMsg(tr('oauthBindEmailRequired'));
+      return;
+    }
+
+    setStatus("warping");
+    setErrorMsg("");
+    try {
+      const res = await fetch('/api/oauth/bindUser', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: targetEmail,
+          code: bindCode.trim(),
+          oauthUserId: bindContext.oauthUserId,
+          provider: bindContext.provider,
+          bindToken: bindContext.bindToken
+        })
+      });
+      const data = await res.json().catch(() => null);
+      if (!data || data.code !== 200 || !data.data) {
+        throw new Error('OAuth bind failed');
+      }
+      const payload = data.data;
+
+      // The proof is single-use; remove it from the address bar before any
+      // navigation so a reload cannot replay the same binding attempt.
+      try {
+        window.history.replaceState({}, '', window.location.pathname);
+      } catch (_) {}
+
+      if (payload.isRestricted && payload.restrictedToken) {
+        try {
+          sessionStorage.setItem('epomail_restricted_token', payload.restrictedToken);
+        } catch (_) {}
+        setStatus("success");
+        setSuccessMsg(payload.message || tr('opFailed'));
+        setTimeout(() => {
+          window.location.href = '/notice/restricted';
+        }, 500);
+        return;
+      }
+      if (payload.mfaRequired) {
+        beginMfaChallenge(payload, payload.email || targetEmail);
+        return;
+      }
+      if (!payload.token) {
+        throw new Error('OAuth bind failed');
+      }
+      saveLoginSessionAndRedirect({
+        data: {
+          token: payload.token,
+          email: payload.email || payload.userInfo?.email || targetEmail,
+          name: payload.userInfo?.name || payload.userInfo?.nickname || ''
+        }
+      });
+    } catch (err: any) {
+      setStatus("idle");
+      setErrorMsg(tr('oauthBindFailed'));
+    }
+  };
+
   const getFactorName = (f: string) => {
     if (f === 'passkey') return t('methodPasskeyTitle');
     if (f === 'totp') return t('methodTotpTitle');
@@ -1568,7 +1616,89 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
         className="relative flex flex-col justify-center w-full"
       >
         <AnimatePresence mode="wait">
-          {stage === "password" ? (
+          {stage === "bind" ? (
+            /* =========================================================================
+               STAGE 0: LINK A VERIFIED THIRD-PARTY IDENTITY TO A LOCAL ACCOUNT
+               ========================================================================= */
+            <motion.form
+              key="oauth-bind-form"
+              initial={reduceMotion ? false : { opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -12, filter: "blur(4px)" }}
+              transition={reduceMotion ? { duration: 0 } : { duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+              onSubmit={handleBindSubmit}
+              className="flex flex-col justify-center gap-4 sm:gap-4.5 w-full"
+            >
+              <div className="flex flex-col items-center text-center gap-2 rounded-2xl p-4 border border-[rgba(139,147,196,0.2)] bg-[rgba(255,255,255,0.03)] backdrop-blur-sm">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 shadow-[0_0_15px_rgba(99,102,241,0.25)]">
+                  <ShieldCheck size={22} />
+                </div>
+                <h2 className="text-[16px] font-semibold text-[var(--epo-ink)] tracking-wide">
+                  {tr('oauthBindTitle')}
+                </h2>
+                <p className="text-[12px] leading-relaxed max-w-[340px]" style={{ color: "var(--epo-muted)" }}>
+                  {tr('oauthBindDesc')}
+                </p>
+                {bindContext?.provider ? (
+                  <div className="text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-[rgba(103,232,249,0.1)] text-[var(--epo-cyan-glow)] border border-[rgba(103,232,249,0.25)]">
+                    {bindContext.provider}
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="flex flex-col gap-4 sm:gap-4.5">
+                <FloatingField
+                  id="epo-bind-email"
+                  type="email"
+                  label={tr('oauthBindEmailLabel')}
+                  icon={<Mail size={16} strokeWidth={1.8} />}
+                  value={bindEmail}
+                  onChange={setBindEmail}
+                  hasError={!!errorMsg}
+                />
+                <FloatingField
+                  id="epo-bind-code"
+                  type="text"
+                  label={tr('oauthBindCodeLabel')}
+                  icon={<KeyRound size={16} strokeWidth={1.8} />}
+                  value={bindCode}
+                  onChange={setBindCode}
+                  hasError={!!errorMsg}
+                />
+              </div>
+
+              <motion.button
+                type="submit"
+                whileHover={submitHover}
+                whileTap={{ scale: 0.96 }}
+                disabled={status !== "idle"}
+                className="epomail-display relative mt-1 flex h-12 w-full items-center justify-center gap-2 overflow-hidden rounded-xl text-[15px] tracking-wide text-white cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#67e8f9] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b0e22] disabled:cursor-not-allowed disabled:opacity-60"
+                style={{
+                  background: "var(--epo-brand-gradient)",
+                  boxShadow: "0 8px 30px rgba(79,70,229,0.45), inset 0 1px 0 rgba(255,255,255,0.25)"
+                }}
+              >
+                {status === "warping" ? (
+                  <>
+                    <Loader2 size={17} className="animate-spin" />
+                    <span>{t('warping')}</span>
+                  </>
+                ) : (
+                  <>
+                    <span>{tr('oauthBindSubmit')}</span>
+                    <ArrowRight size={17} />
+                  </>
+                )}
+              </motion.button>
+
+              {errorMsg ? (
+                <div className="flex items-start gap-1.5 px-1 text-[12px] text-red-400">
+                  <AlertCircle size={14} className="mt-0.5 shrink-0" />
+                  <span>{errorMsg}</span>
+                </div>
+              ) : null}
+            </motion.form>
+          ) : stage === "password" ? (
             /* =========================================================================
                STAGE 1: PASSWORD LOGIN FORM
                ========================================================================= */

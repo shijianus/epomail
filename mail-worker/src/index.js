@@ -3,7 +3,6 @@ import { email } from './email/email';
 import userService from './service/user-service';
 import verifyRecordService from './service/verify-record-service';
 import emailService from './service/email-service';
-import r2Service from './service/r2-service';
 import oauthService from "./service/oauth-service";
 import analysisService from './service/analysis-service';
 import decisionNoticeService from './service/decision-notice-service';
@@ -12,7 +11,7 @@ import { isAdminUser } from './utils/admin-utils';
 import permService from './service/perm-service';
 import KvConst from './const/kv-const';
 import { normalizeObjectKey } from './utils/object-key-utils';
-import { verifyObjectAccess } from './utils/object-token';
+import { objectNotFound, serveObject } from './service/object-serve-service';
 
 async function checkScheduledAuth(req, env) {
 	if (req.method !== 'POST') {
@@ -131,26 +130,26 @@ export default {
 			return new Response('Ran scheduled event: ' + cronParam, { status: 200 });
 		}
 
+		 // Signed capability URLs are emitted as /oss/<key>; the browser
+		 // consumes that exact path, so it must be served by this entry point
+		 // rather than falling through to the SPA asset handler.
+		 if (url.pathname.startsWith('/oss/')) {
+			 const response = await serveObject({ env }, url.pathname.slice('/oss/'.length), url);
+			 return response || objectNotFound();
+		 }
+
 		 if (url.pathname.startsWith('/static/')) {
 			 const key = normalizeObjectKey(url.pathname.substring(1));
 			 if (!key) {
-				 return new Response('Object Not Found', { status: 404 });
+				 return objectNotFound();
 			 }
-			 const response = await r2Service.toObjResponse({ env }, key, null);
-			 return response || new Response('Object Not Found', { status: 404 });
+			 const response = await serveObject({ env }, key, url);
+			 return response || objectNotFound();
 		 }
 
 		 if (url.pathname.startsWith('/attachments/')) {
-			 const key = normalizeObjectKey(url.pathname.substring(1));
-			 if (!key) {
-				 return new Response('Object Not Found', { status: 404 });
-			 }
-			 const access = await verifyObjectAccess({ env }, key, url);
-			 if (!access) {
-				 return new Response('Object Not Found', { status: 404 });
-			 }
-			 const response = await r2Service.toObjResponse({ env }, key, access.userId || null);
-			 return response || new Response('Object Not Found', { status: 404 });
+			 const response = await serveObject({ env }, url.pathname.substring(1), url);
+			 return response || objectNotFound();
 		 }
 
 		if (url.pathname.startsWith('/login/challenge/')) {

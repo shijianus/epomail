@@ -1,9 +1,7 @@
 import http from '@/axios/index.js';
 
-export function oauthLinuxDoLogin(code) {
-    return http.post('/oauth/linuxDo/login',{code})
-}
-
+// The legacy code-only LinuxDo login endpoint is disabled server-side because
+// it bypassed OAuth state and browser binding. Use /oauth/authorize/linuxdo.
 export function oauthBindUser(form) {
     return http.put('/oauth/bindUser', form)
 }

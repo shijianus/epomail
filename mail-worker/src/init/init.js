@@ -4,6 +4,7 @@ import { emailConst } from "../const/entity-const";
 import { getUserDb, getMailDb } from '../utils/db-accessor';
 import { getDefaultUserLabelsString } from '../const/default-labels';
 import cryptoUtils from '../utils/crypto-utils';
+import { ensureSettingExtSchema } from '../utils/setting-schema';
 
 function timingSafeEqual(a, b) {
 	if (typeof a !== 'string' || typeof b !== 'string' || a.length !== b.length) return false;
@@ -77,6 +78,7 @@ const dbInit = {
 		await this.v3_16DB(c);
 		await this.v3_17DB(c);
 		await this.v3_18DB(c);
+		await this.v3_19DB(c);
 		await settingService.refresh(c);
 		const generatedAdminPassword = c.get('generatedAdminPassword');
 		if (generatedAdminPassword) {
@@ -286,26 +288,34 @@ const dbInit = {
 	// v3_18DB: 系统设置操作报告与IP风控持久化配置迁移
 	async v3_18DB(c) {
 		const userDb = getUserDb(c);
-		const settingCols = [
-			{ name: 'audit_log_enabled', sql: `ALTER TABLE setting ADD COLUMN audit_log_enabled INTEGER NOT NULL DEFAULT 1;` },
-			{ name: 'audit_max_ip_per_account', sql: `ALTER TABLE setting ADD COLUMN audit_max_ip_per_account INTEGER NOT NULL DEFAULT 3;` },
-			{ name: 'audit_max_device_per_account', sql: `ALTER TABLE setting ADD COLUMN audit_max_device_per_account INTEGER NOT NULL DEFAULT 3;` },
-			{ name: 'audit_auto_clean_oldest', sql: `ALTER TABLE setting ADD COLUMN audit_auto_clean_oldest INTEGER NOT NULL DEFAULT 1;` },
-			{ name: 'audit_prioritize_non_critical_clean', sql: `ALTER TABLE setting ADD COLUMN audit_prioritize_non_critical_clean INTEGER NOT NULL DEFAULT 1;` },
-			{ name: 'audit_critical_quota', sql: `ALTER TABLE setting ADD COLUMN audit_critical_quota INTEGER NOT NULL DEFAULT 3;` }
-		];
+		// These fields no longer live in the base setting table; ensure the
+		// companion table exists, copy legacy values and release the columns.
+		await ensureSettingExtSchema(userDb);
+	},
 
-		const tableInfo = await userDb.prepare(`PRAGMA table_info('setting')`).all().catch(() => ({ results: [] }));
-		const existingCols = new Set((tableInfo?.results || []).map(r => r.name));
-		for (const col of settingCols) {
-			if (!existingCols.has(col.name)) {
-				try {
-					await userDb.prepare(col.sql).run();
-				} catch (err) {
-					console.warn(`v3_18DB 跳过 setting 列 ${col.name}:`, err.message);
-				}
-			}
+	// v3_19DB: OAuth state / exchange-code / bind-proof single-use storage.
+	// KV get+delete is not atomic, so concurrent callbacks could redeem the
+	// same credential twice. The primary key + DELETE ... RETURNING below is
+	// the authoritative single-consumer gate.
+	async v3_19DB(c) {
+		const userDb = getUserDb(c);
+		try {
+			await userDb.prepare(`
+				CREATE TABLE IF NOT EXISTS oauth_one_time_token (
+					token_hash TEXT PRIMARY KEY,
+					kind TEXT NOT NULL,
+					provider TEXT NOT NULL DEFAULT '',
+					subject TEXT NOT NULL DEFAULT '',
+					payload TEXT NOT NULL,
+					expires_at INTEGER NOT NULL,
+					create_time DATETIME DEFAULT CURRENT_TIMESTAMP
+				)
+			`).run();
+			await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_oauth_one_time_expires ON oauth_one_time_token(expires_at)`).run();
+		} catch (err) {
+			console.warn('v3_19DB oauth_one_time_token warning:', err.message);
 		}
+		await ensureSettingExtSchema(userDb);
 	},
 
 	// v3_17DB: 违规裁决闭环迁移：
@@ -539,15 +549,14 @@ const dbInit = {
 	// 全新冷启动（仅凭 /api/init）会因缺列导致 /setting/set 写入失败，故按红线补幂等迁移。
 	async v3_16DB(c) {
 		const userDb = getUserDb(c);
+		await ensureSettingExtSchema(userDb);
 		const missingSettingCols = [
 			{ name: 'welcome_templates', sql: `ALTER TABLE setting ADD COLUMN welcome_templates TEXT NOT NULL DEFAULT '{}';` },
 			{ name: 'welcome_lang', sql: `ALTER TABLE setting ADD COLUMN welcome_lang TEXT NOT NULL DEFAULT 'zh';` },
 			{ name: 'global_email_config', sql: `ALTER TABLE setting ADD COLUMN global_email_config TEXT NOT NULL DEFAULT '{}';` },
 			{ name: 'user_tg_forward', sql: `ALTER TABLE setting ADD COLUMN user_tg_forward INTEGER NOT NULL DEFAULT 1;` },
 			{ name: 'user_email_forward', sql: `ALTER TABLE setting ADD COLUMN user_email_forward INTEGER NOT NULL DEFAULT 1;` },
-			{ name: 'user_api_support', sql: `ALTER TABLE setting ADD COLUMN user_api_support INTEGER NOT NULL DEFAULT 1;` },
-			{ name: 'oauth_login_enabled', sql: `ALTER TABLE setting ADD COLUMN oauth_login_enabled INTEGER NOT NULL DEFAULT 0;` },
-			{ name: 'oauth_providers', sql: `ALTER TABLE setting ADD COLUMN oauth_providers TEXT NOT NULL DEFAULT '{}';` }
+			{ name: 'user_api_support', sql: `ALTER TABLE setting ADD COLUMN user_api_support INTEGER NOT NULL DEFAULT 1;` }
 		];
 		for (const col of missingSettingCols) {
 			try {
@@ -1586,15 +1595,13 @@ const dbInit = {
 				title TEXT NOT NULL,
 				auto_refresh INTEGER NOT NULL,
 				register_verify INTEGER NOT NULL,
-				add_email_verify INTEGER NOT NULL,
-				audit_log_enabled INTEGER DEFAULT 1,
-				audit_max_ip_per_account INTEGER DEFAULT 3,
-				audit_max_device_per_account INTEGER DEFAULT 3,
-				audit_auto_clean_oldest INTEGER DEFAULT 1,
-				audit_prioritize_non_critical_clean INTEGER DEFAULT 1,
-				audit_critical_quota INTEGER DEFAULT 3
+				add_email_verify INTEGER NOT NULL
 			)
 		`).run();
+
+		// OAuth-login and audit-policy fields live in a second row table so the
+		// base table and every SELECT result stay within D1's 100-column limit.
+		await ensureSettingExtSchema(userDb);
 
 		try {
 			await userDb.prepare(`

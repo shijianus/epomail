@@ -1,6 +1,7 @@
 import { env, SELF } from 'cloudflare:test';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { buildSignedObjectUrl } from '../src/utils/object-token.js';
+import { issueOAuthToken } from '../src/service/oauth-one-time-service.js';
 
 describe('Public object storage isolation', () => {
 	beforeEach(async () => {
@@ -176,13 +177,15 @@ describe('OAuth public callback boundary', () => {
 	});
 
 	it('exchanges a short-lived login code once and never via the callback URL', async () => {
-		const code = 'short-lived-login-code';
-		await env.kv.put(`oauth_login_code:${code}`, JSON.stringify({
-			token: 'mailbox-jwt-value',
-			provider: 'apple',
-			userInfo: { oauthUserId: 'apple:user-1' },
-			createdAt: Date.now()
-		}), { expirationTtl: 60 });
+		const code = await issueOAuthToken({ env }, {
+			kind: 'login_code',
+			payload: {
+				token: 'mailbox-jwt-value',
+				provider: 'apple',
+				userInfo: { oauthUserId: 'apple:user-1' }
+			},
+			ttlSeconds: 60
+		});
 
 		const first = await SELF.fetch('http://example.com/api/oauth/exchange', {
 			method: 'POST',
@@ -202,20 +205,22 @@ describe('OAuth public callback boundary', () => {
 	});
 
 	it('propagates an MFA challenge instead of issuing a session token', async () => {
-		const code = 'oauth-mfa-code';
-		await env.kv.put(`oauth_login_code:${code}`, JSON.stringify({
-			token: null,
-			mfa: {
-				mfaRequired: true,
-				tempToken: 'totp_tmp_oauth',
-				email: 'mfa@example.com',
-				hasTotp: true,
-				hasPasskeys: false
+		const code = await issueOAuthToken({ env }, {
+			kind: 'login_code',
+			payload: {
+				token: null,
+				mfa: {
+					mfaRequired: true,
+					tempToken: 'totp_tmp_oauth',
+					email: 'mfa@example.com',
+					hasTotp: true,
+					hasPasskeys: false
+				},
+				provider: 'apple',
+				userInfo: { oauthUserId: 'apple:user-1' }
 			},
-			provider: 'apple',
-			userInfo: { oauthUserId: 'apple:user-1' },
-			createdAt: Date.now()
-		}), { expirationTtl: 60 });
+			ttlSeconds: 60
+		});
 
 		const response = await SELF.fetch('http://example.com/api/oauth/exchange', {
 			method: 'POST',
@@ -271,7 +276,10 @@ describe('OAuth public callback boundary', () => {
 				{ redirect: 'manual' }
 			);
 			expect(foreign.headers.get('Location')).toContain('oauth_state_invalid');
-			expect(await env.kv.get(`oauth_state:${state}`)).not.toBeNull();
+			const pendingAfterForeign = await env.db.prepare(
+				"SELECT COUNT(*) AS total FROM oauth_one_time_token WHERE kind = 'state' AND provider = 'apple'"
+			).first();
+			expect(Number(pendingAfterForeign.total)).toBe(1);
 
 			// The initiating browser owns the cookie and reaches the provider
 			// exchange (the fake token is then rejected by the Apple verifier).
@@ -281,7 +289,10 @@ describe('OAuth public callback boundary', () => {
 			);
 			const location = own.headers.get('Location') || '';
 			expect(location).toContain('error=oauth_failed');
-			expect(await env.kv.get(`oauth_state:${state}`)).toBeNull();
+			const pendingAfterConsume = await env.db.prepare(
+				"SELECT COUNT(*) AS total FROM oauth_one_time_token WHERE kind = 'state' AND provider = 'apple'"
+			).first();
+			expect(Number(pendingAfterConsume.total)).toBe(0);
 
 			const replay = await SELF.fetch(
 				`http://example.com/api/oauth/callback/apple?id_token=fake&state=${state}`,

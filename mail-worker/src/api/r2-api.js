@@ -5,7 +5,8 @@ import attService from '../service/att-service';
 import userContext from '../security/user-context';
 import { normalizeObjectKey } from '../utils/object-key-utils';
 import { isAdminUser } from '../utils/admin-utils';
-import { buildSignedObjectUrl, verifyObjectAccess } from '../utils/object-token';
+import { buildSignedObjectUrl } from '../utils/object-token';
+import { objectNotFound, serveObject } from '../service/object-serve-service';
 
 function isPublicStaticKey(key, userId) {
 	if (!key.startsWith('static/')) return false;
@@ -14,28 +15,8 @@ function isPublicStaticKey(key, userId) {
 }
 
 app.get('/oss/*', async (c) => {
-	const key = normalizeObjectKey(c.req.path.split('/oss/')[1]);
-	if (!key) {
-		return c.text('Object Not Found', 404);
-	}
-
-	// static/ assets (avatars, backgrounds) are intentionally public. Every
-	// attachment read requires a short-lived capability signature in addition
-	// to the object-key namespace check.
-	let ownerUserId = null;
-	if (key.startsWith('attachments/')) {
-		const access = await verifyObjectAccess(c, key, new URL(c.req.url));
-		if (!access) {
-			return c.text('Object Not Found', 404);
-		}
-		ownerUserId = access.userId || null;
-	}
-
-	const response = await r2Service.toObjResponse(c, key, ownerUserId);
-	if (!response) {
-		return c.text('Object Not Found', 404);
-	}
-	return response;
+	const response = await serveObject(c, c.req.path.slice('/oss/'.length), new URL(c.req.url));
+	return response || objectNotFound();
 });
 
 app.get('/oss-url/*', async (c) => {

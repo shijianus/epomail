@@ -7,6 +7,7 @@ import cryptoUtils from '../src/utils/crypto-utils.js';
 import jwtUtils from '../src/utils/jwt-utils.js';
 import userService from '../src/service/user-service.js';
 import decisionNoticeService from '../src/service/decision-notice-service.js';
+import { issueOAuthToken } from '../src/service/oauth-one-time-service.js';
 
 const BASE = 'http://example.com';
 const enc = new TextEncoder();
@@ -294,15 +295,20 @@ describe('security delivery regressions', () => {
 	it('binds only the exact OAuth identity, consumes the proof once, and refuses rebinding', async () => {
 		const oauthUser = 'github:probe-bind';
 		await env.db.prepare("INSERT INTO oauth (oauth_user_id, user_id) VALUES (?, 0)").bind(oauthUser).run();
-		await env.kv.put('oauth_bind:probe-token', JSON.stringify({ oauthUserId: oauthUser }), { expirationTtl: 600 });
+		const bindToken = await issueOAuthToken({ env }, {
+			kind: 'bind',
+			provider: 'github',
+			subject: oauthUser,
+			payload: { oauthUserId: oauthUser, provider: 'github' },
+			ttlSeconds: 600
+		});
 
 		const wrongIdentity = await api('/api/oauth/bindUser', {
 			method: 'PUT',
-			body: { email: 'probe-bind@example.com', oauthUserId: 'github:other', bindToken: 'probe-token' }
+			body: { email: 'probe-bind@example.com', oauthUserId: 'github:other', provider: 'github', bindToken }
 		});
 		const wrongBody = await wrongIdentity.json();
 		expect(wrongBody.message).toMatch(/bind proof/i);
-		expect(await env.kv.get('oauth_bind:probe-token')).not.toBeNull();
 
 		const boundRole = await createRole('probe-bind-role', 'custom');
 		const existingUser = await seedUser('probe-bind-existing@example.com', boundRole);
@@ -310,15 +316,14 @@ describe('security delivery regressions', () => {
 
 		const rebind = await api('/api/oauth/bindUser', {
 			method: 'PUT',
-			body: { email: 'probe-bind@example.com', oauthUserId: oauthUser, bindToken: 'probe-token' }
+			body: { email: 'probe-bind@example.com', oauthUserId: oauthUser, provider: 'github', bindToken }
 		});
 		const rebindBody = await rebind.json();
 		expect(rebindBody.message).toMatch(/已绑定/);
-		expect(await env.kv.get('oauth_bind:probe-token')).toBeNull();
 
 		const replay = await api('/api/oauth/bindUser', {
 			method: 'PUT',
-			body: { email: 'probe-bind@example.com', oauthUserId: oauthUser, bindToken: 'probe-token' }
+			body: { email: 'probe-bind@example.com', oauthUserId: oauthUser, provider: 'github', bindToken }
 		});
 		const replayBody = await replay.json();
 		expect(replayBody.message).toMatch(/bind proof/i);

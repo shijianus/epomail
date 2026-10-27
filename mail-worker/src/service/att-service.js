@@ -16,13 +16,15 @@ import storageQuotaService from './storage-quota-service';
 import { getMailDb } from '../utils/db-accessor';
 
 const ATTACHMENT_CONTENT_PATTERN = /{{domain}}(attachments\/[A-Za-z0-9._-]+)/g;
+const ATTACHMENT_ABSOLUTE_PATTERN = /https?:\/\/[^\s"'<>]+?\/(attachments\/[A-Za-z0-9._-]+)/g;
 
 function collectContentAttachmentKeys(content) {
 	const keys = new Set();
 	if (typeof content !== 'string' || !content) return [];
-	let match;
-	const pattern = new RegExp(ATTACHMENT_CONTENT_PATTERN.source, 'g');
-	while ((match = pattern.exec(content)) !== null) {
+	for (const match of content.matchAll(ATTACHMENT_CONTENT_PATTERN)) {
+		keys.add(match[1]);
+	}
+	for (const match of content.matchAll(ATTACHMENT_ABSOLUTE_PATTERN)) {
 		keys.add(match[1]);
 	}
 	return [...keys];
@@ -376,9 +378,10 @@ const attService = {
 	},
 
 	/**
-	 * Replace {{domain}}attachments/<key> placeholders with short-lived signed
-	 * worker URLs. Only keys that belong to the mailbox owner are signed, so a
-	 * malicious message body cannot mint capabilities for someone else's file.
+	 * Replace attachment placeholders or legacy public-domain attachment URLs
+	 * with short-lived signed worker URLs. Only keys that belong to the mailbox
+	 * owner are signed, so a malicious message body cannot mint capabilities
+	 * for someone else's file.
 	 */
 	async signContentAttachmentUrls(c, content, userId, ttlSeconds = 3600) {
 		const keys = collectContentAttachmentKeys(content);
@@ -392,10 +395,15 @@ const attService = {
 			replacements.set(key, await buildSignedObjectUrl(c, key, { userId: ownerUserId, ttlSeconds }));
 		}
 
-		return content.replace(
-			new RegExp(ATTACHMENT_CONTENT_PATTERN.source, 'g'),
-			(match, key) => replacements.get(key) || match
-		);
+		return content
+			.replace(
+				new RegExp(ATTACHMENT_CONTENT_PATTERN.source, 'g'),
+				(match, key) => replacements.get(key) || match
+			)
+			.replace(
+				new RegExp(ATTACHMENT_ABSOLUTE_PATTERN.source, 'g'),
+				(match, prefix, key) => replacements.get(key) || match
+			);
 	}
 };
 

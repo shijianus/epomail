@@ -7,7 +7,7 @@
 		"dev": "wrangler dev --config wrangler-dev.toml",
 		"test": "vitest run",
 		"test:unit": "vitest run test/security-hardening.spec.js test/totp-backend-fixes.spec.js",
-		"test:integration": "vitest run test/index.spec.js test/object-ownership.spec.js test/oauth-security.spec.js test/security-delivery.spec.js",
+		"test:integration": "vitest run test/index.spec.js test/object-ownership.spec.js test/oauth-security.spec.js test/security-delivery.spec.js test/security-round2.spec.js",
 		"test:mailjet": "node test-mailjet.js",
 		"deploy": "wrangler deploy",
 		"deploy:test": "wrangler deploy --config wrangler-test.toml",

@@ -577,18 +577,20 @@ function openReplyAll(email) {
 }
 
 /**
- * Resolve forwarded/replied inline images. With no public object domain the
- * worker requires short-lived capability URLs, so signing must finish before
- * the quoted HTML is injected into the editor.
+ * Resolve forwarded/replied inline images. Private attachments always need
+ * short-lived capability URLs, even when a public r2Domain is configured;
+ * signing must finish before the quoted HTML is injected into the editor.
  */
 async function formatImageAsync(content) {
   content = content || '';
   const domain = toOssDomain(settingStore.settings.r2Domain);
-  if (domain) return content.replace(/{{domain}}/g, domain + '/');
+  const placeholderPattern = /{{domain}}(attachments\/[A-Za-z0-9._-]+)/g;
+  const absolutePattern = /(https?:\/\/[^\s"'<>]+?\/)(attachments\/[A-Za-z0-9._-]+)/g;
 
-  const keys = [...new Set(
-    [...content.matchAll(/{{domain}}(attachments\/[A-Za-z0-9._-]+)/g)].map(match => match[1])
-  )];
+  const keys = [...new Set([
+    ...[...content.matchAll(placeholderPattern)].map(match => match[1]),
+    ...[...content.matchAll(absolutePattern)].map(match => match[2])
+  ])];
   let urls = {};
   if (keys.length > 0) {
     try {
@@ -597,8 +599,9 @@ async function formatImageAsync(content) {
     } catch (_) {}
   }
   return content
-    .replace(/{{domain}}(attachments\/[A-Za-z0-9._-]+)/g, (match, key) => urls[key] || '')
-    .replace(/{{domain}}/g, '/');
+    .replace(absolutePattern, (match, prefix, key) => urls[key] || '')
+    .replace(placeholderPattern, (match, key) => urls[key] || '')
+    .replace(/{{domain}}/g, domain ? domain + '/' : '/');
 }
 
 function open() {

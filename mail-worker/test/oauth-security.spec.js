@@ -1,6 +1,7 @@
 import { env } from 'cloudflare:test';
 import { describe, it, expect, beforeAll, beforeEach, afterAll, afterEach, vi } from 'vitest';
 import oauthService from '../src/service/oauth-service.js';
+import { issueOAuthToken } from '../src/service/oauth-one-time-service.js';
 import loginService from '../src/service/login-service.js';
 import userService from '../src/service/user-service.js';
 import settingService from '../src/service/setting-service.js';
@@ -33,6 +34,11 @@ function base64url(bytes) {
 	let binary = '';
 	for (const byte of new Uint8Array(bytes)) binary += String.fromCharCode(byte);
 	return btoa(binary).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+}
+
+async function sha256Hex(value) {
+	const digest = await crypto.subtle.digest('SHA-256', encoder.encode(String(value)));
+	return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
 async function createSigningMaterial() {
@@ -76,7 +82,7 @@ describe('OAuth state, nonce and callback exchange', () => {
 	beforeEach(() => {
 		kv = createMockKv();
 		c = {
-			env: { kv, jwt_secret: 'oauth-unit-test-secret' },
+			env: { kv, db: env.db, jwt_secret: 'oauth-unit-test-secret' },
 			req: { url: 'https://mail.example.com/api/oauth/authorize/apple', header: () => null }
 		};
 		vi.spyOn(settingService, 'query').mockResolvedValue({
@@ -153,11 +159,13 @@ describe('OAuth state, nonce and callback exchange', () => {
 		expect(first.token).toBe('session-jwt');
 		await expect(oauthService.consumeLoginExchangeCode(c, code)).rejects.toThrow('login code');
 
-		await kv.put('oauth_login_code:expired-code', JSON.stringify({
-			token: 'stale-jwt',
-			createdAt: Date.now() - 120000
-		}));
-		await expect(oauthService.consumeLoginExchangeCode(c, 'expired-code')).rejects.toThrow('Expired');
+		// Expired rows are removed by the same atomic DELETE; the payload never
+		// leaves storage.
+		await env.db.prepare(
+			`INSERT INTO oauth_one_time_token (token_hash, kind, provider, payload, expires_at)
+			 VALUES (?, 'login_code', '', ?, ?)`
+		).bind(await sha256Hex('expired-code'), JSON.stringify({ token: 'stale-jwt' }), Date.now() - 1000).run();
+		await expect(oauthService.consumeLoginExchangeCode(c, 'expired-code')).rejects.toThrow('login code');
 	});
 });
 
@@ -255,7 +263,7 @@ describe('OAuth account binding proof', () => {
 			req: { url: 'https://mail.example.com/api/oauth/bindUser', header: () => null }
 		};
 		vi.spyOn(loginService, 'register').mockResolvedValue();
-		vi.spyOn(loginService, 'login').mockResolvedValue('bound-session-jwt');
+		vi.spyOn(loginService, 'login').mockResolvedValue({ token: 'bound-session-jwt', email: 'bound@example.com', userId: 2 });
 		vi.spyOn(userService, 'selectByIdIncludeDel').mockResolvedValue(null);
 		vi.spyOn(userService, 'selectByEmail').mockResolvedValue({ userId: 2, email: 'bound@example.com' });
 	});
@@ -274,15 +282,17 @@ describe('OAuth account binding proof', () => {
 			email: 'bound@example.com',
 			oauthUserId: 'apple:bind-user',
 			code: 'invite',
-			bindToken: 'guessed-token'
+			bindToken: 'guessed-token',
+			provider: 'apple'
 		})).rejects.toThrow('bind proof');
 
-		const bindToken = 'server-issued-bind-proof';
-		await kv.put(`oauth_bind:${bindToken}`, JSON.stringify({
-			oauthUserId: 'apple:bind-user',
+		const bindToken = await issueOAuthToken(c, {
+			kind: 'bind',
 			provider: 'apple',
-			createdAt: Date.now()
-		}));
+			subject: 'apple:bind-user',
+			payload: { oauthUserId: 'apple:bind-user', provider: 'apple' },
+			ttlSeconds: 600
+		});
 
 		const result = await oauthService.bindUser(c, {
 			email: 'bound@example.com',
@@ -305,12 +315,13 @@ describe('OAuth account binding proof', () => {
 			provider: 'apple'
 		})).rejects.toThrow();
 
-		const secondToken = 'second-bind-proof';
-		await kv.put(`oauth_bind:${secondToken}`, JSON.stringify({
-			oauthUserId: 'apple:bind-user',
+		const secondToken = await issueOAuthToken(c, {
+			kind: 'bind',
 			provider: 'apple',
-			createdAt: Date.now()
-		}));
+			subject: 'apple:bind-user',
+			payload: { oauthUserId: 'apple:bind-user', provider: 'apple' },
+			ttlSeconds: 600
+		});
 		await expect(oauthService.bindUser(c, {
 			email: 'second@example.com',
 			oauthUserId: 'apple:bind-user',

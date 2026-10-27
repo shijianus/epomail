@@ -91,12 +91,14 @@ async function handleOAuthCallback(c) {
 			nonce: stateRow.nonce
 		});
 
-		if (loginInfo.token || loginInfo.mfa) {
+		if (loginInfo.token || loginInfo.mfa || loginInfo.restricted) {
 			// Long-lived mailbox JWT must never appear in a URL. Exchange a
 			// short-lived, single-use code on the login page instead.
 			const loginCode = await oauthService.createLoginExchangeCode(c, {
 				token: loginInfo.token,
+				email: loginInfo.email,
 				mfa: loginInfo.mfa,
+				restricted: loginInfo.restricted,
 				userInfo: loginInfo.userInfo,
 				provider
 			});
@@ -151,6 +153,11 @@ app.get('/oauth/authorize/:provider', async (c) => {
 // be replayed against this endpoint without completing the initiation step.
 app.post('/oauth/:provider/login', async (c) => {
 	const provider = c.req.param('provider');
+	if (String(provider).toLowerCase() === 'linuxdo') {
+		// The legacy code-only LinuxDo entry must never run, whether it reaches
+		// this param route or the explicit deprecation route below.
+		return c.json(result.fail('Legacy LinuxDo login endpoint is disabled. Use /oauth/authorize/linuxdo and the standard callback flow.', 410), 410);
+	}
 	const body = await c.req.json();
 	if (!body?.state || typeof body.state !== 'string') {
 		throw new BizError('Missing OAuth state', 400);
@@ -169,14 +176,24 @@ app.post('/oauth/exchange', async (c) => {
 	await rateLimit.check(c, { scope: 'oauth-exchange', limit: 60, windowSeconds: 900 });
 	const body = await c.req.json().catch(() => ({}));
 	const exchange = await oauthService.consumeLoginExchangeCode(c, body.code);
-	if (exchange.mfa) {
+	if (exchange.restricted) {
 		return c.json(result.ok({
-			...exchange.mfa,
-			...(exchange.mfa.mfaRequired ? { mfaRequired: true } : {}),
+			...exchange.restricted,
 			userInfo: exchange.userInfo
 		}));
 	}
-	return c.json(result.ok({ token: exchange.token, userInfo: exchange.userInfo }));
+	if (exchange.mfa) {
+		return c.json(result.ok({
+			...exchange.mfa,
+			mfaRequired: true,
+			userInfo: exchange.userInfo
+		}));
+	}
+	return c.json(result.ok({
+		token: exchange.token,
+		email: exchange.email || exchange.userInfo?.email || null,
+		userInfo: exchange.userInfo
+	}));
 });
 
 // Admin only: test / verify provider configuration and network reachability
@@ -210,10 +227,12 @@ app.post('/oauth/verify/:provider', async (c) => {
 app.get('/oauth/callback/:provider', handleOAuthCallback);
 app.post('/oauth/callback/:provider', handleOAuthCallback);
 
-// Backwards compatibility for LinuxDo
-app.post('/oauth/linuxDo/login', async (c) => {
-	const loginInfo = await oauthService.linuxDoLogin(c, await c.req.json());
-	return c.json(result.ok(loginInfo));
+// Legacy LinuxDo callback used to accept a bare code with no state and no
+// browser binding, which allowed login CSRF. It is intentionally disabled;
+// clients must initiate /oauth/authorize/linuxdo and finish through
+// /oauth/callback/linuxdo, which enforces server state and the flow cookie.
+app.post('/oauth/linuxDo/login', (c) => {
+	return c.json(result.fail('Legacy LinuxDo login endpoint is disabled. Use /oauth/authorize/linuxdo and the standard callback flow.', 410), 410);
 });
 
 // Bind user with email
