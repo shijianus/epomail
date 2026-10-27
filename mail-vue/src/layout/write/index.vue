@@ -105,6 +105,7 @@ import {fileToBase64, formatBytes} from "@/utils/file-utils.js";
 import {getIconByName} from "@/utils/icon-utils.js";
 import sendPercent from "@/components/send-percent/index.vue"
 import {toOssDomain} from "@/utils/convert.js";
+import {signObjectUrls} from "@/request/object.js";
 import {formatDetailDate} from "@/utils/day.js";
 import {useSettingStore} from "@/store/setting.js";
 import {userDraftStore} from "@/store/draft.js";
@@ -344,7 +345,6 @@ async function sendEmail() {
 
   percentMessage = ElMessage({
     message: () => h(sendPercent, {value: percent.value, desc: t('sending')}),
-    dangerouslyUseHTMLString: true,
     plain: true,
     duration: 0,
     customClass: 'message-bottom'
@@ -445,9 +445,11 @@ function openForward(email) {
 
   defValue.value = ''
 
-  setTimeout(() => {
+  setTimeout(async () => {
+    const forwarded = await formatImageAsync(email.content) ||
+      `<pre style="font-family: inherit;word-break: break-word;white-space: pre-wrap;margin: 0">${email.text}</pre>`
     defValue.value = `
-      ${formatImage(email.content) || `<pre style="font-family: inherit;word-break: break-word;white-space: pre-wrap;margin: 0">${email.text}</pre>`}
+      ${forwarded}
     `
     open()
 
@@ -478,7 +480,9 @@ function openReply(email) {
 
   defValue.value = ''
 
-  setTimeout(() => {
+  setTimeout(async () => {
+    const quoted = await formatImageAsync(email.content) ||
+      `<pre style="font-family: inherit;word-break: break-word;white-space: pre-wrap;margin: 0">${email.text}</pre>`
     defValue.value = `
     <div></div>
     <div>
@@ -486,8 +490,8 @@ function openReply(email) {
         ${formatDetailDate(email.createTime)} ${email.name} &lt${email.sendEmail}&gt ${t('wrote')}:
     </div>
     <blockquote class="mceNonEditable" style="margin: 0 0 0 0.8ex;border-left: 1px solid rgb(204,204,204);padding-left: 1ex;">
-      <articl>
-          ${formatImage(email.content) || `<pre style="font-family: inherit;word-break: break-word;white-space: pre-wrap;margin: 0">${email.text}</pre>`}
+      <article>
+          ${quoted}
       </article>
     </blockquote>`
     open()
@@ -547,7 +551,9 @@ function openReplyAll(email) {
 
   defValue.value = '';
 
-  setTimeout(() => {
+  setTimeout(async () => {
+    const quoted = await formatImageAsync(email.content) ||
+      `<pre style="font-family: inherit;word-break: break-word;white-space: pre-wrap;margin: 0">${email.text}</pre>`
     defValue.value = `
     <div></div>
     <div>
@@ -556,7 +562,7 @@ function openReplyAll(email) {
     </div>
     <blockquote class="mceNonEditable" style="margin: 0 0 0 0.8ex;border-left: 1px solid rgb(204,204,204);padding-left: 1ex;">
       <article>
-          ${formatImage(email.content) || `<pre style="font-family: inherit;word-break: break-word;white-space: pre-wrap;margin: 0">${email.text}</pre>`}
+          ${quoted}
       </article>
     </blockquote>`;
     open();
@@ -570,10 +576,29 @@ function openReplyAll(email) {
   });
 }
 
-function formatImage(content) {
+/**
+ * Resolve forwarded/replied inline images. With no public object domain the
+ * worker requires short-lived capability URLs, so signing must finish before
+ * the quoted HTML is injected into the editor.
+ */
+async function formatImageAsync(content) {
   content = content || '';
-  const domain = settingStore.settings.r2Domain;
-  return content.replace(/{{domain}}/g, toOssDomain(domain) + '/');
+  const domain = toOssDomain(settingStore.settings.r2Domain);
+  if (domain) return content.replace(/{{domain}}/g, domain + '/');
+
+  const keys = [...new Set(
+    [...content.matchAll(/{{domain}}(attachments\/[A-Za-z0-9._-]+)/g)].map(match => match[1])
+  )];
+  let urls = {};
+  if (keys.length > 0) {
+    try {
+      const response = await signObjectUrls(keys);
+      urls = response?.urls || {};
+    } catch (_) {}
+  }
+  return content
+    .replace(/{{domain}}(attachments\/[A-Za-z0-9._-]+)/g, (match, key) => urls[key] || '')
+    .replace(/{{domain}}/g, '/');
 }
 
 function open() {

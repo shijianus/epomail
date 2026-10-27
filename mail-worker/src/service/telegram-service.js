@@ -14,6 +14,7 @@ import emailHtmlTemplate from '../template/email-html';
 import verifyUtils from '../utils/verify-utils';
 import domainUtils from "../utils/domain-uitls";
 import emailCryptoUtils from "../utils/email-crypto-utils";
+import attService from './att-service';
 
 const telegramService = {
 
@@ -37,7 +38,14 @@ const telegramService = {
 
 			if (emailRow.content) {
 				const { r2Domain } = await settingService.query(c);
-				return emailHtmlTemplate(emailRow.content || '', r2Domain, nonce)
+				let content = emailRow.content || '';
+				// Without a public object domain, inline images are served by the
+				// worker and need capabilities bound to the mailbox owner. The
+				// share page's own JWT is valid for seven days, so match that TTL.
+				if (!r2Domain && emailRow.userId) {
+					content = await attService.signContentAttachmentUrls(c, content, emailRow.userId, 7 * 24 * 3600);
+				}
+				return emailHtmlTemplate(content, r2Domain, nonce)
 			} else {
 				return emailTextTemplate(emailRow.text || '')
 			}

@@ -87,6 +87,21 @@ const rbacGuard = {
 		return caller;
 	},
 
+	/**
+	 * Editing a role must also require that the caller can manage the role's
+	 * current permissions. Otherwise a scoped role editor could strip the
+	 * privileges of a higher role even though they could not grant them.
+	 */
+	async assertCanManageRole(c, callerUserId, roleId) {
+		const caller = await loadCaller(c, callerUserId);
+		if (isAdminUser(c, caller)) return caller;
+
+		const targetKeys = await permService.rolePermKeys(c, roleId);
+		const callerKeys = new Set(await permService.userPermKeys(c, caller.userId));
+		assertSubset(targetKeys, callerKeys, '无权修改该角色');
+		return caller;
+	},
+
 	async assertCanGrantPermIds(c, callerUserId, permIds) {
 		const caller = await loadCaller(c, callerUserId);
 		if (isAdminUser(c, caller)) return caller;

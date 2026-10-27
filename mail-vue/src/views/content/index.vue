@@ -597,7 +597,7 @@
                     <div class="att-size">{{ formatBytes(att.size) }}</div>
                     <div class="opt-icon att-icon">
                       <Icon v-if="isImage(att.filename)" icon="hugeicons:view" width="22" height="22" @click="showImage(att.key)"/>
-                      <a :href="cvtR2Url(att.key)" download>
+                      <a :href="attachmentUrl(att)" download>
                         <Icon icon="system-uicons:push-down" width="22" height="22"/>
                       </a>
                     </div>
@@ -842,6 +842,7 @@
 </template>
 <script setup>
 import ShadowHtml from '@/components/shadow-html/index.vue'
+import DOMPurify from 'dompurify';
 import {reactive, ref, computed, watch, onMounted, onUnmounted, nextTick} from "vue";
 import {useRouter} from 'vue-router'
 import {ElMessage, ElMessageBox} from 'element-plus'
@@ -862,9 +863,8 @@ import {useUserStore} from "@/store/user.js";
 import {formatDetailDate} from "@/utils/day.js";
 import {starAdd, starCancel} from "@/request/star.js";
 import {getExtName, formatBytes} from "@/utils/file-utils.js";
-import {cvtR2Url,toOssDomain} from "@/utils/convert.js";
+import {useAttachmentUrls} from "@/utils/attachment-urls.js";
 import {getIconByName} from "@/utils/icon-utils.js";
-import {useSettingStore} from "@/store/setting.js";
 import {allEmailDelete} from "@/request/all-email.js";
 import {useUiStore} from "@/store/ui.js";
 import {useI18n} from "vue-i18n";
@@ -875,7 +875,6 @@ import {getThreadKey} from "@/utils/thread-utils.js";
 import {getPredefinedTranslation} from "@/utils/mail-translation-helper.js";
 
 const uiStore = useUiStore();
-const settingStore = useSettingStore();
 const accountStore = useAccountStore();
 const userStore = useUserStore();
 const emailStore = useEmailStore();
@@ -911,8 +910,9 @@ const threadMessages = computed(() => {
   return [email]
 })
 
-const expandedMap = reactive({})
+const { formatImage, attachmentUrl } = useAttachmentUrls(() => threadMessages.value)
 
+const expandedMap = reactive({})
 function isMsgExpanded(emailId, index) {
   if (expandedMap[emailId] !== undefined) {
     return expandedMap[emailId]
@@ -1046,15 +1046,10 @@ function toMessage(message) {
   return  message ? JSON.parse(message).message : '';
 }
 
-function formatImage(content) {
-  content = content || '';
-  const domain = settingStore.settings.r2Domain;
-  return  content.replace(/{{domain}}/g, toOssDomain(domain) + '/');
-}
-
 function showImage(key) {
   if (!isImage(key)) return;
-  const url = cvtR2Url(key)
+  const url = attachmentUrl(key)
+  if (!url) return
   srcList.length = 0
   srcList.push(url)
   showPreview.value = true
@@ -1687,11 +1682,20 @@ const printSingleMsg = (msg) => {
     window.print();
     return;
   }
+  const safeSubject = escapeHtml(target.subject || email.subject || 'Print Email');
+  const safeFrom = escapeHtml(target.name ? `${target.name} <${target.sendEmail}>` : (target.sendEmail || ''));
+  const safeTo = escapeHtml(formateReceive(target.recipient));
+  const safeDate = escapeHtml(formatDetailDate(target.createTime));
+  const safeBody = DOMPurify.sanitize(formatImage(target.content || target.text || ''), {
+    ADD_ATTR: ['target'],
+    FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'form', 'style']
+  });
   const contentHtml = `
     <!DOCTYPE html>
     <html>
       <head>
-        <title>${target.subject || email.subject || 'Print Email'}</title>
+        <meta charset="UTF-8">
+        <title>${safeSubject}</title>
         <style>
           body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; padding: 24px; color: #1e293b; }
           .header { border-bottom: 2px solid #e2e8f0; padding-bottom: 12px; margin-bottom: 20px; }
@@ -1702,15 +1706,15 @@ const printSingleMsg = (msg) => {
       </head>
       <body>
         <div class="header">
-          <div class="title">${target.subject || email.subject || ''}</div>
+          <div class="title">${safeSubject}</div>
           <div class="meta">
-            <div><strong>From:</strong> ${target.name ? `${target.name} &lt;${target.sendEmail}&gt;` : target.sendEmail}</div>
-            <div><strong>To:</strong> ${formateReceive(target.recipient)}</div>
-            <div><strong>Date:</strong> ${formatDetailDate(target.createTime)}</div>
+            <div><strong>From:</strong> ${safeFrom}</div>
+            <div><strong>To:</strong> ${safeTo}</div>
+            <div><strong>Date:</strong> ${safeDate}</div>
           </div>
         </div>
         <div class="body">
-          ${target.content || target.text || ''}
+          ${safeBody}
         </div>
       </body>
     </html>
@@ -1723,6 +1727,15 @@ const printSingleMsg = (msg) => {
     printWindow.close();
   }, 300);
 };
+
+function escapeHtml(value) {
+  return String(value == null ? '' : value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
 const handleOpenInNewWindow = () => {
   window.open(window.location.href, '_blank');

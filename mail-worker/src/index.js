@@ -3,7 +3,7 @@ import { email } from './email/email';
 import userService from './service/user-service';
 import verifyRecordService from './service/verify-record-service';
 import emailService from './service/email-service';
-import kvObjService from './service/kv-obj-service';
+import r2Service from './service/r2-service';
 import oauthService from "./service/oauth-service";
 import analysisService from './service/analysis-service';
 import decisionNoticeService from './service/decision-notice-service';
@@ -11,6 +11,8 @@ import jwtUtils from './utils/jwt-utils';
 import { isAdminUser } from './utils/admin-utils';
 import permService from './service/perm-service';
 import KvConst from './const/kv-const';
+import { normalizeObjectKey } from './utils/object-key-utils';
+import { verifyObjectAccess } from './utils/object-token';
 
 async function checkScheduledAuth(req, env) {
 	if (req.method !== 'POST') {
@@ -129,8 +131,26 @@ export default {
 			return new Response('Ran scheduled event: ' + cronParam, { status: 200 });
 		}
 
-		 if (['/static/','/attachments/'].some(p => url.pathname.startsWith(p))) {
-			 return await kvObjService.toObjResp( { env }, url.pathname.substring(1));
+		 if (url.pathname.startsWith('/static/')) {
+			 const key = normalizeObjectKey(url.pathname.substring(1));
+			 if (!key) {
+				 return new Response('Object Not Found', { status: 404 });
+			 }
+			 const response = await r2Service.toObjResponse({ env }, key, null);
+			 return response || new Response('Object Not Found', { status: 404 });
+		 }
+
+		 if (url.pathname.startsWith('/attachments/')) {
+			 const key = normalizeObjectKey(url.pathname.substring(1));
+			 if (!key) {
+				 return new Response('Object Not Found', { status: 404 });
+			 }
+			 const access = await verifyObjectAccess({ env }, key, url);
+			 if (!access) {
+				 return new Response('Object Not Found', { status: 404 });
+			 }
+			 const response = await r2Service.toObjResponse({ env }, key, access.userId || null);
+			 return response || new Response('Object Not Found', { status: 404 });
 		 }
 
 		if (url.pathname.startsWith('/login/challenge/')) {

@@ -5,6 +5,8 @@ vi.setConfig({ testTimeout: 30000 });
 import { dbInit } from '../src/init/init.js';
 import cryptoUtils from '../src/utils/crypto-utils.js';
 import jwtUtils from '../src/utils/jwt-utils.js';
+import userService from '../src/service/user-service.js';
+import decisionNoticeService from '../src/service/decision-notice-service.js';
 
 const BASE = 'http://example.com';
 const enc = new TextEncoder();
@@ -55,6 +57,11 @@ async function initMinimalSchema() {
 		oauth_id INTEGER PRIMARY KEY AUTOINCREMENT, oauth_user_id TEXT, username TEXT, name TEXT,
 		avatar TEXT, active INTEGER, trust_level INTEGER, silenced INTEGER,
 		create_time DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL, user_id INTEGER NOT NULL DEFAULT 0
+	)`).run();
+	await env.db.prepare(`CREATE TABLE IF NOT EXISTS verify_record (
+		vr_id INTEGER PRIMARY KEY AUTOINCREMENT, ip TEXT NOT NULL DEFAULT '',
+		count INTEGER NOT NULL DEFAULT 1, type INTEGER NOT NULL DEFAULT 0,
+		update_time DATETIME DEFAULT CURRENT_TIMESTAMP
 	)`).run();
 	await addColumn('role', "ban_email TEXT NOT NULL DEFAULT ''");
 	await addColumn('role', 'ban_email_type INTEGER NOT NULL DEFAULT 0');
@@ -392,5 +399,151 @@ describe('security delivery regressions', () => {
 
 		const afterLate = await env.db.prepare('SELECT status FROM email WHERE email_id = ?').bind(first.email_id).first();
 		expect(afterLate.status).toBe(3);
+	});
+
+	it('rejects editing a higher-privileged role while keeping owner edits working', async () => {
+		const highRole = await createRole('probe-role-high', 'custom', ['setting:set', 'email:send']);
+		const callerRole = await createRole('probe-role-editor', 'custom', ['role:set', 'role:add', 'email:send']);
+		const caller = await seedUser('probe-role-editor@example.com', callerRole);
+		const token = await session(caller);
+
+		const forbidden = await api('/api/role/set', {
+			method: 'PUT',
+			token,
+			body: {
+				roleId: highRole,
+				name: 'probe-role-high-edited',
+				permIds: [await permId('email:send')]
+			}
+		});
+		expect((await forbidden.json()).code).toBe(403);
+
+		const unchanged = await env.db.prepare('SELECT perm_id FROM role_perm WHERE role_id = ?').bind(highRole).all();
+		expect(unchanged.results).toHaveLength(2);
+
+		const ownerToken = await session(adminUser);
+		const allowed = await api('/api/role/set', {
+			method: 'PUT',
+			token: ownerToken,
+			body: {
+				roleId: highRole,
+				name: 'probe-role-high-edited',
+				permIds: [await permId('email:send'), await permId('setting:set')]
+			}
+		});
+		expect((await allowed.json()).code).toBe(200);
+	});
+
+	it('masks provider secrets for a non-admin with setting:query', async () => {
+		const role = await createRole('probe-setting-reader', 'custom', ['setting:query']);
+		const reader = await seedUser('probe-setting-reader@example.com', role);
+		const token = await session(reader);
+		const cachedSetting = {
+			aiApiKey: 'sk-live-secret-value',
+			secretKey: 'turnstile-secret-value',
+			siteKey: 'turnstile-site-key',
+			resendTokens: { 'example.com': 'mailjet:abcdef:ghijkl' },
+			oauthProviders: { github: { clientId: 'client-id', clientSecret: 'client-secret-value', enabled: 1 } },
+			s3AccessKey: 'AKIAEXAMPLEVALUE',
+			s3SecretKey: 's3-secret-value',
+			externalDbToken: 'db-token-value',
+			tgBotToken: '123456789:ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghij'
+		};
+		await env.kv.put('setting:', JSON.stringify(cachedSetting));
+		try {
+			const response = await api('/api/setting/query', { token });
+			const body = await response.json();
+			expect(body.code).toBe(200);
+			expect(body.data.aiApiKey).toContain('******');
+			expect(body.data.aiApiKey).not.toContain('sk-live-secret-value');
+			expect(body.data.secretKey).toContain('******');
+			expect(body.data.secretKey).not.toContain('turnstile-secret-value');
+			expect(body.data.oauthProviders.github.clientSecret).toBe('******');
+			expect(body.data.resendTokens['example.com']).toContain('******');
+			expect(body.data.s3SecretKey).not.toContain('s3-secret-value');
+			expect(body.data.externalDbToken).not.toContain('db-token-value');
+			expect(body.data.tgBotToken).toContain('******');
+			expect(body.data.tgBotToken).not.toContain('IJKLMNOPQRSTUVWXYZ');
+
+			const stored = await env.kv.get('setting:', { type: 'json' });
+			expect(stored.aiApiKey).toBe('sk-live-secret-value');
+		} finally {
+			await env.kv.delete('setting:');
+		}
+	});
+
+	it('requires the current password and revokes all sessions when changing it', async () => {
+		const role = await createRole('probe-password', 'custom', ['email:send']);
+		const target = await seedUser('probe-password@example.com', role, 'OldPass123!');
+		const token = await session(target);
+		const serviceContext = { env, get: () => undefined, set: () => {} };
+
+		await expect(userService.resetPassword(
+			serviceContext,
+			{ password: 'NewPass123!', currentPassword: 'wrong-password' },
+			target.userId,
+			{ requireCurrent: true }
+		)).rejects.toThrow();
+
+		expect(await env.kv.get(`auth-uid:${target.userId}`)).not.toBeNull();
+		const before = await env.db.prepare('SELECT password, salt FROM user WHERE user_id = ?').bind(target.userId).first();
+		expect(await cryptoUtils.verifyPassword('OldPass123!', before.salt, before.password)).toBe(true);
+
+		await userService.resetPassword(
+			serviceContext,
+			{ password: 'NewPass123!', currentPassword: 'OldPass123!' },
+			target.userId,
+			{ requireCurrent: true }
+		);
+
+		expect(await env.kv.get(`auth-uid:${target.userId}`)).toBeNull();
+		const after = await env.db.prepare('SELECT password, salt FROM user WHERE user_id = ?').bind(target.userId).first();
+		expect(await cryptoUtils.verifyPassword('NewPass123!', after.salt, after.password)).toBe(true);
+		expect(await cryptoUtils.verifyPassword('OldPass123!', after.salt, after.password)).toBe(false);
+
+		const oldSession = await api('/api/email/list?size=1', { token });
+		expect((await oldSession.json()).code).toBe(401);
+	});
+
+	it('keeps legacy SHA-256 password verification semantics', async () => {
+		const salt = cryptoUtils.generateSalt();
+		const legacy = await cryptoUtils.genLegacyHashPassword('LegacyPass123!', salt);
+		const accepted = await cryptoUtils.verifyPasswordWithUpgrade('LegacyPass123!', salt, legacy, env);
+		expect(accepted.isValid).toBe(true);
+		expect(accepted.isLegacy).toBe(true);
+		const rejected = await cryptoUtils.verifyPasswordWithUpgrade('WrongPass123!', salt, legacy, env);
+		expect(rejected.isValid).toBe(false);
+	});
+
+	it('rejects restricted-notice credentials on regular mailbox APIs', async () => {
+		const token = await jwtUtils.generateToken({ env }, {
+			userId: 1,
+			purpose: 'restricted_notice',
+			jti: 'probe-restricted-jti'
+		}, 60);
+		const response = await api('/api/email/list?size=1', { token });
+		const body = await response.json();
+		expect(body.code).toBe(403);
+		expect(body.message).toContain('Restricted');
+	});
+
+	it('invalidates restricted notice tokens after deletion or unban', async () => {
+		const role = await createRole('probe-restricted-user', 'custom');
+		const target = await seedUser('probe-restricted-user@example.com', role);
+		await env.db.prepare('UPDATE user SET status = 1 WHERE user_id = ?').bind(target.userId).run();
+		const token = await jwtUtils.generateToken({ env }, {
+			userId: target.userId,
+			purpose: 'restricted_notice',
+			jti: 'probe-restricted-object-jti'
+		}, 60);
+		const serviceContext = { env, get: () => undefined, set: () => {} };
+
+		expect(await decisionNoticeService.verifyRestrictedToken(serviceContext, token)).toBeTruthy();
+
+		await env.db.prepare('UPDATE user SET is_del = 1 WHERE user_id = ?').bind(target.userId).run();
+		expect(await decisionNoticeService.verifyRestrictedToken(serviceContext, token)).toBeNull();
+
+		await env.db.prepare('UPDATE user SET is_del = 0, status = 0 WHERE user_id = ?').bind(target.userId).run();
+		expect(await decisionNoticeService.verifyRestrictedToken(serviceContext, token)).toBeNull();
 	});
 });

@@ -165,6 +165,7 @@ import {computed, onBeforeUnmount, onMounted, watch} from "vue";
 import { useRoute } from 'vue-router'
 import { hasPerm } from "@/perm/perm.js"
 import { Icon } from "@iconify/vue"
+import DOMPurify from 'dompurify'
 import router from "@/router/index.js"
 import { getWallpaperCssById } from '@/utils/theme-presets.js'
 import { emailGet } from '@/request/email.js'
@@ -365,6 +366,13 @@ function showNotice(data) {
     let c = cMap[v] || v;
     if (!cMap[v] && /^[0-9a-fA-F]{3,8}$/.test(v)) c = '#' + v;
     return `<span style="color: ${c}">${p2}</span>`;
+  });
+
+  // Site notice HTML is administrator-authored and rendered for every user.
+  // Strip active content before it reaches dangerouslyUseHTMLString.
+  htmlContent = DOMPurify.sanitize(htmlContent, {
+    FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'form'],
+    FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover', 'onfocus']
   });
 
   elNotification = ElNotification({

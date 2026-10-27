@@ -51,7 +51,6 @@ http.interceptors.response.use((res) => {
             return reject(data)
         } else if (data.code === 502) {
             ElMessage({
-                dangerouslyUseHTMLString: true,
                 message: data.message,
                 type: 'error',
                 plain: true,

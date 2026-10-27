@@ -43,7 +43,8 @@ const kvObjService = {
 			headers: safeObjectHeaders({
 				contentType: rawType,
 				contentDisposition: obj.metadata?.contentDisposition,
-				cacheControl: obj.metadata?.cacheControl
+				cacheControl: obj.metadata?.cacheControl,
+				isPublic: safeKey.startsWith('static/')
 			})
 		});
 	},

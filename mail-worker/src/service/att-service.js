@@ -1,6 +1,6 @@
 import { mailOrm as orm } from '../entity/orm';
 import { att } from '../entity/att';
-import { and, eq, isNull, inArray, desc } from 'drizzle-orm';
+import { and, eq, isNull, inArray, desc, asc } from 'drizzle-orm';
 import r2Service from './r2-service';
 import constant from '../const/constant';
 import fileUtils from '../utils/file-utils';
@@ -10,9 +10,23 @@ import { v4 as uuidv4 } from 'uuid';
 import domainUtils from '../utils/domain-uitls';
 import settingService from "./setting-service";
 import BizError from '../error/biz-error';
+import { buildSignedObjectUrl } from '../utils/object-token';
 
 import storageQuotaService from './storage-quota-service';
 import { getMailDb } from '../utils/db-accessor';
+
+const ATTACHMENT_CONTENT_PATTERN = /{{domain}}(attachments\/[A-Za-z0-9._-]+)/g;
+
+function collectContentAttachmentKeys(content) {
+	const keys = new Set();
+	if (typeof content !== 'string' || !content) return [];
+	let match;
+	const pattern = new RegExp(ATTACHMENT_CONTENT_PATTERN.source, 'g');
+	while ((match = pattern.exec(content)) !== null) {
+		keys.add(match[1]);
+	}
+	return [...keys];
+}
 
 const attService = {
 
@@ -68,9 +82,10 @@ const attService = {
 		).all();
 	},
 
-	async toImageUrlHtml(c, content) {
+	async toImageUrlHtml(c, content, userId = null) {
 
 		const { r2Domain } = await settingService.query(c);
+		const ossDomain = domainUtils.toOssDomain(r2Domain);
 
 		const { document } = parseHTML(content);
 
@@ -103,19 +118,27 @@ const attService = {
 			}
 
 			//邮件正文站内图片转cid附件
-			if (src && (src.startsWith(domainUtils.toOssDomain(r2Domain)) || src.startsWith('attachments/'))) {
+			if (src && ((ossDomain && src.startsWith(ossDomain)) || src.startsWith('{{domain}}attachments/') || src.startsWith('attachments/') || src.startsWith('/oss/attachments/'))) {
 
 				const cid = uuidv4().replace(/-/g, '')
 				img.setAttribute('src', 'cid:' + cid);
 
 				const attData = {};
 
-				if (src.startsWith(domainUtils.toOssDomain(r2Domain))) {
-					attData.key = src.replace(domainUtils.toOssDomain(r2Domain) + '/','');
+				if (ossDomain && src.startsWith(ossDomain)) {
+					attData.key = src.replace(ossDomain + '/','');
+				}
+
+				if (src.startsWith('{{domain}}attachments/')) {
+					attData.key = src.slice('{{domain}}'.length).split('?')[0];
 				}
 
 				if (src.startsWith('attachments/')) {
 					attData.key = src;
+				}
+
+				if (src.startsWith('/oss/attachments/')) {
+					attData.key = src.slice('/oss/'.length).split('?')[0];
 				}
 
 				attData.contentId = cid;
@@ -135,8 +158,8 @@ const attService = {
 		}
 
 		//查询已有内嵌url图片信息
-		const keys = [...new Set(imageDataList.filter(item => !item.content).map(item => item.key))];
-		const dbImageList  = await this.selectOneByKeys(c, keys);
+		const keys = [...new Set(imageDataList.filter(item => !item.content && item.key).map(item => item.key))];
+		const dbImageList  = await this.selectOneByKeys(c, keys, userId);
 
 		//设置给当前附件
 		await Promise.all(imageDataList.map(async image => {
@@ -154,7 +177,7 @@ const attService = {
 			image.mimeType = dbImage.mimeType;
 			image.contentType = dbImage.mimeType;
 
-			const obj = await r2Service.getObj(c, image.key);
+			const obj = await r2Service.getObj(c, image.key, userId);
 			if (!obj) {
 				return;
 			}
@@ -291,11 +314,28 @@ const attService = {
 		await this.removeAttByField(c, "account_id", [accountId])
 	},
 
-	selectOneByKeys(c, keys) {
+	selectOneByKeys(c, keys, userId = null) {
 		if (!keys || keys.length === 0) {
 			return []
 		}
-		return orm(c).select().from(att).where(inArray(att.key, keys)).orderBy(desc(att.attId)).groupBy(att.key).all();
+		const uniqueKeys = [...new Set(keys)];
+		const selectChunk = (chunk) => {
+			const conditions = [inArray(att.key, chunk)];
+			if (userId !== null && userId !== undefined) {
+				conditions.push(eq(att.userId, userId));
+			}
+			return orm(c).select().from(att).where(and(...conditions)).orderBy(desc(att.attId)).groupBy(att.key).all();
+		};
+		if (uniqueKeys.length <= 90) {
+			return selectChunk(uniqueKeys);
+		}
+		return (async () => {
+			const rows = [];
+			for (let i = 0; i < uniqueKeys.length; i += 90) {
+				rows.push(...await selectChunk(uniqueKeys.slice(i, i + 90)));
+			}
+			return rows;
+		})();
 	},
 
 	async existsForUser(c, key, userId) {
@@ -304,6 +344,58 @@ const attService = {
 			and(eq(att.key, key), eq(att.userId, userId))
 		).get();
 		return !!row;
+	},
+
+	/**
+	 * Resolve the owner of each attachment key. Passing userId restricts the
+	 * lookup to that mailbox; passing null is reserved for administrators.
+	 * Returns a Map<key, userId> containing only keys that actually exist.
+	 */
+	async findOwnedKeyOwners(c, keys, userId = null) {
+		const uniqueKeys = [...new Set((keys || []).filter(key => typeof key === 'string' && key))];
+		if (uniqueKeys.length === 0) return new Map();
+
+		const owners = new Map();
+		// D1 caps bound parameters per statement (100); keep headroom.
+		for (let i = 0; i < uniqueKeys.length; i += 90) {
+			const chunk = uniqueKeys.slice(i, i + 90);
+			const conditions = [inArray(att.key, chunk)];
+			if (userId !== null && userId !== undefined) {
+				conditions.push(eq(att.userId, userId));
+			}
+			const rows = await orm(c).select({ key: att.key, userId: att.userId })
+				.from(att)
+				.where(and(...conditions))
+				.orderBy(asc(att.attId))
+				.all();
+			for (const row of rows) {
+				if (!owners.has(row.key)) owners.set(row.key, row.userId);
+			}
+		}
+		return owners;
+	},
+
+	/**
+	 * Replace {{domain}}attachments/<key> placeholders with short-lived signed
+	 * worker URLs. Only keys that belong to the mailbox owner are signed, so a
+	 * malicious message body cannot mint capabilities for someone else's file.
+	 */
+	async signContentAttachmentUrls(c, content, userId, ttlSeconds = 3600) {
+		const keys = collectContentAttachmentKeys(content);
+		if (keys.length === 0 || !userId) return content;
+
+		const owners = await this.findOwnedKeyOwners(c, keys, userId);
+		if (owners.size === 0) return content;
+
+		const replacements = new Map();
+		for (const [key, ownerUserId] of owners) {
+			replacements.set(key, await buildSignedObjectUrl(c, key, { userId: ownerUserId, ttlSeconds }));
+		}
+
+		return content.replace(
+			new RegExp(ATTACHMENT_CONTENT_PATTERN.source, 'g'),
+			(match, key) => replacements.get(key) || match
+		);
 	}
 };
 

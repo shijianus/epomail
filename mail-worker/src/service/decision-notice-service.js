@@ -399,13 +399,12 @@ const decisionNoticeService = {
 				if (isRevoked) return null;
 			}
 
-			// Object status check: 若用户已被正式解封恢复正常，受限通道自动失效
+			// Object status check: 若用户已被正式解封恢复正常或已删除，受限通道自动失效
 			const userDb = getUserDb(c) || c?.env?.db;
-			if (userDb && decoded.userId) {
-				const uRow = await userDb.prepare('SELECT status FROM user WHERE user_id = ?').bind(decoded.userId).first().catch(() => null);
-				if (uRow && Number(uRow.status) !== 1) {
-					return null;
-				}
+			if (!userDb || !decoded.userId) return null;
+			const uRow = await userDb.prepare('SELECT status, is_del FROM user WHERE user_id = ?').bind(decoded.userId).first().catch(() => null);
+			if (!uRow || Number(uRow.status) !== 1 || Number(uRow.is_del) === 1) {
+				return null;
 			}
 
 			return decoded;

@@ -378,6 +378,7 @@ import { UseVirtualList } from '@vueuse/components'
 import { useScroll } from '@vueuse/core'
 import { emailSpam, emailSnooze, emailRestore, emailDelete as realEmailDelete } from "@/request/email.js";
 import { getThreadKey } from "@/utils/thread-utils.js";
+import DOMPurify from 'dompurify';
 
 const props = defineProps({
   getEmailList: Function,
@@ -987,9 +988,12 @@ function htmlToText(email) {
 
     const tempDiv = document.createElement('div');
 
-    tempDiv.innerHTML = email.content.replace(
-        /<(img|iframe|object|embed|video|audio|source|link)[^>]*>/gi, ''
-    );
+    // Never assign raw message HTML to a live DOM node: media/event attributes
+    // could trigger before the tag stripper runs. Reduce to text first.
+    tempDiv.innerHTML = DOMPurify.sanitize(email.content, {
+      ALLOWED_TAGS: [],
+      ALLOWED_ATTR: []
+    });
 
     const scriptsAndStyles = tempDiv.querySelectorAll('script, style, title');
     scriptsAndStyles.forEach(el => el.remove());
