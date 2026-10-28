@@ -11,6 +11,31 @@
 
 ---
 
+### 独立验收 B1/B2 定点修复与真实 origin/master 集成 (2026-10-28)
+*   **关联提交 (Git Commit)**: `3d23610d8b74a6177600725f5c9b031900bcc24d` (Short: `3d23610`)；受审候选 `7d88fdf1443eb93bd4dce3382d94c62bfda28a60`；目标 `origin/master` `cde6e97721d80d6573c04026b931a33d3dfd31e1`。
+*   **部署环境 (Deployment)**: 独立 worktree `D:/Users/Smart Kevin/epomail-acceptance-b1-b2-20261027` + 隔离 D1/KV persist；**未部署生产、未访问生产 API/桶/CDN，未轮换生产 Secret**。
+*   **合并基线 (Merge Base)**: `origin/master`（`cde6e97`）已由 `832262b` 合入候选祖先；合并仅 `CHECKLIST.log` 冲突，按双方记录保留，无 RBAC/Webhook/设置迁移/OAuth/附件保护代码冲突。本地 master `9654ea1` 及其 3 个未推送提交未合并、未推送。
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] **B1 站内 EMBED 关系**：`attachments` 新增 `storage_user_id`（`v3_20DB` 幂等迁移 + `intDB` 原生定义），区分“可读邮件的邮箱”与“物理对象所属存储/BYO”；`HandleOnSiteEmail` 复制 EMBED 与 ATT 全部关系，签名绑定 storage owner；收件人 batch 同时取得内嵌图与下载附件签名。
+    - [x] **B1 越权与删除语义**：批量签名仍只按 viewer 的投递行授权；伪造正文他人 Key 不建立关系、不签名；删除沿用 key 全局引用计数，仍被合法邮件引用的对象不物理删除。
+    - [x] **B2 Telegram 分享**：按 URL 解析 host/path，仅对本站对象域（`r2Domain`/`customDomain`/请求域/`LEGACY_ATTACHMENT_DOMAINS`）的 attachments 路径签名或中和；覆盖 `{{domain}}`（含 `/`、`//` 变体）、相对路径、绝对/协议相对 URL、大小写与尾点域名；无权或签名失败一律中和，不回退公开直链；第三方图片保持原样；模板兜底中和。
+    - [x] **历史邮件口径**：不执行生产回填，也不按正文 Key 批量授予权限；既有已投递邮件仅有 ATT 关系，内嵌 EMBED 保持不可签名（回归用例明确断言），下载附件仍可用。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 修复前证据（独立验收目录 `epomail-verify-7d88fdf-evidence/`）：`sign-batch-reader.json` 仅返回下载 Key、`sign-inline-reader.json` 404、`tg10.html` 保留 `https://cdn.verify.test/attachments/...` 绝对公开 URL。
+    - [x] 最终 worker 回归：`npx vitest run` → **8 files / 95 tests passed**（既有 84 + 新增 `acceptance-b1-b2.spec.js` 11）；`test:integration` 73 项、`test:unit` 22 项分别通过；无 `it.fails`。
+    - [x] B1 真实发送（隔离 workerd + 真实 `/api/email/send`）：data URI 内嵌图 + 普通附件因站内投递复制到收件人；收件人 batch 同时返回 EMBED/ATT 签名；内嵌图 HTTP 200、160×100、852B；下载内容一致；无关第三用户拒签；伪造 admin Key 不产生关系；回复/转发后新收件人可签名；删除收件人副本后对象仍可供发件人访问。
+    - [x] B1 浏览器（真实登录 UI + 主前端）：收件人打开邮件，shadow DOM 内嵌图 `/oss/...uid=3...`、`naturalWidth=160`、`naturalHeight=100`；回复编辑器引用图同样 160×100；UI 回复送达（emailId 20）后发件人可再次签名取图（852B）。
+    - [x] B2 真实分享 HTTP（`/api/telegram/getEmail/:token`）：同一 HTML 混合授权/未授权附件；授权项签名 200/160×100；未授权项中和为 `/attachments/...`；`{{domain}}`/`/`/`//`、相对路径、r2Domain、customDomain、请求域、legacy 域全部无公开直链残留；第三方域图片原样保留；签名失败回退中和。
+    - [x] 构建与配置：`temp_login_ui` 2011 modules 构建通过；`mail-vue` 最终构建 22.84s（PWA + copy-login-dist）；生产配置 `wrangler deploy --dry-run` → 5366.04 KiB / gzip 1109.25 KiB，**未部署**。
+    - [x] 静态检查：`git diff --check` 通过；`scripts/scan-staged-secrets.mjs` 0 命中；`scripts/secret-scan.mjs` 工作区 1226 files 0 命中；i18n symmetry/audit 通过（1930 keys 六语言对称）。
+*   **未覆盖 / owner 生产事项 (Uncovered & Owner Follow-up)**:
+    - [ ] 生产部署后需执行 `/api/init` 触发 `v3_20DB` 列迁移；若存在历史对象域名，需显式配置 `LEGACY_ATTACHMENT_DOMAINS`（逗号分隔，仅域名）。
+    - [ ] 未执行历史关系回填；若 owner 决定修复旧邮件内嵌图，必须基于可信投递关联单独设计，禁止按正文 Key 批量授权。
+    - [ ] 未调用真实 OAuth 提供商/JWKS、未验证真实 BYO/S3/CDN、未完成完整 TOTP 挑战、未执行 Apple POST 回调；154 个无关浏览器 E2E 未运行。
+    - [ ] 生产 Secret 轮换、分支合并/部署与桶/CDN ACL 处置均需 owner 单独授权。
+
+---
+
 ### 复审阻断项定点修复：签名附件根路由 / setting 冷启动 / r2Domain 旁路 / OAuth 收口 (2026-10-27)
 *   **关联提交 (Git Commit)**: `4edb556531fb5105a4bd5255d03e10d63bad9be1` (Short: `4edb556`)；受审基线 `a9f0d1e5a8aa66213f7f3ad4cf7e29daccd513f5`，目标分支 `security/audit-2026-10-25`。
 *   **部署环境 (Deployment)**: 独立 worktree `D:/Users/Smart Kevin/epomail-accept-20261027`；本地 workerd + D1 + KV；**未部署生产、未访问生产 API/OAuth/邮件、未修改生产 Secret/数据库/桶权限**。
