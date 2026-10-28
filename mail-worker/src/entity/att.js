@@ -4,6 +4,9 @@ import { sql } from 'drizzle-orm';
 export const  att = sqliteTable('attachments', {
 	attId: integer('att_id').primaryKey({ autoIncrement: true }),
 	userId: integer('user_id').notNull(),
+	// Mailbox whose storage holds the bytes. NULL means the row owner's storage;
+	// internal delivery copies keep the original sender here.
+	storageUserId: integer('storage_user_id'),
 	emailId: integer('email_id').notNull(),
 	accountId: integer('account_id').notNull(),
 	key: text('key').notNull(),

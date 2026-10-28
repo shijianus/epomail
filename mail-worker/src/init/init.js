@@ -79,6 +79,7 @@ const dbInit = {
 		await this.v3_17DB(c);
 		await this.v3_18DB(c);
 		await this.v3_19DB(c);
+		await this.v3_20DB(c);
 		await settingService.refresh(c);
 		const generatedAdminPassword = c.get('generatedAdminPassword');
 		if (generatedAdminPassword) {
@@ -316,6 +317,23 @@ const dbInit = {
 			console.warn('v3_19DB oauth_one_time_token warning:', err.message);
 		}
 		await ensureSettingExtSchema(userDb);
+	},
+
+	// v3_20DB: internal delivery copies must record which mailbox owns the
+	// physical object (sender storage / BYO) separately from the mailbox that
+	// can read the delivered message.
+	async v3_20DB(c) {
+		const mailDb = getMailDb(c);
+		try {
+			const column = await mailDb.prepare(
+				`SELECT name FROM pragma_table_info('attachments') WHERE name = 'storage_user_id' LIMIT 1`
+			).first();
+			if (!column) {
+				await mailDb.prepare(`ALTER TABLE attachments ADD COLUMN storage_user_id INTEGER;`).run();
+			}
+		} catch (err) {
+			console.warn('v3_20DB attachments.storage_user_id warning:', err.message);
+		}
 	},
 
 	// v3_17DB: 违规裁决闭环迁移：
@@ -1543,6 +1561,7 @@ const dbInit = {
 			CREATE TABLE IF NOT EXISTS attachments (
 				att_id INTEGER PRIMARY KEY AUTOINCREMENT,
 				user_id INTEGER NOT NULL,
+				storage_user_id INTEGER,
 				email_id INTEGER NOT NULL,
 				account_id INTEGER NOT NULL,
 				key TEXT NOT NULL,

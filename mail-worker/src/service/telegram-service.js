@@ -42,9 +42,9 @@ const telegramService = {
 				// Private attachment images need capabilities bound to the
 				// mailbox owner regardless of the public r2Domain setting. The
 				// share page's own JWT is valid for seven days, so match that TTL.
-				if (emailRow.userId) {
-					content = await attService.signContentAttachmentUrls(c, content, emailRow.userId, 7 * 24 * 3600);
-				}
+				// This also runs for owner-less rows so recognized absolute
+				// attachment URLs are neutralized rather than left public.
+				content = await attService.signContentAttachmentUrls(c, content, emailRow.userId || null, 7 * 24 * 3600);
 				return emailHtmlTemplate(content, r2Domain, nonce)
 			} else {
 				return emailTextTemplate(emailRow.text || '')

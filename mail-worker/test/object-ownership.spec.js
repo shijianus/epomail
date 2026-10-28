@@ -8,6 +8,7 @@ const CREATE_ATTACHMENTS = `
 CREATE TABLE IF NOT EXISTS attachments (
 	att_id INTEGER PRIMARY KEY AUTOINCREMENT,
 	user_id INTEGER NOT NULL,
+	storage_user_id INTEGER,
 	email_id INTEGER NOT NULL,
 	account_id INTEGER NOT NULL,
 	key TEXT NOT NULL,

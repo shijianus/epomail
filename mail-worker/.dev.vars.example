@@ -16,3 +16,6 @@ resend_webhook_secret=<whsec_your_webhook_signing_secret>
 CORS_ORIGINS=
 # 可选：邮件静态加密主键；不设置时回退到 totp_enc_key
 email_enc_key=<your-optional-email-encryption-key>
+# 可选：明确识别的历史附件对象域名（逗号分隔，仅域名）。Telegram 分享时仅对这些域名上的
+# attachments 路径做签名或中和，其余第三方图片保持原样。
+LEGACY_ATTACHMENT_DOMAINS=

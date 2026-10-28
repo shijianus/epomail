@@ -28,7 +28,7 @@ export default function emailHtmlTemplate(html, domain, nonce = '') {
 	// Attachment placeholders that were not signed (not owned by this mailbox)
 	// must never fall back to the public object domain. /attachments requires a
 	// capability signature, so these resolve to 404 instead of a public URL.
-	html = html.replace(/{{domain}}attachments\//g, '/attachments/');
+	html = html.replace(/\{\{domain\}\}\/*attachments\//g, '/attachments/');
 	html = html.replace(/{{domain}}/g, domainUtils.toOssDomain(domain) + '/');
 	const safeHtmlJson = JSON.stringify(html).replace(/</g, '\\u003C');
 	const scriptPolicy = safeNonce ? `script-src 'nonce-${safeNonce}'` : `script-src 'unsafe-inline'`;

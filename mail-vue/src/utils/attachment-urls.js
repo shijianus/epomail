@@ -4,9 +4,9 @@ import { useSettingStore } from '@/store/setting.js';
 import { toOssDomain } from '@/utils/convert.js';
 
 const TRANSPARENT_PIXEL = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
-const PLACEHOLDER_PATTERN = /{{domain}}(attachments\/[A-Za-z0-9._-]+)/g;
+const PLACEHOLDER_PATTERN = /\{\{domain\}\}\/*(attachments\/[A-Za-z0-9._-]+)/g;
 const DIRECT_PATTERN = /(["'(=\s])\/?(attachments\/[A-Za-z0-9._-]+)/g;
-const ABSOLUTE_PATTERN = /(https?:\/\/[^\s"'<>]+?\/)(attachments\/[A-Za-z0-9._-]+)/g;
+const ABSOLUTE_PATTERN = /((?:https?:)?\/\/[^\s"'<>]+?\/)(attachments\/[A-Za-z0-9._-]+)/gi;
 
 function collectAttachmentKeys(messages) {
 	const keys = new Set();

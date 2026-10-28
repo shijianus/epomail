@@ -31,11 +31,11 @@ app.get('/oss-url/*', async (c) => {
 
 	let ownerUserId = null;
 	if (key.startsWith('attachments/')) {
-		const owners = await attService.findOwnedKeyOwners(c, [key], admin ? null : userId);
-		if (!owners.has(key)) {
+		const rows = await attService.findAccessibleAttachmentRows(c, [key], admin ? null : userId);
+		if (!rows.has(key)) {
 			return c.json(result.fail('Object Not Found', 404));
 		}
-		ownerUserId = owners.get(key);
+		ownerUserId = rows.get(key).storageOwnerId;
 	} else if (!isPublicStaticKey(key, userId)) {
 		return c.json(result.fail('Object Not Found', 404));
 	}
@@ -68,14 +68,15 @@ app.post('/oss-url/batch', async (c) => {
 		.filter(Boolean))];
 
 	const attachmentKeys = uniqueKeys.filter(key => key.startsWith('attachments/'));
-	const owners = await attService.findOwnedKeyOwners(c, attachmentKeys, admin ? null : userId);
+	const rows = await attService.findAccessibleAttachmentRows(c, attachmentKeys, admin ? null : userId);
 
 	const urls = {};
 	await Promise.all(uniqueKeys.map(async (key) => {
 		if (key.startsWith('attachments/')) {
-			if (!owners.has(key)) return;
+			const row = rows.get(key);
+			if (!row) return;
 			urls[key] = await buildSignedObjectUrl(c, key, {
-				userId: owners.get(key),
+				userId: row.storageOwnerId,
 				ttlSeconds: 3600
 			});
 			return;

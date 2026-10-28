@@ -1048,7 +1048,10 @@ const emailService = {
 
 		//如果全是站内接收方，直接写入数据库（传入未加密明文数据由 HandleOnSiteEmail 统一使用收件人私钥加密）
 		if (allInternal) {
-			await this.HandleOnSiteEmail(c, receiveEmail, { ...emailData, emailId: emailResult.emailId }, attList);
+			// Inline EMBED rows are part of the delivered content relation, not
+			// just downloadable ATT rows; copy every row with its storage owner.
+			const deliveryAttList = await attService.selectAllByEmailIds(c, [emailResult.emailId]);
+			await this.HandleOnSiteEmail(c, receiveEmail, { ...emailData, emailId: emailResult.emailId }, deliveryAttList);
 		}
 
 		const dateStr = dayjs().format('YYYY-MM-DD');
@@ -1408,6 +1411,9 @@ const emailService = {
 				attValues.emailId = emailRow.emailId;
 				attValues.accountId = emailRow.accountId;
 				attValues.userId = emailRow.userId;
+				// The delivered copy is readable by this mailbox, but the bytes
+				// still live in the sending mailbox's storage (possibly BYO).
+				attValues.storageUserId = attService.storageOwnerId(attRow);
 				attValues.attId = null;
 				await orm(c).insert(att).values(attValues).run();
 			}

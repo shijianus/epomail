@@ -15,17 +15,87 @@ import { buildSignedObjectUrl } from '../utils/object-token';
 import storageQuotaService from './storage-quota-service';
 import { getMailDb } from '../utils/db-accessor';
 
-const ATTACHMENT_CONTENT_PATTERN = /{{domain}}(attachments\/[A-Za-z0-9._-]+)/g;
-const ATTACHMENT_ABSOLUTE_PATTERN = /https?:\/\/[^\s"'<>]+?\/(attachments\/[A-Za-z0-9._-]+)/g;
+const ATTACHMENT_CONTENT_PATTERN = /\{\{domain\}\}\/*(attachments\/[A-Za-z0-9._-]+)/g;
+const ATTACHMENT_ROOT_RELATIVE_PATTERN = /(^|["'(=\s])\/(attachments\/[A-Za-z0-9._-]+)/g;
+const ATTACHMENT_RELATIVE_PATTERN = /(^|["'(=\s])(attachments\/[A-Za-z0-9._-]+)/g;
+// Absolute and protocol-relative URLs. Hosts are checked against this site's
+// object hosts before anything is rewritten; third-party hosts are untouched.
+const ATTACHMENT_ABSOLUTE_PATTERN = /(?:https?:)?\/\/[^\s"'<>]+/gi;
+const ATTACHMENT_KEY_PATTERN = /^[A-Za-z0-9._-]+$/;
+
+function normalizeHostname(value) {
+	return String(value || '').toLowerCase().replace(/\.$/, '');
+}
+
+/**
+ * The mailbox that owns a row vs. the mailbox whose storage holds the bytes.
+ * Internal delivery copies rows to every recipient, but those copies still
+ * point at the sender's physical object (which may live in a BYO bucket).
+ */
+function storageOwnerId(row) {
+	const storageUserId = Number(row?.storageUserId);
+	return Number.isSafeInteger(storageUserId) && storageUserId > 0 ? storageUserId : row?.userId;
+}
+
+function attachmentKeyFromAbsoluteUrl(token) {
+	let url;
+	try {
+		url = new URL(token.startsWith('//') ? `https:${token}` : token);
+	} catch (_) {
+		return null;
+	}
+	if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
+	const marker = '/attachments/';
+	const index = url.pathname.indexOf(marker);
+	if (index === -1) return null;
+	const filename = url.pathname.slice(index + marker.length);
+	return {
+		host: normalizeHostname(url.hostname),
+		key: ATTACHMENT_KEY_PATTERN.test(filename) ? `attachments/${filename}` : null,
+		path: `/attachments/${filename}`
+	};
+}
+
+function hostnameFromSetting(value) {
+	if (typeof value !== 'string' || !value.trim()) return '';
+	try {
+		return normalizeHostname(
+			new URL(/^https?:\/\//i.test(value.trim()) ? value.trim() : `https://${value.trim()}`).hostname
+		);
+	} catch (_) {
+		return '';
+	}
+}
+
+async function trustedAttachmentHosts(c) {
+	const hosts = new Set();
+	try {
+		const setting = await settingService.query(c);
+		for (const value of [setting?.r2Domain, setting?.customDomain]) {
+			const host = hostnameFromSetting(value);
+			if (host) hosts.add(host);
+		}
+	} catch (_) {}
+	for (const value of String(c?.env?.LEGACY_ATTACHMENT_DOMAINS || '').split(',')) {
+		const host = hostnameFromSetting(value);
+		if (host) hosts.add(host);
+	}
+	try {
+		const host = normalizeHostname(new URL(c.req.url).hostname);
+		if (host) hosts.add(host);
+	} catch (_) {}
+	return hosts;
+}
 
 function collectContentAttachmentKeys(content) {
 	const keys = new Set();
 	if (typeof content !== 'string' || !content) return [];
-	for (const match of content.matchAll(ATTACHMENT_CONTENT_PATTERN)) {
-		keys.add(match[1]);
-	}
+	for (const match of content.matchAll(ATTACHMENT_CONTENT_PATTERN)) keys.add(match[1]);
+	for (const match of content.matchAll(ATTACHMENT_ROOT_RELATIVE_PATTERN)) keys.add(match[2]);
+	for (const match of content.matchAll(ATTACHMENT_RELATIVE_PATTERN)) keys.add(match[2]);
 	for (const match of content.matchAll(ATTACHMENT_ABSOLUTE_PATTERN)) {
-		keys.add(match[1]);
+		const parsed = attachmentKeyFromAbsoluteUrl(match[0]);
+		if (parsed?.key) keys.add(parsed.key);
 	}
 	return [...keys];
 }
@@ -179,7 +249,7 @@ const attService = {
 			image.mimeType = dbImage.mimeType;
 			image.contentType = dbImage.mimeType;
 
-			const obj = await r2Service.getObj(c, image.key, userId);
+			const obj = await r2Service.getObj(c, image.key, storageOwnerId(dbImage));
 			if (!obj) {
 				return;
 			}
@@ -263,6 +333,15 @@ const attService = {
 				eq(att.type, attConst.type.ATT)
 			))
 			.all();
+	},
+
+	/**
+	 * Every attachment row for the given messages, including inline EMBED rows.
+	 * Used when delivering internal mail so the recipient receives the same
+	 * content relations (not just the downloadable ATT rows).
+	 */
+	selectAllByEmailIds(c, emailIds) {
+		return orm(c).select().from(att).where(inArray(att.emailId, emailIds)).all();
 	},
 
 	async removeAttByField(c, fieldName, fieldValues) {
@@ -349,15 +428,16 @@ const attService = {
 	},
 
 	/**
-	 * Resolve the owner of each attachment key. Passing userId restricts the
-	 * lookup to that mailbox; passing null is reserved for administrators.
-	 * Returns a Map<key, userId> containing only keys that actually exist.
+	 * Access rows for the current viewer. Passing userId restricts the lookup
+	 * to rows delivered to that mailbox; null is reserved for administrators.
+	 * Each result keeps both the mailbox owner and the mailbox whose storage
+	 * physically holds the object (they differ for internal delivery copies).
 	 */
-	async findOwnedKeyOwners(c, keys, userId = null) {
+	async findAccessibleAttachmentRows(c, keys, userId = null) {
 		const uniqueKeys = [...new Set((keys || []).filter(key => typeof key === 'string' && key))];
 		if (uniqueKeys.length === 0) return new Map();
 
-		const owners = new Map();
+		const rowsByKey = new Map();
 		// D1 caps bound parameters per statement (100); keep headroom.
 		for (let i = 0; i < uniqueKeys.length; i += 90) {
 			const chunk = uniqueKeys.slice(i, i + 90);
@@ -365,45 +445,68 @@ const attService = {
 			if (userId !== null && userId !== undefined) {
 				conditions.push(eq(att.userId, userId));
 			}
-			const rows = await orm(c).select({ key: att.key, userId: att.userId })
+			const rows = await orm(c).select({
+				key: att.key,
+				userId: att.userId,
+				storageUserId: att.storageUserId
+			})
 				.from(att)
 				.where(and(...conditions))
 				.orderBy(asc(att.attId))
 				.all();
 			for (const row of rows) {
-				if (!owners.has(row.key)) owners.set(row.key, row.userId);
+				if (!rowsByKey.has(row.key)) {
+					rowsByKey.set(row.key, { ...row, storageOwnerId: storageOwnerId(row) });
+				}
 			}
 		}
-		return owners;
+		return rowsByKey;
 	},
+
+	storageOwnerId,
 
 	/**
 	 * Replace attachment placeholders or legacy public-domain attachment URLs
-	 * with short-lived signed worker URLs. Only keys that belong to the mailbox
-	 * owner are signed, so a malicious message body cannot mint capabilities
-	 * for someone else's file.
+	 * with short-lived signed worker URLs. Only keys that the mailbox has an
+	 * attachment row for are signed, so a malicious message body cannot mint
+	 * capabilities for someone else's file. The signature is bound to the
+	 * mailbox whose storage holds the bytes, not to the viewing mailbox.
+	 * Recognized attachment URLs on this site's object hosts that cannot be
+	 * signed are neutralized to an unsigned /attachments/ path instead of
+	 * retaining a public link. Third-party absolute URLs are matched by host,
+	 * not by the string "attachments", and are left untouched.
 	 */
 	async signContentAttachmentUrls(c, content, userId, ttlSeconds = 3600) {
+		if (typeof content !== 'string' || !content) return content;
+
 		const keys = collectContentAttachmentKeys(content);
-		if (keys.length === 0 || !userId) return content;
-
-		const owners = await this.findOwnedKeyOwners(c, keys, userId);
-		if (owners.size === 0) return content;
-
 		const replacements = new Map();
-		for (const [key, ownerUserId] of owners) {
-			replacements.set(key, await buildSignedObjectUrl(c, key, { userId: ownerUserId, ttlSeconds }));
+		if (userId && keys.length > 0) {
+			const rows = await this.findAccessibleAttachmentRows(c, keys, userId);
+			for (const [key, row] of rows) {
+				try {
+					replacements.set(key, await buildSignedObjectUrl(c, key, {
+						userId: row.storageOwnerId,
+						ttlSeconds
+					}));
+				} catch (_) {
+					// Signing failed; fall through to the neutralized path.
+				}
+			}
 		}
 
+		const trustedHosts = await trustedAttachmentHosts(c);
+		const signedOrNeutral = key => replacements.get(key) || `/${key}`;
+
 		return content
-			.replace(
-				new RegExp(ATTACHMENT_CONTENT_PATTERN.source, 'g'),
-				(match, key) => replacements.get(key) || match
-			)
-			.replace(
-				new RegExp(ATTACHMENT_ABSOLUTE_PATTERN.source, 'g'),
-				(match, prefix, key) => replacements.get(key) || match
-			);
+			.replace(ATTACHMENT_CONTENT_PATTERN, (match, key) => signedOrNeutral(key))
+			.replace(ATTACHMENT_ABSOLUTE_PATTERN, (match) => {
+				const parsed = attachmentKeyFromAbsoluteUrl(match);
+				if (!parsed || !trustedHosts.has(parsed.host)) return match;
+				return parsed.key ? signedOrNeutral(parsed.key) : parsed.path;
+			})
+			.replace(ATTACHMENT_ROOT_RELATIVE_PATTERN, (match, prefix, key) => prefix + signedOrNeutral(key))
+			.replace(ATTACHMENT_RELATIVE_PATTERN, (match, prefix, key) => prefix + signedOrNeutral(key));
 	}
 };
 
