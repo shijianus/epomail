@@ -248,6 +248,12 @@ const attService = {
 			image.filename = dbImage.filename;
 			image.mimeType = dbImage.mimeType;
 			image.contentType = dbImage.mimeType;
+			// Re-embedding an existing key keeps its physical object where it
+			// already lives; only record a non-default storage owner.
+			const sourceStorageOwner = storageOwnerId(dbImage);
+			if (sourceStorageOwner !== userId) {
+				image.storageUserId = sourceStorageOwner;
+			}
 
 			const obj = await r2Service.getObj(c, image.key, storageOwnerId(dbImage));
 			if (!obj) {

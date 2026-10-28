@@ -328,7 +328,11 @@ describe('acceptance B1/B2 fixes', () => {
 
 		const replyReceived = await latestReceiveEmail(sender.email);
 		const replyRows = await attachmentRows(replyReceived.email_id);
-		expect(replyRows.some(row => row.key === embed.key && Number(row.type) === 1)).toBe(true);
+		const replyEmbed = replyRows.find(row => row.key === embed.key && Number(row.type) === 1);
+		expect(replyEmbed).toBeTruthy();
+		// Re-embedding reuses the original physical object, so the reply copy
+		// must keep pointing at the original sender's storage (BYO aware).
+		expect(replyEmbed.storage_user_id).toBe(sender.userId);
 
 		const forward = await sendInternal({
 			token: recipientToken,
@@ -340,7 +344,9 @@ describe('acceptance B1/B2 fixes', () => {
 
 		const forwarded = await latestReceiveEmail(outsider.email);
 		const forwardRows = await attachmentRows(forwarded.email_id);
-		expect(forwardRows.some(row => row.key === embed.key && Number(row.type) === 1)).toBe(true);
+		const forwardEmbed = forwardRows.find(row => row.key === embed.key && Number(row.type) === 1);
+		expect(forwardEmbed).toBeTruthy();
+		expect(forwardEmbed.storage_user_id).toBe(sender.userId);
 
 		const batch = await api('/api/oss-url/batch', {
 			method: 'POST', token: outsiderToken, body: { keys: [embed.key] }
