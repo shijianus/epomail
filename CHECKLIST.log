@@ -11,6 +11,32 @@
 
 ---
 
+### B1/B2 交付收口：BYO 归属传播与最终集成回归 (2026-10-28)
+*   **关联提交 (Git Commit)**: `be9c229`（本轮 BYO 归属传播修复）；B1/B2 主体修复 `3d23610`；集成候选基线 `1527e2b`；受审候选 `7d88fdf`；目标 `origin/master` `cde6e977`；本地 master `9654ea1`（3 个未推送提交）未合并、未推送。
+*   **部署环境 (Deployment)**: 独立 worktree `D:/Users/Smart Kevin/epomail-acceptance-b1-b2-20261027` + 隔离 D1/KV persist（端口 8841，已停止并清理）；**未部署生产、未访问生产 API/桶/CDN/Telegram，未轮换生产 Secret**。
+*   **合并关系 (Merge)**: `origin/master`（`cde6e97`）已由 `832262b` 合入候选祖先；本轮 `git merge origin/master` 为 already up-to-date，无新合并、无新冲突；本地 master 三个未推送提交未纳入。
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] **B1 BYO 归属一致性**：回复/转发重新内嵌既有附件 key 时，`toImageUrlHtml` 继承源行 `storage_user_id`；`saveArticleAtt` 落库后站内投递继续按原存储/BYO 传播，避免副本错误绑定到新邮箱存储。红测：回复副本 storage_user_id 原为收件人(3)，修复后为原始发送方(2)。
+    - [x] **越权与删除语义不变**：签名仍仅按 viewer 投递行授权，`storage_user_id` 只决定物理存储、不作为授权来源；删除仍按 key 全局引用计数保留被引用对象。
+    - [x] **历史邮件口径**：不执行生产回填；既有已投递邮件仍只有 ATT 关系，内嵌 EMBED 不回填、不按正文 Key 授权；历史 ATT 副本 `storage_user_id` 为 NULL，按行所有者解析（共享存储可用；BYO 历史副本维持修复前限制）。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 最终 worker 回归：`npx vitest run` → **8 files / 95 tests passed**；B1/B2 新增用例无 `it.fails`/skip。
+    - [x] 构建：`temp_login_ui` 11.30s；`mail-vue` 43.92s（PWA + copy-login-dist 成功）。
+    - [x] 生产配置 `wrangler deploy --dry-run --config wrangler.toml` → 5366.21 KiB / gzip 1109.28 KiB，**未部署**。
+    - [x] B1 真实栈（隔离 workerd + 真实 `/api/email/send`）：收件人 batch 同时取得 EMBED/ATT 签名（`uid=3` 为发送方存储）；内嵌图 200/160×100/852B；下载 25B 原文；无关第三用户拒签；伪造 admin Key 不建立关系；回复/转发后 `uid=3` 保持不变；删除收件人副本后对象仍可按发件人签名访问；行主=发件人、storage owner=第三用户时，第三用户仍被拒签（`uid=5`，对象 200）。
+    - [x] B1 浏览器（真实 `/login` UI + 主前端，收件人 user 4）：邮件详情 shadow DOM 内嵌图 `/oss/...uid=3`、160×100、complete；回复与转发编辑器引用图均 160×100；浏览器上下文下载 200、`application/octet-stream` + `attachment` + `private, no-store`；无 console 错误（指针面不可用，使用页面内真实 UI 事件点击）。
+    - [x] B2 真实分享 HTTP（`/api/telegram/getEmail/:token`）：授权项签名 200/160×100；未授权项中和为 `/attachments/...` 且无签名 404；`{{domain}}`/`/`/`//`、相对路径、r2Domain、customDomain、请求域、legacy 域均无公开直链；第三方域图片原样保留；`{{domain}}` 无残留。
+    - [x] 对象链/初始化回归：unsigned/tampered/swapped/unsigned-download 均 404；`/oss/auth-uid:2`、`/oss/setting:` 404；静态 200；重复 `POST /api/init` → success，setting 94 列 / setting_ext 8 列 / `attachments.storage_user_id` 存在。
+    - [x] 静态检查：`git diff --check` 通过；staged 与工作区凭据扫描 0 命中（gitleaks 未安装，内置规则）；i18n symmetry 1930 键对称、audit 无缺失、hardcoded 为既有 421 行基线（本提交无新增用户可见文案）。
+*   **未覆盖 / owner 生产事项 (Uncovered & Owner Follow-up)**:
+    - [ ] 生产部署后需访问 `/api/init` 触发 `v3_20DB` 列迁移；历史对象域名需显式配置 `LEGACY_ATTACHMENT_DOMAINS`（仅域名，逗号分隔）。
+    - [ ] 未执行历史关系回填；如需修复旧邮件内嵌图或 BYO 历史副本，必须基于可信投递关联单独设计，禁止按正文 Key 批量授权。
+    - [ ] BYO 场景下“最后引用位于非存储主邮箱”时，现有 `r2Service.delete` 仍按默认存储删除（可能留下源桶孤儿对象），属既有删除语义，未在本轮扩展。
+    - [ ] 未调用真实 OAuth 提供商/JWKS、未完成完整 TOTP 挑战、未验证真实 BYO/S3/CDN、未执行 Apple POST 回调；154 个无关浏览器 E2E 未运行。
+    - [ ] 生产 Secret 轮换、分支合并/部署与桶/CDN ACL 处置均需 owner 单独授权。
+
+---
+
 ### 独立验收 B1/B2 定点修复与真实 origin/master 集成 (2026-10-28)
 *   **关联提交 (Git Commit)**: `3d23610d8b74a6177600725f5c9b031900bcc24d` (Short: `3d23610`)；受审候选 `7d88fdf1443eb93bd4dce3382d94c62bfda28a60`；目标 `origin/master` `cde6e97721d80d6573c04026b931a33d3dfd31e1`。
 *   **部署环境 (Deployment)**: 独立 worktree `D:/Users/Smart Kevin/epomail-acceptance-b1-b2-20261027` + 隔离 D1/KV persist；**未部署生产、未访问生产 API/桶/CDN，未轮换生产 Secret**。
