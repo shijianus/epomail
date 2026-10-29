@@ -10,7 +10,7 @@
 ---
 
 ### B6 专项验收：真实 OAuth 提供商集成与 Staging 门禁 (2026-10-29)
-*   **关联提交 (Git Commit)**: `f67445f96b0d0afcedd74c7cf27e319f07627943` (Short: `f67445f`)
+*   **关联提交 (Git Commit)**: `f67445f96b0d0afcedd74c7cf27e319f07627943` (Short: `f67445f`)；补充发现与探针：`926a625b84f2be269f0310ec5bd522de56b88717` (Short: `926a625`)
 *   **专项文档索引 (Detailed Doc)**: `doc/oauth-staging-acceptance-b6-2026-10-29.md`
 *   **体检/审计范围与方法 (Scope & Methodology)**:
     1. 范围与环境：`mail-worker` OAuth 登录/绑定/回调服务、`temp_login_ui` 登录与 bind UI、`mail-vue` 身份设置页、`wrangler.toml` 的 `[env.staging]` 隔离配置、Google/GitHub/Apple provider 配置面；本地 workerd + 隔离 D1/KV 回归，**未部署、未创建 staging 资源、未登录任何真实 provider、未修改远程环境**。
