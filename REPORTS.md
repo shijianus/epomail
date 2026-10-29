@@ -9,6 +9,34 @@
 
 ---
 
+### B6 专项验收：真实 OAuth 提供商集成与 Staging 门禁 (2026-10-29)
+*   **关联提交 (Git Commit)**: `COMMIT_HASH_PLACEHOLDER` (Short: `SHORT_HASH_PLACEHOLDER`)
+*   **专项文档索引 (Detailed Doc)**: `doc/oauth-staging-acceptance-b6-2026-10-29.md`
+*   **体检/审计范围与方法 (Scope & Methodology)**:
+    1. 范围与环境：`mail-worker` OAuth 登录/绑定/回调服务、`temp_login_ui` 登录与 bind UI、`mail-vue` 身份设置页、`wrangler.toml` 的 `[env.staging]` 隔离配置、Google/GitHub/Apple provider 配置面；本地 workerd + 隔离 D1/KV 回归，**未部署、未创建 staging 资源、未登录任何真实 provider、未修改远程环境**。
+    2. 工具与脚本：`vitest` + `@cloudflare/vitest-pool-workers`（13 文件 180 项）、新增 `scripts/oauth-staging-preflight.mjs`（静态隔离 + 只读 live 探针）、`tests/oauth-staging-acceptance.mjs`（协议检查 + 人工矩阵 + 报告）、本地 mock 脚本自测（仅验证脚本，不作为验收证据）。
+*   **核心发现与缺陷矩阵 (Key Findings & Matrix)**:
+    - **[P0·安全] 空 client state 登录 CSRF 残留**：公开 `/api/oauth/authorize/:provider` 可省略 client state；登录页以 `'' === ''` 通过校验，攻击者可诱导受害者登录攻击者邮箱。证据：`AuthForm.tsx:675-681`、`oauth-service.js:179-225`、`security-review-adversarial.spec.js:247-269`。**未修复，发布门禁阻断。**
+    - **[P1·配置] Apple 可显示已配置但无可用 client secret**：`sanitizeOAuthProviders` 接受 `teamId && keyId`，后端不生成 ES256 client secret，管理端不保存 `privateKey`；点击后 token exchange 失败。
+    - **[P1·存储] OAuth client secret 明文落在 settings D1 与 KV 缓存**：`setting-service.js` 将 `oauthProviders` 写入 KV；env-only secret 又不满足 `configured` 判定，形成“安全存储”与“UI 可用”的冲突。
+    - **[P2·安全] 客户端 OAuth 流程未实现 PKCE**：仅 EpoMail 作为 OAuth **服务端**的 `oauth-provider-service.js` 支持 PKCE；Google/GitHub/Apple 登录 client 流程无 `code_challenge`。
+    - **[P2·安全] Google/Microsoft/Custom 的 nonce 只发送不校验**：身份取 userinfo access token，不比对 id_token nonce；Apple 已校验。
+    - **[P2·滥用] `/api/oauth/authorize/:provider` 无速率限制**：匿名调用每次写入一条 `oauth_state`，可增长 staging D1。
+    - **[P2·可观测] 管理端“测试连接”只探测 discovery 端点**：不验证 client secret/redirect URI/scope；回调失败统一折叠为 `oauth_failed`。
+*   **治理修复与回归结果 (Fixes & Verification)**:
+    - 前置回归：`npm run test:integration` → **10 文件 156/156 passed**；`npx vitest run` → **13 文件 180/180 passed**，退出码 0。
+    - Staging 静态预检：`node scripts/oauth-staging-preflight.mjs` → 14 PASS / 4 FAIL / 2 WARN / 2 INFO；FAIL 全部为未替换的 staging 占位符（D1/KV/域名/管理员）。
+    - 验收计划：`node tests/oauth-staging-acceptance.mjs --plan` → 人工矩阵输出正常；静态门禁 FAIL（staging 未 provisioned + P0）。
+    - 脚本自测：本地 mock 下协议检查按预期执行（授权 URL 契约、state 拒绝/重放/跨 provider/并发、取消、缺失 code、Apple form_post、会话 401、Cookie 独立、CORS、缓存头）；**明确标注 NOT A REAL PROVIDER RUN**。
+    - 本次**未执行**：staging 部署、Google/GitHub/Apple 真实授权/绑定/MFA/取消/过期/重放/再次登录、移动端真机、测试数据清理与凭据轮换。
+*   **未执行/需人工处置 (Manual Follow-up)**:
+    - [ ] 创建独立 staging D1/KV/R2/域名/OAuth client/secrets，替换 `[env.staging]` 占位符。
+    - [ ] 修复 F1（前端拒绝空 expected state + 服务端 400 `oauth_state_required`）并补测试；评估 F2～F7。
+    - [ ] 按 `doc/oauth-staging-acceptance-b6-2026-10-29.md` 第 4 节逐 provider 执行真实联调；未执行前保持 **NOT RUN**。
+    - [ ] 执行测试数据清理、OAuth client/secret 轮换/删除、安全复审与发布审批。
+
+---
+
 
 ---
 
