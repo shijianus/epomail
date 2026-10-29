@@ -12,8 +12,8 @@
 ---
 
 ### OAuth 身份管理、对象存储安全收口与 B8 发布候选交付 (2026-10-29)
-*   **关联提交 (Git Commit)**: `COMMIT_HASH_PLACEHOLDER` (Short: `SHORT_HASH_PLACEHOLDER`)
-*   **部署环境 (Deployment)**: 本地 workerd + D1/KV 隔离测试、双前端生产构建、Worker bundle dry-run；**未部署任何远程环境**
+*   **关联提交 (Git Commit)**: `564bbcad37a1769448823211a004a9b76edd9cd3` (Short: `564bbca`)
+*   **部署环境 (Deployment)**: 本地 workerd + D1/KV 隔离测试、双前端生产构建、Worker bundle dry-run；**未部署任何远程环境，本批次推送 `origin/master`**
 *   **功能需求与变更清单 (Changes & Feature Alignment)**:
     - [x] OAuth 单次凭证与状态机：D1 CAS 消费 `state` / login code / bind proof / step-up / 授权码，仅存 SHA-256；`state` 强制非空 client state 并与 provider、redirect URI、OIDC nonce 绑定。
     - [x] 已登录身份管理（B5）：身份列表、step-up 再认证、绑定 / 解绑、最后登录方式保护、会话撤销、审计与六语言安全通知；回调只签发绑定到会话的一次性 claim，由已登录请求兑换。
@@ -40,8 +40,8 @@
 ---
 
 ### 全仓安全复审：对象读取路由、OAuth 登录结果与建号鉴权修复 (2026-10-27)
-*   **关联提交 (Git Commit)**: `COMMIT_HASH_PLACEHOLDER` (Short: `SHORT_HASH_PLACEHOLDER`)
-*   **部署环境 (Deployment)**: 本地 workerd + D1/KV 隔离测试、`mail-vue` 生产构建、Worker bundle dry-run；**未部署任何远程环境，未推送远端**
+*   **关联提交 (Git Commit)**: `564bbcad37a1769448823211a004a9b76edd9cd3` (Short: `564bbca`)
+*   **部署环境 (Deployment)**: 本地 workerd + D1/KV 隔离测试、`mail-vue` 生产构建、Worker bundle dry-run；**未部署任何远程环境，后随 `564bbca` 推送 `origin/master`**
 *   **功能需求与变更清单 (Changes & Feature Alignment)**:
     - [x] 对象读取路径统一：新增 `service/object-serve-service.js#readObjectForRequest`，作为 `/oss/*`、`/api/oss/*`、`/attachments/*` 的唯一实现（Key 白名单 → 附件能力签名 → 统一安全响应头），消除三处规则漂移。
     - [x] 修复签名附件 URL 在浏览器侧不可达：Worker 补 `/oss/*` 根路由；`buildSignedObjectUrl` 产出的 origin-relative URL 与 `mail-vue`/Telegram 分享页的消费方式对齐。

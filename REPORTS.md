@@ -10,7 +10,7 @@
 ---
 
 ### B8 发布候选版本审计：版本、全量验证与最终安全审计 (2026-10-29)
-*   **关联提交 (Git Commit)**: **无新提交**（按 B8 指令：不 commit / 不 push / 不 tag / 不部署）；审计基线为既有 HEAD `31c962fd61afcb59f2357be6275d694cd8b975c6` (Short: `31c962f`)，工作树未提交。
+*   **关联提交 (Git Commit)**: 审计快照本身无提交；后续交付提交 `564bbcad37a1769448823211a004a9b76edd9cd3` (Short: `564bbca`)，审计基线 `31c962fd61afcb59f2357be6275d694cd8b975c6` (Short: `31c962f`)。
 *   **专项文档索引 (Detailed Doc)**: `doc/b8-release-candidate-2026-10-29.md`（审计报告）、`doc/b8-release-runbook-2026-10-29.md`（变更/Secret/迁移/Staging/部署/回滚/备份）
 *   **体检/审计范围与方法 (Scope & Methodology)**:
     1. 范围与环境：`master` 分支与远端拓扑、74 项工作树改动、`mail-worker` 全部安全关键服务（OAuth/身份/附件/权限/会话/迁移）、`temp_login_ui` 登录绑定 UI、`mail-vue` 渲染与 i18n；本地 Node 24.14.0 + pnpm 10.34.5 + workerd。**未部署、未访问生产/staging、未调用真实 provider、未修改任何业务代码。**
@@ -27,9 +27,10 @@
     - Worker 全量 **180/180** 通过；typecheck、两端构建、Playwright **13/13**、i18n 对称/引用/登录词典、密钥扫描（1229 文件 / 3967 blobs）、dry-run（gzip 1131.98 KiB）、`git diff --check` 均通过。
     - 未通过：登录子应用单测 1 项；依赖审计 high 告警；staging 预检 4 项 FAIL；真实 provider 验收 NOT RUN。
     - **最终判定：NO-GO**。达到 GO 的最小条件见审计报告 §8.2（P0 修复、单测转绿、远端整合、禁用开关强制、默认凭据处置、staging 建立、依赖处置、形成不可变 RC、回滚与备份演练、补齐 B7 报告）。
+    - **交付处置 (2026-10-29)**：P0 空 client state、登录单测红灯与远端 `31915a7` 整合已由 `564bbca` 完成；Worker 14 文件 **191/191**、登录子应用 15/15、双前端构建与 dry-run 通过。依赖 high、staging 真实 provider、默认凭据与备份/回滚演练仍未关闭，**生产仍为 NO-GO**。
 *   **未执行/需人工处置 (Manual Follow-up)**:
-    - [ ] 修复 P0 并补正反用例；修复 `classifyBindResponse` 契约。
-    - [ ] 获授权后整合 `origin/master`（含 `31915a7`），提交 RC 并打 Tag。
+    - [x] 修复 P0 并补正反用例；修复 `classifyBindResponse` 契约（`564bbca`）。
+    - [x] 获授权后整合 `origin/master`（含 `31915a7`）并提交 RC（`564bbca`）；Tag 仍待发布审批。
     - [ ] provision staging（替换 4 项占位符），执行协议检查 + 真实 provider 矩阵。
     - [ ] 生产核验参观者账号与 `user_id=1`；轮换/停用默认凭据。
     - [ ] 依赖升级/移除；回滚与备份恢复演练；补齐 B7 报告。
@@ -43,7 +44,7 @@
     1. 范围与环境：`mail-worker` OAuth 登录/绑定/回调服务、`temp_login_ui` 登录与 bind UI、`mail-vue` 身份设置页、`wrangler.toml` 的 `[env.staging]` 隔离配置、Google/GitHub/Apple provider 配置面；本地 workerd + 隔离 D1/KV 回归，**未部署、未创建 staging 资源、未登录任何真实 provider、未修改远程环境**。
     2. 工具与脚本：`vitest` + `@cloudflare/vitest-pool-workers`（13 文件 180 项）、新增 `scripts/oauth-staging-preflight.mjs`（静态隔离 + 只读 live 探针）、`tests/oauth-staging-acceptance.mjs`（协议检查 + 人工矩阵 + 报告）、本地 mock 脚本自测（仅验证脚本，不作为验收证据）。
 *   **核心发现与缺陷矩阵 (Key Findings & Matrix)**:
-    - **[P0·安全] 空 client state 登录 CSRF 残留**：公开 `/api/oauth/authorize/:provider` 可省略 client state；登录页以 `'' === ''` 通过校验，攻击者可诱导受害者登录攻击者邮箱。证据：`AuthForm.tsx:675-681`、`oauth-service.js:179-225`、`security-review-adversarial.spec.js:247-269`。**未修复，发布门禁阻断。**
+    - **[P0·安全] 空 client state 登录 CSRF 残留**：公开 `/api/oauth/authorize/:provider` 可省略 client state；登录页以 `'' === ''` 通过校验，攻击者可诱导受害者登录攻击者邮箱。证据：`AuthForm.tsx:675-681`、`oauth-service.js:179-225`、`security-review-adversarial.spec.js:247-269`。**已由 `564bbca` 修复：服务端 400 `oauth_state_required`，前端空 expected state fail-closed。**
     - **[P1·配置] Apple 可显示已配置但无可用 client secret**：`sanitizeOAuthProviders` 接受 `teamId && keyId`，后端不生成 ES256 client secret，管理端不保存 `privateKey`；点击后 token exchange 失败。
     - **[P1·存储] OAuth client secret 明文落在 settings D1 与 KV 缓存**：`setting-service.js` 将 `oauthProviders` 写入 KV；env-only secret 又不满足 `configured` 判定，形成“安全存储”与“UI 可用”的冲突。
     - **[P1·运维] OAuth 总开关/provider 禁用未在服务端强制**：`getAuthorizeUrl` 与回调路径不检查 `oauthLoginEnabled`/provider `enabled`；管理端关闭后，已签发的 authorize URL（10 分钟）与直接 API 调用仍可完成登录，应急回滚不是硬停止。需在服务端校验并在禁用时清理未用 `oauth_state`。
@@ -59,14 +60,14 @@
     - 本次**未执行**：staging 部署、Google/GitHub/Apple 真实授权/绑定/MFA/取消/过期/重放/再次登录、移动端真机、测试数据清理与凭据轮换。
 *   **未执行/需人工处置 (Manual Follow-up)**:
     - [ ] 创建独立 staging D1/KV/R2/域名/OAuth client/secrets，替换 `[env.staging]` 占位符。
-    - [ ] 修复 F1（前端拒绝空 expected state + 服务端 400 `oauth_state_required`）并补测试；评估 F2～F9。
+    - [x] 修复 F1（前端拒绝空 expected state + 服务端 400 `oauth_state_required`）并补测试（`564bbca`）；评估 F2～F9。
     - [ ] 按 `doc/oauth-staging-acceptance-b6-2026-10-29.md` 第 4 节逐 provider 执行真实联调；未执行前保持 **NOT RUN**。
     - [ ] 执行测试数据清理、OAuth client/secret 轮换/删除、安全复审与发布审批。
 
 ---
 
 ### B5 专项审计：已登录用户的 OAuth 身份管理 (2026-10-29)
-*   **关联提交 (Git Commit)**: **未提交**（按本次任务指令：不 commit、不 push、不部署；无 Commit Hash）
+*   **关联提交 (Git Commit)**: `564bbcad37a1769448823211a004a9b76edd9cd3` (Short: `564bbca`)；审计时按任务指令未提交，后续随 B8 交付批次提交。
 *   **专项文档索引 (Detailed Doc)**: `doc/oauth-identity-management-b5-2026-10-29.md`
 *   **体检/审计范围与方法 (Scope & Methodology)**:
     1. 范围与环境：`mail-vue` 账号安全设置页与请求层、`mail-worker` OAuth 登录/绑定服务、认证中间件与会话/MFA、`oauth` 表与唯一约束、`oauth_one_time_credential`、`oauth_bind_claim`；本地 workerd + 隔离 D1/KV、本地构建产物 + `wrangler dev`、Playwright 真实浏览器（1440/820/390）。未部署、未访问生产数据。
@@ -90,7 +91,7 @@
 ---
 
 ### 全仓安全复审、对象读取路径与权限边界专项审计 (2026-10-27)
-*   **关联提交 (Git Commit)**: 见同批次修复提交（`CHECKLIST.log` 中“全仓安全复审：对象读取路由、OAuth 登录结果与建号鉴权修复”条目）
+*   **关联提交 (Git Commit)**: `564bbcad37a1769448823211a004a9b76edd9cd3` (Short: `564bbca`)（同批次修复与交付提交）
 *   **专项文档索引 (Detailed Doc)**: `doc/security-audit-2026-10-27.md`
 *   **体检/审计范围与方法 (Scope & Methodology)**:
     1. 范围与环境：基线 `9654ea1`（本地 `master`，含 `d23b70d` 历史补丁）；`mail-worker` 的对象存储读路径（KV/R2/S3/B2/BYO）、OAuth 全链路（Apple/Google/Microsoft/GitHub/LinuxDo/自定义）、用户与角色写操作、`mail-vue`/`temp_login_ui` HTML sink、`wrangler` 配置与测试脚本副作用；本地 workerd + D1/KV 隔离测试，未部署、未访问生产数据。

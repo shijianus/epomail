@@ -2,10 +2,11 @@
 
 - **批次**：B8（前置：B5 身份管理、B6 Staging 验收门禁；B7 报告在仓库中缺失，见 §2.4）
 - **审计日期**：2026-10-29
-- **审计基线**：`master` @ `31c962fd61afcb59f2357be6275d694cd8b975c6`（工作树未提交）
+- **审计基线**：`master` @ `31c962fd61afcb59f2357be6275d694cd8b975c6`（审计时工作树未提交）
+- **交付提交**：`564bbcad37a1769448823211a004a9b76edd9cd3` (Short: `564bbca`)，已整合 `origin/master`
 - **审计环境**：本地 Windows + Node v24.14.0 + pnpm 10.34.5 + workerd（`@cloudflare/vitest-pool-workers`）
 - **审计结论**：**NO-GO（不可发布）**
-- **合规声明**：本批次按指令**未创建提交、未推送、未打 Tag、未部署 staging/生产**。因此本报告**没有新的 Commit Hash**；文中所有哈希均为既有历史提交或审计基线，未编造。
+- **合规声明**：本报告审计时按指令**未创建提交、未推送、未打 Tag、未部署 staging/生产**；后续经用户授权，工作树已提交并推送为 `564bbca`。文中除该交付提交外，所有哈希均为既有历史提交或审计基线。
 - **配套文档**：`doc/b8-release-runbook-2026-10-29.md`（变更清单 / Secret 清单 / 迁移说明 / Staging 记录 / 部署与回滚手册 / 备份恢复）
 
 ---
@@ -16,15 +17,15 @@
 
 | 编号 | 级别 | 阻断项 | 结论 |
 | :--- | :--- | :--- | :--- |
-| B8-P0-01 | **P0** | OAuth 空 client state 登录 CSRF 仍可利用 | 未修复，阻断 |
-| G-02 | **强制门禁** | `temp_login_ui` 单测 1/15 失败 | 失败，阻断 |
-| G-03 | **强制门禁** | 本地 `master` 与 `origin/master` 分叉，缺失远端 P1 修复 | 失败，阻断 |
+| B8-P0-01 | **P0** | OAuth 空 client state 登录 CSRF 仍可利用 | 已修复（`564bbca`） |
+| G-02 | **强制门禁** | `temp_login_ui` 单测 1/15 失败 | 已修复（`564bbca`，15/15） |
+| G-03 | **强制门禁** | 本地 `master` 与 `origin/master` 分叉，缺失远端 P1 修复 | 已整合（`564bbca`） |
 | G-04 | **强制门禁** | Staging 预检 4 项 FAIL；真实 provider 验收 NOT RUN | 失败，阻断 |
-| B8-P1-01 | **P1** | 缺失 `31915a7`：`setType` 越权守卫 + Webhook 投影失败收敛 | 未合入，阻断 |
+| B8-P1-01 | **P1** | 缺失 `31915a7`：`setType` 越权守卫 + Webhook 投影失败收敛 | 已合入（`564bbca`） |
 | B8-P1-02 | **P1** | OAuth 总开关/provider 禁用未在服务端强制 | 未修复，阻断 |
 | B8-P1-03 | **P1** | 参观者账号 `admin@epomail.cyou` 使用固定口令 `123456` | 需生产核验/轮换 |
 
-> 按 B8 规则「P0 风险或强制门禁失败时不得给出可发布结论」，最终判定为 **NO-GO**。
+> 按 B8 规则「P0 风险或强制门禁失败时不得给出可发布结论」，最终判定为 **NO-GO**。P0、G-02、G-03 与 P1-01 已由 `564bbca` 关闭；staging、依赖、默认凭据与备份/回滚仍未满足，生产发布仍为 **NO-GO**。
 
 ---
 
@@ -219,7 +220,7 @@
 - **P1**：`init/init.js:816-830` 播种参观者账号 `admin@epomail.cyou`，固定 PBKDF2 哈希对应口令 `123456`（本次已用项目 `cryptoUtils.verifyPassword` 实测 `123456 => true`）。该账号可公开登录，权限为参观者（禁发信、禁附件、配额 0、设置/邀请码掩码），但可读取该地址收件箱与掩码后的系统配置。生产必须核验该账号是否存在并轮换/停用。
 - **P2**：`scripts/i18n-hardcoded.mjs` 仅打印命中，不因命中退出非零，CI 的“硬编码门禁”实际不会失败。
 - **P2**：`scripts/build-prod.mjs` 使用 `pnpm install` 而非 `--frozen-lockfile`，部署构建存在依赖漂移风险。
-- **P2**：`CHECKLIST.log` 存在 `COMMIT_HASH_PLACEHOLDER` 条目（2026-10-27），与 AGENTS.md 的可追溯要求不符。
+- **P2**：`CHECKLIST.log` 的 `COMMIT_HASH_PLACEHOLDER` 条目（2026-10-27）已由 `564bbca` 回填真实哈希。
 - **P2**：此前的真实 staging 部署使用了未入库的 `mail-worker/wrangler-staging-real.toml`，staging 环境无法从仓库复现。
 
 ---
@@ -228,11 +229,11 @@
 
 | ID | 级别 | 状态 | 风险 | 证据 | 影响 | 修复建议 |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| B8-P0-01 | **P0** | **OPEN** | OAuth 空 client state 登录 CSRF | `AuthForm.tsx:670-681`；`oauth-service.js:211-225`；`oauth-api.js:152-158`；`security-review-adversarial.spec.js:247-269` | 攻击者可诱导受害者登录攻击者邮箱，后续输入/邮件落入攻击者账号 | 服务端拒绝缺失/过短 client state（400 `oauth_state_required`）；前端拒绝空 expected/returned；补测试 |
-| B8-P1-01 | P1 | OPEN | 缺失远端 `31915a7`：`setType` 守卫 + Webhook 投影收敛 | `user-service.js:1116-1119`；`resend-service.js:131-135` | 降权纵深防御缺口；投递状态可能永久停留 | 获授权后整合 `origin/master`，保留本地改动并重跑 180 项测试 |
+| B8-P0-01 | **P0** | **FIXED (`564bbca`)** | OAuth 空 client state 登录 CSRF | `AuthForm.tsx:670-681`；`oauth-service.js:211-225`；`oauth-api.js:152-158`；`security-review-adversarial.spec.js:247-269` | 攻击者可诱导受害者登录攻击者邮箱，后续输入/邮件落入攻击者账号 | 服务端拒绝缺失/过短 client state（400 `oauth_state_required`）；前端拒绝空 expected/returned；补测试 |
+| B8-P1-01 | P1 | FIXED (`564bbca`) | 缺失远端 `31915a7`：`setType` 守卫 + Webhook 投影收敛 | `user-service.js:1116-1119`；`resend-service.js:131-135` | 降权纵深防御缺口；投递状态可能永久停留 | 获授权后整合 `origin/master`，保留本地改动并重跑测试 |
 | B8-P1-02 | P1 | OPEN | OAuth 总开关/provider 禁用未在服务端强制 | `oauth-service.js:179-225,315-330`；`oauth-api.js:77-158` | 关闭 OAuth 后 10 分钟内已签发 URL 与直接 API 调用仍可登录，应急回滚非硬停止 | `getAuthorizeUrl`/回调/`startBind` 校验 `oauthLoginEnabled` 与 provider `enabled`，禁用时清理未用 state |
 | B8-P1-03 | P1 | OPEN（需生产核验） | 参观者账号固定口令 `123456` | `init.js:816-830`；本项目 `verifyPassword` 实测为真 | 公开默认凭据；可读该地址收件箱与掩码配置 | 生产核验 `admin@epomail.cyou` 状态；改为环境变量注入或停用/删除 |
-| B8-P2-01 | P2 | OPEN | 登录子应用单测 1/15 失败 | `temp_login_ui/test/oauth-bind.test.mjs:106` | CI `quality-gates` 红灯 | 按 §3.1 修正契约并复跑 |
+| B8-P2-01 | P2 | FIXED (`564bbca`) | 登录子应用单测 1/15 失败 | `temp_login_ui/test/oauth-bind.test.mjs:106` | CI `quality-gates` 红灯 | 按 §3.1 修正契约并复跑 |
 | B8-P2-02 | P2 | OPEN | 限流非原子且 fail-open；authorize/token/userinfo 无限流 | `rate-limit.js:20-49`；`oauth-api.js:152-158`；`oauth-provider-api.js` | 暴力/滥用与 D1 state 行膨胀 | 关键端点改用 D1 CAS 计数或 Cloudflare Rate Limiting；失败时 fail-closed |
 | B8-P2-03 | P2 | OPEN | OAuth client secret 明文存储（settings D1/KV、oauth_app） | `setting-service.js:151-334`；`oauth-app-service.js:69-130` | D1/KV 读取者可获取第三方 client secret | 迁移到 Worker Secrets 或加密存储；限制 D1/KV 访问；轮换 |
 | B8-P2-04 | P2 | OPEN | `userId === 1` 硬编码为管理员 | `admin-utils.js:12` | 播种异常时权限错配 | 生产核验 ID 1 与 `c.env.admin` 一致；长期改为角色判定 |
@@ -241,7 +242,7 @@
 | B8-P2-07 | P2 | OPEN | 生产构建未冻结 lockfile | `scripts/build-prod.mjs:12-16` | 部署产物不可复现 | 改为 `pnpm install --frozen-lockfile` 或使用 CI 制品 |
 | B8-P2-08 | P2 | OPEN | 依赖 HIGH 告警（vue-i18n / react-router） | `pnpm audit --prod` | 当前不可达，但审计红灯 | 升级 vue-i18n ≥11.4.14、react-router ≥7.18.2 或移除未用依赖 |
 | B8-P2-09 | P2 | OPEN | staging 配置与部署不可复现 | `wrangler.toml [env.staging]` 占位符；历史 `wrangler-staging-real.toml` 未入库 | 无法重放 staging 验收 | 以 Secret/参数注入方式固化 staging 配置模板 |
-| B8-P2-10 | P2 | OPEN | `CHECKLIST.log` 占位符哈希 | `CHECKLIST.log` 2026-10-27 条目 | 追溯链断裂 | 回填真实哈希或标注作废 |
+| B8-P2-10 | P2 | FIXED (`564bbca`) | `CHECKLIST.log` 占位符哈希 | `CHECKLIST.log` 2026-10-27 条目 | 追溯链断裂 | 回填真实哈希或标注作废 |
 | B8-P3-01 | P3 | OPEN | 客户端 OAuth 未实现 PKCE | `oauth-service.js:179-250` | 授权码拦截纵深不足；机密客户端有 secret+state 补偿 | 评估增加 S256 PKCE |
 | B8-P3-02 | P3 | OPEN | Google/Microsoft/custom nonce 只发不验 | `oauth-service.js:315-570` | 当前用 userinfo + access token，nonce 非必需；Apple 已验 | 记录为接受风险或改用 id_token 校验 |
 | B8-P3-03 | P3 | OPEN | 能力签名与 JWT 共用 `jwt_secret` | `object-token.js:19-31` | 密钥未分离 | 引入独立 `object_signing_key` |
