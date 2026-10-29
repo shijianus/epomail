@@ -145,6 +145,7 @@ if (!Array.isArray(enabled)) {
 
 const enabledKeys = new Set(enabled.map(item => item.key));
 const activeProviders = SELECTED.filter(key => enabledKeys.has(key));
+await runDisabledProviderChecks(base, checks);
 for (const provider of SELECTED) {
 	if (!enabledKeys.has(provider)) {
 		checks.blocked(`PROVIDER-${provider}`, `${PROVIDER_META[provider].label} is enabled in staging`,
@@ -575,6 +576,58 @@ async function runCorsChecks(targetBase, targetChecks) {
 	}
 }
 
+async function runDisabledProviderChecks(targetBase, targetChecks) {
+	let site;
+	try {
+		site = await request(targetBase, '/api/setting/websiteConfig');
+	} catch (error) {
+		targetChecks.blocked('DISABLED-01', 'disabled providers cannot mint authorization URLs', error.message);
+		return;
+	}
+	const data = site.json?.data;
+	if (!data) {
+		targetChecks.blocked('DISABLED-01', 'disabled providers cannot mint authorization URLs', `HTTP ${site.status}`);
+		return;
+	}
+	const providers = data.oauthProviders && typeof data.oauthProviders === 'object' ? data.oauthProviders : {};
+	const configured = Object.entries(providers).filter(([, value]) =>
+		value && (value.configured === 1 || value.configured === true));
+	const disabled = configured.filter(([, value]) => !(value.enabled === 1 || value.enabled === true));
+	const masterOff = Number(data.oauthLoginEnabled) !== 1;
+	const targets = new Map();
+	if (masterOff) {
+		const first = configured[0]?.[0] || 'google';
+		targets.set(first, 'master switch is off');
+	}
+	for (const [key] of disabled) {
+		if (!targets.has(key)) targets.set(key, 'provider is disabled');
+	}
+	if (!targets.size) {
+		targetChecks.info('DISABLED-01', 'disabled providers cannot mint authorization URLs',
+			'no configured-but-disabled provider and master switch is on; nothing to probe');
+		return;
+	}
+	for (const [provider, reason] of targets) {
+		const clientState = `probe-${crypto.randomUUID()}`;
+		const redirectUri = `${targetBase}/api/oauth/callback/${provider}`;
+		try {
+			const response = await request(targetBase,
+				`/api/oauth/authorize/${provider}?redirect_uri=${encodeURIComponent(redirectUri)}&state=${encodeURIComponent(clientState)}`);
+			if (response.status === 200 && response.json?.data?.url) {
+				targetChecks.fail(`DISABLED-${provider}`, `${provider} cannot mint an authorization URL while ${reason}`,
+					'HTTP 200 with an authorization URL; the admin switch is UI-only (F9)');
+			} else if ([400, 403].includes(response.status)) {
+				targetChecks.pass(`DISABLED-${provider}`, `${provider} cannot mint an authorization URL while ${reason}`);
+			} else {
+				targetChecks.blocked(`DISABLED-${provider}`, `${provider} cannot mint an authorization URL while ${reason}`,
+					`HTTP ${response.status}: ${String(response.json?.message || '').slice(0, 160)}`);
+			}
+		} catch (error) {
+			targetChecks.fail(`DISABLED-${provider}`, `${provider} cannot mint an authorization URL while ${reason}`, error.message);
+		}
+	}
+}
+
 function runUnrunnableChecks(targetChecks, providers) {
 	const list = providers.map(key => PROVIDER_META[key].label).join(', ');
 	targetChecks.notRun('BIND-UI-01', 'unbound provider identity renders the bind UI',
@@ -667,6 +720,7 @@ function buildFindings() {
 	list.push('**P2 (open) PKCE is not implemented**: no `code_challenge`/`code_verifier` is used. With confidential clients, exact redirect URI + client authentication + state are the compensating controls; record this as an accepted risk or add PKCE before broader rollout.');
 	list.push('**P2 (open) Google/Microsoft/custom nonce is sent but not verified**: identity is resolved from the userinfo endpoint with an access token, so the id_token nonce is never compared. Apple does verify it.');
 	list.push('**P1 (open) OAuth client secrets live in the settings row and the KV settings cache in plaintext, while env-only secrets do not set the public "configured" flag**: keep staging D1/KV access restricted, prefer Worker Secrets for the staging lifecycle, and rotate/delete the test client secrets afterwards.');
+	list.push('**P1 (open) disabling OAuth does not stop server-side authorization**: `getAuthorizeUrl` and the callback path never check `oauthLoginEnabled` or the provider `enabled` flag. The admin switch only hides UI; a previously issued authorize URL (10-minute state) or a direct API call still completes login. For emergency rollback, block `/api/oauth/*` at the edge, rotate/remove the provider client secret, and purge unused `oauth_state` rows.');
 	list.push('**P2 (open) the public authorize endpoint has no rate limit**: each call inserts an `oauth_state` row; a scripted caller can grow the staging D1 table. Add a per-IP limit or require a signed initiation.');
 	list.push('**P2 (open) the admin "verify" action only checks provider discovery connectivity**: it does not validate the client secret, redirect URI or scopes. Do not treat a green verify as provider acceptance.');
 	return list;

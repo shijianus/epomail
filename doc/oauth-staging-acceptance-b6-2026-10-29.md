@@ -30,7 +30,7 @@
 2. **Google / GitHub / Apple 均未执行真实联调**：没有合法的测试 provider 配置，按任务要求标记 **NOT RUN**，不得以本地 mock 或本地协议测试替代。
 3. **发布门禁被两个因素阻断**：
    - 环境：staging 未建立；
-   - 安全：发现 **P0 登录 CSRF（空 client state）残留**，以及 Apple 配置、PKCE、nonce、密钥存储等 P1/P2 发现（见第 6 节）。
+   - 安全：发现 **P0 登录 CSRF（空 client state）残留**，以及 **P1 禁用开关未在服务端强制**、Apple 配置、PKCE、nonce、密钥存储等 P1/P2 发现（见第 6 节）。
 4. **可执行的验收工具已交付**：
    - `scripts/oauth-staging-preflight.mjs`：静态隔离审计 + 只读 live 探针；
    - `tests/oauth-staging-acceptance.mjs`：协议级自动检查 + 人工 provider 矩阵 + Markdown 报告；
@@ -255,6 +255,7 @@
 | F6 | P2 | **open** | `/api/oauth/authorize/:provider` 无速率限制 | `oauth-api.js:152-158`；`oauth-service.js:179` 每次调用写入一条 `oauth_state` | 匿名脚本可增长 staging D1 表；生产同样存在 | 增加按 IP 的 `oauth-authorize` 限制（如 60/15min），或要求 signed initiation |
 | F7 | P2 | **open** | 管理端 “测试连接” 只探测 discovery 端点 | `oauth-service.js:630-680` 仅 GET 发现文档/API 根 | 错误的 client secret、redirect URI、scope 仍可能显示“连接成功” | UI 文案改为“端点可达”，不要称为“配置验证”；真实联调必须走完整授权 |
 | F8 | P3 | **open** | 回调失败统一折叠为 `oauth_failed`，排障信息不足 | `oauth-api.js:139-142` catch 后仅 `console.warn` + 通用错误 | staging 联调时难以区分 token exchange/userinfo/JWKS/DB 失败 | 增加服务端 correlation id（不返回敏感细节）；日志保留 provider + 阶段 + 错误类型 |
+| F9 | **P1** | **open** | OAuth 总开关/provider 启用状态未在 authorize/callback 服务端强制 | `oauth-service.js:123-148`（配置读取不检查 enabled）；`179-242`（getAuthorizeUrl 不检查）；`oauth-api.js:152-158`；`getPublicProviders` 只用于 UI/startBind | 管理端关闭 OAuth 或禁用 provider 后，已签发的 authorize URL（10 分钟）和直接 API 调用仍可完成登录；应急回滚不是硬停止 | 在 `getAuthorizeUrl`、`exchangeCodeAndLogin`/回调入口校验 `oauthLoginEnabled=1` 且该 provider `enabled=1`；禁用时清理未用 state；补“禁用 provider → 403/400”测试 |
 
 ### 6.1 F1 复现与修复建议（P0）
 
@@ -473,7 +474,11 @@ node scripts/oauth-staging-preflight.mjs --base-url https://<staging-host> --liv
 1. **立即止血（配置级，最快）**
    - 管理端将 `oauthLoginEnabled = 0`：登录页不再展示 provider。
    - 或将问题 provider 的 `enabled = 0`。
-   - 注意：若有 OAuth-only 账号（无可用密码），关闭 OAuth 登录会使其无法登录；staging 测试账号可接受，生产必须先盘点。
+   - **注意（F9）**：当前服务端 `getAuthorizeUrl`/回调不检查 `oauthLoginEnabled` 或 provider `enabled`，所以这两个开关只是 UI 层；已签发的 authorize URL（10 分钟）与直接 API 调用仍可完成登录。真正的硬停止需要同时：
+     - 在边缘/WAF 阻断 `/api/oauth/authorize/*` 与 `/api/oauth/callback/*`，或
+     - 删除/轮换该 provider 的 client secret（token exchange 会失败），并
+     - 清理未使用的 `oauth_state`（`DELETE FROM oauth_one_time_credential WHERE purpose='oauth_state'`）。
+   - 若有 OAuth-only 账号（无可用密码），关闭 OAuth 登录会使其无法登录；staging 测试账号可接受，生产必须先盘点。
 2. **应用级回滚**
    - `pnpm --dir mail-worker exec wrangler rollback --env staging`（Cloudflare 保留历史版本）。
    - 或部署上一个已验证版本；不要删除 D1/KV。

@@ -19,6 +19,7 @@
     - **[P0·安全] 空 client state 登录 CSRF 残留**：公开 `/api/oauth/authorize/:provider` 可省略 client state；登录页以 `'' === ''` 通过校验，攻击者可诱导受害者登录攻击者邮箱。证据：`AuthForm.tsx:675-681`、`oauth-service.js:179-225`、`security-review-adversarial.spec.js:247-269`。**未修复，发布门禁阻断。**
     - **[P1·配置] Apple 可显示已配置但无可用 client secret**：`sanitizeOAuthProviders` 接受 `teamId && keyId`，后端不生成 ES256 client secret，管理端不保存 `privateKey`；点击后 token exchange 失败。
     - **[P1·存储] OAuth client secret 明文落在 settings D1 与 KV 缓存**：`setting-service.js` 将 `oauthProviders` 写入 KV；env-only secret 又不满足 `configured` 判定，形成“安全存储”与“UI 可用”的冲突。
+    - **[P1·运维] OAuth 总开关/provider 禁用未在服务端强制**：`getAuthorizeUrl` 与回调路径不检查 `oauthLoginEnabled`/provider `enabled`；管理端关闭后，已签发的 authorize URL（10 分钟）与直接 API 调用仍可完成登录，应急回滚不是硬停止。需在服务端校验并在禁用时清理未用 `oauth_state`。
     - **[P2·安全] 客户端 OAuth 流程未实现 PKCE**：仅 EpoMail 作为 OAuth **服务端**的 `oauth-provider-service.js` 支持 PKCE；Google/GitHub/Apple 登录 client 流程无 `code_challenge`。
     - **[P2·安全] Google/Microsoft/Custom 的 nonce 只发送不校验**：身份取 userinfo access token，不比对 id_token nonce；Apple 已校验。
     - **[P2·滥用] `/api/oauth/authorize/:provider` 无速率限制**：匿名调用每次写入一条 `oauth_state`，可增长 staging D1。
@@ -27,11 +28,11 @@
     - 前置回归：`npm run test:integration` → **10 文件 156/156 passed**；`npx vitest run` → **13 文件 180/180 passed**，退出码 0。
     - Staging 静态预检：`node scripts/oauth-staging-preflight.mjs` → 14 PASS / 4 FAIL / 2 WARN / 2 INFO；FAIL 全部为未替换的 staging 占位符（D1/KV/域名/管理员）。
     - 验收计划：`node tests/oauth-staging-acceptance.mjs --plan` → 人工矩阵输出正常；静态门禁 FAIL（staging 未 provisioned + P0）。
-    - 脚本自测：本地 mock 下协议检查按预期执行（授权 URL 契约、state 拒绝/重放/跨 provider/并发、取消、缺失 code、Apple form_post、会话 401、Cookie 独立、CORS、缓存头）；**明确标注 NOT A REAL PROVIDER RUN**。
+    - 脚本自测：本地 mock 下协议检查按预期执行（授权 URL 契约、state 拒绝/重放/跨 provider/并发、取消、缺失 code、Apple form_post、会话 401、Cookie 独立、CORS、缓存头、禁用 provider 探针）；**明确标注 NOT A REAL PROVIDER RUN**。
     - 本次**未执行**：staging 部署、Google/GitHub/Apple 真实授权/绑定/MFA/取消/过期/重放/再次登录、移动端真机、测试数据清理与凭据轮换。
 *   **未执行/需人工处置 (Manual Follow-up)**:
     - [ ] 创建独立 staging D1/KV/R2/域名/OAuth client/secrets，替换 `[env.staging]` 占位符。
-    - [ ] 修复 F1（前端拒绝空 expected state + 服务端 400 `oauth_state_required`）并补测试；评估 F2～F7。
+    - [ ] 修复 F1（前端拒绝空 expected state + 服务端 400 `oauth_state_required`）并补测试；评估 F2～F9。
     - [ ] 按 `doc/oauth-staging-acceptance-b6-2026-10-29.md` 第 4 节逐 provider 执行真实联调；未执行前保持 **NOT RUN**。
     - [ ] 执行测试数据清理、OAuth client/secret 轮换/删除、安全复审与发布审批。
 
