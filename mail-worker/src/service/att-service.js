@@ -14,8 +14,51 @@ import { buildSignedObjectUrl } from '../utils/object-token';
 
 import storageQuotaService from './storage-quota-service';
 import { getMailDb } from '../utils/db-accessor';
+import { normalizeObjectKey } from '../utils/object-key-utils';
 
 const ATTACHMENT_CONTENT_PATTERN = /{{domain}}(attachments\/[A-Za-z0-9._-]+)/g;
+
+// Whitelist: these column names are interpolated into SQL below, so callers
+// must never be able to pass an arbitrary identifier.
+const DELETION_FIELDS = new Set(['user_id', 'email_id', 'account_id']);
+const DELETION_QUEUE_MAX_ATTEMPTS = 10;
+const OBJECT_DELETE_CHUNK = 100;
+const deletionQueueReady = new WeakSet();
+
+/**
+ * Durable outbox for storage objects whose D1 metadata has already been
+ * removed. D1 and object storage cannot share a transaction, so the queue is
+ * written in the same D1 batch as the row deletion and replayed until the
+ * backend confirms the delete (or the retry budget is exhausted).
+ */
+async function ensureDeletionQueueTable(c) {
+	const mailDb = getMailDb(c);
+	if (deletionQueueReady.has(mailDb)) return mailDb;
+
+	await mailDb.prepare(`
+		CREATE TABLE IF NOT EXISTS object_deletion_queue (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			object_key TEXT NOT NULL,
+			user_id INTEGER NOT NULL DEFAULT 0,
+			attempts INTEGER NOT NULL DEFAULT 0,
+			status TEXT NOT NULL DEFAULT 'pending',
+			last_error TEXT,
+			next_retry_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			create_time DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
+			UNIQUE(object_key, user_id)
+		)
+	`).run();
+	await mailDb.prepare(
+		`CREATE INDEX IF NOT EXISTS idx_object_deletion_queue_due ON object_deletion_queue(status, next_retry_at)`
+	).run();
+	deletionQueueReady.add(mailDb);
+	return mailDb;
+}
+
+function queueOwner(userId) {
+	const owner = Number(userId);
+	return Number.isSafeInteger(owner) && owner > 0 ? owner : 0;
+}
 
 function collectContentAttachmentKeys(content) {
 	const keys = new Set();
@@ -35,7 +78,7 @@ const attService = {
 
 		const userId = attachments[0]?.userId;
 		if (userId) {
-			const totalIncomingBytes = attachments.reduce((sum, item) => sum + Number(item.size || item.content?.length || 0), 0);
+			const totalIncomingBytes = attachments.reduce((sum, item) => sum + Number(item.size || item.content?.byteLength || item.content?.length || 0), 0);
 			const quotaCheck = await storageQuotaService.checkQuotaAvailable(c, userId, totalIncomingBytes);
 			if (!quotaCheck.allowed) {
 				console.warn(`User ${userId} storage quota exceeded: ${quotaCheck.reason}`);
@@ -43,8 +86,11 @@ const attService = {
 			}
 		}
 
+		const stored = [];
+		const uploaded = [];
+
 		for (let attachment of attachments) {
-			const attSize = Number(attachment.size || attachment.content?.length || 0);
+			const attSize = Number(attachment.size || attachment.content?.byteLength || attachment.content?.length || 0);
 			if (userId && attSize > 0) {
 				const sizeCheck = await storageQuotaService.checkAttachmentSizeLimit(c, userId, attSize);
 				if (!sizeCheck.allowed) {
@@ -63,10 +109,43 @@ const attService = {
 				metadate.cacheControl = `max-age=259200`;
 			}
 
-			await r2Service.putObj(c, attachment.key, attachment.content, metadate, attachment.userId || userId);
+			const ownerUserId = attachment.userId || userId || null;
+			try {
+				await r2Service.putObj(c, attachment.key, attachment.content, metadate, ownerUserId);
+				uploaded.push({ key: attachment.key, userId: ownerUserId });
+				stored.push(attachment);
+			} catch (e) {
+				// Keep the rest of the message: one bad object must not drop every
+				// other attachment, but it must never produce a metadata row either.
+				console.error(`[attachment-store] failed to store ${attachment.key}:`, e.message);
+			}
 		}
 
-		await orm(c).insert(att).values(attachments).run();
+		if (stored.length === 0) return;
+
+		const rows = stored.map(attachment => ({
+			userId: attachment.userId,
+			emailId: attachment.emailId,
+			accountId: attachment.accountId,
+			key: attachment.key,
+			filename: attachment.filename || null,
+			mimeType: attachment.mimeType || null,
+			size: attachment.size || 0,
+			type: typeof attachment.type === 'number' ? attachment.type : attConst.type.ATT,
+			contentId: attachment.contentId || null,
+			disposition: attachment.disposition || null,
+			related: attachment.related || null,
+			encoding: attachment.encoding || null
+		}));
+
+		try {
+			await orm(c).insert(att).values(rows).run();
+		} catch (e) {
+			// The insert failed after the objects were written: remove the
+			// unreferenced objects so D1 and storage do not diverge.
+			await this.cleanupUnreferencedObjects(c, uploaded);
+			throw e;
+		}
 	},
 
 	list(c, params, userId) {
@@ -191,8 +270,10 @@ const attService = {
 	},
 
 	async saveSendAtt(c, attList, userId, accountId, emailId) {
+		if (!attList || attList.length === 0) return;
 
-		const attDataList = [];
+		const prepared = [];
+		let totalBytes = 0;
 
 		for (let att of attList) {
 			att.buff = fileUtils.base64ToUint8Array(att.content);
@@ -204,46 +285,109 @@ const attService = {
 			}
 
 			att.key = constant.ATTACHMENT_PREFIX + await fileUtils.getBuffHash(att.buff) + fileUtils.getExtFileName(att.filename);
-			const attData = { userId, accountId, emailId };
-			attData.key = att.key;
-			attData.size = att.buff.length;
-			attData.filename = att.filename;
-			attData.mimeType = att.type;
-			attData.type = attConst.type.ATT;
-			attDataList.push(attData);
+			totalBytes += att.buff.length;
+			prepared.push(att);
 		}
 
-		await orm(c).insert(att).values(attDataList).run();
-
-		for (let att of attList) {
-			await r2Service.putObj(c, att.key, att.buff, {
-				contentType: att.type,
-				contentDisposition: fileUtils.encodeContentDisposition(att.filename, 'attachment')
-			}, userId);
+		const quotaCheck = await storageQuotaService.checkQuotaAvailable(c, userId, totalBytes);
+		if (!quotaCheck.allowed) {
+			throw new BizError(quotaCheck.reason);
 		}
 
+		// Objects first, metadata second. If the upload fails no D1 row is
+		// written, and a failed insert is compensated by deleting the objects
+		// that have no metadata reference.
+		const uploaded = [];
+		try {
+			for (let att of prepared) {
+				await r2Service.putObj(c, att.key, att.buff, {
+					contentType: att.type,
+					contentDisposition: fileUtils.encodeContentDisposition(att.filename, 'attachment')
+				}, userId);
+				uploaded.push({ key: att.key, userId });
+			}
+		} catch (e) {
+			await this.cleanupUnreferencedObjects(c, uploaded);
+			throw e;
+		}
+
+		const rows = prepared.map(att => ({
+			userId,
+			accountId,
+			emailId,
+			key: att.key,
+			filename: att.filename || null,
+			mimeType: att.type || null,
+			size: att.buff.length,
+			type: attConst.type.ATT
+		}));
+
+		try {
+			await orm(c).insert(att).values(rows).run();
+		} catch (e) {
+			await this.cleanupUnreferencedObjects(c, uploaded);
+			throw e;
+		}
 	},
 
 	async saveArticleAtt(c, attDataList, userId, accountId, emailId) {
+		if (!attDataList || attDataList.length === 0) return;
+
+		const prepared = [];
+		let totalBytes = 0;
 
 		for (let attData of attDataList) {
+			if (!attData.buff) {
+				continue;
+			}
 			attData.userId = userId;
 			attData.emailId = emailId;
 			attData.accountId = accountId;
 			attData.type = attConst.type.EMBED;
-			if (!attData.buff) {
-				continue;
-			}
-			await r2Service.putObj(c, attData.key, attData.buff, {
-				contentType: attData.mimeType,
-				cacheControl: `max-age=259200`,
-				contentDisposition: fileUtils.encodeContentDisposition(attData.filename, 'inline')
-			}, userId);
-			delete attData.buff;
+			totalBytes += attData.buff.byteLength || attData.buff.length || 0;
+			prepared.push(attData);
 		}
 
-		await orm(c).insert(att).values(attDataList).run();
+		if (prepared.length === 0) return;
 
+		const quotaCheck = await storageQuotaService.checkQuotaAvailable(c, userId, totalBytes);
+		if (!quotaCheck.allowed) {
+			throw new BizError(quotaCheck.reason);
+		}
+
+		const uploaded = [];
+		try {
+			for (let attData of prepared) {
+				await r2Service.putObj(c, attData.key, attData.buff, {
+					contentType: attData.mimeType,
+					cacheControl: `max-age=259200`,
+					contentDisposition: fileUtils.encodeContentDisposition(attData.filename, 'inline')
+				}, userId);
+				uploaded.push({ key: attData.key, userId });
+			}
+		} catch (e) {
+			await this.cleanupUnreferencedObjects(c, uploaded);
+			throw e;
+		}
+
+		const rows = prepared.map(attData => ({
+			userId,
+			emailId,
+			accountId,
+			key: attData.key,
+			filename: attData.filename || null,
+			mimeType: attData.mimeType || attData.contentType || null,
+			size: attData.size || attData.buff.byteLength || attData.buff.length || 0,
+			type: attConst.type.EMBED,
+			contentId: attData.contentId || null
+		}));
+
+		try {
+			await orm(c).insert(att).values(rows).run();
+		} catch (e) {
+			await this.cleanupUnreferencedObjects(c, uploaded);
+			throw e;
+		}
 	},
 
 	async removeByUserIds(c, userIds) {
@@ -264,50 +408,242 @@ const attService = {
 	},
 
 	async removeAttByField(c, fieldName, fieldValues) {
+		if (!DELETION_FIELDS.has(fieldName)) {
+			throw new Error('Invalid attachment deletion field');
+		}
+		const values = (fieldValues || []).filter(value => value !== undefined && value !== null);
+		if (values.length === 0) return;
 
-		const mailDb = getMailDb(c);
-		const sqlList = [];
+		const mailDb = await ensureDeletionQueueTable(c);
+		const candidates = new Map();
 
-		fieldValues.forEach(value => {
-
-			sqlList.push(
-
-				mailDb.prepare(
-					`SELECT a.key, a.att_id
-						FROM attachments a
-							   JOIN (SELECT key
-									 FROM attachments
-									 GROUP BY key
-									 HAVING COUNT (*) = 1) t
-									ON a.key = t.key
-						WHERE a.${fieldName} = ?;`
-					).bind(value)
-			)
-
-			sqlList.push(mailDb.prepare(`DELETE FROM attachments WHERE ${fieldName} = ?`).bind(value))
-
-		});
-
-		const attListResult = await mailDb.batch(sqlList);
-
-		const delKeyList = attListResult.flatMap(r => r.results ? r.results.map(row => row.key) : []);
-
-		if (delKeyList.length > 0) {
-			await this.batchDelete(c, delKeyList);
+		// Collect every key touched by this delete, with the storage owner.
+		// The key may still be referenced by another mailbox (content-addressed
+		// dedupe), so the object is only removed after the post-delete refcount
+		// check below.
+		for (const value of values) {
+			const rows = await mailDb.prepare(
+				`SELECT DISTINCT key, user_id FROM attachments WHERE ${fieldName} = ?`
+			).bind(value).all();
+			for (const row of rows.results || []) {
+				const key = normalizeObjectKey(row.key);
+				if (!key) continue;
+				if (!candidates.has(key)) candidates.set(key, new Set());
+				candidates.get(key).add(queueOwner(row.user_id));
+			}
 		}
 
+		const statements = values.map(value =>
+			mailDb.prepare(`DELETE FROM attachments WHERE ${fieldName} = ?`).bind(value)
+		);
+
+		const entries = [];
+		for (const [key, owners] of candidates) {
+			for (const owner of owners) {
+				entries.push({ key, userId: owner });
+				statements.push(
+					mailDb.prepare(`
+						INSERT OR IGNORE INTO object_deletion_queue (object_key, user_id, next_retry_at)
+						VALUES (?, ?, CURRENT_TIMESTAMP)
+					`).bind(key, owner)
+				);
+			}
+		}
+
+		// D1 batch is transactional: metadata deletion and the durable delete
+		// outbox either both commit or both roll back. Object deletion happens
+		// afterwards and is retried by the queue when the backend fails.
+		await mailDb.batch(statements);
+
+		if (entries.length > 0) {
+			await this.drainObjectDeletionQueue(c, entries).catch(e => {
+				console.warn('[object-delete] immediate drain failed; queued for retry:', e.message);
+			});
+		}
 	},
 
-	async batchDelete(c, keys) {
-		if (!keys.length) return;
+	/**
+	 * Replay the durable deletion outbox. Passing `entries` drains exactly the
+	 * keys touched by the current request; omitting it drains all due rows and
+	 * is used by the scheduled task.
+	 */
+	async drainObjectDeletionQueue(c, entries = null, { limit = 100 } = {}) {
+		const mailDb = await ensureDeletionQueueTable(c);
 
-		const BATCH_SIZE = 1000;
-
-		for (let i = 0; i < keys.length; i += BATCH_SIZE) {
-			const batch = keys.slice(i, i + BATCH_SIZE);
-			await r2Service.delete(c, batch);
+		let rows;
+		if (Array.isArray(entries) && entries.length > 0) {
+			const seen = new Set();
+			rows = [];
+			for (const entry of entries) {
+				const key = normalizeObjectKey(entry.key);
+				if (!key) continue;
+				const owner = queueOwner(entry.userId);
+				const dedupe = `${owner}:${key}`;
+				if (seen.has(dedupe)) continue;
+				seen.add(dedupe);
+				rows.push({ object_key: key, user_id: owner, attempts: 0 });
+			}
+		} else {
+			const result = await mailDb.prepare(`
+				SELECT object_key, user_id, attempts
+				FROM object_deletion_queue
+				WHERE status = 'pending' AND next_retry_at <= CURRENT_TIMESTAMP
+				ORDER BY id
+				LIMIT ?
+			`).bind(Math.max(1, Math.min(Number(limit) || 100, 500))).all();
+			rows = result.results || [];
 		}
 
+		let deleted = 0;
+		let skipped = 0;
+		let failed = 0;
+
+		for (const row of rows) {
+			const key = normalizeObjectKey(row.object_key);
+			const owner = queueOwner(row.user_id);
+
+			if (!key) {
+				await mailDb.prepare(
+					`DELETE FROM object_deletion_queue WHERE object_key = ? AND user_id = ?`
+				).bind(row.object_key, owner).run();
+				skipped++;
+				continue;
+			}
+
+			let referenced;
+			try {
+				referenced = await mailDb.prepare(
+					`SELECT 1 AS present FROM attachments WHERE key = ? LIMIT 1`
+				).bind(key).first();
+			} catch (e) {
+				// Cannot prove the object is unreferenced: never delete blind.
+				await this.scheduleDeletionRetry(mailDb, key, owner, Number(row.attempts) || 0,
+					`reference check failed: ${e.message}`);
+				failed++;
+				continue;
+			}
+
+			if (referenced) {
+				// A surviving row owns the object; its eventual deletion will
+				// enqueue the key again. Drop this stale queue entry.
+				await mailDb.prepare(
+					`DELETE FROM object_deletion_queue WHERE object_key = ? AND user_id = ?`
+				).bind(key, owner).run();
+				skipped++;
+				continue;
+			}
+
+			try {
+				await r2Service.delete(c, key, owner > 0 ? owner : null);
+				await mailDb.prepare(
+					`DELETE FROM object_deletion_queue WHERE object_key = ? AND user_id = ?`
+				).bind(key, owner).run();
+				deleted++;
+			} catch (e) {
+				await this.scheduleDeletionRetry(mailDb, key, owner, Number(row.attempts) || 0, e.message);
+				failed++;
+			}
+		}
+
+		return { processed: rows.length, deleted, skipped, failed };
+	},
+
+	async scheduleDeletionRetry(mailDb, key, owner, currentAttempts, message) {
+		const attempts = currentAttempts + 1;
+		const exhausted = attempts >= DELETION_QUEUE_MAX_ATTEMPTS;
+		const delayMinutes = Math.min(5 * Math.pow(2, Math.min(currentAttempts, 7)), 720);
+
+		await mailDb.prepare(`
+			UPDATE object_deletion_queue
+			SET attempts = ?,
+				status = ?,
+				last_error = ?,
+				next_retry_at = datetime('now', ?)
+			WHERE object_key = ? AND user_id = ?
+		`).bind(
+			attempts,
+			exhausted ? 'failed' : 'pending',
+			String(message || '').slice(0, 500),
+			`+${delayMinutes} minutes`,
+			key,
+			owner
+		).run();
+
+		console.warn(`[object-delete-retry] key=${key} owner=${owner} attempts=${attempts} status=${exhausted ? 'failed' : 'pending'}: ${message}`);
+	},
+
+	/**
+	 * Best-effort compensation after a failed metadata insert. A key that is
+	 * still referenced is left alone; a failed reference check is queued so the
+	 * retry worker can re-evaluate it instead of guessing.
+	 */
+	async cleanupUnreferencedObjects(c, uploaded) {
+		if (!uploaded || uploaded.length === 0) return;
+
+		const mailDb = getMailDb(c);
+		const seen = new Set();
+
+		for (const item of uploaded) {
+			const key = normalizeObjectKey(item.key);
+			if (!key) continue;
+			const owner = queueOwner(item.userId);
+			const dedupe = `${owner}:${key}`;
+			if (seen.has(dedupe)) continue;
+			seen.add(dedupe);
+
+			try {
+				const ref = await mailDb.prepare(
+					`SELECT 1 AS present FROM attachments WHERE key = ? LIMIT 1`
+				).bind(key).first();
+				if (ref) continue;
+			} catch (e) {
+				console.warn('[storage-compensation] reference check failed; deferring delete:', key, e.message);
+				await this.enqueueObjectDeletions(c, [{ key, userId: owner }]);
+				continue;
+			}
+
+			try {
+				await r2Service.delete(c, key, owner > 0 ? owner : null);
+			} catch (e) {
+				console.warn('[storage-compensation] delete failed; queuing retry:', key, e.message);
+				await this.enqueueObjectDeletions(c, [{ key, userId: owner }]);
+			}
+		}
+	},
+
+	async enqueueObjectDeletions(c, entries) {
+		if (!entries || entries.length === 0) return;
+		const mailDb = await ensureDeletionQueueTable(c);
+		const seen = new Set();
+		const statements = [];
+
+		for (const entry of entries) {
+			const key = normalizeObjectKey(entry.key);
+			if (!key) continue;
+			const owner = queueOwner(entry.userId);
+			const dedupe = `${owner}:${key}`;
+			if (seen.has(dedupe)) continue;
+			seen.add(dedupe);
+			statements.push(
+				mailDb.prepare(`
+					INSERT OR IGNORE INTO object_deletion_queue (object_key, user_id, next_retry_at)
+					VALUES (?, ?, CURRENT_TIMESTAMP)
+				`).bind(key, owner)
+			);
+		}
+
+		if (statements.length > 0) {
+			await mailDb.batch(statements);
+		}
+	},
+
+	async batchDelete(c, keys, userId = null) {
+		const normalized = [...new Set((keys || []).map(normalizeObjectKey).filter(Boolean))];
+		if (normalized.length === 0) return;
+
+		for (let i = 0; i < normalized.length; i += OBJECT_DELETE_CHUNK) {
+			await r2Service.delete(c, normalized.slice(i, i + OBJECT_DELETE_CHUNK), userId);
+		}
 	},
 
 	async removeByAccountId(c, accountId) {

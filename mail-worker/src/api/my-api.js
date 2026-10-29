@@ -3,12 +3,38 @@ import userService from '../service/user-service';
 import totpService from '../service/totp-service';
 import telegramService from '../service/telegram-service';
 import oauthAppService from '../service/oauth-app-service';
+import oauthIdentityService from '../service/oauth-identity-service';
 import result from '../model/result';
 import userContext from '../security/user-context';
+import constant from '../const/constant';
 
 app.get('/my/loginUserInfo', async (c) => {
 	const user = await userService.loginUserInfo(c, userContext.getUserId(c), userContext.getLoginEmail(c));
 	return c.json(result.ok(user));
+});
+
+// Eligibility for the one-time "set first password" flow. The response is
+// deliberately limited to booleans/timing: the generated hash used for the
+// compare-and-set never leaves the worker. `providerLinked` and
+// `hasInitialPassword` let the settings page explain why the action is
+// unavailable instead of offering a change-password form the user cannot pass.
+app.get('/my/initialPasswordStatus', async (c) => {
+	const userId = userContext.getUserId(c);
+	const eligibility = await userService.evaluateInitialPassword(c, userId);
+	return c.json(result.ok({
+		canSet: eligibility.canSet === true,
+		provider: eligibility.provider || null,
+		expiresAt: eligibility.expiresAt || null,
+		providerLinked: eligibility.providerLinked === true,
+		hasInitialPassword: eligibility.hasInitialPassword === true,
+		windowMinutes: Math.round(constant.INITIAL_PASSWORD_WINDOW_MS / 60000)
+	}));
+});
+
+app.put('/my/setInitialPassword', async (c) => {
+	const body = await c.req.json().catch(() => ({}));
+	await userService.setInitialPassword(c, body, userContext.getUserId(c));
+	return c.json(result.ok());
 });
 
 app.put('/my/resetPassword', async (c) => {
@@ -197,6 +223,44 @@ app.delete('/my/oauthGrants/:id', async (c) => {
 app.post('/my/revokeOauthGrant', async (c) => {
 	const body = await c.req.json();
 	const data = await oauthAppService.revokeGrant(c, userContext.getUserId(c), body.id || body.clientId);
+	return c.json(result.ok(data));
+});
+
+// ---------------------------------------------------------------------------
+// Third-party login identity management for the signed-in account.
+//
+// Every handler derives the account from the verified session; the request
+// body never names a user. Bind and unbind additionally require a single-use
+// step-up grant minted by /my/oauthIdentities/reauth.
+// ---------------------------------------------------------------------------
+
+app.get('/my/oauthIdentities', async (c) => {
+	const data = await oauthIdentityService.listIdentities(c, userContext.getUserId(c));
+	return c.json(result.ok(data));
+});
+
+app.post('/my/oauthIdentities/reauth', async (c) => {
+	const body = await c.req.json().catch(() => ({}));
+	const data = await oauthIdentityService.reauthenticate(c, userContext.getUserId(c), body);
+	return c.json(result.ok(data));
+});
+
+app.post('/my/oauthIdentities/bind/start', async (c) => {
+	const body = await c.req.json().catch(() => ({}));
+	const data = await oauthIdentityService.startBind(c, userContext.getUserId(c), body);
+	return c.json(result.ok(data));
+});
+
+app.post('/my/oauthIdentities/bind/complete', async (c) => {
+	const body = await c.req.json().catch(() => ({}));
+	const data = await oauthIdentityService.completeBind(c, userContext.getUserId(c), body);
+	return c.json(result.ok(data));
+});
+
+// State-changing unbind is DELETE only. A GET never mutates an identity.
+app.delete('/my/oauthIdentities/:id', async (c) => {
+	const body = await c.req.json().catch(() => ({}));
+	const data = await oauthIdentityService.unbind(c, userContext.getUserId(c), c.req.param('id'), body);
 	return c.json(result.ok(data));
 });
 

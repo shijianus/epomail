@@ -5,6 +5,7 @@ vi.setConfig({ testTimeout: 30000 });
 import { dbInit } from '../src/init/init.js';
 import cryptoUtils from '../src/utils/crypto-utils.js';
 import jwtUtils from '../src/utils/jwt-utils.js';
+import { ensureOtcTable, seedOtc, sha256Hex } from './helpers/one-time-credential.js';
 
 const BASE = 'http://example.com';
 const enc = new TextEncoder();
@@ -284,18 +285,36 @@ describe('security delivery regressions', () => {
 		expect(body.code).toBe(403);
 	});
 
-	it('binds only the exact OAuth identity, consumes the proof once, and refuses rebinding', async () => {
+	it('binds only the exact OAuth identity and treats an already-bound identity as idempotent', async () => {
 		const oauthUser = 'github:probe-bind';
 		await env.db.prepare("INSERT INTO oauth (oauth_user_id, user_id) VALUES (?, 0)").bind(oauthUser).run();
-		await env.kv.put('oauth_bind:probe-token', JSON.stringify({ oauthUserId: oauthUser }), { expirationTtl: 600 });
+		await ensureOtcTable(env.db);
+		await seedOtc(env.db, {
+			purpose: 'oauth_bind',
+			token: 'probe-token',
+			provider: 'github',
+			oauthUserId: oauthUser,
+			ttlSeconds: 600
+		});
+
+		const proofState = async () => env.db.prepare(
+			'SELECT consumed FROM oauth_one_time_credential WHERE token_hash = ?'
+		).bind(await sha256Hex('probe-token')).first();
 
 		const wrongIdentity = await api('/api/oauth/bindUser', {
 			method: 'PUT',
-			body: { email: 'probe-bind@example.com', oauthUserId: 'github:other', bindToken: 'probe-token' }
+			body: {
+				email: 'probe-bind@example.com',
+				provider: 'github',
+				oauthUserId: 'github:other',
+				bindToken: 'probe-token'
+			}
 		});
 		const wrongBody = await wrongIdentity.json();
+		expect(wrongBody.code).toBe(410);
 		expect(wrongBody.message).toMatch(/bind proof/i);
-		expect(await env.kv.get('oauth_bind:probe-token')).not.toBeNull();
+		// A binding mismatch is "not found", never a spend.
+		expect((await proofState()).consumed).toBe(0);
 
 		const boundRole = await createRole('probe-bind-role', 'custom');
 		const existingUser = await seedUser('probe-bind-existing@example.com', boundRole);
@@ -303,18 +322,21 @@ describe('security delivery regressions', () => {
 
 		const rebind = await api('/api/oauth/bindUser', {
 			method: 'PUT',
-			body: { email: 'probe-bind@example.com', oauthUserId: oauthUser, bindToken: 'probe-token' }
+			body: {
+				email: 'probe-bind@example.com',
+				provider: 'github',
+				oauthUserId: oauthUser,
+				bindToken: 'probe-token'
+			}
 		});
 		const rebindBody = await rebind.json();
-		expect(rebindBody.message).toMatch(/已绑定/);
-		expect(await env.kv.get('oauth_bind:probe-token')).toBeNull();
-
-		const replay = await api('/api/oauth/bindUser', {
-			method: 'PUT',
-			body: { email: 'probe-bind@example.com', oauthUserId: oauthUser, bindToken: 'probe-token' }
-		});
-		const replayBody = await replay.json();
-		expect(replayBody.message).toMatch(/bind proof/i);
+		// An identity that is already bound is a committed success; a retry
+		// after a lost response must not mint a second session or report an error.
+		expect(rebindBody.code).toBe(200);
+		expect(rebindBody.data.alreadyBound).toBe(true);
+		expect(rebindBody.data.token).toBeNull();
+		// The idempotent branch never spends the proof.
+		expect((await proofState()).consumed).toBe(0);
 	});
 
 	it('fails the webhook before dedup when mailbox projection fails, then converges on retry', async () => {

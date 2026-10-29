@@ -63,7 +63,7 @@ app.use('*', async (c, next) => {
 app.onError((err, c) => {
 	if (err?.name === 'BizError') {
 		console.log(err.message);
-		return c.json(result.fail(err.message, err.code));
+		return c.json(result.fail(err.message, err.code, err.errorCode));
 	}
 
 	// Internal database/provider errors can contain SQL fragments, binding

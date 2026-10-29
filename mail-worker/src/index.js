@@ -3,8 +3,8 @@ import { email } from './email/email';
 import userService from './service/user-service';
 import verifyRecordService from './service/verify-record-service';
 import emailService from './service/email-service';
-import kvObjService from './service/kv-obj-service';
-import r2Service from './service/r2-service';
+import attService from './service/att-service';
+import { readObjectForRequest } from './service/object-serve-service';
 import oauthService from "./service/oauth-service";
 import analysisService from './service/analysis-service';
 import decisionNoticeService from './service/decision-notice-service';
@@ -12,8 +12,6 @@ import jwtUtils from './utils/jwt-utils';
 import { isAdminUser } from './utils/admin-utils';
 import permService from './service/perm-service';
 import KvConst from './const/kv-const';
-import { normalizeObjectKey } from './utils/object-key-utils';
-import { verifyObjectAccess } from './utils/object-token';
 
 async function checkScheduledAuth(req, env) {
 	if (req.method !== 'POST') {
@@ -132,20 +130,32 @@ export default {
 			return new Response('Ran scheduled event: ' + cronParam, { status: 200 });
 		}
 
+		 // Avatars and backgrounds are public by policy. This route reads through
+		 // the same storage resolver as the write path (KV, R2, S3/B2), so public
+		 // assets keep loading when the operator switches engine. A key that
+		 // fails the allowlist returns an empty response rather than null: the
+		 // handler's return value is a Response, and handing back null makes
+		 // workerd throw an uncaught exception for a merely malformed URL.
 		 if (url.pathname.startsWith('/static/')) {
-			 return await kvObjService.toObjResp({ env }, url.pathname.substring(1));
+			 const response = await readObjectForRequest({ env }, url.pathname.substring(1), url);
+			 return response || new Response('Object Not Found', { status: 404 });
 		 }
 
+		 // Signed attachment capabilities are minted as origin-relative
+		 // `/oss/<key>?...` URLs and consumed directly by the browser (inline
+		 // images, download links, Telegram share pages). Without this route
+		 // they fell through to the SPA asset handler and no signed URL could
+		 // ever be served.
+		 if (url.pathname.startsWith('/oss/')) {
+			 const response = await readObjectForRequest({ env }, url.pathname.slice('/oss/'.length), url);
+			 return response || new Response('Object Not Found', { status: 404 });
+		 }
+
+		 // Legacy alias kept for previously issued links. The path prefix here
+		 // *is* the object namespace, so the key is the path minus the leading
+		 // slash (`attachments/<name>`) — not the text after `/attachments/`.
 		 if (url.pathname.startsWith('/attachments/')) {
-			 const key = normalizeObjectKey(url.pathname.substring(1));
-			 if (!key) {
-				 return new Response('Object Not Found', { status: 404 });
-			 }
-			 const access = await verifyObjectAccess({ env }, key, url);
-			 if (!access) {
-				 return new Response('Object Not Found', { status: 404 });
-			 }
-			 const response = await r2Service.toObjResponse({ env }, key, access.userId || null);
+			 const response = await readObjectForRequest({ env }, url.pathname.substring(1), url);
 			 return response || new Response('Object Not Found', { status: 404 });
 		 }
 
@@ -160,6 +170,13 @@ export default {
 	async scheduled(c, env, ctx) {
 		console.log('SCHEDULED EVENT RECEIVED:', c);
 		try {
+			// Replay the durable object-deletion outbox first: a deletion that
+			// failed in an earlier request must not depend on another user
+			// action to complete.
+			await attService.drainObjectDeletionQueue({ env }, null, { limit: 200 }).catch(e => {
+				console.warn('[scheduled] object deletion queue drain failed:', e.message);
+			});
+
 			if (c?.cron === '*/30 * * * *') {
 				await analysisService.refreshEchartsCache({ env });
 				return;

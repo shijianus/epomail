@@ -5,6 +5,7 @@ import jwtUtils from '../utils/jwt-utils';
 import constant from '../const/constant';
 import KvConst from '../const/kv-const';
 import { isAdminUser } from '../utils/admin-utils';
+import oneTimeCredential, { OTC_PURPOSE } from '../utils/one-time-credential.js';
 
 const encoder = new TextEncoder();
 
@@ -153,8 +154,16 @@ const oauthProviderService = {
 			createdAt: Date.now()
 		};
 
-		// 存入 KV 缓存，TTL 为 300 秒 (5分钟)
-		await c.env.kv.put(`OAUTH_CODE_${code}`, JSON.stringify(authPayload), { expirationTtl: 300 });
+		// 存入 D1，TTL 为 300 秒 (5分钟)。授权码是单次凭证，消费采用原子
+		// 条件更新，两个并发的 token 请求最多只有一个能成功兑换。
+		await oneTimeCredential.issue(c, {
+			purpose: OTC_PURPOSE.AUTHORIZATION_CODE,
+			token: code,
+			provider: app.clientId,
+			oauthUserId: String(user.userId),
+			payload: authPayload,
+			ttlSeconds: 300
+		});
 
 		// 持久化用户授权记录 (oauth_grant)
 		try {
@@ -203,15 +212,17 @@ const oauthProviderService = {
 			throw new BizError('invalid_request: 缺少 code 参数', 400);
 		}
 
-		const kvKey = `OAUTH_CODE_${code}`;
-		const authData = await c.env.kv.get(kvKey, { type: 'json' });
+		// 单次消费由 D1 原子条件更新保证。无论后续校验是否通过，码都已被
+		// 标记消费，重放请求无法再次兑换。
+		const record = await oneTimeCredential.consume(c, {
+			purpose: OTC_PURPOSE.AUTHORIZATION_CODE,
+			token: code
+		});
+		const authData = record?.payload;
 
 		if (!authData) {
 			throw new BizError('invalid_grant: 授权码已失效或已被使用', 400);
 		}
-
-		// 无论验证成功与否，立即删除 code 防止重放攻击
-		await c.env.kv.delete(kvKey);
 
 		if (clientId && clientId !== authData.clientId) {
 			throw new BizError('invalid_client: client_id 不匹配', 400);

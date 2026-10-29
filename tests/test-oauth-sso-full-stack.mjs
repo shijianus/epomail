@@ -130,7 +130,7 @@ async function run() {
 		// 2.3 验证各 Provider 的 Authorization URL 构造
 		const testProviders = ['github', 'google', 'microsoft', 'apple', 'custom'];
 		for (const provider of testProviders) {
-			const authRes = await fetch(`${BASE_URL}/api/oauth/authorize/${provider}?redirect_uri=${encodeURIComponent('https://mail.epocanvas.com/api/oauth/callback/' + provider)}`);
+			const authRes = await fetch(`${BASE_URL}/api/oauth/authorize/${provider}?redirect_uri=${encodeURIComponent('https://mail.epocanvas.com/api/oauth/callback/' + provider)}&state=e2e-${provider}-${Date.now()}`);
 			ok(authRes.status === 200, `GET /api/oauth/authorize/${provider} 响应成功`);
 			const authJson = await authRes.json();
 			ok(authJson.code === 200 && authJson.data?.url, `Provider [${provider}] 成功生成标准 OAuth 授权跳转 URL`);

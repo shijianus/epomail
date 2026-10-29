@@ -190,18 +190,83 @@ const r2Service = {
 		return `/oss/${safeKey}`;
 	},
 
-	async delete(c, key, userId = null) {
-		const safeKey = normalizeObjectKey(key);
-		if (!safeKey) return;
+	async delete(c, keyOrKeys, userId = null) {
+		const list = Array.isArray(keyOrKeys) ? keyOrKeys : [keyOrKeys];
+		const keys = [...new Set(list.map(normalizeObjectKey).filter(Boolean))];
+		if (keys.length === 0) return;
+
 		const resolved = await this.resolveStorage(c, userId);
 
+		// Every backend accepts a batch; the callers rely on this to delete the
+		// object behind an attachment row. Passing an array to the old
+		// single-key path silently deleted nothing.
 		if (resolved.type === 'KV') {
-			await kvObjService.deleteObj(c, safeKey);
+			await kvObjService.deleteObj(c, keys);
 		} else if (resolved.type === 'R2') {
-			await c.env.r2.delete(safeKey);
+			for (let i = 0; i < keys.length; i += 1000) {
+				await c.env.r2.delete(keys.slice(i, i + 1000));
+			}
 		} else if (resolved.type === 'S3' || resolved.type === 'USER_S3') {
-			await s3Service.deleteObj(c, safeKey, resolved.config);
+			for (let i = 0; i < keys.length; i += 1000) {
+				await s3Service.deleteObj(c, keys.slice(i, i + 1000), resolved.config);
+			}
 		}
+	},
+
+	/**
+	 * Enumerate stored objects under a prefix. Used by the read-only orphan
+	 * scan; callers must cap the result (KV/R2/S3 are all paginated).
+	 */
+	async listObjects(c, prefix = 'attachments/', { limit = 5000 } = {}) {
+		const cap = Math.max(1, Math.min(Number(limit) || 5000, 10000));
+		const resolved = await this.resolveStorage(c);
+		const objects = [];
+		let truncated = false;
+
+		if (resolved.type === 'KV') {
+			if (!c.env?.kv) return { objects, truncated, backend: 'KV' };
+			let cursor;
+			while (objects.length < cap) {
+				const page = await c.env.kv.list({
+					prefix,
+					limit: Math.min(1000, cap - objects.length),
+					cursor
+				});
+				for (const key of page.keys || []) {
+					objects.push({ key: key.name, lastModified: null, size: key.metadata?.size ?? null });
+				}
+				if (page.list_complete) break;
+				cursor = page.cursor;
+				if (!cursor) break;
+			}
+			truncated = objects.length >= cap;
+			return { objects, truncated, backend: 'KV' };
+		}
+
+		if (resolved.type === 'R2') {
+			let cursor;
+			while (objects.length < cap) {
+				const page = await c.env.r2.list({
+					prefix,
+					limit: Math.min(1000, cap - objects.length),
+					cursor
+				});
+				for (const obj of page.objects || []) {
+					objects.push({ key: obj.key, lastModified: obj.uploaded || null, size: obj.size ?? null });
+				}
+				cursor = page.truncated ? page.cursor : null;
+				if (!cursor) break;
+			}
+			truncated = objects.length >= cap;
+			return { objects, truncated, backend: 'R2' };
+		}
+
+		if (resolved.type === 'S3' || resolved.type === 'USER_S3') {
+			const listed = await s3Service.listObjKeys(c, prefix, resolved.config, cap);
+			return { objects: listed.objects, truncated: listed.truncated, backend: resolved.type };
+		}
+
+		return { objects, truncated, backend: resolved.type };
 	}
 
 };

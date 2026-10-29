@@ -115,6 +115,43 @@ const storageScanService = {
 			if (userRow) byoUsersCount = Number(userRow.count || 0);
 		} catch (uErr) {}
 
+		// 3.1 Read-only orphan scan. Objects are only reported, never deleted
+		// here: cleanup requires an explicit confirmed admin action.
+		let orphanStats = {
+			supported: false,
+			backend: null,
+			scannedObjects: 0,
+			referencedKeys: 0,
+			orphanCount: 0,
+			samples: [],
+			truncated: false,
+			error: null
+		};
+		try {
+			orphanStats = await this.scanOrphans(c, { maxObjects: 2000 });
+		} catch (orphanErr) {
+			orphanStats.error = orphanErr.message;
+		}
+
+		// 3.2 Durable deletion outbox backlog (created lazily by att-service).
+		let deletionQueue = { pending: 0, failed: 0, oldestRetryAt: null };
+		try {
+			const queueRow = await getMailDb(c).prepare(`
+				SELECT
+					COALESCE(SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END), 0) AS pending,
+					COALESCE(SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END), 0) AS failed,
+					MIN(CASE WHEN status = 'pending' THEN next_retry_at END) AS oldest
+				FROM object_deletion_queue
+			`).first();
+			if (queueRow) {
+				deletionQueue = {
+					pending: Number(queueRow.pending || 0),
+					failed: Number(queueRow.failed || 0),
+					oldestRetryAt: queueRow.oldest || null
+				};
+			}
+		} catch (_) {}
+
 		// 4. Object Storage Reachability & Health Probe
 		const resolvedStorage = await r2Service.resolveStorage(c);
 		let s3Status = {
@@ -196,6 +233,8 @@ const storageScanService = {
 				kvBound,
 				byoUsersCount
 			},
+			orphans: orphanStats,
+			deletionQueue,
 			db: {
 				isDual: isDualDbMode(c),
 				userDbName: (c.env?.USER_DB || c.env?.user_db) ? 'USER_DB' : 'db (Primary D1)',
@@ -208,6 +247,139 @@ const storageScanService = {
 				attachmentCascadeDelete
 			},
 			message: `KV 与多云对象存储深度体检扫描完成！共扫描 ${totalKvKeys} 个 KV 键值与 ${d1Stats.totalAttachments} 个 D1 附件记录 (耗时: ${scanDurationMs}ms)。`
+		};
+	},
+
+	/**
+	 * Keys referenced by attachment metadata. Keyset pagination avoids the D1
+	 * bound-parameter ceiling and does not hold the whole table in one query.
+	 */
+	async listAttachmentKeys(c, { limit = 200000 } = {}) {
+		const mailDb = getMailDb(c);
+		const keys = new Set();
+		let lastKey = '';
+
+		while (keys.size < limit) {
+			const rows = await mailDb.prepare(`
+				SELECT DISTINCT key FROM attachments
+				WHERE key > ?
+				ORDER BY key
+				LIMIT 1000
+			`).bind(lastKey).all();
+			const batch = rows.results || [];
+			if (batch.length === 0) break;
+			for (const row of batch) {
+				keys.add(row.key);
+			}
+			lastKey = batch[batch.length - 1].key;
+			if (batch.length < 1000) break;
+		}
+
+		return keys;
+	},
+
+	/**
+	 * Read-only comparison of stored attachment objects with D1 metadata.
+	 * Pre-existing orphan objects are reported for operator review; this method
+	 * never deletes anything.
+	 */
+	async scanOrphans(c, { maxObjects = 2000, maxDbKeys = 200000 } = {}) {
+		const listing = await r2Service.listObjects(c, 'attachments/', { limit: maxObjects });
+		const referenced = await this.listAttachmentKeys(c, { limit: maxDbKeys });
+		const orphans = listing.objects.filter(obj => !referenced.has(obj.key));
+
+		return {
+			supported: true,
+			backend: listing.backend,
+			scannedObjects: listing.objects.length,
+			referencedKeys: referenced.size,
+			orphanCount: orphans.length,
+			samples: orphans.slice(0, 20).map(obj => ({
+				key: obj.key,
+				lastModified: obj.lastModified || null,
+				size: obj.size ?? null
+			})),
+			truncated: !!listing.truncated || referenced.size >= maxDbKeys,
+			error: null
+		};
+	},
+
+	/**
+	 * Explicit, bounded cleanup of untracked attachment objects. Safety rules:
+	 * - requires confirm === true;
+	 * - only `attachments/` objects older than the grace window;
+	 * - re-checks D1 immediately before each delete;
+	 * - KV is refused because key listings carry no trustworthy timestamp.
+	 */
+	async cleanupOrphans(c, { graceHours = 24, limit = 100, confirm = false } = {}) {
+		if (confirm !== true) {
+			return { ok: false, deleted: 0, skipped: 0, failed: 0, message: 'Explicit confirmation required' };
+		}
+
+		const hours = Math.min(Math.max(Number(graceHours) || 24, 1), 720);
+		const maxDeletes = Math.max(1, Math.min(Number(limit) || 100, 500));
+		const listing = await r2Service.listObjects(c, 'attachments/', { limit: Math.max(1000, maxDeletes * 10) });
+
+		if (listing.backend === 'KV') {
+			return {
+				ok: false,
+				deleted: 0,
+				skipped: listing.objects.length,
+				failed: 0,
+				message: 'KV key listings have no creation timestamp; automatic orphan deletion is not supported on KV'
+			};
+		}
+
+		const cutoff = Date.now() - hours * 3600 * 1000;
+		const mailDb = getMailDb(c);
+		let deleted = 0;
+		let skipped = 0;
+		let failed = 0;
+		const deletedKeys = [];
+
+		for (const obj of listing.objects) {
+			if (deleted >= maxDeletes) break;
+			const timestamp = obj.lastModified instanceof Date
+				? obj.lastModified.getTime()
+				: new Date(obj.lastModified || 0).getTime();
+			if (!Number.isFinite(timestamp) || timestamp > cutoff) {
+				skipped++;
+				continue;
+			}
+
+			let referenced;
+			try {
+				referenced = await mailDb.prepare(
+					`SELECT 1 AS present FROM attachments WHERE key = ? LIMIT 1`
+				).bind(obj.key).first();
+			} catch (e) {
+				skipped++;
+				continue;
+			}
+			if (referenced) {
+				skipped++;
+				continue;
+			}
+
+			try {
+				await r2Service.delete(c, obj.key, null);
+				deleted++;
+				deletedKeys.push(obj.key);
+			} catch (e) {
+				console.warn('[orphan-cleanup] delete failed:', obj.key, e.message);
+				failed++;
+			}
+		}
+
+		return {
+			ok: true,
+			backend: listing.backend,
+			graceHours: hours,
+			deleted,
+			skipped,
+			failed,
+			deletedKeys: deletedKeys.slice(0, 50),
+			message: `Orphan cleanup removed ${deleted} object(s) older than ${hours}h.`
 		};
 	},
 

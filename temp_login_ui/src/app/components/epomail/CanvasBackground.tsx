@@ -1,5 +1,11 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 import { cameraState } from "./cameraStore";
+
+/**
+ * 命名霓虹三色（默认装饰）或调用方给的语义色十六进制值
+ * （如错误提示 #eab308、成功提示 #22c55e）。
+ */
+export type CanvasTone = "purple" | "cyan" | "indigo" | `#${string}`;
 
 /**
  * Imperative API exposed to the login form so keystrokes / submit can
@@ -7,10 +13,10 @@ import { cameraState } from "./cameraStore";
  */
 export interface CanvasHandle {
   /** Small neon ripple — used on password keystrokes. */
-  pulse: (opts?: { color?: "purple" | "cyan" | "indigo"; strength?: number }) => void;
+  pulse: (opts?: { color?: CanvasTone; strength?: number }) => void;
   /** Explosive nova burst — used on every keystroke. */
   burst: (opts?: {
-    color?: "purple" | "cyan" | "indigo";
+    color?: CanvasTone;
     strength?: number;
     x?: number;
     y?: number;
@@ -42,7 +48,7 @@ const PURPLE: [number, number, number] = [168, 85, 247];
 const INDIGO: [number, number, number] = [99, 102, 241];
 const CYAN: [number, number, number] = [103, 232, 249];
 
-function pickColor(c?: "purple" | "cyan" | "indigo" | string): [number, number, number] {
+function pickColor(c?: CanvasTone): [number, number, number] {
   // 支持调用方直接传十六进制色值（如错误提示 #eab308 / 成功提示 #22c55e）
   if (typeof c === "string" && c.startsWith("#")) {
     const hex = c.slice(1);

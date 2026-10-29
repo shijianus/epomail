@@ -27,9 +27,13 @@
       <div class="item" id="password">
         <div>{{ $t('password') }}</div>
         <div style="display: flex; align-items: center; gap: 16px;">
-          <el-button type="primary" @click="pwdShow = true">{{ $t('changePwdBtn') }}</el-button>
+          <el-button v-if="initialPwd.canSet" type="primary" @click="initialPwdShow = true">{{ $t('setInitialPwdBtn') }}</el-button>
+          <el-button v-else type="primary" @click="pwdShow = true">{{ $t('changePwdBtn') }}</el-button>
           <span v-if="passwordChangedText" style="font-size: 12px; color: var(--text-muted);">{{ passwordChangedText }}</span>
         </div>
+      </div>
+      <div v-if="initialPwd.canSet" class="initial-pwd-hint">
+        {{ $t('setInitialPwdHint', { minutes: initialPwd.windowMinutes }) }}
       </div>
     </div>
 
@@ -300,7 +304,81 @@
       </div>
     </div>
 
-    <!-- Section 3: Account Deletion -->
+    <!-- Section 3: Linked third-party sign-in identities -->
+    <div class="container linked-accounts" id="oauthIdentities">
+      <div class="linked-accounts-head">
+        <div>
+          <div class="title">{{ $t('linkedAccountsTitle') }}</div>
+          <div class="linked-accounts-desc">{{ $t('linkedAccountsDesc') }}</div>
+        </div>
+      </div>
+
+      <div v-if="oauthIdentities.loading" class="identity-empty">
+        <el-icon class="is-loading"><Loading /></el-icon>
+      </div>
+
+      <div v-else-if="oauthIdentityRows.length === 0" class="identity-empty">
+        <span>{{ $t('linkedAccountsEmpty') }}</span>
+      </div>
+
+      <div v-else class="identity-list">
+        <div v-for="row in oauthIdentityRows" :key="row.key" class="identity-row">
+          <div class="identity-main">
+            <div class="identity-icon">
+              <Icon :icon="row.icon" width="22" height="22" />
+            </div>
+            <div class="identity-text">
+              <div class="identity-name">
+                <span>{{ row.name }}</span>
+                <el-tag v-if="row.identity" type="success" size="small" effect="plain" round>
+                  {{ $t('linkedAccountBound') }}
+                </el-tag>
+                <el-tag v-else type="info" size="small" effect="plain" round>
+                  {{ $t('linkedAccountNotBound') }}
+                </el-tag>
+              </div>
+              <div class="identity-sub">
+                <template v-if="row.identity">
+                  {{ row.identity.name || row.identity.username || row.name }}
+                  <span v-if="row.identity.boundAt"> · {{ $t('linkedAccountBoundAt', { date: formatDate(row.identity.boundAt) }) }}</span>
+                </template>
+                <template v-else>{{ $t('linkedAccountUnboundHint') }}</template>
+              </div>
+            </div>
+          </div>
+          <div class="identity-action">
+            <el-button
+              v-if="!row.identity"
+              type="primary"
+              plain
+              size="default"
+              :disabled="row.enabled === false"
+              @click="openOauthBind(row)"
+            >
+              {{ $t('linkedAccountBindBtn') }}
+            </el-button>
+            <el-button
+              v-else
+              type="danger"
+              plain
+              size="default"
+              :disabled="oauthIdentities.identities.length <= 1 && !oauthIdentities.login.hasPassword"
+              :title="oauthIdentities.identities.length <= 1 && !oauthIdentities.login.hasPassword ? $t('linkedAccountLastMethodHint') : ''"
+              @click="openOauthUnbind(row)"
+            >
+              {{ $t('linkedAccountUnbindBtn') }}
+            </el-button>
+          </div>
+        </div>
+      </div>
+
+      <div v-if="!oauthIdentities.login.canRemoveIdentity" class="identity-warning">
+        <Icon icon="fluent:warning-16-regular" width="16" height="16" />
+        <span>{{ $t('linkedAccountLastMethodHint') }}</span>
+      </div>
+    </div>
+
+    <!-- Section 4: Account Deletion -->
     <div class="container del-email" id="deleteUser" v-perm="'my:delete'">
       <div class="title">{{ $t('deleteUser') }}</div>
       <div class="del-msg">
@@ -318,6 +396,16 @@
         <el-input type="password" :placeholder="$t('newPassword')" v-model="form.password" autocomplete="new-password"/>
         <el-input type="password" :placeholder="$t('confirmPassword')" v-model="form.newPwd" autocomplete="new-password"/>
         <el-button type="primary" :loading="setPwdLoading" @click="submitPwd">{{ $t('save') }}</el-button>
+      </div>
+    </el-dialog>
+
+    <!-- Set First Password (OAuth-created account, recent provider sign-in) -->
+    <el-dialog v-model="initialPwdShow" :title="$t('setInitialPwdTitle')" width="380px">
+      <div class="update-pwd">
+        <p class="initial-pwd-desc">{{ $t('setInitialPwdDesc') }}</p>
+        <el-input type="password" :placeholder="$t('newPassword')" v-model="initialPwdForm.password" autocomplete="new-password"/>
+        <el-input type="password" :placeholder="$t('confirmPassword')" v-model="initialPwdForm.confirm" autocomplete="new-password"/>
+        <el-button type="primary" :loading="initialPwdLoading" @click="submitInitialPwd">{{ $t('save') }}</el-button>
       </div>
     </el-dialog>
 
@@ -640,6 +728,57 @@
         </div>
       </template>
     </el-dialog>
+
+    <!-- Re-authentication for a sensitive identity bind / unbind -->
+    <el-dialog
+      v-model="oauthReauth.visible"
+      :title="oauthReauth.mode === 'bind' ? $t('linkedAccountBindTitle') : $t('linkedAccountUnbindTitle')"
+      width="420px"
+      destroy-on-close
+    >
+      <div class="oauth-reauth-body">
+        <p class="oauth-reauth-desc">
+          {{ oauthReauth.mode === 'bind'
+            ? $t('linkedAccountBindReauthDesc', { provider: oauthReauth.providerName })
+            : $t('linkedAccountUnbindReauthDesc', { provider: oauthReauth.providerName }) }}
+        </p>
+
+        <template v-if="oauthIdentities.login.hasPassword">
+          <el-input
+            type="password"
+            :placeholder="$t('linkedAccountCurrentPassword')"
+            v-model="oauthReauth.password"
+            autocomplete="current-password"
+          />
+          <el-input
+            v-if="oauthIdentities.login.totpEnabled"
+            :placeholder="oauthReauth.isBackupCode ? $t('totpCodeOrBackupPlaceholder') : $t('totpCodePlaceholder')"
+            v-model="oauthReauth.code"
+            autocomplete="one-time-code"
+            @keyup.enter="submitOauthReauth"
+          />
+          <el-checkbox
+            v-if="oauthIdentities.login.totpEnabled"
+            v-model="oauthReauth.isBackupCode"
+          >
+            {{ $t('linkedAccountUseBackupCode') }}
+          </el-checkbox>
+        </template>
+        <p v-else class="oauth-reauth-hint">{{ $t('linkedAccountProviderReauthHint') }}</p>
+      </div>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="oauthReauth.visible = false">{{ $t('cancel') }}</el-button>
+          <el-button
+            :type="oauthReauth.mode === 'unbind' ? 'danger' : 'primary'"
+            :loading="oauthReauth.loading"
+            @click="submitOauthReauth"
+          >
+            {{ $t('confirm') }}
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -649,6 +788,8 @@ import { useRoute } from 'vue-router'
 import {
   resetPassword,
   userDelete,
+  getInitialPasswordStatus,
+  setInitialPassword,
   getTotpStatus,
   getTotpSetup,
   enableTotp,
@@ -663,7 +804,12 @@ import {
   approvePasskeyWithTotp,
   activateTimelockedPasskey,
   getPasskeyTestOptions,
-  verifyPasskeyTest
+  verifyPasskeyTest,
+  getOauthIdentities,
+  reauthOauthIdentity,
+  startOauthIdentityBind,
+  completeOauthIdentityBind,
+  unbindOauthIdentity
 } from "@/request/my.js";
 import { useUserStore } from "@/store/user.js";
 import { useSettingStore } from "@/store/setting.js";
@@ -681,8 +827,70 @@ const accountStore = useAccountStore()
 const userStore = useUserStore();
 const settingStore = useSettingStore();
 const setPwdLoading = ref(false)
+const initialPwd = reactive({ canSet: false, windowMinutes: 15 })
+const initialPwdShow = ref(false)
+const initialPwdLoading = ref(false)
+const initialPwdForm = reactive({ password: '', confirm: '' })
 const setNameShow = ref(false)
 const accountName = ref(null)
+
+// Linked third-party sign-in identities. The list is the server's view; the UI
+// never sends a userId and never caches an identity claim for later reuse.
+const oauthIdentities = reactive({
+  loading: true,
+  providers: [],
+  identities: [],
+  login: { hasPassword: true, totpEnabled: false, identityCount: 0, canRemoveIdentity: true }
+})
+
+const oauthReauth = reactive({
+  visible: false,
+  mode: 'bind',
+  provider: '',
+  providerName: '',
+  identityId: 0,
+  password: '',
+  code: '',
+  isBackupCode: false,
+  loading: false
+})
+
+const OAUTH_PROVIDER_FALLBACK = {
+  github: { name: 'GitHub', icon: 'mdi:github' },
+  google: { name: 'Google', icon: 'logos:google-icon' },
+  microsoft: { name: 'Microsoft', icon: 'logos:microsoft-icon' },
+  apple: { name: 'Apple', icon: 'ic:baseline-apple' },
+  custom: { name: 'Custom SSO', icon: 'fluent:shield-keyhole-20-filled' },
+  linuxdo: { name: 'LinuxDo', icon: 'simple-icons:linux' }
+}
+
+function providerFallback(provider) {
+  return OAUTH_PROVIDER_FALLBACK[provider] || { name: provider, icon: 'fluent:shapes-20-regular' }
+}
+
+const oauthIdentityRows = computed(() => {
+  const rows = oauthIdentities.providers.map(item => ({
+    key: item.key,
+    name: item.name,
+    icon: item.icon,
+    identity: oauthIdentities.identities.find(identity => identity.provider === item.key) || null
+  }))
+
+  // Identities bound to a provider that the operator has since disabled must
+  // still be visible and removable.
+  for (const identity of oauthIdentities.identities) {
+    if (!rows.some(row => row.key === identity.provider)) {
+      const fallback = providerFallback(identity.provider)
+      rows.push({
+        key: identity.provider,
+        name: fallback.name,
+        icon: fallback.icon,
+        identity
+      })
+    }
+  }
+  return rows
+})
 
 const passwordChangedText = computed(() => {
   const ts = userStore.user.passwordUpdatedAt || userStore.user.createTime
@@ -806,12 +1014,160 @@ const fetchPasskeys = async () => {
   }
 }
 
+const fetchOauthIdentities = async () => {
+  try {
+    const res = await getOauthIdentities()
+    if (res) {
+      oauthIdentities.providers = Array.isArray(res.providers) ? res.providers : []
+      oauthIdentities.identities = Array.isArray(res.identities) ? res.identities : []
+      oauthIdentities.login = {
+        hasPassword: res.login ? res.login.hasPassword !== false : true,
+        totpEnabled: Boolean(res.login && res.login.totpEnabled),
+        identityCount: res.login && Number.isFinite(res.login.identityCount) ? res.login.identityCount : oauthIdentities.identities.length,
+        canRemoveIdentity: res.login ? res.login.canRemoveIdentity !== false : true
+      }
+    }
+  } catch (err) {
+    console.error('Failed to load linked third-party identities:', err)
+  } finally {
+    oauthIdentities.loading = false
+  }
+}
+
+const resetOauthReauth = () => {
+  oauthReauth.password = ''
+  oauthReauth.code = ''
+  oauthReauth.isBackupCode = false
+  oauthReauth.loading = false
+}
+
+const openOauthBind = (row) => {
+  resetOauthReauth()
+  oauthReauth.mode = 'bind'
+  oauthReauth.provider = row.key
+  oauthReauth.providerName = row.name
+  oauthReauth.identityId = 0
+  oauthReauth.visible = true
+}
+
+const openOauthUnbind = (row) => {
+  if (!row.identity) return
+  if (oauthIdentities.identities.length <= 1 && !oauthIdentities.login.hasPassword) {
+    ElMessage({
+      message: t('linkedAccountLastMethodHint'),
+      type: 'warning',
+      plain: true
+    })
+    return
+  }
+  resetOauthReauth()
+  oauthReauth.mode = 'unbind'
+  oauthReauth.provider = row.key
+  oauthReauth.providerName = row.identity.name || row.name
+  oauthReauth.identityId = row.identity.id
+  oauthReauth.visible = true
+}
+
+const submitOauthReauth = async () => {
+  const payload = {}
+  if (oauthIdentities.login.hasPassword) {
+    if (!oauthReauth.password) {
+      ElMessage({ message: t('linkedAccountCurrentPassword'), type: 'warning', plain: true })
+      return
+    }
+    payload.password = oauthReauth.password
+    if (oauthIdentities.login.totpEnabled) {
+      const code = (oauthReauth.code || '').trim()
+      if (!code) {
+        ElMessage({ message: t('totpCodePlaceholder'), type: 'warning', plain: true })
+        return
+      }
+      payload.code = code
+      payload.isBackupCode = oauthReauth.isBackupCode === true
+    }
+  }
+
+  oauthReauth.loading = true
+  try {
+    const grant = await reauthOauthIdentity(payload)
+    if (!grant || !grant.stepUpToken) {
+      throw new Error('missing step-up grant')
+    }
+
+    if (oauthReauth.mode === 'bind') {
+      const started = await startOauthIdentityBind({
+        provider: oauthReauth.provider,
+        stepUpToken: grant.stepUpToken
+      })
+      if (!started || !started.url) {
+        throw new Error('missing authorization url')
+      }
+      // Full-page navigation: the provider must redirect back to the Worker
+      // callback, which then returns to this settings page with a one-time
+      // claim in the URL fragment.
+      window.location.assign(started.url)
+      return
+    }
+
+    await unbindOauthIdentity(oauthReauth.identityId, grant.stepUpToken)
+    ElMessage({ message: t('linkedAccountUnbindSuccess'), type: 'success', plain: true })
+    oauthReauth.visible = false
+    await fetchOauthIdentities()
+  } catch (err) {
+    // The axios interceptor already surfaced the server message.
+  } finally {
+    oauthReauth.loading = false
+  }
+}
+
+// The provider callback lands here with ?oauth_bind=<outcome>#oauth_link=<claim>.
+// The claim is a bearer credential: read it, scrub the address bar, and never
+// keep it in component state longer than the single request that spends it.
+const consumeOauthBindReturn = async () => {
+  const outcome = route.query && route.query.oauth_bind ? String(route.query.oauth_bind) : ''
+  const hash = window.location.hash || ''
+  let claim = ''
+  const marker = '#oauth_link='
+  if (hash.startsWith(marker)) {
+    const raw = hash.slice(marker.length)
+    try {
+      claim = decodeURIComponent(raw.split('&')[0])
+    } catch (e) {
+      claim = ''
+    }
+  }
+  if (!outcome && !claim) return
+
+  try {
+    window.history.replaceState({}, '', `${window.location.pathname}#oauthIdentities`)
+  } catch (e) {}
+
+  if (claim) {
+    try {
+      await completeOauthIdentityBind(claim)
+      ElMessage({ message: t('linkedAccountBindSuccess'), type: 'success', plain: true })
+    } catch (err) {
+      // The interceptor shows the reason (already used, expired, conflict).
+    }
+  } else if (outcome === 'already') {
+    ElMessage({ message: t('linkedAccountBindAlready'), type: 'info', plain: true })
+  } else if (outcome === 'conflict') {
+    ElMessage({ message: t('linkedAccountBindConflict'), type: 'error', plain: true })
+  } else if (outcome === 'error') {
+    ElMessage({ message: t('linkedAccountBindFailed'), type: 'error', plain: true })
+  }
+
+  await fetchOauthIdentities()
+}
+
 onMounted(() => {
   if (route.query && route.query.action === 'change-password') {
     pwdShow.value = true;
   }
   fetchTotpStatus();
   fetchPasskeys();
+  fetchInitialPasswordStatus();
+  fetchOauthIdentities().then(() => consumeOauthBindReturn());
 })
 
 const startTotpSetup = async () => {
@@ -1669,6 +2025,62 @@ function submitPwd() {
     setPwdLoading.value = false
   })
 }
+
+// First-password flow for accounts created by the OAuth bind flow. The server
+// exposes eligibility only while a recent provider sign-in is still valid, so
+// the button disappears once that window closes.
+const fetchInitialPasswordStatus = async () => {
+  try {
+    const res = await getInitialPasswordStatus()
+    initialPwd.canSet = Boolean(res && res.canSet)
+    if (res && Number(res.windowMinutes) > 0) {
+      initialPwd.windowMinutes = Number(res.windowMinutes)
+    }
+    if (initialPwd.canSet && route.query && route.query.action === 'set-password') {
+      initialPwdShow.value = true
+    }
+  } catch (err) {
+    console.error('Failed to load initial password status:', err)
+  }
+}
+
+const submitInitialPwd = () => {
+  const password = initialPwdForm.password || ''
+  if (password.length < 6) {
+    ElMessage({
+      message: t('pwdLengthMsg'),
+      type: 'error',
+      plain: true,
+    })
+    return
+  }
+  if (password !== initialPwdForm.confirm) {
+    ElMessage({
+      message: t('confirmPwdFailMsg'),
+      type: 'error',
+      plain: true,
+    })
+    return
+  }
+
+  initialPwdLoading.value = true
+  setInitialPassword(password).then(() => {
+    ElMessage({
+      message: t('setInitialPwdSuccess'),
+      type: 'success',
+      plain: true,
+    })
+    initialPwdShow.value = false
+    initialPwd.canSet = false
+    initialPwdLoading.value = false
+    initialPwdForm.password = ''
+    initialPwdForm.confirm = ''
+    // Every session is revoked server-side; sign in with the new credential.
+    setTimeout(() => window.location.replace('/login/'), 800)
+  }).catch(() => {
+    initialPwdLoading.value = false
+  })
+}
 </script>
 
 <style scoped lang="scss">
@@ -1683,6 +2095,158 @@ function submitPwd() {
     display: flex;
     flex-direction: column;
     gap: 15px;
+  }
+
+  .initial-pwd-hint {
+    margin-top: -8px;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--text-muted);
+  }
+
+  .initial-pwd-desc {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--text-secondary);
+  }
+
+  /* Linked third-party identities */
+  .linked-accounts {
+    gap: 16px;
+
+    .linked-accounts-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+    }
+
+    .linked-accounts-desc {
+      margin-top: 6px;
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--text-muted);
+    }
+
+    .identity-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .identity-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 14px 16px;
+      border-radius: 12px;
+      border: 1px solid var(--border-subtle);
+      background: var(--bg-hover);
+
+      @media (max-width: 767px) {
+        flex-direction: column;
+        align-items: stretch;
+      }
+    }
+
+    .identity-main {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      min-width: 0;
+    }
+
+    .identity-icon {
+      width: 42px;
+      height: 42px;
+      border-radius: 11px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+    }
+
+    .identity-text {
+      min-width: 0;
+    }
+
+    .identity-name {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .identity-sub {
+      margin-top: 3px;
+      font-size: 12.5px;
+      color: var(--text-muted);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+
+      @media (max-width: 767px) {
+        white-space: normal;
+        overflow: visible;
+      }
+    }
+
+    .identity-action {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+
+      @media (max-width: 767px) {
+        justify-content: flex-end;
+      }
+    }
+
+    .identity-warning {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      background: rgba(245, 158, 11, 0.08);
+      color: #b45309;
+      font-size: 12.5px;
+      line-height: 1.5;
+    }
+
+    .identity-empty {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 22px;
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+  }
+
+  .oauth-reauth-body {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .oauth-reauth-desc {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--text-secondary);
+  }
+
+  .oauth-reauth-hint {
+    margin: 0;
+    font-size: 12.5px;
+    line-height: 1.6;
+    color: var(--text-muted);
   }
 
   .title {

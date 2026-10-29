@@ -44,7 +44,7 @@ const rateLimit = {
 		}
 
 		if (entry.count > limit) {
-			throw new BizError(t('tooManyRequests'), 429);
+			throw new BizError(t('tooManyRequests'), 429, 'rate_limited');
 		}
 	},
 

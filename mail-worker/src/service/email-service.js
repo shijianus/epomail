@@ -1,5 +1,5 @@
 import { mailOrm as orm, userOrm } from '../entity/orm';
-import { getUserDb } from '../utils/db-accessor';
+import { getUserDb, getMailDb } from '../utils/db-accessor';
 import email from '../entity/email';
 import { auditLog } from '../entity/audit-log';
 import auditService from './audit-service';
@@ -743,6 +743,33 @@ const emailService = {
 			dbParams = await emailCryptoUtils.encryptEmailRecord(dbParams, cryptoKey);
 		}
 		return orm(c).insert(email).values(dbParams).returning().get();
+	},
+
+	/**
+	 * Inbound delivery can be retried by the sending MTA (and the same message
+	 * can be delivered twice). A recent row with the same Message-ID for the
+	 * same account is treated as a duplicate. Empty/missing Message-IDs never
+	 * participate, and the window is deliberately short so a re-used ID cannot
+	 * suppress later legitimate mail indefinitely.
+	 */
+	async findRecentDuplicate(c, messageId, accountId = 0, windowMinutes = 10) {
+		const id = typeof messageId === 'string' ? messageId.trim() : '';
+		if (!id) return null;
+
+		const minutes = Math.max(1, Math.min(Number(windowMinutes) || 10, 60));
+		try {
+			return await getMailDb(c).prepare(`
+				SELECT email_id AS emailId, user_id AS userId, account_id AS accountId, status
+				FROM email
+				WHERE message_id = ? AND account_id = ?
+				  AND create_time >= datetime('now', ?)
+				ORDER BY email_id DESC
+				LIMIT 1
+			`).bind(id, Number(accountId) || 0, `-${minutes} minutes`).first();
+		} catch (_) {
+			// A missing/legacy column must not block inbound delivery.
+			return null;
+		}
 	},
 
 	//邮件发送
@@ -2423,8 +2450,9 @@ const emailService = {
 	},
 
 	async completeReceiveAll(c) {
-		await c.env.db.prepare(`UPDATE email as e SET status = ${emailConst.status.RECEIVE} WHERE status = ${emailConst.status.SAVING} AND EXISTS (SELECT 1 FROM account WHERE account_id = e.account_id)`).run();
-		await c.env.db.prepare(`UPDATE email as e SET status = ${emailConst.status.NOONE} WHERE status = ${emailConst.status.SAVING} AND NOT EXISTS (SELECT 1 FROM account WHERE account_id = e.account_id)`).run();
+		const mailDb = getMailDb(c);
+		await mailDb.prepare(`UPDATE email as e SET status = ${emailConst.status.RECEIVE} WHERE status = ${emailConst.status.SAVING} AND EXISTS (SELECT 1 FROM account WHERE account_id = e.account_id)`).run();
+		await mailDb.prepare(`UPDATE email as e SET status = ${emailConst.status.NOONE} WHERE status = ${emailConst.status.SAVING} AND NOT EXISTS (SELECT 1 FROM account WHERE account_id = e.account_id)`).run();
 	},
 
 	async batchDelete(c, params) {

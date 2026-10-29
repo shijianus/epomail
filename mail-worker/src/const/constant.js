@@ -3,6 +3,10 @@ const constant = {
 	JWT_UID: 'user_id:',
 	JWT_TOKEN: 'token:',
 	TOKEN_EXPIRE: 60 * 60 * 24 * 30,
+	// How long after a provider sign-in an OAuth-created account may set its
+	// first password. The window keeps the provider authentication "fresh":
+	// an old session cannot be replayed to attach a password to the account.
+	INITIAL_PASSWORD_WINDOW_MS: 15 * 60 * 1000,
 	ATTACHMENT_PREFIX: 'attachments/',
 	BACKGROUND_PREFIX: 'static/background/',
 	ADMIN_ROLE: {

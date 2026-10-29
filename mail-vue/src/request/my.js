@@ -8,6 +8,16 @@ export function resetPassword(currentPassword, password) {
     return http.put('/my/resetPassword', {currentPassword, password})
 }
 
+// First password for an account created by the OAuth bind flow. The server
+// only accepts it inside a short window after a provider sign-in.
+export function getInitialPasswordStatus() {
+    return http.get('/my/initialPasswordStatus')
+}
+
+export function setInitialPassword(password) {
+    return http.put('/my/setInitialPassword', { password })
+}
+
 export function userDelete() {
     return http.delete('/my/delete')
 }
@@ -138,4 +148,31 @@ export function revokeMyOauthGrant(id) {
 
 export function revokeMyOauthGrantByClient(clientId) {
     return http.post('/my/revokeOauthGrant', { clientId });
+}
+
+// ---------------------------------------------------------------------------
+// Third-party sign-in identities bound to the signed-in account.
+// The server derives the account from the session; no userId is ever sent.
+// ---------------------------------------------------------------------------
+
+export function getOauthIdentities() {
+    return http.get('/my/oauthIdentities');
+}
+
+// Issues a single-use step-up grant bound to the current session. Required
+// before binding or unbinding an identity.
+export function reauthOauthIdentity(data) {
+    return http.post('/my/oauthIdentities/reauth', data);
+}
+
+export function startOauthIdentityBind(data) {
+    return http.post('/my/oauthIdentities/bind/start', data);
+}
+
+export function completeOauthIdentityBind(token) {
+    return http.post('/my/oauthIdentities/bind/complete', { token });
+}
+
+export function unbindOauthIdentity(id, stepUpToken) {
+    return http.delete(`/my/oauthIdentities/${id}`, { data: { stepUpToken } });
 }

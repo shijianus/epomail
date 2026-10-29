@@ -5,7 +5,8 @@ import attService from '../service/att-service';
 import userContext from '../security/user-context';
 import { normalizeObjectKey } from '../utils/object-key-utils';
 import { isAdminUser } from '../utils/admin-utils';
-import { buildSignedObjectUrl, verifyObjectAccess } from '../utils/object-token';
+import { buildSignedObjectUrl } from '../utils/object-token';
+import { readObjectForRequest } from '../service/object-serve-service';
 
 function isPublicStaticKey(key, userId) {
 	if (!key.startsWith('static/')) return false;
@@ -14,24 +15,10 @@ function isPublicStaticKey(key, userId) {
 }
 
 app.get('/oss/*', async (c) => {
-	const key = normalizeObjectKey(c.req.path.split('/oss/')[1]);
-	if (!key) {
-		return c.text('Object Not Found', 404);
-	}
-
-	// static/ assets (avatars, backgrounds) are intentionally public. Every
-	// attachment read requires a short-lived capability signature in addition
-	// to the object-key namespace check.
-	let ownerUserId = null;
-	if (key.startsWith('attachments/')) {
-		const access = await verifyObjectAccess(c, key, new URL(c.req.url));
-		if (!access) {
-			return c.text('Object Not Found', 404);
-		}
-		ownerUserId = access.userId || null;
-	}
-
-	const response = await r2Service.toObjResponse(c, key, ownerUserId);
+	const key = c.req.path.split('/oss/')[1];
+	// Shared reader: key allowlist, then a capability signature bound to the
+	// key/expiry/owner for `attachments/*`. `static/*` stays public by policy.
+	const response = await readObjectForRequest(c, key, new URL(c.req.url));
 	if (!response) {
 		return c.text('Object Not Found', 404);
 	}

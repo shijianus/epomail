@@ -1,6 +1,7 @@
 import app from '../hono/hono';
 import result from "../model/result";
 import oauthService from "../service/oauth-service";
+import oauthIdentityService from "../service/oauth-identity-service";
 import userContext from "../security/user-context";
 import { isAdminUser } from "../utils/admin-utils";
 import BizError from "../error/biz-error";
@@ -39,6 +40,40 @@ async function readCallbackParams(c) {
 	};
 }
 
+/**
+ * Callback for a bind intent started from the signed-in settings page.
+ *
+ * The provider response is verified here, but nothing is associated yet: a
+ * single-use claim bound to the initiating session is handed to the browser in
+ * the URL fragment (never sent to a server or written to logs). The settings
+ * page redeems it over an authenticated request, which is what proves the
+ * callback belongs to the account that started the flow.
+ */
+async function handleBindCallback(c, provider, params, stateRow) {
+	const origin = new URL(c.req.url).origin;
+
+	const finish = (outcome, claimToken = '') => {
+		const query = new URLSearchParams({ oauth_bind: outcome });
+		if (stateRow.clientState) query.set('oauth_client_state', stateRow.clientState);
+		const fragment = claimToken ? `#oauth_link=${encodeURIComponent(claimToken)}` : '';
+		return c.redirect(`${origin}/settings/security?${query.toString()}${fragment}`);
+	};
+
+	try {
+		const bindResult = await oauthIdentityService.handleBindCallback(c, provider, params, stateRow);
+		if (bindResult.outcome === 'claim') {
+			return finish('linked', bindResult.claimToken);
+		}
+		if (bindResult.outcome === 'already') {
+			return finish('already');
+		}
+		return finish('conflict');
+	} catch (err) {
+		console.warn(`OAuth bind callback failed for ${provider}: ${err?.message || 'unknown error'}`);
+		return finish('error');
+	}
+}
+
 async function handleOAuthCallback(c) {
 	const provider = c.req.param('provider');
 	try {
@@ -59,6 +94,12 @@ async function handleOAuthCallback(c) {
 		} catch (_) {
 			console.warn(`OAuth state rejected for provider ${provider}`);
 			return redirectToLogin(c, { error: 'oauth_state_invalid' });
+		}
+
+		// A bind intent is an authenticated, account-scoped flow. It must never
+		// fall through to the login path, which would issue a session.
+		if (stateRow.intent && stateRow.intent.mode === 'bind') {
+			return await handleBindCallback(c, provider, params, stateRow);
 		}
 
 		const loginInfo = await oauthService.exchangeCodeAndLogin(c, provider, {

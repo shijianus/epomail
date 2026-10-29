@@ -29,6 +29,8 @@ import { isAdminEmail, isAdminUser } from '../utils/admin-utils';
 import verifyUtils from '../utils/verify-utils';
 import rbacGuard from './rbac-guard-service.js';
 import { sanitizeCustomLabels } from '../utils/svg-utils.js';
+import rateLimit from '../utils/rate-limit.js';
+import userContext from '../security/user-context.js';
 
 const userService = {
 
@@ -522,6 +524,143 @@ const userService = {
 		} catch (e) {
 			console.error('Failed to send password changed notice:', e);
 		}
+	},
+
+	/**
+	 * Decide whether the current session may set the account's first password.
+	 *
+	 * Every condition is mandatory and independently sufficient to deny:
+	 *   1. the stored password is still the one generated during OAuth bind
+	 *      (KvConst.INITIAL_PASSWORD holds that exact hash),
+	 *   2. the account is actually linked to a provider identity,
+	 *   3. the session was issued by a provider login (tokenMeta.method),
+	 *   4. that provider login is at most INITIAL_PASSWORD_WINDOW_MS old.
+	 *
+	 * The returned status flags let the settings UI explain *why* the action is
+	 * unavailable without exposing the generated hash. Address ownership and
+	 * oauthUserId are never accepted as proof on their own; both are
+	 * attacker-supplied in the flows that matter.
+	 */
+	async evaluateInitialPassword(c, userId) {
+		const status = {
+			canSet: false,
+			provider: null,
+			providerLinked: false,
+			hasInitialPassword: false,
+			expiresAt: null
+		};
+		try {
+			const userRow = await this.selectById(c, userId);
+			if (!userRow || !userRow.password) return status;
+
+			const generatedHash = await c.env.kv.get(KvConst.INITIAL_PASSWORD + userId);
+			status.hasInitialPassword = Boolean(generatedHash && generatedHash === userRow.password);
+
+			const linked = await orm(c).select().from(oauth).where(eq(oauth.userId, userId)).get();
+			status.providerLinked = Boolean(linked);
+			if (linked && typeof linked.oauthUserId === 'string') {
+				const prefix = linked.oauthUserId.split(':')[0];
+				if (/^[a-z0-9_-]{1,32}$/i.test(prefix)) status.provider = prefix.toLowerCase();
+			}
+
+			if (!status.providerLinked || !status.hasInitialPassword) return status;
+
+			const token = await userContext.getToken(c);
+			if (!token) return status;
+
+			const authInfo = await c.env.kv.get(KvConst.AUTH_INFO + userId, { type: 'json' });
+			const meta = authInfo && authInfo.tokenMeta ? authInfo.tokenMeta[token] : null;
+			if (!meta || meta.method !== 'oauth' || !Number.isFinite(meta.at)) return status;
+
+			if (typeof meta.provider === 'string' && meta.provider) {
+				status.provider = meta.provider;
+			}
+			status.expiresAt = meta.at + constant.INITIAL_PASSWORD_WINDOW_MS;
+			if (Date.now() - meta.at > constant.INITIAL_PASSWORD_WINDOW_MS) return status;
+
+			return {
+				...status,
+				canSet: true,
+				// Never serialised to a client: used only for the compare-and-set
+				// that makes two concurrent set requests resolve to one winner.
+				generatedHash
+			};
+		} catch (err) {
+			console.error('Failed to evaluate initial password eligibility:', err);
+			return status;
+		}
+	},
+
+	/**
+	 * Set the first user-chosen password for an account created by the OAuth
+	 * bind flow. This is the only password path that does not require the
+	 * current credential, and it exists because such accounts were seeded with
+	 * a random password the user never saw.
+	 */
+	async setInitialPassword(c, params, userId) {
+		await rateLimit.check(c, { scope: 'initial-password', limit: 5, windowSeconds: 900 });
+
+		const password = params ? params.password : undefined;
+		if (typeof password !== 'string' || password.length < 6) {
+			throw new BizError(t('pwdMinLength'), 400, 'password_too_short');
+		}
+		if (password.length > 30) {
+			throw new BizError(t('pwdLengthLimit'), 400, 'password_too_long');
+		}
+
+		const eligibility = await this.evaluateInitialPassword(c, userId);
+		if (!eligibility.canSet) {
+			throw new BizError(t('initialPwdAuthRequired'), 403, 'initial_pwd_auth_required');
+		}
+
+		const { salt, hash } = await cryptoUtils.hashPassword(password, c.env);
+
+		// Compare-and-set on the generated hash: if another request already set
+		// a password, this update matches no rows and the re-read differs.
+		await orm(c).update(user)
+			.set({ password: hash, salt })
+			.where(and(eq(user.userId, userId), eq(user.password, eligibility.generatedHash || '')))
+			.run();
+
+		const updated = await this.selectById(c, userId);
+		if (!updated || updated.password !== hash) {
+			throw new BizError(t('initialPwdNotApplicable'), 409, 'initial_pwd_not_applicable');
+		}
+
+		// The generated-hash marker can no longer match; remove it to keep KV
+		// clean. Any failure here is harmless by construction.
+		try {
+			await c.env.kv.delete(KvConst.INITIAL_PASSWORD + userId);
+		} catch (err) {
+			console.error('Failed to clear initial password marker:', err);
+		}
+
+		// Invalidate every session, including this one, exactly like a normal
+		// password change: the user signs in again with the credential they
+		// just chose.
+		await c.env.kv.delete(KvConst.AUTH_INFO + userId);
+
+		try {
+			let profile = {};
+			const profileStr = await c.env.kv.get('USER_PROFILE_' + userId);
+			if (profileStr) {
+				profile = JSON.parse(profileStr);
+			}
+			profile.passwordUpdatedAt = new Date().toISOString();
+			await c.env.kv.put('USER_PROFILE_' + userId, JSON.stringify(profile));
+		} catch (e) {
+			console.error('Failed to update password timestamp', e);
+		}
+
+		try {
+			const securityNoticeService = (await import('./security-notice-service.js')).default;
+			const { SECURITY_EVENT_TYPES } = await import('../const/security-notice-templates.js');
+			await securityNoticeService.sendNotice(c, userId, SECURITY_EVENT_TYPES.PASSWORD_CHANGED);
+		} catch (e) {
+			console.error('Failed to send password changed notice:', e);
+		}
+
+		return { success: true };
 	},
 
 	selectByEmail(c, email) {
@@ -1135,6 +1274,11 @@ const userService = {
 	async add(c, params, callerUserId) {
 
 		const { email, type, password } = params;
+
+		// Creating an account is a role grant: the new user receives `type`.
+		// Without this guard any holder of `user:add` (e.g. a moderator) could
+		// mint an account with a more privileged role and use it to escalate.
+		await rbacGuard.assertCanAssignRole(c, callerUserId, Number(type));
 
 		if (!c.env.domain.includes(emailUtils.getDomain(email))) {
 			throw new BizError(t('notEmailDomain'));

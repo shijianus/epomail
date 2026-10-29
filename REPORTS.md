@@ -9,6 +9,33 @@
 
 ---
 
+### B8 发布候选版本审计：版本、全量验证与最终安全审计 (2026-10-29)
+*   **关联提交 (Git Commit)**: **无新提交**（按 B8 指令：不 commit / 不 push / 不 tag / 不部署）；审计基线为既有 HEAD `31c962fd61afcb59f2357be6275d694cd8b975c6` (Short: `31c962f`)，工作树未提交。
+*   **专项文档索引 (Detailed Doc)**: `doc/b8-release-candidate-2026-10-29.md`（审计报告）、`doc/b8-release-runbook-2026-10-29.md`（变更/Secret/迁移/Staging/部署/回滚/备份）
+*   **体检/审计范围与方法 (Scope & Methodology)**:
+    1. 范围与环境：`master` 分支与远端拓扑、74 项工作树改动、`mail-worker` 全部安全关键服务（OAuth/身份/附件/权限/会话/迁移）、`temp_login_ui` 登录绑定 UI、`mail-vue` 渲染与 i18n；本地 Node 24.14.0 + pnpm 10.34.5 + workerd。**未部署、未访问生产/staging、未调用真实 provider、未修改任何业务代码。**
+    2. 工具与脚本：`vitest`（13 文件 180 项）、`tsc --noEmit`、两端 `vite build`、Playwright（13 场景）、i18n 四件套、`secret-scan`（工作树 + 历史）、`pnpm audit --prod`、`wrangler deploy --dry-run`、`git diff --check`、`oauth-staging-preflight`、`oauth-staging-acceptance --plan`。
+*   **核心发现与缺陷矩阵 (Key Findings & Matrix)**:
+    - **[P0·安全] 空 client state 登录 CSRF 仍 OPEN**：服务端未强制 client state，前端以 `'' === ''` 通过；证据 `AuthForm.tsx:670-681`、`oauth-service.js:211-225`、`oauth-api.js:152-158`、`security-review-adversarial.spec.js:247-269`。**发布阻断。**
+    - **[P1·一致性] 本地 master 分叉（ahead 7 / behind 3）**：缺失远端 `31915a7`，导致 `setType` 缺 `assertCanManageUser`、`resend-service.js:131-135` 吞掉投影异常后仍标记台账 `processed`（投递状态可永久丢失）。
+    - **[P1·运维] OAuth 禁用开关未在服务端强制**：关闭后已签发 state 与直接 API 调用仍可完成登录，应急回滚非硬停止。
+    - **[P1·凭据] 参观者账号固定口令**：`init.js:816-830` 播种 `admin@epomail.cyou`，本次实测 PBKDF2 哈希对应 `123456`；权限受限但可公开登录并读取该地址收件箱。
+    - **[P2·门禁] 登录子应用单测 14/15**：`oauth-bind.test.mjs:106` 的 `deepStrictEqual` 未包含 `errorCode: undefined`，CI `quality-gates` 红灯。
+    - **[P2·依赖] `pnpm audit --prod`**：worker 1 low；mail-vue 3 high（vue-i18n 链，未用 `escapeParameter`）；login 6 high（react-router，未 import）。均评估为当前不可达，但需升级/移除。
+    - **[P2·限流] KV 计数非原子且 fail-open**，authorize/token/userinfo 无限流；**[P2·存储]** OAuth client secret 明文存于 settings D1/KV；**[P2·隔离]** `userId===1` 硬编码管理员；**[P2·供应链]** `build-prod.mjs` 未冻结 lockfile；**[P2·追溯]** `CHECKLIST.log` 存在占位符哈希。
+*   **治理修复与回归结果 (Fixes & Verification)**:
+    - Worker 全量 **180/180** 通过；typecheck、两端构建、Playwright **13/13**、i18n 对称/引用/登录词典、密钥扫描（1229 文件 / 3967 blobs）、dry-run（gzip 1131.98 KiB）、`git diff --check` 均通过。
+    - 未通过：登录子应用单测 1 项；依赖审计 high 告警；staging 预检 4 项 FAIL；真实 provider 验收 NOT RUN。
+    - **最终判定：NO-GO**。达到 GO 的最小条件见审计报告 §8.2（P0 修复、单测转绿、远端整合、禁用开关强制、默认凭据处置、staging 建立、依赖处置、形成不可变 RC、回滚与备份演练、补齐 B7 报告）。
+*   **未执行/需人工处置 (Manual Follow-up)**:
+    - [ ] 修复 P0 并补正反用例；修复 `classifyBindResponse` 契约。
+    - [ ] 获授权后整合 `origin/master`（含 `31915a7`），提交 RC 并打 Tag。
+    - [ ] provision staging（替换 4 项占位符），执行协议检查 + 真实 provider 矩阵。
+    - [ ] 生产核验参观者账号与 `user_id=1`；轮换/停用默认凭据。
+    - [ ] 依赖升级/移除；回滚与备份恢复演练；补齐 B7 报告。
+
+---
+
 ### B6 专项验收：真实 OAuth 提供商集成与 Staging 门禁 (2026-10-29)
 *   **关联提交 (Git Commit)**: `f67445f96b0d0afcedd74c7cf27e319f07627943` (Short: `f67445f`)；补充发现与探针：`926a625b84f2be269f0310ec5bd522de56b88717` (Short: `926a625`)
 *   **专项文档索引 (Detailed Doc)**: `doc/oauth-staging-acceptance-b6-2026-10-29.md`
@@ -38,6 +65,53 @@
 
 ---
 
+### B5 专项审计：已登录用户的 OAuth 身份管理 (2026-10-29)
+*   **关联提交 (Git Commit)**: **未提交**（按本次任务指令：不 commit、不 push、不部署；无 Commit Hash）
+*   **专项文档索引 (Detailed Doc)**: `doc/oauth-identity-management-b5-2026-10-29.md`
+*   **体检/审计范围与方法 (Scope & Methodology)**:
+    1. 范围与环境：`mail-vue` 账号安全设置页与请求层、`mail-worker` OAuth 登录/绑定服务、认证中间件与会话/MFA、`oauth` 表与唯一约束、`oauth_one_time_credential`、`oauth_bind_claim`；本地 workerd + 隔离 D1/KV、本地构建产物 + `wrangler dev`、Playwright 真实浏览器（1440/820/390）。未部署、未访问生产数据。
+    2. 工具与脚本：`vitest` + `@cloudflare/vitest-pool-workers`（13 文件 180 项，含新增 32 项身份管理用例）、`vite build`、i18n 三件套、`scripts/secret-scan.mjs`、`git diff --check`、SQLite/D1 只读核对、Playwright 截图与几何测量。
+*   **核心发现与缺陷矩阵 (Key Findings & Matrix)**:
+    - **[P0·功能缺失] 无已登录身份管理能力**：`oauthBindUser` 仅有前端定义、零调用；后端 `/oauth/bindUser` 处于免鉴权 `/oauth` 前缀，只适用于未登录建号，不能把身份绑定到当前会话账号。
+    - **[P0·安全] 缺少“会话 ↔ OAuth 回调”绑定机制**：回调是顶层导航、不带 Authorization 头；若按 state 中的 userId 直接绑定，可被 login-CSRF 注入他人身份。已改为回调只签发绑定到会话 hash 的单次 claim，由已登录请求兑换。
+    - **[P1·并发] 一身份多账号**：复用唯一索引 + `oauth_bind_claim` 租约 + 条件 UPDATE；并发完成时恰好一个成功。
+    - **[P1·可用性] 最后登录方式**：OAuth 建号持有随机密码，不能以“存在密码哈希”判断可解绑；改为以本次 step-up 是否证明密码为准（fail-closed）。
+    - **[P2·审计] 无绑定/解绑审计**：新增 `oauth_identity_audit`（v3_21DB）与六语言安全通知；审计不含任何一次性凭据。
+    - **[P2·一致性] provider 身份解析分散**：抽出 `fetchProviderUserInfo`，登录与绑定共用；LinuxDo 登录复用统一收尾逻辑（新增 verified email 自动关联，与其它 provider 对齐）。
+*   **治理修复与回归结果 (Fixes & Verification)**:
+    - 新增 `oauth-identity-management.spec.js` 32/32；全量 `npx vitest run` 13 文件 **180/180**，退出码 0；`test:unit` 24/24；`test:integration` 全绿。
+    - `mail-vue` 生产构建退出码 0（48.04s）；i18n 对称 3056/1946 keys、引用 0 缺失、硬编码门禁 0；secret scan 1225 文件 0 命中；`git diff --check` 0。
+    - Playwright 三视口实测：无横向溢出、无 console/page error，绑定/解绑按钮与再认证弹窗正常；临时账号、身份、会话与 `setting:` KV 已物理清理并还原。
+*   **未执行/需人工处置 (Manual Follow-up)**:
+    - [ ] 真实 GitHub/Google/Microsoft/Apple/自定义 SSO 绑定与解绑联调（当前 provider HTTP 为测试 stub）。
+    - [ ] 仅有 passkey 的账号尚未参与 step-up 再挑战（当前为密码 + 已通过 MFA 的会话）。
+    - [ ] 历史 OAuth 建号补写 `initial_pwd` 标记；重复 `oauth_user_id` 数据清理后重建唯一索引。
+
+---
+
+### 全仓安全复审、对象读取路径与权限边界专项审计 (2026-10-27)
+*   **关联提交 (Git Commit)**: 见同批次修复提交（`CHECKLIST.log` 中“全仓安全复审：对象读取路由、OAuth 登录结果与建号鉴权修复”条目）
+*   **专项文档索引 (Detailed Doc)**: `doc/security-audit-2026-10-27.md`
+*   **体检/审计范围与方法 (Scope & Methodology)**:
+    1. 范围与环境：基线 `9654ea1`（本地 `master`，含 `d23b70d` 历史补丁）；`mail-worker` 的对象存储读路径（KV/R2/S3/B2/BYO）、OAuth 全链路（Apple/Google/Microsoft/GitHub/LinuxDo/自定义）、用户与角色写操作、`mail-vue`/`temp_login_ui` HTML sink、`wrangler` 配置与测试脚本副作用；本地 workerd + D1/KV 隔离测试，未部署、未访问生产数据。
+    2. 工具与脚本：`vitest` + `@cloudflare/vitest-pool-workers`（9 文件 84 项）、`vite build`、`wrangler deploy --dry-run`、i18n 三件套、`scripts/secret-scan.mjs`、`git diff`/`git log` 历史核对、以及“回退单点修复验证用例有效性”的反向验证。
+*   **核心发现与缺陷矩阵 (Key Findings & Matrix)**:
+    - **[P0·功能回归] 签名附件 URL 在浏览器侧整体不可达**：`buildSignedObjectUrl` 产出 `/oss/<key>?...`，但 Worker 无 `/oss/` 根路由，请求落入 `run_worker_first` 的 SPA 兜底并返回 `index.html`。默认部署下内嵌图与附件下载全部失效，且上一轮引入的能力签名在实际浏览器路径上从未被执行。已抽出 `service/object-serve-service.js` 统一 `/oss/*`、`/api/oss/*`、`/attachments/*` 三入口的校验与读取。
+    - **[P0·越权] `/user/add` 缺角色分配鉴权**：路由未传 caller id，`userService.add` 直接按请求体 `type` 建号，无 `assertCanAssignRole`。持有 `user:add` 的协管角色可创建 `master` 级账号完成纵向提权。已在建号前补守卫并回归。
+    - **[P1·功能回归] OAuth 成功登录被当作 MFA**：`loginService.login` 恒返回对象，`splitLoginResult` 把所有对象判为 MFA 挑战，导致成功登录的 mailbox token 被丢弃、回调改发 bind proof。已按 `mfaRequired`/`isRestricted`/`token` 显式分类。
+    - **[P1·一致性] LinuxDo 未绑定身份不签发 bind proof**：与其余 provider 的绑定模型不一致，该路径无法完成绑定。已补一次性证据。
+    - **[P2·一致性] 根 `/static/*` 读写后端不一致**：写走自适应 `r2Service.putObj`，读硬编码 KV；配置 S3/B2/R2 后新头像/背景 404。已统一读取路径（真实 S3/B2/R2 后端未联调）。
+    - **[P2·健壮性] 根 `/static/*` 非法 Key 抛异常**：处理器返回 `null` 触发 workerd 未捕获异常。已改为 404，测试升级为状态码断言。
+    - **[已排除] 附件级联删除跨租户**：`email_id` 为全局 `PRIMARY KEY AUTOINCREMENT`，跨租户同 ID 不可达，判定不成立，未做无谓改动。
+    - **[残留] OAuth 一次性令牌非原子**、**OAuth 绑定 UI 缺口**、**大邮件内存峰值/容量单位语义/附件失败补偿**：未修复或未验证，详见专项文档。
+*   **治理修复与回归结果 (Fixes & Verification)**:
+    - `npx vitest run` 退出 0：**9 文件 84/84**（基线 9 文件 76/76，其中 3 项为 `it.fails` 缺陷标记，本轮全部转为正常断言并新增 8 项）。
+    - 反向验证：仅回退 `splitLoginResult` 后分类用例确实失败（1 failed / 11 passed），恢复后 12/12——证明用例能捕获该回归。
+    - `test:unit` 24/24、`test:integration` 49/49；`mail-vue` 构建 0（36.80s）；worker bundle dry-run 0（gzip 1104.85 KiB）；i18n 三件套 0；secret scan 1223 文件 0 命中。
+*   **未执行/需人工处置 (Manual Follow-up)**:
+    - [ ] `jwt_secret`/`totp_enc_key`/`email_enc_key`/Mailjet 凭据轮换与存量密文迁移评估。
+    - [ ] 真实 Apple/Google/GitHub 联调；OAuth 绑定 UI 交付。
+    - [ ] 真实 S3/B2/R2 后端读写验证；生产凭据与版本核对；Git 历史清污（需授权）。
 
 ---
 

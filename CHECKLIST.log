@@ -11,6 +11,61 @@
 
 ---
 
+### OAuth 身份管理、对象存储安全收口与 B8 发布候选交付 (2026-10-29)
+*   **关联提交 (Git Commit)**: `COMMIT_HASH_PLACEHOLDER` (Short: `SHORT_HASH_PLACEHOLDER`)
+*   **部署环境 (Deployment)**: 本地 workerd + D1/KV 隔离测试、双前端生产构建、Worker bundle dry-run；**未部署任何远程环境**
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] OAuth 单次凭证与状态机：D1 CAS 消费 `state` / login code / bind proof / step-up / 授权码，仅存 SHA-256；`state` 强制非空 client state 并与 provider、redirect URI、OIDC nonce 绑定。
+    - [x] 已登录身份管理（B5）：身份列表、step-up 再认证、绑定 / 解绑、最后登录方式保护、会话撤销、审计与六语言安全通知；回调只签发绑定到会话的一次性 claim，由已登录请求兑换。
+    - [x] 登录结果与绑定：`splitLoginResult` 显式区分成功 / MFA / 受限账号；未绑定身份 proof 仅经 URL fragment 传递；LinuxDo 绑定模型与其余 provider 对齐。
+    - [x] 数据库迁移 `v3_19`–`v3_22`：单次凭证、绑定租约与条件唯一索引、身份审计、对象删除队列及查询索引；全部幂等、纯增量。
+    - [x] 对象存储：新增 `object-serve-service` 统一 `/oss/*`、`/api/oss/*`、`/attachments/*`、`/static/*` 读取；附件能力签名、归属过滤、响应安全头；只读孤儿扫描与限量清理。
+    - [x] 登录子应用：OAuth 绑定表单、client state 空值 fail-closed、服务端错误码分类；新增登录词典门禁与 Playwright 13 场景。
+    - [x] P0 修复：服务端拒绝空 client state 的 authorize 请求（`oauth_state_required`），前端空 expected state 同步 fail-closed，消除 `'' === ''` 登录 CSRF。
+    - [x] 整合远端 `31915a7`：`/user/add` 角色分配守卫、`/user/setType` 目标角色可管理校验、webhook 投影失败不再吞异常。
+    - [x] 整合远端 `security-delivery.spec.js`：按一次性凭证与 `alreadyBound` 幂等契约重写 OAuth 绑定断言，覆盖身份不匹配不消耗 proof、已绑定重试不再签发会话。
+    - [x] 门禁修复：`classifyBindResponse` 未携带 errorCode 时不再输出 `errorCode: undefined`，登录单测 15/15。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] Worker 全量：`npx vitest run` → **14 文件 191/191 passed**，退出码 0（真实 workerd + D1/KV）
+    - [x] 登录子应用：单测 **15/15 passed**；`tsc --noEmit` 退出码 0
+    - [x] 生产构建：`temp_login_ui` 18.99s、`mail-vue` 58.00s，均退出码 0
+    - [x] Worker 打包：`wrangler deploy --dry-run --config wrangler-vitest.toml` 退出码 0（gzip 1131.99 KiB）
+    - [x] i18n：对称 3056 / 1946 keys；引用 2163 keys 零缺失；登录词典 142 keys、188 处引用全命中；硬编码审计 421 条既有告警、0 失败
+    - [x] 密钥扫描：`node scripts/secret-scan.mjs` → 1229 文件 0 命中
+    - [x] 差异规范：`git diff --check` 通过
+    - [x] 零假数据残留：新增用例均在 `afterAll`/`afterEach` 物理清理 KV 与 D1 行
+    - [ ] 未执行：staging 真实 provider 矩阵、生产部署、依赖 high 告警升级、备份/回滚演练（B8 仍为生产 NO-GO）
+*   **专项报告**: `doc/oauth-identity-management-b5-2026-10-29.md`、`doc/b8-release-candidate-2026-10-29.md`、`doc/b8-release-runbook-2026-10-29.md`、`doc/security-audit-2026-10-27.md`
+
+---
+
+### 全仓安全复审：对象读取路由、OAuth 登录结果与建号鉴权修复 (2026-10-27)
+*   **关联提交 (Git Commit)**: `COMMIT_HASH_PLACEHOLDER` (Short: `SHORT_HASH_PLACEHOLDER`)
+*   **部署环境 (Deployment)**: 本地 workerd + D1/KV 隔离测试、`mail-vue` 生产构建、Worker bundle dry-run；**未部署任何远程环境，未推送远端**
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 对象读取路径统一：新增 `service/object-serve-service.js#readObjectForRequest`，作为 `/oss/*`、`/api/oss/*`、`/attachments/*` 的唯一实现（Key 白名单 → 附件能力签名 → 统一安全响应头），消除三处规则漂移。
+    - [x] 修复签名附件 URL 在浏览器侧不可达：Worker 补 `/oss/*` 根路由；`buildSignedObjectUrl` 产出的 origin-relative URL 与 `mail-vue`/Telegram 分享页的消费方式对齐。
+    - [x] 修复根 `/static/*` 读写后端不一致：改走同一存储解析器，配置 S3/B2/R2 后头像与背景仍可读（真实后端未联调）。
+    - [x] 修复根 `/static/*` 非法 Key 抛异常：返回 404 而非 `null`。
+    - [x] 修复 `/user/add` 纵向提权：建号前调用 `rbacGuard.assertCanAssignRole(c, callerUserId, type)`，路由传入当前用户 id。
+    - [x] 修复 OAuth 成功登录被当成 MFA：`splitLoginResult` 按 `mfaRequired`/`isRestricted`/`token` 显式分类，邮箱令牌不再被丢弃。
+    - [x] 补齐 LinuxDo 未绑定身份的一次性 `bindToken`，与其余 provider 的绑定模型一致。
+    - [x] 测试：`security-review-round2.spec.js` 的 3 项 `it.fails` 全部转为正常断言并按修复后行为重写；`index.spec.js` 新增 3 项根路由用例；`oauth-security.spec.js` 新增 4 项登录结果分类用例；`security-review-adversarial.spec.js` 的 `/static` 用例升级为 404 断言。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 全量 Worker 测试：`npx vitest run` → **9 文件 84/84 passed**，退出码 0（真实 workerd + D1/KV；基线为 76/76，含 3 项 `it.fails`）
+    - [x] 单元测试：`npm run test:unit` → **24/24 passed**，退出码 0
+    - [x] 集成测试：`npm run test:integration` → **49/49 passed**，退出码 0
+    - [x] 反向验证：仅回退 `splitLoginResult` → 分类用例失败 1/12；恢复后 12/12，确认用例可捕获该回归
+    - [x] 前端构建：`npm --prefix mail-vue run build` → 退出码 0（36.80s）
+    - [x] Worker 打包：`npx wrangler deploy --dry-run --config wrangler-vitest.toml` → 退出码 0（gzip 1104.85 KiB）
+    - [x] i18n 三件套：对称 1930 keys / 引用 2136 keys 0 缺失 / 硬编码 0 失败
+    - [x] 密钥扫描：`node scripts/secret-scan.mjs` → 1223 文件 0 命中
+    - [x] 零假数据残留：所有新增用例在 `afterAll`/`afterEach` 物理删除 KV 键与 D1 行
+    - [ ] 未执行：真实 OAuth 提供商联调、真实 S3/B2/R2 后端读写、生产/staging 部署、生产凭据轮换
+*   **专项报告**: `doc/security-audit-2026-10-27.md`（索引见 `REPORTS.md`）
+
+---
+
 ### 附件能力签名、OAuth 回调/绑定与 P1 注入/并发修复 (2026-10-26)
 *   **关联提交 (Git Commit)**: `8cd3bc83d0f643107925da392647a33904747f3a` (Short: `8cd3bc8`)
 *   **部署环境 (Deployment)**: 本地 workerd + D1/KV 隔离测试、双前端生产构建、Worker bundle dry-run；**未部署任何远程环境，未推送远端**

@@ -2,6 +2,10 @@
   "scripts": {
     "security:scan": "node scripts/secret-scan.mjs",
     "security:scan:history": "node scripts/secret-scan.mjs --history --baseline .secret-scan-baseline.json",
+    "typecheck:login": "pnpm --dir temp_login_ui run typecheck",
+    "test:login": "pnpm --dir temp_login_ui test",
+    "test:login:e2e": "node tests/oauth-bind-login-ui-e2e.mjs",
+    "i18n:auth": "node scripts/i18n-auth-locale.mjs",
     "test": "npm --prefix mail-worker test",
     "test:unit": "npm --prefix mail-worker run test:unit",
     "test:integration": "npm --prefix mail-worker run test:integration",

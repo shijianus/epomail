@@ -23,6 +23,7 @@ import attService from '../src/service/att-service.js';
 import loginService from '../src/service/login-service.js';
 import userService from '../src/service/user-service.js';
 import jwtUtils from '../src/utils/jwt-utils.js';
+import { ensureOtcTable, seedOtc, clearOtc, ensureBindClaimTable, clearBindClaim } from './helpers/one-time-credential.js';
 
 const MAX_TTL = 7 * 24 * 3600;
 
@@ -62,11 +63,15 @@ CREATE TABLE IF NOT EXISTS oauth (
 beforeAll(async () => {
 	await env.db.prepare(CREATE_ATTACHMENTS).run();
 	await env.db.prepare(CREATE_OAUTH).run();
+	await ensureOtcTable(env.db);
+	await ensureBindClaimTable(env.db);
 });
 
 afterAll(async () => {
 	await env.db.prepare('DELETE FROM attachments').run();
 	await env.db.prepare('DELETE FROM oauth').run();
+	await clearOtc(env.db);
+	await clearBindClaim(env.db);
 	for (const key of [
 		'auth-uid:2', 'auth-uid:3',
 		'attachments/adv-owned-by-2.txt',
@@ -151,23 +156,15 @@ describe('Object route adversarial entry points', () => {
 
 	it('never leaks session state through encoded traversal on the root /static route', async () => {
 		await seedAuth(2, 'user2@example.com', 'adv-session-2');
-		// Note: the worker's fetch handler returns null for un-normalizable
-		// static keys, which workerd surfaces as an exception instead of a
-		// 404 (pre-existing robustness defect, no data exposure). The security
-		// assertion is only that the session bundle is never returned.
-		let leaked = false;
-		let threwException = false;
-		try {
-			const response = await SELF.fetch('http://example.com/static/..%2Fauth-uid%3A2');
-			const text = await response.text();
-			if (text.includes('adv-session-2') || text.includes('tokens')) leaked = true;
-		} catch (_) {
-			threwException = true;
-		}
-		expect(leaked).toBe(false);
-		if (threwException) {
-			console.warn('Documented: root /static with an un-normalizable key makes the worker return null (workerd exception, pre-existing).');
-		}
+		// A malformed key must produce an ordinary 404 rather than propagating a
+		// null Response out of the worker: workerd raises an uncaught exception
+		// for a null handler return, which is a robustness defect even though no
+		// data is exposed.
+		const response = await SELF.fetch('http://example.com/static/..%2Fauth-uid%3A2');
+		const text = await response.text();
+		expect(response.status).toBe(404);
+		expect(text).not.toContain('adv-session-2');
+		expect(text).not.toContain('tokens');
 	});
 
 	it('rejects encoded traversal on /api/oss', async () => {
@@ -245,10 +242,10 @@ describe('OAuth server-side boundary probes', () => {
 		vi.restoreAllMocks();
 	});
 
-	it('accepts authorize initiation without a browser client state (login CSRF residual enabler)', async () => {
+	it('rejects authorize initiation without a browser client state', async () => {
 		const kv = createMockKv();
 		const c = {
-			env: { kv, jwt_secret: 'test-jwt-secret-for-unit-tests' },
+			env: { kv, db: env.db, jwt_secret: 'test-jwt-secret-for-unit-tests' },
 			req: { url: 'https://mail.example.com/api/oauth/authorize/apple', header: () => null }
 		};
 		vi.spyOn(settingService, 'query').mockResolvedValue({
@@ -258,15 +255,12 @@ describe('OAuth server-side boundary probes', () => {
 		});
 
 		// No `state` query parameter, as a crafted attacker-initiated flow would.
-		const authorizeUrl = new URL(await oauthService.getAuthorizeUrl(c, 'apple', '', ''));
-		const state = authorizeUrl.searchParams.get('state');
-		expect(state).toBeTruthy();
-
-		const row = await oauthService.consumeState(c, 'apple', state);
-		// The server stores an empty clientState, so the callback redirect omits
-		// oauth_client_state entirely and the login page's `'' !== ''` guard
-		// passes. This documents the residual, not a regression.
-		expect(row.clientState).toBe('');
+		// Issuing a state here would let the callback omit `oauth_client_state`
+		// and satisfy the login page's empty-vs-empty comparison.
+		await expect(oauthService.getAuthorizeUrl(c, 'apple', '', '')).rejects.toMatchObject({
+			code: 400,
+			errorCode: 'oauth_state_required'
+		});
 	});
 
 	it('rejects a bind proof whose provider does not match, but allows an omitted provider', async () => {
@@ -285,17 +279,24 @@ describe('OAuth server-side boundary probes', () => {
 			},
 			req: { url: 'https://mail.example.com/api/oauth/bindUser', header: () => null }
 		};
-		vi.spyOn(loginService, 'register').mockResolvedValue();
+		vi.spyOn(loginService, 'validateRegistration').mockResolvedValue({});
+		vi.spyOn(loginService, 'register').mockResolvedValue({ userId: 5, reservedRegKey: false });
 		vi.spyOn(loginService, 'login').mockResolvedValue('bound-session-jwt');
 		vi.spyOn(userService, 'selectByIdIncludeDel').mockResolvedValue(null);
 		vi.spyOn(userService, 'selectByEmail').mockResolvedValue({ userId: 5, email: 'adv-bound@example.com' });
 
 		const bindToken = 'adv-bind-proof-token';
-		await kv.put(`oauth_bind:${bindToken}`, JSON.stringify({
-			oauthUserId: 'apple:adv-bind',
+		await seedOtc(env.db, {
+			purpose: 'oauth_bind',
+			token: bindToken,
 			provider: 'apple',
-			createdAt: Date.now()
-		}));
+			oauthUserId: 'apple:adv-bind',
+			payload: {
+				oauthUserId: 'apple:adv-bind',
+				provider: 'apple',
+				createdAt: Date.now()
+			}
+		});
 
 		// Wrong provider in the request body is rejected.
 		await expect(oauthService.bindUser(c, {

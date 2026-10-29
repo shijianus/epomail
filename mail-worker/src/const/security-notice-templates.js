@@ -24,6 +24,8 @@ export const SECURITY_EVENT_TYPES = {
   TOTP_ENABLED: 'TOTP_ENABLED',
   PASSKEY_ADDED: 'PASSKEY_ADDED',
   BACKUP_CODES_REGENERATED: 'BACKUP_CODES_REGENERATED',
+  OAUTH_IDENTITY_BOUND: 'OAUTH_IDENTITY_BOUND',
+  OAUTH_IDENTITY_UNBOUND: 'OAUTH_IDENTITY_UNBOUND',
 
   // Level 4: Security Downgrade & Destruction (Critical / Emergency)
   ACCOUNT_LOCKED: 'ACCOUNT_LOCKED',
@@ -93,6 +95,8 @@ export const EVENT_LEVEL_MAP = {
   [SECURITY_EVENT_TYPES.TOTP_ENABLED]: 'L3',
   [SECURITY_EVENT_TYPES.PASSKEY_ADDED]: 'L3',
   [SECURITY_EVENT_TYPES.BACKUP_CODES_REGENERATED]: 'L3',
+  [SECURITY_EVENT_TYPES.OAUTH_IDENTITY_BOUND]: 'L3',
+  [SECURITY_EVENT_TYPES.OAUTH_IDENTITY_UNBOUND]: 'L3',
 
   [SECURITY_EVENT_TYPES.ACCOUNT_LOCKED]: 'L4',
   [SECURITY_EVENT_TYPES.TOTP_DISABLED]: 'L4',
@@ -519,6 +523,96 @@ export const EVENT_I18N = {
       headline: 'Externe app geautoriseerd',
       summary: 'U heeft zojuist een externe applicatie toegang verleend tot uw account via OAuth 2.0.',
       detailDesc: 'Nieuwe OAuth-autorisatie'
+    }
+  },
+
+  [SECURITY_EVENT_TYPES.OAUTH_IDENTITY_BOUND]: {
+    zh: {
+      badge: '安全提醒',
+      subject: '[重要通知] 已绑定新的第三方登录身份',
+      headline: '第三方登录身份绑定成功',
+      summary: '您的 Epocanvas Mail 账户刚刚绑定了一个新的第三方登录身份。此后可使用该身份登录您的邮箱账户。',
+      detailDesc: '新增第三方登录身份'
+    },
+    'zh-Hant': {
+      badge: '安全提醒',
+      subject: '[重要通知] 已綁定新的第三方登入身分',
+      headline: '第三方登入身分綁定成功',
+      summary: '您的 Epocanvas Mail 帳戶剛剛綁定了一個新的第三方登入身分。此後可使用該身分登入您的信箱帳戶。',
+      detailDesc: '新增第三方登入身分'
+    },
+    en: {
+      badge: 'Security Alert',
+      subject: '[Important] New third-party sign-in identity linked',
+      headline: 'Third-Party Sign-In Identity Linked',
+      summary: 'A new third-party sign-in identity was just linked to your Epocanvas Mail account. It can now be used to sign in to your mailbox.',
+      detailDesc: 'New third-party identity linked'
+    },
+    es: {
+      badge: 'Alerta de seguridad',
+      subject: '[Importante] Nueva identidad de inicio de sesión vinculada',
+      headline: 'Identidad externa vinculada',
+      summary: 'Se acaba de vincular una nueva identidad de inicio de sesión de terceros a tu cuenta de Epocanvas Mail. Ya puede usarse para iniciar sesión.',
+      detailDesc: 'Nueva identidad externa vinculada'
+    },
+    fr: {
+      badge: 'Alerte de sécurité',
+      subject: '[Important] Nouvelle identité de connexion liée',
+      headline: 'Identité tierce liée',
+      summary: 'Une nouvelle identité de connexion tierce vient d’être liée à votre compte Epocanvas Mail. Elle peut désormais servir à vous connecter.',
+      detailDesc: 'Nouvelle identité tierce liée'
+    },
+    nl: {
+      badge: 'Beveiligingswaarschuwing',
+      subject: '[Belangrijk] Nieuwe externe inlogidentiteit gekoppeld',
+      headline: 'Externe inlogidentiteit gekoppeld',
+      summary: 'Er is zojuist een nieuwe externe inlogidentiteit aan uw Epocanvas Mail-account gekoppeld. Deze kan nu worden gebruikt om in te loggen.',
+      detailDesc: 'Nieuwe externe identiteit gekoppeld'
+    }
+  },
+
+  [SECURITY_EVENT_TYPES.OAUTH_IDENTITY_UNBOUND]: {
+    zh: {
+      badge: '安全提醒',
+      subject: '[重要通知] 已解绑第三方登录身份',
+      headline: '第三方登录身份已解绑',
+      summary: '您的 Epocanvas Mail 账户刚刚解绑了一个第三方登录身份，该身份已无法再登录您的邮箱账户。如非本人操作，请立即修改密码并检查登录方式。',
+      detailDesc: '移除第三方登录身份'
+    },
+    'zh-Hant': {
+      badge: '安全提醒',
+      subject: '[重要通知] 已解除綁定第三方登入身分',
+      headline: '第三方登入身分已解除綁定',
+      summary: '您的 Epocanvas Mail 帳戶剛剛解除綁定了一個第三方登入身分，該身分已無法再登入您的信箱帳戶。如非本人操作，請立即變更密碼並檢查登入方式。',
+      detailDesc: '移除第三方登入身分'
+    },
+    en: {
+      badge: 'Security Alert',
+      subject: '[Important] Third-party sign-in identity unlinked',
+      headline: 'Third-Party Sign-In Identity Unlinked',
+      summary: 'A third-party sign-in identity was just unlinked from your Epocanvas Mail account and can no longer sign in to your mailbox. If this was not you, change your password and review your sign-in methods immediately.',
+      detailDesc: 'Third-party identity removed'
+    },
+    es: {
+      badge: 'Alerta de seguridad',
+      subject: '[Importante] Identidad de inicio de sesión desvinculada',
+      headline: 'Identidad externa desvinculada',
+      summary: 'Se acaba de desvincular una identidad de inicio de sesión de terceros de tu cuenta de Epocanvas Mail y ya no puede iniciar sesión. Si no fuiste tú, cambia tu contraseña y revisa tus métodos de acceso.',
+      detailDesc: 'Identidad externa eliminada'
+    },
+    fr: {
+      badge: 'Alerte de sécurité',
+      subject: '[Important] Identité de connexion dissociée',
+      headline: 'Identité tierce dissociée',
+      summary: 'Une identité de connexion tierce vient d’être dissociée de votre compte Epocanvas Mail et ne peut plus servir à vous connecter. Si vous n’êtes pas à l’origine de cette action, changez votre mot de passe et vérifiez vos méthodes de connexion.',
+      detailDesc: 'Identité tierce supprimée'
+    },
+    nl: {
+      badge: 'Beveiligingswaarschuwing',
+      subject: '[Belangrijk] Externe inlogidentiteit ontkoppeld',
+      headline: 'Externe inlogidentiteit ontkoppeld',
+      summary: 'Er is zojuist een externe inlogidentiteit van uw Epocanvas Mail-account ontkoppeld. Deze kan niet meer inloggen. Was u dit niet, wijzig dan uw wachtwoord en controleer uw inlogmethoden.',
+      detailDesc: 'Externe identiteit verwijderd'
     }
   },
 

@@ -81,6 +81,12 @@ app.post('/setting/storage/cleanup', async (c) => {
 	return c.json(result.ok(cleanResult));
 });
 
+app.post('/setting/storage/orphans/cleanup', async (c) => {
+	const body = await c.req.json().catch(() => ({}));
+	const cleanResult = await storageScanService.cleanupOrphans(c, body);
+	return c.json(result.ok(cleanResult));
+});
+
 app.post('/setting/ai/test', async (c) => {
 	const body = await c.req.json().catch(() => ({}));
 	const testResult = await aiService.testConnection(c, body);

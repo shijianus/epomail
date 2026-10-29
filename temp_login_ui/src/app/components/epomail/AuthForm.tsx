@@ -17,11 +17,24 @@ import {
   HelpCircle,
   ChevronRight,
   ShieldAlert,
-  ExternalLink
+  ExternalLink,
+  Link2,
+  ChevronDown
 } from "lucide-react";
 import type { CanvasHandle } from "./CanvasBackground";
 import { cameraState } from "./cameraStore";
 import { createT, resolveAuthLang } from "../../i18n/authLocale";
+import {
+  buildOAuthBindPayload,
+  classifyBindPolicyError,
+  classifyBindResponse,
+  hasOAuthBindReturn,
+  normalizeDomains,
+  parseOAuthBindReturn,
+  validateBindEmail,
+  type BindErrorField,
+  type OAuthBindContext
+} from "../../oauth-bind";
 
 // 登录成功后把语言偏好同步给主应用（仅当主应用尚无语言设置时写入，避免覆盖用户既有选择）
 function syncLangToMainApp() {
@@ -46,7 +59,7 @@ interface AuthFormProps {
   sysConfig?: any;
 }
 
-type Stage = "password" | "totp";
+type Stage = "password" | "totp" | "bind";
 type Status = "idle" | "warping" | "success";
 export type TwoFAMethod = "totp" | "backup_code" | "passkey";
 
@@ -161,6 +174,13 @@ function FloatingField({
   onKeyFeedback,
   trailing,
   hasError,
+  disabled,
+  inputRef,
+  describedBy,
+  invalid,
+  inputMode,
+  autoComplete,
+  trailingWidth,
 }: {
   id: string;
   type: string;
@@ -171,9 +191,17 @@ function FloatingField({
   onKeyFeedback?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
   trailing?: React.ReactNode;
   hasError?: boolean;
+  disabled?: boolean;
+  inputRef?: React.Ref<HTMLInputElement>;
+  describedBy?: string;
+  invalid?: boolean;
+  inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"];
+  autoComplete?: string;
+  trailingWidth?: string;
 }) {
   const [focused, setFocused] = useState(false);
   const active = focused || value.length > 0;
+  const isInvalid = invalid ?? Boolean(hasError);
 
   return (
     <div className="relative">
@@ -200,15 +228,20 @@ function FloatingField({
 
       <input
         id={id}
+        ref={inputRef}
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
         onKeyDown={onKeyFeedback}
-        autoComplete={type === "password" ? "current-password" : type === "email" ? "email" : "off"}
-        className="w-full bg-transparent pl-8 pr-8 pt-5 pb-2 text-[15px] outline-none transition-colors duration-300"
-        style={{ color: hasError ? "#fef08a" : "var(--epo-ink)" }}
+        disabled={disabled}
+        inputMode={inputMode}
+        aria-invalid={isInvalid || undefined}
+        aria-describedby={describedBy}
+        autoComplete={autoComplete ?? (type === "password" ? "current-password" : type === "email" ? "email" : "off")}
+        className="w-full bg-transparent pl-8 pr-8 pt-5 pb-2 text-[15px] outline-none transition-colors duration-300 disabled:opacity-60"
+        style={{ color: hasError ? "#fef08a" : "var(--epo-ink)", paddingRight: trailingWidth }}
       />
 
       {trailing && (
@@ -520,8 +553,11 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
   const [stayInOrbit, setStayInOrbit] = useState(false);
   const [rememberDevice, setRememberDevice] = useState(false);
   const [showForgotModal, setShowForgotModal] = useState(false);
+  const [bindContext, setBindContext] = useState<OAuthBindContext | null>(null);
+  const [bindCode, setBindCode] = useState("");
 
   const otpInputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const bindFlowRef = useRef(false);
 
   const lang = useMemo(() => resolveAuthLang(), []);
   const getAppealUrl = (targetEmail?: string) => {
@@ -555,6 +591,43 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
   const tr = (key: string, dictKey?: string) => i18n[key] || t(dictKey || key);
 
   const oauthProviderList = useMemo(() => getOAuthProviderList(sysConfig), [sysConfig]);
+  const isRegisterClosed = Number(sysConfig?.register) === 1;
+  const isRegKeyRequired = sysConfig?.regKey === 0;
+  const showBindCode = isRegKeyRequired || sysConfig?.regKey === 2 || sysConfig?.regKey === undefined;
+
+  // The bind form reuses the registration page's domain list. Sites that hide
+  // the domain list (`loginDomain`) intentionally fall back to full-address
+  // entry, exactly like the registration form does.
+  const bindDomains = useMemo(() => normalizeDomains(sysConfig?.domainList), [sysConfig]);
+  const bindMinPrefix = Math.max(1, Number(sysConfig?.minEmailPrefix) || 1);
+  const [bindDomain, setBindDomain] = useState("");
+  const [bindFieldError, setBindFieldError] = useState<{
+    field: Exclude<BindErrorField, 'form'>;
+    message: string;
+  } | null>(null);
+  const bindEmailRef = useRef<HTMLInputElement | null>(null);
+  const bindCodeRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (bindDomains.length > 0 && !bindDomains.includes(bindDomain)) {
+      setBindDomain(bindDomains[0]);
+    }
+  }, [bindDomains, bindDomain]);
+
+  // A human-readable provider name for the bind header. Unknown values fall
+  // back to the validated provider slug rather than being hidden, so the user
+  // can always tell which identity is being linked.
+  const bindProviderLabel = useMemo(() => {
+    if (!bindContext) return '';
+    const labels: Record<string, string> = {
+      google: 'Google',
+      github: 'GitHub',
+      microsoft: 'Microsoft',
+      apple: 'Apple',
+      linuxdo: 'LinuxDo'
+    };
+    return labels[String(bindContext.provider).toLowerCase()] || bindContext.provider;
+  }, [bindContext]);
 
   // 处理 OAuth 重定向回跳：只接受短时、单次使用的交换码，绝不从 URL 读取长期 JWT
   useEffect(() => {
@@ -563,12 +636,6 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
     const oauthCode = params.get('oauth_code');
     const oauthErr = params.get('error');
     const returnedClientState = params.get('oauth_client_state') || '';
-
-    let expectedClientState = '';
-    try {
-      expectedClientState = sessionStorage.getItem('epo_oauth_state') || '';
-      sessionStorage.removeItem('epo_oauth_state');
-    } catch (_) {}
 
     const storeSession = (oauthToken: string, uInfo: any) => {
       const activeEmail = uInfo.email || uInfo.name || 'oauth_user';
@@ -605,7 +672,14 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
       // The code is only exchanged in the browser that started this OAuth
       // flow; otherwise a crafted callback could log the victim into the
       // attacker's mailbox (login CSRF).
-      if (returnedClientState !== expectedClientState) {
+      let expectedClientState = '';
+      try {
+        expectedClientState = sessionStorage.getItem('epo_oauth_state') || '';
+        sessionStorage.removeItem('epo_oauth_state');
+      } catch (_) {}
+      // An empty expected state means this browser never started a flow, so a
+      // callback without `oauth_client_state` must not satisfy `'' === ''`.
+      if (!expectedClientState || returnedClientState !== expectedClientState) {
         setErrorMsg(tr('opFailed'));
         return;
       }
@@ -662,6 +736,7 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
         });
     } else if (oauthErr) {
       window.history.replaceState({}, '', window.location.pathname);
+      try { sessionStorage.removeItem('epo_oauth_state'); } catch (_) {}
       // Never render raw provider/query text: only a localized generic error.
       setErrorMsg(tr('opFailed'));
     }
@@ -825,6 +900,7 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
   // 挂载时检测登录凭证失效提示及自动回填上次登录邮箱
   useEffect(() => {
     if (typeof window !== "undefined") {
+      if (bindFlowRef.current) return;
       const searchParams = new URLSearchParams(window.location.search);
       const isExpired = searchParams.get("reason") === "expired" || searchParams.get("expired") === "true";
       const storedMsg = sessionStorage.getItem("auth_expired_msg");
@@ -846,6 +922,49 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
       }
     }
   }, [lang]);
+
+  // OAuth 未绑定身份回跳：proof 只存在于 fragment。先校验本次浏览器发起的
+  // client state（防止被构造的绑定链接把攻击者身份绑到受害者新账号），
+  // 无论成功与否都立即从地址栏擦除，避免凭证留在历史记录或日志中。
+  useEffect(() => {
+    if (typeof window === 'undefined' || bindFlowRef.current) return;
+    if (!hasOAuthBindReturn(window.location.hash)) return;
+    bindFlowRef.current = true;
+
+    let expectedClientState = '';
+    try {
+      expectedClientState = sessionStorage.getItem('epo_oauth_state') || '';
+      sessionStorage.removeItem('epo_oauth_state');
+    } catch (_) {}
+
+    const parsed = parseOAuthBindReturn({
+      search: window.location.search,
+      hash: window.location.hash,
+      expectedClientState
+    });
+    window.history.replaceState({}, '', window.location.pathname);
+
+    if (!parsed.ok) {
+      setErrorMsg(parsed.reason === 'state_mismatch' ? tr('oauthBindStateMismatch') : tr('oauthBindExpired'));
+      cameraState.authErrorOpacity = 1;
+      return;
+    }
+
+    setEmail('');
+    setBindCode('');
+    setBindFieldError(null);
+    setBindContext(parsed.context);
+    setStage('bind');
+    setErrorMsg('');
+  }, [tr]);
+
+  // Move focus into the bind form so keyboard and screen-reader users land on
+  // the first field instead of the (now removed) provider buttons.
+  useEffect(() => {
+    if (stage !== 'bind') return;
+    const timer = setTimeout(() => bindEmailRef.current?.focus(), 150);
+    return () => clearTimeout(timer);
+  }, [stage]);
 
   useEffect(() => {
     if (errorMsg) {
@@ -1020,7 +1139,7 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
     });
   };
 
-  const saveLoginSessionAndRedirect = (data: any, isTotp: boolean = false) => {
+  const saveLoginSessionAndRedirect = (data: any, isTotp: boolean = false, successMessage?: string) => {
     // 受限账号安全跳转：已被封禁账号仅发放受限通知与申诉凭证，引导前往受限通知页面
     if (data.data?.isRestricted && data.data?.restrictedToken) {
       try {
@@ -1105,7 +1224,7 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
     setStatus("success");
     cameraState.authSuccessOpacity = 1;
 
-    let finalMsg = isTotp ? t('totpSuccess') : (i18n.loginSuccess || data.message || data.msg);
+    let finalMsg = successMessage || (isTotp ? t('totpSuccess') : (i18n.loginSuccess || data.message || data.msg));
     if (!finalMsg || finalMsg.toLowerCase() === 'success') {
       finalMsg = t('loginSuccess');
     }
@@ -1126,6 +1245,231 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
 
   const handleLoginSuccess = (data: any) => {
     saveLoginSessionAndRedirect(data, true);
+  };
+
+  const bindEmailErrorMessage = (reason: string) => {
+    switch (reason) {
+      case 'empty':
+        return t('enterEmail');
+      case 'invalid_local':
+        return tr('bindUsernameInvalid');
+      case 'prefix_too_short':
+        return t('emailTooShort');
+      case 'prefix_too_long':
+        return tr('bindEmailTooLong');
+      case 'domain_not_allowed':
+        return t('notEmailDomain');
+      case 'missing_domain':
+        return t('enterFullEmail');
+      default:
+        return t('invalidEmailFormat');
+    }
+  };
+
+  // Server policy rejections are mapped to the field that caused them, so the
+  // user is taken straight to the value that needs correcting. The proof stays
+  // valid for every rejection routed here.
+  const applyBindFailure = (rawMsg: string, fallbackKey: string) => {
+    const classified = classifyBindPolicyError(rawMsg);
+    const message = classified ? tr(classified.key) : tr(fallbackKey);
+    cameraState.authErrorOpacity = 1;
+
+    if (classified && classified.field !== 'form') {
+      setBindFieldError({ field: classified.field, message });
+      if (classified.field === 'email') {
+        bindEmailRef.current?.focus();
+      } else {
+        bindCodeRef.current?.focus();
+      }
+      return;
+    }
+
+    setErrorMsg(message);
+    cameraState.shakeIntensity = 20;
+    canvasRef.current?.burst({ strength: 3, color: '#eab308' });
+  };
+
+  const handleBindRestart = () => {
+    setBindContext(null);
+    setBindCode('');
+    setBindFieldError(null);
+    setStatus('idle');
+    setErrorMsg('');
+    setStage('password');
+  };
+
+  const handleBindEmailChange = (value: string) => {
+    setEmail(value);
+    if (bindFieldError?.field === 'email') setBindFieldError(null);
+  };
+
+  const handleBindCodeChange = (value: string) => {
+    setBindCode(value);
+    if (bindFieldError?.field === 'code') setBindFieldError(null);
+  };
+
+  const handleBindSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (status !== 'idle' || !bindContext) return;
+
+    if (isRegisterClosed) {
+      setErrorMsg(t('regClosedNotice'));
+      cameraState.authErrorOpacity = 1;
+      return;
+    }
+
+    const validation = validateBindEmail({
+      raw: email,
+      domains: bindDomains,
+      selectedDomain: bindDomain,
+      minPrefix: bindMinPrefix
+    });
+    if (!validation.ok) {
+      setBindFieldError({ field: 'email', message: bindEmailErrorMessage(validation.reason) });
+      bindEmailRef.current?.focus();
+      cameraState.authErrorOpacity = 1;
+      return;
+    }
+    const cleanEmail = validation.email;
+
+    if (isRegKeyRequired && !bindCode.trim()) {
+      setBindFieldError({ field: 'code', message: t('enterRegCode') });
+      bindCodeRef.current?.focus();
+      cameraState.authErrorOpacity = 1;
+      cameraState.shakeIntensity = 15;
+      return;
+    }
+
+    setBindFieldError(null);
+    setStatus('warping');
+    setErrorMsg('');
+    canvasRef.current?.warp();
+
+    let data: any = null;
+    try {
+      const res = await fetch('/api/oauth/bindUser', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(buildOAuthBindPayload(bindContext, { email: cleanEmail, code: bindCode }))
+      });
+      data = await res.json().catch(() => null);
+    } catch (_) {
+      data = null;
+    }
+
+    const outcome = classifyBindResponse(data);
+
+    if (outcome.kind === 'restart') {
+      setStatus('idle');
+      // The proof is spent or invalid. Drop it; only a new OAuth flow can
+      // produce a usable one.
+      setBindContext(null);
+      setBindCode('');
+      setBindFieldError(null);
+      setStage('password');
+      const classified = classifyBindPolicyError(data?.message);
+      setErrorMsg(
+        outcome.reason === 'invalid_proof'
+          ? tr('oauthBindExpired')
+          : (classified ? tr(classified.key) : tr('oauthBindExpired'))
+      );
+      cameraState.authErrorOpacity = 1;
+      cameraState.shakeIntensity = 20;
+      canvasRef.current?.burst({ strength: 3, color: '#eab308' });
+      return;
+    }
+
+    if (outcome.kind === 'retry') {
+      setStatus('idle');
+      // Keep bindContext: the server rejected the request before spending the
+      // proof, so the user can correct the invite code and resubmit. 425 means
+      // an earlier submit is still running; the same proof remains valid.
+      if (outcome.reason === 'in_progress') {
+        setErrorMsg(tr('oauthBindInProgress'));
+        cameraState.authErrorOpacity = 1;
+        cameraState.shakeIntensity = 20;
+        canvasRef.current?.burst({ strength: 3, color: '#eab308' });
+      } else if (outcome.reason === 'policy') {
+        // Map the protocol key to its field; fall back to "check and retry"
+        // without ever telling the user to restart a proof that is still valid.
+        applyBindFailure(data?.message, 'oauthBindRetry');
+      } else {
+        setErrorMsg(tr('oauthBindRetry'));
+        cameraState.authErrorOpacity = 1;
+        cameraState.shakeIntensity = 20;
+        canvasRef.current?.burst({ strength: 3, color: '#eab308' });
+      }
+      return;
+    }
+
+    if (outcome.kind === 'already_bound') {
+      setStatus('idle');
+      // The association is durable. A spent proof never mints a session; the
+      // user signs in again and the provider now logs them in directly.
+      setBindContext(null);
+      setBindCode('');
+      setBindFieldError(null);
+      setEmail(cleanEmail);
+      setStage('password');
+      setSuccessMsg(tr('oauthBindCompletedSignIn'));
+      return;
+    }
+
+    const payload = outcome.payload;
+    const mfa = payload.mfa;
+    if (mfa?.isRestricted && mfa.restrictedToken) {
+      try { sessionStorage.setItem('epomail_restricted_token', mfa.restrictedToken); } catch (_) {}
+      setStatus('success');
+      setSuccessMsg(mfa.message || tr('oauthBindSuccess'));
+      setTimeout(() => {
+        window.location.href = '/notice/restricted';
+      }, 500);
+      return;
+    }
+    if (mfa?.mfaRequired) {
+      setBindContext(null);
+      setBindCode('');
+      setBindFieldError(null);
+      setEmail(cleanEmail);
+      beginMfaChallenge(mfa, cleanEmail);
+      return;
+    }
+    if (!payload.token) {
+      setStatus('idle');
+      setBindContext(null);
+      setBindCode('');
+      setBindFieldError(null);
+      setStage('password');
+      setSuccessMsg(tr('oauthBindCompletedSignIn'));
+      return;
+    }
+
+    try {
+      const userRes = await fetch('/api/user/info', {
+        headers: { token: payload.token }
+      }).then(r => r.json()).catch(() => null);
+      const uInfo = userRes && userRes.code === 200 ? (userRes.data || {}) : {};
+
+      setBindContext(null);
+      setBindCode('');
+      setBindFieldError(null);
+      setEmail(cleanEmail);
+      saveLoginSessionAndRedirect({
+        data: {
+          token: payload.token,
+          email: cleanEmail,
+          name: uInfo.name,
+          nickname: uInfo.nickname
+        }
+      }, false, tr('oauthBindSuccess'));
+    } catch (_) {
+      // The bind already committed (the token was issued), so the only safe
+      // action is a retry of the navigation, not of the bind request.
+      setStatus('idle');
+      setErrorMsg(tr('oauthBindRetry'));
+      cameraState.authErrorOpacity = 1;
+      cameraState.shakeIntensity = 20;
+    }
   };
 
   const getFactorName = (f: string) => {
@@ -1477,6 +1821,8 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
             {successMsg && (
               <motion.div
                 key="success"
+                role="status"
+                aria-live="polite"
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
@@ -1781,6 +2127,214 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
                   </a>
                 </p>
               </div>
+            </motion.form>
+          ) : stage === "bind" ? (
+            /* =========================================================================
+               STAGE 1B: OAUTH IDENTITY BINDING (unbound third-party identity)
+               ========================================================================= */
+            <motion.form
+              key="oauth-bind-form"
+              initial={reduceMotion ? false : { opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -12, filter: "blur(4px)" }}
+              transition={reduceMotion ? { duration: 0 } : { duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+              onSubmit={handleBindSubmit}
+              aria-busy={status === "warping"}
+              noValidate
+              className="flex flex-col justify-center gap-4 sm:gap-4.5 w-full"
+            >
+              <div className="flex flex-col gap-2.5">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500/25 to-cyan-500/25 border border-indigo-400/35 text-cyan-300">
+                    <Link2 size={18} aria-hidden="true" />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <h2 className="text-[17px] font-semibold tracking-wide text-[var(--epo-ink)]">
+                      {tr('oauthBindTitle')}
+                    </h2>
+                    <p className="text-[12px] leading-relaxed" style={{ color: "var(--epo-muted)" }}>
+                      {tr('oauthBindSubtitle')}
+                    </p>
+                  </div>
+                </div>
+                {bindProviderLabel && (
+                  <span className="inline-flex w-fit items-center gap-1.5 rounded-full border border-[rgba(103,232,249,0.28)] bg-[rgba(103,232,249,0.08)] px-2.5 py-0.5 text-[10.5px] font-medium tracking-wide text-[var(--epo-cyan-glow)]">
+                    <ShieldCheck size={12} aria-hidden="true" />
+                    {tr('bindProviderVerified')} · {bindProviderLabel}
+                  </span>
+                )}
+              </div>
+
+              {isRegisterClosed && (
+                <div
+                  id="epo-bind-closed"
+                  role="alert"
+                  className="flex items-start gap-2 rounded-xl border border-yellow-500/35 bg-yellow-950/25 px-3 py-2.5 text-[12px] leading-relaxed text-yellow-200/85"
+                >
+                  <AlertCircle size={14} className="mt-[1px] shrink-0" aria-hidden="true" />
+                  <span>{t('regClosedNotice')}</span>
+                </div>
+              )}
+
+              <div className="flex flex-col gap-1.5">
+                <FloatingField
+                  id="epo-bind-email"
+                  type={bindDomains.length > 0 ? "text" : "email"}
+                  label={bindDomains.length > 0 ? tr('bindUsernameLabel') : tr('emailLabel')}
+                  icon={<Mail size={16} strokeWidth={1.8} />}
+                  value={email}
+                  onChange={handleBindEmailChange}
+                  hasError={bindFieldError?.field === 'email'}
+                  invalid={bindFieldError?.field === 'email'}
+                  describedBy={
+                    bindFieldError?.field === 'email'
+                      ? 'epo-bind-email-error'
+                      : bindDomains.length > 0
+                      ? 'epo-bind-email-hint'
+                      : undefined
+                  }
+                  disabled={status !== 'idle' || isRegisterClosed}
+                  inputRef={bindEmailRef}
+                  inputMode={bindDomains.length > 0 ? 'text' : 'email'}
+                  autoComplete="email"
+                  trailingWidth={
+                    bindDomains.length > 1 ? '8.5rem' : bindDomains.length === 1 ? '7.5rem' : undefined
+                  }
+                  trailing={
+                    bindDomains.length > 1 ? (
+                      <div className="relative flex items-center mr-1">
+                        <select
+                          value={bindDomain}
+                          disabled={status !== 'idle' || isRegisterClosed}
+                          onChange={(e) => setBindDomain(e.target.value)}
+                          aria-label={tr('bindDomainLabel')}
+                          className="appearance-none bg-[#141836]/90 text-[12px] font-mono text-indigo-200 border border-indigo-500/30 rounded-lg pl-2.5 pr-6 py-1 outline-none cursor-pointer hover:border-indigo-400 focus:border-cyan-400 focus-visible:ring-2 focus-visible:ring-[#67e8f9] transition-colors shadow-inner disabled:opacity-60 disabled:cursor-not-allowed"
+                        >
+                          {bindDomains.map((dom) => (
+                            <option key={dom} value={dom} className="bg-[#0b0e24] text-white">
+                              @{dom}
+                            </option>
+                          ))}
+                        </select>
+                        <ChevronDown size={13} className="pointer-events-none absolute right-1.5 text-indigo-400" aria-hidden="true" />
+                      </div>
+                    ) : bindDomains.length === 1 ? (
+                      <div className="flex items-center px-2.5 py-1 mr-1 rounded-lg bg-white/5 border border-white/10 text-xs font-mono text-indigo-300 select-none">
+                        <span>@{bindDomains[0]}</span>
+                      </div>
+                    ) : undefined
+                  }
+                />
+                {bindFieldError?.field === 'email' ? (
+                  <p
+                    id="epo-bind-email-error"
+                    role="alert"
+                    className="flex items-start gap-1.5 text-[11.5px] leading-snug text-yellow-300/90"
+                  >
+                    <AlertCircle size={13} className="mt-[1px] shrink-0" aria-hidden="true" />
+                    <span>{bindFieldError.message}</span>
+                  </p>
+                ) : bindDomains.length > 0 ? (
+                  <p id="epo-bind-email-hint" className="text-[11.5px] leading-snug" style={{ color: 'var(--epo-muted)' }}>
+                    {tr('bindUsernameHint')}
+                  </p>
+                ) : null}
+              </div>
+
+              {showBindCode && (
+                <div className="flex flex-col gap-1.5">
+                  <FloatingField
+                    id="epo-bind-code"
+                    type="text"
+                    label={isRegKeyRequired ? tr('codeLabel') : tr('codeLabelOptional')}
+                    icon={<KeyRound size={16} strokeWidth={1.8} />}
+                    value={bindCode}
+                    onChange={handleBindCodeChange}
+                    hasError={bindFieldError?.field === 'code'}
+                    invalid={bindFieldError?.field === 'code'}
+                    describedBy={bindFieldError?.field === 'code' ? 'epo-bind-code-error' : undefined}
+                    disabled={status !== 'idle' || isRegisterClosed}
+                    inputRef={bindCodeRef}
+                    autoComplete="off"
+                  />
+                  {bindFieldError?.field === 'code' && (
+                    <p
+                      id="epo-bind-code-error"
+                      role="alert"
+                      className="flex items-start gap-1.5 text-[11.5px] leading-snug text-yellow-300/90"
+                    >
+                      <AlertCircle size={13} className="mt-[1px] shrink-0" aria-hidden="true" />
+                      <span>{bindFieldError.message}</span>
+                    </p>
+                  )}
+                </div>
+              )}
+
+              <p className="text-[11.5px] leading-relaxed" style={{ color: "var(--epo-muted)" }}>
+                {tr('oauthBindPasswordNote')}
+              </p>
+
+              <p role="status" aria-live="polite" className="sr-only">
+                {status === 'warping' ? tr('bindSubmitting') : ''}
+              </p>
+
+              <motion.button
+                type="submit"
+                whileHover={isRegisterClosed ? undefined : submitHover}
+                whileTap={{ scale: isRegisterClosed ? 1 : 0.96 }}
+                disabled={status !== "idle" || isRegisterClosed}
+                aria-busy={status === "warping"}
+                aria-describedby={isRegisterClosed ? 'epo-bind-closed' : undefined}
+                className="epomail-display relative mt-1 flex h-12 w-full items-center justify-center gap-2 overflow-hidden rounded-xl text-[15px] tracking-wide text-white cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#67e8f9] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b0e22] disabled:cursor-not-allowed disabled:opacity-60"
+                style={{
+                  background: "var(--epo-brand-gradient)",
+                  boxShadow:
+                    "0 8px 30px rgba(79,70,229,0.45), inset 0 1px 0 rgba(255,255,255,0.25)",
+                }}
+              >
+                <AnimatePresence>
+                  {status === "warping" && (
+                    <motion.span
+                      className="absolute inset-0"
+                      initial={{ x: "-100%" }}
+                      animate={{ x: "100%" }}
+                      transition={{ duration: 1.2, ease: "easeInOut" }}
+                      style={{
+                        background:
+                          "linear-gradient(90deg, transparent, rgba(255,255,255,0.6), transparent)",
+                      }}
+                    />
+                  )}
+                </AnimatePresence>
+
+                <span className="relative flex items-center gap-2">
+                  {status === "idle" && (
+                    <>
+                      {tr('oauthBindSubmit')} <ArrowRight size={17} aria-hidden="true" />
+                    </>
+                  )}
+                  {status === "warping" && (
+                    <>
+                      <Loader2 size={17} className="animate-spin" aria-hidden="true" /> {tr('bindSubmitting')}
+                    </>
+                  )}
+                  {status === "success" && (
+                    <>
+                      <Check size={17} aria-hidden="true" /> {tr('connected')}
+                    </>
+                  )}
+                </span>
+              </motion.button>
+
+              <button
+                type="button"
+                onClick={handleBindRestart}
+                disabled={status === "warping"}
+                className="text-center text-[12.5px] transition-colors hover:text-[var(--epo-cyan-glow)] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#67e8f9] rounded disabled:cursor-not-allowed disabled:opacity-50"
+                style={{ color: "var(--epo-muted)" }}
+              >
+                {tr('oauthBindRestart')}
+              </button>
             </motion.form>
           ) : (
             /* =========================================================================

@@ -1,6 +1,11 @@
 import { env, SELF } from 'cloudflare:test';
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import { buildSignedObjectUrl } from '../src/utils/object-token.js';
+import { ensureOtcTable, seedOtc } from './helpers/one-time-credential.js';
+
+beforeAll(async () => {
+	await ensureOtcTable(env.db);
+});
 
 describe('Public object storage isolation', () => {
 	beforeEach(async () => {
@@ -93,6 +98,51 @@ describe('Public object storage isolation', () => {
 			}
 		}
 	});
+
+	it('serves a signed capability on the origin-relative /oss route the browser uses', async () => {
+		await env.kv.put('attachments/root-route.txt', 'root-route-secret', {
+			metadata: { contentType: 'text/plain' }
+		});
+		const signedUrl = await buildSignedObjectUrl({ env }, 'attachments/root-route.txt', { userId: 1, ttlSeconds: 60 });
+
+		// Batch signing returns exactly this shape and mail-vue consumes it as a
+		// bare <img src>/<a href>, i.e. without an /api prefix.
+		const response = await SELF.fetch(`http://example.com${signedUrl}`);
+		expect(response.status).toBe(200);
+		expect(await response.text()).toBe('root-route-secret');
+		expect(response.headers.get('X-Content-Type-Options')).toBe('nosniff');
+	});
+
+	it('keeps the root /oss route closed to unsigned and control keys', async () => {
+		await env.kv.put('attachments/root-unsigned.txt', 'unsigned-secret', {
+			metadata: { contentType: 'text/plain' }
+		});
+		await env.kv.put('auth-uid:1', JSON.stringify({ tokens: ['session-token'], user: { userId: 1 } }));
+
+		for (const path of [
+			'/oss/attachments/root-unsigned.txt',
+			'/oss/auth-uid:1',
+			'/oss/static/../auth-uid:1',
+			'/oss/attachments/%2e%2e/auth-uid:1'
+		]) {
+			const response = await SELF.fetch(`http://example.com${path}`);
+			const body = await response.text();
+			expect(body).not.toContain('unsigned-secret');
+			expect(body).not.toContain('session-token');
+			expect(response.status).toBe(404);
+		}
+	});
+
+	it('serves public static assets on the root /oss route without a signature', async () => {
+		await env.kv.put('static/avatar/1/root-public.png', 'root-avatar-bytes', {
+			metadata: { contentType: 'image/png', contentDisposition: 'inline' }
+		});
+
+		const response = await SELF.fetch('http://example.com/oss/static/avatar/1/root-public.png');
+		expect(response.status).toBe(200);
+		expect(await response.text()).toBe('root-avatar-bytes');
+		expect(response.headers.get('Content-Type')).toBe('image/png');
+	});
 });
 
 describe('Public API hardening', () => {
@@ -146,6 +196,10 @@ describe('Public API hardening', () => {
 });
 
 describe('OAuth public callback boundary', () => {
+	beforeEach(async () => {
+		await env.db.prepare('DELETE FROM oauth_one_time_credential').run();
+	});
+
 	it('rejects a callback without a server-issued state before contacting the provider', async () => {
 		const missingCode = await SELF.fetch('http://example.com/api/oauth/callback/apple', { redirect: 'manual' });
 		expect(missingCode.status).toBe(302);
@@ -158,12 +212,18 @@ describe('OAuth public callback boundary', () => {
 
 	it('exchanges a short-lived login code once and never via the callback URL', async () => {
 		const code = 'short-lived-login-code';
-		await env.kv.put(`oauth_login_code:${code}`, JSON.stringify({
-			token: 'mailbox-jwt-value',
+		await seedOtc(env.db, {
+			purpose: 'oauth_login_code',
+			token: code,
 			provider: 'apple',
-			userInfo: { oauthUserId: 'apple:user-1' },
-			createdAt: Date.now()
-		}), { expirationTtl: 60 });
+			oauthUserId: 'apple:user-1',
+			payload: {
+				token: 'mailbox-jwt-value',
+				provider: 'apple',
+				userInfo: { oauthUserId: 'apple:user-1' },
+				createdAt: Date.now()
+			}
+		});
 
 		const first = await SELF.fetch('http://example.com/api/oauth/exchange', {
 			method: 'POST',
@@ -184,19 +244,25 @@ describe('OAuth public callback boundary', () => {
 
 	it('propagates an MFA challenge instead of issuing a session token', async () => {
 		const code = 'oauth-mfa-code';
-		await env.kv.put(`oauth_login_code:${code}`, JSON.stringify({
-			token: null,
-			mfa: {
-				mfaRequired: true,
-				tempToken: 'totp_tmp_oauth',
-				email: 'mfa@example.com',
-				hasTotp: true,
-				hasPasskeys: false
-			},
+		await seedOtc(env.db, {
+			purpose: 'oauth_login_code',
+			token: code,
 			provider: 'apple',
-			userInfo: { oauthUserId: 'apple:user-1' },
-			createdAt: Date.now()
-		}), { expirationTtl: 60 });
+			oauthUserId: 'apple:user-1',
+			payload: {
+				token: null,
+				mfa: {
+					mfaRequired: true,
+					tempToken: 'totp_tmp_oauth',
+					email: 'mfa@example.com',
+					hasTotp: true,
+					hasPasskeys: false
+				},
+				provider: 'apple',
+				userInfo: { oauthUserId: 'apple:user-1' },
+				createdAt: Date.now()
+			}
+		});
 
 		const response = await SELF.fetch('http://example.com/api/oauth/exchange', {
 			method: 'POST',
@@ -215,10 +281,25 @@ describe('OAuth public callback boundary', () => {
 			oauthProviders: { apple: { clientId: 'test-client-id', clientSecret: 'test-client-secret', enabled: 1 } }
 		}));
 		try {
-			const response = await SELF.fetch('http://example.com/api/oauth/authorize/apple?redirect_uri=https%3A%2F%2Fattacker.example%2Fcallback');
+			const response = await SELF.fetch('http://example.com/api/oauth/authorize/apple?redirect_uri=https%3A%2F%2Fattacker.example%2Fcallback&state=index-foreign-redirect-state');
 			const body = await response.json();
 			expect(body.code).not.toBe(200);
 			expect(body.message).toContain('redirect_uri');
+		} finally {
+			await env.kv.delete('setting:');
+		}
+	});
+
+	it('rejects an authorize request without a client state', async () => {
+		await env.kv.put('setting:', JSON.stringify({
+			oauthProviders: { apple: { clientId: 'test-client-id', clientSecret: 'test-client-secret', enabled: 1 } }
+		}));
+		try {
+			const response = await SELF.fetch('http://example.com/api/oauth/authorize/apple');
+			const body = await response.json();
+			expect(body.code).toBe(400);
+			expect(body.errorCode).toBe('oauth_state_required');
+			expect(body.message).toContain('client state');
 		} finally {
 			await env.kv.delete('setting:');
 		}

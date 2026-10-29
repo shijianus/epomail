@@ -21,10 +21,15 @@ const kvObjService = {
 			return;
 		}
 
-		await Promise.all(keys.map(key => {
-			const safeKey = normalizeObjectKey(key);
-			return safeKey ? c.env.kv.delete(safeKey) : null;
-		}));
+		// Each KV delete is a subrequest. Chunking keeps a large cascade delete
+		// below the Workers per-request subrequest ceiling.
+		for (let i = 0; i < keys.length; i += 50) {
+			const chunk = keys.slice(i, i + 50);
+			await Promise.all(chunk.map(key => {
+				const safeKey = normalizeObjectKey(key);
+				return safeKey ? c.env.kv.delete(safeKey) : null;
+			}));
+		}
 	},
 
 	async getObj(c, key) {

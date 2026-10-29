@@ -78,7 +78,29 @@ export async function email(message, env, ctx) {
 		const content = raw.content;
 
 
-		const email = await PostalMime.parse(content);
+		let email;
+		try {
+			email = await PostalMime.parse(content);
+		} catch (parseError) {
+			// A malformed MIME payload will never become parseable on retry.
+			// Reject it permanently instead of returning a transient failure.
+			console.warn('[inbound] malformed MIME rejected:', parseError.message);
+			message.setReject('Malformed message');
+			return;
+		}
+
+		if (!email) {
+			message.setReject('Malformed message');
+			return;
+		}
+
+		const attachmentsIn = Array.isArray(email.attachments) ? email.attachments : [];
+		const MAX_INBOUND_ATTACHMENTS = 200;
+		if (attachmentsIn.length > MAX_INBOUND_ATTACHMENTS) {
+			console.warn(`[inbound] rejected message with ${attachmentsIn.length} attachments from ${message.to}`);
+			message.setReject(`Too many attachments (max ${MAX_INBOUND_ATTACHMENTS})`);
+			return;
+		}
 
 
 		const { block: blockFlag, hardBlock: hardBlockFlag } = checkBlock(blackSubject, blackContent, blackFrom, email, env, message.to);
@@ -98,6 +120,16 @@ export async function email(message, env, ctx) {
 
 		if (!account && noRecipient === settingConst.noRecipient.CLOSE) {
 			message.setReject('Recipient not found');
+			return;
+		}
+
+		const duplicate = await emailService.findRecentDuplicate(
+			{ env },
+			email.messageId,
+			account ? account.accountId : 0
+		);
+		if (duplicate) {
+			console.warn(`[inbound-dedupe] duplicate message ${email.messageId} for ${message.to} (emailId=${duplicate.emailId})`);
 			return;
 		}
 
@@ -202,7 +234,7 @@ export async function email(message, env, ctx) {
 			messageId: email.messageId,
 			userId: account ? account.userId : 0,
 			accountId: account ? account.accountId : 0,
-			isDel: isDel.DELETE,
+			isDel: isDelVal,
 			isSpam: isSpamVal,
 			unread: unreadVal,
 			status: emailConst.status.SAVING,
@@ -212,7 +244,7 @@ export async function email(message, env, ctx) {
 		const attachments = [];
 		const cidAttachments = [];
 
-		for (let item of email.attachments) {
+		for (let item of attachmentsIn) {
 			let attachment = { ...item };
 			attachment.key = constant.ATTACHMENT_PREFIX + await fileUtils.getBuffHash(attachment.content) + fileUtils.getExtFileName(item.filename);
 			attachment.size = item.content.length ?? item.content.byteLength;

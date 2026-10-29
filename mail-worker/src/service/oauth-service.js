@@ -1,18 +1,20 @@
 import BizError from "../error/biz-error";
 import orm from "../entity/orm";
 import { oauth } from "../entity/oauth";
-import { eq, inArray } from 'drizzle-orm';
+import { eq, inArray, sql, and } from 'drizzle-orm';
 import userService from "./user-service";
 import loginService from "./login-service";
 import cryptoUtils from "../utils/crypto-utils";
 import settingService from "./setting-service";
+import regKeyService from "./reg-key-service";
 import { verifyAppleIdToken } from "../utils/oauth-jwt-utils";
 import rateLimit from '../utils/rate-limit.js';
 import { isSafePublicUrl } from '../utils/url-utils.js';
+import { getUserDb } from '../utils/db-accessor.js';
+import oneTimeCredential, { OTC_PURPOSE } from '../utils/one-time-credential.js';
+import oauthBindClaim from '../utils/oauth-bind-claim.js';
+import KvConst from '../const/kv-const.js';
 
-const OAUTH_STATE_PREFIX = 'oauth_state:';
-const OAUTH_LOGIN_CODE_PREFIX = 'oauth_login_code:';
-const OAUTH_BIND_PREFIX = 'oauth_bind:';
 const OAUTH_STATE_TTL_SECONDS = 600;
 const OAUTH_LOGIN_CODE_TTL_SECONDS = 60;
 const OAUTH_BIND_TTL_SECONDS = 600;
@@ -54,10 +56,21 @@ function assertSafeCustomEndpoints(config) {
 }
 
 function splitLoginResult(loginResult) {
-	// loginService returns an object for MFA challenges and restricted-account
-	// notices; only a string is a mailbox JWT.
+	// loginService.login returns an object in every modern path:
+	//   { token, email, userId }                      → authenticated session
+	//   { mfaRequired: true, tempToken, ... }         → TOTP/passkey challenge
+	//   { isRestricted: true, restrictedToken, ... }  → banned-account notice
+	// Treating every object as an MFA challenge discarded the mailbox token on
+	// ordinary OAuth logins, so the callback fell through to the bind-proof
+	// branch and the user never received a session.
 	if (loginResult && typeof loginResult === 'object') {
-		return { token: null, mfa: loginResult };
+		if (loginResult.mfaRequired || loginResult.isRestricted) {
+			return { token: null, mfa: loginResult };
+		}
+		if (typeof loginResult.token === 'string' && loginResult.token) {
+			return { token: loginResult.token };
+		}
+		throw new BizError('Unexpected login result shape');
 	}
 	return { token: loginResult };
 }
@@ -163,7 +176,17 @@ const oauthService = {
 		return list;
 	},
 
-	async getAuthorizeUrl(c, providerKey, redirectUri = '', state = '') {
+	async getAuthorizeUrl(c, providerKey, redirectUri = '', state = '', options = {}) {
+		// A login flow without a client state cannot be distinguished from an
+		// attacker-initiated one: the callback would echo no `oauth_client_state`
+		// and the login page's empty-vs-empty comparison would pass (login CSRF).
+		// Bind intents are exempt because the server-side `intent` already binds
+		// the callback to the initiating session.
+		const isBindIntent = Boolean(options.intent && options.intent.mode === 'bind');
+		if (!isBindIntent && (typeof state !== 'string' || !state.trim())) {
+			throw new BizError('Missing OAuth client state', 400, 'oauth_state_required');
+		}
+
 		const config = await this.getProviderConfig(c, providerKey);
 		if (!config || !config.clientId) {
 			throw new BizError(`Provider ${providerKey} is not configured or missing Client ID`);
@@ -190,19 +213,26 @@ const oauthService = {
 
 		// Server-side state binds the callback to this browser flow. The nonce
 		// is additionally echoed by OIDC providers inside the id_token.
-		const stateToken = randomToken();
+		//
+		// The state is stored in D1 so that consumption is a single atomic
+		// compare-and-set. It is bound to the provider: a state minted for one
+		// provider can never be redeemed on another provider's callback.
 		const nonce = randomToken();
-		await c.env.kv.put(
-			`${OAUTH_STATE_PREFIX}${stateToken}`,
-			JSON.stringify({
-				provider: providerKey,
+		const stateToken = await oneTimeCredential.issue(c, {
+			purpose: OTC_PURPOSE.STATE,
+			provider: providerKey,
+			payload: {
 				redirectUri: finalRedirectUri,
 				nonce,
 				clientState: typeof state === 'string' ? state : '',
+				// Server-only intent. The public /oauth/authorize route never
+				// passes options, so a caller cannot mint an authenticated
+				// "bind to account X" flow on its own.
+				intent: options.intent && typeof options.intent === 'object' ? options.intent : null,
 				createdAt: Date.now()
-			}),
-			{ expirationTtl: OAUTH_STATE_TTL_SECONDS }
-		);
+			},
+			ttlSeconds: OAUTH_STATE_TTL_SECONDS
+		});
 
 		const url = new URL(authUrl);
 		url.searchParams.set('client_id', config.clientId);
@@ -225,57 +255,80 @@ const oauthService = {
 		if (!state || typeof state !== 'string') {
 			throw new BizError('Missing OAuth state', 400);
 		}
-		const stateKey = `${OAUTH_STATE_PREFIX}${state}`;
-		const row = await c.env.kv.get(stateKey, { type: 'json' });
-		if (!row || row.provider !== providerKey || !row.redirectUri) {
+		// The provider binding is part of the atomic predicate: a request on
+		// the wrong provider matches zero rows and therefore cannot burn the
+		// legitimate flow's state.
+		const record = await oneTimeCredential.consume(c, {
+			purpose: OTC_PURPOSE.STATE,
+			token: state,
+			provider: providerKey
+		});
+		if (!record || record.provider !== providerKey) {
 			throw new BizError('Invalid or expired OAuth state', 400);
 		}
-		await c.env.kv.delete(stateKey);
-		return row;
+		const row = record.payload;
+		if (!row || !row.redirectUri) {
+			throw new BizError('Invalid or expired OAuth state', 400);
+		}
+		// Preserve the shape the callback (and its tests) expect: provider was
+		// previously part of the stored JSON, now it is a bound column.
+		return { ...row, provider: record.provider };
 	},
 
 	async createLoginExchangeCode(c, { token = null, userInfo, provider, mfa = null }) {
 		if (!token && !mfa) throw new BizError('Missing OAuth login result');
-		const code = randomToken();
-		await c.env.kv.put(
-			`${OAUTH_LOGIN_CODE_PREFIX}${code}`,
-			JSON.stringify({
+		return await oneTimeCredential.issue(c, {
+			purpose: OTC_PURPOSE.LOGIN_CODE,
+			provider: provider || '',
+			oauthUserId: userInfo?.oauthUserId || '',
+			payload: {
 				token,
 				mfa,
 				provider,
 				userInfo,
 				createdAt: Date.now()
-			}),
-			{ expirationTtl: OAUTH_LOGIN_CODE_TTL_SECONDS }
-		);
-		return code;
+			},
+			ttlSeconds: OAUTH_LOGIN_CODE_TTL_SECONDS
+		});
 	},
 
 	async consumeLoginExchangeCode(c, code) {
 		if (!code || typeof code !== 'string') {
 			throw new BizError('Missing OAuth login code', 401);
 		}
-		const codeKey = `${OAUTH_LOGIN_CODE_PREFIX}${code}`;
-		const row = await c.env.kv.get(codeKey, { type: 'json' });
+		const record = await oneTimeCredential.consume(c, {
+			purpose: OTC_PURPOSE.LOGIN_CODE,
+			token: code
+		});
+		const row = record?.payload;
 		if (!row || (!row.token && !row.mfa) || !row.createdAt) {
 			throw new BizError('Invalid or expired OAuth login code', 401);
 		}
-		await c.env.kv.delete(codeKey);
+		// Expiry is enforced by the storage predicate; keep the explicit check
+		// as defence in depth against a misconfigured TTL.
 		if (Date.now() - Number(row.createdAt) > OAUTH_LOGIN_CODE_TTL_SECONDS * 1000) {
 			throw new BizError('Expired OAuth login code', 401);
 		}
 		return row;
 	},
 
-	async exchangeCodeAndLogin(c, providerKey, params) {
-		await rateLimit.check(c, { scope: 'oauth-login', limit: 30, windowSeconds: 900 });
-
+	/**
+	 * Resolve the provider identity behind a completed authorization.
+	 *
+	 * This is a read-only step with respect to local accounts: it performs the
+	 * provider HTTP exchange and returns the verified identity, but creates no
+	 * OAuth row, links nothing, mints no session and never trusts a
+	 * client-supplied email as proof of ownership. Both the login flow and the
+	 * logged-in identity-bind flow go through this function so their identity
+	 * checks cannot drift apart.
+	 */
+	async fetchProviderUserInfo(c, providerKey, params = {}) {
 		const { code, id_token, redirectUri, nonce } = params;
 		if (!code && !id_token) {
 			throw new BizError('Authorization code or ID token is required');
 		}
 		if (providerKey === 'linuxdo') {
-			return await this.linuxDoLogin(c, params);
+			return await this.fetchLinuxDoUserInfo(c, params);
 		}
 
 		const config = await this.getProviderConfig(c, providerKey);
@@ -523,20 +576,44 @@ const oauthService = {
 		if (!userInfo) {
 			throw new BizError('OAuth provider authorization failed');
 		}
+		return userInfo;
+	},
 
+	async exchangeCodeAndLogin(c, providerKey, params = {}) {
+		await rateLimit.check(c, { scope: 'oauth-login', limit: 30, windowSeconds: 900 });
+		const userInfo = await this.fetchProviderUserInfo(c, providerKey, params);
+		return await this.finishIdentityLogin(c, providerKey, userInfo);
+	},
+
+	/**
+	 * Complete a provider authentication for an identity that was already
+	 * resolved from a verified provider response.
+	 *
+	 * Two outcomes are possible and both are deliberate:
+	 *   - the identity already belongs to a mailbox: issue a session;
+	 *   - the identity is unknown/unbound: return a single-use bind proof so a
+	 *     caller cannot bind by guessing an oauthUserId.
+	 *
+	 * The verified-email auto-link below is a *login* convenience only. The
+	 * logged-in bind flow never calls it, so an address returned by a
+	 * third-party provider can never attach an identity to an account.
+	 */
+	async finishIdentityLogin(c, providerKey, userInfo) {
 		const oauthRow = await this.saveUser(c, userInfo);
 		let userRow = null;
 		if (oauthRow.userId && oauthRow.userId > 0) {
 			userRow = await userService.selectByIdIncludeDel(c, oauthRow.userId);
 		}
 
-		// Auto associate by email if user with same email exists in Epomail
-		if (!userRow && userInfo.email) {
-			const existingUser = await userService.selectByEmail(c, userInfo.email);
-			if (existingUser) {
-				await orm(c).update(oauth).set({ userId: existingUser.userId }).where(eq(oauth.oauthUserId, userInfo.oauthUserId)).run();
-				oauthRow.userId = existingUser.userId;
-				userRow = existingUser;
+		// Auto associate by email if user with same email exists in Epomail.
+		// The write is conditional on "this row is still unbound and no row for
+		// the identity is bound", so a concurrent bind can never re-point an
+		// already associated identity at a second account.
+		if (!userRow && userInfo.email && !(Number(oauthRow.userId) > 0)) {
+			const linked = await this.linkVerifiedEmail(c, userInfo.oauthUserId, userInfo.email);
+			if (linked) {
+				oauthRow.userId = linked.userId;
+				userRow = linked;
 			}
 		}
 
@@ -544,16 +621,19 @@ const oauthService = {
 			// Prove possession of the completed OAuth flow before allowing an
 			// account to be created/bound. Without this one-time token any
 			// caller could submit a guessed oauthUserId.
-			const bindToken = randomToken();
-			await c.env.kv.put(
-				`${OAUTH_BIND_PREFIX}${bindToken}`,
-				JSON.stringify({ oauthUserId: oauthRow.oauthUserId, provider: providerKey, createdAt: Date.now() }),
-				{ expirationTtl: OAUTH_BIND_TTL_SECONDS }
-			);
+			const bindToken = await this.createBindProof(c, {
+				oauthUserId: oauthRow.oauthUserId,
+				provider: providerKey
+			});
 			return { userInfo: oauthRow, token: null, bindToken };
 		}
 
-		const loginResult = await loginService.login(c, { email: userRow.email, password: null }, true);
+		const loginResult = await loginService.login(c, {
+			email: userRow.email,
+			password: null,
+			authMethod: 'oauth',
+			authProvider: providerKey
+		}, true);
 		return { userInfo: oauthRow, ...splitLoginResult(loginResult) };
 	},
 
@@ -609,6 +689,42 @@ const oauthService = {
 		return { success: true, message: 'Provider configuration verified' };
 	},
 
+	/**
+	 * Mint a one-time proof that a completed provider flow produced this
+	 * OAuth identity. The proof is stored against the identity so a caller
+	 * cannot redeem it for a different oauthUserId or provider.
+	 */
+	async createBindProof(c, { oauthUserId, provider }) {
+		if (!oauthUserId || typeof oauthUserId !== 'string') {
+			throw new BizError('Missing OAuth identity for bind proof', 500);
+		}
+		return await oneTimeCredential.issue(c, {
+			purpose: OTC_PURPOSE.BIND,
+			provider: provider || '',
+			oauthUserId,
+			payload: { oauthUserId, provider: provider || '', createdAt: Date.now() },
+			ttlSeconds: OAUTH_BIND_TTL_SECONDS
+		});
+	},
+
+	/**
+	 * Bind an unbound provider identity to a locally created mailbox account.
+	 *
+	 * Ordering is the whole security argument:
+	 *   1. inspect the proof (read only),
+	 *   2. check the identity is unbound (read only),
+	 *   3. run the full registration policy without side effects,
+	 *   4. acquire the per-identity lease (D1 primary-key interlock),
+	 *   5. spend the proof with one atomic CAS,
+	 *   6. create the account, recording it on the lease,
+	 *   7. commit the association with one conditional UPDATE that also
+	 *      re-checks the lease and the unbound state,
+	 *   8. only then create a session.
+	 *
+	 * Everything before step 5 is retryable with the same proof. Nothing after
+	 * step 5 ever resurrects it. A rejected registration therefore costs the
+	 * user an invitation-code correction, not a full OAuth round trip.
+	 */
 	async bindUser(c, params) {
 
 		await rateLimit.check(c, { scope: 'oauth-bind', limit: 10, windowSeconds: 900 });
@@ -616,50 +732,257 @@ const oauthService = {
 		const { email, oauthUserId, code, bindToken, provider } = params;
 
 		if (!bindToken || typeof bindToken !== 'string') {
-			throw new BizError('Missing OAuth bind proof; restart the OAuth login flow');
+			throw new BizError('Missing OAuth bind proof; restart the OAuth login flow', 410, 'bind_proof_invalid');
+		}
+		if (!oauthUserId || typeof oauthUserId !== 'string' || oauthUserId.length > 512) {
+			throw new BizError('Invalid OAuth bind proof; restart the OAuth login flow', 410, 'bind_proof_invalid');
+		}
+		if (provider !== undefined && provider !== null && provider !== ''
+			&& (typeof provider !== 'string' || provider.length > 64)) {
+			throw new BizError('Invalid OAuth bind proof; restart the OAuth login flow', 410, 'bind_proof_invalid');
 		}
 
-		const bindKey = `${OAUTH_BIND_PREFIX}${bindToken}`;
-		const pendingBind = await c.env.kv.get(bindKey, { type: 'json' });
-		if (!pendingBind || pendingBind.oauthUserId !== oauthUserId
-			|| (provider && pendingBind.provider !== provider)) {
-			throw new BizError('Invalid or expired OAuth bind proof; restart the OAuth login flow');
-		}
-		// Single use: consume before creating the account.
-		await c.env.kv.delete(bindKey);
+		const boundProvider = provider || null;
 
-		const oauthRow = await this.getById(c, oauthUserId);
+		// Read-only proof probe. A forged, expired or mismatched proof is
+		// rejected here and stays spendable (it simply is not ours to spend).
+		const proof = await oneTimeCredential.inspect(c, {
+			purpose: OTC_PURPOSE.BIND,
+			token: bindToken,
+			provider: boundProvider,
+			oauthUserId
+		});
+		if (!proof || proof.expired) {
+			throw new BizError('Invalid or expired OAuth bind proof; restart the OAuth login flow', 410, 'bind_proof_invalid');
+		}
+
+		let oauthRow = await this.getById(c, oauthUserId);
 		if (!oauthRow) {
-			throw new BizError('OAuth identity not found');
+			throw new BizError('OAuth identity not found', 404, 'bind_identity_missing');
 		}
+
+		// Idempotent final-state confirmation. The identity is already bound,
+		// so the bind succeeded at some earlier point (possibly a request whose
+		// response was lost). Report it without minting a session from a proof
+		// that may already be spent.
 		if (Number(oauthRow.userId) > 0) {
-			throw new BizError('该 OAuth 身份已绑定邮箱，无法重复绑定');
+			return { userInfo: oauthRow, token: null, alreadyBound: true };
 		}
 
-		let userRow = await userService.selectByIdIncludeDel(c, oauthRow.userId);
-
-		if (userRow) {
-			throw new BizError('用户已绑定有邮箱')
+		if (proof.consumed) {
+			// The proof was spent by an attempt that has not committed the
+			// association. An active lease means it is still running; otherwise
+			// it failed after the commit point and only a new flow can help.
+			const activeClaim = await oauthBindClaim.inspect(c, { oauthUserId });
+			if (activeClaim && activeClaim.active) {
+				throw new BizError('OAuth binding is already in progress; retry shortly', 425, 'bind_in_progress');
+			}
+			throw new BizError('OAuth bind proof was already used; restart the OAuth login flow', 409, 'bind_proof_used');
 		}
 
-		await loginService.register(c, { email, password: cryptoUtils.genRandomPwd(), code }, true);
-
-		userRow = await userService.selectByEmail(c, email);
-		if (!userRow) {
-			throw new BizError('Failed to create the local account');
+		// Full policy preflight. No writes and no invite-slot consumption, so
+		// a rejection here leaves the proof valid for a corrected retry.
+		const password = cryptoUtils.genRandomPwd();
+		try {
+			await loginService.validateRegistration(c, { email, password, code }, true);
+		} catch (err) {
+			if (err?.name === 'BizError') {
+				// All preflight failures are retryable with the same proof, so
+				// they are classified as client-side rejection. Rate limiting is
+				// preserved as its own signal.
+				throw new BizError(err.message, err.code === 429 ? 429 : 400, err.errorCode || 'bind_policy_rejected');
+			}
+			console.error('OAuth bind preflight failed:', err);
+			throw new BizError('OAuth binding failed; retry with the same proof', 400, 'bind_failed');
 		}
 
-		await orm(c).update(oauth).set({ userId: userRow.userId }).where(eq(oauth.oauthUserId, oauthUserId)).run();
-		const loginResult = await loginService.login(c, { email, password: null }, true);
+		// Claim before spending. If two flows for the same identity arrive
+		// together, only one reaches the commit point; the loser keeps its
+		// proof intact.
+		const claimResult = await oauthBindClaim.acquire(c, { oauthUserId, email });
+		if (!claimResult) {
+			throw new BizError('Another OAuth binding is in progress for this identity; retry shortly', 425, 'bind_in_progress');
+		}
+		const { claimToken, stale } = claimResult;
 
-		return { userInfo: oauthRow, ...splitLoginResult(loginResult) }
+		let proofSpent = false;
+
+		try {
+			// Re-check after acquiring: an email auto-link or another flow may
+			// have bound the identity between the first read and the lease.
+			oauthRow = await this.getById(c, oauthUserId);
+			if (!oauthRow) {
+				throw new BizError('OAuth identity not found', 404, 'bind_identity_missing');
+			}
+			if (Number(oauthRow.userId) > 0) {
+				return { userInfo: oauthRow, token: null, alreadyBound: true };
+			}
+
+			// A previous holder crashed after creating an account but before
+			// binding it. The identity is still unbound (checked above), so the
+			// abandoned account can be removed. A bound identity never reaches
+			// this branch, so a committed association is never deleted.
+			if (stale.userId > 0) {
+				await this.rollbackRegistration(c, {
+					userId: stale.userId,
+					code: stale.code,
+					reservedRegKey: stale.reservedRegKey
+				});
+			}
+
+			// Commit point: one atomic compare-and-set. From here on the proof
+			// is gone and no failure may attempt to revive it.
+			const record = await oneTimeCredential.consume(c, {
+				purpose: OTC_PURPOSE.BIND,
+				token: bindToken,
+				provider: boundProvider,
+				oauthUserId
+			});
+			if (!record) {
+				throw new BizError('OAuth bind proof was already used; retry shortly', 425, 'bind_in_progress');
+			}
+			proofSpent = true;
+
+			// Authoritative registration. The policy is re-evaluated here, so
+			// nothing that changed since the preflight can be bypassed.
+			const registration = await loginService.register(c, { email, password, code }, true);
+			const userId = Number(registration?.userId);
+			if (!Number.isInteger(userId) || userId <= 0) {
+				throw new BizError('OAuth binding could not create the local account; restart the OAuth login flow', 409, 'bind_commit_failed');
+			}
+
+			// Record the account for crash compensation. Losing this marker is
+			// not fatal: the atomic finalize below still protects the bind.
+			try {
+				await oauthBindClaim.recordUser(c, {
+					oauthUserId,
+					claimToken,
+					userId,
+					email,
+					reservedRegKey: registration.reservedRegKey === true,
+					code: typeof code === 'string' ? code : ''
+				});
+			} catch (err) {
+				console.error('Failed to record OAuth bind claim account:', err);
+			}
+
+			// Atomic association: lease still ours AND identity still unbound.
+			// A false result is a definite "not bound" answer, so the account
+			// created above is compensated.
+			const bound = await oauthBindClaim.finalize(c, { oauthUserId, claimToken, userId });
+			if (!bound) {
+				await this.rollbackRegistration(c, {
+					userId,
+					code,
+					reservedRegKey: registration.reservedRegKey === true
+				});
+				throw new BizError('OAuth identity was bound by another request; restart the OAuth login flow', 409, 'bind_identity_conflict');
+			}
+
+			// The account now exists with a server-generated password the user
+			// cannot present. Record that exact hash as the eligibility marker:
+			// the first user-chosen password changes the stored hash, so the
+			// marker invalidates itself without a second write that could be
+			// lost. Failing to record it only withholds the convenience; it
+			// never weakens authentication, so it must not undo a committed bind.
+			try {
+				const createdRow = await userService.selectById(c, userId);
+				if (createdRow?.password) {
+					await c.env.kv.put(KvConst.INITIAL_PASSWORD + userId, createdRow.password);
+				}
+			} catch (err) {
+				console.error('Failed to mark initial password for OAuth account:', err);
+			}
+		} catch (err) {
+			if (!proofSpent) {
+				// Nothing irreversible happened; keep the original signal (404,
+				// 425, 429, or a storage error) so the client can retry safely.
+				throw err;
+			}
+			if (err?.name === 'BizError' && [409, 410, 425, 429].includes(Number(err.code))) {
+				throw err;
+			}
+			if (err?.name === 'BizError') {
+				// The proof is spent, so even a policy rejection now requires a
+				// new flow. Preserve the user-facing message.
+				throw new BizError(err.message, 409, err.errorCode || 'bind_failed');
+			}
+			console.error('OAuth binding failed after proof consumption:', err);
+			throw new BizError('OAuth binding failed; restart the OAuth login flow', 409, 'bind_failed');
+		} finally {
+			try {
+				await oauthBindClaim.release(c, { oauthUserId, claimToken });
+			} catch (err) {
+				console.error('Failed to release OAuth bind claim:', err);
+			}
+		}
+
+		// Session creation is deliberately last. If it fails the association is
+		// already durable; report the idempotent outcome instead of asking the
+		// client to repeat a flow whose proof is gone.
+		try {
+			const loginResult = await loginService.login(c, {
+				email,
+				password: null,
+				authMethod: 'oauth',
+				authProvider: boundProvider || undefined
+			}, true);
+			return { userInfo: oauthRow, ...splitLoginResult(loginResult) }
+		} catch (err) {
+			console.error('OAuth binding committed but session creation failed:', err);
+			return { userInfo: oauthRow, token: null, alreadyBound: true };
+		}
 	},
 
-	async linuxDoLogin(c, params) {
+	/**
+	 * Compensate an account created by an OAuth bind attempt that did not
+	 * commit. Only a userId obtained by that attempt is removed; the invite
+	 * slot is restored only when this attempt reserved it.
+	 */
+	async rollbackRegistration(c, { userId, code, reservedRegKey } = {}) {
+		await loginService.rollbackPartialRegistration(c, userId);
+		if (reservedRegKey === true && typeof code === 'string' && code) {
+			try {
+				await regKeyService.restoreOne(c, code);
+			} catch (err) {
+				console.error('Failed to restore invite slot after OAuth bind rollback:', err);
+			}
+		}
+	},
 
-		await rateLimit.check(c, { scope: 'oauth-login', limit: 30, windowSeconds: 900 });
+	/**
+	 * Associate an unbound identity with an existing local account whose
+	 * address the provider has verified. The UPDATE only matches while the
+	 * identity (all of its rows) is unbound, so a concurrent bind or a second
+	 * login can never move an existing association to another account.
+	 * Returns the linked user row, or null when nothing was linked.
+	 */
+	async linkVerifiedEmail(c, oauthUserId, verifiedEmail) {
+		if (!oauthUserId || !verifiedEmail) return null;
+		const existingUser = await userService.selectByEmail(c, verifiedEmail);
+		if (!existingUser) return null;
 
+		await orm(c).update(oauth)
+			.set({ userId: existingUser.userId })
+			.where(and(
+				eq(oauth.oauthUserId, oauthUserId),
+				eq(oauth.userId, 0),
+				sql`NOT EXISTS (SELECT 1 FROM oauth AS bound WHERE bound.oauth_user_id = ${oauthUserId} AND bound.user_id > 0)`
+			))
+			.run();
+
+		const linked = await this.getById(c, oauthUserId);
+		if (!linked || Number(linked.userId) <= 0) return null;
+		return linked.userId === existingUser.userId
+			? existingUser
+			: await userService.selectByIdIncludeDel(c, linked.userId);
+	},
+
+	async fetchLinuxDoUserInfo(c, params = {}) {
 		const { code } = params;
+		if (!code) {
+			throw new BizError('Authorization code is required');
+		}
 
 		let token = '';
 		let userInfo = {}
@@ -705,15 +1028,13 @@ const oauthService = {
 		const linuxEmailVerified = userInfo.email_verified === true || userInfo.email_verified === 'true';
 		if (!linuxEmailVerified) userInfo.email = '';
 
-		const  oauthRow = await this.saveUser(c, userInfo);
-		const userRow = await userService.selectByIdIncludeDel(c, oauthRow.userId);
+		return userInfo;
+	},
 
-		if (!userRow) {
-			return { userInfo: oauthRow, token: null }
-		}
-
-		const JwtToken = await loginService.login(c, { email: userRow.email, password: null }, true);
-		return { userInfo: oauthRow, ...splitLoginResult(JwtToken) }
+	async linuxDoLogin(c, params = {}) {
+		await rateLimit.check(c, { scope: 'oauth-login', limit: 30, windowSeconds: 900 });
+		const userInfo = await this.fetchLinuxDoUserInfo(c, params);
+		return await this.finishIdentityLogin(c, 'linuxdo', userInfo);
 	},
 
 	async saveUser(c, userInfo) {
@@ -721,6 +1042,38 @@ const oauthService = {
 		const userInfoRow = await this.getById(c, userInfo.oauthUserId);
 
 		if (!userInfoRow) {
+			// Concurrent first logins for the same identity must not create two
+			// oauth rows: a duplicate row would let one copy be bound to one
+			// account while the other stays unbound. The conditional INSERT is
+			// a single serialised statement; a caller that loses the race
+			// simply reads the winner's row.
+			const db = getUserDb(c);
+			if (db && typeof db.prepare === 'function') {
+				try {
+					await db.prepare(`
+						INSERT INTO oauth (oauth_user_id, username, name, avatar, active, trust_level, silenced, user_id)
+						SELECT ?, ?, ?, ?, ?, ?, ?, 0
+						WHERE NOT EXISTS (SELECT 1 FROM oauth WHERE oauth_user_id = ?)
+					`).bind(
+						userInfo.oauthUserId,
+						userInfo.username ?? null,
+						userInfo.name ?? null,
+						userInfo.avatar ?? null,
+						userInfo.active ?? 1,
+						userInfo.trustLevel ?? 1,
+						userInfo.silenced ?? 0,
+						userInfo.oauthUserId
+					).run();
+					const inserted = await this.getById(c, userInfo.oauthUserId);
+					if (inserted) return inserted;
+				} catch (err) {
+					// A unique index (where migrated) may reject the losing
+					// insert; fall through to the read below.
+					if (!/UNIQUE|constraint/i.test(err?.message || '')) throw err;
+				}
+			}
+			const existing = await this.getById(c, userInfo.oauthUserId);
+			if (existing) return existing;
 			return await orm(c).insert(oauth).values(userInfo).returning().get();
 		} else {
 			// Providers such as Apple only return the email on the first
@@ -739,7 +1092,14 @@ const oauthService = {
 	},
 
 	async getById(c, oauthUserId) {
-		return await orm(c).select().from(oauth).where(eq(oauth.oauthUserId, oauthUserId)).get();
+		// Prefer a bound row if historical duplicates exist: the bind flow and
+		// login flow must agree on whether this identity already has a mailbox.
+		return await orm(c)
+			.select()
+			.from(oauth)
+			.where(eq(oauth.oauthUserId, oauthUserId))
+			.orderBy(sql`(${oauth.userId} > 0) DESC, ${oauth.oauthId} ASC`)
+			.get();
 	},
 
 	async deleteByUserId(c, userId) {

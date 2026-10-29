@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand, DeleteObjectsCommand, DeleteObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, DeleteObjectsCommand, DeleteObjectCommand, GetObjectCommand, ListObjectsV2Command } from "@aws-sdk/client-s3";
 import settingService from './setting-service';
 import domainUtils from '../utils/domain-uitls';
 import { settingConst } from '../const/entity-const';
@@ -77,11 +77,25 @@ const s3Service = {
 		const client = await this.client(c, customConfig);
 		const bucket = customConfig?.bucket || (await settingService.query(c)).bucket;
 
+		// Single-object DELETE does not need Content-MD5 and works on every
+		// S3-compatible provider. Reserve the batch API for real batches.
+		if (keys.length === 1) {
+			await client.send(new DeleteObjectCommand({
+				Bucket: bucket,
+				Key: keys[0]
+			}));
+			return;
+		}
+
 		// Calculate Content-MD5 header for AWS/Backblaze batch delete compatibility
 		client.middlewareStack.add(
 			(next) => async (args) => {
 				const body = args.request.body;
-				if (body) {
+				const hashable = typeof body === 'string'
+					|| body instanceof Uint8Array
+					|| body instanceof ArrayBuffer
+					|| (typeof Blob !== 'undefined' && body instanceof Blob);
+				if (body && hashable) {
 					const encoder = new TextEncoder();
 					const data = typeof body === 'string' ? encoder.encode(body) : body;
 					const hashBuffer = await crypto.subtle.digest('MD5', data);
@@ -102,6 +116,33 @@ const s3Service = {
 				}
 			})
 		);
+	},
+
+	/**
+	 * List object keys under a prefix (read-only; used by the orphan scan).
+	 */
+	async listObjKeys(c, prefix, customConfig = null, limit = 5000) {
+		const client = await this.client(c, customConfig);
+		const bucket = customConfig?.bucket || (await settingService.query(c)).bucket;
+		const cap = Math.max(1, Math.min(Number(limit) || 5000, 10000));
+		const objects = [];
+		let continuationToken;
+
+		do {
+			const page = await client.send(new ListObjectsV2Command({
+				Bucket: bucket,
+				Prefix: prefix,
+				MaxKeys: Math.min(1000, cap - objects.length),
+				ContinuationToken: continuationToken
+			}));
+			for (const item of page.Contents || []) {
+				if (objects.length >= cap) break;
+				objects.push({ key: item.Key, lastModified: item.LastModified || null, size: item.Size ?? null });
+			}
+			continuationToken = page.IsTruncated ? page.NextContinuationToken : null;
+		} while (continuationToken && objects.length < cap);
+
+		return { objects, truncated: objects.length >= cap };
 	},
 
 	/**

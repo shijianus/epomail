@@ -43,13 +43,56 @@ function getSafeSessionUser(userRow) {
 	return safe;
 }
 
+/**
+ * Per-session authentication provenance. Only the issuing server (OAuth
+ * service) can set it, and it is stored next to the token list so a stale or
+ * forged marker cannot outlive the session it describes.
+ *
+ * The initial-password flow uses this to prove the caller just completed a
+ * provider authentication; a plain password session never carries it.
+ */
+function buildSessionMeta(method, provider) {
+	if (method !== 'oauth') return null;
+	return {
+		method: 'oauth',
+		provider: typeof provider === 'string' && provider ? provider.slice(0, 64) : null,
+		at: Date.now()
+	};
+}
+
+function attachSessionMeta(authInfo, token, meta) {
+	if (!meta) return;
+	if (!authInfo.tokenMeta || typeof authInfo.tokenMeta !== 'object') authInfo.tokenMeta = {};
+	authInfo.tokenMeta[token] = meta;
+	// Keep the map bounded by the live token list so it can never grow past
+	// the ten sessions the account is allowed to keep.
+	for (const key of Object.keys(authInfo.tokenMeta)) {
+		if (!Array.isArray(authInfo.tokens) || !authInfo.tokens.includes(key)) {
+			delete authInfo.tokenMeta[key];
+		}
+	}
+}
+
 const loginService = {
 
-	async register(c, params, oauth = false) {
-
-		await rateLimit.check(c, { scope: 'register', limit: 20, windowSeconds: 3600 });
-
-		const { email, password, token, code } = params;
+	/**
+	 * Read-only registration policy evaluation.
+	 *
+	 * Every check below is a read: it never inserts, updates, reserves an
+	 * invite slot or writes a session. It exists so a caller can reject an
+	 * invalid request *before* spending a single-use credential, and it is
+	 * deliberately the same function `register()` runs before any write — so
+	 * the preflight can never drift into a weaker policy than the write path.
+	 *
+	 * A preflight pass is not an authorization: `register()` re-runs this
+	 * function inside the write path, and the invite slot is still reserved
+	 * with an atomic decrement afterwards.
+	 */
+	async validateRegistration(c, params, oauth = false) {
+		const { email, password } = params;
+		// A non-string invite code is treated as absent instead of being handed
+		// to SQL as a binding parameter.
+		const code = typeof params.code === 'string' ? params.code : '';
 
 		let { regKey, register, registerVerify, regVerifyCount, minEmailPrefix, emailPrefixFilter } = await settingService.query(c)
 
@@ -61,35 +104,35 @@ const loginService = {
 		}
 
 		if (register === settingConst.register.CLOSE) {
-			throw new BizError(t('regDisabled'));
+			throw new BizError(t('regDisabled'), undefined, 'register_closed');
 		}
 
 		if (typeof email !== 'string' || !verifyUtils.isEmail(email)) {
-			throw new BizError(t('notEmail'));
+			throw new BizError(t('notEmail'), undefined, 'invalid_email');
 		}
 
 		if (emailUtils.getName(email).length < minEmailPrefix) {
-			throw new BizError(t('minEmailPrefix', { msg: minEmailPrefix } ));
+			throw new BizError(t('minEmailPrefix', { msg: minEmailPrefix } ), undefined, 'prefix_too_short');
 		}
 
 		if (emailPrefixFilter.some(content => emailUtils.getName(email).includes(content)))  {
-			throw new BizError(t('banEmailPrefix'));
+			throw new BizError(t('banEmailPrefix'), undefined, 'invalid_local');
 		}
 
 		if (emailUtils.getName(email).length > 64) {
-			throw new BizError(t('emailLengthLimit'));
+			throw new BizError(t('emailLengthLimit'), undefined, 'prefix_too_long');
 		}
 
 		if (typeof password !== 'string' || password.length > 30) {
-			throw new BizError(t('pwdLengthLimit'));
+			throw new BizError(t('pwdLengthLimit'), undefined, 'password_too_long');
 		}
 
 		if (password.length < 6) {
-			throw new BizError(t('pwdMinLength'));
+			throw new BizError(t('pwdMinLength'), undefined, 'password_too_short');
 		}
 
 		if (!c.env.domain.includes(emailUtils.getDomain(email))) {
-			throw new BizError(t('notEmailDomain'));
+			throw new BizError(t('notEmailDomain'), undefined, 'domain_not_allowed');
 		}
 
 		let type = null;
@@ -110,18 +153,18 @@ const loginService = {
 		const localName = emailUtils.getName(email);
 		const adminName = c.env.admin ? emailUtils.getName(c.env.admin) : '';
 		if (adminName && localName.toLowerCase() === adminName.toLowerCase()) {
-			throw new BizError(t('adminReserved'));
+			throw new BizError(t('adminReserved'), undefined, 'email_reserved');
 		}
 
 		// 检查该完整邮箱是否已被注册或已注销
 		const accountRow = await accountService.selectByEmailIncludeDel(c, email);
 
 		if (accountRow && accountRow.isDel === isDel.DELETE) {
-			throw new BizError(t('isDelUser'));
+			throw new BizError(t('isDelUser'), undefined, 'email_deleted');
 		}
 
 		if (accountRow) {
-			throw new BizError(t('isRegAccount'));
+			throw new BizError(t('isRegAccount'), undefined, 'email_exists');
 		}
 
 		// 用户名抢注规则：第一个抢注用户名的人优先拥有用户名，后来者使用完整的邮箱作为用户名
@@ -144,11 +187,11 @@ const loginService = {
 		if(!roleService.hasAvailDomainPerm(roleRow.availDomain, email)) {
 
 			if (type) {
-				throw new BizError(t('noDomainPermRegKey'),403)
+				throw new BizError(t('noDomainPermRegKey'),403, 'domain_not_permitted')
 			}
 
 			if (defType) {
-				throw new BizError(t('noDomainPermReg'),403)
+				throw new BizError(t('noDomainPermReg'),403, 'domain_not_permitted')
 			}
 
 		}
@@ -157,14 +200,84 @@ const loginService = {
 
 		if (registerVerify === settingConst.registerVerify.OPEN) {
 			regVerifyOpen = true
-			await turnstileService.verify(c,token)
 		}
 
 		if (registerVerify === settingConst.registerVerify.COUNT) {
 			regVerifyOpen = await verifyRecordService.isOpenRegVerify(c, regVerifyCount);
-			if (regVerifyOpen) {
-				await turnstileService.verify(c,token)
-			}
+		}
+
+		return {
+			code,
+			email,
+			regKey,
+			registerVerify,
+			regVerifyCount,
+			type,
+			regKeyId,
+			defType,
+			assignedName,
+			regVerifyOpen
+		};
+	},
+
+	/**
+	 * Remove the rows of an account created by the current request when a
+	 * later step fails. Only a userId this request just obtained is passed in,
+	 * so nothing that existed before the request can be touched.
+	 */
+	async rollbackPartialRegistration(c, userId) {
+		const id = Number(userId);
+		if (!Number.isInteger(id) || id <= 0) return;
+
+		try {
+			await accountService.physicsDeleteByUserIds(c, [id]);
+		} catch (err) {
+			console.error('Failed to roll back OAuth registration account rows:', err);
+		}
+
+		try {
+			await orm(c).delete(user).where(eq(user.userId, id)).run();
+		} catch (err) {
+			console.error('Failed to roll back OAuth registration user row:', err);
+		}
+
+		try {
+			await c.env.kv.delete(KvConst.AUTH_INFO + id);
+		} catch (_) {}
+	},
+
+	async register(c, params, oauth = false) {
+
+		await rateLimit.check(c, { scope: 'register', limit: 20, windowSeconds: 3600 });
+
+		const { password, token } = params;
+
+		// Authoritative policy evaluation. The preflight used by the OAuth bind
+		// path calls the same function, but this invocation is the gate that
+		// actually protects the write: policy changes between preflight and
+		// commit are still enforced here.
+		const policy = await this.validateRegistration(c, params, oauth);
+		const {
+			code,
+			email,
+			regKey,
+			registerVerify,
+			regVerifyCount,
+			type,
+			regKeyId,
+			defType,
+			assignedName,
+			regVerifyOpen: precomputedRegVerifyOpen
+		} = policy;
+
+		let regVerifyOpen = precomputedRegVerifyOpen;
+
+		if (registerVerify === settingConst.registerVerify.OPEN) {
+			await turnstileService.verify(c,token)
+		}
+
+		if (registerVerify === settingConst.registerVerify.COUNT && regVerifyOpen) {
+			await turnstileService.verify(c,token)
 		}
 
 		const { salt, hash } = await saltHashUtils.hashPassword(password, c.env);
@@ -176,7 +289,7 @@ const loginService = {
 		if (regKey !== settingConst.regKey.CLOSE && type) {
 			reservedRegKey = await regKeyService.consumeOne(c, code);
 			if (!reservedRegKey) {
-				throw new BizError(t('noRegKeyCount'));
+				throw new BizError(t('noRegKeyCount'), undefined, 'invite_code_exhausted');
 			}
 		}
 
@@ -190,6 +303,10 @@ const loginService = {
 			if (reservedRegKey) {
 				try { await regKeyService.restoreOne(c, code); } catch (_) {}
 			}
+			// Do not leave a half-created identity behind: a user row without
+			// its account row would permanently reserve the unique email and
+			// block every retry.
+			await this.rollbackPartialRegistration(c, userId);
 			throw err;
 		}
 
@@ -203,12 +320,14 @@ const loginService = {
 			console.error('Failed to deliver welcome email on register:', err);
 		}
 
+		const extra = oauth ? { userId, email, reservedRegKey } : {};
+
 		if (registerVerify === settingConst.registerVerify.COUNT && !regVerifyOpen) {
 			const row = await verifyRecordService.increaseRegCount(c);
-			return {regVerifyOpen: row.count >= regVerifyCount}
+			return {regVerifyOpen: row.count >= regVerifyCount, ...extra}
 		}
 
-		return {regVerifyOpen}
+		return {regVerifyOpen, ...extra}
 
 	},
 
@@ -219,24 +338,24 @@ const loginService = {
 	async handleOpenRegKey(c, regKey, code) {
 
 		if (!code) {
-			throw new BizError(t('emptyRegKey'));
+			throw new BizError(t('emptyRegKey'), undefined, 'invite_code_required');
 		}
 
 		const regKeyRow = await regKeyService.selectByCode(c, code);
 
 		if (!regKeyRow) {
-			throw new BizError(t('notExistRegKey'));
+			throw new BizError(t('notExistRegKey'), undefined, 'invite_code_invalid');
 		}
 
 		if (regKeyRow.count <= 0) {
-			throw new BizError(t('noRegKeyCount'));
+			throw new BizError(t('noRegKeyCount'), undefined, 'invite_code_exhausted');
 		}
 
 		const today = toUtc().tz('Asia/Shanghai').startOf('day')
 		const expireTime = toUtc(regKeyRow.expireTime).tz('Asia/Shanghai').startOf('day');
 
 		if (expireTime.isBefore(today)) {
-			throw new BizError(t('regKeyExpire'));
+			throw new BizError(t('regKeyExpire'), undefined, 'invite_code_expired');
 		}
 
 		return { type: regKeyRow.roleId, regKeyId: regKeyRow.regKeyId };
@@ -437,10 +556,14 @@ const loginService = {
 						needsPasswordUpgrade: isLegacy ? inputPassword : null,
 						stepUpRequired: riskAssessment.stepUpRequired,
 						riskScore: riskAssessment.riskScore,
-						step: 1,
-						verifiedFactors: [],
-						deviceTag,
-						createdAt: Date.now()
+					step: 1,
+					verifiedFactors: [],
+					deviceTag,
+					// Provenance survives the MFA challenge so the session that
+					// is finally issued can still prove a provider login.
+					authMethod: params.authMethod || null,
+					authProvider: params.authProvider || null,
+					createdAt: Date.now()
 					}),
 					{ expirationTtl: 300 } // 5 minutes TTL
 				);
@@ -543,6 +666,8 @@ const loginService = {
 			authInfo.tokens.push(uuid);
 
 		}
+
+		attachSessionMeta(authInfo, uuid, buildSessionMeta(params.authMethod, params.authProvider));
 
 		if (sessionMaxEpoch) {
 			authInfo.trustEpoch = sessionTrustEpoch;
@@ -877,6 +1002,10 @@ const loginService = {
 				refreshTime: dayjs().toISOString()
 			};
 		}
+
+		// The challenge may have started from a provider login; carry that
+		// provenance (never the client's claim) onto the issued session.
+		attachSessionMeta(authInfo, uuid, buildSessionMeta(pendingData.authMethod, pendingData.authProvider));
 
 		if (sessionMaxEpoch) {
 			authInfo.trustEpoch = sessionTrustEpoch;

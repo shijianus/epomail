@@ -7,7 +7,7 @@
 		"dev": "wrangler dev --config wrangler-dev.toml",
 		"test": "vitest run",
 		"test:unit": "vitest run test/security-hardening.spec.js test/totp-backend-fixes.spec.js test/email-ingest.spec.js",
-		"test:integration": "vitest run test/index.spec.js test/object-ownership.spec.js test/oauth-security.spec.js test/reg-key.spec.js test/security-review-adversarial.spec.js",
+		"test:integration": "vitest run test/index.spec.js test/object-ownership.spec.js test/oauth-security.spec.js test/oauth-atomicity.spec.js test/oauth-bind-recovery.spec.js test/oauth-identity-management.spec.js test/initial-password.spec.js test/reg-key.spec.js test/security-review-adversarial.spec.js test/security-review-round2.spec.js",
 		"test:mailjet": "node test-mailjet.js",
 		"deploy": "wrangler deploy",
 		"deploy:test": "wrangler deploy --config wrangler-test.toml",

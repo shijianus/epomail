@@ -5,8 +5,19 @@ import loginService from '../src/service/login-service.js';
 import userService from '../src/service/user-service.js';
 import settingService from '../src/service/setting-service.js';
 import { verifyAppleIdToken } from '../src/utils/oauth-jwt-utils.js';
+import { ensureOtcTable, seedOtc, clearOtc, ensureBindClaimTable, clearBindClaim } from './helpers/one-time-credential.js';
 
 const encoder = new TextEncoder();
+
+beforeAll(async () => {
+	await ensureOtcTable(env.db);
+	await ensureBindClaimTable(env.db);
+});
+
+afterAll(async () => {
+	await clearOtc(env.db);
+	await clearBindClaim(env.db);
+});
 
 function createMockKv() {
 	const store = new Map();
@@ -76,7 +87,7 @@ describe('OAuth state, nonce and callback exchange', () => {
 	beforeEach(() => {
 		kv = createMockKv();
 		c = {
-			env: { kv, jwt_secret: 'oauth-unit-test-secret' },
+			env: { kv, db: env.db, jwt_secret: 'oauth-unit-test-secret' },
 			req: { url: 'https://mail.example.com/api/oauth/authorize/apple', header: () => null }
 		};
 		vi.spyOn(settingService, 'query').mockResolvedValue({
@@ -115,7 +126,8 @@ describe('OAuth state, nonce and callback exchange', () => {
 		await expect(oauthService.getAuthorizeUrl(
 			c,
 			'apple',
-			'https://attacker.example/callback'
+			'https://attacker.example/callback',
+			'test-client-state'
 		)).rejects.toThrow('redirect_uri');
 	});
 
@@ -135,7 +147,8 @@ describe('OAuth state, nonce and callback exchange', () => {
 		await expect(oauthService.getAuthorizeUrl(
 			c,
 			'custom',
-			'https://mail.example.com/api/oauth/callback/custom'
+			'https://mail.example.com/api/oauth/callback/custom',
+			'test-client-state'
 		)).rejects.toThrow('restricted');
 		await expect(oauthService.exchangeCodeAndLogin(c, 'custom', {
 			code: 'fake',
@@ -144,6 +157,7 @@ describe('OAuth state, nonce and callback exchange', () => {
 	});
 
 	it('exchanges a login code exactly once', async () => {
+		await clearOtc(env.db);
 		const code = await oauthService.createLoginExchangeCode(c, {
 			token: 'session-jwt',
 			userInfo: { oauthUserId: 'apple:user-1' },
@@ -153,11 +167,13 @@ describe('OAuth state, nonce and callback exchange', () => {
 		expect(first.token).toBe('session-jwt');
 		await expect(oauthService.consumeLoginExchangeCode(c, code)).rejects.toThrow('login code');
 
-		await kv.put('oauth_login_code:expired-code', JSON.stringify({
-			token: 'stale-jwt',
-			createdAt: Date.now() - 120000
-		}));
-		await expect(oauthService.consumeLoginExchangeCode(c, 'expired-code')).rejects.toThrow('Expired');
+		await seedOtc(env.db, {
+			purpose: 'oauth_login_code',
+			token: 'expired-code',
+			payload: { token: 'stale-jwt', createdAt: Date.now() - 120000 },
+			expiresAt: Math.floor(Date.now() / 1000) - 60
+		});
+		await expect(oauthService.consumeLoginExchangeCode(c, 'expired-code')).rejects.toThrow();
 	});
 });
 
@@ -242,6 +258,8 @@ describe('OAuth account binding proof', () => {
 	beforeEach(async () => {
 		kv = createMockKv();
 		await env.db.prepare('DELETE FROM oauth').run();
+		await clearOtc(env.db);
+		await clearBindClaim(env.db);
 		await env.db.prepare('INSERT INTO oauth (oauth_user_id, username, name, user_id) VALUES (?, ?, ?, ?)')
 			.bind('apple:bind-user', 'bind-user', 'Bind User', 0).run();
 		c = {
@@ -254,7 +272,8 @@ describe('OAuth account binding proof', () => {
 			},
 			req: { url: 'https://mail.example.com/api/oauth/bindUser', header: () => null }
 		};
-		vi.spyOn(loginService, 'register').mockResolvedValue();
+		vi.spyOn(loginService, 'validateRegistration').mockResolvedValue({});
+		vi.spyOn(loginService, 'register').mockResolvedValue({ userId: 2, email: 'bound@example.com', reservedRegKey: false });
 		vi.spyOn(loginService, 'login').mockResolvedValue('bound-session-jwt');
 		vi.spyOn(userService, 'selectByIdIncludeDel').mockResolvedValue(null);
 		vi.spyOn(userService, 'selectByEmail').mockResolvedValue({ userId: 2, email: 'bound@example.com' });
@@ -278,11 +297,13 @@ describe('OAuth account binding proof', () => {
 		})).rejects.toThrow('bind proof');
 
 		const bindToken = 'server-issued-bind-proof';
-		await kv.put(`oauth_bind:${bindToken}`, JSON.stringify({
-			oauthUserId: 'apple:bind-user',
+		await seedOtc(env.db, {
+			purpose: 'oauth_bind',
+			token: bindToken,
 			provider: 'apple',
-			createdAt: Date.now()
-		}));
+			oauthUserId: 'apple:bind-user',
+			payload: { oauthUserId: 'apple:bind-user', provider: 'apple', createdAt: Date.now() }
+		});
 
 		const result = await oauthService.bindUser(c, {
 			email: 'bound@example.com',
@@ -297,26 +318,111 @@ describe('OAuth account binding proof', () => {
 			.bind('apple:bind-user').first();
 		expect(row.user_id).toBe(2);
 
-		await expect(oauthService.bindUser(c, {
+		// A replay of the spent proof is answered idempotently and never mints
+		// a second session from a credential that has already been consumed.
+		const replay = await oauthService.bindUser(c, {
 			email: 'second@example.com',
 			oauthUserId: 'apple:bind-user',
 			code: 'invite',
 			bindToken,
 			provider: 'apple'
-		})).rejects.toThrow();
+		});
+		expect(replay).toMatchObject({ token: null, alreadyBound: true });
 
 		const secondToken = 'second-bind-proof';
-		await kv.put(`oauth_bind:${secondToken}`, JSON.stringify({
-			oauthUserId: 'apple:bind-user',
+		await seedOtc(env.db, {
+			purpose: 'oauth_bind',
+			token: secondToken,
 			provider: 'apple',
-			createdAt: Date.now()
-		}));
-		await expect(oauthService.bindUser(c, {
+			oauthUserId: 'apple:bind-user',
+			payload: { oauthUserId: 'apple:bind-user', provider: 'apple', createdAt: Date.now() }
+		});
+		const alreadyBound = await oauthService.bindUser(c, {
 			email: 'second@example.com',
 			oauthUserId: 'apple:bind-user',
 			code: 'invite',
 			bindToken: secondToken,
 			provider: 'apple'
-		})).rejects.toThrow('已绑定');
+		});
+		expect(alreadyBound).toMatchObject({ token: null, alreadyBound: true });
+		expect(loginService.register).toHaveBeenCalledTimes(1);
+
+		const associations = await env.db.prepare('SELECT user_id FROM oauth WHERE oauth_user_id = ?')
+			.bind('apple:bind-user').all();
+		expect(associations.results).toHaveLength(1);
+		expect(associations.results[0].user_id).toBe(2);
 	});
+});
+
+describe('OAuth login result classification', () => {
+	// The three shapes loginService.login can return. Only an MFA challenge or a
+	// restricted-account notice may be forwarded as `mfa`; a successful login
+	// must surface its mailbox token, otherwise the callback treats a normal
+	// login as an unbound identity and issues a bind proof instead of a session.
+	const cases = [
+		{
+			name: 'successful session object yields the mailbox token',
+			login: { token: 'session-jwt', email: 'user@example.com', userId: 7 },
+			expectToken: 'session-jwt',
+			expectMfa: false
+		},
+		{
+			name: 'TOTP challenge is forwarded as mfa',
+			login: { mfaRequired: true, tempToken: 'temp', authType: 'totp', email: 'user@example.com' },
+			expectToken: null,
+			expectMfa: true
+		},
+		{
+			name: 'restricted-account notice is forwarded as mfa',
+			login: { isRestricted: true, restrictedToken: 'restricted', code: 'exchange' },
+			expectToken: null,
+			expectMfa: true
+		},
+		{
+			name: 'legacy string token still works',
+			login: 'legacy-jwt',
+			expectToken: 'legacy-jwt',
+			expectMfa: false
+		}
+	];
+
+	for (const testCase of cases) {
+		it(testCase.name, async () => {
+			const kv = createMockKv();
+			const c = { env: { kv, db: env.db } };
+			const { pair, jwk } = await createSigningMaterial();
+			await kv.put('apple_jwks_v1', JSON.stringify({ keys: [{ ...jwk }] }));
+
+			vi.spyOn(settingService, 'query').mockResolvedValue({
+				oauthProviders: {
+					apple: { clientId: 'test-client-id', clientSecret: 'test-client-secret', enabled: 1 }
+				}
+			});
+			vi.spyOn(userService, 'selectByEmail').mockResolvedValue(null);
+			vi.spyOn(oauthService, 'saveUser').mockResolvedValue({
+				oauthUserId: 'apple:classified-user',
+				userId: 7
+			});
+			vi.spyOn(userService, 'selectByIdIncludeDel').mockResolvedValue({
+				userId: 7,
+				email: 'user@example.com'
+			});
+			vi.spyOn(loginService, 'login').mockResolvedValue(testCase.login);
+
+			const idToken = await signRs256(pair.privateKey, { alg: 'RS256', kid: 'apple-test-kid' }, {
+				iss: 'https://appleid.apple.com',
+				aud: 'test-client-id',
+				sub: 'classified-user',
+				exp: Math.floor(Date.now() / 1000) + 300
+			});
+
+			const result = await oauthService.exchangeCodeAndLogin(c, 'apple', { id_token: idToken });
+			expect(result.token).toBe(testCase.expectToken);
+			if (testCase.expectMfa) {
+				expect(result.mfa).toBeTruthy();
+			} else {
+				expect(result.mfa).toBeUndefined();
+			}
+		});
+	}
 });

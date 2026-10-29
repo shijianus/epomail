@@ -77,6 +77,10 @@ const dbInit = {
 		await this.v3_16DB(c);
 		await this.v3_17DB(c);
 		await this.v3_18DB(c);
+		await this.v3_19DB(c);
+		await this.v3_20DB(c);
+		await this.v3_21DB(c);
+		await this.v3_22DB(c);
 		await settingService.refresh(c);
 		const generatedAdminPassword = c.get('generatedAdminPassword');
 		if (generatedAdminPassword) {
@@ -280,6 +284,158 @@ const dbInit = {
 			`).run();
 		} catch (e) {
 			console.warn('visitor user:query cleanup warning:', e.message);
+		}
+	},
+
+	// v3_22DB: 对象存储删除状态机与附件/去重索引。
+	// 背景：D1 元数据删除与对象存储删除无法构成跨系统事务，旧实现先删元数据
+	// 再删对象；对象删除失败后 key 永久丢失，形成无法回收的孤儿对象。
+	// 本迁移建立持久化删除队列（与元数据删除同批提交），由定时任务重放；
+	// 同时补齐附件级联删除与入站重复投递检测所需索引。
+	// 幂等：CREATE TABLE/INDEX IF NOT EXISTS，可重复执行。
+	async v3_22DB(c) {
+		const mailDb = getMailDb(c);
+
+		try {
+			await mailDb.prepare(`
+				CREATE TABLE IF NOT EXISTS object_deletion_queue (
+					id INTEGER PRIMARY KEY AUTOINCREMENT,
+					object_key TEXT NOT NULL,
+					user_id INTEGER NOT NULL DEFAULT 0,
+					attempts INTEGER NOT NULL DEFAULT 0,
+					status TEXT NOT NULL DEFAULT 'pending',
+					last_error TEXT,
+					next_retry_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+					create_time DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
+					UNIQUE(object_key, user_id)
+				)
+			`).run();
+			await mailDb.prepare(
+				`CREATE INDEX IF NOT EXISTS idx_object_deletion_queue_due ON object_deletion_queue(status, next_retry_at)`
+			).run();
+		} catch (e) {
+			console.warn('v3_22DB object_deletion_queue warning:', e.message);
+		}
+
+		const indexes = [
+			`CREATE INDEX IF NOT EXISTS idx_attachments_email_id ON attachments(email_id);`,
+			`CREATE INDEX IF NOT EXISTS idx_attachments_user_id ON attachments(user_id);`,
+			`CREATE INDEX IF NOT EXISTS idx_attachments_account_id ON attachments(account_id);`,
+			`CREATE INDEX IF NOT EXISTS idx_attachments_key ON attachments(key);`,
+			`CREATE INDEX IF NOT EXISTS idx_email_message_dedupe ON email(message_id, account_id, create_time);`
+		];
+		for (const sql of indexes) {
+			try {
+				await mailDb.prepare(sql).run();
+			} catch (e) {
+				console.warn('v3_22DB index warning:', e.message);
+			}
+		}
+	},
+
+	// v3_21DB: 已登录用户的第三方身份绑定/解绑审计表。
+	// 背景：账号设置中的身份绑定与解绑属于敏感安全操作，需要可追溯的
+	// 审计轨迹（谁、何时、哪个 provider、成功或拒绝原因）。
+	// 该表只保存事件元数据：绝不写入 step-up 令牌、bind claim、授权码、
+	// access_token 等任何一次性凭据或密钥。
+	// 幂等：CREATE TABLE/INDEX IF NOT EXISTS，可重复执行。
+	async v3_21DB(c) {
+		const userDb = getUserDb(c);
+		try {
+			await userDb.prepare(`
+				CREATE TABLE IF NOT EXISTS oauth_identity_audit (
+					audit_id INTEGER PRIMARY KEY AUTOINCREMENT,
+					user_id INTEGER NOT NULL,
+					event TEXT NOT NULL,
+					provider TEXT NOT NULL DEFAULT '',
+					oauth_user_id TEXT NOT NULL DEFAULT '',
+					outcome TEXT NOT NULL DEFAULT 'success',
+					ip TEXT NOT NULL DEFAULT '',
+					user_agent TEXT NOT NULL DEFAULT '',
+					detail TEXT NOT NULL DEFAULT '',
+					create_time DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
+				)
+			`).run();
+			await userDb.prepare(
+				`CREATE INDEX IF NOT EXISTS idx_oauth_identity_audit_user ON oauth_identity_audit(user_id, audit_id DESC)`
+			).run();
+		} catch (e) {
+			console.warn('v3_21DB oauth_identity_audit warning:', e.message);
+		}
+	},
+
+	// v3_20DB: OAuth 绑定身份租约与身份唯一性迁移。
+	// 背景：bind proof 按 OAuth flow 签发，同一身份两次流程会产生两个 proof；
+	// 仅靠 proof 单次消费无法阻止同一身份被并发绑定到两个账号。
+	// 隔离按 oauth_user_id 主键的租约，最终绑定用单条条件 UPDATE 同时校验
+	// 租约与未绑定状态。旧库若已存在重复 oauth_user_id，不自动删改数据，
+	// 仅跳过唯一索引（代码侧已有条件写入与 finalize 守卫兜底）。
+	// 幂等：CREATE TABLE/INDEX IF NOT EXISTS，可重复执行。
+	async v3_20DB(c) {
+		const userDb = getUserDb(c);
+		try {
+			await userDb.prepare(`
+				CREATE TABLE IF NOT EXISTS oauth_bind_claim (
+					oauth_user_id TEXT PRIMARY KEY,
+					claim_token TEXT NOT NULL,
+					email TEXT NOT NULL DEFAULT '',
+					user_id INTEGER NOT NULL DEFAULT 0,
+					reserved_reg_key INTEGER NOT NULL DEFAULT 0,
+					code TEXT NOT NULL DEFAULT '',
+					expires_at INTEGER NOT NULL,
+					create_time DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
+				)
+			`).run();
+			await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_oauth_bind_claim_expires ON oauth_bind_claim(expires_at)`).run();
+		} catch (e) {
+			console.warn('v3_20DB oauth_bind_claim warning:', e.message);
+		}
+
+		try {
+			const duplicate = await userDb.prepare(`
+				SELECT oauth_user_id FROM oauth
+				WHERE oauth_user_id IS NOT NULL AND oauth_user_id <> ''
+				GROUP BY oauth_user_id HAVING COUNT(*) > 1
+				LIMIT 1
+			`).first();
+			if (duplicate) {
+				console.warn(`v3_20DB skipped oauth_user_id unique index: duplicate identity ${duplicate.oauth_user_id}`);
+			} else {
+				// Partial index: legacy rows with an empty identity must not
+				// block the migration.
+				await userDb.prepare(`
+					CREATE UNIQUE INDEX IF NOT EXISTS idx_oauth_user_id_unique
+					ON oauth(oauth_user_id)
+					WHERE oauth_user_id IS NOT NULL AND oauth_user_id <> ''
+				`).run();
+			}
+		} catch (e) {
+			console.warn('v3_20DB oauth_user_id unique index warning:', e.message);
+		}
+	},
+
+	// v3_19DB: OAuth 单次凭证原子消费表迁移。
+	// 背景：state / login code / bind proof 原先使用 KV get 后 delete，两次
+	// 独立操作在并发下可被重复消费。改为 D1 单条条件 UPDATE（CAS）消费。
+	// 幂等：CREATE TABLE/INDEX IF NOT EXISTS，可重复执行。
+	async v3_19DB(c) {
+		const userDb = getUserDb(c);
+		try {
+			await userDb.prepare(`
+				CREATE TABLE IF NOT EXISTS oauth_one_time_credential (
+					token_hash TEXT PRIMARY KEY,
+					purpose TEXT NOT NULL,
+					provider TEXT NOT NULL DEFAULT '',
+					oauth_user_id TEXT NOT NULL DEFAULT '',
+					payload TEXT NOT NULL,
+					consumed INTEGER NOT NULL DEFAULT 0,
+					expires_at INTEGER NOT NULL,
+					create_time DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
+				)
+			`).run();
+			await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_oauth_otc_expires ON oauth_one_time_credential(expires_at)`).run();
+		} catch (e) {
+			console.warn('v3_19DB oauth_one_time_credential warning:', e.message);
 		}
 	},
 
@@ -1548,6 +1704,32 @@ const dbInit = {
 			)
 		`).run();
 
+		for (const sql of [
+			`CREATE INDEX IF NOT EXISTS idx_attachments_email_id ON attachments(email_id);`,
+			`CREATE INDEX IF NOT EXISTS idx_attachments_user_id ON attachments(user_id);`,
+			`CREATE INDEX IF NOT EXISTS idx_attachments_account_id ON attachments(account_id);`,
+			`CREATE INDEX IF NOT EXISTS idx_attachments_key ON attachments(key);`
+		]) {
+			await mailDb.prepare(sql).run();
+		}
+
+		await mailDb.prepare(`
+			CREATE TABLE IF NOT EXISTS object_deletion_queue (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				object_key TEXT NOT NULL,
+				user_id INTEGER NOT NULL DEFAULT 0,
+				attempts INTEGER NOT NULL DEFAULT 0,
+				status TEXT NOT NULL DEFAULT 'pending',
+				last_error TEXT,
+				next_retry_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				create_time DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
+				UNIQUE(object_key, user_id)
+			)
+		`).run();
+		await mailDb.prepare(
+			`CREATE INDEX IF NOT EXISTS idx_object_deletion_queue_due ON object_deletion_queue(status, next_retry_at)`
+		).run();
+
 		await mailDb.prepare(`
 			CREATE TABLE IF NOT EXISTS account (
 				account_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1739,7 +1921,57 @@ const dbInit = {
 		`).run();
 		await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_exchange_code_expires ON one_time_exchange_code(expires_at)`).run();
 
-		await userDb.prepare(`DROP TRIGGER IF EXISTS trg_audit_decision_version_guard;`).run();
+		// OAuth 单次凭证（state / login exchange code / bind proof / provider authorization code）。
+		// token_hash 只保存 bearer token 的 SHA-256 摘要；消费依靠单条
+		// UPDATE ... WHERE consumed = 0 ... RETURNING 完成原子 CAS。
+		await userDb.prepare(`
+			CREATE TABLE IF NOT EXISTS oauth_one_time_credential (
+				token_hash TEXT PRIMARY KEY,
+				purpose TEXT NOT NULL,
+				provider TEXT NOT NULL DEFAULT '',
+				oauth_user_id TEXT NOT NULL DEFAULT '',
+				payload TEXT NOT NULL,
+				consumed INTEGER NOT NULL DEFAULT 0,
+				expires_at INTEGER NOT NULL,
+				create_time DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
+			)
+		`).run();
+		await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_oauth_otc_expires ON oauth_one_time_credential(expires_at)`).run();
+
+		// OAuth 绑定身份租约：同一身份同一时刻只允许一个绑定写入者；租约短时
+		// 有效，最终绑定在单条 UPDATE 中同时校验租约与未绑定状态。
+		await userDb.prepare(`
+			CREATE TABLE IF NOT EXISTS oauth_bind_claim (
+				oauth_user_id TEXT PRIMARY KEY,
+				claim_token TEXT NOT NULL,
+				email TEXT NOT NULL DEFAULT '',
+				user_id INTEGER NOT NULL DEFAULT 0,
+				reserved_reg_key INTEGER NOT NULL DEFAULT 0,
+				code TEXT NOT NULL DEFAULT '',
+				expires_at INTEGER NOT NULL,
+				create_time DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
+			)
+		`).run();
+		await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_oauth_bind_claim_expires ON oauth_bind_claim(expires_at)`).run();
+
+		// 第三方身份绑定/解绑审计（仅事件元数据，不含任何一次性凭据或密钥）。
+		await userDb.prepare(`
+			CREATE TABLE IF NOT EXISTS oauth_identity_audit (
+				audit_id INTEGER PRIMARY KEY AUTOINCREMENT,
+				user_id INTEGER NOT NULL,
+				event TEXT NOT NULL,
+				provider TEXT NOT NULL DEFAULT '',
+				oauth_user_id TEXT NOT NULL DEFAULT '',
+				outcome TEXT NOT NULL DEFAULT 'success',
+				ip TEXT NOT NULL DEFAULT '',
+				user_agent TEXT NOT NULL DEFAULT '',
+				detail TEXT NOT NULL DEFAULT '',
+				create_time DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
+			)
+		`).run();
+		await userDb.prepare(
+			`CREATE INDEX IF NOT EXISTS idx_oauth_identity_audit_user ON oauth_identity_audit(user_id, audit_id DESC)`
+		).run();
 		await userDb.prepare(`
 			CREATE TRIGGER IF NOT EXISTS trg_audit_decision_version_guard
 			BEFORE INSERT ON audit_decision

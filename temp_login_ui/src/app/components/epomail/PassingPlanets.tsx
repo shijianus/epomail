@@ -1,12 +1,20 @@
 import { useEffect, useRef, useState } from "react";
 import { cameraState } from "./cameraStore";
 
-type PlanetType = "ice" | "gas" | "dark" | "nebula";
+type PlanetType = "ice" | "gas" | "dark" | "nebula" | "earth" | "saturn";
 type FlightPhase = "frontal" | "lateral" | "chase";
 
 function getBellCurve(min: number, max: number): number {
   const u = (Math.random() + Math.random() + Math.random()) / 3;
   return min + u * (max - min);
+}
+
+interface PlanetStyles {
+  surfaceBg: string;
+  atmosphereShadow: string;
+  rings: React.CSSProperties[];
+  outerGlow: string;
+  outerBorder: string;
 }
 
 interface Planet {
@@ -28,6 +36,8 @@ interface Planet {
   spinSpeed: number;
   axialTilt: number;
   spinOffset: number;
+  /** 昂贵渐变串的缓存，由 getPlanetStyles 预热后写入 */
+  _cachedStyles?: PlanetStyles;
 }
 
 export function PassingPlanets() {
@@ -217,7 +227,6 @@ export function PassingPlanets() {
         const baseSize = Math.random() * 800 + 400; // Planets are massive
         const radius = baseSize / 2;
         
-        const type = types[Math.floor(Math.random() * types.length)];
         let spawnX = 0, spawnY = 0, spawnZ = 0;
         let vx = 0, vy = 0, vz = 0;
         let targetX = 0, targetY = 0;
@@ -412,8 +421,8 @@ export function PassingPlanets() {
     return () => cancelAnimationFrame(raf);
   }, []);
 
-function getPlanetStyles(p: Planet) {
-  if ((p as any)._cachedStyles) return (p as any)._cachedStyles;
+function getPlanetStyles(p: Planet): PlanetStyles {
+  if (p._cachedStyles) return p._cachedStyles;
 
   let surfaceBg = "";
   let atmosphereShadow = "";
@@ -707,8 +716,8 @@ function getPlanetStyles(p: Planet) {
     outerGlow = `0 0 50px hsla(${h2}, 80%, 60%, 0.5)`;
   }
 
-  const styles = { surfaceBg, atmosphereShadow, rings, outerGlow, outerBorder };
-  (p as any)._cachedStyles = styles;
+  const styles: PlanetStyles = { surfaceBg, atmosphereShadow, rings, outerGlow, outerBorder };
+  p._cachedStyles = styles;
   return styles;
 }
 
