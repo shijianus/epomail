@@ -11,6 +11,22 @@
 
 ---
 
+### 阶段 1 上线收敛：后端认证/OAuth 强制开关、初始化去固定凭据与邮件隔离安全加固 (2026-10-30)
+*   **关联提交 (Git Commit)**: `748643a8989c27b0a14dbed4922ed29759092bf0` (Short: `748643a`)；前置模块提交 `4aefb562a380f04d01d0290b5690b26769e6104f` (`4aefb56`)、`a1d080559b9a05e1751cfd44c993ef9d17626170` (`a1d0805`)
+*   **部署环境 (Deployment)**: 本地全真栈 workerd + D1/KV 隔离回归、Worker dry-run 打包、`mail-vue` 生产构建；**未执行任何远程部署或生产库修改，统一推送 `origin/release/2026-10-31`**
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 模块 B（固定账号与初始化安全）：移除 `admin-utils.js` 与 `user-service.js` 中 `userId === 1` 超管提权及清理豁免；`init.js` 停止播种/复活 `admin@epomail.cyou` (`123456`) 并在生产冷启动缺失 `admin_initial_password` 时安全失败；将 6 个 `audit_*` 配置迁入 `setting_ext`（`setting` 表降至 96 列，彻底消除 D1 100 列上限报错）。
+    - [x] 模块 A（认证与 OAuth 服务端强制）：`oauthService` / `oauthApi` / `oauthIdentityService` 全端点统一 `assertProviderEnabled` 强制校验总开关、Provider 开关与完整凭据（含修复 Apple 空 `clientSecret` 假阳性）；禁用总开关或单 Provider 时通过 `oneTimeCredential.revokeClientFlows` 即时吊销在途 `state` / `login_code` / `bind` 凭证；补齐 OAuth 客户端 S256 PKCE 闭环、直调登录 `state` 强校验及内置 OAuth2 Provider 常量时间密钥比对与 scope 裁剪。
+    - [x] 模块 C（核心邮件链路与跨用户隔离）：修复 `cascadeDeleteEmails` 未校验归属即跨用户物理删除附件/对象存储与星标的 P0 漏洞；收紧 `emailService.list` / `latest` 显式 `accountId` 归属校验与 `starService` 归属过滤及密文解密；在 `emailService.send` 外发前强制执行 `EMAIL_OUTBOUND_ENABLED`、`OUTBOUND_WHITELIST` 及附件数量/大小/配额预检；修复 `emailService.read` 缺失 `.run()` 及双库模式 `getMailDb`/`getUserDb` 路由。
+    - [x] 交接归档：新增 `doc/rc-2026-10-31-handoff.md`，完整记录真实测试结果、`NOT-TESTED` 外部联调边界、生产存量 `admin@epomail.cyou` 独立处置 SQL 与下一阶段 Windows 兼容性清单。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：`mail-vue` 构建通过 (耗时 20.12s)；`wrangler deploy --dry-run` 通过 (gzip 1136.36 KiB)
+    - [x] 自动化测试套件：`mail-worker` 全量 `vitest run` 全绿 (`17/17` 文件，`207/207` 断言通过)；`temp_login_ui` 单测 `15/15` 通过
+    - [x] 静态门禁与密钥扫描：i18n 四件套 6 语言 100% 对称零缺失；`secret-scan.mjs` 工作树 (1251 文件) 与 Git 历史 (4061 blobs) 0 命中
+    - [x] 零假数据残留：新增测试套件 (`init-visitor-security`、`oauth-switch-enforcement`、`mail-pipeline-convergence`) 均在 `afterAll` 物理清理全部 D1/KV 测试数据
+
+---
+
 ### OAuth 身份管理、对象存储安全收口与 B8 发布候选交付 (2026-10-29)
 *   **关联提交 (Git Commit)**: `564bbcad37a1769448823211a004a9b76edd9cd3` (Short: `564bbca`)
 *   **部署环境 (Deployment)**: 本地 workerd + D1/KV 隔离测试、双前端生产构建、Worker bundle dry-run；**未部署任何远程环境，本批次推送 `origin/master`**
