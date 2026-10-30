@@ -11,6 +11,28 @@
 
 ---
 
+### 阶段 3 上线收敛：依赖高危收口、gitleaks 门禁根因修复与真实全栈/浏览器回归 (2026-10-30)
+*   **关联提交 (Git Commit)**: `a0680e8399f01395725ff9f372032de303cf4e4d` (Short: `a0680e8`)
+*   **部署环境 (Deployment)**: 本地全真栈 `wrangler dev` + 临时 D1/KV、三应用生产构建、Worker dry-run；**未执行任何远程部署、未修改生产库，统一推送 `origin/release/2026-10-31`**
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] CI 真实故障根因修复（P1 门禁失效）：`.github/workflows/secret-scanning.yml` 调用 `gitleaks log`，该子命令属于 gitleaks v7，v8（作业下载 8.24.3）已移除并返回 `unknown command`；因安装步骤为 best-effort，仅在下载成功时暴露，导致有 gitleaks 的正常 runner 上「Offline Secret Scanning Gate」每次 push 必失败。改为 `gitleaks git --log-opts=...`；新分支（全零 before）由非法区间 `0000..sha` 改为 `--all` 全历史扫描。仍然发现即失败，未跳过、未软化、未 `continue-on-error`。
+    - [x] 依赖处置（同大版本内收口）：`mail-vue` 全量审计 3 high + 1 moderate → **0 high**（`brace-expansion` 1.1.16/2.1.2 → 1.1.21/2.1.7、`sharp` 0.35.2 → 0.35.5、`serialize-javascript` 6.0.2 → 7.1.4）；`temp_login_ui` 12 high / 16 moderate / 6 low → **0 条告警**（`vite` 6.3.5 → ^6.4.5，`nanoid` / `undici` / `source-map-js` / `sharp` 定向 overrides）；`mail-worker` 28 high / 32 moderate / 3 critical → 9 high / 4 moderate / 3 critical（`undici` 7.14/7.24 → 7.30.1，并纳入此前未提交的 `nanoid` / `postcss` / `picomatch` / `rollup` overrides）。三应用 `pnpm audit --prod` 均无 high/critical，剩余项全部为 vitest/miniflare/wrangler 测试工具链（`ws` 8.21 已实测会破坏 miniflare WebSocket 回环，维持不覆盖）。
+    - [x] 构建兼容修复：`mail-vue` 的 `@vitejs/plugin-vue` `^5.2.1 → ^6.0.10`，消除「插件仅声明 Vite 5/6、应用运行 Vite 7」的未满足 peer 依赖；生产构建复跑确认产物一致。
+    - [x] 测试能力补强（此前不存在可复跑脚本）：新增 `tests/fullstack-smoke.mjs`（临时 `--persist-to` 目录，冷启动 init/幂等、站长登录、websiteConfig、OAuth 失败关闭 403、sidebarStats、list、account/list、外发 403 `outbound_disabled`、匿名 401、`/login/` 产物）与 `tests/fullstack-browser-e2e.mjs`（真实 Worker + Chromium：表单登录、`/mail/u/0/#inbox` 自定义 history 落地、token 持久化、`/api/email/list` 200、安全设置页绑定身份 API、375px 无横向溢出、过期回登录）。两者均在 `finally` 清理临时状态，零外部请求。
+    - [x] 前端契约复核（对照 Stage 1 后端源码逐项读两端）：OAuth Provider 显示/`configured`、回调失败本地化、bindUser 状态码分类、已登录绑定 claim 流程、MFA 字段、401 强制登出、`sidebarStats` 字段、`/oss-url/batch`、外发 403，全部一致；未发现需修改业务 UI 的兼容缺陷，因此不做界面改动。
+    - [x] Windows 可复跑门禁：`mail-worker` 新增 `test:serial`（`vitest run --maxWorkers=1`），本机 17 文件全量 **208/208** 通过；CI 仍保留并行调用。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：`node scripts/build-prod.mjs` 通过 (exit 0)；`wrangler deploy --dry-run` 通过；`temp_login_ui` 构建 7.9s、`mail-vue` 构建通过
+    - [x] 自动化测试套件：`mail-worker` 串行全量 **17/17 文件、208/208 断言通过**（单进程 17 文件并发仍因本机 workerd 回环 `ConnectEx #1225` 无法收集，如实记为环境限制）；`temp_login_ui` typecheck + **15/15** 单测通过
+    - [x] 全真栈冒烟：`tests/fullstack-smoke.mjs` **13/13** 通过；真实浏览器全栈 `tests/fullstack-browser-e2e.mjs` **10/10** 通过（含 375px 溢出与过期跳转）
+    - [x] Playwright 离线回归：`tests/oauth-bind-login-ui-e2e.mjs` **13/13** 场景通过
+    - [x] 静态门禁与密钥扫描：i18n 四件套全部 exit 0（3056 / 1946 键 × 6 语言、142 条 auth 词条）；`secret-scan.mjs` 工作树 1252 文件 0 命中；`scan-staged-secrets --self-test`、`--push` 均通过
+    - [x] 锁文件一致性：根目录与三应用 `pnpm install --frozen-lockfile` 全部通过
+    - [x] 零假数据残留：全栈脚本使用独立临时持久化目录并在 `finally` 物理删除；未写入任何真实库
+    - [ ] `NOT-TESTED`：GitHub Actions runner 实际执行（需推送后观察）、真实 OAuth Provider 回调、真实 Resend / Mailjet / Cloudflare 外发、真实 R2 / S3 / B2、云端 D1 / KV 备份回滚
+
+---
+
 ### 阶段 2 上线收敛：侧边栏统计 SQL 缺陷修复、Windows 测试可用性、依赖漏洞处置、CI 与生产构建收敛 (2026-10-30)
 *   **关联提交 (Git Commit)**: `e4981a3d5556d0c926405ec33fd7ff1e62b92cc2` (Short: `e4981a3`)；本阶段代码提交 `b575ccedc861c2510af14c5234310a4b34380239` (`b575cce`)、`e450cbd1e4626fa457c985be73b62715e943656f` (`e450cbd`)、`dbba1691a4be8358552610a28b343d3671eac8c0` (`dbba169`)
 *   **部署环境 (Deployment)**: 本地全真栈 `wrangler dev` + 本地 D1/KV、三应用生产构建、Worker dry-run；**未执行任何远程部署、未修改生产库，统一推送 `origin/release/2026-10-31`**
