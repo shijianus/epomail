@@ -665,4 +665,47 @@ describe('Module C: Core mail pipeline, isolation, outbound gates, and webhook c
 		const afterLateDelivered = await env.db.prepare('SELECT status FROM email WHERE email_id = ?').bind(sentEmailId).first();
 		expect(afterLateDelivered.status).toBe(emailConst.status.BOUNCED);
 	});
+
+	// Regression: the snoozed-waiting aggregate once carried a stray parenthesis,
+	// which made the whole statement a SQLite syntax error and turned every
+	// sidebar request into a 500.
+	it('serves sidebar counters for inbox, spam, trash, drafts, sent, and both snooze windows', async () => {
+		const collector = await seedMailboxUser('sidebar-counters-c@example.com', standardRoleId);
+		trackedKvKeys.add(collector.authKey);
+
+		const insert = (values) => env.db.prepare(
+			`INSERT INTO email (send_email, name, account_id, user_id, subject, content, text, recipient, labels, type, status, unread, is_del, is_spam, snoozed_time, snoozed_end_time)
+			 VALUES (?, 'Counter', ?, ?, ?, '<p>x</p>', 'x', '[]', '[]', ?, ?, ?, ?, ?, ?, ?)`
+		).bind('counter@external.org', collector.accountId, collector.userId, ...values).run();
+
+		// inbox unread
+		await insert(['Inbox', 0, 0, 0, 0, 0, null, null]);
+		// spam unread
+		await insert(['Spam', 0, 0, 0, 0, 1, null, null]);
+		// trash read
+		await insert(['Trash', 0, 0, 1, 1, 0, null, null]);
+		// snoozed without an end time -> urgent
+		await insert(['Snoozed Urgent', 0, 0, 1, 0, 0, '2026-01-01 00:00:00', null]);
+		// snoozed with a future end time -> waiting
+		await insert(['Snoozed Waiting', 0, 0, 1, 0, 0, '2026-01-01 00:00:00', '2099-01-01 00:00:00']);
+		// draft + sent
+		await insert(['Draft', 1, emailConst.status.SAVING, 0, 0, 0, null, null]);
+		await insert(['Sent', 1, 0, 0, 0, 0, null, null]);
+
+		const res = await apiFetch('/api/email/sidebarStats', { jwt: collector.jwt });
+		const body = await res.json();
+		expect(body.code).toBe(200);
+		expect(body.data).toMatchObject({
+			inboxUnread: 1,
+			spamUnread: 1,
+			spamRead: 0,
+			trashUnread: 0,
+			trashRead: 1,
+			snoozedUrgent: 1,
+			snoozedWaiting: 1,
+			draftUnread: 1,
+			sentUnread: 1,
+			allUnread: 4
+		});
+	});
 });

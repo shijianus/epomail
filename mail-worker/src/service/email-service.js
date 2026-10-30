@@ -2689,7 +2689,7 @@ const emailService = {
 				SUM(CASE WHEN is_del = 1 AND unread = 0 THEN 1 ELSE 0 END) as trashUnread,
 				SUM(CASE WHEN is_del = 1 AND unread = 1 THEN 1 ELSE 0 END) as trashRead,
 				SUM(CASE WHEN is_del = 0 AND snoozed_time IS NOT NULL AND (snoozed_end_time IS NULL OR datetime(snoozed_end_time) <= datetime('now')) THEN 1 ELSE 0 END) as snoozedUrgent,
-				SUM(CASE WHEN is_del = 0 AND snoozed_time IS NOT NULL AND snoozed_end_time IS NOT NULL AND datetime(snoozed_end_time) > datetime('now')) THEN 1 ELSE 0 END) as snoozedWaiting,
+				SUM(CASE WHEN is_del = 0 AND snoozed_time IS NOT NULL AND snoozed_end_time IS NOT NULL AND datetime(snoozed_end_time) > datetime('now') THEN 1 ELSE 0 END) as snoozedWaiting,
 				SUM(CASE WHEN is_del = 0 AND unread = 0 THEN 1 ELSE 0 END) as allUnread
 			FROM email
 			WHERE user_id = ?
