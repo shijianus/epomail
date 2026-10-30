@@ -12,11 +12,12 @@
 ---
 
 ### 阶段 2 发布门禁收敛：CI 离线密钥检测命令修正与生产构建供应链加固 (2026-10-30)
-*   **关联提交 (Git Commit)**: `6cd14ffbe539bfe3a081056af1a06509c664d638` (Short: `6cd14ff`)
+*   **关联提交 (Git Commit)**: `a1b6599b5066347ee974f114ea06a7516d246c43` (Short: `a1b6599`)；前置提交 `6cd14ffbe539bfe3a081056af1a06509c664d638` (`6cd14ff`)
 *   **部署环境 (Deployment)**: 本地全真栈回归、Worker dry-run 完整打包、双前端生产构建；**未执行任何远程部署或生产库修改，统一推送 `origin/release/2026-10-31`**
 *   **功能需求与变更清单 (Changes & Feature Alignment)**:
     - [x] CI 密钥扫描门禁修正：修复 `.github/workflows/secret-scanning.yml` 中 gitleaks v8+ 不支持 `log` 子命令导致 CI 误判失败的问题，修正为 `gitleaks detect`（覆盖 push 与 PR 两条执行链路）。
     - [x] 生产构建供应链加固：更新 `scripts/build-prod.mjs`，自适应采用 `corepack pnpm@10.34.5`、强制传递 `CI=true` 环境变量并启用 `--frozen-lockfile`，根治非交互环境下的供应链规则校验挂起及 pnpm 12 锁定文件格式不兼容故障。
+    - [x] 测试数据清理防竞争加固：移除各单测 `afterAll` 中的破坏性 `DROP TABLE`（如 `user`、`oauth`、`attachments` 表），统一改为行级 `DELETE` 清理，彻底消除多用例并行运行时偶发的 D1 表丢失竞争；同步 `.github/workflows/security.yml` 的 Node/pnpm 版本至 `24.14.0` / `10.34.5`。
     - [x] 端到端验证与门禁全绿：本地已验证 `temp_login_ui`（typecheck + unit 15/15 + build）、Playwright E2E（13/13 scenarios）、`mail-worker` 全量套件（17 文件 207/207 passed）、`mail-vue` 生产构建、Wrangler dry-run 完整打包（5490.57 KiB / gzip 1136.36 KiB）、i18n 四件套及密钥全量扫描（1253 文件 + 4070 blobs 零命中）。
 *   **自动化测试与核验清单 (Verification Checklist)**:
     - [x] 本地构建核验：`scripts/build-prod.mjs` 全流程通过；`wrangler deploy --dry-run` 完整打包通过
