@@ -74,10 +74,9 @@ const settingService = {
 			if (!value || typeof value !== 'object') continue;
 			const hasClientId = Boolean(value.clientId && String(value.clientId).trim());
 			const hasClientSecret = Boolean(value.clientSecret && String(value.clientSecret).trim());
-			const isAppleConfigured = key === 'apple' && hasClientId && (hasClientSecret || Boolean(value.teamId && value.keyId));
 			sanitized[key] = {
 				enabled: (value.enabled === 1 || value.enabled === true) ? 1 : 0,
-				configured: (hasClientId && hasClientSecret) || isAppleConfigured ? 1 : 0,
+				configured: (hasClientId && hasClientSecret) ? 1 : 0,
 				clientId: value.clientId || '',
 				// Keep a non-empty mask so the admin form can distinguish
 				// "configured" from "empty"; the save path merges the real
@@ -494,6 +493,7 @@ const settingService = {
 			params.oauthLoginEnabled = Number(params.oauthLoginEnabled) === 1 ? 1 : 0;
 		}
 
+		const disabledOAuthProviders = [];
 		if (params.oauthProviders && typeof params.oauthProviders === 'object') {
 			const currentProviders = (typeof settingData.oauthProviders === 'object' && settingData.oauthProviders) ? settingData.oauthProviders : {};
 			const incomingProviders = params.oauthProviders;
@@ -509,6 +509,9 @@ const settingService = {
 					if (!nextValue || String(nextValue).includes('******')) {
 						merged[secretField] = previous[secretField] || '';
 					}
+				}
+				if (merged.enabled !== 1 && merged.enabled !== true) {
+					disabledOAuthProviders.push(key.toLowerCase());
 				}
 				mergedProviders[key] = merged;
 			}
@@ -687,6 +690,21 @@ const settingService = {
 		}
 
 		await this.refresh(c);
+
+		if (params.oauthLoginEnabled === 0 || disabledOAuthProviders.length > 0) {
+			try {
+				const oneTimeCredential = (await import('../utils/one-time-credential.js')).default;
+				if (params.oauthLoginEnabled === 0) {
+					await oneTimeCredential.revokeClientFlows(c);
+				} else {
+					for (const providerKey of disabledOAuthProviders) {
+						await oneTimeCredential.revokeClientFlows(c, { provider: providerKey });
+					}
+				}
+			} catch (_) {
+				// Best-effort revocation; runtime assertProviderEnabled also blocks all disabled endpoints
+			}
+		}
 	},
 
 	async deleteBackground(c) {
@@ -1046,8 +1064,7 @@ const settingService = {
 					if (v && typeof v === 'object') {
 						const hasClientId = Boolean(v.clientId && typeof v.clientId === 'string' && v.clientId.trim() !== '');
 						const hasClientSecret = Boolean(v.clientSecret && typeof v.clientSecret === 'string' && v.clientSecret.trim() !== '');
-						const isAppleConfigured = k === 'apple' && hasClientId && (hasClientSecret || Boolean(v.teamId && v.keyId));
-						const isConfigured = (hasClientId && hasClientSecret) || isAppleConfigured ? 1 : 0;
+						const isConfigured = (hasClientId && hasClientSecret) ? 1 : 0;
 						sanitized[k] = {
 							enabled: (v.enabled === 1 || v.enabled === true) ? 1 : 0,
 							configured: isConfigured,

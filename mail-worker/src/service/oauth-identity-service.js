@@ -434,6 +434,7 @@ const oauthIdentityService = {
 		if (!providerList.some(item => item.key === provider)) {
 			throw new BizError(t('oauthProviderUnavailable'), 400, 'provider_unavailable');
 		}
+		await oauthService.assertProviderEnabled(c, provider);
 
 		const existingRows = await orm(c).select().from(oauth).where(eq(oauth.userId, userId)).all();
 		const alreadyBound = (existingRows || []).some(row =>
@@ -490,11 +491,14 @@ const oauthIdentityService = {
 			throw new BizError(t('oauthStateInvalid'), 400, 'state_invalid');
 		}
 
+		await oauthService.assertProviderEnabled(c, provider);
+
 		const userInfo = await oauthService.fetchProviderUserInfo(c, provider, {
 			code: params.code,
 			id_token: params.id_token,
 			redirectUri: stateRow.redirectUri,
-			nonce: stateRow.nonce
+			nonce: stateRow.nonce,
+			codeVerifier: stateRow.codeVerifier || ''
 		});
 		if (!userInfo || typeof userInfo.oauthUserId !== 'string' || !userInfo.oauthUserId) {
 			throw new BizError('OAuth provider authorization failed');
@@ -593,6 +597,7 @@ const oauthIdentityService = {
 
 		const oauthUserId = probe.oauthUserId;
 		const provider = probe.provider;
+		await oauthService.assertProviderEnabled(c, provider);
 
 		// Serialise concurrent completes for this identity. The loser keeps its
 		// claim intact (nothing was spent) and receives a clear conflict.

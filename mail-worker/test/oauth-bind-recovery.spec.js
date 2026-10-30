@@ -96,7 +96,11 @@ function applyPolicyMocks({ mockRegister = true } = {}) {
 		registerVerify: 1,
 		regVerifyCount: 5,
 		minEmailPrefix: 1,
-		emailPrefixFilter: []
+		emailPrefixFilter: [],
+		oauthLoginEnabled: 1,
+		oauthProviders: {
+			apple: { clientId: 'test-client-id', clientSecret: 'test-client-secret', enabled: 1 }
+		}
 	};
 
 	vi.spyOn(settingService, 'query').mockImplementation(async () => ({ ...settings }));

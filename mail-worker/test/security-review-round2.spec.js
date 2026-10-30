@@ -345,6 +345,12 @@ describe('OAuth bind result shape at the production login service boundary', () 
 			ttlSeconds: 600
 		});
 
+		await env.kv.put('setting:', JSON.stringify({
+			oauthLoginEnabled: 1,
+			oauthProviders: {
+				apple: { clientId: 'test-client-id', clientSecret: 'test-client-secret', enabled: 1 }
+			}
+		}), { expirationTtl: 3600 });
 		vi.spyOn(loginService, 'validateRegistration').mockResolvedValue({});
 		vi.spyOn(loginService, 'register').mockResolvedValue({ userId: 2, reservedRegKey: false });
 		vi.spyOn(loginService, 'login').mockResolvedValue({

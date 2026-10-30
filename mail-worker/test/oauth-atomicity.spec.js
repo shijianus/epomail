@@ -351,6 +351,15 @@ describe('OAuth state', () => {
 });
 
 describe('OAuth login exchange code', () => {
+	beforeEach(() => {
+		vi.spyOn(settingService, 'query').mockResolvedValue({
+			oauthLoginEnabled: 1,
+			oauthProviders: {
+				apple: { clientId: 'test-client-id', clientSecret: 'test-client-secret', enabled: 1 }
+			}
+		});
+	});
+
 	async function issueCode(marker = 'code') {
 		return oauthService.createLoginExchangeCode({ env }, {
 			token: `session-jwt-${marker}`,
@@ -446,6 +455,12 @@ describe('OAuth bind proof', () => {
 	}
 
 	beforeEach(() => {
+		vi.spyOn(settingService, 'query').mockResolvedValue({
+			oauthLoginEnabled: 1,
+			oauthProviders: {
+				apple: { clientId: 'test-client-id', clientSecret: 'test-client-secret', enabled: 1 }
+			}
+		});
 		vi.spyOn(loginService, 'validateRegistration').mockResolvedValue({});
 		vi.spyOn(loginService, 'register').mockResolvedValue({
 			userId: 5,
@@ -635,6 +650,7 @@ describe('OAuth callback end-to-end concurrency', () => {
 		const { pair, jwk } = await createSigningMaterial('atomicity-callback-kid');
 		await env.kv.put('apple_jwks_v1', JSON.stringify({ keys: [jwk] }), { expirationTtl: 3600 });
 		vi.spyOn(settingService, 'query').mockResolvedValue({
+			oauthLoginEnabled: 1,
 			oauthProviders: {
 				apple: { clientId: 'test-client-id', clientSecret: 'test-client-secret', enabled: 1 }
 			}
@@ -701,6 +717,7 @@ describe('OAuth callback end-to-end concurrency', () => {
 		const { jwk } = await createSigningMaterial('atomicity-failure-kid');
 		await env.kv.put('apple_jwks_v1', JSON.stringify({ keys: [jwk] }), { expirationTtl: 3600 });
 		vi.spyOn(settingService, 'query').mockResolvedValue({
+			oauthLoginEnabled: 1,
 			oauthProviders: {
 				apple: { clientId: 'test-client-id', clientSecret: 'test-client-secret', enabled: 1 }
 			}

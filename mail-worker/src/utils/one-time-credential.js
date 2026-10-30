@@ -266,6 +266,44 @@ const oneTimeCredential = {
 				LIMIT ?
 			)
 		`).bind(nowSec, limit).run();
+	},
+
+	/**
+	 * Immediately invalidate unconsumed third-party OAuth client credentials
+	 * (states, callback exchange codes, unbound bind proofs, and signed-in bind
+	 * claims) when global OAuth or a specific provider is disabled.
+	 */
+	async revokeClientFlows(c, { provider = null } = {}) {
+		const db = getUserDb(c);
+		if (!db || typeof db.prepare !== 'function') return 0;
+
+		const purposes = [
+			OTC_PURPOSE.STATE,
+			OTC_PURPOSE.LOGIN_CODE,
+			OTC_PURPOSE.BIND,
+			OTC_PURPOSE.BIND_LINK
+		];
+		const placeholders = purposes.map(() => '?').join(', ');
+
+		if (provider !== null && provider !== undefined && provider !== '') {
+			const boundProvider = assertBinding(String(provider).trim().toLowerCase(), {
+				field: 'provider',
+				maxLength: MAX_PROVIDER_LENGTH
+			});
+			const res = await db.prepare(`
+				UPDATE oauth_one_time_credential
+				SET consumed = 1
+				WHERE consumed = 0 AND provider = ? AND purpose IN (${placeholders})
+			`).bind(boundProvider, ...purposes).run();
+			return Number(res?.meta?.changes ?? res?.changes ?? 0);
+		}
+
+		const res = await db.prepare(`
+			UPDATE oauth_one_time_credential
+			SET consumed = 1
+			WHERE consumed = 0 AND purpose IN (${placeholders})
+		`).bind(...purposes).run();
+		return Number(res?.meta?.changes ?? res?.changes ?? 0);
 	}
 };
 

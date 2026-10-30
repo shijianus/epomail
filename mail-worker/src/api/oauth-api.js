@@ -75,7 +75,7 @@ async function handleBindCallback(c, provider, params, stateRow) {
 }
 
 async function handleOAuthCallback(c) {
-	const provider = c.req.param('provider');
+	const provider = (c.req.param('provider') || '').trim().toLowerCase();
 	try {
 		const params = await readCallbackParams(c);
 		if (params.error) {
@@ -102,11 +102,14 @@ async function handleOAuthCallback(c) {
 			return await handleBindCallback(c, provider, params, stateRow);
 		}
 
+		await oauthService.assertProviderEnabled(c, provider);
+
 		const loginInfo = await oauthService.exchangeCodeAndLogin(c, provider, {
 			code: params.code,
 			id_token: params.id_token,
 			redirectUri: stateRow.redirectUri,
-			nonce: stateRow.nonce
+			nonce: stateRow.nonce,
+			codeVerifier: stateRow.codeVerifier || ''
 		});
 
 		if (loginInfo.token || loginInfo.mfa) {
@@ -138,7 +141,8 @@ async function handleOAuthCallback(c) {
 		return c.redirect(`/login?${query.toString()}#oauth_bind=${bindProof}`);
 	} catch (err) {
 		console.warn(`OAuth callback failed for ${provider}: ${err?.message || 'unknown error'}`);
-		return redirectToLogin(c, { error: 'oauth_failed' });
+		const isPolicyDisabled = ['oauth_disabled', 'oauth_provider_disabled', 'oauth_provider_unconfigured'].includes(err?.errorCode);
+		return redirectToLogin(c, { error: isPolicyDisabled ? 'oauth_disabled' : 'oauth_failed' });
 	}
 }
 
@@ -150,6 +154,7 @@ app.get('/oauth/providers', async (c) => {
 
 // Public: get OAuth authorization URL for a provider
 app.get('/oauth/authorize/:provider', async (c) => {
+	await rateLimit.check(c, { scope: 'oauth-authorize', limit: 60, windowSeconds: 900 });
 	const provider = c.req.param('provider');
 	const redirectUri = c.req.query('redirect_uri') || '';
 	const state = c.req.query('state') || '';
@@ -159,9 +164,32 @@ app.get('/oauth/authorize/:provider', async (c) => {
 
 // Public: direct login with OAuth authorization code or ID token
 app.post('/oauth/:provider/login', async (c) => {
-	const provider = c.req.param('provider');
+	const provider = (c.req.param('provider') || '').trim().toLowerCase();
 	const body = await c.req.json();
-	const loginInfo = await oauthService.exchangeCodeAndLogin(c, provider, body);
+	await oauthService.assertProviderEnabled(c, provider);
+
+	let loginParams = { ...body };
+	if (body?.code) {
+		if (!body.state || typeof body.state !== 'string') {
+			throw new BizError('Missing OAuth state', 400, 'oauth_state_required');
+		}
+		const stateRow = await oauthService.consumeState(c, provider, body.state);
+		loginParams = {
+			...body,
+			redirectUri: stateRow.redirectUri,
+			nonce: stateRow.nonce,
+			codeVerifier: stateRow.codeVerifier || ''
+		};
+	} else if (body?.state) {
+		const stateRow = await oauthService.consumeState(c, provider, body.state);
+		loginParams = {
+			...body,
+			redirectUri: stateRow.redirectUri,
+			nonce: stateRow.nonce
+		};
+	}
+
+	const loginInfo = await oauthService.exchangeCodeAndLogin(c, provider, loginParams);
 	return c.json(result.ok(loginInfo));
 });
 
@@ -213,7 +241,17 @@ app.post('/oauth/callback/:provider', handleOAuthCallback);
 
 // Backwards compatibility for LinuxDo
 app.post('/oauth/linuxDo/login', async (c) => {
-	const loginInfo = await oauthService.linuxDoLogin(c, await c.req.json());
+	const body = await c.req.json();
+	await oauthService.assertProviderEnabled(c, 'linuxdo');
+	if (!body?.state || typeof body.state !== 'string') {
+		throw new BizError('Missing OAuth state', 400, 'oauth_state_required');
+	}
+	const stateRow = await oauthService.consumeState(c, 'linuxdo', body.state);
+	const loginInfo = await oauthService.linuxDoLogin(c, {
+		...body,
+		redirectUri: stateRow.redirectUri,
+		codeVerifier: stateRow.codeVerifier || ''
+	});
 	return c.json(result.ok(loginInfo));
 });
 

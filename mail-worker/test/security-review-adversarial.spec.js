@@ -249,6 +249,7 @@ describe('OAuth server-side boundary probes', () => {
 			req: { url: 'https://mail.example.com/api/oauth/authorize/apple', header: () => null }
 		};
 		vi.spyOn(settingService, 'query').mockResolvedValue({
+			oauthLoginEnabled: 1,
 			oauthProviders: {
 				apple: { clientId: 'test-client-id', clientSecret: 'test-client-secret', enabled: 1 }
 			}
@@ -279,6 +280,12 @@ describe('OAuth server-side boundary probes', () => {
 			},
 			req: { url: 'https://mail.example.com/api/oauth/bindUser', header: () => null }
 		};
+		vi.spyOn(settingService, 'query').mockResolvedValue({
+			oauthLoginEnabled: 1,
+			oauthProviders: {
+				apple: { clientId: 'test-client-id', clientSecret: 'test-client-secret', enabled: 1 }
+			}
+		});
 		vi.spyOn(loginService, 'validateRegistration').mockResolvedValue({});
 		vi.spyOn(loginService, 'register').mockResolvedValue({ userId: 5, reservedRegKey: false });
 		vi.spyOn(loginService, 'login').mockResolvedValue('bound-session-jwt');
