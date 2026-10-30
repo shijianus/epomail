@@ -1,6 +1,7 @@
 import emailService from './email-service';
 import { emailConst } from '../const/entity-const';
 import BizError from '../error/biz-error';
+import { getUserDb } from '../utils/db-accessor';
 
 const SIGNATURE_TOLERANCE_SECONDS = 5 * 60;
 
@@ -87,7 +88,7 @@ const resendService = {
 		if (!body || !body.type || !body.data) return { ignored: true };
 
 		const eventId = svixId || body.id || (body.data?.email_id ? `${body.data.email_id}_${body.type}` : null);
-		const userDb = c?.env?.db || (c._mockOrm ? c._mockOrm : null);
+		const userDb = getUserDb(c) || c?.env?.db || (c._mockOrm ? c._mockOrm : null);
 
 		// 0. KV 快速去重（best-effort 短路；权威去重始终以 webhook_event 台账主键为准）
 		if (eventId && c?.env?.kv) {

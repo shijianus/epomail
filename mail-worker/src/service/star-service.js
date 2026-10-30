@@ -7,17 +7,15 @@ import email from '../entity/email';
 import { isDel } from '../const/entity-const';
 import attService from "./att-service";
 import settingService from './setting-service';
+import emailCryptoUtils from '../utils/email-crypto-utils';
 import { t } from '../i18n/i18n';
 
 const starService = {
 
 	async add(c, params, userId) {
 		const { emailId } = params;
-		const email = await emailService.selectById(c, emailId);
-		if (!email) {
-			throw new BizError(t('starNotExistEmail'));
-		}
-		if (email.userId !== userId) {
+		const emailRow = await emailService.selectById(c, emailId, userId);
+		if (!emailRow || emailRow.userId !== userId) {
 			throw new BizError(t('starNotExistEmail'));
 		}
 		const exist = await orm(c).select().from(star).where(
@@ -53,6 +51,7 @@ const starService = {
 
 		const conditions = [
 			eq(star.userId, userId),
+			eq(email.userId, userId),
 			eq(email.isDel, isDel.NORMAL),
 			lt(star.emailId, emailId)
 		];
@@ -69,7 +68,7 @@ const starService = {
 			);
 		}
 
-		const list = await orm(c).select({
+		let list = await orm(c).select({
 			isStar: sql`1`.as('isStar'),
 			starId: star.starId
 			, ...email
@@ -80,9 +79,14 @@ const starService = {
 			.limit(size)
 			.all();
 
-		const emailIds = list.map(item => item.emailId);
+		if (userId && list.length > 0) {
+			const cryptoKey = await emailCryptoUtils.getUserEmailCryptoKey(c.env, userId);
+			list = await emailCryptoUtils.decryptEmailList(list, cryptoKey);
+		}
 
-		const attsList = await attService.selectByEmailIds(c, emailIds);
+		const emailIds = list.map(item => item.emailId).filter(Boolean);
+
+		const attsList = emailIds.length > 0 ? await attService.selectByEmailIds(c, emailIds) : [];
 
 		const settingData = await settingService.query(c);
 		list.forEach(emailRow => {

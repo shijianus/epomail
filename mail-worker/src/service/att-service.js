@@ -148,8 +148,11 @@ const attService = {
 		}
 	},
 
-	list(c, params, userId) {
-		const { emailId } = params;
+	async list(c, params, userId) {
+		const emailId = Number(params?.emailId);
+		if (!Number.isInteger(emailId) || emailId <= 0 || !userId) {
+			return [];
+		}
 
 		return orm(c).select().from(att).where(
 			and(
