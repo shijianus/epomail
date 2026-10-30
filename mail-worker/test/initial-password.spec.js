@@ -155,8 +155,6 @@ afterEach(() => {
 afterAll(async () => {
 	await env.db.prepare('DELETE FROM user WHERE user_id = ?').bind(USER_ID).run();
 	await env.db.prepare('DELETE FROM oauth').run();
-	await env.db.prepare('DROP TABLE IF EXISTS user').run();
-	await env.db.prepare('DROP TABLE IF EXISTS oauth').run();
 });
 
 describe('eligibility gates for the first password', () => {

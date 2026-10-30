@@ -115,9 +115,9 @@ afterAll(async () => {
 	await clearBindClaim(env.db);
 	await env.kv.delete('apple_jwks_v1');
 	await resetRateLimits();
-	await env.db.prepare('DROP TABLE IF EXISTS oauth').run();
-	await env.db.prepare('DROP TABLE IF EXISTS oauth_bind_claim').run();
-	await dropOtcTable(env.db);
+	await env.db.prepare('DELETE FROM oauth').run();
+	await env.db.prepare('DELETE FROM oauth_bind_claim').run();
+	await clearOtc(env.db);
 });
 
 describe('D1 single-use store: atomic compare-and-set', () => {

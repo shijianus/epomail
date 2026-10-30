@@ -293,7 +293,6 @@ describe('OAuth account binding proof', () => {
 
 	afterAll(async () => {
 		await env.db.prepare('DELETE FROM oauth').run();
-		await env.db.prepare('DROP TABLE IF EXISTS oauth').run();
 	});
 
 	it('requires a server-issued proof, consumes it once and refuses rebinding', async () => {

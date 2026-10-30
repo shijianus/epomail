@@ -206,9 +206,6 @@ afterAll(async () => {
 	await env.db.prepare('DELETE FROM oauth').run();
 	await clearOtc(env.db);
 	await clearBindClaim(env.db);
-	await env.db.prepare('DROP TABLE IF EXISTS oauth_bind_claim').run();
-	await env.db.prepare('DROP TABLE IF EXISTS oauth').run();
-	await env.db.prepare('DROP TABLE IF EXISTS oauth_one_time_credential').run();
 });
 
 describe('OAuth bind: recoverable rejections never spend the proof', () => {
