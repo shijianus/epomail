@@ -15,9 +15,9 @@
 | `b575ccedc861c2510af14c5234310a4b34380239` (`b575cce`) | `fix(mail)`: sidebar counter SQL repair + bucket regression test |
 | `e450cbd1e4626fa457c985be73b62715e943656f` (`e450cbd`) | `build(deps)`: Windows-capable worker harness, runtime advisory remediation |
 | `dbba1691a4be8358552610a28b343d3671eac8c0` (`dbba169`) | `ci(build)`: release-branch triggers, single root lockfile, frozen prod installs |
-| `FILL_AT_COMMIT` | `docs`: this handoff + `CHECKLIST.log` |
+| `e4981a3d5556d0c926405ec33fd7ff1e62b92cc2` | `docs`: this handoff + `CHECKLIST.log` |
 
-Final SHA: `FILL_AT_PUSH`.
+Final SHA: run `git rev-parse HEAD` on `origin/release/2026-10-31`. This record was written at `e4981a3d5556d0c926405ec33fd7ff1e62b92cc2`; the commit after it only backfills these hashes and changes nothing else.
 
 ## 2. Files and modules changed
 
