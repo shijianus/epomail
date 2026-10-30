@@ -11,6 +11,26 @@
 
 ---
 
+### 阶段 2 上线收敛：侧边栏统计 SQL 缺陷修复、Windows 测试可用性、依赖漏洞处置、CI 与生产构建收敛 (2026-10-30)
+*   **关联提交 (Git Commit)**: `FILL_AT_COMMIT` (Short: `FILL_SHORT`)；本阶段代码提交 `b575ccedc861c2510af14c5234310a4b34380239` (`b575cce`)、`e450cbd1e4626fa457c985be73b62715e943656f` (`e450cbd`)、`dbba1691a4be8358552610a28b343d3671eac8c0` (`dbba169`)
+*   **部署环境 (Deployment)**: 本地全真栈 `wrangler dev` + 本地 D1/KV、三应用生产构建、Worker dry-run；**未执行任何远程部署、未修改生产库，统一推送 `origin/release/2026-10-31`**
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 缺陷修复（P1 真实功能缺陷）：`emailService.getSidebarStats` 的 `snoozedWaiting` 聚合多了一个右括号，使整条 SQL 成为语法错误，`GET /api/email/sidebarStats` 恒定返回 `code 500`，邮箱未读徽标完全不可用。修正后本地全真栈实测返回 200 与正确计数，并新增按 7 个分桶精确断言的回归用例。
+    - [x] 前端契约核验（对照 Stage 1 后端源码，不依赖口头结论）：OAuth Provider 显示与 `configured = clientId && clientSecret` 一致；回调失败 `oauth_failed` / `oauth_disabled` 有本地化处理；登录 CSRF 的 `client_state` 双向校验一致；`PUT /oauth/bindUser` 与 200/400/409/410/425/429 分类一致；MFA `tempToken` / `hasTotp` / `passkeys` / `stepUpRequired` 字段一致；`code 401` 触发 `forceLogoutToLogin`；`EMAIL_OUTBOUND_ENABLED` 的 403 以告警提示呈现。未发现阻断性不兼容。
+    - [x] 测试基础设施：`@cloudflare/vitest-pool-workers` `0.7.8 → 0.12.0`（旧版捆绑 miniflare 3，模块回退地址写死 `localhost:<port>`，在 `localhost → ::1` 的机器上 workerd `ConnectEx` 被拒，全部用例无法收集）；`vitest.config.js` 内联 `svix` / `uuid` 并把 `testTimeout` 提到 20s（断言未改）。
+    - [x] 依赖处置：`mail-vue` 升级 `vue-i18n ^11.4.14`（escapeParameter XSS）与 `vite ^7.3.2`，生产告警 6 → 1（余 `echarts` 需 5→6 大版本）；`temp_login_ui` 移除无引用的 `react-router`（12 条告警，含 6 条 high），生产告警 12 → 0；移除 5 个硬编码 Windows-only `devDependencies`，Linux 冻结安装恢复可用；对 `undici` / `nanoid` / `postcss` / `picomatch` / `rollup` / `minimatch` / `brace-expansion` / `fast-uri` / `browserslist` / `immutable` / `@babel/plugin-transform-modules-systemjs` 添加同大版本范围内的定向 `pnpm.overrides`（`ws` 明确不覆盖：8.21 会破坏 miniflare WebSocket 回环并使全部用例失败，已实测回滚）。
+    - [x] CI 与构建：四个工作流补 `release/**` 触发（此前发布分支完全在门禁之外）；Playwright 作业由 `npm ci` 加镜像源 `package-lock.json` 改为 pnpm 冻结安装并删除重复锁文件；`scripts/build-prod.mjs` 改为 `--frozen-lockfile` 安装、显式 `pnpm.cmd`、路径只经 `cwd` 传递，杜绝构建期改写锁文件与含空格路径失败。
+    - [x] 交接归档：重写 `doc/rc-2026-10-31-handoff.md`，记录最终 SHA、提交清单、真实测试状态、环境限制与 Linux / Staging 待办。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：`node scripts/build-prod.mjs` 通过 (exit 0，零告警)；`wrangler deploy --dry-run` 通过 (gzip 1136.42 KiB)
+    - [x] 自动化测试套件：`mail-worker` 全量按 5 个分块执行，**17/17 文件、207/207 断言通过**（单进程 17 文件并发在本机因 workerd 回环限制不可用，如实记为环境限制并以分块结果为准）；`temp_login_ui` 类型检查 + `15/15` 单测 + 构建通过；Playwright OAuth 绑定/登录 `13/13` 场景通过
+    - [x] 全真栈冒烟：`wrangler dev` + 全新本地 D1/KV 下 `13/13` 通过（init 冷启动与幂等、主站长登录、`websiteConfig` OAuth 开关、`/oauth/providers` 空列表、`authorize` 失败关闭 403 `oauth_disabled`、`email/list`、`sidebarStats`、`account/list`、外发闸门 403 `outbound_disabled`、未登录 401、`/login/` 静态页）
+    - [x] 静态门禁与密钥扫描：i18n 四件套全部 exit 0（6 语言 1946 键对称、142 条 auth 词条）；`secret-scan.mjs` 工作树 1252 文件 0 命中
+    - [x] 锁文件一致性：根目录与三应用 `pnpm install --frozen-lockfile` 全部通过
+    - [ ] `NOT-TESTED`：真实 OAuth Provider 回调、真实 Resend / Mailjet / Cloudflare 外发、真实 R2 / S3 / B2、云端 D1 / KV 备份回滚（均需授权外部环境）
+
+---
+
 ### 阶段 1 上线收敛：后端认证/OAuth 强制开关、初始化去固定凭据与邮件隔离安全加固 (2026-10-30)
 *   **关联提交 (Git Commit)**: `748643a8989c27b0a14dbed4922ed29759092bf0` (Short: `748643a`)；前置模块提交 `4aefb562a380f04d01d0290b5690b26769e6104f` (`4aefb56`)、`a1d080559b9a05e1751cfd44c993ef9d17626170` (`a1d0805`)
 *   **部署环境 (Deployment)**: 本地全真栈 workerd + D1/KV 隔离回归、Worker dry-run 打包、`mail-vue` 生产构建；**未执行任何远程部署或生产库修改，统一推送 `origin/release/2026-10-31`**

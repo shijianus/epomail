@@ -1,89 +1,152 @@
-# EpoMail Stage 1 Backend Convergence Handoff (`release/2026-10-31`)
+# EpoMail Release Convergence Handoff (`release/2026-10-31`)
 
-- **Date**: 2026-10-30
-- **Branch**: `release/2026-10-31` (branched from `origin/master` @ `3e1ef741eb57d77908c1f23ad83e6c0cee9e931d`)
-- **Stage 1 Code Convergence HEAD SHA**: `748643a8989c27b0a14dbed4922ed29759092bf0` (`748643a`)
-  - `a1d080559b9a05e1751cfd44c993ef9d17626170` (`a1d0805`) — `fix(security): remove fixed visitor seeding, userId=1 escalation, and D1 setting column overflow`
-  - `4aefb562a380f04d01d0290b5690b26769e6104f` (`4aefb56`) — `fix(oauth): enforce server-side OAuth switches, stale credential revocation, PKCE S256, and fail-closed config`
-  - `748643a8989c27b0a14dbed4922ed29759092bf0` (`748643a`) — `fix(mail): close cross-user cascade-delete leak, enforce outbound gates, and harden send/read consistency`
-  - *(Note: This handoff file and `CHECKLIST.log` are committed directly on top of `748643a8989c27b0a14dbed4922ed29759092bf0`; run `git rev-parse HEAD` for the tip docs commit SHA.)*
+- **Branch**: `release/2026-10-31`
+- **Stage 1 (Linux, backend)**: `748643a8989c27b0a14dbed4922ed29759092bf0` (`748643a`) — see §5 appendix
+- **Stage 2 (Windows, frontend/deps/CI/build)**: see §1 for the commit list and `git rev-parse HEAD` for the tip.
 
 ---
 
-## 1. Modified Core Modules
+# Stage 2 — Frontend, Dependencies, CI and Build (Windows)
 
-### Module B — Fixed Account & Initialization Security (`a1d0805`)
-- `mail-worker/src/utils/admin-utils.js`: Removed `userRow.userId === 1` super-admin fallback; super-admin authority now derives strictly from normalized `c.env.admin` email match.
-- `mail-worker/src/service/user-service.js`: Removed `|| uid === 1` purge bypass so site-owner protection relies solely on `isAdminEmail`.
-- `mail-worker/src/init/init.js`: Stopped seeding fixed visitor account `admin@epomail.cyou` / `123456` and stopped re-enabling disabled visitor rows; enforced fail-closed `admin_initial_password` requirement on production cold start (`ENVIRONMENT !== 'development'`); upgraded legacy `普通用户` role code (`user_base`) before 6-role seeding; moved 6 `audit_*` config fields to `setting_ext` in `intDB` and `v3_18DB`.
-- `mail-worker/src/entity/setting.js` & `mail-worker/src/service/setting-service.js`: Reduced `setting` table from 102 columns to 96 columns (fixing Cloudflare D1's hard 100-column `SQLITE_MAX_COLUMN` limit) while preserving transparent read/write of `audit*` settings via `setting_ext`.
-- `mail-worker/test/init-visitor-security.spec.js`: Added 5 regression tests for cold-start fail-closed init, visitor non-seeding, `userId=1` non-escalation, and upgrade idempotency.
+## 1. Commits
 
-### Module A — Authentication & OAuth Convergence (`4aefb56`)
-- `mail-worker/src/utils/one-time-credential.js`: Added `revokeClientFlows(c, { provider })` to revoke pending `oauth_state`, `oauth_login_code`, `oauth_bind`, and `oauth_bind_link` rows immediately when OAuth or a specific provider is disabled.
-- `mail-worker/src/service/setting-service.js`: Fixed Apple `configured` check to require non-empty `clientSecret` alongside `clientId` in both `sanitizeOAuthProviders` and `websiteConfig`; wired `oneTimeCredential.revokeClientFlows` into `settingService.set` on global/provider disable transitions.
-- `mail-worker/src/service/oauth-service.js`, `mail-worker/src/api/oauth-api.js`, `mail-worker/src/service/oauth-identity-service.js`: Enforced server-side `assertProviderEnabled` (`oauthLoginEnabled === 1`, provider `enabled === true`, complete `clientId + clientSecret`, valid `custom` endpoints) across authorize, callback, direct `POST /oauth/:provider/login`, `/oauth/linuxDo/login`, `/oauth/exchange`, `bindUser`, `startBind`, `handleBindCallback`, and `completeBind`; required `state` on direct POST login endpoints; burned stale `state` on disabled callback; added S256 PKCE (`code_challenge` + `code_verifier`) end-to-end; added `/oauth/authorize/:provider` rate limit.
-- `mail-worker/src/service/oauth-provider-service.js` & `mail-worker/src/api/oauth-provider-api.js`: Switched first-party OAuth2 `client_secret` check to constant-time comparison, gated `/oauth/userinfo` fields strictly by granted `email`/`profile` scopes, and rate-limited `/oauth/token`.
-- `mail-worker/test/oauth-switch-enforcement.spec.js`: Added 5 adversarial regression tests covering global/provider switches, in-flight credential revocation, incomplete config fail-closed behavior, PKCE S256 verification, and MFA/RBAC non-regression.
+| Commit | Scope |
+| :--- | :--- |
+| `b575ccedc861c2510af14c5234310a4b34380239` (`b575cce`) | `fix(mail)`: sidebar counter SQL repair + bucket regression test |
+| `e450cbd1e4626fa457c985be73b62715e943656f` (`e450cbd`) | `build(deps)`: Windows-capable worker harness, runtime advisory remediation |
+| `dbba1691a4be8358552610a28b343d3671eac8c0` (`dbba169`) | `ci(build)`: release-branch triggers, single root lockfile, frozen prod installs |
+| `FILL_AT_COMMIT` | `docs`: this handoff + `CHECKLIST.log` |
 
-### Module C — Core Mail Pipeline & Data Permissions (`748643a`)
-- `mail-worker/src/service/email-service.js`:
-  - Fixed **P0 cross-user cascade delete** in `cascadeDeleteEmails` by resolving `ownedIds` (`email.userId === userId`) BEFORE calling `attService.removeByEmailIds` and `starService.removeByEmailIds`.
-  - Enforced explicit `accountId` ownership in `list` and `latest` (returning empty result instead of falling back to `allReceive = 1` when another user's `accountId` is requested).
-  - Enforced `EMAIL_OUTBOUND_ENABLED=false` (`403 outbound_disabled`) and staging `OUTBOUND_WHITELIST` (`403 outbound_recipient_blocked`) server-side in `send` before external provider invocation.
-  - Moved attachment/inline image count (`<= 10`), per-file size check, and combined storage quota check in `send` BEFORE external provider invocation and `incrUserSendCount`, with internal-mail row rollback if attachment persistence throws.
-  - Added missing `.run()` in `emailService.read`, cascade-removed `star` rows in `batchDelete`, and routed `getSidebarStats` to `getMailDb(c)`.
-- `mail-worker/src/service/att-service.js` & `mail-worker/src/utils/file-utils.js`: Guarded missing/invalid `emailId` in `attService.list` and normalized optional `data:...;base64,` prefixes in `fileUtils.base64ToUint8Array`.
-- `mail-worker/src/service/star-service.js` & `mail-worker/src/service/resend-service.js`: Scoped `starService.add` and `starService.list` strictly to `email.userId === userId` with encrypted-content decryption; routed `resendService.webhooks` ledger/outbox writes via `getUserDb(c)`.
-- `mail-worker/test/mail-pipeline-convergence.spec.js` & `mail-worker/package.json`: Added 6 end-to-end tests on workerd + D1 + KV and wired new security/convergence specs into `test:integration`.
+Final SHA: `FILL_AT_PUSH`.
 
----
+## 2. Files and modules changed
 
-## 2. Verified Real Test Results (Linux Agy CLI)
+### 2.1 Real product defects found and fixed
 
-| Verification Gate | Command | Result |
+- **`mail-worker/src/service/email-service.js` (`getSidebarStats`)** — the `snoozedWaiting` aggregate carried a stray `)` before `THEN`, so the whole statement was a SQLite syntax error. Every `GET /api/email/sidebarStats` returned `code 500`, which breaks the inbox/sidebar unread badges in `mail-vue`. One-character fix; proven by a live `wrangler dev` request returning `code 200` with real counters.
+- **`mail-worker/test/mail-pipeline-convergence.spec.js`** — new regression test `serves sidebar counters for inbox, spam, trash, drafts, sent, and both snooze windows`. It seeds one mailbox with exactly one message per bucket and asserts every counter, so a 500 (or a silently wrong aggregate) fails the suite.
+
+### 2.2 Frontend compatibility with the Stage 1 backend
+
+Verified against source, not against prior reports:
+
+- **OAuth provider visibility** — `temp_login_ui` derives its button list from `GET /api/setting/websiteConfig` (`oauthLoginEnabled` + `oauthProviders[key].enabled/configured`). `settingService.websiteConfig` emits `configured: 0|1` from `clientId && clientSecret`, matching the Stage 1 fail-closed change; a provider with a missing secret renders as unconfigured and is not clickable. No mismatch.
+- **OAuth callback failure** — the worker redirects failures to `/login?error=oauth_failed|oauth_disabled`; `AuthForm` clears the pending client state and shows a localized generic message. Matches.
+- **Login CSRF guard** — `AuthForm` requires `sessionStorage.epo_oauth_state` to equal `oauth_client_state`; the worker now echoes `stateRow.clientState` on both success and bind returns. Matches.
+- **Bind flow** — `PUT /api/oauth/bindUser` with `{ email, code?, oauthUserId, provider, bindToken }`; `oauth-bind.ts` classifies 200/400/409/410/425/429/5xx exactly as `oauth-service` emits them. Matches; covered by Playwright.
+- **MFA** — `beginMfaChallenge` consumes `tempToken/hasTotp/hasPasskeys/hasBackupCodes/passkeys/passkeyChallenge/stepUpRequired`; `loginService` emits all of them. Matches. (`riskScore` is read by the UI but never sent by the worker — cosmetic, defaults to 0.)
+- **Session expiry** — worker returns body `code 401`; the axios interceptor calls `forceLogoutToLogin` for both body-level and HTTP-level 401. Matches.
+- **Outbound gates** — `EMAIL_OUTBOUND_ENABLED=false` / `OUTBOUND_WHITELIST` surface as `code 403` with `errorCode`; the interceptor shows the server message as a warning toast. Verified end-to-end in the live smoke.
+- **Dead code noted, not changed**: `mail-vue/src/request/ouath.js` exports `oauthLinuxDoLogin(code)` and `oauthBindUser(form)` with no callers; `oauthLinuxDoLogin` would now be rejected by the worker because LinuxDo requires `state`. Harmless today, but it is a stale contract if someone wires it up.
+
+### 2.3 Test harness (worker)
+
+- **`@cloudflare/vitest-pool-workers` `0.7.8` → `0.12.0`** — 0.7.8 bundles miniflare 3, which hands workerd a `localhost:<port>` module-fallback URL. On a host where `localhost` resolves to `::1` first, workerd's `ConnectEx` to the fallback service is refused and **every** worker test fails before collection. miniflare 4 (`resolveLocalhost`) fixes this.
+- **`mail-worker/vitest.config.js`** — `server.deps.inline: ['svix', 'uuid']` (the pool's fallback misreads their CJS builds inside `"type": "module"` packages), and `testTimeout: 20000` (the 5s default is exceeded by the password/TOTP specs when several workerd runtimes share a loaded CPU). Assertions unchanged.
+- Deliberately **not** upgraded: `vitest` stays `~3.0.7`. `3.2.x` passes in small runs but changes module externalisation enough to break `svix` collection in the full suite.
+
+### 2.4 Dependencies
+
+Production (`pnpm audit --prod`) before → after:
+
+| App | Before | After |
 | :--- | :--- | :--- |
-| Worker Full Suite | `CI=true corepack pnpm@10.34.5 --dir mail-worker test` | **PASS** — `17/17` files, `207/207` tests passed (67.42s) |
-| Worker Unit Suite | `CI=true corepack pnpm@10.34.5 --dir mail-worker run test:unit` | **PASS** — `3/3` files, `24/24` tests passed |
-| Worker Bundle Dry-Run | `CI=true corepack pnpm@10.34.5 --dir mail-worker exec wrangler deploy --dry-run --config wrangler-vitest.toml` | **PASS** — `5490.57 KiB` (`gzip: 1136.36 KiB`) |
-| Main Frontend Build | `CI=true corepack pnpm@10.34.5 --dir mail-vue run build` | **PASS** — Vite release bundle built in 20.12s |
-| Login UI Logic Tests | `CI=true corepack pnpm@10.34.5 --dir temp_login_ui test` | **PASS** — `15/15` tests passed (`node --test`) |
-| i18n 4-Gate Suite | `node scripts/i18n-{symmetry,audit,auth-locale,hardcoded}.mjs` | **PASS** — 6 locales 100% symmetric (`3056` / `1946` / `142` keys), `0` missing literals |
-| Secret Scan (Tree + History) | `node scripts/secret-scan.mjs` & `--history --baseline .secret-scan-baseline.json` | **PASS** — `1251` files & `4061` git blobs, `0` secrets found |
+| `mail-worker` | 1 low | 1 low (`deepmerge`, no fix published) |
+| `mail-vue` | 3 high + 1 moderate + 1 low (`vue-i18n` XSS) | 1 moderate (`echarts` 5→6 major) |
+| `temp_login_ui` | 12 advisories, 6 high (`react-router`) | 0 |
+
+- `mail-vue`: `vue-i18n` `^11.1.10` → `^11.4.14` (resolved 11.4.16), `vite` `7.1.5` → `^7.3.2`.
+- `temp_login_ui`: **removed `react-router`** — no source file imports it; it existed only to carry 12 advisories.
+- `temp_login_ui`: **removed 5 hardcoded `*-win32-x64*` / `workerd-windows-64` devDependencies.** They were duplicates of transitive optional platform packages; a clean `pnpm install --frozen-lockfile` on Windows still resolves them, and the Linux lockfile entries (`@esbuild/linux-x64`, `@rollup/rollup-linux-x64-gnu`, …) are present, so `ubuntu-latest` installs cleanly. This was the P0 CI blocker from Stage 1.
+- Scoped `pnpm.overrides` added for transitive dev-tooling advisories where the patch is inside the same major: `undici`, `nanoid`, `postcss`, `picomatch`, `rollup`, `minimatch`, `brace-expansion`, `fast-uri`, `browserslist`, `immutable`, `@babel/plugin-transform-modules-systemjs`.
+
+## 3. Verification actually executed (Windows, this workspace)
+
+| Gate | Command | Result |
+| :--- | :--- | :--- |
+| Worker suite | `vitest run` split into 5 chunks (17 files) | **PASS — 207/207 tests, 17/17 files** |
+| Worker suite (single invocation) | `CI=true pnpm --dir mail-worker test` | **FAIL — environment limit, see §4.1.** Never reported as a pass. |
+| Worker dry-run | `wrangler deploy --dry-run --config wrangler-vitest.toml` | **PASS** — 5490.50 KiB / gzip 1136.42 KiB |
+| Login UI | `typecheck` / `test` / `build` | **PASS** — `tsc` clean, 15/15, Vite 6.41s |
+| Login UI clean install | `pnpm install --frozen-lockfile` after deleting `node_modules` | **PASS** |
+| mail-vue build | `pnpm --dir mail-vue run build` | **PASS** — 23–39s across runs |
+| Production pipeline | `node scripts/build-prod.mjs` | **PASS** — exit 0, no warnings |
+| i18n 4-gate | `i18n-symmetry` / `i18n-audit` / `i18n-hardcoded` / `i18n-auth-locale` | **PASS** — all exit 0; 1946 keys × 6 locales; 142 auth keys |
+| Secret scan | `node scripts/secret-scan.mjs` | **PASS** — 1252 files, 0 secrets |
+| Playwright E2E | `node tests/oauth-bind-login-ui-e2e.mjs` | **PASS** — 13/13 scenarios |
+| Full-stack smoke (`wrangler dev` + fresh local D1/KV) | init → login → config → OAuth gate → sidebar → account → send gate → 401 → `/login/` | **PASS — 13/13** |
+| Frozen installs | root + all three apps `--frozen-lockfile` | **PASS** |
+
+`NOT-TESTED` (unchanged from Stage 1, still external): live OAuth provider callbacks, live Resend/Mailjet/Cloudflare Email outbound, live R2/S3/B2 object storage, Cloud D1/KV restore and Worker rollback.
+
+## 4. Remaining real blockers
+
+### 4.1 P1 — Windows cannot run all 17 worker test files in one process
+With every file in one invocation, workerd's module-fallback loopback intermittently refuses connections (`ConnectEx #1225`), independent of directory, concurrency flags, or free ports; the same suite passes 207/207 when split into chunks of 5, and passed once as a single run. Root cause is on the host side (loopback socket handling under ~17 concurrent workerd runtimes), not in the repository. **Ubuntu CI is the authoritative gate and must confirm the single-invocation run.** A `--poolOptions.workers.singleWorker` / `--no-file-parallelism` workaround makes it worse, so no config change was committed for this.
+
+### 4.2 P1 — Dev-only advisory residue (cannot be closed without breaking the harness)
+All of these are `devDependencies`, absent from the deployed Worker bundle:
+
+| Package | Severity | Why it stays |
+| :--- | :--- | :--- |
+| `tinypool` ≤2.1.0 | critical | Only fixed in tinypool 2.x, which only vitest 4 ships; vitest 4 needs the pool package that was renamed to `@cloudflare/vitest-plugin`. |
+| `vitest` <3.2.6 | critical | Same blocker; 3.2.x breaks `svix` collection in the full suite. |
+| `zod` <4.6.6 | high | `miniflare`/pool require zod 3 API. |
+| `sharp` <0.35.5 | high | Native module pinned by miniflare; overriding risks ABI mismatch in image handling. |
+| `wrangler` <4.59.1 | high | Transitive copy pinned by the pool; advisory is OS command injection in `wrangler pages deploy`, which this project never runs. |
+| `ws` <8.21.0 | high | **Overriding it to 8.21 breaks miniflare's WebSocket loopback and all worker tests** — verified and reverted. |
+| `serialize-javascript` ≤7.0.2 | high | Patch requires 6→7 major; `workbox-build` consumes our own source only. |
+
+### 4.3 P1 — `@vitejs/plugin-vue@5` declares `vite ^5 || ^6` while `mail-vue` runs Vite 7
+pnpm prints an unmet-peer warning on every install. The build works, so this was not changed at release time, but the pairing is unsupported and should be moved to `plugin-vue@6` in the next window.
+
+### 4.4 P2 — `echarts` 5.x XSS advisory
+Fix is `>=6.1.0`, a major upgrade. Charts render operator-authored configuration only, so it was deferred rather than taking a major bump into the release.
+
+### 4.5 Carried over from Stage 1 (unchanged)
+- Pre-existing `admin@epomail.cyou` row must be inspected and disabled in staging/production D1, and `auth-uid:<id>` deleted from KV.
+- Staging cloud smoke: reconcile legacy `audit_log` columns, verify disabled providers + outbound whitelist, record a D1 export and a Worker rollback rehearsal.
+
+## 5. What Linux Argon must still do
+
+1. Push-open checks on `release/2026-10-31` and confirm all four workflows now run (they previously ignored `release/**`): Quality Gates, Security Audit, Offline Secret Scanning Gate, and the `login-ui` job that used to die on the Windows-only devDependencies.
+2. Confirm `pnpm --dir mail-worker test` in a single invocation is green on `ubuntu-latest` after the pool `0.7.8 → 0.12.0` upgrade — that is the one gate this Windows host cannot prove.
+3. Decide on the harness migration that closes the two `critical` dev advisories: `@cloudflare/vitest-pool-workers` was renamed to `@cloudflare/vitest-plugin`; the move requires `vitest@4` and re-validating all 207 tests.
+4. Execute the production D1/KV cleanup in §4.5 and record the evidence.
+
+## 6. Staging / production external verification still required
+
+- Live OAuth callback per provider against real credentials (providers without verified credentials stay `enabled: false`).
+- Live outbound through Resend / Mailjet / Cloudflare Email Routing with `OUTBOUND_WHITELIST_ENFORCE=true`.
+- Live R2 / S3 / B2 upload-read-delete plus the scheduled `drainObjectDeletionQueue`.
+- D1 export + KV restore rehearsal and one Worker version rollback.
 
 ---
 
-## 3. Known Failures & `NOT-TESTED` External Items
+# Appendix — Stage 1 (Linux, backend)
 
-- **`temp_login_ui` `typecheck` / `build` on Linux x64 (`KNOWN PLATFORM LIMIT`)**: `tsc --noEmit` exits `127 (tsc: not found)` on Linux because `temp_login_ui/package.json` hardcodes 5 Windows-only `win32-x64` packages in `devDependencies`, blocking Linux `pnpm install`. Must be verified and cleaned up in Stage 2 (Windows).
-- **Live External OAuth Providers (`NOT-TESTED`)**: Real browser callbacks against Google, GitHub, Microsoft, Apple, LinuxDo, and Custom OIDC were not executed in local CLI. Providers without verified live credentials must remain `enabled: false` (server-side disable enforcement is `VERIFIED-FIXED`).
-- **Live Outbound Providers & Public Webhooks (`NOT-TESTED`)**: Live Resend API, Mailjet API, Cloudflare Email Routing outbound, and public Svix webhook delivery were not invoked against external networks.
-- **Live Cloud Object Storage (`NOT-TESTED`)**: Live Cloudflare R2 / AWS S3 / Backblaze B2 buckets and scheduled cron `drainObjectDeletionQueue` were not exercised against cloud endpoints (local KV storage backend + reference-counted deletion queue are `VERIFIED-FIXED`).
-- **Cloud D1 / KV Backup Restore & Worker Version Rollback (`NOT-TESTED`)**: Requires authorized operator execution against staging/production Cloudflare account before final cutover.
+## A1. Modules
 
----
+**`a1d0805` — fixed account & init security**
+- `mail-worker/src/utils/admin-utils.js`: super-admin authority derives only from a normalized `c.env.admin` email match; the `userRow.userId === 1` fallback is gone.
+- `mail-worker/src/service/user-service.js`: `|| uid === 1` purge bypass removed.
+- `mail-worker/src/init/init.js`: no seeding of `admin@epomail.cyou` / `123456`; no re-enabling of disabled visitor rows; `admin_initial_password` is mandatory outside `development`; `user_base` upgraded before 6-role seeding; six `audit_*` fields moved to `setting_ext`.
+- `mail-worker/src/entity/setting.js` + `src/service/setting-service.js`: `setting` reduced from 102 to 96 columns (D1's `SQLITE_MAX_COLUMN` is 100) with transparent `setting_ext` read/write.
+- `mail-worker/test/init-visitor-security.spec.js`: 5 regression tests.
 
-## 4. Residual P0 / P1 Blockers for Stage 2 & Cutover
+**`4aefb56` — auth & OAuth convergence**
+- `src/utils/one-time-credential.js`: `revokeClientFlows` kills pending `oauth_state` / `oauth_login_code` / `oauth_bind` / `oauth_bind_link` rows on disable.
+- `src/service/setting-service.js`: Apple `configured` requires `clientSecret` too; revocation wired into `set`.
+- `src/service/oauth-service.js`, `src/api/oauth-api.js`, `src/service/oauth-identity-service.js`: `assertProviderEnabled` on every entry point, mandatory `state` on direct POST login, burned stale state, S256 PKCE end-to-end, rate limit on `/oauth/authorize/:provider`.
+- `src/service/oauth-provider-service.js`, `src/api/oauth-provider-api.js`: constant-time `client_secret` compare, `/oauth/userinfo` scope gating, rate-limited `/oauth/token`.
+- `mail-worker/test/oauth-switch-enforcement.spec.js`: 5 adversarial tests.
 
-1. **[P0 · CI & Dependency Gate]** `.github/workflows/quality-gates.yml` (`ubuntu-latest`) remains blocked until Stage 2:
-   - Remove hardcoded Windows-only `devDependencies` from `temp_login_ui/package.json` (`@cloudflare/workerd-windows-64`, `@esbuild/win32-x64`, `@rollup/rollup-win32-x64-msvc`, `@tailwindcss/oxide-win32-x64-msvc`, `lightningcss-win32-x64-msvc`) so both Windows x64 and Linux CI install cleanly.
-   - Remediate high/critical `npm/pnpm audit` advisories (`basic-ftp` critical, `lodash` / `dompurify` / `rollup` high) and reconcile root `package-lock.json` vs `pnpm-lock.yaml`.
-2. **[P1 · Standalone Remediation for Pre-Existing Fixed Visitor Account]** Stage 1 code never auto-deletes existing production rows. Before production cutover, operator must inspect and disable any pre-existing `admin@epomail.cyou` row in staging/production D1 and flush its KV session:
-   ```sql
-   -- 1) Inspect first (read-only)
-   SELECT user_id, email, type, status, is_del FROM user WHERE lower(email) = 'admin@epomail.cyou' OR user_id = 1;
-   -- 2) If admin@epomail.cyou exists, disable login & send without deleting historical audit/mail references
-   UPDATE user SET status = 1 WHERE lower(email) = 'admin@epomail.cyou';
-   UPDATE account SET status = 1 WHERE lower(email) = 'admin@epomail.cyou';
-   ```
-   Then delete KV key `auth-uid:<user_id>` for `admin@epomail.cyou` via `wrangler kv key delete` so any active session is immediately invalidated.
-3. **[P1 · Staging Cloud Smoke & Rollback Rehearsal]** Reconcile legacy staging D1 `audit_log` columns if needed, verify disabled OAuth providers + whitelisted outbound mail on staging, and record D1 export + Worker rollback rehearsal evidence.
+**`748643a` — mail pipeline & data permissions**
+- `src/service/email-service.js`: cross-user cascade-delete fixed by resolving `ownedIds` first; explicit `accountId` ownership in `list`/`latest`; `EMAIL_OUTBOUND_ENABLED` + `OUTBOUND_WHITELIST` enforced before provider calls; attachment/quota checks moved before send; missing `.run()` in `read`; stars cascaded in `batchDelete`; `getSidebarStats` routed through `getMailDb(c)`.
+- `src/service/att-service.js`, `src/utils/file-utils.js`: guarded `emailId`, base64 prefix normalization.
+- `src/service/star-service.js`, `src/service/resend-service.js`: strict `email.userId` scoping, `getUserDb(c)` for webhook writes.
+- `mail-worker/test/mail-pipeline-convergence.spec.js`: 6 end-to-end tests (7 as of Stage 2).
 
----
+## A2. Stage 1 verification (Linux)
 
-## 5. Windows Stage 2 Compatibility Notes
-
-1. **Enforce `pnpm@10.34.5` via Corepack**: Run `corepack enable` and invoke `corepack pnpm@10.34.5` (avoid global `pnpm 12.x`, which mutates `lockfileVersion` formatting and fails `ERR_PNPM_IGNORED_BUILDS` on `workerd`, `esbuild`, and `sharp`).
-2. **`temp_login_ui` Native Binaries**: On Windows x64, run `corepack pnpm@10.34.5 --dir temp_login_ui install --frozen-lockfile`, `run typecheck`, `test`, and `run build` first to confirm baseline health, then remove the 5 `*-win32-x64*` / `workerd-windows-64` explicit `devDependencies` so Linux GitHub Actions (`ubuntu-latest`) can also install from the same lockfile.
-3. **Preserve LF Line Endings (`core.autocrlf=false`)**: Ensure `git config core.autocrlf false` on Windows before editing files so `.githooks/pre-commit` (`#!/usr/bin/env sh`) and `scripts/*.mjs` retain LF line endings and pass `git diff --check`.
-4. **Build Order**: Build `temp_login_ui` (`pnpm --dir temp_login_ui run build`) BEFORE `mail-vue` (`pnpm --dir mail-vue run build`), as `mail-vue` invokes `node ../scripts/copy-login-dist.mjs` to copy `temp_login_ui/dist` into `mail-worker/dist/login`.
+Worker full suite 17/17 files and 207/207 tests; unit suite 24/24; bundle dry-run 5490.57 KiB; `mail-vue` build 20.12s; login UI 15/15; i18n 4 gates; secret scan 1251 files and 4061 blobs clean.
