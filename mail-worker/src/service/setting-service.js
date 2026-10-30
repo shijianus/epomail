@@ -1,6 +1,50 @@
 import KvConst from '../const/kv-const';
 import settingEntity from '../entity/setting';
 import orm from '../entity/orm';
+import { getTableColumns } from 'drizzle-orm';
+
+const D1_MAX_SELECT_COLUMNS = 60;
+const AUDIT_EXT_DEFAULTS = Object.freeze({
+	auditLogEnabled: 1,
+	auditMaxIpPerAccount: 3,
+	auditMaxDevicePerAccount: 3,
+	auditAutoCleanOldest: 1,
+	auditPrioritizeNonCriticalClean: 1,
+	auditCriticalQuota: 3
+});
+
+async function selectSettingRow(c) {
+	const entries = Object.entries(getTableColumns(settingEntity));
+	const merged = {};
+	for (let i = 0; i < entries.length; i += D1_MAX_SELECT_COLUMNS) {
+		const projection = Object.fromEntries(entries.slice(i, i + D1_MAX_SELECT_COLUMNS));
+		const part = await orm(c).select(projection).from(settingEntity).get();
+		if (!part) return null;
+		Object.assign(merged, part);
+	}
+	return merged;
+}
+
+async function loadSettingExt(c) {
+	const out = { ...AUDIT_EXT_DEFAULTS };
+	try {
+		const { getUserDb } = await import('../utils/db-accessor');
+		const userDb = getUserDb(c);
+		if (!userDb || typeof userDb.prepare !== 'function') return out;
+		const rows = await userDb.prepare(`SELECT key, value FROM setting_ext`).all();
+		for (const row of rows?.results || []) {
+			if (row?.key && Object.prototype.hasOwnProperty.call(AUDIT_EXT_DEFAULTS, row.key)) {
+				const num = Number(row.value);
+				if (Number.isFinite(num)) {
+					out[row.key] = num;
+				}
+			}
+		}
+	} catch (_) {
+		// Fallback to AUDIT_EXT_DEFAULTS when setting_ext is absent in lightweight unit mocks
+	}
+	return out;
+}
 import {verifyRecordType} from '../const/entity-const';
 import fileUtils from '../utils/file-utils';
 import r2Service from './r2-service';
@@ -77,14 +121,19 @@ const settingService = {
 				{ name: 'terms_url', sql: `ALTER TABLE setting ADD COLUMN terms_url TEXT NOT NULL DEFAULT '';` },
 				{ name: 'privacy_url', sql: `ALTER TABLE setting ADD COLUMN privacy_url TEXT NOT NULL DEFAULT '';` },
 				{ name: 'oauth_login_enabled', sql: `ALTER TABLE setting ADD COLUMN oauth_login_enabled INTEGER NOT NULL DEFAULT 0;` },
-				{ name: 'oauth_providers', sql: `ALTER TABLE setting ADD COLUMN oauth_providers TEXT NOT NULL DEFAULT '{}';` },
-				{ name: 'audit_log_enabled', sql: `ALTER TABLE setting ADD COLUMN audit_log_enabled INTEGER NOT NULL DEFAULT 1;` },
-				{ name: 'audit_max_ip_per_account', sql: `ALTER TABLE setting ADD COLUMN audit_max_ip_per_account INTEGER NOT NULL DEFAULT 3;` },
-				{ name: 'audit_max_device_per_account', sql: `ALTER TABLE setting ADD COLUMN audit_max_device_per_account INTEGER NOT NULL DEFAULT 3;` },
-				{ name: 'audit_auto_clean_oldest', sql: `ALTER TABLE setting ADD COLUMN audit_auto_clean_oldest INTEGER NOT NULL DEFAULT 1;` },
-				{ name: 'audit_prioritize_non_critical_clean', sql: `ALTER TABLE setting ADD COLUMN audit_prioritize_non_critical_clean INTEGER NOT NULL DEFAULT 1;` },
-				{ name: 'audit_critical_quota', sql: `ALTER TABLE setting ADD COLUMN audit_critical_quota INTEGER NOT NULL DEFAULT 3;` }
+				{ name: 'oauth_providers', sql: `ALTER TABLE setting ADD COLUMN oauth_providers TEXT NOT NULL DEFAULT '{}';` }
 			];
+
+			try {
+				await userDb.prepare(`
+					CREATE TABLE IF NOT EXISTS setting_ext (
+						key TEXT PRIMARY KEY,
+						value TEXT NOT NULL
+					)
+				`).run();
+			} catch (_) {
+				// Ignore when mocked DB does not support DDL
+			}
 
 			let existingCols = new Set();
 			try {
@@ -114,7 +163,11 @@ const settingService = {
 
 	async refresh(c) {
 		await this.ensureSettingColumns(c);
-		const settingRow = await orm(c).select().from(settingEntity).get();
+		const settingRow = await selectSettingRow(c);
+		if (!settingRow) {
+			throw new BizError('数据库未初始化 Database not initialized.');
+		}
+		Object.assign(settingRow, await loadSettingExt(c));
 		settingRow.resendTokens = JSON.parse(settingRow.resendTokens);
 		if (typeof settingRow.authI18n === 'string') {
 			try {
@@ -158,7 +211,7 @@ const settingService = {
 
 		if (!settingVal) {
 			await this.ensureSettingColumns(c);
-			const settingRow = await orm(c).select().from(settingEntity).get();
+			const settingRow = await selectSettingRow(c);
 			if (!settingRow) {
 				throw new BizError('数据库未初始化 Database not initialized.');
 			}
@@ -605,9 +658,7 @@ const settingService = {
 			'externalDbToken', 'externalDbName', 'externalDbTarget',
 			'attachmentPolicy', 'attachmentMaxSizeMb', 'attachmentCascadeDelete',
 			'multiAccountEnabled', 'termsUrl', 'privacyUrl',
-			'oauthLoginEnabled', 'oauthProviders',
-			'auditLogEnabled', 'auditMaxIpPerAccount', 'auditMaxDevicePerAccount',
-			'auditAutoCleanOldest', 'auditPrioritizeNonCriticalClean', 'auditCriticalQuota'
+			'oauthLoginEnabled', 'oauthProviders'
 		];
 
 		const updateData = {};
@@ -620,6 +671,21 @@ const settingService = {
 		if (Object.keys(updateData).length > 0) {
 			await orm(c).update(settingEntity).set(updateData).run();
 		}
+
+		const extUpdates = Object.keys(AUDIT_EXT_DEFAULTS).filter(key => params[key] !== undefined);
+		if (extUpdates.length > 0) {
+			await this.ensureSettingColumns(c);
+			const { getUserDb } = await import('../utils/db-accessor');
+			const userDb = getUserDb(c);
+			if (userDb && typeof userDb.prepare === 'function') {
+				for (const key of extUpdates) {
+					await userDb.prepare(
+						`INSERT INTO setting_ext (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`
+					).bind(key, String(params[key])).run();
+				}
+			}
+		}
+
 		await this.refresh(c);
 	},
 

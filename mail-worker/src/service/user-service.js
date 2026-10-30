@@ -1406,7 +1406,7 @@ const userService = {
 
 		await rbacGuard.assertCanManageUser(c, callerUserId, uid);
 
-		if (userRow.type === 0 || isAdminUser(c, userRow) || uid === 1) {
+		if (userRow.type === 0 || isAdminUser(c, userRow)) {
 			throw new BizError('Cannot purge administrator emails', 403);
 		}
 
