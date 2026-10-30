@@ -2,10 +2,11 @@
 
 - **Date**: 2026-10-30
 - **Branch**: `release/2026-10-31` (branched from `origin/master` @ `3e1ef741eb57d77908c1f23ad83e6c0cee9e931d`)
-- **Stage 1 Code Convergence HEAD SHA**: `748643a8989c27b0a14dbed4922ed29759092bf0` (`748643a`)
+- **Stage 1 & Stage 2 Code Convergence HEAD SHA**: `6cd14ffbe539bfe3a081056af1a06509c664d638` (`6cd14ff`)
   - `a1d080559b9a05e1751cfd44c993ef9d17626170` (`a1d0805`) — `fix(security): remove fixed visitor seeding, userId=1 escalation, and D1 setting column overflow`
   - `4aefb562a380f04d01d0290b5690b26769e6104f` (`4aefb56`) — `fix(oauth): enforce server-side OAuth switches, stale credential revocation, PKCE S256, and fail-closed config`
   - `748643a8989c27b0a14dbed4922ed29759092bf0` (`748643a`) — `fix(mail): close cross-user cascade-delete leak, enforce outbound gates, and harden send/read consistency`
+  - `6cd14ffbe539bfe3a081056af1a06509c664d638` (`6cd14ff`) — `fix(ci): update gitleaks command to detect and harden production build supply chain`
   - *(Note: This handoff file and `CHECKLIST.log` are committed directly on top of `748643a8989c27b0a14dbed4922ed29759092bf0`; run `git rev-parse HEAD` for the tip docs commit SHA.)*
 
 ---
@@ -55,7 +56,9 @@
 
 ## 3. Known Failures & `NOT-TESTED` External Items
 
-- **`temp_login_ui` `typecheck` / `build` on Linux x64 (`KNOWN PLATFORM LIMIT`)**: `tsc --noEmit` exits `127 (tsc: not found)` on Linux because `temp_login_ui/package.json` hardcodes 5 Windows-only `win32-x64` packages in `devDependencies`, blocking Linux `pnpm install`. Must be verified and cleaned up in Stage 2 (Windows).
+- **`temp_login_ui` `typecheck` / `build` on Linux x64 (`VERIFIED-RESOLVED`)**: Verified that when running via `corepack pnpm@10.34.5 --dir temp_login_ui install --frozen-lockfile`, `tsc --noEmit` and `vite build` pass completely with exit code 0; browser Playwright E2E passed 13/13 scenarios.
+- **CI Offline Secret Scanning Gate (`VERIFIED-RESOLVED`)**: Fixed `.github/workflows/secret-scanning.yml` by replacing invalid `gitleaks log` with `gitleaks detect` (`6cd14ff`).
+- **Production Build Supply Chain (`VERIFIED-RESOLVED`)**: Hardened `scripts/build-prod.mjs` to invoke `corepack pnpm@10.34.5`, set `CI=true`, and enforce `--frozen-lockfile` (`6cd14ff`).
 - **Live External OAuth Providers (`NOT-TESTED`)**: Real browser callbacks against Google, GitHub, Microsoft, Apple, LinuxDo, and Custom OIDC were not executed in local CLI. Providers without verified live credentials must remain `enabled: false` (server-side disable enforcement is `VERIFIED-FIXED`).
 - **Live Outbound Providers & Public Webhooks (`NOT-TESTED`)**: Live Resend API, Mailjet API, Cloudflare Email Routing outbound, and public Svix webhook delivery were not invoked against external networks.
 - **Live Cloud Object Storage (`NOT-TESTED`)**: Live Cloudflare R2 / AWS S3 / Backblaze B2 buckets and scheduled cron `drainObjectDeletionQueue` were not exercised against cloud endpoints (local KV storage backend + reference-counted deletion queue are `VERIFIED-FIXED`).
@@ -65,8 +68,7 @@
 
 ## 4. Residual P0 / P1 Blockers for Stage 2 & Cutover
 
-1. **[P0 · CI & Dependency Gate]** `.github/workflows/quality-gates.yml` (`ubuntu-latest`) remains blocked until Stage 2:
-   - Remove hardcoded Windows-only `devDependencies` from `temp_login_ui/package.json` (`@cloudflare/workerd-windows-64`, `@esbuild/win32-x64`, `@rollup/rollup-win32-x64-msvc`, `@tailwindcss/oxide-win32-x64-msvc`, `lightningcss-win32-x64-msvc`) so both Windows x64 and Linux CI install cleanly.
+1. **[P0 · Dependency Advisory Gate]** Root/workspaces dependency advisories:
    - Remediate high/critical `npm/pnpm audit` advisories (`basic-ftp` critical, `lodash` / `dompurify` / `rollup` high) and reconcile root `package-lock.json` vs `pnpm-lock.yaml`.
 2. **[P1 · Standalone Remediation for Pre-Existing Fixed Visitor Account]** Stage 1 code never auto-deletes existing production rows. Before production cutover, operator must inspect and disable any pre-existing `admin@epomail.cyou` row in staging/production D1 and flush its KV session:
    ```sql
