@@ -6,6 +6,7 @@
 	"scripts": {
 		"dev": "wrangler dev --config wrangler-dev.toml",
 		"test": "vitest run",
+		"test:serial": "vitest run --maxWorkers=1",
 		"test:unit": "vitest run test/security-hardening.spec.js test/totp-backend-fixes.spec.js test/email-ingest.spec.js",
 		"test:integration": "vitest run test/index.spec.js test/object-ownership.spec.js test/oauth-security.spec.js test/oauth-atomicity.spec.js test/oauth-bind-recovery.spec.js test/oauth-identity-management.spec.js test/oauth-switch-enforcement.spec.js test/initial-password.spec.js test/init-visitor-security.spec.js test/reg-key.spec.js test/security-delivery.spec.js test/mail-pipeline-convergence.spec.js test/security-review-adversarial.spec.js test/security-review-round2.spec.js",
 		"test:mailjet": "node test-mailjet.js",
@@ -40,7 +41,14 @@
 		"overrides": {
 			"fast-xml-parser": "^5.11.2",
 			"form-data": "^4.0.6",
-			"uuid": "^11.1.1"
+			"uuid": "^11.1.1",
+			"nanoid": "^3.3.18",
+			"postcss": "^8.5.12",
+			"picomatch@<2.3.2": "2.3.2",
+			"picomatch@>=4.0.0 <4.0.4": "4.0.4",
+			"rollup@<2.80.0": "2.80.0",
+			"rollup@>=4.0.0 <4.59.0": "4.59.0",
+			"undici@>=7.0.0 <7.30.1": "7.30.1"
 		}
 	}
 }
