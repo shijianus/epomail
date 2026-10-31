@@ -11,6 +11,23 @@
 
 ---
 
+### 部署前收敛独立复验：全门禁本地复核与 B8 GO 清单逐项核对 (2026-10-31)
+*   **关联提交 (Git Commit)**: 本条目所在提交（`git rev-parse HEAD`）；复验基线 `7e24383`（origin/release/2026-10-31 同步点）
+*   **部署环境 (Deployment)**: 本地复验（Node 24.14.0 / pnpm 10.34.5）；**零代码改动、未执行任何远程部署、未修改生产库**
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 独立复验 Stage 4 收敛结论：静态门禁、三应用生产构建、Worker 全量测试、密钥扫描、远端 CI 全部在本机重跑确认，与 `CHECKLIST.log` 既有记录一致。
+    - [x] B8 GO 最小条件逐项代码级核对：空 client state（`564bbca` 已修）、OAuth 禁用开关服务端强制（`oauth-service.js:179/233` 校验 `oauthLoginEnabled`）、参观者默认凭据（`init.js` 改为 `DEMO_VISITOR_ENABLED` 显式开启 + ≥12 位强口令 + 弱口令黑名单）、依赖高危清零——代码层 GO 条件均已关闭。
+    - [x] 遗留优化项登记（不阻断部署，P2/P3）：① 仓库根目录约 473 张过程截图 PNG、11 个 mockup HTML 与约 20 个一次性脚本仍被 git 追踪（.git 361MB），建议后续归档至 `doc/` 或移出版本库（保留 `build.mjs` 等构建链引用文件）；② 本机未执行 `git config core.hooksPath .githooks`，共享 pre-commit 密钥扫描钩子未接线（CI 已覆盖，本机一行命令补齐）；③ `i18n-auth-locale` WARN 7 个字典未被引用词条（forgotPasswordHint、oauthBindFailed、oauthBindAlreadyBound、bindEmailReserved、useTotpCode、useBackupCode、stepUpTitle），属历史残留可清理；④ worker 源码 8 处 `console.log`（多为结构化日志，`src/index.js:171` 打印整个 scheduled event 可收敛）。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 静态门禁：`i18n-symmetry`（mail-vue 3056 键 ×6、mail-worker 1946 键 ×6）/ `i18n-audit`（2163 字面量键零缺失）/ `i18n-hardcoded`（exit 0）/ `i18n-auth-locale`（PASS + 7 残留 WARN）全部 exit 0
+    - [x] 密钥扫描：工作树 1254 文件 0 命中；远端 CI「working tree + history」success
+    - [x] 远端 CI：`e8c7984` 全部 20 项 check run success（Worker 全量+dry-run、登录 UI、mail-vue 构建、i18n、密钥、diff hygiene）；本地与 `origin/release/2026-10-31` 完全同步（0/0）
+    - [x] 依赖审计（生产）：mail-vue 1 moderate（echarts）/ mail-worker 1 low（deepmerge）/ temp_login_ui 0 —— 三应用 0 high / 0 critical
+    - [x] 生产构建：`node scripts/build-prod.mjs` exit 0（temp_login_ui 28.3s、mail-vue 1m38s、PWA 生成、login dist 拷贝）；`wrangler deploy --dry-run` exit 0（D1×2 / AI / Assets / vars 绑定解析正常）
+    - [x] 测试套件：`mail-worker` **17/17 文件、209/209 断言通过（exit 0）**；`temp_login_ui` typecheck 0 错误 + 单测 **15/15** 通过
+    - [x] 零改动零残留：本复验未修改任何代码与配置，无测试数据写入
+    - [ ] `NOT-TESTED`（与 Stage 4 一致的运维项）：staging 未 provision（`env.staging` 仍为 `PLACEHOLDER_*` 占位符）、真实 OAuth Provider 回调、真实 Resend / Mailjet / Cloudflare 外发、真实 R2 / S3 / B2、云端 D1/KV 备份恢复与回滚演练、RC tag 未发布（release workflow 由 `v*` tag 触发）
+
 ### 阶段 4 上线收敛：设置页 OAuth 绑定回跳修复、生产依赖高危清零、CI 并发丢表根因修复与构建冻结 (2026-10-31)
 *   **关联提交 (Git Commit)**: `6369c93b94238a258f3931513e12866ef4882e6c` (Short: `6369c93`, 合并)；代码提交 `fe405a22bea7b7895ef4bba77b3e0b9f77ad0a92` (`fe405a2`)、`7f39f494efde67c905a5322268a92f6a2f0c64cb` (`7f39f49`)、`ade1f878a22cf5e11118c8c631147335993ab1d5` (`ade1f87`)、`2b83f4ca7e1077907288f86aca4e7438e7cb208a` (`2b83f4c`)；文档提交即本条目所在提交（`git rev-parse HEAD`）
 *   **部署环境 (Deployment)**: 本地全真栈 `wrangler dev` + 临时 D1/KV、三应用生产构建、Worker dry-run；**未执行任何远程部署、未修改生产库，统一推送 `origin/release/2026-10-31`**
