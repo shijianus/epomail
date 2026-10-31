@@ -1,12 +1,224 @@
 # EpoMail Release Convergence Handoff (`release/2026-10-31`)
 
 - **Branch**: `release/2026-10-31` (branched from `origin/master` @ `3e1ef741eb57d77908c1f23ad83e6c0cee9e931d`)
-- **Date**: 2026-10-30
+- **Date**: 2026-10-31
+- **Stage 4 code commits** (this handoff's stage): `6369c93` (merge), `fe405a2`, `7f39f49`, `ade1f87`, `2b83f4c`
+- **Final SHA**: this documentation commit — run `git rev-parse HEAD` on `release/2026-10-31`
 - **Stage 3 code commit**: `a0680e8399f01395725ff9f372032de303cf4e4d` (`a0680e8`) — deps / CI / tests
-- **Merged parallel session**: `6cd14ff`, `42352a0`, `a1b6599`, `d99c765` (see §2.1)
+- **Merged parallel session**: `6cd14ff`, `42352a0`, `a1b6599`, `d99c765` (see §2.1 and §4.1)
 - **Previous tip**: `c9039c96d6ef975718d37cfce2b23ba26335887c` (`c9039c9`) — Stage 2 documentation
 - **Stage 1 (Linux, backend)**: `748643a8989c27b0a14dbed4922ed29759092bf0` (`748643a`)
 - **Stage 2 (Windows, frontend/deps/CI/build)**: `b575cce` → `dbba169` (see §4)
+
+---
+
+# Stage 4 — Windows takeover: bind repair, dependency closure, CI determinism (2026-10-31)
+
+## 4.1 Workspace synchronization (completed, not rebased)
+
+The workspace arrived at `333a3573c9f516ab9be90a5436136626be0dbc83` with an
+**unfinished merge** of `origin/release/2026-10-31`: the local branch had seven
+commits the remote did not, the remote had four (Linux Argon's CI/test/report
+work), and four files were conflicted. The merge was completed as
+`6369c93b94238a258f3931513e12866ef4882e6c`; nothing was rebased, force-pushed,
+or deleted.
+
+Conflict resolutions:
+
+- **`.github/workflows/secret-scanning.yml`** — kept the local `gitleaks git`
+  command and the all-zero-before branch. `gitleaks detect` is only a hidden,
+  deprecated v8 alias; the remote side kept `detect`, which is still valid but
+  does not fix the invalid `0000..sha` range on a brand-new branch.
+- **`scripts/build-prod.mjs`** — kept both intents: the `cwd`-based runner,
+  Windows `pnpm.cmd` shim, and `--frozen-lockfile` from the local side, plus
+  the pinned `corepack pnpm@10.34.5` and `CI=true` from the remote side.
+- **`CHECKLIST.log` / this file** — both histories were kept; no record was
+  overwritten.
+
+After the merge, `pnpm install --frozen-lockfile` passed in the repository
+root and in all three apps.
+
+## 4.2 A real settings-page bind defect, found and fixed
+
+The signed-in OAuth bind flow was **not completable in a browser**. The Worker
+redirected to:
+
+```
+/settings/security?oauth_bind=linked#oauth_link=<claim>
+```
+
+`mail-vue` routes through `createAccountHistory()`, which permits only
+`/mail/u/N/#route`. On first load, because `#oauth_link=...` is not a route, the
+history parser returned `/oauth_link=...`, discarded the path and the
+`?oauth_bind` query, and canonicalised to `/mail/u/0/#oauth_link=...`. The
+settings page never mounted, the claim was never redeemed, and a multi-account
+user could additionally have the active session switched to slot 0.
+
+Fix (`fe405a22bea7b7895ef4bba77b3e0b9f77ad0a92`):
+
+- `startBind` records a validated `accountIndex` (0–99) in the OAuth state
+  intent. It only shapes the client-side URL; the claim remains bound to the
+  initiating session hash, so a forged index cannot complete another user's
+  bind.
+- The callback now redirects to
+  `/mail/u/<index>/#settings/security?oauth_bind=<outcome>&oauth_link=<claim>`.
+  The claim is still inside the fragment and is never sent to a server.
+- `setting/index.vue` reads `route.query.oauth_link` and retains a fallback for
+  the already-issued `#oauth_link=` shape.
+- Worker test `returns the claim to the account slot that started the bind`
+  asserts the pathname, fragment and claim. The Chromium full-stack suite now
+  loads a bind return, asserts the claim is posted exactly once to
+  `/api/my/oauthIdentities/bind/complete`, and that the address bar is
+  scrubbed.
+
+The login-page bind flow (unbound identity → `/login/...#oauth_bind=`) was not
+changed; its 13/13 Playwright scenarios still pass.
+
+## 4.3 Dependencies
+
+Measured on the merged tree (`pnpm audit` and `pnpm audit --prod`):
+
+| App | Full audit (high / critical) | Production `--prod` | Notes |
+| :--- | :--- | :--- | :--- |
+| `mail-vue` | **0 / 0** | 0 / 0; 1 moderate (`echarts` 5) | `follow-redirects` 1.16.1 → 1.16.2 removed the only production high |
+| `temp_login_ui` | **0 / 0** | 0 / 0 | clean |
+| `mail-worker` | 9 / 2 (all devDependencies) | **0 / 0**; 1 low (`deepmerge`) | `vitest` 3.0.9 → 3.2.7 cleared the `vitest` criticals |
+
+Changes:
+
+- `mail-vue`: override `follow-redirects@>=1.16.0 <1.16.2` → `1.16.2`
+  (axios transitive, one high, production).
+- `mail-worker`: `vitest ~3.0.7` → `~3.2.6` (resolves 3.2.7), inside the
+  pool's declared peer range `2.0.x - 3.2.x`.
+
+Not closed, with reasons:
+
+| Finding | Scope | Why it remains |
+| :--- | :--- | :--- |
+| `tinypool` ≤2.1.0 / <2.1.2 (critical, 2 advisories) | dev | vitest 3.2.7 requires `tinypool ^1.1.1`; the fix is `tinypool 2.x`, which arrives with vitest 4/the renamed `@cloudflare/vitest-plugin`. Cannot be forced without breaking the pool. |
+| `wrangler` <4.59.1 (high) | dev | The pool pins `wrangler 4.57.0` as a hard dependency. The advisory is in `wrangler pages deploy`, which this project never runs. |
+| `ws` <8.21.0 (high) | dev | Overriding to 8.21 breaks miniflare's WebSocket loopback and every Worker test (verified and reverted in Stage 2). |
+| `sharp` <0.35.5 (high, 3 advisories) | dev | Pinned inside miniflare as a native image dependency; no production path uses miniflare's image binding. |
+| `zod` <4.6.6 (high) | dev | The pool pins zod 3.x; the fix is a major with a different API. |
+| `echarts` <6.1.0 (moderate) | production | Requires a 5 → 6 major upgrade of a heavily configured chart library; deferred as its own window. |
+
+## 4.4 CI root cause, from the actual GitHub runs
+
+Two remote runs were inspected through the public Actions API:
+
+- `Quality Gates` run `41062713412` at `d99c765` — failed in
+  **Worker test suite**.
+- `Security Audit` run `41061614783` at `42352a0` — failed in the same step;
+  the same workflow passed at `d99c765`, so the failure is timing-dependent.
+
+The check-run annotations point only at
+`mail-worker/test/mail-pipeline-convergence.spec.js`:
+`D1_ERROR: no such table: user` and `no such table: email`. Each spec creates the
+full schema in `beforeAll`; parallel file runtimes let one file's isolated
+storage rollback remove tables another file was still using.
+
+Fix (`ade1f878a22cf5e11118c8c631147335993ab1d5`): `poolOptions.workers.singleWorker: true`.
+All files run serially in one runtime. On this Windows host the full suite now
+passes **in one invocation**: 17/17 files, 209/209 tests. This also removes the
+`ConnectEx #1225` failures caused by ~17 simultaneous workerd runtimes. No
+assertion was changed, and `reg-key.spec.js` now uses row-level cleanup rather
+than `DROP TABLE`.
+
+The gitleaks gate was verified against the v8.24.3 documentation: `gitleaks git`
+is the current command and `--log-opts` is supported; `detect` is deprecated
+but still hidden. No workflow was deleted, softened, or wrapped in
+`continue-on-error` in this stage.
+
+## 4.5 Build and lockfile reproducibility
+
+- `wrangler-test.toml` and `wrangler-action.toml` now invoke the same
+  `node ./build.mjs` entry as production, so test/action builds use
+  `--frozen-lockfile` and the pinned pnpm instead of rewriting lockfiles.
+- `scripts/build-prod.mjs` bounds the `corepack pnpm@10.34.5` probe to 15s; an
+  offline machine falls back to the local pnpm instead of hanging.
+- `wrangler deploy --dry-run` re-ran the real build hook: exit 0, 5490.85 KiB
+  upload / 1136.55 KiB gzip. Both frontend builds and the login bundle copy
+  completed.
+
+## 4.6 Verification actually executed in this stage
+
+| Gate | Command | Result |
+| :--- | :--- | :--- |
+| Worker suite (single invocation) | `pnpm --dir mail-worker test` | **PASS — 17/17 files, 209/209 tests, exit 0** |
+| Login UI typecheck | `pnpm --dir temp_login_ui run typecheck` | **PASS** |
+| Login UI unit tests | `pnpm --dir temp_login_ui test` | **PASS — 15/15** |
+| Production build | `node scripts/build-prod.mjs` | **PASS — exit 0** |
+| Worker dry-run | `wrangler deploy --dry-run` | **PASS — 5490.85 KiB / gzip 1136.55 KiB** |
+| Full-stack smoke | `node tests/fullstack-smoke.mjs` | **PASS — 13/13** |
+| Browser E2E (real Worker) | `node tests/fullstack-browser-e2e.mjs` | **PASS — 11/11** (includes the new bind-return scenario) |
+| Login UI E2E (mocked API) | `node tests/oauth-bind-login-ui-e2e.mjs` | **PASS — 13/13** |
+| i18n | symmetry / audit / hardcoded / auth-locale | **PASS — all exit 0** (1946 keys × 6 locales; 2163 literal keys; 142 auth keys) |
+| Secret scan | tree / history / scanner self-test | **PASS — 1254 files, 4121 blobs, 0 findings** |
+| Frozen installs | root + three apps | **PASS** |
+| Dependency audit | `pnpm audit` / `--prod` | See §4.3 |
+
+`i18n-hardcoded` still prints its existing advisory list (421 lines) and exits
+0; this stage added no user-visible strings. The Windows Vitest pool prints
+`EBUSY` warnings while deleting its temporary miniflare directories after a
+successful run; the exit code is 0 and no assertion is affected. Ubuntu CI
+remains the authoritative gate for the runner itself.
+
+`NOT-TESTED` from this host: GitHub Actions execution of the new SHA (requires
+the push); live OAuth provider callbacks; live Resend / Mailjet / Cloudflare
+outbound; live R2 / S3 / B2; cloud D1 / KV restore and Worker rollback.
+
+## 4.7 Remaining real blockers and risks
+
+1. **P1 (conditional) — registration Turnstile is not implemented in the login
+   UI.** `loginService.register` calls `turnstileService.verify` when
+   `registerVerify` is `OPEN` (0) or `COUNT` (2), but `temp_login_ui` has no
+   `siteKey`/Turnstile code. The shipped default is `CLOSE` (1). Keep
+   registration verification closed, or implement the widget before enabling
+   it. This is pre-existing, not introduced by Argon, but it is release-relevant
+   if staging/production turns verification on.
+2. **P1 (operational) — historical credentials.** `jwt_secret` and
+   `totp_enc_key` were committed in earlier history (see
+   `doc/security-audit-2026-09-22.md` §A-19). The current tree scans clean, but
+   history remains. If they were not rotated after that audit, treat them as
+   exposed: rotate both, invalidate `auth-uid:*`/`AUTH_INFO:*` sessions, and
+   re-encrypt mail if `totp_enc_key` was the KEK. Do not rewrite history without
+   coordinating every clone.
+3. **P1 (carried) — legacy owner row.** Inspect and disable
+   `admin@epomail.cyou` (or `user_id = 1`) in staging/production D1 and delete
+   `auth-uid:<id>` from KV. The code no longer creates or escalates the row.
+4. **P2 — dev-only advisories.** The two `tinypool` criticals and the
+   `wrangler`/`ws`/`sharp`/`zod` highs cannot ship in the Worker bundle
+   (`pnpm audit --prod` is clean). Clearing them requires a vitest 4 +
+   `@cloudflare/vitest-plugin` migration and a miniflare dependency bump.
+5. **P2 — `echarts` 5 moderate production advisory.** Fix is `>=6.1.0`; reserve
+   a separate upgrade window and re-test charts.
+6. **P2 — `riskScore` is read by the login UI but never sent by the worker**
+   (defaults to 0); `mail-vue/src/request/ouath.js` remains dead code. Cosmetic,
+   no release impact.
+
+## 4.8 What Linux Argon must still do
+
+1. Push the final SHA and observe **all four** workflows. The two failures
+   above are expected to disappear with `singleWorker`; confirm the Quality
+   Gates and Security Audit worker jobs, and confirm the Offline Secret
+   Scanning Gate still installs gitleaks and passes.
+2. Confirm `pnpm --dir mail-worker test` in a single invocation is green on
+   `ubuntu-latest`. If it is not, capture the failing annotation before
+   changing anything; do not edit assertions.
+3. Decide on the vitest 4 / `@cloudflare/vitest-plugin` migration that clears
+   the remaining dev-only criticals, then re-run all 209 tests.
+4. Execute the production D1/KV cleanup and the credential-rotation runbook in
+   §4.7, and attach evidence.
+
+## 4.9 Staging / production external verification still required
+
+- Live OAuth callback per provider against real credentials; unverified
+  providers must stay `enabled: false`.
+- Live outbound through Resend / Mailjet / Cloudflare Email Routing with
+  `OUTBOUND_WHITELIST_ENFORCE=true`.
+- Live R2 / S3 / B2 upload-read-delete plus the scheduled
+  `drainObjectDeletionQueue`.
+- D1 export + KV restore rehearsal and one Worker version rollback.
 
 ---
 

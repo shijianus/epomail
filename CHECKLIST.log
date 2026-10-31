@@ -11,6 +11,29 @@
 
 ---
 
+### 阶段 4 上线收敛：设置页 OAuth 绑定回跳修复、生产依赖高危清零、CI 并发丢表根因修复与构建冻结 (2026-10-31)
+*   **关联提交 (Git Commit)**: `6369c93b94238a258f3931513e12866ef4882e6c` (Short: `6369c93`, 合并)；代码提交 `fe405a22bea7b7895ef4bba77b3e0b9f77ad0a92` (`fe405a2`)、`7f39f494efde67c905a5322268a92f6a2f0c64cb` (`7f39f49`)、`ade1f878a22cf5e11118c8c631147335993ab1d5` (`ade1f87`)、`2b83f4ca7e1077907288f86aca4e7438e7cb208a` (`2b83f4c`)；文档提交即本条目所在提交（`git rev-parse HEAD`）
+*   **部署环境 (Deployment)**: 本地全真栈 `wrangler dev` + 临时 D1/KV、三应用生产构建、Worker dry-run；**未执行任何远程部署、未修改生产库，统一推送 `origin/release/2026-10-31`**
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 工作区接管（P0 基线）：本地处于未完成的 `origin/release/2026-10-31` 合并状态（本地领先 7、远端领先 4，4 个冲突文件）。以合并提交 `6369c93` 完成集成，未 rebase、未强推、未删除代码；冲突解决保留 `gitleaks git` + 新分支 `--all`、build-prod 的 corepack 固定版本与 Windows/frozen 双重要求、双方文档记录。
+    - [x] 前端真实缺陷修复（P1）：设置页 OAuth 绑定的服务端回跳为 `/settings/security?oauth_bind=...#oauth_link=<claim>`，而 `mail-vue` 的 `createAccountHistory()` 只接受 `/mail/u/N/#route`；首次加载会把该 URL 归一化为 `/mail/u/0/#oauth_link=...`，丢失路由、`oauth_bind` 与 claim，绑定流程实际无法完成。现回跳改为 `/mail/u/<accountIndex>/#settings/security?oauth_bind=...&oauth_link=...`，claim 仍在 fragment（不出现在服务端请求/日志）；`accountIndex` 由发起绑定的浏览器传入并限制 0–99，claim 仍与发起会话 hash 绑定，伪造序号无法完成他人绑定。设置页优先读取 `route.query.oauth_link`，保留旧 `#oauth_link=` 兼容回退。
+    - [x] 前端契约复核（对照 Argon 后端源码）：登录/注册/TOTP/Passkey/受限账号、OAuth Provider `enabled` + `configured`、OAuth 回调错误、登录页 bind 表单、`/api/user/info` 的 `token` 头、`sidebarStats` 七个分桶、`email/list`、`account/list`、外发 403、401 强制登出，均与当前后端一致；本轮仅发现并修复上述设置页绑定回跳缺陷，未重做 UI。
+    - [x] 依赖处置（生产高危清零）：`mail-vue` 增加 `follow-redirects@>=1.16.0 <1.16.2 → 1.16.2` override，`pnpm audit --prod` 由 1 high → 0 high/0 critical（余 1 moderate `echarts` 5）；`temp_login_ui` 全量与生产审计均为 0；`mail-worker` 将 `vitest ~3.0.7 → ~3.2.6`（实际 3.2.7，仍在该 pool 的 peer range `2.0.x - 3.2.x`），清掉 `vitest <3.2.6` 的 critical；生产审计 0 high/0 critical（余 1 low `deepmerge`）。剩余 high/critical 全部为 vitest/miniflare/wrangler 测试工具链，未伪装关闭，原因写入交接文档 §4.3。
+    - [x] CI 真实故障根因修复（P1）：通过 GitHub Actions 公共 API 复现远端失败：`Quality Gates` run `41062713412`（`d99c765`）与 `Security Audit` run `41061614783`（`42352a0`）的 worker 作业均在 `mail-pipeline-convergence.spec.js` 报 `no such table: user` / `email`；注解显示仅该文件失败，同一提交的另一个 workflow 又能通过，属并行文件运行时 D1 隔离回滚竞争。`vitest.config.js` 启用 `poolOptions.workers.singleWorker: true`，文件串行、共享单一 workerd；同时把 `reg-key.spec.js` 的 `DROP TABLE` 改为行级 `DELETE`。未删除/弱化任何工作流，未改断言，未使用 `continue-on-error`。
+    - [x] 构建可复现性：`wrangler-test.toml`、`wrangler-action.toml` 的 `[build]` 统一改为 `node ./build.mjs`，与生产一致地使用 `--frozen-lockfile` 和固定 pnpm，避免测试/发布构建改写锁文件；`scripts/build-prod.mjs` 对 `corepack pnpm@10.34.5` 探测加 15s 上限，离线时回退本地 pnpm 而非挂起。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] Worker 全量：`pnpm --dir mail-worker test` 单次调用 **17/17 文件、209/209 断言通过（exit 0）**；`singleWorker` 同时消除了本机 17 个 workerd 并发导致的 `ConnectEx #1225`
+    - [x] 登录 UI：`tsc --noEmit` 通过，`node --test` **15/15** 通过，`vite build` 通过
+    - [x] 生产构建：`node scripts/build-prod.mjs` exit 0；`wrangler deploy --dry-run` exit 0（5490.85 KiB 上传 / gzip 1136.55 KiB）
+    - [x] 全真栈冒烟：`tests/fullstack-smoke.mjs` **13/13** 通过
+    - [x] 浏览器全真栈：`tests/fullstack-browser-e2e.mjs` **11/11** 通过（新增绑定回跳 claim 消费断言）
+    - [x] 登录页 OAuth 绑定 Playwright：`tests/oauth-bind-login-ui-e2e.mjs` **13/13** 通过
+    - [x] i18n：`i18n-symmetry` / `i18n-audit` / `i18n-hardcoded` / `i18n-auth-locale` 全部 exit 0（6 语言 1946 键对称；2163 个字面量键；142 条 auth 词条）
+    - [x] 密钥扫描：工作树 1254 文件 0 命中；历史 4121 blobs（含 baseline）0 命中；`scan-staged-secrets --self-test` 通过
+    - [x] 锁文件一致性：根目录与三应用 `pnpm install --frozen-lockfile` 全部通过
+    - [x] 依赖审计：`mail-vue` 全量 0 high/0 critical、生产 0 high/0 critical；`temp_login_ui` 全量/生产均 0；`mail-worker` 全量 9 high/2 critical（均为 devDependencies）、生产 0 high/0 critical/1 low
+    - [ ] `NOT-TESTED`：新 SHA 的 GitHub Actions runner 实际执行（需推送后观察）、真实 OAuth Provider 回调、真实 Resend / Mailjet / Cloudflare 外发、真实 R2 / S3 / B2、云端 D1 / KV 恢复与 Worker 回滚；Windows Vitest 清理临时目录的 `EBUSY` 警告不影响 exit 0
+
 ### 阶段 3 上线收敛：依赖高危收口、gitleaks 门禁根因修复与真实全栈/浏览器回归 (2026-10-30)
 *   **关联提交 (Git Commit)**: `a0680e8399f01395725ff9f372032de303cf4e4d` (Short: `a0680e8`)
 *   **部署环境 (Deployment)**: 本地全真栈 `wrangler dev` + 临时 D1/KV、三应用生产构建、Worker dry-run；**未执行任何远程部署、未修改生产库，统一推送 `origin/release/2026-10-31`**
