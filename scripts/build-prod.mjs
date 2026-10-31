@@ -14,7 +14,12 @@ function resolvePnpm() {
 	// the pin; an offline machine falls back to the local binary instead of
 	// failing the build on a network fetch.
 	try {
-		execSync('corepack pnpm@10.34.5 --version', { stdio: 'ignore', env: { ...process.env, CI: 'true' } });
+		// Bounded probe: an offline corepack must fall back, not hang the build.
+		execSync('corepack pnpm@10.34.5 --version', {
+			stdio: 'ignore',
+			env: { ...process.env, CI: 'true' },
+			timeout: 15000
+		});
 		return 'corepack pnpm@10.34.5';
 	} catch (_) {
 		// Windows resolves executables through PATHEXT, so the shim must be
@@ -32,7 +37,8 @@ function run(cwd, args) {
 	for (const arg of args) {
 		if (/\s/.test(arg)) throw new Error(`[build-prod] 不支持含空白的参数: ${arg}`);
 	}
-	const command = [pnpmBin.startsWith('corepack ') || !pnpmBin.includes(' ') ? pnpmBin : `"${pnpmBin}"`, ...args].join(' ');
+	const bin = pnpmBin.includes(' ') && !pnpmBin.startsWith('corepack ') ? `"${pnpmBin}"` : pnpmBin;
+	const command = [bin, ...args].join(' ');
 	// CI=true stops pnpm from prompting when it thinks a TTY is attached.
 	execSync(command, { cwd, stdio: 'inherit', env: { ...process.env, CI: 'true' } });
 }
