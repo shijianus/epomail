@@ -434,6 +434,7 @@ const oauthIdentityService = {
 		if (!providerList.some(item => item.key === provider)) {
 			throw new BizError(t('oauthProviderUnavailable'), 400, 'provider_unavailable');
 		}
+		await oauthService.assertProviderEnabled(c, provider);
 
 		const existingRows = await orm(c).select().from(oauth).where(eq(oauth.userId, userId)).all();
 		const alreadyBound = (existingRows || []).some(row =>
@@ -451,12 +452,21 @@ const oauthIdentityService = {
 			throw new BizError(t('oauthReauthRequired'), 401, 'reauth_required');
 		}
 
+		// The callback must return to the account slot the flow started from.
+		// It only shapes a client-side URL; the claim stays bound to this
+		// session, so a forged index cannot complete someone else's bind.
+		const rawAccountIndex = Number(params.accountIndex);
+		const accountIndex = Number.isInteger(rawAccountIndex) && rawAccountIndex >= 0 && rawAccountIndex < 100
+			? rawAccountIndex
+			: 0;
+
 		const url = await oauthService.getAuthorizeUrl(c, provider, '', '', {
 			intent: {
 				mode: 'bind',
 				userId,
 				sessionHash: await hashToken(sessionToken),
 				provider,
+				accountIndex,
 				issuedAt: Date.now()
 			}
 		});
@@ -490,11 +500,14 @@ const oauthIdentityService = {
 			throw new BizError(t('oauthStateInvalid'), 400, 'state_invalid');
 		}
 
+		await oauthService.assertProviderEnabled(c, provider);
+
 		const userInfo = await oauthService.fetchProviderUserInfo(c, provider, {
 			code: params.code,
 			id_token: params.id_token,
 			redirectUri: stateRow.redirectUri,
-			nonce: stateRow.nonce
+			nonce: stateRow.nonce,
+			codeVerifier: stateRow.codeVerifier || ''
 		});
 		if (!userInfo || typeof userInfo.oauthUserId !== 'string' || !userInfo.oauthUserId) {
 			throw new BizError('OAuth provider authorization failed');
@@ -593,6 +606,7 @@ const oauthIdentityService = {
 
 		const oauthUserId = probe.oauthUserId;
 		const provider = probe.provider;
+		await oauthService.assertProviderEnabled(c, provider);
 
 		// Serialise concurrent completes for this identity. The loser keeps its
 		// claim intact (nothing was spent) and receives a clear conflict.

@@ -87,7 +87,7 @@
               <div class="basis-chain-row trigger-row">
                 <div class="row-icon-col">
                   <el-tag size="small" :type="currentTriggerBadgeType" effect="plain" class="chain-tag">
-                    {{ currentTriggerTag }}
+                    {{ triggerTagDisplay }}
                   </el-tag>
                 </div>
                 <div class="row-content-col">
@@ -99,7 +99,7 @@
               <div class="basis-chain-row suggestion-row">
                 <div class="row-icon-col">
                   <el-tag size="small" :type="currentSuggestionBadgeType" effect="dark" class="chain-tag">
-                    {{ currentSuggestionTag }}
+                    {{ recommendedActionLabel(currentSuggestionTag) }}
                   </el-tag>
                 </div>
                 <div class="row-content-col">
@@ -287,9 +287,9 @@
                 </el-tag>
               </div>
 
-              <!-- 依据单元：原始完整关联依据 (自然换行，不截断) -->
+              <!-- 依据单元：原始完整关联依据 (自然换行，不截断；无采集数据时禁止编造) -->
               <div class="record-col record-basis">
-                <span class="basis-full-text">{{ acc.evidenceSummary || '同一设备指纹 · 关联集群' }}</span>
+                <span class="basis-full-text">{{ acc.evidenceSummary || '—' }}</span>
               </div>
 
               <!-- 查看标识入口 (可访问浮层，键盘与无障碍支持) -->
@@ -364,13 +364,13 @@
               <div class="swimlane-header machine-header">
                 <Icon icon="fluent:bot-16-regular" width="15" height="15" />
                 <span class="header-text-full">{{ $t('auditTimelineSwimlaneMachine') }}</span>
-                <span class="header-text-short">自动化</span>
+                <span class="header-text-short">{{ $t('auditTimelineSwimlaneMachineShort') }}</span>
               </div>
               <div class="swimlane-header-spacer"></div>
               <div class="swimlane-header human-header">
                 <Icon icon="fluent:person-16-regular" width="15" height="15" />
                 <span class="header-text-full">{{ $t('auditTimelineSwimlaneHuman') }}</span>
-                <span class="header-text-short">人工·用户</span>
+                <span class="header-text-short">{{ $t('auditTimelineSwimlaneHumanShort') }}</span>
               </div>
             </div>
 
@@ -503,6 +503,12 @@
                 </div>
               </div>
             </div>
+
+            <!-- 时间线空态：数据库无 timeline 节点时给出明确说明，避免呈现为加载失败 -->
+            <div v-if="!currentTimelineNodes.length" class="evidence-empty-box">
+              <Icon icon="fluent:timeline-20-regular" width="22" height="22" />
+              <div class="evidence-empty-title font-medium">{{ $t('auditTimelineEmpty') }}</div>
+            </div>
           </div>
         </section>
 
@@ -513,10 +519,10 @@
               <Icon icon="fluent:history-20-regular" width="18" height="18" />
               <span>{{ $t('auditJudgmentPathRecord') }}</span>
               <el-tag size="small" type="info" effect="plain" class="ml-2">
-                {{ currentJudgmentLogs.length }} 条
+                {{ $t('auditJudgmentLogCount', { n: currentJudgmentLogs.length }) }}
               </el-tag>
             </div>
-            <button class="collapse-toggle-btn" :title="isJudgmentLogsCollapsed ? '展开' : '折叠'">
+            <button class="collapse-toggle-btn" :title="isJudgmentLogsCollapsed ? $t('expand') : $t('collapse')">
               <Icon :icon="isJudgmentLogsCollapsed ? 'fluent:chevron-down-16-regular' : 'fluent:chevron-up-16-regular'" width="16" height="16" />
             </button>
           </div>
@@ -549,9 +555,9 @@
           <div class="risk-profile-unified-card">
             <!-- 上半区：正方形方格综合风险分 + 中间主驱动维度 + 右侧紧凑维度条列表 -->
             <div class="risk-top-grid">
-              <!-- 1. 正方形方格综合风险分 (克制强调，非整块大红) -->
+              <!-- 1. 正方形方格综合风险分 (克制强调，非整块大红；未采集评分时展示占位破折号) -->
               <div class="composite-score-square" :class="riskScoreLevelClass">
-                <div class="score-number font-mono">{{ currentRiskProfile.compositeScore }}</div>
+                <div class="score-number font-mono">{{ currentRiskProfile.compositeScore ?? '—' }}</div>
                 <div class="score-label">{{ $t('auditRiskCompositeScore') }}</div>
               </div>
 
@@ -573,8 +579,8 @@
                   <div class="dim-label-row">
                     <span class="dim-name font-medium" :title="dim.name">{{ dim.name }}</span>
                     <div class="dim-meta font-mono">
-                      <span class="dim-score">{{ dim.score }}分</span>
-                      <span class="dim-weight text-muted">(权重: {{ dim.weight }}%)</span>
+                      <span class="dim-score">{{ $t('auditRiskDimScore', { score: dim.score }) }}</span>
+                      <span class="dim-weight text-muted">{{ $t('auditRiskDimWeight', { weight: dim.weight }) }}</span>
                     </div>
                   </div>
                   <div class="dim-progress-wrap">
@@ -590,7 +596,7 @@
             </div>
 
             <!-- 数据比较区：将比较数据集中排列，当前值与阈值相邻放置，诚实图形映射与局部克制强调 -->
-            <div class="risk-indicators-unified-box">
+            <div class="risk-indicators-unified-box" v-if="enrichedRiskMetrics.length">
               <!-- 图形符号与图例说明栏（形状 + 色彩双重编码，不单靠颜色区分含义） -->
               <div class="risk-gauge-legend-bar font-mono">
                 <span class="legend-chip">
@@ -794,6 +800,12 @@
                 </div>
               </div>
             </div>
+
+            <!-- 遥测指标空态：后端未采集结构化指标时给出诚实说明 -->
+            <div v-else class="evidence-empty-box">
+              <Icon icon="fluent:chart-multiple-20-regular" width="22" height="22" />
+              <div class="evidence-empty-title font-medium">{{ $t('auditRiskMetricsEmpty') }}</div>
+            </div>
           </div>
         </section>
       </div>
@@ -810,40 +822,29 @@
           </div>
 
           <div class="evidence-chain-structured-list">
-            <div
-              v-for="(rowItem, rIdx) in currentEvidenceChain"
-              :key="rIdx"
-              class="chain-card-row"
-            >
-              <div class="chain-header-line">
-                <div class="evidence-id-title">
-                  <span class="ev-code-box font-mono font-semibold">{{ rowItem.code }}</span>
-                  <span class="ev-title font-medium">{{ rowItem.evidence }}</span>
+            <!-- 证据清单：仅渲染数据库中真实存在的存证字段，空态时给出明确说明 -->
+            <template v-if="evidenceItems.length">
+              <div
+                v-for="(item, eIdx) in evidenceItems"
+                :key="eIdx"
+                class="evidence-item-row"
+              >
+                <div class="evidence-item-label">
+                  <Icon :icon="item.icon" width="14" height="14" />
+                  <span class="font-medium">{{ item.label }}</span>
                 </div>
-                <div class="evidence-rule-box font-mono text-danger font-medium">
-                  {{ rowItem.rule }}
-                </div>
+                <div class="evidence-item-value" :class="{ 'font-mono': item.mono }">{{ item.value }}</div>
               </div>
-
-              <div class="chain-flow-line font-mono">
-                <div class="flow-step-box">
-                  <span>{{ rowItem.step }}</span>
-                </div>
-                <Icon icon="fluent:arrow-right-12-regular" width="12" height="12" class="flow-arrow" />
-                <div class="flow-hash-pill" @click="copyHash(rowItem.hash)" :title="$t('auditCopiedHash')">
-                  <span>{{ rowItem.hash }}</span>
-                  <Icon icon="fluent:copy-16-regular" width="11" height="11" class="copy-icon" />
-                </div>
-                <Icon icon="fluent:arrow-right-12-regular" width="12" height="12" class="flow-arrow" />
-                <div class="flow-judgement-text">
-                  {{ rowItem.judgement }}
-                </div>
-              </div>
+            </template>
+            <div v-else class="evidence-empty-box">
+              <Icon icon="fluent:folder-open-20-regular" width="22" height="22" />
+              <div class="evidence-empty-title font-medium">{{ $t('auditEvidenceChainEmpty') }}</div>
+              <div class="evidence-empty-desc text-muted">{{ $t('auditEvidenceChainEmptyHint') }}</div>
             </div>
           </div>
         </section>
 
-        <!-- 模块 F: 相似案例处置参照 (次级参考) -->
+        <!-- 模块 F: 相似案例处置参照 (后端未提供同类裁决统计接口，诚实空态，不伪造数据) -->
         <section id="chapter-similar" class="dossier-card">
           <div class="section-title">
             <div class="title-left">
@@ -852,53 +853,9 @@
             </div>
           </div>
 
-          <div class="similar-cases-body">
-            <div class="distribution-header-row">
-              <div class="header-reason-box font-mono text-danger font-semibold">
-                <span class="reason-prefix">同原因码</span>
-                <span class="reason-code-val">{{ currentSimilarCases.reasonCode || '—' }}</span>
-              </div>
-              <div class="header-right-meta font-mono text-muted">
-                <span>已裁决样本 {{ currentSimilarCases.totalCases }} 例</span>
-                <span class="meta-separator">·</span>
-                <span>统计窗口 近 90 天</span>
-              </div>
-            </div>
-
-            <!-- 分段比例分布条 -->
-            <div class="stacked-distribution-bar">
-              <div
-                v-for="stat in currentSimilarCases.stats"
-                :key="stat.key"
-                class="dist-segment"
-                :style="{ width: stat.percentage + '%', backgroundColor: stat.color }"
-                :title="`${stat.label}: ${stat.percentage}% (${stat.count}例)`"
-              ></div>
-            </div>
-
-            <!-- 4 列统计矩阵 -->
-            <div class="distribution-stats-grid">
-              <div
-                v-for="stat in currentSimilarCases.stats"
-                :key="stat.key"
-                class="stat-col-box"
-              >
-                <div class="stat-name-row">
-                  <span class="color-dot" :style="{ backgroundColor: stat.color }"></span>
-                  <span class="stat-name">{{ stat.label }}</span>
-                </div>
-                <div class="stat-percent font-mono font-semibold">{{ stat.percentage }}%</div>
-                <div class="stat-count font-mono text-muted">{{ stat.count }} 例</div>
-              </div>
-            </div>
-
-            <!-- 一致性研判指引 -->
-            <div class="consistency-advisory-box">
-              <div class="advisory-bar-indicator"></div>
-              <div class="advisory-content-wrap">
-                <span class="advisory-text">{{ currentSimilarCases.advisoryText }}</span>
-              </div>
-            </div>
+          <div class="evidence-empty-box">
+            <Icon icon="fluent:branch-compare-20-regular" width="22" height="22" />
+            <div class="evidence-empty-title font-medium">{{ $t('auditSimilarCasesUnavailable') }}</div>
           </div>
         </section>
       </div>
@@ -1111,7 +1068,7 @@
             <Icon icon="fluent:shield-checkmark-20-filled" width="20" height="20" class="banner-icon" />
             <div class="banner-text-box">
               <span class="banner-title font-medium">{{ adjudicationContext.cannotExecuteReason || $t('auditSanctionPureNotice') }}</span>
-              <span class="banner-sub text-muted font-mono">AUDIT_LOG_ARCHIVE · 只读审计记录</span>
+              <span class="banner-sub text-muted font-mono">{{ $t('auditArchiveReadOnlyNote') }}</span>
             </div>
           </div>
 
@@ -1644,11 +1601,11 @@ const authorityValue = computed(() => {
   return r.adjudicatorName || r.adjudicator || r.authority || r.operator || r.assignee || 'SecAdmin';
 });
 
-// 证据留存天数 (无需 WORM 无关说明)
+// 证据留存天数 (真实剩余天数，未采集时展示破折号)
 const evidenceDaysFormatted = computed(() => {
   const r = props.selectedRow;
-  const days = r?.evidenceExpiresDays !== undefined ? r.evidenceExpiresDays : 180;
-  return `${days} 天`;
+  const days = r?.evidenceExpiresDays;
+  return (days === undefined || days === null) ? '—' : t('auditEvidenceRetentionDays', { days });
 });
 
 const alarmCountValue = computed(() => {
@@ -1832,16 +1789,113 @@ const currentRiskProfile = computed(() => {
   };
 });
 
-// 模块 F: 相似案例处置参照 (无真实统计数据时保持空状态)
-const currentSimilarCases = computed(() => ({
-  reasonCode: props.selectedRow?.reasonCode ?? null,
-  totalCases: 0,
-  stats: [],
-  advisoryText: ''
-}));
+// 模块 F: 相似案例处置参照 (后端未提供同类裁决统计，界面仅呈现诚实空态)
 
-// 模块 G: 证据链溯源 (无结构化证据时保持空集合)
-const currentEvidenceChain = computed(() => []);
+// 模块 G: 证据链溯源 —— 仅由数据库真实字段派生证据清单，绝不编造哈希或统计
+const EVENT_TYPE_LABEL_KEYS = {
+  multi_account_ban: 'auditEventTypeMultiAccountBan',
+  multi_account_detected: 'auditEventTypeMultiAccountDetected',
+  risk_spike: 'auditEventTypeRiskSpike',
+  user_reported: 'auditEventTypeUserReported',
+  appeal_submitted: 'auditEventTypeAppealSubmitted',
+  auto_ban: 'auditEventTypeAutoBan',
+  credential_tamper_ban: 'auditEventTypeCredentialTamper',
+  outbound_rate: 'auditEventTypeOutboundRate',
+  ip_roaming_routine: 'auditEventTypeIpRoaming',
+  bot_probe_routine: 'auditEventTypeBotProbe',
+  baseline_sample: 'auditEventTypeBaselineSample',
+  device_shift_routine: 'auditEventTypeDeviceShift'
+};
+
+const RECOMMENDED_ACTION_LABEL_KEYS = {
+  ban_account: 'auditActionBanAccount',
+  temp_ban_24h: 'auditActionTempBan24h',
+  mute_account: 'auditActionMuteAccount',
+  blacklist_sender: 'auditActionBlacklistSender',
+  blacklist_ip: 'auditActionBlacklistIp',
+  approve_appeal: 'auditActionApproveAppeal',
+  reject_appeal: 'auditActionRejectAppeal',
+  archive_routine: 'auditActionArchiveRoutine',
+  none: 'auditActionNone'
+};
+
+function eventTypeLabel(value) {
+  if (!value) return '';
+  const key = EVENT_TYPE_LABEL_KEYS[String(value)];
+  return key ? t(key) : String(value);
+}
+
+function recommendedActionLabel(value) {
+  if (!value) return '';
+  const key = RECOMMENDED_ACTION_LABEL_KEYS[String(value)];
+  return key ? t(key) : String(value);
+}
+
+const triggerTagDisplay = computed(() => {
+  const r = props.selectedRow;
+  if (!r) return '';
+  if (r.eventType) return eventTypeLabel(r.eventType);
+  return r.reasonCode || '';
+});
+
+const evidenceItems = computed(() => {
+  const r = props.selectedRow;
+  if (!r) return [];
+  const items = [];
+  const eventLabel = eventTypeLabel(r.eventType);
+  if (eventLabel) {
+    items.push({ icon: 'fluent:flash-16-regular', label: t('auditEvidenceItemEvent'), value: eventLabel });
+  }
+  const alarmReason = r.reportReason || r.banReason || r.appealReason;
+  if (alarmReason) {
+    items.push({ icon: 'fluent:shield-alert-16-regular', label: t('auditAlarmReasonLabel'), value: alarmReason });
+  }
+  if (r.detailText) {
+    items.push({ icon: 'fluent:text-description-16-regular', label: t('auditEvidenceItemDetail'), value: r.detailText });
+  }
+  if (r.evidenceSummary) {
+    items.push({ icon: 'fluent:document-bullet-list-16-regular', label: t('auditEvidenceItemSummary'), value: r.evidenceSummary });
+  }
+  const network = [r.ip, r.baseGeo || r.geo].filter(Boolean).join(' · ');
+  if (network) {
+    items.push({ icon: 'fluent:globe-16-regular', label: t('auditEvidenceItemNetwork'), value: network, mono: true });
+  }
+  const device = [r.device || r.baseDevice, r.fingerprint || r.baseFingerprint].filter(Boolean).join(' · ');
+  if (device) {
+    items.push({ icon: 'fluent:desktop-16-regular', label: t('auditEvidenceItemDevice'), value: device, mono: true });
+  }
+  if (Array.isArray(r.clusterAccounts) && r.clusterAccounts.length > 0) {
+    items.push({
+      icon: 'fluent:people-community-16-regular',
+      label: t('auditClusterAccountsTitle'),
+      value: t('auditClusterAccountsCount', { count: r.clusterAccounts.length })
+    });
+  }
+  if (r.alarmCount !== undefined && r.alarmCount !== null && Number(r.alarmCount) > 0) {
+    items.push({ icon: 'fluent:alert-16-regular', label: t('auditColAlarmCount'), value: String(r.alarmCount) });
+  }
+  if (r.evidenceExpiresDays !== undefined && r.evidenceExpiresDays !== null) {
+    items.push({
+      icon: 'fluent:timer-16-regular',
+      label: t('abuseEvidenceRetentionLabel'),
+      value: t('auditEvidenceRetentionDays', { days: r.evidenceExpiresDays }),
+      mono: true
+    });
+  }
+  return items;
+});
+
+// 多维风险画像评分分级 (依据 matchScore 真实评分着色，未采集时保持中性)
+const riskScoreLevelClass = computed(() => {
+  const score = Number(props.selectedRow?.matchScore);
+  if (!Number.isFinite(score)) return '';
+  if (score >= 70) return 'score-danger';
+  if (score >= 40) return 'score-warning';
+  return 'score-success';
+});
+
+// 遥测指标对比行 (后端未采集结构化指标时保持空集合，由空态接管展示)
+const enrichedRiskMetrics = computed(() => []);
 
 const canAdjudicatePerm = computed(() => hasPerm('setting:set'));
 
@@ -3712,255 +3766,77 @@ function handleDrawerOpened() {
   }
 }
 
-/* 模块 F: 相似案例处置参照 */
-.similar-cases-body {
+/* 模块 F/G 共用空态盒：无真实数据时的诚实说明（替代伪造统计与空白区域） */
+.evidence-empty-box {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 26px 16px;
+  border-radius: 6px;
+  background: var(--el-fill-color-light);
+  border: 1px dashed var(--el-border-color-lighter);
+  color: var(--el-text-color-placeholder);
+  text-align: center;
 
-  .distribution-header-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
+  .evidence-empty-title {
+    font-size: 13px;
+    color: var(--el-text-color-regular);
+  }
+
+  .evidence-empty-desc {
     font-size: 12px;
-    flex-wrap: wrap;
-    gap: 8px;
-
-    .header-reason-box {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 3px 8px;
-      border-radius: 6px;
-      background: rgba(239, 68, 68, 0.08);
-      border: 1px solid rgba(239, 68, 68, 0.18);
-      font-size: 11.5px;
-
-      .reason-prefix {
-        color: var(--el-text-color-secondary);
-        font-weight: 500;
-      }
-      .reason-code-val {
-        color: var(--el-color-danger);
-        font-weight: 600;
-        font-family: var(--el-font-family-monospace, monospace);
-      }
-    }
-
-    .distribution-meta {
-      font-size: 11.5px;
-      color: var(--el-text-color-secondary);
-    }
-
-    .meta-separator {
-      margin: 0 4px;
-    }
-  }
-
-  .stacked-distribution-bar {
-    display: flex;
-    height: 8px;
-    border-radius: 9999px;
-    overflow: hidden;
-    background: var(--el-fill-color);
-
-    .dist-segment {
-      height: 100%;
-      transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-  }
-
-  .distribution-stats-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 8px;
-
-    @media (max-width: 580px) {
-      grid-template-columns: repeat(2, 1fr);
-    }
-
-    .stat-col-box {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 10px 8px;
-      border-radius: 6px;
-      background: var(--el-fill-color-blank);
-      border: 1px solid var(--el-border-color-lighter);
-      gap: 4px;
-      transition: border-color 0.2s, box-shadow 0.2s;
-
-      &:hover {
-        border-color: var(--el-border-color);
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
-      }
-
-      .stat-name-row {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        font-size: 11.5px;
-        color: var(--el-text-color-secondary);
-
-        .color-dot {
-          width: 7px;
-          height: 7px;
-          border-radius: 50%;
-          flex-shrink: 0;
-        }
-      }
-
-      .stat-percent {
-        font-size: 17px;
-        font-weight: 700;
-        font-variant-numeric: tabular-nums;
-        color: var(--el-text-color-primary);
-        line-height: 1.2;
-      }
-
-      .stat-count {
-        font-size: 11px;
-        color: var(--el-text-color-placeholder);
-        font-variant-numeric: tabular-nums;
-      }
-    }
-  }
-
-  .consistency-advisory-box {
-    display: flex;
-    align-items: stretch;
-    background: rgba(59, 130, 246, 0.03);
-    border-radius: 6px;
-    overflow: hidden;
-    border: 1px solid rgba(59, 130, 246, 0.15);
-    border-left: 3px solid var(--el-color-primary);
-
-    .advisory-bar-indicator {
-      display: none;
-    }
-
-    .advisory-content-wrap {
-      padding: 10px 14px;
-      font-size: 12px;
-      line-height: 1.6;
-      color: var(--el-text-color-regular);
-    }
+    line-height: 1.6;
+    max-width: 420px;
   }
 }
 
-/* 模块 G: 证据链溯源 */
+/* 模块 G: 证据清单 (仅真实存证字段，无数据时不渲染任何行) */
 .evidence-chain-structured-list {
   display: flex;
   flex-direction: column;
   gap: 10px;
 
-  .chain-card-row {
-    display: flex;
-    flex-direction: column;
-    padding: 11px 14px;
+  .evidence-item-row {
+    display: grid;
+    grid-template-columns: 128px 1fr;
+    gap: 12px;
+    align-items: start;
+    padding: 10px 14px;
     border-radius: 6px;
     background: var(--el-fill-color-blank);
     border: 1px solid var(--el-border-color-lighter);
-    gap: 7px;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 
     &:hover {
       border-color: var(--el-border-color);
       box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
     }
 
-    .chain-header-line {
-      display: flex;
+    @media (max-width: 600px) {
+      grid-template-columns: 1fr;
+      gap: 6px;
+    }
+
+    .evidence-item-label {
+      display: inline-flex;
       align-items: center;
-      justify-content: space-between;
-      gap: 8px;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--el-text-color-secondary);
 
-      .evidence-id-title {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        font-size: 12.5px;
-        font-weight: 500;
-        color: var(--el-text-color-primary);
-
-        .ev-code-box {
-          display: inline-flex;
-          align-items: center;
-          padding: 2px 8px;
-          border-radius: 4px;
-          background: rgba(59, 130, 246, 0.08);
-          color: var(--el-color-primary);
-          border: 1px solid rgba(59, 130, 246, 0.2);
-          font-family: var(--el-font-family-monospace, monospace);
-          font-size: 11px;
-          font-weight: 600;
-        }
-      }
-
-      .evidence-rule-box {
-        display: inline-flex;
-        align-items: center;
-        padding: 2px 8px;
-        border-radius: 4px;
-        background: rgba(239, 68, 68, 0.08);
-        border: 1px solid rgba(239, 68, 68, 0.2);
-        font-size: 11px;
-        font-weight: 500;
+      svg {
+        color: var(--el-color-primary);
+        flex-shrink: 0;
       }
     }
 
-    .chain-flow-line {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 12px;
-      flex-wrap: wrap;
-
-      .flow-step-box {
-        display: inline-flex;
-        align-items: center;
-        padding: 2px 8px;
-        border-radius: 4px;
-        background: var(--el-fill-color-light);
-        border: 1px solid var(--el-border-color-lighter);
-        color: var(--el-text-color-primary);
-        font-weight: 500;
-        font-size: 11px;
-      }
-
-      .flow-arrow {
-        color: var(--el-text-color-placeholder);
-        display: inline-flex;
-        align-items: center;
-      }
-
-      .flow-hash-pill {
-        display: inline-flex;
-        align-items: center;
-        gap: 4px;
-        padding: 2px 8px;
-        border-radius: 4px;
-        background: var(--el-fill-color-light);
-        border: 1px solid var(--el-border-color-lighter);
-        color: var(--el-text-color-secondary);
-        cursor: pointer;
-        font-family: var(--el-font-family-monospace, monospace);
-        font-size: 11px;
-        transition: all 0.15s ease;
-
-        &:hover {
-          color: var(--el-color-primary);
-          border-color: var(--el-color-primary-light-5);
-          background: var(--el-color-primary-light-9);
-        }
-      }
-
-      .flow-judgement-text {
-        color: var(--el-text-color-regular);
-        font-size: 12px;
-      }
+    .evidence-item-value {
+      font-size: 12.5px;
+      line-height: 1.6;
+      color: var(--el-text-color-primary);
+      word-break: break-word;
     }
   }
 }
@@ -4584,8 +4460,8 @@ html.dark {
       border-color: #30363d;
     }
 
-    .chain-card-row,
-    .stat-col-box,
+    .evidence-item-row,
+    .evidence-empty-box,
     .judgment-path-record-box,
     .risk-indicators-unified-box {
       background: #161b22;

@@ -75,7 +75,7 @@ export async function countOtc(db, purpose = null) {
 }
 
 export async function dropOtcTable(db) {
-	await db.prepare('DROP TABLE IF EXISTS oauth_one_time_credential').run();
+	await clearOtc(db);
 }
 
 export async function ensureBindClaimTable(db) {

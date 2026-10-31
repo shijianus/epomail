@@ -33,6 +33,40 @@ async function sha256Base64Url(str) {
 	return base64url(buffer);
 }
 
+async function timingSafeEqualStr(left, right) {
+	if (typeof left !== 'string' || typeof right !== 'string' || !left || !right) return false;
+	const [leftDigest, rightDigest] = await Promise.all([
+		crypto.subtle.digest('SHA-256', encoder.encode(left)),
+		crypto.subtle.digest('SHA-256', encoder.encode(right))
+	]);
+	const a = new Uint8Array(leftDigest);
+	const b = new Uint8Array(rightDigest);
+	let diff = left.length ^ right.length;
+	for (let i = 0; i < a.length; i++) diff |= a[i] ^ b[i];
+	return diff === 0;
+}
+
+function buildScopedIdentityClaims(user, isAdmin, scopesStr) {
+	const scopes = normalizeScopes(scopesStr);
+	const includeEmail = scopes.length === 0 || scopes.includes('email');
+	const includeProfile = scopes.length === 0 || scopes.includes('profile');
+	const claims = {
+		sub: String(user.userId),
+		is_admin: isAdmin,
+		role: isAdmin ? 'admin' : 'reader'
+	};
+	if (includeEmail) {
+		claims.email = user.email;
+		claims.email_verified = true;
+	}
+	if (includeProfile) {
+		claims.name = user.name || user.email.split('@')[0];
+		claims.preferred_username = user.email.split('@')[0];
+		claims.picture = user.avatar || user.avatarUrl || '';
+	}
+	return claims;
+}
+
 function genRandomHex(bytesCount = 16) {
 	const array = new Uint8Array(bytesCount);
 	crypto.getRandomValues(array);
@@ -249,7 +283,7 @@ const oauthProviderService = {
 				throw new BizError('invalid_grant: PKCE code_verifier 校验失败', 400);
 			}
 		} else {
-			if (!clientSecret || clientSecret !== app.clientSecret) {
+			if (!clientSecret || !(await timingSafeEqualStr(String(clientSecret), String(app.clientSecret || '')))) {
 				throw new BizError('invalid_client: client_secret 验证失败', 401);
 			}
 		}
@@ -259,15 +293,15 @@ const oauthProviderService = {
 			throw new BizError('invalid_grant: 用户不存在或已被封禁', 400);
 		}
 
-		const now = Math.floor(Date.now() / 1000);
 		const origin = new URL(c.req.url).origin;
 
 		const isAdmin = isAdminUser(c, user);
+		const scopedClaims = buildScopedIdentityClaims(user, isAdmin, authData.scopes);
 
 		// 1. Access Token (2小时有效)
 		const accessToken = await jwtUtils.generateToken(c, {
 			userId: user.userId,
-			email: user.email,
+			...(scopedClaims.email ? { email: scopedClaims.email } : {}),
 			clientId: app.clientId,
 			scopes: authData.scopes,
 			is_admin: isAdmin,
@@ -278,15 +312,8 @@ const oauthProviderService = {
 		// 2. ID Token (OIDC 标准规范)
 		const idToken = await jwtUtils.generateToken(c, {
 			iss: origin,
-			sub: String(user.userId),
 			aud: app.clientId,
-			email: user.email,
-			email_verified: true,
-			name: user.name || user.email.split('@')[0],
-			preferred_username: user.email.split('@')[0],
-			picture: user.avatar || user.avatarUrl || '',
-			is_admin: isAdmin,
-			role: isAdmin ? 'admin' : 'reader'
+			...scopedClaims
 		}, 7200);
 
 		return {
@@ -322,16 +349,7 @@ const oauthProviderService = {
 
 		const isAdmin = isAdminUser(c, user);
 
-		return {
-			sub: String(user.userId),
-			email: user.email,
-			email_verified: true,
-			name: user.name || user.email.split('@')[0],
-			preferred_username: user.email.split('@')[0],
-			picture: user.avatar || user.avatarUrl || '',
-			is_admin: isAdmin,
-			role: isAdmin ? 'admin' : 'reader'
-		};
+		return buildScopedIdentityClaims(user, isAdmin, payload.scopes);
 	},
 
 	getOpenIdConfiguration(c) {

@@ -46,6 +46,32 @@ function resolveAllowedRedirectUri(c, providerKey, redirectUri, config) {
 }
 
 const OIDC_NONCE_PROVIDERS = new Set(['google', 'microsoft', 'apple', 'custom']);
+const PKCE_PROVIDERS = new Set(['github', 'google', 'microsoft', 'apple', 'custom', 'linuxdo']);
+
+function generateCodeVerifier() {
+	const bytes = new Uint8Array(32);
+	crypto.getRandomValues(bytes);
+	let binary = '';
+	for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+	return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+async function computeCodeChallengeS256(verifier) {
+	const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
+	const bytes = new Uint8Array(digest);
+	let binary = '';
+	for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+	return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function providerFromIdentity(oauthUserId) {
+	const value = typeof oauthUserId === 'string' ? oauthUserId : '';
+	const idx = value.indexOf(':');
+	if (idx > 0) {
+		return value.slice(0, idx).toLowerCase();
+	}
+	return 'linuxdo';
+}
 
 function assertSafeCustomEndpoints(config) {
 	for (const field of ['authUrl', 'tokenUrl', 'userInfoUrl']) {
@@ -147,6 +173,61 @@ const oauthService = {
 		return config;
 	},
 
+	async assertProviderEnabled(c, providerKey) {
+		const normalizedKey = typeof providerKey === 'string' ? providerKey.trim().toLowerCase() : '';
+		const settingData = await settingService.query(c);
+		if (Number(settingData?.oauthLoginEnabled) !== 1) {
+			throw new BizError('OAuth login is currently disabled', 403, 'oauth_disabled');
+		}
+
+		if (normalizedKey === 'linuxdo') {
+			const linuxdoOn = settingData?.linuxdoSwitch === true
+				|| c.env?.linuxdo_switch === true
+				|| c.env?.linuxdo_switch === 'true';
+			if (!linuxdoOn) {
+				throw new BizError('Provider linuxdo is disabled', 403, 'oauth_provider_disabled');
+			}
+			const cfg = await this.getProviderConfig(c, 'linuxdo');
+			if (!cfg.clientId || !cfg.clientSecret || !cfg.callbackUrl) {
+				throw new BizError('Provider linuxdo is missing required credentials or callback URL', 503, 'oauth_provider_unconfigured');
+			}
+			return cfg;
+		}
+
+		if (!PROVIDER_METADATA[normalizedKey]) {
+			throw new BizError(`Unsupported provider: ${providerKey}`, 400, 'oauth_provider_unsupported');
+		}
+
+		let providers = settingData?.oauthProviders;
+		if (typeof providers === 'string') {
+			try { providers = JSON.parse(providers); } catch (_) { providers = {}; }
+		} else if (!providers || typeof providers !== 'object') {
+			providers = {};
+		}
+
+		const rawCfg = providers[normalizedKey];
+		const isExplicitlyEnabled = Boolean(rawCfg && (rawCfg.enabled === 1 || rawCfg.enabled === true));
+		if (!isExplicitlyEnabled) {
+			throw new BizError(`Provider ${normalizedKey} is disabled`, 403, 'oauth_provider_disabled');
+		}
+
+		const config = await this.getProviderConfig(c, normalizedKey);
+		const hasClientId = Boolean(config?.clientId && String(config.clientId).trim());
+		const hasClientSecret = Boolean(config?.clientSecret && String(config.clientSecret).trim());
+		if (!hasClientId || !hasClientSecret) {
+			throw new BizError(`Provider ${normalizedKey} is not completely configured`, 503, 'oauth_provider_unconfigured');
+		}
+
+		if (normalizedKey === 'custom') {
+			if (!config.authUrl || !config.tokenUrl || !config.userInfoUrl) {
+				throw new BizError('Custom provider missing Auth URL, Token URL, or UserInfo URL', 503, 'oauth_provider_unconfigured');
+			}
+			assertSafeCustomEndpoints(config);
+		}
+
+		return config;
+	},
+
 	async getPublicProviders(c) {
 		const settingData = await settingService.query(c);
 		if (Number(settingData.oauthLoginEnabled) !== 1) {
@@ -162,16 +243,30 @@ const oauthService = {
 		const list = [];
 		const keys = ['github', 'google', 'microsoft', 'apple', 'custom'];
 		for (const key of keys) {
-			const cfg = providers[key];
-			const isEnabled = cfg && (cfg.enabled === 1 || cfg.enabled === true || (cfg.clientId && cfg.enabled !== false && cfg.enabled !== 0));
-			if (isEnabled) {
-				const meta = PROVIDER_METADATA[key];
-				list.push({
-					key,
-					name: (key === 'custom' && cfg.name) ? cfg.name : meta.name,
-					icon: meta.icon
-				});
+			const rawCfg = providers[key];
+			const isExplicitlyEnabled = Boolean(rawCfg && (rawCfg.enabled === 1 || rawCfg.enabled === true));
+			if (!isExplicitlyEnabled) continue;
+
+			const cfg = await this.getProviderConfig(c, key);
+			const hasClientId = Boolean(cfg?.clientId && String(cfg.clientId).trim());
+			const hasClientSecret = Boolean(cfg?.clientSecret && String(cfg.clientSecret).trim());
+			if (!hasClientId || !hasClientSecret) continue;
+
+			if (key === 'custom') {
+				if (!cfg.authUrl || !cfg.tokenUrl || !cfg.userInfoUrl) continue;
+				try {
+					assertSafeCustomEndpoints(cfg);
+				} catch (_) {
+					continue;
+				}
 			}
+
+			const meta = PROVIDER_METADATA[key];
+			list.push({
+				key,
+				name: (key === 'custom' && cfg.name) ? cfg.name : meta.name,
+				icon: meta.icon
+			});
 		}
 		return list;
 	},
@@ -187,43 +282,42 @@ const oauthService = {
 			throw new BizError('Missing OAuth client state', 400, 'oauth_state_required');
 		}
 
-		const config = await this.getProviderConfig(c, providerKey);
-		if (!config || !config.clientId) {
-			throw new BizError(`Provider ${providerKey} is not configured or missing Client ID`);
-		}
-		const meta = PROVIDER_METADATA[providerKey];
-		if (!meta && providerKey !== 'linuxdo') {
-			throw new BizError(`Unsupported provider: ${providerKey}`);
-		}
+		const normalizedProvider = typeof providerKey === 'string' ? providerKey.trim().toLowerCase() : '';
+		const config = await this.assertProviderEnabled(c, normalizedProvider);
+		const meta = PROVIDER_METADATA[normalizedProvider];
 
 		let authUrl = meta?.authUrl || '';
-		if (providerKey === 'microsoft') {
+		if (normalizedProvider === 'microsoft') {
 			const tenant = config.tenant || 'common';
 			authUrl = authUrl.replace('{tenant}', tenant);
-		} else if (providerKey === 'custom') {
+		} else if (normalizedProvider === 'custom') {
 			authUrl = config.authUrl;
 			if (!authUrl) throw new BizError('Custom provider authorization URL (authUrl) is required');
 			assertSafeCustomEndpoints(config);
-		} else if (providerKey === 'linuxdo') {
+		} else if (normalizedProvider === 'linuxdo') {
 			authUrl = 'https://connect.linux.do/oauth2/authorize';
 		}
 
-		const finalRedirectUri = resolveAllowedRedirectUri(c, providerKey, redirectUri, config);
+		const finalRedirectUri = resolveAllowedRedirectUri(c, normalizedProvider, redirectUri, config);
 		const scope = config.scope || meta?.defaultScope || 'openid email profile';
 
 		// Server-side state binds the callback to this browser flow. The nonce
-		// is additionally echoed by OIDC providers inside the id_token.
+		// is additionally echoed by OIDC providers inside the id_token, and
+		// PKCE binds the authorization code to this Worker's token exchange.
 		//
 		// The state is stored in D1 so that consumption is a single atomic
 		// compare-and-set. It is bound to the provider: a state minted for one
 		// provider can never be redeemed on another provider's callback.
 		const nonce = randomToken();
+		const codeVerifier = PKCE_PROVIDERS.has(normalizedProvider) ? generateCodeVerifier() : '';
+		const codeChallenge = codeVerifier ? await computeCodeChallengeS256(codeVerifier) : '';
 		const stateToken = await oneTimeCredential.issue(c, {
 			purpose: OTC_PURPOSE.STATE,
-			provider: providerKey,
+			provider: normalizedProvider,
 			payload: {
 				redirectUri: finalRedirectUri,
 				nonce,
+				codeVerifier,
 				clientState: typeof state === 'string' ? state : '',
 				// Server-only intent. The public /oauth/authorize route never
 				// passes options, so a caller cannot mint an authenticated
@@ -242,10 +336,14 @@ const oauthService = {
 		url.searchParams.set('response_type', 'code');
 		url.searchParams.set('scope', scope);
 		url.searchParams.set('state', stateToken);
-		if (OIDC_NONCE_PROVIDERS.has(providerKey)) {
+		if (codeChallenge) {
+			url.searchParams.set('code_challenge', codeChallenge);
+			url.searchParams.set('code_challenge_method', 'S256');
+		}
+		if (OIDC_NONCE_PROVIDERS.has(normalizedProvider)) {
 			url.searchParams.set('nonce', nonce);
 		}
-		if (providerKey === 'apple') {
+		if (normalizedProvider === 'apple') {
 			url.searchParams.set('response_mode', 'form_post');
 		}
 		return url.toString();
@@ -309,6 +407,10 @@ const oauthService = {
 		if (Date.now() - Number(row.createdAt) > OAUTH_LOGIN_CODE_TTL_SECONDS * 1000) {
 			throw new BizError('Expired OAuth login code', 401);
 		}
+		const codeProvider = record?.provider || row.provider || '';
+		if (codeProvider) {
+			await this.assertProviderEnabled(c, codeProvider);
+		}
 		return row;
 	},
 
@@ -323,27 +425,37 @@ const oauthService = {
 	 * checks cannot drift apart.
 	 */
 	async fetchProviderUserInfo(c, providerKey, params = {}) {
-		const { code, id_token, redirectUri, nonce } = params;
+		const { code, id_token, redirectUri, nonce, codeVerifier } = params;
 		if (!code && !id_token) {
 			throw new BizError('Authorization code or ID token is required');
 		}
-		if (providerKey === 'linuxdo') {
+		const normalizedKey = typeof providerKey === 'string' ? providerKey.trim().toLowerCase() : '';
+		if (normalizedKey === 'linuxdo') {
 			return await this.fetchLinuxDoUserInfo(c, params);
 		}
 
-		const config = await this.getProviderConfig(c, providerKey);
-		if (!config || !config.clientId) {
-			throw new BizError(`Provider ${providerKey} is not configured`);
+		const config = await this.getProviderConfig(c, normalizedKey);
+		if (!config || !String(config.clientId || '').trim() || !String(config.clientSecret || '').trim()) {
+			throw new BizError(`Provider ${normalizedKey || providerKey} is not completely configured`, 503, 'oauth_provider_unconfigured');
 		}
-		const meta = PROVIDER_METADATA[providerKey];
+		const meta = PROVIDER_METADATA[normalizedKey];
 		if (!meta) {
 			throw new BizError(`Unsupported provider: ${providerKey}`);
 		}
 
-		const callbackUri = resolveAllowedRedirectUri(c, providerKey, redirectUri, config);
+		const callbackUri = resolveAllowedRedirectUri(c, normalizedKey, redirectUri, config);
 		let userInfo = null;
 
-		if (providerKey === 'github') {
+		if (normalizedKey === 'github') {
+			const ghTokenPayload = {
+				client_id: config.clientId,
+				client_secret: config.clientSecret,
+				code,
+				redirect_uri: callbackUri
+			};
+			if (codeVerifier) {
+				ghTokenPayload.code_verifier = codeVerifier;
+			}
 			const tokenRes = await fetch(meta.tokenUrl, {
 				method: 'POST',
 				headers: {
@@ -351,12 +463,7 @@ const oauthService = {
 					'Accept': 'application/json',
 					'User-Agent': 'Epocanvas-Mail'
 				},
-				body: JSON.stringify({
-					client_id: config.clientId,
-					client_secret: config.clientSecret,
-					code,
-					redirect_uri: callbackUri
-				})
+				body: JSON.stringify(ghTokenPayload)
 			});
 			if (!tokenRes.ok) throw new BizError(`GitHub token exchange failed: ${tokenRes.statusText}`);
 			const tokenData = await tokenRes.json();
@@ -398,13 +505,14 @@ const oauthService = {
 				trustLevel: 1,
 				silenced: 0
 			};
-		} else if (providerKey === 'google') {
+		} else if (normalizedKey === 'google') {
 			const formBody = new URLSearchParams();
 			formBody.append('client_id', config.clientId);
 			formBody.append('client_secret', config.clientSecret);
 			formBody.append('code', code);
 			formBody.append('redirect_uri', callbackUri);
 			formBody.append('grant_type', 'authorization_code');
+			if (codeVerifier) formBody.append('code_verifier', codeVerifier);
 
 			const tokenRes = await fetch(meta.tokenUrl, {
 				method: 'POST',
@@ -433,7 +541,7 @@ const oauthService = {
 				trustLevel: 1,
 				silenced: 0
 			};
-		} else if (providerKey === 'microsoft') {
+		} else if (normalizedKey === 'microsoft') {
 			const tenant = config.tenant || 'common';
 			const tokenUrl = meta.tokenUrl.replace('{tenant}', tenant);
 			const formBody = new URLSearchParams();
@@ -442,6 +550,7 @@ const oauthService = {
 			formBody.append('code', code);
 			formBody.append('redirect_uri', callbackUri);
 			formBody.append('grant_type', 'authorization_code');
+			if (codeVerifier) formBody.append('code_verifier', codeVerifier);
 
 			const tokenRes = await fetch(tokenUrl, {
 				method: 'POST',
@@ -473,7 +582,7 @@ const oauthService = {
 				trustLevel: 1,
 				silenced: 0
 			};
-		} else if (providerKey === 'apple') {
+		} else if (normalizedKey === 'apple') {
 			let claims = null;
 
 			if (code && config.clientSecret) {
@@ -483,6 +592,7 @@ const oauthService = {
 				formBody.append('code', code);
 				formBody.append('grant_type', 'authorization_code');
 				if (callbackUri) formBody.append('redirect_uri', callbackUri);
+				if (codeVerifier) formBody.append('code_verifier', codeVerifier);
 
 				const tokenRes = await fetch(meta.tokenUrl, {
 					method: 'POST',
@@ -521,7 +631,7 @@ const oauthService = {
 				trustLevel: 1,
 				silenced: 0
 			};
-		} else if (providerKey === 'custom') {
+		} else if (normalizedKey === 'custom') {
 			if (!config.tokenUrl || !config.userInfoUrl) {
 				throw new BizError('Custom provider missing Token URL or UserInfo URL');
 			}
@@ -532,6 +642,7 @@ const oauthService = {
 			formBody.append('code', code);
 			formBody.append('redirect_uri', callbackUri);
 			formBody.append('grant_type', 'authorization_code');
+			if (codeVerifier) formBody.append('code_verifier', codeVerifier);
 
 			const tokenRes = await fetch(config.tokenUrl, {
 				method: 'POST',
@@ -581,8 +692,10 @@ const oauthService = {
 
 	async exchangeCodeAndLogin(c, providerKey, params = {}) {
 		await rateLimit.check(c, { scope: 'oauth-login', limit: 30, windowSeconds: 900 });
-		const userInfo = await this.fetchProviderUserInfo(c, providerKey, params);
-		return await this.finishIdentityLogin(c, providerKey, userInfo);
+		const normalizedKey = typeof providerKey === 'string' ? providerKey.trim().toLowerCase() : '';
+		await this.assertProviderEnabled(c, normalizedKey);
+		const userInfo = await this.fetchProviderUserInfo(c, normalizedKey, params);
+		return await this.finishIdentityLogin(c, normalizedKey, userInfo);
 	},
 
 	/**
@@ -768,6 +881,9 @@ const oauthService = {
 		if (Number(oauthRow.userId) > 0) {
 			return { userInfo: oauthRow, token: null, alreadyBound: true };
 		}
+
+		const effectiveProvider = (proof.provider || boundProvider || providerFromIdentity(oauthUserId)).toLowerCase();
+		await this.assertProviderEnabled(c, effectiveProvider);
 
 		if (proof.consumed) {
 			// The proof was spent by an attempt that has not committed the
@@ -979,9 +1095,12 @@ const oauthService = {
 	},
 
 	async fetchLinuxDoUserInfo(c, params = {}) {
-		const { code } = params;
+		const { code, codeVerifier } = params;
 		if (!code) {
 			throw new BizError('Authorization code is required');
+		}
+		if (!c.env?.linuxdo_client_id || !c.env?.linuxdo_client_secret || !c.env?.linuxdo_callback_url) {
+			throw new BizError('Provider linuxdo is missing required credentials or callback URL', 503, 'oauth_provider_unconfigured');
 		}
 
 		let token = '';
@@ -993,6 +1112,7 @@ const oauthService = {
 		reqParams.append('code', code)
 		reqParams.append('redirect_uri', c.env.linuxdo_callback_url)
 		reqParams.append('grant_type', 'authorization_code')
+		if (codeVerifier) reqParams.append('code_verifier', codeVerifier)
 
 		const tokenRes = await fetch("https://connect.linux.do/oauth2/token", {
 			method: "POST",
@@ -1033,6 +1153,7 @@ const oauthService = {
 
 	async linuxDoLogin(c, params = {}) {
 		await rateLimit.check(c, { scope: 'oauth-login', limit: 30, windowSeconds: 900 });
+		await this.assertProviderEnabled(c, 'linuxdo');
 		const userInfo = await this.fetchLinuxDoUserInfo(c, params);
 		return await this.finishIdentityLogin(c, 'linuxdo', userInfo);
 	},

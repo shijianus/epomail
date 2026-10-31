@@ -11,6 +11,161 @@
 
 ---
 
+### 操作报告抽屉修复：证据链空壳改真实数据 + 原始枚举键本地化 (2026-10-31)
+*   **关联提交 (Git Commit)**: `9195eb1bb786aed00ae3b4bdb2d5fc9c2c37779a` (Short: `9195eb1`)
+*   **部署环境 (Deployment)**: 本地全真栈 (wrangler dev + 本地 D1 审计数据, 端口 8791)；**未执行任何远程部署、未修改生产库**
+*   **任务背景**: 用户检查操作报告页发现「部分证据加载失败、键字有明显问题」，经全真栈复现确认为两处真实缺陷
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 证据链溯源修复（P1）：抽屉"证据"Tab 的 `currentEvidenceChain` 为 `computed(() => [])` 空壳，永远渲染空白；重写为仅由数据库真实字段（event_type、report/ban/appeal reason、detail_text、evidence_summary、ip/geo、device/fingerprint、cluster_accounts、alarm_count、evidence_expires_days）派生的证据清单，字段缺失逐行隐藏，全空时展示 i18n 空态，不编造哈希/统计
+    - [x] 移除伪造界面（P1）：删除硬编码"已裁决样本 0 例·统计窗口 近 90 天"的相似案例假统计，替换为诚实空态（后端无同类裁决统计接口）
+    - [x] 空态补齐（P2）：时间线为空、遥测指标为空时给出明确 i18n 空态说明，不再呈现为"加载失败"式空白；关联账号依据列删除"同一设备指纹 · 关联集群"编造兜底；证据留存天数删除硬编码 180 天默认值
+    - [x] 键字本地化（P1）：触发原因标签（12 种 event_type）与推荐处置标签（9 种 recommended_action，含入库值 `none`）原样输出原始英文枚举，新增 6 语言映射；清除抽屉全部用户可见硬编码中文（泳道短表头/N 条/展开折叠/N 分权重/AUDIT_LOG_ARCHIVE 横幅/N 天等）
+    - [x] 渲染缺陷修复（P1）：模板引用脚本中不存在的 `riskScoreLevelClass`、`enrichedRiskMetrics`，补齐真实定义（matchScore 分级着色 score-danger/warning/success）
+    - [x] 新增 38 组 i18n 键（auditEvidenceItem*/auditEventType*/auditAction* 等），六语言字典 100% 对称
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：mail-vue `vite build` 通过（1m28s，零警告零报错）
+    - [x] 静态门禁：i18n 三件套全绿（symmetry 6 语言 identical；audit 零缺失、2182 字面量键；hardcoded 抽屉用户可见命中清零，仅剩注释）
+    - [x] 回归套件：`mail-worker` vitest **17/17 文件、209/209 断言**全绿
+    - [x] 浏览器全真栈实测（Playwright）：概览 Tab 触发标签"multi_account_ban→一人多號封禁"、推荐"none→無需處置"；证据 Tab 对有数据案（MULTI99）呈现 8 行真实证据（含證據摘要 Jaccard 0.84、集群關聯賬號 3 個），对无数据案（ZS88K1）呈现真实可得字段；调查 Tab 时间线/遥测空态正常；综合风险分按 matchScore 真实着色；控制台零报错
+    - [x] 零假数据残留：验证用本地 D1 使用独立 `--persist-to` 目录并整体删除；临时验证脚本/截图/日志/种子 SQL 已物理清理；本地开发库测试密码仅存在于本机 `.wrangler` 状态，未入库未提交
+
+
+---
+
+### 非阻断项收敛优化：根目录过程产物清理、i18n 死词条清除与门禁增强、Worker 日志收敛 (2026-10-31)
+
+*   **关联提交 (Git Commit)**: `55bf5d1632b60955c0b3920fe2689584233a615a` (`55bf5d1` 仓库瘦身)、`022148e612bd3ee59b783132fe5f4390dc06a4b2` (`022148e` i18n)、`b20da150b5c3309078ad909cc13bb79763aaa364` (`b20da15` worker 日志)；文档提交即本条目所在提交（`git rev-parse HEAD`）
+*   **部署环境 (Deployment)**: 本地全量回归；**未执行任何远程部署、未修改生产库**
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 仓库瘦身（P2）：删除根目录 74 项过程产物（48 张验证截图 PNG、7 个 mockup/原型 HTML、19 个一次性调试/截图脚本，均可在历史中找回）；`.gitignore` 增加根锚定模式（`/*.png`、`/*.html`、`/patch_*.js`、`/test-*.js` 等）防复发。刻意保留 `logo.svg`（README 引用）、`build.mjs`（构建入口）、`.secret-scan-baseline.json`（历史扫描基线）及全部 `doc/`、`resources/` 资产。
+    - [x] 事故记录与恢复（透明留痕）：首次删除时 Git Bash（MSYS）把 `grep "/"` 参数路径转换为 Git 安装目录，导致 `grep -v "/"` 过滤失效、误扫入 429 个非根目录文件（`doc/` 验证截图、`mail-vue/index.html`、`temp_login_ui/index.html` 等）。发现构建失败后立即定位根因，按 `HEAD` 精确恢复全部 429 项（`git restore --source=HEAD --staged --worktree`），最终提交的删除清单经复核恰为 74 项根目录文件、零误伤。后续涉及路径分隔符的过滤一律改用 awk `index($0,"/")`。
+    - [x] i18n 清理与门禁增强（P2）：删除 `authLocale.ts` 中 4 个全源码不可达的死词条（`forgotPasswordHint`、`useTotpCode`、`useBackupCode`、`stepUpTitle`，6 语言同步，138 键/语言）；其余 3 个被 WARN 的键（`oauthBindFailed`、`oauthBindAlreadyBound`、`bindEmailReserved`）经核实为 `oauth-bind.ts` 错误码映射表间接引用（删了会导致绑定报错显示裸 key），**未删除**；`scripts/i18n-auth-locale.mjs` 补充 `key: '<literal>'` 映射引用收集，未引用告警恢复准确。
+    - [x] Worker 日志收敛（P3）：移除 `src/index.js` scheduled 处理器中每次 cron 触发打印整个 event 上下文的调试日志（失败路径已有定向 `console.warn`）；保留 `totp-service`/`setting-service` 的结构化审计事件日志（无敏感字段）。
+    - [x] 本机 pre-commit 钩子接线：`git config core.hooksPath .githooks`，共享密钥扫描钩子生效（本轮 3 次提交均已实际触发并通过）。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 静态门禁：i18n 四件套全部 exit 0（对称 3056/1946 键 ×6；audit 2163 字面量键零缺失；hardcoded exit 0；auth-locale 138 键、零 WARN、188 处引用命中）
+    - [x] 密钥扫描：瘦身后的工作树 751 文件 0 命中；`scan-staged-secrets --self-test` 通过；pre-commit 钩子 3 次提交实跑通过
+    - [x] 测试套件：`mail-worker` **17/17 文件、209/209 断言**（含 scheduled 日志改动后复跑）；`temp_login_ui` typecheck 0 错误 + 单测 **15/15**（含 authLocale 删词条后复跑）
+    - [x] 生产构建：`node scripts/build-prod.mjs` exit 0（三应用全绿 + login dist 拷贝）；`wrangler deploy --dry-run` exit 0
+    - [x] 全真栈冒烟：`tests/fullstack-smoke.mjs` **13/13** 通过（冷启动 init/幂等/登录/OAuth fail-closed/sidebarStats/外发 403/401 等）
+    - [x] 悬空引用排查：`git grep` 全库确认无任何被删文件的残留引用（README 的 `logo.svg` 完好）
+    - [x] 零假数据残留：冒烟使用独立临时持久化目录并在 `finally` 清理；本零改动之外未写入任何业务库
+    - [ ] `NOT-TESTED`（运维项，与前阶段一致）：staging 未 provision、真实 Provider 回调、真实外发、真实 R2/S3/B2、云端备份恢复与回滚演练、RC tag 未发布
+*   **本机环境备注 (Local Environment Notes)**: 工作树存在 3 个未跟踪的并发会话产物（`audit_tmp.json`、`audit_verify_shots/`、`tests/audit-report-verify-tmp.mjs`，内容为 mock 数据的审计页验收截图，标注"验收后删除"）及 1 个归属不明的本地 `workerd`（127.0.0.1:8787，父进程已退出）；因无法确认属主，均未触碰、未入库，留待属主自行处置。
+
+### 部署前收敛独立复验：全门禁本地复核与 B8 GO 清单逐项核对 (2026-10-31)
+*   **关联提交 (Git Commit)**: 本条目所在提交（`git rev-parse HEAD`）；复验基线 `7e24383`（origin/release/2026-10-31 同步点）
+*   **部署环境 (Deployment)**: 本地复验（Node 24.14.0 / pnpm 10.34.5）；**零代码改动、未执行任何远程部署、未修改生产库**
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 独立复验 Stage 4 收敛结论：静态门禁、三应用生产构建、Worker 全量测试、密钥扫描、远端 CI 全部在本机重跑确认，与 `CHECKLIST.log` 既有记录一致。
+    - [x] B8 GO 最小条件逐项代码级核对：空 client state（`564bbca` 已修）、OAuth 禁用开关服务端强制（`oauth-service.js:179/233` 校验 `oauthLoginEnabled`）、参观者默认凭据（`init.js` 改为 `DEMO_VISITOR_ENABLED` 显式开启 + ≥12 位强口令 + 弱口令黑名单）、依赖高危清零——代码层 GO 条件均已关闭。
+    - [x] 遗留优化项登记（不阻断部署，P2/P3）：① 仓库根目录约 473 张过程截图 PNG、11 个 mockup HTML 与约 20 个一次性脚本仍被 git 追踪（.git 361MB），建议后续归档至 `doc/` 或移出版本库（保留 `build.mjs` 等构建链引用文件）；② 本机未执行 `git config core.hooksPath .githooks`，共享 pre-commit 密钥扫描钩子未接线（CI 已覆盖，本机一行命令补齐）；③ `i18n-auth-locale` WARN 7 个字典未被引用词条（forgotPasswordHint、oauthBindFailed、oauthBindAlreadyBound、bindEmailReserved、useTotpCode、useBackupCode、stepUpTitle），属历史残留可清理；④ worker 源码 8 处 `console.log`（多为结构化日志，`src/index.js:171` 打印整个 scheduled event 可收敛）。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 静态门禁：`i18n-symmetry`（mail-vue 3056 键 ×6、mail-worker 1946 键 ×6）/ `i18n-audit`（2163 字面量键零缺失）/ `i18n-hardcoded`（exit 0）/ `i18n-auth-locale`（PASS + 7 残留 WARN）全部 exit 0
+    - [x] 密钥扫描：工作树 1254 文件 0 命中；远端 CI「working tree + history」success
+    - [x] 远端 CI：`e8c7984` 全部 20 项 check run success（Worker 全量+dry-run、登录 UI、mail-vue 构建、i18n、密钥、diff hygiene）；本地与 `origin/release/2026-10-31` 完全同步（0/0）
+    - [x] 依赖审计（生产）：mail-vue 1 moderate（echarts）/ mail-worker 1 low（deepmerge）/ temp_login_ui 0 —— 三应用 0 high / 0 critical
+    - [x] 生产构建：`node scripts/build-prod.mjs` exit 0（temp_login_ui 28.3s、mail-vue 1m38s、PWA 生成、login dist 拷贝）；`wrangler deploy --dry-run` exit 0（D1×2 / AI / Assets / vars 绑定解析正常）
+    - [x] 测试套件：`mail-worker` **17/17 文件、209/209 断言通过（exit 0）**；`temp_login_ui` typecheck 0 错误 + 单测 **15/15** 通过
+    - [x] 零改动零残留：本复验未修改任何代码与配置，无测试数据写入
+    - [ ] `NOT-TESTED`（与 Stage 4 一致的运维项）：staging 未 provision（`env.staging` 仍为 `PLACEHOLDER_*` 占位符）、真实 OAuth Provider 回调、真实 Resend / Mailjet / Cloudflare 外发、真实 R2 / S3 / B2、云端 D1/KV 备份恢复与回滚演练、RC tag 未发布（release workflow 由 `v*` tag 触发）
+
+### 阶段 4 上线收敛：设置页 OAuth 绑定回跳修复、生产依赖高危清零、CI 并发丢表根因修复与构建冻结 (2026-10-31)
+*   **关联提交 (Git Commit)**: `6369c93b94238a258f3931513e12866ef4882e6c` (Short: `6369c93`, 合并)；代码提交 `fe405a22bea7b7895ef4bba77b3e0b9f77ad0a92` (`fe405a2`)、`7f39f494efde67c905a5322268a92f6a2f0c64cb` (`7f39f49`)、`ade1f878a22cf5e11118c8c631147335993ab1d5` (`ade1f87`)、`2b83f4ca7e1077907288f86aca4e7438e7cb208a` (`2b83f4c`)；文档提交即本条目所在提交（`git rev-parse HEAD`）
+*   **部署环境 (Deployment)**: 本地全真栈 `wrangler dev` + 临时 D1/KV、三应用生产构建、Worker dry-run；**未执行任何远程部署、未修改生产库，统一推送 `origin/release/2026-10-31`**
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 工作区接管（P0 基线）：本地处于未完成的 `origin/release/2026-10-31` 合并状态（本地领先 7、远端领先 4，4 个冲突文件）。以合并提交 `6369c93` 完成集成，未 rebase、未强推、未删除代码；冲突解决保留 `gitleaks git` + 新分支 `--all`、build-prod 的 corepack 固定版本与 Windows/frozen 双重要求、双方文档记录。
+    - [x] 前端真实缺陷修复（P1）：设置页 OAuth 绑定的服务端回跳为 `/settings/security?oauth_bind=...#oauth_link=<claim>`，而 `mail-vue` 的 `createAccountHistory()` 只接受 `/mail/u/N/#route`；首次加载会把该 URL 归一化为 `/mail/u/0/#oauth_link=...`，丢失路由、`oauth_bind` 与 claim，绑定流程实际无法完成。现回跳改为 `/mail/u/<accountIndex>/#settings/security?oauth_bind=...&oauth_link=...`，claim 仍在 fragment（不出现在服务端请求/日志）；`accountIndex` 由发起绑定的浏览器传入并限制 0–99，claim 仍与发起会话 hash 绑定，伪造序号无法完成他人绑定。设置页优先读取 `route.query.oauth_link`，保留旧 `#oauth_link=` 兼容回退。
+    - [x] 前端契约复核（对照 Argon 后端源码）：登录/注册/TOTP/Passkey/受限账号、OAuth Provider `enabled` + `configured`、OAuth 回调错误、登录页 bind 表单、`/api/user/info` 的 `token` 头、`sidebarStats` 七个分桶、`email/list`、`account/list`、外发 403、401 强制登出，均与当前后端一致；本轮仅发现并修复上述设置页绑定回跳缺陷，未重做 UI。
+    - [x] 依赖处置（生产高危清零）：`mail-vue` 增加 `follow-redirects@>=1.16.0 <1.16.2 → 1.16.2` override，`pnpm audit --prod` 由 1 high → 0 high/0 critical（余 1 moderate `echarts` 5）；`temp_login_ui` 全量与生产审计均为 0；`mail-worker` 将 `vitest ~3.0.7 → ~3.2.6`（实际 3.2.7，仍在该 pool 的 peer range `2.0.x - 3.2.x`），清掉 `vitest <3.2.6` 的 critical；生产审计 0 high/0 critical（余 1 low `deepmerge`）。剩余 high/critical 全部为 vitest/miniflare/wrangler 测试工具链，未伪装关闭，原因写入交接文档 §4.3。
+    - [x] CI 真实故障根因修复（P1）：通过 GitHub Actions 公共 API 复现远端失败：`Quality Gates` run `41062713412`（`d99c765`）与 `Security Audit` run `41061614783`（`42352a0`）的 worker 作业均在 `mail-pipeline-convergence.spec.js` 报 `no such table: user` / `email`；注解显示仅该文件失败，同一提交的另一个 workflow 又能通过，属并行文件运行时 D1 隔离回滚竞争。`vitest.config.js` 启用 `poolOptions.workers.singleWorker: true`，文件串行、共享单一 workerd；同时把 `reg-key.spec.js` 的 `DROP TABLE` 改为行级 `DELETE`。未删除/弱化任何工作流，未改断言，未使用 `continue-on-error`。
+    - [x] 构建可复现性：`wrangler-test.toml`、`wrangler-action.toml` 的 `[build]` 统一改为 `node ./build.mjs`，与生产一致地使用 `--frozen-lockfile` 和固定 pnpm，避免测试/发布构建改写锁文件；`scripts/build-prod.mjs` 对 `corepack pnpm@10.34.5` 探测加 15s 上限，离线时回退本地 pnpm 而非挂起。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] Worker 全量：`pnpm --dir mail-worker test` 单次调用 **17/17 文件、209/209 断言通过（exit 0）**；`singleWorker` 同时消除了本机 17 个 workerd 并发导致的 `ConnectEx #1225`
+    - [x] 登录 UI：`tsc --noEmit` 通过，`node --test` **15/15** 通过，`vite build` 通过
+    - [x] 生产构建：`node scripts/build-prod.mjs` exit 0；`wrangler deploy --dry-run` exit 0（5490.85 KiB 上传 / gzip 1136.55 KiB）
+    - [x] 全真栈冒烟：`tests/fullstack-smoke.mjs` **13/13** 通过
+    - [x] 浏览器全真栈：`tests/fullstack-browser-e2e.mjs` **11/11** 通过（新增绑定回跳 claim 消费断言）
+    - [x] 登录页 OAuth 绑定 Playwright：`tests/oauth-bind-login-ui-e2e.mjs` **13/13** 通过
+    - [x] i18n：`i18n-symmetry` / `i18n-audit` / `i18n-hardcoded` / `i18n-auth-locale` 全部 exit 0（6 语言 1946 键对称；2163 个字面量键；142 条 auth 词条）
+    - [x] 密钥扫描：工作树 1254 文件 0 命中；历史 4121 blobs（含 baseline）0 命中；`scan-staged-secrets --self-test` 通过
+    - [x] 锁文件一致性：根目录与三应用 `pnpm install --frozen-lockfile` 全部通过
+    - [x] 依赖审计：`mail-vue` 全量 0 high/0 critical、生产 0 high/0 critical；`temp_login_ui` 全量/生产均 0；`mail-worker` 全量 9 high/2 critical（均为 devDependencies）、生产 0 high/0 critical/1 low
+    - [x] GitHub Actions 推送后实测（code SHA `e8c7984`）：Quality Gates `41162646757`（Worker 测试 + dry-run + 登录 UI + mail-vue + Playwright + i18n + 密钥扫描）、Security Audit `41162646788`、Offline Secret Scanning Gate `41162643045` / `41162646832` 全部 success；`singleWorker` 修复在真实 runner 上生效
+    - [ ] `NOT-TESTED`：真实 OAuth Provider 回调、真实 Resend / Mailjet / Cloudflare 外发、真实 R2 / S3 / B2、云端 D1 / KV 恢复与 Worker 回滚；Windows Vitest 清理临时目录的 `EBUSY` 警告不影响 exit 0
+
+### 阶段 3 上线收敛：依赖高危收口、gitleaks 门禁根因修复与真实全栈/浏览器回归 (2026-10-30)
+*   **关联提交 (Git Commit)**: `a0680e8399f01395725ff9f372032de303cf4e4d` (Short: `a0680e8`)
+*   **部署环境 (Deployment)**: 本地全真栈 `wrangler dev` + 临时 D1/KV、三应用生产构建、Worker dry-run；**未执行任何远程部署、未修改生产库，统一推送 `origin/release/2026-10-31`**
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] CI 真实故障根因修复（P1 门禁失效）：`.github/workflows/secret-scanning.yml` 调用 `gitleaks log`，该子命令属于 gitleaks v7，v8（作业下载 8.24.3）已移除并返回 `unknown command`；因安装步骤为 best-effort，仅在下载成功时暴露，导致有 gitleaks 的正常 runner 上「Offline Secret Scanning Gate」每次 push 必失败。改为 `gitleaks git --log-opts=...`；新分支（全零 before）由非法区间 `0000..sha` 改为 `--all` 全历史扫描。仍然发现即失败，未跳过、未软化、未 `continue-on-error`。
+    - [x] 依赖处置（同大版本内收口）：`mail-vue` 全量审计 3 high + 1 moderate → **0 high**（`brace-expansion` 1.1.16/2.1.2 → 1.1.21/2.1.7、`sharp` 0.35.2 → 0.35.5、`serialize-javascript` 6.0.2 → 7.1.4）；`temp_login_ui` 12 high / 16 moderate / 6 low → **0 条告警**（`vite` 6.3.5 → ^6.4.5，`nanoid` / `undici` / `source-map-js` / `sharp` 定向 overrides）；`mail-worker` 28 high / 32 moderate / 3 critical → 9 high / 4 moderate / 3 critical（`undici` 7.14/7.24 → 7.30.1，并纳入此前未提交的 `nanoid` / `postcss` / `picomatch` / `rollup` overrides）。三应用 `pnpm audit --prod` 均无 high/critical，剩余项全部为 vitest/miniflare/wrangler 测试工具链（`ws` 8.21 已实测会破坏 miniflare WebSocket 回环，维持不覆盖）。
+    - [x] 构建兼容修复：`mail-vue` 的 `@vitejs/plugin-vue` `^5.2.1 → ^6.0.10`，消除「插件仅声明 Vite 5/6、应用运行 Vite 7」的未满足 peer 依赖；生产构建复跑确认产物一致。
+    - [x] 测试能力补强（此前不存在可复跑脚本）：新增 `tests/fullstack-smoke.mjs`（临时 `--persist-to` 目录，冷启动 init/幂等、站长登录、websiteConfig、OAuth 失败关闭 403、sidebarStats、list、account/list、外发 403 `outbound_disabled`、匿名 401、`/login/` 产物）与 `tests/fullstack-browser-e2e.mjs`（真实 Worker + Chromium：表单登录、`/mail/u/0/#inbox` 自定义 history 落地、token 持久化、`/api/email/list` 200、安全设置页绑定身份 API、375px 无横向溢出、过期回登录）。两者均在 `finally` 清理临时状态，零外部请求。
+    - [x] 前端契约复核（对照 Stage 1 后端源码逐项读两端）：OAuth Provider 显示/`configured`、回调失败本地化、bindUser 状态码分类、已登录绑定 claim 流程、MFA 字段、401 强制登出、`sidebarStats` 字段、`/oss-url/batch`、外发 403，全部一致；未发现需修改业务 UI 的兼容缺陷，因此不做界面改动。
+    - [x] Windows 可复跑门禁：`mail-worker` 新增 `test:serial`（`vitest run --maxWorkers=1`），本机 17 文件全量 **208/208** 通过；CI 仍保留并行调用。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：`node scripts/build-prod.mjs` 通过 (exit 0)；`wrangler deploy --dry-run` 通过；`temp_login_ui` 构建 7.9s、`mail-vue` 构建通过
+    - [x] 自动化测试套件：`mail-worker` 串行全量 **17/17 文件、208/208 断言通过**（单进程 17 文件并发仍因本机 workerd 回环 `ConnectEx #1225` 无法收集，如实记为环境限制）；`temp_login_ui` typecheck + **15/15** 单测通过
+    - [x] 全真栈冒烟：`tests/fullstack-smoke.mjs` **13/13** 通过；真实浏览器全栈 `tests/fullstack-browser-e2e.mjs` **10/10** 通过（含 375px 溢出与过期跳转）
+    - [x] Playwright 离线回归：`tests/oauth-bind-login-ui-e2e.mjs` **13/13** 场景通过
+    - [x] 静态门禁与密钥扫描：i18n 四件套全部 exit 0（3056 / 1946 键 × 6 语言、142 条 auth 词条）；`secret-scan.mjs` 工作树 1252 文件 0 命中；`scan-staged-secrets --self-test`、`--push` 均通过
+    - [x] 锁文件一致性：根目录与三应用 `pnpm install --frozen-lockfile` 全部通过
+    - [x] 零假数据残留：全栈脚本使用独立临时持久化目录并在 `finally` 物理删除；未写入任何真实库
+    - [ ] `NOT-TESTED`：GitHub Actions runner 实际执行（需推送后观察）、真实 OAuth Provider 回调、真实 Resend / Mailjet / Cloudflare 外发、真实 R2 / S3 / B2、云端 D1 / KV 备份回滚
+
+---
+
+### 阶段 2 发布门禁收敛：CI 离线密钥检测命令修正与生产构建供应链加固 (2026-10-30)
+*   **关联提交 (Git Commit)**: `a1b6599b5066347ee974f114ea06a7516d246c43` (Short: `a1b6599`)；前置提交 `6cd14ffbe539bfe3a081056af1a06509c664d638` (`6cd14ff`)
+*   **部署环境 (Deployment)**: 本地全真栈回归、Worker dry-run 完整打包、双前端生产构建；**未执行任何远程部署或生产库修改，统一推送 `origin/release/2026-10-31`**
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] CI 密钥扫描门禁修正：修复 `.github/workflows/secret-scanning.yml` 中 gitleaks v8+ 不支持 `log` 子命令导致 CI 误判失败的问题，修正为 `gitleaks detect`（覆盖 push 与 PR 两条执行链路）。
+    - [x] 生产构建供应链加固：更新 `scripts/build-prod.mjs`，自适应采用 `corepack pnpm@10.34.5`、强制传递 `CI=true` 环境变量并启用 `--frozen-lockfile`，根治非交互环境下的供应链规则校验挂起及 pnpm 12 锁定文件格式不兼容故障。
+    - [x] 测试数据清理防竞争加固：移除各单测 `afterAll` 中的破坏性 `DROP TABLE`（如 `user`、`oauth`、`attachments` 表），统一改为行级 `DELETE` 清理，彻底消除多用例并行运行时偶发的 D1 表丢失竞争；同步 `.github/workflows/security.yml` 的 Node/pnpm 版本至 `24.14.0` / `10.34.5`。
+    - [x] 端到端验证与门禁全绿：本地已验证 `temp_login_ui`（typecheck + unit 15/15 + build）、Playwright E2E（13/13 scenarios）、`mail-worker` 全量套件（17 文件 207/207 passed）、`mail-vue` 生产构建、Wrangler dry-run 完整打包（5490.57 KiB / gzip 1136.36 KiB）、i18n 四件套及密钥全量扫描（1253 文件 + 4070 blobs 零命中）。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：`scripts/build-prod.mjs` 全流程通过；`wrangler deploy --dry-run` 完整打包通过
+    - [x] 自动化测试套件：`mail-worker` 17 文件 207/207 passed；`temp_login_ui` 15/15 passed；`tests/oauth-bind-login-ui-e2e.mjs` 13/13 passed
+    - [x] 静态门禁与密钥扫描：i18n 6 语言对称；`secret-scan.mjs` 树 + 历史 0 命中；`git diff --check` 通过
+    - [x] 零假数据残留：测试数据自动物理清理
+
+### 阶段 2 上线收敛：侧边栏统计 SQL 缺陷修复、Windows 测试可用性、依赖漏洞处置、CI 与生产构建收敛 (2026-10-30)
+*   **关联提交 (Git Commit)**: `e4981a3d5556d0c926405ec33fd7ff1e62b92cc2` (Short: `e4981a3`)；本阶段代码提交 `b575ccedc861c2510af14c5234310a4b34380239` (`b575cce`)、`e450cbd1e4626fa457c985be73b62715e943656f` (`e450cbd`)、`dbba1691a4be8358552610a28b343d3671eac8c0` (`dbba169`)
+*   **部署环境 (Deployment)**: 本地全真栈 `wrangler dev` + 本地 D1/KV、三应用生产构建、Worker dry-run；**未执行任何远程部署、未修改生产库，统一推送 `origin/release/2026-10-31`**
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 缺陷修复（P1 真实功能缺陷）：`emailService.getSidebarStats` 的 `snoozedWaiting` 聚合多了一个右括号，使整条 SQL 成为语法错误，`GET /api/email/sidebarStats` 恒定返回 `code 500`，邮箱未读徽标完全不可用。修正后本地全真栈实测返回 200 与正确计数，并新增按 7 个分桶精确断言的回归用例。
+    - [x] 前端契约核验（对照 Stage 1 后端源码，不依赖口头结论）：OAuth Provider 显示与 `configured = clientId && clientSecret` 一致；回调失败 `oauth_failed` / `oauth_disabled` 有本地化处理；登录 CSRF 的 `client_state` 双向校验一致；`PUT /oauth/bindUser` 与 200/400/409/410/425/429 分类一致；MFA `tempToken` / `hasTotp` / `passkeys` / `stepUpRequired` 字段一致；`code 401` 触发 `forceLogoutToLogin`；`EMAIL_OUTBOUND_ENABLED` 的 403 以告警提示呈现。未发现阻断性不兼容。
+    - [x] 测试基础设施：`@cloudflare/vitest-pool-workers` `0.7.8 → 0.12.0`（旧版捆绑 miniflare 3，模块回退地址写死 `localhost:<port>`，在 `localhost → ::1` 的机器上 workerd `ConnectEx` 被拒，全部用例无法收集）；`vitest.config.js` 内联 `svix` / `uuid` 并把 `testTimeout` 提到 20s（断言未改）。
+    - [x] 依赖处置：`mail-vue` 升级 `vue-i18n ^11.4.14`（escapeParameter XSS）与 `vite ^7.3.2`，生产告警 6 → 1（余 `echarts` 需 5→6 大版本）；`temp_login_ui` 移除无引用的 `react-router`（12 条告警，含 6 条 high），生产告警 12 → 0；移除 5 个硬编码 Windows-only `devDependencies`，Linux 冻结安装恢复可用；对 `undici` / `nanoid` / `postcss` / `picomatch` / `rollup` / `minimatch` / `brace-expansion` / `fast-uri` / `browserslist` / `immutable` / `@babel/plugin-transform-modules-systemjs` 添加同大版本范围内的定向 `pnpm.overrides`（`ws` 明确不覆盖：8.21 会破坏 miniflare WebSocket 回环并使全部用例失败，已实测回滚）。
+    - [x] CI 与构建：四个工作流补 `release/**` 触发（此前发布分支完全在门禁之外）；Playwright 作业由 `npm ci` 加镜像源 `package-lock.json` 改为 pnpm 冻结安装并删除重复锁文件；`scripts/build-prod.mjs` 改为 `--frozen-lockfile` 安装、显式 `pnpm.cmd`、路径只经 `cwd` 传递，杜绝构建期改写锁文件与含空格路径失败。
+    - [x] 交接归档：重写 `doc/rc-2026-10-31-handoff.md`，记录最终 SHA、提交清单、真实测试状态、环境限制与 Linux / Staging 待办。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：`node scripts/build-prod.mjs` 通过 (exit 0，零告警)；`wrangler deploy --dry-run` 通过 (gzip 1136.42 KiB)
+    - [x] 自动化测试套件：`mail-worker` 全量按 5 个分块执行，**17/17 文件、207/207 断言通过**（单进程 17 文件并发在本机因 workerd 回环限制不可用，如实记为环境限制并以分块结果为准）；`temp_login_ui` 类型检查 + `15/15` 单测 + 构建通过；Playwright OAuth 绑定/登录 `13/13` 场景通过
+    - [x] 全真栈冒烟：`wrangler dev` + 全新本地 D1/KV 下 `13/13` 通过（init 冷启动与幂等、主站长登录、`websiteConfig` OAuth 开关、`/oauth/providers` 空列表、`authorize` 失败关闭 403 `oauth_disabled`、`email/list`、`sidebarStats`、`account/list`、外发闸门 403 `outbound_disabled`、未登录 401、`/login/` 静态页）
+    - [x] 静态门禁与密钥扫描：i18n 四件套全部 exit 0（6 语言 1946 键对称、142 条 auth 词条）；`secret-scan.mjs` 工作树 1252 文件 0 命中
+    - [x] 锁文件一致性：根目录与三应用 `pnpm install --frozen-lockfile` 全部通过
+    - [ ] `NOT-TESTED`：真实 OAuth Provider 回调、真实 Resend / Mailjet / Cloudflare 外发、真实 R2 / S3 / B2、云端 D1 / KV 备份回滚（均需授权外部环境）
+
+---
+
+### 阶段 1 上线收敛：后端认证/OAuth 强制开关、初始化去固定凭据与邮件隔离安全加固 (2026-10-30)
+*   **关联提交 (Git Commit)**: `748643a8989c27b0a14dbed4922ed29759092bf0` (Short: `748643a`)；前置模块提交 `4aefb562a380f04d01d0290b5690b26769e6104f` (`4aefb56`)、`a1d080559b9a05e1751cfd44c993ef9d17626170` (`a1d0805`)
+*   **部署环境 (Deployment)**: 本地全真栈 workerd + D1/KV 隔离回归、Worker dry-run 打包、`mail-vue` 生产构建；**未执行任何远程部署或生产库修改，统一推送 `origin/release/2026-10-31`**
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 模块 B（固定账号与初始化安全）：移除 `admin-utils.js` 与 `user-service.js` 中 `userId === 1` 超管提权及清理豁免；`init.js` 停止播种/复活 `admin@epomail.cyou` (`123456`) 并在生产冷启动缺失 `admin_initial_password` 时安全失败；将 6 个 `audit_*` 配置迁入 `setting_ext`（`setting` 表降至 96 列，彻底消除 D1 100 列上限报错）。
+    - [x] 模块 A（认证与 OAuth 服务端强制）：`oauthService` / `oauthApi` / `oauthIdentityService` 全端点统一 `assertProviderEnabled` 强制校验总开关、Provider 开关与完整凭据（含修复 Apple 空 `clientSecret` 假阳性）；禁用总开关或单 Provider 时通过 `oneTimeCredential.revokeClientFlows` 即时吊销在途 `state` / `login_code` / `bind` 凭证；补齐 OAuth 客户端 S256 PKCE 闭环、直调登录 `state` 强校验及内置 OAuth2 Provider 常量时间密钥比对与 scope 裁剪。
+    - [x] 模块 C（核心邮件链路与跨用户隔离）：修复 `cascadeDeleteEmails` 未校验归属即跨用户物理删除附件/对象存储与星标的 P0 漏洞；收紧 `emailService.list` / `latest` 显式 `accountId` 归属校验与 `starService` 归属过滤及密文解密；在 `emailService.send` 外发前强制执行 `EMAIL_OUTBOUND_ENABLED`、`OUTBOUND_WHITELIST` 及附件数量/大小/配额预检；修复 `emailService.read` 缺失 `.run()` 及双库模式 `getMailDb`/`getUserDb` 路由。
+    - [x] 交接归档：新增 `doc/rc-2026-10-31-handoff.md`，完整记录真实测试结果、`NOT-TESTED` 外部联调边界、生产存量 `admin@epomail.cyou` 独立处置 SQL 与下一阶段 Windows 兼容性清单。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：`mail-vue` 构建通过 (耗时 20.12s)；`wrangler deploy --dry-run` 通过 (gzip 1136.36 KiB)
+    - [x] 自动化测试套件：`mail-worker` 全量 `vitest run` 全绿 (`17/17` 文件，`207/207` 断言通过)；`temp_login_ui` 单测 `15/15` 通过
+    - [x] 静态门禁与密钥扫描：i18n 四件套 6 语言 100% 对称零缺失；`secret-scan.mjs` 工作树 (1251 文件) 与 Git 历史 (4061 blobs) 0 命中
+    - [x] 零假数据残留：新增测试套件 (`init-visitor-security`、`oauth-switch-enforcement`、`mail-pipeline-convergence`) 均在 `afterAll` 物理清理全部 D1/KV 测试数据
+
+---
+
 ### OAuth 身份管理、对象存储安全收口与 B8 发布候选交付 (2026-10-29)
 *   **关联提交 (Git Commit)**: `564bbcad37a1769448823211a004a9b76edd9cd3` (Short: `564bbca`)
 *   **部署环境 (Deployment)**: 本地 workerd + D1/KV 隔离测试、双前端生产构建、Worker bundle dry-run；**未部署任何远程环境，本批次推送 `origin/master`**

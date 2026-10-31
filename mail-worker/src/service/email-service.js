@@ -30,6 +30,7 @@ import { DEFAULT_WELCOME_SUBJECT, DEFAULT_WELCOME_CONTENT, getWelcomeTemplate, g
 import { isAdminEmail, isAdminUser } from '../utils/admin-utils';
 import hashUtils from '../utils/hash-utils';
 import verifyUtils from '../utils/verify-utils';
+import storageQuotaService from './storage-quota-service';
 
 const emailService = {
 
@@ -64,13 +65,16 @@ const emailService = {
 
 		}
 
-		if (isNaN(allReceive)) {
-			if (!accountId || isNaN(accountId)) {
-				allReceive = 1;
-			} else {
-				let accountRow = await accountService.selectById(c, accountId);
-				allReceive = accountRow ? accountRow.allReceive : 1;
+		if (accountId && !isNaN(accountId)) {
+			const accountRow = await accountService.selectById(c, accountId);
+			if (!accountRow || accountRow.userId !== userId) {
+				return { list: [], total: 0, latestEmail: null };
 			}
+			if (isNaN(allReceive)) {
+				allReceive = accountRow.allReceive;
+			}
+		} else if (isNaN(allReceive)) {
+			allReceive = 1;
 		}
 
 		const query = orm(c)
@@ -934,9 +938,71 @@ const emailService = {
 		const resendToken = resendTokens[domain];
 		const useCloudflareEmail = !!c.env.email;
 
+		// 分级外发闸门：对站外收件人强制校验 EMAIL_OUTBOUND_ENABLED 与 staging OUTBOUND_WHITELIST
+		if (!allInternal) {
+			const outboundDisabled = String(c.env?.EMAIL_OUTBOUND_ENABLED || '').trim().toLowerCase() === 'false';
+			if (outboundDisabled) {
+				throw new BizError('External email outbound is disabled in this environment (EMAIL_OUTBOUND_ENABLED=false)', 403, 'outbound_disabled');
+			}
+
+			const externalRecipients = receiveEmail.filter(addr => !domainList.includes('@' + emailUtils.getDomain(addr)));
+			const customWhitelist = String(c.env?.OUTBOUND_WHITELIST || '')
+				.split(',')
+				.map(s => s.trim().toLowerCase())
+				.filter(Boolean);
+			const isStaging = c.env?.ENVIRONMENT === 'staging';
+
+			if (isStaging || String(c.env?.OUTBOUND_WHITELIST_ENFORCE || '').toLowerCase() === 'true') {
+				const officialResendSandbox = ['delivered@resend.dev', 'bounced@resend.dev', 'complained@resend.dev'];
+				const allowedSet = new Set([...officialResendSandbox, ...customWhitelist]);
+				const blockedRecipient = externalRecipients.find(addr => !allowedSet.has(String(addr || '').trim().toLowerCase()));
+				if (blockedRecipient) {
+					throw new BizError(`External recipient (${blockedRecipient}) is not in OUTBOUND_WHITELIST`, 403, 'outbound_recipient_blocked');
+				}
+			}
+		}
+
 		//如果接收方存在站外邮箱，又没有发信服务
 		if (!useCloudflareEmail && !resendToken && !allInternal) {
 			throw new BizError(t('noSendProvider'));
+		}
+
+		// 预检附件数量、单文件大小与合并存储配额 —— 必须在调用外部发信服务与扣减发信次数之前拦截
+		if (imageDataList.length > 10) {
+			throw new BizError(t('imageAttLimit'));
+		}
+		if (attachments?.length > 10) {
+			throw new BizError(t('attLimit'));
+		}
+
+		let combinedAttachmentBytes = 0;
+		for (const img of imageDataList) {
+			if (!img.buff) continue;
+			const imgBytes = img.buff.byteLength || img.buff.length || 0;
+			if (imgBytes > 0) {
+				const sizeCheck = await storageQuotaService.checkAttachmentSizeLimit(c, userId, imgBytes);
+				if (!sizeCheck.allowed) {
+					throw new BizError(sizeCheck.reason);
+				}
+				combinedAttachmentBytes += imgBytes;
+			}
+		}
+		if (attachments?.length > 0) {
+			for (const attItem of attachments) {
+				const decoded = attItem.buff || fileUtils.base64ToUint8Array(attItem.content);
+				attItem.buff = decoded;
+				const sizeCheck = await storageQuotaService.checkAttachmentSizeLimit(c, userId, decoded.length);
+				if (!sizeCheck.allowed) {
+					throw new BizError(sizeCheck.reason);
+				}
+				combinedAttachmentBytes += decoded.length;
+			}
+		}
+		if (combinedAttachmentBytes > 0) {
+			const quotaCheck = await storageQuotaService.checkQuotaAvailable(c, userId, combinedAttachmentBytes);
+			if (!quotaCheck.allowed) {
+				throw new BizError(quotaCheck.reason);
+			}
 		}
 
 		//没有发件人名字自动截取
@@ -1054,20 +1120,22 @@ const emailService = {
 			} catch (_) {}
 		}
 
-		//保存内嵌附件
-		if (imageDataList.length > 0) {
-			if (imageDataList.length > 10) {
-				throw new BizError(t('imageAttLimit'));
+		//保存内嵌附件与普通附件；站内信若附件持久化失败则回滚邮件行以保证状态一致
+		try {
+			if (imageDataList.length > 0) {
+				await attService.saveArticleAtt(c, imageDataList, userId, accountId, emailResult.emailId);
 			}
-			await attService.saveArticleAtt(c, imageDataList, userId, accountId, emailResult.emailId);
-		}
-
-		//保存普通附件
-		if (attachments?.length > 0) {
-			if (attachments.length > 10) {
-				throw new BizError(t('attLimit'));
+			if (attachments?.length > 0) {
+				await attService.saveSendAtt(c, attachments, userId, accountId, emailResult.emailId);
 			}
-			await attService.saveSendAtt(c, attachments, userId, accountId, emailResult.emailId);
+		} catch (attErr) {
+			if (allInternal && emailResult?.emailId) {
+				await attService.removeByEmailIds(c, [emailResult.emailId]).catch(() => {});
+				await orm(c).delete(email).where(
+					and(eq(email.userId, userId), eq(email.emailId, emailResult.emailId))
+				).run().catch(() => {});
+			}
+			throw attErr;
 		}
 
 		const attList = await attService.selectByEmailIds(c, [emailResult.emailId]);
@@ -1956,23 +2024,26 @@ const emailService = {
 	async latest(c, params, userId) {
 		let { emailId, accountId, allReceive } = params;
 		emailId = Number(emailId) || 0;
+		accountId = Number(accountId);
 		allReceive = Number(allReceive);
 
-		if (isNaN(allReceive)) {
-			// 缺省 allReceive 时依据 accountId 判定；accountId 也缺失时回退用户首个信箱，避免 undefined 入参导致 D1 绑定报错
-			let accountRow = accountId ? await accountService.selectById(c, accountId) : null;
-			if (!accountRow) {
-				const myAccounts = await accountService.list(c, { size: 1 }, userId);
-				accountRow = Array.isArray(myAccounts) ? myAccounts[0] : null;
+		if (accountId && !isNaN(accountId)) {
+			const accountRow = await accountService.selectById(c, accountId);
+			if (!accountRow || accountRow.userId !== userId) {
+				return [];
 			}
+			if (isNaN(allReceive)) {
+				allReceive = accountRow.allReceive;
+			}
+		} else if (isNaN(allReceive)) {
+			const myAccounts = await accountService.list(c, { size: 1 }, userId);
+			const accountRow = Array.isArray(myAccounts) ? myAccounts[0] : null;
 			if (!accountRow) {
 				return [];
 			}
 			allReceive = accountRow.allReceive;
-			if (!accountId) {
-				accountId = accountRow.accountId;
-			}
-		} else if (!accountId) {
+			accountId = accountRow.accountId;
+		} else {
 			const myAccounts = await accountService.list(c, { size: 1 }, userId);
 			const firstAccount = Array.isArray(myAccounts) ? myAccounts[0] : null;
 			if (!firstAccount) {
@@ -2043,13 +2114,27 @@ const emailService = {
 	async cascadeDeleteEmails(c, userId, emailIdList) {
 		const CHUNK = 50;
 		for (let i = 0; i < emailIdList.length; i += CHUNK) {
-			const chunk = emailIdList.slice(i, i + CHUNK);
-			await attService.removeByEmailIds(c, chunk);
-			await starService.removeByEmailIds(c, chunk);
+			const chunk = emailIdList
+				.slice(i, i + CHUNK)
+				.map(Number)
+				.filter(id => Number.isInteger(id) && id > 0);
+			if (chunk.length === 0) continue;
+
+			// 严格先校验归属权：仅对真正属于当前 userId 的 emailId 清理附件、对象存储与星标，严禁跨用户越权级联销毁
+			const ownedRows = await orm(c)
+				.select({ emailId: email.emailId })
+				.from(email)
+				.where(and(eq(email.userId, userId), inArray(email.emailId, chunk)))
+				.all();
+			const ownedIds = ownedRows.map(row => row.emailId);
+			if (ownedIds.length === 0) continue;
+
+			await attService.removeByEmailIds(c, ownedIds);
+			await starService.removeByEmailIds(c, ownedIds);
 			await orm(c).delete(email).where(
 				and(
 					eq(email.userId, userId),
-					inArray(email.emailId, chunk)))
+					inArray(email.emailId, ownedIds)))
 				.run();
 		}
 	},
@@ -2497,6 +2582,7 @@ const emailService = {
 		}
 
 		await attService.removeByEmailIds(c, emailIds);
+		await starService.removeByEmailIds(c, emailIds);
 
 		await orm(c).delete(email).where(conditions.length > 1 ? and(...conditions) : conditions[0]).run();
 	},
@@ -2509,8 +2595,10 @@ const emailService = {
 	async read(c, params, userId) {
 		const { emailIds, unread } = params;
 		const unreadValue = unread !== undefined ? Number(unread) : emailConst.unread.READ;
-		const emailIdList = Array.isArray(emailIds) ? emailIds.map(Number) : String(emailIds).split(',').map(Number);
-		await orm(c).update(email).set({ unread: unreadValue }).where(and(eq(email.userId, userId), inArray(email.emailId, emailIdList)));
+		const emailIdList = (Array.isArray(emailIds) ? emailIds.map(Number) : String(emailIds || '').split(',').map(Number))
+			.filter(id => Number.isInteger(id) && id > 0);
+		if (emailIdList.length === 0) return;
+		await orm(c).update(email).set({ unread: unreadValue }).where(and(eq(email.userId, userId), inArray(email.emailId, emailIdList))).run();
 	},
 
 	async searchSuggestions(c, params, userId) {
@@ -2590,7 +2678,8 @@ const emailService = {
 	},
 
 	async getSidebarStats(c, userId) {
-		const stats = await c.env.db.prepare(`
+		const mailDb = getMailDb(c);
+		const stats = await mailDb.prepare(`
 			SELECT 
 				SUM(CASE WHEN is_del = 0 AND is_spam = 0 AND (snoozed_time IS NULL OR send_email IN ('announcement@epocanvas.com', 'admin@epocanvas.com')) AND type = 0 AND unread = 0 THEN 1 ELSE 0 END) as inboxUnread,
 				SUM(CASE WHEN is_del = 0 AND is_spam = 0 AND snoozed_time IS NULL AND type = 1 AND status = 6 AND unread = 0 THEN 1 ELSE 0 END) as draftUnread,
@@ -2606,7 +2695,7 @@ const emailService = {
 			WHERE user_id = ?
 		`).bind(userId).first();
 
-		const labelEmails = await c.env.db.prepare(`
+		const labelEmails = await mailDb.prepare(`
 			SELECT labels, unread FROM email WHERE user_id = ? AND is_del = 0 AND labels != '[]' AND labels IS NOT NULL
 		`).bind(userId).all();
 

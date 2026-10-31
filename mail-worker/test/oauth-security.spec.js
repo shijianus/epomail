@@ -91,6 +91,7 @@ describe('OAuth state, nonce and callback exchange', () => {
 			req: { url: 'https://mail.example.com/api/oauth/authorize/apple', header: () => null }
 		};
 		vi.spyOn(settingService, 'query').mockResolvedValue({
+			oauthLoginEnabled: 1,
 			oauthProviders: {
 				apple: { clientId: 'test-client-id', clientSecret: 'test-client-secret', enabled: 1 }
 			}
@@ -133,6 +134,7 @@ describe('OAuth state, nonce and callback exchange', () => {
 
 	it('rejects custom provider endpoints that target internal networks', async () => {
 		settingService.query.mockResolvedValue({
+			oauthLoginEnabled: 1,
 			oauthProviders: {
 				custom: {
 					clientId: 'custom-client',
@@ -272,6 +274,12 @@ describe('OAuth account binding proof', () => {
 			},
 			req: { url: 'https://mail.example.com/api/oauth/bindUser', header: () => null }
 		};
+		vi.spyOn(settingService, 'query').mockResolvedValue({
+			oauthLoginEnabled: 1,
+			oauthProviders: {
+				apple: { clientId: 'test-client-id', clientSecret: 'test-client-secret', enabled: 1 }
+			}
+		});
 		vi.spyOn(loginService, 'validateRegistration').mockResolvedValue({});
 		vi.spyOn(loginService, 'register').mockResolvedValue({ userId: 2, email: 'bound@example.com', reservedRegKey: false });
 		vi.spyOn(loginService, 'login').mockResolvedValue('bound-session-jwt');
@@ -285,7 +293,6 @@ describe('OAuth account binding proof', () => {
 
 	afterAll(async () => {
 		await env.db.prepare('DELETE FROM oauth').run();
-		await env.db.prepare('DROP TABLE IF EXISTS oauth').run();
 	});
 
 	it('requires a server-issued proof, consumes it once and refuses rebinding', async () => {
@@ -394,6 +401,7 @@ describe('OAuth login result classification', () => {
 			await kv.put('apple_jwks_v1', JSON.stringify({ keys: [{ ...jwk }] }));
 
 			vi.spyOn(settingService, 'query').mockResolvedValue({
+				oauthLoginEnabled: 1,
 				oauthProviders: {
 					apple: { clientId: 'test-client-id', clientSecret: 'test-client-secret', enabled: 1 }
 				}

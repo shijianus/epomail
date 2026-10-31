@@ -12,11 +12,13 @@ on:
       - master
       - main
       - 'review/**'
+      - 'release/**'
   pull_request:
     branches:
       - master
       - main
       - 'review/**'
+      - 'release/**'
   workflow_dispatch:
 
 permissions:
@@ -147,18 +149,23 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-          cache-dependency-path: package-lock.json
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
 
       - name: Install Playwright runtime (frozen lockfile)
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Install Chromium
-        run: npx playwright install --with-deps chromium
+        run: pnpm exec playwright install --with-deps chromium
 
       - name: Download built login bundle
         uses: actions/download-artifact@v4

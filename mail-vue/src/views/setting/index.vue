@@ -1095,9 +1095,15 @@ const submitOauthReauth = async () => {
     }
 
     if (oauthReauth.mode === 'bind') {
+      // The callback returns to the same account slot. Without this the URL
+      // has no /mail/u/N/ prefix and the app falls back to slot 0, switching
+      // the session out from under a claim bound to another account.
+      const accountMatch = window.location.pathname.match(/\/mail\/u\/(\d+)/)
+      const accountIndex = accountMatch ? Number(accountMatch[1]) : 0
       const started = await startOauthIdentityBind({
         provider: oauthReauth.provider,
-        stepUpToken: grant.stepUpToken
+        stepUpToken: grant.stepUpToken,
+        accountIndex
       })
       if (!started || !started.url) {
         throw new Error('missing authorization url')
@@ -1120,20 +1126,26 @@ const submitOauthReauth = async () => {
   }
 }
 
-// The provider callback lands here with ?oauth_bind=<outcome>#oauth_link=<claim>.
-// The claim is a bearer credential: read it, scrub the address bar, and never
-// keep it in component state longer than the single request that spends it.
+// The provider callback lands on /mail/u/N/#settings/security?oauth_bind=<outcome>
+// with the one-time claim in the same fragment. The claim is a bearer credential:
+// read it, scrub the address bar, and never keep it in component state longer
+// than the single request that spends it.
 const consumeOauthBindReturn = async () => {
   const outcome = route.query && route.query.oauth_bind ? String(route.query.oauth_bind) : ''
   const hash = window.location.hash || ''
   let claim = ''
-  const marker = '#oauth_link='
-  if (hash.startsWith(marker)) {
-    const raw = hash.slice(marker.length)
-    try {
-      claim = decodeURIComponent(raw.split('&')[0])
-    } catch (e) {
-      claim = ''
+  if (route.query && typeof route.query.oauth_link === 'string') {
+    claim = route.query.oauth_link
+  } else {
+    // Accept the pre-convergence shape (#oauth_link=<claim>) so a link already
+    // issued before the upgrade still completes instead of being silently lost.
+    const marker = '#oauth_link='
+    if (hash.startsWith(marker)) {
+      try {
+        claim = decodeURIComponent(hash.slice(marker.length).split('&')[0])
+      } catch (e) {
+        claim = ''
+      }
     }
   }
   if (!outcome && !claim) return

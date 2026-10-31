@@ -211,73 +211,90 @@ describe('OAuth public callback boundary', () => {
 	});
 
 	it('exchanges a short-lived login code once and never via the callback URL', async () => {
-		const code = 'short-lived-login-code';
-		await seedOtc(env.db, {
-			purpose: 'oauth_login_code',
-			token: code,
-			provider: 'apple',
-			oauthUserId: 'apple:user-1',
-			payload: {
-				token: 'mailbox-jwt-value',
+		await env.kv.put('setting:', JSON.stringify({
+			oauthLoginEnabled: 1,
+			oauthProviders: { apple: { clientId: 'test-client-id', clientSecret: 'test-client-secret', enabled: 1 } }
+		}));
+		try {
+			const code = 'short-lived-login-code';
+			await seedOtc(env.db, {
+				purpose: 'oauth_login_code',
+				token: code,
 				provider: 'apple',
-				userInfo: { oauthUserId: 'apple:user-1' },
-				createdAt: Date.now()
-			}
-		});
+				oauthUserId: 'apple:user-1',
+				payload: {
+					token: 'mailbox-jwt-value',
+					provider: 'apple',
+					userInfo: { oauthUserId: 'apple:user-1' },
+					createdAt: Date.now()
+				}
+			});
 
-		const first = await SELF.fetch('http://example.com/api/oauth/exchange', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ code })
-		});
-		const firstBody = await first.json();
-		expect(firstBody.code).toBe(200);
-		expect(firstBody.data.token).toBe('mailbox-jwt-value');
+			const first = await SELF.fetch('http://example.com/api/oauth/exchange', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ code })
+			});
+			const firstBody = await first.json();
+			expect(firstBody.code).toBe(200);
+			expect(firstBody.data.token).toBe('mailbox-jwt-value');
 
-		const second = await SELF.fetch('http://example.com/api/oauth/exchange', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ code })
-		});
-		expect((await second.json()).code).toBe(401);
+			const second = await SELF.fetch('http://example.com/api/oauth/exchange', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ code })
+			});
+			expect((await second.json()).code).toBe(401);
+		} finally {
+			await env.kv.delete('setting:');
+		}
 	});
 
 	it('propagates an MFA challenge instead of issuing a session token', async () => {
-		const code = 'oauth-mfa-code';
-		await seedOtc(env.db, {
-			purpose: 'oauth_login_code',
-			token: code,
-			provider: 'apple',
-			oauthUserId: 'apple:user-1',
-			payload: {
-				token: null,
-				mfa: {
-					mfaRequired: true,
-					tempToken: 'totp_tmp_oauth',
-					email: 'mfa@example.com',
-					hasTotp: true,
-					hasPasskeys: false
-				},
+		await env.kv.put('setting:', JSON.stringify({
+			oauthLoginEnabled: 1,
+			oauthProviders: { apple: { clientId: 'test-client-id', clientSecret: 'test-client-secret', enabled: 1 } }
+		}));
+		try {
+			const code = 'oauth-mfa-code';
+			await seedOtc(env.db, {
+				purpose: 'oauth_login_code',
+				token: code,
 				provider: 'apple',
-				userInfo: { oauthUserId: 'apple:user-1' },
-				createdAt: Date.now()
-			}
-		});
+				oauthUserId: 'apple:user-1',
+				payload: {
+					token: null,
+					mfa: {
+						mfaRequired: true,
+						tempToken: 'totp_tmp_oauth',
+						email: 'mfa@example.com',
+						hasTotp: true,
+						hasPasskeys: false
+					},
+					provider: 'apple',
+					userInfo: { oauthUserId: 'apple:user-1' },
+					createdAt: Date.now()
+				}
+			});
 
-		const response = await SELF.fetch('http://example.com/api/oauth/exchange', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ code })
-		});
-		const body = await response.json();
-		expect(body.code).toBe(200);
-		expect(body.data.token).toBeUndefined();
-		expect(body.data.mfaRequired).toBe(true);
-		expect(body.data.tempToken).toBe('totp_tmp_oauth');
+			const response = await SELF.fetch('http://example.com/api/oauth/exchange', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ code })
+			});
+			const body = await response.json();
+			expect(body.code).toBe(200);
+			expect(body.data.token).toBeUndefined();
+			expect(body.data.mfaRequired).toBe(true);
+			expect(body.data.tempToken).toBe('totp_tmp_oauth');
+		} finally {
+			await env.kv.delete('setting:');
+		}
 	});
 
 	it('rejects an unregistered redirect_uri on the authorize endpoint', async () => {
 		await env.kv.put('setting:', JSON.stringify({
+			oauthLoginEnabled: 1,
 			oauthProviders: { apple: { clientId: 'test-client-id', clientSecret: 'test-client-secret', enabled: 1 } }
 		}));
 		try {
@@ -292,6 +309,7 @@ describe('OAuth public callback boundary', () => {
 
 	it('rejects an authorize request without a client state', async () => {
 		await env.kv.put('setting:', JSON.stringify({
+			oauthLoginEnabled: 1,
 			oauthProviders: { apple: { clientId: 'test-client-id', clientSecret: 'test-client-secret', enabled: 1 } }
 		}));
 		try {

@@ -251,6 +251,22 @@ const dbInit = {
 						if (roleId) {
 							await this.assignRolePerms(userDb, roleId, defRole.permKeys);
 						}
+					} else if (!existing.role_code || existing.role_code === 'custom') {
+						// v1_1DB 预插入的遗留「普通用户」行尚无标准 role_code，在此原位对齐为标准角色并赋予权限
+						await userDb.prepare(`
+							UPDATE role SET
+								key = ?, description = ?, sort = ?, is_default = ?,
+								send_count = ?, send_type = ?, account_count = ?,
+								storage_quota_mb = ?, allow_attachment = ?, role_code = ?,
+								tag_text = ?, tag_color = ?
+							WHERE role_id = ?
+						`).bind(
+							defRole.key, defRole.description, defRole.sort, defRole.isDefault,
+							defRole.sendCount, defRole.sendType, defRole.accountCount,
+							defRole.storageQuotaMb, defRole.allowAttachment, defRole.roleCode,
+							defRole.tagText, defRole.tagColor, existing.role_id
+						).run();
+						await this.assignRolePerms(userDb, existing.role_id, defRole.permKeys);
 					}
 				} catch (e) {
 					console.warn(`初始化默认身份分组 ${defRole.name} 提示：`, e.message);
@@ -439,27 +455,54 @@ const dbInit = {
 		}
 	},
 
-	// v3_18DB: 系统设置操作报告与IP风控持久化配置迁移
+	// v3_18DB: 系统设置操作报告与IP风控持久化配置迁移（使用独立 setting_ext 键值表，避免超过 Cloudflare D1 单表 100 列上限）
 	async v3_18DB(c) {
 		const userDb = getUserDb(c);
-		const settingCols = [
-			{ name: 'audit_log_enabled', sql: `ALTER TABLE setting ADD COLUMN audit_log_enabled INTEGER NOT NULL DEFAULT 1;` },
-			{ name: 'audit_max_ip_per_account', sql: `ALTER TABLE setting ADD COLUMN audit_max_ip_per_account INTEGER NOT NULL DEFAULT 3;` },
-			{ name: 'audit_max_device_per_account', sql: `ALTER TABLE setting ADD COLUMN audit_max_device_per_account INTEGER NOT NULL DEFAULT 3;` },
-			{ name: 'audit_auto_clean_oldest', sql: `ALTER TABLE setting ADD COLUMN audit_auto_clean_oldest INTEGER NOT NULL DEFAULT 1;` },
-			{ name: 'audit_prioritize_non_critical_clean', sql: `ALTER TABLE setting ADD COLUMN audit_prioritize_non_critical_clean INTEGER NOT NULL DEFAULT 1;` },
-			{ name: 'audit_critical_quota', sql: `ALTER TABLE setting ADD COLUMN audit_critical_quota INTEGER NOT NULL DEFAULT 3;` }
+		await userDb.prepare(`
+			CREATE TABLE IF NOT EXISTS setting_ext (
+				key TEXT PRIMARY KEY,
+				value TEXT NOT NULL
+			)
+		`).run();
+
+		const legacyColMap = [
+			{ col: 'audit_log_enabled', key: 'auditLogEnabled', def: '1' },
+			{ col: 'audit_max_ip_per_account', key: 'auditMaxIpPerAccount', def: '3' },
+			{ col: 'audit_max_device_per_account', key: 'auditMaxDevicePerAccount', def: '3' },
+			{ col: 'audit_auto_clean_oldest', key: 'auditAutoCleanOldest', def: '1' },
+			{ col: 'audit_prioritize_non_critical_clean', key: 'auditPrioritizeNonCriticalClean', def: '1' },
+			{ col: 'audit_critical_quota', key: 'auditCriticalQuota', def: '3' }
 		];
 
 		const tableInfo = await userDb.prepare(`PRAGMA table_info('setting')`).all().catch(() => ({ results: [] }));
 		const existingCols = new Set((tableInfo?.results || []).map(r => r.name));
-		for (const col of settingCols) {
-			if (!existingCols.has(col.name)) {
-				try {
-					await userDb.prepare(col.sql).run();
-				} catch (err) {
-					console.warn(`v3_18DB 跳过 setting 列 ${col.name}:`, err.message);
+		const presentLegacy = legacyColMap.filter(item => existingCols.has(item.col));
+
+		if (presentLegacy.length > 0) {
+			try {
+				const selectCols = presentLegacy.map(item => item.col).join(', ');
+				const legacyRow = await userDb.prepare(`SELECT ${selectCols} FROM setting LIMIT 1`).first();
+				if (legacyRow) {
+					for (const item of presentLegacy) {
+						if (legacyRow[item.col] !== undefined && legacyRow[item.col] !== null) {
+							await userDb.prepare(
+								`INSERT OR IGNORE INTO setting_ext (key, value) VALUES (?, ?)`
+							).bind(item.key, String(legacyRow[item.col])).run();
+						}
+					}
 				}
+			} catch (err) {
+				console.warn('v3_18DB legacy setting_ext copy warning:', err.message);
+			}
+		}
+
+		for (const item of legacyColMap) {
+			try {
+				await userDb.prepare(
+					`INSERT OR IGNORE INTO setting_ext (key, value) VALUES (?, ?)`
+				).bind(item.key, item.def).run();
+			} catch (err) {
+				console.warn(`v3_18DB setting_ext default ${item.key} warning:`, err.message);
 			}
 		}
 	},
@@ -810,77 +853,38 @@ const dbInit = {
 			}
 		}
 
-		// 确保管理员在所有已配置域名下均具备默认 account 邮箱
-		// 确保演示参观者账号 admin@epomail.cyou 独立存在且归属参观者角色 (type: 2)，绝不越权晋升站长
-		try {
-			const visitorRole = await userDb.prepare(`SELECT role_id FROM role WHERE role_code = 'visitor' OR key = 'visitor' LIMIT 1`).first();
-			const visitorRoleId = visitorRole ? visitorRole.role_id : 2;
-			const visitorEmail = 'admin@epomail.cyou';
-			
-			let visitorUser = await userDb.prepare(`SELECT user_id, type FROM user WHERE email = ?`).bind(visitorEmail).first();
-			if (!visitorUser) {
-				// 预设安全 PBKDF2 哈希密码 123456
-				const defHash = 'pbkdf2:100000:wYbOCP3rv6muivmiYwmd/oXXroIcxp7/VcB02M+Ac5w=';
-				const defSalt = 'ZmUlWbNgsFel3E0oxnPHcA==';
-				await userDb.prepare(`
-					INSERT INTO user (email, password, salt, type, status, is_del, create_time, update_time)
-					VALUES (?, ?, ?, ?, 0, 0, datetime('now'), datetime('now'))
-				`).bind(visitorEmail, defHash, defSalt, visitorRoleId).run();
-				visitorUser = await userDb.prepare(`SELECT user_id, type FROM user WHERE email = ?`).bind(visitorEmail).first();
-			} else if (visitorUser.type !== visitorRoleId) {
-				await userDb.prepare(`UPDATE user SET type = ?, is_del = 0 WHERE user_id = ?`).bind(visitorRoleId, visitorUser.user_id).run();
-			}
+		// 1. 主站长账号优先初始化：确保冷启动时 c.env.admin 首个落库，且缺失 admin_initial_password 时在生产环境安全失败（禁止吞掉异常）
+		if (c.env.admin) {
+			let adminUser = await userDb.prepare(`SELECT user_id FROM user WHERE email = ?`).bind(c.env.admin).first();
+			if (!adminUser) {
+				// 全新部署引导：主站长账号不存在时直接创建（注册端 adminReserved 拦截站长邮箱，无法走注册路径）
+				// 禁止使用固定默认密码。生产环境必须显式提供 admin_initial_password Secret；
+				// 本地开发在缺失时生成一次性随机密码，并仅在初始化响应中回显一次。
+				const masterRoleRow = await userDb.prepare(`SELECT role_id FROM role WHERE role_code = 'master' OR name = '站长' LIMIT 1`).first();
+				const masterRoleId = masterRoleRow ? masterRoleRow.role_id : 1;
 
-			if (visitorUser) {
-				// 确保 account 表中 admin@epomail.cyou 指向该独立的参观者用户，绝不挂在站长名下
-				const existingAcc = await userDb.prepare(`SELECT account_id, user_id FROM account WHERE email = ?`).bind(visitorEmail).first();
-				if (!existingAcc) {
-					await userDb.prepare(`
-						INSERT INTO account (email, status, user_id, is_del, name, all_receive, sort)
-						VALUES (?, 0, ?, 0, ?, 1, 0)
-					`).bind(visitorEmail, visitorUser.user_id, visitorEmail).run();
-				} else {
-					await userDb.prepare(`UPDATE account SET user_id = ?, name = ?, is_del = 0 WHERE account_id = ?`).bind(visitorUser.user_id, visitorEmail, existingAcc.account_id).run();
-				}
-
-				// 清除参观者账号的 HAS_WELCOME KV 脏缓存，确保下次登录时能触发欢迎邮件投递
-				// 修复账号被恢复/迁移后 KV 残留导致欢迎邮件被永久阻塞的问题
-				try {
-					await c.env.kv.delete('HAS_WELCOME_' + visitorUser.user_id);
-				} catch (_) {}
-			}
-
-			// 确保超级管理员 (User 1) 仅绑定自身主邮箱 c.env.admin (admin@epomail.bond)，绝不越权关联其他域名信箱
-			if (c.env.admin) {
-				let adminUser = await userDb.prepare(`SELECT user_id FROM user WHERE email = ?`).bind(c.env.admin).first();
-				if (!adminUser) {
-					// 全新部署引导：主站长账号不存在时直接创建（注册端 adminReserved 拦截站长邮箱，无法走注册路径）
-					// 禁止使用固定默认密码。生产环境必须显式提供 admin_initial_password Secret；
-					// 本地开发在缺失时生成一次性随机密码，并仅在初始化响应中回显一次。
-					const masterRoleRow = await userDb.prepare(`SELECT role_id FROM role WHERE role_code = 'master' OR name = '站长' LIMIT 1`).first();
-					const masterRoleId = masterRoleRow ? masterRoleRow.role_id : 1;
-
-					let initialPassword = (c.env.admin_initial_password || '').trim();
-					let generatedPassword = null;
-					if (!initialPassword || initialPassword.length < 8) {
-						if (c.env.dev || c.env.DEV) {
-							initialPassword = cryptoUtils.genRandomPwd(20);
-							generatedPassword = initialPassword;
-							c.set('generatedAdminPassword', generatedPassword);
-						} else {
-							throw new Error('admin_initial_password Secret is required (min 8 chars) before creating the site owner account');
-						}
+				let initialPassword = (c.env.admin_initial_password || '').trim();
+				let generatedPassword = null;
+				if (!initialPassword || initialPassword.length < 8) {
+					if (c.env.dev || c.env.DEV) {
+						initialPassword = cryptoUtils.genRandomPwd(20);
+						generatedPassword = initialPassword;
+						c.set('generatedAdminPassword', generatedPassword);
+					} else {
+						throw new Error('admin_initial_password Secret is required (min 8 chars) before creating the site owner account');
 					}
-
-					const { salt, hash } = await cryptoUtils.hashPassword(initialPassword);
-					await userDb.prepare(`
-						INSERT INTO user (email, password, salt, type, status, is_del, create_time, update_time, custom_labels)
-						VALUES (?, ?, ?, ?, 0, 0, datetime('now'), datetime('now'), ?)
-					`).bind(c.env.admin, hash, salt, masterRoleId, getDefaultUserLabelsString()).run();
-					adminUser = await userDb.prepare(`SELECT user_id FROM user WHERE email = ?`).bind(c.env.admin).first();
-					console.log(`[init] 已创建主站长账号 ${c.env.admin} (user_id=${adminUser?.user_id})，初始凭据已按安全策略生成/注入`);
 				}
-				if (adminUser) {
+
+				const { salt, hash } = await cryptoUtils.hashPassword(initialPassword);
+				await userDb.prepare(`
+					INSERT INTO user (email, password, salt, type, status, is_del, create_time, update_time, custom_labels)
+					VALUES (?, ?, ?, ?, 0, 0, datetime('now'), datetime('now'), ?)
+				`).bind(c.env.admin, hash, salt, masterRoleId, getDefaultUserLabelsString()).run();
+				adminUser = await userDb.prepare(`SELECT user_id FROM user WHERE email = ?`).bind(c.env.admin).first();
+				console.log(`[init] 已创建主站长账号 ${c.env.admin} (user_id=${adminUser?.user_id})，初始凭据已按安全策略生成/注入`);
+			}
+			if (adminUser) {
+				try {
 					// 若站长账号尚未晋升 master（历史遗留普通账号），此处兜底晋升
 					const masterRoleRow = await userDb.prepare(`SELECT role_id FROM role WHERE role_code = 'master' OR name = '站长' LIMIT 1`).first();
 					if (masterRoleRow) {
@@ -893,10 +897,48 @@ const dbInit = {
 							VALUES (?, 0, ?, 0, ?, 1, 0)
 						`).bind(c.env.admin, adminUser.user_id, emailUtils.getName(c.env.admin)).run();
 					}
+				} catch (e) {
+					console.warn('admin account sync warning:', e.message);
 				}
 			}
-		} catch (e) {
-			console.warn('visitor and admin accounts sync warning:', e.message);
+		}
+
+		// 2. 演示参观者账号默认关闭：严禁在生产环境自动注入固定可猜测密码或复活已停用账号。
+		// 仅当显式开启 DEMO_VISITOR_ENABLED=true 且提供高强度 DEMO_VISITOR_PASSWORD 时按需播种；存量库既有账号保持原状，由独立运维脚本处置。
+		if (String(c.env?.DEMO_VISITOR_ENABLED || '').toLowerCase() === 'true') {
+			const demoEmail = String(c.env?.DEMO_VISITOR_EMAIL || '').trim().toLowerCase();
+			const demoPassword = String(c.env?.DEMO_VISITOR_PASSWORD || '').trim();
+			const weakPasswords = new Set(['123456', '12345678', '123456789', '1234567890', 'password', 'admin123']);
+			if (!demoEmail || !demoPassword || demoPassword.length < 12 || weakPasswords.has(demoPassword.toLowerCase())) {
+				throw new Error('DEMO_VISITOR_EMAIL and strong DEMO_VISITOR_PASSWORD (min 12 chars) are required when DEMO_VISITOR_ENABLED=true');
+			}
+			if (c.env.admin && demoEmail === String(c.env.admin).trim().toLowerCase()) {
+				throw new Error('DEMO_VISITOR_EMAIL must not match site owner admin email');
+			}
+			try {
+				const visitorRole = await userDb.prepare(`SELECT role_id FROM role WHERE role_code = 'visitor' OR key = 'visitor' LIMIT 1`).first();
+				const visitorRoleId = visitorRole ? visitorRole.role_id : 2;
+				let visitorUser = await userDb.prepare(`SELECT user_id, type FROM user WHERE email = ?`).bind(demoEmail).first();
+				if (!visitorUser) {
+					const { salt, hash } = await cryptoUtils.hashPassword(demoPassword);
+					await userDb.prepare(`
+						INSERT INTO user (email, password, salt, type, status, is_del, create_time, update_time)
+						VALUES (?, ?, ?, ?, 0, 0, datetime('now'), datetime('now'))
+					`).bind(demoEmail, hash, salt, visitorRoleId).run();
+					visitorUser = await userDb.prepare(`SELECT user_id, type FROM user WHERE email = ?`).bind(demoEmail).first();
+				}
+				if (visitorUser) {
+					const existingAcc = await userDb.prepare(`SELECT account_id FROM account WHERE email = ?`).bind(demoEmail).first();
+					if (!existingAcc) {
+						await userDb.prepare(`
+							INSERT INTO account (email, status, user_id, is_del, name, all_receive, sort)
+							VALUES (?, 0, ?, 0, ?, 1, 0)
+						`).bind(demoEmail, visitorUser.user_id, demoEmail).run();
+					}
+				}
+			} catch (e) {
+				console.warn('demo visitor sync warning:', e.message);
+			}
 		}
 	},
 
@@ -1768,13 +1810,14 @@ const dbInit = {
 				title TEXT NOT NULL,
 				auto_refresh INTEGER NOT NULL,
 				register_verify INTEGER NOT NULL,
-				add_email_verify INTEGER NOT NULL,
-				audit_log_enabled INTEGER DEFAULT 1,
-				audit_max_ip_per_account INTEGER DEFAULT 3,
-				audit_max_device_per_account INTEGER DEFAULT 3,
-				audit_auto_clean_oldest INTEGER DEFAULT 1,
-				audit_prioritize_non_critical_clean INTEGER DEFAULT 1,
-				audit_critical_quota INTEGER DEFAULT 3
+				add_email_verify INTEGER NOT NULL
+			)
+		`).run();
+
+		await userDb.prepare(`
+			CREATE TABLE IF NOT EXISTS setting_ext (
+				key TEXT PRIMARY KEY,
+				value TEXT NOT NULL
 			)
 		`).run();
 

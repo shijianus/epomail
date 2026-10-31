@@ -201,17 +201,20 @@ function stateFromAuthorizeUrl(url) {
 }
 
 function claimFromLocation(location) {
-	const match = /#oauth_link=([^&]+)/.exec(location || '');
-	return match ? decodeURIComponent(match[1]) : '';
+	const url = new URL(location);
+	const hash = url.hash.startsWith('#') ? url.hash.slice(1) : url.hash;
+	const queryIndex = hash.indexOf('?');
+	const params = new URLSearchParams(queryIndex >= 0 ? hash.slice(queryIndex + 1) : hash);
+	return params.get('oauth_link') || '';
 }
 
-async function startGithubBind(token) {
+async function startGithubBind(token, extra = {}) {
 	const grant = await reauth(token);
 	expect(grant.response.status, JSON.stringify(grant.body)).toBe(200);
 	const response = await api('/my/oauthIdentities/bind/start', {
 		method: 'POST',
 		token,
-		body: { provider: 'github', stepUpToken: grant.body.data.stepUpToken }
+		body: { provider: 'github', stepUpToken: grant.body.data.stepUpToken, ...extra }
 	});
 	const body = await readJson(response);
 	return { response, body, state: body?.data?.url ? stateFromAuthorizeUrl(body.data.url) : '' };
@@ -311,11 +314,11 @@ afterAll(async () => {
 	for (const key of ['auth-uid:7', 'auth-uid:8', 'auth-uid:9', 'initial_pwd:7', 'initial_pwd:8', 'initial_pwd:9', 'setting:']) {
 		await env.kv.delete(key);
 	}
-	await env.db.prepare('DROP TABLE IF EXISTS oauth').run();
-	await env.db.prepare('DROP TABLE IF EXISTS oauth_identity_audit').run();
-	await env.db.prepare('DROP TABLE IF EXISTS oauth_bind_claim').run();
-	await env.db.prepare('DROP TABLE IF EXISTS oauth_one_time_credential').run();
-	await env.db.prepare('DROP TABLE IF EXISTS user').run();
+	await env.db.prepare('DELETE FROM oauth').run();
+	await env.db.prepare('DELETE FROM oauth_identity_audit').run();
+	await env.db.prepare('DELETE FROM oauth_bind_claim').run();
+	await env.db.prepare('DELETE FROM oauth_one_time_credential').run();
+	await env.db.prepare('DELETE FROM user WHERE user_id IN (7, 8, 9)').run();
 });
 
 describe('listing linked identities', () => {
@@ -489,6 +492,20 @@ describe('binding an additional identity', () => {
 		// No one-time credential material in the audit trail.
 		expect(JSON.stringify(audit)).not.toContain(claim);
 		expect(JSON.stringify(audit)).not.toContain(grant.body.data.stepUpToken);
+	});
+
+	it('returns the claim to the account slot that started the bind', async () => {
+		const tokenA = await seedSession(USER_A, EMAIL_A, 'session-a');
+		const started = await startGithubBind(tokenA, { accountIndex: 3 });
+		expect(started.response.status, JSON.stringify(started.body)).toBe(200);
+
+		const callback = await providerCallback(started.state);
+		const location = callback.headers.get('Location') || '';
+		const url = new URL(location);
+		expect(url.pathname).toBe('/mail/u/3/');
+		expect(url.hash.startsWith('#settings/security?')).toBe(true);
+		expect(new URLSearchParams(url.hash.split('?')[1]).get('oauth_bind')).toBe('linked');
+		expect(claimFromLocation(location)).toBeTruthy();
 	});
 
 	it('refuses a second bind of the same provider for the same account', async () => {
