@@ -11,6 +11,26 @@
 
 ---
 
+### 非阻断项收敛优化：根目录过程产物清理、i18n 死词条清除与门禁增强、Worker 日志收敛 (2026-10-31)
+*   **关联提交 (Git Commit)**: `55bf5d1632b60955c0b3920fe2689584233a615a` (`55bf5d1` 仓库瘦身)、`022148e612bd3ee59b783132fe5f4390dc06a4b2` (`022148e` i18n)、`b20da150b5c3309078ad909cc13bb79763aaa364` (`b20da15` worker 日志)；文档提交即本条目所在提交（`git rev-parse HEAD`）
+*   **部署环境 (Deployment)**: 本地全量回归；**未执行任何远程部署、未修改生产库**
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 仓库瘦身（P2）：删除根目录 74 项过程产物（48 张验证截图 PNG、7 个 mockup/原型 HTML、19 个一次性调试/截图脚本，均可在历史中找回）；`.gitignore` 增加根锚定模式（`/*.png`、`/*.html`、`/patch_*.js`、`/test-*.js` 等）防复发。刻意保留 `logo.svg`（README 引用）、`build.mjs`（构建入口）、`.secret-scan-baseline.json`（历史扫描基线）及全部 `doc/`、`resources/` 资产。
+    - [x] 事故记录与恢复（透明留痕）：首次删除时 Git Bash（MSYS）把 `grep "/"` 参数路径转换为 Git 安装目录，导致 `grep -v "/"` 过滤失效、误扫入 429 个非根目录文件（`doc/` 验证截图、`mail-vue/index.html`、`temp_login_ui/index.html` 等）。发现构建失败后立即定位根因，按 `HEAD` 精确恢复全部 429 项（`git restore --source=HEAD --staged --worktree`），最终提交的删除清单经复核恰为 74 项根目录文件、零误伤。后续涉及路径分隔符的过滤一律改用 awk `index($0,"/")`。
+    - [x] i18n 清理与门禁增强（P2）：删除 `authLocale.ts` 中 4 个全源码不可达的死词条（`forgotPasswordHint`、`useTotpCode`、`useBackupCode`、`stepUpTitle`，6 语言同步，138 键/语言）；其余 3 个被 WARN 的键（`oauthBindFailed`、`oauthBindAlreadyBound`、`bindEmailReserved`）经核实为 `oauth-bind.ts` 错误码映射表间接引用（删了会导致绑定报错显示裸 key），**未删除**；`scripts/i18n-auth-locale.mjs` 补充 `key: '<literal>'` 映射引用收集，未引用告警恢复准确。
+    - [x] Worker 日志收敛（P3）：移除 `src/index.js` scheduled 处理器中每次 cron 触发打印整个 event 上下文的调试日志（失败路径已有定向 `console.warn`）；保留 `totp-service`/`setting-service` 的结构化审计事件日志（无敏感字段）。
+    - [x] 本机 pre-commit 钩子接线：`git config core.hooksPath .githooks`，共享密钥扫描钩子生效（本轮 3 次提交均已实际触发并通过）。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 静态门禁：i18n 四件套全部 exit 0（对称 3056/1946 键 ×6；audit 2163 字面量键零缺失；hardcoded exit 0；auth-locale 138 键、零 WARN、188 处引用命中）
+    - [x] 密钥扫描：瘦身后的工作树 751 文件 0 命中；`scan-staged-secrets --self-test` 通过；pre-commit 钩子 3 次提交实跑通过
+    - [x] 测试套件：`mail-worker` **17/17 文件、209/209 断言**（含 scheduled 日志改动后复跑）；`temp_login_ui` typecheck 0 错误 + 单测 **15/15**（含 authLocale 删词条后复跑）
+    - [x] 生产构建：`node scripts/build-prod.mjs` exit 0（三应用全绿 + login dist 拷贝）；`wrangler deploy --dry-run` exit 0
+    - [x] 全真栈冒烟：`tests/fullstack-smoke.mjs` **13/13** 通过（冷启动 init/幂等/登录/OAuth fail-closed/sidebarStats/外发 403/401 等）
+    - [x] 悬空引用排查：`git grep` 全库确认无任何被删文件的残留引用（README 的 `logo.svg` 完好）
+    - [x] 零假数据残留：冒烟使用独立临时持久化目录并在 `finally` 清理；本零改动之外未写入任何业务库
+    - [ ] `NOT-TESTED`（运维项，与前阶段一致）：staging 未 provision、真实 Provider 回调、真实外发、真实 R2/S3/B2、云端备份恢复与回滚演练、RC tag 未发布
+*   **本机环境备注 (Local Environment Notes)**: 工作树存在 3 个未跟踪的并发会话产物（`audit_tmp.json`、`audit_verify_shots/`、`tests/audit-report-verify-tmp.mjs`，内容为 mock 数据的审计页验收截图，标注"验收后删除"）及 1 个归属不明的本地 `workerd`（127.0.0.1:8787，父进程已退出）；因无法确认属主，均未触碰、未入库，留待属主自行处置。
+
 ### 部署前收敛独立复验：全门禁本地复核与 B8 GO 清单逐项核对 (2026-10-31)
 *   **关联提交 (Git Commit)**: 本条目所在提交（`git rev-parse HEAD`）；复验基线 `7e24383`（origin/release/2026-10-31 同步点）
 *   **部署环境 (Deployment)**: 本地复验（Node 24.14.0 / pnpm 10.34.5）；**零代码改动、未执行任何远程部署、未修改生产库**
