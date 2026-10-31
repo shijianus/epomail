@@ -168,7 +168,6 @@ export default {
 	},
 	email: email,
 	async scheduled(c, env, ctx) {
-		console.log('SCHEDULED EVENT RECEIVED:', c);
 		try {
 			// Replay the durable object-deletion outbox first: a deletion that
 			// failed in an earlier request must not depend on another user
