@@ -59,6 +59,21 @@ epomail-prototype.html
 tests/*.png
 .qoder/
 
+# 根目录过程产物（2026-10-31 起移出版本库）：验证截图、mockup 原型、
+# 一次性调试/截图脚本。正式验证材料归档 doc/，测试脚本归档 tests/。
+/*.png
+/*.html
+/patch_*.js
+/test-*.js
+/test_*.js
+/test-*.mjs
+/screenshot_*.mjs
+/shoot.js
+/take_screenshot.js
+/get_sidebar_stats.js
+/route.js
+/verify.mjs
+
 # EpomailDocs 已独立为专用 git 仓库（禁止放回本仓库），见 EpomailDocs/README.md
 EpomailDocs/
 
