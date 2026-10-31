@@ -17,6 +17,14 @@ export default defineWorkersConfig({
 		},
 		poolOptions: {
 			workers: {
+				// Files create the full schema from `beforeAll`. Running several
+				// files in separate workerd runtimes lets one file's storage
+				// rollback remove tables another file is still using, which CI
+				// observed as `no such table: user`. One worker serialises files
+				// and keeps each file's beforeAll schema inside its own storage
+				// scope. It also avoids the Windows loopback module-fallback
+				// failures seen when ~17 runtimes start at once.
+				singleWorker: true,
 				// A dedicated test config avoids the production AI binding, which
 				// the installed workerd/miniflare version cannot resolve locally.
 				wrangler: { configPath: './wrangler-vitest.toml' },

@@ -19,8 +19,9 @@ describe('Invite code atomic redemption', () => {
 	});
 
 	afterAll(async () => {
+		// Row-level cleanup only: dropping the table here could remove schema
+		// another test file still relies on when files share a worker.
 		await env.db.prepare('DELETE FROM reg_key').run();
-		await env.db.prepare('DROP TABLE IF EXISTS reg_key').run();
 	});
 
 	it('allows exactly one concurrent redemption from a single-use code', async () => {
