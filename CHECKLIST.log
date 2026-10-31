@@ -32,7 +32,8 @@
     - [x] 密钥扫描：工作树 1254 文件 0 命中；历史 4121 blobs（含 baseline）0 命中；`scan-staged-secrets --self-test` 通过
     - [x] 锁文件一致性：根目录与三应用 `pnpm install --frozen-lockfile` 全部通过
     - [x] 依赖审计：`mail-vue` 全量 0 high/0 critical、生产 0 high/0 critical；`temp_login_ui` 全量/生产均 0；`mail-worker` 全量 9 high/2 critical（均为 devDependencies）、生产 0 high/0 critical/1 low
-    - [ ] `NOT-TESTED`：新 SHA 的 GitHub Actions runner 实际执行（需推送后观察）、真实 OAuth Provider 回调、真实 Resend / Mailjet / Cloudflare 外发、真实 R2 / S3 / B2、云端 D1 / KV 恢复与 Worker 回滚；Windows Vitest 清理临时目录的 `EBUSY` 警告不影响 exit 0
+    - [x] GitHub Actions 推送后实测（code SHA `e8c7984`）：Quality Gates `41162646757`（Worker 测试 + dry-run + 登录 UI + mail-vue + Playwright + i18n + 密钥扫描）、Security Audit `41162646788`、Offline Secret Scanning Gate `41162643045` / `41162646832` 全部 success；`singleWorker` 修复在真实 runner 上生效
+    - [ ] `NOT-TESTED`：真实 OAuth Provider 回调、真实 Resend / Mailjet / Cloudflare 外发、真实 R2 / S3 / B2、云端 D1 / KV 恢复与 Worker 回滚；Windows Vitest 清理临时目录的 `EBUSY` 警告不影响 exit 0
 
 ### 阶段 3 上线收敛：依赖高危收口、gitleaks 门禁根因修复与真实全栈/浏览器回归 (2026-10-30)
 *   **关联提交 (Git Commit)**: `a0680e8399f01395725ff9f372032de303cf4e4d` (Short: `a0680e8`)

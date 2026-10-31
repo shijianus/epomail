@@ -163,9 +163,24 @@ but still hidden. No workflow was deleted, softened, or wrapped in
 successful run; the exit code is 0 and no assertion is affected. Ubuntu CI
 remains the authoritative gate for the runner itself.
 
-`NOT-TESTED` from this host: GitHub Actions execution of the new SHA (requires
-the push); live OAuth provider callbacks; live Resend / Mailjet / Cloudflare
-outbound; live R2 / S3 / B2; cloud D1 / KV restore and Worker rollback.
+### 4.6.1 Post-push runner verification (code SHA `e8c7984`)
+
+The push produced two workflow sets (both against `e8c79846`); **all six runs
+completed success**:
+
+| Workflow | Run | Verified jobs |
+| :--- | :--- | :--- |
+| Quality Gates | `41162646757` | Worker test suite **success**, Wrangler dry-run **success**, login UI typecheck/unit/build, mail-vue build, Playwright E2E, i18n, diff hygiene, secret scan |
+| Security Audit | `41162646788` | Worker security tests, i18n, working-tree + history secret scan |
+| Offline Secret Scanning Gate | `41162643045` / `41162646832` | built-in scanner + gitleaks history gate |
+
+This closes the runner-execution item that was NOT-TESTED before the push. The
+two workflow runs visible for the same SHA are duplicate triggers on the same
+commit, not two different results.
+
+`NOT-TESTED` from this host, still requiring an external environment: live
+OAuth provider callbacks; live Resend / Mailjet / Cloudflare outbound; live
+R2 / S3 / B2; cloud D1 / KV restore and Worker rollback.
 
 ## 4.7 Remaining real blockers and risks
 
@@ -198,12 +213,13 @@ outbound; live R2 / S3 / B2; cloud D1 / KV restore and Worker rollback.
 
 ## 4.8 What Linux Argon must still do
 
-1. Push the final SHA and observe **all four** workflows. The two failures
-   above are expected to disappear with `singleWorker`; confirm the Quality
-   Gates and Security Audit worker jobs, and confirm the Offline Secret
-   Scanning Gate still installs gitleaks and passes.
-2. Confirm `pnpm --dir mail-worker test` in a single invocation is green on
-   `ubuntu-latest`. If it is not, capture the failing annotation before
+1. ~~Push the final SHA and observe all four workflows.~~ **Done for code SHA
+   `e8c7984`** (see §4.6.1): Quality Gates, Security Audit and both Offline
+   Secret Scanning Gate runs are green, including the Worker test suite and
+   Wrangler dry-run. Keep observing future pushes; no workflow was weakened.
+2. **Confirmed for `e8c7984`**: `pnpm --dir mail-worker test` passed on
+   `ubuntu-latest` in a single invocation with `singleWorker`. If a future
+   change reintroduces a collection failure, capture the annotation before
    changing anything; do not edit assertions.
 3. Decide on the vitest 4 / `@cloudflare/vitest-plugin` migration that clears
    the remaining dev-only criticals, then re-run all 209 tests.
