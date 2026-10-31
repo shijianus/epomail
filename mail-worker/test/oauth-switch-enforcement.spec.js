@@ -148,7 +148,8 @@ describe('Module A: OAuth switch enforcement, stale state/token revocation, PKCE
 			{ redirect: 'manual' }
 		);
 		const bindLoc = bindCb.headers.get('Location') || '';
-		const preIssuedClaimToken = decodeURIComponent((/#oauth_link=([^&]+)/.exec(bindLoc) || [])[1] || '');
+		const bindHash = new URL(bindLoc).hash.replace(/^#/, '');
+		const preIssuedClaimToken = new URLSearchParams(bindHash.split('?')[1] || '').get('oauth_link') || '';
 		expect(preIssuedClaimToken).toBeTruthy();
 		fetchSpy.mockClear();
 

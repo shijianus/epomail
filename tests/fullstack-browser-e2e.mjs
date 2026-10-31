@@ -198,6 +198,34 @@ try {
 		assert.ok(identityText.trim().length > 0, 'section is empty');
 	});
 
+	// 3b. A provider bind returns to the account slot with the one-time claim
+	// inside the fragment. The settings page must spend it and scrub the URL.
+	const bindComplete = page.route('**/api/my/oauthIdentities/bind/complete', route =>
+		route.fulfill({
+			status: 200,
+			contentType: 'application/json',
+			body: JSON.stringify({ code: 200, data: { bound: true } })
+		})
+	);
+	await bindComplete;
+	const bindRequestPromise = page.waitForRequest(
+		req => req.url().includes('/api/my/oauthIdentities/bind/complete') && req.method() === 'POST',
+		{ timeout: 45000 }
+	);
+	await page.goto(
+		`${base}/mail/u/0/#settings/security?oauth_bind=linked&oauth_link=browser-e2e-claim`,
+		{ waitUntil: 'domcontentloaded' }
+	);
+	// A same-document hash change does not re-run onMounted; reload so the
+	// callback is consumed exactly as it would be after a provider redirect.
+	await page.reload({ waitUntil: 'domcontentloaded' });
+	const bindRequest = await bindRequestPromise;
+	check('settings bind return consumes the claim from the fragment', () => {
+		assert.equal(JSON.parse(bindRequest.postData() || '{}').token, 'browser-e2e-claim');
+		assert.doesNotMatch(page.url(), /oauth_link/, 'claim must be scrubbed from the address bar');
+	});
+	await page.unroute('**/api/my/oauthIdentities/bind/complete');
+
 	// 4. The inbox must not overflow horizontally on a phone viewport.
 	const mobile = await context.newPage();
 	await mobile.setViewportSize({ width: 375, height: 812 });

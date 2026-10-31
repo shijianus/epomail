@@ -53,10 +53,17 @@ async function handleBindCallback(c, provider, params, stateRow) {
 	const origin = new URL(c.req.url).origin;
 
 	const finish = (outcome, claimToken = '') => {
+		// The mail app routes on the fragment (`/mail/u/N/#settings/security`).
+		// A bare `/settings/security#oauth_link=...` is rewritten by its custom
+		// history on first load, which drops both the path and the claim before
+		// the settings page can redeem it. Keep the claim inside the fragment
+		// so it is still never sent to a server.
+		const rawIndex = Number(stateRow?.intent?.accountIndex);
+		const accountIndex = Number.isInteger(rawIndex) && rawIndex >= 0 && rawIndex < 100 ? rawIndex : 0;
 		const query = new URLSearchParams({ oauth_bind: outcome });
 		if (stateRow.clientState) query.set('oauth_client_state', stateRow.clientState);
-		const fragment = claimToken ? `#oauth_link=${encodeURIComponent(claimToken)}` : '';
-		return c.redirect(`${origin}/settings/security?${query.toString()}${fragment}`);
+		if (claimToken) query.set('oauth_link', claimToken);
+		return c.redirect(`${origin}/mail/u/${accountIndex}/#settings/security?${query.toString()}`);
 	};
 
 	try {
