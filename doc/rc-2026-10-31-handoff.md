@@ -1,7 +1,9 @@
 # EpoMail Release Convergence Handoff (`release/2026-10-31`)
 
-- **Branch**: `release/2026-10-31`
-- **Final SHA (this stage)**: `a0680e8399f01395725ff9f372032de303cf4e4d` (`a0680e8`) — code/deps/CI/tests
+- **Branch**: `release/2026-10-31` (branched from `origin/master` @ `3e1ef741eb57d77908c1f23ad83e6c0cee9e931d`)
+- **Date**: 2026-10-30
+- **Stage 3 code commit**: `a0680e8399f01395725ff9f372032de303cf4e4d` (`a0680e8`) — deps / CI / tests
+- **Merged parallel session**: `6cd14ff`, `42352a0`, `a1b6599`, `d99c765` (see §2.1)
 - **Previous tip**: `c9039c96d6ef975718d37cfce2b23ba26335887c` (`c9039c9`) — Stage 2 documentation
 - **Stage 1 (Linux, backend)**: `748643a8989c27b0a14dbed4922ed29759092bf0` (`748643a`)
 - **Stage 2 (Windows, frontend/deps/CI/build)**: `b575cce` → `dbba169` (see §4)
@@ -27,7 +29,37 @@ and two executable integration suites that did not exist before.
 | Commit | Scope |
 | :--- | :--- |
 | `a0680e8399f01395725ff9f372032de303cf4e4d` | `fix(release)`: dev-advisory uprems, gitleaks v8 gate repair, `test:serial`, full-stack smoke + browser E2E |
-| _(docs commit)_ | this handoff + `CHECKLIST.log` |
+| `333a3573c9f516ab9be90a5436136626be0dbc83` | `docs(release)`: first write-up of this stage |
+| _(merge commit)_ | integration of the parallel remote session (§2.1) |
+
+### 2.1 Merge with the parallel remote session
+
+While this stage was running, another session pushed four commits to
+`origin/release/2026-10-31` on top of `5162de5`:
+
+- `6cd14ff` — replaced the broken `gitleaks log` call with `gitleaks detect`
+  (same root cause found here independently) and added a pinned
+  `corepack pnpm@10.34.5` + `CI=true` install to `scripts/build-prod.mjs`.
+- `42352a0`, `d99c765` — documentation.
+- `a1b6599` — replaced destructive `DROP TABLE` teardown in the worker specs
+  with row-level `DELETE` (fixes a real parallel-run race) and moved the
+  `security.yml` job to Node 24.14.0 / pnpm 10.34.5.
+
+They were merged, not rebased, so the hashes already recorded in this document
+and in `CHECKLIST.log` stay valid. Conflict resolution:
+
+- **`secret-scanning.yml`** — `gitleaks detect` is a hidden, deprecated alias in
+  v8; this branch keeps `gitleaks git` (the documented command) and the
+  zero-before-SHA branch, because `detect` alone would still fail on a
+  brand-new branch with the invalid `0000..sha` range.
+- **`build-prod.mjs`** — both intents kept: the `cwd`-based runner with the
+  Windows `pnpm.cmd` shim and `--frozen-lockfile`, plus the pinned
+  `corepack pnpm@10.34.5` and `CI=true`. The corepack probe runs the pinned
+  version once, so an offline machine falls back to the local binary instead
+  of failing the build.
+- **`CHECKLIST.log` / this file** — both records kept; the teardown fix and the
+  admin-cleanup SQL below came from the other side.
+
 
 ## 3. Files and modules changed
 
@@ -77,6 +109,13 @@ confirm the plugin swap changes nothing in the output.
 Every one of these was re-validated: `pnpm install --frozen-lockfile` for all
 three apps, both app builds, the login unit tests, the E2E suites, and the
 worker suite.
+
+An earlier note from the merged session listed `basic-ftp` (critical) and
+`lodash` / `dompurify` / `rollup` (high) as an open P0. None of those appear in
+the current audit: `basic-ftp` is not in any of the three lockfiles,
+`dompurify` resolves to 3.4.17 and `lodash` is already past its advisory range
+via the existing override. The table above is the measured state of this tree,
+not a copy of that note.
 
 ### 3.3 Test infrastructure added
 
@@ -192,8 +231,20 @@ of a release branch; it should be scheduled as its own window.
   surface while `EMAIL_OUTBOUND_ENABLED=false` (staging), so they were left.
 
 ### 6.5 Carried over from Stage 1 (unchanged)
+
 - Inspect and disable the pre-existing `admin@epomail.cyou` row in staging /
-  production D1 and delete `auth-uid:<id>` from KV.
+  production D1 and delete `auth-uid:<id>` from KV. Stage 1 code never deletes
+  existing rows, so this is an operator action:
+  ```sql
+  -- 1) Inspect first (read-only)
+  SELECT user_id, email, type, status, is_del FROM user
+   WHERE lower(email) = 'admin@epomail.cyou' OR user_id = 1;
+  -- 2) If it exists, disable login/send without deleting audit or mail history
+  UPDATE user    SET status = 1 WHERE lower(email) = 'admin@epomail.cyou';
+  UPDATE account SET status = 1 WHERE lower(email) = 'admin@epomail.cyou';
+  ```
+  Then `wrangler kv key delete auth-uid:<user_id> --namespace-id <id>` so any
+  live session dies immediately.
 - Reconcile legacy `audit_log` columns, verify disabled providers + outbound
   whitelist, record a D1 export and a Worker rollback rehearsal.
 
@@ -225,6 +276,7 @@ of a release branch; it should be scheduled as its own window.
 # Appendix — Stage 1 (Linux, backend) summary
 
 ## A1. Modules
+
 
 **`a1d0805` — account & init security**
 - `utils/admin-utils.js`: super-admin authority derives only from `env.admin`.
@@ -259,6 +311,16 @@ of a release branch; it should be scheduled as its own window.
 - `service/star-service.js`, `service/resend-service.js`: strict
   `email.userId` scoping, `getUserDb(c)` for webhook writes.
 - `test/mail-pipeline-convergence.spec.js`: 7 end-to-end tests.
+
+## A3. Spec teardown race (from the merged session)
+
+`a1b6599` removed the `DROP TABLE` calls from the worker specs' `afterAll`
+hooks (`user`, `oauth`, `attachments`, …). Under the pool's parallel runtimes a
+teardown could drop a table another file was still using, producing
+non-deterministic "no such table" failures. Row-level `DELETE` keeps each
+file's isolation without touching shared schema. The final suite run recorded
+in §5 includes this change.
+
 
 ## A2. Stage 2 recap
 

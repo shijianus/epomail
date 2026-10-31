@@ -311,11 +311,11 @@ afterAll(async () => {
 	for (const key of ['auth-uid:7', 'auth-uid:8', 'auth-uid:9', 'initial_pwd:7', 'initial_pwd:8', 'initial_pwd:9', 'setting:']) {
 		await env.kv.delete(key);
 	}
-	await env.db.prepare('DROP TABLE IF EXISTS oauth').run();
-	await env.db.prepare('DROP TABLE IF EXISTS oauth_identity_audit').run();
-	await env.db.prepare('DROP TABLE IF EXISTS oauth_bind_claim').run();
-	await env.db.prepare('DROP TABLE IF EXISTS oauth_one_time_credential').run();
-	await env.db.prepare('DROP TABLE IF EXISTS user').run();
+	await env.db.prepare('DELETE FROM oauth').run();
+	await env.db.prepare('DELETE FROM oauth_identity_audit').run();
+	await env.db.prepare('DELETE FROM oauth_bind_claim').run();
+	await env.db.prepare('DELETE FROM oauth_one_time_credential').run();
+	await env.db.prepare('DELETE FROM user WHERE user_id IN (7, 8, 9)').run();
 });
 
 describe('listing linked identities', () => {

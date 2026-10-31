@@ -81,8 +81,8 @@ afterAll(async () => {
 	]) {
 		await env.kv.delete(key);
 	}
-	await env.db.prepare('DROP TABLE IF EXISTS attachments').run();
-	await env.db.prepare('DROP TABLE IF EXISTS oauth').run();
+	await env.db.prepare('DELETE FROM attachments').run();
+	await env.db.prepare('DELETE FROM oauth').run();
 });
 
 function createMockKv() {

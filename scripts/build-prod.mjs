@@ -7,9 +7,23 @@ const rootDir = resolve(__dirname, '..');
 const tempLoginUiDir = join(rootDir, 'temp_login_ui');
 const mailVueDir = join(rootDir, 'mail-vue');
 
-// Windows resolves executables through PATHEXT, so the shim must be named
-// explicitly; POSIX keeps the plain binary.
-const pnpmBin = process.env.EPOMAIL_PNPM || (process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm');
+function resolvePnpm() {
+	if (process.env.EPOMAIL_PNPM) return process.env.EPOMAIL_PNPM;
+	// Pin the package manager so a developer's newer pnpm cannot resolve a
+	// different lockfile than CI. The probe proves corepack can actually reach
+	// the pin; an offline machine falls back to the local binary instead of
+	// failing the build on a network fetch.
+	try {
+		execSync('corepack pnpm@10.34.5 --version', { stdio: 'ignore', env: { ...process.env, CI: 'true' } });
+		return 'corepack pnpm@10.34.5';
+	} catch (_) {
+		// Windows resolves executables through PATHEXT, so the shim must be
+		// named explicitly; POSIX keeps the plain binary.
+		return process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
+	}
+}
+
+const pnpmBin = resolvePnpm();
 
 // Paths travel through `cwd`, never through the command line, so the only
 // thing interpolated below is a fixed flag list. Rejecting whitespace keeps
@@ -18,9 +32,9 @@ function run(cwd, args) {
 	for (const arg of args) {
 		if (/\s/.test(arg)) throw new Error(`[build-prod] 不支持含空白的参数: ${arg}`);
 	}
-	const bin = pnpmBin.includes(' ') ? `"${pnpmBin}"` : pnpmBin;
-	const command = [bin, ...args].join(' ');
-	execSync(command, { cwd, stdio: 'inherit' });
+	const command = [pnpmBin.startsWith('corepack ') || !pnpmBin.includes(' ') ? pnpmBin : `"${pnpmBin}"`, ...args].join(' ');
+	// CI=true stops pnpm from prompting when it thinks a TTY is attached.
+	execSync(command, { cwd, stdio: 'inherit', env: { ...process.env, CI: 'true' } });
 }
 
 // `--frozen-lockfile` is deliberate: a production build must consume the

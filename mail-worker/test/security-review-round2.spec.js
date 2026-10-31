@@ -117,9 +117,6 @@ afterAll(async () => {
 	await cleanupObjectRows();
 	await env.db.prepare('DELETE FROM oauth').run();
 	await clearBindClaim(env.db);
-	await env.db.prepare('DROP TABLE IF EXISTS oauth').run();
-	await env.db.prepare('DROP TABLE IF EXISTS oauth_bind_claim').run();
-	await env.db.prepare('DROP TABLE IF EXISTS attachments').run();
 });
 
 afterEach(() => {

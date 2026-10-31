@@ -47,7 +47,6 @@ describe('Object ownership and capability signing', () => {
 
 	afterAll(async () => {
 		await cleanup();
-		await env.db.prepare('DROP TABLE IF EXISTS attachments').run();
 	});
 
 	afterEach(() => {
