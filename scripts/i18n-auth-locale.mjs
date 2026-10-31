@@ -163,6 +163,7 @@ function walk(dir, files = []) {
 }
 
 const callSites = [];
+const mapRefs = [];
 for (const file of walk(srcDir).filter((file) => !/[\\/]i18n[\\/]/.test(file))) {
   const text = readFileSync(file, 'utf8');
   const pattern = /(?:^|[^\w$.])(t|tr)\(\s*(['"])((?:\\.|(?!\2)[^\\])*)\2/g;
@@ -179,6 +180,14 @@ for (const file of walk(srcDir).filter((file) => !/[\\/]i18n[\\/]/.test(file))) 
       adminKey: name === 'tr' && second ? first : '',
       location: `${rel(file)}:${line}`
     });
+  }
+  // 间接引用：错误码映射表等把词条作为数据传递，稍后才进 t()/tr()
+  // （如 oauth-bind.ts 的 `{ field: 'form', key: 'oauthBindFailed' }`）。
+  const mapPattern = /\bkey:\s*(['"])((?:\\.|(?!\1)[^\\])*)\1/g;
+  let mapMatch;
+  while ((mapMatch = mapPattern.exec(text))) {
+    const mapped = mapMatch[2].replace(/\\(['"\\])/g, '$1');
+    if (mapped) mapRefs.push({ key: mapped, location: `${rel(file)}:${text.slice(0, mapMatch.index).split('\n').length}` });
   }
 }
 
@@ -200,7 +209,10 @@ for (const site of callSites) {
   }
 }
 
-const referencedKeys = new Set(callSites.flatMap((site) => [site.key, site.adminKey]).filter(Boolean));
+const referencedKeys = new Set([
+  ...callSites.flatMap((site) => [site.key, site.adminKey]).filter(Boolean),
+  ...mapRefs.map((ref) => ref.key)
+]);
 const unused = baseline ? Object.keys(baseline).filter((key) => !referencedKeys.has(key)) : [];
 if (unused.length) {
   warn(`字典中存在 ${unused.length} 个代码未引用的词条（可能是历史残留）：${unused.join(', ')}`);
