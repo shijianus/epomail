@@ -160,9 +160,12 @@ app.get('/oauth/providers', async (c) => {
 });
 
 // Public: get OAuth authorization URL for a provider
-app.get('/oauth/authorize/:provider', async (c) => {
-	await rateLimit.check(c, { scope: 'oauth-authorize', limit: 60, windowSeconds: 900 });
+app.get('/oauth/authorize/:provider', async (c, next) => {
 	const provider = c.req.param('provider');
+	if (provider === 'info') {
+		return next();
+	}
+	await rateLimit.check(c, { scope: 'oauth-authorize', limit: 60, windowSeconds: 900 });
 	const redirectUri = c.req.query('redirect_uri') || '';
 	const state = c.req.query('state') || '';
 	const url = await oauthService.getAuthorizeUrl(c, provider, redirectUri, state);
