@@ -11,7 +11,29 @@
 
 ---
 
+### 操作报告抽屉修复：证据链空壳改真实数据 + 原始枚举键本地化 (2026-10-31)
+*   **关联提交 (Git Commit)**: `9195eb1bb786aed00ae3b4bdb2d5fc9c2c37779a` (Short: `9195eb1`)
+*   **部署环境 (Deployment)**: 本地全真栈 (wrangler dev + 本地 D1 审计数据, 端口 8791)；**未执行任何远程部署、未修改生产库**
+*   **任务背景**: 用户检查操作报告页发现「部分证据加载失败、键字有明显问题」，经全真栈复现确认为两处真实缺陷
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 证据链溯源修复（P1）：抽屉"证据"Tab 的 `currentEvidenceChain` 为 `computed(() => [])` 空壳，永远渲染空白；重写为仅由数据库真实字段（event_type、report/ban/appeal reason、detail_text、evidence_summary、ip/geo、device/fingerprint、cluster_accounts、alarm_count、evidence_expires_days）派生的证据清单，字段缺失逐行隐藏，全空时展示 i18n 空态，不编造哈希/统计
+    - [x] 移除伪造界面（P1）：删除硬编码"已裁决样本 0 例·统计窗口 近 90 天"的相似案例假统计，替换为诚实空态（后端无同类裁决统计接口）
+    - [x] 空态补齐（P2）：时间线为空、遥测指标为空时给出明确 i18n 空态说明，不再呈现为"加载失败"式空白；关联账号依据列删除"同一设备指纹 · 关联集群"编造兜底；证据留存天数删除硬编码 180 天默认值
+    - [x] 键字本地化（P1）：触发原因标签（12 种 event_type）与推荐处置标签（9 种 recommended_action，含入库值 `none`）原样输出原始英文枚举，新增 6 语言映射；清除抽屉全部用户可见硬编码中文（泳道短表头/N 条/展开折叠/N 分权重/AUDIT_LOG_ARCHIVE 横幅/N 天等）
+    - [x] 渲染缺陷修复（P1）：模板引用脚本中不存在的 `riskScoreLevelClass`、`enrichedRiskMetrics`，补齐真实定义（matchScore 分级着色 score-danger/warning/success）
+    - [x] 新增 38 组 i18n 键（auditEvidenceItem*/auditEventType*/auditAction* 等），六语言字典 100% 对称
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：mail-vue `vite build` 通过（1m28s，零警告零报错）
+    - [x] 静态门禁：i18n 三件套全绿（symmetry 6 语言 identical；audit 零缺失、2182 字面量键；hardcoded 抽屉用户可见命中清零，仅剩注释）
+    - [x] 回归套件：`mail-worker` vitest **17/17 文件、209/209 断言**全绿
+    - [x] 浏览器全真栈实测（Playwright）：概览 Tab 触发标签"multi_account_ban→一人多號封禁"、推荐"none→無需處置"；证据 Tab 对有数据案（MULTI99）呈现 8 行真实证据（含證據摘要 Jaccard 0.84、集群關聯賬號 3 個），对无数据案（ZS88K1）呈现真实可得字段；调查 Tab 时间线/遥测空态正常；综合风险分按 matchScore 真实着色；控制台零报错
+    - [x] 零假数据残留：验证用本地 D1 使用独立 `--persist-to` 目录并整体删除；临时验证脚本/截图/日志/种子 SQL 已物理清理；本地开发库测试密码仅存在于本机 `.wrangler` 状态，未入库未提交
+
+
+---
+
 ### 非阻断项收敛优化：根目录过程产物清理、i18n 死词条清除与门禁增强、Worker 日志收敛 (2026-10-31)
+
 *   **关联提交 (Git Commit)**: `55bf5d1632b60955c0b3920fe2689584233a615a` (`55bf5d1` 仓库瘦身)、`022148e612bd3ee59b783132fe5f4390dc06a4b2` (`022148e` i18n)、`b20da150b5c3309078ad909cc13bb79763aaa364` (`b20da15` worker 日志)；文档提交即本条目所在提交（`git rev-parse HEAD`）
 *   **部署环境 (Deployment)**: 本地全量回归；**未执行任何远程部署、未修改生产库**
 *   **功能需求与变更清单 (Changes & Feature Alignment)**:
