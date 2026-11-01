@@ -11,6 +11,23 @@
 
 ---
 
+### 真实浏览器交互补验：表单登录、审计详情、访客脱敏与退出 (2026-11-02)
+*   **关联提交 (Git Commit)**: `d024ff4c3d7a8317cede092c12e3c31f79e02e46` (Short: `d024ff4`)
+*   **部署环境 (Deployment)**: 两次独立本地全真栈 `wrangler dev --local`，随机 JWT/TOTP/邮件密钥、临时 D1/KV、外发关闭；**未部署、未访问生产、未推送**。
+*   **真实浏览器核验 (Browser Verification)**:
+    - [x] 站长真实表单登录：在浏览器可见且入场动画完成后填写邮箱/密码，通过真实 `type=submit` 表单事件提交，页面跳转 `/mail/u/0/#inbox`，会话写入 `token` 与 `epo_sessions`。
+    - [x] 站长审计页：真实进入 `/manage/admin/audit`，实际点击工单“查看详情”，打开总览与“证据”Tab；D1 哨兵 `PRIVATE-AUDIT-LOCAL-ONLY details/evidence/staff` 在管理员详情中可见，证明未使用 mock 响应。
+    - [x] 访客真实表单登录：清空旧多账号缓存后填写访客邮箱/密码并真实提交，跳转 `/mail/u/0/#inbox`；公开审计页显示隐私脱敏提示，列表不出现内部哨兵。
+    - [x] 访客公开详情：实际点击“查看详情”，仅显示公开说明、脱敏邮箱/用户 ID、状态、公开截止时间和 `SecAdmin`；内部 detail/evidence/staff 哨兵未出现，证据/调查 Tab 不向访客开放。
+    - [x] 移动端：访客详情及列表在 `375×812` viewport 下实际渲染，`document.documentElement.scrollWidth === innerWidth === 375`，无横向溢出；已保存移动详情验收截图。
+    - [x] 真实退出：访客头像菜单在等待展开动画完成后实际点击“退出”，页面回到 `/login/`，`localStorage.token` 与 `localStorage.epo_sessions` 均为 `null`；退出后再次访问审计路由被重定向回登录页。
+    - [x] 临时栈与数据清理：两次浏览器回归栈均输出 `cleanup complete`；随机账号、D1/KV 状态、`.dev.vars`、临时目录和元数据文件均已确认不存在。
+*   **边界说明**:
+    - IAB 在页面隐藏或 Element Plus 菜单 `scaleY(0)` 入场动画尚未推进时，早期语义点击曾超时；该次不计为通过。恢复可见、等待动画完成后，真实表单提交、详情点击和访客退出均成功。
+    - 公开详情中的“空建议徽标/默认占位”属于现有 UI 语义问题，本次未扩大范围；敏感数据边界已通过真实响应和 DOM 核验。
+
+---
+
 ### 远端同步与安全边界、审计隐私、i18n 和本地全栈门禁完善 (2026-11-02)
 *   **关联提交 (Git Commit)**: `d024ff4c3d7a8317cede092c12e3c31f79e02e46` (Short: `d024ff4`)
 *   **部署环境 (Deployment)**: 本地全真栈 / Node 24.14.0 / pnpm 10.34.5；**未部署、未推送、未访问生产数据、未修改独立 EpomailDocs 仓库**。
