@@ -2,6 +2,7 @@ import axios from "axios";
 import router from "@/router";
 import i18n from "@/i18n/index.js";
 import {useSettingStore} from "@/store/setting.js";
+import {useUiStore} from "@/store/ui.js";
 import {forceLogoutToLogin} from "@/utils/auth.js";
 
 let http = axios.create({
@@ -24,9 +25,7 @@ http.interceptors.response.use((res) => {
         const data = res.data
 
         if (res.config.url?.includes('/email/list') || res.config.url?.includes('/email/latest')) {
-            import('@/store/ui.js').then(({useUiStore}) => {
-                useUiStore().lastSyncTime = Date.now()
-            }).catch(() => {})
+            useUiStore().lastSyncTime = Date.now()
         }
 
         // 无论是否配置了 noMsg（长轮询/静默请求等），401 凭证过期均必须强制退回登录界面

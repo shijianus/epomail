@@ -102,6 +102,9 @@ jobs:
       - name: Login sub-app dictionary gate (symmetry / duplicates / missing / code refs)
         run: node scripts/i18n-auth-locale.mjs
 
+      - name: i18n gate regression tests (positive and negative fixtures)
+        run: node --test tests/test-i18n-gates.mjs
+
   login-ui:
     name: Login UI (typecheck + unit tests + build)
     runs-on: ubuntu-latest
@@ -203,11 +206,17 @@ jobs:
       - name: Worker test suite
         run: pnpm --dir mail-worker test
 
+      - name: Isolated stack lifecycle tests
+        run: node --test tests/helpers/local-stack.test.mjs
+
       # wrangler.toml 的 [build] 钩子会执行 scripts/build-prod.mjs（先 temp_login_ui 后 mail-vue），
       # 因此该步骤同时验证了真实部署路径的可构建性；dry-run 不连接 Cloudflare 账户、不上传任何产物。
       - name: Wrangler deploy dry-run
         working-directory: mail-worker
         run: pnpm exec wrangler deploy --dry-run --outdir "$RUNNER_TEMP/worker-dry-run"
+
+      - name: Cold-start full-stack smoke (local D1/KV, disposable secrets)
+        run: node tests/fullstack-smoke.mjs
 
   mail-vue-build:
     name: mail-vue production build
@@ -241,3 +250,6 @@ jobs:
 
       - name: Vite production build
         run: pnpm --dir mail-vue run build
+
+      - name: UI localization behavior regression tests
+        run: node --test tests/ui-localization.test.mjs

@@ -902,9 +902,11 @@ const passwordChangedText = computed(() => {
     const month = d.getMonth() + 1
     const day = d.getDate()
     const isZhLang = settingStore.lang === 'zh' || settingStore.lang === 'zh-Hant'
-    const formatted = isZhLang
-      ? `${year}年${month}月${day}日`
-      : `${year}-${month < 10 ? '0' + month : month}-${day < 10 ? '0' + day : day}`
+    const formatted = t('dateYmdDisplay', {
+      year,
+      month: isZhLang ? month : String(month).padStart(2, '0'),
+      day: isZhLang ? day : String(day).padStart(2, '0')
+    })
     return t('lastChangedAt', { time: formatted })
   } catch (e) {
     return t('lastChangedAt', { time: ts })
@@ -1745,7 +1747,7 @@ const handleActivateTimelock = async (key) => {
     await fetchTotpStatus();
   } catch (err) {
     ElMessage({
-      message: err.message || '转正失败',
+      message: err.message || t('passkeyActivationFailed'),
       type: 'error',
       plain: true
     });

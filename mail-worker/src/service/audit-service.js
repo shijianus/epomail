@@ -34,16 +34,33 @@ function desensitizeEmail(email) {
 	return `${name.slice(0, 2)}***${name.slice(-1)}@${domain}`;
 }
 
-function desensitizeIp(ip) {
-	if (!ip || typeof ip !== 'string') return '';
-	if (ip.includes('.')) {
-		const parts = ip.split('.');
-		if (parts.length === 4) return `${parts[0]}.${parts[1]}.*.*`;
-	} else if (ip.includes(':')) {
-		const parts = ip.split(':');
-		if (parts.length >= 2) return `${parts[0]}:${parts[1]}:****:****`;
-	}
-	return '***';
+// Public record table + drawer summary only. Never spread a case into this DTO:
+// free-text reasons, telemetry, staff identities and nested evidence/appeal data
+// are private even when the case is closed. New case fields stay private by default.
+function toVisitorAuditRecord(item) {
+	return {
+		id: item.id,
+		ticketId: item.ticketId,
+		ticketNo: item.ticketNo,
+		email: desensitizeEmail(item.email),
+		warningType: item.warningType,
+		eventType: item.eventType,
+		category: item.category,
+		reportCategory: item.reportCategory ?? null,
+		riskLevel: item.riskLevel,
+		priority: item.priority,
+		status: item.status,
+		identityGroup: item.identityGroup,
+		createTime: item.createTime,
+		banTime: item.banTime,
+		resolvedTime: item.resolvedTime ?? null,
+		processTime: item.processTime,
+		updateCount: item.updateCount,
+		lastUpdated: item.lastUpdated,
+		reasonCode: item.reasonCode,
+		publicReason: item.reasonCode || item.reportCategory || item.eventType || null,
+		publicDeadline: item.deadline || item.expireTime || null
+	};
 }
 
 function assertValidCaseState(caseRow) {
@@ -876,22 +893,6 @@ const auditService = {
 				appealHistory: appealHistoryMap.get(Number(row.id)) || []
 			};
 
-			if (visitorMode) {
-				item.email = desensitizeEmail(item.email);
-				item.ip = desensitizeIp(item.ip);
-				item.baseIp = '';
-				item.baseGeo = '';
-				item.baseDevice = '';
-				item.baseFingerprint = '';
-				item.fingerprint = '';
-				item.clusterAccounts = [];
-				item.clusterCount = 1;
-				item.isCluster = false;
-				if (item.detailText) {
-					item.detailText = item.detailText.replace(/\[审核备忘\]:[^\n]*/g, '').trim();
-				}
-			}
-
 			return item;
 		});
 
@@ -1015,7 +1016,8 @@ const auditService = {
 		if (visitorMode) {
 			const recordCount = counts?.record || counts?.banned || processedList.length;
 			return {
-				list: processedList,
+				// Project only at the response boundary, after all server-side filters.
+				list: processedList.map(toVisitorAuditRecord),
 				total: total ?? processedList.length,
 				counts: {
 					record: recordCount,

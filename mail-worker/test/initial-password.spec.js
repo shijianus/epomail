@@ -300,10 +300,11 @@ describe('session provenance', () => {
 
 		await loginService.login(c, {
 			email: EMAIL,
-			password: null,
-			authMethod: 'oauth',
-			authProvider: 'apple'
-		}, true);
+			password: null
+		}, true, {
+			method: 'oauth',
+			provider: 'apple'
+		});
 
 		const authInfo = await kv.get(KvConst.AUTH_INFO + USER_ID, { type: 'json' });
 		expect(authInfo.tokens).toHaveLength(1);

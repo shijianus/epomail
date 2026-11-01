@@ -2842,7 +2842,9 @@ function getRiskDeadlineInfo(row) {
   // 2. 截止期限：若手动延期处置则使用 row.deadline / row.expireTime，
   // 否则按“发现后 14 天内完成审计”基准计算
   let deadlineTime = null;
-  if (row.detailText && row.detailText.includes('[延期处置]') && (row.deadline || row.expireTime)) {
+  if (row.publicDeadline) {
+    deadlineTime = row.publicDeadline;
+  } else if (row.detailText && row.detailText.includes('[延期处置]') && (row.deadline || row.expireTime)) {
     deadlineTime = row.deadline || row.expireTime;
   } else if (baseTime) {
     deadlineTime = tzDayjs(baseTime).add(14, 'day').toISOString();
@@ -3950,7 +3952,7 @@ async function handleBatchExtend() {
             targetEmail: row.email,
             extendDays: days,
             expireTime: newExpire,
-            notes: `批量延期: ${days}d`
+            notes: `${t('auditBatchExtend')}: ${days}d`
           });
           row.expireTime = newExpire;
         } catch (err) {

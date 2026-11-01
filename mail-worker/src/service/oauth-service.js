@@ -743,10 +743,11 @@ const oauthService = {
 
 		const loginResult = await loginService.login(c, {
 			email: userRow.email,
-			password: null,
-			authMethod: 'oauth',
-			authProvider: providerKey
-		}, true);
+			password: null
+		}, true, {
+			method: 'oauth',
+			provider: providerKey
+		});
 		return { userInfo: oauthRow, ...splitLoginResult(loginResult) };
 	},
 
@@ -1039,10 +1040,11 @@ const oauthService = {
 		try {
 			const loginResult = await loginService.login(c, {
 				email,
-				password: null,
-				authMethod: 'oauth',
-				authProvider: boundProvider || undefined
-			}, true);
+				password: null
+			}, true, {
+				method: 'oauth',
+				provider: boundProvider || null
+			});
 			return { userInfo: oauthRow, ...splitLoginResult(loginResult) }
 		} catch (err) {
 			console.error('OAuth binding committed but session creation failed:', err);

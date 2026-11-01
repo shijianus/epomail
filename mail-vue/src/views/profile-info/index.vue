@@ -397,7 +397,7 @@
           </label>
           <el-input
             v-model="newPhoneNumber"
-            :placeholder="selectedCountryMeta.placeholder ? ((langSelect === 'zh' || langSelect === 'zh-Hant') ? `如: ${selectedCountryMeta.placeholder}` : `e.g. ${selectedCountryMeta.placeholder}`) : ($t('phoneNumber'))"
+            :placeholder="selectedCountryMeta.placeholder ? $t('phoneNumberExample', { number: selectedCountryMeta.placeholder }) : $t('phoneNumber')"
             clearable
             class="phone-number-input"
             @input="onPhoneInput"
@@ -666,9 +666,12 @@ const passwordChangedText = computed(() => {
     const year = d.getFullYear()
     const month = d.getMonth() + 1
     const day = d.getDate()
-    const formatted = (langSelect.value === 'zh' || langSelect.value === 'zh-Hant')
-      ? `${year}年${month}月${day}日`
-      : `${year}-${month < 10 ? '0' + month : month}-${day < 10 ? '0' + day : day}`
+    const isZhLang = langSelect.value === 'zh' || langSelect.value === 'zh-Hant'
+    const formatted = t('dateYmdDisplay', {
+      year,
+      month: isZhLang ? month : String(month).padStart(2, '0'),
+      day: isZhLang ? day : String(day).padStart(2, '0')
+    })
     return t('lastChangeTime', { time: formatted })
   } catch (e) {
     return t('lastChangeTime', { time: ts })
@@ -701,9 +704,12 @@ function formatBirthdayDisplay(bday) {
   try {
     const parts = bday.split('-')
     if (parts.length === 3) {
-      return (langSelect.value === 'zh' || langSelect.value === 'zh-Hant')
-        ? `${parts[0]}年${Number(parts[1])}月${Number(parts[2])}日`
-        : `${parts[0]}-${parts[1]}-${parts[2]}`
+      const isZhLang = langSelect.value === 'zh' || langSelect.value === 'zh-Hant'
+      return t('dateYmdDisplay', {
+        year: parts[0],
+        month: isZhLang ? Number(parts[1]) : parts[1],
+        day: isZhLang ? Number(parts[2]) : parts[2]
+      })
     }
   } catch (e) {}
   return bday
@@ -893,6 +899,26 @@ function onCountryChange() {
   onPhoneInput(newPhoneNumber.value)
 }
 
+function getPhoneValidationMessage(result) {
+  const messageKeys = {
+    REQUIRED: 'phoneValidationRequired',
+    NO_DIGITS: 'phoneValidationNoDigits',
+    TOO_SHORT: 'phoneValidationTooShort',
+    TOO_LONG: 'phoneValidationTooLong',
+    INVALID_LENGTH: 'phoneValidationInvalidLength',
+    INVALID_COUNTRY: 'phoneValidationInvalidCountry',
+    COUNTRY_LENGTH: 'phoneValidationCountryLength',
+    INVALID_FORMAT: 'phoneValidationInvalidFormat',
+    INVALID_NUMBER: 'phoneValidationInvalidNumber'
+  }
+  const params = { ...result.params }
+  if (params.countryCode) {
+    const country = ISO_COUNTRIES.find(item => item.code === params.countryCode)
+    params.country = getCountryDisplayName(country, langSelect.value) || params.countryCode
+  }
+  return t(messageKeys[result.errorCode] || 'phoneValidationInvalidNumber', params)
+}
+
 function onPhoneInput(val) {
   let digits = (val || '').replace(/\D/g, '')
   const prevDigits = (lastPhoneValue || '').replace(/\D/g, '')
@@ -923,7 +949,7 @@ function onPhoneInput(val) {
 
   const res = validatePhoneNumber(newPhoneCountry.value, digits)
   if (!res.valid) {
-    phoneValidationError.value = langSelect.value === 'en' ? res.msgEn : res.msgZh
+    phoneValidationError.value = getPhoneValidationMessage(res)
     phoneValidationSuccess.value = false
   } else {
     phoneValidationError.value = ''
@@ -935,7 +961,7 @@ async function saveNewPhone() {
   const cleanNum = (newPhoneNumber.value || '').replace(/\D/g, '')
   const res = validatePhoneNumber(newPhoneCountry.value, cleanNum)
   if (!res.valid) {
-    phoneValidationError.value = langSelect.value === 'en' ? res.msgEn : res.msgZh
+    phoneValidationError.value = getPhoneValidationMessage(res)
     ElMessage.error(phoneValidationError.value)
     return
   }
@@ -1006,61 +1032,27 @@ function formatAddressDisplay(addr) {
 }
 
 function getCityPlaceholder() {
-  const c = addressForm.value.country
-  if (langSelect.value === 'zh-Hant') {
-    if (c === 'HK') return '如: 中環 / 銅鑼灣 / 尖沙咀 / 旺角等'
-    if (c === 'MO') return '如: 新口岸 / 氹仔市區 / 黑沙環等'
-    if (c === 'TW') return '如: 信義區 / 大安區 / 板橋區等'
-    if (c === 'CN') return '如: 朝陽區 / 海淀區 / 天河區等'
-    return '城市或地區名稱'
+  const keys = {
+    HK: 'addressCityPlaceholderHK',
+    MO: 'addressCityPlaceholderMO',
+    TW: 'addressCityPlaceholderTW',
+    CN: 'addressCityPlaceholderCN'
   }
-  if (langSelect.value === 'zh') {
-    if (c === 'HK') return '如: 中环 / 铜锣湾 / 尖沙咀 / 旺角等'
-    if (c === 'MO') return '如: 新口岸 / 氹仔市区 / 黑沙环等'
-    if (c === 'TW') return '如: 信义区 / 大安区 / 板桥区等'
-    if (c === 'CN') return '如: 朝阳区 / 海淀区 / 天河区等'
-    return '城市或地区名称'
-  }
-  if (c === 'HK') return 'e.g. Central, Causeway Bay, Tsim Sha Tsui'
-  if (c === 'MO') return 'e.g. NAPE, Taipa Central, Areia Preta'
-  if (c === 'TW') return 'e.g. Xinyi Dist., Da-an Dist.'
-  if (c === 'CN') return 'e.g. Chaoyang Dist., Haidian Dist.'
-  return 'City or local area'
+  return t(keys[addressForm.value.country] || 'addressCityPlaceholder')
 }
 
 function getSubdivisionLabel() {
-  const c = addressForm.value.country
-  if (langSelect.value === 'zh-Hant') {
-    if (c === 'HK') return '區議會分區 (18區)'
-    if (c === 'MO') return '堂區 (8堂區)'
-    if (c === 'TW') return '縣市 (22縣市)'
-    if (c === 'CN') return '省份 / 直轄市 / 自治區'
-    if (c === 'JP') return '都道府縣'
-    if (c === 'US') return '州 (State)'
-    if (c === 'GB') return '大區 / 郡 (Region / County)'
-    if (c === 'SG') return '規劃分區'
-    return '省份 / 州 / 區域'
+  const keys = {
+    HK: 'addressSubdivisionHK',
+    MO: 'addressSubdivisionMO',
+    TW: 'addressSubdivisionTW',
+    CN: 'addressSubdivisionCN',
+    JP: 'addressSubdivisionJP',
+    US: 'addressSubdivisionUS',
+    GB: 'addressSubdivisionGB',
+    SG: 'addressSubdivisionSG'
   }
-  if (langSelect.value === 'zh') {
-    if (c === 'HK') return '区议会分区 (18区)'
-    if (c === 'MO') return '堂区 (8堂区)'
-    if (c === 'TW') return '县市 (22县市)'
-    if (c === 'CN') return '省份 / 直辖市 / 自治区'
-    if (c === 'JP') return '都道府县'
-    if (c === 'US') return '州 (State)'
-    if (c === 'GB') return '大区 / 郡 (Region / County)'
-    if (c === 'SG') return '规划分区'
-    return '省份 / 州 / 区域'
-  }
-  if (c === 'HK') return 'District (18 Districts)'
-  if (c === 'MO') return 'Parish'
-  if (c === 'TW') return 'City / County'
-  if (c === 'CN') return 'Province / Municipality'
-  if (c === 'JP') return 'Prefecture'
-  if (c === 'US') return 'State'
-  if (c === 'GB') return 'Region / County'
-  if (c === 'SG') return 'Planning Region'
-  return 'State / Province / Region'
+  return t(keys[addressForm.value.country] || 'addressSubdivision')
 }
 
 function openAddressModal(type) {

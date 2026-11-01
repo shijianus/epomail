@@ -485,7 +485,7 @@
               </div>
 
               <div class="app-origin-row" v-if="grant.homepageUrl">
-                <a :href="grant.homepageUrl" target="_blank" class="app-host-link" title="访问该应用官方网站">
+                <a :href="grant.homepageUrl" target="_blank" class="app-host-link" :title="$t('visitAppWebsite')">
                   <span>{{ getHostname(grant.homepageUrl) }}</span>
                   <Icon icon="lucide:external-link" width="11" height="11" class="ext-ic" />
                 </a>
@@ -966,7 +966,8 @@ defineOptions({
 const route = useRoute()
 const { t } = useI18n()
 
-const SAMPLE_APP_SEED_DESC = 'EpoCanvas / shijianus 博客原生集成示例应用（官方内置示例，站长可随时修改或直接删除）';
+// Match the stored seed text independently of the active UI language.
+const SAMPLE_APP_SEED_DESC = t('sampleAppDesc', {}, { locale: 'zh' });
 function localizedGrantDesc(desc) {
   if (!desc) return '';
   return desc.trim() === SAMPLE_APP_SEED_DESC ? t('sampleAppDesc') : desc;

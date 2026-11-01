@@ -212,7 +212,7 @@
               effect="light"
               class="subject-label-tag"
             >
-              {{ lbl }}
+              {{ getLabelDisplayName(lbl, t) }}
             </el-tag>
           </div>
         </div>
@@ -1303,28 +1303,28 @@ function canSendReaction(msg) {
 }
 
 const currentEmojiCat = ref(0);
-const emojiCategories = [
+const emojiCategories = computed(() => [
   {
-    name: '常用',
+    name: t('emojiCategoryCommon'),
     icon: 'fluent:sparkle-16-regular',
     emojis: ['👍', '❤️', '🎉', '👏', '😂', '🔥', '🚀', '👀']
   },
   {
-    name: '表情',
+    name: t('emojiCategoryFaces'),
     icon: 'fluent:emoji-20-regular',
     emojis: ['😀', '😊', '🥰', '😎', '🤔', '🥳', '😅', '😇', '😍', '🤩', '🤗', '😋', '😜', '🧐', '😴', '🙄']
   },
   {
-    name: '手势',
+    name: t('emojiCategoryGestures'),
     icon: 'fluent:hand-wave-20-regular',
     emojis: ['👌', '✌️', '💪', '🙏', '🤝', '🙌', '🫡', '✍️', '👍', '👎', '👊', '🤞', '👋', '🫶', '👐', '🖖']
   },
   {
-    name: '标志',
+    name: t('emojiCategorySymbols'),
     icon: 'fluent:star-20-regular',
     emojis: ['✨', '💯', '⭐', '💡', '🎯', '📌', '✅', '☕', '🍻', '💖', '🌈', '⚡', '🏆', '💎', '🔔', '🎈']
   }
-];
+]);
 
 function changeStar() {
   if (email.isStar) {
@@ -2096,7 +2096,7 @@ const handleReportNotSpam = (emailId) => {
   isReporting.value = true;
   emailReportNotSpam(targetId).then(() => {
     ElMessage({
-      message: '已移至收件箱并加入信任名单',
+      message: t('reportNotSpamSuccess'),
       type: 'success',
       plain: true,
     })

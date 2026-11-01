@@ -36,7 +36,20 @@ export const BUILTIN_LABEL_MAP = {
   '待办': 'todoTag',
   '待辦': 'todoTag',
   'to-do': 'todoTag',
-  'todo': 'todoTag'
+  'todo': 'todoTag',
+  // Persisted built-in identifiers stay unchanged; only their display names are translated.
+  '黑名单': 'blacklist',
+  '黑名單': 'blacklist',
+  '个人拦截': 'labelPersonalBlock',
+  '個人攔截': 'labelPersonalBlock',
+  '自动删除': 'labelAutoDelete',
+  '自動刪除': 'labelAutoDelete',
+  '已静音': 'labelMuted',
+  '已靜音': 'labelMuted',
+  '已归档': 'archiveSuccess',
+  '已歸檔': 'archiveSuccess',
+  '任务待办': 'todoTag',
+  '任務待辦': 'todoTag'
 };
 
 /**

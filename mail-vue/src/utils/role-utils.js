@@ -4,6 +4,8 @@
  * and management console navigation & access control.
  */
 
+import i18n from '@/i18n/index.js';
+
 export const MANAGE_PERMISSIONS = [
     'all-email:query',
     'user:query',
@@ -52,13 +54,14 @@ export function getRoleGroupSlug(user) {
  * Get human-readable role group display name
  */
 export function getRoleGroupName(user, t) {
-    if (!user) return '站长';
+    const translate = typeof t === 'function' ? t : i18n.global.t;
+    if (!user) return translate('roleMaster');
     const slug = getRoleGroupSlug(user);
     if (slug === 'admin') {
-        return t ? (t('roleMaster') || '站长') : '站长';
+        return translate('roleMaster');
     }
     if (slug === 'moderator') {
-        return t ? (t('roleModerator') || '协管者') : '协管者';
+        return translate('roleModerator');
     }
     return user?.role?.name || slug;
 }

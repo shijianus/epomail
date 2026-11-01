@@ -28,7 +28,7 @@ export function forceLogoutToLogin(message) {
 
   clearAuthStorage({ preserveEmail: true });
 
-  const expiredMsg = message || (i18n?.global?.t ? i18n.global.t('authExpired') : '') || '登录凭证已过期，请重新登录';
+  const expiredMsg = message || i18n.global.t('authExpired');
 
   try {
     sessionStorage.setItem('auth_expired_msg', expiredMsg);

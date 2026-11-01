@@ -4370,7 +4370,7 @@ const saveAiHubConfig = (closeDialog = true) => {
   if (isCustom && modelsToTest.length === 0) {
     ElMessage({
       type: 'warning',
-      message: '请选择或键入至少一个主推理模型或模型池模型',
+      message: t('aiModelSelectionRequired'),
       plain: true
     })
     return
@@ -6308,25 +6308,16 @@ function getScenarioLabel() {
 
 function getScenarioPlaceholder() {
   const lang = currentEditingLang.value || 'zh'
-  const placeholders = {
-    zh: {
-      loginSuccess: '成功连结节点',
-      registerSuccess: '节点创建成功',
-      invalidCredentials: '填写的坐标不存在',
-      passwordMismatch: '请确认前后坐标一致',
-      noLandingNodes: '当前没有可着陆的节点',
-      noNewNodes: '当前没有可以探索的新节点，请联系舰长改变航道'
-    },
-    en: {
-      loginSuccess: 'Node Link Established',
-      registerSuccess: 'Node Successfully Created',
-      invalidCredentials: 'Specified coordinates do not exist',
-      passwordMismatch: 'Please ensure coordinates match',
-      noLandingNodes: 'No landing nodes available',
-      noNewNodes: 'No new nodes to explore, please contact the captain'
-    }
+  const keys = {
+    loginSuccess: 'authPlaceholderLoginSuccess',
+    registerSuccess: 'authPlaceholderRegisterSuccess',
+    invalidCredentials: 'authPlaceholderInvalidCredentials',
+    passwordMismatch: 'authPlaceholderPasswordMismatch',
+    noLandingNodes: 'authPlaceholderNoLandingNodes',
+    noNewNodes: 'noNewNodesPlaceholder'
   }
-  return placeholders[lang]?.[selectedScenario.value] || ''
+  const key = keys[selectedScenario.value]
+  return key && ['zh', 'en'].includes(lang) ? t(key, {}, { locale: lang }) : ''
 }
 
 function getPreviewToastText() {

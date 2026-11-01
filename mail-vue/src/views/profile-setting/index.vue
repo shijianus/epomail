@@ -871,10 +871,10 @@ const priorityConfig = reactive({
 const customizeMultipleShow = ref(false)
 const multipleConfig = reactive({
   panels: [
-    { query: 'is:starred', title: '星标邮件' },
-    { query: 'is:unread', title: '未读邮件' },
-    { query: 'has:attachment', title: '含附件' },
-    { query: 'label:work', title: '工作' }
+    { query: 'is:starred', title: t('starredMail') },
+    { query: 'is:unread', title: t('unreadEmails') },
+    { query: 'has:attachment', title: t('hasAttachments') },
+    { query: 'label:work', title: t('labelWork') }
   ],
   position: 'right'
 })

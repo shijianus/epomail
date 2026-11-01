@@ -18,70 +18,10 @@
  *
  * Usage: node tests/fullstack-browser-e2e.mjs
  */
-import { spawn, execFileSync } from 'node:child_process';
-import { createServer } from 'node:net';
-import fs from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
 import assert from 'node:assert/strict';
-import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
+import { withLocalStack } from './helpers/local-stack.mjs';
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const workerDir = path.join(root, 'mail-worker');
-const pnpmBin = process.env.EPOMAIL_PNPM || (process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm');
-
-function readSecret(name) {
-	if (process.env[name]) return process.env[name];
-	const varsFile = path.join(workerDir, '.dev.vars');
-	if (!fs.existsSync(varsFile)) return '';
-	const line = fs.readFileSync(varsFile, 'utf8')
-		.split(/\r?\n/)
-		.find(row => row.trim().startsWith(`${name}=`));
-	if (!line) return '';
-	return line.slice(line.indexOf('=') + 1).trim().replace(/^["']|["']$/g, '');
-}
-
-function freePort() {
-	return new Promise((resolve, reject) => {
-		const srv = createServer();
-		srv.once('error', reject);
-		srv.listen(0, '127.0.0.1', () => {
-			const { port } = srv.address();
-			srv.close(() => resolve(port));
-		});
-	});
-}
-
-async function waitFor(url, timeoutMs = 180000) {
-	const started = Date.now();
-	while (Date.now() - started < timeoutMs) {
-		try {
-			const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
-			if (res.status < 500) return;
-		} catch (_) {}
-		await new Promise(r => setTimeout(r, 1000));
-	}
-	throw new Error(`timed out waiting for ${url}`);
-}
-
-const jwtSecret = readSecret('jwt_secret');
-if (!jwtSecret) {
-	console.error('BLOCKED: jwt_secret is not present in the environment or mail-worker/.dev.vars');
-	process.exit(2);
-}
-if (!fs.existsSync(path.join(workerDir, 'dist', 'index.html'))) {
-	console.error('BLOCKED: mail-worker/dist is missing; run `node scripts/build-prod.mjs` first');
-	process.exit(2);
-}
-
-const persistDir = fs.mkdtempSync(path.join(os.tmpdir(), 'epomail-browser-'));
-const port = await freePort();
-const base = `http://127.0.0.1:${port}`;
-
-let child;
-let browser;
-let serverLog = '';
 const results = [];
 const failures = [];
 function check(name, fn) {
@@ -95,24 +35,7 @@ function check(name, fn) {
 	}
 }
 
-try {
-	child = spawn(pnpmBin, [
-		'exec', 'wrangler', 'dev',
-		'--config', 'wrangler-dev.toml',
-		'--ip', '127.0.0.1',
-		'--port', String(port),
-		'--persist-to', persistDir,
-		'--var', 'EMAIL_OUTBOUND_ENABLED:false',
-		'--var', 'ENVIRONMENT:smoke'
-	], {
-		cwd: workerDir,
-		stdio: ['ignore', 'pipe', 'pipe'],
-		shell: process.platform === 'win32',
-		env: { ...process.env, CI: '1' }
-	});
-	child.stdout.on('data', d => { serverLog += d.toString(); });
-	child.stderr.on('data', d => { serverLog += d.toString(); });
-	await waitFor(`${base}/login/`);
+async function runBrowserChecks({ base, jwtSecret, addCleanup }) {
 
 	const init = await fetch(`${base}/api/init`, {
 		method: 'POST',
@@ -123,7 +46,8 @@ try {
 	const password = (initBody.match(/Initial admin password:\s*(\S+)/) || [])[1];
 	assert.ok(password, 'init did not return the one-time admin password');
 
-	browser = await chromium.launch({ headless: true });
+	const browser = await chromium.launch({ headless: true });
+	addCleanup(() => browser.close());
 	const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
 	const page = await context.newPage();
 
@@ -262,35 +186,14 @@ try {
 		assert.deepEqual(serious, [], serious.join(' | '));
 	});
 
+}
+
+try {
+	await withLocalStack(runBrowserChecks);
 	console.log(results.join('\n'));
-	console.log(`\n${results.length}/${results.length} browser checks passed`);
+	console.log(`\n${results.length}/${results.length} browser checks passed (cleanup complete)`);
 } catch (err) {
 	if (results.length) console.log(results.join('\n'));
-	if (serverLog) {
-		const tail = serverLog.split(/\r?\n/).slice(-20).join('\n');
-		console.error(`\n[server tail]\n${tail}`);
-	}
 	console.error(`\nFAILED: ${err.message}`);
 	process.exitCode = 1;
-} finally {
-	try { if (browser) await browser.close(); } catch (_) {}
-	if (child && child.pid) {
-		try {
-			if (process.platform === 'win32') {
-				execFileSync('taskkill', ['/pid', String(child.pid), '/T', '/F'], { stdio: 'ignore' });
-			} else {
-				process.kill(-child.pid, 'SIGKILL');
-			}
-		} catch (_) {
-			try { child.kill('SIGKILL'); } catch (_) {}
-		}
-	}
-	for (let i = 0; i < 30; i++) {
-		try {
-			fs.rmSync(persistDir, { recursive: true, force: true });
-			break;
-		} catch (_) {
-			await new Promise(r => setTimeout(r, 500));
-		}
-	}
 }

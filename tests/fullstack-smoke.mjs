@@ -12,56 +12,14 @@
  *   - the outbound gate rejects站外 recipients with 403 outbound_disabled;
  *   - an unauthenticated request is a 401, and /login/ serves the built app.
  *
- * Nothing outside the temporary persist directory is written, and that
- * directory is removed in `finally`. No credentials are printed.
+ * Wrangler configuration, generated test secrets and all local state live in
+ * one temporary directory. Process-tree shutdown and directory removal must
+ * both succeed before the run is reported as passing. No credentials are printed.
  *
  * Usage: node tests/fullstack-smoke.mjs
  */
-import { spawn, execFileSync } from 'node:child_process';
-import { createServer } from 'node:net';
-import fs from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
 import assert from 'node:assert/strict';
-import { fileURLToPath } from 'node:url';
-
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const workerDir = path.join(root, 'mail-worker');
-const pnpmBin = process.env.EPOMAIL_PNPM || (process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm');
-
-function readSecret(name) {
-	if (process.env[name]) return process.env[name];
-	const varsFile = path.join(workerDir, '.dev.vars');
-	if (!fs.existsSync(varsFile)) return '';
-	const line = fs.readFileSync(varsFile, 'utf8')
-		.split(/\r?\n/)
-		.find(row => row.trim().startsWith(`${name}=`));
-	if (!line) return '';
-	return line.slice(line.indexOf('=') + 1).trim().replace(/^["']|["']$/g, '');
-}
-
-function freePort() {
-	return new Promise((resolve, reject) => {
-		const srv = createServer();
-		srv.once('error', reject);
-		srv.listen(0, '127.0.0.1', () => {
-			const { port } = srv.address();
-			srv.close(() => resolve(port));
-		});
-	});
-}
-
-async function waitFor(url, timeoutMs = 180000) {
-	const started = Date.now();
-	while (Date.now() - started < timeoutMs) {
-		try {
-			const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
-			if (res.status < 500) return;
-		} catch (_) {}
-		await new Promise(r => setTimeout(r, 1000));
-	}
-	throw new Error(`timed out waiting for ${url}`);
-}
+import { withLocalStack } from './helpers/local-stack.mjs';
 
 async function call(base, pathname, options = {}) {
 	const res = await fetch(base + pathname, {
@@ -78,34 +36,6 @@ async function call(base, pathname, options = {}) {
 	return { status: res.status, body, json };
 }
 
-const jwtSecret = readSecret('jwt_secret');
-if (!jwtSecret) {
-	console.error('BLOCKED: jwt_secret is not present in the environment or mail-worker/.dev.vars');
-	process.exit(2);
-}
-
-const distIndex = path.join(workerDir, 'dist', 'index.html');
-if (!fs.existsSync(distIndex)) {
-	console.error('BLOCKED: mail-worker/dist is missing; run `node scripts/build-prod.mjs` first');
-	process.exit(2);
-}
-
-const persistDir = fs.mkdtempSync(path.join(os.tmpdir(), 'epomail-smoke-'));
-const port = await freePort();
-const base = `http://127.0.0.1:${port}`;
-
-const args = [
-	'exec', 'wrangler', 'dev',
-	'--config', 'wrangler-dev.toml',
-	'--ip', '127.0.0.1',
-	'--port', String(port),
-	'--persist-to', persistDir,
-	'--var', 'EMAIL_OUTBOUND_ENABLED:false',
-	'--var', 'OUTBOUND_WHITELIST_ENFORCE:true',
-	'--var', 'ENVIRONMENT:smoke'
-];
-
-let child;
 const results = [];
 function check(name, fn) {
 	try {
@@ -117,24 +47,7 @@ function check(name, fn) {
 	}
 }
 
-try {
-	child = spawn(pnpmBin, args, {
-		cwd: workerDir,
-		stdio: ['ignore', 'pipe', 'pipe'],
-		shell: process.platform === 'win32',
-		env: { ...process.env, CI: '1' }
-	});
-	let log = '';
-	child.stdout.on('data', d => { log += d.toString(); });
-	child.stderr.on('data', d => { log += d.toString(); });
-	child.on('exit', code => {
-		if (code !== 0 && code !== null) {
-			const tail = log.split(/\r?\n/).slice(-25).join('\n');
-			process.stderr.write(`[wrangler dev exited ${code}]\n${tail}\n`);
-		}
-	});
-
-	await waitFor(`${base}/login/`);
+await withLocalStack(async ({ base, jwtSecret }) => {
 
 	// 1. Cold start: the only bootstrap call is /api/init with the secret header.
 	const init1 = await call(base, '/api/init', {
@@ -246,26 +159,7 @@ try {
 		assert.match(loginHtml, /<div id="root">/);
 	});
 
-	console.log(results.join('\n'));
-	console.log(`\n${results.length}/${results.length} full-stack checks passed`);
-} finally {
-	if (child && child.pid) {
-		try {
-			if (process.platform === 'win32') {
-				execFileSync('taskkill', ['/pid', String(child.pid), '/T', '/F'], { stdio: 'ignore' });
-			} else {
-				process.kill(-child.pid, 'SIGKILL');
-			}
-		} catch (_) {
-			try { child.kill('SIGKILL'); } catch (_) {}
-		}
-	}
-	for (let i = 0; i < 30; i++) {
-		try {
-			fs.rmSync(persistDir, { recursive: true, force: true });
-			break;
-		} catch (_) {
-			await new Promise(r => setTimeout(r, 500));
-		}
-	}
-}
+});
+
+console.log(results.join('\n'));
+console.log(`\n${results.length}/${results.length} full-stack checks passed (cleanup complete)`);

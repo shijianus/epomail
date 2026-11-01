@@ -4,7 +4,8 @@ import result from '../model/result';
 import userContext from '../security/user-context';
 
 app.post('/login', async (c) => {
-	const loginRes = await loginService.login(c, await c.req.json());
+	const { email, password, secPayload, deviceTag, trustedDeviceToken } = await c.req.json();
+	const loginRes = await loginService.login(c, { email, password, secPayload, deviceTag, trustedDeviceToken });
 	if (typeof loginRes === 'object' && (loginRes.mfaRequired || loginRes.isRestricted)) {
 		return c.json(result.ok(loginRes));
 	}

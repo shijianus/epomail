@@ -230,37 +230,25 @@ const compareByLengthAndUpperCase = (a, b, key) => {
   return a[key].length > b[key].length ? a : b;
 };
 
+function formatRegistryDate(value, includeTime = false) {
+  const date = tzDayjs(value);
+  if (!date.isValid()) return '-';
+  const lang = settingStore.lang || 'zh';
+  return new Intl.DateTimeFormat(lang, {
+    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    year: date.year() === tzDayjs().year() ? undefined : 'numeric',
+    month: lang.startsWith('zh') ? 'numeric' : 'short',
+    day: 'numeric',
+    ...(includeTime ? { hour: '2-digit', minute: '2-digit', hour12: false } : {})
+  }).format(date.toDate());
+}
+
 function formatUserCreateTime(regKey) {
-  const createTime = tzDayjs(regKey.createTime);
-  const currentYear = dayjs().year();
-  const expireYear = createTime.year();
-
-  if (settingStore.lang === 'zh' || settingStore.lang === 'zh-Hant') {
-    return expireYear === currentYear
-      ? createTime.format('M月D日 HH:mm')
-      : createTime.format('YYYY年M月D日 HH:mm');
-  } else {
-    return expireYear === currentYear
-      ? createTime.format('MMM D, HH:mm')
-      : createTime.format('MMM D, YYYY HH:mm');
-  }
-
+  return formatRegistryDate(regKey.createTime, true);
 }
 
 function formatExpireTime(expireTime) {
-  const expireDate = tzDayjs(expireTime);
-  const currentYear = dayjs().year();
-  const expireYear = expireDate.year();
-
-  if (settingStore.lang === 'zh' || settingStore.lang === 'zh-Hant') {
-    return expireYear === currentYear
-        ? expireDate.format('M月D日')
-        : expireDate.format('YYYY年M月D日');
-  } else {
-    return expireYear === currentYear
-        ? expireDate.format('MMM D')
-        : expireDate.format('MMM D, YYYY');
-  }
+  return formatRegistryDate(expireTime);
 }
 
 function refresh() {

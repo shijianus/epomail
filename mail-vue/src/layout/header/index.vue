@@ -246,12 +246,12 @@
     <!-- Built-in Terms of Service Dialog -->
     <el-dialog v-model="termsDialogVisible" :title="$t('termsDialogTitle')" width="min(640px, 92vw)" class="legal-doc-dialog" append-to-body>
       <div class="legal-doc-content">
-        <h4>1. 服务协议与使用准则</h4>
-        <p>欢迎使用 Epocanvas Mail。本平台提供纯净、私密且高效的邮件收发与云端协作体验。用户承诺遵守当地法律法规，不利用本服务从事垃圾邮件群发、网络钓鱼或传播有害代码等违规活动。</p>
-        <h4>2. 存储与系统保护机制</h4>
-        <p>系统为每个账户设立合理的存储限额，并永久保留 2% 应急缓冲区。当存储用量达到 95% 时，系统将自动对垃圾桶执行物理清理以释放空间；当用量达到 98% 时，将暂停接收新邮件直到空间释放。</p>
-        <h4>3. 免责声明与知识产权</h4>
-        <p>在适用法律允许的最大范围内，平台对因不可抗力导致的偶发性服务中断不承担连带责任。用户保留其通信内容的全部知识产权与数据所有权。</p>
+        <h4>{{ $t('termsDialogUsageTitle') }}</h4>
+        <p>{{ $t('termsDialogUsageBody') }}</p>
+        <h4>{{ $t('termsDialogStorageTitle') }}</h4>
+        <p>{{ $t('termsDialogStorageBody') }}</p>
+        <h4>{{ $t('termsDialogDisclaimerTitle') }}</h4>
+        <p>{{ $t('termsDialogDisclaimerBody') }}</p>
       </div>
       <template #footer>
         <el-button type="primary" @click="termsDialogVisible = false">{{ $t('confirm') }}</el-button>
@@ -261,12 +261,12 @@
     <!-- Built-in Privacy Policy Dialog -->
     <el-dialog v-model="privacyDialogVisible" :title="$t('privacyDialogTitle')" width="min(640px, 92vw)" class="legal-doc-dialog" append-to-body>
       <div class="legal-doc-content">
-        <h4>1. 零冗余与隐私保护原则</h4>
-        <p>Epocanvas Mail 严格践行数据主权与最小化收集原则。我们绝不出售、共享或商业化分析您的个人邮件、通信录或附件数据。</p>
-        <h4>2. 密码学端到端与数据隔离</h4>
-        <p>系统采用先进的密码学 Hash 索引与用户租户隔离架构，彻底杜绝 IDOR 与横向越权。在隐私/加密模式下，邮件正文及附件受密码学密钥严格保护，管理员接口默认阻断访问。</p>
-        <h4>3. 自主管理与遗忘权</h4>
-        <p>用户随时可通过账户中心导出其数据或彻底注销账号。注销后，名下全部邮件、附件及认证元数据将执行不可逆的物理级彻底销毁。</p>
+        <h4>{{ $t('privacyDialogPrinciplesTitle') }}</h4>
+        <p>{{ $t('privacyDialogPrinciplesBody') }}</p>
+        <h4>{{ $t('privacyDialogIsolationTitle') }}</h4>
+        <p>{{ $t('privacyDialogIsolationBody') }}</p>
+        <h4>{{ $t('privacyDialogErasureTitle') }}</h4>
+        <p>{{ $t('privacyDialogErasureBody') }}</p>
       </div>
       <template #footer>
         <el-button type="primary" @click="privacyDialogVisible = false">{{ $t('confirm') }}</el-button>

@@ -60,6 +60,15 @@ function buildSessionMeta(method, provider) {
 	};
 }
 
+function normalizeAuthContext(authContext) {
+	if (!authContext || authContext.method !== 'oauth') return null;
+	const provider = typeof authContext.provider === 'string' ? authContext.provider.trim() : '';
+	return {
+		method: 'oauth',
+		provider: provider || null
+	};
+}
+
 function attachSessionMeta(authInfo, token, meta) {
 	if (!meta) return;
 	if (!authInfo.tokenMeta || typeof authInfo.tokenMeta !== 'object') authInfo.tokenMeta = {};
@@ -392,11 +401,12 @@ const loginService = {
 		}
 	},
 
-	async login(c, params, noVerifyPwd = false) {
+	async login(c, params, noVerifyPwd = false, authContext = null) {
 
 		await rateLimit.check(c, { scope: 'login', limit: 30, windowSeconds: 900 });
 
 		const { email, password } = params;
+		const trustedAuthContext = normalizeAuthContext(authContext);
 
 		const inputEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
 		const inputPassword = typeof password === 'string' ? password : '';
@@ -559,10 +569,9 @@ const loginService = {
 					step: 1,
 					verifiedFactors: [],
 					deviceTag,
-					// Provenance survives the MFA challenge so the session that
-					// is finally issued can still prove a provider login.
-					authMethod: params.authMethod || null,
-					authProvider: params.authProvider || null,
+					// Provenance is supplied only through the internal auth context;
+					// request JSON must never be able to mint an OAuth session marker.
+					authContext: trustedAuthContext,
 					createdAt: Date.now()
 					}),
 					{ expirationTtl: 300 } // 5 minutes TTL
@@ -667,7 +676,7 @@ const loginService = {
 
 		}
 
-		attachSessionMeta(authInfo, uuid, buildSessionMeta(params.authMethod, params.authProvider));
+		attachSessionMeta(authInfo, uuid, trustedAuthContext && buildSessionMeta(trustedAuthContext.method, trustedAuthContext.provider));
 
 		if (sessionMaxEpoch) {
 			authInfo.trustEpoch = sessionTrustEpoch;
@@ -1005,7 +1014,7 @@ const loginService = {
 
 		// The challenge may have started from a provider login; carry that
 		// provenance (never the client's claim) onto the issued session.
-		attachSessionMeta(authInfo, uuid, buildSessionMeta(pendingData.authMethod, pendingData.authProvider));
+		attachSessionMeta(authInfo, uuid, pendingData.authContext && buildSessionMeta(pendingData.authContext.method, pendingData.authContext.provider));
 
 		if (sessionMaxEpoch) {
 			authInfo.trustEpoch = sessionTrustEpoch;

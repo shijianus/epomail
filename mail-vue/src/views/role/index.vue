@@ -320,7 +320,7 @@
                       effect="plain"
                       style="margin-left: 8px; font-size: 11px; height: 20px; line-height: 18px;"
                     >
-                      {{ locale === 'zh' ? '参观者禁止查看用户列表' : 'Visitor Forbidden' }}
+                      {{ $t('visitorUserListForbidden') }}
                     </el-tag>
                     <span class="send-num" v-if="data.permKey === 'email:send'" @click.stop>
                       <el-input-number v-if="form.sendType === 'day' || form.sendType === 'count'" v-model="form.sendCount" controls-position="right" :min="0" :max="99999" size="small"

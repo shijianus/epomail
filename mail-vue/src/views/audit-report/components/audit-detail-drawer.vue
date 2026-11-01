@@ -1617,7 +1617,7 @@ const alarmCountValue = computed(() => {
 const deadlineValue = computed(() => {
   const r = props.selectedRow;
   if (!r) return null;
-  const dl = r.deadline || r.expireTime || r.deadlockTime;
+  const dl = r.publicDeadline || r.deadline || r.expireTime || r.deadlockTime;
   return dl ? formatTime(dl) : null;
 });
 
@@ -1712,6 +1712,7 @@ const clusterAccountsList = computed(() => {
 // 模块 C: 风险研判与处置依据 (仅展示数据库中已记录的事实)
 const currentAlarmReason = computed(() => {
   const r = props.selectedRow;
+  if (isVisitor.value) return eventTypeLabel(r?.eventType) || r?.publicReason || t('auditVisitorTableNotice');
   return r?.banReason || r?.appealReason || r?.detailText || '';
 });
 
@@ -1728,7 +1729,7 @@ const currentTriggerBadgeType = computed(() => {
 });
 
 const currentTriggerCause = computed(() => {
-  return props.selectedRow?.detailText || '';
+  return isVisitor.value ? t('auditVisitorTableNotice') : (props.selectedRow?.detailText || '');
 });
 
 const currentSuggestionTag = computed(() => {
@@ -1769,7 +1770,7 @@ const recordedTimelineNodes = computed(() => {
 
 const currentJudgmentLogs = computed(() => {
   return recordedTimelineNodes.value.map(node => ({
-    tag: node.action || '事件',
+    tag: node.action || t('auditTimelineEvent'),
     tagType: 'info',
     content: [node.time, node.actor ? `${node.actor}：` : '', node.desc].filter(Boolean).join(' ')
   }));
