@@ -207,7 +207,7 @@
             <div v-if="alarmCountValue !== undefined" class="grid-field">
               <span class="field-k">{{ $t('auditColAlarmCount') }}:</span>
               <span class="field-v font-mono font-medium" :class="{ 'text-danger': alarmCountValue > 1 }">
-                {{ alarmCountValue }} {{ $t('auditTimesUnit') }}
+                {{ alarmCountValue }}<template v-if="alarmCountValue !== '—'"> {{ $t('auditTimesUnit') }}</template>
               </span>
             </div>
 
@@ -1598,7 +1598,7 @@ function getStatusLabel(status) {
 const authorityValue = computed(() => {
   const r = props.selectedRow;
   if (!r) return null;
-  return r.adjudicatorName || r.adjudicator || r.authority || r.operator || r.assignee || 'SecAdmin';
+  return r.adjudicatorName || r.adjudicator || r.authority || r.operator || r.assignee || (isVisitor.value ? '—' : 'SecAdmin');
 });
 
 // 证据留存天数 (真实剩余天数，未采集时展示破折号)
@@ -1610,6 +1610,7 @@ const evidenceDaysFormatted = computed(() => {
 
 const alarmCountValue = computed(() => {
   const r = props.selectedRow;
+  if (isVisitor.value) return r?.alarmCount ?? r?.reportedByOthers ?? '—';
   if (!r) return undefined;
   return r.alarmCount !== undefined ? r.alarmCount : (r.reportedByOthers || 1);
 });

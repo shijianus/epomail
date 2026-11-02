@@ -232,7 +232,7 @@ describe('audit list visitor response allowlist (real Worker + D1 + KV)', () => 
 				riskLevel: 'medium', priority: 'P1', status: 'banned', identityGroup: 'user',
 				createTime: primary.createTime, banTime: primary.banTime, resolvedTime: primary.resolvedTime,
 					processTime: primary.resolvedTime, updateCount: 3, lastUpdated: primary.resolvedTime, reasonCode: primary.reasonCode,
-					publicReason: primary.reasonCode, publicDeadline: null
+					publicReason: primary.reasonCode, publicDeadline: new Date(Date.parse(primary.banTime) + 30 * 86400000).toISOString()
 
 			});
 			expect(data.list.find(row => row.id === CASE_IDS[4]).status).toBe('expired');

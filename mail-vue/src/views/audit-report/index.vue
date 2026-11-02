@@ -412,7 +412,7 @@
                 <template #default="{ row }">
                   <div class="alarm-count-cell">
                     <span class="plain-alarm-count font-mono" :class="{ 'alarm-count-high': getAlarmCount(row) > 3 }">
-                      {{ getAlarmCount(row) }} {{ $t('auditTimesUnit') }}
+                      {{ getAlarmCount(row) }}<template v-if="getAlarmCount(row) !== '—'"> {{ $t('auditTimesUnit') }}</template>
                     </span>
                   </div>
                 </template>
@@ -562,7 +562,7 @@
                 </template>
                 <template #default="{ row }">
                   <div class="operator-cell">
-                    <span class="operator-name-link font-medium" :title="getOperatorName(row)" @click.stop="handleViewOperator(row)">
+                    <span class="operator-name-link font-medium" :title="getOperatorName(row)" @click.stop="!isVisitor && handleViewOperator(row)">
                       {{ getOperatorName(row) }}
                     </span>
                   </div>
@@ -599,7 +599,7 @@
                 </template>
                 <template #default="{ row }">
                   <div class="operator-cell">
-                    <span class="operator-name-link font-medium" :title="getAdjudicatorName(row)" @click.stop="handleViewAdjudicator(row)">
+                    <span class="operator-name-link font-medium" :title="getAdjudicatorName(row)" @click.stop="!isVisitor && handleViewAdjudicator(row)">
                       {{ getAdjudicatorName(row) }}
                     </span>
                   </div>
@@ -921,7 +921,7 @@
                 </template>
                 <template #default="{ row }">
                   <div class="operator-cell">
-                    <span class="operator-name-link font-medium" :title="getOperatorName(row)" @click.stop="handleViewOperator(row)">
+                    <span class="operator-name-link font-medium" :title="getOperatorName(row)" @click.stop="!isVisitor && handleViewOperator(row)">
                       {{ getOperatorName(row) }}
                     </span>
                   </div>
@@ -958,7 +958,7 @@
                 </template>
                 <template #default="{ row }">
                   <div class="operator-cell">
-                    <span class="operator-name-link font-medium" :title="getAdjudicatorName(row)" @click.stop="handleViewAdjudicator(row)">
+                    <span class="operator-name-link font-medium" :title="getAdjudicatorName(row)" @click.stop="!isVisitor && handleViewAdjudicator(row)">
                       {{ getAdjudicatorName(row) }}
                     </span>
                   </div>
@@ -1152,7 +1152,7 @@
                 <template #default="{ row }">
                   <div class="alarm-count-cell">
                     <span class="plain-alarm-count font-mono" :class="{ 'alarm-count-high': getAlarmCount(row) > 3 }">
-                      {{ getAlarmCount(row) }} {{ $t('auditTimesUnit') }}
+                      {{ getAlarmCount(row) }}<template v-if="getAlarmCount(row) !== '—'"> {{ $t('auditTimesUnit') }}</template>
                     </span>
                   </div>
                 </template>
@@ -1328,7 +1328,7 @@
                 </template>
                 <template #default="{ row }">
                   <div class="operator-cell">
-                    <span class="operator-name-link font-medium" :title="getOperatorName(row)" @click.stop="handleViewOperator(row)">
+                    <span class="operator-name-link font-medium" :title="getOperatorName(row)" @click.stop="!isVisitor && handleViewOperator(row)">
                       {{ getOperatorName(row) }}
                     </span>
                   </div>
@@ -1641,7 +1641,7 @@
                 </template>
                 <template #default="{ row }">
                   <div class="operator-cell">
-                    <span class="operator-name-link font-medium" :title="getOperatorName(row)" @click.stop="handleViewOperator(row)">
+                    <span class="operator-name-link font-medium" :title="getOperatorName(row)" @click.stop="!isVisitor && handleViewOperator(row)">
                       {{ getOperatorName(row) }}
                     </span>
                   </div>
@@ -1678,7 +1678,7 @@
                 </template>
                 <template #default="{ row }">
                   <div class="operator-cell">
-                    <span class="operator-name-link font-medium" :title="getAdjudicatorName(row)" @click.stop="handleViewAdjudicator(row)">
+                    <span class="operator-name-link font-medium" :title="getAdjudicatorName(row)" @click.stop="!isVisitor && handleViewAdjudicator(row)">
                       {{ getAdjudicatorName(row) }}
                     </span>
                   </div>
@@ -1981,7 +1981,7 @@
                 </template>
                 <template #default="{ row }">
                   <div class="operator-cell">
-                    <span class="operator-name-link font-medium" :title="getOperatorName(row)" @click.stop="handleViewOperator(row)">
+                    <span class="operator-name-link font-medium" :title="getOperatorName(row)" @click.stop="!isVisitor && handleViewOperator(row)">
                       {{ getOperatorName(row) }}
                     </span>
                   </div>
@@ -2018,7 +2018,7 @@
                 </template>
                 <template #default="{ row }">
                   <div class="operator-cell">
-                    <span class="operator-name-link font-medium" :title="getAdjudicatorName(row)" @click.stop="handleViewAdjudicator(row)">
+                    <span class="operator-name-link font-medium" :title="getAdjudicatorName(row)" @click.stop="!isVisitor && handleViewAdjudicator(row)">
                       {{ getAdjudicatorName(row) }}
                     </span>
                   </div>
@@ -2528,6 +2528,7 @@ function formatTicketNo(row) {
 }
 
 function getAlarmCount(row) {
+  if (isVisitor.value) return row?.alarmCount ?? row?.reportedByOthers ?? '—';
   if (!row) return 1;
   if (typeof row.alarmCount === 'number') return row.alarmCount;
   if (row.reportedByOthers && row.reportedByOthers > 0) return row.reportedByOthers;
@@ -3833,6 +3834,7 @@ function getOperatorAvatar(row) {
 function getOperatorName(row) {
   if (row?.operatorName) return row.operatorName;
   if (row?.operator) return row.operator;
+  if (isVisitor.value) return '—';
   return row?.status === 'banned' ? 'System Bot' : 'SecAdmin';
 }
 
@@ -3842,7 +3844,7 @@ function getOperatorRole(row) {
 }
 
 function getAdjudicatorName(row) {
-  if (!row) return 'SecAdmin';
+  if (!row) return isVisitor.value ? '—' : 'SecAdmin';
   if (row.adjudicatorName) return row.adjudicatorName;
   if (row.adjudicator) return row.adjudicator;
   // 大部分时候拍案管理就是负责人

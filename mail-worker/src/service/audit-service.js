@@ -59,7 +59,7 @@ function toVisitorAuditRecord(item) {
 		lastUpdated: item.lastUpdated,
 		reasonCode: item.reasonCode,
 		publicReason: item.reasonCode || item.reportCategory || item.eventType || null,
-		publicDeadline: item.deadline || item.expireTime || null
+		publicDeadline: item.deadline || item.expireTime || item.deadlockTime || null
 	};
 }
 

@@ -18,6 +18,23 @@ export function validateStagedFile(file, content) {
       seen.add(entry[1]);
     }
     if (providerKey.test(content)) return 'provider credential detected in public release configuration';
+  } else if (file === '.secret-scan-baseline.json') {
+    let baseline;
+    try { baseline = JSON.parse(content); } catch { return 'historical scan baseline must be valid JSON'; }
+    if (!baseline || typeof baseline.description !== 'string' || !baseline.description.trim() ||
+        !Array.isArray(baseline.allow) || Object.keys(baseline).some(key => !['description', 'allow'].includes(key))) {
+      return 'historical scan baseline requires only description and allow';
+    }
+    for (const entry of baseline.allow) {
+      if (!entry || typeof entry.rule !== 'string' || !/^[a-z][a-z0-9_]*$/.test(entry.rule) ||
+          typeof entry.fingerprint !== 'string' || !/^[a-f0-9]{16}$/.test(entry.fingerprint) ||
+          typeof entry.reason !== 'string' || !entry.reason.trim() ||
+          (entry.path !== undefined && (typeof entry.path !== 'string' || !entry.path.trim() || entry.path.includes('..') || /[\\*?]/.test(entry.path))) ||
+          Object.keys(entry).some(key => !['rule', 'fingerprint', 'path', 'reason'].includes(key))) {
+        return 'historical scan baseline permits reviewed fingerprints and reasons, not credential values';
+      }
+    }
+    if (providerKey.test(content)) return 'provider credential detected in historical scan baseline';
   } else if (sensitiveName.test(file)) {
     return 'sensitive filename is not permitted';
   }

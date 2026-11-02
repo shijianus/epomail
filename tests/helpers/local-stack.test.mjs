@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
+import { spawn, execFileSync } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
 import { once, EventEmitter } from 'node:events';
 import fs from 'node:fs/promises';
 import os from 'node:os';
@@ -8,7 +9,8 @@ import { setTimeout as delay } from 'node:timers/promises';
 import test from 'node:test';
 import {
 	localEnvironment, writeLocalConfig, verifyProductionAssets,
-	observeProcess, stopProcessTree, removeTemporaryDirectory
+	observeProcess, stopProcessTree, removeTemporaryDirectory,
+	hasLiveProcessGroupMembers, cleanupLocalStackDirectory
 } from './local-stack.mjs';
 
 const missingProcess = () => Object.assign(new Error('no such process'), { code: 'ESRCH' });
@@ -64,7 +66,7 @@ test('child environment excludes inherited secrets, overrides, proxies and Node 
 	const directory = path.resolve(os.tmpdir(), 'local-stack');
 	const env = localEnvironment(directory, {
 		Path: '/test/bin', SystemRoot: 'C:\\Windows', LANG: 'en_US.UTF-8',
-		jwt_secret: 'host-secret', totp_enc_key: 'host-secret',
+		jwt_secret: randomBytes(32).toString('hex'), totp_enc_key: randomBytes(32).toString('hex'),
 		CLOUDFLARE_API_TOKEN: 'host-token', CLOUDFLARE_ENV: 'production',
 		NODE_OPTIONS: '--require injected.cjs', HTTPS_PROXY: 'http://proxy.invalid',
 		WRANGLER_LOG_PATH: '/host/log', WRANGLER_SEND_METRICS: 'true',
@@ -123,7 +125,7 @@ test('spawn error and unexpected exit reject immediately, even if close has not 
 	assert.equal(exited.closed, false);
 });
 
-test('POSIX shutdown waits for both the group to disappear and child close', async () => {
+test('simulated Linux shutdown waits for both group disappearance and child close', async () => {
 	const state = { closed: false };
 	const signals = [];
 	let alive = true;
@@ -133,6 +135,11 @@ test('POSIX shutdown waits for both the group to disappear and child close', asy
 			assert.equal(pid, -900001);
 			if (signal !== 0) signals.push(signal);
 			if (!alive) throw missingProcess();
+		},
+		async exec(command, args) {
+			assert.equal(command, '/bin/ps');
+			assert.deepEqual(args, ['-eo', 'pgid=,stat=']);
+			return { stdout: alive ? '1 Ss\n900001 Ssl\n' : '1 Ss\n' };
 		}
 	});
 	alive = false;
@@ -145,12 +152,74 @@ test('POSIX shutdown waits for both the group to disappear and child close', asy
 	assert.deepEqual(signals, ['SIGTERM']);
 });
 
-test('POSIX shutdown escalates to SIGKILL for surviving descendants after root exit', async () => {
+test('simulated Linux ps inspection ignores only Z/X members of the target PGID', async () => {
+	for (const status of ['Z', 'Zs', 'X', 'S', 'Ssl', 'R+', 'D', 'T', 't', 'I']) {
+		assert.equal(await hasLiveProcessGroupMembers(910001, {
+			platform: 'linux', async exec(command, args, options) {
+				assert.equal(command, '/bin/ps');
+				assert.deepEqual(args, ['-eo', 'pgid=,stat=']);
+				assert.equal(options.shell, undefined);
+				assert.ok(options.timeout > 0);
+				return { stdout: `1 Ss\n910001 Z\n910001 ${status}\n910002 R+\n` };
+			}
+		}), !/^[ZX]/.test(status), status);
+	}
+	assert.equal(await hasLiveProcessGroupMembers(910001, {
+		platform: 'linux', async exec() { return { stdout: '1 Ss\n910002 R\n' }; }
+	}), false, 'other process groups must not hold up cleanup');
+});
+
+test('simulated Linux ps errors and malformed or empty output fail closed', async () => {
+	for (const stdout of ['', '910001\n', '910001 ?\n', '910001 Z\nunparseable\n']) {
+		await assert.rejects(hasLiveProcessGroupMembers(910001, {
+			platform: 'linux', async exec() { return { stdout }; }
+		}), /Unable to inspect Linux process groups/);
+	}
+	const error = Object.assign(new Error('ps unavailable'), { code: 'ENOENT' });
+	await assert.rejects(stopProcessTree({ pid: 910001 }, { closed: true }, {
+		platform: 'linux', kill() {}, async exec() { throw error; }
+	}), error);
+});
+
+test('simulated Linux zombie-only group still waits for root close without SIGKILL', async () => {
+	const state = { closed: false };
+	const signals = [];
+	let settled = false;
+	const killing = stopProcessTree({ pid: 910002 }, state, {
+		platform: 'linux', graceMs: 100, timeoutMs: 100, pollMs: 2,
+		kill(pid, signal) { assert.equal(pid, -910002); signals.push(signal); },
+		async exec() { return { stdout: '1 Ss\n910002 Z\n' }; }
+	});
+	killing.then(() => { settled = true; });
+	await delay(10);
+	assert.equal(settled, false);
+	state.closed = true;
+	await killing;
+	assert.deepEqual(signals, ['SIGTERM']);
+});
+
+test('simulated Linux shutdown escalates for live members but accepts remaining zombies', async () => {
+	const signals = [];
+	let status = 'S';
+	await stopProcessTree({ pid: 910003 }, { closed: true, exited: true }, {
+		platform: 'linux', graceMs: 0, timeoutMs: 100, pollMs: 1,
+		kill(pid, signal) {
+			assert.equal(pid, -910003);
+			signals.push(signal);
+			if (signal === 'SIGKILL') status = 'Z';
+		},
+		async exec() { return { stdout: `1 Ss\n910003 ${status}\n` }; }
+	});
+	assert.deepEqual(signals, ['SIGTERM', 'SIGKILL']);
+});
+
+test('simulated Darwin shutdown retains kill(0) and escalates after root exit', async () => {
 	const state = { closed: true, exited: true };
 	let alive = true;
 	const signals = [];
 	await stopProcessTree({ pid: 900002 }, state, {
 		platform: 'darwin', graceMs: 0, timeoutMs: 100, pollMs: 1,
+		async exec() { assert.fail('Darwin must not use Linux ps inspection'); },
 		kill(pid, signal) {
 			assert.equal(pid, -900002);
 			if (signal !== 0) signals.push(signal);
@@ -166,7 +235,8 @@ test('POSIX permission errors and surviving groups are fatal', async () => {
 		platform: 'linux', kill() { throw Object.assign(new Error('denied'), { code: 'EPERM' }); }
 	}), { code: 'EPERM' });
 	await assert.rejects(stopProcessTree({ pid: 900003 }, { closed: true }, {
-		platform: 'linux', kill() {}, graceMs: 0, timeoutMs: 0, pollMs: 1
+		platform: 'linux', kill() {}, graceMs: 0, timeoutMs: 0, pollMs: 1,
+		async exec() { return { stdout: '1 Ss\n900003 S\n900003 Z\n' }; }
 	}), /Timed out waiting for local process group/);
 	await assert.rejects(stopProcessTree({ pid: process.pid }, {}, { platform: 'linux' }), /invalid local-stack PID/);
 });
@@ -225,6 +295,91 @@ test('directory removal retries locks and propagates the final failure with its 
 	});
 });
 
+for (const removeDirectory of [false, true]) {
+	test(`secret cleanup runs before directory removal (tree stopped: ${removeDirectory})`, async () => {
+		await withDirectory(async directory => {
+			const secretPath = path.join(directory, '.dev.vars');
+			await fs.writeFile(secretPath, randomBytes(32));
+			let removedDirectory = false;
+			await cleanupLocalStackDirectory(directory, {
+				removeDirectory,
+				async removeDir(target) {
+					assert.equal(target, directory);
+					await assert.rejects(fs.access(secretPath), { code: 'ENOENT' });
+					removedDirectory = true;
+					await removeTemporaryDirectory(target);
+				}
+			});
+			assert.equal(removedDirectory, removeDirectory);
+			await assert.rejects(fs.access(secretPath), { code: 'ENOENT' });
+			if (!removeDirectory) await fs.access(directory);
+		});
+	});
+}
+
+test('directory removal failure cannot retain the independently deleted secret file', async () => {
+	await withDirectory(async directory => {
+		const secretPath = path.join(directory, '.dev.vars');
+		await fs.writeFile(secretPath, randomBytes(32));
+		const error = Object.assign(new Error('state directory locked'), { code: 'EBUSY' });
+		await assert.rejects(cleanupLocalStackDirectory(directory, {
+			async removeDir() {
+				await assert.rejects(fs.access(secretPath), { code: 'ENOENT' });
+				throw error;
+			}
+		}), failure => {
+			assert.deepEqual(failure.errors, [error]);
+			return true;
+		});
+		await assert.rejects(fs.access(secretPath), { code: 'ENOENT' });
+		await fs.access(directory);
+	});
+});
+
+test('secret removal errors stay fatal even when directory removal subsequently succeeds', async () => {
+	await withDirectory(async directory => {
+		const secretPath = path.join(directory, '.dev.vars');
+		await fs.writeFile(secretPath, randomBytes(32));
+		const error = Object.assign(new Error('secret locked'), { code: 'EBUSY' });
+		await assert.rejects(cleanupLocalStackDirectory(directory, {
+			async rm(target, options) {
+				assert.equal(target, secretPath);
+				assert.equal(options.recursive, true, 'Node rm retries require recursive');
+				assert.equal(options.force, true);
+				assert.ok(options.maxRetries > 0);
+				assert.ok(options.retryDelay > 0);
+				throw error;
+			}
+		}), failure => {
+			assert.equal(failure.errors.length, 1);
+			assert.equal(failure.errors[0].cause, error);
+			return true;
+		});
+		await assert.rejects(fs.access(directory), { code: 'ENOENT' });
+	});
+});
+
+test('secret and directory failures are both reported without skipping either cleanup', async () => {
+	await withDirectory(async directory => {
+		const secretError = new Error('secret unavailable');
+		const directoryError = new Error('directory unavailable');
+		await assert.rejects(cleanupLocalStackDirectory(directory, {
+			async rm() { throw secretError; },
+			async removeDir() { throw directoryError; }
+		}), failure => {
+			assert.equal(failure.errors.length, 2);
+			assert.equal(failure.errors[0].cause, secretError);
+			assert.equal(failure.errors[1], directoryError);
+			return true;
+		});
+		await assert.rejects(cleanupLocalStackDirectory(directory, {
+			removeDirectory: false,
+			async rm() { throw secretError; },
+			async removeDir() { assert.fail('live process state must be retained'); }
+		}), failure => failure.errors.length === 1 && failure.errors[0].cause === secretError);
+	});
+});
+
 test('real native process tree exits before locked state is removed', { timeout: 20000 }, async () => {
 	await withDirectory(async directory => {
 		const descendantFile = path.join(directory, 'descendant.pid');
@@ -254,7 +409,17 @@ test('real native process tree exits before locked state is removed', { timeout:
 			await stopProcessTree(child, state);
 		}
 		assert.equal(state.closed, true);
-		assert.throws(() => process.kill(descendant, 0), { code: 'ESRCH' });
+		if (process.platform === 'linux') {
+			// Linux may retain an exited descendant as a zombie until its reaper
+			// runs; kill(pid, 0) alone does not establish that it is still alive.
+			const stdout = execFileSync('/bin/ps', ['-eo', 'pid=,stat='], { encoding: 'utf8', timeout: 5000 });
+			assert.ok(stdout.trim());
+			const entry = stdout.trim().split(/\r?\n/).map(line => line.trim().split(/\s+/))
+				.find(([pid]) => Number(pid) === descendant);
+			if (entry) assert.match(entry[1], /^[ZX]/, 'descendant must be gone or exited, never alive');
+		} else {
+			assert.throws(() => process.kill(descendant, 0), { code: 'ESRCH' });
+		}
 		await removeTemporaryDirectory(directory);
 		await assert.rejects(fs.access(directory), { code: 'ENOENT' });
 	});

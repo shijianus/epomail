@@ -78,6 +78,9 @@ jobs:
       - name: Scan working tree
         run: node scripts/secret-scan.mjs
 
+      - name: Staged metadata and secret-file regression tests
+        run: node --test tests/check-staged-files.test.mjs
+
   i18n:
     name: i18n gates (6-language dictionaries)
     runs-on: ubuntu-latest
@@ -251,5 +254,5 @@ jobs:
       - name: Vite production build
         run: pnpm --dir mail-vue run build
 
-      - name: UI localization behavior regression tests
-        run: node --test tests/ui-localization.test.mjs
+      - name: UI localization and public audit display regression tests
+        run: node --test tests/ui-localization.test.mjs tests/audit-visitor-display.test.mjs

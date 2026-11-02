@@ -149,6 +149,36 @@ async function waitUntil(predicate, timeoutMs, pollMs) {
 	return Boolean(await predicate());
 }
 
+export async function hasLiveProcessGroupMembers(pid, {
+	platform = process.platform,
+	kill = process.kill.bind(process),
+	exec = execFileAsync
+} = {}) {
+	if (platform === 'linux') {
+		// kill(-pgid, 0) also succeeds for zombies, which cannot hold files or
+		// respond to SIGKILL. Inspect the whole table so an absent group is not
+		// confused with ps failing to select any processes (exit status 1).
+		const { stdout } = await exec('/bin/ps', ['-eo', 'pgid=,stat='], {
+			encoding: 'utf8', timeout: 5000
+		});
+		if (!stdout.trim()) throw new Error('Unable to inspect Linux process groups: empty ps output');
+		let alive = false;
+		for (const line of stdout.trim().split(/\r?\n/)) {
+			const entry = /^\s*(\d+)\s+([A-Za-z][\w+<]*)\s*$/.exec(line);
+			if (!entry) throw new Error('Unable to inspect Linux process groups: malformed ps output');
+			if (Number(entry[1]) === pid && !/^[ZX]/.test(entry[2])) alive = true;
+		}
+		return alive;
+	}
+	try {
+		kill(-pid, 0);
+		return true;
+	} catch (error) {
+		if (error.code === 'ESRCH') return false;
+		throw error;
+	}
+}
+
 export async function stopProcessTree(child, state, {
 	platform = process.platform,
 	kill = process.kill.bind(process),
@@ -182,7 +212,7 @@ export async function stopProcessTree(child, state, {
 			throw error;
 		}
 	};
-	const stopped = () => !signalGroup(0) && state.closed;
+	const stopped = async () => !(await hasLiveProcessGroupMembers(pid, { platform, kill, exec })) && state.closed;
 	signalGroup('SIGTERM');
 	if (await waitUntil(stopped, graceMs, pollMs)) return;
 	signalGroup('SIGKILL');
@@ -197,6 +227,29 @@ export async function removeTemporaryDirectory(directory, { rm = fs.rm, maxRetri
 	} catch (cause) {
 		throw new Error(`Unable to remove local-stack directory ${directory}`, { cause });
 	}
+}
+
+export async function cleanupLocalStackDirectory(directory, {
+	removeDirectory = true,
+	rm = fs.rm,
+	removeDir = removeTemporaryDirectory
+} = {}) {
+	if (!directory) return;
+	const errors = [];
+	// Destroy the secret file independently, even when the process tree failed
+	// to stop or another state file prevents directory removal. recursive enables
+	// Node's rm retries for transient locks on this known disposable path.
+	try {
+		await rm(path.join(directory, '.dev.vars'), {
+			recursive: true, force: true, maxRetries: 10, retryDelay: 200
+		});
+	} catch (cause) {
+		errors.push(new Error(`Unable to remove local-stack secrets from ${directory}`, { cause }));
+	}
+	if (removeDirectory) {
+		try { await removeDir(directory); } catch (error) { errors.push(error); }
+	}
+	if (errors.length) throw new AggregateError(errors, `Local-stack file cleanup failed for ${directory}`);
 }
 
 async function waitForLogin(base, signal, timeoutMs) {
@@ -251,12 +304,8 @@ export async function startLocalStack({
 				stopped = false;
 				errors.push(new Error(`Process-tree cleanup failed; state retained at ${directory}`, { cause: error }));
 			}
-			if (directory && !stopped) {
-				try { await fs.rm(path.join(directory, '.dev.vars'), { force: true }); } catch (error) { errors.push(error); }
-			}
-			if (directory && stopped) {
-				try { await removeTemporaryDirectory(directory); } catch (error) { errors.push(error); }
-			}
+			try { await cleanupLocalStackDirectory(directory, { removeDirectory: stopped }); }
+			catch (error) { errors.push(error); }
 		} finally {
 			process.off('SIGINT', onInt);
 			process.off('SIGTERM', onTerm);
