@@ -1,3 +1,21 @@
+### UI 语言归一化与 Worker 请求级 i18n 隔离 (2026-11-03)
+*   **关联提交 (Git Commit)**: `d036007ff684605581c7fc2cfa98b49b80dafdd5` (Short: `d036007`)
+*   **部署环境 (Deployment)**: 本地构建与单测验证；未部署生产或 Staging。
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 新增 `mail-vue/src/utils/ui-locale.js`：6 语言冻结注册表（htmlLang/intlLocale/dayjsLocale/docsSegment/dir）+ `normalizeUiLocale()` 归一化；`day.js` 改由注册表派生 dayjs locale。
+    - [x] Worker `src/i18n/i18n.js` 重写：经 hono context-storage（AsyncLocalStorage）按请求解析 Accept-Language，不再变更共享 i18next 实例语言，修复并发异步 I/O 下的跨请求语言串扰。
+    - [x] 全部 wrangler 配置（wrangler/dev/test/vitest/action）启用 `nodejs_als` compatibility flag。
+    - [x] 六语言字典扩充（parentLabel、Turnstile、noticeType 等）并包裹 views/layout/init/axios/store 中原有硬编码文案；temp_login_ui authLocale.ts 对齐注册表解析规则。
+    - [x] 新增测试与工具：`tests/ui-translation-quality.test.mjs`、`mail-worker/test/i18n-request-isolation.spec.js`、`temp_login_ui/test/locale-resolution.test.mjs`、`scripts/build-local-review.mjs`；`local-stack.mjs` 参数化 assetsDir 并启用 nodejs_als。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] i18n 静态三件套：`i18n-symmetry`（6 语言 1950 键全对称）、`i18n-audit`（2286 字面量引用零缺失、重复键 0）、`i18n-hardcoded`（0 可疑行）全部 PASS。
+    - [x] 前端构建核验：`mail-vue` vite build 通过（23.87s，零报错）。
+    - [x] Worker 单测：`i18n-request-isolation.spec.js` 2/2 通过（交错异步请求各自持有固定 translator）。
+    - [x] Node 测试：`locale-resolution.test.mjs` 4/4、`ui-translation-quality.test.mjs` 20/20 通过。
+    - [x] 离线 secret 扫描门禁通过（0 findings）；vitest 假密钥保留拆分写法以符合扫描规则，值未变。
+
+---
+
 ### 公测候选后端收敛与全真栈验证 (2026-11-02)
 *   **关联提交 (Git Commit)**: `8e42637b3b9ecf4290e4a2bd7edc2d213e4af3cb` (Short: `8e42637`)
 *   **部署环境 (Deployment)**: 本地隔离 workerd/D1/KV/R2、随机 loopback 端口；未部署生产或 Staging，未访问真实供应商。
