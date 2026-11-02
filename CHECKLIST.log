@@ -11,6 +11,26 @@
 
 ---
 
+### 推送前独立核验与缺口修复 (2026-11-02)
+*   **关联提交 (Git Commit)**: `0c03d2fb6c11f7fc0fc28a096789194824088d40` (Short: `0c03d2f`)；独立核验起点 `b94ffabf5eca3bfc57dcd1d9d24ad5bd8bb06f7f`。
+*   **环境与边界**: Node 24.14.0 / pnpm 10.34.5 / Windows；真实本地 workerd/D1/KV 与官方 IAB。推送目标仅 `origin/release/2026-10-31`，不强推、不合入 master、不部署或访问生产数据，不触碰 EpomailDocs 与 `.zcode/`。
+*   **独立发现及修复**:
+    - [x] 发现新增生命周期测试内固定合成密钥导致当前树/历史扫描报错；改为运行时 randomBytes。历史基线仅记录该测试文件的 `hardcoded_jwt_key` 与指纹 `736340e6842adca3`，明确它从未用于真实认证；不修改历史、不弱化当前树扫描。
+    - [x] 提交钩子对根目录历史扫描基线增加严格 schema 验证，仅允许描述、规则、指纹、路径、理由；禁止 value/secret/token 等额外字段，继续执行 staged 密钥门禁。新增 8 项正反例及真实暂存区测试。
+    - [x] 访客缺失负责人/报警次数改为“—”，不再伪造 SecAdmin/1；管理员原有行为保留。公开期限回退包含服务端已计算的 deadlockTime；新增前端 3 项回归及后端真实 Worker 测试断言。
+    - [x] 所有退出路径独立删除临时 .dev.vars，目录删除失败仍阻断。Linux PGID 检查区分活成员与 Z/X 僵尸，并等待根进程 close；ps 异常失败关闭。生命周期测试增至 20 项。
+*   **实际复验结果**:
+    - [x] Worker 完整重跑 **19 文件 / 220 断言通过，206.33s，exit 0**。中途一次并行验证运行在 Smithy 模块加载时报 `[vitest-worker]: Timeout calling "resolveId"`，记录为失败；随后停止并行构建/浏览器负载，在未放宽测试条件下单独全量重跑通过，不使用前一轮结果掩盖该失败。
+    - [x] 登录 typecheck 与单测 **15/15**；审计引擎 **10/10**。
+    - [x] 最终 Node 行为测试 **141/141**：i18n 门禁 33、UI 本地化 77、访客显示 3、生命周期 20、暂存规则 8。四项 i18n 检查全部通过，六语言键集 3165 / 1946 / 138 对称。
+    - [x] 最终生产构建与 Worker dry-run 通过（登录 20.14s / 主站约 75s，Vite 无警告；Wrangler 保留未指定目标环境的配置提示），冷启动 API 冒烟 **13/13**，cleanup complete。
+    - [x] 当前树/历史内置扫描、push-range 扫描、staged 自检与实际 pre-commit 均通过。gitleaks 未安装，未宣称完整第三方扫描。
+    - [x] 真实浏览器：本轮新隔离账号通过表单提交，自动跳转 inbox；最终访客列表及详情中负责人/报警次数显示“—”、公开期限正常、内部哨兵不出现。375×812 测量 scrollWidth=innerWidth=375；截图确认公开详情。一次工具点击超时后重新读 URL/DOM 已确认实际打开详情，未把超时本身当作通过。
+    - [x] 指定的所有独立栈目录、随机凭据、临时元数据以及最终 Vitest 临时目录均已检查不存在；最新浏览器栈输出 cleanup complete。
+*   **推送门禁**: `git push --dry-run` 已确认 SSH 权限与快进条件；归档后普通推送并核对远端哈希及 GitHub Actions。Linux 本机未实跑（无 WSL distro），Linux 清理依赖 CI Ubuntu 实跑确认。真实第三方 OAuth、外发、云端备份/回滚仍不在本轮验证范围。
+
+---
+
 ### 真实浏览器交互补验：表单登录、审计详情、访客脱敏与退出 (2026-11-02)
 *   **关联提交 (Git Commit)**: `d024ff4c3d7a8317cede092c12e3c31f79e02e46` (Short: `d024ff4`)
 *   **部署环境 (Deployment)**: 两次独立本地全真栈 `wrangler dev --local`，随机 JWT/TOTP/邮件密钥、临时 D1/KV、外发关闭；**未部署、未访问生产、未推送**。
