@@ -1,4 +1,10 @@
 const en = {
+    parentLabel: 'Parent label',
+    turnstileSiteKey: 'Turnstile site key',
+    turnstileSecretKey: 'Turnstile secret key',
+    noticeTypeNone: 'No styling',
+    noticeTypePrimary: 'Primary notice',
+    noticeTypeInfo: 'Information',
     legalNotice: {
         adminTitle: 'Operator and privacy settings',
         adminReady: 'Registration information complete',
@@ -596,7 +602,7 @@ const en = {
     emailText: 'Email Text',
     emailPrefix: 'Email Prefix',
     atLeast: 'At Least',
-    character: '',
+    character: 'characters',
     mustNotContain: 'Must Not Contain',
     mustNotContainDesc: 'Type keyword and press Enter (duplicates auto-removed)',
     blackSubjectDesc: 'Subject keywords (any match triggers filter)',

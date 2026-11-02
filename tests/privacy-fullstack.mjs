@@ -6,6 +6,9 @@ import { withLocalStack } from './helpers/local-stack.mjs';
 import { checkPrivacyReadiness } from '../scripts/check-privacy-readiness.mjs';
 
 const hold = process.argv.includes('--hold');
+const assetsIndex = process.argv.indexOf('--assets');
+const assetsDir = assetsIndex < 0 ? undefined : process.argv[assetsIndex + 1];
+if (assetsIndex >= 0 && (!assetsDir || assetsDir.startsWith('--'))) throw new Error('--assets requires a compiled asset directory');
 const checks = [];
 const notice = {
   operatorName: 'Local synthetic test operator',
@@ -169,5 +172,5 @@ await withLocalStack(async stack => {
     assert.notEqual(newLogin.json?.code, 200);
     passed('self deletion disables sessions and future login while preserving an honest manual-review status');
   }
-});
+}, assetsDir ? { assetsDir: path.resolve(assetsDir) } : undefined);
 console.log(`${checks.length} privacy full-stack checks passed; isolated process and data cleanup complete.`);

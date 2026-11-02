@@ -793,6 +793,7 @@ import { useSettingStore } from '@/store/setting.js'
 import { updateProfile, uploadImage } from '@/request/my.js'
 import { parseInlineMarkdown } from '@/utils/md-parser.js'
 import { THEME_PRESETS, COVER_PRESETS, getPresetName } from '@/utils/theme-presets.js'
+import { normalizeUiLocale } from '@/utils/ui-locale.js'
 
 defineOptions({
   name: 'general-setting'
@@ -1074,15 +1075,16 @@ function onConversationViewChange(val) {
 }
 
 function changeLang(lang) {
+  const normalizedLang = normalizeUiLocale(lang)
   let setting = {}
   try {
     setting = JSON.parse(localStorage.getItem('setting') || '{}')
   } catch (e) {
     setting = {}
   }
-  localStorage.setItem('setting', JSON.stringify({ ...setting, lang }))
-  settingStore.lang = lang
-  updateProfile({ lang }).catch(() => {}).finally(() => {
+  localStorage.setItem('setting', JSON.stringify({ ...setting, lang: normalizedLang }))
+  settingStore.lang = normalizedLang
+  updateProfile({ lang: normalizedLang }).catch(() => {}).finally(() => {
     window.location.reload()
   })
 }

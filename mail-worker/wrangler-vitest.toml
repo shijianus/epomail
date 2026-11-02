@@ -1,6 +1,7 @@
 name = "epomail-unit-test"
 main = "src/index.js"
 compatibility_date = "2025-03-10"
+compatibility_flags = ["nodejs_als"]
 
 [[d1_databases]]
 binding = "db"

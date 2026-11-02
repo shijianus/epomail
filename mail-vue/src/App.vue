@@ -16,15 +16,30 @@ import es from 'element-plus/es/locale/lang/es';
 import nl from 'element-plus/es/locale/lang/nl';
 import { useUiStore } from "@/store/ui.js";
 import { userSetCustomLabels } from "@/request/my.js";
+import { normalizeUiLocale, getUiLocaleMetadata } from "@/utils/ui-locale.js";
 
 const { locale } = useI18n()
-locale.value = settingStore.lang || 'zh'
-watch(() => settingStore.lang, (val) => locale.value = val || 'zh')
+
+function syncDocumentLocale(lang) {
+  if (typeof document === 'undefined') return
+  const metadata = getUiLocaleMetadata(lang)
+  document.documentElement.lang = metadata.htmlLang
+  document.documentElement.dir = metadata.dir
+}
+
+function applyLocale(value) {
+  const lang = normalizeUiLocale(value || 'zh')
+  locale.value = lang
+  syncDocumentLocale(lang)
+}
+
+applyLocale(settingStore.lang || 'zh')
+watch(() => settingStore.lang, (val) => applyLocale(val || 'zh'), { immediate: true })
 
 const currentElLocale = computed(() => {
-  const lang = settingStore.lang || 'zh';
-  if (lang === 'zh' || lang === 'zh-CN') return zhCn;
-  if (lang === 'zh-Hant' || lang === 'zh-TW') return zhTw;
+  const lang = normalizeUiLocale(settingStore.lang || 'zh');
+  if (lang === 'zh') return zhCn;
+  if (lang === 'zh-Hant') return zhTw;
   if (lang === 'fr') return fr;
   if (lang === 'es') return es;
   if (lang === 'nl') return nl;

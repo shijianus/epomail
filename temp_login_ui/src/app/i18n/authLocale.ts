@@ -7,26 +7,50 @@
 export const AUTH_LANGS = ['zh', 'zh-Hant', 'en', 'es', 'fr', 'nl'] as const;
 export type AuthLang = (typeof AUTH_LANGS)[number];
 
-const NAV_MAP: Array<[RegExp, AuthLang]> = [
-  [/^zh-(tw|hk|mo|hant)/i, 'zh-Hant'],
-  [/^zh/i, 'zh'],
-  [/^es/i, 'es'],
-  [/^fr/i, 'fr'],
-  [/^nl/i, 'nl'],
-];
+function canonicalAuthLocale(value: unknown): AuthLang | null {
+  if (typeof value !== 'string') return null;
+  const raw = value.trim().replace(/_/g, '-');
+  if (!raw || !/^[a-z]{1,8}(?:-[a-z0-9]{1,8})*$/i.test(raw)) return null;
+  const parts = raw.toLowerCase().split('-');
+  const language = parts[0];
+  if (language === 'zh') {
+    const script = parts.find((part) => part === 'hant' || part === 'hans');
+    const region = parts.slice(1).find((part) => /^[a-z]{2}$/.test(part));
+    if (script) return script === 'hant' ? 'zh-Hant' : 'zh';
+    return ['tw', 'hk', 'mo'].includes(region || '') ? 'zh-Hant' : 'zh';
+  }
+  if (['hant', 'tw', 'hk', 'mo'].includes(language)) return 'zh-Hant';
+  if (['hans', 'cn', 'sg'].includes(language)) return 'zh';
+  if ((AUTH_LANGS as readonly string[]).includes(language)) return language as AuthLang;
+  return null;
+}
 
-export function resolveAuthLang(): AuthLang {
+/** Normalize stored and browser locale tags without changing dictionary text. */
+export function normalizeAuthLang(value: unknown, fallback: AuthLang = 'en'): AuthLang {
+  return canonicalAuthLocale(value) || canonicalAuthLocale(fallback) || 'en';
+}
+
+type AuthLocaleResolveOptions = {
+  storage?: { getItem: (key: string) => string | null } | null;
+  navigatorLanguage?: string | null;
+};
+
+export function resolveAuthLang(options: AuthLocaleResolveOptions = {}): AuthLang {
+  const storage = options.storage !== undefined
+    ? options.storage
+    : (typeof localStorage !== 'undefined' ? localStorage : null);
   try {
-    const stored = JSON.parse(localStorage.getItem('setting') || 'null');
-    if (stored && typeof stored.lang === 'string' && (AUTH_LANGS as readonly string[]).includes(stored.lang)) {
-      return stored.lang as AuthLang;
+    const stored = JSON.parse(storage?.getItem('setting') || 'null');
+    if (stored && typeof stored.lang === 'string' && canonicalAuthLocale(stored.lang)) {
+      return normalizeAuthLang(stored.lang);
     }
   } catch {
     /* 主应用设置不可解析时回落到浏览器语言 */
   }
-  const nav = (typeof navigator !== 'undefined' && navigator.language) || 'en';
-  for (const [re, lang] of NAV_MAP) if (re.test(nav)) return lang;
-  return 'en';
+  const nav = options.navigatorLanguage !== undefined
+    ? options.navigatorLanguage
+    : ((typeof navigator !== 'undefined' && navigator.language) || 'en');
+  return normalizeAuthLang(nav, 'en');
 }
 
 type Dict = Record<string, string>;

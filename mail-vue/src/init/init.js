@@ -9,6 +9,7 @@ import {websiteConfig} from "@/request/setting.js";
 import i18n from "@/i18n/index.js";
 import {clearAuthStorage} from "@/utils/auth.js";
 import { tabSession, updateCurrentIdentity, getCurrentLoginEmail } from '@/utils/tab-session.js';
+import { resolveUiLocale } from '@/utils/ui-locale.js';
 
 export async function init() {
     document.title = '\u200B'
@@ -23,22 +24,9 @@ export async function init() {
     const tabIdentity = tabSession.current();
     const token = tabIdentity?.token || '';
     if (!settingStore.lang) {
-        const rawNav = (navigator.language || '').toLowerCase();
-        let lang = 'en';
-        if (rawNav.startsWith('zh-tw') || rawNav.startsWith('zh-hk') || rawNav.startsWith('zh-mo') || rawNav.startsWith('zh-hant')) {
-            lang = 'zh-Hant';
-        } else if (rawNav.startsWith('zh')) {
-            lang = 'zh';
-        } else if (rawNav.startsWith('fr')) {
-            lang = 'fr';
-        } else if (rawNav.startsWith('es')) {
-            lang = 'es';
-        } else if (rawNav.startsWith('nl')) {
-            lang = 'nl';
-        } else {
-            lang = 'en';
-        }
-        settingStore.lang = lang;
+        settingStore.lang = resolveUiLocale('', navigator.language);
+    } else {
+        settingStore.lang = resolveUiLocale(settingStore.lang, navigator.language);
     }
 
     i18n.global.locale.value = settingStore.lang

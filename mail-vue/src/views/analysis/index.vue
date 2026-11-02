@@ -10,7 +10,7 @@
             <div class="left">
               <div>{{ $t('totalReceived') }}</div>
               <div>
-                <el-statistic :formatter="value => Math.round(value)" :value="receiveData"/>
+                <el-statistic :formatter="formatAnalysisInteger" :value="receiveData"/>
               </div>
             </div>
             <div class="right">
@@ -20,8 +20,8 @@
             </div>
           </div>
           <div class="delete-ratio">
-            <div>{{ $t('active') }} <span class="normal">{{ numberCount.normalReceiveTotal }}</span></div>
-            <div>{{ $t('deleted') }} <span class="deleted">{{ numberCount.delReceiveTotal }}</span></div>
+            <div>{{ $t('active') }} <span class="normal">{{ formatAnalysisInteger(numberCount.normalReceiveTotal) }}</span></div>
+            <div>{{ $t('deleted') }} <span class="deleted">{{ formatAnalysisInteger(numberCount.delReceiveTotal) }}</span></div>
           </div>
         </div>
         <div class="number-item">
@@ -29,7 +29,7 @@
             <div class="left">
               <div>{{ $t('totalSent') }}</div>
               <div>
-                <el-statistic :formatter="value => Math.round(value)" :value="sendData"/>
+                <el-statistic :formatter="formatAnalysisInteger" :value="sendData"/>
               </div>
             </div>
             <div class="right">
@@ -39,8 +39,8 @@
             </div>
           </div>
           <div class="delete-ratio">
-            <div>{{ $t('active') }} <span class="normal">{{ numberCount.normalSendTotal }}</span></div>
-            <div>{{ $t('deleted') }} <span class="deleted">{{ numberCount.delSendTotal }}</span></div>
+            <div>{{ $t('active') }} <span class="normal">{{ formatAnalysisInteger(numberCount.normalSendTotal) }}</span></div>
+            <div>{{ $t('deleted') }} <span class="deleted">{{ formatAnalysisInteger(numberCount.delSendTotal) }}</span></div>
           </div>
         </div>
         <div class="number-item">
@@ -48,7 +48,7 @@
             <div class="left">
               <div style="font-weight: 600;">{{ $t('systemInterceptRate') }}</div>
               <div>
-                <el-statistic :formatter="value => Math.round(value) + '%'" :value="interceptRateData"/>
+                <el-statistic :formatter="formatAnalysisPercent" :value="interceptRateData"/>
               </div>
             </div>
             <div class="right">
@@ -58,8 +58,8 @@
             </div>
           </div>
           <div class="delete-ratio">
-            <div>{{ $t('spamEmails') }} <span style="color: #E6A23C; font-weight: 600;">{{ numberCount.interceptReceiveTotal || 0 }}</span></div>
-            <div>{{ $t('interceptedEmails') }} <span style="color: #f56c6c; font-weight: 600;">{{ numberCount.hardInterceptTotal || 0 }}</span></div>
+            <div>{{ $t('spamEmails') }} <span style="color: #E6A23C; font-weight: 600;">{{ formatAnalysisInteger(numberCount.interceptReceiveTotal || 0) }}</span></div>
+            <div>{{ $t('interceptedEmails') }} <span style="color: #f56c6c; font-weight: 600;">{{ formatAnalysisInteger(numberCount.hardInterceptTotal || 0) }}</span></div>
           </div>
         </div>
         <div class="number-item">
@@ -67,7 +67,7 @@
             <div class="left">
               <div>{{ $t('totalUsers') }}</div>
               <div>
-                <el-statistic :formatter="value => Math.round(value)" :value="userData"/>
+                <el-statistic :formatter="formatAnalysisInteger" :value="userData"/>
               </div>
             </div>
             <div class="right">
@@ -77,8 +77,8 @@
             </div>
           </div>
           <div class="delete-ratio">
-            <div>{{ $t('active') }} <span class="normal">{{ numberCount.normalUserTotal }}</span></div>
-            <div>{{ $t('deleted') }} <span class="deleted">{{ numberCount.delUserTotal }}</span></div>
+            <div>{{ $t('active') }} <span class="normal">{{ formatAnalysisInteger(numberCount.normalUserTotal) }}</span></div>
+            <div>{{ $t('deleted') }} <span class="deleted">{{ formatAnalysisInteger(numberCount.delUserTotal) }}</span></div>
           </div>
         </div>
       </div>
@@ -118,7 +118,7 @@
         <div class="picture-cs-item">
           <div class="title" style="display: flex; justify-content: space-between; align-items: center;">
             <span>{{ $t('aiCallAndTokenTrend') }}</span>
-            <span class="ai-stat-badge" v-if="aiTotalStats.calls > 0">{{ $t('fifteenDaysTotalCalls', { calls: aiTotalStats.calls, tokens: aiTotalStats.tokensText }) }}</span>
+            <span class="ai-stat-badge" v-if="aiTotalStats.calls > 0">{{ $t('fifteenDaysTotalCalls', { calls: formatAnalysisInteger(aiTotalStats.calls), tokens: formatAnalysisCompact(aiTotalStats.tokens) }) }}</span>
           </div>
           <div class="ai-usage-line"></div>
         </div>
@@ -136,20 +136,26 @@ import {Icon} from "@iconify/vue";
 import {useTransition} from "@vueuse/core";
 import {defineOptions, onActivated, onDeactivated, onMounted, reactive, ref, watch, computed, nextTick} from "vue";
 import echarts from "@/echarts/index.js";
-import dayjs from "dayjs";
 import {analysisEcharts} from "@/request/analysis.js";
 import {useUiStore} from "@/store/ui.js";
 import {debounce} from "lodash-es";
 import loading from "@/components/loading/index.vue";
 import {useRoute} from "vue-router";
 import {useI18n} from 'vue-i18n';
+import {formatUiDate, formatUiNumber} from '@/utils/ui-locale.js';
 
 defineOptions({
   name: 'analysis'
 })
 
-const {t} = useI18n();
+const {t, locale} = useI18n();
 const route = useRoute();
+
+const formatAnalysisInteger = value => formatUiNumber(value, locale.value, {maximumFractionDigits: 0});
+const formatAnalysisPercent = value => formatUiNumber(value === null || value === undefined || value === '' ? null : Number(value) / 100, locale.value, {style: 'percent', maximumFractionDigits: 1});
+// These values are calendar-day buckets, not instants in the viewer's time zone.
+const formatAnalysisDate = value => formatUiDate(value, locale.value, {month: 'numeric', day: 'numeric', timeZone: 'UTC'});
+const formatAnalysisCompact = value => formatUiNumber(value, locale.value, {notation: 'compact', maximumFractionDigits: 2});
 const uiStore = useUiStore()
 const checkedSourceType = ref('sender')
 const receiveTotal = ref(0)
@@ -205,8 +211,7 @@ const aiLineData = reactive({
 const aiModelData = ref([])
 const aiTotalStats = reactive({
   calls: 0,
-  tokens: 0,
-  tokensText: '0'
+  tokens: 0
 })
 
 const topic = computed(() => ({
@@ -260,23 +265,20 @@ onMounted(() => {
       }
     })
 
-    userLineData.xdata = (data.userDayCount || []).map(item => dayjs(item.date).format("M.D"));
+    userLineData.xdata = (data.userDayCount || []).map(item => item.date);
     userLineData.sdata = (data.userDayCount || []).map(item => item.total || 0)
 
-    emailColumnData.daysData = (data.emailDayCount?.receiveDayCount || []).map(item => dayjs(item.date).format("M.D"))
+    emailColumnData.daysData = (data.emailDayCount?.receiveDayCount || []).map(item => item.date)
     emailColumnData.receiveData = (data.emailDayCount?.receiveDayCount || []).map(item => item.total || 0)
     emailColumnData.sendData = (data.emailDayCount?.sendDayCount || []).map(item => item.total || 0)
     emailColumnData.interceptData = (data.emailDayCount?.interceptDayCount || []).map(item => item.total || 0)
 
     if (data.aiAnalytics) {
-      aiLineData.xdata = (data.aiAnalytics.dayCount || []).map(item => dayjs(item.date).format("M.D"));
+      aiLineData.xdata = (data.aiAnalytics.dayCount || []).map(item => item.date);
       aiLineData.calls = (data.aiAnalytics.dayCount || []).map(item => item.calls || 0);
       aiLineData.tokens = (data.aiAnalytics.dayCount || []).map(item => item.tokens || 0);
       aiTotalStats.calls = data.aiAnalytics.totalCalls || 0;
       aiTotalStats.tokens = data.aiAnalytics.totalTokens || 0;
-      aiTotalStats.tokensText = aiTotalStats.tokens >= 1000000
-        ? `${(aiTotalStats.tokens / 1000000).toFixed(2)}M`
-        : (aiTotalStats.tokens >= 1000 ? `${(aiTotalStats.tokens / 1000).toFixed(1)}k` : `${aiTotalStats.tokens}`);
       aiModelData.value = data.aiAnalytics.modelRatio || [];
     }
 
@@ -342,6 +344,10 @@ watch(() => uiStore.dark, () => {
   initPicture()
 })
 
+watch(locale, () => {
+  if (!analysisLoading.value) initPicture();
+});
+
 function initPicture() {
   if (!isAnalysisRoute()) return
   boxKey.value++
@@ -396,7 +402,7 @@ function createSenderPie() {
       },
       backgroundColor: topic.value.background,
       formatter: params => {
-        return `${params.marker} ${params.name}： ${params.value} (${params.percent}%)`;
+        return `${params.marker} ${params.name}: ${formatAnalysisInteger(params.value)} (${formatAnalysisPercent(params.percent)})`;
       }
     },
     legend: {
@@ -445,7 +451,7 @@ function createSenderPie() {
         label: {
           show: false,
           position: 'outside', // 标签显示在外部
-          formatter: '{d}%',  // 显示名称和占比
+          formatter: params => formatAnalysisPercent(params.percent),  // 显示名称和占比
           color: '#333',
           fontSize: 14  // 设置字体大小
         },
@@ -492,7 +498,7 @@ function createIncreaseLine() {
       formatter: function (params) {
         let result = ''
         params.forEach(item => {
-          result = `${item.marker} ${t('growthTotalUsers')} ${item.value}`;
+          result = `${item.marker} ${t('growthTotalUsers')} ${formatAnalysisInteger(item.value)}`;
         });
         return result;
       },
@@ -512,7 +518,7 @@ function createIncreaseLine() {
     },
     xAxis: {
       type: 'category',
-      data: userLineData.xdata,
+      data: userLineData.xdata.map(formatAnalysisDate),
       axisTick: {
         show: false,
         alignWithLabel: false,  // 刻度线与标签对齐,
@@ -550,6 +556,7 @@ function createIncreaseLine() {
       type: 'value',
       axisLabel: {
         margin: 5, // 增加y轴刻度数字与网格线之间的间距
+        formatter: formatAnalysisInteger,
       },
       boundaryGap: [0, 0.1],
       max: (params) => {
@@ -568,7 +575,7 @@ function createIncreaseLine() {
         label: {
           show: true,
           formatter: (e) => {
-            return Math.round(e.value)
+            return formatAnalysisInteger(e.value)
           }
         }
       },
@@ -643,7 +650,7 @@ function createEmailColumnChart() {
       backgroundColor: topic.value.background,
       formatter: function (params) {
         params.marker
-        return `${params.marker} ${params.seriesName}: ${params.value}`
+        return `${params.marker} ${params.seriesName}: ${formatAnalysisInteger(params.value)}`
       }
     },
     legend: {
@@ -662,7 +669,7 @@ function createEmailColumnChart() {
     },
     xAxis: {
       type: 'category',
-      data: emailColumnData.daysData,
+      data: emailColumnData.daysData.map(formatAnalysisDate),
       axisTick: {
         show: false,
       },
@@ -696,6 +703,7 @@ function createEmailColumnChart() {
         }
       },
       type: 'value',
+      axisLabel: {formatter: formatAnalysisInteger},
       boundaryGap: [0, 0.1],
     },
     series: [
@@ -809,7 +817,7 @@ function createSendGauge() {
       // 中心文字颜色（新增）
       detail: {
         valueAnimation: true,
-        formatter: '{value}',
+        formatter: formatAnalysisInteger,
         color: topic.value.color // 黑色文字
       },
       data: [{
@@ -857,8 +865,8 @@ function createAiUsageLine() {
         let title = params[0] ? params[0].name : '';
         let str = `<div style="font-weight:600;margin-bottom:4px;">${title}</div>`;
         params.forEach(item => {
-          const unit = item.seriesName.includes('Token') ? ' Tokens' : t('aiCallsUnit');
-          str += `${item.marker} ${item.seriesName}: <b>${item.value}</b>${unit}<br/>`;
+          const unit = item.seriesIndex === 1 ? '' : t('aiCallsUnit');
+          str += `${item.marker} ${item.seriesName}: <b>${formatAnalysisInteger(item.value)}</b>${unit}<br/>`;
         });
         return str;
       }
@@ -880,7 +888,7 @@ function createAiUsageLine() {
     },
     xAxis: {
       type: 'category',
-      data: aiLineData.xdata,
+      data: aiLineData.xdata.map(formatAnalysisDate),
       boundaryGap: false,
       axisTick: { show: false },
       axisLine: {
@@ -921,7 +929,7 @@ function createAiUsageLine() {
       },
       {
         type: 'value',
-        name: 'Tokens',
+        name: t('tokenConsumption'),
         nameTextStyle: {
           color: topic.value.color,
           fontSize: 12
@@ -936,7 +944,7 @@ function createAiUsageLine() {
         },
         axisLabel: {
           color: topic.value.color,
-          formatter: (v) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v
+          formatter: (v) => formatAnalysisCompact(v)
         }
       }
     ],
@@ -1007,7 +1015,7 @@ function createAiModelPie() {
       borderWidth: 1,
       formatter: params => {
         if (!hasData) return t('noAiCallRecords');
-        return `${params.marker} ${params.name}: ${params.value} ${t('aiCallsUnit')} (${params.percent}%)`;
+        return `${params.marker} ${params.name}: ${formatAnalysisInteger(params.value)} ${t('aiCallsUnit')} (${formatAnalysisPercent(params.percent)})`;
       }
     },
     legend: {
@@ -1094,6 +1102,9 @@ function createAiModelPie() {
   }
 
   .title {
+    flex-wrap: wrap;
+    gap: 8px;
+    overflow-wrap: anywhere;
     margin-top: 10px;
     margin-left: 15px;
     font-size: 18px;
@@ -1163,7 +1174,7 @@ function createAiModelPie() {
       .delete-ratio {
         width: 100%;
         display: grid;
-        grid-template-columns:  auto auto;
+        grid-template-columns: repeat(auto-fit, minmax(min(130px, 100%), 1fr));
         justify-content: start;
         gap: 20px;
         padding-top: 5px;
@@ -1199,6 +1210,7 @@ function createAiModelPie() {
     }
 
     .picture-item {
+      min-width: 0;
       background: var(--el-bg-color);
       border-radius: 8px;
       border: 1px solid var(--el-border-color);
@@ -1239,6 +1251,7 @@ function createAiModelPie() {
     }
 
     .picture-cs-item {
+      min-width: 0;
       background: var(--el-bg-color);
       border-radius: 8px;
       border: 1px solid var(--el-border-color);

@@ -148,16 +148,16 @@
                 <div class="email-right" :style="showUserInfo ? 'align-self: start;':''">
                   <span class="email-time" :class="{ 'is-unread': item.unread === EmailUnreadEnum.UNREAD && showUnread }">{{ item.formatCreateTime }}</span>
                   <div class="quick-actions">
-                    <el-tooltip :content="$t('snooze') || 'Snooze'" placement="top" v-if="['email'].includes(props.type)">
+                    <el-tooltip :content="$t('snooze')" placement="top" v-if="['email'].includes(props.type)">
                       <Icon icon="ic:outline-access-time" width="18" height="18" class="quick-icon" @click.stop="handleSnooze(item.emailId)" />
                     </el-tooltip>
                     <el-tooltip :content="$t('delete')" placement="top" v-if="!['trash'].includes(props.type)">
                       <Icon icon="uiw:delete" width="16" height="16" class="quick-icon" @click.stop="rightDelete(item.emailId)" />
                     </el-tooltip>
-                    <el-tooltip :content="$t('permanentDelete') || 'Delete forever'" placement="top" v-if="['trash', 'spam'].includes(props.type)">
+                    <el-tooltip :content="$t('permanentDelete')" placement="top" v-if="['trash', 'spam'].includes(props.type)">
                       <Icon icon="uiw:delete" width="16" height="16" class="quick-icon" @click.stop="rightDelete(item.emailId, true)" />
                     </el-tooltip>
-                    <el-tooltip :content="$t('restore') || 'Restore'" placement="top" v-if="['trash', 'spam', 'snoozed'].includes(props.type)">
+                    <el-tooltip :content="$t('restore')" placement="top" v-if="['trash', 'spam', 'snoozed'].includes(props.type)">
                       <Icon icon="ic:outline-restore" width="18" height="18" class="quick-icon" @click.stop="handleRestore(item.emailId)" />
                     </el-tooltip>
                     <el-tooltip :content="$t('markRead')" placement="top" v-if="item.unread === EmailUnreadEnum.UNREAD && showUnread">
@@ -233,7 +233,7 @@
             <template #default>
               <div class="right-dropdown-item">
                 <Icon icon="ic:outline-access-time" width="20" height="20" />
-                <span>{{t('snooze') || 'Snooze'}}</span>
+                <span>{{t('snooze')}}</span>
               </div>
             </template>
           </el-dropdown-item>
@@ -241,7 +241,7 @@
             <template #default>
               <div class="right-dropdown-item">
                 <Icon icon="ic:outline-report-gmailerrorred" width="20" height="20" />
-                <span>{{t('spam') || 'Spam'}}</span>
+                <span>{{t('spam')}}</span>
               </div>
             </template>
           </el-dropdown-item>
@@ -305,7 +305,7 @@
             <template #default>
               <div class="right-dropdown-item">
                 <Icon icon="uiw:delete" width="16" height="20" style="margin-left: 1px;margin-right: 3px" />
-                <span>{{t('permanentDelete') || 'Delete forever'}}</span>
+                <span>{{t('permanentDelete')}}</span>
               </div>
             </template>
           </el-dropdown-item>
@@ -313,7 +313,7 @@
             <template #default>
               <div class="right-dropdown-item">
                 <Icon icon="ic:outline-restore" width="16" height="20" style="margin-left: 1px;margin-right: 3px" />
-                <span>{{t('restore') || 'Restore'}}</span>
+                <span>{{t('restore')}}</span>
               </div>
             </template>
           </el-dropdown-item>
@@ -324,27 +324,27 @@
     <!-- Snooze Dialog -->
     <el-dialog
       v-model="snoozeDialogVisible"
-      :title="t('snooze') || 'Snooze'"
-      width="400px"
+      :title="t('snooze')"
+      width="min(400px, calc(100vw - 32px))"
       class="snooze-dialog"
       :append-to-body="true"
     >
       <el-form label-position="top">
-        <el-form-item :label="t('snoozeStartTime') || 'Start Time'">
+        <el-form-item :label="t('snoozeStartTime')">
           <el-date-picker
             v-model="snoozeForm.time"
             type="datetime"
-            :placeholder="t('selectTime') || 'Select Time'"
+            :placeholder="t('selectTime')"
             style="width: 100%"
             value-format="YYYY-MM-DD HH:mm:ss"
             :disabled-date="disabledSnoozeDate"
           />
         </el-form-item>
-        <el-form-item :label="t('snoozeEndTime') || 'End Time'">
+        <el-form-item :label="t('snoozeEndTime')">
           <el-date-picker
             v-model="snoozeForm.endTime"
             type="datetime"
-            :placeholder="t('selectTime') || 'Select Time'"
+            :placeholder="t('selectTime')"
             style="width: 100%"
             value-format="YYYY-MM-DD HH:mm:ss"
             :disabled-date="disabledSnoozeDate"
@@ -353,9 +353,9 @@
       </el-form>
       <template #footer>
         <span class="dialog-footer">
-          <el-button @click="snoozeDialogVisible = false">{{ t('cancel') || 'Cancel' }}</el-button>
+          <el-button @click="snoozeDialogVisible = false">{{ t('cancel') }}</el-button>
           <el-button type="primary" @click="confirmSnooze" :loading="snoozeLoading">
-            {{ t('confirm') || 'Confirm' }}
+            {{ t('confirm') }}
           </el-button>
         </span>
       </template>
@@ -724,7 +724,7 @@ const list = computed(() => {
   if (otherPartition.length > 0) {
     finalResult = [
       ...currentPartition,
-      { emailId: 'separator-1', expand: 'separator', title: t('otherFolders') || 'Other Folders' },
+      { emailId: 'separator-1', expand: 'separator', title: t('otherFolders') },
       ...otherPartition
     ];
   } else {
@@ -883,17 +883,17 @@ function handleSnooze(emailId) {
 
 function confirmSnooze() {
   if (!snoozeForm.time || !snoozeForm.endTime) {
-    ElMessage.error(t('selectTime') || 'Please select time');
+    ElMessage.error(t('selectTime'));
     return;
   }
   if (new Date(snoozeForm.endTime).getTime() < new Date(snoozeForm.time).getTime()) {
-    ElMessage.error(t('endTimeBeforeStartTime') || 'End time cannot be earlier than start time');
+    ElMessage.error(t('endTimeBeforeStartTime'));
     return;
   }
 
   snoozeLoading.value = true;
   emailSnooze(snoozeForm.emailId, snoozeForm.time, snoozeForm.endTime).then(() => {
-    ElMessage.success(t('snoozedSuccess') || 'Email snoozed');
+    ElMessage.success(t('snoozedSuccess'));
     deleteEmailFromList([snoozeForm.emailId]);
     emailStore.refreshSidebarStats();
     snoozeDialogVisible.value = false;
@@ -904,7 +904,7 @@ function confirmSnooze() {
 
 function handleSpam(emailId) {
   emailSpam(emailId, true).then(() => {
-    ElMessage.success(t('spamSuccess') || 'Marked as spam');
+    ElMessage.success(t('spamSuccess'));
     deleteEmailFromList([emailId]);
     emailStore.refreshSidebarStats();
   });
@@ -912,7 +912,7 @@ function handleSpam(emailId) {
 
 function handleRestore(emailId) {
   emailRestore(emailId).then(() => {
-    ElMessage.success(t('restoreSuccessMsg') || 'Email restored');
+    ElMessage.success(t('restoreSuccessMsg'));
     deleteEmailFromList([emailId]);
     emailStore.refreshSidebarStats();
   });

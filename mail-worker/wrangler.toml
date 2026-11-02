@@ -1,6 +1,7 @@
 name = "epomail"
 main = "src/index.js"
 compatibility_date = "2025-06-04"
+compatibility_flags = ["nodejs_als"]
 keep_vars = true
 
 [observability]
@@ -86,6 +87,7 @@ command = "node ./build.mjs"
 [env.staging]
 name = "epomail-staging"
 compatibility_date = "2025-06-04"
+compatibility_flags = ["nodejs_als"]
 keep_vars = true
 
 [env.staging.observability]

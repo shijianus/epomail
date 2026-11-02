@@ -6,6 +6,7 @@ import {useUiStore} from "@/store/ui.js";
 import {forceLogoutToLogin} from "@/utils/auth.js";
 import { attachRequestSession, isCurrentResponse } from '@/utils/tab-session.js';
 import { isLocalSessionEnded } from '@/utils/device-privacy.js';
+import { normalizeUiLocale } from '@/utils/ui-locale.js';
 
 let http = axios.create({
     baseURL: import.meta.env.VITE_BASE_URL,
@@ -16,7 +17,7 @@ http.interceptors.request.use(config => {
     if (isLocalSessionEnded()) return Promise.reject(new axios.CanceledError('Local session ended'));
     const { lang } = useSettingStore();
     attachRequestSession(config);
-    config.headers['accept-language'] = lang
+    config.headers['accept-language'] = normalizeUiLocale(lang || 'zh')
     return config
 })
 

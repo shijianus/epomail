@@ -37,6 +37,7 @@ test('config uses only local dummy bindings and absolute repository assets; each
 			assert.ok(entry.includes(JSON.stringify(path.join(workerDir, 'src/index.js').replaceAll('\\', '/'))));
 			assert.ok(entry.includes("Object.defineProperty(globalThis, 'fetch'"));
 			assert.ok(entry.includes('writable: false, configurable: false'));
+		assert.deepEqual(config.compatibility_flags, ['nodejs_als']);
 		assert.equal(config.assets.directory, path.join(workerDir, 'dist'));
 		assert.equal(config.assets.run_worker_first, true);
 		assert.deepEqual(config.d1_databases, [{
@@ -63,6 +64,27 @@ test('config uses only local dummy bindings and absolute repository assets; each
 		if (process.platform !== 'win32') {
 			assert.equal((await fs.stat(path.join(firstDir, '.dev.vars'))).mode & 0o777, 0o600);
 		}
+	});
+});
+
+test('config and asset verification use an explicitly isolated build without falling back to repository dist', async () => {
+	await withDirectory(async directory => {
+		const workerDir = path.join(directory, 'repository', 'mail-worker');
+		const configDir = path.join(directory, 'config');
+		const assetsDir = path.join(directory, 'isolated build');
+		await fs.mkdir(configDir);
+		const { configPath } = await writeLocalConfig(configDir, workerDir, assetsDir);
+		const config = JSON.parse(await fs.readFile(configPath, 'utf8'));
+		assert.equal(config.assets.directory, assetsDir);
+		await assert.rejects(verifyProductionAssets(workerDir, assetsDir), /Production dist is missing/);
+		await fs.mkdir(path.join(assetsDir, 'assets'), { recursive: true });
+		await fs.mkdir(path.join(assetsDir, 'login/assets'), { recursive: true });
+		await fs.writeFile(path.join(assetsDir, 'index.html'), '<script type="module" src="/assets/mail.js"></script>');
+		await fs.writeFile(path.join(assetsDir, 'assets/mail.js'), 'export {};');
+		await fs.writeFile(path.join(assetsDir, 'login/index.html'), '<script type="module" src="/login/assets/login.js"></script>');
+		await fs.writeFile(path.join(assetsDir, 'login/assets/login.js'), 'export {};');
+		await verifyProductionAssets(workerDir, assetsDir);
+		await assert.rejects(verifyProductionAssets(workerDir), /Production dist is missing/);
 	});
 });
 

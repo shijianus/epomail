@@ -1,4 +1,10 @@
 const zh = {
+    parentLabel: '上级标签',
+    turnstileSiteKey: 'Turnstile 站点密钥',
+    turnstileSecretKey: 'Turnstile 私密密钥',
+    noticeTypeNone: '无样式',
+    noticeTypePrimary: '主要提示',
+    noticeTypeInfo: '一般信息',
     legalNotice: {
         adminTitle: '运营与隐私设置',
         adminReady: '注册资料已齐备',

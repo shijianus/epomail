@@ -2,13 +2,13 @@
   <div class="page-container">
     <div class="header-area">
       <div class="header-text">
-        <h1 class="page-title">{{ $t('labelSetting') || 'Label Management' }}</h1>
-        <p class="page-desc">{{ $t('labelSettingDesc') || 'Manage your labels and classification rules' }}</p>
+        <h1 class="page-title">{{ $t('labelSetting') }}</h1>
+        <p class="page-desc">{{ $t('labelSettingDesc') }}</p>
       </div>
       <div style="display: flex; align-items: center; gap: 12px;">
         <span class="label-count-badge">{{ uiStore.allLabels.length }} / 7</span>
         <el-button type="primary" size="large" @click="startAdd" class="primary-btn" :disabled="uiStore.allLabels.length >= 7">
-          <Icon icon="lucide:plus" width="18" /> {{ $t('newLabel') || 'New Label' }}
+          <Icon icon="lucide:plus" width="18" /> {{ $t('newLabel') }}
         </el-button>
       </div>
     </div>
@@ -22,7 +22,7 @@
            @dragend="onDragEnd"
            @drop="onDrop"
            :class="{ 'is-dragging': dragIndex === index }">
-        <div class="drag-handle" :title="$t('dragToReorder') || 'Drag to reorder'"
+        <div class="drag-handle" :title="$t('dragToReorder')"
              @mouseenter="dragEnabledIndex = index"
              @mouseleave="dragEnabledIndex = -1">
           <Icon icon="lucide:grip-vertical" width="18" />
@@ -38,26 +38,26 @@
         <div class="stats-group">
           <div class="stat-item">
             <span class="stat-val">{{ label.stats?.total || 0 }}</span>
-            <span class="stat-lbl">{{ $t('statTotal') || 'Total' }}</span>
+            <span class="stat-lbl">{{ $t('statTotal') }}</span>
           </div>
           <div class="stat-item">
             <span class="stat-val">{{ label.stats?.current || 0 }}</span>
-            <span class="stat-lbl">{{ $t('statCurrent') || 'Current' }}</span>
+            <span class="stat-lbl">{{ $t('statCurrent') }}</span>
           </div>
           <div class="stat-item">
             <span class="stat-val">{{ label.stats?.unread || 0 }}</span>
-            <span class="stat-lbl">{{ $t('statUnread') || 'Unread' }}</span>
+            <span class="stat-lbl">{{ $t('statUnread') }}</span>
           </div>
         </div>
 
         <div class="visibility-cell">
-           <el-switch v-model="label.listVis" size="small" :active-text="$t('show') || 'Show'" :inactive-text="$t('hide') || 'Hide'" inline-prompt />
+           <el-switch v-model="label.listVis" size="small" :active-text="$t('show')" :inactive-text="$t('hide')" inline-prompt />
         </div>
         <div class="actions-cell">
-          <el-button link class="action-btn edit-btn" @click="startEdit(index)" :title="$t('edit') || 'Edit'">
+          <el-button link class="action-btn edit-btn" @click="startEdit(index)" :title="$t('edit')">
             <Icon icon="lucide:pencil" width="16" />
           </el-button>
-          <el-button link class="action-btn delete-btn" @click="confirmDelete(index)" :title="$t('delete') || 'Delete'">
+          <el-button link class="action-btn delete-btn" @click="confirmDelete(index)" :title="$t('delete')">
             <Icon icon="lucide:trash-2" width="16" />
           </el-button>
         </div>
@@ -65,20 +65,20 @@
     </div>
     <div v-else class="empty-state">
       <Icon icon="lucide:tags" width="48" class="empty-icon" />
-      <h3>{{ $t('noLabels') || 'No Labels' }}</h3>
-      <p>{{ $t('noLabelsDesc') || 'Create your first label to keep your inbox organized.' }}</p>
+      <h3>{{ $t('noLabels') }}</h3>
+      <p>{{ $t('noLabelsDesc') }}</p>
     </div>
 
     <!-- Drawer for Add/Edit -->
-    <el-drawer v-model="isEditorOpen" :title="editIndex === -1 ? ($t('createLabel')) : ($t('editLabel'))" size="400px" destroy-on-close class="label-drawer">
+    <el-drawer v-model="isEditorOpen" :title="editIndex === -1 ? ($t('createLabel')) : ($t('editLabel'))" size="min(400px, 100vw)" destroy-on-close class="label-drawer">
       <div class="editor-form">
         <div class="form-group">
-          <label>{{ $t('name') || 'Name' }}</label>
-          <el-input v-model="form.name" size="large" :placeholder="$t('labelNamePlaceholder') || 'Enter label name'" />
+          <label>{{ $t('name') }}</label>
+          <el-input v-model="form.name" size="large" :placeholder="$t('labelNamePlaceholder')" />
         </div>
         <div class="form-group">
-          <label>Parent Label</label>
-          <el-select v-model="form.parent" size="large" placeholder="None" clearable style="width: 100%">
+<label>{{ $t('parentLabel') }}</label>
+        <el-select v-model="form.parent" size="large" :placeholder="$t('select')" clearable style="width: 100%">
              <el-option v-for="(l, i) in uiStore.allLabels" :key="i" :label="getLabelDisplayName(l.name, t)" :value="l.name" :disabled="editIndex === i" />
           </el-select>
         </div>
@@ -105,7 +105,7 @@
           </div>
         </div>
         <div class="form-group">
-          <label>{{ $t('color') || 'Color' }}</label>
+          <label>{{ $t('color') }}</label>
           <div class="swatches">
             <div class="swatch" 
                  v-for="color in presetColors" :key="color"
@@ -123,11 +123,11 @@
         <!-- Rules Section -->
         <div class="form-group" style="margin-top: 8px;">
           <label style="display:flex; align-items:center; gap:8px;">
-            {{ $t('classificationRules') || 'Rules' }}
+            {{ $t('classificationRules') }}
             <span v-if="form.rules && form.rules.length > 0" class="rules-count-badge">{{ $t('rulesCount', { count: form.rules.length }) }}</span>
           </label>
           <p style="font-size: 12px; color: var(--text-muted); margin: 0 0 8px 0; line-height: 1.4;">
-            {{ $t('rulesDesc') || 'Emails matching these rules will automatically receive this label.' }}
+            {{ $t('rulesDesc') }}
           </p>
           
           <div v-if="form.rules && form.rules.length > 0" class="rules-list" style="display: flex; flex-direction: column; gap: 6px; max-height: 280px; overflow-y: auto; margin-bottom: 8px;">
@@ -156,7 +156,7 @@
                     </div>
                   </div>
                   <div class="rule-exc" v-if="rule.exception">
-                    <span class="exc-lbl">Except if:</span>
+                    <span class="exc-lbl">{{ $t('ruleExclude') }}:</span>
                     <span class="exc-val">{{ getConditionText(rule.exception) }}</span>
                   </div>
                 </template>
@@ -164,11 +164,11 @@
                 <!-- ③ 普通规则 -->
                 <template v-else>
                   <div class="rule-cond">
-                    <span class="cond-lbl">If:</span>
+                    <span class="cond-lbl">{{ $t('ruleInclude') }}:</span>
                     <span class="cond-val">{{ getConditionText(rule.condition) }}</span>
                   </div>
                   <div class="rule-exc" v-if="rule.exception">
-                    <span class="exc-lbl">Except if:</span>
+                    <span class="exc-lbl">{{ $t('ruleExclude') }}:</span>
                     <span class="exc-val">{{ getConditionText(rule.exception) }}</span>
                   </div>
                 </template>
@@ -194,33 +194,33 @@
       </div>
       <template #footer>
         <div style="display: flex; justify-content: flex-end; gap: 12px;">
-          <el-button @click="isEditorOpen = false">{{ $t('cancel') || 'Cancel' }}</el-button>
-          <el-button type="primary" @click="saveLabel">{{ $t('saveLabel') || 'Save Label' }}</el-button>
+          <el-button @click="isEditorOpen = false">{{ $t('cancel') }}</el-button>
+          <el-button type="primary" @click="saveLabel">{{ $t('saveLabel') }}</el-button>
         </div>
       </template>
     </el-drawer>
 
     <!-- Delete Confirmation Modal -->
-    <el-dialog v-model="isDeleteOpen" :title="$t('deleteLabel') || 'Delete Label'" width="450px" custom-class="delete-modal">
+    <el-dialog v-model="isDeleteOpen" :title="$t('deleteLabel')" width="min(450px, calc(100vw - 32px))" custom-class="delete-modal">
       <div class="delete-warning">
         <Icon icon="lucide:alert-triangle" width="32" class="warning-icon" />
         <div class="warning-text">
-          <h3 style="margin:0; font-size: 16px;">{{ $t('deleteConfirmMsg', { name: deleteCandidate?.name }) || `Delete "${deleteCandidate?.name}"?` }}</h3>
+          <h3 style="margin:0; font-size: 16px;">{{ $t('deleteConfirmMsg', { name: deleteCandidate?.name }) }}</h3>
           <p style="margin:8px 0 0; color: var(--text-secondary); font-size: 13px;">
-             <strong>{{ $t('note') || 'Note' }}:</strong> {{ $t('deleteLabelWarning') || 'This will only remove the label tag. Associated emails will not be deleted.' }}
+             <strong>{{ $t('note') }}:</strong> {{ $t('deleteLabelWarning') }}
           </p>
         </div>
       </div>
       <template #footer>
         <div style="display: flex; justify-content: flex-end; gap: 12px;">
-          <el-button @click="isDeleteOpen = false">{{ $t('cancel') || 'Cancel' }}</el-button>
-          <el-button type="danger" @click="executeDelete">{{ $t('delete') || 'Delete' }}</el-button>
+          <el-button @click="isDeleteOpen = false">{{ $t('cancel') }}</el-button>
+          <el-button type="danger" @click="executeDelete">{{ $t('delete') }}</el-button>
         </div>
       </template>
     </el-dialog>
 
     <!-- Rule Builder Modal -->
-    <el-dialog v-model="isRuleBuilderOpen" :title="$t('classificationRules')" width="600px" destroy-on-close>
+    <el-dialog v-model="isRuleBuilderOpen" :title="$t('classificationRules')" width="min(600px, calc(100vw - 32px))" destroy-on-close>
       <div class="rule-builder-modal">
         <div style="font-size: 13px; color: var(--text-secondary); margin-bottom: 12px; margin-top: -12px;">
           {{ $t('ruleFutureNotice') }}
@@ -229,7 +229,7 @@
         <!-- Step 1: Condition (Include) -->
         <div class="rb-step">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-            <h4 class="rb-step-title" style="margin: 0;"><span class="step-num">1</span> {{ $t('ruleInclude') }} (Condition)</h4>
+            <h4 class="rb-step-title" style="margin: 0;"><span class="step-num">1</span> {{ $t('ruleInclude') }}</h4>
             <el-switch v-model="rbHasCondition" size="small" />
           </div>
           
@@ -289,7 +289,7 @@
               v-model="rbCondition.value" 
               :fetch-suggestions="queryConditionSuggestions"
               size="large" 
-              placeholder="Value" 
+              :placeholder="getConditionText({ type: rbCondition.type, value: true })"
               style="flex: 1;" 
             />
           </div>
@@ -300,7 +300,7 @@
         <!-- Step 2: Exception (Exclude) -->
         <div class="rb-step">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-            <h4 class="rb-step-title" style="margin: 0;"><span class="step-num">2</span> {{ $t('ruleExclude') }} (Exception)</h4>
+            <h4 class="rb-step-title" style="margin: 0;"><span class="step-num">2</span> {{ $t('ruleExclude') }}</h4>
             <el-switch v-model="rbHasException" size="small" />
           </div>
           
@@ -360,7 +360,7 @@
               v-model="rbException.value" 
               :fetch-suggestions="queryExceptionSuggestions"
               size="large" 
-              placeholder="Value" 
+              :placeholder="getConditionText({ type: rbException.type, value: true })"
               style="flex: 1;" 
             />
           </div>
@@ -375,7 +375,7 @@
     </el-dialog>
 
     <!-- Custom SVG Modal -->
-    <el-dialog v-model="isSvgModalOpen" :title="$t('addCustomIcon')" width="450px" destroy-on-close>
+    <el-dialog v-model="isSvgModalOpen" :title="$t('addCustomIcon')" width="min(450px, calc(100vw - 32px))" destroy-on-close>
       <div style="margin-bottom: 12px; font-size: 13px; color: var(--text-secondary); line-height: 1.5;" v-html="$t('customSvgModalDesc')"></div>
       <el-input v-model="customSvgInput" type="textarea" :rows="6" placeholder="<svg ...> ... </svg>" style="font-family: monospace;" />
       <template #footer>
@@ -554,17 +554,17 @@ const saveNewRule = () => {
   }
 
   if (!rbHasCondition.value && !rbHasException.value) {
-    ElMessage.error(t('ruleErrorMustHaveConditionOrException') || 'Please configure at least one condition or exception')
+    ElMessage.error(t('ruleErrorMustHaveConditionOrException'))
     return
   }
 
   if (rbHasCondition.value && requiresValue(rbCondition.value.type) && !isValidValue(rbCondition.value.value)) {
-    ElMessage.error(t('ruleErrorInvalidValue') || 'Invalid condition value')
+    ElMessage.error(t('ruleErrorInvalidValue'))
     return
   }
   
   if (rbHasException.value && requiresValue(rbException.value.type) && !isValidValue(rbException.value.value)) {
-    ElMessage.warning(t('emptyContentMsg') || 'Please enter exception value')
+    ElMessage.warning(t('emptyContentMsg'))
     return
   }
   
@@ -635,7 +635,7 @@ const removeRule = (index) => {
 const saveLabel = () => {
   const name = form.value.name.trim()
   if (!name) {
-    ElMessage.warning(t('labelNameRequired') || 'Label name is required')
+    ElMessage.warning(t('labelNameRequired'))
     return
   }
   
@@ -672,7 +672,7 @@ const executeDelete = () => {
     uiStore.allLabels.splice(deleteIndex.value, 1)
   }
   isDeleteOpen.value = false
-  ElMessage.success(t('labelDeleted') || 'Label removed successfully')
+  ElMessage.success(t('labelDeleted'))
 }
 
 const dragEnabledIndex = ref(-1)
@@ -709,6 +709,8 @@ const onDrop = () => {
 
 <style scoped>
 .page-container {
+  box-sizing: border-box;
+  overflow-wrap: anywhere;
   padding: 30px 40px;
   width: 100%;
   max-width: 960px;
@@ -717,6 +719,8 @@ const onDrop = () => {
 
 .header-area {
   display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 24px;
@@ -787,6 +791,8 @@ const onDrop = () => {
 
 .tech-row {
   display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
   align-items: center;
   padding: 14px 18px;
   border-radius: 12px;
@@ -830,7 +836,8 @@ const onDrop = () => {
 
 .label-pill-cell {
   flex: 1;
-  min-width: 200px;
+  min-width: 0;
+  flex-basis: 180px;
 }
 
 .label-pill {
@@ -1142,6 +1149,7 @@ const onDrop = () => {
 }
 .rb-form-row {
   display: flex;
+  flex-wrap: wrap;
   gap: 12px;
   align-items: center;
 }
@@ -1258,4 +1266,12 @@ const onDrop = () => {
 .add-rule-btn:active {
   transform: translateY(0);
 }
+@media (max-width: 600px) {
+  .page-container { padding: 16px; }
+  .header-area { padding: 16px; }
+  .stats-group { flex-basis: 100%; flex-wrap: wrap; gap: 16px; }
+  .rb-form-row > * { min-width: 0; max-width: 100%; flex-basis: 100% !important; }
+}
+:deep(.el-button) { height: auto; min-height: 32px; white-space: normal; }
+:deep(.el-button > span) { min-width: 0; overflow-wrap: anywhere; }
 </style>

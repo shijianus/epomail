@@ -449,6 +449,7 @@ import {
 } from '@/request/oauth-app.js'
 import { useSettingStore } from '@/store/setting.js'
 import { getOfficialLink } from '@/const/links-const.js'
+import { normalizeUiLocale, buildDocsPageUrl, formatUiDate } from '@/utils/ui-locale.js'
 
 defineOptions({
   name: 'oauth-app'
@@ -669,12 +670,11 @@ function openCreateDialog() {
   appDialogShow.value = true
 }
 
-// 开发接入教程：指向文档站《开放平台与 API 接入》（按界面语言选择文档目录，zh 为文档站根语言无前缀）
 function openBlogTutorial() {
-  const l = String(locale.value || 'zh')
-  const prefix = (l === 'zh' || l === 'zh-CN') ? '' : (l === 'zh-Hant' || l === 'zh-TW') ? 'zh-tw' : l
-  const base = getOfficialLink('docs', settingStore).replace(/\/$/, '')
-  window.open(`${base}/${prefix ? prefix + '/' : ''}mail/api/`, '_blank')
+  const lang = normalizeUiLocale(locale.value || settingStore.lang || 'zh')
+  const base = getOfficialLink('docs', settingStore)
+  const url = buildDocsPageUrl('mail/api/', lang, base)
+  window.open(url, '_blank')
 }
 
 function openEditDialog(app) {
@@ -857,12 +857,12 @@ function handleLogoError(event, app) {
 
 function formatDate(isoStr) {
   if (!isoStr) return ''
-  try {
-    const d = new Date(isoStr)
-    return t('createdAtLabel', { date: d.toLocaleDateString() })
-  } catch (e) {
-    return isoStr
-  }
+  const formatted = formatUiDate(isoStr, normalizeUiLocale(locale.value || settingStore.lang || 'zh'), {
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric'
+  })
+  return formatted === '-' ? isoStr : t('createdAtLabel', { date: formatted })
 }
 </script>
 

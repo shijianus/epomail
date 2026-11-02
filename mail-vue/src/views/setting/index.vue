@@ -826,6 +826,7 @@ import { Icon } from "@iconify/vue";
 import QRCode from 'qrcode';
 import { clearCurrentSession } from '@/utils/device-privacy.js';
 import { deferForcedLogout } from '@/utils/auth.js';
+import { normalizeUiLocale, formatUiDate } from '@/utils/ui-locale.js';
 
 const { t } = useI18n()
 const route = useRoute()
@@ -902,18 +903,9 @@ const passwordChangedText = computed(() => {
   const ts = userStore.user.passwordUpdatedAt || userStore.user.createTime
   if (!ts) return ''
   try {
-    const d = new Date(ts)
-    if (isNaN(d.getTime())) return t('lastChangedAt', { time: ts })
-    const year = d.getFullYear()
-    const month = d.getMonth() + 1
-    const day = d.getDate()
-    const isZhLang = settingStore.lang === 'zh' || settingStore.lang === 'zh-Hant'
-    const formatted = t('dateYmdDisplay', {
-      year,
-      month: isZhLang ? month : String(month).padStart(2, '0'),
-      day: isZhLang ? day : String(day).padStart(2, '0')
-    })
-    return t('lastChangedAt', { time: formatted })
+  const lang = normalizeUiLocale(settingStore.lang || 'zh')
+  const formatted = formatUiDate(ts, lang, { year: 'numeric', month: 'numeric', day: 'numeric' })
+  return t('lastChangedAt', { time: formatted === '-' ? ts : formatted })
   } catch (e) {
     return t('lastChangedAt', { time: ts })
   }
@@ -988,13 +980,10 @@ const regenPassword = ref('')
 const regenResultCodes = ref([])
 
 function formatDate(isoStr) {
-  if (!isoStr) return '';
-  try {
-    const d = new Date(isoStr);
-    return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
-  } catch (e) {
-    return isoStr;
-  }
+  if (!isoStr) return '-';
+  const lang = normalizeUiLocale(settingStore.lang || 'zh')
+  const formatted = formatUiDate(isoStr, lang, { year: 'numeric', month: 'short', day: 'numeric' })
+  return formatted === '-' ? isoStr : formatted
 }
 
 const fetchTotpStatus = async () => {

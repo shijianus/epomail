@@ -326,8 +326,8 @@
                       <el-input-number v-if="form.sendType === 'day' || form.sendType === 'count'" v-model="form.sendCount" controls-position="right" :min="0" :max="99999" size="small"
                                        :placeholder="$t('total')">
                       </el-input-number>
-                      <el-select v-model="form.sendType" placeholder="Select" size="small"
-                                 :style="`min-width: ${ locale === 'zh' ? 96 : 110 }px; width: auto; margin-left: 5px;`">
+                      <el-select v-model="form.sendType" :placeholder="$t('select')" size="small"
+                                 :style="{ minWidth: sendTypeSelectWidth, width: sendTypeSelectWidth, marginLeft: '5px' }">
                         <el-option :label="$t('total')" value="count"/>
                         <el-option :label="$t('daily')" value="day"/>
                         <el-option :label="$t('internal')" value="internal"/>
@@ -524,6 +524,7 @@ import {useRoleStore} from "@/store/role.js";
 import {useUserStore} from "@/store/user.js";
 import {useSettingStore} from "@/store/setting.js";
 import {isDomain, isEmail} from "@/utils/verify-utils.js";
+import {getTextWidth} from "@/utils/text.js";
 import {useI18n} from "vue-i18n";
 import {ElMessage, ElMessageBox} from "element-plus";
 
@@ -561,6 +562,12 @@ const isMaster = computed(() => {
 
 const isModerator = computed(() => {
   return !isMaster.value && (userStore.user?.role?.roleCode === 'moderator' || userStore.user?.role?.name?.includes('协管'));
+});
+
+const sendTypeSelectWidth = computed(() => {
+  const labels = ['total', 'daily', 'internal', 'btnBan'].map(key => t(key));
+  const width = Math.ceil(Math.max(96, ...labels.map(label => getTextWidth(label, '12px sans-serif') + 36)));
+  return `${Math.min(width, 150)}px`;
 });
 
 function isModeratorSelf(roleRow) {
@@ -1212,7 +1219,7 @@ function handleSyncBlogTier() {
 
 function adjustWidth() {
   desShow.value = window.innerWidth > 767;
-  settingWidth.value = window.innerWidth < 480 ? (locale.value === 'en' ? 85 : 75) : null;
+  settingWidth.value = window.innerWidth < 480 ? 96 : null;
   sortWidth.value = window.innerWidth < 480 ? 75 : null;
   roleWidth.value = window.innerWidth < 480 ? 180 : 240;
 }
@@ -1848,11 +1855,67 @@ onBeforeUnmount(() => {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  flex-shrink: 0;
+  flex-shrink: 1;
+  min-width: 0;
+  max-width: 100%;
   padding-left: 8px;
 
   .el-input-number {
     width: 90px;
+    flex-shrink: 0;
+  }
+
+  :deep(.el-select) {
+    max-width: min(150px, 100%);
+    flex-shrink: 1;
+  }
+
+  :deep(.el-select__wrapper) {
+    min-width: 0 !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .header-actions {
+    padding: 8px 12px;
+    gap: 8px;
+
+    .hierarchy-btn {
+      max-width: 100%;
+      height: auto;
+      min-height: 32px;
+      white-space: normal;
+      text-align: left;
+    }
+  }
+
+  .role-name-cell,
+  .quota-badge,
+  .send-badge,
+  .att-tag {
+    white-space: normal !important;
+    overflow-wrap: anywhere;
+  }
+
+  .description {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .tree-node-content {
+    align-items: flex-start;
+    flex-wrap: wrap;
+
+    .tree-node-label {
+      white-space: normal;
+      overflow-wrap: anywhere;
+    }
+  }
+
+  .send-num {
+    width: 100%;
+    justify-content: flex-end;
+    padding-left: 0;
   }
 }
 

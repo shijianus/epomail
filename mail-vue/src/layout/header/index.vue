@@ -98,8 +98,8 @@
             <!-- Standalone Storage Progress Bar right below profile row (Clickable, no extra explanations) -->
             <div class="gac-single-storage" @click="openStorageSettings" :title="$t('manageStorage')" style="cursor: pointer;">
               <div class="gac-single-storage-header">
-                <span class="gac-single-storage-title">{{ $t('storageSpace') }}: {{ storageData.usedMb }} MB / {{ storageData.quotaDisplay }}</span>
-                <span class="gac-single-storage-pct" :style="{ color: storageProgressColor }">{{ storageData.usedPercentage }}%</span>
+                <span class="gac-single-storage-title">{{ $t('storageSpace') }}: {{ formattedStorageUsedMb }} MB / {{ formattedQuotaDisplay }}</span>
+                <span class="gac-single-storage-pct" :style="{ color: storageProgressColor }">{{ formattedStoragePercentage }}%</span>
               </div>
               <div class="gac-progress-track">
                 <div 
@@ -210,8 +210,8 @@
             <!-- Storage Progress Bar (aligned sizing with cards) -->
             <div class="gac-single-storage" @click="openStorageSettings" :title="$t('manageStorage')" style="cursor: pointer;">
               <div class="gac-single-storage-header">
-                <span class="gac-single-storage-title">{{ $t('storageSpace') }}: {{ storageData.usedMb }} MB / {{ storageData.quotaDisplay }}</span>
-                <span class="gac-single-storage-pct" :style="{ color: storageProgressColor }">{{ storageData.usedPercentage }}%</span>
+                <span class="gac-single-storage-title">{{ $t('storageSpace') }}: {{ formattedStorageUsedMb }} MB / {{ formattedQuotaDisplay }}</span>
+                <span class="gac-single-storage-pct" :style="{ color: storageProgressColor }">{{ formattedStoragePercentage }}%</span>
               </div>
               <div class="gac-progress-track">
                 <div 
@@ -376,6 +376,7 @@ import {useSettingStore} from "@/store/setting.js";
 import {hasPerm} from "@/perm/perm.js"
 import {useI18n} from "vue-i18n";
 import {setExtend} from "@/utils/day.js"
+import { normalizeUiLocale, formatUiNumber, buildDocsPageUrl, resolvePolicyUrl } from "@/utils/ui-locale.js"
 import { clearCurrentSession } from '@/utils/device-privacy.js';
 import { listSessionRecords, getTabIdentity, tabSession } from '@/utils/tab-session.js';
 
@@ -504,7 +505,17 @@ const storageFillWidth = computed(() => {
   return Math.min(98, Math.max(0, storageData.usedPercentage));
 });
 
-// Multi-account mode flag
+const formattedStorageUsedMb = computed(() => formatUiNumber(Number(storageData.usedMb || 0), normalizeUiLocale(locale.value || settingStore.lang || 'zh'), { minimumFractionDigits: 2, maximumFractionDigits: 2 }))
+const formattedStoragePercentage = computed(() => formatUiNumber(storageData.usedPercentage, normalizeUiLocale(locale.value || settingStore.lang || 'zh'), { maximumFractionDigits: 1 }))
+const formattedQuotaDisplay = computed(() => {
+  if (storageData.isUnlimited) return t('unlimitedQuota') || 'Unlimited'
+  const quota = Number(storageData.quotaMb || 0)
+  const lang = normalizeUiLocale(locale.value || settingStore.lang || 'zh')
+  return quota >= 1024
+    ? `${formatUiNumber(quota / 1024, lang, { maximumFractionDigits: 1 })} GB`
+    : `${formatUiNumber(quota, lang)} MB`
+})
+
 const isMultiAccountEnabled = computed(() => {
   if (Number(settingStore.settings?.multiAccountEnabled) === 1) return true;
   try {
@@ -661,9 +672,7 @@ function openAddAccount() {
 
 // 账户外链回退：指向文档站生产域，并按当前界面语言选择文档语言目录（zh 为文档站根语言，无前缀）
 function docsPageUrl(path) {
-  const l = String(locale.value || 'zh');
-  const prefix = (l === 'zh' || l === 'zh-CN') ? '' : (l === 'zh-Hant' || l === 'zh-TW') ? 'zh-tw' : l;
-  return `https://docs.epocanvas.com/epomail/${prefix ? prefix + '/' : ''}${path}`;
+  return buildDocsPageUrl(path, normalizeUiLocale(locale.value || settingStore.lang || 'zh'), settingStore.settings?.docsUrl);
 }
 
 function openProjectIntro() {
@@ -674,13 +683,13 @@ function openProjectIntro() {
 
 function openPrivacyPolicy() {
   closeDropdown();
-  const extUrl = settingStore.settings?.privacyUrl || docsPageUrl('mail/privacy-policy/');
+  const extUrl = resolvePolicyUrl(settingStore.settings?.privacyUrl, 'mail/privacy-policy/', normalizeUiLocale(locale.value || settingStore.lang || 'zh'), settingStore.settings?.docsUrl);
   window.open(extUrl, '_blank', 'noopener,noreferrer');
 }
 
 function openTermsOfService() {
   closeDropdown();
-  const extUrl = settingStore.settings?.termsUrl || docsPageUrl('mail/terms-of-service/');
+  const extUrl = resolvePolicyUrl(settingStore.settings?.termsUrl, 'mail/terms-of-service/', normalizeUiLocale(locale.value || settingStore.lang || 'zh'), settingStore.settings?.docsUrl);
   window.open(extUrl, '_blank', 'noopener,noreferrer');
 }
 
@@ -1204,10 +1213,13 @@ const emailStatus = computed(() => {
 });
 
 const formatSize = (bytes) => {
-  if (!bytes) return '0 B';
-  if (bytes < 1024) return bytes + ' B';
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  const value = Number(bytes)
+  const lang = normalizeUiLocale(locale.value || settingStore.lang || 'zh')
+  if (!Number.isFinite(value) || value <= 0) return '0 B'
+  if (value < 1024) return `${formatUiNumber(value, lang)} B`
+  if (value < 1024 * 1024) return `${formatUiNumber(value / 1024, lang, { maximumFractionDigits: 1 })} KB`
+  if (value < 1024 * 1024 * 1024) return `${formatUiNumber(value / (1024 * 1024), lang, { maximumFractionDigits: 1 })} MB`
+  return `${formatUiNumber(value / (1024 * 1024 * 1024), lang, { maximumFractionDigits: 1 })} GB`
 };
 
 async function copyEmail(email) {
@@ -1231,8 +1243,9 @@ async function copyEmail(email) {
 }
 
 function changeLang(lang) {
-  setExtend(lang === 'en' ? 'en' : 'zh-cn')
-  settingStore.lang = lang
+  const normalizedLang = normalizeUiLocale(lang)
+  setExtend(normalizedLang)
+  settingStore.lang = normalizedLang
 }
 
 function openNotice() {

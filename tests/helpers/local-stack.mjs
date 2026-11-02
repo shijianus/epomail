@@ -51,7 +51,7 @@ export function localEnvironment(directory, source = process.env) {
 	};
 }
 
-export async function writeLocalConfig(directory, workerDir) {
+export async function writeLocalConfig(directory, workerDir, assetsDir = path.join(workerDir, 'dist')) {
 	const secrets = {
 		jwt_secret: randomBytes(32).toString('base64url'),
 		totp_enc_key: randomBytes(32).toString('base64'),
@@ -65,10 +65,11 @@ export async function writeLocalConfig(directory, workerDir) {
 		name: 'epomail-local-test',
 		main: entryPath,
 		compatibility_date: '2025-06-04',
+		compatibility_flags: ['nodejs_als'],
 		send_metrics: false,
 		assets: {
 			binding: 'assets',
-			directory: path.resolve(workerDir, 'dist'),
+			directory: path.resolve(assetsDir),
 			not_found_handling: 'single-page-application',
 			run_worker_first: true
 		},
@@ -100,8 +101,8 @@ export async function writeLocalConfig(directory, workerDir) {
 	return { configPath, secrets };
 }
 
-export async function verifyProductionAssets(workerDir) {
-	const directory = path.join(workerDir, 'dist');
+export async function verifyProductionAssets(workerDir, assetsDir = path.join(workerDir, 'dist')) {
+	const directory = path.resolve(assetsDir);
 	for (const entry of ['index.html', 'login/index.html']) {
 		try {
 			const html = await fs.readFile(path.join(directory, entry), 'utf8');
@@ -277,6 +278,7 @@ async function waitForLogin(base, signal, timeoutMs) {
 // in finally; signals still request shutdown when no callback wrapper is used.
 export async function startLocalStack({
 	workerDir = path.join(root, 'mail-worker'),
+	assetsDir = path.join(workerDir, 'dist'),
 	startupTimeoutMs = 180000
 } = {}) {
 	let directory, child, state, stopPromise;
@@ -332,13 +334,13 @@ export async function startLocalStack({
 	process.on('SIGINT', onInt);
 	process.on('SIGTERM', onTerm);
 	try {
-		await verifyProductionAssets(workerDir);
+		await verifyProductionAssets(workerDir, assetsDir);
 		const require = createRequire(path.join(workerDir, 'package.json'));
 		// Invoke the installed CLI directly: no pnpm/cmd wrapper to orphan its
 		// children, no package download, and paths with spaces remain one argument.
 		const cli = path.resolve(path.dirname(require.resolve('wrangler/bin/wrangler.js')), '../wrangler-dist/cli.js');
 		directory = await fs.mkdtemp(path.join(os.tmpdir(), 'epomail-local-'));
-		const config = await writeLocalConfig(directory, workerDir);
+		const config = await writeLocalConfig(directory, workerDir, assetsDir);
 		secrets = config.secrets;
 		const port = await freePort();
 		const base = `http://127.0.0.1:${port}`;

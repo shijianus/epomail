@@ -159,7 +159,7 @@
 
             <!-- 4. 用户 ID (脱敏掩码 + 一键复制完整 ID) -->
             <div class="grid-field">
-              <span class="field-k">{{ $t('auditColUserId') || '用户 ID' }}:</span>
+              <span class="field-k">{{ $t('auditColUserId') }}:</span>
               <div class="field-v-with-copy font-mono">
                 <span class="masked-text" :title="maskedUserId">{{ maskedUserId }}</span>
                 <button
@@ -207,7 +207,7 @@
             <div v-if="alarmCountValue !== undefined" class="grid-field">
               <span class="field-k">{{ $t('auditColAlarmCount') }}:</span>
               <span class="field-v font-mono font-medium" :class="{ 'text-danger': alarmCountValue > 1 }">
-                {{ alarmCountValue }}<template v-if="alarmCountValue !== '—'"> {{ $t('auditTimesUnit') }}</template>
+                {{ formatUiNumber(alarmCountValue, locale) }}<template v-if="alarmCountValue !== '—'"> {{ $t('auditTimesUnit') }}</template>
               </span>
             </div>
 
@@ -390,7 +390,7 @@
                       <div class="event-title-group">
                         <span class="event-lane-badge badge-machine">
                           <Icon icon="fluent:bot-16-regular" width="11" height="11" />
-                          <span>{{ $t('auditTimelineSwimlaneMachine') || '自动化' }}</span>
+                          <span>{{ $t('auditTimelineSwimlaneMachine') }}</span>
                         </span>
                         <span class="event-action-title font-semibold">{{ node.action }}</span>
                         <span v-if="node.isLatest" class="event-latest-badge">{{ $t('auditTimelineLatestNode') }}</span>
@@ -454,7 +454,7 @@
                       <div class="event-title-group">
                         <span class="event-lane-badge badge-human">
                           <Icon icon="fluent:person-16-regular" width="11" height="11" />
-                          <span>{{ $t('auditTimelineSwimlaneHuman') || '人工·用户' }}</span>
+                          <span>{{ $t('auditTimelineSwimlaneHuman') }}</span>
                         </span>
                         <span class="event-action-title font-semibold">{{ node.action }}</span>
                         <span v-if="node.isLatest" class="event-latest-badge">{{ $t('auditTimelineLatestNode') }}</span>
@@ -557,7 +557,7 @@
             <div class="risk-top-grid">
               <!-- 1. 正方形方格综合风险分 (克制强调，非整块大红；未采集评分时展示占位破折号) -->
               <div class="composite-score-square" :class="riskScoreLevelClass">
-                <div class="score-number font-mono">{{ currentRiskProfile.compositeScore ?? '—' }}</div>
+                <div class="score-number font-mono">{{ formatUiNumber(currentRiskProfile.compositeScore, locale) }}</div>
                 <div class="score-label">{{ $t('auditRiskCompositeScore') }}</div>
               </div>
 
@@ -1159,7 +1159,7 @@
     <el-dialog
       v-model="noticeModalVisible"
       :title="$t('auditStep4NotificationPreviewTitle')"
-      width="580px"
+      width="min(580px, calc(100vw - 32px))"
       align-center
       destroy-on-close
       append-to-body
@@ -1217,7 +1217,7 @@ import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { Icon } from '@iconify/vue';
-import { tzDayjs } from '@/utils/day.js';
+import { formatUiDate, formatUiNumber } from '@/utils/ui-locale.js';
 import { hasPerm } from '@/perm/perm.js';
 import { useUserStore } from '@/store/user.js';
 import { parseCaseDeepLink, normalizeCaseTab } from '@/router/account-history.js';
@@ -1279,7 +1279,7 @@ const emit = defineEmits([
   'refresh'
 ]);
 
-const { t } = useI18n();
+const { t, locale } = useI18n();
 
 const visible = computed({
   get: () => props.modelValue,
@@ -1559,8 +1559,7 @@ const isBanType = computed(() => {
 });
 
 function formatTime(val) {
-  if (!val) return '-';
-  return tzDayjs(val).format('YYYY-MM-DD HH:mm');
+  return formatUiDate(val, locale.value, {year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit'});
 }
 
 // 状态与分类元信息：优先匹配传入的明确终态 (如关联账号的 banned/unbanned)，避免被主案件 circuitStatus 误覆盖
@@ -1589,7 +1588,7 @@ function getStatusLabel(status) {
     case 'rejected': return t('auditStatusRejectedAppeal');
   }
   if (status === 'active' || status === 'pending' || props.selectedRow?.circuitStatus === 'QUEUE_PAUSE' || props.selectedRow?.circuitStatus === 'TRIPPED') {
-    return t('abuseStatusPending') || '待审';
+    return t('abuseStatusPending');
   }
   return status || '-';
 }
@@ -1605,7 +1604,7 @@ const authorityValue = computed(() => {
 const evidenceDaysFormatted = computed(() => {
   const r = props.selectedRow;
   const days = r?.evidenceExpiresDays;
-  return (days === undefined || days === null) ? '—' : t('auditEvidenceRetentionDays', { days });
+  return (days === undefined || days === null) ? '—' : t('auditEvidenceRetentionDays', { days: formatUiNumber(days, locale.value) });
 });
 
 const alarmCountValue = computed(() => {
@@ -1874,13 +1873,13 @@ const evidenceItems = computed(() => {
     });
   }
   if (r.alarmCount !== undefined && r.alarmCount !== null && Number(r.alarmCount) > 0) {
-    items.push({ icon: 'fluent:alert-16-regular', label: t('auditColAlarmCount'), value: String(r.alarmCount) });
+    items.push({ icon: 'fluent:alert-16-regular', label: t('auditColAlarmCount'), value: formatUiNumber(r.alarmCount, locale.value) });
   }
   if (r.evidenceExpiresDays !== undefined && r.evidenceExpiresDays !== null) {
     items.push({
       icon: 'fluent:timer-16-regular',
       label: t('abuseEvidenceRetentionLabel'),
-      value: t('auditEvidenceRetentionDays', { days: r.evidenceExpiresDays }),
+      value: t('auditEvidenceRetentionDays', { days: formatUiNumber(r.evidenceExpiresDays, locale.value) }),
       mono: true
     });
   }
@@ -1945,7 +1944,7 @@ const submitButtonLabel = computed(() => {
   if (selectedVerdictMeta.value?.submitBtnText) {
     return selectedVerdictMeta.value.submitBtnText;
   }
-  return t('auditSubmitPrimaryBtn') || '确认并提交裁决';
+  return t('auditSubmitPrimaryBtn');
 });
 
 // 底部操作栏状态与权限守卫：仅已封禁展示解封，仅已解封展示重新封禁，首次待审严禁展示重新封禁

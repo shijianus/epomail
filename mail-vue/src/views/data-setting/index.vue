@@ -1007,6 +1007,7 @@ import { websiteConfig } from '@/request/setting.js'
 import { clearDeviceData } from '@/utils/device-privacy.js'
 import { listDraftDatabaseNames } from '@/db/db.js'
 import { privacyPreferences, verificationCodeNotice, withVerificationCodePreference } from '@/utils/privacy-preferences.js'
+import { normalizeUiLocale, formatUiDateTime } from '@/utils/ui-locale.js'
 
 defineOptions({
   name: 'data-setting'
@@ -1521,19 +1522,8 @@ function formatClientIdShort(clientId) {
 
 function formatDateTime(dateStr) {
   if (!dateStr) return '-'
-  try {
-    const d = new Date(dateStr)
-    if (isNaN(d.getTime())) return dateStr
-    return d.toLocaleString('zh-CN', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit'
-    })
-  } catch (e) {
-    return dateStr
-  }
+  const formatted = formatUiDateTime(dateStr, normalizeUiLocale(settingStore.lang || 'zh'))
+  return formatted === '-' ? dateStr : formatted
 }
 
 function parseScopeList(scopesStr) {

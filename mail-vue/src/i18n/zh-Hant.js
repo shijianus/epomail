@@ -1,4 +1,10 @@
 const zhHant = {
+    parentLabel: '上層標籤',
+    turnstileSiteKey: 'Turnstile 網站金鑰',
+    turnstileSecretKey: 'Turnstile 私密金鑰',
+    noticeTypeNone: '無樣式',
+    noticeTypePrimary: '主要提示',
+    noticeTypeInfo: '一般資訊',
     legalNotice: {
         adminTitle: '營運與隱私設定',
         adminReady: '註冊資料已齊備',
