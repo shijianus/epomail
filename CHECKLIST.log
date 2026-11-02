@@ -11,6 +11,24 @@
 
 ---
 
+### D1 安全操作与 TOTP 防重放最小模块交付 (2026-11-02)
+*   **关联提交 (Git Commit)**: `0d2be87f2c2d72fc1c48931429cee7c891565303` (Short: `0d2be87`)
+*   **部署环境 (Deployment)**: 本地隔离 workerd/D1；未部署、未推送，未改动主线程现有 user entity/init 或其他工作区修改。
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 新增 `mail-worker/src/utils/auth-security-operation.js`；导出幂等 `ensureAuthSecurityOperationSchema` 与 DDL 数组，供主线程接入冷启动及升级链，不在请求路径临时建表或降级 KV。
+    - [x] 操作 token 为随机 256-bit，仅持久化 SHA-256；绑定 user/target/sessionHash/authVersion/purpose/payload，记录 attempts/maxAttempts/expiry/consumed。
+    - [x] `issue` / `inspect` / `incrementAttempt` / `consume` 与 `bumpAuthVersionExpected` 已实现；尝试次数与消费采用单 SQL 条件更新，版本变更实时撤销旧操作，失效/错误绑定不会消耗合法 token。
+    - [x] 独立表 `auth_totp_replay` 通过 `(user_id, time_step)` 唯一约束和 `INSERT ... ON CONFLICT DO NOTHING RETURNING` 原子占位；导出 `consumeTotpStep`，跨会话、用途及 authVersion 禁止复用同一时间步。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 新模块和新 spec 均通过 `node --check`。
+    - [x] `mail-worker/test/auth-security-operation.spec.js`：真实 workerd/D1 **15/15** 通过；总耗时 33.13s，测试耗时 3.31s。覆盖 32 并发消费/尝试预留/版本 CAS/TOTP 占位，以及过期边界、绑定错配、删除账号、损坏 payload 和存储错误 fail-closed。
+    - [x] 写数据测试均通过 `finally` 物理删除自己的操作/TOTP/用户记录并断言计数为零；runner 退出出现 Windows EBUSY 临时目录提示，随后显式删除该次隔离目录并确认不存在。
+    - [x] i18n symmetry/audit/hardcoded 三件套通过；暂存区检查及内置密钥门禁通过。gitleaks 未安装，不宣称完整第三方凭据扫描。
+    - [ ] 本轮按用户缩减范围仅交付模块；未执行前端构建、HTTP/浏览器全真栈回归或完成业务接线，不宣称这些验证已通过。
+*   **主线程接入契约**: 初始化与升级调用 `ensureAuthSecurityOperationSchema(c)`；有验证码的路径先 `incrementAttempt`，仅在验证成功后将返回计数作为 `consume` 的 `attempt`；`consumeTotpStep` 仅接受已通过 `verifyTOTP` 的匹配时间步。payload 不得放明文凭证。schema/业务接线、存量 KV replay 迁移及到期行清理由主线程继续完成。
+
+---
+
 ### 推送前独立核验与缺口修复 (2026-11-02)
 *   **关联提交 (Git Commit)**: `0c03d2fb6c11f7fc0fc28a096789194824088d40` (Short: `0c03d2f`)；独立核验起点 `b94ffabf5eca3bfc57dcd1d9d24ad5bd8bb06f7f`。
 *   **环境与边界**: Node 24.14.0 / pnpm 10.34.5 / Windows；真实本地 workerd/D1/KV 与官方 IAB。推送目标仅 `origin/release/2026-10-31`，不强推、不合入 master、不部署或访问生产数据，不触碰 EpomailDocs 与 `.zcode/`。
