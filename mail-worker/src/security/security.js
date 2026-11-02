@@ -8,6 +8,8 @@ import permService from '../service/perm-service';
 import { t } from '../i18n/i18n'
 import app from '../hono/hono';
 import { isAdminUser } from '../utils/admin-utils';
+import { getUserDb } from '../utils/db-accessor.js';
+import { authVersionOf } from '../utils/one-time-credential.js';
 
 const exclude = [
 	'/login',
@@ -31,7 +33,6 @@ const requirePerms = [
 	'/account/list',
 	'/account/delete',
 	'/account/add',
-	'/my/delete',
 	'/analysis/echarts',
 	'/role/add',
 	'/role/list',
@@ -149,12 +150,9 @@ app.use('*', async (c, next) => {
 
 	if (pathMatches(path, '/public')) {
 
-		const userPublicToken = await c.env.kv.get(KvConst.PUBLIC_KEY);
-		const publicToken = c.req.header(constant.TOKEN_HEADER);
-		if (!userPublicToken || publicToken !== userPublicToken) {
-			throw new BizError(t('publicTokenFail'), 401);
-		}
-		return await next();
+		// The legacy global bearer has no owner/session/version metadata. Disable
+		// the entire legacy API rather than let old tokens survive factor changes.
+		throw new BizError(t('publicTokenFail'), 403, 'legacy_public_api_disabled');
 	}
 
 	const jwt = c.req.header(constant.TOKEN_HEADER) || c.req.header('token');
@@ -193,14 +191,33 @@ app.use('*', async (c, next) => {
 		}
 	}
 
-	if (authInfo.user.isDel === 1) {
-		await c.env.kv.delete(KvConst.AUTH_INFO + userId);
-		throw new BizError(t('isDelUser'), 403);
+	const currentUser = await getUserDb(c).prepare(
+		'SELECT user_id, email, type, is_del, status, auth_version FROM user WHERE user_id = ? LIMIT 1'
+	).bind(userId).first();
+
+	if (!currentUser || Number(currentUser.is_del) !== 0) {
+		await c.env.kv.delete(KvConst.AUTH_INFO + userId).catch(() => {});
+		throw new BizError(t('authExpired'), 401);
 	}
 
-	if (authInfo.user.status === 1) {
+	if (authVersionOf(result) !== authVersionOf(currentUser)) {
+		throw new BizError(t('authExpired'), 401);
+	}
+
+	if (Number(currentUser.status) !== 0) {
+		await c.env.kv.delete(KvConst.AUTH_INFO + userId).catch(() => {});
 		throw new BizError(t('isBanUser'), 403);
 	}
+
+	authInfo.user = {
+		...authInfo.user,
+		userId: currentUser.user_id,
+		email: currentUser.email,
+		type: currentUser.type,
+		isDel: currentUser.is_del,
+		status: currentUser.status,
+		authVersion: currentUser.auth_version
+	};
 
 	const permIndex = requirePerms.findIndex(item => pathMatches(path, item));
 

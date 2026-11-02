@@ -262,6 +262,7 @@ import { ElMessage } from 'element-plus'
 import { Icon } from '@iconify/vue'
 import { getOAuthAuthorizeInfo, confirmOAuthAuthorize } from '@/request/oauth-app.js'
 import { login } from '@/request/login.js'
+import { tabSession } from '@/utils/tab-session.js'
 
 const route = useRoute()
 const router = useRouter()
@@ -540,7 +541,7 @@ async function handleInlineLogin() {
     })
 
     if (res && res.token) {
-      localStorage.setItem('token', res.token)
+      tabSession.signIn({ token: res.token, email: loginForm.email.trim().toLowerCase() });
       await fetchAuthorizeDetails()
     }
   } catch (err) {
@@ -554,7 +555,7 @@ async function handleInlineLogin() {
 }
 
 function handleSwitchAccount() {
-  localStorage.removeItem('token')
+  tabSession.detach();
   authInfo.isLoggedIn = false
   authInfo.user = null
 }

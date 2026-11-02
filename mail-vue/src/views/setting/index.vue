@@ -379,13 +379,13 @@
     </div>
 
     <!-- Section 4: Account Deletion -->
-    <div class="container del-email" id="deleteUser" v-perm="'my:delete'">
+    <div class="container del-email" id="deleteUser">
       <div class="title">{{ $t('deleteUser') }}</div>
       <div class="del-msg">
-        {{ $t('delAccountMsg') }}
+        {{ $t('privacySettings.accountDeletionHint') }}
       </div>
       <div class="del-action">
-        <el-button type="danger" plain @click="deleteConfirm">{{ $t('deleteUserBtn') }}</el-button>
+        <el-button type="danger" plain :loading="deletingAccount" @click="deleteConfirm">{{ $t('deleteUserBtn') }}</el-button>
       </div>
     </div>
 
@@ -412,6 +412,7 @@
     <!-- 2FA Setup 3-Step Modal -->
     <el-dialog
       v-model="setupDialogVisible"
+      @closed="authenticationChanged && signInAfterSecurityChange()"
       :title="$t('totpSetupTitle')"
       width="460px"
       destroy-on-close
@@ -569,6 +570,7 @@
     <!-- Regenerate Backup Codes Modal -->
     <el-dialog
       v-model="regenDialogVisible"
+      @closed="authenticationChanged && signInAfterSecurityChange()"
       :title="$t('totpRegenTitle')"
       width="460px"
       destroy-on-close
@@ -783,9 +785,11 @@
 </template>
 
 <script setup>
-import { reactive, ref, computed, onMounted, defineOptions } from 'vue'
+import { reactive, ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import {
+  securityReauthOptions,
+  securityReauthenticate,
   resetPassword,
   userDelete,
   getInitialPasswordStatus,
@@ -820,6 +824,8 @@ import { useI18n } from "vue-i18n";
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { Icon } from "@iconify/vue";
 import QRCode from 'qrcode';
+import { clearCurrentSession } from '@/utils/device-privacy.js';
+import { deferForcedLogout } from '@/utils/auth.js';
 
 const { t } = useI18n()
 const route = useRoute()
@@ -1091,7 +1097,8 @@ const submitOauthReauth = async () => {
 
   oauthReauth.loading = true
   try {
-    const grant = await reauthOauthIdentity(payload)
+    const grant = await sensitiveGrant(oauthReauth.mode === 'bind' ? 'oauth_bind' : 'oauth_unbind',
+      oauthReauth.mode === 'bind' ? oauthReauth.provider : String(oauthReauth.identityId), payload)
     if (!grant || !grant.stepUpToken) {
       throw new Error('missing step-up grant')
     }
@@ -1120,7 +1127,7 @@ const submitOauthReauth = async () => {
     await unbindOauthIdentity(oauthReauth.identityId, grant.stepUpToken)
     ElMessage({ message: t('linkedAccountUnbindSuccess'), type: 'success', plain: true })
     oauthReauth.visible = false
-    await fetchOauthIdentities()
+    signInAfterSecurityChange()
   } catch (err) {
     // The axios interceptor already surfaced the server message.
   } finally {
@@ -1159,6 +1166,7 @@ const consumeOauthBindReturn = async () => {
   if (claim) {
     try {
       await completeOauthIdentityBind(claim)
+      signInAfterSecurityChange()
       ElMessage({ message: t('linkedAccountBindSuccess'), type: 'success', plain: true })
     } catch (err) {
       // The interceptor shows the reason (already used, expired, conflict).
@@ -1184,6 +1192,57 @@ onMounted(() => {
   fetchOauthIdentities().then(() => consumeOauthBindReturn());
 })
 
+// Grants are never reused across operations or kept after their single request.
+async function sensitiveGrant(operation, target = 'self', supplied = {}) {
+  const options = await securityReauthOptions({ operation, target });
+  let password = supplied.password || '';
+  if (!password && oauthIdentities.login.hasPassword) {
+    const answer = await ElMessageBox.prompt(t('linkedAccountCurrentPassword'), t('securitySetting'), {
+      inputType: 'password', inputValidator: value => !!value || t('emptyPwdMsg'),
+      confirmButtonText: t('confirm'), cancelButtonText: t('cancel'), closeOnClickModal: false
+    });
+    password = answer.value;
+  }
+  const proof = { operation, target, password, challengeToken: options.challengeToken };
+  if (options.hasFactor) {
+    if (supplied.code || options.hasTotp || !options.allowCredentials?.length) {
+      const code = supplied.code || (await ElMessageBox.prompt(t('totpCodeOrBackupPlaceholder'), t('securitySetting'), {
+        inputValidator: value => /^(?:\d{6}|[A-Z2-9]{4}-?[A-Z2-9]{4})$/i.test((value || '').trim()) || t('totpCodePlaceholder'),
+        confirmButtonText: t('confirm'), cancelButtonText: t('cancel')
+      })).value;
+      proof.code = code.trim();
+      proof.isBackupCode = supplied.isBackupCode === true || !/^\d{6}$/.test(proof.code);
+    } else {
+      const assertion = await navigator.credentials.get({ publicKey: {
+        challenge: base64UrlToBuffer(options.challenge), rpId: options.rpId,
+        allowCredentials: options.allowCredentials.map(key => ({ ...key, id: base64UrlToBuffer(key.id) })),
+        userVerification: 'required', timeout: 60000
+      }});
+      if (!assertion) throw new Error(t('passkeyTestFailed'));
+      Object.assign(proof, { isPasskey: true, credentialId: bufferToBase64Url(assertion.rawId),
+        clientDataJSON: bufferToBase64Url(assertion.response.clientDataJSON),
+        authenticatorData: bufferToBase64Url(assertion.response.authenticatorData),
+        signature: bufferToBase64Url(assertion.response.signature) });
+    }
+  }
+  return operation.startsWith('oauth_') ? reauthOauthIdentity(proof) : securityReauthenticate(proof);
+}
+const authenticationChanged = ref(false);
+let releaseSecurityLogout = null;
+function deferSecurityLogout() {
+  if (!releaseSecurityLogout) releaseSecurityLogout = deferForcedLogout();
+}
+function releaseSecurityLogoutHold() {
+  if (releaseSecurityLogout) releaseSecurityLogout();
+  releaseSecurityLogout = null;
+}
+function signInAfterSecurityChange() {
+  authenticationChanged.value = true;
+  clearCurrentSession({ email: userStore.user.email });
+  releaseSecurityLogoutHold();
+  window.location.replace('/login/');
+}
+
 const startTotpSetup = async () => {
   totpLoading.value = true;
   setupStep.value = 1;
@@ -1193,8 +1252,12 @@ const startTotpSetup = async () => {
   setupDialogVisible.value = true;
 
   try {
-    const data = await getTotpSetup();
+    const operation = totpStatus.totpConfigured ? 'totp_update' : 'totp_enable';
+    const grant = await sensitiveGrant(operation);
+    const data = await getTotpSetup({ operation, stepUpToken: grant.stepUpToken });
     if (data) {
+      setupData.setupToken = data.setupToken;
+      setupData.operation = data.operation;
       setupData.secret = data.secret;
       setupData.otpauthUri = data.otpauthUri;
 
@@ -1233,7 +1296,7 @@ const copySecret = () => {
 }
 
 const submitEnableTotp = async () => {
-  if (!setupCode.value || setupCode.value.trim().length !== 6) {
+  if (!/^\d{6}$/.test(setupCode.value.trim())) {
     ElMessage({
       message: t('totpCodePlaceholder'),
       type: 'error',
@@ -1244,10 +1307,12 @@ const submitEnableTotp = async () => {
 
   enableLoading.value = true;
   try {
-    const res = await enableTotp(setupCode.value.trim());
+    deferSecurityLogout();
+    const payload = { code: setupCode.value.trim(), setupToken: setupData.setupToken };
+    const res = await (setupData.operation === 'totp_update' ? updateTotp(payload) : enableTotp(payload));
+    authenticationChanged.value = true;
     backupCodesList.value = res.backupCodes || [];
     setupStep.value = 3;
-    await fetchTotpStatus();
   } catch (err) {
     ElMessage({
       message: err.message || t('totpCodeInvalid'),
@@ -1256,6 +1321,7 @@ const submitEnableTotp = async () => {
     });
   } finally {
     enableLoading.value = false;
+    if (!authenticationChanged.value) releaseSecurityLogoutHold();
   }
 }
 
@@ -1313,7 +1379,7 @@ const printBackupCodes = () => {
 
 const finishSetup = () => {
   setupDialogVisible.value = false;
-  fetchTotpStatus();
+  if (authenticationChanged.value) signInAfterSecurityChange();
 }
 
 // ==========================================
@@ -1327,7 +1393,7 @@ const openViewBackupCodesModal = () => {
 }
 
 const submitViewBackupCodes = async () => {
-  if (!viewBackupPassword.value) {
+  if (oauthIdentities.login.hasPassword && !viewBackupPassword.value) {
     ElMessage({
       message: t('emptyPwdMsg') || 'Please enter password',
       type: 'error',
@@ -1338,7 +1404,9 @@ const submitViewBackupCodes = async () => {
 
   viewBackupLoading.value = true;
   try {
-    const res = await viewBackupCodes(viewBackupPassword.value);
+    const grant = await sensitiveGrant('backup_view', 'self', { password: viewBackupPassword.value });
+    const res = await viewBackupCodes({ stepUpToken: grant.stepUpToken });
+    viewBackupPassword.value = '';
     viewBackupVerified.value = true;
     if (res && Array.isArray(res.backupCodes) && res.backupCodes.length > 0) {
       viewBackupCodesList.value = res.backupCodes;
@@ -1474,7 +1542,8 @@ const handleCreatePasskey = async () => {
 
   passkeyLoading.value = true;
   try {
-    const setupData = await getPasskeySetup();
+    const grant = await sensitiveGrant('passkey_add');
+    const setupData = await getPasskeySetup({ stepUpToken: grant.stepUpToken });
     if (!setupData || !setupData.challenge) {
       throw new Error('Failed to obtain challenge');
     }
@@ -1576,6 +1645,7 @@ const handleCreatePasskey = async () => {
 
     const regResult = await registerPasskey({
       name: newPasskeyName.value || 'Security Key',
+      setupToken: setupData.setupToken,
       credentialId,
       clientDataJSON,
       attestationObject,
@@ -1598,8 +1668,7 @@ const handleCreatePasskey = async () => {
     }
 
     addPasskeyDialogVisible.value = false;
-    await fetchTotpStatus();
-    await fetchPasskeys();
+    signInAfterSecurityChange();
   } catch (err) {
     if (err.name === 'NotAllowedError') {
       ElMessage({
@@ -1653,7 +1722,7 @@ const handleTestPasskey = async (key) => {
         challenge: challengeBytes,
         rpId: res.rpId || window.location.hostname,
         allowCredentials: allowCreds,
-        userVerification: 'preferred',
+        userVerification: 'required',
         timeout: 60000
       }
     });
@@ -1667,6 +1736,8 @@ const handleTestPasskey = async (key) => {
     const signature = bufferToBase64Url(assertion.response.signature);
 
     await verifyPasskeyTest(key.id, {
+      challengeToken: res.challengeToken,
+      credentialId: bufferToBase64Url(assertion.rawId),
       clientDataJSON,
       authenticatorData,
       signature
@@ -1714,15 +1785,15 @@ const submitApprovePasskey = async () => {
 
   approveLoading.value = true;
   try {
-    await approvePasskeyWithTotp(approvingKey.value.id, approveTotpCode.value.trim());
+    const grant = await sensitiveGrant('passkey_approve', approvingKey.value.id, { code: approveTotpCode.value.trim() });
+    await approvePasskeyWithTotp(approvingKey.value.id, { stepUpToken: grant.stepUpToken });
     ElMessage({
       message: t('passkeyApprovedSuccess') || '通行密钥已通过身份验证器核准并立即生效！',
       type: 'success',
       plain: true
     });
     approveDialogVisible.value = false;
-    await fetchPasskeys();
-    await fetchTotpStatus();
+    signInAfterSecurityChange();
   } catch (err) {
     ElMessage({
       message: err.message || t('totpCodeInvalid'),
@@ -1737,14 +1808,14 @@ const submitApprovePasskey = async () => {
 const handleActivateTimelock = async (key) => {
   activatingKeyId.value = key.id;
   try {
-    await activateTimelockedPasskey(key.id);
+    const grant = await sensitiveGrant('passkey_activate', key.id);
+    await activateTimelockedPasskey(key.id, { stepUpToken: grant.stepUpToken });
     ElMessage({
       message: t('passkeyActivatedSuccess') || '通行密钥已成功转正生效！',
       type: 'success',
       plain: true
     });
-    await fetchPasskeys();
-    await fetchTotpStatus();
+    signInAfterSecurityChange();
   } catch (err) {
     ElMessage({
       message: err.message || t('passkeyActivationFailed'),
@@ -1767,14 +1838,14 @@ const confirmDeletePasskey = (key) => {
     }
   ).then(async () => {
     try {
-      await deletePasskey(key.id);
+      const grant = await sensitiveGrant('passkey_delete', key.id);
+      await deletePasskey(key.id, { stepUpToken: grant.stepUpToken });
       ElMessage({
         message: t('passkeyDeleteSuccess') || 'Security key removed',
         type: 'success',
         plain: true
       });
-      await fetchTotpStatus();
-      await fetchPasskeys();
+      signInAfterSecurityChange();
     } catch (err) {
       ElMessage({
         message: err.message || 'Failed to delete security key',
@@ -1795,7 +1866,7 @@ const openDisableTotpModal = () => {
 }
 
 const submitDisableTotp = async () => {
-  if (!disableForm.password || !disableForm.code) {
+  if (oauthIdentities.login.hasPassword && !disableForm.password) {
     ElMessage({
       message: t('totpDisableParamsEmpty') || 'Please enter password and verification code',
       type: 'error',
@@ -1806,15 +1877,15 @@ const submitDisableTotp = async () => {
 
   disableLoading.value = true;
   try {
-    await disableTotp(disableForm.password, disableForm.code.trim());
+    const grant = await sensitiveGrant('totp_disable', 'self', disableForm);
+    await disableTotp({ stepUpToken: grant.stepUpToken });
     ElMessage({
       message: t('saveSuccessMsg'),
       type: 'success',
       plain: true
     });
     disableDialogVisible.value = false;
-    await fetchTotpStatus();
-    await fetchPasskeys();
+    signInAfterSecurityChange();
   } catch (err) {
     ElMessage({
       message: err.message || 'Failed to disable 2FA',
@@ -1836,7 +1907,7 @@ const openRegenBackupModal = () => {
 }
 
 const submitRegenBackupCodes = async () => {
-  if (!regenPassword.value) {
+  if (oauthIdentities.login.hasPassword && !regenPassword.value) {
     ElMessage({
       message: t('emptyPwdMsg'),
       type: 'error',
@@ -1847,9 +1918,12 @@ const submitRegenBackupCodes = async () => {
 
   regenLoading.value = true;
   try {
-    const res = await regenerateBackupCodes(regenPassword.value);
+    const grant = await sensitiveGrant('backup_regenerate', 'self', { password: regenPassword.value });
+    deferSecurityLogout();
+    const res = await regenerateBackupCodes({ stepUpToken: grant.stepUpToken });
+    regenPassword.value = '';
+    authenticationChanged.value = true;
     regenResultCodes.value = res.backupCodes || [];
-    await fetchTotpStatus();
   } catch (err) {
     ElMessage({
       message: err.message || 'Failed to regenerate backup codes',
@@ -1858,6 +1932,7 @@ const submitRegenBackupCodes = async () => {
     });
   } finally {
     regenLoading.value = false;
+    if (!authenticationChanged.value) releaseSecurityLogoutHold();
   }
 }
 
@@ -1959,29 +2034,46 @@ const form = reactive({
   newPwd: '',
 })
 
-const deleteConfirm = () => {
-  ElMessageBox.confirm(t('delAccountConfirm'), {
-    confirmButtonText: t('confirm'),
-    cancelButtonText: t('cancel'),
+const deletingAccount = ref(false)
+
+async function finishAccountDeletion(messageKey) {
+  clearCurrentSession({ email: userStore.user.email });
+  await ElMessageBox.alert(t(messageKey), t('deleteUser'), {
+    confirmButtonText: t('privacySettings.returnToLogin'),
+    showClose: false,
+    closeOnClickModal: false,
+    closeOnPressEscape: false,
     type: 'warning'
-  }).then(() => {
-    userDelete().then(() => {
-      localStorage.removeItem('token');
-      localStorage.removeItem('loginEmail');
-      localStorage.removeItem('ui');
-      try {
-        sessionStorage.clear();
-      } catch (_) {}
-      ElMessage({
-        message: t('delSuccessMsg'),
-        type: 'success',
-        plain: true,
-      })
-      setTimeout(() => {
-        window.location.replace('/login/');
-      }, 500);
-    })
-  })
+  });
+  window.location.replace('/login/');
+}
+
+const deleteConfirm = async () => {
+  if (deletingAccount.value) return;
+  try {
+    await ElMessageBox.confirm(t('privacySettings.accountDeletionConfirm'), t('deleteUser'), {
+      confirmButtonText: t('confirm'), cancelButtonText: t('cancel'), type: 'warning', closeOnClickModal: false
+    });
+  } catch { return }
+  deletingAccount.value = true;
+  const releaseLogout = deferForcedLogout();
+  try {
+    const result = await userDelete();
+    const status = result?.deletionStatus;
+    await finishAccountDeletion(status === 'cleanup_failed'
+      ? 'privacySettings.accountCleanupPending'
+      : 'privacySettings.accountDeletionPending');
+  } catch (error) {
+    const payload = error?.response?.data || error || {};
+    if (payload.errorCode === 'account_deletion_cleanup_failed' || payload.data?.deletionStatus === 'cleanup_failed') {
+      await finishAccountDeletion('privacySettings.accountCleanupPending');
+    } else {
+      ElMessage.error(payload.message || t('privacySettings.accountDeletionFailed'));
+    }
+  } finally {
+    releaseLogout();
+    deletingAccount.value = false;
+  }
 }
 
 function submitPwd() {
@@ -2003,7 +2095,7 @@ function submitPwd() {
     return
   }
 
-  if (form.password.length < 6) {
+  if (form.password.length < 6 || form.password.length > 30) {
     ElMessage({
       message: t('pwdLengthMsg'),
       type: 'error',

@@ -57,10 +57,13 @@ export async function writeLocalConfig(directory, workerDir) {
 		totp_enc_key: randomBytes(32).toString('base64'),
 		email_enc_key: randomBytes(32).toString('base64')
 	};
+	const entryPath = path.join(directory, 'isolated-worker.mjs');
+	const mainPath = path.resolve(workerDir, 'src/index.js').replaceAll('\\', '/');
+	await fs.writeFile(entryPath, `import worker from ${JSON.stringify(mainPath)};\nObject.defineProperty(globalThis, 'fetch', { value: async () => { throw new Error('External network is disabled in the isolated test worker'); }, writable: false, configurable: false });\nexport default worker;\n`, { mode: 0o600, flag: 'wx' });
 	const configPath = path.join(directory, 'wrangler.json');
 	await fs.writeFile(configPath, JSON.stringify({
 		name: 'epomail-local-test',
-		main: path.resolve(workerDir, 'src/index.js'),
+		main: entryPath,
 		compatibility_date: '2025-06-04',
 		send_metrics: false,
 		assets: {

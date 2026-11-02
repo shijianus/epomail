@@ -8,6 +8,7 @@ import router from "@/router";
 import {websiteConfig} from "@/request/setting.js";
 import i18n from "@/i18n/index.js";
 import {clearAuthStorage} from "@/utils/auth.js";
+import { tabSession, updateCurrentIdentity, getCurrentLoginEmail } from '@/utils/tab-session.js';
 
 export async function init() {
     document.title = '\u200B'
@@ -19,29 +20,8 @@ export async function init() {
 
     uiStore.initTheme();
 
-    let token = localStorage.getItem('token');
-    if (typeof window !== 'undefined') {
-        const urlMatch = window.location.pathname.match(/\/mail\/u\/(\d+)/);
-        const currentU = urlMatch ? parseInt(urlMatch[1], 10) : 0;
-        try {
-            const rawSessions = localStorage.getItem('epo_sessions');
-            let sessions = rawSessions ? JSON.parse(rawSessions) : [];
-            const targetSession = sessions.find(s => s.u === currentU);
-            if (targetSession && targetSession.token) {
-                if (token !== targetSession.token) {
-                    token = targetSession.token;
-                    localStorage.setItem('token', token);
-                    if (targetSession.email) {
-                        localStorage.setItem('loginEmail', targetSession.email);
-                    }
-                }
-            } else if (!sessions.length && token) {
-                const email = localStorage.getItem('loginEmail') || '';
-                sessions = [{ u: 0, token, email }];
-                localStorage.setItem('epo_sessions', JSON.stringify(sessions));
-            }
-        } catch (_) {}
-    }
+    const tabIdentity = tabSession.current();
+    const token = tabIdentity?.token || '';
     if (!settingStore.lang) {
         const rawNav = (navigator.language || '').toLowerCase();
         let lang = 'en';
@@ -92,7 +72,18 @@ export async function init() {
             }
 
             if (user) {
-                const storedLoginEmail = localStorage.getItem('loginEmail');
+                const identity = updateCurrentIdentity({
+                    userId: user.userId,
+                    email: tabIdentity.email || user.email,
+                    name: user.name || user.nickname || user.email,
+                    avatarUrl: user.avatarUrl || '',
+                    roleName: user.role?.name || '',
+                }, tabIdentity);
+                if (!identity) {
+                    clearAuthStorage({ session: tabIdentity });
+                    return;
+                }
+                const storedLoginEmail = getCurrentLoginEmail();
                 if (storedLoginEmail && user.accounts && user.accounts.length) {
                     const matchedAcc = user.accounts.find(a => a.email && a.email.toLowerCase() === storedLoginEmail.toLowerCase());
                     if (matchedAcc) {
@@ -104,23 +95,14 @@ export async function init() {
                 accountStore.currentAccount = user.account || {};
                 userStore.applyUserInfo(user);
 
-                // Update session info in epo_sessions
-                try {
-                    const urlMatch = window.location.pathname.match(/\/mail\/u\/(\d+)/);
-                    const currentU = urlMatch ? parseInt(urlMatch[1], 10) : 0;
-                    const rawSessions = localStorage.getItem('epo_sessions');
-                    let sessions = rawSessions ? JSON.parse(rawSessions) : [];
-                    let targetS = sessions.find(s => s.u === currentU);
-                    if (!targetS) {
-                        targetS = { u: currentU, token };
-                        sessions.push(targetS);
-                    }
-                    targetS.email = user.email || storedLoginEmail || targetS.email;
-                    targetS.name = user.name || user.nickname || targetS.email;
-                    targetS.avatarUrl = user.avatarUrl || '';
-                    targetS.roleName = user.role?.name || '';
-                    localStorage.setItem('epo_sessions', JSON.stringify(sessions));
-                } catch (_) {}
+                // Update this tab's registry row; never select a row by numeric slot alone.
+                updateCurrentIdentity({
+                    email: user.email || storedLoginEmail,
+                    accountEmail: user.email || storedLoginEmail,
+                    name: user.name || user.nickname || storedLoginEmail,
+                    avatarUrl: user.avatarUrl || '',
+                    roleName: user.role?.name || '',
+                }, identity);
 
                 const routers = permsToRouter(user.permKeys);
                 routers.forEach(routerData => {
@@ -129,7 +111,7 @@ export async function init() {
             } else {
                 // Token 存在但无法获取用户信息，说明 token 已过期或已被销毁，执行清理并强制退回到登录页
                 uiStore.resetToDefaults();
-                clearAuthStorage({ preserveEmail: true });
+                clearAuthStorage({ preserveEmail: true, session: tabIdentity });
                 try {
                     sessionStorage.setItem('auth_expired_msg', i18n.global.t('authExpiredMsg'));
                 } catch (_) {}
@@ -140,7 +122,7 @@ export async function init() {
 
                 if (!isOauth && !isPublicProfile) {
                     if (pathname !== '/login/' && !pathname.startsWith('/login')) {
-                        window.location.replace('/login/?reason=expired');
+                        window.location.replace(`/login/?reason=expired&u=${tabIdentity.u}`);
                     }
                     return;
                 }

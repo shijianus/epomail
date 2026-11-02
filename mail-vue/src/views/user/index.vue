@@ -114,9 +114,12 @@
               {{ tzDayjs(props.row.createTime).format('YYYY-MM-DD HH:mm') }}
             </template>
           </el-table-column>
-          <el-table-column v-if="statusShow" min-width="60px" :label="$t('tabStatus')" prop="status">
+          <el-table-column v-if="statusShow" min-width="120" :label="$t('tabStatus')" prop="status">
             <template #default="props">
-              <el-tag disable-transitions v-if="props.row.isDel === 1" type="info">{{ $t('deleted') }}</el-tag>
+              <el-tag disable-transitions size="small" class="deletion-status" v-if="hasDeletionWorkflow(props.row)" :type="deletionTagType(props.row)">
+                {{ $t(`privacyDeletionUi.${deletionLabelKey(props.row)}`) }}
+              </el-tag>
+              <el-tag disable-transitions v-else-if="props.row.isDel === 1" type="info">{{ $t('privacyDeletionUi.softDeleted') }}</el-tag>
               <el-tag disable-transitions v-else-if="props.row.status === 0" type="primary">{{ $t('active') }}</el-tag>
               <el-tag disable-transitions v-else-if="props.row.status === 1" type="danger">{{ $t('banned') }}</el-tag>
             </template>
@@ -142,7 +145,8 @@
                       <el-dropdown-item v-if="props.row.isDel !== 1" @click="setStatus(props.row)">
                         {{ setStatusName(props.row) }}
                       </el-dropdown-item>
-                      <el-dropdown-item v-else @click="restore(props.row)">{{ $t('restore') }}</el-dropdown-item>
+                      <el-dropdown-item v-else-if="!hasDeletionRequest(props.row)" @click="restore(props.row)">{{ $t('restore') }}</el-dropdown-item>
+                      <el-dropdown-item v-else disabled>{{ $t('privacyDeletionUi.restoreBlocked') }}</el-dropdown-item>
                       <el-dropdown-item @click="handlePurgeUserEmails(props.row)" style="color: #ff4d4f;">
                         {{ $t('purgeUserEmails') }}
                       </el-dropdown-item>
@@ -299,13 +303,18 @@
         <div v-if="!typeShow"><span class="details-item-title">{{ $t('perm') }}:</span>
           {{ toRoleName(userDetails.type) }}
         </div>
-        <div v-if="!statusShow">
+        <div v-if="hasDeletionWorkflow(userDetails)" class="deletion-details">
+          <div><span class="details-item-title">{{ $t('privacyDeletionUi.requestedAt') }}:</span>{{ formatDeletionRequestedAt(userDetails.deletionRequestedAt) }}</div>
+          <div><span class="details-item-title">{{ $t('privacyDeletionUi.status') }}:</span><el-tag size="small" class="deletion-status" :type="deletionTagType(userDetails)">{{ $t(`privacyDeletionUi.${deletionLabelKey(userDetails)}`) }}</el-tag></div>
+          <div><span class="details-item-title">{{ $t('privacyDeletionUi.objectQueue') }}:</span>{{ formatObjectDeletionQueue(userDetails.objectDeletionQueue) }}</div>
+          <p class="deletion-note">{{ $t('privacyDeletionUi.scopeNote') }}</p>
+          <p v-if="hasDeletionRequest(userDetails)" class="deletion-note">{{ $t('privacyDeletionUi.restoreBlocked') }}</p>
+        </div>
+        <div v-if="!statusShow && !hasDeletionWorkflow(userDetails)">
           <span class="details-item-title">{{ $t('tabStatus') }}:</span>
-          <el-tag disable-transitions v-if="userDetails.isDel === 1" type="info">{{ $t('deleted') }}</el-tag>
-          <el-tag disable-transitions v-else-if="userDetails.status === 0" type="primary">{{ $t('active') }}
-          </el-tag>
-          <el-tag disable-transitions v-else-if="userDetails.status === 1" type="danger">{{ $t('banned') }}
-          </el-tag>
+          <el-tag disable-transitions v-if="userDetails.isDel === 1" type="info">{{ $t('privacyDeletionUi.softDeleted') }}</el-tag>
+          <el-tag disable-transitions v-else-if="userDetails.status === 0" type="primary">{{ $t('active') }}</el-tag>
+          <el-tag disable-transitions v-else-if="userDetails.status === 1" type="danger">{{ $t('banned') }}</el-tag>
         </div>
         <div><span class="details-item-title">{{ $t('registrationIp') }}:</span>{{
             userDetails.createIp || $t('unknown')
@@ -372,16 +381,20 @@
               </div>
             </template>
           </el-dropdown-item>
-          <el-dropdown-item v-if="rightClickUser.type !== 0">
+          <el-dropdown-item v-if="rightClickUser.type !== 0" :disabled="rightClickUser.isDel === 1 && hasDeletionRequest(rightClickUser)">
             <template #default>
               <div class="right-dropdown-item" v-if="rightClickUser.isDel !== 1" @click="setStatus(rightClickUser)" >
                 <Icon icon="ion:reload" v-if="rightClickUser.status" style="margin-left: 1px;margin-right: 1px" width="19" height="19" />
                 <Icon icon="ion:ban-outline" v-else style="margin-left: 1px;margin-right: 1px" width="19" height="19" />
                 <span>{{ setRightStatusName(rightClickUser) }}</span>
               </div>
-              <div class="right-dropdown-item" v-else @click="restore(rightClickUser)">
+              <div class="right-dropdown-item" v-else-if="!hasDeletionRequest(rightClickUser)" @click="restore(rightClickUser)">
                 <Icon icon="ion:reload" style="margin-left: 1px;margin-right: 1px" width="19" height="19" />
                 <span>{{ t('restoreUser') }}</span>
+              </div>
+              <div class="right-dropdown-item" v-else>
+                <Icon icon="ion:information-circle-outline" style="margin-left: 1px;margin-right: 1px" width="19" height="19" />
+                <span>{{ t('privacyDeletionUi.restoreBlocked') }}</span>
               </div>
             </template>
           </el-dropdown-item>
@@ -477,6 +490,57 @@ function formatUserStorage(row) {
   const send = Number(row.sendEmailCount || 0);
   const estimatedBytes = (recv * 142000) + (send * 85000) + 1048576;
   return formatBytes(estimatedBytes);
+}
+
+function hasDeletionRequest(row) {
+  return Boolean(row?.deletionRequestedAt || row?.deletionStatus);
+}
+
+function hasDeletionWorkflow(row) {
+  if (hasDeletionRequest(row)) return true;
+  const queue = row?.objectDeletionQueue;
+  if (!queue || typeof queue !== 'object') return false;
+  return ['pending', 'failed', 'total'].some(key => {
+    const value = Number(queue[key]);
+    return Number.isFinite(value) && value > 0;
+  });
+}
+
+function deletionLabelKey(row) {
+  const status = String(row?.deletionStatus || '').toLowerCase();
+  const failed = Number(row?.objectDeletionQueue?.failed);
+  if (Number.isFinite(failed) && failed > 0) return 'needsAttention';
+  if (['cleanup_pending', 'pending', 'processing'].includes(status)) return 'pending';
+  if (['cleanup_failed', 'failed', 'manual_review'].includes(status)) return 'needsAttention';
+  if (status === 'completed') return 'recorded';
+  return 'unknownStatus';
+}
+
+function deletionTagType(row) {
+  const key = deletionLabelKey(row);
+  if (key === 'needsAttention') return 'danger';
+  if (key === 'pending') return 'warning';
+  return 'info';
+}
+
+function formatDeletionRequestedAt(value) {
+  if (!value) return t('privacyDeletionUi.unavailable');
+  const date = tzDayjs(value);
+  return date.isValid() ? date.format('YYYY-MM-DD HH:mm') : t('privacyDeletionUi.unavailable');
+}
+
+function formatObjectDeletionQueue(queue) {
+  if (!queue || typeof queue !== 'object') return t('privacyDeletionUi.unavailable');
+  const count = value => {
+    if (typeof value !== 'number' && typeof value !== 'string') return '-';
+    if (typeof value === 'string' && value.trim() === '') return '-';
+    const number = Number(value);
+    return Number.isSafeInteger(number) && number >= 0 ? number : '-';
+  };
+  return t('privacyDeletionUi.queueCounts', {
+    pending: count(queue.pending),
+    failed: count(queue.failed)
+  });
 }
 
 const filteredValue = ['normal', 'del']
@@ -988,6 +1052,10 @@ function delOneUser(user) {
 }
 
 function restore(user) {
+  if (hasDeletionRequest(user)) {
+    ElMessage({ message: t('privacyDeletionUi.restoreBlocked'), type: 'warning', plain: true });
+    return;
+  }
 
   const type = ref(0)
 
@@ -1299,6 +1367,30 @@ function adjustWidth() {
     font-weight: bold;
     padding-right: 10px;
   }
+}
+
+.deletion-status {
+  height: auto;
+  min-height: 20px;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.4;
+  padding: 2px 6px;
+}
+
+.deletion-details {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 6px;
+}
+
+.deletion-note {
+  margin: 0;
+  line-height: 1.5;
+  color: var(--el-text-color-secondary);
 }
 
 :deep(.linuxdo-avatar) {

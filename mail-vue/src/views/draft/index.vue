@@ -31,6 +31,10 @@ import {useUiStore} from "@/store/ui.js";
 import {userDraftStore} from "@/store/draft.js";
 import {useEmailStore} from "@/store/email.js";
 import db from "@/db/db.js"
+import { deleteDraftsAndAttachments } from '@/utils/device-privacy.js';
+import { ElMessage } from 'element-plus';
+import { useI18n } from 'vue-i18n';
+const { t } = useI18n();
 
 defineOptions({
   name: 'draft'
@@ -43,22 +47,23 @@ const scroll = ref({})
 
 watch(() => draftStore.setDraft, async () => {
 
-  const draft = toRaw(draftStore.setDraft)
+  const draft = { ...toRaw(draftStore.setDraft) }
   const draftId = draft.draftId
   const attachments = toRaw(draftStore.setDraft.attachments)
 
   delete draft.draftId
   delete draft.attachments
 
-  if (!draft.content && !draft.subject && !(draft.receiveEmail.length > 0)) {
-    await db.value.draft.delete(draftId);
-    await db.value.att.delete(draftId);
+  if (!draft.content && !draft.subject && !draft.receiveEmail?.length && !attachments?.length) {
+    await deleteDraftsAndAttachments(db.value, draftId);
     draftStore.refreshList++
     return;
   }
 
-  await db.value.draft.update(draftId, draft);
-  await db.value.att.update(draftId, {attachments: attachments});
+  await db.value.transaction('rw', db.value.draft, db.value.att, async () => {
+    await db.value.draft.update(draftId, draft);
+    await db.value.att.put({ draftId, attachments: attachments || [] });
+  });
   draftStore.refreshList++
 }, {
   deep: true
@@ -72,30 +77,30 @@ watch(() => draftStore.refreshList, async () => {
 })
 
 function getEmailList() {
-  return new Promise((resolve, reject) => {
-    db.value.draft.orderBy('createTime').reverse().toArray().then(list => {
-      const keyword = emailStore.searchParsed.cleanKeyword;
-      if (keyword) {
-        list = list.filter(item => {
-          const lkeyword = keyword.toLowerCase();
-          return (item.subject && item.subject.toLowerCase().includes(lkeyword)) ||
-                 (item.content && item.content.toLowerCase().includes(lkeyword)) ||
-                 (item.receiveEmail && item.receiveEmail.join(',').toLowerCase().includes(lkeyword));
-        });
-      }
-      resolve({list})
-    })
-  })
+  return db.value.draft.orderBy('createTime').reverse().toArray().then(list => {
+    const keyword = emailStore.searchParsed.cleanKeyword;
+    if (keyword) {
+      const lkeyword = keyword.toLowerCase();
+      list = list.filter(item => (item.subject && item.subject.toLowerCase().includes(lkeyword)) ||
+        (item.content && item.content.toLowerCase().includes(lkeyword)) ||
+        (item.receiveEmail && item.receiveEmail.join(',').toLowerCase().includes(lkeyword)));
+    }
+    return { list };
+  });
 }
 
 async function deleteDraft(draftIds) {
-  await db.value.draft.bulkDelete(draftIds);
-  draftStore.refreshList++
+  try {
+    await deleteDraftsAndAttachments(db.value, draftIds);
+    draftStore.refreshList++;
+  } catch {
+    ElMessage.error(t('privacySettings.draftDeleteFailed'));
+  }
 }
 
 async function jumpContent(email) {
   const att = await db.value.att.get(email.draftId)
-  email.attachments = att.attachments
+  email.attachments = att?.attachments || []
   uiStore.writerRef.openDraft(email);
 }
 

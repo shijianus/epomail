@@ -7,6 +7,10 @@ import settingService from '../src/service/setting-service.js';
 import cryptoUtils from '../src/utils/crypto-utils.js';
 import jwtUtils from '../src/utils/jwt-utils.js';
 import { emailConst } from '../src/const/entity-const.js';
+import r2Service from '../src/service/r2-service.js';
+import attService from '../src/service/att-service.js';
+import { acquireInboundClaim, failInboundClaim, cleanupExpiredInboundClaims, clearRawForUser } from '../src/service/mail-reliability-service.js';
+import { buildSignedObjectUrl } from '../src/utils/object-token.js';
 
 vi.setConfig({ testTimeout: 60000 });
 
@@ -178,8 +182,13 @@ describe('Module C: Core mail pipeline, isolation, outbound gates, and webhook c
 	});
 
 	afterAll(async () => {
+		try {
+			const rawClaims = await env.db.prepare('SELECT raw_object_key FROM mail_receive_claim').all();
+			for (const row of rawClaims.results || []) trackedKvKeys.add(row.raw_object_key);
+		} catch (_) {}
 		for (const table of [
 			'attachments',
+			'mail_receive_claim',
 			'object_deletion_queue',
 			'star',
 			'email_status_event',
@@ -367,6 +376,7 @@ describe('Module C: Core mail pipeline, isolation, outbound gates, and webhook c
 			jwt: attacker.jwt
 		})).json();
 		expect(delB.code).toBe(200);
+		await attService.drainObjectDeletionQueue({ env }, null, { limit: 100 });
 		expect(await env.kv.get(sharedKey)).toBeNull();
 	});
 
@@ -533,6 +543,105 @@ describe('Module C: Core mail pipeline, isolation, outbound gates, and webhook c
 
 		const orphanEmails = await env.db.prepare('SELECT COUNT(*) AS cnt FROM email WHERE user_id = ?').bind(quotaSender.userId).first();
 		expect(orphanEmails.cnt).toBe(0);
+	});
+
+	it.each(['current', 'legacy'])('keeps %s raw MIME private, reuses it on retry, and deletes it at expiry', async (keyFormat) => {
+		const c = { env, get: () => undefined, set: () => {} };
+		const input = {
+			recipient: victim.email,
+			messageId: `<raw-private-${keyFormat}@external.org>`,
+			rawBytes: enc.encode('From: sender@external.org\r\n\r\nprivate raw recovery body'),
+			accountId: victim.accountId,
+			userId: victim.userId
+		};
+		const claim = await acquireInboundClaim(c, input);
+		const rawKey = keyFormat === 'legacy' ? `mail-raw/inbound/${claim.claimKey}.enc` : claim.rawObjectKey;
+		try {
+			const encrypted = new Uint8Array(await env.kv.get(claim.rawObjectKey, { type: 'arrayBuffer' }));
+			expect(new TextDecoder().decode(encrypted.subarray(0, 7))).toBe('raw:v2:');
+			expect(new TextDecoder().decode(encrypted)).not.toContain('private raw recovery body');
+			if (rawKey !== claim.rawObjectKey) {
+				await env.kv.put(rawKey, encrypted);
+				await env.kv.delete(claim.rawObjectKey);
+				await env.db.prepare('UPDATE mail_receive_claim SET raw_object_key = ? WHERE claim_key = ?')
+					.bind(rawKey, claim.claimKey).run();
+			}
+
+			const signed = await buildSignedObjectUrl(c, rawKey, { userId: victim.userId, ttlSeconds: 60 });
+			const publicPaths = [`/oss/${rawKey}`, `/api/oss/${rawKey}`, signed, `/api${signed}`];
+			if (rawKey.startsWith('attachments/')) publicPaths.push(`/${rawKey}`);
+			for (const path of publicPaths) {
+				expect((await SELF.fetch(`${BASE}${path}`)).status).toBe(404);
+			}
+			expect(await r2Service.getObj(c, rawKey, victim.userId)).toBeNull();
+			expect(await r2Service.getDownloadUrl(c, rawKey, null, victim.userId)).toBeNull();
+			const batch = await (await apiFetch('/api/oss-url/batch', {
+				method: 'POST', jwt: victim.jwt, body: { keys: [rawKey] }
+			})).json();
+			expect(batch.code).toBe(200);
+			expect(batch.data.urls).toEqual({});
+
+			await failInboundClaim(c, claim.claimKey, claim.leaseToken, new Error('retry fixture'));
+			const resumed = await acquireInboundClaim(c, input);
+			expect(resumed.rawObjectKey).toBe(rawKey);
+			// A new encryption would have a fresh IV: equality proves the retry read the stored object.
+			expect(new Uint8Array(await env.kv.get(rawKey, { type: 'arrayBuffer' }))).toEqual(encrypted);
+			await failInboundClaim(c, resumed.claimKey, resumed.leaseToken, new Error('missing raw fixture'));
+			await env.kv.delete(rawKey);
+			const restored = await acquireInboundClaim(c, input);
+			expect(restored.rawObjectKey).toBe(rawKey);
+			expect(new TextDecoder().decode(new Uint8Array(await env.kv.get(rawKey, { type: 'arrayBuffer' })).subarray(0, 7))).toBe('raw:v2:');
+
+			await env.db.prepare('UPDATE mail_receive_claim SET raw_expires_at = 0, lease_until = 0 WHERE claim_key = ?')
+				.bind(claim.claimKey).run();
+			expect(await cleanupExpiredInboundClaims(c)).toEqual({ processed: 1, deleted: 1 });
+			expect(await env.kv.get(rawKey)).toBeNull();
+			expect(await env.db.prepare('SELECT claim_key FROM mail_receive_claim WHERE claim_key = ?')
+				.bind(claim.claimKey).first()).toBeNull();
+		} finally {
+			await env.kv.delete(rawKey);
+			await env.kv.delete(claim.rawObjectKey);
+			await env.db.prepare('DELETE FROM mail_receive_claim WHERE claim_key = ?').bind(claim.claimKey).run();
+		}
+	});
+
+	it('retains raw claims when the owner storage locator is unavailable and clears only the requested user on retry', async () => {
+		const c = { env, get: () => undefined, set: () => {} };
+		const claims = [];
+		try {
+			for (const owner of [victim, attacker]) {
+				claims.push(await acquireInboundClaim(c, {
+					recipient: owner.email,
+					messageId: `<raw-delete-${owner.userId}@external.org>`,
+					rawBytes: enc.encode('From: sender@external.org\r\n\r\nprivate deletion fixture'),
+					accountId: owner.accountId,
+					userId: owner.userId
+				}));
+			}
+			const [owned, other] = claims;
+			await env.db.prepare("UPDATE user SET byo_storage_enabled = 1, byo_storage_config = '{}' WHERE user_id = ?")
+				.bind(victim.userId).run();
+			await expect(clearRawForUser(c, victim.userId)).rejects.toThrow('Original BYO storage configuration is unavailable');
+			expect(new TextDecoder().decode(new Uint8Array(await env.kv.get(owned.rawObjectKey, { type: 'arrayBuffer' })).subarray(0, 7))).toBe('raw:v2:');
+			expect(await env.db.prepare('SELECT claim_key FROM mail_receive_claim WHERE claim_key = ?')
+				.bind(owned.claimKey).first()).toEqual({ claim_key: owned.claimKey });
+
+			await env.db.prepare('UPDATE user SET byo_storage_enabled = 0 WHERE user_id = ?').bind(victim.userId).run();
+			expect(await clearRawForUser(c, victim.userId)).toEqual({ deleted: 1 });
+			expect(await env.kv.get(owned.rawObjectKey)).toBeNull();
+			expect(await env.db.prepare('SELECT claim_key FROM mail_receive_claim WHERE claim_key = ?')
+				.bind(owned.claimKey).first()).toBeNull();
+			expect(new TextDecoder().decode(new Uint8Array(await env.kv.get(other.rawObjectKey, { type: 'arrayBuffer' })).subarray(0, 7))).toBe('raw:v2:');
+			expect(await env.db.prepare('SELECT claim_key FROM mail_receive_claim WHERE claim_key = ?')
+				.bind(other.claimKey).first()).toEqual({ claim_key: other.claimKey });
+		} finally {
+			await env.db.prepare("UPDATE user SET byo_storage_enabled = 0, byo_storage_config = '{}' WHERE user_id = ?")
+				.bind(victim.userId).run();
+			for (const claim of claims) {
+				await env.kv.delete(claim.rawObjectKey);
+				await env.db.prepare('DELETE FROM mail_receive_claim WHERE claim_key = ?').bind(claim.claimKey).run();
+			}
+		}
 	});
 
 	it('ingests inbound MIME + attachment, decrypts starred mail, and converges Resend webhooks across D1 failure, duplicates, and out-of-order events', async () => {

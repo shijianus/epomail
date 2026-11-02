@@ -72,15 +72,24 @@ async function runBrowserChecks({ base, jwtSecret, addCleanup }) {
 		.catch(() => null);
 	await page.click('button[type="submit"]');
 
-	await page.waitForURL(/#inbox/, { timeout: 90000 });
+	await page.waitForURL(/#inbox/, { timeout: 90000, waitUntil: 'domcontentloaded' });
 	check('login lands on the inbox URL', () => {
 		assert.match(page.url(), /\/mail\/u\/0\/#inbox/);
 	});
 
 	// 2. The mail app must have kept the session and mounted.
-	const token = await page.evaluate(() => localStorage.getItem('token'));
-	check('session token is stored by the mail app', () => {
-		assert.ok(token && token.length > 20, 'token missing');
+	const session = await page.evaluate(() => {
+		const current = JSON.parse(sessionStorage.getItem('epomail_tab_identity') || 'null');
+		const sessions = JSON.parse(localStorage.getItem('epo_sessions') || '[]');
+		return { active: current?.status === 'active', hasToken: typeof current?.token === 'string' && current.token.length > 20,
+			registered: sessions.some(row => row.sessionId === current?.sessionId && row.token === current?.token),
+			globalToken: localStorage.getItem('token') };
+	});
+	check('session token is pinned to this tab and recorded in the account registry', () => {
+		assert.equal(session.active, true);
+		assert.equal(session.hasToken, true);
+		assert.equal(session.registered, true);
+		assert.equal(session.globalToken, null);
 	});
 
 	await page.waitForFunction(

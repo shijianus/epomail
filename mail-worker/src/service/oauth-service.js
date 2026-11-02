@@ -843,7 +843,7 @@ const oauthService = {
 
 		await rateLimit.check(c, { scope: 'oauth-bind', limit: 10, windowSeconds: 900 });
 
-		const { email, oauthUserId, code, bindToken, provider } = params;
+			const { email, oauthUserId, code, bindToken, provider, acceptedTerms, termsVersion, locale, sourceUrl } = params;
 
 		if (!bindToken || typeof bindToken !== 'string') {
 			throw new BizError('Missing OAuth bind proof; restart the OAuth login flow', 410, 'bind_proof_invalid');
@@ -901,13 +901,23 @@ const oauthService = {
 		// a rejection here leaves the proof valid for a corrected retry.
 		const password = cryptoUtils.genRandomPwd();
 		try {
-			await loginService.validateRegistration(c, { email, password, code }, true);
+				await loginService.validateRegistration(c, {
+					email,
+					password,
+					code,
+					acceptedTerms,
+					termsVersion,
+					locale,
+					sourceUrl
+				}, true);
 		} catch (err) {
 			if (err?.name === 'BizError') {
 				// All preflight failures are retryable with the same proof, so
 				// they are classified as client-side rejection. Rate limiting is
 				// preserved as its own signal.
-				throw new BizError(err.message, err.code === 429 ? 429 : 400, err.errorCode || 'bind_policy_rejected');
+					throw new BizError(err.message, err.code === 429 ? 429 : 400, err.errorCode || 'bind_policy_rejected', {
+						proofConsumed: false
+					});
 			}
 			console.error('OAuth bind preflight failed:', err);
 			throw new BizError('OAuth binding failed; retry with the same proof', 400, 'bind_failed');
@@ -962,7 +972,15 @@ const oauthService = {
 
 			// Authoritative registration. The policy is re-evaluated here, so
 			// nothing that changed since the preflight can be bypassed.
-			const registration = await loginService.register(c, { email, password, code }, true);
+				const registration = await loginService.register(c, {
+					email,
+					password,
+					code,
+					acceptedTerms,
+					termsVersion,
+					locale,
+					sourceUrl
+				}, true);
 			const userId = Number(registration?.userId);
 			if (!Number.isInteger(userId) || userId <= 0) {
 				throw new BizError('OAuth binding could not create the local account; restart the OAuth login flow', 409, 'bind_commit_failed');

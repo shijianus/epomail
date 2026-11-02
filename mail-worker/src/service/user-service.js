@@ -7,7 +7,6 @@ import { and, asc, count, desc, eq, inArray, sql } from 'drizzle-orm';
 import { emailConst, isDel, roleConst, userConst } from '../const/entity-const';
 import { email } from '../entity/email';
 import { att } from '../entity/att';
-import kvConst from '../const/kv-const';
 import KvConst from '../const/kv-const';
 import cryptoUtils from '../utils/crypto-utils';
 import emailService from './email-service';
@@ -31,8 +30,27 @@ import rbacGuard from './rbac-guard-service.js';
 import { sanitizeCustomLabels } from '../utils/svg-utils.js';
 import rateLimit from '../utils/rate-limit.js';
 import userContext from '../security/user-context.js';
+import { authVersionOf } from '../utils/one-time-credential.js';
+import { getMailDb } from '../utils/db-accessor.js';
+import { deleteKvKeys, deleteKvMatching, forEachKvPage } from '../utils/kv-revocation.js';
+import { assertStorageCanChange, beginAccountDeletion, deleteAccountEvidence, getObjectDeletionCounts,
+	isActiveUser, readPrivacyState, revokeAccountAccess, revokeTelegramLinks, setDeletionStatus } from './privacy-revocation-service.js';
 
 const userService = {
+
+	/** Sensitive fields and revocation epoch change in the same atomic CAS. */
+	async changeAuthentication(c, row, fields) {
+		const changed = await orm(c).update(user).set({ ...fields, authVersion: authVersionOf(row) + 1 })
+			.where(and(eq(user.userId, row.userId), eq(user.authVersion, authVersionOf(row)),
+				eq(user.password, row.password), eq(user.salt, row.salt), eq(user.isDel, 0),
+				eq(user.securityKeys, row.securityKeys), eq(user.totpBackupCodes, row.totpBackupCodes),
+				eq(user.totpSecret, row.totpSecret)))
+			.returning({ authVersion: user.authVersion }).get();
+		if (!changed) throw new BizError(t('authExpired'), 409, 'auth_changed');
+		// D1 is authoritative even if a concurrent stale KV writer restores a token.
+		await c.env.kv.delete(KvConst.AUTH_INFO + row.userId).catch(() => {});
+		return changed.authVersion;
+	},
 
 	async setCustomLabels(c, params, userId) {
 		const { customLabels } = params;
@@ -52,18 +70,18 @@ const userService = {
 	},
 
 	async updateProfile(c, params, userId) {
-        let profile = {};
-        try {
-            const profileStr = await c.env.kv.get('USER_PROFILE_' + userId);
-            if (profileStr) {
-                profile = JSON.parse(profileStr);
-            }
-        } catch (e) {}
+        const accountState = await userService.selectById(c, userId);
+        if (!isActiveUser(accountState)) throw new BizError(t('authExpired'), 403, 'account_unavailable');
+        if (!params || typeof params !== 'object' || Array.isArray(params)) {
+            throw new BizError('Invalid profile update', 400, 'invalid_profile');
+        }
+        const profileStr = await c.env.kv.get('USER_PROFILE_' + userId);
+        let profile = profileStr ? JSON.parse(profileStr) : {};
 
         const ALLOWED_PROFILE_FIELDS = [
             'nickname', 'bio', 'avatarUrl', 'backgroundUrl', 'customLabels',
             'signature', 'themeMode', 'personalForwarding', 'personalTelegram', 'background',
-            'showStats', 'showTrend', 'showSources', 'lang',
+            'showStats', 'showTrend', 'showSources', 'privacyPreferences', 'lang',
             'gender', 'genderCustom', 'birthday', 'phones', 'addresses', 'emails'
         ];
 
@@ -71,6 +89,42 @@ const userService = {
         for (const key of ALLOWED_PROFILE_FIELDS) {
             if (params && params[key] !== undefined) {
                 safeParams[key] = params[key];
+            }
+        }
+
+        for (const field of ['showStats', 'showTrend', 'showSources']) {
+            if (safeParams[field] !== undefined && typeof safeParams[field] !== 'boolean') {
+                throw new BizError('Privacy display settings must be boolean', 400, 'invalid_profile');
+            }
+        }
+        if (safeParams.privacyPreferences !== undefined) {
+            const prefs = safeParams.privacyPreferences;
+            if (!prefs || typeof prefs !== 'object' || Array.isArray(prefs)
+                || Object.keys(prefs).some(key => key !== 'aiVerificationCode')
+                || typeof prefs.aiVerificationCode !== 'boolean') {
+                throw new BizError('Invalid privacy preferences', 400, 'invalid_privacy_preferences');
+            }
+            safeParams.privacyPreferences = { aiVerificationCode: prefs.aiVerificationCode };
+        }
+        if (safeParams.personalTelegram !== undefined) {
+            const tg = safeParams.personalTelegram;
+            if (!tg || typeof tg !== 'object' || Array.isArray(tg) || typeof tg.enabled !== 'boolean'
+                || !['all', 'important', 'privacy'].includes(tg.mode)
+                || (tg.notifyCodeOnly !== undefined && typeof tg.notifyCodeOnly !== 'boolean')
+                || (tg.includePreview !== undefined && typeof tg.includePreview !== 'boolean')) {
+                throw new BizError('Invalid Telegram settings', 400, 'invalid_telegram_settings');
+            }
+            safeParams.personalTelegram = {
+                enabled: tg.enabled,
+                botToken: typeof tg.botToken === 'string' ? tg.botToken.trim().slice(0, 200) : '',
+                chatId: typeof tg.chatId === 'string' || typeof tg.chatId === 'number' ? String(tg.chatId).trim().slice(0, 100) : '',
+                topicId: typeof tg.topicId === 'string' || typeof tg.topicId === 'number' ? String(tg.topicId).trim().slice(0, 50) : '',
+                mode: tg.mode,
+                notifyCodeOnly: tg.notifyCodeOnly === true,
+                includePreview: tg.includePreview === true
+            };
+            if (tg.enabled && (!safeParams.personalTelegram.botToken || !safeParams.personalTelegram.chatId)) {
+                throw new BizError('Telegram bot token and chat ID are required', 400, 'invalid_telegram_settings');
             }
         }
 
@@ -147,23 +201,43 @@ const userService = {
         }
 
         // Sanitize personalForwarding if present
-        if (safeParams.personalForwarding && typeof safeParams.personalForwarding === 'object') {
+        if (safeParams.personalForwarding !== undefined) {
             const pfw = safeParams.personalForwarding;
+            if (!pfw || typeof pfw !== 'object' || Array.isArray(pfw) || typeof pfw.enabled !== 'boolean') {
+                throw new BizError(t('forwardingNotSupported'), 400, 'invalid_forwarding_settings');
+            }
+            if (pfw.enabled && (!['all', 'alias'].includes(pfw.mode) || pfw.keepCopy === false)) {
+                throw new BizError(t('forwardingNotSupported'), 400, 'forwarding_option_unavailable');
+            }
+            if (pfw.targets !== undefined && typeof pfw.targets !== 'string') {
+                throw new BizError(t('forwardingNotSupported'), 400, 'invalid_forwarding_settings');
+            }
             const validTargets = (pfw.targets || '')
                 .split(',')
                 .map(t => t.trim().toLowerCase())
                 .filter(t => t && verifyUtils.isEmail(t))
                 .slice(0, 5)
                 .join(',');
+            const aliasPrefixes = typeof pfw.aliasPrefixes === 'string' ? pfw.aliasPrefixes.slice(0, 200) : '';
+            if (pfw.enabled && (validTargets.length === 0 || (pfw.mode === 'alias' && !aliasPrefixes.split(',').some(prefix => prefix.trim())))) {
+                throw new BizError(t('forwardingNotSupported'), 400, 'invalid_forwarding_settings');
+            }
             safeParams.personalForwarding = {
-                enabled: !!pfw.enabled,
+                enabled: pfw.enabled,
                 mode: ['all', 'alias', 'rules'].includes(pfw.mode) ? pfw.mode : 'all',
-                aliasPrefixes: typeof pfw.aliasPrefixes === 'string' ? pfw.aliasPrefixes.slice(0, 200) : '',
+                aliasPrefixes,
+                keepCopy: true,
                 addPrefix: !!pfw.addPrefix,
                 targets: validTargets
             };
         }
 
+        if (safeParams.personalTelegram !== undefined) {
+            // Revoke in authoritative D1 before writing eventually consistent KV.
+            // A stopped channel can never revive pre-stop links when re-enabled.
+            const revocation = await revokeTelegramLinks(c, userId);
+            profile.telegramShareVersion = revocation.version;
+        }
         Object.assign(profile, safeParams);
         await c.env.kv.put('USER_PROFILE_' + userId, JSON.stringify(profile));
 
@@ -352,6 +426,8 @@ const userService = {
         user.showStats = profile.showStats ?? true;
         user.showTrend = profile.showTrend ?? true;
         user.showSources = profile.showSources ?? true;
+        // Selection of this optional processing feature is not blanket consent.
+        user.privacyPreferences = { aiVerificationCode: profile.privacyPreferences?.aiVerificationCode === true };
 
         user.gender = profile.gender || 'prefer_not_to_say';
         user.genderCustom = profile.genderCustom || '';
@@ -375,8 +451,8 @@ const userService = {
             chatId: '',
             topicId: '',
             mode: 'privacy',
-            notifyCodeOnly: true,
-            includePreview: true
+            notifyCodeOnly: false,
+            includePreview: false
         };
         user.personalForwarding = profile.personalForwarding || {
             enabled: false,
@@ -421,63 +497,47 @@ const userService = {
 	},
 
 	async getUserQuota(c, userId) {
-		const DEFAULT_MAX_EMAILS = 5000;
-		const DEFAULT_MAX_STORAGE_MB = 500;
-		
-		let maxEmails = Math.min(Number(c.env.max_emails || DEFAULT_MAX_EMAILS), DEFAULT_MAX_EMAILS);
-		let maxStorageMB = Math.min(Number(c.env.max_storage_mb || DEFAULT_MAX_STORAGE_MB), DEFAULT_MAX_STORAGE_MB);
-
 		try {
+			const DEFAULT_MAX_EMAILS = 5000;
+			const configuredMaxEmails = c.env.max_emails ?? DEFAULT_MAX_EMAILS;
+			const emailLimit = Number(configuredMaxEmails);
+			if (!['number', 'string'].includes(typeof configuredMaxEmails)
+				|| (typeof configuredMaxEmails === 'string' && !configuredMaxEmails.trim())
+				|| !Number.isSafeInteger(emailLimit) || emailLimit < 0) {
+				throw new Error('Mailbox quota configuration is invalid');
+			}
+			const maxEmails = Math.min(emailLimit, DEFAULT_MAX_EMAILS);
 			const storageQuotaService = (await import('./storage-quota-service')).default;
 			const usage = await storageQuotaService.getUserStorageUsage(c, userId);
-			if (usage) {
-				if (usage.isVisitor && !usage.byoStorageEnabled) {
-					maxStorageMB = 0;
-				} else if (usage.quotaMb !== undefined && usage.quotaMb !== null) {
-					maxStorageMB = usage.quotaMb;
-				}
+			if (!usage || !Number.isSafeInteger(usage.emailCount) || usage.emailCount < 0
+				|| !Number.isSafeInteger(usage.usedBytes) || usage.usedBytes < 0
+				|| !Number.isFinite(usage.quotaMb) || usage.quotaMb < 0
+				|| !Number.isFinite(usage.quotaBytes) || usage.quotaBytes < 0
+				|| ![0, 1].includes(usage.byoStorageEnabled) || typeof usage.isVisitor !== 'boolean') {
+				throw new Error('Storage quota usage is unknown');
 			}
-		} catch (e) {
-			console.warn('Failed to resolve user storage quota in getUserQuota:', e.message);
-		}
-
-		const emailCountRes = await orm(c)
-			.select({ count: sql`count(*)` })
-			.from(email)
-			.where(and(eq(email.userId, userId), eq(email.isDel, 0)))
-			.get();
-		const usedEmails = emailCountRes?.count || 0;
-
-		const emailStorageRes = await orm(c)
-			.select({ size: sql`sum(length(ifnull(text, '')) + length(ifnull(content, '')))` })
-			.from(email)
-			.where(and(eq(email.userId, userId), eq(email.isDel, 0)))
-			.get();
-		const emailStorage = emailStorageRes?.size || 0;
-
-		const attStorageRes = await orm(c)
-			.select({ size: sql`sum(size)` })
-			.from(att)
-			.where(eq(att.userId, userId))
-			.get();
-		const attStorage = attStorageRes?.size || 0;
-
-		let dbFull = false;
-		try {
 			const dbFullFlag = await c.env.kv.get('db_full_status');
-			if (dbFullFlag === 'true') {
-				dbFull = true;
+			if (dbFullFlag !== null && dbFullFlag !== 'true' && dbFullFlag !== 'false') {
+				throw new Error('Database capacity status is unknown');
 			}
-		} catch (e) {}
-
-		return {
-			maxEmails,
-			maxStorageMB,
-			maxStorageBytes: maxStorageMB * 1024 * 1024,
-			usedEmails,
-			usedStorageBytes: Number(emailStorage) + Number(attStorage),
-			dbFull
-		};
+			const bypassStorage = usage.byoStorageEnabled === 1;
+			return {
+				maxEmails,
+				maxStorageMB: usage.quotaMb,
+				maxStorageBytes: usage.quotaBytes,
+				// Actual MAIL_DB occupancy (including trash/SAVING), not reservations.
+				usedEmails: usage.emailCount,
+				usedStorageBytes: usage.usedBytes,
+				byoStorageEnabled: usage.byoStorageEnabled,
+				bypassStorage,
+				isVisitor: usage.isVisitor,
+				// 0 alone is ambiguous: non-visitors have unlimited storage at 0 MB.
+				quotaStorageBlocked: usage.isVisitor && !bypassStorage,
+				dbFull: dbFullFlag === 'true'
+			};
+		} catch (_) {
+			throw new BizError('Storage quota unavailable', 503, 'quota_unavailable');
+		}
 	},
 
 
@@ -487,11 +547,11 @@ const userService = {
 		if (typeof password !== 'string' || password.length < 6) {
 			throw new BizError(t('pwdMinLength'));
 		}
+		if (password.length > 30) throw new BizError(t('pwdLengthLimit'));
+		const userRow = await this.selectById(c, Number(userId));
+		if (!userRow) throw new BizError(t('notExistUser'));
 		if (options.requireCurrent) {
-			const userRow = await orm(c).select().from(user).where(eq(user.userId, userId)).get();
-			if (!userRow) {
-				throw new BizError(t('notExistUser'));
-			}
+			await userContext.requireSession(c, userRow.userId, userRow);
 			const check = await cryptoUtils.verifyPasswordWithUpgrade(currentPassword || '', userRow.salt, userRow.password, c.env);
 			if (!check.isValid) {
 				throw new BizError(t('IncorrectPwd'), 403);
@@ -499,7 +559,7 @@ const userService = {
 		}
 
 		const { salt, hash } = await cryptoUtils.hashPassword(password, c.env);
-		await orm(c).update(user).set({ password: hash, salt: salt }).where(eq(user.userId, userId)).run();
+		await this.changeAuthentication(c, userRow, { password: hash, salt });
 
 		// Password changes invalidate every existing session. The user must log
 		// in again with the new credential.
@@ -565,12 +625,13 @@ const userService = {
 
 			if (!status.providerLinked || !status.hasInitialPassword) return status;
 
-			const token = await userContext.getToken(c);
-			if (!token) return status;
+			const session = await userContext.requireSession(c, userId, userRow);
+			const token = session.token;
 
 			const authInfo = await c.env.kv.get(KvConst.AUTH_INFO + userId, { type: 'json' });
 			const meta = authInfo && authInfo.tokenMeta ? authInfo.tokenMeta[token] : null;
-			if (!meta || meta.method !== 'oauth' || !Number.isFinite(meta.at)) return status;
+			if (!meta || meta.method !== 'oauth' || !Number.isFinite(meta.at)
+				|| meta.at > Date.now() || authVersionOf(meta) !== authVersionOf(userRow)) return status;
 
 			if (typeof meta.provider === 'string' && meta.provider) {
 				status.provider = meta.provider;
@@ -583,8 +644,8 @@ const userService = {
 				canSet: true,
 				// Never serialised to a client: used only for the compare-and-set
 				// that makes two concurrent set requests resolve to one winner.
-				generatedHash
-			};
+				generatedHash,
+				authVersion: authVersionOf(userRow)			};
 		} catch (err) {
 			console.error('Failed to evaluate initial password eligibility:', err);
 			return status;
@@ -618,8 +679,8 @@ const userService = {
 		// Compare-and-set on the generated hash: if another request already set
 		// a password, this update matches no rows and the re-read differs.
 		await orm(c).update(user)
-			.set({ password: hash, salt })
-			.where(and(eq(user.userId, userId), eq(user.password, eligibility.generatedHash || '')))
+			.set({ password: hash, salt, authVersion: eligibility.authVersion + 1 })
+			.where(and(eq(user.userId, userId), eq(user.password, eligibility.generatedHash || ''), eq(user.authVersion, eligibility.authVersion)))
 			.run();
 
 		const updated = await this.selectById(c, userId);
@@ -699,15 +760,28 @@ const userService = {
 	},
 
 	async delete(c, userId) {
-		try {
-			const securityNoticeService = (await import('./security-notice-service.js')).default;
-			const { SECURITY_EVENT_TYPES } = await import('../const/security-notice-templates.js');
-			await securityNoticeService.sendNotice(c, userId, SECURITY_EVENT_TYPES.ACCOUNT_DELETED);
-		} catch (e) {
-			console.error('Failed to send account deletion notice:', e);
+		const target = await this.selectByIdIncludeDel(c, userId);
+		if (!target) throw new BizError(t('notExistUser'), 404);
+		const demoEmail = String(c.env.DEMO_VISITOR_EMAIL || '').trim().toLowerCase();
+		if (Number(userId) === 1 || isAdminUser(c, target)
+			|| (demoEmail && String(target.email).toLowerCase() === demoEmail)) {
+			throw new BizError('This managed account cannot be self-deleted', 403, 'managed_account_deletion_forbidden');
 		}
-		await orm(c).update(user).set({ isDel: isDel.DELETE }).where(eq(user.userId, userId)).run();
-		await c.env.kv.delete(kvConst.AUTH_INFO + userId)
+		const request = await beginAccountDeletion(c, userId);
+		try {
+			await revokeAccountAccess(c, userId);
+			await setDeletionStatus(c, userId, 'manual_review');
+		} catch (error) {
+			await setDeletionStatus(c, userId, 'cleanup_failed');
+			throw new BizError('Account disabled; access cleanup needs operator review', 503, 'account_deletion_cleanup_failed');
+		}
+		return {
+			accountDisabled: true,
+			deletionRequestedAt: request.deletionRequestedAt,
+			deletionStatus: 'manual_review',
+			cleanupComplete: true,
+			physicalDeletionComplete: false
+		};
 	},
 
 	async physicsDelete(c, params, callerUserId) {
@@ -723,31 +797,35 @@ const userService = {
 		if (userIds.includes(1)) {
 			throw new BizError('系统超级管理员（User 1）禁止物理删除！', 403);
 		}
-		userIds = userIds.filter(id => id !== 1);
+		userIds = [...new Set(userIds)].filter(id => Number.isSafeInteger(id) && id > 1);
 		if (userIds.length === 0) return;
 
 		for (const targetUserId of userIds) {
 			await rbacGuard.assertCanManageUser(c, callerUserId, targetUserId);
+			const target = await this.selectByIdIncludeDel(c, targetUserId);
+			if (target && isAdminUser(c, target)) throw new BizError('Managed administrator cannot be deleted', 403);
+		}
+		// Lock access first even for administrator-initiated physical deletion.
+		// Keep the identity/BYO locator if any later step fails.
+		for (const id of userIds) {
+			if (!await this.selectByIdIncludeDel(c, id)) continue;
+			await beginAccountDeletion(c, id);
+			try {
+				await revokeAccountAccess(c, id);
+				await setDeletionStatus(c, id, 'manual_review');
+			} catch (error) {
+				await setDeletionStatus(c, id, 'cleanup_failed');
+				throw error;
+			}
 		}
 
 		// 1. 在物理删除 D1 数据前，提取所有待删除用户的核心标识符（主邮箱、别名邮箱、用户名）
-		let usersToDelete = [];
-		let accountsToDelete = [];
-		try {
-			usersToDelete = await orm(c)
-				.select({ userId: user.userId, email: user.email })
-				.from(user)
-				.where(inArray(user.userId, userIds))
-				.all();
-		} catch (e) {}
-
-		try {
-			accountsToDelete = await orm(c)
-				.select({ accountId: account.accountId, userId: account.userId, email: account.email, name: account.name })
-				.from(account)
-				.where(inArray(account.userId, userIds))
-				.all();
-		} catch (e) {}
+		const usersToDelete = await orm(c)
+			.select({ userId: user.userId, email: user.email })
+			.from(user).where(inArray(user.userId, userIds)).all();
+		const accountsToDelete = await mailOrm(c)
+			.select({ accountId: account.accountId, userId: account.userId, email: account.email, name: account.name })
+			.from(account).where(inArray(account.userId, userIds)).all();
 
 		const identifiers = new Set();
 		for (const u of usersToDelete) {
@@ -801,29 +879,27 @@ const userService = {
 			console.warn('[user-service] Failed to count sentTodayCount:', e);
 		}
 
-		// 3. 级联清理 USER_PROFILE_ 中的 API Tokens（PAT 授权）
-		if (c.env?.kv) {
-			for (const id of userIds) {
-				try {
-					const profileStr = await c.env.kv.get('USER_PROFILE_' + id);
-					if (profileStr) {
-						const profile = typeof profileStr === 'string' ? JSON.parse(profileStr) : profileStr;
-						if (Array.isArray(profile.apiTokens)) {
-							for (const t of profile.apiTokens) {
-								if (t?.token) {
-									await c.env.kv.delete(`API_TOKEN_${t.token}`).catch(() => {});
-								}
-							}
-						}
-					}
-				} catch (e) {}
-			}
+		// Delete owned mail/attachments while the original storage locator exists.
+		try {
+			const { retireOutboundForUser } = await import('./mail-outbound-service.js');
+			for (const id of userIds) await retireOutboundForUser(c, id);
+			const { clearRawForUser } = await import('./mail-reliability-service.js');
+			for (const id of userIds) await clearRawForUser(c, id);
+		} catch (error) {
+			for (const id of userIds) await setDeletionStatus(c, id, 'manual_review');
+			throw new BizError('Inbound recovery data deletion needs review; original storage configuration retained', 409, 'object_deletion_pending');
 		}
-
-		// 4. 执行 D1 物理删除
 		await accountService.physicsDeleteByUserIds(c, userIds);
+		const queueCounts = await Promise.all(userIds.map(id => getObjectDeletionCounts(c, id)));
+		if (queueCounts.some(queue => queue.total > 0)) {
+			for (const id of userIds) await setDeletionStatus(c, id, 'manual_review');
+			throw new BizError('Object deletion is pending or failed; original storage configuration retained for retry', 409, 'object_deletion_pending');
+		}
 		await oauthService.deleteByUserIds(c, userIds);
-		await orm(c).delete(user).where(inArray(user.userId, userIds)).run();
+		for (const id of userIds) {
+			await deleteAccountEvidence(c, id);
+			await getMailDb(c).prepare('DELETE FROM star WHERE user_id = ?').bind(id).run();
+		}
 
 		// 5. 扣减并清理 send_day_count 当日发件统计键
 		if (c.env?.kv && sentTodayCount > 0) {
@@ -841,90 +917,35 @@ const userService = {
 			} catch (e) {}
 		}
 
-		// 6. 彻底清扫 KV 关联的所有用户专属键与孤儿缓存
-		if (c.env?.kv) {
+		// Finish paginated local cleanup before removing the last durable user row.
+		// A failure leaves an observable request/locator for an operator to retry.
+		try {
+			const kv = c.env.kv;
 			for (const id of userIds) {
-				try {
-					await c.env.kv.delete(KvConst.AUTH_INFO + id);
-					await c.env.kv.delete('USER_PROFILE_' + id);
-					await c.env.kv.delete('HAS_WELCOME_' + id);
-					await c.env.kv.delete('USER_KNOWN_ENV_' + id);
-					await c.env.kv.delete(KvConst.TOTP_SETUP + id);
-					if (KvConst.WEBAUTHN_SETUP) await c.env.kv.delete(KvConst.WEBAUTHN_SETUP + id);
-					if (KvConst.WEBAUTHN_TEST) await c.env.kv.delete(KvConst.WEBAUTHN_TEST + id);
-					try {
-						const replayKeys = await c.env.kv.list({ prefix: (KvConst.TOTP_REPLAY || 'totp_replay:') + id + ':', limit: 50 });
-						if (replayKeys?.keys) {
-							for (const rk of replayKeys.keys) {
-								await c.env.kv.delete(rk.name).catch(() => {});
-							}
-						}
-					} catch (e) {}
-				} catch (e) {}
+				await deleteKvKeys(kv, [KvConst.AUTH_INFO + id, 'USER_PROFILE_' + id,
+					'HAS_WELCOME_' + id, 'USER_KNOWN_ENV_' + id]);
+				for (const prefix of [`REVOKED_GRANT_${id}_`, `HAS_GLOBAL_EMAIL_${id}_`, `static/avatar/${id}/`]) {
+					await deleteKvMatching(kv, prefix);
+				}
 			}
-
-			// 清理所有相关邮箱和用户名的登录失败/临时锁定计数键
-			for (const identifier of identifiers) {
-				try {
-					await c.env.kv.delete(KvConst.LOGIN_FAIL + identifier);
-				} catch (e) {}
-			}
-
-			// 风控 IP 聚集计数器：从 risk_ip_acc 中清洗掉已删除用户，若某 IP 账号列表已空则物理回收该键
-			try {
-				const ipListResult = await c.env.kv.list({ prefix: KvConst.RISK_IP_ACCOUNTS || 'risk_ip_acc:', limit: 100 });
-				if (ipListResult && Array.isArray(ipListResult.keys)) {
-					for (const k of ipListResult.keys) {
-						try {
-							const raw = await c.env.kv.get(k.name);
-							if (raw) {
-								let uids = typeof raw === 'string' ? JSON.parse(raw) : raw;
-								if (Array.isArray(uids)) {
-									const remaining = uids.filter(uid => !userIds.includes(Number(uid)));
-									if (remaining.length === 0) {
-										await c.env.kv.delete(k.name);
-									} else if (remaining.length !== uids.length) {
-										await c.env.kv.put(k.name, JSON.stringify(remaining), { expirationTtl: 7200 });
-									}
-								}
-							}
-						} catch (e) {}
+			await deleteKvKeys(kv, [...identifiers].map(identifier => KvConst.LOGIN_FAIL + identifier));
+			await forEachKvPage(kv, KvConst.RISK_IP_ACCOUNTS, async keys => {
+				for (const key of keys) {
+					const ids = await kv.get(key.name, { type: 'json' });
+					if (!Array.isArray(ids)) continue;
+					const remaining = ids.filter(id => !userIds.includes(Number(id)));
+					if (remaining.length === 0) await kv.delete(key.name);
+					else if (remaining.length !== ids.length) {
+						await kv.put(key.name, JSON.stringify(remaining), { expirationTtl: 7200 });
 					}
 				}
-			} catch (e) {}
-
-			// 设备信任设备记录清理 (dev_trust:${deviceHash}:${userId})
-			try {
-				const devKeys = await c.env.kv.list({ prefix: KvConst.DEVICE_TRUST || 'dev_trust:', limit: 100 });
-				if (devKeys?.keys) {
-					for (const dk of devKeys.keys) {
-						const parts = dk.name.split(':');
-						const targetUid = Number(parts[parts.length - 1]);
-						if (userIds.includes(targetUid)) {
-							await c.env.kv.delete(dk.name).catch(() => {});
-						}
-					}
-				}
-			} catch (e) {}
-
-			// 授权撤销与全员邮件标记清理
-			for (const id of userIds) {
-				try {
-					const grantKeys = await c.env.kv.list({ prefix: `REVOKED_GRANT_${id}_`, limit: 50 });
-					if (grantKeys?.keys) {
-						for (const rk of grantKeys.keys) {
-							await c.env.kv.delete(rk.name).catch(() => {});
-						}
-					}
-					const globalEmailKeys = await c.env.kv.list({ prefix: `HAS_GLOBAL_EMAIL_${id}_`, limit: 50 });
-					if (globalEmailKeys?.keys) {
-						for (const gk of globalEmailKeys.keys) {
-							await c.env.kv.delete(gk.name).catch(() => {});
-						}
-					}
-				} catch (e) {}
-			}
+			});
+		} catch (error) {
+			for (const id of userIds) await setDeletionStatus(c, id, 'cleanup_failed');
+			throw new BizError('Deletion cleanup needs operator review', 503, 'account_deletion_cleanup_failed');
 		}
+		await orm(c).delete(user).where(inArray(user.userId, userIds)).run();
+		return { deletedUserIds: userIds, objectDeletionQueue: { pending: 0, failed: 0, total: 0 } };
 	},
 
 	async list(c, params) {
@@ -1002,6 +1023,13 @@ const userService = {
 		}
 
 		const userIds = list.map(user => user.userId);
+		for (const item of list) {
+			const privacy = await readPrivacyState(c, item.userId);
+			item.deletionRequestedAt = privacy?.deletionRequestedAt || '';
+			item.deletionStatus = privacy?.deletionStatus || '';
+			item.objectDeletionQueue = item.deletionRequestedAt
+				? await getObjectDeletionCounts(c, item.userId) : { pending: 0, failed: 0, total: 0 };
+		}
 
 		const types = [...new Set(list.map(user => user.type).filter(t => t !== null && t !== undefined))];
 
@@ -1359,6 +1387,10 @@ const userService = {
 	async restore(c, params, callerUserId) {
 		const { userId, type } = params
 		await rbacGuard.assertCanManageUser(c, callerUserId, Number(userId));
+		const privacy = await readPrivacyState(c, userId);
+		if (privacy?.deletionRequestedAt || privacy?.deletionStatus) {
+			throw new BizError('A deletion request must be reviewed with the user before any restoration', 409, 'deletion_request_pending');
+		}
 		await orm(c)
 			.update(user)
 			.set({ isDel: isDel.NORMAL })
@@ -1595,6 +1627,7 @@ const userService = {
 			throw new BizError('第三方云存储接入功能已被管理员停用 / BYO Storage is disabled', 403);
 		}
 
+		await assertStorageCanChange(c, userId);
 		const { bucket, endpoint, region, s3AccessKey, s3SecretKey, forcePathStyle, customDomain } = params;
 		if (!bucket || !endpoint || !s3AccessKey || !s3SecretKey) {
 			throw new BizError('请填写完整的存储桶信息 (Bucket, Endpoint, Key ID, Secret Key)');
@@ -1635,6 +1668,7 @@ const userService = {
 	},
 
 	async clearUserStorage(c, userId) {
+		await assertStorageCanChange(c, userId);
 		const userDb = (await import('../utils/db-accessor')).getUserDb(c);
 		await userDb.prepare(`
 			UPDATE user 

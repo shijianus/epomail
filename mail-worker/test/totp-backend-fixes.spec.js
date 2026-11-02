@@ -1,236 +1,83 @@
+import { env, SELF, fetchMock } from 'cloudflare:test';
+import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
 import totpUtils from '../src/utils/totp-utils.js';
-import saltHashUtils from '../src/utils/crypto-utils.js';
-import totpService from '../src/service/totp-service.js';
+import cryptoUtils from '../src/utils/crypto-utils.js';
+import JwtUtils from '../src/utils/jwt-utils.js';
 import loginService from '../src/service/login-service.js';
-import userService from '../src/service/user-service.js';
-import userContext from '../src/security/user-context.js';
-import KvConst from '../src/const/kv-const.js';
-import constant from '../src/const/constant.js';
-import { describe, it, expect, vi, afterEach } from 'vitest';
-import assert from 'node:assert';
+import { dbInit } from '../src/init/init.js';
 
-describe('TOTP Backend Fixes & Security Audit Tests', () => {
-
-	afterEach(() => {
-		vi.restoreAllMocks();
-	});
-
-	it('1. getEncryptionKey throws explicit error when totp_enc_key is missing without fallback', async () => {
-		await expect(totpUtils.getEncryptionKey({})).rejects.toThrow('totp_enc_key is not configured');
-		await expect(totpUtils.getEncryptionKey({ jwt_secret: 'some-jwt-secret' })).rejects.toThrow('totp_enc_key is not configured');
-		await expect(totpUtils.getEncryptionKey({ totp_enc_key: '   ' })).rejects.toThrow('totp_enc_key is not configured');
-
-		const validKeyEnv = { totp_enc_key: 'local-dev-totp-enc-key-NOT-FOR-PROD' };
-		const cryptoKey = await totpUtils.getEncryptionKey(validKeyEnv);
-		expect(cryptoKey).toBeDefined();
-	});
-
-	it('2. genRandomPwd rejection sampling produces uniform distribution without bias', () => {
-		const allowedChars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-		for (let i = 0; i < 50; i++) {
-			const pwd = saltHashUtils.genRandomPwd(16);
-			expect(pwd.length).toBe(16);
-			for (const ch of pwd) {
-				expect(allowedChars.includes(ch)).toBe(true);
-			}
-		}
-	});
-
-	it('3. enableTotp, disableTotp, and logout properly await userContext.getToken() and handle AUTH_INFO.tokens', async () => {
-		function createMockKv() {
-			const store = new Map();
-			return {
-				async get(key, options) {
-					const val = store.get(key);
-					if (val === undefined) return null;
-					if (options?.type === 'json') {
-						try { return JSON.parse(val); } catch (e) { return null; }
-					}
-					return val;
-				},
-				async put(key, value, options) {
-					store.set(key, typeof value === 'string' ? value : JSON.stringify(value));
-				},
-				async delete(key) {
-					store.delete(key);
-				},
-				_raw: store
-			};
-		}
-
-		const mockKv = createMockKv();
-		const testUserId = 999;
-		const testEmail = 'user999@epomail.bond';
-		const expectedCurrentToken = 'jwt-session-uuid-real-token-string';
-
-		const mockUser = {
-			userId: testUserId,
-			email: testEmail,
-			status: 0,
-			isDel: 0,
-			totpEnabled: 0,
-			totpSecret: '',
-			totpBackupCodes: '[]',
-			totpCreatedAt: '',
-			salt: 'mock-salt',
-			password: 'mock-password'
-		};
-
-		const mockContext = {
-			env: {
-				kv: mockKv,
-				totp_enc_key: 'local-dev-totp-enc-key-NOT-FOR-PROD',
-				domain: ['epomail.bond']
-			},
-			req: {
-				header: (name) => name.toLowerCase() === constant.TOKEN_HEADER.toLowerCase() ? 'Bearer mock-jwt-header' : null
-			},
-			get: (key) => key === 'user' ? { userId: testUserId, email: testEmail } : null,
-			set: () => {}
-		};
-
-		// Mock userContext.getToken as an async delay function
-		vi.spyOn(userContext, 'getToken').mockImplementation(async (c) => {
-			await new Promise(resolve => setTimeout(resolve, 5));
-			return expectedCurrentToken;
-		});
-
-		// This unit test focuses on KV/session bookkeeping; the D1 update is
-		// covered by the integration suite.
-		vi.spyOn(userService, 'updateTotpState').mockResolvedValue();
-		vi.spyOn(userService, 'selectById').mockResolvedValue({
-			...mockUser,
-			totpEnabled: 1,
-			securityKeys: '[]',
-			totpBackupCodes: JSON.stringify({
-				hashedCodes: Array.from({ length: 10 }, () => ({ used: 0 })),
-				encryptedRaw: ''
-			})
-		});
-
-		// Setup initial AUTH_INFO in KV with multiple existing tokens
-		await mockKv.put(KvConst.AUTH_INFO + testUserId, JSON.stringify({
-			tokens: ['old-session-1', 'old-session-2', expectedCurrentToken],
-			user: { ...mockUser },
-			refreshTime: new Date().toISOString()
-		}));
-
-		// Step A: Setup & Enable TOTP
-		const setupInfo = await totpService.getSetupInfo(mockContext, testUserId, testEmail);
-		expect(setupInfo.secret).toBeDefined();
-
-		const validCode = await totpUtils.generateTOTP(setupInfo.secret);
-		const enableRes = await totpService.enableTotp(mockContext, testUserId, { code: validCode });
-		expect(enableRes.backupCodes).toHaveLength(10);
-
-		// Check KV AUTH_INFO.tokens: MUST be an array containing the exact token string (NOT empty object or Promise)
-		const authInfoAfterEnable = await mockKv.get(KvConst.AUTH_INFO + testUserId, { type: 'json' });
-		expect(Array.isArray(authInfoAfterEnable.tokens)).toBe(true);
-		expect(authInfoAfterEnable.tokens.length).toBe(1);
-		expect(typeof authInfoAfterEnable.tokens[0]).toBe('string');
-		expect(authInfoAfterEnable.tokens[0]).toBe(expectedCurrentToken);
-		expect(JSON.stringify(authInfoAfterEnable.tokens[0])).not.toBe('{}');
-
-		// Step B: Query TOTP Status
-		const statusRes = await totpService.getStatus(mockContext, testUserId);
-		expect(statusRes.enabled).toBe(true);
-		expect(statusRes.backupCodesRemaining).toBe(10);
-
-		// Step C: Logout removes the token from KV AUTH_INFO.tokens
-		await loginService.logout(mockContext, testUserId);
-		const authInfoAfterLogout = await mockKv.get(KvConst.AUTH_INFO + testUserId, { type: 'json' });
-		// Logout deletes the whole AUTH_INFO record when the last session is
-		// removed; an empty token array is also acceptable.
-		expect(authInfoAfterLogout === null || authInfoAfterLogout.tokens.length === 0).toBe(true);
-	});
-
-	it('4. verifyTotpLogin enforces account-level fail lockout across multiple tempTokens', async () => {
-		function createMockKv() {
-			const store = new Map();
-			return {
-				async get(key, options) {
-					const val = store.get(key);
-					if (val === undefined) return null;
-					if (options?.type === 'json') {
-						try { return JSON.parse(val); } catch (e) { return null; }
-					}
-					return val;
-				},
-				async put(key, value, options) {
-					store.set(key, typeof value === 'string' ? value : JSON.stringify(value));
-				},
-				async delete(key) {
-					store.delete(key);
-				},
-				_raw: store
-			};
-		}
-
-		const mockKv = createMockKv();
-		const testUserId = 888;
-		const lockedEmail = 'locked-victim@epomail.bond';
-
-		const mockContext = {
-			env: {
-				kv: mockKv,
-				totp_enc_key: 'local-dev-totp-enc-key-NOT-FOR-PROD',
-				domain: ['epomail.bond']
-			},
-			get: (key) => key === 'user' ? { userId: testUserId, email: lockedEmail } : null,
-			set: () => {}
-		};
-
-		const encryptedTotpSecret = await totpUtils.encryptSecret('JBSWY3DPEE', mockContext.env);
-		vi.spyOn(userService, 'selectById').mockResolvedValue({
-			userId: testUserId,
-			email: lockedEmail,
-			status: 0,
-			isDel: 0,
-			totpEnabled: 1,
-			totpSecret: encryptedTotpSecret,
-			totpKeyVersion: 2,
-			totpBackupCodes: '[]',
-			securityKeys: '[]'
-		});
-
-		const tempToken1 = 'totp_tmp_lockout_test_1';
-		await mockKv.put(KvConst.TOTP_PENDING + tempToken1, JSON.stringify({
-			userId: testUserId,
-			email: lockedEmail,
-			attempts: 0,
-			createdAt: Date.now()
-		}));
-
-		// 4 failed attempts on tempToken1
-		for (let i = 1; i <= 4; i++) {
-			await expect(loginService.verifyTotpLogin(mockContext, { tempToken: tempToken1, code: '000000' })).rejects.toThrow();
-			const currentFail = await mockKv.get(KvConst.LOGIN_FAIL + lockedEmail);
-			expect(parseInt(currentFail)).toBe(i);
-		}
-
-		// 5th failed attempt on a new tempToken2
-		const tempToken2 = 'totp_tmp_lockout_test_2';
-		await mockKv.put(KvConst.TOTP_PENDING + tempToken2, JSON.stringify({
-			userId: testUserId,
-			email: lockedEmail,
-			attempts: 0,
-			createdAt: Date.now()
-		}));
-
-		await expect(loginService.verifyTotpLogin(mockContext, { tempToken: tempToken2, code: '000000' })).rejects.toThrow();
-		const finalFail = await mockKv.get(KvConst.LOGIN_FAIL + lockedEmail);
-		expect(parseInt(finalFail)).toBe(5);
-
-		// 6th attempt on any token must throw account locked
-		const tempToken3 = 'totp_tmp_lockout_test_3';
-		await mockKv.put(KvConst.TOTP_PENDING + tempToken3, JSON.stringify({
-			userId: testUserId,
-			email: lockedEmail,
-			attempts: 0,
-			createdAt: Date.now()
-		}));
-
-		await expect(loginService.verifyTotpLogin(mockContext, { tempToken: tempToken3, code: '123456' })).rejects.toThrow();
-	});
-
+const UID=980001, EMAIL='totp-backend@example.com', PASSWORD='test-only-password';
+const SECRET='JBSWY3DPEHPK3PXP';
+let credentials;
+beforeAll(async()=>{
+ await dbInit.intDB({env}); await dbInit.v1_1DB({env});
+ await env.db.prepare('ALTER TABLE user ADD COLUMN reg_key_id INTEGER NOT NULL DEFAULT 0').run().catch(() => {}); await dbInit.v3_8DB({env});
+ await dbInit.v3_10DB({env}); await dbInit.v3_23DB({env});
+ credentials=await cryptoUtils.hashPassword(PASSWORD,{PBKDF2_WRITER_ITERATIONS:'1000'});
+});
+async function clean(){
+ await env.db.prepare('DELETE FROM auth_security_operation WHERE user_id=?').bind(UID).run();
+ await env.db.prepare('DELETE FROM auth_totp_replay WHERE user_id=?').bind(UID).run();
+ await env.db.prepare('DELETE FROM user WHERE user_id=?').bind(UID).run();
+ let cursor;
+ do {const page=await env.kv.list({...(cursor?{cursor}:{})});for(const key of page.keys)await env.kv.delete(key.name);cursor=page.list_complete?null:page.cursor;}while(cursor);
+}
+beforeEach(async()=>{
+ fetchMock.activate();fetchMock.disableNetConnect();await clean();
+ await env.db.prepare('INSERT INTO user(user_id,email,password,salt,totp_key_version) VALUES(?,?,?,?,2)').bind(UID,EMAIL,credentials.hash,credentials.salt).run();
+ await env.kv.put('setting:',JSON.stringify({allMailMode:0,totp:1}));
+});
+afterEach(async()=>{try{await clean();}finally{fetchMock.deactivate();}});
+async function api(path,token,body){
+ return (await SELF.fetch(`https://example.com/api${path}`,{method:'POST',headers:{'content-type':'application/json',...(token?{Authorization:token}:{})},body:JSON.stringify(body)})).json();
+}
+async function session(){
+ const token='session-to-revoke';
+ const jwt=await JwtUtils.generateToken({env},{userId:UID,token,authVersion:0});
+ await env.kv.put(`auth-uid:${UID}`,JSON.stringify({tokens:['old-session',token],user:{userId:UID,email:EMAIL,isDel:0,status:0},refreshTime:new Date().toISOString()}));
+ return jwt;
+}
+describe('TOTP backend security with real D1 mutation paths',()=>{
+ it('encryption requires totp_enc_key, never jwt_secret fallback',async()=>{
+  await expect(totpUtils.getEncryptionKey({})).rejects.toThrow('totp_enc_key is not configured');
+  await expect(totpUtils.getEncryptionKey({jwt_secret:'test-only-secret'})).rejects.toThrow('totp_enc_key is not configured');
+  await expect(totpUtils.getEncryptionKey({totp_enc_key:' '})).rejects.toThrow('totp_enc_key is not configured');
+  expect(await totpUtils.getEncryptionKey({totp_enc_key:'test-only-encryption'})).toBeDefined();
+ });
+ it('random passwords contain only the intended rejection-sampling alphabet',()=>{
+  const chars='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  for(let i=0;i<50;i++){const value=cryptoUtils.genRandomPwd(16);expect(value).toHaveLength(16);for(const char of value)expect(chars.includes(char)).toBe(true);}
+ });
+ it('enabling TOTP revokes every old session and logout awaits the exact session token',async()=>{
+  const jwt=await session();
+  const opts=await api('/my/security/reauth-options',jwt,{operation:'totp_enable'});
+  const proof=await api('/my/security/reauth',jwt,{operation:'totp_enable',challengeToken:opts.data.challengeToken,password:PASSWORD});
+  expect(proof.code).toBe(200);
+  const setup=await api('/my/totp/setup',jwt,{stepUpToken:proof.data.stepUpToken,operation:'totp_enable'});
+  expect(setup.code).toBe(200);
+  const enabled=await api('/my/totp/enable',jwt,{setupToken:setup.data.setupToken,code:await totpUtils.generateTOTP(setup.data.secret)});
+  expect(enabled.code).toBe(200);expect(enabled.data.backupCodes).toHaveLength(10);
+  expect(await env.kv.get(`auth-uid:${UID}`)).toBeNull();
+  expect((await env.db.prepare('SELECT auth_version FROM user WHERE user_id=?').bind(UID).first()).auth_version).toBe(1);
+  await env.kv.put(`auth-uid:${UID}`,JSON.stringify({tokens:['session-to-revoke'],user:{userId:UID,email:EMAIL}}));
+  await loginService.logout({env,req:{header:name=>name.toLowerCase()==='authorization'?jwt:null}},UID);
+  expect(await env.kv.get(`auth-uid:${UID}`)).toBeNull();
+ });
+ it('accumulates account lockout across distinct D1 pending MFA credentials',async()=>{
+  await env.db.prepare('UPDATE user SET totp_enabled=1,totp_secret=? WHERE user_id=?').bind(await totpUtils.encryptSecret(SECRET,env),UID).run();
+  const pending=[];
+  for(let i=0;i<3;i++){
+   const result=await api('/login',null,{email:EMAIL,password:PASSWORD});
+   expect(result.data.mfaRequired).toBe(true);pending.push(result.data.tempToken);
+  }
+  const actual=await totpUtils.generateTOTP(SECRET);const wrong=actual==='000000'?'111111':'000000';
+  for(let i=0;i<4;i++){
+   expect((await api('/login/totp',null,{tempToken:pending[0],code:wrong})).code).not.toBe(200);
+   expect(Number(await env.kv.get(`login_fail:${EMAIL}`))).toBe(i+1);
+  }
+  expect((await api('/login/totp',null,{tempToken:pending[1],code:wrong})).code).not.toBe(200);
+  expect(Number(await env.kv.get(`login_fail:${EMAIL}`))).toBe(5);
+  expect((await api('/login/totp',null,{tempToken:pending[2],code:actual})).code).not.toBe(200);
+  expect(await env.kv.get(`auth-uid:${UID}`)).toBeNull();
+ });
 });

@@ -107,6 +107,40 @@
       </div>
     </div>
 
+    <section class="container device-privacy-card" id="devicePrivacy" :aria-label="$t('privacySettings.title')">
+      <div class="title privacy-heading">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M12 3 4 6v5c0 5 8 10 8 10s8-5 8-10V6l-8-3Z"/><path d="m9 12 2 2 4-4"/></svg>
+        <span>{{ $t('privacySettings.title') }}</span>
+      </div>
+      <div class="privacy-control-row">
+        <div class="privacy-copy">
+          <label id="verificationCodeLabel">{{ $t('privacySettings.verificationCode') }}</label>
+          <p>{{ $t('privacySettings.verificationCodeHint') }}</p>
+          <a v-if="verificationNoticeUrl" :href="verificationNoticeUrl" target="_blank" rel="noopener noreferrer">{{ $t('privacySettings.processingNotice') }}</a>
+          <p v-else>{{ $t('privacySettings.processingUnavailable') }}</p>
+        </div>
+        <el-switch :model-value="verificationCodeEnabled" :disabled="savingPrivacy || localCleanupStarted || (!verificationNoticeUrl && !verificationCodeEnabled)" :loading="savingPrivacy" aria-labelledby="verificationCodeLabel" @change="saveVerificationCodePreference" />
+      </div>
+      <div class="privacy-control-row">
+        <div class="privacy-copy">
+          <strong>{{ $t('privacySettings.readingLinks') }}</strong>
+          <p>{{ $t('privacySettings.readingLinksHint') }}</p>
+        </div>
+        <el-button size="small" plain :loading="revokingReadingLinks" :disabled="localCleanupStarted" @click="revokeReadingLinks">{{ $t('privacySettings.revokeLinks') }}</el-button>
+      </div>
+      <div class="privacy-control-row">
+        <div class="privacy-copy">
+          <strong>{{ $t('privacySettings.clearDeviceTitle') }}</strong>
+          <p>{{ $t('privacySettings.clearDeviceHint') }}</p>
+        </div>
+        <el-button size="small" type="danger" plain :loading="clearingDevice" :disabled="savingPrivacy || revokingReadingLinks" @click="clearThisDevice">{{ $t('privacySettings.clearDeviceButton') }}</el-button>
+      </div>
+      <div v-if="deviceCleanupMessage" class="privacy-cleanup-status" role="alert">
+        <span>{{ deviceCleanupMessage }}</span>
+        <el-button size="small" @click="leaveAfterCleanup">{{ $t('privacySettings.returnToLogin') }}</el-button>
+      </div>
+    </section>
+
     <!-- Section 2: 邮件与消息转发 (Personal TG Push & Email Forwarding) -->
     <div class="container forwarding-container" id="forwarding" v-if="allowUserTg || allowUserEmailForward">
       <div class="title" style="display: inline-flex; align-items: center; gap: 6px;">
@@ -155,6 +189,9 @@
             </div>
           </div>
 
+          <p v-if="forwardForm.mode === 'rules'" class="forward-availability-note" role="status">
+            {{ $t('privacySettings.forwardRulesUnavailable') }}
+          </p>
           <div class="forwarding-fields" :class="{ 'fields-disabled': !forwardForm.enabled }">
             <!-- 目的地邮箱 -->
             <div class="item forward-field-item">
@@ -241,10 +278,13 @@
                   </div>
 
                   <!-- 3. 智能规则 -->
-                  <div 
-                    class="rule-type-card" 
-                    :class="{ active: forwardForm.mode === 'rules' }"
-                    @click="forwardForm.mode = 'rules'"
+                  <div
+                    class="rule-type-card rule-type-unavailable"
+                    role="radio"
+                    aria-disabled="true"
+                    :aria-checked="forwardForm.mode === 'rules'"
+                    :aria-label="$t('forwardingTypeRules')"
+                    aria-describedby="forward-rules-unavailable"
                   >
                     <div class="rule-card-main">
                       <div class="custom-radio-indicator" :class="{ checked: forwardForm.mode === 'rules' }">
@@ -252,7 +292,7 @@
                       </div>
                       <div class="rule-card-text">
                         <div class="r-title">{{ $t('forwardingTypeRules') }}</div>
-                        <div class="r-desc">{{ $t('forwardingTypeRulesDesc') }}</div>
+                        <div id="forward-rules-unavailable" class="r-desc">{{ $t('privacySettings.forwardRulesUnavailable') }}</div>
                       </div>
                     </div>
                   </div>
@@ -271,9 +311,10 @@
                 </div>
               </div>
               <div class="feature-checkboxes">
-                <el-checkbox v-model="forwardForm.keepCopy">
+                <el-checkbox :model-value="true" disabled aria-describedby="forward-keep-copy-note">
                   <span class="chk-label">{{ $t('forwardingKeepCopy') }}</span>
                 </el-checkbox>
+                <p id="forward-keep-copy-note" class="forward-availability-note">{{ $t('privacySettings.forwardKeepCopyOnly') }}</p>
                 <el-checkbox v-model="forwardForm.addPrefix">
                   <span class="chk-label">{{ $t('forwardingSubjectPrefix') }}</span>
                 </el-checkbox>
@@ -622,6 +663,10 @@
             <el-radio label="important">{{ $t('tgModeImportant') }}</el-radio>
           </el-radio-group>
         </div>
+        <div class="dialog-field feature-checkboxes tg-privacy-options">
+          <el-checkbox v-model="tgForm.notifyCodeOnly" :disabled="savingTg">{{ $t('tgNotifyCodeOnly') }}</el-checkbox>
+          <el-checkbox v-model="tgForm.includePreview" :disabled="savingTg">{{ $t('tgIncludePreview') }}</el-checkbox>
+        </div>
       </div>
 
       <template #footer>
@@ -955,9 +1000,13 @@ import {
   testUserStorage,
   clearUserStorage,
   getMyOauthGrants,
-  revokeMyOauthGrant
+  revokeMyOauthGrant,
+  revokeTelegramLinks
 } from '@/request/my.js'
 import { websiteConfig } from '@/request/setting.js'
+import { clearDeviceData } from '@/utils/device-privacy.js'
+import { listDraftDatabaseNames } from '@/db/db.js'
+import { privacyPreferences, verificationCodeNotice, withVerificationCodePreference } from '@/utils/privacy-preferences.js'
 
 defineOptions({
   name: 'data-setting'
@@ -976,6 +1025,83 @@ const userStore = useUserStore()
 const settingStore = useSettingStore()
 const emailStore = useEmailStore()
 
+const savingPrivacy = ref(false)
+const revokingReadingLinks = ref(false)
+const clearingDevice = ref(false)
+const localCleanupStarted = ref(false)
+const deviceCleanupMessage = ref('')
+const verificationCodeEnabled = computed(() => privacyPreferences(userStore.user.privacyPreferences).aiVerificationCode === true)
+const verificationNoticeUrl = computed(() => verificationCodeNotice(settingStore.settings))
+
+async function saveVerificationCodePreference(enabled) {
+  if (savingPrivacy.value || localCleanupStarted.value) return
+  if (enabled && !verificationNoticeUrl.value) {
+    ElMessage.warning(t('privacySettings.processingUnavailable'))
+    return
+  }
+  const preferences = withVerificationCodePreference(userStore.user.privacyPreferences, enabled)
+  savingPrivacy.value = true
+  try {
+    await updateProfile({ privacyPreferences: preferences })
+    userStore.user.privacyPreferences = preferences
+    ElMessage.success(t('saveSuccessMsg'))
+  } catch {
+    ElMessage.error(t('privacySettings.preferenceSaveFailed'))
+  } finally {
+    savingPrivacy.value = false
+  }
+}
+
+async function revokeReadingLinks() {
+  try {
+    await ElMessageBox.confirm(t('privacySettings.revokeLinksConfirm'), t('privacySettings.revokeLinks'), {
+      type: 'warning', confirmButtonText: t('privacySettings.revokeLinks'), cancelButtonText: t('cancel')
+    })
+  } catch { return }
+  revokingReadingLinks.value = true
+  try {
+    await revokeTelegramLinks()
+    ElMessage.success(t('privacySettings.linksRevoked'))
+  } catch {
+    ElMessage.error(t('privacySettings.linksRevokeFailed'))
+  } finally {
+    revokingReadingLinks.value = false
+  }
+}
+
+function leaveAfterCleanup() {
+  window.location.replace('/login/')
+}
+
+async function clearThisDevice() {
+  try {
+    await ElMessageBox.confirm(t('privacySettings.clearDeviceConfirm'), t('privacySettings.clearDeviceTitle'), {
+      type: 'warning', confirmButtonText: t('privacySettings.clearDeviceButton'), cancelButtonText: t('cancel'),
+      closeOnClickModal: false
+    })
+  } catch { return }
+  clearingDevice.value = true
+  localCleanupStarted.value = true
+  deviceCleanupMessage.value = ''
+  try {
+    const result = await clearDeviceData({ listDatabaseNames: listDraftDatabaseNames })
+    if (result.complete) {
+      await ElMessageBox.alert(t('privacySettings.deviceCleared'), t('privacySettings.clearDeviceTitle'), {
+        confirmButtonText: t('privacySettings.returnToLogin'), showClose: false, closeOnPressEscape: false, closeOnClickModal: false
+      })
+      leaveAfterCleanup()
+    } else {
+      // Remain on this status panel so a blocked DB can be retried after other
+      // tabs are closed. The local session has already ended; no API is sent.
+      deviceCleanupMessage.value = t(result.blocked ? 'privacySettings.cleanupBlocked' : 'privacySettings.cleanupIncomplete')
+    }
+  } catch {
+    deviceCleanupMessage.value = t('privacySettings.cleanupIncomplete')
+  } finally {
+    clearingDevice.value = false
+  }
+}
+
 // 1. Export Data States
 const exportingFull = ref(false)
 const exportingEmails = ref(false)
@@ -993,8 +1119,8 @@ const tgForm = reactive({
   chatId: '',
   topicId: '',
   mode: 'all',
-  notifyCodeOnly: true,
-  includePreview: true
+  notifyCodeOnly: false,
+  includePreview: false
 })
 
 // 3. Forwarding Settings States & Mode Bindings
@@ -1484,8 +1610,10 @@ function initDataFromUserStore() {
   if (user && user.personalTelegram) {
     Object.assign(tgForm, user.personalTelegram)
   }
+  tgForm.notifyCodeOnly = user?.personalTelegram?.notifyCodeOnly === true
+  tgForm.includePreview = user?.personalTelegram?.includePreview === true
   if (user && user.personalForwarding) {
-    Object.assign(forwardForm, user.personalForwarding)
+    Object.assign(forwardForm, user.personalForwarding, { keepCopy: true })
   }
 }
 
@@ -1558,12 +1686,22 @@ async function handleTestTelegram() {
 }
 
 async function saveForwardSettings(showToast = true) {
+  if (savingForward.value) return
+  if (forwardForm.enabled && forwardForm.mode === 'rules') {
+    ElMessage.warning(t('privacySettings.forwardRulesUnavailable'))
+    return
+  }
+  if (forwardForm.enabled && forwardForm.mode === 'alias' &&
+      !(typeof forwardForm.aliasPrefixes === 'string' && forwardForm.aliasPrefixes.slice(0, 200).split(',').some(prefix => prefix.trim()))) {
+    ElMessage.warning(t('forwardingAliasPrefix'))
+    return
+  }
+  const personalForwarding = { ...forwardForm, keepCopy: true }
   savingForward.value = true
   try {
-    await updateProfile({
-      personalForwarding: { ...forwardForm }
-    })
-    userStore.user.personalForwarding = { ...forwardForm }
+    await updateProfile({ personalForwarding })
+    userStore.user.personalForwarding = { ...personalForwarding }
+    forwardForm.keepCopy = true
     if (showToast) {
       ElMessage({
         message: t('forwardingSavedSuccess'),
@@ -1724,6 +1862,23 @@ function triggerFileDownload(content, filename, mimeType) {
 </script>
 
 <style lang="scss" scoped>
+.device-privacy-card {
+  .privacy-heading { display: flex; align-items: center; gap: 8px; }
+  .privacy-heading svg { width: 20px; height: 20px; color: var(--accent-primary); flex-shrink: 0; }
+  .privacy-control-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+  .privacy-control-row + .privacy-control-row { padding-top: 14px; border-top: 1px solid var(--border-subtle); }
+  .privacy-copy { min-width: 0; flex: 1; }
+  .privacy-copy label, .privacy-copy strong { font-weight: 600; color: var(--text-primary); }
+  .privacy-copy p { margin: 5px 0 0; font-size: 12px; line-height: 1.6; color: var(--text-muted); overflow-wrap: anywhere; }
+  .privacy-copy a { display: inline-block; margin-top: 5px; color: var(--accent-primary); font-size: 12px; text-decoration: underline; }
+  .privacy-control-row > .el-button { flex-shrink: 0; max-width: 100%; white-space: normal; height: auto; min-height: 30px; line-height: 1.5; }
+  .privacy-cleanup-status { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; color: var(--text-primary); font-size: 13px; line-height: 1.6; }
+  .privacy-cleanup-status span { flex: 1 1 220px; }
+  @media (max-width: 767px) {
+    .privacy-control-row { flex-wrap: wrap; }
+    .privacy-copy { flex-basis: 100%; }
+  }
+}
 .box {
   padding: 40px 40px;
 
@@ -2184,6 +2339,27 @@ function triggerFileDownload(content, filename, mimeType) {
     }
   }
 }
+
+.rule-type-card.rule-type-unavailable {
+  cursor: not-allowed;
+  border-style: dashed;
+
+  &:hover {
+    border-color: var(--border-subtle);
+    background: var(--bg-surface);
+    transform: none;
+    box-shadow: none;
+  }
+}
+
+.forward-availability-note {
+  margin: 4px 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.tg-privacy-options :deep(.el-checkbox) { white-space: normal; }
 
 .feature-checkboxes {
   display: flex;

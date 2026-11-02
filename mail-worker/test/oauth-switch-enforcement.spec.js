@@ -112,12 +112,26 @@ describe('Module A: OAuth switch enforcement, stale state/token revocation, PKCE
 		});
 
 		const { userId, jwt } = await seedAuthenticatedUser('oauth-conv-owner@example.com', 'OwnerPass#2026!');
-		const reauthRes = await SELF.fetch(`${BASE}/api/my/oauthIdentities/reauth`, {
+		const reauthOptionsRes = await SELF.fetch('https://example.com/api/my/security/reauth-options', {
 			method: 'POST',
 			headers: { Authorization: jwt, 'Content-Type': 'application/json' },
-			body: JSON.stringify({ password: 'OwnerPass#2026!' })
+			body: JSON.stringify({ operation: 'oauth_bind', target: 'github' })
 		});
-		const stepUpToken = (await reauthRes.json()).data.stepUpToken;
+		const reauthOptions = await reauthOptionsRes.json();
+		expect(reauthOptions.code).toBe(200);
+		const reauthRes = await SELF.fetch('https://example.com/api/my/oauthIdentities/reauth', {
+			method: 'POST',
+			headers: { Authorization: jwt, 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				password: 'OwnerPass#2026!',
+				operation: 'oauth_bind',
+				target: 'github',
+				challengeToken: reauthOptions.data.challengeToken
+			})
+		});
+		const reauthBody = await reauthRes.json();
+		expect(reauthBody.code).toBe(200);
+		const stepUpToken = reauthBody.data.stepUpToken;
 		const startBindRes = await SELF.fetch(`${BASE}/api/my/oauthIdentities/bind/start`, {
 			method: 'POST',
 			headers: { Authorization: jwt, 'Content-Type': 'application/json' },

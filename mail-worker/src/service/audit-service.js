@@ -4,6 +4,7 @@ import user from '../entity/user';
 import settingService from './setting-service';
 import userService from './user-service';
 import decisionNoticeService from './decision-notice-service.js';
+import { ensureNoticeDeliverySchema } from '../utils/notice-delivery-schema.js';
 import KvConst from '../const/kv-const.js';
 import { and, desc, asc, eq, sql, count, inArray } from 'drizzle-orm';
 import BizError from '../error/biz-error';
@@ -249,52 +250,9 @@ const auditService = {
 				}
 			}
 
-			// Real table for final notice outbox & retries with distributed lease lock
-			await userDb.prepare(`
-				CREATE TABLE IF NOT EXISTS notification_outbox (
-					id INTEGER PRIMARY KEY AUTOINCREMENT,
-					task_id TEXT NOT NULL UNIQUE,
-					case_id INTEGER,
-					ticket_id TEXT,
-					user_id INTEGER,
-					recipient TEXT NOT NULL,
-					channel TEXT NOT NULL DEFAULT 'internal',
-					template_code TEXT NOT NULL,
-					subject TEXT NOT NULL,
-					content TEXT NOT NULL,
-					reason_code TEXT,
-					status TEXT NOT NULL DEFAULT 'pending',
-					provider_message_id TEXT,
-					retry_count INTEGER NOT NULL DEFAULT 0,
-					max_retries INTEGER NOT NULL DEFAULT 5,
-					last_error TEXT,
-					next_retry_at TEXT,
-					delivered_at TEXT,
-					read_at TEXT,
-					claimant_id TEXT,
-					lease_expires_at TEXT,
-					lease_version INTEGER DEFAULT 0,
-					create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
-					update_time DATETIME DEFAULT CURRENT_TIMESTAMP
-				);
-			`).run();
-			await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_outbox_status_retry ON notification_outbox(status, next_retry_at);`).run();
-
-			// Idempotent columns for notification_outbox
-			const outboxInfo = await userDb.prepare(`PRAGMA table_info('notification_outbox')`).all().catch(() => ({ results: [] }));
-			const existingOutboxCols = new Set((outboxInfo?.results || []).map(r => r.name));
-			const outboxLeaseCols = [
-				{ name: 'claimant_id', sql: `ALTER TABLE notification_outbox ADD COLUMN claimant_id TEXT;` },
-				{ name: 'lease_expires_at', sql: `ALTER TABLE notification_outbox ADD COLUMN lease_expires_at TEXT;` },
-				{ name: 'lease_version', sql: `ALTER TABLE notification_outbox ADD COLUMN lease_version INTEGER DEFAULT 0;` }
-			];
-			for (const col of outboxLeaseCols) {
-				if (!existingOutboxCols.has(col.name)) {
-					try {
-						await userDb.prepare(col.sql).run();
-					} catch (_) {}
-				}
-			}
+			// Notification schema belongs to its two domain databases. The helper
+			// is also called by init; no swallowed PRAGMA/ALTER failures here.
+			await ensureNoticeDeliverySchema(c);
 
 			// Atomic adjudication decision ledger for strict CAS and unique idempotency
 			await userDb.prepare(`
@@ -1771,6 +1729,7 @@ const auditService = {
 			templateCode: noticeSnapshot.templateCode,
 			subject: noticeSnapshot.subject,
 			content: noticeSnapshot.htmlContent,
+			textContent: noticeSnapshot.textContent,
 			reasonCode: targetLog.reasonCode,
 			channel
 		});
@@ -1834,18 +1793,15 @@ const auditService = {
 			}
 		}
 
-		// B. 内部账号：将官方安全最终裁决通知直接送达其邮箱进行持久化
-		if (targetUser) {
+		// B. Immediate delivery uses the same durable task/lease/receipt as cron.
+		// USER_DB adjudication is already committed. A MAIL_DB failure remains
+		// retryable; a later USER_DB writeback failure is recovered from receipt.
+		if (channel === 'internal') {
 			try {
-				await decisionNoticeService.persistInternalNotice(c, {
-					targetUser,
-					recipient: targetLog.email,
-					subject: noticeSnapshot.subject,
-					htmlContent: noticeSnapshot.htmlContent,
-					textContent: noticeSnapshot.textContent
-				});
-			} catch (e) {
-				console.warn('Failed to persist internal notice to mailbox:', e.message);
+				await decisionNoticeService.deliverOutboxTask(c, noticeTaskId);
+			} catch (_) {
+				// Queue/lease read errors leave the original pending task intact.
+				console.warn('Internal notice remains queued for retry');
 			}
 		}
 

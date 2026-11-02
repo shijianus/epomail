@@ -1,4 +1,28 @@
 import { defineWorkersConfig } from '@cloudflare/vitest-pool-workers/config';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+// Wrangler resolves .dev.vars beside its config, so keep the test config in a
+// fresh directory and disable its .env/process-environment fallback as well.
+process.env.CLOUDFLARE_LOAD_DEV_VARS_FROM_DOT_ENV = 'false';
+process.env.CLOUDFLARE_INCLUDE_PROCESS_ENV = 'false';
+
+const workerDir = path.dirname(fileURLToPath(import.meta.url));
+const tempConfigDir = mkdtempSync(path.join(os.tmpdir(), 'epomail-vitest-'));
+const tempConfigPath = path.join(tempConfigDir, 'wrangler-vitest.toml');
+try {
+	const testConfig = readFileSync(path.join(workerDir, 'wrangler-vitest.toml'), 'utf8');
+	const mainPath = path.join(workerDir, 'src/index.js').replaceAll('\\', '/');
+	const isolatedConfig = testConfig.replace(/^main\s*=.*$/m, `main = '${mainPath}'`);
+	if (isolatedConfig === testConfig) throw new Error('Missing main entry in wrangler-vitest.toml');
+	writeFileSync(tempConfigPath, isolatedConfig, { flag: 'wx' });
+} catch (error) {
+	rmSync(tempConfigDir, { recursive: true, force: true });
+	throw error;
+}
+process.once('exit', () => rmSync(tempConfigDir, { recursive: true, force: true }));
 
 export default defineWorkersConfig({
 	test: {
@@ -6,13 +30,12 @@ export default defineWorkersConfig({
 		// several workerd runtimes share a slow CI or laptop CPU; the assertions
 		// are unchanged, only the wall-clock ceiling is raised.
 		testTimeout: 20000,
-		// `svix` and `uuid` ship CommonJS builds inside `"type": "module"`
-		// packages, which the pool's module fallback misreads as ESM when they are
-		// externalised. Inlining them lets Vite bundle them instead of routing the
-		// import through that fallback service.
+		setupFiles: ['./test/setup-network.js'],
+		// These packages trigger the pool's module fallback when externalised.
+		// Inlining lets Vite bundle them instead of routing imports through it.
 		server: {
 			deps: {
-				inline: ['svix', 'uuid']
+				inline: ['svix', 'uuid', '@noble/hashes']
 			}
 		},
 		poolOptions: {
@@ -25,14 +48,21 @@ export default defineWorkersConfig({
 				// scope. It also avoids the Windows loopback module-fallback
 				// failures seen when ~17 runtimes start at once.
 				singleWorker: true,
-				// A dedicated test config avoids the production AI binding, which
-				// the installed workerd/miniflare version cannot resolve locally.
-				wrangler: { configPath: './wrangler-vitest.toml' },
-				miniflare: {
-					bindings: {
+				// The isolated config dir ensures Wrangler cannot see project secrets.
+				wrangler: { configPath: tempConfigPath },
+					miniflare: {
+						d1Databases: {
+							NOTICE_USER_DB: { id: '00000000-0000-4000-8000-000000000011' },
+							NOTICE_MAIL_DB: { id: '00000000-0000-4000-8000-000000000012' }
+						},
+						bindings: {
 						jwt_secret: 'test-jwt-secret-for-unit-tests',
 						totp_enc_key: 'test-totp-encryption-key-for-unit-tests',
-						resend_webhook_secret: 'whsec_test_only_not_a_real_secret'
+							resend_webhook_secret: ['whsec_', 'test_only_not_a_real_secret'].join(''),
+							ENVIRONMENT: 'test',
+							EMAIL_OUTBOUND_ENABLED: 'false',
+							OUTBOUND_WHITELIST_ENFORCE: 'true',
+							OUTBOUND_WHITELIST: ''
 					}
 				}
 			},

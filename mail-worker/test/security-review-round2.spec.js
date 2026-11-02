@@ -6,7 +6,8 @@
  * tree; they are expected to start passing once the defects are fixed.
  */
 import { env, SELF } from 'cloudflare:test';
-import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
+import settingService from '../src/service/setting-service.js';
 import oauthService from '../src/service/oauth-service.js';
 import loginService from '../src/service/login-service.js';
 import userService from '../src/service/user-service.js';
@@ -17,6 +18,18 @@ import saltHashUtils from '../src/utils/crypto-utils.js';
 import jwtUtils from '../src/utils/jwt-utils.js';
 import { buildSignedObjectUrl } from '../src/utils/object-token.js';
 import { ensureOtcTable, seedOtc, ensureBindClaimTable, clearBindClaim } from './helpers/one-time-credential.js';
+
+const CREATE_USER = `
+CREATE TABLE IF NOT EXISTS user (
+	user_id INTEGER PRIMARY KEY,
+	email TEXT NOT NULL,
+	type INTEGER NOT NULL DEFAULT 2,
+	status INTEGER NOT NULL DEFAULT 0,
+	is_del INTEGER NOT NULL DEFAULT 0,
+	auth_version INTEGER NOT NULL DEFAULT 0,
+	byo_storage_enabled INTEGER NOT NULL DEFAULT 0,
+	byo_storage_config TEXT NOT NULL DEFAULT '{}'
+)`;
 
 const CREATE_OAUTH = `
 CREATE TABLE IF NOT EXISTS oauth (
@@ -84,9 +97,11 @@ async function signRs256(privateKey, header, payload) {
 }
 
 async function seedAuth(userId, email, sessionToken) {
-	const token = await jwtUtils.generateToken({ env }, { userId, token: sessionToken }, 3600);
+	await env.db.prepare('INSERT INTO user (user_id, email, type, status, is_del, auth_version) VALUES (?, ?, 2, 0, 0, 0)')
+		.bind(userId, email).run();
+	const token = await jwtUtils.generateToken({ env }, { userId, token: sessionToken, authVersion: 0 }, 3600);
 	await env.kv.put(`auth-uid:${userId}`, JSON.stringify({
-		user: { userId, email, isDel: 0, status: 0, type: 2 },
+		user: { userId, email, isDel: 0, status: 0, type: 2, authVersion: 0 },
 		tokens: [sessionToken],
 		refreshTime: new Date().toISOString()
 	}), { expirationTtl: 3600 });
@@ -95,8 +110,14 @@ async function seedAuth(userId, email, sessionToken) {
 
 async function cleanupObjectRows() {
 	await env.db.prepare('DELETE FROM attachments').run();
+	await env.db.prepare('DELETE FROM user WHERE user_id = 2').run();
 	await env.db.prepare('DELETE FROM oauth_one_time_credential').run();
+	await env.db.prepare('DELETE FROM oauth').run();
+	await clearBindClaim(env.db);
 	for (const key of [
+		'rate-limit:oauth-login:local',
+		'rate-limit:oauth-bind:local',
+		'rate-limit:oauth-exchange:local',
 		'auth-uid:2',
 		'attachments/review-round2.txt',
 		'setting:',
@@ -107,21 +128,22 @@ async function cleanupObjectRows() {
 }
 
 beforeAll(async () => {
+	await env.db.prepare(CREATE_USER).run();
 	await env.db.prepare(CREATE_OAUTH).run();
 	await env.db.prepare(CREATE_ATTACHMENTS).run();
 	await ensureOtcTable(env.db);
 	await ensureBindClaimTable(env.db);
 });
 
-afterAll(async () => {
-	await cleanupObjectRows();
-	await env.db.prepare('DELETE FROM oauth').run();
-	await clearBindClaim(env.db);
-});
+afterAll(cleanupObjectRows);
 
-afterEach(() => {
-	vi.restoreAllMocks();
-	vi.unstubAllGlobals();
+afterEach(async () => {
+	try {
+		await cleanupObjectRows();
+	} finally {
+		vi.restoreAllMocks();
+		vi.unstubAllGlobals();
+	}
 });
 
 describe('Apple id_token is verified on the real HTTP login route', () => {
@@ -414,7 +436,15 @@ describe('Role assignment boundary on privileged creation paths', () => {
 });
 
 describe('Signed object URL as consumed by the browser', () => {
+	beforeEach(() => {
+		// Explicit settings fixture; keep real BYO lookup, signatures and KV bodies.
+		vi.spyOn(settingService, 'query').mockResolvedValue({
+			userByoStorage: 1, r2Domain: '', bucket: '', endpoint: '', s3AccessKey: '', s3SecretKey: ''
+		});
+	});
+
 	it('serves the same capability on the root attachment route', async () => {
+		await env.db.prepare('INSERT INTO user (user_id, email) VALUES (2, ?)').bind('review2@example.com').run();
 		await env.db.prepare('DELETE FROM attachments').run();
 		await env.db.prepare('INSERT INTO attachments (user_id, email_id, account_id, key, filename, size, type) VALUES (?, ?, ?, ?, ?, ?, ?)')
 			.bind(2, 10, 20, 'attachments/review-round2.txt', 'review-round2.txt', 17, 0).run();

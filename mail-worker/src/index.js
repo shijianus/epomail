@@ -12,6 +12,11 @@ import jwtUtils from './utils/jwt-utils';
 import { isAdminUser } from './utils/admin-utils';
 import permService from './service/perm-service';
 import KvConst from './const/kv-const';
+import { getUserDb } from './utils/db-accessor.js';
+import { authVersionOf } from './utils/one-time-credential.js';
+import { purgeAiBudgets } from './utils/ai-budget.js';
+import { cleanupExpiredInboundClaims } from './service/mail-reliability-service.js';
+import { maintainOutboundTasks } from './service/mail-outbound-service.js';
 
 async function checkScheduledAuth(req, env) {
 	if (req.method !== 'POST') {
@@ -54,6 +59,15 @@ async function checkScheduledAuth(req, env) {
 			return { ok: false, status: 401, message: '会话已过期或已被注销 (Session expired or revoked)' };
 		}
 
+		const current = await getUserDb({ env }).prepare(
+			'SELECT user_id, email, type, auth_version, status, is_del FROM user WHERE user_id = ?'
+		).bind(payload.userId).first();
+		if (!current || current.is_del !== 0 || current.status !== 0 || payload.purpose
+			|| authVersionOf(payload) !== authVersionOf(current)) {
+			return { ok: false, status: 401, message: 'Session expired or revoked' };
+		}
+		authInfo.user = { userId: current.user_id, email: current.email, type: current.type, status: current.status, isDel: current.is_del };
+
 		if (authInfo.user && authInfo.user.status === 1) {
 			return { ok: false, status: 403, message: '该账号已被封禁 (Banned user cannot trigger scheduled tasks)' };
 		}
@@ -75,9 +89,9 @@ async function checkScheduledAuth(req, env) {
 		}
 
 		return { ok: true, user: authInfo.user };
-	} catch (err) {
-		return { ok: false, status: 401, message: '凭据校验失败: ' + err.message };
-	}
+		} catch (_) {
+			return { ok: false, status: 401, message: 'Authentication verification failed' };
+		}
 }
 
 export default {
@@ -168,33 +182,35 @@ export default {
 	},
 	email: email,
 	async scheduled(c, env, ctx) {
-		try {
-			// Replay the durable object-deletion outbox first: a deletion that
-			// failed in an earlier request must not depend on another user
-			// action to complete.
-			await attService.drainObjectDeletionQueue({ env }, null, { limit: 200 }).catch(e => {
-				console.warn('[scheduled] object deletion queue drain failed:', e.message);
-			});
-
-			if (c?.cron === '*/30 * * * *') {
-				await analysisService.refreshEchartsCache({ env });
-				return;
+		const failures = [];
+		const run = async (name, task) => {
+			try {
+				await task();
+			} catch (_) {
+				failures.push(name);
+				console.error(JSON.stringify({ event: 'maintenance_failed', task: name }));
 			}
-
-			if (c?.cron === '*/5 * * * *' || c?.cron === '* * * * *' || !c?.cron) {
-				await decisionNoticeService.processOutboxBatch({ env });
-				if (c?.cron === '*/5 * * * *' || c?.cron === '* * * * *') return;
+		};
+		await run('object_deletion', () => attService.drainObjectDeletionQueue({ env }, null, { limit: 200 }));
+		await run('ai_budget_cleanup', () => purgeAiBudgets({ env }));
+		await run('inbound_raw_cleanup', () => cleanupExpiredInboundClaims({ env }, { limit: 100 }));
+		await run('outbound_tasks', () => maintainOutboundTasks({ env }, { limit: 100 }));
+		await run('security_operation_cleanup', () => getUserDb({ env }).batch([
+			getUserDb({ env }).prepare('DELETE FROM auth_security_operation WHERE rowid IN (SELECT rowid FROM auth_security_operation WHERE expires_at < unixepoch() LIMIT 500)'),
+			getUserDb({ env }).prepare('DELETE FROM auth_totp_replay WHERE rowid IN (SELECT rowid FROM auth_totp_replay WHERE expires_at < unixepoch() LIMIT 500)')
+		]));
+		if (c?.cron === '*/30 * * * *') {
+			await run('analytics', () => analysisService.refreshEchartsCache({ env }));
+		} else {
+			await run('notification_outbox', () => decisionNoticeService.processOutboxBatch({ env }));
+			if (c?.cron !== '*/5 * * * *' && c?.cron !== '* * * * *') {
+				await run('verification_records', () => verifyRecordService.clearRecord({ env }));
+				await run('daily_send_counts', () => userService.resetDaySendCount({ env }));
+				await run('trash_retention', () => emailService.clearTrashAndSpam({ env }));
+				await run('unbound_identities', () => oauthService.clearNoBindOathUser({ env }));
+				await run('analytics', () => analysisService.refreshEchartsCache({ env }));
 			}
-
-			await verifyRecordService.clearRecord({ env }).catch(() => {});
-			await userService.resetDaySendCount({ env }).catch(() => {});
-			await emailService.completeReceiveAll({ env }).catch(() => {});
-			await emailService.clearTrashAndSpam({ env }).catch(() => {});
-			await oauthService.clearNoBindOathUser({ env }).catch(() => {});
-			await decisionNoticeService.processOutboxBatch({ env }).catch(() => {});
-			await analysisService.refreshEchartsCache({ env }).catch(() => {});
-		} catch (err) {
-			console.warn('[scheduled error]:', err.message);
 		}
+		if (failures.length) throw new Error(`Maintenance tasks failed: ${failures.join(', ')}`);
 	},
 };

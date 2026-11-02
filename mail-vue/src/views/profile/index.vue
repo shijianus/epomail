@@ -183,6 +183,7 @@ import Header from '@/layout/header/index.vue'
 import { parseInlineMarkdown } from "@/utils/md-parser.js"
 import { cvtR2Url } from "@/utils/convert.js"
 import { ElMessage } from "element-plus"
+import { resolveTabSession } from '@/utils/tab-session.js'
 
 const uiStore = useUiStore()
 const userStore = useUserStore()
@@ -365,7 +366,13 @@ const fetchProfile = () => {
     loading.value = true
     getProfile(username.value).then(res => {
         if (res && res.userInfo) {
-            profileData.value = res
+            profileData.value = {
+              ...profileData.value,
+              ...res,
+              stats: { ...profileData.value.stats, ...(res.stats || {}) },
+              trend: Array.isArray(res.trend) ? res.trend : [],
+              sources: { ...profileData.value.sources, ...(res.sources || {}), top: Array.isArray(res.sources?.top) ? res.sources.top : [] },
+            }
             if (isOwnProfile.value && userStore.user?.backgroundUrl !== undefined && userStore.user?.backgroundUrl !== '') {
                 profileData.value.userInfo.backgroundUrl = userStore.user.backgroundUrl
             }
@@ -395,7 +402,7 @@ const goBack = () => {
 
 const handleContact = () => {
   const targetEmail = profileData.value.userInfo.email;
-  const isLogged = localStorage.getItem('token');
+  const isLogged = !!resolveTabSession();
   if (isLogged) {
     router.push({ path: '/inbox', query: { composeTo: targetEmail } });
   } else {
@@ -421,8 +428,6 @@ const hideTooltip = () => {
 </script>
 
 <style scoped lang="scss">
-@import url('https://fonts.googleapis.com/css2?family=Archivo:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap');
-
 .settings-container {
   --color-send: #3b82f6;
   --color-receive: #10b981;
@@ -435,7 +440,7 @@ const hideTooltip = () => {
   background: var(--bg-base) !important;
   background-image: none !important;
   position: relative;
-  font-family: 'Archivo', system-ui, -apple-system, sans-serif;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
 
   .loading {
     display: flex;

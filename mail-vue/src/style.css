@@ -39,7 +39,7 @@ html, body {
 }
 
 body {
-    font-family: "Outfit", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", "PingFang SC", "Microsoft YaHei", Roboto, "Helvetica Neue", Arial, sans-serif;
     line-height: 1.5;
     color: var(--el-text-color-primary);
     font-size: 14px;
@@ -74,8 +74,15 @@ button, input, select, textarea {
     outline: none;
 }
 
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+    outline: 2px solid var(--el-color-primary, #2563eb);
+    outline-offset: 3px;
+}
+
 .el-message {
-    white-space: nowrap !important;
+    max-width: calc(100vw - 32px);
+    white-space: normal;
+    overflow-wrap: anywhere;
 }
 
 .message-bottom {

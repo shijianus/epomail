@@ -48,6 +48,140 @@ CREATE TABLE IF NOT EXISTS oauth (
 	user_id INTEGER NOT NULL DEFAULT 0
 )`;
 
+const CREATE_USER = `
+CREATE TABLE IF NOT EXISTS user (
+	user_id INTEGER PRIMARY KEY AUTOINCREMENT,
+	email TEXT NOT NULL,
+	type INTEGER DEFAULT 1 NOT NULL,
+	password TEXT NOT NULL,
+	salt TEXT NOT NULL,
+	status INTEGER DEFAULT 0 NOT NULL,
+	create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+	active_time DATETIME,
+	create_ip TEXT,
+	active_ip TEXT,
+	os TEXT,
+	browser TEXT,
+	device TEXT,
+	sort TEXT DEFAULT '0',
+	send_count TEXT DEFAULT '0',
+	reg_key_id INTEGER DEFAULT 0 NOT NULL,
+	is_del INTEGER DEFAULT 0 NOT NULL,
+	custom_labels TEXT NOT NULL DEFAULT '[]',
+	totp_enabled INTEGER DEFAULT 0 NOT NULL,
+	totp_secret TEXT DEFAULT '' NOT NULL,
+	totp_key_version INTEGER DEFAULT 1 NOT NULL,
+	totp_backup_codes TEXT DEFAULT '[]' NOT NULL,
+	totp_created_at TEXT DEFAULT '' NOT NULL,
+	security_keys TEXT DEFAULT '[]' NOT NULL,
+	auth_version INTEGER NOT NULL DEFAULT 0,
+	passkey_history INTEGER NOT NULL DEFAULT 0,
+	storage_quota_mb INTEGER DEFAULT 0 NOT NULL,
+	byo_storage_enabled INTEGER DEFAULT 0 NOT NULL,
+	byo_storage_config TEXT DEFAULT '{}' NOT NULL
+)`;
+
+const LEGAL_SETTINGS = {
+	termsUrl: 'https://policies.example.com/terms',
+	privacyUrl: 'https://policies.example.com/privacy',
+	operatorName: 'OAuth Test Operator',
+	operatorCountry: 'TW',
+	contactEmail: 'legal@example.com',
+	policyVersion: 'oauth-bind-test-v1'
+};
+const LEGAL_EXT_KEYS = ['operatorName', 'operatorCountry', 'contactEmail', 'policyVersion'];
+const REGISTRATION_ACCEPTANCE = {
+	acceptedTerms: true,
+	termsVersion: LEGAL_SETTINGS.policyVersion,
+	locale: 'en',
+	sourceUrl: LEGAL_SETTINGS.termsUrl
+};
+
+async function ensureLegalSettingSchema() {
+	await env.db.prepare(`
+		CREATE TABLE IF NOT EXISTS setting (
+			register INTEGER NOT NULL DEFAULT 0,
+			receive INTEGER NOT NULL DEFAULT 0,
+			add_email INTEGER NOT NULL DEFAULT 0,
+			many_email INTEGER NOT NULL DEFAULT 0,
+			title TEXT NOT NULL DEFAULT '',
+			auto_refresh INTEGER NOT NULL DEFAULT 0,
+			register_verify INTEGER NOT NULL DEFAULT 1,
+			add_email_verify INTEGER NOT NULL DEFAULT 1,
+			terms_url TEXT NOT NULL DEFAULT '',
+			privacy_url TEXT NOT NULL DEFAULT ''
+		)
+	`).run();
+	const columns = await env.db.prepare(`PRAGMA table_info('setting')`).all();
+	const present = new Set((columns.results || []).map(column => column.name));
+	for (const name of ['terms_url', 'privacy_url']) {
+		if (!present.has(name)) {
+			await env.db.prepare(`ALTER TABLE setting ADD COLUMN ${name} TEXT NOT NULL DEFAULT ''`).run();
+		}
+	}
+	await env.db.prepare(`
+		CREATE TABLE IF NOT EXISTS setting_ext (
+			key TEXT PRIMARY KEY,
+			value TEXT NOT NULL
+		)
+	`).run();
+}
+
+let originalLegalSetting = null;
+let originalLegalExt = new Map();
+let legalSnapshotTaken = false;
+let syntheticLegalSettingRowId = null;
+
+async function seedLegalSettings() {
+	await ensureLegalSettingSchema();
+	if (!legalSnapshotTaken) {
+		originalLegalSetting = await env.db.prepare('SELECT rowid, terms_url, privacy_url FROM setting LIMIT 1').first();
+		const extRows = await env.db.prepare(
+			`SELECT key, value FROM setting_ext WHERE key IN (${LEGAL_EXT_KEYS.map(() => '?').join(',')})`
+		).bind(...LEGAL_EXT_KEYS).all();
+		originalLegalExt = new Map((extRows.results || []).map(row => [row.key, row.value]));
+		legalSnapshotTaken = true;
+	}
+	const row = originalLegalSetting || await env.db.prepare('SELECT rowid, terms_url, privacy_url FROM setting LIMIT 1').first();
+	if (!row) {
+		const inserted = await env.db.prepare(`
+			INSERT INTO setting (
+				register, receive, add_email, many_email, title, auto_refresh,
+				register_verify, add_email_verify, terms_url, privacy_url
+			) VALUES (0, 0, 0, 0, 'OAuth test', 0, 1, 1, ?, ?)
+		`).bind(LEGAL_SETTINGS.termsUrl, LEGAL_SETTINGS.privacyUrl).run();
+		syntheticLegalSettingRowId = Number(inserted?.meta?.last_row_id);
+	} else {
+		await env.db.prepare('UPDATE setting SET terms_url = ?, privacy_url = ? WHERE rowid = ?')
+			.bind(LEGAL_SETTINGS.termsUrl, LEGAL_SETTINGS.privacyUrl, row.rowid).run();
+	}
+	for (const key of LEGAL_EXT_KEYS) {
+		await env.db.prepare(`
+			INSERT INTO setting_ext (key, value) VALUES (?, ?)
+			ON CONFLICT(key) DO UPDATE SET value = excluded.value
+		`).bind(key, LEGAL_SETTINGS[key]).run();
+	}
+}
+
+async function restoreLegalSettings() {
+	if (originalLegalSetting) {
+		await env.db.prepare('UPDATE setting SET terms_url = ?, privacy_url = ? WHERE rowid = ?')
+			.bind(originalLegalSetting.terms_url || '', originalLegalSetting.privacy_url || '', originalLegalSetting.rowid).run();
+	} else if (syntheticLegalSettingRowId) {
+		await env.db.prepare('DELETE FROM setting WHERE rowid = ?').bind(syntheticLegalSettingRowId).run();
+	}
+	for (const key of LEGAL_EXT_KEYS) {
+		if (originalLegalExt.has(key)) {
+			await env.db.prepare(`
+				INSERT INTO setting_ext (key, value) VALUES (?, ?)
+				ON CONFLICT(key) DO UPDATE SET value = excluded.value
+			`).bind(key, originalLegalExt.get(key)).run();
+		} else {
+			await env.db.prepare('DELETE FROM setting_ext WHERE key = ?').bind(key).run();
+		}
+	}
+}
+
 const IDENTITY = 'apple:bind-target';
 const PROVIDER = 'apple';
 const GOOD_CODE = 'GOOD-CODE';
@@ -179,13 +313,18 @@ function bindParams(token, overrides = {}) {
 		code: GOOD_CODE,
 		bindToken: token,
 		provider: PROVIDER,
+		...REGISTRATION_ACCEPTANCE,
 		...overrides
 	};
 }
 
 beforeAll(async () => {
+	await env.db.prepare(CREATE_USER).run();
 	await env.db.prepare(CREATE_OAUTH).run();
 	await ensureOtcTable(env.db);
+	await dbInit.v3_23DB({ env });
+	await dbInit.v3_25DB({ env });
+	await seedLegalSettings();
 	// Also exercises the migration twice: it must be idempotent.
 	await dbInit.v3_20DB({ env });
 	await dbInit.v3_20DB({ env });
@@ -193,6 +332,7 @@ beforeAll(async () => {
 
 beforeEach(async () => {
 	await env.db.prepare('DELETE FROM oauth').run();
+	await env.db.prepare('DELETE FROM legal_acceptance').run();
 	await clearOtc(env.db);
 	await clearBindClaim(env.db);
 	applyPolicyMocks();
@@ -204,8 +344,10 @@ afterEach(() => {
 
 afterAll(async () => {
 	await env.db.prepare('DELETE FROM oauth').run();
+	await env.db.prepare('DELETE FROM legal_acceptance').run();
 	await clearOtc(env.db);
 	await clearBindClaim(env.db);
+	await restoreLegalSettings();
 });
 
 describe('OAuth bind: recoverable rejections never spend the proof', () => {
@@ -576,7 +718,12 @@ describe('OAuth bind: concurrency and failure compensation', () => {
 });
 
 describe('Registration policy preflight (shared validator)', () => {
-	const base = { email: 'bind@example.com', password: 'abcdef', code: GOOD_CODE };
+	const base = {
+		email: 'bind@example.com',
+		password: 'abcdef',
+		code: GOOD_CODE,
+		...REGISTRATION_ACCEPTANCE
+	};
 
 	it('rejects a closed registration before any write', async () => {
 		settings.register = 1;
@@ -647,7 +794,8 @@ describe('Register write path after the validator extraction', () => {
 		const result = await loginService.register(context(), {
 			email: 'bind@example.com',
 			password: 'abcdef',
-			code: GOOD_CODE
+			code: GOOD_CODE,
+			...REGISTRATION_ACCEPTANCE
 		}, true);
 
 		expect(result).toMatchObject({ userId: 42, reservedRegKey: true, regVerifyOpen: false });
@@ -660,7 +808,8 @@ describe('Register write path after the validator extraction', () => {
 		await expect(loginService.register(context(), {
 			email: 'bind@example.com',
 			password: 'abcdef',
-			code: GOOD_CODE
+			code: GOOD_CODE,
+			...REGISTRATION_ACCEPTANCE
 		}, true)).rejects.toThrow(t('regDisabled'));
 		expect(regKeyService.consumeOne).not.toHaveBeenCalled();
 		expect(userService.insert).not.toHaveBeenCalled();
@@ -673,7 +822,8 @@ describe('Register write path after the validator extraction', () => {
 		await expect(loginService.register(context(), {
 			email: 'bind@example.com',
 			password: 'abcdef',
-			code: GOOD_CODE
+			code: GOOD_CODE,
+			...REGISTRATION_ACCEPTANCE
 		}, true)).rejects.toThrow(/account insert failed/);
 
 		expect(regKeyService.restoreOne).toHaveBeenCalledWith(expect.anything(), GOOD_CODE);

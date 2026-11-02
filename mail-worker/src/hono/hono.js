@@ -62,9 +62,11 @@ app.use('*', async (c, next) => {
 
 app.onError((err, c) => {
 	if (err?.name === 'BizError') {
-		console.log(err.message);
-		return c.json(result.fail(err.message, err.code, err.errorCode));
-	}
+			console.log(err.message);
+			const body = result.fail(err.message, err.code, err.errorCode);
+			if (typeof err.proofConsumed === 'boolean') body.proofConsumed = err.proofConsumed;
+			return c.json(body);
+		}
 
 	// Internal database/provider errors can contain SQL fragments, binding
 	// names or request parameters. Log them server-side, but never reflect the

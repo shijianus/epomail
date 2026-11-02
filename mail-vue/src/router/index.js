@@ -8,6 +8,7 @@ import {cvtR2Url} from "@/utils/convert.js";
 import {getRoleGroupSlug, getFirstAllowedManageTab, hasAnyManagePermission} from "@/utils/role-utils.js";
 import {hasPerm} from "@/perm/perm.js";
 import {ElMessage} from 'element-plus';
+import { resolveTabSession, getLoginReturnUrl } from '@/utils/tab-session.js';
 import i18n from '@/i18n/index.js';
 
 const routes = [
@@ -392,7 +393,7 @@ router.beforeEach(async (to, from, next) => {
         }, 100)
     }
 
-    const token = localStorage.getItem('token')
+    const token = resolveTabSession()?.token || '';
 
     // 1. 目标为登录界面：无论是从何处跳转，直接硬重定向到独立的 /login/ 应用，避免 SPA 内部循环拦截
     if (to.name === 'login' || to.path === '/login' || to.path === '/login/') {
@@ -410,7 +411,7 @@ router.beforeEach(async (to, from, next) => {
     ];
     if (!token && to.name === 'profile' && protectedSystemPaths.includes(to.params.username?.toLowerCase())) {
         removeLoading();
-        window.location.replace('/login/');
+        window.location.replace(getLoginReturnUrl());
         return;
     }
 
@@ -424,7 +425,7 @@ router.beforeEach(async (to, from, next) => {
                 next({ path: '/audit-report', replace: true });
             } else {
                 removeLoading();
-                window.location.replace('/login/');
+                window.location.replace(getLoginReturnUrl());
             }
             return;
         }
@@ -433,7 +434,7 @@ router.beforeEach(async (to, from, next) => {
     // 3. 无 token 且访问受保护的内部路由：立即硬重定向到登录页
     if (!token && !['login', 'profile', 'oauth-authorize', 'restricted-notice'].includes(to.name)) {
         removeLoading();
-        window.location.replace('/login/');
+        window.location.replace(getLoginReturnUrl());
         return;
     }
 
@@ -447,7 +448,7 @@ router.beforeEach(async (to, from, next) => {
     if (isManageRoute) {
         if (!token) {
             removeLoading();
-            window.location.replace('/login/');
+            window.location.replace(getLoginReturnUrl());
             return;
         }
 

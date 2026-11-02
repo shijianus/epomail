@@ -252,29 +252,33 @@ describe('Module B: Fixed visitor account removal, userId=1 de-escalation, and i
 	});
 
 	it('rejects weak passwords when DEMO_VISITOR_ENABLED=true is explicitly requested', async () => {
-		await resetTables();
-		const baseEnv = {
-			...env,
-			dev: undefined,
-			DEV: undefined,
-			admin: 'admin@example.com',
-			admin_initial_password: 'TestInitOwner#2026!Safe',
-			DEMO_VISITOR_ENABLED: 'true',
-			DEMO_VISITOR_EMAIL: 'demo@example.com'
-		};
-		const ctxWeak = { env: { ...baseEnv, DEMO_VISITOR_PASSWORD: '123456' }, get: () => undefined, set: () => {} };
-		await prepareBaseSchema(ctxWeak);
-		await dbInit.v3_13DB(ctxWeak);
-		await expect(dbInit.v3_14DB(ctxWeak)).rejects.toThrow('DEMO_VISITOR_PASSWORD');
+		try {
+			await resetTables();
+			const baseEnv = {
+				...env,
+				dev: undefined,
+				DEV: undefined,
+				admin: 'admin@example.com',
+				admin_initial_password: 'TestInitOwner#2026!Safe',
+				DEMO_VISITOR_ENABLED: 'true',
+				DEMO_VISITOR_EMAIL: 'demo@example.com'
+			};
+			const ctxWeak = { env: { ...baseEnv, DEMO_VISITOR_PASSWORD: '123456' }, get: () => undefined, set: () => {} };
+			await prepareBaseSchema(ctxWeak);
+			await dbInit.v3_13DB(ctxWeak);
+			await expect(dbInit.v3_14DB(ctxWeak)).rejects.toThrow('DEMO_VISITOR_PASSWORD');
 
-		const ctxStrong = {
-			env: { ...baseEnv, DEMO_VISITOR_PASSWORD: 'StrongDemoVisitor#2026!' },
-			get: () => undefined,
-			set: () => {}
-		};
-		await dbInit.v3_14DB(ctxStrong);
-		const users = (await env.db.prepare(`SELECT user_id, email FROM user ORDER BY user_id ASC`).all()).results || [];
-		expect(users.map(u => u.email)).toEqual(['admin@example.com', 'demo@example.com']);
-		expect(users[0].user_id).toBe(1);
+			const ctxStrong = {
+				env: { ...baseEnv, DEMO_VISITOR_PASSWORD: 'StrongDemoVisitor#2026!' },
+				get: () => undefined,
+				set: () => {}
+			};
+			await dbInit.v3_14DB(ctxStrong);
+			const users = (await env.db.prepare(`SELECT user_id, email FROM user ORDER BY user_id ASC`).all()).results || [];
+			expect(users.map(u => u.email)).toEqual(['admin@example.com', 'demo@example.com']);
+			expect(users[0].user_id).toBe(1);
+		} finally {
+			await resetTables();
+		}
 	});
 });

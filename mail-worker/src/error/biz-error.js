@@ -2,14 +2,13 @@ class BizError extends Error {
 	/**
 	 * @param {string} message Localized, user-safe message.
 	 * @param {number} [code] HTTP-style status code.
-	 * @param {string} [errorCode] Stable machine-readable discriminator. It is
-	 *   deliberately independent of the localized message so clients can
-	 *   distinguish policy rejections without parsing translations.
+	 * @param {object} [options] Additional narrow protocol metadata.
 	 */
-	constructor(message, code, errorCode) {
+	constructor(message, code, errorCode, options = {}) {
 		super(message);
 		this.code = code ? code : 501;
 		this.errorCode = typeof errorCode === 'string' && errorCode ? errorCode : undefined;
+		if (typeof options?.proofConsumed === 'boolean') this.proofConsumed = options.proofConsumed;
 		this.name = 'BizError';
 	}
 }

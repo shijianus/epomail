@@ -5,6 +5,9 @@ import { Mail, Lock, Eye, EyeOff, ArrowRight, Check, Loader2, AlertCircle, KeyRo
 import type { CanvasHandle } from "./CanvasBackground";
 import { cameraState } from "./cameraStore";
 import { createT, resolveAuthLang } from "../../i18n/authLocale";
+import { registrationErrorKey } from "../../registration-legal";
+import { useRegistrationLegal } from "../../use-registration-legal";
+import { RegistrationNotice } from "./RegistrationNotice";
 
 interface RegisterFormProps {
   canvasRef: React.RefObject<CanvasHandle | null>;
@@ -126,23 +129,26 @@ export function RegisterForm({ canvasRef, onSwitch, sysConfig: propsSysConfig }:
   const [successMsg, setSuccessMsg] = useState("");
   const [sysConfig, setSysConfig] = useState<any>(propsSysConfig || null);
 
-  // Sync propsSysConfig whenever parent updates
+  // Sync propsSysConfig whenever parent updates, including an unavailable config.
   useEffect(() => {
-    if (propsSysConfig) {
-      setSysConfig(propsSysConfig);
-    }
+    setSysConfig(propsSysConfig || null);
   }, [propsSysConfig]);
 
-  // Always fetch fresh websiteConfig on mount to ensure real-time synchronization
+  // Fetch the current notice without reusing cached approval. A failed read
+  // blocks new registration rather than falling back to stale parent data.
   useEffect(() => {
-    fetch("/api/setting/websiteConfig")
-      .then((res) => res.json())
+    let active = true;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 10_000);
+    fetch("/api/setting/websiteConfig", { cache: 'no-store', signal: controller.signal })
+      .then((res) => res.ok ? res.json() : null)
       .then((data) => {
-        if (data.code === 200 && data.data) {
-          setSysConfig(data.data);
-        }
+        if (active) setSysConfig(data?.code === 200 && data.data && !Array.isArray(data.data)
+          && typeof data.data === 'object' ? data.data : null);
       })
-      .catch((err) => console.error("Failed to fetch fresh websiteConfig:", err));
+      .catch(() => { if (active) setSysConfig(null); })
+      .finally(() => clearTimeout(timer));
+    return () => { active = false; clearTimeout(timer); controller.abort(); };
   }, []);
 
   // Detect invite code from URL parameters (?code=... or ?regKey=... or ?invite=...)
@@ -156,10 +162,11 @@ export function RegisterForm({ canvasRef, onSwitch, sysConfig: propsSysConfig }:
     }
   }, []);
 
-  const effectiveConfig = sysConfig || propsSysConfig || {};
+  const effectiveConfig = sysConfig;
 
   const lang = useMemo(() => resolveAuthLang(), []);
   const t = useMemo(() => createT(lang), [lang]);
+  const legal = useRegistrationLegal(effectiveConfig, lang);
   const reduceMotion = !!useReducedMotion();
   // 主提交按钮的 hover 抬升反馈；reduced-motion 下只保留亮度变化，不做位移
   const submitHover = reduceMotion
@@ -224,6 +231,13 @@ export function RegisterForm({ canvasRef, onSwitch, sysConfig: propsSysConfig }:
       return;
     }
 
+    const acceptance = legal.payload;
+    if (!acceptance) {
+      setErrorMsg(t(legal.policy.ready ? 'legalAcceptanceRequired' : 'legalRegistrationUnready'));
+      cameraState.authErrorOpacity = 1;
+      return;
+    }
+
     let cleanEmail = email.trim();
     if (!cleanEmail) {
       setErrorMsg(t('enterEmail'));
@@ -274,11 +288,12 @@ export function RegisterForm({ canvasRef, onSwitch, sysConfig: propsSysConfig }:
 
     fetch("/api/register", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "Accept-Language": lang },
       body: JSON.stringify({
         email: cleanEmail,
         password,
         code: code.trim() || undefined,
+        ...acceptance,
       }),
     })
       .then(async (res) => {
@@ -306,6 +321,13 @@ export function RegisterForm({ canvasRef, onSwitch, sysConfig: propsSysConfig }:
           }, 1500);
         } else {
           setStatus("idle");
+          const legalError = registrationErrorKey(data.errorCode);
+          if (legalError) {
+            legal.handleError(data.errorCode);
+            setErrorMsg(t(legalError));
+            cameraState.authErrorOpacity = 1;
+            return;
+          }
           const rawErrMsg = data.message || data.msg || "";
           let friendlyMsg = rawErrMsg;
 
@@ -528,14 +550,16 @@ export function RegisterForm({ canvasRef, onSwitch, sysConfig: propsSysConfig }:
       )}
       </div>
 
+      <RegistrationNotice legal={legal} lang={lang} disabled={status !== 'idle' || isRegisterClosed} />
+
       <div className="pt-2 flex flex-col gap-2.5">
         {/* Action / Submit Button */}
         <motion.button
           type="submit"
-          whileHover={isRegisterClosed ? undefined : submitHover}
-          whileTap={{ scale: isRegisterClosed ? 1 : 0.96 }}
-          disabled={status !== "idle" || isRegisterClosed}
-          className={`epomail-display relative mt-1 flex h-12 w-full items-center justify-center gap-2 overflow-hidden rounded-xl text-[15px] tracking-wide text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#67e8f9] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b0e22] ${
+          whileHover={isRegisterClosed || !legal.payload ? undefined : submitHover}
+          whileTap={{ scale: isRegisterClosed || !legal.payload ? 1 : 0.96 }}
+          disabled={status !== "idle" || isRegisterClosed || !legal.payload}
+          className={`epomail-display relative mt-1 flex h-12 w-full items-center justify-center gap-2 overflow-hidden rounded-xl text-[15px] tracking-wide text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#67e8f9] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b0e22] disabled:opacity-60 disabled:cursor-not-allowed ${
             isRegisterClosed ? "opacity-60 cursor-not-allowed" : "cursor-pointer"
           }`}
           style={{

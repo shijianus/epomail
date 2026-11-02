@@ -5,7 +5,7 @@ import jwtUtils from '../utils/jwt-utils';
 import constant from '../const/constant';
 import KvConst from '../const/kv-const';
 import { isAdminUser } from '../utils/admin-utils';
-import oneTimeCredential, { OTC_PURPOSE } from '../utils/one-time-credential.js';
+import oneTimeCredential, { OTC_PURPOSE, authVersionOf } from '../utils/one-time-credential.js';
 
 const encoder = new TextEncoder();
 
@@ -108,7 +108,7 @@ const oauthProviderService = {
 				const authInfo = await c.env.kv.get(KvConst.AUTH_INFO + payload.userId, { type: 'json' });
 				if (authInfo && Array.isArray(authInfo.tokens) && authInfo.tokens.includes(payload.token)) {
 					const userRow = await userService.selectById(c, payload.userId);
-					if (userRow && userRow.status === 0) {
+					if (userRow && userRow.status === 0 && userRow.isDel === 0 && !payload.purpose && authVersionOf(payload) === authVersionOf(userRow)) {
 						currentUser = {
 							userId: userRow.userId,
 							email: userRow.email,
@@ -172,13 +172,14 @@ const oauthProviderService = {
 		}
 
 		const user = await userService.selectById(c, payload.userId);
-		if (!user || user.status !== 0) {
+		if (!user || user.status !== 0 || user.isDel !== 0 || payload.purpose || authVersionOf(payload) !== authVersionOf(user)) {
 			throw new BizError('用户账户异常或已被禁用', 403);
 		}
 
 		const code = `epo_code_${genRandomHex(16)}`;
 		const authPayload = {
 			userId: user.userId,
+			authVersion: authVersionOf(user),
 			userEmail: user.email,
 			clientId: app.clientId,
 			redirectUri: redirect_uri,
@@ -289,7 +290,7 @@ const oauthProviderService = {
 		}
 
 		const user = await userService.selectById(c, authData.userId);
-		if (!user || user.status !== 0) {
+		if (!user || user.status !== 0 || user.isDel !== 0 || authVersionOf(authData) !== authVersionOf(user)) {
 			throw new BizError('invalid_grant: 用户不存在或已被封禁', 400);
 		}
 
@@ -301,6 +302,7 @@ const oauthProviderService = {
 		// 1. Access Token (2小时有效)
 		const accessToken = await jwtUtils.generateToken(c, {
 			userId: user.userId,
+			authVersion: authVersionOf(user),
 			...(scopedClaims.email ? { email: scopedClaims.email } : {}),
 			clientId: app.clientId,
 			scopes: authData.scopes,
@@ -336,7 +338,7 @@ const oauthProviderService = {
 		}
 
 		const user = await userService.selectById(c, payload.userId);
-		if (!user || user.status !== 0) {
+		if (!user || user.status !== 0 || user.isDel !== 0 || authVersionOf(payload) !== authVersionOf(user)) {
 			throw new BizError('用户不存在或已失效', 401);
 		}
 

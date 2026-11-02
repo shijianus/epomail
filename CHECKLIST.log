@@ -1,3 +1,26 @@
+### 公测候选后端收敛与全真栈验证 (2026-11-02)
+*   **关联提交 (Git Commit)**: `8e42637b3b9ecf4290e4a2bd7edc2d213e4af3cb` (Short: `8e42637`)
+*   **部署环境 (Deployment)**: 本地隔离 workerd/D1/KV/R2、随机 loopback 端口；未部署生产或 Staging，未访问真实供应商。
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 认证安全纪元、MFA/Passkey/WebAuthn/TOTP 原子操作、旧会话撤销、OAuth epoch 绑定与多标签页身份隔离。
+    - [x] 入站 claim/原件恢复、raw:v2 加密对象、Message-ID 内容指纹、附件 D1 100-bind 分块、失败恢复与配额 fail-closed。
+    - [x] 普通外发持久任务、幂等键、发送租约、UNKNOWN/FAILED 状态、计数预留/补偿；站内投递逐收件人 receipt、配额 CAS、CID/BYO 跨后端复制。
+    - [x] 回收站/垃圾邮件按进入时间清理，物理删除显式触发，附件/星标/对象删除 outbox 与竞态保护；通知 Outbox 终态投影与外发策略统一。
+    - [x] 公开 profile 脱敏、AI 内容处理确认/预算边界、隐私删除与 Telegram 分享撤销、六语言对称闭环。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] Worker 全量串行回归：`test:serial` **36 个测试文件 / 494 项断言通过**（exit 0）。
+    - [x] 邮件核心定向回归：7 文件 / **172 项断言通过**，含真实 D1 站内投递、入站恢复、quota、生命周期、外发集成与隐私删除。
+    - [x] Node 工具回归：压力 runner **7/7**；六语言 symmetry/audit/hardcoded/auth-locale 与 secret-scan 全部通过。
+    - [x] 生产构建：`node scripts/build-prod.mjs` exit 0；登录子应用与 mail-vue 构建完成。
+    - [x] 本地全栈冒烟：**13/13**，冷启动、幂等 init、真实登录、邮件列表、外发禁用和临时状态清理通过。
+    - [x] 真实浏览器 E2E：**11/11**，真实表单登录、tab session registry、inbox、OAuth settings、移动端 375px 无横向溢出、缺 token 回登录、无未处理 page error，cleanup complete。
+    - [x] 本地 limited-beta 压力：`node tests/backend-stress.mjs --soak=30s --profile=limited-beta` 已完成阶段/采样/SLO/清理门禁；报告：系统临时目录 `epomail-backend-stress-1793616558844-8b346f42.json`。
+    - [ ] 峰值 capacity 压力：32 并发阶段出现本地超时/进程树清理失败，报告 `epomail-backend-stress-1793615861807-92ecbf15.json`；不宣称容量通过。
+    - [ ] 真实第三方 OAuth、真实外发/SMTP 重试、云端 R2/S3、备份恢复、Worker rollback、生产监控演练：本轮未执行。
+*   **候选结论**: 代码与本地功能门禁达到候选版本；由于峰值容量和所有真实 Staging/生产准入项未完成，结论为 **本地候选 / 公测发布仍 NO-GO，待 Staging 人工准入**。
+
+---
+
 # Epocanvas Mail - 版本发布与上线核验清单流水 (CHECKLIST.log)
 
 > 📌 **归档定位**：

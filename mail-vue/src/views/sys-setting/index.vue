@@ -13,8 +13,8 @@
               <div class="setting-item">
                 <div><span>{{ $t('websiteReg') }}</span></div>
                 <div>
-                  <el-switch @change="(val) => changeField('register', val)" :before-change="beforeChange" :active-value="0" :inactive-value="1"
-                             v-model="setting.register"/>
+                  <el-switch @change="(val) => changeField('register', val)" :before-change="beforeRegisterChange" :active-value="0" :inactive-value="1"
+                             :model-value="legalRegistrationReady ? setting.register : 1" :aria-label="$t('websiteReg')"/>
                 </div>
               </div>
               <div class="setting-item">
@@ -140,6 +140,41 @@
               </div>
             </div>
           </div>
+
+          <details class="settings-card legal-notice-card" :open="legalSettingsExpanded" @toggle="legalSettingsExpanded = $event.target.open">
+            <summary class="card-title">
+              <span>{{ $t('legalNotice.adminTitle') }}</span>
+              <el-tag size="small" :type="legalRegistrationReady ? 'info' : 'warning'">
+                {{ $t(legalRegistrationReady ? 'legalNotice.adminReady' : 'legalNotice.adminIncomplete') }}
+              </el-tag>
+            </summary>
+            <div class="card-content">
+              <p class="legal-settings-hint">{{ $t('legalNotice.adminIntro') }}</p>
+              <el-form :model="legalSettingsForm" label-position="top" :disabled="settingLoading || !settingReady" @submit.prevent="saveLegalSettings">
+                <div class="legal-form-grid">
+                  <el-form-item v-for="field in legalSettingsFields" :key="field.key" :label="$t(`legalNotice.${field.label}`)" :required="field.required" :prop="field.key" :class="{ 'legal-field-wide': field.key === 'contactAddress' }">
+                    <el-input v-model="legalSettingsForm[field.key]" :type="field.key === 'contactAddress' ? 'textarea' : 'text'" :maxlength="field.max" :rows="2" />
+                    <p v-if="field.key === 'contactAddress'" class="legal-settings-hint">{{ $t('legalNotice.adminAddressHint') }}</p>
+                  </el-form-item>
+                </div>
+                <p class="legal-settings-hint">{{ $t('legalNotice.adminRequiredHint') }}</p>
+                <h3 class="legal-processing-title">{{ $t('legalNotice.adminProcessingTitle') }}</h3>
+                <el-form-item :label="$t('legalNotice.adminNoticeUrl')">
+                  <el-input v-model="legalSettingsForm.contentProcessing.noticeUrl" maxlength="2048" />
+                  <p class="legal-settings-hint">{{ $t('legalNotice.adminNoticeHint') }}</p>
+                </el-form-item>
+                <div v-for="field in contentProcessingFields" :key="field.key" class="legal-processing-row">
+                  <label :for="`legal-${field.key}`">{{ $t(`legalNotice.${field.label}`) }}<span v-if="field.unavailable" id="legal-public-fallback-unavailable" class="legal-settings-hint"> · {{ $t('legalNotice.adminPublicFallbackUnavailable') }}</span></label>
+                  <el-switch :id="`legal-${field.key}`" :model-value="field.unavailable ? false : legalSettingsForm.contentProcessing[field.key]" :aria-label="$t(`legalNotice.${field.label}`)" :aria-describedby="field.unavailable ? 'legal-public-fallback-unavailable' : undefined" :disabled="field.unavailable || (!legalSettingsForm.contentProcessing[field.key] && !canEnableContentProcessing(legalSettingsForm.contentProcessing, field.key))" @change="value => changeContentProcessing(field.key, value)" />
+                </div>
+                <p class="legal-settings-hint">{{ $t('legalNotice.adminProcessingHint') }}</p>
+                <p class="legal-settings-hint">{{ $t('legalNotice.adminTranslationHint') }}</p>
+                <div class="legal-settings-actions">
+                  <el-button type="primary" :loading="settingLoading" @click="saveLegalSettings">{{ $t('save') }}</el-button>
+                </div>
+              </el-form>
+            </div>
+          </details>
 
           <!-- Personalization Settings Card -->
           <div class="settings-card customization-card">
@@ -3685,6 +3720,132 @@ const showResendList = ref(false)
 const settingStore = useSettingStore();
 const uiStore = useUiStore();
 const {settings: setting} = storeToRefs(settingStore);
+const legalSettingsExpanded = ref(false)
+const legalSettingsFields = [
+  { key: 'operatorName', label: 'adminOperatorName', required: true, max: 200 },
+  { key: 'operatorCountry', label: 'adminOperatorCountry', required: true, max: 120 },
+  { key: 'contactEmail', label: 'adminContactEmail', required: true, max: 320 },
+  { key: 'policyVersion', label: 'adminPolicyVersion', required: true, max: 120 },
+  { key: 'contactAddress', label: 'adminContactAddress', required: false, max: 500 },
+  { key: 'termsUrl', label: 'adminTermsUrl', required: true, max: 2048 },
+  { key: 'privacyUrl', label: 'adminPrivacyUrl', required: true, max: 2048 },
+  { key: 'recipientsUrl', label: 'adminRecipientsUrl', required: false, max: 2048 },
+  { key: 'retentionUrl', label: 'adminRetentionUrl', required: false, max: 2048 }
+]
+const contentProcessingFields = [
+  { key: 'verificationCodeEnabled', label: 'adminVerificationCode' },
+  { key: 'translationEnabled', label: 'adminTranslation' },
+  { key: 'ocrEnabled', label: 'adminOcr' },
+  { key: 'publicTranslationFallbackEnabled', label: 'adminPublicFallback', unavailable: true }
+]
+const legalSettingsForm = reactive({
+  ...Object.fromEntries(legalSettingsFields.map(field => [field.key, ''])),
+  contentProcessing: readContentProcessing({})
+})
+const legalRegistrationReady = computed(() => isLegalRegistrationReady(setting.value))
+
+function isLegalHttpsUrl(value) {
+  if (typeof value !== 'string' || !value.trim()) return false;
+  try {
+    const url = new URL(value.trim());
+    return url.protocol === 'https:' && Boolean(url.hostname) && !url.username && !url.password;
+  } catch (_) {
+    return false;
+  }
+}
+
+function isLegalRegistrationReady(source = {}) {
+  const value = key => typeof source?.[key] === 'string' ? source[key].trim() : '';
+  return ['operatorName', 'operatorCountry', 'policyVersion'].every(key => Boolean(value(key)))
+    && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value('contactEmail'))
+    && isLegalHttpsUrl(value('termsUrl')) && isLegalHttpsUrl(value('privacyUrl'));
+}
+
+function readContentProcessing(value) {
+  let source = value;
+  if (typeof source === 'string') {
+    try { source = JSON.parse(source); } catch (_) { source = {}; }
+  }
+  if (!source || typeof source !== 'object' || Array.isArray(source)) source = {};
+  return {
+    verificationCodeEnabled: source.verificationCodeEnabled === true,
+    translationEnabled: source.translationEnabled === true,
+    ocrEnabled: source.ocrEnabled === true,
+    publicTranslationFallbackEnabled: false,
+    noticeUrl: typeof source.noticeUrl === 'string' ? source.noticeUrl : ''
+  };
+}
+
+function canEnableContentProcessing(source, key) {
+  if (key === 'publicTranslationFallbackEnabled') return false;
+  if (!isLegalHttpsUrl(source?.noticeUrl)) return false;
+  return key !== 'ocrEnabled' || source.translationEnabled === true;
+}
+
+function changeContentProcessing(key, enabled) {
+  const processing = legalSettingsForm.contentProcessing;
+  if (key === 'publicTranslationFallbackEnabled') {
+    processing.publicTranslationFallbackEnabled = false;
+    return;
+  }
+  if (enabled && !canEnableContentProcessing(processing, key)) return;
+  processing[key] = enabled === true;
+  if (key === 'translationEnabled' && !enabled) {
+    processing.ocrEnabled = false;
+    processing.publicTranslationFallbackEnabled = false;
+  }
+}
+
+function resetLegalSettingsForm(source = {}) {
+  for (const field of legalSettingsFields) {
+    legalSettingsForm[field.key] = typeof source[field.key] === 'string' ? source[field.key] : '';
+  }
+  legalSettingsForm.contentProcessing = readContentProcessing(source.contentProcessing);
+}
+
+function createLegalSettingsPayload(source) {
+  const payload = Object.fromEntries(legalSettingsFields.map(field => [field.key,
+    typeof source?.[field.key] === 'string' ? source[field.key].trim().slice(0, field.max) : ''
+  ]));
+  const content = readContentProcessing(source?.contentProcessing);
+  content.noticeUrl = content.noticeUrl.trim();
+  if (!content.translationEnabled) {
+    content.ocrEnabled = false;
+    content.publicTranslationFallbackEnabled = false;
+  }
+  return { ...payload, contentProcessing: content };
+}
+
+function legalSettingsError(payload) {
+  if (payload.contactEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.contactEmail)) return 'adminInvalidEmail';
+  if (['termsUrl', 'privacyUrl', 'recipientsUrl', 'retentionUrl'].some(key => payload[key] && !isLegalHttpsUrl(payload[key]))) return 'adminInvalidUrl';
+  const content = payload.contentProcessing;
+  if (content.noticeUrl && !isLegalHttpsUrl(content.noticeUrl)) return 'adminInvalidUrl';
+  if (contentProcessingFields.some(field => content[field.key]) && !isLegalHttpsUrl(content.noticeUrl)) return 'adminNoticeRequired';
+  return '';
+}
+
+function saveLegalSettings() {
+  if (settingLoading.value || !settingReady.value) return;
+  const payload = createLegalSettingsPayload(legalSettingsForm);
+  const error = legalSettingsError(payload);
+  if (error) {
+    ElMessage.warning(t(`legalNotice.${error}`));
+    return;
+  }
+  if (!isLegalRegistrationReady(payload)) payload.register = 1;
+  editSetting(payload);
+}
+
+function beforeRegisterChange() {
+  if (!legalRegistrationReady.value) {
+    legalSettingsExpanded.value = true;
+    ElMessage.info(t('legalNotice.adminRequiredHint'));
+    return false;
+  }
+  return beforeChange();
+}
+
 const activeUiTab = ref('dynamic')
 const OAUTH_PROVIDERS_LIST = [
   { key: 'github', label: 'GitHub', icon: 'mdi:github' },
@@ -4866,6 +5027,7 @@ function getSettings() {
     settingData.aiMaxTokens = settingData.aiMaxTokens !== undefined && settingData.aiMaxTokens !== null ? Number(settingData.aiMaxTokens) : 2048
     settingData.aiAdminOnly = settingData.aiAdminOnly !== undefined && settingData.aiAdminOnly !== null ? Number(settingData.aiAdminOnly) : 0
     setting.value = settingData
+    resetLegalSettingsForm(settingData)
     settingStore.domainList = settingData.domainList || []
     settingStore.settings = { ...settingStore.settings, ...settingData }
     resendTokenForm.domain = setting.value.domainList?.[0] || ''
@@ -6480,6 +6642,45 @@ function editSetting(settingForm, refreshStatus = true, closeAiDialog = false) {
 </script>
 
 <style scoped lang="scss">
+.legal-notice-card {
+  align-self: start;
+
+  summary {
+    cursor: pointer;
+    flex-wrap: wrap;
+    list-style: none;
+
+    &::-webkit-details-marker { display: none; }
+    &::before { content: '+'; font-weight: normal; }
+  }
+  &[open] summary::before { content: '−'; }
+  .legal-settings-hint {
+    margin: 4px 0 8px;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--el-text-color-secondary);
+  }
+  .legal-form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0 12px;
+
+    @media (max-width: 600px) { grid-template-columns: 1fr; }
+  }
+  .legal-field-wide { grid-column: 1 / -1; }
+  .legal-processing-title { margin: 10px 0 12px; font-size: 14px; }
+  .legal-processing-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding: 6px 0;
+
+    label { line-height: 1.5; }
+  }
+  .legal-settings-actions { display: flex; justify-content: end; margin-top: 12px; }
+}
+
 .settings-container {
   height: 100%;
   overflow: hidden;

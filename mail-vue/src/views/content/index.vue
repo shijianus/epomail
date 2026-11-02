@@ -136,7 +136,7 @@
         <div class="action-group utility-group">
           <!-- Translate message -->
           <el-tooltip :content="$t('translateMessage')" placement="bottom">
-            <span class="action-icon-wrap btn-translate-wrap" role="button" tabindex="0" @click="toggleTranslateBar(threadMessages[threadMessages.length - 1] || email)">
+            <span class="action-icon-wrap btn-translate-wrap" role="button" tabindex="0" :aria-label="$t('translateMessage')" @click="toggleTranslateBar(threadMessages[threadMessages.length - 1] || email)" @keydown.enter="toggleTranslateBar(threadMessages[threadMessages.length - 1] || email)" @keydown.space.prevent="toggleTranslateBar(threadMessages[threadMessages.length - 1] || email)">
               <Icon class="icon btn-translate" icon="fluent:translate-20-regular" width="20" height="20" />
             </span>
           </el-tooltip>
@@ -351,10 +351,7 @@
                               </div>
                               <div class="detail-row">
                                 <span class="dt-label">{{ $t('detailSecurity') }}</span>
-                                <span class="dt-val security-tls">
-                                  <Icon icon="fluent:lock-closed-16-regular" width="14" height="14" style="color: #10b981;" />
-                                  <span>{{ $t('detailSecurityTls') }}</span>
-                                </span>
+                                <span class="dt-val">{{ $t('contentProcessingUi.rawSourceNotice') }}</span>
                               </div>
                             </div>
                           </el-popover>
@@ -433,7 +430,7 @@
                             </div>
                           </el-popover>
                           <el-tooltip :content="$t('translateMessage')" placement="bottom">
-                            <span class="msg-act-icon btn-translate" role="button" tabindex="0" @click="toggleTranslateBar(msg)">
+                            <span class="msg-act-icon btn-translate" role="button" tabindex="0" :aria-label="$t('translateMessage')" @click="toggleTranslateBar(msg)" @keydown.enter="toggleTranslateBar(msg)" @keydown.space.prevent="toggleTranslateBar(msg)">
                               <Icon icon="fluent:translate-20-regular" width="17" height="17"/>
                             </span>
                           </el-tooltip>
@@ -521,12 +518,12 @@
                   </div>
                 </div>
 
-                <!-- In-place Translation Banner -->
+                <!-- In-place translation: selection never submits message content. -->
                 <div class="mail-translate-bar" v-if="showTranslateMap[msg.emailId]" @click.stop>
                   <div class="gtb-left">
                     <Icon icon="fluent:translate-20-regular" width="16" height="16" class="gtb-icon" />
                     <span class="gtb-title">{{ $t('translateTo') }}</span>
-                    <el-select v-model="targetLangMap[msg.emailId]" size="small" class="gtb-select" style="width: 135px;" @change="handleTranslate(msg, true)">
+                    <el-select v-model="targetLangMap[msg.emailId]" size="small" class="gtb-select" :aria-label="$t('translateTo')" @change="changeTranslationLanguage(msg.emailId)">
                       <el-option label="中文 (简体)" value="zh" />
                       <el-option label="正體中文 (繁體)" value="zh-Hant" />
                       <el-option label="English" value="en" />
@@ -535,6 +532,7 @@
                       <el-option label="Français" value="fr" />
                       <el-option label="Deutsch" value="de" />
                       <el-option label="Español" value="es" />
+                      <el-option label="Nederlands" value="nl" />
                       <el-option label="Русский" value="ru" />
                       <el-option label="Português" value="pt" />
                       <el-option label="Italiano" value="it" />
@@ -543,9 +541,10 @@
                       <el-option label="Tiếng Việt" value="vi" />
                       <el-option label="Bahasa Indonesia" value="id" />
                     </el-select>
-                    <el-button size="small" type="primary" link :loading="translatingMap[msg.emailId]" @click="handleTranslate(msg)">
-                      {{ isTranslatedMap[msg.emailId] ? ($t('reTranslate')) : ($t('translateMessage')) }}
+                    <el-button size="small" type="primary" :link="!translationConfirmationMap[msg.emailId]" :loading="translatingMap[msg.emailId]" :disabled="!canTranslate(msg) || translatingMap[msg.emailId]" :aria-describedby="`translation-notice-${msg.emailId}`" @click="translationConfirmationMap[msg.emailId] ? confirmTranslation(msg) : handleTranslate(msg)">
+                      {{ translationConfirmationMap[msg.emailId] ? $t('contentProcessingUi.confirm') : (localTranslationMap[msg.emailId] ? $t('contentProcessingUi.showLocal') : (isTranslatedMap[msg.emailId] ? $t('reTranslate') : $t('translateMessage'))) }}
                     </el-button>
+                    <el-button v-if="translationConfirmationMap[msg.emailId] || translatingMap[msg.emailId]" size="small" link @click="cancelTranslation(msg.emailId)">{{ $t('cancel') }}</el-button>
                     <template v-if="isTranslatedMap[msg.emailId]">
                       <el-divider direction="vertical" />
                       <el-button size="small" link type="primary" @click="toggleViewOriginal(msg.emailId)">
@@ -555,11 +554,30 @@
                   </div>
                   <div class="gtb-right">
                     <span v-if="isTranslatedMap[msg.emailId] && !showOriginalMap[msg.emailId]" class="gtb-status-tag">
-                      <Icon icon="fluent:sparkle-16-filled" width="13" height="13" />
-                      <span>{{ $t('inPlaceFormatPreserved') }}</span>
+                      <Icon icon="fluent:checkmark-16-regular" width="13" height="13" />
+                      <span>{{ $t('translateSuccess') }}</span>
                     </span>
-                    <Icon icon="fluent:dismiss-16-regular" width="16" height="16" class="gtb-close" @click="closeTranslate(msg.emailId)" />
+                    <button type="button" class="gtb-close" :aria-label="$t('close')" @click="closeTranslate(msg.emailId)">
+                      <Icon icon="fluent:dismiss-16-regular" width="16" height="16" />
+                    </button>
                   </div>
+                  <div class="gtb-notice" :id="`translation-notice-${msg.emailId}`" role="status" aria-live="polite">
+                    <span v-if="localTranslationMap[msg.emailId]">{{ $t('contentProcessingUi.localNotice') }}</span>
+                    <span v-else-if="!contentProcessingPolicy.enabled">{{ $t('contentProcessingUi.unavailable') }}</span>
+                    <template v-else-if="translationConfirmationMap[msg.emailId]">
+                      <span>{{ $t('contentProcessingUi.textNotice') }}</span>
+                      <a :href="contentProcessingPolicy.noticeUrl" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">{{ $t('contentProcessingUi.recipientDetails') }}</a>
+                    </template>
+                    <span v-else>{{ $t('contentProcessingUi.selectionOnly') }}</span>
+                  </div>
+                  <div v-if="translationConfirmationMap[msg.emailId] && contentProcessingPolicy.enabled && !localTranslationMap[msg.emailId]" class="gtb-confirm">
+                    <label class="gtb-ocr" v-if="contentProcessingPolicy.ocrEnabled">
+                      <input type="checkbox" v-model="translationOcrMap[msg.emailId]" :aria-describedby="`translation-ocr-${msg.emailId}`" />
+                      <span>{{ $t('contentProcessingUi.ocrLabel') }} <small :id="`translation-ocr-${msg.emailId}`">{{ $t('contentProcessingUi.ocrHint') }}</small></span>
+                    </label>
+                    <small v-else class="gtb-ocr-unavailable">{{ $t('contentProcessingUi.ocrUnavailable') }}</small>
+                  </div>
+                  <div v-if="translationErrorMap[msg.emailId]" class="gtb-error" role="alert">{{ t(translationErrorMap[msg.emailId]) }}</div>
                 </div>
 
                 <el-alert v-if="msg.status === 3" :closable="false" :title="toMessage(msg.message)" class="email-msg" type="error" show-icon @click.stop />
@@ -577,7 +595,7 @@
               </div>
 
               <el-scrollbar class="htm-scrollbar" :class="(!msg.attList || msg.attList.length === 0) ? 'bottom-distance' : ''">
-                <ShadowHtml class="shadow-html" :html="formatImage(displayedContent(msg))" v-if="msg.content || translatedHtmlMap[msg.emailId]" />
+                <ShadowHtml class="shadow-html" :html="formatImage(displayedContent(msg))" :message-key="msg.emailId || msg.hash" :trusted-image-urls="trustedImageUrls" v-if="msg.content || translatedHtmlMap[msg.emailId]" />
                 <pre v-else class="email-text" >{{ displayedText(msg) }}</pre>
               </el-scrollbar>
 
@@ -757,7 +775,7 @@
               <div class="rht-row"><span class="rht-key">From</span><span class="rht-val">{{ currentRawMsg.name ? `${currentRawMsg.name} <${currentRawMsg.sendEmail}>` : currentRawMsg.sendEmail }}</span></div>
               <div class="rht-row"><span class="rht-key">To</span><span class="rht-val">{{ formateReceive(currentRawMsg.recipient) }}</span></div>
               <div class="rht-row"><span class="rht-key">Subject</span><span class="rht-val">{{ currentRawMsg.subject || email.subject }}</span></div>
-              <div class="rht-row"><span class="rht-key">Security</span><span class="rht-val">Standard Encryption (TLS 1.3 / AES-256)</span></div>
+              <div class="rht-row"><span class="rht-key">{{ $t('contentProcessingUi.rawSourceLabel') }}</span><span class="rht-val">{{ $t('contentProcessingUi.rawSourceNotice') }}</span></div>
             </div>
           </el-tab-pane>
           <el-tab-pane :label="$t('rawEmlText')" name="raw">
@@ -843,6 +861,7 @@
 <script setup>
 import ShadowHtml from '@/components/shadow-html/index.vue'
 import DOMPurify from 'dompurify';
+import { MAIL_SANITIZE_OPTIONS, prepareMailContent } from '@/utils/mail-content-privacy.js';
 import {reactive, ref, computed, watch, onMounted, onUnmounted, nextTick} from "vue";
 import {useRouter} from 'vue-router'
 import {ElMessage, ElMessageBox} from 'element-plus'
@@ -872,9 +891,11 @@ import {EmailUnreadEnum} from "@/enums/email-enum.js";
 import {hasPerm} from "@/perm/perm.js";
 import {getLabelDisplayName} from "@/utils/label-i18n.js";
 import {getThreadKey} from "@/utils/thread-utils.js";
-import {getPredefinedTranslation} from "@/utils/mail-translation-helper.js";
+import {getPredefinedTranslation, getContentProcessingPolicy, prepareMailTranslation} from "@/utils/mail-translation-helper.js";
+import {useSettingStore} from "@/store/setting.js";
 
 const uiStore = useUiStore();
+const settingStore = useSettingStore();
 const accountStore = useAccountStore();
 const userStore = useUserStore();
 const emailStore = useEmailStore();
@@ -910,7 +931,7 @@ const threadMessages = computed(() => {
   return [email]
 })
 
-const { formatImage, attachmentUrl } = useAttachmentUrls(() => threadMessages.value)
+const { formatImage, attachmentUrl, trustedImageUrls } = useAttachmentUrls(() => threadMessages.value)
 
 const expandedMap = reactive({})
 function isMsgExpanded(emailId, index) {
@@ -1686,10 +1707,10 @@ const printSingleMsg = (msg) => {
   const safeFrom = escapeHtml(target.name ? `${target.name} <${target.sendEmail}>` : (target.sendEmail || ''));
   const safeTo = escapeHtml(formateReceive(target.recipient));
   const safeDate = escapeHtml(formatDetailDate(target.createTime));
-  const safeBody = DOMPurify.sanitize(formatImage(target.content || target.text || ''), {
-    ADD_ATTR: ['target'],
-    FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'form', 'style']
+  const printable = prepareMailContent(formatImage(target.content || target.text || ''), {
+    trustedImageUrls: trustedImageUrls.value
   });
+  const safeBody = DOMPurify.sanitize(printable.html, MAIL_SANITIZE_OPTIONS);
   const contentHtml = `
     <!DOCTYPE html>
     <html>
@@ -1791,7 +1812,6 @@ const getRawEmlText = (msg) => {
     `Message-ID: <${msg.messageId || `mail.${msg.emailId || Date.now()}@epomail.bond`}>`,
     `MIME-Version: 1.0`,
     `Content-Type: text/html; charset=UTF-8`,
-    `Security: TLS 1.3 256-bit encryption`,
     '',
     msg.content || msg.text || ''
   ].filter(line => line !== '').join('\r\n');
@@ -1853,6 +1873,14 @@ const targetLangMap = reactive({});
 const activeTranslationAbortControllers = reactive({});
 const activeTranslationSeqMap = reactive({});
 const translatedSubjectMap = reactive({});
+const translationConfirmationMap = reactive({});
+const translationOcrMap = reactive({});
+const translationErrorMap = reactive({});
+const contentProcessingPolicy = computed(() => getContentProcessingPolicy(settingStore.settings, { isDev: import.meta.env.DEV }));
+const localTranslationMap = computed(() => Object.fromEntries(threadMessages.value
+  .filter(msg => showTranslateMap[msg.emailId])
+  .map(msg => [msg.emailId, getPredefinedTranslation(msg, targetLangMap[msg.emailId])])));
+const canTranslate = (msg) => Boolean(localTranslationMap.value[msg.emailId]) || contentProcessingPolicy.value.enabled;
 
 const displayedSubject = (msg) => {
   if (!msg) return '';
@@ -1872,7 +1900,7 @@ const displayedContent = (msg) => {
     }
     const transText = translatedTextMap[msg.emailId];
     if (transText) {
-      return `<div class="translated-embed-body" style="color: inherit; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; line-height: 1.7; white-space: pre-wrap; word-break: break-word; padding: 4px 0;">${transText}</div>`;
+      return `<div class="translated-embed-body" style="color: inherit; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; line-height: 1.7; white-space: pre-wrap; word-break: break-word; padding: 4px 0;">${escapeHtml(transText)}</div>`;
     }
     return msg.content;
   }
@@ -1943,133 +1971,161 @@ const getAlternateTargetLanguage = (srcLang, preferredLang) => {
   return preferredLang && !isSameLanguage(srcLang, preferredLang) ? preferredLang : 'en';
 };
 
+const clearTranslationResult = (id) => {
+  isTranslatedMap[id] = false;
+  showOriginalMap[id] = true;
+  delete translatedTextMap[id];
+  delete translatedHtmlMap[id];
+  delete translatedSubjectMap[id];
+};
+
+const abortTranslationRequest = (id) => {
+  // Invalidate first: even a late response or same-tick retry cannot win.
+  activeTranslationSeqMap[id] = (activeTranslationSeqMap[id] || 0) + 1;
+  activeTranslationAbortControllers[id]?.abort();
+  delete activeTranslationAbortControllers[id];
+  translatingMap[id] = false;
+};
+
+const cancelTranslation = (id) => {
+  abortTranslationRequest(id);
+  delete translationConfirmationMap[id];
+  translationOcrMap[id] = false;
+  delete translationErrorMap[id];
+  clearTranslationResult(id);
+};
+
+const changeTranslationLanguage = (id) => {
+  cancelTranslation(id);
+};
+
 const toggleTranslateBar = (msg) => {
   const target = msg || email;
   if (!target) return;
   const id = target.emailId;
-  showTranslateMap[id] = !showTranslateMap[id];
-
   if (showTranslateMap[id]) {
-    const userDefault = uiStore.defaultTranslateLang || 'zh';
-    const rawContent = target.text || target.content || '';
-    const srcLang = detectSourceLanguage(rawContent);
-
-    // 检查源语言与默认目标语言是否相同
-    const isSameLang = isSameLanguage(srcLang, userDefault);
-
-    if (isSameLang) {
-      // 原文已是默认目标语言：呼出翻译工具条而不会自动执行翻译，并提供合理的替代目标语言
-      const altLang = getAlternateTargetLanguage(srcLang, userDefault);
-      targetLangMap[id] = altLang;
-      ElMessage.closeAll();
-      ElMessage.info(t('alreadyInTargetLang'));
-      return;
-    }
-
-    targetLangMap[id] = userDefault;
-    if (!isTranslatedMap[id]) {
-      handleTranslate(target);
-    }
+    closeTranslate(id);
+    return;
   }
+  cancelTranslation(id);
+  if (!targetLangMap[id]) {
+    const preferred = uiStore.defaultTranslateLang || 'zh';
+    const source = detectSourceLanguage(target.text || target.content || '');
+    targetLangMap[id] = isSameLanguage(source, preferred) ? getAlternateTargetLanguage(source, preferred) : preferred;
+  }
+  showTranslateMap[id] = true;
 };
 
-const handleTranslate = (msg, isLanguageSwitch = false) => {
+const applyTranslationResult = (id, data) => {
+  const text = typeof data?.translatedText === 'string' ? data.translatedText.trim() : '';
+  const html = typeof data?.translatedHtml === 'string' ? data.translatedHtml.trim() : '';
+  if (data?.blocked || data?.model === 'original' || data?.engine === 'original') {
+    translationErrorMap[id] = 'translateFailed';
+    return;
+  }
+  if (!text && !html) {
+    translationErrorMap[id] = 'translateEmpty';
+    return;
+  }
+  translatedTextMap[id] = text;
+  translatedHtmlMap[id] = html;
+  translatedSubjectMap[id] = typeof data.translatedSubject === 'string' ? data.translatedSubject : '';
+  isTranslatedMap[id] = true;
+  showOriginalMap[id] = false;
+  ElMessage.success(t('translateSuccess'));
+};
+
+// First activation either displays a local template or opens a fresh notice.
+// It never sends the message to the translation API.
+const handleTranslate = (msg) => {
+  const target = msg || email;
+  if (!target || translatingMap[target.emailId]) return;
+  const id = target.emailId;
+  cancelTranslation(id);
+  showTranslateMap[id] = true;
+  const lang = targetLangMap[id];
+  const decision = prepareMailTranslation({ email: target, targetLang: lang, settings: settingStore.settings, isDev: import.meta.env.DEV });
+  if (decision.kind === 'local') {
+    applyTranslationResult(id, decision.translation);
+    return;
+  }
+  if (decision.kind === 'blocked') return;
+  if (isSameLanguage(detectSourceLanguage(target.text || target.content || ''), lang)) {
+    translationErrorMap[id] = 'sameLangNotice';
+    return;
+  }
+  translationConfirmationMap[id] = {
+    noticeUrl: decision.noticeUrl,
+    targetLang: lang,
+    text: target.text || '',
+    html: target.content || ''
+  };
+};
+
+const confirmTranslation = async (msg) => {
   const target = msg || email;
   if (!target) return;
   const id = target.emailId;
-
-  // 1. 若当前邮件已有在途的旧翻译请求，立即主动终止旧请求并静默转到最新请求！
-  if (activeTranslationAbortControllers[id]) {
-    try {
-      activeTranslationAbortControllers[id].abort();
-    } catch (_) {}
-    delete activeTranslationAbortControllers[id];
-  }
-
-  // 2. 生成请求唯一时间戳序号，确保若旧请求延时到达也彻底静默废弃
-  const currentSeq = Date.now();
-  activeTranslationSeqMap[id] = currentSeq;
-
-  const rawContent = target.text || target.content || '';
-  const srcLang = detectSourceLanguage(rawContent);
-  let lang = targetLangMap[id] || uiStore.defaultTranslateLang || 'zh';
-
-  // 严格禁止针对源语言翻译为原语言 (杜绝中文翻译为中文等无效调用)
-  if (isSameLanguage(srcLang, lang)) {
-    const altLang = getAlternateTargetLanguage(srcLang, uiStore.defaultTranslateLang);
-    targetLangMap[id] = altLang;
-    if (!isLanguageSwitch) {
-      ElMessage.closeAll();
-      ElMessage.warning(t('sameLangNotice'));
-    }
-    showTranslateMap[id] = true;
-    translatingMap[id] = false;
+  const confirmation = translationConfirmationMap[id];
+  if (!confirmation || translatingMap[id]) return;
+  if (confirmation.targetLang !== targetLangMap[id] || confirmation.text !== (target.text || '') || confirmation.html !== (target.content || '')) {
+    cancelTranslation(id);
+    translationErrorMap[id] = 'contentProcessingUi.confirmationRequired';
     return;
   }
-
-  // 3. 检查官方系统邮件（欢迎邮件/全域公告）是否未被修改：若未修改直接调用官方翻译版本；若翻译版本与实际版本不一致（发生了修改）再退回到 AI 翻译
-  const predefined = getPredefinedTranslation(target, lang);
-  if (predefined) {
-    ElMessage.closeAll();
-    translatedTextMap[id] = predefined.translatedText;
-    translatedHtmlMap[id] = predefined.translatedHtml;
-    translatedSubjectMap[id] = predefined.translatedSubject;
-    isTranslatedMap[id] = true;
-    showOriginalMap[id] = false;
-    showTranslateMap[id] = true;
-    translatingMap[id] = false;
-    ElMessage.success(t('translateSuccess'));
+  const decision = prepareMailTranslation({
+    email: target,
+    targetLang: targetLangMap[id],
+    settings: settingStore.settings,
+    confirmed: true,
+    noticeUrl: confirmation.noticeUrl,
+    enableOcr: translationOcrMap[id],
+    isDev: import.meta.env.DEV
+  });
+  // Consent and OCR selection are single-use, including errors and cancellation.
+  cancelTranslation(id);
+  if (decision.kind === 'blocked') {
+    translationErrorMap[id] = 'contentProcessingUi.unavailable';
     return;
   }
-
-  translatingMap[id] = true;
-  showTranslateMap[id] = true;
+  if (decision.kind === 'confirmation') {
+    translationErrorMap[id] = 'contentProcessingUi.noticeChanged';
+    return;
+  }
+  if (decision.kind === 'local') {
+    applyTranslationResult(id, decision.translation);
+    return;
+  }
 
   const controller = new AbortController();
+  const currentSeq = activeTranslationSeqMap[id];
   activeTranslationAbortControllers[id] = controller;
-
-  emailTranslate({
-    text: target.text || '',
-    html: target.content || '',
-    targetLang: lang,
-    enableOcr: Boolean(uiStore.enableImageOcr)
-  }, { signal: controller.signal }).then((res) => {
-    // 若序号落后（用户在未完成状态下切换了新语言），静默抛弃旧响应
-    if (activeTranslationSeqMap[id] !== currentSeq) return;
-
-    ElMessage.closeAll();
-    const data = (res && res.data !== undefined) ? res.data : (res || {});
-    const transText = (data.translatedText || '').trim();
-    const transHtml = (data.translatedHtml || '').trim();
-    if (!transText && !transHtml) {
-      ElMessage.warning(t('translateEmpty'));
+  translatingMap[id] = true;
+  try {
+    const res = await emailTranslate(decision.payload, { signal: controller.signal });
+    if (activeTranslationSeqMap[id] !== currentSeq || controller.signal.aborted) return;
+    if (confirmation.text !== (target.text || '') || confirmation.html !== (target.content || '')) {
+      translationErrorMap[id] = 'contentProcessingUi.confirmationRequired';
       return;
     }
-    translatedTextMap[id] = transText;
-    translatedHtmlMap[id] = transHtml;
-    if (data.translatedSubject) {
-      translatedSubjectMap[id] = data.translatedSubject;
-    }
-    isTranslatedMap[id] = true;
-    showOriginalMap[id] = false;
-    ElMessage.success(t('translateSuccess'));
-  }).catch(err => {
-    // 若请求被新语言主动终止，静默处理：严禁弹窗、严禁报错提示，以最新请求为准
-    if (activeTranslationSeqMap[id] !== currentSeq) return;
-    if (err?.name === 'AbortError' || err?.name === 'CanceledError' || err?.code === 'ERR_CANCELED' || err?.message?.includes('canceled') || err?.message?.includes('aborted')) {
-      return;
-    }
-
-    console.error('Translation error:', err);
-    ElMessage.closeAll();
-    ElMessage.error(t('translateFailed'));
-  }).finally(() => {
-    // 只有最新一次请求完成时，才重置正在翻译中加载状态
+    applyTranslationResult(id, res?.data !== undefined ? res.data : res);
+  } catch (err) {
+    if (activeTranslationSeqMap[id] !== currentSeq || controller.signal.aborted) return;
+    if (err?.name === 'AbortError' || err?.name === 'CanceledError' || err?.code === 'ERR_CANCELED') return;
+    const data = err?.response?.data || err;
+    const keys = {
+      privacy_processing_disabled: 'contentProcessingUi.unavailable',
+      privacy_confirmation_required: 'contentProcessingUi.confirmationRequired',
+      privacy_notice_changed: 'contentProcessingUi.noticeChanged'
+    };
+    const code = [data?.error, data?.errorCode, data?.code, data?.message, data?.data?.code].find(value => Object.hasOwn(keys, value));
+    translationErrorMap[id] = keys[code] || 'translateFailed';
+  } finally {
     if (activeTranslationSeqMap[id] === currentSeq) {
       translatingMap[id] = false;
       delete activeTranslationAbortControllers[id];
     }
-  });
+  }
 };
 
 const toggleViewOriginal = (emailId) => {
@@ -2077,16 +2133,28 @@ const toggleViewOriginal = (emailId) => {
 };
 
 const closeTranslate = (emailId) => {
-  if (activeTranslationAbortControllers[emailId]) {
-    try {
-      activeTranslationAbortControllers[emailId].abort();
-    } catch (_) {}
-    delete activeTranslationAbortControllers[emailId];
-  }
-  translatingMap[emailId] = false;
+  cancelTranslation(emailId);
   showTranslateMap[emailId] = false;
-  showOriginalMap[emailId] = true;
 };
+
+watch(contentProcessingPolicy, (current, previous) => {
+  if (current.enabled === previous.enabled && current.noticeUrl === previous.noticeUrl && current.ocrEnabled === previous.ocrEnabled) return;
+  for (const id of Object.keys(showTranslateMap)) {
+    if (!translationConfirmationMap[id] && !translatingMap[id]) continue;
+    cancelTranslation(id);
+    translationErrorMap[id] = !current.enabled ? 'contentProcessingUi.unavailable' : 'contentProcessingUi.confirmationRequired';
+  }
+}, { flush: 'sync' });
+
+watch(() => threadMessages.value.map(msg => String(msg.emailId)), (ids) => {
+  for (const id of Object.keys(showTranslateMap)) {
+    if (!ids.includes(id)) closeTranslate(id);
+  }
+});
+
+onUnmounted(() => {
+  Object.keys(showTranslateMap).forEach(closeTranslate);
+});
 
 const isReporting = ref(false)
 
@@ -2915,6 +2983,7 @@ const handleReportNotSpam = (emailId) => {
 
 .mail-translate-bar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   background: var(--bg-elevated, #f8fafc);
@@ -2922,17 +2991,20 @@ const handleReportNotSpam = (emailId) => {
   border-radius: 6px;
   padding: 6px 12px;
   margin-top: 12px;
-  gap: 12px;
+  gap: 6px 12px;
+  min-width: 0;
   font-size: 13px;
 
   .gtb-left {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px 8px;
     flex-wrap: wrap;
+    flex: 1 1 240px;
+    min-width: 0;
 
     .gtb-icon {
-      color: #0284c7;
+      color: var(--el-color-primary, #0284c7);
       flex-shrink: 0;
     }
 
@@ -2943,13 +3015,17 @@ const handleReportNotSpam = (emailId) => {
     }
 
     .gtb-select {
-      width: 120px;
+      width: 135px;
+      max-width: 100%;
     }
   }
 
   .gtb-right {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
+    margin-left: auto;
+    gap: 6px;
 
     .gtb-status-tag {
       display: inline-flex;
@@ -2957,21 +3033,87 @@ const handleReportNotSpam = (emailId) => {
       gap: 4px;
       font-size: 11.5px;
       font-weight: 500;
-      color: #0284c7;
-      background: rgba(2, 132, 199, 0.1);
+      color: var(--el-color-primary, #0284c7);
+      background: var(--el-color-primary-light-9);
       padding: 2px 8px;
       border-radius: 10px;
-      margin-right: 8px;
     }
 
     .gtb-close {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 28px;
+      min-height: 28px;
+      padding: 4px;
+      border: 0;
+      border-radius: 4px;
+      background: transparent;
       cursor: pointer;
-      color: var(--text-muted, #94a3b8);
-      transition: color 0.15s ease;
+      color: var(--text-secondary, #64748b);
       &:hover {
         color: var(--text-primary, #0f172a);
       }
     }
+  }
+
+  .gtb-notice, .gtb-confirm, .gtb-error {
+    flex: 1 0 100%;
+    min-width: 0;
+    font-size: 12px;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+    color: var(--text-secondary, #64748b);
+  }
+
+  .gtb-notice a {
+    margin-inline-start: 6px;
+    color: var(--el-color-primary, #0284c7);
+    text-decoration: underline;
+  }
+
+  .gtb-confirm {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 12px;
+  }
+
+  .gtb-ocr {
+    display: inline-flex;
+    align-items: flex-start;
+    gap: 6px;
+    flex: 1 1 240px;
+    cursor: pointer;
+    color: var(--text-primary, #1e293b);
+
+    input {
+      flex-shrink: 0;
+      margin: 3px 0 0;
+      accent-color: var(--el-color-primary, #0284c7);
+    }
+
+    small {
+      color: var(--text-secondary, #64748b);
+      font-size: 12px;
+    }
+  }
+
+  .gtb-ocr-unavailable { font-size: 12px; }
+  .gtb-error { color: var(--el-color-danger); }
+
+  :deep(.el-button) {
+    margin-left: 0;
+    height: auto;
+    min-height: 24px;
+    white-space: normal;
+  }
+
+  :deep(.el-button > span) { overflow-wrap: anywhere; }
+
+  button:focus-visible, input:focus-visible, a:focus-visible {
+    outline: 2px solid var(--el-color-primary, #0284c7);
+    outline-offset: 2px;
   }
 }
 

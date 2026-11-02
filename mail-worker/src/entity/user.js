@@ -27,6 +27,8 @@ const user = sqliteTable('user', {
 	totpBackupCodes: text('totp_backup_codes').default('[]').notNull(),
 	totpCreatedAt: text('totp_created_at').default('').notNull(),
 	securityKeys: text('security_keys').default('[]').notNull(),
+	authVersion: integer('auth_version').default(0).notNull(),
+	passkeyHistory: integer('passkey_history').default(0).notNull(),
 	storageQuotaMb: integer('storage_quota_mb').default(0).notNull(),
 	byoStorageEnabled: integer('byo_storage_enabled').default(0).notNull(),
 	byoStorageConfig: text('byo_storage_config').default('{}').notNull()

@@ -97,7 +97,7 @@
 
         <el-scrollbar class="detail-body-scrollbar">
           <div class="email-body-content">
-            <ShadowHtml class="shadow-html" :html="formatImage(currentEmail.content)" v-if="currentEmail.content" />
+            <ShadowHtml class="shadow-html" :html="formatImage(currentEmail.content)" :message-key="currentEmail.emailId || currentEmail.hash" :trusted-image-urls="trustedImageUrls" v-if="currentEmail.content" />
             <pre v-else class="email-text">{{ currentEmail.text || $t('noContent') }}</pre>
           </div>
         </el-scrollbar>
@@ -164,7 +164,7 @@ const clearLoading = ref(false)
 
 const showDetailDrawer = ref(false)
 const currentEmail = ref(null)
-const { formatImage, attachmentUrl } = useAttachmentUrls(() => currentEmail.value ? [currentEmail.value] : [])
+const { formatImage, attachmentUrl, trustedImageUrls } = useAttachmentUrls(() => currentEmail.value ? [currentEmail.value] : [])
 
 onMounted(() => {
   emailStore.emailScroll = sysEmailScroll.value;

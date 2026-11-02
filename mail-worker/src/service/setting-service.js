@@ -1,7 +1,16 @@
 import KvConst from '../const/kv-const';
 import settingEntity from '../entity/setting';
 import orm from '../entity/orm';
-import { getTableColumns } from 'drizzle-orm';
+import { getTableColumns, sql } from 'drizzle-orm';
+import legalPolicyService, {
+	LEGAL_EXT_KEYS,
+	CONTENT_PROCESSING_DEFAULTS,
+	isValidNoticeUrl,
+	isValidContactEmail,
+	normalizeContentProcessing,
+	getRegistrationReadiness,
+	readAuthoritativeLegalSettings
+} from './legal-policy-service.js';
 
 const D1_MAX_SELECT_COLUMNS = 60;
 const AUDIT_EXT_DEFAULTS = Object.freeze({
@@ -12,6 +21,21 @@ const AUDIT_EXT_DEFAULTS = Object.freeze({
 	auditPrioritizeNonCriticalClean: 1,
 	auditCriticalQuota: 3
 });
+const LEGAL_EXT_DEFAULTS = Object.freeze({
+	operatorName: '',
+	operatorCountry: '',
+	contactEmail: '',
+	contactAddress: '',
+	policyVersion: '',
+	recipientsUrl: '',
+	retentionUrl: ''
+});
+const CONTENT_PROCESSING_KEY = 'contentProcessing';
+
+function parseExtValue(value) {
+	if (typeof value !== 'string') return value;
+	try { return JSON.parse(value); } catch (_) { return value; }
+}
 
 async function selectSettingRow(c) {
 	const entries = Object.entries(getTableColumns(settingEntity));
@@ -26,7 +50,7 @@ async function selectSettingRow(c) {
 }
 
 async function loadSettingExt(c) {
-	const out = { ...AUDIT_EXT_DEFAULTS };
+	const out = { ...AUDIT_EXT_DEFAULTS, ...LEGAL_EXT_DEFAULTS, contentProcessing: { ...CONTENT_PROCESSING_DEFAULTS } };
 	try {
 		const { getUserDb } = await import('../utils/db-accessor');
 		const userDb = getUserDb(c);
@@ -35,13 +59,19 @@ async function loadSettingExt(c) {
 		for (const row of rows?.results || []) {
 			if (row?.key && Object.prototype.hasOwnProperty.call(AUDIT_EXT_DEFAULTS, row.key)) {
 				const num = Number(row.value);
-				if (Number.isFinite(num)) {
-					out[row.key] = num;
-				}
+				if (Number.isFinite(num)) out[row.key] = num;
+				continue;
+			}
+			if (row?.key && Object.prototype.hasOwnProperty.call(LEGAL_EXT_DEFAULTS, row.key)) {
+				out[row.key] = typeof row.value === 'string' ? row.value : '';
+				continue;
+			}
+			if (row?.key === CONTENT_PROCESSING_KEY) {
+				out.contentProcessing = normalizeContentProcessing(parseExtValue(row.value), c);
 			}
 		}
 	} catch (_) {
-		// Fallback to AUDIT_EXT_DEFAULTS when setting_ext is absent in lightweight unit mocks
+		// Fallback to defaults when setting_ext is absent in lightweight unit mocks.
 	}
 	return out;
 }
@@ -326,6 +356,14 @@ const settingService = {
 		setting.multiAccountEnabled = setting.multiAccountEnabled !== undefined && setting.multiAccountEnabled !== null ? Number(setting.multiAccountEnabled) : 0;
 		setting.termsUrl = setting.termsUrl || '';
 		setting.privacyUrl = setting.privacyUrl || '';
+		setting.operatorName = setting.operatorName || '';
+		setting.operatorCountry = setting.operatorCountry || '';
+		setting.contactEmail = setting.contactEmail || '';
+		setting.contactAddress = setting.contactAddress || '';
+		setting.policyVersion = setting.policyVersion || '';
+		setting.recipientsUrl = setting.recipientsUrl || '';
+		setting.retentionUrl = setting.retentionUrl || '';
+		setting.contentProcessing = normalizeContentProcessing(setting.contentProcessing, c);
 		setting.oauthLoginEnabled = setting.oauthLoginEnabled !== undefined && setting.oauthLoginEnabled !== null ? Number(setting.oauthLoginEnabled) : 0;
 		if (typeof setting.oauthProviders === 'string') {
 			try { setting.oauthProviders = JSON.parse(setting.oauthProviders); } catch (e) { setting.oauthProviders = {}; }
@@ -550,30 +588,22 @@ const settingService = {
 				totpVal = '1';
 				params.totp = 1;
 			}
-			try {
-				await c.env.kv.put('setting_totp_status', totpVal);
-			} catch (e) {}
-
-			// When global 2FA is explicitly disabled in All Mail Mode, completely purge all users' 2FA data
-			// so that when 2FA is re-enabled later, all users are cleanly required to re-configure
+			// Revoke all old sessions/challenges in the same statement that removes
+			// factors. Publishing the global switch must follow the durable change.
 			if (totpVal === '0') {
-				try {
-					const user = (await import('../entity/user')).default;
-					await orm(c).update(user).set({
-						totpEnabled: 0,
-						totpSecret: '',
-						totpBackupCodes: '[]',
-						totpCreatedAt: '',
-						securityKeys: '[]'
-					}).run();
-					console.log(JSON.stringify({
-						auditEvent: 'GLOBAL_TOTP_DISABLED_ALL_USERS_PURGED',
-						timestamp: new Date().toISOString()
-					}));
-				} catch (err) {
-					console.error('Failed to purge user 2FA records upon global TOTP disable:', err);
-				}
+				const user = (await import('../entity/user')).default;
+				await orm(c).update(user).set({
+					totpEnabled: 0,
+					totpSecret: '',
+					totpBackupCodes: '[]',
+					totpCreatedAt: '',
+					securityKeys: '[]',
+					authVersion: sql`${user.authVersion} + 1`,
+					passkeyHistory: sql`CASE WHEN ${user.securityKeys} NOT IN ('', '[]') THEN 1 ELSE ${user.passkeyHistory} END`
+				}).run();
+				console.log(JSON.stringify({ auditEvent: 'GLOBAL_TOTP_DISABLED_ALL_USERS_PURGED', timestamp: new Date().toISOString() }));
 			}
+			await c.env.kv.put('setting_totp_status', totpVal);
 		}
 
 		if (params.publicProfile !== undefined) {
@@ -635,6 +665,38 @@ const settingService = {
 			params.auditCriticalQuota = Number(params.auditCriticalQuota) > 0 ? Number(params.auditCriticalQuota) : 3;
 		}
 
+		const legalTextFields = ['operatorName', 'operatorCountry', 'contactEmail', 'contactAddress', 'policyVersion', 'recipientsUrl', 'retentionUrl'];
+		for (const key of legalTextFields) {
+			if (params[key] !== undefined) params[key] = typeof params[key] === 'string' ? params[key].trim().slice(0, key === 'contactAddress' ? 500 : 320) : '';
+		}
+		if (params.contactEmail !== undefined && params.contactEmail && !isValidContactEmail(params.contactEmail)) {
+			throw new BizError('A valid operator contact email is required.', 400, 'legal_contact_email_invalid');
+		}
+		for (const key of ['termsUrl', 'privacyUrl', 'recipientsUrl', 'retentionUrl']) {
+			if (params[key] !== undefined && params[key]) {
+				const checked = isValidNoticeUrl(params[key], c);
+				if (!checked.ok) throw new BizError(`Invalid ${key} URL.`, 400, 'legal_policy_url_invalid');
+				params[key] = checked.value;
+			}
+		}
+		if (params.contentProcessing !== undefined) {
+			const normalized = normalizeContentProcessing(params.contentProcessing, c);
+			const raw = typeof params.contentProcessing === 'string' ? parseExtValue(params.contentProcessing) : params.contentProcessing;
+			if (raw?.publicTranslationFallbackEnabled === true) {
+				throw new BizError('Public translation fallback is unavailable in this version.', 400, 'content_public_fallback_unavailable');
+			}
+			if (raw?.noticeUrl && !normalized.noticeUrl) {
+				throw new BizError('Invalid content processing notice URL.', 400, 'content_notice_url_invalid');
+			}
+			if (Object.entries(normalized).some(([key, value]) => key !== 'noticeUrl' && value === true) && !normalized.noticeUrl) {
+				throw new BizError('A content processing notice URL is required before enabling this feature.', 400, 'content_notice_url_required');
+			}
+			if ((normalized.ocrEnabled || normalized.publicTranslationFallbackEnabled) && !normalized.translationEnabled) {
+				throw new BizError('Translation must be enabled before enabling OCR or public fallback.', 400, 'content_translation_required');
+			}
+			params.contentProcessing = normalized;
+		}
+
 		params.resendTokens = JSON.stringify(resendTokens);
 
 		// Whitelist only valid DB columns in setting table
@@ -675,16 +737,23 @@ const settingService = {
 			await orm(c).update(settingEntity).set(updateData).run();
 		}
 
-		const extUpdates = Object.keys(AUDIT_EXT_DEFAULTS).filter(key => params[key] !== undefined);
+		const extUpdates = [
+			...Object.keys(AUDIT_EXT_DEFAULTS).filter(key => params[key] !== undefined),
+			...LEGAL_EXT_KEYS.filter(key => params[key] !== undefined),
+			...(params.contentProcessing !== undefined ? [CONTENT_PROCESSING_KEY] : [])
+		];
 		if (extUpdates.length > 0) {
 			await this.ensureSettingColumns(c);
 			const { getUserDb } = await import('../utils/db-accessor');
 			const userDb = getUserDb(c);
 			if (userDb && typeof userDb.prepare === 'function') {
 				for (const key of extUpdates) {
+					const value = key === CONTENT_PROCESSING_KEY
+						? JSON.stringify(params.contentProcessing)
+						: String(params[key] ?? '');
 					await userDb.prepare(
 						`INSERT INTO setting_ext (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`
-					).bind(key, String(params[key])).run();
+					).bind(key, value).run();
 				}
 			}
 		}
@@ -987,7 +1056,10 @@ const settingService = {
 
 	async websiteConfig(c) {
 
-		const settingRow = await this.get(c, true);
+		const cachedSetting = await this.get(c, true);
+		const authoritative = await readAuthoritativeLegalSettings(c, cachedSetting);
+		const settingRow = authoritative.settings;
+		const registrationReadiness = getRegistrationReadiness(settingRow, c);
 		const token = await userContext.getToken(c);
 
 		return {
@@ -1048,10 +1120,26 @@ const settingService = {
 			supportUrl: (c.env.SUPPORT_URL || settingRow.supportUrl || 'https://blog.epocanvas.com/support').replace(/\/+$/, ''),
 			telegramLink: (c.env.TELEGRAM_LINK || settingRow.telegramLink || 'https://t.me/epomail').replace(/\/+$/, ''),
 			githubLink: (c.env.GITHUB_LINK || settingRow.githubLink || 'https://github.com/shijianus/epomail').replace(/\/+$/, ''),
-			multiAccountEnabled: settingRow.multiAccountEnabled ?? 0,
-			termsUrl: settingRow.termsUrl || '',
-			privacyUrl: settingRow.privacyUrl || '',
-			oauthLoginEnabled: settingRow.oauthLoginEnabled ?? 0,
+				multiAccountEnabled: settingRow.multiAccountEnabled ?? 0,
+				termsUrl: settingRow.termsUrl || '',
+				privacyUrl: settingRow.privacyUrl || '',
+				legalNotice: (() => {
+					const readiness = getRegistrationReadiness(settingRow, c);
+					return {
+						operatorName: readiness.notice.operatorName,
+						operatorCountry: readiness.notice.operatorCountry,
+						contactEmail: readiness.notice.contactEmail,
+						contactAddress: readiness.notice.contactAddress,
+						termsVersion: readiness.notice.termsVersion,
+						termsUrl: readiness.notice.termsUrl,
+						privacyUrl: readiness.notice.privacyUrl,
+						recipientsUrl: readiness.notice.recipientsUrl,
+						retentionUrl: readiness.notice.retentionUrl
+					};
+				})(),
+				registrationReadiness: { ready: registrationReadiness.ready, missing: registrationReadiness.missing },
+				contentProcessing: normalizeContentProcessing(settingRow.contentProcessing, c),
+				oauthLoginEnabled: settingRow.oauthLoginEnabled ?? 0,
 			oauthProviders: (() => {
 				let p = settingRow.oauthProviders;
 				if (typeof p === 'string') {

@@ -376,6 +376,8 @@ import {useSettingStore} from "@/store/setting.js";
 import {hasPerm} from "@/perm/perm.js"
 import {useI18n} from "vue-i18n";
 import {setExtend} from "@/utils/day.js"
+import { clearCurrentSession } from '@/utils/device-privacy.js';
+import { listSessionRecords, getTabIdentity, tabSession } from '@/utils/tab-session.js';
 
 const {t, locale} = useI18n();
 const route = useRoute();
@@ -516,13 +518,7 @@ const isMultiAccountEnabled = computed(() => {
         return true;
       }
     }
-    const sessionsRaw = localStorage.getItem('epo_sessions');
-    if (sessionsRaw) {
-      const sessions = JSON.parse(sessionsRaw);
-      if (Array.isArray(sessions) && sessions.length > 1) {
-        return true;
-      }
-    }
+    if (listSessionRecords().length > 1) return true;
   } catch (e) {}
   return false;
 });
@@ -548,23 +544,21 @@ async function loadOtherAccounts() {
   try {
     const urlMatch = window.location.pathname.match(/\/mail\/u\/(\d+)/);
     currentU = urlMatch ? parseInt(urlMatch[1], 10) : 0;
-    const raw = localStorage.getItem('epo_sessions');
-    if (raw) {
-      const sessions = JSON.parse(raw);
-      if (Array.isArray(sessions)) {
-        for (const s of sessions) {
-          if (s.u !== currentU && s.token && s.email) {
-            const sEmail = s.email.toLowerCase().trim();
-            if (sEmail !== currentEmail && !others.some(o => o.email.toLowerCase().trim() === sEmail)) {
-              others.push({
-                isSession: true,
-                u: s.u,
-                email: s.email,
-                name: s.name || s.email,
-                roleName: s.roleName || ''
-              });
-            }
-          }
+    const records = listSessionRecords();
+    for (const s of records) {
+      if (s.u !== currentU && s.token && s.email) {
+        const sEmail = s.email.toLowerCase().trim();
+        if (sEmail !== currentEmail && !others.some(o => o.email.toLowerCase().trim() === sEmail)) {
+          others.push({
+            isSession: true,
+            u: s.u,
+            email: s.email,
+            token: s.token,
+            sessionId: s.sessionId,
+            userId: s.userId,
+            name: s.name || s.email,
+            roleName: s.roleName || ''
+          });
         }
       }
     }
@@ -602,26 +596,18 @@ async function loadOtherAccounts() {
 function switchAccount(acc) {
   closeDropdown();
   if (acc.isSession) {
-    try {
-      const rawSessions = localStorage.getItem('epo_sessions');
-      if (rawSessions) {
-        const sessions = JSON.parse(rawSessions);
-        const targetS = sessions.find(s => s.u === acc.u);
-        if (targetS && targetS.token) {
-          localStorage.setItem('token', targetS.token);
-          if (targetS.email) {
-            localStorage.setItem('loginEmail', targetS.email);
-          }
-        }
-      }
-    } catch (_) {}
+    if (!tabSession.select(acc)) {
+      ElMessage.warning(t('authExpired'));
+      loadOtherAccounts();
+      return;
+    }
     window.location.href = `/mail/u/${acc.u}/#inbox`;
     return;
   }
   accountStore.currentAccountId = acc.accountId;
   accountStore.currentAccount = acc;
   if (acc.email) {
-    localStorage.setItem('loginEmail', acc.email);
+    tabSession.update({ accountEmail: acc.email });
     if (userStore.user) {
       userStore.user.account = acc;
       userStore.user.email = acc.email;
@@ -664,8 +650,7 @@ function openAddAccount() {
   }
   let targetU = 1;
   try {
-    const rawSessions = localStorage.getItem('epo_sessions');
-    const sessions = rawSessions ? JSON.parse(rawSessions) : [];
+    const sessions = listSessionRecords();
     const existingUs = new Set(sessions.map(s => s.u));
     while (existingUs.has(targetU)) {
       targetU++;
@@ -1302,21 +1287,21 @@ function changeAside() {
 }
 
 function goToLogin() {
-  localStorage.removeItem("token")
-  window.location.replace('/login/')
+  const session = getTabIdentity();
+  clearCurrentSession({ session });
+  window.location.replace(`/login/?u=${session?.u ?? 0}`)
 }
 
 function clickLogout() {
+  if (logoutLoading.value) return;
   logoutLoading.value = true
+  const session = getTabIdentity();
   const finalizeLogout = () => {
-    localStorage.removeItem("token")
-    localStorage.removeItem("ui")
-    localStorage.removeItem("epo_sessions")
-    try {
-      sessionStorage.clear()
-    } catch (_) {}
     uiStore.resetToDefaults()
-    window.location.replace('/login/')
+    // Explicit logout clears the current account's cached mail/recipients.
+    // It must not silently erase any account's unsent IndexedDB drafts.
+    clearCurrentSession({ session });
+    window.location.replace(`/login/?u=${session?.u ?? 0}`)
   }
   logout().then(() => {
     finalizeLogout()

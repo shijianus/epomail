@@ -209,8 +209,8 @@ jobs:
       - name: Worker test suite
         run: pnpm --dir mail-worker test
 
-      - name: Isolated stack lifecycle tests
-        run: node --test tests/helpers/local-stack.test.mjs
+      - name: Isolated stack and bounded load-runner tests
+        run: node --test tests/helpers/local-stack.test.mjs tests/helpers/load-runner.test.mjs
 
       # wrangler.toml 的 [build] 钩子会执行 scripts/build-prod.mjs（先 temp_login_ui 后 mail-vue），
       # 因此该步骤同时验证了真实部署路径的可构建性；dry-run 不连接 Cloudflare 账户、不上传任何产物。
@@ -220,6 +220,18 @@ jobs:
 
       - name: Cold-start full-stack smoke (local D1/KV, disposable secrets)
         run: node tests/fullstack-smoke.mjs
+
+      - name: Bounded local backend load and recovery
+        run: node tests/backend-stress.mjs --soak=3m --out=tests/artifacts/backend-stress.json
+
+      - name: Save backend verification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-stress-${{ github.sha }}
+          path: tests/artifacts/backend-stress.json
+          retention-days: 14
+          if-no-files-found: error
 
   mail-vue-build:
     name: mail-vue production build

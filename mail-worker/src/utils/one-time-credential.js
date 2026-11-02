@@ -359,3 +359,9 @@ const oneTimeCredential = {
 };
 
 export default oneTimeCredential;
+
+export function authVersionOf(row) {
+	const version = row?.authVersion ?? row?.auth_version ?? 0;
+	if (!Number.isSafeInteger(version) || version < 0) throw new BizError('Invalid authentication version', 401);
+	return version;
+}

@@ -30,6 +30,10 @@ import deviceTrustService from './device-trust-service.js';
 import rateLimit from '../utils/rate-limit.js';
 import decisionNoticeService from './decision-notice-service.js';
 import totpService from './totp-service.js';
+import authOperation from '../utils/auth-security-operation.js';
+import { authVersionOf, hashToken } from '../utils/one-time-credential.js';
+import { getUserDb } from '../utils/db-accessor.js';
+import legalPolicyService from './legal-policy-service.js';
 
 function getSafeSessionUser(userRow) {
 	if (!userRow) return null;
@@ -51,10 +55,11 @@ function getSafeSessionUser(userRow) {
  * The initial-password flow uses this to prove the caller just completed a
  * provider authentication; a plain password session never carries it.
  */
-function buildSessionMeta(method, provider) {
+function buildSessionMeta(method, provider, authVersion, mfaCompleted = false) {
 	if (method !== 'oauth') return null;
 	return {
 		method: 'oauth',
+		authVersion, mfaCompleted,
 		provider: typeof provider === 'string' && provider ? provider.slice(0, 64) : null,
 		at: Date.now()
 	};
@@ -97,13 +102,16 @@ const loginService = {
 	 * function inside the write path, and the invite slot is still reserved
 	 * with an atomic decrement afterwards.
 	 */
-	async validateRegistration(c, params, oauth = false) {
-		const { email, password } = params;
-		// A non-string invite code is treated as absent instead of being handed
-		// to SQL as a binding parameter.
-		const code = typeof params.code === 'string' ? params.code : '';
+		async validateRegistration(c, params, oauth = false) {
+			const { email, password } = params;
+			// A non-string invite code is treated as absent instead of being handed
+			// to SQL as a binding parameter.
+			const code = typeof params.code === 'string' ? params.code : '';
 
-		let { regKey, register, registerVerify, regVerifyCount, minEmailPrefix, emailPrefixFilter } = await settingService.query(c)
+			const settingData = await settingService.query(c);
+			const acceptance = await legalPolicyService.validateRegistrationAcceptanceAuthoritative(c, params, settingData);
+			let { regKey, register, registerVerify, regVerifyCount, minEmailPrefix, emailPrefixFilter } = settingData;
+
 
 		if (oauth) {
 			// The provider already verified the identity, so the local captcha
@@ -225,7 +233,8 @@ const loginService = {
 			regKeyId,
 			defType,
 			assignedName,
-			regVerifyOpen
+			regVerifyOpen,
+			acceptance
 		};
 	},
 
@@ -238,6 +247,12 @@ const loginService = {
 		const id = Number(userId);
 		if (!Number.isInteger(id) || id <= 0) return;
 
+		try {
+			await (await import('../utils/db-accessor.js')).getUserDb(c)
+				.prepare('DELETE FROM legal_acceptance WHERE user_id = ?').bind(id).run();
+		} catch (error) {
+			console.error('Failed to roll back registration acceptance:', error);
+		}
 		try {
 			await accountService.physicsDeleteByUserIds(c, [id]);
 		} catch (err) {
@@ -275,7 +290,7 @@ const loginService = {
 			type,
 			regKeyId,
 			defType,
-			assignedName,
+				assignedName,
 			regVerifyOpen: precomputedRegVerifyOpen
 		} = policy;
 
@@ -305,8 +320,10 @@ const loginService = {
 		let userId;
 		let acc;
 		try {
+			const acceptance = await legalPolicyService.validateRegistrationAcceptanceAuthoritative(c, params);
 			userId = await userService.insert(c, { email, regKeyId, password: hash, salt, type: type || defType });
 			acc = await accountService.insert(c, { userId: userId, email, name: assignedName });
+			await legalPolicyService.recordAcceptance(c, userId, acceptance);
 			await userService.updateUserInfo(c, userId, true);
 		} catch (err) {
 			if (reservedRegKey) {
@@ -392,10 +409,10 @@ const loginService = {
 		return { type: regKeyRow.roleId, regKeyId: regKeyRow.regKeyId };
 	},
 
-	async lazyMigratePassword(c, userId, plainPassword) {
+	async lazyMigratePassword(c, row, plainPassword) {
 		try {
 			const { salt, hash } = await cryptoUtils.hashPassword(plainPassword, c.env);
-			await orm(c).update(user).set({ password: hash, salt }).where(eq(user.userId, userId)).run();
+			await orm(c).update(user).set({ password: hash, salt }).where(and(eq(user.userId, row.userId), eq(user.password, row.password), eq(user.salt, row.salt), eq(user.authVersion, authVersionOf(row)))).run();
 		} catch (err) {
 			console.error('Lazy password migration failed:', err);
 		}
@@ -538,7 +555,7 @@ const loginService = {
 				sessionTrustEpoch = trustEval.trustEpoch;
 				sessionMaxEpoch = trustEval.maxSessionEpoch;
 			} else {
-				const tempToken = 'totp_tmp_' + uuidv4().replace(/-/g, '');
+				let tempToken;
 				const passkeyChallenge = webauthnUtils.generateChallenge();
 
 				// Evaluate black-box risk model
@@ -556,26 +573,12 @@ const loginService = {
 					} catch (e) {}
 				}
 
-				await c.env.kv.put(
-					KvConst.TOTP_PENDING + tempToken,
-					JSON.stringify({
-						userId: userRow.userId,
-						email: userRow.email,
-						attempts: 0,
-						passkeyChallenge,
-						needsPasswordUpgrade: isLegacy ? inputPassword : null,
-						stepUpRequired: riskAssessment.stepUpRequired,
-						riskScore: riskAssessment.riskScore,
-					step: 1,
-					verifiedFactors: [],
-					deviceTag,
-					// Provenance is supplied only through the internal auth context;
-					// request JSON must never be able to mint an OAuth session marker.
-					authContext: trustedAuthContext,
-					createdAt: Date.now()
-					}),
-					{ expirationTtl: 300 } // 5 minutes TTL
-				);
+				const loginBinding = { userId:userRow.userId, authVersion:authVersionOf(userRow), purpose:'login_mfa',
+					target:'login', sessionHash:await hashToken('login:' + uuidv4()) };
+				const pendingData = { email:userRow.email, passkeyChallenge, ...webauthnUtils.ceremonyContext(c),
+					stepUpRequired:riskAssessment.stepUpRequired, step:1, verifiedFactors:[], deviceTag,
+					authContext:trustedAuthContext, createdAt:Date.now() };
+				tempToken = await authOperation.issue(c,{...loginBinding,payload:pendingData,ttlSeconds:300});
 
 				return {
 					mfaRequired: true,
@@ -643,7 +646,7 @@ const loginService = {
 
 		// If legacy single-round SHA-256 hash was detected, upgrade to PBKDF2 lazily
 		if (isLegacy && inputPassword) {
-			await this.lazyMigratePassword(c, userRow.userId, inputPassword);
+			await this.lazyMigratePassword(c, userRow, inputPassword);
 		}
 
 		const activeLoginEmail = inputEmail.includes('@') ? inputEmail : userRow.email;
@@ -651,7 +654,8 @@ const loginService = {
 		const jwt = await JwtUtils.generateToken(c, { 
 			userId: userRow.userId, 
 			loginEmail: activeLoginEmail,
-			token: uuid 
+			token: uuid,
+			authVersion: authVersionOf(userRow)
 		});
 
 		let authInfo = await c.env.kv.get(KvConst.AUTH_INFO + userRow.userId, { type: 'json' });
@@ -676,7 +680,7 @@ const loginService = {
 
 		}
 
-		attachSessionMeta(authInfo, uuid, trustedAuthContext && buildSessionMeta(trustedAuthContext.method, trustedAuthContext.provider));
+		attachSessionMeta(authInfo, uuid, trustedAuthContext && buildSessionMeta(trustedAuthContext.method, trustedAuthContext.provider, authVersionOf(userRow)));
 
 		if (sessionMaxEpoch) {
 			authInfo.trustEpoch = sessionTrustEpoch;
@@ -727,13 +731,17 @@ const loginService = {
 			throw new BizError(t('totpCodeEmpty'));
 		}
 
-		const pendingKey = KvConst.TOTP_PENDING + tempToken;
-		const pendingData = await c.env.kv.get(pendingKey, { type: 'json' });
-
-		if (!pendingData || !pendingData.userId) {
-			throw new BizError(t('totpSessionExpired'));
-		}
-
+		// The pending token itself is the pre-login session capability. Its immutable
+		// D1 binding is recovered by digest; no client may supply a user/version.
+		const stored = /^[a-f0-9]{64}$/.test(tempToken) ? await getUserDb(c).prepare(
+			'SELECT user_id,auth_version,session_hash FROM auth_security_operation WHERE token_hash=? AND purpose=?'
+		).bind(await hashToken(tempToken),'login_mfa').first() : null;
+		if (!stored) throw new BizError(t('totpSessionExpired'));
+		const binding={token:tempToken,userId:stored.user_id,authVersion:stored.auth_version,sessionHash:stored.session_hash,purpose:'login_mfa',target:'login'};
+		const attempt=await authOperation.incrementAttempt(c,binding);
+		if (!attempt) throw new BizError(t('totpSessionExpired'));
+		const operation=await authOperation.inspect(c,binding);
+		const pendingData=operation.payload;
 		const targetEmail = pendingData.email;
 		const failKey = targetEmail ? KvConst.LOGIN_FAIL + targetEmail : null;
 		let failCount = 0;
@@ -753,120 +761,19 @@ const loginService = {
 			}
 		};
 
-		if (pendingData.attempts >= 5) {
-			await c.env.kv.delete(pendingKey);
-			await incrementAccountFail();
-			throw new BizError(t('totpTooManyAttempts'));
-		}
-
-		pendingData.attempts += 1;
-		await c.env.kv.put(pendingKey, JSON.stringify(pendingData), { expirationTtl: 300 });
-
-		let userRow = await userService.selectById(c, pendingData.userId);
-		if (!userRow || userRow.isDel === isDel.DELETE) {
-			throw new BizError(t('isDelUser'));
-		}
-
-		const factorType = isPasskey ? 'passkey' : (isBackupCode ? 'backup_code' : 'totp');
+		let userRow = await userService.selectById(c, binding.userId);
+		if (!userRow || authVersionOf(userRow)!==binding.authVersion) throw new BizError(t('totpSessionExpired'));
+		const factorType = isPasskey ? 'passkey' : ((isBackupCode || !/^\d{6}$/.test(String(code).trim())) ? 'backup_code' : 'totp');
 
 		if (pendingData.step === 2 && Array.isArray(pendingData.verifiedFactors) && pendingData.verifiedFactors.includes(factorType)) {
 			throw new BizError(t('stepUpDifferentFactorRequired'));
 		}
 
-		if (isPasskey) {
-			// Verify WebAuthn / Passkey signature
-			if (!credentialId || !clientDataJSON || !authenticatorData || !signature) {
-				throw new BizError('Missing passkey authentication credentials');
-			}
-
-			const clientData = webauthnUtils.parseClientData(clientDataJSON);
-			if (clientData.challenge !== pendingData.passkeyChallenge) {
-				await incrementAccountFail();
-				throw new BizError('Passkey challenge mismatch or expired');
-			}
-
-			let keys = [];
-			if (userRow.securityKeys) {
-				try {
-					keys = typeof userRow.securityKeys === 'string' ? JSON.parse(userRow.securityKeys) : userRow.securityKeys;
-					if (!Array.isArray(keys)) keys = [];
-				} catch (e) {
-					keys = [];
-				}
-			}
-
-			const targetKey = keys.find(k => k.credentialId === credentialId);
-			if (!targetKey) {
-				await incrementAccountFail();
-				throw new BizError('Unrecognized security key');
-			}
-
-			if (targetKey.status === 'pending_verification') {
-				await incrementAccountFail();
-				throw new BizError(t('passkeyTimelockedNotice') || '该通行密钥处于安全观察期中，尚未激活生效，暂无法用于登录');
-			}
-
-			const isValidSig = await webauthnUtils.verifyAuthenticationSignature({
-				clientDataJSONBase64: clientDataJSON,
-				authenticatorDataBase64: authenticatorData,
-				signatureBase64: signature,
-				publicKeyJwk: targetKey.publicKeyJwk,
-				publicKeyRaw: targetKey.publicKeyRaw
-			});
-
-			if (!isValidSig) {
-				await incrementAccountFail();
-				throw new BizError('Security key authentication signature invalid');
-			}
-		} else if (isBackupCode) {
-			// Verify backup recovery code
-			const backupResult = await totpUtils.verifyAndConsumeBackupCode(code, userRow.totpBackupCodes);
-			if (!backupResult.isValid) {
-				await incrementAccountFail();
-				throw new BizError(t('backupCodeInvalid'));
-			}
-			await orm(c).update(user).set({
-				totpBackupCodes: backupResult.updatedCodesJson
-			}).where(eq(user.userId, userRow.userId)).run();
-		} else {
-			// Verify 6-digit TOTP code
-			if (!userRow.totpSecret) {
-				throw new BizError(t('totpNotEnabled'));
-			}
-
-			// 显式迁移（收尾轮）：历史 jwt_secret 回退 era 加密数据先解封重加密；
-			// 阻断时给出准确原因，绝不静默回退到 jwt_secret 解密。
-			const migration = await totpService.migrateLegacyTotpEncryption(c, userRow);
-			if (!migration.ok) {
-				if (migration.reason === 'missing_totp_enc_key') {
-					throw new BizError('系统 TOTP 加密密钥未配置 (totp_enc_key missing)，2FA 验证暂时不可用，请联系管理员配置密钥', 500);
-				}
-				throw new BizError('2FA 凭据数据无法解密（历史密钥 era 数据损坏或不匹配），请联系管理员重置两步验证', 500);
-			}
-			if (migration.migrated) {
-				// 迁移可能重加密了数据：以最新持久化行继续验证（不改动原行对象，避免污染共享引用）
-				const freshRow = await userService.selectById(c, userRow.userId);
-				if (freshRow) userRow = freshRow;
-			}
-
-			const plainSecret = await totpUtils.decryptSecret(userRow.totpSecret, c.env);
-			const totpCheck = await totpUtils.verifyTOTP(plainSecret, code, 1);
-
-			if (!totpCheck.isValid) {
-				await incrementAccountFail();
-				throw new BizError(t('totpCodeInvalid'));
-			}
-
-			// Anti-replay: prevent OTP reuse in the same 60-second time window
-			const replayKey = KvConst.TOTP_REPLAY + userRow.userId + ':' + totpCheck.timeStep;
-			const alreadyUsed = await c.env.kv.get(replayKey);
-			if (alreadyUsed) {
-				await incrementAccountFail();
-				throw new BizError(t('totpCodeReplay'));
-			}
-			await c.env.kv.put(replayKey, '1', { expirationTtl: 60 });
-		}
-
+		try {
+			await totpService.verifyExistingFactor(c,userRow,params,{challenge:pendingData.passkeyChallenge,origin:pendingData.origin,rpId:pendingData.rpId});
+		} catch (err) { await incrementAccountFail(); throw err; }
+		userRow=await userService.selectById(c,binding.userId);
+		if (!userRow || authVersionOf(userRow)!==binding.authVersion) throw new BizError(t('totpSessionExpired'));
 		// Check Step-Up (二验) decision: If step-up required and step 1 just completed
 		if (pendingData.stepUpRequired && (!pendingData.step || pendingData.step === 1)) {
 			let remainingBackupCount = 0;
@@ -902,18 +809,24 @@ const loginService = {
 				const nextPasskeyChallenge = webauthnUtils.generateChallenge();
 				pendingData.passkeyChallenge = nextPasskeyChallenge;
 
-				await c.env.kv.put(pendingKey, JSON.stringify(pendingData), { expirationTtl: 300 });
+				// Transition the same row: never reset attempts or extend its deadline.
+				const transitioned = await getUserDb(c).prepare(`UPDATE auth_security_operation SET payload=?
+					WHERE token_hash=? AND purpose='login_mfa' AND consumed=0 AND attempts=? AND expires_at>unixepoch()
+					AND EXISTS (SELECT 1 FROM user WHERE user_id=? AND auth_version=? AND is_del=0)
+					RETURNING token_hash`).bind(JSON.stringify(pendingData),await hashToken(tempToken),attempt,binding.userId,binding.authVersion).first();
+				if (!transitioned) throw new BizError(t('totpSessionExpired'));
+				const nextToken=tempToken;
 
 				return {
 					stepUpRequired: true,
 					step: 2,
-					tempToken,
+					tempToken: nextToken,
 					verifiedFactor: factorType,
 					remainingFactors,
 					hasTotp: !!userRow.totpSecret,
-					hasPasskeys: userKeys.length > 0,
+					hasPasskeys: activeUserKeys.length > 0,
 					hasBackupCodes: remainingBackupCount > 0,
-					passkeys: userKeys.map(k => ({ id: k.credentialId, type: 'public-key' })),
+					passkeys: activeUserKeys.map(k => ({ id: k.credentialId, type: 'public-key' })),
 					passkeyChallenge: nextPasskeyChallenge,
 					email: userRow.email,
 					message: t('stepUpAbnormalNotice')
@@ -922,17 +835,13 @@ const loginService = {
 		}
 
 		// Verification fully passed: consume temporary token
-		await c.env.kv.delete(pendingKey);
+		if (!await authOperation.consume(c,{...binding,attempt})) throw new BizError(t('totpSessionExpired'));
 
 		// Clear login fail rate limit
 		if (failKey) {
 			await c.env.kv.delete(failKey);
 		}
 
-		// Lazy migration of legacy password if needed
-		if (pendingData.needsPasswordUpgrade) {
-			await this.lazyMigratePassword(c, userRow.userId, pendingData.needsPasswordUpgrade);
-		}
 
 		// 受限用户安全通道：2FA 核验通过后，若账号已被封禁管控，阻断常规发信与读信会话，签发专用受限通知凭证
 		if (userRow.status === userConst.status.BAN) {
@@ -979,7 +888,8 @@ const loginService = {
 		const jwt = await JwtUtils.generateToken(c, { 
 			userId: userRow.userId, 
 			loginEmail: activeLoginEmail,
-			token: uuid 
+			token: uuid,
+			authVersion: authVersionOf(userRow)
 		});
 
 		// Issue trusted device token if rememberDevice was requested
@@ -989,7 +899,7 @@ const loginService = {
 
 		const effectiveDeviceTag = deviceTag || pendingData.deviceTag || (typeof c.req.header === 'function' ? c.req.header('x-device-tag') : '') || '';
 		if (rememberDevice && effectiveDeviceTag) {
-			const trustResult = await deviceTrustService.issueTrust(c, userRow.userId, effectiveDeviceTag);
+			const trustResult = await deviceTrustService.issueTrust(c, userRow.userId, effectiveDeviceTag, authVersionOf(userRow));
 			if (trustResult) {
 				issuedTrustToken = trustResult.trustedDeviceToken;
 				sessionTrustEpoch = trustResult.trustEpoch;
@@ -1014,7 +924,7 @@ const loginService = {
 
 		// The challenge may have started from a provider login; carry that
 		// provenance (never the client's claim) onto the issued session.
-		attachSessionMeta(authInfo, uuid, pendingData.authContext && buildSessionMeta(pendingData.authContext.method, pendingData.authContext.provider));
+		attachSessionMeta(authInfo, uuid, pendingData.authContext && buildSessionMeta(pendingData.authContext.method, pendingData.authContext.provider, authVersionOf(userRow), true));
 
 		if (sessionMaxEpoch) {
 			authInfo.trustEpoch = sessionTrustEpoch;

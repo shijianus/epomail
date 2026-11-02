@@ -1,4 +1,5 @@
 const nl = {
+    forwardingNotSupported: 'Kies alle e-mail of geef een niet-lege aliasprefix op en bewaar het origineel; slimme regels en verwijderen na doorsturen zijn niet beschikbaar.',
     dynamicUi: 'Dynamische UI',
     staticUi: 'Statische UI',
     dynamicUiDesc: 'Geldt voor de standaard dynamische deeltjesinterface',
@@ -1914,6 +1915,12 @@ const nl = {
     updateTotpBtn: "Authenticator bijwerken",
     deleteTotpBtn: "Authenticator uitschakelen",
     passkeyNotFound: "Gespecificeerde toegangssleutel niet gevonden",
+
+    privacyProcessing: {
+        disabled: 'Optionele inhoudsverwerking is uitgeschakeld of de openbare informatiepagina is niet beschikbaar.',
+        confirmationRequired: 'Bevestig dat je de actuele informatie over inhoudsverwerking hebt bekeken voordat je vertaalt.',
+        noticeChanged: 'De informatie over inhoudsverwerking is gewijzigd. Bekijk de actuele informatie en probeer het opnieuw.'
+    },
 
     // ===== 权限树本地化（perm-service.tree：按钮按 perm_key，分组按库内名称）=====
     perms: {

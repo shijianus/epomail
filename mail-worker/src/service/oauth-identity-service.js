@@ -46,6 +46,8 @@ import { getUserDb } from '../utils/db-accessor.js';
 import rateLimit from '../utils/rate-limit.js';
 import { t } from '../i18n/i18n.js';
 import reqUtils from '../utils/req-utils.js';
+import totpService from './totp-service.js';
+import { authVersionOf } from '../utils/one-time-credential.js';
 
 const STEP_UP_TTL_SECONDS = 300;
 const STEP_UP_TTL_MS = STEP_UP_TTL_SECONDS * 1000;
@@ -169,95 +171,8 @@ async function providerDisplayName(c, provider) {
 	return fallback[provider] || provider || 'OAuth';
 }
 
-async function issueStepUpGrant(c, userId, method) {
-	const sessionToken = await currentSessionToken(c);
-	if (!sessionToken) {
-		throw new BizError(t('oauthReauthRequired'), 401, 'reauth_required');
-	}
-	const token = await oneTimeCredential.issue(c, {
-		purpose: OTC_PURPOSE.STEP_UP,
-		oauthUserId: stepUpBinding(userId),
-		payload: {
-			userId,
-			tokenHash: await hashToken(sessionToken),
-			method,
-			createdAt: Date.now()
-		},
-		ttlSeconds: STEP_UP_TTL_SECONDS
-	});
-	return { stepUpToken: token, expiresIn: STEP_UP_TTL_SECONDS, method };
-}
-
-/**
- * Spend a step-up grant. Throws unless the grant is unexpired, unused, issued
- * to this user AND issued to this exact session token.
- */
-async function consumeStepUpGrant(c, userId, stepUpToken) {
-	if (!stepUpToken || typeof stepUpToken !== 'string') {
-		throw new BizError(t('oauthReauthRequired'), 403, 'reauth_required');
-	}
-
-	const probe = await oneTimeCredential.inspect(c, {
-		purpose: OTC_PURPOSE.STEP_UP,
-		token: stepUpToken,
-		oauthUserId: stepUpBinding(userId)
-	});
-	if (!probe || probe.consumed || probe.expired || !probe.payload) {
-		throw new BizError(t('oauthReauthRequired'), 403, 'reauth_required');
-	}
-
-	const sessionToken = await currentSessionToken(c);
-	const payload = probe.payload;
-	const valid = payload.userId === userId
-		&& typeof payload.tokenHash === 'string'
-		&& sessionToken
-		&& payload.tokenHash === await hashToken(sessionToken)
-		&& Number.isFinite(payload.createdAt)
-		&& Date.now() - payload.createdAt <= STEP_UP_TTL_MS;
-	if (!valid) {
-		throw new BizError(t('oauthReauthRequired'), 403, 'reauth_required');
-	}
-
-	const record = await oneTimeCredential.consume(c, {
-		purpose: OTC_PURPOSE.STEP_UP,
-		token: stepUpToken,
-		oauthUserId: stepUpBinding(userId)
-	});
-	if (!record) {
-		throw new BizError(t('oauthReauthRequired'), 403, 'reauth_required');
-	}
-	return record.payload;
-}
-
-/**
- * Verify a TOTP code or a backup code for a step-up. Reuses the login-time
- * anti-replay key so a code consumed by a concurrent login cannot be reused
- * here inside the same 30s step.
- */
-async function verifySecondFactor(c, userRow, code, isBackupCode) {
-	if (!isBackupCode) {
-		if (!userRow.totpSecret) {
-			throw new BizError(t('totpNotEnabled'), 403, 'totp_not_enabled');
-		}
-		const plainSecret = await totpUtils.decryptSecret(userRow.totpSecret, c.env);
-		const check = await totpUtils.verifyTOTP(plainSecret, code, 1);
-		if (!check.isValid) {
-			throw new BizError(t('totpCodeInvalid'), 403, 'totp_invalid');
-		}
-		const replayKey = KvConst.TOTP_REPLAY + userRow.userId + ':' + check.timeStep;
-		if (await c.env.kv.get(replayKey)) {
-			throw new BizError(t('totpCodeReplay'), 403, 'totp_replay');
-		}
-		await c.env.kv.put(replayKey, '1', { expirationTtl: 60 });
-		return;
-	}
-
-	const backupResult = await totpUtils.verifyAndConsumeBackupCode(code, userRow.totpBackupCodes);
-	if (!backupResult.isValid) {
-		throw new BizError(t('backupCodeInvalid'), 403, 'backup_code_invalid');
-	}
-	await orm(c).update(user).set({ totpBackupCodes: backupResult.updatedCodesJson })
-		.where(eq(user.userId, userRow.userId)).run();
+async function consumeStepUpGrant(c, userId, stepUpToken, operation, target) {
+ return totpService.consumeGrant(c,userId,{stepUpToken},operation,String(target));
 }
 
 const oauthIdentityService = {
@@ -325,93 +240,19 @@ const oauthIdentityService = {
 	 * have no password the owner could type; for them a provider-issued session
 	 * that is still fresh is the equivalent proof.
 	 */
-	async reauthenticate(c, userId, params = {}) {
-		await rateLimit.check(c, {
-			scope: 'oauth-identity-reauth',
-			limit: 10,
-			windowSeconds: 900,
-			subject: `user:${userId}`
-		});
-
-		const userRow = await userService.selectById(c, userId);
-		if (!userRow) {
-			throw new BizError(t('userNotExist'), 404, 'user_not_found');
-		}
-
-		const passwordUsable = await hasUsablePassword(c, userRow);
-		const hasTotp = userRow.totpEnabled === 1 && Boolean(userRow.totpSecret);
-
-		if (passwordUsable) {
-			const password = typeof params.password === 'string' ? params.password : '';
-			if (!password) {
-				throw new BizError(t('passwordEmpty'), 400, 'password_required');
-			}
-			const valid = await cryptoUtils.verifyPassword(password, userRow.salt, userRow.password);
-			if (!valid) {
-				await recordAudit(c, {
-					userId,
-					event: AUDIT_EVENTS.REAUTH_FAILED,
-					outcome: 'failure',
-					detail: 'password_mismatch'
-				});
-				throw new BizError(t('oauthReauthFailed'), 403, 'reauth_failed');
-			}
-
-			if (hasTotp) {
-				const code = typeof params.code === 'string' ? params.code.trim() : '';
-				if (!code) {
-					throw new BizError(t('totpCodeEmpty'), 400, 'totp_required');
+		async reauthenticate(c, userId, params = {}) {
+			try {
+				if (!['oauth_bind', 'oauth_unbind'].includes(params.operation)) {
+					throw new BizError(t('oauthReauthRequired'), 403, 'reauth_required');
 				}
-				try {
-					await verifySecondFactor(c, userRow, code, params.isBackupCode === true);
-				} catch (err) {
-					await recordAudit(c, {
-						userId,
-						event: AUDIT_EVENTS.REAUTH_FAILED,
-						outcome: 'failure',
-						detail: err?.errorCode || 'second_factor_invalid'
-					});
-					throw err;
-				}
+				const response = await totpService.reauthenticate(c, userId, params);
+				await recordAudit(c, { userId, event: AUDIT_EVENTS.REAUTH_GRANTED });
+				return response;
+			} catch (error) {
+				await recordAudit(c, { userId, event: AUDIT_EVENTS.REAUTH_FAILED, outcome: 'rejected' });
+				throw error;
 			}
-
-			await recordAudit(c, {
-				userId,
-				event: AUDIT_EVENTS.REAUTH_GRANTED,
-				detail: hasTotp ? 'password+second_factor' : 'password'
-			});
-			return await issueStepUpGrant(c, userId, hasTotp ? 'password+totp' : 'password');
-		}
-
-		// Provider-only account: the session must carry provider provenance and
-		// must be recent. The marker is written by the server at login time; a
-		// client cannot forge it.
-		const sessionToken = await currentSessionToken(c);
-		const authInfo = await c.env.kv.get(KvConst.AUTH_INFO + userId, { type: 'json' });
-		const meta = sessionToken && authInfo?.tokenMeta ? authInfo.tokenMeta[sessionToken] : null;
-		const fresh = meta
-			&& meta.method === 'oauth'
-			&& Number.isFinite(meta.at)
-			&& Date.now() - meta.at <= PROVIDER_SESSION_FRESH_MS;
-
-		if (!fresh) {
-			await recordAudit(c, {
-				userId,
-				event: AUDIT_EVENTS.REAUTH_FAILED,
-				outcome: 'failure',
-				detail: 'provider_session_stale'
-			});
-			throw new BizError(t('oauthReauthProviderRequired'), 403, 'reauth_provider_required');
-		}
-
-		await recordAudit(c, {
-			userId,
-			event: AUDIT_EVENTS.REAUTH_GRANTED,
-			provider: typeof meta.provider === 'string' ? meta.provider : '',
-			detail: 'provider_session'
-		});
-		return await issueStepUpGrant(c, userId, 'provider_session');
-	},
+		},
 
 	/**
 	 * Start a bind. Returns the provider authorization URL; the account to bind
@@ -445,7 +286,7 @@ const oauthIdentityService = {
 			throw new BizError(t('oauthIdentityAlreadyBound'), 409, 'identity_already_bound');
 		}
 
-		await consumeStepUpGrant(c, userId, params.stepUpToken);
+		const stepUp = await consumeStepUpGrant(c, userId, params.stepUpToken, 'oauth_bind', provider);
 
 		const sessionToken = await currentSessionToken(c);
 		if (!sessionToken) {
@@ -464,6 +305,7 @@ const oauthIdentityService = {
 			intent: {
 				mode: 'bind',
 				userId,
+				authVersion: authVersionOf(stepUp.row),
 				sessionHash: await hashToken(sessionToken),
 				provider,
 				accountIndex,
@@ -540,6 +382,7 @@ const oauthIdentityService = {
 			payload: {
 				userId,
 				sessionHash: intent.sessionHash,
+				authVersion: intent.authVersion,
 				provider,
 				oauthUserId: userInfo.oauthUserId,
 				createdAt: Date.now()
@@ -585,8 +428,10 @@ const oauthIdentityService = {
 		}
 
 		const payload = probe.payload;
-		const sessionToken = await currentSessionToken(c);
+		const session = await userContext.requireSession(c,userId);
+		const sessionToken = session.token;
 		const valid = payload.userId === userId
+			&& payload.authVersion === session.authVersion
 			&& typeof payload.sessionHash === 'string'
 			&& sessionToken
 			&& payload.sessionHash === await hashToken(sessionToken)
@@ -626,11 +471,18 @@ const oauthIdentityService = {
 				throw new BizError(t('oauthBindProofInvalid'), 409, 'bind_claim_used');
 			}
 
-			const bound = await oauthBindClaim.finalize(c, {
-				oauthUserId,
-				claimToken: lease.claimToken,
-				userId
-			});
+			// Identity attachment and revocation epoch commit together in D1.
+			const db=getUserDb(c);
+			const results=await db.batch([
+				db.prepare(`UPDATE oauth SET user_id=? WHERE oauth_user_id=? AND user_id=0
+				 AND NOT EXISTS (SELECT 1 FROM oauth o WHERE o.oauth_user_id=? AND o.user_id>0)
+				 AND EXISTS (SELECT 1 FROM oauth_bind_claim WHERE oauth_user_id=? AND claim_token=?)
+				 AND EXISTS (SELECT 1 FROM user WHERE user_id=? AND auth_version=? AND is_del=0 AND status=0)`)
+				 .bind(userId,oauthUserId,oauthUserId,oauthUserId,lease.claimToken,userId,payload.authVersion),
+				db.prepare('UPDATE user SET auth_version=auth_version+1 WHERE user_id=? AND auth_version=? AND changes()=1')
+				 .bind(userId,payload.authVersion)
+			]);
+			const bound=Number(results[1]?.meta?.changes)===1;
 
 			if (!bound) {
 				const current = await oauthService.getById(c, oauthUserId);
@@ -690,7 +542,8 @@ const oauthIdentityService = {
 		});
 		await notifyIdentityEvent(c, userId, 'OAUTH_IDENTITY_BOUND', `${await providerDisplayName(c, provider)} · ${payload.oauthUserId}`);
 
-		return { bound: true, provider };
+		await c.env.kv.delete(KvConst.AUTH_INFO + userId);
+		return { bound: true, provider, reauthRequired:true };
 	},
 
 	/**
@@ -727,13 +580,13 @@ const oauthIdentityService = {
 			throw new BizError(t('oauthIdentityNotFound'), 404, 'identity_not_found');
 		}
 
-		const stepUp = await consumeStepUpGrant(c, userId, params.stepUpToken);
+		const stepUp = await consumeStepUpGrant(c, userId, params.stepUpToken, 'oauth_unbind', String(oauthId));
 		// Removing the last identity is only safe when the caller just proved a
 		// password. A provider-session grant proves the provider, not a password
 		// the user could use afterwards — which is exactly the lockout we must
 		// prevent. Deliberately not inferred from stored state: an OAuth-created
 		// account may hold a random password nobody knows.
-		const provedPassword = stepUp.method === 'password' || stepUp.method === 'password+totp';
+		const provedPassword = stepUp.method === 'password' || stepUp.method === 'password+factor';
 
 		const provider = providerFromIdentity(existing.oauthUserId);
 		const lockKey = `lock:unbind:${userId}`;
@@ -758,10 +611,15 @@ const oauthIdentityService = {
 				throw new BizError(t('oauthLastLoginMethod'), 409, 'last_login_method');
 			}
 
-			const result = await orm(c).delete(oauth)
-				.where(and(eq(oauth.oauthId, oauthId), eq(oauth.userId, userId)))
-				.run();
-			const removed = Number(result?.meta?.changes ?? result?.changes ?? 0);
+			const db=getUserDb(c);
+			const results=await db.batch([
+				db.prepare(`DELETE FROM oauth WHERE oauth_id=? AND user_id=? AND EXISTS
+				 (SELECT 1 FROM user WHERE user_id=? AND auth_version=? AND is_del=0 AND status=0)`)
+				 .bind(oauthId,userId,userId,authVersionOf(stepUp.row)),
+				db.prepare('UPDATE user SET auth_version=auth_version+1 WHERE user_id=? AND auth_version=? AND changes()=1')
+				 .bind(userId,authVersionOf(stepUp.row))
+			]);
+			const removed=Number(results[1]?.meta?.changes ?? 0);
 			if (removed !== 1) {
 				await recordAudit(c, {
 					userId,
@@ -774,7 +632,8 @@ const oauthIdentityService = {
 				throw new BizError(t('oauthIdentityNotFound'), 404, 'identity_not_found');
 			}
 
-			const revoked = await this.revokeProviderSessions(c, userId, provider, await currentSessionToken(c));
+			const revoked = await this.revokeProviderSessions(c, userId, provider, null);
+			await c.env.kv.delete(KvConst.AUTH_INFO + userId);
 
 			await recordAudit(c, {
 				userId,
@@ -793,7 +652,7 @@ const oauthIdentityService = {
 			}
 			await notifyIdentityEvent(c, userId, 'OAUTH_IDENTITY_UNBOUND', await providerDisplayName(c, provider));
 
-			return { unbound: true, provider, revokedSessions: revoked };
+			return { unbound: true, provider, revokedSessions: revoked, reauthRequired:true };
 		} finally {
 			try {
 				await oauthBindClaim.release(c, { oauthUserId: lockKey, claimToken: lease.claimToken });

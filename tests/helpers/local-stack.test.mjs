@@ -32,7 +32,11 @@ test('config uses only local dummy bindings and absolute repository assets; each
 		const first = await writeLocalConfig(firstDir, workerDir);
 		const second = await writeLocalConfig(secondDir, workerDir);
 		const config = JSON.parse(await fs.readFile(first.configPath, 'utf8'));
-		assert.equal(config.main, path.join(workerDir, 'src/index.js'));
+			assert.equal(config.main, path.join(firstDir, 'isolated-worker.mjs'));
+			const entry = await fs.readFile(config.main, 'utf8');
+			assert.ok(entry.includes(JSON.stringify(path.join(workerDir, 'src/index.js').replaceAll('\\', '/'))));
+			assert.ok(entry.includes("Object.defineProperty(globalThis, 'fetch'"));
+			assert.ok(entry.includes('writable: false, configurable: false'));
 		assert.equal(config.assets.directory, path.join(workerDir, 'dist'));
 		assert.equal(config.assets.run_worker_first, true);
 		assert.deepEqual(config.d1_databases, [{

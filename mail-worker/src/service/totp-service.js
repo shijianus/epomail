@@ -1,1192 +1,357 @@
 import BizError from '../error/biz-error.js';
-import orm, { mailOrm } from '../entity/orm.js';
+import orm from '../entity/orm.js';
 import user from '../entity/user.js';
-import { eq } from 'drizzle-orm';
+import { oauth } from '../entity/oauth.js';
+import { eq, and } from 'drizzle-orm';
 import totpUtils from '../utils/totp-utils.js';
 import webauthnUtils from '../utils/webauthn-utils.js';
 import cryptoUtils from '../utils/crypto-utils.js';
-import KvConst from '../const/kv-const.js';
-import constant from '../const/constant.js';
 import userContext from '../security/user-context.js';
 import userService from './user-service.js';
-import emailService from './email-service.js';
 import settingService from './setting-service.js';
 import securityNoticeService from './security-notice-service.js';
 import { SECURITY_EVENT_TYPES } from '../const/security-notice-templates.js';
 import { t } from '../i18n/i18n.js';
-import { Resend } from 'resend';
-import { v4 as uuidv4 } from 'uuid';
 import rbacGuard from './rbac-guard-service.js';
+import { v4 as uuidv4 } from 'uuid';
+import authOperation from '../utils/auth-security-operation.js';
+import { authVersionOf, hashToken } from '../utils/one-time-credential.js';
+import rateLimit from '../utils/rate-limit.js';
+
+const OPERATIONS = new Set(['totp_enable', 'totp_update', 'totp_disable', 'backup_view', 'backup_regenerate',
+	'passkey_add', 'passkey_delete', 'passkey_approve', 'passkey_activate', 'oauth_bind', 'oauth_unbind']);
+function keysOf(row) {
+	const keys = JSON.parse(row.securityKeys || '[]');
+	if (!Array.isArray(keys)) throw new BizError('Invalid security key state', 500);
+	return keys;
+}
+function hasFactor(row) { return !!row.totpSecret || keysOf(row).some(k => k.status !== 'pending_verification'); }
+function reject() { throw new BizError(t('oauthReauthRequired'), 403, 'reauth_required'); }
+async function context(c, userId, purpose, target = 'self') {
+	const row = await userService.selectById(c, userId);
+	if (!row) reject();
+	const session = await userContext.requireSession(c, userId, row);
+	return { row, session, binding: { userId, authVersion: authVersionOf(row), purpose, target: String(target), sessionHash: await hashToken(session.token) } };
+}
+async function grant(c, userId, params, purpose, target = 'self') {
+	const ctx = await context(c, userId, purpose, target);
+	const proof = await authOperation.consume(c, { ...ctx.binding, token: params?.stepUpToken });
+	if (!proof) reject();
+	return ctx.row;
+}
+async function notice(c, id, event, params = {}) {
+	try { await securityNoticeService.sendNotice(c, id, SECURITY_EVENT_TYPES[event], params); }
+	catch (err) { console.warn('Security notice failed:', err.message); }
+}
+function publicKey(k) {
+	const now = Date.now();
+	return { id: k.id, name: k.name, createdAt: k.createdAt, status: k.status || 'active',
+		isInitialDevice: !!k.isInitialDevice, verifiedAt: k.verifiedAt || null, timelockUntil: k.timelockUntil || null,
+		timelockRemainingDays: k.timelockUntil ? Math.max(0, Math.ceil((k.timelockUntil - now) / 86400000)) : 0,
+		canActivateNow: k.status === 'pending_verification' && !!k.timelockUntil && now >= k.timelockUntil };
+}
 
 const totpService = {
-	/**
-	 * 【显式迁移机制（收尾轮新增）】历史 jwt_secret 回退 era 加密数据的一次性解封与重加密。
-	 *
-	 * 背景：getEncryptionKey 曾在 totp_enc_key 缺失时静默回退 jwt_secret（fail-secure 契约
-	 * 已于本轮恢复）。该 era 注册 2FA 的账号，其 totp_secret 与备份码 encryptedRaw 是以
-	 * jwt_secret 派生密钥加密的；恢复 fail-secure 后这些数据无法以 totp_enc_key 解密。
-	 *
-	 * 契约：
-	 * - 仅当 totp_key_version < 2 时执行一次；成功后置 version=2；
-	 * - 先以现行 totp_enc_key 解密试探：成功 → 数据本就是现行 era，仅补版本标记，不重加密；
-	 * - 现行解密失败 → 以 getLegacyJwtDecapKey 做 legacy 解封（仅解密用途，绝不用于新加密），
-	 *   成功后以现行密钥重加密并置 version=2；明文 era（无 iv:cipher 结构）一并补加密；
-	 * - totp_enc_key 未配置 → 明确阻断（reason='missing_totp_enc_key'），绝不回退；
-	 * - 两种密钥均无法解密 → 明确阻断（reason='undecryptable'），需管理员为该账号重置 2FA；
-	 *   绝不编造或放行不可解密数据。
-	 */
-	async migrateLegacyTotpEncryption(c, userRow) {
-		const version = Number(userRow.totpKeyVersion || 1);
-		if (version >= 2 || (!userRow.totpSecret && !userRow.totpBackupCodes)) {
-			return { ok: true, migrated: false };
-		}
-
+	// Migration changes ciphertext only, never the factor itself. A concurrent
+	// factor change or backup consumption must win over this old snapshot.
+	async migrateLegacyTotpEncryption(c, row) {
+		if (Number(row.totpKeyVersion || 1) >= 2 || (!row.totpSecret && !row.totpBackupCodes)) return { ok: true, migrated: false };
+		try { await totpUtils.getEncryptionKey(c.env); }
+		catch (_) { return { ok: false, reason: 'missing_totp_enc_key' }; }
+		const decode = async value => {
+			if (!value.includes(':')) return value;
+			let current = '';
+			try { current = await totpUtils.decryptSecret(value, c.env); } catch (_) { /* Try only the explicit legacy decapsulation key below. */ }
+			if (current) return current;
+			const [iv, ciphertext] = value.split(':');
+			const key = await totpUtils.getLegacyJwtDecapKey(c.env);
+			const bytes = val => Uint8Array.from(atob(val), ch => ch.charCodeAt(0));
+			return new TextDecoder().decode(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: bytes(iv) }, key, bytes(ciphertext)));
+		};
 		try {
-			await totpUtils.getEncryptionKey(c.env);
-		} catch (e) {
-			return { ok: false, reason: 'missing_totp_enc_key', message: e.message };
-		}
-
-		const decapLegacy = async (encryptedStr) => {
-			if (!encryptedStr) return { plain: '', legacy: false };
-			if (!encryptedStr.includes(':')) {
-				// 明文 era：无需解密，直接视为 legacy 原文待补加密
-				return { plain: encryptedStr, legacy: true };
-			}
-			const [ivBase64, cipherBase64] = encryptedStr.split(':');
-			if (!ivBase64 || !cipherBase64) return { plain: '', legacy: true };
-			try {
-				const legacyKey = await totpUtils.getLegacyJwtDecapKey(c.env);
-				const iv = Uint8Array.from(atob(ivBase64), ch => ch.charCodeAt(0));
-				const ciphertext = Uint8Array.from(atob(cipherBase64), ch => ch.charCodeAt(0));
-				const buf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, legacyKey, ciphertext);
-				return { plain: new TextDecoder().decode(buf), legacy: true };
-			} catch (e) {
-				return { plain: '', legacy: true };
-			}
-		};
-
-		const decryptCurrent = async (encryptedStr) => {
-			try {
-				const plain = await totpUtils.decryptSecret(encryptedStr, c.env);
-				return plain || null;
-			} catch (e) {
-				return null;
-			}
-		};
-
-		let newSecret = null;
-		let newBackupJson = null;
-
-		if (userRow.totpSecret) {
-			// 1) 现行 era 数据（version=1 但实际以 totp_enc_key 加密）：解密成功即只补版本标记。
-			//    仅 iv:cipher 结构才做现行解密试探；明文 era（无 ':'）必须走重加密，不得原样保留。
-			let plain = null;
-			if (userRow.totpSecret.includes(':')) {
-				plain = await decryptCurrent(userRow.totpSecret);
-			}
-			if (plain) {
-				newSecret = userRow.totpSecret; // 已是现行密文，原样保留
-			} else {
-				// 2) legacy era：以 jwt 派生密钥解封后重加密
-				const dec = await decapLegacy(userRow.totpSecret);
-				if (!dec.plain) {
-					return { ok: false, reason: 'undecryptable', message: 'totp_secret 无法以任何已知密钥解密' };
+			const fields = { totpKeyVersion: 2 };
+			if (row.totpSecret) fields.totpSecret = await totpUtils.encryptSecret(await decode(row.totpSecret), c.env);
+			if (row.totpBackupCodes) {
+				const backup = JSON.parse(row.totpBackupCodes);
+				if (backup.encryptedRaw) {
+					backup.encryptedRaw = await totpUtils.encryptSecret(await decode(backup.encryptedRaw), c.env);
+					fields.totpBackupCodes = JSON.stringify(backup);
 				}
-				newSecret = await totpUtils.encryptSecret(dec.plain, c.env);
 			}
-		}
-
-		if (userRow.totpBackupCodes) {
-			try {
-				const parsed = typeof userRow.totpBackupCodes === 'string'
-					? JSON.parse(userRow.totpBackupCodes)
-					: userRow.totpBackupCodes;
-				if (parsed && parsed.encryptedRaw) {
-					let plainRaw = await decryptCurrent(parsed.encryptedRaw);
-					if (!plainRaw) {
-						const dec = await decapLegacy(parsed.encryptedRaw);
-						if (!dec.plain) {
-							return { ok: false, reason: 'undecryptable', message: '备份码 encryptedRaw 无法解密' };
-						}
-						plainRaw = dec.plain;
-					}
-					// 现行 era 的 encryptedRaw 原样保留；legacy era 的以现行密钥重加密
-					const isCurrentEra = plainRaw === parsed.encryptedRaw;
-					const reEncrypted = isCurrentEra ? parsed.encryptedRaw : await totpUtils.encryptSecret(plainRaw, c.env);
-					newBackupJson = JSON.stringify({ hashedCodes: parsed.hashedCodes || [], encryptedRaw: reEncrypted });
-				}
-			} catch (e) {
-				// 备份码 JSON 损坏不阻塞 totp_secret 迁移；备份码按原样保留
-			}
-		}
-
-		const updateSet = { totpKeyVersion: 2 };
-		if (newSecret !== null) updateSet.totpSecret = newSecret;
-		if (newBackupJson !== null) updateSet.totpBackupCodes = newBackupJson;
-
-		await orm(c).update(user).set(updateSet).where(eq(user.userId, userRow.userId)).run();
-		console.warn(`[totp-migration] user ${userRow.userId} TOTP encryption state confirmed/migrated to totp_key_version=2`);
-		return { ok: true, migrated: true };
+			const updated = await orm(c).update(user).set(fields).where(and(eq(user.userId, row.userId),
+				eq(user.authVersion, authVersionOf(row)), eq(user.totpSecret, row.totpSecret),
+				eq(user.totpBackupCodes, row.totpBackupCodes))).returning({ id: user.userId }).get();
+			return updated ? { ok: true, migrated: true } : { ok: false, reason: 'state_changed' };
+		} catch (_) { return { ok: false, reason: 'undecryptable' }; }
 	},
 
-	/**
-	 * Generate setup secret and URI for the current user (TOTP Authenticator)
-	 */
-	async getSetupInfo(c, userId, email) {
-		const isGlobalEnabled = await settingService.isTotpEnabled(c);
-		if (!isGlobalEnabled) {
-			throw new BizError(t('globalTotpDisabled'));
-		}
-
-		const rawSecret = totpUtils.generateSecret(20);
-		const otpauthUri = totpUtils.generateOtpAuthUri(rawSecret, email, 'EpoMail');
-
-		// Store setup payload in KV with 10 minutes TTL
-		await c.env.kv.put(
-			KvConst.TOTP_SETUP + userId,
-			JSON.stringify({
-				rawSecret,
-				email,
-				createdAt: Date.now()
-			}),
-			{ expirationTtl: 600 }
-		);
-
-		return {
-			secret: rawSecret,
-			otpauthUri
-		};
+	// Only an assertion signed by an ALREADY ACTIVE stored key proves an existing
+	// factor. A new registration (webauthn.create) never substitutes for it.
+	async reauthOptions(c, userId, params = {}) {
+		if (!OPERATIONS.has(params.operation)) reject();
+		await rateLimit.check(c, { scope: 'security-reauth-options', limit: 20, windowSeconds: 900, subject: `user:${userId}` });
+		const ctx = await context(c, userId, 'reauth:' + params.operation, String(params.target || 'self'));
+		const challenge = webauthnUtils.generateChallenge();
+		const expected = webauthnUtils.ceremonyContext(c);
+		const challengeToken = await authOperation.issue(c, { ...ctx.binding, payload: { challenge, ...expected }, ttlSeconds: 300 });
+		return { challengeToken, challenge, rpId: expected.rpId, userVerification: 'required', timeout: 60000,
+			hasTotp: !!ctx.row.totpSecret, hasFactor: hasFactor(ctx.row),
+			allowCredentials: keysOf(ctx.row).filter(k => k.status !== 'pending_verification').map(k => ({ id: k.credentialId, type: 'public-key' })) };
 	},
 
-	/**
-	 * Verify initial code and enable 2FA
-	 */
-	async enableTotp(c, userId, params) {
-		const isGlobalEnabled = await settingService.isTotpEnabled(c);
-		if (!isGlobalEnabled) {
-			throw new BizError(t('globalTotpDisabled'));
+	async reauthenticate(c, userId, params = {}) {
+		await rateLimit.check(c, { scope: 'security-reauth', limit: 10, windowSeconds: 900, subject: `user:${userId}` });
+		if (!OPERATIONS.has(params.operation)) reject();
+		const ctx = await context(c, userId, 'reauth:' + params.operation, String(params.target || 'self'));
+		const binding = { ...ctx.binding, token: params.challengeToken };
+		const attempt = await authOperation.incrementAttempt(c, binding);
+		if (!attempt) reject();
+		const challenge = await authOperation.inspect(c, binding);
+		let method = 'password';
+		if (typeof params.password === 'string' && params.password) {
+			const valid = await cryptoUtils.verifyPasswordWithUpgrade(params.password, ctx.row.salt, ctx.row.password, c.env);
+			if (!valid.isValid) throw new BizError(t('oauthReauthFailed'), 403, 'reauth_failed');
+		} else {
+			const meta = ctx.session.meta;
+			if (!meta || meta.method !== 'oauth' || authVersionOf(meta) !== authVersionOf(ctx.row)
+				|| !Number.isFinite(meta.at) || meta.at > Date.now() || Date.now() - meta.at > 300000) {
+				throw new BizError(t('oauthReauthProviderRequired'), 403, 'reauth_provider_required');
+			}
+			const links = await orm(c).select().from(oauth).where(eq(oauth.userId, userId)).all();
+			if (!links.some(link => link.oauthUserId?.startsWith(meta.provider + ':') || (meta.provider === 'linuxdo' && /^\d+$/.test(link.oauthUserId)))) reject();
+			method = 'provider_session';
 		}
-
-		const { code } = params;
-		if (!code) {
-			throw new BizError(t('totpCodeEmpty'));
+		if (hasFactor(ctx.row)) {
+			await this.verifyExistingFactor(c, ctx.row, params, challenge.payload);
+			method += '+factor';
 		}
+		if (!await authOperation.consume(c, { ...binding, attempt })) reject();
+		const stepUpToken = await authOperation.issue(c, { ...ctx.binding, purpose: params.operation,
+			payload: { method }, ttlSeconds: 300, maxAttempts: 1 });
+		return { stepUpToken, expiresIn: 300, method };
+	},
 
-		const setupData = await c.env.kv.get(KvConst.TOTP_SETUP + userId, { type: 'json' });
-		if (!setupData || !setupData.rawSecret) {
-			throw new BizError(t('totpSetupExpired'));
+	async consumeGrant(c, userId, params, operation, target = 'self') {
+		const ctx = await context(c, userId, operation, target);
+		const proof = await authOperation.consume(c, { ...ctx.binding, token: params?.stepUpToken });
+		if (!proof) reject();
+		return { row: ctx.row, ...proof.payload };
+	},
+
+	async verifyExistingFactor(c, row, params, expected) {
+		if (params.isPasskey === true) {
+			const keys = keysOf(row);
+			const key = keys.find(k => k.credentialId === params.credentialId && k.status !== 'pending_verification');
+			const signCount = await webauthnUtils.verifyAssertion(params, key, expected);
+			key.signCount = signCount;
+			const updated = await orm(c).update(user).set({ securityKeys: JSON.stringify(keys) })
+				.where(and(eq(user.userId, row.userId), eq(user.authVersion, authVersionOf(row)), eq(user.securityKeys, row.securityKeys)))
+				.returning({ id: user.userId }).get();
+			if (!updated) reject();
+			return;
 		}
-
-		const verifyResult = await totpUtils.verifyTOTP(setupData.rawSecret, code, 1);
-		if (!verifyResult.isValid) {
-			throw new BizError(t('totpCodeInvalid'));
+		const code = typeof params.code === 'string' ? params.code.trim() : '';
+		if (!code) throw new BizError(t('totpCodeEmpty'), 403, 'totp_required');
+		if (params.isBackupCode === true || !/^\d{6}$/.test(code)) {
+			const result = await totpUtils.verifyAndConsumeBackupCode(code, row.totpBackupCodes);
+			if (!result.isValid) throw new BizError(t('backupCodeInvalid'), 403, 'backup_code_invalid');
+			const updated = await orm(c).update(user).set({ totpBackupCodes: result.updatedCodesJson })
+				.where(and(eq(user.userId, row.userId), eq(user.authVersion, authVersionOf(row)), eq(user.totpBackupCodes, row.totpBackupCodes)))
+				.returning({ id: user.userId }).get();
+			if (!updated) throw new BizError(t('backupCodeInvalid'), 403, 'backup_code_used');
+			return;
 		}
+		if (!row.totpSecret) throw new BizError(t('totpNotEnabled'), 403);
+		const originalVersion = authVersionOf(row);
+		const migration = await this.migrateLegacyTotpEncryption(c, row);
+		if (!migration.ok) throw new BizError('TOTP encryption unavailable', 503);
+		if (migration.migrated) row = await userService.selectById(c, row.userId);
+		if (!row || authVersionOf(row) !== originalVersion) reject();
+		const secret = await totpUtils.decryptSecret(row.totpSecret, c.env);
+		const checked = await totpUtils.verifyTOTP(secret, code, 1);
+		if (!checked.isValid) throw new BizError(t('totpCodeInvalid'), 403, 'totp_invalid');
+		if (!await authOperation.consumeTotpStep(c, { userId: row.userId, timeStep: checked.timeStep })) {
+			throw new BizError(t('totpCodeReplay'), 403, 'totp_replay');
+		}
+	},
 
+	async getSetupInfo(c, userId, email, params = {}) {
+		if (!await settingService.isTotpEnabled(c)) throw new BizError(t('globalTotpDisabled'));
+		const operation = params.operation === 'totp_update' ? 'totp_update' : 'totp_enable';
+		const row = await grant(c, userId, params, operation);
+		if ((operation === 'totp_enable' && row.totpSecret) || (operation === 'totp_update' && !row.totpSecret)) reject();
+		const secret = totpUtils.generateSecret(20);
+		const ctx = await context(c, userId, 'setup:' + operation);
+		if (authVersionOf(ctx.row) !== authVersionOf(row)) reject();
+		const setupToken = await authOperation.issue(c, { ...ctx.binding, ttlSeconds: 300,
+			payload: { encryptedSecret: await totpUtils.encryptSecret(secret, c.env) } });
+		return { secret, otpauthUri: totpUtils.generateOtpAuthUri(secret, email, 'EpoMail'), setupToken, operation };
+	},
+	async enableTotp(c, userId, params) { return this.completeTotpSetup(c, userId, params, 'totp_enable'); },
+	async updateTotp(c, userId, params) { return this.completeTotpSetup(c, userId, params, 'totp_update'); },
+	async completeTotpSetup(c, userId, params = {}, operation) {
+		if (!await settingService.isTotpEnabled(c)) throw new BizError(t('globalTotpDisabled'));
+		const ctx = await context(c, userId, 'setup:' + operation);
+		if ((operation === 'totp_enable' && ctx.row.totpSecret) || (operation === 'totp_update' && !ctx.row.totpSecret)) reject();
+		const binding = { ...ctx.binding, token: params.setupToken };
+		const attempt = await authOperation.incrementAttempt(c, binding);
+		if (!attempt) throw new BizError(t('totpSetupExpired'), 403);
+		const setup = await authOperation.inspect(c, binding);
+		const secret = await totpUtils.decryptSecret(setup.payload.encryptedSecret, c.env);
+		const checked = await totpUtils.verifyTOTP(secret, params.code, 1);
+		if (!checked.isValid) throw new BizError(t('totpCodeInvalid'));
 		const { rawCodes, hashedCodes, encryptedRaw } = await totpUtils.generateBackupCodes(10, c.env);
-		const encryptedSecret = await totpUtils.encryptSecret(setupData.rawSecret, c.env);
-		const now = new Date().toISOString();
-
-		const backupPayload = JSON.stringify({
-			hashedCodes,
-			encryptedRaw
-		});
-
-		await userService.updateTotpState(c, userId, {
-			totpEnabled: 1,
-			totpSecret: encryptedSecret,
-			// version=2 表示「数据以 totp_enc_key（现行 fail-secure 契约）加密」；
-			// version=1 保留给历史 era 行（含 jwt_secret 回退 era）供显式迁移闸门识别
-			totpKeyVersion: 2,
-			totpBackupCodes: backupPayload,
-			totpCreatedAt: now
-		});
-
-		// Session revocation: except current session, invalidate all other sessions
-		const currentToken = await userContext.getToken(c);
-		const authInfo = await c.env.kv.get(KvConst.AUTH_INFO + userId, { type: 'json' });
-		if (authInfo) {
-			authInfo.tokens = currentToken ? [currentToken] : [];
-			if (authInfo.user) {
-				authInfo.user.totpEnabled = 1;
-				authInfo.user.totpCreatedAt = now;
-			}
-			await c.env.kv.put(KvConst.AUTH_INFO + userId, JSON.stringify(authInfo), { expirationTtl: constant.TOKEN_EXPIRE });
-		}
-
-		// Delete setup key
-		await c.env.kv.delete(KvConst.TOTP_SETUP + userId);
-
-		// Deliver in-app security alert email
-		try {
-			await securityNoticeService.sendNotice(c, userId, SECURITY_EVENT_TYPES.TOTP_ENABLED, {});
-		} catch (err) {
-			console.error('Failed to send 2FA enable notice:', err);
-		}
-
-		return {
-			backupCodes: rawCodes
-		};
+		if (!await authOperation.consume(c, { ...binding, attempt })) reject();
+		await userService.changeAuthentication(c, ctx.row, { totpEnabled: 1, totpSecret: setup.payload.encryptedSecret,
+			totpKeyVersion: 2, totpBackupCodes: JSON.stringify({ hashedCodes, encryptedRaw }), totpCreatedAt: new Date().toISOString() });
+		await notice(c, userId, 'TOTP_ENABLED');
+		return { backupCodes: rawCodes, reauthRequired: true };
 	},
-
-	/**
-	 * Query TOTP & 2FA full status (TOTP, Backup Codes, Security Keys) for current user
-	 */
 	async getStatus(c, userId) {
-		const isGlobalEnabled = await settingService.isTotpEnabled(c);
-		const userRow = await userService.selectById(c, userId);
-		if (!userRow) {
-			throw new BizError(t('notExistUser'));
-		}
-
-		let securityKeysList = [];
-		if (userRow.securityKeys) {
-			try {
-				securityKeysList = typeof userRow.securityKeys === 'string'
-					? JSON.parse(userRow.securityKeys)
-					: userRow.securityKeys;
-				if (!Array.isArray(securityKeysList)) securityKeysList = [];
-			} catch (e) {
-				securityKeysList = [];
-			}
-		}
-
-		let remainingCount = 0;
-		if (userRow.totpBackupCodes) {
-			try {
-				const parsed = typeof userRow.totpBackupCodes === 'string'
-					? JSON.parse(userRow.totpBackupCodes)
-					: userRow.totpBackupCodes;
-				if (Array.isArray(parsed)) {
-					remainingCount = parsed.filter(item => item.used === 0).length;
-				} else if (parsed && Array.isArray(parsed.hashedCodes)) {
-					remainingCount = parsed.hashedCodes.filter(item => item.used === 0).length;
-				}
-			} catch (e) {
-				remainingCount = 0;
-			}
-		}
-
-		const isEnabled = isGlobalEnabled && (userRow.totpEnabled === 1);
-		const nowTime = Date.now();
-
-		return {
-			globalEnabled: isGlobalEnabled,
-			enabled: isEnabled,
-			totpConfigured: isGlobalEnabled && !!userRow.totpSecret,
-			backupCodesRemaining: isGlobalEnabled ? remainingCount : 0,
-			securityKeysCount: isGlobalEnabled ? securityKeysList.length : 0,
-			securityKeys: isGlobalEnabled ? securityKeysList.map(k => {
-				const status = k.status || 'active';
-				const timelockUntil = k.timelockUntil || null;
-				const timelockRemainingDays = (status === 'pending_verification' && timelockUntil)
-					? Math.max(0, Math.ceil((timelockUntil - nowTime) / (24 * 3600 * 1000)))
-					: 0;
-				const canActivateNow = (status === 'pending_verification' && timelockUntil && nowTime >= timelockUntil);
-				return {
-					id: k.id,
-					name: k.name,
-					createdAt: k.createdAt,
-					isInitialDevice: !!k.isInitialDevice,
-					status,
-					timelockUntil,
-					timelockRemainingDays,
-					canActivateNow,
-					verifiedAt: k.verifiedAt || null
-				};
-			}) : [],
-			createdAt: isGlobalEnabled ? (userRow.totpCreatedAt || null) : null
-		};
+		const row = await userService.selectById(c, userId);
+		if (!row) throw new BizError(t('notExistUser'));
+		const globalEnabled = await settingService.isTotpEnabled(c);
+		const parsed = JSON.parse(row.totpBackupCodes || '[]');
+		const keys = keysOf(row);
+		return { globalEnabled, enabled: globalEnabled && row.totpEnabled === 1, totpConfigured: globalEnabled && !!row.totpSecret,
+			backupCodesRemaining: globalEnabled ? (Array.isArray(parsed) ? parsed : parsed.hashedCodes || []).filter(i => i.used === 0).length : 0,
+			securityKeysCount: globalEnabled ? keys.length : 0, securityKeys: globalEnabled ? keys.map(publicKey) : [],
+			createdAt: globalEnabled ? row.totpCreatedAt : null };
 	},
-
-	/**
-	 * View existing unused Backup Codes (requires password confirmation)
-	 */
 	async viewBackupCodes(c, userId, params) {
-		const { password } = params;
-		if (!password) {
-			throw new BizError(t('emptyPwdMsg'));
-		}
-
-		let userRow = await userService.selectById(c, userId);
-		if (!userRow) {
-			throw new BizError(t('notExistUser'));
-		}
-
-		const isPwdValid = await cryptoUtils.verifyPassword(password, userRow.salt, userRow.password);
-		if (!isPwdValid) {
-			throw new BizError(t('IncorrectPwd'));
-		}
-
-		// 显式迁移（收尾轮）：历史 jwt_secret 回退 era 的备份码 encryptedRaw 先解封重加密；
-		// 阻断时如实报错，绝不静默回退。
-		const migration = await this.migrateLegacyTotpEncryption(c, userRow);
-		if (!migration.ok) {
-			if (migration.reason === 'missing_totp_enc_key') {
-				throw new BizError('系统 TOTP 加密密钥未配置 (totp_enc_key missing)，备份码暂时无法查看，请联系管理员配置密钥', 500);
-			}
-			throw new BizError('备份码数据无法解密（历史密钥 era 数据损坏或不匹配），请联系管理员重置两步验证', 500);
-		}
-		if (migration.migrated) {
-			userRow = await userService.selectById(c, userId);
-			if (!userRow) {
-				throw new BizError(t('notExistUser'));
-			}
-		}
-
-		if (!userRow.totpBackupCodes) {
-			return { backupCodes: [], remaining: 0 };
-		}
-
-		let parsed = null;
-		try {
-			parsed = typeof userRow.totpBackupCodes === 'string'
-				? JSON.parse(userRow.totpBackupCodes)
-				: userRow.totpBackupCodes;
-		} catch (e) {
-			return { backupCodes: [], remaining: 0 };
-		}
-
-		if (parsed && parsed.encryptedRaw) {
-			try {
-				const rawJson = await totpUtils.decryptSecret(parsed.encryptedRaw, c.env);
-				const rawList = JSON.parse(rawJson);
-				const hashedList = parsed.hashedCodes || [];
-				
-				// Map through hashedList to return only unused raw codes
-				const availableCodes = [];
-				for (let i = 0; i < hashedList.length; i++) {
-					if (hashedList[i].used === 0 && rawList[i]) {
-						availableCodes.push(rawList[i]);
-					}
-				}
-
-				return {
-					backupCodes: availableCodes,
-					remaining: availableCodes.length
-				};
-			} catch (e) {
-				console.error('Failed to decrypt backup codes:', e);
-			}
-		}
-
-		// If legacy format without reversible encryption, calculate remaining count
-		let count = 0;
-		if (Array.isArray(parsed)) {
-			count = parsed.filter(i => i.used === 0).length;
-		}
-		return {
-			backupCodes: null, // Signals client to show remaining count with option to regenerate
-			remaining: count
-		};
+		let row = await grant(c, userId, params, 'backup_view');
+		const migration = await this.migrateLegacyTotpEncryption(c, row);
+		if (!migration.ok) throw new BizError('Backup code encryption unavailable', 503);
+		if (migration.migrated) row = await userService.selectById(c, userId);
+		await userContext.requireSession(c, userId, row);
+		const parsed = JSON.parse(row.totpBackupCodes || '[]');
+		if (!parsed.encryptedRaw) return { backupCodes: null, remaining: (Array.isArray(parsed) ? parsed : []).filter(i => i.used === 0).length };
+		const raw = JSON.parse(await totpUtils.decryptSecret(parsed.encryptedRaw, c.env));
+		const backupCodes = (parsed.hashedCodes || []).flatMap((item, i) => item.used === 0 && raw[i] ? [raw[i]] : []);
+		return { backupCodes, remaining: backupCodes.length };
 	},
-
-	/**
-	 * Regenerate Backup Codes (requires password confirmation)
-	 */
 	async regenerateBackupCodes(c, userId, params) {
-		const { password } = params;
-		if (!password) {
-			throw new BizError(t('emptyPwdMsg'));
-		}
-
-		const userRow = await userService.selectById(c, userId);
-		if (!userRow) {
-			throw new BizError(t('notExistUser'));
-		}
-
-		const isPwdValid = await cryptoUtils.verifyPassword(password, userRow.salt, userRow.password);
-		if (!isPwdValid) {
-			throw new BizError(t('IncorrectPwd'));
-		}
-
+		const row = await grant(c, userId, params, 'backup_regenerate');
+		if (!hasFactor(row)) reject();
 		const { rawCodes, hashedCodes, encryptedRaw } = await totpUtils.generateBackupCodes(10, c.env);
-
-		const backupPayload = JSON.stringify({
-			hashedCodes,
-			encryptedRaw
-		});
-
-		await orm(c).update(user).set({
-			totpBackupCodes: backupPayload
-		}).where(eq(user.userId, userId)).run();
-
-		try {
-			await securityNoticeService.sendNotice(c, userId, SECURITY_EVENT_TYPES.BACKUP_CODES_REGENERATED, {});
-		} catch (err) {
-			console.error('Failed to send backup codes notice:', err);
-		}
-
-		return {
-			backupCodes: rawCodes
-		};
+		await userService.changeAuthentication(c, row, { totpBackupCodes: JSON.stringify({ hashedCodes, encryptedRaw }) });
+		await notice(c, userId, 'BACKUP_CODES_REGENERATED');
+		return { backupCodes: rawCodes, reauthRequired: true };
 	},
-
-	/**
-	 * Disable 2FA for the current user (requires password + current OTP / backup code)
-	 */
 	async disableTotp(c, userId, params) {
-		const { password, code } = params;
-		if (!password || !code) {
-			throw new BizError(t('totpDisableParamsEmpty'));
-		}
-
-		const userRow = await userService.selectById(c, userId);
-		if (!userRow) {
-			throw new BizError(t('notExistUser'));
-		}
-
-		if (userRow.totpEnabled !== 1) {
-			return true;
-		}
-
-		// Verify password
-		const isPwdValid = await cryptoUtils.verifyPassword(password, userRow.salt, userRow.password);
-		if (!isPwdValid) {
-			throw new BizError(t('IncorrectPwd'));
-		}
-
-		// Verify OTP or Backup Code
-		let codeValid = false;
-		if (userRow.totpSecret) {
-			const plainSecret = await totpUtils.decryptSecret(userRow.totpSecret, c.env);
-			const totpCheck = await totpUtils.verifyTOTP(plainSecret, code, 1);
-			if (totpCheck.isValid) {
-				codeValid = true;
-			}
-		}
-
-		if (!codeValid && userRow.totpBackupCodes) {
-			const backupCheck = await totpUtils.verifyAndConsumeBackupCode(code, userRow.totpBackupCodes);
-			if (backupCheck.isValid) {
-				codeValid = true;
-			}
-		}
-
-		if (!codeValid) {
-			throw new BizError(t('totpCodeInvalid'));
-		}
-
-		// Update database: disable 2FA, clear TOTP secret and backup codes
-		await orm(c).update(user).set({
-			totpEnabled: 0,
-			totpSecret: '',
-			totpBackupCodes: '[]',
-			totpCreatedAt: ''
-		}).where(eq(user.userId, userId)).run();
-
-		// Session revocation: except current session, invalidate all other sessions
-		const currentToken = await userContext.getToken(c);
-		const authInfo = await c.env.kv.get(KvConst.AUTH_INFO + userId, { type: 'json' });
-		if (authInfo) {
-			authInfo.tokens = currentToken ? [currentToken] : [];
-			if (authInfo.user) {
-				authInfo.user.totpEnabled = 0;
-				authInfo.user.totpCreatedAt = '';
-			}
-			await c.env.kv.put(KvConst.AUTH_INFO + userId, JSON.stringify(authInfo), { expirationTtl: constant.TOKEN_EXPIRE });
-		}
-
-		// Deliver in-app security alert email
-		try {
-			await securityNoticeService.sendNotice(c, userId, SECURITY_EVENT_TYPES.TOTP_DISABLED, {});
-		} catch (err) {
-			console.error('Failed to send 2FA disable notice:', err);
-		}
-
-		return true;
+		const row = await grant(c, userId, params, 'totp_disable');
+		const active = keysOf(row).some(k => k.status !== 'pending_verification');
+		await userService.changeAuthentication(c, row, { totpSecret: '', totpEnabled: active ? 1 : 0,
+			...(active ? {} : { totpBackupCodes: '[]', totpCreatedAt: '' }) });
+		await notice(c, userId, 'TOTP_DISABLED');
+		return { reauthRequired: true };
 	},
 
-	/**
-	 * ==========================================
-	 * Passkeys & Security Keys (WebAuthn / FIDO2)
-	 * ==========================================
-	 */
-
-	/**
-	 * Generate WebAuthn registration challenge & options
-	 * Automatically scans client User-Agent and configures platform resident key for local storage
-	 */
-	async getPasskeyRegistrationOptions(c, userId, email) {
-		const isGlobalEnabled = await settingService.isTotpEnabled(c);
-		if (!isGlobalEnabled) {
-			throw new BizError(t('globalTotpDisabled'));
-		}
-
+	async getPasskeyRegistrationOptions(c, userId, email, params = {}) {
+		if (!await settingService.isTotpEnabled(c)) throw new BizError(t('globalTotpDisabled'));
+		await grant(c, userId, params, 'passkey_add');
+		const ctx = await context(c, userId, 'setup:passkey_add');
 		const challenge = webauthnUtils.generateChallenge();
-
-		// Save challenge in KV with 5 min TTL
-		await c.env.kv.put(
-			KvConst.WEBAUTHN_SETUP + userId,
-			JSON.stringify({
-				challenge,
-				email,
-				createdAt: Date.now()
-			}),
-			{ expirationTtl: 300 }
-		);
-
-		// Scan User-Agent to determine client device capabilities and default name
-		const ua = c.req.header('user-agent') || '';
-		let os = 'other';
-		let suggestedName = '通行密钥';
-		let isPlatformDevice = false;
-
-		if (/Windows/i.test(ua)) {
-			os = 'windows';
-			suggestedName = 'Windows Hello (此电脑)';
-			isPlatformDevice = true;
-		} else if (/Macintosh|Mac OS/i.test(ua) && !/iPhone|iPad/i.test(ua)) {
-			os = 'macos';
-			suggestedName = 'Apple 钥匙串 (Mac)';
-			isPlatformDevice = true;
-		} else if (/iPhone|iPad/i.test(ua)) {
-			os = 'ios';
-			suggestedName = 'Apple 钥匙串 (iOS)';
-			isPlatformDevice = true;
-		} else if (/Android/i.test(ua)) {
-			os = 'android';
-			suggestedName = 'Android 凭据管理器';
-			isPlatformDevice = true;
-		} else if (/Linux/i.test(ua)) {
-			os = 'linux';
-			suggestedName = 'Linux 安全密钥';
-			isPlatformDevice = true;
-		}
-
-		// Generate standard 32-byte opaque user handle (W3C WebAuthn 16-64 bytes requirement for Windows Hello / TPM)
-		const userHandleDigest = await crypto.subtle.digest(
-			'SHA-256',
-			new TextEncoder().encode(`epomail_uid_${userId}`)
-		);
-		const userHandle = webauthnUtils.bufferToBase64Url(new Uint8Array(userHandleDigest));
-
-		return {
-			challenge,
-			rp: {
-				name: 'EpoCanvas Mail',
-				id: c.req.header('host')?.split(':')[0] || 'localhost'
-			},
-			user: {
-				id: userHandle,
-				rawUserId: String(userId),
-				name: email,
-				displayName: email.split('@')[0] || email
-			},
-			pubKeyCredParams: [
-				{ type: 'public-key', alg: -7 },   // ES256 (NIST P-256 with SHA-256)
-				{ type: 'public-key', alg: -257 }, // RS256 (RSASSA-PKCS1-v1_5 with SHA-256)
-				{ type: 'public-key', alg: -37 },  // PS256 (RSA-PSS with SHA-256) - preferred by Windows Hello TPM
-				{ type: 'public-key', alg: -8 },   // Ed25519 (EdDSA)
-				{ type: 'public-key', alg: -258 }, // RS384
-				{ type: 'public-key', alg: -259 }, // RS512
-				{ type: 'public-key', alg: -35 },  // ES384
-				{ type: 'public-key', alg: -36 }   // ES512
-			],
-			timeout: 60000,
-			attestation: 'none',
-			authenticatorSelection: {
-				authenticatorAttachment: isPlatformDevice ? 'platform' : undefined,
-				residentKey: 'required',
-				requireResidentKey: true,
-				userVerification: 'required'
-			},
-			deviceInfo: {
-				os,
-				suggestedName,
-				isPlatformDevice
-			}
-		};
+		const expected = webauthnUtils.ceremonyContext(c);
+		const setupToken = await authOperation.issue(c, { ...ctx.binding, payload: { challenge, ...expected }, ttlSeconds: 300 });
+		const handle = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`epomail_uid_${userId}`));
+		return { setupToken, challenge, rp: { name: 'EpoCanvas Mail', id: expected.rpId }, user: { id: webauthnUtils.bufferToBase64Url(handle), name: email, displayName: email },
+			pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }, { type: 'public-key', alg: -37 }],
+			timeout: 60000, attestation: 'none', authenticatorSelection: { residentKey: 'required', requireResidentKey: true, userVerification: 'required' },
+			excludeCredentials: keysOf(ctx.row).map(k => ({ id: k.credentialId, type: 'public-key' })) };
 	},
-
-	/**
-	 * Complete Passkey / Security Key registration
-	 * Genesis/Initial device: activated immediately.
-	 * Subsequent new devices: put into 30-day security timelock pending TOTP approval or timelock expiry.
-	 */
-	async registerPasskey(c, userId, params) {
-		const isGlobalEnabled = await settingService.isTotpEnabled(c);
-		if (!isGlobalEnabled) {
-			throw new BizError(t('globalTotpDisabled'));
-		}
-
-		const { name, clientDataJSON, attestationObject } = params;
-		if (!clientDataJSON || !attestationObject) {
-			throw new BizError('Missing WebAuthn registration payload');
-		}
-
-		const setupData = await c.env.kv.get(KvConst.WEBAUTHN_SETUP + userId, { type: 'json' });
-		if (!setupData || !setupData.challenge) {
-			throw new BizError(t('passkeyRegisterFailed') || 'WebAuthn registration session expired, please retry');
-		}
-
-		// Verify clientDataJSON challenge
-		const clientData = webauthnUtils.parseClientData(clientDataJSON);
-		if (clientData.challenge !== setupData.challenge) {
-			throw new BizError('WebAuthn challenge mismatch');
-		}
-
-		// Parse attestation object and extract public key / credential ID
-		const parsedAtt = webauthnUtils.parseAttestationObject(attestationObject);
-		const userRow = await userService.selectById(c, userId);
-		if (!userRow) {
-			throw new BizError(t('notExistUser'));
-		}
-
-		let keys = [];
-		if (userRow.securityKeys) {
-			try {
-				keys = typeof userRow.securityKeys === 'string' ? JSON.parse(userRow.securityKeys) : userRow.securityKeys;
-				if (!Array.isArray(keys)) keys = [];
-			} catch (e) {
-				keys = [];
-			}
-		}
-
-		// Check duplicate credential ID
-		if (keys.some(k => k.credentialId === parsedAtt.credentialId)) {
-			throw new BizError(t('passkeyAlreadyRegistered') || 'Security key already registered');
-		}
-
-		const isInitial = keys.length === 0;
-		const nowIso = new Date().toISOString();
-		const nowMs = Date.now();
-		const timelockDuration = 30 * 24 * 3600 * 1000; // 30 days in milliseconds
-
-		const newKey = {
-			id: uuidv4(),
-			name: (name || '').trim() || (isInitial ? (t('initialDevicePasskeyName') || '初创设备通行密钥') : (t('defaultPasskeyName', { num: keys.length + 1 }) || `通行密钥 ${keys.length + 1}`)),
-			credentialId: parsedAtt.credentialId,
-			publicKeyJwk: parsedAtt.publicKeyJwk,
-			publicKeyRaw: parsedAtt.publicKeyRaw,
-			aaguid: parsedAtt.aaguid,
-			signCount: parsedAtt.signCount,
-			createdAt: nowIso,
-			isInitialDevice: isInitial,
-			status: isInitial ? 'active' : 'pending_verification',
-			timelockUntil: isInitial ? null : (nowMs + timelockDuration),
-			verifiedAt: isInitial ? nowIso : null
-		};
-
-		keys.push(newKey);
-
-		// If user doesn't have 2FA enabled yet, activating the genesis security key enables 2FA
-		const updates = {
-			securityKeys: JSON.stringify(keys)
-		};
-
-		if (userRow.totpEnabled === 0) {
-			updates.totpEnabled = 1;
-			updates.totpCreatedAt = nowIso;
-
-			// Generate initial backup codes if not present
-			if (!userRow.totpBackupCodes || userRow.totpBackupCodes === '[]') {
-				const { hashedCodes, encryptedRaw } = await totpUtils.generateBackupCodes(10, c.env);
-				updates.totpBackupCodes = JSON.stringify({ hashedCodes, encryptedRaw });
-			}
-		}
-
-		await orm(c).update(user).set(updates).where(eq(user.userId, userId)).run();
-
-		// Cleanup KV challenge
-		await c.env.kv.delete(KvConst.WEBAUTHN_SETUP + userId);
-
-		try {
-			await securityNoticeService.sendNotice(c, userId, SECURITY_EVENT_TYPES.PASSKEY_ADDED, {
-				keyName: newKey.name
-			});
-		} catch (err) {
-			console.error('Failed to send passkey added notice:', err);
-		}
-
-		return {
-			id: newKey.id,
-			name: newKey.name,
-			createdAt: newKey.createdAt,
-			isInitialDevice: newKey.isInitialDevice,
-			status: newKey.status,
-			timelockUntil: newKey.timelockUntil
-		};
+	async registerPasskey(c, userId, params = {}) {
+		if (!await settingService.isTotpEnabled(c)) throw new BizError(t('globalTotpDisabled'));
+		const ctx = await context(c, userId, 'setup:passkey_add');
+		const binding = { ...ctx.binding, token: params.setupToken };
+		const attempt = await authOperation.incrementAttempt(c, binding);
+		if (!attempt) reject();
+		const setup = await authOperation.inspect(c, binding);
+		const parsed = await webauthnUtils.verifyRegistration(params, setup.payload);
+		const keys = keysOf(ctx.row);
+		if (keys.some(k => k.credentialId === parsed.credentialId)) throw new BizError(t('passkeyAlreadyRegistered'));
+		const initial = !ctx.row.passkeyHistory && keys.length === 0;
+		const now = new Date().toISOString();
+		const key = { id: uuidv4(), name: typeof params.name === 'string' ? params.name.trim().slice(0, 80) : 'Passkey',
+			credentialId: parsed.credentialId, publicKeyJwk: parsed.publicKeyJwk, publicKeyRaw: parsed.publicKeyRaw,
+			signCount: parsed.signCount, aaguid: parsed.aaguid, createdAt: now, isInitialDevice: initial,
+			status: initial ? 'active' : 'pending_verification', timelockUntil: initial ? null : Date.now() + 30 * 86400000, verifiedAt: initial ? now : null };
+		keys.push(key);
+		if (!await authOperation.consume(c, { ...binding, attempt })) reject();
+		const fields = { securityKeys: JSON.stringify(keys), passkeyHistory: 1 };
+		if (initial) { fields.totpEnabled = 1; fields.totpCreatedAt = ctx.row.totpCreatedAt || now; }
+		await userService.changeAuthentication(c, ctx.row, fields);
+		await notice(c, userId, 'PASSKEY_ADDED', { keyName: key.name });
+		return { ...publicKey(key), reauthRequired: true };
 	},
-
-	/**
-	 * List all registered passkeys / security keys for user with timelock status
-	 */
 	async getPasskeys(c, userId) {
-		const userRow = await userService.selectById(c, userId);
-		if (!userRow || !userRow.securityKeys) return [];
-
-		try {
-			const keys = typeof userRow.securityKeys === 'string'
-				? JSON.parse(userRow.securityKeys)
-				: userRow.securityKeys;
-			if (!Array.isArray(keys)) return [];
-
-			const nowTime = Date.now();
-			return keys.map(k => {
-				const status = k.status || 'active';
-				const timelockUntil = k.timelockUntil || null;
-				const timelockRemainingDays = (status === 'pending_verification' && timelockUntil)
-					? Math.max(0, Math.ceil((timelockUntil - nowTime) / (24 * 3600 * 1000)))
-					: 0;
-				const canActivateNow = (status === 'pending_verification' && timelockUntil && nowTime >= timelockUntil);
-
-				return {
-					id: k.id,
-					name: k.name,
-					createdAt: k.createdAt,
-					isInitialDevice: !!k.isInitialDevice,
-					status,
-					timelockUntil,
-					timelockRemainingDays,
-					canActivateNow,
-					verifiedAt: k.verifiedAt || null
-				};
-			});
-		} catch (e) {
-			return [];
-		}
+		const row = await userService.selectById(c, userId);
+		return row ? keysOf(row).map(publicKey) : [];
 	},
-
-	/**
-	 * Approve a pending passkey instantly using existing TOTP code
-	 */
-	async approvePasskeyWithTotp(c, userId, passkeyId, params) {
-		const userRow = await userService.selectById(c, userId);
-		if (!userRow) throw new BizError(t('notExistUser'));
-
-		if (userRow.totpEnabled !== 1 || !userRow.totpSecret) {
-			throw new BizError(t('totpNotConfiguredForApproval') || '当前账号尚未绑定 TOTP 身份验证器，无法直接核准，请等待 30 天观察期结束后手动转正');
-		}
-
-		const { code } = params || {};
-		if (!code) {
-			throw new BizError(t('totpCodeEmpty'));
-		}
-
-		const plainSecret = await totpUtils.decryptSecret(userRow.totpSecret, c.env);
-		const verifyResult = await totpUtils.verifyTOTP(plainSecret, code, 1);
-		if (!verifyResult.isValid) {
-			throw new BizError(t('totpCodeInvalid'));
-		}
-
-		let keys = [];
-		if (userRow.securityKeys) {
-			try {
-				keys = typeof userRow.securityKeys === 'string' ? JSON.parse(userRow.securityKeys) : userRow.securityKeys;
-				if (!Array.isArray(keys)) keys = [];
-			} catch (e) {
-				keys = [];
-			}
-		}
-
-		const targetKey = keys.find(k => k.id === passkeyId);
-		if (!targetKey) {
-			throw new BizError(t('passkeyNotFound') || '未找到指定的通行密钥');
-		}
-
-		targetKey.status = 'active';
-		targetKey.verifiedAt = new Date().toISOString();
-		targetKey.timelockUntil = null;
-
-		await orm(c).update(user).set({
-			securityKeys: JSON.stringify(keys)
-		}).where(eq(user.userId, userId)).run();
-
-		try {
-			await securityNoticeService.sendNotice(c, userId, SECURITY_EVENT_TYPES.PASSKEY_ADDED, {
-				keyName: targetKey.name
-			});
-		} catch (err) {}
-
-		return {
-			id: targetKey.id,
-			name: targetKey.name,
-			status: 'active',
-			verifiedAt: targetKey.verifiedAt
-		};
+	async approvePasskeyWithTotp(c, userId, id, params) { return this.approvePasskey(c, userId, id, params, false); },
+	async activateTimelockedPasskey(c, userId, id, params) { return this.approvePasskey(c, userId, id, params, true); },
+	async approvePasskey(c, userId, id, params, timelock) {
+		const row = await grant(c, userId, params, timelock ? 'passkey_activate' : 'passkey_approve', id);
+		if (!timelock && !hasFactor(row)) reject();
+		const keys = keysOf(row); const key = keys.find(k => k.id === id);
+		if (!key) throw new BizError(t('passkeyNotFound'));
+		if (timelock && (!key.timelockUntil || Date.now() < key.timelockUntil)) throw new BizError(t('passkeyTimelockActive', { days: 30 }));
+		key.status = 'active'; key.verifiedAt = new Date().toISOString(); key.timelockUntil = null;
+		await userService.changeAuthentication(c, row, { securityKeys: JSON.stringify(keys), passkeyHistory: 1, totpEnabled: 1 });
+		return { ...publicKey(key), reauthRequired: true };
 	},
-
-	/**
-	 * Manually activate a timelocked passkey after 30 days observation period
-	 */
-	async activateTimelockedPasskey(c, userId, passkeyId) {
-		const userRow = await userService.selectById(c, userId);
-		if (!userRow) throw new BizError(t('notExistUser'));
-
-		let keys = [];
-		if (userRow.securityKeys) {
-			try {
-				keys = typeof userRow.securityKeys === 'string' ? JSON.parse(userRow.securityKeys) : userRow.securityKeys;
-				if (!Array.isArray(keys)) keys = [];
-			} catch (e) {
-				keys = [];
-			}
-		}
-
-		const targetKey = keys.find(k => k.id === passkeyId);
-		if (!targetKey) {
-			throw new BizError(t('passkeyNotFound') || '未找到指定的通行密钥');
-		}
-
-		if (targetKey.status === 'active') {
-			return { id: targetKey.id, name: targetKey.name, status: 'active' };
-		}
-
-		const now = Date.now();
-		if (!targetKey.timelockUntil || now < targetKey.timelockUntil) {
-			const remainingDays = targetKey.timelockUntil ? Math.max(1, Math.ceil((targetKey.timelockUntil - now) / (24 * 3600 * 1000))) : 30;
-			throw new BizError(t('passkeyTimelockActive', { days: remainingDays }) || `该通行密钥仍在安全时间锁观察期内，还需 ${remainingDays} 天方可手动转正。`);
-		}
-
-		targetKey.status = 'active';
-		targetKey.verifiedAt = new Date().toISOString();
-		targetKey.timelockUntil = null;
-
-		await orm(c).update(user).set({
-			securityKeys: JSON.stringify(keys)
-		}).where(eq(user.userId, userId)).run();
-
-		return {
-			id: targetKey.id,
-			name: targetKey.name,
-			status: 'active',
-			verifiedAt: targetKey.verifiedAt
-		};
+	async getPasskeyTestOptions(c, userId, id) {
+		const ctx = await context(c, userId, 'passkey_test', id);
+		const key = keysOf(ctx.row).find(k => k.id === id && k.status !== 'pending_verification');
+		if (!key) throw new BizError(t('passkeyNotFound'));
+		const challenge = webauthnUtils.generateChallenge(); const expected = webauthnUtils.ceremonyContext(c);
+		const challengeToken = await authOperation.issue(c, { ...ctx.binding, payload: { challenge, ...expected }, ttlSeconds: 300 });
+		return { challengeToken, challenge, rpId: expected.rpId, allowCredentials: [{ id: key.credentialId, type: 'public-key' }], userVerification: 'required', timeout: 60000 };
 	},
-
-	/**
-	 * Generate challenge and options for testing an existing registered passkey
-	 */
-	async getPasskeyTestOptions(c, userId, passkeyId) {
-		const userRow = await userService.selectById(c, userId);
-		if (!userRow) throw new BizError(t('notExistUser'));
-
-		let keys = [];
-		if (userRow.securityKeys) {
-			try {
-				keys = typeof userRow.securityKeys === 'string' ? JSON.parse(userRow.securityKeys) : userRow.securityKeys;
-				if (!Array.isArray(keys)) keys = [];
-			} catch (e) {
-				keys = [];
-			}
-		}
-
-		const targetKey = keys.find(k => k.id === passkeyId);
-		if (!targetKey) {
-			throw new BizError(t('passkeyNotFound') || '未找到指定的通行密钥');
-		}
-
-		const challenge = webauthnUtils.generateChallenge();
-		await c.env.kv.put(
-			KvConst.WEBAUTHN_TEST + userId + ':' + passkeyId,
-			JSON.stringify({ challenge, passkeyId, createdAt: Date.now() }),
-			{ expirationTtl: 300 }
-		);
-
-		return {
-			challenge,
-			rpId: c.req.header('host')?.split(':')[0] || 'localhost',
-			allowCredentials: [{
-				id: targetKey.credentialId,
-				type: 'public-key'
-			}],
-			userVerification: 'preferred',
-			timeout: 60000
-		};
+	async verifyPasskeyTest(c, userId, id, params = {}) {
+		const ctx = await context(c, userId, 'passkey_test', id);
+		const binding = { ...ctx.binding, token: params.challengeToken };
+		const attempt = await authOperation.incrementAttempt(c, binding);
+		if (!attempt) reject();
+		const challenge = await authOperation.inspect(c, binding);
+		const key = keysOf(ctx.row).find(k => k.id === id);
+		if (!key || key.credentialId !== params.credentialId) reject();
+		await this.verifyExistingFactor(c, ctx.row, { ...params, isPasskey: true }, challenge.payload);
+		if (!await authOperation.consume(c, { ...binding, attempt })) reject();
+		return { success: true, keyId: id, name: key.name };
 	},
-
-	/**
-	 * Verify authentication assertion signature for passkey testing
-	 */
-	async verifyPasskeyTest(c, userId, passkeyId, params) {
-		const { clientDataJSON, authenticatorData, signature } = params || {};
-		if (!clientDataJSON || !authenticatorData || !signature) {
-			throw new BizError('Missing test signature payload');
-		}
-
-		const kvKey = KvConst.WEBAUTHN_TEST + userId + ':' + passkeyId;
-		const sessionData = await c.env.kv.get(kvKey, { type: 'json' });
-		if (!sessionData || !sessionData.challenge) {
-			throw new BizError(t('passkeyTestExpired') || '通行密钥测试会话已超时，请重试');
-		}
-
-		const clientData = webauthnUtils.parseClientData(clientDataJSON);
-		if (clientData.challenge !== sessionData.challenge) {
-			throw new BizError('WebAuthn test challenge mismatch');
-		}
-
-		const userRow = await userService.selectById(c, userId);
-		if (!userRow) throw new BizError(t('notExistUser'));
-
-		let keys = [];
-		if (userRow.securityKeys) {
-			try {
-				keys = typeof userRow.securityKeys === 'string' ? JSON.parse(userRow.securityKeys) : userRow.securityKeys;
-				if (!Array.isArray(keys)) keys = [];
-			} catch (e) {
-				keys = [];
-			}
-		}
-
-		const targetKey = keys.find(k => k.id === passkeyId);
-		if (!targetKey) throw new BizError(t('passkeyNotFound') || '未找到指定的通行密钥');
-
-		const isValidSig = await webauthnUtils.verifyAuthenticationSignature({
-			clientDataJSONBase64: clientDataJSON,
-			authenticatorDataBase64: authenticatorData,
-			signatureBase64: signature,
-			publicKeyJwk: targetKey.publicKeyJwk,
-			publicKeyRaw: targetKey.publicKeyRaw
-		});
-
-		if (!isValidSig) {
-			throw new BizError(t('passkeyTestFailed') || '通行密钥签名校验未通过');
-		}
-
-		await c.env.kv.delete(kvKey);
-		return {
-			success: true,
-			keyId: targetKey.id,
-			name: targetKey.name
-		};
+	async deletePasskey(c, userId, id, params) {
+		const row = await grant(c, userId, params, 'passkey_delete', id);
+		const keys = keysOf(row); const key = keys.find(k => k.id === id);
+		if (!key) throw new BizError(t('passkeyNotFound'));
+		const remaining = keys.filter(k => k.id !== id);
+		const enabled = !!row.totpSecret || remaining.some(k => k.status !== 'pending_verification');
+		await userService.changeAuthentication(c, row, { securityKeys: JSON.stringify(remaining), passkeyHistory: 1, totpEnabled: enabled ? 1 : 0,
+			...(enabled ? {} : { totpBackupCodes: '[]', totpCreatedAt: '' }) });
+		await notice(c, userId, 'PASSKEY_DELETED', { keyName: key.name });
+		return { reauthRequired: true };
 	},
-
-	/**
-	 * Delete a registered security key
-	 */
-	async deletePasskey(c, userId, passkeyId) {
-		const userRow = await userService.selectById(c, userId);
-		if (!userRow) throw new BizError(t('notExistUser'));
-
-		let keys = [];
-		if (userRow.securityKeys) {
-			try {
-				keys = typeof userRow.securityKeys === 'string' ? JSON.parse(userRow.securityKeys) : userRow.securityKeys;
-				if (!Array.isArray(keys)) keys = [];
-			} catch (e) {
-				keys = [];
-			}
-		}
-
-		const deletedKey = keys.find(k => k.id === passkeyId);
-		const deletedKeyName = deletedKey ? deletedKey.name : passkeyId;
-
-		const filtered = keys.filter(k => k.id !== passkeyId);
-		if (filtered.length === keys.length) {
-			throw new BizError(t('passkeyNotFound') || 'Security key not found');
-		}
-
-		const updates = {
-			securityKeys: JSON.stringify(filtered)
-		};
-
-		if (filtered.length === 0 && (!userRow.totpSecret || userRow.totpSecret === '')) {
-			updates.totpEnabled = 0;
-			updates.totpBackupCodes = '[]';
-			updates.totpCreatedAt = '';
-		}
-
-		await orm(c).update(user).set(updates).where(eq(user.userId, userId)).run();
-
-		try {
-			await securityNoticeService.sendNotice(c, userId, SECURITY_EVENT_TYPES.PASSKEY_DELETED, {
-				keyName: deletedKeyName
-			});
-		} catch (err) {
-			console.error('Failed to send passkey deleted notice:', err);
-		}
-
+	async renamePasskey(c, userId, id, name) {
+		const ctx = await context(c, userId, 'passkey_rename', id);
+		if (typeof name !== 'string' || !name.trim() || name.length > 80) throw new BizError('Invalid key name', 400);
+		const keys = keysOf(ctx.row); const key = keys.find(k => k.id === id);
+		if (!key) throw new BizError(t('passkeyNotFound'));
+		key.name = name.trim();
+		const updated = await orm(c).update(user).set({ securityKeys: JSON.stringify(keys) })
+			.where(and(eq(user.userId, userId), eq(user.authVersion, authVersionOf(ctx.row)), eq(user.securityKeys, ctx.row.securityKeys))).returning({ id: user.userId }).get();
+		if (!updated) reject();
 		return true;
 	},
-
-	/**
-	 * Rename a registered security key
-	 */
-	async renamePasskey(c, userId, passkeyId, name) {
-		name = (name || '').trim();
-		if (!name) throw new BizError('Key name cannot be empty');
-
-		const userRow = await userService.selectById(c, userId);
-		if (!userRow) throw new BizError(t('notExistUser'));
-
-		let keys = [];
-		if (userRow.securityKeys) {
-			try {
-				keys = typeof userRow.securityKeys === 'string' ? JSON.parse(userRow.securityKeys) : userRow.securityKeys;
-				if (!Array.isArray(keys)) keys = [];
-			} catch (e) {
-				keys = [];
-			}
-		}
-
-		const target = keys.find(k => k.id === passkeyId);
-		if (!target) throw new BizError(t('passkeyNotFound') || 'Security key not found');
-
-		target.name = name;
-
-		await orm(c).update(user).set({
-			securityKeys: JSON.stringify(keys)
-		}).where(eq(user.userId, userId)).run();
-
-		return true;
-	},
-
-	/**
-	 * Re-bind / Update TOTP secret (requires current password and new OTP code)
-	 */
-	async updateTotp(c, userId, params) {
-		const { password, code } = params || {};
-		if (!password || !code) {
-			throw new BizError(t('totpDisableParamsEmpty'));
-		}
-
-		const userRow = await userService.selectById(c, userId);
-		if (!userRow) throw new BizError(t('notExistUser'));
-
-		const isPwdValid = await cryptoUtils.verifyPassword(password, userRow.salt, userRow.password);
-		if (!isPwdValid) throw new BizError(t('IncorrectPwd'));
-
-		const setupData = await c.env.kv.get(KvConst.TOTP_SETUP + userId, { type: 'json' });
-		if (!setupData || !setupData.rawSecret) {
-			throw new BizError(t('totpSetupExpired'));
-		}
-
-		const verifyResult = await totpUtils.verifyTOTP(setupData.rawSecret, code, 1);
-		if (!verifyResult.isValid) {
-			throw new BizError(t('totpCodeInvalid'));
-		}
-
-		const { rawCodes, hashedCodes, encryptedRaw } = await totpUtils.generateBackupCodes(10, c.env);
-		const encryptedSecret = await totpUtils.encryptSecret(setupData.rawSecret, c.env);
-		const now = new Date().toISOString();
-
-		const backupPayload = JSON.stringify({
-			hashedCodes,
-			encryptedRaw
-		});
-
-		await orm(c).update(user).set({
-			totpEnabled: 1,
-			totpSecret: encryptedSecret,
-			totpBackupCodes: backupPayload,
-			totpCreatedAt: now
-		}).where(eq(user.userId, userId)).run();
-
-		// Session revocation: except current session, invalidate all other sessions
-		const currentToken = await userContext.getToken(c);
-		const authInfo = await c.env.kv.get(KvConst.AUTH_INFO + userId, { type: 'json' });
-		if (authInfo) {
-			authInfo.tokens = currentToken ? [currentToken] : [];
-			if (authInfo.user) {
-				authInfo.user.totpEnabled = 1;
-				authInfo.user.totpCreatedAt = now;
-			}
-			await c.env.kv.put(KvConst.AUTH_INFO + userId, JSON.stringify(authInfo), { expirationTtl: constant.TOKEN_EXPIRE });
-		}
-
-		await c.env.kv.delete(KvConst.TOTP_SETUP + userId);
-
-		try {
-			await securityNoticeService.sendNotice(c, userId, SECURITY_EVENT_TYPES.TOTP_ENABLED, {});
-		} catch (err) {}
-
-		return {
-			backupCodes: rawCodes
-		};
-	},
-
-	/**
-	 * Admin emergency reset TOTP for locked-out users
-	 */
 	async adminResetTotp(c, adminUserId, targetUserId) {
-		targetUserId = Number(targetUserId);
-		if (!targetUserId) {
-			throw new BizError(t('notExistUser'));
-		}
-
-		const targetUser = await userService.selectById(c, targetUserId);
-		if (!targetUser) {
-			throw new BizError(t('notExistUser'));
-		}
-
-		if (targetUserId === 1 && Number(adminUserId) !== 1) {
-			throw new BizError('无权重置站长二步验证！', 403);
-		}
-
-		await rbacGuard.assertCanManageUser(c, adminUserId, targetUserId);
-
-		const now = new Date().toISOString();
-
-		// Audit Log
-		console.log(JSON.stringify({
-			auditEvent: 'ADMIN_RESET_TOTP',
-			adminUserId,
-			targetUserId,
-			targetEmail: targetUser.email,
-			timestamp: now
-		}));
-
-		// Clear TOTP and security key fields in D1
-		await orm(c).update(user).set({
-			totpEnabled: 0,
-			totpSecret: '',
-			totpBackupCodes: '[]',
-			totpCreatedAt: '',
-			securityKeys: '[]'
-		}).where(eq(user.userId, targetUserId)).run();
-
-		// Invalidate ALL session tokens in KV (force logout everywhere)
-		const authInfo = await c.env.kv.get(KvConst.AUTH_INFO + targetUserId, { type: 'json' });
-		if (authInfo) {
-			authInfo.tokens = [];
-			if (authInfo.user) {
-				authInfo.user.totpEnabled = 0;
-				authInfo.user.totpCreatedAt = '';
-			}
-			await c.env.kv.put(KvConst.AUTH_INFO + targetUserId, JSON.stringify(authInfo), { expirationTtl: constant.TOKEN_EXPIRE });
-		}
-
-		// Deliver security notification email
-		try {
-			const settingData = await settingService.query(c);
-			const alertSubject = '🚨 [安全提醒] 管理员已重置您的两步验证 (2FA)';
-			const alertText = `您好，管理员已于 ${now} 重置了您的 EpoCanvas Mail 账号 (${targetUser.email}) 的两步验证。您的所有活跃登录会话已被强制下线。如非您本人申请，请立即联系系统管理员！`;
-			const alertHtml = `<div style="font-family: sans-serif; padding: 24px; line-height: 1.6; color: #1e293b;">
-				<h2 style="color: #dc2626; margin-bottom: 16px;">🚨 管理员已重置您的两步验证 (2FA)</h2>
-				<p>尊敬的用户：</p>
-				<p>系统管理员已于 <strong>${now}</strong> 重置了您的 EpoCanvas Mail 账号（<strong>${targetUser.email}</strong>）的两步验证设置。</p>
-				<p style="background: #fef2f2; border-left: 4px solid #ef4444; padding: 12px; color: #991b1b;">
-					为确保账号安全，您的所有历史登录会话均已被强制终止。您可以立即使用账号密码登录系统，并重新设置两步验证。
-				</p>
-				<p style="font-size: 13px; color: #64748b; margin-top: 24px;">⚠️ 如果您并未申请重置，说明您的账号可能存在安全风险，请立即联系管理员。</p>
-			</div>`;
-
-			// 1. In-app mailbox injection via securityNoticeService
-			await securityNoticeService.sendNotice(c, targetUserId, SECURITY_EVENT_TYPES.TOTP_DISABLED, {});
-
-			// 2. Resend external mail dispatch if configured
-			if (settingData.resendTokens && typeof settingData.resendTokens === 'object') {
-				const tokens = Object.values(settingData.resendTokens);
-				if (tokens.length > 0 && tokens[0]) {
-					const resend = new Resend(tokens[0]);
-					await resend.emails.send({
-						from: `security@${c.env.domain[0] || 'epomail.bond'}`,
-						to: targetUser.email,
-						subject: alertSubject,
-						text: alertText,
-						html: alertHtml
-					}).catch(err => {
-						console.warn('Resend alert dispatch skipped or failed:', err.message);
-					});
-				}
-			}
-		} catch (err) {
-			console.error('Failed to dispatch admin reset notification:', err);
-		}
-
+		const row = await userService.selectById(c, Number(targetUserId));
+		if (!row) throw new BizError(t('notExistUser'));
+		if (Number(targetUserId) === 1 && Number(adminUserId) !== 1) throw new BizError(t('unauthorized'), 403);
+		await rbacGuard.assertCanManageUser(c, adminUserId, Number(targetUserId));
+		await userService.changeAuthentication(c, row, { totpEnabled: 0, totpSecret: '', totpBackupCodes: '[]', totpCreatedAt: '', securityKeys: '[]',
+			passkeyHistory: row.passkeyHistory || (keysOf(row).length ? 1 : 0) });
+		// In-app notice only. No direct provider dispatch can bypass outbound policy.
+		await notice(c, Number(targetUserId), 'TOTP_DISABLED');
 		return true;
 	}
 };
-
 export default totpService;

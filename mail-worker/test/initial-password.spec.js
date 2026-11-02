@@ -49,6 +49,8 @@ CREATE TABLE IF NOT EXISTS user (
 	totp_backup_codes TEXT DEFAULT '[]' NOT NULL,
 	totp_created_at TEXT DEFAULT '' NOT NULL,
 	security_keys TEXT DEFAULT '[]' NOT NULL,
+	auth_version INTEGER NOT NULL DEFAULT 0,
+	passkey_history INTEGER NOT NULL DEFAULT 0,
 	storage_quota_mb INTEGER DEFAULT 0 NOT NULL,
 	byo_storage_enabled INTEGER DEFAULT 0 NOT NULL,
 	byo_storage_config TEXT DEFAULT '{}' NOT NULL
@@ -69,10 +71,22 @@ CREATE TABLE IF NOT EXISTS oauth (
 	user_id INTEGER NOT NULL DEFAULT 0
 )`;
 
-const USER_ID = 7;
+const USER_ID = 970101;
 const EMAIL = 'oauth.user@example.com';
 const GENERATED_HASH = 'generated-hash-never-chosen';
 const GENERATED_SALT = 'generated-salt';
+
+async function ensureSecurityColumns() {
+	for (const column of [
+		{ name: 'auth_version', sql: 'ALTER TABLE user ADD COLUMN auth_version INTEGER NOT NULL DEFAULT 0' },
+		{ name: 'passkey_history', sql: 'ALTER TABLE user ADD COLUMN passkey_history INTEGER NOT NULL DEFAULT 0' }
+	]) {
+		const present = await env.db.prepare(
+			`SELECT 1 AS present FROM pragma_table_info('user') WHERE name = ? LIMIT 1`
+		).bind(column.name).first();
+		if (!present) await env.db.prepare(column.sql).run();
+	}
+}
 
 function createMockKv() {
 	const store = new Map();
