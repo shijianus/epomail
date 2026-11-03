@@ -9,6 +9,30 @@
 
 ---
 
+### 后端逻辑、权限边界与发布门禁专项审计 (2026-11-03)
+*   **关联提交 (Git Commit)**: 审计基线 `b76130f88a9de4247e1e1f4b9ae0545292640bb1` (Short: `b76130f`)；报告与索引提交见本条所在提交记录。
+*   **专项文档索引 (Detailed Doc)**: [后端逻辑与发布门禁审计](doc/backend-audit-2026-11-03.md)；[本轮检查结果](doc/validation/backend-audit-2026-11-03.json)。
+*   **体检/审计范围与方法 (Scope & Methodology)**:
+    1. 范围：`release/2026-10-31` 当前 HEAD 的 `mail-worker` 全部后端模块、关键 `mail-vue`/`temp_login_ui` 契约、Wrangler/CI/测试配置；本地 workerd/D1/KV 与静态审阅，未部署、未访问生产/Staging、未调用真实供应商。
+    2. 方法：认证/会话/MFA、RBAC、OAuth 客户端与服务端、邮件收发/存储、设置/Webhook/初始化迁移逐项数据流复核；实跑 Worker 全量测试、双前端构建/类型检查、i18n 四项、密钥扫描、Wrangler dry-run、`git diff --check`；对 2026-11-02 报告逐项复核。
+*   **核心发现与缺陷矩阵 (Key Findings & Matrix)**:
+    - **[P0·发布阻断]** 提交态 `wrangler-vitest.toml:26` 不是合法 TOML；干净检出 `npx vitest run` 报 ParseError 并跑 0 个测试，`quality-gates.yml:209-210` 的 Worker 步骤必红。496/496 仅在未跟踪的隔离审计配置下复现，不能绑定 HEAD。
+    - **[P1·安全/条件提权]** `reg-key-service.js:13-42` 未调用 `rbacGuard.assertCanAssignRole`；持有 `reg-key:add` 的非站长可创建 `master` 邀请码并注册为站长。种子角色默认无此权限，故为委派条件下的完整提权链。
+    - **[P1·邮件一致性]** 管理员删除绕过生命周期事务；批删按动态条件二次删除；外发 UNKNOWN 无对账；转发 fallback 丢附件/CID；站内直投绕过用户规则/通知/转发；加密搜索在密文上过滤；系统存储切换无存量保护。
+    - **[P1·账号/OAuth]** 首把 Passkey 不生成恢复码、最后一枚恢复码无轮换通道；OAuth 首密码依赖 KV 标记；OIDC ID Token 用站点 HS256 无 nonce，userinfo 不检查应用停用；建号/关联可半提交；旧库唯一索引迁移先删后建。
+    - **[P1·前端契约]** OAuth 授权页登录/MFA、草稿姓名插槽、首载自动更新、请求竞态、管理路由名、慢网误清会话、导出范围/收件人仍未修复。
+    - **[P2·加固]** 负数分页绕过上限、资料/举报文本无界、`/my/testTelegram` 可作发送代理、PAT 不可用且明文存储、访客可读掩码密钥前缀、Apple id_token 可重放、DB 健康假阳性、KV 限流非原子且 fail-open、生产默认允许 URL init secret、历史演示弱口令不自动修复、SSRF 未做 DNS 解析后校验等。
+*   **治理修复与回归结果 (Fixes & Verification)**:
+    - 本轮未修改业务代码；Worker 隔离配置 37 文件/496 项通过；Vue 构建、登录 tsc/29 项、i18n 四项、密钥扫描 1,256 文件、dry-run 439 资源均通过。
+    - 提交态测试配置 0 测试失败、真实 Staging/供应商/备份恢复/浏览器 E2E/容量/告警未执行；历史结果不写成本轮通过。
+    - **结论：NO-GO。** 先修 R1 与 B1，再按邮件一致性、账号恢复/OIDC、前端契约、Staging/恢复演练分批闭环；不以删功能、放宽权限或跳过检查换上线。
+*   **未执行/需人工处置 (Manual Follow-up)**:
+    - [ ] 修复测试 TOML，增加配置解析门禁，从干净检出重跑并绑定新 SHA。
+    - [ ] 修复邀请码角色授予守卫，审计现有 `reg-key:add` 委派与 `master` 邀请码。
+    - [ ] 按报告第 10 节完成 P1 批次与 GO 条件；生产核查历史演示账号与密钥轮换。
+
+---
+
 ### 发布收敛、功能保全与候选证据专项审计 (2026-11-02)
 *   **关联提交 (Git Commit)**: `05576cfaa4dbfab75cd75f663abac74ce628c14d` (Short: `05576cf`)；审计基线 `49f8b30eaeacaab93dc00e29857fcad52c83deb4` (Short: `49f8b30`)。本条索引在独立归档提交中记录上述报告提交，不将索引自身 Hash 写成待填占位。
 *   **专项文档索引 (Detailed Doc)**: [发布收敛与功能保全审计](doc/release-convergence-audit-2026-11-02.md)；[本轮检查结果](doc/validation/release-audit-2026-11-02.json)。
