@@ -10,7 +10,7 @@
 ---
 
 ### 后端逻辑、权限边界与发布门禁专项审计 (2026-11-03)
-*   **关联提交 (Git Commit)**: 审计基线 `b76130f88a9de4247e1e1f4b9ae0545292640bb1` (Short: `b76130f`)；报告与索引提交见本条所在提交记录。
+*   **关联提交 (Git Commit)**: 审计基线 `b76130f88a9de4247e1e1f4b9ae0545292640bb1` (Short: `b76130f`)；报告与索引提交 `09489464d9c03d27047e566d811fb0f21011df5a` (Short: `0948946`)。
 *   **专项文档索引 (Detailed Doc)**: [后端逻辑与发布门禁审计](doc/backend-audit-2026-11-03.md)；[本轮检查结果](doc/validation/backend-audit-2026-11-03.json)。
 *   **体检/审计范围与方法 (Scope & Methodology)**:
     1. 范围：`release/2026-10-31` 当前 HEAD 的 `mail-worker` 全部后端模块、关键 `mail-vue`/`temp_login_ui` 契约、Wrangler/CI/测试配置；本地 workerd/D1/KV 与静态审阅，未部署、未访问生产/Staging、未调用真实供应商。
