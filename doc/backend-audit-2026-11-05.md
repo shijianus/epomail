@@ -80,7 +80,7 @@ Windows 下 Miniflare 的模块 fallback 无法解析 `linkedom → cssom` 的�
 
 ### P1-1 加密邮件搜索仍在密文上过滤（B7，未修复）
 
-- 证据：`mail-worker/src/service/email-service.js:190-224` 对 `email.subject`/`email.text` 直接 `LIKE`，`:281` 才解密；`star-service.js:62-75` 同样在密文列上搜索。全站模式 0/2 会加密主题/正文。
+- 证据：`mail-worker/src/service/email-service.js:193-204` 对 `email.subject`/`email.text` 直接 `LIKE`，随后才解密；`star-service.js:62-75` 同样在密文列上搜索。全站模式 0/2 会加密主题/正文。
 - 影响：用户能看到邮件，却无法按可见主题/正文完整搜索；`total` 与分页不能表达真实匹配集合，跨页可能漏项/重复。
 - 建议：在所属用户范围内做有界解密搜索，或引入经隐私评估的索引；匹配、计数、分页必须使用同一语义，禁止改存明文或全表无界解密。
 
