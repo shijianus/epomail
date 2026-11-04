@@ -10,7 +10,7 @@
 ---
 
 ### 后端逻辑、权限边界与发布门禁复审 (2026-11-05)
-*   **关联提交 (Git Commit)**: 代码修复与报告提交 `{{CODE_COMMIT}}`；本索引 Hash 在后续归档提交中记录。
+*   **关联提交 (Git Commit)**: 代码修复与报告提交 `c003fc8efd74d12b4b4c941d980069347c4d723d` (Short: `c003fc8`)；本索引 Hash 在后续归档提交中记录。
 *   **专项文档索引 (Detailed Doc)**: [后端逻辑、权限边界与发布门禁复审](doc/backend-audit-2026-11-05.md)。
 *   **体检/审计范围与方法 (Scope & Methodology)**:
     1. 范围：`release/2026-10-31` 的 `mail-worker` 全部后端模块、关键 `mail-vue` 契约、Vitest/Wrangler/CI 配置；本地 workerd/D1/KV，未部署、未访问生产/Staging、未调用真实供应商。

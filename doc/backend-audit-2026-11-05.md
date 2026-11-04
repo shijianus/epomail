@@ -17,7 +17,7 @@
 
 - 分支：`release/2026-10-31`
 - 已提交基线：`13dbdfccc8c8b1a9eaf6a8644ac30c6e5f4f8a8a`（`13dbdfc`）
-- 本轮在已提交基线上复核并修复了工作区中的未提交改动；最终代码提交 Hash 见 `REPORTS.md`/`CHECKLIST.log` 对应条目。
+- 本轮代码修复与报告提交：`c003fc8efd74d12b4b4c941d980069347c4d723d`（`c003fc8`）
 - 范围：`mail-worker/src` 全部后端模块、关键 `mail-vue` 契约、Wrangler/Vitest/CI 配置。
 - 方法：
   1. 逐项复核 2026-11-03 报告的 R1、B1-B12、P2-1 至 P2-14。

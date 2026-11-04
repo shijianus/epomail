@@ -1,5 +1,5 @@
 ### 后端审计修复批次与发布门禁复审 (2026-11-05)
-*   **关联提交 (Git Commit)**: `{{CODE_COMMIT}}`
+*   **关联提交 (Git Commit)**: `c003fc8efd74d12b4b4c941d980069347c4d723d` (Short: `c003fc8`)
 *   **部署环境 (Deployment)**: 本地 workerd/D1/KV 与构建验证；未部署生产或 Staging，未调用真实供应商。
 *   **功能需求与变更清单 (Changes & Feature Alignment)**:
     - [x] 修复提交态 Vitest 配置：`wrangler-vitest.toml` 改为合法 TOML；`vitest.config.js` 增加 `hookTimeout` 与 `linkedom/worker` 测试别名，消除 Windows 下 cssom module fallback 与 `Isolated storage failed` 误报。

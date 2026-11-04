@@ -3,7 +3,7 @@
   "date": "2026-11-05",
   "branch": "release/2026-10-31",
   "baseCommit": "13dbdfccc8c8b1a9eaf6a8644ac30c6e5f4f8a8a",
-  "codeCommit": "{{CODE_COMMIT}}",
+  "codeCommit": "c003fc8efd74d12b4b4c941d980069347c4d723d",
   "environment": {
     "deployment": "local workerd/D1/KV only",
     "productionOrStagingAccessed": false,
