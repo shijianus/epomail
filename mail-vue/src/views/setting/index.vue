@@ -571,13 +571,13 @@
     <el-dialog
       v-model="regenDialogVisible"
       @closed="authenticationChanged && signInAfterSecurityChange()"
-      :title="$t('totpRegenTitle')"
+      :title="regenDialogMode === 'initial' ? $t('passkeyRecoveryCodesTitle') : $t('totpRegenTitle')"
       width="460px"
       destroy-on-close
     >
       <div v-if="regenResultCodes.length === 0" class="regen-modal-content">
         <div class="dialog-sub-desc">
-          {{ $t('totpRegenDesc') }}
+          {{ regenDialogMode === 'initial' ? $t('passkeyRecoveryCodesDesc') : $t('totpRegenDesc') }}
         </div>
         <el-input
           type="password"
@@ -975,6 +975,7 @@ const disableForm = reactive({
 })
 
 const regenDialogVisible = ref(false)
+const regenDialogMode = ref('regen')
 const regenLoading = ref(false)
 const regenPassword = ref('')
 const regenResultCodes = ref([])
@@ -1641,6 +1642,15 @@ const handleCreatePasskey = async () => {
       transports
     });
 
+    if (Array.isArray(regResult?.backupCodes) && regResult.backupCodes.length > 0) {
+      regenDialogMode.value = 'initial';
+      regenResultCodes.value = regResult.backupCodes;
+      authenticationChanged.value = true;
+      regenDialogVisible.value = true;
+      addPasskeyDialogVisible.value = false;
+      return;
+    }
+
     if (regResult && regResult.status === 'pending_verification') {
       ElMessage({
         message: t('passkeyRegisterTimelockedNotice') || '通行密钥已创建！由于这是新设备，密钥已进入 30 天安全观察期，您可以通过已有身份验证器立即核准生效。',
@@ -1892,6 +1902,7 @@ const submitDisableTotp = async () => {
 const openRegenBackupModal = () => {
   regenPassword.value = '';
   regenResultCodes.value = [];
+  regenDialogMode.value = 'regen';
   regenDialogVisible.value = true;
 }
 

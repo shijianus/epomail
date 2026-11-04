@@ -1,3 +1,26 @@
+### 后端审计修复批次与发布门禁复审 (2026-11-05)
+*   **关联提交 (Git Commit)**: `{{CODE_COMMIT}}`
+*   **部署环境 (Deployment)**: 本地 workerd/D1/KV 与构建验证；未部署生产或 Staging，未调用真实供应商。
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 修复提交态 Vitest 配置：`wrangler-vitest.toml` 改为合法 TOML；`vitest.config.js` 增加 `hookTimeout` 与 `linkedom/worker` 测试别名，消除 Windows 下 cssom module fallback 与 `Isolated storage failed` 误报。
+    - [x] 关闭邀请码条件提权：创建端接入 `rbacGuard.assertCanAssignRole`，兑换端新增 `assertInviteRoleBoundary`（master/高危权限角色仅站长可发放）。
+    - [x] 管理员删除接入生命周期快照事务：`physicsDelete`/`batchDelete` 改走 `cascadeDeleteSystemEmails`，固定 ID 快照、附件/星标/对象 outbox 同事务。
+    - [x] 系统存储 locator 变更增加存量保护；外发 UNKNOWN 增加定时对账与管理处置入口；provider id 在歧义响应中保留。
+    - [x] 站内直投接入用户规则/通知/转发；修复转发误用发件人 accountId、`markAsRead` 写成未读、Telegram 绕过 `userTgForward`。
+    - [x] Passkey 首因子生成恢复码；OAuth 首密码改 D1 权威标记；OIDC nonce/应用停用/clientSecret 签名/grant 顺序收敛；唯一索引迁移先建后删。
+    - [x] 负数分页统一 clamp（star/user/audit/account/public）；`oidc-` 加入限流 fail-closed scope；举报长度/限流、密钥前缀、DB 健康、对象 owner 状态、导出范围/收件人等 P2 加固。
+    - [x] 新增专项审计报告 `doc/backend-audit-2026-11-05.md`，在 `REPORTS.md` 建立索引。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] Worker 全量测试：`npx vitest run` → **37 个测试文件 / 513 项断言通过**（exit 0）。
+    - [x] 前端构建：`mail-vue: npx vite build` 通过（1m15s，最大 chunk 1,464.53 kB / gzip 479.05 kB）。
+    - [x] i18n 静态三件套：symmetry（mail-vue 3,259 / worker 1,950 keys 六语言对称）、audit（2,289 字面量，缺失 0、重复 0）、hardcoded（0 可疑行）全部通过。
+    - [x] Worker 打包：`wrangler deploy --dry-run --config wrangler-dev.toml` 通过（438 files，gzip 1,185.34 KiB）。
+    - [x] `git diff --check` 通过；测试临时数据由 workerd 隔离存储回收，未写入生产数据库/KV。
+    - [ ] 真实 Staging/生产、第三方 OAuth/邮件/对象存储、备份恢复、浏览器 E2E、容量/告警演练未执行。
+*   **结论**: 无条件公开 GA 仍 **NO-GO**；受控公测可条件式 GO。残余 P1（加密搜索、入站转发附件/CID、OAuth 授权页 MFA、慢网会话、最后一枚恢复码轮换、管理建号事务）见 `doc/backend-audit-2026-11-05.md` 第 5 节。
+
+---
+
 ### UI 语言归一化与 Worker 请求级 i18n 隔离 (2026-11-03)
 *   **关联提交 (Git Commit)**: `d036007ff684605581c7fc2cfa98b49b80dafdd5` (Short: `d036007`)
 *   **部署环境 (Deployment)**: 本地构建与单测验证；未部署生产或 Staging。

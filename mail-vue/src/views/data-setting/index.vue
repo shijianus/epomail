@@ -1747,6 +1747,15 @@ async function handleExportEmails() {
     const emailsList = res?.emails || []
     
     if (emailExportFormat.value === 'mbox') {
+      const recipientAddress = (em) => {
+        if (em.toEmail) return em.toEmail
+        try {
+          const list = typeof em.recipient === 'string' ? JSON.parse(em.recipient) : em.recipient
+          return Array.isArray(list) ? (list[0]?.address || '') : ''
+        } catch (_) {
+          return ''
+        }
+      }
       let mboxContent = ''
       for (const em of emailsList) {
         const dateStr = em.createTime ? new Date(em.createTime).toUTCString() : new Date().toUTCString()
@@ -1754,7 +1763,7 @@ async function handleExportEmails() {
         mboxContent += `Message-ID: <${em.messageId || em.emailId + '@epocanvas.mail'}>\n`
         mboxContent += `Date: ${dateStr}\n`
         mboxContent += `From: ${em.name ? `"${em.name}" ` : ''}<${em.sendEmail || 'unknown@domain'}>\n`
-        mboxContent += `To: <${em.toEmail || userStore.user.email}>\n`
+        mboxContent += `To: <${recipientAddress(em) || userStore.user.email}>\n`
         mboxContent += `Subject: ${em.subject || '(No Subject)'}\n`
         mboxContent += `MIME-Version: 1.0\n`
         mboxContent += `Content-Type: text/html; charset=utf-8\n\n`
@@ -1766,12 +1775,21 @@ async function handleExportEmails() {
         'application/mbox'
       )
     } else if (emailExportFormat.value === 'csv') {
+      const recipientAddress = (em) => {
+        if (em.toEmail) return em.toEmail
+        try {
+          const list = typeof em.recipient === 'string' ? JSON.parse(em.recipient) : em.recipient
+          return Array.isArray(list) ? (list[0]?.address || '') : ''
+        } catch (_) {
+          return ''
+        }
+      }
       let csvContent = 'ID,From,To,Subject,Date,Unread,IsSpam\n'
       for (const em of emailsList) {
         const row = [
           em.emailId,
           `"${(em.sendEmail || '').replace(/"/g, '""')}"`,
-          `"${(em.toEmail || '').replace(/"/g, '""')}"`,
+          `"${(recipientAddress(em) || '').replace(/"/g, '""')}"`,
           `"${(em.subject || '').replace(/"/g, '""')}"`,
           `"${em.createTime || ''}"`,
           em.unread ? 'Yes' : 'No',

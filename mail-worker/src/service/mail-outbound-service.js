@@ -71,9 +71,10 @@ export async function claimOutboundTask(c, taskId, leaseToken) {
 	return { task, leaseToken, dispatch: true };
 }
 
-export async function markOutboundUnknown(c, { taskId, leaseToken }) {
-	await getMailDb(c).prepare(`UPDATE mail_outbound_task SET state='UNKNOWN',last_error='Provider result requires reconciliation',lease_until=0,updated_at=CURRENT_TIMESTAMP
-		WHERE task_id=? AND state='SENDING' AND lease_token=?`).bind(taskId,leaseToken).run();
+export async function markOutboundUnknown(c, { taskId, leaseToken, providerId = null }) {
+	await getMailDb(c).prepare(`UPDATE mail_outbound_task SET state='UNKNOWN',provider_id=COALESCE(provider_id,?),
+		last_error='Provider result requires reconciliation',lease_until=0,updated_at=CURRENT_TIMESTAMP
+		WHERE task_id=? AND state='SENDING' AND lease_token=?`).bind(providerId || null, taskId, leaseToken).run();
 }
 
 export async function releasePreparation(c, taskId, leaseToken) {

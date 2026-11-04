@@ -12,6 +12,7 @@ import { escapeHtml } from '../utils/safe-email-html.js';
 import { t } from '../i18n/i18n.js';
 import r2Service from './r2-service.js';
 import fileUtils from '../utils/file-utils.js';
+import rateLimit from '../utils/rate-limit.js';
 
 const telegramService = {
 
@@ -131,11 +132,20 @@ const telegramService = {
 
 	},
 
-	async testPersonalBot(c, params) {
+	async testPersonalBot(c, params, userId = null) {
 		const { botToken, chatId, topicId } = params;
 		if (!botToken || !chatId) {
 			throw new BizError('Bot Token 和 Chat ID 不能为空');
 		}
+		if (typeof botToken !== 'string' || !/^\d{5,20}:[A-Za-z0-9_-]{20,100}$/.test(botToken.trim())) {
+			throw new BizError('Bot Token 格式无效');
+		}
+		await rateLimit.check(c, {
+			scope: 'telegram-test',
+			limit: 10,
+			windowSeconds: 900,
+			subject: `user:${userId || 'anonymous'}`
+		});
 
 		const body = {
 			chat_id: chatId,

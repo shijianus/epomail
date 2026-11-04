@@ -6,6 +6,8 @@ import { ensureOtcTable, seedOtc } from './helpers/one-time-credential.js';
 
 const CREATE_USER = `CREATE TABLE IF NOT EXISTS user (
 	user_id INTEGER PRIMARY KEY,
+	status INTEGER NOT NULL DEFAULT 0,
+	is_del INTEGER NOT NULL DEFAULT 0,
 	byo_storage_enabled INTEGER NOT NULL DEFAULT 0,
 	byo_storage_config TEXT NOT NULL DEFAULT '{}'
 )`;

@@ -184,7 +184,8 @@ export async function email(message, env, ctx) {
 				messageId: email.messageId,
 				rawBytes: raw.rawBytes,
 				accountId: account?.accountId || 0,
-				userId: account?.userId || 0
+				userId: account?.userId || 0,
+				storeRaw: Boolean(account)
 			});
 			if (activeInboundClaim.complete) return;
 
@@ -307,8 +308,10 @@ export async function email(message, env, ctx) {
 						attachment.accountId = account?.accountId || 0;
 					}
 					const mailDb = getMailDb({ env });
-					await mailDb.batch(attachments.map(attachment => mailDb.prepare(`INSERT OR IGNORE INTO object_deletion_queue
-						(object_key,user_id,next_retry_at) VALUES (?,?,datetime('now','+1 hour'))`).bind(attachment.key, attachment.userId)));
+					await mailDb.batch(attachments.map(attachment => mailDb.prepare(`INSERT INTO object_deletion_queue
+						(object_key,user_id,next_retry_at,status,attempts,last_error) VALUES (?,?,datetime('now','+1 hour'),'pending',0,NULL)
+						ON CONFLICT(object_key,user_id) DO UPDATE SET status='pending',
+							next_retry_at=datetime('now','+1 hour'), attempts=0, last_error=NULL`).bind(attachment.key, attachment.userId)));
 					stagedAttachments = await attService.stageInboundAtt({ env }, attachments);
 				}
 				if (stagedAttachments.rows.length > 0) {
@@ -326,7 +329,13 @@ export async function email(message, env, ctx) {
 				activeInboundClaim.complete = true;
 			} catch (error) {
 				await attService.cleanupUnreferencedObjects({ env }, stagedAttachments.uploaded).catch(() => {});
-				await failInboundClaim({ env }, activeInboundClaim.claimKey, activeInboundClaim.leaseToken, error).catch(() => {});
+				// Quota rejection is terminal for this raw copy. Keeping it would
+				// let an over-quota sender park a 25 MiB recovery object per attempt
+				// outside every quota calculation. Transient failures keep the copy
+				// so a retry does not re-upload it.
+				const discardRaw = error?.code === 'inbound_quota_exceeded';
+				await failInboundClaim({ env }, activeInboundClaim.claimKey, activeInboundClaim.leaseToken, error,
+					{ deleteRaw: discardRaw }).catch(() => {});
 				throw error;
 			}
 
@@ -485,19 +494,78 @@ export async function email(message, env, ctx) {
 
 }
 
+/**
+ * Match one administrator-configured sender entry.
+ *
+ * Wildcards are a supported list feature (`*@spam.example`, `alerts-*@...`).
+ * Escape every regex metacharacter first, then turn the escaped `\*` into
+ * `.*`. A malformed pattern must only fail its own entry: throwing here would
+ * reject every inbound message while the bad entry remains configured.
+ */
+export function senderPatternMatches(entry, address, domain) {
+	const e = String(entry || '').trim().toLowerCase();
+	if (!e) return false;
+	const targetAddress = String(address || '').toLowerCase();
+	const targetDomain = String(domain || '').toLowerCase();
+	if (e.includes('*')) {
+		try {
+			const escaped = e.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\\\*/g, '.*');
+			const regex = new RegExp('^' + escaped + '$');
+			return regex.test(targetAddress) || regex.test(targetDomain);
+		} catch (_) {
+			return false;
+		}
+	}
+	if (e.includes('@')) return targetAddress === e;
+	return targetDomain === e || targetDomain.endsWith('.' + e);
+}
+
+function headerValue(email, name) {
+	const headers = email?.headers;
+	if (headers instanceof Map) {
+		for (const [key, value] of headers) {
+			if (String(key).toLowerCase() === name) return String(value || '');
+		}
+		return '';
+	}
+	if (Array.isArray(headers)) {
+		for (const item of headers) {
+			const key = String(item?.key || item?.name || '').toLowerCase();
+			if (key === name) return String(item?.value || '');
+		}
+	}
+	return '';
+}
+
+/**
+ * A local From domain alone is not proof of an internal sender: external mail
+ * can spoof it. Require a DKIM/DMARC pass bound to that domain from the
+ * receiving path's Authentication-Results. Without an authenticated result the
+ * message is treated as external, so global blacklists still apply.
+ */
+export function isAuthenticatedInternalSender(email, envDomains) {
+	const senderDomain = emailUtils.getDomain(String(email?.from?.address || '').toLowerCase());
+	if (!senderDomain) return false;
+	const domains = Array.isArray(envDomains) ? envDomains.map(value => String(value).toLowerCase()) : [];
+	if (!domains.includes(senderDomain)) return false;
+	const auth = `${headerValue(email, 'authentication-results')} ${headerValue(email, 'arc-authentication-results')}`;
+	if (!auth.trim()) return false;
+	const domain = senderDomain.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+	const passThenFrom = new RegExp(`(?:dmarc=pass|dkim=pass)[^;]*(?:header\\.from|header\\.d)\\s*=\\s*${domain}`, 'i');
+	const fromThenPass = new RegExp(`(?:header\\.from|header\\.d)\\s*=\\s*${domain}[^;]*(?:dmarc=pass|dkim=pass)`, 'i');
+	return passThenFrom.test(auth) || fromThenPass.test(auth);
+}
+
 function checkBlock(blackSubjectStr, blackContentStr, blackFromStr, email, env, messageTo) {
 
 	const senderAddress = (email.from?.address || '').toLowerCase();
 	const senderDomain = emailUtils.getDomain(senderAddress) || '';
 	
-	let isInternal = false;
 	let envDomains = env?.domain || [];
 	if (typeof envDomains === 'string') {
 		try { envDomains = JSON.parse(envDomains); } catch(e){}
 	}
-	if (envDomains.includes(senderDomain)) {
-		isInternal = true;
-	}
+	const isInternal = isAuthenticatedInternalSender(email, envDomains);
 
 	let blockInternalList = false;
 	if (blackFromStr && blackFromStr.includes('__blockInternal,')) {
@@ -527,19 +595,7 @@ function checkBlock(blackSubjectStr, blackContentStr, blackFromStr, email, env, 
 		regularContentList = blackContentStr ? blackContentStr.split(',').filter(Boolean) : [];
 	}
 
-	function matchesSender(entry, address, domain) {
-		const e = entry.trim().toLowerCase();
-		if (!e) return false;
-		if (e.includes('*')) {
-			const escaped = e.replace(/[.+?^${}()|[\]\\]/g, '\\$&');
-			const regex = new RegExp('^' + escaped.replace(/\\\*/g, '.*') + '$');
-			return regex.test(address) || regex.test(domain);
-		}
-		if (e.includes('@')) {
-			return address === e;
-		}
-		return domain === e || domain.endsWith('.' + e);
-	}
+	const matchesSender = (entry, address, domain) => senderPatternMatches(entry, address, domain);
 
 	if (!isInternal || blockInternalBlock) {
 		for (const blockEntry of hardBlockList) {

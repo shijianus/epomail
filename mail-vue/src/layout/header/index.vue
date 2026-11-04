@@ -17,7 +17,7 @@
         <span class="search-icon" @click="handleSearch" :title="$t('search') || 'Search'">
           <Icon icon="lucide:search" width="18" height="18"/>
         </span>
-        <input ref="searchInputRef" type="text" :placeholder="isSettingsMode && route.name !== 'all-email' ? (route.name === 'manage-audit' ? $t('auditSearchCasesPlaceholder') : (route.name === 'data-setting' ? $t('searchSettingsOrApps') : $t('searchSettings'))) : route.name === 'all-email' ? $t('searchAllMail') : $t('searchMail')" v-model="emailStore.searchKeyword" @input="handleSearchInput" @keyup.enter="handleSearch" @keydown.tab.prevent="handleTabComplete" @focus="searchFocus = true" @blur="onSearchBlur" />
+        <input ref="searchInputRef" type="text" :placeholder="isSettingsMode && route.name !== 'manage-mail' ? (route.name === 'manage-audit' ? $t('auditSearchCasesPlaceholder') : (route.name === 'data-setting' ? $t('searchSettingsOrApps') : $t('searchSettings'))) : route.name === 'manage-mail' ? $t('searchAllMail') : $t('searchMail')" v-model="emailStore.searchKeyword" @input="handleSearchInput" @keyup.enter="handleSearch" @keydown.tab.prevent="handleTabComplete" @focus="searchFocus = true" @blur="onSearchBlur" />
         <span class="clear-icon" v-show="emailStore.searchKeyword" @mousedown.prevent @click.stop="clearSearch" :title="$t('clear')">
           <Icon icon="lucide:x" width="15" height="15"/>
         </span>
@@ -26,7 +26,7 @@
         </button>
         
         <!-- Dropdown for all-email syntax suggestions -->
-        <div v-if="route.name === 'all-email' && searchFocus && allEmailSuggestions.length > 0" class="settings-search-dropdown" style="padding: 4px 0;">
+        <div v-if="route.name === 'manage-mail' && searchFocus && allEmailSuggestions.length > 0" class="settings-search-dropdown" style="padding: 4px 0;">
            <div class="settings-search-item" v-for="(item) in allEmailSuggestions" :key="item.token" @mousedown.prevent="applySuggestion(item)" style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
              <span><strong style="color:var(--el-color-primary)">$</strong>{{ item.display }}</span>
              <span style="color:var(--el-text-color-secondary); font-size:11px; white-space:nowrap;">{{ item.desc }}</span>
@@ -34,7 +34,7 @@
         </div>
 
         <!-- Dropdown for Settings Search -->
-        <div v-else-if="isSettingsMode && route.name !== 'all-email' && route.name !== 'manage-audit' && emailStore.searchKeyword.trim() && searchFocus" class="settings-search-dropdown">
+        <div v-else-if="isSettingsMode && route.name !== 'manage-mail' && route.name !== 'manage-audit' && emailStore.searchKeyword.trim() && searchFocus" class="settings-search-dropdown">
            <div v-for="group in settingsSearchResults" :key="group.route" class="settings-search-group">
              <div class="settings-search-title">{{ group.title }}</div>
              <div class="settings-search-item" v-for="item in group.items" :key="item.text" @mousedown.prevent="goToSetting(group.route, item.id)">
@@ -722,7 +722,7 @@ const ALL_EMAIL_OPTS = computed(() => [
 ]);
 
 const allEmailSuggestions = computed(() => {
-   if (route.name !== 'all-email' || !searchFocus.value) return [];
+   if (route.name !== 'manage-mail' || !searchFocus.value) return [];
    const input = emailStore.searchKeyword || '';
    const match = input.match(/(?:^|\s)\$(\S*)$/);
    if (!match) return [];
@@ -746,7 +746,7 @@ function applySuggestion(opt) {
 }
 
 function handleTabComplete() {
-  if (route.name === 'all-email') {
+  if (route.name === 'manage-mail') {
     const suggestions = allEmailSuggestions.value;
     if (suggestions.length > 0) {
       applySuggestion(suggestions[0]);
@@ -757,7 +757,7 @@ function handleTabComplete() {
 // Debounced real-time search for all-email
 let searchDebounceTimer = null;
 function handleSearchInput() {
-  if (route.name !== 'all-email') return;
+  if (route.name !== 'manage-mail') return;
   clearTimeout(searchDebounceTimer);
   searchDebounceTimer = setTimeout(() => {
     triggerAllEmailSearch();
@@ -960,7 +960,7 @@ const settingsSearchResults = computed(() => {
   // 严格基于当前用户实际权限进行前置安全过滤，未授权路由绝不向用户呈现，彻底杜绝 404
   const accessibleGroups = settingsMap.value.filter(group => {
     if (group.perm && !hasPerm(group.perm)) return false;
-    if (group.route === 'all-email' && Number(settingStore.settings?.allMailMode) === 2) return false;
+    if (group.route === 'manage-mail' && Number(settingStore.settings?.allMailMode) === 2) return false;
     return true;
   });
 
@@ -1057,7 +1057,7 @@ function onSearchBlur() {
 function clearSearch() {
   emailStore.searchKeyword = '';
   clearHighlightOnPage();
-  if (['email', 'user-all-email', 'star', 'snoozed', 'spam', 'trash', 'draft', 'send', 'all-email'].includes(route.name)) {
+  if (['email', 'user-all-email', 'star', 'snoozed', 'spam', 'trash', 'draft', 'send', 'all-email', 'manage-mail'].includes(route.name)) {
     if (emailStore.emailScroll && emailStore.emailScroll.refreshList) {
       emailStore.emailScroll.refreshList();
     } else if (route.name === 'draft') {
@@ -1085,7 +1085,7 @@ function handleSearch() {
     window.dispatchEvent(new CustomEvent('manage-audit-search', { detail: emailStore.searchKeyword }));
     return;
   }
-  if (isSettingsMode.value && route.name !== 'all-email') {
+  if (isSettingsMode.value && route.name !== 'manage-mail') {
     return;
   }
 
@@ -1110,7 +1110,7 @@ function handleSearch() {
     return;
   }
 
-  if (route.name === 'all-email') {
+  if (route.name === 'manage-mail') {
     if (emailStore.emailScroll) {
       emailStore.emailScroll.refreshList();
     }

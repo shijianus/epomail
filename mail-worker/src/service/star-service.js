@@ -44,6 +44,9 @@ const starService = {
 		let { emailId, size, keyword } = params;
 		emailId = Number(emailId);
 		size = Number(size);
+		// SQLite treats LIMIT -1 as no limit. Clamp like every other list path.
+		if (!Number.isInteger(size) || size < 1) size = 20;
+		if (size > 50) size = 50;
 
 		if (!emailId) {
 			emailId = 9999999999;

@@ -406,7 +406,7 @@ describe('re-authentication before a sensitive identity operation', () => {
 		const tokenA = await seedSession(USER_A, EMAIL_A, 'session-a');
 		const { body } = await requestReauth(tokenA);
 		expect(body.code).toBe(403);
-		expect(body.errorCode).toBe('reauth_provider_required');
+		expect(body.errorCode).toBe('reauth_password_required');
 	});
 
 	it('requires the second factor when TOTP is enabled, and accepts a valid code', async () => {
@@ -448,13 +448,23 @@ describe('re-authentication before a sensitive identity operation', () => {
 		expect(body.errorCode).toBe('reauth_provider_required');
 	});
 
+	it('rejects provider-session step-up when the account has a usable password', async () => {
+		const tokenA = await seedSession(USER_A, EMAIL_A, 'session-a', {
+			method: 'oauth', provider: 'github', at: Date.now()
+		});
+		await seedIdentity(`github:${GITHUB_ID}`, USER_A);
+		const { body } = await requestReauth(tokenA);
+		expect(body.code, JSON.stringify(body)).toBe(403);
+		expect(body.errorCode).toBe('reauth_password_required');
+	});
+
 	it('rejects a password-based session that never had a recent provider login', async () => {
 		// Password is usable, so the password path is the only accepted proof;
 		// an empty body must not fall back to the session.
 		const tokenA = await seedSession(USER_A, EMAIL_A, 'session-a');
 		const { body } = await requestReauth(tokenA);
 		expect(body.code).toBe(403);
-		expect(body.errorCode).toBe('reauth_provider_required');
+		expect(body.errorCode).toBe('reauth_password_required');
 	});
 });
 

@@ -449,6 +449,7 @@ let scrollTop = 0
 const latestEmail = ref(null)
 const scrollbarRef = ref(null)
 let reqLock = false
+let requestSeq = 0
 let isMobile = ref(innerWidth < 1367)
 // 与 CSS 两行化断点 @media (max-width: 767px) 严格同源，避免行高契约在 768~1366px 区间错位
 let isNarrowRow = ref(innerWidth <= 767)
@@ -1259,8 +1260,13 @@ function jumpDetails(email) {
 
 function getEmailList(refresh = false) {
 
-  if (reqLock) return;
+  // A refresh may supersede an in-flight page load (for example when the user
+  // switches alias or changes the query). Only the newest response is allowed
+  // to write the list; older responses are ignored instead of overwriting the
+  // new mailbox state.
+  if (reqLock && !refresh) return;
 
+  const seq = ++requestSeq;
   let emailId = emailList.length > 0 ? emailList.at(-1).emailId : 0;
 
   reqLock = true
@@ -1268,7 +1274,7 @@ function getEmailList(refresh = false) {
   if (!refresh) {
 
     if (loading.value || noLoading.value) {
-      reqLock = false
+      if (seq === requestSeq) reqLock = false
       return
     }
 
@@ -1287,11 +1293,13 @@ function getEmailList(refresh = false) {
   let start = Date.now();
 
   props.getEmailList(emailId, queryParam.size).then(async data => {
+    if (seq !== requestSeq) return;
     let end = Date.now();
     let duration = end - start;
     if (duration < 300 && !emailId) {
         await sleep(300 - duration)
     }
+    if (seq !== requestSeq) return;
     firstLoad.value = false
 
     let list = data.list.map(item => ({
@@ -1315,6 +1323,7 @@ function getEmailList(refresh = false) {
 
     total.value = data.total;
   }).finally(() => {
+    if (seq !== requestSeq) return;
     loading.value = false
     reqLock = false
   })

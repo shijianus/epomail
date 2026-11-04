@@ -229,6 +229,47 @@ export async function recordAcceptance(c, userId, acceptance) {
 	if (!row) throw new BizError('The registration notice changed. Refresh and review the current terms.', 409, 'terms_version_mismatch');
 }
 
+export async function getLegalAcceptanceStatus(c, userId) {
+	const id = Number(userId);
+	const authoritative = await readAuthoritativeLegalSettings(c);
+	const notice = normalizeLegalNotice(authoritative.settings);
+	const currentVersion = notice.termsVersion;
+	if (!authoritative.available || !currentVersion || !Number.isInteger(id) || id <= 0) {
+		return {
+			required: false,
+			currentVersion,
+			currentUrl: notice.termsUrl,
+			acceptedVersion: '',
+			acceptedAt: ''
+		};
+	}
+	let accepted = null;
+	try {
+		accepted = await getUserDb(c).prepare(`
+			SELECT terms_version, accepted_at FROM legal_acceptance
+			WHERE user_id = ? ORDER BY id DESC LIMIT 1
+		`).bind(id).first();
+	} catch (_) {}
+	const acceptedVersion = typeof accepted?.terms_version === 'string' ? accepted.terms_version : '';
+	return {
+		required: acceptedVersion !== currentVersion,
+		currentVersion,
+		currentUrl: notice.termsUrl,
+		acceptedVersion,
+		acceptedAt: typeof accepted?.accepted_at === 'string' ? accepted.accepted_at : ''
+	};
+}
+
+/**
+ * Record acceptance of the currently authoritative policy. The client cannot
+ * choose the version or URL: both are re-read from D1 and validated server-side.
+ */
+export async function acceptCurrentPolicy(c, userId, params = {}) {
+	const acceptance = await validateRegistrationAcceptanceAuthoritative(c, params);
+	await recordAcceptance(c, userId, acceptance);
+	return await getLegalAcceptanceStatus(c, userId);
+}
+
 const legalPolicyService = {
 	LEGAL_LOCALES,
 	LEGAL_EXT_KEYS,
@@ -241,7 +282,9 @@ const legalPolicyService = {
 	normalizeLegalNotice,
 	getRegistrationReadiness,
 	validateRegistrationAcceptance,
-	recordAcceptance
+	recordAcceptance,
+	getLegalAcceptanceStatus,
+	acceptCurrentPolicy
 };
 
 export default legalPolicyService;

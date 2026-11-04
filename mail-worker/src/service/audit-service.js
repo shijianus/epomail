@@ -413,8 +413,11 @@ const auditService = {
 		if (visitorMode) {
 			warningType = 'record';
 		}
-		size = Math.min(Number(size) || 15, 50);
-		num = Math.max(Number(num) || 1, 1);
+		size = Number(size);
+		if (!Number.isInteger(size) || size < 1) size = 15;
+		if (size > 50) size = 50;
+		num = Number(num);
+		if (!Number.isInteger(num) || num < 1) num = 1;
 		const offset = (num - 1) * size;
 
 		const conditions = [];

@@ -7,6 +7,7 @@ import oauthIdentityService from '../service/oauth-identity-service';
 import result from '../model/result';
 import userContext from '../security/user-context';
 import constant from '../const/constant';
+import legalPolicyService from '../service/legal-policy-service.js';
 
 app.get('/my/loginUserInfo', async (c) => {
 	const user = await userService.loginUserInfo(c, userContext.getUserId(c), userContext.getLoginEmail(c));
@@ -173,7 +174,7 @@ app.get('/my/exportData', async (c) => {
 });
 
 app.post('/my/testTelegram', async (c) => {
-	const data = await telegramService.testPersonalBot(c, await c.req.json());
+	const data = await telegramService.testPersonalBot(c, await c.req.json(), userContext.getUserId(c));
 	return c.json(result.ok(data));
 });
 
@@ -278,4 +279,14 @@ app.post('/my/security/reauth-options', async (c) => {
 });
 app.post('/my/security/reauth', async (c) => {
  return c.json(result.ok(await totpService.reauthenticate(c, userContext.getUserId(c), await c.req.json())));
+});
+
+app.get('/my/legal/status', async (c) => {
+ return c.json(result.ok(await legalPolicyService.getLegalAcceptanceStatus(c, userContext.getUserId(c))));
+});
+
+app.post('/my/legal/accept', async (c) => {
+ const body = await c.req.json().catch(() => ({}));
+ const data = await legalPolicyService.acceptCurrentPolicy(c, userContext.getUserId(c), body);
+ return c.json(result.ok(data));
 });

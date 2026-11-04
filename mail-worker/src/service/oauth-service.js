@@ -1015,15 +1015,19 @@ const oauthService = {
 			}
 
 			// The account now exists with a server-generated password the user
-			// cannot present. Record that exact hash as the eligibility marker:
-			// the first user-chosen password changes the stored hash, so the
-			// marker invalidates itself without a second write that could be
-			// lost. Failing to record it only withholds the convenience; it
-			// never weakens authentication, so it must not undo a committed bind.
+			// cannot present. Persist that exact hash in D1 (authoritative) and
+			// cache it in KV for compatibility. A lost KV write no longer
+			// permanently disables the first-password flow; a lost D1 write is
+			// still recoverable through the legacy KV path.
 			try {
 				const createdRow = await userService.selectById(c, userId);
 				if (createdRow?.password) {
-					await c.env.kv.put(KvConst.INITIAL_PASSWORD + userId, createdRow.password);
+					await userService.markInitialPassword(c, userId, createdRow.password);
+					try {
+						await c.env.kv.put(KvConst.INITIAL_PASSWORD + userId, createdRow.password);
+					} catch (kvErr) {
+						console.error('Failed to cache initial password marker:', kvErr);
+					}
 				}
 			} catch (err) {
 				console.error('Failed to mark initial password for OAuth account:', err);

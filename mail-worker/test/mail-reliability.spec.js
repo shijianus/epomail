@@ -652,6 +652,64 @@ describe('Real D1 mail reliability transactions', () => {
 			} finally { if (claim) await clean([claim.claimKey], emailId ? [emailId] : []); store.clear(); }
 		});
 
+		it('re-delivers a completed message after its email row is permanently deleted', async () => {
+			const store = objects();
+			const input = { recipient: `${crypto.randomUUID()}@local.test`, messageId: '<reissue@local.test>', rawBytes: encoder.encode('Subject: reissue\r\n\r\nbody') };
+			let claim;
+			let again;
+			let emailId;
+			try {
+				claim = await acquireInboundClaim(c, input);
+				emailId = await seedSaving(claim);
+				await emailService.completeInboundReceive(c, { ...claim, emailId, status: 0, isDel: 0, isSpam: 0 });
+				await db.prepare('DELETE FROM email WHERE email_id=?').bind(emailId).run();
+				emailId = null;
+				again = await acquireInboundClaim(c, input);
+				expect(again.complete).toBeFalsy();
+				expect(again.claimKey).not.toBe(claim.claimKey);
+			} finally {
+				await clean([claim?.claimKey, again?.claimKey].filter(Boolean), emailId ? [emailId] : []);
+				store.clear();
+			}
+		});
+
+		it('discards the raw recovery copy on a terminal quota rejection', async () => {
+			const store = objects();
+			const input = { recipient: `${crypto.randomUUID()}@local.test`, userId: 7, messageId: '<discard@local.test>', rawBytes: encoder.encode('Subject: discard\r\n\r\nbody') };
+			let claim;
+			try {
+				claim = await acquireInboundClaim(c, input);
+				expect(store.has(claim.rawObjectKey)).toBe(true);
+				await failInboundClaim(c, claim.claimKey, claim.leaseToken,
+					Object.assign(new Error('recipient quota is full'), { code: 'inbound_quota_exceeded' }), { deleteRaw: true });
+				expect(store.has(claim.rawObjectKey)).toBe(false);
+				expect(await db.prepare('SELECT state, raw_object_key FROM mail_receive_claim WHERE claim_key=?').bind(claim.claimKey).first())
+					.toEqual({ state: 'FAILED', raw_object_key: '' });
+			} finally {
+				if (claim) await clean([claim.claimKey]);
+				store.clear();
+			}
+		});
+
+		it('does not drain a staged attachment while its inbound claim is active', async () => {
+			const store = objects();
+			const input = { recipient: `${crypto.randomUUID()}@local.test`, userId: 7, messageId: '<protected-drain@local.test>', rawBytes: encoder.encode('Subject: drain\r\n\r\nbody') };
+			let claim;
+			try {
+				claim = await acquireInboundClaim(c, input);
+				const protectedKey = `attachments/${claim.claimKey}-0-protected.bin`;
+				store.set(protectedKey, new Uint8Array([1]));
+				await db.prepare(`INSERT INTO object_deletion_queue(object_key,user_id,status,attempts)
+					VALUES (?,?,'pending',0)`).bind(protectedKey, 7).run();
+				expect(await attService.drainObjectDeletionQueue(c)).toMatchObject({ skipped: 1, deleted: 0 });
+				expect(store.has(protectedKey)).toBe(true);
+				await db.prepare('DELETE FROM object_deletion_queue WHERE object_key=?').bind(protectedKey).run();
+			} finally {
+				if (claim) await clean([claim.claimKey]);
+				store.clear();
+			}
+		});
+
 		it('rejects oversized multibyte body rows before any provider work', () => {
 		expect(() => assertMailRowSize({ content: '界'.repeat(700000), text: '' })).toThrow(/row size/i);
 	});

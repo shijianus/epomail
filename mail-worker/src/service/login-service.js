@@ -15,8 +15,11 @@ import cryptoUtils from '../utils/crypto-utils.js';
 import turnstileService from './turnstile-service.js';
 import roleService from './role-service.js';
 import regKeyService from './reg-key-service.js';
+import rbacGuard from './rbac-guard-service.js';
+import permService from './perm-service.js';
 import dayjs from 'dayjs';
 import { toUtc } from '../utils/date-uitil.js';
+import { isAdminUser } from '../utils/admin-utils.js';
 import { t } from '../i18n/i18n.js';
 import verifyRecordService from './verify-record-service.js';
 import totpUtils from '../utils/totp-utils.js';
@@ -85,6 +88,63 @@ function attachSessionMeta(authInfo, token, meta) {
 			delete authInfo.tokenMeta[key];
 		}
 	}
+}
+
+const LOGIN_FAIL_WINDOW_SECONDS = 12 * 60 * 60;
+
+function loginFailWindow() {
+	const now = Math.floor(Date.now() / 1000);
+	const start = Math.floor(now / LOGIN_FAIL_WINDOW_SECONDS) * LOGIN_FAIL_WINDOW_SECONDS;
+	return { start, expires: start + LOGIN_FAIL_WINDOW_SECONDS };
+}
+
+async function readLoginFail(c, email) {
+	if (String(c?.env?.ENVIRONMENT || '').toLowerCase() === 'test') return null;
+	try {
+		const db = getUserDb(c);
+		if (!db?.prepare) return null;
+		const window = loginFailWindow();
+		const row = await db.prepare(`SELECT count FROM rate_limit_counter
+			WHERE scope = 'login-fail' AND subject = ? AND window_start = ?`)
+			.bind(`email:${email}`, window.start).first();
+		return Number(row?.count) || 0;
+	} catch (_) {
+		return null;
+	}
+}
+
+async function incrementLoginFail(c, email) {
+	if (String(c?.env?.ENVIRONMENT || '').toLowerCase() === 'test') return null;
+	try {
+		const db = getUserDb(c);
+		if (!db?.prepare) return null;
+		const window = loginFailWindow();
+		const row = await db.prepare(`
+			INSERT INTO rate_limit_counter (scope, subject, window_start, count, expires_at)
+			VALUES ('login-fail', ?, ?, 1, ?)
+			ON CONFLICT(scope, subject, window_start)
+			DO UPDATE SET count = count + 1
+			RETURNING count
+		`).bind(`email:${email}`, window.start, window.expires).first();
+		return Number(row?.count) || 0;
+	} catch (_) {
+		return null;
+	}
+}
+
+async function clearLoginFail(c, email) {
+	if (String(c?.env?.ENVIRONMENT || '').toLowerCase() !== 'test') {
+		try {
+			const db = getUserDb(c);
+			if (db?.prepare) {
+				await db.prepare(`DELETE FROM rate_limit_counter
+					WHERE scope = 'login-fail' AND subject = ?`).bind(`email:${email}`).run();
+			}
+		} catch (_) {}
+	}
+	try {
+		await c.env.kv.delete(KvConst.LOGIN_FAIL + email);
+	} catch (_) {}
 }
 
 const loginService = {
@@ -361,6 +421,40 @@ const loginService = {
 
 	},
 
+	/**
+	 * A legacy or delegated invite code must not be able to grant a privileged
+	 * role on redemption. Creation is already guarded by
+	 * rbacGuard.assertCanAssignRole; this is the defence-in-depth check for
+	 * codes created before that guard existed or by a since-demoted operator.
+	 * It covers master and every role carrying PRIVILEGED_PERMS (for example a
+	 * legacy moderator code), not only master.
+	 */
+	async assertInviteRoleBoundary(c, regKeyRow) {
+		let role;
+		try {
+			role = await roleService.selectById(c, regKeyRow.roleId);
+		} catch (err) {
+			console.warn('Invite role lookup unavailable:', err?.message || err);
+			return true;
+		}
+		if (!role) return true;
+		const isMasterRole = role.roleCode === 'master' || role.key === 'master';
+		let roleKeys = [];
+		try {
+			roleKeys = await permService.rolePermKeys(c, role.roleId);
+		} catch (err) {
+			// Lightweight/legacy schemas may not expose role_perm yet. The
+			// creation-side guard remains authoritative for new codes; do not
+			// turn a missing auxiliary table into a total registration outage.
+			console.warn('Invite role permission lookup unavailable:', err?.message || err);
+		}
+		const hasPrivilegedPerm = roleKeys.some(key => rbacGuard.PRIVILEGED_PERMS.has(key));
+		if (!isMasterRole && !hasPrivilegedPerm) return true;
+		const creatorId = Number(regKeyRow.userId) || 0;
+		const creator = creatorId > 0 ? await userService.selectByIdIncludeDel(c, creatorId) : null;
+		return Boolean(creator && isAdminUser(c, creator));
+	},
+
 	async handleOpenRegKey(c, regKey, code) {
 
 		if (!code) {
@@ -370,6 +464,10 @@ const loginService = {
 		const regKeyRow = await regKeyService.selectByCode(c, code);
 
 		if (!regKeyRow) {
+			throw new BizError(t('notExistRegKey'), undefined, 'invite_code_invalid');
+		}
+
+		if (!await this.assertInviteRoleBoundary(c, regKeyRow)) {
 			throw new BizError(t('notExistRegKey'), undefined, 'invite_code_invalid');
 		}
 
@@ -396,6 +494,10 @@ const loginService = {
 		const regKeyRow = await regKeyService.selectByCode(c, code);
 
 		if (!regKeyRow) {
+			return null
+		}
+
+		if (!await this.assertInviteRoleBoundary(c, regKeyRow)) {
 			return null
 		}
 
@@ -432,30 +534,44 @@ const loginService = {
 		}
 
 		const failKey = KvConst.LOGIN_FAIL + inputEmail;
-		let failCountStr = await c.env.kv.get(failKey);
-		let failCount = failCountStr ? parseInt(failCountStr) : 0;
+		const durableFailCount = await readLoginFail(c, inputEmail);
+		let failCount = durableFailCount;
+		if (failCount === null) {
+			const failCountStr = await c.env.kv.get(failKey);
+			failCount = failCountStr ? parseInt(failCountStr) : 0;
+		}
 
 		if (failCount >= 5) {
 			throw new BizError(t('accountLocked'));
 		}
 
+		const notifyLocked = async () => {
+			if (!userRow || !userRow.userId) return;
+			try {
+				const securityNoticeService = (await import('./security-notice-service.js')).default;
+				const { SECURITY_EVENT_TYPES } = await import('../const/security-notice-templates.js');
+				await securityNoticeService.sendNotice(c, userRow.userId, SECURITY_EVENT_TYPES.ACCOUNT_LOCKED, {
+					detail: '12 hours lockdown (5 consecutive failed attempts)'
+				});
+			} catch (e) {
+				console.error('Failed to send account locked notice:', e);
+			}
+		};
+
 		const incrementFail = async () => {
+			const durableCount = await incrementLoginFail(c, inputEmail);
+			if (durableCount !== null) {
+				if (durableCount >= 5) await notifyLocked();
+				return;
+			}
+			// Pre-migration / test fallback. The D1 counter is authoritative when
+			// the rate_limit_counter table is present.
 			try {
 				let latest = await c.env.kv.get(failKey);
 				let current = latest ? parseInt(latest) : 0;
 				const nextCount = current + 1;
 				await c.env.kv.put(failKey, nextCount.toString(), { expirationTtl: 12 * 60 * 60 });
-				if (nextCount >= 5 && userRow && userRow.userId) {
-					try {
-						const securityNoticeService = (await import('./security-notice-service.js')).default;
-						const { SECURITY_EVENT_TYPES } = await import('../const/security-notice-templates.js');
-						await securityNoticeService.sendNotice(c, userRow.userId, SECURITY_EVENT_TYPES.ACCOUNT_LOCKED, {
-							detail: '12 hours lockdown (5 consecutive failed attempts)'
-						});
-					} catch (e) {
-						console.error('Failed to send account locked notice:', e);
-					}
-				}
+				if (nextCount >= 5) await notifyLocked();
 			} catch {}
 		};
 
@@ -637,11 +753,9 @@ const loginService = {
 		}
 
 		// Clear fail count on success
-		if (failCount > 0) {
-			await c.env.kv.delete(failKey);
-		}
-		if (userRow.email && (KvConst.LOGIN_FAIL + userRow.email) !== failKey) {
-			await c.env.kv.delete(KvConst.LOGIN_FAIL + userRow.email);
+		await clearLoginFail(c, inputEmail);
+		if (userRow.email && userRow.email.toLowerCase() !== inputEmail) {
+			await clearLoginFail(c, userRow.email.toLowerCase());
 		}
 
 		// If legacy single-round SHA-256 hash was detected, upgrade to PBKDF2 lazily
@@ -704,7 +818,8 @@ const loginService = {
 		}
 
 		await c.env.kv.put(KvConst.AUTH_INFO + userRow.userId, JSON.stringify(authInfo), { expirationTtl: constant.TOKEN_EXPIRE });
-		return { token: jwt, email: activeLoginEmail, userId: userRow.userId };
+		const legalAcceptance = await legalPolicyService.getLegalAcceptanceStatus(c, userRow.userId);
+		return { token: jwt, email: activeLoginEmail, userId: userRow.userId, legalAcceptance };
 	},
 
 	async verifyTotpLogin(c, params) {
@@ -743,22 +858,28 @@ const loginService = {
 		const operation=await authOperation.inspect(c,binding);
 		const pendingData=operation.payload;
 		const targetEmail = pendingData.email;
-		const failKey = targetEmail ? KvConst.LOGIN_FAIL + targetEmail : null;
+		const failKey = targetEmail ? KvConst.LOGIN_FAIL + targetEmail.toLowerCase() : null;
 		let failCount = 0;
 		if (failKey) {
-			const failCountStr = await c.env.kv.get(failKey);
-			failCount = failCountStr ? parseInt(failCountStr) : 0;
+			const durable = await readLoginFail(c, targetEmail.toLowerCase());
+			if (durable === null) {
+				const failCountStr = await c.env.kv.get(failKey);
+				failCount = failCountStr ? parseInt(failCountStr) : 0;
+			} else {
+				failCount = durable;
+			}
 			if (failCount >= 5) {
 				throw new BizError(t('accountLocked'));
 			}
 		}
 
 		const incrementAccountFail = async () => {
-			if (failKey) {
-				const currentFailStr = await c.env.kv.get(failKey);
-				const currentFail = currentFailStr ? parseInt(currentFailStr) : 0;
-				await c.env.kv.put(failKey, (currentFail + 1).toString(), { expirationTtl: 12 * 60 * 60 });
-			}
+			if (!failKey) return;
+			const durable = await incrementLoginFail(c, targetEmail.toLowerCase());
+			if (durable !== null) return;
+			const currentFailStr = await c.env.kv.get(failKey);
+			const currentFail = currentFailStr ? parseInt(currentFailStr) : 0;
+			await c.env.kv.put(failKey, (currentFail + 1).toString(), { expirationTtl: 12 * 60 * 60 });
 		};
 
 		let userRow = await userService.selectById(c, binding.userId);
@@ -838,8 +959,8 @@ const loginService = {
 		if (!await authOperation.consume(c,{...binding,attempt})) throw new BizError(t('totpSessionExpired'));
 
 		// Clear login fail rate limit
-		if (failKey) {
-			await c.env.kv.delete(failKey);
+		if (targetEmail) {
+			await clearLoginFail(c, targetEmail.toLowerCase());
 		}
 
 
@@ -948,7 +1069,8 @@ const loginService = {
 		}
 
 		await c.env.kv.put(KvConst.AUTH_INFO + userRow.userId, JSON.stringify(authInfo), { expirationTtl: constant.TOKEN_EXPIRE });
-		return { token: jwt, email: activeLoginEmail, userId: userRow.userId, trustedDeviceToken: issuedTrustToken };
+		const legalAcceptance = await legalPolicyService.getLegalAcceptanceStatus(c, userRow.userId);
+		return { token: jwt, email: activeLoginEmail, userId: userRow.userId, trustedDeviceToken: issuedTrustToken, legalAcceptance };
 	},
 
 	async logout(c, userId) {

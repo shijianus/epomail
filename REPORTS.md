@@ -9,6 +9,27 @@
 
 ---
 
+### 后端逻辑、权限边界与发布门禁复审 (2026-11-05)
+*   **关联提交 (Git Commit)**: 代码修复与报告提交 `{{CODE_COMMIT}}`；本索引 Hash 在后续归档提交中记录。
+*   **专项文档索引 (Detailed Doc)**: [后端逻辑、权限边界与发布门禁复审](doc/backend-audit-2026-11-05.md)。
+*   **体检/审计范围与方法 (Scope & Methodology)**:
+    1. 范围：`release/2026-10-31` 的 `mail-worker` 全部后端模块、关键 `mail-vue` 契约、Vitest/Wrangler/CI 配置；本地 workerd/D1/KV，未部署、未访问生产/Staging、未调用真实供应商。
+    2. 方法：逐项复核 2026-11-03 报告的 R1、B1-B12、P2-1~P2-14；对工作区修复做数据流、权限、事务与幂等审阅；实跑 Worker 全量测试、Vue 构建、i18n 三项、Wrangler dry-run、`git diff --check`。
+*   **核心发现与缺陷矩阵 (Key Findings & Matrix)**:
+    - **[已关闭·P0]** R1 提交态 Vitest 配置非法 TOML 已修复；37 文件/513 项测试可在提交态配置下完整执行。B1 邀请码创建/兑换两端角色授予守卫已接入。
+    - **[P1·功能断链]** 加密模式搜索仍在密文列上 `LIKE`（B7）；入站个人转发 fallback 仍丢附件/CID 且无持久任务（B5）；OAuth 授权页内联登录未处理 `mfaRequired/tempToken`（U1）；慢网仍误清会话（U6）。
+    - **[P1·账号一致性]** 最后一枚恢复码后的自助因子轮换未闭合（B8）；管理建号仍为 user/profile/account 顺序写入，可能半提交（B11）。
+    - **[P2·加固]** 资料字段无界、举报去重缺失、Telegram 测试未绑定配置、PAT 明文且不可用、Apple id_token 可跳过 state/nonce、SSRF 未做 DNS 后校验、附件下载无原名、`init_secret` 回退 `jwt_secret`、存储切换保护过严、UNKNOWN 对账覆盖有限等。
+*   **治理修复与回归结果 (Fixes & Verification)**:
+    - 本轮修复了工作区中的后端加固批次，并额外修复：站内转发误用发件人 accountId、`markAsRead` 写成未读、站内 Telegram 绕过 `userTgForward`、星标/用户/审计/账号/公开 API 负数分页、`oidc-` 限流未 fail-closed、provider id 在歧义响应中丢失、Vitest 在 Windows 下的 linkedom/cssom 与 hook 超时问题。
+    - 验证：Worker 全量 `37 files / 513 tests passed`（exit 0）；Vue 构建通过；i18n 三项通过；Wrangler dry-run 通过；`git diff --check` 通过。
+    - **结论：无条件 GA 仍 NO-GO；受控公测可条件式 GO。** 残余 P1 清单、发布前检查与最小修复批次见专项文档第 5-7 节。
+*   **未执行/需人工处置 (Manual Follow-up)**:
+    - [ ] 修复加密搜索、入站转发持久任务、OAuth 授权页 MFA、慢网会话、最后一枚恢复码轮换、管理建号事务边界。
+    - [ ] 生产核查历史演示账号、旧库重复邮箱/唯一索引、`rate_limit_counter` 迁移与存储 locator；完成 Staging/备份恢复演练。
+
+---
+
 ### 后端逻辑、权限边界与发布门禁专项审计 (2026-11-03)
 *   **关联提交 (Git Commit)**: 审计基线 `b76130f88a9de4247e1e1f4b9ae0545292640bb1` (Short: `b76130f`)；报告与索引提交 `09489464d9c03d27047e566d811fb0f21011df5a` (Short: `0948946`)。
 *   **专项文档索引 (Detailed Doc)**: [后端逻辑与发布门禁审计](doc/backend-audit-2026-11-03.md)；[本轮检查结果](doc/validation/backend-audit-2026-11-03.json)。

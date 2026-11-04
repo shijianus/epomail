@@ -7,6 +7,7 @@ import attService from '../src/service/att-service.js';
 import r2Service from '../src/service/r2-service.js';
 import emailCryptoUtils from '../src/utils/email-crypto-utils.js';
 import { emailConst } from '../src/const/entity-const.js';
+import { assertSystemStorageCanChange } from '../src/service/privacy-revocation-service.js';
 
 // vitest.config.js has no shared schema setup. Use its two independent real D1
 // bindings and bootstrap this file alone; never depend on another spec's tables.
@@ -448,6 +449,36 @@ describe('Production mail lifecycle on independent real D1 databases', () => {
 				Array.from({ length: MAIL_LIFECYCLE_LIMITS.requestIds + 1 }, (_, i) => retained + i)))
 				.rejects.toMatchObject({ errorCode: 'mail_lifecycle_selection_limit' });
 			expect(await read(retained)).not.toBeNull();
+		});
+	});
+
+	it('administrator deletion uses a fixed ID snapshot and cleans attachments', async () => {
+		await withFixture(async f => {
+			const target = await f.mail({ subject: 'admin-delete-target' });
+			const survivor = await f.mail({ subject: 'admin-delete-survivor' });
+			const key = await f.attachment(target);
+			await f.star(target);
+
+			const deleted = await lifecycle.cascadeDeleteSystemEmails(f.c, [target]);
+			expect(deleted).toHaveLength(1);
+			expect(await read(target)).toBeNull();
+			expect(await read(survivor)).not.toBeNull();
+			expect(await count('attachments', target)).toBe(0);
+			expect(await count('star', target)).toBe(0);
+			const queued = await db.prepare('SELECT object_key FROM object_deletion_queue WHERE object_key=?').bind(key).first();
+			expect(queued?.object_key).toBe(key);
+		});
+	});
+
+	it('blocks a system storage change while any mail or object deletion remains', async () => {
+		await withFixture(async f => {
+			const id = await f.mail();
+			const key = await f.attachment(id);
+			await expect(assertSystemStorageCanChange(f.c)).rejects.toMatchObject({ code: 409 });
+			await lifecycle.cascadeDeleteSystemEmails(f.c, [id]);
+			await expect(assertSystemStorageCanChange(f.c)).rejects.toMatchObject({ code: 409 });
+			await db.prepare('DELETE FROM object_deletion_queue WHERE object_key=?').bind(key).run();
+			await expect(assertSystemStorageCanChange(f.c)).resolves.toBeUndefined();
 		});
 	});
 });

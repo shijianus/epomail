@@ -137,6 +137,28 @@ describe('Object ownership and capability signing', () => {
 		expect(await download.text()).toBe('user-three-file');
 	});
 
+	it('rejects a signed attachment URL after the owner is banned or deleted', async () => {
+		await env.db.prepare('INSERT INTO attachments (user_id, email_id, account_id, key, filename, size, type) VALUES (?, ?, ?, ?, ?, ?, ?)')
+			.bind(2, 10, 20, 'attachments/owned-by-2.txt', 'owned-by-2.txt', 10, 0).run();
+		await env.kv.put('attachments/owned-by-2.txt', 'user-two-file');
+		const token = await seedAuth(2, 'user2@example.com', 'session-user-2');
+		const signed = await SELF.fetch('http://example.com/api/oss-url/batch', {
+			method: 'POST',
+			headers: { Authorization: token, 'Content-Type': 'application/json' },
+			body: JSON.stringify({ keys: ['attachments/owned-by-2.txt'] })
+		});
+		const signedBody = await signed.json();
+		const url = signedBody.data.urls['attachments/owned-by-2.txt'];
+		expect(url).toBeTruthy();
+		expect((await SELF.fetch(`http://example.com/api${url}`)).status).toBe(200);
+
+		await env.db.prepare('UPDATE user SET status = 1 WHERE user_id = 2').run();
+		expect((await SELF.fetch(`http://example.com/api${url}`)).status).toBe(404);
+
+		await env.db.prepare('UPDATE user SET status = 0, is_del = 1 WHERE user_id = 2').run();
+		expect((await SELF.fetch(`http://example.com/api${url}`)).status).toBe(404);
+	});
+
 	it('rejects anonymous batch signing', async () => {
 		const response = await SELF.fetch('http://example.com/api/oss-url/batch', {
 			method: 'POST',

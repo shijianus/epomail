@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS user (
 	type INTEGER DEFAULT 1 NOT NULL,
 	password TEXT NOT NULL,
 	salt TEXT NOT NULL,
+	initial_password_hash TEXT NOT NULL DEFAULT '',
 	status INTEGER DEFAULT 0 NOT NULL,
 	create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
 	active_time DATETIME,
@@ -184,6 +185,19 @@ describe('eligibility gates for the first password', () => {
 		expect(eligibility.generatedHash).toBe(GENERATED_HASH);
 	});
 
+	it('uses the durable D1 marker even when KV has no copy', async () => {
+		const kv = createMockKv();
+		const c = context(kv, 'placeholder');
+		const jwt = await issueSession(c, kv);
+		c.req.header = (name) => (String(name).toLowerCase() === 'authorization' ? jwt : null);
+		await env.db.prepare('UPDATE user SET initial_password_hash = ? WHERE user_id = ?')
+			.bind(GENERATED_HASH, USER_ID).run();
+
+		const eligibility = await userService.evaluateInitialPassword(c, USER_ID);
+		expect(eligibility.canSet).toBe(true);
+		expect(eligibility.generatedHash).toBe(GENERATED_HASH);
+	});
+
 	it('denies a session that was not issued by a provider login', async () => {
 		const kv = createMockKv();
 		const c = context(kv, 'placeholder');
@@ -235,6 +249,8 @@ describe('setting the first password', () => {
 		const jwt = await issueSession(c, kv);
 		c.req.header = (name) => (String(name).toLowerCase() === 'authorization' ? jwt : null);
 		await kv.put(KvConst.INITIAL_PASSWORD + USER_ID, GENERATED_HASH);
+		await env.db.prepare('UPDATE user SET initial_password_hash = ? WHERE user_id = ?')
+			.bind(GENERATED_HASH, USER_ID).run();
 
 		const result = await userService.setInitialPassword(c, { password: 'new-user-password' }, USER_ID);
 		expect(result).toEqual({ success: true });
@@ -244,6 +260,9 @@ describe('setting the first password', () => {
 		const check = await cryptoUtils.verifyPasswordWithUpgrade('new-user-password', row.salt, row.password, c.env);
 		expect(check.isValid).toBe(true);
 
+		const durable = await env.db.prepare('SELECT initial_password_hash FROM user WHERE user_id = ?')
+			.bind(USER_ID).first();
+		expect(durable.initial_password_hash).toBe('');
 		expect(await kv.get(KvConst.INITIAL_PASSWORD + USER_ID)).toBeNull();
 		expect(await kv.get(KvConst.AUTH_INFO + USER_ID)).toBeNull();
 	});

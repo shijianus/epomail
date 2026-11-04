@@ -552,6 +552,20 @@ const attService = {
 				continue;
 			}
 
+			// Inbound staging writes the object before its attachment metadata is
+			// committed. A stale queue row from an earlier failed attempt must not
+			// delete the re-uploaded object between PUT and completeInboundReceive.
+			const inboundClaim = key.match(/^attachments\/([a-f0-9]{64})-/i);
+			if (inboundClaim) {
+				const active = await mailDb.prepare(`SELECT 1 AS present FROM mail_receive_claim
+					WHERE claim_key = ? AND state IN ('CLAIMED','SAVING') AND lease_until > unixepoch()`)
+					.bind(inboundClaim[1].toLowerCase()).first();
+				if (active) {
+					skipped++;
+					continue;
+				}
+			}
+
 			let referenced;
 			try {
 				const storage = await r2Service.resolveStorage(c, owner > 0 ? owner : null, { forDeletion: true });

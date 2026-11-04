@@ -1,4 +1,4 @@
-import { sql } from 'drizzle-orm';
+import { sql, eq } from 'drizzle-orm';
 import { mailOrm } from '../entity/orm.js';
 import email from '../entity/email.js';
 import account from '../entity/account.js';
@@ -7,7 +7,7 @@ import { getMailDb } from '../utils/db-accessor.js';
 import { mailTransactionGuard } from '../utils/mail-transaction.js';
 import { assertMailRowSize, buildBoundedInserts, prepareMailQuery, mailSha256, normalizeMailAddress } from '../utils/mail-pipeline.js';
 import emailCryptoUtils from '../utils/email-crypto-utils.js';
-import { emailConst, settingConst } from '../const/entity-const.js';
+import { emailConst, settingConst, isDel } from '../const/entity-const.js';
 import { isAdminUser } from '../utils/admin-utils.js';
 import BizError from '../error/biz-error.js';
 import settingService from './setting-service.js';
@@ -15,6 +15,8 @@ import userService from './user-service.js';
 import roleService from './role-service.js';
 import r2Service from './r2-service.js';
 import fileUtils from '../utils/file-utils.js';
+import telegramService from './telegram-service.js';
+import { applyRules } from '../email/rule-engine.js';
 
 const encoder = new TextEncoder();
 const bodyBytes = row => ['subject', 'text', 'content', 'code']
@@ -103,6 +105,7 @@ export async function deliverLocalMail(c, recipients, sender, attachments = [], 
 		AND lease_token=? AND lease_until>unixepoch()`).bind(taskId, sender.userId, sender.accountId, sender.emailId, leaseToken).first();
 	if (!validSender) throw new BizError('Local sender task does not match its archive', 409, 'outbound_lease_lost');
 	const setting = await settingService.query(c);
+	const failedRecipients = [];
 	for (const recipient of addresses) {
 		const receipt = await db.prepare('SELECT state FROM mail_local_delivery WHERE task_id=? AND recipient=?').bind(taskId, recipient).first();
 		if (receipt) continue;
@@ -135,7 +138,17 @@ export async function deliverLocalMail(c, recipients, sender, attachments = [], 
 		if (!Number.isFinite(quota.maxStorageBytes) || !Number.isFinite(quota.maxEmails)) {
 			throw new BizError('Recipient quota is unavailable', 503, 'quota_unavailable');
 		}
-		const copied = await copyAttachments(c, attachments, sender.userId, userId, accountId, taskId, recipient);
+		let copied;
+		try {
+			copied = await copyAttachments(c, attachments, sender.userId, userId, accountId, taskId, recipient);
+		} catch (error) {
+			// Do not let one recipient's source/destination storage failure starve
+			// every later recipient. Keep the overall task pending so the failed
+			// recipient is retried; never turn a transient storage error into a
+			// permanent bounce that loses the message.
+			failedRecipients.push({ recipient, error });
+			continue;
+		}
 		let content = sender.content || '';
 		for (const [from, to] of copied.replacements) content = content.replaceAll(`{{domain}}${from}`, `{{domain}}${to}`);
 		const deliveryKey = `local:${await mailSha256(`${taskId}\n${recipient}`)}`;
@@ -144,7 +157,27 @@ export async function deliverLocalMail(c, recipients, sender, attachments = [], 
 			recipient: JSON.stringify([{ address: recipient, name: '' }]), cc: '[]', bcc: '[]',
 			inReplyTo: sender.inReplyTo || '', relation: sender.relation || '', messageId: `<${taskId}@local.epomail>`,
 			type: emailConst.type.RECEIVE, status: userId ? emailConst.status.RECEIVE : emailConst.status.NOONE,
-			isDel: 0, isSpam: 0, unread: 0, receiveClaimKey: deliveryKey };
+			isDel: 0, isSpam: 0, unread: 0, labels: '[]', receiveClaimKey: deliveryKey };
+		// Internal delivery used to bypass the recipient's own rules entirely.
+		// Apply the same rule engine as external inbound mail before encryption.
+		if (owner) {
+			const ruleResult = applyRules({
+				sendEmail: sender.sendEmail,
+				subject: sender.subject,
+				content: sender.content,
+				text: sender.text,
+				recipient: JSON.stringify([{ address: recipient, name: '' }])
+			}, owner.customLabels, setting.blackFrom);
+			if (ruleResult) {
+				values.labels = ruleResult.labelsStr || '[]';
+				if (ruleResult.actions?.targetFolder === 'spam') values.isSpam = 1;
+				else if (ruleResult.actions?.targetFolder === 'trash') values.isDel = isDel.DELETE;
+				if (ruleResult.actions?.markAsRead) values.unread = emailConst.unread.READ;
+			}
+		}
+		// Keep a plaintext snapshot for personal notifications, then encrypt the
+		// stored row if the instance mail mode requires it.
+		const notificationSnapshot = { ...values, userId, accountId };
 		if (userId && emailCryptoUtils.shouldEncryptEmail(setting.allMailMode, values)) {
 			values = await emailCryptoUtils.encryptEmailRecord(values, await emailCryptoUtils.getUserEmailCryptoKey(c.env, userId));
 		}
@@ -167,6 +200,61 @@ export async function deliverLocalMail(c, recipients, sender, attachments = [], 
 				SELECT ?,?,email_id,'DELIVERED' FROM email WHERE receive_claim_key=?`).bind(taskId, recipient, deliveryKey),
 			...copied.stagedKeys.map(key => db.prepare('DELETE FROM object_deletion_queue WHERE object_key=? AND user_id=?').bind(key, userId)), guard.after];
 		await db.batch(statements);
+		try {
+			if (!userId || !owner) continue;
+			const inserted = await db.prepare('SELECT email_id AS emailId FROM email WHERE receive_claim_key=?')
+				.bind(deliveryKey).first();
+			if (!inserted?.emailId) continue;
+			const profile = await c.env.kv.get('USER_PROFILE_' + userId, { type: 'json' });
+			const notificationRow = { ...notificationSnapshot, emailId: inserted.emailId };
+			const ptg = profile?.personalTelegram;
+			if (Number(setting.userTgForward ?? 1) === 1
+				&& ptg?.enabled === true && ptg.botToken && ptg.chatId) {
+				await telegramService.sendPersonalEmailToBot(c, notificationRow, ptg)
+					.catch(err => console.warn('Local personal Telegram notification failed:', err.message));
+			}
+			const pfw = profile?.personalForwarding;
+			if (Number(setting.userEmailForward ?? 1) === 1 && pfw?.enabled === true && pfw.targets) {
+				const mode = pfw.mode || 'all';
+				const local = recipient.split('@')[0].toLowerCase();
+				const prefixes = String(pfw.aliasPrefixes || '').split(',').map(p => p.trim().toLowerCase()).filter(Boolean);
+				const shouldForward = mode === 'all'
+					|| (mode === 'alias' && prefixes.some(p => local.startsWith(p) || local === p));
+				if (shouldForward) {
+					const localDomains = new Set((setting.domainList || [])
+						.map(value => String(value).replace(/^@/, '').toLowerCase()));
+					const targets = String(pfw.targets).split(',').map(t => t.trim().toLowerCase()).filter(Boolean);
+					const { default: emailService } = await import('./email-service.js');
+					for (const target of targets) {
+						const targetDomain = target.split('@').pop();
+						if (!target || target === recipient.toLowerCase()
+							|| target === String(sender.sendEmail || '').toLowerCase()
+							|| localDomains.has(targetDomain)) continue;
+						await emailService.send(c, {
+							receiveEmail: [target],
+							subject: notificationRow.subject,
+							content: notificationRow.content,
+							text: notificationRow.text,
+							// Forward from the recipient's own mailbox. The sender's
+							// account belongs to a different user, so emailService.send
+							// would reject it as sendEmailNotCurUser.
+							accountId
+						}, userId).catch(err => console.warn('Local personal forwarding failed:', err.message));
+					}
+				}
+			}
+		} catch (notifyError) {
+			// Notification and forwarding are secondary to the committed mailbox
+			// copy; a provider failure must not roll back a delivered message.
+			console.warn('Local delivery notification failed:', notifyError.message);
+		}
+	}
+	if (failedRecipients.length > 0) {
+		const first = failedRecipients[0];
+		const error = new Error(`Local delivery failed for ${failedRecipients.map(item => item.recipient).join(', ')}: ${first.error?.message || 'attachment copy failed'}`);
+		error.cause = first.error;
+		error.failedRecipients = failedRecipients.map(item => item.recipient);
+		throw error;
 	}
 	const result = await db.prepare('SELECT recipient,state,reason FROM mail_local_delivery WHERE task_id=?').bind(taskId).all();
 	const receipts = result.results || [];

@@ -38,6 +38,7 @@ import mailOutboundService from './mail-outbound-service.js';
 import { deliverLocalMail } from './mail-local-delivery-service.js';
 import mailLifecycleService from './mail-lifecycle-service.js';
 import { reserveInboundQuota } from './mail-reliability-service.js';
+import rateLimit from '../utils/rate-limit.js';
 
 const emailService = {
 
@@ -58,6 +59,9 @@ const emailService = {
 		accountId = Number(accountId);
 		allReceive = Number(allReceive);
 
+		// SQLite treats LIMIT -1 as "no limit". Clamp both ends so a crafted
+		// negative size cannot dump the whole mailbox in one response.
+		if (!Number.isInteger(size) || size < 1) size = 20;
 		if (size > 50) {
 			size = 50;
 		}
@@ -386,7 +390,7 @@ const emailService = {
 			whitelistLabel.actions = { priority: 1, stopProcessing: true };
 
 			// Save back
-			await orm(c).update(user).set({ customLabels: JSON.stringify(labelsObj) }).where(eq(user.userId, userId)).run();
+			await userOrm(c).update(user).set({ customLabels: JSON.stringify(labelsObj) }).where(eq(user.userId, userId)).run();
 			
 			const authInfo = await c.env.kv.get(kvConst.AUTH_INFO + userId, { type: 'json' });
 			if (authInfo && authInfo.user) {
@@ -417,9 +421,13 @@ const emailService = {
 	},
 
 	async reportSpam(c, params, userId) {
-		const { emailIds, reportCategory, reportReason } = params;
+		const { emailIds } = params;
+		const reportCategory = (typeof params.reportCategory === 'string' ? params.reportCategory : 'spam').trim().slice(0, 64) || 'spam';
+		const reportReason = (typeof params.reportReason === 'string' ? params.reportReason : '').trim().slice(0, 2000);
 		const emailIdList = Array.isArray(emailIds) ? emailIds.map(Number) : String(emailIds).split(',').map(Number);
 		if (emailIdList.length === 0) return;
+
+		await rateLimit.check(c, { scope: 'report-spam', limit: 30, windowSeconds: 3600, subject: `user:${userId}` });
 
 		const emailRows = await mailLifecycleService.setMailSpam(c, { emailIds, isSpam: true }, userId);
 
@@ -1070,9 +1078,19 @@ const emailService = {
 		} catch (cause) {
 			// Compensate only while this lease still owns PREPARED. An ambiguous
 			// SENDING commit or a replacement lease must retain its reservation.
-			const failed = await mailDb.prepare("UPDATE mail_outbound_task SET state='FAILED',reserved_bytes=0,reserved_count=0,lease_until=0,last_error='Dispatch was not started' WHERE task_id=? AND state='PREPARED' AND lease_token=? RETURNING task_id")
+			const failed = await mailDb.prepare("UPDATE mail_outbound_task SET state='FAILED',reserved_bytes=0,reserved_count=0,lease_until=0,last_error='Dispatch was not started' WHERE task_id=? AND state='PREPARED' AND lease_token=? RETURNING task_id,email_id")
 				.bind(task.task_id, leaseToken).first();
-			if (failed) await mailOutboundService.compensateSendCount(c, { taskId: task.task_id });
+			if (failed) {
+				// The archive row was created as SAVING. Leaving it there makes it
+				// permanently invisible to retention and impossible for the user to
+				// delete, because MUTABLE excludes SAVING.
+				const emailId = failed.email_id || archived.emailId;
+				if (emailId) {
+					await mailDb.prepare('UPDATE email SET status=? WHERE email_id=? AND user_id=? AND status=?')
+						.bind(emailConst.status.FAILED, emailId, userId, emailConst.status.SAVING).run();
+				}
+				await mailOutboundService.compensateSendCount(c, { taskId: task.task_id });
+			}
 			throw cause;
 		}
 		let providerId = null;
@@ -1087,6 +1105,11 @@ const emailService = {
 					idempotencyKey: `mail-${task.task_id}` };
 				const result = useCloudflareEmail ? await this.sendByCloudflareEmail(c, providerParams) : await this.sendByResend(resendToken, providerParams);
 				if (result.error) {
+					// Preserve an acceptance identifier even when the response also
+					// reports an error/transport ambiguity. The catch path writes it
+					// to the UNKNOWN task so reconciliation can query the provider
+					// instead of leaving an unresolvable task behind.
+					if (result.data?.id) providerId = result.data.id;
 					const statusCode = Number(result.error.statusCode || result.error.status);
 					// Transport, timeout, conflict and 5xx results do not establish
 					// rejection. Keep UNKNOWN rather than inviting another send.
@@ -1112,7 +1135,7 @@ const emailService = {
 					WHERE task_id=? AND provider='local' AND state='SENDING' AND lease_token=?`).bind(task.task_id, leaseToken).run();
 				throw new BizError('Local delivery is pending; retry the same request to resume safely', 503, 'local_delivery_pending');
 			}
-			await mailOutboundService.markOutboundUnknown(c, { taskId: task.task_id, leaseToken }).catch(() => {});
+			await mailOutboundService.markOutboundUnknown(c, { taskId: task.task_id, leaseToken, providerId }).catch(() => {});
 			if (cause.errorCode === 'provider_rejected') throw cause;
 			throw new BizError('Send result requires reconciliation; retrying this request will not dispatch again', 503, 'provider_unknown');
 		}
@@ -1128,7 +1151,7 @@ const emailService = {
 			} catch (_) {
 				// Dispatch may already be accepted. A local commit failure must
 				// never invite a second message or return its send-count reservation.
-				await mailOutboundService.markOutboundUnknown(c, { taskId: task.task_id, leaseToken }).catch(() => {});
+				await mailOutboundService.markOutboundUnknown(c, { taskId: task.task_id, leaseToken, providerId }).catch(() => {});
 				throw new BizError('Send was submitted but its archive needs reconciliation', 503, 'provider_unknown');
 			}
 		}
@@ -1505,7 +1528,7 @@ const emailService = {
 		let userName = emailUtils.getName(userEmail) || (userEmail ? userEmail.split('@')[0] : getUserFallbackNameByLang(tplLang));
 		try {
 			const userEntity = (await import('../entity/user')).default;
-			const userRow = await orm(c).select({ nickname: userEntity.nickname, email: userEntity.email }).from(userEntity).where(eq(userEntity.userId, userId)).get();
+			const userRow = await userOrm(c).select({ nickname: userEntity.nickname, email: userEntity.email }).from(userEntity).where(eq(userEntity.userId, userId)).get();
 			if (userRow && userRow.nickname) {
 				userName = userRow.nickname;
 			}
@@ -1542,6 +1565,7 @@ const emailService = {
 			if (existing) {
 				try {
 					await c.env.kv.put('HAS_WELCOME_' + userId, '1');
+					await c.env.kv.put('WELCOME_ISSUED_' + userId, '1');
 				} catch (e) {}
 				return null;
 			}
@@ -1596,6 +1620,7 @@ const emailService = {
 
 		try {
 			await c.env.kv.put('HAS_WELCOME_' + userId, '1');
+			await c.env.kv.put('WELCOME_ISSUED_' + userId, '1');
 		} catch (e) {}
 
 		return emailRow;
@@ -1604,19 +1629,15 @@ const emailService = {
 	async ensureWelcomeEmailForUser(c, userId, userEmail = null) {
 		if (!userId) return null;
 		try {
-			const kvCached = await c.env.kv.get('HAS_WELCOME_' + userId);
-			if (kvCached === '1') {
-				// 双重验证：KV 说已发过，但需检查 DB 实际是否存在（防止账号恢复/迁移后 KV 残留阻塞欢迎邮件）
-				const dbCheck = await orm(c).select({ emailId: email.emailId }).from(email).where(
-					and(
-						eq(email.userId, userId),
-						inArray(email.sendEmail, ['announcement@epocanvas.com', 'admin@epocanvas.com']),
-						eq(email.isDel, isDel.NORMAL)
-					)
-				).limit(1).get();
-				if (dbCheck) return null; // 确实已有，正常跳过
-				// KV 为脏缓存（账号曾被删除再恢复），清除后重新发送
-				await c.env.kv.delete('HAS_WELCOME_' + userId).catch(() => {});
+			// Welcome mail is issued at most once per account. A separate marker
+			// survives the user permanently deleting the message, so a read-path
+			// ensure cannot recreate mail the user deliberately removed.
+			if (await c.env.kv.get('WELCOME_ISSUED_' + userId) === '1') return null;
+			// Migrate the legacy marker without re-sending: HAS_WELCOME_ was set
+			// only after a successful delivery in previous versions.
+			if (await c.env.kv.get('HAS_WELCOME_' + userId) === '1') {
+				await c.env.kv.put('WELCOME_ISSUED_' + userId, '1');
+				return null;
 			}
 		} catch (e) {}
 
@@ -1630,6 +1651,7 @@ const emailService = {
 		if (existing) {
 			try {
 				await c.env.kv.put('HAS_WELCOME_' + userId, '1');
+				await c.env.kv.put('WELCOME_ISSUED_' + userId, '1');
 			} catch (e) {}
 			await this.ensureGlobalEmailForUser(c, userId, userEmail).catch(() => {});
 			return null;
@@ -1638,7 +1660,7 @@ const emailService = {
 		let emailAddress = userEmail;
 		if (!emailAddress) {
 			const userEntity = (await import('../entity/user')).default;
-			const userRow = await orm(c).select({ email: userEntity.email }).from(userEntity).where(eq(userEntity.userId, userId)).get();
+			const userRow = await userOrm(c).select({ email: userEntity.email }).from(userEntity).where(eq(userEntity.userId, userId)).get();
 			if (userRow) {
 				emailAddress = userRow.email;
 			}
@@ -1699,7 +1721,7 @@ const emailService = {
 		let userName = emailUtils.getName(userEmail) || (userEmail ? userEmail.split('@')[0] : getUserFallbackNameByLang(tplLang));
 		try {
 			const userEntity = (await import('../entity/user')).default;
-			const userRow = await orm(c).select({ nickname: userEntity.nickname, email: userEntity.email }).from(userEntity).where(eq(userEntity.userId, userId)).get();
+			const userRow = await userOrm(c).select({ nickname: userEntity.nickname, email: userEntity.email }).from(userEntity).where(eq(userEntity.userId, userId)).get();
 			if (userRow && userRow.nickname) {
 				userName = userRow.nickname;
 			}
@@ -1791,7 +1813,7 @@ const emailService = {
 		}
 
 		const userEntity = (await import('../entity/user')).default;
-		const userRow = await orm(c).select().from(userEntity).where(eq(userEntity.userId, userId)).get();
+		const userRow = await userOrm(c).select().from(userEntity).where(eq(userEntity.userId, userId)).get();
 		if (!userRow) return null;
 
 		if (globalConfig.targetType === 'roles') {
@@ -1971,11 +1993,9 @@ const emailService = {
 	},
 
 	async physicsDelete(c, params) {
-		let { emailIds } = params;
-		emailIds = emailIds.split(',').map(Number);
-		await attService.removeByEmailIds(c, emailIds);
-		await starService.removeByEmailIds(c, emailIds);
-		await orm(c).delete(email).where(inArray(email.emailId, emailIds)).run();
+		const { emailIds } = params;
+		const ids = Array.isArray(emailIds) ? emailIds : String(emailIds || '').split(',');
+		return await mailLifecycleService.cascadeDeleteSystemEmails(c, ids);
 	},
 
 	async physicsDeleteUserIds(c, userIds) {
@@ -2103,6 +2123,130 @@ const emailService = {
 		return eventRows.length;
 	},
 
+	/**
+	 * Reconcile UNKNOWN outbound tasks that have a durable provider id.
+	 *
+	 * A provider acceptance that could not be written back locally used to stay
+	 * UNKNOWN forever, keeping its send-count reservation and archive pending.
+	 * Resend exposes GET /emails/:id, so a bounded maintenance pass can turn a
+	 * confirmed provider fact into ACCEPTED/FAILED without ever re-dispatching.
+	 * Tasks without a provider id remain UNKNOWN for administrator review.
+	 */
+	async reconcileUnknownOutbound(c, { limit = 20 } = {}) {
+		const db = getMailDb(c);
+		const bound = Math.max(1, Math.min(Number(limit) || 20, 50));
+		const candidates = await db.prepare(`SELECT task_id, user_id, account_id, provider_id
+			FROM mail_outbound_task
+			WHERE state='UNKNOWN' AND provider='external' AND provider_id IS NOT NULL
+				AND updated_at < datetime('now','-30 seconds')
+			ORDER BY updated_at ASC LIMIT ?`).bind(bound).all();
+		const rows = candidates.results || [];
+		if (rows.length === 0) return { checked: 0, accepted: 0, failed: 0 };
+
+		const settings = await settingService.query(c);
+		let checked = 0;
+		let accepted = 0;
+		let failed = 0;
+		for (const row of rows) {
+			const account = await accountService.selectById(c, row.account_id);
+			const domain = emailUtils.getDomain(account?.email || '');
+			const token = settings?.resendTokens?.[domain];
+			if (!token || String(token).startsWith('mailjet:')) continue;
+			checked++;
+			let response;
+			try {
+				response = await fetch(`https://api.resend.com/emails/${encodeURIComponent(row.provider_id)}`, {
+					headers: { Authorization: `Bearer ${String(token)}` },
+					signal: AbortSignal.timeout(5000)
+				});
+			} catch (_) {
+				continue;
+			}
+			if (!response.ok) continue;
+			const data = await response.json().catch(() => null);
+			const event = String(data?.last_event || data?.status || '').toLowerCase();
+			if (!event) continue;
+
+			if (['sent', 'delivery_delayed', 'delivered'].includes(event)) {
+				const updated = await db.prepare(`UPDATE mail_outbound_task
+					SET state='ACCEPTED',reserved_bytes=0,reserved_count=0,lease_until=0,
+						last_error='Reconciled from provider acceptance',updated_at=CURRENT_TIMESTAMP
+					WHERE task_id=? AND state='UNKNOWN' AND provider_id=?
+					RETURNING email_id`).bind(row.task_id, row.provider_id).first();
+				if (!updated) continue;
+				accepted++;
+				if (updated.email_id) {
+					const emailStatus = event === 'delivered' ? emailConst.status.DELIVERED : emailConst.status.SENT;
+					await db.prepare(`UPDATE email SET status=CASE WHEN status=? THEN ? ELSE status END,
+						resend_email_id=COALESCE(resend_email_id,?) WHERE email_id=? AND user_id=?`)
+						.bind(emailConst.status.SAVING, emailStatus, row.provider_id, updated.email_id, row.user_id).run();
+				}
+				if (event !== 'delivered') {
+					await this.replayProviderEventsFromLedger(c, row.provider_id).catch(() => {});
+				}
+				continue;
+			}
+
+			if (['bounced', 'complained', 'failed'].includes(event)) {
+				const updated = await db.prepare(`UPDATE mail_outbound_task
+					SET state='FAILED',reserved_bytes=0,reserved_count=0,lease_until=0,
+						last_error=?,updated_at=CURRENT_TIMESTAMP
+					WHERE task_id=? AND state='UNKNOWN' AND provider_id=?
+					RETURNING email_id`).bind(`Provider reported ${event}`, row.task_id, row.provider_id).first();
+				if (!updated) continue;
+				failed++;
+				if (updated.email_id) {
+					const emailStatus = event === 'bounced' ? emailConst.status.BOUNCED
+						: event === 'complained' ? emailConst.status.COMPLAINED : emailConst.status.FAILED;
+					await db.prepare('UPDATE email SET status=? WHERE email_id=? AND user_id=? AND status IN (?,?,?)')
+						.bind(emailStatus, updated.email_id, row.user_id, emailConst.status.SAVING,
+							emailConst.status.SENT, emailConst.status.DELAYED).run();
+				}
+				await mailOutboundService.compensateSendCount(c, { taskId: row.task_id }).catch(() => {});
+			}
+		}
+		return { checked, accepted, failed };
+	},
+
+	async listUnknownOutbound(c, { limit = 50 } = {}) {
+		const bound = Math.max(1, Math.min(Number(limit) || 50, 100));
+		const result = await getMailDb(c).prepare(`SELECT task_id, user_id, account_id, provider_id,
+			reserved_bytes, reserved_count, last_error, create_time, updated_at
+			FROM mail_outbound_task WHERE state='UNKNOWN' ORDER BY updated_at ASC LIMIT ?`).bind(bound).all();
+		return result.results || [];
+	},
+
+	/**
+	 * Administrator resolution of an UNKNOWN task after checking the provider.
+	 * ACCEPTED confirms delivery and keeps the consumed send-count reservation;
+	 * FAILED is only valid for a confirmed provider rejection and compensates it.
+	 */
+	async resolveUnknownOutbound(c, { taskId, state, note = '' } = {}) {
+		const target = String(state || '').toUpperCase();
+		if (!['ACCEPTED', 'FAILED'].includes(target)) {
+			throw new BizError('Unknown resolution state', 400, 'invalid_outbound_resolution');
+		}
+		if (typeof taskId !== 'string' || !taskId.trim()) {
+			throw new BizError('Missing outbound task id', 400, 'invalid_outbound_resolution');
+		}
+		const db = getMailDb(c);
+		const reason = `Administrator resolved ${target}${note ? `: ${String(note).slice(0, 300)}` : ''}`;
+		const updated = await db.prepare(`UPDATE mail_outbound_task
+			SET state=?,reserved_bytes=0,reserved_count=0,lease_until=0,last_error=?,updated_at=CURRENT_TIMESTAMP
+			WHERE task_id=? AND state='UNKNOWN' RETURNING email_id,user_id`)
+			.bind(target, reason, taskId.trim()).first();
+		if (!updated) throw new BizError('Outbound task is not UNKNOWN or was already resolved', 409, 'outbound_task_state_changed');
+		if (updated.email_id) {
+			const emailStatus = target === 'ACCEPTED' ? emailConst.status.SENT : emailConst.status.FAILED;
+			await db.prepare('UPDATE email SET status=CASE WHEN status=? THEN ? ELSE status END WHERE email_id=? AND user_id=?')
+				.bind(emailConst.status.SAVING, emailStatus, updated.email_id, updated.user_id).run();
+		}
+		if (target === 'FAILED') {
+			await mailOutboundService.compensateSendCount(c, { taskId: taskId.trim() });
+		}
+		return { taskId: taskId.trim(), state: target, emailId: updated.email_id || null };
+	},
+
 	async selectUserEmailCountList(c, userIds, type, del = isDel.NORMAL) {
 		if (!userIds || userIds.length === 0) {
 			return [];
@@ -2132,6 +2276,7 @@ const emailService = {
 		emailId = Number(emailId);
 		timeSort = Number(timeSort);
 
+		if (!Number.isInteger(size) || size < 1) size = 20;
 		if (size > 50) {
 			size = 50;
 		}
@@ -2441,10 +2586,11 @@ const emailService = {
 			return;
 		}
 
-		await attService.removeByEmailIds(c, emailIds);
-		await starService.removeByEmailIds(c, emailIds);
-
-		await orm(c).delete(email).where(conditions.length > 1 ? and(...conditions) : conditions[0]).run();
+		// Delete exactly this snapshot through the lifecycle transaction. Never
+		// re-evaluate the dynamic filter after the attachment snapshot: a message
+		// that arrived in between would otherwise lose its parent row without its
+		// attachment/object cleanup.
+		return await mailLifecycleService.cascadeDeleteSystemEmails(c, emailIds);
 	},
 
 	async physicsDeleteByAccountId(c, accountId) {

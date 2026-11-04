@@ -25,7 +25,16 @@ export const AUTH_SECURITY_OPERATION_SCHEMA = Object.freeze([
 		expires_at INTEGER NOT NULL,
 		PRIMARY KEY (user_id, time_step)
 	)`,
-	`CREATE INDEX IF NOT EXISTS idx_auth_totp_replay_expiry ON auth_totp_replay(expires_at)`
+	`CREATE INDEX IF NOT EXISTS idx_auth_totp_replay_expiry ON auth_totp_replay(expires_at)`,
+	`CREATE TABLE IF NOT EXISTS rate_limit_counter (
+		scope TEXT NOT NULL,
+		subject TEXT NOT NULL,
+		window_start INTEGER NOT NULL,
+		count INTEGER NOT NULL CHECK (count >= 0),
+		expires_at INTEGER NOT NULL,
+		PRIMARY KEY (scope, subject, window_start)
+	)`,
+	`CREATE INDEX IF NOT EXISTS idx_rate_limit_counter_expiry ON rate_limit_counter(expires_at)`
 ]);
 
 const TOKEN_PATTERN = /^[a-f0-9]{64}$/;

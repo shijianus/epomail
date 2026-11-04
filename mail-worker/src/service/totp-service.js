@@ -112,6 +112,14 @@ const totpService = {
 			const valid = await cryptoUtils.verifyPasswordWithUpgrade(params.password, ctx.row.salt, ctx.row.password, c.env);
 			if (!valid.isValid) throw new BizError(t('oauthReauthFailed'), 403, 'reauth_failed');
 		} else {
+			// Provider-session proof is only for accounts that never had a
+			// user-chosen password. A password-capable account must present the
+			// password even when it logged in through OAuth; otherwise a stolen
+			// fresh OAuth session can bind an attacker identity and survive a
+			// password reset.
+			if (await userService.hasUsablePassword(c, ctx.row)) {
+				throw new BizError(t('oauthReauthRequired'), 403, 'reauth_password_required');
+			}
 			const meta = ctx.session.meta;
 			if (!meta || meta.method !== 'oauth' || authVersionOf(meta) !== authVersionOf(ctx.row)
 				|| !Number.isFinite(meta.at) || meta.at > Date.now() || Date.now() - meta.at > 300000) {
@@ -279,10 +287,20 @@ const totpService = {
 		keys.push(key);
 		if (!await authOperation.consume(c, { ...binding, attempt })) reject();
 		const fields = { securityKeys: JSON.stringify(keys), passkeyHistory: 1 };
+		let recoveryCodes = null;
 		if (initial) { fields.totpEnabled = 1; fields.totpCreatedAt = ctx.row.totpCreatedAt || now; }
+		// The first passkey can be the only MFA factor. Issue recovery codes in
+		// the same authentication-changing write so losing that device does not
+		// permanently lock the account out of self-service factor rotation.
+		const missingBackupCodes = !ctx.row.totpBackupCodes || ctx.row.totpBackupCodes === '[]' || ctx.row.totpBackupCodes === '';
+		if (initial && missingBackupCodes) {
+			const backup = await totpUtils.generateBackupCodes(10, c.env);
+			fields.totpBackupCodes = JSON.stringify({ hashedCodes: backup.hashedCodes, encryptedRaw: backup.encryptedRaw });
+			recoveryCodes = backup.rawCodes;
+		}
 		await userService.changeAuthentication(c, ctx.row, fields);
 		await notice(c, userId, 'PASSKEY_ADDED', { keyName: key.name });
-		return { ...publicKey(key), reauthRequired: true };
+		return { ...publicKey(key), reauthRequired: true, ...(recoveryCodes ? { backupCodes: recoveryCodes } : {}) };
 	},
 	async getPasskeys(c, userId) {
 		const row = await userService.selectById(c, userId);
@@ -342,11 +360,12 @@ const totpService = {
 		if (!updated) reject();
 		return true;
 	},
-	async adminResetTotp(c, adminUserId, targetUserId) {
+	async adminResetTotp(c, adminUserId, targetUserId, operatorPassword = '') {
 		const row = await userService.selectById(c, Number(targetUserId));
 		if (!row) throw new BizError(t('notExistUser'));
 		if (Number(targetUserId) === 1 && Number(adminUserId) !== 1) throw new BizError(t('unauthorized'), 403);
 		await rbacGuard.assertCanManageUser(c, adminUserId, Number(targetUserId));
+		await userService.assertAdminStepUp(c, adminUserId, operatorPassword);
 		await userService.changeAuthentication(c, row, { totpEnabled: 0, totpSecret: '', totpBackupCodes: '[]', totpCreatedAt: '', securityKeys: '[]',
 			passkeyHistory: row.passkeyHistory || (keysOf(row).length ? 1 : 0) });
 		// In-app notice only. No direct provider dispatch can bypass outbound policy.

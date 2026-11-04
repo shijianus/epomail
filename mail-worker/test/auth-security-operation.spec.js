@@ -73,7 +73,8 @@ async function mint(c, options, extra = {}) {
 
 describe('D1 security operation primitives', () => {
 	it('exports idempotent schema and supports USER_DB routing and raw D1 bindings', async () => {
-		expect(AUTH_SECURITY_OPERATION_SCHEMA).toHaveLength(4);
+		expect(AUTH_SECURITY_OPERATION_SCHEMA).toHaveLength(6);
+		expect(AUTH_SECURITY_OPERATION_SCHEMA.some(sql => sql.includes('rate_limit_counter'))).toBe(true);
 		expect(authSecurityOperation.ensureSchema).toBe(ensureAuthSecurityOperationSchema);
 		await ensureAuthSecurityOperationSchema(env.db);
 		await fixture(async ({ options }) => {

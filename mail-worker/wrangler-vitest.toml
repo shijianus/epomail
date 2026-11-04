@@ -23,4 +23,4 @@ domain = ["example.com"]
 admin = "admin@example.com"
 jwt_secret = "test-jwt-secret-for-unit-tests"
 totp_enc_key = "test-totp-encryption-key-for-unit-tests"
-resend_webhook_secret = "whsec_" + "test_only_not_a_real_secret"
+resend_webhook_secret = "local-test-only-webhook-secret"

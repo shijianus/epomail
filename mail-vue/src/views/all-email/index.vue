@@ -148,7 +148,7 @@ import {getIconByName} from "@/utils/icon-utils.js";
 import {formatBytes} from "@/utils/file-utils.js";
 import {useAttachmentUrls} from "@/utils/attachment-urls.js";
 defineOptions({
-  name: 'all-email'
+  name: 'manage-mail'
 })
 
 const route = useRoute()
@@ -417,7 +417,7 @@ function getEmailList(emailId, size) {
 }
 
 useEmailPolling({
-  routeName: 'all-email',
+  routeName: 'manage-mail',
   tick: async () => {
     const latestId = sysEmailScroll.value.latestEmail?.emailId
     if (!latestId && latestId !== 0) return

@@ -3,7 +3,7 @@ import accountService from './account-service';
 import { userOrm as orm, mailOrm } from '../entity/orm';
 import user from '../entity/user';
 import account from '../entity/account';
-import { and, asc, count, desc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gte, inArray, sql } from 'drizzle-orm';
 import { emailConst, isDel, roleConst, userConst } from '../const/entity-const';
 import { email } from '../entity/email';
 import { att } from '../entity/att';
@@ -31,7 +31,7 @@ import { sanitizeCustomLabels } from '../utils/svg-utils.js';
 import rateLimit from '../utils/rate-limit.js';
 import userContext from '../security/user-context.js';
 import { authVersionOf } from '../utils/one-time-credential.js';
-import { getMailDb } from '../utils/db-accessor.js';
+import { getMailDb, getUserDb } from '../utils/db-accessor.js';
 import { deleteKvKeys, deleteKvMatching, forEachKvPage } from '../utils/kv-revocation.js';
 import { assertStorageCanChange, beginAccountDeletion, deleteAccountEvidence, getObjectDeletionCounts,
 	isActiveUser, readPrivacyState, revokeAccountAccess, revokeTelegramLinks, setDeletionStatus } from './privacy-revocation-service.js';
@@ -560,6 +560,11 @@ const userService = {
 
 		const { salt, hash } = await cryptoUtils.hashPassword(password, c.env);
 		await this.changeAuthentication(c, userRow, { password: hash, salt });
+		try {
+			await getUserDb(c).prepare("UPDATE user SET initial_password_hash = '' WHERE user_id = ?").bind(userId).run();
+		} catch (err) {
+			console.warn('Failed to clear initial password marker:', err.message);
+		}
 
 		// Password changes invalidate every existing session. The user must log
 		// in again with the new credential.
@@ -601,6 +606,44 @@ const userService = {
 	 * oauthUserId are never accepted as proof on their own; both are
 	 * attacker-supplied in the flows that matter.
 	 */
+	/**
+	 * Persist the exact generated password hash as the durable first-password
+	 * marker. KV may still cache it for compatibility, but a lost KV write must
+	 * not permanently disable the normal self-service first-password flow.
+	 */
+	async markInitialPassword(c, userId, passwordHash) {
+		if (!passwordHash) return false;
+		try {
+			const result = await getUserDb(c).prepare(
+				'UPDATE user SET initial_password_hash = ? WHERE user_id = ? AND password = ? AND is_del = 0'
+			).bind(passwordHash, userId, passwordHash).run();
+			return Number(result?.meta?.changes ?? 0) > 0;
+		} catch (err) {
+			console.error('Failed to persist initial password marker:', err);
+			return false;
+		}
+	},
+
+	/**
+	 * True only when the account owner can actually present the stored password.
+	 * OAuth-created accounts carry a random password whose exact hash is the
+	 * initial-password marker; that password is not a usable login method.
+	 */
+	async hasUsablePassword(c, userRow) {
+		if (!userRow || typeof userRow.password !== 'string' || !userRow.password) return false;
+		try {
+			const durable = await getUserDb(c).prepare(
+				'SELECT initial_password_hash AS marker FROM user WHERE user_id = ?'
+			).bind(userRow.userId).first();
+			if (durable?.marker && durable.marker === userRow.password) return false;
+		} catch (_) {}
+		try {
+			const marker = await c.env.kv.get(KvConst.INITIAL_PASSWORD + userRow.userId);
+			if (marker && marker === userRow.password) return false;
+		} catch (_) {}
+		return true;
+	},
+
 	async evaluateInitialPassword(c, userId) {
 		const status = {
 			canSet: false,
@@ -613,7 +656,18 @@ const userService = {
 			const userRow = await this.selectById(c, userId);
 			if (!userRow || !userRow.password) return status;
 
-			const generatedHash = await c.env.kv.get(KvConst.INITIAL_PASSWORD + userId);
+			// D1 is authoritative; KV remains a compatibility fallback for
+			// accounts bound before the durable marker column existed.
+			let durableMarker = '';
+			try {
+				const markerRow = await getUserDb(c).prepare(
+					'SELECT initial_password_hash AS marker FROM user WHERE user_id = ?'
+				).bind(userId).first();
+				durableMarker = typeof markerRow?.marker === 'string' ? markerRow.marker : '';
+			} catch (_) {}
+			let kvMarker = null;
+			try { kvMarker = await c.env.kv.get(KvConst.INITIAL_PASSWORD + userId); } catch (_) {}
+			const generatedHash = durableMarker || kvMarker || '';
 			status.hasInitialPassword = Boolean(generatedHash && generatedHash === userRow.password);
 
 			const linked = await orm(c).select().from(oauth).where(eq(oauth.userId, userId)).get();
@@ -677,11 +731,14 @@ const userService = {
 		const { salt, hash } = await cryptoUtils.hashPassword(password, c.env);
 
 		// Compare-and-set on the generated hash: if another request already set
-		// a password, this update matches no rows and the re-read differs.
-		await orm(c).update(user)
-			.set({ password: hash, salt, authVersion: eligibility.authVersion + 1 })
-			.where(and(eq(user.userId, userId), eq(user.password, eligibility.generatedHash || ''), eq(user.authVersion, eligibility.authVersion)))
-			.run();
+		// a password, this update matches no rows and the re-read differs. The
+		// same statement clears the durable marker; a lost KV write can no longer
+		// strand the account in the "generated password" state.
+		await getUserDb(c).prepare(`
+			UPDATE user
+			SET password = ?, salt = ?, auth_version = ?, initial_password_hash = ''
+			WHERE user_id = ? AND password = ? AND auth_version = ? AND is_del = 0
+		`).bind(hash, salt, eligibility.authVersion + 1, userId, eligibility.generatedHash || '', eligibility.authVersion).run();
 
 		const updated = await this.selectById(c, userId);
 		if (!updated || updated.password !== hash) {
@@ -956,8 +1013,14 @@ const userService = {
 		num = Number(num);
 		timeSort = Number(timeSort);
 		params.isDel = Number(params.isDel);
+		if (!Number.isInteger(size) || size < 1) {
+			size = 20;
+		}
 		if (size > 50) {
 			size = 50;
+		}
+		if (!Number.isInteger(num) || num < 1) {
+			num = 1;
 		}
 
 		num = (num - 1) * size;
@@ -1114,12 +1177,30 @@ const userService = {
 			.run();
 	},
 
+	/**
+	 * Re-prove the acting administrator before a destructive account action.
+	 * The site owner is the final authority; delegated operators must re-enter
+	 * their own password so a stolen moderator session cannot reset a user.
+	 */
+	async assertAdminStepUp(c, callerUserId, currentPassword) {
+		const caller = await this.selectById(c, Number(callerUserId));
+		if (!caller) throw new BizError('操作者账号不存在', 403);
+		if (isAdminUser(c, caller)) return caller;
+		if (typeof currentPassword !== 'string' || !currentPassword) {
+			throw new BizError('该操作需要重新验证管理员身份', 403, 'reauth_required');
+		}
+		const valid = await cryptoUtils.verifyPasswordWithUpgrade(currentPassword, caller.salt, caller.password, c.env);
+		if (!valid.isValid) throw new BizError('管理员密码错误', 403, 'reauth_failed');
+		return caller;
+	},
+
 	async setPwd(c, params, callerUserId) {
-		const { password, userId } = params;
+		const { password, userId, operatorPassword } = params;
 		if (Number(userId) === 1 && callerUserId && Number(callerUserId) !== 1) {
 			throw new BizError('仅站长本人可修改站长密码！', 403);
 		}
 		await rbacGuard.assertCanManageUser(c, callerUserId, Number(userId));
+		await this.assertAdminStepUp(c, callerUserId, operatorPassword);
 		await this.resetPassword(c, { password }, userId);
 		await c.env.kv.delete(KvConst.AUTH_INFO + userId);
 	},
@@ -1467,10 +1548,18 @@ const userService = {
 		const userRow = await userService.selectById(c, userId);
 		if (!userRow) throw new BizError('User not found');
 
+		const range = typeof options?.range === 'string' ? options.range : 'all';
+		const emailConditions = [eq(email.userId, userId), eq(email.isDel, 0)];
+		if (range === '30d') {
+			emailConditions.push(gte(email.createTime, dayjs().subtract(30, 'day').format('YYYY-MM-DD HH:mm:ss')));
+		} else if (range === '1y') {
+			emailConditions.push(gte(email.createTime, dayjs().subtract(1, 'year').format('YYYY-MM-DD HH:mm:ss')));
+		}
+
 		const [account, roleRow, userEmails] = await Promise.all([
 			accountService.selectByEmailIncludeDel(c, userRow.email),
 			roleService.selectById(c, userRow.type),
-			mailOrm(c).select().from(email).where(and(eq(email.userId, userId), eq(email.isDel, 0))).all()
+			mailOrm(c).select().from(email).where(and(...emailConditions)).all()
 		]);
 
 		let profile = {};
@@ -1511,6 +1600,7 @@ const userService = {
 				emailId: em.emailId,
 				messageId: em.messageId,
 				toEmail: em.toEmail,
+				recipient: em.recipient,
 				sendEmail: em.sendEmail,
 				name: em.name,
 				subject: em.subject,

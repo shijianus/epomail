@@ -191,6 +191,8 @@
       <div class="dialog-box">
         <el-input v-model="userForm.password" type="password" :placeholder="$t('newPassword')" autocomplete="off">
         </el-input>
+        <el-input v-model="userForm.operatorPassword" type="password" :placeholder="$t('adminPassword')" autocomplete="off">
+        </el-input>
         <el-button class="btn" type="primary" :loading="settingLoading" @click="updatePwd"
         >{{ $t('save') }}
         </el-button>
@@ -614,6 +616,7 @@ const params = reactive({
 let chooseUser = {}
 const userForm = reactive({
   password: null,
+  operatorPassword: null,
   type: -1,
   userId: 0,
 })
@@ -979,11 +982,22 @@ function resetTotp(user) {
       type: 'warning'
     }
   ).then(() => {
-    userResetTotp(user.userId).then(() => {
-      ElMessage({
-        message: t('resetTotpSuccess'),
-        type: 'success',
-        plain: true
+    ElMessageBox.prompt(
+      t('adminPassword'),
+      t('resetTotpTitle'),
+      {
+        confirmButtonText: t('confirm'),
+        cancelButtonText: t('cancel'),
+        inputType: 'password',
+        inputPlaceholder: t('password')
+      }
+    ).then(({ value }) => {
+      userResetTotp(user.userId, value || '').then(() => {
+        ElMessage({
+          message: t('resetTotpSuccess'),
+          type: 'success',
+          plain: true
+        })
       })
     })
   });
@@ -1128,6 +1142,7 @@ function setType() {
 
 function resetUserForm() {
   userForm.password = null
+  userForm.operatorPassword = null
   userForm.userId = 0
 }
 
@@ -1157,7 +1172,7 @@ function updatePwd() {
   }
 
   settingLoading.value = true
-  userSetPwd({password: userForm.password, userId: userForm.userId}).then(() => {
+  userSetPwd({password: userForm.password, userId: userForm.userId, operatorPassword: userForm.operatorPassword || ''}).then(() => {
     setPwdShow.value = false
     ElMessage({
       message: t('saveSuccessMsg'),

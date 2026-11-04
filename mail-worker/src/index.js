@@ -17,6 +17,7 @@ import { authVersionOf } from './utils/one-time-credential.js';
 import { purgeAiBudgets } from './utils/ai-budget.js';
 import { cleanupExpiredInboundClaims } from './service/mail-reliability-service.js';
 import { maintainOutboundTasks } from './service/mail-outbound-service.js';
+import { clearNoOne } from './service/mail-lifecycle-service.js';
 
 async function checkScheduledAuth(req, env) {
 	if (req.method !== 'POST') {
@@ -195,10 +196,16 @@ export default {
 		await run('ai_budget_cleanup', () => purgeAiBudgets({ env }));
 		await run('inbound_raw_cleanup', () => cleanupExpiredInboundClaims({ env }, { limit: 100 }));
 		await run('outbound_tasks', () => maintainOutboundTasks({ env }, { limit: 100 }));
+		await run('outbound_reconcile', () => emailService.reconcileUnknownOutbound({ env }, { limit: 20 }));
 		await run('security_operation_cleanup', () => getUserDb({ env }).batch([
 			getUserDb({ env }).prepare('DELETE FROM auth_security_operation WHERE rowid IN (SELECT rowid FROM auth_security_operation WHERE expires_at < unixepoch() LIMIT 500)'),
 			getUserDb({ env }).prepare('DELETE FROM auth_totp_replay WHERE rowid IN (SELECT rowid FROM auth_totp_replay WHERE expires_at < unixepoch() LIMIT 500)')
 		]));
+		// Keep this separate: a pre-migration database without the new table must
+		// not roll back the auth-table cleanup above.
+		await run('rate_limit_cleanup', () => getUserDb({ env }).prepare(
+			'DELETE FROM rate_limit_counter WHERE rowid IN (SELECT rowid FROM rate_limit_counter WHERE expires_at < unixepoch() LIMIT 500)'
+		).run());
 		if (c?.cron === '*/30 * * * *') {
 			await run('analytics', () => analysisService.refreshEchartsCache({ env }));
 		} else {
@@ -206,11 +213,15 @@ export default {
 			if (c?.cron !== '*/5 * * * *' && c?.cron !== '* * * * *') {
 				await run('verification_records', () => verifyRecordService.clearRecord({ env }));
 				await run('daily_send_counts', () => userService.resetDaySendCount({ env }));
-				await run('trash_retention', () => emailService.clearTrashAndSpam({ env }));
 				await run('unbound_identities', () => oauthService.clearNoBindOathUser({ env }));
 				await run('analytics', () => analysisService.refreshEchartsCache({ env }));
 			}
 		}
+		// Run the bounded retention sweep on every scheduled invocation. A daily
+		// 50-per-phase budget cannot drain a mailbox receiving more than 50
+		// spam/trash items per day.
+		await run('trash_retention', () => emailService.clearTrashAndSpam({ env }));
+		await run('noone_retention', () => clearNoOne({ env }));
 		if (failures.length) throw new Error(`Maintenance tasks failed: ${failures.join(', ')}`);
 	},
 };

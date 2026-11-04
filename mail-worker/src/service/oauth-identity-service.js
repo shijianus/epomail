@@ -86,26 +86,6 @@ function stepUpBinding(userId) {
 	return `user:${userId}`;
 }
 
-/**
- * True only when the stored credential is one the account owner can actually
- * present. Accounts created by the OAuth bind flow are seeded with a random
- * password and marked in KV; while that marker matches, the password is not a
- * usable login method.
- */
-async function hasUsablePassword(c, userRow) {
-	if (!userRow || typeof userRow.password !== 'string' || !userRow.password) return false;
-	try {
-		const marker = await c.env.kv.get(KvConst.INITIAL_PASSWORD + userRow.userId);
-		if (marker && marker === userRow.password) return false;
-	} catch (err) {
-		// Without KV the session itself cannot be validated by the auth
-		// middleware, so this path is not reachable in practice. Be
-		// conservative and report "no usable password".
-		return false;
-	}
-	return true;
-}
-
 async function currentSessionToken(c) {
 	try {
 		return await userContext.getToken(c);
@@ -216,7 +196,7 @@ const oauthIdentityService = {
 		}));
 
 		const userRow = await userService.selectById(c, userId);
-		const hasPassword = await hasUsablePassword(c, userRow);
+		const hasPassword = await userService.hasUsablePassword(c, userRow);
 
 		return {
 			providers: bindable,

@@ -148,6 +148,9 @@ const accountService = {
 		size = Number(size);
 		lastSort = Number(lastSort);
 
+		if (!Number.isInteger(size) || size < 1) {
+			size = 20;
+		}
 		if (size > 30) {
 			size = 30;
 		}
@@ -266,10 +269,16 @@ const accountService = {
 		num = Number(num)
 		size = Number(size)
 
+		if (!Number.isInteger(size) || size < 1) {
+			size = 20;
+		}
 		if (size > 30) {
 			size = 30;
 		}
 
+		if (!Number.isInteger(num) || num < 1) {
+			num = 1;
+		}
 		num = (num - 1) * size;
 
 		const userRow = await userService.selectByIdIncludeDel(c, userId);

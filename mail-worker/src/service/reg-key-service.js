@@ -6,6 +6,7 @@ import BizError from '../error/biz-error';
 import { formatDetailDate, toUtc } from '../utils/date-uitil';
 import userService from './user-service';
 import userContext from '../security/user-context';
+import rbacGuard from './rbac-guard-service.js';
 import { t } from '../i18n/i18n.js';
 
 const regKeyService = {
@@ -31,6 +32,11 @@ const regKeyService = {
 		if (regKeyRow) {
 			throw new BizError(t('isExistRegKye'));
 		}
+
+		// Creating an invite code is a role grant: the redeemer will receive
+		// `roleId`. A delegated operator must not be able to mint a role whose
+		// permissions exceed their own (especially the site-owner role).
+		await rbacGuard.assertCanAssignRole(c, userId, Number(roleId));
 
 		const roleRow = await roleService.selectById(c, roleId);
 		if (!roleRow) {

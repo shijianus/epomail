@@ -1,5 +1,6 @@
 import { defineWorkersConfig } from '@cloudflare/vitest-pool-workers/config';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -8,6 +9,12 @@ import { fileURLToPath } from 'node:url';
 // fresh directory and disable its .env/process-environment fallback as well.
 process.env.CLOUDFLARE_LOAD_DEV_VARS_FROM_DOT_ENV = 'false';
 process.env.CLOUDFLARE_INCLUDE_PROCESS_ENV = 'false';
+
+const require = createRequire(import.meta.url);
+// linkedom's ESM entry imports the CJS cssom package through extensionless
+// relative requires. The Windows pool module-fallback cannot resolve those,
+// so tests use linkedom's self-contained worker bundle instead.
+const linkedomWorker = path.resolve(path.dirname(require.resolve('linkedom')), '..', 'worker.js');
 
 const workerDir = path.dirname(fileURLToPath(import.meta.url));
 const tempConfigDir = mkdtempSync(path.join(os.tmpdir(), 'epomail-vitest-'));
@@ -30,12 +37,18 @@ export default defineWorkersConfig({
 		// several workerd runtimes share a slow CI or laptop CPU; the assertions
 		// are unchanged, only the wall-clock ceiling is raised.
 		testTimeout: 20000,
+		// Full-schema cold-start in beforeAll can exceed the 10s default on a
+		// loaded Windows host. When it does, the suite aborts while Miniflare
+		// still holds the D1/KV files, which surfaces as a misleading
+		// "Isolated storage failed" teardown error.
+		hookTimeout: 60000,
 		setupFiles: ['./test/setup-network.js'],
+		alias: [{ find: /^linkedom$/, replacement: linkedomWorker }],
 		// These packages trigger the pool's module fallback when externalised.
 		// Inlining lets Vite bundle them instead of routing imports through it.
 		server: {
 			deps: {
-				inline: ['svix', 'uuid', '@noble/hashes']
+				inline: ['svix', 'uuid', '@noble/hashes', 'linkedom', 'cssom']
 			}
 		},
 		poolOptions: {

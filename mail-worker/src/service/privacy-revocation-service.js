@@ -80,6 +80,27 @@ export async function assertStorageCanChange(c, userId) {
 	}
 }
 
+/**
+ * System-wide variant of assertStorageCanChange. Changing the instance bucket,
+ * endpoint or provider while any object still references the old backend makes
+ * history unreadable and can strand the deletion queue. Administrators must
+ * migrate or drain first; this is intentionally a hard stop.
+ */
+export async function assertSystemStorageCanChange(c) {
+	const db = getMailDb(c);
+	const [attachment, message, queue] = await Promise.all([
+		db.prepare('SELECT 1 AS present FROM attachments LIMIT 1').first(),
+		db.prepare('SELECT 1 AS present FROM email LIMIT 1').first(),
+		db.prepare('SELECT COUNT(*) AS total FROM object_deletion_queue').first()
+	]);
+	const rawClaim = await tableExists(db, 'mail_receive_claim')
+		? await db.prepare('SELECT 1 AS present FROM mail_receive_claim LIMIT 1').first()
+		: null;
+	if (attachment || message || Number(queue?.total || 0) > 0 || rawClaim) {
+		throw new BizError('Storage cannot be changed while mail, attachments, raw claims or object deletions remain', 409, 'storage_in_use');
+	}
+}
+
 async function revokeDatabaseCredentials(c, userId) {
 	const db = getUserDb(c);
 	if (await tableExists(db, 'oauth_grant')) {

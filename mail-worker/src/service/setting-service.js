@@ -11,6 +11,8 @@ import legalPolicyService, {
 	getRegistrationReadiness,
 	readAuthoritativeLegalSettings
 } from './legal-policy-service.js';
+import { assertSystemStorageCanChange } from './privacy-revocation-service.js';
+import { isAdminUser } from '../utils/admin-utils.js';
 
 const D1_MAX_SELECT_COLUMNS = 60;
 const AUDIT_EXT_DEFAULTS = Object.freeze({
@@ -412,18 +414,31 @@ const settingService = {
 			settingRow.siteKey = settingRow.siteKey ? `${settingRow.siteKey.slice(0, 6)}******` : null;
 		}
 
-		settingRow.secretKey = settingRow.secretKey ? `${settingRow.secretKey.slice(0, 6)}******` : null;
-		settingRow.aiApiKey = settingRow.aiApiKey ? `${settingRow.aiApiKey.slice(0, 8)}******` : null;
+		// Non-admin callers (for example the read-only visitor sandbox) may see
+		// that a secret is configured, but not a usable prefix of it. Admins keep
+		// the familiar prefix so the settings form can distinguish credential
+		// changes without ever receiving the full value.
+		const requester = c.get?.('user');
+		const adminViewer = Boolean(requester && isAdminUser(c, requester));
+		const secretView = (value, keep) => value
+			? (adminViewer ? `${String(value).slice(0, keep)}******` : '******')
+			: null;
+		settingRow.secretKey = secretView(settingRow.secretKey, 6);
+		settingRow.aiApiKey = secretView(settingRow.aiApiKey, 8);
 
 		Object.keys(settingRow.resendTokens).forEach(key => {
-			const value = String(settingRow.resendTokens[key] || '');
-			settingRow.resendTokens[key] = `${value.slice(0, 12)}******`;
+			if (adminViewer) {
+				const value = String(settingRow.resendTokens[key] || '');
+				settingRow.resendTokens[key] = `${value.slice(0, 12)}******`;
+			} else {
+				settingRow.resendTokens[key] = '******';
+			}
 		});
 
-		settingRow.s3AccessKey = settingRow.s3AccessKey ? `${settingRow.s3AccessKey.slice(0, 12)}******` : null;
-		settingRow.s3SecretKey = settingRow.s3SecretKey ? `${settingRow.s3SecretKey.slice(0, 12)}******` : null;
-		settingRow.externalDbToken = settingRow.externalDbToken ? `${settingRow.externalDbToken.slice(0, 8)}******` : null;
-		settingRow.tgBotToken = settingRow.tgBotToken ? `${settingRow.tgBotToken.slice(0, 20)}******` : null;
+		settingRow.s3AccessKey = secretView(settingRow.s3AccessKey, 12);
+		settingRow.s3SecretKey = secretView(settingRow.s3SecretKey, 12);
+		settingRow.externalDbToken = secretView(settingRow.externalDbToken, 8);
+		settingRow.tgBotToken = secretView(settingRow.tgBotToken, 20);
 		settingRow.hasR2 = !!c.env.r2
 		settingRow.hasCfEmail = !!c.env.email
 
@@ -490,6 +505,25 @@ const settingService = {
 	async set(c, params) {
 		await this.ensureSettingColumns(c);
 		const settingData = await this.query(c);
+
+		// Storage engine changes must not strand existing objects. This mirrors
+		// the per-user assertStorageCanChange guard; an empty instance can still
+		// be reconfigured freely.
+		const storageFields = ['storageProvider', 'bucket', 'endpoint', 'region',
+			's3AccessKey', 's3SecretKey', 'forcePathStyle', 'customDomain', 'userByoStorage'];
+		const normalizeStorageValue = value => {
+			if (value === true || value === 1 || value === '1') return '1';
+			if (value === false || value === 0 || value === '0') return '0';
+			return String(value ?? '');
+		};
+		const changingStorage = storageFields.some(field => {
+			const incoming = params[field];
+			if (incoming === undefined) return false;
+			if (typeof incoming === 'string' && incoming.includes('******')) return false;
+			return normalizeStorageValue(incoming) !== normalizeStorageValue(settingData[field]);
+		});
+		if (changingStorage) await assertSystemStorageCanChange(c);
+
 		let resendTokens = { ...settingData.resendTokens, ...(params.resendTokens || {}) };
 		Object.keys(resendTokens).forEach(domain => {
 			const incoming = params.resendTokens?.[domain];

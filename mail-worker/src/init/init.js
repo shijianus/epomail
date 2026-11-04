@@ -33,7 +33,10 @@ const dbInit = {
 		if (!secret) {
 			const urlSecret = c.req.param('secret');
 			if (urlSecret) {
-				if (c?.env?.ALLOW_URL_INIT === 'false' || c?.env?.ENVIRONMENT === 'staging') {
+				const envName = String(c.env?.ENVIRONMENT || '').toLowerCase();
+				const localLike = Boolean(c.env?.DEV || c.env?.dev) || envName === 'development' || envName === 'test';
+				const productionLike = !localLike || envName === 'production' || envName === 'prod';
+				if (c.env?.ALLOW_URL_INIT === 'false' || envName === 'staging' || productionLike) {
 					return c.text('❌ Passing initialization secret via URL is prohibited in this environment. Use POST /api/init with X-Init-Secret header.', 403);
 				}
 				secret = urlSecret;
@@ -317,6 +320,7 @@ const dbInit = {
 		async v3_25DB(c) {
 			const userDb = getUserDb(c);
 			for (const [name, definition] of [
+				['initial_password_hash', "TEXT NOT NULL DEFAULT ''"],
 				['telegram_share_version', 'INTEGER NOT NULL DEFAULT 0'],
 				['deletion_requested_at', "TEXT NOT NULL DEFAULT ''"],
 				['deletion_status', "TEXT NOT NULL DEFAULT ''"]
@@ -1484,14 +1488,38 @@ const dbInit = {
 		} catch (e) { console.warn(e.message); }
 
 		try {
-			await mailDb.prepare(`DROP INDEX IF EXISTS idx_account_email`).run();
-			await mailDb.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS idx_account_email_nocase ON account (email COLLATE NOCASE)`).run();
-		} catch (e) { console.warn(e.message); }
+			await this.ensureEmailUniqueIndex(mailDb, 'account', 'idx_account_email', 'idx_account_email_nocase');
+		} catch (e) { console.warn(`account email unique index migration: ${e.message}`); }
 
 		try {
-			await userDb.prepare(`DROP INDEX IF EXISTS idx_user_email`).run();
-			await userDb.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS idx_user_email_nocase ON user (email COLLATE NOCASE)`).run();
-		} catch (e) { console.warn(e.message); }
+			await this.ensureEmailUniqueIndex(userDb, 'user', 'idx_user_email', 'idx_user_email_nocase');
+		} catch (e) { console.warn(`user email unique index migration: ${e.message}`); }
+	},
+
+	/**
+	 * Create the NOCASE unique index BEFORE dropping the legacy index. If the
+	 * historical table contains case-insensitive duplicates, keep the old
+	 * protection and report the unresolved data instead of leaving the table
+	 * with no unique constraint at all.
+	 */
+	async ensureEmailUniqueIndex(db, table, oldIndex, newIndex) {
+		const duplicate = await db.prepare(`
+			SELECT email FROM ${table}
+			WHERE email IS NOT NULL AND TRIM(email) <> ''
+			GROUP BY email COLLATE NOCASE
+			HAVING COUNT(*) > 1
+			LIMIT 1
+		`).first();
+		if (duplicate) {
+			console.warn(`[init] ${table}.email has case-insensitive duplicates; keeping ${oldIndex} and skipping ${newIndex}`);
+			return { ok: false, reason: 'duplicate_emails' };
+		}
+
+		await db.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS ${newIndex} ON ${table} (email COLLATE NOCASE)`).run();
+		const created = await db.prepare(`SELECT name FROM sqlite_master WHERE type='index' AND name=?`).bind(newIndex).first();
+		if (!created) throw new Error(`Failed to create ${newIndex}`);
+		await db.prepare(`DROP INDEX IF EXISTS ${oldIndex}`).run();
+		return { ok: true };
 	},
 
 	async v1_5DB(c) {
@@ -1881,6 +1909,7 @@ const dbInit = {
 				type INTEGER DEFAULT 1 NOT NULL,
 				password TEXT NOT NULL,
 				salt TEXT NOT NULL,
+				initial_password_hash TEXT NOT NULL DEFAULT '',
 				status INTEGER DEFAULT 0 NOT NULL,
 				create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
 				update_time DATETIME DEFAULT CURRENT_TIMESTAMP,

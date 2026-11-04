@@ -262,7 +262,51 @@ export async function cascadeDeleteEmails(c, userId, emailIdList) {
 }
 
 /**
- * At most 50 spam transitions + 50 trash candidates per invocation. Calling
+ * Administrator/system deletion by a fixed ID snapshot. This deliberately has
+ * no owner filter because /allEmail/* is an administrator surface, but it uses
+ * the same snapshot + transaction + object-outbox primitives as user deletion.
+ * It never re-evaluates a dynamic filter, so a message that arrives after the
+ * snapshot cannot be deleted without its attachment cleanup.
+ */
+export async function cascadeDeleteSystemEmails(c, emailIdList) {
+	const input = Array.isArray(emailIdList) ? emailIdList : typeof emailIdList === 'string' ? emailIdList.split(',') : [emailIdList];
+	const ids = [...new Set(input.map(item => Number(item)).filter(id => Number.isSafeInteger(id) && id > 0))];
+	if (ids.length === 0) return [];
+	if (ids.length > 5000) {
+		throw new Error('Too many emails selected for one administrative deletion');
+	}
+	const deleted = [];
+	const readChunk = 50;
+	for (let i = 0; i < ids.length; i += readChunk) {
+		const chunk = ids.slice(i, i + readChunk);
+		const rows = await getMailDb(c).prepare(`SELECT ${STATE_COLUMNS.map(column => `e.${column}`).join(',')}
+			FROM email e WHERE e.email_id IN (${placeholders(chunk)}) AND ${MUTABLE}`)
+			.bind(...chunk).all();
+		const result = await deleteSnapshots(c, rows.results || []);
+		deleted.push(...result.deleted);
+	}
+	return deleted;
+}
+
+/**
+ * Unknown-recipient mail has no owner quota and no user trash lifecycle. Keep
+ * a bounded retention window so a catch-all domain cannot grow D1/object
+ * storage forever.
+ */
+export async function clearNoOne(c, { days = 7, limit = 50 } = {}) {
+	const db = getMailDb(c);
+	const safeDays = Math.max(1, Math.min(Number(days) || 7, 365));
+	const safeLimit = Math.max(1, Math.min(Number(limit) || 50, 500));
+	const rows = await db.prepare(`SELECT ${STATE_COLUMNS.map(column => `e.${column}`).join(',')} FROM email e
+		WHERE e.status = ${emailConst.status.NOONE} AND e.is_del = 0 AND e.is_spam = 0
+			AND e.create_time <= datetime('now', ?) AND ${MUTABLE}
+		ORDER BY e.create_time, e.email_id LIMIT ?`).bind(`-${safeDays} days`, safeLimit).all();
+	const result = await deleteSnapshots(c, rows.results || []);
+	return { deleted: result.deleted.length, conflicted: result.conflicted };
+}
+
+/**
+ * At most 50 spam transitions + 50 trash candidates per invocation.
  * cron again drains the backlog; legacy NULL/invalid times never use mail age.
  * Newly trashed spam receives a full additional seven-day trash window.
  */
@@ -294,4 +338,4 @@ export async function clearTrashAndSpam(c) {
 	};
 }
 
-export default { moveToTrash, restoreMail, setMailSpam, clearTrashAndSpam, cascadeDeleteEmails };
+export default { moveToTrash, restoreMail, setMailSpam, clearTrashAndSpam, clearNoOne, cascadeDeleteEmails, cascadeDeleteSystemEmails };

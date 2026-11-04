@@ -48,8 +48,11 @@ const publicService = {
 		}).from(email).innerJoin(account, and(
 			eq(email.accountId, account.accountId), eq(email.userId, account.userId)))
 
-		size = Math.min(Math.max(1, Number(size) || 20), 100);
-		num = Math.max(1, Number(num) || 1);
+		size = Number(size);
+		if (!Number.isInteger(size) || size < 1) size = 20;
+		if (size > 100) size = 100;
+		num = Number(num);
+		if (!Number.isInteger(num) || num < 1) num = 1;
 		const offset = (num - 1) * size;
 
 		// This integration API is not a trash/archive export. Only active mailbox
@@ -202,7 +205,40 @@ const publicService = {
 	async getProfile(c, username) {
 		const cleanTarget = (username || '').trim().toLowerCase();
 		if (!cleanTarget) {
-			throw new BizError(t('notExistUser'));
+			throw new BizError(t('notExistUser'), 404);
+		}
+
+		const settingStr = await c.env.kv.get(KvConst.SETTING);
+		let publicProfileEnabled = 0;
+		if (settingStr) {
+			try {
+				const settings = JSON.parse(settingStr);
+				publicProfileEnabled = settings.publicProfile || 0;
+			} catch (e) {}
+		}
+
+		// Resolve the viewer before the target. Otherwise an unauthenticated
+		// request can distinguish "account exists but is private" (401) from
+		// "account does not exist" (404) and enumerate the user base.
+		let viewer = null;
+		let viewerMaySeeEmail = false;
+		if (Number(publicProfileEnabled) !== 1) {
+			const jwt = c.req.header(constant.TOKEN_HEADER);
+			if (!jwt) throw new BizError(t('unauthorized'), 401);
+
+			const result = await jwtUtils.verifyToken(c, jwt);
+			if (!result) throw new BizError(t('authExpired'), 401);
+
+			const { userId, token } = result;
+			const authInfo = await c.env.kv.get(KvConst.AUTH_INFO + userId, { type: 'json' });
+
+			if (!authInfo || !Array.isArray(authInfo.tokens) || !authInfo.tokens.includes(token)) {
+				throw new BizError(t('authExpired'), 401);
+			}
+
+			viewer = await userService.selectByIdIncludeDel(c, userId);
+			if (!isActiveUser(viewer)) throw new BizError(t('authExpired'), 401);
+			await userContext.requireSession(c, userId, viewer);
 		}
 
 		let userRow = null;
@@ -243,36 +279,14 @@ const publicService = {
 			throw new BizError(t('notExistUser'), 404);
 		}
 
-		const settingStr = await c.env.kv.get(KvConst.SETTING);
-		let publicProfileEnabled = 0;
-		if (settingStr) {
-			try {
-				const settings = JSON.parse(settingStr);
-				publicProfileEnabled = settings.publicProfile || 0;
-			} catch (e) {}
-		}
-
 		if (Number(publicProfileEnabled) !== 1) {
-			const jwt = c.req.header(constant.TOKEN_HEADER);
-			if (!jwt) throw new BizError(t('unauthorized'), 401);
-
-			const result = await jwtUtils.verifyToken(c, jwt);
-			if (!result) throw new BizError(t('authExpired'), 401);
-
-			const { userId, token } = result;
-			const authInfo = await c.env.kv.get(KvConst.AUTH_INFO + userId, { type: 'json' });
-
-			if (!authInfo || !Array.isArray(authInfo.tokens) || !authInfo.tokens.includes(token)) {
-				throw new BizError(t('authExpired'), 401);
+			const isSelf = Number(viewer?.userId) === Number(userRow.userId);
+			if (!isSelf && !isAdminUser(c, viewer)) {
+				// Same status as a nonexistent account: private profiles must not
+				// become an account-existence oracle for authenticated users.
+				throw new BizError(t('notExistUser'), 404);
 			}
-
-			const currentUser = await userService.selectByIdIncludeDel(c, userId);
-			if (!isActiveUser(currentUser)) throw new BizError(t('authExpired'), 401);
-			await userContext.requireSession(c, userId, currentUser);
-			const isSelf = currentUser.userId === userRow.userId;
-			if (!isSelf && !isAdminUser(c, currentUser)) {
-				throw new BizError(t('unauthorized'), 403);
-			}
+			viewerMaySeeEmail = true;
 		}
 		
 		let roleRow = null;
@@ -287,7 +301,7 @@ const publicService = {
 		
 		const profileStr = await c.env.kv.get('USER_PROFILE_' + userRow.userId);
 		const profile = profileStr ? JSON.parse(profileStr) : {};
-		const visible = value => value === undefined || value === true;
+		const visible = value => value === true || value === 1;
 		const showStats = visible(profile.showStats);
 		const showTrend = visible(profile.showTrend);
 		const showSources = visible(profile.showSources);
@@ -397,11 +411,15 @@ const publicService = {
 		let otherPercent = 100;
 		pieSources.forEach(s => otherPercent -= s.percent);
 		if (otherPercent < 0) otherPercent = 0;
-		
+		const displayEmail = viewerMaySeeEmail ? userRow.email : (() => {
+			const [local, domain] = String(userRow.email || '').split('@');
+			return domain ? `${local.slice(0, 1)}***@${domain}` : '***';
+		})();
+
         return {
             userInfo: {
                 account: username,
-                email: userRow.email,
+                email: displayEmail,
                 roleName: roleRow ? roleRow.name : 'Unknown',
                 joinTime: userRow.createTime,
                 avatarInitials: username.substring(0, 2).toUpperCase(),
