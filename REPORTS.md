@@ -10,7 +10,7 @@
 ---
 
 ### Cloudflare 生产环境全量发布与在线验证审计报告 (2026-11-05)
-*   **关联提交 (Git Commit)**: 待提交后回填；生产部署 Version ID: `625c1291-386f-4ff9-8d8c-465ca1422f4f`。
+*   **关联提交 (Git Commit)**: `a0f01684d56708fd25d102204d2858dd09789c75` (Short: `a0f0168`)；生产部署 Version ID: `625c1291-386f-4ff9-8d8c-465ca1422f4f`。
 *   **专项文档索引 (Detailed Doc)**: [生产发布运行手册](doc/production-release-runbook-2026-11-05.md)。
 *   **体检/审计范围与方法 (Scope & Methodology)**:
     1. 范围：Cloudflare 生产环境全真栈（Worker + D1 + KV + Assets 托管）；覆盖 4 大生产访问端点（`mail.epocanvas.com`、`mail.epomail.bond`、`mail.epomail.cyou` 与 `workers.dev`）。

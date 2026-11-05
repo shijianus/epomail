@@ -1,5 +1,5 @@
 ### Cloudflare 生产环境全量部署与在线实测验收 (2026-11-05)
-*   **关联提交 (Git Commit)**: 待提交后回填
+*   **关联提交 (Git Commit)**: `a0f01684d56708fd25d102204d2858dd09789c75` (Short: `a0f0168`)
 *   **部署环境 (Deployment)**: 生产 Cloudflare (Version ID: `625c1291-386f-4ff9-8d8c-465ca1422f4f`)，绑定域名 `mail.epocanvas.com`、`mail.epomail.bond`、`mail.epomail.cyou`、`epomail.epocanvas.workers.dev`。
 *   **功能需求与变更清单 (Changes & Feature Alignment)**:
     - [x] Cloudflare Worker 与双端静态前端完整打包与发布至生产（Upload 438 files, gzip 1,192.12 KiB）。
