@@ -1,3 +1,21 @@
+### 后端 Freeze 门禁复核 (2026-11-05)
+*   **关联提交 (Git Commit)**: `a4f262337bf58aed6927bdff5a11999b3c26003a` (Short: `a4f2623`)
+*   **部署环境 (Deployment)**: 本地 workerd/D1/KV、构建与单测；未部署生产或 Staging，未调用真实供应商。
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] Mailjet UNKNOWN 状态端点对账回归（`payload_json.providerName` + `/v3/REST/message/:id`）。
+    - [x] BYO Endpoint DNS-over-HTTPS 解析后私网校验；只在保存/连接测试执行，不进入对象读写热路径。
+    - [x] 入站内部发件人改用接收 MTA transport headers，要求 `INBOUND_AUTHSERV_ID`（默认 `mx.cloudflare.net`）。
+    - [x] 敏感限流 D1 不可用时 fail-closed，不再降级非原子 KV；缺表时一次性创建 auth schema 后重试，避免升级窗口登录 503。
+    - [x] 冻结文档 `doc/backend-freeze-2026-11-05.md` 与 REPORTS 索引。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] Worker 全量：37 files / 524 tests passed, exit 0, 1,135.88s。
+    - [x] 定向：Mailjet 44/44、入站/限流 25/25、SSRF/对象头 20/20、PAT/Apple/MFA 14/14。
+    - [x] Vue 构建 34.05s；登录子应用 tsc + 29/29；i18n 四项通过；密钥扫描 1,264 文件 0 命中；dry-run 438 文件 / gzip 1,192.18 KiB。
+    - [ ] 真实 Staging/生产、OAuth/邮件/对象存储、备份恢复、回滚、浏览器 E2E、容量/告警未执行。
+*   **结论**: 允许后端 freeze 于 `a4f2623`；无条件 GA 仍待 Staging/恢复演练与剩余 P2 接受。
+
+---
+
 ### 后端审计残余项收敛与发布门禁复审 (2026-11-05 续)
 *   **关联提交 (Git Commit)**: `b795f01ff11c850b1b2258ba1514b4bb3e67122e` (Short: `b795f01`)
 *   **部署环境 (Deployment)**: 本地 workerd/D1/KV、构建与单测验证；未部署生产或 Staging，未调用真实供应商。

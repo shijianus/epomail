@@ -9,6 +9,25 @@
 
 ---
 
+### 后端 Freeze 门禁复核 (2026-11-05)
+*   **关联提交 (Git Commit)**: freeze 候选 `a4f262337bf58aed6927bdff5a11999b3c26003a` (Short: `a4f2623`)；此前收敛基线 `b795f01ff11c850b1b2258ba1514b4bb3e67122e` (Short: `b795f01`)。
+*   **专项文档索引 (Detailed Doc)**: [后端 Freeze 门禁复核](doc/backend-freeze-2026-11-05.md)。
+*   **体检/审计范围与方法 (Scope & Methodology)**:
+    1. 范围：`mail-worker` 认证/OAuth/RBAC/限流、邮件入站认证头、转发/生命周期、加密搜索、BYO 存储 SSRF、PAT/Telegram、Vitest 配置；`mail-vue` OAuth 授权页/慢网会话；`temp_login_ui` 恢复码展示。本地 workerd/D1/KV，未部署、未访问生产/Staging、未调用真实供应商。
+    2. 方法：复核 Mailjet UNKNOWN 对账、DoH 解析后私网校验、transport headers 内部发件人判定、敏感限流 fail-closed；跑最终全量、定向安全/入站/转发/SSRF 测试、构建、i18n、密钥扫描、dry-run、`git diff --check`。
+*   **核心发现与缺陷矩阵 (Key Findings & Matrix)**:
+    - **[已关闭·P1]** B5/B7/B8/B11 及 U1/U6 在前序收敛批次关闭；本轮新增 Mailjet UNKNOWN 对账回归、BYO Endpoint DoH 私网校验、transport-header 认证头信任、敏感限流 fail-closed 与缺表一次性自建 schema。
+    - **[保留·P2]** DNS rebinding 残余、接收 MTA authserv-id 配置依赖、Cloudflare Email 无状态查询 API、OIDC 内联 Passkey step-up、存储 locator 迁移、Telegram 首次未保存配置、公开 profile 本人邮箱掩码、转发失败管理 UI、宽泛加密搜索、`/api/init` 升级顺序依赖。
+*   **治理修复与回归结果 (Fixes & Verification)**:
+    - 最终门禁：Worker 37 files / 524 tests passed, exit 0, 1,135.88s；Vue 构建 34.05s；登录子应用 tsc + 29/29；i18n 四项全通过；密钥扫描 1,264 文件 0 命中；dry-run 438 文件 / gzip 1,192.18 KiB；`git diff --check` 通过。
+    - **结论：允许后端 freeze 于 `a4f2623`。** 部署前必须配置独立 `init_secret` 并先执行 `/api/init`，确保敏感限流表存在；非 Cloudflare 收信 MTA 需配置 `INBOUND_AUTHSERV_ID`。
+*   **未执行/需人工处置 (Manual Follow-up)**:
+    - [ ] Staging/生产真实 OAuth、邮件、对象存储、备份恢复、回滚与告警演练。
+    - [ ] 生产核查历史演示账号、旧库重复邮箱/唯一索引、`mail_forward_task`/`rate_limit_counter` 迁移与独立 `init_secret`。
+    - [ ] 无条件 GA 前接受剩余 P2 或完成对应加固。
+
+---
+
 ### 后端审计收敛补丁 (2026-11-05 续)
 *   **关联提交 (Git Commit)**: 代码修复与报告提交 `b795f01ff11c850b1b2258ba1514b4bb3e67122e` (Short: `b795f01`)；上一轮基线 `c003fc8efd74d12b4b4c941d980069347c4d723d` (Short: `c003fc8`)。
 *   **专项文档索引 (Detailed Doc)**: [后端审计收敛补丁](doc/backend-audit-2026-11-05-convergence.md)；[本轮检查结果](doc/validation/backend-audit-2026-11-05-convergence.json)。
