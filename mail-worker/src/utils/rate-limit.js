@@ -1,9 +1,14 @@
 import BizError from '../error/biz-error';
 import { t } from '../i18n/i18n';
 import { getUserDb } from './db-accessor.js';
+import { ensureAuthSecurityOperationSchema } from './auth-security-operation.js';
 
 const RATE_PREFIX = 'rate-limit:';
 const SENSITIVE_SCOPE = /^(login|login-totp|register|security-|oauth-|oidc-|initial-password)/;
+
+function isMissingCounterTable(error) {
+	return /no such table|no such column/i.test(String(error?.message || error || ''));
+}
 
 function clientIp(c) {
 	// Only trust the header Cloudflare writes. X-Forwarded-For is caller
@@ -94,9 +99,20 @@ const rateLimit = {
 			return;
 		} catch (error) {
 			if (error instanceof BizError) throw error;
-			// Sensitive paths must not silently downgrade to non-atomic KV just
-			// because the migration has not run yet. Deployment runs /api/init,
-			// which installs rate_limit_counter.
+			if (isMissingCounterTable(error)) {
+				// Install the counter schema once on a pre-migration database, then
+				// retry the atomic count. This keeps sensitive paths fail-closed
+				// without breaking legitimate traffic during the upgrade window.
+				try {
+					await ensureAuthSecurityOperationSchema(c);
+					const count = await incrementD1(c, scope, keySubject, windowSeconds);
+					if (count > limit) throw new BizError(t('tooManyRequests'), 429, 'rate_limited');
+					return;
+				} catch (retryError) {
+					if (retryError instanceof BizError) throw retryError;
+					error = retryError;
+				}
+			}
 			if (failClosed) {
 				throw new BizError('Rate limit storage is unavailable', 503, 'rate_limit_unavailable');
 			}
