@@ -1,5 +1,5 @@
 ### 后端审计残余项收敛与发布门禁复审 (2026-11-05 续)
-*   **关联提交 (Git Commit)**: `{{CODE_COMMIT}}`
+*   **关联提交 (Git Commit)**: `b795f01ff11c850b1b2258ba1514b4bb3e67122e` (Short: `b795f01`)
 *   **部署环境 (Deployment)**: 本地 workerd/D1/KV、构建与单测验证；未部署生产或 Staging，未调用真实供应商。
 *   **功能需求与变更清单 (Changes & Feature Alignment)**:
     - [x] B5 持久转发：新增 `mail_forward_task`/`mail-forward-service`，按用户/邮件/目标独立任务、cron 重试、原始附件字节与 CID 保留；修正 `accountId` 缺失、`provider_rejected` 判断、主题 998 截断、内嵌图重复发送。

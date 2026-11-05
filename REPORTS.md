@@ -10,7 +10,7 @@
 ---
 
 ### 后端审计收敛补丁 (2026-11-05 续)
-*   **关联提交 (Git Commit)**: 代码修复与报告提交 `{{CODE_COMMIT}}`；上一轮基线 `c003fc8efd74d12b4b4c941d980069347c4d723d` (Short: `c003fc8`)。
+*   **关联提交 (Git Commit)**: 代码修复与报告提交 `b795f01ff11c850b1b2258ba1514b4bb3e67122e` (Short: `b795f01`)；上一轮基线 `c003fc8efd74d12b4b4c941d980069347c4d723d` (Short: `c003fc8`)。
 *   **专项文档索引 (Detailed Doc)**: [后端审计收敛补丁](doc/backend-audit-2026-11-05-convergence.md)；[本轮检查结果](doc/validation/backend-audit-2026-11-05-convergence.json)。
 *   **体检/审计范围与方法 (Scope & Methodology)**:
     1. 范围：`mail-worker` 认证/OAuth/RBAC、邮件入站/转发/生命周期、加密搜索、存储对象、PAT/Telegram、Vitest 配置；`mail-vue` OAuth 授权页/慢网会话/i18n；`temp_login_ui` 恢复码展示。本地 workerd/D1/KV，未部署、未访问生产/Staging、未调用真实供应商。
