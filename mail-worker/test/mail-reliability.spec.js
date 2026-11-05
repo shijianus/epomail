@@ -1,4 +1,4 @@
-import { env } from 'cloudflare:test';
+import { env, fetchMock } from 'cloudflare:test';
 import { beforeAll, afterEach, describe, expect, it, vi } from 'vitest';
 import { ensureMailReliabilitySchema } from '../src/utils/mail-reliability-schema.js';
 import { getMailDb } from '../src/utils/db-accessor.js';
@@ -386,6 +386,30 @@ describe('Production inbound email handler with local D1 and stubbed providers',
 });
 
 describe('Real D1 mail reliability transactions', () => {
+	it('reconciles a Mailjet UNKNOWN task through the provider status endpoint', async () => {
+		const taskId = crypto.randomUUID();
+		const accountSpy = vi.spyOn(accountService, 'selectById').mockResolvedValue({ email: 'mailjet-user@example.com' });
+		const settingSpy = vi.spyOn(settingService, 'query').mockResolvedValue({
+			resendTokens: { 'example.com': 'mailjet:test-key:test-secret' }
+		});
+		await db.prepare(`INSERT INTO mail_outbound_task
+			(task_id,user_id,account_id,idempotency_key,content_hash,state,provider,payload_json,provider_id,updated_at)
+			VALUES (?,?,?,?,?,'UNKNOWN','external',?,?,datetime('now','-1 minute'))`)
+			.bind(taskId, 42, 7, 'mailjet-' + taskId, 'hash', JSON.stringify({ providerName: 'mailjet' }), 'mailjet-1').run();
+		fetchMock.get('https://api.mailjet.com').intercept({ path: '/v3/REST/message/mailjet-1' })
+			.reply(200, { Data: [{ Status: 'sent' }] });
+		try {
+			const result = await emailService.reconcileUnknownOutbound(c, { limit: 1 });
+			expect(result).toMatchObject({ checked: 1, accepted: 1, failed: 0 });
+			expect(await db.prepare('SELECT state FROM mail_outbound_task WHERE task_id=?').bind(taskId).first())
+				.toEqual({ state: 'ACCEPTED' });
+		} finally {
+			accountSpy.mockRestore();
+			settingSpy.mockRestore();
+			await db.prepare('DELETE FROM mail_outbound_task WHERE task_id=?').bind(taskId).run();
+		}
+	});
+
 	it.each([7, 8, 200])('publishes all %i attachments using actual <=100-bind statements', async (n) => {
 		const store = objects();
 		const claim = await acquireInboundClaim(c, { recipient: `${crypto.randomUUID()}@local.test`, rawBytes: encoder.encode('From: local@test.invalid\r\n\r\nbody') });
