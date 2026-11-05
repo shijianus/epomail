@@ -1,3 +1,18 @@
+### 生产发布运行手册与全自动化预检套件交付 (2026-11-05)
+*   **关联提交 (Git Commit)**: 待提交后回填
+*   **部署环境 (Deployment)**: 本地全真栈 / Cloudflare 生产预备；静态预检通过，未部署生产。
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 新增生产发布运行手册 `doc/production-release-runbook-2026-11-05.md`：详细列明 6 大核心机密矩阵、D1 幂等升级命令、部署前后零停机 SOP、10 项 P2 生产处置指引与紧急秒级回滚/Point-in-Time 灾备方案。
+    - [x] 新增自动化上线就绪核验脚本 `scripts/verify-production-readiness.mjs`：集成 Git 洁净度、构建产物完整性、Wrangler 安全基线及在线安全与限流探针。
+    - [x] 新增核验脚本单元测试 `tests/verify-production-readiness.test.mjs`：覆盖参数解析、构建检测、Wrangler 基线与机密完整性（6/6 PASS）。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 门禁单测：`tests/verify-production-readiness.test.mjs` 6/6 全绿。
+    - [x] 就绪核验脚本：`node scripts/verify-production-readiness.mjs` 输出 6 PASS / 0 FAIL。
+    - [x] 密钥扫描：1,265 文件 0 泄露；i18n 六语言全对称。
+    - [x] 零假数据残留：测试纯内存/临时沙盒运行，零数据残留。
+
+---
+
 ### 后端 Freeze 门禁复核 (2026-11-05)
 *   **关联提交 (Git Commit)**: `a4f262337bf58aed6927bdff5a11999b3c26003a` (Short: `a4f2623`)
 *   **部署环境 (Deployment)**: 本地 workerd/D1/KV、构建与单测；未部署生产或 Staging，未调用真实供应商。

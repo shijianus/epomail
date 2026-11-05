@@ -9,6 +9,23 @@
 
 ---
 
+### 生产上线准入核验与全量部署运行规程 (2026-11-05)
+*   **关联提交 (Git Commit)**: 待提交后回填；基线 freeze 候选 `a4f262337bf58aed6927bdff5a11999b3c26003a` (Short: `a4f2623`)。
+*   **专项文档索引 (Detailed Doc)**: [生产发布运行手册](doc/production-release-runbook-2026-11-05.md)。
+*   **体检/审计范围与方法 (Scope & Methodology)**:
+    1. 范围：生产上线前置门禁、机密注入安全矩阵、D1 数据库与 Schema 幂等升级链、部署后自动化在线探针、10 项 P2 生产运维处置指引、秒级回滚与 D1 时间点恢复灾备预案。
+    2. 工具与脚本：新建 `scripts/verify-production-readiness.mjs`，配合 `secret-scan.mjs` 与 i18n 静态扫描套件对上线前环境做全量自检。
+*   **核心发现与缺陷矩阵 (Key Findings & Matrix)**:
+    - **[P0·阻断]** 0 项（全部关闭）。
+    - **[P1·严重]** 0 项（全部关闭）。
+    - **[P2·受限]** 10 项已知架构与外部协议受限（DoH IP 固定受限、MTA authserv-id 依赖、CF Email 缺失对账 API 等），已全部制定对应生产控制与缓解方案。
+*   **治理修复与回归结果 (Fixes & Verification)**:
+    - 交付完整的生产发布运行手册（Runbook）与自动化预检套件，确保生产操作人员有章可循、零失误部署与秒级回滚能力。
+    - 门禁单测 6/6 通过，预检脚本 6/6 通过，工作区 0 密钥泄露。
+    - **结论：准允上线（Controlled Public Beta GO；按 Runbook 推进生产部署）。**
+
+---
+
 ### 后端 Freeze 门禁复核 (2026-11-05)
 *   **关联提交 (Git Commit)**: freeze 候选 `a4f262337bf58aed6927bdff5a11999b3c26003a` (Short: `a4f2623`)；此前收敛基线 `b795f01ff11c850b1b2258ba1514b4bb3e67122e` (Short: `b795f01`)。
 *   **专项文档索引 (Detailed Doc)**: [后端 Freeze 门禁复核](doc/backend-freeze-2026-11-05.md)。
