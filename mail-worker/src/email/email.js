@@ -154,7 +154,7 @@ export async function email(message, env, ctx) {
 		}
 
 
-		const { block: blockFlag, hardBlock: hardBlockFlag } = checkBlock(blackSubject, blackContent, blackFrom, email, env, message.to);
+		const { block: blockFlag, hardBlock: hardBlockFlag } = checkBlock(blackSubject, blackContent, blackFrom, email, env, message.to, message.headers);
 
 		if (hardBlockFlag) {
 			try {
@@ -538,8 +538,11 @@ export function senderPatternMatches(entry, address, domain) {
 	return targetDomain === e || targetDomain.endsWith('.' + e);
 }
 
-function headerValue(email, name) {
-	const headers = email?.headers;
+function headerValue(source, name) {
+	if (source && typeof source.get === 'function') {
+		return String(source.get(name) || '');
+	}
+	const headers = source?.headers || source;
 	if (headers instanceof Map) {
 		for (const [key, value] of headers) {
 			if (String(key).toLowerCase() === name) return String(value || '');
@@ -561,20 +564,30 @@ function headerValue(email, name) {
  * receiving path's Authentication-Results. Without an authenticated result the
  * message is treated as external, so global blacklists still apply.
  */
-export function isAuthenticatedInternalSender(email, envDomains) {
+export function isAuthenticatedInternalSender(email, envDomains, {
+	transportHeaders = null,
+	trustedAuthservId = '',
+	requireTransport = false
+} = {}) {
 	const senderDomain = emailUtils.getDomain(String(email?.from?.address || '').toLowerCase());
 	if (!senderDomain) return false;
 	const domains = Array.isArray(envDomains) ? envDomains.map(value => String(value).toLowerCase()) : [];
 	if (!domains.includes(senderDomain)) return false;
-	const auth = `${headerValue(email, 'authentication-results')} ${headerValue(email, 'arc-authentication-results')}`;
+	if (requireTransport && !transportHeaders) return false;
+	const source = transportHeaders || email;
+	const auth = `${headerValue(source, 'authentication-results')} ${headerValue(source, 'arc-authentication-results')}`;
 	if (!auth.trim()) return false;
+	if (trustedAuthservId) {
+		const authservId = auth.split(';')[0].trim().split(/\s+/)[0].replace(/:$/, '').toLowerCase();
+		if (authservId !== String(trustedAuthservId).toLowerCase()) return false;
+	}
 	const domain = senderDomain.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 	const passThenFrom = new RegExp(`(?:dmarc=pass|dkim=pass)[^;]*(?:header\\.from|header\\.d)\\s*=\\s*${domain}`, 'i');
 	const fromThenPass = new RegExp(`(?:header\\.from|header\\.d)\\s*=\\s*${domain}[^;]*(?:dmarc=pass|dkim=pass)`, 'i');
 	return passThenFrom.test(auth) || fromThenPass.test(auth);
 }
 
-function checkBlock(blackSubjectStr, blackContentStr, blackFromStr, email, env, messageTo) {
+function checkBlock(blackSubjectStr, blackContentStr, blackFromStr, email, env, messageTo, transportHeaders = null) {
 
 	const senderAddress = (email.from?.address || '').toLowerCase();
 	const senderDomain = emailUtils.getDomain(senderAddress) || '';
@@ -583,7 +596,11 @@ function checkBlock(blackSubjectStr, blackContentStr, blackFromStr, email, env, 
 	if (typeof envDomains === 'string') {
 		try { envDomains = JSON.parse(envDomains); } catch(e){}
 	}
-	const isInternal = isAuthenticatedInternalSender(email, envDomains);
+	const isInternal = isAuthenticatedInternalSender(email, envDomains, {
+		transportHeaders,
+		trustedAuthservId: String(env?.INBOUND_AUTHSERV_ID || 'mx.cloudflare.net'),
+		requireTransport: true
+	});
 
 	let blockInternalList = false;
 	if (blackFromStr && blackFromStr.includes('__blockInternal,')) {

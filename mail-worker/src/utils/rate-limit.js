@@ -16,10 +16,6 @@ function rateKey(c, scope, subject) {
 	return `${RATE_PREFIX}${scope}:${subject || clientIp(c)}`;
 }
 
-function isMissingCounterTable(error) {
-	return /no such table|no such column/i.test(String(error?.message || error || ''));
-}
-
 function durableCountersEnabled(c) {
 	// Tests share one D1 database across files; a real fixed-window counter
 	// would leak login attempts between unrelated specs. Production and
@@ -98,11 +94,12 @@ const rateLimit = {
 			return;
 		} catch (error) {
 			if (error instanceof BizError) throw error;
-			if (!isMissingCounterTable(error) && failClosed) {
+			// Sensitive paths must not silently downgrade to non-atomic KV just
+			// because the migration has not run yet. Deployment runs /api/init,
+			// which installs rate_limit_counter.
+			if (failClosed) {
 				throw new BizError('Rate limit storage is unavailable', 503, 'rate_limit_unavailable');
 			}
-			// Pre-migration databases and test fixtures still have KV; the D1
-			// table is installed by the normal init migration.
 		}
 		await checkKv(c, rateKey(c, scope, keySubject), limit, windowSeconds, failClosed);
 	},

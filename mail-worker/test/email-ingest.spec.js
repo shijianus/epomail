@@ -89,4 +89,23 @@ describe('Authenticated internal sender detection', () => {
 		] };
 		expect(isAuthenticatedInternalSender(email, ['example.com'])).toBe(false);
 	});
+
+	it('trusts only transport headers from the configured receiving MTA', () => {
+		const spoofedRaw = { from: { address: 'user@example.com' }, headers: [
+			{ key: 'Authentication-Results', value: 'mx.cloudflare.net; dkim=pass header.d=example.com' }
+		] };
+		expect(isAuthenticatedInternalSender(spoofedRaw, ['example.com'], {
+			trustedAuthservId: 'mx.cloudflare.net', requireTransport: true
+		})).toBe(false);
+		const transport = new Map([
+			['authentication-results', 'mx.cloudflare.net; dkim=pass header.d=example.com']
+		]);
+		expect(isAuthenticatedInternalSender(spoofedRaw, ['example.com'], {
+			transportHeaders: transport, trustedAuthservId: 'mx.cloudflare.net', requireTransport: true
+		})).toBe(true);
+		expect(isAuthenticatedInternalSender(spoofedRaw, ['example.com'], {
+			transportHeaders: new Map([['authentication-results', 'mx.example; dkim=pass header.d=example.com']]),
+			trustedAuthservId: 'mx.cloudflare.net', requireTransport: true
+		})).toBe(false);
+	});
 });
