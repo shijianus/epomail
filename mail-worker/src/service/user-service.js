@@ -28,6 +28,7 @@ import { isAdminEmail, isAdminUser } from '../utils/admin-utils';
 import verifyUtils from '../utils/verify-utils';
 import rbacGuard from './rbac-guard-service.js';
 import { sanitizeCustomLabels } from '../utils/svg-utils.js';
+import { assertSafePublicUrl } from '../utils/url-utils.js';
 import rateLimit from '../utils/rate-limit.js';
 import userContext from '../security/user-context.js';
 import { authVersionOf } from '../utils/one-time-credential.js';
@@ -1824,6 +1825,9 @@ const userService = {
 		if (Number(settingData.userByoStorage ?? 1) === 0) {
 			throw new BizError('第三方云存储接入功能已被管理员停用 / BYO Storage is disabled', 403);
 		}
+		if (!params?.endpoint || !await assertSafePublicUrl(params.endpoint)) {
+			throw new BizError('存储端点必须解析到公网地址 / Storage endpoint must resolve to a public address', 400, 'unsafe_storage_endpoint');
+		}
 
 		const s3Service = (await import('./s3-service')).default;
 		return await s3Service.testConnection(params);
@@ -1840,6 +1844,9 @@ const userService = {
 		const { bucket, endpoint, region, s3AccessKey, s3SecretKey, forcePathStyle, customDomain } = params;
 		if (!bucket || !endpoint || !s3AccessKey || !s3SecretKey) {
 			throw new BizError('请填写完整的存储桶信息 (Bucket, Endpoint, Key ID, Secret Key)');
+		}
+		if (!await assertSafePublicUrl(endpoint)) {
+			throw new BizError('存储端点必须解析到公网地址 / Storage endpoint must resolve to a public address', 400, 'unsafe_storage_endpoint');
 		}
 
 		const s3Service = (await import('./s3-service')).default;

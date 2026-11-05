@@ -98,6 +98,61 @@ export function isSafePublicUrl(urlStr) {
 	}
 }
 
+/**
+ * Resolve a hostname through DNS-over-HTTPS before a user-controlled storage
+ * endpoint is used. Literal IP/hostname checks remain the first gate; this
+ * second gate rejects names whose A/AAAA answers point into private space.
+ * Workers cannot pin the resolved address for the later SDK connection, so
+ * this is defense-in-depth, not a complete DNS-rebinding guarantee.
+ */
+export async function assertSafePublicUrl(urlStr, {
+	fetchImpl = globalThis.fetch,
+	timeoutMs = 3000
+} = {}) {
+	if (!isSafePublicUrl(urlStr)) return false;
+	let hostname;
+	try {
+		hostname = new URL(urlStr).hostname.toLowerCase().replace(/^\[|\]$/g, '').replace(/\.$/, '');
+	} catch {
+		return false;
+	}
+	if (!hostname || isIpLiteral(hostname)) return true;
+	if (typeof fetchImpl !== 'function') return false;
+
+	let publicAnswer = false;
+	for (const type of ['A', 'AAAA']) {
+		let response;
+		try {
+			response = await fetchImpl(
+				`https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(hostname)}&type=${type}`,
+				{ headers: { accept: 'application/dns-json' }, signal: AbortSignal.timeout(timeoutMs) }
+			);
+		} catch (_) {
+			continue;
+		}
+		if (!response?.ok) continue;
+		const data = await response.json().catch(() => null);
+		for (const answer of data?.Answer || []) {
+			const value = String(answer?.data || '').trim();
+			if (!value) continue;
+			// A/AAAA answers are normally IP literals; tolerate a provider that
+			// returns an IPv4 value for the AAAA slot without constructing an
+			// invalid bracketed URL.
+			const probe = type === 'AAAA' && value.includes(':') ? `http://[${value}]` : `http://${value}`;
+			if (!isSafePublicUrl(probe)) return false;
+			publicAnswer = true;
+		}
+	}
+	return publicAnswer;
+}
+
+function isIpLiteral(hostname) {
+	if (hostname.includes(':')) return true;
+	const parts = hostname.split('.').map(Number);
+	return parts.length === 4 && parts.every(part => Number.isInteger(part));
+}
+
 export default {
-	isSafePublicUrl
+	isSafePublicUrl,
+	assertSafePublicUrl
 };

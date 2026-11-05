@@ -1,8 +1,8 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import jwtUtils from '../src/utils/jwt-utils.js';
 import hashUtils from '../src/utils/hash-utils.js';
 import emailCryptoUtils from '../src/utils/email-crypto-utils.js';
-import { isSafePublicUrl } from '../src/utils/url-utils.js';
+import { isSafePublicUrl, assertSafePublicUrl } from '../src/utils/url-utils.js';
 import fileUtils from '../src/utils/file-utils.js';
 import { isAllowedObjectKey, normalizeObjectKey } from '../src/utils/object-key-utils.js';
 import { safeObjectHeaders } from '../src/utils/object-response.js';
@@ -109,6 +109,35 @@ describe('Network and storage boundaries', () => {
 		}
 		expect(isSafePublicUrl('https://s3.us-west-004.backblazeb2.com')).toBe(true);
 		expect(isSafePublicUrl('https://example.com/path')).toBe(true);
+	});
+
+	it('rejects DNS answers that resolve a public hostname into private space', async () => {
+		const privateDns = async () => ({ ok: true, json: async () => ({ Answer: [{ data: '10.0.0.7' }] }) });
+		const publicDns = async (url) => ({ ok: true, json: async () => ({ Answer: [{ data: url.includes('type=AAAA') ? '2606:4700:4700::1111' : '8.8.8.8' }] }) });
+		expect(await assertSafePublicUrl('https://storage.example.com', { fetchImpl: privateDns })).toBe(false);
+		expect(await assertSafePublicUrl('https://storage.example.com', { fetchImpl: publicDns })).toBe(true);
+		expect(await assertSafePublicUrl('https://127.0.0.1', { fetchImpl: publicDns })).toBe(false);
+	});
+
+	it('rejects DNS answers that point a BYO endpoint into private space', async () => {
+		const answer = (data) => new Response(JSON.stringify({ Status: 0, Answer: [{ data }] }), {
+			status: 200, headers: { 'Content-Type': 'application/dns-json' }
+		});
+		const fetchImpl = vi.fn(async (url) => {
+			const type = new URL(url).searchParams.get('type');
+			return type === 'A' ? answer('93.184.216.34') : answer('2606:2800:220:1:248:1893:25c8:1946');
+		});
+		await expect(assertSafePublicUrl('https://storage.example.com', { fetchImpl })).resolves.toBe(true);
+
+		const privateFetch = vi.fn(async (url) => {
+			const type = new URL(url).searchParams.get('type');
+			return type === 'A' ? answer('10.0.0.8') : answer('fd00::1');
+		});
+		await expect(assertSafePublicUrl('https://storage.example.com', { fetchImpl: privateFetch })).resolves.toBe(false);
+		await expect(assertSafePublicUrl('https://storage.example.com', {
+			fetchImpl: vi.fn(async () => { throw new Error('dns unavailable'); })
+		})).resolves.toBe(false);
+		await expect(assertSafePublicUrl('https://93.184.216.34', { fetchImpl })).resolves.toBe(true);
 	});
 
 	it('only allows object keys under attachments/ or static/', () => {
