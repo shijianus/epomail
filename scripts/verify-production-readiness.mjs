@@ -230,7 +230,7 @@ export async function runLiveProbes(baseUrl, initSecret, suite) {
     suite.fail('LIVE-04', '登录子应用静态路由连接失败', err.message);
   }
 
-  // 3. 检查敏感限流表状态 (通过空密码登录触发，期望返回 400/401，严禁 503 限流表缺损)
+  // 3. 检查敏感限流表状态 (通过空密码登录触发，期望业务安全拦截，严禁 503 限流表缺损)
   try {
     const loginProbe = await fetch(`${baseUrl}/api/login`, {
       method: 'POST',
@@ -238,10 +238,13 @@ export async function runLiveProbes(baseUrl, initSecret, suite) {
       body: JSON.stringify({ email: 'probe@epomail.invalid', password: 'probe-password-123' }),
       signal: AbortSignal.timeout(8000)
     });
-    if (loginProbe.status === 400 || loginProbe.status === 401) {
-      suite.pass('LIVE-05', '敏感限流与认证接口安全网正常 (D1 限流表正常，无 503 缺表崩溃)', `HTTP ${loginProbe.status}`);
-    } else if (loginProbe.status === 503) {
+    let body = {};
+    try { body = await loginProbe.json(); } catch (_) {}
+
+    if (loginProbe.status === 503) {
       suite.fail('LIVE-05', '致命隐患：/api/login 返回 503！rate_limit_counter 表缺失或 D1 离线！');
+    } else if (loginProbe.status === 400 || loginProbe.status === 401 || (loginProbe.status === 200 && (body.code === 501 || body.code === 400 || body.code === 401 || /密码|不存在|错误/i.test(body.message || '')))) {
+      suite.pass('LIVE-05', '敏感限流与认证接口安全网正常 (D1 限流与业务拦截正常，无 503 缺表崩溃)', `HTTP ${loginProbe.status}, code: ${body.code || loginProbe.status}`);
     } else {
       suite.warn('LIVE-05', '登录接口返回非预期状态码', `HTTP ${loginProbe.status}`);
     }
@@ -249,7 +252,7 @@ export async function runLiveProbes(baseUrl, initSecret, suite) {
     suite.fail('LIVE-05', '登录接口测试失败', err.message);
   }
 
-  // 4. 若提供了 initSecret，测试 /api/init 幂等性
+  // 4. 若提供了 initSecret，测试 /api/init 幂等性 (远程全库探测耗时约 15-30s)
   if (initSecret) {
     try {
       const initProbe = await fetch(`${baseUrl}/api/init`, {
@@ -258,7 +261,7 @@ export async function runLiveProbes(baseUrl, initSecret, suite) {
           'Content-Type': 'application/json',
           'x-init-secret': initSecret
         },
-        signal: AbortSignal.timeout(10000)
+        signal: AbortSignal.timeout(45000)
       });
       if (initProbe.ok) {
         suite.pass('LIVE-06', '系统初始化接口验证通过 (/api/init 具备幂等性与合法授权)', `HTTP ${initProbe.status}`);

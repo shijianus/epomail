@@ -1,3 +1,21 @@
+### Cloudflare 生产环境全量部署与在线实测验收 (2026-11-05)
+*   **关联提交 (Git Commit)**: 待提交后回填
+*   **部署环境 (Deployment)**: 生产 Cloudflare (Version ID: `625c1291-386f-4ff9-8d8c-465ca1422f4f`)，绑定域名 `mail.epocanvas.com`、`mail.epomail.bond`、`mail.epomail.cyou`、`epomail.epocanvas.workers.dev`。
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] Cloudflare Worker 与双端静态前端完整打包与发布至生产（Upload 438 files, gzip 1,192.12 KiB）。
+    - [x] 注入生产独立初始化机密 `init_secret` 至 Cloudflare Worker Secret 存储。
+    - [x] 远程触发 D1 生产数据库架构幂等升级与建表（`POST /api/init` 返回 HTTP 200 success）。
+    - [x] 远程核验新数据表 `rate_limit_counter` 与 `mail_forward_task` 已在生产 D1 (`epomail`) 成功创建。
+    - [x] 优化 `scripts/verify-production-readiness.mjs`：适配业务失败 HTTP 状态码分类，并适配远程 D1 跨网络迁移超时窗口。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] Cloudflare 部署验证：`wrangler deploy --env=""` 成功部署 (Version: `625c1291`)。
+    - [x] 生产就绪探针实测：`verify-production-readiness.mjs` 对 `https://mail.epocanvas.com` 执行 10 项全绿 (PASS=10, FAIL=0)。
+    - [x] 生产四域名 HTTP 连通性：`mail.epocanvas.com`、`mail.epomail.bond`、`mail.epomail.cyou`、`workers.dev` 均返回 HTTP 200。
+    - [x] 生产数据库与认证安全网：D1 `rate_limit_counter` 实体表生效，异常登录业务安全拦截 (HTTP 200/501)，无 503 限流表崩溃。
+    - [x] 零假数据残留：测试数据与探针均为只读/无害请求，零脏数据残留。
+
+---
+
 ### 生产发布运行手册与全自动化预检套件交付 (2026-11-05)
 *   **关联提交 (Git Commit)**: `9117187fc8135df1a8db4a33a93d2d174bbf9f64` (Short: `9117187`)
 *   **部署环境 (Deployment)**: 本地全真栈 / Cloudflare 生产预备；静态预检通过，未部署生产。

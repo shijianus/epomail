@@ -9,6 +9,23 @@
 
 ---
 
+### Cloudflare 生产环境全量发布与在线验证审计报告 (2026-11-05)
+*   **关联提交 (Git Commit)**: 待提交后回填；生产部署 Version ID: `625c1291-386f-4ff9-8d8c-465ca1422f4f`。
+*   **专项文档索引 (Detailed Doc)**: [生产发布运行手册](doc/production-release-runbook-2026-11-05.md)。
+*   **体检/审计范围与方法 (Scope & Methodology)**:
+    1. 范围：Cloudflare 生产环境全真栈（Worker + D1 + KV + Assets 托管）；覆盖 4 大生产访问端点（`mail.epocanvas.com`、`mail.epomail.bond`、`mail.epomail.cyou` 与 `workers.dev`）。
+    2. 工具与脚本：通过 Cloudflare CLI (`wrangler deploy`) 正式投产；使用 `verify-production-readiness.mjs` 与 curl 执行在线存活、公开配置、登录路由、MFA/限流安全网与 `/api/init` 幂等升级实测。
+*   **核心发现与缺陷矩阵 (Key Findings & Matrix)**:
+    - **[生产实测] 部署与静态资产分发**: 438 个前端与独立登录子应用静态资产全量同步成功，首屏响应返回 HTTP 200。
+    - **[生产实测] 数据库迁移与安全网**: 成功在远程 D1 (`epomail`) 创建 `rate_limit_counter` 和 `mail_forward_task`；敏感限流安全网杜绝了升级窗口 503 缺表隐患。
+    - **[生产实测] 接口鉴权与幂等初始化**: 通过 `x-init-secret` 调用 `/api/init` 成功完成幂等全量迁移，无任何 SQL 冲突。
+*   **治理修复与回归结果 (Fixes & Verification)**:
+    - 生产就绪预检套件在线实测 10 项全部通过（PASS=10, FAIL=0）；
+    - 生产环境四大域名全部连通（HTTP 200）；
+    - **最终交付结论：生产环境成功部署上线并完成全真栈验证，达到稳定可用的受控公测状态 (GO)。**
+
+---
+
 ### 生产上线准入核验与全量部署运行规程 (2026-11-05)
 *   **关联提交 (Git Commit)**: `9117187fc8135df1a8db4a33a93d2d174bbf9f64` (Short: `9117187`)；基线 freeze 候选 `a4f262337bf58aed6927bdff5a11999b3c26003a` (Short: `a4f2623`)。
 *   **专项文档索引 (Detailed Doc)**: [生产发布运行手册](doc/production-release-runbook-2026-11-05.md)。
