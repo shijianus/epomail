@@ -1,5 +1,5 @@
 ### 生产发布运行手册与全自动化预检套件交付 (2026-11-05)
-*   **关联提交 (Git Commit)**: 待提交后回填
+*   **关联提交 (Git Commit)**: `9117187fc8135df1a8db4a33a93d2d174bbf9f64` (Short: `9117187`)
 *   **部署环境 (Deployment)**: 本地全真栈 / Cloudflare 生产预备；静态预检通过，未部署生产。
 *   **功能需求与变更清单 (Changes & Feature Alignment)**:
     - [x] 新增生产发布运行手册 `doc/production-release-runbook-2026-11-05.md`：详细列明 6 大核心机密矩阵、D1 幂等升级命令、部署前后零停机 SOP、10 项 P2 生产处置指引与紧急秒级回滚/Point-in-Time 灾备方案。

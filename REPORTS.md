@@ -10,7 +10,7 @@
 ---
 
 ### 生产上线准入核验与全量部署运行规程 (2026-11-05)
-*   **关联提交 (Git Commit)**: 待提交后回填；基线 freeze 候选 `a4f262337bf58aed6927bdff5a11999b3c26003a` (Short: `a4f2623`)。
+*   **关联提交 (Git Commit)**: `9117187fc8135df1a8db4a33a93d2d174bbf9f64` (Short: `9117187`)；基线 freeze 候选 `a4f262337bf58aed6927bdff5a11999b3c26003a` (Short: `a4f2623`)。
 *   **专项文档索引 (Detailed Doc)**: [生产发布运行手册](doc/production-release-runbook-2026-11-05.md)。
 *   **体检/审计范围与方法 (Scope & Methodology)**:
     1. 范围：生产上线前置门禁、机密注入安全矩阵、D1 数据库与 Schema 幂等升级链、部署后自动化在线探针、10 项 P2 生产运维处置指引、秒级回滚与 D1 时间点恢复灾备预案。
